@@ -93,7 +93,40 @@ function segDist(p, a, b) {
 // ---------- renderer / scene ----------
 const canvas = $('#c');
 const viewportEl = $('#viewport');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+const params = new URLSearchParams(location.search);
+
+// Problems on a phone are otherwise invisible: show them over the viewport with GPU details.
+let fatal = false;
+let renderer;
+function gpuInfo() {
+  try {
+    const gl = renderer.getContext();
+    const ext = gl.getExtension('WEBGL_debug_renderer_info');
+    const name = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
+    return `${name} · WebGL${renderer.capabilities.isWebGL2 ? '2' : '1'} · ${renderer.capabilities.precision} precision`;
+  } catch (_) { return 'WebGL unavailable'; }
+}
+function showError(msg) {
+  if (fatal) return;
+  fatal = true;
+  const el = $('#loading');
+  el.hidden = false;
+  el.innerHTML = `<div class="err"><b>Something went wrong displaying the model.</b><p>${String(msg).replace(/</g, '&lt;')}</p><p class="muted">${renderer ? gpuInfo() : ''}<br>${navigator.userAgent.replace(/</g, '&lt;')}</p><p>Try reloading. If it keeps happening, send a screenshot of this message.</p></div>`;
+}
+window.addEventListener('error', (e) => showError(e.message || e.error));
+window.addEventListener('unhandledrejection', (e) => showError(e.reason?.message || e.reason));
+
+try {
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance', precision: params.get('precision') || 'highp' });
+} catch (err) {
+  showError(`WebGL could not start in this browser (${err.message}). Check that hardware acceleration is enabled in Chrome settings.`);
+  throw err;
+}
+renderer.debug.onShaderError = (gl, program, vs, fs) => {
+  const log = (sh) => (gl.getShaderInfoLog(sh) || '').trim();
+  showError(`Shader compile error: ${log(fs) || log(vs) || gl.getProgramInfoLog(program)}`);
+};
+canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); showError('The graphics context was lost (the GPU ran out of memory or was reset). Reload the page.'); });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 0.9;
@@ -101,9 +134,17 @@ renderer.localClippingEnabled = false;
 renderer.autoClear = false;
 
 const scene = new THREE.Scene();
-const pmrem = new THREE.PMREMGenerator(renderer);
-scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-scene.fog = new THREE.Fog(0x2a0c0a, 1e5, 1e6);
+// The generated environment map renders materials black on some mobile GPUs, so touch devices
+// use plain lights unless ?env=1 is given (?env=0 turns it off everywhere).
+const USE_ENV = params.has('env') ? params.get('env') !== '0' : !COARSE;
+if (USE_ENV) {
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+}
+// fog only matters inside the scope; outside it is pushed beyond the model. Keep the values below
+// ~65000 so they survive GPUs that run fragment shaders at medium precision.
+const FOG_OFF = [5000, 9000];
+scene.fog = new THREE.Fog(0x2a0c0a, FOG_OFF[0], FOG_OFF[1]);
 const BG_EXT = new THREE.Color(0x23262d);
 
 const extCam = new THREE.PerspectiveCamera(35, 1, 0.5, 2000);
@@ -117,7 +158,9 @@ const hemi = new THREE.HemisphereLight(0xffffff, 0x404858, 0.5);
 const scopeLight = new THREE.SpotLight(0xf4f7ff, 0, 60, 1.0, 0.6, 1.0);
 scene.add(keyLight, fillLight, hemi, scopeLight, scopeLight.target);
 // keep the light count constant between passes so shaders are not recompiled; only intensities change
-const LIGHTS = { ext: { key: 1.25, fill: 0.4, hemi: 0.2, scope: 0, env: 0.28 }, scope: { key: 0, fill: 0, hemi: 0.06, scope: 7, env: 0.04 } };
+const LIGHTS = USE_ENV
+  ? { ext: { key: 1.25, fill: 0.4, hemi: 0.2, scope: 0, env: 0.28 }, scope: { key: 0, fill: 0, hemi: 0.06, scope: 7, env: 0.04 } }
+  : { ext: { key: 1.6, fill: 0.6, hemi: 0.95, scope: 0, env: 0 }, scope: { key: 0, fill: 0, hemi: 0.1, scope: 7, env: 0 } };
 function lightPass(p) {
   keyLight.intensity = p.key; fillLight.intensity = p.fill; hemi.intensity = p.hemi; scopeLight.intensity = p.scope; scene.environmentIntensity = p.env;
 }
@@ -167,8 +210,13 @@ function materialFor(name, group) {
   return capMaterial(new THREE.MeshStandardMaterial({ color: COL.muscle, roughness: 0.7 }), 0x8a2e2c);
 }
 const GLSL_NOISE = `
-float h3(vec3 p){ p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
-float vnoise(vec3 x){ vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+#define NP highp
+#else
+#define NP mediump
+#endif
+NP float h3(NP vec3 p){ p = mod(p, 251.0); p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+float vnoise(NP vec3 x){ NP vec3 i = floor(x); vec3 f = fract(x); f = f * f * (3.0 - 2.0 * f);
   return mix(mix(mix(h3(i), h3(i + vec3(1,0,0)), f.x), mix(h3(i + vec3(0,1,0)), h3(i + vec3(1,1,0)), f.x), f.y),
              mix(mix(h3(i + vec3(0,0,1)), h3(i + vec3(1,0,1)), f.x), mix(h3(i + vec3(0,1,1)), h3(i + vec3(1,1,1)), f.x), f.y), f.z); }
 float fib(vec3 p){ return vnoise(p) * 0.6 + vnoise(p * 2.7 + 3.1) * 0.3 + vnoise(p * 6.3 + 7.7) * 0.1; }
@@ -1037,7 +1085,7 @@ function renderExt(r) {
   setVP(r);
   extCam.aspect = r.w / r.h; extCam.updateProjectionMatrix();
   lightPass(LIGHTS.ext);
-  scene.fog.near = 1e5; scene.fog.far = 1e6;
+  scene.fog.near = FOG_OFF[0]; scene.fog.far = FOG_OFF[1];
   const xr = state.xray && state.mode === 'oa';
   scene.background = xr ? new THREE.Color(0x050608) : BG_EXT;
   renderer.setClearColor(scene.background);
@@ -1095,6 +1143,11 @@ function pointIn(r) { return r && pointer.x >= r.x && pointer.x <= r.x + r.w && 
 
 let last = performance.now();
 function frame(now) {
+  if (fatal) return;
+  try { frameBody(now); } catch (err) { console.error(err); showError(`Render error: ${err.message}`); return; }
+  requestAnimationFrame(frame);
+}
+function frameBody(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
   if (tween) {
     tween.t = Math.min(1, tween.t + dt / 0.6); const k = sstep(0, 1, tween.t);
@@ -1121,7 +1174,6 @@ function frame(now) {
     if (state.swapped) { renderExt(rect.ext); renderScope(rect.scope); } else { renderScope(rect.scope); renderExt(rect.ext); }
   } else { if (state.section) updateClip(); renderExt(rect.ext); }
   updateOrient();
-  requestAnimationFrame(frame);
 }
 
 function dirName(v) {
@@ -1256,7 +1308,7 @@ function bindUI() {
   $('#resetScope').onclick = resetScope;
   $('#swapViews').onclick = () => { state.swapped = !state.swapped; resize(); };
   $('#resetJoint').onclick = () => { applyStage(state.stage); toast('Joint restored'); };
-  $('#aboutBtn').onclick = () => $('#about').showModal();
+  $('#aboutBtn').onclick = () => { $('#diag').textContent = `Graphics: ${gpuInfo()}${USE_ENV ? '' : ' · basic lighting'}`; $('#about').showModal(); };
   $('#panelToggle').onclick = () => { document.body.classList.toggle('panel-collapsed'); setTimeout(resize, 0); };
 
   window.addEventListener('keydown', (e) => {
@@ -1385,5 +1437,5 @@ bindUI();
 setMode('anatomy');
 load().then(() => { setMode('anatomy'); resize(); requestAnimationFrame(frame); }).catch((err) => {
   console.error(err);
-  $('#loading').textContent = `Could not load the model: ${err.message}`;
+  showError(`Could not load the model: ${err.message}`);
 });
