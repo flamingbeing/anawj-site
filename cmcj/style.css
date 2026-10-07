@@ -116,6 +116,17 @@ select { width: 100%; padding: 5px 6px; border-radius: 8px; border: 1px solid va
   padding: 8px 10px; border-radius: 8px; max-width: min(360px, 60%); pointer-events: none;
 }
 .hud .warn { color: #fdba74; } .hud .bad { color: #fca5a5; font-weight: 600; }
+.hud .hint { margin-top: 4px; font-size: 11px; color: rgba(255,255,255,.7); }
+.scope-ctl { position: absolute; left: 10px; bottom: 10px; display: grid; gap: 6px; justify-items: start; z-index: 2; }
+.scope-ctl .row { display: flex; align-items: center; gap: 4px; background: rgba(0,0,0,.6); padding: 4px; border-radius: 12px; }
+.scope-ctl button {
+  min-width: 44px; height: 40px; padding: 0 6px; border: 0; border-radius: 9px; background: rgba(255,255,255,.14); color: #fff;
+  font-size: 12px; cursor: pointer; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+}
+.scope-ctl button:hover { background: rgba(255,255,255,.24); }
+.scope-ctl button.active { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.scope-ctl button.big { font-size: 20px; line-height: 1; }
+.scope-ctl .lbl { font-size: 10px; color: rgba(255,255,255,.7); text-align: center; width: 30px; line-height: 1.1; }
 .orient { position: absolute; right: 12px; top: 12px; font-size: 11px; color: rgba(255,255,255,.7); text-align: right; pointer-events: none; line-height: 1.5; }
 .info {
   position: absolute; left: 12px; bottom: 12px; max-width: min(420px, calc(100% - 24px)); background: var(--panel);
@@ -156,7 +167,15 @@ dialog h2 { margin-top: 0; }
   .viewport { flex: 1 1 0; }
   .brand { overflow: hidden; text-overflow: ellipsis; }
 }
+@media (max-height: 500px) {
+  body.panel-collapsed .panel { display: none; }
+  #panelToggle { display: block; }
+}
 @media (max-width: 480px) {
+  .scope-ctl { left: 6px; bottom: 6px; }
+  .scope-ctl button { min-width: 40px; padding: 0 4px; font-size: 11px; }
+  .scope-ctl .lbl { display: none; }
+  .hud { max-width: calc(100% - 24px); font-size: 12px; }
   .brand { display: none; }
   .tabs { margin-left: 0; flex: 1; }
   .tabs button { flex: 1; font-size: 13px; padding: 6px 4px; }
