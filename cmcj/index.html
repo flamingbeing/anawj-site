@@ -132,6 +132,23 @@
     <canvas id="c"></canvas>
     <div id="insetFrame" class="inset-frame" hidden><span id="insetLabel">External view</span></div>
     <div id="hud" class="hud" hidden></div>
+    <div id="scopeCtl" class="scope-ctl" hidden>
+      <div class="row" role="toolbar" aria-label="Instrument">
+        <button data-tool="scope" class="active" title="Scope: drag to aim (1)">Scope</button>
+        <button data-tool="probe" title="Probe (2)">Probe</button>
+        <button data-tool="shaver" title="Shaver (3)">Shaver</button>
+        <button data-tool="burr" title="Burr (4)">Burr</button>
+        <button data-tool="grasper" title="Grasper (5)">Grasp</button>
+      </div>
+      <div class="row" role="toolbar" aria-label="Scope">
+        <button data-act="out" class="big" title="Withdraw scope (S)" aria-label="Withdraw scope">−</button>
+        <span class="lbl">in / out</span>
+        <button data-act="in" class="big" title="Advance scope (W)" aria-label="Advance scope">+</button>
+        <button data-act="rotL" class="big" title="Rotate 30° lens (Q)" aria-label="Rotate lens left">⟲</button>
+        <button data-act="rotR" class="big" title="Rotate 30° lens (E)" aria-label="Rotate lens right">⟳</button>
+        <button data-act="centre" class="big" title="Re-centre scope" aria-label="Re-centre scope">⌖</button>
+      </div>
+    </div>
     <div id="orient" class="orient"></div>
     <div id="info" class="info" hidden></div>
     <div id="quiz" class="quiz" hidden></div>

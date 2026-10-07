@@ -8,6 +8,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { STAGES, NOTES, INFO, GROUP_LABEL } from './content.js';
 
 const $ = (s) => document.querySelector(s);
+const COARSE = matchMedia('(pointer: coarse)').matches;
 const $$ = (s) => [...document.querySelectorAll(s)];
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
@@ -422,6 +423,7 @@ function applyThumb() {
   geo.thumbOff = off;
   geo.J = geo.cT.clone().add(geo.cF.clone().add(off)).multiplyScalar(0.5);
   fitCapsule();
+  if (state.mode === 'arthro') ensureScopeFree();
 }
 
 // ---------- capsule, synovium, loose bodies ----------
@@ -569,6 +571,7 @@ function buildPortals() {
   fill($('#scopePortal'), scope.portal); fill($('#workPortal'), scope.work);
   // danger structures, world-space vertex lists
   const vlist = (names) => names.flatMap((nm) => { const m = meshes[nm]; if (!m) return []; const p = m.geometry.attributes.position, a = []; for (let i = 0; i < p.count; i += 2) a.push(V(p.getX(i), p.getY(i), p.getZ(i))); return a; });
+  geo.collide = COLLIDE_NAMES.map((n) => meshes[n]).filter(Boolean);
   geo.artery = vlist(['Radial artery', 'Dorsal carpal anastomosis', 'Palmar carpal branch of radial artery']);
   geo.nerve = vlist(['Superficial branch of radial nerve', 'Dorsal digital branches of radial nerve']);
 }
@@ -592,13 +595,77 @@ function buildInstruments() {
   instrument.traverse((o) => { o.layers.set(1); o.layers.enable(2); });
   scene.add(instrument);
 }
+// ---------- scope collision ----------
+// The scope may not enter bone: its tip keeps SCOPE_CLEAR mm from bone surfaces and the shaft near the
+// tip keeps SHAFT_CLEAR mm. Signed distance uses the nearest vertex and its normal (negative = inside).
+const SCOPE_CLEAR = 0.8, SHAFT_CLEAR = 0.6;
+const COLLIDE_NAMES = ['Trapezium bone', 'First metacarpal bone', 'Scaphoid bone', 'Trapezoid bone', 'Second metacarpal bone', 'Proximal phalanx of first finger of hand'];
+const _cv = new THREE.Vector3();
+function boneClearance(p, limit = 4) {
+  let best = Infinity;
+  for (const m of geo.collide) {
+    const g = m.geometry;
+    if (!g.boundingBox) g.computeBoundingBox();
+    const lp = m.worldToLocal(_cv.copy(p)), bb = g.boundingBox;
+    if (lp.x < bb.min.x - limit || lp.y < bb.min.y - limit || lp.z < bb.min.z - limit || lp.x > bb.max.x + limit || lp.y > bb.max.y + limit || lp.z > bb.max.z + limit) continue;
+    const pos = g.attributes.position.array, nrm = g.attributes.normal.array;
+    let bi = -1, bd = Infinity;
+    for (let i = 0, n = pos.length; i < n; i += 3) {
+      const dx = lp.x - pos[i], dy = lp.y - pos[i + 1], dz = lp.z - pos[i + 2], d = dx * dx + dy * dy + dz * dz;
+      if (d < bd) { bd = d; bi = i; }
+    }
+    const sd = (lp.x - pos[bi]) * nrm[bi] + (lp.y - pos[bi + 1]) * nrm[bi + 1] + (lp.z - pos[bi + 2]) * nrm[bi + 2];
+    best = Math.min(best, sd < 0 ? -Math.sqrt(bd) : Math.sqrt(bd));
+  }
+  return best;
+}
+function tipAt(dir, depth) { return geo.portals[scope.portal].entry.clone().addScaledVector(dir, depth); }
+function tipFree(dir, depth) { return boneClearance(tipAt(dir, depth)) > SCOPE_CLEAR; }
+// whole scope line is free: tip plus the last 10 mm of shaft (the rest is soft tissue)
+function lineFree(dir, depth) {
+  if (!tipFree(dir, depth)) return false;
+  for (let d = depth - 0.75; d > Math.max(0, depth - 10); d -= 0.75) if (boneClearance(tipAt(dir, d)) <= SHAFT_CLEAR) return false;
+  return true;
+}
+// furthest depth reachable by advancing along dir from `from` towards `to` without touching bone
+function reachDepth(dir, from, to) {
+  let d = from;
+  while (d < to) { const n = Math.min(to, d + 0.2); if (!tipFree(dir, n)) return d; d = n; }
+  return d;
+}
+let bumpTime = 0;
+function bump() { const n = performance.now(); if (n - bumpTime > 1500) { toast('Scope tip against bone'); bumpTime = n; } scope.bumped = n; }
+function setDepth(d) {
+  d = clamp(d, 0, scope.maxDepth);
+  if (d > scope.depth) { const r = reachDepth(scope.dir, scope.depth, d); if (r < d - 1e-3) bump(); d = r; }
+  scope.depth = d; syncScopeUI();
+}
+function rollLens(deg) { scope.roll = ((scope.roll + deg + 540) % 360) - 180; syncScopeUI(); }
+// after the joint moves (stage, traction, burring) back the scope out until it is clear again
+function ensureScopeFree() {
+  if (!geo.portals || scope.dir.lengthSq() === 0) return;
+  let d = scope.depth, moved = false;
+  while (d > 0 && !lineFree(scope.dir, d)) { d = Math.max(0, d - 0.25); moved = true; }
+  if (moved) { scope.depth = d; syncScopeUI(); toast('Scope withdrawn to clear bone'); }
+}
 function resetScope() {
   const e = geo.portals[scope.portal].entry;
   const target = geo.J.clone();
-  scope.dir = target.clone().sub(e).normalize();
-  scope.home = scope.dir.clone();
+  const base = target.clone().sub(e).normalize();
+  const want = e.distanceTo(target) - 1.5;
   scope.maxDepth = e.distanceTo(target) + 9;
-  scope.depth = e.distanceTo(target) - 2.5;
+  // aim at the joint centre; if bone blocks the straight path, try nearby directions and keep the deepest
+  const up = perp(geo.nJ, base), right = base.clone().cross(up).normalize();
+  let best = { dir: base, d: -1 };
+  for (const [a, b] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1], [2, 0], [-2, 0], [0, 2], [0, -2]]) {
+    const dir = base.clone().addScaledVector(up, a * 0.07).addScaledVector(right, b * 0.07).normalize();
+    const d = reachDepth(dir, 0, want);
+    if (d > best.d + 0.3) best = { dir, d };
+    if (d >= want) break;
+  }
+  scope.dir = best.dir.clone();
+  scope.home = best.dir.clone();
+  scope.depth = Math.max(0, best.d - 0.3);
   scope.roll = 0;
   $('#depth').max = scope.maxDepth.toFixed(1);
   syncScopeUI();
@@ -843,6 +910,12 @@ function setMode(m) {
   if (m === 'anatomy' && state.stage !== 0) applyStage(0);
   if (m !== 'oa') { state.xray = false; $('#xrayOn').checked = false; state.heat = false; $('#heatOn').checked = false; }
   if (m === 'oa' && state.stage === 0) applyStage(2);
+  const small = matchMedia('(max-width: 820px), (max-height: 500px)').matches;
+  if (small) {
+    const collapse = m === 'arthro';
+    if (collapse && !document.body.classList.contains('panel-collapsed')) toast('Tap ☰ for stage, portals and tasks');
+    document.body.classList.toggle('panel-collapsed', collapse);
+  }
   if (m === 'arthro') {
     if (state.stage === 0) applyStage(2);
     state.section = false; $('#sectionOn').checked = false; $('#sectionCtl').hidden = true;
@@ -944,7 +1017,7 @@ function resize() {
     else { const ss = Math.min(W * 0.34, 300); rect.ext = { x: 0, y: 0, w: W, h: H }; rect.scope = { x: W - ss - 10, y: H - ss - 10, w: ss, h: ss }; }
   } else { rect.ext = { x: 0, y: 0, w: W, h: H }; rect.scope = null; }
   const frame = $('#insetFrame');
-  frame.hidden = !arth; $('#hud').hidden = !arth;
+  frame.hidden = !arth; $('#hud').hidden = !arth; $('#scopeCtl').hidden = !arth || state.swapped;
   if (arth) {
     const sR = rect.scope;
     const iR = state.swapped ? sR : rect.ext;
@@ -972,10 +1045,28 @@ function renderExt(r) {
   renderer.clear();
   renderer.render(scene, extCam);
 }
+// arthroscopy cameras auto-expose: dim the light source as the lens nears a surface
+let exposure = { t: 0, gain: 1 };
+function autoExposure() {
+  const n = performance.now(); if (n - exposure.t < 100) return exposure.gain; exposure.t = n;
+  raycaster.setFromCamera({ x: 0, y: 0 }, scopeCam); raycaster.layers.set(2); raycaster.layers.enable(0);
+  const near = [];
+  for (const [x, y] of [[0, 0], [0.4, 0.4], [-0.4, 0.4], [0.4, -0.4], [-0.4, -0.4]]) {
+    raycaster.setFromCamera({ x, y }, scopeCam);
+    const h = raycaster.intersectObjects(toolTargets(), false)[0];
+    near.push(h ? h.distance : 12);
+  }
+  near.sort((a, b) => a - b);
+  const d = (near[1] + near[2]) / 2;
+  const target = clamp(Math.pow(d / 4, 1.7), 0.06, 1.6);
+  exposure.gain = lerp(exposure.gain, target, 0.5);
+  return exposure.gain;
+}
 function renderScope(r) {
   setVP(r);
   scopeCam.aspect = r.w / r.h; scopeCam.updateProjectionMatrix();
   lightPass(LIGHTS.scope);
+  scopeLight.intensity = LIGHTS.scope.scope * autoExposure();
   scene.fog.color.setHex(0x1e0907); scene.fog.near = 6; scene.fog.far = 38;
   scene.background = new THREE.Color(0x000000);
   renderer.setClearColor(0x000000);
@@ -1016,7 +1107,7 @@ function frame(now) {
     hoverHit = null;
     if (state.tool !== 'scope' && pointIn(rect.scope)) {
       hoverHit = scopeRaycast();
-      if (pointer.down && pointer.inScope && hoverHit) applyTool(hoverHit, dt);
+      if (pointer.down && pointer.inScope && !pointer.aim && hoverHit) applyTool(hoverHit, dt);
     }
     placeInstrument(hoverHit ? hoverHit.point : null);
     updateHud();
@@ -1051,9 +1142,11 @@ function updateHud() {
   }).join('') + '<div class="muted" style="font-size:12px">Distances from the instrument tract to the nearest Z-Anatomy vessel/nerve vertex. Skin is not modelled.</div>';
   const look = dirName(f.view);
   let html = `<div><b>${geo.portals[scope.portal].label}</b> · 30° lens looking ${look}</div><div>Depth ${scope.depth.toFixed(1)} mm${state.traction ? ' · traction on' : ''}</div>`;
+  if (performance.now() - (scope.bumped || 0) < 800) html += '<div class="warn">Against bone</div>';
   if (scope.inBone) html += '<div class="bad">Scope tip inside bone. Withdraw.</div>';
   else if (!scope.inJoint) html += '<div class="warn">Outside the joint capsule: advance the scope</div>';
   if (state.tool !== 'scope') html += `<div>${state.tool[0].toUpperCase() + state.tool.slice(1)} via ${scope.work}${hoverHit ? ` · on ${hitLabel(hoverHit)}` : ''}</div>`;
+  html += `<div class="hint">${COARSE ? 'Drag: aim / use tool · pinch: in–out · two fingers: aim' : 'Drag: aim / use tool · right-drag: aim · scroll or W/S: in–out · Q/E: lens'}</div>`;
   $('#hud').innerHTML = html;
   if (scope.everInJoint) renderTasksThrottled();
 }
@@ -1158,7 +1251,7 @@ function bindUI() {
   $('#workPortal').onchange = (e) => { scope.work = e.target.value; if (scope.work === scope.portal) toast('Use a different portal for the instrument'); };
   $('#tractionOn').onchange = (e) => { state.traction = e.target.checked; applyThumb(); if (!state.traction) toast('Without traction the joint space is too tight to work in'); };
   $('#toolSeg').addEventListener('click', (e) => { const b = e.target.closest('[data-tool]'); if (b) setTool(b.dataset.tool); });
-  $('#depth').oninput = (e) => { scope.depth = +e.target.value; syncScopeUI(); };
+  $('#depth').oninput = (e) => { setDepth(+e.target.value); };
   $('#roll').oninput = (e) => { scope.roll = +e.target.value; syncScopeUI(); };
   $('#resetScope').onclick = resetScope;
   $('#swapViews').onclick = () => { state.swapped = !state.swapped; resize(); };
@@ -1171,33 +1264,60 @@ function bindUI() {
     if (state.mode === 'arthro') {
       const tools = ['scope', 'probe', 'shaver', 'burr', 'grasper'];
       if (e.key >= '1' && e.key <= '5') setTool(tools[+e.key - 1]);
-      if (e.key === 'q' || e.key === 'Q') { scope.roll = ((scope.roll - 10 + 540) % 360) - 180; syncScopeUI(); }
-      if (e.key === 'e' || e.key === 'E') { scope.roll = ((scope.roll + 10 + 540) % 360) - 180; syncScopeUI(); }
-      if (e.key === 'w' || e.key === 'ArrowUp') { scope.depth = clamp(scope.depth + 0.5, 0, scope.maxDepth); syncScopeUI(); }
-      if (e.key === 's' || e.key === 'ArrowDown') { scope.depth = clamp(scope.depth - 0.5, 0, scope.maxDepth); syncScopeUI(); }
+      if (e.key === 'q' || e.key === 'Q') rollLens(-10);
+      if (e.key === 'e' || e.key === 'E') rollLens(10);
+      if (e.key === 'w' || e.key === 'ArrowUp') { e.preventDefault(); setDepth(scope.depth + 0.5); }
+      if (e.key === 's' || e.key === 'ArrowDown') { e.preventDefault(); setDepth(scope.depth - 0.5); }
     }
   });
 
+  // Pointer input. In the scope view: one finger / left button uses the selected tool (the Scope tool aims);
+  // right button always aims; two fingers pinch to advance/withdraw and drag to aim.
+  const touches = new Map();
+  let gesture = null;
+  const local = (e) => { const r = canvas.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
+  const twoFinger = () => { const [p, q] = [...touches.values()]; return { dist: Math.hypot(p.x - q.x, p.y - q.y), mx: (p.x + q.x) / 2, my: (p.y + q.y) / 2 }; };
+  canvas.addEventListener('contextmenu', (e) => { if (state.mode === 'arthro') e.preventDefault(); });
   canvas.addEventListener('pointerdown', (e) => {
-    const r = canvas.getBoundingClientRect();
-    pointer.x = e.clientX - r.left; pointer.y = e.clientY - r.top; pointer.lastX = pointer.x; pointer.lastY = pointer.y;
+    const p = local(e);
+    touches.set(e.pointerId, p);
+    const inScope = state.mode === 'arthro' && pointIn(rect.scope);
+    if (inScope) { try { canvas.setPointerCapture(e.pointerId); } catch (_) { /* synthetic event */ } }
+    if (touches.size === 2 && state.mode === 'arthro') {
+      // second finger: switch from tool use to pinch/aim
+      gesture = twoFinger(); pointer.down = false; pointer.inScope = false;
+      return;
+    }
+    if (touches.size > 2) return;
+    pointer.x = p.x; pointer.y = p.y; pointer.lastX = p.x; pointer.lastY = p.y;
     pointer.down = true; pointer.moved = 0; pointer.button = e.button;
-    pointer.inScope = state.mode === 'arthro' && pointIn(rect.scope);
-    if (pointer.inScope) canvas.setPointerCapture(e.pointerId);
-    if (pointer.inScope && state.tool === 'probe') { const h = scopeRaycast(); if (h) applyTool(h, 0); }
+    pointer.inScope = inScope;
+    pointer.aim = state.tool === 'scope' || e.button === 2;
+    if (inScope && !pointer.aim && state.tool === 'probe') { const h = scopeRaycast(); if (h) applyTool(h, 0); }
   });
   canvas.addEventListener('pointermove', (e) => {
-    const r = canvas.getBoundingClientRect();
-    pointer.x = e.clientX - r.left; pointer.y = e.clientY - r.top;
+    const p = local(e);
+    if (touches.has(e.pointerId)) touches.set(e.pointerId, p);
+    if (gesture && touches.size >= 2) {
+      const g = twoFinger();
+      setDepth(scope.depth + (g.dist - gesture.dist) * 0.035);
+      pivotScope(g.mx - gesture.mx, g.my - gesture.my);
+      gesture = g;
+      return;
+    }
+    if (gesture) return;
+    pointer.x = p.x; pointer.y = p.y;
     const dx = pointer.x - pointer.lastX, dy = pointer.y - pointer.lastY; pointer.lastX = pointer.x; pointer.lastY = pointer.y;
     if (pointer.down) pointer.moved += Math.abs(dx) + Math.abs(dy);
-    if (pointer.down && pointer.inScope && state.tool === 'scope') pivotScope(dx, dy);
+    if (pointer.down && pointer.inScope && pointer.aim) pivotScope(dx, dy);
   });
   const up = (e) => {
+    touches.delete(e.pointerId);
+    try { canvas.releasePointerCapture(e.pointerId); } catch (_) { /* not captured */ }
+    if (gesture) { if (touches.size < 2) gesture = null; if (touches.size === 0) pointer.down = false; return; }
     if (!pointer.down) return;
     pointer.down = false;
     if (pointer.moved < 5 && state.mode !== 'arthro' && pointIn(rect.ext)) { if ($('#quiz').hidden) pick(); }
-    if (pointer.inScope) { try { canvas.releasePointerCapture(e.pointerId); } catch (_) { /* not captured */ } }
     pointer.inScope = false; renderTasks();
   };
   canvas.addEventListener('pointerup', up);
@@ -1205,22 +1325,49 @@ function bindUI() {
   canvas.addEventListener('wheel', (e) => {
     if (state.mode === 'arthro' && pointIn(rect.scope)) {
       e.preventDefault(); e.stopImmediatePropagation();
-      scope.depth = clamp(scope.depth - Math.sign(e.deltaY) * 0.4, 0, scope.maxDepth); syncScopeUI();
+      setDepth(scope.depth - Math.sign(e.deltaY) * 0.4);
     }
   }, { passive: false, capture: true });
+
+  // on-screen scope controls (touch friendly): hold +/- or the lens buttons to repeat
+  const ctl = $('#scopeCtl');
+  ctl.addEventListener('click', (e) => { const b = e.target.closest('[data-tool]'); if (b) setTool(b.dataset.tool); });
+  const acts = { in: () => setDepth(scope.depth + 0.3), out: () => setDepth(scope.depth - 0.3), rotL: () => rollLens(-6), rotR: () => rollLens(6), centre: resetScope };
+  let rep = null;
+  const stopRep = () => { clearTimeout(rep); clearInterval(rep); rep = null; };
+  ctl.querySelectorAll('[data-act]').forEach((b) => {
+    b.addEventListener('pointerdown', (e) => {
+      e.preventDefault(); stopRep();
+      const f = acts[b.dataset.act]; f();
+      if (b.dataset.act !== 'centre') rep = setTimeout(() => { rep = setInterval(f, 60); }, 300);
+    });
+    for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) b.addEventListener(ev, stopRep);
+    b.addEventListener('contextmenu', (e) => e.preventDefault());
+  });
   new ResizeObserver(resize).observe(viewportEl);
 }
 function pivotScope(dx, dy) {
   const f = scopeFrame();
   const k = 0.0035;
-  const q1 = new THREE.Quaternion().setFromAxisAngle(f.up, -dx * k);
-  const q2 = new THREE.Quaternion().setFromAxisAngle(f.right, -dy * k);
-  const nd = scope.dir.clone().applyQuaternion(q1).applyQuaternion(q2).normalize();
-  if (nd.angleTo(scope.home) < THREE.MathUtils.degToRad(55)) scope.dir.copy(nd);
+  // split big drags into small steps so the scope slides along bone instead of jumping through it
+  const steps = Math.max(1, Math.ceil((Math.abs(dx) + Math.abs(dy)) * k / 0.02));
+  for (let i = 0; i < steps; i++) {
+    let moved = false;
+    for (const [ax, ay] of [[dx, dy], [dx, 0], [0, dy]]) {
+      if (!ax && !ay) continue;
+      const q1 = new THREE.Quaternion().setFromAxisAngle(f.up, (-ax * k) / steps);
+      const q2 = new THREE.Quaternion().setFromAxisAngle(f.right, (-ay * k) / steps);
+      const nd = scope.dir.clone().applyQuaternion(q1).applyQuaternion(q2).normalize();
+      if (nd.angleTo(scope.home) >= THREE.MathUtils.degToRad(55)) continue;
+      if (!lineFree(nd, scope.depth)) continue;
+      scope.dir.copy(nd); moved = true; break;
+    }
+    if (!moved) { bump(); break; }
+  }
 }
 function setTool(t) {
   state.tool = t;
-  $$('#toolSeg button').forEach((b) => b.classList.toggle('active', b.dataset.tool === t));
+  $$('[data-tool]').forEach((b) => b.classList.toggle('active', b.dataset.tool === t));
   canvas.style.cursor = t === 'scope' ? 'grab' : 'crosshair';
   applyVisibility();
   if (t !== 'scope' && state.swapped) { state.swapped = false; resize(); }
@@ -1228,7 +1375,7 @@ function setTool(t) {
 
 // handle for debugging and automated checks in the browser console
 window.__cmcj = {
-  state, scope, JB, geo: () => geo, applyStage, setTool, taskList, stats, setView,
+  state, scope, JB, geo: () => geo, applyStage, setTool, taskList, stats, setView, setDepth, pivotScope, resetScope, boneClearance, tip: () => scopeFrame().tip, inCap: () => insideCapsule(scopeFrame().tip),
   apply(nx, ny, secs) { raycaster.setFromCamera({ x: nx, y: ny }, scopeCam); raycaster.layers.set(2); raycaster.layers.enable(0); for (let t = 0; t < secs; t += 0.05) { const h = raycaster.intersectObjects(toolTargets(), false)[0]; if (h) applyTool(h, 0.05); for (const k in JB) JB[k].update(); } },
   probe(nx, ny) { raycaster.setFromCamera({ x: nx, y: ny }, scopeCam); raycaster.layers.set(2); raycaster.layers.enable(0); const h = raycaster.intersectObjects(toolTargets(), false)[0]; return h ? `${hitLabel(h)}:${h.object.userData.zname.slice(0,6)} @ ${h.distance.toFixed(1)}` : "none"; },
 };

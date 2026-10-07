@@ -110,7 +110,7 @@ export const NOTES = {
 <li><b>III</b>: hemitrapeziectomy (often around 3–5 mm of the distal trapezium) ± interposition, or convert to open surgery</li>
 </ul>
 <h3>Controls</h3>
-<p class="muted"><b>Scope tool</b>: drag in the scope view to pivot the scope around its portal, scroll (or the slider) to advance/withdraw, <kbd>Q</kbd>/<kbd>E</kbd> to rotate the 30° lens. <b>Instruments</b> (<kbd>2</kbd>–<kbd>5</kbd>) come in through the working portal: press and hold on a surface to use them.</p>`,
+<p class="muted">Use the toolbar at the bottom left of the scope view. <b>In / out</b>: hold <b>+</b> / <b>−</b>, pinch with two fingers, scroll, or <kbd>W</kbd>/<kbd>S</kbd>. <b>Aim</b>: with <b>Scope</b> selected, drag in the view; with an instrument selected, drag with two fingers or the right mouse button. The scope pivots around its portal. <b>Lens</b>: ⟲ / ⟳ or <kbd>Q</kbd>/<kbd>E</kbd> rotate the 30° view. <b>Instruments</b> enter through the working portal: press and hold on a surface to use them. The scope stops at bone; burr bone away to make room.</p>`,
 };
 
 // Short descriptions for structures picked in the viewer. Keys are Z-Anatomy object names.
