@@ -342,6 +342,7 @@ class JointBone {
     }
     this.g.attributes.position.needsUpdate = true; this.g.attributes.color.needsUpdate = true; this.g.attributes.scl.needsUpdate = true;
     this.g.computeVertexNormals(); this.g.computeBoundingSphere(); this.g.computeBoundingBox();
+    this.g.userData.ver = (this.g.userData.ver || 0) + 1;
     if (!this.cart) return;
     const cg = this.cart.geometry, cp = cg.attributes.position.array, cc = cg.attributes.color.array, cr = cg.attributes.rough.array;
     const healthy = [0.72, 0.82, 0.96], worn = [0.92, 0.85, 0.64];
@@ -366,6 +367,7 @@ class JointBone {
     }
     cg.attributes.position.needsUpdate = true; cg.attributes.color.needsUpdate = true; cg.attributes.rough.needsUpdate = true;
     cg.computeVertexNormals(); cg.computeBoundingSphere(); cg.computeBoundingBox();
+    cg.userData.ver = (cg.userData.ver || 0) + 1;
   }
   nearest(localP) {
     let best = -1, bd = Infinity;
@@ -510,8 +512,11 @@ function buildCapsule() {
   fronds.frustumCulled = false;
   scene.add(fronds);
   const rnd = mulberry(7);
-  for (let k = 0; k < 2000 && frondData.length < 520; k++) {
+  for (let k = 0; k < 4000 && frondData.length < 520; k++) {
     const u = V(rnd() * 2 - 1, rnd() * 2 - 1, rnd() * 2 - 1); if (u.lengthSq() > 1 || u.lengthSq() < 0.05) continue;
+    u.normalize();
+    // keep candidates near the capsule equator (the joint line); the axis is fixed later in layoutFronds
+    if (Math.min(Math.abs(u.x), Math.abs(u.y), Math.abs(u.z)) > 0.35) continue;
     u.normalize();
     frondData.push({ u, len: 1.2 + rnd() * 2.2, tilt: V(rnd() - 0.5, rnd() - 0.5, rnd() - 0.5).multiplyScalar(2.2), hue: rnd(), removed: false, ok: true });
   }
@@ -557,6 +562,20 @@ function fitCapsule() {
   layoutFronds(); layoutLoose();
 }
 function insideCapsule(p) { return p.clone().applyMatrix4(geo.capInv).length() < 1; }
+// In the simulator, synovitis is only placed where an instrument can reach it from at least one portal
+// (the recesses at the articular margin); villi hidden behind the saddle could never be treated.
+function frondReachable(f, base) {
+  if (state.mode !== 'arthro' || !geo.portals || !geo.collide) return true;
+  const n0 = geo.capCentre.clone().sub(base).normalize();
+  const inward = n0.clone().add(f.tilt.clone().addScaledVector(n0, -f.tilt.dot(n0)).clampLength(0, 0.9)).normalize();
+  const q = base.clone().addScaledVector(inward, Math.min(1.6, f.len * 0.6));
+  for (const k in geo.portals) {
+    const e = geo.portals[k].entry, d = q.clone().sub(e), len = d.length();
+    d.divideScalar(len);
+    if (lineClear(e, d, len - 1.0, 0.7, INST_SHAFT_CLEAR)) return true;
+  }
+  return false;
+}
 function layoutFronds() {
   const P = STAGE_P[state.stage];
   const mtx = new THREE.Matrix4(), q = new THREE.Quaternion(), col = new THREE.Color();
@@ -566,10 +585,13 @@ function layoutFronds() {
     const base = f.u.clone().applyMatrix4(geo.capM);
     // synovitis concentrates at the capsular reflections around the articular margins
     const eq = Math.abs(f.u.dot(new THREE.Vector3().setComponent(geo.capNi, 1)));
-    f.ok = k < P.fronds && eq < 0.6 && !insideBones(base);
+    f.ok = k < P.fronds && eq < 0.6 && !insideBones(base) && frondReachable(f, base);
     const show = f.ok && !f.removed;
     if (f.ok) active++;
-    const inward = geo.capCentre.clone().sub(base).normalize().add(f.tilt).normalize();
+    // villi lean randomly but always point into the joint, never out through the capsule
+    const n0 = geo.capCentre.clone().sub(base).normalize();
+    const lean = f.tilt.clone().addScaledVector(n0, -f.tilt.dot(n0)).clampLength(0, 0.9);
+    const inward = n0.clone().add(lean).normalize();
     q.setFromUnitVectors(V(0, 1, 0), inward);
     const s = show ? f.len * (0.7 + 0.5 * P.hyper) : 0;
     mtx.compose(base.addScaledVector(inward, -0.15), q, V(show ? 1 : 0, s, show ? 1 : 0));
@@ -619,7 +641,7 @@ function buildPortals() {
   fill($('#scopePortal'), scope.portal); fill($('#workPortal'), scope.work);
   // danger structures, world-space vertex lists
   const vlist = (names) => names.flatMap((nm) => { const m = meshes[nm]; if (!m) return []; const p = m.geometry.attributes.position, a = []; for (let i = 0; i < p.count; i += 2) a.push(V(p.getX(i), p.getY(i), p.getZ(i))); return a; });
-  geo.collide = COLLIDE_NAMES.map((n) => meshes[n]).filter(Boolean);
+  geo.collide = [...COLLIDE_NAMES.map((n) => meshes[n]).filter(Boolean), JB.T.cart, JB.F.cart];
   geo.artery = vlist(['Radial artery', 'Dorsal carpal anastomosis', 'Palmar carpal branch of radial artery']);
   geo.nerve = vlist(['Superficial branch of radial nerve', 'Dorsal digital branches of radial nerve']);
 }
@@ -631,56 +653,118 @@ function buildInstruments() {
   marker.layers.set(1); scopeMesh.userData.marker = marker; scene.add(marker);
   instrument = new THREE.Group();
   const sh = new THREE.Mesh(shaft.clone(), new THREE.MeshStandardMaterial({ color: 0xb8bfc7, metalness: 0.95, roughness: 0.22 }));
-  sh.scale.set(0.8, 1, 0.8); instrument.add(sh); instrument.userData.shaft = sh;
+  sh.scale.set(INST_R / 0.95, 1, INST_R / 0.95); instrument.add(sh); instrument.userData.shaft = sh;
+  // tip shapes: origin at the instrument tip, +Y back up the shaft. Each fits inside TOOL_CLEAR of the tip
+  // plus the shaft radius, so what collides is what is drawn.
+  const dark = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.5, roughness: 0.5 });
   const tips = {
-    probe: (() => { const g = new THREE.Group(); const c = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 1.6, 10), sh.material); c.rotation.z = Math.PI / 2; c.position.x = 0.8; g.add(c); const b = new THREE.Mesh(new THREE.SphereGeometry(0.4, 12, 10), sh.material); b.position.x = 1.6; g.add(b); return g; })(),
-    shaver: (() => { const g = new THREE.Group(); const c = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 1.2, 18), sh.material); c.position.y = -0.4; g.add(c); const w = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.8, 0.5), new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.5, roughness: 0.5 })); w.position.set(0, -0.6, 0.6); g.add(w); return g; })(),
-    burr: (() => { const g = new THREE.Group(); const b = new THREE.Mesh(new THREE.IcosahedronGeometry(1.0, 1), new THREE.MeshStandardMaterial({ color: 0xd4af37, metalness: 0.9, roughness: 0.35, flatShading: true })); g.add(b); return g; })(),
-    grasper: (() => { const g = new THREE.Group(); for (const s of [-1, 1]) { const j = new THREE.Mesh(new THREE.BoxGeometry(0.35, 1.8, 0.9), sh.material); j.position.set(s * 0.45, 0.2, 0); j.rotation.z = s * 0.25; g.add(j); } return g; })(),
+    probe: (() => { const g = new THREE.Group(); const c = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 1.2, 10), sh.material); c.position.y = 0.6; g.add(c); const hk = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.6, 8), sh.material); hk.rotation.z = Math.PI / 2; hk.position.set(0.3, 0.1, 0); g.add(hk); const b = new THREE.Mesh(new THREE.SphereGeometry(0.24, 10, 8), sh.material); b.position.set(0.55, 0.1, 0); g.add(b); return g; })(),
+    shaver: (() => { const g = new THREE.Group(); const c = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 1.5, 18), sh.material); c.position.y = 0.75; g.add(c); const w = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.7, 0.2), dark); w.position.set(0, 0.5, 0.52); g.add(w); return g; })(),
+    burr: (() => { const g = new THREE.Group(); const b = new THREE.Mesh(new THREE.IcosahedronGeometry(0.75, 1), new THREE.MeshStandardMaterial({ color: 0xd4af37, metalness: 0.9, roughness: 0.35, flatShading: true })); g.add(b); return g; })(),
+    grasper: (() => { const g = new THREE.Group(); for (const sg of [-1, 1]) { const j = new THREE.Mesh(new THREE.BoxGeometry(0.25, 1.4, 0.6), sh.material); j.position.set(sg * 0.3, 0.7, 0); j.rotation.z = -sg * 0.15; g.add(j); } return g; })(),
   };
   for (const k in tips) { tips[k].visible = false; instrument.add(tips[k]); }
   instrument.userData.tips = tips;
   instrument.traverse((o) => { o.layers.set(1); o.layers.enable(2); });
   scene.add(instrument);
 }
-// ---------- scope collision ----------
-// The scope may not enter bone: its tip keeps SCOPE_CLEAR mm from bone surfaces and the shaft near the
-// tip keeps SHAFT_CLEAR mm. Signed distance uses the nearest vertex and its normal (negative = inside).
-const SCOPE_CLEAR = 0.8, SHAFT_CLEAR = 0.6;
+// ---------- collision for scope and instruments ----------
+// Neither scope nor instruments may enter bone or articular cartilage. Clearance is a signed distance to
+// the nearest vertex along its normal (negative = inside); moves are also rejected if the tip's path
+// crosses a surface, so nothing can tunnel through a thin edge in one step.
+// clearances equal the drawn radii: 1.9 mm scope; instruments have a 1.1 mm shaft
+const SCOPE_CLEAR = 0.95, SHAFT_CLEAR = 0.95;
+const TOOL_CLEAR = { probe: 0.7, shaver: 0.65, burr: 0.78, grasper: 0.7 };
+const INST_R = 0.55, INST_SHAFT_CLEAR = 0.6;
 const COLLIDE_NAMES = ['Trapezium bone', 'First metacarpal bone', 'Scaphoid bone', 'Trapezoid bone', 'Second metacarpal bone', 'Proximal phalanx of first finger of hand'];
 const _cv = new THREE.Vector3();
-function boneClearance(p, limit = 4) {
-  let best = Infinity;
-  for (const m of geo.collide) {
-    const g = m.geometry;
-    if (!g.boundingBox) g.computeBoundingBox();
-    const lp = m.worldToLocal(_cv.copy(p)), bb = g.boundingBox;
-    if (lp.x < bb.min.x - limit || lp.y < bb.min.y - limit || lp.z < bb.min.z - limit || lp.x > bb.max.x + limit || lp.y > bb.max.y + limit || lp.z > bb.max.z + limit) continue;
-    const pos = g.attributes.position.array, nrm = g.attributes.normal.array;
-    let bi = -1, bd = Infinity;
-    for (let i = 0, n = pos.length; i < n; i += 3) {
-      const dx = lp.x - pos[i], dy = lp.y - pos[i + 1], dz = lp.z - pos[i + 2], d = dx * dx + dy * dy + dz * dz;
+// Nearest-vertex queries use a per-mesh uniform grid (cells of GRID_CS mm, searched 3x3x3), so they only see
+// surfaces within ~GRID_CS mm; anything further away reports FAR. All clearance thresholds are below that.
+// Grids are rebuilt when a joint bone's geometry changes (burring, stage changes).
+const GRID_CS = 1.6, FAR = 2.5;
+function meshGrid(m) {
+  const g = m.geometry;
+  if (m.userData.grid && m.userData.gridVer === g.userData.ver) return m.userData.grid;
+  const pos = g.attributes.position.array, map = new Map();
+  for (let i = 0, n = pos.length / 3; i < n; i++) {
+    const k = gridKey(Math.floor(pos[i * 3] / GRID_CS), Math.floor(pos[i * 3 + 1] / GRID_CS), Math.floor(pos[i * 3 + 2] / GRID_CS));
+    const c = map.get(k); if (c) c.push(i); else map.set(k, [i]);
+  }
+  g.computeBoundingBox();
+  m.userData.grid = map; m.userData.gridVer = g.userData.ver;
+  return map;
+}
+function gridKey(x, y, z) { return ((x + 512) * 1024 + (y + 512)) * 1024 + (z + 512); }
+const _gp = new THREE.Vector3();
+// nearest vertex of mesh m to world point p: { i, d2 } or null if none within the search cells
+function nearestVertex(m, p) {
+  const map = meshGrid(m), bb = m.geometry.boundingBox;
+  const lp = m.worldToLocal(_gp.copy(p));
+  if (lp.x < bb.min.x - GRID_CS || lp.y < bb.min.y - GRID_CS || lp.z < bb.min.z - GRID_CS || lp.x > bb.max.x + GRID_CS || lp.y > bb.max.y + GRID_CS || lp.z > bb.max.z + GRID_CS) return null;
+  const pos = m.geometry.attributes.position.array;
+  const cx = Math.floor(lp.x / GRID_CS), cy = Math.floor(lp.y / GRID_CS), cz = Math.floor(lp.z / GRID_CS);
+  let bi = -1, bd = Infinity;
+  for (let x = cx - 1; x <= cx + 1; x++) for (let y = cy - 1; y <= cy + 1; y++) for (let z = cz - 1; z <= cz + 1; z++) {
+    const cell = map.get(gridKey(x, y, z)); if (!cell) continue;
+    for (const i of cell) {
+      const dx = lp.x - pos[i * 3], dy = lp.y - pos[i * 3 + 1], dz = lp.z - pos[i * 3 + 2], d = dx * dx + dy * dy + dz * dz;
       if (d < bd) { bd = d; bi = i; }
     }
-    const sd = (lp.x - pos[bi]) * nrm[bi] + (lp.y - pos[bi + 1]) * nrm[bi + 1] + (lp.z - pos[bi + 2]) * nrm[bi + 2];
-    best = Math.min(best, sd < 0 ? -Math.sqrt(bd) : Math.sqrt(bd));
+  }
+  return bi < 0 ? null : { i: bi, d2: bd, lp: lp.clone() };
+}
+// nearest collider surface point to p (world), as a raycast-like hit for applyTool
+function nearestSurface(p) {
+  let best = null;
+  for (const m of geo.collide) {
+    const nv = nearestVertex(m, p); if (!nv) continue;
+    // cartilage that has been worn away sits just under the bone; prefer the bone there
+    if (m.userData.zname === '__cartilage' && m.userData.jb.thick[m.userData.jb.cartSrc[nv.i]] < 0.03) continue;
+    const d = Math.sqrt(nv.d2), pos = m.geometry.attributes.position.array;
+    if (!best || d < best.distance) best = { object: m, distance: d, point: V(pos[nv.i * 3], pos[nv.i * 3 + 1], pos[nv.i * 3 + 2]).applyMatrix4(m.matrixWorld) };
   }
   return best;
 }
-function tipAt(dir, depth) { return geo.portals[scope.portal].entry.clone().addScaledVector(dir, depth); }
-function tipFree(dir, depth) { return boneClearance(tipAt(dir, depth)) > SCOPE_CLEAR; }
-// whole scope line is free: tip plus the last 10 mm of shaft (the rest is soft tissue)
-function lineFree(dir, depth) {
-  if (!tipFree(dir, depth)) return false;
-  for (let d = depth - 0.75; d > Math.max(0, depth - 10); d -= 0.75) if (boneClearance(tipAt(dir, d)) <= SHAFT_CLEAR) return false;
+function boneClearance(p) {
+  let best = FAR;
+  for (const m of geo.collide) {
+    const nv = nearestVertex(m, p); if (!nv) continue;
+    if (m.userData.zname === '__cartilage' && m.userData.jb.thick[m.userData.jb.cartSrc[nv.i]] < 0.03) continue; // sunk under bone
+    const pos = m.geometry.attributes.position.array, nrm = m.geometry.attributes.normal.array, i = nv.i * 3;
+    const sd = (nv.lp.x - pos[i]) * nrm[i] + (nv.lp.y - pos[i + 1]) * nrm[i + 1] + (nv.lp.z - pos[i + 2]) * nrm[i + 2];
+    best = Math.min(best, sd < 0 ? -Math.sqrt(nv.d2) : Math.sqrt(nv.d2));
+  }
+  return best;
+}
+const segRay = new THREE.Raycaster();
+function crossesSurface(a, b) {
+  const d = b.clone().sub(a), len = d.length();
+  if (len < 1e-6) return false;
+  segRay.set(a, d.divideScalar(len)); segRay.near = 0; segRay.far = len;
+  return segRay.intersectObjects(geo.collide, false).length > 0;
+}
+// line from entry e along dir is free: tip clearance, and the whole shaft back to the portal
+const _lp = new THREE.Vector3();
+function lineClear(e, dir, depth, tipClear, shaftClear) {
+  if (boneClearance(_lp.copy(e).addScaledVector(dir, depth)) <= tipClear) return false;
+  for (let d = depth - 0.6; d > 0; d -= 0.6) if (boneClearance(_lp.copy(e).addScaledVector(dir, d)) <= shaftClear) return false;
   return true;
 }
-// furthest depth reachable by advancing along dir from `from` towards `to` without touching bone
-function reachDepth(dir, from, to) {
+// furthest depth reachable by advancing along dir from `from` towards `to` without touching a surface
+function reach(e, dir, from, to, tipClear) {
   let d = from;
-  while (d < to) { const n = Math.min(to, d + 0.2); if (!tipFree(dir, n)) return d; d = n; }
+  while (d < to) {
+    const n = Math.min(to, d + 0.1);
+    if (boneClearance(e.clone().addScaledVector(dir, n)) <= tipClear) return d;
+    d = n;
+  }
   return d;
 }
+const scopeEntry = () => geo.portals[scope.portal].entry;
+function tipAt(dir, depth) { return scopeEntry().clone().addScaledVector(dir, depth); }
+function tipFree(dir, depth) { return boneClearance(tipAt(dir, depth)) > SCOPE_CLEAR; }
+function lineFree(dir, depth) { return lineClear(scopeEntry(), dir, depth, SCOPE_CLEAR, SHAFT_CLEAR); }
+function reachDepth(dir, from, to) { return reach(scopeEntry(), dir, from, to, SCOPE_CLEAR); }
 let bumpTime = 0;
 function bump() { const n = performance.now(); if (n - bumpTime > 1500) { toast('Scope tip against bone'); bumpTime = n; } scope.bumped = n; }
 function setDepth(d) {
@@ -692,6 +776,8 @@ function rollLens(deg) { scope.roll = ((scope.roll + deg + 540) % 360) - 180; sy
 // after the joint moves (stage, traction, burring) back the scope out until it is clear again
 function ensureScopeFree() {
   if (!geo.portals || scope.dir.lengthSq() === 0) return;
+  for (const k in JB) JB[k].update(); // pick up new osteophytes / cartilage before testing
+  ensureInstFree();
   let d = scope.depth, moved = false;
   while (d > 0 && !lineFree(scope.dir, d)) { d = Math.max(0, d - 0.25); moved = true; }
   if (moved) { scope.depth = d; syncScopeUI(); toast('Scope withdrawn to clear bone'); }
@@ -750,24 +836,151 @@ function updateScope() {
   scope.inJoint = inJ;
   scope.inBone = insideBones(f.tip);
 }
-function placeInstrument(tipPoint) {
+// The instrument is a rigid rod through the working portal. Touching the scope view sets an aim point;
+// the instrument pivots and advances towards it at a finite speed, stops at bone/cartilage, and only
+// acts on tissue that its own tip is touching.
+const inst = { dir: V(), depth: 0, contact: null, aim: null, probeT: 0, hold: 0, holdAt: null };
+const workEntry = () => geo.portals[scope.work].entry;
+const instTip = (dir = inst.dir, depth = inst.depth) => workEntry().clone().addScaledVector(dir, depth);
+function resetInstrument() {
+  if (!geo.portals) return;
+  const e = workEntry(), base = geo.J.clone().sub(e).normalize();
+  inst.dir = base; inst.depth = reach(e, base, 0, e.distanceTo(geo.J) - 3, 0.9);
+  ensureInstFree();
+  inst.contact = null;
+}
+function ensureInstFree() {
+  if (inst.dir.lengthSq() === 0) return;
+  const c = TOOL_CLEAR[state.tool] || 0.5;
+  while (inst.depth > 0 && !lineClear(workEntry(), inst.dir, inst.depth, c, INST_SHAFT_CLEAR)) inst.depth = Math.max(0, inst.depth - 0.25);
+}
+function aimRay(px) {
+  const r = rect.scope;
+  const nx = ((px.x - r.x) / r.w) * 2 - 1, ny = -((px.y - r.y) / r.h) * 2 + 1;
+  if (nx * nx + ny * ny > 0.97) return null;
+  raycaster.setFromCamera({ x: nx, y: ny }, scopeCam);
+  raycaster.layers.set(2); raycaster.layers.enable(0);
+  const hits = raycaster.intersectObjects(toolTargets(), false).filter((h) => !(h.object === fronds && h.instanceId != null && frondData[h.instanceId]?.removed));
+  let hit = hits[0] || null;
+  // villi are thin: aiming close to one (within ~1.2 mm of the ray, in front of what the ray hit) snaps to it
+  if (hit && hit.object !== fronds) {
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = V(), pos = V();
+    let best = null;
+    frondData.forEach((f, k) => {
+      if (!f.ok || f.removed) return;
+      fronds.getMatrixAt(k, m); m.decompose(pos, q, sc);
+      const mid = pos.clone().add(V(0, sc.y * 0.5, 0).applyQuaternion(q));
+      const t = mid.clone().sub(raycaster.ray.origin).dot(raycaster.ray.direction);
+      if (t <= 0 || t > hit.distance + 0.5) return;
+      const d = raycaster.ray.distanceToPoint(mid);
+      if (d < 1.2 && (!best || t < best.t)) best = { t, mid, k };
+    });
+    if (best) hit = { object: fronds, instanceId: best.k, point: best.mid, distance: best.t };
+  }
+  return { hit, point: hit ? hit.point.clone() : raycaster.ray.at(8, V()) };
+}
+function updateInstrument(dt, now) {
+  const tool = state.tool;
+  inst.contact = null;
+  if (tool === 'scope' || !geo.portals) { inst.aim = null; return; }
+  if (inst.dir.lengthSq() === 0) resetInstrument();
+  const e = workEntry(), clr = TOOL_CLEAR[tool];
+  // aim point: under the mouse, or offset above a finger so the finger does not hide the target
+  const px = pointIn(rect.scope) && (pointer.down || !pointer.touch) ? { x: pointer.x, y: pointer.y - (pointer.touch ? AIM_OFFSET : 0) } : null;
+  const active = pointer.down && pointer.inScope && !pointer.aim;
+  inst.aim = px ? { px, ...(aimRay(px) || {}) } : null;
+  // holding a running burr on one spot keeps feeding it into the bone (up to 3 mm past the aimed surface)
+  if (active && tool === 'burr' && inst.atAim && inst.contact0 && inst.aim && inst.holdAt && inst.aim.point.distanceTo(inst.holdAt) < 1.6) inst.hold = Math.min(3, inst.hold + dt);
+  else { inst.hold = 0; inst.holdAt = inst.aim && inst.aim.point ? inst.aim.point.clone() : null; }
+  if (active && inst.aim && inst.aim.point) {
+    const want = inst.aim.point.clone().sub(e);
+    const goal = want.length() + 0.3 + inst.hold;
+    const wantDir = want.normalize();
+    const ang = inst.dir.angleTo(wantDir);
+    if (ang > 1e-4) {
+      // try the full step, then a smaller one, then sliding along each axis; if all are blocked back off
+      const full = Math.min(1, (1.6 * dt) / ang);
+      const axisA = inst.dir.clone().cross(wantDir).normalize();
+      const cands = [inst.dir.clone().lerp(wantDir, full), inst.dir.clone().lerp(wantDir, full / 3)];
+      const side = wantDir.clone().sub(inst.dir).normalize();
+      const sideB = axisA.clone().cross(inst.dir).normalize();
+      for (const sgn of [1, -1]) cands.push(inst.dir.clone().addScaledVector(side.clone().addScaledVector(sideB, sgn).normalize(), 1.6 * dt));
+      let moved = false;
+      for (const c of cands) {
+        const nd = c.normalize();
+        if (lineClear(e, nd, inst.depth, clr, INST_SHAFT_CLEAR) && !crossesSurface(instTip(), instTip(nd))) { inst.dir.copy(nd); moved = true; break; }
+      }
+      if (!moved) inst.depth = Math.max(0, inst.depth - 3 * dt); // back off to get round the obstacle
+    }
+    if (goal > inst.depth) {
+      const before = inst.depth;
+      inst.depth = reach(e, inst.dir, inst.depth, Math.min(goal, inst.depth + 10 * dt), clr);
+      // a running burr feeds into trapezium / MC1 at a cutting rate, carving as it goes
+      if (tool === 'burr' && inst.depth < goal - 1e-3 && inst.depth - before < 1e-3 && inst.contact0 && (inst.contact0 === JB.T || inst.contact0 === JB.F)) {
+        const nd = Math.min(goal, inst.depth + 1.2 * dt);
+        if (lineClear(e, inst.dir, nd, -1, INST_SHAFT_CLEAR)) {
+          const keep = inst.depth;
+          inst.depth = nd; carve(inst.contact0, instTip(), BURR_R + 0.02, dt);
+          if (boneClearance(instTip()) < clr - 0.12) { inst.dbg = 'revert'; inst.depth = keep; } else inst.dbg = 'fed'; // something else (another bone) is in the way
+        }
+      }
+    } else inst.depth = Math.max(goal, inst.depth - 10 * dt);
+  }
+  // what is the tip touching?
+  const tip = instTip();
+  raycaster.set(tip.clone().addScaledVector(inst.dir, -0.4), inst.dir); raycaster.near = 0; raycaster.far = 0.4 + clr + 0.45;
+  raycaster.layers.set(2); raycaster.layers.enable(0);
+  let hit = raycaster.intersectObjects(toolTargets(), false).find((h) => !(h.object === fronds && h.instanceId != null && frondData[h.instanceId]?.removed));
+  raycaster.far = Infinity;
+  // the sides of the tip count too (a burr cuts with its whole head)
+  if (!hit && tool === 'burr') { const n = nearestSurface(tip); if (n && n.distance < clr + 0.35) hit = n; }
+  if (hit) inst.contact = hit;
+  const o = hit && hit.object;
+  inst.contact0 = o === JB.T.mesh || o === JB.T.cart ? JB.T : o === JB.F.mesh || o === JB.F.cart ? JB.F : null;
+  // the instrument only works on what you aimed at: brushing past other tissue on the way does nothing
+  const kind = (o) => (!o ? null : o === fronds || o.userData.zname === '__synovium' ? 'syn' : o === JB.T.mesh || o === JB.T.cart ? 'T' : o === JB.F.mesh || o === JB.F.cart ? 'F' : o.userData.zname);
+  const aimed = inst.aim && inst.aim.hit;
+  const atAim = hit && aimed && kind(hit.object) === kind(aimed.object) && hit.point.distanceTo(inst.aim.point) < (tool === 'burr' ? 2.2 : 2.5);
+  inst.atAim = !!atAim;
+  // a running shaver draws nearby villi into its window
+  if (active && tool === 'shaver' && frondsNear(tip, 1.8)) renderTasksThrottled();
+  // a running burr is pressed towards the aimed point in any direction (not just along its axis):
+  // bone between the head and the target is cut at the feed rate and the instrument follows next frame
+  if (active && tool === 'burr' && atAim && inst.contact0 && inst.aim.point) {
+    const toP = inst.aim.point.clone().sub(tip), dist = toP.length();
+    if (dist > 0.25) carve(inst.contact0, tip.clone().addScaledVector(toP.normalize(), Math.min(1.2 * dt, dist - 0.2)), BURR_R + 0.02, dt);
+  }
+  if (active && atAim) {
+    if (tool === 'probe') { if (now - inst.probeT > 700) { applyTool(hit, 0); inst.probeT = now; } }
+    else applyTool(hit, dt, tool === 'burr' ? tip : undefined);
+  }
+}
+function updateAimMarker() {
+  const el = $('#aim');
+  const a = state.mode === 'arthro' && state.tool !== 'scope' ? inst.aim : null;
+  el.hidden = !a;
+  if (!a) return;
+  el.style.left = `${a.px.x}px`; el.style.top = `${a.px.y}px`;
+  el.classList.toggle('touching', !!inst.atAim);
+}
+function placeInstrument() {
   const tool = state.tool;
   const vis = state.mode === 'arthro' && tool !== 'scope';
   instrument.visible = vis;
   if (!vis) return;
-  const e = geo.portals[scope.work].entry;
-  const tip = tipPoint ? tipPoint.clone() : e.clone().lerp(geo.J, 0.85);
+  const e = workEntry();
+  const tip = instTip();
   const d = tip.clone().sub(e).normalize();
-  const backoff = tool === 'burr' ? 0.9 : tool === 'shaver' ? 0.3 : tool === 'grasper' ? 1.2 : 1.4;
+  const backoff = { burr: 0.6, shaver: 1.4, grasper: 1.3, probe: 1.1 }[tool];
   const end = tip.clone().addScaledVector(d, -backoff);
   const start = e.clone().addScaledVector(d, -25);
   const sh = instrument.userData.shaft;
   instrument.position.set(0, 0, 0); instrument.quaternion.identity();
-  sh.position.copy(start); sh.quaternion.setFromUnitVectors(V(0, 1, 0), d); sh.scale.set(0.8, Math.max(0.1, start.distanceTo(end)), 0.8);
+  sh.position.copy(start); sh.quaternion.setFromUnitVectors(V(0, 1, 0), d); sh.scale.set(INST_R / 0.95, Math.max(0.1, start.distanceTo(end)), INST_R / 0.95);
   for (const [k, t] of Object.entries(instrument.userData.tips)) {
     t.visible = k === tool;
     if (!t.visible) continue;
-    t.position.copy(end.clone().addScaledVector(d, tool === 'burr' ? 0.9 : 0.6));
+    t.position.copy(tip);
     t.quaternion.setFromUnitVectors(V(0, -1, 0), d);
   }
   instrument.userData.seg = [e, tip];
@@ -828,7 +1041,45 @@ function cartInfoAt(jb, i) {
   if (fa > 0.05 || jb.soft[i] > 0.3) return { grade: 'ICRS 1–2', txt: 'Softening and superficial fibrillation' };
   return { grade: 'Normal', txt: 'Firm, smooth hyaline cartilage' };
 }
-function applyTool(hit, dt) {
+// Remove bone (osteophyte first, then subchondral bone) and cartilage inside a sphere of radius r at centre.
+// Each vertex moves inward along its normal to the sphere surface, so nothing is left inside the burr head.
+const BURR_R = 0.78;
+function carve(jb, centreW, r, dt) {
+  const P = STAGE_P[state.stage];
+  const c = jb.mesh.worldToLocal(centreW.clone());
+  const out = { healthy: false, bone: false };
+  const pos = jb.g.attributes.position.array;
+  for (let i = 0; i < jb.n; i++) {
+    const wx = pos[i * 3] - c.x, wy = pos[i * 3 + 1] - c.y, wz = pos[i * 3 + 2] - c.z;
+    const d2 = wx * wx + wy * wy + wz * wz;
+    // cartilage lying over the burr is shaved off first
+    if (jb.w[i] > 0.05 && jb.thick[i] > 0.03 && d2 < (r + jb.thick[i] + 0.1) ** 2) {
+      if (jb.loss[i] < 0.05 && jb.fibA[i] < 0.09) out.healthy = true;
+      jb.cartLost[i] = Math.min(1, jb.cartLost[i] + dt * 4);
+      jb.dirty = true;
+    }
+    if (d2 >= r * r) continue;
+    // solve |w + n*t| = r for the inward root t < 0 (w = vertex - centre, n = base normal)
+    const nx = jb.nrm[i * 3], ny = jb.nrm[i * 3 + 1], nz = jb.nrm[i * 3 + 2];
+    const wn = wx * nx + wy * ny + wz * nz;
+    const disc = wn * wn - d2 + r * r;
+    const t = -wn - Math.sqrt(Math.max(0, disc));
+    if (t >= 0) continue;
+    let need = Math.min(-t, 1.5); // depth to remove at this vertex
+    const ost = P.osteo * jb.osteoMask[i] * jb.osteoRemain[i] + P.stt * jb.sttMask[i] * jb.osteoRemain[i];
+    if (ost > 0.01) {
+      const amp = P.osteo * jb.osteoMask[i] + P.stt * jb.sttMask[i];
+      const take = Math.min(ost, need);
+      jb.osteoRemain[i] = Math.max(0, jb.osteoRemain[i] - take / amp);
+      need -= take;
+    }
+    if (need > 0) { jb.resect[i] = Math.min(8, jb.resect[i] + need); out.bone = true; }
+    jb.dirty = true;
+  }
+  if (jb.dirty) jb.update();
+  return out;
+}
+function applyTool(hit, dt, center) {
   const tool = state.tool, obj = hit.object, z = obj.userData.zname;
   const P = STAGE_P[state.stage];
   const which = (o) => (o === JB.T.mesh || o === JB.T.cart ? JB.T : o === JB.F.mesh || o === JB.F.cart ? JB.F : null);
@@ -880,24 +1131,12 @@ function applyTool(hit, dt) {
     if (obj === fronds || z === '__synovium') { frondsNear(hit.point, 1.2); if (z === '__synovium') warn('Burr on capsule: risk to capsule and tendons'); renderTasks(); return; }
     if (z === '__loose') { obj.userData.removed = true; obj.visible = false; renderTasks(); return; }
     if (jb) {
-      const lp = jb.mesh.worldToLocal(hit.point.clone());
-      let healthy = false, mc1 = false;
-      jb.forEachNear(lp, 1.5, (i, f) => {
-        const ost = P.osteo * jb.osteoMask[i] * jb.osteoRemain[i] + P.stt * jb.sttMask[i] * jb.osteoRemain[i];
-        if (ost > 0.05) {
-          const amp = Math.max(0.2, P.osteo * jb.osteoMask[i] + P.stt * jb.sttMask[i]);
-          jb.osteoRemain[i] = Math.max(0, jb.osteoRemain[i] - dt * 1.6 * f / amp);
-        } else if (jb.thick[i] > 0.05 && jb.w[i] > 0.05) {
-          if (jb.loss[i] < 0.05 && jb.fibA[i] < 0.09) healthy = true;
-          jb.cartLost[i] = Math.min(1, jb.cartLost[i] + dt * 3.0 * f);
-        } else {
-          jb.resect[i] = Math.min(6, jb.resect[i] + dt * 1.5 * f);
-          if (jb === JB.F) mc1 = true;
-        }
-      });
-      if (healthy) { stats.iatro.cart += dt; warn('Burring healthy cartilage'); }
-      if (mc1) { stats.iatro.mc1 += dt; warn('Resecting the MC1 base: in hemitrapeziectomy the trapezium is resected'); }
-      jb.dirty = true; renderTasksThrottled();
+      // carve away everything inside the burr head (a sphere at the instrument tip)
+      const centre = center || hit.point.clone().addScaledVector(raycaster.ray.direction, -BURR_R * 0.6);
+      const r = carve(jb, centre, BURR_R + 0.08, dt);
+      if (r.healthy) { stats.iatro.cart += dt; warn('Burring healthy cartilage'); }
+      if (r.bone && jb === JB.F) { stats.iatro.mc1 += dt; warn('Resecting the MC1 base: in hemitrapeziectomy the trapezium is resected'); }
+      renderTasksThrottled();
       return;
     }
     if (/ligament/i.test(z)) { stats.iatro.lig += dt; warn('Burr on a capsular ligament'); }
@@ -917,7 +1156,7 @@ function taskList() {
   return [
     { t: 'Enter the joint with the scope', done: scope.everInJoint, na: false },
     { t: 'Probe the cartilage of trapezium and MC1 base', done: stats.probedT && stats.probedF, na: false, prog: `${+stats.probedT + +stats.probedF}/2 surfaces` },
-    { t: 'Synovectomy: remove ≥ 90% of the synovitis', done: synTot > 0 && synRem / synTot >= 0.9, na: synTot === 0, prog: synTot ? `${Math.round((100 * synRem) / synTot)}%` : '' },
+    { t: 'Synovectomy: remove ≥ 75% of the synovitis', done: synTot > 0 && synRem / synTot >= 0.75, na: synTot === 0, prog: synTot ? `${Math.round((100 * synRem) / synTot)}%` : '' },
     { t: 'Remove all loose bodies', done: lbTot > 0 && lbRem === lbTot, na: lbTot === 0, prog: lbTot ? `${lbRem}/${lbTot}` : '' },
     { t: 'Excise marginal osteophytes (≥ 80%)', done: P.osteo > 0 && ostPct >= 0.8, na: P.osteo === 0, prog: P.osteo ? `${Math.round(ostPct * 100)}%` : '' },
     { t: 'Hemitrapeziectomy: burr ≥ 2.5 mm off the distal trapezial surface (≥ 70% of it)', done: s >= 3 && hemi >= 0.7, na: s < 3, prog: s >= 3 ? `${Math.round(hemi * 100)}%` : '' },
@@ -968,7 +1207,7 @@ function setMode(m) {
     if (state.stage === 0) applyStage(2);
     state.section = false; $('#sectionOn').checked = false; $('#sectionCtl').hidden = true;
     state.layers.hideT = state.layers.hideF = false;
-    applyThumb(); resetScope();
+    applyThumb(); resetScope(); resetInstrument();
     setView('arthro', true);
   } else { applyThumb(); }
   closeQuiz();
@@ -1129,16 +1368,7 @@ function renderScope(r) {
 }
 
 let pointer = { x: 0, y: 0, down: false, inScope: false, moved: 0, lastX: 0, lastY: 0, button: 0 };
-let hoverHit = null;
-function scopeRaycast() {
-  const r = rect.scope;
-  const nx = ((pointer.x - r.x) / r.w) * 2 - 1, ny = -((pointer.y - r.y) / r.h) * 2 + 1;
-  if (nx * nx + ny * ny > 1) return null;
-  raycaster.setFromCamera({ x: nx, y: ny }, scopeCam);
-  raycaster.layers.set(2); raycaster.layers.enable(0);
-  const hits = raycaster.intersectObjects(toolTargets(), false).filter((h) => !(h.object === fronds && h.instanceId != null && frondData[h.instanceId]?.removed));
-  return hits[0] || null;
-}
+const AIM_OFFSET = 70; // px above a touching finger
 function pointIn(r) { return r && pointer.x >= r.x && pointer.x <= r.x + r.w && pointer.y >= r.y && pointer.y <= r.y + r.h; }
 
 let last = performance.now();
@@ -1157,12 +1387,9 @@ function frameBody(now) {
   controls.update();
   if (state.mode === 'arthro' && geo.portals) {
     updateScope();
-    hoverHit = null;
-    if (state.tool !== 'scope' && pointIn(rect.scope)) {
-      hoverHit = scopeRaycast();
-      if (pointer.down && pointer.inScope && !pointer.aim && hoverHit) applyTool(hoverHit, dt);
-    }
-    placeInstrument(hoverHit ? hoverHit.point : null);
+    updateInstrument(dt, now);
+    placeInstrument();
+    updateAimMarker();
     updateHud();
   }
   for (const k in JB) JB[k].update();
@@ -1197,8 +1424,9 @@ function updateHud() {
   if (performance.now() - (scope.bumped || 0) < 800) html += '<div class="warn">Against bone</div>';
   if (scope.inBone) html += '<div class="bad">Scope tip inside bone. Withdraw.</div>';
   else if (!scope.inJoint) html += '<div class="warn">Outside the joint capsule: advance the scope</div>';
-  if (state.tool !== 'scope') html += `<div>${state.tool[0].toUpperCase() + state.tool.slice(1)} via ${scope.work}${hoverHit ? ` · on ${hitLabel(hoverHit)}` : ''}</div>`;
-  html += `<div class="hint">${COARSE ? 'Drag: aim / use tool · pinch: in–out · two fingers: aim' : 'Drag: aim / use tool · right-drag: aim · scroll or W/S: in–out · Q/E: lens'}</div>`;
+  if (state.tool !== 'scope') html += `<div>${state.tool[0].toUpperCase() + state.tool.slice(1)} via ${scope.work} · ${inst.atAim ? `working on ${hitLabel(inst.contact)}` : inst.contact ? `blocked by ${hitLabel(inst.contact)}` : pointer.down ? 'moving to target' : 'not in contact'}</div>`;
+  const toolHint = state.tool === 'scope' ? 'drag: aim scope' : `${COARSE ? 'touch' : 'press'} and hold: steer the ${state.tool} to the ring`;
+  html += `<div class="hint">${toolHint} · ${COARSE ? 'pinch: in–out · two fingers: aim scope' : 'right-drag: aim scope · scroll or W/S: in–out · Q/E: lens'}</div>`;
   $('#hud').innerHTML = html;
   if (scope.everInJoint) renderTasksThrottled();
 }
@@ -1299,8 +1527,8 @@ function bindUI() {
   $('#heatOn').onchange = (e) => { state.heat = e.target.checked; [JB.T, JB.F, JB.S].forEach((j) => { j.dirty = true; }); };
   $('#xrayOn').onchange = (e) => { state.xray = e.target.checked; applyXray(); };
   $('#quizBtn').onclick = () => { quiz.score = 0; quiz.n = 0; nextQuestion(); };
-  $('#scopePortal').onchange = (e) => { scope.portal = e.target.value; if (scope.work === scope.portal) { scope.work = Object.keys(geo.portals).find((k) => k !== scope.portal); $('#workPortal').value = scope.work; } resetScope(); };
-  $('#workPortal').onchange = (e) => { scope.work = e.target.value; if (scope.work === scope.portal) toast('Use a different portal for the instrument'); };
+  $('#scopePortal').onchange = (e) => { scope.portal = e.target.value; if (scope.work === scope.portal) { scope.work = Object.keys(geo.portals).find((k) => k !== scope.portal); $('#workPortal').value = scope.work; } resetScope(); resetInstrument(); };
+  $('#workPortal').onchange = (e) => { scope.work = e.target.value; if (scope.work === scope.portal) toast('Use a different portal for the instrument'); resetInstrument(); };
   $('#tractionOn').onchange = (e) => { state.traction = e.target.checked; applyThumb(); if (!state.traction) toast('Without traction the joint space is too tight to work in'); };
   $('#toolSeg').addEventListener('click', (e) => { const b = e.target.closest('[data-tool]'); if (b) setTool(b.dataset.tool); });
   $('#depth').oninput = (e) => { setDepth(+e.target.value); };
@@ -1345,10 +1573,11 @@ function bindUI() {
     pointer.down = true; pointer.moved = 0; pointer.button = e.button;
     pointer.inScope = inScope;
     pointer.aim = state.tool === 'scope' || e.button === 2;
-    if (inScope && !pointer.aim && state.tool === 'probe') { const h = scopeRaycast(); if (h) applyTool(h, 0); }
+    pointer.touch = e.pointerType === 'touch' || e.pointerType === 'pen';
   });
   canvas.addEventListener('pointermove', (e) => {
     const p = local(e);
+    if (!pointer.down && !gesture) pointer.touch = e.pointerType === 'touch' || e.pointerType === 'pen';
     if (touches.has(e.pointerId)) touches.set(e.pointerId, p);
     if (gesture && touches.size >= 2) {
       const g = twoFinger();
@@ -1411,7 +1640,7 @@ function pivotScope(dx, dy) {
       const q2 = new THREE.Quaternion().setFromAxisAngle(f.right, (-ay * k) / steps);
       const nd = scope.dir.clone().applyQuaternion(q1).applyQuaternion(q2).normalize();
       if (nd.angleTo(scope.home) >= THREE.MathUtils.degToRad(55)) continue;
-      if (!lineFree(nd, scope.depth)) continue;
+      if (!lineFree(nd, scope.depth) || crossesSurface(tipAt(scope.dir, scope.depth), tipAt(nd, scope.depth))) continue;
       scope.dir.copy(nd); moved = true; break;
     }
     if (!moved) { bump(); break; }
@@ -1423,11 +1652,17 @@ function setTool(t) {
   canvas.style.cursor = t === 'scope' ? 'grab' : 'crosshair';
   applyVisibility();
   if (t !== 'scope' && state.swapped) { state.swapped = false; resize(); }
+  if (t !== 'scope' && geo.portals) { if (inst.dir.lengthSq() === 0) resetInstrument(); else ensureInstFree(); }
 }
 
 // handle for debugging and automated checks in the browser console
 window.__cmcj = {
-  state, scope, JB, geo: () => geo, applyStage, setTool, taskList, stats, setView, setDepth, pivotScope, resetScope, boneClearance, tip: () => scopeFrame().tip, inCap: () => insideCapsule(scopeFrame().tip),
+  state, scope, JB, geo: () => geo, applyStage, setTool, taskList, stats, setView, inst, instTip, pointer, rect: () => rect, lineClear, workEntry, aimRay, updateInstrument, ensureScopeFree, scopeCam, frondData, fronds,
+  frondScreen(k) { const m = new THREE.Matrix4(); fronds.getMatrixAt(k, m); const v = new THREE.Vector3().setFromMatrixPosition(m); const q = new THREE.Quaternion(), sc = new THREE.Vector3(); m.decompose(new THREE.Vector3(), q, sc); v.add(new THREE.Vector3(0, sc.y * 0.6, 0).applyQuaternion(q)); const p = v.clone().project(scopeCam); const r = rect.scope; return p.z < 1 && Math.hypot(p.x, p.y) < 0.95 ? { x: r.x + (p.x + 1) / 2 * r.w, y: r.y + (1 - p.y) / 2 * r.h } : null; },
+  updateScope, patchT: () => geo.patchT, portals: () => geo.portals,
+  nearestDist(p) { const n = nearestSurface(p); return n ? n.distance : 9; },
+  diag(p) { const n = nearestSurface(p); const bones = geo.collide.filter((m) => m.userData.zname !== '__cartilage'); const saved = geo.collide; geo.collide = bones; const bc = boneClearance(p); geo.collide = saved; let th = null; if (n && n.object.userData.zname === '__cartilage') { const jb = n.object.userData.jb; const nv = nearestVertex(n.object, p); th = jb.thick[jb.cartSrc[nv.i]]; } return { near: n && n.object.userData.zname, boneClr: bc, cartThick: th }; },
+  insideTruth(p) { const bones = geo.collide.filter((m) => m.userData.zname !== '__cartilage'); let votes = 0; for (const d of [V(0.3, 1, 0.2), V(-0.7, -0.2, 0.6), V(0.1, -0.5, -1)]) { const r = new THREE.Raycaster(p, d.normalize()); const n = r.intersectObjects(bones, false).length; votes += n % 2; } return votes >= 2; }, setDepth, pivotScope, resetScope, boneClearance, tip: () => scopeFrame().tip, inCap: () => insideCapsule(scopeFrame().tip),
   apply(nx, ny, secs) { raycaster.setFromCamera({ x: nx, y: ny }, scopeCam); raycaster.layers.set(2); raycaster.layers.enable(0); for (let t = 0; t < secs; t += 0.05) { const h = raycaster.intersectObjects(toolTargets(), false)[0]; if (h) applyTool(h, 0.05); for (const k in JB) JB[k].update(); } },
   probe(nx, ny) { raycaster.setFromCamera({ x: nx, y: ny }, scopeCam); raycaster.layers.set(2); raycaster.layers.enable(0); const h = raycaster.intersectObjects(toolTargets(), false)[0]; return h ? `${hitLabel(h)}:${h.object.userData.zname.slice(0,6)} @ ${h.distance.toFixed(1)}` : "none"; },
 };
