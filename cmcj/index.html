@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Thumb CMC Trainer</title>
+<meta name="description" content="Interactive 3D trainer for hand surgeons: normal thumb CMC (trapeziometacarpal) joint anatomy, osteoarthritis staging, and simulated CMC arthroscopy and debridement. Built on Z-Anatomy models.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%227%22 fill=%22%235b8cff%22/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+<script type="importmap">
+{ "imports": { "three": "./vendor/three/three.module.min.js", "three/addons/": "./vendor/three/addons/" } }
+</script>
+</head>
+<body>
+<header class="topbar">
+  <button class="icon-btn" id="panelToggle" aria-label="Toggle panel" title="Toggle panel">☰</button>
+  <div class="brand">Thumb CMC Trainer <span class="sub">trapeziometacarpal joint</span></div>
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-mode="anatomy" class="active">Anatomy</button>
+    <button role="tab" data-mode="oa">Osteoarthritis</button>
+    <button role="tab" data-mode="arthro">Arthroscopy</button>
+  </nav>
+  <button class="icon-btn" id="aboutBtn" title="About and credits" aria-label="About">i</button>
+</header>
+
+<div class="layout">
+  <aside class="panel" id="panel">
+    <!-- shared: stage -->
+    <section class="card" data-show="oa arthro">
+      <h2>Disease stage</h2>
+      <div class="seg" id="stageSeg"></div>
+      <div id="stageInfo" class="stage-info"></div>
+    </section>
+
+    <!-- ANATOMY -->
+    <section class="card" data-show="anatomy oa">
+      <h2>View</h2>
+      <div class="btn-grid" id="viewBtns">
+        <button data-view="dorsal">Dorsal</button>
+        <button data-view="palmar">Palmar</button>
+        <button data-view="radial">Radial</button>
+        <button data-view="ulnar">Ulnar</button>
+        <button data-view="trapezium">Trapezium surface</button>
+        <button data-view="mc1">MC1 base</button>
+        <button data-view="xap" data-show="oa">Thumb AP (Robert)</button>
+        <button data-view="xlat" data-show="oa">Thumb lateral</button>
+      </div>
+    </section>
+
+    <section class="card" data-show="anatomy oa">
+      <h2>Layers</h2>
+      <div class="checks" id="layerChecks">
+        <label><input type="checkbox" data-layer="bone" checked> CMC bones</label>
+        <label><input type="checkbox" data-layer="context" checked> Other hand bones</label>
+        <label><input type="checkbox" data-layer="cartilage" checked> Articular cartilage</label>
+        <label><input type="checkbox" data-layer="ligament" checked> Ligaments</label>
+        <label><input type="checkbox" data-layer="muscle"> Muscles &amp; tendons</label>
+        <label><input type="checkbox" data-layer="nv"> Vessels &amp; nerves</label>
+        <label><input type="checkbox" data-layer="capsule"> Capsule (schematic)</label>
+        <label><input type="checkbox" data-layer="hideT"> Hide trapezium</label>
+        <label><input type="checkbox" data-layer="hideF"> Hide thumb</label>
+      </div>
+    </section>
+
+    <section class="card" data-show="anatomy oa">
+      <h2>Inspect</h2>
+      <label class="range">Distract joint <output id="distractOut">0 mm</output>
+        <input type="range" id="distract" min="0" max="8" step="0.1" value="0"></label>
+      <label class="check-inline"><input type="checkbox" id="sectionOn"> Section plane</label>
+      <div id="sectionCtl" class="sub-ctl" hidden>
+        <select id="sectionAxis">
+          <option value="dp">Through joint, dorsopalmar</option>
+          <option value="ru">Through joint, radioulnar</option>
+        </select>
+        <label class="range">Offset <output id="sectionOut">0 mm</output>
+          <input type="range" id="sectionOffset" min="-12" max="12" step="0.1" value="0"></label>
+      </div>
+      <div data-show="oa">
+        <label class="check-inline"><input type="checkbox" id="heatOn"> Cartilage thickness map</label>
+        <label class="check-inline"><input type="checkbox" id="xrayOn"> Simulated radiograph</label>
+      </div>
+      <div data-show="anatomy" class="row">
+        <button id="quizBtn" class="primary">Quiz me</button>
+      </div>
+    </section>
+
+    <!-- ARTHROSCOPY -->
+    <section class="card" data-show="arthro">
+      <h2>Portals</h2>
+      <div class="two-col">
+        <label>Scope<select id="scopePortal"></select></label>
+        <label>Instrument<select id="workPortal"></select></label>
+      </div>
+      <label class="check-inline"><input type="checkbox" id="tractionOn" checked> Finger-trap traction</label>
+      <div id="safety" class="safety"></div>
+    </section>
+
+    <section class="card" data-show="arthro">
+      <h2>Instruments</h2>
+      <div class="seg tools" id="toolSeg">
+        <button data-tool="scope" class="active" title="1">Scope</button>
+        <button data-tool="probe" title="2">Probe</button>
+        <button data-tool="shaver" title="3">Shaver</button>
+        <button data-tool="burr" title="4">Burr</button>
+        <button data-tool="grasper" title="5">Grasper</button>
+      </div>
+      <label class="range">Scope depth <output id="depthOut"></output>
+        <input type="range" id="depth" min="0" max="30" step="0.1" value="14"></label>
+      <label class="range">30° lens rotation <output id="rollOut">0°</output>
+        <input type="range" id="roll" min="-180" max="180" step="1" value="0"></label>
+      <div class="row">
+        <button id="resetScope">Re-centre scope</button>
+        <button id="swapViews">Swap views</button>
+        <button id="resetJoint">Reset joint</button>
+      </div>
+    </section>
+
+    <section class="card" data-show="arthro">
+      <h2>Training tasks</h2>
+      <ul class="tasks" id="tasks"></ul>
+    </section>
+
+    <section class="card notes">
+      <details open>
+        <summary><h2>Teaching notes</h2></summary>
+        <div id="notes"></div>
+      </details>
+    </section>
+  </aside>
+
+  <main class="viewport" id="viewport">
+    <canvas id="c"></canvas>
+    <div id="insetFrame" class="inset-frame" hidden><span id="insetLabel">External view</span></div>
+    <div id="hud" class="hud" hidden></div>
+    <div id="orient" class="orient"></div>
+    <div id="info" class="info" hidden></div>
+    <div id="quiz" class="quiz" hidden></div>
+    <div id="toast" class="toast" hidden></div>
+    <div id="loading" class="loading">Loading Z-Anatomy model…</div>
+  </main>
+</div>
+
+<dialog id="about">
+  <h2>About this trainer</h2>
+  <p>An interactive teaching model of the thumb carpometacarpal (trapeziometacarpal) joint for hand surgery trainees. It covers normal anatomy, simulated osteoarthritis by Eaton–Littler stage, and simulated CMC arthroscopy with synovectomy, chondroplasty, loose body removal, osteophyte excision and hemitrapeziectomy.</p>
+  <p><b>Educational use only.</b> Pathology and instrument behaviour are procedural simulations on a normal anatomical model. They are not patient data and are not a substitute for supervised training.</p>
+  <h3>Credits &amp; licence</h3>
+  <p>Anatomical meshes are derived from <a href="https://www.z-anatomy.com/" target="_blank" rel="noopener">Z-Anatomy</a> (<a href="https://github.com/LluisV/Z-Anatomy" target="_blank" rel="noopener">LluisV/Z-Anatomy</a>), which builds on BodyParts3D (© The Database Center for Life Science), licensed <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener">CC BY-SA 4.0</a>. The derived model file <code>models/cmcj.glb</code> (region extracted, rescaled to millimetres, subdivided, joint-distance attribute added) is shared under the same licence.</p>
+  <p>Rendering: <a href="https://threejs.org" target="_blank" rel="noopener">three.js</a> (MIT).</p>
+  <form method="dialog"><button class="primary">Close</button></form>
+</dialog>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
