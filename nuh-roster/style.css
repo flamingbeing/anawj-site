@@ -85,11 +85,18 @@ tr.off td:first-child { opacity: 1; }
 .add-name { align-self: center; padding: 0 8px; font-size: 12px; line-height: 18px; border-style: dashed; color: var(--muted); opacity: .5; }
 .cell:hover .add-name { opacity: 1; }
 .name { padding: 1px 8px; border-radius: 6px; border: 1px solid transparent; user-select: none; display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
-.names .name .label { cursor: pointer; flex: 1; }
-.grip { cursor: grab; touch-action: none; color: var(--muted); font-size: 12px; line-height: 1; padding: 2px 1px; }
-.grip.cover { color: #d00; font-weight: 700; font-size: 10px; border: 1px solid currentColor; border-radius: 3px; padding: 0 2px; opacity: .55; }
-.name:hover .grip.cover { opacity: 1; }
-.pool-names .name { cursor: grab; touch-action: none; }
+.names .name .label { flex: 1; }
+@media (hover: hover) and (pointer: fine) { .name { cursor: grab; touch-action: none; } }
+@media (hover: none), (pointer: coarse) { .names .name { cursor: pointer; } }
+.name .icon { font-size: 10px; line-height: 1; border-radius: 3px; padding: 1px 3px; opacity: .45; }
+.name:hover .icon { opacity: 1; }
+.name .icon.cover { cursor: grab; color: #d00; font-weight: 700; border: 1px solid currentColor; }
+.name .icon.del { cursor: pointer; color: var(--muted); font-size: 13px; }
+.name .icon.del:hover { color: #d00; background: var(--chip); }
+.tag-editor .where { border-bottom: 1px solid var(--line); padding-bottom: 6px; margin-bottom: 2px; font-size: 13px; }
+.tag-editor .where ul { margin: 4px 0 0; padding-left: 18px; }
+.datebar label { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+@media print { .datebar { display: none; } }
 .name:hover { border-color: var(--line); background: var(--chip); }
 .name.over { border-color: var(--accent); background: var(--chip); box-shadow: 0 0 0 1px var(--accent); }
 .name.dragging { opacity: .35; }

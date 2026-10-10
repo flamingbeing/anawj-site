@@ -191,9 +191,18 @@ function render() {
   if (!['general', 'roster', 'premed', 'cases', 'manpower', 'seniors', 'juniors', 'settings'].includes(state.tab)) state.tab = 'seniors';
   app.replaceChildren(({ general: renderGeneral, roster: renderRoster, premed: renderPremed, cases: () => renderDay('cases'), manpower: () => renderDay('manpower'), seniors: () => renderStaff('senior'), juniors: () => renderStaff('junior'), settings: renderSettings })[state.tab]());
   renderCloudBar();
+  renderDateBar();
   window.scrollTo(0, y);
   save();
 }
+// One date for the whole workspace, in the header.
+function renderDateBar() {
+  const el = document.getElementById('date');
+  if (!el) return;
+  const input = el.querySelector('input') || el.appendChild(h('label', {}, 'Roster for ', h('input', { type: 'date', onchange: e => { state.day.date = e.target.value; render(); } }))).querySelector('input');
+  if (input.value !== state.day.date) input.value = state.day.date || '';
+}
+
 document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', async () => {
   const t = b.dataset.tab;
   if (staffEditing() && !['seniors', 'juniors'].includes(t) && !(await finishStaffEdit())) return;
@@ -506,7 +515,6 @@ function renderDay(part) {
     h('section', { class: 'card' },
       h('h2', {}, cases ? 'Cases' : 'Manpower'),
       h('div', { class: 'bar' },
-        h('label', {}, 'Roster for ', h('input', { type: 'date', value: d.date, onchange: e => { d.date = e.target.value; save(); } })),
         fileButton('Load draft roster (.xlsx)', '.xlsx', false, loadDraft),
         cases
           ? h('button', { onclick: () => { if (confirm('Clear the running rooms and case notes for this day? Rooms go back to "running by default".')) { d.rooms = []; syncRooms(); render(); } } }, 'Clear cases')
@@ -926,6 +934,9 @@ function dropToPool(src) {
   afterRosterEdit();
 }
 
+// Touchscreens get no dragging, covering or deleting on the chips: tapping a name opens it.
+const TOUCH = matchMedia('(hover: none), (pointer: coarse)').matches;
+
 function startNameDrag(e, src) {
   if (e.button !== 0) return;
   e.preventDefault();
@@ -952,6 +963,8 @@ function startNameDrag(e, src) {
     window.removeEventListener('pointerup', up);
     window.removeEventListener('pointercancel', up);
     if (!ghost) {
+      // a click without dragging opens the name's details
+      if (ev.type === 'pointerup' && !src.pool && !src.cover) { clearTimeout(tagTimer); tagTimer = setTimeout(() => openTagEditor(chip, src), 200); }
       return;
     }
     ghost.remove();
@@ -1029,6 +1042,36 @@ function syncCoverEntry(row, oldName, oldCover, name, coverTo) {
   if (to && to !== row && !cellParts(to, 'junior').some(x => isEntry(x, name))) setCellParts(to, 'junior', [...cellParts(to, 'junior'), `${name} (C)`]);
 }
 
+// Everywhere a person is on today's roster: rooms, ad hoc covers, premeds, calls and clinics.
+function wherePerson(p) {
+  const out = [];
+  const is = text => namesInCell(text).some(n => matchName(n, state.staff).person?.id === p.id);
+  for (const row of state.roster?.rows || []) {
+    for (const key of ['senior', 'junior']) for (const part of cellParts(row, key)) {
+      if (!is(part)) continue;
+      if (isCoverPart(part)) out.push(`Covering ${row.label} (C)`);
+      else {
+        out.push(`In ${row.label} (${key})`);
+        const c = parseNamePart(part).cover;
+        if (c) out.push(`Covering ${coverTarget(c, row, state.roster.rows) || c} (C-${c})`);
+      }
+    }
+    if (cellParts(row, 'premed').some(is)) out.push(`Premed for ${row.label}`);
+  }
+  const g = effectiveGeneral();
+  for (const [k, label] of TEAM_ROWS) for (const team of ['mot', 'sicu']) if (is(g[`${team}.${k}`] || '')) out.push(`${team.toUpperCase()} ${label.replace(':', '') || 'MO'}`);
+  for (const d of DUTIES) for (const [f, label] of d.fields) if (is(g[`${d.key}.${f}`] || '')) out.push(`${d.label} ${label.toLowerCase()}`);
+  const st = state.day.staff[p.id]?.status;
+  if (st && st !== 'avail') out.push(STATUSES.find(s => s[0] === st)?.[1] || st);
+  return out;
+}
+function whereCard(p) {
+  const at = wherePerson(p);
+  return h('div', { class: 'where' },
+    h('b', {}, p.name), h('span', { class: 'seen' }, ` · ${p.grade}${p.posting ? ' · ' + p.posting : ''}`),
+    h('ul', {}, (at.length ? at : ['Not on any list today']).map(t => h('li', {}, t))));
+}
+
 function closeTagEditor() { document.querySelector('.tag-editor')?.remove(); }
 
 function openTagEditor(chip, src) {
@@ -1086,13 +1129,14 @@ function openTagEditor(chip, src) {
   };
   const box = h('div', { class: 'tag-editor', role: 'dialog', 'aria-label': 'Edit name',
     onkeydown: e => { if (e.key === 'Escape') closeTagEditor(); if (e.key === 'Enter') { e.preventDefault(); apply(); } } },
+    p ? whereCard(p) : null,
     h('label', {}, 'Name'), name,
     h('label', {}, 'Tags'), chips,
     h('label', {}, 'Other tags'), other,
     h('label', {}, 'Leaving (L-)'), leave,
     h('label', {}, 'Covering (C-)'), cover,
     juniorCell && h('label', { class: 'check', title: 'No junior is physically in this room: this person only covers it ad hoc. Shown as "Name (C)" in red.' }, coveredBox, ' Covered (ad hoc cover, not physically here)'),
-    h('label', {}, 'Other note (after a dash)'), dash,
+    h('label', {}, 'Comment (also shown in the comments box)'), dash,
     h('div', { class: 'bar', style: 'margin:8px 0 0' },
       h('button', { class: 'primary', onclick: apply }, 'Save'),
       h('button', { onclick: closeTagEditor }, 'Cancel'),
@@ -1191,16 +1235,19 @@ function rosterCell(row, i, key, doubles) {
   } else {
     adder = h('button', { class: 'add-name', title: 'Add a name', onclick: () => { clearTimeout(tagTimer); closeTagEditor(); editing = id; render(); } }, '+');
   }
-  // each name: a grip to drag (move or swap), for juniors a C grip to drag them into another
-  // room as an ad hoc cover, and the short name, which opens the tag editor
+  // each name shows the short name. With a mouse: drag the chip to move or swap it, drag the
+  // C to add a junior to another room as an ad hoc cover, × takes the name off. On a
+  // touchscreen there's no dragging (so the page scrolls); tapping opens the name's details.
   const chip = (p, k) => {
     const src = { row: i, key, part: k };
-    const el = h('span', { class: 'name', 'data-drop': '', 'data-row': i, 'data-key': key, 'data-part': k, style: colourStyle(p), title: p },
-      h('span', { class: 'grip', title: 'Drag to move, or onto another name to swap', onpointerdown: e => startNameDrag(e, src), onclick: e => e.stopPropagation() }, '⠿'),
-      key === 'junior' && !isCoverPart(p) ? h('span', { class: 'grip cover', title: 'Drag to another room to add them there as an ad hoc cover (C). They stay in this room.',
-        onpointerdown: e => startNameDrag(e, { ...src, cover: true }), onclick: e => e.stopPropagation() }, 'C') : null,
-      h('span', { class: 'label', onclick: () => { clearTimeout(tagTimer); openTagEditor(el, src); } }, shortOf(p)),
-      key === 'senior' && isDouble(p, doubles) ? h('sup', { class: 'dbl', title: 'Double covering' }, '&') : null);
+    const icon = (cls, title, text, o) => h('span', { class: 'icon ' + cls, title, onpointerdown: e => { e.stopPropagation(); o.down?.(e); }, onclick: e => { e.stopPropagation(); o.click?.(); } }, text);
+    const el = h('span', { class: 'name', 'data-drop': '', 'data-row': i, 'data-key': key, 'data-part': k, style: colourStyle(p), title: p,
+      onpointerdown: TOUCH ? null : e => startNameDrag(e, src),
+      onclick: TOUCH ? () => openTagEditor(el, src) : null },
+      !TOUCH && key === 'junior' && !isCoverPart(p) ? icon('cover', 'Drag to another room to add them there as an ad hoc cover (C). They stay in this room.', 'C', { down: e => startNameDrag(e, { ...src, cover: true }) }) : null,
+      h('span', { class: 'label' }, shortOf(p)),
+      key === 'senior' && isDouble(p, doubles) ? h('sup', { class: 'dbl', title: 'Double covering' }, '&') : null,
+      !TOUCH ? icon('del', isCoverPart(p) ? 'Remove this ad hoc cover' : 'Take off this list (they go to Admin / no list)', '×', { click: () => dropToPool(src) }) : null);
     return el;
   };
   return h('td', {
@@ -1340,8 +1387,7 @@ function renderGeneral() {
   return h('div', {},
     h('section', { class: 'card' },
       h('h2', {}, 'Calls/clinics'),
-      h('p', { class: 'hint' }, 'MOT and SICU calls, EOT and clinics for the day. Type names (autocomplete from the staff list); separate two people with "/". EOT 8 and EOT 9 default to the MOT call team (shown in grey) unless you type someone else. The cardiac call team goes to MOR 12. Everyone else here is left out of the OT lists. These fill the top half of the sheet; Load draft roster on the Cases tab fills them from the admin draft.'),
-      h('div', { class: 'bar' }, h('label', { class: 'seen' }, 'Roster for ', h('input', { type: 'date', value: state.day.date, onchange: e => { state.day.date = e.target.value; render(); } })))),
+      h('p', { class: 'hint' }, 'MOT and SICU calls, EOT and clinics for the day. Type names (autocomplete from the staff list); separate two people with "/". EOT 8 and EOT 9 default to the MOT call team (shown in grey) unless you type someone else. The cardiac call team goes to MOR 12. Everyone else here is left out of the OT lists. These fill the top half of the sheet; Load draft roster on the Cases tab fills them from the admin draft.')),
     h('section', { class: 'card scroll' },
       h('h2', {}, 'MOT and SICU Calls'),
       h('table', {},
@@ -1417,7 +1463,7 @@ let premedFilter = true;
 // The sheet exactly as it will be exported, drawn as an HTML table.
 function renderSheet() {
   colourCache.clear();
-  const layout = buildLayout({ date: state.day.date, rows: state.roster.rows, lists: rosterLists(), general: effectiveGeneral(), box: state.day.box || '', colourOf, shortOf });
+  const layout = buildLayout({ date: state.day.date, rows: state.roster.rows, lists: rosterLists(), general: effectiveGeneral(), box: commentsText(), colourOf, shortOf });
   const start = {}, covered = new Set();
   for (const c of layout.cells) {
     start[c.r + ':' + c.c1] = c;
@@ -1457,7 +1503,24 @@ function ensureSpecialRows(r) {
 }
 
 // The comments box: free text at the top right of the sheet.
+// Comments added to names on the roster ("Tan YW -mtg 3pm") as comments box lines.
+function nameComments() {
+  const out = [];
+  for (const row of state.roster?.rows || []) for (const key of ['senior', 'junior']) for (const part of cellParts(row, key)) {
+    const { name, dash } = parseNamePart(part);
+    if (dash) { const line = `${shortOf(name)} - ${dash}`; if (!out.includes(line)) out.push(line); }
+  }
+  return out;
+}
+// The comments box text: what was typed, then name comments not already in it.
+function commentsText() {
+  const typed = state.day.box || '';
+  const extra = nameComments().filter(l => !typed.toLowerCase().includes(l.toLowerCase()));
+  return [typed.trimEnd(), ...extra].filter(Boolean).join('\n');
+}
+
 function boxCard() {
+  const fromNames = nameComments();
   return h('section', { class: 'card' },
     h('h2', {}, 'Comments box'),
     h('p', { class: 'hint' }, 'Shown in the box at the top right of the sheet, e.g. meetings or people away. People on an admin day go on the Admin/no list row instead (Manpower tab).'),
@@ -1466,7 +1529,8 @@ function boxCard() {
       state.day.box = e.target.value;
       logRoster([`Comments box: ${before || '—'} → ${e.target.value || '—'}`]);
       save();
-    } }));
+    } }),
+    fromNames.length ? h('div', { class: 'hint' }, 'Also shown, from comments on names:', h('ul', {}, fromNames.map(l => h('li', {}, l)))) : null);
 }
 
 function renderRoster() {
@@ -1481,8 +1545,6 @@ function renderRoster() {
       h('button', { 'aria-pressed': String(rosterView === 'edit'), onclick: () => { rosterView = 'edit'; render(); } }, 'Edit'),
       h('button', { 'aria-pressed': String(rosterView === 'sheet'), onclick: () => { rosterView = 'sheet'; render(); } }, 'Sheet preview')),
     r && rosterView === 'sheet' && h('button', { onclick: () => window.print() }, 'Print / save PDF'),
-    h('span', { class: 'grow' }),
-    h('label', { class: 'seen' }, 'Roster for ', h('input', { type: 'date', value: state.day.date, onchange: e => { state.day.date = e.target.value; render(); } })),
   );
   if (!r) return h('div', {}, h('section', { class: 'card' }, h('h2', {}, 'OT roster'), h('p', { class: 'hint' }, 'Generates AOCC, AIC and the OT lists: seniors, juniors and premed cover. You can edit any cell before downloading.'), actions), historyCard());
 
@@ -1540,11 +1602,11 @@ function noListCard() {
   const people = noListPeople();
   const admin = state.staff.filter(p => state.day.staff[p.id]?.status === 'admin');
   const chip = p => h('span', { class: 'name', style: colourStyle(p.name), title: `${p.name} · ${p.grade}. Drag onto the roster.`,
-    onpointerdown: e => startNameDrag(e, { pool: p.id }) }, shortName(p));
+    onpointerdown: TOUCH ? null : e => startNameDrag(e, { pool: p.id }) }, shortName(p));
   const group = (title, list) => list.length ? h('div', { class: 'pool-group' }, h('b', {}, title), h('div', { class: 'pool-names' }, list.map(chip))) : null;
   return h('section', { class: 'card pool', 'data-drop': '', 'data-pool': '' },
     h('h2', {}, 'Admin / no list'),
-    h('p', { class: 'hint' }, 'Working today but not on any list, so they go on the Admin/no list row. Drag a name onto the roster to give them a list, or drag a name off the roster onto this box.'),
+    h('p', { class: 'hint' }, TOUCH ? 'Working today but not on any list, so they go on the Admin/no list row. Use + on the roster to give them a list.' : 'Working today but not on any list, so they go on the Admin/no list row. Drag a name onto the roster to give them a list, or drag a name off the roster onto this box (or click its ×).'),
     group('Seniors', people.filter(p => p.role === 'senior')),
     group('Juniors', people.filter(p => p.role === 'junior')),
     group('Admin day', admin),
@@ -1553,7 +1615,7 @@ function noListCard() {
 
 async function exportXlsx() {
   colourCache.clear();
-  const wb = buildRosterWorkbook(window.ExcelJS, { date: state.day.date, rows: state.roster.rows, lists: rosterLists(), general: effectiveGeneral(), box: state.day.box || '', colourOf, shortOf });
+  const wb = buildRosterWorkbook(window.ExcelJS, { date: state.day.date, rows: state.roster.rows, lists: rosterLists(), general: effectiveGeneral(), box: commentsText(), colourOf, shortOf });
   const buf = await wb.xlsx.writeBuffer();
   download(`OT roster ${state.day.date}.xlsx`, new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
 }
