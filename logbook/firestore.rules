@@ -1,0 +1,147 @@
+rules_version = '2';
+
+// APMES Logbook. Paste into Firebase console → Firestore Database → Rules, then Publish.
+// Least privilege: each person's logbook and cases are theirs alone; admins (listed in /admins,
+// added by hand in the console) can also read logbooks, import cases, and manage the resident
+// list. Summaries hold counts only (no case details) and are visible to admins and programme
+// residents (a resident's own logbook names their rid, and residents/{rid} must carry their email).
+// Anything not matched below is denied.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+    function me() {
+      return request.auth.token.email.lower();
+    }
+    function isAdmin() {
+      return signedIn() && exists(/databases/$(database)/documents/admins/$(me()));
+    }
+    function isOwner(email) {
+      return signedIn() && email == me();
+    }
+    function optString(d, k, max) {
+      return !(k in d) || d[k] == null || (d[k] is string && d[k].size() <= max);
+    }
+    function optNumber(d, k) {
+      return !(k in d) || d[k] == null || d[k] is number;
+    }
+
+    // admins: written only from the console. A user may check their own entry.
+    match /admins/{email} {
+      allow get: if isOwner(email);
+      allow list: if isAdmin();
+      allow write: if false;
+    }
+
+    // programme residents: admins manage the list; a user may read only the entry with their email
+    // (the app queries residents where email == their email).
+    match /residents/{rid} {
+      allow read: if isAdmin();
+      allow get, list: if signedIn() && resource.data.email == me();
+      allow create, update: if isAdmin() && validResident(rid, request.resource.data);
+      allow delete: if isAdmin();
+    }
+    function validResident(rid, d) {
+      return d.keys().hasOnly(['rid', 'name', 'email', 'status', 'intake', 'rYear'])
+        && d.rid == rid
+        && d.email is string && d.email == d.email.lower() && d.email.size() <= 200
+        && optString(d, 'name', 200)
+        && d.status in ['ACTIVE', 'ON LEAVE', 'GRADUATED', 'ATTRITED']
+        && optNumber(d, 'intake')
+        && (!('rYear' in d) || d.rYear == null || (d.rYear is int && d.rYear >= 1 && d.rYear <= 5));
+    }
+
+    // a person's logbook: owner only; admins may read
+    match /logbooks/{email} {
+      allow read: if isOwner(email) || isAdmin();
+      allow create, update: if isOwner(email) && validLogbook(email, request.resource.data);
+      allow delete: if isOwner(email);
+
+      // cases: owner; admins may also write (import from the old form)
+      match /cases/{caseId} {
+        allow read: if isOwner(email) || isAdmin();
+        allow create, update: if (isOwner(email) || isAdmin()) && validCase(caseId, request.resource.data);
+        allow delete: if isOwner(email) || isAdmin();
+      }
+
+      // case reflections (later phase): owner only; closed to writes until that phase ships
+      match /reflections/{id} {
+        allow read, delete: if isOwner(email);
+        allow write: if false;
+      }
+    }
+    function validLogbook(email, d) {
+      return d.keys().hasOnly(['email', 'name', 'rid', 'settings', 'templates', 'updatedAt'])
+        && d.email == email
+        && optString(d, 'rid', 40)
+        && optNumber(d, 'updatedAt')
+        && optString(d, 'name', 200)
+        && (!('templates' in d) || (d.templates is list && d.templates.size() <= 100))
+        && (!('settings' in d) || d.settings is map);
+    }
+    function validCase(caseId, d) {
+      return d.keys().hasOnly(['id', 'date', 'dateText', 'details', 'cats', 'createdAt', 'updatedAt', 'source', 'importKey', 'reflectionId'])
+        && d.id == caseId
+        && d.details is string && d.details.size() <= 2000
+        && d.cats is list && d.cats.size() <= 40
+        && (!('date' in d) || d.date == null || (d.date is string && d.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')))
+        && optString(d, 'dateText', 200)
+        && optString(d, 'importKey', 200)
+        && optString(d, 'reflectionId', 200)
+        && (!('source' in d) || d.source in ['app', 'import', 'paste', 'sheet'])
+        && optNumber(d, 'createdAt') && optNumber(d, 'updatedAt');
+    }
+
+    // counts per resident for benchmarking: admins and programme residents read; admins or the
+    // resident write. A resident's own write must carry the name and intake on the programme list.
+    match /summaries/{rid} {
+      allow read: if isAdmin() || isMember();
+      allow create, update: if validSummary(rid, request.resource.data)
+        && (isAdmin() || (isResident(rid) && ownSummary(rid, request.resource.data)));
+      allow delete: if isAdmin();
+    }
+    function isResident(rid) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/residents/$(rid))
+        && get(/databases/$(database)/documents/residents/$(rid)).data.email == me();
+    }
+    // signed in and on the programme list: the rid named in their logbook belongs to their email
+    function isMember() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/logbooks/$(me()))
+        && get(/databases/$(database)/documents/logbooks/$(me())).data.get('rid', null) is string
+        && get(/databases/$(database)/documents/residents/$(get(/databases/$(database)/documents/logbooks/$(me())).data.rid)).data.email == me();
+    }
+    function ownSummary(rid, d) {
+      return (d.get('name', '') == get(/databases/$(database)/documents/residents/$(rid)).data.get('name', '')
+          || (d.get('name', '') == '' && get(/databases/$(database)/documents/residents/$(rid)).data.get('name', null) == null))
+        && d.get('intake', null) == get(/databases/$(database)/documents/residents/$(rid)).data.get('intake', null);
+    }
+    function validSummary(rid, d) {
+      return d.keys().hasOnly(['rid', 'name', 'intake', 'rYear', 'counts', 'total', 'reflections', 'reflectionsTotal', 'updatedAt'])
+        && d.rid == rid
+        && d.counts is map && d.counts.size() <= 100
+        && d.total is number
+        && optString(d, 'name', 200)
+        && optNumber(d, 'intake') && optNumber(d, 'rYear') && optNumber(d, 'reflectionsTotal') && optNumber(d, 'updatedAt')
+        && (!('reflections' in d) || d.reflections is map);
+    }
+
+    // which old-form rows have been imported: admins only
+    match /imports/{rid} {
+      allow read, write: if isAdmin();
+    }
+
+    // templates offered to everyone: admins write
+    match /sharedTemplates/{id} {
+      allow read: if signedIn();
+      allow create, update: if isAdmin()
+        && request.resource.data.keys().hasOnly(['id', 'name', 'cats', 'details'])
+        && request.resource.data.name is string && request.resource.data.name.size() <= 100
+        && request.resource.data.cats is list && request.resource.data.cats.size() <= 40
+        && optString(request.resource.data, 'details', 2000);
+      allow delete: if isAdmin();
+    }
+  }
+}
