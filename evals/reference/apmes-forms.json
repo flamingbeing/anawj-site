@@ -120,11 +120,12 @@
    ]
   },
   "guidance": {
-   "about": "Dropdown. Only one option was visible.",
+   "about": "DOPS: how much guidance was provided for the critical portion of the procedure (options confirmed by the user, 2026-10-10; only the Passive Help wording was seen in full).",
    "options": [
-    "Passive Help (Supervisor assists and follows the lead of the resident)"
-   ],
-   "unconfirmed": true
+    "Hands-off",
+    "Passive Help (Supervisor assists and follows the lead of the resident)",
+    "Active Help"
+   ]
   },
   "clinicalSetting": {
    "about": "Mini-CEX clinical setting dropdown (confirmed from a screenshot, 2026-10-10).",

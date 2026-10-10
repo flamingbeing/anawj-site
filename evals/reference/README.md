@@ -4,7 +4,7 @@ Reference material for the evaluations app and other APMES tools, transcribed fr
 
 - **Evaluations_Tracking_TemplateAY2023.xlsx**: which DOPS, Mini-CEX and EBD assessments each resident must complete, and by which residency year. Transcribed in full, cell by cell, into [`apmes-requirements.json`](apmes-requirements.json) and summarised below.
 - **RESIDENT GUIDE FOR LOGGING DOPS & MINI CEX UNDER MEDHUB (ver 19 Jul 2023)**: how residents trigger these assessments in MedHub today. The workflow and fields are described below.
-- **Three MedHub app screenshots of the evaluator's side** (EBD, Mini-CEX, DOPS): transcribed question by question into [`apmes-forms.json`](apmes-forms.json) and summarised below.
+- **Three MedHub app screenshots of the evaluator's side** (EBD, Mini-CEX, DOPS; since removed from the repo because they showed names and real ratings): transcribed question by question into [`apmes-forms.json`](apmes-forms.json) and summarised below.
 
 The original files are not in this repository, which is public. The guide's screenshots show real faculty names, and both documents are programme-internal. Keep the originals with the programme. If a newer template comes out, re-transcribe it here and say which version it is.
 
@@ -74,11 +74,11 @@ Every form opens with an introduction saying it is a **formative** assessment by
 
 **The milestone scale** (EBD and Mini-CEX) has ten points: 0.5 = Not Yet Achieved Level 1, then 1.0 to 5.0 in half-levels, shown alongside 1 to 9 on the 9-point scale (1.0 = 1, 1.5 = 2 … 5.0 = 9). Medical knowledge and clinical reasoning can't be N/A; evidence-based medicine and healthcare system awareness can.
 
-**Forms vary by item in name only, as far as these three show.** MedHub names each form after its EPA, e.g. "(2023) EBD EPA (5): (HeadNeck Trauma)", "(2023) Mini Clinical Evaluation Exercise (CEX) Form - PNB", "(2023) Direct Observation of Procedural Skills (DOPS) Form - (Truncal)". The procedure names carry EPA numbers and sometimes a level ("[DOPS] EPA 3 (Level 3): Single Shot Truncal Block: Transabdominal Plane Block", "[MiniCEX] EPA 3: Manage a patient for surgery under peripheral nerve block and sedation", "[EBD] EPA 5: Mx of head/neck trauma"). The tracking template doesn't have these numbers.
+**Forms vary by item in name only, as far as these three show.** MedHub names each form after its EPA, e.g. "(2023) EBD EPA (5): (HeadNeck Trauma)", "(2023) Mini Clinical Evaluation Exercise (CEX) Form - PNB", "(2023) Direct Observation of Procedural Skills (DOPS) Form - (Truncal)". The procedure names carry EPA numbers and sometimes a level ("[DOPS] EPA 3 (Level 3): Single Shot Truncal Block: Transabdominal Plane Block", "[MiniCEX] EPA 3: Manage a patient for surgery under peripheral nerve block and sedation", "[EBD] EPA 5: Mx of head/neck trauma"). The tracking template doesn't have these numbers; they are in the programme's EPA guidebook.
 
 **Still to confirm** (marked `unconfirmed` in the JSON):
 
-- The dropdown options. The screenshots show only the selected or placeholder value: the DOPS guidance question (only "Passive Help (Supervisor assists and follows the lead of the resident)" seen).
+- The full wording of the DOPS guidance options "Hands-off" and "Active Help" (only "Passive Help (Supervisor assists and follows the lead of the resident)" was seen in full).
 - Whether the DOPS form continues after question 19; the screenshot ends there.
 - In the DOPS screenshot the comments question (17) has no asterisk, so it may be optional there while it is required on the other two.
 - The EPA numbering for each tracking-template item.
