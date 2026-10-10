@@ -3,7 +3,7 @@
 import { R_YEARS, BY_CODE, CATEGORIES } from './categories.js';
 import { progress, epaProgress, todayISO } from './engine.js';
 import { exportTotals } from './xlsxio.js';
-import { reflectionProgress, needsCase } from './reflections.js';
+import { reflectionProgress } from './reflections.js';
 import { S, h, toast, cloud, rYear, settings, patchLogbook, needExcel, download, displayName, hooks, add, resetters } from './ui-core.js';
 
 const STATUS_TEXT = { late: 'Behind', due: 'Due this year', ontrack: 'On track', done: 'Done', none: 'No target' };
@@ -68,7 +68,7 @@ function reflCard() {
     h('p', { class: 'hint', style: 'margin-top:8px' },
       `${p.totals.counted} / ${p.totals.min} counted · ${met} of ${p.headings.length} headings met · ${p.totals.drafts} draft${p.totals.drafts === 1 ? '' : 's'}`,
       issues ? ` · ${issues} to sort out` : '',
-      (S.reflections || []).some(needsCase) ? ` · ${(S.reflections || []).filter(needsCase).length} not linked to a case` : ''),
+      ''),
     h('span', { class: 'meter' }, h('i', { class: met === p.headings.length ? 'done' : 'ontrack', style: `width:${Math.min(100, Math.round(p.totals.counted / p.totals.min * 100))}%` })));
 }
 

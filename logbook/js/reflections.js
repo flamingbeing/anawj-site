@@ -62,13 +62,10 @@ export const isLegacy = r => !!(r && r.sections && Object.values(r.sections).som
   && !String(r.summary || '').trim() && !arr(r.points).some(p => p && (String(p.heading || '').trim() || String(p.text || '').trim())));
 
 // What is missing before a reflection can be marked complete (empty = ready).
-// Reflections written in the app must be linked to a logged case (caseId). Ones imported from a Word
-// portfolio (source 'word') may be linked but don't have to be.
-export const needsCase = r => !!r && !r.caseId && r.source !== 'word';
+// Linking a reflection to a logged case (caseId) is optional. source 'word' marks a Word import.
 export function completeProblems(r) {
   const out = [];
   const hd = HEADING_BY_ID[r.headingId];
-  if (needsCase(r)) out.push('linked case');
   if (!hd) out.push('heading');
   if (hd && hd.subs && !r.subId) out.push('sub-type');
   if (!String(r.initials || '').trim()) out.push('initials');

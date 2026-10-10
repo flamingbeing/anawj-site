@@ -7,7 +7,7 @@
 // works) and selecting several to delete. Every delete goes to the recycle bin (bin.js, 30 days).
 
 import { REFLECTION_HEADINGS, REFLECTION_SECTIONS } from './categories.js';
-import { reflectionProgress, reflectionCounts, HEADING_BY_ID, splitDetails, completeProblems, isLegacy, LIMITS, IMAGE_MAX_B64, wordCount, MIN_WORDS, suggestHeadings, moveToHeading, needsCase } from './reflections.js';
+import { reflectionProgress, reflectionCounts, HEADING_BY_ID, splitDetails, completeProblems, isLegacy, LIMITS, IMAGE_MAX_B64, wordCount, MIN_WORDS, suggestHeadings, moveToHeading } from './reflections.js';
 export { completeProblems };
 import { fmtDate } from './engine.js';
 import { S, h, toast, cloud, debounce, hooks, rYear, todayISO, confirmBox, add, resetters, scheduleSummary, displayName, byNewest, catName } from './ui-core.js';
@@ -224,7 +224,7 @@ function list() {
     em ? null : h('div', { class: 'bar' }, renderExportButton(() => (S.reflections || []).filter(r => r.status === 'complete'), displayName,
       async () => ({ cases: S.cases || [], intake: (S.resident && (S.resident.intake || Number(String(S.resident.rid || '').slice(0, 4)))) || null, rYear: rYear(),
         images: await loadImagesFor((S.reflections || []).filter(r => r.status === 'complete')) }))),
-    all.some(needsCase) ? h('p', { class: 'hint', style: 'color:var(--warn, #b45309)' }, `${all.filter(needsCase).length} reflection${all.filter(needsCase).length === 1 ? ' is' : 's are'} not linked to a case yet: open and link before marking complete.`) : null);
+    null);
 
   // edit-mode toolbar: select all / clear / delete selected
   const checks = [];
@@ -250,7 +250,7 @@ function list() {
       h('span', { class: 'd' }, em ? h('span', { class: 'refl-tools' }, h('span', { class: 'refl-handle', title: 'Drag to another heading', 'aria-label': 'Drag to another heading', onpointerdown: e => startDrag(e, r, li), onclick: e => e.stopPropagation() }, '⠿'), cb) : null,
         (r.jr ? 'JR ' : '') + (r.date ? fmtDate(r.date) : '—')),
       h('span', { class: 't' }, `${r.initials || '??'} ${r.diagnosis || ''}`),
-      h('span', { class: 'c' }, r.status === 'complete' ? h('span', { class: 'flag' }, 'complete') : h('span', { class: 'flag err' }, 'draft'), r.caseId ? null : needsCase(r) ? h('span', { class: 'flag err' }, 'not linked') : h('span', { class: 'flag' }, 'from Word'), h('span', { class: 'flag' + (wordCount(r) < MIN_WORDS ? ' err' : '') }, `${wordCount(r)} words`)));
+      h('span', { class: 'c' }, r.status === 'complete' ? h('span', { class: 'flag' }, 'complete') : h('span', { class: 'flag err' }, 'draft'), r.source === 'word' ? h('span', { class: 'flag' }, 'from Word') : null, h('span', { class: 'flag' + (wordCount(r) < MIN_WORDS ? ' err' : '') }, `${wordCount(r)} words`)));
     if (cb) checks.push([cb, li, r.id]);
     return li;
   };
@@ -488,18 +488,13 @@ function editor() {
       h('div', { class: 'bar', style: 'gap:8px;align-items:center' },
         h('b', { style: 'font-size:13px' }, 'Linked case'), h('span', { class: 'grow' }),
         h('button', { class: 'small', onclick: () => openPicker(true) }, 'Change case'),
-        // a Word import doesn't need a case, so its link can be removed again
-        r.source === 'word' ? h('button', { class: 'small', onclick: () => { r.caseId = null; restructure(); } }, 'Unlink') : null),
+        h('button', { class: 'small', onclick: () => { r.caseId = null; restructure(); } }, 'Unlink')),
       lc ? h('div', {}, h('span', { class: 'muted' }, caseDate(lc) + ' · '), lc.details || '(no details)',
         (lc.cats || []).length ? h('div', { class: 'muted', style: 'font-size:13px' }, lc.cats.map(catName).join(', ')) : null)
         : h('div', { class: 'hint' }, S.casesLoaded === false ? 'Loading case…' : 'The linked case is no longer in your logbook. Change case to link another.'))
-    : r.source === 'word'
-      ? h('div', { style: 'border:1px solid var(--line, #ddd);border-radius:10px;padding:8px 10px;margin:8px 0' },
-        h('p', { style: 'margin:0 0 6px' }, h('b', {}, 'Imported from Word. '), 'Linking it to a logged case is optional.'),
-        h('button', { onclick: () => openPicker(true) }, 'Link to a case'))
-    : h('div', { style: 'border:1px solid var(--warn, #b45309);border-radius:10px;padding:8px 10px;margin:8px 0' },
-      h('p', { style: 'margin:0 0 6px' }, h('b', {}, 'Not linked to a case. '), 'Every reflection must be on a logged case; link one before marking complete.'),
-      h('button', { class: 'primary', onclick: () => openPicker(true) }, 'Link to a case'));
+    : h('div', { style: 'border:1px solid var(--line, #ddd);border-radius:10px;padding:8px 10px;margin:8px 0' },
+      h('p', { style: 'margin:0 0 6px' }, h('b', {}, r.source === 'word' ? 'Imported from Word. ' : 'No case linked. '), 'Linking it to a logged case is optional.'),
+      h('button', { onclick: () => openPicker(true) }, 'Link to a case'));
   if (rv.relinked) { rv.relinked = false; setTimeout(() => { status.textContent = 'Editing…'; autosave(); }, 0); }
 
   const input = (key, attrs = {}) => h('input', { style: 'font-size:16px', value: r[key] ?? '', ...attrs, oninput: e => { r[key] = e.target.value || (key === 'date' ? null : ''); changed(); } });
