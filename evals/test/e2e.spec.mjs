@@ -137,15 +137,15 @@ try {
   await open('assessor', 'e/' + r2.id);
   await page.waitForSelector('.e-form');
   taps = 0;
-  await fillForm('minicex', { skip: ['q5'], text: { q19: 'Too short' } });
+  await fillForm('minicex', { skip: ['q5', 'q19'] });
   await submit();
   await page.waitForTimeout(400);
-  ok((await page.locator('.e-form__sent').count()) === 0, 'submit blocked with a missing required answer and a short comment');
+  ok((await page.locator('.e-form__sent').count()) === 0, 'submit blocked with missing required answers');
   const gaps = await page.locator('.e-form__gaps').innerText().catch(() => '');
   ok(/Q5/.test(gaps) && /Q19/.test(gaps), `gaps listed (${gaps.replace(/\s+/g, ' ').slice(0, 60)})`);
   ok((await evById(r2.id)).status === 'requested', 'still requested after the blocked submit');
   await tap(page.locator('#q-q5 label:has(input[value="NA"])'));
-  await page.locator('#q-q19 textarea').fill('Clear history and a sensible plan; summarise risks more crisply.');
+  await page.locator('#q-q19 textarea').fill('Good plan.');   // no minimum length
   await submit();
   await page.waitForSelector('.e-form__sent', { timeout: 5000 });
   const m2 = await evById(r2.id);

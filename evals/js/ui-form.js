@@ -614,7 +614,7 @@ class FormScreen {
             h('p', { class: 'e-entrust__title' }, 'Entrustment questions (discuss at least 2)'),
             h('ol', { class: 'e-entrust__list' }, qs.map(x => h('li', {}, x))))
         : h('p', { class: 'e-q__help' }, 'The guidebook sets no entrustment questions for this item. Discuss at least 2 of your own.');
-    } else if (!ro && q.minLength) {
+    } else if (!ro && (q.feedback || q.minLength)) {
       starters = h('div', { class: 'e-starters' }, COMMENT_STARTERS.map(s => h('button', { type: 'button', onclick: () => insert(s) }, s.replace(/: $/, '…'))));
     }
     return [starters, ta, counter, warn];

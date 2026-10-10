@@ -44,7 +44,7 @@ assert.equal(q('dops', 2).options.length, 4);
 for (let n = 3; n <= 13; n++) { assert.equal(q('dops', n).type, 'ninePoint'); assert.equal(q('dops', n).na, true); }
 assert.equal(q('dops', 14).na, false); assert.equal(q('dops', 14).required, true);
 assert.equal(q('dops', 16).type, 'supervision');
-assert.equal(q('dops', 17).required, false); assert.equal(q('dops', 17).minLength, 30);
+assert.equal(q('dops', 17).required, false); assert.equal(q('dops', 17).minLength, null); assert.equal(q('dops', 17).feedback, true); assert.doesNotMatch(q('dops', 17).label, /minimum 30/); assert.match(q('dops', 17).officialLabel, /minimum 30 characters/);
 assert.deepEqual(q('dops', 18).options, ['Yes', 'No', 'Maybe']);
 // Mini-CEX (22)
 assert.equal(questionsOf(FORMS.minicex).length, 22);
@@ -52,7 +52,7 @@ assert.equal(q('minicex', 1).options.length, 8);
 assert.equal(q('minicex', 7).required, false);
 assert.equal(q('minicex', 12).na, false);
 assert.deepEqual([14, 15, 16, 17].map(n => q('minicex', n).na), [false, false, true, true]);
-assert.equal(q('minicex', 19).minLength, 30); assert.equal(q('minicex', 19).required, true);
+assert.equal(q('minicex', 19).minLength, null); assert.equal(q('minicex', 19).required, true);
 assert.equal(q('minicex', 22).required, false);
 assert.equal(FORMS.minicex.sections.find(s => s.questions.some(x => x.n === 3)).title, 'Patient Assessment/ Preparation');
 // EBD (12)
@@ -62,7 +62,7 @@ assert.equal(q('ebd', 2).exclusive, 'No obvious areas for improvement');
 assert.deepEqual(q('ebd', 3).showIf, { key: 'q2', anyExcept: 'No obvious areas for improvement' });
 assert.equal(q('ebd', 3).required, false);
 assert.deepEqual([5, 6, 7, 8].map(n => q('ebd', n).na), [false, false, true, true]);
-assert.equal(q('ebd', 10).minLength, 30);
+assert.equal(q('ebd', 10).minLength, null);
 assert.ok(!questionsOf(FORMS.dops).some(x => x.showIf || x.exclusive));
 
 console.log('forms tests passed');

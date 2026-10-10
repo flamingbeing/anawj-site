@@ -71,31 +71,38 @@ const { dops, minicex, ebd } = FORMS;
   // text: required with no minimum (DOPS q15)
   assert.equal(validate(dops, { ...full(dops), q15: 'ok' }).ok, true);
   assert.deepEqual(validate(dops, { ...full(dops), q15: '   ' }).missing, [15]);
+  // The app's forms have no minimum length now; the engine still supports one (tested on copies).
+  assert.equal(validate(dops, { ...full(dops), q17: 'Too short' }).ok, true, 'no minimum on DOPS q17');
+  assert.equal(validate(minicex, { ...full(minicex), q19: 'ok' }).ok, true, 'no minimum on Mini-CEX q19');
+  assert.equal(validate(ebd, { ...full(ebd), q10: 'ok' }).ok, true, 'no minimum on EBD q10');
+  const withMin = (f, key, n) => ({ ...f, sections: f.sections.map(s => ({ ...s, questions: s.questions.map(q => q.key === key ? { ...q, minLength: n } : q) })) });
+  { const dops = withMin(FORMS.dops, 'q17', 30), minicex = withMin(FORMS.minicex, 'q19', 30), ebd = withMin(FORMS.ebd, 'q10', 30);
   // optional text with minLength applies only when non-empty (DOPS q17)
-  assert.equal(validate(dops, { ...full(dops), q17: '' }).ok, true);
-  assert.equal(validate(dops, without(full(dops), 'q17')).ok, true);
-  const short = validate(dops, { ...full(dops), q17: 'Too short' });
-  assert.equal(short.ok, false); assert.deepEqual(short.missing, []); assert.equal(short.errors[0].n, 17);
-  assert.match(short.errors[0].msg, /30 characters \(9 so far\)/);
-  assert.equal(short.answered, 18, 'optional errors do not change the required count');
-  // required with minLength (Mini-CEX q19, EBD q10)
-  const r19 = validate(minicex, { ...full(minicex), q19: 'x'.repeat(29) });
-  assert.equal(r19.ok, false); assert.equal(r19.errors[0].n, 19); assert.equal(r19.answered, 19);
-  assert.equal(validate(minicex, { ...full(minicex), q19: 'x'.repeat(30) }).ok, true);
-  assert.equal(validate(minicex, { ...full(minicex), q19: '  ' + 'x'.repeat(29) + '  ' }).ok, false, 'trimmed');
-  assert.equal(validate(ebd, { ...full(ebd), q10: 'short' }).ok, false);
-  // starter text does not count
-  const STARTER = 'Do more of… because…';
-  assert.equal(validate(minicex, { ...full(minicex), q19: STARTER + ' ' + 'x'.repeat(10) }, { starters: [STARTER] }).ok, false);
-  assert.equal(validate(minicex, { ...full(minicex), q19: STARTER + ' ' + 'x'.repeat(30) }, { starters: [STARTER] }).ok, true);
-  assert.deepEqual(validate(minicex, { ...full(minicex), q19: STARTER }, { starters: [STARTER] }).missing, [19]);
-  assert.equal(validate(dops, { ...full(dops), q17: STARTER }, { starters: [STARTER] }).ok, true, 'optional starter-only = blank');
-  // starters that end in a space are stored trimmed ("A: " → "A:"): still not the assessor's words
-  const EQ = 'Q: When would you call for help?\nA: ';
-  const STS = [EQ, 'Did well: ', 'To reach the next level: '];
-  assert.deepEqual(validate(dops, { ...full(dops), q15: (EQ + EQ).trimEnd() }, { starters: STS }).missing.includes(15), true, 'trimmed entrustment starters = blank');
-  assert.equal(validate(minicex, { ...full(minicex), q19: 'Did well:\nTo reach the next level:' }, { starters: STS }).ok, false, 'trimmed comment starters do not count');
-  assert.equal(validate(minicex, { ...full(minicex), q19: 'Did well: ' + 'x'.repeat(30) }, { starters: STS }).ok, true);
+    assert.equal(validate(dops, { ...full(dops), q17: '' }).ok, true);
+    assert.equal(validate(dops, without(full(dops), 'q17')).ok, true);
+    const short = validate(dops, { ...full(dops), q17: 'Too short' });
+    assert.equal(short.ok, false); assert.deepEqual(short.missing, []); assert.equal(short.errors[0].n, 17);
+    assert.match(short.errors[0].msg, /30 characters \(9 so far\)/);
+    assert.equal(short.answered, 18, 'optional errors do not change the required count');
+    // required with minLength (Mini-CEX q19, EBD q10)
+    const r19 = validate(minicex, { ...full(minicex), q19: 'x'.repeat(29) });
+    assert.equal(r19.ok, false); assert.equal(r19.errors[0].n, 19); assert.equal(r19.answered, 19);
+    assert.equal(validate(minicex, { ...full(minicex), q19: 'x'.repeat(30) }).ok, true);
+    assert.equal(validate(minicex, { ...full(minicex), q19: '  ' + 'x'.repeat(29) + '  ' }).ok, false, 'trimmed');
+    assert.equal(validate(ebd, { ...full(ebd), q10: 'short' }).ok, false);
+    // starter text does not count
+    const STARTER = 'Do more of… because…';
+    assert.equal(validate(minicex, { ...full(minicex), q19: STARTER + ' ' + 'x'.repeat(10) }, { starters: [STARTER] }).ok, false);
+    assert.equal(validate(minicex, { ...full(minicex), q19: STARTER + ' ' + 'x'.repeat(30) }, { starters: [STARTER] }).ok, true);
+    assert.deepEqual(validate(minicex, { ...full(minicex), q19: STARTER }, { starters: [STARTER] }).missing, [19]);
+    assert.equal(validate(dops, { ...full(dops), q17: STARTER }, { starters: [STARTER] }).ok, true, 'optional starter-only = blank');
+    // starters that end in a space are stored trimmed ("A: " → "A:"): still not the assessor's words
+    const EQ = 'Q: When would you call for help?\nA: ';
+    const STS = [EQ, 'Did well: ', 'To reach the next level: '];
+    assert.deepEqual(validate(dops, { ...full(dops), q15: (EQ + EQ).trimEnd() }, { starters: STS }).missing.includes(15), true, 'trimmed entrustment starters = blank');
+    assert.equal(validate(minicex, { ...full(minicex), q19: 'Did well:\nTo reach the next level:' }, { starters: STS }).ok, false, 'trimmed comment starters do not count');
+    assert.equal(validate(minicex, { ...full(minicex), q19: 'Did well: ' + 'x'.repeat(30) }, { starters: STS }).ok, true);
+  }
 
   // EBD checkboxes and the exclusive option
   const NONE = 'No obvious areas for improvement';
