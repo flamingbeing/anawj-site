@@ -1,4 +1,4 @@
-// Settings tab (#settings): display, logging, templates, recycle bin, privacy. Also the Account tab's
+// Settings tab (#settings): the Admin entry (admins only), display, logging, templates, recycle bin, privacy. Also the Account tab's
 // "You" and sign-out cards (youCard, signOutCard), used by ui-account.js.
 
 import { R_YEARS } from './categories.js';
@@ -21,6 +21,10 @@ export function cachedCompact() {
 export function renderSettings() {
   const st = settings();
   return h('div', {},
+    S.admin ? h('section', { class: 'card' },
+      h('div', { class: 'bar' }, h('h2', { style: 'margin:0' }, 'Admin'), h('span', { class: 'grow' }),
+        h('a', { class: 'btn small primary', href: '#admin' }, 'Open admin')),
+      h('p', { class: 'hint', style: 'margin:6px 0 0' }, 'Residents list, importing the old logbook, shared templates and the portfolio template.')) : null,
     h('section', { class: 'card' },
       h('h2', {}, 'Display'),
       h('label', { class: 'check' }, h('input', { type: 'checkbox', role: 'switch', checked: !!st.compact, onchange: e => {

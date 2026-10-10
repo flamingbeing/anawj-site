@@ -8,7 +8,7 @@ import { renderLogbook } from './ui-logbook.js';
 import { renderProgress, renderTotals } from './ui-progress.js';
 import { applyCompact, cachedCompact, renderSettings } from './ui-settings.js';
 import { renderAccount, flush as flushProfile } from './ui-account.js';
-import { renderAdmin } from './ui-admin.js';
+import { renderAdmin, leaveAdmin } from './ui-admin.js';
 import { renderReflect, watchMyReflections } from './ui-reflect.js';
 import { purgeExpired } from './bin.js';
 
@@ -40,7 +40,8 @@ const TABS = [
   { id: 'totals', label: 'Totals', render: renderTotals },
   { id: 'account', label: 'Account', render: renderAccount },
   { id: 'settings', label: 'Settings', render: renderSettings },
-  { id: 'admin', label: 'Admin', render: renderAdmin, admin: true },   // only admins see this tab
+  // not in the bar: admins open it from Settings → Admin
+  { id: 'admin', label: 'Admin', render: renderAdmin, admin: true, hidden: true, under: 'settings' },
 ];
 
 const app = document.getElementById('app');
@@ -75,6 +76,7 @@ function paintTabs() {
 function go(id) {
   if (S.tab === id) { if (id === 'log') document.querySelector('textarea.details')?.focus(); return; }
   if (S.tab === 'account') flushProfile();
+  if (S.tab === 'admin') leaveAdmin();
   S.tab = id;
   history.replaceState(null, '', location.pathname + location.search + '#' + id);
   window.scrollTo(0, 0);

@@ -221,6 +221,8 @@ ul.cases .c { grid-column: 2; display: flex; flex-wrap: wrap; gap: 4px; }
 .flag.err { background: var(--err-bg); color: var(--err); }
 .monthhead { position: sticky; top: 0; background: var(--bg); font-size: 12px; font-weight: 700; color: var(--muted); padding: 10px 4px 4px; text-transform: uppercase; letter-spacing: .03em; z-index: 1; }
 
+table.res-table tr.res-group th { font-size: 13px; color: var(--accent); background: var(--bg); padding-top: 14px; text-transform: none; }
+table.res-table tbody:first-of-type tr.res-group th { padding-top: 6px; }
 table.grid td { padding: 2px; }
 table.grid input, table.grid textarea { border-radius: 6px; min-height: 34px; padding: 4px 6px; }
 table.grid textarea { min-height: 34px; height: 34px; }
