@@ -11,7 +11,7 @@ import { computeBoundsTree, disposeBoundsTree, acceleratedRaycast } from 'three-
 THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree;
 THREE.BufferGeometry.prototype.disposeBoundsTree = disposeBoundsTree;
 THREE.Mesh.prototype.raycast = acceleratedRaycast;
-import { STAGES, NOTES, INFO, GROUP_LABEL } from './content.js';
+import { STAGES, NOTES, INFO, GROUP_LABEL, VIVA, VIVA_TOPICS } from './content.js';
 
 const $ = (s) => document.querySelector(s);
 const COARSE = matchMedia('(pointer: coarse)').matches;
@@ -1240,6 +1240,7 @@ function renderStageUI() {
 }
 function setMode(m) {
   state.mode = m;
+  if (location.hash.slice(1) !== m) history.replaceState(null, '', `#${m}`);
   $$('.tabs button').forEach((b) => b.classList.toggle('active', b.dataset.mode === m));
   $$('[data-show]').forEach((el) => { el.hidden = !el.dataset.show.split(' ').includes(m); });
   $('#notes').innerHTML = NOTES[m === 'oa' ? 'oa' : m];
@@ -1564,6 +1565,48 @@ function nextQuestion() {
 }
 function closeQuiz() { $('#quiz').hidden = true; if (state.selected) { state.selected.material.emissive?.setRGB(0, 0, 0); state.selected = null; } }
 
+// ---------- exam viva ----------
+const viva = { queue: [], cur: null, got: 0, n: 0 };
+function vivaDeck() {
+  const t = $('#vivaTopic').value;
+  return VIVA.map((_, i) => i).filter((i) => !t || VIVA[i].topic === t).sort(() => Math.random() - 0.5);
+}
+function vivaScore() { $('#vivaScore').textContent = `${viva.got} / ${viva.n}`; }
+function vivaAsk() {
+  if (!viva.queue.length) viva.queue = vivaDeck();
+  viva.cur = viva.queue.shift();
+  const v = VIVA[viva.cur];
+  $('#vivaBody').innerHTML = `<div class="lbl">${VIVA_TOPICS[v.topic]}</div><p class="viva-q">${v.q}</p>
+    <p class="muted">Answer aloud, then reveal.</p>
+    <div class="row"><button data-v="reveal" class="primary">Show answer</button>${v.show ? '<button data-v="show">Show me</button>' : ''}</div>`;
+  $('#vivaNext').textContent = 'Skip';
+}
+function vivaReveal() {
+  const v = VIVA[viva.cur];
+  $('#vivaBody').innerHTML = `<div class="lbl">${VIVA_TOPICS[v.topic]}</div><p class="viva-q">${v.q}</p>
+    <div class="viva-a">${v.a}</div>
+    <div class="row">${v.show ? '<button data-v="show">Show me</button>' : ''}<span style="flex:1"></span>
+    <button data-v="got" class="ok">Got it</button><button data-v="missed">Missed it</button></div>`;
+  $('#vivaNext').textContent = 'Next question';
+}
+function vivaShow() {
+  const sh = VIVA[viva.cur].show;
+  if (!sh || !geo.portals) return;
+  if (sh.mode && sh.mode !== state.mode) setMode(sh.mode);
+  if (sh.stage != null && sh.stage !== state.stage) { applyStage(sh.stage); [JB.T, JB.F, JB.S].forEach((j) => { j.dirty = true; }); }
+  if (sh.layers) {
+    for (const [k, on] of Object.entries(sh.layers)) { state.layers[k] = on; const cb = $(`#layerChecks [data-layer="${k}"]`); if (cb) cb.checked = on; }
+    applyVisibility();
+  }
+  if (sh.heat != null && state.mode === 'oa') { state.heat = sh.heat; $('#heatOn').checked = sh.heat; [JB.T, JB.F, JB.S].forEach((j) => { j.dirty = true; }); }
+  if (sh.view && state.mode !== 'arthro') setView(sh.view);
+  if (matchMedia('(max-width: 820px), (max-height: 500px)').matches) { document.body.classList.add('panel-collapsed'); setTimeout(resize, 0); toast('Tap ☰ to return to the question'); }
+}
+function vivaMark(ok) {
+  viva.n++; if (ok) viva.got++; else viva.queue.splice(Math.min(3, viva.queue.length), 0, viva.cur); // missed: ask again soon
+  vivaScore(); vivaAsk();
+}
+
 // ---------- events ----------
 function bindUI() {
   $$('.tabs button').forEach((b) => { b.onclick = () => setMode(b.dataset.mode); });
@@ -1577,6 +1620,13 @@ function bindUI() {
   $('#heatOn').onchange = (e) => { state.heat = e.target.checked; [JB.T, JB.F, JB.S].forEach((j) => { j.dirty = true; }); };
   $('#xrayOn').onchange = (e) => { state.xray = e.target.checked; applyXray(); };
   $('#quizBtn').onclick = () => { quiz.score = 0; quiz.n = 0; nextQuestion(); };
+  $('#vivaTopic').insertAdjacentHTML('beforeend', Object.entries(VIVA_TOPICS).map(([k, t]) => `<option value="${k}">${t} (${VIVA.filter((v) => v.topic === k).length})</option>`).join(''));
+  $('#vivaTopic').onchange = () => { viva.queue = []; viva.got = viva.n = 0; vivaScore(); vivaAsk(); };
+  $('#vivaNext').onclick = vivaAsk;
+  $('#vivaBody').addEventListener('click', (e) => {
+    const a = e.target.closest('[data-v]')?.dataset.v;
+    if (a === 'reveal') vivaReveal(); else if (a === 'show') vivaShow(); else if (a === 'got' || a === 'missed') vivaMark(a === 'got');
+  });
   $('#scopePortal').onchange = (e) => { scope.portal = e.target.value; if (scope.work === scope.portal) { scope.work = Object.keys(geo.portals).find((k) => k !== scope.portal); $('#workPortal').value = scope.work; } resetScope(); resetInstrument(); };
   $('#workPortal').onchange = (e) => { scope.work = e.target.value; if (scope.work === scope.portal) toast('Use a different portal for the instrument'); resetInstrument(); };
   $('#tractionOn').onchange = (e) => { state.traction = e.target.checked; applyThumb(); if (!state.traction) toast('Without traction the joint space is too tight to work in'); };
@@ -1591,6 +1641,7 @@ function bindUI() {
 
   window.addEventListener('keydown', (e) => {
     if (e.target.matches('input, select, textarea')) return;
+    if (e.key === 'Escape') { closeQuiz(); $('#info').hidden = true; }
     if (state.mode === 'arthro') {
       const tools = ['scope', 'probe', 'shaver', 'burr', 'grasper'];
       if (e.key >= '1' && e.key <= '5') setTool(tools[+e.key - 1]);
@@ -1719,8 +1770,9 @@ window.__cmcj = {
 
 // ---------- boot ----------
 bindUI();
-setMode('anatomy');
-load().then(() => { setMode('anatomy'); resize(); requestAnimationFrame(frame); }).catch((err) => {
+const startMode = ['anatomy', 'oa', 'arthro'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'anatomy';
+setMode(startMode);
+load().then(() => { setMode(startMode); resize(); requestAnimationFrame(frame); }).catch((err) => {
   console.error(err);
   showError(`Could not load the model: ${err.message}`);
 });
