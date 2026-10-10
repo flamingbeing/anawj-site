@@ -166,22 +166,35 @@ class FormScreen {
     if (!text && !noAdvance && !was && Date.now() - this.lastPointer < 1500) this.advance(q.key);
   }
 
-  // After a choice, bring the next unanswered question into view. Focus stays put.
+  // After a choice, scroll so the next unanswered question's answer row lands where the one just
+  // tapped was: the finger stays put and taps straight down the form. The next question's heading
+  // always stays visible under the header. Focus stays put.
   advance(key) {
     try { if (localStorage.getItem(AUTOSCROLL_KEY) === 'off') return; } catch {}
     const keys = visibleQuestions(this.form, this.answers).map(q => q.key);
     const i = keys.indexOf(key);
     const next = keys.slice(i + 1).find(k => blank(this.answers[k]));
-    const el = next ? this.qEls[next] : this.barEl;
-    if (!el) return;
-    setTimeout(() => {
-      const r = el.getBoundingClientRect();
-      const top = (document.querySelector('.e-appbar')?.getBoundingClientRect().bottom || 0) + 4;
-      const bottom = (this.barEl?.getBoundingClientRect().top || window.innerHeight) - 4;
-      // already fully on screen (or its first part is, for a tall one): stay put
-      if (r.top >= top && (r.bottom <= bottom || r.top + 160 <= bottom)) return;
-      el.scrollIntoView({ behavior: reducedMotion() ? 'auto' : 'smooth', block: next ? 'start' : 'end' });
-    }, 120);
+    const cur = this.qEls[key];
+    if (!cur) return;
+    const area = answerArea;
+    const before = this.tapRow && this.tapRow.el === cur ? this.tapRow.top : area(cur).getBoundingClientRect().top;
+    setTimeout(() => {                                       // after the answer's own repaint
+      const smooth = reducedMotion() ? 'auto' : 'smooth';
+      if (!next) { this.barEl?.scrollIntoView({ behavior: smooth, block: 'end' }); return; }
+      const el = this.qEls[next];
+      if (!el) return;
+      const barBottom = (document.querySelector('.e-appbar')?.getBoundingClientRect().bottom || 0) + 4;
+      const need = () => {
+        let d = area(el).getBoundingClientRect().top - before;
+        const headTop = el.getBoundingClientRect().top - d;   // the next heading after scrolling
+        if (headTop < barBottom) d -= barBottom - headTop;    // keep it readable
+        return d;
+      };
+      const d = need();
+      if (Math.abs(d) > 2) window.scrollBy({ top: d, behavior: smooth });
+      // late layout changes (descriptor lines, ticks) can shift things while scrolling: settle exactly
+      setTimeout(() => { const e = need(); if (Math.abs(e) > 2) window.scrollBy({ top: e, behavior: 'auto' }); }, smooth === 'smooth' ? 450 : 30);
+    }, 60);
   }
 
   // Required tag, errors, EBD q3, and the bar after an answer changes.
@@ -329,7 +342,12 @@ class FormScreen {
 
   render() {
     const ev = this.ev, form = this.form;
-    const root = h('div', { class: 'e-form', onpointerdown: () => { this.lastPointer = Date.now(); } });
+    const root = h('div', { class: 'e-form', onpointerdown: e => {
+      this.lastPointer = Date.now();
+      // where the tapped answer row sits at the moment of the tap (taps can nudge the page before change fires)
+      const q = e.target.closest?.('.e-q');
+      this.tapRow = q ? { el: q, top: answerArea(q).getBoundingClientRect().top } : null;
+    } });
     this.root = root;
     if (this.mode === 'fill' && !this.metrics.openedAt) {
       this.metrics.openedAt = Date.now();
@@ -622,6 +640,9 @@ class FormScreen {
 }
 
 // ---------- pieces ----------
+
+// A question's answer controls (the row the finger taps), for keeping taps in one place.
+const answerArea = el => el.querySelector('.e-scale9__row, .e-radios, .e-chips, .e-checks, textarea') || el;
 
 // The long supervision question: [first sentence, the rest (shown behind "more") or null].
 function labelParts(q) {
