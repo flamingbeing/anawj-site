@@ -618,7 +618,22 @@ function rosterLists() {
     }
     out[key] = list;
   }
+  // people working today but on no list go on the Admin/no list row too
+  for (const p of noListPeople()) out.admin.push(shortName(p));
   return out;
+}
+
+// Seniors and juniors who are available but not on any list of the roster (or the Calls/clinics tab).
+function noListPeople() {
+  const rows = state.roster?.date === state.day.date ? state.roster.rows : null;
+  if (!rows) return [];
+  const listed = new Set(generalPeople());
+  for (const row of rows) for (const key of ['senior', 'junior']) for (const n of namesInCell(row[key])) {
+    const p = matchName(n, state.staff).person;
+    if (p) listed.add(p.id);
+  }
+  return state.staff.filter(p => (state.day.staff[p.id]?.status || 'avail') === 'avail' && !listed.has(p.id))
+    .sort((a, b) => (a.role === b.role ? 0 : a.role === 'senior' ? -1 : 1) || shortName(a).localeCompare(shortName(b)));
 }
 
 function applyPaste() {
@@ -830,6 +845,9 @@ function afterRosterEdit(undone, prompted) {
 }
 
 function dropName(src, dst) {
+  if (src.pool) return dropFromPool(src.pool, dst);
+  if (src.cover) return dropAsCover(src, dst);
+  if (dst.pool) return dropToPool(src);
   const rows = state.roster.rows;
   const a = rows[src.row], b = rows[dst.row];
   if (!a || !b) return;
@@ -860,9 +878,58 @@ function dropName(src, dst) {
   afterRosterEdit();
 }
 
+// A name dragged from the Admin / no list card onto the roster: onto a name swaps them (the
+// other person goes back to no list), onto a cell adds them there.
+function dropFromPool(id, dst) {
+  const p = state.staff.find(s => s.id === id);
+  const row = state.roster.rows[dst.row];
+  if (!p || !row || !dst.key) return;
+  const d = dayOf(p.id);
+  if (d.status === 'admin') d.status = 'avail'; // off their admin day and onto a list
+  const text = p.role === 'senior' ? fmtSenior(p, d) : fmtJunior(p, d);
+  undoStack.push(JSON.stringify(state.roster.rows));
+  const parts = cellParts(row, dst.key);
+  if (dst.part != null && parts[dst.part] != null) parts[dst.part] = text; else parts.push(text);
+  setCellParts(row, dst.key, parts);
+  toast(`Put ${p.name} in ${row.label}.`);
+  afterRosterEdit();
+}
+
+// A junior dragged by their C grip: they stay in their room and are added to the other room's
+// junior cell as an ad hoc cover, "Name (C)".
+function dropAsCover(src, dst) {
+  const rows = state.roster.rows;
+  const from = rows[src.row], to = rows[dst.row];
+  if (!from || !to || dst.pool || from === to) return;
+  const cur = parseNamePart(cellParts(from, src.key)[src.part] || '');
+  const n = namesInCell(cur.name)[0];
+  if (!n) return;
+  const parts = cellParts(to, 'junior');
+  if (parts.some(x => namesInCell(x)[0] === n)) return toast(`${n} is already in ${to.label}.`);
+  undoStack.push(JSON.stringify(rows));
+  parts.push(buildNamePart({ name: cur.name, tags: [...cur.tags.filter(t => TAGS.includes(t)), 'C'], leave: '', cover: '', dash: '' }));
+  setCellParts(to, 'junior', parts);
+  toast(`${n} covers ${to.label} (C).`);
+  afterRosterEdit();
+}
+
+// A name dragged off the roster onto the Admin / no list card: take it out of its cell.
+function dropToPool(src) {
+  const row = state.roster.rows[src.row];
+  const parts = row ? cellParts(row, src.key) : [];
+  const name = parts[src.part];
+  if (name == null) return;
+  undoStack.push(JSON.stringify(state.roster.rows));
+  parts.splice(src.part, 1);
+  setCellParts(row, src.key, parts);
+  toast(`Took ${namesInCell(name)[0] || name} off ${row.label}.`);
+  afterRosterEdit();
+}
+
 function startNameDrag(e, src) {
   if (e.button !== 0) return;
-  const chip = e.currentTarget;
+  e.preventDefault();
+  const chip = e.currentTarget.closest('.name') || e.currentTarget;
   const x0 = e.clientX, y0 = e.clientY;
   let ghost = null, over = null;
   const targetAt = (x, y) => document.elementFromPoint(x, y)?.closest('[data-drop]');
@@ -885,7 +952,6 @@ function startNameDrag(e, src) {
     window.removeEventListener('pointerup', up);
     window.removeEventListener('pointercancel', up);
     if (!ghost) {
-      if (ev.type === 'pointerup') { clearTimeout(tagTimer); tagTimer = setTimeout(() => openTagEditor(chip, src), 250); }
       return;
     }
     ghost.remove();
@@ -893,6 +959,7 @@ function startNameDrag(e, src) {
     over?.classList.remove('over');
     const t = ev.type === 'pointerup' ? targetAt(ev.clientX, ev.clientY) : null;
     if (!t) return;
+    if (t.dataset.pool != null) { if (!src.pool && !src.cover) dropName(src, { pool: true }); return; }
     dropName(src, { row: +t.dataset.row, key: t.dataset.key, part: t.dataset.part != null ? +t.dataset.part : null });
   };
   window.addEventListener('pointermove', move);
@@ -1124,13 +1191,21 @@ function rosterCell(row, i, key, doubles) {
   } else {
     adder = h('button', { class: 'add-name', title: 'Add a name', onclick: () => { clearTimeout(tagTimer); closeTagEditor(); editing = id; render(); } }, '+');
   }
+  // each name: a grip to drag (move or swap), for juniors a C grip to drag them into another
+  // room as an ad hoc cover, and the short name, which opens the tag editor
+  const chip = (p, k) => {
+    const src = { row: i, key, part: k };
+    const el = h('span', { class: 'name', 'data-drop': '', 'data-row': i, 'data-key': key, 'data-part': k, style: colourStyle(p), title: p },
+      h('span', { class: 'grip', title: 'Drag to move, or onto another name to swap', onpointerdown: e => startNameDrag(e, src), onclick: e => e.stopPropagation() }, '⠿'),
+      key === 'junior' && !isCoverPart(p) ? h('span', { class: 'grip cover', title: 'Drag to another room to add them there as an ad hoc cover (C). They stay in this room.',
+        onpointerdown: e => startNameDrag(e, { ...src, cover: true }), onclick: e => e.stopPropagation() }, 'C') : null,
+      h('span', { class: 'label', onclick: () => { clearTimeout(tagTimer); openTagEditor(el, src); } }, shortOf(p)),
+      key === 'senior' && isDouble(p, doubles) ? h('sup', { class: 'dbl', title: 'Double covering' }, '&') : null);
+    return el;
+  };
   return h('td', {
-    class: 'cell', 'data-drop': '', 'data-row': i, 'data-key': key, title: 'Drag a name to swap or move it. Click a name to edit it.',
-  }, h('div', { class: 'names' }, parts.map((p, k) => h('span', {
-      class: 'name', 'data-drop': '', 'data-row': i, 'data-key': key, 'data-part': k, style: colourStyle(p),
-      title: 'Drag to swap or move. Click to edit tags.',
-      onpointerdown: e => startNameDrag(e, { row: i, key, part: k }),
-    }, p, key === 'senior' && isDouble(p, doubles) ? h('sup', { class: 'dbl', title: 'Double covering' }, '&') : null)), adder));
+    class: 'cell', 'data-drop': '', 'data-row': i, 'data-key': key, title: 'Drag a name by its grip to swap or move it. Click a name to edit it.',
+  }, h('div', { class: 'names' }, parts.map(chip), adder));
 }
 
 // The day as the generator sees it: people on the Calls/clinics tab are busy, and the
@@ -1214,8 +1289,6 @@ function fillGaps() {
   undoStack.push(JSON.stringify(r.rows));
   r.rows = rows;
   r.warnings = res.warnings;
-  r.unusedSeniors = res.unusedSeniors;
-  r.unusedJuniors = res.unusedJuniors;
   editing = null;
   afterRosterEdit(false, true);
   toast(`Filled ${filled.length} empty cell(s).`);
@@ -1273,14 +1346,15 @@ function renderGeneral() {
       h('h2', {}, 'MOT and SICU Calls'),
       h('table', {},
         h('thead', {}, h('tr', {}, ['', 'MOT', 'SICU'].map(t => h('th', {}, t)))),
+        // residents are MO1–MO3; SICU has only an MO1
         h('tbody', {}, TEAM_ROWS.map(([k, label], i) => h('tr', {},
-          h('td', { class: 'seen' }, label || 'Resident'),
+          h('td', { class: 'seen' }, i < 2 ? label : `MO${i - 1}:`),
           h('td', {}, field('mot.' + k, i < 2 ? 'senior' : 'junior')),
-          h('td', {}, field('sicu.' + k, i < 2 ? 'senior' : 'junior'))))))),
+          h('td', {}, i < 3 ? field('sicu.' + k, i < 2 ? 'senior' : 'junior') : null)))))),
     h('section', { class: 'card scroll' },
       h('h2', {}, 'EOT and clinics'),
       h('table', {},
-        h('thead', {}, h('tr', {}, ['', 'Specialist', 'Assistant', 'Assistant'].map(t => h('th', {}, t)))),
+        h('thead', {}, h('tr', {}, ['', 'Senior', 'Junior', 'Junior'].map(t => h('th', {}, t)))),
         h('tbody', {}, DUTIES.map(d => h('tr', {},
           h('td', {}, h('b', {}, d.label)),
           [0, 1, 2].map(i => h('td', {}, d.fields[i] ? h('div', {}, h('div', { class: 'seen' }, d.fields[i][1]), field(`${d.key}.${d.fields[i][0]}`, d.fields[i][0] === 's' ? 'senior' : 'junior')) : null))))))),
@@ -1441,27 +1515,40 @@ function renderRoster() {
   }
   return h('div', {},
     h('section', { class: 'card' }, h('h2', {}, 'OT roster'), actions,
-      h('p', { class: 'hint', style: 'margin:0' }, 'Drag a name onto another name to swap them, or onto an empty part of a cell to move it there. Click a name to change it or its tags ((L), (RA), L-4pm, C-OT13, C-KROR PACU…). + adds someone from the staff list. Click the case notes to edit them. & marks a senior who is double covering. Premed cover is on its own tab.')),
+      h('p', { class: 'hint', style: 'margin:0' }, 'Drag a name by its ⠿ grip onto another name to swap them, or onto an empty part of a cell to move it there. Drag a junior by their C grip to add them to another room as an ad hoc cover. Click a name to change it or its tags ((L), (RA), L-4pm, C-OT13, C-KROR PACU…). + adds someone from the staff list. Click the case notes to edit them. & marks a senior who is double covering. Premed cover is on its own tab.')),
     h('div', { class: 'cols' },
       h('section', { class: 'card scroll' },
         h('table', { class: 'sheet' },
           h('thead', {}, h('tr', {}, ['', 'Senior', 'Junior', 'Cases'].map(t => h('th', {}, t)))),
           h('tbody', {}, body))),
       h('div', {},
+        noListCard(),
         boxCard(),
         historyCard(),
         rosterLogCard(),
         h('section', { class: 'card' },
           h('h2', {}, 'Things to look at'),
           all.length ? h('ul', { class: 'warnings' }, all.map(w => h('li', { class: w.level }, w.text))) : h('p', { class: 'hint' }, 'No problems found.')),
-        h('section', { class: 'card' },
-          h('h2', {}, 'Not on an OT list'),
-          h('p', { class: 'hint' }, 'Available but unassigned. Use them for AH OT, covers or admin.'),
-          h('p', {}, h('b', {}, 'Seniors: '), r.unusedSeniors.join(', ') || '—'),
-          h('p', {}, h('b', {}, 'Juniors: '), r.unusedJuniors.join(', ') || '—')),
       ),
     ),
   );
+}
+
+// Everyone available but on no list. They go on the sheet's Admin/no list row; drag them
+// onto the roster to give them a list, or drag a name here to take it off.
+function noListCard() {
+  const people = noListPeople();
+  const admin = state.staff.filter(p => state.day.staff[p.id]?.status === 'admin');
+  const chip = p => h('span', { class: 'name', style: colourStyle(p.name), title: `${p.name} · ${p.grade}. Drag onto the roster.`,
+    onpointerdown: e => startNameDrag(e, { pool: p.id }) }, shortName(p));
+  const group = (title, list) => list.length ? h('div', { class: 'pool-group' }, h('b', {}, title), h('div', { class: 'pool-names' }, list.map(chip))) : null;
+  return h('section', { class: 'card pool', 'data-drop': '', 'data-pool': '' },
+    h('h2', {}, 'Admin / no list'),
+    h('p', { class: 'hint' }, 'Working today but not on any list, so they go on the Admin/no list row. Drag a name onto the roster to give them a list, or drag a name off the roster onto this box.'),
+    group('Seniors', people.filter(p => p.role === 'senior')),
+    group('Juniors', people.filter(p => p.role === 'junior')),
+    group('Admin day', admin),
+    !people.length && !admin.length ? h('p', { class: 'hint' }, 'Everyone working has a list.') : null);
 }
 
 async function exportXlsx() {

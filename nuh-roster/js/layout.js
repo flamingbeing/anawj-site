@@ -11,13 +11,13 @@ export const GREY = 'FFBFBFBF';
 // The General tab: MOT and SICU teams, then the duty rows (specialist in C, assistants in F and I).
 export const TEAM_ROWS = [['cons', 'Consultant:'], ['reg', 'Registrar/AC:'], ['res1', 'Residents:'], ['res2', ''], ['res3', '']];
 export const DUTIES = [
-  { key: 'eot8', label: 'EOT 8', fields: [['s', 'Specialist'], ['a', 'Assistant']] },
-  { key: 'eot9', label: 'EOT 9', fields: [['s', 'Specialist'], ['a', 'Assistant'], ['a2', 'Assistant 2']] },
-  { key: 'epi', label: 'Epidural', fields: [['s', 'Specialist'], ['df', 'Day float (DF)'], ['nf', 'Night float (NF)']] },
-  { key: 'cardiac', label: 'Cardiac Call', fields: [['s', 'Specialist'], ['a', 'Assistant']] },
-  { key: 'painacp', label: 'Pain/ACP Clinic', fields: [['s', 'Specialist'], ['a', 'Assistant']] },
-  { key: 'acute', label: 'Acute Pain', fields: [['s', 'Specialist'], ['a', 'Assistant']] },
-  { key: 'chronic', label: 'Chronic Pain', fields: [['s', 'Specialist'], ['a', 'Assistant']] },
+  { key: 'eot8', label: 'EOT 8', fields: [['s', 'Senior'], ['a', 'Junior']] },
+  { key: 'eot9', label: 'EOT 9', fields: [['s', 'Senior'], ['a', 'Junior'], ['a2', 'Junior 2']] },
+  { key: 'epi', label: 'Epidural', fields: [['s', 'Senior'], ['df', 'Day float (DF)'], ['nf', 'Night float (NF)']] },
+  { key: 'cardiac', label: 'Cardiac Call', fields: [['s', 'Senior'], ['a', 'Junior']] },
+  { key: 'painacp', label: 'Pain/ACP Clinic', fields: [['s', 'Senior'], ['a', 'Junior']] },
+  { key: 'acute', label: 'Acute Pain', fields: [['s', 'Senior'], ['a', 'Junior']] },
+  { key: 'chronic', label: 'Chronic Pain', fields: [['s', 'Senior'], ['a', 'Junior']] },
 ];
 
 // lists: { postcall: [...names], leave: [...], admin: [...] }
