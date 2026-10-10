@@ -5,7 +5,7 @@ import { BY_CODE, TIPS } from './categories.js';
 import { withParents, frequentCombos, parseBulk, parseDate, fmtDate, sortCodes, uid } from './engine.js';
 import { suggest } from './suggest.js';
 import {
-  S, h, toast, debounce, modal, confirmBox, cat, catName, catChip, countText, PICKER_ORDER, PROGRESS_BY_CODE,
+  S, h, toast, debounce, modal, confirmBox, cat, catName, catFull, catChip, countText, PICKER_ORDER, PROGRESS_BY_CODE,
   createCase, updateCase, removeCase, restoreCase, saveMany, settings, todayISO, hooks, fill, add, cloud } from './ui-core.js';
 
 const DRAFT_KEY = 'logbook-draft-v2';
@@ -87,7 +87,7 @@ export function catPicker({ get, toggle, placeholder = 'Search categories: code 
     fill(list, ...items.map(c => {
       const p = prog[c.code];
       return h('li', {
-        role: 'option', 'aria-selected': String(sel.has(c.code)), class: `${c.parent ? 'sub' : ''} ${sel.has(c.code) ? 'on' : ''}`, title: c.label,
+        role: 'option', 'aria-selected': String(sel.has(c.code)), class: `${c.parent ? 'sub' : ''} ${sel.has(c.code) ? 'on' : ''}`, title: c.full || c.name,
         onclick: () => keepPlace(list, () => { toggle(c.code); refresh(); }),
       },
       h('span', { class: 'tick' }, sel.has(c.code) ? '✓' : ''),
@@ -200,7 +200,7 @@ function paintSuggest() {
     onclick: () => { keepPlace(ui.selected, () => { draft.cats = sortCodes(withParents([...draft.cats, ...strong])); saveDraft(); paintSel(); }); refocus(); } }, '+ All ' + strong.length) : null;
   fill(ui.sugg, all, ...(list.length ? list.map(s => catChip(s.code, {
     cls: `sugg ${s.score >= 0.5 ? 'strong' : ''}`,
-    title: `${cat(s.code).label} — ${s.why === 'age' ? 'from the age' : s.why === 'bmi' ? 'from the BMI' : 'from your words'}`,
+    title: `${catFull(s.code)} — ${s.why === 'age' ? 'from the age' : s.why === 'bmi' ? 'from the BMI' : 'from your words'}`,
     onclick: () => { keepPlace(ui.sugg, () => { draft.cats = addCat(draft.cats, s.code); saveDraft(); paintSel(); }); refocus(); },
   })) : [h('span', { class: 'muted', style: 'font-size:13px' }, text ? 'No suggestions — search below.' : 'Start typing to see suggestions.')]));
 }
@@ -208,7 +208,7 @@ function paintSuggest() {
 function paintSel() {
   if (!ui || !ui.selected) return;
   fill(ui.selected, ...(draft.cats.length
-    ? draft.cats.map(code => catChip(code, { on: true, removable: true, cls: 'add', title: 'Remove ' + cat(code).label,
+    ? draft.cats.map(code => catChip(code, { on: true, removable: true, cls: 'add', title: 'Remove ' + catFull(code),
       onclick: () => keepPlace(ui.selected, () => { draft.cats = dropCat(draft.cats, code); saveDraft(); paintSel(); }) }))
     : [h('span', { class: 'none' }, 'None yet — tap a suggestion, a quick pick or search below.')]));
   const tips = draft.cats.filter(c => TIPS[c]).map(c => TIPS[c]);
@@ -241,7 +241,7 @@ function paintQuick() {
   const last = lastCase();
   if (last && last.cats && last.cats.length) {
     chips.push(h('span', {
-      class: 'chip tmpl', role: 'button', tabindex: '0', title: 'Same categories as your last case: ' + last.cats.map(catName).join(', '),
+      class: 'chip tmpl', role: 'button', tabindex: '0', title: 'Same categories as your last case: ' + last.cats.map(catFull).join(', '),
       onclick: () => {
         draft.cats = sortCodes(withParents(last.cats));
         // its date too, but only when it was logged in this sitting (not yesterday evening's list)
@@ -255,7 +255,7 @@ function paintQuick() {
     const key = sortCodes(t.cats).join(',');
     if (!t.cats || !t.cats.length || (!name && seen.has(key))) return null;
     seen.add(key);
-    return h('span', { class: 'chip tmpl', role: 'button', tabindex: '0', title: t.cats.map(c => cat(c).label).join('\n'), onclick: () => applyTemplate(t) },
+    return h('span', { class: 'chip tmpl', role: 'button', tabindex: '0', title: t.cats.map(catFull).join('\n'), onclick: () => applyTemplate(t) },
       name ? h('b', {}, name) : null, h('span', { class: name ? 'muted' : '', style: name ? 'font-size:12px' : '' }, (name ? ' ' : '') + sortCodes(t.cats).join(' + ')));
   };
   for (const t of (S.logbook && S.logbook.templates) || []) chips.push(tmplChip(t, t.name));

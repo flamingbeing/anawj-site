@@ -5,10 +5,26 @@ import { sortCodes, uid } from './engine.js';
 import { S, h, toast, modal, confirmBox, cloud, catChip, settings, patchLogbook, displayName, hooks, rYear, fill } from './ui-core.js';
 import { pickDialog } from './ui-log.js';
 
+// Compact mode (S.logbook.settings.compact): body.compact (style.css, "compact mode" block). Cached in
+// localStorage so the first paint after a reload is already compact, before the logbook loads.
+const COMPACT_KEY = 'apmes-logbook-compact';
+export function applyCompact(on) {
+  document.body.classList.toggle('compact', !!on);
+  try { on ? localStorage.setItem(COMPACT_KEY, '1') : localStorage.removeItem(COMPACT_KEY); } catch { /* storage blocked */ }
+}
+export function cachedCompact() {
+  try { return localStorage.getItem(COMPACT_KEY) === '1'; } catch { return false; }
+}
+
 export function renderSettings() {
   const st = settings();
   const r = S.resident;
   return h('div', {},
+    // ---- admin entry (reflections-tab agent): Admin left the tab bar to keep it at 6 on phones ----
+    S.admin ? h('section', { class: 'card' },
+      h('div', { class: 'bar' }, h('h2', { style: 'margin:0' }, 'Admin'), h('span', { class: 'grow' }),
+        h('a', { class: 'btn small primary', href: '#admin' }, 'Open admin')),
+      h('p', { class: 'hint', style: 'margin:6px 0 0' }, 'Residents list, programme template and the reflection portfolio template.')) : null,
     h('section', { class: 'card' },
       h('h2', {}, 'You'),
       h('p', { class: 'hint' }, 'Signed in as ', h('b', {}, S.user.email), S.admin ? ' (admin)' : '', '.'),
@@ -17,6 +33,14 @@ export function renderSettings() {
       r
         ? h('p', { class: 'hint' }, `On the programme list: ${r.rid}, AY${r.intake || '?'} intake, ${R_YEARS[rYear() - 1]}${r.status && r.status !== 'ACTIVE' ? ', ' + r.status.toLowerCase() : ''}. Your case counts (never your case details) are shared on the Totals tab.`)
         : h('p', { class: 'hint' }, 'Not on the programme resident list, so your logbook is private and not on the Totals tab. If you are an APMES resident, ask the programme admins to add your email.')),
+
+    h('section', { class: 'card' },
+      h('h2', {}, 'Display'),
+      h('label', { class: 'check' }, h('input', { type: 'checkbox', role: 'switch', checked: !!st.compact, onchange: e => {
+        applyCompact(e.target.checked);
+        patchLogbook({ settings: { compact: e.target.checked } });
+      } }), 'Compact mode'),
+      h('p', { class: 'hint', style: 'margin:2px 0 0' }, 'Smaller chips, rows and spacing so more categories fit on screen. Saved to your account, so it follows you to other devices.')),
 
     h('section', { class: 'card' },
       h('h2', {}, 'Logging'),

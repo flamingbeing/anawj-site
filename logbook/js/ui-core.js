@@ -144,8 +144,10 @@ function plainCell(v) {
 
 // ---------- categories ----------
 
-export const cat = code => BY_CODE[code] || { code, name: code, label: code };
+export const cat = code => BY_CODE[code] || { code, name: code, label: code, full: code };
 export const catName = code => cat(code).name;
+// Readable procedure name for tags and tooltips: no code, no targets.
+export const catFull = code => cat(code).full || cat(code).name;
 export const PROGRESS_BY_CODE = () => Object.fromEntries(progress(S.counts, rYear()).map(p => [p.code, p]));
 
 // "count / next target" for a category, e.g. "7 / 10 by R3" or "12 ✓".
@@ -159,11 +161,11 @@ export function countText(code, prog) {
 
 export function catChip(code, { on, onclick, cls = '', removable, title } = {}) {
   return h('span', {
-    class: `chip ${on ? 'on' : ''} ${cls}`, role: 'button', tabindex: '0', title: title || cat(code).label,
+    class: `chip ${on ? 'on' : ''} ${cls}`, role: 'button', tabindex: '0', title: title || catFull(code),
     onclick, onkeydown: e => { if ((e.key === 'Enter' || e.key === ' ') && onclick) { e.preventDefault(); onclick(e); } },
   }, h('span', { class: 'code' }, code), h('span', { class: 'nm' }, catName(code)), removable ? h('span', { class: 'x', 'aria-label': 'remove' }, '×') : null);
 }
-export const miniChips = cats => h('span', { class: 'chips' }, sortCodes(cats || []).map(c => h('span', { class: 'mini', title: cat(c).label }, c)));
+export const miniChips = cats => h('span', { class: 'chips' }, sortCodes(cats || []).map(c => h('span', { class: 'mini', title: catFull(c) }, c)));
 
 // Categories ordered for the picker: each parent followed by its sub-categories.
 export const PICKER_ORDER = (() => {

@@ -6,7 +6,7 @@ import { S, hooks, h, toast, cloud, setCases, scheduleSummary, fill, resetCaches
 import { renderLog, logCasesChanged, clearDrafts } from './ui-log.js';
 import { renderLogbook } from './ui-logbook.js';
 import { renderProgress, renderTotals } from './ui-progress.js';
-import { renderSettings } from './ui-settings.js';
+import { renderSettings, applyCompact, cachedCompact } from './ui-settings.js';
 import { renderAdmin } from './ui-admin.js';
 import { renderReflect, watchMyReflections } from './ui-reflect.js';
 
@@ -17,6 +17,7 @@ const ICONS = {
   progress: 'M5 20V12M10 20V6M15 20v-9M20 20V9',
   totals: 'M4 4h16v16H4zM4 10h16M4 15h16M10 4v16M15 4v16',
   settings: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1',
+  reflect: 'M4 19.5V5a2 2 0 0 1 2-2h12v14H6a2 2 0 0 0-2 2.5zM6 21h12v-4M8 7h6M8 11h4',
   admin: 'M12 3l2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.6 6.6 19.5l1.2-6-4.5-4.2 6.1-.7z',
 };
 const icon = id => {
@@ -31,12 +32,12 @@ const icon = id => {
 const TABS = [
   { id: 'log', label: 'Log', render: renderLog },
   { id: 'logbook', label: 'Logbook', render: renderLogbook },
+  { id: 'reflect', label: 'Reflections', render: renderReflect },
   { id: 'progress', label: 'Progress', render: renderProgress },
   { id: 'totals', label: 'Totals', render: renderTotals },
   { id: 'settings', label: 'Settings', render: renderSettings },
-  // not in the bar (keeps it at 6 on phones): reached from Progress → Reflections and Logbook → Reflect
-  { id: 'reflect', label: 'Reflections', render: renderReflect, hidden: true, under: 'progress' },
-  { id: 'admin', label: 'Admin', render: renderAdmin, admin: true },
+  // not in the bar (keeps it at 6 on phones): admins reach it from Settings → Admin
+  { id: 'admin', label: 'Admin', render: renderAdmin, admin: true, hidden: true, under: 'settings' },
 ];
 
 const app = document.getElementById('app');
@@ -49,8 +50,10 @@ const banner = document.getElementById('banner');
 
 // Totals (names and counts of programme residents) is for the programme only; the rules agree.
 const visibleTabs = () => TABS.filter(t => (!t.admin || S.admin) && (t.id !== 'totals' || S.admin || S.resident));
+const TAB_ALIASES = { reflections: 'reflect' };
 const tabFromHash = () => {
-  const id = location.hash.replace(/^#/, '');
+  let id = location.hash.replace(/^#/, '');
+  id = TAB_ALIASES[id] || id;
   return visibleTabs().some(t => t.id === id) ? id : null;
 };
 
@@ -149,7 +152,7 @@ async function onUser(user) {
   S.user = user;
   if (!user) {
     Object.assign(S, { admin: false, resident: null, logbook: null, cases: [], reflections: [], counts: {}, casesLoaded: false, casesSynced: false, sharedTemplates: [] });
-    if (signedInOnce) { clearDrafts(); resetCaches(); }
+    if (signedInOnce) { clearDrafts(); resetCaches(); applyCompact(false); }   // a shared device starts plain for the next person
     paintWho();
     renderLanding();
     return;
@@ -166,6 +169,7 @@ async function onUser(user) {
     ]);
     if (S.user !== user) return; // signed out meanwhile
     Object.assign(S, { admin, resident, logbook, sharedTemplates: shared || [] });
+    applyCompact(logbook.settings && logbook.settings.compact);   // per-user display setting
     if (!logbook.name && (resident?.name || user.name)) S.logbook.name = resident?.name || user.name;
     // a programme resident's logbook remembers their rid (used by admins and the rules)
     if (resident && logbook.rid !== resident.rid) cloud.saveLogbook(user.email, { rid: resident.rid }).catch(() => {});
@@ -230,6 +234,7 @@ function registerSW() {
 
 if (cloud.onSyncError) cloud.onSyncError(err => toast('A change could not be synced: ' + (err.message || err)));
 
+if (cachedCompact()) document.body.classList.add('compact');   // first paint; corrected once the logbook loads
 paintWho();
 if (cloud.demo) {
   banner.className = 'banner warn';
