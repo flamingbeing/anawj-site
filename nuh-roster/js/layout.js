@@ -32,9 +32,9 @@ export function buildLayout({ date, rows, lists = {}, general = {}, box = '', co
   const label = (r, text, o = {}) => put(r, 1, 2, text, { align: 'right', ...o });
 
   const d = date ? new Date(date + 'T12:00:00') : null;
-  // the title band is shaded grey, as on the department's sheet
-  put(2, 1, 12, 'DEPARTMENT OF ANAESTHESIA', { sz: 10, bold: true, fill: GREY });
-  put(3, 1, 12, 'NATIONAL UNIVERSITY HEALTH SYSTEM', { sz: 10, bold: true, fill: GREY });
+  // the title band (A to K, in line with the OT rows) is shaded grey, as on the department's sheet
+  put(2, 1, 11, 'DEPARTMENT OF ANAESTHESIA', { sz: 10, bold: true, fill: GREY });
+  put(3, 1, 11, 'NATIONAL UNIVERSITY HEALTH SYSTEM', { sz: 10, bold: true, fill: GREY });
   label(5, 'Date', { bold: true });
   put(5, 3, 5, d ? d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '', { bold: true });
   put(5, 6, 7, d ? d.toLocaleDateString('en-GB', { weekday: 'long' }) : '', { bold: true });
