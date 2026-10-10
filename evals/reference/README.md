@@ -78,7 +78,7 @@ Every form opens with an introduction saying it is a **formative** assessment by
 
 **Still to confirm** (marked `unconfirmed` in the JSON):
 
-- The dropdown options. The screenshots show only the selected or placeholder value: complexity (only "Moderate" seen; Low / Moderate / High assumed), the DOPS guidance question (only "Passive Help (Supervisor assists and follows the lead of the resident)" seen), receptive / reflective (only "Yes" seen; Yes / No assumed).
+- The dropdown options. The screenshots show only the selected or placeholder value: the DOPS guidance question (only "Passive Help (Supervisor assists and follows the lead of the resident)" seen), receptive / reflective (only "Yes" seen; Yes / No assumed).
 - Whether the DOPS form continues after question 19; the screenshot ends there.
 - In the DOPS screenshot the comments question (17) has no asterisk, so it may be optional there while it is required on the other two.
 - The EPA numbering for each tracking-template item.

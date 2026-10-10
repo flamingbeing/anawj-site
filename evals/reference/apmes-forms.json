@@ -120,13 +120,12 @@
    "unconfirmed": true
   },
   "complexity": {
-   "about": "Dropdown. Only \"Moderate\" was visible; assumed Low / Moderate / High.",
+   "about": "Complexity of case dropdown (confirmed by the user, 2026-10-10).",
    "options": [
     "Low",
     "Moderate",
     "High"
-   ],
-   "unconfirmed": true
+   ]
   },
   "guidance": {
    "about": "Dropdown. Only one option was visible.",
