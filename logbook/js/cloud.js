@@ -28,9 +28,15 @@ export const enabled = demo || !!(FIREBASE_CONFIG && FIREBASE_CONFIG.apiKey && F
 
 const BATCH = 450;            // Firestore allows 500 writes per batch; keep a margin
 const ACK_WAIT = 3000;        // ms to wait for the server before treating a write as queued
+const CLEAR_WAIT = 3000;      // ms to wait for the offline cache to clear on sign-out
 
-let fb = null;
+let fb = null, dbReady = null;   // dbReady: set while signOut swaps in a fresh Firestore
 async function sdk() {
+  const s = await loadSdk();
+  if (dbReady) await dbReady;
+  return s;
+}
+function loadSdk() {
   if (fb) return fb;
   fb = (async () => {
     const [app, auth, fs] = await Promise.all([
@@ -45,7 +51,10 @@ async function sdk() {
   return fb;
 }
 
-function openDb(a, fs) {
+function openDb(a, fs, memoryOnly = false) {
+  if (memoryOnly) {
+    try { return fs.initializeFirestore(a, { localCache: fs.memoryLocalCache() }); } catch (e) { return fs.getFirestore(a); }
+  }
   try {
     return fs.initializeFirestore(a, { localCache: fs.persistentLocalCache({ tabManager: fs.persistentMultipleTabManager() }) });
   } catch (e) {
@@ -101,11 +110,19 @@ export async function signOut() {
   if (demo) return D.signOut();
   const s = await sdk();
   await s.A.signOut(s.auth);
-  try {
-    await s.F.terminate(s.db);
-    await s.F.clearIndexedDbPersistence(s.db);
-  } catch (e) { console.warn('Could not clear the offline cache', e); }
-  s.db = openDb(s.app, s.F);   // a fresh, empty Firestore for the next sign-in
+  // Every Firestore call waits for this, so nothing touches the terminated instance. Clearing the
+  // cache never finishes while the logbook is open in another tab or the home-screen app, so give
+  // up after a few seconds and run memory-only until the next reload.
+  dbReady = (async () => {
+    let cleared = false;
+    try {
+      await s.F.terminate(s.db);
+      cleared = await Promise.race([s.F.clearIndexedDbPersistence(s.db).then(() => true, e => { console.warn('Could not clear the offline cache', e); return false; }), new Promise(r => setTimeout(() => r(false), CLEAR_WAIT))]);
+    } catch (e) { console.warn('Could not clear the offline cache', e); }
+    if (!cleared) console.warn('Offline cache not cleared (open in another tab?); using memory only until reload');
+    s.db = openDb(s.app, s.F, !cleared);   // a fresh, empty Firestore for the next sign-in
+  })();
+  try { await dbReady; } finally { dbReady = null; }
 }
 
 // ---- people ----
