@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OT Roster</title>
+<meta name="description" content="Draft the daily anaesthesia OT roster and export it as an Excel file. Runs entirely in your browser.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <h1>OT Roster</h1>
+    <p class="privacy">Runs in this browser only. Nothing you enter or load is uploaded.</p>
+  </div>
+  <div class="team">
+    <button id="saveTeam" title="Download staff list, rooms and settings to share with other rosterers">Save team file</button>
+    <label class="btn" title="Load a team file someone shared with you">Load team file<input id="loadTeam" type="file" accept=".json,application/json" hidden></label>
+  </div>
+</header>
+
+<nav class="tabs" role="tablist">
+  <button role="tab" data-tab="staff">1 · Staff</button>
+  <button role="tab" data-tab="day">2 · Day setup</button>
+  <button role="tab" data-tab="roster">3 · Roster</button>
+  <button role="tab" data-tab="settings">Settings</button>
+</nav>
+
+<main id="app"></main>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script src="vendor/exceljs.min.js"></script>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
