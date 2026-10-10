@@ -53,6 +53,8 @@ const tokens = s => norm(s).split(' ').filter(Boolean);
 // or as a run of initials ("yw" -> "yi wei")? Returns the number of tokens consumed.
 function tokenMatch(q, t, i) {
   if (t[i] === q) return 1;
+  if (q.length === 1 && t[i][0] === q) return 1; // "R Chia", "Arumugam R Kannan"
+  if (i + 1 < t.length && t[i] + t[i + 1] === q) return 2; // "Jiaxin" vs "Jia Xin"
   if (q.length >= 2 && q.length <= 4 && i + q.length <= t.length) {
     for (let k = 0; k < q.length; k++) if (t[i + k][0] !== q[k]) return 0;
     return q.length;
@@ -632,6 +634,36 @@ export function tickFromHistory(staff, minCount = 1) {
     }
   }
   return added;
+}
+
+// ---------- merging a contact list ----------
+
+// Match a contact-list name ("Sophia Ang Bee Leng") to a staff entry ("Sophia Ang") either way round.
+export function findSameStaff(name, staff) {
+  const m = matchName(name, staff);
+  if (m.person) return m.person;
+  const squash = n => tokens(n).join('');
+  const hits = staff.filter(p => [p.name, ...(p.aliases || [])].some(f => matchName(f, [{ id: 'x', name }]).person
+    || squash(f) === squash(name)));
+  return hits.length === 1 ? hits[0] : null;
+}
+
+// Fold contact-list people into the staff list. Matched people get the list's subspecs added,
+// and its grade only if their role hasn't changed since (rosters are newer than the list).
+// New seniors are added; new juniors are not, since junior postings rotate.
+export function mergeContacts(staff, people, newId) {
+  const out = staff.map(p => ({ ...p, subspecs: [...(p.subspecs || [])] }));
+  const skipped = [];
+  for (const c of people) {
+    const p = findSameStaff(c.name, out);
+    if (p) {
+      if (p.role === c.role && p.grade !== c.grade) p.grade = c.grade;
+      for (const k of c.subspecs) if (!p.subspecs.includes(k)) p.subspecs.push(k);
+    } else if (c.role === 'senior') {
+      out.push({ id: newId(), name: c.name, aliases: [], role: c.role, grade: c.grade, posting: '', subspecs: c.subspecs, avoid: [], history: {} });
+    } else skipped.push(c.name);
+  }
+  return { staff: out, skipped };
 }
 
 // ---------- short names ----------

@@ -37,6 +37,54 @@ const HEADERS = {
   avoid: /avoid|doesn.?t do|exclu/i,
 };
 
+// The department contact list: grade groups in column C, names in B, subspecialty in D.
+// Only names, grade groups and subspecialties are read; phone numbers, MCR, emails and
+// employee numbers are ignored.
+const CONTACT_GROUPS = [
+  [/head|senior consultant|^consultant|visiting consultant|locum/i, 'senior', 'Consultant'],
+  [/associate consultant/i, 'senior', 'AC'],
+  [/snr resident physician|senior resident physician/i, 'senior', 'Registrar'],
+  [/resident physician/i, 'junior', 'MOPEX'],
+  [/mopex/i, 'junior', 'MOPEX'],
+  [/senior resident|residents? - ca|rotating resident|^ast$|fellow/i, 'junior', 'Resident'],
+];
+const CONTACT_SUBSPECS = { cardiac: 'cardiac', paeds: 'paeds', neuro: 'neuro', thoracic: 'thoracic', liver: 'hpb', og: 'obs' };
+
+export function cleanContactName(raw) {
+  let n = String(raw || '').replace(/\(.*?\)/g, ' ').replace(/^\s*(dr|a\/prof|prof|adj\s+a\/prof)\.?\s+/i, '')
+    .replace(/\b[DS]\/O\b|\bBte\b|\bBin\b/gi, ' ').replace(/\s+/g, ' ').trim();
+  const comma = n.match(/^(.*?),\s*(.+)$/); // "Foo Peng Xiang, Donald" -> "Donald Foo Peng Xiang"
+  if (comma) n = `${comma[2]} ${comma[1]}`;
+  return n;
+}
+
+export function isContactList(ws) {
+  let hit = false;
+  ws.eachRow({ includeEmpty: false }, (row, n) => {
+    if (n > 6 || hit) return;
+    const t = [1, 2, 3, 4].map(c => cellText(row.getCell(c).value)).join(' ');
+    if (/contact list/i.test(t) || (/s\/n/i.test(t) && /speciality/i.test(t))) hit = true;
+  });
+  return hit;
+}
+
+export function readContactList(ws) {
+  const people = [];
+  let group = null;
+  ws.eachRow({ includeEmpty: false }, row => {
+    const g = cellText(row.getCell(3).value).trim();
+    if (g) group = g.replace(/\s+/g, ' ');
+    const raw = cellText(row.getCell(2).value).trim();
+    if (!raw || !group || /^name$/i.test(raw) || /acupunctur|nurs|\bssn\b/i.test(raw)) return;
+    const kind = CONTACT_GROUPS.find(([re]) => re.test(group));
+    if (!kind) return; // admin, nursing, research and other non-anaesthetist rows
+    const spec = cellText(row.getCell(4).value).toLowerCase();
+    const subspecs = [...new Set(spec.split(/[\/\n,]+/).map(x => CONTACT_SUBSPECS[x.trim()]).filter(Boolean))];
+    people.push({ name: cleanContactName(raw), role: kind[1], grade: kind[2], subspecs: kind[1] === 'senior' ? subspecs : [], group });
+  });
+  return { people };
+}
+
 export function readStaffSheet(ws) {
   let headerRow = null, cols = {};
   ws.eachRow({ includeEmpty: false }, (row, n) => {
