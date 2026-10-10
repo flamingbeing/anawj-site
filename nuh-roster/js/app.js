@@ -855,6 +855,7 @@ function afterRosterEdit(undone, prompted) {
 function dropName(src, dst) {
   if (src.pool) return dropFromPool(src.pool, dst);
   if (src.cover) return dropAsCover(src, dst);
+  if (src.dup) return dropAsDouble(src, dst);
   if (dst.pool) return dropToPool(src);
   const rows = state.roster.rows;
   const a = rows[src.row], b = rows[dst.row];
@@ -921,6 +922,25 @@ function dropAsCover(src, dst) {
   afterRosterEdit();
 }
 
+// A senior dragged by their &: they stay in their room and also take the other room's
+// senior cell, i.e. double cover it.
+function dropAsDouble(src, dst) {
+  const rows = state.roster.rows;
+  const from = rows[src.row], to = rows[dst.row];
+  if (!from || !to || dst.pool || from === to) return;
+  const cur = parseNamePart(cellParts(from, src.key)[src.part] || '');
+  const n = namesInCell(cur.name)[0];
+  if (!n) return;
+  const parts = cellParts(to, 'senior');
+  if (parts.some(x => namesInCell(x)[0] === n)) return toast(`${n} is already in ${to.label}.`);
+  if (from.complex !== to.complex && !confirm(`${from.label} and ${to.label} are in different complexes. Double cover across complexes anyway?`)) return;
+  undoStack.push(JSON.stringify(rows));
+  parts.push(buildNamePart({ name: cur.name, tags: cur.tags.filter(t => TAGS.includes(t)), leave: cur.leave, cover: '', dash: '' }));
+  setCellParts(to, 'senior', parts);
+  toast(`${n} double covers ${from.label} and ${to.label}.`);
+  afterRosterEdit();
+}
+
 // A name dragged off the roster onto the Admin / no list card: take it out of its cell.
 function dropToPool(src) {
   const row = state.roster.rows[src.row];
@@ -964,7 +984,7 @@ function startNameDrag(e, src) {
     window.removeEventListener('pointercancel', up);
     if (!ghost) {
       // a click without dragging opens the name's details
-      if (ev.type === 'pointerup' && !src.pool && !src.cover) { clearTimeout(tagTimer); tagTimer = setTimeout(() => openTagEditor(chip, src), 200); }
+      if (ev.type === 'pointerup' && !src.pool && !src.cover && !src.dup) { clearTimeout(tagTimer); tagTimer = setTimeout(() => openTagEditor(chip, src), 200); }
       return;
     }
     ghost.remove();
@@ -972,7 +992,7 @@ function startNameDrag(e, src) {
     over?.classList.remove('over');
     const t = ev.type === 'pointerup' ? targetAt(ev.clientX, ev.clientY) : null;
     if (!t) return;
-    if (t.dataset.pool != null) { if (!src.pool && !src.cover) dropName(src, { pool: true }); return; }
+    if (t.dataset.pool != null) { if (!src.pool && !src.cover && !src.dup) dropName(src, { pool: true }); return; }
     dropName(src, { row: +t.dataset.row, key: t.dataset.key, part: t.dataset.part != null ? +t.dataset.part : null });
   };
   window.addEventListener('pointermove', move);
@@ -1236,8 +1256,9 @@ function rosterCell(row, i, key, doubles) {
     adder = h('button', { class: 'add-name', title: 'Add a name', onclick: () => { clearTimeout(tagTimer); closeTagEditor(); editing = id; render(); } }, '+');
   }
   // each name shows the short name. With a mouse: drag the chip to move or swap it, drag the
-  // C to add a junior to another room as an ad hoc cover, × takes the name off. On a
-  // touchscreen there's no dragging (so the page scrolls); tapping opens the name's details.
+  // C to add a junior to another room as an ad hoc cover, drag a senior's & to have them
+  // double cover another room, × takes the name off. On a touchscreen there's no dragging
+  // (so the page scrolls); tapping opens the name's details.
   const chip = (p, k) => {
     const src = { row: i, key, part: k };
     const icon = (cls, title, text, o) => h('span', { class: 'icon ' + cls, title, onpointerdown: e => { e.stopPropagation(); o.down?.(e); }, onclick: e => { e.stopPropagation(); o.click?.(); } }, text);
@@ -1245,13 +1266,15 @@ function rosterCell(row, i, key, doubles) {
       onpointerdown: TOUCH ? null : e => startNameDrag(e, src),
       onclick: TOUCH ? () => openTagEditor(el, src) : null },
       !TOUCH && key === 'junior' && !isCoverPart(p) ? icon('cover', 'Drag to another room to add them there as an ad hoc cover (C). They stay in this room.', 'C', { down: e => startNameDrag(e, { ...src, cover: true }) }) : null,
+      key === 'senior' && (!TOUCH || isDouble(p, doubles)) ? icon('dbl' + (isDouble(p, doubles) ? ' on' : ''),
+        (isDouble(p, doubles) ? 'Double covering. ' : '') + (TOUCH ? '' : 'Drag to another room to have them double cover it too.'), '&',
+        { down: TOUCH ? null : e => startNameDrag(e, { ...src, dup: true }) }) : null,
       h('span', { class: 'label' }, shortOf(p)),
-      key === 'senior' && isDouble(p, doubles) ? h('sup', { class: 'dbl', title: 'Double covering' }, '&') : null,
       !TOUCH ? icon('del', isCoverPart(p) ? 'Remove this ad hoc cover' : 'Take off this list (they go to Admin / no list)', '×', { click: () => dropToPool(src) }) : null);
     return el;
   };
   return h('td', {
-    class: 'cell', 'data-drop': '', 'data-row': i, 'data-key': key, title: 'Drag a name by its grip to swap or move it. Click a name to edit it.',
+    class: 'cell', 'data-drop': '', 'data-row': i, 'data-key': key, title: 'Drag a name to swap or move it. Click a name to edit it.',
   }, h('div', { class: 'names' }, parts.map(chip), adder));
 }
 
@@ -1404,7 +1427,7 @@ function renderGeneral() {
         h('tbody', {}, DUTIES.map(d => h('tr', {},
           h('td', {}, h('b', {}, d.label)),
           [0, 1, 2].map(i => h('td', {}, d.fields[i] ? h('div', {}, h('div', { class: 'seen' }, d.fields[i][1]), field(`${d.key}.${d.fields[i][0]}`, d.fields[i][0] === 's' ? 'senior' : 'junior')) : null))))))),
-    h('p', { class: 'hint' }, 'AOCC, AIC, AH OT and ECT are on the OT roster tab.'));
+    h('p', { class: 'hint' }, 'AOCC, AIC, AH OT and ECT are on the Roster tab.'));
 }
 
 // ----- premed tab -----
@@ -1572,12 +1595,12 @@ function renderRoster() {
   if (rosterView === 'sheet') {
     return h('div', {},
       h('section', { class: 'card no-print' }, h('h2', {}, 'OT roster'), actions,
-        h('p', { class: 'hint', style: 'margin:0' }, 'This is what the downloaded .xlsx looks like. The top half comes from the General tab; case notes aren\'t included. Switch to Edit to move names or change tags. & marks a senior who is double covering.')),
+        h('p', { class: 'hint', style: 'margin:0' }, 'This is what the downloaded .xlsx looks like. The top half comes from the Calls/clinics tab; case notes aren\'t included. Switch to Edit to move names or change tags. & marks a senior who is double covering.')),
       renderSheet());
   }
   return h('div', {},
     h('section', { class: 'card' }, h('h2', {}, 'OT roster'), actions,
-      h('p', { class: 'hint', style: 'margin:0' }, 'Drag a name by its ⠿ grip onto another name to swap them, or onto an empty part of a cell to move it there. Drag a junior by their C grip to add them to another room as an ad hoc cover. Click a name to change it or its tags ((L), (RA), L-4pm, C-OT13, C-KROR PACU…). + adds someone from the staff list. Click the case notes to edit them. & marks a senior who is double covering. Premed cover is on its own tab.')),
+      h('p', { class: 'hint', style: 'margin:0' }, 'Drag a name onto another name to swap them, or onto an empty part of a cell to move it there. Drag the C on a junior to add them to another room as an ad hoc cover, or the & on a senior to have them double cover another room (a dark & means they already are). × takes a name off. Click a name to see where they are and change its tags ((L), (RA), L-4pm, C-OT13…). + adds someone from the staff list. Click the case notes to edit them. Premed cover is on the Premeds tab.')),
     h('div', { class: 'cols' },
       h('section', { class: 'card scroll' },
         h('table', { class: 'sheet' },
@@ -2011,5 +2034,6 @@ function membersCard() {
 
 lastRows = state.roster ? JSON.stringify(state.roster.rows) : null;
 if (state.tab === 'staff') state.tab = 'seniors';
+state.tab = 'roster'; // the page opens on the roster
 if (!state.staff.length) state.tab = 'seniors';
 render();

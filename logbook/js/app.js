@@ -9,6 +9,7 @@ import { renderProgress, renderTotals } from './ui-progress.js';
 import { renderSettings, applyCompact, cachedCompact } from './ui-settings.js';
 import { renderAdmin } from './ui-admin.js';
 import { renderReflect, watchMyReflections } from './ui-reflect.js';
+import { purgeExpired } from './bin.js';
 
 // Tab icons: tiny inline SVG paths (24x24, stroked), so they look the same on every phone.
 const ICONS = {
@@ -178,6 +179,14 @@ async function onUser(user) {
     return;
   }
   S.tab = tabFromHash() || 'log';
+  // recycle bin: drop entries older than 30 days, but only once the reflections are loaded, so an
+  // image still used by a live (e.g. restored) reflection is never deleted with an old bin entry
+  { let done = false, stop = null;
+    stop = cloud.watchReflections(user.email, (list, meta = {}) => {
+      if (done || meta.fromCache) return;   // wait for the server's copy, not a possibly stale offline cache
+      done = true; if (stop) stop();
+      S.reflections = list; purgeExpired().catch(err => console.warn('Recycle bin purge failed', err));
+    }); if (done && stop) stop(); }
   unwatchRefl = watchMyReflections(user.email);
   let sig = '';
   unwatch = cloud.watchCases(user.email, (cases, meta = {}) => {

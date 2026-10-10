@@ -385,3 +385,37 @@ export async function loadTemplate() {
   try { const s = localStorage.getItem(TEMPLATE_KEY); if (s) return JSON.parse(s); } catch { /* storage blocked */ }
   return templateMem;
 }
+
+// ---- recycle bin (bin agent): logbooks/{email}/bin/{id} = { id, kind, data, deletedAt } ----
+const binWatchers = new Set();   // { email, cb }
+function binOf(email) {
+  const lb = load().logbooks[email];
+  return lb && lb.bin ? Object.values(lb.bin).map(plain).sort((a, b) => (b.deletedAt || 0) - (a.deletedAt || 0)) : [];
+}
+function notifyBin(email) { for (const w of binWatchers) if (w.email === email) w.cb(binOf(email)); }
+export function watchBin(email, cb) {
+  const w = { email: lc(email), cb: list => cb(list, meta) };
+  binWatchers.add(w);
+  w.cb(binOf(w.email));
+  return () => binWatchers.delete(w);
+}
+export async function listBin(email) { return binOf(lc(email)); }
+export async function saveBinEntry(email, e) {
+  email = lc(email);
+  const s = load();
+  const lb = book(s, email);
+  const doc = plain({ id: String(e.id), kind: e.kind, data: e.data, deletedAt: Number(e.deletedAt) || Date.now() });
+  (lb.bin ||= {})[doc.id] = doc;
+  save(s);
+  notifyBin(email);
+  return doc;
+}
+export async function deleteBinEntry(email, id) {
+  email = lc(email);
+  const s = load();
+  const lb = book(s, email);
+  if (lb.bin) delete lb.bin[id];
+  save(s);
+  notifyBin(email);
+}
+// ---- end recycle bin ----

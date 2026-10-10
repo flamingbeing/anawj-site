@@ -7,7 +7,7 @@ import { REFLECTION_HEADINGS, REFLECTION_SECTIONS } from './categories.js';
 
 export const REFLECTION_TOTAL = REFLECTION_HEADINGS.reduce((n, h) => n + h.min, 0);   // 96
 export const SECTION_MAX = 20000;
-export const REFLECTION_FIELDS = ['id', 'headingId', 'subId', 'initials', 'date', 'jr', 'diagnosis', 'title', 'summary', 'points', 'figures', 'references', 'sections', 'caseId', 'status', 'createdAt', 'updatedAt'];
+export const REFLECTION_FIELDS = ['id', 'headingId', 'subId', 'initials', 'date', 'jr', 'diagnosis', 'title', 'summary', 'points', 'figures', 'references', 'sections', 'caseId', 'source', 'status', 'createdAt', 'updatedAt'];
 // Caps (firestore.rules checks list sizes and top-level types; string lengths inside lists are capped here).
 export const LIMITS = { title: 300, summary: 20000, points: 15, pointHeading: 300, pointText: 20000, figures: 10, caption: 300, references: 30, reference: 1000 };
 export const IMAGE_MAX_B64 = 700 * 1024;   // an image doc's base64 must be under this (rules allow < 750000)
@@ -44,6 +44,7 @@ export function cleanReflection(r, now = Date.now()) {
     figures,
     references: arr(r.references).slice(0, L.references).map(x => str(x, L.reference)),
     caseId: r.caseId ? String(r.caseId).slice(0, 200) : null,
+    ...(r.source === 'word' ? { source: 'word' } : {}),
     status: r.status === 'complete' ? 'complete' : 'draft',
     createdAt: Number(r.createdAt) || now,
     updatedAt: now,
@@ -61,13 +62,12 @@ export const isLegacy = r => !!(r && r.sections && Object.values(r.sections).som
   && !String(r.summary || '').trim() && !arr(r.points).some(p => p && (String(p.heading || '').trim() || String(p.text || '').trim())));
 
 // What is missing before a reflection can be marked complete (empty = ready).
-// Every reflection must be linked to a logged case (caseId); older unlinked ones can't be completed until linked.
+// Linking a reflection to a logged case (caseId) is optional. source 'word' marks a Word import.
+// The sub-type is optional too: headings with required sub-types show what is still needed instead.
 export function completeProblems(r) {
   const out = [];
   const hd = HEADING_BY_ID[r.headingId];
-  if (!r.caseId) out.push('linked case');
   if (!hd) out.push('heading');
-  if (hd && hd.subs && !r.subId) out.push('sub-type');
   if (!String(r.initials || '').trim()) out.push('initials');
   if (!r.date) out.push('date');
   if (isLegacy(r)) {
@@ -115,15 +115,12 @@ export function reflectionProgress(reflections) {
     const jrNeeded = h.jr || 0;
     const jrMax = h.jr ? Infinity : 1;
     const subs = (h.subs || []).map(s => ({ id: s.id, name: s.name, min: s.min, done: mine.filter(r => r.subId === s.id).length }));
+    // JR and sub-type rules are shown as reminders only, not enforced
     const issues = [];
-    if (jrNeeded && jrDone < jrNeeded) issues.push(`Needs ${jrNeeded - jrDone} more JR reflection${jrNeeded - jrDone > 1 ? 's' : ''}`);
-    if (!h.jr && jrDone > 1) issues.push('Only 1 JR reflection counts under this heading');
-    for (const s of subs) if (s.done < s.min) issues.push(`Missing: ${s.name}`);
     const dups = (reflections || []).filter(r => r.headingId === h.id && dupKeys.has(patientKey(r)));
     if (dups.length) issues.push(`Same patient used more than once (${[...new Set(dups.map(r => r.initials + ' ' + r.date))].join(', ')})`);
-    // a heading is met when the count, JR and sub-types are met (extra JR beyond the max don't count)
-    const counted = h.jr ? mine.length : mine.length - Math.max(0, jrDone - 1);
-    const met = counted >= h.min && (!jrNeeded || jrDone >= jrNeeded) && subs.every(s => s.done >= s.min);
+    const counted = mine.length;
+    const met = counted >= h.min;
     return { id: h.id, section: h.section, name: h.name, hint: h.hint || '', done: mine.length, counted, min: h.min, jrDone, jrNeeded, jrMax, subs, issues, met };
   });
   const total = headings.reduce((n, h) => n + Math.min(h.counted, h.min), 0);
@@ -150,3 +147,82 @@ export function wordCount(r) {
   return n;
 }
 
+
+// ---------- heading suggestions from a logged case ----------
+// Case category code -> [headingId, subId?]. Codes are matched exactly, then by their parent (e.g. 20iii -> 20).
+const CAT_HEADINGS = {
+  '01': [['cabg', 'on'], ['cardiac']], '02': [['cabg', 'off'], ['cardiac']],
+  '03': [['thoracic']], '07': [['thoracic']], '04': [['thyroid']], '05': [['ugi']], '06': [['egi']], '08': [['lap']],
+  '09': [['eye']], '11': [['shared']], '12': [['airway']], '15': [['neuro']], '15i': [['neuro']],
+  '16': [['lscs']], '17': [['labour']], '20': [['paeds']], '20i': [['paeds', 'neonate']],
+  '21': [['geriatric']], '23': [['bariatric']], '24': [['spine']],
+  '26': [['regional']], '26i': [['regional', 'ul']], '26ii': [['regional', 'll']], '26iii': [['regional', 'truncal']],
+  '27': [['regional', 'epidural']], '28': [['regional']], '29': [['regional']],
+  '30': [['acute']], '31': [['chronic']], '33': [['remote']], '34': [['urology']], '35': [['vascular']],
+  '36': [['polytrauma']], '38': [['icu']],
+};
+// Keyword hints in the case details: [regex, headingId, subId?, onlyIfHeadingAlreadySuggested?]
+const KEYWORD_HEADINGS = [
+  [/prostat|\bTURP\b|\bTURBT?\b/i, 'urology', 'prostate'],
+  [/nephrectom|kidney|\bPCNL\b|renal/i, 'urology', 'kidney'],
+  [/\bRSI\b|rapid sequence/i, 'paeds', 'rsi', true],
+  [/\bAAA\b|fem(oral)?[- ]?pop|aort/i, 'vascular'],
+  [/valve|\bAVR\b|\bMVR\b|\bTAVI\b|pacemaker|\bAICD\b|pericardial/i, 'cardiac'],
+  [/\bCABG\b/i, 'cabg'],
+  [/\bMRI\b|\bIR\b|angio|cath(eter)? lab|\bERCP\b/i, 'remote'],
+  [/polytrauma/i, 'polytrauma'],
+  [/difficult airway|\bAFOI\b|awake fib|\bFONA\b/i, 'airway'],
+  [/thyroid/i, 'thyroid'],
+  [/\bLSCS\b|caesar/i, 'lscs'],
+  [/craniotomy/i, 'neuro'],
+];
+
+// Ranked heading suggestions for a case: [{ headingId, subId, name, needed }].
+// Headings still short (count, a missing sub-type, or JR needed and the case is JR) come first.
+// opts.jr: the reflection would be a JR case (default: unknown -> JR shortfalls not considered).
+export function suggestHeadings(caseObj, reflections = [], opts = {}) {
+  if (!caseObj) return [];
+  const cats = (caseObj.cats || []).map(c => String(c).toLowerCase());
+  const details = String(caseObj.details || '');
+  const out = [];
+  const push = (headingId, subId = null) => {
+    const hd = HEADING_BY_ID[headingId];
+    if (!hd) return;
+    if (subId && !(hd.subs || []).some(s => s.id === subId)) subId = null;
+    const ex = out.find(o => o.headingId === headingId);
+    if (ex) { if (!ex.subId && subId) ex.subId = subId; return; }
+    out.push({ headingId, subId });
+  };
+  for (const c of cats) {
+    let m = CAT_HEADINGS[c];
+    if (!m) { const parent = c.match(/^\d{2}/); if (parent && /^20/.test(c)) m = CAT_HEADINGS['20']; else if (parent && /^26/.test(c)) m = CAT_HEADINGS['26']; }
+    if (!m) continue;
+    for (const [hid, sid] of m) {
+      // a 27 epidural on an obstetric case (17) is labour analgesia, not a non-obstetric epidural
+      if (c === '27' && cats.includes('17')) continue;
+      push(hid, sid);
+    }
+  }
+  for (const [re, hid, sid, onlyIf] of KEYWORD_HEADINGS) {
+    if (!re.test(details)) continue;
+    if (onlyIf && !out.some(o => o.headingId === hid)) continue;
+    push(hid, sid);
+  }
+  const prog = reflectionProgress(reflections || []);
+  const byId = Object.fromEntries(prog.headings.map(x => [x.id, x]));
+  const scored = out.map((o, i) => {
+    const p = byId[o.headingId];
+    const needed = p.counted < p.min;   // headings short of their minimum come first
+    return { headingId: o.headingId, subId: o.subId, name: HEADING_BY_ID[o.headingId].name, needed, _s: needed ? 0 : 100, _i: i };
+  });
+  scored.sort((a, b) => a._s - b._s || a._i - b._i);
+  return scored.map(({ _s, _i, ...o }) => o);
+}
+
+// Move a reflection to another heading: keeps subId only when the new heading has that sub-type.
+export function moveToHeading(r, headingId) {
+  const hd = HEADING_BY_ID[headingId];
+  if (!hd) return { ...r };
+  const subId = hd.subs && hd.subs.some(s => s.id === r.subId) ? r.subId : null;
+  return { ...r, headingId, subId };
+}

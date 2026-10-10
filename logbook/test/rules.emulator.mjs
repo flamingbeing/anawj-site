@@ -91,6 +91,8 @@ await t('legacy-section reflection', assertSucceeds(setDoc(doc(a, 'logbooks', A,
 await t('read own reflection', assertSucceeds(getDoc(doc(a, 'logbooks', A, 'reflections', 'r1'))));
 await t('other reads reflection', assertFails(getDoc(doc(b, 'logbooks', A, 'reflections', 'r1'))));
 await t('admin reads reflection', assertFails(getDoc(doc(adm, 'logbooks', A, 'reflections', 'r1'))));
+await t('word-imported reflection, no case', assertSucceeds(setDoc(doc(a, 'logbooks', A, 'reflections', 'rw'), { ...refl('rw'), source: 'word' })));
+await t('reflection bad source', assertFails(setDoc(doc(a, 'logbooks', A, 'reflections', 'rw2'), { ...refl('rw2'), source: 'x' })));
 await t('reflection bad status', assertFails(setDoc(doc(a, 'logbooks', A, 'reflections', 'r3'), { ...refl('r3'), status: 'done' })));
 await t('reflection extra field', assertFails(setDoc(doc(a, 'logbooks', A, 'reflections', 'r3'), { ...refl('r3'), grade: 'A' })));
 await t('reflection too many points', assertFails(setDoc(doc(a, 'logbooks', A, 'reflections', 'r3'), { ...refl('r3'), points: Array.from({ length: 16 }, () => ({ heading: 'h', text: 't' })) })));
@@ -103,6 +105,24 @@ await t('admin reads image', assertFails(getDoc(doc(adm, 'logbooks', A, 'images'
 await t('image bad mime', assertFails(setDoc(doc(a, 'logbooks', A, 'images', 'img2'), { ...img('img2'), mime: 'image/gif' })));
 await t('image too big', assertFails(setDoc(doc(a, 'logbooks', A, 'images', 'img2'), { ...img('img2'), data: 'A'.repeat(760000) })));
 await t('delete own image', assertSucceeds(deleteDoc(doc(a, 'logbooks', A, 'images', 'img1'))));
+// ---- recycle bin (bin agent): owner only; admins no access ----
+const binE = (id, kind = 'case', data = c('c1')) => ({ id, kind, data, deletedAt: 5 });
+await t('own bin entry (case)', assertSucceeds(setDoc(doc(a, 'logbooks', A, 'bin', 'c_c1_x'), binE('c_c1_x'))));
+await t('own bin entry (reflection)', assertSucceeds(setDoc(doc(a, 'logbooks', A, 'bin', 'r_r1_x'), binE('r_r1_x', 'reflection', refl('r1')))));
+await t('read own bin', assertSucceeds(getDocs(collection(a, 'logbooks', A, 'bin'))));
+await t('other reads bin', assertFails(getDocs(collection(b, 'logbooks', A, 'bin'))));
+await t('admin reads bin', assertFails(getDoc(doc(adm, 'logbooks', A, 'bin', 'c_c1_x'))));
+await t('admin writes bin', assertFails(setDoc(doc(adm, 'logbooks', A, 'bin', 'c_c2_x'), binE('c_c2_x'))));
+await t('other writes bin', assertFails(setDoc(doc(b, 'logbooks', A, 'bin', 'c_c2_x'), binE('c_c2_x'))));
+await t('bin bad kind', assertFails(setDoc(doc(a, 'logbooks', A, 'bin', 'c_c2_x'), binE('c_c2_x', 'summary'))));
+await t('bin id mismatch', assertFails(setDoc(doc(a, 'logbooks', A, 'bin', 'c_c2_x'), binE('zz'))));
+await t('bin extra field', assertFails(setDoc(doc(a, 'logbooks', A, 'bin', 'c_c2_x'), { ...binE('c_c2_x'), note: 'x' })));
+await t('bin data not map', assertFails(setDoc(doc(a, 'logbooks', A, 'bin', 'c_c2_x'), binE('c_c2_x', 'case', 'text'))));
+await t('bin deletedAt not number', assertFails(setDoc(doc(a, 'logbooks', A, 'bin', 'c_c2_x'), { ...binE('c_c2_x'), deletedAt: 'today' })));
+await t('bin missing deletedAt', assertFails(setDoc(doc(a, 'logbooks', A, 'bin', 'c_c2_x'), { id: 'c_c2_x', kind: 'case', data: c('c2') })));
+await t('bin data too many keys', assertFails(setDoc(doc(a, 'logbooks', A, 'bin', 'c_c2_x'), binE('c_c2_x', 'case', Object.fromEntries(Array.from({ length: 41 }, (_, i) => ['k' + i, i]))))));
+await t('admin deletes bin entry', assertFails(deleteDoc(doc(adm, 'logbooks', A, 'bin', 'c_c1_x'))));
+await t('owner deletes bin entry', assertSucceeds(deleteDoc(doc(a, 'logbooks', A, 'bin', 'c_c1_x'))));
 // portfolio template: everyone signed in reads, admins write
 await t('template read', assertSucceeds(getDoc(doc(a, 'config', 'portfolioTemplate'))));
 await t('template user write', assertFails(setDoc(doc(a, 'config', 'portfolioTemplate'), { parts: 1, size: 3, uploadedAt: 1 })));
