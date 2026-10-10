@@ -1253,15 +1253,15 @@ function ensureSpecialRows(r) {
   lastRows = JSON.stringify(r.rows);
 }
 
-// The free-text box at the top right of the sheet.
+// The comments box: free text at the top right of the sheet.
 function boxCard() {
   return h('section', { class: 'card' },
-    h('h2', {}, 'Top right box'),
+    h('h2', {}, 'Comments box'),
     h('p', { class: 'hint' }, 'Shown in the box at the top right of the sheet, e.g. meetings or people away. People on an admin day go on the Admin/no list row instead (Manpower tab).'),
     h('textarea', { rows: 5, value: state.day.box || '', placeholder: 'e.g. Sophia Ang - mtg 2 to 5pm', onchange: e => {
       const before = state.day.box || '';
       state.day.box = e.target.value;
-      logRoster([`Top right box: ${before || '—'} → ${e.target.value || '—'}`]);
+      logRoster([`Comments box: ${before || '—'} → ${e.target.value || '—'}`]);
       save();
     } }));
 }
@@ -1318,8 +1318,8 @@ function renderRoster() {
           h('thead', {}, h('tr', {}, ['', 'Senior', 'Junior', 'Cases'].map(t => h('th', {}, t)))),
           h('tbody', {}, body))),
       h('div', {},
-        historyCard(),
         boxCard(),
+        historyCard(),
         rosterLogCard(),
         h('section', { class: 'card' },
           h('h2', {}, 'Things to look at'),
