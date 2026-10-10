@@ -94,7 +94,10 @@ const parasOf = x => x.match(/<w:p(?=[\s>])[^>]*>[\s\S]*?<\/w:p>/g) || [];
 
 // Which heading a table belongs to: the paragraph(s) just above it, matched on the heading name.
 function headingFor(between) {
-  const texts = parasOf(between).map(textOf).map(s => s.trim()).filter(Boolean).slice(-3).reverse();
+  const all = parasOf(between).map(textOf).map(s => s.trim()).filter(Boolean);
+  const texts = all.slice(-3).reverse();
+  const minLine = [...all].reverse().find(t => /\(min\s*\d+\)/i.test(t));
+  if (minLine) texts.push(minLine);
   let best = null, bestLen = 0;
   for (const t of texts) {
     const nt = norm(t.replace(/\(min\s*\d+\)/i, ''));
@@ -124,6 +127,35 @@ function fillRow(proto, r) {
   return proto.replace(/<w:tc(?:\s[^>]*)?>[\s\S]*?<\/w:tc>/g, tc => fillCell(tc, cells[i++] || []));
 }
 
+// The template's rows are slots: some carry a pre-printed "JR" in the date cell or a sub-type in the
+// diagnosis cell ("On pump CABG", "Under GA"). Each reflection goes to the row that asks for it;
+// rows left empty keep their prompt; extra reflections get new rows after the last.
+function slotInfo(hd, tr) {
+  const cells = (tr.match(/<w:tc(?:\s[^>]*)?>[\s\S]*?<\/w:tc>/g) || []).map(textOf).map(t => t.trim());
+  const label = norm(cells[2] || '');
+  const sub = label && (hd.subs || []).find(x => { const n = norm(x.name); return label.includes(n) || n.includes(label) || label.startsWith(n.slice(0, 6)); });
+  return { tr, jr: /^jr$/i.test(cells[1] || ''), sub: sub ? sub.id : null, prompt: !!label, used: false };
+}
+export function placeInSlots(hd, protoRows, list) {
+  const slots = protoRows.map(tr => slotInfo(hd, tr));
+  const out = slots.map(() => null);
+  const take = (r, ok) => { const i = slots.findIndex(sl => !sl.used && ok(sl)); if (i < 0) return false; slots[i].used = true; out[i] = fillRow(slots[i].tr, r); return true; };
+  const extra = [];
+  for (const r of list) {
+    const done = (r.subId && take(r, sl => sl.sub === r.subId))
+      || (r.jr && take(r, sl => sl.jr && !sl.sub))
+      || take(r, sl => !sl.jr && !sl.sub && !sl.prompt)
+      || take(r, sl => !sl.sub && !(sl.jr && !r.jr))
+      || take(r, sl => !sl.sub);
+    if (!done) extra.push(r);
+  }
+  const plain = (slots.find(sl => !sl.jr && !sl.prompt) || slots[slots.length - 1]).tr;
+  const rows = slots.map((sl, i) => out[i] || sl.tr);
+  for (const r of extra) rows.push(fillRow(plain, r));
+  while (rows.length < hd.min) rows.push(fillRow(plain, null));
+  return rows;
+}
+
 export function fillDocumentXml(xml, reflections, { name } = {}) {
   const groups = groupReflections(reflections);
   const tables = topTables(xml);
@@ -137,12 +169,9 @@ export function fillDocumentXml(xml, reflections, { name } = {}) {
     last = b;
     if (!hd || done.has(hd.id)) { out += tbl; continue; }
     done.add(hd.id);
-    const list = groups[hd.id];
-    const n = Math.max(hd.min, list.length, rows.length - 1);
-    const proto = rows[1];
     const firstRow = tbl.indexOf(rows[1]);
     const lastRow = tbl.lastIndexOf(rows[rows.length - 1]) + rows[rows.length - 1].length;
-    const filled = Array.from({ length: n }, (_, i) => fillRow(proto, list[i])).join('');
+    const filled = placeInSlots(hd, rows.slice(1), groups[hd.id]).join('');
     out += tbl.slice(0, firstRow) + filled + tbl.slice(lastRow);
   }
   out += xml.slice(last);
