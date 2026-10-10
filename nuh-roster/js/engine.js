@@ -25,7 +25,7 @@ export const POSTINGS = ['', 'RA', 'P', 'L', 'SR', 'Neu', 'Amb'];
 
 // Name colour on the roster: green marks Baby MOs (never left alone), purple marks locums.
 export const COLOURS = [['', 'Black'], ['green', 'Green'], ['purple', 'Purple']];
-export const COLOUR_ARGB = { green: 'FF00B050', purple: 'FF7030A0' };
+export const COLOUR_ARGB = { green: 'FF00B050', purple: 'FF7030A0', red: 'FFFF0000' };
 export const isBaby = p => !!p && (p.grade === 'Baby MO' || p.colour === 'green');
 export const STATUSES = [
   ['avail', 'Available'],
@@ -575,10 +575,14 @@ export function coverTarget(text, row, rows) {
   return null;
 }
 
+// A junior written "Name (C)" in a room is only an ad hoc cover there, not physically in it.
+export const isCoverPart = part => /\(\s*C\s*\)/i.test(String(part));
+
 export function missingCovers(rows) {
   const out = [];
   const covered = new Set();
   for (const row of rows) for (const col of ['senior', 'junior']) for (const part of String(row[col] || '').split('/')) {
+    if (isCoverPart(part)) covered.add(row.label);
     const c = coverText(part);
     if (c) { const target = coverTarget(c, row, rows); if (target) covered.add(target); }
   }
@@ -608,7 +612,9 @@ export function check({ rows, staff, day, settings = DEFAULT_SETTINGS }) {
   const seniorsOf = {}, juniorsOf = {};
   for (const row of rows) {
     seniorsOf[row.roomId] = resolve(row.senior, 'senior', row);
-    juniorsOf[row.roomId] = resolve(row.junior, 'junior', row);
+    const parts = String(row.junior || '').split('/');
+    juniorsOf[row.roomId] = resolve(parts.filter(x => !isCoverPart(x)).join('/'), 'junior', row);
+    resolve(parts.filter(isCoverPart).join('/'), 'cover', row);
     resolve(String(row.premed || '').replace(/-\s*premed/i, ''), 'premed', row);
   }
   for (const [id, uses] of Object.entries(where)) {
