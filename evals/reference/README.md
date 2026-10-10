@@ -76,9 +76,8 @@ Every form opens with an introduction saying it is a **formative** assessment by
 
 **Forms vary by item in name only, as far as these three show.** MedHub names each form after its EPA, e.g. "(2023) EBD EPA (5): (HeadNeck Trauma)", "(2023) Mini Clinical Evaluation Exercise (CEX) Form - PNB", "(2023) Direct Observation of Procedural Skills (DOPS) Form - (Truncal)". The procedure names carry EPA numbers and sometimes a level ("[DOPS] EPA 3 (Level 3): Single Shot Truncal Block: Transabdominal Plane Block", "[MiniCEX] EPA 3: Manage a patient for surgery under peripheral nerve block and sedation", "[EBD] EPA 5: Mx of head/neck trauma"). The tracking template doesn't have these numbers; they are in the programme's EPA guidebook.
 
+**From the EPA guidebook (v8):** the blank MedHub forms embedded in the guidebook confirm the questions above and supply the descriptors now in the JSON: each 1–9 observation score has a written descriptor (1 = cannot perform; 5 = indirect supervision for an uncomplicated case; 7 = independent with distant supervision; 9 = well enough to instruct others), N/A is "Not Observed", and the DOPS form groups 1–3 / 4–6 / 7–9 as Below / Meets / Exceeds Expectations. Level 3 entrustment needs an overall score of at least 5, level 4 at least 7. Each milestone rating has descriptors at 1, 3, 5, 7 and 9. Every form also has an "Insufficient contact to evaluate (delete evaluation)" option for the assessor. The DOPS form ends at question 19.
+
 **Still to confirm** (marked `unconfirmed` in the JSON):
 
-- The full wording of the DOPS guidance options "Hands-off" and "Active Help" (only "Passive Help (Supervisor assists and follows the lead of the resident)" was seen in full).
-- Whether the DOPS form continues after question 19; the screenshot ends there.
-- In the DOPS screenshot the comments question (17) has no asterisk, so it may be optional there while it is required on the other two.
-- The EPA numbering for each tracking-template item.
+- The DOPS guidance options. The user listed Hands-off, Passive Help and Active Help; the blank form shows a fourth, "Observation (Supervisor performs critical portion)". The order and the full wording of Active Help and Hands-off are not confirmed.

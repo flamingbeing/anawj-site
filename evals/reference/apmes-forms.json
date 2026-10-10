@@ -1,7 +1,7 @@
 {
  "scales": {
   "milestone": {
-   "about": "Milestone level with its 9-point equivalent. 0.5 = Not Yet Achieved Level 1.",
+   "about": "Entrustment-based discussion portion of Mini-CEX and EBD: milestone descriptors. Value 0.5 = Not Yet Achieved Level 1; 1.0-5.0 in half steps shown as 1-9. Descriptors exist for 1, 3, 5, 7 and 9 (milestone levels 1-5) and differ per competency; see \"descriptors\" on each question. Medical knowledge and clinical reasoning are compulsory.",
    "options": [
     {
      "value": 0.5,
@@ -46,45 +46,79 @@
    ]
   },
   "ninePoint": {
-   "about": "9-point grid, 1 to 9.",
+   "about": "Observation portion of Mini-CEX and DOPS (EPA guidebook v8 and the blank MedHub forms). The DOPS form groups 1-3 as Below Expectations, 4-6 Meets, 7-9 Exceeds. N/A is shown as \"Not Observed\".",
+   "bands": [
+    {
+     "range": [
+      1,
+      3
+     ],
+     "label": "Below Expectations"
+    },
+    {
+     "range": [
+      4,
+      6
+     ],
+     "label": "Meets Expectations"
+    },
+    {
+     "range": [
+      7,
+      9
+     ],
+     "label": "Exceeds Expectations"
+    }
+   ],
+   "naLabel": "Not Observed",
    "options": [
     {
      "value": 1,
-     "label": "1"
+     "label": "1",
+     "descriptor": "Trainee cannot perform this activity."
     },
     {
      "value": 2,
-     "label": "2"
+     "label": "2",
+     "descriptor": "The trainee can perform this activity only under direct supervision with supervisor performing more than 50% of activity."
     },
     {
      "value": 3,
-     "label": "3"
+     "label": "3",
+     "descriptor": "The trainee can perform this activity only under direct supervision with supervisor performing less than 50% of activity."
     },
     {
      "value": 4,
-     "label": "4"
+     "label": "4",
+     "descriptor": "The trainee can perform this activity but requires occasional direct supervision."
     },
     {
      "value": 5,
-     "label": "5"
+     "label": "5",
+     "descriptor": "The trainee can perform this activity under indirect supervision for uncomplicated case."
     },
     {
      "value": 6,
-     "label": "6"
+     "label": "6",
+     "descriptor": "The trainee can perform this activity under indirect supervision for complicated case."
     },
     {
      "value": 7,
-     "label": "7"
+     "label": "7",
+     "descriptor": "The trainee can perform this activity independently with distant supervision."
     },
     {
      "value": 8,
-     "label": "8"
+     "label": "8",
+     "descriptor": "The trainee performs this activity independently with distant supervision well enough to supervise others."
     },
     {
      "value": 9,
-     "label": "9"
+     "label": "9",
+     "descriptor": "The trainee performs this activity independently with distant supervision well enough to instruct others."
     }
-   ]
+   ],
+   "entrustmentThresholds": "Level 3 entrustment needs an overall clinical care / overall assessment score of at least 5; level 4 needs at least 7."
   },
   "supervision": {
    "about": "Entrustment / level of supervision.",
@@ -109,7 +143,14 @@
      "value": 5,
      "label": "Level 5 (Supervise)"
     }
-   ]
+   ],
+   "descriptions": {
+    "1": "The trainee has permission only to be present but not to enact this EPA.",
+    "2": "Supervisor needs to be present in the SAME room as the resident at all times. Pro-active supervision is required for all / most clinical activities.",
+    "3": "Supervisor need not be in the same room as resident but remains within the healthcare facility, contactable and ready to respond within minutes to any call for help by the resident e.g., the supervisor having a meal break while the resident remains alone to care for the patient.",
+    "4": "Supervisor is not present in healthcare facility but remains contactable via phone call to provide advice and supervision remotely.",
+    "5": "The trainee is able to guide others in this EPA."
+   }
   },
   "complexity": {
    "about": "Complexity of case dropdown (confirmed by the user, 2026-10-10).",
@@ -120,12 +161,14 @@
    ]
   },
   "guidance": {
-   "about": "DOPS: how much guidance was provided for the critical portion of the procedure (options confirmed by the user, 2026-10-10; only the Passive Help wording was seen in full).",
+   "about": "DOPS: how much guidance was provided for the critical portion of the procedure. The user listed Hands-off, Passive Help and Active Help; the blank MedHub DOPS form (EPA guidebook v8) shows \"Observation (Supervisor performs critical portion)\" as the first option. Order and the full wording of Active Help and Hands-off not yet confirmed.",
    "options": [
-    "Hands-off",
+    "Observation (Supervisor performs critical portion)",
+    "Active Help",
     "Passive Help (Supervisor assists and follows the lead of the resident)",
-    "Active Help"
-   ]
+    "Hands-off"
+   ],
+   "unconfirmed": true
   },
   "clinicalSetting": {
    "about": "Mini-CEX clinical setting dropdown (confirmed from a screenshot, 2026-10-10).",
@@ -229,27 +272,55 @@
        "n": 5,
        "label": "Medical Knowledge",
        "type": "milestone",
-       "required": true
+       "required": true,
+       "descriptors": {
+        "1": "Demonstrates knowledge of pathophysiology / treatment of medical and surgical considerations and identifies medications used to treat common comorbidities",
+        "3": "Demonstrates knowledge of common medical / surgical disease / medications routinely used in anaesthestic care",
+        "5": "Demonstrates knowledge of complex medical / surgical disease / medication used in subspecialty anaesthesia",
+        "7": "Demonstrates knowledge of medical / surgical disease as it relates to full spectrum of patient's perioperative care / pharmacology in setting of complex comorbidities",
+        "9": "Demonstrates knowledge of uncommon, complex, atypical conditions as it applies to the full spectrum of patient's perioperative care / participates in research related to pharmacology / pathophysiology relevant to anaesthesia"
+       }
       },
       {
        "n": 6,
        "label": "Clinical reasoning skills",
        "type": "milestone",
-       "required": true
+       "required": true,
+       "descriptors": {
+        "1": "Organizes and accurately summarizes patient information and list types of clinical reasoning errors",
+        "3": "Integrates information to form basic differential diagnosis for common patient presentations / Identifies clinical reasoning errors with guidance",
+        "5": "Develops a thorough and prioritised differential diagnosis for common patient presentation and able to apply clinical reasoning principles to identify errors",
+        "7": "Develops prioritised differential diagnosis in complex patient presentations and notes peculiarities of case / continually self reappraises clinical reasoning",
+        "9": "Coaches others to develop prioritised differential diagnoses in complex patients and models how to recognise errors and reflect on own clinical reasoning"
+       }
       },
       {
        "n": 7,
        "label": "Use of evidence based medicine",
        "type": "milestone",
        "required": true,
-       "na": true
+       "na": true,
+       "descriptors": {
+        "1": "Accesses and uses evidence in routine patient care",
+        "3": "Articulates clinical question and elicits patient preferences and to guide evidence based care",
+        "5": "Locates and applies best evidence based evidence integrated with patient preference to care of complex patients",
+        "7": "Appraises and applies evidence even in the face of uncertainty and conflicting evidence to guide individualised care",
+        "9": "Coaches others to appraise and apply evidence based care and / or participates in development of guidelines"
+       }
       },
       {
        "n": 8,
        "label": "Healthcare system awareness",
        "type": "milestone",
        "required": true,
-       "na": true
+       "na": true,
+       "descriptors": {
+        "1": "Identifies key components of the complex healthcare system that affects anaesthetic care and patient experience and factors impacting the cost of anaesthetic care",
+        "3": "Describes how components of a complex health care system interrelate and impact patient care and documents anaesthetic details to facilitate accurate billing",
+        "5": "Discusses how individual practice affects the broader system and explains the impact of documentation on billing and reimbursement",
+        "7": "Manages various components of the complex healthcare system to provide efficient and effective patient care and transition",
+        "9": "Advocates for or leads system change that enhances high-value, efficient and effective patient care and engages in external activities to advocate for cost effective care"
+       }
       }
      ]
     },
@@ -285,7 +356,8 @@
       }
      ]
     }
-   ]
+   ],
+   "decline": "Insufficient contact to evaluate (delete evaluation)"
   },
   "MiniCEX": {
    "medhubName": "(2023) Mini Clinical Evaluation Exercise (CEX) Form - (variant), e.g. \"- PNB\"",
@@ -454,27 +526,55 @@
        "n": 14,
        "label": "Medical Knowledge",
        "type": "milestone",
-       "required": true
+       "required": true,
+       "descriptors": {
+        "1": "Demonstrates knowledge of pathophysiology / treatment of medical and surgical considerations and identifies medications used to treat common comorbidities",
+        "3": "Demonstrates knowledge of common medical / surgical disease / medications routinely used in anaesthestic care",
+        "5": "Demonstrates knowledge of complex medical / surgical disease / medication used in subspecialty anaesthesia",
+        "7": "Demonstrates knowledge of medical / surgical disease as it relates to full spectrum of patient's perioperative care / pharmacology in setting of complex comorbidities",
+        "9": "Demonstrates knowledge of uncommon, complex, atypical conditions as it applies to the full spectrum of patient's perioperative care / participates in research related to pharmacology / pathophysiology relevant to anaesthesia"
+       }
       },
       {
        "n": 15,
        "label": "Clinical Reasoning Skills",
        "type": "milestone",
-       "required": true
+       "required": true,
+       "descriptors": {
+        "1": "Organizes and accurately summarizes patient information and list types of clinical reasoning errors",
+        "3": "Integrates information to form basic differential diagnosis for common patient presentations / Identifies clinical reasoning errors with guidance",
+        "5": "Develops a thorough and prioritised differential diagnosis for common patient presentation and able to apply clinical reasoning principles to identify errors",
+        "7": "Develops prioritised differential diagnosis in complex patient presentations and notes peculiarities of case / continually self reappraises clinical reasoning",
+        "9": "Coaches others to develop prioritised differential diagnoses in complex patients and models how to recognise errors and reflect on own clinical reasoning"
+       }
       },
       {
        "n": 16,
        "label": "Use of evidence based medicine (Locates and applies best evidence based medicine integrated with patient preference to care of complex patients)",
        "type": "milestone",
        "required": true,
-       "na": true
+       "na": true,
+       "descriptors": {
+        "1": "Accesses and uses evidence in routine patient care",
+        "3": "Articulates clinical question and elicits patient preferences and to guide evidence based care",
+        "5": "Locates and applies best evidence based evidence integrated with patient preference to care of complex patients",
+        "7": "Appraises and applies evidence even in the face of uncertainty and conflicting evidence to guide individualised care",
+        "9": "Coaches others to appraise and apply evidence based care and / or participates in development of guidelines"
+       }
       },
       {
        "n": 17,
        "label": "Healthcare System Awareness (Able to discuss how individual practice affects patient outcome and clinical efficiency e.g. affects length of stay and financial cost)",
        "type": "milestone",
        "required": true,
-       "na": true
+       "na": true,
+       "descriptors": {
+        "1": "Identifies key components of the complex healthcare system that affects anaesthetic care and patient experience and factors impacting the cost of anaesthetic care",
+        "3": "Describes how components of a complex health care system interrelate and impact patient care and documents anaesthetic details to facilitate accurate billing",
+        "5": "Discusses how individual practice affects the broader system and explains the impact of documentation on billing and reimbursement",
+        "7": "Manages various components of the complex healthcare system to provide efficient and effective patient care and transition",
+        "9": "Advocates for or leads system change that enhances high-value, efficient and effective patient care and engages in external activities to advocate for cost effective care"
+       }
       }
      ]
     },
@@ -521,7 +621,8 @@
       }
      ]
     }
-   ]
+   ],
+   "decline": "Insufficient contact to evaluate (delete evaluation)"
   },
   "DOPS": {
    "medhubName": "(2023) Direct Observation of Procedural Skills (DOPS) Form - (variant), e.g. \"- (Truncal)\"",
@@ -680,8 +781,19 @@
      ]
     }
    ],
-   "note": "The screenshot ends at question 19; there may be more below it."
+   "decline": "Insufficient contact to evaluate (delete evaluation)",
+   "endsAt": "Question 19 (reflective learning) is the last question; confirmed from the blank MedHub DOPS form in the EPA guidebook."
   }
  },
- "source": "Transcribed from three MedHub app screenshots of the evaluator side (EBD, Mini-CEX, DOPS), 2026-10-10."
+ "source": "Transcribed from three MedHub app screenshots of the evaluator side (EBD, Mini-CEX, DOPS), 2026-10-10. Checked against the blank MedHub forms (printed Jul 20, 2023) embedded in the EPA Guidebook v8 (Jul 2024), which supplied the 9-point and milestone descriptors.",
+ "rules": [
+  "Only physician / core faculty may assess Mini-CEX, DOPS and EBD; senior residents do not assess EPAs.",
+  "EBD assessors must have co-managed the case.",
+  "Faculty and resident agree on the case. After the observed assessment the resident triggers the form to the assessor and fills in the case details first.",
+  "The same patient can be used for at most 2 EPA assessments, each on its own form.",
+  "Forms should be filled within 24 hours of being triggered; otherwise the assessor gets a reminder email.",
+  "Residents should complete the relevant Mini-CEX, DOPS and EBD for an EPA by the end of each clinical rotation.",
+  "Assessors with a conflict of interest (e.g. close relations) should not assess and should flag it to the programme.",
+  "At least 2 entrustment questions per assessment; the discussion must follow an actual case."
+ ]
 }
