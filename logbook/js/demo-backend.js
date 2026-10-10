@@ -11,8 +11,8 @@
 
 export const DEMO_USER = { email: 'demo@example.com', name: 'Demo User', uid: 'demo-uid' };
 
-import { cleanReflection } from './reflections.js';
-export { cleanReflection };
+import { cleanReflection, cleanImage } from './reflections.js';
+export { cleanReflection, cleanImage };
 
 const KEY = 'apmes-logbook-demo-v1';
 
@@ -294,6 +294,29 @@ export async function deleteReflection(email, id) {
   if (lb.reflections) delete lb.reflections[id];
   save(s);
   notifyReflections(email);
+}
+
+// ---- reflection images (logbooks/{email}/images/{id}) ----
+// Kept under their own key (base64 is large) so load()/save() of the demo state stays fast.
+const IMAGES_KEY = KEY + '-images';
+const imagesMem = {};
+function imageStore() { try { return JSON.parse(localStorage.getItem(IMAGES_KEY) || '{}'); } catch { return { ...imagesMem }; } }
+function imageStoreSave(m) {
+  Object.keys(imagesMem).forEach(k => delete imagesMem[k]); Object.assign(imagesMem, m);
+  if (typeof localStorage === 'undefined') return;
+  try { localStorage.setItem(IMAGES_KEY, JSON.stringify(m)); } catch (e) { console.warn('Demo images kept in memory only', e); }
+}
+export async function saveImage(email, img) {
+  const d = cleanImage(img);
+  const m = imageStore(); m[lc(email) + '/' + d.id] = d; imageStoreSave(m);
+  return d;
+}
+export async function loadImage(email, id) {
+  const d = imageStore()[lc(email) + '/' + id];
+  return d ? plain(d) : null;
+}
+export async function deleteImage(email, id) {
+  const m = imageStore(); delete m[lc(email) + '/' + id]; imageStoreSave(m);
 }
 
 export async function writeSummary(rid, summary) {

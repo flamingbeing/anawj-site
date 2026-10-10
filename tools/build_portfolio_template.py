@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Make a BLANK APMES portfolio template from a filled portfolio .docx.
 
+Only needed when the official blank portfolio is not to hand: the original blank .docx can be
+uploaded on the Admin page as it is.
+
   python3 tools/build_portfolio_template.py filled.docx blank-template.docx
 
 Keeps styles, headers/footers, instructions, the official example reflection and every

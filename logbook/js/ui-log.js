@@ -41,6 +41,21 @@ const toggleCat = (list, code) => (list.includes(code) ? dropCat(list, code) : a
 // ---------- category picker (search + grouped list) ----------
 
 // opts.get(): current codes; opts.toggle(code); opts.autofocus. Returns { el, refresh, focus }.
+// Picking a category repaints the selected chips, suggestions and quick picks above, which changes
+// their height. Keep whatever was tapped (or its group) at the same place on screen, so several
+// categories can be tapped in a row without the page jumping.
+function keepPlace(anchor, fn) {
+  const before = anchor && anchor.isConnected ? anchor.getBoundingClientRect().top : null;
+  const inner = anchor && anchor.scrollTop;
+  fn();
+  if (before == null || !anchor.isConnected) return;
+  if (inner) anchor.scrollTop = inner;
+  const d = anchor.getBoundingClientRect().top - before;
+  if (d) window.scrollBy(0, d);
+}
+// On phones, focusing the details box pops the keyboard and scrolls back up: only do it with a mouse.
+const refocus = () => { if (ui.textarea && matchMedia('(pointer: fine)').matches) ui.textarea.focus({ preventScroll: true }); };
+
 export function catPicker({ get, toggle, placeholder = 'Search categories: code or name' }) {
   let q = '', hl = 0, items = [];
   const list = h('ul', { role: 'listbox' });
@@ -73,7 +88,7 @@ export function catPicker({ get, toggle, placeholder = 'Search categories: code 
       const p = prog[c.code];
       return h('li', {
         role: 'option', 'aria-selected': String(sel.has(c.code)), class: `${c.parent ? 'sub' : ''} ${sel.has(c.code) ? 'on' : ''}`, title: c.label,
-        onclick: () => { toggle(c.code); refresh(); },
+        onclick: () => keepPlace(list, () => { toggle(c.code); refresh(); }),
       },
       h('span', { class: 'tick' }, sel.has(c.code) ? '✓' : ''),
       h('span', { class: 'code' }, c.code),
@@ -182,11 +197,11 @@ function paintSuggest() {
   const list = text ? suggest(text, { limit: 8 }).filter(s => !draft.cats.includes(s.code)) : [];
   const strong = list.filter(s => s.score >= 0.5).map(s => s.code);
   const all = strong.length > 1 ? h('span', { class: 'chip sugg strong all', role: 'button', tabindex: '0', title: 'Add all the confident suggestions',
-    onclick: () => { draft.cats = sortCodes(withParents([...draft.cats, ...strong])); saveDraft(); paintSel(); ui.textarea.focus({ preventScroll: true }); } }, '+ All ' + strong.length) : null;
+    onclick: () => { keepPlace(ui.selected, () => { draft.cats = sortCodes(withParents([...draft.cats, ...strong])); saveDraft(); paintSel(); }); refocus(); } }, '+ All ' + strong.length) : null;
   fill(ui.sugg, all, ...(list.length ? list.map(s => catChip(s.code, {
     cls: `sugg ${s.score >= 0.5 ? 'strong' : ''}`,
     title: `${cat(s.code).label} — ${s.why === 'age' ? 'from the age' : s.why === 'bmi' ? 'from the BMI' : 'from your words'}`,
-    onclick: () => { draft.cats = addCat(draft.cats, s.code); saveDraft(); paintSel(); ui.textarea.focus({ preventScroll: true }); },
+    onclick: () => { keepPlace(ui.sugg, () => { draft.cats = addCat(draft.cats, s.code); saveDraft(); paintSel(); }); refocus(); },
   })) : [h('span', { class: 'muted', style: 'font-size:13px' }, text ? 'No suggestions — search below.' : 'Start typing to see suggestions.')]));
 }
 
@@ -194,7 +209,7 @@ function paintSel() {
   if (!ui || !ui.selected) return;
   fill(ui.selected, ...(draft.cats.length
     ? draft.cats.map(code => catChip(code, { on: true, removable: true, cls: 'add', title: 'Remove ' + cat(code).label,
-      onclick: () => { draft.cats = dropCat(draft.cats, code); saveDraft(); paintSel(); } }))
+      onclick: () => keepPlace(ui.selected, () => { draft.cats = dropCat(draft.cats, code); saveDraft(); paintSel(); }) }))
     : [h('span', { class: 'none' }, 'None yet — tap a suggestion, a quick pick or search below.')]));
   const tips = draft.cats.filter(c => TIPS[c]).map(c => TIPS[c]);
   fill(ui.tip, ...tips.map(t => h('p', { class: 'tip' }, t)));
@@ -208,7 +223,7 @@ function paintTop() {
     .sort((a, b) => b[1] - a[1]).slice(0, 8).map(([c]) => c);
   ui.card.querySelector('#topLabel').hidden = !top.length;
   fill(ui.top, ...top.map(code => catChip(code, {
-    onclick: () => { draft.cats = addCat(draft.cats, code); saveDraft(); paintSel(); },
+    onclick: () => keepPlace(ui.top, () => { draft.cats = addCat(draft.cats, code); saveDraft(); paintSel(); }),
   })));
 }
 
@@ -217,7 +232,7 @@ const lastCase = () => S.cases.reduce((best, c) => (!best || (c.createdAt || 0) 
 function applyTemplate(t) {
   draft.cats = sortCodes(withParents([...draft.cats, ...t.cats]));
   if (t.details && !draft.details.trim()) { draft.details = t.details + ' '; ui.textarea.value = draft.details; }
-  saveDraft(); paintSel(); ui.textarea.focus({ preventScroll: true });
+  keepPlace(ui.templates, () => { saveDraft(); paintSel(); }); refocus();
 }
 
 function paintQuick() {
@@ -231,7 +246,7 @@ function paintQuick() {
         draft.cats = sortCodes(withParents(last.cats));
         // its date too, but only when it was logged in this sitting (not yesterday evening's list)
         if (last.date && Date.now() - (last.createdAt || 0) < KEEP_MS / 3) draft.date = last.date === todayISO() ? null : last.date;
-        saveDraft(); paintDate(); paintSel(); ui.textarea.focus({ preventScroll: true });
+        keepPlace(ui.templates, () => { saveDraft(); paintDate(); paintSel(); }); refocus();
       },
     }, '↻ Same as last', h('span', { class: 'muted', style: 'font-size:12px' }, ' ' + last.cats.join(' + '))));
   }

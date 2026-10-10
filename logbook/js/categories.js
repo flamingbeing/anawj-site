@@ -96,7 +96,7 @@ export const REFLECTION_HEADINGS = [
   { id: 'challenging', section: 'Challenging cases', name: 'Challenging cases and additional special experience (e.g., long surgeries, massive blood transfusion)', min: 3 },
   { id: 'lscs', section: 'Obstetrics', name: 'Caesarean sections', min: 5, jr: 1, hint: 'e.g. pre-eclampsia, placenta praevia major, cardiac disease in pregnancy' },
   { id: 'labour', section: 'Obstetrics', name: 'Labour analgesia', min: 5, jr: 1, hint: 'Challenging labour epidural / CSE' },
-  { id: 'paeds', section: 'Paediatrics', name: 'Paediatrics', min: 6, jr: 2 },
+  { id: 'paeds', section: 'Paediatrics', name: 'Paediatrics', min: 6, jr: 2, subs: [{ id: 'neonate', name: 'Neonate/infant less than 3 months old', min: 1 }, { id: 'rsi', name: 'Emergency case requiring rapid sequence induction', min: 1 }] },
   { id: 'remote', section: 'Remote locations', name: 'Anaesthesia in Remote Locations (EPA 8) e.g., MRI, Angiography (Interventional and Diagnostic procedures), cardiovascular lab', min: 5, jr: 1 },
   { id: 'acute', section: 'Pain Medicine', name: 'Pain Medicine (acute) (EPA 11)', min: 5, jr: 1 },
   { id: 'chronic', section: 'Pain Medicine', name: 'Pain Medicine (chronic)', min: 1, jr: 1 },

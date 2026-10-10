@@ -10,7 +10,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw
 
 OUT = Path(__file__).resolve().parent.parent / 'logbook' / 'icons'
-BLUE = (29, 95, 209, 255)
+BLUE = (0, 47, 108, 255)  # NUHS navy
 WHITE = (255, 255, 255, 255)
 SS = 4  # supersampling
 

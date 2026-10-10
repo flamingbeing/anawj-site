@@ -27,7 +27,12 @@ export function needZip() {
 export const esc = s => String(s ?? '')
   .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '')
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-const run = (text, bold) => `<w:r>${bold ? '<w:rPr><w:b/><w:bCs/></w:rPr>' : ''}<w:t xml:space="preserve">${esc(text)}</w:t></w:r>`;
+// fmt: true = bold, or { b, u, sup } for bold / single underline / superscript.
+const run = (text, fmt) => {
+  const f = fmt === true ? { b: true } : (fmt || {});
+  const rPr = (f.b ? '<w:b/><w:bCs/>' : '') + (f.u ? '<w:u w:val="single"/>' : '') + (f.sup ? '<w:vertAlign w:val="superscript"/>' : '');
+  return `<w:r>${rPr ? `<w:rPr>${rPr}</w:rPr>` : ''}<w:t xml:space="preserve">${esc(text)}</w:t></w:r>`;
+};
 const para = (pPr, runs) => `<w:p>${pPr || ''}${runs}</w:p>`;
 const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
@@ -42,30 +47,147 @@ const subName = r => {
   return sub ? sub.name : '';
 };
 
-// The four cells of one portfolio row, each as a list of paragraphs: [[text, bold], ...] runs per paragraph.
-export function rowCells(r) {
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+export const ordinal = d => (d % 100 >= 11 && d % 100 <= 13) ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' })[d % 10] || 'th';
+// "2024-12-21" -> runs for "21st Dec 2024" with the suffix superscript, as in residents' own portfolios.
+export function dateRuns(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || '');
+  if (!m) return [['', false]];
+  const d = Number(m[3]);
+  return [[String(d), false], [ordinal(d), { sup: true }], [` ${MON[Number(m[2]) - 1] || ''} ${m[1]}`, false]];
+}
+
+const lines = s => String(s || '').split(/\r?\n/).map(x => x.trimEnd());
+// Text split into paragraphs; blank lines kept (as empty paragraphs), leading/trailing blanks dropped.
+const textParas = s => {
+  const ls = lines(String(s || '').trim());
+  return ls.length === 1 && !ls[0] ? [] : ls.map(l => (l ? [[l, false]] : []));
+};
+export const isStructured = r => !!(r && (String(r.title || '').trim() || String(r.summary || '').trim()
+  || (r.points || []).some(p => p && (String(p.heading || '').trim() || String(p.text || '').trim()))));
+
+// Column 4 of a structured reflection: title, summary, Learning Points (underlined numbered headings,
+// figures after the point they belong to), References. A paragraph is a list of runs, or { image }.
+function detailsStructured(r) {
+  const out = [];
+  const summary = textParas(r.summary);
+  if (String(r.title || '').trim()) out.push([[r.title.trim(), true]], ...(summary.length ? [[]] : []));
+  out.push(...summary);
+  const figs = (r.figures || []).filter(f => f && f.id);
+  const pts = (r.points || []).map((p, i) => ({ ...p, i })).filter(p => p && (String(p.heading || '').trim() || String(p.text || '').trim()));
+  const valid = new Set(pts.map(p => p.i));
+  let k = 0;
+  const figure = f => { k++; out.push({ image: f.id }); out.push([[`Figure ${k}: ${String(f.caption || '').trim()}`.replace(/:\s*$/, ''), false]]); };
+  if (pts.length || figs.length) {
+    out.push([]);
+    out.push([['Learning Points', true]]);
+    pts.forEach((p, n) => {
+      if (n) out.push([]);
+      out.push([[`${n + 1}. ${String(p.heading || '').trim()}`.trimEnd(), { u: true }]]);
+      out.push(...textParas(p.text));
+      for (const f of figs) if (f.point === p.i) figure(f);
+    });
+    for (const f of figs) if (f.point == null || !valid.has(f.point)) figure(f);
+  }
+  const refs = (r.references || []).map(x => String(x || '').trim()).filter(Boolean);
+  if (refs.length) {
+    out.push([]);
+    out.push([['References', true]]);
+    refs.forEach((x, n) => out.push([[`${n + 1}. ${x.replace(/^\d+[.)]\s*/, '')}`, false]]));
+  }
+  return out;
+}
+
+// The four cells of one portfolio row, each as a list of paragraphs: [[text, fmt], ...] runs per paragraph.
+// n: the row's number within its table (filled rows only).
+export function rowCells(r, n) {
   if (!r) return [[], [], [], []];
-  const lines = s => String(s || '').split(/\r?\n/).map(x => x.trimEnd());
-  const details = [];
-  for (const sec of REFLECTION_SECTIONS) {
-    const v = (r.sections && r.sections[sec.id] || '').trim();
-    if (!v) continue;
-    details.push([[sec.name, true]]);
-    for (const l of lines(v)) details.push([[l, false]]);
+  let details = [];
+  if (isStructured(r)) details = detailsStructured(r);
+  else {
+    for (const sec of REFLECTION_SECTIONS) {
+      const v = (r.sections && r.sections[sec.id] || '').trim();
+      if (!v) continue;
+      details.push([[sec.name, true]]);
+      for (const l of lines(v)) details.push([[l, false]]);
+    }
   }
   const sub = subName(r);
   const diag = [];
   if (sub) diag.push([[sub, true]]);
   for (const l of lines(r.diagnosis)) if (l || !diag.length) diag.push([[l, false]]);
   return [
-    [[[r.initials || '', false]]],
-    [...(r.jr ? [[['JR', true]]] : []), [[fmtDate(r.date), false]]],
+    [...(n ? [[[`${n}.`, false]]] : []), [[r.initials || '', false]]],
+    [...(r.jr ? [[['JR', true]]] : []), dateRuns(r.date)],
     diag,
     details,
   ];
 }
 
-const paras = (pPr, list) => (list.length ? list : [[]]).map(p => para(pPr, p.map(([t, b]) => run(t, b)).join(''))).join('');
+// ---------- inline pictures ----------
+
+const EMU = 914400, MAX_W = 2194560, MAX_H = Math.round(3.5 * EMU);
+const REL_IMG = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image';
+// Collects the pictures a document uses; finishMedia() then writes them into the package.
+export function newMedia(images, docXml = '') {
+  const ids = (docXml.match(/<wp:docPr\b[^>]*\bid="(\d+)"/g) || []).map(x => Number(/id="(\d+)"/.exec(x)[1]));
+  return { images: images || {}, used: [], byId: {}, docPr: Math.max(1000, ...ids) };
+}
+export function imageSize(w, h) {
+  const ar = w > 0 && h > 0 ? h / w : 1;
+  let cx = MAX_W, cy = Math.round(cx * ar);
+  if (cy > MAX_H) { cy = MAX_H; cx = Math.round(cy / ar); }
+  return [cx, cy];
+}
+function drawing(media, id) {
+  const img = media && media.images[id];
+  if (!img || !img.data) return '';
+  let m = media.byId[id];
+  if (!m) {
+    const png = /png/i.test(img.mime || '');
+    m = media.byId[id] = { id, n: media.used.length + 1, rId: `rIdApmesImg${media.used.length + 1}`, ext: png ? 'png' : 'jpeg', img };
+    media.used.push(m);
+  }
+  const [cx, cy] = imageSize(img.w, img.h);
+  const pid = ++media.docPr;
+  const name = `Figure ${pid}`;
+  return `<w:r><w:rPr><w:noProof/></w:rPr><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:docPr id="${pid}" name="${name}"/><wp:cNvGraphicFramePr><a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="${pid}" name="${name}"/><pic:cNvPicPr><a:picLocks noChangeAspect="1"/></pic:cNvPicPr></pic:nvPicPr><pic:blipFill><a:blip r:embed="${m.rId}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>`;
+}
+
+const NS = { wp: 'http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing', a: 'http://schemas.openxmlformats.org/drawingml/2006/main',
+  pic: 'http://schemas.openxmlformats.org/drawingml/2006/picture', r: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships' };
+export function ensureNamespaces(xml) {
+  return xml.replace(/<w:document\b[^>]*>/, tag => {
+    let t = tag;
+    for (const [p, uri] of Object.entries(NS)) if (!new RegExp(`\\sxmlns:${p}=`).test(t)) t = t.replace(/>$/, ` xmlns:${p}="${uri}">`);
+    return t;
+  });
+}
+
+// Writes the used pictures into the zip: media files, relationships, content types.
+async function finishMedia(zip, media) {
+  if (!media || !media.used.length) return;
+  const relsPath = 'word/_rels/document.xml.rels';
+  let rels = zip.file(relsPath) ? await zip.file(relsPath).async('string')
+    : '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>';
+  let ct = await zip.file('[Content_Types].xml').async('string');
+  for (const m of media.used) {
+    let n = m.n, file;
+    while (zip.file(file = `word/media/image${n}.${m.ext}`)) n += 1000;
+    zip.file(file, b64ToBytes(String(m.img.data).replace(/^data:[^,]*,/, '')));
+    rels = rels.replace('</Relationships>', `<Relationship Id="${m.rId}" Type="${REL_IMG}" Target="${file.slice(5)}"/></Relationships>`);
+  }
+  const types = { jpeg: 'image/jpeg', jpg: 'image/jpeg', png: 'image/png' };
+  for (const [ext, mime] of Object.entries(types)) {
+    if (!new RegExp(`Extension="${ext}"`, 'i').test(ct)) ct = ct.replace('</Types>', `<Default Extension="${ext}" ContentType="${mime}"/></Types>`);
+  }
+  zip.file(relsPath, rels);
+  zip.file('[Content_Types].xml', ct);
+}
+
+const paras = (pPr, list, media) => (list.length ? list : [[]]).map(p => (Array.isArray(p)
+  ? para(pPr, p.map(([t, b]) => run(t, b)).join(''))
+  : para(pPr, drawing(media, p.image)))).join('');
 
 const byDate = (a, b) => (a.date || '9999').localeCompare(b.date || '9999') || (a.createdAt || 0) - (b.createdAt || 0);
 export function groupReflections(reflections) {
@@ -94,7 +216,10 @@ const parasOf = x => x.match(/<w:p(?=[\s>])[^>]*>[\s\S]*?<\/w:p>/g) || [];
 
 // Which heading a table belongs to: the paragraph(s) just above it, matched on the heading name.
 function headingFor(between) {
-  const texts = parasOf(between).map(textOf).map(s => s.trim()).filter(Boolean).slice(-3).reverse();
+  const all = parasOf(between).map(textOf).map(s => s.trim()).filter(Boolean);
+  const texts = all.slice(-3).reverse();
+  const minLine = [...all].reverse().find(t => /\(min\s*\d+\)/i.test(t));
+  if (minLine) texts.push(minLine);
   let best = null, bestLen = 0;
   for (const t of texts) {
     const nt = norm(t.replace(/\(min\s*\d+\)/i, ''));
@@ -109,22 +234,105 @@ function headingFor(between) {
   return null;
 }
 
-function fillCell(tc, list) {
+function fillCell(tc, list, media) {
   const open = tc.match(/^<w:tc(?:\s[^>]*)?>/)[0];
   const tcPr = (tc.match(/<w:tcPr>[\s\S]*?<\/w:tcPr>/) || [''])[0];
   const p0 = parasOf(tc)[0] || '';
   let pPr = (p0.match(/<w:pPr>[\s\S]*?<\/w:pPr>/) || [''])[0];
   pPr = pPr.replace(/<w:rPr>[\s\S]*?<\/w:rPr>/, '');
-  return `${open}${tcPr}${paras(pPr, list)}</w:tc>`;
+  return `${open}${tcPr}${paras(pPr, list, media)}</w:tc>`;
 }
 
-function fillRow(proto, r) {
-  const cells = rowCells(r);
+function fillRow(proto, r, n, media) {
+  const cells = rowCells(r, n);
   let i = 0;
-  return proto.replace(/<w:tc(?:\s[^>]*)?>[\s\S]*?<\/w:tc>/g, tc => fillCell(tc, cells[i++] || []));
+  return proto.replace(/<w:tc(?:\s[^>]*)?>[\s\S]*?<\/w:tc>/g, tc => fillCell(tc, cells[i++] || [], media));
 }
 
-export function fillDocumentXml(xml, reflections, { name } = {}) {
+// The template's rows are slots: some carry a pre-printed "JR" in the date cell or a sub-type in the
+// diagnosis cell ("On pump CABG", "Under GA"). Each reflection goes to the row that asks for it;
+// rows left empty keep their prompt; extra reflections get new rows after the last.
+function slotInfo(hd, tr) {
+  const cells = (tr.match(/<w:tc(?:\s[^>]*)?>[\s\S]*?<\/w:tc>/g) || []).map(textOf).map(t => t.trim());
+  const label = norm(cells[2] || '');
+  const sub = label && (hd.subs || []).find(x => { const n = norm(x.name); return label.includes(n) || n.includes(label) || label.startsWith(n.slice(0, 6)); });
+  return { tr, jr: /^jr$/i.test(cells[1] || ''), sub: sub ? sub.id : null, prompt: !!label, used: false };
+}
+export function placeInSlots(hd, protoRows, list, media) {
+  const slots = protoRows.map(tr => slotInfo(hd, tr));
+  const out = slots.map(() => null);
+  const take = (r, ok) => { const i = slots.findIndex(sl => !sl.used && ok(sl)); if (i < 0) return false; slots[i].used = true; out[i] = r; return true; };
+  const extra = [];
+  for (const r of list) {
+    const done = (r.subId && take(r, sl => sl.sub === r.subId))
+      || (r.jr && take(r, sl => sl.jr && !sl.sub))
+      || take(r, sl => !sl.jr && !sl.sub && !sl.prompt)
+      || take(r, sl => !sl.sub && !(sl.jr && !r.jr))
+      || take(r, sl => !sl.sub);
+    if (!done) extra.push(r);
+  }
+  const plain = (slots.find(sl => !sl.jr && !sl.prompt) || slots[slots.length - 1]).tr;
+  // rows are numbered 1, 2, … in table order; slots left empty don't count
+  let n = 0;
+  const rows = slots.map((sl, i) => (out[i] ? fillRow(sl.tr, out[i], ++n, media) : sl.tr));
+  for (const r of extra) rows.push(fillRow(plain, r, ++n, media));
+  while (rows.length < hd.min) rows.push(fillRow(plain, null));
+  return rows;
+}
+
+// ---------- Section 4: summary of experience ----------
+
+// Residency year a case falls in: the academic year starts on 1 July; intake 2024 → AY2024 is R1.
+export function caseRYear(date, intake) {
+  const m = /^(\d{4})-(\d{2})/.exec(date || '');
+  if (!m || !intake) return null;
+  const ay = Number(m[1]) - (Number(m[2]) < 7 ? 1 : 0);
+  return Math.min(5, Math.max(1, ay - Number(intake) + 1));
+}
+
+// counts[code] = { 1: n, …, 5: n, total }
+export function countsByYear(cases, intake) {
+  const out = {};
+  for (const c of cases || []) {
+    const y = caseRYear(c.date, intake);
+    for (const code of new Set(c.cats || [])) {
+      const o = (out[code] ||= { total: 0 });
+      o.total++;
+      if (y) o[y] = (o[y] || 0) + 1;
+    }
+  }
+  return out;
+}
+
+// "15 i) Emergency neurosurgery (EPA2)" -> "15i"
+const s4Code = label => { const m = /^\s*(\d+)\s*([ivx]*)\s*\)/i.exec(label); return m ? m[1].padStart(2, '0') + m[2].toLowerCase() : null; };
+
+// Replace the minimum numbers in the "Posting period" table with the resident's own counts: cases in
+// each residency year (blank for years not reached yet) and the total. Without an intake year only
+// the total is filled.
+export function fillSummaryXml(xml, cases, { intake = null, rYear = null } = {}) {
+  const counts = countsByYear(cases, intake);
+  const upTo = rYear || (intake ? 5 : 0);
+  let n = 0;
+  const out = xml.replace(/<w:tbl>[\s\S]*?<\/w:tbl>/g, tbl => {
+    if (!/Posting period/.test(textOf(tbl))) return tbl;
+    return tbl.replace(/<w:tr(?=[\s>])[^>]*>[\s\S]*?<\/w:tr>/g, tr => {
+      const tcs = tr.match(/<w:tc(?:\s[^>]*)?>[\s\S]*?<\/w:tc>/g) || [];
+      if (tcs.length < 7) return tr;
+      const code = s4Code(textOf(tcs[0]));
+      if (!code) return tr;
+      n++;
+      const c = counts[code] || { total: 0 };
+      const vals = [1, 2, 3, 4, 5].map(y => (intake && y <= upTo ? String(c[y] || 0) : ''));
+      vals.push(String(c.total));
+      let i = 0;
+      return tr.replace(/<w:tc(?:\s[^>]*)?>[\s\S]*?<\/w:tc>/g, tc => (i++ === 0 ? tc : fillCell(tc, [[[vals[i - 2], false]]])));
+    });
+  });
+  return { xml: out, rows: n };
+}
+
+export function fillDocumentXml(xml, reflections, { name, media = null } = {}) {
   const groups = groupReflections(reflections);
   const tables = topTables(xml);
   const done = new Set();
@@ -137,16 +345,14 @@ export function fillDocumentXml(xml, reflections, { name } = {}) {
     last = b;
     if (!hd || done.has(hd.id)) { out += tbl; continue; }
     done.add(hd.id);
-    const list = groups[hd.id];
-    const n = Math.max(hd.min, list.length, rows.length - 1);
-    const proto = rows[1];
     const firstRow = tbl.indexOf(rows[1]);
     const lastRow = tbl.lastIndexOf(rows[rows.length - 1]) + rows[rows.length - 1].length;
-    const filled = Array.from({ length: n }, (_, i) => fillRow(proto, list[i])).join('');
+    const filled = placeInSlots(hd, rows.slice(1), groups[hd.id], media).join('');
     out += tbl.slice(0, firstRow) + filled + tbl.slice(lastRow);
   }
   out += xml.slice(last);
   if (name) out = out.replace(/(Resident’s name\s*:\s*)_{6,}/, (_, p) => p + esc(name));
+  if (media && media.used.length) out = ensureNamespaces(out);
   return { xml: out, matched: [...done] };
 }
 
@@ -154,28 +360,28 @@ export function fillDocumentXml(xml, reflections, { name } = {}) {
 
 const CELL_W = [1300, 1300, 2300, 4700];
 const HEAD = ['Patient’s Initials', 'Date', 'Diagnosis/ Operations', 'Case details and Learning points'];
-function plainTable(list, min) {
+function plainTable(list, min, media) {
   const borders = ['top', 'left', 'bottom', 'right', 'insideH', 'insideV'].map(s => `<w:${s} w:val="single" w:sz="4" w:space="0" w:color="000000"/>`).join('');
   const tc = (i, body, shade) => `<w:tc><w:tcPr><w:tcW w:w="${CELL_W[i]}" w:type="dxa"/>${shade ? '<w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/>' : ''}</w:tcPr>${body}</w:tc>`;
   const head = `<w:tr><w:trPr><w:tblHeader/></w:trPr>${HEAD.map((t, i) => tc(i, para('', run(t, true)), true)).join('')}</w:tr>`;
   const n = Math.max(min, list.length);
-  const rows = Array.from({ length: n }, (_, k) => `<w:tr><w:trPr><w:cantSplit/></w:trPr>${rowCells(list[k]).map((c, i) => tc(i, paras('', c))).join('')}</w:tr>`).join('');
+  const rows = Array.from({ length: n }, (_, k) => `<w:tr><w:trPr><w:cantSplit/></w:trPr>${rowCells(list[k], list[k] ? k + 1 : 0).map((c, i) => tc(i, paras('', c, media))).join('')}</w:tr>`).join('');
   return `<w:tbl><w:tblPr><w:tblW w:w="9600" w:type="dxa"/><w:tblBorders>${borders}</w:tblBorders><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid>${CELL_W.map(w => `<w:gridCol w:w="${w}"/>`).join('')}</w:tblGrid>${head}${rows}</w:tbl>`;
 }
 
-export function plainDocumentXml(reflections, { name } = {}) {
+export function plainDocumentXml(reflections, { name, media = null } = {}) {
   const groups = groupReflections(reflections);
   const H = (t, size) => para(`<w:pPr><w:keepNext/><w:spacing w:before="240" w:after="120"/></w:pPr>`, `<w:r><w:rPr><w:b/><w:sz w:val="${size}"/></w:rPr><w:t xml:space="preserve">${esc(t)}</w:t></w:r>`);
   let body = H('Anaesthesiology Residency Training Portfolio', 32);
   if (name) body += para('', run('Resident’s name : ' + name));
   body += H('SECTION 2 – CASE REFLECTIONS', 28);
-  body += para('', run('Structure: case description; thoughts and feelings; evaluation; analysis; conclusions; action plan; further reflection as a SR (optional, for a JR reflection). “JR” above the date marks a junior residency reflection.'));
+  body += para('', run('Each reflection: a title and case summary, then the learning points. “JR” above the date marks a junior residency reflection.'));
   let section = '';
   for (const hd of REFLECTION_HEADINGS) {
     if (hd.section !== section) { section = hd.section; body += H(section, 26); }
-    body += H(`${hd.name} (Min ${hd.min})`, 22) + plainTable(groups[hd.id], hd.min) + para('', '');
+    body += H(`${hd.name} (Min ${hd.min})`, 22) + plainTable(groups[hd.id], hd.min, media) + para('', '');
   }
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="${W_NS}"><w:body>${body}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134" w:header="567" w:footer="567" w:gutter="0"/></w:sectPr></w:body></w:document>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="${W_NS}" xmlns:r="${NS.r}" xmlns:wp="${NS.wp}" xmlns:a="${NS.a}" xmlns:pic="${NS.pic}"><w:body>${body}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134" w:header="567" w:footer="567" w:gutter="0"/></w:sectPr></w:body></w:document>`;
 }
 
 function plainPackage(zip, docXml) {
@@ -192,20 +398,24 @@ const b64ToBytes = b64 => {
 };
 
 // reflections: reflection objects (any status). Returns a Blob (.docx).
-export async function exportPortfolio(reflections, { name = '', templateB64 = null, JSZip = null } = {}) {
+// images: { [imageId]: { data (base64), mime, w, h } } for the reflections' figures.
+export async function exportPortfolio(reflections, { name = '', templateB64 = null, JSZip = null, cases = null, intake = null, rYear = null, images = null } = {}) {
   const Z = JSZip || await needZip();
-  let zip = null, usedTemplate = false;
+  let zip = null, usedTemplate = false, media = null;
   if (templateB64) {
     try {
       zip = await Z.loadAsync(b64ToBytes(templateB64));
       const xml = await zip.file('word/document.xml').async('string');
-      const { xml: filled, matched } = fillDocumentXml(xml, reflections, { name });
+      media = newMedia(images, xml);
+      let { xml: filled, matched } = fillDocumentXml(xml, reflections, { name, media });
+      if (cases) filled = fillSummaryXml(filled, cases, { intake, rYear }).xml;
       if (matched.length < REFLECTION_HEADINGS.length / 2) throw new Error('template headings not found');
       zip.file('word/document.xml', filled);
       usedTemplate = true;
     } catch (err) { console.warn('Portfolio template unusable, using the plain layout', err); zip = null; }
   }
-  if (!zip) { zip = new Z(); plainPackage(zip, plainDocumentXml(reflections, { name })); }
+  if (!zip) { zip = new Z(); media = newMedia(images); plainPackage(zip, plainDocumentXml(reflections, { name, media })); }
+  await finishMedia(zip, media);
   const bytes = await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' });
   const blob = new Blob([bytes], { type: DOCX });
   blob.usedTemplate = usedTemplate;
@@ -223,7 +433,9 @@ async function getTemplate() {
 }
 
 // A button for the reflections screen (or Progress): getReflections() and getName() are called on click.
-export function renderExportButton(getReflections, getName) {
+// getExtra() (may be async) may return { cases, intake, rYear } to fill Section 4 with the resident's case
+// counts, and { images } with the pictures of the reflections' figures.
+export function renderExportButton(getReflections, getName, getExtra) {
   return h('button', { onclick: async e => {
     const btn = e.currentTarget;
     btn.disabled = true;
@@ -231,7 +443,7 @@ export function renderExportButton(getReflections, getName) {
       const refl = (await getReflections()) || [];
       const t = await getTemplate();
       const name = (getName && getName()) || '';
-      const blob = await exportPortfolio(refl, { name, templateB64: t && t.data });
+      const blob = await exportPortfolio(refl, { name, templateB64: t && t.data, ...((getExtra && await getExtra()) || {}) });
       download(`APMES portfolio reflections${name ? ' - ' + name : ''}.docx`, blob);
       toast(blob.usedTemplate ? 'Portfolio exported.' : 'Exported in the plain layout (no portfolio template uploaded yet).');
     } catch (err) { toast('Could not export: ' + err.message); }
