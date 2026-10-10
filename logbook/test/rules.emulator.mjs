@@ -82,6 +82,33 @@ await t('user deletes summary', assertFails(deleteDoc(doc(a, 'summaries', 'R1'))
 await t('shared tpl read', assertSucceeds(getDocs(collection(a, 'sharedTemplates'))));
 await t('shared tpl user write', assertFails(setDoc(doc(a, 'sharedTemplates', 't1'), { id: 't1', name: 'x', cats: [] })));
 await t('shared tpl admin write', assertSucceeds(setDoc(doc(adm, 'sharedTemplates', 't1'), { id: 't1', name: 'x', cats: ['16'] })));
+// reflections and images: owner only; admins have no access
+const refl = id => ({ id, headingId: 'thyroid', subId: null, initials: 'AB', date: '2026-01-02', jr: true, diagnosis: 'Thyroidectomy',
+  title: 'Airway plan', summary: 'Made-up summary.', points: [{ heading: 'One', text: 'Two' }], figures: [{ id: 'img1', caption: 'Fig', point: 0 }],
+  references: ['Ref'], caseId: null, status: 'draft', createdAt: 1, updatedAt: 2 });
+await t('own reflection', assertSucceeds(setDoc(doc(a, 'logbooks', A, 'reflections', 'r1'), refl('r1'))));
+await t('legacy-section reflection', assertSucceeds(setDoc(doc(a, 'logbooks', A, 'reflections', 'r2'), { ...refl('r2'), title: '', summary: '', points: [], figures: [], references: [], sections: { description: 'old style' } })));
+await t('read own reflection', assertSucceeds(getDoc(doc(a, 'logbooks', A, 'reflections', 'r1'))));
+await t('other reads reflection', assertFails(getDoc(doc(b, 'logbooks', A, 'reflections', 'r1'))));
+await t('admin reads reflection', assertFails(getDoc(doc(adm, 'logbooks', A, 'reflections', 'r1'))));
+await t('reflection bad status', assertFails(setDoc(doc(a, 'logbooks', A, 'reflections', 'r3'), { ...refl('r3'), status: 'done' })));
+await t('reflection extra field', assertFails(setDoc(doc(a, 'logbooks', A, 'reflections', 'r3'), { ...refl('r3'), grade: 'A' })));
+await t('reflection too many points', assertFails(setDoc(doc(a, 'logbooks', A, 'reflections', 'r3'), { ...refl('r3'), points: Array.from({ length: 16 }, () => ({ heading: 'h', text: 't' })) })));
+await t('delete own reflection', assertSucceeds(deleteDoc(doc(a, 'logbooks', A, 'reflections', 'r2'))));
+const img = id => ({ id, data: 'QUJD', mime: 'image/jpeg', w: 10, h: 10, createdAt: 1 });
+await t('own image', assertSucceeds(setDoc(doc(a, 'logbooks', A, 'images', 'img1'), img('img1'))));
+await t('read own image', assertSucceeds(getDoc(doc(a, 'logbooks', A, 'images', 'img1'))));
+await t('other reads image', assertFails(getDoc(doc(b, 'logbooks', A, 'images', 'img1'))));
+await t('admin reads image', assertFails(getDoc(doc(adm, 'logbooks', A, 'images', 'img1'))));
+await t('image bad mime', assertFails(setDoc(doc(a, 'logbooks', A, 'images', 'img2'), { ...img('img2'), mime: 'image/gif' })));
+await t('image too big', assertFails(setDoc(doc(a, 'logbooks', A, 'images', 'img2'), { ...img('img2'), data: 'A'.repeat(760000) })));
+await t('delete own image', assertSucceeds(deleteDoc(doc(a, 'logbooks', A, 'images', 'img1'))));
+// portfolio template: everyone signed in reads, admins write
+await t('template read', assertSucceeds(getDoc(doc(a, 'config', 'portfolioTemplate'))));
+await t('template user write', assertFails(setDoc(doc(a, 'config', 'portfolioTemplate'), { parts: 1, size: 3, uploadedAt: 1 })));
+await t('template admin write', assertSucceeds(setDoc(doc(adm, 'config', 'portfolioTemplate'), { parts: 1, size: 3, uploadedAt: 1 })));
+await t('template part admin write', assertSucceeds(setDoc(doc(adm, 'config', 'portfolioTemplate_part0'), { data: 'QUJD' })));
+await t('other config doc', assertFails(setDoc(doc(adm, 'config', 'other'), { data: 'x' })));
 await t('random collection', assertFails(getDoc(doc(adm, 'other', 'x'))));
 console.log(`${n - fail}/${n} rule checks passed`);
 await env.cleanup();
