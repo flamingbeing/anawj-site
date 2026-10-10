@@ -25,7 +25,7 @@ const CSS = `
 .e-cg--none { color: var(--e-muted-on-grey); }
 .e-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
 @media (min-width: 720px) { .e-stats { grid-template-columns: repeat(4, 1fr); } }
-.e-stat { background: #fff; border: 1px solid var(--n-line); border-top: 4px solid var(--n-blue); padding: 10px 12px; }
+.e-stat { background: #fff; border: 1px solid var(--n-line); border-top: 4px solid var(--n-navy); border-radius: 14px; padding: 10px 12px; }
 .e-stat b { display: block; font-size: var(--n-text-2xl); font-weight: var(--n-light); color: var(--n-navy); line-height: 1.2; }
 .e-stat span { font-size: var(--n-text-sm); color: var(--n-muted); }
 .e-stat--alert { border-top-color: var(--n-red); }
