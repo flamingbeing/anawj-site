@@ -1,4 +1,5 @@
-// Account-tab settings cards (rendered under the portfolio details by ui-account.js): name, display, logging, templates, bin, install help, privacy, sign out.
+// Settings tab (#settings): display, logging, templates, recycle bin, privacy. Also the Account tab's
+// "You" and sign-out cards (youCard, signOutCard), used by ui-account.js.
 
 import { R_YEARS } from './categories.js';
 import { sortCodes, uid } from './engine.js';
@@ -19,22 +20,7 @@ export function cachedCompact() {
 
 export function renderSettings() {
   const st = settings();
-  const r = S.resident;
   return h('div', {},
-    // ---- admin entry (reflections-tab agent): Admin left the tab bar to keep it at 6 on phones ----
-    S.admin ? h('section', { class: 'card' },
-      h('div', { class: 'bar' }, h('h2', { style: 'margin:0' }, 'Admin'), h('span', { class: 'grow' }),
-        h('a', { class: 'btn small primary', href: '#admin' }, 'Open admin')),
-      h('p', { class: 'hint', style: 'margin:6px 0 0' }, 'Residents list, programme template and the reflection portfolio template.')) : null,
-    h('section', { class: 'card' },
-      h('h2', {}, 'You'),
-      h('p', { class: 'hint' }, 'Signed in as ', h('b', {}, S.user.email), S.admin ? ' (admin)' : '', '.'),
-      h('label', { class: 'field' }, 'Name (shown on your exports and, for programme residents, on the totals table)',
-        h('input', { value: displayName(), autocomplete: 'name', onchange: e => patchLogbook({ name: e.target.value.trim() }).then(() => toast('Saved')) })),
-      r
-        ? h('p', { class: 'hint' }, `On the programme list: ${r.rid}, AY${r.intake || '?'} intake, ${R_YEARS[rYear() - 1]}${r.status && r.status !== 'ACTIVE' ? ', ' + r.status.toLowerCase() : ''}. Your case counts (never your case details) are shared on the Totals tab.`)
-        : h('p', { class: 'hint' }, 'Not on the programme resident list, so your logbook is private and not on the Totals tab. If you are an APMES resident, ask the programme admins to add your email.')),
-
     h('section', { class: 'card' },
       h('h2', {}, 'Display'),
       h('label', { class: 'check' }, h('input', { type: 'checkbox', role: 'switch', checked: !!st.compact, onchange: e => {
@@ -61,23 +47,32 @@ export function renderSettings() {
       h('p', { class: 'hint', style: 'margin:6px 0 0' }, 'Deleted cases and reflections are kept for 30 days and can be restored.')),
 
     h('section', { class: 'card' },
-      h('h2', {}, 'Install on your phone'),
-      h('p', { class: 'hint' }, 'It works like an app and keeps working without signal; cases sync when you are back online.'),
-      h('ul', {},
-        h('li', {}, h('b', {}, 'iPhone (Safari): '), 'tap Share ', h('span', { 'aria-hidden': 'true' }, '⎋'), ' → Add to Home Screen.'),
-        h('li', {}, h('b', {}, 'Android (Chrome): '), 'tap the ⋮ menu → Install app (or Add to Home screen).'))),
-
-    h('section', { class: 'card' },
       h('h2', {}, 'Privacy'),
       h('p', { class: 'hint', style: 'margin:0' },
         'Your cases are stored in your own logbook in Google Cloud Firestore and only you (and the programme admins) can read them. ',
         'Log patient initials only — no names, NRIC or hospital numbers. Programme residents share case counts per category on the Totals tab; details are never shared. ',
-        'This device keeps an offline copy of your cases until you sign out — sign out on shared computers.')),
+        'This device keeps an offline copy of your cases until you sign out — sign out on shared computers.')));
+}
 
-    h('section', { class: 'card' },
-      h('div', { class: 'bar', style: 'margin:0' },
-        h('button', { onclick: () => cloud.signOut() }, 'Sign out'),
-        cloud.demo ? h('span', { class: 'muted' }, 'Demo mode: data stays in this browser.') : null)));
+// ---------- Account-tab cards: who you are, sign out ----------
+
+export function youCard() {
+  const r = S.resident;
+  return h('section', { class: 'card' },
+    h('h2', {}, 'You'),
+    h('p', { class: 'hint' }, 'Signed in as ', h('b', {}, S.user.email), S.admin ? ' (admin)' : '', '.'),
+    h('label', { class: 'field' }, 'Name (shown on your exports and, for programme residents, on the totals table)',
+      h('input', { value: displayName(), autocomplete: 'name', onchange: e => patchLogbook({ name: e.target.value.trim() }).then(() => toast('Saved')) })),
+    r
+      ? h('p', { class: 'hint' }, `On the programme list: ${r.rid}, AY${r.intake || '?'} intake, ${R_YEARS[rYear() - 1]}${r.status && r.status !== 'ACTIVE' ? ', ' + r.status.toLowerCase() : ''}. Your case counts (never your case details) are shared on the Totals tab.`)
+      : h('p', { class: 'hint' }, 'Not on the programme resident list, so your logbook is private and not on the Totals tab. If you are an APMES resident, ask the programme admins to add your email.'));
+}
+
+export function signOutCard() {
+  return h('section', { class: 'card' },
+    h('div', { class: 'bar', style: 'margin:0' },
+      h('button', { onclick: () => cloud.signOut() }, 'Sign out'),
+      cloud.demo ? h('span', { class: 'muted' }, 'Demo mode: data stays in this browser.') : null));
 }
 
 // ---------- templates ----------

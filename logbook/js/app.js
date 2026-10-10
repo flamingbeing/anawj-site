@@ -2,11 +2,11 @@
 // shared state and helpers are in ui-core.js. Case data comes from cloud.js (Firestore, or the
 // in-browser demo backend with ?demo).
 
-import { S, hooks, h, toast, cloud, setCases, scheduleSummary, fill, resetCaches } from './ui-core.js';
+import { S, hooks, h, toast, cloud, setCases, scheduleSummary, fill, resetCaches, confirmBox } from './ui-core.js';
 import { renderLog, logCasesChanged, clearDrafts } from './ui-log.js';
 import { renderLogbook } from './ui-logbook.js';
 import { renderProgress, renderTotals } from './ui-progress.js';
-import { applyCompact, cachedCompact } from './ui-settings.js';
+import { applyCompact, cachedCompact, renderSettings } from './ui-settings.js';
 import { renderAccount, flush as flushProfile } from './ui-account.js';
 import { renderAdmin } from './ui-admin.js';
 import { renderReflect, watchMyReflections } from './ui-reflect.js';
@@ -19,6 +19,7 @@ const ICONS = {
   progress: 'M5 20V12M10 20V6M15 20v-9M20 20V9',
   totals: 'M4 4h16v16H4zM4 10h16M4 15h16M10 4v16M15 4v16',
   account: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0',
+  settings: 'M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1M15 4v4M9 10v4M17 16v4',
   reflect: 'M4 19.5V5a2 2 0 0 1 2-2h12v14H6a2 2 0 0 0-2 2.5zM6 21h12v-4M8 7h6M8 11h4',
   admin: 'M12 3l2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.6 6.6 19.5l1.2-6-4.5-4.2 6.1-.7z',
 };
@@ -38,8 +39,8 @@ const TABS = [
   { id: 'progress', label: 'Progress', render: renderProgress },
   { id: 'totals', label: 'Totals', render: renderTotals },
   { id: 'account', label: 'Account', render: renderAccount },
-  // not in the bar (keeps it at 6 on phones): admins reach it from Account → Admin
-  { id: 'admin', label: 'Admin', render: renderAdmin, admin: true, hidden: true, under: 'account' },
+  { id: 'settings', label: 'Settings', render: renderSettings },
+  { id: 'admin', label: 'Admin', render: renderAdmin, admin: true },   // only admins see this tab
 ];
 
 const app = document.getElementById('app');
@@ -52,12 +53,12 @@ const banner = document.getElementById('banner');
 
 // Totals (names and counts of programme residents) is for the programme only; the rules agree.
 const visibleTabs = () => TABS.filter(t => (!t.admin || S.admin) && (t.id !== 'totals' || S.admin || S.resident));
-const TAB_ALIASES = { reflections: 'reflect', settings: 'account' };
+const TAB_ALIASES = { reflections: 'reflect' };
 const tabFromHash = () => {
   const raw = location.hash.replace(/^#/, '');
   const id = TAB_ALIASES[raw] || raw;
   if (!visibleTabs().some(t => t.id === id)) return null;
-  if (id !== raw) history.replaceState(null, '', location.pathname + location.search + '#' + id);   // old links: #settings → #account
+  if (id !== raw) history.replaceState(null, '', location.pathname + location.search + '#' + id);   // old links: #reflections → #reflect
   return id;
 };
 
@@ -262,7 +263,14 @@ if (cachedCompact()) document.body.classList.add('compact');   // first paint; c
 paintWho();
 if (cloud.demo) {
   banner.className = 'banner warn';
-  fill(banner, h('span', {}, 'Demo: made-up data, stored only in this browser.'), h('a', { href: location.pathname, class: 'btn small' }, 'Leave demo'));
+  fill(banner, h('span', {}, 'Demo: made-up data, stored only in this browser.'),
+    h('button', { class: 'small', onclick: async () => {
+      if (!(await confirmBox('Reset demo', 'Delete everything you added in the demo (cases, reflections, images, settings) and start again with the made-up data? The uploaded portfolio template is kept.', 'Reset', true))) return;
+      clearDrafts(); resetCaches(); applyCompact(false);
+      cloud.resetDemo();
+      location.reload();
+    } }, 'Reset demo'),
+    h('a', { href: location.pathname, class: 'btn small' }, 'Leave demo'));
   banner.hidden = false;
 }
 if (!cloud.enabled) renderLanding();

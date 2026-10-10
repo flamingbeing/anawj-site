@@ -112,11 +112,13 @@ function mode() {
   try { return typeof location !== 'undefined' ? new URLSearchParams(location.search).get('demo') : null; } catch { return null; }
 }
 
-// Wipe the store (tests, and ?demo=reset on page load).
+// Wipe the store and the reflection images (tests, ?demo=reset on page load, and the banner's
+// Reset demo button). The uploaded portfolio template is kept. The images key is spelled out
+// because IMAGES_KEY is declared further down and this can run while the module is loading.
 export function resetDemo({ seeded = true } = {}) {
   memory = null;
   const ls = storage();
-  if (ls) { try { ls.removeItem(KEY); } catch { /* ignore */ } }
+  if (ls) { try { ls.removeItem(KEY); ls.removeItem(KEY + '-images'); } catch { /* ignore */ } }
   const s = blank();
   if (seeded) seed(s);
   save(s);
