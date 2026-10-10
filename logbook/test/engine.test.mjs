@@ -1,0 +1,407 @@
+// Run with: node logbook/test/engine.test.mjs  (fake data only)
+// Also worth running under other time zones, e.g. TZ=America/New_York and TZ=Asia/Singapore.
+import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+import {
+  uid, todayISO, parseDate, fmtDate, withParents, countCases, rYearDefault, progress, epaProgress,
+  frequentCombos, parseBulk, duplicates, caseFromRow, diffRows, catFromText,
+} from '../js/engine.js';
+import { BY_CODE } from '../js/categories.js';
+
+// ids and dates
+{
+  const ids = new Set(Array.from({ length: 500 }, uid));
+  assert.equal(ids.size, 500);
+  for (const id of ids) assert.match(id, /^[0-9a-z]{16}$/);
+  assert.equal(todayISO(new Date(2026, 0, 7, 23, 59)), '2026-01-07');
+  assert.equal(todayISO(new Date(2026, 11, 31, 0, 0)), '2026-12-31');
+}
+
+// parseDate
+{
+  const P = parseDate;
+  assert.equal(P('2026-03-12'), '2026-03-12');
+  assert.equal(P('2026-3-2'), '2026-03-02');
+  assert.equal(P('2026-03-12T10:00:00'), '2026-03-12');
+  assert.equal(P('2026-02-30'), null);
+  assert.equal(P('12/3/26'), '2026-03-12', 'day first');
+  assert.equal(P('12/3/2026'), '2026-03-12');
+  assert.equal(P('1-2-2025'), '2025-02-01');
+  assert.equal(P('01.02.25'), '2025-02-01');
+  assert.equal(P(' 7/1/26 '), '2026-01-07');
+  assert.equal(P('31/6/24'), null, '30 days in June');
+  assert.equal(P('29/2/24'), '2024-02-29', 'leap year');
+  assert.equal(P('29/2/23'), null, 'not a leap year');
+  assert.equal(P('29/2/2000'), '2000-02-29');
+  assert.equal(P('29/2/2100'), null);
+  assert.equal(P('13/13/24'), null);
+  assert.equal(P('0/1/24'), null);
+  assert.equal(P('12/3'), null, 'no year: not a full date');
+  assert.equal(P('7 Jan 2026'), '2026-01-07');
+  assert.equal(P('7 January 2026'), '2026-01-07');
+  assert.equal(P('7-Jan-26'), '2026-01-07');
+  assert.equal(P('07 jan 26'), '2026-01-07');
+  assert.equal(P('1st Sept 2025'), '2025-09-01');
+  assert.equal(P('31 Apr 2025'), null);
+  assert.equal(P('7 Junior 2026'), null);
+  assert.equal(P('yesterday'), null);
+  assert.equal(P(''), null);
+  assert.equal(P(null), null);
+  assert.equal(P(undefined), null);
+  // Excel serials (1900 date system)
+  assert.equal(P(45658), '2025-01-01');
+  assert.equal(P(45658.75), '2025-01-01', 'time part ignored');
+  assert.equal(P(45351), '2024-02-29');
+  assert.equal(P('45658'), '2025-01-01');
+  assert.equal(P(12), null, 'small numbers are not dates');
+  assert.equal(P(NaN), null);
+  // Date objects: local midnight, local afternoon, and UTC midnight (as ExcelJS returns date cells)
+  assert.equal(P(new Date(2026, 2, 12)), '2026-03-12');
+  assert.equal(P(new Date(2026, 2, 12, 15, 30)), '2026-03-12');
+  assert.equal(P(new Date(2024, 1, 29)), '2024-02-29');
+  assert.equal(P(new Date(Date.UTC(2026, 2, 12))), '2026-03-12');
+  assert.equal(P(new Date('nope')), null);
+}
+
+// fmtDate
+assert.equal(fmtDate('2026-01-07'), '7 Jan 2026');
+assert.equal(fmtDate('2025-12-25'), '25 Dec 2025');
+assert.equal(fmtDate(null), '');
+assert.equal(fmtDate('sometime'), 'sometime');
+
+// withParents
+assert.deepEqual(withParents(['20iii']), ['20', '20iii']);
+assert.deepEqual(withParents(['17', '26i', '26iii']), ['17', '26', '26i', '26iii']);
+assert.deepEqual(withParents(['26', '26i']), ['26', '26i']);
+assert.deepEqual(withParents(['26i', '26']), ['26', '26i']);
+assert.deepEqual(withParents(['16', '16', '15i']), ['16', '15', '15i']);
+assert.deepEqual(withParents([]), []);
+assert.deepEqual(withParents(undefined), []);
+
+// countCases
+assert.deepEqual(countCases([{ cats: ['16', '17'] }, { cats: ['16', '16'] }, { cats: ['20iii'] }, {}]), { 16: 2, 17: 1, '20iii': 1 });
+assert.deepEqual(countCases([]), {});
+
+// rYearDefault (AY starts 1 July)
+assert.equal(rYearDefault(2026, new Date(2026, 9, 10)), 1);
+assert.equal(rYearDefault(2026, new Date(2026, 6, 1)), 1);
+assert.equal(rYearDefault(2026, new Date(2026, 5, 30)), 1, 'clamped up');
+assert.equal(rYearDefault(2025, new Date(2026, 5, 30)), 1);
+assert.equal(rYearDefault(2025, new Date(2026, 6, 1)), 2);
+assert.equal(rYearDefault(2023, new Date(2026, 9, 10)), 4);
+assert.equal(rYearDefault(2019, new Date(2026, 9, 10)), 5, 'clamped down');
+assert.equal(rYearDefault('2024', new Date(2026, 9, 10)), 3);
+assert.equal(rYearDefault(undefined), 1);
+
+// progress
+{
+  const get = (counts, r, code) => progress(counts, r).find(p => p.code === code);
+  const all = progress({}, 1);
+  assert.ok(!all.some(p => BY_CODE[p.code].retired), 'no retired categories');
+  assert.equal(get({}, 1, '99').status, 'none');
+  assert.equal(get({}, 1, '37').next, null);
+  // 16 LSCS: R3 10, R5 20
+  const lscs = r => get({ 16: 12 }, r, '16');
+  assert.deepEqual(lscs(1).milestones, [{ by: 'R3', n: 10, met: true, due: 'later' }, { by: 'R5', n: 20, met: false, due: 'later' }]);
+  assert.deepEqual(lscs(1).next, { by: 'R5', n: 20 });
+  assert.equal(lscs(1).status, 'ontrack');
+  assert.equal(lscs(4).status, 'ontrack');
+  assert.equal(lscs(5).status, 'due');
+  assert.equal(lscs(5).milestones[1].due, 'now');
+  assert.equal(get({ 16: 20 }, 5, '16').status, 'done');
+  assert.equal(get({ 16: 25 }, 2, '16').status, 'done', 'done early');
+  const lscs5 = r => get({ 16: 5 }, r, '16');
+  assert.equal(lscs5(1).status, 'ontrack');
+  assert.equal(lscs5(2).status, 'ontrack');
+  assert.equal(lscs5(3).status, 'due');
+  assert.equal(lscs5(3).milestones[0].due, 'now');
+  assert.equal(lscs5(4).status, 'late');
+  assert.equal(lscs5(4).milestones[0].due, 'past');
+  assert.equal(lscs5(5).status, 'late');
+  assert.equal(lscs5(4).count, 5);
+  // 26 blocks: R2 10, R3 20, R4 30, R5 40 (lifetime counts)
+  const blocks = (n, r) => get({ 26: n }, r, '26');
+  assert.equal(blocks(0, 1).status, 'ontrack');
+  assert.equal(blocks(5, 2).status, 'due');
+  assert.equal(blocks(10, 2).status, 'ontrack', 'R2 met, R3 still to come');
+  assert.deepEqual(blocks(10, 2).next, { by: 'R3', n: 20 });
+  assert.equal(blocks(15, 3).status, 'due');
+  assert.equal(blocks(9, 3).status, 'late');
+  assert.equal(blocks(25, 4).status, 'due');
+  assert.equal(blocks(25, 5).status, 'late');
+  assert.equal(blocks(40, 5).status, 'done');
+  assert.equal(blocks(40, 5).milestones.length, 4);
+  // 31 chronic pain: R5 only
+  assert.equal(get({}, 3, '31').status, 'ontrack');
+  assert.equal(get({}, 5, '31').status, 'due');
+  // R3-only target, R4+
+  assert.equal(get({ 13: 19 }, 4, '13').status, 'late');
+  assert.equal(get({ 13: 20 }, 4, '13').status, 'done');
+  assert.equal(progress(undefined, undefined).length, all.length);
+}
+
+// epaProgress
+{
+  const e = epaProgress({ 16: 25, 17: 2 }, 3);
+  const epas = e.map(g => String(g.epa));
+  assert.deepEqual(epas.slice(0, 5), ['2', '3', '4', '5', '6']);
+  assert.ok(epas.indexOf('7a') < epas.indexOf('7b') && epas.indexOf('7b') < epas.indexOf('8') && epas.indexOf('11') < epas.indexOf('12'));
+  assert.equal(e.find(g => g.epa === '7b').status, 'done');
+  assert.equal(e.find(g => g.epa === '7a').status, 'due');
+  const nine = epaProgress({ 20: 200, '20i': 5, '20ii': 20, '20iii': 99 }, 4).find(g => g.epa === 9);
+  assert.equal(nine.items.length, 4);
+  assert.equal(nine.status, 'late', 'worst item wins');
+  assert.ok(!epaProgress({}, 1).some(g => g.items.some(i => i.code === '13')), 'categories without an EPA are left out');
+}
+
+// frequentCombos
+{
+  const C = cats => ({ cats });
+  const cases = [
+    ...Array(5).fill(['17', '16']).map(C),
+    ...Array(3).fill(['13', '08']).map(C),
+    ...Array(2).fill(['18', '26', '26ii']).map(C),
+    ...Array(4).fill(['21']).map(C),
+    C(['16', '17', '28']), C([]),
+  ];
+  const f = frequentCombos(cases);
+  assert.deepEqual(f, [{ cats: ['16', '17'], count: 5 }, { cats: ['21'], count: 4 }, { cats: ['08', '13'], count: 3 }]);
+  assert.deepEqual(frequentCombos(cases, { min: 2, limit: 2 }), [{ cats: ['16', '17'], count: 5 }, { cats: ['21'], count: 4 }]);
+  assert.deepEqual(frequentCombos(cases, { min: 2 }).map(x => x.cats.join()), ['16,17', '21', '08,13', '18,26,26ii']);
+  assert.deepEqual(frequentCombos([]), []);
+  // ties: bigger set first
+  assert.deepEqual(frequentCombos([...Array(3).fill(['09']).map(C), ...Array(3).fill(['10', '11']).map(C)]).map(x => x.cats.join()), ['10,11', '09']);
+}
+
+// parseBulk
+{
+  const fakeSuggest = text => {
+    const t = text.toLowerCase(), out = [];
+    if (t.includes('lscs')) out.push({ code: '16', score: 0.9 });
+    if (t.includes('spinal')) out.push({ code: '17', score: 0.7 }, { code: '28', score: 0.4 });
+    if (t.includes('esp')) out.push({ code: '26iii', score: 0.8 });
+    return out;
+  };
+  const now = new Date(2026, 2, 15, 10); // 15 Mar 2026
+  const r = parseBulk('12/3 AB LSCS spinal\n\n  2026-01-05 CD ESP block  \n20/12 EF lap chole\n16/3 GH future so last year\n15/3 today\nno date here\n12/3/25 IJ TKR\n12 Mar KL eye\n31/6 bad date stays text', fakeSuggest, now);
+  assert.equal(r.length, 9);
+  assert.deepEqual(r[0], { date: '2026-03-12', details: 'AB LSCS spinal', cats: ['16', '17'] });
+  assert.deepEqual(r[1], { date: '2026-01-05', details: 'CD ESP block', cats: ['26', '26iii'] });
+  assert.equal(r[2].date, '2025-12-20', 'December is in the future in March: previous year');
+  assert.equal(r[3].date, '2025-03-16', 'tomorrow -> last year');
+  assert.equal(r[4].date, '2026-03-15', 'today stays this year');
+  assert.deepEqual(r[5], { date: null, details: 'no date here', cats: [] });
+  assert.equal(r[6].date, '2025-03-12');
+  assert.equal(r[7].date, '2026-03-12');
+  assert.equal(r[7].details, 'KL eye');
+  assert.equal(r[8].date, null);
+  assert.equal(r[8].details, '31/6 bad date stays text');
+  // separators after the date, and paediatric ages written like dates
+  assert.equal(parseBulk('12/3 - MN hernia', null, now)[0].details, 'MN hernia');
+  assert.equal(parseBulk('12/3: MN hernia', null, now)[0].date, '2026-03-12');
+  assert.deepEqual(parseBulk('8/12 boy circumcision', null, now)[0], { date: null, details: '8/12 boy circumcision', cats: [] });
+  assert.equal(parseBulk('3/52 old pyloromyotomy', null, now)[0].date, null);
+  assert.equal(parseBulk('5yo tonsillectomy', null, now)[0].date, null);
+  assert.equal(parseBulk('1.5 hr case', null, now)[0].date, null);
+  assert.equal(parseBulk('12 Mar 30yo man', null, now)[0].date, '2026-03-12');
+  assert.equal(parseBulk('12 Mar 30yo man', null, now)[0].details, '30yo man');
+  // 29/2 when this year is not a leap year: the most recent one, if any
+  assert.equal(parseBulk('29/2 OP', null, new Date(2025, 5, 1))[0].date, '2024-02-29');
+  assert.equal(parseBulk('29/2 OP', null, new Date(2026, 5, 1))[0].date, null);
+  // year rollover on 1 Jan
+  assert.equal(parseBulk('31/12 QR', null, new Date(2027, 0, 1))[0].date, '2026-12-31');
+  assert.equal(parseBulk('1/1 QR', null, new Date(2027, 0, 1))[0].date, '2027-01-01');
+  assert.deepEqual(parseBulk('', fakeSuggest), []);
+  assert.equal(parseBulk('a\tb', null, now)[0].details, 'a b');
+}
+
+// duplicates
+{
+  const cs = [
+    { id: 'a', date: '2026-01-01', details: 'AB lscs', cats: ['16', '17'] },
+    { id: 'b', date: '2026-01-01', details: ' ab  LSCS ', cats: ['17', '16'] },
+    { id: 'c', date: '2026-01-02', details: 'AB lscs', cats: ['16', '17'] },
+    { id: 'd', date: '2026-01-01', details: 'AB lscs', cats: ['16'] },
+    { id: 'e', date: '2026-01-01', details: 'AB lscs', cats: ['16', '17'] },
+    { id: 'f', date: null, details: 'x', cats: [] },
+    { id: 'g', date: null, details: 'x', cats: [] },
+  ];
+  assert.deepEqual(duplicates(cs), [['a', 'b', 'e'], ['f', 'g']]);
+  assert.deepEqual(duplicates([]), []);
+}
+
+// catFromText and caseFromRow
+{
+  assert.equal(catFromText('16'), '16');
+  assert.equal(catFromText('6'), '06');
+  assert.equal(catFromText('20iii'), '20iii');
+  assert.equal(catFromText('20III)'), '20iii');
+  assert.equal(catFromText(BY_CODE['17'].label), '17');
+  assert.equal(catFromText('lscs'), '16');
+  assert.equal(catFromText('Lower Segment Caesarean Section'), '16');
+  assert.equal(catFromText('truncal BLOCKS'), '26iii');
+  assert.equal(catFromText('8) Laparoscopic surgery'), '08');
+  assert.equal(catFromText('42'), null);
+  assert.equal(catFromText('banana'), null);
+
+  const r = caseFromRow({ id: 'x1', date: '12/3/26', details: '  AB LSCS ', categories: '16, 17' });
+  assert.deepEqual(r, { id: 'x1', date: '2026-03-12', details: 'AB LSCS', cats: ['16', '17'], unknown: [] });
+  const r2 = caseFromRow({ date: 'sometime in March', details: 'CD', categories: `${BY_CODE['20'].label}, ${BY_CODE['20iii'].label}; ENT\nfoo` });
+  assert.equal(r2.id, undefined);
+  assert.equal(r2.date, null);
+  assert.equal(r2.dateText, 'sometime in March');
+  assert.deepEqual(r2.cats, ['20', '20iii', '10']);
+  assert.deepEqual(r2.unknown, ['foo']);
+  assert.equal(caseFromRow({ date: new Date(Date.UTC(2025, 0, 1)), details: 'x', categories: '' }).date, '2025-01-01');
+  assert.equal(caseFromRow({ date: 45658, details: 'x' }).date, '2025-01-01');
+  assert.deepEqual(caseFromRow({ categories: '16, 16, lscs' }).cats, ['16'], 'deduped');
+  assert.deepEqual(caseFromRow({ categories: ['16', '17'] }).cats, ['16', '17']);
+}
+
+// diffRows
+{
+  const now = 1000;
+  const existing = [
+    { id: 'a', date: '2026-01-01', details: 'AB lscs', cats: ['16', '17'], createdAt: 1, updatedAt: 1, source: 'app' },
+    { id: 'b', date: '2026-01-02', details: 'CD lap chole', cats: ['08', '13'], createdAt: 1, updatedAt: 1, source: 'app' },
+    { id: 'c', date: null, dateText: 'Jan?', details: 'EF', cats: ['99'], createdAt: 1, updatedAt: 1, source: 'import' },
+    { id: 'd', date: '2026-01-04', details: 'GH', cats: ['18'], createdAt: 1, updatedAt: 1, source: 'app' },
+  ];
+  const rows = [
+    { row: 2, id: 'a', date: new Date(Date.UTC(2026, 0, 1)), details: 'AB lscs', categories: `${BY_CODE['17'].label}, ${BY_CODE['16'].label}` }, // unchanged (order of cats ignored)
+    { row: 3, id: 'b', date: '2/1/2026', details: 'CD lap chole', categories: '08, 13, 21' }, // changed
+    { row: 4, id: 'c', date: 'Jan?', details: 'EF', categories: '99' }, // unchanged, still no date
+    { row: 5, id: '', date: '5/1/26', details: 'IJ new', categories: 'tkr?' }, // error
+    { row: 6, date: '6/1/26', details: 'KL new', categories: '18' }, // added (no id key)
+    { row: 7, id: 'a', date: '1/1/26', details: 'AB lscs copy', categories: '16' }, // repeated id: added
+    { row: 8, id: 'zzz', date: '7/1/26', details: 'MN', categories: '' }, // unknown id: added
+    { row: 9, id: '', date: null, details: '', categories: '' }, // blank
+    { row: 10, id: '', date: '', details: '', categories: '16' }, // no date or details
+  ];
+  rows.hasIdColumn = true;
+  const d = diffRows(existing, rows, now);
+  assert.equal(d.changed.length, 1);
+  assert.equal(d.changed[0].before.id, 'b');
+  assert.deepEqual(d.changed[0].after, { ...existing[1], cats: ['08', '13', '21'], updatedAt: now });
+  assert.deepEqual(d.added.map(c => c.details), ['KL new', 'AB lscs copy', 'MN']);
+  for (const c of d.added) {
+    assert.equal(c.source, 'sheet');
+    assert.equal(c.createdAt, now);
+    assert.ok(c.id && !['a', 'zzz'].includes(c.id), 'new ids');
+  }
+  assert.deepEqual(d.added[0].cats, ['18']);
+  assert.equal(d.added[0].date, '2026-01-06');
+  assert.deepEqual(d.deleted.map(c => c.id), ['d']);
+  assert.deepEqual(d.errors.map(e => e.row), [5, 10]);
+  assert.match(d.errors[0].message, /tkr\?/);
+
+  // a row with an error keeps its case from being deleted
+  const d2 = diffRows(existing, Object.assign([
+    { id: 'a', date: '1/1/26', details: 'AB lscs', categories: 'nonsense' },
+  ], { hasIdColumn: true }), now);
+  assert.deepEqual(d2.deleted.map(c => c.id), ['b', 'c', 'd']);
+  assert.equal(d2.errors[0].row, 2, 'row numbers default to index + 2');
+
+  // date fixed for a case that had none: dateText dropped
+  const d3 = diffRows(existing, [{ id: 'c', date: '3/1/26', details: 'EF', categories: '99' }], now);
+  assert.equal(d3.changed.length, 1);
+  assert.equal(d3.changed[0].after.date, '2026-01-03');
+  assert.equal('dateText' in d3.changed[0].after, false);
+  assert.equal(d3.deleted.length, 3, 'ids in rows imply an id column');
+
+  // no id column: add-only import, nothing deleted
+  const d4 = diffRows(existing, Object.assign([{ date: '9/1/26', details: 'OP', categories: '16 , 17' }], { hasIdColumn: false }), now);
+  assert.equal(d4.added.length, 1);
+  assert.deepEqual(d4.added[0].cats, ['16', '17']);
+  assert.equal(d4.deleted.length, 0);
+  assert.equal(diffRows(existing, [{ date: '9/1/26', details: 'OP', categories: '' }], now).deleted.length, 0);
+
+  // details whitespace/case differences are not changes
+  assert.equal(diffRows(existing, [{ id: 'd', date: '4/1/26', details: ' gh ', categories: '18' }], now).changed.length, 0);
+  assert.deepEqual(diffRows([], [], now), { added: [], changed: [], deleted: [], errors: [] });
+}
+
+// xlsxio round trip (the vendored ExcelJS browser bundle also loads in Node)
+{
+  const require = createRequire(import.meta.url);
+  globalThis.ExcelJS = require('../../nuh-roster/vendor/exceljs.min.js');
+  const { exportCases, readCasesSheet, exportTotals } = await import('../js/xlsxio.js');
+  const cases = [
+    { id: 'k2', date: '2026-02-03', details: 'AB lscs spinal', cats: ['17', '16'], createdAt: 2 },
+    { id: 'k1', date: '2026-01-31', details: 'CD 5yo T&A', cats: ['20iii', '20', '10'], createdAt: 1 },
+    { id: 'k3', date: null, dateText: 'Feb?', details: 'EF ESP', cats: ['26', '26iii'], createdAt: 3 },
+  ];
+  const blob = await exportCases(cases, { name: 'Test Resident', rYear: 2 });
+  assert.ok(blob instanceof Blob && blob.size > 1000);
+  const rows = await readCasesSheet(blob);
+  assert.equal(rows.hasIdColumn, true);
+  assert.deepEqual(rows.map(r => r.id), ['k1', 'k2', 'k3'], 'oldest first, undated last');
+  assert.equal(rows[0].categories, `${BY_CODE['10'].label}, ${BY_CODE['20'].label}, ${BY_CODE['20iii'].label}`);
+  assert.equal(parseDate(rows[0].date), '2026-01-31');
+  assert.equal(rows[2].date, 'Feb?');
+  const d = diffRows(cases, rows);
+  assert.deepEqual(d, { added: [], changed: [], deleted: [], errors: [] }, 'an untouched export round-trips with no changes');
+
+  // summary sheet
+  const wb = new globalThis.ExcelJS.Workbook();
+  await wb.xlsx.load(await blob.arrayBuffer());
+  const sum = wb.getWorksheet('Summary');
+  const vals = [];
+  sum.eachRow((row) => vals.push(row.values.slice(1)));
+  const header = vals.findIndex(v => v[0] === 'Category');
+  assert.deepEqual(vals[header], ['Category', 'Count', 'R3', 'R5', 'Status']);
+  const lscs = vals.find(v => v[0] === BY_CODE['16'].label);
+  assert.deepEqual(lscs, [BY_CODE['16'].label, 1, 10, 20, '🟡']);
+  assert.equal(wb.getWorksheet('Cases').getColumn(4).hidden, true);
+  const late = await exportCases([], { progressRows: progress({ 13: 20, 16: 1 }, 4) });
+  const wb2 = new globalThis.ExcelJS.Workbook();
+  await wb2.xlsx.load(await late.arrayBuffer());
+  const v2 = [];
+  wb2.getWorksheet('Summary').eachRow(row => v2.push(row.values.slice(1)));
+  assert.equal(v2.find(v => v[0] === BY_CODE['13'].label)[4], '🟢');
+  assert.equal(v2.find(v => v[0] === BY_CODE['16'].label)[4], '🔴');
+
+  // a plain sheet without an id column, headers in other places/orders
+  const plain = new globalThis.ExcelJS.Workbook();
+  const ws = plain.addWorksheet('Sheet1');
+  ws.addRow(['My logbook']);
+  ws.addRow([]);
+  ws.addRow(['Categories', 'Initials,  Case Details', 'Date']);
+  ws.addRow(['16, 17', 'GH lscs', '4/2/26']);
+  ws.addRow(['LSCS', 'IJ lscs', new Date(Date.UTC(2026, 1, 5))]);
+  ws.addRow([]);
+  ws.addRow(['nope', 'KL', 45700]);
+  const prows = await readCasesSheet(new Blob([await plain.xlsx.writeBuffer()]));
+  assert.equal(prows.hasIdColumn, false);
+  assert.equal(prows.length, 3);
+  assert.equal('id' in prows[0], false);
+  assert.equal(prows[2].row, 7);
+  const pd = diffRows(cases, prows);
+  assert.equal(pd.added.length, 2);
+  assert.equal(pd.deleted.length, 0);
+  assert.deepEqual(pd.errors, [{ row: 7, message: 'Unknown category: nope' }]);
+  assert.deepEqual(pd.added.map(c => c.date), ['2026-02-04', '2026-02-05']);
+
+  // no matching sheet
+  const empty = new globalThis.ExcelJS.Workbook();
+  empty.addWorksheet('x').addRow(['a', 'b']);
+  await assert.rejects(readCasesSheet(await empty.xlsx.writeBuffer()), /Could not find/);
+
+  // totals, both input shapes
+  const t1 = await exportTotals({ title: 'AY2024 totals', columns: ['Resident A', 'Resident B'], rows: [
+    { label: BY_CODE['16'].label, values: [3, 12], statuses: ['late', 'done'] },
+    { label: 'Reflections', values: [1, 2] },
+  ] });
+  const t2 = await exportTotals([['Category', 'A'], ['16', 1], ['Grand Total', 1]]);
+  for (const b of [t1, t2]) {
+    const w = new globalThis.ExcelJS.Workbook();
+    await w.xlsx.load(await b.arrayBuffer());
+    assert.ok(w.getWorksheet('Totals'));
+  }
+  const w1 = new globalThis.ExcelJS.Workbook();
+  await w1.xlsx.load(await t1.arrayBuffer());
+  assert.deepEqual(w1.getWorksheet('Totals').getRow(3).values.slice(1), ['Category', 'Resident A', 'Resident B']);
+  assert.deepEqual(w1.getWorksheet('Totals').getRow(4).values.slice(1), [BY_CODE['16'].label, 3, 12]);
+}
+
+console.log('engine tests passed');
