@@ -111,14 +111,6 @@
     }
    ]
   },
-  "yesNo": {
-   "about": "Dropdown. Only \"Yes\" was visible in the screenshots; assumed Yes / No.",
-   "options": [
-    "Yes",
-    "No"
-   ],
-   "unconfirmed": true
-  },
   "complexity": {
    "about": "Complexity of case dropdown (confirmed by the user, 2026-10-10).",
    "options": [
@@ -146,6 +138,22 @@
     "Recovery/PACU",
     "Ward"
    ]
+  },
+  "receptive": {
+   "about": "Resident was receptive to feedback (confirmed by the user, 2026-10-10).",
+   "options": [
+    "Yes",
+    "No",
+    "Maybe"
+   ]
+  },
+  "reflective": {
+   "about": "Resident demonstrated reflective learning. Only \"Yes\" was visible; assumed Yes / No, possibly Yes / No / Maybe like the receptive question.",
+   "options": [
+    "Yes",
+    "No"
+   ],
+   "unconfirmed": true
   }
  },
  "forms": {
@@ -265,14 +273,14 @@
        "label": "Resident was receptive to feedback",
        "type": "select",
        "required": true,
-       "options": "yesNo"
+       "options": "receptive"
       },
       {
        "n": 12,
        "label": "Resident demonstrated reflective learning",
        "type": "select",
        "required": true,
-       "options": "yesNo"
+       "options": "reflective"
       }
      ]
     }
@@ -490,14 +498,14 @@
        "label": "Resident was receptive to feedback",
        "type": "select",
        "required": true,
-       "options": "yesNo"
+       "options": "receptive"
       },
       {
        "n": 21,
        "label": "Resident demonstrated reflective learning",
        "type": "select",
        "required": true,
-       "options": "yesNo"
+       "options": "reflective"
       }
      ]
     },
@@ -659,14 +667,14 @@
        "label": "Resident was receptive to feedback",
        "type": "select",
        "required": true,
-       "options": "yesNo"
+       "options": "receptive"
       },
       {
        "n": 19,
        "label": "Resident demonstrated reflective learning",
        "type": "select",
        "required": true,
-       "options": "yesNo"
+       "options": "reflective"
       }
      ]
     }
