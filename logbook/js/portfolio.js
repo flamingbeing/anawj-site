@@ -28,10 +28,11 @@ export function needZip() {
 export const esc = s => String(s ?? '')
   .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '')
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-// fmt: true = bold, or { b, u, sup } for bold / single underline / superscript.
+// fmt: true = bold, or { b, u, sup, arial } for bold / single underline / superscript / Arial.
+const ARIAL = '<w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial" w:eastAsia="Arial"/>';
 const run = (text, fmt) => {
   const f = fmt === true ? { b: true } : (fmt || {});
-  const rPr = (f.b ? '<w:b/><w:bCs/>' : '') + (f.u ? '<w:u w:val="single"/>' : '') + (f.sup ? '<w:vertAlign w:val="superscript"/>' : '');
+  const rPr = (f.arial ? ARIAL : '') + (f.b ? '<w:b/><w:bCs/>' : '') + (f.u ? '<w:u w:val="single"/>' : '') + (f.sup ? '<w:vertAlign w:val="superscript"/>' : '');
   return `<w:r>${rPr ? `<w:rPr>${rPr}</w:rPr>` : ''}<w:t xml:space="preserve">${esc(text)}</w:t></w:r>`;
 };
 const para = (pPr, runs) => `<w:p>${pPr || ''}${runs}</w:p>`;
@@ -187,7 +188,8 @@ async function finishMedia(zip, media) {
 }
 
 const paras = (pPr, list, media) => (list.length ? list : [[]]).map(p => (Array.isArray(p)
-  ? para(pPr, p.map(([t, b]) => run(t, b)).join(''))
+  // the case reflection rows are written in Arial (the rest of the template keeps its own fonts)
+  ? para(pPr, p.map(([t, b]) => run(t, { ...(b === true ? { b: true } : b || {}), arial: true })).join(''))
   : para(pPr, drawing(media, p.image)))).join('');
 
 const byDate = (a, b) => (a.date || '9999').localeCompare(b.date || '9999') || (a.createdAt || 0) - (b.createdAt || 0);
