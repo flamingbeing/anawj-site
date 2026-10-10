@@ -43,7 +43,7 @@ The data (staff names, leave, case notes) is then stored in Google Cloud, outsid
 2. **Build → Authentication → Get started → Sign-in method → Google → Enable**, then Save.
    Under **Authentication → Settings → Authorized domains**, add `anawj.com`.
 3. **Build → Firestore Database → Create database**. Pick a Singapore location (`asia-southeast1`) and start in **production mode**.
-   Open the **Rules** tab, paste the contents of `nuh-roster/firestore.rules`, and click **Publish**.
+   Rules: `nuh-roster/firestore.rules` is deployed automatically when a change to it is merged to `main` (`.github/workflows/deploy-firestore-rules.yml`). No console paste.
 4. Add yourself as the first admin. In **Firestore → Data → Start collection**, use collection ID `members`, document ID = your Google email in lowercase (e.g. `you@gmail.com`), and fields `role` (string) = `admin` and `name` (string) = your name.
 5. Go to **Project settings (gear) → General → Your apps → Web (`</>`)** and register an app (no hosting needed). Copy `apiKey`, `authDomain`, `projectId` and `appId` into `nuh-roster/js/firebase-config.js`, then commit.
    These values are meant to be public. Access is controlled by the rules and the members list.

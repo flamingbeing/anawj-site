@@ -23,7 +23,7 @@ The Firebase project `apmes-logbook` already exists and its web config is in `js
 
 1. **Authentication**: Firebase console → Authentication → Sign-in method → enable **Google**. Then Authentication → Settings → Authorised domains → add `anawj.com` (`localhost` is there already for testing).
 2. **Firestore**: Firestore Database → Create database → location **asia-southeast1 (Singapore)** → **production mode**.
-3. **Rules**: Firestore Database → Rules → paste the whole of `firestore.rules` → Publish. Paste it again whenever the file changes. This one file holds the rules for the whole Firebase project, the logbook and evaluations (`/evals`) alike, so never publish another app's rules file over it.
+3. **Rules**: deployed automatically to `apmes-logbook` when a change to `firestore.rules` is merged to `main` (`.github/workflows/deploy-firestore-rules.yml`). No console paste. This one file holds the rules for the whole Firebase project, the logbook and evaluations (`/evals`) alike, so never publish another app's rules file over it.
 4. **Admins**: Firestore Database → Data → Start collection `admins`. Add one document per admin. The document ID is the admin's Google email in lower case (use the admins' emails), with a field `name` (string). Admin emails are never written in this repository.
 5. **Optional, API key restriction**: Google Cloud console → APIs & Services → Credentials → the "Browser key" → Application restrictions → Websites → add `https://anawj.com/*`, `https://apmes-logbook.firebaseapp.com/*` and `http://localhost/*`. The key isn't a secret, but this stops other sites using it.
 6. Sign in on the page as an admin, open **Account → Admin**, paste the residents list, then run the import (below).
@@ -77,7 +77,7 @@ The old data is the Google Form responses workbook (tabs **Case** and **AY20xx T
 - `js/demo-backend.js`: the `?demo` stand-in for `cloud.js` (localStorage, fake admin `demo@example.com`).
 - `js/app.js`: boot, sign-in, tabs, service worker. Each screen is in `js/ui-*.js` (`ui-core.js` holds shared state and helpers).
 - `sw.js`: offline app shell (cache-first). **Bump `VERSION` in `sw.js` whenever any file changes**, otherwise installed phones keep the old copy; with a new version the app shows "Update available — Reload".
-- `firestore.rules`: access rules for the whole project, logbook and evaluations (paste into the console).
+- `firestore.rules`: access rules for the whole project, logbook and evaluations (auto-deployed on merge to `main`).
 
 ## Tests
 
