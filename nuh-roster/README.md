@@ -24,3 +24,27 @@ Everything runs in the browser. Staff lists, leave and case notes stay in the br
 - `js/app.js`: UI.
 - `vendor/exceljs.min.js`: ExcelJS 4.4.0 (MIT).
 - `test/engine.test.mjs`: run with `node nuh-roster/test/engine.test.mjs`. It uses fake names only.
+
+## Team sign-in (optional)
+
+With a Firebase project configured, rosterers sign in with Google. Then:
+
+- the staff list, rooms and settings are shared (*Save staff list for the team* on the Staff tab)
+- each day's roster has a **Save** button, records who saved it and when, and keeps a permanent history of every save
+- anyone on the team can open any saved roster
+
+Only Google accounts on the team list can read or write anything. This is enforced by `firestore.rules` on Google's side, not just by the page. Without a config the page works as before, with everything kept in the browser.
+
+The data (staff names, leave, case notes) is then stored in Google Cloud, outside NUH systems. Check with the department that this is acceptable under PDPA and hospital policy before you use real names.
+
+### Setup (about 10 minutes, once)
+
+1. Go to <https://console.firebase.google.com>, **Add project** (e.g. `nuh-roster`). Google Analytics isn't needed.
+2. **Build → Authentication → Get started → Sign-in method → Google → Enable**, then Save.
+   Under **Authentication → Settings → Authorized domains**, add `anawj.com`.
+3. **Build → Firestore Database → Create database**. Pick a Singapore location (`asia-southeast1`) and start in **production mode**.
+   Open the **Rules** tab, paste the contents of `nuh-roster/firestore.rules`, and click **Publish**.
+4. Add yourself as the first admin. In **Firestore → Data → Start collection**, use collection ID `members`, document ID = your Google email in lowercase (e.g. `you@gmail.com`), and fields `role` (string) = `admin` and `name` (string) = your name.
+5. Go to **Project settings (gear) → General → Your apps → Web (`</>`)** and register an app (no hosting needed). Copy `apiKey`, `authDomain`, `projectId` and `appId` into `nuh-roster/js/firebase-config.js`, then commit.
+   These values are meant to be public. Access is controlled by the rules and the members list.
+6. Open the page, **Sign in with Google**, and add the other rosterers under **Settings → Team members**.
