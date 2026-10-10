@@ -13,9 +13,7 @@ export const DUTIES = [
   { key: 'eot8', label: 'EOT 8', fields: [['s', 'Specialist'], ['a', 'Assistant']] },
   { key: 'eot9', label: 'EOT 9', fields: [['s', 'Specialist'], ['a', 'Assistant'], ['a2', 'Assistant 2']] },
   { key: 'epi', label: 'Epidural', fields: [['s', 'Specialist'], ['df', 'Day float (DF)'], ['nf', 'Night float (NF)']] },
-  { key: 'adot', label: 'ADOT', fields: [['s', 'Specialist']] },
   { key: 'cardiac', label: 'Cardiac Call', fields: [['s', 'Specialist'], ['a', 'Assistant']] },
-  { key: 'ect', label: 'ECT', fields: [['s', 'Specialist'], ['a', 'Assistant']] },
   { key: 'painacp', label: 'Pain/ACP Clinic', fields: [['s', 'Specialist'], ['a', 'Assistant']] },
   { key: 'acute', label: 'Acute Pain', fields: [['s', 'Specialist'], ['a', 'Assistant']] },
   { key: 'chronic', label: 'Chronic Pain', fields: [['s', 'Specialist'], ['a', 'Assistant']] },
@@ -67,11 +65,10 @@ export function buildLayout({ date, rows, lists = {}, general = {}, box = '', co
   duty('EOT 8:', g('eot8.s'), g('eot8.a'));
   duty('EOT 9:', g('eot9.s'), g('eot9.a'));
   duty('', '', g('eot9.a2'));
-  duty('Epidural:', g('epi.s'), tag(g('epi.df'), 'DF'), tag(g('epi.nf'), 'NF'));
-  duty('ADOT:', g('adot.s'), '');
+  duty('Epidural:', g('epi.s'), tag(g('epi.df'), 'DF'));
+  duty('', '', tag(g('epi.nf'), 'NF'));
   duty('Cardiac Call:', g('cardiac.s'), g('cardiac.a'));
   r++;
-  duty('ECT:', g('ect.s'), g('ect.a'));
   label(r, 'AOCC:');
   names(r, 3, 5, special('aocc').senior);
   names(r, 6, 8, special('aocc').junior);
