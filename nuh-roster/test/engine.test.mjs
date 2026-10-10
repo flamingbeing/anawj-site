@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { matchName, namesInCell, suggestFlags, generate, check, tickFromHistory, suggestShortName, suggestShortNames } from '../js/engine.js';
 
-const P = (id, name, role, extra = {}) => ({ id, name, role, grade: role === 'senior' ? 'Consultant' : 'Resident', aliases: [], posting: '', subspecs: [], avoid: [], ...extra });
+const P = (id, name, role, extra = {}) => ({ id, name, role, grade: role === 'senior' ? 'C' : 'Junior resident', aliases: [], posting: '', subspecs: [], avoid: [], ...extra });
 
 // names
 const staff0 = [P('a', 'Tan Yi Wei', 'senior'), P('b', 'Leong Siaw May', 'senior'), P('c', 'Tan Yi Ling', 'senior')];
@@ -37,7 +37,7 @@ const staff = [
   P('s1', 'Senior Paeds', 'senior', { subspecs: ['paeds'] }),
   P('s2', 'Senior Cardiac', 'senior', { subspecs: ['cardiac'] }),
   P('s3', 'Senior General', 'senior', { avoid: ['eye'] }),
-  P('j1', 'Junior Baby', 'junior', { grade: 'Baby MO' }),
+  P('j1', 'Junior Baby', 'junior', { grade: 'MOPEX', colour: 'green' }),
   P('j2', 'Junior Resident', 'junior'),
   P('j3', 'Junior Mopex', 'junior', { grade: 'MOPEX' }),
   P('j4', 'Junior Paeds', 'junior', { posting: 'P' }),
@@ -95,13 +95,13 @@ console.log('engine tests passed');
   assert.equal(findSameStaff('Sophia Ang Bee Leng', staff).id, 'a');
   let n = 0;
   const res = mergeContacts(staff, [
-    { name: 'Sophia Ang Bee Leng', role: 'senior', grade: 'Consultant', subspecs: ['cardiac'] },
-    { name: 'Donald Foo Peng Xiang', role: 'senior', grade: 'Consultant', subspecs: [] },
+    { name: 'Sophia Ang Bee Leng', role: 'senior', grade: 'C', subspecs: ['cardiac'] },
+    { name: 'Donald Foo Peng Xiang', role: 'senior', grade: 'C', subspecs: [] },
     { name: 'New Person Senior', role: 'senior', grade: 'AC', subspecs: ['paeds'] },
     { name: 'New Junior Person', role: 'junior', grade: 'MOPEX', subspecs: [] },
   ], () => 'n' + ++n);
   assert.deepEqual(res.staff.find(p => p.id === 'a').subspecs, ['cardiac']);
-  assert.equal(res.staff.find(p => p.id === 'b').grade, 'Consultant');
+  assert.equal(res.staff.find(p => p.id === 'b').grade, 'C');
   assert.ok(res.staff.some(p => p.name === 'New Person Senior'));
   assert.deepEqual(res.skipped, ['New Junior Person']);
   assert.deepEqual(staff[0].subspecs, [], 'input not mutated');
@@ -155,7 +155,7 @@ console.log('engine tests passed');
   const st = [
     P('s1', 'Senior A', 'senior'), P('s2', 'Senior B', 'senior'), P('s3', 'Senior C', 'senior'),
     P('j1', 'Junior A', 'junior'), P('j2', 'Junior B', 'junior'), P('j3', 'Junior C', 'junior'),
-    P('j4', 'Junior SR', 'junior', { grade: 'Senior Resident' }),
+    P('j4', 'Junior SR', 'junior', { grade: 'Senior resident' }),
   ];
   const dy = { rooms: [room('r1', 'MOR 1', 'MOR', 'hernia')], staff: {} };
   const g = generate({ staff: st, day: dy, seed: 5 });
