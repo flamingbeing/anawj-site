@@ -91,6 +91,8 @@ tr.off td:first-child { opacity: 1; }
 .name .icon { font-size: 10px; line-height: 1; border-radius: 3px; padding: 1px 3px; opacity: .45; }
 .name:hover .icon { opacity: 1; }
 .name .icon.cover { cursor: grab; color: #d00; font-weight: 700; border: 1px solid currentColor; }
+.name .icon.dbl { cursor: grab; font-weight: 700; font-size: 12px; color: var(--muted); border: 1px dashed currentColor; }
+.name .icon.dbl.on { color: var(--ink); border-style: solid; opacity: 1; }
 .name .icon.del { cursor: pointer; color: var(--muted); font-size: 13px; }
 .name .icon.del:hover { color: #d00; background: var(--chip); }
 .tag-editor .where { border-bottom: 1px solid var(--line); padding-bottom: 6px; margin-bottom: 2px; font-size: 13px; }
