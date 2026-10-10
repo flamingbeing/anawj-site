@@ -120,5 +120,11 @@ console.log('engine tests passed');
   assert.equal(missingCovers(rows).length, 1);
   rows[1].senior = 'Senior Two C-OT13';
   assert.equal(missingCovers(rows).length, 0);
+  rows.push({ roomId: 'c', label: 'KROR PACU', complex: 'KROR', senior: 'Senior Three L-4-5pm', junior: '' });
+  assert.equal(missingCovers(rows).length, 1);
+  rows[1].junior = 'Junior Four C-KROR PACU';
+  assert.equal(missingCovers(rows).length, 0, 'cover by full room name, from another complex');
+  rows[1].senior = 'Senior Two C-13';
+  assert.equal(missingCovers(rows).length, 0, 'bare number means own complex');
   console.log('cover tests passed');
 }
