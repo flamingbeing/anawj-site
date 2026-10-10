@@ -1,6 +1,6 @@
 // Run with: node nuh-roster/test/engine.test.mjs  (fake names only)
 import assert from 'node:assert/strict';
-import { matchName, namesInCell, suggestFlags, generate, check } from '../js/engine.js';
+import { matchName, namesInCell, suggestFlags, generate, check, tickFromHistory } from '../js/engine.js';
 
 const P = (id, name, role, extra = {}) => ({ id, name, role, grade: role === 'senior' ? 'Consultant' : 'Resident', aliases: [], posting: '', subspecs: [], avoid: [], ...extra });
 
@@ -20,6 +20,16 @@ assert.deepEqual(suggestFlags('c').subspecs, ['cardiac']);
 assert.deepEqual(suggestFlags('scoli 28y').subspecs, []);
 assert.equal(suggestFlags('scoli 28y').complex, true);
 assert.deepEqual(suggestFlags('eye').subspecs, []);
+assert.deepEqual(suggestFlags('', undefined, 'MOR 12').subspecs, ['cardiac'], 'MOR 12 is cardiac by default');
+assert.deepEqual(suggestFlags('c', undefined, 'mor 13').subspecs, ['cardiac'], 'no duplicate, case-insensitive room');
+assert.deepEqual(suggestFlags('', undefined, 'MOR 11').subspecs, []);
+{
+  const st = [{ id: 'x', role: 'senior', subspecs: ['neuro'], history: { cardiac: 2, paeds: 1 } }, { id: 'y', role: 'junior', history: { paeds: 3 } }];
+  assert.equal(tickFromHistory(st, 2), 1);
+  assert.deepEqual(st[0].subspecs, ['neuro', 'cardiac']);
+  assert.equal(tickFromHistory(st, 1), 1);
+  assert.equal(st[1].subspecs, undefined, 'juniors untouched');
+}
 
 // generation
 const room = (id, name, complex, notes = '') => ({ id, name, complex, running: true, notes, flags: suggestFlags(notes), session: 'full' });

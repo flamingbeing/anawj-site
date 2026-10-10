@@ -145,3 +145,5 @@ table.xl td.spill { overflow: visible; white-space: nowrap; }
   section.card { border: 0; padding: 0; margin: 0; }
   @page { size: A4 portrait; margin: 10mm; }
 }
+
+.btn-group { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; }
