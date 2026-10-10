@@ -80,7 +80,10 @@ tr.off td:first-child { opacity: 1; }
 .sheet td.cell.over { background: var(--chip); box-shadow: inset 0 0 0 2px var(--accent); }
 .sheet td.editing { padding: 2px; }
 .sheet .cell-input { width: 100%; text-align: center; font: inherit; }
-.names { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; }
+.names { display: flex; flex-direction: column; gap: 3px; align-items: stretch; }
+.names .name { border-color: var(--line); background: var(--panel); text-align: center; }
+.add-name { align-self: center; padding: 0 8px; font-size: 12px; line-height: 18px; border-style: dashed; color: var(--muted); opacity: .5; }
+.cell:hover .add-name { opacity: 1; }
 .name { padding: 1px 8px; border-radius: 6px; border: 1px solid transparent; cursor: grab; touch-action: none; user-select: none; }
 .name:hover { border-color: var(--line); background: var(--chip); }
 .name.over { border-color: var(--accent); background: var(--chip); box-shadow: 0 0 0 1px var(--accent); }
