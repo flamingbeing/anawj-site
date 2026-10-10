@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { REFLECTION_HEADINGS } from '../js/categories.js';
-import { stripComments, fillDocumentXml, plainDocumentXml, exportPortfolio, rowCells, esc, fmtDate, caseRYear, countsByYear, fillSummaryXml, placeInSlots, dateRuns, ordinal, imageSize, ensureNamespaces } from '../js/portfolio.js';
+import { printLayoutSettings, stripComments, fillDocumentXml, plainDocumentXml, exportPortfolio, rowCells, esc, fmtDate, caseRYear, countsByYear, fillSummaryXml, placeInSlots, dateRuns, ordinal, imageSize, ensureNamespaces } from '../js/portfolio.js';
 
 const JSZip = createRequire(import.meta.url)('../vendor/jszip.min.js');
 
@@ -164,4 +164,8 @@ const S1 = R({ headingId: 'thyroid', initials: 'GH', date: '2024-12-21', jr: tru
   assert.ok(y.includes('Keep me'));
   assert.ok(!/comment/i.test(y), y);
 }
+// exports open in Print Layout
+assert.equal(printLayoutSettings('<w:settings x="1"><w:zoom w:percent="100"/></w:settings>'), '<w:settings x="1"><w:view w:val="print"/><w:zoom w:percent="100"/></w:settings>');
+assert.equal(printLayoutSettings('<w:settings><w:view w:val="web"/><w:zoom/></w:settings>'), '<w:settings><w:view w:val="print"/><w:zoom/></w:settings>');
+assert.equal(printLayoutSettings('<w:settings><w:writeProtection w:recommended="1"/></w:settings>'), '<w:settings><w:writeProtection w:recommended="1"/><w:view w:val="print"/></w:settings>');
 console.log('portfolio tests passed');
