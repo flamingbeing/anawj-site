@@ -149,8 +149,9 @@ const app = document.getElementById('app');
 function render() {
   document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === state.tab)));
   const y = window.scrollY;
-  if (!['roster', 'seniors', 'juniors', 'day', 'settings'].includes(state.tab)) state.tab = 'seniors';
-  app.replaceChildren(({ roster: renderRoster, seniors: () => renderStaff('senior'), juniors: () => renderStaff('junior'), day: renderDay, settings: renderSettings })[state.tab]());
+  if (state.tab === 'day') state.tab = 'cases';
+  if (!['roster', 'cases', 'manpower', 'seniors', 'juniors', 'settings'].includes(state.tab)) state.tab = 'seniors';
+  app.replaceChildren(({ roster: renderRoster, cases: () => renderDay('cases'), manpower: () => renderDay('manpower'), seniors: () => renderStaff('senior'), juniors: () => renderStaff('junior'), settings: renderSettings })[state.tab]());
   renderCloudBar();
   window.scrollTo(0, y);
   save();
@@ -264,7 +265,8 @@ const pasteText = { leave: '', postcall: '', elsewhere: '', admin: '', notAround
 let unmatched = [];
 let dayFilter = '';
 
-function renderDay() {
+function renderDay(part) {
+  const cases = part === 'cases';
   const d = state.day;
   const subs = state.settings.subspecs;
   const running = d.rooms.filter(r => r.running);
@@ -328,11 +330,13 @@ function renderDay() {
   return h('div', {},
     names,
     h('section', { class: 'card' },
-      h('h2', {}, 'Day'),
+      h('h2', {}, cases ? 'Cases' : 'Manpower'),
       h('div', { class: 'bar' },
         h('label', {}, 'Roster for ', h('input', { type: 'date', value: d.date, onchange: e => { d.date = e.target.value; save(); } })),
         fileButton('Load draft roster (.xlsx)', '.xlsx', false, loadDraft),
-        h('button', { onclick: () => { if (confirm('Clear rooms, notes and staff statuses for this day?')) { state.day = { date: d.date, rooms: [], staff: {}, lists: {} }; syncRooms(); render(); } } }, 'Clear day'),
+        cases
+          ? h('button', { onclick: () => { if (confirm('Clear the running rooms and case notes for this day? Rooms go back to "running by default".')) { d.rooms = []; syncRooms(); render(); } } }, 'Clear cases')
+          : h('button', { onclick: () => { if (confirm('Clear leave, post call and other statuses for this day?')) { d.staff = {}; d.lists = {}; render(); } } }, 'Clear manpower'),
       ),
       h('p', { class: 'hint' }, "\"Load draft roster\" reads the admin team's draft in the usual format: it picks up running rooms, case notes, leave, post call and upper-half duties."),
       unmatched.length ? h('ul', { class: 'warnings', style: 'margin-bottom:12px' }, h('li', { class: 'warn' },
@@ -344,14 +348,14 @@ function renderDay() {
         h('span', {}, h('b', {}, avail('junior')), ' juniors available'),
       ),
     ),
-    h('section', { class: 'card scroll' },
+    cases && h('section', { class: 'card scroll' },
       h('h2', {}, 'OT lists'),
       h('p', { class: 'hint' }, 'Tick the rooms that are running and type the case notes as usual. Flags are suggested from the notes (ages under ' + state.settings.paedsAgeYears + 'y count as paeds). Click a flag to change it. Fix a senior or junior to lock them in; the rest is filled automatically.'),
       h('table', {},
         h('thead', {}, h('tr', {}, ['Run', 'Room', 'Session', 'Case notes', 'Flags', 'Fixed senior', 'Fixed junior'].map(t => h('th', {}, t)))),
         h('tbody', {}, d.rooms.map(roomRow))),
     ),
-    h('section', { class: 'card' },
+    !cases && h('section', { class: 'card' },
       h('h2', {}, 'Who is around'),
       h('p', { class: 'hint' }, 'Paste names from the leave sheet: short forms like "Tan YW" or "Swapna" work. Separate names with commas or new lines.'),
       h('div', { class: 'paste' },
@@ -363,7 +367,7 @@ function renderDay() {
       ),
       h('div', { class: 'bar', style: 'margin-top:12px' }, h('button', { class: 'primary', onclick: applyPaste }, 'Apply names')),
     ),
-    h('section', { class: 'card scroll' },
+    !cases && h('section', { class: 'card scroll' },
       h('div', { class: 'bar' }, h('h2', { class: 'grow' }, 'Staff today'),
         h('input', { placeholder: 'Filter', value: dayFilter, oninput: e => { dayFilter = e.target.value; const pos = e.target.selectionStart; render(); const i = app.querySelector('input[placeholder="Filter"]'); i.focus(); i.setSelectionRange(pos, pos); } })),
       state.staff.length
@@ -710,7 +714,7 @@ function rosterCell(row, i, key, doubles) {
 
 function runGenerate(newSeed) {
   if (!state.staff.length) return toast('Add staff on the Seniors and Juniors tabs first.');
-  if (!state.day.rooms.some(r => r.running)) return toast('Tick the running rooms in Day setup first.');
+  if (!state.day.rooms.some(r => r.running)) return toast('Tick the running rooms on the Cases tab first.');
   const seed = newSeed ? Math.floor(Math.random() * 1e9) : (state.roster?.seed || 1);
   const res = generate({ staff: state.staff, day: state.day, settings: state.settings, seed });
   undoStack = []; editing = null;
