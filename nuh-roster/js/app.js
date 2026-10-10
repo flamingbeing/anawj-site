@@ -1,6 +1,6 @@
 import {
   DEFAULT_SETTINGS, DEFAULT_ROOMS, JUNIOR_GRADES, SENIOR_GRADES, POSTINGS, STATUSES,
-  matchName, splitNameList, namesInCell, suggestFlags, generate, check, learnFromRosters,
+  matchName, splitNameList, namesInCell, suggestFlags, generate, check, learnFromRosters, tickFromHistory,
 } from './engine.js';
 import { readRosterRows, readStaffSheet, buildRosterWorkbook, cellText } from './xlsxio.js';
 import { buildLayout, COL_WIDTHS, shortName } from './layout.js';
@@ -131,6 +131,7 @@ document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click
 // ----- staff tab -----
 
 let staffFilter = '';
+let tickMin = 1;
 function renderStaff() {
   const subs = state.settings.subspecs;
   const list = state.staff
@@ -164,6 +165,13 @@ function renderStaff() {
       h('div', { class: 'bar' },
         fileButton('Import staff sheet (.xlsx / .csv)', '.xlsx,.csv', false, importStaffSheet),
         fileButton('Learn from past rosters', '.xlsx', true, learnFiles),
+        h('span', { class: 'btn-group' },
+          h('button', { title: 'Tick each senior\'s subspecs from the lists in "Seen in". Only adds ticks.', onclick: () => {
+            const n = tickFromHistory(state.staff, tickMin);
+            render();
+            toast(n ? `Ticked ${n} subspec(s). Check them before generating.` : 'Nothing new to tick.');
+          } }, 'Tick subspecs from "Seen in"'),
+          h('label', { class: 'seen' }, ' if seen ≥ ', h('input', { type: 'number', min: 1, max: 20, value: tickMin, style: 'width:56px', onchange: e => { tickMin = Math.max(1, +e.target.value || 1); } }), ' times')),
         h('button', { onclick: () => { state.staff.unshift({ id: newId(), name: '', aliases: [], role: 'junior', grade: 'Resident', posting: '', subspecs: [], avoid: [], history: {} }); staffFilter = ''; render(); } }, '+ Add person'),
         h('span', { class: 'grow' }),
         h('input', { placeholder: 'Filter names', value: staffFilter, oninput: e => { staffFilter = e.target.value; const pos = e.target.selectionStart; render(); const i = app.querySelector('input[placeholder="Filter names"]'); i.focus(); i.setSelectionRange(pos, pos); } }),
@@ -234,13 +242,13 @@ function renderDay() {
   });
 
   const roomRow = r => h('tr', { class: r.running ? '' : 'off' },
-    h('td', {}, h('input', { type: 'checkbox', checked: r.running, 'aria-label': 'Running', onchange: e => { r.running = e.target.checked; render(); } })),
+    h('td', {}, h('input', { type: 'checkbox', checked: r.running, 'aria-label': 'Running', onchange: e => { r.running = e.target.checked; if (r.running && !r.flagsManual) r.flags = suggestFlags(r.notes, state.settings, r.name); render(); } })),
     h('td', {}, h('b', {}, r.name)),
     h('td', {}, select(r.session || 'full', [['full', 'Full'], ['am', 'AM'], ['pm', 'PM']], v => { r.session = v; save(); })),
     h('td', {}, h('input', { value: r.notes, placeholder: 'e.g. eye 5y', onchange: e => {
       r.notes = e.target.value;
       if (e.target.value.trim()) r.running = true;
-      if (!r.flagsManual) r.flags = suggestFlags(r.notes, state.settings);
+      if (!r.flagsManual) r.flags = suggestFlags(r.notes, state.settings, r.name);
       render();
     } })),
     h('td', {}, h('div', { class: 'chips' },
@@ -413,7 +421,7 @@ async function loadDraft([file]) {
     room.running = true;
     room.notes = r.notes;
     room.flagsManual = false;
-    room.flags = suggestFlags(r.notes, state.settings);
+    room.flags = suggestFlags(r.notes, state.settings, name);
     room.session = /\bam\b/i.test(r.senior) && !/\bpm\b/i.test(r.senior) && !r.notes ? 'am' : 'full';
     rooms++;
   }
@@ -700,6 +708,21 @@ function renderSettings() {
         state.roomTemplate = e.target.value.split('\n').map(l => l.split(':')).filter(p => p.length > 1)
           .flatMap(([c, rs]) => rs.split(',').map(n => n.trim()).filter(Boolean).map(name => ({ complex: c.trim(), name })));
         syncRooms(); save(); toast('Rooms updated.');
+      } }),
+      h('p', { class: 'hint', style: 'margin-top:12px' }, 'Room defaults: subspecs a room always needs, one room per line, e.g. "MOR 12: cardiac". Use the keys ' + st.subspecs.map(x => x.key).join(', ') + '.'),
+      h('textarea', { rows: 3, value: Object.entries(st.roomDefaults || {}).map(([room, ks]) => `${room}: ${ks.join(', ')}`).join('\n'), onchange: e => {
+        const keys = new Set(st.subspecs.map(x => x.key));
+        const out = {}, bad = [];
+        for (const line of e.target.value.split('\n')) {
+          const [room, ks] = line.split(':');
+          if (!room?.trim() || ks == null) continue;
+          const list = splitNameList(ks).map(x => x.toLowerCase());
+          bad.push(...list.filter(k => !keys.has(k)));
+          out[room.trim().toUpperCase().replace(/\s+/, ' ')] = list.filter(k => keys.has(k));
+        }
+        st.roomDefaults = out;
+        state.day.rooms.forEach(r => { if (!r.flagsManual) r.flags = suggestFlags(r.notes, st, r.name); });
+        save(); toast(bad.length ? `Unknown subspec: ${bad.join(', ')}` : 'Room defaults updated.');
       } }),
     ),
     h('section', { class: 'card' },

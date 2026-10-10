@@ -15,6 +15,8 @@ export const DEFAULT_SETTINGS = {
   ],
   complexKeywords: ['whipple', 'hepatec', 'hepatectomy', 'oesophagectomy', 'scoli', 'evar', 'laryngect', 'lefort', 'transplant', 'vats', 'ugi', 'thoracic'],
   longKeywords: ['7pm', '8pm', 'long'],
+  // rooms whose lists always need a subspec, whatever the case notes say
+  roomDefaults: { 'MOR 12': ['cardiac'], 'MOR 13': ['cardiac'] },
 };
 
 export const JUNIOR_GRADES = ['Resident', 'MOPEX', 'Baby MO'];
@@ -136,13 +138,15 @@ function hasKeyword(notes, kw) {
   return new RegExp(`(^| )${k.replace(/ /g, ' ')}( |$)`).test(norm(notes));
 }
 
-// Suggest flags for a room from its free-text case notes.
-export function suggestFlags(notes, settings = DEFAULT_SETTINGS) {
-  const subspecs = [];
+// Suggest flags for a room from its free-text case notes (and the room's own defaults).
+export function suggestFlags(notes, settings = DEFAULT_SETTINGS, roomName = '') {
+  const room = String(roomName).toUpperCase().replace(/\s+/g, ' ').trim();
+  const defaults = Object.entries(settings.roomDefaults || {}).find(([k]) => k.toUpperCase().replace(/\s+/g, ' ').trim() === room)?.[1] || [];
+  const subspecs = [...defaults];
   for (const s of settings.subspecs) {
     let hit = (s.keywords || []).some(k => hasKeyword(notes, k));
     if (s.byAge && ageYears(notes) < settings.paedsAgeYears) hit = true;
-    if (hit) subspecs.push(s.key);
+    if (hit && !subspecs.includes(s.key)) subspecs.push(s.key);
   }
   const complex = (settings.complexKeywords || []).some(k => hasKeyword(notes, k));
   const long = (settings.longKeywords || []).some(k => hasKeyword(notes, k));
@@ -575,7 +579,7 @@ export function learnFromRosters(rosterRows, staff, settings = DEFAULT_SETTINGS)
       }
       const c = (counts[p.id] ||= { senior: 0, junior: 0 });
       c[col]++;
-      if (col === 'senior') for (const k of suggestFlags(notes, settings).subspecs) p.history[k] = (p.history[k] || 0) + 1;
+      if (col === 'senior') for (const k of suggestFlags(notes, settings, label).subspecs) p.history[k] = (p.history[k] || 0) + 1;
     }
     if (col === 'junior') {
       for (const part of String(raw).split('/')) {
@@ -607,4 +611,17 @@ export function learnFromRosters(rosterRows, staff, settings = DEFAULT_SETTINGS)
   const order = { Other: 0, KROR: 1, MCOR: 2, MOR: 3 };
   rooms.sort((a, b) => (order[a.complex] - order[b.complex]) || (roomNum(a.name) - roomNum(b.name)));
   return { staff: people, rooms };
+}
+
+// Tick each senior's subspecs from the lists they were seen doing in past rosters.
+// Only adds ticks; returns how many were added.
+export function tickFromHistory(staff, minCount = 1) {
+  let added = 0;
+  for (const p of staff) {
+    if (p.role !== 'senior') continue;
+    for (const [k, n] of Object.entries(p.history || {})) {
+      if (n >= minCount && !(p.subspecs || []).includes(k)) { (p.subspecs ||= []).push(k); added++; }
+    }
+  }
+  return added;
 }
