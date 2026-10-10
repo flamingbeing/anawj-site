@@ -2,7 +2,7 @@
 // Also the reusable category picker and the edit-case dialog (used by the Logbook screen).
 
 import { BY_CODE, TIPS } from './categories.js';
-import { withParents, frequentCombos, parseBulk, parseDate, fmtDate, sortCodes, uid } from './engine.js';
+import { withParents, frequentCombos, parseBulk, parseDate, fmtDate, sortCodes, uid, caseParts, caseText, cleanInitials } from './engine.js';
 import { suggest } from './suggest.js';
 import {
   S, h, toast, debounce, modal, confirmBox, cat, catName, catFull, catChip, countText, PICKER_ORDER, PROGRESS_BY_CODE,
@@ -146,14 +146,15 @@ function paintDate() {
 
 function renderOne(card) {
   const textarea = h('textarea', {
-    class: 'details', rows: '3', autofocus: true, enterkeyhint: 'done', autocapitalize: 'sentences', autocorrect: 'off', 'aria-label': 'Case details',
+    class: 'details', rows: '3', autofocus: true, enterkeyhint: 'enter', autocapitalize: 'sentences', autocorrect: 'off', 'aria-label': 'Case details',
     placeholder: 'Initials + case, e.g. “AB 72M lap chole GA” or “CD LSCS spinal”',
     value: draft.details,
     oninput: e => { draft.details = e.target.value; saveDraft(); suggestSoon(); },
     // on a phone the keyboard takes half the screen: bring the box to the top so the chips show below it
     onpointerup: e => { if (e.pointerType === 'touch') setTimeout(() => e.target.scrollIntoView({ block: 'start', behavior: 'smooth' }), 300); },
+    // Enter is a new line (a case can take several lines); Ctrl+Enter / Cmd+Enter saves
     onkeydown: e => {
-      if (e.key !== 'Enter' || e.shiftKey || e.isComposing) return;
+      if (e.key !== 'Enter' || e.isComposing || !(e.ctrlKey || e.metaKey)) return;
       e.preventDefault();
       save({ another: e.altKey });
     },
@@ -168,7 +169,7 @@ function renderOne(card) {
     toggle: code => { draft.cats = toggleCat(draft.cats, code); saveDraft(); paintSel(); },
   });
   const actions = h('div', { class: 'actions' },
-    h('button', { class: 'primary big', onclick: () => save({}) }, 'Save', h('span', { class: 'kbd' }, '⏎')),
+    h('button', { class: 'primary big', onclick: () => save({}) }, 'Save', h('span', { class: 'kbd', title: 'Ctrl+Enter (Cmd+Enter on a Mac)' }, ' Ctrl+⏎')),
     h('button', { class: 'big', title: 'Save and keep this date for the next case', onclick: () => save({ another: true }) }, 'Save, keep date'));
 
   add(card, 
@@ -287,7 +288,7 @@ async function save({ another }) {
       removeCase(c.id);
       // put the case back in the box, unless the next one is already being typed
       if (draft.details.trim() || draft.cats.length) return;
-      draft = { ...draft, details: c.details, cats: c.cats, date: c.date === todayISO() ? null : c.date };
+      draft = { ...draft, details: caseText(c), cats: c.cats, date: c.date === todayISO() ? null : c.date };
       saveDraft();
       if (S.tab === 'log' && ui.textarea) { ui.textarea.value = draft.details; paintDate(); paintSel(); paintQuick(); }
     },
@@ -307,12 +308,12 @@ let bulkRows = null;
 function renderBulk(card) {
   const ta = h('textarea', {
     class: 'details', rows: '8', value: draft.bulk || '',
-    placeholder: 'One case per line. An optional date at the start, e.g.\n12/3 AB 5yo circumcision caudal\n13/3 CD LSCS spinal\nEF 80F hemiarthroplasty',
+    placeholder: 'Separate cases with an empty line. An optional date at the start, e.g.\n12/3 AB 5yo circumcision caudal\n\n13/3 CD LSCS spinal\nconverted to GA\n\nEF 80F hemiarthroplasty',
     oninput: e => { draft.bulk = e.target.value; saveDraft(); },
   });
   const out = h('div');
   add(card, 
-    h('p', { class: 'hint' }, 'Paste your notes; categories are guessed for each line. Lines without a date get ', h('b', {}, fmtDate(curDate())), ' (change it above).'),
+    h('p', { class: 'hint' }, 'Paste your notes. Separate cases with an empty line (a case can take several lines); categories are guessed for each case. Cases without a date at the start get ', h('b', {}, fmtDate(curDate())), ' (change it above).'),
     ta,
     h('div', { class: 'bar', style: 'margin-top:8px' },
       h('button', { class: 'primary', onclick: () => { bulkRows = parseBulk(ta.value, t => suggest(t)); paintBulk(out); } }, 'Review'),
@@ -322,19 +323,33 @@ function renderBulk(card) {
 }
 
 function paintBulk(out) {
-  if (!bulkRows || !bulkRows.length) { fill(out, h('p', { class: 'empty' }, 'Nothing to review — paste some lines first.')); return; }
+  if (!bulkRows || !bulkRows.length) { fill(out, h('p', { class: 'empty' }, 'Nothing to review — paste some cases first.')); return; }
   const def = curDate();
   const missing = bulkRows.filter(r => !r.cats.length).length;
-  const tbody = h('tbody', {}, bulkRows.map((r, i) => h('tr', {},
-    h('td', {}, h('input', { type: 'date', value: r.date || def, max: todayISO(), onchange: e => { r.date = parseDate(e.target.value); } })),
-    h('td', { class: 'details' }, h('textarea', { rows: '2', value: r.details, oninput: e => { r.details = e.target.value; } })),
-    h('td', {}, h('div', { class: 'chips' },
-      r.cats.map(code => catChip(code, { on: true, removable: true, onclick: () => { r.cats = dropCat(r.cats, code); paintBulk(out); } })),
-      h('button', { class: 'small', onclick: () => pickDialog(r.cats, cats => { r.cats = cats; paintBulk(out); }) }, r.cats.length ? '+' : '+ Add'))),
-    h('td', {}, h('button', { class: 'small danger', title: 'Drop this line', onclick: () => { bulkRows.splice(i, 1); paintBulk(out); } }, '×')))));
+  const on = settings().suggestions !== false;
+  const tbody = h('tbody', {}, bulkRows.map((r, i) => {
+    // "Same as above": the categories of the case above, in one tap, when they are not all here already
+    const above = i > 0 ? bulkRows[i - 1].cats : [];
+    const same = above.length && !above.every(c => r.cats.includes(c)) ? h('span', {
+      class: 'chip tmpl same', role: 'button', tabindex: '0', title: 'Add the categories of the case above: ' + above.map(catFull).join(', '),
+      onclick: () => { r.cats = sortCodes(withParents([...r.cats, ...above])); paintBulk(out); },
+    }, 'Same as above: ', h('b', {}, sortCodes(above).join(' + '))) : null;
+    const sugg = on && r.details.trim() ? suggest(r.details, { limit: 4 }).filter(s => !r.cats.includes(s.code)) : [];
+    return h('tr', {},
+      h('td', {}, h('input', { type: 'date', value: r.date || def, max: todayISO(), onchange: e => { r.date = parseDate(e.target.value); } })),
+      h('td', { class: 'details' },
+        h('input', { value: r.initials || '', placeholder: 'Initials', 'aria-label': 'Patient initials', autocapitalize: 'characters', maxlength: '20', oninput: e => { r.initials = e.target.value; } }),
+        h('textarea', { rows: String(Math.min(6, Math.max(2, r.details.split('\n').length))), value: r.details, 'aria-label': 'Case details', oninput: e => { r.details = e.target.value; } })),
+      h('td', {}, h('div', { class: 'chips' },
+        r.cats.map(code => catChip(code, { on: true, removable: true, onclick: () => { r.cats = dropCat(r.cats, code); paintBulk(out); } })),
+        h('button', { class: 'small', onclick: () => pickDialog(r.cats, cats => { r.cats = cats; paintBulk(out); }) }, r.cats.length ? '+' : '+ Add')),
+        same || sugg.length ? h('div', { class: 'chips', style: 'margin-top:4px' }, same,
+          sugg.map(s => catChip(s.code, { cls: `sugg ${s.score >= 0.5 ? 'strong' : ''}`, title: 'Suggested: ' + catFull(s.code), onclick: () => { r.cats = addCat(r.cats, s.code); paintBulk(out); } }))) : null),
+      h('td', {}, h('button', { class: 'small danger', title: 'Drop this case', onclick: () => { bulkRows.splice(i, 1); paintBulk(out); } }, '×')));
+  }));
   fill(out, 
     h('h3', {}, `${bulkRows.length} case${bulkRows.length === 1 ? '' : 's'}`),
-    missing ? h('p', { class: 'tip' }, `${missing} line${missing === 1 ? ' has' : 's have'} no category yet.`) : null,
+    missing ? h('p', { class: 'tip' }, `${missing} case${missing === 1 ? ' has' : 's have'} no category yet.`) : null,
     h('div', { class: 'scroll' }, h('table', { class: 'bulk' }, h('thead', {}, h('tr', {}, h('th', {}, 'Date'), h('th', {}, 'Details'), h('th', {}, 'Categories'), h('th', {}))), tbody)),
     h('div', { class: 'actions' }, h('button', { class: 'primary big', onclick: saveBulk }, `Save all ${bulkRows.length}`)));
 }
@@ -344,10 +359,10 @@ async function saveBulk(e) {
   if (bulkBusy || !bulkRows) return;
   const btn = e && e.currentTarget;
   const def = curDate();
-  const rows = bulkRows.filter(r => r.details.trim() || r.cats.length);
+  const rows = bulkRows.filter(r => r.details.trim() || String(r.initials || '').trim() || r.cats.length);
   if (rows.some(r => !r.cats.length) && !(await confirmBox('Some cases have no category', 'Save them anyway? They will not count towards any target until you add one.', 'Save all'))) return;
   const now = Date.now();
-  const cases = rows.map((r, i) => ({ id: uid(), date: r.date || def, details: r.details.trim(), cats: sortCodes(r.cats), createdAt: now + i, updatedAt: now + i, source: 'paste' }));
+  const cases = rows.map((r, i) => ({ id: uid(), date: r.date || def, initials: cleanInitials(r.initials), details: r.details.trim(), cats: sortCodes(r.cats), createdAt: now + i, updatedAt: now + i, source: 'paste' }));
   // clear the list first: offline the save can take a few seconds, and a second tap must not repeat it
   bulkBusy = true;
   if (btn) btn.disabled = true;
@@ -379,7 +394,8 @@ export function pickDialog(initial, done) {
 
 // Edit (or delete) one case.
 export function editCaseDialog(c) {
-  const e = { ...c, cats: [...(c.cats || [])] };
+  // older cases keep the initials at the front of the details: split them now, saved apart on Save
+  const e = { ...c, ...caseParts(c), cats: [...(c.cats || [])] };
   const sel = h('div', { class: 'chips selected' });
   const sugg = h('div', { class: 'chips' });
   const paint = () => {
@@ -393,6 +409,7 @@ export function editCaseDialog(c) {
   const m = modal('Edit case', [
     c.dateText && !c.date ? h('p', { class: 'tip' }, `Imported date “${c.dateText}” could not be read — please set the date.`) : null,
     h('label', { class: 'field' }, 'Date', h('input', { type: 'date', value: e.date || '', max: todayISO(), onchange: ev => { e.date = parseDate(ev.target.value); } })),
+    h('label', { class: 'field' }, 'Patient initials', h('input', { value: e.initials, placeholder: 'e.g. AB', maxlength: '20', autocapitalize: 'characters', autocomplete: 'off', spellcheck: 'false', oninput: ev => { e.initials = ev.target.value; } })),
     h('label', { class: 'field' }, 'Case details', h('textarea', { rows: '3', value: e.details, oninput: ev => { e.details = ev.target.value; paintSoon(); } })),
     h('div', { class: 'chiplabel' }, 'Categories'), sel,
     h('div', { class: 'chiplabel' }, 'Suggested'), sugg,
@@ -407,7 +424,7 @@ export function editCaseDialog(c) {
       h('button', { onclick: () => m.close() }, 'Cancel'),
       h('button', { class: 'primary', onclick: async () => {
         m.close();
-        await updateCase({ ...e, details: e.details.trim() });
+        await updateCase({ ...e, initials: cleanInitials(e.initials), details: e.details.trim() });
         toast('Case updated', { action: 'Undo', onaction: () => restoreCase(c) });
       } }, 'Save')),
   ]);

@@ -1,7 +1,7 @@
 // Logbook screen: every case, newest first (list) or by day (calendar). Search, filter, flags, edit; a grid view for bulk edits
 // and pasting rows from Excel; Excel download and upload (round trip with a preview of the changes).
 
-import { duplicates, fmtDate, caseFromRow, diffRows, sortCodes, withParents } from './engine.js';
+import { duplicates, fmtDate, caseFromRow, diffRows, sortCodes, withParents, caseParts, caseText } from './engine.js';
 import { flagCase } from './importer.js';
 import { exportCases, readCasesSheet } from './xlsxio.js';
 import {
@@ -33,7 +33,7 @@ export function renderLogbook() {
       if (view.cat && !(c.cats || []).includes(view.cat)) return false;
       if (view.flag && !flagsOf(c).includes(view.flag)) return false;
       if (!words.length) return true;
-      const hay = `${c.details} ${c.date || c.dateText || ''} ${fmtDate(c.date) || ''} ${(c.cats || []).join(' ')}`.toLowerCase();
+      const hay = `${caseText(c)} ${c.date || c.dateText || ''} ${fmtDate(c.date) || ''} ${(c.cats || []).join(' ')}`.toLowerCase();
       return words.every(w => hay.includes(w));
     });
   };
@@ -52,7 +52,7 @@ export function renderLogbook() {
 
   add(wrap, h('section', { class: 'card' },
     h('div', { class: 'bar' },
-      h('input', { type: 'search', class: 'grow', placeholder: 'Search details, dates, codes', value: view.q, 'aria-label': 'Search cases', oninput: e => { view.q = e.target.value; paintSoon(); } }),
+      h('input', { type: 'search', class: 'grow', placeholder: 'Search initials, details, dates, codes', value: view.q, 'aria-label': 'Search cases', oninput: e => { view.q = e.target.value; paintSoon(); } }),
       h('select', { 'aria-label': 'Filter by category', onchange: e => { view.cat = e.target.value; paint(); } },
         h('option', { value: '' }, 'All categories'),
         PICKER_ORDER.map(c => h('option', { value: c.code, selected: view.cat === c.code }, `${c.parent ? '  ' : ''}${c.code} ${c.name} (${S.counts[c.code] || 0})`))),
@@ -97,9 +97,10 @@ function listView(rows, flagsOf, repaint) {
 // One case: date, details, procedure tags, flags. Tap to edit. Shared by the list and the calendar.
 function caseRow(c, flagsOf) {
   const flags = flagsOf(c);
+  const p = caseParts(c);
   return h('li', { onclick: () => editCaseDialog(c), tabindex: '0', onkeydown: e => { if (e.key === 'Enter') editCaseDialog(c); } },
       h('span', { class: 'd' }, c.date ? fmtDate(c.date).replace(/ \d{4}$/, '') : (c.dateText || '—')),
-      h('span', { class: 't' }, c.details || h('i', { class: 'muted' }, 'no details')),
+      h('span', { class: 't' }, p.initials ? [h('b', {}, p.initials), ' '] : null, p.details || (p.initials ? null : h('i', { class: 'muted' }, 'no details'))),
       h('span', { class: 'c' }, catTags(c.cats),
         flags.includes('needsDate') ? h('span', { class: 'flag err' }, 'needs date') : null,
         flags.includes('future') ? h('span', { class: 'flag' }, 'future date') : null,
@@ -169,7 +170,8 @@ const catText = cats => sortCodes(cats || []).join(', ');
 function gridView(rows, repaint) {
   const tbody = h('tbody');
   for (const c of rows.slice(0, view.limit)) {
-    const row = { id: c.id, date: c.date || c.dateText || '', details: c.details || '', categories: catText(c.cats) };
+    const p = caseParts(c);
+    const row = { id: c.id, date: c.date || c.dateText || '', initials: p.initials, details: p.details, categories: catText(c.cats) };
     const tr = h('tr');
     const commit = async () => {
       const parsed = caseFromRow(row);
@@ -179,17 +181,19 @@ function gridView(rows, repaint) {
         toast(`Could not read the date “${row.date}” — use day/month/year, e.g. 13/3/2026`); tr.classList.add('dirty'); return;
       }
       parsed.cats = sortCodes(withParents(parsed.cats));   // as in the Log picker: 26i also counts for 26
-      const same = (c.date || '') === (parsed.date || '') && (c.details || '') === parsed.details && catText(c.cats) === catText(parsed.cats)
+      const same = (c.date || '') === (parsed.date || '') && p.initials === parsed.initials && p.details === parsed.details && catText(c.cats) === catText(parsed.cats)
         && (parsed.date || (c.dateText || '') === (parsed.dateText || ''));
       tr.classList.remove('dirty');
       if (same) return;
-      const next = { ...c, date: parsed.date, details: parsed.details, cats: parsed.cats };
+      const next = { ...c, date: parsed.date, initials: parsed.initials, details: parsed.details, cats: parsed.cats };
       if (!parsed.date && parsed.dateText) next.dateText = parsed.dateText;
       Object.assign(c, await updateCase(next));
+      Object.assign(p, { initials: parsed.initials, details: parsed.details });
     };
     const cell = (key, attrs = {}) => h('input', { ...attrs, value: row[key], oninput: e => { row[key] = e.target.value; tr.classList.add('dirty'); }, onchange: commit });
     add(tr, 
       h('td', { class: 'date' }, cell('date', { 'aria-label': 'Date', placeholder: 'd/m/yyyy' })),
+      h('td', { class: 'ini' }, cell('initials', { 'aria-label': 'Initials', placeholder: 'AB', autocapitalize: 'characters', size: '5' })),
       h('td', {}, cell('details', { 'aria-label': 'Details' })),
       h('td', { class: 'cats' }, cell('categories', { 'aria-label': 'Categories', placeholder: '16, 17' })));
     add(tbody, tr);
@@ -197,20 +201,27 @@ function gridView(rows, repaint) {
   const more = rows.length > view.limit ? h('button', { onclick: () => { view.limit += 300; repaint(); } }, `Show more (${rows.length - view.limit} left)`) : null;
   return h('div', {},
     h('p', { class: 'hint' }, 'Edit cells directly; changes save when you leave a cell. Dates as 12/3/2026; categories as codes (16, 17) or names.'),
-    h('div', { class: 'scroll' }, h('table', { class: 'grid' }, h('thead', {}, h('tr', {}, h('th', {}, 'Date'), h('th', {}, 'Case details'), h('th', {}, 'Categories'))), tbody)),
+    h('div', { class: 'scroll' }, h('table', { class: 'grid' }, h('thead', {}, h('tr', {}, h('th', {}, 'Date'), h('th', {}, 'Initials'), h('th', {}, 'Case details'), h('th', {}, 'Categories'))), tbody)),
     more,
     pasteRows());
 }
 
-// Rows copied from Excel arrive as tab-separated lines: Date, Case details, Categories.
+// Rows copied from Excel arrive as tab-separated lines: Date, Case details, Categories (initials are split
+// off the front of the details), or Date, Initials, Case details, Categories when there are four columns.
 function pasteRows() {
-  const ta = h('textarea', { rows: '4', placeholder: 'Paste rows from Excel here: Date ⇥ Case details ⇥ Categories' });
+  const ta = h('textarea', { rows: '4', placeholder: 'Paste rows from Excel here: Date ⇥ Case details ⇥ Categories (or Date ⇥ Initials ⇥ Case details ⇥ Categories)' });
   return h('div', { style: 'margin-top:16px' },
     h('h3', {}, 'Add rows from a spreadsheet'), ta,
     h('div', { class: 'bar', style: 'margin-top:8px' }, h('button', { class: 'primary', onclick: () => {
       const rows = ta.value.split(/\r?\n/).filter(l => l.trim()).map((l, i) => {
-        const [date, details, categories] = l.split('\t');
-        return { row: i + 1, date: (date || '').trim(), details: (details || '').trim(), categories: (categories || '').trim() };
+        const cols = l.split('\t');
+        // four columns with a short letters-only second one: Date, Initials, Details, Categories (a copied export's
+        // fourth column is the hidden id, not initials)
+        const four = cols.length >= 4 && /^[A-Za-z.\-]{0,6}$/.test(cols[1].trim());
+        const [date, initials, details, categories] = four ? cols : [cols[0], undefined, cols[1], cols[2]];
+        const r = { row: i + 1, date: (date || '').trim(), details: (details || '').trim(), categories: (categories || '').trim() };
+        if (initials !== undefined) r.initials = initials.trim();
+        return r;
       }).filter(r => !/^date$/i.test(r.date));
       if (!rows.length) return toast('Nothing to add');
       const d = diffRows(S.cases, rows);
@@ -252,7 +263,7 @@ async function uploadExcel(file) {
   } catch (err) { toast('Could not read the file: ' + err.message); }
 }
 
-const caseKey = c => `${c.date || c.dateText || ''}|${(c.details || '').trim().toLowerCase()}|${catText(c.cats)}`;
+const caseKey = c => `${c.date || c.dateText || ''}|${caseText(c).toLowerCase().replace(/\s+/g, ' ')}|${catText(c.cats)}`;
 
 function previewDiff(d, after) {
   const { changed, deleted, errors } = d;
@@ -262,7 +273,7 @@ function previewDiff(d, after) {
   const added = d.added.filter(c => !have.has(caseKey(c))).map(c => ({ ...c, cats: sortCodes(withParents(c.cats || [])) }));
   for (const x of changed) x.after = { ...x.after, cats: sortCodes(withParents(x.after.cats || [])) };
   const nothing = !added.length && !changed.length && !deleted.length;
-  const line = c => `${c.date ? fmtDate(c.date) : (c.dateText || 'no date')} · ${(c.details || '').slice(0, 60)} · ${catText(c.cats)}`;
+  const line = c => `${c.date ? fmtDate(c.date) : (c.dateText || 'no date')} · ${caseText(c).slice(0, 60)} · ${catText(c.cats)}`;
   const section = (title, items, fmt, cls) => items.length ? h('details', { open: items.length <= 5 },
     h('summary', {}, `${title} (${items.length})`),
     h('ul', { class: 'warnings' }, items.slice(0, 200).map(x => h('li', { class: cls }, fmt(x))))) : null;

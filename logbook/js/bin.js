@@ -13,7 +13,7 @@ import { S, h, toast, modal, confirmBox, cloud, fill, removeCase, deleteMany, re
 import { cleanCase } from './demo-backend.js';
 import { cleanReflection } from './reflections.js';
 import { REFLECTION_HEADINGS } from './categories.js';
-import { uid, fmtDate } from './engine.js';
+import { uid, fmtDate, caseText } from './engine.js';
 
 export const BIN_DAYS = 30;
 const DAY = 864e5;
@@ -133,7 +133,7 @@ const HEADING = Object.fromEntries(REFLECTION_HEADINGS.map(x => [x.id, x.name]))
 function row(e) {
   const d = e.data || {};
   const isCase = e.kind === 'case';
-  const title = isCase ? (d.details || '(no details)') : (d.title || d.diagnosis || '(untitled reflection)');
+  const title = isCase ? (caseText(d) || '(no details)') : (d.title || d.diagnosis || '(untitled reflection)');
   const sub = isCase
     ? [h('span', {}, d.date ? fmtDate(d.date) : (d.dateText || 'no date')), ' ', miniChips(d.cats)]
     : [h('span', {}, [HEADING[d.headingId] || d.headingId || '', d.date ? ' · ' + fmtDate(d.date) : ''].join(''))];

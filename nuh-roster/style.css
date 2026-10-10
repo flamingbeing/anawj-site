@@ -36,14 +36,15 @@
 
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.5 var(--font-sans); }
-/* the brand stripe: orange, red, navy (1 : 1 : 2) */
-body::before { content: ''; display: block; height: 6px; background: linear-gradient(to right, var(--orange) 0 25%, var(--red) 25% 50%, var(--navy) 50% 100%); }
+
 :focus-visible { outline: 3px solid var(--navy); outline-offset: 2px; }
 a { color: var(--link); }
 a:hover { color: var(--link-hover); }
 button, input, select, textarea { font: inherit; color: inherit; }
 
-.top { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; padding: 14px 16px; max-width: 1400px; margin: 0 auto; }
+.top { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; padding: 17px 16px 12px; }
+/* NUHS four-colour band along the top of the header, as on the logbook */
+.top { background: linear-gradient(90deg, var(--orange) 0 25%, var(--red) 25% 50%, var(--cyan) 50% 75%, var(--navy) 75% 100%) top / 100% 5px no-repeat, var(--panel); border-bottom: 1px solid var(--line); }
 .top h1 { margin: 0; font-size: 1.125rem; font-weight: 600; color: var(--navy); }
 .privacy { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
 .team { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -171,7 +172,6 @@ table.xl td.spill { overflow: visible; white-space: nowrap; }
 .sheet-wrap { padding-right: 120px; }
 @media print {
   body { background: #fff; }
-  body::before { display: none; }
   .top, .tabs, .no-print, #toast { display: none !important; }
   main { padding: 0; max-width: none; }
   section.card { border: 0; padding: 0; margin: 0; }
@@ -222,3 +222,21 @@ ul.log ul { margin: 2px 0 0; padding-left: 18px; }
 .pool-group > b { font-size: 12px; color: var(--muted); }
 .pool-names { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; }
 .pool-names .name { border-color: var(--line); background: var(--panel); }
+
+.seg.subtabs { margin-bottom: 12px; }
+
+/* Monthly: manpower board and roster grids */
+.board { display: grid; grid-template-columns: 2fr repeat(4, minmax(140px, 1fr)); gap: 10px; }
+@media (max-width: 900px) { .board { grid-template-columns: 1fr 1fr; } }
+.board-col { border: 1px solid var(--line); padding: 8px; min-height: 80px; background: var(--panel); }
+.board-col.over { box-shadow: inset 0 0 0 2px var(--navy); background: var(--chip); }
+.board-col h3 { margin: 0 0 6px; font-size: 14px; color: var(--navy); }
+.board-chip { cursor: grab; font-size: 13px; }
+.board-chip.senior { font-weight: 600; }
+.board-chip.manual { border: 2px solid var(--navy) !important; }
+input.unmatched, td.unmatched { color: var(--red); }
+input.unmatched { border-color: var(--red); }
+table.monthly td { padding: 2px 4px; }
+table.monthly td input { min-width: 150px; }
+table.monthly tr.weekend td { background: #f3f5f8; }
+table.monthly tr.today td { background: var(--chip); }

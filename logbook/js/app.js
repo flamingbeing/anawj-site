@@ -6,7 +6,8 @@ import { S, hooks, h, toast, cloud, setCases, scheduleSummary, fill, resetCaches
 import { renderLog, logCasesChanged, clearDrafts } from './ui-log.js';
 import { renderLogbook } from './ui-logbook.js';
 import { renderProgress, renderTotals } from './ui-progress.js';
-import { renderSettings, applyCompact, cachedCompact } from './ui-settings.js';
+import { applyCompact, cachedCompact } from './ui-settings.js';
+import { renderAccount, flush as flushProfile } from './ui-account.js';
 import { renderAdmin } from './ui-admin.js';
 import { renderReflect, watchMyReflections } from './ui-reflect.js';
 import { purgeExpired } from './bin.js';
@@ -17,7 +18,7 @@ const ICONS = {
   logbook: 'M4 5h16M4 10h16M4 15h16M4 20h10',
   progress: 'M5 20V12M10 20V6M15 20v-9M20 20V9',
   totals: 'M4 4h16v16H4zM4 10h16M4 15h16M10 4v16M15 4v16',
-  settings: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1',
+  account: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0',
   reflect: 'M4 19.5V5a2 2 0 0 1 2-2h12v14H6a2 2 0 0 0-2 2.5zM6 21h12v-4M8 7h6M8 11h4',
   admin: 'M12 3l2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.6 6.6 19.5l1.2-6-4.5-4.2 6.1-.7z',
 };
@@ -36,9 +37,9 @@ const TABS = [
   { id: 'reflect', label: 'Reflections', render: renderReflect },
   { id: 'progress', label: 'Progress', render: renderProgress },
   { id: 'totals', label: 'Totals', render: renderTotals },
-  { id: 'settings', label: 'Settings', render: renderSettings },
-  // not in the bar (keeps it at 6 on phones): admins reach it from Settings → Admin
-  { id: 'admin', label: 'Admin', render: renderAdmin, admin: true, hidden: true, under: 'settings' },
+  { id: 'account', label: 'Account', render: renderAccount },
+  // not in the bar (keeps it at 6 on phones): admins reach it from Account → Admin
+  { id: 'admin', label: 'Admin', render: renderAdmin, admin: true, hidden: true, under: 'account' },
 ];
 
 const app = document.getElementById('app');
@@ -51,11 +52,13 @@ const banner = document.getElementById('banner');
 
 // Totals (names and counts of programme residents) is for the programme only; the rules agree.
 const visibleTabs = () => TABS.filter(t => (!t.admin || S.admin) && (t.id !== 'totals' || S.admin || S.resident));
-const TAB_ALIASES = { reflections: 'reflect' };
+const TAB_ALIASES = { reflections: 'reflect', settings: 'account' };
 const tabFromHash = () => {
-  let id = location.hash.replace(/^#/, '');
-  id = TAB_ALIASES[id] || id;
-  return visibleTabs().some(t => t.id === id) ? id : null;
+  const raw = location.hash.replace(/^#/, '');
+  const id = TAB_ALIASES[raw] || raw;
+  if (!visibleTabs().some(t => t.id === id)) return null;
+  if (id !== raw) history.replaceState(null, '', location.pathname + location.search + '#' + id);   // old links: #settings → #account
+  return id;
 };
 
 function paintTabs() {
@@ -70,6 +73,7 @@ function paintTabs() {
 
 function go(id) {
   if (S.tab === id) { if (id === 'log') document.querySelector('textarea.details')?.focus(); return; }
+  if (S.tab === 'account') flushProfile();
   S.tab = id;
   history.replaceState(null, '', location.pathname + location.search + '#' + id);
   window.scrollTo(0, 0);
@@ -94,7 +98,7 @@ let pendingRender = false;
 hooks.casesChanged = () => {
   paintWho();
   if (S.tab === 'log') return logCasesChanged();
-  if (S.tab === 'settings' || S.tab === 'admin' || S.tab === 'totals') return;
+  if (S.tab === 'account' || S.tab === 'admin' || S.tab === 'totals') return;
   pendingRender = true;
   setTimeout(flushRender, 250);
 };
@@ -110,8 +114,11 @@ function flushRender() {
 // ---------- header ----------
 
 function paintWho() {
-  if (!S.user) { fill(whoEl); subEl.textContent = 'Case log for APMES anaesthesia residents'; return; }
-  subEl.textContent = `${S.cases.length} case${S.cases.length === 1 ? '' : 's'}${cloud.demo ? ' · demo' : ''}${navigator.onLine ? '' : ' · offline'}`;
+  if (!S.user) { fill(whoEl); subEl.hidden = false; subEl.textContent = 'Case log for APMES anaesthesia residents'; return; }
+  // signed in: no case count (keeps the header compact); only flag demo / offline, and hide the line otherwise
+  subEl.textContent = [cloud.demo ? 'demo' : '', navigator.onLine ? '' : 'offline'].filter(Boolean).join(' · ');
+  subEl.hidden = !subEl.textContent;
+  document.body.dataset.cases = String(S.cases.length);   // not shown; read by tests
   fill(whoEl, h('span', { class: 'email', title: S.user.email }, S.user.name || S.user.email));
 }
 window.addEventListener('online', paintWho);

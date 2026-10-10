@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import {
   uid, todayISO, parseDate, fmtDate, withParents, countCases, rYearDefault, progress, epaProgress,
-  frequentCombos, parseBulk, duplicates, caseFromRow, diffRows, catFromText,
+  frequentCombos, parseBulk, duplicates, caseFromRow, diffRows, catFromText, splitInitials, cleanInitials, caseParts, caseText,
 } from '../js/engine.js';
 import { BY_CODE } from '../js/categories.js';
 
@@ -183,23 +183,34 @@ assert.equal(rYearDefault(undefined), 1);
     return out;
   };
   const now = new Date(2026, 2, 15, 10); // 15 Mar 2026
-  const r = parseBulk('12/3 AB LSCS spinal\n\n  2026-01-05 CD ESP block  \n20/12 EF lap chole\n16/3 GH future so last year\n15/3 today\nno date here\n12/3/25 IJ TKR\n12 Mar KL eye\n31/6 bad date stays text', fakeSuggest, now);
+  // cases are separated by blank lines (whitespace-only lines count); leading initials go to their own field
+  const r = parseBulk('12/3 AB LSCS spinal\n\n \t \n  2026-01-05 CD ESP block  \n\n20/12 EF lap chole\n\n16/3 GH future so last year\n\n15/3 today\n\nno date here\n\n12/3/25 IJ TKR\n\n12 Mar KL eye\n\n31/6 bad date stays text', fakeSuggest, now);
   assert.equal(r.length, 9);
-  assert.deepEqual(r[0], { date: '2026-03-12', details: 'AB LSCS spinal', cats: ['16', '17'] });
-  assert.deepEqual(r[1], { date: '2026-01-05', details: 'CD ESP block', cats: ['26', '26iii'] });
+  assert.deepEqual(r[0], { date: '2026-03-12', initials: 'AB', details: 'LSCS spinal', cats: ['16', '17'] });
+  assert.deepEqual(r[1], { date: '2026-01-05', initials: 'CD', details: 'ESP block', cats: ['26', '26iii'] });
   assert.equal(r[2].date, '2025-12-20', 'December is in the future in March: previous year');
   assert.equal(r[3].date, '2025-03-16', 'tomorrow -> last year');
   assert.equal(r[4].date, '2026-03-15', 'today stays this year');
-  assert.deepEqual(r[5], { date: null, details: 'no date here', cats: [] });
+  assert.deepEqual(r[5], { date: null, initials: '', details: 'no date here', cats: [] });
   assert.equal(r[6].date, '2025-03-12');
+  assert.equal(r[6].initials, '', 'IJ is a known case word (internal jugular), not initials');
   assert.equal(r[7].date, '2026-03-12');
-  assert.equal(r[7].details, 'KL eye');
+  assert.equal(r[7].initials, 'KL');
+  assert.equal(r[7].details, 'eye');
   assert.equal(r[8].date, null);
   assert.equal(r[8].details, '31/6 bad date stays text');
+  // a case spans lines until the next blank line; inner line breaks are kept; the date is on the first line only
+  const multi = parseBulk('12/3 AB/34F LSCS\nspinal, converted to GA\n\n\n13/3 CD 72M\nlap chole\n14/3 not a date line\n\nLSCS spinal', fakeSuggest, now);
+  assert.equal(multi.length, 3);
+  assert.deepEqual(multi[0], { date: '2026-03-12', initials: 'AB', details: '34F LSCS\nspinal, converted to GA', cats: ['16', '17'] });
+  assert.deepEqual(multi[1], { date: '2026-03-13', initials: 'CD', details: '72M\nlap chole\n14/3 not a date line', cats: [] });
+  assert.deepEqual(multi[2], { date: null, initials: '', details: 'LSCS spinal', cats: ['16', '17'] });
+  // a date alone on the first line
+  assert.deepEqual(parseBulk('12/3\nEF hernia', null, now)[0], { date: '2026-03-12', initials: 'EF', details: 'hernia', cats: [] });
   // separators after the date, and paediatric ages written like dates
-  assert.equal(parseBulk('12/3 - MN hernia', null, now)[0].details, 'MN hernia');
+  assert.equal(parseBulk('12/3 - MN hernia', null, now)[0].details, 'hernia');
   assert.equal(parseBulk('12/3: MN hernia', null, now)[0].date, '2026-03-12');
-  assert.deepEqual(parseBulk('8/12 boy circumcision', null, now)[0], { date: null, details: '8/12 boy circumcision', cats: [] });
+  assert.deepEqual(parseBulk('8/12 boy circumcision', null, now)[0], { date: null, initials: '', details: '8/12 boy circumcision', cats: [] });
   assert.equal(parseBulk('3/52 old pyloromyotomy', null, now)[0].date, null);
   assert.equal(parseBulk('5yo tonsillectomy', null, now)[0].date, null);
   assert.equal(parseBulk('1.5 hr case', null, now)[0].date, null);
@@ -245,11 +256,17 @@ assert.equal(rYearDefault(undefined), 1);
   assert.equal(catFromText('banana'), null);
 
   const r = caseFromRow({ id: 'x1', date: '12/3/26', details: '  AB LSCS ', categories: '16, 17' });
-  assert.deepEqual(r, { id: 'x1', date: '2026-03-12', details: 'AB LSCS', cats: ['16', '17'], unknown: [] });
+  assert.deepEqual(r, { id: 'x1', date: '2026-03-12', initials: 'AB', details: 'LSCS', cats: ['16', '17'], unknown: [] });
+  // an Initials column is used as it is (cleaned), and the details are then left whole
+  assert.deepEqual(caseFromRow({ date: '12/3/26', initials: ' ab ', details: 'CD lap chole', categories: '' }).initials, 'AB');
+  assert.equal(caseFromRow({ date: '12/3/26', initials: 'ab', details: 'CD lap chole' }).details, 'CD lap chole');
+  assert.equal(caseFromRow({ details: 'LSCS spinal' }).initials, '');
   const r2 = caseFromRow({ date: 'sometime in March', details: 'CD', categories: `${BY_CODE['20'].label}, ${BY_CODE['20iii'].label}; ENT\nfoo` });
   assert.equal(r2.id, undefined);
   assert.equal(r2.date, null);
   assert.equal(r2.dateText, 'sometime in March');
+  assert.equal(r2.initials, 'CD');
+  assert.equal(r2.details, '');
   assert.deepEqual(r2.cats, ['20', '20iii', '10']);
   assert.deepEqual(r2.unknown, ['foo']);
   assert.equal(caseFromRow({ date: new Date(Date.UTC(2025, 0, 1)), details: 'x', categories: '' }).date, '2025-01-01');
@@ -282,8 +299,9 @@ assert.equal(rYearDefault(undefined), 1);
   const d = diffRows(existing, rows, now);
   assert.equal(d.changed.length, 1);
   assert.equal(d.changed[0].before.id, 'b');
-  assert.deepEqual(d.changed[0].after, { ...existing[1], cats: ['08', '13', '21'], updatedAt: now });
-  assert.deepEqual(d.added.map(c => c.details), ['KL new', 'AB lscs copy', 'MN']);
+  assert.deepEqual(d.changed[0].after, { ...existing[1], initials: 'CD', details: 'lap chole', cats: ['08', '13', '21'], updatedAt: now });
+  assert.deepEqual(d.added.map(caseText), ['KL new', 'AB lscs copy', 'MN']);
+  assert.deepEqual(d.added.map(c => c.initials), ['KL', 'AB', 'MN']);
   for (const c of d.added) {
     assert.equal(c.source, 'sheet');
     assert.equal(c.createdAt, now);
@@ -319,6 +337,51 @@ assert.equal(rYearDefault(undefined), 1);
   // details whitespace/case differences are not changes
   assert.equal(diffRows(existing, [{ id: 'd', date: '4/1/26', details: ' gh ', categories: '18' }], now).changed.length, 0);
   assert.deepEqual(diffRows([], [], now), { added: [], changed: [], deleted: [], errors: [] });
+  // initials + details are compared as one text: an old case (initials in the details) read back from
+  // an export, or a new case read back from the single "Case details" column, is unchanged
+  const withIni = [{ id: 'n', date: '2026-01-05', initials: 'QR', details: '34F LSCS', cats: ['16'] }];
+  assert.equal(diffRows(withIni, [{ id: 'n', date: '5/1/26', details: 'QR 34F LSCS', categories: '16' }], now).changed.length, 0);
+  assert.equal(diffRows(withIni, [{ id: 'n', date: '5/1/26', initials: 'QR', details: '34F lscs', categories: '16' }], now).changed.length, 0);
+  const moved = diffRows(withIni, [{ id: 'n', date: '5/1/26', details: 'ST 34F LSCS', categories: '16' }], now).changed;
+  assert.equal(moved.length, 1);
+  assert.equal(moved[0].after.initials, 'ST');
+  assert.equal(moved[0].after.details, '34F LSCS');
+  // an older case written "QR/34F LSCS" exports as is and splits on upload to the same parts: no change
+  const slash = [{ id: 's', date: '2026-01-05', details: 'QR/34F LSCS', cats: ['16'] }];
+  assert.equal(diffRows(slash, [{ id: 's', date: '5/1/26', details: 'QR/34F LSCS', categories: '16' }], now).changed.length, 0);
+  // common abbreviations at the start are not initials
+  for (const w of ['THR', 'TURP', 'EVAR', 'DM', 'HTN', 'PICC']) assert.equal(splitInitials(w + ' for x').initials, '', w);
+}
+
+// patient initials
+{
+  assert.deepEqual(splitInitials('AB 34F LSCS spinal'), { initials: 'AB', details: '34F LSCS spinal' });
+  assert.deepEqual(splitInitials('AB/34F LSCS'), { initials: 'AB', details: '34F LSCS' });
+  assert.deepEqual(splitInitials('ABCD 5yo tonsil'), { initials: 'ABCD', details: '5yo tonsil' });
+  assert.deepEqual(splitInitials('LSCS spinal'), { initials: '', details: 'LSCS spinal' }, 'a case word is not initials');
+  assert.deepEqual(splitInitials('TKR left'), { initials: '', details: 'TKR left' });
+  assert.deepEqual(splitInitials('VATS lobectomy'), { initials: '', details: 'VATS lobectomy' });
+  assert.deepEqual(splitInitials('GA lap chole'), { initials: '', details: 'GA lap chole' });
+  assert.deepEqual(splitInitials('ABCDE x'), { initials: '', details: 'ABCDE x' }, '5 letters: not initials');
+  assert.deepEqual(splitInitials('A 5yo'), { initials: '', details: 'A 5yo' });
+  assert.deepEqual(splitInitials('Ab 5yo'), { initials: '', details: 'Ab 5yo' });
+  assert.deepEqual(splitInitials('AB2 x'), { initials: '', details: 'AB2 x' });
+  assert.deepEqual(splitInitials('  AB  '), { initials: 'AB', details: '' });
+  assert.deepEqual(splitInitials('AB 72M\nlap chole'), { initials: 'AB', details: '72M\nlap chole' });
+  assert.deepEqual(splitInitials(''), { initials: '', details: '' });
+  assert.equal(cleanInitials(' a.b-c d1 '), 'A.B-CD');
+  assert.equal(cleanInitials('x'.repeat(30)).length, 20);
+  assert.deepEqual(caseParts({ details: 'AB lap chole' }), { initials: 'AB', details: 'lap chole' }, 'older case: split on the fly');
+  assert.deepEqual(caseParts({ initials: '', details: 'AB lap chole' }), { initials: '', details: 'AB lap chole' }, 'stored field wins');
+  assert.equal(caseText({ initials: 'AB', details: '34F LSCS' }), 'AB 34F LSCS');
+  assert.equal(caseText({ initials: '', details: 'x' }), 'x');
+  assert.equal(caseText({ details: 'AB x' }), 'AB x');
+  // duplicates look at initials + details together
+  assert.deepEqual(duplicates([
+    { id: '1', date: '2026-01-01', initials: 'AB', details: 'lscs', cats: ['16'] },
+    { id: '2', date: '2026-01-01', details: 'AB lscs', cats: ['16'] },
+    { id: '3', date: '2026-01-01', initials: 'CD', details: 'lscs', cats: ['16'] },
+  ]), [['1', '2']]);
 }
 
 // xlsxio round trip (the vendored ExcelJS browser bundle also loads in Node)
@@ -341,6 +404,22 @@ assert.equal(rYearDefault(undefined), 1);
   assert.equal(rows[2].date, 'Feb?');
   const d = diffRows(cases, rows);
   assert.deepEqual(d, { added: [], changed: [], deleted: [], errors: [] }, 'an untouched export round-trips with no changes');
+  // cases with their own initials field: one "Case details" column (initials + details), split again on the way back
+  const withIni = [...cases, { id: 'k4', date: '2026-02-04', initials: 'GH', details: '34F LSCS', cats: ['16'], createdAt: 4 }, { id: 'k5', date: '2026-02-04', initials: '', details: 'LSCS spinal', cats: ['16'], createdAt: 5 }];
+  const irows = await readCasesSheet(await exportCases(withIni));
+  assert.equal(irows.find(r => r.id === 'k4').details, 'GH 34F LSCS');
+  assert.equal('initials' in irows[0], false, 'no Initials column in the export');
+  assert.deepEqual(diffRows(withIni, irows), { added: [], changed: [], deleted: [], errors: [] });
+  // an Initials column of its own is used directly
+  const iwb = new globalThis.ExcelJS.Workbook();
+  const iws = iwb.addWorksheet('Sheet1');
+  iws.addRow(['Date', 'Initials', 'Case details', 'Categories']);
+  iws.addRow(['4/2/26', 'mn', 'OP lscs', '16']);
+  const icol = await readCasesSheet(new Blob([await iwb.xlsx.writeBuffer()]));
+  assert.equal(icol[0].initials, 'mn');
+  const ia = diffRows([], icol).added[0];
+  assert.equal(ia.initials, 'MN');
+  assert.equal(ia.details, 'OP lscs');
 
   // summary sheet
   const wb = new globalThis.ExcelJS.Workbook();

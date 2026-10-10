@@ -2,7 +2,7 @@
 // Firestore rules enforce admin-only access; this screen is only hidden from everyone else.
 
 import { R_YEARS } from './categories.js';
-import { countCases, sortCodes } from './engine.js';
+import { countCases, sortCodes, splitInitials } from './engine.js';
 import { parseResidentsScript, parseCaseSheet, parseTotalsSheet, countCheck } from './importer.js';
 import { S, h, toast, confirmBox, cloud, needExcel, sheetRows, fileButton, hooks, add, resetters, residentYear } from './ui-core.js';
 import { templateDialog } from './ui-settings.js';
@@ -19,7 +19,7 @@ const demoOk = () => !cloud.demo || confirmBox('Demo mode', 'The demo stores dat
 export function renderAdmin() {
   if (!S.admin) return h('p', { class: 'empty' }, 'Admins only.');
   if (!A.residents && !A.loading) load();
-  return h('div', {}, h('p', { style: 'margin:0 0 8px' }, h('a', { class: 'btn small', href: '#settings' }, '← Back to settings')), residentsCard(), importCard(), sharedCard(), renderTemplateCard());
+  return h('div', {}, h('p', { style: 'margin:0 0 8px' }, h('a', { class: 'btn small', href: '#account' }, '← Back to account')), residentsCard(), importCard(), sharedCard(), renderTemplateCard());
 }
 
 async function load() {
@@ -164,7 +164,8 @@ async function runImport() {
   for (const g of groups) {
     const r = byRid.get(g.rid);
     const cases = g.cases.map(c => {
-      const out = { date: c.date || null, details: c.details, cats: sortCodes(c.cats), importKey: c.importKey, source: 'import', createdAt: c.timestamp || Date.now(), updatedAt: Date.now() };
+      // importKey was hashed on the original details text (importer.js); only the stored fields are split
+      const out = { date: c.date || null, ...splitInitials(c.details), cats: sortCodes(c.cats), importKey: c.importKey, source: 'import', createdAt: c.timestamp || Date.now(), updatedAt: Date.now() };
       if (!c.date && c.dateText) out.dateText = c.dateText;
       return out;
     });

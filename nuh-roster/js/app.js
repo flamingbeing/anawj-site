@@ -1,12 +1,13 @@
 import {
-  DEFAULT_SETTINGS, DEFAULT_ROOMS, JUNIOR_GRADES, SENIOR_GRADES, POSTINGS, STATUSES, COLOURS, COLOUR_ARGB, isBaby,
+  DEFAULT_SETTINGS, DEFAULT_ROOMS, JUNIOR_GRADES, SENIOR_GRADES, DEFAULT_GRADE, OLD_GRADES, POSTINGS, postingName, bySeniority, STATUSES, COLOURS, COLOUR_ARGB, isBaby,
   matchName, splitNameList, namesInCell, suggestFlags, generate, check, learnFromRosters, tickFromHistory, remoteRoom, suggestShortNames, mergeContacts, pacuRoom, isPacu, fmtSenior, fmtJunior, SPECIAL_ROWS, isCoverPart, coverTarget,
 } from './engine.js';
-// Consultants are always shown in black.
-const staffColour = p => (p && p.grade !== 'Consultant' && p.colour) || '';
+// Seniors are always shown in black; juniors may be green (Baby MO) or purple (locum).
+const staffColour = p => (p && p.role !== 'senior' && p.colour) || '';
 import { readRosterRows, readStaffSheet, buildRosterWorkbook, cellText, isContactList, readContactList, cleanContactName } from './xlsxio.js';
 import { buildLayout, COL_WIDTHS, shortName, doubleCovered, isDouble, TEAM_ROWS, DUTIES } from './layout.js';
 import * as cloud from './cloud.js';
+import { MONTHLY, monthlyDef, LEAVE_TYPES, NIGHT_DUTIES, cleanCell, daysIn, weekday, monthName, addDays, readMonthlyPdf, readMonthlyXlsx, buildMonthlyWorkbook, dutiesOn, generalFromMonthly, leaveOn } from './monthly.js';
 
 const KEY = 'ot-roster-v1';
 const clone = o => JSON.parse(JSON.stringify(o));
@@ -24,7 +25,9 @@ function blankState() {
     roomTemplate: clone(DEFAULT_ROOMS),
     day: { date: today(), rooms: [], staff: {} },
     roster: null,
-    tab: 'seniors',
+    days: {},     // other dates: { '2026-10-12': { day, roster } }
+    monthly: {},  // monthly rosters by month: { '2022-10': { junior: { rows }, leave: { entries } } }
+    tab: 'staff',
     cloudBase: {},
     roomsVersion: 4,
   };
@@ -43,6 +46,12 @@ syncRooms();
 // remember they came from an import, so a contact list can correct their role.
 function cleanStaffNames() {
   for (const p of state.staff) {
+    // grades from before the department's own grade names
+    // a registrar is a senior resident, on the junior list
+    if (p.role === 'senior' && p.grade === 'Registrar') { p.role = 'junior'; p.grade = 'Senior resident'; }
+    if (p.posting === 'Card') p.posting = 'Cardiac';
+    const old = OLD_GRADES[p.role]?.[p.grade];
+    if (old) { if (p.grade === 'Baby MO' && !p.colour) p.colour = 'green'; p.grade = old; }
     const clean = cleanContactName(p.name);
     if (clean !== p.name.trim() && /^\s*(dr|a\/prof|prof|adj)\b/i.test(p.name)) { p.name = clean; p.source ||= 'import'; }
   }
@@ -188,24 +197,44 @@ function render() {
   const y = window.scrollY;
   if (state.tab === 'day') state.tab = 'cases';
   colourCache.clear();
-  if (!['general', 'roster', 'premed', 'cases', 'manpower', 'seniors', 'juniors', 'settings'].includes(state.tab)) state.tab = 'seniors';
-  app.replaceChildren(({ general: renderGeneral, roster: renderRoster, premed: renderPremed, cases: () => renderDay('cases'), manpower: () => renderDay('manpower'), seniors: () => renderStaff('senior'), juniors: () => renderStaff('junior'), settings: renderSettings })[state.tab]());
+  if (state.tab === 'seniors' || state.tab === 'juniors') { state.staffRole = state.tab === 'juniors' ? 'junior' : 'senior'; state.tab = 'staff'; }
+  if (state.tab === 'general' || state.tab === 'manpower') { state.monthlyView = state.tab === 'manpower' ? 'today' : state.monthlyView; state.tab = 'monthly'; }
+  if (!['monthly', 'roster', 'premed', 'cases', 'staff', 'settings'].includes(state.tab)) state.tab = 'staff';
+  personCache.clear();
+  syncMonthly();
+  app.replaceChildren(({ monthly: renderMonthly, roster: renderRoster, premed: renderPremed, cases: () => renderDay('cases'), staff: renderStaffTab, settings: renderSettings })[state.tab]());
   renderCloudBar();
   renderDateBar();
   window.scrollTo(0, y);
   save();
 }
+// Each date keeps its own manpower, calls, cases and roster. Switching the header date puts
+// the current day away and brings up the other one (empty if it's new).
+function switchDate(date) {
+  if (!date || date === state.day.date) return;
+  (state.days ||= {})[state.day.date] = { day: state.day, roster: state.roster };
+  const rec = state.days[date];
+  delete state.days[date];
+  state.day = rec?.day || { date, rooms: [], staff: {} };
+  state.day.date = date;
+  state.roster = rec?.roster || null;
+  syncRooms();
+  undoStack = []; editing = null;
+  lastRows = state.roster ? JSON.stringify(state.roster.rows) : null;
+  render();
+}
+
 // One date for the whole workspace, in the header.
 function renderDateBar() {
   const el = document.getElementById('date');
   if (!el) return;
-  const input = el.querySelector('input') || el.appendChild(h('label', {}, 'Roster for ', h('input', { type: 'date', onchange: e => { state.day.date = e.target.value; render(); } }))).querySelector('input');
+  const input = el.querySelector('input') || el.appendChild(h('label', {}, 'Roster for ', h('input', { type: 'date', onchange: e => { if (e.target.value) switchDate(e.target.value); } }))).querySelector('input');
   if (input.value !== state.day.date) input.value = state.day.date || '';
 }
 
 document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', async () => {
   const t = b.dataset.tab;
-  if (staffEditing() && !['seniors', 'juniors'].includes(t) && !(await finishStaffEdit())) return;
+  if (staffEditing() && t !== 'staff' && !(await finishStaffEdit())) return;
   state.tab = t; window.scrollTo(0, 0); render();
 }));
 
@@ -292,6 +321,14 @@ function staffLogCard() {
       h('ul', {}, e.changes.map(c => h('li', {}, c))))))));
 }
 
+// The Staff tab: seniors or juniors, read-only until Edit.
+function renderStaffTab() {
+  const role = state.staffRole === 'junior' ? 'junior' : 'senior';
+  const pick = r => h('button', { 'aria-pressed': String(role === r), onclick: () => { state.staffRole = r; staffFilter = ''; render(); } },
+    `${r === 'senior' ? 'Seniors' : 'Juniors'} (${state.staff.filter(p => p.role === r).length})`);
+  return h('div', {}, h('div', { class: 'seg subtabs', role: 'group', 'aria-label': 'Staff' }, pick('senior'), pick('junior')), renderStaff(role));
+}
+
 function renderStaff(role) {
   if (!staffEditing()) return renderStaffView(role);
   const subs = state.settings.subspecs;
@@ -299,13 +336,13 @@ function renderStaff(role) {
   const list = state.staff
     .filter(p => p.role === role)
     .filter(p => !staffFilter || (p.name + ' ' + (p.aliases || []).join(' ')).toLowerCase().includes(staffFilter.toLowerCase()))
-    .sort((a, b) => (a.role === b.role ? 0 : a.role === 'senior' ? -1 : 1) || a.name.localeCompare(b.name));
+    .sort(bySeniority);
 
   const row = p => h('tr', {},
     h('td', {}, h('input', { value: p.name, onchange: e => { p.name = e.target.value.trim(); save(); } })),
     h('td', {}, h('input', { value: (p.aliases || []).join(', '), placeholder: 'e.g. Tan YW', onchange: e => { p.aliases = splitNameList(e.target.value); save(); } })),
-    h('td', {}, select(p.grade, p.role === 'senior' ? SENIOR_GRADES : JUNIOR_GRADES, v => { p.grade = v; if (v === 'Baby MO' && !p.colour) p.colour = 'green'; render(); })),
-    h('td', {}, p.grade === 'Consultant' ? h('span', { class: 'seen', title: 'Consultants are always black' }, 'Black') : select(p.colour || '', COLOURS, v => { p.colour = v; render(); })),
+    h('td', {}, select(p.grade, p.role === 'senior' ? SENIOR_GRADES : JUNIOR_GRADES, v => { p.grade = v; if (v === 'Locum' && !p.colour) p.colour = 'purple'; render(); })),
+    !senior && h('td', {}, select(p.colour || '', COLOURS, v => { p.colour = v; render(); })),
     !senior && h('td', {}, select(p.posting || '', POSTINGS, v => { p.posting = v; save(); })),
     senior && h('td', {}, h('div', { class: 'chips' }, subs.map(s => {
         const on = (p.subspecs || []).includes(s.key);
@@ -314,7 +351,13 @@ function renderStaff(role) {
         } }, s.label);
       }))),
     senior && h('td', {}, h('input', { value: (p.avoid || []).join(', '), placeholder: 'e.g. eye, obs', onchange: e => { p.avoid = splitNameList(e.target.value).map(s => s.toLowerCase()); save(); } })),
-    senior && h('td', { class: 'seen' }, Object.entries(p.history || {}).map(([k, n]) => `${subs.find(s => s.key === k)?.label || k} ×${n}`).join(', ')),
+    h('td', {}, select(p.role, [['senior', 'Senior'], ['junior', 'Junior']], v => {
+      p.role = v;
+      if (!(v === 'senior' ? SENIOR_GRADES : JUNIOR_GRADES).includes(p.grade)) p.grade = DEFAULT_GRADE[v];
+      if (v === 'senior') { p.colour = ''; p.posting = ''; }
+      render();
+      toast(`Moved ${p.name || 'them'} to ${v === 'senior' ? 'Seniors' : 'Juniors'}.`);
+    })),
     h('td', {}, h('button', { class: 'small', title: 'Remove', onclick: () => { if (confirm(`Remove ${p.name}?`)) { state.staff = state.staff.filter(x => x !== p); render(); } } }, '✕')),
   );
 
@@ -323,8 +366,8 @@ function renderStaff(role) {
     h('section', { class: 'card' },
       h('h2', {}, senior ? 'Seniors' : 'Juniors'),
       h('p', { class: 'hint' }, senior
-        ? 'Tick each senior\'s subspecs and the lists they don\'t do. "Seen in" counts the subspec lists they did in past rosters you loaded, as a hint. Colour: purple for locums; consultants are always black.'
-        : 'Set each junior\'s grade, posting and colour. Green marks a Baby MO: never left alone, so their senior won\'t double cover. Purple marks locums.'),
+        ? 'Tick each senior\'s subspecs and the lists they don\'t do. "Move to" moves someone to the juniors.'
+        : 'Set each junior\'s grade, posting and colour. Green marks a Baby MO: never left alone, so their senior won\'t double cover. Purple marks locums. "Move to" moves someone to the seniors.'),
       h('div', { class: 'bar sync dirty' },
         h('span', {}, `Editing the staff list. ${diffStaff(staffBackup, state.staff).length} change(s) so far; nothing is kept until you review and save.`),
         h('button', { class: 'primary', onclick: finishStaffEdit }, 'Review & save changes'),
@@ -333,11 +376,11 @@ function renderStaff(role) {
         fileButton('Import staff sheet or contact list', '.xlsx,.csv', false, importStaffSheet),
         fileButton('Learn from past rosters', '.xlsx', true, learnFiles),
         senior && h('span', { class: 'btn-group' },
-          h('button', { title: 'Tick each senior\'s subspecs from the lists in "Seen in". Only adds ticks.', onclick: () => {
+          h('button', { title: 'Tick each senior\'s subspecs from the subspec lists they did in past rosters you loaded. Only adds ticks.', onclick: () => {
             const n = tickFromHistory(state.staff, tickMin);
             render();
             toast(n ? `Ticked ${n} subspec(s). Check them before generating.` : 'Nothing new to tick.');
-          } }, 'Tick subspecs from "Seen in"'),
+          } }, 'Tick subspecs from past rosters'),
           h('label', { class: 'seen' }, ' if seen ≥ ', h('input', { type: 'number', min: 1, max: 20, value: tickMin, style: 'width:56px', onchange: e => { tickMin = Math.max(1, +e.target.value || 1); } }), ' times')),
         h('button', { title: 'Fill in short names (e.g. Tan YW, Swapna) for everyone who has none', onclick: () => {
           const props = suggestShortNames(state.staff);
@@ -348,7 +391,7 @@ function renderStaff(role) {
           render();
           toast(`Added ${props.length} short names. Check them, then save for the team.`);
         } }, 'Suggest short names'),
-        h('button', { onclick: () => { state.staff.unshift({ id: newId(), name: '', aliases: [], role, grade: senior ? 'Consultant' : 'Resident', posting: '', subspecs: [], avoid: [], history: {} }); staffFilter = ''; render(); } }, senior ? '+ Add senior' : '+ Add junior'),
+        h('button', { onclick: () => { state.staff.unshift({ id: newId(), name: '', aliases: [], role, grade: DEFAULT_GRADE[role], posting: '', subspecs: [], avoid: [], history: {} }); staffFilter = ''; render(); } }, senior ? '+ Add senior' : '+ Add junior'),
         h('span', { class: 'grow' }),
         h('input', { placeholder: 'Filter names', value: staffFilter, oninput: e => { staffFilter = e.target.value; const pos = e.target.selectionStart; render(); const i = app.querySelector('input[placeholder="Filter names"]'); i.focus(); i.setSelectionRange(pos, pos); } }),
       ),
@@ -356,7 +399,7 @@ function renderStaff(role) {
     ),
     count
       ? h('section', { class: 'card scroll' }, h('table', {},
-        h('thead', {}, h('tr', {}, (senior ? ['Name', 'Short names', 'Grade', 'Colour', 'Subspecs', "Doesn't do", 'Seen in', ''] : ['Name', 'Short names', 'Grade', 'Colour', 'Posting', '']).map(t => h('th', {}, t)))),
+        h('thead', {}, h('tr', {}, (senior ? ['Name', 'Short names', 'Grade', 'Subspecs', "Doesn't do", 'Move to', ''] : ['Name', 'Short names', 'Grade', 'Colour', 'Posting', 'Move to', '']).map(t => h('th', {}, t)))),
         h('tbody', {}, list.map(row))))
       : h('section', { class: 'card empty' }, `No ${senior ? 'seniors' : 'juniors'} yet. Import the master staff sheet, or load a few past rosters to build the list automatically.`),
   );
@@ -368,18 +411,17 @@ function renderStaffView(role) {
   const list = state.staff
     .filter(p => p.role === role)
     .filter(p => !staffFilter || (p.name + ' ' + (p.aliases || []).join(' ')).toLowerCase().includes(staffFilter.toLowerCase()))
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .sort(bySeniority);
   const count = state.staff.filter(p => p.role === role).length;
   const row = p => h('tr', {},
     h('td', {}, h('b', { style: staffColour(p) ? `color:#${COLOUR_ARGB[staffColour(p)].slice(2)}` : '' }, p.name)),
     h('td', {}, (p.aliases || []).join(', ')),
     h('td', {}, p.grade),
-    h('td', { class: 'seen' }, COLOURS.find(c => c[0] === staffColour(p))[1]),
+    !senior && h('td', { class: 'seen' }, COLOURS.find(c => c[0] === staffColour(p))[1]),
     senior
       ? h('td', {}, h('div', { class: 'chips' }, (p.subspecs || []).map(k => h('span', { class: 'chip on static' }, subLabel(k)))))
-      : h('td', {}, p.posting || ''),
+      : h('td', {}, postingName(p.posting)),
     senior && h('td', {}, (p.avoid || []).join(', ')),
-    senior && h('td', { class: 'seen' }, Object.entries(p.history || {}).map(([k, n]) => `${subLabel(k)} ×${n}`).join(', ')),
   );
   return h('div', {},
     h('section', { class: 'card' },
@@ -396,7 +438,7 @@ function renderStaffView(role) {
     ),
     count
       ? h('section', { class: 'card scroll' }, h('table', {},
-        h('thead', {}, h('tr', {}, (senior ? ['Name', 'Short names', 'Grade', 'Colour', 'Subspecs', "Doesn't do", 'Seen in'] : ['Name', 'Short names', 'Grade', 'Colour', 'Posting']).map(t => h('th', {}, t)))),
+        h('thead', {}, h('tr', {}, (senior ? ['Name', 'Short names', 'Grade', 'Subspecs', "Doesn't do"] : ['Name', 'Short names', 'Grade', 'Colour', 'Posting']).map(t => h('th', {}, t)))),
         h('tbody', {}, list.map(row))))
       : h('section', { class: 'card empty' }, `No ${senior ? 'seniors' : 'juniors'} yet. Click Edit to import the master staff sheet or learn from past rosters.`),
     staffLogCard(),
@@ -491,17 +533,17 @@ function renderDay(part) {
 
   const flist = state.staff
     .filter(p => !dayFilter || p.name.toLowerCase().includes(dayFilter.toLowerCase()))
-    .sort((a, b) => (a.role === b.role ? 0 : a.role === 'senior' ? -1 : 1) || a.name.localeCompare(b.name));
+    .sort(bySeniority);
   const staffRow = p => {
     const s = dayOf(p.id);
     return h('tr', { class: (s.status || 'avail') === 'avail' ? '' : 'off' },
       h('td', {}, p.name),
-      h('td', { class: 'seen' }, p.role === 'senior' ? p.grade : `${p.grade}${p.posting ? ' · ' + p.posting : ''}`),
-      h('td', {}, select(s.status || 'avail', STATUSES, v => { s.status = v; render(); })),
+      h('td', { class: 'seen' }, p.role === 'senior' ? p.grade : `${p.grade}${p.posting ? ' · ' + postingName(p.posting) : ''}`),
+      h('td', {}, select(s.status || 'avail', STATUSES, v => { s.status = v; s.manual = true; render(); })),
       h('td', {}, h('input', { class: 'narrow', value: s.leaveTime || '', placeholder: '4pm', title: 'Leaving at, e.g. 4pm or 4-5pm (shown as L-4pm)', onchange: e => { s.leaveTime = e.target.value.trim(); save(); } })),
       h('td', {}, p.role === 'senior'
-        ? h('label', { title: 'Liver transplant standby' }, h('input', { type: 'checkbox', checked: s.liverStandby, onchange: e => { s.liverStandby = e.target.checked; save(); } }), ' (L)')
-        : h('label', { title: 'Not around on the previous working day: needs premed cover' }, h('input', { type: 'checkbox', checked: s.notAroundPrev, onchange: e => { s.notAroundPrev = e.target.checked; save(); } }), ' away yesterday')),
+        ? h('label', { title: 'Liver transplant standby' }, h('input', { type: 'checkbox', checked: s.liverStandby, onchange: e => { s.liverStandby = e.target.checked; s.manualLiver = true; save(); } }), ' (L)')
+        : h('label', { title: 'Not around on the previous working day: needs premed cover' }, h('input', { type: 'checkbox', checked: s.notAroundPrev, onchange: e => { s.notAroundPrev = e.target.checked; s.manualAway = true; save(); } }), ' away yesterday')),
       h('td', {}, h('input', { value: s.note || '', placeholder: p.role === 'senior' ? '(AOH 1), -mtg 5pm' : '', onchange: e => { s.note = e.target.value.trim(); save(); } })),
     );
   };
@@ -522,7 +564,7 @@ function renderDay(part) {
       ),
       h('p', { class: 'hint' }, "\"Load draft roster\" reads the admin team's draft in the usual format: it picks up running rooms, case notes, leave, post call and upper-half duties."),
       unmatched.length ? h('ul', { class: 'warnings', style: 'margin-bottom:12px' }, h('li', { class: 'warn' },
-        `Names not matched to the staff list: ${unmatched.join(', ')}. Add them on the Seniors or Juniors tab, or add the short name to the right person, then load or apply again. `,
+        `Names not matched to the staff list: ${unmatched.join(', ')}. Add them on the Staff tab, or add the short name to the right person, then load or apply again. `,
         h('button', { class: 'link', onclick: () => { unmatched = []; render(); } }, 'Dismiss'))) : null,
       h('div', { class: 'stats' },
         h('span', {}, h('b', {}, running.length), ' rooms running'),
@@ -537,7 +579,6 @@ function renderDay(part) {
         h('thead', {}, h('tr', {}, ['Run', 'Room', 'Session', 'Case notes', 'Flags', 'Fixed senior', 'Fixed junior'].map(t => h('th', {}, t)))),
         h('tbody', {}, d.rooms.map(roomRow))),
     ),
-    !cases && quickStatusCard(),
     !cases && h('section', { class: 'card' },
       h('h2', {}, 'Paste from the leave sheet'),
       h('p', { class: 'hint' }, 'Paste names from the leave sheet: short forms like "Tan YW" or "Swapna" work. Separate names with commas or new lines.'),
@@ -557,7 +598,7 @@ function renderDay(part) {
         ? h('table', {},
           h('thead', {}, h('tr', {}, ['Name', 'Grade', 'Status', 'Leaves at', '', 'Note on roster'].map(t => h('th', {}, t)))),
           h('tbody', {}, flist.map(staffRow)))
-        : h('p', { class: 'empty' }, 'Add staff on the Seniors and Juniors tabs first.'),
+        : h('p', { class: 'empty' }, 'Add staff on the Staff tab first.'),
     ),
   );
 }
@@ -593,8 +634,13 @@ function markNames(names, fn) {
   const missed = [];
   for (const n of names) {
     const m = matchName(n, state.staff);
-    if (m.person) fn(dayOf(m.person.id), m.person);
-    else missed.push(m.ambiguous ? `${n} (several matches)` : n);
+    if (m.person) {
+      const d = dayOf(m.person.id);
+      const before = [d.status, d.notAroundPrev];
+      fn(d, m.person);
+      if (d.status !== before[0]) d.manual = true;
+      if (d.notAroundPrev !== before[1]) d.manualAway = true;
+    } else missed.push(m.ambiguous ? `${n} (several matches)` : n);
   }
   return missed;
 }
@@ -622,7 +668,8 @@ function rosterLists() {
       list.push(e);
     }
     for (const p of state.staff) {
-      if ((state.day.staff[p.id]?.status || 'avail') === key && !covered.has(p.id)) list.push(shortName(p));
+      const st = state.day.staff[p.id]?.status || 'avail';
+      if ((st === key || (key === 'leave' && st === 'mc')) && !covered.has(p.id)) list.push(shortName(p));
     }
     out[key] = list;
   }
@@ -641,7 +688,7 @@ function noListPeople() {
     if (p) listed.add(p.id);
   }
   return state.staff.filter(p => (state.day.staff[p.id]?.status || 'avail') === 'avail' && !listed.has(p.id))
-    .sort((a, b) => (a.role === b.role ? 0 : a.role === 'senior' ? -1 : 1) || shortName(a).localeCompare(shortName(b)));
+    .sort(bySeniority);
 }
 
 function applyPaste() {
@@ -894,7 +941,7 @@ function dropFromPool(id, dst) {
   const row = state.roster.rows[dst.row];
   if (!p || !row || !dst.key) return;
   const d = dayOf(p.id);
-  if (d.status === 'admin') d.status = 'avail'; // off their admin day and onto a list
+  if (d.status === 'admin') { d.status = 'avail'; d.manual = true; } // off their admin day and onto a list
   const text = p.role === 'senior' ? fmtSenior(p, d) : fmtJunior(p, d);
   undoStack.push(JSON.stringify(state.roster.rows));
   const parts = cellParts(row, dst.key);
@@ -1012,7 +1059,7 @@ async function resolvePerson(text, role) {
   const choice = await confirmChanges(`"${v}" isn't on the staff list`, ['Check the spelling. If it\'s right, add them so they can be rostered.'],
     [[role, `Add to ${role === 'senior' ? 'Seniors' : 'Juniors'}`, 'primary'], [other, `Add to ${other === 'senior' ? 'Seniors' : 'Juniors'}`], ['back', 'Cancel']]);
   if (choice === 'back') return null;
-  const p = { id: newId(), name: v, aliases: [], role: choice, grade: choice === 'senior' ? 'Consultant' : 'Resident', posting: '', subspecs: [], avoid: [], history: {}, source: 'roster-entry' };
+  const p = { id: newId(), name: v, aliases: [], role: choice, grade: DEFAULT_GRADE[choice], posting: '', subspecs: [], avoid: [], history: {}, source: 'roster-entry' };
   state.staff.push(p);
   (state.staffLog ||= []).unshift({ at: Date.now(), by: who(), changes: [`Added ${choice} ${v} (typed on the roster)`] });
   toast(`Added ${v} to ${choice === 'senior' ? 'Seniors' : 'Juniors'}. Fill in their details there.`);
@@ -1024,13 +1071,13 @@ function nameInput(attrs = {}, role = null) {
   const id = 'names-' + (role || 'all');
   if (!document.getElementById(id)) document.body.append(h('datalist', { id }));
   document.getElementById(id).replaceChildren(...state.staff.filter(p => !role || p.role === role)
-    .sort((a, b) => a.name.localeCompare(b.name)).map(p => h('option', { value: p.name })));
+    .sort(bySeniority).map(p => h('option', { value: p.name })));
   return h('input', { list: id, autocomplete: 'off', spellcheck: 'false', ...attrs });
 }
 
 // ---- tags on one name: "(L)", "(RA)", "(AOH 1)" and the part after a dash ("-5pm", "-C-OT 4") ----
 
-const TAGS = ['L', 'RA', 'P', 'SR', 'Neu', 'Amb', 'PACU'];
+const TAGS = ['L', 'HPB', 'RA', 'P', 'SR', 'Neu', 'Cardiac', 'ENT', 'Vasc', 'Amb', 'Remote', 'PACU'];
 let tagTimer = null;
 
 // "Tan YW (RA) L-4pm C-OT13 -mtg 5pm" -> name, tags, leave ("4pm" / "4-5pm"), cover ("OT13", "KROR PACU"), note
@@ -1088,7 +1135,7 @@ function wherePerson(p) {
 function whereCard(p) {
   const at = wherePerson(p);
   return h('div', { class: 'where' },
-    h('b', {}, p.name), h('span', { class: 'seen' }, ` · ${p.grade}${p.posting ? ' · ' + p.posting : ''}`),
+    h('b', {}, p.name), h('span', { class: 'seen' }, ` · ${p.grade}${p.posting ? ' · ' + postingName(p.posting) : ''}`),
     h('ul', {}, (at.length ? at : ['Not on any list today']).map(t => h('li', {}, t))));
 }
 
@@ -1226,7 +1273,7 @@ const colourStyle = part => { const c = COLOUR_ARGB[colourOf(part)]; return c ? 
 async function addToCell(i, key, text) {
   const p = await resolvePerson(text, key === 'senior' ? 'senior' : 'junior');
   if (!p) return false;
-  if (state.roster.rows[i].roomId === 'aic' && !(p.grade === 'Consultant' || p.grade === 'Senior Resident')
+  if (state.roster.rows[i].roomId === 'aic' && !(['SC', 'C'].includes(p.grade) || p.grade === 'Senior resident')
     && !confirm(`AIC is usually a consultant or senior resident. Put ${p.name} (${p.grade}) there anyway?`)) return false;
   if (!p) return false;
   const row = state.roster.rows[i];
@@ -1296,7 +1343,7 @@ function generatorDay() {
 }
 
 function canGenerate() {
-  if (!state.staff.length) { toast('Add staff on the Seniors and Juniors tabs first.'); return false; }
+  if (!state.staff.length) { toast('Add staff on the Staff tab first.'); return false; }
   if (!state.day.rooms.some(r => r.running)) { toast('Tick the running rooms on the Cases tab first.'); return false; }
   return true;
 }
@@ -1386,7 +1433,8 @@ async function setGeneral(key, value, role, input) {
 // Fields left empty take a default: the MOT on-call team also does EOT 8 and EOT 9.
 const GENERAL_DEFAULTS = { 'eot8.s': 'mot.cons', 'eot8.a': 'mot.res1', 'eot9.s': 'mot.cons', 'eot9.a': 'mot.res2', 'eot9.a2': 'mot.res3' };
 function effectiveGeneral() {
-  const g = { ...(state.day.general || {}) };
+  const typed = Object.fromEntries(Object.entries(state.day.general || {}).filter(([, v]) => v));
+  const g = { ...generalFromMonthly(state.monthly, state.day.date), ...typed };
   for (const [k, from] of Object.entries(GENERAL_DEFAULTS)) if (!g[k] && g[from]) g[k] = g[from];
   return g;
 }
@@ -1404,13 +1452,14 @@ function generalPeople() {
 function renderGeneral() {
   const g = state.day.general || {};
   const eff = effectiveGeneral();
-  const field = (key, role) => nameInput({ value: g[key] || '', placeholder: !g[key] && eff[key] ? `${eff[key]} (MOT)` : '—', style: 'width:100%',
+  const fromMonthly = generalFromMonthly(state.monthly, state.day.date);
+  const field = (key, role) => nameInput({ value: g[key] || '', placeholder: !g[key] && eff[key] ? `${eff[key]} (${fromMonthly[key] ? 'monthly roster' : 'MOT'})` : '—', style: 'width:100%',
     onchange: e => setGeneral(key, e.target.value, role, e.target),
     onkeydown: e => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } } }, role);
   return h('div', {},
     h('section', { class: 'card' },
-      h('h2', {}, 'Calls/clinics'),
-      h('p', { class: 'hint' }, 'MOT and SICU calls, EOT and clinics for the day. Type names (autocomplete from the staff list); separate two people with "/". EOT 8 and EOT 9 default to the MOT call team (shown in grey) unless you type someone else. The cardiac call team goes to MOR 12. Everyone else here is left out of the OT lists. These fill the top half of the sheet; Load draft roster on the Cases tab fills them from the admin draft.')),
+      h('h2', {}, 'Calls and clinics'),
+      h('p', { class: 'hint' }, 'MOT and SICU calls, EOT and clinics for the day. Names in grey come from the monthly rosters (or, for EOT 8 and 9, the MOT call team); type a name to override one. Separate two people with "/". The cardiac call team goes to MOR 12. Everyone here is left out of the OT lists. These fill the top half of the sheet; Load draft roster on the Cases tab fills them from the admin draft.')),
     h('section', { class: 'card scroll' },
       h('h2', {}, 'MOT and SICU Calls'),
       h('table', {},
@@ -1428,6 +1477,289 @@ function renderGeneral() {
           h('td', {}, h('b', {}, d.label)),
           [0, 1, 2].map(i => h('td', {}, d.fields[i] ? h('div', {}, h('div', { class: 'seen' }, d.fields[i][1]), field(`${d.key}.${d.fields[i][0]}`, d.fields[i][0] === 's' ? 'senior' : 'junior')) : null))))))),
     h('p', { class: 'hint' }, 'AOCC, AIC, AH OT and ECT are on the Roster tab.'));
+}
+
+// ----- monthly tab -----
+
+// A name as written on a monthly roster ("Chern Zer Hui, Belinda", "KING CHRISTOPHER") -> person
+const personCache = new Map();
+function personByText(text) {
+  const t = cleanCell(text);
+  if (!t) return null;
+  if (!personCache.has(t)) {
+    const m = matchName(t, state.staff);
+    personCache.set(t, m.person || matchName(cleanContactName(t), state.staff).person || null);
+  }
+  return personCache.get(t);
+}
+
+// What the monthly rosters say about everyone on a date: id -> { status, why, liver }
+function derivedFor(date) {
+  const out = new Map();
+  const at = p => out.get(p.id) || out.set(p.id, {}).get(p.id);
+  for (const e of leaveOn(state.monthly, date)) {
+    const p = personByText(e.name);
+    if (p) Object.assign(at(p), /medical/i.test(e.type) ? { status: 'mc', why: e.type } : { status: 'leave', why: e.type || 'Leave' });
+  }
+  const prev = dutiesOn(state.monthly, addDays(date, -1));
+  for (const key of state.settings.nightDuties || NIGHT_DUTIES) {
+    const [kind, col] = key.split('.');
+    const p = personByText(prev[kind]?.[col]);
+    if (p && !at(p).status) Object.assign(at(p), { status: 'postcall', why: `${monthlyDef(kind)?.cols.find(c => c.key === col)?.label} yesterday` });
+  }
+  const today = dutiesOn(state.monthly, date);
+  for (const def of MONTHLY) for (const c of def.cols) if (c.liver) { const p = personByText(today[def.id]?.[c.key]); if (p) at(p).liver = true; }
+  return out;
+}
+const prevWorkingDay = date => { let d = addDays(date, -1); while ([0, 6].includes(new Date(d + 'T12:00:00').getDay())) d = addDays(d, -1); return d; };
+const hasMonthly = () => Object.keys(state.monthly || {}).length > 0;
+
+// Bring the day's manpower in line with the monthly rosters. Anything set by hand stays.
+function syncMonthly() {
+  if (!hasMonthly() || !state.day?.date) return;
+  const now = derivedFor(state.day.date);
+  const before = derivedFor(prevWorkingDay(state.day.date));
+  for (const p of state.staff) {
+    const r = now.get(p.id) || {};
+    const s = { ...(state.day.staff[p.id] || {}) };
+    if (!s.manual) {
+      if (r.status) { s.status = r.status; s.auto = r.why; }
+      else if (s.auto) { s.status = 'avail'; delete s.auto; }
+    }
+    if (p.role === 'senior' && !s.manualLiver) {
+      if (r.liver) { s.liverStandby = true; s.autoLiver = true; } else if (s.autoLiver) { s.liverStandby = false; delete s.autoLiver; }
+    }
+    if (p.role === 'junior' && !s.manualAway) {
+      const away = ['leave', 'mc', 'postcall'].includes(before.get(p.id)?.status);
+      if (away) { s.notAroundPrev = true; s.autoAway = true; } else if (s.autoAway) { s.notAroundPrev = false; delete s.autoAway; }
+    }
+    if (Object.keys(s).length && JSON.stringify(s) !== JSON.stringify(state.day.staff[p.id] || {})) state.day.staff[p.id] = s;
+  }
+}
+
+const MONTHLY_VIEWS = [['today', 'Today'], ['pain', 'Pain Roster'], ['liver', 'Liver Roster'], ['leave', 'Leave Roster'], ['aoh', 'AOH Roster'], ['junior', 'Junior Roster'], ['senior', 'Senior Roster']];
+function renderMonthly() {
+  const view = MONTHLY_VIEWS.some(v => v[0] === state.monthlyView) ? state.monthlyView : 'today';
+  const tabs = h('div', { class: 'seg subtabs', role: 'group', 'aria-label': 'Monthly' }, MONTHLY_VIEWS.map(([k, label]) =>
+    h('button', { 'aria-pressed': String(view === k), onclick: () => { state.monthlyView = k; render(); } }, label)));
+  return h('div', {}, tabs, view === 'today' ? renderToday() : renderMonthlyRoster(view));
+}
+
+// ---- today: who is where, then the calls and clinics ----
+
+const BOARD = [['working', 'Working'], ['leave', 'Leave'], ['mc', 'MC'], ['postcall', 'Post call'], ['admin', 'Admin']];
+const groupOf = st => ({ leave: 'leave', mc: 'mc', postcall: 'postcall', admin: 'admin' })[st || 'avail'] || 'working';
+let boardRole = 'all', boardFilter = '';
+function setStatus(p, group) {
+  const s = dayOf(p.id);
+  const was = groupOf(s.status);
+  s.status = group === 'working' ? (s.status === 'elsewhere' ? 'elsewhere' : 'avail') : group;
+  s.manual = true;
+  delete s.auto;
+  if (state.roster && was !== group) logRoster([`${p.name}: ${BOARD.find(b => b[0] === was)[1]} → ${BOARD.find(b => b[0] === group)[1]}`]);
+  render();
+}
+function manpowerBoard() {
+  const people = state.staff
+    .filter(p => boardRole === 'all' || p.role === boardRole)
+    .filter(p => !boardFilter || (p.name + ' ' + (p.aliases || []).join(' ')).toLowerCase().includes(boardFilter.toLowerCase()))
+    .sort(bySeniority);
+  const chip = p => {
+    const s = state.day.staff[p.id] || {};
+    return h('span', {
+      class: 'name board-chip' + (s.manual ? ' manual' : '') + (p.role === 'senior' ? ' senior' : ''), draggable: TOUCH ? null : 'true', style: colourStyle(p.name),
+      title: `${p.name} · ${p.grade}${s.manual ? ' · set by hand' : s.auto ? ` · ${s.auto}` : ''}${s.status === 'elsewhere' ? ' · elsewhere (calls/clinics)' : ''}`,
+      ondragstart: e => { e.dataTransfer.setData('text/plain', p.id); e.dataTransfer.effectAllowed = 'move'; },
+      onclick: async () => {
+        const g = await confirmChanges(p.name, [`Now: ${BOARD.find(b => b[0] === groupOf(s.status))[1]}${s.auto ? ` (${s.auto})` : ''}`], [...BOARD.map(([k, l]) => [k, l, k === groupOf(s.status) ? 'primary' : '']), ['back', 'Cancel']]);
+        if (g !== 'back') setStatus(p, g);
+      },
+    }, shortName(p) || p.name);
+  };
+  const col = ([key, label]) => {
+    const list = people.filter(p => groupOf(state.day.staff[p.id]?.status) === key);
+    return h('div', { class: 'board-col', 'data-group': key,
+      ondragover: e => { e.preventDefault(); e.currentTarget.classList.add('over'); },
+      ondragleave: e => e.currentTarget.classList.remove('over'),
+      ondrop: e => { e.preventDefault(); e.currentTarget.classList.remove('over'); const p = person(e.dataTransfer.getData('text/plain')); if (p) setStatus(p, key); } },
+      h('h3', {}, label, h('span', { class: 'seen' }, ` ${list.length}`)),
+      h('div', { class: 'pool-names' }, list.map(chip)));
+  };
+  const manualCount = Object.values(state.day.staff).filter(s => s.manual).length;
+  return h('section', { class: 'card' },
+    h('h2', {}, 'Manpower'),
+    h('p', { class: 'hint' }, (TOUCH ? 'Tap a name to move them. ' : 'Drag a name to another group, or click it. ')
+      + (hasMonthly() ? 'Leave, MC and post call come from the Leave, Junior and Senior rosters; anything you move by hand stays (bold border).' : 'Import the monthly rosters to fill leave, MC and post call automatically.')),
+    h('div', { class: 'bar' },
+      h('div', { class: 'seg', role: 'group', 'aria-label': 'Who' }, [['all', 'Everyone'], ['senior', 'Seniors'], ['junior', 'Juniors']].map(([k, l]) =>
+        h('button', { 'aria-pressed': String(boardRole === k), onclick: () => { boardRole = k; render(); } }, l))),
+      manualCount && hasMonthly() ? h('button', { onclick: () => {
+        if (!confirm(`Undo the ${manualCount} change(s) made by hand today and go back to the monthly rosters?`)) return;
+        for (const s of Object.values(state.day.staff)) { delete s.manual; delete s.manualAway; delete s.manualLiver; if (!s.auto) s.status = 'avail'; }
+        render();
+      } }, 'Reset to monthly rosters') : null,
+      h('span', { class: 'grow' }),
+      h('input', { placeholder: 'Filter names', value: boardFilter, oninput: e => { boardFilter = e.target.value; const pos = e.target.selectionStart; render(); const i = app.querySelector('.card input[placeholder="Filter names"]'); i.focus(); i.setSelectionRange(pos, pos); } })),
+    state.staff.length ? h('div', { class: 'board' }, BOARD.map(col)) : h('p', { class: 'empty' }, 'Add staff on the Staff tab first.'));
+}
+
+// The day's other duties from the monthly rosters (AOH, liver team, cardiac and so on)
+function monthlyDayCard() {
+  if (!hasMonthly()) return null;
+  const duty = dutiesOn(state.monthly, state.day.date);
+  const items = [];
+  for (const def of MONTHLY) for (const c of def.cols) {
+    const v = duty[def.id]?.[c.key];
+    if (v) items.push([def.label.replace(' Roster', ''), c.label, v]);
+  }
+  if (!items.length) return null;
+  return h('section', { class: 'card' }, h('details', {},
+    h('summary', {}, `From the monthly rosters today (${items.length})`),
+    h('table', {}, h('tbody', {}, items.map(([r, c, v]) => h('tr', {}, h('td', { class: 'seen' }, r), h('td', {}, c), h('td', { class: personByText(v) ? '' : 'unmatched', title: personByText(v) ? '' : 'Not matched to the staff list' }, v)))))));
+}
+
+function renderToday() {
+  return h('div', {},
+    manpowerBoard(),
+    monthlyDayCard(),
+    renderGeneral(),
+    h('section', { class: 'card' }, h('details', {},
+      h('summary', {}, 'More: paste from the leave sheet, leave times, away yesterday, notes'),
+      renderDay('manpower'))));
+}
+
+// ---- the monthly roster grids ----
+
+const curMonth = () => state.day.date.slice(0, 7);
+const shiftMonth = n => { const d = new Date(state.day.date.slice(0, 7) + '-01T12:00:00'); d.setMonth(d.getMonth() + n); switchDate(d.toISOString().slice(0, 8) + '01'); };
+function monthData(kind, month = curMonth(), create = false) {
+  const m = state.monthly?.[month]?.[kind];
+  if (m || !create) return m;
+  return (((state.monthly ||= {})[month] ||= {})[kind] = monthlyDef(kind).list ? { entries: [] } : { rows: {} });
+}
+
+let pdfjs = null;
+async function loadPdfJs() {
+  if (pdfjs) return pdfjs;
+  await new Promise((ok, fail) => { const s = document.createElement('script'); s.src = 'vendor/pdf.min.js'; s.onload = ok; s.onerror = fail; document.head.append(s); });
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'vendor/pdf.worker.min.js';
+  return (pdfjs = window.pdfjsLib);
+}
+async function readMonthlyFile(file) {
+  if (/\.pdf$/i.test(file.name) || file.type === 'application/pdf') {
+    const lib = await loadPdfJs();
+    const doc = await lib.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+    const pages = [];
+    for (let i = 1; i <= doc.numPages; i++) {
+      const tc = await (await doc.getPage(i)).getTextContent();
+      pages.push(tc.items.filter(x => x.str.trim()).map(x => ({ str: x.str, x: x.transform[4], y: x.transform[5], w: x.width })));
+    }
+    return readMonthlyPdf(pages);
+  }
+  const wb = await readWorkbook(file);
+  return readMonthlyXlsx(wb.worksheets[0], cellText);
+}
+async function importMonthly(files) {
+  const done = [];
+  for (const file of files) {
+    let res;
+    try { res = await readMonthlyFile(file); } catch (e) { res = { error: `Couldn't read ${file.name}: ${e.message}` }; }
+    if (res.error) { toast(res.error); continue; }
+    const def = monthlyDef(res.kind);
+    const old = state.monthly?.[res.month]?.[res.kind];
+    if (old && !confirm(`Replace the ${def.label} for ${monthName(res.month)} with ${file.name}?`)) continue;
+    ((state.monthly ||= {})[res.month] ||= {})[res.kind] = res.data;
+    done.push(res);
+  }
+  if (!done.length) return;
+  personCache.clear();
+  const names = done.flatMap(r => r.data.entries ? r.data.entries.map(e => e.name) : Object.values(r.data.rows).flatMap(Object.values));
+  const missing = [...new Set(names.filter(n => !personByText(n)))];
+  const last = done.at(-1);
+  state.monthlyView = last.kind;
+  toast(`Imported ${done.map(r => `${monthlyDef(r.kind).label} (${monthName(r.month)})`).join(', ')}.${missing.length ? ` ${missing.length} name(s) aren't on the staff list.` : ''}`);
+  if (last.month !== curMonth() && confirm(`Go to ${monthName(last.month)} to see it?`)) return switchDate(last.month + '-01');
+  render();
+}
+async function exportMonthly(kind) {
+  const wb = buildMonthlyWorkbook(window.ExcelJS, kind, curMonth(), monthData(kind) || {});
+  const buf = await wb.xlsx.writeBuffer();
+  download(`${monthlyDef(kind).label} ${monthName(curMonth())}.xlsx`, new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+}
+
+function monthlyBar(kind) {
+  const def = monthlyDef(kind);
+  return h('section', { class: 'card' },
+    h('div', { class: 'bar' },
+      h('button', { title: 'Previous month', onclick: () => shiftMonth(-1) }, '‹'),
+      h('h2', { style: 'margin:0' }, `${def.label} · ${monthName(curMonth())}`),
+      h('button', { title: 'Next month', onclick: () => shiftMonth(1) }, '›'),
+      h('span', { class: 'grow' }),
+      fileButton('Import roster (PDF or Excel)', '.pdf,.xlsx', true, importMonthly),
+      h('button', { onclick: () => exportMonthly(kind) }, 'Download .xlsx'),
+      monthData(kind) && h('button', { onclick: () => { if (confirm(`Clear the ${def.label} for ${monthName(curMonth())}?`)) { delete state.monthly[curMonth()][kind]; render(); } } }, 'Clear')),
+    h('p', { class: 'hint', style: 'margin:0' }, kind === 'leave'
+      ? 'Leave sets people on leave on those days (Medical Leave counts as MC). Import the HMS leave roster or add leave by hand.'
+      : `Import the HMS ${def.label.toLowerCase()} (PDF) or an Excel copy, or type names in. ${def.cols.some(c => c.to) ? 'Columns marked • fill the calls and clinics on Today. ' : ''}${def.cols.some(c => c.night) ? 'Overnight duties make people post call the next day. ' : ''}Names in red aren't matched to the staff list.`));
+}
+
+function renderMonthlyRoster(kind) {
+  const def = monthlyDef(kind);
+  if (def.list) return renderLeaveRoster();
+  const month = curMonth();
+  const data = monthData(kind);
+  const set = (d, key, v) => {
+    const rows = monthData(kind, month, true).rows;
+    const rec = (rows[d] ||= {});
+    if (v) rec[key] = v; else delete rec[key];
+    personCache.clear();
+    render();
+  };
+  const today = +state.day.date.slice(8, 10);
+  const cell = (d, c) => {
+    const v = data?.rows?.[d]?.[c.key] || '';
+    return h('td', {}, nameInput({ value: v, class: v && !personByText(v) ? 'unmatched' : '', title: v && !personByText(v) ? 'Not matched to the staff list' : '',
+      onchange: e => set(d, c.key, cleanCell(e.target.value)),
+      onkeydown: e => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } } }));
+  };
+  const days = Array.from({ length: daysIn(month) }, (_, i) => i + 1);
+  return h('div', {}, monthlyBar(kind),
+    h('section', { class: 'card scroll' }, h('table', { class: 'monthly' },
+      h('thead', {}, h('tr', {}, ['Date', 'Day', ...def.cols.map(c => `${c.label}${c.to ? ' •' : ''}${c.night ? ' ☾' : ''}`)].map(t => h('th', {}, t)))),
+      h('tbody', {}, days.map(d => {
+        const wd = weekday(month, d);
+        return h('tr', { class: (wd === 'Sat' || wd === 'Sun' ? 'weekend' : '') + (d === today ? ' today' : '') },
+          h('td', {}, h('button', { class: 'link', title: 'Go to this day', onclick: () => { switchDate(`${month}-${String(d).padStart(2, '0')}`); } }, d)),
+          h('td', { class: 'seen' }, wd),
+          def.cols.map(c => cell(d, c)));
+      })))));
+}
+
+let leaveFilter = '';
+function renderLeaveRoster() {
+  const month = curMonth();
+  const data = monthData('leave');
+  const entries = (data?.entries || [])
+    .filter(e => !leaveFilter || e.name.toLowerCase().includes(leaveFilter.toLowerCase()))
+    .sort((a, b) => a.name.localeCompare(b.name) || a.from.localeCompare(b.from));
+  const change = () => { personCache.clear(); render(); };
+  const row = e => h('tr', {},
+    h('td', {}, nameInput({ value: e.name, class: personByText(e.name) ? '' : 'unmatched', title: personByText(e.name) ? '' : 'Not matched to the staff list', onchange: ev => { e.name = cleanCell(ev.target.value); change(); } })),
+    h('td', {}, h('input', { type: 'date', value: e.from, onchange: ev => { e.from = ev.target.value; if (e.to < e.from) e.to = e.from; change(); } })),
+    h('td', {}, h('input', { type: 'date', value: e.to, onchange: ev => { e.to = ev.target.value < e.from ? e.from : ev.target.value; change(); } })),
+    h('td', {}, select(e.type, LEAVE_TYPES.includes(e.type) || !e.type ? LEAVE_TYPES : [e.type, ...LEAVE_TYPES], v => { e.type = v; change(); })),
+    h('td', {}, h('input', { value: e.remarks || '', onchange: ev => { e.remarks = ev.target.value; save(); } })),
+    h('td', {}, h('button', { class: 'small', title: 'Remove', onclick: () => { data.entries = data.entries.filter(x => x !== e); change(); } }, '✕')));
+  return h('div', {}, monthlyBar('leave'),
+    h('section', { class: 'card scroll' },
+      h('div', { class: 'bar' },
+        h('button', { onclick: () => { monthData('leave', month, true).entries.unshift({ name: '', from: state.day.date, to: state.day.date, type: 'Annual Leave', remarks: '' }); leaveFilter = ''; render(); } }, '+ Add leave'),
+        h('span', { class: 'stats' }, h('span', {}, h('b', {}, data?.entries?.length || 0), ' entries')),
+        h('span', { class: 'grow' }),
+        h('input', { placeholder: 'Filter names', value: leaveFilter, oninput: e => { leaveFilter = e.target.value; const pos = e.target.selectionStart; render(); const i = app.querySelector('.card.scroll input[placeholder="Filter names"]'); i.focus(); i.setSelectionRange(pos, pos); } })),
+      entries.length
+        ? h('table', {}, h('thead', {}, h('tr', {}, ['Name', 'From', 'To', 'Leave type', 'Remarks', ''].map(t => h('th', {}, t)))), h('tbody', {}, entries.map(row)))
+        : h('p', { class: 'empty' }, `No leave for ${monthName(month)} yet.`)));
 }
 
 // ----- premed tab -----
@@ -1459,7 +1791,6 @@ function renderPremed() {
     const mate = juniors.find(j => j.p && !away(j.p) && !isBaby(j.p))?.p;
     const cur = cellParts(row, 'premed')[0] || '';
     if (needs) { needed++; if (!cur) missing++; }
-    if (!needs && !cur && premedFilter) return null;
     const options = [['', '— none —'], ...coverers.map(p => [p.name, `${p.name}${homeOf[p.id] ? ' · ' + homeOf[p.id] : ' · not on a list'}${load[p.name] ? ` · ${load[p.name]} room${load[p.name] > 1 ? 's' : ''}` : ''}`])];
     if (cur && !options.some(o => o[0] === cur)) options.push([cur, cur]);
     return h('tr', { class: needs && !cur ? 'flagged' : '' },
@@ -1471,17 +1802,15 @@ function renderPremed() {
   return h('div', {},
     h('section', { class: 'card' },
       h('h2', {}, 'Premed cover'),
-      h('p', { class: 'hint' }, 'A room needs premed cover when its junior wasn\'t around on the previous working day (tick "away yesterday" on the Manpower tab). Cover can be any resident or MOPEX who was around, from any complex. The list shows where each person is today and how many rooms they already cover (max ' + state.settings.premedCap + ').'),
+      h('p', { class: 'hint' }, 'A room needs premed cover when its junior wasn\'t around on the previous working day (it comes from the monthly rosters, or tick "away yesterday" under Monthly › Today). Cover can be any resident or MOPEX who was around, from any complex. The list shows where each person is today and how many rooms they already cover (max ' + state.settings.premedCap + ').'),
       h('div', { class: 'bar' },
         h('span', { class: 'stats' }, h('span', {}, h('b', {}, needed), ' rooms need cover'), h('span', {}, h('b', {}, missing), ' still without')),
-        h('span', { class: 'grow' }),
-        h('label', { class: 'seen' }, h('input', { type: 'checkbox', checked: premedFilter, onchange: e => { premedFilter = e.target.checked; render(); } }), ' Only rooms that need or have cover'))),
+        h('span', { class: 'grow' }))),
     h('section', { class: 'card scroll' }, h('table', { class: 'sheet' },
       h('thead', {}, h('tr', {}, ['', 'Junior', '', 'Premed cover'].map(t => h('th', {}, t)))),
       h('tbody', {}, rows))),
     rosterLogCard());
 }
-let premedFilter = true;
 
 // The sheet exactly as it will be exported, drawn as an HTML table.
 function renderSheet() {
@@ -1546,7 +1875,7 @@ function boxCard() {
   const fromNames = nameComments();
   return h('section', { class: 'card' },
     h('h2', {}, 'Comments box'),
-    h('p', { class: 'hint' }, 'Shown in the box at the top right of the sheet, e.g. meetings or people away. People on an admin day go on the Admin/no list row instead (Manpower tab).'),
+    h('p', { class: 'hint' }, 'Shown in the box at the top right of the sheet, e.g. meetings or people away. People on an admin day go on the Admin/no list row instead (Monthly › Today).'),
     h('textarea', { rows: 5, value: state.day.box || '', placeholder: 'e.g. Sophia Ang - mtg 2 to 5pm', onchange: e => {
       const before = state.day.box || '';
       state.day.box = e.target.value;
@@ -1595,7 +1924,7 @@ function renderRoster() {
   if (rosterView === 'sheet') {
     return h('div', {},
       h('section', { class: 'card no-print' }, h('h2', {}, 'OT roster'), actions,
-        h('p', { class: 'hint', style: 'margin:0' }, 'This is what the downloaded .xlsx looks like. The top half comes from the Calls/clinics tab; case notes aren\'t included. Switch to Edit to move names or change tags. & marks a senior who is double covering.')),
+        h('p', { class: 'hint', style: 'margin:0' }, 'This is what the downloaded .xlsx looks like. The top half comes from Monthly › Today; case notes aren\'t included. Switch to Edit to move names or change tags. & marks a senior who is double covering.')),
       renderSheet());
   }
   return h('div', {},
@@ -1706,6 +2035,15 @@ function renderSettings() {
         h('div', {}, h('label', {}, 'Runs-late keywords'), h('textarea', { value: st.longKeywords.join(', '), onchange: e => { st.longKeywords = splitNameList(e.target.value).map(x => x.toLowerCase()); save(); } })),
       ),
     ),
+    h('section', { class: 'card' },
+      h('h2', {}, 'Post call'),
+      h('p', { class: 'hint' }, 'Someone on one of these overnight duties in the monthly rosters is post call the next day.'),
+      h('div', { class: 'chips' }, MONTHLY.flatMap(def => def.cols.filter(c => !def.list).map(c => {
+        const key = `${def.id}.${c.key}`;
+        const list = st.nightDuties || NIGHT_DUTIES;
+        const on = list.includes(key);
+        return h('span', { class: 'chip' + (on ? ' on' : ''), onclick: () => { st.nightDuties = on ? list.filter(k => k !== key) : [...list, key]; render(); } }, `${def.label.replace(' Roster', '')}: ${c.label}`);
+      })))),
     h('section', { class: 'card' },
       h('h2', {}, 'Rooms'),
       h('p', { class: 'hint' }, 'The rooms on the roster, in order. "Running by default" rooms are ticked when you set up a new day (Clear day). Rooms in the same complex can share a senior when seniors are short. MOR 7–9 are emergency OTs, so they have no line.'),
@@ -1849,7 +2187,7 @@ cloud.watchUser(async user => {
   if (cs.member) loadTeamFromCloud(false);
 }).catch(e => { cs.ready = true; cloudError(e); render(); });
 
-const teamHash = () => JSON.stringify([state.settings, state.staff, state.roomTemplate, state.staffLog || []]);
+const teamHash = () => JSON.stringify([state.settings, state.staff, state.roomTemplate, state.staffLog || [], state.monthly || {}]);
 
 // Shown on the staff and settings tabs: whether this browser's staff list, rooms and settings match the team's.
 function teamSyncBar() {
@@ -1857,7 +2195,7 @@ function teamSyncBar() {
   const dirty = state.teamSyncedHash !== teamHash();
   return h('div', { class: 'bar sync' + (dirty ? ' dirty' : '') },
     h('span', {}, dirty
-      ? 'You have changes to staff, rooms or settings that the team doesn\'t have yet.'
+      ? 'You have changes to staff, rooms, settings or monthly rosters that the team doesn\'t have yet.'
       : `Shared with the team${state.teamSyncedAt ? `, last saved ${when(state.teamSyncedAt)}` : ''}.`),
     h('button', { class: dirty ? 'primary' : '', onclick: saveTeamToCloud }, 'Save for the team'),
     h('button', { onclick: () => loadTeamFromCloud(true) }, 'Load team version'));
@@ -1866,6 +2204,7 @@ function teamSyncBar() {
 async function saveTeamToCloud() {
   try {
     const doc = await cloud.saveTeam({ settings: state.settings, staff: state.staff, roomTemplate: state.roomTemplate, roomsVersion: state.roomsVersion, staffLog: state.staffLog || [] }, me());
+    await cloud.saveMonthly(state.monthly || {}, me());
     state.teamSyncedAt = doc.updatedAt;
     state.teamSyncedHash = teamHash();
     render();
@@ -1885,6 +2224,8 @@ async function loadTeamFromCloud(asked) {
     staffBackup = null;
     cleanStaffNames();
     state.roomTemplate = t.roomTemplate || clone(DEFAULT_ROOMS);
+    const m = await cloud.loadMonthly();
+    if (m) state.monthly = m.months || {};
     state.teamSyncedAt = t.updatedAt;
     state.roomsVersion = t.roomsVersion || 1;
     migrateRooms();
@@ -1925,6 +2266,8 @@ async function saveRosterToCloud() {
 function openSaved(date, snapshot, updatedAt) {
   const local = state.roster && state.day.date === date;
   if (local && !confirm(`Replace the roster on screen with the saved one for ${date}?`)) return;
+  if (state.day.date !== date) (state.days ||= {})[state.day.date] = { day: state.day, roster: state.roster };
+  delete state.days?.[date];
   state.day = clone(snapshot.day);
   state.roster = clone(snapshot.roster);
   state.day.date = date;
@@ -2033,7 +2376,5 @@ function membersCard() {
 }
 
 lastRows = state.roster ? JSON.stringify(state.roster.rows) : null;
-if (state.tab === 'staff') state.tab = 'seniors';
-state.tab = 'roster'; // the page opens on the roster
-if (!state.staff.length) state.tab = 'seniors';
+state.tab = state.staff.length ? 'roster' : 'staff'; // the page opens on the roster
 render();

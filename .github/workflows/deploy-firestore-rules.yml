@@ -1,0 +1,51 @@
+name: Deploy Firestore rules
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'logbook/firestore.rules'
+      - 'nuh-roster/firestore.rules'
+  workflow_dispatch:
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      logbook: ${{ steps.filter.outputs.logbook }}
+      roster: ${{ steps.filter.outputs.roster }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            logbook: 'logbook/firestore.rules'
+            roster: 'nuh-roster/firestore.rules'
+
+  deploy:
+    needs: changes
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - dir: logbook
+            project: apmes-logbook
+            changed: logbook
+          - dir: nuh-roster
+            project: nuh-roster
+            changed: roster
+    steps:
+      - uses: actions/checkout@v4
+        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs[matrix.changed] == 'true'
+      - name: Deploy ${{ matrix.dir }}/firestore.rules to ${{ matrix.project }}
+        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs[matrix.changed] == 'true'
+        working-directory: ${{ matrix.dir }}
+        env:
+          SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          echo "$SA_KEY" > "$RUNNER_TEMP/sa.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
+          echo '{"firestore":{"rules":"firestore.rules"}}' > firebase.json
+          npx --yes firebase-tools@13 deploy --only firestore:rules --project ${{ matrix.project }} --non-interactive

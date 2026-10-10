@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { matchName, namesInCell, suggestFlags, generate, check, tickFromHistory, suggestShortName, suggestShortNames } from '../js/engine.js';
 
-const P = (id, name, role, extra = {}) => ({ id, name, role, grade: role === 'senior' ? 'Consultant' : 'Resident', aliases: [], posting: '', subspecs: [], avoid: [], ...extra });
+const P = (id, name, role, extra = {}) => ({ id, name, role, grade: role === 'senior' ? 'C' : 'Junior resident', aliases: [], posting: '', subspecs: [], avoid: [], ...extra });
 
 // names
 const staff0 = [P('a', 'Tan Yi Wei', 'senior'), P('b', 'Leong Siaw May', 'senior'), P('c', 'Tan Yi Ling', 'senior')];
@@ -37,7 +37,7 @@ const staff = [
   P('s1', 'Senior Paeds', 'senior', { subspecs: ['paeds'] }),
   P('s2', 'Senior Cardiac', 'senior', { subspecs: ['cardiac'] }),
   P('s3', 'Senior General', 'senior', { avoid: ['eye'] }),
-  P('j1', 'Junior Baby', 'junior', { grade: 'Baby MO' }),
+  P('j1', 'Junior Baby', 'junior', { grade: 'MOPEX', colour: 'green' }),
   P('j2', 'Junior Resident', 'junior'),
   P('j3', 'Junior Mopex', 'junior', { grade: 'MOPEX' }),
   P('j4', 'Junior Paeds', 'junior', { posting: 'P' }),
@@ -95,13 +95,13 @@ console.log('engine tests passed');
   assert.equal(findSameStaff('Sophia Ang Bee Leng', staff).id, 'a');
   let n = 0;
   const res = mergeContacts(staff, [
-    { name: 'Sophia Ang Bee Leng', role: 'senior', grade: 'Consultant', subspecs: ['cardiac'] },
-    { name: 'Donald Foo Peng Xiang', role: 'senior', grade: 'Consultant', subspecs: [] },
+    { name: 'Sophia Ang Bee Leng', role: 'senior', grade: 'C', subspecs: ['cardiac'] },
+    { name: 'Donald Foo Peng Xiang', role: 'senior', grade: 'C', subspecs: [] },
     { name: 'New Person Senior', role: 'senior', grade: 'AC', subspecs: ['paeds'] },
     { name: 'New Junior Person', role: 'junior', grade: 'MOPEX', subspecs: [] },
   ], () => 'n' + ++n);
   assert.deepEqual(res.staff.find(p => p.id === 'a').subspecs, ['cardiac']);
-  assert.equal(res.staff.find(p => p.id === 'b').grade, 'Consultant');
+  assert.equal(res.staff.find(p => p.id === 'b').grade, 'C');
   assert.ok(res.staff.some(p => p.name === 'New Person Senior'));
   assert.deepEqual(res.skipped, ['New Junior Person']);
   assert.deepEqual(staff[0].subspecs, [], 'input not mutated');
@@ -155,7 +155,7 @@ console.log('engine tests passed');
   const st = [
     P('s1', 'Senior A', 'senior'), P('s2', 'Senior B', 'senior'), P('s3', 'Senior C', 'senior'),
     P('j1', 'Junior A', 'junior'), P('j2', 'Junior B', 'junior'), P('j3', 'Junior C', 'junior'),
-    P('j4', 'Junior SR', 'junior', { grade: 'Senior Resident' }),
+    P('j4', 'Junior SR', 'junior', { grade: 'Senior resident' }),
   ];
   const dy = { rooms: [room('r1', 'MOR 1', 'MOR', 'hernia')], staff: {} };
   const g = generate({ staff: st, day: dy, seed: 5 });
@@ -169,4 +169,32 @@ console.log('engine tests passed');
   assert.equal(g2.rows.find(r => r.label === 'AH OT').senior, 'Senior C');
   assert.equal(g2.rows.find(r => r.label === 'AIC').senior, 'Junior SR');
   console.log('special row tests passed');
+}
+
+// monthly rosters (fake names only)
+{
+  const M = await import('../js/monthly.js');
+  assert.deepEqual(M.parseTitle('Anaesthesia - Junior On Call Roster For Oct 2022'), { kind: 'junior', month: '2022-10' });
+  assert.equal(M.parseTitle('Anaesthesia - Liver Transplant Roster (new) For Oct 2022').kind, 'liver');
+  assert.equal(M.parseTitle('Anaesthesia - Night List (After Office Hr) Roster For Oct 2022').kind, 'aoh');
+  assert.deepEqual(M.parsePeriod('1 Oct - 4 Oct', '2022-10'), { from: '2022-10-01', to: '2022-10-04' });
+  assert.deepEqual(M.parsePeriod('6 Oct', '2022-10'), { from: '2022-10-06', to: '2022-10-06' });
+  assert.deepEqual(M.parsePeriod('30 Dec - 2 Jan', '2022-12'), { from: '2022-12-30', to: '2023-01-02' });
+  assert.equal(M.formatPeriod({ from: '2022-10-01', to: '2022-10-04' }), '1 Oct - 4 Oct');
+  // a page of PDF text: header centres, then a row per day
+  const page = [
+    { str: 'Anaesthesia - Junior On Call Roster For Oct 2022', x: 177, y: 811, w: 257 },
+    { str: 'R1', x: 146, y: 748, w: 8 }, { str: 'R2', x: 238, y: 748, w: 8 }, { str: 'Day Float', x: 414, y: 748, w: 27 },
+    { str: '1', x: 41, y: 731, w: 3 }, { str: 'Sat', x: 76, y: 731, w: 9 }, { str: 'Junior Alpha', x: 109, y: 731, w: 50 }, { str: 'Junior Beta []', x: 201, y: 731, w: 50 }, { str: 'Junior Gamma', x: 386, y: 731, w: 50 },
+  ];
+  const r = M.readMonthlyPdf([page]);
+  assert.equal(r.kind, 'junior');
+  assert.deepEqual(r.data.rows[1], { r1: 'Junior Alpha', r2: 'Junior Beta', df: 'Junior Gamma' });
+  const monthly = { '2022-10': { junior: r.data, leave: { entries: [{ name: 'Senior One', from: '2022-10-01', to: '2022-10-03', type: 'Medical Leave' }] } } };
+  assert.equal(M.generalFromMonthly(monthly, '2022-10-01')['mot.res1'], 'Junior Alpha');
+  assert.equal(M.generalFromMonthly(monthly, '2022-10-01')['epi.df'], 'Junior Gamma');
+  assert.equal(M.leaveOn(monthly, '2022-10-03').length, 1);
+  assert.equal(M.leaveOn(monthly, '2022-10-04').length, 0);
+  assert.ok(M.NIGHT_DUTIES.includes('junior.r1') && !M.NIGHT_DUTIES.includes('junior.df'));
+  console.log('monthly tests passed');
 }

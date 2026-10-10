@@ -1,7 +1,7 @@
 // Shared UI state and helpers for the logbook screens (ui-*.js). app.js owns boot, auth and tabs.
 
 import { BY_CODE, CATEGORIES } from './categories.js';
-import { countCases, uid, todayISO, sortCodes, progress, rYearDefault } from './engine.js';
+import { countCases, uid, todayISO, sortCodes, progress, rYearDefault, splitInitials, cleanInitials } from './engine.js';
 import * as cloud from './cloud.js';
 import { reflectionCounts } from './reflections.js';
 
@@ -186,9 +186,11 @@ function applyLocal(fn) {
   hooks.casesChanged();
 }
 
-export async function createCase({ date, details, cats, source = 'app', dateText }) {
+// Without `initials`, leading patient initials are split off the details ("AB 34F LSCS" -> 'AB', '34F LSCS').
+export async function createCase({ date, details, initials, cats, source = 'app', dateText }) {
   const now = Date.now();
-  const c = { id: uid(), date: date || null, details: String(details || '').trim(), cats: sortCodes(cats), createdAt: now, updatedAt: now, source };
+  const parts = initials == null ? splitInitials(details) : { initials: cleanInitials(initials), details: String(details || '').trim() };
+  const c = { id: uid(), date: date || null, initials: parts.initials, details: parts.details, cats: sortCodes(cats), createdAt: now, updatedAt: now, source };
   if (!date && dateText) c.dateText = dateText;
   applyLocal(list => [c, ...list]);
   cloud.saveCase(mine(), c).catch(err => toast('Could not save: ' + err.message));

@@ -110,13 +110,15 @@ service cloud.firestore {
       }
     }
     function validLogbook(email, d) {
-      return d.keys().hasOnly(['email', 'name', 'rid', 'settings', 'templates', 'updatedAt'])
+      return d.keys().hasOnly(['email', 'name', 'rid', 'settings', 'templates', 'profile', 'updatedAt'])
         && d.email == email
         && optString(d, 'rid', 40)
         && optNumber(d, 'updatedAt')
         && optString(d, 'name', 200)
         && (!('templates' in d) || (d.templates is list && d.templates.size() <= 100))
-        && (!('settings' in d) || d.settings is map);
+        && (!('settings' in d) || d.settings is map)
+        // portfolio Section 1 details (js/profile.js cleanProfile caps lists and strings)
+        && (!('profile' in d) || (d.profile is map && d.profile.size() <= 30));
     }
     function validBinEntry(id, d) {
       return d.keys().hasOnly(['id', 'kind', 'data', 'deletedAt'])
@@ -160,12 +162,13 @@ service cloud.firestore {
         && optNumber(d, 'w') && optNumber(d, 'h') && optNumber(d, 'createdAt');
     }
     function validCase(caseId, d) {
-      return d.keys().hasOnly(['id', 'date', 'dateText', 'details', 'cats', 'createdAt', 'updatedAt', 'source', 'importKey', 'reflectionId'])
+      return d.keys().hasOnly(['id', 'date', 'dateText', 'initials', 'details', 'cats', 'createdAt', 'updatedAt', 'source', 'importKey', 'reflectionId'])
         && d.id == caseId
         && d.details is string && d.details.size() <= 2000
         && d.cats is list && d.cats.size() <= 40
         && (!('date' in d) || d.date == null || (d.date is string && d.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')))
         && optString(d, 'dateText', 200)
+        && optString(d, 'initials', 20)
         && optString(d, 'importKey', 200)
         && optString(d, 'reflectionId', 200)
         && (!('source' in d) || d.source in ['app', 'import', 'paste', 'sheet'])

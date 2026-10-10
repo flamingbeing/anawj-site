@@ -4,14 +4,14 @@
 // cache in IndexedDB. The Firebase SDK files themselves (versioned, never change) are cached here,
 // so the app still starts with no signal after the phone has cleared its HTTP cache.
 
-const VERSION = 'logbook-v15';
+const VERSION = 'logbook-v16d';
 const SDK = 'https://www.gstatic.com/firebasejs/10.12.2/';
 const SDK_FILES = ['firebase-app.js', 'firebase-auth.js', 'firebase-firestore.js'].map(f => SDK + f);
 const SHELL = [
   './', 'index.html', 'style.css', 'manifest.webmanifest',
   'js/app.js', 'js/ui-core.js', 'js/ui-log.js', 'js/ui-logbook.js', 'js/ui-progress.js', 'js/ui-settings.js', 'js/ui-admin.js', 'js/ui-reflect.js', 'js/reflections.js', 'js/portfolio.js',
   'js/categories.js', 'js/engine.js', 'js/suggest.js', 'js/keywords.js', 'js/importer.js', 'js/xlsxio.js',
-  'js/cloud.js', 'js/demo-backend.js', 'js/firebase-config.js', 'js/bin.js', 'js/reflect-import.js', 'js/ui-reflect-import.js',
+  'js/cloud.js', 'js/demo-backend.js', 'js/firebase-config.js', 'js/bin.js', 'js/reflect-import.js', 'js/ui-reflect-import.js', 'js/ui-account.js', 'js/profile.js',
   'vendor/exceljs.min.js', 'vendor/jszip.min.js',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/maskable-512.png', 'icons/apple-touch-icon.png', 'icons/favicon-32.png',
 ];

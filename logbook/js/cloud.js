@@ -17,6 +17,7 @@
 
 import { FIREBASE_CONFIG } from './firebase-config.js';
 import * as D from './demo-backend.js';
+import { cleanProfile } from './profile.js';
 import { plain, cleanCase, cleanSummary, cleanResident, cleanTemplate, importDocId, defaultLogbook, cleanReflection, cleanImage } from './demo-backend.js';
 
 const SDK = 'https://www.gstatic.com/firebasejs/10.12.2/';
@@ -152,7 +153,7 @@ export async function saveLogbook(email, patch) {
   if (demo) return D.saveLogbook(email, patch);
   email = lc(email);
   const { db, F } = await sdk();
-  const doc = plain({ ...patch, email, updatedAt: Date.now() });
+  const doc = plain({ ...patch, ...(patch && 'profile' in patch ? { profile: cleanProfile(patch.profile) } : {}), email, updatedAt: Date.now() });
   await queued(F.setDoc(F.doc(db, 'logbooks', email), doc, { merge: true }));
   return doc;
 }

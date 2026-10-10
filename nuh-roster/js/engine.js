@@ -6,7 +6,7 @@ export const DEFAULT_SETTINGS = {
   premedCap: 3,
   subspecs: [
     { key: 'paeds', label: 'Paeds', keywords: ['pas', 'paeds', 'paed'], hard: true, posting: 'P', byAge: true },
-    { key: 'cardiac', label: 'Cardiac', keywords: ['c', 'cardiac', 'cabg', 'avr', 'mvr'], hard: true, posting: '' },
+    { key: 'cardiac', label: 'Cardiac', keywords: ['c', 'cardiac', 'cabg', 'avr', 'mvr'], hard: true, posting: 'Cardiac' },
     { key: 'neuro', label: 'Neuro', keywords: ['nes', 'neuro', 'craniotomy', 'crani'], hard: true, posting: 'Neu' },
     { key: 'thoracic', label: 'Thoracic', keywords: ['vats', 'thoracic', 'lobectomy'], hard: true, posting: 'SR' },
     { key: 'hpb', label: 'Liver / HPB', keywords: ['hepatec', 'hepatectomy', 'whipple', 'liver', 'hpb'], hard: false, posting: 'L' },
@@ -19,17 +19,31 @@ export const DEFAULT_SETTINGS = {
   roomDefaults: { 'MOR 12': ['cardiac'], 'MOR 13': ['cardiac'] },
 };
 
-export const JUNIOR_GRADES = ['Senior Resident', 'Resident', 'MOPEX', 'Baby MO'];
-export const SENIOR_GRADES = ['Consultant', 'AC', 'Registrar'];
-export const POSTINGS = ['', 'RA', 'P', 'L', 'SR', 'Neu', 'Amb'];
+// in order of seniority
+export const JUNIOR_GRADES = ['Senior resident', 'Junior resident', 'RP', 'Locum', 'MOPEX', 'Rotating resident'];
+export const SENIOR_GRADES = ['SC', 'C', 'VC', 'AC', 'RP'];
+// seniors first, then by grade, then by name
+export const bySeniority = (a, b) => (a.role === b.role ? 0 : a.role === 'senior' ? -1 : 1)
+  || rank(a) - rank(b) || String(a.name).localeCompare(String(b.name));
+const rank = p => { const i = (p.role === 'senior' ? SENIOR_GRADES : JUNIOR_GRADES).indexOf(p.grade); return i < 0 ? 99 : i; };
+export const DEFAULT_GRADE = { senior: 'C', junior: 'Junior resident' };
+// residents in training: preferred for complex lists
+export const isResident = p => ['Senior resident', 'Junior resident', 'Rotating resident'].includes(p?.grade);
+// Postings as [tag on the roster, name]. The tag is what the sheet shows after a name, e.g. "(RA)".
+export const POSTINGS = [['', '—'], ['P', 'Paeds'], ['Neu', 'Neuro'], ['SR', 'Special Risk'], ['Cardiac', 'Cardiac'], ['ENT', 'ENT'],
+  ['RA', 'Regional'], ['Vasc', 'Vascular'], ['Amb', 'Ambulatory'], ['Remote', 'Remote'], ['PACU', 'PACU'], ['L', 'Liver Transplant'], ['HPB', 'Liver Donor']];
+export const postingName = code => POSTINGS.find(p => p[0] === code)?.[1] || code || '';
+// Grades used before the department's own grade names, and what they became.
+export const OLD_GRADES = { senior: { Consultant: 'C' }, junior: { 'Senior Resident': 'Senior resident', Resident: 'Junior resident', 'Baby MO': 'MOPEX', 'Rotating Resident': 'Rotating resident' } };
 
 // Name colour on the roster: green marks Baby MOs (never left alone), purple marks locums.
 export const COLOURS = [['', 'Black'], ['green', 'Green'], ['purple', 'Purple']];
 export const COLOUR_ARGB = { green: 'FF00B050', purple: 'FF7030A0', red: 'FFFF0000' };
-export const isBaby = p => !!p && (p.grade === 'Baby MO' || p.colour === 'green');
+export const isBaby = p => !!p && p.colour === 'green';
 export const STATUSES = [
   ['avail', 'Available'],
   ['leave', 'Leave'],
+  ['mc', 'MC'],
   ['postcall', 'Post call'],
   ['elsewhere', 'Elsewhere'],
   ['admin', 'Admin / no list'],
@@ -269,7 +283,7 @@ function juniorRoomCost(p, d, room, settings, noise, doubled) {
   if (baby && doubled) return INF;
   let c = noise;
   if (baby && room.flags.complex) c += 30;
-  if (room.flags.complex) c += p.grade === 'Resident' ? -5 : 10;
+  if (room.flags.complex) c += isResident(p) ? -5 : 10;
   else if (p.grade === 'MOPEX') c -= 2;
   if (p.posting) {
     const match = room.flags.subspecs.some(k => sub[k]?.posting && sub[k].posting === p.posting)
@@ -436,10 +450,10 @@ export function generate({ staff, day, settings = DEFAULT_SETTINGS, seed = 1 }) 
   // ---- AIC: a consultant left over, else a senior resident ----
   let aicPerson = null;
   if (!fixed.aic) {
-    const free = seniors.filter(p => !usedSeniors.has(p.id) && p.grade === 'Consultant');
+    const free = seniors.filter(p => !usedSeniors.has(p.id) && ['SC', 'C'].includes(p.grade));
     aicPerson = free[Math.floor(rand() * free.length)] || null;
     if (!aicPerson) {
-      const sr = staff.filter(p => p.role === 'junior' && p.grade === 'Senior Resident' && isAvail(day, p));
+      const sr = staff.filter(p => p.role === 'junior' && p.grade === 'Senior resident' && isAvail(day, p));
       aicPerson = sr[Math.floor(rand() * sr.length)] || null;
     }
     if (aicPerson) usedSeniors.add(aicPerson.id);
@@ -710,7 +724,7 @@ export function learnFromRosters(rosterRows, staff, settings = DEFAULT_SETTINGS)
       if (!p) {
         // a short form ("Leong SM") is only useful once we know the full name
         if (tokens(n).length < 2 || tokens(n).some(t => t.length <= 2)) continue;
-        p = { id: 'p' + nextId++, source: 'roster', name: n, aliases: [], role: col, grade: col === 'senior' ? 'Consultant' : 'Resident', posting: '', subspecs: [], avoid: [], history: {} };
+        p = { id: 'p' + nextId++, source: 'roster', name: n, aliases: [], role: col, grade: DEFAULT_GRADE[col], posting: '', subspecs: [], avoid: [], history: {} };
         people.push(p);
       } else if (norm(n) !== norm(p.name) && !p.aliases.some(a => norm(a) === norm(n))) {
         if (tokens(n).length > tokens(p.name).length) { p.aliases.push(p.name); p.name = n; } else p.aliases.push(n);
@@ -721,7 +735,7 @@ export function learnFromRosters(rosterRows, staff, settings = DEFAULT_SETTINGS)
     }
     if (col === 'junior') {
       for (const part of String(raw).split('/')) {
-        const tag = part.match(/\((RA|P|L|SR|Neu|Amb|LivOT)\)/)?.[1];
+        const tag = part.match(/\((RA|P|L|SR|Neu|Amb|Cardiac|ENT|Vasc|Remote|PACU|HPB|LivOT)\)/)?.[1];
         const nm = namesInCell(part)[0];
         if (!tag || !nm) continue;
         const p = matchName(nm, people).person;
@@ -743,8 +757,8 @@ export function learnFromRosters(rosterRows, staff, settings = DEFAULT_SETTINGS)
   for (const p of people) {
     const c = counts[p.id];
     if (c && !staff.some(s => s.id === p.id)) p.role = c.senior >= c.junior ? 'senior' : 'junior';
-    if (p.role === 'senior' && SENIOR_GRADES.indexOf(p.grade) < 0) p.grade = 'Consultant';
-    if (p.role === 'junior' && JUNIOR_GRADES.indexOf(p.grade) < 0) p.grade = 'Resident';
+    if (p.role === 'senior' && SENIOR_GRADES.indexOf(p.grade) < 0) p.grade = DEFAULT_GRADE.senior;
+    if (p.role === 'junior' && JUNIOR_GRADES.indexOf(p.grade) < 0) p.grade = DEFAULT_GRADE.junior;
     if (postingSeen[p.id] && !p.posting) p.posting = postingSeen[p.id];
   }
   const order = { Other: 0, KROR: 1, MCOR: 2, MOR: 3 };
