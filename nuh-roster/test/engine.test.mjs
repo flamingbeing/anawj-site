@@ -136,6 +136,17 @@ console.log('engine tests passed');
   const st = [P('j5', 'Junior Five', 'junior'), P('j6', 'Junior Six', 'junior'), P('s1', 'Senior One', 'senior'), P('s2', 'Senior Two', 'senior')];
   const day = { rooms: [{ id: 'a', name: 'MOR 13' }, { id: 'b', name: 'MOR 14' }], staff: {} };
   assert.ok(!check({ rows: r2, staff: st, day }).some(w => /junior in/.test(w.text)), 'an ad hoc cover is not a second junior posting');
+  // short of juniors: a room is covered "(C)" by a junior from the same complex rather than left empty
+  {
+    const st = [P('s1', 'Senior One', 'senior'), P('s2', 'Senior Two', 'senior'), P('s3', 'Senior Three', 'senior'), P('j1', 'Junior One', 'junior'), P('j2', 'Junior Two', 'junior')];
+    const mk = (id, name) => ({ id, name, complex: 'MOR', running: true, notes: '', session: 'full' });
+    const day = { rooms: [mk('m1', 'MOR 1'), mk('m2', 'MOR 2'), mk('m3', 'MOR 3')], staff: {} };
+    const res = generate({ staff: st, day, seed: 3 });
+    const rows = res.rows.filter(r => /^MOR/.test(r.label));
+    assert.equal(rows.filter(r => /\(C\)/.test(r.junior)).length, 1, 'one room gets an ad hoc cover');
+    assert.ok(rows.every(r => r.junior), 'no room left without a junior');
+    assert.ok(!check({ rows: res.rows, staff: st, day }).some(w => /junior in/.test(w.text)));
+  }
   console.log('cover tests passed');
 }
 

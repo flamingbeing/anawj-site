@@ -123,6 +123,7 @@ tr.off td:first-child { opacity: 1; }
 /* sheet preview: a white page like Excel, in both themes */
 .sheet-wrap { background: #fff; color: #000; }
 table.xl { border-collapse: collapse; table-layout: fixed; width: auto; font-family: Arial, sans-serif; color: #000; background: #fff; }
+table.xl { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 table.xl td { border: 0; padding: 1px 3px; height: 17px; line-height: 1.2; overflow: hidden; white-space: normal; word-break: break-word; }
 table.xl tbody tr:nth-child(even) { background: none; }
 table.xl td.box { border: 1px solid #000; }
