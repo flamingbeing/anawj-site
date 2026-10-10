@@ -153,6 +153,11 @@ async function signIn() {
 // ---------- signed in ----------
 
 let unwatch = null, unwatchRefl = null, signedInOnce = false;
+// set before reloading for a closed Firestore client, so a persistent failure can't loop
+function reloadFlag(v) {
+  try { if (v === undefined) return sessionStorage.getItem('reloadedAfterTerminate'); if (v) sessionStorage.setItem('reloadedAfterTerminate', v); else sessionStorage.removeItem('reloadedAfterTerminate'); }
+  catch (e) { return v === undefined ? '1' : undefined; }   // storage blocked: never auto-reload
+}
 
 async function onUser(user) {
   if (unwatch) { unwatch(); unwatch = null; }
@@ -176,12 +181,15 @@ async function onUser(user) {
       cloud.listSharedTemplates().catch(() => []),
     ]);
     if (S.user !== user) return; // signed out meanwhile
+    reloadFlag('');
     Object.assign(S, { admin, resident, logbook, sharedTemplates: shared || [] });
     applyCompact(logbook.settings && logbook.settings.compact);   // per-user display setting
     if (!logbook.name && (resident?.name || user.name)) S.logbook.name = resident?.name || user.name;
     // a programme resident's logbook remembers their rid (used by admins and the rules)
     if (resident && logbook.rid !== resident.rid) cloud.saveLogbook(user.email, { rid: resident.rid }).catch(() => {});
   } catch (err) {
+    // a Firestore client closed by an earlier sign-out can't be reused: start the page afresh (once)
+    if (/terminated/i.test(err.message) && !reloadFlag()) { reloadFlag('1'); location.reload(); return; }
     fill(app, h('p', { class: 'empty' }, 'Could not load your logbook: ' + err.message), h('p', { class: 'empty' }, h('button', { onclick: () => onUser(user) }, 'Try again')));
     return;
   }
