@@ -18,9 +18,9 @@ const r = (o) => ({ status: 'complete', initials: 'AB', date: '2026-01-01', jr: 
   assert.equal(p.totals.done, 0);
   const bar = p.headings.find(x => x.id === 'bariatric');
   assert.deepEqual([bar.done, bar.min, bar.jrNeeded], [0, 3, 1]);
-  assert.ok(bar.issues.some(i => /JR/.test(i)));
+  assert.deepEqual(bar.issues, [], 'JR is a reminder, not an issue');
 }
-// JR requirement, subs, >1 JR without jr, duplicates, drafts not counted
+// counts only (JR and sub-types are reminders, not enforced), duplicates, drafts not counted
 {
   const list = [
     r({ id: '1', headingId: 'bariatric', initials: 'AA', jr: true }),
@@ -38,10 +38,10 @@ const r = (o) => ({ status: 'complete', initials: 'AB', date: '2026-01-01', jr: 
   assert.equal(by.bariatric.met, true);
   assert.equal(by.bariatric.jrDone, 1);
   assert.equal(by.bariatric.issues.length, 1);   // duplicate patient
-  assert.ok(by.thyroid.issues.some(i => /Only 1 JR/.test(i)));
-  assert.equal(by.thyroid.counted, 1);
-  assert.equal(by.cabg.met, false);
-  assert.ok(by.cabg.issues.some(i => /Off pump/.test(i)));
+  assert.deepEqual(by.thyroid.issues, []);
+  assert.equal(by.thyroid.counted, 2);
+  assert.equal(by.cabg.met, true, 'sub-types not enforced');
+  assert.deepEqual(by.cabg.issues, []);
   assert.ok(by.lap.issues.some(i => /Same patient/.test(i)));
   assert.equal(by.icu.done, 0);
   assert.equal(p.totals.done, 8);
@@ -83,7 +83,7 @@ const r = (o) => ({ status: 'complete', initials: 'AB', date: '2026-01-01', jr: 
   assert.deepEqual(completeProblems({ ...base, title: 'T', points: [{ heading: 'One', text: '' }] }), []);
   assert.deepEqual(completeProblems({ ...base, summary: 'S', points: [] }), ['at least one learning point']);
   assert.deepEqual(completeProblems({ ...base, points: [{ heading: 'a', text: 'b' }] }), ['title or case summary']);
-  assert.deepEqual(completeProblems({ headingId: 'cabg', title: 'T', points: [{ text: 'x' }] }), ['sub-type', 'initials', 'date']);
+  assert.deepEqual(completeProblems({ headingId: 'cabg', title: 'T', points: [{ text: 'x' }] }), ['initials', 'date']);
   // no case link is fine
   assert.deepEqual(completeProblems({ ...base, caseId: null, title: 'T', points: [{ heading: 'One' }] }), []);
   const legacy = { ...base, sections: { description: 'd', thoughts: 't', evaluation: 'e', analysis: 'a', conclusions: 'c', action: '' } };
@@ -151,11 +151,11 @@ assert.ok(MIN_WORDS > 0);
   const full = [1, 2, 3].map(i => r({ headingId: 'thoracic', initials: 'T' + i }));
   const s = suggestHeadings({ cats: ['07', '21'] }, full);
   assert.deepEqual(s.map(x => [x.headingId, x.needed]), [['geriatric', true], ['thoracic', false]]);
-  // JR shortfall ranks first for a JR case
+  // JR is a reminder only: a met heading stays behind, JR resident or not
   const ger = [1, 2, 3].map(i => r({ headingId: 'geriatric', initials: 'G' + i, jr: false }));
-  assert.deepEqual(suggestHeadings({ cats: ['04', '21'] }, ger, { jr: true }).map(x => x.headingId), ['geriatric', 'thyroid']);
+  assert.deepEqual(suggestHeadings({ cats: ['04', '21'] }, ger, { jr: true }).map(x => x.headingId), ['thyroid', 'geriatric']);
   assert.deepEqual(suggestHeadings({ cats: ['04', '21'] }, ger).map(x => x.headingId), ['thyroid', 'geriatric']);
-  assert.equal(suggestHeadings({ cats: ['21'] }, ger, { jr: true })[0].needed, true);
+  assert.equal(suggestHeadings({ cats: ['21'] }, ger, { jr: true })[0].needed, false);
   // moving between headings
   assert.deepEqual(moveToHeading({ headingId: 'regional', subId: 'll' }, 'thoracic'), { headingId: 'thoracic', subId: null });
   assert.deepEqual(moveToHeading({ headingId: 'regional', subId: 'chronic' }, 'urology'), { headingId: 'urology', subId: null });
