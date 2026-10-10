@@ -775,8 +775,50 @@ function logRoster(changes) {
   state.roster.log.splice(500);
 }
 
-function afterRosterEdit(undone) {
+// Where each junior is physically rostered: person id -> [{ row, part }] (ad hoc covers left out).
+function juniorPlaces(rows) {
+  const out = {};
+  rows.forEach((row, i) => cellParts(row, 'junior').forEach((part, k) => {
+    if (isCoverPart(part)) return;
+    const p = matchName(namesInCell(part)[0] || '', state.staff).person;
+    if (p) (out[p.id] ||= []).push({ row: i, part: k });
+  }));
+  return out;
+}
+
+// A junior can't be in two rooms at once: offer to make one of them an ad hoc cover (C).
+let askingCover = false;
+async function askCoverForDoubles(before) {
+  if (askingCover) return;
+  askingCover = true;
+  try { await askCover(before); } finally { askingCover = false; }
+}
+async function askCover(before) {
+  const rows = state.roster.rows;
+  const now = juniorPlaces(rows);
+  for (const [id, places] of Object.entries(now)) {
+    if (places.length < 2 || (before[id]?.length || 0) >= places.length) continue;
+    const p = state.staff.find(s => s.id === id);
+    const was = new Set((before[id] || []).map(x => rows[x.row]?.label));
+    const order = [...places].sort((a, b) => was.has(rows[a.row].label) - was.has(rows[b.row].label));
+    const labels = places.map(x => rows[x.row].label);
+    const choice = await confirmChanges(`${p.name} is now in ${labels.join(' and ')}`,
+      ['A junior can\'t be in two places at once. Pick the room where they are only an ad hoc cover: it shows as "' + shortName(p) + ' (C)" in red.'],
+      [...order.map((x, k) => [String(k), `Cover in ${rows[x.row].label}`, k ? '' : 'primary']), ['back', 'Keep both']]);
+    if (choice === 'back') continue;
+    const x = order[+choice];
+    const parts = cellParts(rows[x.row], 'junior');
+    const cur = parseNamePart(parts[x.part]);
+    parts[x.part] = buildNamePart({ ...cur, tags: [...cur.tags, 'C'], cover: '' });
+    setCellParts(rows[x.row], 'junior', parts);
+    afterRosterEdit(false, true);
+    return;
+  }
+}
+
+function afterRosterEdit(undone, prompted) {
   const r = state.roster;
+  const before = lastRows ? juniorPlaces(JSON.parse(lastRows)) : {};
   if (lastRows) {
     const changes = describeRowChanges(JSON.parse(lastRows), r.rows);
     logRoster(undone ? changes.map(c => 'Undo: ' + c) : changes);
@@ -784,6 +826,7 @@ function afterRosterEdit(undone) {
   lastRows = JSON.stringify(r.rows);
   r.checks = check({ rows: r.rows, staff: state.staff, day: state.day, settings: state.settings });
   render();
+  if (!undone && !prompted) askCoverForDoubles(before);
 }
 
 function dropName(src, dst) {
@@ -1069,9 +1112,12 @@ function rosterCell(row, i, key, doubles) {
   const parts = cellParts(row, key);
   let adder;
   if (editing === id) {
+    // Enter and the change event can both fire for one pick: add the name once
+    let busy = false;
+    const add = v => { if (busy) return; busy = true; addToCell(i, key, v).then(ok => { if (!ok) busy = false; }); };
     adder = nameInput({ class: 'cell-input', placeholder: 'Type a name',
-      onkeydown: e => { if (e.key === 'Escape') { editing = null; render(); } if (e.key === 'Enter') { e.preventDefault(); addToCell(i, key, e.target.value); } },
-      onchange: e => { if (state.staff.some(p => p.name === e.target.value)) addToCell(i, key, e.target.value); },
+      onkeydown: e => { if (e.key === 'Escape') { editing = null; render(); } if (e.key === 'Enter') { e.preventDefault(); add(e.target.value); } },
+      onchange: e => { if (state.staff.some(p => p.name === e.target.value)) add(e.target.value); },
       onblur: e => setTimeout(() => { if (editing === id && !e.target.value.trim()) { editing = null; render(); } }, 150),
     }, key === 'senior' && row.roomId !== 'aic' ? 'senior' : key === 'senior' ? null : 'junior');
     setTimeout(() => adder.focus());
@@ -1087,11 +1133,9 @@ function rosterCell(row, i, key, doubles) {
     }, p, key === 'senior' && isDouble(p, doubles) ? h('sup', { class: 'dbl', title: 'Double covering' }, '&') : null)), adder));
 }
 
-function runGenerate(newSeed) {
-  if (!state.staff.length) return toast('Add staff on the Seniors and Juniors tabs first.');
-  if (!state.day.rooms.some(r => r.running)) return toast('Tick the running rooms on the Cases tab first.');
-  const seed = newSeed ? Math.floor(Math.random() * 1e9) : (state.roster?.seed || 1);
-  // people on the General tab aren't available for the OT lists
+// The day as the generator sees it: people on the Calls/clinics tab are busy, and the
+// cardiac call team goes to MOR 12.
+function generatorDay() {
   const busy = generalPeople();
   const genDay = { ...state.day, staff: { ...state.day.staff }, rooms: state.day.rooms.map(r => ({ ...r })) };
   const mor12 = genDay.rooms.find(r => r.name === 'MOR 12' && r.running);
@@ -1103,14 +1147,78 @@ function runGenerate(newSeed) {
     if (ca && !mor12.lockJunior) mor12.lockJunior = ca.id;
   }
   for (const id of busy) if ((genDay.staff[id]?.status || 'avail') === 'avail') genDay.staff[id] = { ...(genDay.staff[id] || {}), status: 'elsewhere' };
-  const res = generate({ staff: state.staff, day: genDay, settings: state.settings, seed });
+  return genDay;
+}
+
+function canGenerate() {
+  if (!state.staff.length) { toast('Add staff on the Seniors and Juniors tabs first.'); return false; }
+  if (!state.day.rooms.some(r => r.running)) { toast('Tick the running rooms on the Cases tab first.'); return false; }
+  return true;
+}
+
+function runGenerate(newSeed) {
+  if (!canGenerate()) return;
+  const seed = newSeed ? Math.floor(Math.random() * 1e9) : (state.roster?.seed || 1);
+  const res = generate({ staff: state.staff, day: generatorDay(), settings: state.settings, seed });
   const log = state.roster?.date === state.day.date ? state.roster.log || [] : [];
-  if (state.roster?.rows?.length && state.roster.date === state.day.date && !confirm('Regenerate? This replaces the current roster, including any changes you made by hand. (Undo can\'t bring it back, but the change log keeps a record.)')) return;
+  if (state.roster?.rows?.length && state.roster.date === state.day.date && !confirm('Generate a new roster? This replaces the current one, including any changes you made by hand. (Undo can\'t bring it back, but the change log keeps a record.) To keep what\'s there, use Fill empty gaps instead.')) return;
   undoStack = []; editing = null;
   state.roster = { ...res, seed, date: state.day.date, log, checks: check({ rows: res.rows, staff: state.staff, day: state.day, settings: state.settings }) };
-  logRoster([log.length ? 'Regenerated the roster' : 'Generated the roster']);
+  logRoster([log.length ? 'Generated a new roster' : 'Generated the roster']);
   lastRows = JSON.stringify(res.rows);
   render();
+}
+
+// Keep every name already on the roster and generate only the empty cells: people already
+// placed stay where they are (so the generator can pair or cover around them), everyone
+// else rostered is left out.
+function fillGaps() {
+  if (!canGenerate()) return;
+  const r = state.roster;
+  const genDay = generatorDay();
+  const placed = new Set(), locked = new Set();
+  const person = text => matchName(namesInCell(text)[0] || '', state.staff).person;
+  for (const row of r.rows) for (const key of ['senior', 'junior']) for (const part of cellParts(row, key)) {
+    const p = person(part);
+    if (p) placed.add(p.id);
+  }
+  for (const row of r.rows) {
+    const room = genDay.rooms.find(x => x.id === row.roomId);
+    if (!room) continue;
+    const s = person(cellParts(row, 'senior')[0] || '');
+    const j = person(cellParts(row, 'junior').find(x => !isCoverPart(x)) || '');
+    if (s && !locked.has(s.id)) { room.lockSenior = s.id; locked.add(s.id); }
+    if (j && !locked.has(j.id)) { room.lockJunior = j.id; locked.add(j.id); }
+  }
+  for (const id of placed) {
+    if (locked.has(id) || (genDay.staff[id]?.status || 'avail') !== 'avail') continue;
+    genDay.staff[id] = { ...(genDay.staff[id] || {}), status: 'elsewhere' };
+  }
+  const special = id => r.rows.find(x => x.roomId === id) || {};
+  const fixed = { ...(genDay.fixed || {}) };
+  if (special('ahot').senior) fixed.ahot = special('ahot').senior;
+  if (special('aic').senior) fixed.aic = special('aic').senior;
+  if (special('aocc').senior || special('aocc').junior) { fixed['aocc.s'] = special('aocc').senior || ''; fixed['aocc.j'] = special('aocc').junior || ''; }
+  genDay.fixed = fixed;
+  const res = generate({ staff: state.staff, day: genDay, settings: state.settings, seed: Math.floor(Math.random() * 1e9) });
+  const old = Object.fromEntries(r.rows.map(x => [x.roomId, x]));
+  const filled = [];
+  const rows = res.rows.map(g => {
+    const o = old[g.roomId];
+    if (!o) { if (g.senior || g.junior) filled.push(`${g.label} (new room)`); return g; }
+    const row = { ...o };
+    for (const key of ['senior', 'junior', 'premed']) if (!String(o[key] || '').trim() && g[key]) { row[key] = g[key]; filled.push(`${g.label} ${key}`); }
+    return row;
+  });
+  if (!filled.length) return toast('Nothing to fill: no one free for the empty cells.');
+  undoStack.push(JSON.stringify(r.rows));
+  r.rows = rows;
+  r.warnings = res.warnings;
+  r.unusedSeniors = res.unusedSeniors;
+  r.unusedJuniors = res.unusedJuniors;
+  editing = null;
+  afterRosterEdit(false, true);
+  toast(`Filled ${filled.length} empty cell(s).`);
 }
 
 let rosterView = 'edit';
@@ -1251,6 +1359,7 @@ function renderSheet() {
       const style = [
         `font-size:${c.sz === 10 ? 13 : 11}px`, c.bold ? 'font-weight:700' : '', c.color ? `color:#${c.color.slice(2)}` : '',
         `text-align:${c.align}`, `vertical-align:${c.valign}`,
+        c.fill ? `background:#${c.fill.slice(2)}` : '', c.pad ? 'padding:6px 10px' : '',
       ].filter(Boolean).join(';');
       const attrs = { class: (c.box ? 'box' : '') + (c.c1 === 12 ? ' spill' : ''), colspan: c.c2 - c.c1 + 1, rowspan: c.r2 - c.r + 1, style };
       const lines = String(c.text).split('\n');
@@ -1289,7 +1398,8 @@ function boxCard() {
 function renderRoster() {
   const r = state.roster;
   const actions = h('div', { class: 'bar' },
-    h('button', { class: 'primary', onclick: () => runGenerate(!!r) }, r ? 'Regenerate' : 'Generate roster'),
+    h('button', { class: 'primary', onclick: () => runGenerate(!!r) }, r ? 'Generate new' : 'Generate roster'),
+    r && r.date === state.day.date && h('button', { onclick: fillGaps, title: 'Keep every name already on the roster and fill only the empty cells' }, 'Fill empty gaps'),
     r && h('button', { disabled: !undoStack.length, onclick: () => { state.roster.rows = JSON.parse(undoStack.pop()); afterRosterEdit(true); } }, 'Undo'),
     r && isMember() && h('button', { class: 'primary', onclick: saveRosterToCloud }, 'Save'),
     r && h('button', { onclick: exportXlsx }, 'Download .xlsx'),

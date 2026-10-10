@@ -452,7 +452,8 @@ export function generate({ staff, day, settings = DEFAULT_SETTINGS, seed = 1 }) 
   for (const r of rooms) {
     if (r.lockJunior && byId[r.lockJunior]) { rowOf[r.id].juniors.push(r.lockJunior); lockedJuniors.add(r.lockJunior); }
   }
-  const jRooms = rooms.filter(r => !rowOf[r.id].juniors.length);
+  // AOCC takes juniors left over after the OT lists, like its senior
+  const jRooms = rooms.filter(r => !rowOf[r.id].juniors.length && r.id !== 'aocc');
   let juniors = staff.filter(p => p.role === 'junior' && isAvail(day, p) && !lockedJuniors.has(p.id));
   // first pass: one junior per room; dummy "nobody" columns let rooms go without
   // a Baby MO never goes where there is no senior
@@ -471,18 +472,13 @@ export function generate({ staff, day, settings = DEFAULT_SETTINGS, seed = 1 }) 
     rowOf[jRooms[j].id].juniors.push(juniors[i].id);
     placed.add(juniors[i].id);
   });
-  for (const r of jRooms) {
-    if (!rowOf[r.id].juniors.length) {
-      warnings.push({ level: doubled.has(r.id) ? 'error' : 'warn', text: `${r.name}: no junior${doubled.has(r.id) ? ' but senior is double covering' : ''}.` });
-    }
-  }
-  // extra juniors: AOCC needs a second one first, then double up elsewhere,
+  // extra juniors: AOCC gets its two first, then double up elsewhere,
   // favouring rooms with Baby MOs, complex lists and posting matches
   let extras = juniors.filter(p => !placed.has(p.id));
-  if (rowOf.aocc && rowOf.aocc.juniors.length < 2) {
+  while (rowOf.aocc && rowOf.aocc.juniors.length < 2) {
     const k = extras.findIndex(p => !isBaby(p));
-    if (k >= 0) { rowOf.aocc.juniors.push(extras[k].id); extras.splice(k, 1); }
-    else warnings.push({ level: 'warn', text: 'AOCC: only one junior free.' });
+    if (k < 0) { warnings.push({ level: 'warn', text: `AOCC: ${rowOf.aocc.juniors.length ? 'only one junior' : 'no junior'} free.` }); break; }
+    rowOf.aocc.juniors.push(extras[k].id); extras.splice(k, 1);
   }
   while (extras.length) {
     const cost = extras.map(p => rooms.map(r => {
@@ -504,6 +500,34 @@ export function generate({ staff, day, settings = DEFAULT_SETTINGS, seed = 1 }) 
     });
     if (next.length === extras.length) break;
     extras = next;
+  }
+
+  // ---- ad hoc covers: a room still without a junior is covered by one from a nearby room
+  // in the same complex ("Name (C)"), which beats leaving it empty ----
+  const homeOf = {};
+  for (const r of rooms) for (const id of rowOf[r.id].juniors) homeOf[id] ||= r;
+  const coverLoad = {};
+  for (const r of rooms) {
+    const row = rowOf[r.id];
+    row.covers = [];
+    if (row.juniors.length || r.complex === 'Clinic' || r.complex === 'Other') continue;
+    let best = null, bestC = Infinity;
+    for (const [id, home] of Object.entries(homeOf)) {
+      const p = byId[id];
+      if (home.complex !== r.complex || home.id === r.id || isBaby(p) || home.complex === 'Clinic') continue;
+      let c = (coverLoad[id] || 0) * 20 + Math.abs((roomNum(home.name) || 0) - (roomNum(r.name) || 0)) + rand();
+      if (home.flags.complex) c += 8;
+      if (rowOf[home.id].juniors.length > 1) c -= 10;
+      if (p.grade === 'MOPEX') c += 3;
+      if (c < bestC) { bestC = c; best = id; }
+    }
+    if (best) {
+      row.covers.push(best);
+      coverLoad[best] = (coverLoad[best] || 0) + 1;
+      warnings.push({ level: doubled.has(r.id) ? 'warn' : 'info', text: `${r.name}: no junior free, ${byId[best].name} covers from ${homeOf[best].name} (C).` });
+    } else {
+      warnings.push({ level: doubled.has(r.id) ? 'error' : 'warn', text: `${r.name}: no junior${doubled.has(r.id) ? ' but senior is double covering' : ''}.` });
+    }
   }
 
   // ---- premed cover ----
@@ -546,7 +570,7 @@ export function generate({ staff, day, settings = DEFAULT_SETTINGS, seed = 1 }) 
       label: r.name,
       complex: r.complex,
       senior: row.seniors.map(id => fmtSenior(byId[id], dayOf(day, byId[id]))).join(' / '),
-      junior: row.juniors.map(id => fmtJunior(byId[id], dayOf(day, byId[id]))).join(' / '),
+      junior: [...row.juniors.map(id => fmtJunior(byId[id], dayOf(day, byId[id]))), ...(row.covers || []).map(id => `${byId[id].name} (C)`)].join(' / '),
       premed: row.premed ? `${byId[row.premed].name} - Premed` : '',
       notes: row.notes,
     };

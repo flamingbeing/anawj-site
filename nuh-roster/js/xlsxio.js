@@ -151,7 +151,8 @@ export function buildRosterWorkbook(ExcelJS, { date, rows, lists, general, box, 
       } })) };
     } else cell.value = c.text;
     cell.font = font;
-    cell.alignment = { horizontal: c.align, vertical: c.valign, wrapText: c.c2 < 12 };
+    cell.alignment = { horizontal: c.align, vertical: c.valign, wrapText: c.c2 < 12, ...(c.pad ? { indent: 1 } : {}) };
+    if (c.fill) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: c.fill } };
     // style the top-left cell, then merge: the merged cells take its style, so the box is drawn all round
     if (c.box) cell.border = { top: thin, bottom: thin, left: thin, right: thin };
     if (c.r2 > c.r || c.c2 > c.c1) ws.mergeCells(c.r, c.c1, c.r2, c.c2);
