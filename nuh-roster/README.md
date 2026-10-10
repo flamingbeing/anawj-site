@@ -6,7 +6,7 @@ Everything runs in the browser. Staff lists, leave and case notes stay in the br
 
 ## Flow
 
-1. **Staff**: import the master staff sheet (`Name`, `Short name`, `Role`, `Grade`, `Posting`, `Subspecs`, `Doesn't do` columns, found by header name), or *Learn from past rosters* to build the list from old roster files. Tick each senior's subspecs.
+1. **Seniors / Juniors**: import the master staff sheet (`Name`, `Short name`, `Role`, `Grade`, `Posting`, `Subspecs`, `Doesn't do` columns, found by header name), or *Learn from past rosters* to build the list from old roster files. Tick each senior's subspecs.
 2. **Day setup**: load the admin draft roster (rooms, case notes, leave, post call and upper-half duties are read from it), or tick rooms and paste names by hand. Mark leave times, liver standby, and juniors who were away on the previous working day.
 3. **Roster**: generate, edit cells, re-check, then download.
 
@@ -29,7 +29,7 @@ Everything runs in the browser. Staff lists, leave and case notes stay in the br
 
 With a Firebase project configured, rosterers sign in with Google. Then:
 
-- the staff list, rooms and settings are shared (*Save staff list for the team* on the Staff tab)
+- the staff list, rooms and settings are shared (*Save for the team* on the Seniors, Juniors or Settings tab)
 - each day's roster has a **Save** button, records who saved it and when, and keeps a permanent history of every save
 - anyone on the team can open any saved roster
 
