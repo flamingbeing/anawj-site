@@ -7,6 +7,7 @@ import { suggest } from './suggest.js';
 import {
   S, h, toast, debounce, modal, confirmBox, cat, catName, catFull, catChip, countText, PICKER_ORDER, PROGRESS_BY_CODE,
   createCase, updateCase, removeCase, restoreCase, saveMany, settings, todayISO, hooks, fill, add, cloud } from './ui-core.js';
+import { moveToBin } from './bin.js';
 
 const DRAFT_KEY = 'logbook-draft-v2';
 const KEEP_MS = 12 * 3600e3; // a date kept by "Save, keep date" lasts this long
@@ -399,8 +400,8 @@ export function editCaseDialog(c) {
     h('div', { class: 'bar', style: 'margin-top:12px' },
       h('button', { class: 'danger', onclick: async () => {
         m.close();
-        await removeCase(c.id);
-        toast('Case deleted', { action: 'Undo', onaction: () => restoreCase(c) });
+        // recycle bin (bin agent): kept 30 days; Undo restores it
+        try { await moveToBin('case', c, { toast: true }); } catch (err) { toast('Could not delete: ' + err.message); }
       } }, 'Delete'),
       h('span', { class: 'grow' }),
       h('button', { onclick: () => m.close() }, 'Cancel'),

@@ -150,3 +150,84 @@ export function wordCount(r) {
   return n;
 }
 
+
+// ---------- heading suggestions from a logged case ----------
+// Case category code -> [headingId, subId?]. Codes are matched exactly, then by their parent (e.g. 20iii -> 20).
+const CAT_HEADINGS = {
+  '01': [['cabg', 'on'], ['cardiac']], '02': [['cabg', 'off'], ['cardiac']],
+  '03': [['thoracic']], '07': [['thoracic']], '04': [['thyroid']], '05': [['ugi']], '06': [['egi']], '08': [['lap']],
+  '09': [['eye']], '11': [['shared']], '12': [['airway']], '15': [['neuro']], '15i': [['neuro']],
+  '16': [['lscs']], '17': [['labour']], '20': [['paeds']], '20i': [['paeds', 'neonate']],
+  '21': [['geriatric']], '23': [['bariatric']], '24': [['spine']],
+  '26': [['regional']], '26i': [['regional', 'ul']], '26ii': [['regional', 'll']], '26iii': [['regional', 'truncal']],
+  '27': [['regional', 'epidural']], '28': [['regional']], '29': [['regional']],
+  '30': [['acute']], '31': [['chronic']], '33': [['remote']], '34': [['urology']], '35': [['vascular']],
+  '36': [['polytrauma']], '38': [['icu']],
+};
+// Keyword hints in the case details: [regex, headingId, subId?, onlyIfHeadingAlreadySuggested?]
+const KEYWORD_HEADINGS = [
+  [/prostat|\bTURP\b|\bTURBT?\b/i, 'urology', 'prostate'],
+  [/nephrectom|kidney|\bPCNL\b|renal/i, 'urology', 'kidney'],
+  [/\bRSI\b|rapid sequence/i, 'paeds', 'rsi', true],
+  [/\bAAA\b|fem(oral)?[- ]?pop|aort/i, 'vascular'],
+  [/valve|\bAVR\b|\bMVR\b|\bTAVI\b|pacemaker|\bAICD\b|pericardial/i, 'cardiac'],
+  [/\bCABG\b/i, 'cabg'],
+  [/\bMRI\b|\bIR\b|angio|cath(eter)? lab|\bERCP\b/i, 'remote'],
+  [/polytrauma/i, 'polytrauma'],
+  [/difficult airway|\bAFOI\b|awake fib|\bFONA\b/i, 'airway'],
+  [/thyroid/i, 'thyroid'],
+  [/\bLSCS\b|caesar/i, 'lscs'],
+  [/craniotomy/i, 'neuro'],
+];
+
+// Ranked heading suggestions for a case: [{ headingId, subId, name, needed }].
+// Headings still short (count, a missing sub-type, or JR needed and the case is JR) come first.
+// opts.jr: the reflection would be a JR case (default: unknown -> JR shortfalls not considered).
+export function suggestHeadings(caseObj, reflections = [], opts = {}) {
+  if (!caseObj) return [];
+  const cats = (caseObj.cats || []).map(c => String(c).toLowerCase());
+  const details = String(caseObj.details || '');
+  const out = [];
+  const push = (headingId, subId = null) => {
+    const hd = HEADING_BY_ID[headingId];
+    if (!hd) return;
+    if (subId && !(hd.subs || []).some(s => s.id === subId)) subId = null;
+    const ex = out.find(o => o.headingId === headingId);
+    if (ex) { if (!ex.subId && subId) ex.subId = subId; return; }
+    out.push({ headingId, subId });
+  };
+  for (const c of cats) {
+    let m = CAT_HEADINGS[c];
+    if (!m) { const parent = c.match(/^\d{2}/); if (parent && /^20/.test(c)) m = CAT_HEADINGS['20']; else if (parent && /^26/.test(c)) m = CAT_HEADINGS['26']; }
+    if (!m) continue;
+    for (const [hid, sid] of m) {
+      // a 27 epidural on an obstetric case (17) is labour analgesia, not a non-obstetric epidural
+      if (c === '27' && cats.includes('17')) continue;
+      push(hid, sid);
+    }
+  }
+  for (const [re, hid, sid, onlyIf] of KEYWORD_HEADINGS) {
+    if (!re.test(details)) continue;
+    if (onlyIf && !out.some(o => o.headingId === hid)) continue;
+    push(hid, sid);
+  }
+  const prog = reflectionProgress(reflections || []);
+  const byId = Object.fromEntries(prog.headings.map(x => [x.id, x]));
+  const scored = out.map((o, i) => {
+    const p = byId[o.headingId];
+    const subNeeded = !!(o.subId && p.subs.some(s => s.id === o.subId && s.done < s.min));
+    const jrNeeded = !!(opts.jr && p.jrNeeded && p.jrDone < p.jrNeeded);
+    const needed = !p.met && (p.counted < p.min || subNeeded || jrNeeded || p.subs.some(s => s.done < s.min));
+    return { headingId: o.headingId, subId: o.subId, name: HEADING_BY_ID[o.headingId].name, needed, _s: (needed ? 0 : 100) - (subNeeded ? 2 : 0) - (jrNeeded ? 1 : 0), _i: i };
+  });
+  scored.sort((a, b) => a._s - b._s || a._i - b._i);
+  return scored.map(({ _s, _i, ...o }) => o);
+}
+
+// Move a reflection to another heading: keeps subId only when the new heading has that sub-type.
+export function moveToHeading(r, headingId) {
+  const hd = HEADING_BY_ID[headingId];
+  if (!hd) return { ...r };
+  const subId = hd.subs && hd.subs.some(s => s.id === r.subId) ? r.subId : null;
+  return { ...r, headingId, subId };
+}

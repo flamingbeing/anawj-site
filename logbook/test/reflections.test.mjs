@@ -127,4 +127,38 @@ assert.equal(wordCount({ title: 'Airway plan', summary: 'A made-up 50-year-old m
 assert.equal(wordCount({ sections: { description: 'old style text', action: 'plan' } }), 4);
 assert.equal(wordCount(null), 0);
 assert.ok(MIN_WORDS > 0);
+
+// heading suggestions
+{
+  const { suggestHeadings, moveToHeading } = await import('../js/reflections.js');
+  const ids = (c, refl = [], o) => suggestHeadings(c, refl, o).map(x => x.headingId + (x.subId ? ':' + x.subId : ''));
+  assert.deepEqual(ids({ cats: ['04'], details: 'AB thyroidectomy' }), ['thyroid']);
+  assert.deepEqual(ids({ cats: ['01'] }), ['cabg:on', 'cardiac']);
+  assert.deepEqual(ids({ cats: ['02'] }), ['cabg:off', 'cardiac']);
+  assert.deepEqual(ids({ cats: ['26ii'] }), ['regional:ll']);
+  assert.deepEqual(ids({ cats: ['26iv'] }), ['regional']);
+  assert.deepEqual(ids({ cats: ['27'] }), ['regional:epidural']);
+  assert.deepEqual(ids({ cats: ['17', '27'] }), ['labour']);
+  assert.deepEqual(ids({ cats: ['20i'] }), ['paeds:neonate']);
+  assert.deepEqual(ids({ cats: ['20iii'], details: 'CD 6M appendicectomy, RSI' }), ['paeds:rsi']);
+  assert.deepEqual(ids({ cats: ['13'], details: 'EF RSI for laparotomy' }), []);   // RSI only hints paeds
+  assert.deepEqual(ids({ cats: ['34'], details: 'GH TURP' }), ['urology:prostate']);
+  assert.deepEqual(ids({ cats: ['99'], details: 'JK EVAR for AAA' }), ['vascular']);
+  assert.deepEqual(ids({ cats: ['13'], details: 'LM MRI under GA' }), ['remote']);
+  assert.deepEqual(ids({ cats: [], details: 'AFOI for trismus' }), ['airway']);
+  assert.deepEqual(ids(null), []);
+  // a heading already met drops behind one still needed
+  const full = [1, 2, 3].map(i => r({ headingId: 'thoracic', initials: 'T' + i }));
+  const s = suggestHeadings({ cats: ['07', '21'] }, full);
+  assert.deepEqual(s.map(x => [x.headingId, x.needed]), [['geriatric', true], ['thoracic', false]]);
+  // JR shortfall ranks first for a JR case
+  const ger = [1, 2, 3].map(i => r({ headingId: 'geriatric', initials: 'G' + i, jr: false }));
+  assert.deepEqual(suggestHeadings({ cats: ['04', '21'] }, ger, { jr: true }).map(x => x.headingId), ['geriatric', 'thyroid']);
+  assert.deepEqual(suggestHeadings({ cats: ['04', '21'] }, ger).map(x => x.headingId), ['thyroid', 'geriatric']);
+  assert.equal(suggestHeadings({ cats: ['21'] }, ger, { jr: true })[0].needed, true);
+  // moving between headings
+  assert.deepEqual(moveToHeading({ headingId: 'regional', subId: 'll' }, 'thoracic'), { headingId: 'thoracic', subId: null });
+  assert.deepEqual(moveToHeading({ headingId: 'regional', subId: 'chronic' }, 'urology'), { headingId: 'urology', subId: null });
+  assert.equal(moveToHeading({ headingId: 'x', subId: 'neonate' }, 'paeds').subId, 'neonate');
+}
 console.log('reflections tests passed');

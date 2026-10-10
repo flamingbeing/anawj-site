@@ -34,7 +34,7 @@ const run = (text, fmt) => {
   return `<w:r>${rPr ? `<w:rPr>${rPr}</w:rPr>` : ''}<w:t xml:space="preserve">${esc(text)}</w:t></w:r>`;
 };
 const para = (pPr, runs) => `<w:p>${pPr || ''}${runs}</w:p>`;
-const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+export const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
 export function fmtDate(iso) {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || '');
@@ -200,7 +200,7 @@ export function groupReflections(reflections) {
 // ---------- filling the official template ----------
 
 // Top-level <w:tbl> spans in document.xml (nested tables are skipped over).
-function topTables(xml) {
+export function topTables(xml) {
   const out = [];
   const re = /<w:tbl>|<w:tbl\s[^>]*>|<\/w:tbl>/g;
   let depth = 0, start = -1, m;
@@ -210,12 +210,12 @@ function topTables(xml) {
   }
   return out;
 }
-const textOf = x => (x.match(/<w:t(?:\s[^>]*)?>[^<]*<\/w:t>/g) || []).map(t => t.replace(/<[^>]+>/g, '')).join('')
+export const textOf = x => (x.match(/<w:t(?:\s[^>]*)?>[^<]*<\/w:t>/g) || []).map(t => t.replace(/<[^>]+>/g, '')).join('')
   .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'");
-const parasOf = x => x.match(/<w:p(?=[\s>])[^>]*>[\s\S]*?<\/w:p>/g) || [];
+export const parasOf = x => x.match(/<w:p(?=[\s>])[^>]*>[\s\S]*?<\/w:p>/g) || [];
 
 // Which heading a table belongs to: the paragraph(s) just above it, matched on the heading name.
-function headingFor(between) {
+export function headingFor(between) {
   const all = parasOf(between).map(textOf).map(s => s.trim()).filter(Boolean);
   const texts = all.slice(-3).reverse();
   const minLine = [...all].reverse().find(t => /\(min\s*\d+\)/i.test(t));

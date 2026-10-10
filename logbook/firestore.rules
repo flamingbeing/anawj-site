@@ -94,6 +94,13 @@ service cloud.firestore {
         allow read, delete: if isOwner(email);
         allow create, update: if isOwner(email) && validImage(id, request.resource.data);
       }
+
+      // ---- recycle bin (bin agent): deleted cases/reflections kept 30 days; owner only, admins no access ----
+      // A binned reflection's figures stay in images/ until its bin entry is purged.
+      match /bin/{id} {
+        allow read, delete: if isOwner(email);
+        allow create, update: if isOwner(email) && validBinEntry(id, request.resource.data);
+      }
     }
     function validLogbook(email, d) {
       return d.keys().hasOnly(['email', 'name', 'rid', 'settings', 'templates', 'updatedAt'])
@@ -104,6 +111,15 @@ service cloud.firestore {
         && (!('templates' in d) || (d.templates is list && d.templates.size() <= 100))
         && (!('settings' in d) || d.settings is map);
     }
+    function validBinEntry(id, d) {
+      return d.keys().hasOnly(['id', 'kind', 'data', 'deletedAt'])
+        && d.keys().hasAll(['id', 'kind', 'data', 'deletedAt'])
+        && d.id == id && id.size() <= 120
+        && d.kind in ['reflection', 'case']
+        && d.data is map && d.data.size() <= 40
+        && d.deletedAt is number;
+    }
+    // ---- end recycle bin ----
     function sec(m, k) { return !(k in m) || (m[k] is string && m[k].size() <= 20000); }
     // lists can't be looped in rules: their sizes are capped here and their contents by reflections.js
     function validReflection(id, d) {

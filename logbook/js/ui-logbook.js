@@ -9,6 +9,7 @@ import {
   updateCase, saveMany, deleteMany, displayName, rYear, todayISO, fill, add } from './ui-core.js';
 import { editCaseDialog } from './ui-log.js';
 import { reflectOnCase } from './ui-reflect.js';
+import { moveToBin } from './bin.js';
 
 const view = { q: '', cat: '', flag: '', mode: null, limit: 150, month: null, day: null };
 const MODES = [['list', 'List'], ['calendar', 'Calendar'], ['grid', 'Grid']];
@@ -281,8 +282,8 @@ function previewDiff(d, after) {
         try {
           const writes = [...changed.map(x => x.after), ...added];
           if (writes.length) await saveMany(writes);
-          if (deleted.length) await deleteMany(deleted.map(c => c.id));
-          toast(`Applied: ${changed.length} changed, ${added.length} new, ${deleted.length} deleted`);
+          if (deleted.length) await moveToBin('case', deleted);   // recycle bin (bin agent): restorable for 30 days
+          toast(`Applied: ${changed.length} changed, ${added.length} new, ${deleted.length} deleted${deleted.length ? ' (in the recycle bin for 30 days)' : ''}`);
           after && after();
         } catch (err) { toast('Could not apply: ' + err.message); }
       } }, 'Apply')),
