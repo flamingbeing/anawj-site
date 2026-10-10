@@ -3,6 +3,7 @@
 import { R_YEARS, BY_CODE, CATEGORIES } from './categories.js';
 import { progress, epaProgress, todayISO } from './engine.js';
 import { exportTotals } from './xlsxio.js';
+import { reflectionProgress } from './reflections.js';
 import { S, h, toast, cloud, rYear, settings, patchLogbook, needExcel, download, displayName, hooks, add, resetters } from './ui-core.js';
 
 const STATUS_TEXT = { late: 'Behind', due: 'Due this year', ontrack: 'On track', done: 'Done', none: 'No target' };
@@ -51,7 +52,23 @@ export function renderProgress() {
     if (urgent.length) add(body, h('h3', {}, 'Needs attention'), progList(urgent), h('h3', { style: 'margin-top:16px' }, 'All categories'));
     add(body, progList(rows));
   }
-  return h('div', {}, head, body);
+  return h('div', {}, head, reflCard(), body);
+}
+
+// Reflections at a glance; the full list and editor are on #reflect.
+function reflCard() {
+  const p = reflectionProgress(S.reflections || []);
+  const met = p.headings.filter(x => x.met).length;
+  const issues = p.headings.reduce((n, x) => n + x.issues.length, 0);
+  return h('section', { class: 'card' },
+    h('div', { class: 'bar' },
+      h('h3', { style: 'margin:0' }, 'Reflections'),
+      h('span', { class: 'grow' }),
+      h('a', { class: 'btn small primary', href: '#reflect' }, 'Open reflections')),
+    h('p', { class: 'hint', style: 'margin-top:8px' },
+      `${p.totals.counted} / ${p.totals.min} counted · ${met} of ${p.headings.length} headings met · ${p.totals.drafts} draft${p.totals.drafts === 1 ? '' : 's'}`,
+      issues ? ` · ${issues} to sort out` : ''),
+    h('span', { class: 'meter' }, h('i', { class: met === p.headings.length ? 'done' : 'ontrack', style: `width:${Math.min(100, Math.round(p.totals.counted / p.totals.min * 100))}%` })));
 }
 
 function progList(items) {

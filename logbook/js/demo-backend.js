@@ -11,6 +11,9 @@
 
 export const DEMO_USER = { email: 'demo@example.com', name: 'Demo User', uid: 'demo-uid' };
 
+import { cleanReflection } from './reflections.js';
+export { cleanReflection };
+
 const KEY = 'apmes-logbook-demo-v1';
 
 // ---- shared field whitelists ----
@@ -155,10 +158,12 @@ function seed(s) {
 
 const caseWatchers = new Set();   // { email, cb }
 const userWatchers = new Set();
+const reflWatchers = new Set();   // { email, cb }
 
 function notifyAll() {
   for (const w of caseWatchers) w.cb(casesOf(w.email));
   for (const cb of userWatchers) cb(currentUser());
+  for (const w of reflWatchers) w.cb(reflectionsOf(w.email));
 }
 function notifyCases(email) {
   for (const w of caseWatchers) if (w.email === email) w.cb(casesOf(email));
@@ -257,6 +262,40 @@ export async function deleteCases(email, ids) {
   notifyCases(email);
 }
 
+// ---- reflections (logbooks/{email}/reflections/{id}) ----
+
+function reflectionsOf(email) {
+  const lb = load().logbooks[email];
+  return lb && lb.reflections ? Object.values(lb.reflections).map(plain).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)) : [];
+}
+function notifyReflections(email) {
+  for (const w of reflWatchers) if (w.email === email) w.cb(reflectionsOf(email));
+}
+export function watchReflections(email, cb) {
+  const w = { email: lc(email), cb: list => cb(list, meta) };
+  reflWatchers.add(w);
+  w.cb(reflectionsOf(w.email));
+  return () => reflWatchers.delete(w);
+}
+export async function saveReflection(email, r) {
+  email = lc(email);
+  const s = load();
+  const lb = book(s, email);
+  const doc = cleanReflection(r);
+  (lb.reflections ||= {})[doc.id] = doc;
+  save(s);
+  notifyReflections(email);
+  return doc;
+}
+export async function deleteReflection(email, id) {
+  email = lc(email);
+  const s = load();
+  const lb = book(s, email);
+  if (lb.reflections) delete lb.reflections[id];
+  save(s);
+  notifyReflections(email);
+}
+
 export async function writeSummary(rid, summary) {
   const s = load();
   s.summaries[rid] = cleanSummary(rid, summary);
@@ -308,4 +347,18 @@ export async function importCases(email, rid, cases, onProgress) {
   if (onProgress) onProgress(fresh.length, fresh.length);
   notifyCases(email);
   return { written: fresh.length, skipped: cases.length - fresh.length };
+}
+
+// ---- portfolio template (word-export) ----
+// Kept under its own key: it is ~1.4 MB of base64 and must not slow every load()/save() of the demo state.
+const TEMPLATE_KEY = KEY + '-portfolio-template';
+let templateMem = null;
+export async function saveTemplate(b64) {
+  const t = { data: b64, size: Math.floor(b64.length * 3 / 4), uploadedAt: Date.now() };
+  templateMem = t;
+  try { localStorage.setItem(TEMPLATE_KEY, JSON.stringify(t)); } catch (e) { console.warn('Demo template kept in memory only', e); }
+}
+export async function loadTemplate() {
+  try { const s = localStorage.getItem(TEMPLATE_KEY); if (s) return JSON.parse(s); } catch { /* storage blocked */ }
+  return templateMem;
 }

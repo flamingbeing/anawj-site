@@ -65,10 +65,10 @@ service cloud.firestore {
         allow delete: if isOwner(email) || isAdmin();
       }
 
-      // case reflections (later phase): owner only; closed to writes until that phase ships
+      // case reflections: owner only (admins have no access)
       match /reflections/{id} {
         allow read, delete: if isOwner(email);
-        allow write: if false;
+        allow create, update: if isOwner(email) && validReflection(id, request.resource.data);
       }
     }
     function validLogbook(email, d) {
@@ -79,6 +79,24 @@ service cloud.firestore {
         && optString(d, 'name', 200)
         && (!('templates' in d) || (d.templates is list && d.templates.size() <= 100))
         && (!('settings' in d) || d.settings is map);
+    }
+    function sec(m, k) { return !(k in m) || (m[k] is string && m[k].size() <= 20000); }
+    function validReflection(id, d) {
+      return d.keys().hasOnly(['id', 'headingId', 'subId', 'initials', 'date', 'jr', 'diagnosis', 'sections', 'caseId', 'status', 'createdAt', 'updatedAt'])
+        && d.id == id
+        && d.headingId is string && d.headingId.size() <= 40
+        && (!('subId' in d) || d.subId == null || (d.subId is string && d.subId.size() <= 40))
+        && optString(d, 'initials', 20)
+        && (!('date' in d) || d.date == null || (d.date is string && d.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')))
+        && (!('jr' in d) || d.jr is bool)
+        && optString(d, 'diagnosis', 2000)
+        && (!('caseId' in d) || d.caseId == null || (d.caseId is string && d.caseId.size() <= 200))
+        && d.status in ['draft', 'complete']
+        && d.sections is map
+        && d.sections.keys().hasOnly(['description', 'thoughts', 'evaluation', 'analysis', 'conclusions', 'action', 'further'])
+        && sec(d.sections, 'description') && sec(d.sections, 'thoughts') && sec(d.sections, 'evaluation')
+        && sec(d.sections, 'analysis') && sec(d.sections, 'conclusions') && sec(d.sections, 'action') && sec(d.sections, 'further')
+        && optNumber(d, 'createdAt') && optNumber(d, 'updatedAt');
     }
     function validCase(caseId, d) {
       return d.keys().hasOnly(['id', 'date', 'dateText', 'details', 'cats', 'createdAt', 'updatedAt', 'source', 'importKey', 'reflectionId'])
@@ -142,6 +160,20 @@ service cloud.firestore {
         && request.resource.data.cats is list && request.resource.data.cats.size() <= 40
         && optString(request.resource.data, 'details', 2000);
       allow delete: if isAdmin();
+    }
+
+    // ---- portfolio template (word-export): the blank APMES portfolio, base64 in ≤700 KB chunks ----
+    match /config/portfolioTemplate {
+      allow read: if signedIn();
+      allow write: if isAdmin()
+        && request.resource.data.keys().hasOnly(['parts', 'size', 'uploadedAt'])
+        && request.resource.data.parts is int && request.resource.data.parts >= 1 && request.resource.data.parts <= 20;
+    }
+    match /config/{part} {
+      allow read: if signedIn() && part.matches('portfolioTemplate_part[0-9]+');
+      allow write: if isAdmin() && part.matches('portfolioTemplate_part[0-9]+')
+        && request.resource.data.keys().hasOnly(['data'])
+        && request.resource.data.data is string && request.resource.data.data.size() <= 716800;
     }
   }
 }

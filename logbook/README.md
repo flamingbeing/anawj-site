@@ -40,7 +40,7 @@ Sign-in uses a Google popup, falling back to a redirect if popups are blocked (e
 | `residents/{rid}` | `{ rid, name, email (lower case), status: ACTIVE / ON LEAVE / GRADUATED / ATTRITED, intake, rYear 1–5 }` | admins; a user may read the entry with their own email |
 | `logbooks/{email}` | `{ email, name, rid, settings, templates: [{ id, name, cats, details? }], updatedAt }` | owner; admins read |
 | `logbooks/{email}/cases/{id}` | `{ id, date ('YYYY-MM-DD' or null), dateText?, details (≤2000 chars), cats (≤40 codes), createdAt, updatedAt, source: app / import / paste / sheet, importKey?, reflectionId? }` | owner; admins read and write (import) |
-| `logbooks/{email}/reflections/{id}` | case reflections (later) | owner only |
+| `logbooks/{email}/reflections/{id}` | `{ id, headingId, subId (or null), initials, date ('YYYY-MM-DD' or null), jr (bool), diagnosis (≤2000), sections: { description, thoughts, evaluation, analysis, conclusions, action, further } (each ≤20000 chars), caseId (or null), status: draft / complete, createdAt, updatedAt }` (`js/reflections.js`) | owner only; admins have no access |
 | `summaries/{rid}` | `{ rid, name, intake, rYear, counts: { code: n }, total, reflections: { headingId: n }, reflectionsTotal, updatedAt }` | admins and programme residents read; admins or that resident write |
 | `imports/{rid}` | `{ email, keys: [importKey], updatedAt }` (keys reset if the resident's email changes) | admins |
 | `sharedTemplates/{id}` | `{ id, name, cats, details? }` | everyone signed in reads; admins write |
@@ -58,6 +58,7 @@ The old data is the Google Form responses workbook (tabs **Case** and **AY20xx T
 
 ## Code
 
+- `js/reflections.js`: reflection shape and progress against the portfolio rules (96 total, JR, sub-types, unique patients); `js/ui-reflect.js`: the Reflections screen (`#reflect`, from Progress or a case's Reflect button).
 - `js/categories.js`: categories, targets, EPA tags, tips, reflection headings.
 - `js/suggest.js`, `js/keywords.js`: category suggestions from free text.
 - `js/engine.js`: dates, counts, progress, bulk paste, duplicates, spreadsheet diff. No DOM.

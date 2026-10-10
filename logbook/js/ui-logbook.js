@@ -8,6 +8,7 @@ import {
   S, h, toast, debounce, modal, cat, catChip, miniChips, PICKER_ORDER, needExcel, download, fileButton,
   updateCase, saveMany, deleteMany, displayName, rYear, todayISO, fill, add } from './ui-core.js';
 import { editCaseDialog } from './ui-log.js';
+import { reflectOnCase } from './ui-reflect.js';
 
 const view = { q: '', cat: '', flag: '', grid: false, limit: 150 };
 
@@ -78,7 +79,9 @@ function listView(rows, flagsOf, repaint) {
         flags.includes('needsDate') ? h('span', { class: 'flag err' }, 'needs date') : null,
         flags.includes('future') ? h('span', { class: 'flag' }, 'future date') : null,
         flags.includes('duplicate') ? h('span', { class: 'flag' }, 'possible duplicate') : null,
-        !(c.cats || []).length ? h('span', { class: 'flag err' }, 'no category') : null)));
+        !(c.cats || []).length ? h('span', { class: 'flag err' }, 'no category') : null,
+        h('button', { class: 'small', style: 'margin-left:auto', title: 'Write a reflection on this case', onclick: e => { e.stopPropagation(); reflectOnCase(c); } },
+          (S.reflections || []).some(r => r.caseId === c.id) ? 'Reflection' : 'Reflect'))));
   }
   // month headers are sticky and not tappable
   ul.querySelectorAll('.monthhead').forEach(li => { li.style.display = 'block'; li.style.cursor = 'default'; });
