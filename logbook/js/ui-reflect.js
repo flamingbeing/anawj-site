@@ -67,7 +67,8 @@ function list() {
     h('p', { class: 'hint' }, `${p.totals.counted} / ${p.totals.min} counted · ${p.totals.done} complete · ${p.totals.drafts} draft${p.totals.drafts === 1 ? '' : 's'}. `,
       'Each reflection is a different patient, under one heading only. JR = done in R1–R3.'),
     h('p', { class: 'hint' }, 'Generative AI use must follow the NUS guidelines on the use of AI tools in academic work.'),
-    h('div', { class: 'bar' }, renderExportButton(() => (S.reflections || []).filter(r => r.status === 'complete'), displayName)),
+    h('div', { class: 'bar' }, renderExportButton(() => (S.reflections || []).filter(r => r.status === 'complete'), displayName,
+      () => ({ cases: S.cases || [], intake: (S.resident && (S.resident.intake || Number(String(S.resident.rid || '').slice(0, 4)))) || null, rYear: rYear() }))),
     h('p', {}, h('a', { href: '#progress' }, '← Back to case progress')));
 
   const body = h('section', { class: 'card' });

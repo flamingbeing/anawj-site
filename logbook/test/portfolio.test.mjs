@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { REFLECTION_HEADINGS } from '../js/categories.js';
-import { fillDocumentXml, plainDocumentXml, exportPortfolio, rowCells, esc, fmtDate } from '../js/portfolio.js';
+import { fillDocumentXml, plainDocumentXml, exportPortfolio, rowCells, esc, fmtDate, caseRYear, countsByYear, fillSummaryXml } from '../js/portfolio.js';
 
 const JSZip = createRequire(import.meta.url)('../vendor/jszip.min.js');
 
@@ -56,4 +56,36 @@ if (process.env.PORTFOLIO_TEMPLATE) {
   assert.equal(out.usedTemplate, true);
   if (process.env.PORTFOLIO_OUT) writeFileSync(process.env.PORTFOLIO_OUT, new Uint8Array(await out.arrayBuffer()));
 }
+
+// Section 4: the resident's own counts replace the minimum numbers
+assert.equal(caseRYear('2024-07-01', 2024), 1);
+assert.equal(caseRYear('2025-06-30', 2024), 1);
+assert.equal(caseRYear('2025-07-01', 2024), 2);
+assert.equal(caseRYear('2031-01-01', 2024), 5, 'clamped to R5');
+assert.equal(caseRYear(null, 2024), null);
+{
+  const cases = [
+    { date: '2024-08-01', cats: ['20', '20iii'] }, { date: '2025-08-01', cats: ['20'] }, { date: null, cats: ['20', '20'] },
+    { date: '2025-09-01', cats: ['15i'] },
+  ];
+  const c = countsByYear(cases, 2024);
+  assert.deepEqual(c['20'], { total: 3, 1: 1, 2: 1 });
+  assert.deepEqual(c['20iii'], { total: 1, 1: 1 });
+  const tc = t => `<w:tc><w:tcPr/><w:p><w:r><w:t>${t}</w:t></w:r></w:p></w:tc>`;
+  const tr = cells => `<w:tr>${cells.map(tc).join('')}</w:tr>`;
+  const xml = `<w:tbl>${tr(['Posting period', 'Number of cases', 'Total Number'])}${tr(['', 'R1', 'R2', 'R3', 'R4', 'R5', ''])}`
+    + `${tr(['20) Paediatric Surgery (EPA 9)', '', '', 'Total - 125', '', 'Total - 155', ''])}${tr(['15 i) Emergency neurosurgery (EPA2)', '', '', '10', '', '', ''])}`
+    + `${tr(['Supervisor’s signature', '', '', '', '', '', ''])}</w:tbl>`;
+  const { xml: out, rows } = fillSummaryXml(xml, cases, { intake: 2024, rYear: 2 });
+  assert.equal(rows, 2);
+  const texts = r => (r.match(/<w:t(?:\s[^>]*)?>[^<]*<\/w:t>/g) || []).map(t => t.replace(/<[^>]+>/g, ''));
+  const trs = out.match(/<w:tr>[\s\S]*?<\/w:tr>/g);
+  assert.deepEqual(texts(trs[2]), ['20) Paediatric Surgery (EPA 9)', '1', '1', '', '', '', '3'], 'years not reached are blank; minimums gone');
+  assert.deepEqual(texts(trs[3]), ['15 i) Emergency neurosurgery (EPA2)', '0', '1', '', '', '', '1']);
+  assert.ok(!out.includes('Total - 125') && !out.includes('>10<'));
+  assert.deepEqual(texts(trs[4])[0], 'Supervisor’s signature');
+  const noIntake = fillSummaryXml(xml, cases, {}).xml.match(/<w:tr>[\s\S]*?<\/w:tr>/g);
+  assert.deepEqual(texts(noIntake[2]), ['20) Paediatric Surgery (EPA 9)', '', '', '', '', '', '3'], 'no intake: total only');
+}
+
 console.log('portfolio tests passed');

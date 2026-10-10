@@ -156,6 +156,58 @@ export function placeInSlots(hd, protoRows, list) {
   return rows;
 }
 
+// ---------- Section 4: summary of experience ----------
+
+// Residency year a case falls in: the academic year starts on 1 July; intake 2024 → AY2024 is R1.
+export function caseRYear(date, intake) {
+  const m = /^(\d{4})-(\d{2})/.exec(date || '');
+  if (!m || !intake) return null;
+  const ay = Number(m[1]) - (Number(m[2]) < 7 ? 1 : 0);
+  return Math.min(5, Math.max(1, ay - Number(intake) + 1));
+}
+
+// counts[code] = { 1: n, …, 5: n, total }
+export function countsByYear(cases, intake) {
+  const out = {};
+  for (const c of cases || []) {
+    const y = caseRYear(c.date, intake);
+    for (const code of new Set(c.cats || [])) {
+      const o = (out[code] ||= { total: 0 });
+      o.total++;
+      if (y) o[y] = (o[y] || 0) + 1;
+    }
+  }
+  return out;
+}
+
+// "15 i) Emergency neurosurgery (EPA2)" -> "15i"
+const s4Code = label => { const m = /^\s*(\d+)\s*([ivx]*)\s*\)/i.exec(label); return m ? m[1].padStart(2, '0') + m[2].toLowerCase() : null; };
+
+// Replace the minimum numbers in the "Posting period" table with the resident's own counts: cases in
+// each residency year (blank for years not reached yet) and the total. Without an intake year only
+// the total is filled.
+export function fillSummaryXml(xml, cases, { intake = null, rYear = null } = {}) {
+  const counts = countsByYear(cases, intake);
+  const upTo = rYear || (intake ? 5 : 0);
+  let n = 0;
+  const out = xml.replace(/<w:tbl>[\s\S]*?<\/w:tbl>/g, tbl => {
+    if (!/Posting period/.test(textOf(tbl))) return tbl;
+    return tbl.replace(/<w:tr(?=[\s>])[^>]*>[\s\S]*?<\/w:tr>/g, tr => {
+      const tcs = tr.match(/<w:tc(?:\s[^>]*)?>[\s\S]*?<\/w:tc>/g) || [];
+      if (tcs.length < 7) return tr;
+      const code = s4Code(textOf(tcs[0]));
+      if (!code) return tr;
+      n++;
+      const c = counts[code] || { total: 0 };
+      const vals = [1, 2, 3, 4, 5].map(y => (intake && y <= upTo ? String(c[y] || 0) : ''));
+      vals.push(String(c.total));
+      let i = 0;
+      return tr.replace(/<w:tc(?:\s[^>]*)?>[\s\S]*?<\/w:tc>/g, tc => (i++ === 0 ? tc : fillCell(tc, [[[vals[i - 2], false]]])));
+    });
+  });
+  return { xml: out, rows: n };
+}
+
 export function fillDocumentXml(xml, reflections, { name } = {}) {
   const groups = groupReflections(reflections);
   const tables = topTables(xml);
@@ -221,14 +273,15 @@ const b64ToBytes = b64 => {
 };
 
 // reflections: reflection objects (any status). Returns a Blob (.docx).
-export async function exportPortfolio(reflections, { name = '', templateB64 = null, JSZip = null } = {}) {
+export async function exportPortfolio(reflections, { name = '', templateB64 = null, JSZip = null, cases = null, intake = null, rYear = null } = {}) {
   const Z = JSZip || await needZip();
   let zip = null, usedTemplate = false;
   if (templateB64) {
     try {
       zip = await Z.loadAsync(b64ToBytes(templateB64));
       const xml = await zip.file('word/document.xml').async('string');
-      const { xml: filled, matched } = fillDocumentXml(xml, reflections, { name });
+      let { xml: filled, matched } = fillDocumentXml(xml, reflections, { name });
+      if (cases) filled = fillSummaryXml(filled, cases, { intake, rYear }).xml;
       if (matched.length < REFLECTION_HEADINGS.length / 2) throw new Error('template headings not found');
       zip.file('word/document.xml', filled);
       usedTemplate = true;
@@ -252,7 +305,8 @@ async function getTemplate() {
 }
 
 // A button for the reflections screen (or Progress): getReflections() and getName() are called on click.
-export function renderExportButton(getReflections, getName) {
+// getExtra() may return { cases, intake, rYear } to fill Section 4 with the resident's case counts.
+export function renderExportButton(getReflections, getName, getExtra) {
   return h('button', { onclick: async e => {
     const btn = e.currentTarget;
     btn.disabled = true;
@@ -260,7 +314,7 @@ export function renderExportButton(getReflections, getName) {
       const refl = (await getReflections()) || [];
       const t = await getTemplate();
       const name = (getName && getName()) || '';
-      const blob = await exportPortfolio(refl, { name, templateB64: t && t.data });
+      const blob = await exportPortfolio(refl, { name, templateB64: t && t.data, ...((getExtra && getExtra()) || {}) });
       download(`APMES portfolio reflections${name ? ' - ' + name : ''}.docx`, blob);
       toast(blob.usedTemplate ? 'Portfolio exported.' : 'Exported in the plain layout (no portfolio template uploaded yet).');
     } catch (err) { toast('Could not export: ' + err.message); }
