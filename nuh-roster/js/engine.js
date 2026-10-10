@@ -131,7 +131,7 @@ export function namesInCell(text) {
     .split('/')
     .map(s => s
       .replace(/\s-\s*premed.*$/i, '')
-      .replace(/\s+[LC]-.*$/, '')        // "L-4pm", "L-4-5pm", "C-OT13"
+      .replace(/\s+[LC]-.*$/, '')        // "L-4pm", "L-4-5pm", "C-OT13", "C-KROR PACU"
       .replace(/\s+-.*$/, '')          // "-mtg 8.30", "-C-OT 4", "-5pm"
       .replace(/\b(am|pm)\b/gi, ' ')
       .replace(/\breq\b/gi, ' ')
@@ -510,18 +510,31 @@ export function generate({ staff, day, settings = DEFAULT_SETTINGS, seed = 1 }) 
 // ---------- checks on a (possibly hand-edited) roster ----------
 
 // Someone leaving early is written "Name L-4pm" (or "L-4-5pm"); whoever covers the room is
-// written "Name C-OT13". Returns rooms where a leaver has no cover.
+// written "Name C-OT13", "Name C-KROR PACU" or "Name C-MOR 4". Returns rooms where a leaver has no cover.
+const COVER_RE = /\bC-\s*(.+?)(?=\s+L-|\s+-\s|$)/i;
+export function coverText(part) { return String(part).match(COVER_RE)?.[1].trim() || ''; }
+
+// Which room a cover refers to: a full room name ("KROR PACU", "MOR 4"), or "OT13" / "13"
+// meaning that room number in the coverer's own complex.
+export function coverTarget(text, row, rows) {
+  const t = String(text).toUpperCase().replace(/\s+/g, ' ').trim();
+  const exact = rows.find(r => r.label.toUpperCase() === t);
+  if (exact) return exact.label;
+  const n = t.match(/^(?:OT\s*)?(\d+)$/)?.[1];
+  if (n) return rows.find(r => r.complex === row.complex && roomNum(r.label) === +n)?.label || null;
+  return null;
+}
+
 export function missingCovers(rows) {
   const out = [];
-  const covers = new Set();
+  const covered = new Set();
   for (const row of rows) for (const col of ['senior', 'junior']) for (const part of String(row[col] || '').split('/')) {
-    const m = part.match(/\bC-\s*OT\s*(\d+)/i);
-    if (m) covers.add(row.complex + ':' + m[1]);
+    const c = coverText(part);
+    if (c) { const target = coverTarget(c, row, rows); if (target) covered.add(target); }
   }
   for (const row of rows) for (const col of ['senior', 'junior']) for (const part of String(row[col] || '').split('/')) {
     const m = part.match(/\bL-\s*([\d.:]+(?:\s*-\s*[\d.:]+)?\s*(?:am|pm)?)/i);
-    const num = roomNum(row.label);
-    if (m && !Number.isNaN(num) && !covers.has(row.complex + ':' + num)) out.push({ row, name: namesInCell(part)[0] || part.trim(), when: m[1] });
+    if (m && !covered.has(row.label)) out.push({ row, name: namesInCell(part)[0] || part.trim(), when: m[1] });
   }
   return out;
 }
@@ -529,7 +542,7 @@ export function missingCovers(rows) {
 export function check({ rows, staff, day, settings = DEFAULT_SETTINGS }) {
   const out = [];
   for (const m of missingCovers(rows)) {
-    out.push({ level: 'warn', text: `${m.row.label}: ${m.name} leaves L-${m.when} but nobody is marked C-OT${roomNum(m.row.label)} to cover.` });
+    out.push({ level: 'warn', text: `${m.row.label}: ${m.name} leaves L-${m.when} but nobody covers the room (C-${/^\D+\s\d+$/.test(m.row.label) ? 'OT' + roomNum(m.row.label) : m.row.label}).` });
   }
   const sub = subspecByKey(settings);
   const roomById = Object.fromEntries(day.rooms.map(r => [r.id, r]));

@@ -831,14 +831,14 @@ function nameInput(attrs = {}, role = null) {
 const TAGS = ['L', 'RA', 'P', 'SR', 'Neu', 'Amb', 'PACU'];
 let tagTimer = null;
 
-// "Tan YW (RA) L-4pm C-OT13 -mtg 5pm" -> name, tags, leave ("4pm" / "4-5pm"), cover ("13"), note
+// "Tan YW (RA) L-4pm C-OT13 -mtg 5pm" -> name, tags, leave ("4pm" / "4-5pm"), cover ("OT13", "KROR PACU"), note
 const TIME = '[\\d.:]+(?:\\s*-\\s*[\\d.:]+)?\\s*(?:am|pm)?';
 function parseNamePart(text) {
   const tags = [...String(text).matchAll(/\(([^)]*)\)/g)].map(m => m[1].trim()).filter(Boolean);
   let rest = String(text).replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim();
   let leave = '', cover = '', dash = '';
   rest = rest.replace(new RegExp(`\\s+L-\\s*(${TIME})`, 'i'), (_, t) => { leave = t.trim(); return ''; });
-  rest = rest.replace(/\s+-?C-\s*OT\s*(\d+)/i, (_, n) => { cover = n; return ''; });
+  rest = rest.replace(/\s+-?C-\s*(.+?)(?=\s+L-|\s+-\s|$)/i, (_, c) => { cover = c.trim().replace(/^OT\s+/i, 'OT'); return ''; });
   const m = rest.match(/^(.*?)\s+-\s*(.+)$/);
   if (m) {
     rest = m[1].trim(); dash = m[2].trim();
@@ -848,7 +848,7 @@ function parseNamePart(text) {
   return { name: rest.trim(), tags, leave, cover, dash };
 }
 const buildNamePart = ({ name, tags, leave, cover, dash }) =>
-  `${name}${tags.map(t => ` (${t})`).join('')}${leave ? ` L-${leave}` : ''}${cover ? ` C-OT${cover}` : ''}${dash ? ` -${dash}` : ''}`;
+  `${name}${tags.map(t => ` (${t})`).join('')}${leave ? ` L-${leave}` : ''}${cover ? ` C-${cover}` : ''}${dash ? ` -${dash}` : ''}`;
 
 function closeTagEditor() { document.querySelector('.tag-editor')?.remove(); }
 
@@ -862,7 +862,7 @@ function openTagEditor(chip, src) {
   const other = h('input', { value: cur.tags.filter(t => !TAGS.includes(t)).join(', '), placeholder: 'e.g. AOH 1' });
   const dash = h('input', { value: cur.dash, placeholder: 'e.g. mtg 3pm' });
   const leave = h('input', { value: cur.leave, placeholder: 'e.g. 4pm or 4-5pm' });
-  const cover = h('input', { value: cur.cover, placeholder: 'e.g. 13', inputmode: 'numeric' });
+  const cover = h('input', { value: cur.cover, placeholder: 'e.g. OT13, KROR PACU' });
   const name = nameInput({ value: cur.name }, src.key === 'senior' ? 'senior' : 'junior');
   const chips = h('div', { class: 'chips' }, TAGS.map(t => {
     const c = h('span', { class: 'chip' + (on.has(t) ? ' on' : ''), title: t === 'L' ? (src.key === 'senior' ? 'Liver standby' : 'Liver posting') : '', onclick: () => {
@@ -879,7 +879,7 @@ function openTagEditor(chip, src) {
       if (!person) return;
       picked = person.name;
     }
-    const next = buildNamePart({ name: picked, tags, leave: leave.value.trim().replace(/^L-/i, ''), cover: cover.value.trim().replace(/\D/g, ''), dash: dash.value.trim() });
+    const next = buildNamePart({ name: picked, tags, leave: leave.value.trim().replace(/^L-/i, ''), cover: cover.value.trim().replace(/^C-/i, ''), dash: dash.value.trim() });
     closeTagEditor();
     if (next === parts[src.part]) return;
     undoStack.push(JSON.stringify(state.roster.rows));
@@ -906,7 +906,7 @@ function openTagEditor(chip, src) {
     h('label', {}, 'Tags'), chips,
     h('label', {}, 'Other tags'), other,
     h('label', {}, 'Leaving (L-)'), leave,
-    h('label', {}, 'Covering OT (C-OT)'), cover,
+    h('label', {}, 'Covering (C-)'), cover,
     h('label', {}, 'Other note (after a dash)'), dash,
     h('div', { class: 'bar', style: 'margin:8px 0 0' },
       h('button', { class: 'primary', onclick: apply }, 'Save'),
@@ -1151,7 +1151,7 @@ function renderRoster() {
   }
   return h('div', {},
     h('section', { class: 'card' }, h('h2', {}, 'Roster'), actions,
-      h('p', { class: 'hint', style: 'margin:0' }, 'Drag a name onto another name to swap them, or onto an empty part of a cell to move it there. Click a name to change it or its tags ((L), (RA), L-4pm, C-OT13…). + adds someone from the staff list. Click the case notes to edit them. & marks a senior who is double covering. Premed cover is on its own tab.')),
+      h('p', { class: 'hint', style: 'margin:0' }, 'Drag a name onto another name to swap them, or onto an empty part of a cell to move it there. Click a name to change it or its tags ((L), (RA), L-4pm, C-OT13, C-KROR PACU…). + adds someone from the staff list. Click the case notes to edit them. & marks a senior who is double covering. Premed cover is on its own tab.')),
     h('div', { class: 'cols' },
       h('section', { class: 'card scroll' },
         h('table', { class: 'sheet' },
