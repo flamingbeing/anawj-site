@@ -1,0 +1,2564 @@
+{
+ "source": "EPA Guidebook - v8.pdf (Anaesthesiology residency, Singapore)",
+ "epas": [
+  {
+   "epa": "1",
+   "title": "Performing preoperative/ pre-procedural assessment and optimisation of adult patients",
+   "levels": [
+    {
+     "level": 3,
+     "by": "R1",
+     "scope": null
+    },
+    {
+     "level": 4,
+     "by": "R2",
+     "scope": null
+    }
+   ],
+   "limitations": [
+    "Patients less than 16 years’ old",
+    "Obstetric patients"
+   ],
+   "assessments": [
+    {
+     "tool": "Mini-CEX",
+     "toolLabel": "Mini-Clinical Examination (Mini-CEX)",
+     "number": "Minimum 1 by end R1 (For level 3 supervision)",
+     "byYear": 1,
+     "forLevel": 3,
+     "assessor": "Physician Faculty",
+     "items": [
+      "Preoperative assessment of a patient in the hospital setting e.g., preoperative clinic/ pre-anaesthetic evaluation clinic (PEC), ward"
+     ],
+     "itemGroups": [
+      {
+       "completeBy": "end R1",
+       "forLevel": 3,
+       "items": [
+        "Preoperative assessment of a patient in the hospital setting e.g., preoperative clinic/ pre-anaesthetic evaluation clinic (PEC), ward"
+       ]
+      }
+     ],
+     "page": 21
+    },
+    {
+     "tool": "EBD",
+     "toolLabel": "Entrustment-based Discussion (EBD)",
+     "number": "Minimum 3 by end R1 (For level 3 supervision)",
+     "byYear": 1,
+     "forLevel": 3,
+     "assessor": "Physician Faculty co-managing case",
+     "items": [
+      "Assessment of a patient with pre-existing respiratory disease",
+      "Assessment of a patient with pre-existing cardiovascular disease",
+      "Assessment of a patient with pre-existing endocrine disease"
+     ],
+     "itemGroups": [
+      {
+       "completeBy": "end R1",
+       "forLevel": 3,
+       "items": [
+        "Assessment of a patient with pre-existing respiratory disease",
+        "Assessment of a patient with pre-existing cardiovascular disease",
+        "Assessment of a patient with pre-existing endocrine disease"
+       ]
+      }
+     ],
+     "page": 21
+    },
+    {
+     "tool": "EBD",
+     "toolLabel": "Entrustment-based Discussion (EBD)",
+     "number": "Minimum 2 by end R2 (For level 4 supervision)",
+     "byYear": 2,
+     "forLevel": 4,
+     "assessor": "Physician Faculty co-managing case",
+     "items": [
+      "Assessment of geriatric patient",
+      "Assessment of morbidly obese patient"
+     ],
+     "itemGroups": [
+      {
+       "completeBy": "end R2",
+       "forLevel": 4,
+       "items": [
+        "Assessment of geriatric patient",
+        "Assessment of morbidly obese patient"
+       ]
+      }
+     ],
+     "page": 21
+    },
+    {
+     "tool": "MSF",
+     "toolLabel": "Multisource 360° Feedback (MSF)",
+     "number": "1 during pre-anaesthetic clinic rotation",
+     "byYear": null,
+     "forLevel": null,
+     "assessor": "Minimum 2 nurses and 2 doctors",
+     "items": [],
+     "itemGroups": [],
+     "page": 21
+    },
+    {
+     "tool": "Competency Evaluation",
+     "toolLabel": "Competency Evaluation",
+     "number": "Minimum 2 per year",
+     "byYear": null,
+     "forLevel": null,
+     "assessor": "Physician Faculty",
+     "items": [],
+     "itemGroups": [],
+     "page": 21
+    }
+   ],
+   "expiry": "1 year",
+   "medhubTitles": []
+  },
+  {
+   "epa": "2",
+   "title": "Providing anaesthetic care for adult patients requiring general anaesthesia (GA)",
+   "levels": [
+    {
+     "level": 3,
+     "by": "R2",
+     "scope": null
+    },
+    {
+     "level": 4,
+     "by": "R3",
+     "scope": null
+    }
+   ],
+   "limitations": [
+    "Patients pregnant with a viable foetus.",
+    "Patients aged less than 16 years’ old.",
+    "Patient undergoing procedures involving the heart and/or access to heart chambers and/or cardiopulmonary bypass or equivalent.",
+    "Patients undergoing procedures NOT within the operating rooms."
+   ],
+   "assessments": [
+    {
+     "tool": "Mini-CEX",
+     "toolLabel": "Mini-Clinical Examination (Mini-CEX)",
+     "number": "Minimum 2 by end R1 (For level 3 supervision)",
+     "byYear": 1,
+     "forLevel": 3,
+     "assessor": "Physician Faculty",
+     "items": [
+      "Patient requiring GA with endotracheal tube (inclusive of entrustment discussion on management of ventilation or oxygenation related anaesthetic crisis during general anaesthesia)",
+      "Patient requiring GA with LMA (inclusive of entrustment discussion on management of crisis related to anaesthetic agent use e.g., anaphylaxis, malignant hyperthermia)"
+     ],
+     "itemGroups": [
+      {
+       "completeBy": "end R1",
+       "forLevel": 3,
+       "items": [
+        "Patient requiring GA with endotracheal tube (inclusive of entrustment discussion on management of ventilation or oxygenation related anaesthetic crisis during general anaesthesia)",
+        "Patient requiring GA with LMA (inclusive of entrustment discussion on management of crisis related to anaesthetic agent use e.g., anaphylaxis, malignant hyperthermia)"
+       ],
+       "note": "Minimum 1 each of the following"
+      }
+     ],
+     "page": 29
+    },
+    {
+     "tool": "DOPS",
+     "toolLabel": "Direct Observation of Procedural Skills (DOPS)",
+     "number": "Minimum 3 of specified DOPS reaching minimal score of 5 for overall assessment. (To note that mask holding and LMA will be assessed with the same form; same with mask holding and endotracheal intubation)",
+     "byYear": 1,
+     "forLevel": null,
+     "assessor": "Physician Faculty",
+     "items": [
+      "Mask holding and bag ventilation",
+      "Successful LMA insertion",
+      "Successful endotracheal intubation"
+     ],
+     "itemGroups": [
+      {
+       "completeBy": "first 2 months of R1",
+       "forLevel": null,
+       "items": [
+        "Mask holding and bag ventilation",
+        "Successful LMA insertion",
+        "Successful endotracheal intubation"
+       ],
+       "note": "Airway Management Skills: Minimum 1 each of the following"
+      }
+     ],
+     "page": 29
+    },
+    {
+     "tool": "DOPS",
+     "toolLabel": "Direct Observation of Procedural Skills (DOPS)",
+     "number": "Minimum 4 of specified DOPS reaching minimal score of 5 for overall assessment",
+     "byYear": 2,
+     "forLevel": null,
+     "assessor": "Physician Faculty",
+     "items": [
+      "Mask holding and bag ventilation",
+      "Successful endotracheal intubation",
+      "Placement of double lumen tube and confirmation using both auscultation and bronchoscopy"
+     ],
+     "itemGroups": [
+      {
+       "completeBy": "end R2",
+       "forLevel": null,
+       "items": [
+        "Mask holding and bag ventilation",
+        "Successful endotracheal intubation"
+       ],
+       "note": "Airway management skills in a morbidly obese patient: Minimum 1 each of the following"
+      },
+      {
+       "completeBy": "end R2",
+       "forLevel": null,
+       "items": [
+        "Placement of double lumen tube and confirmation using both auscultation and bronchoscopy"
+       ],
+       "note": "Separate 'To be completed by end R2' sub-heading at top of p30 (cell continues from p29)"
+      }
+     ],
+     "page": 29
+    },
+    {
+     "tool": "EBD",
+     "toolLabel": "Entrustment-based Discussion (EBD)",
+     "number": "Minimum 1 by end R1 (For level 3 supervision)",
+     "byYear": 1,
+     "forLevel": 3,
+     "assessor": "Physician Faculty co-managing case",
+     "items": [
+      "Management of cardiovascular related anaesthetic crisis during general anaesthesia"
+     ],
+     "itemGroups": [
+      {
+       "completeBy": "end R1",
+       "forLevel": 3,
+       "items": [
+        "Management of cardiovascular related anaesthetic crisis during general anaesthesia"
+       ]
+      }
+     ],
+     "page": 30
+    },
+    {
+     "tool": "EBD",
+     "toolLabel": "Entrustment-based Discussion (EBD)",
+     "number": "Minimum 6 by end R3 (For level 4 supervision)",
+     "byYear": 3,
+     "forLevel": 4,
+     "assessor": "Physician Faculty co-managing case",
+     "items": [
+      "Management of ASA 3 or 4 patient presenting for elective or emergency procedures requiring general anaesthesia, e.g., high risk cardiac patient presenting for non-cardiac surgery",
+      "Management of geriatric patient",
+      "Management of morbidly obese patient",
+      "Management of patient requiring intraoperative neurophysiological monitoring",
+      "Management of patient undergoing thoracic surgery requiring one lung ventilation",
+      "Management of patient undergoing neurosurgical procedure"
+     ],
+     "itemGroups": [
+      {
+       "completeBy": "end R2",
+       "forLevel": 4,
+       "items": [
+        "Management of ASA 3 or 4 patient presenting for elective or emergency procedures requiring general anaesthesia, e.g., high risk cardiac patient presenting for non-cardiac surgery",
+        "Management of geriatric patient",
+        "Management of morbidly obese patient",
+        "Management of patient requiring intraoperative neurophysiological monitoring"
+       ],
+       "note": "Minimum 1 each of the following"
+      },
+      {
+       "completeBy": "end R3",
+       "forLevel": 4,
+       "items": [
+        "Management of patient undergoing thoracic surgery requiring one lung ventilation",
+        "Management of patient undergoing neurosurgical procedure"
+       ],
+       "note": "Minimum 1 each of the following"
+      }
+     ],
+     "page": 30
+    },
+    {
+     "tool": "Competency Evaluation",
+     "toolLabel": "Competency Evaluation",
+     "number": "Minimum 2 per year",
+     "byYear": null,
+     "forLevel": null,
+     "assessor": "Physician Faculty",
+     "items": [],
+     "itemGroups": [],
+     "page": 30,
+     "specification": "End of anaesthesia rotation (6 monthly) evaluation on competency"
+    },
+    {
+     "tool": "MSF",
+     "toolLabel": "Multisource 360° Feedback (MSF)",
+     "number": "Minimum 1 per year",
+     "byYear": null,
+     "forLevel": null,
+     "assessor": "Minimum 2 peers, 2 nurses, 2 senior doctors",
+     "items": [],
+     "itemGroups": [],
+     "page": 30
+    },
+    {
+     "tool": "Case log",
+     "toolLabel": "Case Logs",
+     "number": "All patients undergoing GA • Geriatric patients aged 65 years and above (minimum 30) • Morbidly obese patients (minimum 10) • Surgery requiring IONM (minimum 5) • Thoracic surgery requiring OLV (minimum 10) • Neurosurgical cases (minimum 15 of which minimum of 10 are emergency cases)",
+     "byYear": null,
+     "forLevel": null,
+     "assessor": "Reviewed by programme",
+     "items": [
+      "Geriatric patients aged 65 years and above (minimum 30)",
+      "Morbidly obese patients (minimum 10)",
+      "Surgery requiring IONM (minimum 5)",
+      "Thoracic surgery requiring OLV (minimum 10)",
+      "Neurosurgical cases (minimum 15 of which minimum of 10 are emergency cases)"
+     ],
+     "itemGroups": [
+      {
+       "completeBy": null,
+       "forLevel": null,
+       "items": [
+        "Geriatric patients aged 65 years and above (minimum 30)",
+        "Morbidly obese patients (minimum 10)",
+        "Surgery requiring IONM (minimum 5)",
+        "Thoracic surgery requiring OLV (minimum 10)",
+        "Neurosurgical cases (minimum 15 of which minimum of 10 are emergency cases)"
+       ]
+      }
+     ],
+     "page": 30,
+     "specification": "All cases managed by resident should ideally be logged and reviewed by programme on a regular basis. In particular, it must be ensured that minimum numbers as stipulated are met to allow the appropriate entrustment level to be assigned"
+    }
+   ],
+   "expiry": "1 year",
+   "medhubTitles": []
+  },
+  {
+   "epa": "3",
+   "title": "Providing anaesthetic care for patients under regional anaesthesia (RA)",
+   "levels": [
+    {
+     "level": 3,
+     "by": "R2",
+     "scope": "For patients under RA (including single shot peripheral nerve blocks and subarachnoid blocks)"
+    },
+    {
+     "level": 4,
+     "by": "R3",
+     "scope": "For patients under RA (including single shot peripheral nerve blocks and subarachnoid blocks)"
+    },
+    {
+     "level": 3,
+     "by": "R3",
+     "scope": "For patients under RA with catheter"
+    },
+    {
+     "level": 4,
+     "by": "R5",
+     "scope": "For patients under RA with catheter"
+    }
+   ],
+   "levelsNote": "Resident is expected to exit the programme at entrustment level 4",
+   "limitations": [
+    "Patient aged less than 16 years old"
+   ],
+   "assessments": [
+    {
+     "tool": "Mini-CEX",
+     "toolLabel": "Mini-Clinical Examination (Mini-CEX)",
+     "number": "Minimum 1 by end R2) (For level 3 supervision)",
+     "byYear": 2,
+     "forLevel": 3,
+     "assessor": "Physician Faculty",
+     "items": [
+      "Manage a patient for surgery under peripheral nerve block and sedation"
+     ],
+     "itemGroups": [
+      {
+       "completeBy": "end R2",
+       "forLevel": 3,
+       "items": [
+        "Manage a patient for surgery under peripheral nerve block and sedation"
+       ]
+      }
+     ],
+     "page": 43
+    },
+    {
+     "tool": "DOPS",
+     "toolLabel": "Direct Observation of Procedural Skills (DOPS)",
+     "number": "Minimum 5 (1 each) reaching minimal score of 5 for overall assessment.",
+     "byYear": null,
+     "forLevel": null,
+     "assessor": "Physician Faculty",
+     "items": [
+      "Subarachnoid block",
+      "Upper limb block (single shot) Brachial plexus",
+      "Lower limb block (single shot) Any one of the following blocks: • Fascia iliaca, • Femoral nerve block, • Popliteal approach to sciatic nerve block",
+      "Truncal block (single shot) Any one of the following blocks • Erector spinae block, • Rectus sheath block, • Transversus abdominis plane block, • Ilioinguinal/ iliohypogastric nerve block",
+      "Peripheral nerve block with catheter"
+     ],
+     "itemGroups": [
+      {
+       "completeBy": "end R1",
+       "forLevel": null,
+       "items": [
+        "Subarachnoid block"
+       ]
+      },
+      {
+       "completeBy": "end R2",
+       "forLevel": null,
+       "items": [
+        "Upper limb block (single shot) Brachial plexus",
+        "Lower limb block (single shot) Any one of the following blocks: • Fascia iliaca, • Femoral nerve block, • Popliteal approach to sciatic nerve block"
+       ]
+      },
+      {
+       "completeBy": "end R3",
+       "forLevel": null,
+       "items": [
+        "Truncal block (single shot) Any one of the following blocks • Erector spinae block, • Rectus sheath block, • Transversus abdominis plane block, • Ilioinguinal/ iliohypogastric nerve block"
+       ]
+      },
+      {
+       "completeBy": "end R5",
+       "forLevel": null,
+       "items": [
+        "Peripheral nerve block with catheter"
+       ]
+      }
+     ],
+     "page": 43,
+     "specification": "(The same case may be used for the relevant EBD discussion for this EPA; Please note that 2 different forms i.e., DOPS and EBD will have to be filled)"
+    },
+    {
+     "tool": "EBD",
+     "toolLabel": "Entrustment-based Discussion (EBD)",
+     "number": "Minimum 1 by end R1 (For level 3 supervision)",
+     "byYear": 1,
+     "forLevel": 3,
+     "assessor": "Physician Faculty co-managing case",
+     "items": [
+      "Management of a patient undergoing ophthalmic surgery under MAC"
+     ],
+     "itemGroups": [
+      {
+       "completeBy": "end R1",
+       "forLevel": 3,
+       "items": [
+        "Management of a patient undergoing ophthalmic surgery under MAC"
+       ]
+      }
+     ],
+     "page": 43
+    },
+    {
+     "tool": "EBD",
+     "toolLabel": "Entrustment-based Discussion (EBD)",
+     "number": "Minimum 1 by end R2 (For level 3 supervision)",
+     "byYear": 2,
+     "forLevel": 3,
+     "assessor": "Physician Faculty co-managing case",
+     "items": [
+      "Management of a patient undergoing surgery under subarachnoid block"
+     ],
+     "itemGroups": [
+      {
+       "completeBy": "end R2",
+       "forLevel": 3,
+       "items": [
+        "Management of a patient undergoing surgery under subarachnoid block"
+       ]
+      }
+     ],
+     "page": 44
+    },
+    {
+     "tool": "EBD",
+     "toolLabel": "Entrustment-based Discussion (EBD)",
+     "number": "Minimum 1 by end R3 (For level 4 supervision)",
+     "byYear": 3,
+     "forLevel": 4,
+     "assessor": "Physician Faculty co-managing case",
+     "items": [
+      "Management of a patient undergoing surgery under subarachnoid block/single shot peripheral nerve block"
+     ],
+     "itemGroups": [
+      {
+       "completeBy": "end R3",
+       "forLevel": 4,
+       "items": [
+        "Management of a patient undergoing surgery under subarachnoid block/single shot peripheral nerve block"
+       ]
+      }
+     ],
+     "page": 44
+    },
+    {
+     "tool": "EBD",
+     "toolLabel": "Entrustment-based Discussion (EBD)",
+     "number": "Minimum 1 by end R3 (For level 3 supervision)",
+     "byYear": 3,
+     "forLevel": 3,
+     "assessor": "Physician Faculty co-managing case",
+     "items": [
+      "Management of patient undergoing surgery with a peripheral nerve block catheter"
+     ],
+     "itemGroups": [
+      {
+       "completeBy": "end R3",
+       "forLevel": 3,
+       "items": [
+        "Management of patient undergoing surgery with a peripheral nerve block catheter"
+       ]
+      }
+     ],
+     "page": 44
+    },
+    {
+     "tool": "EBD",
+     "toolLabel": "Entrustment-based Discussion (EBD)",
+     "number": "Minimum 1 by end R5 (For level 4 supervision)",
+     "byYear": 5,
+     "forLevel": 4,
+     "assessor": "Physician Faculty co-managing case",
+     "items": [
+      "Management of patient undergoing surgery with a peripheral nerve block catheter"
+     ],
+     "itemGroups": [
+      {
+       "completeBy": "end R5",
+       "forLevel": 4,
+       "items": [
+        "Management of patient undergoing surgery with a peripheral nerve block catheter"
+       ]
+      }
+     ],
+     "page": 44
+    },
+    {
+     "tool": "Competency Evaluation",
+     "toolLabel": "Competency Evaluation",
+     "number": "Minimum 1",
+     "byYear": null,
+     "forLevel": null,
+     "assessor": null,
+     "items": [],
+     "itemGroups": [],
+     "page": 44,
+     "specification": "End of RA rotation"
+    },
+    {
+     "tool": "MSF",
+     "toolLabel": "Multisource 360° Feedback (MSF)",
+     "number": "Minimum 2",
+     "byYear": null,
+     "forLevel": null,
+     "assessor": "Minimum 1 nurse and 1 physician faculty",
+     "items": [],
+     "itemGroups": [],
+     "page": 44,
+     "specification": "Setting where RA is performed • Minimum 1 nurse and 1 physician faculty • Minimum 1 in Junior Residency (R1 to R3) • Minimum 1 in Senior Residency (R4 to R5)"
+    },
+    {
+     "tool": "Case log",
+     "toolLabel": "Case Logs",
+     "number": "Minimum cumulative numbers (40) • 10 by R2 • 20 by R3 • 30 by R4 • 40 by R5",
+     "byYear": null,
+     "forLevel": null,
+     "assessor": "Reviewed by programme",
+     "items": [
+      "10 upper limb RA blocks",
+      "10 lower limb RA blocks",
+      "5 truncal blocks"
+     ],
+     "itemGroups": [
+      {
+       "completeBy": null,
+       "forLevel": null,
+       "items": [
+        "10 upper limb RA blocks",
+        "10 lower limb RA blocks",
+        "5 truncal blocks"
+       ],
+       "note": "Peripheral nerve blocks"
+      }
+     ],
+     "page": 44,
+     "specification": "Peripheral nerve blocks • 10 upper limb RA blocks • 10 lower limb RA blocks • 5 truncal blocks Minimum numbers must be achieved each year to qualify for: • Level 3 supervision by end R2 • Level 4 supervision by end R3",
+     "byYearAll": [
+      2,
+      3,
+      4,
+      5
+     ]
+    },
+    {
+     "tool": "Case log",
+     "toolLabel": "Case Logs",
+     "number": "Minimum cumulative numbers (40) • 10 by R2 • 20 by R3 • 30 by R4 • 40 by R5",
+     "byYear": null,
+     "forLevel": null,
+     "assessor": "Reviewed by programme",
+     "items": [
+      "Subarachnoid blocks"
+     ],
+     "itemGroups": [
+      {
+       "completeBy": null,
+       "forLevel": null,
+       "items": [
+        "Subarachnoid blocks"
+       ]
+      }
+     ],
+     "page": 44,
+     "specification": "• Subarachnoid blocks o Combined spinal epidural (CSE) can be logged under both subarachnoid block and epidural. o Obstetric subarachnoid blocks can be included",
+     "byYearAll": [
+      2,
+      3,
+      4,
+      5
+     ]
+    },
+    {
+     "tool": "Case log",
+     "toolLabel": "Case Logs",
+     "number": "Minimum cumulative numbers (40) • 10 by R2 • 20 by R3 • 30 by R4 • 40 by R5",
+     "byYear": null,
+     "forLevel": null,
+     "assessor": "Reviewed by programme",
+     "items": [
+      "Epidural/ caudal"
+     ],
+     "itemGroups": [
+      {
+       "completeBy": null,
+       "forLevel": null,
+       "items": [
+        "Epidural/ caudal"
+       ]
+      }
+     ],
+     "page": 45,
+     "specification": "• Epidural/ caudal o Combined spinal epidural (CSE) can be logged under both subarachnoid block and epidural. o Labour epidural for obstetric patients can be included",
+     "byYearAll": [
+      2,
+      3,
+      4,
+      5
+     ]
+    },
+    {
+     "tool": "Case log",
+     "toolLabel": "Case Logs",
+     "number": "Minimum cumulative numbers (5) • 1 by R3 • 5 by R5",
+     "byYear": null,
+     "forLevel": null,
+     "assessor": "Reviewed by programme",
+     "items": [
+      "Peripheral nerve block with catheter"
+     ],
+     "itemGroups": [
+      {
+       "completeBy": null,
+       "forLevel": null,
+       "items": [
+        "Peripheral nerve block with catheter"
+       ]
+      }
+     ],
+     "page": 45,
+     "specification": "Peripheral nerve block with catheter Minimum numbers must be achieved to qualify for: • Level 3 supervision by end R3 • Level 4 supervision by end R5",
+     "byYearAll": [
+      3,
+      5
+     ]
+    }
+   ],
+   "expiry": "1 year",
+   "medhubTitles": []
+  },
+  {
+   "epa": "4",
+   "title": "Assessing and managing patients with potentially difficult airway in the hospital setting",
+   "levels": [
+    {
+     "level": 3,
+     "by": "R3",
+     "scope": null
+    },
+    {
+     "level": 4,
+     "by": "R5",
+     "scope": null
+    }
+   ],
+   "limitations": [
+    "Unanticipated difficult airway scenarios"
+   ],
+   "assessments": [
+    {
+     "tool": "Mini-CEX",
+     "toolLabel": "Mini-Clinical Examination (Mini-CEX)",
+     "number": "Minimum 2 by end R3 for level 3 supervision",
+     "byYear": 3,
+     "forLevel": 3,
+     "assessor": "Physician Faculty",
+     "items": [
+      "Anaesthetic management of a patient with anticipated difficult airway",
+      "Anaesthetic management of a patient going for surgery with a shared airway"
+     ],
+     "itemGroups": [
+      {
+       "completeBy": "end R3",
+       "forLevel": 3,
+       "items": [
+        "Anaesthetic management of a patient with anticipated difficult airway",
+        "Anaesthetic management of a patient going for surgery with a shared airway"
+       ]
+      }
+     ],
+     "page": 51
+    },
+    {
+     "tool": "DOPS",
+     "toolLabel": "Direct Observation of Procedural Skills (DOPS)",
+     "number": "Minimum 4 by end R3 reaching minimal score of 5 for overall assessment.",
+     "byYear": 3,
+     "forLevel": null,
+     "assessor": "Physician Faculty",
+     "items": [
+      "Minimum 1 DOPS for awake flexible bronchoscopy guided intubation",
+      "Minimum 3 DOPS for difficult airway intubation using three different types of laryngoscope blades (curved, hyper-angulated, straight) and/or different models of video-laryngoscopes"
+     ],
+     "itemGroups": [
+      {
+       "completeBy": "end R3",
+       "forLevel": null,
+       "items": [
+        "Minimum 1 DOPS for awake flexible bronchoscopy guided intubation",
+        "Minimum 3 DOPS for difficult airway intubation using three different types of laryngoscope blades (curved, hyper-angulated, straight) and/or different models of video-laryngoscopes"
+       ]
+      }
+     ],
+     "page": 51
+    },
+    {
+     "tool": "EBD",
+     "toolLabel": "Entrustment-based Discussion (EBD)",
+     "number": "Minimum 1 by R5 for level 4 supervision",
+     "byYear": 5,
+     "forLevel": 4,
+     "assessor": "Physician Faculty co-managing case",
+     "items": [
+      "Patient with a difficult airway, requiring alternative intubation approaches such as awake intubation +/- front of neck access."
+     ],
+     "itemGroups": [
+      {
+       "completeBy": "end R5",
+       "forLevel": 4,
+       "items": [
+        "Patient with a difficult airway, requiring alternative intubation approaches such as awake intubation +/- front of neck access."
+       ]
+      }
+     ],
+     "page": 51
+    },
+    {
+     "tool": "Competency Evaluation",
+     "toolLabel": "Competency Evaluation",
+     "number": "1 during airway/ ENT rotation",
+     "byYear": 3,
+     "forLevel": null,
+     "assessor": "Physician Faculty",
+     "items": [],
+     "itemGroups": [],
+     "page": 51,
+     "specification": "To be completed by end R3"
+    },
+    {
+     "tool": "Case log",
+     "toolLabel": "Case Logs",
+     "number": "Minimum 10",
+     "byYear": 5,
+     "forLevel": null,
+     "assessor": "Reviewed by programme",
+     "items": [
+      "Shared airway surgery (e.g., dental, ENT, airway instrumentation, airway tumour)"
+     ],
+     "itemGroups": [
+      {
+       "completeBy": "end R5",
+       "forLevel": null,
+       "items": [
+        "Shared airway surgery (e.g., dental, ENT, airway instrumentation, airway tumour)"
+       ]
+      }
+     ],
+     "page": 52
+    }
+   ],
+   "expiry": "1 year",
+   "medhubTitles": []
+  },
+  {
+   "epa": "5",
+   "title": "Assessing and managing patients with polytrauma in the perioperative setting",
+   "levels": [
+    {
+     "level": 4,
+     "by": "R3",
+     "scope": null
+    }
+   ],
+   "limitations": [
+    "Obstetric patients",
+    "Patients aged less than 16 years old"
+   ],
+   "assessments": [
+    {
+     "tool": "EBD",
+     "toolLabel": "Entrustment-based Discussion (EBD)",
+     "number": "Minimum 3 by end R3 for level 4 supervision",
+     "byYear": 3,
+     "forLevel": 4,
+     "assessor": "Physician Faculty co-managing case",
+     "items": [
+      "Management of head/ neck trauma",
+      "Management of thoracic/ abdominal trauma",
+      "Management of pelvic/lower limb injury"
+     ],
+     "itemGroups": [
+      {
+       "completeBy": "end R3",
+       "forLevel": 4,
+       "items": [
+        "Management of head/ neck trauma",
+        "Management of thoracic/ abdominal trauma",
+        "Management of pelvic/lower limb injury"
+       ]
+      }
+     ],
+     "page": 60
+    },
+    {
+     "tool": "MSF",
+     "toolLabel": "Multisource 360° Feedback (MSF)",
+     "number": "2",
+     "byYear": null,
+     "forLevel": null,
+     "assessor": "Include nurses/ doctors (at least 3) who work with the resident in EOT",
+     "items": [],
+     "itemGroups": [],
+     "page": 60,
+     "specification": "EOT (emergency OT) setting Include nurses/ doctors (at least 3) who work with the resident in EOT Resident to decide on evaluators and match on the spot for evaluation • 1 in Junior Residency (R1 to R3) • 1 in Senior Residency (R4 to R5)"
+    },
+    {
+     "tool": "Case log",
+     "toolLabel": "Case Logs",
+     "number": "Minimum cumulative numbers • 4 • 8",
+     "byYear": null,
+     "forLevel": null,
+     "assessor": null,
+     "items": [],
+     "itemGroups": [],
+     "page": 60,
+     "specification": "To be completed by end R3 To be completed by end R5"
+    },
+    {
+     "tool": "Case reflection",
+     "toolLabel": "Case reflections",
+     "number": "Minimum 4",
+     "byYear": 5,
+     "forLevel": null,
+     "assessor": "Reviewed by programme",
+     "items": [
+      "Holistic management of polytrauma patient"
+     ],
+     "itemGroups": [
+      {
+       "completeBy": "end R5",
+       "forLevel": null,
+       "items": [
+        "Holistic management of polytrauma patient"
+       ]
+      }
+     ],
+     "page": 61
+    }
+   ],
+   "expiry": "1 year",
+   "medhubTitles": []
+  },
+  {
+   "epa": "6",
+   "title": "Managing critically ill patients in the intensive care unit (ICU)",
+   "levels": [
+    {
+     "level": 3,
+     "by": "R2",
+     "scope": null
+    },
+    {
+     "level": 4,
+     "by": "R3",
+     "scope": null
+    }
+   ],
+   "limitations": [
+    "Patients aged less than 16 years’ old",
+    "Cardiothoracic surgical intensive care unit and coronary care unit patients"
+   ],
+   "assessments": [
+    {
+     "tool": "Mini-CEX",
+     "toolLabel": "Mini-Clinical Examination (Mini-CEX)",
+     "number": "Minimum 1 by end R3 for level 4 supervision",
+     "byYear": 3,
+     "forLevel": 4,
+     "assessor": "Physician Faculty",
+     "items": [
+      "Outreach/Triage admission to ICU"
+     ],
+     "itemGroups": [
+      {
+       "completeBy": "R3",
+       "forLevel": 4,
+       "items": [
+        "Outreach/Triage admission to ICU"
+       ]
+      }
+     ],
+     "page": 68
+    },
+    {
+     "tool": "DOPS",
+     "toolLabel": "Direct Observation of Procedural Skills (DOPS)",
+     "number": "Minimum 2 reaching minimal score of 5 for overall assessment.",
+     "byYear": null,
+     "forLevel": null,
+     "assessor": "Physician Faculty",
+     "items": [
+      "Minimum 1 Intra-arterial (IA) line",
+      "Minimum 1 Dialysis vascular access catheter insertion"
+     ],
+     "itemGroups": [
+      {
+       "completeBy": "end R1",
+       "forLevel": null,
+       "items": [
+        "Minimum 1 Intra-arterial (IA) line"
+       ]
+      },
+      {
+       "completeBy": "end R3",
+       "forLevel": null,
+       "items": [
+        "Minimum 1 Dialysis vascular access catheter insertion"
+       ]
+      }
+     ],
+     "page": 68
+    },
+    {
+     "tool": "EBD",
+     "toolLabel": "Entrustment-based Discussion (EBD)",
+     "number": "Minimum 3 (2 by end R2 for level 3 supervision 1 by end R3 for level 4 supervision)",
+     "byYear": null,
+     "forLevel": null,
+     "assessor": "Physician Faculty co-managing case",
+     "items": [
+      "Post general surgery critically ill patient",
+      "Neurosurgical critically ill patient",
+      "Critically ill patient with severe medical comorbidities"
+     ],
+     "itemGroups": [
+      {
+       "completeBy": "end R2",
+       "forLevel": 3,
+       "items": [
+        "Post general surgery critically ill patient",
+        "Neurosurgical critically ill patient"
+       ]
+      },
+      {
+       "completeBy": "end R3",
+       "forLevel": 4,
+       "items": [
+        "Critically ill patient with severe medical comorbidities"
+       ]
+      }
+     ],
+     "page": 68,
+     "byYearAll": [
+      2,
+      3
+     ],
+     "forLevelAll": [
+      3,
+      4
+     ]
+    },
+    {
+     "tool": "Competency Evaluation",
+     "toolLabel": "Competency Evaluation",
+     "number": "3",
+     "byYear": null,
+     "forLevel": null,
+     "assessor": "Physician Faculty",
+     "items": [],
+     "itemGroups": [],
+     "page": 69,
+     "specification": "To be completed by end of rotation • 2 in Junior Residency (R1 to R3) • 1 in Senior Residency (R4 to R5)"
+    },
+    {
+     "tool": "MSF",
+     "toolLabel": "Multisource 360° Feedback (MSF)",
+     "number": "3 In ICU setting",
+     "byYear": null,
+     "forLevel": null,
+     "assessor": "Minimum 1 Faculty, 1 peer, 2 nurses",
+     "items": [],
+     "itemGroups": [],
+     "page": 69,
+     "specification": "Minimum 1 Faculty, 1 peer, 2 nurses • 2 in Junior Residency (R1 to R3) • 1 in Senior Residency (R4 to R5)"
+    }
+   ],
+   "expiry": "1 year",
+   "medhubTitles": []
+  },
+  {
+   "epa": "7",
+   "title": "Providing anaesthetic care for obstetric patients",
+   "nested": [
+    "7a",
+    "7b"
+   ],
+   "levels": [
+    {
+     "level": 3,
+     "by": "R3",
+     "scope": null
+    },
+    {
+     "level": 4,
+     "by": "R5",
+     "scope": null
+    }
+   ],
+   "limitations": [
+    "Obstetric patients requiring intensive care",
+    "Medically complex mother-foetal dyad presenting for foetal surgery",
+    "Obstetric patients undergoing complicated non obstetric surgeries e.g., complicated oncological surgeries"
+   ],
+   "assessments": [
+    {
+     "tool": "Mini-CEX",
+     "toolLabel": "Mini-Clinical Examination (Mini-CEX)",
+     "number": "Minimum 1 by end R3 for level 3 supervision",
+     "byYear": 3,
+     "forLevel": 3,
+     "assessor": "Physician Faculty",
+     "items": [],
+     "itemGroups": [],
+     "page": 81,
+     "specification": "Please refer EPA 7b"
+    },
+    {
+     "tool": "DOPS",
+     "toolLabel": "Direct Observation of Procedural Skills (DOPS)",
+     "number": "Minimum 3 reaching minimal score of 5 for overall assessment.",
+     "byYear": null,
+     "forLevel": null,
+     "assessor": "Physician Faculty",
+     "items": [],
+     "itemGroups": [],
+     "page": 81,
+     "specification": "Please refer EPA 7a"
+    },
+    {
+     "tool": "EBD",
+     "toolLabel": "Entrustment-based Discussion (EBD)",
+     "number": "Minimum 3 (1 by end R3 for level 3 supervision 2 by end R5 for level 4 supervision)",
+     "byYear": null,
+     "forLevel": null,
+     "assessor": "Physician Faculty co-managing case",
+     "items": [],
+     "itemGroups": [],
+     "page": 82,
+     "specification": "Please refer EPA 7a, 7b",
+     "byYearAll": [
+      3,
+      5
+     ],
+     "forLevelAll": [
+      3,
+      4
+     ]
+    },
+    {
+     "tool": "Competency Evaluation",
+     "toolLabel": "Competency Evaluation",
+     "number": "Minimum 2",
+     "byYear": null,
+     "forLevel": null,
+     "assessor": null,
+     "items": [],
+     "itemGroups": [],
+     "page": 82,
+     "specification": "• 1 in Junior Residency (R1 to R3) rotation • 1 in Senior Residency (R4 to R5) rotation"
+    },
+    {
+     "tool": "MSF",
+     "toolLabel": "Multisource 360° Feedback (MSF)",
+     "number": "2",
+     "byYear": null,
+     "forLevel": null,
+     "assessor": "physician faculty, nurses, and peers (minimum 6 evaluators in total)",
+     "items": [],
+     "itemGroups": [],
+     "page": 82,
+     "specification": "Each evaluation comprises the following evaluators: physician faculty, nurses, and peers (minimum 6 evaluators in total) • 1 in Junior Residency (R1 to R3) rotation • 1 in Senior Residency (R4 to R5) rotation"
+    },
+    {
+     "tool": "Case log",
+     "toolLabel": "Case Logs",
+     "number": "Minimum cumulative numbers: • 40 Obstetric RA • 20 Lower Segment Caesarean Section",
+     "byYear": null,
+     "forLevel": null,
+     "assessor": "Reviewed by programme",
+     "items": [
+      "Minimum 10 directly observed cases for level 3 supervision • Includes epidural, spinal, CSE • Includes LSCS done under RA, GA, and high-risk cases",
+      "40 Obstetric RA",
+      "20 Lower Segment Caesarean Section"
+     ],
+     "itemGroups": [
+      {
+       "completeBy": "end of R3",
+       "forLevel": 3,
+       "items": [
+        "Minimum 10 directly observed cases for level 3 supervision • Includes epidural, spinal, CSE • Includes LSCS done under RA, GA, and high-risk cases"
+       ]
+      },
+      {
+       "completeBy": "end of R5",
+       "forLevel": 4,
+       "items": [
+        "40 Obstetric RA",
+        "20 Lower Segment Caesarean Section"
+       ],
+       "note": "For level 4 supervision Minimum numbers"
+      }
+     ],
+     "page": 82
+    },
+    {
+     "tool": "Case reflection",
+     "toolLabel": "Case reflections",
+     "number": "Minimum numbers: • 5 Lower Segment Caesarean sections • 5 Labour Analgesia",
+     "byYear": 5,
+     "forLevel": null,
+     "assessor": "Reviewed by programme",
+     "items": [
+      "Includes management of pre-eclamptic patients",
+      "patients with placenta praevia majors and cardiac disease in pregnancy"
+     ],
+     "itemGroups": [
+      {
+       "completeBy": "end of R5",
+       "forLevel": null,
+       "items": [
+        "Includes management of pre-eclamptic patients",
+        "patients with placenta praevia majors and cardiac disease in pregnancy"
+       ]
+      }
+     ],
+     "page": 82
+    }
+   ],
+   "expiry": "1 year",
+   "medhubTitles": []
+  },
+  {
+   "epa": "7a",
+   "title": "Managing parturient for labour epidural/ combined spinal epidural (CSE)",
+   "parent": "7",
+   "levels": [
+    {
+     "level": 3,
+     "by": "R3",
+     "scope": null
+    },
+    {
+     "level": 4,
+     "by": "R5",
+     "scope": null
+    }
+   ],
+   "limitations": [
+    "Refer main EPA 7"
+   ],
+   "assessments": [
+    {
+     "tool": "DOPS",
+     "toolLabel": "Direct Observation of Procedural Skills (DOPS)",
+     "number": "Minimum 3 by end R3 reaching minimal score of 5 for overall assessment.",
+     "byYear": 3,
+     "forLevel": null,
+     "assessor": "Physician Faculty",
+     "items": [
+      "Labour epidural / CSE"
+     ],
+     "itemGroups": [
+      {
+       "completeBy": "end R3",
+       "forLevel": null,
+       "items": [
+        "Labour epidural / CSE"
+       ]
+      }
+     ],
+     "page": 85
+    },
+    {
+     "tool": "EBD",
+     "toolLabel": "Entrustment-based Discussion (EBD)",
+     "number": "Minimum 2 (1 by end R3 for level 3 supervision 1 by end R5 for level 4 supervision)",
+     "byYear": null,
+     "forLevel": null,
+     "assessor": "Physician Faculty co-managing case",
+     "items": [
+      "Troubleshooting inadequate or failed labour epidural",
+      "Foetal distress/non-reassuring foetal status post RA",
+      "Hypotension",
+      "High/total spinal block",
+      "Inadvertent dural puncture",
+      "Managing complications of labour epidural/ CSE like postpartum neurological deficit, post dural puncture headache"
+     ],
+     "itemGroups": [
+      {
+       "completeBy": "end R3",
+       "forLevel": 3,
+       "items": [
+        "Troubleshooting inadequate or failed labour epidural",
+        "Foetal distress/non-reassuring foetal status post RA",
+        "Hypotension",
+        "High/total spinal block",
+        "Inadvertent dural puncture"
+       ],
+       "note": "Minimum 1 For level 3 supervision"
+      },
+      {
+       "completeBy": "end R5",
+       "forLevel": 4,
+       "items": [
+        "Managing complications of labour epidural/ CSE like postpartum neurological deficit, post dural puncture headache"
+       ],
+       "note": "Minimum 1 For level 4 supervision"
+      }
+     ],
+     "page": 85,
+     "byYearAll": [
+      3,
+      5
+     ],
+     "forLevelAll": [
+      3,
+      4
+     ]
+    },
+    {
+     "tool": "MSF",
+     "toolLabel": "Multisource 360° Feedback (MSF)",
+     "number": "Refer main EPA 7",
+     "byYear": null,
+     "forLevel": null,
+     "assessor": null,
+     "items": [],
+     "itemGroups": [],
+     "page": 85,
+     "specification": "Refer main EPA 7"
+    },
+    {
+     "tool": "Case log",
+     "toolLabel": "Case Logs",
+     "number": "Minimum cumulative numbers: 40",
+     "byYear": null,
+     "forLevel": null,
+     "assessor": null,
+     "items": [
+      "10 direct supervision of labour epidural",
+      "Minimum 40"
+     ],
+     "itemGroups": [
+      {
+       "completeBy": "end R3",
+       "forLevel": 3,
+       "items": [
+        "10 direct supervision of labour epidural"
+       ],
+       "note": "For level 3 supervision RA (epidural, spinal, CSE)"
+      },
+      {
+       "completeBy": null,
+       "forLevel": 4,
+       "items": [
+        "Minimum 40"
+       ],
+       "note": "For level 4 supervision"
+      }
+     ],
+     "page": 85
+    },
+    {
+     "tool": "Case reflection",
+     "toolLabel": "Case reflections",
+     "number": "Minimum 5",
+     "byYear": 5,
+     "forLevel": null,
+     "assessor": "Reviewed by programme",
+     "items": [
+      "Challenging labour epidural/ CSE"
+     ],
+     "itemGroups": [
+      {
+       "completeBy": "end R5",
+       "forLevel": null,
+       "items": [
+        "Challenging labour epidural/ CSE"
+       ]
+      }
+     ],
+     "page": 86
+    }
+   ],
+   "expiry": "1 year",
+   "medhubTitles": []
+  },
+  {
+   "epa": "7b",
+   "title": "Managing parturient for Lower Segment Caesarean Section (LSCS)",
+   "parent": "7",
+   "levels": [
+    {
+     "level": 3,
+     "by": "R3",
+     "scope": null
+    },
+    {
+     "level": 4,
+     "by": "R5",
+     "scope": null
+    }
+   ],
+   "limitations": [
+    "(In addition to those mentioned under limitations of main EPA 7)",
+    "Patients with abnormal placentation",
+    "Ex utero intrapartum treatment (EXIT) procedure"
+   ],
+   "assessments": [
+    {
+     "tool": "Mini-CEX",
+     "toolLabel": "Mini-Clinical Examination (Mini-CEX)",
+     "number": "Minimum 1 by end R3 for level 3 supervision",
+     "byYear": 3,
+     "forLevel": 3,
+     "assessor": "Physician Faculty",
+     "items": [
+      "Lower segment Caesarean section To include discussion on management of GA for LSCS in pre-eclamptic patient coming for LSCS"
+     ],
+     "itemGroups": [
+      {
+       "completeBy": "end R3",
+       "forLevel": 3,
+       "items": [
+        "Lower segment Caesarean section To include discussion on management of GA for LSCS in pre-eclamptic patient coming for LSCS"
+       ]
+      }
+     ],
+     "page": 91
+    },
+    {
+     "tool": "EBD",
+     "toolLabel": "Entrustment-based Discussion (EBD)",
+     "number": "Minimum 1 by end R5 for level 4 supervision",
+     "byYear": 5,
+     "forLevel": 4,
+     "assessor": "Physician Faculty co-managing case",
+     "items": [
+      "To include discussion on management of GA for LSCS in which patient develops obstetric haemorrhage"
+     ],
+     "itemGroups": [
+      {
+       "completeBy": "end R5",
+       "forLevel": 4,
+       "items": [
+        "To include discussion on management of GA for LSCS in which patient develops obstetric haemorrhage"
+       ]
+      }
+     ],
+     "page": 91
+    },
+    {
+     "tool": "Competency Evaluation",
+     "toolLabel": "Competency Evaluation",
+     "number": "Refer main EPA 7",
+     "byYear": null,
+     "forLevel": null,
+     "assessor": null,
+     "items": [],
+     "itemGroups": [],
+     "page": 91,
+     "specification": "Refer main EPA 7"
+    },
+    {
+     "tool": "MSF",
+     "toolLabel": "Multisource 360° Feedback (MSF)",
+     "number": "Refer main EPA 7",
+     "byYear": null,
+     "forLevel": null,
+     "assessor": null,
+     "items": [],
+     "itemGroups": [],
+     "page": 92,
+     "specification": "Refer main EPA 7"
+    },
+    {
+     "tool": "Case log",
+     "toolLabel": "Case Logs",
+     "number": "Minimum 20",
+     "byYear": 3,
+     "forLevel": null,
+     "assessor": "Reviewed by programme",
+     "items": [
+      "Includes LSCS done under RA, GA, and high-risk cases"
+     ],
+     "itemGroups": [
+      {
+       "completeBy": "end R3",
+       "forLevel": null,
+       "items": [
+        "Includes LSCS done under RA, GA, and high-risk cases"
+       ]
+      }
+     ],
+     "page": 92
+    },
+    {
+     "tool": "Case reflection",
+     "toolLabel": "Case reflections",
+     "number": "Minimum 5",
+     "byYear": 5,
+     "forLevel": null,
+     "assessor": "Reviewed by programme",
+     "items": [
+      "Management of challenging patients e.g., pre-eclamptic patients, patients with placenta praevia majors and cardiac disease in pregnancy"
+     ],
+     "itemGroups": [
+      {
+       "completeBy": "end R5",
+       "forLevel": null,
+       "items": [
+        "Management of challenging patients e.g., pre-eclamptic patients, patients with placenta praevia majors and cardiac disease in pregnancy"
+       ]
+      }
+     ],
+     "page": 92
+    }
+   ],
+   "expiry": "1 year",
+   "medhubTitles": []
+  },
+  {
+   "epa": "8",
+   "title": "Providing anaesthetic care for patients in a non-operating theatre setting",
+   "levels": [
+    {
+     "level": 3,
+     "by": "R3",
+     "scope": null
+    },
+    {
+     "level": 4,
+     "by": "R5",
+     "scope": null
+    }
+   ],
+   "limitations": [
+    "Procedures involving the heart and/or access to heart chambers"
+   ],
+   "assessments": [
+    {
+     "tool": "EBD",
+     "toolLabel": "Entrustment-based Discussion (EBD)",
+     "number": "Minimum 2 (At most only 1 paediatric patient may be discussed) 1 by end R3 for level 3 supervision 1 by end R5 for level 4 supervision)",
+     "byYear": null,
+     "forLevel": null,
+     "assessor": "Physician Faculty co-managing case",
+     "items": [
+      "MRI suite",
+      "Interventional radiology suite"
+     ],
+     "itemGroups": [
+      {
+       "completeBy": "end of R3",
+       "forLevel": 3,
+       "items": [
+        "MRI suite"
+       ],
+       "note": "Minimum 1 For level 3 supervision"
+      },
+      {
+       "completeBy": "end of R5",
+       "forLevel": 4,
+       "items": [
+        "Interventional radiology suite"
+       ],
+       "note": "Minimum 1 For level 4 supervision"
+      }
+     ],
+     "page": 98,
+     "byYearAll": [
+      3,
+      5
+     ],
+     "forLevelAll": [
+      3,
+      4
+     ]
+    },
+    {
+     "tool": "Case log",
+     "toolLabel": "Case Logs",
+     "number": "Minimum cumulative numbers • 5 • 10",
+     "byYear": null,
+     "forLevel": null,
+     "assessor": "Reviewed by programme",
+     "items": [],
+     "itemGroups": [],
+     "page": 98,
+     "specification": "To be completed by end of R3 To be completed by end of R5"
+    },
+    {
+     "tool": "Case reflection",
+     "toolLabel": "Case reflections",
+     "number": "Minimum numbers • 5",
+     "byYear": 5,
+     "forLevel": null,
+     "assessor": "Reviewed by programme",
+     "items": [
+      "Challenges and learning points related to providing care for patients in remote locations"
+     ],
+     "itemGroups": [
+      {
+       "completeBy": "end of R5",
+       "forLevel": null,
+       "items": [
+        "Challenges and learning points related to providing care for patients in remote locations"
+       ]
+      }
+     ],
+     "page": 98
+    }
+   ],
+   "expiry": "1 year",
+   "medhubTitles": []
+  },
+  {
+   "epa": "9",
+   "title": "Providing anaesthetic care for paediatric patients aged between 3 to 16 years old",
+   "levels": [
+    {
+     "level": 3,
+     "by": "R3",
+     "scope": null
+    },
+    {
+     "level": 4,
+     "by": "R5",
+     "scope": null
+    }
+   ],
+   "limitations": [
+    "Neonates, infants, and children aged less than 3 years old",
+    "Children ASA 4 and above",
+    "Children with congenital heart disease, potentially difficult airway or undergoing airway procedures, one- lung ventilation, neurosurgical emergencies"
+   ],
+   "assessments": [
+    {
+     "tool": "Mini-CEX",
+     "toolLabel": "Mini-Clinical Examination (Mini-CEX)",
+     "number": "Minimum 2 by end R3 for level 3 supervision",
+     "byYear": 3,
+     "forLevel": 3,
+     "assessor": "Physician Faculty",
+     "items": [
+      "GA/ SR case, ASA 1-2 aged 3-10 years",
+      "GA/IPPV case, ASA 2-3, age 3-5 years"
+     ],
+     "itemGroups": [
+      {
+       "completeBy": "end R2",
+       "forLevel": 3,
+       "items": [
+        "GA/ SR case, ASA 1-2 aged 3-10 years"
+       ],
+       "note": "For level 3 supervision Minimum 1"
+      },
+      {
+       "completeBy": "end R3",
+       "forLevel": null,
+       "items": [
+        "GA/IPPV case, ASA 2-3, age 3-5 years"
+       ],
+       "note": "Minimum 1 in R3"
+      }
+     ],
+     "page": 106
+    },
+    {
+     "tool": "EBD",
+     "toolLabel": "Entrustment-based Discussion (EBD)",
+     "number": "Minimum 2 (1 by end R3 for level 3 supervision 1 by end R5 for level 4 supervision)",
+     "byYear": null,
+     "forLevel": null,
+     "assessor": "Physician Faculty co-managing case",
+     "items": [
+      "Paediatric trauma patient requiring surgery",
+      "Special needs child requiring anaesthesia"
+     ],
+     "itemGroups": [
+      {
+       "completeBy": "end R3",
+       "forLevel": 3,
+       "items": [
+        "Paediatric trauma patient requiring surgery"
+       ],
+       "note": "For level 3 supervision Minimum 1"
+      },
+      {
+       "completeBy": "end R5",
+       "forLevel": 4,
+       "items": [
+        "Special needs child requiring anaesthesia"
+       ],
+       "note": "Minimum 1 For level 4 supervision"
+      }
+     ],
+     "page": 106,
+     "byYearAll": [
+      3,
+      5
+     ],
+     "forLevelAll": [
+      3,
+      4
+     ]
+    },
+    {
+     "tool": "Competency Evaluation",
+     "toolLabel": "Competency Evaluation",
+     "number": "3",
+     "byYear": null,
+     "forLevel": null,
+     "assessor": null,
+     "items": [],
+     "itemGroups": [],
+     "page": 106,
+     "specification": "• 2 in Junior Residency (R1 to R3) • 1 in Senior Residency (R4 to R5)"
+    },
+    {
+     "tool": "MSF",
+     "toolLabel": "Multisource 360° Feedback (MSF)",
+     "number": "2",
+     "byYear": null,
+     "forLevel": null,
+     "assessor": "Minimally 1 peer, 2 faculty, 2 nurses",
+     "items": [],
+     "itemGroups": [],
+     "page": 106,
+     "specification": "Minimally 1 peer, 2 faculty, 2 nurses • 1 in Junior Residency (R1 to R3) • 1 in Senior Residency (R4 to R5)"
+    },
+    {
+     "tool": "Case log",
+     "toolLabel": "Case Logs",
+     "number": "Junior Residency (R1 to R3) Minimum 125",
+     "byYear": 3,
+     "forLevel": null,
+     "assessor": null,
+     "items": [
+      "< 3 months 5 cases",
+      "< 3 years 20 cases",
+      "< 12 years 100 cases"
+     ],
+     "itemGroups": [
+      {
+       "completeBy": "end R3",
+       "forLevel": null,
+       "items": [
+        "< 3 months 5 cases",
+        "< 3 years 20 cases",
+        "< 12 years 100 cases"
+       ],
+       "note": "Minimum case numbers 125 cases:"
+      }
+     ],
+     "page": 106
+    },
+    {
+     "tool": "Case log",
+     "toolLabel": "Case Logs",
+     "number": "Senior Residency (R4 to R5) Minimum 30",
+     "byYear": 5,
+     "forLevel": null,
+     "assessor": null,
+     "items": [],
+     "itemGroups": [],
+     "page": 106,
+     "specification": "Minimum case numbers To be completed by end R5"
+    }
+   ],
+   "expiry": "1 year",
+   "medhubTitles": []
+  },
+  {
+   "epa": "10",
+   "title": "Managing adult patients for cardiovascular procedures and interventions",
+   "levels": [
+    {
+     "level": 3,
+     "by": "R5",
+     "scope": null
+    }
+   ],
+   "levelsNote": "Level 3 supervision at end R5. Resident is expected to exit the programme at level 3 supervision because cardiac anaesthesia is a subspecialty",
+   "limitations": [
+    "Patients aged less than 16 years old"
+   ],
+   "assessments": [
+    {
+     "tool": "DOPS",
+     "toolLabel": "Direct Observation of Procedural Skills (DOPS)",
+     "number": "Minimum 3 by end R2 reaching minimal score of 5 for overall assessment.",
+     "byYear": 2,
+     "forLevel": null,
+     "assessor": "Physician Faculty",
+     "items": [
+      "Central venous catheter insertion"
+     ],
+     "itemGroups": [
+      {
+       "completeBy": "end of R2",
+       "forLevel": null,
+       "items": [
+        "Central venous catheter insertion"
+       ]
+      }
+     ],
+     "page": 112
+    },
+    {
+     "tool": "EBD",
+     "toolLabel": "Entrustment-based Discussion (EBD)",
+     "number": "Minimum 1 by end R3 For level 3 supervision",
+     "byYear": 3,
+     "forLevel": 3,
+     "assessor": "Physician Faculty co-managing case",
+     "items": [
+      "Patient undergoing cardiac surgery requiring CPB"
+     ],
+     "itemGroups": [
+      {
+       "completeBy": "end of R3",
+       "forLevel": 3,
+       "items": [
+        "Patient undergoing cardiac surgery requiring CPB"
+       ]
+      }
+     ],
+     "page": 112
+    },
+    {
+     "tool": "Competency Evaluation",
+     "toolLabel": "Competency Evaluation",
+     "number": "2",
+     "byYear": null,
+     "forLevel": null,
+     "assessor": "Physician Faculty",
+     "items": [],
+     "itemGroups": [],
+     "page": 113,
+     "specification": "• 1 in Junior Residency (R1 to R3) • 1 in Senior Residency (R4 to R5)"
+    },
+    {
+     "tool": "MSF",
+     "toolLabel": "Multisource 360° Feedback (MSF)",
+     "number": "2",
+     "byYear": null,
+     "forLevel": null,
+     "assessor": "Minimum 1 physician faculty, 1 peer and 1 nurse (Staff Nurse and above)",
+     "items": [],
+     "itemGroups": [],
+     "page": 113,
+     "specification": "• 1 in Junior Residency (R1 to R3) • 1 in Senior Residency (R4 to R5)"
+    },
+    {
+     "tool": "Case log",
+     "toolLabel": "Case Logs",
+     "number": "Minimum case numbers 20",
+     "byYear": 3,
+     "forLevel": null,
+     "assessor": "Reviewed by programme",
+     "items": [
+      "At least 10 procedures requiring cardiopulmonary bypass.",
+      "At least 10 procedures not requiring cardiopulmonary bypass, e.g., insertion of implantable cardioverter defibrillator or pacemaker, cardiac ablation, repair of descending aortic aneurysm, and pericardiotomy surgery."
+     ],
+     "itemGroups": [
+      {
+       "completeBy": "end of R3",
+       "forLevel": null,
+       "items": [
+        "At least 10 procedures requiring cardiopulmonary bypass.",
+        "At least 10 procedures not requiring cardiopulmonary bypass, e.g., insertion of implantable cardioverter defibrillator or pacemaker, cardiac ablation, repair of descending aortic aneurysm, and pericardiotomy surgery."
+       ],
+       "note": "At least 20 patients for cardiac surgery and cardiology intervention"
+      }
+     ],
+     "page": 113
+    },
+    {
+     "tool": "Case log",
+     "toolLabel": "Case Logs",
+     "number": "Minimum case numbers 15",
+     "byYear": 5,
+     "forLevel": null,
+     "assessor": null,
+     "items": [
+      "At least 5 procedures must involve cardiopulmonary bypass"
+     ],
+     "itemGroups": [
+      {
+       "completeBy": "end of R5",
+       "forLevel": null,
+       "items": [
+        "At least 5 procedures must involve cardiopulmonary bypass"
+       ],
+       "note": "15 patients for cardiac surgery and cardiology interventions"
+      }
+     ],
+     "page": 113
+    }
+   ],
+   "expiry": "1 year",
+   "medhubTitles": []
+  },
+  {
+   "epa": "11",
+   "title": "Assessing and managing patients with acute pain",
+   "levels": [
+    {
+     "level": 3,
+     "by": "R3",
+     "scope": null
+    },
+    {
+     "level": 4,
+     "by": "R5",
+     "scope": null
+    }
+   ],
+   "limitations": [
+    "Pure chronic pain cases",
+    "Patients aged less than 16 years old"
+   ],
+   "assessments": [
+    {
+     "tool": "Mini-CEX",
+     "toolLabel": "Mini-Clinical Examination (Mini-CEX)",
+     "number": "Minimum 1 by end R3 for level 3 supervision",
+     "byYear": 3,
+     "forLevel": 3,
+     "assessor": "Physician Faculty",
+     "items": [
+      "To cover pain assessment and acute pain management (PACU/ pain rounds)"
+     ],
+     "itemGroups": [
+      {
+       "completeBy": "end R3",
+       "forLevel": 3,
+       "items": [
+        "To cover pain assessment and acute pain management (PACU/ pain rounds)"
+       ]
+      }
+     ],
+     "page": 118
+    },
+    {
+     "tool": "EBD",
+     "toolLabel": "Entrustment-based Discussion (EBD)",
+     "number": "Minimum 1 by end R5 for level 4 supervision",
+     "byYear": 5,
+     "forLevel": 4,
+     "assessor": "Physician Faculty co-managing case",
+     "items": [
+      "Blue letter referral setting"
+     ],
+     "itemGroups": [
+      {
+       "completeBy": "end R5",
+       "forLevel": 4,
+       "items": [
+        "Blue letter referral setting"
+       ]
+      }
+     ],
+     "page": 118
+    },
+    {
+     "tool": "Case log",
+     "toolLabel": "Case Logs",
+     "number": "Minimum 20",
+     "byYear": 3,
+     "forLevel": null,
+     "assessor": "Reviewed by programme",
+     "items": [
+      "Evaluation of new patient presenting with pain"
+     ],
+     "itemGroups": [
+      {
+       "completeBy": "end R3",
+       "forLevel": null,
+       "items": [
+        "Evaluation of new patient presenting with pain"
+       ]
+      }
+     ],
+     "page": 118
+    },
+    {
+     "tool": "Case reflection",
+     "toolLabel": "Case reflections",
+     "number": "Minimum 5",
+     "byYear": 5,
+     "forLevel": null,
+     "assessor": null,
+     "items": [
+      "Challenging cases of acute pain management"
+     ],
+     "itemGroups": [
+      {
+       "completeBy": "end R5",
+       "forLevel": null,
+       "items": [
+        "Challenging cases of acute pain management"
+       ]
+      }
+     ],
+     "page": 118
+    }
+   ],
+   "expiry": "1 year",
+   "medhubTitles": []
+  },
+  {
+   "epa": "12",
+   "title": "Assessing and managing patients with chronic pain",
+   "levels": [
+    {
+     "level": 3,
+     "by": "R5",
+     "scope": null
+    }
+   ],
+   "levelsNote": "Level 3 supervision by end R5. Resident is expected to exit the programme at level 3 supervision because chronic pain management is a subspecialty",
+   "limitations": [
+    "Patients aged less than 16 years old"
+   ],
+   "assessments": [
+    {
+     "tool": "Mini-CEX",
+     "toolLabel": "Mini-Clinical Examination (Mini-CEX)",
+     "number": "Minimum 1 by end R3 for level 3 supervision",
+     "byYear": 3,
+     "forLevel": 3,
+     "assessor": "Physician Faculty",
+     "items": [
+      "Assessing chronic pain • History and physical examination"
+     ],
+     "itemGroups": [
+      {
+       "completeBy": "end R3",
+       "forLevel": 3,
+       "items": [
+        "Assessing chronic pain • History and physical examination"
+       ]
+      }
+     ],
+     "page": 124
+    },
+    {
+     "tool": "EBD",
+     "toolLabel": "Entrustment-based Discussion (EBD)",
+     "number": "Minimum 1 by end R3 for level 3 supervision",
+     "byYear": 3,
+     "forLevel": 3,
+     "assessor": "Physician Faculty co-managing case",
+     "items": [
+      "Complex chronic pain patient coming in for surgery • Pain management for opioid tolerant patient"
+     ],
+     "itemGroups": [
+      {
+       "completeBy": "end R3",
+       "forLevel": 3,
+       "items": [
+        "Complex chronic pain patient coming in for surgery • Pain management for opioid tolerant patient"
+       ]
+      }
+     ],
+     "page": 124
+    },
+    {
+     "tool": "MSF",
+     "toolLabel": "Multisource 360° Feedback (MSF)",
+     "number": "1",
+     "byYear": 3,
+     "forLevel": null,
+     "assessor": "Pain nurse/ physician faculty running chronic pain clinic",
+     "items": [],
+     "itemGroups": [],
+     "page": 124,
+     "specification": "Pain nurse/ physician faculty running chronic pain clinic To be completed by end R3"
+    }
+   ],
+   "expiry": "1 year",
+   "medhubTitles": []
+  }
+ ],
+ "crosscheck": [
+  {
+   "requirementId": "R1-DOPS-01",
+   "epa": "2",
+   "tool": "DOPS",
+   "matchedItem": "Mask holding and bag ventilation",
+   "note": ""
+  },
+  {
+   "requirementId": "R1-DOPS-02",
+   "epa": "2",
+   "tool": "DOPS",
+   "matchedItem": "Successful LMA insertion",
+   "note": ""
+  },
+  {
+   "requirementId": "R1-DOPS-03",
+   "epa": "2",
+   "tool": "DOPS",
+   "matchedItem": "Successful endotracheal intubation",
+   "note": ""
+  },
+  {
+   "requirementId": "R1-DOPS-04",
+   "epa": "3",
+   "tool": "DOPS",
+   "matchedItem": "Subarachnoid block",
+   "note": ""
+  },
+  {
+   "requirementId": "R1-DOPS-05",
+   "epa": "6",
+   "tool": "DOPS",
+   "matchedItem": "Minimum 1 Intra-arterial (IA) line",
+   "note": ""
+  },
+  {
+   "requirementId": "R1-EBD-01",
+   "epa": "2",
+   "tool": "EBD",
+   "matchedItem": "Management of cardiovascular related anaesthetic crisis during general anaesthesia",
+   "note": ""
+  },
+  {
+   "requirementId": "R1-EBD-02",
+   "epa": "1",
+   "tool": "EBD",
+   "matchedItem": "Assessment of a patient with pre-existing respiratory disease",
+   "note": ""
+  },
+  {
+   "requirementId": "R1-EBD-03",
+   "epa": "1",
+   "tool": "EBD",
+   "matchedItem": "Assessment of a patient with pre-existing cardiovascular disease",
+   "note": ""
+  },
+  {
+   "requirementId": "R1-EBD-04",
+   "epa": "1",
+   "tool": "EBD",
+   "matchedItem": "Assessment of a patient with pre-existing endocrine disease",
+   "note": ""
+  },
+  {
+   "requirementId": "R1-EBD-05",
+   "epa": "3",
+   "tool": "EBD",
+   "matchedItem": "Management of a patient undergoing ophthalmic surgery under MAC",
+   "note": ""
+  },
+  {
+   "requirementId": "R1-MiniCEX-01",
+   "epa": "1",
+   "tool": "Mini-CEX",
+   "matchedItem": "Preoperative assessment of a patient in the hospital setting e.g., preoperative clinic/ pre-anaesthetic evaluation clinic (PEC), ward",
+   "note": ""
+  },
+  {
+   "requirementId": "R1-MiniCEX-02",
+   "epa": "2",
+   "tool": "Mini-CEX",
+   "matchedItem": "Patient requiring GA with endotracheal tube (inclusive of entrustment discussion on management of ventilation or oxygenation related anaesthetic crisis during general anaesthesia)",
+   "note": ""
+  },
+  {
+   "requirementId": "R1-MiniCEX-03",
+   "epa": "2",
+   "tool": "Mini-CEX",
+   "matchedItem": "Patient requiring GA with LMA (inclusive of entrustment discussion on management of crisis related to anaesthetic agent use e.g., anaphylaxis, malignant hyperthermia)",
+   "note": ""
+  },
+  {
+   "requirementId": "R2-DOPS-01",
+   "epa": "2",
+   "tool": "DOPS",
+   "matchedItem": "Mask holding and bag ventilation",
+   "note": "Guidebook obese-patient DOPS group (by end R2)."
+  },
+  {
+   "requirementId": "R2-DOPS-02",
+   "epa": "2",
+   "tool": null,
+   "matchedItem": null,
+   "note": "No 'LMA insertion in morbidly obese patient' item in the guidebook EPA 2 DOPS list (p29 lists only mask holding/bag ventilation and endotracheal intubation for obese patients, plus double lumen tube on p30). The guidebook row says 'Minimum 4 of specified DOPS' but lists only 3 items, so the template's 4th (LMA) may reflect programme practice; unverified."
+  },
+  {
+   "requirementId": "R2-DOPS-03",
+   "epa": "2",
+   "tool": "DOPS",
+   "matchedItem": "Successful endotracheal intubation",
+   "note": "Guidebook obese-patient DOPS group (by end R2)."
+  },
+  {
+   "requirementId": "R2-DOPS-04",
+   "epa": "2",
+   "tool": "DOPS",
+   "matchedItem": "Placement of double lumen tube and confirmation using both auscultation and bronchoscopy",
+   "note": "Template frames DLT as 'in a morbidly obese patient'; in the guidebook DLT sits under a fresh 'To be completed by end R2' sub-heading on p30, so the obese qualifier is ambiguous."
+  },
+  {
+   "requirementId": "R2-DOPS-05",
+   "epa": "3",
+   "tool": "DOPS",
+   "matchedItem": "Upper limb block (single shot) Brachial plexus",
+   "note": ""
+  },
+  {
+   "requirementId": "R2-DOPS-06",
+   "epa": "3",
+   "tool": "DOPS",
+   "matchedItem": "Lower limb block (single shot) Any one of the following blocks: • Fascia iliaca, • Femoral nerve block, • Popliteal approach to sciatic nerve block",
+   "note": ""
+  },
+  {
+   "requirementId": "R2-EBD-01",
+   "epa": "1",
+   "tool": "EBD",
+   "matchedItem": "Assessment of geriatric patient",
+   "note": ""
+  },
+  {
+   "requirementId": "R2-EBD-02",
+   "epa": "1",
+   "tool": "EBD",
+   "matchedItem": "Assessment of morbidly obese patient",
+   "note": ""
+  },
+  {
+   "requirementId": "R2-EBD-03",
+   "epa": "2",
+   "tool": "EBD",
+   "matchedItem": "Management of ASA 3 or 4 patient presenting for elective or emergency procedures requiring general anaesthesia, e.g., high risk cardiac patient presenting for non-cardiac surgery",
+   "note": ""
+  },
+  {
+   "requirementId": "R2-EBD-04",
+   "epa": "2",
+   "tool": "EBD",
+   "matchedItem": "Management of geriatric patient",
+   "note": ""
+  },
+  {
+   "requirementId": "R2-EBD-05",
+   "epa": "2",
+   "tool": "EBD",
+   "matchedItem": "Management of morbidly obese patient",
+   "note": ""
+  },
+  {
+   "requirementId": "R2-EBD-06",
+   "epa": "2",
+   "tool": "EBD",
+   "matchedItem": "Management of patient requiring intraoperative neurophysiological monitoring",
+   "note": ""
+  },
+  {
+   "requirementId": "R2-EBD-07",
+   "epa": "3",
+   "tool": "EBD",
+   "matchedItem": "Management of a patient undergoing surgery under subarachnoid block",
+   "note": ""
+  },
+  {
+   "requirementId": "R2-EBD-08",
+   "epa": "6",
+   "tool": "EBD",
+   "matchedItem": "Post general surgery critically ill patient",
+   "note": ""
+  },
+  {
+   "requirementId": "R2-EBD-09",
+   "epa": "6",
+   "tool": "EBD",
+   "matchedItem": "Neurosurgical critically ill patient",
+   "note": ""
+  },
+  {
+   "requirementId": "R2-MiniCEX-01",
+   "epa": "10",
+   "tool": "DOPS",
+   "matchedItem": "Central venous catheter insertion",
+   "note": "TOOL MISMATCH: template lists CVC insertion x3 as Mini-CEX; guidebook EPA 10 (p112) specifies it as DOPS (Minimum 3 by end R2)."
+  },
+  {
+   "requirementId": "R2-MiniCEX-02",
+   "epa": "10",
+   "tool": "DOPS",
+   "matchedItem": "Central venous catheter insertion",
+   "note": "TOOL MISMATCH: template Mini-CEX vs guidebook DOPS (EPA 10, p112)."
+  },
+  {
+   "requirementId": "R2-MiniCEX-03",
+   "epa": "10",
+   "tool": "DOPS",
+   "matchedItem": "Central venous catheter insertion",
+   "note": "TOOL MISMATCH: template Mini-CEX vs guidebook DOPS (EPA 10, p112)."
+  },
+  {
+   "requirementId": "R2-MiniCEX-04",
+   "epa": "9",
+   "tool": "Mini-CEX",
+   "matchedItem": "GA/ SR case, ASA 1-2 aged 3-10 years",
+   "note": ""
+  },
+  {
+   "requirementId": "R2-MiniCEX-05",
+   "epa": "3",
+   "tool": "Mini-CEX",
+   "matchedItem": "Manage a patient for surgery under peripheral nerve block and sedation",
+   "note": ""
+  },
+  {
+   "requirementId": "R3-DOPS-01",
+   "epa": "3",
+   "tool": "DOPS",
+   "matchedItem": "Truncal block (single shot) Any one of the following blocks • Erector spinae block, • Rectus sheath block, • Transversus abdominis plane block, • Ilioinguinal/ iliohypogastric nerve block",
+   "note": "Template says 'transabdominal plane block'; guidebook says 'Transversus abdominis plane block'."
+  },
+  {
+   "requirementId": "R3-DOPS-02",
+   "epa": "4",
+   "tool": "DOPS",
+   "matchedItem": "Minimum 1 DOPS for awake flexible bronchoscopy guided intubation",
+   "note": ""
+  },
+  {
+   "requirementId": "R3-DOPS-03",
+   "epa": "4",
+   "tool": "DOPS",
+   "matchedItem": "Minimum 3 DOPS for difficult airway intubation using three different types of laryngoscope blades (curved, hyper-angulated, straight) and/or different models of video-laryngoscopes",
+   "note": ""
+  },
+  {
+   "requirementId": "R3-DOPS-04",
+   "epa": "4",
+   "tool": "DOPS",
+   "matchedItem": "Minimum 3 DOPS for difficult airway intubation using three different types of laryngoscope blades (curved, hyper-angulated, straight) and/or different models of video-laryngoscopes",
+   "note": ""
+  },
+  {
+   "requirementId": "R3-DOPS-05",
+   "epa": "4",
+   "tool": "DOPS",
+   "matchedItem": "Minimum 3 DOPS for difficult airway intubation using three different types of laryngoscope blades (curved, hyper-angulated, straight) and/or different models of video-laryngoscopes",
+   "note": ""
+  },
+  {
+   "requirementId": "R3-DOPS-06",
+   "epa": "6",
+   "tool": "DOPS",
+   "matchedItem": "Minimum 1 Dialysis vascular access catheter insertion",
+   "note": ""
+  },
+  {
+   "requirementId": "R3-DOPS-07",
+   "epa": "7a",
+   "tool": "DOPS",
+   "matchedItem": "Labour epidural / CSE",
+   "note": "Guidebook: Minimum 3 by end R3."
+  },
+  {
+   "requirementId": "R3-DOPS-08",
+   "epa": "7a",
+   "tool": "DOPS",
+   "matchedItem": "Labour epidural / CSE",
+   "note": ""
+  },
+  {
+   "requirementId": "R3-DOPS-09",
+   "epa": "7a",
+   "tool": "DOPS",
+   "matchedItem": "Labour epidural / CSE",
+   "note": ""
+  },
+  {
+   "requirementId": "R3-EBD-01",
+   "epa": "7a",
+   "tool": "EBD",
+   "matchedItem": "Troubleshooting inadequate or failed labour epidural",
+   "note": "Template merges the 5 guidebook options (Troubleshooting inadequate or failed labour epidural; Foetal distress/non-reassuring foetal status post RA; Hypotension; High/total spinal block; Inadvertent dural puncture) into one item; guidebook requires 'Minimum 1' of them."
+  },
+  {
+   "requirementId": "R3-EBD-02",
+   "epa": "8",
+   "tool": "EBD",
+   "matchedItem": "MRI suite",
+   "note": "'At most only 1 paediatric patient may be discussed' comes from the guidebook number cell."
+  },
+  {
+   "requirementId": "R3-EBD-03",
+   "epa": "9",
+   "tool": "EBD",
+   "matchedItem": "Paediatric trauma patient requiring surgery",
+   "note": ""
+  },
+  {
+   "requirementId": "R3-EBD-04",
+   "epa": "10",
+   "tool": "EBD",
+   "matchedItem": "Patient undergoing cardiac surgery requiring CPB",
+   "note": ""
+  },
+  {
+   "requirementId": "R3-EBD-05",
+   "epa": "12",
+   "tool": "EBD",
+   "matchedItem": "Complex chronic pain patient coming in for surgery • Pain management for opioid tolerant patient",
+   "note": ""
+  },
+  {
+   "requirementId": "R3-EBD-06",
+   "epa": "2",
+   "tool": "EBD",
+   "matchedItem": "Management of patient undergoing thoracic surgery requiring one lung ventilation",
+   "note": ""
+  },
+  {
+   "requirementId": "R3-EBD-07",
+   "epa": "2",
+   "tool": "EBD",
+   "matchedItem": "Management of patient undergoing neurosurgical procedure",
+   "note": ""
+  },
+  {
+   "requirementId": "R3-EBD-08",
+   "epa": "3",
+   "tool": "EBD",
+   "matchedItem": "Management of a patient undergoing surgery under subarachnoid block/single shot peripheral nerve block",
+   "note": ""
+  },
+  {
+   "requirementId": "R3-EBD-09",
+   "epa": "5",
+   "tool": "EBD",
+   "matchedItem": "Management of head/ neck trauma",
+   "note": ""
+  },
+  {
+   "requirementId": "R3-EBD-10",
+   "epa": "5",
+   "tool": "EBD",
+   "matchedItem": "Management of thoracic/ abdominal trauma",
+   "note": ""
+  },
+  {
+   "requirementId": "R3-EBD-11",
+   "epa": "5",
+   "tool": "EBD",
+   "matchedItem": "Management of pelvic/lower limb injury",
+   "note": ""
+  },
+  {
+   "requirementId": "R3-EBD-12",
+   "epa": "6",
+   "tool": "EBD",
+   "matchedItem": "Critically ill patient with severe medical comorbidities",
+   "note": ""
+  },
+  {
+   "requirementId": "R3-EBD-13",
+   "epa": "3",
+   "tool": "EBD",
+   "matchedItem": "Management of patient undergoing surgery with a peripheral nerve block catheter",
+   "note": "Guidebook has this item twice in EPA 3: by end R3 (level 3) and by end R5 (level 4); this is the R3/level 3 one."
+  },
+  {
+   "requirementId": "R3-MiniCEX-01",
+   "epa": "9",
+   "tool": "Mini-CEX",
+   "matchedItem": "GA/IPPV case, ASA 2-3, age 3-5 years",
+   "note": ""
+  },
+  {
+   "requirementId": "R3-MiniCEX-02",
+   "epa": "7b",
+   "tool": "Mini-CEX",
+   "matchedItem": "Lower segment Caesarean section To include discussion on management of GA for LSCS in pre-eclamptic patient coming for LSCS",
+   "note": ""
+  },
+  {
+   "requirementId": "R3-MiniCEX-03",
+   "epa": "11",
+   "tool": "Mini-CEX",
+   "matchedItem": "To cover pain assessment and acute pain management (PACU/ pain rounds)",
+   "note": ""
+  },
+  {
+   "requirementId": "R3-MiniCEX-04",
+   "epa": "12",
+   "tool": "Mini-CEX",
+   "matchedItem": "Assessing chronic pain • History and physical examination",
+   "note": ""
+  },
+  {
+   "requirementId": "R3-MiniCEX-05",
+   "epa": "4",
+   "tool": "Mini-CEX",
+   "matchedItem": "Anaesthetic management of a patient with anticipated difficult airway",
+   "note": ""
+  },
+  {
+   "requirementId": "R3-MiniCEX-06",
+   "epa": "4",
+   "tool": "Mini-CEX",
+   "matchedItem": "Anaesthetic management of a patient going for surgery with a shared airway",
+   "note": ""
+  },
+  {
+   "requirementId": "R3-MiniCEX-07",
+   "epa": "6",
+   "tool": "Mini-CEX",
+   "matchedItem": "Outreach/Triage admission to ICU",
+   "note": ""
+  },
+  {
+   "requirementId": "R5-DOPS-01",
+   "epa": "3",
+   "tool": "DOPS",
+   "matchedItem": "Peripheral nerve block with catheter",
+   "note": ""
+  },
+  {
+   "requirementId": "R5-EBD-01",
+   "epa": "3",
+   "tool": "EBD",
+   "matchedItem": "Management of patient undergoing surgery with a peripheral nerve block catheter",
+   "note": "The R5/level 4 instance of the repeated EPA 3 item."
+  },
+  {
+   "requirementId": "R5-EBD-02",
+   "epa": "4",
+   "tool": "EBD",
+   "matchedItem": "Patient with a difficult airway, requiring alternative intubation approaches such as awake intubation +/- front of neck access.",
+   "note": ""
+  },
+  {
+   "requirementId": "R5-EBD-03",
+   "epa": "7a",
+   "tool": "EBD",
+   "matchedItem": "Managing complications of labour epidural/ CSE like postpartum neurological deficit, post dural puncture headache",
+   "note": ""
+  },
+  {
+   "requirementId": "R5-EBD-04",
+   "epa": "7b",
+   "tool": "EBD",
+   "matchedItem": "To include discussion on management of GA for LSCS in which patient develops obstetric haemorrhage",
+   "note": ""
+  },
+  {
+   "requirementId": "R5-EBD-05",
+   "epa": "8",
+   "tool": "EBD",
+   "matchedItem": "Interventional radiology suite",
+   "note": ""
+  },
+  {
+   "requirementId": "R5-EBD-06",
+   "epa": "9",
+   "tool": "EBD",
+   "matchedItem": "Special needs child requiring anaesthesia",
+   "note": ""
+  },
+  {
+   "requirementId": "R5-EBD-07",
+   "epa": "11",
+   "tool": "EBD",
+   "matchedItem": "Blue letter referral setting",
+   "note": ""
+  }
+ ],
+ "unmatchedGuidebookItems": [],
+ "notes": [
+  "Printed page numbers are used throughout ('page' fields); PDF page = printed page + 2.",
+  "No per-EPA MedHub-style titles appear in any EPA assessment section; the only example is on printed p12 ('Abbreviations for title of EPA assessment on MedHub'): '[EBD] EPA 1 (Level 3): Assessment of a patient with pre-existing respiratory disease.' medhubTitles is therefore [] for every EPA.",
+  "EPA 2 (p29-31): Mini-CEX and the first EBD are labelled 'by end R1 (For level 3 supervision)' but the 'Which supervision level when?' row says Level 3 by end R2, Level 4 by end R3.",
+  "EPA 2 DOPS obese row (p29): 'Minimum 4 of specified DOPS' but only 3 items are listed (mask/bag ventilation, ETT, plus DLT on p30). Template adds 'LMA insertion' in obese patient (R2-DOPS-02), which the guidebook does not list.",
+  "EPA 2 DOPS R1 row deadline is 'first 2 months of R1' (byYear set to 1).",
+  "EPA 3 (p43): Mini-CEX number cell reads 'Minimum 1 by end R2)' with a stray closing parenthesis; kept verbatim.",
+  "EPA 3 (p44-45): four separate Case Log rows (peripheral nerve blocks, subarachnoid blocks, epidural/caudal, PNB with catheter); each recorded as its own assessment row.",
+  "EPA 3: 'Management of patient undergoing surgery with a peripheral nerve block catheter' appears twice as EBD (by end R3 for level 3; by end R5 for level 4), matching template R3-EBD-13 and R5-EBD-01.",
+  "EPA 4 (p51): EBD number says 'Minimum 1 by R5' (not 'by end R5'); spec says 'To be completed by end R5'.",
+  "EPA 5 (p60): only one supervision level given (Level 4 by end R3); no Mini-CEX or DOPS. Case Log number cell lists bare '4' and '8' matched to 'by end R3'/'by end R5' in the adjacent cell (byYear null). Experiences row (p59-60) also mentions 'at least 4 cases over 3 years' and 'Minimum 8 case logs by end R5'.",
+  "EPA 6 (p68): Mini-CEX deadline cell says 'To be completed by R3' (no 'end').",
+  "EPA 7 (p81-82): main EPA's Mini-CEX/DOPS/EBD rows have no items of their own; they point to EPA 7a/7b ('Please refer'). Counts there (DOPS min 3, EBD min 3 = 1 by R3 + 2 by R5) are the sums over 7a/7b.",
+  "EPA 7a (p85): EBD R3 lists 5 alternative scenarios with 'Minimum 1'; the template collapses them into one item (R3-EBD-01).",
+  "EPA 7a (p85) Case Logs spec numbers its two entries '1. 10 direct supervision of labour epidural' (level 3, by end R3) and '2. Minimum 40' (level 4, no explicit deadline).",
+  "EPA 7b limitations: 'In addition to those mentioned under limitations of main EPA 7, this EPA excludes the following:' ; the first list entry is that qualifier, not an item.",
+  "EPA 8 (p98): EBD number cell has an unbalanced parenthesis: 'Minimum 2 (At most only 1 paediatric patient may be discussed) 1 by end R3 for level 3 supervision 1 by end R5 for level 4 supervision)'; kept verbatim. Items 'MRI suite' and 'Interventional radiology suite' are bullets.",
+  "EPA 9 (p106): Mini-CEX number says 'Minimum 2 by end R3 for level 3 supervision' but the first item (GA/ SR case) is 'To be completed by end R2'. Case Log breakdown includes '< 3 months 5 cases', which falls outside the EPA's own limitation (excludes children < 3 years); recorded verbatim.",
+  "EPA 10 (p112-113): Central venous catheter insertion is a DOPS (min 3 by end R2) in the guidebook but appears as 3 Mini-CEX items in the tracking template (R2-MiniCEX-01..03). Only one supervision level: Level 3 at end R5 (exit at level 3, subspecialty).",
+  "EPA 12 (p124): 'Which supervision level' says Level 3 by end R5, yet Mini-CEX and EBD are both 'by end R3 for level 3 supervision'. No Competency Evaluation or Case Log row.",
+  "EPA 12 Mini-CEX/EBD items use a numbered heading followed by a bullet sub-point (e.g. '1. Assessing chronic pain' / '• History and physical examination'); joined as one item with ' • '.",
+  "Template R3-DOPS-01 says 'transabdominal plane block'; guidebook EPA 3 says 'Transversus abdominis plane block'.",
+  "Bulleted sub-lists inside a numbered item are kept joined with ' • ' (e.g. EPA 3 lower-limb and truncal DOPS).",
+  "byYear/forLevel are parsed from the 'number' cell; where that cell has no year but the specifications cell gives a single 'To be completed by end Rx' (e.g. EPA 4 Competency Evaluation and Case Logs, case reflections in EPAs 5/7/7a/7b/8/11, EPA 12 MSF), byYear was taken from the specifications cell. Rows with several deadlines have byYear null plus byYearAll; per-deadline detail is in itemGroups[].completeBy.",
+  "R3-EBD-01 (template) is treated as covering all five EPA 7a EBD R3 alternatives, so none of them is listed as unmatched.",
+  "Contributors' names were deliberately not extracted."
+ ]
+}
