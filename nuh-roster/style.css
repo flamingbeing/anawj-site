@@ -156,3 +156,10 @@ details summary { cursor: pointer; font-size: 13px; font-weight: 600; margin-top
 .bar.sync { padding: 8px 12px; border-radius: 8px; background: var(--info-bg); color: var(--info); font-size: 13px; }
 .bar.sync.dirty { background: var(--warn-bg); color: var(--warn); }
 .bar.sync span { flex: 1; min-width: 200px; }
+
+dialog.changes { border: 1px solid var(--line); border-radius: 12px; padding: 16px; max-width: min(640px, calc(100vw - 32px)); width: 100%; background: var(--panel); color: var(--ink); }
+dialog.changes::backdrop { background: rgba(0,0,0,.35); }
+dialog.changes h2 { margin: 0 0 8px; font-size: 16px; }
+dialog.changes ul { max-height: 50vh; overflow: auto; margin: 0 0 12px; padding-left: 18px; font-size: 13px; }
+ul.log { list-style: none; margin: 8px 0 0; padding: 0; font-size: 13px; display: grid; gap: 8px; max-height: 50vh; overflow: auto; }
+ul.log ul { margin: 2px 0 0; padding-left: 18px; }

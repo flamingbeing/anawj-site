@@ -156,13 +156,91 @@ function render() {
   window.scrollTo(0, y);
   save();
 }
-document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => { state.tab = b.dataset.tab; window.scrollTo(0, 0); render(); }));
+document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', async () => {
+  const t = b.dataset.tab;
+  if (staffEditing() && !['seniors', 'juniors'].includes(t) && !(await finishStaffEdit())) return;
+  state.tab = t; window.scrollTo(0, 0); render();
+}));
 
 // ----- staff tab -----
 
 let staffFilter = '';
 let tickMin = 1;
+let staffBackup = null; // copy of the staff list taken when editing starts; null when not editing
+const staffEditing = () => staffBackup !== null;
+const who = () => (typeof rostererName === 'string' && rostererName.trim()) || cs?.user?.displayName || cs?.user?.email || 'this browser';
+
+const subLabel = k => state.settings.subspecs.find(s => s.key === k)?.label || k;
+const listText = a => (a || []).join(', ') || 'none';
+
+// What changed between two staff lists, as readable lines.
+function diffStaff(before, after) {
+  const out = [];
+  const old = Object.fromEntries(before.map(p => [p.id, p]));
+  const now = Object.fromEntries(after.map(p => [p.id, p]));
+  for (const p of after) {
+    const o = old[p.id];
+    if (!o) { out.push(`Added ${p.role} ${p.name || '(no name)'} (${p.grade}${p.posting ? ', ' + p.posting : ''}${(p.subspecs || []).length ? ', ' + p.subspecs.map(subLabel).join('/') : ''})`); continue; }
+    const c = [];
+    if (o.name !== p.name) c.push(`renamed from ${o.name}`);
+    if (o.role !== p.role) c.push(`moved ${o.role} → ${p.role}`);
+    if (o.grade !== p.grade) c.push(`grade ${o.grade} → ${p.grade}`);
+    if ((o.posting || '') !== (p.posting || '')) c.push(`posting ${o.posting || 'none'} → ${p.posting || 'none'}`);
+    if (listText(o.aliases) !== listText(p.aliases)) c.push(`short names ${listText(o.aliases)} → ${listText(p.aliases)}`);
+    const os = new Set(o.subspecs || []), ns = new Set(p.subspecs || []);
+    const plus = [...ns].filter(k => !os.has(k)).map(k => '+' + subLabel(k)), minus = [...os].filter(k => !ns.has(k)).map(k => '−' + subLabel(k));
+    if (plus.length || minus.length) c.push(`subspecs ${[...plus, ...minus].join(' ')}`);
+    if (listText(o.avoid) !== listText(p.avoid)) c.push(`doesn't do ${listText(o.avoid)} → ${listText(p.avoid)}`);
+    if (c.length) out.push(`${p.name}: ${c.join('; ')}`);
+  }
+  for (const o of before) if (!now[o.id]) out.push(`Removed ${o.role} ${o.name}`);
+  return out;
+}
+
+// A modal listing changes. Resolves to one of the button keys.
+function confirmChanges(title, lines, buttons) {
+  return new Promise(resolve => {
+    const dlg = h('dialog', { class: 'changes' },
+      h('h2', {}, title),
+      h('ul', {}, lines.slice(0, 300).map(l => h('li', {}, l))),
+      lines.length > 300 ? h('p', { class: 'hint' }, `…and ${lines.length - 300} more.`) : null,
+      h('div', { class: 'bar' }, buttons.map(([key, label, cls]) => h('button', { class: cls || '', onclick: () => { dlg.close(); dlg.remove(); resolve(key); } }, label))));
+    dlg.addEventListener('cancel', e => { e.preventDefault(); dlg.close(); dlg.remove(); resolve('back'); });
+    document.body.append(dlg);
+    dlg.showModal();
+  });
+}
+
+function startStaffEdit() { staffBackup = clone(state.staff); render(); }
+
+// Ask to keep or discard edits. Resolves true when editing has ended.
+async function finishStaffEdit() {
+  if (!staffEditing()) return true;
+  const changes = diffStaff(staffBackup, state.staff);
+  if (!changes.length) { staffBackup = null; render(); return true; }
+  const choice = await confirmChanges(`Save ${changes.length} change${changes.length > 1 ? 's' : ''} to the staff list?`, changes,
+    [['save', 'Save changes', 'primary'], ['back', 'Keep editing'], ['discard', 'Discard changes']]);
+  if (choice === 'back') return false;
+  if (choice === 'discard') state.staff = staffBackup;
+  else (state.staffLog ||= []).unshift({ at: Date.now(), by: who(), changes }), state.staffLog.splice(300);
+  staffBackup = null;
+  render();
+  if (choice === 'save') toast(isMember() ? 'Changes saved here. Use "Save for the team" to share them.' : 'Changes saved.');
+  return true;
+}
+
+function staffLogCard() {
+  const log = state.staffLog || [];
+  if (!log.length) return null;
+  return h('section', { class: 'card' }, h('details', {},
+    h('summary', {}, `Change history (${log.length})`),
+    h('ul', { class: 'log' }, log.map(e => h('li', {},
+      h('div', { class: 'seen' }, `${when(e.at)} · ${e.by}`),
+      h('ul', {}, e.changes.map(c => h('li', {}, c))))))));
+}
+
 function renderStaff(role) {
+  if (!staffEditing()) return renderStaffView(role);
   const subs = state.settings.subspecs;
   const senior = role === 'senior';
   const list = state.staff
@@ -194,7 +272,10 @@ function renderStaff(role) {
       h('p', { class: 'hint' }, senior
         ? 'Tick each senior\'s subspecs and the lists they don\'t do. "Seen in" counts the subspec lists they did in past rosters you loaded, as a hint. Change Role to move someone to Juniors.'
         : 'Set each junior\'s grade and posting. Baby MOs are never left alone, so their senior won\'t double cover. Change Role to move someone to Seniors.'),
-      teamSyncBar(),
+      h('div', { class: 'bar sync dirty' },
+        h('span', {}, `Editing the staff list. ${diffStaff(staffBackup, state.staff).length} change(s) so far; nothing is kept until you review and save.`),
+        h('button', { class: 'primary', onclick: finishStaffEdit }, 'Review & save changes'),
+        h('button', { onclick: () => { if (confirm('Discard all changes since you started editing?')) { state.staff = staffBackup; staffBackup = null; render(); } } }, 'Cancel')),
       h('div', { class: 'bar' },
         fileButton('Import staff sheet (.xlsx / .csv)', '.xlsx,.csv', false, importStaffSheet),
         fileButton('Learn from past rosters', '.xlsx', true, learnFiles),
@@ -225,6 +306,46 @@ function renderStaff(role) {
         h('thead', {}, h('tr', {}, (senior ? ['Name', 'Short names', 'Role', 'Grade', 'Subspecs', "Doesn't do", 'Seen in', ''] : ['Name', 'Short names', 'Role', 'Grade', 'Posting', '']).map(t => h('th', {}, t)))),
         h('tbody', {}, list.map(row))))
       : h('section', { class: 'card empty' }, `No ${senior ? 'seniors' : 'juniors'} yet. Import the master staff sheet, or load a few past rosters to build the list automatically.`),
+  );
+}
+
+function renderStaffView(role) {
+  const subs = state.settings.subspecs;
+  const senior = role === 'senior';
+  const list = state.staff
+    .filter(p => p.role === role)
+    .filter(p => !staffFilter || (p.name + ' ' + (p.aliases || []).join(' ')).toLowerCase().includes(staffFilter.toLowerCase()))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const count = state.staff.filter(p => p.role === role).length;
+  const row = p => h('tr', {},
+    h('td', {}, h('b', {}, p.name)),
+    h('td', {}, (p.aliases || []).join(', ')),
+    h('td', {}, p.grade),
+    senior
+      ? h('td', {}, h('div', { class: 'chips' }, (p.subspecs || []).map(k => h('span', { class: 'chip on static' }, subLabel(k)))))
+      : h('td', {}, p.posting || ''),
+    senior && h('td', {}, (p.avoid || []).join(', ')),
+    senior && h('td', { class: 'seen' }, Object.entries(p.history || {}).map(([k, n]) => `${subLabel(k)} ×${n}`).join(', ')),
+  );
+  return h('div', {},
+    h('section', { class: 'card' },
+      h('h2', {}, senior ? 'Seniors' : 'Juniors'),
+      h('p', { class: 'hint' }, senior
+        ? 'The seniors the roster is generated from, with their subspecs and the lists they don\'t do.'
+        : 'The juniors the roster is generated from, with their grade and posting.'),
+      teamSyncBar(),
+      h('div', { class: 'bar' },
+        h('button', { onclick: startStaffEdit }, `Edit ${senior ? 'seniors' : 'juniors'}`),
+        h('span', { class: 'grow' }),
+        h('input', { placeholder: 'Filter names', value: staffFilter, oninput: e => { staffFilter = e.target.value; const pos = e.target.selectionStart; render(); const i = app.querySelector('input[placeholder="Filter names"]'); i.focus(); i.setSelectionRange(pos, pos); } })),
+      h('div', { class: 'stats' }, h('span', {}, h('b', {}, count), senior ? ' seniors' : ' juniors')),
+    ),
+    count
+      ? h('section', { class: 'card scroll' }, h('table', {},
+        h('thead', {}, h('tr', {}, (senior ? ['Name', 'Short names', 'Grade', 'Subspecs', "Doesn't do", 'Seen in'] : ['Name', 'Short names', 'Grade', 'Posting']).map(t => h('th', {}, t)))),
+        h('tbody', {}, list.map(row))))
+      : h('section', { class: 'card empty' }, `No ${senior ? 'seniors' : 'juniors'} yet. Click Edit to import the master staff sheet or learn from past rosters.`),
+    staffLogCard(),
   );
 }
 
@@ -500,10 +621,38 @@ function setCellParts(row, key, parts) {
 }
 
 let undoStack = [];
+let lastRows = null; // rows as of the last logged change
 let editing = null; // "rowIndex:key" of the cell being typed in
 
-function afterRosterEdit() {
+const COLS = { senior: 'senior', junior: 'junior', premed: 'premed', notes: 'cases' };
+
+// Cell-by-cell description of what changed between two versions of the roster rows.
+function describeRowChanges(before, after) {
+  const out = [];
+  const old = Object.fromEntries(before.map(r => [r.roomId, r]));
+  for (const r of after) {
+    const o = old[r.roomId];
+    if (!o) continue;
+    for (const [k, label] of Object.entries(COLS)) {
+      if ((o[k] || '') !== (r[k] || '')) out.push(`${r.label} ${label}: ${o[k] || '—'} → ${r[k] || '—'}`);
+    }
+  }
+  return out;
+}
+
+function logRoster(changes) {
+  if (!changes.length || !state.roster) return;
+  (state.roster.log ||= []).unshift({ at: Date.now(), by: who(), changes });
+  state.roster.log.splice(500);
+}
+
+function afterRosterEdit(undone) {
   const r = state.roster;
+  if (lastRows) {
+    const changes = describeRowChanges(JSON.parse(lastRows), r.rows);
+    logRoster(undone ? changes.map(c => 'Undo: ' + c) : changes);
+  }
+  lastRows = JSON.stringify(r.rows);
   r.checks = check({ rows: r.rows, staff: state.staff, day: state.day, settings: state.settings });
   render();
 }
@@ -665,7 +814,9 @@ function editNotes(i, value) {
   const row = state.roster.rows[i];
   if (!row || value === row.notes) return;
   undoStack.push(JSON.stringify(state.roster.rows));
+  logRoster([`${row.label} cases: ${row.notes || '—'} → ${value || '—'}`]);
   row.notes = value;
+  lastRows = JSON.stringify(state.roster.rows);
   const room = state.day.rooms.find(x => x.id === row.roomId);
   if (room) {
     room.notes = value;
@@ -717,8 +868,12 @@ function runGenerate(newSeed) {
   if (!state.day.rooms.some(r => r.running)) return toast('Tick the running rooms on the Cases tab first.');
   const seed = newSeed ? Math.floor(Math.random() * 1e9) : (state.roster?.seed || 1);
   const res = generate({ staff: state.staff, day: state.day, settings: state.settings, seed });
+  const log = state.roster?.date === state.day.date ? state.roster.log || [] : [];
+  if (state.roster?.rows?.length && state.roster.date === state.day.date && !confirm('Regenerate? This replaces the current roster, including any changes you made by hand. (Undo can\'t bring it back, but the change log keeps a record.)')) return;
   undoStack = []; editing = null;
-  state.roster = { ...res, seed, date: state.day.date, checks: check({ rows: res.rows, staff: state.staff, day: state.day, settings: state.settings }) };
+  state.roster = { ...res, seed, date: state.day.date, log, checks: check({ rows: res.rows, staff: state.staff, day: state.day, settings: state.settings }) };
+  logRoster([log.length ? 'Regenerated the roster' : 'Generated the roster']);
+  lastRows = JSON.stringify(res.rows);
   render();
 }
 
@@ -766,7 +921,7 @@ function renderRoster() {
   const r = state.roster;
   const actions = h('div', { class: 'bar' },
     h('button', { class: 'primary', onclick: () => runGenerate(!!r) }, r ? 'Regenerate' : 'Generate roster'),
-    r && h('button', { disabled: !undoStack.length, onclick: () => { state.roster.rows = JSON.parse(undoStack.pop()); afterRosterEdit(); } }, 'Undo'),
+    r && h('button', { disabled: !undoStack.length, onclick: () => { state.roster.rows = JSON.parse(undoStack.pop()); afterRosterEdit(true); } }, 'Undo'),
     r && isMember() && h('button', { class: 'primary', onclick: saveRosterToCloud }, 'Save'),
     r && h('button', { onclick: exportXlsx }, 'Download .xlsx'),
     r && h('div', { class: 'seg', role: 'group', 'aria-label': 'View' },
@@ -813,6 +968,7 @@ function renderRoster() {
           h('tbody', {}, body))),
       h('div', {},
         historyCard(),
+        rosterLogCard(),
         h('section', { class: 'card' },
           h('h2', {}, 'Things to look at'),
           all.length ? h('ul', { class: 'warnings' }, all.map(w => h('li', { class: w.level }, w.text))) : h('p', { class: 'hint' }, 'No problems found.')),
@@ -929,7 +1085,7 @@ function renderSettings() {
 // ---------- team file ----------
 
 document.getElementById('saveTeam').addEventListener('click', () => {
-  const data = { kind: 'ot-roster-team', version: 1, savedAt: new Date().toISOString(), settings: state.settings, staff: state.staff, roomTemplate: state.roomTemplate, roomsVersion: state.roomsVersion };
+  const data = { kind: 'ot-roster-team', version: 1, savedAt: new Date().toISOString(), settings: state.settings, staff: state.staff, roomTemplate: state.roomTemplate, roomsVersion: state.roomsVersion, staffLog: state.staffLog || [] };
   download(`OT roster team file ${new Date().toISOString().slice(0, 10)}.json`, new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' }));
 });
 document.getElementById('loadTeam').addEventListener('change', async e => {
@@ -941,6 +1097,8 @@ document.getElementById('loadTeam').addEventListener('change', async e => {
     if (state.staff.length && !confirm('Replace the staff list, rooms and settings in this browser with the team file?')) return;
     state.settings = { ...clone(DEFAULT_SETTINGS), ...data.settings };
     state.staff = data.staff || [];
+    state.staffLog = data.staffLog || [];
+    staffBackup = null;
     state.roomTemplate = data.roomTemplate || clone(DEFAULT_ROOMS);
     state.roomsVersion = data.roomsVersion || 1;
     migrateRooms();
@@ -1034,7 +1192,7 @@ cloud.watchUser(async user => {
   if (cs.member) loadTeamFromCloud(false);
 }).catch(e => { cs.ready = true; cloudError(e); render(); });
 
-const teamHash = () => JSON.stringify([state.settings, state.staff, state.roomTemplate]);
+const teamHash = () => JSON.stringify([state.settings, state.staff, state.roomTemplate, state.staffLog || []]);
 
 // Shown on the staff and settings tabs: whether this browser's staff list, rooms and settings match the team's.
 function teamSyncBar() {
@@ -1050,7 +1208,7 @@ function teamSyncBar() {
 
 async function saveTeamToCloud() {
   try {
-    const doc = await cloud.saveTeam({ settings: state.settings, staff: state.staff, roomTemplate: state.roomTemplate, roomsVersion: state.roomsVersion }, me());
+    const doc = await cloud.saveTeam({ settings: state.settings, staff: state.staff, roomTemplate: state.roomTemplate, roomsVersion: state.roomsVersion, staffLog: state.staffLog || [] }, me());
     state.teamSyncedAt = doc.updatedAt;
     state.teamSyncedHash = teamHash();
     render();
@@ -1066,6 +1224,8 @@ async function loadTeamFromCloud(asked) {
     if (state.staff.length && !confirm(`Load the team's staff list (${t.staff?.length || 0} people, saved by ${byName(t.updatedBy)} ${when(t.updatedAt)})? It replaces the staff list, rooms and settings in this browser.`)) return;
     state.settings = { ...clone(DEFAULT_SETTINGS), ...t.settings };
     state.staff = t.staff || [];
+    state.staffLog = t.staffLog || [];
+    staffBackup = null;
     state.roomTemplate = t.roomTemplate || clone(DEFAULT_ROOMS);
     state.teamSyncedAt = t.updatedAt;
     state.roomsVersion = t.roomsVersion || 1;
@@ -1110,6 +1270,8 @@ function openSaved(date, snapshot, updatedAt) {
   state.day = clone(snapshot.day);
   state.roster = clone(snapshot.roster);
   state.day.date = date;
+  logRoster([`Opened the version saved ${snapshot.savedAt ? when(snapshot.savedAt) : ''} by ${byName(snapshot.savedBy || snapshot.updatedBy)}`.replace('  ', ' ')]);
+  lastRows = JSON.stringify(state.roster.rows);
   state.cloudBase[date] = updatedAt;
   undoStack = []; editing = null;
   syncRooms();
@@ -1133,6 +1295,16 @@ function lazy(store, key, fn) {
     fn().then(v => { store[key] = v; render(); }, e => { store[key] = null; cloudError(e); });
   }
   return store[key] === 'loading' ? null : store[key];
+}
+
+function rosterLogCard() {
+  const log = state.roster?.log || [];
+  if (!log.length) return null;
+  return h('section', { class: 'card' }, h('details', {},
+    h('summary', {}, `Change log (${log.length})`),
+    h('ul', { class: 'log' }, log.map(e => h('li', {},
+      h('div', { class: 'seen' }, `${when(e.at)} · ${e.by}`),
+      e.changes.length === 1 ? h('div', {}, e.changes[0]) : h('ul', {}, e.changes.map(c => h('li', {}, c))))))));
 }
 
 function historyCard() {
@@ -1202,6 +1374,7 @@ function membersCard() {
   );
 }
 
+lastRows = state.roster ? JSON.stringify(state.roster.rows) : null;
 if (state.tab === 'staff') state.tab = 'seniors';
 if (!state.staff.length) state.tab = 'seniors';
 render();
