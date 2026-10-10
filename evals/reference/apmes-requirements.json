@@ -1,0 +1,511 @@
+{
+ "source": "Evaluations_Tracking_TemplateAY2023.xlsx (APMES), transcribed 2026-10-10",
+ "types": {
+  "DOPS": "Direct Observation of Procedural Skills",
+  "MiniCEX": "Mini Clinical Evaluation Exercise",
+  "EBD": "Entrustment-Based Discussion (case-based, physician faculty co-managing the case)"
+ },
+ "requirements": [
+  {
+   "id": "R1-DOPS-01",
+   "byYear": 1,
+   "type": "DOPS",
+   "item": "Mask holding and bag ventilation",
+   "group": "DOPS (Complete by first 2 mths) with Physician faculty"
+  },
+  {
+   "id": "R1-DOPS-02",
+   "byYear": 1,
+   "type": "DOPS",
+   "item": "Successful LMA insertion.",
+   "group": "DOPS (Complete by first 2 mths) with Physician faculty"
+  },
+  {
+   "id": "R1-DOPS-03",
+   "byYear": 1,
+   "type": "DOPS",
+   "item": "Successful endotracheal intubation",
+   "group": "DOPS (Complete by first 2 mths) with Physician faculty"
+  },
+  {
+   "id": "R1-DOPS-04",
+   "byYear": 1,
+   "type": "DOPS",
+   "item": "Subarachnoid block",
+   "group": "DOPS with Physician faculty"
+  },
+  {
+   "id": "R1-DOPS-05",
+   "byYear": 1,
+   "type": "DOPS",
+   "item": "Minimum 1 Intra-arterial (IA) line",
+   "group": "DOPS with Physician faculty"
+  },
+  {
+   "id": "R1-EBD-01",
+   "byYear": 1,
+   "type": "EBD",
+   "item": "Management of cardiovascular related anaesthetic crisis during general anaesthesia",
+   "group": "EBD with Physician Faculty co-managing case"
+  },
+  {
+   "id": "R1-EBD-02",
+   "byYear": 1,
+   "type": "EBD",
+   "item": "Assessment of a patient with pre-existing respiratory disease",
+   "group": "EBD with Physician Faculty co-managing case"
+  },
+  {
+   "id": "R1-EBD-03",
+   "byYear": 1,
+   "type": "EBD",
+   "item": "Assessment of a patient with pre-existing cardiovascular disease",
+   "group": "EBD with Physician Faculty co-managing case"
+  },
+  {
+   "id": "R1-EBD-04",
+   "byYear": 1,
+   "type": "EBD",
+   "item": "Assessment of a patient with pre-existing endocrine disease",
+   "group": "EBD with Physician Faculty co-managing case"
+  },
+  {
+   "id": "R1-EBD-05",
+   "byYear": 1,
+   "type": "EBD",
+   "item": "Management of a patient undergoing ophthalmic surgery under MAC",
+   "group": "EBD with Physician Faculty co-managing case"
+  },
+  {
+   "id": "R1-MiniCEX-01",
+   "byYear": 1,
+   "type": "MiniCEX",
+   "item": "Preoperative assessment of a patient in the hospital setting e.g., preoperative clinic/ pre-anaesthetic evaluation clinic (PEC), ward",
+   "group": "MiniCEX with Physician faculty"
+  },
+  {
+   "id": "R1-MiniCEX-02",
+   "byYear": 1,
+   "type": "MiniCEX",
+   "item": "Patient requiring GA with endotracheal tube (inclusive of entrustment discussion on management of ventilation or oxygenation related anaesthetic crisis during general anaesthesia)",
+   "group": "MiniCEX with Physician faculty"
+  },
+  {
+   "id": "R1-MiniCEX-03",
+   "byYear": 1,
+   "type": "MiniCEX",
+   "item": "Patient requiring GA with LMA (inclusive of entrustment discussion on management of crisis related to anaesthetic agent use e.g. anaphylaxis, malignant hyperthermia)",
+   "group": "MiniCEX with Physician faculty"
+  },
+  {
+   "id": "R2-DOPS-01",
+   "byYear": 2,
+   "type": "DOPS",
+   "item": "Airway management skills in a morbidly obese patient: mask holding and bag ventilation",
+   "group": "DOPS with Physician faculty"
+  },
+  {
+   "id": "R2-DOPS-02",
+   "byYear": 2,
+   "type": "DOPS",
+   "item": "Airway management skills in a morbidly obese patient: successful LMA insertion",
+   "group": "DOPS with Physician faculty"
+  },
+  {
+   "id": "R2-DOPS-03",
+   "byYear": 2,
+   "type": "DOPS",
+   "item": "Airway management skills in a morbidly obese patient: endotracheal intubation",
+   "group": "DOPS with Physician faculty"
+  },
+  {
+   "id": "R2-DOPS-04",
+   "byYear": 2,
+   "type": "DOPS",
+   "item": "Airway management skills in a morbidly obese patient: Placement of double lumen tube and confirmation using both auscultation and bronchoscopy",
+   "group": "DOPS with Physician faculty"
+  },
+  {
+   "id": "R2-DOPS-05",
+   "byYear": 2,
+   "type": "DOPS",
+   "item": "Upper limb block (single shot) Brachial plexus",
+   "group": "DOPS with Physician faculty"
+  },
+  {
+   "id": "R2-DOPS-06",
+   "byYear": 2,
+   "type": "DOPS",
+   "item": "Lower limb block (single shot) Fascia iliaca, Femoral nerve block, Popliteal approach to sciatic nerve block",
+   "group": "DOPS with Physician faculty"
+  },
+  {
+   "id": "R2-EBD-01",
+   "byYear": 2,
+   "type": "EBD",
+   "item": "Assessment of geriatric patient",
+   "group": "EBD with Physician faculty co-managing case"
+  },
+  {
+   "id": "R2-EBD-02",
+   "byYear": 2,
+   "type": "EBD",
+   "item": "Assessment of morbidly obese patient",
+   "group": "EBD with Physician faculty co-managing case"
+  },
+  {
+   "id": "R2-EBD-03",
+   "byYear": 2,
+   "type": "EBD",
+   "item": "Management of ASA 3 or 4 patient presenting for elective or emergency procedures requiring general anaesthesia, e.g., high risk cardiac patient presenting for non-cardiac surgery",
+   "group": "EBD with Physician faculty co-managing case"
+  },
+  {
+   "id": "R2-EBD-04",
+   "byYear": 2,
+   "type": "EBD",
+   "item": "Management of geriatric patient",
+   "group": "EBD with Physician faculty co-managing case"
+  },
+  {
+   "id": "R2-EBD-05",
+   "byYear": 2,
+   "type": "EBD",
+   "item": "Management of morbidly obese patient",
+   "group": "EBD with Physician faculty co-managing case"
+  },
+  {
+   "id": "R2-EBD-06",
+   "byYear": 2,
+   "type": "EBD",
+   "item": "Management of patient requiring intraoperative neurophysiological monitoring",
+   "group": "EBD with Physician faculty co-managing case"
+  },
+  {
+   "id": "R2-EBD-07",
+   "byYear": 2,
+   "type": "EBD",
+   "item": "Management of a patient undergoing surgery under subarachnoid block",
+   "group": "EBD with Physician faculty co-managing case"
+  },
+  {
+   "id": "R2-EBD-08",
+   "byYear": 2,
+   "type": "EBD",
+   "item": "Post general surgery critically ill patient",
+   "group": "EBD with Physician faculty co-managing case"
+  },
+  {
+   "id": "R2-EBD-09",
+   "byYear": 2,
+   "type": "EBD",
+   "item": "Neurosurgical critically ill patient",
+   "group": "EBD with Physician faculty co-managing case"
+  },
+  {
+   "id": "R2-MiniCEX-01",
+   "byYear": 2,
+   "type": "MiniCEX",
+   "item": "Central venous catheter insertion 1",
+   "group": "MiniCEX (min 3) with Physician faculty",
+   "groupMin": 3
+  },
+  {
+   "id": "R2-MiniCEX-02",
+   "byYear": 2,
+   "type": "MiniCEX",
+   "item": "Central venous catheter insertion 2",
+   "group": "MiniCEX (min 3) with Physician faculty",
+   "groupMin": 3
+  },
+  {
+   "id": "R2-MiniCEX-03",
+   "byYear": 2,
+   "type": "MiniCEX",
+   "item": "Central venous catheter insertion 3",
+   "group": "MiniCEX (min 3) with Physician faculty",
+   "groupMin": 3
+  },
+  {
+   "id": "R2-MiniCEX-04",
+   "byYear": 2,
+   "type": "MiniCEX",
+   "item": "GA/ SR case, ASA 1-2 aged 3-10 years",
+   "group": "MiniCEX with Physician faculty"
+  },
+  {
+   "id": "R2-MiniCEX-05",
+   "byYear": 2,
+   "type": "MiniCEX",
+   "item": "Manage a patient for surgery under peripheral nerve block and sedation",
+   "group": "MiniCEX with Physician faculty"
+  },
+  {
+   "id": "R3-DOPS-01",
+   "byYear": 3,
+   "type": "DOPS",
+   "item": "Truncal block (single shot) Erector spinae block, rectus sheath block, transabdominal plane block, ilioinguinal/ iliohypogastric nerve block",
+   "group": "DOPS with Physician faculty"
+  },
+  {
+   "id": "R3-DOPS-02",
+   "byYear": 3,
+   "type": "DOPS",
+   "item": "Awake flexible bronchoscopy guided intubation",
+   "group": "DOPS (min 1) with Physician faculty",
+   "groupMin": 1
+  },
+  {
+   "id": "R3-DOPS-03",
+   "byYear": 3,
+   "type": "DOPS",
+   "item": "Difficult airway intubation 1 using three different types of laryngoscope blades (curved, hyperangulated, straight) and/or different models of videolaryngoscopes",
+   "group": "DOPS (min 3) with Physician faculty",
+   "groupMin": 3
+  },
+  {
+   "id": "R3-DOPS-04",
+   "byYear": 3,
+   "type": "DOPS",
+   "item": "Difficult airway intubation 2 using three different types of laryngoscope blades (curved, hyperangulated, straight) and/or different models of videolaryngoscopes",
+   "group": "DOPS (min 3) with Physician faculty",
+   "groupMin": 3
+  },
+  {
+   "id": "R3-DOPS-05",
+   "byYear": 3,
+   "type": "DOPS",
+   "item": "Difficult airway intubation 3 using three different types of laryngoscope blades (curved, hyperangulated, straight) and/or different models of videolaryngoscopes",
+   "group": "DOPS (min 3) with Physician faculty",
+   "groupMin": 3
+  },
+  {
+   "id": "R3-DOPS-06",
+   "byYear": 3,
+   "type": "DOPS",
+   "item": "Dialysis vascular access catheter insertion",
+   "group": "DOPS (min 1) with Physician faculty",
+   "groupMin": 1
+  },
+  {
+   "id": "R3-DOPS-07",
+   "byYear": 3,
+   "type": "DOPS",
+   "item": "Labour epidural / CSE 1",
+   "group": "DOPS (3) with Physician faculty",
+   "groupMin": 3
+  },
+  {
+   "id": "R3-DOPS-08",
+   "byYear": 3,
+   "type": "DOPS",
+   "item": "Labour epidural / CSE 2",
+   "group": "DOPS (3) with Physician faculty",
+   "groupMin": 3
+  },
+  {
+   "id": "R3-DOPS-09",
+   "byYear": 3,
+   "type": "DOPS",
+   "item": "Labour epidural / CSE 3",
+   "group": "DOPS (3) with Physician faculty",
+   "groupMin": 3
+  },
+  {
+   "id": "R3-EBD-01",
+   "byYear": 3,
+   "type": "EBD",
+   "item": "Troubleshooting inadequate or failed labour epidural Foetal distress/non-reassuring foetal status post RA Hypotension High/total spinal block Inadvertent dural puncture",
+   "group": "EBD with Physician faculty co-managing case"
+  },
+  {
+   "id": "R3-EBD-02",
+   "byYear": 3,
+   "type": "EBD",
+   "item": "MRI suite (At most only 1 paediatric patient may be discussed)",
+   "group": "EBD with Physician faculty co-managing case"
+  },
+  {
+   "id": "R3-EBD-03",
+   "byYear": 3,
+   "type": "EBD",
+   "item": "Paediatric trauma patient requiring surgery",
+   "group": "EBD with Physician faculty co-managing case"
+  },
+  {
+   "id": "R3-EBD-04",
+   "byYear": 3,
+   "type": "EBD",
+   "item": "Patient undergoing cardiac surgery requiring CPB",
+   "group": "EBD with Physician faculty co-managing case"
+  },
+  {
+   "id": "R3-EBD-05",
+   "byYear": 3,
+   "type": "EBD",
+   "item": "Complex chronic pain patient coming in for surgery Pain management for opioid tolerant patient",
+   "group": "EBD with Physician faculty co-managing case"
+  },
+  {
+   "id": "R3-EBD-06",
+   "byYear": 3,
+   "type": "EBD",
+   "item": "Management of patient undergoing thoracic surgery requiring one lung ventilation",
+   "group": "EBD with Physician faculty co-managing case"
+  },
+  {
+   "id": "R3-EBD-07",
+   "byYear": 3,
+   "type": "EBD",
+   "item": "Management of patient undergoing neurosurgical procedure",
+   "group": "EBD with Physician faculty co-managing case"
+  },
+  {
+   "id": "R3-EBD-08",
+   "byYear": 3,
+   "type": "EBD",
+   "item": "Management of a patient undergoing surgery under subarachnoid block/single shot peripheral nerve block",
+   "group": "EBD with Physician faculty co-managing case"
+  },
+  {
+   "id": "R3-EBD-09",
+   "byYear": 3,
+   "type": "EBD",
+   "item": "Management of head/ neck trauma",
+   "group": "EBD with Physician faculty co-managing case"
+  },
+  {
+   "id": "R3-EBD-10",
+   "byYear": 3,
+   "type": "EBD",
+   "item": "Management of thoracic/ abdominal trauma",
+   "group": "EBD with Physician faculty co-managing case"
+  },
+  {
+   "id": "R3-EBD-11",
+   "byYear": 3,
+   "type": "EBD",
+   "item": "Management of pelvic/lower limb injury",
+   "group": "EBD with Physician faculty co-managing case"
+  },
+  {
+   "id": "R3-EBD-12",
+   "byYear": 3,
+   "type": "EBD",
+   "item": "Critically ill patient with severe medical comorbidities",
+   "group": "EBD with Physician faculty co-managing case"
+  },
+  {
+   "id": "R3-EBD-13",
+   "byYear": 3,
+   "type": "EBD",
+   "item": "Management of patient undergoing surgery with a peripheral nerve block catheter",
+   "group": "EBD with Physician faculty co-managing case"
+  },
+  {
+   "id": "R3-MiniCEX-01",
+   "byYear": 3,
+   "type": "MiniCEX",
+   "item": "GA/IPPV case, ASA 2-3, age 3-5 years",
+   "group": "MiniCEX with Physician faculty"
+  },
+  {
+   "id": "R3-MiniCEX-02",
+   "byYear": 3,
+   "type": "MiniCEX",
+   "item": "Lower segment Caesarean section To include discussion on management of GA for LSCS in pre-eclamptic patient coming for LSCS",
+   "group": "MiniCEX with Physician Faculty"
+  },
+  {
+   "id": "R3-MiniCEX-03",
+   "byYear": 3,
+   "type": "MiniCEX",
+   "item": "To cover pain assessment and acute pain management (PACU/ pain rounds)",
+   "group": "MiniCEX with Physician Faculty"
+  },
+  {
+   "id": "R3-MiniCEX-04",
+   "byYear": 3,
+   "type": "MiniCEX",
+   "item": "Assessing chronic pain History and physical examination",
+   "group": "MiniCEX with Physician Faculty"
+  },
+  {
+   "id": "R3-MiniCEX-05",
+   "byYear": 3,
+   "type": "MiniCEX",
+   "item": "Anaesthetic management of a patient with anticipated difficult airway",
+   "group": "MiniCEX with Physician Faculty"
+  },
+  {
+   "id": "R3-MiniCEX-06",
+   "byYear": 3,
+   "type": "MiniCEX",
+   "item": "Anaesthetic management of a patient going for surgery with a shared airway",
+   "group": "MiniCEX with Physician Faculty"
+  },
+  {
+   "id": "R3-MiniCEX-07",
+   "byYear": 3,
+   "type": "MiniCEX",
+   "item": "Mini-CEX on Outreach/Triage admission to ICU",
+   "group": "MiniCEX with Physician Faculty"
+  },
+  {
+   "id": "R5-DOPS-01",
+   "byYear": 5,
+   "type": "DOPS",
+   "item": "Peripheral nerve block with catheter",
+   "group": "DOPS with Physician faculty"
+  },
+  {
+   "id": "R5-EBD-01",
+   "byYear": 5,
+   "type": "EBD",
+   "item": "Management of patient undergoing surgery with a peripheral nerve block catheter",
+   "group": "EBD with Physician faculty co-managing case"
+  },
+  {
+   "id": "R5-EBD-02",
+   "byYear": 5,
+   "type": "EBD",
+   "item": "At least 1 entrustment case-based discussion of patient with a difficult airway, requiring alternative intubation approaches such as awake intubation +/- front of neck access.",
+   "group": "EBD with Physician faculty co-managing case"
+  },
+  {
+   "id": "R5-EBD-03",
+   "byYear": 5,
+   "type": "EBD",
+   "item": "Managing complications of labour epidural/ CSE like postpartum neurological deficit, post dural puncture headache",
+   "group": "EBD with Physician faculty co-managing case"
+  },
+  {
+   "id": "R5-EBD-04",
+   "byYear": 5,
+   "type": "EBD",
+   "item": "To include discussion on management of GA for LSCS in which patient develops obstetric haemorrhage",
+   "group": "EBD with Physician faculty co-managing case"
+  },
+  {
+   "id": "R5-EBD-05",
+   "byYear": 5,
+   "type": "EBD",
+   "item": "Interventional radiology suite (At most only 1 paediatric patient may be discussed)",
+   "group": "EBD with Physician faculty co-managing case"
+  },
+  {
+   "id": "R5-EBD-06",
+   "byYear": 5,
+   "type": "EBD",
+   "item": "Special needs child requiring anaesthesia",
+   "group": "EBD with Physician faculty co-managing case"
+  },
+  {
+   "id": "R5-EBD-07",
+   "byYear": 5,
+   "type": "EBD",
+   "item": "Blue letter referral setting",
+   "group": "EBD with Physician faculty co-managing case"
+  }
+ ]
+}
