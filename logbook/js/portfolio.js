@@ -594,7 +594,7 @@ export function renderExportButton(getReflections, getName, getExtra) {
   const paintNote = t => {
     note.textContent = t
       ? 'Exports into the official APMES portfolio: Section 1 (from Account → Portfolio details), the case reflection tables and the Section 4 numbers are filled in; everything else is kept for you to complete.'
-      : 'No portfolio template uploaded yet, so the export is a plain layout without the portfolio’s preamble and other sections. An admin can upload it on the Admin tab.';
+      : 'No portfolio template uploaded yet, so the export is a plain layout without the portfolio’s preamble and other sections. An admin can upload it in Settings → Admin.';
     note.style.color = t ? '' : 'var(--warn, #b45309)';
   };
   getTemplate().then(paintNote, () => paintNote(null));

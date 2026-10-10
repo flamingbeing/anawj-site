@@ -9,17 +9,20 @@ import { templateDialog } from './ui-settings.js';
 import { renderTemplateCard } from './portfolio.js';
 
 const STATUSES = ['ACTIVE', 'ON LEAVE', 'GRADUATED', 'ATTRITED'];
-const A = { residents: null, loading: false, pasted: null, imp: null, busy: false, log: [], shared: null };
+const A = { residents: null, loading: false, pasted: null, imp: null, busy: false, log: [], shared: null, editRes: false };
 const intakeOf = rid => Number(String(rid).slice(0, 4)) || null;
-resetters.push(() => Object.assign(A, { residents: null, loading: false, pasted: null, imp: null, busy: false, log: [], shared: null, prog: null }));
+resetters.push(() => Object.assign(A, { residents: null, loading: false, pasted: null, imp: null, busy: false, log: [], shared: null, prog: null, editRes: false }));
 
 // The demo keeps everything unencrypted in this browser: real residents or cases must not go there.
 const demoOk = () => !cloud.demo || confirmBox('Demo mode', 'The demo stores data unencrypted in this browser. Use made-up data only — never real residents or cases. Continue?', 'Continue');
 
+// Leaving the admin screen ends residents editing, so it opens read-only next time.
+export function leaveAdmin() { A.editRes = false; A.pasted = null; }
+
 export function renderAdmin() {
   if (!S.admin) return h('p', { class: 'empty' }, 'Admins only.');
   if (!A.residents && !A.loading) load();
-  return h('div', {}, residentsCard(), importCard(), sharedCard(), renderTemplateCard());
+  return h('div', {}, h('p', { style: 'margin:0 0 8px' }, h('a', { class: 'btn small', href: '#settings' }, '← Back to settings')), residentsCard(), importCard(), sharedCard(), renderTemplateCard());
 }
 
 async function load() {
@@ -33,15 +36,30 @@ async function load() {
 
 // ---------- residents ----------
 
+// Groups for the residents list: active and on-leave residents by residency year (R1–R5), then
+// graduated and attrited. Within a group, by name.
+const GONE = { GRADUATED: 'Graduated', ATTRITED: 'Attrited' };
+export function groupResidents(list) {
+  const groups = new Map([...R_YEARS.map(y => [y, []]), ['Year unknown', []], ...Object.values(GONE).map(g => [g, []])]);
+  for (const r of list) {
+    const y = residentYear(r);
+    const key = GONE[r.status] || (y ? R_YEARS[Math.min(y, R_YEARS.length) - 1] : 'Year unknown');
+    groups.get(key).push(r);
+  }
+  for (const g of groups.values()) g.sort((a, b) => String(a.name || a.rid).localeCompare(String(b.name || b.rid)));
+  return [...groups].filter(([, g]) => g.length);
+}
+
 function residentsCard() {
-  const card = h('section', { class: 'card' }, h('h2', {}, 'Residents'),
+  const card = h('section', { class: 'card' },
+    h('div', { class: 'bar' }, h('h2', { style: 'margin:0' }, 'Residents'), h('span', { class: 'grow' }),
+      A.residents ? h('button', { class: A.editRes ? 'small primary' : 'small', onclick: () => { A.editRes = !A.editRes; if (!A.editRes) A.pasted = null; hooks.render(); } }, A.editRes ? 'Done' : 'Edit') : null),
     h('p', { class: 'hint' }, 'Programme residents share their case counts on the Totals tab. Year defaults from the intake (AY starts 1 July); change it for leave or repeats.'));
   if (!A.residents) { add(card, h('p', { class: 'empty' }, 'Loading…')); return card; }
-  const list = [...A.residents].sort((a, b) => String(a.rid).localeCompare(String(b.rid)));
+  const ed = A.editRes;
   const save = async r => { try { await cloud.saveResident(r); toast('Saved ' + (r.name || r.rid)); } catch (err) { toast('Could not save: ' + err.message); } };
-  add(card, list.length ? h('div', { class: 'scroll' }, h('table', {},
-    h('thead', {}, h('tr', {}, ['ID', 'Name', 'Email', 'Intake', 'Year', 'Status', ''].map(t => h('th', {}, t)))),
-    h('tbody', {}, list.map(r => h('tr', {},
+  const yearLabel = r => (residentYear(r) ? R_YEARS[Math.min(residentYear(r), R_YEARS.length) - 1] : '?') + (r.rYear ? ' (set)' : '');
+  const row = r => ed ? h('tr', {},
       h('td', {}, r.rid),
       h('td', {}, h('input', { value: r.name || '', style: 'min-width:150px', onchange: e => { r.name = e.target.value.trim(); save(r); } })),
       h('td', {}, h('input', { type: 'email', value: r.email || '', style: 'min-width:200px', onchange: e => { r.email = e.target.value.trim().toLowerCase(); save(r); } })),
@@ -51,10 +69,21 @@ function residentsCard() {
         h('option', { value: '', selected: !r.rYear }, `Auto (${R_YEARS[(residentYear({ intake: r.intake }) || 1) - 1]})`),
         R_YEARS.map((y, i) => h('option', { value: String(i + 1), selected: r.rYear === i + 1 }, y)))),
       h('td', {}, h('select', { onchange: e => { r.status = e.target.value; save(r); } }, STATUSES.map(s => h('option', { value: s, selected: r.status === s }, s)))),
-      h('td', {}, h('button', { class: 'small danger', onclick: async () => {
+      h('td', {}, h('button', { class: 'small danger', 'aria-label': `Remove ${r.name || r.rid}`, onclick: async () => {
         if (!(await confirmBox('Remove resident', `Remove ${r.name || r.rid} from the programme list? Their logbook is kept.`, 'Remove', true))) return;
         await cloud.deleteResident(r.rid); A.residents = A.residents.filter(x => x.rid !== r.rid); hooks.render();
-      } }, '×'))))))) : h('p', { class: 'muted' }, 'No residents yet.'));
+      } }, '×')))
+    : h('tr', {}, h('td', {}, r.rid), h('td', {}, r.name || ''), h('td', {}, r.email || h('span', { class: 'flag err' }, 'no email')),
+      h('td', {}, String(r.intake || '')), h('td', {}, yearLabel(r)), h('td', {}, r.status || ''));
+  const cols = ['ID', 'Name', 'Email', 'Intake', 'Year', 'Status'].concat(ed ? [''] : []);
+  const groups = groupResidents(A.residents);
+  add(card, groups.length ? h('div', { class: 'scroll' }, h('table', { class: ed ? 'res-table edit' : 'res-table' },
+    h('thead', {}, h('tr', {}, cols.map(t => h('th', {}, t)))),
+    groups.map(([label, rs]) => h('tbody', {},
+      h('tr', { class: 'res-group' }, h('th', { colspan: String(cols.length), scope: 'colgroup' }, `${label} · ${rs.length}`)),
+      rs.map(row))))) : h('p', { class: 'muted' }, 'No residents yet.'));
+  if (ed) add(card, h('p', { class: 'hint', style: 'margin:6px 0 0' }, 'Changes save as you make them. The grouping updates when you tap Done.'));
+  if (!ed) return card;
 
   const ta = h('textarea', { rows: '4', placeholder: 'Paste the RESIDENTS array from the old Apps Script: const RESIDENTS = [ {id: "...", name: "...", email: "...", status: "ACTIVE"}, … ];' });
   add(card, h('h3', {}, 'Add or update from the Apps Script'), ta,
