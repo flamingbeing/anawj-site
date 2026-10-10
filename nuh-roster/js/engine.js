@@ -43,6 +43,7 @@ export const isBaby = p => !!p && p.colour === 'green';
 export const STATUSES = [
   ['avail', 'Available'],
   ['leave', 'Leave'],
+  ['mc', 'MC'],
   ['postcall', 'Post call'],
   ['elsewhere', 'Elsewhere'],
   ['admin', 'Admin / no list'],
