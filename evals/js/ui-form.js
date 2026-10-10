@@ -174,7 +174,14 @@ class FormScreen {
     const next = keys.slice(i + 1).find(k => blank(this.answers[k]));
     const el = next ? this.qEls[next] : this.barEl;
     if (!el) return;
-    setTimeout(() => el.scrollIntoView({ behavior: reducedMotion() ? 'auto' : 'smooth', block: next ? 'start' : 'end' }), 180);
+    setTimeout(() => {
+      const r = el.getBoundingClientRect();
+      const top = (document.querySelector('.e-appbar')?.getBoundingClientRect().bottom || 0) + 4;
+      const bottom = (this.barEl?.getBoundingClientRect().top || window.innerHeight) - 4;
+      // already fully on screen (or its first part is, for a tall one): stay put
+      if (r.top >= top && (r.bottom <= bottom || r.top + 160 <= bottom)) return;
+      el.scrollIntoView({ behavior: reducedMotion() ? 'auto' : 'smooth', block: next ? 'start' : 'end' });
+    }, 120);
   }
 
   // Required tag, errors, EBD q3, and the bar after an answer changes.
@@ -481,39 +488,46 @@ class FormScreen {
         exp.checklist.map(([t, items]) => [h('p', {}, h('b', {}, t)), h('ol', {}, items.map(i => h('li', {}, i)))])) : null);
   }
 
+  // Milestones look like the 9-point scale: one row of 1-9 (stored as the official 1.0-5.0 in half
+  // steps), "Not yet Level 1" and "Not observed" below, the chosen descriptor under the row.
   milestone(q, ro) {
     const sc = SCALES.milestone;
-    const wrap = h('div', { class: 'e-milestone' });
-    const chipRow = (opts) => h('div', { class: 'e-milestone__halves' }, opts.map(([v, txt, aria]) =>
-      h('label', { class: 'e-choice' }, this.radio(q, v, ro, { 'aria-label': aria }), h('span', {}, txt))));
-    const kids = [chipRow([[0.5, 'Not yet Level 1', 'Not yet achieved level 1']])];
-    for (const o of sc.options.filter(o => o.value >= 1)) {
-      const n = Number(o.label);
-      if (n % 2) {
-        const dId = uid('md');
-        kids.push(h('label', { class: 'e-milestone__opt' }, this.radio(q, o.value, ro, { 'aria-label': `${n}, level ${(n + 1) / 2}`, 'aria-describedby': dId }),
-          h('span', { class: 'e-milestone__val', 'aria-hidden': 'true' }, n),
-          h('span', { class: 'e-milestone__text', id: dId }, q.descriptors?.[String(n)] || '')));
-      } else kids.push(chipRow([[o.value, String(n), `${n}, between level ${n / 2} and ${n / 2 + 1}`]]));
-    }
-    if (q.na) kids.push(chipRow([['NA', 'Not observed', 'Not observed']]));
-    const change = h('button', { type: 'button', class: 'e-btn-link e-form__change', hidden: true, onclick: () => {
-      wrap.classList.remove('is-folded'); change.hidden = true;
-      (wrap.querySelector('input:checked') || wrap.querySelector('input'))?.focus();
-    } }, 'Change');
-    add(wrap, kids);
-    // Fold to the chosen option after a tap. Not while the keyboard is in the group (arrow keys
-    // move through the options), only once focus leaves it.
-    const refresh = () => {
-      const has = !blank(this.answers[q.key]);
-      const fold = has && (ro || Date.now() - this.lastPointer < 1500 || !wrap.contains(document.activeElement));
-      wrap.classList.toggle('is-folded', fold);
-      change.hidden = !fold || ro;
+    const opts = sc.options.filter(o => o.value >= 1);
+    const nOf = v => Math.round(Number(v) * 2 - 1);            // 1.0 -> 1, 1.5 -> 2 ... 5.0 -> 9
+    const anchorText = n => q.descriptors?.[String(n)] || '';
+    const desc = h('p', { class: 'e-scale9__desc', 'aria-hidden': 'true' });
+    const paintDesc = () => {
+      const v = this.answers[q.key];
+      if (v === 'NA') fill(desc, h('b', {}, 'Not observed'));
+      else if (Number(v) === 0.5) fill(desc, h('b', {}, 'Not yet achieved Level 1'));
+      else if (v != null) {
+        const n = nOf(v);
+        fill(desc, n % 2 ? [h('b', {}, `${n} · Level ${(n + 1) / 2}: `), anchorText(n)] : h('b', {}, `${n} · between Level ${n / 2} and Level ${n / 2 + 1}`));
+      } else fill(desc);
     };
-    wrap.addEventListener('focusout', e => { if (!wrap.contains(e.relatedTarget)) refresh(); });
-    this.refreshers[q.key] = refresh;
-    refresh();
-    return [wrap, change];
+    this.refreshers[q.key] = paintDesc;
+    paintDesc();
+    return h('div', { class: 'e-scale9 e-scale9--milestone' },
+      h('div', { class: 'e-scale9__row e-scale9__row--even' }, opts.map(o => {
+        const n = nOf(o.value);
+        return h('label', { class: 'e-cell' }, this.radio(q, o.value, ro, { 'aria-label': n % 2 ? `${n}, level ${(n + 1) / 2}: ${anchorText(n)}` : `${n}, between level ${n / 2} and ${n / 2 + 1}` }),
+          h('span', { 'aria-hidden': 'true' }, String(n)));
+      })),
+      h('div', { class: 'e-scale9__na' },
+        h('label', { class: 'e-cell e-cell--na' }, this.radio(q, 0.5, ro, { 'aria-label': 'Not yet achieved level 1' }), h('span', {}, 'Not yet Level 1')),
+        q.na ? h('label', { class: 'e-cell e-cell--na' }, this.radio(q, 'NA', ro), h('span', {}, 'Not observed')) : null,
+        h('span', { class: 'e-grow' }),
+        h('button', { type: 'button', class: 'e-btn-link e-form__info', onclick: () => this.milestoneInfo(q) }, icon('info'), 'Descriptors')),
+      desc);
+  }
+
+  milestoneInfo(q) {
+    const rows = [[h('b', {}, '<1'), 'Not yet achieved Level 1']];
+    for (const n of [1, 3, 5, 7, 9]) rows.push([h('b', {}, `${n} (L${(n + 1) / 2})`), q.descriptors?.[String(n)] || '']);
+    const body = h('div', { class: 'e-form__info-body' },
+      h('dl', { class: 'e-kv' }, rows.map(([k, v]) => [h('dt', {}, k), h('dd', {}, v)])),
+      h('p', { class: 'e-small' }, 'Even numbers sit between two levels.'));
+    const m = modal(q.label.length > 80 ? `Q${q.n}` : q.label, [body, h('div', { class: 'e-actions' }, h('button', { class: 'n-btn', onclick: () => m.close() }, 'Close'))]);
   }
 
   supervision(q, ro) {
@@ -612,7 +626,8 @@ class FormScreen {
 // The long supervision question: [first sentence, the rest (shown behind "more") or null].
 function labelParts(q) {
   const t = q.label || '';
-  if (t.length < 160) return [t, null];
+  // only the long supervision question folds (other long labels would split at "e.g. ")
+  if (q.type !== 'supervision' || t.length < 160) return [t, null];
   const i = t.indexOf('. ');
   if (i < 0) return [t, null];
   return [t.slice(0, i + 1), t.slice(i + 2)];

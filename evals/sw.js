@@ -3,7 +3,7 @@
 // Firebase traffic (auth, Firestore) always goes to the network; Firestore keeps its own offline
 // cache in IndexedDB. The Firebase SDK files (versioned, never change) are cached here.
 
-const VERSION = 'evals-v4';
+const VERSION = 'evals-v5';
 const SDK = 'https://www.gstatic.com/firebasejs/10.12.2/';
 const SDK_FILES = ['firebase-app.js', 'firebase-auth.js', 'firebase-firestore.js'].map(f => SDK + f);
 const SHELL = [
