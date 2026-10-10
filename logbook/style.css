@@ -310,13 +310,13 @@ code, kbd { font-size: 13px; background: var(--chip); padding: 0 4px; border-rad
   label.check input { width: 22px; height: 22px; }
 }
 
-/* NUHS-style four-colour band along the top, navy headings, cyan focus */
+/* NUHS-style four-colour band along the top, navy headings, navy focus ring (cyan on white is only 2.7:1) */
 .top { background: linear-gradient(90deg, var(--nuhs-orange) 0 25%, var(--nuhs-red) 25% 50%, var(--nuhs-cyan) 50% 75%, var(--nuhs-navy) 75% 100%) top / 100% 5px no-repeat, var(--panel); border-bottom: 1px solid var(--line); }
 .top, .top[class] { padding-top: max(17px, calc(env(safe-area-inset-top, 0px) + 5px)); }
 .top h1, section.card h2, h2, h3 { color: var(--nuhs-navy); }
 a { color: var(--accent); }
-:focus-visible { outline: 2px solid var(--nuhs-cyan); outline-offset: 2px; }
-input:focus, select:focus, textarea:focus { border-color: var(--nuhs-cyan); box-shadow: 0 0 0 3px rgba(0, 169, 224, .18); outline: none; }
+:focus-visible { outline: 3px solid var(--nuhs-navy); outline-offset: 2px; }
+input:focus, select:focus, textarea:focus { border-color: var(--nuhs-navy); box-shadow: none; outline: 3px solid var(--nuhs-navy); outline-offset: 1px; }
 
 /* ---- logbook-tab ---- */
 .lb-tags { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
