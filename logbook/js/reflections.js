@@ -134,3 +134,17 @@ export function reflectionCounts(reflections) {
   for (const r of reflections || []) if (r.status === 'complete' && HEADING_IDS.has(r.headingId)) out[r.headingId] = (out[r.headingId] || 0) + 1;
   return { reflections: out, reflectionsTotal: Object.values(out).reduce((a, b) => a + b, 0) };
 }
+
+// Words in the reflection itself: title, case summary and learning points (or the older sections).
+// Captions and references don't count. There is no official minimum; MIN_WORDS is a guide only
+// (most of a recent senior resident's portfolio reflections were 270–770 words).
+export const MIN_WORDS = 250;
+const words = s => (String(s || '').match(/[A-Za-z0-9\u00C0-\u024F]+(?:['’-][A-Za-z0-9]+)*/g) || []).length;
+export function wordCount(r) {
+  if (!r) return 0;
+  let n = words(r.title) + words(r.summary);
+  for (const p of r.points || []) n += words(p.heading) + words(p.text);
+  for (const v of Object.values(r.sections || {})) n += words(v);
+  return n;
+}
+

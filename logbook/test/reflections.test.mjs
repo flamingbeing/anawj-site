@@ -1,4 +1,5 @@
 // Run with: node logbook/test/reflections.test.mjs  (fake data only)
+import { wordCount, MIN_WORDS } from '../js/reflections.js';
 import assert from 'node:assert/strict';
 
 globalThis.location = { search: '?demo' };
@@ -119,4 +120,9 @@ assert.deepEqual(splitDetails('lscs'), { initials: '', diagnosis: 'lscs' });
   await cloud.deleteImage(DEMO_USER.email, 'img9');
   assert.equal(await cloud.loadImage(DEMO_USER.email, 'img9'), null);
 }
+// word count: title, summary and learning points (not captions or references)
+assert.equal(wordCount({ title: 'Airway plan', summary: 'A made-up 50-year-old man.', points: [{ heading: 'One', text: 'Two three' }], figures: [{ caption: 'not counted' }], references: ['Not counted at all'] }), 9);
+assert.equal(wordCount({ sections: { description: 'old style text', action: 'plan' } }), 4);
+assert.equal(wordCount(null), 0);
+assert.ok(MIN_WORDS > 0);
 console.log('reflections tests passed');

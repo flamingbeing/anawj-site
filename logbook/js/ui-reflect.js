@@ -5,7 +5,7 @@
 // compressed on the phone and saved to their own docs straight away (cloud.saveImage).
 
 import { REFLECTION_HEADINGS, REFLECTION_SECTIONS } from './categories.js';
-import { reflectionProgress, reflectionCounts, HEADING_BY_ID, splitDetails, completeProblems, isLegacy, LIMITS, IMAGE_MAX_B64 } from './reflections.js';
+import { reflectionProgress, reflectionCounts, HEADING_BY_ID, splitDetails, completeProblems, isLegacy, LIMITS, IMAGE_MAX_B64, wordCount, MIN_WORDS } from './reflections.js';
 export { completeProblems };
 import { fmtDate } from './engine.js';
 import { S, h, toast, cloud, debounce, hooks, rYear, todayISO, confirmBox, add, resetters, scheduleSummary, displayName } from './ui-core.js';
@@ -88,7 +88,7 @@ function list() {
       items.length ? h('ul', { class: 'cases' }, items.map(r => h('li', { tabindex: '0', onclick: () => openEditor(r), onkeydown: e => { if (e.key === 'Enter') openEditor(r); } },
         h('span', { class: 'd' }, (r.jr ? 'JR ' : '') + (r.date ? fmtDate(r.date) : '—')),
         h('span', { class: 't' }, `${r.initials || '??'} ${r.diagnosis || ''}`),
-        h('span', { class: 'c' }, r.status === 'complete' ? h('span', { class: 'flag' }, 'complete') : h('span', { class: 'flag err' }, 'draft'))))) : null));
+        h('span', { class: 'c' }, r.status === 'complete' ? h('span', { class: 'flag' }, 'complete') : h('span', { class: 'flag err' }, 'draft'), h('span', { class: 'flag' + (wordCount(r) < MIN_WORDS ? ' err' : '') }, `${wordCount(r)} words`))))) : null));
   }
   const orphans = all.filter(r => !HEADING_BY_ID[r.headingId]);
   if (orphans.length) add(body, h('h3', {}, 'No heading yet'), h('ul', { class: 'cases' }, orphans.map(r => h('li', { onclick: () => openEditor(r) },
@@ -168,7 +168,14 @@ function editor() {
     } catch (err) { status.textContent = 'Saved on this device only'; toast('Could not save: ' + err.message); }
   };
   const autosave = debounce(persist, 1200);
-  const changed = () => { status.textContent = 'Editing…'; lsSet({ ...r, restore: true }); autosave(); };
+  const words = h('span', { 'aria-live': 'polite' });
+  const paintWords = () => {
+    const n = wordCount(r), ok = n >= MIN_WORDS;
+    words.textContent = ok ? `${n} words ✓ meets the ${MIN_WORDS}-word guide` : `${n} / ${MIN_WORDS} words (suggested minimum)`;
+    words.style.cssText = `font-size:13px;font-weight:600;color:${ok ? 'var(--ok, #15803d)' : 'var(--warn, #b45309)'}`;
+  };
+  paintWords();
+  const changed = () => { status.textContent = 'Editing…'; paintWords(); lsSet({ ...r, restore: true }); autosave(); };
   const restructure = () => { changed(); hooks.render(); };   // list changed: save and redraw
   const close = async () => { autosave.cancel(); if (hasContent(r)) await persist(); rv.editing = null; rv.thumbs = {}; lsSet(null); hooks.render(); };
 
@@ -281,8 +288,9 @@ function editor() {
         autosave.cancel(); await persist(); hooks.render();
       } catch (err) { status.textContent = 'Image not added'; toast('Could not add image: ' + err.message); }
     } });
-    const figures = boxCard('Figures', null,
-      h('p', { class: 'hint', style: 'margin:0 0 8px;color:var(--warn, #b45309)' }, 'No faces, names, NRIC, MRN or anything identifying on monitors, labels or screens. Crop before adding.'),
+    const figures = boxCard('Figures (optional)', null,
+      h('p', { class: 'hint', style: 'margin:0 0 4px;color:var(--warn, #b45309)' }, 'No faces, names, NRIC, MRN or anything identifying on monitors, labels or screens. Crop before adding.'),
+      h('p', { class: 'hint', style: 'margin:0 0 8px;color:var(--warn, #b45309)' }, 'Use your own photos or diagrams. Don’t copy copyrighted figures from papers, books or websites without permission; if you adapt one, cite it under References.'),
       r.figures.map((f, i) => {
         const im = h('img', { alt: f.caption || `Figure ${i + 1}`, style: 'max-width:100%;max-height:220px;display:block;border-radius:6px;background:#eee;min-height:60px' });
         if (rv.thumbs[f.id]) im.src = rv.thumbs[f.id];
@@ -320,7 +328,7 @@ function editor() {
     body = [title, summary, points, figures, refs];
   }
 
-  const actions = h('section', { class: 'card' }, h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:8px' },
+  const actions = h('section', { class: 'card' }, h('p', { style: 'margin:0 0 8px' }, words), h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:8px' },
     r.status === 'complete'
       ? h('button', { onclick: async () => { r.status = 'draft'; await persist(); hooks.render(); } }, 'Back to draft')
       : h('button', { class: 'primary', onclick: async () => {
