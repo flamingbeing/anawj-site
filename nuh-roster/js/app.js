@@ -916,7 +916,12 @@ function renderCloudBar() {
   }
   const out = h('button', { onclick: () => cloud.signOut() }, 'Sign out');
   if (!cs.member) {
-    el.replaceChildren(h('span', { class: 'seen' }, `${cs.user.email} isn't on the team list yet. Ask an admin to add you.`), out);
+    const why = !cs.memberError
+      ? `${cs.user.email} isn't on the team list yet. Ask an admin to add you.`
+      : cs.memberError === 'permission-denied'
+        ? `Signed in as ${cs.user.email}, but the database refused access. Check the Firestore rules are published.`
+        : `Signed in as ${cs.user.email}, but the team list couldn't be checked (${cs.memberError}).`;
+    el.replaceChildren(h('span', { class: 'seen' }, why), out);
     return;
   }
   el.replaceChildren(
@@ -931,7 +936,8 @@ function renderCloudBar() {
 cloud.watchUser(async user => {
   cs.user = user; cs.member = null; cs.meta = {}; cs.versions = {}; cs.recent = null; cs.members = null;
   if (user) {
-    try { cs.member = await cloud.membership(user.email); } catch (e) { cloudError(e); }
+    cs.memberError = null;
+    try { cs.member = await cloud.membership(user.email); } catch (e) { cs.memberError = e?.code || String(e); console.error(e); }
     if (cs.member && !rostererName) rostererName = cs.member.name || user.displayName || '';
   }
   cs.ready = true;
