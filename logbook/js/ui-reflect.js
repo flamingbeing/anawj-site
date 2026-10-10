@@ -11,7 +11,7 @@ import { reflectionProgress, reflectionCounts, HEADING_BY_ID, splitDetails, comp
 export { completeProblems };
 import { fmtDate } from './engine.js';
 import { S, h, toast, cloud, debounce, hooks, rYear, todayISO, confirmBox, add, resetters, scheduleSummary, displayName, byNewest, catName } from './ui-core.js';
-import { renderExportButton } from './portfolio.js';
+import { renderExportButton, caseRYear } from './portfolio.js';
 
 const DRAFT_KEY = 'apmes-logbook-reflection-draft';
 const rv = { editing: null, thumbs: {}, picking: null, editMode: false, sel: new Set(), view: null };
@@ -71,6 +71,14 @@ function suggestChips(c, onpick, jr = rYear() <= 3) {
 const shortName = n => { const t = n.replace(/\s*\(.*$/, '').replace(/\s+e\.g\.?,?.*$/i, '').trim() || n; return t.length > 48 ? t.slice(0, 46) + '…' : t; };
 
 const showTab = () => { if (location.hash !== '#reflect') location.hash = '#reflect'; else hooks.render(); };
+// JR follows from the reflection's date: R1–R3 at that date (from the resident's intake) is junior residency.
+// Without a known intake, the current residency year decides.
+function setJr(r) {
+  const intake = S.resident && (S.resident.intake || Number(String(S.resident.rid || '').slice(0, 4)));
+  const y = r.date && intake ? caseRYear(r.date, intake) : null;
+  r.jr = y ? y <= 3 : rYear() <= 3;
+}
+
 function openEditor(r) {
   rv.editing = JSON.parse(JSON.stringify(r));
   showTab();
@@ -219,7 +227,7 @@ function list() {
       h('button', { class: 'small', onclick: () => openView('import') }, 'Upload from Word'),
       h('button', { class: 'small', onclick: () => openView('bin') }, 'Recycle bin')),
     h('p', { class: 'hint' }, `${p.totals.counted} / ${p.totals.min} counted · ${p.totals.done} complete · ${p.totals.drafts} draft${p.totals.drafts === 1 ? '' : 's'}. `,
-      'Each reflection is a different patient, under one heading only. JR = done in R1–R3.'),
+      'Each reflection is a different patient, under one heading only. Some categories require one case reflection in Junior Residency (JR, R1–R3); when not indicated, at most one case reflection can be done at the JR level per category.'),
     em ? null : h('p', { class: 'hint' }, 'Generative AI use must follow the NUS guidelines on the use of AI tools in academic work.'),
     em ? null : h('div', { class: 'bar' }, renderExportButton(() => (S.reflections || []).filter(r => r.status === 'complete'), displayName,
       async () => ({ cases: S.cases || [], intake: (S.resident && (S.resident.intake || Number(String(S.resident.rid || '').slice(0, 4)))) || null, rYear: rYear(),
@@ -259,16 +267,16 @@ function list() {
   let section = '';
   for (const hp of p.headings) {
     if (hp.section !== section) { section = hp.section; add(body, h('h3', { style: 'margin-top:14px' }, section)); }
-    const jrTxt = hp.jrNeeded ? ` · JR ${hp.jrDone}/${hp.jrNeeded}${hp.jrDone >= hp.jrNeeded ? ' ✓' : ''}` : '';
-    const subsTxt = hp.subs.length ? ' · ' + hp.subs.map(s => `${s.name} ${s.done >= s.min ? '✓' : '✗'}`).join(', ') : '';
+    const jrTxt = '';
+    const subsTxt = '';
     const items = all.filter(r => r.headingId === hp.id);
     add(body, h('div', { class: 'refl-h', 'data-heading': hp.id, style: 'margin:8px 0 4px' },
       h('div', { class: 'refl-hrow' },
         h('div', { class: 'grow' }, h('i', { class: `dot ${hp.met ? 'done' : hp.done ? 'ontrack' : 'due'}` }), ' ', h('b', {}, `${hp.done}/${hp.min}`), ' ', hp.name, h('span', { class: 'muted' }, jrTxt + subsTxt)),
         em ? null : h('button', { class: 'small refl-add', title: 'Add a reflection under ' + hp.name, 'aria-label': 'Add a reflection under ' + hp.name, onclick: () => openPicker(false, { headingId: hp.id, subId: null }) }, '+ Add')),
-      !em && hp.subs.length ? h('div', { class: 'refl-chips', style: 'margin:4px 0 0' }, hp.subs.map(s =>
-        h('button', { class: 'refl-chip' + (s.done < s.min ? ' need' : ''), title: `Add a reflection: ${s.name}`, onclick: () => openPicker(false, { headingId: hp.id, subId: s.id }) }, '+ ' + s.name))) : null,
-      hp.issues.length ? h('div', { class: 'hint', style: 'color:var(--warn, #b45309)' }, hp.issues.join(' · ')) : null,
+      HEADING_BY_ID[hp.id].subs ? h('div', { class: 'hint', style: 'margin:2px 0 0' }, 'Include at least one of each: ' + HEADING_BY_ID[hp.id].subs.map(s => s.name).join(' · ')) : null,
+      // sub-types are shown in the "needs at least one of each" line above, so don't repeat them here
+      hp.issues.filter(x => !x.startsWith('Missing: ')).length ? h('div', { class: 'hint', style: 'color:var(--warn, #b45309)' }, hp.issues.filter(x => !x.startsWith('Missing: ')).join(' · ')) : null,
       items.length ? h('ul', { class: 'cases' }, items.map(row)) : em ? h('div', { class: 'refl-empty hint' }, 'Drop here') : null));
   }
   const orphans = all.filter(r => !HEADING_BY_ID[r.headingId]);
@@ -442,6 +450,7 @@ function editor() {
   const persist = async () => {
     lsSet({ ...r, restore: true });
     try {
+      if (r.source !== 'word') setJr(r);   // Word imports keep the JR written in the document
       r.id ||= Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
       r.createdAt ||= Date.now();
       await cloud.saveReflection(mine(), r);
@@ -465,11 +474,7 @@ function editor() {
     const hd = HEADING_BY_ID[r.headingId];
     subWrap.replaceChildren(...[
       hd && hd.hint ? h('p', { class: 'hint' }, hd.hint) : null,
-      hd && hd.subs ? h('label', { class: 'field' }, 'Sub-type',
-        h('select', { style: 'font-size:16px', onchange: e => { r.subId = e.target.value || null; changed(); } },
-          h('option', { value: '' }, '—'), hd.subs.map(s => h('option', { value: s.id, selected: r.subId === s.id }, s.name)))) : null,
-      hd && !hd.jr ? h('p', { class: 'hint' }, 'At most one JR reflection counts under this heading.') : null,
-      hd && hd.jr ? h('p', { class: 'hint' }, `${hd.jr} of these must be JR (R1–R3) case${hd.jr > 1 ? 's' : ''}.`) : null,
+      hd && hd.subs ? h('p', { class: 'hint' }, 'This heading should include at least one of each: ' + hd.subs.map(s => s.name).join(' · ') + '. Just describe the procedure or diagnosis below.') : null,
     ].filter(Boolean));
   };
   paintSubs();
@@ -501,14 +506,13 @@ function editor() {
   const fields = h('section', { class: 'card' },
     h('div', { class: 'bar' }, h('button', { onclick: close }, '← Reflections'), h('span', { class: 'grow' }), status),
     linkBox,
-    !r.headingId ? suggestChips(lc, x => { r.headingId = x.headingId; r.subId = x.subId || null; restructure(); }, r.jr) : null,
+    !r.headingId ? suggestChips(lc, x => { r.headingId = x.headingId; r.subId = null; restructure(); }, r.jr) : null,
     h('label', { class: 'field' }, 'Heading', headingSelect),
     subWrap,
     h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:8px' },
       h('label', { class: 'field' }, 'Patient initials', input('initials', { maxlength: '20', autocapitalize: 'characters', style: 'font-size:16px;width:7em' })),
-      h('label', { class: 'field' }, 'Date', input('date', { type: 'date' })),
-      h('label', { class: 'field', style: 'display:flex;align-items:center;gap:6px' },
-        h('input', { type: 'checkbox', checked: r.jr, style: 'width:22px;height:22px', onchange: e => { r.jr = e.target.checked; changed(); hooks.render(); } }), 'JR case (R1–R3)')),
+      h('label', { class: 'field' }, 'Date', h('input', { type: 'date', style: 'font-size:16px', value: r.date || '', oninput: e => { r.date = e.target.value || null; if (r.source !== 'word') setJr(r); changed(); } }))),
+    h('p', { class: 'hint' }, 'Some categories require one case reflection in Junior Residency (JR); when not indicated, at most one case reflection can be done at the JR level per category. A reflection dated in R1–R3 is marked JR in the Word export automatically.'),
     h('label', { class: 'field' }, 'Diagnosis / operation', input('diagnosis', { maxlength: '2000' })),
     h('p', { class: 'hint' }, 'De-identified only: initials, no names or NRIC. Generative AI use must follow the NUS guidelines on the use of AI tools in academic work.'));
 

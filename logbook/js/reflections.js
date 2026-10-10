@@ -63,11 +63,11 @@ export const isLegacy = r => !!(r && r.sections && Object.values(r.sections).som
 
 // What is missing before a reflection can be marked complete (empty = ready).
 // Linking a reflection to a logged case (caseId) is optional. source 'word' marks a Word import.
+// The sub-type is optional too: headings with required sub-types show what is still needed instead.
 export function completeProblems(r) {
   const out = [];
   const hd = HEADING_BY_ID[r.headingId];
   if (!hd) out.push('heading');
-  if (hd && hd.subs && !r.subId) out.push('sub-type');
   if (!String(r.initials || '').trim()) out.push('initials');
   if (!r.date) out.push('date');
   if (isLegacy(r)) {
@@ -115,15 +115,12 @@ export function reflectionProgress(reflections) {
     const jrNeeded = h.jr || 0;
     const jrMax = h.jr ? Infinity : 1;
     const subs = (h.subs || []).map(s => ({ id: s.id, name: s.name, min: s.min, done: mine.filter(r => r.subId === s.id).length }));
+    // JR and sub-type rules are shown as reminders only, not enforced
     const issues = [];
-    if (jrNeeded && jrDone < jrNeeded) issues.push(`Needs ${jrNeeded - jrDone} more JR reflection${jrNeeded - jrDone > 1 ? 's' : ''}`);
-    if (!h.jr && jrDone > 1) issues.push('Only 1 JR reflection counts under this heading');
-    for (const s of subs) if (s.done < s.min) issues.push(`Missing: ${s.name}`);
     const dups = (reflections || []).filter(r => r.headingId === h.id && dupKeys.has(patientKey(r)));
     if (dups.length) issues.push(`Same patient used more than once (${[...new Set(dups.map(r => r.initials + ' ' + r.date))].join(', ')})`);
-    // a heading is met when the count, JR and sub-types are met (extra JR beyond the max don't count)
-    const counted = h.jr ? mine.length : mine.length - Math.max(0, jrDone - 1);
-    const met = counted >= h.min && (!jrNeeded || jrDone >= jrNeeded) && subs.every(s => s.done >= s.min);
+    const counted = mine.length;
+    const met = counted >= h.min;
     return { id: h.id, section: h.section, name: h.name, hint: h.hint || '', done: mine.length, counted, min: h.min, jrDone, jrNeeded, jrMax, subs, issues, met };
   });
   const total = headings.reduce((n, h) => n + Math.min(h.counted, h.min), 0);
@@ -215,10 +212,8 @@ export function suggestHeadings(caseObj, reflections = [], opts = {}) {
   const byId = Object.fromEntries(prog.headings.map(x => [x.id, x]));
   const scored = out.map((o, i) => {
     const p = byId[o.headingId];
-    const subNeeded = !!(o.subId && p.subs.some(s => s.id === o.subId && s.done < s.min));
-    const jrNeeded = !!(opts.jr && p.jrNeeded && p.jrDone < p.jrNeeded);
-    const needed = !p.met && (p.counted < p.min || subNeeded || jrNeeded || p.subs.some(s => s.done < s.min));
-    return { headingId: o.headingId, subId: o.subId, name: HEADING_BY_ID[o.headingId].name, needed, _s: (needed ? 0 : 100) - (subNeeded ? 2 : 0) - (jrNeeded ? 1 : 0), _i: i };
+    const needed = p.counted < p.min;   // headings short of their minimum come first
+    return { headingId: o.headingId, subId: o.subId, name: HEADING_BY_ID[o.headingId].name, needed, _s: needed ? 0 : 100, _i: i };
   });
   scored.sort((a, b) => a._s - b._s || a._i - b._i);
   return scored.map(({ _s, _i, ...o }) => o);
