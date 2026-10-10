@@ -41,7 +41,7 @@ Queries must match the rules: residents list with `where('residentEmail', '==', 
 
 ## Open questions
 
-- The evaluator's forms are transcribed in [`reference/apmes-forms.json`](reference/apmes-forms.json). Still unconfirmed: the dropdown options (complexity, DOPS guidance, Mini-CEX clinical setting, Yes/No), whether the DOPS form continues past question 19, and the EPA number for each requirement. See [`reference/`](reference/README.md#the-evaluators-forms).
+- The evaluator's forms are transcribed in [`reference/apmes-forms.json`](reference/apmes-forms.json). Still unconfirmed: the dropdown options (complexity, DOPS guidance, Yes/No), whether the DOPS form continues past question 19, and the EPA number for each requirement. See [`reference/`](reference/README.md#the-evaluators-forms).
 - The resident's request mirrors the MedHub case log: date, location, evaluator, patient initials, gender, age, item, role (performed / assisted / observed), diagnosis, complications, notes to the evaluator. See [`reference/`](reference/README.md).
 
 ## Tests

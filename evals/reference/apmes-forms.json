@@ -136,9 +136,17 @@
    "unconfirmed": true
   },
   "clinicalSetting": {
-   "about": "Dropdown. Options not visible in the screenshots.",
-   "options": [],
-   "unconfirmed": true
+   "about": "Mini-CEX clinical setting dropdown (confirmed from a screenshot, 2026-10-10).",
+   "options": [
+    "Blue letter referral for pain",
+    "Delivery suite",
+    "ICU",
+    "Operating theatre",
+    "Pain Clinic",
+    "Preop Clinic",
+    "Recovery/PACU",
+    "Ward"
+   ]
   }
  },
  "forms": {
