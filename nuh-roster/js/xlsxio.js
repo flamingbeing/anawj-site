@@ -1,3 +1,5 @@
+import { buildLayout, COL_WIDTHS } from './layout.js';
+
 // Reading and writing roster spreadsheets with ExcelJS (passed in, so this runs in the browser and in Node).
 
 export function cellText(v) {
@@ -81,41 +83,26 @@ function normGrade(g, seniorish) {
   return seniorish ? 'Consultant' : 'Resident';
 }
 
-// Build the roster workbook in the department's layout (OT section only for now).
-export function buildRosterWorkbook(ExcelJS, { date, rows }) {
+// Build the roster workbook in the department's layout.
+export function buildRosterWorkbook(ExcelJS, { date, rows, lists }) {
+  const layout = buildLayout({ date, rows, lists });
   const wb = new ExcelJS.Workbook();
-  const d = date ? new Date(date + 'T00:00:00') : null;
-  const title = date || 'roster';
-  const ws = wb.addWorksheet(title, { pageSetup: { orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 0 } });
-  ws.columns = [10, 5, 9, 9, 9, 9, 9, 9, 9, 9, 9, 18].map(width => ({ width }));
-  const font = (sz, bold, color) => ({ name: 'Arial', size: sz, bold: !!bold, ...(color ? { color: { argb: color } } : {}) });
-  const center = { horizontal: 'center', vertical: 'middle', wrapText: true };
+  const ws = wb.addWorksheet(date || 'roster', { pageSetup: { orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 1 } });
+  ws.columns = COL_WIDTHS.map(width => ({ width }));
   const thin = { style: 'thin' };
-
-  const put = (addr, value, f, align) => { const c = ws.getCell(addr); c.value = value; c.font = f; if (align) c.alignment = align; return c; };
-  ws.mergeCells('A2:L2'); put('A2', 'DEPARTMENT OF ANAESTHESIA', font(10, true), center);
-  ws.mergeCells('A3:L3'); put('A3', 'NATIONAL UNIVERSITY HEALTH SYSTEM', font(10, true), center);
-  ws.mergeCells('A5:B5'); put('A5', 'Date', font(8, true), { horizontal: 'right' });
-  ws.mergeCells('C5:E5');
-  put('C5', d ? d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '', font(8, true), center);
-  ws.mergeCells('F5:G5');
-  put('F5', d ? d.toLocaleDateString('en-GB', { weekday: 'long' }) : '', font(8, true), center);
-
-  let r = 7;
-  let lastComplex = null;
-  for (const row of rows) {
-    if (lastComplex && row.complex !== lastComplex && row.complex === 'MOR') r++; // gap before MOR, as in the paper roster
-    lastComplex = row.complex;
-    ws.mergeCells(`A${r}:B${r}`);
-    ws.mergeCells(`C${r}:E${r}`);
-    ws.mergeCells(`F${r}:H${r}`);
-    ws.mergeCells(`I${r}:K${r}`);
-    put(`A${r}`, row.label + ':', font(8, true), { horizontal: 'right', vertical: 'middle' });
-    put(`C${r}`, row.senior || '', font(8), center).border = { bottom: thin };
-    put(`F${r}`, row.junior || '', font(8), center).border = { bottom: thin, left: thin };
-    put(`I${r}`, row.premed || '', font(8, false, 'FF000000'), center).border = { bottom: thin };
-    put(`L${r}`, row.notes || '', font(10));
-    r++;
+  for (const c of layout.cells) {
+    const cell = ws.getCell(c.r, c.c1);
+    const font = { name: 'Arial', size: c.sz, bold: c.bold, ...(c.color ? { color: { argb: c.color } } : {}) };
+    if (c.underlineFirst && c.text) {
+      const [first, ...rest] = c.text.split('\n');
+      cell.value = { richText: [{ text: first, font: { ...font, underline: true } }, ...(rest.length ? [{ text: '\n' + rest.join('\n'), font }] : [])] };
+    } else cell.value = c.text;
+    cell.font = font;
+    cell.alignment = { horizontal: c.align, vertical: c.valign, wrapText: c.c2 < 12 };
+    // style the top-left cell, then merge: the merged cells take its style, so the box is drawn all round
+    if (c.box) cell.border = { top: thin, bottom: thin, left: thin, right: thin };
+    if (c.r2 > c.r || c.c2 > c.c1) ws.mergeCells(c.r, c.c1, c.r2, c.c2);
   }
+  for (const [r, h] of Object.entries(layout.heights)) ws.getRow(+r).height = h;
   return wb;
 }

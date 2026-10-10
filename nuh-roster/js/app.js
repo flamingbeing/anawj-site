@@ -3,6 +3,7 @@ import {
   matchName, splitNameList, namesInCell, suggestFlags, generate, check, learnFromRosters,
 } from './engine.js';
 import { readRosterRows, readStaffSheet, buildRosterWorkbook, cellText } from './xlsxio.js';
+import { buildLayout, COL_WIDTHS, shortName } from './layout.js';
 
 const KEY = 'ot-roster-v1';
 const clone = o => JSON.parse(JSON.stringify(o));
@@ -64,7 +65,7 @@ function h(tag, attrs = {}, ...kids) {
     else if (k === 'checked') el.checked = !!v;
     else el.setAttribute(k, v === true ? '' : v);
   }
-  for (const k of kids.flat()) if (k != null && k !== false) el.append(k.nodeType ? k : document.createTextNode(k));
+  for (const k of kids.flat(Infinity)) if (k != null && k !== false) el.append(k.nodeType ? k : document.createTextNode(k));
   return el;
 }
 
@@ -282,7 +283,7 @@ function renderDay() {
       h('div', { class: 'bar' },
         h('label', {}, 'Roster for ', h('input', { type: 'date', value: d.date, onchange: e => { d.date = e.target.value; save(); } })),
         fileButton('Load draft roster (.xlsx)', '.xlsx', false, loadDraft),
-        h('button', { onclick: () => { if (confirm('Clear rooms, notes and staff statuses for this day?')) { state.day = { date: d.date, rooms: [], staff: {} }; syncRooms(); render(); } } }, 'Clear day'),
+        h('button', { onclick: () => { if (confirm('Clear rooms, notes and staff statuses for this day?')) { state.day = { date: d.date, rooms: [], staff: {}, lists: {} }; syncRooms(); render(); } } }, 'Clear day'),
       ),
       h('p', { class: 'hint' }, "\"Load draft roster\" reads the admin team's draft in the usual format: it picks up running rooms, case notes, leave, post call and upper-half duties."),
       unmatched.length ? h('ul', { class: 'warnings', style: 'margin-bottom:12px' }, h('li', { class: 'warn' },
@@ -335,10 +336,41 @@ function markNames(names, fn) {
   return missed;
 }
 
+// Names as written on the leave sheet / draft, kept so the roster shows them the same way.
+function addRaw(key, entries) {
+  const lists = (state.day.lists ||= {});
+  const list = (lists[key] ||= []);
+  for (const e of entries.map(x => x.trim()).filter(Boolean)) if (!list.includes(e)) list.push(e);
+}
+
+// The post call / leave / admin lists for the sheet: raw entries that still apply, plus anyone
+// whose status was set by hand and isn't listed yet.
+function rosterLists() {
+  const out = {};
+  for (const key of ['postcall', 'leave', 'admin']) {
+    const covered = new Set();
+    const list = [];
+    for (const e of state.day.lists?.[key] || []) {
+      const p = matchName(e.replace(/\(.*?\)/g, '').trim(), state.staff).person;
+      if (p) {
+        if ((dayOf(p.id).status || 'avail') !== key) continue; // status changed since
+        covered.add(p.id);
+      }
+      list.push(e);
+    }
+    for (const p of state.staff) {
+      if ((state.day.staff[p.id]?.status || 'avail') === key && !covered.has(p.id)) list.push(shortName(p));
+    }
+    out[key] = list;
+  }
+  return out;
+}
+
 function applyPaste() {
   const missed = [];
   for (const [key, status] of [['leave', 'leave'], ['postcall', 'postcall'], ['elsewhere', 'elsewhere'], ['admin', 'admin']]) {
     missed.push(...markNames(splitNameList(pasteText[key]), s => { s.status = status; }));
+    if (key !== 'elsewhere') addRaw(key, pasteText[key].split(/[\n,;\/\t]+/));
   }
   missed.push(...markNames(splitNameList(pasteText.notAround), s => { s.notAroundPrev = true; }));
   Object.keys(pasteText).forEach(k => { pasteText[k] = ''; });
@@ -385,6 +417,7 @@ async function loadDraft([file]) {
     room.session = /\bam\b/i.test(r.senior) && !/\bpm\b/i.test(r.senior) && !r.notes ? 'am' : 'full';
     rooms++;
   }
+  d.lists = { leave: get(/^leave/), postcall: get(/^post call/), admin: get(/^admin/) };
   const missed = [
     ...markNames(get(/^leave/).flatMap(splitNameList).filter(n => !/kiv/i.test(n)), s => { s.status = 'leave'; }),
     ...markNames(get(/^post call/).flatMap(splitNameList), s => { s.status = 'postcall'; }),
@@ -410,12 +443,49 @@ function runGenerate(newSeed) {
   render();
 }
 
+let rosterView = 'edit';
+
+// The sheet exactly as it will be exported, drawn as an HTML table.
+function renderSheet() {
+  const layout = buildLayout({ date: state.day.date, rows: state.roster.rows, lists: rosterLists() });
+  const start = {}, covered = new Set();
+  for (const c of layout.cells) {
+    start[c.r + ':' + c.c1] = c;
+    for (let r = c.r; r <= c.r2; r++) for (let k = c.c1; k <= c.c2; k++) if (r !== c.r || k !== c.c1) covered.add(r + ':' + k);
+  }
+  const trs = [];
+  for (let r = 2; r <= layout.rows; r++) {
+    const tds = [];
+    for (let k = 1; k <= layout.cols; k++) {
+      if (covered.has(r + ':' + k)) continue;
+      const c = start[r + ':' + k];
+      if (!c) { tds.push(h('td', {})); continue; }
+      const style = [
+        `font-size:${c.sz === 10 ? 13 : 11}px`, c.bold ? 'font-weight:700' : '', c.color ? `color:#${c.color.slice(2)}` : '',
+        `text-align:${c.align}`, `vertical-align:${c.valign}`,
+      ].filter(Boolean).join(';');
+      const lines = String(c.text).split('\n');
+      tds.push(h('td', { class: (c.box ? 'box' : '') + (c.c1 === 12 ? ' spill' : ''), colspan: c.c2 - c.c1 + 1, rowspan: c.r2 - c.r + 1, style },
+        lines.map((t, i) => [i ? h('br') : null, c.underlineFirst && i === 0 ? h('u', {}, t) : t])));
+    }
+    trs.push(h('tr', { style: layout.heights[r] ? `height:${Math.round(layout.heights[r] * 1.33)}px` : '' }, tds));
+  }
+  return h('section', { class: 'card scroll sheet-wrap' },
+    h('table', { class: 'xl' },
+      h('colgroup', {}, COL_WIDTHS.map(w => h('col', { style: `width:${Math.round(w * 7 + 5)}px` }))),
+      h('tbody', {}, trs)));
+}
+
 function renderRoster() {
   const r = state.roster;
   const actions = h('div', { class: 'bar' },
     h('button', { class: 'primary', onclick: () => runGenerate(!!r) }, r ? 'Regenerate' : 'Generate roster'),
     r && h('button', { onclick: () => { r.checks = check({ rows: r.rows, staff: state.staff, day: state.day, settings: state.settings }); render(); toast('Checked.'); } }, 'Re-check edits'),
     r && h('button', { onclick: exportXlsx }, 'Download .xlsx'),
+    r && h('div', { class: 'seg', role: 'group', 'aria-label': 'View' },
+      h('button', { 'aria-pressed': String(rosterView === 'edit'), onclick: () => { rosterView = 'edit'; render(); } }, 'Edit'),
+      h('button', { 'aria-pressed': String(rosterView === 'sheet'), onclick: () => { rosterView = 'sheet'; render(); } }, 'Sheet preview')),
+    r && rosterView === 'sheet' && h('button', { onclick: () => window.print() }, 'Print / save PDF'),
     h('span', { class: 'grow' }),
     r && h('span', { class: 'seen' }, `Roster for ${state.day.date}`),
   );
@@ -440,6 +510,12 @@ function renderRoster() {
   const order = { error: 0, warn: 1, info: 2 };
   all.sort((a, b) => order[a.level] - order[b.level]);
 
+  if (rosterView === 'sheet') {
+    return h('div', {},
+      h('section', { class: 'card no-print' }, h('h2', {}, 'Roster'), actions,
+        h('p', { class: 'hint', style: 'margin:0' }, 'This is what the downloaded .xlsx looks like. Parts the tool doesn\'t fill yet (MOT, SICU, upper duties, AH OT) are left blank. Switch to Edit to change cells.')),
+      renderSheet());
+  }
   return h('div', {},
     h('section', { class: 'card' }, h('h2', {}, 'Roster'), actions),
     h('div', { class: 'cols' },
@@ -462,7 +538,7 @@ function renderRoster() {
 }
 
 async function exportXlsx() {
-  const wb = buildRosterWorkbook(window.ExcelJS, { date: state.day.date, rows: state.roster.rows });
+  const wb = buildRosterWorkbook(window.ExcelJS, { date: state.day.date, rows: state.roster.rows, lists: rosterLists() });
   const buf = await wb.xlsx.writeBuffer();
   download(`OT roster ${state.day.date}.xlsx`, new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
 }
