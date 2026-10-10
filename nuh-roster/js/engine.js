@@ -22,6 +22,11 @@ export const DEFAULT_SETTINGS = {
 export const JUNIOR_GRADES = ['Resident', 'MOPEX', 'Baby MO'];
 export const SENIOR_GRADES = ['Consultant', 'AC', 'Registrar'];
 export const POSTINGS = ['', 'RA', 'P', 'L', 'SR', 'Neu', 'Amb'];
+
+// Name colour on the roster: green marks Baby MOs (never left alone), purple marks locums.
+export const COLOURS = [['', 'Black'], ['green', 'Green'], ['purple', 'Purple']];
+export const COLOUR_ARGB = { green: 'FF00B050', purple: 'FF7030A0' };
+export const isBaby = p => !!p && (p.grade === 'Baby MO' || p.colour === 'green');
 export const STATUSES = [
   ['avail', 'Available'],
   ['leave', 'Leave'],
@@ -242,7 +247,7 @@ function seniorRoomCost(p, d, room, settings, noise) {
 
 function juniorRoomCost(p, d, room, settings, noise, doubled) {
   const sub = subspecByKey(settings);
-  const baby = p.grade === 'Baby MO';
+  const baby = isBaby(p);
   if (baby && doubled) return INF;
   let c = noise;
   if (baby && room.flags.complex) c += 30;
@@ -430,8 +435,8 @@ export function generate({ staff, day, settings = DEFAULT_SETTINGS, seed = 1 }) 
       const here = rowOf[r.id].juniors.map(id => byId[id]);
       let c = juniorRoomCost(p, dayOf(day, p), r, settings, rand() * 2, doubled.has(r.id));
       if (c >= INF) return INF;
-      if (p.grade === 'Baby MO') c += 20; // a Baby MO as the extra is fine, but prefer seniors-in-training
-      if (here.some(h => h.grade === 'Baby MO')) c -= 20;
+      if (isBaby(p)) c += 20; // a Baby MO as the extra is fine, but prefer seniors-in-training
+      if (here.some(isBaby)) c -= 20;
       c += here.length * 25;
       if (!here.length) c -= 30;
       return c;
@@ -449,13 +454,13 @@ export function generate({ staff, day, settings = DEFAULT_SETTINGS, seed = 1 }) 
   // ---- premed cover ----
   const roomOfJunior = {};
   for (const r of rooms) for (const id of rowOf[r.id].juniors) roomOfJunior[id] = r;
-  const coverers = staff.filter(p => p.role === 'junior' && p.grade !== 'Baby MO'
+  const coverers = staff.filter(p => p.role === 'junior' && !isBaby(p)
     && ['avail', 'elsewhere'].includes(dayOf(day, p).status || 'avail') && !dayOf(day, p).notAroundPrev);
   const load = {};
   const premedRooms = rooms.filter(r => rowOf[r.id].juniors.some(id => dayOf(day, byId[id]).notAroundPrev));
   for (const r of premedRooms) {
     const row = rowOf[r.id];
-    const mate = row.juniors.map(id => byId[id]).find(p => !dayOf(day, p).notAroundPrev && p.grade !== 'Baby MO');
+    const mate = row.juniors.map(id => byId[id]).find(p => !dayOf(day, p).notAroundPrev && !isBaby(p));
     if (mate) { row.premed = mate.id; load[mate.id] = (load[mate.id] || 0) + 1; continue; }
     const sameSenior = rooms.filter(o => o.id !== r.id && row.seniors.length && rowOf[o.id].seniors[0] === row.seniors[0]).map(o => rowOf[o.id].premed).filter(Boolean);
     let best = null, bestC = Infinity;
@@ -550,11 +555,11 @@ export function check({ rows, staff, day, settings = DEFAULT_SETTINGS }) {
       }
     }
     const shared = sen.some(p => (where[p.id] || []).filter(u => u.col === 'senior').length > 1);
-    if (shared && jun.some(p => p.grade === 'Baby MO')) {
+    if (shared && jun.some(isBaby)) {
       out.push({ level: 'error', text: `${row.label}: Baby MO in a room whose senior is double covering.` });
     }
     if (shared && flags.complex) out.push({ level: 'warn', text: `${row.label}: complex list but senior is double covering.` });
-    const needPremed = jun.some(p => dayOf(day, p).notAroundPrev) && !jun.some(p => !dayOf(day, p).notAroundPrev && p.grade !== 'Baby MO');
+    const needPremed = jun.some(p => dayOf(day, p).notAroundPrev) && !jun.some(p => !dayOf(day, p).notAroundPrev && !isBaby(p));
     if (needPremed && !String(row.premed || '').trim()) out.push({ level: 'warn', text: `${row.label}: junior wasn't around yesterday — needs premed cover.` });
   }
   return out;

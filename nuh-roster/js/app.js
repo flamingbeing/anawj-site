@@ -1,5 +1,5 @@
 import {
-  DEFAULT_SETTINGS, DEFAULT_ROOMS, JUNIOR_GRADES, SENIOR_GRADES, POSTINGS, STATUSES,
+  DEFAULT_SETTINGS, DEFAULT_ROOMS, JUNIOR_GRADES, SENIOR_GRADES, POSTINGS, STATUSES, COLOURS, COLOUR_ARGB, isBaby,
   matchName, splitNameList, namesInCell, suggestFlags, generate, check, learnFromRosters, tickFromHistory, remoteRoom, suggestShortNames, mergeContacts,
 } from './engine.js';
 import { readRosterRows, readStaffSheet, buildRosterWorkbook, cellText, isContactList, readContactList, cleanContactName } from './xlsxio.js';
@@ -160,8 +160,9 @@ function render() {
   document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === state.tab)));
   const y = window.scrollY;
   if (state.tab === 'day') state.tab = 'cases';
-  if (!['roster', 'cases', 'manpower', 'seniors', 'juniors', 'settings'].includes(state.tab)) state.tab = 'seniors';
-  app.replaceChildren(({ roster: renderRoster, cases: () => renderDay('cases'), manpower: () => renderDay('manpower'), seniors: () => renderStaff('senior'), juniors: () => renderStaff('junior'), settings: renderSettings })[state.tab]());
+  colourCache.clear();
+  if (!['roster', 'premed', 'cases', 'manpower', 'seniors', 'juniors', 'settings'].includes(state.tab)) state.tab = 'seniors';
+  app.replaceChildren(({ roster: renderRoster, premed: renderPremed, cases: () => renderDay('cases'), manpower: () => renderDay('manpower'), seniors: () => renderStaff('senior'), juniors: () => renderStaff('junior'), settings: renderSettings })[state.tab]());
   renderCloudBar();
   window.scrollTo(0, y);
   save();
@@ -196,6 +197,8 @@ function diffStaff(before, after) {
     if (o.role !== p.role) c.push(`moved ${o.role} → ${p.role}`);
     if (o.grade !== p.grade) c.push(`grade ${o.grade} → ${p.grade}`);
     if ((o.posting || '') !== (p.posting || '')) c.push(`posting ${o.posting || 'none'} → ${p.posting || 'none'}`);
+    const colourName = k => COLOURS.find(x => x[0] === (k || ''))[1].toLowerCase();
+    if ((o.colour || '') !== (p.colour || '')) c.push(`colour ${colourName(o.colour)} → ${colourName(p.colour)}`);
     if (listText(o.aliases) !== listText(p.aliases)) c.push(`short names ${listText(o.aliases)} → ${listText(p.aliases)}`);
     const os = new Set(o.subspecs || []), ns = new Set(p.subspecs || []);
     const plus = [...ns].filter(k => !os.has(k)).map(k => '+' + subLabel(k)), minus = [...os].filter(k => !ns.has(k)).map(k => '−' + subLabel(k));
@@ -261,8 +264,8 @@ function renderStaff(role) {
   const row = p => h('tr', {},
     h('td', {}, h('input', { value: p.name, onchange: e => { p.name = e.target.value.trim(); save(); } })),
     h('td', {}, h('input', { value: (p.aliases || []).join(', '), placeholder: 'e.g. Tan YW', onchange: e => { p.aliases = splitNameList(e.target.value); save(); } })),
-    h('td', {}, select(p.role, [['senior', 'Senior'], ['junior', 'Junior']], v => { p.role = v; p.grade = v === 'senior' ? 'Consultant' : 'Resident'; render(); })),
-    h('td', {}, select(p.grade, p.role === 'senior' ? SENIOR_GRADES : JUNIOR_GRADES, v => { p.grade = v; save(); })),
+    h('td', {}, select(p.grade, p.role === 'senior' ? SENIOR_GRADES : JUNIOR_GRADES, v => { p.grade = v; if (v === 'Baby MO' && !p.colour) p.colour = 'green'; render(); })),
+    h('td', {}, select(p.colour || '', COLOURS, v => { p.colour = v; render(); })),
     !senior && h('td', {}, select(p.posting || '', POSTINGS, v => { p.posting = v; save(); })),
     senior && h('td', {}, h('div', { class: 'chips' }, subs.map(s => {
         const on = (p.subspecs || []).includes(s.key);
@@ -280,8 +283,8 @@ function renderStaff(role) {
     h('section', { class: 'card' },
       h('h2', {}, senior ? 'Seniors' : 'Juniors'),
       h('p', { class: 'hint' }, senior
-        ? 'Tick each senior\'s subspecs and the lists they don\'t do. "Seen in" counts the subspec lists they did in past rosters you loaded, as a hint. Change Role to move someone to Juniors.'
-        : 'Set each junior\'s grade and posting. Baby MOs are never left alone, so their senior won\'t double cover. Change Role to move someone to Seniors.'),
+        ? 'Tick each senior\'s subspecs and the lists they don\'t do. "Seen in" counts the subspec lists they did in past rosters you loaded, as a hint. Colour: purple for locums.'
+        : 'Set each junior\'s grade, posting and colour. Green marks a Baby MO: never left alone, so their senior won\'t double cover. Purple marks locums.'),
       h('div', { class: 'bar sync dirty' },
         h('span', {}, `Editing the staff list. ${diffStaff(staffBackup, state.staff).length} change(s) so far; nothing is kept until you review and save.`),
         h('button', { class: 'primary', onclick: finishStaffEdit }, 'Review & save changes'),
@@ -313,7 +316,7 @@ function renderStaff(role) {
     ),
     count
       ? h('section', { class: 'card scroll' }, h('table', {},
-        h('thead', {}, h('tr', {}, (senior ? ['Name', 'Short names', 'Role', 'Grade', 'Subspecs', "Doesn't do", 'Seen in', ''] : ['Name', 'Short names', 'Role', 'Grade', 'Posting', '']).map(t => h('th', {}, t)))),
+        h('thead', {}, h('tr', {}, (senior ? ['Name', 'Short names', 'Grade', 'Colour', 'Subspecs', "Doesn't do", 'Seen in', ''] : ['Name', 'Short names', 'Grade', 'Colour', 'Posting', '']).map(t => h('th', {}, t)))),
         h('tbody', {}, list.map(row))))
       : h('section', { class: 'card empty' }, `No ${senior ? 'seniors' : 'juniors'} yet. Import the master staff sheet, or load a few past rosters to build the list automatically.`),
   );
@@ -328,9 +331,10 @@ function renderStaffView(role) {
     .sort((a, b) => a.name.localeCompare(b.name));
   const count = state.staff.filter(p => p.role === role).length;
   const row = p => h('tr', {},
-    h('td', {}, h('b', {}, p.name)),
+    h('td', {}, h('b', { style: p.colour ? `color:#${COLOUR_ARGB[p.colour].slice(2)}` : '' }, p.name)),
     h('td', {}, (p.aliases || []).join(', ')),
     h('td', {}, p.grade),
+    h('td', { class: 'seen' }, COLOURS.find(c => c[0] === (p.colour || ''))[1]),
     senior
       ? h('td', {}, h('div', { class: 'chips' }, (p.subspecs || []).map(k => h('span', { class: 'chip on static' }, subLabel(k)))))
       : h('td', {}, p.posting || ''),
@@ -352,7 +356,7 @@ function renderStaffView(role) {
     ),
     count
       ? h('section', { class: 'card scroll' }, h('table', {},
-        h('thead', {}, h('tr', {}, (senior ? ['Name', 'Short names', 'Grade', 'Subspecs', "Doesn't do", 'Seen in'] : ['Name', 'Short names', 'Grade', 'Posting']).map(t => h('th', {}, t)))),
+        h('thead', {}, h('tr', {}, (senior ? ['Name', 'Short names', 'Grade', 'Colour', 'Subspecs', "Doesn't do", 'Seen in'] : ['Name', 'Short names', 'Grade', 'Colour', 'Posting']).map(t => h('th', {}, t)))),
         h('tbody', {}, list.map(row))))
       : h('section', { class: 'card empty' }, `No ${senior ? 'seniors' : 'juniors'} yet. Click Edit to import the master staff sheet or learn from past rosters.`),
     staffLogCard(),
@@ -852,6 +856,17 @@ const notesCell = (row, i, attrs = {}) => h('td', {
   onblur: e => editNotes(i, e.target.textContent.trim()),
 }, row.notes || '');
 
+// The colour of the person a roster name refers to ('green', 'purple' or '').
+const colourCache = new Map();
+function colourOf(part) {
+  const n = namesInCell(part)[0];
+  if (!n) return '';
+  const k = n + '|' + state.staff.length;
+  if (!colourCache.has(k)) colourCache.set(k, matchName(n, state.staff).person?.colour || '');
+  return colourCache.get(k);
+}
+const colourStyle = part => { const c = COLOUR_ARGB[colourOf(part)]; return c ? `color:#${c.slice(2)}` : ''; };
+
 function rosterCell(row, i, key, doubles) {
   const id = i + ':' + key;
   if (editing === id) {
@@ -874,7 +889,7 @@ function rosterCell(row, i, key, doubles) {
     ondblclick: () => { clearTimeout(tagTimer); closeTagEditor(); editing = id; render(); },
   }, parts.length
     ? h('div', { class: 'names' }, parts.map((p, k) => [k ? h('span', { class: 'sep' }, '/') : null, h('span', {
-      class: 'name', 'data-drop': '', 'data-row': i, 'data-key': key, 'data-part': k,
+      class: 'name', 'data-drop': '', 'data-row': i, 'data-key': key, 'data-part': k, style: colourStyle(p),
       title: 'Drag to swap or move. Click to edit tags.',
       onpointerdown: e => startNameDrag(e, { row: i, key, part: k }),
     }, p, key === 'senior' && isDouble(p, doubles) ? h('sup', { class: 'dbl', title: 'Double covering' }, '&') : null)]))
@@ -897,9 +912,63 @@ function runGenerate(newSeed) {
 
 let rosterView = 'edit';
 
+// ----- premed tab -----
+
+function renderPremed() {
+  const r = state.roster;
+  if (!r) return h('section', { class: 'card empty' }, 'Generate a roster on the Roster tab first.');
+  const byName = n => matchName(n, state.staff).person;
+  const away = p => !!p && !!state.day.staff[p.id]?.notAroundPrev;
+  // who can cover: residents and MOPEX who were around yesterday and are working today
+  const coverers = state.staff.filter(p => p.role === 'junior' && !isBaby(p) && !away(p)
+    && ['avail', 'elsewhere'].includes(state.day.staff[p.id]?.status || 'avail'))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const load = {};
+  for (const row of r.rows) for (const n of cellParts(row, 'premed')) load[n] = (load[n] || 0) + 1;
+  const homeOf = {};
+  r.rows.forEach(row => cellParts(row, 'junior').forEach(part => { const p = byName(namesInCell(part)[0] || ''); if (p) homeOf[p.id] = row.label; }));
+
+  const setCover = (row, name) => {
+    undoStack.push(JSON.stringify(r.rows));
+    row.premed = name ? `${name} - Premed` : '';
+    afterRosterEdit();
+  };
+  let needed = 0, missing = 0;
+  const rows = r.rows.map(row => {
+    const juniors = cellParts(row, 'junior').map(part => ({ part, p: byName(namesInCell(part)[0] || '') }));
+    const awayNames = juniors.filter(j => away(j.p)).map(j => j.p.name);
+    const needs = awayNames.length > 0;
+    const mate = juniors.find(j => j.p && !away(j.p) && !isBaby(j.p))?.p;
+    const cur = cellParts(row, 'premed')[0] || '';
+    if (needs) { needed++; if (!cur) missing++; }
+    if (!needs && !cur && premedFilter) return null;
+    const options = [['', '— none —'], ...coverers.map(p => [p.name, `${p.name}${homeOf[p.id] ? ' · ' + homeOf[p.id] : ' · not on a list'}${load[p.name] ? ` · ${load[p.name]} room${load[p.name] > 1 ? 's' : ''}` : ''}`])];
+    if (cur && !options.some(o => o[0] === cur)) options.push([cur, cur]);
+    return h('tr', { class: needs && !cur ? 'flagged' : '' },
+      h('td', { class: 'room' }, row.label + ':'),
+      h('td', {}, juniors.map((j, k) => [k ? ' / ' : '', h('span', { style: colourStyle(j.part) }, j.part)])),
+      h('td', { class: 'seen' }, awayNames.length ? `${awayNames.join(', ')} away yesterday${mate && !cur ? ` · ${mate.name} in the same room could cover` : ''}` : ''),
+      h('td', {}, select(cur, options, v => setCover(row, v))));
+  }).filter(Boolean);
+  return h('div', {},
+    h('section', { class: 'card' },
+      h('h2', {}, 'Premed cover'),
+      h('p', { class: 'hint' }, 'A room needs premed cover when its junior wasn\'t around on the previous working day (tick "away yesterday" on the Manpower tab). Cover can be any resident or MOPEX who was around, from any complex. The list shows where each person is today and how many rooms they already cover (max ' + state.settings.premedCap + ').'),
+      h('div', { class: 'bar' },
+        h('span', { class: 'stats' }, h('span', {}, h('b', {}, needed), ' rooms need cover'), h('span', {}, h('b', {}, missing), ' still without')),
+        h('span', { class: 'grow' }),
+        h('label', { class: 'seen' }, h('input', { type: 'checkbox', checked: premedFilter, onchange: e => { premedFilter = e.target.checked; render(); } }), ' Only rooms that need or have cover'))),
+    h('section', { class: 'card scroll' }, h('table', { class: 'sheet' },
+      h('thead', {}, h('tr', {}, ['', 'Junior', '', 'Premed cover'].map(t => h('th', {}, t)))),
+      h('tbody', {}, rows))),
+    rosterLogCard());
+}
+let premedFilter = true;
+
 // The sheet exactly as it will be exported, drawn as an HTML table.
 function renderSheet() {
-  const layout = buildLayout({ date: state.day.date, rows: state.roster.rows, lists: rosterLists() });
+  colourCache.clear();
+  const layout = buildLayout({ date: state.day.date, rows: state.roster.rows, lists: rosterLists(), colourOf });
   const start = {}, covered = new Set();
   for (const c of layout.cells) {
     start[c.r + ':' + c.c1] = c;
@@ -917,14 +986,9 @@ function renderSheet() {
         `text-align:${c.align}`, `vertical-align:${c.valign}`,
       ].filter(Boolean).join(';');
       const attrs = { class: (c.box ? 'box' : '') + (c.c1 === 12 ? ' spill' : ''), colspan: c.c2 - c.c1 + 1, rowspan: c.r2 - c.r + 1, style };
-      if (c.edit?.key === 'notes') {
-        const row = state.roster.rows[c.edit.row];
-        tds.push(notesCell(row, c.edit.row, { ...attrs, class: attrs.class + ' editable' }));
-        continue;
-      }
       const lines = String(c.text).split('\n');
       tds.push(h('td', attrs, c.runs
-        ? c.runs.map(run => run.sup ? h('sup', {}, run.text) : run.text)
+        ? c.runs.map(run => h(run.sup ? 'sup' : 'span', { style: run.color ? `color:#${run.color.slice(2)}` : '' }, run.text))
         : lines.map((t, i) => [i ? h('br') : null, c.underlineFirst && i === 0 ? h('u', {}, t) : t])));
     }
     trs.push(h('tr', { style: layout.heights[r] ? `height:${Math.round(layout.heights[r] * 1.33)}px` : '' }, tds));
@@ -956,11 +1020,11 @@ function renderRoster() {
   const body = [];
   let last = null;
   r.rows.forEach((row, i) => {
-    if (last && row.complex !== last && row.complex === 'MOR') body.push(h('tr', { class: 'gap' }, h('td', { colspan: 5 })));
+    if (last && row.complex !== last && row.complex === 'MOR') body.push(h('tr', { class: 'gap' }, h('td', { colspan: 4 })));
     last = row.complex;
     body.push(h('tr', { class: flaggedRooms.has(row.label) ? 'flagged' : '' },
       h('td', { class: 'room' }, row.label + ':'),
-      rosterCell(row, i, 'senior', doubles), rosterCell(row, i, 'junior', doubles), rosterCell(row, i, 'premed', doubles),
+      rosterCell(row, i, 'senior', doubles), rosterCell(row, i, 'junior', doubles),
       notesCell(row, i, { class: 'notes' })));
   });
   const genRooms = new Set((r.warnings || []).filter(w => w.level === 'error').map(w => w.text.split(':')[0]));
@@ -973,16 +1037,16 @@ function renderRoster() {
   if (rosterView === 'sheet') {
     return h('div', {},
       h('section', { class: 'card no-print' }, h('h2', {}, 'Roster'), actions,
-        h('p', { class: 'hint', style: 'margin:0' }, 'This is what the downloaded .xlsx looks like. Click the case notes on the right to edit them. Parts the tool doesn\'t fill yet (MOT, SICU, upper duties, AH OT) are left blank. Switch to Edit to move names or change tags. & marks a senior who is double covering.')),
+        h('p', { class: 'hint', style: 'margin:0' }, 'This is what the downloaded .xlsx looks like. Case notes aren\'t included. Parts the tool doesn\'t fill yet (MOT, SICU, upper duties, AH OT) are left blank. Switch to Edit to move names or change tags. & marks a senior who is double covering.')),
       renderSheet());
   }
   return h('div', {},
     h('section', { class: 'card' }, h('h2', {}, 'Roster'), actions,
-      h('p', { class: 'hint', style: 'margin:0' }, 'Drag a name onto another name to swap them, or onto an empty part of a cell to move it there. Click a name to change its tags ((L), (RA), -5pm…). Double-click a cell to type, or click the case notes to edit them. & marks a senior who is double covering.')),
+      h('p', { class: 'hint', style: 'margin:0' }, 'Drag a name onto another name to swap them, or onto an empty part of a cell to move it there. Click a name to change its tags ((L), (RA), -5pm…). Double-click a cell to type, or click the case notes to edit them. & marks a senior who is double covering. Premed cover is on its own tab.')),
     h('div', { class: 'cols' },
       h('section', { class: 'card scroll' },
         h('table', { class: 'sheet' },
-          h('thead', {}, h('tr', {}, ['', 'Senior', 'Junior', 'Premed cover', 'Cases'].map(t => h('th', {}, t)))),
+          h('thead', {}, h('tr', {}, ['', 'Senior', 'Junior', 'Cases'].map(t => h('th', {}, t)))),
           h('tbody', {}, body))),
       h('div', {},
         historyCard(),
@@ -1001,7 +1065,8 @@ function renderRoster() {
 }
 
 async function exportXlsx() {
-  const wb = buildRosterWorkbook(window.ExcelJS, { date: state.day.date, rows: state.roster.rows, lists: rosterLists() });
+  colourCache.clear();
+  const wb = buildRosterWorkbook(window.ExcelJS, { date: state.day.date, rows: state.roster.rows, lists: rosterLists(), colourOf });
   const buf = await wb.xlsx.writeBuffer();
   download(`OT roster ${state.day.date}.xlsx`, new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
 }
