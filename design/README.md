@@ -20,7 +20,8 @@ Unofficial. The values were read from the public site's stylesheet (`main.min.cs
 | Token | Hex | Use |
 |---|---|---|
 | `--n-navy` | `#002F6C` | Headings, primary buttons, dark panels, footer |
-| `--n-cyan` | `#00A9E0` | Active tab and menu item, focus ring, underlines. Not for text on white |
+| `--n-cyan` | `#00A9E0` | Active tab and menu item, underlines, focus ring on navy. Not for text or focus rings on white |
+| `--n-focus` | `#002F6C` | Focus ring on light grounds (3px, 12.9:1 on white) |
 | `--n-blue` | `#337AB7` | Links, secondary buttons, section titles on bands |
 | `--n-blue-bright` | `#1C8ED7` | Full-width gallery band |
 | `--n-orange` | `#E57200` | Brand stripe, first tile bar |
@@ -83,4 +84,4 @@ Open Sans, weights 300 / 400 / 600 / 700, from Google Fonts. Base 16px, line hei
 - Icons: thin outline icons for tiles; Font Awesome 5 solid for small UI.
 - Photos: real staff in navy scrubs or lab coats, bright clinical rooms. Report covers on soft blue-purple gradients.
 - Voice: plain, warm, institutional. Title case in menus and headings.
-- Keep a visible focus ring (3px cyan). The source site mostly relies on browser defaults.
+- Keep a visible focus ring: 3px `--n-focus` (navy) on light grounds, cyan on navy. Cyan on white is only 2.7:1, under the 3:1 a focus ring needs. The source site mostly relies on browser defaults.
