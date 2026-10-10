@@ -68,8 +68,8 @@ export function buildLayout({ date, rows, lists = {}, general = {}, box = '', co
   duty('', '', tag(g('epi.nf'), 'NF'));
   duty('Cardiac Call:', g('cardiac.s'), g('cardiac.a'));
   r++;
-  // the comments box runs from the date row down to just above AIC
-  put(5, 9, 11, box, { r2: r - 1, box: true, align: 'left', valign: 'top' });
+  // the comments box runs from the date row down to the cardiac call row, leaving a gap above AIC
+  put(5, 9, 11, box, { r2: r - 2, box: true, align: 'left', valign: 'top' });
   label(r, 'AOCC:');
   names(r, 3, 5, special('aocc').senior);
   names(r, 6, 8, special('aocc').junior);
