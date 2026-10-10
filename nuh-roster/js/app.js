@@ -2,7 +2,7 @@ import {
   DEFAULT_SETTINGS, DEFAULT_ROOMS, JUNIOR_GRADES, SENIOR_GRADES, POSTINGS, STATUSES,
   matchName, splitNameList, namesInCell, suggestFlags, generate, check, learnFromRosters, tickFromHistory, remoteRoom, suggestShortNames, mergeContacts,
 } from './engine.js';
-import { readRosterRows, readStaffSheet, buildRosterWorkbook, cellText, isContactList, readContactList } from './xlsxio.js';
+import { readRosterRows, readStaffSheet, buildRosterWorkbook, cellText, isContactList, readContactList, cleanContactName } from './xlsxio.js';
 import { buildLayout, COL_WIDTHS, shortName, doubleCovered, isDouble } from './layout.js';
 import * as cloud from './cloud.js';
 
@@ -37,6 +37,16 @@ migrateRooms();
 syncRooms();
 
 // Room list changes since the first version: Remote Case -> Remote 1 + Remote 2, add KROR 1 and MCOR 9.
+// Names imported before titles were stripped ("Dr Bryan Ng", "A/Prof ..."): clean them and
+// remember they came from an import, so a contact list can correct their role.
+function cleanStaffNames() {
+  for (const p of state.staff) {
+    const clean = cleanContactName(p.name);
+    if (clean !== p.name.trim() && /^\s*(dr|a\/prof|prof|adj)\b/i.test(p.name)) { p.name = clean; p.source ||= 'import'; }
+  }
+}
+cleanStaffNames();
+
 function migrateRooms() {
   if ((state.roomsVersion || 1) >= 2) return;
   const t = state.roomTemplate;
@@ -356,7 +366,7 @@ async function importStaffSheet([file]) {
     const res = mergeContacts(state.staff, people, newId);
     state.staff = res.staff;
     render();
-    toast(`Contact list: read ${people.length} anaesthetists (names, grades and subspecs only).${res.skipped.length ? ` ${res.skipped.length} juniors not on the staff list were left out, since postings rotate.` : ''} Review the changes before saving.`);
+    toast(`Contact list: read ${people.length} anaesthetists (names, grades and subspecs only).${res.skipped.length ? ` ${res.skipped.length} juniors not on the staff list were left out, since postings rotate.` : ''}${res.removed.length ? ` ${res.removed.length} non-anaesthetist entries from an earlier import removed.` : ''} Review the changes before saving.`);
     return;
   }
   const res = readStaffSheet(wb.worksheets[0]);
@@ -365,7 +375,7 @@ async function importStaffSheet([file]) {
   for (const p of res.people) {
     const m = matchName(p.name, state.staff).person;
     if (m) { Object.assign(m, { ...p, history: m.history, aliases: [...new Set([...(m.aliases || []), ...p.aliases])] }); updated++; }
-    else { state.staff.push({ id: newId(), history: {}, ...p }); added++; }
+    else { state.staff.push({ id: newId(), history: {}, source: 'import', ...p }); added++; }
   }
   toast(`Staff sheet: ${added} added, ${updated} updated.`);
   render();
@@ -1107,6 +1117,7 @@ document.getElementById('loadTeam').addEventListener('change', async e => {
     state.staff = data.staff || [];
     state.staffLog = data.staffLog || [];
     staffBackup = null;
+    cleanStaffNames();
     state.roomTemplate = data.roomTemplate || clone(DEFAULT_ROOMS);
     state.roomsVersion = data.roomsVersion || 1;
     migrateRooms();
@@ -1142,9 +1153,10 @@ function renderCloudBar() {
   const el = document.getElementById('cloud');
   if (!el) return;
   const note = document.getElementById('privacy');
-  if (note && cloud.enabled) note.textContent = isMember()
-    ? 'Signed in: Save shares the staff list and rosters with signed-in team members only.'
-    : 'Works in this browser without signing in. Sign in to save and share rosters with the team.';
+  if (note && cloud.enabled) {
+    note.textContent = isMember() ? '' : 'Works in this browser without signing in. Sign in to save and share rosters with the team.';
+    note.hidden = isMember();
+  }
   if (!cloud.enabled) { el.replaceChildren(); return; }
   if (!cs.ready) { el.replaceChildren(h('span', { class: 'seen' }, 'Connecting…')); return; }
   if (!cs.user) {
@@ -1204,7 +1216,7 @@ const teamHash = () => JSON.stringify([state.settings, state.staff, state.roomTe
 
 // Shown on the staff and settings tabs: whether this browser's staff list, rooms and settings match the team's.
 function teamSyncBar() {
-  if (!isMember()) return cloud.enabled ? null : h('p', { class: 'hint' }, 'To share with other rosterers, use Save team file at the top.');
+  if (!isMember()) return cloud.enabled ? null : h('p', { class: 'hint' }, 'To share with other rosterers, use Export JSON at the bottom of the page.');
   const dirty = state.teamSyncedHash !== teamHash();
   return h('div', { class: 'bar sync' + (dirty ? ' dirty' : '') },
     h('span', {}, dirty
@@ -1234,6 +1246,7 @@ async function loadTeamFromCloud(asked) {
     state.staff = t.staff || [];
     state.staffLog = t.staffLog || [];
     staffBackup = null;
+    cleanStaffNames();
     state.roomTemplate = t.roomTemplate || clone(DEFAULT_ROOMS);
     state.teamSyncedAt = t.updatedAt;
     state.roomsVersion = t.roomsVersion || 1;

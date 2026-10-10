@@ -581,7 +581,7 @@ export function learnFromRosters(rosterRows, staff, settings = DEFAULT_SETTINGS)
       if (!p) {
         // a short form ("Leong SM") is only useful once we know the full name
         if (tokens(n).length < 2 || tokens(n).some(t => t.length <= 2)) continue;
-        p = { id: 'p' + nextId++, name: n, aliases: [], role: col, grade: col === 'senior' ? 'Consultant' : 'Resident', posting: '', subspecs: [], avoid: [], history: {} };
+        p = { id: 'p' + nextId++, source: 'roster', name: n, aliases: [], role: col, grade: col === 'senior' ? 'Consultant' : 'Resident', posting: '', subspecs: [], avoid: [], history: {} };
         people.push(p);
       } else if (norm(n) !== norm(p.name) && !p.aliases.some(a => norm(a) === norm(n))) {
         if (tokens(n).length > tokens(p.name).length) { p.aliases.push(p.name); p.name = n; } else p.aliases.push(n);
@@ -657,13 +657,19 @@ export function mergeContacts(staff, people, newId) {
   for (const c of people) {
     const p = findSameStaff(c.name, out);
     if (p) {
-      if (p.role === c.role && p.grade !== c.grade) p.grade = c.grade;
+      p.inContactList = true;
+      if (p.source === 'import') { p.role = c.role; p.grade = c.grade; p.name = c.name; }
+      else if (p.role === c.role && p.grade !== c.grade) p.grade = c.grade;
       for (const k of c.subspecs) if (!p.subspecs.includes(k)) p.subspecs.push(k);
     } else if (c.role === 'senior') {
-      out.push({ id: newId(), name: c.name, aliases: [], role: c.role, grade: c.grade, posting: '', subspecs: c.subspecs, avoid: [], history: {} });
+      out.push({ id: newId(), source: 'contact', name: c.name, aliases: [], role: c.role, grade: c.grade, posting: '', subspecs: c.subspecs, avoid: [], history: {} });
     } else skipped.push(c.name);
   }
-  return { staff: out, skipped };
+  // people added by an earlier import of this list who aren't anaesthetists (admin, nursing…)
+  const stale = out.filter(p => p.source === 'import' && !p.inContactList);
+  const kept = out.filter(p => !(p.source === 'import' && !p.inContactList));
+  kept.forEach(p => { delete p.inContactList; });
+  return { staff: kept, skipped, removed: stale.map(p => p.name) };
 }
 
 // ---------- short names ----------
