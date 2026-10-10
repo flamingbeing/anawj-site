@@ -224,21 +224,23 @@ function list() {
     em ? null : h('div', { class: 'bar' }, renderExportButton(() => (S.reflections || []).filter(r => r.status === 'complete'), displayName,
       async () => ({ cases: S.cases || [], intake: (S.resident && (S.resident.intake || Number(String(S.resident.rid || '').slice(0, 4)))) || null, rYear: rYear(),
         images: await loadImagesFor((S.reflections || []).filter(r => r.status === 'complete')) }))),
-    all.some(r => !r.caseId) ? h('p', { class: 'hint', style: 'color:var(--warn, #b45309)' }, `${all.filter(r => !r.caseId).length} reflection${all.filter(r => !r.caseId).length === 1 ? ' is' : 's are'} not linked to a case yet: open and link before marking complete.`) : null);
+    null);
 
   // edit-mode toolbar: select all / clear / delete selected
   const checks = [];
   const delBtn = h('button', { class: 'danger', onclick: () => deleteSelected() });
+  const doneBtn = h('button', { class: 'primary', onclick: () => completeSelected() });
   const paintSel = () => {
     delBtn.textContent = `Delete selected (${rv.sel.size})`; delBtn.disabled = !rv.sel.size;
+    doneBtn.textContent = `Mark complete (${rv.sel.size})`; doneBtn.disabled = !rv.sel.size;
     for (const [cb, li, id] of checks) { cb.checked = rv.sel.has(id); li.classList.toggle('sel', cb.checked); }
   };
   const toolbar = em ? h('section', { class: 'card refl-editbar' },
-    h('p', { class: 'hint', style: 'margin:0 0 6px' }, 'Drag ', h('span', { class: 'refl-handle-ico' }, '⠿'), ' onto another heading to move a reflection. Tick reflections to delete them.'),
+    h('p', { class: 'hint', style: 'margin:0 0 6px' }, 'Drag ', h('span', { class: 'refl-handle-ico' }, '⠿'), ' onto another heading to move a reflection. Tick reflections to mark them complete or delete them.'),
     h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:8px' },
       h('button', { class: 'small', onclick: () => { all.forEach(r => r.id && rv.sel.add(r.id)); paintSel(); } }, 'Select all'),
       h('button', { class: 'small', onclick: () => { rv.sel.clear(); paintSel(); } }, 'Clear'),
-      h('span', { class: 'grow' }), delBtn)) : null;
+      h('span', { class: 'grow' }), doneBtn, delBtn)) : null;
 
   const row = r => {
     const cb = em ? h('input', { type: 'checkbox', class: 'refl-cb', 'aria-label': `Select ${r.initials || 'reflection'} ${r.diagnosis || ''}`, onclick: e => e.stopPropagation(),
@@ -248,7 +250,7 @@ function list() {
       h('span', { class: 'd' }, em ? h('span', { class: 'refl-tools' }, h('span', { class: 'refl-handle', title: 'Drag to another heading', 'aria-label': 'Drag to another heading', onpointerdown: e => startDrag(e, r, li), onclick: e => e.stopPropagation() }, '⠿'), cb) : null,
         (r.jr ? 'JR ' : '') + (r.date ? fmtDate(r.date) : '—')),
       h('span', { class: 't' }, `${r.initials || '??'} ${r.diagnosis || ''}`),
-      h('span', { class: 'c' }, r.status === 'complete' ? h('span', { class: 'flag' }, 'complete') : h('span', { class: 'flag err' }, 'draft'), r.caseId ? null : h('span', { class: 'flag err' }, 'not linked'), h('span', { class: 'flag' + (wordCount(r) < MIN_WORDS ? ' err' : '') }, `${wordCount(r)} words`)));
+      h('span', { class: 'c' }, r.status === 'complete' ? h('span', { class: 'flag' }, 'complete') : h('span', { class: 'flag err' }, 'draft'), r.source === 'word' ? h('span', { class: 'flag' }, 'from Word') : null, h('span', { class: 'flag' + (wordCount(r) < MIN_WORDS ? ' err' : '') }, `${wordCount(r)} words`)));
     if (cb) checks.push([cb, li, r.id]);
     return li;
   };
@@ -283,6 +285,30 @@ async function deleteSelected() {
   const done = await binReflections(pick);
   rv.sel.clear();
   if (done) toast(`${done} ${done === 1 ? 'reflection' : 'reflections'} moved to the recycle bin`, { action: 'Recycle bin', onaction: () => openView('bin') });
+  hooks.render();
+}
+
+// Mark the ticked reflections complete. Ones still missing something (case, initials, date, …) stay
+// drafts and are listed, so nothing is marked complete that couldn't be marked one by one.
+async function completeSelected() {
+  const pick = (S.reflections || []).filter(r => rv.sel.has(r.id));
+  if (!pick.length) return;
+  const ready = pick.filter(r => r.status !== 'complete' && !completeProblems(r).length);
+  const already = pick.filter(r => r.status === 'complete').length;
+  const blocked = pick.filter(r => r.status !== 'complete' && completeProblems(r).length);
+  let done = 0;
+  for (const r of ready) {
+    try { await cloud.saveReflection(mine(), { ...r, status: 'complete' }); done++; }
+    catch (err) { toast('Could not save: ' + err.message); break; }
+  }
+  rv.sel.clear();
+  const parts = [`${done} marked complete`];
+  if (already) parts.push(`${already} already complete`);
+  if (blocked.length) {
+    const why = [...new Set(blocked.flatMap(completeProblems))].slice(0, 3).join(', ');
+    parts.push(`${blocked.length} still need${blocked.length === 1 ? 's' : ''} ${why}`);
+  }
+  toast(parts.join(' · '));
   hooks.render();
 }
 
@@ -461,13 +487,14 @@ function editor() {
     ? h('div', { class: 'refl-case', style: 'border:1px solid var(--line, #ddd);border-radius:10px;padding:8px 10px;margin:8px 0' },
       h('div', { class: 'bar', style: 'gap:8px;align-items:center' },
         h('b', { style: 'font-size:13px' }, 'Linked case'), h('span', { class: 'grow' }),
-        h('button', { class: 'small', onclick: () => openPicker(true) }, 'Change case')),
+        h('button', { class: 'small', onclick: () => openPicker(true) }, 'Change case'),
+        h('button', { class: 'small', onclick: () => { r.caseId = null; restructure(); } }, 'Unlink')),
       lc ? h('div', {}, h('span', { class: 'muted' }, caseDate(lc) + ' · '), lc.details || '(no details)',
         (lc.cats || []).length ? h('div', { class: 'muted', style: 'font-size:13px' }, lc.cats.map(catName).join(', ')) : null)
         : h('div', { class: 'hint' }, S.casesLoaded === false ? 'Loading case…' : 'The linked case is no longer in your logbook. Change case to link another.'))
-    : h('div', { style: 'border:1px solid var(--warn, #b45309);border-radius:10px;padding:8px 10px;margin:8px 0' },
-      h('p', { style: 'margin:0 0 6px' }, h('b', {}, 'Not linked to a case. '), 'Every reflection must be on a logged case; link one before marking complete.'),
-      h('button', { class: 'primary', onclick: () => openPicker(true) }, 'Link to a case'));
+    : h('div', { style: 'border:1px solid var(--line, #ddd);border-radius:10px;padding:8px 10px;margin:8px 0' },
+      h('p', { style: 'margin:0 0 6px' }, h('b', {}, r.source === 'word' ? 'Imported from Word. ' : 'No case linked. '), 'Linking it to a logged case is optional.'),
+      h('button', { onclick: () => openPicker(true) }, 'Link to a case'));
   if (rv.relinked) { rv.relinked = false; setTimeout(() => { status.textContent = 'Editing…'; autosave(); }, 0); }
 
   const input = (key, attrs = {}) => h('input', { style: 'font-size:16px', value: r[key] ?? '', ...attrs, oninput: e => { r[key] = e.target.value || (key === 'date' ? null : ''); changed(); } });

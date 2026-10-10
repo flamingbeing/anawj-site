@@ -68,7 +68,7 @@ function reflCard() {
     h('p', { class: 'hint', style: 'margin-top:8px' },
       `${p.totals.counted} / ${p.totals.min} counted · ${met} of ${p.headings.length} headings met · ${p.totals.drafts} draft${p.totals.drafts === 1 ? '' : 's'}`,
       issues ? ` · ${issues} to sort out` : '',
-      (S.reflections || []).some(r => !r.caseId) ? ` · ${(S.reflections || []).filter(r => !r.caseId).length} not linked to a case` : ''),
+      ''),
     h('span', { class: 'meter' }, h('i', { class: met === p.headings.length ? 'done' : 'ontrack', style: `width:${Math.min(100, Math.round(p.totals.counted / p.totals.min * 100))}%` })));
 }
 

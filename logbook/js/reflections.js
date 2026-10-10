@@ -7,7 +7,7 @@ import { REFLECTION_HEADINGS, REFLECTION_SECTIONS } from './categories.js';
 
 export const REFLECTION_TOTAL = REFLECTION_HEADINGS.reduce((n, h) => n + h.min, 0);   // 96
 export const SECTION_MAX = 20000;
-export const REFLECTION_FIELDS = ['id', 'headingId', 'subId', 'initials', 'date', 'jr', 'diagnosis', 'title', 'summary', 'points', 'figures', 'references', 'sections', 'caseId', 'status', 'createdAt', 'updatedAt'];
+export const REFLECTION_FIELDS = ['id', 'headingId', 'subId', 'initials', 'date', 'jr', 'diagnosis', 'title', 'summary', 'points', 'figures', 'references', 'sections', 'caseId', 'source', 'status', 'createdAt', 'updatedAt'];
 // Caps (firestore.rules checks list sizes and top-level types; string lengths inside lists are capped here).
 export const LIMITS = { title: 300, summary: 20000, points: 15, pointHeading: 300, pointText: 20000, figures: 10, caption: 300, references: 30, reference: 1000 };
 export const IMAGE_MAX_B64 = 700 * 1024;   // an image doc's base64 must be under this (rules allow < 750000)
@@ -44,6 +44,7 @@ export function cleanReflection(r, now = Date.now()) {
     figures,
     references: arr(r.references).slice(0, L.references).map(x => str(x, L.reference)),
     caseId: r.caseId ? String(r.caseId).slice(0, 200) : null,
+    ...(r.source === 'word' ? { source: 'word' } : {}),
     status: r.status === 'complete' ? 'complete' : 'draft',
     createdAt: Number(r.createdAt) || now,
     updatedAt: now,
@@ -61,11 +62,10 @@ export const isLegacy = r => !!(r && r.sections && Object.values(r.sections).som
   && !String(r.summary || '').trim() && !arr(r.points).some(p => p && (String(p.heading || '').trim() || String(p.text || '').trim())));
 
 // What is missing before a reflection can be marked complete (empty = ready).
-// Every reflection must be linked to a logged case (caseId); older unlinked ones can't be completed until linked.
+// Linking a reflection to a logged case (caseId) is optional. source 'word' marks a Word import.
 export function completeProblems(r) {
   const out = [];
   const hd = HEADING_BY_ID[r.headingId];
-  if (!r.caseId) out.push('linked case');
   if (!hd) out.push('heading');
   if (hd && hd.subs && !r.subId) out.push('sub-type');
   if (!String(r.initials || '').trim()) out.push('initials');

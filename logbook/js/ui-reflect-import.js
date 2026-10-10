@@ -169,7 +169,7 @@ export function renderImport(onDone) {
         const now = Date.now();
         const out = { id: uid('r'), headingId: r.headingId, subId: r.subId, initials: r.initials, date: r.date, jr: r.jr, diagnosis: r.diagnosis,
           title: r.title, summary: r.summary, points: r.points, figures, references: r.references,
-          caseId: x.caseId || null, status: 'draft', createdAt: now, updatedAt: now };
+          caseId: x.caseId || null, source: 'word', status: 'draft', createdAt: now, updatedAt: now };
         if (r.sections) out.sections = r.sections;
         if (!r.date && r.dateText) out.summary = [`(Date in the Word file: ${r.dateText})`, out.summary].filter(Boolean).join('\n');
         await cloud.saveReflection(email, out);

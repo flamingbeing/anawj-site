@@ -83,9 +83,9 @@ const r = (o) => ({ status: 'complete', initials: 'AB', date: '2026-01-01', jr: 
   assert.deepEqual(completeProblems({ ...base, title: 'T', points: [{ heading: 'One', text: '' }] }), []);
   assert.deepEqual(completeProblems({ ...base, summary: 'S', points: [] }), ['at least one learning point']);
   assert.deepEqual(completeProblems({ ...base, points: [{ heading: 'a', text: 'b' }] }), ['title or case summary']);
-  assert.deepEqual(completeProblems({ headingId: 'cabg', title: 'T', points: [{ text: 'x' }] }), ['linked case', 'sub-type', 'initials', 'date']);
-  // unlinked (older) reflections need a case before they can be completed
-  assert.deepEqual(completeProblems({ ...base, caseId: null, title: 'T', points: [{ heading: 'One' }] }), ['linked case']);
+  assert.deepEqual(completeProblems({ headingId: 'cabg', title: 'T', points: [{ text: 'x' }] }), ['sub-type', 'initials', 'date']);
+  // no case link is fine
+  assert.deepEqual(completeProblems({ ...base, caseId: null, title: 'T', points: [{ heading: 'One' }] }), []);
   const legacy = { ...base, sections: { description: 'd', thoughts: 't', evaluation: 'e', analysis: 'a', conclusions: 'c', action: '' } };
   assert.equal(isLegacy(legacy), true);
   assert.deepEqual(completeProblems(legacy), ['action plan']);
@@ -160,5 +160,12 @@ assert.ok(MIN_WORDS > 0);
   assert.deepEqual(moveToHeading({ headingId: 'regional', subId: 'll' }, 'thoracic'), { headingId: 'thoracic', subId: null });
   assert.deepEqual(moveToHeading({ headingId: 'regional', subId: 'chronic' }, 'urology'), { headingId: 'urology', subId: null });
   assert.equal(moveToHeading({ headingId: 'x', subId: 'neonate' }, 'paeds').subId, 'neonate');
+}
+// a case link is optional for every reflection
+{
+  const r = cleanReflection({ id: 'w1', headingId: 'thyroid', initials: 'AB', date: '2025-01-02', title: 'T', points: [{ heading: 'h', text: 't' }] });
+  assert.ok(!completeProblems(r).includes('linked case'));
+  assert.equal(cleanReflection({ ...r, source: 'word' }).source, 'word');
+  assert.equal(cleanReflection({ id: 'x', headingId: 'thyroid', source: 'evil' }).source, undefined);
 }
 console.log('reflections tests passed');

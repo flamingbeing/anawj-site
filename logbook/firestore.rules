@@ -123,8 +123,9 @@ service cloud.firestore {
     function sec(m, k) { return !(k in m) || (m[k] is string && m[k].size() <= 20000); }
     // lists can't be looped in rules: their sizes are capped here and their contents by reflections.js
     function validReflection(id, d) {
-      return d.keys().hasOnly(['id', 'headingId', 'subId', 'initials', 'date', 'jr', 'diagnosis', 'title', 'summary', 'points', 'figures', 'references', 'sections', 'caseId', 'status', 'createdAt', 'updatedAt'])
+      return d.keys().hasOnly(['id', 'headingId', 'subId', 'initials', 'date', 'jr', 'diagnosis', 'title', 'summary', 'points', 'figures', 'references', 'sections', 'caseId', 'source', 'status', 'createdAt', 'updatedAt'])
         && d.id == id
+        && (!('source' in d) || d.source in ['app', 'word'])
         && d.headingId is string && d.headingId.size() <= 40
         && (!('subId' in d) || d.subId == null || (d.subId is string && d.subId.size() <= 40))
         && optString(d, 'initials', 20)

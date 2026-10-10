@@ -91,6 +91,8 @@ await t('legacy-section reflection', assertSucceeds(setDoc(doc(a, 'logbooks', A,
 await t('read own reflection', assertSucceeds(getDoc(doc(a, 'logbooks', A, 'reflections', 'r1'))));
 await t('other reads reflection', assertFails(getDoc(doc(b, 'logbooks', A, 'reflections', 'r1'))));
 await t('admin reads reflection', assertFails(getDoc(doc(adm, 'logbooks', A, 'reflections', 'r1'))));
+await t('word-imported reflection, no case', assertSucceeds(setDoc(doc(a, 'logbooks', A, 'reflections', 'rw'), { ...refl('rw'), source: 'word' })));
+await t('reflection bad source', assertFails(setDoc(doc(a, 'logbooks', A, 'reflections', 'rw2'), { ...refl('rw2'), source: 'x' })));
 await t('reflection bad status', assertFails(setDoc(doc(a, 'logbooks', A, 'reflections', 'r3'), { ...refl('r3'), status: 'done' })));
 await t('reflection extra field', assertFails(setDoc(doc(a, 'logbooks', A, 'reflections', 'r3'), { ...refl('r3'), grade: 'A' })));
 await t('reflection too many points', assertFails(setDoc(doc(a, 'logbooks', A, 'reflections', 'r3'), { ...refl('r3'), points: Array.from({ length: 16 }, () => ({ heading: 'h', text: 't' })) })));
