@@ -152,3 +152,7 @@ ul.history { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 
 ul.history li { display: flex; justify-content: space-between; gap: 8px; padding: 2px 0; border-bottom: 1px solid var(--line); }
 details summary { cursor: pointer; font-size: 13px; font-weight: 600; margin-top: 8px; }
 @media print { .cloud { display: none; } }
+
+.bar.sync { padding: 8px 12px; border-radius: 8px; background: var(--info-bg); color: var(--info); font-size: 13px; }
+.bar.sync.dirty { background: var(--warn-bg); color: var(--warn); }
+.bar.sync span { flex: 1; min-width: 200px; }

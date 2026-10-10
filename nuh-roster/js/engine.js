@@ -30,12 +30,19 @@ export const STATUSES = [
   ['admin', 'Admin / no list'],
 ];
 
+// defaultOn: ticked as running when a new day is set up. MOR 7-9 are emergency OTs and have no line.
 export const DEFAULT_ROOMS = [
-  ['Other', ['Remote Case']],
-  ['KROR', ['KROR 2', 'KROR 3', 'KROR 4', 'KROR 5', 'KROR 6', 'KROR 7']],
-  ['MCOR', ['MCOR 1', 'MCOR 2', 'MCOR 3', 'MCOR 4', 'MCOR 5', 'MCOR 6', 'MCOR 7', 'MCOR 8', 'MCOR 10']],
+  ['Other', ['Remote 1', 'Remote 2']],
+  ['KROR', ['KROR 1', 'KROR 2', 'KROR 3', 'KROR 4', 'KROR 5', 'KROR 6', 'KROR 7']],
+  ['MCOR', ['MCOR 1', 'MCOR 2', 'MCOR 3', 'MCOR 4', 'MCOR 5', 'MCOR 6', 'MCOR 7', 'MCOR 8', 'MCOR 9', 'MCOR 10']],
   ['MOR', ['MOR 1', 'MOR 2', 'MOR 3', 'MOR 4', 'MOR 5', 'MOR 6', 'MOR 10', 'MOR 11', 'MOR 12', 'MOR 13', 'MOR 14', 'MOR 15', 'MOR 16', 'MOR 17', 'MOR 18']],
-].flatMap(([complex, rooms]) => rooms.map(name => ({ complex, name })));
+].flatMap(([complex, rooms]) => rooms.map(name => ({ complex, name, defaultOn: !['Remote 2', 'KROR 1', 'MCOR 9'].includes(name) })));
+
+// "Remote Case" / "Remote case 2" / "Remote 2:" -> "Remote 1" / "Remote 2"
+export function remoteRoom(label) {
+  const m = String(label).match(/^\s*remote(?:\s*case)?\s*(\d)?/i);
+  return m ? `Remote ${m[1] || 1}` : null;
+}
 
 // ---------- names ----------
 
@@ -594,9 +601,10 @@ export function learnFromRosters(rosterRows, staff, settings = DEFAULT_SETTINGS)
 
   for (const r of rosterRows) {
     const m = String(r.label).match(ROOM_RE);
-    const isRemote = /^\s*remote/i.test(r.label);
+    const remote = remoteRoom(r.label);
+    const isRemote = !!remote;
     if (!m && !isRemote) continue;
-    const name = isRemote ? 'Remote Case' : m[1].toUpperCase().replace(/\s+/, ' ');
+    const name = isRemote ? remote : m[1].toUpperCase().replace(/\s+/, ' ');
     if (!rooms.some(x => x.name === name)) rooms.push({ complex: isRemote ? 'Other' : m[2].toUpperCase(), name });
     add(r.senior, 'senior', r.notes || '', name);
     add(r.junior, 'junior', r.notes || '', name);

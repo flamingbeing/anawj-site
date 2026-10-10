@@ -1,6 +1,6 @@
 import {
   DEFAULT_SETTINGS, DEFAULT_ROOMS, JUNIOR_GRADES, SENIOR_GRADES, POSTINGS, STATUSES,
-  matchName, splitNameList, namesInCell, suggestFlags, generate, check, learnFromRosters, tickFromHistory,
+  matchName, splitNameList, namesInCell, suggestFlags, generate, check, learnFromRosters, tickFromHistory, remoteRoom,
 } from './engine.js';
 import { readRosterRows, readStaffSheet, buildRosterWorkbook, cellText } from './xlsxio.js';
 import { buildLayout, COL_WIDTHS, shortName, doubleCovered, isDouble } from './layout.js';
@@ -22,17 +22,42 @@ function blankState() {
     roomTemplate: clone(DEFAULT_ROOMS),
     day: { date: today(), rooms: [], staff: {} },
     roster: null,
-    tab: 'staff',
+    tab: 'seniors',
     cloudBase: {},
+    roomsVersion: 2,
   };
 }
 
 let state = blankState();
 try {
   const saved = JSON.parse(localStorage.getItem(KEY) || 'null');
-  if (saved) state = { ...state, ...saved, settings: { ...clone(DEFAULT_SETTINGS), ...saved.settings } };
+  if (saved) state = { ...state, ...saved, settings: { ...clone(DEFAULT_SETTINGS), ...saved.settings }, roomsVersion: saved.roomsVersion || 1 };
 } catch { /* private mode or corrupt data: start fresh */ }
+migrateRooms();
 syncRooms();
+
+// Room list changes since the first version: Remote Case -> Remote 1 + Remote 2, add KROR 1 and MCOR 9.
+function migrateRooms() {
+  if ((state.roomsVersion || 1) >= 2) return;
+  const t = state.roomTemplate;
+  const rename = (from, to) => {
+    t.forEach(r => { if (r.name === from) r.name = to; });
+    (state.day.rooms || []).forEach(r => { if (r.name === from) r.name = to; });
+    (state.roster?.rows || []).forEach(r => { if (r.label === from) r.label = to; });
+  };
+  rename('Remote Case', 'Remote 1');
+  const addAfter = (name, complex, after, before) => {
+    if (t.some(r => r.name === name)) return;
+    let i = t.findIndex(r => r.name === after);
+    if (i >= 0) i++; else i = Math.max(0, t.findIndex(r => r.name === before));
+    t.splice(i, 0, { complex, name, defaultOn: false });
+  };
+  addAfter('Remote 2', 'Other', 'Remote 1', 'KROR 2');
+  addAfter('KROR 1', 'KROR', null, 'KROR 2');
+  addAfter('MCOR 9', 'MCOR', 'MCOR 8', 'MCOR 10');
+  t.forEach(r => { if (r.defaultOn === undefined) r.defaultOn = true; });
+  state.roomsVersion = 2;
+}
 
 let saveTimer;
 function save() {
@@ -49,7 +74,7 @@ function syncRooms() {
   const byName = Object.fromEntries((state.day.rooms || []).map(r => [r.name, r]));
   state.day.rooms = state.roomTemplate.map((t, i) => byName[t.name]
     ? { ...byName[t.name], complex: t.complex }
-    : { id: 'r' + i + '-' + t.name.replace(/\W+/g, ''), name: t.name, complex: t.complex, running: false, session: 'full', notes: '', flags: { subspecs: [], complex: false, long: false }, flagsManual: false, lockSenior: '', lockJunior: '' });
+    : { id: 'r' + i + '-' + t.name.replace(/\W+/g, ''), name: t.name, complex: t.complex, running: !!t.defaultOn, session: 'full', notes: '', flags: { subspecs: [], complex: false, long: false }, flagsManual: false, lockSenior: '', lockJunior: '' });
 }
 
 const dayOf = id => (state.day.staff[id] ||= {});
@@ -124,7 +149,8 @@ const app = document.getElementById('app');
 function render() {
   document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === state.tab)));
   const y = window.scrollY;
-  app.replaceChildren(({ staff: renderStaff, day: renderDay, roster: renderRoster, settings: renderSettings })[state.tab]());
+  if (!['roster', 'seniors', 'juniors', 'day', 'settings'].includes(state.tab)) state.tab = 'seniors';
+  app.replaceChildren(({ roster: renderRoster, seniors: () => renderStaff('senior'), juniors: () => renderStaff('junior'), day: renderDay, settings: renderSettings })[state.tab]());
   renderCloudBar();
   window.scrollTo(0, y);
   save();
@@ -135,9 +161,11 @@ document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click
 
 let staffFilter = '';
 let tickMin = 1;
-function renderStaff() {
+function renderStaff(role) {
   const subs = state.settings.subspecs;
+  const senior = role === 'senior';
   const list = state.staff
+    .filter(p => p.role === role)
     .filter(p => !staffFilter || (p.name + ' ' + (p.aliases || []).join(' ')).toLowerCase().includes(staffFilter.toLowerCase()))
     .sort((a, b) => (a.role === b.role ? 0 : a.role === 'senior' ? -1 : 1) || a.name.localeCompare(b.name));
 
@@ -146,48 +174,47 @@ function renderStaff() {
     h('td', {}, h('input', { value: (p.aliases || []).join(', '), placeholder: 'e.g. Tan YW', onchange: e => { p.aliases = splitNameList(e.target.value); save(); } })),
     h('td', {}, select(p.role, [['senior', 'Senior'], ['junior', 'Junior']], v => { p.role = v; p.grade = v === 'senior' ? 'Consultant' : 'Resident'; render(); })),
     h('td', {}, select(p.grade, p.role === 'senior' ? SENIOR_GRADES : JUNIOR_GRADES, v => { p.grade = v; save(); })),
-    h('td', {}, p.role === 'junior' ? select(p.posting || '', POSTINGS, v => { p.posting = v; save(); }) : ''),
-    h('td', {}, p.role === 'senior'
-      ? h('div', { class: 'chips' }, subs.map(s => {
+    !senior && h('td', {}, select(p.posting || '', POSTINGS, v => { p.posting = v; save(); })),
+    senior && h('td', {}, h('div', { class: 'chips' }, subs.map(s => {
         const on = (p.subspecs || []).includes(s.key);
         return h('span', { class: 'chip' + (on ? ' on' : ''), title: s.hard ? 'Only seniors with this subspec get these lists' : '', onclick: () => {
           p.subspecs = on ? p.subspecs.filter(k => k !== s.key) : [...(p.subspecs || []), s.key]; render();
         } }, s.label);
-      }))
-      : ''),
-    h('td', {}, p.role === 'senior' ? h('input', { value: (p.avoid || []).join(', '), placeholder: 'e.g. eye, obs', onchange: e => { p.avoid = splitNameList(e.target.value).map(s => s.toLowerCase()); save(); } }) : ''),
-    h('td', { class: 'seen' }, Object.entries(p.history || {}).map(([k, n]) => `${subs.find(s => s.key === k)?.label || k} ×${n}`).join(', ')),
+      }))),
+    senior && h('td', {}, h('input', { value: (p.avoid || []).join(', '), placeholder: 'e.g. eye, obs', onchange: e => { p.avoid = splitNameList(e.target.value).map(s => s.toLowerCase()); save(); } })),
+    senior && h('td', { class: 'seen' }, Object.entries(p.history || {}).map(([k, n]) => `${subs.find(s => s.key === k)?.label || k} ×${n}`).join(', ')),
     h('td', {}, h('button', { class: 'small', title: 'Remove', onclick: () => { if (confirm(`Remove ${p.name}?`)) { state.staff = state.staff.filter(x => x !== p); render(); } } }, '✕')),
   );
 
-  const seniors = state.staff.filter(p => p.role === 'senior').length;
+  const count = state.staff.filter(p => p.role === role).length;
   return h('div', {},
     h('section', { class: 'card' },
-      h('h2', {}, 'Staff list'),
-      h('p', { class: 'hint' }, 'Do this once, then save a team file to share with the other rosterers. "Seen in" counts the subspec lists each senior did in the past rosters you loaded. Use it as a hint when ticking subspecs.'),
+      h('h2', {}, senior ? 'Seniors' : 'Juniors'),
+      h('p', { class: 'hint' }, senior
+        ? 'Tick each senior\'s subspecs and the lists they don\'t do. "Seen in" counts the subspec lists they did in past rosters you loaded, as a hint. Change Role to move someone to Juniors.'
+        : 'Set each junior\'s grade and posting. Baby MOs are never left alone, so their senior won\'t double cover. Change Role to move someone to Seniors.'),
+      teamSyncBar(),
       h('div', { class: 'bar' },
-        isMember() && h('button', { class: 'primary', onclick: saveTeamToCloud, title: 'Share this staff list, rooms and settings with the team' }, 'Save staff list for the team'),
-        isMember() && h('button', { onclick: () => loadTeamFromCloud(true) }, 'Load team staff list'),
         fileButton('Import staff sheet (.xlsx / .csv)', '.xlsx,.csv', false, importStaffSheet),
         fileButton('Learn from past rosters', '.xlsx', true, learnFiles),
-        h('span', { class: 'btn-group' },
+        senior && h('span', { class: 'btn-group' },
           h('button', { title: 'Tick each senior\'s subspecs from the lists in "Seen in". Only adds ticks.', onclick: () => {
             const n = tickFromHistory(state.staff, tickMin);
             render();
             toast(n ? `Ticked ${n} subspec(s). Check them before generating.` : 'Nothing new to tick.');
           } }, 'Tick subspecs from "Seen in"'),
           h('label', { class: 'seen' }, ' if seen ≥ ', h('input', { type: 'number', min: 1, max: 20, value: tickMin, style: 'width:56px', onchange: e => { tickMin = Math.max(1, +e.target.value || 1); } }), ' times')),
-        h('button', { onclick: () => { state.staff.unshift({ id: newId(), name: '', aliases: [], role: 'junior', grade: 'Resident', posting: '', subspecs: [], avoid: [], history: {} }); staffFilter = ''; render(); } }, '+ Add person'),
+        h('button', { onclick: () => { state.staff.unshift({ id: newId(), name: '', aliases: [], role, grade: senior ? 'Consultant' : 'Resident', posting: '', subspecs: [], avoid: [], history: {} }); staffFilter = ''; render(); } }, senior ? '+ Add senior' : '+ Add junior'),
         h('span', { class: 'grow' }),
         h('input', { placeholder: 'Filter names', value: staffFilter, oninput: e => { staffFilter = e.target.value; const pos = e.target.selectionStart; render(); const i = app.querySelector('input[placeholder="Filter names"]'); i.focus(); i.setSelectionRange(pos, pos); } }),
       ),
-      h('div', { class: 'stats' }, h('span', {}, h('b', {}, seniors), ' seniors'), h('span', {}, h('b', {}, state.staff.length - seniors), ' juniors')),
+      h('div', { class: 'stats' }, h('span', {}, h('b', {}, count), senior ? ' seniors' : ' juniors')),
     ),
-    state.staff.length
+    count
       ? h('section', { class: 'card scroll' }, h('table', {},
-        h('thead', {}, h('tr', {}, ['Name', 'Short names', 'Role', 'Grade', 'Posting', 'Subspecs', "Doesn't do", 'Seen in', ''].map(t => h('th', {}, t)))),
+        h('thead', {}, h('tr', {}, (senior ? ['Name', 'Short names', 'Role', 'Grade', 'Subspecs', "Doesn't do", 'Seen in', ''] : ['Name', 'Short names', 'Role', 'Grade', 'Posting', '']).map(t => h('th', {}, t)))),
         h('tbody', {}, list.map(row))))
-      : h('section', { class: 'card empty' }, 'No staff yet. Import the master staff sheet, or load a few past rosters to build the list automatically.'),
+      : h('section', { class: 'card empty' }, `No ${senior ? 'seniors' : 'juniors'} yet. Import the master staff sheet, or load a few past rosters to build the list automatically.`),
   );
 }
 
@@ -217,7 +244,7 @@ async function learnFiles(files) {
   state.staff = staff;
   nextId = 1 + staff.reduce((m, p) => Math.max(m, parseInt(String(p.id).replace(/\D/g, ''), 10) || 0), 0);
   const newRooms = rooms.filter(r => !state.roomTemplate.some(t => t.name === r.name));
-  if (newRooms.length) { state.roomTemplate.push(...newRooms); syncRooms(); }
+  if (newRooms.length) { state.roomTemplate.push(...newRooms.map(r => ({ ...r, defaultOn: true }))); syncRooms(); }
   toast(`Read ${files.length} roster(s): ${staff.length - before} new people${newRooms.length ? `, ${newRooms.length} new rooms` : ''}. Check roles, grades and subspecs.`);
   render();
 }
@@ -300,7 +327,7 @@ function renderDay() {
       ),
       h('p', { class: 'hint' }, "\"Load draft roster\" reads the admin team's draft in the usual format: it picks up running rooms, case notes, leave, post call and upper-half duties."),
       unmatched.length ? h('ul', { class: 'warnings', style: 'margin-bottom:12px' }, h('li', { class: 'warn' },
-        `Names not matched to the staff list: ${unmatched.join(', ')}. Add them in Staff, or add the short name to the right person, then load or apply again. `,
+        `Names not matched to the staff list: ${unmatched.join(', ')}. Add them on the Seniors or Juniors tab, or add the short name to the right person, then load or apply again. `,
         h('button', { class: 'link', onclick: () => { unmatched = []; render(); } }, 'Dismiss'))) : null,
       h('div', { class: 'stats' },
         h('span', {}, h('b', {}, running.length), ' rooms running'),
@@ -334,7 +361,7 @@ function renderDay() {
         ? h('table', {},
           h('thead', {}, h('tr', {}, ['Name', 'Grade', 'Status', 'Leaves at', '', 'Note on roster'].map(t => h('th', {}, t)))),
           h('tbody', {}, flist.map(staffRow)))
-        : h('p', { class: 'empty' }, 'Add staff in step 1 first.'),
+        : h('p', { class: 'empty' }, 'Add staff on the Seniors and Juniors tabs first.'),
     ),
   );
 }
@@ -418,11 +445,12 @@ async function loadDraft([file]) {
   d.rooms.forEach(r => { r.running = false; });
   let rooms = 0;
   for (const r of rows) {
-    const m = r.label.match(/((KROR|MCOR|MOR)\s*\d+)\s*$/i) || (/^remote/i.test(r.label) ? [null, 'Remote Case', 'Other'] : null);
+    const remote = remoteRoom(r.label);
+    const m = r.label.match(/((KROR|MCOR|MOR)\s*\d+)\s*$/i) || (remote ? [null, remote, 'Other'] : null);
     if (!m) continue;
-    const name = m[1].toUpperCase().replace(/\s+/, ' ').replace('REMOTE CASE', 'Remote Case');
+    const name = remote || m[1].toUpperCase().replace(/\s+/, ' ');
     let room = d.rooms.find(x => x.name === name);
-    if (!room) { state.roomTemplate.push({ complex: m[2] ? m[2].toUpperCase() : 'Other', name }); syncRooms(); room = d.rooms.find(x => x.name === name); }
+    if (!room) { state.roomTemplate.push({ complex: m[2] ? m[2].toUpperCase() : 'Other', name, defaultOn: true }); syncRooms(); room = d.rooms.find(x => x.name === name); }
     room.running = true;
     room.notes = r.notes;
     room.flagsManual = false;
@@ -672,7 +700,7 @@ function rosterCell(row, i, key, doubles) {
 }
 
 function runGenerate(newSeed) {
-  if (!state.staff.length) return toast('Add staff first.');
+  if (!state.staff.length) return toast('Add staff on the Seniors and Juniors tabs first.');
   if (!state.day.rooms.some(r => r.running)) return toast('Tick the running rooms in Day setup first.');
   const seed = newSeed ? Math.floor(Math.random() * 1e9) : (state.roster?.seed || 1);
   const res = generate({ staff: state.staff, day: state.day, settings: state.settings, seed });
@@ -793,6 +821,38 @@ async function exportXlsx() {
 
 // ----- settings tab -----
 
+function roomEditor() {
+  const t = state.roomTemplate;
+  const changed = () => { syncRooms(); render(); };
+  const move = (i, d) => { const j = i + d; if (j < 0 || j >= t.length) return; [t[i], t[j]] = [t[j], t[i]]; changed(); };
+  const complexes = [...new Set(['Other', 'KROR', 'MCOR', 'MOR', ...t.map(r => r.complex)])];
+  return h('div', { class: 'scroll' }, h('table', {},
+    h('thead', {}, h('tr', {}, ['Complex', 'Room', 'Running by default', ''].map(x => h('th', {}, x)))),
+    h('tbody', {},
+      t.map((r, i) => h('tr', {},
+        h('td', {}, select(r.complex, complexes, v => { r.complex = v; changed(); })),
+        h('td', {}, h('input', { value: r.name, onchange: e => {
+          const v = e.target.value.trim();
+          if (!v || t.some(x => x !== r && x.name === v)) { toast(v ? `${v} is already in the list.` : 'A room needs a name.'); e.target.value = r.name; return; }
+          (state.day.rooms || []).forEach(x => { if (x.name === r.name) x.name = v; });
+          r.name = v; changed();
+        } })),
+        h('td', {}, h('input', { type: 'checkbox', checked: r.defaultOn, 'aria-label': 'Running by default', onchange: e => { r.defaultOn = e.target.checked; save(); } })),
+        h('td', { style: 'white-space:nowrap' },
+          h('button', { class: 'small', title: 'Move up', onclick: () => move(i, -1) }, '↑'), ' ',
+          h('button', { class: 'small', title: 'Move down', onclick: () => move(i, 1) }, '↓'), ' ',
+          h('button', { class: 'small', title: 'Remove room', onclick: () => { if (confirm(`Remove ${r.name} from the roster?`)) { t.splice(i, 1); changed(); } } }, '✕')))),
+      h('tr', {}, h('td', { colspan: 4 }, h('button', { class: 'small', onclick: () => {
+        const name = prompt('Room name, e.g. MOR 19');
+        if (!name?.trim()) return;
+        if (t.some(x => x.name === name.trim())) return toast(`${name.trim()} is already in the list.`);
+        const complex = (name.match(/^(KROR|MCOR|MOR)/i)?.[1] || 'Other').toUpperCase().replace('OTHER', 'Other');
+        let i = t.map(x => x.complex).lastIndexOf(complex);
+        t.splice(i < 0 ? t.length : i + 1, 0, { complex, name: name.trim(), defaultOn: true });
+        changed();
+      } }, '+ Add room'))))));
+}
+
 function renderSettings() {
   const st = state.settings;
   const subRow = s => h('tr', {},
@@ -802,8 +862,6 @@ function renderSettings() {
     h('td', {}, select(s.posting || '', POSTINGS, v => { s.posting = v; save(); })),
     h('td', {}, h('button', { class: 'small', onclick: () => { st.subspecs = st.subspecs.filter(x => x !== s); render(); } }, '✕')),
   );
-  const roomText = Object.entries(state.roomTemplate.reduce((acc, r) => { (acc[r.complex] ||= []).push(r.name); return acc; }, {}))
-    .map(([c, rs]) => `${c}: ${rs.join(', ')}`).join('\n');
 
   return h('div', {},
     h('section', { class: 'card scroll' },
@@ -826,12 +884,9 @@ function renderSettings() {
     ),
     h('section', { class: 'card' },
       h('h2', {}, 'Rooms'),
-      h('p', { class: 'hint' }, 'One complex per line, in roster order. Rooms in the same complex can share a senior when seniors are short.'),
-      h('textarea', { rows: 6, value: roomText, onchange: e => {
-        state.roomTemplate = e.target.value.split('\n').map(l => l.split(':')).filter(p => p.length > 1)
-          .flatMap(([c, rs]) => rs.split(',').map(n => n.trim()).filter(Boolean).map(name => ({ complex: c.trim(), name })));
-        syncRooms(); save(); toast('Rooms updated.');
-      } }),
+      h('p', { class: 'hint' }, 'The rooms on the roster, in order. "Running by default" rooms are ticked when you set up a new day (Clear day). Rooms in the same complex can share a senior when seniors are short. MOR 7–9 are emergency OTs, so they have no line.'),
+      teamSyncBar(),
+      roomEditor(),
       h('p', { class: 'hint', style: 'margin-top:12px' }, 'Room defaults: subspecs a room always needs, one room per line, e.g. "MOR 12: cardiac". Use the keys ' + st.subspecs.map(x => x.key).join(', ') + '.'),
       h('textarea', { rows: 3, value: Object.entries(st.roomDefaults || {}).map(([room, ks]) => `${room}: ${ks.join(', ')}`).join('\n'), onchange: e => {
         const keys = new Set(st.subspecs.map(x => x.key));
@@ -861,7 +916,7 @@ function renderSettings() {
 // ---------- team file ----------
 
 document.getElementById('saveTeam').addEventListener('click', () => {
-  const data = { kind: 'ot-roster-team', version: 1, savedAt: new Date().toISOString(), settings: state.settings, staff: state.staff, roomTemplate: state.roomTemplate };
+  const data = { kind: 'ot-roster-team', version: 1, savedAt: new Date().toISOString(), settings: state.settings, staff: state.staff, roomTemplate: state.roomTemplate, roomsVersion: state.roomsVersion };
   download(`OT roster team file ${new Date().toISOString().slice(0, 10)}.json`, new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' }));
 });
 document.getElementById('loadTeam').addEventListener('change', async e => {
@@ -874,6 +929,8 @@ document.getElementById('loadTeam').addEventListener('change', async e => {
     state.settings = { ...clone(DEFAULT_SETTINGS), ...data.settings };
     state.staff = data.staff || [];
     state.roomTemplate = data.roomTemplate || clone(DEFAULT_ROOMS);
+    state.roomsVersion = data.roomsVersion || 1;
+    migrateRooms();
     nextId = 1 + state.staff.reduce((m, p) => Math.max(m, parseInt(String(p.id).replace(/\D/g, ''), 10) || 0), 0);
     syncRooms();
     render();
@@ -964,12 +1021,27 @@ cloud.watchUser(async user => {
   if (cs.member) loadTeamFromCloud(false);
 }).catch(e => { cs.ready = true; cloudError(e); render(); });
 
+const teamHash = () => JSON.stringify([state.settings, state.staff, state.roomTemplate]);
+
+// Shown on the staff and settings tabs: whether this browser's staff list, rooms and settings match the team's.
+function teamSyncBar() {
+  if (!isMember()) return cloud.enabled ? null : h('p', { class: 'hint' }, 'To share with other rosterers, use Save team file at the top.');
+  const dirty = state.teamSyncedHash !== teamHash();
+  return h('div', { class: 'bar sync' + (dirty ? ' dirty' : '') },
+    h('span', {}, dirty
+      ? 'You have changes to staff, rooms or settings that the team doesn\'t have yet.'
+      : `Shared with the team${state.teamSyncedAt ? `, last saved ${when(state.teamSyncedAt)}` : ''}.`),
+    h('button', { class: dirty ? 'primary' : '', onclick: saveTeamToCloud }, 'Save for the team'),
+    h('button', { onclick: () => loadTeamFromCloud(true) }, 'Load team version'));
+}
+
 async function saveTeamToCloud() {
   try {
-    const doc = await cloud.saveTeam({ settings: state.settings, staff: state.staff, roomTemplate: state.roomTemplate }, me());
+    const doc = await cloud.saveTeam({ settings: state.settings, staff: state.staff, roomTemplate: state.roomTemplate, roomsVersion: state.roomsVersion }, me());
     state.teamSyncedAt = doc.updatedAt;
-    save();
-    toast(`Staff list saved for the team (${state.staff.length} people).`);
+    state.teamSyncedHash = teamHash();
+    render();
+    toast(`Saved for the team: ${state.staff.length} staff, ${state.roomTemplate.length} rooms and settings.`);
   } catch (e) { cloudError(e); }
 }
 
@@ -983,10 +1055,13 @@ async function loadTeamFromCloud(asked) {
     state.staff = t.staff || [];
     state.roomTemplate = t.roomTemplate || clone(DEFAULT_ROOMS);
     state.teamSyncedAt = t.updatedAt;
+    state.roomsVersion = t.roomsVersion || 1;
+    migrateRooms();
     nextId = 1 + state.staff.reduce((m, p) => Math.max(m, parseInt(String(p.id).replace(/\D/g, ''), 10) || 0), 0);
     syncRooms();
+    state.teamSyncedHash = teamHash();
     render();
-    toast(`Team staff list loaded (${state.staff.length} people).`);
+    toast(`Team version loaded: ${state.staff.length} staff, ${state.roomTemplate.length} rooms and settings.`);
   } catch (e) { cloudError(e); }
 }
 
@@ -1114,5 +1189,6 @@ function membersCard() {
   );
 }
 
-if (!state.staff.length) state.tab = 'staff';
+if (state.tab === 'staff') state.tab = 'seniors';
+if (!state.staff.length) state.tab = 'seniors';
 render();
