@@ -633,3 +633,43 @@ export function tickFromHistory(staff, minCount = 1) {
   }
   return added;
 }
+
+// ---------- short names ----------
+
+// Common surnames in the department's names; used to tell "Tan Yi Wei" (surname first)
+// from "Swapna Thampi" (given name first).
+const SURNAMES = new Set(`tan lim lee ng ong wong goh chua chan koh teo ang yeo tay ho low toh sim chong chia seah foo
+  leong loh poh neo lau yap chew phua peng chen huang zhang liu wang li hwang tham tiong khoo quek oon chern cheah eu ti
+  kang boey bao cui shen wo go chionh lui er oo hong lam chang zhao zhou wu xu sun ma hu guo he lin luo song tang han
+  feng deng cao xie yang liang chiew chng gan heng hoe kek kwek lai lau leow lew liew lo mok pang pek seet soh tee teh
+  thong wee yong yeoh yeow yip yu zheng choo fung kwan ling mah ow siew tung woo aw lum
+  foong ngiam sng ting loke au kwok kok hoo hsu chiam chin chee choy eng fong kee khor kong ku lek loo lye mak neoh ooi
+  pua see sia sin siow soo tai tey tng tsang wan yee yin yoong yuen quah thio tian`.split(/\s+/).filter(Boolean));
+
+// The way names are written on the leave and post call lists:
+// "Tan Yi Wei" -> "Tan YW", "Chan Jiaxin" -> "Jiaxin", "Swapna Thampi" -> "Swapna", "Eric Lee Shih Hsiung" -> "Eric".
+export function suggestShortName(name) {
+  let t = String(name).replace(/\(.*?\)/g, ' ').replace(/[^A-Za-z\-' ]+/g, ' ').trim().split(/\s+/).filter(Boolean);
+  while (t.length > 1 && t[0].length === 1) t = t.slice(1); // "S. Surentheran"
+  if (t.length < 2) return t[0] || '';
+  const isSurname = w => SURNAMES.has(w.toLowerCase());
+  if (isSurname(t[0])) {
+    const given = t.slice(1).flatMap(w => w.split('-')).filter(Boolean);
+    if (given.length === 1) return given[0].length <= 4 ? t.join(' ') : given[0]; // "Ng Peng" stays as is
+    return `${t[0]} ${given.map(w => w[0].toUpperCase()).join('')}`;
+  }
+  return t[0];
+}
+
+// Suggest a short name for everyone who has none, skipping any that would clash with
+// another person's name or short name. Returns [{ id, name, short }].
+export function suggestShortNames(staff) {
+  const key = s => String(s).toLowerCase().trim();
+  const taken = new Map(); // form -> person id
+  for (const p of staff) for (const f of [p.name, ...(p.aliases || [])]) taken.set(key(f), taken.has(key(f)) ? null : p.id);
+  const proposals = staff.filter(p => !(p.aliases || []).length && p.name).map(p => ({ id: p.id, name: p.name, short: suggestShortName(p.name) }));
+  const count = {};
+  for (const x of proposals) count[key(x.short)] = (count[key(x.short)] || 0) + 1;
+  return proposals.filter(x => x.short && key(x.short) !== key(x.name) && count[key(x.short)] === 1
+    && (!taken.has(key(x.short)) || taken.get(key(x.short)) === x.id));
+}

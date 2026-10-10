@@ -1,6 +1,6 @@
 // Run with: node nuh-roster/test/engine.test.mjs  (fake names only)
 import assert from 'node:assert/strict';
-import { matchName, namesInCell, suggestFlags, generate, check, tickFromHistory } from '../js/engine.js';
+import { matchName, namesInCell, suggestFlags, generate, check, tickFromHistory, suggestShortName, suggestShortNames } from '../js/engine.js';
 
 const P = (id, name, role, extra = {}) => ({ id, name, role, grade: role === 'senior' ? 'Consultant' : 'Resident', aliases: [], posting: '', subspecs: [], avoid: [], ...extra });
 
@@ -70,4 +70,15 @@ const bad = [{ roomId: 'r1', label: 'MCOR 1', complex: 'MCOR', senior: 'Senior G
 const out = check({ rows: bad, staff, day: { ...day, staff: { s3: { status: 'leave' } } } }).map(w => w.text).join('\n');
 assert.match(out, /on leave/);
 assert.match(out, /Paeds list/);
+assert.equal(suggestShortName('Tan Yi Wei'), 'Tan YW');
+assert.equal(suggestShortName('Chan Jiaxin'), 'Jiaxin');
+assert.equal(suggestShortName('Swapna Thampi'), 'Swapna');
+assert.equal(suggestShortName('Eric Lee Shih Hsiung'), 'Eric');
+assert.equal(suggestShortName('Loh May-Han'), 'Loh MH');
+{
+  const st = [P('a', 'Tan Yi Wei', 'senior'), P('b', 'Tan Yu Wen', 'junior'), P('c', 'Swapna Thampi', 'senior'), P('d', 'Ang King Sin', 'senior', { aliases: ['Ang KS'] }), P('e', 'Swapna Rao', 'junior')];
+  assert.deepEqual(suggestShortNames(st), [], 'clashing suggestions and people with short names are skipped');
+  st.pop(); st.splice(1, 1);
+  assert.deepEqual(suggestShortNames(st).map(x => x.short), ['Tan YW', 'Swapna']);
+}
 console.log('engine tests passed');
