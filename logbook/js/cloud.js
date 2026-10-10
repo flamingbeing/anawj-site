@@ -8,13 +8,14 @@
 //   residents/{rid}                       { rid, name, email, status, intake, rYear }
 //   logbooks/{email}                      { email, name, rid, settings, templates, updatedAt }
 //   logbooks/{email}/cases/{caseId}       case object (see engine.js)
+//   logbooks/{email}/reflections/{id} reflection object (see reflections.js), owner only
 //   summaries/{rid}                       counts only, readable by everyone signed in
 //   imports/{rid}                         { email, keys: [importKey], updatedAt }  (which old-form rows are in)
 //   sharedTemplates/{id}                  { id, name, cats, details? }
 
 import { FIREBASE_CONFIG } from './firebase-config.js';
 import * as D from './demo-backend.js';
-import { plain, cleanCase, cleanSummary, cleanResident, cleanTemplate, importDocId, defaultLogbook } from './demo-backend.js';
+import { plain, cleanCase, cleanSummary, cleanResident, cleanTemplate, importDocId, defaultLogbook, cleanReflection } from './demo-backend.js';
 
 const SDK = 'https://www.gstatic.com/firebasejs/10.12.2/';
 export const demo = (() => {
@@ -184,6 +185,34 @@ export async function deleteCase(email, id) {
   await queued(F.deleteDoc(F.doc(db, 'logbooks', lc(email), 'cases', String(id))));
 }
 
+// Live list of the user's reflections (owner only). cb(list, meta). Returns an unsubscribe function.
+export function watchReflections(email, cb) {
+  if (demo) return D.watchReflections(email, cb);
+  let stop = null, stopped = false;
+  sdk().then(({ db, F }) => {
+    if (stopped) return;
+    stop = F.onSnapshot(F.collection(db, 'logbooks', lc(email), 'reflections'), snap => {
+      const list = snap.docs.map(d => ({ ...d.data(), id: d.id })).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+      cb(list, { fromCache: snap.metadata.fromCache });
+    }, e => { console.error('Reflection listener failed', e); for (const l of syncErrorListeners) l(e); });
+  });
+  return () => { stopped = true; if (stop) stop(); };
+}
+
+export async function saveReflection(email, r) {
+  if (demo) return D.saveReflection(email, r);
+  const { db, F } = await sdk();
+  const doc = cleanReflection(r);
+  await queued(F.setDoc(F.doc(db, 'logbooks', lc(email), 'reflections', doc.id), doc));
+  return doc;
+}
+
+export async function deleteReflection(email, id) {
+  if (demo) return D.deleteReflection(email, id);
+  const { db, F } = await sdk();
+  await queued(F.deleteDoc(F.doc(db, 'logbooks', lc(email), 'reflections', String(id))));
+}
+
 async function inBatches(items, write, onBatch) {
   const { db, F } = await sdk();
   for (let i = 0; i < items.length; i += BATCH) {
@@ -306,4 +335,32 @@ export async function importCases(email, rid, cases, onProgress) {
     if (onProgress) onProgress(n, fresh.length);
   });
   return { written: fresh.length, skipped: cases.length - fresh.length };
+}
+
+// ---- portfolio template (word-export; admins upload, everyone signed in reads) ----
+// The blank APMES portfolio .docx, as base64 split into ≤700 KB chunks to stay under Firestore's 1 MiB doc limit:
+// config/portfolioTemplate {parts, size, uploadedAt} + config/portfolioTemplate_part{i} {data}.
+const TEMPLATE_CHUNK = 700 * 1024;
+
+export async function saveTemplate(b64) {
+  if (demo) return D.saveTemplate(b64);
+  const { db, F } = await sdk();
+  const parts = Math.ceil(b64.length / TEMPLATE_CHUNK) || 1;
+  for (let i = 0; i < parts; i++) {
+    await F.setDoc(F.doc(db, 'config', 'portfolioTemplate_part' + i), { data: b64.slice(i * TEMPLATE_CHUNK, (i + 1) * TEMPLATE_CHUNK) });
+  }
+  // the index doc goes last, so a reader never sees parts from a half-finished upload as complete
+  await F.setDoc(F.doc(db, 'config', 'portfolioTemplate'), { parts, size: Math.floor(b64.length * 3 / 4), uploadedAt: Date.now() });
+}
+
+// { data: base64, size, uploadedAt } or null when none was uploaded.
+export async function loadTemplate() {
+  if (demo) return D.loadTemplate();
+  const { db, F } = await sdk();
+  const meta = await F.getDoc(F.doc(db, 'config', 'portfolioTemplate'));
+  if (!meta.exists()) return null;
+  const { parts, size, uploadedAt } = meta.data();
+  const snaps = await Promise.all(Array.from({ length: parts }, (_, i) => F.getDoc(F.doc(db, 'config', 'portfolioTemplate_part' + i))));
+  if (snaps.some(s => !s.exists())) return null;
+  return { data: snaps.map(s => s.data().data).join(''), size, uploadedAt };
 }

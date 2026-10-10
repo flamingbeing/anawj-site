@@ -3,6 +3,7 @@
 import { BY_CODE, CATEGORIES } from './categories.js';
 import { countCases, uid, todayISO, sortCodes, progress, rYearDefault } from './engine.js';
 import * as cloud from './cloud.js';
+import { reflectionCounts } from './reflections.js';
 
 export { cloud };
 
@@ -14,6 +15,7 @@ export const S = {
   resident: null,      // residents/{rid} doc when the user is on the programme list
   logbook: null,       // logbooks/{email} doc
   cases: [],           // newest first
+  reflections: [],     // logbooks/{email}/reflections (ui-reflect.js keeps it live)
   counts: {},
   casesLoaded: false,
   casesSynced: false,  // a snapshot has come from the server (not only the offline cache)
@@ -237,7 +239,7 @@ export function summaryOf(counts = S.counts) {
   return {
     // the name is the one on the programme list (the rules check it), never a Google display name
     rid: r.rid, name: r.name || '', intake: r.intake || null, rYear: rYear(),
-    counts, total, reflections: {}, reflectionsTotal: 0, updatedAt: Date.now(),
+    counts, total, ...reflectionCounts(S.reflections), updatedAt: Date.now(),
   };
 }
 
@@ -246,7 +248,7 @@ const writeSummaryNow = async () => {
   // an empty first snapshot from a new device's cache must not wipe the shared counts
   if (!S.resident || !S.resident.rid || !S.casesLoaded || !S.casesSynced) return;
   const s = summaryOf();
-  const key = JSON.stringify([s.counts, s.total, s.rYear, s.name]);
+  const key = JSON.stringify([s.counts, s.total, s.rYear, s.name, s.reflections]);
   if (key === lastSummary) return;
   try { await cloud.writeSummary(S.resident.rid, s); lastSummary = key; } catch (err) { console.warn('summary', err); }
 };

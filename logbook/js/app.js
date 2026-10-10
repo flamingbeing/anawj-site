@@ -8,6 +8,7 @@ import { renderLogbook } from './ui-logbook.js';
 import { renderProgress, renderTotals } from './ui-progress.js';
 import { renderSettings } from './ui-settings.js';
 import { renderAdmin } from './ui-admin.js';
+import { renderReflect, watchMyReflections } from './ui-reflect.js';
 
 // Tab icons: tiny inline SVG paths (24x24, stroked), so they look the same on every phone.
 const ICONS = {
@@ -33,6 +34,8 @@ const TABS = [
   { id: 'progress', label: 'Progress', render: renderProgress },
   { id: 'totals', label: 'Totals', render: renderTotals },
   { id: 'settings', label: 'Settings', render: renderSettings },
+  // not in the bar (keeps it at 6 on phones): reached from Progress → Reflections and Logbook → Reflect
+  { id: 'reflect', label: 'Reflections', render: renderReflect, hidden: true, under: 'progress' },
   { id: 'admin', label: 'Admin', render: renderAdmin, admin: true },
 ];
 
@@ -52,8 +55,10 @@ const tabFromHash = () => {
 };
 
 function paintTabs() {
-  fill(tabsEl, ...visibleTabs().map(t => h('button', {
-    role: 'tab', 'aria-selected': String(S.tab === t.id), 'data-tab': t.id,
+  const cur = TABS.find(t => t.id === S.tab);
+  const sel = (cur && cur.under) || S.tab;
+  fill(tabsEl, ...visibleTabs().filter(t => !t.hidden).map(t => h('button', {
+    role: 'tab', 'aria-selected': String(sel === t.id), 'data-tab': t.id,
     onclick: () => go(t.id),
   }, icon(t.id), h('span', { class: 'lbl' }, t.label))));
   tabsEl.hidden = false;
@@ -136,13 +141,14 @@ async function signIn() {
 
 // ---------- signed in ----------
 
-let unwatch = null, signedInOnce = false;
+let unwatch = null, unwatchRefl = null, signedInOnce = false;
 
 async function onUser(user) {
   if (unwatch) { unwatch(); unwatch = null; }
+  if (unwatchRefl) { unwatchRefl(); unwatchRefl = null; }
   S.user = user;
   if (!user) {
-    Object.assign(S, { admin: false, resident: null, logbook: null, cases: [], counts: {}, casesLoaded: false, casesSynced: false, sharedTemplates: [] });
+    Object.assign(S, { admin: false, resident: null, logbook: null, cases: [], reflections: [], counts: {}, casesLoaded: false, casesSynced: false, sharedTemplates: [] });
     if (signedInOnce) { clearDrafts(); resetCaches(); }
     paintWho();
     renderLanding();
@@ -168,6 +174,7 @@ async function onUser(user) {
     return;
   }
   S.tab = tabFromHash() || 'log';
+  unwatchRefl = watchMyReflections(user.email);
   let sig = '';
   unwatch = cloud.watchCases(user.email, (cases, meta = {}) => {
     const first = !S.casesLoaded;

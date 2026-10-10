@@ -6,6 +6,7 @@ import { countCases, sortCodes } from './engine.js';
 import { parseResidentsScript, parseCaseSheet, parseTotalsSheet, countCheck } from './importer.js';
 import { S, h, toast, confirmBox, cloud, needExcel, sheetRows, fileButton, hooks, add, resetters, residentYear } from './ui-core.js';
 import { templateDialog } from './ui-settings.js';
+import { renderTemplateCard } from './portfolio.js';
 
 const STATUSES = ['ACTIVE', 'ON LEAVE', 'GRADUATED', 'ATTRITED'];
 const A = { residents: null, loading: false, pasted: null, imp: null, busy: false, log: [], shared: null };
@@ -18,7 +19,7 @@ const demoOk = () => !cloud.demo || confirmBox('Demo mode', 'The demo stores dat
 export function renderAdmin() {
   if (!S.admin) return h('p', { class: 'empty' }, 'Admins only.');
   if (!A.residents && !A.loading) load();
-  return h('div', {}, residentsCard(), importCard(), sharedCard());
+  return h('div', {}, residentsCard(), importCard(), sharedCard(), renderTemplateCard());
 }
 
 async function load() {
@@ -126,7 +127,7 @@ function importCard() {
 }
 
 async function readWorkbook(file) {
-  A.busy = true; A.imp = null; A.log = []; hooks.render();
+  A.busy = true; A.imp = null; A.log = []; A.prevSummaries = null; hooks.render();
   try {
     await needExcel();
     const wb = new globalThis.ExcelJS.Workbook();
@@ -172,7 +173,9 @@ async function runImport() {
       // counts for the Totals tab, from everything in the logbook (cases logged in the app included)
       const all = await cloud.listCases(r.email);
       const intake = r.intake || intakeOf(g.rid);
-      await cloud.writeSummary(g.rid, { rid: g.rid, name: r.name || '', intake, rYear: residentYear({ ...r, intake }) || 1, counts: countCases(all), total: all.length, reflections: {}, reflectionsTotal: 0, updatedAt: Date.now() });
+      // keep the resident's reflection counts: admins can't read reflections themselves
+      const prev = (A.prevSummaries ||= Object.fromEntries((await cloud.listSummaries()).map(x => [String(x.rid), x])))[String(g.rid)];
+      await cloud.writeSummary(g.rid, { rid: g.rid, name: r.name || '', intake, rYear: residentYear({ ...r, intake }) || 1, counts: countCases(all), total: all.length, reflections: prev?.reflections || {}, reflectionsTotal: prev?.reflectionsTotal || 0, updatedAt: Date.now() });
       A.log.push({ cls: 'ok', text: `${r.name || g.rid}: ${res.written} written, ${res.skipped} already there` });
     } catch (err) {
       A.log.push({ cls: 'error', text: `${r.name || g.rid}: ${err.message}` });
