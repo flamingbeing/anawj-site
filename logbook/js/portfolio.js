@@ -399,6 +399,28 @@ const b64ToBytes = b64 => {
 
 // reflections: reflection objects (any status). Returns a Blob (.docx).
 // images: { [imageId]: { data (base64), mime, w, h } } for the reflections' figures.
+// Word comments in the template (reviewers' notes) are not part of the portfolio: remove their anchors
+// from the document and the comment parts from the package. Everything else in the template is kept.
+export function stripComments(xml) {
+  return xml
+    .replace(/<w:commentRangeStart\b[^>]*\/>/g, '')
+    .replace(/<w:commentRangeEnd\b[^>]*\/>/g, '')
+    .replace(/<w:r>(?:(?!<\/w:r>)[\s\S])*?<w:commentReference\b[^>]*\/>(?:(?!<\/w:r>)[\s\S])*?<\/w:r>/g, '')
+    .replace(/<w:r\s[^>]*>(?:(?!<\/w:r>)[\s\S])*?<w:commentReference\b[^>]*\/>(?:(?!<\/w:r>)[\s\S])*?<\/w:r>/g, '')
+    .replace(/<w:commentReference\b[^>]*\/>/g, '');
+}
+function dropCommentParts(zip) {
+  const parts = Object.keys(zip.files).filter(n => /^word\/comments[A-Za-z]*\.xml$/.test(n));
+  if (!parts.length) return;
+  for (const n of parts) zip.remove(n);
+  const rels = zip.file('word/_rels/document.xml.rels');
+  const types = zip.file('[Content_Types].xml');
+  return Promise.all([
+    rels && rels.async('string').then(x => zip.file('word/_rels/document.xml.rels', x.replace(/<Relationship\b[^>]*Target="comments[A-Za-z]*\.xml"[^>]*\/>/g, ''))),
+    types && types.async('string').then(x => zip.file('[Content_Types].xml', x.replace(/<Override\b[^>]*PartName="\/word\/comments[A-Za-z]*\.xml"[^>]*\/>/g, ''))),
+  ]);
+}
+
 export async function exportPortfolio(reflections, { name = '', templateB64 = null, JSZip = null, cases = null, intake = null, rYear = null, images = null } = {}) {
   const Z = JSZip || await needZip();
   let zip = null, usedTemplate = false, media = null;
@@ -410,7 +432,8 @@ export async function exportPortfolio(reflections, { name = '', templateB64 = nu
       let { xml: filled, matched } = fillDocumentXml(xml, reflections, { name, media });
       if (cases) filled = fillSummaryXml(filled, cases, { intake, rYear }).xml;
       if (matched.length < REFLECTION_HEADINGS.length / 2) throw new Error('template headings not found');
-      zip.file('word/document.xml', filled);
+      zip.file('word/document.xml', stripComments(filled));
+      await dropCommentParts(zip);
       usedTemplate = true;
     } catch (err) { console.warn('Portfolio template unusable, using the plain layout', err); zip = null; }
   }
@@ -424,31 +447,41 @@ export async function exportPortfolio(reflections, { name = '', templateB64 = nu
 
 // ---------- UI ----------
 
-let templateCache = undefined;   // undefined: not loaded; null: none uploaded
-async function getTemplate() {
-  if (templateCache !== undefined) return templateCache;
-  try { templateCache = cloud.loadTemplate ? await cloud.loadTemplate() : null; }
+let templateCache = undefined;   // the loaded template; "none uploaded" is not cached, so an upload made
+async function getTemplate() {    // after the page opened is picked up at the next export
+  if (templateCache) return templateCache;
+  try { templateCache = (cloud.loadTemplate ? await cloud.loadTemplate() : null) || undefined; }
   catch (err) { console.warn('Could not load the portfolio template', err); return null; }
-  return templateCache;
+  return templateCache || null;
 }
 
 // A button for the reflections screen (or Progress): getReflections() and getName() are called on click.
 // getExtra() (may be async) may return { cases, intake, rYear } to fill Section 4 with the resident's case
 // counts, and { images } with the pictures of the reflections' figures.
 export function renderExportButton(getReflections, getName, getExtra) {
-  return h('button', { onclick: async e => {
-    const btn = e.currentTarget;
+  // says up front which layout the export will use, so a missing template is noticed before exporting
+  const note = h('span', { class: 'hint', style: 'display:block;margin-top:4px' }, 'Checking the portfolio template…');
+  const paintNote = t => {
+    note.textContent = t
+      ? 'Exports into the official APMES portfolio: only the case reflection tables and the Section 4 numbers are filled in; everything else is kept for you to complete.'
+      : 'No portfolio template uploaded yet, so the export is a plain layout without the portfolio’s preamble and other sections. An admin can upload it in Settings → Admin.';
+    note.style.color = t ? '' : 'var(--warn, #b45309)';
+  };
+  getTemplate().then(paintNote, () => paintNote(null));
+  const btn = h('button', { onclick: async () => {
     btn.disabled = true;
     try {
       const refl = (await getReflections()) || [];
       const t = await getTemplate();
+      paintNote(t);
       const name = (getName && getName()) || '';
       const blob = await exportPortfolio(refl, { name, templateB64: t && t.data, ...((getExtra && await getExtra()) || {}) });
       download(`APMES portfolio reflections${name ? ' - ' + name : ''}.docx`, blob);
-      toast(blob.usedTemplate ? 'Portfolio exported.' : 'Exported in the plain layout (no portfolio template uploaded yet).');
+      toast(blob.usedTemplate ? 'Portfolio exported.' : t ? 'The portfolio template could not be read, so the plain layout was used. Ask an admin to upload it again.' : 'Exported in the plain layout (no portfolio template uploaded yet).');
     } catch (err) { toast('Could not export: ' + err.message); }
     btn.disabled = false;
   } }, 'Export portfolio (Word)');
+  return h('span', { style: 'display:block' }, btn, note);
 }
 
 const TC = { info: null, loading: false, busy: false };

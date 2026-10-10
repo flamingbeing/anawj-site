@@ -444,3 +444,6 @@ body.dragging-refl { user-select: none; -webkit-user-select: none; }
 .rimp-tag { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 8px; font-size: 11px; font-weight: 700; background: var(--accent-soft); color: var(--accent); }
 .btn.disabled { opacity: .6; pointer-events: none; }
 /* ---- end upload reflections ---- */
+
+/* ---- reflection fields still needed before Mark complete ---- */
+[data-field].missing { outline: 2px solid var(--err, #b42318) !important; outline-offset: 2px; border-color: var(--err, #b42318) !important; background-color: var(--err-bg, #fdecea); }

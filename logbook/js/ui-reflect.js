@@ -73,6 +73,21 @@ const shortName = n => { const t = n.replace(/\s*\(.*$/, '').replace(/\s+e\.g\.?
 const showTab = () => { if (location.hash !== '#reflect') location.hash = '#reflect'; else hooks.render(); };
 // JR follows from the reflection's date: R1–R3 at that date (from the resident's intake) is junior residency.
 // Without a known intake, the current residency year decides.
+// Mark complete was refused: outline the fields that are still needed in red and scroll to the first.
+function showMissing(missing) {
+  document.querySelectorAll('[data-field].missing').forEach(el => el.classList.remove('missing'));
+  const els = missing.map(m => document.querySelector(`[data-field="${m}"]`)).filter(Boolean);
+  for (const el of els) {
+    el.classList.add('missing');
+    el.addEventListener('input', () => el.classList.remove('missing'), { once: true });
+    el.addEventListener('change', () => el.classList.remove('missing'), { once: true });
+  }
+  if (!els.length) return;
+  els[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+  const f = els[0].matches('input, select, textarea') ? els[0] : els[0].querySelector('input, select, textarea');
+  if (f) setTimeout(() => f.focus({ preventScroll: true }), 300);
+}
+
 function setJr(r) {
   const intake = S.resident && (S.resident.intake || Number(String(S.resident.rid || '').slice(0, 4)));
   const y = r.date && intake ? caseRYear(r.date, intake) : null;
@@ -480,7 +495,7 @@ function editor() {
   paintSubs();
 
   let sec = '';
-  const headingSelect = h('select', { style: 'font-size:16px;max-width:100%', onchange: e => { r.headingId = e.target.value; r.subId = null; paintSubs(); changed(); } },
+  const headingSelect = h('select', { 'data-field': 'heading', style: 'font-size:16px;max-width:100%', onchange: e => { r.headingId = e.target.value; r.subId = null; paintSubs(); changed(); } },
     h('option', { value: '' }, 'Choose a heading…'),
     REFLECTION_HEADINGS.map(hd => {
       const g = hd.section !== sec ? (sec = hd.section) : null;
@@ -510,8 +525,8 @@ function editor() {
     h('label', { class: 'field' }, 'Heading', headingSelect),
     subWrap,
     h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:8px' },
-      h('label', { class: 'field' }, 'Patient initials', input('initials', { maxlength: '20', autocapitalize: 'characters', style: 'font-size:16px;width:7em' })),
-      h('label', { class: 'field' }, 'Date', h('input', { type: 'date', style: 'font-size:16px', value: r.date || '', oninput: e => { r.date = e.target.value || null; if (r.source !== 'word') setJr(r); changed(); } }))),
+      h('label', { class: 'field' }, 'Patient initials', input('initials', { 'data-field': 'initials', maxlength: '20', autocapitalize: 'characters', style: 'font-size:16px;width:7em' })),
+      h('label', { class: 'field' }, 'Date', h('input', { type: 'date', 'data-field': 'date', style: 'font-size:16px', value: r.date || '', oninput: e => { r.date = e.target.value || null; if (r.source !== 'word') setJr(r); changed(); } }))),
     h('p', { class: 'hint' }, 'Some categories require one case reflection in Junior Residency (JR); when not indicated, at most one case reflection can be done at the JR level per category. A reflection dated in R1–R3 is marked JR in the Word export automatically.'),
     h('label', { class: 'field' }, 'Diagnosis / operation', input('diagnosis', { maxlength: '2000' })),
     h('p', { class: 'hint' }, 'De-identified only: initials, no names or NRIC. Generative AI use must follow the NUS guidelines on the use of AI tools in academic work.'));
@@ -547,6 +562,7 @@ function editor() {
       h('textarea', { rows: '10', maxlength: String(LIMITS.summary), style: TA, value: r.summary || '',
         placeholder: 'Demographics, history, examination, investigations, anaesthetic plan, events, outcome.',
         oninput: e => { r.summary = e.target.value; changed(); } }));
+    title.dataset.field = summary.dataset.field = 'title or case summary';
 
     const n = r.points.length;
     const points = boxCard('Learning points', 'Each point gets a short underlined heading and your discussion: thoughts and feelings, what went well or badly, analysis with evidence, conclusions, action plan.',
@@ -627,6 +643,7 @@ function editor() {
         h('button', { 'aria-label': 'Remove reference', onclick: () => { r.references.splice(i, 1); restructure(); } }, '✕'))),
       r.references.length < LIMITS.references ? h('button', { style: 'margin-top:6px', onclick: () => { r.references.push(''); restructure(); } }, '+ Add reference') : null);
 
+    points.dataset.field = 'at least one learning point';
     body = [title, summary, points, figures, refs];
   }
 
@@ -635,7 +652,7 @@ function editor() {
       ? h('button', { onclick: async () => { r.status = 'draft'; await persist(); hooks.render(); } }, 'Back to draft')
       : h('button', { class: 'primary', onclick: async () => {
         const missing = completeProblems(r);
-        if (missing.length) return toast('Before marking complete: ' + missing.join(', '));
+        if (missing.length) { showMissing(missing); return toast('Before marking complete: ' + missing.join(', ')); }
         r.status = 'complete'; autosave.cancel(); await persist(); toast('Reflection complete'); rv.editing = null; rv.thumbs = {}; lsSet(null); hooks.render();
       } }, 'Mark complete'),
     h('span', { class: 'grow' }),
