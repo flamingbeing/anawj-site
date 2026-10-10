@@ -3,7 +3,7 @@ import {
   matchName, splitNameList, namesInCell, suggestFlags, generate, check, learnFromRosters, tickFromHistory,
 } from './engine.js';
 import { readRosterRows, readStaffSheet, buildRosterWorkbook, cellText } from './xlsxio.js';
-import { buildLayout, COL_WIDTHS, shortName } from './layout.js';
+import { buildLayout, COL_WIDTHS, shortName, doubleCovered, isDouble } from './layout.js';
 
 const KEY = 'ot-roster-v1';
 const clone = o => JSON.parse(JSON.stringify(o));
@@ -517,7 +517,10 @@ function startNameDrag(e, src) {
     window.removeEventListener('pointermove', move);
     window.removeEventListener('pointerup', up);
     window.removeEventListener('pointercancel', up);
-    if (!ghost) return;
+    if (!ghost) {
+      if (ev.type === 'pointerup') { clearTimeout(tagTimer); tagTimer = setTimeout(() => openTagEditor(chip, src), 250); }
+      return;
+    }
     ghost.remove();
     chip.classList.remove('dragging');
     over?.classList.remove('over');
@@ -530,7 +533,111 @@ function startNameDrag(e, src) {
   window.addEventListener('pointercancel', up);
 }
 
-function rosterCell(row, i, key) {
+// ---- tags on one name: "(L)", "(RA)", "(AOH 1)" and the part after a dash ("-5pm", "-C-OT 4") ----
+
+const TAGS = ['L', 'RA', 'P', 'SR', 'Neu', 'Amb', 'PACU'];
+let tagTimer = null;
+
+function parseNamePart(text) {
+  const tags = [...String(text).matchAll(/\(([^)]*)\)/g)].map(m => m[1].trim()).filter(Boolean);
+  let rest = String(text).replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim();
+  let dash = '';
+  const m = rest.match(/^(.*?)\s+-\s*(.+)$/);
+  if (m) { rest = m[1].trim(); dash = m[2].trim(); }
+  return { name: rest, tags, dash };
+}
+const buildNamePart = ({ name, tags, dash }) => `${name}${tags.map(t => ` (${t})`).join('')}${dash ? ` -${dash}` : ''}`;
+
+function closeTagEditor() { document.querySelector('.tag-editor')?.remove(); }
+
+function openTagEditor(chip, src) {
+  closeTagEditor();
+  const row = state.roster.rows[src.row];
+  const parts = cellParts(row, src.key);
+  const cur = parseNamePart(parts[src.part] ?? '');
+  const p = matchName(cur.name, state.staff).person;
+  const on = new Set(cur.tags.filter(t => TAGS.includes(t)));
+  const other = h('input', { value: cur.tags.filter(t => !TAGS.includes(t)).join(', '), placeholder: 'e.g. AOH 1' });
+  const dash = h('input', { value: cur.dash, placeholder: 'e.g. 5pm, mtg 3pm, C-OT 4' });
+  const name = h('input', { value: cur.name });
+  const chips = h('div', { class: 'chips' }, TAGS.map(t => {
+    const c = h('span', { class: 'chip' + (on.has(t) ? ' on' : ''), title: t === 'L' ? (src.key === 'senior' ? 'Liver standby' : 'Liver posting') : '', onclick: () => {
+      if (on.has(t)) on.delete(t); else on.add(t);
+      c.classList.toggle('on', on.has(t));
+    } }, t);
+    return c;
+  }));
+  const apply = () => {
+    const tags = [...TAGS.filter(t => on.has(t)), ...splitNameList(other.value)];
+    const next = buildNamePart({ name: name.value.trim() || cur.name, tags, dash: dash.value.trim() });
+    closeTagEditor();
+    if (next === parts[src.part]) return;
+    undoStack.push(JSON.stringify(state.roster.rows));
+    parts[src.part] = next;
+    setCellParts(row, src.key, parts);
+    // keep the day's details in step so checks and regenerating agree with the sheet
+    if (p) {
+      const d = dayOf(p.id);
+      if (src.key === 'senior') d.liverStandby = on.has('L');
+      const t = dash.value.trim();
+      if (!t || /^\d{1,2}([.:]\d{2})?\s*(am|pm)?$/i.test(t)) d.leaveTime = t;
+    }
+    afterRosterEdit();
+  };
+  const remove = () => {
+    closeTagEditor();
+    undoStack.push(JSON.stringify(state.roster.rows));
+    parts.splice(src.part, 1);
+    setCellParts(row, src.key, parts);
+    afterRosterEdit();
+  };
+  const box = h('div', { class: 'tag-editor', role: 'dialog', 'aria-label': 'Edit name',
+    onkeydown: e => { if (e.key === 'Escape') closeTagEditor(); if (e.key === 'Enter') apply(); } },
+    h('label', {}, 'Name'), name,
+    h('label', {}, 'Tags'), chips,
+    h('label', {}, 'Other tags'), other,
+    h('label', {}, 'After a dash (leave time or note)'), dash,
+    h('div', { class: 'bar', style: 'margin:8px 0 0' },
+      h('button', { class: 'primary', onclick: apply }, 'Save'),
+      h('button', { onclick: closeTagEditor }, 'Cancel'),
+      h('span', { class: 'grow' }),
+      h('button', { onclick: remove, title: 'Take this name out of the cell' }, 'Remove')),
+  );
+  document.body.append(box);
+  const rc = chip.getBoundingClientRect();
+  const w = box.offsetWidth, hgt = box.offsetHeight;
+  box.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, rc.left)) + 'px';
+  box.style.top = (rc.bottom + hgt + 8 < window.innerHeight ? rc.bottom + 4 : Math.max(8, rc.top - hgt - 4)) + 'px';
+  setTimeout(() => {
+    const away = e => { if (!box.contains(e.target)) { closeTagEditor(); window.removeEventListener('pointerdown', away, true); } };
+    window.addEventListener('pointerdown', away, true);
+  });
+}
+
+// Case notes typed on the roster also update the day's room, so flags and checks follow.
+function editNotes(i, value) {
+  const row = state.roster.rows[i];
+  if (!row || value === row.notes) return;
+  undoStack.push(JSON.stringify(state.roster.rows));
+  row.notes = value;
+  const room = state.day.rooms.find(x => x.id === row.roomId);
+  if (room) {
+    room.notes = value;
+    if (!room.flagsManual) room.flags = suggestFlags(value, state.settings, room.name);
+  }
+  const before = JSON.stringify(state.roster.checks);
+  state.roster.checks = check({ rows: state.roster.rows, staff: state.staff, day: state.day, settings: state.settings });
+  save();
+  if (JSON.stringify(state.roster.checks) !== before) render();
+}
+
+const notesCell = (row, i, attrs = {}) => h('td', {
+  ...attrs, contenteditable: 'plaintext-only', spellcheck: 'false', title: 'Click to edit the case notes',
+  onkeydown: e => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } },
+  onblur: e => editNotes(i, e.target.textContent.trim()),
+}, row.notes || '');
+
+function rosterCell(row, i, key, doubles) {
   const id = i + ':' + key;
   if (editing === id) {
     const input = h('input', {
@@ -549,12 +656,13 @@ function rosterCell(row, i, key) {
   const parts = cellParts(row, key);
   return h('td', {
     class: 'cell', 'data-drop': '', 'data-row': i, 'data-key': key, title: 'Drag a name to swap or move it. Double-click to type.',
-    ondblclick: () => { editing = id; render(); },
+    ondblclick: () => { clearTimeout(tagTimer); closeTagEditor(); editing = id; render(); },
   }, parts.length
     ? h('div', { class: 'names' }, parts.map((p, k) => [k ? h('span', { class: 'sep' }, '/') : null, h('span', {
       class: 'name', 'data-drop': '', 'data-row': i, 'data-key': key, 'data-part': k,
+      title: 'Drag to swap or move. Click to edit tags.',
       onpointerdown: e => startNameDrag(e, { row: i, key, part: k }),
-    }, p)]))
+    }, p, key === 'senior' && isDouble(p, doubles) ? h('sup', { class: 'dbl', title: 'Double covering' }, '&') : null)]))
     : h('span', { class: 'empty-cell' }, '—'));
 }
 
@@ -589,9 +697,16 @@ function renderSheet() {
         `font-size:${c.sz === 10 ? 13 : 11}px`, c.bold ? 'font-weight:700' : '', c.color ? `color:#${c.color.slice(2)}` : '',
         `text-align:${c.align}`, `vertical-align:${c.valign}`,
       ].filter(Boolean).join(';');
+      const attrs = { class: (c.box ? 'box' : '') + (c.c1 === 12 ? ' spill' : ''), colspan: c.c2 - c.c1 + 1, rowspan: c.r2 - c.r + 1, style };
+      if (c.edit?.key === 'notes') {
+        const row = state.roster.rows[c.edit.row];
+        tds.push(notesCell(row, c.edit.row, { ...attrs, class: attrs.class + ' editable' }));
+        continue;
+      }
       const lines = String(c.text).split('\n');
-      tds.push(h('td', { class: (c.box ? 'box' : '') + (c.c1 === 12 ? ' spill' : ''), colspan: c.c2 - c.c1 + 1, rowspan: c.r2 - c.r + 1, style },
-        lines.map((t, i) => [i ? h('br') : null, c.underlineFirst && i === 0 ? h('u', {}, t) : t])));
+      tds.push(h('td', attrs, c.runs
+        ? c.runs.map(run => run.sup ? h('sup', {}, run.text) : run.text)
+        : lines.map((t, i) => [i ? h('br') : null, c.underlineFirst && i === 0 ? h('u', {}, t) : t])));
     }
     trs.push(h('tr', { style: layout.heights[r] ? `height:${Math.round(layout.heights[r] * 1.33)}px` : '' }, tds));
   }
@@ -612,10 +727,11 @@ function renderRoster() {
       h('button', { 'aria-pressed': String(rosterView === 'sheet'), onclick: () => { rosterView = 'sheet'; render(); } }, 'Sheet preview')),
     r && rosterView === 'sheet' && h('button', { onclick: () => window.print() }, 'Print / save PDF'),
     h('span', { class: 'grow' }),
-    r && h('span', { class: 'seen' }, `Roster for ${state.day.date}`),
+    h('label', { class: 'seen' }, 'Roster for ', h('input', { type: 'date', value: state.day.date, onchange: e => { state.day.date = e.target.value; render(); } })),
   );
   if (!r) return h('div', {}, h('section', { class: 'card' }, h('h2', {}, 'Roster'), h('p', { class: 'hint' }, 'Generates the OT section: seniors, juniors and premed cover. You can edit any cell before downloading.'), actions));
 
+  const doubles = doubleCovered(r.rows);
   const flaggedRooms = new Set([...(r.warnings || []), ...(r.checks || [])].filter(w => w.level === 'error').map(w => w.text.split(':')[0]));
   const body = [];
   let last = null;
@@ -624,8 +740,8 @@ function renderRoster() {
     last = row.complex;
     body.push(h('tr', { class: flaggedRooms.has(row.label) ? 'flagged' : '' },
       h('td', { class: 'room' }, row.label + ':'),
-      rosterCell(row, i, 'senior'), rosterCell(row, i, 'junior'), rosterCell(row, i, 'premed'),
-      h('td', { class: 'notes' }, row.notes)));
+      rosterCell(row, i, 'senior', doubles), rosterCell(row, i, 'junior', doubles), rosterCell(row, i, 'premed', doubles),
+      notesCell(row, i, { class: 'notes' })));
   });
   const genRooms = new Set((r.warnings || []).filter(w => w.level === 'error').map(w => w.text.split(':')[0]));
   const seen = new Set();
@@ -637,12 +753,12 @@ function renderRoster() {
   if (rosterView === 'sheet') {
     return h('div', {},
       h('section', { class: 'card no-print' }, h('h2', {}, 'Roster'), actions,
-        h('p', { class: 'hint', style: 'margin:0' }, 'This is what the downloaded .xlsx looks like. Parts the tool doesn\'t fill yet (MOT, SICU, upper duties, AH OT) are left blank. Switch to Edit to change cells.')),
+        h('p', { class: 'hint', style: 'margin:0' }, 'This is what the downloaded .xlsx looks like. Click the case notes on the right to edit them. Parts the tool doesn\'t fill yet (MOT, SICU, upper duties, AH OT) are left blank. Switch to Edit to move names or change tags. & marks a senior who is double covering.')),
       renderSheet());
   }
   return h('div', {},
     h('section', { class: 'card' }, h('h2', {}, 'Roster'), actions,
-      h('p', { class: 'hint', style: 'margin:0' }, 'Drag a name onto another name to swap them, or onto an empty part of a cell to move it there. Double-click a cell to type. The checks on the right update after every change.')),
+      h('p', { class: 'hint', style: 'margin:0' }, 'Drag a name onto another name to swap them, or onto an empty part of a cell to move it there. Click a name to change its tags ((L), (RA), -5pm…). Double-click a cell to type, or click the case notes to edit them. & marks a senior who is double covering.')),
     h('div', { class: 'cols' },
       h('section', { class: 'card scroll' },
         h('table', { class: 'sheet' },
