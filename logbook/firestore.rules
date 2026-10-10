@@ -20,7 +20,8 @@ service cloud.firestore {
       return signedIn() && exists(/databases/$(database)/documents/admins/$(me()));
     }
     // programme directors: a role separate from admin, so their permissions can be tuned on their own.
-    // Today a PD can read the resident list, the counts summaries and every evaluation; nothing else.
+    // Today a PD can read the resident list, the counts summaries and every evaluation, and maintain
+    // the resident and faculty lists and decide applications (evals); nothing else.
     function isPD() {
       return signedIn() && exists(/databases/$(database)/documents/pds/$(me()));
     }
@@ -57,7 +58,13 @@ service cloud.firestore {
     match /residents/{rid} {
       allow read: if isAdmin() || isPD();
       allow get, list: if signedIn() && resource.data.email == me();
+      // PDs may add residents and edit their name, status and year (the evals people lists), but never
+      // overwrite an entry or move it to another email (that email is what grants the logbook's
+      // programme access); only admins do that, and only admins delete
       allow create, update: if isAdmin() && validResident(rid, request.resource.data);
+      allow create: if isPD() && validResident(rid, request.resource.data);
+      allow update: if isPD() && validResident(rid, request.resource.data)
+        && request.resource.data.email == resource.data.email;
       allow delete: if isAdmin();
     }
     function validResident(rid, d) {
@@ -229,50 +236,55 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['data'])
         && request.resource.data.data is string && request.resource.data.data.size() <= 716800;
     }
-    // ==== Evaluations (/evals): workplace-based assessments ====
-    // The resident starts one and names an assessor; the assessor (signed in with that email) fills in
-    // the assessment; PDs and admins read all of them. Residents never see each other's, and an
-    // assessor only sees the ones assigned to them. A submitted evaluation is locked (admins can
+    // ==== Evaluations (/evals): workplace-based assessments (DOPS, Mini-CEX, EBD) ====
+    // The resident starts one and names an assessor from the faculty list; the assessor (signed in
+    // with that email) fills it in, then submits or declines; PDs and admins read all of them.
+    // Residents never see each other's, and an assessor only sees the ones assigned to them.
+    // A submitted evaluation can be edited by its assessor for 15 min, then it is locked (admins can
     // reopen). Shared keys with the logbook: rid, date ('YYYY-MM-DD'), source.
+    // Times (requestedAt, submittedAt, declinedAt, seenAt, chasedAt) are client ms numbers; the
+    // request, submit and decline times may not be in the future (5 min slack for clocks) or more
+    // than 30 days old: an assessor may submit offline and sync hours later.
+    function isActiveFaculty(e) {
+      return e is string
+        && exists(/databases/$(database)/documents/faculty/$(e))
+        && get(/databases/$(database)/documents/faculty/$(e)).data.get('status', '') == 'ACTIVE';
+    }
+    function notFuture(t) {
+      return t is number && t <= request.time.toMillis() + 300000 && t >= request.time.toMillis() - 2592000000;
+    }
     match /evaluations/{id} {
+      // the assessor sees it once it is sent (not the resident's unsent draft)
       allow read: if isAdmin() || isPD()
-        || (signedIn() && (resource.data.residentEmail == me() || resource.data.assessorEmail == me()));
+        || (signedIn() && (resource.data.residentEmail == me()
+            || (resource.data.assessorEmail == me() && resource.data.status != 'draft')));
 
-      // the resident: create as draft or requested, for themselves, never pre-filling the assessment
+      // the resident: create as draft or requested, for themselves, naming an active faculty member
+      // (never themselves), never pre-filling the assessment or the outcome
       allow create: if signedIn() && request.resource.data.get('residentEmail', '') == me()
         && validEval(id, request.resource.data)
-        && isResident(request.resource.data.rid)
         && request.resource.data.status in ['draft', 'requested']
-        && !('assessment' in request.resource.data) && !('submittedAt' in request.resource.data);
+        && !request.resource.data.keys().hasAny(['assessment', 'metrics', 'submittedAt', 'declineReason', 'declinedAt', 'seenAt'])
+        && (request.resource.data.status == 'draft' || notFuture(request.resource.data.get('requestedAt', null)))
+        && validCaseCard(request.resource.data.get('request', {}))
+        && isResident(request.resource.data.rid)
+        && isActiveFaculty(request.resource.data.assessorEmail);
 
-      // the resident: edit their request until it is submitted; the assessor can be changed only
-      // before an assessment has been started (so a half-written assessment never moves to someone else)
-      // (who-is-asking checks come first: validEval is long, and rules stop at the first false)
-      allow update: if signedIn() && resource.data.residentEmail == me()
-        && resource.data.status in ['draft', 'requested']
-        && validEval(id, request.resource.data)
-        && request.resource.data.status in ['draft', 'requested', 'cancelled']
-        && request.resource.data.diff(resource.data).affectedKeys()
-             .hasOnly(['request', 'status', 'assessorEmail', 'assessorName', 'formId', 'formVersion', 'epa', 'date', 'caseId', 'updatedAt', 'requestedAt'])
-        && (!('assessment' in resource.data) || request.resource.data.assessorEmail == resource.data.assessorEmail);
-
-      // the assessor: fill in (and save) the assessment while it is requested, then submit
-      allow update: if signedIn() && resource.data.assessorEmail == me()
-        && resource.data.status == 'requested'
-        && validEval(id, request.resource.data)
-        && request.resource.data.status in ['requested', 'submitted']
-        && request.resource.data.diff(resource.data).affectedKeys()
-             .hasOnly(['assessment', 'status', 'submittedAt', 'updatedAt', 'assessorName'])
-        && request.resource.data.get('assessment', {}) is map;
-
-      // admins: anything valid (e.g. reopen a submitted one); PDs read only for now
+      // updates: the document must stay valid, and one of the branches below must allow the change.
+      // Cheap who-is-asking checks come first: validEval is long, and the rules engine allows 1000
+      // expressions per request.
       allow update: if isAdmin() && validEval(id, request.resource.data);
+      allow update: if signedIn() && (resource.data.residentEmail == me() || resource.data.assessorEmail == me())
+        && validEval(id, request.resource.data)
+        && (residentEdits() || residentReassigns() || residentSees() || assessorWrites() || assessorCorrects());
 
+      // never delete resident data: only a resident's own unsent draft (never one an assessor has
+      // started), or an admin
       allow delete: if isAdmin()
-        || (signedIn() && resource.data.residentEmail == me() && resource.data.status == 'draft');
+        || (signedIn() && resource.data.residentEmail == me() && resource.data.status == 'draft'
+            && !resource.data.keys().hasAny(['assessment', 'submittedAt', 'declinedAt']));
 
-      // the assessor's comments meant only for the PD (placeholder until it is decided whether
-      // residents see free-text comments): never readable by the resident
+      // the assessor's comments meant only for the PD (optional): never readable by the resident
       match /private/{doc} {
         allow read: if isAdmin() || isPD()
           || (signedIn() && get(/databases/$(database)/documents/evaluations/$(id)).data.assessorEmail == me());
@@ -283,10 +295,87 @@ service cloud.firestore {
           && optString(request.resource.data, 'comments', 20000) && optNumber(request.resource.data, 'updatedAt');
       }
     }
+    // Update branches (rs = the document after the write). Who-is-asking checks come first.
+    // The resident: edit their request until it is submitted (and nudge: chasedAt). The assessor,
+    // form and item can change only before an assessment has been started (so a half-written
+    // assessment never moves to someone else); a new assessor must be on the faculty list.
+    function residentEdits() {
+      return resource.data.residentEmail == me()
+        && resource.data.status in ['draft', 'requested']
+        && request.resource.data.status in ['draft', 'requested', 'cancelled']
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['request', 'status', 'assessorEmail', 'assessorName', 'formId', 'formVersion', 'epa', 'date', 'caseId', 'updatedAt', 'requestedAt',
+                       'itemId', 'itemText', 'tool', 'level', 'caseKey', 'catalogueVersion', 'chasedAt'])
+        && (resource.data.get('assessment', {}).size() == 0
+            || (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['assessorEmail', 'formId', 'itemId', 'tool'])
+                && request.resource.data.status != 'draft'))
+        && (request.resource.data.assessorEmail == resource.data.assessorEmail || isActiveFaculty(request.resource.data.assessorEmail))
+        && (request.resource.data.get('request', {}) == resource.data.get('request', {}) || validCaseCard(request.resource.data.get('request', {})));
+    }
+    // The resident, after a decline: send it to a new assessor on the faculty list (the old partial
+    // assessment and metrics are removed, the decline reason stays as history), or cancel it.
+    function residentReassigns() {
+      return resource.data.residentEmail == me()
+        && resource.data.status == 'declined'
+        && ((request.resource.data.status == 'requested'
+              && request.resource.data.diff(resource.data).affectedKeys()
+                   .hasOnly(['status', 'assessorEmail', 'assessorName', 'updatedAt', 'requestedAt', 'assessment', 'metrics', 'chasedAt', 'request', 'date'])
+              && !request.resource.data.keys().hasAny(['assessment', 'metrics'])
+              && (request.resource.data.get('request', {}) == resource.data.get('request', {}) || validCaseCard(request.resource.data.get('request', {})))
+              && request.resource.data.assessorEmail != resource.data.assessorEmail
+              && isActiveFaculty(request.resource.data.assessorEmail))
+          || (request.resource.data.status == 'cancelled'
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])));
+    }
+    // The resident, once submitted: may only mark the feedback as seen.
+    function residentSees() {
+      return resource.data.residentEmail == me()
+        && resource.data.status == 'submitted'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['seenAt', 'updatedAt']);
+    }
+    // The assessor: fill in (and save) the assessment while it is requested, then submit or decline.
+    function assessorWrites() {
+      return resource.data.assessorEmail == me()
+        && resource.data.status == 'requested'
+        && request.resource.data.get('assessment', {}) is map
+        && ((request.resource.data.status == 'requested'
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['assessment', 'metrics', 'assessorName', 'updatedAt']))
+          || (request.resource.data.status == 'submitted'
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['assessment', 'metrics', 'assessorName', 'updatedAt', 'status', 'submittedAt'])
+              && notFuture(request.resource.data.submittedAt))
+          // a decline drops any partial answers (the resident would otherwise see half a score sheet)
+          || (request.resource.data.status == 'declined'
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['assessment', 'metrics', 'assessorName', 'updatedAt', 'status', 'declineReason', 'declinedAt'])
+              && !request.resource.data.keys().hasAny(['assessment', 'metrics'])
+              && validDecline(request.resource.data.get('declineReason', null))
+              && notFuture(request.resource.data.declinedAt)));
+    }
+    // The assessor: may correct the answers for 15 min after submitting.
+    function assessorCorrects() {
+      return resource.data.assessorEmail == me()
+        && resource.data.status == 'submitted'
+        && resource.data.get('submittedAt', null) is number
+        && request.time.toMillis() < resource.data.submittedAt + 900000
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['assessment', 'updatedAt'])
+        && request.resource.data.get('assessment', {}) is map;
+    }
+    function validDecline(r) {
+      return r is map && r.keys().hasOnly(['code', 'text'])
+        && r.get('code', null) is string && r.code.size() > 0 && r.code.size() <= 40
+        && optString(r, 'text', 2000);
+    }
+    // the case card: no names or free-form identifiers beyond short fields and a short note
+    function validCaseCard(r) {
+      return r is map && r.keys().hasOnly(['date', 'location', 'initials', 'ageBand', 'gender', 'coManaged', 'notes'])
+        && optString(r, 'date', 10) && optString(r, 'location', 100) && optString(r, 'initials', 3)
+        && optString(r, 'ageBand', 20) && optString(r, 'gender', 20) && optString(r, 'notes', 1000);
+    }
     function validEval(id, d) {
       return d.keys().hasOnly(['id', 'rid', 'residentEmail', 'residentName', 'assessorEmail', 'assessorName',
           'formId', 'formVersion', 'epa', 'date', 'source', 'status', 'request', 'assessment', 'caseId',
-          'createdAt', 'updatedAt', 'requestedAt', 'submittedAt'])
+          'createdAt', 'updatedAt', 'requestedAt', 'submittedAt',
+          'itemId', 'itemText', 'tool', 'level', 'caseKey', 'catalogueVersion',
+          'declineReason', 'declinedAt', 'seenAt', 'chasedAt', 'metrics'])
         && d.id == id
         && d.rid is string && d.rid.size() <= 40
         && d.residentEmail is string && d.residentEmail == d.residentEmail.lower() && d.residentEmail.size() <= 200
@@ -294,14 +383,85 @@ service cloud.firestore {
         && d.assessorEmail != d.residentEmail
         && d.formId is string && d.formId.size() <= 60
         && d.source == 'evals'
-        && d.status in ['draft', 'requested', 'submitted', 'cancelled']
+        && d.status in ['draft', 'requested', 'submitted', 'declined', 'cancelled']
         && (d.date == null || (d.date is string && d.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')))
         && optString(d, 'residentName', 200) && optString(d, 'assessorName', 200)
         && optString(d, 'epa', 20) && optString(d, 'caseId', 200)
+        && optString(d, 'itemId', 60) && optString(d, 'itemText', 600) && optString(d, 'caseKey', 100) && optString(d, 'catalogueVersion', 40)
+        && (!('tool' in d) || d.tool == null || d.tool in ['DOPS', 'MiniCEX', 'EBD'])
+        && optNumber(d, 'level')
         && optNumber(d, 'formVersion') && optNumber(d, 'createdAt') && optNumber(d, 'updatedAt')
         && optNumber(d, 'requestedAt') && optNumber(d, 'submittedAt')
-        && (!('request' in d) || (d.request is map && d.request.size() <= 40))
+        && optNumber(d, 'declinedAt') && optNumber(d, 'seenAt') && optNumber(d, 'chasedAt')
+        && (!('declineReason' in d) || d.declineReason == null || validDecline(d.declineReason))
+        && (!('metrics' in d) || (d.metrics is map && d.metrics.size() <= 10))
+        && (!('request' in d) || d.request is map)
         && (!('assessment' in d) || (d.assessment is map && d.assessment.size() <= 80));
+    }
+
+    // faculty list (who may be named as an assessor): admins and PDs maintain it. Read by admins,
+    // PDs, faculty (any status) and programme residents; anyone may check their own entry.
+    // Residents are keyed by rid, so a resident proves themselves through members/{email} (below).
+    match /faculty/{email} {
+      allow get: if isOwner(email);
+      allow read: if isAdmin() || isPD()
+        || (signedIn() && exists(/databases/$(database)/documents/faculty/$(me())))
+        || (signedIn() && exists(/databases/$(database)/documents/members/$(me()))
+            && isResident(get(/databases/$(database)/documents/members/$(me())).data.rid));
+      allow create, update: if (isAdmin() || isPD()) && email == email.lower() && validFaculty(email, request.resource.data);
+      allow delete: if isAdmin();
+    }
+    function validFaculty(email, d) {
+      return d.keys().hasOnly(['email', 'name', 'status', 'updatedAt'])
+        && d.email == email
+        && optString(d, 'name', 200)
+        && d.status in ['ACTIVE', 'INACTIVE']
+        && optNumber(d, 'updatedAt');
+    }
+
+    // members/{email}: { rid } — an email-keyed pointer to the person's resident entry, written by the
+    // resident themselves (the rid must carry their email), so rules can check "is a resident" by
+    // email. It grants nothing on its own: every use re-checks residents/{rid}.
+    match /members/{email} {
+      allow get: if isOwner(email);
+      allow list: if isAdmin();
+      allow create, update: if isOwner(email) && email == email.lower()
+        && request.resource.data.keys().hasOnly(['rid'])
+        && request.resource.data.rid is string && request.resource.data.rid.size() <= 40
+        && isResident(request.resource.data.rid);
+      allow delete: if isOwner(email) || isAdmin();
+    }
+
+    // applications to join as faculty or resident: the applicant writes their own while pending (or
+    // applies again after a rejection);
+    // admins and PDs read them all and approve or reject (the app then adds the faculty/resident entry)
+    match /applications/{uid} {
+      allow get: if signedIn() && uid == request.auth.uid;
+      allow read: if isAdmin() || isPD();
+      allow create: if signedIn() && uid == request.auth.uid
+        && validApplication(uid, request.resource.data)
+        && request.resource.data.email == me()
+        && request.resource.data.status == 'pending'
+        && !request.resource.data.keys().hasAny(['decidedAt', 'decidedBy']);
+      allow update: if signedIn() && uid == request.auth.uid
+        && resource.data.status in ['pending', 'rejected']
+        && validApplication(uid, request.resource.data)
+        && request.resource.data.email == me()
+        && request.resource.data.status == 'pending'
+        && !request.resource.data.keys().hasAny(['decidedAt', 'decidedBy']);
+      allow update: if (isAdmin() || isPD())
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'decidedAt', 'decidedBy'])
+        && validApplication(uid, request.resource.data);
+      allow delete: if isAdmin();
+    }
+    function validApplication(uid, d) {
+      return d.keys().hasOnly(['uid', 'email', 'name', 'role', 'note', 'status', 'createdAt', 'decidedAt', 'decidedBy'])
+        && d.uid == uid
+        && d.email is string && d.email == d.email.lower() && d.email.size() <= 200
+        && optString(d, 'name', 200) && optString(d, 'note', 1000)
+        && d.role in ['resident', 'faculty']
+        && d.status in ['pending', 'approved', 'rejected']
+        && optNumber(d, 'createdAt') && optNumber(d, 'decidedAt') && optString(d, 'decidedBy', 200);
     }
 
     // form definitions (Mini-CEX, DOPS, EPA entrustment, …): everyone signed in reads; admins write

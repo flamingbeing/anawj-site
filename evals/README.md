@@ -1,56 +1,129 @@
 # APMES Evaluations
 
-Workplace-based assessments at `anawj.com/evals/`: the resident starts an evaluation and names an assessor. The assessor opens a link, signs in and fills it in. PDs and admins see every evaluation and which are complete. The app itself isn't built yet. This folder holds the agreed data model and the access rules, so the app can be built against them and later combined with the logbook and the roster.
+A phone-first web app at `anawj.com/evals/` for workplace-based assessments: **DOPS, Mini-CEX and EBD**.
+The resident picks the item (from the EPA Guidebook v8 catalogue), names an assessor from the faculty
+list and sends a link or QR code. The assessor signs in with Google, fills the official form in a few
+taps (saved as they go) and submits or declines. The resident reads the result and sees progress
+against the APMES requirements. PDs and admins see every evaluation, keep the faculty and resident
+lists, approve applications and download a CSV.
 
-## Decisions
+It is a trial app for **all residents and postings**. Vanilla ES modules, no build step, same Firebase
+project as the logbook (`apmes-logbook`, free Spark plan).
 
-| Decision | Choice | Notes |
-|---|---|---|
-| Firebase project | Same as the logbook (`apmes-logbook`) | Reuses `residents/{rid}`, `admins/{email}`, and lower-case email as identity. |
-| Rules file | **One file for the project: `logbook/firestore.rules`** | Firestore allows one rules file per project. The evals rules are a block in that file. Publishing any other rules file would wipe out the logbook's rules. |
-| PD role | `pds/{email}` `{ name }`, separate from `admins` | Today a PD can read residents, summaries and all evaluations, with no writes, so permissions can be tuned later without touching admins. Admins add PDs (or add them by hand in the console). |
-| Shared keys | Every evaluation has `rid`, `date` (`YYYY-MM-DD`) and `source: 'evals'` | A future CCC dashboard can join evaluations to logbook summaries (`summaries/{rid}`). Logbook cases sit under `logbooks/{email}` without a rid, so joining evaluations to individual cases goes through `residents/{rid}.email`, or through `caseId` when an evaluation is linked to a case. |
-| Code | Separate `/evals` folder, same style as the logbook | Vanilla ES modules, no build step, node tests in `test/*.test.mjs`. **Copy** rather than import from `logbook/js/`. `cloud.js`, `demo-backend.js` and the `ui-core` helpers are written around the logbook's data and screens, and importing across folders would let a change to one app break the other. Pull the shared pieces into `/shared/` when the apps are combined. |
-| Service worker | Its own `evals/sw.js` with its own cache name | A service worker's scope is its folder, so the two apps don't interfere. |
-| Sign-in | Google **or** an emailed sign-in link, for residents and assessors alike | The user decided this on 2026-10-10. Assessors can **link several emails into one account**, for example a hospital address and a Gmail, so evaluations sent to any of them reach the same person. The current rules match the assessor on the signed-in token's email only. Before building, extend them so any verified email linked to the account counts (for example through the token's linked identities, or a `emailLinks/{email}` → uid claim that can only be written while signed in as that email), and add rules tests for it. Email-link sign-in works on the free Spark plan, but the free plan caps how many sign-in emails go out each day; check the limit under Authentication → Settings. |
-| Comments | Residents **see** the assessor's comments | Decided 2026-10-10. Feedback goes in `assessment`, which the resident reads. `private/` stays as an optional note for the PD only; drop it from the form if the programme doesn't want one. |
-| Forms | DOPS, Mini-CEX and EBD, matching the MedHub `[DOPS]`, `[MiniCEX]`, `[EBD]` items | The requirement list per residency year is in [`reference/`](reference/README.md) (70 items, from the AY2023 tracking template). The PD has agreed (2026-10-10). |
+## Try it
 
-## Data model
+Serve the repo root and open the demo (made-up people, kept only in this browser):
 
-| Path | Fields | Who can do what |
-|---|---|---|
-| `pds/{email}` | `{ name }` | The PD can read their own entry. PDs and admins can list. Admins write. |
-| `evaluations/{id}` | `{ id, rid, residentEmail, residentName?, assessorEmail, assessorName?, formId, formVersion?, epa?, date, source: 'evals', status, request?, assessment?, caseId?, createdAt, updatedAt, requestedAt?, submittedAt? }` | See the next table. |
-| `evaluations/{id}/private/{doc}` | `{ comments, updatedAt }` | Comments from the assessor meant only for the PD. The assessor writes them while the evaluation is `requested`, and can read them back. PDs and admins read them. **Never the resident.** Optional: residents see the assessor's feedback in `assessment`, so use this only for a separate note to the PD. |
-| `evalForms/{formId}` | Form definition (placeholder) | Anyone signed in reads. Admins write. |
+```
+npx http-server . -p 8110 -c-1
+# http://localhost:8110/evals/?demo            resident "Demo Resident"
+# http://localhost:8110/evals/?demo=assessor   "Dr Demo Faculty"
+# http://localhost:8110/evals/?demo=admin      admin + PD
+# http://localhost:8110/evals/?demo=reset      wipe and re-seed the demo store
+```
 
-`status` moves `draft` → `requested` → `submitted`. A resident can also set `cancelled` before submission. `request` is the resident's part of the form (setting, case summary and so on). `assessment` is the assessor's part (ratings, entrustment level, feedback). Both are maps whose fields depend on the form.
+All tabs share one demo store (`localStorage` key `apmes-evals-demo-v1`), so you can request in one tab
+as the resident and complete it in another as the assessor. More → "Switch demo role" does the same in
+one tab. The demo never loads Firebase.
 
-Field limits: emails are lower case, at most 200 characters. The assessor can't be the resident. `request` has at most 40 keys and `assessment` at most 80. `date` is `YYYY-MM-DD` or null. Unknown top-level fields are rejected.
+## Files
 
-| Who | Can |
+| File | What |
 |---|---|
-| Resident | Create evaluations for themselves only, as `draft` or `requested`, never with an assessment filled in. Read their own. Edit the request, form, date and assessor until it's submitted; the assessor can only change while no assessment has been started. Cancel. Delete their own drafts. |
-| Assessor (signed in with `assessorEmail`) | Read the evaluations assigned to them. While an evaluation is `requested`, write `assessment`, `assessorName` and their private comments, saving as often as needed, then submit. After submission it's locked. |
-| PD | Read every evaluation, including private comments, plus residents and summaries. No writes yet. |
-| Admin | Everything above, plus any valid edit (for example reopening a submitted evaluation) and deleting. |
-| Other residents and assessors | Nothing. Residents never see each other's evaluations, and an assessor never sees ones not assigned to them. |
+| `index.html`, `style.css`, `manifest.webmanifest`, `icons/`, `sw.js` | Shell, styles (NUHS tokens from `../design/tokens.css`), PWA and offline cache (`evals-*` caches only). |
+| `js/app.js`, `js/ui-core.js` | Boot, sign-in, roles, tabs, hash routes, shared helpers and state. |
+| `js/catalogue.js`, `js/forms.js` | **Generated** by `node tools/build-data.mjs` from `reference/*.json` and `reference/guidebook/*.md`. 14 EPAs, 67 items (DOPS 17, Mini-CEX 12, EBD 38), 46 counting groups; the three forms. |
+| `js/engine.js` | Pure logic: validation, visible questions, progress, status, case key, identifier warning. |
+| `js/cloud.js`, `js/demo-backend.js`, `js/firebase-config.js` | Firestore backend and the in-browser demo, same API. |
+| `js/ui-*.js` | Screens: home, request flow, requests, result, progress (resident); pending and form (assessor); overview and people (admin/PD); more. |
+| `js/vendor/qrcode.js` | qrcode-generator 1.4.4 (MIT), as an ES module. |
 
-Queries must match the rules: residents list with `where('residentEmail', '==', me)`, and assessors with `where('assessorEmail', '==', me)`.
-
-## Open questions
-
-- The evaluator's forms are transcribed in [`reference/apmes-forms.json`](reference/apmes-forms.json). The EPA Guidebook v8 is the source of truth; see [`reference/apmes-epas.json`](reference/apmes-epas.json). See [`reference/`](reference/README.md#the-evaluators-forms).
-- The resident's request mirrors the MedHub case log: date, location, evaluator, patient initials, gender, age, item, role (performed / assisted / observed), diagnosis, complications, notes to the evaluator. See [`reference/`](reference/README.md).
+Routes: `#home` `#new[/itemId]` `#requests` `#r/{id}` `#progress` `#pending[/history]` `#e/{id}` `#overview` `#people[/faculty|/residents]` `#more`.
 
 ## Tests
 
-The rules tests run against the Firestore emulator, which needs Java, `firebase-tools`, `@firebase/rules-unit-testing` and `firebase`. Run them from the repo root:
+```
+# unit tests (no dependencies)
+for f in evals/test/*.test.mjs; do node "$f"; done
+
+# end-to-end demo loop (Playwright + Chromium; a global install works)
+npx http-server . -p 8110 -s -c-1 &
+node evals/test/e2e.spec.mjs        # BASE, PW_PATH, CHROMIUM env vars override the defaults
+```
+
+The e2e script drives one browser context across roles: a resident requests a DOPS, the assessor
+completes it, the resident marks it "Got it" and Progress ticks it; then a Mini-CEX (with a blocked
+submit for a missing answer and a comment under 30 characters), an EBD (Q3 shown/hidden), a decline
+with "Other" and a reassign to another assessor, the admin screens, and no console errors (36 checks).
+Taps measured: DOPS 18 (17 answers + Submit, plus typing the entrustment answer), Mini-CEX 19,
+EBD 10, resident request 6 from `#new/{item}` (+ typing the initials).
+
+Rules tests run against the Firestore emulator (needs Java, `firebase-tools`,
+`@firebase/rules-unit-testing` and `firebase`), from the repo root:
 
 ```
 npx firebase emulators:exec --only firestore --project demo-logbook \
   "cd logbook && node test/rules.emulator.mjs; cd .. && node evals/test/rules.emulator.mjs"
 ```
 
-There are 61 evals checks covering the PD role, creation, reads and list queries, resident and assessor updates, locking after submission, private comments, deletion and forms. They run alongside the 85 logbook checks, which confirm the logbook's behaviour is unchanged.
+151 evals checks and 103 logbook checks (the logbook's behaviour is unchanged).
+
+## Data model
+
+One rules file for the whole project: **`logbook/firestore.rules`** (the evals rules are a block in it).
+Emails are lower case and are the identity; sign-in is Google only for now (`cloud.EMAIL_LINK = false`
+keeps a stub for hospital email-link sign-in on the paid plan later).
+
+| Path | Fields | Who |
+|---|---|---|
+| `admins/{email}`, `pds/{email}` | `{ name }` | As the logbook. PDs can now also maintain the people lists. |
+| `residents/{rid}` | `{ rid, name, email, status: ACTIVE\|ON LEAVE\|GRADUATED\|ATTRITED, intake, rYear }` | Admin create/update; PD create, and update without changing the email (the email is what grants logbook access). Delete admin-only; **the app never deletes residents** (change the status instead). |
+| `members/{email}` **new** | `{ rid }` | Written by the resident themselves at sign-in (the rid must carry their email), so rules can tell a resident by email. Grants nothing alone: each use re-checks `residents/{rid}`. |
+| `faculty/{email}` **new** | `{ email, name, status: ACTIVE\|INACTIVE, updatedAt }` | Admin or PD write. Read by admins, PDs, faculty and residents (via `members`); anyone may check their own entry. Only ACTIVE faculty can be named as assessors. |
+| `applications/{uid}` **new** | `{ uid, email, name, role: resident\|faculty, note, status: pending\|approved\|rejected, createdAt, decidedAt?, decidedBy? }` | The applicant writes their own while pending, or applies again after a rejection; admin/PD read and decide. Approving creates the faculty or resident entry (never overwriting another resident's rid). |
+| `evaluations/{id}` | `{ id, rid, residentEmail, residentName, assessorEmail, assessorName, formId: dops\|minicex\|ebd, formVersion, itemId, itemText, tool: DOPS\|MiniCEX\|EBD, epa, level, date, caseKey, source:'evals', status, request, assessment, metrics, declineReason, createdAt, updatedAt, requestedAt, submittedAt, declinedAt, seenAt, chasedAt, caseId? }` | See below. |
+| `evaluations/{id}/private/assessor` | `{ comments, updatedAt }` | Optional PD-only note. Never the resident. |
+
+`status`: `draft` → `requested` → `submitted`, or `declined` (assessor, with `declineReason {code, text}`;
+codes `not-observed`, `not-co-managed`, `conflict`, `wrong-item`, `other`) → `requested` again when the
+resident sends it to another assessor, or `cancelled` (resident, before submission).
+`request` is the case card `{ date, location, initials, ageBand, gender, coManaged (EBD), notes? }` (no
+names or record numbers). `assessment` is keyed `q1…q22`: 9-point 1–9 or `'NA'`, milestones 0.5–5 or
+`'NA'`, supervision 1–5, selects store the option text, checkboxes an array, text a string.
+`metrics` is `{ openedAt, firstAnswerAt, submitAttempts }`. Times are client milliseconds; request,
+submit and decline times may not be in the future (5 min slack) or over 30 days old, so a form
+submitted offline still syncs hours later. The assessor's answers stay on the device until the server
+has the outcome. A decline drops any partial answers. The case card is limited to its 7 keys
+(initials ≤3, location ≤100, notes ≤1000 characters).
+
+| Who | Can |
+|---|---|
+| Resident | Create for themselves (`draft`/`requested`) naming an active listed faculty member, not themselves. Change the assessor until an answer is saved (opening the form doesn't count); cancel; reassign after a decline; set `seenAt` on a result; delete their own drafts only (never one with answers). |
+| Assessor (signed in as `assessorEmail`) | Sees it once sent (never the resident's unsent draft). While `requested`: save answers, then submit or decline. Edit the answers for 15 minutes after submitting. Faculty set INACTIVE can still finish requests already sent to them. |
+| PD | Read everything; maintain faculty, residents and applications. |
+| Admin | Everything, including any valid change to an evaluation (#r/{id} has Reassign, Cancel request and Reopen). |
+
+Queries match the rules: `where('residentEmail','==',me)`, `where('assessorEmail','==',me)` with
+`where('status','in',[sent statuses])` and, for PD/admin, the whole collection. Equality filters only,
+so **no composite indexes are needed**.
+
+## Going live (Firebase console, project `apmes-logbook`)
+
+1. **Authentication → Sign-in method:** Google is already on for the logbook. Under Settings →
+   Authorised domains, check `anawj.com` is listed.
+2. **Firestore → Rules:** paste the whole of `logbook/firestore.rules` and Publish (never paste another
+   rules file over it). Run the emulator tests first.
+3. **Admins and PDs:** add `admins/{email}` and `pds/{email}` documents `{ name }` by hand (lower-case
+   email as the document id) if they aren't there yet.
+4. **People lists:** sign in as an admin/PD, open People, and paste the faculty list (`Name, email` per
+   line) and the resident list (`rid, name, email, intake, rYear`). Anyone else who signs in can apply
+   as faculty or resident from the app; approve them under People → Applications.
+5. **Deploy:** push the `evals/` folder with the site. The service worker is `evals-v1`; bump `VERSION`
+   in `sw.js` whenever a shell file changes so phones pick up the update.
+
+## Still to do
+
+- **EPA 7–12 entrustment questions** aren't transcribed yet (EPA 1–6 are, from the guidebook). Add them
+  to `reference/guidebook/` and rerun `node tools/build-data.mjs` before going live.
+- Not built yet: linking an evaluation to a logbook case (`caseId`), mask holding credited automatically by an LMA/ETT DOPS, "abandoned >3 days" flags.
+- Hospital email sign-in (email link, linked emails) waits for the paid plan; see `cloud.EMAIL_LINK`.

@@ -1,18 +1,18 @@
-// Offline app shell for the APMES Logbook. Bump VERSION whenever any shell file changes:
-// the new worker installs alongside the old one and the app offers "Update available — reload".
+// Offline app shell for APMES Evals (copied from logbook/sw.js). Bump VERSION whenever any shell file
+// changes: the new worker installs alongside the old one and the app offers "Update available".
 // Firebase traffic (auth, Firestore) always goes to the network; Firestore keeps its own offline
-// cache in IndexedDB. The Firebase SDK files themselves (versioned, never change) are cached here,
-// so the app still starts with no signal after the phone has cleared its HTTP cache.
+// cache in IndexedDB. The Firebase SDK files (versioned, never change) are cached here.
 
-const VERSION = 'logbook-v15';
+const VERSION = 'evals-v1';
 const SDK = 'https://www.gstatic.com/firebasejs/10.12.2/';
 const SDK_FILES = ['firebase-app.js', 'firebase-auth.js', 'firebase-firestore.js'].map(f => SDK + f);
 const SHELL = [
-  './', 'index.html', 'style.css', 'manifest.webmanifest',
-  'js/app.js', 'js/ui-core.js', 'js/ui-log.js', 'js/ui-logbook.js', 'js/ui-progress.js', 'js/ui-settings.js', 'js/ui-admin.js', 'js/ui-reflect.js', 'js/reflections.js', 'js/portfolio.js',
-  'js/categories.js', 'js/engine.js', 'js/suggest.js', 'js/keywords.js', 'js/importer.js', 'js/xlsxio.js',
-  'js/cloud.js', 'js/demo-backend.js', 'js/firebase-config.js', 'js/bin.js', 'js/reflect-import.js', 'js/ui-reflect-import.js',
-  'vendor/exceljs.min.js', 'vendor/jszip.min.js',
+  './', 'index.html', 'style.css', 'manifest.webmanifest', '../design/tokens.css',
+  'js/app.js', 'js/ui-core.js', 'js/cloud.js', 'js/demo-backend.js', 'js/firebase-config.js',
+  'js/catalogue.js', 'js/forms.js', 'js/engine.js',
+  'js/ui-home.js', 'js/ui-request.js', 'js/ui-requests.js', 'js/ui-result.js', 'js/ui-progress.js',
+  'js/ui-pending.js', 'js/ui-form.js', 'js/ui-admin.js', 'js/ui-more.js',
+  'js/vendor/qrcode.js', 'reference/guidebook/dops-expectations.md',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/maskable-512.png', 'icons/apple-touch-icon.png', 'icons/favicon-32.png',
 ];
 
@@ -24,12 +24,13 @@ self.addEventListener('install', e => {
   ])));
 });
 
-// The page asks a waiting worker to take over when the user taps "reload".
+// The page asks a waiting worker to take over when the user taps "Reload".
 self.addEventListener('message', e => { if (e.data === 'skipWaiting') self.skipWaiting(); });
 
 self.addEventListener('activate', e => {
   e.waitUntil((async () => {
-    for (const k of await caches.keys()) if (k.startsWith('logbook-') && k !== VERSION) await caches.delete(k);   // other apps on this site keep their caches
+    // only this app's caches: the logbook on the same origin keeps its own
+    for (const k of await caches.keys()) if (k.startsWith('evals-') && k !== VERSION) await caches.delete(k);
     await self.clients.claim();
   })());
 });
