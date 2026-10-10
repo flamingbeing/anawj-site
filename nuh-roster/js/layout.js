@@ -80,13 +80,13 @@ export function buildLayout({ date, rows, lists = {}, general = {}, box = '', co
   duty('Chronic Pain:', g('chronic.s'), g('chronic.a'));
   r++;
 
-  // admin, post call and leave grids: ten names per row across C..L
+  // admin, post call and leave grids: nine names per row across C..K, in line with the OT rows
   const grid = (title, names) => {
     const list = names.length ? names : [''];
-    for (let i = 0; i < list.length; i += 10) {
+    for (let i = 0; i < list.length; i += 9) {
       if (i === 0) label(r, title);
       heights[r] = 22.5;
-      list.slice(i, i + 10).forEach((n, k) => put(r, 3 + k, 3 + k, n, { box: true }));
+      list.slice(i, i + 9).forEach((n, k) => put(r, 3 + k, 3 + k, n, { box: true }));
       r++;
     }
   };
