@@ -1,14 +1,14 @@
-// Account tab (#account, old #settings): "Portfolio details (Section 1)" (the profile that fills
-// Section 1 of the exported portfolio), then the settings cards from ui-settings.js.
+// Account tab (#account): who you are, "Portfolio details (Section 1)" (the profile that fills
+// Section 1 of the exported portfolio), and sign out. Settings are on their own tab (ui-settings.js).
 // Profile shape and cleaning: js/profile.js (cleanProfile, SECTIONS, parseSection1).
 
 import { S, h, toast, cloud, fill, debounce, modal, hooks } from './ui-core.js';
-import { renderSettings } from './ui-settings.js';
+import { youCard, signOutCard } from './ui-settings.js';
 import { needZip } from './portfolio.js';
 import { SECTIONS, emptyProfile, cleanProfile, parseSection1 } from './profile.js';
 
 export function renderAccount() {
-  return h('div', {}, profileCard(), renderSettings());
+  return h('div', {}, youCard(), profileCard(), signOutCard());
 }
 
 // SECTIONS entries are { key, title, cols: [{ key, label }] }; tolerate small naming differences.

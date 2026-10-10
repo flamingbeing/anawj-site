@@ -106,6 +106,9 @@ export async function signIn() {
 }
 
 // Signing out also wipes this device's offline copy of the cases (a shared theatre PC keeps nothing).
+// Demo only: wipe the in-browser demo data and start again with the made-up cases.
+export function resetDemo() { if (demo) D.resetDemo(); }
+
 export async function signOut() {
   if (demo) return D.signOut();
   const s = await sdk();
