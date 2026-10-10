@@ -1,29 +1,34 @@
 :root {
-  --bg: #f6f5f2;
+  --bg: #f3f3f3;
   --panel: #ffffff;
-  --ink: #1f2328;
+  --ink: #333333;
   --muted: #646b73;
-  --line: #dcd9d2;
-  --accent: #1d5fd1;
+  --line: #dddddd;
+  --accent: #002f6c;
   --accent-ink: #ffffff;
-  --accent-soft: #e6eefc;
-  --chip: #eef2fb;
-  --chip-on: #1d5fd1;
+  --accent-soft: #e0ebf7;
+  --chip: #e8f4fb;
+  --chip-on: #002f6c;
   --err: #b42318;
   --err-bg: #fdecea;
   --warn: #8a5a00;
   --warn-bg: #fff5d6;
   --ok: #1a7f37;
   --ok-bg: #e3f4e8;
-  --info: #285e9e;
-  --info-bg: #e8f0fb;
-  --row-alt: #faf9f6;
+  --info: #002f6c;
+  --info-bg: #e3f2fb;
+  --row-alt: #f8f9fb;
   --late: #d1242f;
   --due: #d4a72c;
   --ontrack: #b8bcc2;
   --done: #2da44e;
   --tabbar-h: 0px;
   --safe-b: env(safe-area-inset-bottom, 0px);
+  /* NUHS palette: navy, cyan, red, orange */
+  --nuhs-navy: #002f6c;
+  --nuhs-cyan: #00a9e0;
+  --nuhs-red: #e4002b;
+  --nuhs-orange: #e57200;
   color-scheme: light;
 }
 
@@ -31,7 +36,7 @@
 html { -webkit-text-size-adjust: 100%; }
 body {
   margin: 0; background: var(--bg); color: var(--ink);
-  font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+  font: 15px/1.45 "Open Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px);
   -webkit-tap-highlight-color: transparent;
 }
@@ -290,3 +295,11 @@ code, kbd { font-size: 13px; background: var(--chip); padding: 0 4px; border-rad
   .chip.static { min-height: 0; }
   label.check input { width: 22px; height: 22px; }
 }
+
+/* NUHS-style four-colour band along the top, navy headings, cyan focus */
+.top { background: linear-gradient(90deg, var(--nuhs-orange) 0 25%, var(--nuhs-red) 25% 50%, var(--nuhs-cyan) 50% 75%, var(--nuhs-navy) 75% 100%) top / 100% 5px no-repeat, var(--panel); border-bottom: 1px solid var(--line); }
+.top, .top[class] { padding-top: max(17px, calc(env(safe-area-inset-top, 0px) + 5px)); }
+.top h1, section.card h2, h2, h3 { color: var(--nuhs-navy); }
+a { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--nuhs-cyan); outline-offset: 2px; }
+input:focus, select:focus, textarea:focus { border-color: var(--nuhs-cyan); box-shadow: 0 0 0 3px rgba(0, 169, 224, .18); outline: none; }
