@@ -132,8 +132,8 @@ function normGrade(g, seniorish) {
 }
 
 // Build the roster workbook in the department's layout.
-export function buildRosterWorkbook(ExcelJS, { date, rows, lists }) {
-  const layout = buildLayout({ date, rows, lists });
+export function buildRosterWorkbook(ExcelJS, { date, rows, lists, colourOf }) {
+  const layout = buildLayout({ date, rows, lists, colourOf });
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet(date || 'roster', { pageSetup: { orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 1 } });
   ws.columns = COL_WIDTHS.map(width => ({ width }));
@@ -145,7 +145,9 @@ export function buildRosterWorkbook(ExcelJS, { date, rows, lists }) {
       const [first, ...rest] = c.text.split('\n');
       cell.value = { richText: [{ text: first, font: { ...font, underline: true } }, ...(rest.length ? [{ text: '\n' + rest.join('\n'), font }] : [])] };
     } else if (c.runs) {
-      cell.value = { richText: c.runs.map(run => ({ text: run.text, font: run.sup ? { ...font, vertAlign: 'superscript' } : font })) };
+      cell.value = { richText: c.runs.map(run => ({ text: run.text, font: {
+        ...font, ...(run.sup ? { vertAlign: 'superscript' } : {}), ...(run.color ? { color: { argb: run.color } } : {}),
+      } })) };
     } else cell.value = c.text;
     cell.font = font;
     cell.alignment = { horizontal: c.align, vertical: c.valign, wrapText: c.c2 < 12 };

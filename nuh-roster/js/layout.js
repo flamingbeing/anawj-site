@@ -1,7 +1,7 @@
 // The department roster sheet as a list of cells, shared by the Excel export and the in-page preview.
 // Columns are 1-based like Excel (A=1 ... L=12). Parts not generated yet are left blank.
 
-import { namesInCell } from './engine.js';
+import { namesInCell, COLOUR_ARGB } from './engine.js';
 
 export const COL_WIDTHS = [10, 5, 9.14, 9.14, 9.14, 9.14, 9.14, 9.14, 9.14, 9.14, 9.14, 9.14];
 export const RED = 'FFFF0000';
@@ -15,7 +15,8 @@ const UPPER = [
 ];
 
 // lists: { postcall: [...names], leave: [...], admin: [...] }
-export function buildLayout({ date, rows, lists = {} }) {
+// colourOf(namePart) -> 'green' | 'purple' | '' for each name on the OT rows.
+export function buildLayout({ date, rows, lists = {}, colourOf = () => '' }) {
   const cells = [];
   const heights = {};
   const put = (r, c1, c2, text, o = {}) => cells.push({ r, r2: o.r2 || r, c1, c2, text: text ?? '', runs: o.runs || null, edit: o.edit || null, sz: o.sz || 8, bold: !!o.bold, color: o.color || null, align: o.align || 'center', box: !!o.box, valign: o.valign || 'middle', underlineFirst: !!o.underlineFirst });
@@ -75,10 +76,9 @@ export function buildLayout({ date, rows, lists = {} }) {
     last = row.complex;
     const red = row.complex === 'KROR' || row.complex === 'Other';
     label(r, row.label + ':', red ? { bold: true, color: RED } : {});
-    put(r, 3, 5, row.senior || '', { box: true, runs: seniorRuns(row.senior, doubles) });
-    put(r, 6, 8, row.junior || '', { box: true });
-    put(r, 9, 11, row.premed || '', { box: true, bold: true });
-    put(r, 12, 12, row.notes || '', { sz: 10, align: 'left', edit: { row: i, key: 'notes' } });
+    put(r, 3, 5, row.senior || '', { box: true, runs: cellRuns(row.senior, colourOf, doubles) });
+    put(r, 6, 8, row.junior || '', { box: true, runs: cellRuns(row.junior, colourOf) });
+    put(r, 9, 11, row.premed || '', { box: true, bold: true, runs: cellRuns(row.premed, colourOf) });
     r++;
   });
   return { cells, heights, rows: r - 1, cols: 12 };
@@ -98,14 +98,18 @@ export function isDouble(part, doubles) {
   return !!n && doubles.has(key(n));
 }
 
-// The senior cell as text runs, with a superscript "&" after anyone double covering.
-function seniorRuns(text, doubles) {
+// A roster cell as text runs: each name in its colour, and a superscript "&" after a senior
+// who is double covering. Returns null when plain text will do.
+function cellRuns(text, colourOf, doubles = null) {
   const parts = String(text || '').split(/\s*\/\s*/).filter(Boolean);
-  if (!parts.some(p => isDouble(p, doubles))) return null;
+  const colours = parts.map(p => COLOUR_ARGB[colourOf(p)] || null);
+  const dbl = parts.map(p => !!doubles && isDouble(p, doubles));
+  if (!colours.some(Boolean) && !dbl.some(Boolean)) return null;
   const runs = [];
   parts.forEach((p, k) => {
-    runs.push({ text: (k ? ' / ' : '') + p });
-    if (isDouble(p, doubles)) runs.push({ text: '&', sup: true });
+    if (k) runs.push({ text: ' / ' });
+    runs.push({ text: p, color: colours[k] });
+    if (dbl[k]) runs.push({ text: '&', sup: true, color: colours[k] });
   });
   return runs;
 }
