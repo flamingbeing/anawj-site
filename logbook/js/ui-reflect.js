@@ -270,12 +270,14 @@ function list() {
   const row = r => {
     const cb = em ? h('input', { type: 'checkbox', class: 'refl-cb', 'aria-label': `Select ${r.initials || 'reflection'} ${r.diagnosis || ''}`, onclick: e => e.stopPropagation(),
       onchange: e => { e.target.checked ? rv.sel.add(r.id) : rv.sel.delete(r.id); paintSel(); } }) : null;
+    const draft = r.status !== 'complete';
+    const pts = (r.points || []).map(pt => (pt && pt.heading || '').trim()).filter(Boolean);
     const open = () => { if (em) { if (cb) { cb.checked = !cb.checked; cb.dispatchEvent(new Event('change')); } } else openEditor(r); };
     const li = h('li', { tabindex: '0', class: em ? 'refl-row edit' : 'refl-row', onclick: open, onkeydown: e => { if (e.key === 'Enter') open(); } },
       h('span', { class: 'd' }, em ? h('span', { class: 'refl-tools' }, h('span', { class: 'refl-handle', title: 'Drag to another heading', 'aria-label': 'Drag to another heading', onpointerdown: e => startDrag(e, r, li), onclick: e => e.stopPropagation() }, '⠿'), cb) : null,
         (r.jr ? 'JR ' : '') + (r.date ? fmtDate(r.date) : '—')),
-      h('span', { class: 't' }, `${r.initials || '??'} ${r.diagnosis || ''}`),
-      h('span', { class: 'c' }, r.status === 'complete' ? h('span', { class: 'flag' }, 'complete') : h('span', { class: 'flag err' }, 'draft'), r.source === 'word' ? h('span', { class: 'flag' }, 'from Word') : null, h('span', { class: 'flag' + (wordCount(r) < MIN_WORDS ? ' err' : '') }, `${wordCount(r)} words`)));
+      h('span', { class: 't' }, h('span', { class: draft ? 'refl-proc draft' : 'refl-proc' }, `${r.initials || '??'} ${r.diagnosis || ''}`), draft ? h('span', { class: 'flag err' }, 'draft') : null),
+      pts.length ? h('div', { class: 'refl-points' }, ...pts.map((t, i) => h('div', {}, `${i + 1}. ${t}`))) : null);
     if (cb) checks.push([cb, li, r.id]);
     return li;
   };
