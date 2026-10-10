@@ -422,3 +422,100 @@ body.e-nonav #toast { bottom: calc(80px + var(--e-safe-b)); }
   main { max-width: none; padding: 0; }
   .e-section { background: none; color: var(--n-navy); border-bottom: 2px solid var(--n-navy); }
 }
+
+
+/* ==========================================================================
+   Logbook theme (matches /logbook): white header with the four-colour NUHS band
+   (orange, red, cyan, navy), light grey page, white rounded cards, navy accent,
+   navy focus ring (cyan on white is only 2.7:1). Overrides the rules above.
+   ========================================================================== */
+:root {
+  --e-bg-group: #f3f3f3;
+  --e-muted-on-grey: #5f656c;
+  --e-select: #002f6c;          /* selected answers: navy, as the logbook's chips */
+  --e-go: #002f6c;  --e-go-hover: #2c6597;
+  --e-accent-soft: #e0ebf7;
+  --e-chip: #e8f4fb;
+  --e-cell: #ffffff;
+  --e-bar-h: 66px;              /* 5px band + 61px header */
+  --nuhs-orange: #e57200; --nuhs-red: #e4002b; --nuhs-cyan: #00a9e0; --nuhs-navy: #002f6c;
+}
+body { background: var(--e-bg-group); }
+
+/* header */
+.e-appbar {
+  background: linear-gradient(90deg, var(--nuhs-orange) 0 25%, var(--nuhs-red) 25% 50%, var(--nuhs-cyan) 50% 75%, var(--nuhs-navy) 75% 100%) top / 100% 5px no-repeat, #fff;
+  color: var(--n-ink); border-bottom: 1px solid var(--n-line);
+  padding-top: calc(env(safe-area-inset-top, 0px) + 5px);
+}
+.e-appbar .n-stripe { display: none; }
+.e-appbar__bar { height: 60px; }
+.e-appbar__title { color: var(--n-navy); font-size: 19px; font-weight: var(--n-bold); }
+.e-appbar__sub { color: var(--n-muted); font-size: 13px; font-weight: var(--n-regular); letter-spacing: 0; }
+.e-appbar__back { color: var(--n-navy); }
+.e-appbar__me { background: var(--e-accent-soft); color: var(--n-navy); border: 1px solid var(--n-line); }
+.e-appbar__me:hover { background: var(--n-navy); color: #fff; }
+.e-appbar :focus-visible { outline-color: var(--n-navy); }
+@media (max-width: 600px) { .e-appbar__title { font-size: 17px; } }
+
+/* focus: navy ring, as the logbook */
+:focus-visible, .n-btn:focus-visible { outline: 3px solid var(--n-navy); outline-offset: 2px; box-shadow: none; }
+.e-input:focus, .e-textarea:focus, .e-select:focus { outline: 3px solid var(--n-navy); outline-offset: 1px; box-shadow: none; border-color: var(--n-navy); }
+.e-cell input:focus-visible + span, .e-choice input:focus-visible + span, .e-milestone__opt:has(input:focus-visible) { outline: 3px solid var(--n-navy); outline-offset: 2px; box-shadow: none; }
+
+/* cards, lists, sections */
+.e-card { border-radius: 14px; border-color: var(--n-line); }
+.e-card--accent { border-top: 1px solid var(--n-line); box-shadow: inset 0 3px 0 var(--n-navy); }
+.e-list { border: 1px solid var(--n-line); border-radius: 14px; overflow: hidden; }
+.e-card .e-list { border: 0; border-radius: 0; }
+.e-section { background: var(--e-accent-soft); color: var(--n-navy); border-top: 1px solid var(--n-line); border-bottom: 1px solid var(--n-line); font-size: 16px; font-weight: var(--n-bold); }
+.e-avatar { background: var(--e-accent-soft); }
+.e-dot { background: var(--n-navy); }
+
+/* buttons: rounded like the logbook, navy primary (the green submit becomes navy) */
+#app .n-btn, .e-dialog .n-btn, .e-landing .n-btn, .e-banner .n-btn, .e-submitbar .n-btn { border-radius: 10px; }
+.n-btn.e-go { background: var(--e-go); }
+.n-btn.e-go:hover { background: var(--e-go-hover); }
+.e-btn-link, .e-q__more summary { color: var(--n-navy); }
+
+/* segment: the logbook's segmented buttons on white */
+.e-segment { background: #fff; border-bottom: 1px solid var(--n-line); padding: 8px 12px; gap: 0; }
+.e-segment button { border: 1px solid var(--n-line); border-radius: 0; color: var(--n-ink); background: #fff; }
+.e-segment button:first-child { border-radius: 10px 0 0 10px; }
+.e-segment button:last-child { border-radius: 0 10px 10px 0; }
+.e-segment button + button { margin-left: -1px; }
+.e-segment button[aria-selected="true"] { background: var(--e-accent-soft); color: var(--n-navy); border-color: var(--n-navy); position: relative; z-index: 1; }
+.e-segment button:focus-visible { outline-color: var(--n-navy); }
+
+/* bottom nav: translucent white bar, navy top line on the current tab (as the logbook) */
+.e-bottomnav { background: rgba(255,255,255,.96); backdrop-filter: saturate(1.4) blur(8px); -webkit-backdrop-filter: saturate(1.4) blur(8px); }
+.e-tab { border-top-width: 2px; color: var(--n-muted); }
+.e-tab[aria-current="page"] { color: var(--n-navy); border-top-color: var(--n-navy); }
+
+/* answers: rounded, navy when chosen */
+.e-cell > span { border-color: var(--n-line); background: #fff; }
+.e-scale9__row > :first-child > span { border-radius: 10px 0 0 10px; }
+.e-scale9__row > :nth-child(3n) > span { border-radius: 0 10px 10px 0; }
+.e-scale9__row > :nth-child(3n+1) > span { border-radius: 10px 0 0 10px; }
+.e-cell:hover > span { background: var(--e-chip); }
+.e-cell input:checked + span { background: var(--n-navy); color: #fff; border-color: var(--n-navy); box-shadow: none; }
+.e-scale9__na .e-cell > span, .e-cell--na > span { border-radius: 999px; }
+.e-scale9__bands > :nth-child(2) { border-top-color: var(--nuhs-cyan); }
+.e-scale9__bands > :nth-child(3) { border-top-color: var(--n-navy); }
+.e-choice > span { border-radius: 999px; border-color: var(--n-line); background: var(--e-chip); font-weight: var(--n-regular); }
+.e-choice:hover > span { border-color: var(--n-navy); }
+.e-choice input:checked + span { background: var(--n-navy); color: #fff; border-color: var(--n-navy); box-shadow: none; }
+.e-choice input:checked + span::before { color: #fff; }
+.e-milestone__opt, .e-radio, .e-check { border-color: var(--n-line); border-radius: 10px; background: #fff; }
+.e-milestone__opt:has(input:checked), .e-radio:has(input:checked), .e-check:has(input:checked) { background: var(--e-accent-soft); border-color: var(--n-navy); box-shadow: inset 0 0 0 1px var(--n-navy); }
+.e-input, .e-textarea, .e-select { border-color: var(--n-line-input); border-radius: 10px; }
+.e-textarea { border-radius: 12px; }
+.e-starters button { border-radius: 999px; background: var(--e-chip); border: 1px dashed var(--n-navy); }
+.e-entrust { border-radius: 10px; background: var(--e-accent-soft); }
+.e-required { border-radius: 999px; padding: 1px 8px; }
+.e-chip { border-radius: 999px; }
+.e-tag { border-radius: 999px; border-color: var(--n-line); padding: 0 8px; }
+.e-tag--tool { border-color: var(--n-navy); }
+.e-steps li.is-done::before { background: var(--n-navy); }
+.e-q.is-error { box-shadow: inset 4px 0 0 var(--nuhs-red); }
+.e-table th { background: var(--e-accent-soft); color: var(--n-navy); }
