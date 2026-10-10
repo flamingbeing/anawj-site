@@ -40,6 +40,7 @@ export const DEFAULT_ROOMS = [
   ['Other', ['Remote 1', 'Remote 2']],
   ['KROR', ['KROR PACU', 'KROR 1', 'KROR 2', 'KROR 3', 'KROR 4', 'KROR 5', 'KROR 6', 'KROR 7']],
   ['MCOR', ['MCOR PACU', 'MCOR 1', 'MCOR 2', 'MCOR 3', 'MCOR 4', 'MCOR 5', 'MCOR 6', 'MCOR 7', 'MCOR 8', 'MCOR 9', 'MCOR 10']],
+  ['ECT', ['ECT']],
   ['MOR', ['MBOR PACU', 'MOR 1', 'MOR 2', 'MOR 3', 'MOR 4', 'MOR 5', 'MOR 6', 'MOR 10', 'MOR 11', 'MOR 12', 'MOR 13', 'MOR 14', 'MOR 15', 'MOR 16', 'MOR 17', 'MOR 18']],
 ].flatMap(([complex, rooms]) => rooms.map(name => ({ complex, name, defaultOn: !['Remote 2', 'KROR 1', 'MCOR 9'].includes(name) })));
 
