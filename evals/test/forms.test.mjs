@@ -31,7 +31,7 @@ for (const [id, f] of Object.entries(FORMS)) {
   assert.ok(f.sections.every(s => s.title === null || typeof s.title === 'string'));
   // entrustment text box
   const ek = qs.find(q => q.key === ENTRUSTMENT_TEXT_KEY[id]);
-  assert.equal(ek.type, 'text'); assert.equal(ek.required, true); assert.match(ek.label, /at least 2 entrustment questions/);
+  assert.equal(ek.type, 'text'); assert.equal(ek.required, true); assert.equal(ek.label, 'Please briefly describe what was discussed'); assert.match(ek.officialLabel, /at least 2 entrustment questions/);
   assert.equal(ek.minLength, null);
 }
 
