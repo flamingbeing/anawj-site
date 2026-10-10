@@ -385,3 +385,62 @@ body.compact dialog { padding: 12px; }
 @media (min-width: 601px) {
   body.compact .tabs button { min-height: 36px; padding: 6px 10px; }
 }
+
+/* ===== Reflections tab: per-heading add, suggestions, edit mode (drag + select) [tab agent] ===== */
+.refl-hrow { display: flex; align-items: flex-start; gap: 8px; }
+.refl-hrow .grow { flex: 1; min-width: 0; }
+.refl-add { flex: none; }
+.refl-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.refl-chip { font-size: 13px; padding: 4px 10px; min-height: 32px; border-radius: 999px; border: 1px solid var(--line, #ddd); background: transparent; }
+.refl-chip.need { border-color: var(--warn, #b45309); font-weight: 600; }
+.refl-sug { margin: 6px 0 8px; }
+.refl-editbar { position: sticky; top: 0; z-index: 5; }
+.refl-tools { display: inline-flex; align-items: center; gap: 6px; margin-right: 6px; vertical-align: middle; }
+.refl-handle { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; font-size: 20px; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; border-radius: 6px; color: var(--muted, #666); }
+.refl-handle:active { cursor: grabbing; }
+.refl-cb { width: 22px; height: 22px; margin: 0; }
+ul.cases li.refl-row.edit { grid-template-columns: auto 1fr; }
+ul.cases li.refl-row.edit .d { display: flex; align-items: center; white-space: nowrap; }
+ul.cases li.sel { background: color-mix(in srgb, var(--warn, #b45309) 10%, transparent); }
+ul.cases li.dragging { opacity: .35; }
+.refl-ghost { position: fixed; left: 0; top: 0; z-index: 1000; pointer-events: none; list-style: none; display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; padding: 8px; border-radius: 10px; background: var(--panel, #fff); box-shadow: 0 6px 24px rgba(0, 0, 0, .25); opacity: .95; }
+.refl-h { border-radius: 10px; transition: background .1s, outline-color .1s; outline: 2px dashed transparent; outline-offset: 2px; }
+.refl-h.refl-drop { outline-color: var(--accent, #1f6feb); background: color-mix(in srgb, var(--accent, #1f6feb) 10%, transparent); }
+.refl-empty { padding: 6px 8px; border: 1px dashed var(--line, #ddd); border-radius: 8px; margin: 4px 0; }
+body.dragging-refl { user-select: none; -webkit-user-select: none; }
+@media (max-width: 600px) { .refl-chip { min-height: 40px; } .refl-handle { width: 40px; height: 40px; } }
+/* ===== end Reflections tab block ===== */
+
+/* ---- recycle bin (bin agent, js/bin.js) ---- */
+.bin-list { list-style: none; margin: 8px 0 0; padding: 0; }
+.bin-row { display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; border-top: 1px solid var(--line, #e3e6ea); }
+.bin-row:first-child { border-top: 0; }
+.bin-kind { flex: none; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; padding: 2px 6px; border-radius: 4px; background: #e8eef7; color: #1d3c6e; margin-top: 2px; }
+.bin-kind.reflection { background: #f3e9f7; color: #5a2a6e; }
+.bin-main { flex: 1; min-width: 0; }
+.bin-title { overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.bin-sub { font-size: 13px; opacity: .8; margin-top: 2px; }
+.bin-when { margin: 2px 0 0; font-size: 12px; }
+.bin-actions { flex: none; display: flex; flex-direction: column; gap: 6px; }
+@media (max-width: 380px) { .bin-row { flex-wrap: wrap; } .bin-actions { flex-direction: row; width: 100%; justify-content: flex-end; } }
+/* ---- end recycle bin ---- */
+/* ---- upload reflections from Word (ui-reflect-import.js) ---- */
+.rimp-h { margin: 0 0 8px; font-size: 15px; }
+.rimp-list { list-style: none; margin: 0; padding: 0; }
+.rimp-item { display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; border-top: 1px solid var(--line); }
+.rimp-item:first-child { border-top: 0; }
+.rimp-item.off .rimp-body { opacity: .55; }
+.rimp-check { flex: none; padding: 2px 4px; }
+.rimp-check input { width: 22px; height: 22px; margin: 0; }
+.rimp-body { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.rimp-top { font-size: 14px; }
+.rimp-title { margin-top: 2px; }
+.rimp-meta { font-size: 12px; margin-top: 2px; }
+.rimp-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.rimp-sel { font-size: 16px; max-width: 100%; min-width: 0; }
+.rimp-case { margin-top: 6px; font-size: 13px; }
+.rimp-ok { color: var(--ok); }
+.rimp-warn { color: var(--warn); font-size: 13px; margin-top: 4px; }
+.rimp-tag { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 8px; font-size: 11px; font-weight: 700; background: var(--accent-soft); color: var(--accent); }
+.btn.disabled { opacity: .6; pointer-events: none; }
+/* ---- end upload reflections ---- */

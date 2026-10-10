@@ -2,6 +2,7 @@
 
 import { R_YEARS } from './categories.js';
 import { sortCodes, uid } from './engine.js';
+import { openBin } from './bin.js';
 import { S, h, toast, modal, confirmBox, cloud, catChip, settings, patchLogbook, displayName, hooks, rYear, fill } from './ui-core.js';
 import { pickDialog } from './ui-log.js';
 
@@ -52,6 +53,12 @@ export function renderSettings() {
           h('option', { value: 'last', selected: st.defaultDate === 'last' }, 'The date I used last')))),
 
     templatesCard(),
+
+    // ---- recycle bin (bin agent) ----
+    h('section', { class: 'card' },
+      h('div', { class: 'bar' }, h('h2', { style: 'margin:0' }, 'Recycle bin'), h('span', { class: 'grow' }),
+        h('button', { class: 'small', onclick: () => openBin() }, 'Open')),
+      h('p', { class: 'hint', style: 'margin:6px 0 0' }, 'Deleted cases and reflections are kept for 30 days and can be restored.')),
 
     h('section', { class: 'card' },
       h('h2', {}, 'Install on your phone'),

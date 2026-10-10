@@ -10,6 +10,7 @@
 //   logbooks/{email}/cases/{caseId}       case object (see engine.js)
 //   logbooks/{email}/reflections/{id} reflection object (see reflections.js), owner only
 //   logbooks/{email}/images/{id}      { id, data (base64 JPEG), mime, w, h, createdAt }  reflection figures, owner only
+//   logbooks/{email}/bin/{id}         { id, kind: case | reflection, data, deletedAt }  recycle bin (30 days), owner only
 //   summaries/{rid}                       counts only, readable by everyone signed in
 //   imports/{rid}                         { email, keys: [importKey], updatedAt }  (which old-form rows are in)
 //   sharedTemplates/{id}                  { id, name, cats, details? }
@@ -387,3 +388,38 @@ export async function loadTemplate() {
   if (snaps.some(s => !s.exists())) return null;
   return { data: snaps.map(s => s.data().data).join(''), size, uploadedAt };
 }
+
+// ---- recycle bin (bin agent): logbooks/{email}/bin/{id} = { id, kind: reflection | case, data, deletedAt }, owner only ----
+// Deleted cases and reflections are kept here for 30 days (js/bin.js purges older entries after sign-in).
+const cleanBinEntry = e => plain({ id: String(e.id), kind: e.kind, data: e.data, deletedAt: Number(e.deletedAt) || Date.now() });
+export { cleanBinEntry };
+export function watchBin(email, cb) {
+  if (demo) return D.watchBin(email, cb);
+  let stop = null, stopped = false;
+  sdk().then(({ db, F }) => {
+    if (stopped) return;
+    stop = F.onSnapshot(F.collection(db, 'logbooks', lc(email), 'bin'), snap => {
+      cb(snap.docs.map(d => ({ ...d.data(), id: d.id })).sort((a, b) => (b.deletedAt || 0) - (a.deletedAt || 0)), { fromCache: snap.metadata.fromCache });
+    }, e => { console.error('Bin listener failed', e); for (const l of syncErrorListeners) l(e); });
+  });
+  return () => { stopped = true; if (stop) stop(); };
+}
+export async function listBin(email) {
+  if (demo) return D.listBin(email);
+  const { db, F } = await sdk();
+  const snap = await F.getDocs(F.collection(db, 'logbooks', lc(email), 'bin'));
+  return snap.docs.map(d => ({ ...d.data(), id: d.id })).sort((a, b) => (b.deletedAt || 0) - (a.deletedAt || 0));
+}
+export async function saveBinEntry(email, entry) {
+  if (demo) return D.saveBinEntry(email, entry);
+  const { db, F } = await sdk();
+  const doc = cleanBinEntry(entry);
+  await queued(F.setDoc(F.doc(db, 'logbooks', lc(email), 'bin', doc.id), doc));
+  return doc;
+}
+export async function deleteBinEntry(email, id) {
+  if (demo) return D.deleteBinEntry(email, id);
+  const { db, F } = await sdk();
+  await queued(F.deleteDoc(F.doc(db, 'logbooks', lc(email), 'bin', String(id))));
+}
+// ---- end recycle bin ----
