@@ -904,6 +904,10 @@ function cloudError(e) {
 function renderCloudBar() {
   const el = document.getElementById('cloud');
   if (!el) return;
+  const note = document.getElementById('privacy');
+  if (note && cloud.enabled) note.textContent = isMember()
+    ? 'Signed in: Save shares the staff list and rosters with signed-in team members only.'
+    : 'Works in this browser without signing in. Sign in to save and share rosters with the team.';
   if (!cloud.enabled) { el.replaceChildren(); return; }
   if (!cs.ready) { el.replaceChildren(h('span', { class: 'seen' }, 'Connecting…')); return; }
   if (!cs.user) {
