@@ -96,7 +96,7 @@ export function buildLayout({ date, rows, lists = {}, general = {}, box = '', co
   r++;
 
   label(r, 'AH OT : ', { bold: true, color: BLUE });
-  put(r, 3, 11, short(special('ahot').senior), { box: true, bold: true, color: BLUE });
+  put(r, 3, 11, short(special('ahot').senior), { box: true, color: BLUE });
   r++;
 
   const doubles = doubleCovered(rows.filter(x => x.complex !== 'Clinic'));
