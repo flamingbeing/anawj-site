@@ -111,8 +111,8 @@ so **no composite indexes are needed**.
 
 1. **Authentication → Sign-in method:** Google is already on for the logbook. Under Settings →
    Authorised domains, check `anawj.com` is listed.
-2. **Firestore → Rules:** paste the whole of `logbook/firestore.rules` and Publish (never paste another
-   rules file over it). Run the emulator tests first.
+2. **Firestore rules** deploy automatically: a merge to `main` that changes `logbook/firestore.rules`
+   runs `.github/workflows/deploy-firestore-rules.yml`. Run the emulator tests before merging.
 3. **Admins and PDs:** add `admins/{email}` and `pds/{email}` documents `{ name }` by hand (lower-case
    email as the document id) if they aren't there yet.
 4. **People lists:** sign in as an admin/PD, open People, and paste the faculty list (`Name, email` per
