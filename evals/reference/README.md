@@ -72,7 +72,7 @@ Every form opens with an introduction saying it is a **formative** assessment by
 
 - **Entrustment-Based Discussion:** "Please briefly describe what was discussed centered around at least 2 entrustment questions" (required free text).
 - **Level of Supervision:** a rating from Level 1 (Observe only), Level 2 (Direct supervision), Level 3 (Indirect supervision), Level 4 (Distant supervision) to Level 5 (Supervise). The question asks the faculty to explain the level and to consider agency, reliability, integrity, capability and humility as well as competency.
-- **Comments** on what was done well and what can be improved, including readiness for variations of the case, with a **minimum of 30 characters**.
+- **Comments** on what was done well and what can be improved, including readiness for variations of the case, with a **minimum of 30 characters** on MedHub. The app drops that minimum (decided 2026-10-10).
 - **Resident was receptive to feedback** and **Resident demonstrated reflective learning**: dropdowns, each Yes / No / Maybe.
 
 | Form | Questions | What's specific to it |

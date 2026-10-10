@@ -392,11 +392,13 @@ export const FORMS = {
      {
       "n": 10,
       "key": "q10",
-      "label": "Comments on what was done well and what can be improved upon, including trainee's readiness to handle variations of the situation or clinical case described above (minimum 30 characters)",
+      "label": "Comments on what was done well and what can be improved upon, including trainee's readiness to handle variations of the situation or clinical case described above",
       "type": "text",
       "required": true,
       "na": false,
-      "minLength": 30,
+      "minLength": null,
+      "officialLabel": "Comments on what was done well and what can be improved upon, including trainee's readiness to handle variations of the situation or clinical case described above (minimum 30 characters)",
+      "feedback": true,
       "descriptors": null
      },
      {
@@ -757,11 +759,13 @@ export const FORMS = {
      {
       "n": 19,
       "key": "q19",
-      "label": "Comments on what was done well and what can be improved upon, including trainee's readiness to handle variations of the situation or clinical case described above (minimum 30 characters)",
+      "label": "Comments on what was done well and what can be improved upon, including trainee's readiness to handle variations of the situation or clinical case described above",
       "type": "text",
       "required": true,
       "na": false,
-      "minLength": 30,
+      "minLength": null,
+      "officialLabel": "Comments on what was done well and what can be improved upon, including trainee's readiness to handle variations of the situation or clinical case described above (minimum 30 characters)",
+      "feedback": true,
       "descriptors": null
      },
      {
@@ -1032,11 +1036,13 @@ export const FORMS = {
      {
       "n": 17,
       "key": "q17",
-      "label": "Comments on what was done well and what can be improved upon, including trainee's readiness to handle variations of the situation or clinical case described above (minimum 30 characters)",
+      "label": "Comments on what was done well and what can be improved upon, including trainee's readiness to handle variations of the situation or clinical case described above",
       "type": "text",
       "required": false,
       "na": false,
-      "minLength": 30,
+      "minLength": null,
+      "officialLabel": "Comments on what was done well and what can be improved upon, including trainee's readiness to handle variations of the situation or clinical case described above (minimum 30 characters)",
+      "feedback": true,
       "descriptors": null
      },
      {

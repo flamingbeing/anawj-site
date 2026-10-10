@@ -326,7 +326,10 @@ for (const [tool, f] of Object.entries(FORMS_JSON.forms)) {
         if (typeof q.options === 'string') out.scaleKey = q.options;
       } else if (SCALE_TYPES.includes(q.type)) out.scaleKey = q.type;
       else if (q.type !== 'text') fail(`unknown type ${q.type}`);
-      out.minLength = q.minLength || null;
+      // The comments questions carry "(minimum 30 characters)" on MedHub; the app drops that minimum
+      // (user decision 2026-10-10). The official wording stays in officialLabel.
+      out.minLength = null;
+      if (/\s*\(minimum 30 characters\)/i.test(out.label)) Object.assign(out, { label: out.label.replace(/\s*\(minimum 30 characters\)/i, ''), officialLabel: q.label, feedback: true });
       out.descriptors = q.descriptors || null;
       if (q.type === 'checkboxes' && q.options.includes(EXCLUSIVE)) out.exclusive = EXCLUSIVE;
       return out;

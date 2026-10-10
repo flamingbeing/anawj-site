@@ -53,7 +53,7 @@ node evals/test/e2e.spec.mjs        # BASE, PW_PATH, CHROMIUM env vars override 
 
 The e2e script drives one browser context across roles: a resident requests a DOPS, the assessor
 completes it, the resident marks it "Got it" and Progress ticks it; then a Mini-CEX (with a blocked
-submit for a missing answer and a comment under 30 characters), an EBD (Q3 shown/hidden), a decline
+submit for missing answers), an EBD (Q3 shown/hidden), a decline
 with "Other" and a reassign to another assessor, the admin screens, and no console errors (36 checks).
 Taps measured: DOPS 18 (17 answers + Submit, plus typing the entrustment answer), Mini-CEX 19,
 EBD 10, resident request 6 from `#new/{item}` (+ typing the initials).
@@ -118,7 +118,7 @@ so **no composite indexes are needed**.
 4. **People lists:** sign in as an admin/PD, open People, and paste the faculty list (`Name, email` per
    line) and the resident list (`rid, name, email, intake, rYear`). Anyone else who signs in can apply
    as faculty or resident from the app; approve them under People → Applications.
-5. **Deploy:** push the `evals/` folder with the site. The service worker is `evals-v5`; bump `VERSION`
+5. **Deploy:** push the `evals/` folder with the site. The service worker is `evals-v6`; bump `VERSION`
    in `sw.js` whenever a shell file changes so phones pick up the update.
 
 ## Still to do
