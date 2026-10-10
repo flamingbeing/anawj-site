@@ -1,0 +1,42 @@
+rules_version = '2';
+
+// Paste into Firebase console → Firestore Database → Rules, then Publish.
+// Only signed-in Google accounts listed in /members can read or write anything.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+    function email() {
+      return request.auth.token.email.lower();
+    }
+    function member() {
+      return signedIn() && exists(/databases/$(database)/documents/members/$(email()));
+    }
+    function admin() {
+      return member() && get(/databases/$(database)/documents/members/$(email())).data.role == 'admin';
+    }
+
+    match /members/{memberEmail} {
+      // anyone signed in may check their own entry; members see the list; admins manage it
+      allow get: if signedIn() && memberEmail == email();
+      allow list, get: if member();
+      allow write: if admin();
+    }
+
+    match /team/{doc} {
+      allow read, write: if member();
+    }
+
+    match /rosters/{date} {
+      allow read, create, update: if member();
+      allow delete: if admin();
+
+      // history entries are permanent
+      match /versions/{version} {
+        allow read, create: if member();
+        allow update, delete: if false;
+      }
+    }
+  }
+}

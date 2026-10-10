@@ -4,6 +4,7 @@ import {
 } from './engine.js';
 import { readRosterRows, readStaffSheet, buildRosterWorkbook, cellText } from './xlsxio.js';
 import { buildLayout, COL_WIDTHS, shortName, doubleCovered, isDouble } from './layout.js';
+import * as cloud from './cloud.js';
 
 const KEY = 'ot-roster-v1';
 const clone = o => JSON.parse(JSON.stringify(o));
@@ -22,6 +23,7 @@ function blankState() {
     day: { date: today(), rooms: [], staff: {} },
     roster: null,
     tab: 'staff',
+    cloudBase: {},
   };
 }
 
@@ -123,6 +125,7 @@ function render() {
   document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === state.tab)));
   const y = window.scrollY;
   app.replaceChildren(({ staff: renderStaff, day: renderDay, roster: renderRoster, settings: renderSettings })[state.tab]());
+  renderCloudBar();
   window.scrollTo(0, y);
   save();
 }
@@ -163,6 +166,8 @@ function renderStaff() {
       h('h2', {}, 'Staff list'),
       h('p', { class: 'hint' }, 'Do this once, then save a team file to share with the other rosterers. "Seen in" counts the subspec lists each senior did in the past rosters you loaded. Use it as a hint when ticking subspecs.'),
       h('div', { class: 'bar' },
+        isMember() && h('button', { class: 'primary', onclick: saveTeamToCloud, title: 'Share this staff list, rooms and settings with the team' }, 'Save staff list for the team'),
+        isMember() && h('button', { onclick: () => loadTeamFromCloud(true) }, 'Load team staff list'),
         fileButton('Import staff sheet (.xlsx / .csv)', '.xlsx,.csv', false, importStaffSheet),
         fileButton('Learn from past rosters', '.xlsx', true, learnFiles),
         h('span', { class: 'btn-group' },
@@ -721,6 +726,7 @@ function renderRoster() {
   const actions = h('div', { class: 'bar' },
     h('button', { class: 'primary', onclick: () => runGenerate(!!r) }, r ? 'Regenerate' : 'Generate roster'),
     r && h('button', { disabled: !undoStack.length, onclick: () => { state.roster.rows = JSON.parse(undoStack.pop()); afterRosterEdit(); } }, 'Undo'),
+    r && isMember() && h('button', { class: 'primary', onclick: saveRosterToCloud }, 'Save'),
     r && h('button', { onclick: exportXlsx }, 'Download .xlsx'),
     r && h('div', { class: 'seg', role: 'group', 'aria-label': 'View' },
       h('button', { 'aria-pressed': String(rosterView === 'edit'), onclick: () => { rosterView = 'edit'; render(); } }, 'Edit'),
@@ -729,7 +735,7 @@ function renderRoster() {
     h('span', { class: 'grow' }),
     h('label', { class: 'seen' }, 'Roster for ', h('input', { type: 'date', value: state.day.date, onchange: e => { state.day.date = e.target.value; render(); } })),
   );
-  if (!r) return h('div', {}, h('section', { class: 'card' }, h('h2', {}, 'Roster'), h('p', { class: 'hint' }, 'Generates the OT section: seniors, juniors and premed cover. You can edit any cell before downloading.'), actions));
+  if (!r) return h('div', {}, h('section', { class: 'card' }, h('h2', {}, 'Roster'), h('p', { class: 'hint' }, 'Generates the OT section: seniors, juniors and premed cover. You can edit any cell before downloading.'), actions), historyCard());
 
   const doubles = doubleCovered(r.rows);
   const flaggedRooms = new Set([...(r.warnings || []), ...(r.checks || [])].filter(w => w.level === 'error').map(w => w.text.split(':')[0]));
@@ -765,6 +771,7 @@ function renderRoster() {
           h('thead', {}, h('tr', {}, ['', 'Senior', 'Junior', 'Premed cover', 'Cases'].map(t => h('th', {}, t)))),
           h('tbody', {}, body))),
       h('div', {},
+        historyCard(),
         h('section', { class: 'card' },
           h('h2', {}, 'Things to look at'),
           all.length ? h('ul', { class: 'warnings' }, all.map(w => h('li', { class: w.level }, w.text))) : h('p', { class: 'hint' }, 'No problems found.')),
@@ -841,6 +848,7 @@ function renderSettings() {
         save(); toast(bad.length ? `Unknown subspec: ${bad.join(', ')}` : 'Room defaults updated.');
       } }),
     ),
+    isAdmin() ? membersCard() : null,
     h('section', { class: 'card' },
       h('h2', {}, 'Reset'),
       h('div', { class: 'bar' },
@@ -874,6 +882,198 @@ document.getElementById('loadTeam').addEventListener('change', async e => {
     toast("That file isn't an OT roster team file.");
   }
 });
+
+// ---------- team sign-in and shared rosters ----------
+
+const cs = { ready: !cloud.enabled, user: null, member: null, meta: {}, versions: {}, recent: null, members: null };
+let rostererName = '';
+try { rostererName = localStorage.getItem('ot-roster-name') || ''; } catch { /* no storage */ }
+state.cloudBase ||= {}; // date -> updatedAt of the cloud copy this browser last loaded or saved
+
+const isMember = () => !!cs.member;
+const isAdmin = () => cs.member?.role === 'admin';
+const me = () => ({ email: cs.user.email, displayName: cs.user.displayName, rostererName: rostererName.trim() });
+const when = ms => new Date(ms).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+const byName = b => b?.name || b?.email || 'someone';
+
+function cloudError(e) {
+  console.error(e);
+  toast(e?.code === 'permission-denied' ? "You don't have access to that. Ask an admin to add you to the team." : `Couldn't reach the shared storage: ${e?.message || e}`);
+}
+
+function renderCloudBar() {
+  const el = document.getElementById('cloud');
+  if (!el) return;
+  if (!cloud.enabled) { el.replaceChildren(); return; }
+  if (!cs.ready) { el.replaceChildren(h('span', { class: 'seen' }, 'Connecting…')); return; }
+  if (!cs.user) {
+    el.replaceChildren(h('button', { class: 'primary', onclick: () => cloud.signIn().catch(e => { if (e?.code !== 'auth/popup-closed-by-user') cloudError(e); }) }, 'Sign in with Google'));
+    return;
+  }
+  const out = h('button', { onclick: () => cloud.signOut() }, 'Sign out');
+  if (!cs.member) {
+    el.replaceChildren(h('span', { class: 'seen' }, `${cs.user.email} isn't on the team list yet. Ask an admin to add you.`), out);
+    return;
+  }
+  el.replaceChildren(
+    h('label', { class: 'seen', title: 'Shown in the history when you save' }, 'Rosterer ',
+      h('input', { value: rostererName, placeholder: cs.user.displayName || 'Your name', style: 'width:140px', onchange: e => {
+        rostererName = e.target.value; try { localStorage.setItem('ot-roster-name', rostererName); } catch { /* no storage */ }
+      } })),
+    h('span', { class: 'seen', title: cs.user.email }, isAdmin() ? 'admin' : ''),
+    out);
+}
+
+cloud.watchUser(async user => {
+  cs.user = user; cs.member = null; cs.meta = {}; cs.versions = {}; cs.recent = null; cs.members = null;
+  if (user) {
+    try { cs.member = await cloud.membership(user.email); } catch (e) { cloudError(e); }
+    if (cs.member && !rostererName) rostererName = cs.member.name || user.displayName || '';
+  }
+  cs.ready = true;
+  render();
+  if (cs.member) loadTeamFromCloud(false);
+}).catch(e => { cs.ready = true; cloudError(e); render(); });
+
+async function saveTeamToCloud() {
+  try {
+    const doc = await cloud.saveTeam({ settings: state.settings, staff: state.staff, roomTemplate: state.roomTemplate }, me());
+    state.teamSyncedAt = doc.updatedAt;
+    save();
+    toast(`Staff list saved for the team (${state.staff.length} people).`);
+  } catch (e) { cloudError(e); }
+}
+
+async function loadTeamFromCloud(asked) {
+  try {
+    const t = await cloud.loadTeam();
+    if (!t) { if (asked) toast('Nobody has saved a team staff list yet.'); return; }
+    if (!asked && t.updatedAt === state.teamSyncedAt) return;
+    if (state.staff.length && !confirm(`Load the team's staff list (${t.staff?.length || 0} people, saved by ${byName(t.updatedBy)} ${when(t.updatedAt)})? It replaces the staff list, rooms and settings in this browser.`)) return;
+    state.settings = { ...clone(DEFAULT_SETTINGS), ...t.settings };
+    state.staff = t.staff || [];
+    state.roomTemplate = t.roomTemplate || clone(DEFAULT_ROOMS);
+    state.teamSyncedAt = t.updatedAt;
+    nextId = 1 + state.staff.reduce((m, p) => Math.max(m, parseInt(String(p.id).replace(/\D/g, ''), 10) || 0), 0);
+    syncRooms();
+    render();
+    toast(`Team staff list loaded (${state.staff.length} people).`);
+  } catch (e) { cloudError(e); }
+}
+
+async function saveRosterToCloud() {
+  const date = state.day.date;
+  if (!date) return toast('Pick a date first.');
+  if (!rostererName.trim()) {
+    const n = prompt('Your name, for the roster history:', cs.user.displayName || '');
+    if (!n) return;
+    rostererName = n.trim(); try { localStorage.setItem('ot-roster-name', rostererName); } catch { /* no storage */ }
+  }
+  const data = { day: state.day, roster: state.roster };
+  try {
+    let ts;
+    try {
+      ts = await cloud.saveRoster(date, data, me(), { expectedUpdatedAt: state.cloudBase[date] ?? null });
+    } catch (e) {
+      if (!(e instanceof cloud.Conflict)) throw e;
+      const c = e.current;
+      if (!confirm(`${byName(c.updatedBy)} saved the ${date} roster at ${when(c.updatedAt)}, after you opened it.\n\nOK: save yours as the latest (theirs stays in the history).\nCancel: don't save, so you can open theirs from the history first.`)) return;
+      ts = await cloud.saveRoster(date, data, me(), { force: true });
+    }
+    state.cloudBase[date] = ts;
+    delete cs.meta[date]; delete cs.versions[date]; cs.recent = null;
+    render();
+    toast(`Saved the ${date} roster.`);
+  } catch (e) { cloudError(e); }
+}
+
+function openSaved(date, snapshot, updatedAt) {
+  const local = state.roster && state.day.date === date;
+  if (local && !confirm(`Replace the roster on screen with the saved one for ${date}?`)) return;
+  state.day = clone(snapshot.day);
+  state.roster = clone(snapshot.roster);
+  state.day.date = date;
+  state.cloudBase[date] = updatedAt;
+  undoStack = []; editing = null;
+  syncRooms();
+  state.tab = 'roster';
+  render();
+  toast(`Opened the ${date} roster.`);
+}
+
+async function openLatest(date) {
+  try {
+    const d = await cloud.loadRoster(date);
+    if (!d) return toast(`No saved roster for ${date}.`);
+    openSaved(date, d, d.updatedAt);
+  } catch (e) { cloudError(e); }
+}
+
+// fetch something once per key, then re-render when it arrives
+function lazy(store, key, fn) {
+  if (store[key] === undefined) {
+    store[key] = 'loading';
+    fn().then(v => { store[key] = v; render(); }, e => { store[key] = null; cloudError(e); });
+  }
+  return store[key] === 'loading' ? null : store[key];
+}
+
+function historyCard() {
+  if (!isMember()) return null;
+  const date = state.day.date;
+  const meta = lazy(cs.meta, date, () => cloud.rosterMeta(date));
+  const versions = lazy(cs.versions, date, () => cloud.listVersions(date));
+  if (cs.recent === null) { cs.recent = 'loading'; cloud.listRosters().then(v => { cs.recent = v; render(); }, e => { cs.recent = []; cloudError(e); }); }
+  const recent = Array.isArray(cs.recent) ? cs.recent : [];
+  const behind = meta && state.cloudBase[date] !== meta.updatedAt;
+  return h('section', { class: 'card' },
+    h('h2', {}, 'Saved rosters'),
+    meta
+      ? h('p', { class: 'hint' }, `${date}: last saved by ${byName(meta.updatedBy)}, ${when(meta.updatedAt)}. `,
+        behind ? h('button', { class: 'link', onclick: () => openLatest(date) }, 'Open latest') : 'You have the latest.')
+      : h('p', { class: 'hint' }, `${date} hasn't been saved yet.`),
+    versions?.length ? h('details', { open: versions.length <= 5 },
+      h('summary', {}, `History for ${date} (${versions.length})`),
+      h('ul', { class: 'history' }, versions.map(v => h('li', {},
+        h('span', {}, `${when(v.savedAt)} · ${byName(v.savedBy)}`),
+        h('button', { class: 'link', onclick: () => openSaved(date, v, meta?.updatedAt ?? v.savedAt) }, 'Open'))))) : null,
+    recent.filter(x => x.date !== date).length ? h('details', {},
+      h('summary', {}, 'Other dates'),
+      h('ul', { class: 'history' }, recent.filter(x => x.date !== date).map(x => h('li', {},
+        h('span', {}, `${x.date} · ${byName(x.updatedBy)}`),
+        h('button', { class: 'link', onclick: () => openLatest(x.date) }, 'Open'))))) : null,
+  );
+}
+
+let newMember = { email: '', role: 'rosterer', name: '' };
+function membersCard() {
+  if (cs.members === null) {
+    cs.members = 'loading';
+    cloud.listMembers().then(v => { cs.members = v; render(); }, e => { cs.members = []; cloudError(e); });
+  }
+  const list = Array.isArray(cs.members) ? cs.members : [];
+  const refresh = () => { cs.members = null; render(); };
+  return h('section', { class: 'card scroll' },
+    h('h2', {}, 'Team members'),
+    h('p', { class: 'hint' }, 'Only these Google accounts can sign in and see the shared staff list and rosters. Admins can also manage this list.'),
+    h('table', {},
+      h('thead', {}, h('tr', {}, ['Google email', 'Name', 'Role', ''].map(t => h('th', {}, t)))),
+      h('tbody', {},
+        list.map(m => h('tr', {},
+          h('td', {}, m.email), h('td', {}, m.name || ''),
+          h('td', {}, select(m.role, [['rosterer', 'Rosterer'], ['admin', 'Admin']], v => cloud.setMember(m.email, v, m.name || '').then(refresh, cloudError))),
+          h('td', {}, m.email === cs.user.email.toLowerCase() ? '' : h('button', { class: 'small', onclick: () => { if (confirm(`Remove ${m.email}?`)) cloud.removeMember(m.email).then(refresh, cloudError); } }, '✕')))),
+        h('tr', {},
+          h('td', {}, h('input', { type: 'email', placeholder: 'name@gmail.com', value: newMember.email, oninput: e => { newMember.email = e.target.value; } })),
+          h('td', {}, h('input', { placeholder: 'Name', value: newMember.name, oninput: e => { newMember.name = e.target.value; } })),
+          h('td', {}, select(newMember.role, [['rosterer', 'Rosterer'], ['admin', 'Admin']], v => { newMember.role = v; })),
+          h('td', {}, h('button', { class: 'small', onclick: () => {
+            const e = newMember.email.trim().toLowerCase();
+            if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) return toast('Enter a Google email address.');
+            cloud.setMember(e, newMember.role, newMember.name.trim()).then(() => { newMember = { email: '', role: 'rosterer', name: '' }; refresh(); toast(`Added ${e}.`); }, cloudError);
+          } }, 'Add'))))),
+  );
+}
 
 if (!state.staff.length) state.tab = 'staff';
 render();
