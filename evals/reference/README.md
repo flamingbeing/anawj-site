@@ -2,6 +2,13 @@
 
 **The EPA Guidebook (v8, July 2024) is the source of truth.** Where the AY2023 tracking template or anything else here disagrees with it, follow the guidebook. The guidebook's assessment tables are in [`apmes-epas.json`](apmes-epas.json), with a cross-check of every tracking-template item (`crosscheck`) and the disagreements found (`notes`): for example, central venous catheter insertion is a DOPS (EPA 10) in the guidebook but a Mini-CEX in the template.
 
+**The guidebook's text is transcribed in full** under [`guidebook/`](guidebook/), with no personal names (cited authors in the Appendix and the EPA 7 attachments are left out):
+
+- [`00-introduction.md`](guidebook/00-introduction.md): front matter and how to use the guidebook.
+- [`epa-01-06.md`](guidebook/epa-01-06.md) and [`epa-07-12.md`](guidebook/epa-07-12.md): every EPA (1–6, 7, 7a, 7b, 8–12) with its specifications, sub-competencies, sources of information, supervision levels and entrustment questions, then the Appendix (how WBAs link to EPAs). The evals app's entrustment-question chips are built from the `#### <Tool> — <item>` sections of these two files.
+- [`epa-07-attachments.md`](guidebook/epa-07-attachments.md): the four documents embedded in the EPA 7a/7b tables (EBD_EPA7A_JR/SR, EBD_EPA7B_JR/SR), with their scenarios, questions and expected discussion points.
+- [`dops-expectations.md`](guidebook/dops-expectations.md) and [`msf-and-competency-forms.md`](guidebook/msf-and-competency-forms.md): the DOPS checklist and the remaining forms.
+
 Reference material for the evaluations app and other APMES tools, transcribed from programme documents the user supplied on 2026-10-10:
 
 - **Evaluations_Tracking_TemplateAY2023.xlsx**: which DOPS, Mini-CEX and EBD assessments each resident must complete, and by which residency year. Transcribed in full, cell by cell, into [`apmes-requirements.json`](apmes-requirements.json) and summarised below.
