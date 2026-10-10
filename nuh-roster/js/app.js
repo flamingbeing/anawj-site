@@ -1427,7 +1427,7 @@ function renderGeneral() {
         h('tbody', {}, DUTIES.map(d => h('tr', {},
           h('td', {}, h('b', {}, d.label)),
           [0, 1, 2].map(i => h('td', {}, d.fields[i] ? h('div', {}, h('div', { class: 'seen' }, d.fields[i][1]), field(`${d.key}.${d.fields[i][0]}`, d.fields[i][0] === 's' ? 'senior' : 'junior')) : null))))))),
-    h('p', { class: 'hint' }, 'AOCC, AIC, AH OT and ECT are on the OT roster tab.'));
+    h('p', { class: 'hint' }, 'AOCC, AIC, AH OT and ECT are on the Roster tab.'));
 }
 
 // ----- premed tab -----
@@ -1595,12 +1595,12 @@ function renderRoster() {
   if (rosterView === 'sheet') {
     return h('div', {},
       h('section', { class: 'card no-print' }, h('h2', {}, 'OT roster'), actions,
-        h('p', { class: 'hint', style: 'margin:0' }, 'This is what the downloaded .xlsx looks like. The top half comes from the General tab; case notes aren\'t included. Switch to Edit to move names or change tags. & marks a senior who is double covering.')),
+        h('p', { class: 'hint', style: 'margin:0' }, 'This is what the downloaded .xlsx looks like. The top half comes from the Calls/clinics tab; case notes aren\'t included. Switch to Edit to move names or change tags. & marks a senior who is double covering.')),
       renderSheet());
   }
   return h('div', {},
     h('section', { class: 'card' }, h('h2', {}, 'OT roster'), actions,
-      h('p', { class: 'hint', style: 'margin:0' }, 'Drag a name onto another name to swap them, or onto an empty part of a cell to move it there. Drag the C on a junior to add them to another room as an ad hoc cover, or the & on a senior to have them double cover another room (a dark & means they already are). × takes a name off. Click a name to see where they are and change its tags ((L), (RA), L-4pm, C-OT13…). + adds someone from the staff list. Click the case notes to edit them. Premed cover is on its own tab.')),
+      h('p', { class: 'hint', style: 'margin:0' }, 'Drag a name onto another name to swap them, or onto an empty part of a cell to move it there. Drag the C on a junior to add them to another room as an ad hoc cover, or the & on a senior to have them double cover another room (a dark & means they already are). × takes a name off. Click a name to see where they are and change its tags ((L), (RA), L-4pm, C-OT13…). + adds someone from the staff list. Click the case notes to edit them. Premed cover is on the Premeds tab.')),
     h('div', { class: 'cols' },
       h('section', { class: 'card scroll' },
         h('table', { class: 'sheet' },
@@ -2034,5 +2034,6 @@ function membersCard() {
 
 lastRows = state.roster ? JSON.stringify(state.roster.rows) : null;
 if (state.tab === 'staff') state.tab = 'seniors';
+state.tab = 'roster'; // the page opens on the roster
 if (!state.staff.length) state.tab = 'seniors';
 render();
