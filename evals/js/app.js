@@ -2,7 +2,7 @@
 // own ui-*.js file and is loaded on first use; shared state and helpers are in ui-core.js.
 // Data comes from cloud.js (Firestore, or the in-browser demo backend with ?demo).
 
-import { S, hooks, h, fill, toast, cloud, icon, initials, go, isResident, isFaculty, isStaff, hasRole, pruneDrafts } from './ui-core.js';
+import { S, hooks, h, fill, toast, cloud, icon, initials, go, isResident, isFaculty, isStaff, hasRole, pruneDrafts, confirmBox } from './ui-core.js';
 
 const app = document.getElementById('app');
 const tabsEl = document.getElementById('tabs');
@@ -378,6 +378,15 @@ function registerSW() {
   }).catch(err => console.warn('Service worker not registered', err));
 }
 
+// Demo only: wipe the demo store (and any half-filled demo forms) and reload in the same role.
+export async function resetDemoData() {
+  if (!(await confirmBox('Reset the demo?', 'All demo changes in this browser are wiped and the made-up data is loaded again. You stay in the same demo role.', 'Reset', true))) return;
+  const { resetDemo } = await import('./demo-backend.js');
+  try { for (const k of Object.keys(localStorage)) if (k.startsWith('evals-draft-')) localStorage.removeItem(k); } catch {}
+  resetDemo();
+  location.replace(location.pathname + location.search);
+}
+
 // ---------- boot ----------
 
 if (cloud.onSyncError) cloud.onSyncError(err => toast('A change could not be synced: ' + (err.message || err)));
@@ -386,6 +395,7 @@ if (cloud.demo) {
   S.demoRole = cloud.demoRole ? cloud.demoRole() : 'resident';
   banner.append(h('div', { class: 'e-banner e-banner--warn' },
     h('span', {}, 'Demo: made-up data, kept in this browser.'),
+    h('button', { type: 'button', class: 'n-btn n-btn--outline e-btn-small', onclick: resetDemoData }, 'Reset'),
     h('a', { href: location.pathname, class: 'n-btn n-btn--outline e-btn-small' }, 'Leave demo')));
   banner.hidden = false;
 }
