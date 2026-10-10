@@ -5,6 +5,12 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { computeBoundsTree, disposeBoundsTree, acceleratedRaycast } from 'three-mesh-bvh';
+
+// bounding-volume hierarchies make raycasts (aiming, contact, exposure, picking) fast enough for phones
+THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree;
+THREE.BufferGeometry.prototype.disposeBoundsTree = disposeBoundsTree;
+THREE.Mesh.prototype.raycast = acceleratedRaycast;
 import { STAGES, NOTES, INFO, GROUP_LABEL } from './content.js';
 
 const $ = (s) => document.querySelector(s);
@@ -284,6 +290,7 @@ class JointBone {
     this.osteoRemain = new Float32Array(n).fill(1); this.resect = new Float32Array(n);
     this.fibRemain = new Float32Array(n).fill(1); this.cartLost = new Float32Array(n);
     this.disp = new Float32Array(n); this.thick = new Float32Array(n);
+    this.coff = new Float32Array(n * 3); // burr carving offset (any direction); resect[i] holds its length
     g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(n * 3).fill(1), 3));
     g.setAttribute('scl', new THREE.BufferAttribute(new Float32Array(n), 1));
     for (let i = 0; i < n; i++) this.fibN[i] = fbm(this.base[i * 3] * 3.1, this.base[i * 3 + 1] * 3.1, this.base[i * 3 + 2] * 3.1, 3) * 2 - 1;
@@ -291,7 +298,7 @@ class JointBone {
   }
   P(i) { return V(this.base[i * 3], this.base[i * 3 + 1], this.base[i * 3 + 2]); }
   N(i) { return V(this.nrm[i * 3], this.nrm[i * 3 + 1], this.nrm[i * 3 + 2]); }
-  resetTools() { this.osteoRemain.fill(1); this.resect.fill(0); this.fibRemain.fill(1); this.cartLost.fill(0); this.dirty = true; }
+  resetTools() { this.osteoRemain.fill(1); this.resect.fill(0); this.coff.fill(0); this.fibRemain.fill(1); this.cartLost.fill(0); this.dirty = true; }
   buildCartilage() {
     const idx = this.g.index.array, keep = [];
     for (let f = 0; f < idx.length; f += 3) {
@@ -316,9 +323,9 @@ class JointBone {
     const pos = this.g.attributes.position.array, col = this.g.attributes.color.array, scl = this.g.attributes.scl.array;
     const heat = state.heat && state.mode === 'oa';
     for (let i = 0; i < this.n; i++) {
-      const d = P.osteo * this.osteoMask[i] * this.osteoRemain[i] + P.stt * this.sttMask[i] * this.osteoRemain[i] - this.resect[i];
+      const d = P.osteo * this.osteoMask[i] * this.osteoRemain[i] + P.stt * this.sttMask[i] * this.osteoRemain[i];
       this.disp[i] = d;
-      for (let k = 0; k < 3; k++) pos[i * 3 + k] = this.base[i * 3 + k] + this.nrm[i * 3 + k] * d;
+      for (let k = 0; k < 3; k++) pos[i * 3 + k] = this.base[i * 3 + k] + this.nrm[i * 3 + k] * d + this.coff[i * 3 + k];
       // cartilage thickness
       const lost = Math.max(this.loss[i], this.cartLost[i], this.resect[i] > 0.05 ? 1 : 0);
       const th = T0 * this.w[i] * (1 - lost) * (1 - 0.22 * this.soft[i]);
@@ -343,6 +350,7 @@ class JointBone {
     this.g.attributes.position.needsUpdate = true; this.g.attributes.color.needsUpdate = true; this.g.attributes.scl.needsUpdate = true;
     this.g.computeVertexNormals(); this.g.computeBoundingSphere(); this.g.computeBoundingBox();
     this.g.userData.ver = (this.g.userData.ver || 0) + 1;
+    if (this.g.boundsTree) this.g.boundsTree.refit();
     if (!this.cart) return;
     const cg = this.cart.geometry, cp = cg.attributes.position.array, cc = cg.attributes.color.array, cr = cg.attributes.rough.array;
     const healthy = [0.72, 0.82, 0.96], worn = [0.92, 0.85, 0.64];
@@ -368,6 +376,7 @@ class JointBone {
     cg.attributes.position.needsUpdate = true; cg.attributes.color.needsUpdate = true; cg.attributes.rough.needsUpdate = true;
     cg.computeVertexNormals(); cg.computeBoundingSphere(); cg.computeBoundingBox();
     cg.userData.ver = (cg.userData.ver || 0) + 1;
+    if (cg.boundsTree) cg.boundsTree.refit();
   }
   nearest(localP) {
     let best = -1, bd = Infinity;
@@ -404,6 +413,10 @@ async function load() {
   }
   setupJoint();
   buildCapsule();
+  for (const m of Object.values(meshes)) m.geometry.computeBoundsTree();
+  for (const jb of [JB.T, JB.F]) jb.cart.geometry.computeBoundsTree();
+  capsule.geometry.computeBoundsTree();
+  for (const m of looseBodies) m.geometry.computeBoundsTree();
   buildPortals();
   buildInstruments();
   applyStage(0);
@@ -737,6 +750,7 @@ function boneClearance(p) {
   return best;
 }
 const segRay = new THREE.Raycaster();
+segRay.firstHitOnly = true;
 function crossesSurface(a, b) {
   const d = b.clone().sub(a), len = d.length();
   if (len < 1e-6) return false;
@@ -890,8 +904,8 @@ function updateInstrument(dt, now) {
   const active = pointer.down && pointer.inScope && !pointer.aim;
   inst.aim = px ? { px, ...(aimRay(px) || {}) } : null;
   // holding a running burr on one spot keeps feeding it into the bone (up to 3 mm past the aimed surface)
-  if (active && tool === 'burr' && inst.atAim && inst.contact0 && inst.aim && inst.holdAt && inst.aim.point.distanceTo(inst.holdAt) < 1.6) inst.hold = Math.min(3, inst.hold + dt);
-  else { inst.hold = 0; inst.holdAt = inst.aim && inst.aim.point ? inst.aim.point.clone() : null; }
+  if (active && tool === 'burr' && inst.atAim && inst.contact0 && inst.aim && inst.holdAt && inst.aim.px && Math.hypot(inst.aim.px.x - inst.holdAt.x, inst.aim.px.y - inst.holdAt.y) < 25) inst.hold = Math.min(4, inst.hold + dt);
+  else { inst.hold = 0; inst.holdAt = inst.aim && inst.aim.px ? { ...inst.aim.px } : null; }
   if (active && inst.aim && inst.aim.point) {
     const want = inst.aim.point.clone().sub(e);
     const goal = want.length() + 0.3 + inst.hold;
@@ -917,10 +931,10 @@ function updateInstrument(dt, now) {
       inst.depth = reach(e, inst.dir, inst.depth, Math.min(goal, inst.depth + 10 * dt), clr);
       // a running burr feeds into trapezium / MC1 at a cutting rate, carving as it goes
       if (tool === 'burr' && inst.depth < goal - 1e-3 && inst.depth - before < 1e-3 && inst.contact0 && (inst.contact0 === JB.T || inst.contact0 === JB.F)) {
-        const nd = Math.min(goal, inst.depth + 1.2 * dt);
+        const nd = Math.min(goal, inst.depth + BURR_FEED * dt);
         if (lineClear(e, inst.dir, nd, -1, INST_SHAFT_CLEAR)) {
           const keep = inst.depth;
-          inst.depth = nd; carve(inst.contact0, instTip(), BURR_R + 0.02, dt);
+          inst.depth = nd; carve(inst.contact0, instTip(), BURR_CUT, dt);
           if (boneClearance(instTip()) < clr - 0.12) { inst.dbg = 'revert'; inst.depth = keep; } else inst.dbg = 'fed'; // something else (another bone) is in the way
         }
       }
@@ -940,7 +954,7 @@ function updateInstrument(dt, now) {
   // the instrument only works on what you aimed at: brushing past other tissue on the way does nothing
   const kind = (o) => (!o ? null : o === fronds || o.userData.zname === '__synovium' ? 'syn' : o === JB.T.mesh || o === JB.T.cart ? 'T' : o === JB.F.mesh || o === JB.F.cart ? 'F' : o.userData.zname);
   const aimed = inst.aim && inst.aim.hit;
-  const atAim = hit && aimed && kind(hit.object) === kind(aimed.object) && hit.point.distanceTo(inst.aim.point) < (tool === 'burr' ? 2.2 : 2.5);
+  const atAim = hit && aimed && kind(hit.object) === kind(aimed.object) && hit.point.distanceTo(inst.aim.point) < (tool === 'burr' ? 4 : 2.5);
   inst.atAim = !!atAim;
   // a running shaver draws nearby villi into its window
   if (active && tool === 'shaver' && frondsNear(tip, 1.8)) renderTasksThrottled();
@@ -948,7 +962,7 @@ function updateInstrument(dt, now) {
   // bone between the head and the target is cut at the feed rate and the instrument follows next frame
   if (active && tool === 'burr' && atAim && inst.contact0 && inst.aim.point) {
     const toP = inst.aim.point.clone().sub(tip), dist = toP.length();
-    if (dist > 0.25) carve(inst.contact0, tip.clone().addScaledVector(toP.normalize(), Math.min(1.2 * dt, dist - 0.2)), BURR_R + 0.02, dt);
+    if (dist > 0.25) carve(inst.contact0, tip.clone().addScaledVector(toP.normalize(), Math.min(BURR_FEED * dt, dist - 0.2)), BURR_CUT, dt);
   }
   if (active && atAim) {
     if (tool === 'probe') { if (now - inst.probeT > 700) { applyTool(hit, 0); inst.probeT = now; } }
@@ -1010,6 +1024,7 @@ function applyStage(s) {
   // capture baseline osteophyte volume for task progress
   geo.osteoTotal = [JB.T, JB.F].reduce((a, jb) => a + jb.osteoMask.reduce((x, y) => x + y, 0), 0) * P.osteo;
   geo.patchT = []; for (let i = 0; i < JB.T.n; i++) if (JB.T.w[i] > 0.6) geo.patchT.push(i);
+  geo.reachStage = -1;
   applyThumb();
   if (state.mode === 'arthro' && scope.dir.lengthSq() === 0) resetScope();
   renderStageUI(); renderTasks();
@@ -1017,6 +1032,7 @@ function applyStage(s) {
 
 // ---------- tools ----------
 const raycaster = new THREE.Raycaster();
+raycaster.firstHitOnly = true;
 function toolTargets() {
   const t = [JB.T.mesh, JB.F.mesh, JB.T.cart, JB.F.cart, fronds, capsuleInner, ...looseBodies.filter((m) => m.visible)];
   for (const n of ['Dorsal carpometacarpal ligaments', 'Palmar carpometacarpal ligaments', 'Scaphoid bone', 'Second metacarpal bone', 'Trapezoid bone']) if (meshes[n]) t.push(meshes[n]);
@@ -1043,7 +1059,9 @@ function cartInfoAt(jb, i) {
 }
 // Remove bone (osteophyte first, then subchondral bone) and cartilage inside a sphere of radius r at centre.
 // Each vertex moves inward along its normal to the sphere surface, so nothing is left inside the burr head.
-const BURR_R = 0.78;
+// the burr head is drawn (and collides) at BURR_R; when pressed against bone it cuts out to BURR_CUT, so
+// space opens ahead of the head and it can follow without ever overlapping bone
+const BURR_R = 0.78, BURR_CUT = 1.2, BURR_FEED = 2.5;
 function carve(jb, centreW, r, dt) {
   const P = STAGE_P[state.stage];
   const c = jb.mesh.worldToLocal(centreW.clone());
@@ -1059,21 +1077,28 @@ function carve(jb, centreW, r, dt) {
       jb.dirty = true;
     }
     if (d2 >= r * r) continue;
-    // solve |w + n*t| = r for the inward root t < 0 (w = vertex - centre, n = base normal)
+    // osteophyte is removed first (the vertex sinks back along its normal) ...
     const nx = jb.nrm[i * 3], ny = jb.nrm[i * 3 + 1], nz = jb.nrm[i * 3 + 2];
-    const wn = wx * nx + wy * ny + wz * nz;
-    const disc = wn * wn - d2 + r * r;
-    const t = -wn - Math.sqrt(Math.max(0, disc));
-    if (t >= 0) continue;
-    let need = Math.min(-t, 1.5); // depth to remove at this vertex
+    let px = pos[i * 3], py = pos[i * 3 + 1], pz = pos[i * 3 + 2];
     const ost = P.osteo * jb.osteoMask[i] * jb.osteoRemain[i] + P.stt * jb.sttMask[i] * jb.osteoRemain[i];
     if (ost > 0.01) {
+      const wn = wx * nx + wy * ny + wz * nz, disc = wn * wn - d2 + r * r;
+      const take = Math.min(ost, Math.max(0, wn + Math.sqrt(Math.max(0, disc))));
       const amp = P.osteo * jb.osteoMask[i] + P.stt * jb.sttMask[i];
-      const take = Math.min(ost, need);
       jb.osteoRemain[i] = Math.max(0, jb.osteoRemain[i] - take / amp);
-      need -= take;
+      px -= nx * take; py -= ny * take; pz -= nz * take;
+      jb.dirty = true;
     }
-    if (need > 0) { jb.resect[i] = Math.min(8, jb.resect[i] + need); out.bone = true; }
+    // ... then bone is pushed radially out of the burr head; rays from one centre never cross, so the
+    // surface cannot fold over itself the way pushing along converging normals would
+    const qx = px - c.x, qy = py - c.y, qz = pz - c.z, ql = Math.hypot(qx, qy, qz);
+    if (ql >= r) continue;
+    const k = ql > 1e-6 ? r / ql : 0;
+    const tx = ql > 1e-6 ? c.x + qx * k : px - nx * r, ty = ql > 1e-6 ? c.y + qy * k : py - ny * r, tz = ql > 1e-6 ? c.z + qz * k : pz - nz * r;
+    const o = i * 3;
+    jb.coff[o] += tx - px; jb.coff[o + 1] += ty - py; jb.coff[o + 2] += tz - pz;
+    jb.resect[i] = Math.hypot(jb.coff[o], jb.coff[o + 1], jb.coff[o + 2]);
+    if (jb.resect[i] > 1.0) out.bone = true;
     jb.dirty = true;
   }
   if (jb.dirty) jb.update();
@@ -1133,7 +1158,7 @@ function applyTool(hit, dt, center) {
     if (jb) {
       // carve away everything inside the burr head (a sphere at the instrument tip)
       const centre = center || hit.point.clone().addScaledVector(raycaster.ray.direction, -BURR_R * 0.6);
-      const r = carve(jb, centre, BURR_R + 0.08, dt);
+      const r = carve(jb, centre, BURR_CUT, dt);
       if (r.healthy) { stats.iatro.cart += dt; warn('Burring healthy cartilage'); }
       if (r.bone && jb === JB.F) { stats.iatro.mc1 += dt; warn('Resecting the MC1 base: in hemitrapeziectomy the trapezium is resected'); }
       renderTasksThrottled();
@@ -1150,17 +1175,42 @@ function taskList() {
   const synTot = frondData.filter((f) => f.ok).length;
   const synRem = frondData.filter((f) => f.ok && f.removed).length;
   const lbTot = Math.min(P.loose, looseBodies.length), lbRem = looseBodies.slice(0, lbTot).filter((m) => m.userData.removed).length;
-  let ostLeft = 0; for (const jb of [JB.T, JB.F]) for (let i = 0; i < jb.n; i++) ostLeft += jb.osteoMask[i] * jb.osteoRemain[i] * P.osteo;
-  const ostPct = geo.osteoTotal > 0 ? 1 - ostLeft / geo.osteoTotal : 1;
-  const hemi = geo.patchT.length ? geo.patchT.filter((i) => JB.T.resect[i] >= 2.5).length / geo.patchT.length : 0;
+  const R = reachSets();
+  // osteophyte excision is measured on the osteophytes reachable from the portals
+  let ostTot = 0, ostLeft = 0;
+  for (const [jb, list] of [[JB.T, R.osteoT], [JB.F, R.osteoF]]) for (const i of list) { ostTot += jb.osteoMask[i]; ostLeft += jb.osteoMask[i] * jb.osteoRemain[i]; }
+  const ostPct = ostTot > 0 ? 1 - ostLeft / ostTot : 1;
+  const hemi = geo.patchT.length ? geo.patchT.filter((i) => JB.T.resect[i] >= 2).length / geo.patchT.length : 0;
   return [
     { t: 'Enter the joint with the scope', done: scope.everInJoint, na: false },
     { t: 'Probe the cartilage of trapezium and MC1 base', done: stats.probedT && stats.probedF, na: false, prog: `${+stats.probedT + +stats.probedF}/2 surfaces` },
     { t: 'Synovectomy: remove ≥ 75% of the synovitis', done: synTot > 0 && synRem / synTot >= 0.75, na: synTot === 0, prog: synTot ? `${Math.round((100 * synRem) / synTot)}%` : '' },
     { t: 'Remove all loose bodies', done: lbTot > 0 && lbRem === lbTot, na: lbTot === 0, prog: lbTot ? `${lbRem}/${lbTot}` : '' },
-    { t: 'Excise marginal osteophytes (≥ 80%)', done: P.osteo > 0 && ostPct >= 0.8, na: P.osteo === 0, prog: P.osteo ? `${Math.round(ostPct * 100)}%` : '' },
-    { t: 'Hemitrapeziectomy: burr ≥ 2.5 mm off the distal trapezial surface (≥ 70% of it)', done: s >= 3 && hemi >= 0.7, na: s < 3, prog: s >= 3 ? `${Math.round(hemi * 100)}%` : '' },
+    { t: 'Excise intra-articular osteophytes (≥ 50% of those reachable from the portals)', done: P.osteo > 0 && ostPct >= 0.5, na: P.osteo === 0, prog: P.osteo ? `${Math.round(ostPct * 100)}%` : '' },
+    { t: 'Hemitrapeziectomy: burr ≥ 2 mm off ≥ 30% of the distal trapezial articular surface', done: s >= 3 && hemi >= 0.3, na: s < 3, prog: s >= 3 ? `${Math.min(100, Math.round((100 * hemi) / 0.3))}% of target` : '' },
   ];
+}
+// vertices of jb (from list) whose surface a burr can reach in a straight line from at least one portal
+function reachableVerts(jb, list) {
+  const pos = jb.g.attributes.position.array, nrm = jb.g.attributes.normal.array, out = [];
+  for (const i of list) {
+    const q = V(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]).applyMatrix4(jb.mesh.matrixWorld).addScaledVector(V(nrm[i * 3], nrm[i * 3 + 1], nrm[i * 3 + 2]), BURR_R + 0.07);
+    for (const k in geo.portals) {
+      const e = geo.portals[k].entry, d = q.clone().sub(e), len = d.length();
+      if (lineClear(e, d.divideScalar(len), len, TOOL_CLEAR.burr - 0.08, INST_SHAFT_CLEAR)) { out.push(i); break; }
+    }
+  }
+  return out;
+}
+// computed once per stage, at the start of the stage (before any burring)
+function reachSets() {
+  if (geo.reachStage === state.stage && geo.reach) return geo.reach;
+  for (const k in JB) JB[k].update();
+  const P = STAGE_P[state.stage];
+  const ost = (jb) => { const l = []; for (let i = 0; i < jb.n; i++) if (P.osteo * jb.osteoMask[i] > 0.3) l.push(i); return l; };
+  geo.reach = { osteoT: P.osteo ? reachableVerts(JB.T, ost(JB.T)) : [], osteoF: P.osteo ? reachableVerts(JB.F, ost(JB.F)) : [] };
+  geo.reachStage = state.stage;
+  return geo.reach;
 }
 function renderTasks() {
   if (state.mode !== 'arthro' || !geo.patchT) return;
@@ -1659,7 +1709,7 @@ function setTool(t) {
 window.__cmcj = {
   state, scope, JB, geo: () => geo, applyStage, setTool, taskList, stats, setView, inst, instTip, pointer, rect: () => rect, lineClear, workEntry, aimRay, updateInstrument, ensureScopeFree, scopeCam, frondData, fronds,
   frondScreen(k) { const m = new THREE.Matrix4(); fronds.getMatrixAt(k, m); const v = new THREE.Vector3().setFromMatrixPosition(m); const q = new THREE.Quaternion(), sc = new THREE.Vector3(); m.decompose(new THREE.Vector3(), q, sc); v.add(new THREE.Vector3(0, sc.y * 0.6, 0).applyQuaternion(q)); const p = v.clone().project(scopeCam); const r = rect.scope; return p.z < 1 && Math.hypot(p.x, p.y) < 0.95 ? { x: r.x + (p.x + 1) / 2 * r.w, y: r.y + (1 - p.y) / 2 * r.h } : null; },
-  updateScope, patchT: () => geo.patchT, portals: () => geo.portals,
+  updateScope, patchT: () => geo.patchT, reachSets, reachableVerts, autoExposure, exposure: () => exposure, portals: () => geo.portals,
   nearestDist(p) { const n = nearestSurface(p); return n ? n.distance : 9; },
   diag(p) { const n = nearestSurface(p); const bones = geo.collide.filter((m) => m.userData.zname !== '__cartilage'); const saved = geo.collide; geo.collide = bones; const bc = boneClearance(p); geo.collide = saved; let th = null; if (n && n.object.userData.zname === '__cartilage') { const jb = n.object.userData.jb; const nv = nearestVertex(n.object, p); th = jb.thick[jb.cartSrc[nv.i]]; } return { near: n && n.object.userData.zname, boneClr: bc, cartThick: th }; },
   insideTruth(p) { const bones = geo.collide.filter((m) => m.userData.zname !== '__cartilage'); let votes = 0; for (const d of [V(0.3, 1, 0.2), V(-0.7, -0.2, 0.6), V(0.1, -0.5, -1)]) { const r = new THREE.Raycaster(p, d.normalize()); const n = r.intersectObjects(bones, false).length; votes += n % 2; } return votes >= 2; }, setDepth, pivotScope, resetScope, boneClearance, tip: () => scopeFrame().tip, inCap: () => insideCapsule(scopeFrame().tip),
