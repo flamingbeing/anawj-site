@@ -592,11 +592,13 @@ class FormScreen {
       ta.setSelectionRange(ta.value.length, ta.value.length);
     };
     let starters = null;
-    if (!ro && isEntrust) {
+    if (isEntrust) {
+      // the item's suggested entrustment questions, as a plain reading list (not tappable)
       const qs = this.item?.entrustQs || [];
       starters = qs.length
-        ? [h('p', { class: 'e-q__help' }, 'Tap a question to add it. At least 2 are expected.'),
-          h('div', { class: 'e-starters e-form__entrust' }, qs.map((x, i) => h('button', { type: 'button', title: x, onclick: () => insert(entrustStarter(x)) }, `Q${i + 1}: ${x.length > 70 ? x.slice(0, 68) + '…' : x}`)))]
+        ? h('div', { class: 'e-entrust' },
+            h('p', { class: 'e-entrust__title' }, 'Entrustment questions (discuss at least 2)'),
+            h('ol', { class: 'e-entrust__list' }, qs.map(x => h('li', {}, x))))
         : h('p', { class: 'e-q__help' }, 'The guidebook sets no entrustment questions for this item. Discuss at least 2 of your own.');
     } else if (!ro && q.minLength) {
       starters = h('div', { class: 'e-starters' }, COMMENT_STARTERS.map(s => h('button', { type: 'button', onclick: () => insert(s) }, s.replace(/: $/, '…'))));
@@ -742,7 +744,10 @@ function injectCss() {
 .e-form__info .e-ico { width: 20px; height: 20px; }
 .e-scale9__na { align-items: center; padding: 0 8px; }
 .e-form__change { min-height: var(--e-touch, 48px); font-size: var(--n-text-sm); margin-top: 4px; }
-.e-form__entrust button { text-align: left; }
+.e-entrust { margin: 0 0 10px; padding: 10px 12px; background: var(--n-bg-blue); border-left: 3px solid var(--n-navy); }
+.e-entrust__title { margin: 0 0 6px; font-weight: 600; color: var(--n-navy); font-size: var(--n-text-sm); }
+.e-entrust__list { margin: 0; padding-left: 1.4em; font-size: var(--n-text-sm); color: var(--n-ink); }
+.e-entrust__list li { margin: 0 0 6px; white-space: pre-line; }
 .e-form__idwarn { margin: 8px 0 0; padding: 8px 12px; }
 .e-form__gaps { margin: 0; }
 .e-form__jump { font-weight: var(--n-regular); color: var(--n-muted); }

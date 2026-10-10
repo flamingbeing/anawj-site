@@ -309,12 +309,16 @@ const SCALE_TYPES = ['ninePoint', 'milestone', 'supervision'];
 const EXCLUSIVE = 'No obvious areas for improvement';
 const SCALES = FORMS_JSON.scales;
 const FORMS = {};
+// The app shortens the entrustment question and lists the item's suggested entrustment questions under it
+// (ui-form.js); the official MedHub wording stays in reference/apmes-forms.json as officialLabel.
+const ENTRUST_LABEL = 'Please briefly describe what was discussed';
 for (const [tool, f] of Object.entries(FORMS_JSON.forms)) {
   const meta = FORM_META[tool] || fail('unknown form ' + tool);
   const sections = f.sections.map(s => ({
     title: s.section || null,
     questions: s.questions.map(q => {
       const out = { n: q.n, key: 'q' + q.n, label: q.label, type: q.type, required: !!q.required, na: !!q.na };
+      if (/^Please briefly describe what was discussed centered around/.test(q.label)) Object.assign(out, { label: ENTRUST_LABEL, officialLabel: q.label });
       if (q.type === 'select' || q.type === 'checkboxes') {
         const opts = typeof q.options === 'string' ? (SCALES[q.options] || fail('no scale ' + q.options)).options : q.options;
         if (!Array.isArray(opts) || !opts.every(o => typeof o === 'string')) fail(`options for ${tool} q${q.n}`);
