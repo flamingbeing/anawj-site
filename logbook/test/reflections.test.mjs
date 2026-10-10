@@ -161,4 +161,16 @@ assert.ok(MIN_WORDS > 0);
   assert.deepEqual(moveToHeading({ headingId: 'regional', subId: 'chronic' }, 'urology'), { headingId: 'urology', subId: null });
   assert.equal(moveToHeading({ headingId: 'x', subId: 'neonate' }, 'paeds').subId, 'neonate');
 }
+// Word imports: a case link is optional
+{
+  const { needsCase } = await import('../js/reflections.js');
+  assert.equal(needsCase({ caseId: null }), true);
+  assert.equal(needsCase({ caseId: null, source: 'word' }), false);
+  assert.equal(needsCase({ caseId: 'c1' }), false);
+  const word = cleanReflection({ id: 'w1', headingId: 'thyroid', initials: 'AB', date: '2025-01-02', title: 'T', points: [{ heading: 'h', text: 't' }], source: 'word' });
+  assert.equal(word.source, 'word');
+  assert.ok(!completeProblems(word).includes('linked case'));
+  assert.ok(completeProblems({ ...word, source: undefined }).includes('linked case'));
+  assert.equal(cleanReflection({ id: 'x', headingId: 'thyroid', source: 'evil' }).source, undefined);
+}
 console.log('reflections tests passed');
