@@ -414,6 +414,10 @@ body.compact dialog { padding: 12px; }
 .refl-handle:active { cursor: grabbing; }
 .refl-cb { width: 22px; height: 22px; margin: 0; }
 ul.cases li.refl-row.edit { grid-template-columns: auto 1fr; }
+ul.cases .refl-proc.draft { color: var(--err); }
+ul.cases .refl-row .t .flag { margin-left: 6px; vertical-align: 2px; }
+ul.cases .refl-points { grid-column: 2; font-size: 13px; color: var(--muted); }
+ul.cases .refl-points div { padding-left: 1.2em; text-indent: -1.2em; }
 ul.cases li.refl-row.edit .d { display: flex; align-items: center; white-space: nowrap; }
 ul.cases li.sel { background: color-mix(in srgb, var(--warn, #b45309) 10%, transparent); }
 ul.cases li.dragging { opacity: .35; }
