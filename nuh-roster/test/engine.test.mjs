@@ -54,12 +54,12 @@ for (let seed = 1; seed < 30; seed++) {
   assert.doesNotMatch(by['MCOR 2'].senior, /Senior General/, "senior who doesn't do eye isn't given eye");
   // one double cover is needed (3 seniors, 4 rooms): Baby MO must not be in a double-covered room
   const counts = {};
-  g.rows.forEach(r => r.senior.split(' / ').forEach(s => { counts[s] = (counts[s] || 0) + 1; }));
+  g.rows.forEach(r => r.senior.split(' / ').filter(Boolean).forEach(s => { counts[s] = (counts[s] || 0) + 1; }));
   for (const r of g.rows) {
     if (r.junior.includes('Junior Baby')) assert.ok(r.senior.split(' / ').every(s => counts[s] === 1), `Baby MO in double-covered room (seed ${seed})`);
   }
   assert.match(by['MCOR 1'].junior, /Junior Paeds/, 'paeds posting junior goes to the paeds list');
-  const withJ2 = g.rows.find(r => r.junior.includes('Junior Resident'));
+  const withJ2 = g.rows.find(r => r.complex !== 'Clinic' && r.junior.includes('Junior Resident'));
   if (withJ2) assert.ok(withJ2.premed && !withJ2.premed.includes('Junior Resident') && !withJ2.premed.includes('Junior Baby'), 'premed cover from someone around yesterday, not a Baby MO');
   const errs = check({ rows: g.rows, staff, day }).filter(w => w.level === 'error');
   assert.deepEqual(errs, [], JSON.stringify(errs));
@@ -127,4 +127,25 @@ console.log('engine tests passed');
   rows[1].senior = 'Senior Two C-13';
   assert.equal(missingCovers(rows).length, 0, 'bare number means own complex');
   console.log('cover tests passed');
+}
+
+// AOCC gets a senior and two juniors; AIC a spare consultant or a senior resident
+{
+  const st = [
+    P('s1', 'Senior A', 'senior'), P('s2', 'Senior B', 'senior'), P('s3', 'Senior C', 'senior'),
+    P('j1', 'Junior A', 'junior'), P('j2', 'Junior B', 'junior'), P('j3', 'Junior C', 'junior'),
+    P('j4', 'Junior SR', 'junior', { grade: 'Senior Resident' }),
+  ];
+  const dy = { rooms: [room('r1', 'MOR 1', 'MOR', 'hernia')], staff: {} };
+  const g = generate({ staff: st, day: dy, seed: 5 });
+  const by = Object.fromEntries(g.rows.map(r => [r.label, r]));
+  assert.ok(by['AOCC'].senior, 'AOCC has a senior');
+  assert.equal(by['AOCC'].junior.split(' / ').length, 2, 'AOCC has two juniors');
+  assert.ok(by['AIC'].senior, 'AIC filled');
+  assert.equal(by['AH OT'].senior, '', 'AH OT left for hand entry');
+  const fixedDay = { ...dy, fixed: { ahot: 'Senior C', aic: 'Junior SR' } };
+  const g2 = generate({ staff: st, day: fixedDay, seed: 5 });
+  assert.equal(g2.rows.find(r => r.label === 'AH OT').senior, 'Senior C');
+  assert.equal(g2.rows.find(r => r.label === 'AIC').senior, 'Junior SR');
+  console.log('special row tests passed');
 }

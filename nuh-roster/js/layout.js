@@ -7,17 +7,26 @@ export const COL_WIDTHS = [10, 5, 9.14, 9.14, 9.14, 9.14, 9.14, 9.14, 9.14, 9.14
 export const RED = 'FFFF0000';
 export const BLUE = 'FF0000FF';
 
-const UPPER = [
-  // [row label, has a boxed assistant cell]
-  ['Recovery Room', false], ['EOT 8:', false], ['EOT 9:', false], ['', false],
-  ['Epidural:', false], ['ADOT:', false], ['Cardiac Call:', false], null,
-  ['ECT:', false], ['AOCC:', false], ['Pain/ACP Clinic:', false], ['Acute Pain:', false], ['Chronic Pain:', false],
+// The General tab: MOT and SICU teams, then the duty rows (specialist in C, assistants in F and I).
+export const TEAM_ROWS = [['cons', 'Consultant:'], ['reg', 'Registrar/AC:'], ['res1', 'Residents:'], ['res2', ''], ['res3', '']];
+export const DUTIES = [
+  { key: 'eot8', label: 'EOT 8', fields: [['s', 'Specialist'], ['a', 'Assistant']] },
+  { key: 'eot9', label: 'EOT 9', fields: [['s', 'Specialist'], ['a', 'Assistant'], ['a2', 'Assistant 2']] },
+  { key: 'epi', label: 'Epidural', fields: [['s', 'Specialist'], ['df', 'Day float (DF)'], ['nf', 'Night float (NF)']] },
+  { key: 'adot', label: 'ADOT', fields: [['s', 'Specialist']] },
+  { key: 'cardiac', label: 'Cardiac Call', fields: [['s', 'Specialist'], ['a', 'Assistant']] },
+  { key: 'ect', label: 'ECT', fields: [['s', 'Specialist'], ['a', 'Assistant']] },
+  { key: 'painacp', label: 'Pain/ACP Clinic', fields: [['s', 'Specialist'], ['a', 'Assistant']] },
+  { key: 'acute', label: 'Acute Pain', fields: [['s', 'Specialist'], ['a', 'Assistant']] },
+  { key: 'chronic', label: 'Chronic Pain', fields: [['s', 'Specialist'], ['a', 'Assistant']] },
 ];
 
 // lists: { postcall: [...names], leave: [...], admin: [...] }
 // colourOf(namePart) -> 'green' | 'purple' | '' for each name on the OT rows.
 // shortOf(namePart) -> the same part with the person's short name ("Tan YW (RA)").
-export function buildLayout({ date, rows, lists = {}, colourOf = () => '', shortOf = s => s }) {
+// general: the General tab's fields ({ 'mot.cons': '…', 'eot8.s': '…' }); box: the free text
+// in the top right box.
+export function buildLayout({ date, rows, lists = {}, general = {}, box = '', colourOf = () => '', shortOf = s => s }) {
   const cells = [];
   const heights = {};
   const put = (r, c1, c2, text, o = {}) => cells.push({ r, r2: o.r2 || r, c1, c2, text: text ?? '', runs: o.runs || null, edit: o.edit || null, sz: o.sz || 8, bold: !!o.bold, color: o.color || null, align: o.align || 'center', box: !!o.box, valign: o.valign || 'middle', underlineFirst: !!o.underlineFirst });
@@ -29,30 +38,51 @@ export function buildLayout({ date, rows, lists = {}, colourOf = () => '', short
   label(5, 'Date', { bold: true });
   put(5, 3, 5, d ? d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '', { bold: true });
   put(5, 6, 7, d ? d.toLocaleDateString('en-GB', { weekday: 'long' }) : '', { bold: true });
-  put(5, 9, 11, ['Admin day', ...(lists.admin || [])].join('\n'), { r2: 13, box: true, align: 'left', valign: 'top', underlineFirst: true });
+  put(5, 9, 11, box, { r2: 13, box: true, align: 'left', valign: 'top' });
+
+  const short = text => String(text || '').split(/\s*\/\s*/).filter(Boolean).map(shortOf).join(' / ');
+  const names = (r, c1, c2, text, o = {}) => put(r, c1, c2, short(text), { ...o, runs: cellRuns(text, colourOf, null, shortOf) });
+  const g = k => general[k] || '';
 
   put(7, 3, 5, 'MOT', { bold: true });
   put(7, 6, 8, 'SICU', { bold: true });
-  label(8, 'Consultant:'); label(9, 'Registrar/AC:'); label(10, 'Residents:');
-  for (let r = 8; r <= 12; r++) { put(r, 3, 5, ''); put(r, 6, 8, ''); }
-
-  put(15, 3, 5, 'Specialist', { bold: true });
-  put(15, 6, 8, 'Assistants', { bold: true });
-  UPPER.forEach((u, i) => {
-    if (!u) return;
-    const r = 16 + i;
-    const [text, boxed] = u;
-    if (text) label(r, text);
-    put(r, 3, 5, '');
-    put(r, 6, 8, '', { box: boxed });
-    if (text === 'AOCC:') put(r, 9, 11, 'AIC:', { box: true, bold: true });
+  TEAM_ROWS.forEach(([k, text], i) => {
+    if (text) label(8 + i, text);
+    names(8 + i, 3, 5, g('mot.' + k));
+    names(8 + i, 6, 8, g('sicu.' + k));
   });
 
-  // admin, post call and leave grids: ten names per row across C..L
-  let r = 30;
-  label(r, 'Admin/no list');
-  put(r, 3, 3, '', { box: true });
+  const special = id => rows.find(x => x.roomId === id) || {};
+  const tag = (text, t) => text && !new RegExp(`\\(${t}\\)`, 'i').test(text) ? `${text} (${t})` : text;
+  put(15, 3, 5, 'Specialist', { bold: true });
+  put(15, 6, 8, 'Assistants', { bold: true });
+  let r = 16;
+  const duty = (text, c, f, i) => {
+    if (text) label(r, text);
+    names(r, 3, 5, c);
+    names(r, 6, 8, f);
+    if (i != null) names(r, 9, 11, i);
+    r++;
+  };
+  duty('EOT 8:', g('eot8.s'), g('eot8.a'));
+  duty('EOT 9:', g('eot9.s'), g('eot9.a'));
+  duty('', '', g('eot9.a2'));
+  duty('Epidural:', g('epi.s'), tag(g('epi.df'), 'DF'), tag(g('epi.nf'), 'NF'));
+  duty('ADOT:', g('adot.s'), '');
+  duty('Cardiac Call:', g('cardiac.s'), g('cardiac.a'));
   r++;
+  duty('ECT:', g('ect.s'), g('ect.a'));
+  label(r, 'AOCC:');
+  names(r, 3, 5, special('aocc').senior);
+  names(r, 6, 8, special('aocc').junior);
+  put(r, 9, 11, 'AIC: ' + short(special('aic').senior), { box: true, bold: true });
+  r++;
+  duty('Pain/ACP Clinic:', g('painacp.s'), g('painacp.a'));
+  duty('Acute Pain:', g('acute.s'), g('acute.a'));
+  duty('Chronic Pain:', g('chronic.s'), g('chronic.a'));
+  r++;
+
+  // admin, post call and leave grids: ten names per row across C..L
   const grid = (title, names) => {
     const list = names.length ? names : [''];
     for (let i = 0; i < list.length; i += 10) {
@@ -62,19 +92,20 @@ export function buildLayout({ date, rows, lists = {}, colourOf = () => '', short
       r++;
     }
   };
+  grid('Admin/no list', lists.admin || []);
   grid('Post call', lists.postcall || []);
   grid('Leave', lists.leave || []);
   r++;
 
   label(r, 'AH OT : ', { bold: true, color: BLUE });
-  put(r, 3, 11, '', { box: true, bold: true, color: BLUE });
+  put(r, 3, 11, short(special('ahot').senior), { box: true, bold: true, color: BLUE });
   r++;
 
-  const doubles = doubleCovered(rows);
+  const doubles = doubleCovered(rows.filter(x => x.complex !== 'Clinic'));
   rows.forEach((row, i) => {
+    if (row.complex === 'Clinic') return; // AH OT, AOCC and AIC are shown above
     // room labels are black, apart from the remote cases in red
     label(r, row.label + ':', row.complex === 'Other' ? { bold: true, color: RED } : {});
-    const short = text => String(text || '').split(/\s*\/\s*/).filter(Boolean).map(shortOf).join(' / ');
     put(r, 3, 5, short(row.senior), { box: true, runs: cellRuns(row.senior, colourOf, doubles, shortOf) });
     put(r, 6, 8, short(row.junior), { box: true, runs: cellRuns(row.junior, colourOf, null, shortOf) });
     put(r, 9, 11, short(row.premed), { box: true, bold: true, runs: cellRuns(row.premed, colourOf, null, shortOf) });

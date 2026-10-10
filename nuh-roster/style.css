@@ -170,3 +170,5 @@ ul.log ul { margin: 2px 0 0; padding-left: 18px; }
 .foot { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: center; padding: 24px 16px 32px; color: var(--muted); font-size: 13px; }
 .btn.small { padding: 2px 8px; font-size: 12px; }
 @media print { .foot { display: none; } }
+
+.sheet tr.special td.room { color: var(--accent); }

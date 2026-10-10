@@ -46,7 +46,8 @@ const CONTACT_GROUPS = [
   [/snr resident physician|senior resident physician/i, 'senior', 'Registrar'],
   [/resident physician/i, 'junior', 'MOPEX'],
   [/mopex/i, 'junior', 'MOPEX'],
-  [/senior resident|residents? - ca|rotating resident|^ast$|fellow/i, 'junior', 'Resident'],
+  [/^senior resident/i, 'junior', 'Senior Resident'],
+  [/residents? - ca|rotating resident|^ast$|fellow/i, 'junior', 'Resident'],
 ];
 const CONTACT_SUBSPECS = { cardiac: 'cardiac', paeds: 'paeds', neuro: 'neuro', thoracic: 'thoracic', liver: 'hpb', og: 'obs' };
 

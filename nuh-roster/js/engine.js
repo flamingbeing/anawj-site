@@ -19,7 +19,7 @@ export const DEFAULT_SETTINGS = {
   roomDefaults: { 'MOR 12': ['cardiac'], 'MOR 13': ['cardiac'] },
 };
 
-export const JUNIOR_GRADES = ['Resident', 'MOPEX', 'Baby MO'];
+export const JUNIOR_GRADES = ['Senior Resident', 'Resident', 'MOPEX', 'Baby MO'];
 export const SENIOR_GRADES = ['Consultant', 'AC', 'Registrar'];
 export const POSTINGS = ['', 'RA', 'P', 'L', 'SR', 'Neu', 'Amb'];
 
@@ -42,6 +42,15 @@ export const DEFAULT_ROOMS = [
   ['MCOR', ['MCOR PACU', 'MCOR 1', 'MCOR 2', 'MCOR 3', 'MCOR 4', 'MCOR 5', 'MCOR 6', 'MCOR 7', 'MCOR 8', 'MCOR 9', 'MCOR 10']],
   ['MOR', ['MBOR PACU', 'MOR 1', 'MOR 2', 'MOR 3', 'MOR 4', 'MOR 5', 'MOR 6', 'MOR 10', 'MOR 11', 'MOR 12', 'MOR 13', 'MOR 14', 'MOR 15', 'MOR 16', 'MOR 17', 'MOR 18']],
 ].flatMap(([complex, rooms]) => rooms.map(name => ({ complex, name, defaultOn: !['Remote 2', 'KROR 1', 'MCOR 9'].includes(name) })));
+
+// Rows at the top of the OT roster that aren't operating rooms. AOCC gets a senior and two
+// juniors, AIC one consultant or senior resident; AH OT is filled by hand.
+export const SPECIAL_ROWS = [
+  { id: 'ahot', name: 'AH OT' },
+  { id: 'aocc', name: 'AOCC' },
+  { id: 'aic', name: 'AIC' },
+];
+export const isSpecialRow = row => row?.complex === 'Clinic';
 
 // PACU rows are filled by hand: the generator leaves them empty and doesn't ask for a senior.
 export const isPacu = name => /pacu/i.test(String(name));
@@ -290,11 +299,16 @@ export function fmtJunior(p, d) {
 }
 
 // Generate the OT section. Returns { rows, warnings, unusedSeniors, unusedJuniors }.
+// day.fixed: text already decided for the special rows (from the draft or the General tab):
+// { ahot, 'aocc.s', 'aocc.j', aic }. A filled one is kept as is instead of generated.
 export function generate({ staff, day, settings = DEFAULT_SETTINGS, seed = 1 }) {
   const rand = rng(seed);
   const warnings = [];
-  const allRooms = day.rooms.filter(r => r.running);
-  const rooms = allRooms.filter(r => !isPacu(r.name)).map(r => ({
+  const fixed = day.fixed || {};
+  const special = SPECIAL_ROWS.map(r => ({ ...r, complex: 'Clinic', running: true, notes: '', session: 'full', flags: { subspecs: [], complex: false, long: false } }));
+  const aoccFixed = !!(fixed['aocc.s'] || fixed['aocc.j']);
+  const allRooms = [...special, ...day.rooms.filter(r => r.running)];
+  const rooms = allRooms.filter(r => !isPacu(r.name) && r.id !== 'ahot' && r.id !== 'aic' && !(r.id === 'aocc' && aoccFixed)).map(r => ({
     ...r,
     flags: { subspecs: [], complex: false, long: false, ...(r.flags || {}) },
   }));
@@ -306,7 +320,8 @@ export function generate({ staff, day, settings = DEFAULT_SETTINGS, seed = 1 }) 
   for (const r of rooms) {
     if (r.lockSenior && byId[r.lockSenior]) { rowOf[r.id].seniors.push(r.lockSenior); lockedSeniors.add(r.lockSenior); }
   }
-  const openRooms = rooms.filter(r => !rowOf[r.id].seniors.length);
+  // operating rooms first; AOCC takes a senior left over afterwards
+  const openRooms = rooms.filter(r => !rowOf[r.id].seniors.length && r.id !== 'aocc');
   const seniors = staff.filter(p => p.role === 'senior' && isAvail(day, p) && !lockedSeniors.has(p.id));
 
   // cost of each senior for each room (noise fixed up front so options compare fairly)
@@ -340,7 +355,7 @@ export function generate({ staff, day, settings = DEFAULT_SETTINGS, seed = 1 }) 
     const cands = [];
     for (let i = 0; i < openRooms.length; i++) for (let j = i + 1; j < openRooms.length; j++) {
       const a = openRooms[i], b = openRooms[j];
-      if (a.complex !== b.complex || a.complex === 'Other') continue;
+      if (a.complex !== b.complex || a.complex === 'Other' || a.complex === 'Clinic') continue;
       const halfDay = (a.session === 'am' && b.session !== 'am') || (b.session === 'am' && a.session !== 'am')
         || (a.session === 'pm' && b.session !== 'pm') || (b.session === 'pm' && a.session !== 'pm');
       if (!halfDay && (a.flags.complex || b.flags.complex)) continue;
@@ -410,15 +425,38 @@ export function generate({ staff, day, settings = DEFAULT_SETTINGS, seed = 1 }) 
     }
   }
 
+  if (rowOf.aocc && !rowOf.aocc.seniors.length) {
+    const free = seniors.filter(p => !usedSeniors.has(p.id));
+    const p = free[Math.floor(rand() * free.length)];
+    if (p) { rowOf.aocc.seniors.push(p.id); usedSeniors.add(p.id); }
+    else warnings.push({ level: 'warn', text: 'AOCC: no senior left after the OT lists.' });
+  }
+
+  // ---- AIC: a consultant left over, else a senior resident ----
+  let aicPerson = null;
+  if (!fixed.aic) {
+    const free = seniors.filter(p => !usedSeniors.has(p.id) && p.grade === 'Consultant');
+    aicPerson = free[Math.floor(rand() * free.length)] || null;
+    if (!aicPerson) {
+      const sr = staff.filter(p => p.role === 'junior' && p.grade === 'Senior Resident' && isAvail(day, p));
+      aicPerson = sr[Math.floor(rand() * sr.length)] || null;
+    }
+    if (aicPerson) usedSeniors.add(aicPerson.id);
+    else warnings.push({ level: 'warn', text: 'AIC: no consultant or senior resident free.' });
+  }
+
   // ---- juniors ----
   const lockedJuniors = new Set();
+  if (aicPerson?.role === 'junior') lockedJuniors.add(aicPerson.id);
   for (const r of rooms) {
     if (r.lockJunior && byId[r.lockJunior]) { rowOf[r.id].juniors.push(r.lockJunior); lockedJuniors.add(r.lockJunior); }
   }
   const jRooms = rooms.filter(r => !rowOf[r.id].juniors.length);
   let juniors = staff.filter(p => p.role === 'junior' && isAvail(day, p) && !lockedJuniors.has(p.id));
   // first pass: one junior per room; dummy "nobody" columns let rooms go without
-  const jCost = juniors.map(p => jRooms.map(r => juniorRoomCost(p, dayOf(day, p), r, settings, rand() * 2, doubled.has(r.id))));
+  // a Baby MO never goes where there is no senior
+  const jCost = juniors.map(p => jRooms.map(r => isBaby(p) && !rowOf[r.id].seniors.length ? INF
+    : juniorRoomCost(p, dayOf(day, p), r, settings, rand() * 2, doubled.has(r.id))));
   const nobody = jRooms.map(r => doubled.has(r.id) ? 5000 : r.flags.complex ? 80 : 40);
   const rowsForNobody = Math.max(0, jRooms.length - juniors.length);
   const fullCost = [
@@ -437,11 +475,18 @@ export function generate({ staff, day, settings = DEFAULT_SETTINGS, seed = 1 }) 
       warnings.push({ level: doubled.has(r.id) ? 'error' : 'warn', text: `${r.name}: no junior${doubled.has(r.id) ? ' but senior is double covering' : ''}.` });
     }
   }
-  // extra juniors: double up, favouring rooms with Baby MOs, complex lists and posting matches
+  // extra juniors: AOCC needs a second one first, then double up elsewhere,
+  // favouring rooms with Baby MOs, complex lists and posting matches
   let extras = juniors.filter(p => !placed.has(p.id));
+  if (rowOf.aocc && rowOf.aocc.juniors.length < 2) {
+    const k = extras.findIndex(p => !isBaby(p));
+    if (k >= 0) { rowOf.aocc.juniors.push(extras[k].id); extras.splice(k, 1); }
+    else warnings.push({ level: 'warn', text: 'AOCC: only one junior free.' });
+  }
   while (extras.length) {
     const cost = extras.map(p => rooms.map(r => {
       const here = rowOf[r.id].juniors.map(id => byId[id]);
+      if (r.complex === 'Clinic' || (isBaby(p) && !rowOf[r.id].seniors.length)) return INF;
       let c = juniorRoomCost(p, dayOf(day, p), r, settings, rand() * 2, doubled.has(r.id));
       if (c >= INF) return INF;
       if (isBaby(p)) c += 20; // a Baby MO as the extra is fine, but prefer seniors-in-training
@@ -466,7 +511,7 @@ export function generate({ staff, day, settings = DEFAULT_SETTINGS, seed = 1 }) 
   const coverers = staff.filter(p => p.role === 'junior' && !isBaby(p)
     && ['avail', 'elsewhere'].includes(dayOf(day, p).status || 'avail') && !dayOf(day, p).notAroundPrev);
   const load = {};
-  const premedRooms = rooms.filter(r => rowOf[r.id].juniors.some(id => dayOf(day, byId[id]).notAroundPrev));
+  const premedRooms = rooms.filter(r => r.complex !== 'Clinic' && rowOf[r.id].juniors.some(id => dayOf(day, byId[id]).notAroundPrev));
   for (const r of premedRooms) {
     const row = rowOf[r.id];
     const mate = row.juniors.map(id => byId[id]).find(p => !dayOf(day, p).notAroundPrev && !isBaby(p));
@@ -488,8 +533,12 @@ export function generate({ staff, day, settings = DEFAULT_SETTINGS, seed = 1 }) 
   }
 
   const pacu = Object.fromEntries(allRooms.filter(r => isPacu(r.name)).map(r => [r.id, { roomId: r.id, label: r.name, complex: r.complex, senior: '', junior: '', premed: '', notes: r.notes || '' }]));
+  const textRow = (r, senior, junior = '') => ({ roomId: r.id, label: r.name, complex: r.complex, senior, junior, premed: '', notes: '' });
   const rows = allRooms.map(r => {
     if (pacu[r.id]) return pacu[r.id];
+    if (r.id === 'ahot') return textRow(r, fixed.ahot || '');
+    if (r.id === 'aic') return textRow(r, fixed.aic || (aicPerson ? (aicPerson.role === 'senior' ? fmtSenior : fmtJunior)(aicPerson, dayOf(day, aicPerson)) : ''));
+    if (r.id === 'aocc' && aoccFixed) return textRow(r, fixed['aocc.s'] || '', fixed['aocc.j'] || '');
     const row = rowOf[r.id];
     return {
       roomId: r.id,
@@ -501,7 +550,7 @@ export function generate({ staff, day, settings = DEFAULT_SETTINGS, seed = 1 }) 
       notes: row.notes,
     };
   });
-  const allUsed = new Set(Object.values(rowOf).flatMap(r => [...r.seniors, ...r.juniors]));
+  const allUsed = new Set([...Object.values(rowOf).flatMap(r => [...r.seniors, ...r.juniors]), ...(aicPerson ? [aicPerson.id] : [])]);
   const unusedSeniors = staff.filter(p => p.role === 'senior' && isAvail(day, p) && !allUsed.has(p.id)).map(p => p.name);
   const unusedJuniors = staff.filter(p => p.role === 'junior' && isAvail(day, p) && !allUsed.has(p.id)).map(p => p.name);
   return { rows, warnings, unusedSeniors, unusedJuniors };

@@ -1,9 +1,9 @@
 import {
   DEFAULT_SETTINGS, DEFAULT_ROOMS, JUNIOR_GRADES, SENIOR_GRADES, POSTINGS, STATUSES, COLOURS, COLOUR_ARGB, isBaby,
-  matchName, splitNameList, namesInCell, suggestFlags, generate, check, learnFromRosters, tickFromHistory, remoteRoom, suggestShortNames, mergeContacts, pacuRoom, isPacu, fmtSenior, fmtJunior,
+  matchName, splitNameList, namesInCell, suggestFlags, generate, check, learnFromRosters, tickFromHistory, remoteRoom, suggestShortNames, mergeContacts, pacuRoom, isPacu, fmtSenior, fmtJunior, SPECIAL_ROWS,
 } from './engine.js';
 import { readRosterRows, readStaffSheet, buildRosterWorkbook, cellText, isContactList, readContactList, cleanContactName } from './xlsxio.js';
-import { buildLayout, COL_WIDTHS, shortName, doubleCovered, isDouble } from './layout.js';
+import { buildLayout, COL_WIDTHS, shortName, doubleCovered, isDouble, TEAM_ROWS, DUTIES } from './layout.js';
 import * as cloud from './cloud.js';
 
 const KEY = 'ot-roster-v1';
@@ -174,8 +174,8 @@ function render() {
   const y = window.scrollY;
   if (state.tab === 'day') state.tab = 'cases';
   colourCache.clear();
-  if (!['roster', 'premed', 'cases', 'manpower', 'seniors', 'juniors', 'settings'].includes(state.tab)) state.tab = 'seniors';
-  app.replaceChildren(({ roster: renderRoster, premed: renderPremed, cases: () => renderDay('cases'), manpower: () => renderDay('manpower'), seniors: () => renderStaff('senior'), juniors: () => renderStaff('junior'), settings: renderSettings })[state.tab]());
+  if (!['general', 'roster', 'premed', 'cases', 'manpower', 'seniors', 'juniors', 'settings'].includes(state.tab)) state.tab = 'seniors';
+  app.replaceChildren(({ general: renderGeneral, roster: renderRoster, premed: renderPremed, cases: () => renderDay('cases'), manpower: () => renderDay('manpower'), seniors: () => renderStaff('senior'), juniors: () => renderStaff('junior'), settings: renderSettings })[state.tab]());
   renderCloudBar();
   window.scrollTo(0, y);
   save();
@@ -620,6 +620,44 @@ function applyPaste() {
   toast(missed.length ? `${missed.length} name(s) not matched` : 'All names matched.');
 }
 
+// The admin draft's top half: MOT/SICU block, duty rows, AOCC/AIC and AH OT.
+function readUpperHalf(ws, d) {
+  const g = (d.general = {});
+  const fixed = (d.fixed = {});
+  const byRow = [];
+  ws.eachRow({ includeEmpty: true }, (row, n) => {
+    const t = c => cellText(row.getCell(c).value).trim();
+    byRow[n] = { label: t(1).replace(/:\s*$/, '').toLowerCase(), c: t(3), f: t(6), i: t(9) };
+  });
+  const find = re => byRow.findIndex(x => x && re.test(x.label));
+  const team = find(/^consultant$/);
+  if (team > 0) TEAM_ROWS.forEach(([k], i) => {
+    const x = byRow[team + i];
+    if (!x) return;
+    if (x.c && !/^mot$/i.test(x.c)) g['mot.' + k] = x.c;
+    if (x.f && !/^sicu$/i.test(x.f)) g['sicu.' + k] = x.f;
+  });
+  const keys = { 'eot 8': 'eot8', 'eot 9': 'eot9', epidural: 'epi', adot: 'adot', 'cardiac call': 'cardiac', ect: 'ect', 'pain/acp clinic': 'painacp', 'acute pain': 'acute', 'chronic pain': 'chronic' };
+  const strip = (v, t) => v.replace(new RegExp(`\\s*\\(${t}\\)\\s*$`, 'i'), '');
+  byRow.forEach((x, n) => {
+    if (!x) return;
+    const k = keys[x.label];
+    if (k === 'epi') { if (x.c) g['epi.s'] = x.c; if (x.f) g['epi.df'] = strip(x.f, 'DF'); if (x.i) g['epi.nf'] = strip(x.i, 'NF'); }
+    else if (k) {
+      if (x.c) g[k + '.s'] = x.c;
+      if (x.f) g[k + '.a'] = x.f;
+      if (k === 'eot9' && byRow[n + 1] && !byRow[n + 1].label && byRow[n + 1].f) g['eot9.a2'] = byRow[n + 1].f;
+    }
+    if (x.label === 'aocc') {
+      if (x.c) fixed['aocc.s'] = x.c.replace(/\s*\(req\)\s*$/i, '');
+      if (x.f) fixed['aocc.j'] = strip(x.f, 'AOCC');
+      const aic = x.i.replace(/^AIC:\s*/i, '');
+      if (aic) fixed.aic = aic;
+    }
+    if (/^ah ot/.test(x.label) && x.c) fixed.ahot = x.c;
+  });
+}
+
 async function loadDraft([file]) {
   const wb = await readWorkbook(file);
   const ws = wb.worksheets[0];
@@ -668,6 +706,7 @@ async function loadDraft([file]) {
     ...markNames(get(/^post call/).flatMap(splitNameList), s => { s.status = 'postcall'; }),
     ...markNames(get(/^admin/).flatMap(splitNameList), s => { s.status = 'admin'; }),
   ];
+  readUpperHalf(ws, d);
   const upperLabels = /^(recovery|eot|epidural|adot|cardiac call|ect|aocc|pain|acute pain|chronic pain|consultant|registrar|residents|ah ot|ah icu)/;
   const upperNames = Object.entries(sections).filter(([k]) => upperLabels.test(k)).flatMap(([, v]) => v)
     .flatMap(namesInCell).filter(n => !/^(MOT|SICU|AIC\b)/i.test(n)).map(n => n.replace(/^AIC:\s*/i, ''));
@@ -975,6 +1014,9 @@ const colourStyle = part => { const c = COLOUR_ARGB[colourOf(part)]; return c ? 
 async function addToCell(i, key, text) {
   const p = await resolvePerson(text, key === 'senior' ? 'senior' : 'junior');
   if (!p) return false;
+  if (state.roster.rows[i].roomId === 'aic' && !(p.grade === 'Consultant' || p.grade === 'Senior Resident')
+    && !confirm(`AIC is usually a consultant or senior resident. Put ${p.name} (${p.grade}) there anyway?`)) return false;
+  if (!p) return false;
   const row = state.roster.rows[i];
   const d = state.day.staff[p.id] || {};
   undoStack.push(JSON.stringify(state.roster.rows));
@@ -993,7 +1035,7 @@ function rosterCell(row, i, key, doubles) {
       onkeydown: e => { if (e.key === 'Escape') { editing = null; render(); } if (e.key === 'Enter') { e.preventDefault(); addToCell(i, key, e.target.value); } },
       onchange: e => { if (state.staff.some(p => p.name === e.target.value)) addToCell(i, key, e.target.value); },
       onblur: e => setTimeout(() => { if (editing === id && !e.target.value.trim()) { editing = null; render(); } }, 150),
-    }, key === 'senior' ? 'senior' : 'junior');
+    }, key === 'senior' && row.roomId !== 'aic' ? 'senior' : key === 'senior' ? null : 'junior');
     setTimeout(() => adder.focus());
   } else {
     adder = h('button', { class: 'add-name', title: 'Add a name', onclick: () => { clearTimeout(tagTimer); closeTagEditor(); editing = id; render(); } }, '+');
@@ -1011,7 +1053,11 @@ function runGenerate(newSeed) {
   if (!state.staff.length) return toast('Add staff on the Seniors and Juniors tabs first.');
   if (!state.day.rooms.some(r => r.running)) return toast('Tick the running rooms on the Cases tab first.');
   const seed = newSeed ? Math.floor(Math.random() * 1e9) : (state.roster?.seed || 1);
-  const res = generate({ staff: state.staff, day: state.day, settings: state.settings, seed });
+  // people on the General tab aren't available for the OT lists
+  const busy = generalPeople();
+  const genDay = { ...state.day, staff: { ...state.day.staff } };
+  for (const id of busy) if ((genDay.staff[id]?.status || 'avail') === 'avail') genDay.staff[id] = { ...(genDay.staff[id] || {}), status: 'elsewhere' };
+  const res = generate({ staff: state.staff, day: genDay, settings: state.settings, seed });
   const log = state.roster?.date === state.day.date ? state.roster.log || [] : [];
   if (state.roster?.rows?.length && state.roster.date === state.day.date && !confirm('Regenerate? This replaces the current roster, including any changes you made by hand. (Undo can\'t bring it back, but the change log keeps a record.)')) return;
   undoStack = []; editing = null;
@@ -1022,6 +1068,61 @@ function runGenerate(newSeed) {
 }
 
 let rosterView = 'edit';
+
+// ----- general tab -----
+
+// Names typed into a General field must be on the staff list (unknown ones offer to be added).
+async function setGeneral(key, value, role, input) {
+  const g = (state.day.general ||= {});
+  const before = g[key] || '';
+  const v = value.trim();
+  for (const n of v.split('/').flatMap(namesInCell)) {
+    const p = await resolvePerson(n, role);
+    if (!p) { if (input) input.value = before; return; }
+  }
+  if (v === before) return;
+  g[key] = v;
+  if (state.roster) logRoster([`General · ${key}: ${before || '—'} → ${v || '—'}`]);
+  render();
+}
+
+// Everyone named on the General tab, so the OT generator leaves them out.
+function generalPeople() {
+  const ids = new Set();
+  for (const v of Object.values(state.day.general || {})) for (const n of String(v).split('/').flatMap(namesInCell)) {
+    const p = matchName(n, state.staff).person;
+    if (p) ids.add(p.id);
+  }
+  return ids;
+}
+
+function renderGeneral() {
+  const g = state.day.general || {};
+  const field = (key, role) => nameInput({ value: g[key] || '', placeholder: '—', style: 'width:100%',
+    onchange: e => setGeneral(key, e.target.value, role, e.target),
+    onkeydown: e => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } } }, role);
+  return h('div', {},
+    h('section', { class: 'card' },
+      h('h2', {}, 'General roster'),
+      h('p', { class: 'hint' }, 'MOT, SICU, calls and clinics for the day. Type names (autocomplete from the staff list); separate two people with "/". Everyone here is left out when the OT roster is generated. These fill the top half of the sheet. Load draft roster on the Cases tab also fills them from the admin draft.'),
+      h('div', { class: 'bar' }, h('label', { class: 'seen' }, 'Roster for ', h('input', { type: 'date', value: state.day.date, onchange: e => { state.day.date = e.target.value; render(); } })))),
+    h('section', { class: 'card scroll' },
+      h('h2', {}, 'MOT and SICU'),
+      h('table', {},
+        h('thead', {}, h('tr', {}, ['', 'MOT', 'SICU'].map(t => h('th', {}, t)))),
+        h('tbody', {}, TEAM_ROWS.map(([k, label], i) => h('tr', {},
+          h('td', { class: 'seen' }, label || 'Resident'),
+          h('td', {}, field('mot.' + k, i < 2 ? 'senior' : 'junior')),
+          h('td', {}, field('sicu.' + k, i < 2 ? 'senior' : 'junior'))))))),
+    h('section', { class: 'card scroll' },
+      h('h2', {}, 'Calls and clinics'),
+      h('table', {},
+        h('thead', {}, h('tr', {}, ['', 'Specialist', 'Assistant', 'Assistant'].map(t => h('th', {}, t)))),
+        h('tbody', {}, DUTIES.map(d => h('tr', {},
+          h('td', {}, h('b', {}, d.label)),
+          [0, 1, 2].map(i => h('td', {}, d.fields[i] ? h('div', {}, h('div', { class: 'seen' }, d.fields[i][1]), field(`${d.key}.${d.fields[i][0]}`, d.fields[i][0] === 's' ? 'senior' : 'junior')) : null))))))),
+    h('p', { class: 'hint' }, 'AOCC, AIC and AH OT are on the OT roster tab.'));
+}
 
 // ----- premed tab -----
 
@@ -1045,7 +1146,7 @@ function renderPremed() {
     afterRosterEdit();
   };
   let needed = 0, missing = 0;
-  const rows = r.rows.map(row => {
+  const rows = r.rows.filter(row => row.complex !== 'Clinic').map(row => {
     const juniors = cellParts(row, 'junior').map(part => ({ part, p: byName(namesInCell(part)[0] || '') }));
     const awayNames = juniors.filter(j => away(j.p)).map(j => j.p.name);
     const needs = awayNames.length > 0;
@@ -1079,7 +1180,7 @@ let premedFilter = true;
 // The sheet exactly as it will be exported, drawn as an HTML table.
 function renderSheet() {
   colourCache.clear();
-  const layout = buildLayout({ date: state.day.date, rows: state.roster.rows, lists: rosterLists(), colourOf, shortOf });
+  const layout = buildLayout({ date: state.day.date, rows: state.roster.rows, lists: rosterLists(), general: state.day.general, box: state.day.box || '', colourOf, shortOf });
   const start = {}, covered = new Set();
   for (const c of layout.cells) {
     start[c.r + ':' + c.c1] = c;
@@ -1110,6 +1211,26 @@ function renderSheet() {
       h('tbody', {}, trs)));
 }
 
+// Rosters saved before AH OT, AOCC and AIC were added get empty rows for them.
+function ensureSpecialRows(r) {
+  if (r.rows.some(x => x.complex === 'Clinic')) return;
+  r.rows.unshift(...SPECIAL_ROWS.map(x => ({ roomId: x.id, label: x.name, complex: 'Clinic', senior: '', junior: '', premed: '', notes: '' })));
+  lastRows = JSON.stringify(r.rows);
+}
+
+// The free-text box at the top right of the sheet.
+function boxCard() {
+  return h('section', { class: 'card' },
+    h('h2', {}, 'Top right box'),
+    h('p', { class: 'hint' }, 'Shown in the box at the top right of the sheet, e.g. meetings or people away. People on an admin day go on the Admin/no list row instead (Manpower tab).'),
+    h('textarea', { rows: 5, value: state.day.box || '', placeholder: 'e.g. Sophia Ang - mtg 2 to 5pm', onchange: e => {
+      const before = state.day.box || '';
+      state.day.box = e.target.value;
+      logRoster([`Top right box: ${before || '—'} → ${e.target.value || '—'}`]);
+      save();
+    } }));
+}
+
 function renderRoster() {
   const r = state.roster;
   const actions = h('div', { class: 'bar' },
@@ -1124,17 +1245,21 @@ function renderRoster() {
     h('span', { class: 'grow' }),
     h('label', { class: 'seen' }, 'Roster for ', h('input', { type: 'date', value: state.day.date, onchange: e => { state.day.date = e.target.value; render(); } })),
   );
-  if (!r) return h('div', {}, h('section', { class: 'card' }, h('h2', {}, 'Roster'), h('p', { class: 'hint' }, 'Generates the OT section: seniors, juniors and premed cover. You can edit any cell before downloading.'), actions), historyCard());
+  if (!r) return h('div', {}, h('section', { class: 'card' }, h('h2', {}, 'OT roster'), h('p', { class: 'hint' }, 'Generates AOCC, AIC and the OT lists: seniors, juniors and premed cover. You can edit any cell before downloading.'), actions), historyCard());
 
-  const doubles = doubleCovered(r.rows);
+  ensureSpecialRows(r);
+  const doubles = doubleCovered(r.rows.filter(x => x.complex !== 'Clinic'));
   const flaggedRooms = new Set([...(r.warnings || []), ...(r.checks || [])].filter(w => w.level === 'error').map(w => w.text.split(':')[0]));
   const body = [];
   let last = null;
   r.rows.forEach((row, i) => {
-    body.push(h('tr', { class: flaggedRooms.has(row.label) ? 'flagged' : '' },
+    const sp = row.complex === 'Clinic';
+    if (!sp && i && r.rows[i - 1].complex === 'Clinic') body.push(h('tr', { class: 'gap' }, h('td', { colspan: 4 })));
+    body.push(h('tr', { class: (flaggedRooms.has(row.label) ? 'flagged' : '') + (sp ? ' special' : '') },
       h('td', { class: 'room' }, row.label + ':'),
-      rosterCell(row, i, 'senior', doubles), rosterCell(row, i, 'junior', doubles),
-      notesCell(row, i, { class: 'notes' })));
+      rosterCell(row, i, 'senior', doubles),
+      row.roomId === 'aic' || row.roomId === 'ahot' ? h('td', {}) : rosterCell(row, i, 'junior', doubles),
+      sp ? h('td', {}) : notesCell(row, i, { class: 'notes' })));
   });
   const genRooms = new Set((r.warnings || []).filter(w => w.level === 'error').map(w => w.text.split(':')[0]));
   const seen = new Set();
@@ -1145,12 +1270,12 @@ function renderRoster() {
 
   if (rosterView === 'sheet') {
     return h('div', {},
-      h('section', { class: 'card no-print' }, h('h2', {}, 'Roster'), actions,
-        h('p', { class: 'hint', style: 'margin:0' }, 'This is what the downloaded .xlsx looks like. Case notes aren\'t included. Parts the tool doesn\'t fill yet (MOT, SICU, upper duties, AH OT) are left blank. Switch to Edit to move names or change tags. & marks a senior who is double covering.')),
+      h('section', { class: 'card no-print' }, h('h2', {}, 'OT roster'), actions,
+        h('p', { class: 'hint', style: 'margin:0' }, 'This is what the downloaded .xlsx looks like. The top half comes from the General tab; case notes aren\'t included. Switch to Edit to move names or change tags. & marks a senior who is double covering.')),
       renderSheet());
   }
   return h('div', {},
-    h('section', { class: 'card' }, h('h2', {}, 'Roster'), actions,
+    h('section', { class: 'card' }, h('h2', {}, 'OT roster'), actions,
       h('p', { class: 'hint', style: 'margin:0' }, 'Drag a name onto another name to swap them, or onto an empty part of a cell to move it there. Click a name to change it or its tags ((L), (RA), L-4pm, C-OT13, C-KROR PACU…). + adds someone from the staff list. Click the case notes to edit them. & marks a senior who is double covering. Premed cover is on its own tab.')),
     h('div', { class: 'cols' },
       h('section', { class: 'card scroll' },
@@ -1159,6 +1284,7 @@ function renderRoster() {
           h('tbody', {}, body))),
       h('div', {},
         historyCard(),
+        boxCard(),
         rosterLogCard(),
         h('section', { class: 'card' },
           h('h2', {}, 'Things to look at'),
@@ -1175,7 +1301,7 @@ function renderRoster() {
 
 async function exportXlsx() {
   colourCache.clear();
-  const wb = buildRosterWorkbook(window.ExcelJS, { date: state.day.date, rows: state.roster.rows, lists: rosterLists(), colourOf, shortOf });
+  const wb = buildRosterWorkbook(window.ExcelJS, { date: state.day.date, rows: state.roster.rows, lists: rosterLists(), general: state.day.general, box: state.day.box || '', colourOf, shortOf });
   const buf = await wb.xlsx.writeBuffer();
   download(`OT roster ${state.day.date}.xlsx`, new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
 }
