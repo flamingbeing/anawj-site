@@ -23,4 +23,4 @@ Everything runs in the browser. Staff lists, leave and case notes stay in the br
 - `js/xlsxio.js`: reading rosters and staff sheets, and writing the roster workbook (ExcelJS).
 - `js/app.js`: UI.
 - `vendor/exceljs.min.js`: ExcelJS 4.4.0 (MIT).
-- `test/engine.test.mjs`: run with `node roster/test/engine.test.mjs`. It uses fake names only.
+- `test/engine.test.mjs`: run with `node nuh-roster/test/engine.test.mjs`. It uses fake names only.
