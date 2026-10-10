@@ -1,15 +1,18 @@
 // Reflections screen (#reflect, reached from Progress → Reflections and the Logbook's Reflect
-// buttons): list grouped by section and heading with progress, and an editor with one box per
-// REFLECTION_SECTIONS item. Drafts autosave (to the cloud and to this device) as you type.
+// buttons): list grouped by section and heading with progress, and an editor laid out like a
+// portfolio Section 2 row: title, case summary, learning points (heading + text), figures with
+// captions, references. Drafts autosave (to the cloud and to this device) as you type; images are
+// compressed on the phone and saved to their own docs straight away (cloud.saveImage).
 
 import { REFLECTION_HEADINGS, REFLECTION_SECTIONS } from './categories.js';
-import { reflectionProgress, reflectionCounts, HEADING_BY_ID, splitDetails } from './reflections.js';
+import { reflectionProgress, reflectionCounts, HEADING_BY_ID, splitDetails, completeProblems, isLegacy, LIMITS, IMAGE_MAX_B64 } from './reflections.js';
+export { completeProblems };
 import { fmtDate } from './engine.js';
 import { S, h, toast, cloud, debounce, hooks, rYear, todayISO, confirmBox, add, resetters, scheduleSummary, displayName } from './ui-core.js';
 import { renderExportButton } from './portfolio.js';
 
 const DRAFT_KEY = 'apmes-logbook-reflection-draft';
-const rv = { editing: null };   // the reflection open in the editor, or null for the list
+const rv = { editing: null, thumbs: {} };   // the reflection open in the editor (or null for the list); figure previews by image id
 
 const mine = () => S.user.email;
 const lsGet = () => { try { return JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null'); } catch { return null; } };
@@ -30,7 +33,7 @@ export const summaryReflections = () => reflectionCounts(S.reflections || []);
 
 const blank = (over = {}) => ({
   id: null, headingId: '', subId: null, initials: '', date: todayISO(), jr: rYear() <= 3, diagnosis: '',
-  sections: Object.fromEntries(REFLECTION_SECTIONS.map(s => [s.id, ''])), caseId: null, status: 'draft', ...over,
+  title: '', summary: '', points: [{ heading: '', text: '' }], figures: [], references: [], caseId: null, status: 'draft', ...over,
 });
 
 // From a logged case: initials = leading capitals, diagnosis = the rest.
@@ -68,7 +71,8 @@ function list() {
       'Each reflection is a different patient, under one heading only. JR = done in R1–R3.'),
     h('p', { class: 'hint' }, 'Generative AI use must follow the NUS guidelines on the use of AI tools in academic work.'),
     h('div', { class: 'bar' }, renderExportButton(() => (S.reflections || []).filter(r => r.status === 'complete'), displayName,
-      () => ({ cases: S.cases || [], intake: (S.resident && (S.resident.intake || Number(String(S.resident.rid || '').slice(0, 4)))) || null, rYear: rYear() }))),
+      async () => ({ cases: S.cases || [], intake: (S.resident && (S.resident.intake || Number(String(S.resident.rid || '').slice(0, 4)))) || null, rYear: rYear(),
+        images: await loadImagesFor((S.reflections || []).filter(r => r.status === 'complete')) }))),
     h('p', {}, h('a', { href: '#progress' }, '← Back to case progress')));
 
   const body = h('section', { class: 'card' });
@@ -92,10 +96,67 @@ function list() {
   return h('div', {}, head, body);
 }
 
+// ---------- images ----------
+
+// Images of the given reflections' figures, for the Word export: { id: { data, mime, w, h } }. Missing ones are skipped.
+export async function loadImagesFor(reflections) {
+  const ids = [...new Set((reflections || []).flatMap(r => (r.figures || []).map(f => f.id)).filter(Boolean))];
+  const out = {};
+  await Promise.all(ids.map(async id => {
+    try {
+      const img = await cloud.loadImage(mine(), id);
+      if (img && img.data) out[id] = { data: img.data, mime: img.mime || 'image/jpeg', w: img.w, h: img.h };
+    } catch { /* skip */ }
+  }));
+  return out;
+}
+
+// Phone photo -> JPEG base64 (no data: prefix), longest side ≤ 1400 px, under IMAGE_MAX_B64.
+async function compressImage(file) {
+  let src = null;
+  try { if (typeof createImageBitmap === 'function') src = await createImageBitmap(file, { imageOrientation: 'from-image' }); } catch { src = null; }
+  if (!src) {
+    // fallback: <img> (browsers apply EXIF orientation to images by default)
+    const url = URL.createObjectURL(file);
+    try {
+      src = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('not an image this browser can read')); i.src = url; });
+    } finally { setTimeout(() => URL.revokeObjectURL(url), 1000); }
+  }
+  const W = src.width || src.naturalWidth, H = src.height || src.naturalHeight;
+  if (!W || !H) throw new Error('could not read the image');
+  let max = 1400, q = 0.75;
+  for (let i = 0; i < 8; i++) {
+    const k = Math.min(1, max / Math.max(W, H));
+    const w = Math.max(1, Math.round(W * k)), hh = Math.max(1, Math.round(H * k));
+    const c = document.createElement('canvas');
+    c.width = w; c.height = hh;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, hh);   // transparent PNGs -> white, not black
+    ctx.drawImage(src, 0, 0, w, hh);
+    const data = c.toDataURL('image/jpeg', q).split(',')[1] || '';
+    if (data && data.length < IMAGE_MAX_B64) { if (src.close) src.close(); return { data, mime: 'image/jpeg', w, h: hh }; }
+    max = Math.round(max * 0.8); q = Math.max(0.5, q - 0.08);
+  }
+  throw new Error('image is too large even after compressing');
+}
+
+const newId = () => 'img' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+
 // ---------- editor ----------
+
+const TA = 'font-size:16px;width:100%;box-sizing:border-box;line-height:1.4';
+const IN = 'font-size:16px;width:100%;box-sizing:border-box';
+const boxCard = (label, hint, ...kids) => h('section', { class: 'card' },
+  h('h3', { style: 'margin:0 0 4px' }, label), hint ? h('p', { class: 'hint', style: 'margin:0 0 8px' }, hint) : null, ...kids);
+const nonEmpty = s => !!String(s || '').trim();
+
+// Move figures along with their learning points when points are removed or reordered.
+function remapFigures(r, map) { for (const f of r.figures || []) if (f.point != null) f.point = map(f.point); }
 
 function editor() {
   const r = rv.editing;
+  r.points ||= []; r.figures ||= []; r.references ||= [];
+  const legacy = isLegacy(r);
   const status = h('span', { class: 'muted', style: 'font-size:13px' }, r.id ? 'Saved' : 'Not saved yet');
   const persist = async () => {
     lsSet({ ...r, restore: true });
@@ -108,7 +169,8 @@ function editor() {
   };
   const autosave = debounce(persist, 1200);
   const changed = () => { status.textContent = 'Editing…'; lsSet({ ...r, restore: true }); autosave(); };
-  const close = async () => { autosave.cancel(); if (hasContent(r)) await persist(); rv.editing = null; lsSet(null); hooks.render(); };
+  const restructure = () => { changed(); hooks.render(); };   // list changed: save and redraw
+  const close = async () => { autosave.cancel(); if (hasContent(r)) await persist(); rv.editing = null; rv.thumbs = {}; lsSet(null); hooks.render(); };
 
   const subWrap = h('div');
   const paintSubs = () => {
@@ -145,11 +207,118 @@ function editor() {
     h('label', { class: 'field' }, 'Diagnosis / operation', input('diagnosis', { maxlength: '2000' })),
     h('p', { class: 'hint' }, 'De-identified only: initials, no names or NRIC. Generative AI use must follow the NUS guidelines on the use of AI tools in academic work.'));
 
-  const sections = h('section', { class: 'card' }, REFLECTION_SECTIONS.map(s =>
-    s.id === 'further' && !r.jr ? null : h('label', { class: 'field', style: 'display:block;margin-bottom:12px' },
-      h('b', {}, s.name + (s.optional ? ' (optional)' : '')),
-      h('textarea', { rows: '5', maxlength: '20000', placeholder: s.hint, style: 'font-size:16px;width:100%;box-sizing:border-box',
-        value: r.sections[s.id] || '', oninput: e => { r.sections[s.id] = e.target.value; changed(); } }))));
+  // What APMES wants covered (from the portfolio's reflection elements)
+  const guide = h('details', { class: 'card', style: 'padding:12px 16px' },
+    h('summary', { style: 'cursor:pointer;font-weight:600' }, 'What APMES wants covered'),
+    h('p', { class: 'hint' }, 'Write a case summary, then learning points. Between them, the learning points should cover:'),
+    h('ul', { style: 'margin:4px 0 0;padding-left:20px' }, REFLECTION_SECTIONS.filter(s => s.id !== 'description' && (s.id !== 'further' || r.jr))
+      .map(s => h('li', { style: 'margin-bottom:4px' }, h('b', {}, s.name), ': ', s.hint))));
+
+  let body;
+  if (legacy) {
+    body = [h('section', { class: 'card' },
+      h('p', { class: 'hint' }, 'This reflection uses the older one-box-per-section layout. It still exports as it is, or convert it to the portfolio layout (case summary + learning points).'),
+      h('button', { onclick: () => {
+        const sx = r.sections || {};
+        r.summary = sx.description || '';
+        r.points = REFLECTION_SECTIONS.filter(s => s.id !== 'description' && nonEmpty(sx[s.id])).map(s => ({ heading: s.name, text: sx[s.id] }));
+        if (!r.points.length) r.points = [{ heading: '', text: '' }];
+        delete r.sections;
+        restructure();
+      } }, 'Convert to portfolio layout')),
+    h('section', { class: 'card' }, REFLECTION_SECTIONS.map(s =>
+      s.id === 'further' && !r.jr ? null : h('label', { class: 'field', style: 'display:block;margin-bottom:12px' },
+        h('b', {}, s.name + (s.optional ? ' (optional)' : '')),
+        h('textarea', { rows: '5', maxlength: '20000', placeholder: s.hint, style: TA,
+          value: r.sections[s.id] || '', oninput: e => { r.sections[s.id] = e.target.value; changed(); } }))))];
+  } else {
+    const title = boxCard('Title', 'Bold heading of the reflection, e.g. “Airway management in a patient with trismus”.',
+      h('input', { style: IN, maxlength: String(LIMITS.title), value: r.title || '', placeholder: 'Title', oninput: e => { r.title = e.target.value; changed(); } }));
+    const summary = boxCard('Case summary', null,
+      h('textarea', { rows: '10', maxlength: String(LIMITS.summary), style: TA, value: r.summary || '',
+        placeholder: 'Demographics, history, examination, investigations, anaesthetic plan, events, outcome.',
+        oninput: e => { r.summary = e.target.value; changed(); } }));
+
+    const n = r.points.length;
+    const points = boxCard('Learning points', 'Each point gets a short underlined heading and your discussion: thoughts and feelings, what went well or badly, analysis with evidence, conclusions, action plan.',
+      r.points.map((p, i) => h('div', { style: 'border:1px solid var(--line, #ddd);border-radius:10px;padding:10px;margin:0 0 10px' },
+        h('div', { class: 'bar', style: 'gap:6px;align-items:center;margin-bottom:6px' },
+          h('b', { style: 'font-size:16px' }, `${i + 1}.`),
+          h('input', { style: IN + ';flex:1', maxlength: String(LIMITS.pointHeading), value: p.heading || '', placeholder: 'Heading, e.g. Choice of airway management in trismus',
+            'aria-label': `Learning point ${i + 1} heading`, oninput: e => { p.heading = e.target.value; changed(); } })),
+        h('textarea', { rows: '6', maxlength: String(LIMITS.pointText), style: TA, value: p.text || '', placeholder: 'Discussion',
+          'aria-label': `Learning point ${i + 1} text`, oninput: e => { p.text = e.target.value; changed(); } }),
+        h('div', { class: 'bar', style: 'gap:6px;margin-top:6px' },
+          h('button', { disabled: i === 0, 'aria-label': 'Move up', onclick: () => {
+            [r.points[i - 1], r.points[i]] = [r.points[i], r.points[i - 1]];
+            remapFigures(r, k => (k === i ? i - 1 : k === i - 1 ? i : k)); restructure();
+          } }, '↑'),
+          h('button', { disabled: i === n - 1, 'aria-label': 'Move down', onclick: () => {
+            [r.points[i + 1], r.points[i]] = [r.points[i], r.points[i + 1]];
+            remapFigures(r, k => (k === i ? i + 1 : k === i + 1 ? i : k)); restructure();
+          } }, '↓'),
+          h('span', { class: 'grow' }),
+          h('button', { class: 'danger', onclick: async () => {
+            if ((nonEmpty(p.heading) || nonEmpty(p.text)) && !await confirmBox('Remove learning point?', `Learning point ${i + 1} will be removed.`, 'Remove', true)) return;
+            r.points.splice(i, 1);
+            remapFigures(r, k => (k === i ? (i > 0 ? i - 1 : null) : k > i ? k - 1 : k)); restructure();
+          } }, 'Remove')))),
+      n < LIMITS.points ? h('button', { onclick: () => { r.points.push({ heading: '', text: '' }); restructure(); } }, '+ Add learning point') : null);
+
+    // figures
+    const fileIn = h('input', { type: 'file', accept: 'image/*', style: 'display:none', onchange: async e => {
+      const file = e.target.files && e.target.files[0];
+      e.target.value = '';
+      if (!file) return;
+      if (r.figures.length >= LIMITS.figures) return toast(`At most ${LIMITS.figures} images per reflection.`);
+      status.textContent = 'Adding image…';
+      try {
+        const img = await compressImage(file);
+        const id = newId();
+        await cloud.saveImage(mine(), { id, ...img, createdAt: Date.now() });
+        rv.thumbs[id] = 'data:image/jpeg;base64,' + img.data;
+        r.figures.push({ id, caption: '', point: r.points.length ? r.points.length - 1 : null });
+        autosave.cancel(); await persist(); hooks.render();
+      } catch (err) { status.textContent = 'Image not added'; toast('Could not add image: ' + err.message); }
+    } });
+    const figures = boxCard('Figures', null,
+      h('p', { class: 'hint', style: 'margin:0 0 8px;color:var(--warn, #b45309)' }, 'No faces, names, NRIC, MRN or anything identifying on monitors, labels or screens. Crop before adding.'),
+      r.figures.map((f, i) => {
+        const im = h('img', { alt: f.caption || `Figure ${i + 1}`, style: 'max-width:100%;max-height:220px;display:block;border-radius:6px;background:#eee;min-height:60px' });
+        if (rv.thumbs[f.id]) im.src = rv.thumbs[f.id];
+        else cloud.loadImage(mine(), f.id).then(d => {
+          if (d && d.data) { rv.thumbs[f.id] = `data:${d.mime || 'image/jpeg'};base64,${d.data}`; im.src = rv.thumbs[f.id]; }
+          else im.alt = 'Image not found';
+        }).catch(() => { im.alt = 'Image not available offline'; });
+        return h('div', { style: 'border:1px solid var(--line, #ddd);border-radius:10px;padding:10px;margin:0 0 10px' },
+          im,
+          h('label', { class: 'field', style: 'display:block;margin-top:6px' }, `Caption (Figure ${i + 1}: …)`,
+            h('input', { style: IN, maxlength: String(LIMITS.caption), value: f.caption || '', placeholder: 'e.g. Apnoeic oxygenation', oninput: e => { f.caption = e.target.value; changed(); } })),
+          h('label', { class: 'field', style: 'display:block' }, 'Place after',
+            h('select', { style: 'font-size:16px;max-width:100%', onchange: e => { f.point = e.target.value === '' ? null : Number(e.target.value); changed(); } },
+              r.points.map((p, k) => h('option', { value: String(k), selected: f.point === k }, `Learning point ${k + 1}${nonEmpty(p.heading) ? ': ' + p.heading.slice(0, 40) : ''}`)),
+              h('option', { value: '', selected: f.point == null }, 'End (after all learning points)'))),
+          h('div', { class: 'bar' }, h('span', { class: 'grow' }), h('button', { class: 'danger', onclick: async () => {
+            if (!await confirmBox('Remove image?', 'The image will be deleted.', 'Remove', true)) return;
+            r.figures.splice(i, 1); delete rv.thumbs[f.id];
+            cloud.deleteImage(mine(), f.id).catch(err => toast('Could not delete image: ' + err.message));
+            restructure();
+          } }, 'Remove image')));
+      }),
+      r.figures.length < LIMITS.figures ? h('button', { onclick: () => fileIn.click() }, '+ Add image') : h('p', { class: 'hint' }, `At most ${LIMITS.figures} images.`),
+      fileIn);
+
+    // references (optional, collapsed unless there are some)
+    const refs = h('details', { class: 'card', style: 'padding:12px 16px', open: r.references.length > 0 },
+      h('summary', { style: 'cursor:pointer;font-weight:600' }, `References (optional)${r.references.length ? ' · ' + r.references.length : ''}`),
+      r.references.map((x, i) => h('div', { class: 'bar', style: 'gap:6px;margin:6px 0;align-items:center' },
+        h('span', {}, `${i + 1}.`),
+        h('input', { style: IN + ';flex:1', maxlength: String(LIMITS.reference), value: x, placeholder: 'Author. Title. Journal. Year;vol:pages.', oninput: e => { r.references[i] = e.target.value; changed(); } }),
+        h('button', { 'aria-label': 'Remove reference', onclick: () => { r.references.splice(i, 1); restructure(); } }, '✕'))),
+      r.references.length < LIMITS.references ? h('button', { style: 'margin-top:6px', onclick: () => { r.references.push(''); restructure(); } }, '+ Add reference') : null);
+
+    body = [title, summary, points, figures, refs];
+  }
 
   const actions = h('section', { class: 'card' }, h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:8px' },
     r.status === 'complete'
@@ -157,29 +326,22 @@ function editor() {
       : h('button', { class: 'primary', onclick: async () => {
         const missing = completeProblems(r);
         if (missing.length) return toast('Before marking complete: ' + missing.join(', '));
-        r.status = 'complete'; autosave.cancel(); await persist(); toast('Reflection complete'); rv.editing = null; lsSet(null); hooks.render();
+        r.status = 'complete'; autosave.cancel(); await persist(); toast('Reflection complete'); rv.editing = null; rv.thumbs = {}; lsSet(null); hooks.render();
       } }, 'Mark complete'),
     h('span', { class: 'grow' }),
-    r.id ? h('button', { class: 'danger', onclick: async () => {
-      if (!await confirmBox('Delete reflection?', 'This cannot be undone.', 'Delete', true)) return;
+    r.id || r.figures.length ? h('button', { class: 'danger', onclick: async () => {
+      if (!await confirmBox('Delete reflection?', 'This cannot be undone. Its images are deleted too.', 'Delete', true)) return;
       autosave.cancel();
-      try { await cloud.deleteReflection(mine(), r.id); } catch (err) { toast('Could not delete: ' + err.message); }
-      rv.editing = null; lsSet(null); hooks.render();
+      try {
+        await Promise.all((r.figures || []).map(f => cloud.deleteImage(mine(), f.id).catch(() => {})));
+        if (r.id) await cloud.deleteReflection(mine(), r.id);
+      } catch (err) { toast('Could not delete: ' + err.message); }
+      rv.editing = null; rv.thumbs = {}; lsSet(null); hooks.render();
     } }, 'Delete') : null));
 
-  return h('div', {}, fields, sections, actions);
+  return h('div', {}, fields, legacy ? null : guide, body, actions);
 }
 
-const hasContent = r => !!(r.headingId || r.initials || r.diagnosis || Object.values(r.sections || {}).some(Boolean));
-
-export function completeProblems(r) {
-  const out = [];
-  const hd = HEADING_BY_ID[r.headingId];
-  if (!hd) out.push('heading');
-  if (hd && hd.subs && !r.subId) out.push('sub-type');
-  if (!r.initials) out.push('initials');
-  if (!r.date) out.push('date');
-  if (!r.diagnosis) out.push('diagnosis');
-  for (const s of REFLECTION_SECTIONS) if (!s.optional && !String(r.sections[s.id] || '').trim()) out.push(s.name.toLowerCase());
-  return out;
-}
+const hasContent = r => !!(r.headingId || r.initials || r.diagnosis || r.title || r.summary
+  || (r.points || []).some(p => p.heading || p.text) || (r.figures || []).length || (r.references || []).some(Boolean)
+  || Object.values(r.sections || {}).some(Boolean));

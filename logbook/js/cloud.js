@@ -9,13 +9,14 @@
 //   logbooks/{email}                      { email, name, rid, settings, templates, updatedAt }
 //   logbooks/{email}/cases/{caseId}       case object (see engine.js)
 //   logbooks/{email}/reflections/{id} reflection object (see reflections.js), owner only
+//   logbooks/{email}/images/{id}      { id, data (base64 JPEG), mime, w, h, createdAt }  reflection figures, owner only
 //   summaries/{rid}                       counts only, readable by everyone signed in
 //   imports/{rid}                         { email, keys: [importKey], updatedAt }  (which old-form rows are in)
 //   sharedTemplates/{id}                  { id, name, cats, details? }
 
 import { FIREBASE_CONFIG } from './firebase-config.js';
 import * as D from './demo-backend.js';
-import { plain, cleanCase, cleanSummary, cleanResident, cleanTemplate, importDocId, defaultLogbook, cleanReflection } from './demo-backend.js';
+import { plain, cleanCase, cleanSummary, cleanResident, cleanTemplate, importDocId, defaultLogbook, cleanReflection, cleanImage } from './demo-backend.js';
 
 const SDK = 'https://www.gstatic.com/firebasejs/10.12.2/';
 export const demo = (() => {
@@ -183,6 +184,28 @@ export async function deleteCase(email, id) {
   if (demo) return D.deleteCase(email, id);
   const { db, F } = await sdk();
   await queued(F.deleteDoc(F.doc(db, 'logbooks', lc(email), 'cases', String(id))));
+}
+
+// Reflection figures: one doc per image (base64 < 700 KB) so reflection docs stay small. Owner only.
+export async function saveImage(email, img) {
+  if (demo) return D.saveImage(email, img);
+  const { db, F } = await sdk();
+  const doc = cleanImage(img);
+  await queued(F.setDoc(F.doc(db, 'logbooks', lc(email), 'images', doc.id), doc));
+  return doc;
+}
+export async function loadImage(email, id) {
+  if (demo) return D.loadImage(email, id);
+  const { db, F } = await sdk();
+  try {
+    const snap = await F.getDoc(F.doc(db, 'logbooks', lc(email), 'images', String(id)));
+    return snap.exists() ? snap.data() : null;
+  } catch (e) { console.warn('Could not load image', id, e); return null; }
+}
+export async function deleteImage(email, id) {
+  if (demo) return D.deleteImage(email, id);
+  const { db, F } = await sdk();
+  await queued(F.deleteDoc(F.doc(db, 'logbooks', lc(email), 'images', String(id))));
 }
 
 // Live list of the user's reflections (owner only). cb(list, meta). Returns an unsubscribe function.
