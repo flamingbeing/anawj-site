@@ -89,8 +89,18 @@ tr.off td:first-child { opacity: 1; }
 .sheet { font-family: Arial, sans-serif; font-size: 13px; }
 .sheet td { border-bottom: 1px solid var(--line); }
 .sheet td.room { font-weight: 700; text-align: right; white-space: nowrap; width: 1%; padding-right: 12px; }
-.sheet td.cell { min-width: 160px; text-align: center; outline: none; }
-.sheet td.cell:focus { background: var(--chip); box-shadow: inset 0 0 0 2px var(--accent); }
+.sheet td.cell { min-width: 160px; text-align: center; outline: none; cursor: text; }
+.sheet td.cell.over { background: var(--chip); box-shadow: inset 0 0 0 2px var(--accent); }
+.sheet td.editing { padding: 2px; }
+.sheet .cell-input { width: 100%; text-align: center; font: inherit; }
+.names { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; }
+.name { padding: 1px 8px; border-radius: 6px; border: 1px solid transparent; cursor: grab; touch-action: none; user-select: none; }
+.name:hover { border-color: var(--line); background: var(--chip); }
+.name.over { border-color: var(--accent); background: var(--chip); box-shadow: 0 0 0 1px var(--accent); }
+.name.dragging { opacity: .35; }
+.name.ghost { position: fixed; z-index: 10; pointer-events: none; background: var(--panel); border-color: var(--accent); box-shadow: 0 4px 12px rgba(0,0,0,.25); cursor: grabbing; font-family: Arial, sans-serif; font-size: 13px; }
+.names .sep { color: var(--muted); align-self: center; }
+.empty-cell { color: var(--muted); opacity: .5; }
 .sheet td.notes { color: var(--muted); min-width: 120px; }
 .sheet tr.gap td { border: 0; height: 12px; background: var(--panel); }
 .sheet tr.flagged td.room { color: var(--err); }

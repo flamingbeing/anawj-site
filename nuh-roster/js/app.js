@@ -434,11 +434,128 @@ async function loadDraft([file]) {
 
 // ----- roster tab -----
 
+// ---- names in roster cells: drag to swap or move, double-click to type ----
+
+const PREMED = /\s*-\s*premed\s*$/i;
+function cellParts(row, key) {
+  return String(row[key] || '').split(/\s*\/\s*/).map(s => s.trim()).filter(Boolean)
+    .map(s => key === 'premed' ? s.replace(PREMED, '') : s);
+}
+function setCellParts(row, key, parts) {
+  row[key] = parts.map(p => key === 'premed' ? `${p} - Premed` : p).join(' / ');
+}
+
+let undoStack = [];
+let editing = null; // "rowIndex:key" of the cell being typed in
+
+function afterRosterEdit() {
+  const r = state.roster;
+  r.checks = check({ rows: r.rows, staff: state.staff, day: state.day, settings: state.settings });
+  render();
+}
+
+function dropName(src, dst) {
+  const rows = state.roster.rows;
+  const a = rows[src.row], b = rows[dst.row];
+  if (!a || !b) return;
+  const aParts = cellParts(a, src.key);
+  const name = aParts[src.part];
+  if (name == null) return;
+  if (src.row === dst.row && src.key === dst.key && (dst.part == null || dst.part === src.part)) return;
+  undoStack.push(JSON.stringify(rows));
+  if (undoStack.length > 50) undoStack.shift();
+  if (dst.part != null) {
+    // swap two names
+    const bParts = src.row === dst.row && src.key === dst.key ? aParts : cellParts(b, dst.key);
+    const other = bParts[dst.part];
+    aParts[src.part] = other;
+    bParts[dst.part] = name;
+    setCellParts(a, src.key, aParts);
+    if (bParts !== aParts) setCellParts(b, dst.key, bParts);
+    toast(`Swapped ${name} and ${other}.`);
+  } else {
+    // move into another cell
+    aParts.splice(src.part, 1);
+    setCellParts(a, src.key, aParts);
+    const bParts = cellParts(b, dst.key);
+    bParts.push(name);
+    setCellParts(b, dst.key, bParts);
+    toast(`Moved ${name} to ${b.label}.`);
+  }
+  afterRosterEdit();
+}
+
+function startNameDrag(e, src) {
+  if (e.button !== 0) return;
+  const chip = e.currentTarget;
+  const x0 = e.clientX, y0 = e.clientY;
+  let ghost = null, over = null;
+  const targetAt = (x, y) => document.elementFromPoint(x, y)?.closest('[data-drop]');
+  const move = ev => {
+    if (!ghost) {
+      if (Math.hypot(ev.clientX - x0, ev.clientY - y0) < 5) return;
+      ghost = chip.cloneNode(true);
+      ghost.classList.add('ghost');
+      document.body.append(ghost);
+      chip.classList.add('dragging');
+    }
+    ev.preventDefault();
+    ghost.style.left = ev.clientX + 10 + 'px';
+    ghost.style.top = ev.clientY + 10 + 'px';
+    const t = targetAt(ev.clientX, ev.clientY);
+    if (t !== over) { over?.classList.remove('over'); over = t; over?.classList.add('over'); }
+  };
+  const up = ev => {
+    window.removeEventListener('pointermove', move);
+    window.removeEventListener('pointerup', up);
+    window.removeEventListener('pointercancel', up);
+    if (!ghost) return;
+    ghost.remove();
+    chip.classList.remove('dragging');
+    over?.classList.remove('over');
+    const t = ev.type === 'pointerup' ? targetAt(ev.clientX, ev.clientY) : null;
+    if (!t) return;
+    dropName(src, { row: +t.dataset.row, key: t.dataset.key, part: t.dataset.part != null ? +t.dataset.part : null });
+  };
+  window.addEventListener('pointermove', move);
+  window.addEventListener('pointerup', up);
+  window.addEventListener('pointercancel', up);
+}
+
+function rosterCell(row, i, key) {
+  const id = i + ':' + key;
+  if (editing === id) {
+    const input = h('input', {
+      class: 'cell-input', value: row[key] || '', spellcheck: 'false',
+      onkeydown: e => { if (e.key === 'Enter') e.target.blur(); if (e.key === 'Escape') { editing = null; render(); } },
+      onblur: e => {
+        if (editing !== id) return;
+        editing = null;
+        if (e.target.value !== (row[key] || '')) { undoStack.push(JSON.stringify(state.roster.rows)); row[key] = e.target.value; afterRosterEdit(); }
+        else render();
+      },
+    });
+    setTimeout(() => { input.focus(); input.select(); });
+    return h('td', { class: 'cell editing' }, input);
+  }
+  const parts = cellParts(row, key);
+  return h('td', {
+    class: 'cell', 'data-drop': '', 'data-row': i, 'data-key': key, title: 'Drag a name to swap or move it. Double-click to type.',
+    ondblclick: () => { editing = id; render(); },
+  }, parts.length
+    ? h('div', { class: 'names' }, parts.map((p, k) => [k ? h('span', { class: 'sep' }, '/') : null, h('span', {
+      class: 'name', 'data-drop': '', 'data-row': i, 'data-key': key, 'data-part': k,
+      onpointerdown: e => startNameDrag(e, { row: i, key, part: k }),
+    }, p)]))
+    : h('span', { class: 'empty-cell' }, '—'));
+}
+
 function runGenerate(newSeed) {
   if (!state.staff.length) return toast('Add staff first.');
   if (!state.day.rooms.some(r => r.running)) return toast('Tick the running rooms in Day setup first.');
   const seed = newSeed ? Math.floor(Math.random() * 1e9) : (state.roster?.seed || 1);
   const res = generate({ staff: state.staff, day: state.day, settings: state.settings, seed });
+  undoStack = []; editing = null;
   state.roster = { ...res, seed, date: state.day.date, checks: check({ rows: res.rows, staff: state.staff, day: state.day, settings: state.settings }) };
   render();
 }
@@ -480,7 +597,7 @@ function renderRoster() {
   const r = state.roster;
   const actions = h('div', { class: 'bar' },
     h('button', { class: 'primary', onclick: () => runGenerate(!!r) }, r ? 'Regenerate' : 'Generate roster'),
-    r && h('button', { onclick: () => { r.checks = check({ rows: r.rows, staff: state.staff, day: state.day, settings: state.settings }); render(); toast('Checked.'); } }, 'Re-check edits'),
+    r && h('button', { disabled: !undoStack.length, onclick: () => { state.roster.rows = JSON.parse(undoStack.pop()); afterRosterEdit(); } }, 'Undo'),
     r && h('button', { onclick: exportXlsx }, 'Download .xlsx'),
     r && h('div', { class: 'seg', role: 'group', 'aria-label': 'View' },
       h('button', { 'aria-pressed': String(rosterView === 'edit'), onclick: () => { rosterView = 'edit'; render(); } }, 'Edit'),
@@ -492,17 +609,16 @@ function renderRoster() {
   if (!r) return h('div', {}, h('section', { class: 'card' }, h('h2', {}, 'Roster'), h('p', { class: 'hint' }, 'Generates the OT section: seniors, juniors and premed cover. You can edit any cell before downloading.'), actions));
 
   const flaggedRooms = new Set([...(r.warnings || []), ...(r.checks || [])].filter(w => w.level === 'error').map(w => w.text.split(':')[0]));
-  const cell = (row, key) => h('td', { class: 'cell', contenteditable: 'plaintext-only', spellcheck: 'false', oninput: e => { row[key] = e.target.textContent; save(); } }, row[key] || '');
   const body = [];
   let last = null;
-  for (const row of r.rows) {
+  r.rows.forEach((row, i) => {
     if (last && row.complex !== last && row.complex === 'MOR') body.push(h('tr', { class: 'gap' }, h('td', { colspan: 5 })));
     last = row.complex;
     body.push(h('tr', { class: flaggedRooms.has(row.label) ? 'flagged' : '' },
       h('td', { class: 'room' }, row.label + ':'),
-      cell(row, 'senior'), cell(row, 'junior'), cell(row, 'premed'),
+      rosterCell(row, i, 'senior'), rosterCell(row, i, 'junior'), rosterCell(row, i, 'premed'),
       h('td', { class: 'notes' }, row.notes)));
-  }
+  });
   const genRooms = new Set((r.warnings || []).filter(w => w.level === 'error').map(w => w.text.split(':')[0]));
   const seen = new Set();
   const all = [...(r.warnings || []), ...(r.checks || []).filter(w => !(genRooms.has(w.text.split(':')[0]) && / no senior\.$/.test(w.text)))]
@@ -517,7 +633,8 @@ function renderRoster() {
       renderSheet());
   }
   return h('div', {},
-    h('section', { class: 'card' }, h('h2', {}, 'Roster'), actions),
+    h('section', { class: 'card' }, h('h2', {}, 'Roster'), actions,
+      h('p', { class: 'hint', style: 'margin:0' }, 'Drag a name onto another name to swap them, or onto an empty part of a cell to move it there. Double-click a cell to type. The checks on the right update after every change.')),
     h('div', { class: 'cols' },
       h('section', { class: 'card scroll' },
         h('table', { class: 'sheet' },
