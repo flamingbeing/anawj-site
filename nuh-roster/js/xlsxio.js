@@ -96,6 +96,8 @@ export function buildRosterWorkbook(ExcelJS, { date, rows, lists }) {
     if (c.underlineFirst && c.text) {
       const [first, ...rest] = c.text.split('\n');
       cell.value = { richText: [{ text: first, font: { ...font, underline: true } }, ...(rest.length ? [{ text: '\n' + rest.join('\n'), font }] : [])] };
+    } else if (c.runs) {
+      cell.value = { richText: c.runs.map(run => ({ text: run.text, font: run.sup ? { ...font, vertAlign: 'superscript' } : font })) };
     } else cell.value = c.text;
     cell.font = font;
     cell.alignment = { horizontal: c.align, vertical: c.valign, wrapText: c.c2 < 12 };
