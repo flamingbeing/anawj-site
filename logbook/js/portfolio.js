@@ -498,9 +498,10 @@ export function plainDocumentXml(reflections, { name, media = null, profile = nu
 }
 
 function plainPackage(zip, docXml) {
-  zip.file('[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/></Types>');
+  zip.file('[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/></Types>');
   zip.file('_rels/.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>');
-  zip.file('word/_rels/document.xml.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>');
+  zip.file('word/_rels/document.xml.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/></Relationships>');
+  zip.file('word/settings.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:settings xmlns:w="${W_NS}"><w:view w:val="print"/><w:zoom w:percent="100"/></w:settings>`);
   zip.file('word/styles.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="${W_NS}"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/><w:sz w:val="20"/><w:szCs w:val="20"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after="60"/></w:pPr></w:pPrDefault></w:docDefaults></w:styles>`);
   zip.file('word/document.xml', docXml);
 }
@@ -534,6 +535,20 @@ function dropCommentParts(zip) {
   ]);
 }
 
+// Open in Print Layout: set <w:view w:val="print"/> in word/settings.xml. Schema order puts w:view
+// right before w:zoom (after an optional w:writeProtection). Templates without a settings part are left
+// alone (Word's default is print).
+export function printLayoutSettings(xml) {
+  if (/<w:view\b[^>]*\/>/.test(xml)) return xml.replace(/<w:view\b[^>]*\/>/, '<w:view w:val="print"/>');
+  if (/<w:zoom\b/.test(xml)) return xml.replace(/<w:zoom\b/, '<w:view w:val="print"/><w:zoom');
+  if (/<w:writeProtection\b[^>]*\/>/.test(xml)) return xml.replace(/(<w:writeProtection\b[^>]*\/>)/, '$1<w:view w:val="print"/>');
+  return xml.replace(/(<w:settings\b[^>]*>)/, '$1<w:view w:val="print"/>');
+}
+async function setPrintLayout(zip) {
+  const f = zip.file('word/settings.xml');
+  if (f) zip.file('word/settings.xml', printLayoutSettings(await f.async('string')));
+}
+
 export async function exportPortfolio(reflections, { name = '', templateB64 = null, JSZip = null, cases = null, intake = null, rYear = null, images = null, profile = null } = {}) {
   const Z = JSZip || await needZip();
   let zip = null, usedTemplate = false, media = null;
@@ -548,6 +563,7 @@ export async function exportPortfolio(reflections, { name = '', templateB64 = nu
       if (matched.length < REFLECTION_HEADINGS.length / 2) throw new Error('template headings not found');
       zip.file('word/document.xml', stripComments(filled));
       await dropCommentParts(zip);
+      await setPrintLayout(zip);
       usedTemplate = true;
     } catch (err) { console.warn('Portfolio template unusable, using the plain layout', err); zip = null; }
   }
