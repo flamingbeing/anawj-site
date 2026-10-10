@@ -126,6 +126,16 @@ console.log('engine tests passed');
   assert.equal(missingCovers(rows).length, 0, 'cover by full room name, from another complex');
   rows[1].senior = 'Senior Two C-13';
   assert.equal(missingCovers(rows).length, 0, 'bare number means own complex');
+  const r2 = [
+    { roomId: 'a', label: 'MOR 13', complex: 'MOR', senior: 'Senior One', junior: 'Junior Five L-3pm' },
+    { roomId: 'b', label: 'MOR 14', complex: 'MOR', senior: 'Senior Two', junior: 'Junior Six' },
+  ];
+  assert.equal(missingCovers(r2).length, 1);
+  r2[0].junior = 'Junior Five L-3pm / Junior Six (C)';
+  assert.equal(missingCovers(r2).length, 0, '"Name (C)" in the room counts as its cover');
+  const st = [P('j5', 'Junior Five', 'junior'), P('j6', 'Junior Six', 'junior'), P('s1', 'Senior One', 'senior'), P('s2', 'Senior Two', 'senior')];
+  const day = { rooms: [{ id: 'a', name: 'MOR 13' }, { id: 'b', name: 'MOR 14' }], staff: {} };
+  assert.ok(!check({ rows: r2, staff: st, day }).some(w => /junior in/.test(w.text)), 'an ad hoc cover is not a second junior posting');
   console.log('cover tests passed');
 }
 

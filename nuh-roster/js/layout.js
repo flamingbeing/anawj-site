@@ -23,7 +23,7 @@ export const DUTIES = [
 // colourOf(namePart) -> 'green' | 'purple' | '' for each name on the OT rows.
 // shortOf(namePart) -> the same part with the person's short name ("Tan YW (RA)").
 // general: the General tab's fields ({ 'mot.cons': '…', 'eot8.s': '…' }); box: the free text
-// in the top right box.
+// in the comments box at the top right.
 export function buildLayout({ date, rows, lists = {}, general = {}, box = '', colourOf = () => '', shortOf = s => s }) {
   const cells = [];
   const heights = {};
@@ -36,7 +36,6 @@ export function buildLayout({ date, rows, lists = {}, general = {}, box = '', co
   label(5, 'Date', { bold: true });
   put(5, 3, 5, d ? d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '', { bold: true });
   put(5, 6, 7, d ? d.toLocaleDateString('en-GB', { weekday: 'long' }) : '', { bold: true });
-  put(5, 9, 11, box, { r2: 13, box: true, align: 'left', valign: 'top' });
 
   const short = text => String(text || '').split(/\s*\/\s*/).filter(Boolean).map(shortOf).join(' / ');
   const names = (r, c1, c2, text, o = {}) => put(r, c1, c2, short(text), { ...o, runs: cellRuns(text, colourOf, null, shortOf) });
@@ -52,9 +51,9 @@ export function buildLayout({ date, rows, lists = {}, general = {}, box = '', co
 
   const special = id => rows.find(x => x.roomId === id) || {};
   const tag = (text, t) => text && !new RegExp(`\\(${t}\\)`, 'i').test(text) ? `${text} (${t})` : text;
-  put(15, 3, 5, 'Specialist', { bold: true });
-  put(15, 6, 8, 'Assistants', { bold: true });
-  let r = 16;
+  put(14, 3, 5, 'Specialist', { bold: true });
+  put(14, 6, 8, 'Assistants', { bold: true });
+  let r = 15;
   const duty = (text, c, f, i) => {
     if (text) label(r, text);
     names(r, 3, 5, c);
@@ -69,6 +68,8 @@ export function buildLayout({ date, rows, lists = {}, general = {}, box = '', co
   duty('', '', tag(g('epi.nf'), 'NF'));
   duty('Cardiac Call:', g('cardiac.s'), g('cardiac.a'));
   r++;
+  // the comments box runs from the date row down to just above AIC
+  put(5, 9, 11, box, { r2: r - 1, box: true, align: 'left', valign: 'top' });
   label(r, 'AOCC:');
   names(r, 3, 5, special('aocc').senior);
   names(r, 6, 8, special('aocc').junior);

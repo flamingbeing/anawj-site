@@ -1,7 +1,9 @@
 import {
   DEFAULT_SETTINGS, DEFAULT_ROOMS, JUNIOR_GRADES, SENIOR_GRADES, POSTINGS, STATUSES, COLOURS, COLOUR_ARGB, isBaby,
-  matchName, splitNameList, namesInCell, suggestFlags, generate, check, learnFromRosters, tickFromHistory, remoteRoom, suggestShortNames, mergeContacts, pacuRoom, isPacu, fmtSenior, fmtJunior, SPECIAL_ROWS,
+  matchName, splitNameList, namesInCell, suggestFlags, generate, check, learnFromRosters, tickFromHistory, remoteRoom, suggestShortNames, mergeContacts, pacuRoom, isPacu, fmtSenior, fmtJunior, SPECIAL_ROWS, isCoverPart, coverTarget,
 } from './engine.js';
+// Consultants are always shown in black.
+const staffColour = p => (p && p.grade !== 'Consultant' && p.colour) || '';
 import { readRosterRows, readStaffSheet, buildRosterWorkbook, cellText, isContactList, readContactList, cleanContactName } from './xlsxio.js';
 import { buildLayout, COL_WIDTHS, shortName, doubleCovered, isDouble, TEAM_ROWS, DUTIES } from './layout.js';
 import * as cloud from './cloud.js';
@@ -294,7 +296,7 @@ function renderStaff(role) {
     h('td', {}, h('input', { value: p.name, onchange: e => { p.name = e.target.value.trim(); save(); } })),
     h('td', {}, h('input', { value: (p.aliases || []).join(', '), placeholder: 'e.g. Tan YW', onchange: e => { p.aliases = splitNameList(e.target.value); save(); } })),
     h('td', {}, select(p.grade, p.role === 'senior' ? SENIOR_GRADES : JUNIOR_GRADES, v => { p.grade = v; if (v === 'Baby MO' && !p.colour) p.colour = 'green'; render(); })),
-    h('td', {}, select(p.colour || '', COLOURS, v => { p.colour = v; render(); })),
+    h('td', {}, p.grade === 'Consultant' ? h('span', { class: 'seen', title: 'Consultants are always black' }, 'Black') : select(p.colour || '', COLOURS, v => { p.colour = v; render(); })),
     !senior && h('td', {}, select(p.posting || '', POSTINGS, v => { p.posting = v; save(); })),
     senior && h('td', {}, h('div', { class: 'chips' }, subs.map(s => {
         const on = (p.subspecs || []).includes(s.key);
@@ -312,7 +314,7 @@ function renderStaff(role) {
     h('section', { class: 'card' },
       h('h2', {}, senior ? 'Seniors' : 'Juniors'),
       h('p', { class: 'hint' }, senior
-        ? 'Tick each senior\'s subspecs and the lists they don\'t do. "Seen in" counts the subspec lists they did in past rosters you loaded, as a hint. Colour: purple for locums.'
+        ? 'Tick each senior\'s subspecs and the lists they don\'t do. "Seen in" counts the subspec lists they did in past rosters you loaded, as a hint. Colour: purple for locums; consultants are always black.'
         : 'Set each junior\'s grade, posting and colour. Green marks a Baby MO: never left alone, so their senior won\'t double cover. Purple marks locums.'),
       h('div', { class: 'bar sync dirty' },
         h('span', {}, `Editing the staff list. ${diffStaff(staffBackup, state.staff).length} change(s) so far; nothing is kept until you review and save.`),
@@ -360,10 +362,10 @@ function renderStaffView(role) {
     .sort((a, b) => a.name.localeCompare(b.name));
   const count = state.staff.filter(p => p.role === role).length;
   const row = p => h('tr', {},
-    h('td', {}, h('b', { style: p.colour ? `color:#${COLOUR_ARGB[p.colour].slice(2)}` : '' }, p.name)),
+    h('td', {}, h('b', { style: staffColour(p) ? `color:#${COLOUR_ARGB[staffColour(p)].slice(2)}` : '' }, p.name)),
     h('td', {}, (p.aliases || []).join(', ')),
     h('td', {}, p.grade),
-    h('td', { class: 'seen' }, COLOURS.find(c => c[0] === (p.colour || ''))[1]),
+    h('td', { class: 'seen' }, COLOURS.find(c => c[0] === staffColour(p))[1]),
     senior
       ? h('td', {}, h('div', { class: 'chips' }, (p.subspecs || []).map(k => h('span', { class: 'chip on static' }, subLabel(k)))))
       : h('td', {}, p.posting || ''),
@@ -907,6 +909,16 @@ function parseNamePart(text) {
 const buildNamePart = ({ name, tags, leave, cover, dash }) =>
   `${name}${tags.map(t => ` (${t})`).join('')}${leave ? ` L-${leave}` : ''}${cover ? ` C-${cover}` : ''}${dash ? ` -${dash}` : ''}`;
 
+// Keep the "Name (C)" entry in the room a junior covers in step with their C- tag.
+function syncCoverEntry(row, oldName, oldCover, name, coverTo) {
+  const rows = state.roster.rows;
+  const target = c => c ? rows.find(r => r.label === coverTarget(c, row, rows)) : null;
+  const isEntry = (part, n) => isCoverPart(part) && namesInCell(part)[0] === namesInCell(n)[0];
+  const from = target(oldCover), to = target(coverTo);
+  if (from && (from !== to || oldName !== name)) setCellParts(from, 'junior', cellParts(from, 'junior').filter(x => !isEntry(x, oldName)));
+  if (to && to !== row && !cellParts(to, 'junior').some(x => isEntry(x, name))) setCellParts(to, 'junior', [...cellParts(to, 'junior'), `${name} (C)`]);
+}
+
 function closeTagEditor() { document.querySelector('.tag-editor')?.remove(); }
 
 function openTagEditor(chip, src) {
@@ -916,7 +928,9 @@ function openTagEditor(chip, src) {
   const cur = parseNamePart(parts[src.part] ?? '');
   const p = matchName(cur.name, state.staff).person;
   const on = new Set(cur.tags.filter(t => TAGS.includes(t)));
-  const other = h('input', { value: cur.tags.filter(t => !TAGS.includes(t)).join(', '), placeholder: 'e.g. AOH 1' });
+  const other = h('input', { value: cur.tags.filter(t => !TAGS.includes(t) && !/^C$/i.test(t)).join(', '), placeholder: 'e.g. AOH 1' });
+  const juniorCell = src.key === 'junior';
+  const coveredBox = h('input', { type: 'checkbox', checked: cur.tags.some(t => /^C$/i.test(t)) });
   const dash = h('input', { value: cur.dash, placeholder: 'e.g. mtg 3pm' });
   const leave = h('input', { value: cur.leave, placeholder: 'e.g. 4pm or 4-5pm' });
   const cover = h('input', { value: cur.cover, placeholder: 'e.g. OT13, KROR PACU' });
@@ -929,19 +943,22 @@ function openTagEditor(chip, src) {
     return c;
   }));
   const apply = async () => {
-    const tags = [...TAGS.filter(t => on.has(t)), ...splitNameList(other.value)];
+    const tags = [...TAGS.filter(t => on.has(t)), ...splitNameList(other.value).filter(t => !/^C$/i.test(t)), ...(juniorCell && coveredBox.checked ? ['C'] : [])];
     let picked = name.value.trim() || cur.name;
     if (picked !== cur.name) {
       const person = await resolvePerson(picked, src.key === 'senior' ? 'senior' : 'junior');
       if (!person) return;
       picked = person.name;
     }
-    const next = buildNamePart({ name: picked, tags, leave: leave.value.trim().replace(/^L-/i, ''), cover: cover.value.trim().replace(/^C-/i, ''), dash: dash.value.trim() });
+    const coverTo = cover.value.trim().replace(/^C-/i, '');
+    const next = buildNamePart({ name: picked, tags, leave: leave.value.trim().replace(/^L-/i, ''), cover: coverTo, dash: dash.value.trim() });
     closeTagEditor();
     if (next === parts[src.part]) return;
     undoStack.push(JSON.stringify(state.roster.rows));
     parts[src.part] = next;
     setCellParts(row, src.key, parts);
+    // a junior covering another room (C-OT13) is shown there as "Name (C)"
+    if (juniorCell && !coveredBox.checked) syncCoverEntry(row, cur.name, cur.cover, picked, coverTo);
     // keep the day's details in step so checks and regenerating agree with the sheet
     if (p) {
       const d = dayOf(p.id);
@@ -964,6 +981,7 @@ function openTagEditor(chip, src) {
     h('label', {}, 'Other tags'), other,
     h('label', {}, 'Leaving (L-)'), leave,
     h('label', {}, 'Covering (C-)'), cover,
+    juniorCell && h('label', { class: 'check', title: 'No junior is physically in this room: this person only covers it ad hoc. Shown as "Name (C)" in red.' }, coveredBox, ' Covered (ad hoc cover, not physically here)'),
     h('label', {}, 'Other note (after a dash)'), dash,
     h('div', { class: 'bar', style: 'margin:8px 0 0' },
       h('button', { class: 'primary', onclick: apply }, 'Save'),
@@ -1007,13 +1025,15 @@ const notesCell = (row, i, attrs = {}) => h('td', {
   onblur: e => editNotes(i, e.target.textContent.trim()),
 }, row.notes || '');
 
-// The colour of the person a roster name refers to ('green', 'purple' or '').
+// The colour of a roster name: red for an ad hoc cover ("Name (C)"), else the person's
+// colour ('green', 'purple' or '', consultants always black).
 const colourCache = new Map();
 function colourOf(part) {
+  if (isCoverPart(part)) return 'red';
   const n = namesInCell(part)[0];
   if (!n) return '';
   const k = n + '|' + state.staff.length;
-  if (!colourCache.has(k)) colourCache.set(k, matchName(n, state.staff).person?.colour || '');
+  if (!colourCache.has(k)) colourCache.set(k, staffColour(matchName(n, state.staff).person));
   return colourCache.get(k);
 }
 // The sheet uses short names: "Tan Yi Wei (RA) L-4pm" -> "Tan YW (RA) L-4pm".
