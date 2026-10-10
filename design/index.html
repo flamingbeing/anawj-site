@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>NUHS Style Guide</title>
+<meta name="description" content="Colours, type and components modelled on nuhs.edu.sg, for the NUH tools on this site.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300;0,400;0,600;0,700;1,400&display=swap">
+<link rel="stylesheet" href="tokens.css">
+<style>
+  /* Guide-only layout */
+  .g-sec { padding-block: 48px; }
+  .g-sec + .g-sec { border-top: 1px solid var(--n-line); }
+  .g-lede { max-width: 62ch; font-size: var(--n-text-lg); font-weight: var(--n-light); }
+  .g-note { font-size: var(--n-text-sm); color: var(--n-muted); max-width: 70ch; }
+  .g-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
+  .g-sw { border: 1px solid var(--n-line); border-radius: var(--n-radius); overflow: hidden; font-size: var(--n-text-sm); }
+  .g-sw b { display: block; height: 72px; }
+  .g-sw div { padding: 8px 10px; }
+  .g-sw code { display: block; color: var(--n-muted); font-size: var(--n-text-xs); }
+  .g-type > div { display: grid; grid-template-columns: 110px 1fr; gap: 16px; align-items: baseline; padding: 10px 0; border-bottom: 1px solid var(--n-line); }
+  .g-type code { font-size: var(--n-text-xs); color: var(--n-muted); }
+  .g-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .g-demo { padding: 24px; border-radius: var(--n-radius); }
+  table.g-tbl { border-collapse: collapse; width: 100%; font-size: var(--n-text-sm); }
+  .g-tbl th, .g-tbl td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--n-line); }
+  .g-tbl th { background: var(--n-bg-periwinkle); color: #fff; font-weight: var(--n-semibold); }
+  .g-chip { display: inline-block; width: 18px; height: 18px; border-radius: 3px; vertical-align: -4px; margin-right: 6px; border: 1px solid rgba(0,0,0,.1); }
+  .ok { color: #1a7f37; font-weight: var(--n-semibold); }
+  .bad { color: var(--n-red); font-weight: var(--n-semibold); }
+  .g-tiles { display: grid; gap: 24px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+  .g-news { display: grid; gap: 32px; grid-template-columns: minmax(220px, 1fr) 1fr 1fr; padding: 32px; }
+  .g-feature { display: grid; grid-template-columns: 1fr 1fr; min-height: 280px; }
+  .g-feature > div { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 32px; gap: 20px; }
+  .g-feature h3 { margin: 0; font-size: var(--n-text-3xl); }
+  .g-media { background: linear-gradient(135deg, #3a4f8f, #8a5fa8 55%, #d9b3c9); }
+  .g-cards { display: grid; gap: 32px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+  .g-foot { padding: 32px; display: grid; gap: 24px; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); font-size: var(--n-text-sm); }
+  .g-foot h6 { margin: 0 0 12px; color: var(--n-cyan) !important; font-size: var(--n-text-sm); text-transform: uppercase; font-weight: var(--n-bold); }
+  .g-foot ul { list-style: none; margin: 0; padding: 0; line-height: 2; }
+  .g-foot a { text-decoration: none; }
+  .g-do { display: grid; gap: 24px; grid-template-columns: 1fr 1fr; }
+  .g-do ul { padding-left: 1.2em; }
+  @media (max-width: 767px) {
+    .n-page h1 { font-size: var(--n-text-4xl); }
+    .g-news, .g-feature, .g-do { grid-template-columns: 1fr; }
+    .g-news { padding: 16px; }
+    .g-type > div { grid-template-columns: 1fr; gap: 2px; }
+    .g-media { min-height: 160px; }
+  }
+</style>
+</head>
+<body class="n-page">
+<div class="n-stripe" aria-hidden="true"><i></i><i></i><i></i></div>
+
+<header class="n-container g-sec">
+  <h1>NUHS style guide</h1>
+  <p class="g-lede">Colours, type and components taken from <a href="https://www.nuhs.edu.sg/">nuhs.edu.sg</a>, so the NUH tools on this site look at home next to it. Everything below is drawn with <a href="tokens.css"><code>tokens.css</code></a>.</p>
+  <p class="g-note">Unofficial. Read from the public site's stylesheet in October 2026. It copies the look, not the identity: don't use the NUHS logo or name to make a tool look official.</p>
+</header>
+
+<main>
+<section class="n-container g-sec" id="principles">
+  <h2>Character</h2>
+  <div class="g-do">
+    <div>
+      <h5>What the site does</h5>
+      <ul>
+        <li><b>Navy and white.</b> Navy carries the heavy parts (side panel, footer, primary buttons). Most of the page is white.</li>
+        <li><b>Light, large headings.</b> Headings are Open Sans 300 in navy. Weight comes from size, not boldness.</li>
+        <li><b>Colour as a thin line.</b> Orange, red and cyan show up as stripes and underlines, rarely as fills.</li>
+        <li><b>Square, flat blocks.</b> Bands go edge to edge with no rounding and no shadow. Only buttons get a 5px radius.</li>
+        <li><b>Two-up feature bands.</b> Half photo, half soft colour with a centred light heading and an outline button. Sides alternate.</li>
+      </ul>
+    </div>
+    <div>
+      <h5>Where to improve on it</h5>
+      <ul>
+        <li>White text on cyan (the site's active tab) is 2.7:1. Use navy text on cyan instead.</li>
+        <li>White on periwinkle and on the bright blue band is below 4.5:1. Keep text there at 24px+ or use navy.</li>
+        <li>Don't use cyan for text on white. Use <code>--n-blue</code> for links.</li>
+        <li>Keep a visible focus ring (cyan, 3px). The site mostly relies on browser defaults.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="n-container g-sec" id="colour">
+  <h2>Colour</h2>
+  <h5>Brand</h5>
+  <div class="g-grid">
+    <div class="g-sw"><b style="background:#002f6c"></b><div>Navy<code>--n-navy #002F6C</code></div></div>
+    <div class="g-sw"><b style="background:#00a9e0"></b><div>Cyan<code>--n-cyan #00A9E0</code></div></div>
+    <div class="g-sw"><b style="background:#337ab7"></b><div>Link blue<code>--n-blue #337AB7</code></div></div>
+    <div class="g-sw"><b style="background:#1c8ed7"></b><div>Bright blue<code>--n-blue-bright #1C8ED7</code></div></div>
+    <div class="g-sw"><b style="background:#e57200"></b><div>Orange<code>--n-orange #E57200</code></div></div>
+    <div class="g-sw"><b style="background:#e4002b"></b><div>Red<code>--n-red #E4002B</code></div></div>
+  </div>
+  <h5>Surfaces</h5>
+  <div class="g-grid">
+    <div class="g-sw"><b style="background:#fff"></b><div>White<code>--n-bg #FFFFFF</code></div></div>
+    <div class="g-sw"><b style="background:#d5e3ef"></b><div>Pale blue<code>--n-bg-blue #D5E3EF</code></div></div>
+    <div class="g-sw"><b style="background:#e6dbce"></b><div>Beige<code>--n-bg-beige #E6DBCE</code></div></div>
+    <div class="g-sw"><b style="background:#7d8cb3"></b><div>Periwinkle<code>--n-bg-periwinkle #7D8CB3</code></div></div>
+    <div class="g-sw"><b style="background:#eee"></b><div>Grey<code>--n-bg-grey #EEEEEE</code></div></div>
+    <div class="g-sw"><b style="background:#333"></b><div>Ink<code>--n-ink #333333</code></div></div>
+  </div>
+  <h5>Interaction</h5>
+  <div class="g-grid">
+    <div class="g-sw"><b style="background:#d7340b"></b><div>Hover on light<code>--n-hover-light #D7340B</code></div></div>
+    <div class="g-sw"><b style="background:#f7941d"></b><div>Hover on navy<code>--n-hover-dark #F7941D</code></div></div>
+    <div class="g-sw"><b style="background:#2c6597"></b><div>Button hover<code>--n-navy-hover #2C6597</code></div></div>
+    <div class="g-sw"><b style="background:#c249bc"></b><div>Visited<code>--n-visited #C249BC</code></div></div>
+  </div>
+
+  <h5 style="margin-top:32px">Contrast</h5>
+  <table class="g-tbl">
+    <thead><tr><th>Pair</th><th>Ratio</th><th>Use for</th></tr></thead>
+    <tbody>
+      <tr><td><span class="g-chip" style="background:#002f6c"></span>Navy on white</td><td>12.9</td><td class="ok">Any text</td></tr>
+      <tr><td><span class="g-chip" style="background:#333"></span>Ink on white</td><td>12.6</td><td class="ok">Any text</td></tr>
+      <tr><td><span class="g-chip" style="background:#337ab7"></span>Link blue on white</td><td>4.6</td><td class="ok">Body text and links</td></tr>
+      <tr><td><span class="g-chip" style="background:#d7340b"></span>Hover red on white</td><td>4.8</td><td class="ok">Body text</td></tr>
+      <tr><td><span class="g-chip" style="background:#f7941d"></span>Orange on navy</td><td>5.7</td><td class="ok">Body text</td></tr>
+      <tr><td><span class="g-chip" style="background:#002f6c"></span>Navy on cyan</td><td>4.8</td><td class="ok">Body text</td></tr>
+      <tr><td><span class="g-chip" style="background:#1c8ed7"></span>White on bright blue</td><td>3.6</td><td class="bad">24px+ only</td></tr>
+      <tr><td><span class="g-chip" style="background:#7d8cb3"></span>White on periwinkle</td><td>3.4</td><td class="bad">24px+ only</td></tr>
+      <tr><td><span class="g-chip" style="background:#00a9e0"></span>White on cyan</td><td>2.7</td><td class="bad">Don't</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="n-container g-sec" id="type">
+  <h2>Type</h2>
+  <p class="g-note">Open Sans (Google Fonts), weights 300, 400, 600 and 700. Base 16px, line height 1.5. h1 to h3 are Light in navy; h5 and h6 are SemiBold in navy. Section titles on coloured bands use SemiBold link blue.</p>
+  <div class="g-type">
+    <div><code>h1 · 42 / 300</code><span style="font-size:var(--n-text-5xl);font-weight:300;color:var(--n-navy);line-height:1.2">Measuring what matters</span></div>
+    <div><code>h2 · 30 / 300</code><span style="font-size:var(--n-text-3xl);font-weight:300;color:var(--n-navy)">Leading value-based care</span></div>
+    <div><code>h3 · 24 / 300</code><span style="font-size:var(--n-text-2xl);font-weight:300;color:var(--n-navy)">Clinical outcomes across our institutions</span></div>
+    <div><code>section · 30 / 600</code><span style="font-size:var(--n-text-3xl);font-weight:600;color:var(--n-blue)">Upcoming Events</span></div>
+    <div><code>h4 · 20 / 600</code><span style="font-size:var(--n-text-xl);font-weight:600">Find a doctor</span></div>
+    <div><code>h5 · 18 / 600</code><span style="font-size:var(--n-text-lg);font-weight:600;color:var(--n-navy)">Patient care</span></div>
+    <div><code>body · 16 / 400</code><span>Polyclinics will train all front-line staff to better help people with intellectual disabilities.</span></div>
+    <div><code>small · 14 / 400</code><span style="font-size:var(--n-text-sm)">13 October 2026 · Health education talk</span></div>
+    <div><code>label · 12 / 700</code><span style="font-size:var(--n-text-xs);font-weight:700;text-transform:uppercase;color:var(--n-blue)">Quick links</span></div>
+  </div>
+</section>
+
+<section class="n-container g-sec" id="buttons">
+  <h2>Buttons and inputs</h2>
+  <p class="g-note">5px radius, 6px × 12px padding, regular weight. The outline button ("View More") is the most common one on the site: it takes the text colour of whatever band it sits on.</p>
+  <div class="g-row">
+    <button class="n-btn">Primary</button>
+    <button class="n-btn n-btn--secondary">Secondary</button>
+    <button class="n-btn n-btn--alert">Alert</button>
+    <button class="n-btn n-btn--outline">View More</button>
+    <button class="n-btn" disabled>Disabled</button>
+  </div>
+  <div class="g-row g-demo n-dark" style="margin-top:16px">
+    <button class="n-btn n-btn--outline">View More on navy</button>
+    <a href="#buttons">Link on navy</a>
+  </div>
+  <div class="g-row" style="margin-top:16px">
+    <input class="n-input" placeholder="Search for a doctor" aria-label="Search for a doctor">
+    <div class="n-tabs" role="tablist" style="flex:1;min-width:260px">
+      <button role="tab" aria-selected="true">Overview</button>
+      <button role="tab" aria-selected="false">Clinics</button>
+      <button role="tab" aria-selected="false">Contact</button>
+    </div>
+  </div>
+  <div class="n-alert" style="margin-top:16px"><b>Beware of scam calls.</b> Staff will never ask you to transfer money or share bank details over a call.</div>
+</section>
+
+<section class="g-sec" id="patterns">
+  <div class="n-container">
+    <h2>Page patterns</h2>
+    <p class="g-note">The home page is a stack of full-width bands. Below, each one in order.</p>
+
+    <h5>1. Quick-action tiles</h5>
+    <p class="g-note">Thin line icon, label in ink, 4px coloured bar underneath. Bars run orange, red, cyan, link blue.</p>
+    <nav class="g-tiles" aria-label="Quick actions example">
+      <a class="n-tile" href="#patterns" style="--n-tile:var(--n-orange)"><svg viewBox="0 0 40 40"><circle cx="20" cy="14" r="7"/><path d="M7 36c1-8 6-12 13-12s12 4 13 12"/></svg>Find a Doctor</a>
+      <a class="n-tile" href="#patterns" style="--n-tile:var(--n-red)"><svg viewBox="0 0 40 40"><rect x="6" y="9" width="28" height="25" rx="2"/><path d="M6 16h28M13 5v7M27 5v7"/></svg>Manage Appointments</a>
+      <a class="n-tile" href="#patterns" style="--n-tile:var(--n-cyan)"><svg viewBox="0 0 40 40"><path d="M10 5v10a7 7 0 0 0 14 0V5M17 22v5a7 7 0 0 0 14 0v-3"/><circle cx="31" cy="21" r="3"/></svg>Find a Condition</a>
+      <a class="n-tile" href="#patterns" style="--n-tile:var(--n-blue)"><svg viewBox="0 0 40 40"><path d="M16 5h8M18 5v10L9 32a2 2 0 0 0 2 3h18a2 2 0 0 0 2-3l-9-17V5"/><path d="M13 25h14"/></svg>Clinical Trials</a>
+    </nav>
+
+    <h5 style="margin-top:40px">2. Navy panel: menu and news</h5>
+    <p class="g-note">Side menu of large Light links with a cyan block for the active item, then two dated lists. Each list ends in a right-aligned outline button.</p>
+  </div>
+  <div class="n-container">
+    <div class="n-dark g-news">
+      <ul class="n-menu">
+        <li><a href="#patterns" aria-current="page">News &amp; Stories</a></li>
+        <li><a href="#patterns">A Healthy Community</a></li>
+        <li><a href="#patterns">Careers</a></li>
+        <li><a href="#patterns">Family Medicine</a></li>
+      </ul>
+      <div class="n-news">
+        <h3>Media Releases</h3>
+        <time>25 September 2026</time><p>First clinical trial of oral immunotherapy for prawn allergy</p>
+        <time>18 September 2026</time><p>End-to-end care model for patients with diabetes</p>
+        <div style="text-align:right"><a class="n-btn n-btn--outline" href="#patterns">View More</a></div>
+      </div>
+      <div class="n-news">
+        <h3>News &amp; Stories</h3>
+        <time>05 October 2026</time><p>Nearly $50 million given to severely disabled Singaporeans</p>
+        <time>04 October 2026</time><p>Being more active cannot fully offset bad diet</p>
+        <div style="text-align:right"><a class="n-btn n-btn--outline" href="#patterns">View More</a></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="n-container">
+    <h5 style="margin-top:40px">3. Feature bands</h5>
+    <p class="g-note">Half image, half flat colour. Centred Light heading (30px) and one outline button. Alternate the image side and cycle beige, periwinkle, pale blue.</p>
+    <div class="g-feature n-band-periwinkle">
+      <div><h3 style="color:#fff">Measuring what matters</h3><a class="n-btn n-btn--outline" href="#patterns" style="color:#fff">Download the book</a></div>
+      <div class="g-media" aria-hidden="true"></div>
+    </div>
+    <div class="g-feature n-band-beige">
+      <div class="g-media" aria-hidden="true" style="background:linear-gradient(135deg,#1d3d7a,#b06aa0)"></div>
+      <div><h3>A practical framework for health outcomes</h3><a class="n-btn n-btn--outline" href="#patterns" style="color:var(--n-navy)">See more</a></div>
+    </div>
+
+    <h5 style="margin-top:40px">4. Cards on a pale-blue band</h5>
+  </div>
+  <div class="n-band-blue" style="padding:40px 0">
+    <div class="n-container">
+      <div class="n-section-head"><h2>Upcoming Events</h2><a class="n-btn n-btn--outline" href="#patterns" style="color:var(--n-blue)">View More</a></div>
+      <div class="g-cards">
+        <article class="n-card"><div class="n-card__media" style="background:#fde3e1"></div><h4>Pink Hour</h4><time>13 October 2026</time></article>
+        <article class="n-card"><div class="n-card__media" style="background:#fff"></div><h4>Health Talk: Nutrition for Healthy Ageing</h4><time>16 October 2026</time></article>
+        <article class="n-card"><div class="n-card__media" style="background:#fde3e1"></div><h4>Pink Hour</h4><time>17 October 2026</time></article>
+      </div>
+    </div>
+  </div>
+
+  <div class="n-container">
+    <h5 style="margin-top:40px">5. Footer</h5>
+    <p class="g-note">Navy, four columns. Cyan uppercase labels, small white links; the last column is SemiBold. Then a pale-blue address strip and a grey copyright strip.</p>
+    <footer class="n-dark g-foot">
+      <div><h6>Quick links</h6><ul><li><a href="#patterns">Find a Doctor</a></li><li><a href="#patterns">Research</a></li><li><a href="#patterns">Giving</a></li></ul></div>
+      <div><h6>&nbsp;</h6><ul><li><a href="#patterns">Careers</a></li><li><a href="#patterns">Events</a></li><li><a href="#patterns">Newsroom</a></li></ul></div>
+      <div><h6>Useful links</h6><ul><li><a href="#patterns">Ministry of Health</a></li><li><a href="#patterns">HealthHub</a></li></ul></div>
+      <div><ul style="font-weight:600"><li><a href="#patterns">Contact Us</a></li><li><a href="#patterns">Terms of Use</a></li><li><a href="#patterns">Privacy</a></li></ul></div>
+    </footer>
+    <div class="n-band-blue" style="padding:10px 32px;font-size:var(--n-text-sm)">1E Kent Ridge Road, Singapore 119228</div>
+    <div style="background:var(--n-bg-grey);padding:16px 32px;font-size:var(--n-text-sm)">Copyright © 2026</div>
+  </div>
+</section>
+
+<section class="n-container g-sec" id="layout">
+  <h2>Layout and detail</h2>
+  <table class="g-tbl">
+    <thead><tr><th>Thing</th><th>Value</th></tr></thead>
+    <tbody>
+      <tr><td>Container</td><td>1320px max (Bootstrap 5), 16px side padding on phones</td></tr>
+      <tr><td>Breakpoints</td><td>576, 768, 992, 1200, 1400px. Main menu collapses below 992px</td></tr>
+      <tr><td>Gutters</td><td>1.5rem default; 2.5–3rem between the big blocks</td></tr>
+      <tr><td>Radius</td><td>5px buttons and inputs, 3px badges, 0 everything else</td></tr>
+      <tr><td>Shadow</td><td>Almost none. Cards that need lift: <code>2px 4px 6px #e9e9e9</code></td></tr>
+      <tr><td>Icons</td><td>Thin outline icons for tiles; Font Awesome 5 solid for small UI (chevrons, social, search)</td></tr>
+      <tr><td>Photography</td><td>Real staff in navy scrubs or lab coats, bright clinical rooms, natural smiles. Book and report covers on soft gradients</td></tr>
+      <tr><td>Voice</td><td>Plain, warm, institutional. Sentence-case body; title case in menus and headings</td></tr>
+    </tbody>
+  </table>
+</section>
+</main>
+</body>
+</html>
