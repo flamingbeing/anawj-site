@@ -55,7 +55,7 @@ export function renderProgress() {
   return h('div', {}, head, reflCard(), body);
 }
 
-// Reflections at a glance; the full list and editor are on #reflect.
+// Reflections at a glance; the full list and editor are on the Reflections tab (#reflect).
 function reflCard() {
   const p = reflectionProgress(S.reflections || []);
   const met = p.headings.filter(x => x.met).length;
@@ -67,7 +67,8 @@ function reflCard() {
       h('a', { class: 'btn small primary', href: '#reflect' }, 'Open reflections')),
     h('p', { class: 'hint', style: 'margin-top:8px' },
       `${p.totals.counted} / ${p.totals.min} counted · ${met} of ${p.headings.length} headings met · ${p.totals.drafts} draft${p.totals.drafts === 1 ? '' : 's'}`,
-      issues ? ` · ${issues} to sort out` : ''),
+      issues ? ` · ${issues} to sort out` : '',
+      (S.reflections || []).some(r => !r.caseId) ? ` · ${(S.reflections || []).filter(r => !r.caseId).length} not linked to a case` : ''),
     h('span', { class: 'meter' }, h('i', { class: met === p.headings.length ? 'done' : 'ontrack', style: `width:${Math.min(100, Math.round(p.totals.counted / p.totals.min * 100))}%` })));
 }
 
@@ -76,7 +77,7 @@ function progList(items) {
     const c = BY_CODE[p.code];
     const max = Math.max(1, ...p.milestones.map(m => m.n));
     const pct = Math.min(100, Math.round((p.count / max) * 100));
-    return h('li', { class: c.parent ? 'sub' : '', title: c.label },
+    return h('li', { class: c.parent ? 'sub' : '', title: c.full || c.name },
       h('i', { class: `dot ${p.status}`, title: STATUS_TEXT[p.status] }),
       h('span', { class: 'nm' }, h('b', {}, p.code), p.name),
       h('span', { class: 'ct' }, p.status === 'none' ? String(p.count) : p.next ? `${p.count} / ${p.next.n}` : `${p.count} ✓`),
@@ -154,7 +155,7 @@ function totalsTable(people) {
     const vals = people.map(p => (p.counts || {})[code] || 0);
     const sts = prog.map(pr => (pr[code] ? pr[code].status : 'none'));
     data.rows.push({ label: BY_CODE[code].label, values: vals, statuses: sts });
-    add(tbody, h('tr', {}, h('td', { class: 'cat', title: BY_CODE[code].label }, `${code} ${BY_CODE[code].name}`),
+    add(tbody, h('tr', {}, h('td', { class: 'cat', title: BY_CODE[code].full }, `${code} ${BY_CODE[code].name}`),
       vals.map((v, i) => h('td', { class: `n ${sts[i]}` }, String(v)))));
   }
   const totals = people.map(p => p.total || 0);

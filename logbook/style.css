@@ -303,3 +303,85 @@ code, kbd { font-size: 13px; background: var(--chip); padding: 0 4px; border-rad
 a { color: var(--accent); }
 :focus-visible { outline: 2px solid var(--nuhs-cyan); outline-offset: 2px; }
 input:focus, select:focus, textarea:focus { border-color: var(--nuhs-cyan); box-shadow: 0 0 0 3px rgba(0, 169, 224, .18); outline: none; }
+
+/* ---- logbook-tab ---- */
+.lb-tags { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
+.lb-tag { font-size: 12px; line-height: 1.35; padding: 1px 8px; border-radius: 10px; background: var(--chip); border: 1px solid var(--line); white-space: normal; overflow-wrap: anywhere; max-width: 100%; }
+.lb-calbar { gap: 6px; margin-bottom: 8px; }
+.lb-cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; }
+.lb-dow { font-size: 11px; font-weight: 700; color: var(--muted); text-align: center; padding: 2px 0; }
+.lb-day { position: relative; min-width: 0; min-height: 44px; padding: 3px 0 0; margin: 0; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: inherit; font: inherit; display: flex; flex-direction: column; align-items: center; gap: 2px; cursor: pointer; }
+.lb-day.blank { border: 0; background: none; cursor: default; }
+.lb-day .n { font-size: 12px; color: var(--muted); }
+.lb-day.today .n { color: var(--accent); font-weight: 700; }
+.lb-day.today { border-color: var(--accent); }
+.lb-day.sel { outline: 2px solid var(--accent); outline-offset: -1px; }
+.lb-count { font-size: 12px; font-weight: 700; min-width: 20px; padding: 0 5px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
+.lb-day.t2 .lb-count { background: color-mix(in srgb, var(--accent) 35%, transparent); }
+.lb-day.t3 .lb-count { background: color-mix(in srgb, var(--accent) 60%, transparent); color: var(--accent-ink); }
+.lb-day.t4 .lb-count { background: var(--accent); color: var(--accent-ink); }
+.lb-dot { position: absolute; top: 4px; right: 4px; width: 6px; height: 6px; border-radius: 50%; background: #d9822b; }
+
+/* ---- compact mode ---- */
+/* Settings → Compact mode (body.compact): tighter everything so more categories fit on a phone screen.
+   Inputs stay at 16px (iOS zooms smaller ones); tap targets stay at least 30px tall. */
+body.compact { font-size: 14px; line-height: 1.35; }
+body.compact .top { padding: 6px 12px 4px; padding-top: max(10px, calc(env(safe-area-inset-top, 0px) + 5px)); }
+body.compact .top h1 { font-size: 16px; }
+body.compact .top .sub { font-size: 12px; }
+body.compact main { padding: 6px 8px; padding-bottom: calc(16px + var(--tabbar-h) + var(--safe-b)); }
+body.compact section.card { padding: 10px; margin-bottom: 8px; border-radius: 12px; }
+body.compact section.card h2 { font-size: 15px; margin-bottom: 2px; }
+body.compact section.card h3 { margin: 8px 0 4px; font-size: 13px; }
+body.compact .log-card { padding: 8px; }
+body.compact .hint { margin-bottom: 8px; font-size: 12px; }
+body.compact .bar { gap: 6px; margin-bottom: 8px; }
+body.compact .chips { gap: 4px; }
+body.compact .chip { min-height: 32px; padding: 3px 9px; font-size: 13px; gap: 3px; }
+body.compact .chip.static { min-height: 0; padding: 0 6px; font-size: 12px; }
+body.compact .datebar { gap: 4px; margin-bottom: 6px; }
+body.compact .datebar .chip, body.compact .datebar input[type="date"] { min-height: 32px; padding: 3px 8px; }
+body.compact .chiplabel { font-size: 11px; margin: 6px 0 2px; }
+body.compact .selected { min-height: 32px; }
+body.compact .tip { margin-top: 4px; padding: 4px 8px; font-size: 12px; }
+body.compact button, body.compact .btn { min-height: 34px; padding: 5px 12px; }
+body.compact button.small, body.compact .btn.small, body.compact .seg button { min-height: 30px; padding: 3px 9px; }
+body.compact button.big { min-height: 40px; font-size: 15px; padding: 6px 14px; }
+body.compact button.link { min-height: 0; padding: 0; }
+body.compact .actions { padding: 6px 0 4px; margin-top: 4px; gap: 6px; }
+body.compact input[type="text"], body.compact input[type="search"], body.compact input[type="email"], body.compact input:not([type]),
+body.compact input[type="date"], body.compact input[type="number"], body.compact select {
+  font-size: 16px; min-height: 34px; padding: 4px 8px;
+}
+body.compact textarea { font-size: 16px; padding: 6px 8px; }
+body.compact textarea.details { min-height: 64px; font-size: 16px; padding: 6px 10px; }
+body.compact label.field { margin-bottom: 6px; gap: 2px; }
+body.compact label.check { min-height: 32px; }
+/* category picker: ~32px rows */
+body.compact .picker ul { margin-top: 4px; max-height: 60vh; border-radius: 10px; }
+body.compact .picker li { min-height: 32px; padding: 3px 10px; gap: 8px; line-height: 1.25; }
+body.compact .picker li.sub { padding-left: 26px; }
+body.compact .picker li .code { min-width: 34px; }
+body.compact .picker li .ct { font-size: 12px; }
+body.compact .picker li .tick { width: 18px; height: 18px; font-size: 12px; border-radius: 5px; }
+/* logbook list and progress rows */
+body.compact ul.cases li { padding: 5px 2px; gap: 2px 8px; grid-template-columns: 64px 1fr; }
+body.compact ul.cases .d { font-size: 12px; }
+body.compact .monthhead { padding: 6px 2px 2px; font-size: 11px; }
+body.compact .lb-tag { font-size: 11px; padding: 0 6px; }
+body.compact ul.prog li { padding: 4px 2px; gap: 1px 6px; }
+body.compact ul.prog .ct { font-size: 13px; }
+body.compact ul.prog .meter { height: 4px; }
+body.compact th, body.compact td { padding: 4px 6px; }
+body.compact dialog { padding: 12px; }
+@media (max-width: 600px) {
+  body.compact { --tabbar-h: 47px; } /* 46px buttons + 1px border */
+  body.compact.typing { --tabbar-h: 0px; }
+  body.compact .top { padding: 6px 12px 4px; padding-top: max(8px, calc(env(safe-area-inset-top, 0px) + 5px)); }
+  body.compact main { padding: 6px 8px; padding-bottom: calc(16px + var(--tabbar-h) + var(--safe-b)); }
+  body.compact .tabs button { height: var(--tabbar-h); min-height: 0; padding: 2px; font-size: 10px; gap: 0; }
+  body.compact .tabs .ico { width: 19px; height: 19px; }
+}
+@media (min-width: 601px) {
+  body.compact .tabs button { min-height: 36px; padding: 6px 10px; }
+}

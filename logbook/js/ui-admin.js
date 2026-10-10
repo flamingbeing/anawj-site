@@ -19,7 +19,7 @@ const demoOk = () => !cloud.demo || confirmBox('Demo mode', 'The demo stores dat
 export function renderAdmin() {
   if (!S.admin) return h('p', { class: 'empty' }, 'Admins only.');
   if (!A.residents && !A.loading) load();
-  return h('div', {}, residentsCard(), importCard(), sharedCard(), renderTemplateCard());
+  return h('div', {}, h('p', { style: 'margin:0 0 8px' }, h('a', { class: 'btn small', href: '#settings' }, '← Back to settings')), residentsCard(), importCard(), sharedCard(), renderTemplateCard());
 }
 
 async function load() {

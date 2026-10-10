@@ -26,7 +26,7 @@ The Firebase project `apmes-logbook` already exists and its web config is in `js
 3. **Rules**: Firestore Database → Rules → paste the whole of `firestore.rules` → Publish. Paste it again whenever the file changes. This one file holds the rules for the whole Firebase project, the logbook and evaluations (`/evals`) alike, so never publish another app's rules file over it.
 4. **Admins**: Firestore Database → Data → Start collection `admins`. Add one document per admin. The document ID is the admin's Google email in lower case (use the admins' emails), with a field `name` (string). Admin emails are never written in this repository.
 5. **Optional, API key restriction**: Google Cloud console → APIs & Services → Credentials → the "Browser key" → Application restrictions → Websites → add `https://anawj.com/*`, `https://apmes-logbook.firebaseapp.com/*` and `http://localhost/*`. The key isn't a secret, but this stops other sites using it.
-6. Sign in on the page as an admin, open **Admin**, paste the residents list, then run the import (below).
+6. Sign in on the page as an admin, open **Settings → Admin**, paste the residents list, then run the import (below).
 
 Free (Spark) plan limits that matter: 20,000 writes and 50,000 reads a day. The first import is about 16,000 cases, so it fits in one day; re-imports write only new rows.
 
@@ -51,7 +51,7 @@ Sign-in uses a Google popup, falling back to a redirect if popups are blocked (e
 
 ## How the import works
 
-The old data is the Google Form responses workbook (tabs **Case** and **AY20xx Totals**). In **Admin**:
+The old data is the Google Form responses workbook (tabs **Case** and **AY20xx Totals**). In **Settings → Admin**:
 
 1. Paste the residents list (the `RESIDENTS` array from the old Apps Script). Check names, emails, status and residency year, then save. This creates `residents/{rid}`.
 2. Upload the workbook. It is read in the browser (nothing is uploaded except the resulting cases). `js/importer.js` reads the Case tab: resident, date, details and the category columns, merged into one list of codes. Rows marked "WRONG ENTRY" are skipped; dates that can't be read are kept as text and flagged "needs date".
@@ -60,7 +60,7 @@ The old data is the Google Form responses workbook (tabs **Case** and **AY20xx T
 
 ## Code
 
-- `js/reflections.js`: reflection shape and progress against the portfolio rules (96 total, JR, sub-types, unique patients); `js/ui-reflect.js`: the Reflections screen (`#reflect`, from Progress or a case's Reflect button).
+- `js/reflections.js`: reflection shape and progress against the portfolio rules (96 total, JR, sub-types, unique patients); `js/ui-reflect.js`: the Reflections tab (`#reflect`): every reflection is linked to a logged case (`caseId`); "+ New reflection" opens a case picker and pre-fills from the chosen case, and a case's Reflect button does the same. Unlinked older reflections show "not linked" and can't be marked complete until linked.
 - `js/categories.js`: categories, targets, EPA tags, tips, reflection headings.
 - `js/suggest.js`, `js/keywords.js`: category suggestions from free text.
 - `js/engine.js`: dates, counts, progress, bulk paste, duplicates, spreadsheet diff. No DOM.

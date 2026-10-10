@@ -61,9 +61,11 @@ export const isLegacy = r => !!(r && r.sections && Object.values(r.sections).som
   && !String(r.summary || '').trim() && !arr(r.points).some(p => p && (String(p.heading || '').trim() || String(p.text || '').trim())));
 
 // What is missing before a reflection can be marked complete (empty = ready).
+// Every reflection must be linked to a logged case (caseId); older unlinked ones can't be completed until linked.
 export function completeProblems(r) {
   const out = [];
   const hd = HEADING_BY_ID[r.headingId];
+  if (!r.caseId) out.push('linked case');
   if (!hd) out.push('heading');
   if (hd && hd.subs && !r.subId) out.push('sub-type');
   if (!String(r.initials || '').trim()) out.push('initials');

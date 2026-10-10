@@ -1,16 +1,24 @@
-// Logbook screen: every case, newest first. Search, filter, flags, edit; a grid view for bulk edits
+// Logbook screen: every case, newest first (list) or by day (calendar). Search, filter, flags, edit; a grid view for bulk edits
 // and pasting rows from Excel; Excel download and upload (round trip with a preview of the changes).
 
 import { duplicates, fmtDate, caseFromRow, diffRows, sortCodes, withParents } from './engine.js';
 import { flagCase } from './importer.js';
 import { exportCases, readCasesSheet } from './xlsxio.js';
 import {
-  S, h, toast, debounce, modal, cat, catChip, miniChips, PICKER_ORDER, needExcel, download, fileButton,
+  S, h, toast, debounce, modal, cat, catFull, catChip, PICKER_ORDER, settings, patchLogbook, needExcel, download, fileButton,
   updateCase, saveMany, deleteMany, displayName, rYear, todayISO, fill, add } from './ui-core.js';
 import { editCaseDialog } from './ui-log.js';
 import { reflectOnCase } from './ui-reflect.js';
 
-const view = { q: '', cat: '', flag: '', grid: false, limit: 150 };
+const view = { q: '', cat: '', flag: '', mode: null, limit: 150, month: null, day: null };
+const MODES = [['list', 'List'], ['calendar', 'Calendar'], ['grid', 'Grid']];
+
+// Procedure-name tags; a parent (e.g. 20) is left out when one of its sub-categories (20iii) is there.
+function catTags(cats) {
+  const codes = sortCodes(cats || []);
+  const shown = codes.filter(c => !codes.some(o => o !== c && cat(o).parent === c));
+  return h('span', { class: 'lb-tags' }, shown.map(c => h('span', { class: 'lb-tag', title: catFull(c) }, catFull(c))));
+}
 
 export function renderLogbook() {
   const wrap = h('div');
@@ -29,9 +37,10 @@ export function renderLogbook() {
     });
   };
 
+  if (!view.mode) view.mode = MODES.some(([m]) => m === settings().logbookView) ? settings().logbookView : 'list';
   const paint = () => {
     const rows = filtered();
-    fill(list, view.grid ? gridView(rows, paint) : listView(rows, flagsOf, paint));
+    fill(list, view.mode === 'grid' ? gridView(rows, paint) : view.mode === 'calendar' ? calendarView(rows, flagsOf, paint) : listView(rows, flagsOf, paint));
     counter.textContent = rows.length === S.cases.length ? `${S.cases.length} cases` : `${rows.length} of ${S.cases.length} cases`;
   };
   const paintSoon = debounce(() => { view.limit = 150; paint(); }, 150);
@@ -50,15 +59,18 @@ export function renderLogbook() {
         flagOpts.map(([v, l]) => h('option', { value: v, selected: view.flag === v }, l)))),
     h('div', { class: 'bar', style: 'margin-bottom:0' },
       counter, h('span', { class: 'grow' }),
-      h('div', { class: 'seg' },
-        h('button', { 'aria-pressed': String(!view.grid), onclick: () => { view.grid = false; hooksRender(); } }, 'List'),
-        h('button', { 'aria-pressed': String(view.grid), onclick: () => { view.grid = true; hooksRender(); } }, 'Grid')))),
+      h('div', { class: 'seg' }, MODES.map(([m, l]) =>
+        h('button', { 'aria-pressed': String(view.mode === m), onclick: () => setMode(m) }, l))))),
   h('section', { class: 'card' }, list),
   excelCard());
   paint();
   return wrap;
 
-  function hooksRender() { paint(); wrap.querySelectorAll('.seg button').forEach((b, i) => b.setAttribute('aria-pressed', String(i === (view.grid ? 1 : 0)))); }
+  function setMode(m) {
+    view.mode = m; view.limit = 150; paint();
+    wrap.querySelectorAll('.seg button').forEach((b, i) => b.setAttribute('aria-pressed', String(MODES[i][0] === m)));
+    if (settings().logbookView !== m) patchLogbook({ settings: { logbookView: m } });  // remembered per user
+  }
 }
 
 // ---------- list ----------
@@ -71,17 +83,7 @@ function listView(rows, flagsOf, repaint) {
   for (const c of rows.slice(0, view.limit)) {
     const m = c.date ? fmtDate(c.date).replace(/^\d+ /, '') : 'No date';
     if (m !== month) { month = m; add(ul, h('li', { class: 'monthhead', onclick: null }, m)); }
-    const flags = flagsOf(c);
-    add(ul, h('li', { onclick: () => editCaseDialog(c), tabindex: '0', onkeydown: e => { if (e.key === 'Enter') editCaseDialog(c); } },
-      h('span', { class: 'd' }, c.date ? fmtDate(c.date).replace(/ \d{4}$/, '') : (c.dateText || '—')),
-      h('span', { class: 't' }, c.details || h('i', { class: 'muted' }, 'no details')),
-      h('span', { class: 'c' }, miniChips(c.cats),
-        flags.includes('needsDate') ? h('span', { class: 'flag err' }, 'needs date') : null,
-        flags.includes('future') ? h('span', { class: 'flag' }, 'future date') : null,
-        flags.includes('duplicate') ? h('span', { class: 'flag' }, 'possible duplicate') : null,
-        !(c.cats || []).length ? h('span', { class: 'flag err' }, 'no category') : null,
-        h('button', { class: 'small', style: 'margin-left:auto', title: 'Write a reflection on this case', onclick: e => { e.stopPropagation(); reflectOnCase(c); } },
-          (S.reflections || []).some(r => r.caseId === c.id) ? 'Reflection' : 'Reflect'))));
+    add(ul, caseRow(c, flagsOf));
   }
   // month headers are sticky and not tappable
   ul.querySelectorAll('.monthhead').forEach(li => { li.style.display = 'block'; li.style.cursor = 'default'; });
@@ -89,6 +91,74 @@ function listView(rows, flagsOf, repaint) {
     ? h('div', { class: 'bar', style: 'justify-content:center;margin-top:12px' }, h('button', { onclick: () => { view.limit += 300; repaint(); } }, `Show more (${rows.length - view.limit} left)`))
     : null;
   return h('div', {}, ul, more);
+}
+
+// One case: date, details, procedure tags, flags. Tap to edit. Shared by the list and the calendar.
+function caseRow(c, flagsOf) {
+  const flags = flagsOf(c);
+  return h('li', { onclick: () => editCaseDialog(c), tabindex: '0', onkeydown: e => { if (e.key === 'Enter') editCaseDialog(c); } },
+      h('span', { class: 'd' }, c.date ? fmtDate(c.date).replace(/ \d{4}$/, '') : (c.dateText || '—')),
+      h('span', { class: 't' }, c.details || h('i', { class: 'muted' }, 'no details')),
+      h('span', { class: 'c' }, catTags(c.cats),
+        flags.includes('needsDate') ? h('span', { class: 'flag err' }, 'needs date') : null,
+        flags.includes('future') ? h('span', { class: 'flag' }, 'future date') : null,
+        flags.includes('duplicate') ? h('span', { class: 'flag' }, 'possible duplicate') : null,
+        !(c.cats || []).length ? h('span', { class: 'flag err' }, 'no category') : null,
+        h('button', { class: 'small', style: 'margin-left:auto', title: 'Write a reflection on this case', onclick: e => { e.stopPropagation(); reflectOnCase(c); } },
+          (S.reflections || []).some(r => r.caseId === c.id) ? 'Reflection' : 'Reflect')));
+}
+
+// ---------- calendar ----------
+
+const pad = n => String(n).padStart(2, '0');
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+function calendarView(rows, flagsOf, repaint) {
+  if (!S.cases.length) return h('p', { class: 'empty' }, 'No cases yet. Log your first one on the Log tab.');
+  const today = todayISO();
+  if (!view.month) view.month = today.slice(0, 7);
+  const [y, m] = view.month.split('-').map(Number);
+  const byDay = new Map();
+  const undated = [];
+  for (const c of rows) {
+    if (!c.date) { undated.push(c); continue; }
+    if (!byDay.has(c.date)) byDay.set(c.date, []);
+    byDay.get(c.date).push(c);
+  }
+  const shift = d => { const t = new Date(y, m - 1 + d, 1); view.month = `${t.getFullYear()}-${pad(t.getMonth() + 1)}`; view.day = null; repaint(); };
+  const first = new Date(y, m - 1, 1);
+  const lead = (first.getDay() + 6) % 7;           // Monday first
+  const days = new Date(y, m, 0).getDate();
+  const grid = h('div', { class: 'lb-cal', role: 'grid' }, ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => h('div', { class: 'lb-dow' }, d)));
+  for (let i = 0; i < lead; i++) add(grid, h('div', { class: 'lb-day blank' }));
+  let monthN = 0;
+  for (let d = 1; d <= days; d++) {
+    const iso = `${y}-${pad(m)}-${pad(d)}`;
+    const cs = byDay.get(iso) || [];
+    monthN += cs.length;
+    const flagged = cs.some(c => flagsOf(c).length);
+    const tint = cs.length ? Math.min(4, cs.length) : 0;
+    add(grid, h('button', {
+      class: `lb-day t${tint} ${iso === today ? 'today' : ''} ${iso === view.day ? 'sel' : ''}`,
+      'aria-label': `${d} ${MONTHS[m - 1]}: ${cs.length} case${cs.length === 1 ? '' : 's'}`, 'aria-pressed': String(iso === view.day),
+      onclick: () => { view.day = view.day === iso ? null : iso; repaint(); },
+    }, h('span', { class: 'n' }, d), cs.length ? h('span', { class: 'lb-count' }, cs.length) : null, flagged ? h('i', { class: 'lb-dot', title: 'Has a flagged case' }) : null));
+  }
+  const dayCases = view.day ? (byDay.get(view.day) || []) : [];
+  return h('div', {},
+    h('div', { class: 'bar lb-calbar' },
+      h('button', { class: 'small', 'aria-label': 'Previous month', onclick: () => shift(-1) }, '‹'),
+      h('strong', { class: 'grow', style: 'text-align:center' }, `${MONTHS[m - 1]} ${y}`, h('span', { class: 'muted', style: 'font-weight:400;font-size:13px' }, ` · ${monthN} case${monthN === 1 ? '' : 's'}`)),
+      h('button', { class: 'small', 'aria-label': 'Next month', onclick: () => shift(1) }, '›'),
+      h('button', { class: 'small', onclick: () => { view.month = today.slice(0, 7); view.day = today; repaint(); } }, 'Today')),
+    grid,
+    view.day ? h('div', { style: 'margin-top:12px' },
+      h('h3', {}, `${fmtDate(view.day)} (${dayCases.length})`),
+      dayCases.length ? h('ul', { class: 'cases' }, dayCases.map(c => caseRow(c, flagsOf))) : h('p', { class: 'empty' }, 'No cases on this day.'))
+      : h('p', { class: 'hint', style: 'margin-top:10px' }, 'Tap a day to see its cases.'),
+    undated.length ? h('details', { style: 'margin-top:12px' },
+      h('summary', {}, `No date (${undated.length})`),
+      h('ul', { class: 'cases' }, undated.map(c => caseRow(c, flagsOf)))) : null);
 }
 
 // ---------- grid ----------
