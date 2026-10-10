@@ -148,12 +148,12 @@
    ]
   },
   "reflective": {
-   "about": "Resident demonstrated reflective learning. Only \"Yes\" was visible; assumed Yes / No, possibly Yes / No / Maybe like the receptive question.",
+   "about": "Resident demonstrated reflective learning (confirmed by the user, 2026-10-10).",
    "options": [
     "Yes",
-    "No"
-   ],
-   "unconfirmed": true
+    "No",
+    "Maybe"
+   ]
   }
  },
  "forms": {

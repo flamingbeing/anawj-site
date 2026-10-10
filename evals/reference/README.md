@@ -64,7 +64,7 @@ Every form opens with an introduction saying it is a **formative** assessment by
 - **Entrustment-Based Discussion:** "Please briefly describe what was discussed centered around at least 2 entrustment questions" (required free text).
 - **Level of Supervision:** a rating from Level 1 (Observe only), Level 2 (Direct supervision), Level 3 (Indirect supervision), Level 4 (Distant supervision) to Level 5 (Supervise). The question asks the faculty to explain the level and to consider agency, reliability, integrity, capability and humility as well as competency.
 - **Comments** on what was done well and what can be improved, including readiness for variations of the case, with a **minimum of 30 characters**.
-- **Resident was receptive to feedback** and **Resident demonstrated reflective learning**: dropdowns. Receptive is Yes / No / Maybe; reflective is not yet confirmed.
+- **Resident was receptive to feedback** and **Resident demonstrated reflective learning**: dropdowns, each Yes / No / Maybe.
 
 | Form | Questions | What's specific to it |
 |---|---|---|
@@ -78,7 +78,7 @@ Every form opens with an introduction saying it is a **formative** assessment by
 
 **Still to confirm** (marked `unconfirmed` in the JSON):
 
-- The dropdown options. The screenshots show only the selected or placeholder value: the DOPS guidance question (only "Passive Help (Supervisor assists and follows the lead of the resident)" seen), reflective learning (only "Yes" seen; Yes / No assumed, possibly Yes / No / Maybe like receptive).
+- The dropdown options. The screenshots show only the selected or placeholder value: the DOPS guidance question (only "Passive Help (Supervisor assists and follows the lead of the resident)" seen).
 - Whether the DOPS form continues after question 19; the screenshot ends there.
 - In the DOPS screenshot the comments question (17) has no asterisk, so it may be optional there while it is required on the other two.
 - The EPA numbering for each tracking-template item.
