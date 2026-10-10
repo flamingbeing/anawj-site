@@ -1,8 +1,8 @@
 import {
   DEFAULT_SETTINGS, DEFAULT_ROOMS, JUNIOR_GRADES, SENIOR_GRADES, POSTINGS, STATUSES,
-  matchName, splitNameList, namesInCell, suggestFlags, generate, check, learnFromRosters, tickFromHistory, remoteRoom, suggestShortNames,
+  matchName, splitNameList, namesInCell, suggestFlags, generate, check, learnFromRosters, tickFromHistory, remoteRoom, suggestShortNames, mergeContacts,
 } from './engine.js';
-import { readRosterRows, readStaffSheet, buildRosterWorkbook, cellText } from './xlsxio.js';
+import { readRosterRows, readStaffSheet, buildRosterWorkbook, cellText, isContactList, readContactList } from './xlsxio.js';
 import { buildLayout, COL_WIDTHS, shortName, doubleCovered, isDouble } from './layout.js';
 import * as cloud from './cloud.js';
 
@@ -277,7 +277,7 @@ function renderStaff(role) {
         h('button', { class: 'primary', onclick: finishStaffEdit }, 'Review & save changes'),
         h('button', { onclick: () => { if (confirm('Discard all changes since you started editing?')) { state.staff = staffBackup; staffBackup = null; render(); } } }, 'Cancel')),
       h('div', { class: 'bar' },
-        fileButton('Import staff sheet (.xlsx / .csv)', '.xlsx,.csv', false, importStaffSheet),
+        fileButton('Import staff sheet or contact list', '.xlsx,.csv', false, importStaffSheet),
         fileButton('Learn from past rosters', '.xlsx', true, learnFiles),
         senior && h('span', { class: 'btn-group' },
           h('button', { title: 'Tick each senior\'s subspecs from the lists in "Seen in". Only adds ticks.', onclick: () => {
@@ -351,6 +351,14 @@ function renderStaffView(role) {
 
 async function importStaffSheet([file]) {
   const wb = await readWorkbook(file);
+  if (isContactList(wb.worksheets[0])) {
+    const { people } = readContactList(wb.worksheets[0]);
+    const res = mergeContacts(state.staff, people, newId);
+    state.staff = res.staff;
+    render();
+    toast(`Contact list: read ${people.length} anaesthetists (names, grades and subspecs only).${res.skipped.length ? ` ${res.skipped.length} juniors not on the staff list were left out, since postings rotate.` : ''} Review the changes before saving.`);
+    return;
+  }
   const res = readStaffSheet(wb.worksheets[0]);
   if (res.error) return toast(res.error);
   let added = 0, updated = 0;

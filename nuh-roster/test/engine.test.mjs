@@ -82,3 +82,28 @@ assert.equal(suggestShortName('Loh May-Han'), 'Loh MH');
   assert.deepEqual(suggestShortNames(st).map(x => x.short), ['Tan YW', 'Swapna']);
 }
 console.log('engine tests passed');
+
+// contact list merging (fake names)
+{
+  const { mergeContacts, findSameStaff } = await import('../js/engine.js');
+  const { cleanContactName } = await import('../js/xlsxio.js');
+  assert.equal(cleanContactName('Dr Foo Peng Xiang, Donald'), 'Donald Foo Peng Xiang');
+  assert.equal(cleanContactName('A/Prof Sophia Ang Bee Leng '), 'Sophia Ang Bee Leng');
+  assert.equal(cleanContactName('Dr Ambika D/O Paramasivan'), 'Ambika Paramasivan');
+  assert.equal(cleanContactName('Dr Ng Peng (SAF)'), 'Ng Peng');
+  const staff = [P('a', 'Sophia Ang', 'senior'), P('b', 'Donald Foo', 'senior', { grade: 'AC' }), P('c', 'Zara Lim', 'senior')];
+  assert.equal(findSameStaff('Sophia Ang Bee Leng', staff).id, 'a');
+  let n = 0;
+  const res = mergeContacts(staff, [
+    { name: 'Sophia Ang Bee Leng', role: 'senior', grade: 'Consultant', subspecs: ['cardiac'] },
+    { name: 'Donald Foo Peng Xiang', role: 'senior', grade: 'Consultant', subspecs: [] },
+    { name: 'New Person Senior', role: 'senior', grade: 'AC', subspecs: ['paeds'] },
+    { name: 'New Junior Person', role: 'junior', grade: 'MOPEX', subspecs: [] },
+  ], () => 'n' + ++n);
+  assert.deepEqual(res.staff.find(p => p.id === 'a').subspecs, ['cardiac']);
+  assert.equal(res.staff.find(p => p.id === 'b').grade, 'Consultant');
+  assert.ok(res.staff.some(p => p.name === 'New Person Senior'));
+  assert.deepEqual(res.skipped, ['New Junior Person']);
+  assert.deepEqual(staff[0].subspecs, [], 'input not mutated');
+  console.log('contact tests passed');
+}

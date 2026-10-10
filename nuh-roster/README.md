@@ -6,7 +6,7 @@ Everything runs in the browser. Staff lists, leave and case notes stay in the br
 
 ## Flow
 
-1. **Seniors / Juniors**: import the master staff sheet (`Name`, `Short name`, `Role`, `Grade`, `Posting`, `Subspecs`, `Doesn't do` columns, found by header name), or *Learn from past rosters* to build the list from old roster files. Tick each senior's subspecs.
+1. **Seniors / Juniors** (click Edit first): import the master staff sheet or the department contact list (only names, grade groups and subspecialties are read from it) (`Name`, `Short name`, `Role`, `Grade`, `Posting`, `Subspecs`, `Doesn't do` columns, found by header name), or *Learn from past rosters* to build the list from old roster files. Tick each senior's subspecs.
 2. **Cases** and **Manpower**: load the admin draft roster (rooms, case notes, leave, post call and upper-half duties are read from it), or tick rooms (Cases) and paste names (Manpower) by hand. On Manpower, mark leave times, liver standby, and juniors who were away on the previous working day.
 3. **Roster**: generate, edit cells, re-check, then download.
 
