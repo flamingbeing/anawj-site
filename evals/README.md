@@ -118,7 +118,7 @@ so **no composite indexes are needed**.
 4. **People lists:** sign in as an admin/PD, open People, and paste the faculty list (`Name, email` per
    line) and the resident list (`rid, name, email, intake, rYear`). Anyone else who signs in can apply
    as faculty or resident from the app; approve them under People → Applications.
-5. **Deploy:** push the `evals/` folder with the site. The service worker is `evals-v7`; bump `VERSION`
+5. **Deploy:** push the `evals/` folder with the site. The service worker is `evals-v8`; bump `VERSION`
    in `sw.js` whenever a shell file changes so phones pick up the update.
 
 ## Still to do

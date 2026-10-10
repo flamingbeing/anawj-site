@@ -110,10 +110,7 @@ function demoCard() {
       opt('admin', '?demo=admin', 'Admin and programme director', 'Demo Admin')),
     h('div', { style: 'padding:12px 16px' },
       h('p', { class: 'e-small', style: 'margin:0 0 8px' }, 'The demo data is shared between roles in this browser. Open two tabs to play both sides.'),
-      h('a', { class: 'n-btn n-btn--outline e-btn-quiet e-btn-small', href: base + '?demo=reset', onclick: async e => {
-        e.preventDefault();
-        if (await confirmBox('Reset the demo?', 'All demo changes in this browser are wiped and the made-up data is loaded again.', 'Reset', true)) location.href = base + '?demo=reset';
-      } }, 'Reset demo data')));
+      h('button', { type: 'button', class: 'n-btn n-btn--outline e-btn-quiet e-btn-small', onclick: () => import('./app.js').then(m => m.resetDemoData()) }, 'Reset demo data')));
 }
 
 function settingsCard() {
