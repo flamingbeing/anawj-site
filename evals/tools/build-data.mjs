@@ -1,8 +1,8 @@
 // Builds evals/js/catalogue.js and evals/js/forms.js from the reference transcriptions.
 // Run from anywhere: node evals/tools/build-data.mjs
 // Sources: reference/apmes-epas.json (EPA Guidebook v8, the source of truth for items),
-// reference/apmes-forms.json (the three evaluator forms) and reference/guidebook/epa-01-06.md
-// (suggested entrustment questions). The outputs are committed; re-run after editing a source.
+// reference/apmes-forms.json (the three evaluator forms) and reference/guidebook/epa-01-06.md and
+// epa-07-12.md (suggested entrustment questions). The outputs are committed; re-run after editing a source.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -12,7 +12,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = p => fs.readFileSync(path.join(ROOT, p), 'utf8');
 const EPAS_JSON = JSON.parse(read('reference/apmes-epas.json'));
 const FORMS_JSON = JSON.parse(read('reference/apmes-forms.json'));
-const GUIDE = read('reference/guidebook/epa-01-06.md');
+const GUIDE = ['epa-01-06.md', 'epa-07-12.md'].map(f => read('reference/guidebook/' + f)).join('\n');
 
 const TOOLS = { DOPS: { tool: 'DOPS', formId: 'dops', idTool: 'DOPS' }, 'Mini-CEX': { tool: 'MiniCEX', formId: 'minicex', idTool: 'MINICEX' }, EBD: { tool: 'EBD', formId: 'ebd', idTool: 'EBD' } };
 const pad = n => String(n).padStart(2, '0');
@@ -154,10 +154,11 @@ const SYN = {
   'EBD-12-01': ['chronic pain', 'opioid tolerant', 'opioids'],
 };
 
-// ---------- entrustment questions (EPA 1-6) ----------
+// ---------- entrustment questions (EPA 1-12) ----------
 // '#### <Tool> — <heading>' then '**Suggested entrustment questions**' and a list. Top-level list
 // entries become questions; numbered sub-points and wrapped lines are joined on; italic lines
-// (model answers for the assessor) are dropped.
+// (model answers for the assessor), links to the embedded EPA 7a/7b documents and prose before the
+// first list entry (a case vignette) are dropped; markdown hard breaks and <sup> are flattened.
 function parseEntrust(md) {
   const out = [];
   const blocks = md.split(/^#### /m).slice(1);
@@ -173,8 +174,9 @@ function parseEntrust(md) {
         if (!l.trim()) continue;
         const t = l.trim();
         if (/^(-\s*)?\*[^*]/.test(t) && /\*\s*$/.test(t)) continue; // italic model answer
+        if (/^(Click\b|For more entrustment questions)/i.test(t)) continue; // link to an embedded document
         const top = l.match(/^(?:\d+\.|-)\s+(.*)$/);
-        const body = s => s.replace(/^[a-z]\.\s+/, '').replace(/\s+/g, ' ').trim();
+        const body = s => s.replace(/^[a-z]\.\s+/, '').replace(/<\/?sup>/g, '').replace(/\\$/, '').replace(/\s+/g, ' ').trim();
         if (top) qs.push(body(top[1]));
         else if (qs.length) {
           const sub = t.match(/^(?:\d+\.|-)\s+(.*)$/);
@@ -207,8 +209,32 @@ const ENTRUST_HEADING = {
   'EBD-5-01': 'Any trauma case (Management of head', 'EBD-5-02': 'Any trauma case (Management of thoracic', 'EBD-5-03': 'Any trauma case (Management of pelvic',
   'MINICEX-6-01': 'Triage', 'DOPS-6-01': 'Arterial line', 'DOPS-6-02': 'Dialysis catheter',
   'EBD-6-01': 'Post general surgery', 'EBD-6-02': 'Neurosurgical critically ill', 'EBD-6-03': 'Critically ill patient with severe',
+  'DOPS-7a-01': 'Labour combined spinal epidural',
+  'EBD-7a-01': '=Labour combined spinal epidural (CSE)/epidural', 'EBD-7a-02': '=Labour combined spinal epidural (CSE)/epidural',
+  'EBD-7a-03': '=Labour combined spinal epidural (CSE)/epidural', 'EBD-7a-04': '=Labour combined spinal epidural (CSE)/epidural',
+  'EBD-7a-05': '=Labour combined spinal epidural (CSE)/epidural',
+  'MINICEX-7b-01': 'Lower segment Caesarean section', 'EBD-7b-01': 'Lower segment Caesarean section',
+  'EBD-8-01': 'MRI', 'EBD-8-02': 'Interventional radiology suite',
+  'MINICEX-9-01': 'GA/ SR case', 'MINICEX-9-02': 'GA/IPPV case', 'EBD-9-01': 'Paediatric trauma', 'EBD-9-02': 'Special needs child',
+  'DOPS-10-01': 'Central Venous catheter', 'EBD-10-01': 'Patient undergoing cardiac surgery requiring CPB',
+  'MINICEX-11-01': 'Pain assessment and acute pain management', 'EBD-11-01': 'Management of Blue letter referral',
+  'MINICEX-12-01': 'Assessing chronic pain', 'EBD-12-01': 'Chronic pain patient coming in for surgery',
 };
+// The guidebook's EBD for EPA 7a SR (postpartum neurological deficit, post dural puncture headache)
+// gives only a case vignette in its table; its questions are in the embedded EBD_EPA7A_SR document,
+// transcribed in reference/guidebook/epa-07-attachments.md ("**Entrustment question n.** …" lines).
+const NO_ENTRUST = new Set();
+function attachmentQs(title) {
+  const md = read('reference/guidebook/epa-07-attachments.md');
+  const start = md.indexOf('## Attachment: ' + title);
+  if (start < 0) fail('attachment not found: ' + title);
+  const next = md.indexOf('\n## ', start + 1);
+  const sec = md.slice(start, next < 0 ? undefined : next);
+  return [...sec.matchAll(/^\*\*Entrustment question \d+\.\*\*\s*(.+)$/gm)].map(m => m[1].trim());
+}
+const ATTACHMENT_ENTRUST = { 'EBD-7a-06': 'EPA 7a (SR)' };
 function entrustFor(id, tool) {
+  if (ATTACHMENT_ENTRUST[id]) return attachmentQs(ATTACHMENT_ENTRUST[id]);
   const spec = ENTRUST_HEADING[id];
   if (!spec) return [];
   const qs = [];
@@ -261,7 +287,7 @@ for (const g of GROUPS) for (const id of g.itemIds) ITEMS.find(i => i.id === id)
 const count = t => ITEMS.filter(i => i.tool === t).length;
 if (ITEMS.length !== 67 || count('DOPS') !== 17 || count('MiniCEX') !== 12 || count('EBD') !== 38)
   fail(`item counts ${ITEMS.length} (DOPS ${count('DOPS')}, Mini-CEX ${count('MiniCEX')}, EBD ${count('EBD')})`);
-for (const id of [...Object.keys(TEXT), ...Object.keys(SYN), ...Object.keys(NOTES), ...Object.keys(ENTRUST_HEADING)])
+for (const id of [...Object.keys(TEXT), ...Object.keys(SYN), ...Object.keys(NOTES), ...Object.keys(ENTRUST_HEADING), ...NO_ENTRUST])
   if (!ITEMS.some(i => i.id === id)) fail('unknown item id in a table: ' + id);
 for (const id of [...Object.keys(GROUP_MIN), ...Object.keys(GROUP_LABEL)])
   if (!GROUPS.some(g => g.id === id)) fail('unknown group id: ' + id);
@@ -269,6 +295,8 @@ for (const i of ITEMS) {
   if (!i.byYear) fail('no byYear for ' + i.id);
   if (!i.synonyms.length) fail('no synonyms for ' + i.id);
   if (/•|Minimum/.test(i.text)) fail('untidy text ' + i.id + ': ' + i.text);
+  if (!i.entrustQs.length !== NO_ENTRUST.has(i.id)) fail('entrustment questions for ' + i.id + ': ' + i.entrustQs.length);
+  if (i.entrustQs.some(q => /\\$|<\/?sup>|embedded file|^Click/.test(q))) fail('untidy entrustment question in ' + i.id);
 }
 
 // ---------- forms ----------
@@ -313,7 +341,7 @@ if (nq('dops') !== 19 || nq('minicex') !== 22 || nq('ebd') !== 12) fail('form qu
 const HEADER = src => `// GENERATED by evals/tools/build-data.mjs from ${src}. Do not edit by hand: edit the\n// reference files or the tables in the build script, then run: node evals/tools/build-data.mjs\n`;
 const rows = arr => '[\n' + arr.map(x => '  ' + JSON.stringify(x)).join(',\n') + ',\n]';
 
-const catalogue = `${HEADER('reference/apmes-epas.json (EPA Guidebook v8) and reference/guidebook/epa-01-06.md')}
+const catalogue = `${HEADER('reference/apmes-epas.json (EPA Guidebook v8) and reference/guidebook/epa-01-06.md, epa-07-12.md')}
 export const CATALOGUE_VERSION = '2024-07-v8';
 
 export const EPAS = ${rows(EPAS)};

@@ -597,7 +597,7 @@ class FormScreen {
       starters = qs.length
         ? [h('p', { class: 'e-q__help' }, 'Tap a question to add it. At least 2 are expected.'),
           h('div', { class: 'e-starters e-form__entrust' }, qs.map((x, i) => h('button', { type: 'button', title: x, onclick: () => insert(entrustStarter(x)) }, `Q${i + 1}: ${x.length > 70 ? x.slice(0, 68) + '…' : x}`)))]
-        : h('p', { class: 'e-q__help' }, 'Entrustment questions for this EPA are still being added. Discuss at least 2 of your own.');
+        : h('p', { class: 'e-q__help' }, 'The guidebook sets no entrustment questions for this item. Discuss at least 2 of your own.');
     } else if (!ro && q.minLength) {
       starters = h('div', { class: 'e-starters' }, COMMENT_STARTERS.map(s => h('button', { type: 'button', onclick: () => insert(s) }, s.replace(/: $/, '…'))));
     }

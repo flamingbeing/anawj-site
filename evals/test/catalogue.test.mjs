@@ -58,11 +58,19 @@ assert.equal(itemById('EBD-3-04').level, 3); assert.equal(itemById('EBD-3-05').l
 assert.equal(groupById('EPA6-MINICEX-A').completeBy, 'end R3');
 assert.equal(groupById('EPA8-EBD-A').completeBy, 'end R3');
 
-// entrustment questions: EPA 1-6 items have them, 7+ are pending
-for (const i of ITEMS) {
-  const early = ['1', '2', '3', '4', '5', '6'].includes(i.epa);
-  assert.equal(i.entrustQs.length > 0, early, i.id);
-}
+// entrustment questions: every item has them except the EPA 7a SR EBD, whose guidebook entry is a
+// case vignette only (its questions are in the embedded EBD_EPA7A_SR document)
+for (const i of ITEMS) assert.ok(i.entrustQs.length > 0, i.id);
+// EPA 7a SR's questions come from the embedded EBD_EPA7A_SR document (epa-07-attachments.md)
+assert.equal(itemById('EBD-7a-06').entrustQs.length, 10);
+assert.equal(itemById('EBD-7a-06').entrustQs[0], 'What are the causes for postpartum neurological deficits?');
+assert.equal(itemById('EBD-8-01').entrustQs.length, 10);
+assert.equal(itemById('DOPS-10-01').entrustQs.length, 6);
+assert.equal(itemById('EBD-10-01').entrustQs.length, 16);
+assert.equal(itemById('MINICEX-11-01').entrustQs.length, 15);
+assert.deepEqual(itemById('EBD-7a-03').entrustQs, itemById('EBD-7a-01').entrustQs, 'the 7a JR scenarios share one table');
+assert.match(itemById('EBD-8-02').entrustQs[3], /Patient needs to be immobile.*ruptured/, 'IR sub-points and follow-up joined');
+assert.ok(ITEMS.every(i => i.entrustQs.every(q => !/\\$|<\/?sup>|embedded file|^Click/.test(q))), 'no links or markup');
 assert.match(itemById('DOPS-2-02').entrustQs[0], /mask/i);
 assert.ok(itemById('DOPS-2-01').entrustQs.length > itemById('DOPS-2-02').entrustQs.length, 'mask gets both forms');
 assert.ok(itemById('MINICEX-6-01').entrustQs.every(q => !q.startsWith('*') && !/^[a-f]\. /.test(q)));

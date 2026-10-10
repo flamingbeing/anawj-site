@@ -16,7 +16,7 @@ Read with `evals/PLAN.md` (the why and the UX detail). This file fixes **names, 
 | `index.html` | shell | Links `../design/tokens.css` then `style.css`; `<header class="e-appbar">`, `<main id="app">`, `<nav id="tabs" class="e-bottomnav">`, `<div id="toast">`, `<div id="banner">`. Viewport `width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content`. |
 | `style.css` | shell | All app CSS, `e-` prefixed classes, NUHS `--n-*` variables + `--e-*` additions (PLAN §3, incl. contrast fixes). Light only. Mobile first (360px), max content width 720px, desktop OK. |
 | `manifest.webmanifest`, `icons/` | shell | PWA (generate simple navy square icons with "E" via a script; no NUHS/MedHub artwork). |
-| `sw.js` | shell | Copy of logbook/sw.js pattern, `VERSION = 'evals-v1'`, SHELL lists every evals file. |
+| `sw.js` | shell | Copy of logbook/sw.js pattern, `VERSION = 'evals-v2'`, SHELL lists every evals file. |
 | `js/app.js` | shell | Boot, auth state, role detection, tabs, hash routing, update banner, demo banner. |
 | `js/ui-core.js` | shell | `S` state, `hooks`, `h`, `fill`, `add`, `toast`, `debounce`, `icon(name)`, `go(route)`, `fmtDate`, `initials(name)`, `statusChip(ev)`. Copy helpers from logbook/js/ui-core.js. |
 | `tools/build-data.mjs` | data | Node script: reads `reference/apmes-epas.json` + `reference/apmes-forms.json` (+ `reference/guidebook/*.md` for entrustment questions if easy) and writes `js/catalogue.js` and `js/forms.js` (committed, generated header comment). |

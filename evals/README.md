@@ -32,7 +32,7 @@ one tab. The demo never loads Firebase.
 |---|---|
 | `index.html`, `style.css`, `manifest.webmanifest`, `icons/`, `sw.js` | Shell, styles (NUHS tokens from `../design/tokens.css`), PWA and offline cache (`evals-*` caches only). |
 | `js/app.js`, `js/ui-core.js` | Boot, sign-in, roles, tabs, hash routes, shared helpers and state. |
-| `js/catalogue.js`, `js/forms.js` | **Generated** by `node tools/build-data.mjs` from `reference/*.json` and `reference/guidebook/*.md`. 14 EPAs, 67 items (DOPS 17, Mini-CEX 12, EBD 38), 46 counting groups; the three forms. |
+| `js/catalogue.js`, `js/forms.js` | **Generated** by `node tools/build-data.mjs` from `reference/*.json` and `reference/guidebook/*.md`. 14 EPAs, 67 items (DOPS 17, Mini-CEX 12, EBD 38), 46 counting groups; the three forms. Entrustment questions for EPA 1–12 come from `reference/guidebook/epa-01-06.md` and `epa-07-12.md`; all 67 items have them. The EPA 7a SR EBD (`EBD-7a-06`) has only a case vignette in the guidebook's table, so its questions come from the embedded EBD_EPA7A_SR document (`epa-07-attachments.md`). |
 | `js/engine.js` | Pure logic: validation, visible questions, progress, status, case key, identifier warning. |
 | `js/cloud.js`, `js/demo-backend.js`, `js/firebase-config.js` | Firestore backend and the in-browser demo, same API. |
 | `js/ui-*.js` | Screens: home, request flow, requests, result, progress (resident); pending and form (assessor); overview and people (admin/PD); more. |
@@ -118,12 +118,10 @@ so **no composite indexes are needed**.
 4. **People lists:** sign in as an admin/PD, open People, and paste the faculty list (`Name, email` per
    line) and the resident list (`rid, name, email, intake, rYear`). Anyone else who signs in can apply
    as faculty or resident from the app; approve them under People → Applications.
-5. **Deploy:** push the `evals/` folder with the site. The service worker is `evals-v1`; bump `VERSION`
+5. **Deploy:** push the `evals/` folder with the site. The service worker is `evals-v2`; bump `VERSION`
    in `sw.js` whenever a shell file changes so phones pick up the update.
 
 ## Still to do
 
-- **EPA 7–12 entrustment questions** aren't transcribed yet (EPA 1–6 are, from the guidebook). Add them
-  to `reference/guidebook/` and rerun `node tools/build-data.mjs` before going live.
 - Not built yet: linking an evaluation to a logbook case (`caseId`), mask holding credited automatically by an LMA/ETT DOPS, "abandoned >3 days" flags.
 - Hospital email sign-in (email link, linked emails) waits for the paid plan; see `cloud.EMAIL_LINK`.

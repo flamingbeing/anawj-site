@@ -288,7 +288,7 @@ The timings come from server timestamps where we report them, plus a small clien
 
 **Text boxes**
 - They grow with the text and use `autocapitalize=sentences` and `enterkeyhint=done`. A one-time hint says "Tap the mic to dictate".
-- Entrustment chips (from `epa-01-06.md`) insert starter text into DOPS Q15, Mini-CEX Q13 and EBD Q4, with a soft reminder that at least 2 are expected. EPA 7–12 show "questions pending".
+- Entrustment chips (from `epa-01-06.md` and `epa-07-12.md`) insert starter text into DOPS Q15, Mini-CEX Q13 and EBD Q4, with a soft reminder that at least 2 are expected. The one item without set questions (`EBD-7a-06`) asks for 2 of the assessor's own.
 - Starter chips for Q17/Q19/Q10: "Do more of… because…" and "To reach the next level…".
 - **Inserted starter text does not count** toward the 30-character minimum. The counter ("18/30") is shown only where `minLength` exists. DOPS Q15 has no minimum, and Q17's minimum applies only once it has text.
 
