@@ -19,7 +19,7 @@ const KEY = 'apmes-logbook-demo-v1';
 
 // ---- shared field whitelists ----
 
-const CASE_FIELDS = ['id', 'date', 'dateText', 'details', 'cats', 'createdAt', 'updatedAt', 'source', 'importKey', 'reflectionId'];
+const CASE_FIELDS = ['id', 'date', 'dateText', 'initials', 'details', 'cats', 'createdAt', 'updatedAt', 'source', 'importKey', 'reflectionId'];
 const SUMMARY_FIELDS = ['rid', 'name', 'intake', 'rYear', 'counts', 'total', 'reflections', 'reflectionsTotal', 'updatedAt'];
 const RESIDENT_FIELDS = ['rid', 'name', 'email', 'status', 'intake', 'rYear'];
 const TEMPLATE_FIELDS = ['id', 'name', 'cats', 'details'];
@@ -35,6 +35,7 @@ export function cleanCase(c, now = Date.now()) {
   out.details = String(out.details ?? '').slice(0, 2000);
   out.cats = [...new Set((out.cats || []).map(String))].slice(0, 40);
   if (out.dateText != null) out.dateText = String(out.dateText).slice(0, 200);
+  if (out.initials != null) out.initials = String(out.initials).slice(0, 20);
   out.createdAt = Number(out.createdAt) || now;
   out.updatedAt = now;
   out.source = out.source || 'app';

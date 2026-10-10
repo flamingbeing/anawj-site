@@ -9,7 +9,7 @@
 import { REFLECTION_HEADINGS, REFLECTION_SECTIONS } from './categories.js';
 import { reflectionProgress, reflectionCounts, HEADING_BY_ID, splitDetails, completeProblems, isLegacy, LIMITS, IMAGE_MAX_B64, wordCount, MIN_WORDS, suggestHeadings, moveToHeading } from './reflections.js';
 export { completeProblems };
-import { fmtDate } from './engine.js';
+import { fmtDate, caseText } from './engine.js';
 import { S, h, toast, cloud, debounce, hooks, rYear, todayISO, confirmBox, add, resetters, scheduleSummary, displayName, byNewest, catName } from './ui-core.js';
 import { renderExportButton, caseRYear } from './portfolio.js';
 
@@ -43,7 +43,8 @@ const blank = (over = {}) => ({
 });
 
 // From a logged case: initials = leading capitals, diagnosis = the rest.
-const fromCase = c => { const { initials, diagnosis } = splitDetails(c.details); return { initials, diagnosis, date: c.date || null, caseId: c.id }; };
+// the case's own initials field when it has one; older cases have them at the front of the details
+const fromCase = c => { const { initials, diagnosis } = c.initials ? { initials: c.initials, diagnosis: String(c.details || '').trim() } : splitDetails(c.details); return { initials, diagnosis, date: c.date || null, caseId: c.id }; };
 // preset: { headingId, subId } from a heading's "+ Add" button.
 export function reflectOnCase(c, preset = null) {
   rv.picking = null; rv.view = null;
@@ -140,7 +141,7 @@ function chooseHeading() {
   return h('div', {}, h('section', { class: 'card' },
     h('div', { class: 'bar' }, h('button', { onclick: () => { p.chosen = null; hooks.render(); } }, '← Cases'), h('span', { class: 'grow' })),
     h('h2', { style: 'margin:8px 0 4px' }, 'Which heading?'),
-    h('p', { style: 'margin:0 0 8px' }, h('span', { class: 'muted' }, caseDate(c) + ' · '), c.details || '(no details)',
+    h('p', { style: 'margin:0 0 8px' }, h('span', { class: 'muted' }, caseDate(c) + ' · '), caseText(c) || '(no details)',
       (c.cats || []).length ? h('span', { class: 'muted', style: 'display:block;font-size:13px' }, c.cats.map(catName).join(', ')) : null),
     suggestChips(c, preset => reflectOnCase(c, preset)),
     h('p', { class: 'hint', style: 'margin:10px 0 6px' }, 'Highlighted headings still need reflections. You can change the heading later.'),
@@ -160,7 +161,7 @@ function picker() {
     const words = p.q.toLowerCase().split(/\s+/).filter(Boolean);
     const hits = cases.filter(c => {
       if (!words.length) return true;
-      const hay = `${c.details || ''} ${c.date || ''} ${c.dateText || ''} ${c.date ? fmtDate(c.date) : ''} ${(c.cats || []).map(k => k + ' ' + catName(k)).join(' ')}`.toLowerCase();
+      const hay = `${caseText(c)} ${c.date || ''} ${c.dateText || ''} ${c.date ? fmtDate(c.date) : ''} ${(c.cats || []).map(k => k + ' ' + catName(k)).join(' ')}`.toLowerCase();
       return words.every(w => hay.includes(w));
     });
     const shown = hits.slice(0, 200);
@@ -171,7 +172,7 @@ function picker() {
       const names = (c.cats || []).map(catName).join(', ');
       return h('li', { tabindex: '0', role: 'button', onclick: () => pickCase(c), onkeydown: e => { if (e.key === 'Enter') pickCase(c); } },
         h('span', { class: 'd' }, caseDate(c)),
-        h('span', { class: 't' }, c.details || '(no details)', names ? h('span', { class: 'muted', style: 'display:block;font-size:13px' }, names) : null),
+        h('span', { class: 't' }, caseText(c) || '(no details)', names ? h('span', { class: 'muted', style: 'display:block;font-size:13px' }, names) : null),
         h('span', { class: 'c' }, cur ? h('span', { class: 'flag' }, 'current') : has ? h('span', { class: 'flag' }, 'has reflection') : null));
     }));
     if (!shown.length) ul.replaceChildren(h('li', { class: 'empty' }, cases.length ? 'No cases match.' : 'No cases logged yet. Log the case first, then reflect on it.'));
@@ -510,7 +511,7 @@ function editor() {
         h('b', { style: 'font-size:13px' }, 'Linked case'), h('span', { class: 'grow' }),
         h('button', { class: 'small', onclick: () => openPicker(true) }, 'Change case'),
         h('button', { class: 'small', onclick: () => { r.caseId = null; restructure(); } }, 'Unlink')),
-      lc ? h('div', {}, h('span', { class: 'muted' }, caseDate(lc) + ' · '), lc.details || '(no details)',
+      lc ? h('div', {}, h('span', { class: 'muted' }, caseDate(lc) + ' · '), caseText(lc) || '(no details)',
         (lc.cats || []).length ? h('div', { class: 'muted', style: 'font-size:13px' }, lc.cats.map(catName).join(', ')) : null)
         : h('div', { class: 'hint' }, S.casesLoaded === false ? 'Loading case…' : 'The linked case is no longer in your logbook. Change case to link another.'))
     : h('div', { style: 'border:1px solid var(--line, #ddd);border-radius:10px;padding:8px 10px;margin:8px 0' },

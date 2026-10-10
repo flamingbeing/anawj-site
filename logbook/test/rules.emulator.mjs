@@ -41,6 +41,8 @@ await t('case id mismatch', assertFails(setDoc(doc(a, 'logbooks', A, 'cases', 'c
 await t('case extra field', assertFails(setDoc(doc(a, 'logbooks', A, 'cases', 'c3'), { ...c('c3'), nric: 'x' })));
 await t('case long details', assertFails(setDoc(doc(a, 'logbooks', A, 'cases', 'c3'), { ...c('c3'), details: 'x'.repeat(2001) })));
 await t('case 2000 details', assertSucceeds(setDoc(doc(a, 'logbooks', A, 'cases', 'c3'), { ...c('c3'), details: 'x'.repeat(2000) })));
+await t('case with initials', assertSucceeds(setDoc(doc(a, 'logbooks', A, 'cases', 'c5'), { ...c('c5'), initials: 'AB', details: '5yo tonsil' })));
+await t('case 21-char initials', assertFails(setDoc(doc(a, 'logbooks', A, 'cases', 'c6'), { ...c('c6'), initials: 'A'.repeat(21) })));
 await t('case 41 cats', assertFails(setDoc(doc(a, 'logbooks', A, 'cases', 'c4'), { ...c('c4'), cats: Array(41).fill('01') })));
 await t('case bad source', assertFails(setDoc(doc(a, 'logbooks', A, 'cases', 'c4'), { ...c('c4'), source: 'x' })));
 await t('other read cases', assertFails(getDocs(collection(b, 'logbooks', A, 'cases'))));

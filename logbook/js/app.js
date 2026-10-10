@@ -114,8 +114,11 @@ function flushRender() {
 // ---------- header ----------
 
 function paintWho() {
-  if (!S.user) { fill(whoEl); subEl.textContent = 'Case log for APMES anaesthesia residents'; return; }
-  subEl.textContent = `${S.cases.length} case${S.cases.length === 1 ? '' : 's'}${cloud.demo ? ' · demo' : ''}${navigator.onLine ? '' : ' · offline'}`;
+  if (!S.user) { fill(whoEl); subEl.hidden = false; subEl.textContent = 'Case log for APMES anaesthesia residents'; return; }
+  // signed in: no case count (keeps the header compact); only flag demo / offline, and hide the line otherwise
+  subEl.textContent = [cloud.demo ? 'demo' : '', navigator.onLine ? '' : 'offline'].filter(Boolean).join(' · ');
+  subEl.hidden = !subEl.textContent;
+  document.body.dataset.cases = String(S.cases.length);   // not shown; read by tests
   fill(whoEl, h('span', { class: 'email', title: S.user.email }, S.user.name || S.user.email));
 }
 window.addEventListener('online', paintWho);

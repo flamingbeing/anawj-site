@@ -2,7 +2,7 @@
 // in the browser; tests set globalThis.ExcelJS).
 
 import { BY_CODE } from './categories.js';
-import { countCases, progress, sortCodes, fmtDate, todayISO } from './engine.js';
+import { countCases, progress, sortCodes, fmtDate, todayISO, caseText } from './engine.js';
 
 const XLSX_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 const X = () => {
@@ -48,7 +48,7 @@ function styleHeader(row) {
   row.alignment = { vertical: 'middle' };
 }
 
-// Sheet "Cases" (Date | Case details | Categories | id, the id column hidden so edits can be
+// Sheet "Cases" (Date | Case details (initials + details, one column as in the old form) | Categories | id, the id column hidden so edits can be
 // matched back), oldest first, and sheet "Summary" (Category | Count | R3 | R5 | Status).
 // progressRows = progress(counts, rYear); computed from counts (or the cases) and opts.rYear if absent.
 export async function exportCases(cases, { name = '', counts, progressRows, rYear = 1 } = {}) {
@@ -66,7 +66,7 @@ export async function exportCases(cases, { name = '', counts, progressRows, rYea
   const sorted = [...(cases || [])].sort((a, b) =>
     (a.date ? 0 : 1) - (b.date ? 0 : 1) || String(a.date || '').localeCompare(String(b.date || '')) || (a.createdAt || 0) - (b.createdAt || 0));
   for (const c of sorted) {
-    const row = ws.addRow({ date: c.date ? isoToUTC(c.date) : (c.dateText || ''), details: c.details || '', categories: labelsOf(c.cats), id: c.id || '' });
+    const row = ws.addRow({ date: c.date ? isoToUTC(c.date) : (c.dateText || ''), details: caseText(c), categories: labelsOf(c.cats), id: c.id || '' });
     row.getCell(2).alignment = { wrapText: true, vertical: 'top' };
     row.getCell(3).alignment = { wrapText: true, vertical: 'top' };
     row.getCell(1).alignment = { vertical: 'top', horizontal: 'left' };
@@ -100,12 +100,13 @@ const EXPORTED_TAG = 'logbook-exported-at:';
 
 const HEADERS = {
   date: /^date\b/i,
+  initials: /^(?:patient(?:'?s)?\s+)?initials$/i,   // an optional column of its own
   details: /detail|initials/i,
   categories: /categor/i,
   id: /^id$/i,
 };
 
-// Rows [{ row, id?, date, details, categories }] from the "Cases" sheet exported above or from the first
+// Rows [{ row, id?, date, initials?, details, categories }] from the "Cases" sheet exported above or from the first
 // sheet with Date / Case details / Categories headers (found by name, in the first 10 rows).
 // `date` is the raw cell (Date, number or text) for parseDate. Rows only carry `id` when the sheet
 // has an id column; the returned array then has hasIdColumn = true (diffRows uses it for deletions).
@@ -124,8 +125,12 @@ export async function readCasesSheet(file) {
       const found = {};
       row.eachCell((c, i) => {
         const h = cellText(c.value).trim();
-        for (const [k, re] of Object.entries(HEADERS)) if (!found[k] && re.test(h)) found[k] = i;
+        for (const [k, re] of Object.entries(HEADERS)) {
+          if (k === 'details' && HEADERS.initials.test(h)) continue;   // "Initials" alone is not the details column
+          if (!found[k] && re.test(h)) found[k] = i;
+        }
       });
+      if (!found.details && found.initials) { found.details = found.initials; delete found.initials; }
       if (found.details && (found.date || found.categories)) { headerRow = n; cols = found; }
     });
     if (!headerRow) continue;
@@ -142,7 +147,9 @@ export async function readCasesSheet(file) {
         categories: cellText(get('categories')).trim(),
       };
       if (cols.id) r.id = cellText(get('id')).trim();
-      if (r.date == null && !r.details && !r.categories && !r.id) return;
+      // with an Initials column they are used as they are; otherwise caseFromRow splits them off the details
+      if (cols.initials) r.initials = cellText(get('initials')).trim();
+      if (r.date == null && !r.details && !r.initials && !r.categories && !r.id) return;
       out.push(r);
     });
     return out;

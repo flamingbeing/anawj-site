@@ -2,6 +2,7 @@
 // spreadsheet round trips. Pure functions only (no DOM), so it can be tested in Node.
 
 import { CATEGORIES, BY_CODE, R_YEARS, codeOf } from './categories.js';
+import { KEYWORDS } from './keywords.js';
 
 // ---------- ids and dates ----------
 
@@ -178,6 +179,39 @@ export function frequentCombos(cases, { min = 3, limit = 6 } = {}) {
     .slice(0, limit);
 }
 
+// ---------- patient initials ----------
+
+// Leading capitals that are case words, not a patient ("GA for lap chole", "LSCS spinal"):
+// anything the keyword table knows (as in suggest.js tokens()), plus a few common abbreviations.
+const NOT_INITIALS = new Set(['GA', 'LA', 'RA', 'MAC', 'ETT', 'LMA', 'ASA', 'OT', 'ICU', 'HDU', 'ED', 'CSE', 'SAB', 'GETA', 'TIVA', 'IV', 'ECT', 'MRI', 'CT', 'IR', 'EUA', 'ENT', 'OGD', 'ERCP',
+  'DM', 'THR', 'TURP', 'TURBT', 'AVR', 'MVR', 'EVAR', 'TEVAR', 'PCNL', 'URS', 'ESWL', 'EGD', 'DHS', 'AAA', 'TOF', 'BMI', 'HTN', 'IHD', 'COPD',
+  'LRTI', 'URTI', 'DKA', 'AKI', 'CVA', 'TIA', 'DVT', 'PPH', 'APH', 'ARDS', 'TBI', 'MVA', 'RTA', 'RIJ', 'LIJ', 'CVC', 'CVP', 'PICC', 'NGT', 'TCI',
+  'CICU', 'NICU', 'PICU', 'PACU', 'NBM', 'DNR', 'GERD', 'GORD', 'PONV', 'AKA', 'BKA', 'TORS', 'EBUS', 'ESD', 'EMR', 'LAVH', 'TAH', 'BSO', 'TLH',
+  'RFA', 'TACE', 'IVC', 'SVC', 'SVD', 'NVD', 'HIE', 'NEC', 'TEF', 'CDH', 'CXR', 'ECG', 'ECHO', 'TTE', 'TOE', 'CPB', 'IABP', 'ECMO', 'RRT', 'CRRT',
+  'MPFL', 'ROM', 'SSG', 'STSG', 'OSA', 'CKD', 'ESRF', 'ESRD', 'SAH', 'SDH', 'EDH', 'RSI', 'PET', 'ART', 'LSCS', 'ORIF', 'CABG', 'VATS']);
+
+// Patient initials as stored: upper case, letters, '-' and '.' only, at most 20 characters.
+export const cleanInitials = s => String(s || '').toUpperCase().replace(/[^A-Z.\-]/g, '').slice(0, 20);
+
+// "AB 34F LSCS spinal" / "AB/34F ..." -> { initials: 'AB', details: '34F LSCS spinal' }. Leading 2–4 capitals,
+// unless they are a known case word ("LSCS spinal", "TKR"). No initials -> { initials: '', details }.
+// Line breaks inside the rest are kept.
+export function splitInitials(text, keywords = KEYWORDS) {
+  const s = String(text || '').trim();
+  const m = s.match(/^([A-Z]{2,4})(?![A-Za-z0-9])[\s\/,:;.\-]*/);
+  if (!m || NOT_INITIALS.has(m[1]) || (keywords && keywords[m[1].toLowerCase()])) return { initials: '', details: s };
+  return { initials: m[1], details: s.slice(m[0].length).trim() };
+}
+
+// A case's initials and details for display and editing: the initials field when the case has one,
+// else split off the details (cases logged before initials had their own field).
+export const caseParts = c => (c && c.initials != null
+  ? { initials: String(c.initials || ''), details: String(c.details || '') }
+  : splitInitials(c && c.details));
+
+// Initials + details as one line of text: the Excel "Case details" column, search, duplicates.
+export const caseText = c => [c && c.initials, c && c.details].map(x => String(x || '').trim()).filter(Boolean).join(' ');
+
 // ---------- bulk paste ----------
 
 // A leading date on a pasted line: "12/3", "12/3/26", "12-3-2026", "2026-03-12", "12 Mar", "12 Mar 26".
@@ -210,27 +244,35 @@ function leadingDate(line, now) {
   return { date, rest };
 }
 
-// One case per non-empty line. suggestFn(text) -> [{ code, score }]; codes scoring 0.5+ are kept.
+// Cases are separated by blank lines (one or more empty or whitespace-only lines), so a case can span
+// several lines (kept in its details). An optional date at the start of a case's first line sets its date.
+// Leading patient initials are split off as in splitInitials. suggestFn(text) -> [{ code, score }];
+// codes scoring 0.5+ are kept.
 export function parseBulk(text, suggestFn, now = new Date()) {
-  const out = [];
+  const blocks = [];
+  let cur = null;
   for (const raw of String(text || '').split(/\r?\n/)) {
     const line = raw.replace(/\t+/g, ' ').trim();
-    if (!line) continue;
-    const ld = leadingDate(line, now);
-    const details = (ld ? ld.rest : line).trim();
+    if (!line) { cur = null; continue; }
+    if (!cur) blocks.push(cur = []);
+    cur.push(line);
+  }
+  return blocks.map(([first, ...more]) => {
+    const ld = leadingDate(first, now);
+    const whole = [(ld ? ld.rest : first).trim(), ...more].filter(Boolean).join('\n');
+    const { initials, details } = splitInitials(whole);
     const sugg = typeof suggestFn === 'function' && details ? suggestFn(details) || [] : [];
     const cats = withParents(sugg.filter(s => s.score >= 0.5).map(s => s.code));
-    out.push({ date: ld ? ld.date : null, details, cats });
-  }
-  return out;
+    return { date: ld ? ld.date : null, initials, details, cats };
+  });
 }
 
 // ---------- duplicates ----------
 
 const normText = s => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
-const caseKey = c => `${c.date || c.dateText || ''}|${normText(c.details)}|${sortCodes(c.cats || []).join(',')}`;
+const caseKey = c => `${c.date || c.dateText || ''}|${normText(caseText(c))}|${sortCodes(c.cats || []).join(',')}`;
 
-// Groups of ids of cases with the same date, details (ignoring case and spacing) and categories.
+// Groups of ids of cases with the same date, initials + details (ignoring case and spacing) and categories.
 export function duplicates(cases) {
   const groups = new Map();
   for (const c of cases || []) {
@@ -264,8 +306,9 @@ export function catFromText(t) {
 
 const cellStr = v => (v == null ? '' : v instanceof Date ? '' : String(v)).trim();
 
-// A spreadsheet row {id?, date, details, categories: '16, 17'} -> { id, date, dateText?, details, cats, unknown }.
-// Categories may be separated by commas, semicolons or new lines.
+// A spreadsheet row {id?, date, initials?, details, categories: '16, 17'} -> { id, date, dateText?, initials, details, cats, unknown }.
+// Categories may be separated by commas, semicolons or new lines. Without an initials column (no
+// `initials` key on the row) the initials are split off the front of the details.
 export function caseFromRow(row) {
   const r = row || {};
   const date = parseDate(r.date);
@@ -278,7 +321,8 @@ export function caseFromRow(row) {
     if (code) { if (!cats.includes(code)) cats.push(code); }
     else unknown.push(part.trim());
   }
-  const out = { id: cellStr(r.id) || undefined, date, details: cellStr(r.details), cats, unknown };
+  const parts = r.initials !== undefined ? { initials: cleanInitials(cellStr(r.initials)), details: cellStr(r.details) } : splitInitials(cellStr(r.details));
+  const out = { id: cellStr(r.id) || undefined, date, initials: parts.initials, details: parts.details, cats, unknown };
   if (!date && rawDate) out.dateText = rawDate;
   return out;
 }
@@ -287,7 +331,7 @@ const sameCats = (a, b) => sortCodes(a || []).join(',') === sortCodes(b || []).j
 
 // Compare the user's cases with rows read back from a spreadsheet.
 // - rows with no id, a repeated id or an id we don't know are added as new cases
-// - rows whose id matches a case and whose date, details or categories differ are changed
+// - rows whose id matches a case and whose date, initials + details (as one text) or categories differ are changed
 // - cases whose id is not in the sheet are deleted, but only if the sheet has an id column
 //   (rows.hasIdColumn from readCasesSheet, or any row carrying an id); otherwise it's an add-only import
 // - rows with unknown categories or no date and no details are errors and change nothing
@@ -300,7 +344,7 @@ export function diffRows(existing, rows, now = Date.now()) {
   (rows || []).forEach((row, i) => {
     const rowNum = (row && row.row) || i + 2;
     const hasDate = row && (row.date instanceof Date || typeof row.date === 'number' || cellStr(row.date));
-    const blank = !row || (!hasDate && !cellStr(row.details) && !cellStr(row.categories));
+    const blank = !row || (!hasDate && !cellStr(row.details) && !cellStr(row.initials) && !cellStr(row.categories));
     const c = caseFromRow(row);
     const known = c.id && byId.has(c.id) && !seen.has(c.id);
     if (c.id && byId.has(c.id)) seen.add(c.id); // an errored or blanked row still keeps its case from deletion
@@ -309,12 +353,16 @@ export function diffRows(existing, rows, now = Date.now()) {
       errors.push({ row: rowNum, message: `Unknown categor${c.unknown.length > 1 ? 'ies' : 'y'}: ${c.unknown.join(', ')}` });
       return;
     }
-    if (!c.date && !c.dateText && !c.details) { errors.push({ row: rowNum, message: 'No date or case details' }); return; }
-    const fields = { date: c.date, details: c.details, cats: c.cats };
+    if (!c.date && !c.dateText && !c.details && !c.initials) { errors.push({ row: rowNum, message: 'No date or case details' }); return; }
+    const fields = { date: c.date, initials: c.initials, details: c.details, cats: c.cats };
     if (!c.date && c.dateText) fields.dateText = c.dateText;
     if (known) {
       const before = byId.get(c.id);
-      const same = (before.date || null) === c.date && normText(before.details) === normText(c.details) && sameCats(before.cats, c.cats) &&
+      // initials + details as one text, or as parts (an older "AB/34F ..." case splits to the same parts as its exported text)
+      const bp = caseParts(before);
+      const sameText = normText(caseText(before)) === normText(caseText(c)) ||
+        (normText(bp.initials) === normText(c.initials) && normText(bp.details) === normText(c.details));
+      const same = (before.date || null) === c.date && sameText && sameCats(before.cats, c.cats) &&
         (c.date || (before.dateText || '') === (c.dateText || ''));
       if (!same) {
         const after = { ...before, ...fields, updatedAt: now };
