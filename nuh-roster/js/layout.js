@@ -73,7 +73,7 @@ export function buildLayout({ date, rows, lists = {}, general = {}, box = '', co
   label(r, 'AOCC:');
   names(r, 3, 5, special('aocc').senior);
   names(r, 6, 8, special('aocc').junior);
-  put(r, 9, 11, 'AIC: ' + short(special('aic').senior), { box: true, bold: true });
+  put(r, 9, 11, 'AIC: ' + short(special('aic').senior), { box: true });
   r++;
   duty('Pain/ACP Clinic:', g('painacp.s'), g('painacp.a'));
   duty('Acute Pain:', g('acute.s'), g('acute.a'));
