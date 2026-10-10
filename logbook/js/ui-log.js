@@ -252,13 +252,9 @@ function paintQuick() {
 
 async function save({ another }) {
   const details = draft.details.trim();
-  let auto = false;
   if (!draft.cats.length) {
-    // nothing picked: save with the confident suggestions (the toast shows them, with Undo)
-    const strong = settings().suggestions !== false && details ? suggest(details).filter(s => s.score >= 0.5).map(s => s.code) : [];
-    if (!strong.length) { toast('Pick at least one category'); ui.picker.focus({ preventScroll: true }); return; }
-    draft.cats = sortCodes(withParents(strong));
-    auto = true;
+    // categories are counted towards credentialling, so they must be picked on purpose
+    toast('Tap at least one category (suggestions are above)'); ui.picker.focus({ preventScroll: true }); return;
   }
   if (!details && !(await confirmBox('No case details', 'Save this case without initials or details?', 'Save'))) return;
   const c = await createCase({ date: curDate(), details, cats: draft.cats });
@@ -269,7 +265,7 @@ async function save({ another }) {
   if (ui.textarea) ui.textarea.value = '';
   paintDate(); paintSel(); paintQuick();
   ui.textarea.focus();
-  toast(`Saved ${fmtDate(c.date)} · ${auto ? 'suggested ' : ''}${c.cats.join(', ')}`, {
+  toast(`Saved ${fmtDate(c.date)} · ${c.cats.join(', ')}`, {
     action: 'Undo',
     onaction: () => {
       removeCase(c.id);
