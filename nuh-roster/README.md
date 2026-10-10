@@ -1,4 +1,4 @@
-# OT Roster
+# NUH Roster
 
 A static page for drafting the OT section of the daily anaesthesia roster (seniors, juniors, premed cover) and downloading it as an `.xlsx` in the department's layout.
 

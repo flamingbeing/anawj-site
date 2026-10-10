@@ -38,10 +38,17 @@ export const STATUSES = [
 // defaultOn: ticked as running when a new day is set up. MOR 7-9 are emergency OTs and have no line.
 export const DEFAULT_ROOMS = [
   ['Other', ['Remote 1', 'Remote 2']],
-  ['KROR', ['KROR 1', 'KROR 2', 'KROR 3', 'KROR 4', 'KROR 5', 'KROR 6', 'KROR 7']],
-  ['MCOR', ['MCOR 1', 'MCOR 2', 'MCOR 3', 'MCOR 4', 'MCOR 5', 'MCOR 6', 'MCOR 7', 'MCOR 8', 'MCOR 9', 'MCOR 10']],
-  ['MOR', ['MOR 1', 'MOR 2', 'MOR 3', 'MOR 4', 'MOR 5', 'MOR 6', 'MOR 10', 'MOR 11', 'MOR 12', 'MOR 13', 'MOR 14', 'MOR 15', 'MOR 16', 'MOR 17', 'MOR 18']],
+  ['KROR', ['KROR PACU', 'KROR 1', 'KROR 2', 'KROR 3', 'KROR 4', 'KROR 5', 'KROR 6', 'KROR 7']],
+  ['MCOR', ['MCOR PACU', 'MCOR 1', 'MCOR 2', 'MCOR 3', 'MCOR 4', 'MCOR 5', 'MCOR 6', 'MCOR 7', 'MCOR 8', 'MCOR 9', 'MCOR 10']],
+  ['MOR', ['MBOR PACU', 'MOR 1', 'MOR 2', 'MOR 3', 'MOR 4', 'MOR 5', 'MOR 6', 'MOR 10', 'MOR 11', 'MOR 12', 'MOR 13', 'MOR 14', 'MOR 15', 'MOR 16', 'MOR 17', 'MOR 18']],
 ].flatMap(([complex, rooms]) => rooms.map(name => ({ complex, name, defaultOn: !['Remote 2', 'KROR 1', 'MCOR 9'].includes(name) })));
+
+// PACU rows are filled by hand: the generator leaves them empty and doesn't ask for a senior.
+export const isPacu = name => /pacu/i.test(String(name));
+export function pacuRoom(label) {
+  const m = String(label).match(/\b(KROR|MCOR|MBOR|MOR)\s*PACU\b/i);
+  return m ? `${m[1].toUpperCase() === 'MOR' ? 'MBOR' : m[1].toUpperCase()} PACU` : null;
+}
 
 // "Remote Case" / "Remote case 2" / "Remote 2:" -> "Remote 1" / "Remote 2"
 export function remoteRoom(label) {
@@ -124,6 +131,7 @@ export function namesInCell(text) {
     .split('/')
     .map(s => s
       .replace(/\s-\s*premed.*$/i, '')
+      .replace(/\s+[LC]-.*$/, '')        // "L-4pm", "L-4-5pm", "C-OT13"
       .replace(/\s+-.*$/, '')          // "-mtg 8.30", "-C-OT 4", "-5pm"
       .replace(/\b(am|pm)\b/gi, ' ')
       .replace(/\breq\b/gi, ' ')
@@ -269,7 +277,7 @@ export function fmtSenior(p, d) {
   let s = p.name;
   if (d.liverStandby) s += ' (L)';
   if (d.note) s += ' ' + d.note;
-  if (d.leaveTime) s += ' -' + d.leaveTime;
+  if (d.leaveTime) s += ' L-' + d.leaveTime;
   return s;
 }
 
@@ -277,7 +285,7 @@ export function fmtJunior(p, d) {
   let s = p.name;
   if (p.posting) s += ` (${p.posting})`;
   if (d.note) s += ' ' + d.note;
-  if (d.leaveTime) s += ' -' + d.leaveTime;
+  if (d.leaveTime) s += ' L-' + d.leaveTime;
   return s;
 }
 
@@ -285,7 +293,8 @@ export function fmtJunior(p, d) {
 export function generate({ staff, day, settings = DEFAULT_SETTINGS, seed = 1 }) {
   const rand = rng(seed);
   const warnings = [];
-  const rooms = day.rooms.filter(r => r.running).map(r => ({
+  const allRooms = day.rooms.filter(r => r.running);
+  const rooms = allRooms.filter(r => !isPacu(r.name)).map(r => ({
     ...r,
     flags: { subspecs: [], complex: false, long: false, ...(r.flags || {}) },
   }));
@@ -478,7 +487,9 @@ export function generate({ staff, day, settings = DEFAULT_SETTINGS, seed = 1 }) 
     else warnings.push({ level: 'warn', text: `${r.name}: needs premed cover but nobody is free.` });
   }
 
-  const rows = rooms.map(r => {
+  const pacu = Object.fromEntries(allRooms.filter(r => isPacu(r.name)).map(r => [r.id, { roomId: r.id, label: r.name, complex: r.complex, senior: '', junior: '', premed: '', notes: r.notes || '' }]));
+  const rows = allRooms.map(r => {
+    if (pacu[r.id]) return pacu[r.id];
     const row = rowOf[r.id];
     return {
       roomId: r.id,
@@ -498,8 +509,28 @@ export function generate({ staff, day, settings = DEFAULT_SETTINGS, seed = 1 }) 
 
 // ---------- checks on a (possibly hand-edited) roster ----------
 
+// Someone leaving early is written "Name L-4pm" (or "L-4-5pm"); whoever covers the room is
+// written "Name C-OT13". Returns rooms where a leaver has no cover.
+export function missingCovers(rows) {
+  const out = [];
+  const covers = new Set();
+  for (const row of rows) for (const col of ['senior', 'junior']) for (const part of String(row[col] || '').split('/')) {
+    const m = part.match(/\bC-\s*OT\s*(\d+)/i);
+    if (m) covers.add(row.complex + ':' + m[1]);
+  }
+  for (const row of rows) for (const col of ['senior', 'junior']) for (const part of String(row[col] || '').split('/')) {
+    const m = part.match(/\bL-\s*([\d.:]+(?:\s*-\s*[\d.:]+)?\s*(?:am|pm)?)/i);
+    const num = roomNum(row.label);
+    if (m && !Number.isNaN(num) && !covers.has(row.complex + ':' + num)) out.push({ row, name: namesInCell(part)[0] || part.trim(), when: m[1] });
+  }
+  return out;
+}
+
 export function check({ rows, staff, day, settings = DEFAULT_SETTINGS }) {
   const out = [];
+  for (const m of missingCovers(rows)) {
+    out.push({ level: 'warn', text: `${m.row.label}: ${m.name} leaves L-${m.when} but nobody is marked C-OT${roomNum(m.row.label)} to cover.` });
+  }
   const sub = subspecByKey(settings);
   const roomById = Object.fromEntries(day.rooms.map(r => [r.id, r]));
   const where = {}; // person id -> [{row, col}]
@@ -539,7 +570,7 @@ export function check({ rows, staff, day, settings = DEFAULT_SETTINGS }) {
     if (!room) continue;
     const flags = { subspecs: [], ...(room.flags || {}) };
     const sen = seniorsOf[row.roomId], jun = juniorsOf[row.roomId];
-    if (!String(row.senior || '').trim()) out.push({ level: 'error', text: `${row.label}: no senior.` });
+    if (!isPacu(row.label) && !String(row.senior || '').trim()) out.push({ level: 'error', text: `${row.label}: no senior.` });
     for (const k of flags.subspecs) {
       if (!sub[k]?.hard) continue;
       if (sen.length && !sen.some(p => (p.subspecs || []).includes(k))) {

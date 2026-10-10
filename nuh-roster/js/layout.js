@@ -16,7 +16,8 @@ const UPPER = [
 
 // lists: { postcall: [...names], leave: [...], admin: [...] }
 // colourOf(namePart) -> 'green' | 'purple' | '' for each name on the OT rows.
-export function buildLayout({ date, rows, lists = {}, colourOf = () => '' }) {
+// shortOf(namePart) -> the same part with the person's short name ("Tan YW (RA)").
+export function buildLayout({ date, rows, lists = {}, colourOf = () => '', shortOf = s => s }) {
   const cells = [];
   const heights = {};
   const put = (r, c1, c2, text, o = {}) => cells.push({ r, r2: o.r2 || r, c1, c2, text: text ?? '', runs: o.runs || null, edit: o.edit || null, sz: o.sz || 8, bold: !!o.bold, color: o.color || null, align: o.align || 'center', box: !!o.box, valign: o.valign || 'middle', underlineFirst: !!o.underlineFirst });
@@ -70,15 +71,13 @@ export function buildLayout({ date, rows, lists = {}, colourOf = () => '' }) {
   r++;
 
   const doubles = doubleCovered(rows);
-  let last = null;
   rows.forEach((row, i) => {
-    if (last && row.complex !== last && row.complex === 'MOR') r++;
-    last = row.complex;
-    const red = row.complex === 'KROR' || row.complex === 'Other';
-    label(r, row.label + ':', red ? { bold: true, color: RED } : {});
-    put(r, 3, 5, row.senior || '', { box: true, runs: cellRuns(row.senior, colourOf, doubles) });
-    put(r, 6, 8, row.junior || '', { box: true, runs: cellRuns(row.junior, colourOf) });
-    put(r, 9, 11, row.premed || '', { box: true, bold: true, runs: cellRuns(row.premed, colourOf) });
+    // room labels are black, apart from the remote cases in red
+    label(r, row.label + ':', row.complex === 'Other' ? { bold: true, color: RED } : {});
+    const short = text => String(text || '').split(/\s*\/\s*/).filter(Boolean).map(shortOf).join(' / ');
+    put(r, 3, 5, short(row.senior), { box: true, runs: cellRuns(row.senior, colourOf, doubles, shortOf) });
+    put(r, 6, 8, short(row.junior), { box: true, runs: cellRuns(row.junior, colourOf, null, shortOf) });
+    put(r, 9, 11, short(row.premed), { box: true, bold: true, runs: cellRuns(row.premed, colourOf, null, shortOf) });
     r++;
   });
   return { cells, heights, rows: r - 1, cols: 12 };
@@ -100,7 +99,7 @@ export function isDouble(part, doubles) {
 
 // A roster cell as text runs: each name in its colour, and a superscript "&" after a senior
 // who is double covering. Returns null when plain text will do.
-function cellRuns(text, colourOf, doubles = null) {
+function cellRuns(text, colourOf, doubles = null, shortOf = s => s) {
   const parts = String(text || '').split(/\s*\/\s*/).filter(Boolean);
   const colours = parts.map(p => COLOUR_ARGB[colourOf(p)] || null);
   const dbl = parts.map(p => !!doubles && isDouble(p, doubles));
@@ -108,7 +107,7 @@ function cellRuns(text, colourOf, doubles = null) {
   const runs = [];
   parts.forEach((p, k) => {
     if (k) runs.push({ text: ' / ' });
-    runs.push({ text: p, color: colours[k] });
+    runs.push({ text: shortOf(p), color: colours[k] });
     if (dbl[k]) runs.push({ text: '&', sup: true, color: colours[k] });
   });
   return runs;

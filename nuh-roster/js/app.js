@@ -1,6 +1,6 @@
 import {
   DEFAULT_SETTINGS, DEFAULT_ROOMS, JUNIOR_GRADES, SENIOR_GRADES, POSTINGS, STATUSES, COLOURS, COLOUR_ARGB, isBaby,
-  matchName, splitNameList, namesInCell, suggestFlags, generate, check, learnFromRosters, tickFromHistory, remoteRoom, suggestShortNames, mergeContacts,
+  matchName, splitNameList, namesInCell, suggestFlags, generate, check, learnFromRosters, tickFromHistory, remoteRoom, suggestShortNames, mergeContacts, pacuRoom, isPacu, fmtSenior, fmtJunior,
 } from './engine.js';
 import { readRosterRows, readStaffSheet, buildRosterWorkbook, cellText, isContactList, readContactList, cleanContactName } from './xlsxio.js';
 import { buildLayout, COL_WIDTHS, shortName, doubleCovered, isDouble } from './layout.js';
@@ -24,7 +24,7 @@ function blankState() {
     roster: null,
     tab: 'seniors',
     cloudBase: {},
-    roomsVersion: 2,
+    roomsVersion: 3,
   };
 }
 
@@ -48,8 +48,8 @@ function cleanStaffNames() {
 cleanStaffNames();
 
 function migrateRooms() {
-  if ((state.roomsVersion || 1) >= 2) return;
   const t = state.roomTemplate;
+  if ((state.roomsVersion || 1) >= 2) return migratePacu();
   const rename = (from, to) => {
     t.forEach(r => { if (r.name === from) r.name = to; });
     (state.day.rooms || []).forEach(r => { if (r.name === from) r.name = to; });
@@ -67,6 +67,19 @@ function migrateRooms() {
   addAfter('MCOR 9', 'MCOR', 'MCOR 8', 'MCOR 10');
   t.forEach(r => { if (r.defaultOn === undefined) r.defaultOn = true; });
   state.roomsVersion = 2;
+  migratePacu();
+}
+
+// v3: a PACU row above each complex
+function migratePacu() {
+  if ((state.roomsVersion || 1) >= 3) return;
+  const t = state.roomTemplate;
+  for (const [complex, name] of [['KROR', 'KROR PACU'], ['MCOR', 'MCOR PACU'], ['MOR', 'MBOR PACU']]) {
+    if (t.some(r => r.name === name)) continue;
+    const i = t.findIndex(r => r.complex === complex);
+    t.splice(i < 0 ? t.length : i, 0, { complex, name, defaultOn: true });
+  }
+  state.roomsVersion = 3;
 }
 
 let saveTimer;
@@ -217,7 +230,11 @@ function confirmChanges(title, lines, buttons) {
       h('h2', {}, title),
       h('ul', {}, lines.slice(0, 300).map(l => h('li', {}, l))),
       lines.length > 300 ? h('p', { class: 'hint' }, `…and ${lines.length - 300} more.`) : null,
-      h('div', { class: 'bar' }, buttons.map(([key, label, cls]) => h('button', { class: cls || '', onclick: () => { dlg.close(); dlg.remove(); resolve(key); } }, label))));
+      h('div', { class: 'bar' }, buttons.map(([key, label, cls]) => h('button', { class: cls || '', onclick: () => {
+        if (Date.now() - opened < 300) return; // ignore the key press that opened the dialog
+        dlg.close(); dlg.remove(); resolve(key);
+      } }, label))));
+    const opened = Date.now();
     dlg.addEventListener('cancel', e => { e.preventDefault(); dlg.close(); dlg.remove(); resolve('back'); });
     document.body.append(dlg);
     dlg.showModal();
@@ -458,7 +475,7 @@ function renderDay(part) {
       h('td', {}, p.name),
       h('td', { class: 'seen' }, p.role === 'senior' ? p.grade : `${p.grade}${p.posting ? ' · ' + p.posting : ''}`),
       h('td', {}, select(s.status || 'avail', STATUSES, v => { s.status = v; render(); })),
-      h('td', {}, h('input', { class: 'narrow', value: s.leaveTime || '', placeholder: '5pm', title: 'Needs to leave at', onchange: e => { s.leaveTime = e.target.value.trim(); save(); } })),
+      h('td', {}, h('input', { class: 'narrow', value: s.leaveTime || '', placeholder: '4pm', title: 'Leaving at, e.g. 4pm or 4-5pm (shown as L-4pm)', onchange: e => { s.leaveTime = e.target.value.trim(); save(); } })),
       h('td', {}, p.role === 'senior'
         ? h('label', { title: 'Liver transplant standby' }, h('input', { type: 'checkbox', checked: s.liverStandby, onchange: e => { s.liverStandby = e.target.checked; save(); } }), ' (L)')
         : h('label', { title: 'Not around on the previous working day: needs premed cover' }, h('input', { type: 'checkbox', checked: s.notAroundPrev, onchange: e => { s.notAroundPrev = e.target.checked; save(); } }), ' away yesterday')),
@@ -498,8 +515,9 @@ function renderDay(part) {
         h('thead', {}, h('tr', {}, ['Run', 'Room', 'Session', 'Case notes', 'Flags', 'Fixed senior', 'Fixed junior'].map(t => h('th', {}, t)))),
         h('tbody', {}, d.rooms.map(roomRow))),
     ),
+    !cases && quickStatusCard(),
     !cases && h('section', { class: 'card' },
-      h('h2', {}, 'Who is around'),
+      h('h2', {}, 'Paste from the leave sheet'),
       h('p', { class: 'hint' }, 'Paste names from the leave sheet: short forms like "Tan YW" or "Swapna" work. Separate names with commas or new lines.'),
       h('div', { class: 'paste' },
         pasteBox('leave', 'Leave', 'Tan YW, Ang KS'),
@@ -520,6 +538,33 @@ function renderDay(part) {
         : h('p', { class: 'empty' }, 'Add staff on the Seniors and Juniors tabs first.'),
     ),
   );
+}
+
+// Search-and-add boxes for each status, showing who is already in it.
+const QUICK = [['admin', 'Admin / no list'], ['leave', 'Leave'], ['postcall', 'Post call'], ['elsewhere', 'Elsewhere (SICU, EOT, pain…)'], ['away', 'Juniors away yesterday']];
+function quickStatusCard() {
+  const inList = key => state.staff.filter(p => key === 'away' ? state.day.staff[p.id]?.notAroundPrev : (state.day.staff[p.id]?.status || 'avail') === key)
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const setOne = async (key, text) => {
+    const p = await resolvePerson(text, key === 'away' ? 'junior' : 'senior');
+    if (!p) return;
+    const d = dayOf(p.id);
+    if (key === 'away') d.notAroundPrev = true; else d.status = key;
+    render();
+    toast(`${p.name}: ${QUICK.find(q => q[0] === key)[1]}.`);
+  };
+  const clearOne = (key, p) => { const d = dayOf(p.id); if (key === 'away') d.notAroundPrev = false; else d.status = 'avail'; render(); };
+  return h('section', { class: 'card' },
+    h('h2', {}, 'Who is around'),
+    h('p', { class: 'hint' }, 'Type a name to add someone, e.g. a senior on an admin day. Click × to put them back as available.'),
+    h('div', { class: 'paste' }, QUICK.map(([key, label]) => h('div', {},
+      h('label', {}, label),
+      h('div', { class: 'chips', style: 'margin-bottom:6px' }, inList(key).map(p => h('span', { class: 'chip static' }, p.name, ' ',
+        h('button', { class: 'link', title: 'Remove', onclick: () => clearOne(key, p) }, '×')))),
+      nameInput({ placeholder: 'Add a name…', style: 'width:100%',
+        onkeydown: e => { if (e.key === 'Enter') { e.preventDefault(); setOne(key, e.target.value); } },
+        onchange: e => { if (state.staff.some(p => p.name === e.target.value)) setOne(key, e.target.value); } },
+      key === 'away' ? 'junior' : null)))));
 }
 
 function markNames(names, fn) {
@@ -598,13 +643,16 @@ async function loadDraft([file]) {
   });
   const get = re => Object.entries(sections).filter(([k]) => re.test(k)).flatMap(([, v]) => v);
 
-  d.rooms.forEach(r => { r.running = false; });
+  // PACU rows aren't in the admin draft; keep them as set in Settings
+  d.rooms.forEach(r => { r.running = isPacu(r.name) ? !!state.roomTemplate.find(t => t.name === r.name)?.defaultOn : false; });
   let rooms = 0;
   for (const r of rows) {
     const remote = remoteRoom(r.label);
-    const m = r.label.match(/((KROR|MCOR|MOR)\s*\d+)\s*$/i) || (remote ? [null, remote, 'Other'] : null);
+    const pacu = pacuRoom(r.label);
+    const m = (pacu ? [null, pacu, pacu.startsWith('MBOR') ? 'MOR' : pacu.split(' ')[0]] : null)
+      || r.label.match(/((KROR|MCOR|MOR)\s*\d+)\s*$/i) || (remote ? [null, remote, 'Other'] : null);
     if (!m) continue;
-    const name = remote || m[1].toUpperCase().replace(/\s+/, ' ');
+    const name = pacu || remote || m[1].toUpperCase().replace(/\s+/, ' ');
     let room = d.rooms.find(x => x.name === name);
     if (!room) { state.roomTemplate.push({ complex: m[2] ? m[2].toUpperCase() : 'Other', name, defaultOn: true }); syncRooms(); room = d.rooms.find(x => x.name === name); }
     room.running = true;
@@ -750,20 +798,57 @@ function startNameDrag(e, src) {
   window.addEventListener('pointercancel', up);
 }
 
+// Resolve a typed name to a person. Unknown names offer to add the person (so typos are caught);
+// resolves to the person, or null when cancelled.
+async function resolvePerson(text, role) {
+  const v = String(text).trim();
+  if (!v) return null;
+  const m = matchName(v, state.staff);
+  if (m.person) return m.person;
+  if (m.ambiguous) { toast(`"${v}" could be ${m.ambiguous.map(p => p.name).join(' or ')}. Type more of the name.`); return null; }
+  const other = role === 'senior' ? 'junior' : 'senior';
+  const choice = await confirmChanges(`"${v}" isn't on the staff list`, ['Check the spelling. If it\'s right, add them so they can be rostered.'],
+    [[role, `Add to ${role === 'senior' ? 'Seniors' : 'Juniors'}`, 'primary'], [other, `Add to ${other === 'senior' ? 'Seniors' : 'Juniors'}`], ['back', 'Cancel']]);
+  if (choice === 'back') return null;
+  const p = { id: newId(), name: v, aliases: [], role: choice, grade: choice === 'senior' ? 'Consultant' : 'Resident', posting: '', subspecs: [], avoid: [], history: {}, source: 'roster-entry' };
+  state.staff.push(p);
+  (state.staffLog ||= []).unshift({ at: Date.now(), by: who(), changes: [`Added ${choice} ${v} (typed on the roster)`] });
+  toast(`Added ${v} to ${choice === 'senior' ? 'Seniors' : 'Juniors'}. Fill in their details there.`);
+  return p;
+}
+
+// A text box that suggests names from the staff list (optionally one role).
+function nameInput(attrs = {}, role = null) {
+  const id = 'names-' + (role || 'all');
+  if (!document.getElementById(id)) document.body.append(h('datalist', { id }));
+  document.getElementById(id).replaceChildren(...state.staff.filter(p => !role || p.role === role)
+    .sort((a, b) => a.name.localeCompare(b.name)).map(p => h('option', { value: p.name })));
+  return h('input', { list: id, autocomplete: 'off', spellcheck: 'false', ...attrs });
+}
+
 // ---- tags on one name: "(L)", "(RA)", "(AOH 1)" and the part after a dash ("-5pm", "-C-OT 4") ----
 
 const TAGS = ['L', 'RA', 'P', 'SR', 'Neu', 'Amb', 'PACU'];
 let tagTimer = null;
 
+// "Tan YW (RA) L-4pm C-OT13 -mtg 5pm" -> name, tags, leave ("4pm" / "4-5pm"), cover ("13"), note
+const TIME = '[\\d.:]+(?:\\s*-\\s*[\\d.:]+)?\\s*(?:am|pm)?';
 function parseNamePart(text) {
   const tags = [...String(text).matchAll(/\(([^)]*)\)/g)].map(m => m[1].trim()).filter(Boolean);
   let rest = String(text).replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim();
-  let dash = '';
+  let leave = '', cover = '', dash = '';
+  rest = rest.replace(new RegExp(`\\s+L-\\s*(${TIME})`, 'i'), (_, t) => { leave = t.trim(); return ''; });
+  rest = rest.replace(/\s+-?C-\s*OT\s*(\d+)/i, (_, n) => { cover = n; return ''; });
   const m = rest.match(/^(.*?)\s+-\s*(.+)$/);
-  if (m) { rest = m[1].trim(); dash = m[2].trim(); }
-  return { name: rest, tags, dash };
+  if (m) {
+    rest = m[1].trim(); dash = m[2].trim();
+    // older roster style: "Name -5pm" means leaving at 5pm
+    if (!leave && new RegExp(`^${TIME}$`, 'i').test(dash)) { leave = dash; dash = ''; }
+  }
+  return { name: rest.trim(), tags, leave, cover, dash };
 }
-const buildNamePart = ({ name, tags, dash }) => `${name}${tags.map(t => ` (${t})`).join('')}${dash ? ` -${dash}` : ''}`;
+const buildNamePart = ({ name, tags, leave, cover, dash }) =>
+  `${name}${tags.map(t => ` (${t})`).join('')}${leave ? ` L-${leave}` : ''}${cover ? ` C-OT${cover}` : ''}${dash ? ` -${dash}` : ''}`;
 
 function closeTagEditor() { document.querySelector('.tag-editor')?.remove(); }
 
@@ -775,8 +860,10 @@ function openTagEditor(chip, src) {
   const p = matchName(cur.name, state.staff).person;
   const on = new Set(cur.tags.filter(t => TAGS.includes(t)));
   const other = h('input', { value: cur.tags.filter(t => !TAGS.includes(t)).join(', '), placeholder: 'e.g. AOH 1' });
-  const dash = h('input', { value: cur.dash, placeholder: 'e.g. 5pm, mtg 3pm, C-OT 4' });
-  const name = h('input', { value: cur.name });
+  const dash = h('input', { value: cur.dash, placeholder: 'e.g. mtg 3pm' });
+  const leave = h('input', { value: cur.leave, placeholder: 'e.g. 4pm or 4-5pm' });
+  const cover = h('input', { value: cur.cover, placeholder: 'e.g. 13', inputmode: 'numeric' });
+  const name = nameInput({ value: cur.name }, src.key === 'senior' ? 'senior' : 'junior');
   const chips = h('div', { class: 'chips' }, TAGS.map(t => {
     const c = h('span', { class: 'chip' + (on.has(t) ? ' on' : ''), title: t === 'L' ? (src.key === 'senior' ? 'Liver standby' : 'Liver posting') : '', onclick: () => {
       if (on.has(t)) on.delete(t); else on.add(t);
@@ -784,9 +871,15 @@ function openTagEditor(chip, src) {
     } }, t);
     return c;
   }));
-  const apply = () => {
+  const apply = async () => {
     const tags = [...TAGS.filter(t => on.has(t)), ...splitNameList(other.value)];
-    const next = buildNamePart({ name: name.value.trim() || cur.name, tags, dash: dash.value.trim() });
+    let picked = name.value.trim() || cur.name;
+    if (picked !== cur.name) {
+      const person = await resolvePerson(picked, src.key === 'senior' ? 'senior' : 'junior');
+      if (!person) return;
+      picked = person.name;
+    }
+    const next = buildNamePart({ name: picked, tags, leave: leave.value.trim().replace(/^L-/i, ''), cover: cover.value.trim().replace(/\D/g, ''), dash: dash.value.trim() });
     closeTagEditor();
     if (next === parts[src.part]) return;
     undoStack.push(JSON.stringify(state.roster.rows));
@@ -796,8 +889,7 @@ function openTagEditor(chip, src) {
     if (p) {
       const d = dayOf(p.id);
       if (src.key === 'senior') d.liverStandby = on.has('L');
-      const t = dash.value.trim();
-      if (!t || /^\d{1,2}([.:]\d{2})?\s*(am|pm)?$/i.test(t)) d.leaveTime = t;
+      d.leaveTime = leave.value.trim().replace(/^L-/i, '');
     }
     afterRosterEdit();
   };
@@ -809,11 +901,13 @@ function openTagEditor(chip, src) {
     afterRosterEdit();
   };
   const box = h('div', { class: 'tag-editor', role: 'dialog', 'aria-label': 'Edit name',
-    onkeydown: e => { if (e.key === 'Escape') closeTagEditor(); if (e.key === 'Enter') apply(); } },
+    onkeydown: e => { if (e.key === 'Escape') closeTagEditor(); if (e.key === 'Enter') { e.preventDefault(); apply(); } } },
     h('label', {}, 'Name'), name,
     h('label', {}, 'Tags'), chips,
     h('label', {}, 'Other tags'), other,
-    h('label', {}, 'After a dash (leave time or note)'), dash,
+    h('label', {}, 'Leaving (L-)'), leave,
+    h('label', {}, 'Covering OT (C-OT)'), cover,
+    h('label', {}, 'Other note (after a dash)'), dash,
     h('div', { class: 'bar', style: 'margin:8px 0 0' },
       h('button', { class: 'primary', onclick: apply }, 'Save'),
       h('button', { onclick: closeTagEditor }, 'Cancel'),
@@ -865,35 +959,52 @@ function colourOf(part) {
   if (!colourCache.has(k)) colourCache.set(k, matchName(n, state.staff).person?.colour || '');
   return colourCache.get(k);
 }
+// The sheet uses short names: "Tan Yi Wei (RA) L-4pm" -> "Tan YW (RA) L-4pm".
+function shortOf(part) {
+  const n = namesInCell(part)[0];
+  if (!n) return part;
+  const p = matchName(n, state.staff).person;
+  if (!p) return part;
+  const s = shortName(p);
+  const at = part.indexOf(n);
+  return s && at >= 0 ? part.slice(0, at) + s + part.slice(at + n.length) : part;
+}
 const colourStyle = part => { const c = COLOUR_ARGB[colourOf(part)]; return c ? `color:#${c.slice(2)}` : ''; };
+
+// Add a person to a cell from the staff list (unknown names offer to add them to the staff list).
+async function addToCell(i, key, text) {
+  const p = await resolvePerson(text, key === 'senior' ? 'senior' : 'junior');
+  if (!p) return false;
+  const row = state.roster.rows[i];
+  const d = state.day.staff[p.id] || {};
+  undoStack.push(JSON.stringify(state.roster.rows));
+  setCellParts(row, key, [...cellParts(row, key), p.role === 'senior' ? fmtSenior(p, d) : fmtJunior(p, d)]);
+  editing = null;
+  afterRosterEdit();
+  return true;
+}
 
 function rosterCell(row, i, key, doubles) {
   const id = i + ':' + key;
-  if (editing === id) {
-    const input = h('input', {
-      class: 'cell-input', value: row[key] || '', spellcheck: 'false',
-      onkeydown: e => { if (e.key === 'Enter') e.target.blur(); if (e.key === 'Escape') { editing = null; render(); } },
-      onblur: e => {
-        if (editing !== id) return;
-        editing = null;
-        if (e.target.value !== (row[key] || '')) { undoStack.push(JSON.stringify(state.roster.rows)); row[key] = e.target.value; afterRosterEdit(); }
-        else render();
-      },
-    });
-    setTimeout(() => { input.focus(); input.select(); });
-    return h('td', { class: 'cell editing' }, input);
-  }
   const parts = cellParts(row, key);
+  let adder;
+  if (editing === id) {
+    adder = nameInput({ class: 'cell-input', placeholder: 'Type a name',
+      onkeydown: e => { if (e.key === 'Escape') { editing = null; render(); } if (e.key === 'Enter') { e.preventDefault(); addToCell(i, key, e.target.value); } },
+      onchange: e => { if (state.staff.some(p => p.name === e.target.value)) addToCell(i, key, e.target.value); },
+      onblur: e => setTimeout(() => { if (editing === id && !e.target.value.trim()) { editing = null; render(); } }, 150),
+    }, key === 'senior' ? 'senior' : 'junior');
+    setTimeout(() => adder.focus());
+  } else {
+    adder = h('button', { class: 'add-name', title: 'Add a name', onclick: () => { clearTimeout(tagTimer); closeTagEditor(); editing = id; render(); } }, '+');
+  }
   return h('td', {
-    class: 'cell', 'data-drop': '', 'data-row': i, 'data-key': key, title: 'Drag a name to swap or move it. Double-click to type.',
-    ondblclick: () => { clearTimeout(tagTimer); closeTagEditor(); editing = id; render(); },
-  }, parts.length
-    ? h('div', { class: 'names' }, parts.map((p, k) => [k ? h('span', { class: 'sep' }, '/') : null, h('span', {
+    class: 'cell', 'data-drop': '', 'data-row': i, 'data-key': key, title: 'Drag a name to swap or move it. Click a name to edit it.',
+  }, h('div', { class: 'names' }, parts.map((p, k) => h('span', {
       class: 'name', 'data-drop': '', 'data-row': i, 'data-key': key, 'data-part': k, style: colourStyle(p),
       title: 'Drag to swap or move. Click to edit tags.',
       onpointerdown: e => startNameDrag(e, { row: i, key, part: k }),
-    }, p, key === 'senior' && isDouble(p, doubles) ? h('sup', { class: 'dbl', title: 'Double covering' }, '&') : null)]))
-    : h('span', { class: 'empty-cell' }, '—'));
+    }, p, key === 'senior' && isDouble(p, doubles) ? h('sup', { class: 'dbl', title: 'Double covering' }, '&') : null)), adder));
 }
 
 function runGenerate(newSeed) {
@@ -968,7 +1079,7 @@ let premedFilter = true;
 // The sheet exactly as it will be exported, drawn as an HTML table.
 function renderSheet() {
   colourCache.clear();
-  const layout = buildLayout({ date: state.day.date, rows: state.roster.rows, lists: rosterLists(), colourOf });
+  const layout = buildLayout({ date: state.day.date, rows: state.roster.rows, lists: rosterLists(), colourOf, shortOf });
   const start = {}, covered = new Set();
   for (const c of layout.cells) {
     start[c.r + ':' + c.c1] = c;
@@ -1020,8 +1131,6 @@ function renderRoster() {
   const body = [];
   let last = null;
   r.rows.forEach((row, i) => {
-    if (last && row.complex !== last && row.complex === 'MOR') body.push(h('tr', { class: 'gap' }, h('td', { colspan: 4 })));
-    last = row.complex;
     body.push(h('tr', { class: flaggedRooms.has(row.label) ? 'flagged' : '' },
       h('td', { class: 'room' }, row.label + ':'),
       rosterCell(row, i, 'senior', doubles), rosterCell(row, i, 'junior', doubles),
@@ -1042,7 +1151,7 @@ function renderRoster() {
   }
   return h('div', {},
     h('section', { class: 'card' }, h('h2', {}, 'Roster'), actions,
-      h('p', { class: 'hint', style: 'margin:0' }, 'Drag a name onto another name to swap them, or onto an empty part of a cell to move it there. Click a name to change its tags ((L), (RA), -5pm…). Double-click a cell to type, or click the case notes to edit them. & marks a senior who is double covering. Premed cover is on its own tab.')),
+      h('p', { class: 'hint', style: 'margin:0' }, 'Drag a name onto another name to swap them, or onto an empty part of a cell to move it there. Click a name to change it or its tags ((L), (RA), L-4pm, C-OT13…). + adds someone from the staff list. Click the case notes to edit them. & marks a senior who is double covering. Premed cover is on its own tab.')),
     h('div', { class: 'cols' },
       h('section', { class: 'card scroll' },
         h('table', { class: 'sheet' },
@@ -1066,7 +1175,7 @@ function renderRoster() {
 
 async function exportXlsx() {
   colourCache.clear();
-  const wb = buildRosterWorkbook(window.ExcelJS, { date: state.day.date, rows: state.roster.rows, lists: rosterLists(), colourOf });
+  const wb = buildRosterWorkbook(window.ExcelJS, { date: state.day.date, rows: state.roster.rows, lists: rosterLists(), colourOf, shortOf });
   const buf = await wb.xlsx.writeBuffer();
   download(`OT roster ${state.day.date}.xlsx`, new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
 }

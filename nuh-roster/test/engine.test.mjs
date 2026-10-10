@@ -107,3 +107,18 @@ console.log('engine tests passed');
   assert.deepEqual(staff[0].subspecs, [], 'input not mutated');
   console.log('contact tests passed');
 }
+
+// leave and cover tags
+{
+  const { missingCovers, namesInCell: nic } = await import('../js/engine.js');
+  assert.deepEqual(nic('Tan YW L-4pm / Lee AB C-OT13'), ['Tan YW', 'Lee AB']);
+  assert.deepEqual(nic('Tan YW L-4-5pm'), ['Tan YW']);
+  const rows = [
+    { roomId: 'a', label: 'MOR 13', complex: 'MOR', senior: 'Senior One L-4pm', junior: '' },
+    { roomId: 'b', label: 'MOR 14', complex: 'MOR', senior: 'Senior Two', junior: '' },
+  ];
+  assert.equal(missingCovers(rows).length, 1);
+  rows[1].senior = 'Senior Two C-OT13';
+  assert.equal(missingCovers(rows).length, 0);
+  console.log('cover tests passed');
+}
