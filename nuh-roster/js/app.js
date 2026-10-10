@@ -1,6 +1,6 @@
 import {
   DEFAULT_SETTINGS, DEFAULT_ROOMS, JUNIOR_GRADES, SENIOR_GRADES, POSTINGS, STATUSES,
-  matchName, splitNameList, namesInCell, suggestFlags, generate, check, learnFromRosters, tickFromHistory, remoteRoom,
+  matchName, splitNameList, namesInCell, suggestFlags, generate, check, learnFromRosters, tickFromHistory, remoteRoom, suggestShortNames,
 } from './engine.js';
 import { readRosterRows, readStaffSheet, buildRosterWorkbook, cellText } from './xlsxio.js';
 import { buildLayout, COL_WIDTHS, shortName, doubleCovered, isDouble } from './layout.js';
@@ -204,6 +204,15 @@ function renderStaff(role) {
             toast(n ? `Ticked ${n} subspec(s). Check them before generating.` : 'Nothing new to tick.');
           } }, 'Tick subspecs from "Seen in"'),
           h('label', { class: 'seen' }, ' if seen ≥ ', h('input', { type: 'number', min: 1, max: 20, value: tickMin, style: 'width:56px', onchange: e => { tickMin = Math.max(1, +e.target.value || 1); } }), ' times')),
+        h('button', { title: 'Fill in short names (e.g. Tan YW, Swapna) for everyone who has none', onclick: () => {
+          const props = suggestShortNames(state.staff);
+          if (!props.length) return toast('Everyone already has a short name, or the suggestions would clash.');
+          const eg = props.slice(0, 6).map(x => `${x.name} → ${x.short}`).join('\n');
+          if (!confirm(`Add short names for ${props.length} people (seniors and juniors)?\n\n${eg}${props.length > 6 ? '\n…' : ''}\n\nYou can edit any of them afterwards.`)) return;
+          for (const x of props) { const p = state.staff.find(s => s.id === x.id); if (p) p.aliases = [x.short]; }
+          render();
+          toast(`Added ${props.length} short names. Check them, then save for the team.`);
+        } }, 'Suggest short names'),
         h('button', { onclick: () => { state.staff.unshift({ id: newId(), name: '', aliases: [], role, grade: senior ? 'Consultant' : 'Resident', posting: '', subspecs: [], avoid: [], history: {} }); staffFilter = ''; render(); } }, senior ? '+ Add senior' : '+ Add junior'),
         h('span', { class: 'grow' }),
         h('input', { placeholder: 'Filter names', value: staffFilter, oninput: e => { staffFilter = e.target.value; const pos = e.target.selectionStart; render(); const i = app.querySelector('input[placeholder="Filter names"]'); i.focus(); i.setSelectionRange(pos, pos); } }),
