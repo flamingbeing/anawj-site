@@ -885,9 +885,10 @@ document.getElementById('loadTeam').addEventListener('change', async e => {
 
 // ---------- team sign-in and shared rosters ----------
 
-const cs = { ready: !cloud.enabled, user: null, member: null, meta: {}, versions: {}, recent: null, members: null };
+const cs = { ready: !cloud.enabled, user: null, member: null, meta: {}, versions: {}, recent: null, members: null, request: null, requests: null };
 let rostererName = '';
-try { rostererName = localStorage.getItem('ot-roster-name') || ''; } catch { /* no storage */ }
+const nameKey = () => 'ot-roster-name:' + (cs.user?.email || '').toLowerCase();
+function storeName(n) { rostererName = n; try { localStorage.setItem(nameKey(), n); } catch { /* no storage */ } }
 state.cloudBase ||= {}; // date -> updatedAt of the cloud copy this browser last loaded or saved
 
 const isMember = () => !!cs.member;
@@ -916,29 +917,47 @@ function renderCloudBar() {
   }
   const out = h('button', { onclick: () => cloud.signOut() }, 'Sign out');
   if (!cs.member) {
-    const why = !cs.memberError
-      ? `${cs.user.email} isn't on the team list yet. Ask an admin to add you.`
-      : cs.memberError === 'permission-denied'
+    if (!cs.memberError) {
+      el.replaceChildren(...[
+        cs.request
+          ? h('span', { class: 'seen' }, `${cs.user.email}: access requested ${when(cs.request.requestedAt)}. An admin needs to approve it, then sign in again.`)
+          : [h('span', { class: 'seen' }, `${cs.user.email} isn't on the team yet.`),
+            h('button', { class: 'primary', onclick: async () => {
+              const name = prompt('Your name, so the admin knows who you are:', cs.user.displayName || '');
+              if (name === null) return;
+              try { cs.request = await cloud.requestAccess(cs.user, name.trim()); render(); toast('Access requested. An admin will approve it.'); } catch (e) { cloudError(e); }
+            } }, 'Request access')],
+        out].flat());
+      return;
+    }
+    const why = cs.memberError === 'permission-denied'
         ? `Signed in as ${cs.user.email}, but the database refused access. Check the Firestore rules are published.`
         : `Signed in as ${cs.user.email}, but the team list couldn't be checked (${cs.memberError}).`;
     el.replaceChildren(h('span', { class: 'seen' }, why), out);
     return;
   }
-  el.replaceChildren(
+  el.replaceChildren(...[
     h('label', { class: 'seen', title: 'Shown in the history when you save' }, 'Rosterer ',
       h('input', { value: rostererName, placeholder: cs.user.displayName || 'Your name', style: 'width:140px', onchange: e => {
-        rostererName = e.target.value; try { localStorage.setItem('ot-roster-name', rostererName); } catch { /* no storage */ }
+        storeName(e.target.value);
       } })),
     h('span', { class: 'seen', title: cs.user.email }, isAdmin() ? 'admin' : ''),
-    out);
+    isAdmin() && Array.isArray(cs.requests) && cs.requests.length
+      ? h('button', { onclick: () => { state.tab = 'settings'; render(); document.getElementById('requests')?.scrollIntoView(); } }, `${cs.requests.length} access request${cs.requests.length > 1 ? 's' : ''}`)
+      : null,
+    out].filter(Boolean));
 }
 
 cloud.watchUser(async user => {
-  cs.user = user; cs.member = null; cs.meta = {}; cs.versions = {}; cs.recent = null; cs.members = null;
+  cs.user = user; cs.member = null; cs.meta = {}; cs.versions = {}; cs.recent = null; cs.members = null; cs.request = null; cs.requests = null;
   if (user) {
     cs.memberError = null;
     try { cs.member = await cloud.membership(user.email); } catch (e) { cs.memberError = e?.code || String(e); console.error(e); }
+    rostererName = '';
+    try { rostererName = localStorage.getItem(nameKey()) || ''; } catch { /* no storage */ }
     if (cs.member && !rostererName) rostererName = cs.member.name || user.displayName || '';
+    if (!cs.member && !cs.memberError) { try { cs.request = await cloud.myRequest(user.email); } catch (e) { console.error(e); } }
+    if (cs.member?.role === 'admin') { try { cs.requests = await cloud.listRequests(); } catch (e) { console.error(e); cs.requests = []; } }
   }
   cs.ready = true;
   render();
@@ -977,7 +996,7 @@ async function saveRosterToCloud() {
   if (!rostererName.trim()) {
     const n = prompt('Your name, for the roster history:', cs.user.displayName || '');
     if (!n) return;
-    rostererName = n.trim(); try { localStorage.setItem('ot-roster-name', rostererName); } catch { /* no storage */ }
+    storeName(n.trim());
   }
   const data = { day: state.day, roster: state.roster };
   try {
@@ -1062,8 +1081,18 @@ function membersCard() {
     cloud.listMembers().then(v => { cs.members = v; render(); }, e => { cs.members = []; cloudError(e); });
   }
   const list = Array.isArray(cs.members) ? cs.members : [];
-  const refresh = () => { cs.members = null; render(); };
+  const refresh = () => { cs.members = null; cs.requests = null; cloud.listRequests().then(v => { cs.requests = v; render(); }, cloudError); render(); };
+  const requests = Array.isArray(cs.requests) ? cs.requests : [];
   return h('section', { class: 'card scroll' },
+    requests.length ? h('div', { id: 'requests', style: 'margin-bottom:16px' },
+      h('h2', {}, 'Access requests'),
+      h('table', {},
+        h('thead', {}, h('tr', {}, ['Google email', 'Name', 'Asked', ''].map(t => h('th', {}, t)))),
+        h('tbody', {}, requests.map(q => h('tr', {},
+          h('td', {}, q.email), h('td', {}, q.name || ''), h('td', { class: 'seen' }, when(q.requestedAt)),
+          h('td', {},
+            h('button', { class: 'small primary', onclick: () => cloud.setMember(q.email, 'rosterer', q.name || '').then(() => cloud.deleteRequest(q.email)).then(() => { toast(`Approved ${q.email}.`); refresh(); }, cloudError) }, 'Approve'), ' ',
+            h('button', { class: 'small', onclick: () => { if (confirm(`Decline ${q.email}?`)) cloud.deleteRequest(q.email).then(refresh, cloudError); } }, 'Decline'))))))) : null,
     h('h2', {}, 'Team members'),
     h('p', { class: 'hint' }, 'Only these Google accounts can sign in and see the shared staff list and rosters. Admins can also manage this list.'),
     h('table', {},

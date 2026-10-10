@@ -7,6 +7,7 @@
 //   team/main                  { settings, staff, roomTemplate, updatedAt, updatedBy }
 //   rosters/{date}             { date, day, roster, updatedAt, updatedBy }
 //   rosters/{date}/versions/*  { day, roster, savedAt, savedBy }   (never changed once written)
+//   accessRequests/{email}     { email, name, requestedAt }       (people asking to join)
 
 import { FIREBASE_CONFIG } from './firebase-config.js';
 
@@ -120,6 +121,33 @@ export async function listRosters(n = 30) {
   const q = F.query(F.collection(db, 'rosters'), F.orderBy('updatedAt', 'desc'), F.limit(n));
   const snap = await F.getDocs(q);
   return snap.docs.map(d => ({ date: d.id, updatedAt: d.data().updatedAt, updatedBy: d.data().updatedBy }));
+}
+
+// ---- access requests ----
+
+export async function myRequest(email) {
+  const { db, F } = await sdk();
+  const snap = await F.getDoc(F.doc(db, 'accessRequests', email.toLowerCase()));
+  return snap.exists() ? snap.data() : null;
+}
+
+export async function requestAccess(user, name) {
+  const { db, F } = await sdk();
+  const email = user.email.toLowerCase();
+  const doc = { email, name: String(name || user.displayName || '').slice(0, 100), requestedAt: Date.now() };
+  await F.setDoc(F.doc(db, 'accessRequests', email), doc);
+  return doc;
+}
+
+export async function listRequests() {
+  const { db, F } = await sdk();
+  const snap = await F.getDocs(F.collection(db, 'accessRequests'));
+  return snap.docs.map(d => d.data()).sort((a, b) => a.requestedAt - b.requestedAt);
+}
+
+export async function deleteRequest(email) {
+  const { db, F } = await sdk();
+  await F.deleteDoc(F.doc(db, 'accessRequests', email.toLowerCase()));
 }
 
 // ---- members (admins only, enforced by the rules) ----
