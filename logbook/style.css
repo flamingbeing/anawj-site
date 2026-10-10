@@ -170,7 +170,7 @@ textarea.details { min-height: 92px; font-size: 17px; line-height: 1.4; padding:
 }
 .actions .primary { flex: 1 1 auto; }
 .kbd { font-size: 11px; opacity: .75; font-weight: 400; }
-@media (pointer: coarse) { .kbd { display: none; } }
+@media not (pointer: fine) { .kbd { display: none; } }
 
 .picker input[type="search"] { width: 100%; }
 .picker ul { list-style: none; margin: 8px 0 0; padding: 0; max-height: 52vh; overflow: auto; border: 1px solid var(--line); border-radius: 12px; -webkit-overflow-scrolling: touch; }
@@ -197,6 +197,17 @@ textarea.details { min-height: 92px; font-size: 17px; line-height: 1.4; padding:
 .bulk td.details { min-width: 200px; }
 .bulk td .chips { gap: 4px; }
 .bulk .chip { min-height: 30px; padding: 2px 8px; font-size: 13px; }
+/* phones: one case per block (date and ×, details, categories) instead of a table wider than the screen */
+@media (max-width: 600px) {
+  table.bulk, table.bulk tbody { display: block; width: 100%; }
+  table.bulk thead { display: none; }
+  table.bulk tr { display: grid; grid-template-columns: 1fr auto; gap: 6px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  table.bulk td { display: block; padding: 0; border: 0; min-width: 0; }
+  table.bulk td:nth-child(1) { grid-area: 1 / 1; }
+  table.bulk td:nth-child(4) { grid-area: 1 / 2; }
+  table.bulk td:nth-child(2), table.bulk td:nth-child(3) { grid-column: 1 / -1; }
+  table.bulk td.details textarea { width: 100%; }
+}
 
 /* ---------- logbook ---------- */
 
@@ -215,6 +226,9 @@ table.grid input, table.grid textarea { border-radius: 6px; min-height: 34px; pa
 table.grid textarea { min-height: 34px; height: 34px; }
 table.grid td.date input { width: 150px; }
 table.grid td.cats input { min-width: 140px; }
+table.grid td.ini input { width: 64px; text-transform: uppercase; }
+.chip.same { border-style: dashed; }
+table.bulk td.details input { width: 70px; margin-bottom: 4px; text-transform: uppercase; }
 table.grid tr.dirty td { background: var(--warn-bg); }
 
 dialog { border: 1px solid var(--line); border-radius: 16px; padding: 16px; width: min(640px, calc(100vw - 24px)); max-height: calc(100vh - 32px); background: var(--panel); color: var(--ink); }
@@ -444,3 +458,19 @@ body.dragging-refl { user-select: none; -webkit-user-select: none; }
 .rimp-tag { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 8px; font-size: 11px; font-weight: 700; background: var(--accent-soft); color: var(--accent); }
 .btn.disabled { opacity: .6; pointer-events: none; }
 /* ---- end upload reflections ---- */
+
+/* ---- reflection fields still needed before Mark complete ---- */
+[data-field].missing { outline: 2px solid var(--err, #b42318) !important; outline-offset: 2px; border-color: var(--err, #b42318) !important; background-color: var(--err-bg, #fdecea); }
+
+/* ---- account tab: portfolio details (account-UI agent) ---- */
+.acct .acct-import { margin: 4px 0 10px; }
+.acct .acct-status { font-size: 13px; }
+.acct details.acct-group { border-top: 1px solid var(--line, #e5e7eb); padding: 4px 0; }
+.acct details.acct-group > summary { font-weight: 600; cursor: pointer; padding: 6px 0; min-height: 44px; box-sizing: border-box; display: list-item; line-height: 32px; }
+.acct .acct-body { padding-top: 6px; }
+.acct .acct-row { border: 1px solid var(--line, #e5e7eb); border-radius: 10px; padding: 8px 10px; margin: 0 0 8px; }
+.acct .acct-row .field { margin-bottom: 6px; }
+.acct input[type=text], .acct input[type=date], .acct textarea { font-size: 16px; width: 100%; box-sizing: border-box; }
+.acct .acct-radios { gap: 16px; margin-top: 4px; }
+.acct .acct-radios .check { margin: 0; }
+/* ---- end account tab ---- */

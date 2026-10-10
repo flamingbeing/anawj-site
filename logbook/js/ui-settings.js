@@ -1,4 +1,4 @@
-// Settings: name, suggestions, default date, templates, privacy, install help, sign out.
+// Account-tab settings cards (rendered under the portfolio details by ui-account.js): name, display, logging, templates, bin, install help, privacy, sign out.
 
 import { R_YEARS } from './categories.js';
 import { sortCodes, uid } from './engine.js';

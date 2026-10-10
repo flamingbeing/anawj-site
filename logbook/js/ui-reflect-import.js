@@ -4,7 +4,7 @@
 
 import { REFLECTION_HEADINGS } from './categories.js';
 import { HEADING_BY_ID, splitDetails, wordCount, IMAGE_MAX_B64 } from './reflections.js';
-import { fmtDate } from './engine.js';
+import { fmtDate, caseText } from './engine.js';
 import { S, h, toast, cloud, fill } from './ui-core.js';
 import { needZip } from './portfolio.js';
 import { parseDocx, sameKey } from './reflect-import.js';
@@ -13,7 +13,7 @@ const short = n => n.replace(/\s*\(.*$/, '').replace(/\s+e\.g\..*$/i, '');
 const uid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 
 // Cases with the same initials (case-insensitive) and date; reflections that look like the same one.
-const casesFor = r => (r.initials && r.date ? (S.cases || []).filter(c => c.date === r.date && sameKey(splitDetails(c.details).initials, r.initials)) : []);
+const casesFor = r => (r.initials && r.date ? (S.cases || []).filter(c => c.date === r.date && sameKey(c.initials || splitDetails(c.details).initials, r.initials)) : []);
 const dupOf = r => (S.reflections || []).find(x => x.headingId === r.headingId && x.date === r.date && sameKey(x.initials, r.initials));
 
 // Picture (base64) -> JPEG, longest side ≤ 1400 px, under IMAGE_MAX_B64 (as ui-reflect.js does for photos).
@@ -124,9 +124,9 @@ export function renderImport(onDone) {
       h('option', { value: '' }, '— sub-type —'), hd.subs.map(s => h('option', { value: s.id, selected: s.id === r.subId }, s.name))) : null;
     const matches = casesFor(r);
     let caseEl;
-    if (matches.length === 1) caseEl = h('span', { class: 'rimp-ok' }, '✓ Linked to case: ' + matches[0].details.slice(0, 60));
+    if (matches.length === 1) caseEl = h('span', { class: 'rimp-ok' }, '✓ Linked to case: ' + caseText(matches[0]).slice(0, 60));
     else if (matches.length > 1) caseEl = h('select', { class: 'rimp-sel', 'aria-label': 'Linked case', onchange: e => { x.caseId = e.target.value || null; } },
-      h('option', { value: '' }, `${matches.length} matching cases — choose…`), matches.map(c => h('option', { value: c.id, selected: c.id === x.caseId }, c.details.slice(0, 70))));
+      h('option', { value: '' }, `${matches.length} matching cases — choose…`), matches.map(c => h('option', { value: c.id, selected: c.id === x.caseId }, caseText(c).slice(0, 70))));
     else caseEl = h('span', { class: 'muted' }, 'No matching case — link later');
     const warns = [...r.warnings.filter(w => !/sub-type/.test(w) || !r.subId)];
     if (!r.headingId) warns.unshift('choose a heading');
