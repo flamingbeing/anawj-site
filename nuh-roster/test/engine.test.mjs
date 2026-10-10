@@ -1,4 +1,4 @@
-// Run with: node roster/test/engine.test.mjs  (fake names only)
+// Run with: node nuh-roster/test/engine.test.mjs  (fake names only)
 import assert from 'node:assert/strict';
 import { matchName, namesInCell, suggestFlags, generate, check } from '../js/engine.js';
 
