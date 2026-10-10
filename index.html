@@ -3,26 +3,58 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>anawj.com</title>
+<title>anawj.com status</title>
 <style>
-  body { margin: 0; min-height: 100vh; display: grid; place-items: center; font-family: system-ui, sans-serif; background: #f6f5f2; color: #222; }
-  @media (prefers-color-scheme: dark) { body { background: #16171a; color: #e8e8e8; } }
+  :root { --bg: #f6f5f2; --fg: #222; --muted: #6b6b6b; --line: #d8d5ce; --up: #16a34a; --down: #dc2626; --wait: #a3a3a3; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #16171a; --fg: #e8e8e8; --muted: #9a9a9a; --line: #33363c; --up: #22c55e; --down: #f87171; --wait: #6b6b6b; } }
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; font-family: system-ui, sans-serif; background: var(--bg); color: var(--fg); }
   main { padding: 16px; text-align: center; }
-  h1 { font-weight: 600; margin: 0 0 .5rem; }
-  a.card { display: inline-block; margin-top: 1rem; padding: 12px 16px; border-radius: 12px; border: 1px solid #d8d5ce; color: inherit; text-decoration: none; text-align: left; max-width: 360px; }
-  a.card:hover { border-color: #2563eb; }
-  a.card b { display: block; }
-  a.card span { font-size: 14px; opacity: .75; }
-  @media (prefers-color-scheme: dark) { a.card { border-color: #33363c; } }
+  h1 { font-weight: 600; font-size: 1.1rem; margin: 0 0 1.25rem; color: var(--muted); }
+  .status { display: inline-flex; align-items: center; gap: 12px; padding: 14px 20px; border: 1px solid var(--line); border-radius: 12px; font-size: 1.25rem; font-weight: 600; }
+  .dot { width: 14px; height: 14px; border-radius: 50%; background: var(--wait); }
+  [data-state="up"] .dot { background: var(--up); box-shadow: 0 0 0 4px color-mix(in srgb, var(--up) 25%, transparent); }
+  [data-state="down"] .dot { background: var(--down); box-shadow: 0 0 0 4px color-mix(in srgb, var(--down) 25%, transparent); }
+  p { margin: 1rem 0 0; font-size: 14px; color: var(--muted); }
 </style>
 </head>
 <body>
 <main>
   <h1>anawj.com</h1>
-  <p>Coming soon.</p>
-  <a class="card" href="cmcj/"><b>Thumb CMC Trainer →</b><span>3D trapeziometacarpal anatomy, osteoarthritis staging and simulated CMC arthroscopy for hand surgeons.</span></a>
-  <br><a class="card" href="nuh-roster/"><b>NUH Roster →</b><span>Draft the daily anaesthesia OT roster and download it as an Excel file. Runs in your browser; nothing is uploaded.</span></a>
-  <br><a class="card" href="logbook/"><b>APMES Logbook →</b><span>Log anaesthesia cases in seconds, with category suggestions, offline use and progress against the APMES case targets.</span></a>
+  <div class="status" id="status" data-state="checking" role="status" aria-live="polite">
+    <span class="dot" aria-hidden="true"></span><span id="label">Checking…</span>
+  </div>
+  <p id="detail"></p>
 </main>
+<script>
+  // Pings this site (bypassing caches) and reports whether it responded.
+  const status = document.getElementById('status');
+  const label = document.getElementById('label');
+  const detail = document.getElementById('detail');
+  const INTERVAL_MS = 30000;
+
+  async function check() {
+    const started = performance.now();
+    let up = false;
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 10000);
+      const res = await fetch('/?ping=' + Date.now(), { method: 'HEAD', cache: 'no-store', signal: ctrl.signal });
+      clearTimeout(timer);
+      up = res.ok;
+    } catch (e) {
+      up = false;
+    }
+    const ms = Math.round(performance.now() - started);
+    status.dataset.state = up ? 'up' : 'down';
+    label.textContent = up ? 'Server is up' : 'Server is down';
+    detail.textContent = (up ? 'Responded in ' + ms + ' ms' : 'No response') +
+      ' · checked ' + new Date().toLocaleTimeString();
+  }
+
+  check();
+  setInterval(check, INTERVAL_MS);
+  window.addEventListener('online', check);
+  window.addEventListener('offline', check);
+</script>
 </body>
 </html>
