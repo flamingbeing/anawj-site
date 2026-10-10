@@ -5,6 +5,7 @@
 
 import { REFLECTION_HEADINGS, REFLECTION_SECTIONS } from './categories.js';
 import { S, h, toast, cloud, download, hooks } from './ui-core.js';
+import { SECTIONS, PROFILE_FIELDS, cleanProfile, locateSection1, pdField, isoToDmy, ROW_RE, CELL_RE, PARA_RE } from './profile.js';
 
 const DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 const W_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
@@ -356,6 +357,115 @@ export function fillDocumentXml(xml, reflections, { name, media = null } = {}) {
   return { xml: out, matched: [...done] };
 }
 
+// ---------- Section 1: personal details and lists (profile.js) ----------
+
+const markRPr = pPr => ((pPr.match(/<w:rPr>[\s\S]*?<\/w:rPr>/) || [''])[0]).replace(/<w:b\/>|<w:bCs\/>|<w:b w:val="[^"]*"\/>|<w:bCs w:val="[^"]*"\/>/g, '');
+// A table cell with its text replaced by `text` (one paragraph per line), keeping the cell's properties,
+// its first paragraph's properties and the paragraph mark's font for the new runs.
+function textCell(tc, text) {
+  const open = tc.match(/^<w:tc(?:\s[^>]*)?>/)[0];
+  const tcPr = (tc.match(/<w:tcPr>[\s\S]*?<\/w:tcPr>/) || [''])[0];
+  const p0 = (tc.match(PARA_RE) || [''])[0];
+  const pPr = (p0.match(/<w:pPr>[\s\S]*?<\/w:pPr>/) || [''])[0];
+  const rPr = markRPr(pPr);
+  const ps = String(text ?? '').split('\n').map(l => `<w:p>${pPr}${l ? `<w:r>${rPr}<w:t xml:space="preserve">${esc(l)}</w:t></w:r>` : ''}</w:p>`);
+  return `${open}${tcPr}${ps.join('')}</w:tc>`;
+}
+// exact row heights become minimums so longer (multi-line) entries are not cut off
+const rowWith = (tr, values) => { let i = 0; return tr.replace(/(<w:trHeight\b[^>]*w:hRule=")exact"/, '$1atLeast"').replace(CELL_RE, tc => (i < values.length ? textCell(tc, values[i++]) : tc)); };
+
+// "Label : ______" -> "Label : value": the first run of underscores takes the value, later ones go.
+function fillBlank(p, value) {
+  if (!value) return p;
+  let done = false;
+  return p.replace(/(<w:t(?:\s[^>]*)?>)([^<]*)(<\/w:t>)/g, (all, a, t, b) => {
+    if (!/_{2,}/.test(t)) return all;
+    const nt = t.replace(/_{2,}/g, () => (done ? '' : (done = true, esc(value))));
+    return `${a.startsWith('<w:t>') ? '<w:t xml:space="preserve">' : a}${nt}${b}`;
+  });
+}
+
+// The ☐ before option n (0 = Male, 1 = Female) becomes ☒ (and its checkbox control is ticked).
+function tickBox(tc, n) {
+  let k = -1, at = -1;
+  const re = /<w:t(?:\s[^>]*)?>([^<]*)<\/w:t>/g;
+  let m;
+  while ((m = re.exec(tc))) {
+    const j = m[1].indexOf('☐');
+    if (j >= 0 && ++k === n) { at = m.index + m[0].indexOf('>') + 1 + j; break; }
+  }
+  if (at < 0) return tc;
+  let out = tc.slice(0, at) + '☒' + tc.slice(at + 1);
+  const sdt = out.lastIndexOf('<w:sdt>', at);
+  if (sdt >= 0 && out.indexOf('</w:sdt>', sdt) > at) out = out.slice(0, sdt) + out.slice(sdt).replace(/<w14:checked w14:val="0"\/>/, '<w14:checked w14:val="1"/>');
+  return out;
+}
+
+// Writes the profile into Section 1 of the template's document.xml: cover page, PERSONAL DETAILS and the
+// list tables (rows filled in order, more added when needed, unused rows left empty), Remarks lines.
+export function fillSection1Xml(xml, profile, { name = '' } = {}) {
+  const p = cleanProfile(profile);
+  const loc = locateSection1(xml);
+  const edits = [];   // [start, end, replacement]
+  const full = `${p.givenName.trim()} ${p.familyName.trim()}`.trim() || String(name || '').trim();
+  const coverVal = { name: full, program: p.program.trim(), residencyStart: isoToDmy(p.residencyStart), seniorStart: isoToDmy(p.seniorStart) };
+  for (const c of loc.cover) edits.push([c.start, c.end, fillBlank(xml.slice(c.start, c.end), coverVal[c.key])]);
+  if (loc.personal) {
+    const tbl = xml.slice(...loc.personal);
+    const out = tbl.replace(ROW_RE, tr => {
+      const cells = tr.match(CELL_RE) || [];
+      if (cells.length < 2) return tr;
+      const key = pdField(textOf(cells[0]));
+      if (!key) return tr;
+      let i = 0;
+      const last = cells.length - 1;
+      if (key === 'sex') return p.sex ? tr.replace(CELL_RE, tc => (i++ === last ? tickBox(tc, p.sex === 'F' ? 1 : 0) : tc)) : tr;
+      const v = key === 'dob' ? isoToDmy(p.dob) : p[key];
+      return v ? tr.replace(CELL_RE, tc => (i++ === last ? textCell(tc, v) : tc)) : tr;
+    });
+    edits.push([...loc.personal, out]);
+  }
+  const fillTable = (span, items, header) => {
+    const tbl = xml.slice(...span);
+    const rows = tbl.match(ROW_RE) || [];
+    const data = rows.slice(header ? 1 : 0);
+    if (!data.length || !items.length) return;
+    const proto = data[data.length - 1];
+    const filled = items.map((vals, k) => rowWith(data[k] || proto, vals));
+    for (let k = items.length; k < data.length; k++) filled.push(data[k]);
+    const a = tbl.indexOf(data[0]);
+    const b = tbl.lastIndexOf(data[data.length - 1]) + data[data.length - 1].length;
+    edits.push([...span, tbl.slice(0, a) + filled.join('') + tbl.slice(b)]);
+  };
+  for (const s of SECTIONS) if (loc.lists[s.key]) fillTable(loc.lists[s.key], p[s.key].map(it => s.columns.map(c => it[c.key])), true);
+  if (loc.remarks && p.projectRemarks.trim()) fillTable(loc.remarks, p.projectRemarks.replace(/\s+$/, '').split('\n').map(l => [l]), false);
+  edits.sort((x, y) => y[0] - x[0]);
+  let out = xml;
+  for (const [a, b, r] of edits) out = out.slice(0, a) + r + out.slice(b);
+  return { xml: out, found: { cover: loc.cover.map(c => c.key), personal: !!loc.personal, lists: Object.keys(loc.lists), remarks: !!loc.remarks } };
+}
+
+// Plain layout: a simple "Personal details" section at the top.
+function plainProfileXml(profile, H) {
+  const p = cleanProfile(profile);
+  let body = H('SECTION 1 – PERSONAL DETAILS', 28);
+  const val = f => (f.type === 'date' ? isoToDmy(p[f.key]) : f.type === 'sex' ? ({ M: 'Male', F: 'Female' })[p[f.key]] || '' : p[f.key]);
+  for (const f of PROFILE_FIELDS) {
+    const v = val(f);
+    if (!String(v).trim()) continue;
+    const ls = String(v).split('\n');
+    body += para('', run(f.label + ': ', true) + run(ls[0]));
+    for (const l of ls.slice(1)) body += para('', run(l));
+  }
+  for (const s of SECTIONS) {
+    if (!p[s.key].length && !(s.key === 'projects' && p.projectRemarks.trim())) continue;
+    body += H(s.title, 22);
+    for (const it of p[s.key]) body += para('', s.columns.filter(c => it[c.key].trim()).map((c, i) => (i ? run(' · ') : '') + run(c.label + ': ', true) + run(it[c.key].replace(/\n/g, ' '))).join(''));
+    if (s.key === 'projects' && p.projectRemarks.trim()) body += para('', run('Remarks: ', true)) + p.projectRemarks.trim().split('\n').map(l => para('', run(l))).join('');
+  }
+  return body;
+}
+
 // ---------- fallback: a clean docx without the template ----------
 
 const CELL_W = [1300, 1300, 2300, 4700];
@@ -369,11 +479,12 @@ function plainTable(list, min, media) {
   return `<w:tbl><w:tblPr><w:tblW w:w="9600" w:type="dxa"/><w:tblBorders>${borders}</w:tblBorders><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid>${CELL_W.map(w => `<w:gridCol w:w="${w}"/>`).join('')}</w:tblGrid>${head}${rows}</w:tbl>`;
 }
 
-export function plainDocumentXml(reflections, { name, media = null } = {}) {
+export function plainDocumentXml(reflections, { name, media = null, profile = null } = {}) {
   const groups = groupReflections(reflections);
   const H = (t, size) => para(`<w:pPr><w:keepNext/><w:spacing w:before="240" w:after="120"/></w:pPr>`, `<w:r><w:rPr><w:b/><w:sz w:val="${size}"/></w:rPr><w:t xml:space="preserve">${esc(t)}</w:t></w:r>`);
   let body = H('Anaesthesiology Residency Training Portfolio', 32);
   if (name) body += para('', run('Resident’s name : ' + name));
+  if (profile) body += plainProfileXml(profile, H);
   body += H('SECTION 2 – CASE REFLECTIONS', 28);
   body += para('', run('Each reflection: a title and case summary, then the learning points. “JR” above the date marks a junior residency reflection.'));
   let section = '';
@@ -421,7 +532,7 @@ function dropCommentParts(zip) {
   ]);
 }
 
-export async function exportPortfolio(reflections, { name = '', templateB64 = null, JSZip = null, cases = null, intake = null, rYear = null, images = null } = {}) {
+export async function exportPortfolio(reflections, { name = '', templateB64 = null, JSZip = null, cases = null, intake = null, rYear = null, images = null, profile = null } = {}) {
   const Z = JSZip || await needZip();
   let zip = null, usedTemplate = false, media = null;
   if (templateB64) {
@@ -431,13 +542,14 @@ export async function exportPortfolio(reflections, { name = '', templateB64 = nu
       media = newMedia(images, xml);
       let { xml: filled, matched } = fillDocumentXml(xml, reflections, { name, media });
       if (cases) filled = fillSummaryXml(filled, cases, { intake, rYear }).xml;
+      if (profile || name) filled = fillSection1Xml(filled, profile || {}, { name }).xml;
       if (matched.length < REFLECTION_HEADINGS.length / 2) throw new Error('template headings not found');
       zip.file('word/document.xml', stripComments(filled));
       await dropCommentParts(zip);
       usedTemplate = true;
     } catch (err) { console.warn('Portfolio template unusable, using the plain layout', err); zip = null; }
   }
-  if (!zip) { zip = new Z(); media = newMedia(images); plainPackage(zip, plainDocumentXml(reflections, { name, media })); }
+  if (!zip) { zip = new Z(); media = newMedia(images); plainPackage(zip, plainDocumentXml(reflections, { name, media, profile })); }
   await finishMedia(zip, media);
   const bytes = await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' });
   const blob = new Blob([bytes], { type: DOCX });
@@ -463,8 +575,8 @@ export function renderExportButton(getReflections, getName, getExtra) {
   const note = h('span', { class: 'hint', style: 'display:block;margin-top:4px' }, 'Checking the portfolio template…');
   const paintNote = t => {
     note.textContent = t
-      ? 'Exports into the official APMES portfolio: only the case reflection tables and the Section 4 numbers are filled in; everything else is kept for you to complete.'
-      : 'No portfolio template uploaded yet, so the export is a plain layout without the portfolio’s preamble and other sections. An admin can upload it in Settings → Admin.';
+      ? 'Exports into the official APMES portfolio: Section 1 (from Account → Portfolio details), the case reflection tables and the Section 4 numbers are filled in; everything else is kept for you to complete.'
+      : 'No portfolio template uploaded yet, so the export is a plain layout without the portfolio’s preamble and other sections. An admin can upload it in Account → Admin.';
     note.style.color = t ? '' : 'var(--warn, #b45309)';
   };
   getTemplate().then(paintNote, () => paintNote(null));
@@ -484,11 +596,25 @@ export function renderExportButton(getReflections, getName, getExtra) {
   return h('span', { style: 'display:block' }, btn, note);
 }
 
+// The uploaded template without Word comments (reviewers' notes): anchors stripped from document.xml and the
+// comment parts dropped. Returns { bytes, matched (reflection tables found), comments (true if any removed) }.
+export async function cleanTemplate(bytes, Z) {
+  const zip = await Z.loadAsync(bytes);
+  const xml = await zip.file('word/document.xml').async('string');
+  const { matched } = fillDocumentXml(xml, []);
+  const cleaned = stripComments(xml);
+  const comments = cleaned !== xml || Object.keys(zip.files).some(n => /^word\/comments[A-Za-z]*\.xml$/.test(n));
+  if (!comments) return { bytes, matched, comments };
+  zip.file('word/document.xml', cleaned);
+  await dropCommentParts(zip);
+  return { bytes: await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' }), matched, comments };
+}
+
 const TC = { info: null, loading: false, busy: false };
 // Admin page card: upload the blank portfolio template (made with tools/build_portfolio_template.py).
 export function renderTemplateCard() {
   const card = h('section', { class: 'card' }, h('h2', {}, 'Portfolio template'),
-    h('p', { class: 'hint' }, 'The blank APMES portfolio (.docx) that “Export portfolio (Word)” fills in. Make it from a filled portfolio with tools/build_portfolio_template.py, which clears every resident’s details. Do not upload a filled one. Without a template, exports use a plain layout.'));
+    h('p', { class: 'hint' }, 'The blank APMES portfolio (.docx) that “Export portfolio (Word)” fills in. Word comments in it are removed on upload. Make it from a filled portfolio with tools/build_portfolio_template.py, which clears every resident’s details. Do not upload a filled one. Without a template, exports use a plain layout.'));
   if (!cloud.saveTemplate) return card;
   if (!TC.info && !TC.loading) {
     TC.loading = true;
@@ -504,18 +630,16 @@ export function renderTemplateCard() {
       if (!f) return;
       TC.busy = true; hooks.render();
       try {
-        const bytes = new Uint8Array(await f.arrayBuffer());
+        const Z = await needZip();
+        const { bytes, matched, comments } = await cleanTemplate(new Uint8Array(await f.arrayBuffer()), Z);
+        if (matched.length < REFLECTION_HEADINGS.length / 2) throw new Error(`only ${matched.length} of ${REFLECTION_HEADINGS.length} reflection tables found — is this the APMES portfolio?`);
         let bin = '';
         for (let k = 0; k < bytes.length; k += 0x8000) bin += String.fromCharCode(...bytes.subarray(k, k + 0x8000));
         const b64 = btoa(bin);
-        const Z = await needZip();
-        const xml = await (await Z.loadAsync(bytes)).file('word/document.xml').async('string');
-        const { matched } = fillDocumentXml(xml, []);
-        if (matched.length < REFLECTION_HEADINGS.length / 2) throw new Error(`only ${matched.length} of ${REFLECTION_HEADINGS.length} reflection tables found — is this the APMES portfolio?`);
         await cloud.saveTemplate(b64);
         templateCache = { data: b64, size: bytes.length, uploadedAt: Date.now() };
         TC.info = { size: bytes.length, uploadedAt: Date.now() };
-        toast(`Template saved (${matched.length} reflection tables found).`);
+        toast(`Template saved (${matched.length} reflection tables found${comments ? '; comments removed' : ''}).`);
       } catch (err) { toast('Could not upload: ' + err.message); }
       TC.busy = false; hooks.render();
     } })));

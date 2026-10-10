@@ -103,13 +103,15 @@ service cloud.firestore {
       }
     }
     function validLogbook(email, d) {
-      return d.keys().hasOnly(['email', 'name', 'rid', 'settings', 'templates', 'updatedAt'])
+      return d.keys().hasOnly(['email', 'name', 'rid', 'settings', 'templates', 'profile', 'updatedAt'])
         && d.email == email
         && optString(d, 'rid', 40)
         && optNumber(d, 'updatedAt')
         && optString(d, 'name', 200)
         && (!('templates' in d) || (d.templates is list && d.templates.size() <= 100))
-        && (!('settings' in d) || d.settings is map);
+        && (!('settings' in d) || d.settings is map)
+        // portfolio Section 1 details (js/profile.js cleanProfile caps lists and strings)
+        && (!('profile' in d) || (d.profile is map && d.profile.size() <= 30));
     }
     function validBinEntry(id, d) {
       return d.keys().hasOnly(['id', 'kind', 'data', 'deletedAt'])

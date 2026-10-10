@@ -12,6 +12,7 @@
 export const DEMO_USER = { email: 'demo@example.com', name: 'Demo User', uid: 'demo-uid' };
 
 import { cleanReflection, cleanImage } from './reflections.js';
+import { cleanProfile } from './profile.js';
 export { cleanReflection, cleanImage };
 
 const KEY = 'apmes-logbook-demo-v1';
@@ -218,6 +219,7 @@ export async function saveLogbook(email, patch) {
   const lb = book(s, email);
   const cur = lb.doc || defaultLogbook(email);
   const p = plain(patch || {});
+  if ('profile' in p) p.profile = cleanProfile(p.profile);
   lb.doc = { ...cur, ...p, settings: { ...(cur.settings || {}), ...(p.settings || {}) }, email, updatedAt: Date.now() };
   save(s);
   return plain(lb.doc);

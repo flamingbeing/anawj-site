@@ -246,6 +246,7 @@ function list() {
     em ? null : h('p', { class: 'hint' }, 'Generative AI use must follow the NUS guidelines on the use of AI tools in academic work.'),
     em ? null : h('div', { class: 'bar' }, renderExportButton(() => (S.reflections || []).filter(r => r.status === 'complete'), displayName,
       async () => ({ cases: S.cases || [], intake: (S.resident && (S.resident.intake || Number(String(S.resident.rid || '').slice(0, 4)))) || null, rYear: rYear(),
+        profile: (S.logbook && S.logbook.profile) || null,
         images: await loadImagesFor((S.reflections || []).filter(r => r.status === 'complete')) }))),
     null);
 
