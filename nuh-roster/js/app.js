@@ -1,5 +1,5 @@
 import {
-  DEFAULT_SETTINGS, DEFAULT_ROOMS, JUNIOR_GRADES, SENIOR_GRADES, DEFAULT_GRADE, OLD_GRADES, POSTINGS, postingName, STATUSES, COLOURS, COLOUR_ARGB, isBaby,
+  DEFAULT_SETTINGS, DEFAULT_ROOMS, JUNIOR_GRADES, SENIOR_GRADES, DEFAULT_GRADE, OLD_GRADES, POSTINGS, postingName, bySeniority, STATUSES, COLOURS, COLOUR_ARGB, isBaby,
   matchName, splitNameList, namesInCell, suggestFlags, generate, check, learnFromRosters, tickFromHistory, remoteRoom, suggestShortNames, mergeContacts, pacuRoom, isPacu, fmtSenior, fmtJunior, SPECIAL_ROWS, isCoverPart, coverTarget,
 } from './engine.js';
 // Seniors are always shown in black; juniors may be green (Baby MO) or purple (locum).
@@ -44,6 +44,9 @@ syncRooms();
 function cleanStaffNames() {
   for (const p of state.staff) {
     // grades from before the department's own grade names
+    // a registrar is a senior resident, on the junior list
+    if (p.role === 'senior' && p.grade === 'Registrar') { p.role = 'junior'; p.grade = 'Senior resident'; }
+    if (p.posting === 'Card') p.posting = 'Cardiac';
     const old = OLD_GRADES[p.role]?.[p.grade];
     if (old) { if (p.grade === 'Baby MO' && !p.colour) p.colour = 'green'; p.grade = old; }
     const clean = cleanContactName(p.name);
@@ -311,7 +314,7 @@ function renderStaff(role) {
   const list = state.staff
     .filter(p => p.role === role)
     .filter(p => !staffFilter || (p.name + ' ' + (p.aliases || []).join(' ')).toLowerCase().includes(staffFilter.toLowerCase()))
-    .sort((a, b) => (a.role === b.role ? 0 : a.role === 'senior' ? -1 : 1) || a.name.localeCompare(b.name));
+    .sort(bySeniority);
 
   const row = p => h('tr', {},
     h('td', {}, h('input', { value: p.name, onchange: e => { p.name = e.target.value.trim(); save(); } })),
@@ -386,7 +389,7 @@ function renderStaffView(role) {
   const list = state.staff
     .filter(p => p.role === role)
     .filter(p => !staffFilter || (p.name + ' ' + (p.aliases || []).join(' ')).toLowerCase().includes(staffFilter.toLowerCase()))
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .sort(bySeniority);
   const count = state.staff.filter(p => p.role === role).length;
   const row = p => h('tr', {},
     h('td', {}, h('b', { style: staffColour(p) ? `color:#${COLOUR_ARGB[staffColour(p)].slice(2)}` : '' }, p.name)),
@@ -508,7 +511,7 @@ function renderDay(part) {
 
   const flist = state.staff
     .filter(p => !dayFilter || p.name.toLowerCase().includes(dayFilter.toLowerCase()))
-    .sort((a, b) => (a.role === b.role ? 0 : a.role === 'senior' ? -1 : 1) || a.name.localeCompare(b.name));
+    .sort(bySeniority);
   const staffRow = p => {
     const s = dayOf(p.id);
     return h('tr', { class: (s.status || 'avail') === 'avail' ? '' : 'off' },
@@ -658,7 +661,7 @@ function noListPeople() {
     if (p) listed.add(p.id);
   }
   return state.staff.filter(p => (state.day.staff[p.id]?.status || 'avail') === 'avail' && !listed.has(p.id))
-    .sort((a, b) => (a.role === b.role ? 0 : a.role === 'senior' ? -1 : 1) || shortName(a).localeCompare(shortName(b)));
+    .sort(bySeniority);
 }
 
 function applyPaste() {
@@ -1041,13 +1044,13 @@ function nameInput(attrs = {}, role = null) {
   const id = 'names-' + (role || 'all');
   if (!document.getElementById(id)) document.body.append(h('datalist', { id }));
   document.getElementById(id).replaceChildren(...state.staff.filter(p => !role || p.role === role)
-    .sort((a, b) => a.name.localeCompare(b.name)).map(p => h('option', { value: p.name })));
+    .sort(bySeniority).map(p => h('option', { value: p.name })));
   return h('input', { list: id, autocomplete: 'off', spellcheck: 'false', ...attrs });
 }
 
 // ---- tags on one name: "(L)", "(RA)", "(AOH 1)" and the part after a dash ("-5pm", "-C-OT 4") ----
 
-const TAGS = ['L', 'HPB', 'RA', 'P', 'SR', 'Neu', 'Card', 'ENT', 'Vasc', 'Amb', 'Remote', 'PACU'];
+const TAGS = ['L', 'HPB', 'RA', 'P', 'SR', 'Neu', 'Cardiac', 'ENT', 'Vasc', 'Amb', 'Remote', 'PACU'];
 let tagTimer = null;
 
 // "Tan YW (RA) L-4pm C-OT13 -mtg 5pm" -> name, tags, leave ("4pm" / "4-5pm"), cover ("OT13", "KROR PACU"), note
@@ -1476,7 +1479,6 @@ function renderPremed() {
     const mate = juniors.find(j => j.p && !away(j.p) && !isBaby(j.p))?.p;
     const cur = cellParts(row, 'premed')[0] || '';
     if (needs) { needed++; if (!cur) missing++; }
-    if (!needs && !cur && premedFilter) return null;
     const options = [['', '— none —'], ...coverers.map(p => [p.name, `${p.name}${homeOf[p.id] ? ' · ' + homeOf[p.id] : ' · not on a list'}${load[p.name] ? ` · ${load[p.name]} room${load[p.name] > 1 ? 's' : ''}` : ''}`])];
     if (cur && !options.some(o => o[0] === cur)) options.push([cur, cur]);
     return h('tr', { class: needs && !cur ? 'flagged' : '' },
@@ -1491,14 +1493,12 @@ function renderPremed() {
       h('p', { class: 'hint' }, 'A room needs premed cover when its junior wasn\'t around on the previous working day (tick "away yesterday" on the Manpower tab). Cover can be any resident or MOPEX who was around, from any complex. The list shows where each person is today and how many rooms they already cover (max ' + state.settings.premedCap + ').'),
       h('div', { class: 'bar' },
         h('span', { class: 'stats' }, h('span', {}, h('b', {}, needed), ' rooms need cover'), h('span', {}, h('b', {}, missing), ' still without')),
-        h('span', { class: 'grow' }),
-        h('label', { class: 'seen' }, h('input', { type: 'checkbox', checked: premedFilter, onchange: e => { premedFilter = e.target.checked; render(); } }), ' Only rooms that need or have cover'))),
+        h('span', { class: 'grow' }))),
     h('section', { class: 'card scroll' }, h('table', { class: 'sheet' },
       h('thead', {}, h('tr', {}, ['', 'Junior', '', 'Premed cover'].map(t => h('th', {}, t)))),
       h('tbody', {}, rows))),
     rosterLogCard());
 }
-let premedFilter = true;
 
 // The sheet exactly as it will be exported, drawn as an HTML table.
 function renderSheet() {

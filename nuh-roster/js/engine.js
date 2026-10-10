@@ -6,7 +6,7 @@ export const DEFAULT_SETTINGS = {
   premedCap: 3,
   subspecs: [
     { key: 'paeds', label: 'Paeds', keywords: ['pas', 'paeds', 'paed'], hard: true, posting: 'P', byAge: true },
-    { key: 'cardiac', label: 'Cardiac', keywords: ['c', 'cardiac', 'cabg', 'avr', 'mvr'], hard: true, posting: 'Card' },
+    { key: 'cardiac', label: 'Cardiac', keywords: ['c', 'cardiac', 'cabg', 'avr', 'mvr'], hard: true, posting: 'Cardiac' },
     { key: 'neuro', label: 'Neuro', keywords: ['nes', 'neuro', 'craniotomy', 'crani'], hard: true, posting: 'Neu' },
     { key: 'thoracic', label: 'Thoracic', keywords: ['vats', 'thoracic', 'lobectomy'], hard: true, posting: 'SR' },
     { key: 'hpb', label: 'Liver / HPB', keywords: ['hepatec', 'hepatectomy', 'whipple', 'liver', 'hpb'], hard: false, posting: 'L' },
@@ -19,17 +19,22 @@ export const DEFAULT_SETTINGS = {
   roomDefaults: { 'MOR 12': ['cardiac'], 'MOR 13': ['cardiac'] },
 };
 
-export const JUNIOR_GRADES = ['Senior resident', 'Junior resident', 'MOPEX', 'Rotating Resident', 'Locum', 'RP'];
-export const SENIOR_GRADES = ['SC', 'C', 'AC', 'VC', 'RP'];
+// in order of seniority
+export const JUNIOR_GRADES = ['Senior resident', 'Junior resident', 'RP', 'Locum', 'MOPEX', 'Rotating resident'];
+export const SENIOR_GRADES = ['SC', 'C', 'VC', 'AC', 'RP'];
+// seniors first, then by grade, then by name
+export const bySeniority = (a, b) => (a.role === b.role ? 0 : a.role === 'senior' ? -1 : 1)
+  || rank(a) - rank(b) || String(a.name).localeCompare(String(b.name));
+const rank = p => { const i = (p.role === 'senior' ? SENIOR_GRADES : JUNIOR_GRADES).indexOf(p.grade); return i < 0 ? 99 : i; };
 export const DEFAULT_GRADE = { senior: 'C', junior: 'Junior resident' };
 // residents in training: preferred for complex lists
-export const isResident = p => ['Senior resident', 'Junior resident', 'Rotating Resident'].includes(p?.grade);
+export const isResident = p => ['Senior resident', 'Junior resident', 'Rotating resident'].includes(p?.grade);
 // Postings as [tag on the roster, name]. The tag is what the sheet shows after a name, e.g. "(RA)".
-export const POSTINGS = [['', '—'], ['P', 'Paeds'], ['Neu', 'Neuro'], ['SR', 'Special Risk'], ['Card', 'Cardiac'], ['ENT', 'ENT'],
+export const POSTINGS = [['', '—'], ['P', 'Paeds'], ['Neu', 'Neuro'], ['SR', 'Special Risk'], ['Cardiac', 'Cardiac'], ['ENT', 'ENT'],
   ['RA', 'Regional'], ['Vasc', 'Vascular'], ['Amb', 'Ambulatory'], ['Remote', 'Remote'], ['PACU', 'PACU'], ['L', 'Liver Transplant'], ['HPB', 'Liver Donor']];
 export const postingName = code => POSTINGS.find(p => p[0] === code)?.[1] || code || '';
 // Grades used before the department's own grade names, and what they became.
-export const OLD_GRADES = { senior: { Consultant: 'C', Registrar: 'RP' }, junior: { 'Senior Resident': 'Senior resident', Resident: 'Junior resident', 'Baby MO': 'MOPEX' } };
+export const OLD_GRADES = { senior: { Consultant: 'C' }, junior: { 'Senior Resident': 'Senior resident', Resident: 'Junior resident', 'Baby MO': 'MOPEX', 'Rotating Resident': 'Rotating resident' } };
 
 // Name colour on the roster: green marks Baby MOs (never left alone), purple marks locums.
 export const COLOURS = [['', 'Black'], ['green', 'Green'], ['purple', 'Purple']];
@@ -729,7 +734,7 @@ export function learnFromRosters(rosterRows, staff, settings = DEFAULT_SETTINGS)
     }
     if (col === 'junior') {
       for (const part of String(raw).split('/')) {
-        const tag = part.match(/\((RA|P|L|SR|Neu|Amb|Card|ENT|Vasc|Remote|PACU|HPB|LivOT)\)/)?.[1];
+        const tag = part.match(/\((RA|P|L|SR|Neu|Amb|Cardiac|ENT|Vasc|Remote|PACU|HPB|LivOT)\)/)?.[1];
         const nm = namesInCell(part)[0];
         if (!tag || !nm) continue;
         const p = matchName(nm, people).person;

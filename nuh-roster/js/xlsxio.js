@@ -49,7 +49,8 @@ const CONTACT_GROUPS = [
   [/resident physician/i, 'junior', 'RP'],
   [/mopex/i, 'junior', 'MOPEX'],
   [/^senior resident/i, 'junior', 'Senior resident'],
-  [/rotating resident/i, 'junior', 'Rotating Resident'],
+  [/rotating resident/i, 'junior', 'Rotating resident'],
+  [/registrar/i, 'junior', 'Senior resident'],
   [/residents? - ca|^ast$|fellow/i, 'junior', 'Junior resident'],
 ];
 const CONTACT_SUBSPECS = { cardiac: 'cardiac', paeds: 'paeds', neuro: 'neuro', thoracic: 'thoracic', liver: 'hpb', og: 'obs' };
@@ -110,7 +111,7 @@ export function readStaffSheet(ws) {
     if (!name) return;
     const grade = get('grade');
     const roleText = get('role').toLowerCase();
-    const seniorish = /consultant|senior|registrar|\bac\b|associate/i.test(grade + ' ' + roleText);
+    const seniorish = /consultant|\bac\b|associate/i.test(grade + ' ' + roleText);
     people.push({
       name,
       aliases: list(get('aliases')),
@@ -130,10 +131,11 @@ function normGrade(g, seniorish) {
   if (/\bsc\b|senior consultant/.test(s)) return 'SC';
   if (/\bac\b|associate/.test(s)) return 'AC';
   if (/consultant|^c$/.test(s)) return 'C';
-  if (/\brp\b|resident physician|registrar/.test(s)) return 'RP';
+  if (/registrar/.test(s)) return 'Senior resident';
+  if (/\brp\b|resident physician/.test(s)) return 'RP';
   if (/locum/.test(s)) return seniorish ? 'C' : 'Locum';
   if (/baby|mopex|medical officer|\bmo\b/.test(s)) return 'MOPEX';
-  if (/rotating/.test(s)) return 'Rotating Resident';
+  if (/rotating/.test(s)) return 'Rotating resident';
   if (/senior resident/.test(s)) return 'Senior resident';
   if (/resident|trainee/.test(s)) return 'Junior resident';
   return seniorish ? 'C' : 'Junior resident';
