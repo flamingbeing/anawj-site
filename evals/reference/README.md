@@ -1,5 +1,7 @@
 # APMES workplace-based assessment reference
 
+**The EPA Guidebook (v8, July 2024) is the source of truth.** Where the AY2023 tracking template or anything else here disagrees with it, follow the guidebook. The guidebook's assessment tables are in [`apmes-epas.json`](apmes-epas.json), with a cross-check of every tracking-template item (`crosscheck`) and the disagreements found (`notes`): for example, central venous catheter insertion is a DOPS (EPA 10) in the guidebook but a Mini-CEX in the template.
+
 Reference material for the evaluations app and other APMES tools, transcribed from programme documents the user supplied on 2026-10-10:
 
 - **Evaluations_Tracking_TemplateAY2023.xlsx**: which DOPS, Mini-CEX and EBD assessments each resident must complete, and by which residency year. Transcribed in full, cell by cell, into [`apmes-requirements.json`](apmes-requirements.json) and summarised below.
@@ -78,6 +80,4 @@ Every form opens with an introduction saying it is a **formative** assessment by
 
 **From the EPA guidebook (v8):** the blank MedHub forms embedded in the guidebook confirm the questions above and supply the descriptors now in the JSON: each 1–9 observation score has a written descriptor (1 = cannot perform; 5 = indirect supervision for an uncomplicated case; 7 = independent with distant supervision; 9 = well enough to instruct others), N/A is "Not Observed", and the DOPS form groups 1–3 / 4–6 / 7–9 as Below / Meets / Exceeds Expectations. Level 3 entrustment needs an overall score of at least 5, level 4 at least 7. Each milestone rating has descriptors at 1, 3, 5, 7 and 9. Every form also has an "Insufficient contact to evaluate (delete evaluation)" option for the assessor. The DOPS form ends at question 19.
 
-**Still to confirm** (marked `unconfirmed` in the JSON):
-
-- The DOPS guidance options. The user listed Hands-off, Passive Help and Active Help; the blank form shows a fourth, "Observation (Supervisor performs critical portion)". The order and the full wording of Active Help and Hands-off are not confirmed.
+**DOPS guidance options** (confirmed): Observation (Supervisor performs critical portion), Active Help, Passive Help (Supervisor assists and follows the lead of the resident), Hands-off.

@@ -41,7 +41,7 @@ Queries must match the rules: residents list with `where('residentEmail', '==', 
 
 ## Open questions
 
-- The evaluator's forms are transcribed in [`reference/apmes-forms.json`](reference/apmes-forms.json). Still unconfirmed: the DOPS guidance options (whether "Observation (Supervisor performs critical portion)" is a fourth option, and the full wording of the others). See [`reference/`](reference/README.md#the-evaluators-forms).
+- The evaluator's forms are transcribed in [`reference/apmes-forms.json`](reference/apmes-forms.json). The EPA Guidebook v8 is the source of truth; see [`reference/apmes-epas.json`](reference/apmes-epas.json). See [`reference/`](reference/README.md#the-evaluators-forms).
 - The resident's request mirrors the MedHub case log: date, location, evaluator, patient initials, gender, age, item, role (performed / assisted / observed), diagnosis, complications, notes to the evaluator. See [`reference/`](reference/README.md).
 
 ## Tests
