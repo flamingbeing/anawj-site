@@ -70,6 +70,18 @@ export async function saveTeam(data, user) {
   return doc;
 }
 
+// The monthly rosters live in their own document, so the staff list stays small.
+export async function loadMonthly() {
+  const { db, F } = await sdk();
+  const snap = await F.getDoc(F.doc(db, 'team', 'monthly'));
+  return snap.exists() ? snap.data() : null;
+}
+
+export async function saveMonthly(months, user) {
+  const { db, F } = await sdk();
+  await F.setDoc(F.doc(db, 'team', 'monthly'), plain({ months, updatedAt: Date.now(), updatedBy: who(user) }));
+}
+
 // ---- rosters ----
 
 export async function rosterMeta(date) {

@@ -170,3 +170,31 @@ console.log('engine tests passed');
   assert.equal(g2.rows.find(r => r.label === 'AIC').senior, 'Junior SR');
   console.log('special row tests passed');
 }
+
+// monthly rosters (fake names only)
+{
+  const M = await import('../js/monthly.js');
+  assert.deepEqual(M.parseTitle('Anaesthesia - Junior On Call Roster For Oct 2022'), { kind: 'junior', month: '2022-10' });
+  assert.equal(M.parseTitle('Anaesthesia - Liver Transplant Roster (new) For Oct 2022').kind, 'liver');
+  assert.equal(M.parseTitle('Anaesthesia - Night List (After Office Hr) Roster For Oct 2022').kind, 'aoh');
+  assert.deepEqual(M.parsePeriod('1 Oct - 4 Oct', '2022-10'), { from: '2022-10-01', to: '2022-10-04' });
+  assert.deepEqual(M.parsePeriod('6 Oct', '2022-10'), { from: '2022-10-06', to: '2022-10-06' });
+  assert.deepEqual(M.parsePeriod('30 Dec - 2 Jan', '2022-12'), { from: '2022-12-30', to: '2023-01-02' });
+  assert.equal(M.formatPeriod({ from: '2022-10-01', to: '2022-10-04' }), '1 Oct - 4 Oct');
+  // a page of PDF text: header centres, then a row per day
+  const page = [
+    { str: 'Anaesthesia - Junior On Call Roster For Oct 2022', x: 177, y: 811, w: 257 },
+    { str: 'R1', x: 146, y: 748, w: 8 }, { str: 'R2', x: 238, y: 748, w: 8 }, { str: 'Day Float', x: 414, y: 748, w: 27 },
+    { str: '1', x: 41, y: 731, w: 3 }, { str: 'Sat', x: 76, y: 731, w: 9 }, { str: 'Junior Alpha', x: 109, y: 731, w: 50 }, { str: 'Junior Beta []', x: 201, y: 731, w: 50 }, { str: 'Junior Gamma', x: 386, y: 731, w: 50 },
+  ];
+  const r = M.readMonthlyPdf([page]);
+  assert.equal(r.kind, 'junior');
+  assert.deepEqual(r.data.rows[1], { r1: 'Junior Alpha', r2: 'Junior Beta', df: 'Junior Gamma' });
+  const monthly = { '2022-10': { junior: r.data, leave: { entries: [{ name: 'Senior One', from: '2022-10-01', to: '2022-10-03', type: 'Medical Leave' }] } } };
+  assert.equal(M.generalFromMonthly(monthly, '2022-10-01')['mot.res1'], 'Junior Alpha');
+  assert.equal(M.generalFromMonthly(monthly, '2022-10-01')['epi.df'], 'Junior Gamma');
+  assert.equal(M.leaveOn(monthly, '2022-10-03').length, 1);
+  assert.equal(M.leaveOn(monthly, '2022-10-04').length, 0);
+  assert.ok(M.NIGHT_DUTIES.includes('junior.r1') && !M.NIGHT_DUTIES.includes('junior.df'));
+  console.log('monthly tests passed');
+}

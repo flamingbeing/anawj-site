@@ -224,3 +224,19 @@ ul.log ul { margin: 2px 0 0; padding-left: 18px; }
 .pool-names .name { border-color: var(--line); background: var(--panel); }
 
 .seg.subtabs { margin-bottom: 12px; }
+
+/* Monthly: manpower board and roster grids */
+.board { display: grid; grid-template-columns: 2fr repeat(4, minmax(140px, 1fr)); gap: 10px; }
+@media (max-width: 900px) { .board { grid-template-columns: 1fr 1fr; } }
+.board-col { border: 1px solid var(--line); padding: 8px; min-height: 80px; background: var(--panel); }
+.board-col.over { box-shadow: inset 0 0 0 2px var(--navy); background: var(--chip); }
+.board-col h3 { margin: 0 0 6px; font-size: 14px; color: var(--navy); }
+.board-chip { cursor: grab; font-size: 13px; }
+.board-chip.senior { font-weight: 600; }
+.board-chip.manual { border: 2px solid var(--navy) !important; }
+input.unmatched, td.unmatched { color: var(--red); }
+input.unmatched { border-color: var(--red); }
+table.monthly td { padding: 2px 4px; }
+table.monthly td input { min-width: 150px; }
+table.monthly tr.weekend td { background: #f3f5f8; }
+table.monthly tr.today td { background: var(--chip); }
