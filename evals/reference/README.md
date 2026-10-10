@@ -1,9 +1,12 @@
 # APMES workplace-based assessment reference
 
-Reference material for the evaluations app and other APMES tools, transcribed from two programme documents the user supplied on 2026-10-10:
+**The EPA Guidebook (v8, July 2024) is the source of truth.** Where the AY2023 tracking template or anything else here disagrees with it, follow the guidebook. The guidebook's assessment tables are in [`apmes-epas.json`](apmes-epas.json), with a cross-check of every tracking-template item (`crosscheck`) and the disagreements found (`notes`): for example, central venous catheter insertion is a DOPS (EPA 10) in the guidebook but a Mini-CEX in the template.
+
+Reference material for the evaluations app and other APMES tools, transcribed from programme documents the user supplied on 2026-10-10:
 
 - **Evaluations_Tracking_TemplateAY2023.xlsx**: which DOPS, Mini-CEX and EBD assessments each resident must complete, and by which residency year. Transcribed in full, cell by cell, into [`apmes-requirements.json`](apmes-requirements.json) and summarised below.
 - **RESIDENT GUIDE FOR LOGGING DOPS & MINI CEX UNDER MEDHUB (ver 19 Jul 2023)**: how residents trigger these assessments in MedHub today. The workflow and fields are described below.
+- **Three MedHub app screenshots of the evaluator's side** (EBD, Mini-CEX, DOPS; since removed from the repo because they showed names and real ratings): transcribed question by question into [`apmes-forms.json`](apmes-forms.json) and summarised below.
 
 The original files are not in this repository, which is public. The guide's screenshots show real faculty names, and both documents are programme-internal. Keep the originals with the programme. If a newer template comes out, re-transcribe it here and say which version it is.
 
@@ -56,4 +59,25 @@ On the web: **Procedures → Log New Procedure/Case**. In the app: **Procedures 
 
 After submitting, the resident sees triggered evaluations under **Procedures → Reports & History → Log History**. MedHub also has summary reports by gender, age, location, procedure and diagnosis.
 
-**Not in either document:** the evaluator's side of the form (rating scales, entrustment levels, comment boxes). The app needs it. Get a copy of the DOPS, Mini-CEX and EBD evaluation forms as faculty see them in MedHub.
+## The evaluator's forms
+
+Every form opens with an introduction saying it is a **formative** assessment by a faculty member who directly observed the trainee. The case may be chosen by the trainee with the faculty, and the faculty grades on a 9-point scale, comments, documents the entrustment-based discussion and records a supervision level. All three forms end the same way:
+
+- **Entrustment-Based Discussion:** "Please briefly describe what was discussed centered around at least 2 entrustment questions" (required free text).
+- **Level of Supervision:** a rating from Level 1 (Observe only), Level 2 (Direct supervision), Level 3 (Indirect supervision), Level 4 (Distant supervision) to Level 5 (Supervise). The question asks the faculty to explain the level and to consider agency, reliability, integrity, capability and humility as well as competency.
+- **Comments** on what was done well and what can be improved, including readiness for variations of the case, with a **minimum of 30 characters**.
+- **Resident was receptive to feedback** and **Resident demonstrated reflective learning**: dropdowns, each Yes / No / Maybe.
+
+| Form | Questions | What's specific to it |
+|---|---|---|
+| EBD | 12 | Complexity of case. "Areas for improvement" checkboxes: patient assessment and preparation, preparation of the physical location, clinical management plan, communication with patient/next of kin, communication with healthcare team, technical skills, clinical judgment, organization and efficiency, professionalism, or no obvious areas for improvement; then optional comments. Four milestone ratings: medical knowledge, clinical reasoning, use of evidence-based medicine (N/A allowed), healthcare system awareness (N/A allowed). |
+| Mini-CEX | 22 | Clinical setting (blue letter referral for pain, delivery suite, ICU, operating theatre, pain clinic, preop clinic, recovery/PACU, ward) and complexity. Nine 9-point ratings (1–9 or N/A), each with a descriptor: patient assessment/preparation, preparation of physical location, clinical management plan, communication with patient/next of kin, communication with team members (the only optional one), technical skills, clinical judgment, organisation/efficiency, professionalism. Overall clinical care (1–9, no N/A). The same four milestone ratings as EBD. Ends with an optional "Comments (if any)". |
+| DOPS | 19 | Complexity of case, and how much guidance was given for the critical portion of the procedure. Eleven 9-point ratings (1–9 or N/A): consent, preprocedural checks, rationale/anatomy/equipment, analgesia/sedation/comfort, monitoring, asepsis and safety, technical ability and troubleshooting, communication with patient, communication with team, situational awareness, post-procedure management. Overall assessment (1–9, no N/A). No milestone ratings. |
+
+**The milestone scale** (EBD and Mini-CEX) has ten points: 0.5 = Not Yet Achieved Level 1, then 1.0 to 5.0 in half-levels, shown alongside 1 to 9 on the 9-point scale (1.0 = 1, 1.5 = 2 … 5.0 = 9). Medical knowledge and clinical reasoning can't be N/A; evidence-based medicine and healthcare system awareness can.
+
+**Forms vary by item in name only, as far as these three show.** MedHub names each form after its EPA, e.g. "(2023) EBD EPA (5): (HeadNeck Trauma)", "(2023) Mini Clinical Evaluation Exercise (CEX) Form - PNB", "(2023) Direct Observation of Procedural Skills (DOPS) Form - (Truncal)". The procedure names carry EPA numbers and sometimes a level ("[DOPS] EPA 3 (Level 3): Single Shot Truncal Block: Transabdominal Plane Block", "[MiniCEX] EPA 3: Manage a patient for surgery under peripheral nerve block and sedation", "[EBD] EPA 5: Mx of head/neck trauma"). The tracking template doesn't have these numbers; they are in the programme's EPA guidebook.
+
+**From the EPA guidebook (v8):** the blank MedHub forms embedded in the guidebook confirm the questions above and supply the descriptors now in the JSON: each 1–9 observation score has a written descriptor (1 = cannot perform; 5 = indirect supervision for an uncomplicated case; 7 = independent with distant supervision; 9 = well enough to instruct others), N/A is "Not Observed", and the DOPS form groups 1–3 / 4–6 / 7–9 as Below / Meets / Exceeds Expectations. Level 3 entrustment needs an overall score of at least 5, level 4 at least 7. Each milestone rating has descriptors at 1, 3, 5, 7 and 9. Every form also has an "Insufficient contact to evaluate (delete evaluation)" option for the assessor. The DOPS form ends at question 19.
+
+**DOPS guidance options** (confirmed): Observation (Supervisor performs critical portion), Active Help, Passive Help (Supervisor assists and follows the lead of the resident), Hands-off.

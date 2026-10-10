@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="robots" content="noindex, nofollow">
+<title>APMES Evals</title>
+<meta name="description" content="Request and complete DOPS, Mini-CEX and EBD workplace-based assessments.">
+<meta name="theme-color" content="#002f6c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Evals">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600;700&display=swap">
+<link rel="stylesheet" href="../design/tokens.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="e-appbar">
+  <div class="n-stripe" aria-hidden="true"><span></span><span></span><span></span></div>
+  <div class="e-appbar__bar">
+    <button type="button" id="back" class="e-appbar__back" aria-label="Back" hidden><svg viewBox="0 0 24 24" class="e-ico" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <div class="e-appbar__titles">
+      <h1 id="title" class="e-appbar__title">APMES Evals</h1>
+      <p id="sub" class="e-appbar__sub" hidden></p>
+    </div>
+    <div id="me" class="e-appbar__right"></div>
+  </div>
+</header>
+
+<div id="banner" class="e-banners" hidden></div>
+<main id="app"><p class="e-loading">Loading…</p></main>
+<nav id="tabs" class="e-bottomnav" aria-label="Main" hidden></nav>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
