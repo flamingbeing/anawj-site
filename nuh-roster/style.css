@@ -163,3 +163,7 @@ dialog.changes h2 { margin: 0 0 8px; font-size: 16px; }
 dialog.changes ul { max-height: 50vh; overflow: auto; margin: 0 0 12px; padding-left: 18px; font-size: 13px; }
 ul.log { list-style: none; margin: 8px 0 0; padding: 0; font-size: 13px; display: grid; gap: 8px; max-height: 50vh; overflow: auto; }
 ul.log ul { margin: 2px 0 0; padding-left: 18px; }
+
+.foot { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: center; padding: 24px 16px 32px; color: var(--muted); font-size: 13px; }
+.btn.small { padding: 2px 8px; font-size: 12px; }
+@media print { .foot { display: none; } }

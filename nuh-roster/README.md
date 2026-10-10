@@ -2,7 +2,7 @@
 
 A static page for drafting the OT section of the daily anaesthesia roster (seniors, juniors, premed cover) and downloading it as an `.xlsx` in the department's layout.
 
-Everything runs in the browser. Staff lists, leave and case notes stay in the browser's local storage and are never uploaded. Rosterers share setup by passing a **team file** (JSON) between them, and share the finished roster as the downloaded Excel file (for example on SharePoint / Excel Online).
+Everything runs in the browser. Staff lists, leave and case notes stay in the browser's local storage and are never uploaded. Without sign-in, rosterers share setup with **Export JSON / Import JSON** at the bottom of the page, and share the finished roster as the downloaded Excel file (for example on SharePoint / Excel Online).
 
 ## Flow
 

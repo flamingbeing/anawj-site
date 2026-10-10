@@ -102,7 +102,7 @@ export function readStaffSheet(ws) {
   ws.eachRow({ includeEmpty: false }, (row, n) => {
     if (n <= headerRow) return;
     const get = k => cols[k] ? cellText(row.getCell(cols[k]).value).trim() : '';
-    const name = get('name');
+    const name = cleanContactName(get('name'));
     if (!name) return;
     const grade = get('grade');
     const roleText = get('role').toLowerCase();
