@@ -49,6 +49,10 @@ const r = (o) => ({ status: 'complete', initials: 'AB', date: '2026-01-01', jr: 
   const c = reflectionCounts(list);
   assert.deepEqual(c.reflections, { bariatric: 3, thyroid: 2, cabg: 2, lap: 1 });
   assert.equal(c.reflectionsTotal, 8);
+  // past the minimum, the shared count stops there
+  const extra = [...list, ...[1, 2, 3].map(i => r({ headingId: 'bariatric', initials: 'Z' + i, date: '2026-02-0' + i }))];
+  assert.equal(reflectionCounts(extra).reflections.bariatric, 3);
+  assert.equal(reflectionCounts(extra).reflectionsTotal, 8);
 }
 // whitelist
 {

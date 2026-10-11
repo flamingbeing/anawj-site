@@ -169,10 +169,13 @@ export function pickJustEnough(reflections) {
   return out;
 }
 
-// For the shared summary: { headingId: complete count } and the total.
+// For the shared summary (Totals, admins): { headingId: complete count } and the total. Each heading's
+// count stops at its minimum: short of it shows exactly, but once met nobody else can tell how many
+// more were written.
 export function reflectionCounts(reflections) {
   const out = {};
   for (const r of reflections || []) if (r.status === 'complete' && HEADING_IDS.has(r.headingId)) out[r.headingId] = (out[r.headingId] || 0) + 1;
+  for (const k in out) out[k] = Math.min(out[k], HEADING_BY_ID[k].min);
   return { reflections: out, reflectionsTotal: Object.values(out).reduce((a, b) => a + b, 0) };
 }
 

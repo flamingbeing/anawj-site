@@ -211,10 +211,10 @@ function totalsTable(people) {
   }
   const totals = people.map(p => p.total || 0);
   const refl = people.map(p => p.reflectionsTotal || 0);
-  data.rows.push({ label: 'Total cases', values: totals }, { label: 'Reflections', values: refl });
+  data.rows.push({ label: 'Total cases', values: totals }, { label: 'Reflections (towards the 96 needed)', values: refl });
   add(tbody, 
     h('tr', { class: 'total' }, h('td', { class: 'cat' }, 'Total cases'), totals.map(v => h('td', { class: 'n' }, String(v)))),
-    h('tr', {}, h('td', { class: 'cat' }, 'Reflections'), refl.map(v => h('td', { class: 'n' }, String(v)))));
+    h('tr', {}, h('td', { class: 'cat', title: 'Counted towards each heading’s minimum only' }, 'Reflections', h('small', { class: 'tgt' }, 'towards the 96 needed')), refl.map(v => h('td', { class: 'n' }, String(v)))));
   const thead = h('thead', {}, h('tr', {}, h('th', {}, 'Category'),
     people.map(p => h('th', { class: `rot ${p.rid === meId ? 'me' : ''}`, title: p.name }, `${p.name} · ${p.smo ? 'SMO' : p.rYear ? yearName(p.rYear) : '?'}`))));
   data.title = `${tview.year ? (tview.year === 3 && people.some(p => p.smo) ? 'R3 / SMO' : 'R' + tview.year) : 'Year unknown'} totals — ${todayISO()}`;

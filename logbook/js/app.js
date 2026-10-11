@@ -9,7 +9,7 @@ import { renderProgress, renderTotals } from './ui-progress.js';
 import { applyCompact, cachedCompact, applyTheme, cachedTheme, applyTextSize, cachedTextSize, renderSettings } from './ui-settings.js';
 import { renderAccount, flush as flushProfile } from './ui-account.js';
 import { renderAdmin, leaveAdmin } from './ui-admin.js';
-import { renderReflect, watchMyReflections, portfolioExportButton } from './ui-reflect.js';
+import { renderReflect, watchMyReflections, renderExportPage } from './ui-reflect.js';
 import { downloadExcel } from './ui-logbook.js';
 import { downloadBackup } from './backup.js';
 import { purgeExpired } from './bin.js';
@@ -45,12 +45,14 @@ const TABS = [
   { id: 'totals', label: 'Totals', render: renderTotals, hidden: true, under: 'more', desc: 'How your case counts compare across your intake' },
   { id: 'account', label: 'Account', render: renderAccount, hidden: true, under: 'more', desc: 'Your name and portfolio details (Section 1); sign out' },
   { id: 'settings', label: 'Settings', render: renderSettings, hidden: true, under: 'more', desc: 'Display, text size, logging, templates, recycle bin' },
+  // opened from More → Export & Sync (not in the More list)
+  { id: 'export', label: 'Export portfolio', render: renderExportPage, hidden: true, under: 'more', unlisted: true },
   // admins open it from More (or Settings → Admin)
   { id: 'admin', label: 'Admin', render: renderAdmin, admin: true, hidden: true, under: 'more', desc: 'Residents list, import, shared templates, portfolio template' },
 ];
 
 function renderMore() {
-  const items = visibleTabs().filter(t => t.under === 'more');
+  const items = visibleTabs().filter(t => t.under === 'more' && !t.unlisted);
   return h('div', {},
     h('section', { class: 'card more-list' }, h('h2', {}, 'More'),
       h('ul', {}, items.map(t => h('li', {}, h('a', { href: '#' + t.id, 'data-go': t.id, onclick: e => { e.preventDefault(); go(t.id); } },
@@ -58,8 +60,8 @@ function renderMore() {
     // everything that leaves the app as a file
     h('section', { class: 'card export-sync' }, h('h2', {}, 'Export & Sync'),
       h('h3', {}, 'Portfolio (Word)'),
-      h('p', { class: 'hint' }, 'Your complete reflections in the APMES portfolio, with Section 1 and the Section 4 case numbers filled in.'),
-      h('div', { class: 'bar' }, portfolioExportButton()),
+      h('p', { class: 'hint' }, 'Choose which complete reflections go in, then export the APMES portfolio with Section 1 and the Section 4 case numbers filled in.'),
+      h('div', { class: 'bar' }, h('a', { class: 'btn primary', href: '#export' }, 'Choose reflections and export ›')),
       h('h3', {}, 'Logbook (Excel)'),
       h('p', { class: 'hint' }, 'All your cases as a spreadsheet. To edit and upload it back, use Logbook → More tools.'),
       h('div', { class: 'bar' }, h('button', { onclick: downloadExcel }, 'Download Excel')),
