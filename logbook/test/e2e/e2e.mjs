@@ -1755,6 +1755,7 @@ async function run(label, ctxOpts) {
     await configure('newline');
   });
   await step('logging: first field, optional autodetection and month shorthand', async () => {
+    if (phone) { await tab('display'); await p.getByLabel('Case tab upside down (phones)', { exact: true }).check(); }
     await tab('logging');
     const first = p.getByLabel('First field for a new case', { exact: true });
     await first.selectOption('initials');
@@ -1769,7 +1770,10 @@ async function run(label, ctxOpts) {
       assert((await p.locator('.parsed').innerText()).includes('3 months'), unit + ' preview');
       assert(await p.locator('.sugg-row [data-code="20i"]').count() === 1, unit + ' paeds band');
     }
-    if (phone) await p.screenshot({ path: DIR + 'logging-first-field-phone.png', fullPage: true });
+    if (phone) {
+      assert(await p.evaluate(() => document.querySelector('.log-initials').getBoundingClientRect().bottom <= document.querySelector('.box-wrap').getBoundingClientRect().top), 'inverted layout separated initials from summary');
+      await p.screenshot({ path: DIR + 'logging-first-field-phone.png', fullPage: true });
+    }
     await p.locator('.sugg-row [data-code="20i"]').click();
     await summary.press('Control+Enter'); await until(async () => (await stored()).some(c => c.initials === 'IJ' && c.details === '3mo hernia'), 'explicit initials saved');
     assert(await initials.evaluate(el => el === document.activeElement), 'save did not return to first field');
@@ -1795,6 +1799,7 @@ async function run(label, ctxOpts) {
     await summary.fill('AB 80M hernia'); await debounced();
     assert(await p.locator('.sugg-row [data-code="21"]').count() === 1, 'geriatric detection not restored');
     await summary.fill('');
+    if (phone) { await tab('display'); await p.getByLabel('Case tab upside down (phones)', { exact: true }).uncheck(); await tab('log'); }
   });
   await step('navigation: demo Account, browser Back/Forward and app Back agree', async () => {
     const q = await ctx.newPage();

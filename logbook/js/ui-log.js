@@ -343,7 +343,7 @@ function renderOne(card) {
     const parts = splitInitials(draft.details); draft.initials = parts.initials; draft.details = parts.details;
   } else if (!separateInitials && draft.initials) { draft.details = draftText(); draft.initials = ''; }
   saveDraft();
-  const initialsInput = separateInitials ? h('input', { 'aria-label': 'Patient initials', placeholder: 'Initials (optional)', maxlength: '4', autocomplete: 'off', autocapitalize: 'characters', value: draft.initials || '',
+  const initialsInput = separateInitials ? h('input', { 'aria-label': 'Patient initials', placeholder: 'Initials (optional)', maxlength: '20', enterkeyhint: 'next', autocomplete: 'off', autocapitalize: 'characters', value: draft.initials || '',
     oninput: e => { suggestedSave = null; draft.initials = cleanInitials(e.target.value); saveDraft(); paintParsed(true); suggestSoon(); },
     onkeydown: e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); ui.textarea.focus(); } } }) : null;
   const textarea = h('textarea', {
@@ -414,7 +414,7 @@ function renderOne(card) {
   card.classList.add('panes');
   add(card,
     h('div', { class: 'lp-left' },
-      initialsInput ? h('label', { class: 'field' }, 'Initials', initialsInput) : null,
+      initialsInput ? h('label', { class: 'field log-initials' }, 'Initials', initialsInput) : null,
       h('div', { class: 'box-wrap' }, textarea, pasteBtn(textarea), clearBtn), parsed, tagRow,
       // suggestions first, then the last case and your own templates
       h('div', { class: 'chiplabel' }, 'Quick picks'), sugg, templates),

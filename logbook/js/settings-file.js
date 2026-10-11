@@ -26,7 +26,7 @@ const OBJECTS = {
     .map(x => ({ id: str(x.id, 20) || Math.random().toString(36).slice(2, 8), name: str(x.name, 40), q: str(x.q), has: strs(x.has), not: strs(x.not), from: str(x.from, 10), to: str(x.to, 10), flag: str(x.flag, 20), scope: str(x.scope, 20) || 'all' })),
 };
 const PLAIN = new Set(['accent', 'boxLines', 'catView', 'compact', 'defaultDate', 'detectAgeSex', 'firstField', 'enterMode', 'enterSaves', 'hideTips', 'lbCase', 'lbFuzzy', 'lbScope', 'logbookView',
-  'reflExport', 'reflNotes', 'searchOps', 'startTab', 'suggestions', 'tagEditorView', 'textSize', 'zoom', 'fontUi', 'fontUiName', 'fontLog', 'fontLogName', 'lineWidth', 'lineHeight', 'contrast', 'motion', 'tabIcons', 'tabBar', 'hideHeader', 'weeklyDigest']);
+  'reflExport', 'reflNotes', 'searchOps', 'startTab', 'suggestions', 'tagEditorView', 'textSize', 'zoom', 'fontUi', 'fontUiName', 'fontLog', 'fontLogName', 'lineWidth', 'lineHeight', 'contrast', 'motion', 'tabIcons', 'tabBar', 'hideHeader', 'caseInverted', 'weeklyDigest']);
 const MAX_JSON = 400 * 1024;
 
 export function settingsFile(logbook, { theme } = {}) {
