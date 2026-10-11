@@ -300,8 +300,9 @@ const s4Code = label => { const m = /^\s*(\d+)\s*([ivx]*)\s*\)/i.exec(label); re
 // Replace the minimum numbers in the "Posting period" table with the resident's own counts: cases in
 // each residency year (blank for years not reached yet) and the total. Without an intake year only
 // the total is filled.
-export function fillSummaryXml(xml, cases, { intake = null, rYear = null, smo = 0 } = {}) {
-  const counts = countsByYear(cases, intake, smo);
+// counts: countsByYear's result made earlier (a ready portfolio carries the numbers, not the cases).
+export function fillSummaryXml(xml, cases, { intake = null, rYear = null, smo = 0, counts: given = null } = {}) {
+  const counts = given || countsByYear(cases, intake, smo);
   const upTo = rYear || (intake ? 5 : 0);
   let n = 0;
   const out = xml.replace(/<w:tbl>[\s\S]*?<\/w:tbl>/g, tbl => {
@@ -476,7 +477,7 @@ export function plainDocumentXml(reflections, { name, media = null, profile = nu
   if (name) body += para('', run('Resident’s name : ' + name));
   if (profile) body += plainProfileXml(profile, H);
   body += H('SECTION 2 – CASE REFLECTIONS', 28);
-  body += para('', run('Each reflection: a title and case summary, then the learning points. “JR” above the date marks a junior residency reflection.'));
+  body += para('', run('Each reflection: a title and case details, then the learning points. “JR” above the date marks a junior residency reflection.'));
   let section = '';
   for (const hd of REFLECTION_HEADINGS) {
     if (hd.section !== section) { section = hd.section; body += H(section, 26); }
@@ -537,7 +538,7 @@ async function setPrintLayout(zip) {
   if (f) zip.file('word/settings.xml', printLayoutSettings(await f.async('string')));
 }
 
-export async function exportPortfolio(reflections, { name = '', templateB64 = null, JSZip = null, cases = null, intake = null, rYear = null, smo = 0, images = null, profile = null } = {}) {
+export async function exportPortfolio(reflections, { name = '', templateB64 = null, JSZip = null, cases = null, counts = null, intake = null, rYear = null, smo = 0, images = null, profile = null } = {}) {
   const Z = JSZip || await needZip();
   let zip = null, usedTemplate = false, media = null;
   if (templateB64) {
@@ -546,7 +547,7 @@ export async function exportPortfolio(reflections, { name = '', templateB64 = nu
       const xml = await zip.file('word/document.xml').async('string');
       media = newMedia(images, xml);
       let { xml: filled, matched } = fillDocumentXml(xml, reflections, { name, media });
-      if (cases) filled = fillSummaryXml(filled, cases, { intake, rYear, smo }).xml;
+      if (cases || counts) filled = fillSummaryXml(filled, cases || [], { intake, rYear, smo, counts }).xml;
       if (profile || name) filled = fillSection1Xml(filled, profile || {}, { name }).xml;
       if (matched.length < REFLECTION_HEADINGS.length / 2) throw new Error('template headings not found');
       zip.file('word/document.xml', stripComments(filled));
@@ -566,7 +567,7 @@ export async function exportPortfolio(reflections, { name = '', templateB64 = nu
 // ---------- UI ----------
 
 let templateCache = undefined;   // the loaded template; "none uploaded" is not cached, so an upload made
-async function getTemplate() {    // after the page opened is picked up at the next export
+export async function getTemplate() {    // after the page opened is picked up at the next export
   if (templateCache) return templateCache;
   try { templateCache = (cloud.loadTemplate ? await cloud.loadTemplate() : null) || undefined; }
   catch (err) { console.warn('Could not load the portfolio template', err); return null; }
@@ -582,7 +583,7 @@ export function renderExportButton(getReflections, getName, getExtra, label = 'E
   const paintNote = t => {
     note.textContent = t
       ? 'Exports into the official APMES portfolio: Section 1 (from Account → Portfolio details), the case reflection tables and the Section 4 numbers are filled in; everything else is kept for you to complete.'
-      : 'No portfolio template uploaded yet, so the export is a plain layout without the portfolio’s preamble and other sections. An admin can upload it in Settings → Admin.';
+      : 'No portfolio template uploaded yet, so the export is a plain layout without the portfolio’s preamble and other sections. An admin can upload it in Settings → Admin portal.';
     note.style.color = t ? '' : 'var(--warn, #b45309)';
   };
   getTemplate().then(paintNote, () => paintNote(null));
@@ -644,7 +645,7 @@ async function checkTemplate() {
 // Admin page card: upload the blank portfolio template (made with tools/build_portfolio_template.py).
 export function renderTemplateCard() {
   const card = h('section', { class: 'card' }, h('h2', {}, 'Portfolio template'),
-    h('p', { class: 'hint' }, 'The blank APMES portfolio (.docx) that the Word export (More → Export & Sync) fills in. Word comments in it are removed on upload. Make it from a filled portfolio with tools/build_portfolio_template.py, which clears every resident’s details. Do not upload a filled one. Without a template, exports use a plain layout.'));
+    h('p', { class: 'hint' }, 'The blank APMES portfolio (.docx) that the Word export (More → Export) fills in. Word comments in it are removed on upload. Make it from a filled portfolio with tools/build_portfolio_template.py, which clears every resident’s details. Do not upload a filled one. Without a template, exports use a plain layout.'));
   if (!cloud.saveTemplate) return card;
   if (!TC.info && !TC.loading) {
     TC.loading = true;

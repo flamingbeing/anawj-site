@@ -127,9 +127,10 @@ export const fileButton = (label, accept, onfile, cls = 'btn') => h('label', { c
 
 // A modal dialog; returns { el, close }. body: nodes. Closes on backdrop tap / Esc.
 // sticky: a tap on the backdrop doesn't close it (forms, so a stray tap doesn't lose typing)
-export function modal(title, body, { onclose, sticky } = {}) {
+// cls: extra classes on the dialog ('full': the whole screen on phones, with a .dlg-actions bar pinned)
+export function modal(title, body, { onclose, sticky, cls = '' } = {}) {
   // the title takes the initial focus, so phones don't pop a keyboard or date picker on open
-  const el = h('dialog', {}, h('h2', { tabindex: '-1', autofocus: true, style: 'outline:none' }, title), body);
+  const el = h('dialog', { class: cls }, h('h2', { tabindex: '-1', autofocus: true, style: 'outline:none' }, title), body);
   el.addEventListener('close', () => { el.remove(); onclose && onclose(); });
   if (!sticky) el.addEventListener('click', e => { if (e.target === el) el.close(); });
   document.body.append(el);
@@ -299,7 +300,7 @@ export function keepTags(tags, cats) {
 }
 // A chip for one of your tags (selected ones can be removed).
 export const tagChip = (key, { onclick, on = true } = {}) => h('span', { class: `chip tag ${on ? 'on' : ''}`, role: 'button', tabindex: '0', 'data-tag': key, title: 'Your tag', onclick,
-  onkeydown: e => { if ((e.key === 'Enter' || e.key === ' ') && onclick) { e.preventDefault(); onclick(e); } } }, h('span', { class: 'nm' }, tagName(key)), onclick ? h('span', { class: 'x', 'aria-label': 'remove' }, '×') : null);
+  onkeydown: e => { if ((e.key === 'Enter' || e.key === ' ') && onclick) { e.preventDefault(); onclick(e); } } }, h('span', { class: 'nm' }, tagName(key)), onclick && on ? h('span', { class: 'x', 'aria-label': 'remove' }, '×') : null);
 
 export async function createCase({ date, details, initials, cats, source = 'app', dateText, reflectTag = false, tags = [] }) {
   const now = Date.now();

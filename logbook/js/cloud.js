@@ -18,7 +18,8 @@
 import { FIREBASE_CONFIG } from './firebase-config.js';
 import * as D from './demo-backend.js';
 import { cleanProfile } from './profile.js';
-import { plain, cleanCase, cleanSummary, cleanResident, cleanTemplate, importDocId, defaultLogbook, cleanReflection, cleanImage, cleanCategoryNames } from './demo-backend.js';
+import { plain, cleanCase, cleanSummary, cleanResident, cleanTemplate, importDocId, defaultLogbook, cleanReflection, cleanImage, cleanCategoryNames, cleanSubmission } from './demo-backend.js';
+export { cleanSubmission };
 
 const SDK = 'https://www.gstatic.com/firebasejs/10.12.2/';
 export const demo = (() => {
@@ -410,6 +411,62 @@ export async function importCases(email, rid, cases, onProgress) {
     if (onProgress) onProgress(n, fresh.length);
   });
   return { written: fresh.length, skipped: cases.length - fresh.length };
+}
+
+// ---- ready portfolios: submissions/{email} (the resident writes; admins read) ----
+// A copy of only what the portfolio needs, made when the resident marks it ready: the meta doc
+// { email, rid, name, intake, rYear, smo, readyAt, updatedAt, fp, count, profile, counts, imageIds }
+// (counts = Section 4 numbers per category and year, never case details) and a sub-collection
+// reflections/{id} (the ticked ones). Figures aren't copied (they're most of the size): imageIds lists
+// them, and the rules let admins read just those from the resident's images. Admins never read
+// logbooks, cases or other reflections.
+export async function submitPortfolio(email, meta, reflections) {
+  if (demo) return D.submitPortfolio(email, meta, reflections);
+  const { db, F } = await sdk();
+  const base = ['submissions', lc(email)];
+  const keepR = new Set(reflections.map(r => r.id));
+  for (const r of reflections) await F.setDoc(F.doc(db, ...base, 'reflections', r.id), cleanReflection(r));
+  // what an earlier copy had that this one doesn't
+  for (const s of (await F.getDocs(F.collection(db, ...base, 'reflections'))).docs) if (!keepR.has(s.id)) await F.deleteDoc(s.ref);
+  // the meta doc last, so admins never see a half-written copy as ready
+  const doc = cleanSubmission(email, meta);
+  await F.setDoc(F.doc(db, ...base), doc);
+  return doc;
+}
+export async function withdrawPortfolio(email) {
+  if (demo) return D.withdrawPortfolio(email);
+  const { db, F } = await sdk();
+  const base = ['submissions', lc(email)];
+  await F.deleteDoc(F.doc(db, ...base));
+  for (const s of (await F.getDocs(F.collection(db, ...base, 'reflections'))).docs) await F.deleteDoc(s.ref);
+}
+export async function loadMySubmission(email) {
+  if (demo) return D.loadMySubmission(email);
+  const { db, F } = await sdk();
+  try { const s = await F.getDoc(F.doc(db, 'submissions', lc(email))); return s.exists() ? s.data() : null; }
+  catch (e) { console.warn('submission not loaded', e); return null; }
+}
+// admins: every ready portfolio's meta doc
+export async function listSubmissions() {
+  if (demo) return D.listSubmissions();
+  const { db, F } = await sdk();
+  return (await F.getDocs(F.collection(db, 'submissions'))).docs.map(d => d.data());
+}
+// admins: one ready portfolio in full { meta, reflections, images: { id: img } }
+export async function loadSubmission(email) {
+  if (demo) return D.loadSubmission(email);
+  const { db, F } = await sdk();
+  const base = ['submissions', lc(email)];
+  const meta = await F.getDoc(F.doc(db, ...base));
+  if (!meta.exists()) return null;
+  const reflections = (await F.getDocs(F.collection(db, ...base, 'reflections'))).docs.map(d => d.data());
+  // the figures, from the resident's own images (only the ones the copy lists are readable)
+  const images = {};
+  for (const id of meta.data().imageIds || []) {
+    try { const s = await F.getDoc(F.doc(db, 'logbooks', lc(email), 'images', String(id))); if (s.exists()) images[id] = s.data(); }
+    catch (e) { console.warn('figure not loaded', id, e); }
+  }
+  return { meta: meta.data(), reflections, images };
 }
 
 // ---- portfolio template (word-export; admins upload, everyone signed in reads) ----

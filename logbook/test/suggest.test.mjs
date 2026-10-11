@@ -1,8 +1,13 @@
 // Run with: node logbook/test/suggest.test.mjs  (made-up case text only)
 import assert from 'node:assert/strict';
-import { parseAge, parseBMI, suggest, calibrate, tokens } from '../js/suggest.js';
+import { parseAge, parseBMI, suggest as rawSuggest, calibrate, tokens } from '../js/suggest.js';
 import { KEYWORDS, CALIBRATION, STOP } from '../js/keywords.js';
 import { BY_CODE } from '../js/categories.js';
+import { splitAge, splitInitials } from '../js/engine.js';
+import { apmesShorthand, defaultTagSet, cleanTagSet } from '../js/tags.js';
+// as the app calls it: with the built-in shorthand (editable in the Tag editor)
+const SH = apmesShorthand(defaultTagSet());
+const suggest = (t, o = {}) => rawSuggest(t, { extra: SH, ...o });
 
 const yrs = t => parseAge(t)?.years;
 const near = (a, b, msg) => assert.ok(a != null && Math.abs(a - b) < 0.01, `${msg}: got ${a}, want ${b}`);
@@ -91,7 +96,7 @@ const lacks = (t, no, min = 0.5) => { const got = codes(t, min); for (const c of
   for (const x of s) {
     assert.ok(BY_CODE[x.code] && !BY_CODE[x.code].retired, 'only active codes');
     assert.ok(x.score >= 0 && x.score <= 1);
-    assert.ok(['keyword', 'age', 'bmi'].includes(x.why));
+    assert.ok(['keyword', 'age', 'bmi', 'shorthand'].includes(x.why));
   }
   for (let i = 1; i < s.length; i++) assert.ok(s[i - 1].score >= s[i].score, 'sorted by score');
   assert.ok(suggest('ABC 5yo circumcision penile block caudal').length <= 6, 'default limit 6');
@@ -131,5 +136,26 @@ has('EF 80F hip FNB', ['26ii']);
 has('CD 5yo T&A', ['10']);
 has('CD adenotonsillectomy', ['10']);
 has('AB 2yo circumcision caudal', ['27']);
+
+// "72y" and "72yo" are both 72 years, no sex; a sex letter can be glued on
+for (const t of ['72y', '72yo', '72Y', '72 yo', '72yoF', '72yF', '72yrsM']) {
+  assert.equal(parseAge(t + ' lap chole').years, 72, t);
+  assert.equal(splitAge(t + ' lap chole').rest, 'lap chole', t);
+  assert.equal(splitInitials('IJ ' + t + ' lap chole').initials, 'IJ', t);
+}
+assert.equal(splitAge('72y lap chole').age, '72y');
+
+// built-in shorthand (editable per tag in the Tag editor), passed in like the app does
+const top = t => suggest(t, { limit: 4, extra: SH }).map(s => s.code);
+assert.ok(top('free flap').includes('32'), 'flap');
+assert.ok(top('lap appy').includes('08') && top('lap appy').includes('13'), 'lap appy');
+assert.ok(top('ex lap').includes('06') && !suggest('ex lap', { extra: SH }).some(s => s.code === '08' && s.why === 'shorthand'), 'ex lap is not laparoscopic');
+assert.ok(top('tka').includes('18') && top('turp').includes('34') && top('crani').includes('15'));
+assert.ok(!suggest('DL 30F lap chole', { extra: SH }).some(s => s.code === '11'), 'initials are not shorthand');
+// changed shorthand on an APMES tag replaces the built-in words; an empty list turns them off
+const mine = cleanTagSet([{ k: 'c:32', kw: ['zz'] }]);
+assert.ok(suggest('45M zz', { extra: apmesShorthand(mine) }).some(s => s.code === '32' && s.why === 'shorthand'));
+assert.ok(!suggest('45M free flap', { extra: apmesShorthand(mine) }).some(s => s.code === '32'));
+assert.ok(!suggest('45M tka', { extra: apmesShorthand(cleanTagSet([{ k: 'c:18', kw: [] }])) }).some(s => s.code === '18' && s.why === 'shorthand'));
 
 console.log('suggest tests passed');

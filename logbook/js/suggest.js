@@ -30,8 +30,8 @@ export function parseAge(text) {
   // compounds: "7y3mo", "1y 2mo", "5y10m", "2m2w", "6m3wk"
   add(R('NB(\\d{1,2})\\s*(?:y|yrs?|years?)\\s*,?\\s*(\\d{1,2})\\s*(?:m|mo|mos|mths?|months?)(?![a-z])'), m => num(m[1]) + num(m[2]) / 12);
   add(R('NB(\\d{1,2})\\s*(?:m|mo|mos|mths?|months?)\\s*,?\\s*(\\d{1,2})\\s*(?:w|wk|wks|weeks?)(?![a-z])'), m => num(m[1]) / 12 + num(m[2]) / 52);
-  // "5yo", "5 y.o.", "5 y/o", "5y", "5yr", "5 years", "5-year-old" (not "3 years ago")
-  add(R('NB(\\d{1,3}(?:\\.\\d)?)\\s*-?\\s*(?:y\\.?\\s?o\\b\\.?|y\\/o\\b|yrs?\\b|years?\\b(?!\\s*(?:ago|of|hx|history|post|since))(?:\\s*-?\\s*old)?|y\\b(?![\\s.]*o\\b)(?!\\s*\\d))'),
+  // "5yo", "5 y.o.", "5 y/o", "5y", "5yr", "5 years", "5-year-old", "72yoF", "72yF" (not "3 years ago")
+  add(R('NB(\\d{1,3}(?:\\.\\d)?)\\s*-?\\s*(?:y\\.?\\s?o(?:\\b|(?=[mf]\\b))\\.?|y\\/o\\b|yrs?(?:\\b|(?=[mf]\\b))|years?\\b(?!\\s*(?:ago|of|hx|history|post|since))(?:\\s*-?\\s*old)?|y(?:\\b|(?=[mf]\\b))(?![\\s.]*o\\b)(?!\\s*\\d))'),
     m => num(m[1]));
   // "8mo", "8 months", "8mth", "8/12" (but not dates like 8/12/24 or 17/12)
   add(R('NB(\\d{1,2})\\s*(?:mo|mos|mths?|months?)\\b(?!\\s*(?:ago|post|since))(?:\\s*-?\\s*old)?'), m => num(m[1]) / 12);
@@ -103,15 +103,6 @@ function grams(text, keywords) {
 
 // Words that define a category whatever residents ticked in the past (blocks are often under-logged).
 // Each hit also suggests its parent (26iii -> 26). These count as 'keyword' evidence.
-const RULES = [
-  [/\b(?:esp|erector spinae|tap block|transversus abdominis|rectus sheath|paravertebral|pecs ?(?:i|ii|1|2)?|serratus anterior|quadratus lumborum|ql block|ilioinguinal|penile block)\b/, '26iii', 0.8],
-  [/\b(?:interscalene|supraclavicular|infraclavicular|axillary block|brachial plexus)\b/, '26i', 0.8],
-  [/\b(?:adductor canal|sciatic|popliteal|fascia iliaca|femoral (?:nerve )?block|ankle block|ipack|peng(?: block)?|acb|fnb|ficb)\b/, '26ii', 0.8],
-  [/\b(?:lscs|caesarean|cesarean|c-?section)\b/, '16', 0.8],
-  [/\b(?:labou?r (?:epidural|analgesia|cse))\b/, '17', 0.8],
-  [/\bcaudal\b/, '27', 0.8],
-  [/\b(?:tonsil\w*|adenotonsil\w*|adenoid\w*|t&a)\b|\bt ?& ?a\b/, '10', 0.8],
-];
 
 // Score of a code = the strongest word for it, nudged up a little by a second independent word
 // (noisy-OR on a damped runner-up). Plain noisy-OR over-counts words that always travel together.
@@ -124,6 +115,8 @@ const TILT = 1.25;
 // so a teen gets a weak '20' chip that the bulk paste (score >= 0.5) won't auto-tick.
 const AGE_SCORE = { '20': 0.95, band: 0.9, '21': 0.9, teen: 0.45 };
 const BMI_SCORE = 0.9;
+// A shorthand word you (or the built-in list) linked to a tag: a strong chip.
+const SHORTHAND_SCORE = 0.8;
 
 // Raw keyword scores run hot (the best of several noisy word probabilities), so they are mapped
 // through the builder's cross-validated table to "how often residents ticked such a chip".
@@ -139,7 +132,7 @@ export function calibrate(raw, table = CALIBRATION) {
 }
 
 // keywords / calibration options exist so the builder's held-out evaluation can swap tables in.
-export function suggest(text, { limit = 6, keywords = KEYWORDS, calibration = CALIBRATION } = {}) {
+export function suggest(text, { limit = 6, keywords = KEYWORDS, calibration = CALIBRATION, extra = null } = {}) {
   const ev = {};   // code -> [p, ...]
   for (const g of grams(text, keywords)) {
     const ps = keywords[g];
@@ -158,10 +151,18 @@ export function suggest(text, { limit = 6, keywords = KEYWORDS, calibration = CA
   }
 
   const lower = String(text || '').toLowerCase();
-  for (const [re, code, score] of RULES) {
-    if (!re.test(lower)) continue;
-    put(code, score, 'keyword');
-    if (BY_CODE[code].parent) put(BY_CODE[code].parent, score, 'keyword');
+  // leading capitals before an age are the patient's initials ("DL 45M …"), not shorthand
+  const words = String(text || '').replace(/^\s*[A-Z]{2,4}(?=[\s\/,:;.-]+\d)/, '').toLowerCase();
+  // shorthand (Tag editor: built in, and your own): whole words that mean an APMES tag. A word inside
+  // a longer match ("lap" in "ex lap") steps aside for it.
+  const hits = [];
+  for (const { re, code } of extra || []) {
+    const m = re.exec(words);
+    if (m) { const at = m.index + m[0].search(/[a-z0-9]/); hits.push({ code, at, end: m.index + m[0].length }); }
+  }
+  for (const x of hits) {
+    if (hits.some(y => y !== x && y.at <= x.at && y.end >= x.end && (y.end - y.at) > (x.end - x.at))) continue;
+    put(x.code, SHORTHAND_SCORE, 'shorthand'); if (BY_CODE[x.code] && BY_CODE[x.code].parent) put(BY_CODE[x.code].parent, SHORTHAND_SCORE, 'shorthand');
   }
 
   const age = parseAge(text);

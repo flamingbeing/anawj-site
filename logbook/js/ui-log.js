@@ -2,14 +2,14 @@
 // Also the reusable category picker and the edit-case dialog (used by the Logbook screen).
 
 import { BY_CODE, TIPS } from './categories.js';
-import { withParents, frequentCombos, parseBulk, parseDate, fmtDate, sortCodes, uid, caseParts, caseText, cleanInitials, splitInitials, splitAge, nth } from './engine.js';
-import { suggest } from './suggest.js';
+import { withParents, parseBulk, parseDate, fmtDate, sortCodes, uid, caseParts, caseText, cleanInitials, splitInitials, splitAge, nth } from './engine.js';
+import { suggest as suggestCodes } from './suggest.js';
+import { apmesShorthand, shorthandTags } from './tags.js';
 import {
   S, h, toast, debounce, modal, confirmBox, cat, catName, catShort, catFull, catChip, countText, logTags, tagLinks, tagChip, tagSet, keepTags, PROGRESS_BY_CODE,
   createCase, updateCase, removeCase, restoreCase, saveMany, deleteMany, subcatChips, subcatsOf, settings, todayISO, hooks, fill, add, cloud, okNoIds, patchLogbook, catPills } from './ui-core.js';
 import { templateDialog } from './ui-settings.js';
 import { moveToBin } from './bin.js';
-import { shareText, copyText, caseText as shareCaseText, dayText, dayMarkdown } from './share.js';
 
 const DRAFT_KEY = 'logbook-draft-v2';
 const KEEP_MS = 12 * 3600e3; // a date kept by "Save, keep date" lasts this long
@@ -28,6 +28,27 @@ function loadDraft() {
   if (!draft.keepDate || !(Date.now() - (draft.keptAt || 0) < KEEP_MS)) draft.date = null;
 }
 const saveDraft = debounce(() => { try { localStorage.setItem(draftKey(), JSON.stringify(draft)); } catch { /* ignore */ } }, 300);
+// Text shared to the installed app (share sheet → Logbook; manifest share_target) arrives as
+// ?share_text=…; app.js keeps it for here: it opens in paste-a-list, so one case or a whole list works.
+export const SHARED_KEY = 'logbook-shared';
+function takeShared() {
+  let text = '';
+  try { text = sessionStorage.getItem(SHARED_KEY) || ''; sessionStorage.removeItem(SHARED_KEY); } catch { /* ignore */ }
+  if (!text.trim()) return;
+  draft.bulk = draft.bulk && draft.bulk.trim() ? draft.bulk.trimEnd() + '\n\n' + text.trim() : text.trim();
+  draft.mode = 'bulk'; bulkRows = null;
+  saveDraft.cancel(); try { localStorage.setItem(draftKey(), JSON.stringify(draft)); } catch { /* ignore */ }
+  setTimeout(() => toast('Shared text added: check it, then Review'), 300);
+}
+
+// Open the Log page with this day picked (from the Logbook calendar's "+ Log a case").
+export function logOnDate(iso) {
+  loadDraft();
+  draft.date = iso === todayISO() ? null : iso; draft.dateAt = Date.now(); draft.mode = 'one';
+  saveDraft.cancel(); try { localStorage.setItem(draftKey(), JSON.stringify(draft)); } catch { /* ignore */ }
+  location.hash = '#log';
+}
+
 export function clearDrafts() {
   saveDraft.cancel();
   draft = EMPTY(); draftOwner = null; bulkRows = null; ui = null;
@@ -85,7 +106,7 @@ const refocus = () => { if (ui.textarea && matchMedia('(pointer: fine)').matches
 // The list follows your tag set (Settings → Tag editor): section headers, categories and your own tags,
 // indented under what they sit in; hidden ones only turn up in a search. getTags / toggleTag handle your
 // tags (left out: categories only).
-export function catPicker({ get, toggle, getTags = null, toggleTag = null, placeholder = 'Search categories and tags' }) {
+export function catPicker({ get, toggle, getTags = null, toggleTag = null, placeholder = 'Search tags' }) {
   let q = '', hl = 0, items = [];
   const list = h('ul', { role: 'listbox' });
   const input = h('input', {
@@ -187,8 +208,9 @@ function stillNeeded() {
 }
 
 // Once a week (from Monday): last week's count and what is still needed. Dismissed until next week.
+// Off unless turned on in Settings → Logging.
 function weeklyDigest() {
-  if (!S.cases || !S.cases.length) return null;
+  if (!settings().weeklyDigest || !S.cases || !S.cases.length) return null;
   const now = new Date(), dow = (now.getDay() + 6) % 7;
   const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dow);
   const from = todayISO(new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() - 7)), to = todayISO(new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() - 1));
@@ -207,6 +229,7 @@ function weeklyDigest() {
 
 export function renderLog() {
   loadDraft();
+  takeShared();
   const card = h('section', { class: 'card log-card' });
   const datebar = h('div', { class: 'datebar', id: 'datebar' });
   add(card, datebar);
@@ -267,10 +290,27 @@ function paintDate() {
   ui.refit = fit;
 }
 
+// The empty box's example, one line per part, with the arrows lined up (padded to the box's own font).
+const PLACEHOLDER = [['AB 72M', 'initials, age/sex'], ['lap chole', 'procedure'], ['GA ETT', 'notes']];
+function alignPlaceholder(ta) {
+  try {
+    const ctx = document.createElement('canvas').getContext('2d');
+    ctx.font = getComputedStyle(ta).font;
+    const w = t => ctx.measureText(t).width;
+    const en = w('\u2002'), hair = w('\u200A') || 1;
+    const max = Math.max(...PLACEHOLDER.map(([a]) => w(a))) + 2 * en;
+    ta.placeholder = PLACEHOLDER.map(([a, b]) => {
+      let gap = max - w(a);
+      const ens = Math.floor(gap / en); gap -= ens * en;
+      return a + '\u2002'.repeat(ens) + '\u200A'.repeat(Math.round(gap / hair)) + '← ' + b;
+    }).join('\n');
+  } catch { /* keep the plain one */ }
+}
+
 function renderOne(card) {
   const textarea = h('textarea', {
-    class: 'details', rows: String(boxLines()), style: `min-height:calc(${boxLines()} * 1.4em + 22px)`, autofocus: true, enterkeyhint: settings().enterSaves ? 'done' : 'enter', autocapitalize: 'sentences', autocorrect: 'off', 'aria-label': 'Case details',
-    placeholder: 'AB 72M  ← initials, age/sex\nlap chole GA  ← procedure',
+    class: 'details', rows: String(boxLines()), style: `min-height:calc(${boxLines()} * 1.4em + 22px)`, autofocus: true, enterkeyhint: settings().enterSaves ? 'done' : 'enter', autocapitalize: 'sentences', autocorrect: 'off', 'aria-label': 'Case summary',
+    placeholder: PLACEHOLDER.map(([a, b]) => `${a}  ← ${b}`).join('\n'),
     value: draft.details,
     oninput: e => { draft.details = e.target.value; saveDraft(); suggestSoon(); paintParsed(true); },
     // Enter is a new line (a case can take several lines); Ctrl+Enter / Cmd+Enter saves
@@ -285,7 +325,9 @@ function renderOne(card) {
   const sugg = h('div', { class: 'chips', 'aria-live': 'polite' });
   const selected = h('div', { class: 'chips selected' });
   const tip = h('div');
-  const templates = h('div', { class: 'chips' });
+  const templates = h('div', { class: 'chips quick-rest' });
+  // the programme's tag groups (Admin portal), after the full list
+  const shared = h('div', { class: 'shared-groups' });
   const picker = catPicker({
     get: () => draft.cats,
     toggle: code => { draft.cats = toggleCat(draft.cats, code); saveDraft(); paintSel(); },
@@ -293,11 +335,13 @@ function renderOne(card) {
     toggleTag: key => { Object.assign(draft, toggleTagIn(draft.cats, draft.tags, key)); saveDraft(); paintSel(); },
   });
   // "might be worth a reflection": tag it now, write it later from the Reflections tab
-  const tagBox = h('label', { class: 'check reflect-tag' }, h('input', { type: 'checkbox', checked: !!draft.reflectTag, onchange: e => { draft.reflectTag = e.target.checked; saveDraft(); } }), '☆ Tag as a possible reflection');
+  const tagBox = h('label', { class: 'check reflect-tag' }, h('input', { type: 'checkbox', checked: !!draft.reflectTag, onchange: e => { draft.reflectTag = e.target.checked; saveDraft(); } }), 'Possible reflection');
   ui.tagBox = tagBox;
+  const draftNote = h('span', { class: 'draft-note', 'aria-live': 'polite' });
+  const tagRow = h('div', { class: 'tag-row' }, tagBox, draftNote);
   const actions = h('div', { class: 'actions' },
-    h('button', { class: 'primary big', onclick: () => save({}) }, 'Save', h('span', { class: 'kbd', title: 'Ctrl+Enter (Cmd+Enter on a Mac)' }, ' Ctrl+⏎')),
-    h('button', { class: 'big', title: 'Save and keep this date for the next case', onclick: () => save({ another: true }) }, 'Save, keep date'));
+    h('button', { class: 'big', title: 'Save and keep this date for the next case', onclick: () => save({ another: true }) }, 'Save, keep date'),
+    h('button', { class: 'primary big', onclick: () => save({}) }, 'Save', h('span', { class: 'kbd', title: 'Ctrl+Enter (Cmd+Enter on a Mac)' }, ' Ctrl+⏎')));
 
   // what the box was read as (initials come off into their own field; age/sex stay in the details)
   const parsed = h('div', { class: 'parsed', 'aria-live': 'polite' });
@@ -306,17 +350,19 @@ function renderOne(card) {
   const selExtra = h('div', { class: 'sel-extra' });
   const savebar = h('div', { class: 'savebar' }, selected, actions);
   add(card,
-    h('div', { class: 'box-wrap' }, textarea, pasteBtn(textarea)), parsed, selExtra, tip, tagBox,
-    h('div', { class: 'chiplabel', id: 'suggLabel' }, 'Suggested'), sugg,
-    stillNeeded(),
-    h('div', { class: 'chiplabel' }, 'Quick picks'), templates,
-    h('div', { class: 'bar cat-head' }, h('div', { class: 'chiplabel grow' }, 'All categories'),
-      h('span', { class: 'seg cat-view', role: 'group', 'aria-label': 'Show categories as' },
+    h('div', { class: 'box-wrap' }, textarea, pasteBtn(textarea)), parsed, selExtra, tip, tagRow,
+    // suggestions first, then the last case and your own templates
+    h('div', { class: 'chiplabel' }, 'Quick picks'), sugg, templates,
+    h('div', { class: 'bar cat-head' }, h('div', { class: 'chiplabel grow' }, 'All tags'),
+      h('span', { class: 'seg cat-view', role: 'group', 'aria-label': 'Show tags as' },
         ['list', 'pills'].map(v => h('button', { class: 'small', 'aria-pressed': String((settings().catView || 'list') === v), onclick: () => { if ((settings().catView || 'list') === v) return; patchLogbook({ settings: { catView: v } }); hooks.render(); } }, v === 'list' ? 'List' : 'Pills')))),
     picker.el,
+    shared,
+    stillNeeded(),
     savebar);
-  Object.assign(ui, { textarea, parsed, sugg, selected, selExtra, tip, templates, picker });
+  Object.assign(ui, { shared, draftNote, textarea, parsed, sugg, selected, selExtra, tip, templates, picker });
   paintSuggest(); paintSel(); paintQuick(); paintParsed(false);
+  requestAnimationFrame(() => alignPlaceholder(textarea));
   // autofocus attribute is ignored on re-render; focus after insertion (not on phones' first paint
   // when that would pop the keyboard over a fresh landing — it's what the user came to do, so do it)
   requestAnimationFrame(() => { if (document.activeElement === document.body || !document.activeElement) textarea.focus({ preventScroll: true }); });
@@ -324,37 +370,42 @@ function renderOne(card) {
 
 const suggestSoon = debounce(() => paintSuggest(), 120);
 
-// "AB · 72M · lap chole, GA ETT" under the box, plus "Draft saved" once typing pauses
-let draftNote = null;
+// "AB · 72M · lap chole, GA ETT" under the box; "Draft saved" (once typing pauses) sits at the end of
+// the Possible reflection line
 function paintParsed(typed) {
   if (!ui || !ui.parsed) return;
   const text = draft.details.trim();
+  if (ui.draftNote) ui.draftNote.textContent = text && typed ? 'Draft saved' : '';
   if (!text) { fill(ui.parsed); return; }
   const { initials, details } = splitInitials(text);
   const { age, rest } = splitAge(details);
   const bits = [initials ? h('span', { class: 'pi' }, h('small', {}, 'Initials '), h('b', {}, initials)) : h('span', { class: 'pi none' }, 'No initials found'),
     age ? h('span', { class: 'pi' }, h('small', {}, 'Age/sex '), h('b', {}, age.replace(/[mf]$/, c => c.toUpperCase()))) : null,
     rest ? h('span', { class: 'pi grow' }, rest.split('\n')[0].slice(0, 60)) : null];
-  draftNote = h('span', { class: 'draft-note' }, typed ? 'Draft saved' : '');
-  fill(ui.parsed, ...bits.filter(Boolean), draftNote);
+  fill(ui.parsed, ...bits.filter(Boolean));
 }
+
+// Suggestions, with your own shorthand for APMES tags (Tag editor) mixed in
+const suggest = (text, opts = {}) => suggestCodes(text, { ...opts, extra: apmesShorthand(tagSet()) });
 
 function paintSuggest() {
   if (!ui || !ui.sugg) return;
   const on = settings().suggestions !== false;
-  ui.card.querySelector('#suggLabel').hidden = !on;
   ui.sugg.hidden = !on;
   if (!on) return;
   const text = draft.details.trim();
   const list = text ? suggest(text, { limit: 8 }).filter(s => !draft.cats.includes(s.code)) : [];
+  // your own tags whose shorthand you typed (choosing one ticks what it counts towards)
+  const mine = text ? shorthandTags(tagSet(), text).filter(k => !(draft.tags || []).includes(k)) : [];
+  const mineChips = mine.map(k => tagChip(k, { on: false, onclick: () => { keepPlace(ui.sugg, () => { Object.assign(draft, toggleTagIn(draft.cats, draft.tags, k)); saveDraft(); paintSel(); }); refocus(); } }));
   const strong = list.filter(s => s.score >= 0.5).map(s => s.code);
   const all = strong.length > 1 ? h('span', { class: 'chip sugg strong all', role: 'button', tabindex: '0', title: 'Add all the confident suggestions',
     onclick: () => { keepPlace(ui.sugg, () => { draft.cats = sortCodes(withParents([...draft.cats, ...strong])); saveDraft(); paintSel(); }); refocus(); } }, '+ All ' + strong.length) : null;
-  fill(ui.sugg, all, ...(list.length ? list.map(s => catChip(s.code, {
+  fill(ui.sugg, ...mineChips, all, ...(list.length || mine.length ? list.map(s => catChip(s.code, {
     cls: `sugg ${s.score >= 0.5 ? 'strong' : ''}`,
-    title: `${catFull(s.code)} — ${s.why === 'age' ? 'from the age' : s.why === 'bmi' ? 'from the BMI' : 'from your words'}`,
+    title: `${catFull(s.code)} — ${s.why === 'age' ? 'from the age' : s.why === 'bmi' ? 'from the BMI' : s.why === 'yours' ? 'from your shorthand' : 'from your words'}`,
     onclick: () => { keepPlace(ui.sugg, () => { draft.cats = addCat(draft.cats, s.code); saveDraft(); paintSel(); }); refocus(); },
-  })) : [h('span', { class: 'muted', style: 'font-size:13px' }, text ? 'No suggestions — search below.' : 'Start typing to see suggestions.')]));
+  })) : [h('span', { class: 'muted', style: 'font-size:13px' }, text ? 'No suggestions: search below.' : 'Suggestions appear as you type.')]));
 }
 
 function paintSel() {
@@ -362,15 +413,15 @@ function paintSel() {
   fill(ui.selected, ...(draft.cats.length
     ? draft.cats.map(code => catChip(code, { on: true, removable: true, cls: 'add', title: 'Remove ' + catFull(code),
       onclick: () => { draft.cats = dropCat(draft.cats, code); saveDraft(); paintSel(); } }))
-    : [h('span', { class: 'none' }, 'No category yet: tap one below')]),
+    : [h('span', { class: 'none' }, 'No tag yet: tap one below')]),
     ...looseTags(draft.cats, draft.tags).map(k => tagChip(k, { onclick: () => { draft.tags = draft.tags.filter(t => t !== k); saveDraft(); paintSel(); } })));
   fill(ui.selExtra,
     // a combination worth keeping: one tap to make it a template (no trip to Settings)
     draft.cats.length >= 2 && !((S.logbook && S.logbook.templates) || []).some(t => sortCodes(t.cats).join() === sortCodes(draft.cats).join())
       ? h('button', { type: 'button', class: 'small linkish', onclick: () => templateDialog({ id: uid(), name: '', cats: [...draft.cats], details: '' }, async out => {
         await patchLogbook({ templates: [...((S.logbook && S.logbook.templates) || []), out] });
-        toast(`Template “${out.name}” saved`); paintQuick(); paintSel();
-      }, 'Save as template') }, '☆ Save as template') : null,
+        toast(`Tag group “${out.name}” saved`); paintQuick(); paintSel();
+      }, 'Save as tag group') }, '☆ Save as tag group') : null,
     // personal subcategories of the selected categories (Settings → My subcategories)
     subcatChips(draft.cats, draft.tags || [], tags => keepPlace(ui.selExtra, () => { draft.tags = tags; saveDraft(); paintSel(); })));
   const tips = draft.cats.filter(c => TIPS[c]).map(c => TIPS[c]);
@@ -387,6 +438,8 @@ function applyTemplate(t) {
   keepPlace(ui.templates, () => { saveDraft(); paintSel(); }); refocus();
 }
 
+const clip = (t, n) => (t.length > n ? t.slice(0, n - 1).trimEnd() + '…' : t);
+
 function paintQuick() {
   if (!ui || !ui.templates) return;
   const chips = [];
@@ -399,10 +452,10 @@ function paintQuick() {
     const key = proc.toLowerCase() + '|' + sortCodes(c.cats).join();
     if (keys.has(key)) continue;
     keys.add(key); recent.push({ c, proc });
-    if (recent.length >= 3) break;
+    if (recent.length >= 1) break;
   }
   recent.forEach(({ c, proc }, i) => chips.push(h('span', {
-    class: 'chip tmpl recent', role: 'button', tabindex: '0', title: (proc || 'No details') + '\n' + c.cats.map(catFull).join('\n'),
+    class: 'chip tmpl recent', role: 'button', tabindex: '0', title: 'Same as last: ' + (proc || 'no details') + '\n' + c.cats.map(catFull).join('\n'), 'aria-label': 'Same as last: ' + (proc || 'no details'),
     onclick: () => {
       draft.cats = sortCodes(withParents(c.cats));
       draft.details = proc ? '\n' + proc : '';
@@ -411,7 +464,7 @@ function paintQuick() {
       if (ui.textarea) { ui.textarea.value = draft.details; ui.textarea.focus({ preventScroll: true }); ui.textarea.setSelectionRange(0, 0); }
       keepPlace(ui.templates, () => { saveDraft(); paintDate(); paintSel(); paintParsed(false); });
     },
-  }, i === 0 ? '↻ Same as last ' : '↻ ', h('span', {}, (proc || 'no details').slice(0, 28)), h('span', { class: 'muted', style: 'font-size:12px' }, ' ' + catPills(c.cats)))));
+  }, '↻ ', h('span', {}, clip(proc || 'no details', 30)))));
   const seen = new Set();
   const tmplChip = (t, name) => {
     const key = sortCodes(t.cats).join(',');
@@ -421,10 +474,9 @@ function paintQuick() {
       name ? h('b', {}, name) : null, h('span', { class: name ? 'muted' : '', style: name ? 'font-size:12px' : '' }, (name ? ' ' : '') + catPills(t.cats)));
   };
   for (const t of (S.logbook && S.logbook.templates) || []) chips.push(tmplChip(t, t.name));
-  for (const t of S.sharedTemplates || []) chips.push(tmplChip(t, t.name));
-  for (const t of frequentCombos(S.cases, { min: 3, limit: 6 })) if (t.cats.length > 1) chips.push(tmplChip(t));
-  const list = chips.filter(Boolean);
-  fill(ui.templates, ...(list.length ? list : [h('span', { class: 'muted', style: 'font-size:13px' }, 'Your common combinations will appear here.')]));
+  fill(ui.templates, ...chips.filter(Boolean));
+  const sh = (S.sharedTemplates || []).map(t => tmplChip(t, t.name)).filter(Boolean);
+  if (ui.shared) fill(ui.shared, ...(sh.length ? [h('div', { class: 'chiplabel' }, 'Programme tag groups'), h('div', { class: 'chips' }, ...sh)] : []));
 }
 
 async function save({ another }) {
@@ -434,10 +486,10 @@ async function save({ another }) {
     // point at the suggestions (no keyboard popping up); with none, the search box
     const target = ui.sugg && !ui.sugg.hidden && ui.sugg.querySelector('.chip') ? ui.sugg : null;
     if (target) {
-      toast('Tap at least one category: suggestions are highlighted');
+      toast('Tap at least one tag: suggestions are highlighted');
       target.scrollIntoView({ behavior: 'smooth', block: 'center' });
       target.classList.remove('flash'); void target.offsetWidth; target.classList.add('flash');
-    } else { toast('Pick at least one category: search below'); ui.picker.focus(); }
+    } else { toast('Pick at least one tag: search below'); ui.picker.focus(); }
     return;
   }
   if (!details && !(await confirmBox('No case details', 'Save this case without initials or details?', 'Save'))) return;
@@ -490,7 +542,7 @@ function renderBulk(card) {
   });
   const out = h('div');
   add(card, 
-    h('p', { class: 'hint' }, 'Paste your notes or OT list with an empty line between cases (a case can take several lines). Categories are guessed for each case. Cases without a date at the start get ', h('b', {}, fmtDate(curDate())), ' (change it above).'),
+    h('p', { class: 'hint' }, 'Paste your notes or OT list with an empty line between cases (a case can take several lines). Tags are guessed for each case. Cases without a date at the start get ', h('b', {}, fmtDate(curDate())), ' (change it above).'),
     ta,
     h('div', { class: 'bar', style: 'margin-top:8px' },
       h('button', { class: 'primary', onclick: () => { bulkRows = parseBulk(ta.value, t => suggest(t)); paintBulk(out); } }, 'Review'),
@@ -509,7 +561,7 @@ function paintBulk(out) {
     // "Same as above": the categories of the case above, in one tap, when they are not all here already
     const above = i > 0 ? bulkRows[i - 1].cats : [];
     const same = above.length && !above.every(c => r.cats.includes(c)) ? h('span', {
-      class: 'chip tmpl same', role: 'button', tabindex: '0', title: 'Add the categories of the case above: ' + above.map(catFull).join(', '),
+      class: 'chip tmpl same', role: 'button', tabindex: '0', title: 'Add the tags of the case above: ' + above.map(catFull).join(', '),
       onclick: () => { r.cats = sortCodes(withParents([...r.cats, ...above])); paintBulk(out); },
     }, 'Same as above: ', h('b', {}, catPills(above))) : null;
     const sugg = on && r.details.trim() ? suggest(r.details, { limit: 4 }).filter(s => !r.cats.includes(s.code)) : [];
@@ -517,18 +569,18 @@ function paintBulk(out) {
       h('td', {}, h('input', { type: 'date', value: r.date || def, max: todayISO(), onchange: e => { r.date = parseDate(e.target.value); } })),
       h('td', { class: 'details' },
         h('input', { value: r.initials || '', placeholder: 'Initials', 'aria-label': 'Patient initials', autocapitalize: 'characters', maxlength: '20', oninput: e => { r.initials = e.target.value; } }),
-        h('textarea', { rows: String(Math.min(6, Math.max(2, r.details.split('\n').length))), value: r.details, 'aria-label': 'Case details', oninput: e => { r.details = e.target.value; } })),
+        h('textarea', { rows: String(Math.min(6, Math.max(2, r.details.split('\n').length))), value: r.details, 'aria-label': 'Case summary', oninput: e => { r.details = e.target.value; } })),
       h('td', {}, h('div', { class: 'chips' },
         r.cats.map(code => catChip(code, { on: true, removable: true, onclick: () => { r.cats = dropCat(r.cats, code); paintBulk(out); } })),
-        h('button', { class: 'small icon-btn', 'aria-label': 'Add categories', onclick: () => pickDialog(r.cats, cats => { r.cats = cats; paintBulk(out); }) }, r.cats.length ? '+' : '+ Add')),
+        h('button', { class: 'small icon-btn', 'aria-label': 'Add tags', onclick: () => pickDialog(r.cats, cats => { r.cats = cats; paintBulk(out); }) }, r.cats.length ? '+' : '+ Add')),
         same || sugg.length ? h('div', { class: 'chips', style: 'margin-top:4px' }, same,
           sugg.map(s => catChip(s.code, { cls: `sugg ${s.score >= 0.5 ? 'strong' : ''}`, title: 'Suggested: ' + catFull(s.code), onclick: () => { r.cats = addCat(r.cats, s.code); paintBulk(out); } }))) : null),
       h('td', {}, h('button', { class: 'small danger icon-btn', title: 'Drop this case', 'aria-label': 'Drop this case', onclick: () => { bulkRows.splice(i, 1); paintBulk(out); } }, '×')));
   }));
   fill(out, 
     h('h3', {}, `${bulkRows.length} case${bulkRows.length === 1 ? '' : 's'}`),
-    missing ? h('p', { class: 'tip' }, `${missing} case${missing === 1 ? ' has' : 's have'} no category yet.`) : null,
-    h('div', { class: 'scroll' }, h('table', { class: 'bulk' }, h('thead', {}, h('tr', {}, h('th', {}, 'Date'), h('th', {}, 'Details'), h('th', {}, 'Categories'), h('th', {}))), tbody)),
+    missing ? h('p', { class: 'tip' }, `${missing} case${missing === 1 ? ' has' : 's have'} no tag yet.`) : null,
+    h('div', { class: 'scroll' }, h('table', { class: 'bulk' }, h('thead', {}, h('tr', {}, h('th', {}, 'Date'), h('th', {}, 'Details'), h('th', {}, 'Tags'), h('th', {}))), tbody)),
     h('div', { class: 'actions' }, h('button', { class: 'primary big', onclick: saveBulk }, `Save all ${bulkRows.length}`),
       h('button', { class: 'big', title: 'Keep these as a plan and confirm each one after the list', onclick: planBulk }, 'Plan for later…')));
 }
@@ -574,7 +626,7 @@ function planCard() {
   const done = async (items, opts = {}) => {
     const now = Date.now();
     const cases = items.map((p, i) => ({ id: uid(), date: p.date, initials: p.initials || '', details: p.details || '', cats: sortCodes(p.cats || []), createdAt: now + i, updatedAt: now + i, source: 'paste' }));
-    if (cases.some(c => !c.cats.length) && !opts.quiet && !(await confirmBox('No category', 'Some of these have no category yet. Log them anyway?', 'Log'))) return;
+    if (cases.some(c => !c.cats.length) && !opts.quiet && !(await confirmBox('No tag', 'Some of these have no tag yet. Log them anyway?', 'Log'))) return;
     await saveMany(cases);
     const gone = new Set(items.map(p => p.id));
     await savePlan(plan().filter(p => !gone.has(p.id)));
@@ -593,7 +645,7 @@ function planCard() {
       due.length > 1 ? h('button', { class: 'small primary', onclick: () => done(due) }, `✓ All ${due.length} done`) : null),
     due.length ? h('ul', { class: 'plan-list' }, due.map(p => h('li', {},
       h('span', { class: 'pt' }, p.date < today ? h('small', {}, fmtDate(p.date).replace(/ \d{4}$/, '') + ' · ') : null, p.initials ? h('b', {}, p.initials + ' ') : null, String(p.details || '').split('\n').join(' · '),
-        h('small', { class: 'muted' }, ' ' + (p.cats && p.cats.length ? catPills(p.cats) : 'no category'))),
+        h('small', { class: 'muted' }, ' ' + (p.cats && p.cats.length ? catPills(p.cats) : 'no tag'))),
       h('span', { class: 'row' },
         h('button', { class: 'small primary', 'aria-label': 'Done: log this case', onclick: () => done([p]) }, '✓ Done'),
         h('button', { class: 'small', 'aria-label': 'Edit before logging', onclick: () => edit(p) }, 'Edit'),
@@ -606,7 +658,7 @@ async function saveBulk(e) {
   const def = curDate();
   const rows = bulkRows.filter(r => r.details.trim() || String(r.initials || '').trim() || r.cats.length);
   if (!(await okNoIds(...rows.map(r => r.details)))) return;
-  if (rows.some(r => !r.cats.length) && !(await confirmBox('Some cases have no category', 'Save them anyway? They will not count towards any target until you add one.', 'Save all'))) return;
+  if (rows.some(r => !r.cats.length) && !(await confirmBox('Some cases have no tag', 'Save them anyway? They will not count towards any target until you add one.', 'Save all'))) return;
   const now = Date.now();
   const cases = rows.map((r, i) => ({ id: uid(), date: r.date || def, initials: cleanInitials(r.initials), details: r.details.trim(), cats: sortCodes(r.cats), createdAt: now + i, updatedAt: now + i, source: 'paste' }));
   // clear the list first: offline the save can take a few seconds, and a second tap must not repeat it
@@ -632,45 +684,49 @@ export function pickDialog(initial, done) {
   const paint = () => fill(sel, ...(cats.length ? cats.map(code => catChip(code, { on: true, removable: true, onclick: () => { cats = dropCat(cats, code); paint(); picker.refresh(); } })) : [h('span', { class: 'none' }, 'None selected')]));
   const picker = catPicker({ get: () => cats, toggle: code => { cats = toggleCat(cats, code); paint(); } });
   paint();
-  const m = modal('Categories', [sel, h('div', { style: 'height:8px' }), picker.el,
+  const m = modal('Tags', [sel, h('div', { style: 'height:8px' }), picker.el,
     h('div', { class: 'bar', style: 'margin-top:12px' }, h('span', { class: 'grow' }), h('button', { class: 'primary', onclick: () => m.close() }, 'Done'))],
   { onclose: () => done(sortCodes(cats)) });
   picker.focus();
 }
 
-// Edit (or delete) one case.
-export function editCaseDialog(c) {
+// Edit (or delete) one case. With opts.onCreated and a case with no id: a new case (from the
+// Reflections case picker), saved with createCase and handed back.
+export function editCaseDialog(c, opts = {}) {
+  const isNew = !c.id && typeof opts.onCreated === 'function';
   // older cases keep the initials at the front of the details: split them now, saved apart on Save
   const e = { ...c, ...caseParts(c), cats: [...(c.cats || [])] };
   const sel = h('div', { class: 'chips selected' });
-  const sugg = h('div', { class: 'chips' });
   const paint = () => {
-    fill(sel, ...(e.cats.length ? e.cats.map(code => catChip(code, { on: true, removable: true, onclick: () => { e.cats = dropCat(e.cats, code); paint(); picker.refresh(); } })) : [h('span', { class: 'none' }, 'No categories')]),
+    fill(sel, ...(e.cats.length ? e.cats.map(code => catChip(code, { on: true, removable: true, onclick: () => { e.cats = dropCat(e.cats, code); paint(); picker.refresh(); } })) : [h('span', { class: 'none' }, 'No tags')]),
       ...looseTags(e.cats, e.tags).map(k => tagChip(k, { onclick: () => { e.tags = e.tags.filter(t => t !== k); paint(); picker.refresh(); } })),
       subcatChips(e.cats, e.tags || [], tags => { e.tags = tags; paint(); }));
-    const s = e.details.trim() && settings().suggestions !== false ? suggest(e.details, { limit: 6 }).filter(x => !e.cats.includes(x.code)) : [];
-    fill(sugg, ...s.map(x => catChip(x.code, { cls: `sugg ${x.score >= 0.5 ? 'strong' : ''}`, onclick: () => { e.cats = addCat(e.cats, x.code); paint(); picker.refresh(); } })));
   };
   const picker = catPicker({ get: () => e.cats, toggle: code => { e.cats = toggleCat(e.cats, code); paint(); },
     getTags: () => e.tags || [], toggleTag: key => { Object.assign(e, toggleTagIn(e.cats, e.tags, key)); paint(); } });
-  const paintSoon = debounce(paint, 120);
   paint();
-  const m = modal('Edit case', [
+  // the full list opens from the Add tags button
+  const pickWrap = h('div', { hidden: true, style: 'margin-top:8px' }, picker.el);
+  const addBtn = h('button', { type: 'button', class: 'small', style: 'margin-top:8px', 'aria-expanded': 'false', onclick: () => {
+    pickWrap.hidden = !pickWrap.hidden; addBtn.setAttribute('aria-expanded', String(!pickWrap.hidden));
+    addBtn.textContent = pickWrap.hidden ? '+ Add tags' : 'Done adding tags';
+    if (!pickWrap.hidden) picker.focus({ preventScroll: true });
+  } }, '+ Add tags');
+  // at least 6 lines, growing with the text
+  const grow = ta => { ta.style.height = 'auto'; ta.style.height = Math.max(ta.scrollHeight + 2, 0) + 'px'; };
+  const detailsBox = h('textarea', { rows: '6', class: 'grow-box', value: e.details, placeholder: isNew ? 'e.g. 72M lap chole GA ETT, difficult airway' : '',
+    oninput: ev => { e.details = ev.target.value; grow(ev.target); } });
+  requestAnimationFrame(() => grow(detailsBox));
+  const m = modal(isNew ? 'New case' : 'Edit case', [
     c.dateText && !c.date ? h('p', { class: 'tip' }, `Imported date “${c.dateText}” could not be read — please set the date.`) : null,
     h('label', { class: 'field' }, 'Date', h('input', { type: 'date', value: e.date || '', max: todayISO(), onchange: ev => { e.date = parseDate(ev.target.value); } })),
     h('label', { class: 'field' }, 'Patient initials', h('input', { value: e.initials, placeholder: 'e.g. AB', maxlength: '20', autocapitalize: 'characters', autocomplete: 'off', spellcheck: 'false', oninput: ev => { e.initials = ev.target.value; } })),
-    h('label', { class: 'field' }, 'Case details', h('textarea', { rows: '3', value: e.details, oninput: ev => { e.details = ev.target.value; paintSoon(); } })),
-    h('div', { class: 'chiplabel' }, 'Categories'), sel,
-    h('div', { class: 'chiplabel' }, 'Suggested'), sugg,
-    h('details', {}, h('summary', {}, 'All categories'), picker.el),
-    h('label', { class: 'check reflect-tag', style: 'margin-top:8px' }, h('input', { type: 'checkbox', checked: !!e.reflectTag, onchange: ev => { e.reflectTag = ev.target.checked; } }), '☆ Possible reflection'),
-    // to your own notes (WhatsApp, Notes, Obsidian): this case, or the whole day's list
-    h('div', { class: 'bar share-row', style: 'margin:10px 0 0' },
-      h('button', { class: 'small', onclick: () => shareText(shareCaseText(c)) }, 'Share case'),
-      c.date ? h('button', { class: 'small', onclick: () => shareText(dayText(c.date)) }, "Share day's list") : null,
-      c.date ? h('button', { class: 'small', onclick: () => copyText(dayMarkdown(c.date), 'Markdown copied: paste into your notebook') }, 'Copy day as Markdown') : null),
-    h('div', { class: 'bar', style: 'margin-top:12px' },
-      h('button', { class: 'danger', onclick: async () => {
+    h('label', { class: 'field' }, 'Case summary', detailsBox),
+    h('div', { class: 'chiplabel' }, 'Tags'), sel, addBtn, pickWrap,
+    h('label', { class: 'check reflect-tag', style: 'margin-top:8px' }, h('input', { type: 'checkbox', checked: !!e.reflectTag, onchange: ev => { e.reflectTag = ev.target.checked; } }), 'Possible reflection'),
+    // Delete / Cancel / Save stay pinned to the bottom while the form scrolls
+    h('div', { class: 'bar dlg-actions' },
+      isNew ? null : h('button', { class: 'danger', onclick: async () => {
         m.close();
         // recycle bin (bin agent): kept 30 days; Undo restores it
         try { await moveToBin('case', c, { toast: true }); } catch (err) { toast('Could not delete: ' + err.message); }
@@ -679,6 +735,13 @@ export function editCaseDialog(c) {
       h('button', { onclick: () => m.close() }, 'Cancel'),
       h('button', { class: 'primary', onclick: async () => {
         if (!(await okNoIds(e.details))) return;
+        if (isNew) {
+          if (!e.details.trim() && !e.cats.length) return toast('Add a case summary or a tag');
+          m.close();
+          const made = await createCase({ date: e.date || todayISO(), initials: e.initials, details: e.details, cats: e.cats, reflectTag: !!e.reflectTag, tags: e.tags || [] });
+          toast('Case logged');
+          return opts.onCreated(made);
+        }
         m.close();
         const next = { ...e, initials: cleanInitials(e.initials), details: e.details.trim() };
         if (!next.reflectTag) delete next.reflectTag;
@@ -688,6 +751,6 @@ export function editCaseDialog(c) {
         await updateCase(next);
         toast('Case updated', { action: 'Undo', onaction: () => restoreCase(c) });
       } }, 'Save')),
-  ]);
+  ], { cls: 'full', sticky: true });
   return m;
 }

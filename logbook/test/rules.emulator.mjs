@@ -138,6 +138,27 @@ await t('owner reads reflection', assertFails(getDoc(doc(own, 'logbooks', A, 're
 await t('reflection left out of the export', assertSucceeds(setDoc(doc(a, 'logbooks', A, 'reflections', 'rx'), { ...refl('rx'), export: false })));
 await t('reflection export flag must be true/false', assertFails(setDoc(doc(a, 'logbooks', A, 'reflections', 'rx'), { ...refl('rx'), export: 'no' })));
 await t('uncategorised reflection', assertSucceeds(setDoc(doc(a, 'logbooks', A, 'reflections', 'ru'), { ...refl('ru'), headingId: '' })));
+// ready portfolios: the resident writes their copy; admins read it; nobody else
+const subm = { email: A, rid: 'R1', name: 'Alice', intake: 2024, rYear: 2, smo: 0, readyAt: 1, updatedAt: 1, fp: 'x', count: 1, profile: null, counts: { '16': { total: 2, 1: 2 } }, imageIds: ['img1'] };
+await t('resident marks portfolio ready', assertSucceeds(setDoc(doc(a, 'submissions', A), subm)));
+await t('resident adds a ticked reflection to it', assertSucceeds(setDoc(doc(a, 'submissions', A, 'reflections', 'rs1'), refl('rs1'))));
+await t('admin reads the ready portfolio', assertSucceeds(getDoc(doc(adm, 'submissions', A))));
+await t('admin reads its reflections', assertSucceeds(getDocs(collection(adm, 'submissions', A, 'reflections'))));
+await t('admin lists ready portfolios', assertSucceeds(getDocs(collection(adm, 'submissions'))));
+await t('admin cannot write a ready portfolio', assertFails(setDoc(doc(adm, 'submissions', A), subm)));
+await t('other resident cannot read it', assertFails(getDoc(doc(b, 'submissions', A))));
+await t('other resident cannot write it', assertFails(setDoc(doc(b, 'submissions', A), subm)));
+await t('submission with case details refused', assertFails(setDoc(doc(a, 'submissions', A), { ...subm, cases: [{ details: 'AB lscs' }] })));
+await t('submission under another email refused', assertFails(setDoc(doc(a, 'submissions', A), { ...subm, email: B })));
+await t('resident unmarks (deletes) it', assertSucceeds(deleteDoc(doc(a, 'submissions', A, 'reflections', 'rs1'))));
+await setDoc(doc(a, 'logbooks', A, 'images', 'img1'), { id: 'img1', data: 'QUJD', mime: 'image/jpeg', w: 1, h: 1, createdAt: 1 });
+await setDoc(doc(a, 'logbooks', A, 'images', 'img2'), { id: 'img2', data: 'QUJD', mime: 'image/jpeg', w: 1, h: 1, createdAt: 1 });
+await t('admin reads a figure the ready portfolio lists', assertSucceeds(getDoc(doc(adm, 'logbooks', A, 'images', 'img1'))));
+await t('admin cannot read a figure it doesn\'t list', assertFails(getDoc(doc(adm, 'logbooks', A, 'images', 'img2'))));
+await t('admin cannot list a resident\'s figures', assertFails(getDocs(collection(adm, 'logbooks', A, 'images'))));
+await t('resident unmarks: the ready copy goes', assertSucceeds(deleteDoc(doc(a, 'submissions', A))));
+await t('after unmarking, admin cannot read the figure', assertFails(getDoc(doc(adm, 'logbooks', A, 'images', 'img1'))));
+await t('admin still cannot read logbook reflections', assertFails(getDoc(doc(adm, 'logbooks', A, 'reflections', 'r1'))));
 await t('word-imported reflection, no case', assertSucceeds(setDoc(doc(a, 'logbooks', A, 'reflections', 'rw'), { ...refl('rw'), source: 'word' })));
 await t('reflection bad source', assertFails(setDoc(doc(a, 'logbooks', A, 'reflections', 'rw2'), { ...refl('rw2'), source: 'x' })));
 await t('reflection bad status', assertFails(setDoc(doc(a, 'logbooks', A, 'reflections', 'r3'), { ...refl('r3'), status: 'done' })));

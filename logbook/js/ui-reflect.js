@@ -7,11 +7,11 @@
 // works) and selecting several to delete. Every delete goes to the recycle bin (bin.js, 30 days).
 
 import { REFLECTION_HEADINGS, REFLECTION_SECTIONS, yearName } from './categories.js';
-import { reflectionProgress, reflectionCounts, HEADING_BY_ID, splitDetails, completeProblems, isLegacy, LIMITS, IMAGE_MAX_B64, IMAGE_MAX_SIDE, IMAGE_QUALITY, PHOTO_BUDGET_KB, photoUsageKb, imageKb, fmtMb, wordCount, MIN_WORDS, suggestHeadings, moveToHeading, inExport, exportSummary, pickJustEnough } from './reflections.js';
+import { reflectionProgress, reflectionCounts, HEADING_BY_ID, splitDetails, completeProblems, isLegacy, LIMITS, IMAGE_MAX_B64, IMAGE_MAX_SIDE, IMAGE_QUALITY, PHOTO_BUDGET_KB, PHOTO_NOTE, photoUsageKb, imageKb, fmtMb, wordCount, MIN_WORDS, suggestHeadings, moveToHeading, inExport, exportSummary, pickJustEnough } from './reflections.js';
 export { completeProblems };
-import { fmtDate, caseText } from './engine.js';
+import { fmtDate, caseText, procedureText } from './engine.js';
 import { S, h, toast, cloud, debounce, hooks, rYear, effectiveIntake, residentSmo, todayISO, confirmBox, add, resetters, scheduleSummary, displayName, byNewest, catName, updateCase, settings } from './ui-core.js';
-import { renderExportButton, caseRYear } from './portfolio.js';
+import { renderExportButton, caseRYear, countsByYear } from './portfolio.js';
 
 const DRAFT_KEY = 'apmes-logbook-reflection-draft';
 const VIEW_KEY = 'apmes-logbook-reflection-view';
@@ -38,7 +38,7 @@ export function watchMyReflections(email) {
     S.reflections = list;
     scheduleSummary();
     // don't re-render under someone typing in the editor
-    if ((S.tab === 'reflect' && !rv.editing && !rv.picking && !rv.view && !drag) || S.tab === 'export') hooks.render();
+    if ((S.tab === 'reflect' && !rv.editing && !rv.picking && !rv.view && !drag) || S.tab === 'export' || S.tab === 'choose') hooks.render();
   });
 }
 export const summaryReflections = () => reflectionCounts(S.reflections || []);
@@ -49,9 +49,12 @@ const blank = (over = {}) => ({
   ...(settings().reflExport === false ? { export: false } : {}), ...over,
 });
 
-// From a logged case: initials = leading capitals, diagnosis = the rest.
-// the case's own initials field when it has one; older cases have them at the front of the details
-const fromCase = c => { const { initials, diagnosis } = c.initials ? { initials: c.initials, diagnosis: String(c.details || '').trim() } : splitDetails(c.details); return { initials, diagnosis, date: c.date || null, caseId: c.id }; };
+// From a logged case: its initials (older cases have them at the front of the details), the procedure
+// line as the diagnosis, and its case summary as the reflection's case details (summary).
+const fromCase = c => {
+  const { initials, diagnosis: rest } = c.initials ? { initials: c.initials, diagnosis: String(c.details || '').trim() } : splitDetails(c.details);
+  return { initials, diagnosis: procedureText(c) || rest, summary: rest, date: c.date || null, caseId: c.id };
+};
 // preset: { headingId, subId } from a heading's "+ Add" button.
 export function reflectOnCase(c, preset = null) {
   rv.picking = null; rv.view = null;
@@ -134,6 +137,7 @@ function pickCase(c) {
     const r = rv.editing, old = caseById(r.caseId), oldFill = old ? fromCase(old) : null, f = fromCase(c);
     r.caseId = c.id; r.initials = f.initials || r.initials; r.date = f.date || r.date;
     if (!String(r.diagnosis || '').trim() || (oldFill && r.diagnosis === oldFill.diagnosis)) r.diagnosis = f.diagnosis;
+    if (!String(r.summary || '').trim() || (oldFill && r.summary === oldFill.summary)) r.summary = f.summary;
     lsSet({ ...r, restore: true });
     rv.picking = null; rv.relinked = true; hooks.render();
     return;
@@ -185,7 +189,7 @@ function picker() {
         h('span', { class: 't' }, c.reflectTag && !has ? h('span', { class: 'flag tagged' }, '☆ tagged') : null, caseText(c) || '(no details)', names ? h('span', { class: 'muted', style: 'display:block;font-size:13px' }, names) : null),
         h('span', { class: 'c' }, cur ? h('span', { class: 'flag' }, 'current') : has ? h('span', { class: 'flag' }, 'has reflection') : null));
     }));
-    if (!shown.length) ul.replaceChildren(h('li', { class: 'empty' }, cases.length ? 'No cases match.' : 'No cases logged yet. Log the case first, then reflect on it.'));
+    if (!shown.length) ul.replaceChildren(h('li', { class: 'empty' }, cases.length ? 'No cases match.' : 'No cases logged yet: tap + New case above.'));
   };
   paint();
   const search = h('input', { type: 'search', value: p.q, placeholder: 'Search initials, details, date or procedure', style: 'font-size:16px;width:100%;box-sizing:border-box',
@@ -198,8 +202,15 @@ function picker() {
     h('h2', { style: 'margin:8px 0 4px' }, p.relink ? 'Change the linked case' : 'Which case is this reflection on?'),
     ph ? h('p', { style: 'margin:0 0 4px' }, h('span', { class: 'muted' }, 'Heading: '), h('b', {}, shortName(ph.name) + (psub ? ' · ' + psub.name : ''))) : null,
     p.preset && p.preset.uncat ? h('p', { style: 'margin:0 0 4px' }, h('span', { class: 'muted' }, 'Heading: '), h('b', {}, 'Uncategorised')) : null,
-    h('p', { class: 'hint', style: 'margin:0 0 8px' }, p.relink ? 'Pick the logged case this reflection is about.' : 'Pick a logged case: the reflection starts with its initials, date and diagnosis filled in.'),
+    h('p', { class: 'hint', style: 'margin:0 0 8px' }, p.relink ? 'Pick the logged case this reflection is about.' : 'Pick a logged case: the reflection starts with its initials, date, diagnosis and case details filled in. Not logged yet? Add it here.'),
+    p.relink ? null : h('button', { class: 'small', style: 'margin:0 0 8px', onclick: newCaseForReflection }, '+ New case'),
     search, count), h('section', { class: 'card' }, ul));
+}
+
+// Log a case from the picker, then carry on as if it had been picked.
+async function newCaseForReflection() {
+  const { editCaseDialog } = await import('./ui-log.js');
+  editCaseDialog({ date: todayISO(), initials: '', details: '', cats: [] }, { onCreated: c => { if (rv.picking) pickCase(c); else reflectOnCase(c); } });
 }
 
 // ---------- recycle bin / Word upload sub-views ----------
@@ -359,7 +370,7 @@ function list() {
 
   // the rest at the bottom, like the Logbook tab: export, Word upload and the bin, the rules
   const foot = em ? null : h('section', { class: 'card refl-foot' },
-    h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:8px;margin:0 0 6px' }, h('a', { class: 'btn small', href: '#export' }, `Export portfolio (${ex.total} ticked) ›`)),
+    h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:8px;margin:0 0 6px' }, h('a', { class: 'btn small', href: '#export' }, 'Export portfolio ›')),
     h('details', { class: 'more-tools', open: !!rv.toolsOpen, ontoggle: e => { rv.toolsOpen = e.target.open; } },
       h('summary', {}, 'More tools: upload from Word, recycle bin'),
       h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:8px;margin:0' },
@@ -571,12 +582,61 @@ async function moveReflection(r, headingId) {
 
 // ---------- images ----------
 
-// ---------- Export page (#export, from More → Export & Sync) ----------
+// ---------- mark the portfolio as ready (admins generate it; js/cloud.js submissions) ----------
+
+const RS = { sub: undefined, loading: false, busy: false };
+resetters.push(() => { RS.sub = undefined; RS.loading = false; });
+const hashStr = s => { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return (h >>> 0).toString(36); };
+// what admins would get now: the ticked reflections, Section 1, the Section 4 numbers, and a fingerprint
+function readyPayload() {
+  const list = (S.reflections || []).filter(inExport);
+  const profile = (S.logbook && S.logbook.profile) || null;
+  const intake = effectiveIntake(), smo = residentSmo(S.resident);
+  const counts = countsByYear(S.cases || [], intake, smo);
+  const imageIds = [...new Set(list.flatMap(r => (r.figures || []).map(f => f.id)).filter(Boolean))];
+  const fp = hashStr(JSON.stringify([list.map(r => [r.id, r.updatedAt || 0]).sort(), profile, counts, displayName(), intake, rYear(), smo]));
+  return { list, meta: { rid: (S.resident && S.resident.rid) || (S.logbook && S.logbook.rid) || null, name: displayName(), intake, rYear: rYear(), smo, fp, count: list.length, profile, counts, imageIds } };
+}
+async function markReady(ex, update = false) {
+  // no check against the portfolio rules here: the programme also reviews interim portfolios
+  RS.busy = true; hooks.render();
+  try {
+    const { list, meta } = readyPayload();
+    RS.sub = await cloud.submitPortfolio(mine(), { ...meta, readyAt: update && RS.sub ? RS.sub.readyAt : Date.now() }, list);
+    toast(update ? 'Ready portfolio updated' : 'Portfolio marked as ready: the programme admins can generate it');
+  } catch (err) { toast('Could not save: ' + err.message); }
+  RS.busy = false; hooks.render();
+}
+function readyCard(ex) {
+  if (RS.sub === undefined && !RS.loading) {
+    RS.loading = true;
+    cloud.loadMySubmission(mine()).then(x => { RS.sub = x; RS.loading = false; if (S.tab === 'export') hooks.render(); });
+  }
+  const sub = RS.sub;
+  const changed = sub && sub.fp !== readyPayload().meta.fp;
+  return h('section', { class: `card ready-card${sub ? ' is-ready' : ''}` },
+    h('h2', { style: 'margin:0 0 4px' }, 'Portfolio for the programme'),
+    sub === undefined ? h('p', { class: 'muted' }, 'Checking…')
+      : sub ? h('p', { style: 'margin:0 0 6px' }, h('b', {}, '✓ Marked ready'), ` on ${new Date(sub.readyAt).toLocaleDateString()} (${sub.count} reflection${sub.count === 1 ? '' : 's'}). The programme admins can generate it.`)
+      : h('p', { class: 'hint', style: 'margin:0 0 6px' }, 'When your ticked reflections are ready, mark the portfolio as ready: the programme admins can then generate it. They see only the ticked reflections, your Section 1 details and your Section 4 case numbers, never your cases or other reflections.'),
+    changed ? h('p', { class: 'tip' }, 'You’ve changed things since you marked it ready. Tap Update so the admins get the latest.') : null,
+    sub === undefined ? null : h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:8px;margin:0' },
+      sub ? [
+        h('button', { class: changed ? 'primary' : '', disabled: RS.busy, onclick: () => markReady(ex, true) }, RS.busy ? 'Saving…' : 'Update'),
+        h('button', { disabled: RS.busy, onclick: async () => {
+          if (!(await confirmBox('Unmark the portfolio?', 'The admins will no longer be able to generate it until you mark it ready again.', 'Unmark', true))) return;
+          try { await cloud.withdrawPortfolio(mine()); RS.sub = null; toast('Portfolio unmarked'); } catch (err) { toast('Could not unmark: ' + err.message); }
+          hooks.render();
+        } }, 'Unmark')]
+        : h('button', { class: 'primary', disabled: RS.busy || !ex.total, onclick: () => markReady(ex) }, RS.busy ? 'Saving…' : 'Mark portfolio as ready')));
+}
+
+// ---------- Export page (#export, from More → Export) ----------
 
 // Choose which complete reflections go into the Word portfolio (ticks are kept for next time), then export.
 // Per heading: how many are ticked against its minimum, with warnings when a required sub-type or the
 // JR ones are left out. "Tick just enough" keeps the longest that meet each minimum.
-export function renderExportPage() {
+export function renderExportPage(onChoose = false) {
   const all = S.reflections || [];
   const ex = exportSummary(all);
   const exBy = Object.fromEntries(ex.headings.map(x => [x.id, x]));
@@ -591,14 +651,23 @@ export function renderExportPage() {
   };
   const top = h('section', { class: 'card' },
     h('h2', { style: 'margin:0 0 4px' }, 'Export portfolio (Word)'),
-    h('p', { class: 'hint', style: 'margin:0 0 8px' }, 'Tick the reflections to put in the portfolio. Your ticks are kept for next time. Section 1 and the Section 4 case numbers are filled in too.'),
-    h('p', { style: 'margin:0 0 8px' }, h('b', {}, `${ex.total} of ${complete.length} ticked`),
-      drafts || uncat ? h('span', { class: 'hint' }, ` · not exported: ${[drafts ? `${drafts} draft${drafts === 1 ? '' : 's'}` : '', uncat ? `${uncat} uncategorised` : ''].filter(Boolean).join(', ')}`) : null),
-    complete.length ? h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:8px;margin:0 0 10px' },
-      h('button', { class: 'small', onclick: () => justEnough() }, 'Tick just enough'),
-      h('button', { class: 'small', onclick: () => setMany(complete, true) }, 'Tick all'),
-      h('button', { class: 'small', onclick: () => setMany(complete, false) }, 'Untick all')) : null,
+    h('p', { class: 'hint', style: 'margin:0 0 8px' }, 'Your complete reflections go into the APMES portfolio, with Section 1 and the Section 4 case numbers filled in. All are included unless you leave some out.'),
+    h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:8px;margin:0 0 10px;align-items:center' },
+      h('span', {}, h('b', {}, `${ex.total} of ${complete.length} reflections included`),
+        drafts || uncat ? h('span', { class: 'hint' }, ` · not exported: ${[drafts ? `${drafts} draft${drafts === 1 ? '' : 's'}` : '', uncat ? `${uncat} uncategorised` : ''].filter(Boolean).join(', ')}`) : null),
+      complete.length ? h('a', { class: 'btn small', href: '#choose' }, 'Choose reflections ›') : null),
     portfolioExportButton());
+  if (!onChoose) return h('div', {}, top, readyCard(ex));
+  // ---- the Choose page (#choose): ticks per heading, quick actions behind one button ----
+  const quick = h('details', { class: 'quick-actions' },
+    h('summary', { class: 'btn small' }, 'Quick actions ▾'),
+    h('div', { class: 'qa-menu' },
+      h('button', { class: 'small', onclick: () => justEnough() }, 'Tick just enough (longest that meet each minimum)'),
+      h('button', { class: 'small', onclick: () => setMany(complete, true) }, 'Tick all'),
+      h('button', { class: 'small', onclick: async () => { if (await confirmBox('Untick all?', 'Nothing will be exported until you tick some again.', 'Untick all', true)) setMany(complete, false); } }, 'Untick all')));
+  const choose = h('section', { class: 'card' },
+    h('div', { class: 'bar', style: 'align-items:center' }, h('h2', { style: 'margin:0' }, 'Choose reflections'), h('span', { class: 'grow' }), complete.length ? quick : null),
+    h('p', { class: 'hint', style: 'margin:6px 0 0' }, `${ex.total} of ${complete.length} included. Untick any you’d rather leave out; your choice is kept for next time.`));
   const body = h('section', { class: 'card' });
   let section = '';
   for (const hd of REFLECTION_HEADINGS) {
@@ -616,14 +685,19 @@ export function renderExportPage() {
           h('input', { type: 'checkbox', checked: r.export !== false, onchange: e => setExport(r, e.target.checked) }),
           h('span', {}, h('span', { class: 'muted' }, `${r.jr ? 'JR ' : ''}${r.date ? fmtDate(r.date) : '—'} · `), `${r.initials || '??'} ${r.diagnosis || ''}`,
             r.subId && hd.subs ? h('span', { class: 'flag' }, (hd.subs.find(s2 => s2.id === r.subId) || {}).name || '') : null,
-            h('span', { class: 'muted refl-wc' }, ` · ${wordCount(r)} words`))))))));
+            h('span', { class: 'muted refl-wc' }, ` · ${wordCount(r)} words`),
+            // learning point headings, to tell similar reflections apart
+            (r.points || []).some(pt => (pt.heading || '').trim())
+              ? h('ul', { class: 'exp-points hint' }, (r.points || []).filter(pt => (pt.heading || '').trim()).map(pt => h('li', {}, pt.heading.trim())))
+              : null)))))));
   }
-  if (!complete.length) add(body, h('p', { class: 'empty' }, 'No complete reflections under a heading yet. Mark reflections complete on the Reflections tab, then come back to export.'));
-  return h('div', {}, top, body);
+  if (!complete.length) add(body, h('p', { class: 'empty' }, 'No complete reflections under a heading yet. Mark reflections complete on the Reflections tab, then come back.'));
+  return h('div', {}, choose, body);
 }
+export const renderChoosePage = () => renderExportPage(true);
 
 // Images of the given reflections' figures, for the Word export: { id: { data, mime, w, h } }. Missing ones are skipped.
-// The Word portfolio export button (shown in More → Export & Sync): complete reflections, Section 1
+// The Word portfolio export button (shown in More → Export): complete reflections, Section 1
 // details and the Section 4 counts.
 export function portfolioExportButton() {
   const n = (S.reflections || []).filter(inExport).length;
@@ -770,14 +844,14 @@ function editor() {
   // What APMES wants covered (from the portfolio's reflection elements)
   const guide = h('details', { class: 'card', style: 'padding:12px 16px' },
     h('summary', { style: 'cursor:pointer;font-weight:600' }, 'What APMES wants covered'),
-    h('p', { class: 'hint' }, 'Write a case summary, then learning points. Between them, the learning points should cover:'),
+    h('p', { class: 'hint' }, 'Write the case details, then learning points. Between them, the learning points should cover:'),
     h('ul', { style: 'margin:4px 0 0;padding-left:20px' }, REFLECTION_SECTIONS.filter(s => s.id !== 'description' && (s.id !== 'further' || r.jr))
       .map(s => h('li', { style: 'margin-bottom:4px' }, h('b', {}, s.name), ': ', s.hint))));
 
   let body;
   if (legacy) {
     body = [h('section', { class: 'card' },
-      h('p', { class: 'hint' }, 'This reflection uses the older one-box-per-section layout. It still exports as it is, or convert it to the portfolio layout (case summary + learning points).'),
+      h('p', { class: 'hint' }, 'This reflection uses the older one-box-per-section layout. It still exports as it is, or convert it to the portfolio layout (case details + learning points).'),
       h('button', { onclick: () => {
         const sx = r.sections || {};
         r.summary = sx.description || '';
@@ -794,11 +868,11 @@ function editor() {
   } else {
     const title = boxCard('Title', 'Bold heading of the reflection, e.g. “Airway management in a patient with trismus”.',
       h('input', { style: IN, maxlength: String(LIMITS.title), value: r.title || '', placeholder: 'Title', oninput: e => { r.title = e.target.value; changed(); } }));
-    const summary = boxCard('Case summary', 'What happened?',
+    const summary = boxCard('Case details', 'What happened?',
       h('textarea', { rows: '10', maxlength: String(LIMITS.summary), style: TA, value: r.summary || '',
         placeholder: 'What happened? Demographics, history, examination, investigations, anaesthetic plan, events, outcome.',
         oninput: e => { r.summary = e.target.value; changed(); } }));
-    title.dataset.field = summary.dataset.field = 'title or case summary';
+    title.dataset.field = summary.dataset.field = 'title or case details';
 
     const n = r.points.length;
     const points = boxCard('Learning points', 'For each point: what were the considerations, and what did you learn? Give it a short heading, then your discussion (analysis with evidence, conclusions, action plan).',
@@ -849,8 +923,10 @@ function editor() {
         autosave.cancel(); await persist(); hooks.render();
       } catch (err) { status.textContent = 'Image not added'; toast('Could not add image: ' + err.message); }
     } });
-    const figures = boxCard('Figures (optional)', null,
-      h('p', { class: 'hint', style: 'margin:0 0 4px' }, `Your photos: ${fmtMb(usedKb())} of ${fmtMb(PHOTO_BUDGET_KB)} used.`),
+    // figures: rarely needed, so collapsed after References like it (open when there are some)
+    const figures = h('details', { class: 'card fold-card', open: r.figures.length > 0 },
+      h('summary', {}, `Figures (optional)${r.figures.length ? ' · ' + r.figures.length : ''}`),
+      h('p', { class: 'hint', style: 'margin:8px 0 4px' }, `${PHOTO_NOTE} Your photos: ${fmtMb(usedKb())} of ${fmtMb(PHOTO_BUDGET_KB)} used.`),
       h('p', { class: 'hint', style: 'margin:0 0 4px;color:var(--warn, #b45309)' }, 'No faces, names, NRIC, MRN or anything identifying on monitors, labels or screens. Crop before adding.'),
       h('p', { class: 'hint', style: 'margin:0 0 8px;color:var(--warn, #b45309)' }, 'Use your own photos or diagrams. Don’t copy copyrighted figures from papers, books or websites without permission; if you adapt one, cite it under References.'),
       r.figures.map((f, i) => {
@@ -883,8 +959,8 @@ function editor() {
       fileIn);
 
     // references (optional, collapsed unless there are some)
-    const refs = h('details', { class: 'card', style: 'padding:12px 16px', open: r.references.length > 0 },
-      h('summary', { style: 'cursor:pointer;font-weight:600' }, `References (optional)${r.references.length ? ' · ' + r.references.length : ''}`),
+    const refs = h('details', { class: 'card fold-card', open: r.references.length > 0 },
+      h('summary', {}, `References (optional)${r.references.length ? ' · ' + r.references.length : ''}`),
       r.references.map((x, i) => h('div', { class: 'bar', style: 'gap:6px;margin:6px 0;align-items:center' },
         h('span', {}, `${i + 1}.`),
         h('input', { style: IN + ';flex:1', maxlength: String(LIMITS.reference), value: x, placeholder: 'Author. Title. Journal. Year;vol:pages.', oninput: e => { r.references[i] = e.target.value; changed(); } }),
@@ -892,7 +968,7 @@ function editor() {
       r.references.length < LIMITS.references ? h('button', { style: 'margin-top:6px', onclick: () => { r.references.push(''); restructure(); } }, '+ Add reference') : null);
 
     points.dataset.field = 'at least one learning point';
-    body = [title, summary, points, figures, refs];
+    body = [title, summary, points, refs, figures];
   }
 
   const exportBox = HEADING_BY_ID[r.headingId] ? null : h('p', { class: 'hint', style: 'margin:0 0 8px' }, 'Uncategorised: not exported. Choose a heading above to export it.');

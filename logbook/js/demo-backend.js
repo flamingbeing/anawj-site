@@ -125,7 +125,7 @@ function mode() {
 export function resetDemo({ seeded = true } = {}) {
   memory = null;
   const ls = storage();
-  if (ls) { try { ls.removeItem(KEY); ls.removeItem(KEY + '-images'); } catch { /* ignore */ } }
+  if (ls) { try { ls.removeItem(KEY); ls.removeItem(KEY + '-images'); ls.removeItem(KEY + '-submissions'); } catch { /* ignore */ } }
   const s = blank();
   if (seeded) seed(s);
   save(s);
@@ -156,6 +156,18 @@ function seed(s) {
     })),
   };
   s.logbooks[DEMO_USER.email].doc.rid = 'DEMO01';
+  // one complete reflection on the LSCS case, so the Reflections, Progress and Export pages have something in them
+  const rt = t - 864e5;
+  s.logbooks[DEMO_USER.email].reflections = { refl0: {
+    id: 'refl0', headingId: 'lscs', subId: null, initials: 'AB', date: day(1), jr: true, diagnosis: 'LSCS under spinal',
+    title: 'High spinal block during caesarean section',
+    summary: 'Made-up example. A term parturient for elective caesarean section under spinal anaesthesia. Shortly after the intrathecal injection she reported difficulty breathing and weak hands, with hypotension and bradycardia. The block was rising quickly. I called for help, tilted the table head up slightly, supported ventilation with oxygen by mask and gave vasopressors and atropine. She did not need intubation; the block settled and surgery went ahead. Mother and baby were well afterwards.',
+    points: [
+      { heading: 'Recognising a high block early', text: 'Hand weakness, difficulty speaking and a falling heart rate are early signs. Checking the block height early and often, and asking the patient how her hands and breathing feel, let me act before she lost her airway reflexes.' },
+      { heading: 'A plan before the block goes in', text: 'Having vasopressors drawn up, the airway equipment checked and a second pair of hands ready made the response calm and quick. I now say the plan for a high block out loud at the sign-in.' },
+    ],
+    figures: [], references: [], caseId: 'demo0', source: 'app', status: 'complete', createdAt: rt, updatedAt: rt,
+  } };
   const peers = [['DEMO02', 'Resident A', 3], ['DEMO03', 'Resident B', 7], ['DEMO04', 'Resident C', 11]];
   for (const [rid, name, k] of peers) {
     const counts = { '13': 4 + k % 5, '16': 3 + k % 4, '17': 5 + k % 6, '18': 6 + k % 3, '20': 10 + k, '20iii': 8 + k, '26': 2 + k % 7, '28': 4 + k % 5 };
@@ -329,6 +341,36 @@ export async function loadImage(email, id) {
 }
 export async function deleteImage(email, id) {
   const m = imageStore(); delete m[lc(email) + '/' + id]; imageStoreSave(m);
+}
+
+// ---- ready portfolios (submissions) ----
+const SUB_KEY = KEY + '-submissions';
+const subs = () => { try { return JSON.parse(localStorage.getItem(SUB_KEY) || '{}'); } catch { return {}; } };
+const subsSave = m => { try { localStorage.setItem(SUB_KEY, JSON.stringify(m)); } catch (e) { console.warn('Demo submissions not saved', e); } };
+export const cleanSubmission = (email, m) => plain({
+  email: lc(email), rid: m.rid ? String(m.rid).slice(0, 40) : null, name: String(m.name || '').slice(0, 200),
+  intake: Number(m.intake) || null, rYear: Number(m.rYear) || null, smo: Math.max(0, Math.floor(Number(m.smo) || 0)),
+  readyAt: Number(m.readyAt) || Date.now(), updatedAt: Date.now(), fp: String(m.fp || '').slice(0, 100),
+  count: Math.max(0, Math.floor(Number(m.count) || 0)), profile: m.profile && typeof m.profile === 'object' ? m.profile : null,
+  counts: m.counts && typeof m.counts === 'object' ? m.counts : {},
+  imageIds: [...new Set((Array.isArray(m.imageIds) ? m.imageIds : []).map(String))].slice(0, 1000),
+});
+export async function submitPortfolio(email, meta, reflections) {
+  const m = subs();
+  const doc = cleanSubmission(email, meta);
+  m[lc(email)] = { meta: doc, reflections: reflections.map(r => cleanReflection(r)) };
+  subsSave(m);
+  return doc;
+}
+export async function withdrawPortfolio(email) { const m = subs(); delete m[lc(email)]; subsSave(m); }
+export async function loadMySubmission(email) { const x = subs()[lc(email)]; return x ? plain(x.meta) : null; }
+export async function listSubmissions() { return Object.values(subs()).map(x => plain(x.meta)); }
+export async function loadSubmission(email) {
+  const x = subs()[lc(email)];
+  if (!x) return null;
+  const images = {};
+  for (const id of x.meta.imageIds || []) { const img = imageStore()[lc(email) + '/' + id]; if (img) images[id] = plain(img); }
+  return { ...plain(x), images };
 }
 
 export async function writeSummary(rid, summary) {

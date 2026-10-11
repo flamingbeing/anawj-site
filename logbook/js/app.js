@@ -2,14 +2,14 @@
 // shared state and helpers are in ui-core.js. Case data comes from cloud.js (Firestore, or the
 // in-browser demo backend with ?demo).
 
-import { S, hooks, h, toast, cloud, setCases, scheduleSummary, fill, resetCaches, confirmBox, setCategoryNames, categoryNames as categoryNamesNow } from './ui-core.js';
-import { renderLog, logCasesChanged, clearDrafts } from './ui-log.js';
+import { S, hooks, h, toast, cloud, setCases, scheduleSummary, fill, resetCaches, confirmBox, modal, setCategoryNames, categoryNames as categoryNamesNow } from './ui-core.js';
+import { renderLog, logCasesChanged, clearDrafts, SHARED_KEY } from './ui-log.js';
 import { renderLogbook } from './ui-logbook.js';
 import { renderProgress, renderTotals } from './ui-progress.js';
-import { applyCompact, cachedCompact, applyTheme, cachedTheme, applyTextSize, cachedTextSize, renderSettings } from './ui-settings.js';
+import { applyCompact, cachedCompact, applyTheme, cachedTheme, applyTextSize, cachedTextSize, renderSettings, renderTagEditor } from './ui-settings.js';
 import { renderAccount, flush as flushProfile } from './ui-account.js';
 import { renderAdmin, leaveAdmin } from './ui-admin.js';
-import { renderReflect, watchMyReflections, renderExportPage } from './ui-reflect.js';
+import { renderReflect, watchMyReflections, renderExportPage, renderChoosePage } from './ui-reflect.js';
 import { downloadExcel } from './ui-logbook.js';
 import { downloadBackup } from './backup.js';
 import { purgeExpired } from './bin.js';
@@ -39,16 +39,19 @@ const TABS = [
   { id: 'log', label: 'Log', render: renderLog },
   { id: 'logbook', label: 'Logbook', render: renderLogbook },
   { id: 'reflect', label: 'Reflections', render: renderReflect },
-  { id: 'progress', label: 'Progress', render: renderProgress },
+  { id: 'progress', label: 'Analytics', render: renderProgress },
   // five tabs on the bar; the rest live under More (still reachable by #totals, #account, #settings)
   { id: 'more', label: 'More', render: () => renderMore() },
   { id: 'totals', label: 'Totals', render: renderTotals, hidden: true, under: 'more', desc: 'How your case counts compare across your intake' },
   { id: 'account', label: 'Account', render: renderAccount, hidden: true, under: 'more', desc: 'Your name and portfolio details (Section 1); sign out' },
-  { id: 'settings', label: 'Settings', render: renderSettings, hidden: true, under: 'more', desc: 'Display, text size, logging, templates, recycle bin' },
-  // opened from More → Export & Sync (not in the More list)
-  { id: 'export', label: 'Export portfolio', render: renderExportPage, hidden: true, under: 'more', unlisted: true },
-  // admins open it from More (or Settings → Admin)
-  { id: 'admin', label: 'Admin', render: renderAdmin, admin: true, hidden: true, under: 'more', desc: 'Residents list, import, shared templates, portfolio template' },
+  { id: 'settings', label: 'Settings', render: renderSettings, hidden: true, under: 'more', desc: 'Display, text size, logging, tag editor, recycle bin' },
+  // opened from More → Export (not in the More list)
+  { id: 'export', label: 'Export portfolio', render: () => renderExportPage(), hidden: true, under: 'more', unlisted: true },
+  { id: 'choose', label: 'Export portfolio', render: renderChoosePage, hidden: true, under: 'export', unlisted: true },
+  // admins open it from More (or Settings → Admin portal)
+  { id: 'admin', label: 'Admin portal', render: renderAdmin, admin: true, hidden: true, under: 'more', desc: 'Residents, ready portfolios, portfolio template, default tag names' },
+  // opened from Settings
+  { id: 'tags', label: 'Tag editor', render: renderTagEditor, hidden: true, under: 'settings', unlisted: true },
 ];
 
 function renderMore() {
@@ -58,7 +61,7 @@ function renderMore() {
       h('ul', {}, items.map(t => h('li', {}, h('a', { href: '#' + t.id, 'data-go': t.id, onclick: e => { e.preventDefault(); go(t.id); } },
         icon(t.id), h('span', { class: 'mt' }, h('b', {}, t.label), h('small', {}, t.desc)), h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')))))),
     // everything that leaves the app as a file
-    h('section', { class: 'card export-sync' }, h('h2', {}, 'Export & Sync'),
+    h('section', { class: 'card export-sync' }, h('h2', {}, 'Export'),
       h('h3', {}, 'Portfolio (Word)'),
       h('p', { class: 'hint' }, 'Choose which complete reflections go in, then export the APMES portfolio with Section 1 and the Section 4 case numbers filled in.'),
       h('div', { class: 'bar' }, h('a', { class: 'btn primary', href: '#export' }, 'Choose reflections and export ›')),
@@ -123,7 +126,7 @@ function render() {
   S.tab = tab.id;
   const y = window.scrollY;
   // pages opened from More get a way back to the list
-  fill(app, tab.under ? h('p', { class: 'back-row' }, h('a', { class: 'btn small', href: '#' + tab.under }, '← More')) : null, tab.render());
+  fill(app, tab.under ? h('p', { class: 'back-row' }, h('a', { class: 'btn small', href: '#' + tab.under }, '← ' + ((TABS.find(t => t.id === tab.under) || {}).label || 'More'))) : null, tab.render());
   if (tab.id !== 'log') window.scrollTo(0, y);
 }
 hooks.render = render;
@@ -153,14 +156,17 @@ function flushRender() {
 // loading, signed out and signed in. Demo / offline show as a small tag beside the name.
 function paintWho() {
   const flags = [cloud.demo ? 'demo' : '', navigator.onLine ? '' : 'offline'].filter(Boolean).join(' · ');
+  // the demo is a small badge in the header (tap for Reset / Leave), so the app looks as it does for real
+  const flag = cloud.demo ? h('button', { type: 'button', class: 'demo-flag', title: 'Demo: tap to reset or leave', onclick: demoMenu }, h('span', { class: 'who-flag' }, navigator.onLine ? 'demo ▾' : 'demo · offline ▾'))
+    : flags ? h('span', { class: 'who-flag' }, flags) : null;
   // sync: cases saved on this phone but not yet on the server (no signal), or all synced
   const sync = !S.user || cloud.demo ? null : S.pending
     ? h('span', { class: 'sync wait', title: navigator.onLine ? 'Saving to the server…' : 'Saved on this phone; will sync when there is signal' }, navigator.onLine ? '⟳ Saving' : '⏳ Will sync')
     : S.casesSynced ? h('span', { class: 'sync ok', title: 'All your cases are saved to the server' }, '✓ Synced') : null;
   subEl.textContent = flags;   // kept (hidden) for tests
-  if (!S.user) { fill(whoEl, flags ? h('span', { class: 'who-flag' }, flags) : null); return; }
+  if (!S.user) { fill(whoEl, flag); return; }
   document.body.dataset.cases = String(S.cases.length);   // not shown; read by tests
-  fill(whoEl, sync, flags ? h('span', { class: 'who-flag' }, flags) : null, h('span', { class: 'email', title: S.user.email }, S.user.name || S.user.email));
+  fill(whoEl, sync, flag, h('span', { class: 'email', title: S.user.email }, S.user.name || S.user.email));
 }
 window.addEventListener('online', paintWho);
 window.addEventListener('offline', paintWho);
@@ -174,11 +180,11 @@ function renderLanding(error) {
     h('img', { src: 'icons/icon-192.png', alt: '' }),
     h('p', { class: 'muted', style: 'margin:0' }, 'Case log for APMES anaesthesia residents'),
     h('h2', {}, 'Log a case in seconds'),
-    h('p', {}, 'Type the initials and case, tap the suggested categories, save. Your progress against the APMES targets updates as you go.'),
+    h('p', {}, 'Type the initials and case, tap the suggested tags, save. Your progress against the APMES targets updates as you go.'),
     h('ul', {},
-      h('li', {}, 'Category suggestions from what you type (age, BMI, procedure).'),
+      h('li', {}, 'Tag suggestions from what you type (age, BMI, procedure).'),
       h('li', {}, 'Works offline on your phone; syncs when you are back online.'),
-      h('li', {}, 'Progress by category and EPA; Excel download any time.'),
+      h('li', {}, 'Analytics: progress by tag and EPA, trends; Excel download any time.'),
       h('li', {}, 'Private: only you and the programme admins can see your cases.')),
     error ? h('p', { class: 'tip' }, error) : null,
     cloud.enabled ? h('div', { class: 'cta' },
@@ -355,21 +361,36 @@ function registerSW() {
 
 if (cloud.onSyncError) cloud.onSyncError(err => toast('A change could not be synced: ' + (err.message || err)));
 
+// shared to the installed app (Android share sheet): keep the text for the Log page, tidy the address
+{
+  const q = new URLSearchParams(location.search);
+  const shared = [q.get('share_title'), q.get('share_text'), q.get('share_url')].filter(Boolean).join('\n').trim();
+  if (q.has('share_text') || q.has('share_title') || q.has('share_url')) {
+    try { if (shared) sessionStorage.setItem(SHARED_KEY, shared); } catch { /* ignore */ }
+    for (const k of ['share_title', 'share_text', 'share_url']) q.delete(k);
+    const rest = q.toString().replace(/=(&|$)/g, '$1');
+    history.replaceState(null, '', location.pathname + (rest ? '?' + rest : '') + '#log');
+  }
+}
 applyTheme(cachedTheme());   // this device's choice (Settings → Display → Theme)
 applyTextSize(cachedTextSize());
 if (cachedCompact()) document.body.classList.add('compact');   // first paint; corrected once the logbook loads
 paintWho();
-if (cloud.demo) {
-  banner.className = 'banner warn';
-  fill(banner, h('span', {}, 'Demo: made-up data, stored only in this browser.'),
-    h('button', { class: 'small', onclick: async () => {
-      if (!(await confirmBox('Reset demo', 'Delete everything you added in the demo (cases, reflections, images, settings) and start again with the made-up data? The uploaded portfolio template is kept.', 'Reset', true))) return;
-      clearDrafts(); resetCaches(); forgetWho(); applyCompact(false); applyTextSize('1');
-      cloud.resetDemo();
-      location.reload();
-    } }, 'Reset demo'),
-    h('a', { href: location.pathname, class: 'btn small' }, 'Leave demo'));
-  banner.hidden = false;
+// Demo: what it is, Reset and Leave (from the header badge)
+function demoMenu() {
+  const m = modal('Demo', [
+    h('p', {}, 'Made-up data, stored only in this browser. Try anything: nothing is sent anywhere.'),
+    h('div', { class: 'bar', style: 'margin-top:12px;flex-wrap:wrap' },
+      h('button', { class: 'danger', onclick: async () => {
+        m.close();
+        if (!(await confirmBox('Reset demo', 'Delete everything you added in the demo (cases, reflections, images, settings) and start again with the made-up data? The uploaded portfolio template is kept.', 'Reset', true))) return;
+        clearDrafts(); resetCaches(); forgetWho(); applyCompact(false); applyTextSize('1');
+        cloud.resetDemo();
+        location.reload();
+      } }, 'Reset demo'),
+      h('a', { href: location.pathname, class: 'btn' }, 'Leave demo'),
+      h('span', { class: 'grow' }),
+      h('button', { onclick: () => m.close() }, 'Close'))]);
 }
 if (!cloud.enabled) renderLanding();
 else cloud.watchUser(onUser).catch(err => renderLanding('Could not start sign-in: ' + err.message));

@@ -86,7 +86,7 @@ const r = (o) => ({ status: 'complete', initials: 'AB', date: '2026-01-01', jr: 
   const base = { headingId: 'icu', initials: 'AB', date: '2026-01-01', caseId: 'c1' };
   assert.deepEqual(completeProblems({ ...base, title: 'T', points: [{ heading: 'One', text: '' }] }), []);
   assert.deepEqual(completeProblems({ ...base, summary: 'S', points: [] }), ['at least one learning point']);
-  assert.deepEqual(completeProblems({ ...base, points: [{ heading: 'a', text: 'b' }] }), ['title or case summary']);
+  assert.deepEqual(completeProblems({ ...base, points: [{ heading: 'a', text: 'b' }] }), ['title or case details']);
   assert.deepEqual(completeProblems({ headingId: 'cabg', title: 'T', points: [{ text: 'x' }] }), ['initials', 'date']);
   // no case link is fine
   assert.deepEqual(completeProblems({ ...base, caseId: null, title: 'T', points: [{ heading: 'One' }] }), []);

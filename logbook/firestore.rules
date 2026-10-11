@@ -116,6 +116,9 @@ service cloud.firestore {
       match /images/{id} {
         allow read, delete: if isOwner(email);
         allow create, update: if isOwner(email) && isMember() && validImage(id, request.resource.data);
+        // admins: only the figures of a portfolio marked ready (listed in its copy), to generate it
+        allow get: if isAdmin() && exists(/databases/$(database)/documents/submissions/$(email))
+          && id in get(/databases/$(database)/documents/submissions/$(email)).data.get('imageIds', []);
       }
 
       // ---- recycle bin (bin agent): deleted cases/reflections kept 30 days; owner only, admins no access ----
@@ -198,6 +201,30 @@ service cloud.firestore {
 
     // counts per resident for benchmarking: admins and programme residents read; admins or the
     // resident write. A resident's own write must carry the name and intake on the programme list.
+    // ready portfolios: a copy of what the portfolio needs (ticked reflections, their figures, Section 1,
+    // Section 4 counts), written by the resident when they mark it ready; admins read it to generate the
+    // portfolio. Admins still can't read logbooks, cases or the resident's own reflections.
+    match /submissions/{email} {
+      allow read: if isOwner(email) || isAdmin();
+      allow delete: if isOwner(email);
+      allow create, update: if isOwner(email) && validSubmission(email, request.resource.data);
+      match /reflections/{id} {
+        allow read: if isOwner(email) || isAdmin();
+        allow delete: if isOwner(email);
+        allow create, update: if isOwner(email) && validReflection(id, request.resource.data);
+      }
+    }
+    function validSubmission(email, d) {
+      return d.keys().hasOnly(['email', 'rid', 'name', 'intake', 'rYear', 'smo', 'readyAt', 'updatedAt', 'fp', 'count', 'profile', 'counts', 'imageIds'])
+        && (!('imageIds' in d) || (d.imageIds is list && d.imageIds.size() <= 1000))
+        && d.email == email
+        && optString(d, 'name', 200) && optString(d, 'fp', 100)
+        && (!('rid' in d) || d.rid == null || (d.rid is string && d.rid.size() <= 40))
+        && d.count is int && d.count >= 0 && d.count <= 500
+        && (!('profile' in d) || d.profile == null || (d.profile is map && d.profile.size() <= 30))
+        && d.counts is map && d.counts.size() <= 100;
+    }
+
     match /summaries/{rid} {
       allow read: if isAdmin() || isPD() || isMember();
       allow create, update: if validSummary(rid, request.resource.data)

@@ -6,10 +6,10 @@ import { YEAR_NAMES, yearName } from './categories.js';
 import { academicYear } from './engine.js';
 import { countCases, sortCodes, splitInitials } from './engine.js';
 import { parseResidentsScript, parseCaseSheet, parseTotalsSheet, countCheck } from './importer.js';
-import { S, h, toast, confirmBox, cloud, needExcel, sheetRows, fileButton, hooks, add, resetters, residentYear, residentYearName, residentSmo, baseIntake, effectiveIntake, catPills } from './ui-core.js';
-import { templateDialog } from './ui-settings.js';
+import { S, h, toast, confirmBox, cloud, needExcel, sheetRows, fileButton, hooks, add, resetters, residentYear, residentYearName, residentSmo, baseIntake, effectiveIntake, catPills, download, todayISO } from './ui-core.js';
+import { templateDialog, categoryNamesCard } from './ui-settings.js';
 import { forgetTotals } from './ui-progress.js';
-import { renderTemplateCard } from './portfolio.js';
+import { renderTemplateCard, getTemplate, exportPortfolio, needZip } from './portfolio.js';
 
 const STATUSES = ['ACTIVE', 'ON LEAVE', 'SMO', 'GRADUATED', 'ATTRITED'];
 const A = { residents: null, loading: false, pasted: null, imp: null, busy: false, log: [], shared: null, editRes: false };
@@ -27,7 +27,7 @@ export function leaveAdmin() { A.editRes = false; A.pasted = null; }
 export function renderAdmin() {
   if (!S.admin) return h('p', { class: 'empty' }, 'Admins only.');
   if (!A.residents && !A.loading) load();
-  return h('div', {}, residentsCard(), S.owner ? importCard() : ownerOnlyCard(), sharedCard(), h('p', { class: 'hint' }, 'Category names are in Settings → Category names (Edit).'), renderTemplateCard());
+  return h('div', {}, residentsCard(), S.owner ? importCard() : ownerOnlyCard(), readyPortfoliosCard(), sharedCard(), categoryNamesCard(), renderTemplateCard());
 }
 
 // Attrited residents are left off Totals: their rids go on config/totalsHidden, kept in step with the
@@ -65,6 +65,62 @@ async function unfixYears() {
     catch (err) { console.warn('year not moved to intake', r.rid, err); }
   }
   if (fixed.length && S.tab === 'admin' && !A.editRes) hooks.render();
+}
+
+// ---------- ready portfolios (residents marked theirs ready; generate one or all) ----------
+
+const RP = { list: null, loading: false, busy: '' };
+resetters.push(() => { RP.list = null; RP.loading = false; RP.busy = ''; });
+async function portfolioBlob(email) {
+  const sub = await cloud.loadSubmission(email);
+  if (!sub) throw new Error('not marked ready any more');
+  const t = await getTemplate();
+  const m = sub.meta;
+  const blob = await exportPortfolio(sub.reflections, { name: m.name || '', templateB64: t && t.data, counts: m.counts, intake: m.intake, rYear: m.rYear, smo: m.smo, images: sub.images, profile: m.profile });
+  return { blob, name: m.name || email };
+}
+const safeName = s => String(s || 'resident').replace(/[\\/:*?"<>|]+/g, ' ').trim().slice(0, 80);
+function readyPortfoliosCard() {
+  if (!RP.list && !RP.loading) {
+    RP.loading = true;
+    cloud.listSubmissions().then(l => { RP.list = l; }).catch(err => { RP.list = []; toast('Could not load ready portfolios: ' + err.message); }).finally(() => { RP.loading = false; if (S.tab === 'admin') hooks.render(); });
+  }
+  const list = (RP.list || []).slice().sort((a, b) => String(a.name).localeCompare(String(b.name)));
+  const readyEmails = new Set(list.map(x => x.email));
+  const notReady = (A.residents || []).filter(r => (r.status === 'ACTIVE' || r.status === 'SMO') && r.email && !readyEmails.has(String(r.email).toLowerCase()));
+  const one = async x => {
+    RP.busy = x.email; hooks.render();
+    try { const { blob, name } = await portfolioBlob(x.email); download(`APMES portfolio - ${safeName(name)}.docx`, blob); }
+    catch (err) { toast(`Could not generate ${x.name || x.email}: ${err.message}`); }
+    RP.busy = ''; hooks.render();
+  };
+  const all = async () => {
+    RP.busy = 'all'; hooks.render();
+    try {
+      const Z = await needZip();
+      const zip = new Z();
+      const failed = [];
+      for (const x of list) {
+        try { const { blob, name } = await portfolioBlob(x.email); zip.file(`APMES portfolio - ${safeName(name)}.docx`, blob); }
+        catch (err) { failed.push(`${x.name || x.email} (${err.message})`); }
+      }
+      if (notReady.length) zip.file('Not marked ready.txt', notReady.map(r => `${r.name || ''} <${r.email}>`).join('\r\n') + '\r\n');
+      download(`APMES portfolios ${todayISO()}.zip`, await zip.generateAsync({ type: 'blob' }));
+      toast(`${list.length - failed.length} portfolio${list.length - failed.length === 1 ? '' : 's'} generated${failed.length ? '; could not generate ' + failed.join(', ') : ''}`);
+    } catch (err) { toast('Could not generate: ' + err.message); }
+    RP.busy = ''; hooks.render();
+  };
+  return h('section', { class: 'card' },
+    h('div', { class: 'bar' }, h('h2', { style: 'margin:0' }, 'Ready portfolios'), h('span', { class: 'grow' }),
+      h('button', { class: 'small', onclick: () => { RP.list = null; hooks.render(); } }, 'Refresh'),
+      list.length ? h('button', { class: 'small primary', disabled: !!RP.busy, onclick: all }, RP.busy === 'all' ? 'Generating…' : `Download all (${list.length})`) : null),
+    h('p', { class: 'hint' }, 'Residents who marked their portfolio ready. Each is generated from what they ticked, with their Section 1 details and Section 4 case numbers, using the portfolio template. You never see their cases or other reflections.'),
+    !RP.list ? h('p', { class: 'muted' }, 'Loading…') : !list.length ? h('p', { class: 'empty' }, 'No portfolios marked ready yet.')
+      : h('ul', { class: 'ready-list' }, list.map(x => h('li', {},
+        h('span', { class: 'grow' }, h('b', {}, x.name || x.email), h('span', { class: 'muted' }, ` · ready ${new Date(x.readyAt).toLocaleDateString()}${x.updatedAt && x.updatedAt - x.readyAt > 60000 ? `, updated ${new Date(x.updatedAt).toLocaleDateString()}` : ''} · ${x.count} reflection${x.count === 1 ? '' : 's'}`)),
+        h('button', { class: 'small', disabled: !!RP.busy, onclick: () => one(x) }, RP.busy === x.email ? 'Generating…' : 'Download')))),
+    RP.list && notReady.length ? h('details', { class: 'more-tools' }, h('summary', {}, `Not marked ready (${notReady.length})`),
+      h('ul', { class: 'hint' }, notReady.map(r => h('li', {}, `${r.name || r.rid} · ${r.email}`)))) : null);
 }
 
 async function load() {
@@ -309,16 +365,16 @@ function sharedCard() {
   const list = A.shared || [];
   const save = async t => { try { await cloud.saveSharedTemplate(t); A.shared = [...list.filter(x => x.id !== t.id), t]; S.sharedTemplates = A.shared; hooks.render(); } catch (err) { toast('Could not save: ' + err.message); } };
   return h('section', { class: 'card' },
-    h('h2', {}, 'Shared templates'),
-    h('p', { class: 'hint' }, 'Quick picks everyone sees on the Log screen.'),
+    h('h2', {}, 'Shared tag groups'),
+    h('p', { class: 'hint' }, 'Tag groups every resident sees at the end of the tag list on the Log page.'),
     list.length ? h('ul', { class: 'prog' }, list.map(t => h('li', { style: 'grid-template-columns:1fr auto' },
       h('span', {}, h('b', {}, t.name), ' ', h('span', { class: 'muted' }, catPills(t.cats))),
       h('span', { class: 'row' },
         h('button', { class: 'small', onclick: () => templateDialog(t, save) }, 'Edit'),
         h('button', { class: 'small danger', onclick: async () => {
-          if (!(await confirmBox('Delete shared template', `Delete “${t.name}” for everyone?`, 'Delete', true))) return;
+          if (!(await confirmBox('Delete shared tag group', `Delete “${t.name}” for everyone?`, 'Delete', true))) return;
           try { await cloud.deleteSharedTemplate(t.id); } catch (err) { toast('Could not delete: ' + err.message); return; }
           A.shared = list.filter(x => x.id !== t.id); S.sharedTemplates = A.shared; hooks.render();
         } }, 'Delete'))))) : h('p', { class: 'muted' }, 'None yet.'),
-    h('div', { class: 'bar', style: 'margin:12px 0 0' }, h('button', { onclick: () => templateDialog(null, save) }, '+ New shared template')));
+    h('div', { class: 'bar', style: 'margin:12px 0 0' }, h('button', { onclick: () => templateDialog(null, save) }, '+ New shared tag group')));
 }

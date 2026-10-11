@@ -1,6 +1,6 @@
 // Run with: node logbook/test/tags.test.mjs  (fake data only)
 import assert from 'node:assert/strict';
-import { defaultTagSet, cleanTagSet, tagSetOf, tagTree, flatTree, tagLinks, userCatNames, tagName, tagSetToCsv, tagSetFromCsv, parseCsv } from '../js/tags.js';
+import { learnShorthand, cleanShorthand, apmesShorthand, shorthandTags, defaultTagSet, cleanTagSet, tagSetOf, tagTree, flatTree, tagLinks, userCatNames, tagName, tagSetToCsv, tagSetFromCsv, parseCsv } from '../js/tags.js';
 import { CATEGORIES } from '../js/categories.js';
 
 const ACTIVE = CATEGORIES.filter(c => !c.retired);
@@ -58,25 +58,73 @@ assert.equal(tagName([], '16:elective'), 'elective', 'older subcategory key');
 // CSV round trip
 const names = code => ({ pill: 'P' + code, long: 'Long ' + code });
 const csv = tagSetToCsv(c, names);
-assert.ok(csv.startsWith('Type,Tag,Long name,Under,APMES categories,Hidden,Key'));
-assert.ok(/Tag,Interscalene,,Blocks,26i Upper limb blocks,,u:x/.test(csv), csv.split('\r\n').find(l => l.includes('Interscalene')));
-const back = tagSetFromCsv(csv, names);
-assert.deepEqual(back.errors, []);
+assert.ok(csv.startsWith('Type,Name,Full name,Under,APMES tags,Shorthand,Hidden,ID'));
+assert.ok(/Personal,Interscalene,,Blocks,26i Upper limb blocks,,no,u:x/.test(csv), csv.split('\r\n').find(l => l.includes('Interscalene')));
+assert.ok(/^APMES,Blocks,/m.test(csv) && /^Header,/m.test(csv));
+const back = tagSetFromCsv(csv, names, c);
+assert.deepEqual(back.errors, []); assert.deepEqual(back.notes, []);
 const bb = Object.fromEntries(back.set.map(e => [e.k, e]));
 assert.equal(bb['c:26'].n, 'Blocks'); assert.equal(bb['c:26'].p, 'h:reg');
 assert.equal(bb['u:x'].p, 'c:26'); assert.deepEqual(bb['u:x'].links, ['26i']);
 assert.ok(!('n' in bb['c:03']), 'default names not stored');
-// hand-written CSV from Excel: moved columns, quotes, no keys
-const hand = 'Tag,Type,Under,APMES categories\r\nRegional,Header,,\r\nBlocks,Category,Regional,"26 Peripheral nerve blocks"\r\n"Hip #, NOF",Tag,Blocks,"18; 21"\r\nSupervisor note,Tag,,\r\nBad,Tag,,99x\r\n';
-const h2 = tagSetFromCsv(hand, names);
-assert.equal(h2.errors.length, 1); assert.match(h2.errors[0], /99x/);
+// the old file format still loads
+const old = 'Type,Tag,Long name,Under,APMES categories,Hidden,Key\r\nCategory,Blocks,,,26 Peripheral nerve blocks,,c:26\r\nTag,Interscalene,,Blocks,26i,,u:x\r\n';
+const o2 = tagSetFromCsv(old, names, c);
+assert.deepEqual(o2.errors, []); assert.equal(o2.set.find(e => e.k === 'u:x').p, 'c:26');
+// hand-written CSV from Excel: moved columns, quotes, no IDs, Under below it, names instead of numbers
+const hand = 'My tags\r\n\r\nName,Type,Under,Counts towards,Extra\r\nRegional,Header,,,x\r\nBlocks,APMES,Regional,"26 Peripheral nerve blocks"\r\n"Hip #, NOF",Personal,Blocks,"18; 21"\r\nSupervisor note,,Later,\r\nBad,Personal,,99x\r\nLater,Header,,\r\nThoracic,APMES,,Thoracic surgery\r\nInterscalene,Personal,Nowhere,8\r\n';
+const h2 = tagSetFromCsv(hand, names, c);
+assert.equal(h2.errors.length, 2, h2.errors.join('\n')); assert.match(h2.errors[0], /99x/); assert.match(h2.errors[1], /Nowhere/);
 const hip = h2.set.find(e => e.n === 'Hip #, NOF');
 assert.ok(hip && hip.k.startsWith('u:'));
 assert.deepEqual(hip.links, ['18', '21']);
 assert.equal(h2.set.find(e => e.k === 'c:26').p, h2.set.find(e => e.n === 'Regional').k);
 assert.deepEqual(tagLinks(h2.set, hip.k).sort(), ['18', '21', '26']);
+assert.equal(h2.set.find(e => e.n === 'Supervisor note').p, h2.set.find(e => e.n === 'Later').k, 'Under a row further down');
+assert.ok(h2.set.some(e => e.k === 'c:03'), 'APMES by name');
+assert.equal(h2.set.find(e => e.n === 'Interscalene').k, 'u:x', 'same name keeps your tag ID');
+assert.deepEqual(h2.set.find(e => e.n === 'Interscalene').links, ['08'], 'single-digit number');
+assert.ok(h2.missing.length > 0 && h2.notes.some(n => /at the end/.test(n)), 'missing APMES reported');
+assert.ok(h2.set.filter(e => e.k.startsWith('c:')).length === ACTIVE.length, 'missing APMES added back');
+// unknown type, duplicate APMES, semicolon file
+const odd = tagSetFromCsv('Type;Name;APMES categories\r\nWeird;Foo;\r\nAPMES;A;26\r\nAPMES;B;26\r\n', names, []);
+assert.equal(odd.errors.length, 2, odd.errors.join('\n')); assert.ok(odd.set.some(e => e.n === 'Foo' && e.k.startsWith('u:')));
+// your tags missing from the file are reported
+assert.ok(tagSetFromCsv('Type,Name\r\nPersonal,New one\r\n', names, c).dropped.includes('Interscalene'));
 assert.ok(tagSetFromCsv('a,b\r\n1,2', names).errors.length, 'not a tag file');
 assert.deepEqual(parseCsv('a,"b ""c""",d\n'), [['a', 'b "c"', 'd']]);
+// shorthand: stored cleaned, round-trips through the CSV, matches whole words (not the initials)
+assert.deepEqual(cleanShorthand('Appy, lap  appy;appy,'), ['appy', 'lap appy']);
+const ks = cleanTagSet([{ k: 'c:32', kw: ['flap', 'free flap'] }, { k: 'u:ap', n: 'Appendix', links: ['13'], kw: 'appy, lap appy' }, { k: 'h:z', n: 'H', hd: true, kw: ['x'] }]);
+assert.deepEqual(ks.find(e => e.k === 'u:ap').kw, ['appy', 'lap appy']);
+assert.ok(!ks.find(e => e.k === 'h:z').kw, 'headers have no shorthand');
+assert.deepEqual(shorthandTags(ks, 'AB 12M lap appy GA'), ['u:ap']);
+assert.deepEqual(shorthandTags(ks, 'happy patient'), [], 'whole words only');
+assert.deepEqual(shorthandTags([{ k: 'u:dl', n: 'DL', kw: ['dl'] }], 'DL 40F lap chole'), [], 'leading initials are not shorthand');
+assert.ok(apmesShorthand(ks).some(x => x.code === '32' && x.re.test(' free  flap')));
+const kc = tagSetFromCsv(tagSetToCsv(ks, names), names, ks);
+assert.deepEqual(kc.set.find(e => e.k === 'u:ap').kw, ['appy', 'lap appy']);
+assert.deepEqual(kc.set.find(e => e.k === 'c:32').kw, ['flap', 'free flap']);
+// built-in shorthand: shown on APMES tags until changed; a matching CSV row keeps following it
+import('../js/tags.js').then(({ shorthandOf, DEFAULT_SHORTHAND }) => {
+  assert.deepEqual(shorthandOf({ k: 'c:32' }), DEFAULT_SHORTHAND['32']);
+  assert.deepEqual(shorthandOf({ k: 'c:32', kw: [] }), [], 'turned off');
+  assert.deepEqual(cleanTagSet([{ k: 'c:32', kw: [] }]).find(e => e.k === 'c:32').kw, [], 'an empty list on an APMES tag is kept');
+  const d0 = defaultTagSet({});
+  const d1 = tagSetFromCsv(tagSetToCsv(d0, names), names, d0).set;
+  assert.ok(!d1.some(e => e.k.startsWith('c:') && e.kw), 'built-in shorthand is not copied into the set');
+});
+// shorthand learned from your own cases: frequent in the tag, rare elsewhere; ages and filler skipped
+{
+  const cs = [];
+  for (let i = 0; i < 5; i++) cs.push({ initials: 'AB', details: '45M lap appy GA', cats: ['08', '13'] });
+  for (let i = 0; i < 6; i++) cs.push({ initials: 'CD', details: '70M TKR spinal', cats: ['18', '28'], tags: ['u:knee'] });
+  const w = learnShorthand(cs, 'c:13').map(x => x.w);
+  assert.ok(w.includes('appy') && !w.includes('45m') && !w.includes('ga'), w.join());
+  assert.ok(!learnShorthand(cs, 'c:13', { have: ['appy'] }).some(x => x.w === 'appy'), 'words you have are not suggested');
+  assert.ok(learnShorthand(cs, 'u:knee').some(x => x.w === 'tkr'), 'personal tags too');
+  assert.deepEqual(learnShorthand(cs.slice(0, 2), 'c:13'), [], 'needs at least 3 cases');
+}
 console.log('tags tests passed');
 {
   const { moveTag, reparentTag, removeTag } = await import('../js/tags.js');
@@ -95,4 +143,29 @@ console.log('tags tests passed');
   assert.equal(del.find(e => e.k === 'u:3').p, 'h:a', 'child moves up');
   assert.equal(removeTag(s, 'c:26'), s, 'built-ins stay');
   console.log('tag editing tests passed');
+}
+{
+  const { dropTag, canPlace } = await import('../js/tags.js');
+  const s = cleanTagSet([{ k: 'h:a', n: 'A', hd: true }, { k: 'u:1', n: 'one' }, { k: 'u:2', n: 'two', p: 'u:1' }]);
+  // a tag nested by dragging onto another
+  let d = dropTag(s, 'u:1', 'c:26', 'inside');
+  assert.equal(d.find(e => e.k === 'u:1').p, 'c:26');
+  assert.equal(d.find(e => e.k === 'u:2').p, 'u:1', 'its child comes with it');
+  assert.ok(d.findIndex(e => e.k === 'u:1') > d.findIndex(e => e.k === 'c:26iii'), 'last child of 26');
+  // before / after: sibling of the target
+  d = dropTag(s, 'u:1', 'c:03', 'before');
+  assert.ok(!d.find(e => e.k === 'u:1').p);
+  assert.equal(d.findIndex(e => e.k === 'u:2'), d.findIndex(e => e.k === 'c:03') - 1, 'the block (with its child) sits right before Thoracic');
+  d = dropTag(s, 'c:16', 'h:a', 'inside');
+  assert.equal(d.find(e => e.k === 'c:16').p, 'h:a', 'a category under a header');
+  // not allowed: unchanged
+  assert.equal(dropTag(s, 'c:16', 'c:26', 'inside'), s, 'category under a category');
+  assert.equal(dropTag(s, 'c:20i', 'c:26', 'inside'), s, 'built-in sub stays with its parent');
+  assert.equal(dropTag(s, 'h:a', 'c:26', 'inside'), s, 'header nested');
+  assert.equal(dropTag(s, 'u:1', 'u:2', 'inside'), s, 'under its own child');
+  assert.ok(canPlace(s, 'c:20ii', 'c:20') && !canPlace(s, 'c:20ii', ''));
+  // reorder built-in subs among themselves
+  d = dropTag(s, 'c:20iii', 'c:20i', 'before');
+  assert.ok(d.findIndex(e => e.k === 'c:20iii') < d.findIndex(e => e.k === 'c:20i'));
+  console.log('tag drag tests passed');
 }
