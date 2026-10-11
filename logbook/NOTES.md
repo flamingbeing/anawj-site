@@ -56,8 +56,10 @@ portfolio content.
   (ticks, Quick actions). Draft kept per account. Only a small "Rules for reflections" (no card) at the bottom.
 - **Analytics** (`ui-progress.js`): header tally, folded sections (Needs attention, Logbook,
   Reflections with ⓘ requirements, Trends), Compare with your intake (Totals). EPA view and Download summary removed (owner: not useful).
-- **More** (`app.js`): Account (with Residency year for non-programme users), Settings, Export &
-  backup, Admin portal; Privacy, Credits, What's new (`WHATS_NEW` in app.js; update each release).
+- **More** (`app.js`): Account (with Residency year for non-programme users; Delete account at the bottom,
+  greyed out for residents on the programme list: a programme admin takes them off first; `cloud.deleteAccount`
+  wipes cases, reflections, images, bin, submission, members entry, logbook, then the Google sign-in), Settings, Export &
+  backup, Admin portal; Privacy, Credits, What's new (`WHATS_NEW` in app.js; update each release), Sign out at the very bottom.
 - **Settings**: a menu of Display (incl. the tab the app opens on, `settings.startTab`; a #hash still wins),
   Logging, Tag editor (`#tags`), Reflections (`#reflset`: new reflections in the export, photo sizes), Copy & share format (`#sharefmt`), Recycle bin;
   then a "Settings file" card: export / import settings, tags, tag groups, formats as JSON (`settings-file.js`, tested; never cases or portfolio).

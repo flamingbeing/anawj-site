@@ -246,6 +246,13 @@ export async function watchUser(cb) {
 
 export async function signIn() { const s = load(); s.signedOut = false; save(s); notifyAll(); }
 export async function signOut() { const s = load(); s.signedOut = true; save(s); notifyAll(); }
+// Delete account in the demo: the demo user's logbook goes (cases, reflections, photos, bin) and they're
+// signed out; signing in again starts an empty logbook (?demo=reset brings the samples back).
+export async function deleteAccount(email) {
+  const s = load(); delete s.logbooks[lc(email)]; s.signedOut = true; save(s);
+  try { localStorage.removeItem(KEY + '-images'); localStorage.removeItem(KEY + '-submissions'); } catch { /* ignore */ }
+  notifyAll();
+}
 
 export async function isAdmin(email) { return !!load().admins[lc(email)]; }
 

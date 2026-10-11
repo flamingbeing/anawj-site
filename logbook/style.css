@@ -914,3 +914,5 @@ details.an-sec[open] > summary .an-t::after { content: ' ⌄'; }
 .ops-pick .ops-row span { font-size: 14px; color: var(--muted); }
 /* Reflections: the rules sit small at the bottom, no card */
 details.refl-foot { margin: 4px 4px 12px; }
+.danger-zone h2 { color: var(--err, #b91c1c); }
+.danger-zone.off h2 { color: var(--muted); }

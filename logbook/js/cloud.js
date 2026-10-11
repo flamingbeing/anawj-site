@@ -137,6 +137,45 @@ export async function signOut() {
   try { await dbReady; } finally { dbReady = null; }
 }
 
+// Delete the account (Account → Delete account; never offered to residents on the programme list):
+// every case, reflection, photo and bin entry, a ready portfolio, the members entry and the logbook,
+// then the Google sign-in itself. Firebase may ask to sign in again first (a recent sign-in is needed
+// to delete one). onStep(text) reports progress.
+export async function deleteAccount(email, onStep = () => {}) {
+  if (demo) return D.deleteAccount(email);
+  email = lc(email);
+  const { db, F, auth, A } = await sdk();
+  const wipe = async path => {
+    const snap = await F.getDocs(F.collection(db, ...path));
+    for (let i = 0; i < snap.docs.length; i += 400) {
+      const b = F.writeBatch(db);
+      for (const d of snap.docs.slice(i, i + 400)) b.delete(d.ref);
+      await b.commit();
+    }
+    return snap.size;
+  };
+  for (const [sub, label] of [['cases', 'cases'], ['reflections', 'reflections'], ['images', 'photos'], ['bin', 'recycle bin']]) {
+    onStep(`Deleting ${label}…`);
+    await wipe(['logbooks', email, sub]);
+  }
+  onStep('Deleting the rest…');
+  await wipe(['submissions', email, 'reflections']).catch(() => 0);
+  await F.deleteDoc(F.doc(db, 'submissions', email)).catch(() => {});
+  await F.deleteDoc(F.doc(db, 'members', email)).catch(() => {});
+  await F.deleteDoc(F.doc(db, 'logbooks', email));
+  onStep('Removing the sign-in…');
+  const u = auth.currentUser;
+  if (u) {
+    try { await A.deleteUser(u); }
+    catch (e) {
+      if (e?.code !== 'auth/requires-recent-login') throw e;
+      await A.reauthenticateWithPopup(u, new A.GoogleAuthProvider());
+      await A.deleteUser(u);
+    }
+  }
+  await signOut().catch(() => {});
+}
+
 // ---- people ----
 
 export async function isAdmin(email) {
