@@ -30,6 +30,6 @@ export function readSettingsFile(text) {
   }
   if ('tagSet' in settings) settings.tagSet = settings.tagSet == null ? null : cleanTagSet(settings.tagSet);
   const templates = Array.isArray(d.templates) ? d.templates.slice(0, 100).map(cleanTemplate).filter(t => t.id && t.cats.length) : null;
-  const theme = ['light', 'dark', 'auto'].includes(d.theme) ? d.theme : null;
+  const theme = ['light', 'dark', 'oled', 'auto'].includes(d.theme) ? d.theme : null;
   return { settings, templates, theme };
 }

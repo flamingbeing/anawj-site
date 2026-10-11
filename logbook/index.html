@@ -16,9 +16,9 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <script>
   // this device's theme before the first paint (Settings → Display → Theme; light unless chosen)
-  try { var t = localStorage.getItem('apmes-logbook-theme'); document.documentElement.dataset.theme = t === 'dark' || t === 'auto' ? t : 'light'; } catch (e) {}
-  // and its colour theme (Settings → Display → Theme; Default unless chosen)
-  try { var sc = localStorage.getItem('apmes-logbook-scheme'); if (/^(nord|matcha|sakura|mono)$/.test(sc || '')) document.documentElement.dataset.scheme = sc; } catch (e) {}
+  try { var t = localStorage.getItem('apmes-logbook-theme'); document.documentElement.dataset.theme = t === 'dark' || t === 'oled' ? 'dark' : t === 'auto' ? 'auto' : 'light'; if (t === 'oled') document.documentElement.dataset.oled = ''; } catch (e) {}
+  // and its colour (Settings → Display → Colour; navy unless chosen): the palettes colors.js worked out last time
+  try { var css = localStorage.getItem('apmes-logbook-accent-css'); if (css && css.length < 8000) { var st = document.createElement('style'); st.id = 'accent-css'; st.textContent = css; document.head.appendChild(st); } } catch (e) {}
 </script>
 <link rel="stylesheet" href="style.css">
 <!-- fetch every module and the Firebase SDK at once instead of one import at a time -->

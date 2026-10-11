@@ -6,7 +6,7 @@ import { S, hooks, h, toast, cloud, setCases, scheduleSummary, fill, resetCaches
 import { renderLog, logCasesChanged, clearDrafts, SHARED_KEY } from './ui-log.js';
 import { renderLogbook } from './ui-logbook.js';
 import { renderProgress, renderTotals } from './ui-progress.js';
-import { applyCompact, cachedCompact, applyTheme, cachedTheme, applyTextSize, cachedTextSize, applyScheme, renderTagEditor, renderDisplay, renderLogging, renderReflectionSettings, renderShareFormat, START_TABS, privacyCard, creditsCard, signOutCard } from './ui-settings.js';
+import { applyCompact, cachedCompact, applyTheme, cachedTheme, applyTextSize, cachedTextSize, applyAccent, renderTagEditor, renderDisplay, renderLogging, renderReflectionSettings, renderShareFormat, START_TABS, privacyCard, creditsCard, signOutCard } from './ui-settings.js';
 import { renderAccount, flush as flushProfile } from './ui-account.js';
 import { renderAdmin, leaveAdmin } from './ui-admin.js';
 import { renderReflect, watchMyReflections, renderExportPage, renderChoosePage } from './ui-reflect.js';
@@ -125,7 +125,7 @@ function settingsFileCard() {
     if (!(await confirmBox('Import settings', `Use the ${n} setting${n === 1 ? '' : 's'} in this file${newGroups.length ? ` and add ${newGroups.length} tag group${newGroups.length === 1 ? '' : 's'}` : ''}? Settings in the file replace yours (your tags and shorthand too, if the file has them); anything not in it stays. Cases, reflections and portfolio details are never touched.`, 'Import'))) return;
     await patchLogbook({ settings: d.settings, ...(newGroups.length ? { templates: [...mine, ...newGroups].slice(0, 100) } : {}) });
     if (d.theme) applyTheme(d.theme);
-    applyCompact(!!settings().compact); applyTextSize(settings().textSize || '1'); applyScheme(settings().scheme);
+    applyCompact(!!settings().compact); applyTextSize(settings().textSize || '1'); applyAccent(settings().accent);
     toast('Settings imported'); render();
   };
   return h('section', { class: 'card' },
@@ -339,7 +339,7 @@ function refreshWho(user, who, firstLogbook) {
     let lbChanged = false;
     if (lb && S.logbook === firstLogbook && JSON.stringify(lb) !== JSON.stringify(firstLogbook)) {
       S.logbook = lb; lbChanged = true;
-      applyCompact(lb.settings && lb.settings.compact); applyTextSize(lb.settings && lb.settings.textSize); applyScheme(lb.settings && lb.settings.scheme);
+      applyCompact(lb.settings && lb.settings.compact); applyTextSize(lb.settings && lb.settings.textSize); applyAccent(lb.settings && lb.settings.accent);
     }
     if (adoptShared()) lbChanged = true;
     if (!lbChanged && before === JSON.stringify([S.admin, S.owner, S.pd, S.resident, S.sharedTemplates, categoryNamesNow()])) return;
@@ -359,7 +359,7 @@ async function onUser(user) {
   S.user = user;
   if (!user) {
     Object.assign(S, { admin: false, owner: false, pd: false, resident: null, logbook: null, cases: [], reflections: [], counts: {}, casesLoaded: false, casesSynced: false, sharedTemplates: [] });
-    if (signedInOnce) { clearDrafts(); resetCaches(); forgetWho(); applyCompact(false); applyTextSize('1'); applyScheme('default'); }   // a shared device starts plain for the next person
+    if (signedInOnce) { clearDrafts(); resetCaches(); forgetWho(); applyCompact(false); applyTextSize('1'); applyAccent(null); }   // a shared device starts plain for the next person
     paintWho();
     renderLanding();
     return;
@@ -390,7 +390,7 @@ async function onUser(user) {
     else refreshWho(user, who, logbook);
     applyCompact(logbook.settings && logbook.settings.compact);   // per-user display settings
     applyTextSize(logbook.settings && logbook.settings.textSize);
-    applyScheme(logbook.settings && logbook.settings.scheme);
+    applyAccent(logbook.settings && logbook.settings.accent);
     const resident = S.resident;
     if (!logbook.name && (resident?.name || user.name)) S.logbook.name = resident?.name || user.name;
     // a programme resident's logbook remembers their rid (used by admins and the rules)
@@ -513,7 +513,7 @@ function demoMenu() {
       h('button', { class: 'danger', onclick: async () => {
         m.close();
         if (!(await confirmBox('Reset demo', 'Delete everything you added in the demo (cases, reflections, images, settings) and start again with the made-up data? The uploaded portfolio template is kept.', 'Reset', true))) return;
-        clearDrafts(); resetCaches(); forgetWho(); applyCompact(false); applyTextSize('1'); applyScheme('default');
+        clearDrafts(); resetCaches(); forgetWho(); applyCompact(false); applyTextSize('1'); applyAccent(null);
         cloud.resetDemo();
         location.reload();
       } }, 'Reset demo'),

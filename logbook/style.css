@@ -527,15 +527,15 @@ button.icon-btn { min-width: 40px; }
 
 /* ---------- dark mode: Settings → Display → Theme (light by default; data-theme on <html>) ---------- */
 :root[data-theme="dark"] {
-    --bg: #121417; --panel: #1c1f24; --ink: #e6e8eb; --muted: #a2abb5; --line: #333941;
-    --accent: #8cc0ff; --accent-ink: #0b1a2e; --accent-soft: #1d2b3d; --chip: #1f2a36; --chip-on: #8cc0ff;
+    --bg: #121417; --panel: #1b1e23; --ink: #eef0f3; --muted: #b8c0c9; --line: #363b43;
+    --accent: #69abff; --accent-ink: #0d0f12; --accent-soft: #283a51; --chip: #222d3b; --chip-on: #69abff;
     --err: #ff9a8f; --err-bg: #3b1f1c; --warn: #f3c46e; --warn-bg: #362b12; --ok: #74dd90; --ok-bg: #15301e;
-    --info: #8cc0ff; --info-bg: #15263a; --row-alt: #181b20; --ontrack: #5f666e; color-scheme: dark;
+    --info: #69abff; --info-bg: #222f40; --row-alt: #202329; --ontrack: #5f666e; color-scheme: dark;
   }
 :root[data-theme="dark"] .top h1, :root[data-theme="dark"] section.card h2, :root[data-theme="dark"] h2, :root[data-theme="dark"] h3 { color: var(--accent); }
 :root[data-theme="dark"] :focus-visible, :root[data-theme="dark"] input:focus, :root[data-theme="dark"] select:focus, :root[data-theme="dark"] textarea:focus { outline-color: var(--accent); }
 :root[data-theme="dark"] input:focus, :root[data-theme="dark"] select:focus, :root[data-theme="dark"] textarea:focus { border-color: var(--accent); }
-:root[data-theme="dark"] input, :root[data-theme="dark"] select, :root[data-theme="dark"] textarea { background: #15181c; color: var(--ink); }
+:root[data-theme="dark"] input, :root[data-theme="dark"] select, :root[data-theme="dark"] textarea { background: var(--input-bg, #15181c); color: var(--ink); }
 :root[data-theme="dark"] table.totals td.late { background: #4a1f23; }
 :root[data-theme="dark"] table.totals td.due { background: #43361a; }
 :root[data-theme="dark"] table.totals td.done { background: #1d3a25; }
@@ -544,15 +544,15 @@ button.icon-btn { min-width: 40px; }
 :root[data-theme="dark"] img { opacity: .92; }
 @media (prefers-color-scheme: dark) {
   :root[data-theme="auto"] {
-    --bg: #121417; --panel: #1c1f24; --ink: #e6e8eb; --muted: #a2abb5; --line: #333941;
-    --accent: #8cc0ff; --accent-ink: #0b1a2e; --accent-soft: #1d2b3d; --chip: #1f2a36; --chip-on: #8cc0ff;
+    --bg: #121417; --panel: #1b1e23; --ink: #eef0f3; --muted: #b8c0c9; --line: #363b43;
+    --accent: #69abff; --accent-ink: #0d0f12; --accent-soft: #283a51; --chip: #222d3b; --chip-on: #69abff;
     --err: #ff9a8f; --err-bg: #3b1f1c; --warn: #f3c46e; --warn-bg: #362b12; --ok: #74dd90; --ok-bg: #15301e;
-    --info: #8cc0ff; --info-bg: #15263a; --row-alt: #181b20; --ontrack: #5f666e; color-scheme: dark;
+    --info: #69abff; --info-bg: #222f40; --row-alt: #202329; --ontrack: #5f666e; color-scheme: dark;
   }
   :root[data-theme="auto"] .top h1, :root[data-theme="auto"] section.card h2, :root[data-theme="auto"] h2, :root[data-theme="auto"] h3 { color: var(--accent); }
   :root[data-theme="auto"] :focus-visible, :root[data-theme="auto"] input:focus, :root[data-theme="auto"] select:focus, :root[data-theme="auto"] textarea:focus { outline-color: var(--accent); }
   :root[data-theme="auto"] input:focus, :root[data-theme="auto"] select:focus, :root[data-theme="auto"] textarea:focus { border-color: var(--accent); }
-  :root[data-theme="auto"] input, :root[data-theme="auto"] select, :root[data-theme="auto"] textarea { background: #15181c; color: var(--ink); }
+  :root[data-theme="auto"] input, :root[data-theme="auto"] select, :root[data-theme="auto"] textarea { background: var(--input-bg, #15181c); color: var(--ink); }
   :root[data-theme="auto"] table.totals td.late { background: #4a1f23; }
   :root[data-theme="auto"] table.totals td.due { background: #43361a; }
   :root[data-theme="auto"] table.totals td.done { background: #1d3a25; }
@@ -920,26 +920,13 @@ details.refl-foot { margin: 4px 4px 12px; }
 .danger-zone h2 { color: var(--err, #b91c1c); }
 .danger-zone.off h2 { color: var(--muted); }
 
-/* ---------- colour themes: Settings → Display → Theme (data-scheme on <html>; Default has none).
-   Each has a light and a dark palette; light/dark itself is the separate data-theme. ---------- */
-:root[data-scheme="nord"] { --bg: #eceff4; --panel: #ffffff; --ink: #2e3440; --muted: #5b6477; --line: #d8dee9; --accent: #4c6f9b; --accent-ink: #ffffff; --accent-soft: #e3eaf3; --chip: #e8eef6; --chip-on: #4c6f9b; --info: #4c6f9b; --info-bg: #e5ecf5; --row-alt: #f4f6f9; --heading: #3b4252; --s1: #88c0d0; --s2: #81a1c1; --s3: #5e81ac; --s4: #b48ead; }
-:root[data-scheme="nord"][data-theme="dark"] { --bg: #242933; --panel: #2e3440; --ink: #eceff4; --muted: #a3adbf; --line: #434c5e; --accent: #88c0d0; --accent-ink: #1d2129; --accent-soft: #34404f; --chip: #3b4252; --chip-on: #88c0d0; --info: #88c0d0; --info-bg: #2f3b4a; --row-alt: #2a303b; --heading: #88c0d0; --input-bg: #262b35; }
-@media (prefers-color-scheme: dark) { :root[data-scheme="nord"][data-theme="auto"] { --bg: #242933; --panel: #2e3440; --ink: #eceff4; --muted: #a3adbf; --line: #434c5e; --accent: #88c0d0; --accent-ink: #1d2129; --accent-soft: #34404f; --chip: #3b4252; --chip-on: #88c0d0; --info: #88c0d0; --info-bg: #2f3b4a; --row-alt: #2a303b; --heading: #88c0d0; --input-bg: #262b35; } }
-:root[data-scheme="matcha"] { --bg: #f2f4ef; --panel: #ffffff; --ink: #2b2f2a; --muted: #5f665b; --line: #dde2d6; --accent: #44704b; --accent-ink: #ffffff; --accent-soft: #e3eee2; --chip: #ebf2e7; --chip-on: #44704b; --info: #44704b; --info-bg: #e6f0e3; --row-alt: #f7f9f5; --heading: #2f5a37; --s1: #d7e3a3; --s2: #a8cc8c; --s3: #6b9f6e; --s4: #2f5a37; }
-:root[data-scheme="matcha"][data-theme="dark"] { --bg: #151915; --panel: #1e241e; --ink: #e4ebe1; --muted: #a3ad9f; --line: #343d33; --accent: #9ccf8f; --accent-ink: #132013; --accent-soft: #263326; --chip: #243024; --chip-on: #9ccf8f; --info: #9ccf8f; --info-bg: #1f2e20; --row-alt: #1a1f1a; --heading: #9ccf8f; --input-bg: #171c17; }
-@media (prefers-color-scheme: dark) { :root[data-scheme="matcha"][data-theme="auto"] { --bg: #151915; --panel: #1e241e; --ink: #e4ebe1; --muted: #a3ad9f; --line: #343d33; --accent: #9ccf8f; --accent-ink: #132013; --accent-soft: #263326; --chip: #243024; --chip-on: #9ccf8f; --info: #9ccf8f; --info-bg: #1f2e20; --row-alt: #1a1f1a; --heading: #9ccf8f; --input-bg: #171c17; } }
-:root[data-scheme="sakura"] { --bg: #fdf5f7; --panel: #ffffff; --ink: #3a2e33; --muted: #76646c; --line: #f0dfe4; --accent: #b83b70; --accent-ink: #ffffff; --accent-soft: #fbe6ee; --chip: #fcedf2; --chip-on: #b83b70; --info: #b83b70; --info-bg: #fbe9f0; --row-alt: #fffafb; --heading: #9c2f5a; --s1: #ffd1df; --s2: #ff9fbf; --s3: #e0659a; --s4: #a78bfa; }
-:root[data-scheme="sakura"][data-theme="dark"] { --bg: #1b1417; --panel: #261c21; --ink: #f3e6eb; --muted: #bba5ae; --line: #3d2d34; --accent: #ff9cc0; --accent-ink: #2a0f1b; --accent-soft: #3a2430; --chip: #33222b; --chip-on: #ff9cc0; --info: #ff9cc0; --info-bg: #35202b; --row-alt: #22191d; --heading: #ff9cc0; --input-bg: #1e161a; }
-@media (prefers-color-scheme: dark) { :root[data-scheme="sakura"][data-theme="auto"] { --bg: #1b1417; --panel: #261c21; --ink: #f3e6eb; --muted: #bba5ae; --line: #3d2d34; --accent: #ff9cc0; --accent-ink: #2a0f1b; --accent-soft: #3a2430; --chip: #33222b; --chip-on: #ff9cc0; --info: #ff9cc0; --info-bg: #35202b; --row-alt: #22191d; --heading: #ff9cc0; --input-bg: #1e161a; } }
-:root[data-scheme="mono"] { --bg: #fafafa; --panel: #ffffff; --ink: #18181b; --muted: #5f5f68; --line: #e4e4e7; --accent: #18181b; --accent-ink: #ffffff; --accent-soft: #f0f0f2; --chip: #f4f4f5; --chip-on: #18181b; --info: #18181b; --info-bg: #f4f4f5; --row-alt: #fafafa; --heading: #18181b; --s1: #18181b; --s2: #18181b; --s3: #18181b; --s4: #18181b; }
-:root[data-scheme="mono"][data-theme="dark"] { --bg: #0b0b0c; --panel: #161618; --ink: #ededef; --muted: #a1a1aa; --line: #2a2a2e; --accent: #fafafa; --accent-ink: #0b0b0c; --accent-soft: #232326; --chip: #1f1f22; --chip-on: #fafafa; --info: #fafafa; --info-bg: #1d1d20; --row-alt: #121214; --heading: #fafafa; --s1: #fafafa; --s2: #fafafa; --s3: #fafafa; --s4: #fafafa; --input-bg: #0f0f11; }
-@media (prefers-color-scheme: dark) { :root[data-scheme="mono"][data-theme="auto"] { --bg: #0b0b0c; --panel: #161618; --ink: #ededef; --muted: #a1a1aa; --line: #2a2a2e; --accent: #fafafa; --accent-ink: #0b0b0c; --accent-soft: #232326; --chip: #1f1f22; --chip-on: #fafafa; --info: #fafafa; --info-bg: #1d1d20; --row-alt: #121214; --heading: #fafafa; --s1: #fafafa; --s2: #fafafa; --s3: #fafafa; --s4: #fafafa; --input-bg: #0f0f11; } }
-:root[data-scheme] input, :root[data-scheme] select, :root[data-scheme] textarea { background: var(--input-bg, var(--panel)); }
-/* the theme picker */
-.scheme-pick { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; margin: 6px 0 4px; }
-.scheme-pick button { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 10px; min-height: 76px; text-align: left; font-weight: 400; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
-.scheme-pick button[aria-pressed="true"] { border: 2px solid var(--accent); padding: 9px; }
-.scheme-pick b { font-size: 14px; }
-.scheme-pick small { font-size: 12px; color: var(--muted); line-height: 1.3; }
-.scheme-dots { display: flex; gap: 4px; }
-.scheme-dots i { width: 16px; height: 16px; border-radius: 50%; border: 1px solid rgba(0,0,0,.12); }
+/* ---------- colour: one accent (Settings → Display → Colour); colors.js writes the palettes into a
+   <style id="accent-css"> (cached for the first paint). OLED black is data-oled on top of dark. ---------- */
+:root[data-theme="dark"][data-oled] section.card, :root[data-theme="dark"][data-oled] dialog, :root[data-theme="dark"][data-oled] .savebar { border: 1px solid var(--line); }
+/* the colour picker: suggested swatches, then any colour */
+.accent-pick { display: flex; flex-wrap: wrap; gap: 10px; margin: 6px 0 4px; }
+.accent-pick .swatch { position: relative; width: 44px; height: 44px; min-height: 44px; padding: 0; border-radius: 50%; border: 2px solid var(--line); background: var(--sw, var(--panel)); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.accent-pick .swatch[aria-pressed="true"], .accent-pick .swatch.on { box-shadow: 0 0 0 3px var(--panel), 0 0 0 5px var(--ink); border-color: transparent; }
+.accent-pick .swatch.custom { background: var(--sw, conic-gradient(#e4002b, #e57200, #d4a72c, #2da44e, #00a9e0, #6d4fc2, #c2417a, #e4002b)); color: #fff; font-size: 22px; font-weight: 700; text-shadow: 0 1px 2px rgba(0,0,0,.5); }
+.accent-pick .swatch.custom input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; border: 0; padding: 0; cursor: pointer; }
+.accent-pick .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
