@@ -101,6 +101,11 @@ portfolio content.
   Monospace (system stacks), a font installed on the device by name (`cleanFontName`; a width test says whether it
   was found; Safari mostly ignores user-installed fonts), or the user's own file (.woff2/.woff/.ttf/.otf ≤ 3 MB,
   IndexedDB `apmes-logbook-fonts`, FontFace API; this device only, never synced).
+- **Look options** (Display, per device; `applyLook` in ui-settings.js, classes on `<html>`, also set at first paint in
+  index.html): line spacing (`--lh`; every line-height in style.css is `calc(x * var(--lh, 1))`), line width (narrow
+  760 px / normal 980 / wide 1400; the Case tab's panes keep theirs), contrast (follow the device's Increase contrast
+  by default, normal, or higher: darker text and lines), motion (follow the device's Reduce motion by default, on, or
+  reduce), icons-only tab bar (buttons keep `aria-label`). Defaults are pixel-identical to before.
 - **Display is per device** (owner: people use the logbook on different devices with different needs): compact,
   text size, zoom, fonts, colour and the start tab live in localStorage `apmes-logbook-display` (`deviceDisplay` / `setDisplay` /
   `adoptDisplay` in ui-settings.js), light / dark in `apmes-logbook-theme`. A device with none starts from the

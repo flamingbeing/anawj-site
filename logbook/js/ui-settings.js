@@ -96,7 +96,7 @@ export function residencyCard() {
 // the light / dark choice. The first time a device opens the app it starts from what the account had (these used to
 // follow the account), so nobody's look changes. Kept at sign-out: they are the device's, and nothing private.
 const DISPLAY_KEY = 'apmes-logbook-display';
-export const DISPLAY_KEYS = ['compact', 'textSize', 'zoom', 'accent', 'startTab', 'fontUi', 'fontUiName', 'fontLog', 'fontLogName'];
+export const DISPLAY_KEYS = ['compact', 'textSize', 'zoom', 'accent', 'startTab', 'fontUi', 'fontUiName', 'fontLog', 'fontLogName', 'lineWidth', 'lineHeight', 'contrast', 'motion', 'tabIcons'];
 export function deviceDisplay() {
   try { const d = JSON.parse(localStorage.getItem(DISPLAY_KEY) || 'null'); return d && typeof d === 'object' && !Array.isArray(d) ? d : null; } catch { return null; }
 }
@@ -125,7 +125,21 @@ export function adoptDisplay(accountSettings, { fresh = false } = {}) {
   return display();   // (an old account text size becomes the zoom here too)
 }
 export function resetDisplay() { adoptedNow = false; try { localStorage.removeItem(DISPLAY_KEY); } catch { /* storage blocked */ } }
-export function applyDisplay(d = display()) { applyCompact(!!d.compact); applyTextSize(d.textSize || '1'); applyZoom(d.zoom || '1'); applyAccent(d.accent); applyFonts(d); }
+export function applyDisplay(d = display()) { applyCompact(!!d.compact); applyTextSize(d.textSize || '1'); applyZoom(d.zoom || '1'); applyAccent(d.accent); applyFonts(d); applyLook(d); }
+// line width, line spacing, contrast, motion, icons-only tabs: classes on <html> and --lh (style.css, end); also set at
+// first paint from the same localStorage entry (index.html)
+export const LINE_WIDTHS = [['narrow', 'Narrow (easier to read on a big screen)'], ['normal', 'Normal (default)'], ['wide', 'Wide (use the whole screen)']];
+export const LINE_HEIGHTS = [['0.9', 'Tight'], ['1', 'Normal (default)'], ['1.15', 'Relaxed'], ['1.3', 'Loose']];
+export const CONTRASTS = [['auto', 'Follow the device (default)'], ['normal', 'Normal'], ['high', 'Higher contrast']];
+export const MOTIONS = [['auto', 'Follow the device (default)'], ['full', 'Animations on'], ['reduce', 'Reduce motion']];
+export function applyLook(d = {}) {
+  const c = document.documentElement.classList;
+  c.toggle('lw-narrow', d.lineWidth === 'narrow'); c.toggle('lw-wide', d.lineWidth === 'wide');
+  document.documentElement.style.setProperty('--lh', LINE_HEIGHTS.some(([v]) => v === String(d.lineHeight)) ? String(d.lineHeight) : '1');
+  const ct = d.contrast || 'auto'; c.toggle('hc', ct === 'high'); c.toggle('hc-auto', ct === 'auto');
+  const mo = d.motion || 'auto'; c.toggle('rm', mo === 'reduce'); c.toggle('rm-auto', mo === 'auto');
+  c.toggle('tab-icons', !!d.tabIcons);
+}
 
 export function renderDisplay() {
   const st = display();
@@ -146,6 +160,11 @@ export function renderDisplay() {
       h('p', { class: 'hint help', style: 'margin:2px 0 0' }, 'Only the words: buttons and spacing stay as they are.'),
       fontPicker('ui'),
       fontPicker('log'),
+      lookSelect('lineHeight', 'Line spacing', LINE_HEIGHTS, '1'),
+      lookSelect('lineWidth', 'Line width', LINE_WIDTHS, 'normal', 'How wide text and lists go on a computer or tablet. The Case tab keeps its two panes.'),
+      lookSelect('contrast', 'Contrast', CONTRASTS, 'auto', 'Higher contrast: darker text and stronger lines (lighter in dark mode).'),
+      lookSelect('motion', 'Motion', MOTIONS, 'auto'),
+      h('label', { class: 'check', style: 'margin-top:10px' }, h('input', { type: 'checkbox', checked: !!st.tabIcons, onchange: e => applyDisplay(setDisplay({ tabIcons: e.target.checked })) }), 'Icons only in the tab bar'),
       h('div', { class: 'field', style: 'margin-top:10px' }, 'Colour', accentPicker()),
       h('p', { class: 'hint', style: 'margin:2px 0 0' }, 'Light and dark versions are worked out to stay easy to read.'),
       h('label', { class: 'field', style: 'margin-top:10px' }, 'Light or dark',
@@ -195,6 +214,12 @@ function fontPicker(slot) {
     slot === 'log' ? h('span', { class: 'hint help' }, 'The case box, case text in the Logbook and the reflection editor.') : null,
     nameRow, fileRow, sample);
 }
+
+const lookSelect = (k, label, opts, dflt, hint) => h('div', { class: 'field', style: 'margin-top:10px' },
+  h('label', { class: 'field', style: 'margin:0' }, label,
+    h('select', { 'aria-label': label, onchange: e => applyDisplay(setDisplay({ [k]: e.target.value === dflt ? null : e.target.value })) },
+      opts.map(([v, l]) => h('option', { value: v, selected: String(display()[k] ?? dflt) === v }, l)))),
+  hint ? h('span', { class: 'hint help' }, hint) : null);
 
 // suggested colours, then any colour (a custom pick shows as the last swatch)
 function accentPicker() {
