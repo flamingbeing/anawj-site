@@ -5,7 +5,7 @@ import { duplicates, fmtDate, diffRows, sortCodes, withParents, caseParts, caseT
 import { flagCase } from './importer.js';
 import { exportCases, readCasesSheet } from './xlsxio.js';
 import {
-  S, h, toast, debounce, modal, cat, catName, categoryNames, catFull, catChip, PICKER_ORDER, settings, patchLogbook, needExcel, download, fileButton, catPills,
+  S, h, toast, debounce, modal, cat, catName, catShort, tagName, catFull, catChip, PICKER_ORDER, settings, patchLogbook, needExcel, download, fileButton, catPills,
   updateCase, saveMany, deleteMany, displayName, rYear, todayISO, fill, add, resetters } from './ui-core.js';
 import { editCaseDialog } from './ui-log.js';
 import { reflectOnCase } from './ui-reflect.js';
@@ -21,7 +21,7 @@ const weekday = iso => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); 
 function catTags(cats) {
   const codes = sortCodes(cats || []);
   const shown = codes.filter(c => !codes.some(o => o !== c && cat(o).parent === c));
-  return h('span', { class: 'lb-tags' }, shown.map(c => h('span', { class: 'lb-tag', title: catFull(c) }, (categoryNames()[c] && categoryNames()[c].name) || catFull(c))));
+  return h('span', { class: 'lb-tags' }, shown.map(c => h('span', { class: 'lb-tag', title: catFull(c) }, catName(c))));
 }
 
 export function renderLogbook() {
@@ -39,7 +39,7 @@ export function renderLogbook() {
       if (view.flag && !flagsOf(c).includes(view.flag)) return false;
       if (win && !(c.date && c.date >= win.from && c.date <= win.to)) return false;
       if (!words.length) return true;
-      const hay = `${caseText(c)} ${c.date || c.dateText || ''} ${weekday(c.date)} ${fmtDate(c.date) || ''} ${(c.cats || []).join(' ')} ${(c.tags || []).join(' ')}`.toLowerCase();
+      const hay = `${caseText(c)} ${c.date || c.dateText || ''} ${weekday(c.date)} ${fmtDate(c.date) || ''} ${(c.cats || []).map(k => `${k} ${catName(k)} ${catShort(k)}`).join(' ')} ${(c.tags || []).map(tagName).join(' ')}`.toLowerCase();
       return words.every(w => hay.includes(w));
     });
   };
@@ -155,7 +155,7 @@ function caseRow(c, flagsOf) {
         flags.includes('duplicate') ? h('span', { class: 'flag' }, 'possible duplicate') : null,
         !(c.cats || []).length ? h('span', { class: 'flag err' }, 'no category') : null,
         c.reflectTag && !(S.reflections || []).some(r => r.caseId === c.id) ? h('span', { class: 'flag', title: 'Tagged as a possible reflection' }, '☆ reflection?') : null,
-        (c.tags || []).map(t => h('span', { class: 'flag sc-tag', title: 'Your subcategory' }, t.split(':').slice(1).join(':'))),
+        (c.tags || []).map(t => h('span', { class: 'flag sc-tag', title: 'Your tag' }, tagName(t))),
         h('button', { class: 'small', style: 'margin-left:auto', title: 'Write a reflection on this case', onclick: e => { e.stopPropagation(); reflectOnCase(c); } },
           (S.reflections || []).some(r => r.caseId === c.id) ? 'Reflection' : 'Reflect'))), c);
 }

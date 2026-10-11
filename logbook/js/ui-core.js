@@ -1,6 +1,7 @@
 // Shared UI state and helpers for the logbook screens (ui-*.js). app.js owns boot, auth and tabs.
 
 import { BY_CODE, CATEGORIES, DEFAULT_NAMES, yearName, appYear } from './categories.js';
+import { tagSetOf, tagTree, flatTree, userCatNames, tagName as tagNameIn, tagLinks as tagLinksIn } from './tags.js';
 import { countCases, uid, todayISO, sortCodes, progress, rYearDefault, academicYear, splitInitials, cleanInitials } from './engine.js';
 import * as cloud from './cloud.js';
 import { reflectionCounts } from './reflections.js';
@@ -195,9 +196,27 @@ export const cat = code => BY_CODE[code] || { code, name: code, label: code, ful
 let NAMES = {};
 export const setCategoryNames = m => { NAMES = m || {}; };
 export const categoryNames = () => NAMES;
-// an admin's name (Settings → Category names), else the programme's default, else the official one
-export const catName = code => (NAMES[code] && NAMES[code].name) || (DEFAULT_NAMES[code] && DEFAULT_NAMES[code][0]) || cat(code).name;
-export const catShort = code => (NAMES[code] && NAMES[code].short) || (DEFAULT_NAMES[code] && DEFAULT_NAMES[code][1]) || catName(code);
+// ---------- tags (Settings → Tag editor; js/tags.js) ----------
+// The tag set in effect for the signed-in user, rebuilt when their settings change.
+let tagMemo = { st: null, set: null, mine: {} };
+export function tagSet() {
+  const st = settings();
+  if (tagMemo.st !== (S.logbook && S.logbook.settings)) {
+    const set = tagSetOf(st);
+    tagMemo = { st: S.logbook && S.logbook.settings, set, mine: userCatNames(set) };
+  }
+  return tagMemo.set;
+}
+const myNames = () => { tagSet(); return tagMemo.mine; };
+export const tagName = key => tagNameIn(tagSet(), key);
+export const tagLinks = key => tagLinksIn(tagSet(), key);
+// The Log page's list: the tag tree flattened (headers, categories and your tags), hidden ones marked.
+export const logTags = () => flatTree(tagTree(tagSet()));
+
+// your own name (Tag editor), else an admin's (Settings → Category names), else the programme's
+// default, else the official one
+export const catName = code => (myNames()[code] && myNames()[code].l) || (NAMES[code] && NAMES[code].name) || (DEFAULT_NAMES[code] && DEFAULT_NAMES[code][0]) || cat(code).name;
+export const catShort = code => (myNames()[code] && myNames()[code].n) || (NAMES[code] && NAMES[code].short) || (DEFAULT_NAMES[code] && DEFAULT_NAMES[code][1]) || catName(code);
 // Readable procedure name for tags and tooltips: no code, no targets.
 export const catFull = code => cat(code).full || cat(code).name;
 export const PROGRESS_BY_CODE = () => Object.fromEntries(progress(S.counts, rYear()).map(p => [p.code, p]));
@@ -228,15 +247,12 @@ export const PICKER_ORDER = (() => {
   for (const c of active) if (!c.parent) { out.push(c); for (const s of active) if (s.parent === c.code) out.push(s); }
   return out;
 })();
-// The Log page's category list in the order chosen in Settings → Category order (settings.catOrder:
-// top-level codes; subcategories stay under their parent; categories not in the list keep their place
-// at the end, in the official order).
-export function pickerOrder(order = settings().catOrder) {
-  if (!Array.isArray(order) || !order.length) return PICKER_ORDER;
-  const tops = PICKER_ORDER.filter(c => !c.parent);
-  const rank = new Map(order.map((code, i) => [String(code), i]));
-  const sortedTops = [...tops].sort((a, b) => (rank.get(a.code) ?? 1e3 + tops.indexOf(a)) - (rank.get(b.code) ?? 1e3 + tops.indexOf(b)));
-  return sortedTops.flatMap(t => PICKER_ORDER.filter(c => c.code === t.code || c.parent === t.code));
+// Categories in the order of your tag set (each parent followed by its subcategories).
+export function pickerOrder() {
+  const seen = new Set();
+  const out = [];
+  for (const n of logTags()) if (n.code && !seen.has(n.code)) { seen.add(n.code); out.push(BY_CODE[n.code]); }
+  return out;
 }
 
 // ---------- case writes (optimistic; the live listener confirms) ----------
@@ -259,19 +275,22 @@ export function okNoIds(...texts) {
   return confirmBox('Looks like an ID number', 'This looks like an NRIC, hospital or phone number. Log patient initials only, never identifiers. Save anyway?', 'Save anyway', true);
 }
 
-// Personal subcategories (settings.subcats = { '26': ['Interscalene', 'Femoral'] }): a case carries
-// them as tags '26:Interscalene'. They sit within the APMES categories and never change the counts.
-export const subcatsOf = code => ((settings().subcats || {})[code] || []);
+// Your tags that sit right under a category (Tag editor; older personal subcategories became these).
+// Under the selected categories they show as chips to tick; a case carries them by key in case.tags.
+export const subcatsOf = code => tagSet().filter(e => e.p === 'c:' + code && !e.hd && !e.k.startsWith('c:') && !e.hide);
 export function subcatChips(cats, tags, onchange) {
   const rows = (cats || []).filter(code => subcatsOf(code).length).map(code => h('div', { class: 'subcats' },
-    h('span', { class: 'sc-l' }, code),
-    subcatsOf(code).map(name => {
-      const t = `${code}:${name}`, on = (tags || []).includes(t);
-      return h('span', { class: `chip sc ${on ? 'on' : ''}`, role: 'button', tabindex: '0', 'aria-pressed': String(on),
-        onclick: () => onchange(on ? tags.filter(x => x !== t) : [...(tags || []), t]) }, name);
+    h('span', { class: 'sc-l' }, catShort(code)),
+    subcatsOf(code).map(e => {
+      const on = (tags || []).includes(e.k);
+      return h('span', { class: `chip sc ${on ? 'on' : ''}`, role: 'button', tabindex: '0', 'aria-pressed': String(on), 'data-tag': e.k,
+        onclick: () => onchange(on ? tags.filter(x => x !== e.k) : [...(tags || []), e.k]) }, e.n);
     })));
   return rows.length ? h('div', { class: 'subcat-wrap' }, rows) : null;
 }
+// A chip for one of your tags (selected ones can be removed).
+export const tagChip = (key, { onclick, on = true } = {}) => h('span', { class: `chip tag ${on ? 'on' : ''}`, role: 'button', tabindex: '0', 'data-tag': key, title: 'Your tag', onclick,
+  onkeydown: e => { if ((e.key === 'Enter' || e.key === ' ') && onclick) { e.preventDefault(); onclick(e); } } }, h('span', { class: 'nm' }, tagName(key)), onclick ? h('span', { class: 'x', 'aria-label': 'remove' }, '×') : null);
 
 export async function createCase({ date, details, initials, cats, source = 'app', dateText, reflectTag = false, tags = [] }) {
   const now = Date.now();

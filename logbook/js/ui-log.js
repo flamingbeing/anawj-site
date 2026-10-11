@@ -5,8 +5,8 @@ import { BY_CODE, TIPS } from './categories.js';
 import { withParents, frequentCombos, parseBulk, parseDate, fmtDate, sortCodes, uid, caseParts, caseText, cleanInitials, splitInitials, splitAge, nth } from './engine.js';
 import { suggest } from './suggest.js';
 import {
-  S, h, toast, debounce, modal, confirmBox, cat, catName, catShort, catFull, catChip, countText, pickerOrder, PROGRESS_BY_CODE,
-  createCase, updateCase, removeCase, restoreCase, saveMany, deleteMany, subcatChips, settings, todayISO, hooks, fill, add, cloud, okNoIds, patchLogbook, catPills } from './ui-core.js';
+  S, h, toast, debounce, modal, confirmBox, cat, catName, catShort, catFull, catChip, countText, logTags, tagLinks, tagChip, tagSet, PROGRESS_BY_CODE,
+  createCase, updateCase, removeCase, restoreCase, saveMany, deleteMany, subcatChips, subcatsOf, settings, todayISO, hooks, fill, add, cloud, okNoIds, patchLogbook, catPills } from './ui-core.js';
 import { templateDialog } from './ui-settings.js';
 import { moveToBin } from './bin.js';
 import { shareText, copyText, caseText as shareCaseText, dayText, dayMarkdown } from './share.js';
@@ -38,6 +38,13 @@ export function clearDrafts() {
 
 // Adding a sub-category adds its parent; removing a parent removes its sub-categories.
 function addCat(list, code) { return sortCodes(withParents([...list, code])); }
+// Tick or untick one of your tags: ticking it also ticks the APMES categories it counts towards.
+function toggleTagIn(cats, tags, key) {
+  const on = (tags || []).includes(key);
+  return on ? { cats, tags: tags.filter(t => t !== key) } : { cats: sortCodes(withParents([...cats, ...tagLinks(key)])), tags: [...(tags || []), key] };
+}
+// your tags shown as their own chips (the ones right under a selected category show as tick-chips instead)
+const looseTags = (cats, tags) => (tags || []).filter(k => !(cats || []).some(code => subcatsOf(code).some(e => e.k === k)));
 function dropCat(list, code) { return list.filter(c => c !== code && BY_CODE[c]?.parent !== code); }
 const toggleCat = (list, code) => (list.includes(code) ? dropCat(list, code) : addCat(list, code));
 
@@ -59,7 +66,10 @@ function keepPlace(anchor, fn) {
 // On phones, focusing the details box pops the keyboard and scrolls back up: only do it with a mouse.
 const refocus = () => { if (ui.textarea && matchMedia('(pointer: fine)').matches) ui.textarea.focus({ preventScroll: true }); };
 
-export function catPicker({ get, toggle, placeholder = 'Search categories: code or name' }) {
+// The list follows your tag set (Settings → Tag editor): section headers, categories and your own tags,
+// indented under what they sit in; hidden ones only turn up in a search. getTags / toggleTag handle your
+// tags (left out: categories only).
+export function catPicker({ get, toggle, getTags = null, toggleTag = null, placeholder = 'Search categories and tags' }) {
   let q = '', hl = 0, items = [];
   const list = h('ul', { role: 'listbox' });
   const input = h('input', {
@@ -70,14 +80,18 @@ export function catPicker({ get, toggle, placeholder = 'Search categories: code 
       else if (e.key === 'ArrowUp') { hl = Math.max(0, hl - 1); paintHl(); e.preventDefault(); }
       else if (e.key === 'Enter' && q.trim()) {
         e.preventDefault();
-        if (items[hl]) { toggle(items[hl].code); q = ''; input.value = ''; hl = 0; refresh(); }
+        if (items[hl]) { pick(items[hl]); q = ''; input.value = ''; hl = 0; refresh(); }
       } else if (e.key === 'Escape') { q = ''; input.value = ''; refresh(); }
     },
   });
-  function matches(c, words) {
+  function matches(n, words) {
+    if (n.kind === 'head') return false;
+    if (n.kind === 'tag') { const hay = `${n.e.n} ${n.e.l || ''}`.toLowerCase(); return words.every(w => hay.includes(w)); }
+    const c = BY_CODE[n.code];
     const hay = `${c.code} ${c.name} ${c.label} ${catName(c.code)} ${catShort(c.code)}`.toLowerCase();
     return words.every(w => (/^\d/.test(w) ? c.code.startsWith(w.padStart(2, '0')) || c.code.startsWith(w) : hay.includes(w)));
   }
+  const pick = n => (n.kind === 'cat' ? toggle(n.code) : n.kind === 'tag' && toggleTag ? toggleTag(n.e.k) : null);
   function paintHl() {
     [...list.children].forEach((li, i) => li.classList.toggle('hl', i === hl && !!q.trim()));
     list.children[hl]?.scrollIntoView({ block: 'nearest' });
@@ -86,19 +100,34 @@ export function catPicker({ get, toggle, placeholder = 'Search categories: code 
     const sel = new Set(get());
     const prog = PROGRESS_BY_CODE();
     const words = q.toLowerCase().split(/\s+/).filter(Boolean);
-    const order = pickerOrder();
-    items = words.length ? order.filter(c => matches(c, words)) : order;
-    fill(list, ...items.map(c => {
-      const p = prog[c.code];
+    const tagsOn = new Set(getTags ? getTags() : []);
+    // hidden items (and everything under them) only in a search; your tags only when this list handles them
+    const hiddenUnder = new Set();
+    const all = logTags().filter(n => {
+      if ((n.e.p && hiddenUnder.has(n.e.p)) || n.e.hide) { hiddenUnder.add(n.e.k); if (!words.length) return false; }
+      return n.kind !== 'tag' || !!toggleTag;
+    });
+    items = words.length ? all.filter(n => matches(n, words)) : all.filter(n => n.kind !== 'head');
+    const shown = words.length ? items : all;
+    fill(list, ...shown.map(n => {
+      const pad = `padding-left:${12 + Math.min(n.depth, 4) * 16}px`;
+      if (n.kind === 'head') return h('li', { class: 'head', role: 'presentation', style: pad }, n.e.n);
+      if (n.kind === 'tag') {
+        const on = tagsOn.has(n.e.k);
+        return h('li', { role: 'option', 'data-tag': n.e.k, 'aria-selected': String(on), class: `tag ${n.depth ? 'sub' : ''} ${on ? 'on' : ''}`, style: pad, title: n.e.l || n.e.n,
+          onclick: () => keepPlace(list, () => { pick(n); refresh(); }) },
+          h('span', { class: 'tick' }, on ? '✓' : ''), h('span', { class: 'nm' }, n.e.n, n.e.l ? h('small', { class: 'muted' }, ' ' + n.e.l) : null), h('span', { class: 'ct' }, ''));
+      }
+      const c = BY_CODE[n.code], p = prog[c.code];
       return h('li', {
-        role: 'option', 'data-code': c.code, 'aria-selected': String(sel.has(c.code)), class: `${c.parent ? 'sub' : ''} ${sel.has(c.code) ? 'on' : ''}`, title: c.full || c.name,
-        onclick: () => keepPlace(list, () => { toggle(c.code); refresh(); }),
+        role: 'option', 'data-code': c.code, 'aria-selected': String(sel.has(c.code)), class: `${n.depth ? 'sub' : ''} ${sel.has(c.code) ? 'on' : ''}`, style: pad, title: c.full || c.name,
+        onclick: () => keepPlace(list, () => { pick(n); refresh(); }),
       },
       h('span', { class: 'tick' }, sel.has(c.code) ? '✓' : ''),
       h('span', { class: 'nm' }, catName(c.code)),
       h('span', { class: `ct ${p && p.status === 'done' ? 'met' : ''}` }, countText(c.code, prog)));
     }));
-    if (!items.length) add(list, h('li', { class: 'muted' }, 'No category matches “' + q + '”'));
+    if (words.length && !items.length) add(list, h('li', { class: 'muted' }, 'Nothing matches “' + q + '”'));
     paintHl();
   }
   refresh();
@@ -212,6 +241,8 @@ function renderOne(card) {
   const picker = catPicker({
     get: () => draft.cats,
     toggle: code => { draft.cats = toggleCat(draft.cats, code); saveDraft(); paintSel(); },
+    getTags: () => draft.tags || [],
+    toggleTag: key => { Object.assign(draft, toggleTagIn(draft.cats, draft.tags, key)); saveDraft(); paintSel(); },
   });
   // "might be worth a reflection": tag it now, write it later from the Reflections tab
   const tagBox = h('label', { class: 'check reflect-tag' }, h('input', { type: 'checkbox', checked: !!draft.reflectTag, onchange: e => { draft.reflectTag = e.target.checked; saveDraft(); } }), '☆ Tag as a possible reflection');
@@ -281,7 +312,8 @@ function paintSel() {
   fill(ui.selected, ...(draft.cats.length
     ? draft.cats.map(code => catChip(code, { on: true, removable: true, cls: 'add', title: 'Remove ' + catFull(code),
       onclick: () => { draft.cats = dropCat(draft.cats, code); saveDraft(); paintSel(); } }))
-    : [h('span', { class: 'none' }, 'No category yet: tap one below')]));
+    : [h('span', { class: 'none' }, 'No category yet: tap one below')]),
+    ...looseTags(draft.cats, draft.tags).map(k => tagChip(k, { onclick: () => { draft.tags = draft.tags.filter(t => t !== k); saveDraft(); paintSel(); } })));
   fill(ui.selExtra,
     // a combination worth keeping: one tap to make it a template (no trip to Settings)
     draft.cats.length >= 2 && !((S.logbook && S.logbook.templates) || []).some(t => sortCodes(t.cats).join() === sortCodes(draft.cats).join())
@@ -572,11 +604,13 @@ export function editCaseDialog(c) {
   const sugg = h('div', { class: 'chips' });
   const paint = () => {
     fill(sel, ...(e.cats.length ? e.cats.map(code => catChip(code, { on: true, removable: true, onclick: () => { e.cats = dropCat(e.cats, code); paint(); picker.refresh(); } })) : [h('span', { class: 'none' }, 'No categories')]),
+      ...looseTags(e.cats, e.tags).map(k => tagChip(k, { onclick: () => { e.tags = e.tags.filter(t => t !== k); paint(); picker.refresh(); } })),
       subcatChips(e.cats, e.tags || [], tags => { e.tags = tags; paint(); }));
     const s = e.details.trim() && settings().suggestions !== false ? suggest(e.details, { limit: 6 }).filter(x => !e.cats.includes(x.code)) : [];
     fill(sugg, ...s.map(x => catChip(x.code, { cls: `sugg ${x.score >= 0.5 ? 'strong' : ''}`, onclick: () => { e.cats = addCat(e.cats, x.code); paint(); picker.refresh(); } })));
   };
-  const picker = catPicker({ get: () => e.cats, toggle: code => { e.cats = toggleCat(e.cats, code); paint(); } });
+  const picker = catPicker({ get: () => e.cats, toggle: code => { e.cats = toggleCat(e.cats, code); paint(); },
+    getTags: () => e.tags || [], toggleTag: key => { Object.assign(e, toggleTagIn(e.cats, e.tags, key)); paint(); } });
   const paintSoon = debounce(paint, 120);
   paint();
   const m = modal('Edit case', [
@@ -606,7 +640,8 @@ export function editCaseDialog(c) {
         m.close();
         const next = { ...e, initials: cleanInitials(e.initials), details: e.details.trim() };
         if (!next.reflectTag) delete next.reflectTag;
-        next.tags = (next.tags || []).filter(t => next.cats.includes(String(t).split(':')[0]));
+        // a tag that sits under a category goes when that category is taken off; other tags stay
+        next.tags = (next.tags || []).filter(t => { const e = tagSet().find(x => x.k === t); const under = e && e.p && e.p.startsWith('c:') ? e.p.slice(2) : (/^\d/.test(t) ? String(t).split(':')[0] : null); return !under || next.cats.includes(under); });
         if (!next.tags.length) delete next.tags;
         await updateCase(next);
         toast('Case updated', { action: 'Undo', onaction: () => restoreCase(c) });

@@ -80,6 +80,8 @@ main { padding: 16px; max-width: 980px; margin: 0 auto; padding-bottom: calc(32p
   body.typing .savebar button.big, body.typing .actions button.big { min-height: 44px; padding-block: 6px; }
   body.typing main { padding-bottom: calc(130px + var(--tabbar-h)); }
   /* a focused field scrolls clear of the tab bar riding on the keyboard */
+  /* anything scrolled to stops above the tab bar */
+  html { scroll-padding-bottom: calc(var(--tabbar-h) + var(--safe-b, 0px) + 12px); }
   html:has(body.typing) { scroll-padding-bottom: calc(var(--tabbar-h) + 120px); }
   /* suggestion chips: keep names short so several fit on a line */
   .chip .nm { max-width: 12em; }
@@ -249,11 +251,11 @@ table.grid td.ini input { width: 64px; text-transform: uppercase; }
 table.bulk td.details input { width: 70px; margin-bottom: 4px; text-transform: uppercase; }
 table.grid tr.dirty td { background: var(--warn-bg); }
 
-dialog { box-sizing: border-box; border: 1px solid var(--line); border-radius: 16px; padding: 16px; width: min(640px, calc(100vw - 24px)); max-height: calc(100vh - 32px); background: var(--panel); color: var(--ink); }
+dialog { box-sizing: border-box; border: 1px solid var(--line); border-radius: 16px; padding: 16px; width: min(640px, calc(100vw - 24px)); max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px); background: var(--panel); color: var(--ink); }
 dialog::backdrop { background: rgba(0,0,0,.35); }
 dialog h2 { margin: 0 0 8px; font-size: 17px; }
 @media (max-width: 600px) {
-  dialog { margin: auto 0 0; width: 100vw; max-width: 100vw; border-radius: 16px 16px 0 0; padding-bottom: calc(16px + var(--safe-b)); max-height: 92vh; }
+  dialog { margin: auto 0 0; width: 100vw; max-width: 100vw; border-radius: 16px 16px 0 0; padding-bottom: calc(16px + var(--safe-b)); max-height: 92vh; max-height: 92dvh; }
 }
 
 /* ---------- progress / totals ---------- */
@@ -713,3 +715,18 @@ ol.cat-order li { display: flex; align-items: center; gap: 6px; padding: 4px 0; 
 ol.cat-order .icon-btn { min-width: 44px; min-height: 40px; }
 /* grid: categories open the edit dialog */
 button.grid-cats { width: 100%; min-height: 40px; text-align: left; font-size: 13px; padding: 4px 8px; background: transparent; border: 1px dashed var(--line); border-radius: 8px; }
+
+/* Settings: tag editor */
+ul.te-list { list-style: none; margin: 0; padding: 0; }
+ul.te-list li { display: flex; align-items: center; gap: 4px; border-bottom: 1px solid var(--line); min-height: 44px; }
+ul.te-list .te-name { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; text-align: left; min-height: 40px; padding: 4px 0; background: none; border: 0; color: inherit; font: inherit; cursor: pointer; }
+ul.te-list .te-pill { font-weight: 600; }
+ul.te-list .te-sub { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+ul.te-list li.te-tag .te-pill { font-style: italic; }
+ul.te-list li.te-head { background: var(--row-alt); }
+ul.te-list li.te-hidden .te-pill { text-decoration: line-through; opacity: .6; }
+ul.te-list .icon-btn { min-width: 40px; min-height: 40px; }
+.te-links { max-height: 30vh; max-height: 30dvh; overflow: auto; border: 1px solid var(--line); border-radius: 8px; padding: 4px 8px; }
+.picker li.head { font-weight: 700; color: var(--muted); cursor: default; background: var(--row-alt); min-height: 32px; }
+.picker li.tag .nm { font-style: italic; }
+.chip.tag { border-style: dashed; }

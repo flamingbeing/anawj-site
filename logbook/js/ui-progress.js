@@ -4,7 +4,7 @@ import { R_YEARS, BY_CODE, CATEGORIES, appYear, yearName } from './categories.js
 import { progress, epaProgress, todayISO, rYearDefault } from './engine.js';
 import { exportTotals } from './xlsxio.js';
 import { reflectionProgress } from './reflections.js';
-import { S, h, toast, cloud, rYear, myYearName, settings, patchLogbook, needExcel, download, displayName, hooks, add, resetters, info, catName } from './ui-core.js';
+import { S, h, toast, cloud, rYear, myYearName, settings, subcatsOf, patchLogbook, needExcel, download, displayName, hooks, add, resetters, info, catName } from './ui-core.js';
 
 const STATUS_TEXT = { late: 'Behind', due: 'Due this year', ontrack: 'On track', done: 'Done', none: 'No target' };
 const pview = { by: 'cat' };
@@ -78,12 +78,12 @@ function reflCard() {
     h('span', { class: 'meter' }, h('i', { class: met === p.headings.length ? 'done' : 'ontrack', style: `width:${Math.min(100, Math.round(p.totals.counted / p.totals.min * 100))}%` })));
 }
 
-// your own subcategories under a category: "Interscalene 3 · Femoral 2"
+// your own tags under a category (Tag editor): "Interscalene 3 · Femoral 2"
 function subcatLine(code) {
-  const names = ((settings().subcats || {})[code] || []);
-  if (!names.length) return null;
-  const n = name => (S.cases || []).filter(c => (c.tags || []).includes(`${code}:${name}`)).length;
-  return h('span', { class: 'ms sc-line' }, names.map(name => `${name} ${n(name)}`).join(' · '));
+  const tags = subcatsOf(code);
+  if (!tags.length) return null;
+  const n = k => (S.cases || []).filter(c => (c.tags || []).includes(k)).length;
+  return h('span', { class: 'ms sc-line' }, tags.map(e => `${e.n} ${n(e.k)}`).join(' · '));
 }
 
 function progList(items) {
