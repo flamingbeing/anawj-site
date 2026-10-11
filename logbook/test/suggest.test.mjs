@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { parseAge, parseBMI, suggest, calibrate, tokens } from '../js/suggest.js';
 import { KEYWORDS, CALIBRATION, STOP } from '../js/keywords.js';
 import { BY_CODE } from '../js/categories.js';
+import { splitAge, splitInitials } from '../js/engine.js';
 
 const yrs = t => parseAge(t)?.years;
 const near = (a, b, msg) => assert.ok(a != null && Math.abs(a - b) < 0.01, `${msg}: got ${a}, want ${b}`);
@@ -131,5 +132,13 @@ has('EF 80F hip FNB', ['26ii']);
 has('CD 5yo T&A', ['10']);
 has('CD adenotonsillectomy', ['10']);
 has('AB 2yo circumcision caudal', ['27']);
+
+// "72y" and "72yo" are both 72 years, no sex; a sex letter can be glued on
+for (const t of ['72y', '72yo', '72Y', '72 yo', '72yoF', '72yF', '72yrsM']) {
+  assert.equal(parseAge(t + ' lap chole').years, 72, t);
+  assert.equal(splitAge(t + ' lap chole').rest, 'lap chole', t);
+  assert.equal(splitInitials('IJ ' + t + ' lap chole').initials, 'IJ', t);
+}
+assert.equal(splitAge('72y lap chole').age, '72y');
 
 console.log('suggest tests passed');

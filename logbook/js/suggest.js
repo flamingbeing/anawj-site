@@ -30,8 +30,8 @@ export function parseAge(text) {
   // compounds: "7y3mo", "1y 2mo", "5y10m", "2m2w", "6m3wk"
   add(R('NB(\\d{1,2})\\s*(?:y|yrs?|years?)\\s*,?\\s*(\\d{1,2})\\s*(?:m|mo|mos|mths?|months?)(?![a-z])'), m => num(m[1]) + num(m[2]) / 12);
   add(R('NB(\\d{1,2})\\s*(?:m|mo|mos|mths?|months?)\\s*,?\\s*(\\d{1,2})\\s*(?:w|wk|wks|weeks?)(?![a-z])'), m => num(m[1]) / 12 + num(m[2]) / 52);
-  // "5yo", "5 y.o.", "5 y/o", "5y", "5yr", "5 years", "5-year-old" (not "3 years ago")
-  add(R('NB(\\d{1,3}(?:\\.\\d)?)\\s*-?\\s*(?:y\\.?\\s?o\\b\\.?|y\\/o\\b|yrs?\\b|years?\\b(?!\\s*(?:ago|of|hx|history|post|since))(?:\\s*-?\\s*old)?|y\\b(?![\\s.]*o\\b)(?!\\s*\\d))'),
+  // "5yo", "5 y.o.", "5 y/o", "5y", "5yr", "5 years", "5-year-old", "72yoF", "72yF" (not "3 years ago")
+  add(R('NB(\\d{1,3}(?:\\.\\d)?)\\s*-?\\s*(?:y\\.?\\s?o(?:\\b|(?=[mf]\\b))\\.?|y\\/o\\b|yrs?(?:\\b|(?=[mf]\\b))|years?\\b(?!\\s*(?:ago|of|hx|history|post|since))(?:\\s*-?\\s*old)?|y(?:\\b|(?=[mf]\\b))(?![\\s.]*o\\b)(?!\\s*\\d))'),
     m => num(m[1]));
   // "8mo", "8 months", "8mth", "8/12" (but not dates like 8/12/24 or 17/12)
   add(R('NB(\\d{1,2})\\s*(?:mo|mos|mths?|months?)\\b(?!\\s*(?:ago|post|since))(?:\\s*-?\\s*old)?'), m => num(m[1]) / 12);

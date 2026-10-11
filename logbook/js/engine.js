@@ -212,7 +212,7 @@ export function splitInitials(text, keywords = KEYWORDS) {
   if (!m) return { initials: '', details: s };
   const word = m[1], up = word.toUpperCase(), lower = word !== up;
   // a case word ("IJ", "TKR", "lap") is still initials when an age follows: "IJ 60M VATS", "lap 45f …"
-  const ageNext = /^\d{1,3}\s?(?:[MF]|yo|y\/o|yrs?|years?|\/12|\/52|m\/o|mo|d\/o)(?![A-Za-z])/i.test(s.slice(m[0].length));
+  const ageNext = /^\d{1,3}\s?(?:(?:yo|y\/o|yrs?|years?|y|\/12|\/52|m\/o|mo|d\/o)\s?[MF]?|[MF])(?![A-Za-z])/i.test(s.slice(m[0].length));
   const caseWord = NOT_INITIALS.has(up) || (keywords && keywords[word.toLowerCase()]) || (lower && STOP_WORDS.has(word.toLowerCase()));
   if (caseWord && !ageNext) return { initials: '', details: s };
   // lower case: a 4-letter word ("circ", "knee") needs an age after it to count as initials
@@ -255,8 +255,8 @@ export function dateWindow(q, now = new Date()) {
 // 5 -> '5th', 22 -> '22nd'
 export const nth = d => `${d}${(d % 100 >= 11 && d % 100 <= 13) ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' })[d % 10] || 'th'}`;
 
-// A leading age / sex ("45F", "72 M", "5yo", "3/12 M") on case details: { age, rest }. Optional.
-const AGE_SEX = /^\s*(\d{1,3}\s?(?:(?:yo|y\/o|yrs?|years?|\/12|\/52|m\/o|mo|d\/o)\s?[MF]?|[MF]))(?![A-Za-z])[\s,;:\-]*/i;
+// A leading age / sex ("45F", "72 M", "5yo", "72y", "72yoF", "3/12 M") on case details: { age, rest }. Optional.
+const AGE_SEX = /^\s*(\d{1,3}\s?(?:(?:yo|y\/o|yrs?|years?|y|\/12|\/52|m\/o|mo|d\/o)\s?[MF]?|[MF]))(?![A-Za-z])[\s,;:\-]*/i;
 export function splitAge(details) {
   const s = String(details || '');
   const m = s.match(AGE_SEX);
