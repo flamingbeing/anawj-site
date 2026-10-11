@@ -95,7 +95,7 @@ export function renderLogbook() {
   // the two filters fold behind a Filter button (shown open while one is in use)
   const searchIn = h('select', { 'aria-label': 'Search in', onchange: e => { patchLogbook({ settings: { lbScope: e.target.value } }); paintFilterBtn(); paint(); } },
     [['all', 'Everything'], ['initials', 'Initials only'], ['procedure', 'Procedure only']].map(([v, t]) => h('option', { value: v, selected: (settings().lbScope || 'all') === v }, t)));
-  const fuzzyBox = h('label', { class: 'check', style: 'margin:0' }, h('input', { type: 'checkbox', checked: !!settings().lbFuzzy, onchange: e => { patchLogbook({ settings: { lbFuzzy: e.target.checked } }); paintFilterBtn(); paint(); } }), 'Fuzzy search (allows typos)');
+  const fuzzyBox = h('label', { class: 'check', style: 'margin:0' }, h('input', { type: 'checkbox', checked: !!settings().lbFuzzy, onchange: e => { patchLogbook({ settings: { lbFuzzy: e.target.checked } }); paintFilterBtn(); paintFolds(); paint(); } }), 'Fuzzy search (allows typos)');
   // tag filters: chips you add from a list of every tag (APMES and your own)
   const tagSel = (label, list) => h('select', { class: 'small', 'aria-label': label, onchange: e => { const k = e.target.value; e.target.value = ''; if (k && !list.includes(k)) { list.push(k); refresh(); } } },
     h('option', { value: '' }, label),
@@ -110,19 +110,35 @@ export function renderLogbook() {
   // compact: two columns on a phone, so the panel doesn't fill the screen
   const cell = (label, ...kids) => h('div', { class: 'lb-cell' }, h('span', { class: 'lb-fl' }, label), ...kids);
   const resetBtn = resetLink();
-  const tagSum = h('summary', {}, 'Tag filters');
-  const tagFold = h('details', { class: 'lb-more', open: !!(view.has.length || view.not.length) || undefined }, tagSum,
-    h('div', { class: 'lb-grid' }, cell('Has all of', hasRow), cell('Has none of', notRow)));
-  const filters = h('div', { class: 'lb-filters', hidden: !(view.showFilters || active()) },
-    h('div', { class: 'lb-grid' },
-      cell('From', dateIn('from')), cell('To', dateIn('to')),
-      cell('Show', flagSel), cell('Search in', searchIn)),
+  // Dates, Tags and More fold behind one row of small toggles (a fold opens by itself while in use);
+  // the toggles say what is set ("1 Oct – 31 Oct", "Tags (2)")
+  const fold = (body, open) => {
+    const b = h('button', { type: 'button', class: 'small lb-fold', 'aria-expanded': String(!!open), onclick: () => { body.hidden = !body.hidden; b.setAttribute('aria-expanded', String(!body.hidden)); } });
+    body.hidden = !open;
+    return b;
+  };
+  const datePanel = h('div', { class: 'lb-grid lb-panel' }, cell('From', dateIn('from')), cell('To', dateIn('to')));
+  const tagPanel = h('div', { class: 'lb-grid lb-panel' }, cell('Has all of', hasRow), cell('Has none of', notRow));
+  const morePanel = h('div', { class: 'lb-panel' },
     h('div', { class: 'bar lb-fbar' }, fuzzyBox),
-    // the tag filters fold away (open while one is in use); the summary says how many are set
-    tagFold,
-    h('div', { class: 'bar lb-fbar', style: 'margin:0' },
-      h('button', { class: 'small', title: 'Save this search', onclick: saveSearch }, '☆ Save search'),
-      bulkBtn, resetBtn));
+    h('div', { class: 'bar lb-fbar', style: 'margin:0' }, h('button', { class: 'small', title: 'Save this search', onclick: saveSearch }, '☆ Save search'), bulkBtn));
+  const dateBtn = fold(datePanel, view.from || view.to);
+  const tagBtn = fold(tagPanel, view.has.length || view.not.length);
+  const moreBtn = fold(morePanel, settings().lbFuzzy);
+  moreBtn.textContent = 'More';
+  const short = iso => fmtDate(iso).replace(/ \d{4}$/, '');
+  const paintFolds = () => {
+    dateBtn.textContent = view.from && view.to ? `${short(view.from)} – ${short(view.to)}` : view.from ? `From ${short(view.from)}` : view.to ? `To ${short(view.to)}` : 'Dates';
+    dateBtn.classList.toggle('on', !!(view.from || view.to));
+    const n = view.has.length + view.not.length;
+    tagBtn.textContent = n ? `Tags (${n})` : 'Tags';
+    tagBtn.classList.toggle('on', !!n);
+    moreBtn.classList.toggle('on', !!settings().lbFuzzy);
+  };
+  const filters = h('div', { class: 'lb-filters', hidden: !(view.showFilters || active()) },
+    h('div', { class: 'lb-grid' }, cell('Show', flagSel), cell('Search in', searchIn)),
+    h('div', { class: 'bar lb-folds' }, dateBtn, tagBtn, moreBtn, resetBtn),
+    datePanel, tagPanel, morePanel);
   // everything back to how it starts: search text, tag and date filters, search options
   function resetLink() {
     return h('button', { class: 'small linkish', style: 'margin-left:auto', onclick: () => {
@@ -141,9 +157,7 @@ export function renderLogbook() {
   const repaintFilters = () => {
     fill(hasRow, ...chipsOf(view.has), tagSel('+ Add tag', view.has));
     fill(notRow, ...chipsOf(view.not), tagSel('+ Add tag', view.not));
-    const n = view.has.length + view.not.length;
-    tagSum.textContent = n ? `Tag filters (${n})` : 'Tag filters';
-    if (n) tagFold.open = true;
+    paintFolds();
   };
   // saved searches: one tap to run again (stored with your account)
   const savedRow = h('div', { class: 'chips lb-saved' });
