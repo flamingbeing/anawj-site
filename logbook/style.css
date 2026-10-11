@@ -817,7 +817,22 @@ ul.te-list.te-pills li.drop-before { box-shadow: inset 4px 0 0 var(--accent); }
 ul.te-list.te-pills li.drop-after { box-shadow: inset -4px 0 0 var(--accent); }
 ul.te-list.te-pills li.te-head.drop-before { box-shadow: inset 0 3px 0 var(--accent); }
 ul.te-list.te-pills li.te-head.drop-after { box-shadow: inset 0 -3px 0 var(--accent); }
-.te-ghost.te-pillitem { width: auto !important; border-radius: 999px; padding: 4px 12px; list-style: none; }
+/* dragging in the tag editor: the copy under the finger, where it lands, and a label saying so */
+ul.te-ghostlist { padding: 0; list-style: none; }
+ul.te-ghostlist li.te-ghost { background: var(--panel); box-shadow: 0 8px 22px rgba(0,0,0,.28); border-radius: 10px; opacity: .95; }
+ul.te-ghostlist.te-pills li.te-ghost { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); transform: scale(1.18); transform-origin: left center; }
+ul.te-ghostlist.te-pills li.te-ghost .te-n { color: inherit; opacity: .8; }
+ul.te-list.te-pills li.te-pillitem { position: relative; transition: transform .1s; }
+ul.te-list.te-pills li.te-pillitem.drop-before, ul.te-list.te-pills li.te-pillitem.drop-after { box-shadow: none; }
+ul.te-list.te-pills li.te-pillitem.drop-before::after, ul.te-list.te-pills li.te-pillitem.drop-after::after { content: ''; position: absolute; top: -6px; bottom: -6px; width: 4px; border-radius: 2px; background: var(--accent); }
+ul.te-list.te-pills li.te-pillitem.drop-before::after { left: -6px; }
+ul.te-list.te-pills li.te-pillitem.drop-after::after { right: -6px; }
+ul.te-list.te-pills li.te-pillitem.drop-inside { outline: 2px solid var(--accent); outline-offset: 1px; background: var(--accent-soft); transform: scale(1.08); }
+ul.te-list.te-pills li.te-pillitem.te-head.drop-before::after, ul.te-list.te-pills li.te-pillitem.te-head.drop-after::after { left: 0; right: 0; width: auto; height: 4px; }
+ul.te-list.te-pills li.te-pillitem.te-head.drop-before::after { top: 2px; bottom: auto; }
+ul.te-list.te-pills li.te-pillitem.te-head.drop-after::after { top: auto; bottom: -4px; }
+.te-drop-hint { position: fixed; z-index: 60; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 10px); transform: translateX(-50%); max-width: calc(100vw - 32px); padding: 8px 14px; border-radius: 999px; background: var(--ink); color: var(--panel); font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
+.te-drop-hint:empty { display: none; }
 /* Logbook filters */
 .lb-filters .bar { flex-wrap: wrap; gap: 6px; align-items: center; margin: 0 0 6px; }
 .lb-filters .lb-fl { font-size: 12px; font-weight: 600; color: var(--muted); min-width: 84px; }

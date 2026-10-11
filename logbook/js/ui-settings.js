@@ -412,6 +412,8 @@ function pillDown(e, key, li) {
 
 // ---------- drag and drop (pointer events, so touch works) ----------
 let tdrag = null;
+// a short vibration (Android; iPhones don't allow web pages to vibrate, so nothing happens there)
+const buzz = ms => { try { if (navigator.vibrate) navigator.vibrate(ms); } catch { /* not allowed */ } };
 function startTagDrag(e, key, horiz = false, liArg = null) {
   // (a pills drag starts from a pointermove, where button is -1)
   if (tdrag || (e.type === 'pointerdown' && e.pointerType === 'mouse' && e.button !== 0)) return;
@@ -420,12 +422,20 @@ function startTagDrag(e, key, horiz = false, liArg = null) {
   const li = liArg || e.target.closest('li');
   if (!li) return;
   const box = li.getBoundingClientRect();
-  const ghost = li.cloneNode(true);
-  Object.assign(ghost.style, { position: 'fixed', left: box.left + 'px', top: box.top + 'px', width: box.width + 'px', pointerEvents: 'none', opacity: '.85', zIndex: 50, background: 'var(--panel)', boxShadow: '0 6px 18px rgba(0,0,0,.25)' });
-  ghost.classList.add('te-ghost');
+  // the copy that follows the finger sits in a list of the same kind, so the list's styles still apply
+  // (a bare row in <body> wrapped onto two lines)
+  const ghost = h('ul', { class: li.parentElement.className + ' te-ghostlist', 'aria-hidden': 'true' }, li.cloneNode(true));
+  ghost.firstChild.classList.add('te-ghost');
+  Object.assign(ghost.style, { position: 'fixed', left: box.left + 'px', top: box.top + 'px', width: horiz ? 'auto' : box.width + 'px', margin: 0, pointerEvents: 'none', zIndex: 50 });
   document.body.append(ghost);
   li.classList.add('te-dragging');
-  tdrag = { key, ghost, li, dx: e.clientX - box.left, dy: e.clientY - box.top, target: null, where: null, y: e.clientY };
+  // a finger hides what it holds: lift the copy above the finger
+  const lift = e.pointerType === 'touch' ? box.height + 18 : 0;
+  // where it will land, in words, at the top of the screen (visible even under a finger)
+  const hint = h('div', { class: 'te-drop-hint', role: 'status' });
+  document.body.append(hint);
+  tdrag = { key, ghost, li, hint, dx: e.clientX - box.left, dy: e.clientY - box.top + lift, target: null, where: null, y: e.clientY };
+  buzz(15);   // picked up
   // while dragging, a finger must not scroll the page
   const noScroll = ev => { if (tdrag) ev.preventDefault(); };
   window.addEventListener('touchmove', noScroll, { passive: false });
@@ -438,6 +448,7 @@ function startTagDrag(e, key, horiz = false, liArg = null) {
     const under = document.elementFromPoint(ev.clientX, ev.clientY);
     const t = under && under.closest('.te-list li[data-k]');
     tdrag.target = null;
+    hint.textContent = '';
     if (!t || t.dataset.k === key) return;
     const r = t.getBoundingClientRect();
     // pills sit side by side: left / middle / right; rows (and header lines) stack: top / middle / bottom
@@ -448,8 +459,11 @@ function startTagDrag(e, key, horiz = false, liArg = null) {
     const ok = w => canPlace(set, key, w === 'inside' ? tk : (te.p || '')) && dropTag(set, key, tk, w) !== set;
     if (!ok(where)) where = ['before', 'after', 'inside'].find(ok);
     if (!where) return;
+    if (tdrag.lastSpot !== tk + where) { tdrag.lastSpot = tk + where; buzz(6); }   // a tick each time the drop spot changes
     tdrag.target = tk; tdrag.where = where;
     t.classList.add('drop-' + where);
+    const nm = (t.querySelector('.te-pill') || t).textContent.trim().slice(0, 40);
+    hint.textContent = where === 'inside' ? `Under “${nm}”` : `${where === 'before' ? 'Before' : 'After'} “${nm}”`;
   };
   // scroll when near the top or bottom of the screen
   const tick = () => {
@@ -464,10 +478,10 @@ function startTagDrag(e, key, horiz = false, liArg = null) {
     window.removeEventListener('touchmove', noScroll);
     cancelAnimationFrame(tdrag.raf);
     setTimeout(() => { pillDragged = false; }, 0);   // the click that ends a drag doesn't open the editor
-    ghost.remove(); li.classList.remove('te-dragging'); clear();
+    ghost.remove(); hint.remove(); li.classList.remove('te-dragging'); clear();
     const { target, where } = tdrag;
     tdrag = null;
-    if (ev.type === 'pointerup' && target) saveTags(dropTag(tagSet(), key, target, where));
+    if (ev.type === 'pointerup' && target) { buzz(20); saveTags(dropTag(tagSet(), key, target, where)); }
   };
   window.addEventListener('pointermove', move); window.addEventListener('pointerup', end); window.addEventListener('pointercancel', end);
 }

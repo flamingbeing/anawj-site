@@ -84,7 +84,8 @@ portfolio content.
 - **Copy & share** (`share-format.js`, tested): templates in `settings.shareFormat` (dayHead, dayCase, oneCase)
   with {date} {day} {weekday} {count} {n} {initials} {case}. Default day: `[[YYYY-MM-DD]]`, then
   `1. AB` / case, a blank line between cases (none for a one-line case format). No tags, ever.
-- **Tag editor** (`ui-settings.js`): List | Pills (drag; hold on phones), search, case counts, edit
+- **Tag editor** (`ui-settings.js`): List | Pills (drag; hold on phones; the dragged copy is lifted above the finger,
+  a bar or highlight shows the drop spot, a label at the top says "Before/After/Under …", vibration on Android), search, case counts, edit
   dialog (name, long name, sits under, counts towards, shorthand with built-in defaults and words
   learned from your cases, hide, merge), CSV download/load, Tag groups card.
 
