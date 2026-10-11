@@ -177,7 +177,7 @@ function picker() {
   const ph = p.preset && HEADING_BY_ID[p.preset.headingId];
   const psub = ph && p.preset.subId && ph.subs ? ph.subs.find(s => s.id === p.preset.subId) : null;
   const linked = new Set((S.reflections || []).map(r => r.caseId).filter(Boolean));
-  // cases tagged as possible reflections (and not written yet) come first
+  // cases marked interesting (and not written yet) come first
   const cases = [...(S.cases || [])].sort(byNewest).sort((a, b) => (b.reflectTag && !linked.has(b.id)) - (a.reflectTag && !linked.has(a.id)));
   const ul = h('ul', { class: 'cases refl-pick' });
   const count = h('p', { class: 'hint', style: 'margin:6px 0 0' });
@@ -196,7 +196,7 @@ function picker() {
       const names = (c.cats || []).map(catName).join(', ');
       return h('li', { tabindex: '0', role: 'button', onclick: () => pickCase(c), onkeydown: e => { if (e.key === 'Enter') pickCase(c); } },
         h('span', { class: 'd' }, caseDate(c)),
-        h('span', { class: 't' }, c.reflectTag && !has ? h('span', { class: 'flag tagged' }, '☆ tagged') : null, caseText(c) || '(no details)', names ? h('span', { class: 'muted', style: 'display:block;font-size:13px' }, names) : null),
+        h('span', { class: 't' }, c.reflectTag && !has ? h('span', { class: 'flag tagged' }, '☆ interesting') : null, caseText(c) || '(no details)', names ? h('span', { class: 'muted', style: 'display:block;font-size:13px' }, names) : null),
         h('span', { class: 'c' }, cur ? h('span', { class: 'flag' }, 'current') : has ? h('span', { class: 'flag' }, 'has reflection') : null));
     }));
     if (!shown.length) ul.replaceChildren(h('li', { class: 'empty' }, cases.length ? 'No cases match.' : 'No cases logged yet: tap + New case above.'));
@@ -259,7 +259,7 @@ async function binReflections(list) {
 
 // ---------- list ----------
 
-// "Ready to write": cases tagged as possible reflections, then recent cases that fit a heading you
+// "Ready to write": cases marked interesting, then recent cases that fit a heading you
 // haven't met yet. Each opens a new reflection prefilled from the case.
 function readyLine(p) {
   const linked = new Set((S.reflections || []).map(r => r.caseId).filter(Boolean));
@@ -281,7 +281,7 @@ function readyLine(p) {
       h('button', { class: 'small primary', onclick: () => reflectOnCase(c, hd || null) }, 'Write'),
       isTag ? h('button', { class: 'small', title: 'Remove the tag', onclick: async () => { const next = { ...c }; delete next.reflectTag; await updateCase(next); hooks.render(); } }, 'Untag') : null));
   // one slim line under the header; tap to see the cases
-  const what = [tagged.length ? `☆ ${tagged.length} tagged case${tagged.length === 1 ? '' : 's'} to write up` : null,
+  const what = [tagged.length ? `☆ ${tagged.length} interesting case${tagged.length === 1 ? '' : 's'} to write up` : null,
     suggested.length ? `${suggested.length} suggestion${suggested.length === 1 ? '' : 's'}` : null].filter(Boolean).join(' · ');
   return h('details', { class: 'ready-line', open: !!rv.readyOpen, ontoggle: e => { rv.readyOpen = e.target.open; } },
     h('summary', {}, what),

@@ -24,7 +24,8 @@ portfolio content.
   only a starting set: each is copied once into the resident's own tag groups (id `sh-<id>`,
   `settings.sharedSeen`), where it can be edited or deleted like any other and doesn't come back.
 - Logbook **Case summary** (the case box). Reflection **Case details** (prefilled from the case summary).
-- **Possible reflection** = the ☆ flag on a case (just a bookmark; missing it doesn't matter).
+- **☆ Interesting** = the star on a case (`reflectTag`; was "Possible reflection"): a bookmark for interesting cases.
+  Logbook rows show "☆ interesting", Filter → Show has "Interesting", the Reflections tab offers them first.
 - **Analytics** = the old Progress tab (`#progress`). Totals is under it ("Compare with your intake").
 - More → **Export / Import** (`#data`): **Export** = the Word portfolio only (it holds everything APMES needs);
   **Import** = reflections from Word (`#reflimport`) and the logbook from Excel/CSV; **Backup** = backup file and
@@ -43,7 +44,7 @@ portfolio content.
 ## Where things are (screens)
 
 - **Case** tab (id `log`, `ui-log.js`; the bar label was "Log"; tag counting tips hide with `settings.hideTips`): the case box (aligned example lines; Paste button; "Draft saved" sits on the
-  Possible reflection line), Quick picks (suggestions + your shorthand tags, Same as last, your tag
+  Interesting line), Quick picks (suggestions + your shorthand tags, Same as last, your tag
   groups), All tags, Still needed, "Save these tags as a tag group" under the tag list, pinned bar (chosen tags, Save, keep date | Save).
   Paste-a-list (List mode), Plan for later. `editCaseDialog` (full screen on phones, pinned
   Delete/Cancel/Save, 6-line growing box, Tags + "Add tags"; also "New case" from the reflection picker).

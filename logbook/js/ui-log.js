@@ -366,8 +366,8 @@ function renderOne(card) {
     getTags: () => draft.tags || [],
     toggleTag: key => keepPlace(picker.el, () => { Object.assign(draft, toggleTagIn(draft.cats, draft.tags, key)); saveDraft(); paintSel(); }),
   });
-  // "might be worth a reflection": tag it now, write it later from the Reflections tab
-  const tagBox = h('label', { class: 'check reflect-tag' }, h('input', { type: 'checkbox', checked: !!draft.reflectTag, onchange: e => { draft.reflectTag = e.target.checked; saveDraft(); } }), 'Possible reflection');
+  // "Interesting": a star on the case (reflectTag), to find it again; the Reflections tab offers these first
+  const tagBox = h('label', { class: 'check reflect-tag' }, h('input', { type: 'checkbox', checked: !!draft.reflectTag, onchange: e => { draft.reflectTag = e.target.checked; saveDraft(); } }), '☆ Interesting');
   ui.tagBox = tagBox;
   const draftNote = h('span', { class: 'draft-note', 'aria-live': 'polite' });
   const tagRow = h('div', { class: 'tag-row' }, tagBox, draftNote);
@@ -419,7 +419,7 @@ function renderOne(card) {
 const suggestSoon = debounce(() => paintSuggest(), 120);
 
 // "AB · 72M · lap chole, GA ETT" under the box; "Draft saved" (once typing pauses) sits at the end of
-// the Possible reflection line
+// the Interesting line
 function paintParsed(typed) {
   if (!ui || !ui.parsed) return;
   const text = draft.details.trim();
@@ -780,7 +780,7 @@ export function editCaseDialog(c, opts = {}) {
     h('label', { class: 'field' }, 'Patient initials', h('input', { value: e.initials, placeholder: 'e.g. AB', maxlength: '20', autocapitalize: 'characters', autocomplete: 'off', spellcheck: 'false', oninput: ev => { e.initials = ev.target.value; } })),
     h('label', { class: 'field' }, 'Case summary', detailsBox),
     h('div', { class: 'chiplabel' }, 'Tags'), sel, addBtn, pickWrap,
-    h('label', { class: 'check reflect-tag', style: 'margin-top:8px' }, h('input', { type: 'checkbox', checked: !!e.reflectTag, onchange: ev => { e.reflectTag = ev.target.checked; } }), 'Possible reflection'),
+    h('label', { class: 'check reflect-tag', style: 'margin-top:8px' }, h('input', { type: 'checkbox', checked: !!e.reflectTag, onchange: ev => { e.reflectTag = ev.target.checked; } }), '☆ Interesting'),
     // Delete / Cancel / Save stay pinned to the bottom while the form scrolls
     h('div', { class: 'bar dlg-actions' },
       isNew ? null : h('button', { class: 'danger', onclick: async () => {

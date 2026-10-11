@@ -37,7 +37,7 @@ export function cleanCase(c, now = Date.now()) {
   out.cats = [...new Set((out.cats || []).map(String))].slice(0, 40);
   if (out.dateText != null) out.dateText = String(out.dateText).slice(0, 200);
   if (out.initials != null) out.initials = String(out.initials).slice(0, 20);
-  // tagged as a possible reflection; personal subcategory tags ("16:elective")
+  // marked interesting; personal subcategory tags ("16:elective")
   if (out.reflectTag) out.reflectTag = true; else delete out.reflectTag;
   if (Array.isArray(out.tags) && out.tags.length) out.tags = [...new Set(out.tags.map(t => String(t).slice(0, 60)))].slice(0, 20); else delete out.tags;
   out.createdAt = Number(out.createdAt) || now;

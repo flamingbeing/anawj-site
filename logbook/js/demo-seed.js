@@ -72,7 +72,7 @@ export function demoLogbook(day, t) {
     const age = a0 + Math.floor(r() * (a1 - a0 + 1));
     const ageText = age === 0 ? `${1 + Math.floor(r() * 10)}/52` : age < 2 ? `${age}yo` : age < 13 ? `${age}yo` : `${age}${pick(sexes.split(''))}`;
     const ago = 1 + Math.floor(Math.pow(r(), 0.9) * 700);   // a little busier lately
-    cases.push({ id: 'dg' + i, date: day(ago), initials: pick(LETTERS) + pick(LETTERS), details: `${ageText} ${proc}`, cats: [...cats], createdAt: t - ago * 864e5, updatedAt: t - ago * 864e5, source: 'app' });
+    cases.push({ id: 'dg' + i, date: day(ago), initials: pick(LETTERS) + pick(LETTERS), details: `${ageText} ${proc}`, cats: [...cats], createdAt: t - ago * 864e5, updatedAt: t - ago * 864e5, source: 'app', ...(i % 23 === 5 ? { reflectTag: true } : {}) });   // some starred interesting
   }
   const reflections = DEMO_REFLECTIONS.map((x, i) => {
     const ago = 20 + Math.floor((i / DEMO_REFLECTIONS.length) * 650 + r() * 15);

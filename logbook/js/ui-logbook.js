@@ -73,7 +73,7 @@ export function renderLogbook() {
       return m[key];
     };
     return S.cases.filter(c => {
-      if (view.flag && !flagsOf(c).includes(view.flag)) return false;
+      if (view.flag && !(view.flag === 'interesting' ? c.reflectTag : flagsOf(c).includes(view.flag))) return false;
       if (view.has.length && !view.has.every(k => hasTag(c, k))) return false;
       if (view.not.length && view.not.some(k => hasTag(c, k))) return false;
       if ((view.from || view.to) && !(c.date && (!view.from || c.date >= view.from) && (!view.to || c.date <= view.to))) return false;
@@ -102,7 +102,7 @@ export function renderLogbook() {
   const paintSoon = debounce(() => { view.limit = 150; paint(); }, 150);
 
   const nFlag = f => S.cases.filter(c => flagsOf(c).includes(f)).length;
-  const flagOpts = [['', 'All cases'], ['needsDate', `Needs a date (${nFlag('needsDate')})`], ['duplicate', `Possible duplicates (${nFlag('duplicate')})`], ['future', `Upcoming (${nFlag('future')})`]];
+  const flagOpts = [['', 'All cases'], ['needsDate', `Needs a date (${nFlag('needsDate')})`], ['duplicate', `Possible duplicates (${nFlag('duplicate')})`], ['future', `Upcoming (${nFlag('future')})`], ['interesting', `☆ Interesting (${S.cases.filter(c => c.reflectTag).length})`]];
   const counter = h('span', { class: 'muted', style: 'font-size:13px' });
 
   // the two filters fold behind a Filter button (shown open while one is in use)
@@ -321,7 +321,7 @@ function caseRow(c, flagsOf) {
         flags.includes('future') ? h('span', { class: 'flag', title: 'Dated after today' }, 'upcoming') : null,
         flags.includes('duplicate') ? h('span', { class: 'flag' }, 'possible duplicate') : null,
         !(c.cats || []).length ? h('span', { class: 'flag err' }, 'no tag') : null,
-        c.reflectTag && !(S.reflections || []).some(r => r.caseId === c.id) ? h('span', { class: 'flag', title: 'Tagged as a possible reflection' }, '☆ reflection?') : null,
+        c.reflectTag ? h('span', { class: 'flag', title: 'Marked interesting' }, '☆ interesting') : null,
         (c.tags || []).map(t => h('span', { class: 'flag sc-tag', title: 'Your tag' }, tagName(t))),
         // to your own notes (paste into WhatsApp, Notes, Obsidian)
         h('button', { class: 'small', style: 'margin-left:auto', title: 'Copy this case', 'aria-label': 'Copy this case', onclick: e => { e.stopPropagation(); copyText(shareCaseText(c), 'Case copied: paste it into your notes'); } }, 'Copy'),

@@ -15,7 +15,7 @@ export const CASE_COLS = [
   { k: 'case', name: 'Case details', width: 55 },
   { k: 'apmes', name: 'Tags', width: 60 },
   { k: 'personal', name: 'Personal tags', width: 30 },
-  { k: 'flag', name: 'Possible reflection', width: 10 },
+  { k: 'flag', name: 'Interesting', width: 10 },
   { k: 'reflected', name: 'Reflection written', width: 10 },
 ];
 export const REFL_COLS = [
