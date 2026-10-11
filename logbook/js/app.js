@@ -362,21 +362,30 @@ async function onUser(user) {
 const typingEl = el => el && (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && /^(text|search|email|number|)$/.test(el.type)));
 let fullH = 0, fullW = 0;   // the tallest visible area seen at this width (keyboard down)
 function keyboardCheck() {
-  const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-  if (window.innerWidth !== fullW) { fullW = window.innerWidth; fullH = 0; }   // rotated
-  fullH = Math.max(fullH, vh);
-  const typing = !!typingEl(document.activeElement) && vh < fullH * 0.75;
-  document.body.classList.toggle('typing', typing);
-  // how far the keyboard covers the bottom of the layout viewport
   const vv = window.visualViewport;
+  const vh = vv ? vv.height : window.innerHeight;
+  if (window.innerWidth !== fullW) { fullW = window.innerWidth; fullH = 0; }   // rotated
+  fullH = Math.max(fullH, vh, window.innerHeight);
+  // a keyboard takes at least ~120px (also small and landscape keyboards, where 25% was too much to ask)
+  const typing = !!typingEl(document.activeElement) && fullH - vh > 120;
+  document.body.classList.toggle('typing', typing);
+  // how far the keyboard covers the bottom of the layout viewport (iOS also scrolls the visible area
+  // inside it: offsetTop), and the visible area itself, for dialogs (style.css: --kb, --vvh, --vvt)
   const kb = typing && vv ? Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)) : 0;
-  document.documentElement.style.setProperty('--kb', kb + 'px');
+  const root = document.documentElement.style;
+  root.setProperty('--kb', kb + 'px');
+  root.setProperty('--vvh', Math.round(vh) + 'px');
+  root.setProperty('--vvt', Math.round(vv && typing ? vv.offsetTop : 0) + 'px');
 }
+// once per frame at most, and again when scrolling settles (iOS reports the keyboard late)
+let kbFrame = 0;
+const kbSoon = () => { if (!kbFrame) kbFrame = requestAnimationFrame(() => { kbFrame = 0; keyboardCheck(); }); };
 keyboardCheck();
-document.addEventListener('focusin', keyboardCheck);
+document.addEventListener('focusin', () => { kbSoon(); setTimeout(keyboardCheck, 350); });
 document.addEventListener('focusout', () => setTimeout(keyboardCheck, 0));
-(window.visualViewport || window).addEventListener('resize', keyboardCheck);
-if (window.visualViewport) window.visualViewport.addEventListener('scroll', keyboardCheck);
+(window.visualViewport || window).addEventListener('resize', kbSoon);
+if (window.visualViewport) window.visualViewport.addEventListener('scroll', kbSoon);
+window.addEventListener('scroll', kbSoon, { passive: true });
 
 // ---------- offline: service worker and "update available" ----------
 
