@@ -1,37 +1,34 @@
 # NUH Roster
 
-A static page for drafting the OT section of the daily anaesthesia roster (seniors, juniors, premed cover) and downloading it as an `.xlsx` in the department's layout.
+Drafts the NUH anaesthesia department's daily roster and downloads it as `.xlsx` or PDF in the department's layout. Live at <https://anawj.com/nuh-roster/>. Try it with made-up data at <https://anawj.com/nuh-roster/?demo>.
 
-Everything runs in the browser. Staff lists, leave and case notes stay in the browser's local storage and are never uploaded. Without sign-in, rosterers share setup with **Export JSON / Import JSON** at the bottom of the page, and share the finished roster as the downloaded Excel file (for example on SharePoint / Excel Online).
+Background, department rules, file formats and the decisions behind the app are in [NOTES.md](NOTES.md). Read it before changing anything here.
 
 ## Flow
 
-1. **Seniors / Juniors** (click Edit first): import the master staff sheet or the department contact list (only names, grade groups and subspecialties are read from it) (`Name`, `Short name`, `Role`, `Grade`, `Posting`, `Subspecs`, `Doesn't do` columns, found by header name), or *Learn from past rosters* to build the list from old roster files. Tick each senior's subspecs.
-2. **Cases** and **Manpower**: load the admin draft roster (rooms, case notes, leave, post call and upper-half duties are read from it), or tick rooms (Cases) and paste names (Manpower) by hand. On Manpower, mark leave times, liver standby, and juniors who were away on the previous working day.
-3. **Roster**: generate, edit cells, re-check, then download.
-
-## Rules implemented
-
-- Seniors: required subspecs (paeds, cardiac, neuro, thoracic by default) only go to seniors with that subspec. "Doesn't do" keywords are excluded. Liver standby seniors avoid complex or subspec lists. People who leave early avoid lists that run late.
-- Double cover happens only when seniors are short. Both rooms must be in the same complex, and complex lists are excluded. Pairs are chosen to keep the overall assignment best.
-- Juniors: posting matches (RA, P, L, SR, Neu) are preferred. Residents go to complex lists and MOPEX to simpler ones. Baby MOs never go to a double-covered room. Extra juniors are doubled up.
-- Premed cover: needed when a room's junior was away on the previous working day. It's filled by a second junior in the same room if one was around, otherwise by a resident or MOPEX who was around, with a per-person cap.
+1. **Staff** (press Edit first). Import the department contact list or a staff sheet; each person is reviewed before anything is added. You can also learn names from past rosters. Then set grades, subspecs and short names on Seniors and Juniors, and postings on the Postings subtab. *Find duplicates* merges people entered twice.
+2. **Monthly**. Import the HMS monthly rosters (Junior, Senior, Liver, Leave, AOH; PDF or Excel), or type them in. **Today** shows the day's manpower board (Working, Leave, MC, Post call, Admin) and the calls and clinics, filled from those rosters. Changes made by hand win.
+3. **Cases**. Load the admin draft or tick the running rooms, type case notes, and fix people to rooms if needed.
+4. **Roster**. Generate, then edit: drag names, use C for an ad hoc cover, & for a double cover, × to take someone off. Tap a name for their box. *Fill empty gaps* keeps what's there, and Undo works for everything. Download the result as .xlsx or PDF, or print it.
+5. **Premeds**. Check and fill premed cover.
 
 ## Code
 
-- `js/engine.js`: name matching, case-note flags, assignment (Hungarian algorithm) and checks. No DOM.
-- `js/xlsxio.js`: reading rosters and staff sheets, and writing the roster workbook (ExcelJS).
-- `js/app.js`: UI.
-- `vendor/exceljs.min.js`: ExcelJS 4.4.0 (MIT).
-- `test/engine.test.mjs`: run with `node nuh-roster/test/engine.test.mjs`. It uses fake names only.
+See the code map in [NOTES.md](NOTES.md#code-map). Vendored libraries:
+
+- ExcelJS 4.4.0 (MIT)
+- pdf.js 3.11.174 (Apache-2.0)
+- jsPDF 2.5.1 (MIT)
+
+Tests: `node nuh-roster/test/engine.test.mjs` (fake names only).
 
 ## Team sign-in (optional)
 
 With a Firebase project configured, rosterers sign in with Google. Then:
 
-- the staff list, rooms and settings are shared (*Save for the team* on the Seniors, Juniors or Settings tab)
+- the staff list, rooms, settings and monthly rosters are shared (*Save for the team* on the Staff or Settings tab)
 - each day's roster has a **Save** button, records who saved it and when, and keeps a permanent history of every save
-- anyone on the team can open any saved roster
+- anyone on the team can restore any saved version
 
 Only Google accounts on the team list can read or write anything. This is enforced by `firestore.rules` on Google's side, not just by the page. Without a config the page works as before, with everything kept in the browser.
 
@@ -43,7 +40,7 @@ The data (staff names, leave, case notes) is then stored in Google Cloud, outsid
 2. **Build → Authentication → Get started → Sign-in method → Google → Enable**, then Save.
    Under **Authentication → Settings → Authorized domains**, add `anawj.com`.
 3. **Build → Firestore Database → Create database**. Pick a Singapore location (`asia-southeast1`) and start in **production mode**.
-   Open the **Rules** tab, paste the contents of `nuh-roster/firestore.rules`, and click **Publish**.
+   The rules in `nuh-roster/firestore.rules` deploy automatically on every merge to main (GitHub Actions); never paste them by hand.
 4. Add yourself as the first admin. In **Firestore → Data → Start collection**, use collection ID `members`, document ID = your Google email in lowercase (e.g. `you@gmail.com`), and fields `role` (string) = `admin` and `name` (string) = your name.
 5. Go to **Project settings (gear) → General → Your apps → Web (`</>`)** and register an app (no hosting needed). Copy `apiKey`, `authDomain`, `projectId` and `appId` into `nuh-roster/js/firebase-config.js`, then commit.
    These values are meant to be public. Access is controlled by the rules and the members list.

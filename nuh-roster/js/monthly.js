@@ -60,14 +60,14 @@ export const NIGHT_DUTIES = MONTHLY.flatMap(m => m.cols.filter(c => c.night).map
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const norm = s => String(s ?? '').toLowerCase().replace(/\s+/g, ' ').trim();
-// "Ng Peng []" -> "Ng Peng"
+// "Ng Kai []" -> "Ng Kai"
 export const cleanCell = s => String(s ?? '').replace(/\[\s*\]/g, '').replace(/\s+/g, ' ').trim();
 
 export const daysIn = month => new Date(+month.slice(0, 4), +month.slice(5, 7), 0).getDate();
 export const weekday = (month, d) => WEEKDAYS[new Date(+month.slice(0, 4), +month.slice(5, 7) - 1, d).getDay()];
 export const monthName = month => `${MONTHS[+month.slice(5, 7) - 1]} ${month.slice(0, 4)}`;
 const iso = (y, m, d) => `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-export const addDays = (date, n) => { const d = new Date(date + 'T12:00:00'); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+export const addDays = (date, n) => { const d = new Date(Date.UTC(+date.slice(0, 4), +date.slice(5, 7) - 1, +date.slice(8, 10) + n)); return d.toISOString().slice(0, 10); };
 
 // "Anaesthesia - Junior On Call Roster For Oct 2022" -> { kind: 'junior', month: '2022-10' }
 export function parseTitle(text) {
@@ -85,7 +85,7 @@ export function parsePeriod(text, month) {
   const one = s => {
     const x = s.match(/^(\d{1,2})\s*([A-Za-z]{3})?/);
     if (!x) return null;
-    const mi = x[2] ? MONTHS.findIndex(k => k.toLowerCase() === x[2].toLowerCase()) + 1 : m0;
+    const mi = (x[2] && MONTHS.findIndex(k => k.toLowerCase() === x[2].toLowerCase()) + 1) || m0;
     // a month well before the roster's month is next year's (December rosters running into January)
     const yy = mi < m0 - 6 ? y + 1 : mi > m0 + 6 ? y - 1 : y;
     return iso(yy, mi || m0, +x[1]);
@@ -115,24 +115,30 @@ function headerColumns(def, headers) {
 // items: [{ str, x, y, w }] per page. Returns { kind, month, data, cols } or { error }.
 export function readMonthlyPdf(pages) {
   const all = pages.flat();
-  const titleItem = all.find(i => /roster\b.*\bfor\s+[a-z]{3}/i.test(i.str));
-  const { kind, month } = parseTitle(titleItem?.str);
+  // the title may be one text item or several on one line
+  const titleText = [...all.map(i => i.str), ...groupRows(all).map(r => r.map(i => i.str).join(' '))]
+    .find(t => /roster\b.*\bfor\s+[a-z]{3}/i.test(t));
+  const { kind, month } = parseTitle(titleText);
   if (!kind || !month) return { error: 'This doesn\'t look like one of the monthly rosters (no "… Roster For <month> <year>" title).' };
   const def = monthlyDef(kind);
   const found = new Set();
+  let heads = [];
   if (def.list) {
     const entries = [];
     for (const items of pages) {
-      const heads = headerColumns(def, items.map(i => ({ text: i.str, x: i.x, y: i.y, w: i.w })));
+      const own = headerColumns(def, items.map(i => ({ text: i.str, x: i.x, y: i.y, w: i.w })));
+      if (own.length) heads = own; // a page without headers carries on with the last page's
       if (!heads.length) continue;
       heads.forEach(hh => found.add(hh.col.key));
-      const hy = Math.min(...heads.map(hh => hh.y));
-      const rows = groupRows(items.filter(i => i.y < hy - 2 && !/powered by|^\d+\s*\/\s*\d+$/i.test(i.str)));
-      for (const row of rows) {
+      const hy = own.length ? Math.min(...own.map(hh => hh.y)) : Infinity;
+      // left-aligned columns: an item belongs to the last header starting at or before it
+      const colOf = it => [...heads].reverse().find(hh => hh.x - 10 <= it.x);
+      const lines = groupRows(items.filter(i => i.y < hy - 2 && !/powered by|^\d+\s*\/\s*\d+$/i.test(i.str)));
+      const isEntry = line => line.some(it => colOf(it)?.col.key === 'period' && parsePeriod(it.str, month));
+      for (const { items: row } of bands(lines, isEntry)) {
         const rec = {};
-        // left-aligned columns: an item belongs to the last header starting at or before it
         for (const it of row) {
-          const col = [...heads].reverse().find(hh => hh.x - 10 <= it.x);
+          const col = colOf(it);
           if (col) rec[col.col.key] = cleanCell([rec[col.col.key], it.str].filter(Boolean).join(' '));
         }
         const p = rec.period && parsePeriod(rec.period, month);
@@ -142,16 +148,18 @@ export function readMonthlyPdf(pages) {
     return { kind, month, data: { entries }, cols: [...found] };
   }
   const rows = {};
+  const isDay = ([d, wd]) => d && /^\d{1,2}$/.test(d.str.trim()) && wd && WEEKDAYS.includes(wd.str.trim());
   for (const items of pages) {
-    const heads = headerColumns(def, items.map(i => ({ text: i.str, x: i.x + i.w / 2, y: i.y })));
+    const own = headerColumns(def, items.map(i => ({ text: i.str, x: i.x + i.w / 2, y: i.y })));
+    if (own.length) heads = own;
     if (!heads.length) continue;
     heads.forEach(hh => found.add(hh.col.key));
-    for (const row of groupRows(items)) {
-      const [d, wd] = row;
-      if (!d || !/^\d{1,2}$/.test(d.str.trim()) || !wd || !WEEKDAYS.includes(wd.str.trim())) continue;
-      const rec = (rows[+d.str] ||= {});
+    const hy = own.length ? Math.min(...own.map(hh => hh.y)) : Infinity;
+    for (const { anchor, items: row } of bands(groupRows(items.filter(i => i.y < hy - 2)), isDay)) {
+      const rec = (rows[+anchor[0].str] ||= {});
       // centred headers: an item belongs to the first column whose centre lies to its right
-      for (const it of row.slice(2)) {
+      for (const it of row) {
+        if (it === anchor[0] || it === anchor[1]) continue;
         const col = heads.find(hh => hh.x > it.x);
         if (col) rec[col.col.key] = cleanCell([rec[col.col.key], it.str].filter(Boolean).join(' '));
       }
@@ -168,6 +176,25 @@ function groupRows(items) {
     if (r) r.items.push(it); else rows.push({ y: it.y, items: [it] });
   }
   return rows.map(r => r.items.sort((a, b) => a.x - b.x));
+}
+
+// Text wrapped onto a second line in a cell sits a little above or below its row's main line.
+// Each anchor line (a day, a leave entry) takes the lines nearest it, within half a row.
+// Returns [{ anchor, items }], the items top to bottom then left to right.
+function bands(lines, isAnchor) {
+  const anchors = lines.filter(isAnchor);
+  if (!anchors.length) return [];
+  const ys = anchors.map(l => l[0].y);
+  const gaps = ys.slice(1).map((y, i) => ys[i] - y).filter(g => g > 0).sort((a, b) => a - b);
+  const reach = Math.min(14, (gaps[Math.floor(gaps.length / 2)] || 20) / 2);
+  const out = anchors.map(l => [...l]);
+  for (const l of lines) {
+    if (anchors.includes(l)) continue;
+    let best = -1;
+    ys.forEach((y, i) => { if (Math.abs(y - l[0].y) < reach && (best < 0 || Math.abs(y - l[0].y) < Math.abs(ys[best] - l[0].y))) best = i; });
+    if (best >= 0) out[best].push(...l);
+  }
+  return out.map((r, i) => ({ anchor: anchors[i], items: r.sort((a, b) => b.y - a.y || a.x - b.x) }));
 }
 
 // ---- Excel (the same layout, e.g. an export from here) ----
