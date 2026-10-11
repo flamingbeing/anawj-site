@@ -5,8 +5,8 @@ import { BY_CODE, TIPS } from './categories.js';
 import { withParents, frequentCombos, parseBulk, parseDate, fmtDate, sortCodes, uid, caseParts, caseText, cleanInitials, splitInitials, splitAge, nth } from './engine.js';
 import { suggest } from './suggest.js';
 import {
-  S, h, toast, debounce, modal, confirmBox, cat, catName, catShort, catFull, catChip, countText, PICKER_ORDER, PROGRESS_BY_CODE,
-  createCase, updateCase, removeCase, restoreCase, saveMany, deleteMany, subcatChips, settings, todayISO, hooks, fill, add, cloud, okNoIds, patchLogbook } from './ui-core.js';
+  S, h, toast, debounce, modal, confirmBox, cat, catName, catShort, catFull, catChip, countText, pickerOrder, PROGRESS_BY_CODE,
+  createCase, updateCase, removeCase, restoreCase, saveMany, deleteMany, subcatChips, settings, todayISO, hooks, fill, add, cloud, okNoIds, patchLogbook, catPills } from './ui-core.js';
 import { templateDialog } from './ui-settings.js';
 import { moveToBin } from './bin.js';
 import { shareText, copyText, caseText as shareCaseText, dayText, dayMarkdown } from './share.js';
@@ -86,15 +86,15 @@ export function catPicker({ get, toggle, placeholder = 'Search categories: code 
     const sel = new Set(get());
     const prog = PROGRESS_BY_CODE();
     const words = q.toLowerCase().split(/\s+/).filter(Boolean);
-    items = words.length ? PICKER_ORDER.filter(c => matches(c, words)) : PICKER_ORDER;
+    const order = pickerOrder();
+    items = words.length ? order.filter(c => matches(c, words)) : order;
     fill(list, ...items.map(c => {
       const p = prog[c.code];
       return h('li', {
-        role: 'option', 'aria-selected': String(sel.has(c.code)), class: `${c.parent ? 'sub' : ''} ${sel.has(c.code) ? 'on' : ''}`, title: c.full || c.name,
+        role: 'option', 'data-code': c.code, 'aria-selected': String(sel.has(c.code)), class: `${c.parent ? 'sub' : ''} ${sel.has(c.code) ? 'on' : ''}`, title: c.full || c.name,
         onclick: () => keepPlace(list, () => { toggle(c.code); refresh(); }),
       },
       h('span', { class: 'tick' }, sel.has(c.code) ? '✓' : ''),
-      h('span', { class: 'code' }, c.code),
       h('span', { class: 'nm' }, catName(c.code)),
       h('span', { class: `ct ${p && p.status === 'done' ? 'met' : ''}` }, countText(c.code, prog)));
     }));
@@ -338,14 +338,14 @@ function paintQuick() {
       if (ui.textarea) { ui.textarea.value = draft.details; ui.textarea.focus({ preventScroll: true }); ui.textarea.setSelectionRange(0, 0); }
       keepPlace(ui.templates, () => { saveDraft(); paintDate(); paintSel(); paintParsed(false); });
     },
-  }, i === 0 ? '↻ Same as last ' : '↻ ', h('span', {}, (proc || 'no details').slice(0, 28)), h('span', { class: 'muted', style: 'font-size:12px' }, ' ' + sortCodes(c.cats).join(' + ')))));
+  }, i === 0 ? '↻ Same as last ' : '↻ ', h('span', {}, (proc || 'no details').slice(0, 28)), h('span', { class: 'muted', style: 'font-size:12px' }, ' ' + catPills(c.cats)))));
   const seen = new Set();
   const tmplChip = (t, name) => {
     const key = sortCodes(t.cats).join(',');
     if (!t.cats || !t.cats.length || (!name && seen.has(key))) return null;
     seen.add(key);
     return h('span', { class: 'chip tmpl', role: 'button', tabindex: '0', title: t.cats.map(catFull).join('\n'), onclick: () => applyTemplate(t) },
-      name ? h('b', {}, name) : null, h('span', { class: name ? 'muted' : '', style: name ? 'font-size:12px' : '' }, (name ? ' ' : '') + sortCodes(t.cats).join(' + ')));
+      name ? h('b', {}, name) : null, h('span', { class: name ? 'muted' : '', style: name ? 'font-size:12px' : '' }, (name ? ' ' : '') + catPills(t.cats)));
   };
   for (const t of (S.logbook && S.logbook.templates) || []) chips.push(tmplChip(t, t.name));
   for (const t of S.sharedTemplates || []) chips.push(tmplChip(t, t.name));
@@ -385,7 +385,7 @@ async function save({ another }) {
   // say where it went and what it counted towards: "Saved Sat 10 Oct · 16 LSCS now 4/10"
   const prog = PROGRESS_BY_CODE();
   const withTarget = c.cats.map(code => prog[code]).find(p => p && p.next);
-  const counted = withTarget ? ` · ${withTarget.code} ${catName(withTarget.code)} now ${withTarget.count}/${withTarget.next.n}` : ` · ${c.cats.join(', ')}`;
+  const counted = withTarget ? ` · ${catName(withTarget.code)} now ${withTarget.count}/${withTarget.next.n}` : ` · ${catPills(c.cats)}`;
   toast(`Saved ${fmtDate(c.date)}${counted}`, {
     action: 'Undo',
     onaction: () => {
@@ -437,7 +437,7 @@ function paintBulk(out) {
     const same = above.length && !above.every(c => r.cats.includes(c)) ? h('span', {
       class: 'chip tmpl same', role: 'button', tabindex: '0', title: 'Add the categories of the case above: ' + above.map(catFull).join(', '),
       onclick: () => { r.cats = sortCodes(withParents([...r.cats, ...above])); paintBulk(out); },
-    }, 'Same as above: ', h('b', {}, sortCodes(above).join(' + '))) : null;
+    }, 'Same as above: ', h('b', {}, catPills(above))) : null;
     const sugg = on && r.details.trim() ? suggest(r.details, { limit: 4 }).filter(s => !r.cats.includes(s.code)) : [];
     return h('tr', {},
       h('td', {}, h('input', { type: 'date', value: r.date || def, max: todayISO(), onchange: e => { r.date = parseDate(e.target.value); } })),
@@ -519,7 +519,7 @@ function planCard() {
       due.length > 1 ? h('button', { class: 'small primary', onclick: () => done(due) }, `✓ All ${due.length} done`) : null),
     due.length ? h('ul', { class: 'plan-list' }, due.map(p => h('li', {},
       h('span', { class: 'pt' }, p.date < today ? h('small', {}, fmtDate(p.date).replace(/ \d{4}$/, '') + ' · ') : null, p.initials ? h('b', {}, p.initials + ' ') : null, String(p.details || '').split('\n').join(' · '),
-        h('small', { class: 'muted' }, ' ' + (p.cats && p.cats.length ? sortCodes(p.cats).join(' + ') : 'no category'))),
+        h('small', { class: 'muted' }, ' ' + (p.cats && p.cats.length ? catPills(p.cats) : 'no category'))),
       h('span', { class: 'row' },
         h('button', { class: 'small primary', 'aria-label': 'Done: log this case', onclick: () => done([p]) }, '✓ Done'),
         h('button', { class: 'small', 'aria-label': 'Edit before logging', onclick: () => edit(p) }, 'Edit'),

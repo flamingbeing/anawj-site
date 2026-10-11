@@ -683,3 +683,33 @@ table.cat-names td.muted { font-size: 13px; }
 
 /* pages under More: the way back */
 .back-row { margin: 0 0 8px; }
+
+/* Reflections: export ticks, folded tagged line, collapsible headings */
+.refl-wc { font-size: 12px; }
+.refl-counts { font-size: 13px; }
+.refl-htoggle { cursor: pointer; min-height: 40px; display: flex; align-items: center; flex-wrap: wrap; gap: 0 4px; }
+.refl-htoggle .res-chev { display: inline-block; transition: transform .15s; }
+.refl-htoggle[aria-expanded="true"] .res-chev { transform: rotate(90deg); }
+.ready-line { margin: 8px 0 0; padding: 6px 10px; border-radius: 10px; background: var(--info-bg); }
+.ready-line > summary { cursor: pointer; font-size: 14px; color: var(--info); min-height: 40px; display: flex; align-items: center; }
+.refl-filters { margin-top: 6px; }
+.refl-filters .chip { min-height: 40px; }
+.flag.tagged { background: var(--warn-bg, #fff4e5); color: var(--warn, #b45309); margin-right: 6px; }
+.refl-htoggle .res-chev.blank { width: .5em; }
+.refl-view { display: inline-flex; align-items: center; gap: 4px; }
+.refl-view select { min-height: 40px; }
+.refl-hd { display: block; font-size: 12px; }
+.refl-viewpanel { margin-top: 6px; padding: 6px 8px 8px; border: 1px solid var(--line); border-radius: 10px; }
+/* Export page: tick reflections for the portfolio */
+ul.exp-list { list-style: none; margin: 0; padding: 0; }
+ul.exp-list li { border-bottom: 1px solid var(--line); }
+label.exp-row { display: flex; align-items: flex-start; gap: 10px; padding: 8px 2px; min-height: 44px; cursor: pointer; }
+label.exp-row input { width: 20px; height: 20px; margin: 2px 0 0; flex: none; }
+label.exp-row .flag { margin-left: 6px; }
+
+/* Settings: category order */
+ol.cat-order { list-style: none; margin: 0; padding: 0; }
+ol.cat-order li { display: flex; align-items: center; gap: 6px; padding: 4px 0; border-bottom: 1px solid var(--line); }
+ol.cat-order .icon-btn { min-width: 44px; min-height: 40px; }
+/* grid: categories open the edit dialog */
+button.grid-cats { width: 100%; min-height: 40px; text-align: left; font-size: 13px; padding: 4px 8px; background: transparent; border: 1px dashed var(--line); border-radius: 8px; }

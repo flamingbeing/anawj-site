@@ -1,6 +1,6 @@
 // Shared UI state and helpers for the logbook screens (ui-*.js). app.js owns boot, auth and tabs.
 
-import { BY_CODE, CATEGORIES, yearName, appYear } from './categories.js';
+import { BY_CODE, CATEGORIES, DEFAULT_NAMES, yearName, appYear } from './categories.js';
 import { countCases, uid, todayISO, sortCodes, progress, rYearDefault, academicYear, splitInitials, cleanInitials } from './engine.js';
 import * as cloud from './cloud.js';
 import { reflectionCounts } from './reflections.js';
@@ -195,8 +195,9 @@ export const cat = code => BY_CODE[code] || { code, name: code, label: code, ful
 let NAMES = {};
 export const setCategoryNames = m => { NAMES = m || {}; };
 export const categoryNames = () => NAMES;
-export const catName = code => (NAMES[code] && NAMES[code].name) || cat(code).name;
-export const catShort = code => (NAMES[code] && NAMES[code].short) || catName(code);
+// an admin's name (Settings → Category names), else the programme's default, else the official one
+export const catName = code => (NAMES[code] && NAMES[code].name) || (DEFAULT_NAMES[code] && DEFAULT_NAMES[code][0]) || cat(code).name;
+export const catShort = code => (NAMES[code] && NAMES[code].short) || (DEFAULT_NAMES[code] && DEFAULT_NAMES[code][1]) || catName(code);
 // Readable procedure name for tags and tooltips: no code, no targets.
 export const catFull = code => cat(code).full || cat(code).name;
 export const PROGRESS_BY_CODE = () => Object.fromEntries(progress(S.counts, rYear()).map(p => [p.code, p]));
@@ -212,11 +213,13 @@ export function countText(code, prog) {
 
 export function catChip(code, { on, onclick, cls = '', removable, title } = {}) {
   return h('span', {
-    class: `chip ${on ? 'on' : ''} ${cls}`, role: 'button', tabindex: '0', title: title || catFull(code),
+    class: `chip ${on ? 'on' : ''} ${cls}`, role: 'button', tabindex: '0', title: title || catFull(code), 'data-code': code,
     onclick, onkeydown: e => { if ((e.key === 'Enter' || e.key === ' ') && onclick) { e.preventDefault(); onclick(e); } },
-  }, h('span', { class: 'code' }, code), h('span', { class: 'nm' }, catShort(code)), removable ? h('span', { class: 'x', 'aria-label': 'remove' }, '×') : null);
+  }, h('span', { class: 'nm' }, catShort(code)), removable ? h('span', { class: 'x', 'aria-label': 'remove' }, '×') : null);
 }
-export const miniChips = cats => h('span', { class: 'chips' }, sortCodes(cats || []).map(c => h('span', { class: 'mini', title: catFull(c) }, c)));
+export const miniChips = cats => h('span', { class: 'chips' }, sortCodes(cats || []).map(c => h('span', { class: 'mini', title: catFull(c) }, catShort(c))));
+// "LSCS + CNB(Obs) + Spinal": categories by their pill names (numbers are only on Totals and in exports)
+export const catPills = cats => sortCodes(cats || []).map(catShort).join(' + ');
 
 // Categories ordered for the picker: each parent followed by its sub-categories.
 export const PICKER_ORDER = (() => {
@@ -225,6 +228,16 @@ export const PICKER_ORDER = (() => {
   for (const c of active) if (!c.parent) { out.push(c); for (const s of active) if (s.parent === c.code) out.push(s); }
   return out;
 })();
+// The Log page's category list in the order chosen in Settings → Category order (settings.catOrder:
+// top-level codes; subcategories stay under their parent; categories not in the list keep their place
+// at the end, in the official order).
+export function pickerOrder(order = settings().catOrder) {
+  if (!Array.isArray(order) || !order.length) return PICKER_ORDER;
+  const tops = PICKER_ORDER.filter(c => !c.parent);
+  const rank = new Map(order.map((code, i) => [String(code), i]));
+  const sortedTops = [...tops].sort((a, b) => (rank.get(a.code) ?? 1e3 + tops.indexOf(a)) - (rank.get(b.code) ?? 1e3 + tops.indexOf(b)));
+  return sortedTops.flatMap(t => PICKER_ORDER.filter(c => c.code === t.code || c.parent === t.code));
+}
 
 // ---------- case writes (optimistic; the live listener confirms) ----------
 

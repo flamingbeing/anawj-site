@@ -576,7 +576,7 @@ async function getTemplate() {    // after the page opened is picked up at the n
 // A button for the reflections screen (or Progress): getReflections() and getName() are called on click.
 // getExtra() (may be async) may return { cases, intake, rYear, smo } to fill Section 4 with the resident's case
 // counts, and { images } with the pictures of the reflections' figures.
-export function renderExportButton(getReflections, getName, getExtra) {
+export function renderExportButton(getReflections, getName, getExtra, label = 'Export portfolio (Word)') {
   // says up front which layout the export will use, so a missing template is noticed before exporting
   const note = h('span', { class: 'hint', style: 'display:block;margin-top:4px' }, 'Checking the portfolio template…');
   const paintNote = t => {
@@ -598,7 +598,7 @@ export function renderExportButton(getReflections, getName, getExtra) {
       toast(blob.usedTemplate ? 'Portfolio exported.' : t ? 'The portfolio template could not be read, so the plain layout was used. Ask an admin to upload it again.' : 'Exported in the plain layout (no portfolio template uploaded yet).');
     } catch (err) { toast('Could not export: ' + err.message); }
     btn.disabled = false;
-  } }, 'Export portfolio (Word)');
+  } }, label);
   return h('span', { style: 'display:block' }, btn, note);
 }
 
@@ -620,7 +620,7 @@ const TC = { info: null, loading: false, busy: false };
 // Admin page card: upload the blank portfolio template (made with tools/build_portfolio_template.py).
 export function renderTemplateCard() {
   const card = h('section', { class: 'card' }, h('h2', {}, 'Portfolio template'),
-    h('p', { class: 'hint' }, 'The blank APMES portfolio (.docx) that “Export portfolio (Word)” fills in. Word comments in it are removed on upload. Make it from a filled portfolio with tools/build_portfolio_template.py, which clears every resident’s details. Do not upload a filled one. Without a template, exports use a plain layout.'));
+    h('p', { class: 'hint' }, 'The blank APMES portfolio (.docx) that the Word export (More → Export & Sync) fills in. Word comments in it are removed on upload. Make it from a filled portfolio with tools/build_portfolio_template.py, which clears every resident’s details. Do not upload a filled one. Without a template, exports use a plain layout.'));
   if (!cloud.saveTemplate) return card;
   if (!TC.info && !TC.loading) {
     TC.loading = true;

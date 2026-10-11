@@ -1,11 +1,11 @@
 // Logbook screen: every case, newest first (list) or by day (calendar). Search, filter, flags, edit; a grid view for bulk edits
 // and pasting rows from Excel; Excel download and upload (round trip with a preview of the changes).
 
-import { duplicates, fmtDate, caseFromRow, diffRows, sortCodes, withParents, caseParts, caseText, dateWindow, nth } from './engine.js';
+import { duplicates, fmtDate, diffRows, sortCodes, withParents, caseParts, caseText, dateWindow, nth, cleanInitials } from './engine.js';
 import { flagCase } from './importer.js';
 import { exportCases, readCasesSheet } from './xlsxio.js';
 import {
-  S, h, toast, debounce, modal, cat, catName, categoryNames, catFull, catChip, PICKER_ORDER, settings, patchLogbook, needExcel, download, fileButton,
+  S, h, toast, debounce, modal, cat, catName, categoryNames, catFull, catChip, PICKER_ORDER, settings, patchLogbook, needExcel, download, fileButton, catPills,
   updateCase, saveMany, deleteMany, displayName, rYear, todayISO, fill, add, resetters } from './ui-core.js';
 import { editCaseDialog } from './ui-log.js';
 import { reflectOnCase } from './ui-reflect.js';
@@ -60,7 +60,7 @@ export function renderLogbook() {
   const filters = h('div', { class: 'bar lb-filters', hidden: !(view.showFilters || view.cat || view.flag) },
     h('select', { 'aria-label': 'Filter by category', onchange: e => { view.cat = e.target.value; paintFilterBtn(); paint(); } },
       h('option', { value: '' }, 'All categories'),
-      PICKER_ORDER.map(c => h('option', { value: c.code, selected: view.cat === c.code }, `${c.parent ? '  ' : ''}${c.code} ${catName(c.code)} (${S.counts[c.code] || 0})`))),
+      PICKER_ORDER.map(c => h('option', { value: c.code, selected: view.cat === c.code }, `${c.parent ? '  ' : ''}${catName(c.code)} (${S.counts[c.code] || 0})`))),
     h('select', { 'aria-label': 'Filter by flag', onchange: e => { view.flag = e.target.value; paintFilterBtn(); paint(); } },
       flagOpts.map(([v, l]) => h('option', { value: v, selected: view.flag === v }, l))));
   const filterBtn = h('button', { class: 'small', 'aria-expanded': String(!filters.hidden), onclick: () => {
@@ -221,36 +221,31 @@ function gridView(rows, repaint) {
   const tbody = h('tbody');
   for (const c of rows.slice(0, view.limit)) {
     const p = caseParts(c);
-    const row = { id: c.id, date: c.date || c.dateText || '', initials: p.initials, details: p.details, categories: catText(c.cats) };
+    // dates come from a date picker and categories from the case's edit dialog: nothing free-text gets in
+    const row = { date: c.date || '', initials: p.initials, details: p.details };
     const tr = h('tr');
     const commit = async () => {
-      const parsed = caseFromRow(row);
-      if (parsed.unknown.length) { toast('Unknown categor' + (parsed.unknown.length > 1 ? 'ies: ' : 'y: ') + parsed.unknown.join(', ')); tr.classList.add('dirty'); return; }
-      // a typed date that can't be read (e.g. month first) is not saved as "no date"
-      if (!parsed.date && String(row.date).trim() && String(row.date).trim() !== (c.dateText || '')) {
-        toast(`Could not read the date “${row.date}” — use day/month/year, e.g. 13/3/2026`); tr.classList.add('dirty'); return;
-      }
-      parsed.cats = sortCodes(withParents(parsed.cats));   // as in the Log picker: 26i also counts for 26
-      const same = (c.date || '') === (parsed.date || '') && p.initials === parsed.initials && p.details === parsed.details && catText(c.cats) === catText(parsed.cats)
-        && (parsed.date || (c.dateText || '') === (parsed.dateText || ''));
+      const initials = cleanInitials(row.initials), details = String(row.details || '').trim();
+      const date = /^\d{4}-\d{2}-\d{2}$/.test(row.date) ? row.date : null;
       tr.classList.remove('dirty');
-      if (same) return;
-      const next = { ...c, date: parsed.date, initials: parsed.initials, details: parsed.details, cats: parsed.cats };
-      if (!parsed.date && parsed.dateText) next.dateText = parsed.dateText;
+      if ((c.date || null) === date && p.initials === initials && p.details === details) return;
+      const next = { ...c, date, initials, details };
+      if (date) delete next.dateText;
       Object.assign(c, await updateCase(next));
-      Object.assign(p, { initials: parsed.initials, details: parsed.details });
+      Object.assign(p, { initials, details });
     };
     const cell = (key, attrs = {}) => h('input', { ...attrs, value: row[key], oninput: e => { row[key] = e.target.value; tr.classList.add('dirty'); }, onchange: commit });
     add(tr, 
-      h('td', { class: 'date' }, cell('date', { 'aria-label': 'Date', placeholder: 'd/m/yyyy' })),
+      h('td', { class: 'date' }, cell('date', { type: 'date', 'aria-label': 'Date', title: c.dateText && !c.date ? `Was written as “${c.dateText}”: pick the date` : '' })),
       h('td', { class: 'ini' }, cell('initials', { 'aria-label': 'Initials', placeholder: 'AB', autocapitalize: 'characters', size: '5' })),
       h('td', {}, cell('details', { 'aria-label': 'Details' })),
-      h('td', { class: 'cats' }, cell('categories', { 'aria-label': 'Categories', placeholder: '16, 17' })));
+      h('td', { class: 'cats' }, h('button', { type: 'button', class: 'grid-cats', 'aria-label': 'Categories: change', onclick: () => editCaseDialog(c) },
+        (c.cats || []).length ? catPills(c.cats) : h('span', { class: 'flag err' }, 'no category'))));
     add(tbody, tr);
   }
   const more = rows.length > view.limit ? h('button', { onclick: () => { view.limit += 300; repaint(); } }, `Show more (${rows.length - view.limit} left)`) : null;
   return h('div', {},
-    h('p', { class: 'hint' }, 'Edit cells directly; changes save when you leave a cell. Dates as 12/3/2026; categories as codes (16, 17) or names.'),
+    h('p', { class: 'hint' }, 'Edit the date, initials and details directly; changes save when you leave a cell. Tap the categories to change them.'),
     h('div', { class: 'scroll' }, h('table', { class: 'grid' }, h('thead', {}, h('tr', {}, h('th', {}, 'Date'), h('th', {}, 'Initials'), h('th', {}, 'Case details'), h('th', {}, 'Categories'))), tbody)),
     more,
     pasteRows());
@@ -325,7 +320,7 @@ function previewDiff(d, after) {
   const added = d.added.filter(c => !have.has(caseKey(c))).map(c => ({ ...c, cats: sortCodes(withParents(c.cats || [])) }));
   for (const x of changed) x.after = { ...x.after, cats: sortCodes(withParents(x.after.cats || [])) };
   const nothing = !added.length && !changed.length && !deleted.length;
-  const line = c => `${c.date ? fmtDate(c.date) : (c.dateText || 'no date')} · ${caseText(c).slice(0, 60)} · ${catText(c.cats)}`;
+  const line = c => `${c.date ? fmtDate(c.date) : (c.dateText || 'no date')} · ${caseText(c).slice(0, 60)} · ${catPills(c.cats)}`;
   const section = (title, items, fmt, cls) => items.length ? h('details', { open: items.length <= 5 },
     h('summary', {}, `${title} (${items.length})`),
     h('ul', { class: 'warnings' }, items.slice(0, 200).map(x => h('li', { class: cls }, fmt(x))))) : null;
