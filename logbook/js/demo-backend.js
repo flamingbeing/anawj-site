@@ -396,6 +396,9 @@ export function cleanCategoryNames(m) {
   return out;
 }
 const NAMES_KEY = KEY + '-category-names';
+const HIDDEN_KEY = 'apmes-logbook-demo-hidden';
+export async function loadTotalsHidden() { try { return JSON.parse(localStorage.getItem(HIDDEN_KEY) || '[]'); } catch { return []; } }
+export async function saveTotalsHidden(rids) { try { localStorage.setItem(HIDDEN_KEY, JSON.stringify([...new Set(rids.map(String))].sort())); } catch { /* storage blocked */ } }
 export async function loadCategoryNames() { try { return JSON.parse(localStorage.getItem(NAMES_KEY) || '{}'); } catch { return {}; } }
 export async function saveCategoryNames(names) { const n = cleanCategoryNames(names); try { localStorage.setItem(NAMES_KEY, JSON.stringify(n)); } catch { /* storage blocked */ } return n; }
 

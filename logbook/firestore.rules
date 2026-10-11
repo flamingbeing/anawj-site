@@ -255,6 +255,13 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['names', 'updatedAt'])
         && request.resource.data.names is map && request.resource.data.names.size() <= 200;
     }
+    // rids left off Totals (attrited residents); admins keep it in step with the residents list
+    match /config/totalsHidden {
+      allow read: if signedIn();
+      allow write: if isAdmin()
+        && request.resource.data.keys().hasOnly(['rids', 'updatedAt'])
+        && request.resource.data.rids is list && request.resource.data.rids.size() <= 500;
+    }
     match /config/portfolioTemplate {
       allow read: if signedIn();
       allow write: if isAdmin()

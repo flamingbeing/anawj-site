@@ -122,6 +122,8 @@ async function downloadSummary(rows, yr) {
 
 const tview = { summaries: null, loading: false, intake: null, error: '' };
 resetters.push(() => Object.assign(tview, { summaries: null, intake: null, error: '' }));
+// reload the totals next time they're shown (an admin took a row off)
+export const forgetTotals = () => { tview.summaries = null; };
 
 export function renderTotals() {
   const card = h('section', { class: 'card' });
@@ -166,7 +168,9 @@ async function loadSummaries() {
     return Math.min(5, base + (x.updatedAt ? Math.max(0, nowAy - ay(x.updatedAt)) : 0));
   };
   try {
-    tview.summaries = (await cloud.listSummaries()).map(x => {
+    const [list, hidden] = await Promise.all([cloud.listSummaries(), cloud.loadTotalsHidden()]);
+    const off = new Set(hidden);   // attrited residents (Admin)
+    tview.summaries = list.filter(x => !off.has(String(x.rid))).map(x => {
       const ridYear = Number(String(x.rid || '').slice(0, 4));
       const intake = Number(x.intake) || (ridYear > 2000 && ridYear < 2100 ? ridYear : null);   // no intake: the rid starts with it
       return { ...x, intake, rYear: yearOf({ ...x, intake }), counts: clean(x.counts), total: whole(x.total), reflectionsTotal: whole(x.reflectionsTotal) };

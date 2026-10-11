@@ -8,6 +8,7 @@ import { countCases, sortCodes, splitInitials } from './engine.js';
 import { parseResidentsScript, parseCaseSheet, parseTotalsSheet, countCheck } from './importer.js';
 import { S, h, toast, confirmBox, cloud, needExcel, sheetRows, fileButton, hooks, add, resetters, residentYear, residentYearName, residentSmo, baseIntake, effectiveIntake, categoryNames, setCategoryNames, PICKER_ORDER } from './ui-core.js';
 import { templateDialog } from './ui-settings.js';
+import { forgetTotals } from './ui-progress.js';
 import { renderTemplateCard } from './portfolio.js';
 
 const STATUSES = ['ACTIVE', 'ON LEAVE', 'SMO', 'GRADUATED', 'ATTRITED'];
@@ -29,10 +30,26 @@ export function renderAdmin() {
   return h('div', {}, residentsCard(), S.owner ? importCard() : ownerOnlyCard(), sharedCard(), categoryNamesCard(), renderTemplateCard());
 }
 
+// Attrited residents are left off Totals: their rids go on config/totalsHidden, kept in step with the
+// residents list each time Admin opens and whenever a status changes. Setting someone back to Active
+// takes them off the list, so their row (still kept up to date by their device) shows again.
+// Their logbook is never touched.
+async function syncHidden(announce = null) {
+  try {
+    const want = A.residents.filter(r => r.status === 'ATTRITED').map(r => r.rid).sort();
+    const have = (await cloud.loadTotalsHidden()).slice().sort();
+    if (want.join() === have.join()) return;
+    await cloud.saveTotalsHidden(want);
+    forgetTotals();
+    if (announce) toast(announce);
+  } catch (err) { if (announce) toast('Could not update Totals: ' + err.message); }
+}
+
 async function load() {
   A.loading = true;
   try {
     [A.residents, A.shared] = await Promise.all([cloud.listResidents(), cloud.listSharedTemplates()]);
+    syncHidden();
   } catch (err) { A.residents = []; A.shared = []; toast('Could not load: ' + err.message); }
   A.loading = false;
   if (S.tab === 'admin') hooks.render();
@@ -82,7 +99,7 @@ function residentsCard() {
   const card = h('section', { class: 'card' },
     h('div', { class: 'bar' }, h('h2', { style: 'margin:0' }, 'Residents'), h('span', { class: 'grow' }),
       A.residents ? h('button', { class: A.editRes ? 'small primary' : 'small', onclick: () => { A.editRes = !A.editRes; if (!A.editRes) A.pasted = null; hooks.render(); } }, A.editRes ? 'Done' : 'Edit') : null),
-    h('p', { class: 'hint' }, 'Programme residents share their case counts on the Totals tab. Year defaults from the intake (AY starts 1 July). Tap Edit to set it by hand (leave, repeats) or to mark someone as an SMO: cases done as an SMO count as R3 in the portfolio.'));
+    h('p', { class: 'hint' }, 'Programme residents share their case counts on the Totals tab. Year defaults from the intake (AY starts 1 July). Tap Edit to set it by hand (leave, repeats) or to mark someone as an SMO: cases done as an SMO count as R3 in the portfolio. Attrited residents are left off Totals (their logbook is kept); set them back to Active to show them again.'));
   if (!A.residents) { add(card, h('p', { class: 'empty' }, 'Loading…')); return card; }
   const ed = A.editRes;
   // apply a change and save it; a refused save puts the old values back
@@ -116,9 +133,10 @@ function residentsCard() {
         YEAR_NAMES.map((y, i) => h('option', { value: String(i + 1), selected: r.status !== 'SMO' && r.rYear === i + 1 }, y)),
         h('option', { value: 'SMO', selected: r.status === 'SMO' }, 'SMO (counts as R3)'))),
       h('td', {}, h('select', { onchange: e => {
-        const v = e.target.value;
+        const v = e.target.value, was = r.status;
         if (v === 'SMO') setYear(r, 'SMO');
-        else edit(r, r.status === 'SMO' ? { status: v, smo: residentSmo(r) || null } : { status: v });
+        else edit(r, was === 'SMO' ? { status: v, smo: residentSmo(r) || null } : { status: v });
+        if (v === 'ATTRITED' || was === 'ATTRITED') syncHidden(v === 'ATTRITED' ? `${r.name || r.rid} taken off Totals` : `${r.name || r.rid} back on Totals`);
         hooks.render();
       } }, STATUSES.map(s => h('option', { value: s, selected: r.status === s }, s)))),
       h('td', {}, h('button', { class: 'small danger', 'aria-label': `Remove ${r.name || r.rid}`, onclick: async () => {

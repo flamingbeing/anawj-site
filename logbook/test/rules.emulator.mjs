@@ -103,6 +103,11 @@ await t('summary fake total', assertFails(setDoc(doc(a, 'summaries', 'R1'), { ..
 await t('summary negative total', assertFails(setDoc(doc(a, 'summaries', 'R1'), { ...sum('R1'), total: -1 })));
 await t('summary year out of range', assertFails(setDoc(doc(a, 'summaries', 'R1'), { ...sum('R1'), rYear: 9 })));
 await t('summary negative reflections', assertFails(setDoc(doc(a, 'summaries', 'R1'), { ...sum('R1'), reflectionsTotal: -5 })));
+// attrited residents left off Totals: admins keep the hidden list
+await t('admin saves the Totals hidden list', assertSucceeds(setDoc(doc(adm, 'config', 'totalsHidden'), { rids: ['R2'], updatedAt: 1 })));
+await t('member reads the Totals hidden list', assertSucceeds(getDoc(doc(a, 'config', 'totalsHidden'))));
+await t('resident cannot change the hidden list', assertFails(setDoc(doc(a, 'config', 'totalsHidden'), { rids: [], updatedAt: 2 })));
+await t('hidden list extra field', assertFails(setDoc(doc(adm, 'config', 'totalsHidden'), { rids: [], updatedAt: 2, x: 1 })));
 await t('admin saves category names', assertSucceeds(setDoc(doc(adm, 'config', 'categoryNames'), { names: { '26': { name: 'Nerve blocks', short: 'Blocks' } }, updatedAt: 1 })));
 await t('resident reads category names', assertSucceeds(getDoc(doc(a, 'config', 'categoryNames'))));
 await t('resident cannot change category names', assertFails(setDoc(doc(a, 'config', 'categoryNames'), { names: {}, updatedAt: 2 })));
