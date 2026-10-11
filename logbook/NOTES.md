@@ -83,11 +83,21 @@ portfolio content.
   cached for the first paint (index.html). Light / Dark / OLED (pure black: data-oled on top of dark) / Auto is
   separate, per device. (Fixed named themes were tried and dropped: they read as shades of one colour.)
 - **Settings**: a menu of Display (incl. the tab the app opens on, `settings.startTab`; a #hash still wins),
-  Logging, Tag editor (`#tags`), Reflections (`#reflset`: new reflections in the export, photo sizes), Copy & share format (`#sharefmt`), Recycle bin;
+  Logging, Tag editor (`#tags`), Reflections (`#reflset`: new reflections in the export, photo sizes), Markdown (`#sharefmt`), Recycle bin;
   then a "Settings file" card: export / import settings, tags, tag groups, formats as JSON (`settings-file.js`, tested; never cases or portfolio).
-- **Copy & share** (`share-format.js`, tested): templates in `settings.shareFormat` (dayHead, dayCase, oneCase)
-  with {date} {day} {weekday} {count} {n} {initials} {case}. Default day: `[[YYYY-MM-DD]]`, then
-  `1. AB` / case, a blank line between cases (none for a one-line case format). No tags, ever.
+- **Markdown** (Settings → Markdown, `#sharefmt`; `markdown.js`, tested in `markdown.test.mjs`): one format in
+  `settings.markdown` (only what differs from the default; ≤ 8 KB) for Copy / Share on the Logbook tab and the notes
+  export. Templates take `{{name}}` (older `{name}` still works): case fill-ins {{date}} {{iso}} {{day}} {{weekday}}
+  {{n}} {{count}} {{initials}} {{details}} {{categories}} {{categoryCodes}} {{tags}} {{reflection}}; a line whose
+  fill-ins are all empty goes; a value is never read again as a template. Options: date format, categories as
+  names / codes / #tags, wiki or Markdown links, case notes per month or day, reflection folders (month, heading,
+  flat), file name pattern, front matter fields, the reflection templates (title, summary, each point, figure,
+  references). Default day: `[[YYYY-MM-DD]]`, then `1. AB` / case, a blank line between cases; no tags. An older
+  `settings.shareFormat` (the Copy & share format) carries over until the Markdown page is saved; `share-format.js`
+  is kept for that and its tests. Previews use the user's own latest day and reflection.
+- **Download for notes apps** (More → Export / Import → Backup; `ui-notes.js`): a zip made on the phone (JSZip):
+  `Cases/` notes, `Reflections/…` one note each (linked both ways), `Progress.md` (counts vs targets, reflections vs
+  minimums), optional figures in `images/` (fetched one by one from `images/`). A privacy line is always shown.
 - **Tag editor** (`ui-settings.js`): List | Pills (drag; hold on phones; the dragged copy is lifted above the finger,
   a bar or highlight shows the drop spot, a label at the top says "Before/After/Under …", vibration on Android), search, case counts, edit
   dialog (name, long name, sits under, counts towards, shorthand with built-in defaults and words
