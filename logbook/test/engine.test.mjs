@@ -494,9 +494,9 @@ assert.equal(rYearDefault(undefined), 1);
   for (const w of ['PEG', 'LP', 'ICD', 'EBL']) assert.equal(splitInitials(`${w} insertion`).initials, '', w);
   assert.equal(splitInitials('IJ 60M VATS DLT').initials, 'IJ');
   assert.equal(splitInitials('TKR spinal').initials, '');
-  // one case per line when nothing is separated by a blank line; list markers dropped
-  const lines = parseBulk('1. AB 45F lap chole GA\n2. CD 30F LSCS spinal\nconverted to GA\n- IJ 60M VATS DLT', null, now);
-  assert.deepEqual(lines.map(c => [c.initials, c.details]), [['AB', '45F lap chole GA'], ['CD', '30F LSCS spinal\nconverted to GA'], ['IJ', '60M VATS DLT']]);
+  // a blank line starts a new case; lines without one stay in the same case; list markers dropped
+  const two = parseBulk('1. AB 45F\nlap chole GA\n\n2. CD 30F\nLSCS spinal', null, now);
+  assert.deepEqual(two.map(c => [c.initials, c.details]), [['AB', '45F\nlap chole GA'], ['CD', '30F\nLSCS spinal']]);
 }
 
 console.log('engine tests passed');

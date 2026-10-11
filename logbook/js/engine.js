@@ -212,6 +212,14 @@ export const caseParts = c => (c && c.initials != null
   ? { initials: String(c.initials || ''), details: String(c.details || '') }
   : splitInitials(c && c.details));
 
+// A leading age / sex ("45F", "72 M", "5yo", "3/12 M") on case details: { age, rest }. Optional.
+const AGE_SEX = /^\s*(\d{1,3}\s?(?:(?:yo|y\/o|yrs?|years?|\/12|\/52|m\/o|mo|d\/o)\s?[MF]?|[MF]))(?![A-Za-z])[\s,;:\-]*/i;
+export function splitAge(details) {
+  const s = String(details || '');
+  const m = s.match(AGE_SEX);
+  return m ? { age: m[1].replace(/\s+/g, ''), rest: s.slice(m[0].length).trim() } : { age: '', rest: s.trim() };
+}
+
 // Initials + details as one line of text: the Excel "Case details" column, search, duplicates.
 export const caseText = c => [c && c.initials, c && c.details].map(x => String(x || '').trim()).filter(Boolean).join(' ');
 
@@ -251,9 +259,8 @@ function leadingDate(line, now) {
 }
 
 // Cases are separated by blank lines (one or more empty or whitespace-only lines), so a case can span
-// several lines (kept in its details). A paste with no blank lines at all is read as one case per line
-// instead, wherever a line starts like a case (a date, initials, or an age such as "45F"); other lines
-// continue the case above. List markers ("1.", "-", "•") are dropped.
+// several lines (kept in its details), e.g. "AB 45F" on one line and the procedure on the next.
+// List markers ("1.", "-", "•") are dropped.
 // An optional date at the start of a case's first line sets its date.
 // Leading patient initials are split off as in splitInitials. suggestFn(text) -> [{ code, score }];
 // codes scoring 0.5+ are kept.
@@ -265,17 +272,6 @@ export function parseBulk(text, suggestFn, now = new Date()) {
     if (!line) { cur = null; continue; }
     if (!cur) blocks.push(cur = []);
     cur.push(line);
-  }
-  if (blocks.length === 1 && blocks[0].length > 1) {
-    const starts = l => !!(leadingDate(l, now) || splitInitials(l).initials || /^\d{1,3}\s?(?:yo|y\/o|yr|[MF])\b/i.test(l));
-    // a line holding only a date belongs with the line after it
-    const bare = g => g.length === 1 && leadingDate(g[0], now) && !leadingDate(g[0], now).rest.trim();
-    const split = [];
-    for (const l of blocks[0]) {
-      const g = split[split.length - 1];
-      if (g && !(starts(l) && !bare(g))) g.push(l); else split.push([l]);
-    }
-    blocks.splice(0, 1, ...split);
   }
   return blocks.map(([first, ...more]) => {
     const ld = leadingDate(first, now);

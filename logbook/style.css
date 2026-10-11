@@ -76,9 +76,12 @@ main { padding: 16px; max-width: 980px; margin: 0 auto; padding-bottom: calc(32p
   /* typing (keyboard open): the tab bar sits on the keyboard (--kb, set in app.js); the sticky Save
      bar unsticks so it doesn't cover the suggestions */
   body.typing .tabs { transform: translateY(calc(-1 * var(--kb, 0px))); padding-bottom: 0; }
-  body.typing .actions { position: static; background: none; }
+  /* typing: Save stays in reach, just above the tab bar on the keyboard */
+  body.typing .actions { position: fixed; left: 0; right: 0; bottom: calc(var(--kb, 0px) + var(--tabbar-h)); z-index: 29; margin: 0; padding: 6px 12px; background: var(--panel); border-top: 1px solid var(--line); }
+  body.typing .actions button.big { min-height: 44px; padding-block: 6px; }
+  body.typing main { padding-bottom: calc(80px + var(--tabbar-h)); }
   /* a focused field scrolls clear of the tab bar riding on the keyboard */
-  html:has(body.typing) { scroll-padding-bottom: calc(var(--tabbar-h) + 12px); }
+  html:has(body.typing) { scroll-padding-bottom: calc(var(--tabbar-h) + 72px); }
   /* suggestion chips: keep names short so several fit on a line */
   .chip .nm { max-width: 12em; }
 }
@@ -162,7 +165,12 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .datebar .datepick input[type="date"] { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0; opacity: 0; border: 0; padding: 0; cursor: pointer; }
 .datebar .linkish { background: none; border-color: transparent; color: var(--accent); font-weight: 600; padding: 4px 6px; font-size: 14px; white-space: nowrap; }
 .datebar .linkish { margin-left: auto; }
-@media (max-width: 600px) { .datebar { gap: 4px; } .datebar .chip { padding: 4px 9px; white-space: nowrap; } }
+@media (max-width: 600px) {
+  .datebar { gap: 4px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-inline: -4px; padding-inline: 4px; }
+  .datebar::-webkit-scrollbar { display: none; }
+  .datebar .chip { padding: 4px 9px; white-space: nowrap; flex: none; }
+  .datebar .linkish { flex: none; }
+}
 textarea.details { scroll-margin-top: 8px; }
 .chip.sugg.all { font-weight: 700; }
 textarea.details { min-height: 92px; font-size: 17px; line-height: 1.4; padding: 10px 12px; border-radius: 12px; }
@@ -178,7 +186,7 @@ textarea.details { min-height: 92px; font-size: 17px; line-height: 1.4; padding:
 @media not (pointer: fine) { .kbd { display: none; } }
 
 .picker input[type="search"] { width: 100%; }
-.picker ul { list-style: none; margin: 8px 0 0; padding: 0; max-height: 52vh; overflow: auto; border: 1px solid var(--line); border-radius: 12px; -webkit-overflow-scrolling: touch; }
+.picker ul { list-style: none; margin: 8px 0 0; padding: 0; border: 1px solid var(--line); border-radius: 12px; }   /* no inner scroll: the page scrolls */
 .picker li { display: flex; align-items: center; gap: 10px; padding: 8px 12px; min-height: 46px; border-bottom: 1px solid var(--line); cursor: pointer; }
 .picker li:last-child { border-bottom: 0; }
 .picker li:hover, .picker li.hl { background: var(--accent-soft); }
@@ -383,7 +391,7 @@ body.compact textarea.details { min-height: 64px; font-size: 16px; padding: 6px 
 body.compact label.field { margin-bottom: 6px; gap: 2px; }
 body.compact label.check { min-height: 32px; }
 /* category picker: ~32px rows */
-body.compact .picker ul { margin-top: 4px; max-height: 60vh; border-radius: 10px; }
+body.compact .picker ul { margin-top: 4px; border-radius: 10px; }
 body.compact .picker li { min-height: 32px; padding: 3px 10px; gap: 8px; line-height: 1.25; }
 body.compact .picker li.sub { padding-left: 26px; }
 body.compact .picker li .code { min-width: 34px; }
@@ -558,3 +566,13 @@ button.icon-btn { min-width: 40px; }
 .top .who .email { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .who-flag { font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 999px; background: var(--warn-bg); color: var(--warn); white-space: nowrap; }
 .top h1 { white-space: nowrap; }
+
+/* what the case box was read as */
+.parsed { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; min-height: 22px; margin: 4px 2px 2px; font-size: 13px; color: var(--muted); }
+.parsed .pi small { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+.parsed .pi b { color: var(--ink); }
+.parsed .pi.none { color: var(--warn); }
+.parsed .pi.grow { flex: 1 1 8em; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.parsed .draft-note { margin-left: auto; font-size: 12px; }
+/* text size (Settings -> Display): scales the page content and dialogs, not the tab bar */
+main, dialog { zoom: var(--text-zoom, 1); }
