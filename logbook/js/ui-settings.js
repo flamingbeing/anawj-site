@@ -5,7 +5,7 @@ import { YEAR_NAMES, DEFAULT_NAMES, BY_CODE } from './categories.js';
 import { sortCodes, uid, academicYear } from './engine.js';
 import { openBin } from './bin.js';
 import { S, h, toast, modal, confirmBox, cloud, catChip, catName, catShort, PICKER_ORDER, pickerOrder, settings, patchLogbook, displayName, hooks, rYear, myYearName, fill, categoryNames, setCategoryNames, catPills, tagSet, download, fileButton, todayISO } from './ui-core.js';
-import { cleanShorthand, cleanTagSet, defaultTagSet, tagTree, flatTree, moveTag, reparentTag, removeTag, newKey, tagSetToCsv, tagSetFromCsv, dropTag, canPlace } from './tags.js';
+import { cleanShorthand, shorthandOf, DEFAULT_SHORTHAND, cleanTagSet, defaultTagSet, tagTree, flatTree, moveTag, reparentTag, removeTag, newKey, tagSetToCsv, tagSetFromCsv, dropTag, canPlace } from './tags.js';
 import { pickDialog } from './ui-log.js';
 import { PHOTO_BUDGET_KB, PHOTO_NOTE, photoUsageKb, fmtMb } from './reflections.js';
 import { backupCard } from './backup.js';
@@ -346,7 +346,7 @@ function editTag(n, kind = n ? n.kind : 'tag') {
   const pill = h('input', { value: e.n || '', maxlength: kind === 'head' ? '60' : '40', placeholder: code ? dflt.pill : kind === 'head' ? 'e.g. Regional' : 'e.g. Interscalene' });
   const long = h('input', { value: e.l || '', maxlength: '100', placeholder: code ? ((DEFAULT_NAMES[code] || [])[0] || BY_CODE[code].name) : 'optional' });
   const hide = h('input', { type: 'checkbox', checked: !!e.hide });
-  const kw = h('input', { value: (e.kw || []).join(', '), maxlength: '300', placeholder: kind === 'cat' ? 'e.g. flap, free flap' : 'e.g. appy, lap appy', autocapitalize: 'off', spellcheck: 'false' });
+  const kw = h('textarea', { rows: '3', value: shorthandOf(e).join(', '), maxlength: '1000', placeholder: kind === 'cat' ? 'e.g. flap, free flap' : 'e.g. appy, lap appy', autocapitalize: 'off', spellcheck: 'false' });
   const linkBox = h('div', { class: 'te-links' }, PICKER_ORDER.map(c => h('label', { class: 'check' },
     h('input', { type: 'checkbox', checked: e.links.includes(c.code), onchange: ev => { e.links = ev.target.checked ? [...e.links, c.code] : e.links.filter(x => x !== c.code); } }),
     `${c.parent ? '\u00a0\u00a0' : ''}${catName(c.code)}`)));
@@ -358,7 +358,8 @@ function editTag(n, kind = n ? n.kind : 'tag') {
     kind === 'tag' ? [h('div', { class: 'chiplabel' }, 'Counts towards (optional)'),
       h('p', { class: 'hint', style: 'margin:0 0 4px' }, 'Choosing this tag ticks these APMES tags. Leave all unticked for a label only.'), linkBox] : null,
     kind !== 'head' ? h('label', { class: 'field', style: 'margin-top:8px' }, 'Shorthand (optional)', kw,
-      h('small', { class: 'hint', style: 'display:block' }, 'Words you type for this, separated by commas. Typing one in a case suggests this tag.')) : null,
+      h('small', { class: 'hint', style: 'display:block' }, code ? 'Words you type for this, separated by commas. Typing one in a case suggests this tag. Starts with the built-in list: add, change or remove words.' : 'Words you type for this, separated by commas. Typing one in a case suggests this tag.')) : null,
+    code && (DEFAULT_SHORTHAND[code] || []).length ? h('button', { type: 'button', class: 'small linkish', onclick: () => { kw.value = DEFAULT_SHORTHAND[code].join(', '); } }, 'Reset to the built-in shorthand') : null,
     kind !== 'head' ? h('label', { class: 'check', style: 'margin-top:8px' }, hide, 'Hide from the Log page (still found by search)') : null,
     h('div', { class: 'bar', style: 'margin-top:12px' },
       n && kind !== 'cat' ? h('button', { class: 'danger', onclick: async () => { m.close(); await saveTags(removeTag(set, e.k)); toast('Removed (cases keep the tag)'); } }, 'Remove') : null,
@@ -368,7 +369,9 @@ function editTag(n, kind = n ? n.kind : 'tag') {
         const nm = pill.value.trim();
         if (kind !== 'cat' && !nm) return toast('Give it a name');
         const out = { ...e, n: nm, l: long.value.trim(), hide: hide.checked, kw: kind === 'head' ? [] : cleanShorthand(kw.value) };
-        if (!out.l) delete out.l; if (!out.hide) delete out.hide; if (!out.kw.length) delete out.kw; if (!out.n && kind === 'cat') delete out.n;
+        if (!out.l) delete out.l; if (!out.hide) delete out.hide;
+        // an APMES tag left on the built-in list keeps following it (and gets later additions)
+        if (code ? out.kw.join() === (DEFAULT_SHORTHAND[code] || []).join() : !out.kw.length) delete out.kw; if (!out.n && kind === 'cat') delete out.n;
         if (kind !== 'tag') delete out.links;
         let next = n ? set.map(x => (x.k === e.k ? out : x)) : [...set, out];
         const p = sub ? 'c:' + sub : under.value;

@@ -9,7 +9,8 @@
 // Stored as settings.tagSet, a list in display order:
 //   { k: 'c:26', n?, l?, p?, hide?, kw? }          built-in category (n = your pill name, l = your long name)
 //   { k: 'u:ab12cd', n, l?, p?, links?, hide?, kw? } your tag ('26:Interscalene' for older subcategories)
-// kw = your shorthand: words that, typed in a case, suggest this tag ("appy", "free flap").
+// kw = shorthand: words that, typed in a case, suggest this tag ("appy", "free flap"). APMES tags start
+// with the built-in DEFAULT_SHORTHAND; kw on an APMES tag replaces it (an empty list = none).
 //   { k: 'h:ab12cd', n, hd: true }             a section header
 // p = the key of the item it sits under (a header, a category or another tag). Built-in subcategories
 // (20i) always sit under their official parent.
@@ -70,7 +71,7 @@ export function cleanTagSet(list) {
     }
     if (typeof raw.p === 'string' && raw.p) e.p = raw.p.slice(0, 80);
     const kw = cleanShorthand(raw.kw);
-    if (kw.length && !e.hd) e.kw = kw;
+    if (!e.hd && (kw.length || (k.startsWith('c:') && Array.isArray(raw.kw)))) e.kw = kw;
     if (raw.hide && !e.hd) e.hide = true;
     seen.add(k);
     out.push(e);
@@ -97,12 +98,43 @@ export function cleanTagSet(list) {
   return out;
 }
 
-// ---------- your shorthand ----------
+// ---------- shorthand ----------
+
+// Built in: common shorthand the old log was too sparse to learn. Shown (and editable) on each APMES
+// tag in the Tag editor; a word can sit under more than one tag.
+export const DEFAULT_SHORTHAND = {
+  '01': ['cabg', 'avr', 'mvr', 'bentall', 'cpb'],
+  '02': ['opcab', 'opcabg', 'off pump'],
+  '03': ['vats', 'lobectomy', 'pneumonectomy', 'wedge resection', 'segmentectomy', 'decortication', 'thoracotomy'],
+  '04': ['thyroidectomy', 'hemithyroidectomy', 'parathyroidectomy', 'parotidectomy', 'neck dissection', 'laryngectomy'],
+  '05': ['whipple', 'oesophagectomy', 'esophagectomy', 'gastrectomy', 'ivor lewis', 'fundoplication'],
+  '06': ['ex lap', 'exlap', 'laparotomy', 'hartmann', 'hartmanns', 'perforation', 'perf'],
+  '07': ['dlt', 'double lumen', 'olv', 'one lung', 'vats'],
+  '08': ['lap', 'laparoscopic', 'robotic', 'lsg', 'lap appy', 'lap chole'],
+  '09': ['phaco', 'cataract', 'vitrectomy', 'ppv', 'squint', 'strabismus', 'ptosis', 'dcr', 'trabeculectomy'],
+  '10': ['fess', 'septoplasty', 'mastoidectomy', 'grommets', 'myringotomy', 'tympanoplasty', 'adenoidectomy'],
+  '11': ['mll', 'microlaryngoscopy', 'dl', 'trachy', 'tracheostomy', 'rigid bronchoscopy', 'jet ventilation'],
+  '13': ['appy', 'appendicectomy', 'appendectomy', 'chole', 'hernia', 'hemicolectomy', 'anterior resection', 'mastectomy', 'wle', 'mrm', 'slnb'],
+  '14': ['hyst', 'tah', 'tlh', 'lah', 'hysterectomy', 'myomectomy', 'd&c', 'dnc', 'erpc', 'hysteroscopy', 'ectopic', 'bso'],
+  '15': ['crani', 'craniotomy', 'craniectomy', 'evd', 'vp shunt', 'burr hole', 'burr holes'],
+  '18': ['tka', 'tkr', 'tha', 'thr', 'uka', 'hemiarthroplasty', 'dhs', 'orif', 'nof', 'acl', 'arthroscopy', 'mua', 'pfna', 'tsr', 'k wire'],
+  '20': ['circ', 'circumcision', 'orchidopexy', 'hypospadias', 'herniotomy'],
+  '23': ['sleeve', 'lsg', 'rygb', 'gastric bypass', 'oagb'],
+  '24': ['acdf', 'laminectomy', 'discectomy', 'tlif', 'plif', 'xlif', 'spinal fusion', 'kyphoplasty', 'scoliosis'],
+  '25': ['ssep', 'mep', 'meps', 'neuromonitoring'],
+  '32': ['flap', 'flaps', 'free flap', 'alt flap', 'diep', 'skin graft', 'ssg'],
+  '33': ['mri', 'ct scan', 'angiogram', 'embolisation', 'embolization', 'tace', 'rfa', 'thrombectomy'],
+  '34': ['turp', 'turbt', 'cysto', 'cystoscopy', 'urs', 'ureteroscopy', 'pcnl', 'rirs', 'nephrectomy', 'pyeloplasty', 'prostatectomy', 'holep'],
+  '35': ['evar', 'tevar', 'fem pop', 'endarterectomy', 'avf', 'av fistula', 'bka', 'aka', 'amputation', 'embolectomy'],
+  '37': ['ktx', 'kidney transplant', 'liver transplant', 'renal transplant'],
+};
+// A tag's shorthand: its own, or for an APMES tag the built-in words until you change them.
+export const shorthandOf = e => (e && Array.isArray(e.kw) ? e.kw : e && e.k && e.k.startsWith('c:') ? (DEFAULT_SHORTHAND[e.k.slice(2)] || []) : []);
 
 // "appy, Free flap,  lap appy" -> ['appy', 'free flap', 'lap appy'] (lower case, ≤ 10 words of ≤ 30 letters)
 export function cleanShorthand(v) {
   const list = Array.isArray(v) ? v : String(v ?? '').split(/[,;\n]+/);
-  return [...new Set(list.map(x => str(x, 30).toLowerCase()).filter(Boolean))].slice(0, 10);
+  return [...new Set(list.map(x => str(x, 30).toLowerCase()).filter(Boolean))].slice(0, 30);
 }
 const wordRe = w => new RegExp(`(?:^|[^a-z0-9])${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '\\s+')}(?![a-z0-9])`);
 // the case text without its leading initials ("DL 45M …"), lower case
@@ -110,7 +142,7 @@ const caseWords = text => String(text || '').replace(/^\s*[A-Z]{2,4}(?![A-Za-z0-
 // For suggest(): [{ re, code }] from shorthand on APMES tags.
 export function apmesShorthand(set) {
   const out = [];
-  for (const e of set || []) if (e.kw && e.k.startsWith('c:')) for (const w of e.kw) out.push({ re: wordRe(w), code: e.k.slice(2) });
+  for (const e of set || []) if (e.k.startsWith('c:')) for (const w of shorthandOf(e)) out.push({ re: wordRe(w), code: e.k.slice(2) });
   return out;
 }
 // Your own tags whose shorthand appears in the text, in list order (not hidden ones' parents' rules: just the tags).
@@ -210,7 +242,7 @@ export function tagSetToCsv(set, names = () => ({ pill: '', long: '' })) {
     const nm = n.kind === 'cat' ? (e.n || names(n.code).pill) : e.n;
     const long = n.kind === 'cat' ? (e.l || names(n.code).long) : n.kind === 'head' ? '' : (e.l || '');
     const links = n.kind === 'cat' ? [catRef(n.code)] : (e.links || []).map(catRef);
-    rows.push([TYPE_OUT[n.kind], nm, long, e.p ? label(e.p) : '', links.join('; '), (e.kw || []).join(', '), n.kind === 'head' ? '' : e.hide ? 'yes' : 'no', e.k]);
+    rows.push([TYPE_OUT[n.kind], nm, long, e.p ? label(e.p) : '', links.join('; '), shorthandOf(e).join(', '), n.kind === 'head' ? '' : e.hide ? 'yes' : 'no', e.k]);
   }
   return rows.map(r => r.map(csvCell).join(',')).join('\r\n') + '\r\n';
 }
@@ -327,8 +359,10 @@ export function tagSetFromCsv(text, names = () => ({ pill: '', long: '' }), curr
     for (const x of bad) errors.push(`Row ${line}: “${x}” isn’t an APMES tag, so it was left out`);
     if (under) unders.push([e, under, line]);
     if (hidden && kind !== 'head') e.hide = true;
-    const kw = kind === 'head' ? [] : cleanShorthand(get(r, ci.kw));
-    if (kw.length) e.kw = kw;
+    // shorthand: an APMES row that matches the built-in list keeps following it
+    const kw = kind === 'head' || ci.kw < 0 ? null : cleanShorthand(get(r, ci.kw));
+    if (kw && kind === 'cat') { const def = DEFAULT_SHORTHAND[e.k.slice(2)] || []; if (kw.join() !== def.join()) e.kw = kw; }
+    else if (kw && kw.length) e.kw = kw;
     keys.add(e.k);
     set.push(e);
   });

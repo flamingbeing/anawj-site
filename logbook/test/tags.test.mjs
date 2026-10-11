@@ -105,6 +105,15 @@ assert.ok(apmesShorthand(ks).some(x => x.code === '32' && x.re.test(' free  flap
 const kc = tagSetFromCsv(tagSetToCsv(ks, names), names, ks);
 assert.deepEqual(kc.set.find(e => e.k === 'u:ap').kw, ['appy', 'lap appy']);
 assert.deepEqual(kc.set.find(e => e.k === 'c:32').kw, ['flap', 'free flap']);
+// built-in shorthand: shown on APMES tags until changed; a matching CSV row keeps following it
+import('../js/tags.js').then(({ shorthandOf, DEFAULT_SHORTHAND }) => {
+  assert.deepEqual(shorthandOf({ k: 'c:32' }), DEFAULT_SHORTHAND['32']);
+  assert.deepEqual(shorthandOf({ k: 'c:32', kw: [] }), [], 'turned off');
+  assert.deepEqual(cleanTagSet([{ k: 'c:32', kw: [] }]).find(e => e.k === 'c:32').kw, [], 'an empty list on an APMES tag is kept');
+  const d0 = defaultTagSet({});
+  const d1 = tagSetFromCsv(tagSetToCsv(d0, names), names, d0).set;
+  assert.ok(!d1.some(e => e.k.startsWith('c:') && e.kw), 'built-in shorthand is not copied into the set');
+});
 console.log('tags tests passed');
 {
   const { moveTag, reparentTag, removeTag } = await import('../js/tags.js');
