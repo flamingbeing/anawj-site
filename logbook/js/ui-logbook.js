@@ -3,7 +3,9 @@
 
 import { duplicates, fmtDate, diffRows, sortCodes, withParents, caseParts, caseText, dateWindow, nth, cleanInitials, procedureText, textHas, guessMapping, rowsFromGrid, IMPORT_FIELDS, caseFromRow } from './engine.js';
 import { flagCase } from './importer.js';
-import { exportCases, readSheetGrid } from './xlsxio.js';
+import { exportWorkbook, readSheetGrid } from './xlsxio.js';
+import { cleanExportOpts, exportTables, rangeText, CASE_COLS, REFL_COLS } from './export-opts.js';
+import { inExport } from './reflections.js';
 import { parseCsv } from './tags.js';
 import {
   S, h, toast, debounce, modal, cat, catName, catShort, tagName, catFull, catChip, PICKER_ORDER, settings, patchLogbook, needExcel, download, fileButton, catPills,
@@ -87,7 +89,7 @@ export function renderLogbook() {
   const paintSoon = debounce(() => { view.limit = 150; paint(); }, 150);
 
   const nFlag = f => S.cases.filter(c => flagsOf(c).includes(f)).length;
-  const flagOpts = [['', 'All cases'], ['needsDate', `Needs a date (${nFlag('needsDate')})`], ['duplicate', `Possible duplicates (${nFlag('duplicate')})`], ['future', `Future date (${nFlag('future')})`]];
+  const flagOpts = [['', 'All cases'], ['needsDate', `Needs a date (${nFlag('needsDate')})`], ['duplicate', `Possible duplicates (${nFlag('duplicate')})`], ['future', `Upcoming (${nFlag('future')})`]];
   const counter = h('span', { class: 'muted', style: 'font-size:13px' });
 
   // the two filters fold behind a Filter button (shown open while one is in use)
@@ -276,7 +278,7 @@ function caseRow(c, flagsOf) {
       h('span', { class: 't' }, p.initials ? [h('b', {}, p.initials), ' '] : null, p.details || (p.initials ? null : h('i', { class: 'muted' }, 'no details'))),
       h('span', { class: 'c' }, catTags(c.cats),
         flags.includes('needsDate') ? h('span', { class: 'flag err' }, 'needs date') : null,
-        flags.includes('future') ? h('span', { class: 'flag' }, 'future date') : null,
+        flags.includes('future') ? h('span', { class: 'flag', title: 'Dated after today' }, 'upcoming') : null,
         flags.includes('duplicate') ? h('span', { class: 'flag' }, 'possible duplicate') : null,
         !(c.cats || []).length ? h('span', { class: 'flag err' }, 'no tag') : null,
         c.reflectTag && !(S.reflections || []).some(r => r.caseId === c.id) ? h('span', { class: 'flag', title: 'Tagged as a possible reflection' }, '☆ reflection?') : null,
@@ -341,7 +343,7 @@ function calendarView(rows, flagsOf, repaint) {
         h('h3', { style: 'margin:0' }, `${fmtDate(view.day)} (${dayCases.length})`),
         h('div', { class: 'lb-daybtns' },
           // log on this day: the Log page opens with the date already picked
-          view.day <= today ? h('button', { class: 'small primary', onclick: () => logOnDate(view.day) }, '+ Log a case') : null,
+          h('button', { class: 'small primary', onclick: () => logOnDate(view.day) }, '+ Log a case'),
           dayCases.length ? h('button', { class: 'small', onclick: () => shareText(dayText(view.day)) }, 'Share day') : null,
           dayCases.length ? h('button', { class: 'small', title: 'Copy this day (format in Settings → Copy & share)', 'aria-label': 'Copy this day', onclick: () => copyText(dayText(view.day), 'Day copied: paste it into your notes') }, 'Copy') : null)),
       dayCases.length ? h('ul', { class: 'cases' }, dayCases.map(c => caseRow(c, flagsOf))) : h('p', { class: 'empty' }, 'No cases on this day.'))
@@ -420,16 +422,76 @@ function excelCard() {
   return h('details', { class: 'card more-tools' }, h('summary', {}, 'More tools: Excel download, Excel/CSV upload'),
     h('p', { class: 'hint' }, 'Download your logbook as a spreadsheet, edit it on a computer, then upload it back. You will see what changes before anything is saved.'),
     h('div', { class: 'bar', style: 'margin-bottom:0' },
-      h('button', { onclick: downloadExcel }, 'Download Excel'),
+      h('button', { onclick: downloadExcel }, 'Export to Excel…'),
       fileButton('Upload Excel/CSV logbook', '.xlsx,.csv,text/csv', uploadExcel)));
 }
 
-export async function downloadExcel() {
-  try {
-    await needExcel();
-    const blob = await exportCases(S.cases, { name: displayName(), counts: S.counts, rYear: rYear() });
-    download(`logbook-${todayISO()}.xlsx`, blob);
-  } catch (err) { toast('Could not export: ' + err.message); }
+// Excel export: logbook and/or reflections, a date range, the columns and their order. The choices
+// are saved with the account (settings.excelExport) and come back next time.
+export function downloadExcel() {
+  let o = cleanExportOpts(settings().excelExport);
+  const body = h('div', { class: 'xport' });
+  const ctx = { tagName, reflections: S.reflections || [], inPortfolio: inExport };
+  const seg = (label, key, opts) => h('div', { class: 'xp-row' }, h('span', { class: 'lb-fl' }, label),
+    h('span', { class: 'seg', role: 'group', 'aria-label': label }, opts.map(([v, t]) =>
+      h('button', { type: 'button', class: 'small', 'aria-pressed': String(o[key] === v), onclick: () => { o[key] = v; paint(); } }, t))));
+  const sel = (label, key, opts) => h('label', { class: 'field xp-field' }, label,
+    h('select', { onchange: e => { o[key] = e.target.value; paint(); } }, opts.map(([v, t]) => h('option', { value: v, selected: o[key] === v }, t))));
+  // ticked columns first, in their order (↑ ↓ move them), then the unticked ones
+  const colList = (key, all) => {
+    const on = o[key], off = all.filter(c => !on.includes(c.k));
+    const move = (k, d) => { const a = [...on], i = a.indexOf(k), j = i + d; if (j < 0 || j >= a.length) return; [a[i], a[j]] = [a[j], a[i]]; o[key] = a; paint(); };
+    const toggle = k => { o[key] = on.includes(k) ? on.filter(x => x !== k) : [...on, k]; if (!o[key].length) { o[key] = on; toast('Keep at least one column'); } paint(); };
+    return h('ul', { class: 'xp-cols' },
+      ...on.map((k, i) => { const c = all.find(x => x.k === k); return h('li', {},
+        h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: true, onchange: () => toggle(k) }), c.name),
+        h('button', { type: 'button', class: 'small icon-btn', 'aria-label': `Move ${c.name} left`, disabled: i === 0, onclick: () => move(k, -1) }, '↑'),
+        h('button', { type: 'button', class: 'small icon-btn', 'aria-label': `Move ${c.name} right`, disabled: i === on.length - 1, onclick: () => move(k, 1) }, '↓')); }),
+      ...off.map(c => h('li', { class: 'off' }, h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: false, onchange: () => toggle(c.k) }), c.name))));
+  };
+  const paint = () => {
+    const t = exportTables(S.cases, S.reflections || [], o, ctx);
+    const n = [t.cases ? `${t.cases.rows.length} case${t.cases.rows.length === 1 ? '' : 's'}` : '', t.reflections ? `${t.reflections.rows.length} reflection${t.reflections.rows.length === 1 ? '' : 's'}` : ''].filter(Boolean).join(' and ');
+    fill(body,
+      seg('Export', 'what', [['both', 'Logbook + reflections'], ['logbook', 'Logbook'], ['reflections', 'Reflections']]),
+      sel('Dates', 'range', [['all', 'All dates'], ['year', 'This residency year'], ['12m', 'The last 12 months'], ['custom', 'Choose dates']]),
+      o.range === 'custom' ? h('div', { class: 'lb-grid' },
+        h('label', { class: 'field xp-field' }, 'From', h('input', { type: 'date', value: o.from, onchange: e => { o.from = e.target.value; paint(); } })),
+        h('label', { class: 'field xp-field' }, 'To', h('input', { type: 'date', value: o.to, onchange: e => { o.to = e.target.value; paint(); } }))) : null,
+      t.cases ? h('div', { class: 'xp-sec' }, h('h3', {}, 'Logbook columns'),
+        h('p', { class: 'hint' }, 'Tick the columns you want; ↑ ↓ set the order (left to right in Excel).'),
+        colList('caseCols', CASE_COLS),
+        sel('Tags written as', 'tagStyle', [['label', 'Code and name (16) LSCS)'], ['name', 'Name only (LSCS)'], ['code', 'Code only (16)']]),
+        h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: o.summary, onchange: e => { o.summary = e.target.checked; } }), 'Add a Summary sheet (counts against targets)')) : null,
+      t.reflections ? h('div', { class: 'xp-sec' }, h('h3', {}, 'Reflections'),
+        sel('Which', 'reflWhich', [['all', 'All, drafts too'], ['complete', 'Complete only'], ['portfolio', 'Only those in the portfolio export']]),
+        colList('reflCols', REFL_COLS)) : null,
+      h('div', { class: 'xp-sec' }, h('h3', {}, 'Both'),
+        h('div', { class: 'lb-grid' },
+          sel('Dates written as', 'dateStyle', [['excel', 'Excel dates (10 Oct 2026)'], ['iso', 'Text (2026-10-10)']]),
+          sel('Order', 'sort', [['oldest', 'Oldest first'], ['newest', 'Newest first']]))),
+      h('p', { class: 'xp-count' }, n ? `${n}, ${rangeText(t.range)}.` : 'Nothing to export.'),
+      t.cases && (t.range.from || t.range.to) ? h('p', { class: 'hint', style: 'margin:0' }, 'Uploading this file back only changes cases within these dates.') : null);
+  };
+  const go = async () => {
+    const t = exportTables(S.cases, S.reflections || [], o, ctx);
+    if (!(t.cases && t.cases.rows.length) && !(t.reflections && t.reflections.rows.length)) return toast('Nothing to export for these choices');
+    patchLogbook({ settings: { excelExport: cleanExportOpts(o) } });
+    try {
+      await needExcel();
+      const blob = await exportWorkbook(t, { name: displayName(), rYear: rYear(), rangeLabel: rangeText(t.range) });
+      const kind = o.what === 'both' ? 'logbook-reflections' : o.what;
+      download(`${kind}-${todayISO()}.xlsx`, blob);
+      m.close();
+    } catch (err) { toast('Could not export: ' + err.message); }
+  };
+  paint();
+  const m = modal('Export to Excel', [body,
+    h('div', { class: 'bar dlg-actions' },
+      h('button', { class: 'small linkish', onclick: () => { o = cleanExportOpts(null); paint(); } }, 'Reset'),
+      h('span', { class: 'grow' }),
+      h('button', { onclick: () => m.close() }, 'Cancel'),
+      h('button', { class: 'primary', onclick: go }, 'Download'))], { cls: 'full xport-dlg' });
 }
 
 // Upload a logbook from Excel (.xlsx) or a CSV file: match the file's columns to the case fields
@@ -496,6 +558,9 @@ function mapColumns(fileName, grid) {
     if (st.headerRow) patchLogbook({ settings: { importMap: Object.fromEntries(IMPORT_FIELDS.map(f => [f.k, st.map[f.k] >= 0 ? String(head[st.map[f.k]] ?? '') : ''])) } });
     m.close();
     const d = diffRows(S.cases, rows);
+    // a file limited to some dates: cases outside them were never in it, so never delete those
+    const rg = grid.range || {};
+    if (rg.from || rg.to) d.deleted = d.deleted.filter(c => c.date && (!rg.from || c.date >= rg.from) && (!rg.to || c.date <= rg.to));
     // cases logged or edited after an exported file was downloaded are not in it: never delete those
     if (grid.exportedAt) {
       const newer = d.deleted.filter(c => Math.max(c.updatedAt || 0, c.createdAt || 0) > grid.exportedAt);

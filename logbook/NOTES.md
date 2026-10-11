@@ -27,6 +27,11 @@ portfolio content.
 - **Possible reflection** = the ☆ flag on a case (just a bookmark; missing it doesn't matter).
 - **Analytics** = the old Progress tab (`#progress`). Totals is under it ("Compare with your intake").
 - More → **Export & backup** (Word portfolio, Excel, backup and restore).
+- **Excel export** (`export-opts.js`, tested; dialog in `ui-logbook.js` `downloadExcel`): logbook + reflections
+  (or one), date range, columns ticked and ordered, tag/date style, Summary sheet; saved as
+  `settings.excelExport`. The Cases sheet keeps a hidden id column and a veryHidden "Export info" sheet
+  (export time, date range): uploading back never deletes cases outside the range or newer than the file.
+- Future dates are allowed (Log date picker, calendar "+ Log a case"); they show as "upcoming".
 
 ## Where things are (screens)
 

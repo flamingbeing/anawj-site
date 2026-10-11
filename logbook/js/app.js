@@ -111,10 +111,10 @@ function renderDataPage() {
       h('h3', {}, 'Portfolio (Word)'),
       h('p', { class: 'hint' }, 'Choose which complete reflections go in, then export the APMES portfolio with Section 1 and the Section 4 case numbers filled in.'),
       h('div', { class: 'bar' }, h('a', { class: 'btn primary', href: '#export' }, 'Choose reflections and export ›')),
-      h('h3', {}, 'Logbook (Excel)'),
-      h('p', { class: 'hint' }, 'All your cases as a spreadsheet. To edit and upload it back, use Logbook → More tools.'),
-      h('div', { class: 'bar', style: 'margin-bottom:0' }, h('button', { onclick: downloadExcel }, 'Download Excel')),
-      h('p', { class: 'hint', style: 'margin:10px 0 0' }, 'To copy a day into your notes, use Share or Copy as Markdown on the Logbook calendar.')),
+      h('h3', {}, 'Logbook and reflections (Excel)'),
+      h('p', { class: 'hint' }, 'A spreadsheet of your cases, your reflections or both: choose the dates and the columns. To edit cases and upload them back, use Logbook → More tools.'),
+      h('div', { class: 'bar', style: 'margin-bottom:0' }, h('button', { onclick: downloadExcel }, 'Export to Excel…')),
+      h('p', { class: 'hint', style: 'margin:10px 0 0' }, 'To copy a day into your notes, use Copy or Share day on the Logbook calendar (format in Settings → Copy & share format).')),
     backupCard());
 }
 
