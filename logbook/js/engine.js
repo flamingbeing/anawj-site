@@ -326,6 +326,29 @@ export function parseBulk(text, suggestFn, now = new Date()) {
   });
 }
 
+// Text read from a photo of a list (ocr.js) -> Paste list text, cases split by blank lines. A photo's
+// line breaks and paragraph gaps don't mark cases reliably, so a case starts at a line that opens with
+// a date, initials and an age ("12/3 AB 34F …", "AB 34F", "34F …"); the lines after it (the procedure)
+// belong to it. With no such line anywhere, each line is a case.
+export function ocrToBulk(text, now = new Date()) {
+  const lines = String(text || '').split(/\r?\n/)
+    .map(l => l.replace(/[|_~]+/g, ' ').replace(/\s+/g, ' ').trim())
+    .filter(l => /[A-Za-z0-9]/.test(l));
+  const opens = line => {
+    let rest = line.replace(/^(?:\d{1,2}[.)]|[-•*·])\s+/, '');
+    const ld = leadingDate(rest, now);
+    if (ld) rest = ld.rest;
+    if (splitAge(rest).age) return true;
+    const m = rest.match(/^[A-Za-z]{2,4}\s+(.*)$/);
+    return !!(m && splitAge(m[1]).age);
+  };
+  const starts = lines.map(opens);
+  if (!starts.some(Boolean)) return lines.join('\n\n');
+  const groups = [];
+  lines.forEach((l, i) => { if (starts[i] || !groups.length) groups.push([l]); else groups[groups.length - 1].push(l); });
+  return groups.map(g => g.join('\n')).join('\n\n');
+}
+
 // ---------- duplicates ----------
 
 const normText = s => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
