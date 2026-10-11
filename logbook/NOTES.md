@@ -126,8 +126,14 @@ portfolio content.
   `logbook/test/rules.emulator.mjs` + `evals/test/rules.emulator.mjs` into a folder with firebase-tools, then
   `firebase emulators:exec --only firestore --project demo-logbook "node logbook/test/rules.emulator.mjs; node evals/test/rules.emulator.mjs"`.
 - e2e: `logbook/test/e2e/e2e.mjs` (Playwright, demo mode, phone and desk profiles; see the header for
-  how to run). About 5 minutes per profile; green on both after the Oct 2026 batch. `E2E_FAILFAST=1` stops at
-  the first failing step (fix, rerun); `E2E_TIMEOUT` sets the per-action wait (10 s). The run sets
+  how to run). Phone and desk run at once, about 1.5 minutes in all; each step prints its time and the
+  slowest five are listed. `E2E_ONLY=calendar` runs every step up to the last one whose name has that word
+  (the earlier steps set the stage), e.g. 4 s to 50 s instead of the whole run: use it while fixing, and the
+  full run before merging. `E2E_FAILFAST=1` stops at the first failing step; `E2E_TIMEOUT` sets the
+  per-action wait (10 s). Pauses after a tap go through `nap()` (capped at 160 ms, `E2E_NAP`); after typing in
+  a search box use `debounced()` (the lists repaint 150–250 ms later); a list that repaints after a save is
+  checked with `until()` (polls up to 3 s), never a longer sleep. The demo has `window.__logbookTest.flushSummary()`
+  so a Totals check doesn't wait the 4 s for the summary. The run sets
   localStorage `apmes-logbook-demo-small`, so the demo keeps its six seeded cases and skips the big sample
   logbook (`demo-seed.js`); counts in the steps start from those six. Navigation goes through the `tab()`
   helper: Settings pages (`display`, `logging`, `tags`, `reflset`, `sharefmt`, `bin` = the Recycle bin dialog),
