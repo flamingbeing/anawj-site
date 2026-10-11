@@ -22,6 +22,7 @@ const ICONS = {
   settings: 'M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1M15 4v4M9 10v4M17 16v4',
   reflect: 'M4 19.5V5a2 2 0 0 1 2-2h12v14H6a2 2 0 0 0-2 2.5zM6 21h12v-4M8 7h6M8 11h4',
   admin: 'M12 3l2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.6 6.6 19.5l1.2-6-4.5-4.2 6.1-.7z',
+  more: 'M5 12h.01M12 12h.01M19 12h.01M4 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0M11 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0M18 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0',
 };
 const icon = id => {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -37,12 +38,21 @@ const TABS = [
   { id: 'logbook', label: 'Logbook', render: renderLogbook },
   { id: 'reflect', label: 'Reflections', render: renderReflect },
   { id: 'progress', label: 'Progress', render: renderProgress },
-  { id: 'totals', label: 'Totals', render: renderTotals },
-  { id: 'account', label: 'Account', render: renderAccount },
-  { id: 'settings', label: 'Settings', render: renderSettings },
-  // not in the bar: admins open it from Settings → Admin
-  { id: 'admin', label: 'Admin', render: renderAdmin, admin: true, hidden: true, under: 'settings' },
+  // five tabs on the bar; the rest live under More (still reachable by #totals, #account, #settings)
+  { id: 'more', label: 'More', render: () => renderMore() },
+  { id: 'totals', label: 'Totals', render: renderTotals, hidden: true, under: 'more', desc: 'How your case counts compare across your intake' },
+  { id: 'account', label: 'Account', render: renderAccount, hidden: true, under: 'more', desc: 'Your name and portfolio details (Section 1); sign out' },
+  { id: 'settings', label: 'Settings', render: renderSettings, hidden: true, under: 'more', desc: 'Display, text size, logging, templates, recycle bin' },
+  // admins open it from More (or Settings → Admin)
+  { id: 'admin', label: 'Admin', render: renderAdmin, admin: true, hidden: true, under: 'more', desc: 'Residents list, import, shared templates, portfolio template' },
 ];
+
+function renderMore() {
+  const items = visibleTabs().filter(t => t.under === 'more');
+  return h('section', { class: 'card more-list' }, h('h2', {}, 'More'),
+    h('ul', {}, items.map(t => h('li', {}, h('a', { href: '#' + t.id, 'data-go': t.id, onclick: e => { e.preventDefault(); go(t.id); } },
+      icon(t.id), h('span', { class: 'mt' }, h('b', {}, t.label), h('small', {}, t.desc)), h('span', { class: 'chev', 'aria-hidden': 'true' }, '›'))))));
+}
 
 const app = document.getElementById('app');
 const tabsEl = document.getElementById('tabs');
@@ -126,10 +136,14 @@ function flushRender() {
 // loading, signed out and signed in. Demo / offline show as a small tag beside the name.
 function paintWho() {
   const flags = [cloud.demo ? 'demo' : '', navigator.onLine ? '' : 'offline'].filter(Boolean).join(' · ');
+  // sync: cases saved on this phone but not yet on the server (no signal), or all synced
+  const sync = !S.user || cloud.demo ? null : S.pending
+    ? h('span', { class: 'sync wait', title: navigator.onLine ? 'Saving to the server…' : 'Saved on this phone; will sync when there is signal' }, navigator.onLine ? '⟳ Saving' : '⏳ Will sync')
+    : S.casesSynced ? h('span', { class: 'sync ok', title: 'All your cases are saved to the server' }, '✓ Synced') : null;
   subEl.textContent = flags;   // kept (hidden) for tests
   if (!S.user) { fill(whoEl, flags ? h('span', { class: 'who-flag' }, flags) : null); return; }
   document.body.dataset.cases = String(S.cases.length);   // not shown; read by tests
-  fill(whoEl, flags ? h('span', { class: 'who-flag' }, flags) : null, h('span', { class: 'email', title: S.user.email }, S.user.name || S.user.email));
+  fill(whoEl, sync, flags ? h('span', { class: 'who-flag' }, flags) : null, h('span', { class: 'email', title: S.user.email }, S.user.name || S.user.email));
 }
 window.addEventListener('online', paintWho);
 window.addEventListener('offline', paintWho);
@@ -164,6 +178,7 @@ async function signIn() {
 // ---------- signed in ----------
 
 let unwatch = null, unwatchRefl = null, signedInOnce = false;
+const SKELETON = '<section class="card skeleton" aria-label="Loading"><div class="sk-row"><i></i><i></i><i></i></div><div class="sk-box"></div><div class="sk-line"></div><div class="sk-row"><i></i><i></i></div><div class="sk-btn"></div></section>';
 
 // Last-seen admin / PD / programme entry / shared templates per account, so the next start needn't wait
 // for the server. Wiped at sign-out (a shared device keeps nothing of the last person).
@@ -211,7 +226,8 @@ async function onUser(user) {
   }
   signedInOnce = true;
   paintWho();
-  fill(app, h('p', { class: 'empty' }, 'Loading your logbook…'));
+  // an outline of the Log screen while the logbook loads (index.html starts with the same)
+  if (!app.querySelector('.skeleton')) app.innerHTML = SKELETON;
   // Fast start: the Log screen opens from this device's copies (the logbook from the offline cache;
   // admin / PD / programme entry / shared templates as last seen, in localStorage) and the server's
   // answers replace them in the background. Only a first sign-in on a device waits for the server.
@@ -255,7 +271,9 @@ async function onUser(user) {
   let sig = '';
   unwatch = cloud.watchCases(user.email, (cases, meta = {}) => {
     const first = !S.casesLoaded;
+    const wasSynced = S.casesSynced;
     if (!meta.fromCache) S.casesSynced = true;
+    if (S.pending !== !!meta.hasPendingWrites || wasSynced !== S.casesSynced) { S.pending = !!meta.hasPendingWrites; paintWho(); }
     // metadata-only updates (write acknowledged, cache -> server) need no re-render
     const next = cases.map(c => c.id + ':' + (c.updatedAt || 0)).join();
     if (!first && next === sig) { scheduleSummary(); return; }

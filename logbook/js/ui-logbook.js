@@ -53,14 +53,23 @@ export function renderLogbook() {
   const flagOpts = [['', 'All cases'], ['needsDate', `Needs a date (${nFlag('needsDate')})`], ['duplicate', `Possible duplicates (${nFlag('duplicate')})`], ['future', `Future date (${nFlag('future')})`]];
   const counter = h('span', { class: 'muted', style: 'font-size:13px' });
 
+  // the two filters fold behind a Filter button (shown open while one is in use)
+  const filters = h('div', { class: 'bar lb-filters', hidden: !(view.showFilters || view.cat || view.flag) },
+    h('select', { 'aria-label': 'Filter by category', onchange: e => { view.cat = e.target.value; paintFilterBtn(); paint(); } },
+      h('option', { value: '' }, 'All categories'),
+      PICKER_ORDER.map(c => h('option', { value: c.code, selected: view.cat === c.code }, `${c.parent ? '  ' : ''}${c.code} ${c.name} (${S.counts[c.code] || 0})`))),
+    h('select', { 'aria-label': 'Filter by flag', onchange: e => { view.flag = e.target.value; paintFilterBtn(); paint(); } },
+      flagOpts.map(([v, l]) => h('option', { value: v, selected: view.flag === v }, l))));
+  const filterBtn = h('button', { class: 'small', 'aria-expanded': String(!filters.hidden), onclick: () => {
+    view.showFilters = filters.hidden; filters.hidden = !filters.hidden; filterBtn.setAttribute('aria-expanded', String(!filters.hidden));
+  } });
+  const paintFilterBtn = () => { const n = (view.cat ? 1 : 0) + (view.flag ? 1 : 0); filterBtn.textContent = n ? `Filter (${n})` : 'Filter'; filterBtn.classList.toggle('primary', !!n); };
+  paintFilterBtn();
   add(wrap, h('section', { class: 'card' },
     h('div', { class: 'bar' },
       h('input', { type: 'search', class: 'grow', placeholder: 'Search initials, details, dates, codes', value: view.q, 'aria-label': 'Search cases', oninput: e => { view.q = e.target.value; paintSoon(); } }),
-      h('select', { 'aria-label': 'Filter by category', onchange: e => { view.cat = e.target.value; paint(); } },
-        h('option', { value: '' }, 'All categories'),
-        PICKER_ORDER.map(c => h('option', { value: c.code, selected: view.cat === c.code }, `${c.parent ? '  ' : ''}${c.code} ${c.name} (${S.counts[c.code] || 0})`))),
-      h('select', { 'aria-label': 'Filter by flag', onchange: e => { view.flag = e.target.value; paint(); } },
-        flagOpts.map(([v, l]) => h('option', { value: v, selected: view.flag === v }, l)))),
+      filterBtn),
+    filters,
     h('div', { class: 'bar', style: 'margin-bottom:0' },
       counter, h('span', { class: 'grow' }),
       h('div', { class: 'seg' }, MODES.map(([m, l]) =>
@@ -235,8 +244,7 @@ function pasteRows() {
 // ---------- Excel ----------
 
 function excelCard() {
-  return h('section', { class: 'card' },
-    h('h2', {}, 'Excel'),
+  return h('details', { class: 'card more-tools' }, h('summary', {}, 'More tools: Excel download and upload'),
     h('p', { class: 'hint' }, 'Download your logbook as a spreadsheet, edit it on a computer, then upload it back. You will see what changes before anything is saved.'),
     h('div', { class: 'bar', style: 'margin-bottom:0' },
       h('button', { onclick: downloadExcel }, 'Download Excel'),

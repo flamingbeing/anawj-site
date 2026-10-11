@@ -4,7 +4,7 @@ import { R_YEARS, BY_CODE, CATEGORIES } from './categories.js';
 import { progress, epaProgress, todayISO, rYearDefault } from './engine.js';
 import { exportTotals } from './xlsxio.js';
 import { reflectionProgress } from './reflections.js';
-import { S, h, toast, cloud, rYear, settings, patchLogbook, needExcel, download, displayName, hooks, add, resetters } from './ui-core.js';
+import { S, h, toast, cloud, rYear, settings, patchLogbook, needExcel, download, displayName, hooks, add, resetters, info } from './ui-core.js';
 
 const STATUS_TEXT = { late: 'Behind', due: 'Due this year', ontrack: 'On track', done: 'Done', none: 'No target' };
 const pview = { by: 'cat' };
@@ -20,22 +20,25 @@ export function renderProgress() {
   const tally = s => rows.filter(r => r.status === s).length;
   const yearCtl = h('span', { class: 'big' }, R_YEARS[yr - 1]);
 
+  const [infoBtn, infoText] = info('Targets are cumulative: every case counts towards the R3 and R5 numbers whenever it was done.');
   const head = h('section', { class: 'card' },
     h('div', { class: 'ry' },
       yearCtl,
       h('span', {}, yr <= 3 ? 'Junior residency (R1–R3)' : 'Senior residency (R4–R5)'),
       h('span', { class: 'muted' }, `${S.cases.length} cases logged`)),
     h('p', { class: 'hint', style: 'margin-top:8px' },
-      `${tally('done')} done · ${tally('late')} behind · ${tally('due')} due this year · ${tally('ontrack')} on track. `,
-      'Targets are cumulative: every case counts towards the R3 and R5 numbers whenever it was done.',
+      `${tally('done')} done · ${tally('late')} behind · ${tally('due')} due this year · ${tally('ontrack')} on track `, infoBtn,
       S.resident ? '' : [' Not on the programme list, so your year is set in ', h('a', { href: '#settings' }, 'Settings'), '.']),
+    infoText,
     legend(),
-    h('div', { class: 'bar', style: 'margin:12px 0 0' },
-      h('div', { class: 'seg' },
-        h('button', { 'aria-pressed': String(pview.by === 'cat'), onclick: () => { pview.by = 'cat'; hooks.render(); } }, 'By category'),
-        h('button', { 'aria-pressed': String(pview.by === 'epa'), onclick: () => { pview.by = 'epa'; hooks.render(); } }, 'By EPA')),
-      h('span', { class: 'grow' }),
-      h('button', { class: 'small', onclick: () => downloadSummary(rows, yr) }, 'Download summary')));
+    h('details', { class: 'more-tools', open: pview.by === 'epa' || !!pview.toolsOpen, ontoggle: e => { pview.toolsOpen = e.target.open; } },
+      h('summary', {}, 'More tools: EPA view, download summary'),
+      h('div', { class: 'bar', style: 'margin:0' },
+        h('div', { class: 'seg' },
+          h('button', { 'aria-pressed': String(pview.by === 'cat'), onclick: () => { pview.by = 'cat'; hooks.render(); } }, 'By category'),
+          h('button', { 'aria-pressed': String(pview.by === 'epa'), onclick: () => { pview.by = 'epa'; hooks.render(); } }, 'By EPA')),
+        h('span', { class: 'grow' }),
+        h('button', { class: 'small', onclick: () => downloadSummary(rows, yr) }, 'Download summary'))));
 
   const body = h('section', { class: 'card' });
   let urgentCard = null;
@@ -83,7 +86,8 @@ function progList(items) {
     return h('li', { class: c.parent ? 'sub' : '', title: c.full || c.name },
       h('i', { class: `dot ${p.status}`, title: STATUS_TEXT[p.status] }),
       h('span', { class: 'nm' }, h('b', {}, p.code), p.name),
-      h('span', { class: 'ct' }, p.status === 'none' ? String(p.count) : p.next ? `${p.count} / ${p.next.n}` : `${p.count} ✓`),
+      h('span', { class: 'ct' }, (p.status === 'late' || p.status === 'due') ? h('span', { class: `stw ${p.status}` }, STATUS_TEXT[p.status]) : null,
+        p.status === 'none' ? String(p.count) : p.next ? `${p.count} / ${p.next.n}` : `${p.count} ✓`),
       p.milestones.length ? h('span', { class: 'meter' }, h('i', { class: p.status, style: `width:${pct}%` })) : null,
       p.milestones.length ? h('span', { class: 'ms' }, p.milestones.map(m => `${m.by}: ${m.n}${m.met ? ' ✓' : ''}`).join(' · ')
         + (p.next ? ` — ${p.next.n - p.count} more by end of ${p.next.by}` : '')) : null);
