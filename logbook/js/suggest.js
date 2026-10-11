@@ -132,7 +132,7 @@ export function calibrate(raw, table = CALIBRATION) {
 }
 
 // keywords / calibration options exist so the builder's held-out evaluation can swap tables in.
-export function suggest(text, { limit = 6, keywords = KEYWORDS, calibration = CALIBRATION, extra = null } = {}) {
+export function suggest(text, { limit = 6, keywords = KEYWORDS, calibration = CALIBRATION, extra = null, detectAgeSex = true } = {}) {
   const ev = {};   // code -> [p, ...]
   for (const g of grams(text, keywords)) {
     const ps = keywords[g];
@@ -166,7 +166,7 @@ export function suggest(text, { limit = 6, keywords = KEYWORDS, calibration = CA
     put(x.code, SHORTHAND_SCORE, 'shorthand'); if (BY_CODE[x.code] && BY_CODE[x.code].parent) put(BY_CODE[x.code].parent, SHORTHAND_SCORE, 'shorthand');
   }
 
-  const age = parseAge(text);
+  const age = detectAgeSex ? parseAge(text) : null;
   if (age) {
     const y = age.years;
     if (y >= 65) put('21', AGE_SCORE['21'], 'age');

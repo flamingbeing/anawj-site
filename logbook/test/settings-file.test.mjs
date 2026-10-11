@@ -39,4 +39,5 @@ const ss = readSettingsFile(JSON.stringify({ kind: SETTINGS_KIND, settings: { sa
 assert.equal(ss.length, 1); assert.deepEqual(ss[0].has, ['c:26']); assert.equal(ss[0].q, 'block');
 assert.equal('rYear' in settingsFile({ settings: { rYear: 4, compact: true } }).settings, false);
 
+assert.deepEqual(readSettingsFile(JSON.stringify({ kind: SETTINGS_KIND, settings: { firstField: 'initials', detectAgeSex: false } })).settings, { firstField: 'initials', detectAgeSex: false });
 console.log('settings file tests passed');

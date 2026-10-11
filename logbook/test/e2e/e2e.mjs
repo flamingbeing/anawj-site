@@ -1754,6 +1754,48 @@ async function run(label, ctxOpts) {
     await ta.fill('');
     await configure('newline');
   });
+  await step('logging: first field, optional autodetection and month shorthand', async () => {
+    await tab('logging');
+    const first = p.getByLabel('First field for a new case', { exact: true });
+    await first.selectOption('initials');
+    await tab('log');
+    const initials = p.getByLabel('Patient initials', { exact: true });
+    const summary = p.getByLabel('Case summary', { exact: true });
+    assert(await initials.evaluate(el => el === document.activeElement), 'Initials not focused');
+    await initials.fill('IJ'); await initials.press('Enter');
+    assert(await summary.evaluate(el => el === document.activeElement), 'Enter did not move to summary');
+    for (const unit of ['3m', '3mo']) {
+      await summary.fill(unit + ' hernia'); await debounced();
+      assert((await p.locator('.parsed').innerText()).includes('3 months'), unit + ' preview');
+      assert(await p.locator('.sugg-row [data-code="20i"]').count() === 1, unit + ' paeds band');
+    }
+    if (phone) await p.screenshot({ path: DIR + 'logging-first-field-phone.png', fullPage: true });
+    await p.locator('.sugg-row [data-code="20i"]').click();
+    await summary.press('Control+Enter'); await until(async () => (await stored()).some(c => c.initials === 'IJ' && c.details === '3mo hernia'), 'explicit initials saved');
+    assert(await initials.evaluate(el => el === document.activeElement), 'save did not return to first field');
+    await tab('logging');
+    await p.getByLabel('Autodetect age and gender', { exact: true }).uncheck();
+    await first.selectOption('date');
+    await tab('log');
+    const date = p.getByLabel('Case date', { exact: true });
+    assert(await date.evaluate(el => el === document.activeElement), 'Date not focused');
+    await date.press('Enter');
+    assert(await summary.evaluate(el => el === document.activeElement), 'Date Enter did not move to summary');
+    await summary.fill('AB 80M hernia'); await debounced();
+    assert(!(await p.locator('.parsed').innerText()).includes('Age/sex'), 'disabled age preview');
+    assert(await p.locator('.sugg-row [title*="from the age"]').count() === 0, 'disabled age suggestions');
+    await p.reload(); await p.waitForSelector('textarea.details');
+    assert(await p.getByLabel('Case date', { exact: true }).evaluate(el => el === document.activeElement), 'device first field not retained on reload');
+    assert(!(await p.locator('.parsed').innerText()).includes('Age/sex'), 'disabled age detection not retained');
+    await tab('logging');
+    await p.getByLabel('Autodetect age and gender', { exact: true }).check();
+    await first.selectOption('details');
+    await tab('log');
+    assert(await summary.evaluate(el => el === document.activeElement), 'default summary not focused');
+    await summary.fill('AB 80M hernia'); await debounced();
+    assert(await p.locator('.sugg-row [data-code="21"]').count() === 1, 'geriatric detection not restored');
+    await summary.fill('');
+  });
   await step('navigation: demo Account, browser Back/Forward and app Back agree', async () => {
     const q = await ctx.newPage();
     try {

@@ -3,7 +3,7 @@
 // in-browser demo backend with ?demo).
 
 import { S, hooks, h, toast, cloud, setCases, scheduleSummary, fill, resetCaches, patchLogbook, confirmBox, fileButton, modal, download, todayISO, settings, setCategoryNames, categoryNames as categoryNamesNow } from './ui-core.js';
-import { renderLog, logCasesChanged, clearDrafts, SHARED_KEY } from './ui-log.js';
+import { renderLog, focusLog, logCasesChanged, clearDrafts, SHARED_KEY } from './ui-log.js';
 import { renderLogbook } from './ui-logbook.js';
 import { renderProgress, renderTotals } from './ui-progress.js';
 import { applyCompact, cachedCompact, applyTheme, cachedTheme, applyTextSize, cachedTextSize, applyZoom, cachedZoom, stepZoom, applyAccent, adoptDisplay, applyDisplay, display, setDisplay, resetDisplay, DISPLAY_KEYS, renderTagEditor, renderDisplay, renderLogging, renderReflectionSettings, renderMarkdownSettings, START_TABS, privacyCard, creditsCard, signOutCard } from './ui-settings.js';
@@ -257,7 +257,7 @@ const navigation = createNavigation({ history, location,
   allowed: id => visibleTabs().some(t => t.id === id),
   onNavigate: changeScreen, getScroll: () => window.scrollY });
 function go(id) {
-  if (S.tab === id) { if (id === 'log') document.querySelector('textarea.details')?.focus(); return; }
+  if (S.tab === id) { if (id === 'log') focusLog(); return; }
   navigation.go(id);
 }
 // Native links, menu links and tab buttons use the same history policy. Modified

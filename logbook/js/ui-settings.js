@@ -96,7 +96,7 @@ export function residencyCard() {
 // the light / dark choice. The first time a device opens the app it starts from what the account had (these used to
 // follow the account), so nobody's look changes. Kept at sign-out: they are the device's, and nothing private.
 const DISPLAY_KEY = 'apmes-logbook-display';
-export const DISPLAY_KEYS = ['compact', 'textSize', 'zoom', 'accent', 'startTab', 'fontUi', 'fontUiName', 'fontLog', 'fontLogName', 'lineWidth', 'lineHeight', 'contrast', 'motion', 'tabIcons', 'tabBar', 'hideHeader'];
+export const DISPLAY_KEYS = ['compact', 'textSize', 'zoom', 'accent', 'startTab', 'fontUi', 'fontUiName', 'fontLog', 'fontLogName', 'lineWidth', 'lineHeight', 'contrast', 'motion', 'tabIcons', 'tabBar', 'hideHeader', 'firstField'];
 export function deviceDisplay() {
   try { const d = JSON.parse(localStorage.getItem(DISPLAY_KEY) || 'null'); return d && typeof d === 'object' && !Array.isArray(d) ? d : null; } catch { return null; }
 }
@@ -329,6 +329,14 @@ export function renderLogging() {
   return h('div', {},
     h('section', { class: 'card' },
       h('h2', {}, 'Logging'),
+      h('label', { class: 'field' }, 'First field for a new case',
+        h('select', { 'aria-label': 'First field for a new case', onchange: e => { setDisplay({ firstField: e.target.value }); toast('Saved on this device'); } },
+          [['details', 'Case summary (default)'], ['initials', 'Initials'], ['date', 'Date']].map(([v, l]) =>
+            h('option', { value: v, selected: (display().firstField || 'details') === v }, l)))),
+      h('p', { class: 'hint help' }, 'Starts here when you open the Case tab or save a case. This device only. Enter in Initials moves to the case summary.'),
+      h('label', { class: 'check' }, h('input', { type: 'checkbox', 'aria-label': 'Autodetect age and gender', checked: st.detectAgeSex !== false,
+        onchange: e => patchLogbook({ settings: { detectAgeSex: e.target.checked } }) }), 'Autodetect age and gender'),
+      h('p', { class: 'hint' }, 'Age and gender are optional for APMES. Turning this off stops age-based Paediatrics and Geriatric suggestions. Choose those tags yourself when needed; explicit words can still suggest them.'),
       h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: st.suggestions !== false, onchange: e => patchLogbook({ settings: { suggestions: e.target.checked } }) }),
         'Suggest tags as I type'),
       h('label', { class: 'field', style: 'margin-top:8px' }, 'Enter key in the case box',

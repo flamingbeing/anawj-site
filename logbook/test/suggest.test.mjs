@@ -56,6 +56,19 @@ assert.equal(parseAge(''), null);
 assert.equal(parseAge(null), null);
 assert.equal(yrs('pain for 3 years ago 70/M'), 70, '"3 years ago" is not the age');
 
+// Month shorthand must agree in the parser, preview and suggested paediatric band.
+for (const unit of ['3m', '3mo']) {
+  near(yrs('AB ' + unit + ' hernia'), 0.25, unit);
+  assert.deepEqual(splitAge(unit + ' hernia'), { age: unit, rest: 'hernia' });
+  const tags = suggest('AB ' + unit + ' hernia', { limit: 30 });
+  assert.ok(tags.some(x => x.code === '20i' && x.why === 'age'), unit + ' neonatal band');
+}
+for (const text of ['AB 3m hernia', 'AB 3mo hernia', 'AB 80M hernia']) {
+  assert.ok(!suggest(text, { detectAgeSex: false, limit: 30 }).some(x => x.why === 'age'), 'autodetect off: ' + text);
+}
+assert.ok(suggest('AB 80M hernia', { limit: 30 }).some(x => x.code === '21' && x.why === 'age'));
+assert.ok(suggest('AB 3m hernia', { detectAgeSex: false, limit: 30 }).some(x => x.why !== 'age'), 'clinical suggestions survive');
+
 // BMI
 assert.equal(parseBMI('BMI 42'), 42);
 assert.equal(parseBMI('bmi42 OSA'), 42);
