@@ -385,6 +385,8 @@ const writeSummaryNow = async () => {
   }
 };
 export const scheduleSummary = debounce(writeSummaryNow, 4000);
+// demo only: the e2e test writes the summary now instead of waiting the 4 s
+if (cloud.demo && typeof window !== 'undefined') window.__logbookTest = { flushSummary: () => { scheduleSummary.cancel(); return writeSummaryNow(); } };
 
 // Sign-out: forget per-user caches held by the screens (each registers its own reset).
 export const resetters = [() => { lastSummary = ''; scheduleSummary.cancel(); }];
