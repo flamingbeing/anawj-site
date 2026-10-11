@@ -1771,7 +1771,7 @@ async function run(label, ctxOpts) {
       assert(await p.locator('.sugg-row [data-code="20i"]').count() === 1, unit + ' paeds band');
     }
     if (phone) {
-      assert(await p.evaluate(() => document.querySelector('.log-initials').getBoundingClientRect().bottom <= document.querySelector('.box-wrap').getBoundingClientRect().top), 'inverted layout separated initials from summary');
+      assert(await p.evaluate(() => document.querySelector('.parsed').getBoundingClientRect().bottom <= document.querySelector('.log-initials').getBoundingClientRect().top && document.querySelector('.log-initials').getBoundingClientRect().bottom <= document.querySelector('.box-wrap').getBoundingClientRect().top), 'inverted layout separated initials from summary');
       await p.screenshot({ path: DIR + 'logging-first-field-phone.png', fullPage: true });
     }
     await p.locator('.sugg-row [data-code="20i"]').click();
