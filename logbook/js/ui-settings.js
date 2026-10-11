@@ -5,7 +5,7 @@ import { YEAR_NAMES, DEFAULT_NAMES, BY_CODE } from './categories.js';
 import { sortCodes, uid, academicYear } from './engine.js';
 import { openBin } from './bin.js';
 import { S, h, toast, modal, confirmBox, cloud, catChip, catName, catShort, PICKER_ORDER, pickerOrder, settings, patchLogbook, displayName, hooks, rYear, myYearName, fill, categoryNames, setCategoryNames, catPills, tagSet, download, fileButton, todayISO } from './ui-core.js';
-import { cleanTagSet, defaultTagSet, tagTree, flatTree, moveTag, reparentTag, removeTag, newKey, tagSetToCsv, tagSetFromCsv } from './tags.js';
+import { cleanTagSet, defaultTagSet, tagTree, flatTree, moveTag, reparentTag, removeTag, newKey, tagSetToCsv, tagSetFromCsv, dropTag, canPlace } from './tags.js';
 import { pickDialog } from './ui-log.js';
 import { backupCard } from './backup.js';
 
@@ -244,7 +244,9 @@ export function renderTagEditor() {
   const def = code => ({ pill: (DEFAULT_NAMES[code] || [])[1] || BY_CODE[code].name, long: (DEFAULT_NAMES[code] || [])[0] || BY_CODE[code].name });
   const linkText = n => n.kind === 'cat' ? 'APMES category' : n.kind === 'head' ? 'section header'
     : (n.e.links || []).length ? 'counts as ' + n.e.links.map(catShort).join(', ') : (n.e.p && n.e.p.startsWith('c:') ? 'under ' + catShort(n.e.p.slice(2)) : 'personal label');
-  const row = n => h('li', { style: `padding-left:${8 + Math.min(n.depth, 4) * 18}px`, class: `te-${n.kind}${n.e.hide ? ' te-hidden' : ''}` },
+  const row = n => h('li', { 'data-k': n.e.k, style: `padding-left:${8 + Math.min(n.depth, 4) * 18}px`, class: `te-${n.kind}${n.e.hide ? ' te-hidden' : ''}` },
+    // drag by the handle: onto the top or bottom of a row to go before or after it, the middle to go inside
+    h('span', { class: 'te-handle', title: 'Drag to move or nest', 'aria-label': 'Drag to move or nest', onpointerdown: e => startTagDrag(e, n.e.k) }, '⠿'),
     h('button', { type: 'button', class: 'te-name', onclick: () => editTag(n) },
       h('span', { class: 'te-pill' }, n.kind === 'head' ? n.e.n : n.kind === 'cat' ? catShort(n.code) : n.e.n),
       n.kind === 'head' ? null : h('small', { class: 'muted te-sub' },
@@ -264,6 +266,57 @@ export function renderTagEditor() {
         await patchLogbook({ settings: { tagSet: defaultTagSet({}), catOrder: [], subcats: {} } }); hooks.render();
       } }, 'Reset')),
     h('ul', { class: 'te-list' }, nodes.map(row)));
+}
+
+// ---------- drag and drop (pointer events, so touch works) ----------
+let tdrag = null;
+function startTagDrag(e, key) {
+  if (tdrag || (e.pointerType === 'mouse' && e.button !== 0)) return;
+  e.preventDefault();
+  const li = e.target.closest('li');
+  const box = li.getBoundingClientRect();
+  const ghost = li.cloneNode(true);
+  Object.assign(ghost.style, { position: 'fixed', left: box.left + 'px', top: box.top + 'px', width: box.width + 'px', pointerEvents: 'none', opacity: '.85', zIndex: 50, background: 'var(--panel)', boxShadow: '0 6px 18px rgba(0,0,0,.25)' });
+  ghost.classList.add('te-ghost');
+  document.body.append(ghost);
+  li.classList.add('te-dragging');
+  tdrag = { key, ghost, li, dy: e.clientY - box.top, target: null, where: null, y: e.clientY };
+  const clear = () => document.querySelectorAll('.te-list li.drop-before, .te-list li.drop-after, .te-list li.drop-inside').forEach(x => x.classList.remove('drop-before', 'drop-after', 'drop-inside'));
+  const move = ev => {
+    tdrag.y = ev.clientY;
+    ghost.style.top = (ev.clientY - tdrag.dy) + 'px';
+    clear();
+    const under = document.elementFromPoint(ev.clientX, ev.clientY);
+    const t = under && under.closest('.te-list li[data-k]');
+    tdrag.target = null;
+    if (!t || t.dataset.k === key) return;
+    const r = t.getBoundingClientRect(), f = (ev.clientY - r.top) / r.height;
+    const set = tagSet();
+    const tk = t.dataset.k, te = set.find(x => x.k === tk);
+    let where = f < 0.3 ? 'before' : f > 0.7 ? 'after' : 'inside';
+    const ok = w => canPlace(set, key, w === 'inside' ? tk : (te.p || '')) && dropTag(set, key, tk, w) !== set;
+    if (!ok(where)) where = ['before', 'after', 'inside'].find(ok);
+    if (!where) return;
+    tdrag.target = tk; tdrag.where = where;
+    t.classList.add('drop-' + where);
+  };
+  // scroll when near the top or bottom of the screen
+  const tick = () => {
+    if (!tdrag) return;
+    const edge = 70, h0 = window.innerHeight;
+    if (tdrag.y < edge) window.scrollBy(0, -10); else if (tdrag.y > h0 - edge - 60) window.scrollBy(0, 10);
+    tdrag.raf = requestAnimationFrame(tick);
+  };
+  tdrag.raf = requestAnimationFrame(tick);
+  const end = ev => {
+    window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', end); window.removeEventListener('pointercancel', end);
+    cancelAnimationFrame(tdrag.raf);
+    ghost.remove(); li.classList.remove('te-dragging'); clear();
+    const { target, where } = tdrag;
+    tdrag = null;
+    if (ev.type === 'pointerup' && target) saveTags(dropTag(tagSet(), key, target, where));
+  };
+  window.addEventListener('pointermove', move); window.addEventListener('pointerup', end); window.addEventListener('pointercancel', end);
 }
 
 // Edit one item (or add a tag / header when n is null).

@@ -96,3 +96,28 @@ console.log('tags tests passed');
   assert.equal(removeTag(s, 'c:26'), s, 'built-ins stay');
   console.log('tag editing tests passed');
 }
+{
+  const { dropTag, canPlace } = await import('../js/tags.js');
+  const s = cleanTagSet([{ k: 'h:a', n: 'A', hd: true }, { k: 'u:1', n: 'one' }, { k: 'u:2', n: 'two', p: 'u:1' }]);
+  // a tag nested by dragging onto another
+  let d = dropTag(s, 'u:1', 'c:26', 'inside');
+  assert.equal(d.find(e => e.k === 'u:1').p, 'c:26');
+  assert.equal(d.find(e => e.k === 'u:2').p, 'u:1', 'its child comes with it');
+  assert.ok(d.findIndex(e => e.k === 'u:1') > d.findIndex(e => e.k === 'c:26iii'), 'last child of 26');
+  // before / after: sibling of the target
+  d = dropTag(s, 'u:1', 'c:03', 'before');
+  assert.ok(!d.find(e => e.k === 'u:1').p);
+  assert.equal(d.findIndex(e => e.k === 'u:2'), d.findIndex(e => e.k === 'c:03') - 1, 'the block (with its child) sits right before Thoracic');
+  d = dropTag(s, 'c:16', 'h:a', 'inside');
+  assert.equal(d.find(e => e.k === 'c:16').p, 'h:a', 'a category under a header');
+  // not allowed: unchanged
+  assert.equal(dropTag(s, 'c:16', 'c:26', 'inside'), s, 'category under a category');
+  assert.equal(dropTag(s, 'c:20i', 'c:26', 'inside'), s, 'built-in sub stays with its parent');
+  assert.equal(dropTag(s, 'h:a', 'c:26', 'inside'), s, 'header nested');
+  assert.equal(dropTag(s, 'u:1', 'u:2', 'inside'), s, 'under its own child');
+  assert.ok(canPlace(s, 'c:20ii', 'c:20') && !canPlace(s, 'c:20ii', ''));
+  // reorder built-in subs among themselves
+  d = dropTag(s, 'c:20iii', 'c:20i', 'before');
+  assert.ok(d.findIndex(e => e.k === 'c:20iii') < d.findIndex(e => e.k === 'c:20i'));
+  console.log('tag drag tests passed');
+}

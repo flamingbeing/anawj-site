@@ -294,3 +294,38 @@ export function removeTag(set, key) {
   if (!me || me.k.startsWith('c:')) return set;
   return cleanTagSet(set.filter(e => e.k !== key).map(e => (e.p === key ? { ...e, p: me.p } : e)));
 }
+
+// Can the item sit under p ('' = the top level)? Built-in subcategories stay under their official
+// parent; other categories go at the top or under a header; headers only at the top; your tags anywhere
+// but under themselves.
+export function canPlace(set, key, p) {
+  const me = set.find(e => e.k === key);
+  if (!me) return false;
+  const target = p ? set.find(e => e.k === p) : null;
+  if (p && !target) return false;
+  if (me.k.startsWith('c:')) {
+    const c = BY_CODE[me.k.slice(2)];
+    if (c.parent) return p === 'c:' + c.parent;
+    return !p || !!target.hd;
+  }
+  if (me.hd) return !p;
+  return !p || !blockOf(set, key).has(p);
+}
+
+// Drag and drop in the editor: put the item (with everything under it) before or after another item, as
+// its sibling, or inside it (as its last child). Returns the set unchanged when that isn't allowed.
+export function dropTag(set, key, target, where) {
+  if (key === target) return set;
+  const t = set.find(e => e.k === target);
+  if (!t) return set;
+  const p = where === 'inside' ? target : (t.p || '');
+  if (!canPlace(set, key, p)) return set;
+  const mine = blockOf(set, key);
+  if (mine.has(target)) return set;
+  const moved = set.filter(e => mine.has(e.k)).map(e => (e.k === key ? (() => { const x = { ...e }; if (p) x.p = p; else delete x.p; return x; })() : e));
+  const rest = set.filter(e => !mine.has(e.k));
+  const theirs = blockOf(rest, target);
+  const idx = rest.map((e, i) => (theirs.has(e.k) ? i : -1)).filter(i => i >= 0);
+  const at = where === 'before' ? idx[0] : idx[idx.length - 1] + 1;
+  return cleanTagSet([...rest.slice(0, at), ...moved, ...rest.slice(at)]);
+}
