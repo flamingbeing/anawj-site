@@ -83,7 +83,39 @@ function renderMore() {
     privacyCard(),
     creditsCard(),
     whatsNewCard(),
+    installCard(),
     signOutCard());
+}
+
+// "Install the app" (More): Android and desktop Chrome/Edge offer their own install prompt, which we
+// keep from beforeinstallprompt; iPhone/iPad Safari has none, so it gets the Share → Add to Home Screen
+// steps. Hidden once installed (running standalone), or after "Not now" on this device.
+let installPrompt = null;
+const INSTALL_KEY = 'apmes-logbook-install-dismissed';
+addEventListener('beforeinstallprompt', e => { e.preventDefault(); installPrompt = e; if (S.tab === 'more') render(); });
+addEventListener('appinstalled', () => { installPrompt = null; if (S.tab === 'more') render(); });
+const standalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const isIOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+function installCard() {
+  let dismissed = false;
+  try { dismissed = !!localStorage.getItem(INSTALL_KEY); } catch { /* storage blocked */ }
+  if (standalone() || dismissed || (!installPrompt && !isIOS())) return null;
+  const notNow = h('button', { class: 'small linkish', onclick: e => { try { localStorage.setItem(INSTALL_KEY, '1'); } catch { /* ignore */ } e.target.closest('section').remove(); } }, 'Not now');
+  return h('section', { class: 'card install-card' },
+    h('h2', {}, 'Install the app'),
+    h('p', { class: 'hint' }, 'Open the logbook from your home screen like any other app: full screen, quicker to reach, and it works with no signal.'),
+    installPrompt
+      ? h('div', { class: 'bar', style: 'margin-bottom:0' },
+        h('button', { class: 'primary', onclick: async () => {
+          const ev = installPrompt; installPrompt = null;
+          try { ev.prompt(); const r = await ev.userChoice; if (r && r.outcome === 'accepted') toast('Installing…'); } catch { /* the browser said no */ }
+          render();
+        } }, 'Install'), h('span', { class: 'grow' }), notNow)
+      : [h('ol', { class: 'install-steps' },
+        h('li', {}, 'Open this page in ', h('b', {}, 'Safari'), ' (not Chrome).'),
+        h('li', {}, 'Tap ', h('b', {}, 'Share'), ' (the square with an arrow: at the bottom, or the top on iPad).'),
+        h('li', {}, 'Choose ', h('b', {}, 'Add to Home Screen'), ', then ', h('b', {}, 'Add'), '.')),
+        h('div', { class: 'bar', style: 'margin-bottom:0' }, h('span', { class: 'grow' }), notNow)]);
 }
 
 // The latest changes, newest first (keep it to a handful; update with each release)
