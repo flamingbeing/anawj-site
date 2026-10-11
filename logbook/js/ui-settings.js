@@ -7,6 +7,7 @@ import { openBin } from './bin.js';
 import { S, h, toast, modal, confirmBox, cloud, catChip, catName, catShort, PICKER_ORDER, pickerOrder, settings, patchLogbook, displayName, hooks, rYear, myYearName, fill, categoryNames, setCategoryNames, catPills, tagSet, download, fileButton, todayISO } from './ui-core.js';
 import { cleanTagSet, defaultTagSet, tagTree, flatTree, moveTag, reparentTag, removeTag, newKey, tagSetToCsv, tagSetFromCsv, dropTag, canPlace } from './tags.js';
 import { pickDialog } from './ui-log.js';
+import { PHOTO_BUDGET_KB, photoUsageKb, fmtMb } from './reflections.js';
 import { backupCard } from './backup.js';
 
 // Compact mode (S.logbook.settings.compact): body.compact (style.css, "compact mode" block). Cached in
@@ -102,6 +103,13 @@ export function renderSettings() {
     templatesCard(),
 
     // ---- recycle bin (bin agent) ----
+    h('section', { class: 'card' },
+      h('h2', {}, 'Photos'),
+      (() => { const kb = photoUsageKb(S.reflections), pct = Math.min(100, Math.round(kb / PHOTO_BUDGET_KB * 100));
+        return [h('p', { style: 'margin:0 0 6px' }, `${fmtMb(kb)} of ${fmtMb(PHOTO_BUDGET_KB)} used by your reflection figures`),
+          h('div', { style: 'height:8px;border-radius:4px;background:var(--line, #ddd);overflow:hidden' }, h('div', { style: `height:100%;width:${pct}%;background:${pct >= 90 ? 'var(--err, #b91c1c)' : 'var(--accent, #002f6c)'}` }))]; })(),
+      h('p', { class: 'hint', style: 'margin:6px 0 0' }, 'Photos are shrunk on your phone before saving. To free space, remove figures you no longer need; deleted reflections free theirs when they leave the recycle bin (30 days).')),
+
     h('section', { class: 'card' },
       h('div', { class: 'bar' }, h('h2', { style: 'margin:0' }, 'Recycle bin'), h('span', { class: 'grow' }),
         h('button', { class: 'small', onclick: () => openBin() }, 'Open')),

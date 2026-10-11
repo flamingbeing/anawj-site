@@ -212,3 +212,19 @@ console.log('reflections tests passed');
   assert.ok(!('u' in pickJustEnough([R('u', { headingId: '' })])));
 }
 console.log('export choice tests passed');
+
+// photo budget: sizes recorded on figures, each image counted once, older figures estimated
+{
+  const { photoUsageKb, PHOTO_BUDGET_KB, LEGACY_FIGURE_KB, imageKb, fmtMb } = await import('../js/reflections.js');
+  const a = { id: 'a', figures: [{ id: 'img1', kb: 120 }, { id: 'img2' }] };
+  const b = { id: 'b', figures: [{ id: 'img1', kb: 120 }, { id: 'img3', kb: 80 }] };
+  assert.equal(photoUsageKb([a, b]), 120 + LEGACY_FIGURE_KB + 80);
+  assert.equal(photoUsageKb([]), 0);
+  assert.equal(PHOTO_BUDGET_KB, 20 * 1024);
+  assert.equal(imageKb('x'.repeat(2048)), 2);
+  assert.equal(fmtMb(20 * 1024), '20 MB');
+  const kept = cleanReflection({ id: 'r', headingId: '', figures: [{ id: 'img1', caption: 'c', point: null, kb: 133.4 }, { id: 'img2', kb: -1 }] });
+  assert.equal(kept.figures[0].kb, 133);
+  assert.ok(!('kb' in kept.figures[1]));
+  console.log('photo budget tests passed');
+}
