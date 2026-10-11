@@ -11,7 +11,7 @@ residentCSS();
 const STATE = {
   done: ['Done', 'var(--e-go)'],
   overdue: ['Overdue', 'var(--n-red)'],
-  'due-soon': ['Due this year', '#b7791f'],
+  'due-soon': ['Due this year', 'var(--e-due)'],
   'on-track': ['On track', 'var(--n-blue)'],
   later: ['Later', 'var(--n-muted)'],
 };
