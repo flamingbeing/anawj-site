@@ -162,7 +162,7 @@ service cloud.firestore {
         && optNumber(d, 'w') && optNumber(d, 'h') && optNumber(d, 'createdAt');
     }
     function validCase(caseId, d) {
-      return d.keys().hasOnly(['id', 'date', 'dateText', 'initials', 'details', 'cats', 'createdAt', 'updatedAt', 'source', 'importKey', 'reflectionId'])
+      return d.keys().hasOnly(['id', 'date', 'dateText', 'initials', 'details', 'cats', 'createdAt', 'updatedAt', 'source', 'importKey', 'reflectionId', 'reflectTag', 'tags'])
         && d.id == caseId
         && d.details is string && d.details.size() <= 2000
         && d.cats is list && d.cats.size() <= 40
@@ -171,6 +171,8 @@ service cloud.firestore {
         && optString(d, 'initials', 20)
         && optString(d, 'importKey', 200)
         && optString(d, 'reflectionId', 200)
+        && (!('reflectTag' in d) || d.reflectTag is bool)
+        && (!('tags' in d) || (d.tags is list && d.tags.size() <= 20))
         && (!('source' in d) || d.source in ['app', 'import', 'paste', 'sheet'])
         && optNumber(d, 'createdAt') && optNumber(d, 'updatedAt');
     }

@@ -10,7 +10,7 @@ import { REFLECTION_HEADINGS, REFLECTION_SECTIONS } from './categories.js';
 import { reflectionProgress, reflectionCounts, HEADING_BY_ID, splitDetails, completeProblems, isLegacy, LIMITS, IMAGE_MAX_B64, wordCount, MIN_WORDS, suggestHeadings, moveToHeading } from './reflections.js';
 export { completeProblems };
 import { fmtDate, caseText } from './engine.js';
-import { S, h, toast, cloud, debounce, hooks, rYear, effectiveIntake, todayISO, confirmBox, add, resetters, scheduleSummary, displayName, byNewest, catName } from './ui-core.js';
+import { S, h, toast, cloud, debounce, hooks, rYear, effectiveIntake, todayISO, confirmBox, add, resetters, scheduleSummary, displayName, byNewest, catName, updateCase } from './ui-core.js';
 import { renderExportButton, caseRYear } from './portfolio.js';
 
 const DRAFT_KEY = 'apmes-logbook-reflection-draft';
@@ -88,6 +88,8 @@ function showMissing(missing) {
   const f = els[0].matches('input, select, textarea') ? els[0] : els[0].querySelector('input, select, textarea');
   if (f) setTimeout(() => f.focus({ preventScroll: true }), 300);
 }
+
+const PROMPTS = 'What were the considerations?\n\n\nWhat did you learn?\n';
 
 function setJr(r) {
   const intake = effectiveIntake();
@@ -227,6 +229,34 @@ async function binReflections(list) {
 
 // ---------- list ----------
 
+// "Ready to write": cases tagged as possible reflections, then recent cases that fit a heading you
+// haven't met yet. Each opens a new reflection prefilled from the case.
+function readyCard(p) {
+  const linked = new Set((S.reflections || []).map(r => r.caseId).filter(Boolean));
+  const tagged = (S.cases || []).filter(c => c.reflectTag && !linked.has(c.id));
+  const unmet = new Set(p.headings.filter(x => !x.met).map(x => x.id));
+  const since = todayISO(new Date(Date.now() - 60 * 864e5));
+  const suggested = [];
+  for (const c of S.cases || []) {
+    if (suggested.length >= 3) break;
+    if (linked.has(c.id) || c.reflectTag || !c.date || c.date < since) continue;
+    const hd = suggestHeadings(c, S.reflections || []).find(x => unmet.has(x.headingId));
+    if (hd) suggested.push({ c, hd });
+  }
+  if (!tagged.length && !suggested.length) return null;
+  const line = c => `${c.date ? fmtDate(c.date) : ''} · ${[c.initials, String(c.details || '').split('\n').join(' ')].filter(Boolean).join(' ').slice(0, 60)}`;
+  const row = (c, hd, isTag) => h('li', {},
+    h('span', { class: 'rt' }, isTag ? '☆ ' : '', line(c), hd ? h('small', {}, ' → ' + (HEADING_BY_ID[hd.headingId] || {}).name) : null),
+    h('span', { class: 'row' },
+      h('button', { class: 'small primary', onclick: () => reflectOnCase(c, hd || null) }, 'Write'),
+      isTag ? h('button', { class: 'small', title: 'Remove the tag', onclick: async () => { const next = { ...c }; delete next.reflectTag; await updateCase(next); hooks.render(); } }, 'Untag') : null));
+  return h('section', { class: 'card ready' },
+    h('h3', { style: 'margin:0 0 6px' }, 'Ready to write'),
+    tagged.length ? h('ul', { class: 'ready-list' }, tagged.slice(0, 10).map(c => row(c, suggestHeadings(c, S.reflections || [])[0] || null, true))) : null,
+    suggested.length ? [h('div', { class: 'chiplabel', style: 'margin-top:8px' }, 'Suggested for headings not yet met'),
+      h('ul', { class: 'ready-list' }, suggested.map(({ c, hd }) => row(c, hd, false)))] : null);
+}
+
 let drag = null;   // active drag { r, ghost, target, x, y, raf }
 
 function list() {
@@ -306,7 +336,7 @@ function list() {
   const orphans = all.filter(r => !HEADING_BY_ID[r.headingId]);
   if (orphans.length) add(body, h('h3', {}, 'No heading yet'), h('ul', { class: 'cases' }, orphans.map(row)));
   if (em) paintSel();
-  return h('div', {}, head, toolbar, body);
+  return h('div', {}, head, toolbar, em ? null : readyCard(p), body);
 }
 
 async function deleteSelected() {
@@ -570,21 +600,23 @@ function editor() {
   } else {
     const title = boxCard('Title', 'Bold heading of the reflection, e.g. “Airway management in a patient with trismus”.',
       h('input', { style: IN, maxlength: String(LIMITS.title), value: r.title || '', placeholder: 'Title', oninput: e => { r.title = e.target.value; changed(); } }));
-    const summary = boxCard('Case summary', null,
+    const summary = boxCard('Case summary', 'What happened?',
       h('textarea', { rows: '10', maxlength: String(LIMITS.summary), style: TA, value: r.summary || '',
-        placeholder: 'Demographics, history, examination, investigations, anaesthetic plan, events, outcome.',
+        placeholder: 'What happened? Demographics, history, examination, investigations, anaesthetic plan, events, outcome.',
         oninput: e => { r.summary = e.target.value; changed(); } }));
     title.dataset.field = summary.dataset.field = 'title or case summary';
 
     const n = r.points.length;
-    const points = boxCard('Learning points', 'Each point gets a short underlined heading and your discussion: thoughts and feelings, what went well or badly, analysis with evidence, conclusions, action plan.',
+    const points = boxCard('Learning points', 'For each point: what were the considerations, and what did you learn? Give it a short heading, then your discussion (analysis with evidence, conclusions, action plan).',
       r.points.map((p, i) => h('div', { style: 'border:1px solid var(--line, #ddd);border-radius:10px;padding:10px;margin:0 0 10px' },
         h('div', { class: 'bar', style: 'gap:6px;align-items:center;margin-bottom:6px' },
           h('b', { style: 'font-size:16px' }, `${i + 1}.`),
           h('input', { style: IN + ';flex:1', maxlength: String(LIMITS.pointHeading), value: p.heading || '', placeholder: 'Heading, e.g. Choice of airway management in trismus',
             'aria-label': `Learning point ${i + 1} heading`, oninput: e => { p.heading = e.target.value; changed(); } })),
-        h('textarea', { rows: '6', maxlength: String(LIMITS.pointText), style: TA, value: p.text || '', placeholder: 'Discussion',
+        h('textarea', { rows: '6', maxlength: String(LIMITS.pointText), style: TA, value: p.text || '', placeholder: 'What were the considerations?\nWhat did you learn?',
           'aria-label': `Learning point ${i + 1} text`, oninput: e => { p.text = e.target.value; changed(); } }),
+        // a scaffold to write into, for an empty point
+        !String(p.text || '').trim() ? h('button', { class: 'small', style: 'margin-top:6px', onclick: () => { p.text = PROMPTS; restructure(); } }, 'Use prompts') : null,
         h('div', { class: 'bar', style: 'gap:6px;margin-top:6px' },
           h('button', { disabled: i === 0, 'aria-label': 'Move up', onclick: () => {
             [r.points[i - 1], r.points[i]] = [r.points[i], r.points[i - 1]];

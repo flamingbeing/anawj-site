@@ -214,11 +214,12 @@ export function okNoIds(...texts) {
   return confirmBox('Looks like an ID number', 'This looks like an NRIC, hospital or phone number. Log patient initials only, never identifiers. Save anyway?', 'Save anyway', true);
 }
 
-export async function createCase({ date, details, initials, cats, source = 'app', dateText }) {
+export async function createCase({ date, details, initials, cats, source = 'app', dateText, reflectTag = false }) {
   const now = Date.now();
   const parts = initials == null ? splitInitials(details) : { initials: cleanInitials(initials), details: String(details || '').trim() };
   const c = { id: uid(), date: date || null, initials: parts.initials, details: parts.details, cats: sortCodes(cats), createdAt: now, updatedAt: now, source };
   if (!date && dateText) c.dateText = dateText;
+  if (reflectTag) c.reflectTag = true;
   applyLocal(list => [c, ...list]);
   cloud.saveCase(mine(), c).catch(err => toast('Could not save: ' + err.message));
   return c;
