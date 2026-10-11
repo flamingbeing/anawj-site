@@ -45,7 +45,8 @@ portfolio content.
 
 - **Show tips and help text** (Settings → Logging, `settings.hideTips` true = off): an experienced-user mode. Off adds
   `body.no-help`, hiding every `.help` explanation (mark new how-to paragraphs `class: 'hint help'`) and the tag tips.
-  Status lines, warnings, privacy and safety notes are never `.help`.
+  The inline privacy and safety notes (reflection editor, photo rules) are `.help` too (owner). Status lines, the
+  ID-number check, the delete-account warning and the Privacy card on More stay.
 - **Case** tab (id `log`, `ui-log.js`; the bar label was "Log"): the case box (aligned example lines; Paste button; "Draft saved" sits on the
   Interesting line), Quick picks (suggestions + your shorthand tags, Same as last, your tag
   groups), All tags, Still needed, "Save these tags as a tag group" under the tag list, pinned bar (chosen tags, Save, keep date | Save).

@@ -166,7 +166,7 @@ export function renderLogging() {
         'Show last week’s summary on the Case tab (once a week)'),
       h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !st.hideTips, onchange: e => patchLogbook({ settings: { hideTips: !e.target.checked } }) }),
         'Show tips and help text'),
-      h('p', { class: 'hint', style: 'margin:0 0 6px' }, 'Off for experienced users: hides the explanations around the app (like the one at the top of the tag editor) and the tips for the tags you pick.'),
+      h('p', { class: 'hint', style: 'margin:0 0 6px' }, 'Off for experienced users: hides the explanations around the app (like the one at the top of the tag editor), the privacy and photo reminders, and the tips for the tags you pick.'),
       h('label', { class: 'field', style: 'margin-top:8px' }, 'Case box height on the Case tab',
         h('select', { onchange: e => patchLogbook({ settings: { boxLines: Number(e.target.value) } }).then(() => toast('Saved')) },
           Array.from({ length: 19 }, (_, i) => i + 2).map(n => h('option', { value: String(n), selected: n === (Math.min(20, Math.max(2, Number(st.boxLines) || 3))) }, `${n} lines${n === 3 ? ' (default)' : ''}`)))),
