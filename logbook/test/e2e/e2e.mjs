@@ -1286,6 +1286,7 @@ async function run(label, ctxOpts) {
         assert(/extra JR.*not counted/.test(await row.innerText()), `${name} explanation`);
       }
       assert((await card.locator('.gl-bar').getAttribute('aria-label')).startsWith('5 of 96 reflections counted'), 'overview bar count');
+      if (phone) await card.screenshot({ path: DIR + 'jr-reflections-phone.png' });
       await shot('jr-progress');
     } finally {
       await p.evaluate(async reflections => { const { S, hooks } = await import('./js/ui-core.js'); S.reflections = reflections; hooks.render(); }, before);
