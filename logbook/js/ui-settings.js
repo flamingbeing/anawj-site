@@ -6,6 +6,7 @@ import { sortCodes, uid } from './engine.js';
 import { openBin } from './bin.js';
 import { S, h, toast, modal, confirmBox, cloud, catChip, settings, patchLogbook, displayName, hooks, rYear, fill } from './ui-core.js';
 import { pickDialog } from './ui-log.js';
+import { backupCard } from './backup.js';
 
 // Compact mode (S.logbook.settings.compact): body.compact (style.css, "compact mode" block). Cached in
 // localStorage so the first paint after a reload is already compact, before the logbook loads.
@@ -85,6 +86,8 @@ export function renderSettings() {
       h('div', { class: 'bar' }, h('h2', { style: 'margin:0' }, 'Recycle bin'), h('span', { class: 'grow' }),
         h('button', { class: 'small', onclick: () => openBin() }, 'Open')),
       h('p', { class: 'hint', style: 'margin:6px 0 0' }, 'Deleted cases and reflections are kept for 30 days and can be restored.')),
+
+    backupCard(),
 
     h('section', { class: 'card' },
       h('h2', {}, 'Privacy'),

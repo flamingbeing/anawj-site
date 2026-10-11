@@ -1,7 +1,7 @@
 // Logbook screen: every case, newest first (list) or by day (calendar). Search, filter, flags, edit; a grid view for bulk edits
 // and pasting rows from Excel; Excel download and upload (round trip with a preview of the changes).
 
-import { duplicates, fmtDate, caseFromRow, diffRows, sortCodes, withParents, caseParts, caseText } from './engine.js';
+import { duplicates, fmtDate, caseFromRow, diffRows, sortCodes, withParents, caseParts, caseText, dateWindow } from './engine.js';
 import { flagCase } from './importer.js';
 import { exportCases, readCasesSheet } from './xlsxio.js';
 import {
@@ -31,10 +31,13 @@ export function renderLogbook() {
   const flagsOf = c => [...flagCase(c), ...(dupIds.has(c.id) ? ['duplicate'] : [])];
 
   const filtered = () => {
-    const words = view.q.toLowerCase().split(/\s+/).filter(Boolean);
+    // "last tuesday", "this week", "last month"… narrow by date; the other words search the text
+    const win = dateWindow(view.q);
+    const words = (win ? win.rest : view.q).toLowerCase().split(/\s+/).filter(Boolean);
     return S.cases.filter(c => {
       if (view.cat && !(c.cats || []).includes(view.cat)) return false;
       if (view.flag && !flagsOf(c).includes(view.flag)) return false;
+      if (win && !(c.date && c.date >= win.from && c.date <= win.to)) return false;
       if (!words.length) return true;
       const hay = `${caseText(c)} ${c.date || c.dateText || ''} ${weekday(c.date)} ${fmtDate(c.date) || ''} ${(c.cats || []).join(' ')}`.toLowerCase();
       return words.every(w => hay.includes(w));
@@ -67,7 +70,7 @@ export function renderLogbook() {
   paintFilterBtn();
   add(wrap, h('section', { class: 'card' },
     h('div', { class: 'bar' },
-      h('input', { type: 'search', class: 'grow', placeholder: 'Search initials, details, dates, codes', value: view.q, 'aria-label': 'Search cases', oninput: e => { view.q = e.target.value; paintSoon(); } }),
+      h('input', { type: 'search', class: 'grow', placeholder: 'Search: initials, procedure, “last Tuesday”, “this week”', value: view.q, 'aria-label': 'Search cases', oninput: e => { view.q = e.target.value; paintSoon(); } }),
       filterBtn),
     filters,
     h('div', { class: 'bar', style: 'margin-bottom:0' },
@@ -88,6 +91,17 @@ export function renderLogbook() {
 
 // ---------- list ----------
 
+// A month heading: tap it to jump to a date (the first case on or before it).
+function monthHead(label, ul) {
+  const input = h('input', { type: 'date', class: 'jump-date', 'aria-label': 'Jump to a date', max: todayISO(), onchange: e => {
+    const d = e.target.value; if (!d) return;
+    const row = [...ul.querySelectorAll('li[data-date]')].find(li => li.dataset.date && li.dataset.date <= d);
+    if (!row) { toast('No cases on or before ' + fmtDate(d) + ' in this list'); return; }
+    row.scrollIntoView({ behavior: 'smooth', block: 'center' }); row.classList.remove('flash'); void row.offsetWidth; row.classList.add('flash');
+  } });
+  return h('li', { class: 'monthhead' }, h('span', {}, label), h('label', { class: 'jump', title: 'Jump to a date' }, '📅 Jump', input));
+}
+
 function listView(rows, flagsOf, repaint) {
   if (!S.cases.length) return h('div', { class: 'empty' }, h('p', {}, 'No cases yet.'), h('a', { class: 'btn primary', href: '#log' }, 'Log your first case'));
   if (!rows.length) return h('p', { class: 'empty' }, 'No cases match.');
@@ -95,11 +109,11 @@ function listView(rows, flagsOf, repaint) {
   let month = '';
   for (const c of rows.slice(0, view.limit)) {
     const m = c.date ? fmtDate(c.date).replace(/^\d+ /, '') : 'No date';
-    if (m !== month) { month = m; add(ul, h('li', { class: 'monthhead', onclick: null }, m)); }
+    if (m !== month) { month = m; add(ul, monthHead(m, ul)); }
     add(ul, caseRow(c, flagsOf));
   }
   // month headers are sticky and not tappable
-  ul.querySelectorAll('.monthhead').forEach(li => { li.style.display = 'block'; li.style.cursor = 'default'; });
+  ul.querySelectorAll('.monthhead').forEach(li => { li.style.cursor = 'default'; });
   const more = rows.length > view.limit
     ? h('div', { class: 'bar', style: 'justify-content:center;margin-top:12px' }, h('button', { onclick: () => { view.limit += 300; repaint(); } }, `Show more (${rows.length - view.limit} left)`))
     : null;
@@ -107,10 +121,32 @@ function listView(rows, flagsOf, repaint) {
 }
 
 // One case: date, details, procedure tags, flags. Tap to edit. Shared by the list and the calendar.
+// Swipe a row: right to edit, left to delete (Undo in the toast). A short tap still opens it.
+function swipeable(li, c) {
+  let x0 = null, y0 = 0, dx = 0, swiping = false;
+  li.addEventListener('touchstart', e => { const t = e.touches[0]; x0 = t.clientX; y0 = t.clientY; dx = 0; swiping = false; }, { passive: true });
+  li.addEventListener('touchmove', e => {
+    if (x0 == null) return;
+    const t = e.touches[0]; dx = t.clientX - x0;
+    if (!swiping && Math.abs(dx) > 14 && Math.abs(dx) > Math.abs(t.clientY - y0) * 1.5) swiping = true;
+    if (swiping) { li.style.transform = `translateX(${dx}px)`; li.classList.toggle('swipe-del', dx < -40); li.classList.toggle('swipe-edit', dx > 40); }
+  }, { passive: true });
+  li.addEventListener('touchend', () => {
+    if (swiping) {
+      li.addEventListener('click', ev => { ev.stopPropagation(); ev.preventDefault(); }, { capture: true, once: true });
+      if (dx < -90) { li.style.transform = 'translateX(-110%)'; moveToBin('case', c, { toast: true }).catch(err => toast('Could not delete: ' + err.message)); }
+      else { li.style.transform = ''; if (dx > 90) editCaseDialog(c); }
+      li.classList.remove('swipe-del', 'swipe-edit');
+    }
+    x0 = null; swiping = false;
+  });
+  return li;
+}
+
 function caseRow(c, flagsOf) {
   const flags = flagsOf(c);
   const p = caseParts(c);
-  return h('li', { onclick: () => editCaseDialog(c), tabindex: '0', onkeydown: e => { if (e.key === 'Enter' && e.target === e.currentTarget) editCaseDialog(c); } },
+  return swipeable(h('li', { 'data-date': c.date || '', onclick: () => editCaseDialog(c), tabindex: '0', onkeydown: e => { if (e.key === 'Enter' && e.target === e.currentTarget) editCaseDialog(c); } },
       h('span', { class: 'd' }, c.date ? [h('span', { class: 'wd' }, weekday(c.date)), ' ', fmtDate(c.date).replace(/ \d{4}$/, '')] : (c.dateText || '—')),
       h('span', { class: 't' }, p.initials ? [h('b', {}, p.initials), ' '] : null, p.details || (p.initials ? null : h('i', { class: 'muted' }, 'no details'))),
       h('span', { class: 'c' }, catTags(c.cats),
@@ -119,7 +155,7 @@ function caseRow(c, flagsOf) {
         flags.includes('duplicate') ? h('span', { class: 'flag' }, 'possible duplicate') : null,
         !(c.cats || []).length ? h('span', { class: 'flag err' }, 'no category') : null,
         h('button', { class: 'small', style: 'margin-left:auto', title: 'Write a reflection on this case', onclick: e => { e.stopPropagation(); reflectOnCase(c); } },
-          (S.reflections || []).some(r => r.caseId === c.id) ? 'Reflection' : 'Reflect')));
+          (S.reflections || []).some(r => r.caseId === c.id) ? 'Reflection' : 'Reflect'))), c);
 }
 
 // ---------- calendar ----------

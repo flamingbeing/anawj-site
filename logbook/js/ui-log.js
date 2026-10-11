@@ -9,6 +9,7 @@ import {
   createCase, updateCase, removeCase, restoreCase, saveMany, deleteMany, settings, todayISO, hooks, fill, add, cloud, okNoIds, patchLogbook } from './ui-core.js';
 import { templateDialog } from './ui-settings.js';
 import { moveToBin } from './bin.js';
+import { shareText, copyText, caseText as shareCaseText, dayText, dayMarkdown } from './share.js';
 
 const DRAFT_KEY = 'logbook-draft-v2';
 const KEEP_MS = 12 * 3600e3; // a date kept by "Save, keep date" lasts this long
@@ -109,6 +110,37 @@ export function catPicker({ get, toggle, placeholder = 'Search categories: code 
 
 let ui = null; // live parts of the screen, so a case-list update doesn't wipe what's being typed
 
+// "Still needed this year": the categories behind or due, most urgent first; tap for Progress.
+function stillNeeded() {
+  const rank = { late: 0, due: 1 };
+  const need = Object.values(PROGRESS_BY_CODE()).filter(p => p.status in rank && p.next)
+    .sort((a, b) => rank[a.status] - rank[b.status] || (b.next.n - b.count) - (a.next.n - a.count)).slice(0, 3);
+  if (!need.length) return null;
+  return h('a', { class: 'still-needed', href: '#progress' },
+    h('span', { class: 'sn-l' }, 'Still needed:'),
+    need.map(p => h('span', { class: `sn ${p.status}` }, h('b', {}, p.code), ' ', catName(p.code), ' ', h('b', {}, `${p.next.n - p.count} more`))),
+    h('span', { class: 'chev' }, '›'));
+}
+
+// Once a week (from Monday): last week's count and what is still needed. Dismissed until next week.
+function weeklyDigest() {
+  if (!S.cases || !S.cases.length) return null;
+  const now = new Date(), dow = (now.getDay() + 6) % 7;
+  const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dow);
+  const from = todayISO(new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() - 7)), to = todayISO(new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() - 1));
+  const key = `logbook-digest:${(S.user && S.user.email) || ''}`;
+  let seen = ''; try { seen = localStorage.getItem(key) || ''; } catch { /* storage blocked */ }
+  if (seen === from) return null;
+  const n = S.cases.filter(c => c.date && c.date >= from && c.date <= to).length;
+  const card = h('section', { class: 'card digest' },
+    h('div', { class: 'bar', style: 'margin:0' },
+      h('b', {}, `Last week: ${n} case${n === 1 ? '' : 's'} logged`), h('span', { class: 'grow' }),
+      h('button', { class: 'small', 'aria-label': 'Dismiss until next week', onclick: () => { try { localStorage.setItem(key, from); } catch { /* ignore */ } card.remove(); } }, 'OK')),
+    h('p', { class: 'hint', style: 'margin:4px 0 8px' }, n ? 'Nice work.' : 'Nothing logged last week: catch up with the weekday chips or Paste list.'),
+    h('a', { class: 'btn small', href: '#progress' }, 'See what is still needed'));
+  return card;
+}
+
 export function renderLog() {
   loadDraft();
   const card = h('section', { class: 'card log-card' });
@@ -118,7 +150,8 @@ export function renderLog() {
   if (draft.mode === 'bulk') renderBulk(card);
   else renderOne(card);
   paintDate();
-  return card;
+  const digest = weeklyDigest();
+  return digest ? h('div', {}, digest, card) : card;
 }
 
 function setMode(m) { draft.mode = m; saveDraft(); hooks.render(); }
@@ -157,7 +190,7 @@ function paintDate() {
 function renderOne(card) {
   const textarea = h('textarea', {
     class: 'details', rows: '3', autofocus: true, enterkeyhint: 'enter', autocapitalize: 'sentences', autocorrect: 'off', 'aria-label': 'Case details',
-    placeholder: 'AB 72M   ← initials, then age/sex (optional)\nlap chole, GA ETT   ← procedure and details',
+    placeholder: 'AB 72M  ← initials, age/sex\nlap chole GA  ← procedure',
     value: draft.details,
     oninput: e => { draft.details = e.target.value; saveDraft(); suggestSoon(); paintParsed(true); },
     // Enter is a new line (a case can take several lines); Ctrl+Enter / Cmd+Enter saves
@@ -187,6 +220,7 @@ function renderOne(card) {
     h('div', { class: 'chiplabel', id: 'suggLabel' }, 'Suggested'), sugg,
     h('div', { class: 'chiplabel' }, 'Selected'), selected, tip,
     actions,
+    stillNeeded(),
     h('div', { class: 'chiplabel' }, 'Quick picks'), templates,
     h('div', { class: 'chiplabel', id: 'topLabel' }, 'Your top categories'), top,
     h('div', { class: 'chiplabel' }, 'All categories'), picker.el);
@@ -471,6 +505,11 @@ export function editCaseDialog(c) {
     h('div', { class: 'chiplabel' }, 'Categories'), sel,
     h('div', { class: 'chiplabel' }, 'Suggested'), sugg,
     h('details', {}, h('summary', {}, 'All categories'), picker.el),
+    // to your own notes (WhatsApp, Notes, Obsidian): this case, or the whole day's list
+    h('div', { class: 'bar share-row', style: 'margin:10px 0 0' },
+      h('button', { class: 'small', onclick: () => shareText(shareCaseText(c)) }, 'Share case'),
+      c.date ? h('button', { class: 'small', onclick: () => shareText(dayText(c.date)) }, "Share day's list") : null,
+      c.date ? h('button', { class: 'small', onclick: () => copyText(dayMarkdown(c.date), 'Markdown copied: paste into your notebook') }, 'Copy day as Markdown') : null),
     h('div', { class: 'bar', style: 'margin-top:12px' },
       h('button', { class: 'danger', onclick: async () => {
         m.close();

@@ -212,6 +212,32 @@ export const caseParts = c => (c && c.initials != null
   ? { initials: String(c.initials || ''), details: String(c.details || '') }
   : splitInitials(c && c.details));
 
+// Search words that mean dates: "today", "yesterday", "this week", "last week", "this month",
+// "last month", "last 7 days", "tuesday", "last tue". -> { from, to, rest } (ISO dates, inclusive;
+// rest is the query without the date words), or null when the query names no date.
+const WEEKDAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+export function dateWindow(q, now = new Date()) {
+  let s = ' ' + String(q || '').toLowerCase().replace(/\s+/g, ' ') + ' ';
+  const day = (n = 0) => { const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + n); return todayISO(d); };
+  const monday = (weeksBack = 0) => { const dow = (now.getDay() + 6) % 7; return day(-dow - 7 * weeksBack); };
+  let win = null;
+  const take = (re, f) => { if (win) return; const m = s.match(re); if (m) { win = f(m); s = s.replace(re, ' '); } };
+  take(/ today /, () => ({ from: day(), to: day() }));
+  take(/ yesterday /, () => ({ from: day(-1), to: day(-1) }));
+  take(/ (?:last|past) (\d{1,3}) days /, m => ({ from: day(-(Number(m[1]) - 1)), to: day() }));
+  take(/ this week /, () => ({ from: monday(), to: day() }));
+  take(/ last week /, () => { const from = monday(1); const [y, mo, d] = from.split('-').map(Number); return { from, to: todayISO(new Date(y, mo - 1, d + 6)) }; });
+  take(/ this month /, () => ({ from: todayISO(new Date(now.getFullYear(), now.getMonth(), 1)), to: day() }));
+  take(/ last month /, () => ({ from: todayISO(new Date(now.getFullYear(), now.getMonth() - 1, 1)), to: todayISO(new Date(now.getFullYear(), now.getMonth(), 0)) }));
+  take(/ (last )?(sun|mon|tue|wed|thu|fri|sat)(?:day|s|sday|nesday|r|rs|rsday|urday)? /, m => {
+    const want = WEEKDAYS.indexOf(m[2]);
+    let back = (now.getDay() - want + 7) % 7;
+    if (m[1] && back === 0) back = 7;   // "last tuesday" on a Tuesday is a week ago
+    return { from: day(-back), to: day(-back) };
+  });
+  return win ? { ...win, rest: s.trim() } : null;
+}
+
 // A leading age / sex ("45F", "72 M", "5yo", "3/12 M") on case details: { age, rest }. Optional.
 const AGE_SEX = /^\s*(\d{1,3}\s?(?:(?:yo|y\/o|yrs?|years?|\/12|\/52|m\/o|mo|d\/o)\s?[MF]?|[MF]))(?![A-Za-z])[\s,;:\-]*/i;
 export function splitAge(details) {
