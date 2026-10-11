@@ -541,9 +541,8 @@ function renderDay(part) {
       h('td', { class: 'seen' }, p.role === 'senior' ? p.grade : `${p.grade}${p.posting ? ' · ' + postingName(p.posting) : ''}`),
       h('td', {}, select(s.status || 'avail', STATUSES, v => { s.status = v; s.manual = true; render(); })),
       h('td', {}, h('input', { class: 'narrow', value: s.leaveTime || '', placeholder: '4pm', title: 'Leaving at, e.g. 4pm or 4-5pm (shown as L-4pm)', onchange: e => { s.leaveTime = e.target.value.trim(); save(); } })),
-      h('td', {}, p.role === 'senior'
-        ? h('label', { title: 'Liver transplant standby' }, h('input', { type: 'checkbox', checked: s.liverStandby, onchange: e => { s.liverStandby = e.target.checked; s.manualLiver = true; save(); } }), ' (L)')
-        : h('label', { title: 'Not around on the previous working day: needs premed cover' }, h('input', { type: 'checkbox', checked: s.notAroundPrev, onchange: e => { s.notAroundPrev = e.target.checked; s.manualAway = true; save(); } }), ' away yesterday')),
+      h('td', {}, h('label', { title: 'Liver transplant standby: no complex lists' }, h('input', { type: 'checkbox', checked: s.liverStandby, onchange: e => { s.liverStandby = e.target.checked; s.manualLiver = true; save(); } }), ' (L)'),
+        p.role === 'junior' ? h('label', { title: 'Not around on the previous working day: needs premed cover', style: 'margin-left:8px' }, h('input', { type: 'checkbox', checked: s.notAroundPrev, onchange: e => { s.notAroundPrev = e.target.checked; s.manualAway = true; save(); } }), ' away yesterday') : null),
       h('td', {}, h('input', { value: s.note || '', placeholder: p.role === 'senior' ? '(AOH 1), -mtg 5pm' : '', onchange: e => { s.note = e.target.value.trim(); save(); } })),
     );
   };
@@ -1077,7 +1076,7 @@ function nameInput(attrs = {}, role = null) {
 
 // ---- tags on one name: "(L)", "(RA)", "(AOH 1)" and the part after a dash ("-5pm", "-C-OT 4") ----
 
-const TAGS = ['L', 'HPB', 'RA', 'P', 'SR', 'Neu', 'Cardiac', 'ENT', 'Vasc', 'Amb', 'Remote', 'PACU'];
+const TAGS = ['L', 'AOH', 'HPB', 'RA', 'P', 'SR', 'Neu', 'Cardiac', 'ENT', 'Vasc', 'Amb', 'Remote', 'PACU'];
 let tagTimer = null;
 
 // "Tan YW (RA) L-4pm C-OT13 -mtg 5pm" -> name, tags, leave ("4pm" / "4-5pm"), cover ("OT13", "KROR PACU"), note
@@ -1526,7 +1525,7 @@ function syncMonthly() {
       if (r.status) { s.status = r.status; s.auto = r.why; }
       else if (s.auto) { s.status = 'avail'; delete s.auto; }
     }
-    if (p.role === 'senior' && !s.manualLiver) {
+    if (!s.manualLiver) {
       if (r.liver) { s.liverStandby = true; s.autoLiver = true; } else if (s.autoLiver) { s.liverStandby = false; delete s.autoLiver; }
     }
     if (p.role === 'junior' && !s.manualAway) {

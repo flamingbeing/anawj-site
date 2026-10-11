@@ -16,7 +16,7 @@ export const MONTHLY = [
     { key: 'chronic.a', label: 'Chronic Pain (Junior)', group: 'Chronic Pain', to: 'chronic.a' },
   ] },
   { id: 'liver', label: 'Liver Roster', title: 'Liver Transplant Roster', match: /liver/i, cols: [
-    { key: 'otj', label: 'OT (Junior)' },
+    { key: 'otj', label: 'OT (Junior)', liver: true },
     { key: 'ots', label: 'OT (Senior)', liver: true },
     { key: 'icu', label: 'ICU' },
     { key: 'donor', label: 'Donor' },

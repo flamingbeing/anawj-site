@@ -290,6 +290,8 @@ function juniorRoomCost(p, d, room, settings, noise, doubled) {
       || (p.posting === 'SR' && room.flags.complex);
     c += match ? -15 : 4;
   }
+  // the liver standby team isn't given complex lists
+  if (d.liverStandby && room.flags.complex) c += 50;
   if (d.leaveTime && room.flags.long) c += 40;
   return c;
 }
@@ -308,6 +310,7 @@ export function fmtSenior(p, d) {
 export function fmtJunior(p, d) {
   let s = p.name;
   if (p.posting) s += ` (${p.posting})`;
+  if (d.liverStandby && p.posting !== 'L') s += ' (L)';
   if (d.note) s += ' ' + d.note;
   if (d.leaveTime) s += ' L-' + d.leaveTime;
   return s;
@@ -691,6 +694,9 @@ export function check({ rows, staff, day, settings = DEFAULT_SETTINGS }) {
       if (dayOf(day, p).liverStandby && (flags.complex || flags.subspecs.some(k => sub[k]?.hard))) {
         out.push({ level: 'warn', text: `${row.label}: ${p.name} is liver standby but has a complex/subspec list.` });
       }
+    }
+    for (const p of jun) {
+      if (dayOf(day, p).liverStandby && flags.complex) out.push({ level: 'warn', text: `${row.label}: ${p.name} is liver standby but has a complex list.` });
     }
     const shared = sen.some(p => (where[p.id] || []).filter(u => u.col === 'senior').length > 1);
     if (shared && jun.some(isBaby)) {
