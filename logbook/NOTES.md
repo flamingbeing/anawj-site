@@ -57,6 +57,9 @@ portfolio content.
   Delete/Cancel/Save, 6-line growing box, Tags + "Add tags"; also "New case" from the reflection picker).
 - **Enter key** (Settings → Logging, `settings.enterMode`): New line (default; Ctrl/Cmd+Enter saves), Press Enter twice
   (Enter on an empty line saves; also via beforeinput for phone keyboards), or Enter saves. Old `enterSaves` = single.
+  A no-tag save highlights suggestions; an additional Enter accepts the suggested tags and saves
+  (the third Enter in double-Enter mode). This requires suggestions to be on. Editing or manually
+  selecting tags cancels the offer; Shift+Enter remains a new line and holding Enter never accepts it.
 - **Two panes** on the Case tab at >= 840px wide and >= 500px tall (tablets, unfolded foldables, computers; not
   landscape phones): `.log-card.panes` grid, left = date, case box, quick picks, Still needed, Save; right = all tags
   (sticky, own scroll). On phones `.lp-left` / `.lp-right` are display: contents, so the order is unchanged.

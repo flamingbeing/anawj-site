@@ -19,6 +19,8 @@ const yesterdayISO = () => { const d = new Date(); d.setDate(d.getDate() - 1); r
 // (and apart from the demo), so the next person on a shared phone never sees it; sign-out wipes it.
 const EMPTY = () => ({ date: null, details: '', cats: [], mode: 'one', bulk: '' });
 let draft = EMPTY(), draftOwner = null;
+let suggestedSave = null, saving = false;
+const suggestionKey = () => JSON.stringify([draft.details.trim(), curDate()]);
 const draftKey = () => `${DRAFT_KEY}:${cloud.demo ? 'demo:' : ''}${(S.user && S.user.email) || ''}`;
 function loadDraft() {
   if (draftOwner === draftKey()) return;
@@ -56,6 +58,7 @@ export function logOnDate(iso) {
 }
 
 export function clearDrafts() {
+  suggestedSave = null;
   saveDraft.cancel();
   draft = EMPTY(); draftOwner = null; bulkRows = null; ui = null;
   try { for (const k of Object.keys(localStorage)) if (k.startsWith('logbook-draft-')) localStorage.removeItem(k); } catch { /* ignore */ }
@@ -330,16 +333,19 @@ function saveFromEmptyLine(ta, another) {
 }
 
 function renderOne(card) {
+  suggestedSave = null;
   const textarea = h('textarea', {
     class: 'details', rows: String(boxLines()), style: `min-height:calc(${boxLines()} * 1.4em + 22px)`, autofocus: true, enterkeyhint: enterMode() === 'single' ? 'done' : 'enter', autocapitalize: 'sentences', autocorrect: 'off', 'aria-label': 'Case summary',
     placeholder: PLACEHOLDER.map(([a, b]) => `${a}  ← ${b}`).join('\n'),
     value: draft.details,
-    oninput: e => { draft.details = e.target.value; saveDraft(); suggestSoon(); paintParsed(true); },
+    oninput: e => { suggestedSave = null; draft.details = e.target.value; saveDraft(); suggestSoon(); paintParsed(true); },
     // Settings → Logging → Enter key: 'newline' (default; Ctrl/Cmd+Enter saves), 'double' (Enter on an empty
     // line saves, so a case can still take several lines) or 'single' (Enter saves; Shift+Enter a new line)
     onkeydown: e => {
       if (e.key !== 'Enter' || e.isComposing) return;
       e.target._shiftAt = e.shiftKey ? Date.now() : 0;   // Shift+Enter is a new line in every mode (see onbeforeinput)
+      if (e.repeat && suggestedSave && !e.shiftKey) { e.preventDefault(); return; }
+      if (!e.shiftKey && applySuggestedSave()) { e.preventDefault(); return save({ another: e.altKey }); }
       const mode = enterMode();
       if (e.ctrlKey || e.metaKey) { e.preventDefault(); return save({ another: e.altKey }); }
       if (e.shiftKey) return;
@@ -348,7 +354,8 @@ function renderOne(card) {
     },
     // phone keyboards that don't send a usable Enter keydown still send this
     onbeforeinput: e => {
-      if (!/^insert(LineBreak|Paragraph)$/.test(e.inputType) || Date.now() - (e.target._shiftAt || 0) < 1000) return;
+      if (e.isComposing || !/^insert(LineBreak|Paragraph)$/.test(e.inputType) || Date.now() - (e.target._shiftAt || 0) < 1000) return;
+      if (applySuggestedSave()) { e.preventDefault(); return save({}); }
       const mode = enterMode();
       if (mode === 'single') { e.preventDefault(); save({}); }
       else if (mode === 'double' && onEmptyLine(e.target)) { e.preventDefault(); saveFromEmptyLine(e.target, false); }
@@ -464,6 +471,7 @@ function paintSuggest() {
 }
 
 function paintSel() {
+  suggestedSave = null;
   if (!ui || !ui.selected) return;
   fill(ui.selected, ...(draft.cats.length
     ? draft.cats.map(code => catChip(code, { on: true, removable: true, cls: 'add', title: 'Remove ' + catFull(code),
@@ -542,19 +550,44 @@ function paintQuick() {
   fill(ui.templates, ...chips.filter(Boolean));
 }
 
-async function save({ another }) {
+// The failed no-tag save is the first step; only a subsequent Enter accepts these
+// suggestions. Editing, selecting tags or leaving this screen cancels the offer.
+function applySuggestedSave() {
+  const offer = suggestedSave;
+  suggestedSave = null;
+  if (!offer || saving || settings().suggestions === false || draft.cats.length || offer.key !== suggestionKey()) return false;
+  draft.cats = offer.cats;
+  draft.tags = [...new Set([...(draft.tags || []), ...offer.tags])];
+  saveDraft(); paintSel();
+  return true;
+}
+
+async function save(opts) {
+  if (saving) return;
+  saving = true;
+  try { await saveCase(opts); } finally { saving = false; }
+}
+
+async function saveCase({ another }) {
   const details = draft.details.trim();
   if (!draft.cats.length) {
+    paintSuggest();   // a quick Enter must not depend on the typing debounce
+    const tags = settings().suggestions !== false && details ? shorthandTags(tagSet(), details).filter(k => !(draft.tags || []).includes(k)) : [];
+    const codes = settings().suggestions !== false && details ? suggest(details, { limit: 8 }).map(s => s.code) : [];
+    const cats = sortCodes(withParents([...codes, ...tags.flatMap(tagLinks)]));
+    suggestedSave = cats.length ? { key: suggestionKey(), cats, tags } : null;
     // categories are counted towards credentialling, so they must be picked on purpose
     // point at the suggestions (no keyboard popping up); with none, the search box
     const target = ui.sugg && !ui.sugg.hidden && ui.sugg.querySelector('.chip') ? ui.sugg : null;
     if (target) {
-      toast('Tap at least one tag: suggestions are highlighted');
+      toast(suggestedSave ? 'Press Enter again to apply suggested tags and save, or tap a tag' : 'Tap at least one tag: suggestions are highlighted');
+      if (suggestedSave) ui.textarea.focus();
       target.scrollIntoView({ behavior: 'smooth', block: 'center' });
       target.classList.remove('flash'); void target.offsetWidth; target.classList.add('flash');
     } else { toast('Pick at least one tag: search below'); ui.picker.focus(); }
     return;
   }
+  suggestedSave = null;
   if (!details && !(await confirmBox('No case details', 'Save this case without initials or details?', 'Save'))) return;
   if (!(await okNoIds(details))) return;
   // the same text on the same date is probably a double entry
