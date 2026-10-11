@@ -95,6 +95,11 @@ portfolio content.
   references). Default day: `[[YYYY-MM-DD]]`, then `1. AB` / case, a blank line between cases; no tags. An older
   `settings.shareFormat` (the Copy & share format) carries over until the Markdown page is saved; `share-format.js`
   is kept for that and its tests. Previews use the user's own latest day and reflection.
+- **Connect Claude** (`mcp/`, Settings → Connect Claude (advanced) links its README on GitHub): a read-only MCP
+  server residents run locally; Google "Desktop app" OAuth (loopback, PKCE) → Firebase `signInWithIdp` → Firestore
+  REST as the user, so the rules apply; only `logbooks/{own email}` and the user's own `residents` entry. Owner
+  setup (the Desktop client ID and its non-confidential secret in `mcp/config.mjs`) is in `mcp/README.md`; until
+  then sign-in can't work. Tests: `logbook/mcp/test/*.test.mjs` (tools test needs `npm install` there).
 - **Download for notes apps** (More → Export / Import → Backup; `ui-notes.js`): a zip made on the phone (JSZip):
   `Cases/` notes, `Reflections/…` one note each (linked both ways), `Progress.md` (counts vs targets, reflections vs
   minimums), optional figures in `images/` (fetched one by one from `images/`). A privacy line is always shown.

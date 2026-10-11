@@ -126,7 +126,18 @@ function renderSettingsMenu() {
     h('section', { class: 'card more-list' }, h('h2', {}, 'Settings'),
       h('ul', {}, pages.map(t => menuItem(t.id, t.label, t.desc)),
         menuItem('bin', 'Recycle bin', 'Deleted cases and reflections, kept for 30 days', () => openBin()))),
-    settingsFileCard());
+    settingsFileCard(),
+    connectClaudeCard());
+}
+
+// Connect Claude (advanced): the read-only MCP server residents run on their own computer (logbook/mcp/README.md)
+const MCP_README = 'https://github.com/flamingbeing/anawj-site/tree/main/logbook/mcp#readme';
+function connectClaudeCard() {
+  return h('section', { class: 'card' },
+    h('h2', {}, 'Connect Claude (advanced)'),
+    h('p', { class: 'hint', style: 'margin:0 0 6px' }, 'Ask Claude Desktop or Claude Code about your own logbook ("which tags am I behind on?"). A small read-only program on your computer signs in as you; it can\u2019t change anything.'),
+    h('p', { class: 'hint', style: 'margin:0 0 6px' }, 'What it reads is sent to Claude: check hospital policy before using it, and keep cases de-identified.'),
+    h('div', { class: 'bar', style: 'margin-bottom:0' }, h('a', { class: 'btn', href: MCP_README, target: '_blank', rel: 'noopener' }, 'How to set it up ›')));
 }
 
 // Settings export / import: preferences, tags, shorthand, tag groups, formats as one small file
