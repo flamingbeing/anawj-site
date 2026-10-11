@@ -212,3 +212,34 @@ console.log('engine tests passed');
   }
   console.log('liver standby tests passed');
 }
+
+// duplicates and import review (fake names only)
+{
+  const { findDuplicates, sameNameScore, mergeStaffRecords, planImport } = await import('../js/engine.js');
+  const st = [P('a', 'Tan Yi Wei', 'senior'), P('b', 'Tan Yi Wei Gerald', 'senior'), P('c', 'Shree', 'junior'), P('d', 'Shree Venkatesan', 'junior'),
+    P('e', 'Cui Jiaqian', 'junior'), P('f', 'Jiaqian Cui', 'junior'), P('g', 'Lim Wei Ming', 'senior'), P('h', 'Lim Wei Ling', 'senior')];
+  assert.equal(sameNameScore(st[4], st[5]), 3, 'same name in another order');
+  assert.ok(sameNameScore(st[0], st[1]) >= 2, 'an extra name');
+  assert.ok(sameNameScore({ name: 'Tan YW' }, st[1]) >= 2, 'initials');
+  assert.equal(sameNameScore(st[6], st[7]), 0, 'different people');
+  const pairs = findDuplicates(st).map(x => [x.a.id, x.b.id].sort().join(''));
+  assert.ok(pairs.includes('ef') && pairs.includes('cd'), 'finds reordered and short-name duplicates');
+  assert.ok(!pairs.includes('gh'));
+  st[4].notDup = ['f'];
+  assert.ok(!findDuplicates(st).some(x => [x.a.id, x.b.id].sort().join('') === 'ef'), 'pairs marked different are left out');
+  const m = mergeStaffRecords({ ...st[3], subspecs: ['paeds'] }, { ...st[2], subspecs: ['neuro'], colour: 'green' });
+  assert.deepEqual(m.aliases, ['Shree']);
+  assert.deepEqual(m.subspecs, ['paeds', 'neuro']);
+  assert.equal(m.colour, 'green');
+  const plan = planImport([P('x', 'Tan Yi Wei', 'senior')], [
+    { name: 'Tan Yi Wei', role: 'senior', grade: 'SC', subspecs: [] },
+    { name: 'Tan Yi Wei Gerald', role: 'senior', grade: 'C', subspecs: [] },
+    { name: 'New Senior Person', role: 'senior', grade: 'AC', subspecs: [] },
+    { name: 'New Junior Person', role: 'junior', grade: 'MOPEX', subspecs: [] },
+    { name: 'Skipped Person', role: 'senior', grade: 'C', subspecs: [] },
+  ], { skip: ['skipped person'] });
+  assert.deepEqual(plan.items.map(i => i.kind), ['match', 'maybe', 'new', 'newJunior', 'skipped']);
+  assert.deepEqual(plan.items[0].changes, ['grade C → SC']);
+  assert.equal(plan.items[1].candidates[0].id, 'x');
+  console.log('duplicate tests passed');
+}
