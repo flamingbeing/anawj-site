@@ -73,15 +73,14 @@ main { padding: 16px; max-width: 980px; margin: 0 auto; padding-bottom: calc(32p
   .tabs button[aria-selected="true"] { border-top-color: var(--accent); border-bottom: 0; color: var(--accent); }
   .tabs .ico { display: block; width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
   .tabs .lbl { overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-  /* typing (keyboard open): the tab bar sits on the keyboard (--kb, set in app.js); the sticky Save
-     bar unsticks so it doesn't cover the suggestions */
+  /* typing (keyboard open): the tab bar sits on the keyboard (--kb, set in app.js) */
   body.typing .tabs { transform: translateY(calc(-1 * var(--kb, 0px))); padding-bottom: 0; }
   /* typing: Save stays in reach, just above the tab bar on the keyboard */
-  body.typing .actions { position: fixed; left: 0; right: 0; bottom: calc(var(--kb, 0px) + var(--tabbar-h)); z-index: 29; margin: 0; padding: 6px 12px; background: var(--panel); border-top: 1px solid var(--line); }
-  body.typing .actions button.big { min-height: 44px; padding-block: 6px; }
-  body.typing main { padding-bottom: calc(80px + var(--tabbar-h)); }
+  body.typing .savebar, body.typing :not(.savebar) > .actions { position: fixed; left: 0; right: 0; bottom: calc(var(--kb, 0px) + var(--tabbar-h)); z-index: 29; margin: 0; padding: 6px 12px; background: var(--panel); border-top: 1px solid var(--line); }
+  body.typing .savebar button.big, body.typing .actions button.big { min-height: 44px; padding-block: 6px; }
+  body.typing main { padding-bottom: calc(130px + var(--tabbar-h)); }
   /* a focused field scrolls clear of the tab bar riding on the keyboard */
-  html:has(body.typing) { scroll-padding-bottom: calc(var(--tabbar-h) + 72px); }
+  html:has(body.typing) { scroll-padding-bottom: calc(var(--tabbar-h) + 120px); }
   /* suggestion chips: keep names short so several fit on a line */
   .chip .nm { max-width: 12em; }
 }
@@ -666,15 +665,17 @@ table.totals td.due .gap { color: var(--warn); }
 .chip .chip-x { border: 0; background: none; color: inherit; min-height: 40px; min-width: 32px; margin: -10px -8px -10px 0; padding: 0 0 0 6px; font-size: 14px; }
 .sc-line { color: var(--accent); }
 
-/* Log: the box, selected categories and Save stay pinned while the categories scroll */
-.composer { position: sticky; top: 0; z-index: 12; background: var(--panel); margin: 0 -12px; padding: 6px 12px 4px; }
-body.compact .composer { margin: 0 -8px; padding: 4px 8px; }
-.composer.stuck { box-shadow: 0 6px 12px -8px rgba(0,0,0,.35); border-bottom: 1px solid var(--line); }
-.composer.stuck textarea.details { min-height: 0; height: 3.7em; }
-.composer.stuck .parsed, .composer.stuck .sel-label, .composer.stuck .reflect-tag { display: none; }
-.composer.stuck .actions { position: static; margin-top: 4px; padding: 0; }
-.composer.stuck .chips.selected .none { display: none; }
-.pin-mark { height: 1px; }
+/* Log: the selected categories and Save stay pinned at the bottom (above the tab bar) while the
+   categories scroll; the pills are one row that scrolls sideways so the bar stays slim */
+.savebar { position: sticky; bottom: calc(var(--tabbar-h) + var(--safe-b)); z-index: 10; margin: 12px -12px -12px; padding: 6px 12px 8px; border-radius: 0 0 var(--radius, 14px) var(--radius, 14px); background: var(--panel); border-top: 1px solid var(--line); box-shadow: 0 -6px 12px -10px rgba(0,0,0,.35); }
+body.compact .savebar { margin: 6px -8px 0; padding: 4px 8px 6px; }
+.savebar .chips.selected { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; min-height: 40px; }
+.savebar .chips.selected::-webkit-scrollbar { display: none; }
+.savebar .chips.selected .chip { flex: 0 0 auto; }
+.savebar .selected .none { white-space: nowrap; }
+.savebar .actions { position: static; margin-top: 6px; padding: 0; background: none; }
+.sel-extra:empty { display: none; }
+.sel-extra { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 
 /* Admin: category display names */
 table.cat-names input { min-width: 140px; }

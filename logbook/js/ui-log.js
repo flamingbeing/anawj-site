@@ -222,37 +222,20 @@ function renderOne(card) {
 
   // what the box was read as (initials come off into their own field; age/sex stay in the details)
   const parsed = h('div', { class: 'parsed', 'aria-live': 'polite' });
-  // The box, the selected categories and Save stay pinned at the top while you scroll the
-  // categories below, so you can tag and save without scrolling back up.
-  const composer = h('div', { class: 'composer' },
-    textarea, parsed,
-    h('div', { class: 'chiplabel sel-label' }, 'Selected'), selected, tip,
-    tagBox,
-    actions);
-  const pinMark = h('div', { class: 'pin-mark', 'aria-hidden': 'true' });
+  // Only the selected categories and Save stay pinned: a slim bar at the end of the card that sticks
+  // to the bottom (above the tab bar) the whole way down; the box itself scrolls away.
+  const selExtra = h('div', { class: 'sel-extra' });
+  const savebar = h('div', { class: 'savebar' }, selected, actions);
   add(card,
-    pinMark, composer,
+    textarea, parsed, selExtra, tip, tagBox,
     h('div', { class: 'chiplabel', id: 'suggLabel' }, 'Suggested'), sugg,
     stillNeeded(),
     h('div', { class: 'chiplabel' }, 'Quick picks'), templates,
     h('div', { class: 'chiplabel', id: 'topLabel' }, 'Your top categories'), top,
-    h('div', { class: 'chiplabel' }, 'All categories'), picker.el);
-  Object.assign(ui, { textarea, parsed, sugg, selected, tip, templates, top, picker });
+    h('div', { class: 'chiplabel' }, 'All categories'), picker.el,
+    savebar);
+  Object.assign(ui, { textarea, parsed, sugg, selected, selExtra, tip, templates, top, picker });
   paintSuggest(); paintSel(); paintQuick(); paintParsed(false);
-  // compact the pinned box once it sticks (the marker above it has scrolled away)
-  if ('IntersectionObserver' in window) {
-    // The compact box keeps its old height in the flow (a bottom margin makes up the difference),
-    // so nothing below moves when it pins. Otherwise scroll anchoring shifts the page, the marker
-    // comes back into view and the box flickers between pinned and not.
-    const io = new IntersectionObserver(([e]) => {
-      const want = !e.isIntersecting && e.boundingClientRect.top < 0;
-      if (want === composer.classList.contains('stuck')) return;
-      const h0 = composer.offsetHeight;
-      composer.classList.toggle('stuck', want);
-      composer.style.marginBottom = want ? Math.max(0, h0 - composer.offsetHeight) + 'px' : '';
-    });
-    io.observe(pinMark);
-  }
   // autofocus attribute is ignored on re-render; focus after insertion (not on phones' first paint
   // when that would pop the keyboard over a fresh landing — it's what the user came to do, so do it)
   requestAnimationFrame(() => { if (document.activeElement === document.body || !document.activeElement) textarea.focus({ preventScroll: true }); });
@@ -285,7 +268,7 @@ function paintSuggest() {
   const list = text ? suggest(text, { limit: 8 }).filter(s => !draft.cats.includes(s.code)) : [];
   const strong = list.filter(s => s.score >= 0.5).map(s => s.code);
   const all = strong.length > 1 ? h('span', { class: 'chip sugg strong all', role: 'button', tabindex: '0', title: 'Add all the confident suggestions',
-    onclick: () => { keepPlace(ui.selected, () => { draft.cats = sortCodes(withParents([...draft.cats, ...strong])); saveDraft(); paintSel(); }); refocus(); } }, '+ All ' + strong.length) : null;
+    onclick: () => { keepPlace(ui.sugg, () => { draft.cats = sortCodes(withParents([...draft.cats, ...strong])); saveDraft(); paintSel(); }); refocus(); } }, '+ All ' + strong.length) : null;
   fill(ui.sugg, all, ...(list.length ? list.map(s => catChip(s.code, {
     cls: `sugg ${s.score >= 0.5 ? 'strong' : ''}`,
     title: `${catFull(s.code)} — ${s.why === 'age' ? 'from the age' : s.why === 'bmi' ? 'from the BMI' : 'from your words'}`,
@@ -297,8 +280,9 @@ function paintSel() {
   if (!ui || !ui.selected) return;
   fill(ui.selected, ...(draft.cats.length
     ? draft.cats.map(code => catChip(code, { on: true, removable: true, cls: 'add', title: 'Remove ' + catFull(code),
-      onclick: () => keepPlace(ui.selected, () => { draft.cats = dropCat(draft.cats, code); saveDraft(); paintSel(); }) }))
-    : [h('span', { class: 'none' }, 'None yet — tap a suggestion, a quick pick or search below.')]),
+      onclick: () => { draft.cats = dropCat(draft.cats, code); saveDraft(); paintSel(); } }))
+    : [h('span', { class: 'none' }, 'No category yet: tap one below')]));
+  fill(ui.selExtra,
     // a combination worth keeping: one tap to make it a template (no trip to Settings)
     draft.cats.length >= 2 && !((S.logbook && S.logbook.templates) || []).some(t => sortCodes(t.cats).join() === sortCodes(draft.cats).join())
       ? h('button', { type: 'button', class: 'small linkish', onclick: () => templateDialog({ id: uid(), name: '', cats: [...draft.cats], details: '' }, async out => {
@@ -306,7 +290,7 @@ function paintSel() {
         toast(`Template “${out.name}” saved`); paintQuick(); paintSel();
       }, 'Save as template') }, '☆ Save as template') : null,
     // personal subcategories of the selected categories (Settings → My subcategories)
-    subcatChips(draft.cats, draft.tags || [], tags => keepPlace(ui.selected, () => { draft.tags = tags; saveDraft(); paintSel(); })));
+    subcatChips(draft.cats, draft.tags || [], tags => keepPlace(ui.selExtra, () => { draft.tags = tags; saveDraft(); paintSel(); })));
   const tips = draft.cats.filter(c => TIPS[c]).map(c => TIPS[c]);
   fill(ui.tip, ...tips.map(t => h('p', { class: 'tip' }, t)));
   paintSuggest();
