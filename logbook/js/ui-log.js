@@ -66,6 +66,20 @@ function keepPlace(anchor, fn) {
 // On phones, focusing the details box pops the keyboard and scrolls back up: only do it with a mouse.
 // how tall the case box starts (Settings → Logging: 2 to 20 lines)
 const boxLines = () => Math.min(20, Math.max(2, Math.round(Number(settings().boxLines) || 3)));
+// "📋 Paste": the clipboard into a box (filled when empty, else on a new line). Browsers that can't read
+// the clipboard (or a refused permission) get a hint to long-press and paste instead.
+async function pasteInto(ta, after) {
+  let text = '';
+  try { text = await navigator.clipboard.readText(); }
+  catch { return toast('Couldn’t read the clipboard here: long-press (or right-click) the box and choose Paste'); }
+  text = String(text || '').replace(/\r\n?/g, '\n').trim();
+  if (!text) return toast('The clipboard is empty');
+  ta.value = ta.value.trim() ? ta.value.replace(/\s+$/, '') + '\n' + text : text;
+  ta.dispatchEvent(new Event('input', { bubbles: true }));
+  ta.focus({ preventScroll: true });
+  after && after();
+}
+const pasteBtn = (ta, label = '📋 Paste') => h('button', { type: 'button', class: 'small paste-btn', title: 'Paste from the clipboard', onclick: () => pasteInto(ta) }, label);
 const refocus = () => { if (ui.textarea && matchMedia('(pointer: fine)').matches) ui.textarea.focus({ preventScroll: true }); };
 
 // The list follows your tag set (Settings → Tag editor): section headers, categories and your own tags,
@@ -292,7 +306,7 @@ function renderOne(card) {
   const selExtra = h('div', { class: 'sel-extra' });
   const savebar = h('div', { class: 'savebar' }, selected, actions);
   add(card,
-    textarea, parsed, selExtra, tip, tagBox,
+    h('div', { class: 'box-wrap' }, textarea, pasteBtn(textarea)), parsed, selExtra, tip, tagBox,
     h('div', { class: 'chiplabel', id: 'suggLabel' }, 'Suggested'), sugg,
     stillNeeded(),
     h('div', { class: 'chiplabel' }, 'Quick picks'), templates,
@@ -480,6 +494,7 @@ function renderBulk(card) {
     ta,
     h('div', { class: 'bar', style: 'margin-top:8px' },
       h('button', { class: 'primary', onclick: () => { bulkRows = parseBulk(ta.value, t => suggest(t)); paintBulk(out); } }, 'Review'),
+      pasteBtn(ta, '📋 Paste from clipboard'),
       h('button', { onclick: () => { ta.value = ''; draft.bulk = ''; bulkRows = null; saveDraft(); fill(out); } }, 'Clear')),
     out);
   if (bulkRows) paintBulk(out);

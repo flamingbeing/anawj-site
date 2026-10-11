@@ -747,3 +747,9 @@ ul.te-list .icon-btn { min-width: 40px; min-height: 40px; }
 .map-grid select, .map-grid + * select { max-width: 100%; }
 table.map-preview td.bad { color: var(--err, #b91c1c); font-weight: 600; }
 table.map-preview td { font-size: 13px; vertical-align: top; }
+
+/* Log: paste from the clipboard */
+.box-wrap { position: relative; }
+.box-wrap .paste-btn { position: absolute; right: 6px; bottom: 6px; min-height: 40px; padding: 2px 10px; font-size: 13px; opacity: .85; background: var(--panel); }
+/* only while the box is empty, so it never covers what's typed */
+.box-wrap textarea:not(:placeholder-shown) + .paste-btn { display: none; }

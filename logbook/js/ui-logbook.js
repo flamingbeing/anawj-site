@@ -354,7 +354,7 @@ function mapColumns(fileName, grid) {
           h('td', { class: !c.date && c.dateText ? 'bad' : '' }, c.date ? fmtDate(c.date) : c.dateText ? `“${c.dateText}” ✗` : '—'),
           h('td', {}, c.initials || ''),
           h('td', {}, String(c.details || '').slice(0, 60)),
-          h('td', { class: c.unknown.length ? 'bad' : '' }, [catPills(c.cats), c.unknown.length ? ` ✗ ${c.unknown.join(', ')}` : ''].join('')))))))),
+          h('td', { class: c.unknown.length ? 'bad' : '' }, [catPills(c.cats), c.unknown.length ? ` ✗ ${c.unknown.join(', ')}` : ''].join(''))))))),
       ok ? null : h('p', { class: 'tip' }, 'Choose at least the Date or the Case details column.'));
     reviewBtn.disabled = !ok;
   };
