@@ -921,8 +921,32 @@ const SURNAMES = new Set(`tan lim lee ng ong wong goh chua chan koh teo ang yeo 
   foong ngiam sng ting loke au kwok kok hoo hsu chiam chin chee choy eng fong kee khor kong ku lek loo lye mak neoh ooi
   pua see sia sin siow soo tai tey tng tsang wan yee yin yoong yuen quah thio tian`.split(/\s+/).filter(Boolean));
 
+// Common given names, mostly English: written as an initial and the surname ("R Chia").
+const COMMON_GIVEN = new Set(`aaron abigail adam adeline adrian agnes aidan aileen alan albert alex alexander alexandra alexis alfred
+  alice alicia alison amanda amber amelia amy andrea andrew andy angel angela angeline anita ann anna anne annette anthony april
+  arthur ashley audrey barbara ben benedict benjamin bernard beth bethany betty bianca bill bob bonnie brandon brenda brian bridget
+  bryan caitlin caleb calvin cameron carl carmen carol caroline carolyn catherine cecilia celeste charlene charles charlotte chelsea cheryl
+  chloe chris christina christine christopher cindy claire clara clarence claribel clarissa claudia clement colin connie constance
+  cynthia daisy dale damien daniel danielle danny daphne darren david dawn dean deborah debbie denise dennis derek desmond diana
+  diane dominic donald doris dorothy douglas dylan eda edmund edward edwin eileen elaine eleanor elizabeth ella ellen emily emma
+  eric erica esther ethan eugene eunice eva evelyn faith felicia fiona florence frances francis frank freda gabriel gareth gary
+  gavin genevieve geoffrey george gerald gilbert gillian gina glen glenn gloria grace graham grant gregory hannah harold harry hazel
+  heather helen henry hilary iris ivy jocelyn kenny hillary howard ian irene isaac isabel isabelle ivan jack jacqueline jade james jamie jane janet janice
+  jared jasmin jasmine jason jean jeanette jeffrey jennifer jenny jeremy jerome jerry jessica jill joan joanna joanne joe joel john
+  johnny jolene jonathan joseph josephine joshua joy joyce judith judy julia julian juliana julie justin karen kate katherine kathleen
+  kathy katrina keith kelly kelvin kenneth kevin kimberly kristen lance laura lauren lawrence leonard leslie lillian linda lindsay
+  lionel lisa lois lorraine louis louise lucas lucy lydia lynn mabel madeline magdalene malcolm marcus margaret maria marian marie
+  marilyn mark martha martin mary matthew maureen maurice maxine megan melanie melissa melvin michael michelle miranda molly monica
+  nancy natalie nathan nathaniel neil nelson nicholas nicole noel nora norman olivia oscar pamela patricia patrick paul paula pauline
+  peggy penelope peter philip phoebe phyllis priscilla rachel ralph raymond rebecca regina reuben rex richard rita robert robin
+  roger ronald rose rosemary ruby russell ruth ryan sabrina samantha samuel sandra sarah sean serene sharon sheila shirley sophia
+  sophie stacey stanley stella stephanie stephen steven susan suzanne sylvia tabitha terence teresa terry theodore theresa thomas
+  tiffany timothy tina tracy trevor valerie vanessa veronica victor victoria vincent violet vivian walter wendy william winnie
+  yvonne zachary zach zoe`.split(/\s+/).filter(Boolean));
+
 // The way names are written on the leave and post call lists:
-// "Tan Yi Wei" -> "Tan YW", "Chan Jiaxin" -> "Jiaxin", "Swapna Thampi" -> "Swapna", "Eric Lee Shih Hsiung" -> "Eric".
+// "Tan Yi Wei" -> "Tan YW", "Chan Jiaxin" -> "Jiaxin", "Swapna Thampi" -> "Swapna",
+// "Eric Lee Shih Hsiung" -> "E Lee", "Richard Tierney" -> "R Tierney".
 export function suggestShortName(name) {
   let t = String(name).replace(/\(.*?\)/g, ' ').replace(/[^A-Za-z\-' ]+/g, ' ').trim().split(/\s+/).filter(Boolean);
   while (t.length > 1 && t[0].length === 1) t = t.slice(1); // "S. Surentheran"
@@ -932,6 +956,13 @@ export function suggestShortName(name) {
     const given = t.slice(1).flatMap(w => w.split('-')).filter(Boolean);
     if (given.length === 1) return given[0].length <= 4 ? t.join(' ') : given[0]; // "Ng Peng" stays as is
     return `${t[0]} ${given.map(w => w[0].toUpperCase()).join('')}`;
+  }
+  if (COMMON_GIVEN.has(t[0].toLowerCase())) {
+    // the surname comes straight after the English given name(s): "Rachel Genevieve Law Rui Qi" -> Law
+    let i = 1;
+    while (i < t.length - 1 && COMMON_GIVEN.has(t[i].toLowerCase())) i++;
+    const last = t[i];
+    return `${t[0][0].toUpperCase()} ${last}`;
   }
   return t[0];
 }

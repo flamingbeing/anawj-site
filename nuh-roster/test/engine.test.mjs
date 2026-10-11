@@ -73,7 +73,12 @@ assert.match(out, /Paeds list/);
 assert.equal(suggestShortName('Tan Yi Wei'), 'Tan YW');
 assert.equal(suggestShortName('Chan Jiaxin'), 'Jiaxin');
 assert.equal(suggestShortName('Swapna Thampi'), 'Swapna');
-assert.equal(suggestShortName('Eric Lee Shih Hsiung'), 'Eric');
+assert.equal(suggestShortName('Eric Lee Shih Hsiung'), 'E Lee');
+assert.equal(suggestShortName('Richard Tierney'), 'R Tierney');
+assert.equal(suggestShortName('Caitlin Louise Choo Min Ci'), 'C Choo');
+assert.equal(suggestShortName('Mary Ann Tan'), 'M Tan');
+assert.equal(suggestShortName('Terry Pan Ling Te'), 'T Pan');
+assert.equal(suggestShortName('Rachel Genevieve Law Rui Qi'), 'R Law');
 assert.equal(suggestShortName('Loh May-Han'), 'Loh MH');
 {
   const st = [P('a', 'Tan Yi Wei', 'senior'), P('b', 'Tan Yu Wen', 'junior'), P('c', 'Swapna Thampi', 'senior'), P('d', 'Ang King Sin', 'senior', { aliases: ['Ang KS'] }), P('e', 'Swapna Rao', 'junior')];
