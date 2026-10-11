@@ -451,7 +451,7 @@ export function generate({ staff, day, settings = DEFAULT_SETTINGS, seed = 1 }) 
   for (const r of openRooms) {
     if (!rowOf[r.id].seniors.length) {
       const req = r.flags.subspecs.filter(k => subspecByKey(settings)[k]?.hard).map(k => subspecByKey(settings)[k].label);
-      warnings.push({ level: 'error', text: `${r.name}: no eligible senior${req.length ? ` (needs ${req.join(', ')})` : ''}.` });
+      warnings.push({ level: 'error', rooms: [r.name], text: `${r.name}: no eligible senior${req.length ? ` (needs ${req.join(', ')})` : ''}.` });
     }
   }
 
@@ -587,7 +587,7 @@ export function generate({ staff, day, settings = DEFAULT_SETTINGS, seed = 1 }) 
       if (c < bestC) { bestC = c; best = p; }
     }
     if (best) { row.premed = best.id; load[best.id] = (load[best.id] || 0) + 1; }
-    else warnings.push({ level: 'warn', text: `${r.name}: needs premed cover but nobody is free.` });
+    else warnings.push({ level: 'warn', fix: 'premed', rooms: [r.name], text: `${r.name}: needs premed cover but nobody is free.` });
   }
 
   const pacu = Object.fromEntries(allRooms.filter(r => isPacu(r.name)).map(r => [r.id, { roomId: r.id, label: r.name, complex: r.complex, senior: '', junior: '', premed: '', notes: r.notes || '' }]));
@@ -679,10 +679,11 @@ export function check({ rows, staff, day, settings = DEFAULT_SETTINGS }) {
     const d = dayOf(day, p);
     const st = d.status || 'avail';
     if (['leave', 'mc', 'postcall'].includes(st)) {
-      out.push({ level: 'error', text: `${p.name} is ${{ leave: 'on leave', mc: 'on MC', postcall: 'post call' }[st]} but rostered in ${[...new Set(uses.map(u => u.row.label))].join(', ')}.` });
+      const rooms = [...new Set(uses.map(u => u.row.label))];
+      out.push({ level: 'error', fix: 'takeOff', person: p.id, rooms, text: `${p.name} is ${{ leave: 'on leave', mc: 'on MC', postcall: 'post call' }[st]} but rostered in ${rooms.join(', ')}.` });
     }
     const asJunior = uses.filter(u => u.col === 'junior');
-    if (asJunior.length > 1) out.push({ level: 'warn', text: `${p.name} is the junior in ${asJunior.map(u => u.row.label).join(' and ')}.` });
+    if (asJunior.length > 1) out.push({ level: 'warn', fix: 'cover', person: p.id, rooms: asJunior.map(u => u.row.label), text: `${p.name} is the junior in ${asJunior.map(u => u.row.label).join(' and ')}.` });
     const asSenior = uses.filter(u => u.col === 'senior');
     if (asSenior.length > 1) {
       const complexes = new Set(asSenior.map(u => u.row.complex));
@@ -696,23 +697,23 @@ export function check({ rows, staff, day, settings = DEFAULT_SETTINGS }) {
     if (!room) continue;
     const flags = { subspecs: [], ...(room.flags || {}) };
     const sen = seniorsOf[row.roomId], jun = juniorsOf[row.roomId];
-    if (!isPacu(row.label) && !String(row.senior || '').trim()) out.push({ level: 'error', text: `${row.label}: no senior.` });
+    if (!isPacu(row.label) && !String(row.senior || '').trim()) out.push({ level: 'error', fix: 'fill', rooms: [row.label], text: `${row.label}: no senior.` });
     for (const k of flags.subspecs) {
       if (!sub[k]?.hard) continue;
       if (sen.length && !sen.some(p => (p.subspecs || []).includes(k))) {
-        out.push({ level: 'error', text: `${row.label}: ${sub[k].label} list but ${sen.map(p => p.name).join(' / ')} has no ${sub[k].label} subspec.` });
+        out.push({ level: 'error', fix: 'reseat', col: 'senior', person: sen[0].id, rooms: [row.label], text: `${row.label}: ${sub[k].label} list but ${sen.map(p => p.name).join(' / ')} has no ${sub[k].label} subspec.` });
       }
     }
     for (const p of sen) {
       if ((p.avoid || []).some(a => flags.subspecs.includes(a) || hasKeyword(row.notes, a))) {
-        out.push({ level: 'error', text: `${row.label}: ${p.name} doesn't do this list.` });
+        out.push({ level: 'error', fix: 'reseat', col: 'senior', person: p.id, rooms: [row.label], text: `${row.label}: ${p.name} doesn't do this list.` });
       }
       if (dayOf(day, p).liverStandby && (flags.complex || flags.subspecs.some(k => sub[k]?.hard))) {
-        out.push({ level: 'warn', text: `${row.label}: ${p.name} is liver standby but has a complex/subspec list.` });
+        out.push({ level: 'warn', fix: 'reseat', col: 'senior', person: p.id, rooms: [row.label], text: `${row.label}: ${p.name} is liver standby but has a complex/subspec list.` });
       }
     }
     for (const p of jun) {
-      if (dayOf(day, p).liverStandby && flags.complex) out.push({ level: 'warn', text: `${row.label}: ${p.name} is liver standby but has a complex list.` });
+      if (dayOf(day, p).liverStandby && flags.complex) out.push({ level: 'warn', fix: 'reseat', col: 'junior', person: p.id, rooms: [row.label], text: `${row.label}: ${p.name} is liver standby but has a complex list.` });
     }
     const shared = sen.some(p => (where[p.id] || []).filter(u => u.col === 'senior').length > 1);
     if (shared && jun.some(isBaby)) {
@@ -720,7 +721,7 @@ export function check({ rows, staff, day, settings = DEFAULT_SETTINGS }) {
     }
     if (shared && flags.complex) out.push({ level: 'warn', text: `${row.label}: complex list but senior is double covering.` });
     const needPremed = jun.some(p => dayOf(day, p).notAroundPrev) && !jun.some(p => !dayOf(day, p).notAroundPrev && !isBaby(p));
-    if (needPremed && !String(row.premed || '').trim()) out.push({ level: 'warn', text: `${row.label}: junior wasn't around yesterday — needs premed cover.` });
+    if (needPremed && !String(row.premed || '').trim()) out.push({ level: 'warn', fix: 'premed', rooms: [row.label], text: `${row.label}: junior wasn't around yesterday — needs premed cover.` });
   }
   return out;
 }

@@ -78,22 +78,38 @@ export function makeDemo(date) {
     }
     monthly[m] = { junior, senior, liver, pain, aoh, leave: { entries: [] } };
   }
+  // on the chosen day five people are on leave (two seniors, three juniors); the rest of the
+  // month's leave falls on other days
   const leave = { entries: [] };
   const day = n => `${month}-${String(Math.min(days, Math.max(1, n))).padStart(2, '0')}`;
   const today = +date.slice(8, 10);
-  for (let k = 0; k < 10; k++) {
-    const p = staff[(k * 7 + 3) % staff.length];
-    const from = today - 2 + Math.floor(rand() * 6);
-    leave.entries.push({ name: p.name, from: day(from), to: day(from + Math.floor(rand() * 4)), type: k === 3 ? 'Medical Leave' : k === 6 ? 'Conference Leave' : 'Annual Leave', remarks: k === 6 ? 'ASA meeting' : '' });
-  }
-  // some leave spread over the rest of the month too
-  for (let k = 0; k < 14; k++) {
+  const away = [
+    [seniors[5], -1, 2, 'Annual Leave', ''], [seniors[12], 0, 4, 'Annual Leave', ''],
+    [juniors[7], 0, 1, 'Conference Leave', 'ASA meeting'], [juniors[15], -3, 0, 'Annual Leave', ''], [juniors[22], 0, 0, 'Off in Lieu', ''],
+  ];
+  for (const [p, a, b, type, remarks] of away) leave.entries.push({ name: p.name, from: day(today + a), to: day(today + b), type, remarks });
+  const onLeave = new Set(away.map(x => x[0].name));
+  for (let k = 0; k < 22; k++) {
     const p = staff[(k * 11 + 5) % staff.length];
-    const from = 1 + Math.floor(rand() * days);
-    leave.entries.push({ name: p.name, from: day(from), to: day(from + Math.floor(rand() * 5)), type: k % 7 === 2 ? 'Medical Leave' : k % 5 === 4 ? 'Off in Lieu' : 'Annual Leave', remarks: '' });
+    if (onLeave.has(p.name)) continue;
+    const len = Math.floor(rand() * 4);
+    // before or after the chosen day, never over it
+    const from = k % 2 ? today + 1 + Math.floor(rand() * Math.max(1, days - today)) : Math.max(1, today - 1 - len - Math.floor(rand() * Math.max(1, today - 1)));
+    const to = Math.min(days, from + len);
+    if (from <= today && to >= today) continue;
+    if (from > days || to < 1) continue;
+    leave.entries.push({ name: p.name, from: day(from), to: day(to), type: k % 7 === 2 ? 'Medical Leave' : k % 5 === 4 ? 'Off in Lieu' : 'Annual Leave', remarks: '' });
   }
   monthly[month].leave = leave;
   return { staff, monthly, notes: demoNotes(date) };
+}
+
+// Two seniors on an admin day, different each day (and not anyone on leave that day).
+export function demoAdmin(date, staff, onLeave = new Set()) {
+  const seniors = staff.filter(p => p.role === 'senior' && !onLeave.has(p.name));
+  const d = Math.round(new Date(date + 'T12:00') / 864e5);
+  const a = seniors[(d * 7) % seniors.length], b = seniors[(d * 7 + 11) % seniors.length];
+  return [...new Set([a, b])].map(p => p.id);
 }
 
 // Case notes for a demo day: most rooms on weekdays (varying by date), emergencies only at weekends.
