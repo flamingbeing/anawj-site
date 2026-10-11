@@ -64,7 +64,12 @@ export function renderProgress() {
       h('label', { class: 'check', style: 'margin:0 0 4px' }, h('input', { type: 'checkbox', checked: !!pview.hideDone, onchange: e => { pview.hideDone = e.target.checked; hooks.render(); } }), 'Hide done'),
       progList(shown));
   }
-  return h('div', {}, head, urgentSec, targets, reflCard(), trendsCard(), foot);
+  // everyone's counts (counts only) for comparison
+  const compare = h('section', { class: 'card more-list an-compare' },
+    h('ul', {}, h('li', {}, h('a', { href: '#totals' },
+      h('span', { class: 'mt' }, h('b', {}, 'Compare with your intake'), h('small', {}, 'Case counts per tag across residents in your year (Totals)')),
+      h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')))));
+  return h('div', {}, head, urgentSec, targets, reflCard(), trendsCard(), compare, foot);
 }
 
 // A folded card: the title and a one-line summary; tap to open the full section (kept open while you stay).

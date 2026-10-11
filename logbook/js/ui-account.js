@@ -3,12 +3,12 @@
 // Profile shape and cleaning: js/profile.js (cleanProfile, SECTIONS, parseSection1).
 
 import { S, h, toast, cloud, fill, debounce, modal, hooks } from './ui-core.js';
-import { youCard, signOutCard } from './ui-settings.js';
+import { youCard, signOutCard, residencyCard } from './ui-settings.js';
 import { needZip } from './portfolio.js';
 import { SECTIONS, emptyProfile, cleanProfile, parseSection1 } from './profile.js';
 
 export function renderAccount() {
-  return h('div', {}, youCard(), profileCard(), signOutCard());
+  return h('div', {}, youCard(), residencyCard(), profileCard(), signOutCard());
 }
 
 // SECTIONS entries are { key, title, cols: [{ key, label }] }; tolerate small naming differences.

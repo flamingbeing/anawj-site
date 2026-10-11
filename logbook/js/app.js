@@ -6,7 +6,7 @@ import { S, hooks, h, toast, cloud, setCases, scheduleSummary, fill, resetCaches
 import { renderLog, logCasesChanged, clearDrafts, SHARED_KEY } from './ui-log.js';
 import { renderLogbook } from './ui-logbook.js';
 import { renderProgress, renderTotals } from './ui-progress.js';
-import { applyCompact, cachedCompact, applyTheme, cachedTheme, applyTextSize, cachedTextSize, renderTagEditor, residencyCard, renderDisplay, renderLogging, renderReflectionSettings, privacyCard, creditsCard } from './ui-settings.js';
+import { applyCompact, cachedCompact, applyTheme, cachedTheme, applyTextSize, cachedTextSize, renderTagEditor, renderDisplay, renderLogging, renderReflectionSettings, privacyCard, creditsCard } from './ui-settings.js';
 import { renderAccount, flush as flushProfile } from './ui-account.js';
 import { renderAdmin, leaveAdmin } from './ui-admin.js';
 import { renderReflect, watchMyReflections, renderExportPage, renderChoosePage } from './ui-reflect.js';
@@ -48,14 +48,16 @@ const TABS = [
   { id: 'progress', label: 'Analytics', render: renderProgress },
   // five tabs on the bar; the rest live under More (still reachable by #totals, #account, #settings)
   { id: 'more', label: 'More', render: () => renderMore() },
-  { id: 'totals', label: 'Totals', render: renderTotals, hidden: true, under: 'more', desc: 'How your case counts compare across your intake' },
+  // under Analytics: how your counts compare with your intake
+  { id: 'totals', label: 'Totals', render: renderTotals, hidden: true, under: 'progress', unlisted: true },
   { id: 'account', label: 'Account', render: renderAccount, hidden: true, under: 'more', desc: 'Your name and portfolio details (Section 1); sign out' },
-  { id: 'settings', label: 'Settings', render: () => renderSettingsMenu(), hidden: true, under: 'more', desc: 'Display, logging, tags, reflections and photos, recycle bin' },
+  { id: 'settings', label: 'Settings', render: () => renderSettingsMenu(), hidden: true, under: 'more', desc: 'Display, logging, tag editor, recycle bin' },
   { id: 'data', label: 'Export & backup', render: () => renderDataPage(), hidden: true, under: 'more', desc: 'Portfolio (Word), Excel, backup and restore' },
   // Settings' own pages (not in the More list)
   { id: 'display', label: 'Display', render: renderDisplay, hidden: true, under: 'settings', unlisted: true, desc: 'Theme, text size, compact mode' },
   { id: 'logging', label: 'Logging', render: renderLogging, hidden: true, under: 'settings', unlisted: true, desc: 'Suggestions, the Enter key, case box, search, dates' },
-  { id: 'reflset', label: 'Reflections & photos', render: renderReflectionSettings, hidden: true, under: 'settings', unlisted: true, desc: 'What new reflections start as; photo space' },
+  // from Reflections → More tools
+  { id: 'reflset', label: 'Reflection settings', render: renderReflectionSettings, hidden: true, under: 'reflect', unlisted: true },
   // opened from More → Export & backup (not in the More list)
   { id: 'export', label: 'Export portfolio', render: () => renderExportPage(), hidden: true, under: 'data', unlisted: true },
   { id: 'choose', label: 'Export portfolio', render: renderChoosePage, hidden: true, under: 'export', unlisted: true },
@@ -75,15 +77,26 @@ function renderMore() {
     h('section', { class: 'card more-list' }, h('h2', {}, 'More'),
       h('ul', {}, items.map(t => menuItem(t.id, t.label, t.desc)))),
     privacyCard(),
-    creditsCard());
+    creditsCard(),
+    whatsNewCard());
 }
+
+// The latest changes, newest first (keep it to a handful; update with each release)
+const WHATS_NEW = [
+  'Analytics tab: folded sections and Trends; Totals moved here (Compare with your intake)',
+  'Tag editor: pills view with drag, search, case counts, merge, shorthand you can edit',
+  'Logbook: calendar first, filters by tags and dates, saved searches, tag many cases at once',
+  'Export & backup in one place under More',
+];
+const whatsNewCard = () => h('section', { class: 'card' },
+  h('details', { class: 'more-tools' }, h('summary', {}, 'What’s new'),
+    h('ul', { class: 'hint', style: 'margin:4px 0 0;padding-left:18px' }, WHATS_NEW.map(t => h('li', {}, t)))));
 
 // Settings: a short menu of its pages (residency year on top for people not on the programme list)
 function renderSettingsMenu() {
-  const order = ['display', 'logging', 'tags', 'reflset'];
+  const order = ['display', 'logging', 'tags'];
   const pages = TABS.filter(t => t.under === 'settings').sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
   return h('div', {},
-    residencyCard(),
     h('section', { class: 'card more-list' }, h('h2', {}, 'Settings'),
       h('ul', {}, pages.map(t => menuItem(t.id, t.label, t.desc)),
         menuItem('bin', 'Recycle bin', 'Deleted cases and reflections, kept for 30 days', () => openBin()))));

@@ -839,3 +839,4 @@ details.an-sec[open] > summary .an-t::after { content: ' ⌄'; }
 .an-wd .meter i { display: block; height: 100%; background: var(--ontrack); }
 .an-wd .meter i.done { background: var(--done); }
 .an-wd b { text-align: right; font-variant-numeric: tabular-nums; }
+.an-compare a { padding: 6px 2px; min-height: 48px; }

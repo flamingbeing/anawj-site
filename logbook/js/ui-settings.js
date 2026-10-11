@@ -42,8 +42,9 @@ export function cachedCompact() {
   try { return localStorage.getItem(COMPACT_KEY) === '1'; } catch { return false; }
 }
 
-// Settings is a short menu (app.js) of these pages: Display, Logging, the Tag editor, Reflections and
-// photos, and the Recycle bin. Residency year (for people not on the programme list) sits on the menu.
+// Settings is a short menu (app.js) of these pages: Display, Logging, the Tag editor and the Recycle bin.
+// Residency year (for people not on the programme list) is on Account; reflection settings on the
+// Reflections tab (#reflset).
 export function residencyCard() {
   return (
     S.resident ? null : h('section', { class: 'card' },
@@ -88,12 +89,7 @@ export function renderLogging() {
       h('label', { class: 'field', style: 'margin-top:8px' }, 'Case box height on the Log page',
         h('select', { onchange: e => patchLogbook({ settings: { boxLines: Number(e.target.value) } }).then(() => toast('Saved')) },
           Array.from({ length: 19 }, (_, i) => i + 2).map(n => h('option', { value: String(n), selected: n === (Math.min(20, Math.max(2, Number(st.boxLines) || 3))) }, `${n} lines${n === 3 ? ' (default)' : ''}`)))),
-      h('label', { class: 'field', style: 'margin-top:8px' }, 'Logbook search',
-        h('select', { onchange: e => patchLogbook({ settings: { lbScope: e.target.value } }).then(() => toast('Saved')) },
-          [['all', 'Search everything (default)'], ['initials', 'Search initials only'], ['procedure', 'Search the procedure only']].map(([v, t]) => h('option', { value: v, selected: (st.lbScope || 'all') === v }, t)))),
-      h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !!st.lbFuzzy, onchange: e => patchLogbook({ settings: { lbFuzzy: e.target.checked } }) }),
-        'Fuzzy search in the Logbook (allows typos)'),
-      h('p', { class: 'hint', style: 'margin:0 0 6px' }, 'Also under Filter on the Logbook tab.'),
+      h('p', { class: 'hint', style: 'margin:8px 0 6px' }, 'How the Logbook search works (everything, initials or procedure; fuzzy) is under Filter on the Logbook tab, and is remembered.'),
       h('label', { class: 'field', style: 'margin-top:8px' }, 'Date for a new case',
         h('select', { onchange: e => patchLogbook({ settings: { defaultDate: e.target.value } }) },
           h('option', { value: 'today', selected: st.defaultDate !== 'last' }, 'Today'),
@@ -122,7 +118,7 @@ export const privacyCard = () => (
       h('h2', {}, 'Privacy'),
       h('p', { class: 'hint', style: 'margin:0' },
         'Your cases are stored in your own logbook in Google Cloud Firestore. Only you can read them (and the app owner, who runs the import from the old Google Form); programme admins cannot. ',
-        'Log patient initials only — no names, NRIC or hospital numbers. Programme residents share case counts per tag on the Totals tab; details are never shared. ',
+        'Log patient initials only — no names, NRIC or hospital numbers. Programme residents share case counts per tag (Analytics → Compare with your intake); details are never shared. ',
         'This device keeps an offline copy of your cases until you sign out — sign out on shared computers.')));
 export const creditsCard = () => (
     h('section', { class: 'card credits' },
@@ -140,8 +136,8 @@ export function youCard() {
     h('label', { class: 'field' }, 'Name (shown on your exports; the Totals table uses the name on the programme list)',
       h('input', { value: displayName(), autocomplete: 'name', onchange: e => patchLogbook({ name: e.target.value.trim() }).then(() => toast('Saved')) })),
     r
-      ? h('p', { class: 'hint' }, `On the programme list: ${r.rid}, AY${r.intake || '?'} intake, ${myYearName()}${r.status && r.status !== 'ACTIVE' ? ', ' + r.status.toLowerCase() : ''}. Your case counts (never your case details) are shared on the Totals tab.`)
-      : h('p', { class: 'hint' }, 'Not on the programme resident list, so your logbook is private and not on the Totals tab. If you are an APMES resident, ask the programme admins to add your email.'));
+      ? h('p', { class: 'hint' }, `On the programme list: ${r.rid}, AY${r.intake || '?'} intake, ${myYearName()}${r.status && r.status !== 'ACTIVE' ? ', ' + r.status.toLowerCase() : ''}. Your case counts (never your case details) are shared on Totals (Analytics → Compare with your intake).`)
+      : h('p', { class: 'hint' }, 'Not on the programme resident list, so your logbook is private and not on Totals. If you are an APMES resident, ask the programme admins to add your email.'));
 }
 
 export function signOutCard() {

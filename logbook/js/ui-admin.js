@@ -154,7 +154,7 @@ function residentsCard() {
   const card = h('section', { class: 'card' },
     h('div', { class: 'bar' }, h('h2', { style: 'margin:0' }, 'Residents'), h('span', { class: 'grow' }),
       A.residents ? h('button', { class: A.editRes ? 'small primary' : 'small', onclick: () => { A.editRes = !A.editRes; if (!A.editRes) A.pasted = null; hooks.render(); } }, A.editRes ? 'Done' : 'Edit') : null),
-    h('p', { class: 'hint' }, 'Programme residents share their case counts on the Totals tab. Years move up every 1 July from the intake. Tap Edit to change one (leave, repeats; it keeps moving up from there) or to mark someone as an SMO, which stays put: cases done as an SMO count as R3 in the portfolio. Attrited residents are left off Totals (their logbook is kept); set them back to Active to show them again.'));
+    h('p', { class: 'hint' }, 'Programme residents share their case counts on Totals (Analytics → Compare with your intake). Years move up every 1 July from the intake. Tap Edit to change one (leave, repeats; it keeps moving up from there) or to mark someone as an SMO, which stays put: cases done as an SMO count as R3 in the portfolio. Attrited residents are left off Totals (their logbook is kept); set them back to Active to show them again.'));
   if (!A.residents) { add(card, h('p', { class: 'empty' }, 'Loading…')); return card; }
   const ed = A.editRes;
   // apply a change and save it; a refused save puts the old values back
