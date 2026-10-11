@@ -382,8 +382,9 @@ function list() {
     const open = () => { if (em) { if (cb) { cb.checked = !cb.checked; cb.dispatchEvent(new Event('change')); } } else openEditor(r); };
     const li = h('li', { tabindex: '0', class: em ? 'refl-row edit' : 'refl-row', onclick: open, onkeydown: e => { if (e.key === 'Enter') open(); } },
       h('span', { class: 'd' }, em ? h('span', { class: 'refl-tools' }, rv.group === 'heading' ? h('span', { class: 'refl-handle', title: 'Drag to another heading', 'aria-label': 'Drag to another heading', onpointerdown: e => startDrag(e, r, li), onclick: e => e.stopPropagation() }, '⠿') : null, cb) : null,
-        (r.jr ? 'JR ' : '') + (r.date ? fmtDate(r.date) : '—')),
-      h('span', { class: 't' }, h('span', { class: draft ? 'refl-proc draft' : 'refl-proc' }, `${r.initials || '??'} ${r.diagnosis || ''}`), draft ? h('span', { class: 'flag err' }, 'draft') : null,
+        // the patient's initials sit on top in the left column, the date (and JR) under them
+        h('b', { class: 'refl-ini' }, r.initials || '??'), h('span', { class: 'refl-date' }, (r.jr ? 'JR ' : '') + (r.date ? fmtDate(r.date) : '—'))),
+      h('span', { class: 't' }, h('span', { class: draft ? 'refl-proc draft' : 'refl-proc' }, r.diagnosis || h('i', { class: 'muted' }, 'no diagnosis yet')), draft ? h('span', { class: 'flag err' }, 'draft') : null,
         h('span', { class: 'muted refl-wc' }, ` ${wordCount(r)} words`),
         showHeading ? h('span', { class: 'muted refl-hd' }, labelOf(HEADING_BY_ID[r.headingId])) : null),
       pts.length ? h('div', { class: 'refl-points' }, ...pts.map((t, i) => h('div', {}, `${i + 1}. ${t}`))) : null);

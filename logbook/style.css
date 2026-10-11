@@ -967,3 +967,5 @@ details.refl-foot { margin: 4px 4px 12px; }
 }
 .refl-note { margin: 0 0 4px 34px; white-space: pre-line; }
 .refl-notes-switch { margin: 4px 4px 0; font-size: 14px; }
+.refl-row .refl-ini { display: block; font-size: 15px; color: var(--ink); }
+.refl-row .refl-date { display: block; }
