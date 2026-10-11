@@ -2,14 +2,14 @@
 // benchmarking; counts only, never details).
 
 import { R_YEARS, BY_CODE, CATEGORIES, appYear, yearName } from './categories.js';
-import { progress, epaProgress, todayISO, rYearDefault } from './engine.js';
+import { progress, todayISO, rYearDefault } from './engine.js';
 import { exportTotals } from './xlsxio.js';
 import { reflectionProgress, HEADING_BY_ID } from './reflections.js';
 import { S, h, toast, cloud, rYear, myYearName, settings, subcatsOf, patchLogbook, needExcel, download, displayName, hooks, add, resetters, info, catName, catShort, tagName } from './ui-core.js';
 
 const STATUS_TEXT = { late: 'Behind', due: 'Due this year', ontrack: 'On track', done: 'Done', none: 'No target' };
 // open: the sections you have expanded (they start folded, showing a one-line summary)
-const pview = { by: 'cat', open: new Set() };
+const pview = { open: new Set() };
 
 const legend = () => h('div', { class: 'legend' },
   ['late', 'due', 'ontrack', 'done'].map(s => h('span', {}, h('i', { class: `dot ${s}` }), STATUS_TEXT[s])));
@@ -33,43 +33,24 @@ export function renderProgress() {
       [['late', 'behind'], ['due', 'due this year'], ['ontrack', 'on track'], ['done', 'done']].map(([k, t], i) => h('span', {}, i ? ' · ' : '', h('i', { class: `dot ${k}` }), ` ${tally(k)} ${t}`)),
       ' ', infoBtn),
     infoText,
-    S.resident ? null : h('p', { class: 'hint', style: 'margin:4px 0 0' }, 'Not on the programme list, so your year is set in ', h('a', { href: '#settings' }, 'Settings'), '.'),
-    pview.by === 'epa' ? h('p', { style: 'margin:6px 0 0' }, h('span', { class: 'hint' }, 'Showing by EPA · '), h('button', { class: 'small linkish', onclick: () => { pview.by = 'cat'; hooks.render(); } }, 'Back to tags')) : null);
-  // the rest at the bottom, like the Logbook and Reflections tabs
-  const foot = h('section', { class: 'card' },
-    h('details', { class: 'more-tools', open: !!pview.toolsOpen, ontoggle: e => { pview.toolsOpen = e.target.open; } },
-      h('summary', {}, 'More tools: EPA view, download summary'),
-      h('div', { class: 'bar', style: 'margin:0' },
-        h('div', { class: 'seg' },
-          h('button', { 'aria-pressed': String(pview.by === 'cat'), onclick: () => { pview.by = 'cat'; hooks.render(); } }, 'By tag'),
-          h('button', { 'aria-pressed': String(pview.by === 'epa'), onclick: () => { pview.by = 'epa'; scrollTo(0, 0); hooks.render(); } }, 'By EPA')),
-        h('span', { class: 'grow' }),
-        h('button', { class: 'small', onclick: () => downloadSummary(rows, yr) }, 'Download summary'))));
-
-  let urgentSec = null, targets = null;
-  if (pview.by === 'epa') {
-    const body = h('div');
-    for (const g of epaProgress(S.counts, yr)) add(body, h('div', { class: 'epa' }, h('h3', {}, h('i', { class: `dot ${g.status}` }), `EPA ${g.epa}`), progList(g.items)));
-    targets = section('epa', 'Targets by EPA', 'Each EPA’s tags and how far along they are', body);
-  } else {
-    // what needs doing: behind, then due this year
-    const rank = { late: 0, due: 1 };
-    const urgent = rows.filter(r => r.status in rank).sort((a, b) => rank[a.status] - rank[b.status]);
-    urgentSec = section('urgent', urgent.length ? `Needs attention (${urgent.length})` : 'Needs attention',
-      urgent.length ? `${tally('late')} behind · ${tally('due')} due this year` : 'Nothing behind or due this year ✓',
-      urgent.length ? progList(urgent) : h('p', { class: 'empty' }, 'Nothing behind or due this year ✓'));
-    const shown = pview.hideDone ? rows.filter(r => r.status !== 'done') : rows;
-    const withTarget = rows.filter(r => r.status !== 'none');
-    targets = section('targets', 'Logbook', `${tally('done')} of ${withTarget.length} tags done · ${S.cases.length} cases`,
-      h('label', { class: 'check', style: 'margin:0 0 4px' }, h('input', { type: 'checkbox', checked: !!pview.hideDone, onchange: e => { pview.hideDone = e.target.checked; hooks.render(); } }), 'Hide done'),
-      progList(shown));
-  }
+    S.resident ? null : h('p', { class: 'hint', style: 'margin:4px 0 0' }, 'Not on the programme list, so your year is set in ', h('a', { href: '#settings' }, 'Settings'), '.'));
+  // what needs doing: behind, then due this year
+  const rank = { late: 0, due: 1 };
+  const urgent = rows.filter(r => r.status in rank).sort((a, b) => rank[a.status] - rank[b.status]);
+  const urgentSec = section('urgent', urgent.length ? `Needs attention (${urgent.length})` : 'Needs attention',
+    urgent.length ? `${tally('late')} behind · ${tally('due')} due this year` : 'Nothing behind or due this year ✓',
+    urgent.length ? progList(urgent) : h('p', { class: 'empty' }, 'Nothing behind or due this year ✓'));
+  const shown = pview.hideDone ? rows.filter(r => r.status !== 'done') : rows;
+  const withTarget = rows.filter(r => r.status !== 'none');
+  const targets = section('targets', 'Logbook', `${tally('done')} of ${withTarget.length} tags done · ${S.cases.length} cases`,
+    h('label', { class: 'check', style: 'margin:0 0 4px' }, h('input', { type: 'checkbox', checked: !!pview.hideDone, onchange: e => { pview.hideDone = e.target.checked; hooks.render(); } }), 'Hide done'),
+    progList(shown));
   // everyone's counts (counts only) for comparison
   const compare = h('section', { class: 'card more-list an-compare' },
     h('ul', {}, h('li', {}, h('a', { href: '#totals' },
       h('span', { class: 'mt' }, h('b', {}, 'Compare with your intake'), h('small', {}, 'Case counts per tag across residents in your year (Totals)')),
       h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')))));
-  return h('div', {}, head, urgentSec, targets, reflCard(), trendsCard(), compare, foot);
+  return h('div', {}, head, urgentSec, targets, reflCard(), trendsCard(), compare);
 }
 
 // A folded card: the title and a one-line summary; tap to open the full section (kept open while you stay).
@@ -210,20 +191,6 @@ function progList(items) {
   }));
 }
 
-async function downloadSummary(rows, yr) {
-  try {
-    await needExcel();
-    const blob = await exportTotals({
-      title: `${displayName() || 'Logbook'} — ${R_YEARS[yr - 1]} — ${todayISO()}`, sheet: 'Summary',
-      columns: ['Count', 'Next target', 'Status'],
-      rows: rows.map(p => ({
-        label: BY_CODE[p.code].label, values: [p.count, p.next ? `${p.next.n} by ${p.next.by}` : '', STATUS_TEXT[p.status]],
-        statuses: [p.status, '', ''],
-      })),
-    });
-    download(`logbook-summary-${todayISO()}.xlsx`, blob);
-  } catch (err) { toast('Could not export: ' + err.message); }
-}
 
 // ---------- Totals ----------
 
@@ -233,7 +200,7 @@ const groupName = (y, all) => !y ? 'Year unknown' : y === 3 && all.some(s => s.s
 // gen: bumped on sign-out, so a load still running for the last person is dropped
 resetters.push(() => { Object.assign(tview, { summaries: null, year: null, error: '', loading: false }); tview.gen = (tview.gen || 0) + 1; });
 // the Analytics screen's own state starts fresh for the next person too
-resetters.push(() => { pview.open.clear(); Object.assign(pview, { by: 'cat', hideDone: false, toolsOpen: false }); });
+resetters.push(() => { pview.open.clear(); Object.assign(pview, { hideDone: false }); });
 // reload the totals next time they're shown (an admin took a row off)
 export const forgetTotals = () => { tview.summaries = null; };
 

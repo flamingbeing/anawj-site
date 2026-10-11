@@ -12,6 +12,8 @@ export { completeProblems };
 import { fmtDate, caseText, procedureText, caseParts } from './engine.js';
 import { S, h, toast, cloud, debounce, hooks, rYear, effectiveIntake, residentSmo, todayISO, confirmBox, add, resetters, scheduleSummary, displayName, byNewest, catName, updateCase, settings } from './ui-core.js';
 import { renderExportButton, caseRYear, countsByYear } from './portfolio.js';
+import { parseQuery, matchQuery, REFL_FIELDS, REFL_OPERATOR_HELP } from './search-ops.js';
+import { opsHelp } from './ui-logbook.js';
 
 const DRAFT_KEY = 'apmes-logbook-reflection-draft';
 const VIEW_KEY = 'apmes-logbook-reflection-view';
@@ -301,8 +303,17 @@ function list() {
   // search and filter: headings with no match are hidden, the rest open
   const words = rv.q.toLowerCase().split(/\s+/).filter(Boolean);
   const FILTERS = { all: () => true, draft: r => r.status !== 'complete', complete: r => r.status === 'complete', uncat: r => !HEADING_BY_ID[r.headingId] };
-  const match = r => (FILTERS[rv.filter] || FILTERS.all)(r) && (!words.length || words.every(w =>
-    `${r.initials || ''} ${r.diagnosis || ''} ${r.title || ''} ${r.summary || ''} ${(r.points || []).map(x => `${x.heading || ''} ${x.text || ''}`).join(' ')} ${r.date || ''} ${r.date ? fmtDate(r.date) : ''}`.toLowerCase().includes(w)));
+  const hayOf = r => `${r.initials || ''} ${r.diagnosis || ''} ${r.title || ''} ${r.summary || ''} ${(r.points || []).map(x => `${x.heading || ''} ${x.text || ''}`).join(' ')} ${r.date || ''} ${r.date ? fmtDate(r.date) : ''}`.toLowerCase();
+  // Advanced search (Settings → Logging): operators, with the reflection's own fields
+  const ops = settings().searchOps && words.length ? parseQuery(rv.q, { fields: REFL_FIELDS }) : null;
+  const fieldOf = (r, k) => {
+    const hd = HEADING_BY_ID[r.headingId];
+    if (k === 'heading') return `${hd ? hd.name : 'uncategorised'} ${(hd && (hd.subs || []).find(x => x.id === r.subId) || {}).name || ''}`.toLowerCase();
+    if (k === 'case') return String(r.summary || '').toLowerCase();
+    return k === 'all' ? hayOf(r) : String(r[k] || '').toLowerCase();
+  };
+  const match = r => (FILTERS[rv.filter] || FILTERS.all)(r) && (!words.length
+    || (ops ? matchQuery(ops, k => fieldOf(r, k), null) : words.every(w => hayOf(r).includes(w))));
   const narrowed = !!words.length || rv.filter !== 'all';
   // the filter / group / sort panel folds behind one button; it says how many differ from the defaults
   const changedN = (rv.filter !== 'all') + (rv.group !== 'heading') + (rv.sort !== 'newest');
@@ -338,7 +349,9 @@ function list() {
     h('p', { class: 'hint', style: 'margin:6px 0 0' }, `${p.totals.counted} / ${p.totals.min} counted · ${p.totals.done} complete · ${p.totals.drafts} draft${p.totals.drafts === 1 ? '' : 's'}`),
     em ? null : readyLine(p),
     em ? null : h('div', { class: 'bar', style: 'gap:8px;margin:8px 0 0;flex-wrap:nowrap' }, search,
+      settings().searchOps ? h('button', { type: 'button', class: 'small icon-btn', title: 'Search operators', 'aria-label': 'Search operators', onclick: () => opsHelp(search, v => { rv.q = v; hooks.render(); requestAnimationFrame(() => { const el = document.querySelector('input[aria-label="Search reflections"]'); if (el) { el.focus(); const n = el.value.length; el.setSelectionRange(n, n); } }); }, REFL_OPERATOR_HELP, 'heading:lap -draft "blood pressure"') }, '?') : null,
       h('button', { class: `small${changedN ? ' primary' : ''}`, 'aria-expanded': String(viewOpen), onclick: () => { rv.viewOpen = !viewOpen; hooks.render(); } }, 'Filter & sort' + (changedN ? ` (${changedN})` : ''))),
+    em || !ops || !ops.unknown.length ? null : h('p', { class: 'hint lb-opsnote' }, ops.unknown.map(x => `“${x.op}” isn’t an operator (searched as text): did you mean ${x.suggest}?`).join(' ')),
     em || !viewOpen ? null : h('div', { class: 'refl-viewpanel' }, filterChips, viewBar));
 
   // edit-mode toolbar: select all / clear / complete / export in or out / delete selected

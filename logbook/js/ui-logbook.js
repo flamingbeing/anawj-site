@@ -56,18 +56,21 @@ export function renderLogbook() {
   const filtered = () => {
     // "last tuesday", "this week", "last month"… narrow by date; the other words search the text
     const win = dateWindow(view.q);
-    const words = (win ? win.rest : view.q).toLowerCase().split(/\s+/).filter(Boolean);
-    const ops = opsOn() && words.length ? parseQuery(win ? win.rest : view.q) : null;
-    // Search in (Filter): everything, the initials only, or the procedure line only; fuzzy allows typos
-    const scope = settings().lbScope || 'all', fuzzy = !!settings().lbFuzzy;
+    // Search in (Filter): everything, the initials only, or the procedure line only; fuzzy allows typos;
+    // case sensitive (off by default) keeps capitals apart ("GA" doesn't find "gastrectomy")
+    const scope = settings().lbScope || 'all', fuzzy = !!settings().lbFuzzy, cs = !!settings().lbCase;
+    const low = t => (cs ? t : t.toLowerCase());
+    const words = low(win ? win.rest : view.q).split(/\s+/).filter(Boolean);
+    const ops = opsOn() && words.length ? parseQuery(win ? win.rest : view.q, { keepCase: cs }) : null;
     if (hayFor !== settings().tagSet) { hayCache = new WeakMap(); hayFor = settings().tagSet; }
     const hayOf = c => {
       let m = hayCache.get(c);
       if (!m) { m = {}; hayCache.set(c, m); }
-      if (m[scope] == null) m[scope] = (scope === 'initials' ? caseParts(c).initials
+      const key = cs ? scope + ':cs' : scope;
+      if (m[key] == null) m[key] = low(scope === 'initials' ? caseParts(c).initials
         : scope === 'procedure' ? procedureText(c)
-        : `${caseText(c)} ${c.date || c.dateText || ''} ${weekday(c.date)} ${fmtDate(c.date) || ''} ${(c.cats || []).map(k => `${k} ${catName(k)} ${catShort(k)}`).join(' ')} ${(c.tags || []).map(tagName).join(' ')}`).toLowerCase();
-      return m[scope];
+        : `${caseText(c)} ${c.date || c.dateText || ''} ${weekday(c.date)} ${fmtDate(c.date) || ''} ${(c.cats || []).map(k => `${k} ${catName(k)} ${catShort(k)}`).join(' ')} ${(c.tags || []).map(tagName).join(' ')}`);
+      return m[key];
     };
     return S.cases.filter(c => {
       if (view.flag && !flagsOf(c).includes(view.flag)) return false;
@@ -75,7 +78,7 @@ export function renderLogbook() {
       if (view.not.length && view.not.some(k => hasTag(c, k))) return false;
       if ((view.from || view.to) && !(c.date && (!view.from || c.date >= view.from) && (!view.to || c.date <= view.to))) return false;
       if (win && !(c.date && c.date >= win.from && c.date <= win.to)) return false;
-      if (ops) return matchQuery(ops, k => (k === 'all' ? hayOf(c) : partsOf(c)[k]), t => tagHas(c, t), (hay, w, f) => textHas(hay, w, fuzzy && f !== 'initials' && (f || scope !== 'initials')));
+      if (ops) return matchQuery(ops, k => (k === 'all' ? hayOf(c) : partsOf(c, cs)[k]), t => tagHas(c, t), (hay, w, f) => textHas(hay, w, fuzzy && f !== 'initials' && (f || scope !== 'initials')));
       if (!words.length) return true;
       const hay = hayOf(c);
       return words.every(w => textHas(hay, w, fuzzy && scope !== 'initials'));
@@ -84,7 +87,7 @@ export function renderLogbook() {
   // Advanced search (Settings → Logging): operators in the box (search-ops.js); off by default
   const opsOn = () => !!settings().searchOps;
   // title: the case's first line (initials and the first line of the details)
-  const partsOf = c => { const p = caseParts(c); return { initials: p.initials.toLowerCase(), case: String(p.details || '').toLowerCase(), title: caseText(c).split('\n')[0].toLowerCase() }; };
+  const partsOf = (c, cs) => { const p = caseParts(c), low = t => (cs ? t : t.toLowerCase()); return { initials: low(p.initials), case: low(String(p.details || '')), title: low(caseText(c).split('\n')[0]) }; };
   // tag:16 / tag:lscs: a tag's code, or a word in its name (APMES or your own)
   const tagHas = (c, t) => (c.cats || []).some(k => k.toLowerCase() === t || `${catName(k)} ${catShort(k)} ${catFull(k)}`.toLowerCase().includes(t))
     || (c.tags || []).some(k => tagName(k).toLowerCase().includes(t));
@@ -106,6 +109,7 @@ export function renderLogbook() {
   const searchIn = h('select', { 'aria-label': 'Search in', onchange: e => { patchLogbook({ settings: { lbScope: e.target.value } }); paintFilterBtn(); paint(); } },
     [['all', 'Everything'], ['initials', 'Initials only'], ['procedure', 'Procedure only']].map(([v, t]) => h('option', { value: v, selected: (settings().lbScope || 'all') === v }, t)));
   const fuzzyBox = h('label', { class: 'check', style: 'margin:0' }, h('input', { type: 'checkbox', checked: !!settings().lbFuzzy, onchange: e => { patchLogbook({ settings: { lbFuzzy: e.target.checked } }); paintFilterBtn(); paintFolds(); paint(); } }), 'Fuzzy search (allows typos)');
+  const caseBox = h('label', { class: 'check', style: 'margin:0' }, h('input', { type: 'checkbox', checked: !!settings().lbCase, onchange: e => { patchLogbook({ settings: { lbCase: e.target.checked } }); paintFilterBtn(); paintFolds(); paint(); } }), 'Case sensitive');
   // tag filters: chips you add from a list of every tag (APMES and your own)
   const tagSel = (label, list) => h('select', { class: 'small', 'aria-label': label, onchange: e => { const k = e.target.value; e.target.value = ''; if (k && !list.includes(k)) { list.push(k); refresh(); } } },
     h('option', { value: '' }, label),
@@ -130,11 +134,11 @@ export function renderLogbook() {
   const datePanel = h('div', { class: 'lb-grid lb-panel' }, cell('From', dateIn('from')), cell('To', dateIn('to')));
   const tagPanel = h('div', { class: 'lb-grid lb-panel' }, cell('Has all of', hasRow), cell('Has none of', notRow));
   const morePanel = h('div', { class: 'lb-panel' },
-    h('div', { class: 'bar lb-fbar' }, fuzzyBox),
+    h('div', { class: 'bar lb-fbar' }, fuzzyBox, caseBox),
     h('div', { class: 'bar lb-fbar', style: 'margin:0' }, h('button', { class: 'small', title: 'Save this search', onclick: saveSearch }, '☆ Save search'), bulkBtn));
   const dateBtn = fold(datePanel, view.from || view.to);
   const tagBtn = fold(tagPanel, view.has.length || view.not.length);
-  const moreBtn = fold(morePanel, settings().lbFuzzy);
+  const moreBtn = fold(morePanel, settings().lbFuzzy || settings().lbCase);
   moreBtn.textContent = 'More';
   const short = iso => fmtDate(iso).replace(/ \d{4}$/, '');
   const paintFolds = () => {
@@ -143,7 +147,7 @@ export function renderLogbook() {
     const n = view.has.length + view.not.length;
     tagBtn.textContent = n ? `Tags (${n})` : 'Tags';
     tagBtn.classList.toggle('on', !!n);
-    moreBtn.classList.toggle('on', !!settings().lbFuzzy);
+    moreBtn.classList.toggle('on', !!(settings().lbFuzzy || settings().lbCase));
   };
   const filters = h('div', { class: 'lb-filters', hidden: !(view.showFilters || active()) },
     h('div', { class: 'lb-grid' }, cell('Show', flagSel), cell('Search in', searchIn)),
@@ -155,14 +159,14 @@ export function renderLogbook() {
       Object.assign(view, { q: '', has: [], not: [], from: '', to: '', flag: '' });
       setBox('');
       filters.querySelectorAll('input[type=date]').forEach(i => { i.value = ''; });
-      setOpts('all', false);
+      setOpts('all', false, false);
       refresh();
     } }, 'Reset');
   }
-  // "Search in" and fuzzy are kept with your account; a saved search sets "Search in" (not fuzzy)
-  function setOpts(scope, fuzzy) {
-    if ((settings().lbScope || 'all') !== scope || !!settings().lbFuzzy !== fuzzy) patchLogbook({ settings: { lbScope: scope, lbFuzzy: fuzzy } });
-    searchIn.value = scope; fuzzyBox.querySelector('input').checked = fuzzy;
+  // "Search in", fuzzy and case sensitive are kept with your account; a saved search sets "Search in" only
+  function setOpts(scope, fuzzy, cs = !!settings().lbCase) {
+    if ((settings().lbScope || 'all') !== scope || !!settings().lbFuzzy !== fuzzy || !!settings().lbCase !== cs) patchLogbook({ settings: { lbScope: scope, lbFuzzy: fuzzy, lbCase: cs } });
+    searchIn.value = scope; fuzzyBox.querySelector('input').checked = fuzzy; caseBox.querySelector('input').checked = cs;
   }
   const repaintFilters = () => {
     fill(hasRow, ...chipsOf(view.has), tagSel('+ Add tag', view.has));
@@ -195,12 +199,12 @@ export function renderLogbook() {
     paintSaved(); toast(`Saved “${name}”`);
   }
   function refresh() { flagSel.value = view.flag; paintFilterBtn(); repaintFilters(); view.limit = 150; paint(); }
-  function active() { return !!(view.has.length || view.not.length || view.from || view.to || view.flag || (settings().lbScope || 'all') !== 'all' || settings().lbFuzzy); }
+  function active() { return !!(view.has.length || view.not.length || view.from || view.to || view.flag || (settings().lbScope || 'all') !== 'all' || settings().lbFuzzy || settings().lbCase); }
   const filterBtn = h('button', { class: 'small', 'aria-expanded': String(!filters.hidden), onclick: () => {
     view.showFilters = filters.hidden; filters.hidden = !filters.hidden; filterBtn.setAttribute('aria-expanded', String(!filters.hidden));
   } });
   const paintFilterBtn = () => {
-    const n = view.has.length + view.not.length + (view.from || view.to ? 1 : 0) + (view.flag ? 1 : 0) + ((settings().lbScope || 'all') !== 'all' ? 1 : 0) + (settings().lbFuzzy ? 1 : 0);
+    const n = view.has.length + view.not.length + (view.from || view.to ? 1 : 0) + (view.flag ? 1 : 0) + ((settings().lbScope || 'all') !== 'all' ? 1 : 0) + (settings().lbFuzzy ? 1 : 0) + (settings().lbCase ? 1 : 0);
     filterBtn.textContent = n ? `Filter (${n})` : 'Filter'; filterBtn.classList.toggle('primary', !!n);
   };
   // the search box, with its own × that empties just the box (filters stay)
@@ -455,17 +459,17 @@ function pasteRows() {
 
 // The operators, from the "?" by the search box (Advanced search on)
 // The operators, from the "?" by the search box (Advanced search on). Tap one to add it to the box.
-function opsHelp(box, onchange) {
+export function opsHelp(box, onchange, list = OPERATOR_HELP, example = 'tag:16 -GA "under spinal"') {
   const caret = box.selectionStart ?? box.value.length;
   const m = modal('Search operators', [
     h('p', { class: 'hint', style: 'margin:0 0 6px' }, 'Tap one to add it to the search box.'),
-    h('div', { class: 'ops-pick' }, OPERATOR_HELP.map(([op, what, insert, at]) => h('button', { type: 'button', class: 'ops-row', onclick: () => {
+    h('div', { class: 'ops-pick' }, list.map(([op, what, insert, at]) => h('button', { type: 'button', class: 'ops-row', onclick: () => {
       const r = insertOperator(box.value, caret, insert, at);
       m.close();
       box.value = r.text; onchange(r.text);
       box.focus(); box.setSelectionRange(r.caret, r.caret);
     } }, h('code', {}, op), h('span', {}, what)))),
-    h('p', { class: 'hint' }, 'Combine them: tag:16 -GA "under spinal". Plain words, dates (“last week”), Search in and fuzzy work as usual. Turn operators off in Settings → Logging.'),
+    h('p', { class: 'hint' }, `Combine them: ${example}. Plain words work as usual. Turn operators off in Settings → Logging.`),
     h('div', { class: 'bar' }, h('span', { class: 'grow' }), h('button', { onclick: () => m.close() }, 'Close'))]);
 }
 

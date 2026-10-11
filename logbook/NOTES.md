@@ -34,7 +34,9 @@ portfolio content.
   (export time, date range): uploading back never deletes cases outside the range or newer than the file.
 - **Advanced search** (`search-ops.js`, tested; Settings → Logging, `settings.searchOps`, **off by default**):
   initials: title: (first line) case: tag: "phrase" -word OR/| AND; a "?" by the box lists them (tap one to add it at the cursor); a misspelt operator is searched as
-  text with a "did you mean" note. No raw regex (owner's choice).
+  text with a "did you mean" note. No raw regex (owner's choice). Reflections search has its own
+  operators (REFL_FIELDS: initials: heading: title: diagnosis: case:). Logbook More also has "Case sensitive"
+  (`settings.lbCase`, off by default; tag: always ignores case).
 - Future dates are allowed (Log date picker, calendar "+ Log a case"); they show as "upcoming".
 
 ## Where things are (screens)
@@ -45,14 +47,14 @@ portfolio content.
   Paste-a-list (List mode), Plan for later. `editCaseDialog` (full screen on phones, pinned
   Delete/Cancel/Save, 6-line growing box, Tags + "Add tags"; also "New case" from the reflection picker).
 - **Logbook** (`ui-logbook.js`): Calendar (default) | List | Grid. Calendar day: + Log a case (opens Log
-  on that date), Share day, Copy. Rows: Copy, Reflect (no swipe actions). Filter (Show, Search in; then Dates | Tags | More toggles, each open while in use; More = fuzzy, Save search, Tag N cases; saved searches one slim scrolling row): has all of / has none of
+  on that date), Share day, Copy. Rows: Copy, Reflect (no swipe actions). Filter (Show, Search in; then Dates | Tags | More toggles, each open while in use; More = fuzzy, case sensitive, Save search, Tag N cases; saved searches one slim scrolling row): has all of / has none of
   tags, dates, flag, search scope, fuzzy; Reset (everything); × in the search box clears just the text; saved searches (text, filters, "Search in"; not fuzzy); Tag N cases (bulk add/remove). Search text
   cached per case (`hayCache`, reset when the tag set changes).
 - **Reflections** (`ui-reflect.js`): list by heading, editor (Case details, learning points,
   References and Figures as folded white cards), Export page (summary + Mark ready) and Choose page
   (ticks, Quick actions). Draft kept per account. More tools: Word upload, bin, Reflection settings.
 - **Analytics** (`ui-progress.js`): header tally, folded sections (Needs attention, Logbook,
-  Reflections with ⓘ requirements, Trends), Compare with your intake (Totals), More tools (EPA view).
+  Reflections with ⓘ requirements, Trends), Compare with your intake (Totals). EPA view and Download summary removed (owner: not useful).
 - **More** (`app.js`): Account (with Residency year for non-programme users), Settings, Export &
   backup, Admin portal; Privacy, Credits, What's new (`WHATS_NEW` in app.js; update each release).
 - **Settings**: a menu of Display (incl. the tab the app opens on, `settings.startTab`; a #hash still wins),

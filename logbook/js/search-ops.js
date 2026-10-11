@@ -12,6 +12,20 @@
 import { editDistance } from './engine.js';
 
 export const FIELDS = ['initials', 'title', 'case', 'tag'];
+// Reflections search: its own fields (no tags; title: is the reflection's title)
+export const REFL_FIELDS = ['initials', 'heading', 'title', 'diagnosis', 'case'];
+export const REFL_OPERATOR_HELP = [
+  ['initials:AB', 'only reflections with those initials', 'initials:', 9],
+  ['heading:bariatric', 'the heading or sub-heading', 'heading:', 8],
+  ['title:blood', 'only the title', 'title:', 6],
+  ['diagnosis:stroke', 'only the diagnosis / procedure', 'diagnosis:', 10],
+  ['case:hypertension', 'only the case details', 'case:', 5],
+  ['"blood pressure"', 'that exact phrase', '""', 1],
+  ['-draft', 'leave out reflections with that word (works with the others: -heading:lap)', '-', 1],
+  ['ponv OR nausea', 'either one (ponv | nausea works too)', 'OR ', 3],
+  ['ponv AND ear', 'both (the same as a space)', 'AND ', 4],
+];
+
 // [example, what it does, what a tap in the "?" list puts in the box, where the cursor goes in it]
 export const OPERATOR_HELP = [
   ['initials:AB', 'only cases with those initials', 'initials:', 9],
@@ -36,7 +50,8 @@ export function insertOperator(text, caret, insert, at) {
 
 // q -> { groups: [[term, ...], ...], unknown: [{ op, suggest }] }
 // All groups must match; within a group any term may (OR). term: { field: null|'initials'|'case'|'tag', text, phrase, neg }
-export function parseQuery(q) {
+// opts: { fields (FIELDS or REFL_FIELDS), keepCase (case-sensitive search: the text isn't lower-cased) }
+export function parseQuery(q, { fields = FIELDS, keepCase = false } = {}) {
   const tokens = [];
   const unknown = [];
   const re = /(-?)(?:([A-Za-z]+):)?(?:"([^"]*)"?|(\S+))/g;
@@ -50,13 +65,14 @@ export function parseQuery(q) {
     if (!neg && !field && phrase == null && (word === 'OR' || word === '|')) { tokens.push({ or: true }); continue; }
     if (!neg && !field && phrase == null && (word === 'AND' || word === '&')) continue;   // a space does the same
     let f = field ? field.toLowerCase() : null;
-    if (f && !FIELDS.includes(f)) {
+    if (f && !fields.includes(f)) {
       // not an operator: the whole thing is text ("GA:ETT"); a near miss of one is reported
-      const near = FIELDS.find(x => editDistance(f, x, 2) <= 2 && f.length >= 3);
+      const near = fields.find(x => editDistance(f, x, 2) <= 2 && f.length >= 3);
       if (near) unknown.push({ op: field + ':', suggest: near + ':' });
       word = field + ':' + (phrase != null ? phrase : word || ''); phrase = undefined; f = null;
     }
-    const text = (phrase != null ? phrase : word || '').toLowerCase().trim();
+    const raw = (phrase != null ? phrase : word || '').trim();
+    const text = keepCase && f !== 'tag' ? raw : raw.toLowerCase();
     if (!text) continue;
     tokens.push({ field: f, text, phrase: phrase != null, neg: !!neg });
   }
@@ -75,7 +91,7 @@ export function parseQuery(q) {
 // has(hay, word) the plain-word test (fuzzy aware).
 export function matchQuery(parsed, get, tagHas, has = (hay, w) => hay.includes(w)) {
   const one = t => {
-    const hit = t.field === 'tag' ? tagHas(t.text)
+    const hit = t.field === 'tag' && tagHas ? tagHas(t.text)
       : t.phrase ? get(t.field || 'all').includes(t.text)
       : has(get(t.field || 'all'), t.text, t.field);
     return t.neg ? !hit : hit;
