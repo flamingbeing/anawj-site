@@ -151,7 +151,7 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
   - navy and white, Open Sans
   - the four-colour band (orange, red, cyan, navy) along the top of the header, as on the logbook
   - square panels, with only controls rounded
-- **Demo mode** (`?demo`): invented staff, monthly rosters and cases. It uses separate storage and never signs in.
+- **Demo mode** (`?demo`): an invented department about the real size (39 seniors, 51 juniors), every monthly roster filled for the chosen month and the months either side (more are made as the date moves on), and made-up case notes for each new day (fewer at weekends). It uses separate storage and never signs in. Bump `DEMO_VERSION` in `js/app.js` when the demo data changes, so open demos start again.
 
 ## Known limits
 

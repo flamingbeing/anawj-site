@@ -29,10 +29,11 @@ export function makeDemo(date) {
     staff.push(p);
     return p;
   };
-  const seniorGrades = [...Array(4).fill('SC'), ...Array(10).fill('C'), 'VC', ...Array(6).fill('AC'), ...Array(3).fill('RP')];
-  const subs = ['cardiac', 'cardiac', 'cardiac', 'paeds', 'paeds', 'paeds', 'neuro', 'neuro', 'thoracic', 'thoracic', 'hpb', 'hpb', 'obs', 'obs'];
+  // about the size of the department on a weekday, so most rooms get their own senior and junior
+  const seniorGrades = [...Array(6).fill('SC'), ...Array(17).fill('C'), 'VC', ...Array(11).fill('AC'), ...Array(4).fill('RP')];
+  const subs = ['cardiac', 'cardiac', 'cardiac', 'cardiac', 'paeds', 'paeds', 'paeds', 'paeds', 'paeds', 'neuro', 'neuro', 'thoracic', 'thoracic', 'hpb', 'hpb', 'obs', 'obs'];
   seniorGrades.forEach((g, i) => add('senior', g, { subspecs: subs[i] ? [subs[i]] : [] }));
-  const juniorGrades = [...Array(6).fill('Senior resident'), ...Array(12).fill('Junior resident'), ...Array(3).fill('RP'), 'Locum', 'Locum', ...Array(8).fill('MOPEX'), ...Array(5).fill('Rotating resident')];
+  const juniorGrades = [...Array(9).fill('Senior resident'), ...Array(20).fill('Junior resident'), ...Array(4).fill('RP'), 'Locum', 'Locum', ...Array(9).fill('MOPEX'), ...Array(6).fill('Rotating resident')];
   const postings = ['P', 'RA', 'L', 'SR', 'Neu', 'Amb', 'Cardiac', '', '', ''];
   juniorGrades.forEach((g, i) => add('junior', g, {
     posting: g === 'MOPEX' || g === 'Locum' ? '' : postings[i % postings.length],
@@ -40,20 +41,42 @@ export function makeDemo(date) {
   }));
   for (const p of staff) if (p.aliases[0] && staff.some(o => o !== p && o.aliases[0] === p.aliases[0])) p.aliases = [];
 
-  // the month of the chosen date: calls, liver team, leave
+  // every monthly roster for the chosen month and the months either side (so changing the date,
+  // or working out who is post call on the 1st, still finds them)
   const month = date.slice(0, 7);
   const days = new Date(+month.slice(0, 4), +month.slice(5, 7), 0).getDate();
   const seniors = staff.filter(p => p.role === 'senior'), juniors = staff.filter(p => p.role === 'junior' && p.grade !== 'MOPEX');
+  const residents = juniors.filter(p => p.grade === 'Senior resident' || p.grade === 'Junior resident');
   const cardiac = seniors.filter(p => p.subspecs.includes('cardiac'));
-  const junior = { rows: {} }, senior = { rows: {} }, liver = { rows: {} };
-  for (let d = 1; d <= days; d++) {
-    const j = k => juniors[(d * 5 + k) % juniors.length].name;
-    junior.rows[d] = { r1: j(0), r2: j(1), r3: j(2), df: j(3), nf: j(4), s1pm: j(5), sicumo: j(6), icureg: j(7),
-      epid: seniors[(d * 3) % seniors.length].name, epin: seniors[(d * 3 + 1) % seniors.length].name };
-    senior.rows[d] = { cons: seniors[(d * 7) % seniors.length].name, c1: cardiac[d % cardiac.length].name, c3: j(8),
-      sicu: seniors[Math.floor((d - 1) / 7) % seniors.length].name };
-    const week = Math.floor((d - 1) / 7);
-    liver.rows[d] = { ots: seniors[(week * 5 + 2) % seniors.length].name, otj: juniors[(week * 3 + 10) % juniors.length].name };
+  const hpb = seniors.filter(p => p.subspecs.includes('hpb'));
+  const shift = (m, n) => { const d = new Date(+m.slice(0, 4), +m.slice(5, 7) - 1 + n, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
+  const monthly = {};
+  for (const m of [shift(month, -1), month, shift(month, 1)]) {
+    const nDays = new Date(+m.slice(0, 4), +m.slice(5, 7), 0).getDate();
+    const base = (+m.slice(0, 4) * 12 + +m.slice(5, 7)) * 31; // a running day number, so months follow on
+    const junior = { rows: {} }, senior = { rows: {} }, liver = { rows: {} }, pain = { rows: {} }, aoh = { rows: {} };
+    for (let d = 1; d <= nDays; d++) {
+      const n = base + d;
+      const wd = new Date(+m.slice(0, 4), +m.slice(5, 7) - 1, d).getDay();
+      const weekday = wd > 0 && wd < 6;
+      const j = k => juniors[(n * 5 + k) % juniors.length].name;
+      const sn = k => seniors[(n * 3 + k) % seniors.length].name;
+      junior.rows[d] = { r1: j(0), r2: j(1), r3: j(2), df: j(3), nf: j(4), s1am: weekday ? '' : j(9), s1pm: j(5), ref: weekday ? j(10) : '', sicumo: j(6), icureg: j(7), epid: sn(0), epin: sn(1) };
+      senior.rows[d] = { cons: seniors[(n * 7) % seniors.length].name, c1: cardiac[n % cardiac.length].name, c2: cardiac[(n + 1) % cardiac.length].name, c3: j(8),
+        tee: weekday ? cardiac[(n + 2) % cardiac.length].name : '', sicu: seniors[Math.floor(n / 7) % seniors.length].name };
+      const week = Math.floor(n / 7);
+      liver.rows[d] = { ots: seniors[(week * 5 + 2) % seniors.length].name, otj: juniors[(week * 3 + 10) % juniors.length].name,
+        icu: seniors[(week * 5 + 9) % seniors.length].name, donor: hpb[week % hpb.length].name };
+      if (weekday) {
+        pain.rows[d] = { 'painacp.s': sn(11), 'painacp.a': residents[(n * 2) % residents.length].name, 'acute.s': sn(13), 'acute.a': residents[(n * 2 + 1) % residents.length].name,
+          ...(wd === 2 || wd === 4 ? { 'chronic.s': sn(15) } : {}) };
+        aoh.rows[d] = { aoh: sn(17), standby: sn(19), exts: wd === 3 ? sn(21) : '', extj: wd === 3 ? j(11) : '' };
+      } else {
+        pain.rows[d] = { 'acute.s': sn(13), 'acute.a': residents[(n * 2 + 1) % residents.length].name };
+        aoh.rows[d] = { aoh: sn(17), standby: sn(19) };
+      }
+    }
+    monthly[m] = { junior, senior, liver, pain, aoh, leave: { entries: [] } };
   }
   const leave = { entries: [] };
   const day = n => `${month}-${String(Math.min(days, Math.max(1, n))).padStart(2, '0')}`;
@@ -61,9 +84,28 @@ export function makeDemo(date) {
   for (let k = 0; k < 10; k++) {
     const p = staff[(k * 7 + 3) % staff.length];
     const from = today - 2 + Math.floor(rand() * 6);
-    leave.entries.push({ name: p.name, from: day(from), to: day(from + Math.floor(rand() * 4)), type: k === 3 ? 'Medical Leave' : k === 6 ? 'Conference Leave' : 'Annual Leave', remarks: '' });
+    leave.entries.push({ name: p.name, from: day(from), to: day(from + Math.floor(rand() * 4)), type: k === 3 ? 'Medical Leave' : k === 6 ? 'Conference Leave' : 'Annual Leave', remarks: k === 6 ? 'ASA meeting' : '' });
   }
-  const notes = { 'KROR 2': 'tkr x2', 'KROR 3': 'acl', 'KROR 5': 'shoulder', 'MCOR 1': 'lap chole', 'MCOR 3': 'eye 5y', 'MCOR 4': 'hernia', 'MCOR 6': 'ent 3y',
-    'MOR 1': 'craniotomy', 'MOR 2': 'lscs', 'MOR 3': 'whipple', 'MOR 4': 'vats lobectomy', 'MOR 5': 'eye', 'MOR 12': 'cabg', 'MOR 13': 'avr', 'MOR 15': 'thr', 'MOR 16': 'nil' };
-  return { staff, monthly: { [month]: { junior, senior, liver, leave } }, notes };
+  // some leave spread over the rest of the month too
+  for (let k = 0; k < 14; k++) {
+    const p = staff[(k * 11 + 5) % staff.length];
+    const from = 1 + Math.floor(rand() * days);
+    leave.entries.push({ name: p.name, from: day(from), to: day(from + Math.floor(rand() * 5)), type: k % 7 === 2 ? 'Medical Leave' : k % 5 === 4 ? 'Off in Lieu' : 'Annual Leave', remarks: '' });
+  }
+  monthly[month].leave = leave;
+  return { staff, monthly, notes: demoNotes(date) };
+}
+
+// Case notes for a demo day: most rooms on weekdays (varying by date), emergencies only at weekends.
+const NOTES = { 'KROR 2': 'tkr x2', 'KROR 3': 'acl', 'KROR 5': 'shoulder', 'MCOR 1': 'lap chole', 'MCOR 3': 'eye 5y', 'MCOR 4': 'hernia', 'MCOR 6': 'ent 3y',
+  'MOR 1': 'craniotomy', 'MOR 2': 'lscs', 'MOR 3': 'whipple', 'MOR 4': 'vats lobectomy', 'MOR 5': 'eye', 'MOR 12': 'cabg', 'MOR 13': 'avr', 'MOR 15': 'thr', 'MOR 16': 'nil' };
+const MORE = { 'KROR 4': 'hip scope', 'KROR 6': 'carpal tunnel', 'MCOR 2': 'lap appendix', 'MCOR 5': 'pas 4y', 'MCOR 7': 'tonsils 6y', 'MOR 6': 'evar', 'MOR 10': 'thyroid', 'MOR 11': 'mastectomy', 'MOR 14': 'tka', 'MOR 17': 'hepatectomy' };
+export function demoNotes(date) {
+  const wd = new Date(date + 'T12:00').getDay();
+  if (wd === 0 || wd === 6) return { 'MOR 1': 'emergency crani', 'MOR 2': 'lscs' };
+  const d = +date.slice(8, 10);
+  const out = { ...NOTES };
+  Object.entries(MORE).forEach(([room, note], i) => { if ((i + d) % 3) out[room] = note; });
+  if (d % 2) delete out['MOR 4'];
+  return out;
 }

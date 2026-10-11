@@ -8,7 +8,7 @@ import { readRosterRows, readStaffSheet, buildRosterWorkbook, cellText, isContac
 import { buildLayout, COL_WIDTHS, shortName, doubleCovered, isDouble, TEAM_ROWS, DUTIES } from './layout.js';
 import * as cloud from './cloud.js';
 import { buildRosterPdf } from './pdfout.js';
-import { makeDemo } from './demo.js';
+import { makeDemo, demoNotes } from './demo.js';
 import { MONTHLY, monthlyDef, LEAVE_TYPES, NIGHT_DUTIES, cleanCell, daysIn, weekday, monthName, addDays, readMonthlyPdf, readMonthlyXlsx, buildMonthlyWorkbook, dutiesOn, generalFromMonthly, leaveOn } from './monthly.js';
 
 // ?demo: a made-up department, kept apart from real data in its own storage
@@ -45,14 +45,23 @@ try {
 } catch { /* private mode or corrupt data: start fresh */ }
 migrateRooms();
 syncRooms();
+// bumped when the demo data changes, so a demo already open in a browser picks it up
+const DEMO_VERSION = 2;
 if (DEMO && !state.staff.length) startDemo();
+else if (DEMO && state.demoVersion !== DEMO_VERSION) { state = blankState(); syncRooms(); startDemo(); } // the made-up department changed: start it again
 
 function startDemo() {
   const demo = makeDemo(state.day.date);
   state.staff = demo.staff;
   state.monthly = demo.monthly;
-  for (const r of state.day.rooms) if (demo.notes[r.name]) { r.notes = demo.notes[r.name]; r.running = true; r.flags = suggestFlags(r.notes, state.settings, r.name); }
+  state.demoVersion = DEMO_VERSION;
+  fillDemoNotes(state.day);
   state.tab = 'monthly';
+}
+// a new demo day starts with that day's made-up case notes
+function fillDemoNotes(day) {
+  const notes = demoNotes(day.date);
+  for (const r of day.rooms) if (notes[r.name]) { r.notes = notes[r.name]; r.running = true; r.flags = suggestFlags(r.notes, state.settings, r.name); }
 }
 const demoLink = () => location.origin + location.pathname + '?demo';
 
@@ -236,6 +245,8 @@ function switchDate(date) {
   state.day.date = date;
   state.roster = rec?.roster || null;
   syncRooms();
+  if (DEMO && !rec) fillDemoNotes(state.day);
+  if (DEMO && !state.monthly?.[date.slice(0, 7)]?.junior) for (const [m, v] of Object.entries(makeDemo(date).monthly)) (state.monthly ||= {})[m] ||= v; // months further out
   clearUndo(); editing = null;
   lastRows = state.roster ? JSON.stringify(state.roster.rows) : null;
   render();
