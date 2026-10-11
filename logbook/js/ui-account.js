@@ -30,7 +30,7 @@ function confirmDelete() {
   if (S.resident) return;
   if (!cloud.demo && !navigator.onLine) return toast('You’re offline. Deleting needs signal.');
   const n = (S.cases || []).length, r = (S.reflections || []).length;
-  const word = h('input', { type: 'text', autocomplete: 'off', 'aria-label': 'Type DELETE to confirm', placeholder: 'DELETE', style: 'font-size:16px' });
+  const word = h('input', { type: 'text', autocomplete: 'off', 'aria-label': 'Type DELETE to confirm', placeholder: 'DELETE', style: 'font-size:calc(16px * var(--fs, 1))' });
   const status = h('p', { class: 'hint', 'aria-live': 'polite' });
   const go = h('button', { class: 'primary danger', disabled: true, onclick: async () => {
     go.disabled = true; cancel.disabled = true;

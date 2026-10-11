@@ -103,7 +103,7 @@ export function renderLogbook() {
 
   const nFlag = f => S.cases.filter(c => flagsOf(c).includes(f)).length;
   const flagOpts = [['', 'All cases'], ['needsDate', `Needs a date (${nFlag('needsDate')})`], ['duplicate', `Possible duplicates (${nFlag('duplicate')})`], ['future', `Upcoming (${nFlag('future')})`], ['interesting', `☆ Interesting (${S.cases.filter(c => c.reflectTag).length})`]];
-  const counter = h('span', { class: 'muted', style: 'font-size:13px' });
+  const counter = h('span', { class: 'muted', style: 'font-size:calc(13px * var(--fs, 1))' });
 
   // the two filters fold behind a Filter button (shown open while one is in use)
   const searchIn = h('select', { 'aria-label': 'Search in', onchange: e => { patchLogbook({ settings: { lbScope: e.target.value } }); paintFilterBtn(); paint(); } },
@@ -375,7 +375,7 @@ function calendarView(rows, flagsOf, repaint) {
   return h('div', {},
     h('div', { class: 'bar lb-calbar' },
       h('button', { class: 'small icon-btn', 'aria-label': 'Previous month', onclick: () => shift(-1) }, '‹'),
-      h('strong', { class: 'grow', style: 'text-align:center' }, `${MONTHS[m - 1]} ${y}`, h('span', { class: 'muted', style: 'font-weight:400;font-size:13px' }, ` · ${monthN} case${monthN === 1 ? '' : 's'}`)),
+      h('strong', { class: 'grow', style: 'text-align:center' }, `${MONTHS[m - 1]} ${y}`, h('span', { class: 'muted', style: 'font-weight:400;font-size:calc(13px * var(--fs, 1))' }, ` · ${monthN} case${monthN === 1 ? '' : 's'}`)),
       h('button', { class: 'small icon-btn', 'aria-label': 'Next month', onclick: () => shift(1) }, '›'),
       h('button', { class: 'small', onclick: () => { view.month = today.slice(0, 7); view.day = today; repaint(); } }, 'Today')),
     grid,
