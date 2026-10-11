@@ -204,9 +204,11 @@ service cloud.firestore {
       return d.keys().hasOnly(['rid', 'name', 'intake', 'rYear', 'counts', 'total', 'reflections', 'reflectionsTotal', 'updatedAt'])
         && d.rid == rid
         && d.counts is map && d.counts.size() <= 100
-        && d.total is number
+        && d.total is int && d.total >= 0 && d.total < 100000
         && optString(d, 'name', 200)
-        && optNumber(d, 'intake') && optNumber(d, 'rYear') && optNumber(d, 'reflectionsTotal') && optNumber(d, 'updatedAt')
+        && optNumber(d, 'intake') && optNumber(d, 'updatedAt')
+        && (!('rYear' in d) || d.rYear == null || (d.rYear is int && d.rYear >= 1 && d.rYear <= 5))
+        && (!('reflectionsTotal' in d) || d.reflectionsTotal == null || (d.reflectionsTotal is int && d.reflectionsTotal >= 0 && d.reflectionsTotal < 10000))
         && (!('reflections' in d) || d.reflections is map);
     }
 

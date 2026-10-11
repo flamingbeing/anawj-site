@@ -9,7 +9,7 @@
 // purgeExpired()                 drop entries older than 30 days; app.js runs it once after sign-in
 // renderBin() / openBin()        the bin view (element) / the same in a dialog
 
-import { S, h, toast, modal, confirmBox, cloud, fill, removeCase, deleteMany, restoreCase, miniChips } from './ui-core.js';
+import { S, h, toast, modal, confirmBox, cloud, fill, removeCase, deleteMany, restoreCase, miniChips, resetters } from './ui-core.js';
 import { cleanCase } from './demo-backend.js';
 import { cleanReflection } from './reflections.js';
 import { REFLECTION_HEADINGS } from './categories.js';
@@ -40,6 +40,7 @@ export function binEntry(kind, item, now = Date.now()) {
 // ---- moving in and out ----
 
 let binCache = [];   // last list seen by a bin watcher (for undo lookups); refreshed on demand
+resetters.push(() => { binCache = []; });   // never hand one user's deleted cases to the next
 
 // Returns the bin entry (or entries, for an array). Never deletes the original if the copy failed.
 export async function moveToBin(kind, item, extra = {}) {
@@ -47,13 +48,14 @@ export async function moveToBin(kind, item, extra = {}) {
   if (!items.length) return [];
   const now = Date.now();
   const entries = items.map((it, i) => binEntry(kind, it, now + i));   // distinct ids for same-id items
-  for (const e of entries) await cloud.saveBinEntry(mine(), e);
+  // in parallel: offline, each write waits up to ACK_WAIT before it counts as queued
+  await Promise.all(entries.map(e => cloud.saveBinEntry(mine(), e)));
   binCache = [...entries, ...binCache];
   if (kind === 'case') {
     if (entries.length === 1) await removeCase(entries[0].data.id);
     else await deleteMany(entries.map(e => e.data.id));
   } else {
-    for (const e of entries) await cloud.deleteReflection(mine(), e.data.id);
+    await Promise.all(entries.map(e => cloud.deleteReflection(mine(), e.data.id)));
     if (Array.isArray(S.reflections)) {
       const gone = new Set(entries.map(e => e.data.id));
       S.reflections = S.reflections.filter(r => !gone.has(r.id));

@@ -188,7 +188,7 @@ const NOT_INITIALS = new Set(['GA', 'LA', 'RA', 'MAC', 'ETT', 'LMA', 'ASA', 'OT'
   'LRTI', 'URTI', 'DKA', 'AKI', 'CVA', 'TIA', 'DVT', 'PPH', 'APH', 'ARDS', 'TBI', 'MVA', 'RTA', 'RIJ', 'LIJ', 'CVC', 'CVP', 'PICC', 'NGT', 'TCI',
   'CICU', 'NICU', 'PICU', 'PACU', 'NBM', 'DNR', 'GERD', 'GORD', 'PONV', 'AKA', 'BKA', 'TORS', 'EBUS', 'ESD', 'EMR', 'LAVH', 'TAH', 'BSO', 'TLH',
   'RFA', 'TACE', 'IVC', 'SVC', 'SVD', 'NVD', 'HIE', 'NEC', 'TEF', 'CDH', 'CXR', 'ECG', 'ECHO', 'TTE', 'TOE', 'CPB', 'IABP', 'ECMO', 'RRT', 'CRRT',
-  'MPFL', 'ROM', 'SSG', 'STSG', 'OSA', 'CKD', 'ESRF', 'ESRD', 'SAH', 'SDH', 'EDH', 'RSI', 'PET', 'ART', 'LSCS', 'ORIF', 'CABG', 'VATS']);
+  'MPFL', 'ROM', 'LP', 'PEG', 'ICD', 'MRCP', 'HFNO', 'EBL', 'UGIB', 'BTL', 'LAR', 'EVLT', 'SSG', 'STSG', 'OSA', 'CKD', 'ESRF', 'ESRD', 'SAH', 'SDH', 'EDH', 'RSI', 'PET', 'ART', 'LSCS', 'ORIF', 'CABG', 'VATS']);
 
 // Patient initials as stored: upper case, letters, '-' and '.' only, at most 20 characters.
 export const cleanInitials = s => String(s || '').toUpperCase().replace(/[^A-Z.\-]/g, '').slice(0, 20);
@@ -217,14 +217,17 @@ export const caseText = c => [c && c.initials, c && c.details].map(x => String(x
 // A leading date on a pasted line: "12/3", "12/3/26", "12-3-2026", "2026-03-12", "12 Mar", "12 Mar 26".
 const LEAD_DATE = /^\s*(\d{4}-\d{1,2}-\d{1,2}|\d{1,2}[\/.\-]\d{1,2}[\/.\-](?:\d{4}|\d{2})|\d{1,2}[\/\-]\d{1,2}|\d{1,2}\s*[a-z]{3,9}\.?(?:\s+\d{4}|\s+\d{2}(?!\d))?)(?=$|[\s,:;\-–)]+)/i;
 // "8/12 boy", "3/52 old": paediatric ages written like dates; leave those as details.
-const AGE_AFTER = /^\s*(?:old|yo|y\/o|boy|girl|male|female|m|f|infant|baby|child|ex|prem|term|chinese|malay|indian)\b/i;
+const AGE_AFTER = /^\s*(?:old|yo|y\/o|yr|yrs|year|years|boy|girl|male|female|man|woman|lady|gentleman|m|f|infant|baby|child|ex|prem|term|chinese|malay|indian)\b/i;
 
 function leadingDate(line, now) {
   const m = line.match(LEAD_DATE);
   if (!m) return null;
-  const token = m[1].trim();
-  const rest = line.slice(m[0].length).replace(/^[\s,:;\-–)]+/, '');
-  if (AGE_AFTER.test(rest)) return null;
+  let token = m[1].trim();
+  let rest = line.slice(m[0].length).replace(/^[\s,:;\-–)]+/, '');
+  // "12 Mar 65 year old man": the 65 is an age, not 2065
+  const yy = token.match(/^(\d{1,2}\s*[a-z]{3,9}\.?)\s+(\d{2})$/i);
+  if (yy && (AGE_AFTER.test(rest) || 2000 + Number(yy[2]) > now.getFullYear() + 1)) { token = yy[1]; rest = yy[2] + (rest ? ' ' + rest : ''); }
+  else if (AGE_AFTER.test(rest)) return null;
   let date = parseDate(token);
   if (!date) {
     // no year: this year, or last year if that date is still to come

@@ -65,7 +65,7 @@ export function youCard() {
   return h('section', { class: 'card' },
     h('h2', {}, 'You'),
     h('p', { class: 'hint' }, 'Signed in as ', h('b', {}, S.user.email), S.admin ? ' (admin)' : '', '.'),
-    h('label', { class: 'field' }, 'Name (shown on your exports and, for programme residents, on the totals table)',
+    h('label', { class: 'field' }, 'Name (shown on your exports; the Totals table uses the name on the programme list)',
       h('input', { value: displayName(), autocomplete: 'name', onchange: e => patchLogbook({ name: e.target.value.trim() }).then(() => toast('Saved')) })),
     r
       ? h('p', { class: 'hint' }, `On the programme list: ${r.rid}, AY${r.intake || '?'} intake, ${R_YEARS[rYear() - 1]}${r.status && r.status !== 'ACTIVE' ? ', ' + r.status.toLowerCase() : ''}. Your case counts (never your case details) are shared on the Totals tab.`)
@@ -75,7 +75,14 @@ export function youCard() {
 export function signOutCard() {
   return h('section', { class: 'card' },
     h('div', { class: 'bar', style: 'margin:0' },
-      h('button', { onclick: () => cloud.signOut() }, 'Sign out'),
+      h('button', { onclick: async e => {
+        const btn = e.currentTarget;
+        btn.disabled = true;
+        const ok = await cloud.synced();
+        btn.disabled = false;
+        if (!ok && !(await confirmBox('Not synced yet', 'Some cases or changes on this device have not reached the server yet (no signal?). Signing out now deletes them. Wait for signal and try again, or sign out anyway?', 'Sign out anyway', true))) return;
+        cloud.signOut();
+      } }, 'Sign out'),
       cloud.demo ? h('span', { class: 'muted' }, 'Demo mode: data stays in this browser.') : null));
 }
 

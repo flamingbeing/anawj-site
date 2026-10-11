@@ -59,21 +59,28 @@ function residentsCard() {
     h('p', { class: 'hint' }, 'Programme residents share their case counts on the Totals tab. Year defaults from the intake (AY starts 1 July); change it for leave or repeats.'));
   if (!A.residents) { add(card, h('p', { class: 'empty' }, 'Loading…')); return card; }
   const ed = A.editRes;
-  const save = async r => { try { await cloud.saveResident(r); toast('Saved ' + (r.name || r.rid)); } catch (err) { toast('Could not save: ' + err.message); } };
+  // apply a change and save it; a refused save puts the old values back
+  const edit = async (r, patch) => {
+    const prev = { ...r };
+    Object.assign(r, patch);
+    try { await cloud.saveResident(r); toast('Saved ' + (r.name || r.rid)); }
+    catch (err) { Object.keys(r).forEach(k => delete r[k]); Object.assign(r, prev); toast('Could not save: ' + err.message); hooks.render(); }
+  };
   const yearLabel = r => (residentYear(r) ? R_YEARS[Math.min(residentYear(r), R_YEARS.length) - 1] : '?') + (r.rYear ? ' (set)' : '');
   const row = r => ed ? h('tr', {},
       h('td', {}, r.rid),
-      h('td', {}, h('input', { value: r.name || '', style: 'min-width:150px', onchange: e => { r.name = e.target.value.trim(); save(r); } })),
-      h('td', {}, h('input', { type: 'email', value: r.email || '', style: 'min-width:200px', onchange: e => { r.email = e.target.value.trim().toLowerCase(); save(r); } })),
-      h('td', {}, h('input', { type: 'number', value: r.intake || '', style: 'width:90px', onchange: e => { r.intake = Number(e.target.value) || null; save(r); } })),
+      h('td', {}, h('input', { value: r.name || '', style: 'min-width:150px', onchange: e => { edit(r, { name: e.target.value.trim() }); } })),
+      h('td', {}, h('input', { type: 'email', value: r.email || '', style: 'min-width:200px', onchange: e => { edit(r, { email: e.target.value.trim().toLowerCase() }); } })),
+      h('td', {}, h('input', { type: 'number', value: r.intake || '', style: 'width:90px', onchange: e => { edit(r, { intake: Number(e.target.value) || null }); } })),
       // "Auto" moves up each 1 July from the intake; a set year stays until changed (leave, repeats)
-      h('td', {}, h('select', { onchange: e => { r.rYear = Number(e.target.value) || null; save(r); } },
+      h('td', {}, h('select', { onchange: e => { edit(r, { rYear: Number(e.target.value) || null }); } },
         h('option', { value: '', selected: !r.rYear }, `Auto (${R_YEARS[(residentYear({ intake: r.intake }) || 1) - 1]})`),
         R_YEARS.map((y, i) => h('option', { value: String(i + 1), selected: r.rYear === i + 1 }, y)))),
-      h('td', {}, h('select', { onchange: e => { r.status = e.target.value; save(r); } }, STATUSES.map(s => h('option', { value: s, selected: r.status === s }, s)))),
+      h('td', {}, h('select', { onchange: e => { edit(r, { status: e.target.value }); } }, STATUSES.map(s => h('option', { value: s, selected: r.status === s }, s)))),
       h('td', {}, h('button', { class: 'small danger', 'aria-label': `Remove ${r.name || r.rid}`, onclick: async () => {
-        if (!(await confirmBox('Remove resident', `Remove ${r.name || r.rid} from the programme list? Their logbook is kept.`, 'Remove', true))) return;
-        await cloud.deleteResident(r.rid); A.residents = A.residents.filter(x => x.rid !== r.rid); hooks.render();
+        if (!(await confirmBox('Remove resident', `Remove ${r.name || r.rid} from the programme list? Their row leaves the Totals table; their logbook is kept.`, 'Remove', true))) return;
+        try { await cloud.deleteResident(r.rid); } catch (err) { toast('Could not remove: ' + err.message); return; }
+        A.residents = A.residents.filter(x => x.rid !== r.rid); hooks.render();
       } }, '×')))
     : h('tr', {}, h('td', {}, r.rid), h('td', {}, r.name || ''), h('td', {}, r.email || h('span', { class: 'flag err' }, 'no email')),
       h('td', {}, String(r.intake || '')), h('td', {}, yearLabel(r)), h('td', {}, r.status || ''));
@@ -106,7 +113,11 @@ function residentsCard() {
       const intake = old.intake || intakeOf(p.id);
       // statuses outside the four the rules accept would stop the save halfway: flag them, save as ACTIVE
       const status = STATUSES.includes(p.status) ? p.status : 'ACTIVE';
-      return { ...old, rid: p.id, name: p.name, email: p.email, status, badStatus: status !== p.status ? p.status : null, intake, rYear: old.rYear || null };
+      // a row without an email keeps the one on the list; a status set here (SMO, graduated…) isn't
+      // undone by the script's default ACTIVE
+      const keepStatus = old.status && status === 'ACTIVE' && old.status !== 'ACTIVE';
+      return { ...old, rid: p.id, name: p.name || old.name, email: p.email || old.email || '', status: keepStatus ? old.status : status,
+        badStatus: status !== p.status ? p.status : null, intake, rYear: old.rYear || null };
     });
     const bad = rows.filter(r => r.badStatus);
     add(card, h('p', {}, `${rows.length} residents (${rows.filter(r => !known.has(r.rid)).length} new).`),
@@ -247,7 +258,9 @@ function sharedCard() {
       h('span', { class: 'row' },
         h('button', { class: 'small', onclick: () => templateDialog(t, save) }, 'Edit'),
         h('button', { class: 'small danger', onclick: async () => {
-          await cloud.deleteSharedTemplate(t.id); A.shared = list.filter(x => x.id !== t.id); S.sharedTemplates = A.shared; hooks.render();
+          if (!(await confirmBox('Delete shared template', `Delete “${t.name}” for everyone?`, 'Delete', true))) return;
+          try { await cloud.deleteSharedTemplate(t.id); } catch (err) { toast('Could not delete: ' + err.message); return; }
+          A.shared = list.filter(x => x.id !== t.id); S.sharedTemplates = A.shared; hooks.render();
         } }, 'Delete'))))) : h('p', { class: 'muted' }, 'None yet.'),
     h('div', { class: 'bar', style: 'margin:12px 0 0' }, h('button', { onclick: () => templateDialog(null, save) }, '+ New shared template')));
 }

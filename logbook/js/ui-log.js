@@ -6,7 +6,7 @@ import { withParents, frequentCombos, parseBulk, parseDate, fmtDate, sortCodes, 
 import { suggest } from './suggest.js';
 import {
   S, h, toast, debounce, modal, confirmBox, cat, catName, catFull, catChip, countText, PICKER_ORDER, PROGRESS_BY_CODE,
-  createCase, updateCase, removeCase, restoreCase, saveMany, settings, todayISO, hooks, fill, add, cloud } from './ui-core.js';
+  createCase, updateCase, removeCase, restoreCase, saveMany, settings, todayISO, hooks, fill, add, cloud, okNoIds } from './ui-core.js';
 import { moveToBin } from './bin.js';
 
 const DRAFT_KEY = 'logbook-draft-v2';
@@ -122,15 +122,19 @@ export function renderLog() {
 
 function setMode(m) { draft.mode = m; saveDraft(); hooks.render(); }
 
-function curDate() { return draft.date || todayISO(); }
+// A picked or kept date lasts KEEP_MS from when it was set, even if the app stays open for days.
+function curDate() {
+  if (draft.date && !(Date.now() - (draft.dateAt || draft.keptAt || 0) < KEEP_MS)) { draft.date = null; saveDraft(); }
+  return draft.date || todayISO();
+}
 
 function paintDate() {
   const d = curDate(), t = todayISO(), y = yesterdayISO();
   const dateInput = h('input', {
     type: 'date', value: d, max: t, 'aria-label': 'Case date',
-    onchange: e => { draft.date = parseDate(e.target.value) || null; saveDraft(); paintDate(); },
+    onchange: e => { draft.date = parseDate(e.target.value) || null; draft.dateAt = Date.now(); saveDraft(); paintDate(); },
   });
-  const pick = iso => () => { draft.date = iso === t ? null : iso; saveDraft(); paintDate(); ui.textarea?.focus(); };
+  const pick = iso => () => { draft.date = iso === t ? null : iso; draft.dateAt = Date.now(); saveDraft(); paintDate(); ui.textarea?.focus(); };
   const other = d !== t && d !== y;
   // the date input sits invisibly over a chip, so the row stays one line on a phone
   const picker = h('label', { class: `chip datepick ${other ? 'on' : ''}`, title: 'Pick a date' }, other ? fmtDate(d) : '📅 Date', dateInput);
@@ -247,7 +251,7 @@ function paintQuick() {
       onclick: () => {
         draft.cats = sortCodes(withParents(last.cats));
         // its date too, but only when it was logged in this sitting (not yesterday evening's list)
-        if (last.date && Date.now() - (last.createdAt || 0) < KEEP_MS / 3) draft.date = last.date === todayISO() ? null : last.date;
+        if (last.date && Date.now() - (last.createdAt || 0) < KEEP_MS / 3) { draft.date = last.date === todayISO() ? null : last.date; draft.dateAt = Date.now(); }
         keepPlace(ui.templates, () => { saveDraft(); paintDate(); paintSel(); }); refocus();
       },
     }, '↻ Same as last', h('span', { class: 'muted', style: 'font-size:12px' }, ' ' + last.cats.join(' + '))));
@@ -274,10 +278,11 @@ async function save({ another }) {
     toast('Tap at least one category (suggestions are above)'); ui.picker.focus({ preventScroll: true }); return;
   }
   if (!details && !(await confirmBox('No case details', 'Save this case without initials or details?', 'Save'))) return;
+  if (!(await okNoIds(details))) return;
   const c = await createCase({ date: curDate(), details, cats: draft.cats });
   const sticky = another || settings().defaultDate === 'last';
   const keep = sticky ? draft.date : null;
-  draft = { ...draft, details: '', cats: [], date: keep, keepDate: sticky, keptAt: Date.now() };
+  draft = { ...draft, details: '', cats: [], date: keep, keepDate: sticky, keptAt: Date.now(), dateAt: Date.now() };
   saveDraft();
   if (ui.textarea) ui.textarea.value = '';
   paintDate(); paintSel(); paintQuick();
@@ -360,6 +365,7 @@ async function saveBulk(e) {
   const btn = e && e.currentTarget;
   const def = curDate();
   const rows = bulkRows.filter(r => r.details.trim() || String(r.initials || '').trim() || r.cats.length);
+  if (!(await okNoIds(...rows.map(r => r.details)))) return;
   if (rows.some(r => !r.cats.length) && !(await confirmBox('Some cases have no category', 'Save them anyway? They will not count towards any target until you add one.', 'Save all'))) return;
   const now = Date.now();
   const cases = rows.map((r, i) => ({ id: uid(), date: r.date || def, initials: cleanInitials(r.initials), details: r.details.trim(), cats: sortCodes(r.cats), createdAt: now + i, updatedAt: now + i, source: 'paste' }));
@@ -423,6 +429,7 @@ export function editCaseDialog(c) {
       h('span', { class: 'grow' }),
       h('button', { onclick: () => m.close() }, 'Cancel'),
       h('button', { class: 'primary', onclick: async () => {
+        if (!(await okNoIds(e.details))) return;
         m.close();
         await updateCase({ ...e, initials: cleanInitials(e.initials), details: e.details.trim() });
         toast('Case updated', { action: 'Undo', onaction: () => restoreCase(c) });

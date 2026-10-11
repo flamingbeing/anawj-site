@@ -106,6 +106,14 @@ export async function signIn() {
 }
 
 // Signing out also wipes this device's offline copy of the cases (a shared theatre PC keeps nothing).
+// True when every local change has reached the server within ms (offline: false). Signing out
+// wipes the offline cache, so changes still waiting for signal would be lost.
+export async function synced(ms = 4000) {
+  if (demo) return true;
+  const { db, F } = await sdk();
+  return Promise.race([F.waitForPendingWrites(db).then(() => true, () => false), new Promise(r => setTimeout(() => r(false), ms))]);
+}
+
 // Demo only: wipe the in-browser demo data and start again with the made-up cases.
 export function resetDemo() { if (demo) D.resetDemo(); }
 
@@ -139,6 +147,14 @@ export async function isAdmin(email) {
     if (e?.code !== 'permission-denied') console.warn('Admin check failed', e);
     return false;
   }
+}
+
+// Programme directors (pds/{email}, managed with the evals app) can read the shared totals.
+export async function isPD(email) {
+  if (demo) return false;
+  const { db, F } = await sdk();
+  try { return (await F.getDoc(F.doc(db, 'pds', lc(email)))).exists(); }
+  catch (e) { if (e?.code !== 'permission-denied') console.warn('PD check failed', e); return false; }
 }
 
 export async function myResident(email) {
@@ -317,6 +333,8 @@ export async function deleteResident(rid) {
   if (demo) return D.deleteResident(rid);
   const { db, F } = await sdk();
   await F.deleteDoc(F.doc(db, 'residents', String(rid)));
+  // their row on Totals goes too (they can no longer write it, so it would stay frozen)
+  await F.deleteDoc(F.doc(db, 'summaries', String(rid))).catch(err => console.warn('summary not removed', err));
 }
 
 // ---- shared templates (everyone reads, admins write) ----

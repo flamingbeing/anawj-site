@@ -1,7 +1,7 @@
 // Progress (my targets) and Totals (everyone's counts, for benchmarking; counts only, never details).
 
 import { R_YEARS, BY_CODE, CATEGORIES } from './categories.js';
-import { progress, epaProgress, todayISO } from './engine.js';
+import { progress, epaProgress, todayISO, rYearDefault } from './engine.js';
 import { exportTotals } from './xlsxio.js';
 import { reflectionProgress } from './reflections.js';
 import { S, h, toast, cloud, rYear, settings, patchLogbook, needExcel, download, displayName, hooks, add, resetters } from './ui-core.js';
@@ -139,7 +139,23 @@ async function loadSummaries() {
   tview.loading = true; tview.error = '';
   // counts are written by each resident's device: anything that isn't a whole number counts as 0
   const clean = c => Object.fromEntries(Object.entries(c && typeof c === 'object' ? c : {}).map(([k, v]) => [k, Number.isFinite(v) && v > 0 ? Math.floor(v) : 0]));
-  try { tview.summaries = (await cloud.listSummaries()).map(x => ({ ...x, counts: clean(x.counts) })); }
+  const whole = v => (Number.isFinite(v) && v > 0 ? Math.floor(v) : 0);
+  // the academic year (from 1 July) a time falls in; a summary last written in an earlier one moves
+  // its year on, so a resident who hasn't opened the app since 30 June isn't coloured as last year
+  const ay = t => { const d = new Date(t); return d.getMonth() >= 6 ? d.getFullYear() : d.getFullYear() - 1; };
+  const nowAy = ay(Date.now());
+  const yearOf = x => {
+    const base = Number(x.rYear) || (x.intake && rYearDefault(x.intake)) || null;
+    if (!base) return null;
+    return Math.min(5, base + (x.updatedAt ? Math.max(0, nowAy - ay(x.updatedAt)) : 0));
+  };
+  try {
+    tview.summaries = (await cloud.listSummaries()).map(x => {
+      const ridYear = Number(String(x.rid || '').slice(0, 4));
+      const intake = Number(x.intake) || (ridYear > 2000 && ridYear < 2100 ? ridYear : null);   // no intake: the rid starts with it
+      return { ...x, intake, rYear: yearOf({ ...x, intake }), counts: clean(x.counts), total: whole(x.total), reflectionsTotal: whole(x.reflectionsTotal) };
+    });
+  }
   catch (err) { tview.summaries = []; tview.error = 'Could not load totals: ' + err.message; }
   tview.loading = false;
   if (S.tab === 'totals') hooks.render();
