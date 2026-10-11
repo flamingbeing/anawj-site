@@ -13,6 +13,7 @@
   --link-hover: #d7340b;    /* n-hover-light */
   --orange: #e57200;        /* n-orange */
   --red: #e4002b;           /* n-red */
+  --ok: #1d7a3a;
   --accent: var(--navy);
   --accent-ink: #ffffff;
   --chip: #d5e3ef;          /* n-bg-blue */
@@ -123,7 +124,19 @@ tr.off td:first-child { opacity: 1; }
 .name .icon.del:hover { color: var(--red); background: var(--chip); }
 .tag-editor .where { border-bottom: 1px solid var(--line); padding-bottom: 6px; margin-bottom: 2px; font-size: 13px; }
 .tag-editor .where ul { margin: 4px 0 0; padding-left: 18px; }
-.datebar label { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+/* header date: the date in words over the native picker, steps either way, save state below */
+.datebar { display: grid; gap: 4px; justify-items: start; }
+.date-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.date-row button.small { padding: 4px 10px; font-size: 13px; }
+.date-row button[aria-pressed="true"] { background: var(--navy); color: #fff; border-color: var(--navy); }
+.date-pick { position: relative; display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: var(--radius); padding: 4px 10px; font-weight: 600; color: var(--navy); background: var(--panel); cursor: pointer; }
+.date-pick input { position: absolute; inset: 0; opacity: 0; width: 100%; cursor: pointer; }
+.date-pick input::-webkit-calendar-picker-indicator { position: absolute; inset: 0; width: 100%; height: 100%; cursor: pointer; }
+.date-pick:focus-within { outline: 2px solid var(--navy); outline-offset: 1px; }
+.date-notes { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; align-items: center; }
+.date-warn { color: var(--warn); background: var(--warn-bg); padding: 1px 6px; font-weight: 600; }
+.save-state .saved { color: var(--ok); }
+.save-state .unsaved { color: var(--red); font-weight: 600; }
 @media print { .datebar { display: none; } }
 .name:hover { border-color: var(--line); background: var(--chip); }
 .name.over { border-color: var(--accent); background: var(--chip); box-shadow: 0 0 0 1px var(--accent); }
@@ -270,3 +283,31 @@ a.btn { text-decoration: none; }
 .person-box .btn-group button { margin: 0; }
 tr.highlight td { background: #fff4c2 !important; transition: background 1s; }
 .status-pick { flex-wrap: wrap; } .status-pick button[aria-pressed=true] { background: var(--navy); color: #fff; border-color: var(--navy); }
+
+.add-flag { padding: 0 8px; font-size: 12px; line-height: 20px; border-style: dashed; color: var(--muted); background: none; }
+.add-flag:hover { color: var(--navy); border-color: var(--navy); }
+
+/* roster cells: the + and the & / C handles appear on hover; an empty cell always shows its + */
+.sheet .cell .add-name { opacity: 0; }
+.sheet .cell:hover .add-name, .sheet .cell:focus-within .add-name, .sheet .cell:not(:has(.name)) .add-name { opacity: 1; }
+@media (hover: none), (pointer: coarse) { .sheet .cell .add-name { opacity: .35; } .sheet .cell:not(:has(.name)) .add-name { opacity: 1; } }
+.name .icon { opacity: 0; }
+.name:hover .icon, .name:focus-within .icon, .name .icon.dbl.on { opacity: 1; }
+.name.hl, .pchip.hl { background: #fff3c4; border-color: #c99a06; box-shadow: 0 0 0 1px #c99a06; }
+
+/* tabs: the daily ones in work order, the set-up ones (Staff, Settings) to the right */
+.tabs button.setup { display: inline-flex; align-items: center; gap: 6px; }
+.tabs button.setup:first-of-type, .tabs button[data-tab="staff"] { margin-left: auto; }
+@media (max-width: 560px) {
+  .tabs { gap: 0; }
+  .tabs button { padding: 10px 9px; }
+  .tabs button.setup .tab-text { display: none; }
+}
+.next-step { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 12px 14px; margin: 8px 0 12px; background: var(--chip); border-left: 4px solid var(--navy); }
+.next-step span { flex: 1 1 260px; }
+
+/* long tables: the header row stays on screen (wide screens, where the table needs no sideways scroll);
+   the room column stays put when a narrow screen scrolls sideways */
+@media (min-width: 900px) { .card.scroll:has(> table.sheet) { overflow: visible; } }
+.sheet thead th { z-index: 2; box-shadow: 0 1px 0 var(--line); }
+@media (max-width: 899px) { .sheet td.room { position: sticky; left: 0; z-index: 1; background: var(--panel); } }

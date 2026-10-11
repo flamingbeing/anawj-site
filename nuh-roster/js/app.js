@@ -217,6 +217,7 @@ function render() {
   if (!['monthly', 'roster', 'premed', 'cases', 'staff', 'settings'].includes(state.tab)) state.tab = 'staff';
   personCache.clear();
   syncMonthly();
+  if (hashPending?.date === state.day.date) { markSaved(hashPending.date, hashPending.at); hashPending = null; }
   app.replaceChildren(({ monthly: renderMonthly, roster: renderRoster, premed: renderPremed, cases: () => renderDay('cases'), staff: renderStaffTab, settings: renderSettings })[state.tab]());
   renderCloudBar();
   renderDateBar();
@@ -235,7 +236,7 @@ function switchDate(date) {
   state.day.date = date;
   state.roster = rec?.roster || null;
   syncRooms();
-  undoStack = []; editing = null;
+  clearUndo(); editing = null;
   lastRows = state.roster ? JSON.stringify(state.roster.rows) : null;
   render();
 }
@@ -250,13 +251,49 @@ function renderDemoBar() {
     h('a', { class: 'btn small', href: location.pathname }, 'Exit demo')));
 }
 
-// One date for the whole workspace, in the header.
+// One date for the whole workspace, in the header: the date in words (the picker shows
+// mm/dd on some phones), steps a day either way, and whether this day is saved.
+const isoDate = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const realToday = () => isoDate(new Date());
+const longDate = iso => iso ? new Date(iso + 'T12:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) : '';
 function renderDateBar() {
   const el = document.getElementById('date');
   if (!el) return;
-  const input = el.querySelector('input') || el.appendChild(h('label', {}, 'Roster for ', h('input', { type: 'date', onchange: e => { if (e.target.value) switchDate(e.target.value); } }))).querySelector('input');
-  if (input.value !== state.day.date) input.value = state.day.date || '';
+  if (!el.querySelector('.date-pick')) {
+    const step = n => () => switchDate(addDays(state.day.date || realToday(), n));
+    el.append(
+      h('div', { class: 'date-row' },
+        h('button', { class: 'small', title: 'Previous day', 'aria-label': 'Previous day', onclick: step(-1) }, '‹'),
+        h('label', { class: 'date-pick' }, h('span', { class: 'date-words' }), h('input', { type: 'date', 'aria-label': 'Roster date', onchange: e => { if (e.target.value) switchDate(e.target.value); } })),
+        h('button', { class: 'small', title: 'Next day', 'aria-label': 'Next day', onclick: step(1) }, '›'),
+        h('button', { class: 'small', 'data-go': 'today', onclick: () => switchDate(realToday()) }, 'Today'),
+        h('button', { class: 'small', 'data-go': 'tomorrow', onclick: () => switchDate(today()) }, 'Tomorrow')),
+      h('div', { class: 'date-notes' }, h('span', { class: 'date-warn' }), h('span', { class: 'save-state' })));
+  }
+  const date = state.day.date || '';
+  const input = el.querySelector('input');
+  if (input.value !== date) input.value = date;
+  el.querySelector('.date-words').textContent = longDate(date) || 'Pick a date';
+  el.querySelectorAll('[data-go]').forEach(b => b.setAttribute('aria-pressed', String(date === (b.dataset.go === 'today' ? realToday() : today()))));
+  const warn = el.querySelector('.date-warn');
+  warn.textContent = date && date !== today() ? `Not tomorrow: you're on ${date === realToday() ? 'today' : longDate(date)}.` : '';
+  warn.hidden = !warn.textContent;
+  el.querySelector('.save-state').replaceChildren(...saveState());
 }
+
+// Whether the day on screen is saved where the team can see it.
+const hashOf = o => { let x = 5381; const t = JSON.stringify(o); for (let i = 0; i < t.length; i++) x = (x * 33 ^ t.charCodeAt(i)) >>> 0; return x.toString(36); };
+const dayHash = () => hashOf({ day: state.day, roster: state.roster });
+let hashPending = null; // a date whose saved copy was just opened; its hash is taken after the next sync
+function saveState() {
+  const date = state.day.date;
+  if (DEMO || !cloud.enabled || !isMember()) return [h('span', { class: 'seen' }, 'Saved in this browser only')];
+  const saved = state.cloudHash?.[date];
+  if (!saved) return [h('span', { class: 'unsaved' }, state.roster ? 'Not saved to the team yet' : '')];
+  if (saved.hash === dayHash()) return [h('span', { class: 'saved' }, `✓ Saved to the team ${when(saved.at)}`)];
+  return [h('span', { class: 'unsaved' }, 'Changes not saved to the team'), ' ', h('button', { class: 'small', onclick: saveRosterToCloud }, 'Save')];
+}
+function markSaved(date, at) { (state.cloudHash ||= {})[date] = { hash: dayHash(), at }; }
 
 document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', async () => {
   const t = b.dataset.tab;
@@ -671,6 +708,10 @@ let unmatched = [];
 let lockEditing = null;
 let settingsEditing = false; // "roomId:lockSenior" while picking a fixed person on the Cases tab
 
+// A box saying what to do next, with a button that goes there.
+const goTab = async t => { if (staffEditing() && t !== 'staff' && !(await finishStaffEdit())) return; state.tab = t; window.scrollTo(0, 0); render(); };
+const nextStep = (text, label, tab) => h('div', { class: 'next-step' }, h('span', {}, text), h('button', { class: 'primary', onclick: () => goTab(tab) }, label + ' →'));
+let flagsOpen = null; // the room whose full set of flags is showing on Cases
 function renderDay(part) {
   const cases = part === 'cases';
   const d = state.day;
@@ -704,6 +745,21 @@ function renderDay(part) {
     return input;
   };
 
+  // flags: only the ones that are on, as chips; "+ flag" opens the full set for that room
+  const flagCell = r => {
+    const all = [
+      ...subs.map(x => ({ label: x.label, on: r.flags.subspecs.includes(x.key), toggle: () => { r.flags.subspecs = r.flags.subspecs.includes(x.key) ? r.flags.subspecs.filter(k => k !== x.key) : [...r.flags.subspecs, x.key]; } })),
+      { label: 'Complex', title: 'No double cover, no MOPEX/Baby MO if avoidable, no liver standby senior', on: !!r.flags.complex, toggle: () => { r.flags.complex = !r.flags.complex; } },
+      { label: 'Runs late', title: 'Runs late: avoid people who need to leave early', on: !!r.flags.long, toggle: () => { r.flags.long = !r.flags.long; } },
+    ];
+    const open = flagsOpen === r.id;
+    const chip = f => h('span', { class: 'chip' + (f.on ? ' on' : ''), title: f.title || (f.on ? `Remove ${f.label}` : `Add ${f.label}`), onclick: () => { r.flagsManual = true; f.toggle(); render(); } }, f.label, f.on && !open ? ' ×' : '');
+    if (!r.running) return null;
+    return h('div', { class: 'chips' },
+      (open ? all : all.filter(f => f.on)).map(chip),
+      h('button', { class: 'add-flag', onclick: () => { flagsOpen = open ? null : r.id; render(); } }, open ? 'Done' : '+ flag'));
+  };
+
   const roomRow = r => h('tr', { class: r.running ? '' : 'off' },
     h('td', {}, h('input', { type: 'checkbox', checked: r.running, 'aria-label': 'Running', onchange: e => { r.running = e.target.checked; if (r.running && !r.flagsManual) r.flags = suggestFlags(r.notes, state.settings, r.name); render(); } })),
     h('td', {}, h('b', {}, r.name)),
@@ -714,14 +770,7 @@ function renderDay(part) {
       if (!r.flagsManual) r.flags = suggestFlags(r.notes, state.settings, r.name);
       render();
     } })),
-    h('td', {}, h('div', { class: 'chips' },
-      subs.map(s => {
-        const on = r.flags.subspecs.includes(s.key);
-        return h('span', { class: 'chip' + (on ? ' on' : ''), onclick: () => { r.flagsManual = true; r.flags.subspecs = on ? r.flags.subspecs.filter(k => k !== s.key) : [...r.flags.subspecs, s.key]; render(); } }, s.label);
-      }),
-      h('span', { class: 'chip' + (r.flags.complex ? ' on' : ''), title: 'No double cover, no MOPEX/Baby MO if avoidable, no liver standby senior', onclick: () => { r.flagsManual = true; r.flags.complex = !r.flags.complex; render(); } }, 'Complex'),
-      h('span', { class: 'chip' + (r.flags.long ? ' on' : ''), title: 'Runs late: avoid people who need to leave early', onclick: () => { r.flagsManual = true; r.flags.long = !r.flags.long; render(); } }, 'Runs late'),
-    )),
+    h('td', {}, flagCell(r)),
     h('td', {}, lockInput(r, 'lockSenior')),
     h('td', {}, lockInput(r, 'lockJunior')),
   );
@@ -734,6 +783,7 @@ function renderDay(part) {
     names,
     h('section', { class: 'card' },
       h('h2', {}, cases ? 'Cases' : 'Manpower'),
+      !state.staff.length ? nextStep('Add the staff list first, so names in the draft can be matched.', 'Go to Staff', 'staff') : null,
       h('div', { class: 'bar' },
         fileButton('Load draft roster (.xlsx)', '.xlsx', false, loadDraft),
         cases
@@ -752,7 +802,7 @@ function renderDay(part) {
     ),
     cases && h('section', { class: 'card scroll' },
       h('h2', {}, 'OT lists'),
-      h('p', { class: 'hint' }, 'Tick the rooms that are running and type the case notes as usual. Flags are suggested from the notes (ages under ' + state.settings.paedsAgeYears + 'y count as paeds). Click a flag to change it. Fix a senior or junior to lock them in; the rest is filled automatically.'),
+      h('p', { class: 'hint' }, 'Tick the rooms that are running and type the case notes as usual. Flags are suggested from the notes (ages under ' + state.settings.paedsAgeYears + 'y count as paeds); "+ flag" adds or removes one. Fix a senior or junior to lock them in; the rest is filled automatically.'),
       h('table', {},
         h('thead', {}, h('tr', {}, ['Run', 'Room', 'Session', 'Case notes', 'Flags', 'Fixed senior', 'Fixed junior'].map(t => h('th', {}, t)))),
         h('tbody', {}, d.rooms.map(roomRow))),
@@ -965,26 +1015,52 @@ function setCellParts(row, key, parts) {
 }
 
 let undoStack = []; // roster rows as JSON, or { roster, day?, what } (JSON) for a whole-roster or whole-day change
+let redoStack = []; // what Undo took back, in the same form; any new change clears it
+function pushUndo(e) {
+  undoStack.push(e);
+  if (undoStack.length > 50) undoStack.shift();
+  redoStack = [];
+}
+const clearUndo = () => { undoStack = []; redoStack = []; };
 // Before replacing the whole roster (Generate new): keep the roster. With day, also the day's
 // details (restoring a saved version, the person box), and even when there's no roster yet.
 function pushUndoAll(what, { day = false } = {}) {
   const rosterNow = state.roster && state.roster.date === state.day.date ? state.roster : null;
   if (!rosterNow && !day) return;
-  undoStack.push({ roster: JSON.stringify(rosterNow), ...(day ? { day: JSON.stringify(state.day) } : {}), what });
-  if (undoStack.length > 50) undoStack.shift();
+  pushUndo({ roster: JSON.stringify(rosterNow), ...(day ? { day: JSON.stringify(state.day) } : {}), what });
 }
-function undo() {
-  const e = undoStack.pop();
-  if (!e) return;
+// The state an entry would replace, in the entry's own form, so the step can be reversed.
+const inverseOf = e => typeof e === 'string' ? JSON.stringify(state.roster?.rows || [])
+  : { roster: JSON.stringify(state.roster), ...(e.day ? { day: JSON.stringify(state.day) } : {}), what: e.what };
+function applyStep(e, verb) {
   if (typeof e === 'string') { if (state.roster) { state.roster.rows = JSON.parse(e); afterRosterEdit(true); } return; }
   if (e.day) state.day = JSON.parse(e.day);
   state.roster = JSON.parse(e.roster);
   lastRows = state.roster ? JSON.stringify(state.roster.rows) : null;
-  if (state.roster) logRoster([`Undo: ${e.what}`]);
+  if (state.roster) logRoster([`${verb}: ${e.what}`]);
   syncRooms();
   render();
-  toast(`Undid ${e.what}.`);
+  toast(`${verb === 'Undo' ? 'Undid' : 'Redid'} ${e.what}.`);
 }
+function undo() {
+  const e = undoStack.pop();
+  if (!e) return;
+  redoStack.push(inverseOf(e));
+  applyStep(e, 'Undo');
+}
+function redo() {
+  const e = redoStack.pop();
+  if (!e) return;
+  undoStack.push(inverseOf(e));
+  applyStep(e, 'Redo');
+}
+// Ctrl+Z / Ctrl+Y (Cmd on a Mac) when not typing in a box
+document.addEventListener('keydown', e => {
+  if (!(e.ctrlKey || e.metaKey) || e.altKey || e.target.closest?.('input, textarea, select, [contenteditable]')) return;
+  const k = e.key.toLowerCase();
+  if (k === 'z' && !e.shiftKey && undoStack.length) { e.preventDefault(); undo(); }
+  else if ((k === 'y' || (k === 'z' && e.shiftKey)) && redoStack.length) { e.preventDefault(); redo(); }
+});
 let lastRows = null; // rows as of the last logged change
 let editing = null; // "rowIndex:key" of the cell being typed in
 
@@ -1077,8 +1153,7 @@ function dropName(src, dst) {
   const name = aParts[src.part];
   if (name == null) return;
   if (src.row === dst.row && src.key === dst.key && (dst.part == null || dst.part === src.part)) return;
-  undoStack.push(JSON.stringify(rows));
-  if (undoStack.length > 50) undoStack.shift();
+  pushUndo(JSON.stringify(rows));
   if (dst.part != null) {
     // swap two names
     const bParts = src.row === dst.row && src.key === dst.key ? aParts : cellParts(b, dst.key);
@@ -1108,7 +1183,7 @@ function dropFromPool(id, dst) {
   if (!p || !row || !dst.key) return;
   const d = dayOf(p.id);
   const admin = d.status === 'admin';
-  if (admin) pushUndoAll(`putting ${p.name} in ${row.label}`, { day: true }); else undoStack.push(JSON.stringify(state.roster.rows));
+  if (admin) pushUndoAll(`putting ${p.name} in ${row.label}`, { day: true }); else pushUndo(JSON.stringify(state.roster.rows));
   if (admin) { d.status = 'avail'; d.manual = true; } // off their admin day and onto a list
   const text = p.role === 'senior' ? fmtSenior(p, d) : fmtJunior(p, d);
   const parts = cellParts(row, dst.key);
@@ -1129,7 +1204,7 @@ function dropAsCover(src, dst) {
   if (!n) return;
   const parts = cellParts(to, 'junior');
   if (parts.some(x => namesInCell(x)[0] === n)) return toast(`${n} is already in ${to.label}.`);
-  undoStack.push(JSON.stringify(rows));
+  pushUndo(JSON.stringify(rows));
   parts.push(buildNamePart({ name: cur.name, tags: [...cur.tags.filter(t => TAGS.includes(t)), 'C'], leave: '', cover: '', dash: '' }));
   setCellParts(to, 'junior', parts);
   toast(`${n} covers ${to.label} (C).`);
@@ -1148,7 +1223,7 @@ function dropAsDouble(src, dst) {
   const parts = cellParts(to, 'senior');
   if (parts.some(x => namesInCell(x)[0] === n)) return toast(`${n} is already in ${to.label}.`);
   if (from.complex !== to.complex && !confirm(`${from.label} and ${to.label} are in different complexes. Double cover across complexes anyway?`)) return;
-  undoStack.push(JSON.stringify(rows));
+  pushUndo(JSON.stringify(rows));
   parts.push(buildNamePart({ name: cur.name, tags: cur.tags.filter(t => TAGS.includes(t)), leave: cur.leave, cover: '', dash: '' }));
   setCellParts(to, 'senior', parts);
   toast(`${n} double covers ${from.label} and ${to.label}.`);
@@ -1161,7 +1236,7 @@ function dropToPool(src) {
   const parts = row ? cellParts(row, src.key) : [];
   const name = parts[src.part];
   if (name == null) return;
-  undoStack.push(JSON.stringify(state.roster.rows));
+  pushUndo(JSON.stringify(state.roster.rows));
   parts.splice(src.part, 1);
   setCellParts(row, src.key, parts);
   toast(`Took ${namesInCell(name)[0] || name} off ${row.label}.`);
@@ -1314,7 +1389,14 @@ function whereCard(p) {
     h('ul', {}, (at.length ? at : ['Not on any list today']).map(t => h('li', {}, t))));
 }
 
-function closeTagEditor() { document.querySelector('.tag-editor')?.remove(); }
+function closeTagEditor() { document.querySelector('.tag-editor')?.remove(); boxPerson = null; highlightPerson(null); }
+// Light up every chip of one person (hover, or while their box is open), so double bookings show.
+let boxPerson = null;
+function highlightPerson(id) {
+  const on = id || boxPerson;
+  document.querySelectorAll('[data-pid].hl').forEach(e => { if (e.dataset.pid !== on) e.classList.remove('hl'); });
+  if (on) document.querySelectorAll(`[data-pid="${on}"]`).forEach(e => e.classList.add('hl'));
+}
 
 function openRawEditor(chip, src) {
   closeTagEditor();
@@ -1349,7 +1431,7 @@ function openRawEditor(chip, src) {
     const next = buildNamePart({ name: picked, tags, leave: leave.value.trim().replace(/^L-/i, ''), cover: coverTo, dash: dash.value.trim() });
     closeTagEditor();
     if (next === parts[src.part]) return;
-    undoStack.push(JSON.stringify(state.roster.rows));
+    pushUndo(JSON.stringify(state.roster.rows));
     parts[src.part] = next;
     setCellParts(row, src.key, parts);
     // a junior covering another room (C-OT13) is shown there as "Name (C)"
@@ -1364,7 +1446,7 @@ function openRawEditor(chip, src) {
   };
   const remove = () => {
     closeTagEditor();
-    undoStack.push(JSON.stringify(state.roster.rows));
+    pushUndo(JSON.stringify(state.roster.rows));
     parts.splice(src.part, 1);
     setCellParts(row, src.key, parts);
     afterRosterEdit();
@@ -1411,7 +1493,7 @@ function dayMarks(p) {
 // The person chip for the daily tabs: short name in their colour, then the day's markers
 function personChip(p, attrs = {}, ...extra) {
   const marks = dayMarks(p);
-  return h('span', { class: 'name pchip', style: colourStyle(p.name), title: `${p.name} · ${p.grade}`, ...attrs },
+  return h('span', { class: 'name pchip', 'data-pid': p.id, style: colourStyle(p.name), title: `${p.name} · ${p.grade}`, ...attrs },
     h('span', { class: 'label' }, shortName(p) || p.name), marks ? h('span', { class: 'marks' }, ' ' + marks) : null, ...extra);
 }
 
@@ -1451,6 +1533,7 @@ async function goEditStaff(p) {
 // ctx: { kind: 'roster', src } | { kind: 'today' } | { kind: 'lock', room, key } | { kind: 'premed', row, options }
 function openPersonBox(anchor, p, ctx) {
   closeTagEditor();
+  boxPerson = p.id; setTimeout(() => highlightPerson(p.id));
   const d = state.day.staff[p.id] || {};
   const roster = ctx.kind === 'roster';
   const rrow = roster ? state.roster.rows[ctx.src.row] : null;
@@ -1566,7 +1649,7 @@ function openTagEditor(chip, src) {
 function editNotes(i, value) {
   const row = state.roster.rows[i];
   if (!row || value === row.notes) return;
-  undoStack.push(JSON.stringify(state.roster.rows));
+  pushUndo(JSON.stringify(state.roster.rows));
   logRoster([`${row.label} cases: ${row.notes || '—'} → ${value || '—'}`]);
   row.notes = value;
   lastRows = JSON.stringify(state.roster.rows);
@@ -1619,7 +1702,7 @@ async function addToCell(i, key, text) {
   if (!p) return false;
   const row = state.roster.rows[i];
   const d = state.day.staff[p.id] || {};
-  undoStack.push(JSON.stringify(state.roster.rows));
+  pushUndo(JSON.stringify(state.roster.rows));
   setCellParts(row, key, [...cellParts(row, key), p.role === 'senior' ? fmtSenior(p, d) : fmtJunior(p, d)]);
   editing = null;
   afterRosterEdit();
@@ -1650,7 +1733,9 @@ function rosterCell(row, i, key, doubles) {
   const chip = (p, k) => {
     const src = { row: i, key, part: k };
     const icon = (cls, title, text, o) => h('span', { class: 'icon ' + cls, title, onpointerdown: e => { e.stopPropagation(); o.down?.(e); }, onclick: e => { e.stopPropagation(); o.click?.(); } }, text);
-    const el = h('span', { class: 'name', 'data-drop': '', 'data-row': i, 'data-key': key, 'data-part': k, style: colourStyle(p), title: p,
+    const pid = personOfPart(p)?.id;
+    const el = h('span', { class: 'name', 'data-drop': '', 'data-row': i, 'data-key': key, 'data-part': k, 'data-pid': pid || '', style: colourStyle(p), title: p,
+      onpointerenter: TOUCH || !pid ? null : () => highlightPerson(pid), onpointerleave: TOUCH || !pid ? null : () => highlightPerson(null),
       onpointerdown: TOUCH ? null : e => startNameDrag(e, src),
       onclick: TOUCH ? () => openTagEditor(el, src) : null },
       !TOUCH && key === 'junior' && !isCoverPart(p) ? icon('cover', 'Drag to another room to add them there as an ad hoc cover (C). They stay in this room.', 'C', { down: e => startNameDrag(e, { ...src, cover: true }) }) : null,
@@ -1748,7 +1833,7 @@ function fillGaps() {
   const kept = new Set(rows.map(x => x.roomId));
   rows.push(...r.rows.filter(o => !kept.has(o.roomId) && (o.senior || o.junior || o.premed)));
   if (!filled.length) return toast('Nothing to fill: no one free for the empty cells.');
-  undoStack.push(JSON.stringify(r.rows));
+  pushUndo(JSON.stringify(r.rows));
   r.rows = rows;
   r.warnings = res.warnings;
   editing = null;
@@ -1965,7 +2050,7 @@ function manpowerBoard() {
       } }, 'Reset to monthly rosters') : null,
       h('span', { class: 'grow' }),
       h('input', { placeholder: 'Filter names', value: boardFilter, oninput: e => { boardFilter = e.target.value; const pos = e.target.selectionStart; render(); const i = app.querySelector('.card input[placeholder="Filter names"]'); i.focus(); i.setSelectionRange(pos, pos); } })),
-    state.staff.length ? h('div', { class: 'board' }, BOARD.map(col)) : h('p', { class: 'empty' }, 'Add staff on the Staff tab first.'));
+    state.staff.length ? h('div', { class: 'board' }, BOARD.map(col)) : nextStep('Nobody here yet: add the staff list first.', 'Go to Staff', 'staff'));
 }
 
 // The day's other duties from the monthly rosters (AOH, liver team, cardiac and so on)
@@ -2131,7 +2216,7 @@ function renderLeaveRoster() {
 
 function renderPremed() {
   const r = state.roster;
-  if (!r) return h('section', { class: 'card empty' }, 'Generate a roster on the Roster tab first.');
+  if (!r) return h('section', { class: 'card' }, h('h2', {}, 'Premed cover'), nextStep('Premed cover is set on the roster. Make the roster first.', 'Go to Roster', 'roster'));
   const byName = n => matchName(n, state.staff).person;
   const away = p => !!p && !!state.day.staff[p.id]?.notAroundPrev;
   // who can cover: residents and MOPEX who were around yesterday and are working today
@@ -2144,7 +2229,7 @@ function renderPremed() {
   r.rows.forEach(row => cellParts(row, 'junior').forEach(part => { const p = byName(namesInCell(part)[0] || ''); if (p) homeOf[p.id] = row.label; }));
 
   const setCover = (row, name) => {
-    undoStack.push(JSON.stringify(r.rows));
+    pushUndo(JSON.stringify(r.rows));
     row.premed = name ? `${name} - Premed` : '';
     afterRosterEdit();
   };
@@ -2260,14 +2345,23 @@ function renderRoster() {
   const actions = h('div', { class: 'bar' },
     h('button', { class: 'primary', onclick: () => runGenerate(!!r) }, r ? 'Generate new' : 'Generate roster'),
     r && r.date === state.day.date && h('button', { onclick: fillGaps, title: 'Keep every name already on the roster and fill only the empty cells' }, 'Fill empty gaps'),
-    r && h('button', { disabled: !undoStack.length, onclick: undo }, 'Undo'),
+    r && h('button', { disabled: !undoStack.length, title: undoStack.length ? `Undo${typeof undoStack.at(-1) === 'object' ? ' ' + undoStack.at(-1).what : ' the last change'} (Ctrl+Z)` : 'Nothing to undo', onclick: undo }, 'Undo'),
+    r && h('button', { disabled: !redoStack.length, title: redoStack.length ? 'Redo (Ctrl+Y)' : 'Nothing to redo', onclick: redo }, 'Redo'),
     r && isMember() && h('button', { class: 'primary', onclick: saveRosterToCloud }, 'Save'),
     r && h('div', { class: 'seg', role: 'group', 'aria-label': 'View' },
       h('button', { 'aria-pressed': String(rosterView === 'edit'), onclick: () => { rosterView = 'edit'; render(); } }, 'Edit'),
       h('button', { 'aria-pressed': String(rosterView === 'sheet'), onclick: () => { rosterView = 'sheet'; render(); } }, 'Sheet preview')),
     r && downloadButton(),
   );
-  if (!r) return h('div', {}, h('section', { class: 'card' }, h('h2', {}, 'OT roster'), h('p', { class: 'hint' }, 'Generates AOCC, AIC and the OT lists: seniors, juniors and premed cover. You can edit any cell before downloading.'), actions), historyCard());
+  if (!r) {
+    // what's missing before a roster can be made, with a way there
+    const casesIn = state.day.rooms.some(x => x.running && x.notes);
+    const next = !state.staff.length ? nextStep('Add the staff list first: the roster is made from it.', 'Go to Staff', 'staff')
+      : !casesIn ? nextStep('No case notes yet for this day. Load the admin draft on Cases first, or generate from the rooms that run by default.', 'Go to Cases', 'cases')
+      : null;
+    return h('div', {}, h('section', { class: 'card' }, h('h2', {}, 'OT roster'), next,
+      h('p', { class: 'hint' }, 'Generates AOCC, AIC and the OT lists: seniors, juniors and premed cover. You can edit any cell before downloading.'), state.staff.length ? actions : null), historyCard());
+  }
 
   ensureSpecialRows(r);
   const doubles = doubleCovered(r.rows.filter(x => x.complex !== 'Clinic'));
@@ -2543,7 +2637,8 @@ function renderCloudBar() {
   const el = document.getElementById('cloud');
   if (!el) return;
   const note = document.getElementById('privacy');
-  if (note && cloud.enabled) {
+  if (note && DEMO) note.hidden = true; // the demo banner says it already
+  else if (note && cloud.enabled) {
     note.textContent = isMember() ? '' : 'Works in this browser without signing in. Sign in to save and share rosters with the team.';
     note.hidden = isMember();
   }
@@ -2673,6 +2768,7 @@ async function saveRosterToCloud() {
       ts = await cloud.saveRoster(date, data, me(), { force: true });
     }
     state.cloudBase[date] = ts;
+    markSaved(date, ts);
     delete cs.meta[date]; delete cs.versions[date]; cs.recent = null;
     render();
     toast(`Saved the ${date} roster.`);
@@ -2688,7 +2784,7 @@ function openSaved(date, snapshot, updatedAt) {
   const local = here ? state.roster || dayHasData(state.day) : state.days?.[date] && (state.days[date].roster || dayHasData(state.days[date].day));
   if (local && !confirm(`Replace what you have for ${date} with the saved version?${here ? '' : ' Your changes to that date in this browser will be lost.'}`)) return;
   if (here) pushUndoAll('the restore', { day: true });
-  else { (state.days ||= {})[state.day.date] = { day: state.day, roster: state.roster }; undoStack = []; }
+  else { (state.days ||= {})[state.day.date] = { day: state.day, roster: state.roster }; clearUndo(); }
   delete state.days?.[date];
   state.day = clone(snapshot.day);
   state.roster = clone(snapshot.roster);
@@ -2696,6 +2792,7 @@ function openSaved(date, snapshot, updatedAt) {
   logRoster([`Restored the version saved ${snapshot.savedAt ? when(snapshot.savedAt) : ''} by ${byName(snapshot.savedBy || snapshot.updatedBy)}`.replace('  ', ' ')]);
   lastRows = state.roster ? JSON.stringify(state.roster.rows) : null;
   state.cloudBase[date] = updatedAt;
+  hashPending = { date, at: updatedAt };
   editing = null;
   syncRooms();
   state.tab = 'roster';
