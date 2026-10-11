@@ -315,8 +315,8 @@ function renderOne(card) {
   const draftNote = h('span', { class: 'draft-note', 'aria-live': 'polite' });
   const tagRow = h('div', { class: 'tag-row' }, tagBox, draftNote);
   const actions = h('div', { class: 'actions' },
-    h('button', { class: 'primary big', onclick: () => save({}) }, 'Save', h('span', { class: 'kbd', title: 'Ctrl+Enter (Cmd+Enter on a Mac)' }, ' Ctrl+⏎')),
-    h('button', { class: 'big', title: 'Save and keep this date for the next case', onclick: () => save({ another: true }) }, 'Save, keep date'));
+    h('button', { class: 'big', title: 'Save and keep this date for the next case', onclick: () => save({ another: true }) }, 'Save, keep date'),
+    h('button', { class: 'primary big', onclick: () => save({}) }, 'Save', h('span', { class: 'kbd', title: 'Ctrl+Enter (Cmd+Enter on a Mac)' }, ' Ctrl+⏎')));
 
   // what the box was read as (initials come off into their own field; age/sex stay in the details)
   const parsed = h('div', { class: 'parsed', 'aria-live': 'polite' });
