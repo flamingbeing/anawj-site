@@ -260,35 +260,10 @@ function listView(rows, flagsOf, repaint) {
 }
 
 // One case: date, details, procedure tags, flags. Tap to edit. Shared by the list and the calendar.
-// Swipe a row: right to edit, left to delete (Undo in the toast). A short tap still opens it.
-function swipeable(li, c) {
-  let x0 = null, y0 = 0, dx = 0, swiping = false;
-  li.addEventListener('touchstart', e => { const t = e.touches[0]; x0 = t.clientX; y0 = t.clientY; dx = 0; swiping = false; }, { passive: true });
-  li.addEventListener('touchmove', e => {
-    if (x0 == null) return;
-    const t = e.touches[0]; dx = t.clientX - x0;
-    if (!swiping && Math.abs(dx) > 14 && Math.abs(dx) > Math.abs(t.clientY - y0) * 1.5) swiping = true;
-    if (swiping) { li.style.transform = `translateX(${dx}px)`; li.classList.toggle('swipe-del', dx < -40); li.classList.toggle('swipe-edit', dx > 40); }
-  }, { passive: true });
-  li.addEventListener('touchend', () => {
-    if (swiping) {
-      // swallow the click that may follow the swipe, but only just after it (phones often send none)
-      const block = ev => { ev.stopPropagation(); ev.preventDefault(); };
-      li.addEventListener('click', block, { capture: true, once: true });
-      setTimeout(() => li.removeEventListener('click', block, { capture: true }), 400);
-      if (dx < -90) { li.style.transform = 'translateX(-110%)'; moveToBin('case', c, { toast: true }).catch(err => toast('Could not delete: ' + err.message)); }
-      else { li.style.transform = ''; if (dx > 90) editCaseDialog(c); }
-      li.classList.remove('swipe-del', 'swipe-edit');
-    }
-    x0 = null; swiping = false;
-  });
-  return li;
-}
-
 function caseRow(c, flagsOf) {
   const flags = flagsOf(c);
   const p = caseParts(c);
-  return swipeable(h('li', { 'data-date': c.date || '', onclick: () => editCaseDialog(c), tabindex: '0', onkeydown: e => { if (e.key === 'Enter' && e.target === e.currentTarget) editCaseDialog(c); } },
+  return h('li', { 'data-date': c.date || '', onclick: () => editCaseDialog(c), tabindex: '0', onkeydown: e => { if (e.key === 'Enter' && e.target === e.currentTarget) editCaseDialog(c); } },
       h('span', { class: 'd' }, c.date ? [h('span', { class: 'wd' }, weekday(c.date)), ' ', fmtDate(c.date).replace(/ \d{4}$/, '').replace(/^(\d+)/, (_, d) => nth(Number(d)))] : (c.dateText || '—')),
       h('span', { class: 't' }, p.initials ? [h('b', {}, p.initials), ' '] : null, p.details || (p.initials ? null : h('i', { class: 'muted' }, 'no details'))),
       h('span', { class: 'c' }, catTags(c.cats),
@@ -298,10 +273,10 @@ function caseRow(c, flagsOf) {
         !(c.cats || []).length ? h('span', { class: 'flag err' }, 'no tag') : null,
         c.reflectTag && !(S.reflections || []).some(r => r.caseId === c.id) ? h('span', { class: 'flag', title: 'Tagged as a possible reflection' }, '☆ reflection?') : null,
         (c.tags || []).map(t => h('span', { class: 'flag sc-tag', title: 'Your tag' }, tagName(t))),
-        // to your own notes (WhatsApp, Notes, Obsidian)
-        h('button', { class: 'small', style: 'margin-left:auto', title: 'Share this case', onclick: e => { e.stopPropagation(); shareText(shareCaseText(c)); } }, 'Share'),
+        // to your own notes (paste into WhatsApp, Notes, Obsidian)
+        h('button', { class: 'small', style: 'margin-left:auto', title: 'Copy this case', 'aria-label': 'Copy this case', onclick: e => { e.stopPropagation(); copyText(shareCaseText(c), 'Case copied: paste it into your notes'); } }, 'Copy'),
         h('button', { class: 'small', title: 'Write a reflection on this case', onclick: e => { e.stopPropagation(); reflectOnCase(c); } },
-          (S.reflections || []).some(r => r.caseId === c.id) ? 'Reflection' : 'Reflect'))), c);
+          (S.reflections || []).some(r => r.caseId === c.id) ? 'Reflection' : 'Reflect')));
 }
 
 // ---------- calendar ----------

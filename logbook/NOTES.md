@@ -36,7 +36,7 @@ portfolio content.
   Paste-a-list (List mode), Plan for later. `editCaseDialog` (full screen on phones, pinned
   Delete/Cancel/Save, 6-line growing box, Tags + "Add tags"; also "New case" from the reflection picker).
 - **Logbook** (`ui-logbook.js`): Calendar (default) | List | Grid. Calendar day: + Log a case (opens Log
-  on that date), Share day, Copy (Markdown). Rows: Share, Reflect. Filter: has all of / has none of
+  on that date), Share day, Copy (Markdown). Rows: Copy, Reflect (no swipe actions). Filter: has all of / has none of
   tags, dates, flag, search scope, fuzzy; Reset (everything); × in the search box clears just the text; saved searches (text, filters, "Search in"; not fuzzy); Tag N cases (bulk add/remove). Search text
   cached per case (`hayCache`, reset when the tag set changes).
 - **Reflections** (`ui-reflect.js`): list by heading, editor (Case details, learning points,
@@ -88,7 +88,7 @@ portfolio content.
 ## Review findings fixed (Oct 2026), worth not regressing
 
 - Saved searches must store copies of filter arrays; flag select resets with Clear.
-- Swipe click blockers must be removed shortly after (phones send no click).
+- Case rows have no swipe actions (owner: off); per-case Copy, not Share.
 - Diff keys compare tags with parents; pasted export rows (hidden id) aren't read as initials.
 - Removed personal tags show as "Removed tag" and stay filterable / bulk-removable.
 - Per-user state resets on sign-out (`resetters`), including Analytics, Reflections view, drafts;
