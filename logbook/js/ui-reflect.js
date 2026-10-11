@@ -446,8 +446,9 @@ function list() {
       h('div', { class: 'refl-hrow' },
         h('div', { class: 'grow refl-htoggle', role: 'button', tabindex: '0', 'aria-expanded': String(opened), onclick: () => toggle(hp.id, hp.met), onkeydown: e => { if (e.key === 'Enter') toggle(hp.id, hp.met); } },
           items.length ? h('span', { class: 'res-chev', 'aria-hidden': 'true' }, '›') : h('span', { class: 'res-chev blank', 'aria-hidden': 'true' }), ' ',
-          h('i', { class: `dot ${hp.met ? 'done' : hp.done ? 'ontrack' : 'due'}` }), ' ', h('b', {}, `${hp.done}/${hp.min}`), ' ', hp.name,
-          x.written > hp.done ? h('span', { class: 'muted refl-counts' }, ` · ${x.written} written`) : null),
+          h('i', { class: `dot ${hp.met ? 'done' : hp.done ? 'ontrack' : 'due'}` }), ' ', h('b', {}, `${hp.done}/${hp.min}`), ' ',
+          // the name flows beside the count (a long one wraps under itself, not below the count)
+          h('span', { class: 'refl-hname' }, hp.name, x.written > hp.done ? h('span', { class: 'muted refl-counts' }, ` · ${x.written} written`) : null)),
         em ? null : h('button', { class: 'small refl-add', title: 'Add a reflection under ' + hp.name, 'aria-label': 'Add a reflection under ' + hp.name, onclick: () => openPicker(false, { headingId: hp.id, subId: null }) }, '+ Add')),
       opened ? [
         HEADING_BY_ID[hp.id].subs ? h('div', { class: 'hint', style: 'margin:2px 0 0' }, 'Include at least one of each: ' + HEADING_BY_ID[hp.id].subs.map(s => s.name).join(' · ')) : null,

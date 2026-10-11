@@ -695,7 +695,9 @@ table.cat-names td.muted { font-size: 13px; }
 /* Reflections: export ticks, folded tagged line, collapsible headings */
 .refl-wc { font-size: 12px; }
 .refl-counts { font-size: 13px; }
-.refl-htoggle { cursor: pointer; min-height: 40px; display: flex; align-items: center; flex-wrap: wrap; gap: 0 4px; }
+.refl-htoggle { cursor: pointer; min-height: 40px; display: flex; align-items: baseline; flex-wrap: nowrap; gap: 0 4px; padding-top: 8px; }
+.refl-htoggle > b { flex: none; }
+.refl-htoggle .refl-hname { flex: 1; min-width: 0; }
 .refl-htoggle .res-chev { display: inline-block; transition: transform .15s; }
 .refl-htoggle[aria-expanded="true"] .res-chev { transform: rotate(90deg); }
 .ready-line { margin: 8px 0 0; padding: 6px 10px; border-radius: 10px; background: var(--info-bg); }
