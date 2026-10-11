@@ -131,13 +131,15 @@ export function reflectionProgress(reflections) {
     const mine = done.filter(r => r.headingId === h.id);
     const jrDone = mine.filter(r => r.jr).length;
     const jrNeeded = h.jr || 0;
-    const jrMax = h.jr ? Infinity : 1;
+    const jrMax = h.jr || 1;
     const subs = (h.subs || []).map(s => ({ id: s.id, name: s.name, min: s.min, done: mine.filter(r => r.subId === s.id).length }));
-    // JR and sub-type rules are shown as reminders only, not enforced
+    // JR credit is capped; required JR cases and sub-types remain reminders.
     const issues = [];
+    const jrExcess = Math.max(0, jrDone - jrMax);
+    if (jrExcess) issues.push(`${jrExcess} extra JR reflection${jrExcess === 1 ? '' : 's'} not counted (maximum ${jrMax})`);
     const dups = (reflections || []).filter(r => r.headingId === h.id && dupKeys.has(patientKey(r)));
     if (dups.length) issues.push(`Same patient used more than once (${[...new Set(dups.map(r => r.initials + ' ' + r.date))].join(', ')})`);
-    const counted = mine.length;
+    const counted = mine.length - jrExcess;
     const met = counted >= h.min;
     return { id: h.id, section: h.section, name: h.name, label: h.label || h.name, note: h.note || '', hint: h.hint || '', done: mine.length, counted, min: h.min, jrDone, jrNeeded, jrMax, subs, issues, met };
   });
@@ -186,13 +188,12 @@ export function pickJustEnough(reflections) {
   return out;
 }
 
-// For the shared summary (Totals, admins): { headingId: complete count } and the total. Each heading's
+// For the shared summary (Totals, admins): { headingId: counted credit } and the total. Each heading's
 // count stops at its minimum: short of it shows exactly, but once met nobody else can tell how many
 // more were written.
 export function reflectionCounts(reflections) {
   const out = {};
-  for (const r of reflections || []) if (r.status === 'complete' && HEADING_IDS.has(r.headingId)) out[r.headingId] = (out[r.headingId] || 0) + 1;
-  for (const k in out) out[k] = Math.min(out[k], HEADING_BY_ID[k].min);
+  for (const h of reflectionProgress(reflections).headings) if (h.done) out[h.id] = Math.min(h.counted, h.min);
   return { reflections: out, reflectionsTotal: Object.values(out).reduce((a, b) => a + b, 0) };
 }
 
