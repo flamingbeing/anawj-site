@@ -238,7 +238,7 @@ function paintTabs() {
   while (cur && cur.under) cur = TABS.find(t => t.id === cur.under);
   const sel = cur ? cur.id : S.tab;
   fill(tabsEl, ...visibleTabs().filter(t => !t.hidden).map(t => h('button', {
-    role: 'tab', 'aria-selected': String(sel === t.id), 'data-tab': t.id,
+    role: 'tab', 'aria-selected': String(sel === t.id), 'data-tab': t.id, 'aria-label': t.label, title: t.label,   // named even with icons only
     onclick: () => go(t.id),
   }, icon(t.id), h('span', { class: 'lbl' }, t.label))));
   tabsEl.hidden = false;
