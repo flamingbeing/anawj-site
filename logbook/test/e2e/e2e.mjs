@@ -108,24 +108,26 @@ async function run(label, ctxOpts) {
     };
     const waitSaved = async () => { await p.waitForFunction(() => document.querySelector('.acct-status')?.textContent === 'Saved', null, { timeout: 5000 }); };
 
-    await step('account + settings: separate tabs, no install card', async () => {
+    await step('account + settings: separate tabs; More has credits and sign out at the bottom', async () => {
       assert(await p.locator('.tabs button').count() <= 5, 'more than 5 tabs: ' + await p.locator('.tabs button').count());
       await p.locator('.tabs button[data-tab="more"]').click();
       const more = await p.locator('.more-list a').evaluateAll(as => as.map(a => a.dataset.go));
-      assert(more.includes('account') && more.includes('settings') && more.includes('totals'), 'More list ' + more);
+      assert(more.includes('account') && more.includes('settings') && more.includes('data'), 'More list ' + more);
+      assert(/Code by Abigail Sim[\s\S]*Design and UX\/UI by Koh Wenjun/.test(await p.locator('section.credits').innerText()), 'credits card');
+      const lastCard = await p.locator('main section.card').last().innerText();
+      assert(/Sign out/.test(lastCard), 'sign out not at the bottom of More: ' + lastCard.slice(0, 80));
       await p.goto(BASE + '?demo#settings', { waitUntil: 'networkidle' });
-      await p.waitForSelector('.card >> text=Compact mode', { timeout: 6000 });
+      await p.waitForSelector('.more-list a[data-go="display"]', { timeout: 6000 });
       assert(p.url().endsWith('#settings'), 'hash rewritten: ' + p.url());
       assert(await p.locator('.acct').count() === 0, 'portfolio details on Settings');
-      assert(await p.locator('.card', { hasText: 'Install on your phone' }).count() === 0, 'install card still there');
-      assert(await p.locator('.card h2', { hasText: /^Recycle bin$/ }).count() === 1, 'no recycle bin card');
-      assert(/Code by Abigail Sim[\s\S]*Design and UX\/UI by Koh Wenjun/.test(await p.locator('section.credits').innerText()), 'credits card');
+      assert(await p.locator('.more-list a[data-go="bin"]').count() === 1, 'no recycle bin in Settings');
+      await tab('display');
+      assert(await p.locator('.card', { hasText: 'Compact mode' }).count() === 1, 'no Compact mode on Display');
       await tab('account');
       await p.waitForSelector('.acct', { timeout: 6000 });
       assert(await p.locator('.card', { hasText: 'Compact mode' }).count() === 0, 'settings still under Account');
-      assert(await p.locator('a', { hasText: 'Open admin' }).count() === 0, 'admin entry on Account');
-      assert(await p.locator('button', { hasText: 'Sign out' }).count() === 1, 'no sign out on Account');
-
+      assert(await p.locator('button', { hasText: 'Sign out' }).count() === 0, 'sign out on Account (it is on More)');
+      assert(await p.locator('button', { hasText: 'Delete account' }).count() === 1, 'no Delete account on Account');
     });
 
     await step('account: fill personal details + 2 memberships + 1 paper, reload persists', async () => {
@@ -207,8 +209,7 @@ async function run(label, ctxOpts) {
       await p.waitForFunction(() => /Template saved/.test(document.getElementById('toast')?.textContent || ''), null, { timeout: 15000 });
       const t = await toastText();
       assert(/comments removed/.test(t), 'toast: ' + t);
-      await p.locator('.tabs button[data-tab="more"]').click();
-      await p.waitForTimeout(300);
+      await tab('data');
       await p.locator('section.export-sync a', { hasText: 'Choose reflections and export' }).click();
       await p.waitForTimeout(300);
       const btn = p.locator('main button', { hasText: /^Export \d+ reflections? \(Word\)$/ });
@@ -372,7 +373,7 @@ async function run(label, ctxOpts) {
       assert(await p.locator('li.refl-row').count() === n0 - 2, 'rows not removed');
       if (await editBtn().innerText() === 'Done') await editBtn().click();
       await p.waitForTimeout(300);
-      await p.locator('details.more-tools').first().evaluate(d => { d.open = true; }).catch(() => {}); await p.locator('main button', { hasText: 'Recycle bin' }).click();
+      await tab('bin');
       await p.waitForTimeout(700);
       const items = p.locator('.bin-list li');
       assert(await items.count() >= 2, 'bin count ' + await items.count());
@@ -381,7 +382,9 @@ async function run(label, ctxOpts) {
       await shot4('recycle-bin');
       await items.first().locator('button', { hasText: 'Restore' }).click();
       await p.waitForTimeout(700);
-      await backToList();
+      // the bin is a dialog over Settings
+      await p.locator('dialog[open] button', { hasText: 'Close' }).first().click();
+      await tab('reflect');
       // count in edit mode, where every heading is open (met ones start folded otherwise)
       await editBtn().click(); await p.waitForTimeout(300);
       const n1 = await p.locator('li.refl-row').count();
@@ -420,7 +423,7 @@ async function run(label, ctxOpts) {
       fs.writeFileSync(file, Buffer.from(await blob.arrayBuffer()));
       await tab('reflect');
       const before = await p.locator('li.refl-row').count();
-      await p.locator('details.more-tools').first().evaluate(d => { d.open = true; }).catch(() => {}); await p.locator('main button', { hasText: 'Upload from Word' }).click();
+      await tab('data'); await p.locator('main a', { hasText: 'Upload from Word' }).click();
       await p.waitForTimeout(600);
       await p.locator('main input[type=file]').setInputFiles(file);
       await p.waitForSelector('text=Found 3 reflections', { timeout: 10000 });
@@ -432,7 +435,7 @@ async function run(label, ctxOpts) {
       await p.locator('main button.primary', { hasText: /^Add/ }).first().click();
       await p.waitForSelector('text=as drafts', { timeout: 10000 });
       const done = await p.locator('main h2').first().innerText();
-      await p.locator('main button', { hasText: 'Back to reflections' }).click();
+      await p.locator('main a, main button', { hasText: 'Go to Reflections' }).first().click();
       await p.waitForTimeout(600);
       const txt = await p.locator('main').innerText();
       const after = await p.locator('li.refl-row').count();
@@ -817,14 +820,23 @@ async function run(label, ctxOpts) {
     assert(dbar[0] <= dbar[1] + 1 && dbar[2] < 60, 'date bar not one line: ' + dbar);
     assert(await p.locator('.datebar button[data-mode="bulk"]', { hasText: 'List' }).count() === 1 && await p.locator('.datebar .chip', { hasText: 'Yesterday' }).count() === 0, 'Case | List switch / no Yesterday');
     await p.locator('textarea.details').fill('');
-    await p.evaluate(() => window.scrollTo(0, 1500));
-    await p.waitForTimeout(300);
-    const bar = await p.locator('.savebar').boundingBox();
-    const vh = await p.evaluate(() => innerHeight);
-    assert(bar && bar.y > vh / 2 && bar.y + bar.height <= vh + 1 && bar.height < 140, 'save bar not pinned at the bottom: ' + JSON.stringify(bar));
-    const tbox = await p.locator('textarea.details').boundingBox();
-    assert(tbox.y + tbox.height < 0, 'case box should scroll away');
-    await p.evaluate(() => window.scrollTo(0, 0));
+    const twoPanes = await p.locator('.log-card.panes .lp-left').evaluate(e => getComputedStyle(e).display === 'block');
+    if (twoPanes) {
+      // wide screen: the tag list scrolls in its own pane; the case box and Save stay in view
+      const tl = await p.locator('.log-card.panes .lp-right').evaluate(e => [e.scrollHeight > e.clientHeight, getComputedStyle(e).overflowY]);
+      assert(tl[0] && tl[1] === 'auto', 'tag pane does not scroll on its own: ' + tl);
+      const sv = await p.locator('.savebar').boundingBox();
+      assert(sv && sv.y + sv.height <= await p.evaluate(() => innerHeight) + 1, 'Save off screen in two panes');
+    } else {
+      await p.evaluate(() => window.scrollTo(0, 1500));
+      await p.waitForTimeout(300);
+      const bar = await p.locator('.savebar').boundingBox();
+      const vh = await p.evaluate(() => innerHeight);
+      assert(bar && bar.y > vh / 2 && bar.y + bar.height <= vh + 1 && bar.height < 140, 'save bar not pinned at the bottom: ' + JSON.stringify(bar));
+      const tbox = await p.locator('textarea.details').boundingBox();
+      assert(tbox.y + tbox.height < 0, 'case box should scroll away');
+      await p.evaluate(() => window.scrollTo(0, 0));
+    }
     // Enter saves (setting)
     await tab('logging');
     await p.locator('label.field', { hasText: 'Enter key' }).locator('select').selectOption('single');
@@ -1219,8 +1231,10 @@ async function run(label, ctxOpts) {
     await openAn('Reflections');
     await p.locator('a', { hasText: 'Open reflections' }).click();
     await p.waitForTimeout(300);
-    // Reflections links to the Export page (summary and the export button; ticks on Choose reflections)
-    await p.locator('main a', { hasText: /Export portfolio/ }).first().click();
+    assert(/#reflect$/.test(p.url()), 'Open reflections went to ' + p.url());
+    // More → Export / Import → Export: the portfolio page (summary and the export button)
+    await tab('data');
+    await p.locator('main a', { hasText: /Choose reflections and export/ }).first().click();
     await p.waitForTimeout(300);
     const [dl] = await Promise.all([p.waitForEvent('download'), p.locator('main button', { hasText: /^Export \d+ reflections? \(Word\)$/ }).click()]);
     const fp = await dl.path();
@@ -1273,7 +1287,7 @@ async function run(label, ctxOpts) {
     await p.waitForSelector('table.totals');
     const cols = await p.locator('table.totals thead th').count();
     assert(cols >= 4, 'cols ' + cols);
-    const t26 = await p.locator('table.totals td.cat', { hasText: '26 ' }).first().innerText();
+    const t26 = await p.locator('table.totals td.cat', { hasText: 'Peripheral nerve' }).first().innerText();
     assert(/by R\d/.test(t26), 'targets missing under the name: ' + t26);
     const behind = await p.locator('table.totals td.late, table.totals td.due').count();
     assert(behind >= 0 && await p.locator('table.totals td .gap').count() === 0, 'shortfall numbers should be gone');
@@ -1428,7 +1442,7 @@ async function run(label, ctxOpts) {
     await p.locator('select[aria-label="Group by"]').selectOption('heading');
     await p.locator('select[aria-label="Sort"]').selectOption('newest'); await p.waitForTimeout(300);
     // Export page: ticks live here
-    await p.locator('main a', { hasText: /Export portfolio/ }).first().click(); await p.waitForTimeout(400);
+    await tab('data'); await p.locator('main a', { hasText: /Choose reflections and export/ }).first().click(); await p.waitForTimeout(400);
     // Export page: a summary; the ticks are on Choose reflections
     assert(/of \d+ reflections included/.test(await p.locator('main').innerText()), 'export summary');
     await p.locator('a', { hasText: 'Choose reflections' }).first().click(); await p.waitForTimeout(400);
@@ -1450,8 +1464,8 @@ async function run(label, ctxOpts) {
     assert(/3 of 3/.test(await p.locator('.exp-h', { hasText: 'Bariatric' }).innerText()), 'bariatric not at 3 of 3');
     await p.locator('main a, main button', { hasText: 'Export portfolio' }).first().click(); await p.waitForTimeout(400);
     assert(await p.locator('main button', { hasText: /^Export \d+ reflections? \(Word\)$/ }).count() === 1, 'export button missing');
-    // More → Export links here
-    await tab('more');
+    // More → Export / Import links here
+    await tab('data');
     assert(await p.locator('section.export-sync h2', { hasText: /^Export$/ }).count() === 1 && await p.locator('section.export-sync a', { hasText: 'Choose reflections and export' }).count() === 1, 'no link from Export');
     // the setting: new reflections start unticked
     await tab('reflset');
@@ -1471,18 +1485,15 @@ async function run(label, ctxOpts) {
     await p.waitForSelector('.tabs button[data-tab="log"]');
     await p.waitForTimeout(400);
     const onAdmin = await p.locator('main').innerText();
-    await tab('settings');
-    const noAdminCard = await p.locator('a', { hasText: 'Open admin' }).count();
     await p.locator('.tabs button[data-tab="more"]').click();
     const tabs = await p.locator('.more-list a').evaluateAll(as => as.map(a => a.dataset.go));
     await p.evaluate(([k, v]) => localStorage.setItem(k, v), [KEY, saved]);
     await p.goto(BASE + '?demo#log', { waitUntil: 'networkidle' });
     await p.reload({ waitUntil: 'networkidle' });
     await p.waitForSelector('.tabs button[data-tab="log"]');
-    await tab('settings');
-    await p.waitForSelector('a:has-text("Open admin")');
+    await p.locator('.tabs button[data-tab="more"]').click();
+    await p.waitForSelector('.more-list a[data-go="admin"]');   // back for the admin
     assert(!tabs.includes('admin'), 'admin tab shown to a non-admin: ' + tabs);
-    assert(!noAdminCard, 'Settings shows the Admin card to a non-admin');
     assert(!/Residents/.test(onAdmin), '#admin opened the admin screen for a non-admin');
     assert(tabs.includes('settings') && tabs.includes('account'), 'More list ' + tabs);
   });

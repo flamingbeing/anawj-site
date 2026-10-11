@@ -126,16 +126,12 @@ portfolio content.
   `logbook/test/rules.emulator.mjs` + `evals/test/rules.emulator.mjs` into a folder with firebase-tools, then
   `firebase emulators:exec --only firestore --project demo-logbook "node logbook/test/rules.emulator.mjs; node evals/test/rules.emulator.mjs"`.
 - e2e: `logbook/test/e2e/e2e.mjs` (Playwright, demo mode, phone and desk profiles; see the header for
-  how to run). About 15 minutes per profile. Many steps are stale after the Oct 2026 batch (PR #116) and need
-  updating before the next run: tab label "Case" (id still `log`); More → Export / Import (`#data`: Export =
-  portfolio only, Import card, Backup card), Settings menu (Display, Logging, Tag editor, Reflections `#reflset`,
-  Copy & share `#sharefmt`, Recycle bin, Settings file card); Sign out at the bottom of More, Delete account on
-  Account; Totals under Analytics, no EPA view / Download summary; Logbook filter (Show, Search in, then Dates |
-  Tags | More toggles; Reset; × in the box; saved searches incl. "Search in"); rows Copy (no Share, no swipe),
-  short tag names, "☆ interesting"; calendar day "+ Log a case" on any day, Copy / Share day; Excel dialog
-  ("Download Excel…", "Excel backup", tag style Full/Short); "☆ Interesting" checkbox; Reflections (no section
-  headings, chosen heading labels + notes switch, initials in the left column, Edit left of New, no More tools);
-  tag editor CSV card at the bottom; demo user R3 with ~358 cases, 33 reflections, 6 R3 batchmates.
+  how to run). About 5 minutes per profile; green on both after the Oct 2026 batch. `E2E_FAILFAST=1` stops at
+  the first failing step (fix, rerun); `E2E_TIMEOUT` sets the per-action wait (10 s). The run sets
+  localStorage `apmes-logbook-demo-small`, so the demo keeps its six seeded cases and skips the big sample
+  logbook (`demo-seed.js`); counts in the steps start from those six. Navigation goes through the `tab()`
+  helper: Settings pages (`display`, `logging`, `tags`, `reflset`, `sharefmt`, `bin` = the Recycle bin dialog),
+  `data` (Export / Import), `totals` (by hash, under Analytics). On a wide screen the Case tab is two panes.
 - Owner preferences: merge your own PRs once unit tests and e2e pass, then report. The owner may say
   "no e2e yet": then only unit tests and quick browser checks. Show phone screenshots of UI changes. When the
   owner asks "should we / can we", answer and propose; for multi-part changes say the plan first and wait when
