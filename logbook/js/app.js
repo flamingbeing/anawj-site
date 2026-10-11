@@ -44,7 +44,7 @@ const icon = id => {
 };
 
 const TABS = [
-  { id: 'log', label: 'Log', render: renderLog },
+  { id: 'log', label: 'Case', render: renderLog },
   { id: 'logbook', label: 'Logbook', render: renderLogbook },
   { id: 'reflect', label: 'Reflections', render: renderReflect },
   { id: 'progress', label: 'Analytics', render: renderProgress },

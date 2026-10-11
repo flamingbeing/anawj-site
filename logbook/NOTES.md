@@ -42,7 +42,7 @@ portfolio content.
 
 ## Where things are (screens)
 
-- **Log** (`ui-log.js`): the case box (aligned example lines; Paste button; "Draft saved" sits on the
+- **Case** tab (id `log`, `ui-log.js`; the bar label was "Log"; tag counting tips hide with `settings.hideTips`): the case box (aligned example lines; Paste button; "Draft saved" sits on the
   Possible reflection line), Quick picks (suggestions + your shorthand tags, Same as last, your tag
   groups), All tags, Still needed, "Save these tags as a tag group" under the tag list, pinned bar (chosen tags, Save, keep date | Save).
   Paste-a-list (List mode), Plan for later. `editCaseDialog` (full screen on phones, pinned

@@ -255,7 +255,7 @@ function residentsCard() {
 // ---------- importer (the app owner only: admins can't read or write residents' cases) ----------
 function ownerOnlyCard() {
   return h('section', { class: 'card' }, h('h2', {}, 'Import the old Google Form responses'),
-    h('p', { class: 'hint', style: 'margin:0' }, 'Only the app owner can import cases into residents’ logbooks: admins can’t see anyone’s cases. The owner is set in the Firebase console (Firestore → owners). Residents can add their own past cases with Paste list on the Log screen.'));
+    h('p', { class: 'hint', style: 'margin:0' }, 'Only the app owner can import cases into residents’ logbooks: admins can’t see anyone’s cases. The owner is set in the Firebase console (Firestore → owners). Residents can add their own past cases with Paste list on the Case tab.'));
 }
 
 
@@ -366,7 +366,7 @@ function sharedCard() {
   const save = async t => { try { await cloud.saveSharedTemplate(t); A.shared = [...list.filter(x => x.id !== t.id), t]; S.sharedTemplates = A.shared; hooks.render(); } catch (err) { toast('Could not save: ' + err.message); } };
   return h('section', { class: 'card' },
     h('h2', {}, 'Shared tag groups'),
-    h('p', { class: 'hint' }, 'A starting set of tag groups: each resident gets a copy in their own tag groups (Quick picks on the Log page), which they can edit or delete. Changes here reach only residents who haven\'t had that group yet.'),
+    h('p', { class: 'hint' }, 'A starting set of tag groups: each resident gets a copy in their own tag groups (Quick picks on the Case tab), which they can edit or delete. Changes here reach only residents who haven\'t had that group yet.'),
     list.length ? h('ul', { class: 'prog' }, list.map(t => h('li', { style: 'grid-template-columns:1fr auto' },
       h('span', {}, h('b', {}, t.name), ' ', h('span', { class: 'muted' }, catPills(t.cats))),
       h('span', { class: 'row' },

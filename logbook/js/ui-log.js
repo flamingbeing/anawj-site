@@ -456,7 +456,8 @@ function paintSel() {
   fill(ui.selExtra,
     // personal subcategories of the selected categories (Settings → My subcategories)
     subcatChips(draft.cats, draft.tags || [], tags => keepPlace(ui.selExtra, () => { draft.tags = tags; saveDraft(); paintSel(); })));
-  const tips = draft.cats.filter(c => TIPS[c]).map(c => TIPS[c]);
+  // counting tips for the chosen tags ("blocks count cumulatively"); off in Settings → Logging
+  const tips = settings().hideTips ? [] : draft.cats.filter(c => TIPS[c]).map(c => TIPS[c]);
   fill(ui.tip, ...tips.map(t => h('p', { class: 'tip' }, t)));
   paintSuggest();
   ui.picker.refresh();
@@ -633,13 +634,13 @@ async function planBulk() {
     const items = rows.map(r => ({ id: uid(), date, initials: cleanInitials(r.initials), details: r.details.trim(), cats: sortCodes(r.cats) }));
     await savePlan([...plan(), ...items].slice(-100));
     bulkRows = null; draft.bulk = ''; saveDraft();
-    toast(`Planned ${items.length} case${items.length === 1 ? '' : 's'} for ${fmtDate(date)}: confirm them on the Log screen that day`);
+    toast(`Planned ${items.length} case${items.length === 1 ? '' : 's'} for ${fmtDate(date)}: confirm them on the Case tab that day`);
     m.close(); hooks.render();
   };
   const t = isoPlus(1), w = nextWorkingDay();
   const pick = h('input', { type: 'date', min: todayISO(), value: t, 'aria-label': 'Plan for date' });
   const m = modal('Plan for later', [
-    h('p', { class: 'hint' }, `${rows.length} case${rows.length === 1 ? '' : 's'}. On that day they wait on the Log screen: tick each one when it is done.`),
+    h('p', { class: 'hint' }, `${rows.length} case${rows.length === 1 ? '' : 's'}. On that day they wait on the Case tab: tick each one when it is done.`),
     h('div', { class: 'bar' },
       h('button', { class: 'primary', onclick: () => put(t) }, `Tomorrow (${fmtDate(t).replace(/ \d{4}$/, '')})`),
       w !== t ? h('button', { onclick: () => put(w) }, `Next working day (${fmtDate(w).replace(/ \d{4}$/, '')})`) : null),

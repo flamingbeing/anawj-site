@@ -161,8 +161,10 @@ export function renderLogging() {
         'Enter key saves the case (Shift+Enter for a new line)'),
       h('p', { class: 'hint', style: 'margin:0 0 6px' }, 'Off (the default): Enter starts a new line, and Ctrl+Enter (Cmd+Enter on a Mac) saves.'),
       h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !!st.weeklyDigest, onchange: e => patchLogbook({ settings: { weeklyDigest: e.target.checked } }) }),
-        'Show last week’s summary on the Log page (once a week)'),
-      h('label', { class: 'field', style: 'margin-top:8px' }, 'Case box height on the Log page',
+        'Show last week’s summary on the Case tab (once a week)'),
+      h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !st.hideTips, onchange: e => patchLogbook({ settings: { hideTips: !e.target.checked } }) }),
+        'Show tips for the tags I pick (e.g. how blocks count)'),
+      h('label', { class: 'field', style: 'margin-top:8px' }, 'Case box height on the Case tab',
         h('select', { onchange: e => patchLogbook({ settings: { boxLines: Number(e.target.value) } }).then(() => toast('Saved')) },
           Array.from({ length: 19 }, (_, i) => i + 2).map(n => h('option', { value: String(n), selected: n === (Math.min(20, Math.max(2, Number(st.boxLines) || 3))) }, `${n} lines${n === 3 ? ' (default)' : ''}`)))),
       h('p', { class: 'hint', style: 'margin:8px 0 6px' }, 'How the Logbook search works (everything, initials or procedure; fuzzy) is under Filter on the Logbook tab, and is remembered.'),
@@ -244,7 +246,7 @@ function tagGroupsCard() {
   const list = (S.logbook && S.logbook.templates) || [];
   return h('section', { class: 'card', id: 'tag-groups' },
     h('h2', {}, 'Tag groups'),
-    h('p', { class: 'hint' }, 'Tags you often pick together, one tap in Quick picks on the Log page, e.g. “LSCS spinal” = LSCS + CNB(Obs) + Spinal.'),
+    h('p', { class: 'hint' }, 'Tags you often pick together, one tap in Quick picks on the Case tab, e.g. “LSCS spinal” = LSCS + CNB(Obs) + Spinal.'),
     list.length ? h('ul', { class: 'prog' }, list.map(t => h('li', { style: 'grid-template-columns:1fr auto' },
       h('span', {}, h('b', {}, t.name), ' ', h('span', { class: 'muted' }, catPills(t.cats)), t.details ? h('span', { class: 'muted' }, ` · “${t.details}”`) : null),
       h('span', { class: 'row' },
@@ -325,7 +327,7 @@ export function categoryNamesCard() {
 // under section headers, and add your own tags (linked to APMES categories, or personal labels).
 // Share it as a CSV file (opens in Excel) or load someone else's.
 const saveTags = set => patchLogbook({ settings: { tagSet: cleanTagSet(set) } }).then(() => hooks.render());
-// view: the list (details, up/down) or pills (as on the Log page, drag to reorder); a search narrows both
+// view: the list (details, up/down) or pills (as on the Case tab, drag to reorder); a search narrows both
 // (List or Pills is remembered with your account, like the Log page's switch)
 const tev = { q: '' };
 const teMode = () => (settings().tagEditorView === 'pills' ? 'pills' : 'list');
@@ -368,7 +370,7 @@ export function renderTagEditor() {
     [['list', 'List'], ['pills', 'Pills']].map(([m, l]) => h('button', { class: 'small', 'aria-pressed': String(teMode() === m), onclick: () => { if (teMode() !== m) patchLogbook({ settings: { tagEditorView: m } }).then(() => hooks.render()); } }, l)));
   return h('div', {}, h('section', { class: 'card tag-editor' },
     h('h2', {}, 'Tag editor'),
-    h('p', { class: 'hint' }, 'Lay out the Log page’s list your way. APMES tags are the programme’s categories: rename (just for you), hide, move them or put them under section headers. Personal tags are your own: link one to APMES categories and choosing it ticks them, or leave it as a label only. A personal tag under an APMES one counts towards it. Totals and exports always use APMES.'),
+    h('p', { class: 'hint' }, 'Lay out the Case tab’s list your way. APMES tags are the programme’s categories: rename (just for you), hide, move them or put them under section headers. Personal tags are your own: link one to APMES categories and choosing it ticks them, or leave it as a label only. A personal tag under an APMES one counts towards it. Totals and exports always use APMES.'),
     h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:8px;margin:0 0 8px' },
       h('button', { class: 'small primary', onclick: () => editTag(null, 'tag') }, '+ Personal tag'),
       h('button', { class: 'small', onclick: () => editTag(null, 'head') }, '+ Section header'),
@@ -518,7 +520,7 @@ function editTag(n, kind = n ? n.kind : 'tag') {
       paint();
       return box;
     })() : null,
-    kind !== 'head' ? h('label', { class: 'check', style: 'margin-top:8px' }, hide, 'Hide from the Log page (still found by search)') : null,
+    kind !== 'head' ? h('label', { class: 'check', style: 'margin-top:8px' }, hide, 'Hide from the Case tab (still found by search)') : null,
     h('div', { class: 'bar', style: 'margin-top:12px' },
       n && kind !== 'cat' ? h('button', { class: 'danger', onclick: async () => { m.close(); await saveTags(removeTag(set, e.k)); toast('Removed (cases keep the tag)'); } }, 'Remove') : null,
       n && kind === 'tag' ? h('button', { onclick: () => { m.close(); mergeTag(n); } }, 'Merge…') : null,
