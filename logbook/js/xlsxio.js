@@ -73,12 +73,17 @@ export async function exportCases(cases, { name = '', counts, progressRows, rYea
   }
   ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: 3 } };
 
-  const rows = progressRows || progress(counts || countCases(cases || []), rYear);
+  addSummary(wb, progressRows || progress(counts || countCases(cases || []), rYear), name, `Exported ${fmtDate(todayISO())}. R3 and R5 are cumulative targets.`);
+  return toBlob(wb);
+}
+
+// Sheet "Summary": Category | Count | R3 | R5 | Status, plus the hidden export time (H1)
+function addSummary(wb, rows, name, note) {
   const sum = wb.addWorksheet('Summary', { views: [{ state: 'frozen', ySplit: 3 }] });
   sum.columns = [{ width: 62 }, { width: 8 }, { width: 6 }, { width: 6 }, { width: 8 }];
   sum.getCell('A1').value = `${name ? name + ' — ' : ''}case log summary`;
   sum.getCell('A1').font = { bold: true, size: 13 };
-  sum.getCell('A2').value = `Exported ${fmtDate(todayISO())}. R3 and R5 are cumulative targets.`;
+  sum.getCell('A2').value = note;
   // when this file was made, in a hidden cell: on upload, cases logged after it are never deleted
   sum.getCell('H1').value = `${EXPORTED_TAG}${Date.now()}`;
   sum.getColumn(8).hidden = true;
@@ -93,10 +98,60 @@ export async function exportCases(cases, { name = '', counts, progressRows, rYea
   }
   sum.addRow([]);
   sum.addRow(['🔴 behind a past target   🟡 target not yet met   🟢 all targets met']).getCell(1).font = { color: { argb: 'FF666666' } };
+}
+
+// The export with the user's choices (export-opts.js exportTables): sheet "Cases" (with the hidden id
+// column, so it can be uploaded back), sheet "Reflections", and "Summary" when asked for.
+// meta: { name, rYear, rangeLabel }
+export async function exportWorkbook(tables, meta = {}) {
+  const wb = new (X().Workbook)();
+  wb.creator = 'APMES Logbook';
+  wb.title = meta.name ? `${meta.name} logbook` : 'Logbook';
+  const excelDates = tables.opts.dateStyle !== 'iso';
+  const sheet = (title, t, withId) => {
+    const ws = wb.addWorksheet(title, { views: [{ state: 'frozen', ySplit: 1 }] });
+    ws.columns = [
+      ...t.cols.map(c => ({ header: c.name, key: c.k, width: c.width, ...(c.k === 'date' && excelDates ? { style: { numFmt: 'd mmm yyyy' } } : {}) })),
+      ...(withId ? [{ header: 'id', key: 'id', width: 20, hidden: true }] : []),
+    ];
+    styleHeader(ws.getRow(1));
+    for (const r of t.rows) {
+      const cells = r.cells.map(v => (v && typeof v === 'object' && v.date ? (excelDates ? isoToUTC(v.date) : v.date) : v));
+      const row = ws.addRow(withId ? [...cells, r.id] : cells);
+      t.cols.forEach((c, i) => { row.getCell(i + 1).alignment = c.width >= 30 ? { wrapText: true, vertical: 'top' } : { vertical: 'top', horizontal: 'left' }; });
+    }
+    if (t.cols.length) ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: t.cols.length } };
+  };
+  if (tables.cases) sheet('Cases', tables.cases, true);
+  if (tables.reflections) sheet('Reflections', tables.reflections, false);
+  if (tables.cases && tables.opts.summary) {
+    const ranged = tables.range.from || tables.range.to;
+    addSummary(wb, progress(countCases(tables.cases.list), meta.rYear || 1), meta.name,
+      `Exported ${fmtDate(todayISO())}${ranged ? ` · counts are for ${meta.rangeLabel || 'the chosen dates'} only` : ''}. R3 and R5 are cumulative targets.`);
+  }
+  if (!wb.worksheets.length) wb.addWorksheet('Empty');
+  if (tables.cases) {
+    const info = wb.addWorksheet('Export info', { state: 'veryHidden' });
+    info.getCell('A1').value = `${EXPORTED_TAG}${Date.now()}`;
+    info.getCell('A2').value = `${RANGE_TAG}${tables.range.from || ''}:${tables.range.to || ''}`;
+  }
   return toBlob(wb);
 }
 
 const EXPORTED_TAG = 'logbook-exported-at:';
+const RANGE_TAG = 'logbook-range:';
+// When the file was made and the dates it was limited to: from the hidden "Export info" sheet, or
+// the hidden Summary H1 cell of older files. On upload, cases outside the range, or logged after the
+// file was made, are never deleted.
+function exportInfo(wb) {
+  const info = wb.getWorksheet('Export info');
+  const sumTag = wb.getWorksheet('Summary') && cellText(wb.getWorksheet('Summary').getCell('H1').value);
+  const tag = (info && cellText(info.getCell('A1').value)) || sumTag || '';
+  const exportedAt = tag.startsWith(EXPORTED_TAG) ? Number(tag.slice(EXPORTED_TAG.length)) || null : null;
+  const r = (info && cellText(info.getCell('A2').value)) || '';
+  const [from = '', to = ''] = r.startsWith(RANGE_TAG) ? r.slice(RANGE_TAG.length).split(':') : [];
+  return { exportedAt, from: /^\d{4}-\d{2}-\d{2}$/.test(from) ? from : '', to: /^\d{4}-\d{2}-\d{2}$/.test(to) ? to : '' };
+}
 
 const HEADERS = {
   date: /^date\b/i,
@@ -116,8 +171,7 @@ export async function readCasesSheet(file) {
   const wb = new (X().Workbook)();
   await wb.xlsx.load(data);
   const sheets = [...wb.worksheets].sort((a, b) => (b.name === 'Cases') - (a.name === 'Cases'));
-  const tag = wb.getWorksheet('Summary') && cellText(wb.getWorksheet('Summary').getCell('H1').value);
-  const exportedAt = tag && tag.startsWith(EXPORTED_TAG) ? Number(tag.slice(EXPORTED_TAG.length)) || null : null;
+  const { exportedAt, from, to } = exportInfo(wb);
   for (const ws of sheets) {
     let headerRow = 0, cols = {};
     ws.eachRow({ includeEmpty: false }, (row, n) => {
@@ -137,6 +191,7 @@ export async function readCasesSheet(file) {
     const out = [];
     out.hasIdColumn = !!cols.id;
     out.exportedAt = exportedAt;   // ms, or null for a sheet not exported by this app
+    out.range = { from, to };      // the dates the file was limited to ('' = open)
     ws.eachRow({ includeEmpty: false }, (row, n) => {
       if (n <= headerRow) return;
       const get = k => (cols[k] ? row.getCell(cols[k]).value : null);
@@ -163,9 +218,8 @@ export async function readSheetGrid(file) {
   const data = file && typeof file.arrayBuffer === 'function' ? await file.arrayBuffer() : file;
   const wb = new (X().Workbook)();
   await wb.xlsx.load(data);
-  const tag = wb.getWorksheet('Summary') && cellText(wb.getWorksheet('Summary').getCell('H1').value);
-  const exportedAt = tag && tag.startsWith(EXPORTED_TAG) ? Number(tag.slice(EXPORTED_TAG.length)) || null : null;
-  const sheets = [...wb.worksheets].sort((a, b) => (b.name === 'Cases') - (a.name === 'Cases')).map(ws => {
+  const { exportedAt, from, to } = exportInfo(wb);
+  const sheets = [...wb.worksheets].filter(ws => ws.state !== 'veryHidden' && ws.state !== 'hidden').sort((a, b) => (b.name === 'Cases') - (a.name === 'Cases')).map(ws => {
     const rows = [];
     ws.eachRow({ includeEmpty: true }, (row, n) => {
       const out = [];
@@ -174,7 +228,7 @@ export async function readSheetGrid(file) {
     });
     return { name: ws.name, rows: Array.from(rows, r => r || []) };
   }).filter(s => s.rows.some(r => r.some(v => String(v ?? '').trim())));
-  return { sheets, exportedAt };
+  return { sheets, exportedAt, range: { from, to } };
 }
 
 // A totals matrix (categories down, residents across). Accepts either

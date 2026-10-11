@@ -154,7 +154,7 @@ function residentsCard() {
   const card = h('section', { class: 'card' },
     h('div', { class: 'bar' }, h('h2', { style: 'margin:0' }, 'Residents'), h('span', { class: 'grow' }),
       A.residents ? h('button', { class: A.editRes ? 'small primary' : 'small', onclick: () => { A.editRes = !A.editRes; if (!A.editRes) A.pasted = null; hooks.render(); } }, A.editRes ? 'Done' : 'Edit') : null),
-    h('p', { class: 'hint' }, 'Programme residents share their case counts on the Totals tab. Years move up every 1 July from the intake. Tap Edit to change one (leave, repeats; it keeps moving up from there) or to mark someone as an SMO, which stays put: cases done as an SMO count as R3 in the portfolio. Attrited residents are left off Totals (their logbook is kept); set them back to Active to show them again.'));
+    h('p', { class: 'hint' }, 'Programme residents share their case counts on Totals (Analytics → Compare with your intake). Years move up every 1 July from the intake. Tap Edit to change one (leave, repeats; it keeps moving up from there) or to mark someone as an SMO, which stays put: cases done as an SMO count as R3 in the portfolio. Attrited residents are left off Totals (their logbook is kept); set them back to Active to show them again.'));
   if (!A.residents) { add(card, h('p', { class: 'empty' }, 'Loading…')); return card; }
   const ed = A.editRes;
   // apply a change and save it; a refused save puts the old values back
@@ -255,7 +255,7 @@ function residentsCard() {
 // ---------- importer (the app owner only: admins can't read or write residents' cases) ----------
 function ownerOnlyCard() {
   return h('section', { class: 'card' }, h('h2', {}, 'Import the old Google Form responses'),
-    h('p', { class: 'hint', style: 'margin:0' }, 'Only the app owner can import cases into residents’ logbooks: admins can’t see anyone’s cases. The owner is set in the Firebase console (Firestore → owners). Residents can add their own past cases with Paste list on the Log screen.'));
+    h('p', { class: 'hint', style: 'margin:0' }, 'Only the app owner can import cases into residents’ logbooks: admins can’t see anyone’s cases. The owner is set in the Firebase console (Firestore → owners). Residents can add their own past cases with Paste list on the Case tab.'));
 }
 
 
@@ -366,7 +366,7 @@ function sharedCard() {
   const save = async t => { try { await cloud.saveSharedTemplate(t); A.shared = [...list.filter(x => x.id !== t.id), t]; S.sharedTemplates = A.shared; hooks.render(); } catch (err) { toast('Could not save: ' + err.message); } };
   return h('section', { class: 'card' },
     h('h2', {}, 'Shared tag groups'),
-    h('p', { class: 'hint' }, 'Tag groups every resident sees at the end of the tag list on the Log page.'),
+    h('p', { class: 'hint' }, 'A starting set of tag groups: each resident gets a copy in their own tag groups (Quick picks on the Case tab), which they can edit or delete. Changes here reach only residents who haven\'t had that group yet.'),
     list.length ? h('ul', { class: 'prog' }, list.map(t => h('li', { style: 'grid-template-columns:1fr auto' },
       h('span', {}, h('b', {}, t.name), ' ', h('span', { class: 'muted' }, catPills(t.cats))),
       h('span', { class: 'row' },

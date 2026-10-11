@@ -3,7 +3,7 @@
 Static site on GitHub Pages (public repo: no names, patient data or real evaluation data). Apps share one origin:
 
 - `evals/`: APMES workplace-based assessments. Start with `evals/NOTES.md` (decisions, MedHub, forms, operations), then `evals/README.md`.
-- `logbook/`: APMES case logbook. `logbook/README.md`.
+- `logbook/`: APMES case logbook. Start with `logbook/NOTES.md` (principles, words, screens, tags, demo, how to test), then `logbook/README.md`.
 - `nuh-roster/`: NUH anaesthesia daily roster (own Firebase project `nuh-roster`). Start with `nuh-roster/NOTES.md`: its department section (grades, postings, roster sheet, notation, HMS monthly rosters, short names) applies to any app dealing with NUH anaesthesia staff.
 - `design/tokens.css`: shared design tokens.
 

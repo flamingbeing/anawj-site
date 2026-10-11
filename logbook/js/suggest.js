@@ -157,8 +157,9 @@ export function suggest(text, { limit = 6, keywords = KEYWORDS, calibration = CA
   // a longer match ("lap" in "ex lap") steps aside for it.
   const hits = [];
   for (const { re, code } of extra || []) {
-    const m = re.exec(words);
-    if (m) { const at = m.index + m[0].search(/[a-z0-9]/); hits.push({ code, at, end: m.index + m[0].length }); }
+    // every place the word appears ("ex lap … lap washout": the second lap still counts)
+    const g = re.global ? re : new RegExp(re.source, re.flags + 'g');
+    for (const m of words.matchAll(g)) { const at = m.index + m[0].search(/[a-z0-9&]/); hits.push({ code, at, end: m.index + m[0].length }); }
   }
   for (const x of hits) {
     if (hits.some(y => y !== x && y.at <= x.at && y.end >= x.end && (y.end - y.at) > (x.end - x.at))) continue;

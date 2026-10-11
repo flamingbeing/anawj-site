@@ -1,7 +1,7 @@
 // APMES logbook engine: dates, category counts, progress against targets, bulk paste and
 // spreadsheet round trips. Pure functions only (no DOM), so it can be tested in Node.
 
-import { CATEGORIES, BY_CODE, R_YEARS, codeOf } from './categories.js';
+import { CATEGORIES, BY_CODE, R_YEARS, codeOf, DEFAULT_NAMES } from './categories.js';
 import { KEYWORDS, STOP } from './keywords.js';
 const STOP_WORDS = new Set(STOP);
 
@@ -337,7 +337,7 @@ export function procedureText(c) {
 }
 
 // Edit distance between a and b, giving up past max (returns max + 1).
-function editDistance(a, b, max) {
+export function editDistance(a, b, max) {
   if (Math.abs(a.length - b.length) > max) return max + 1;
   let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
   for (let i = 1; i <= a.length; i++) {
@@ -432,6 +432,8 @@ for (const c of CATEGORIES) {
   NAME_INDEX.set(normText(c.name), c.code);
   // the label without its code and target numbers: "Lower Segment Caesarean Section"
   NAME_INDEX.set(normText(c.label.replace(/^\s*\d{2}[ivx]*\)\s*/i, '').replace(/\s*\([^)]*\)\s*$/, '')), c.code);
+  // the Excel export's names: the full name ("Paediatric surgery: age 4 to 12 years") and the app's short one ("<12yo")
+  for (const n of [c.full, ...(DEFAULT_NAMES[c.code] || [])]) if (n && !NAME_INDEX.has(normText(n))) NAME_INDEX.set(normText(n), c.code);
 }
 
 // One category cell entry -> code | null. Codes first ("16", "6", "20iii", "20iii)"), then full
@@ -457,8 +459,13 @@ export function caseFromRow(row) {
   const rawDate = r.date instanceof Date ? '' : cellStr(r.date);
   const cats = [], unknown = [];
   const catText = Array.isArray(r.categories) ? r.categories.join(',') : cellStr(r.categories);
-  for (const part of catText.split(/[,;\n]+/)) {
+  const bits = catText.split(/[,;\n]+/);
+  for (let i = 0; i < bits.length; i++) {
+    let part = bits[i];
     if (!part.trim()) continue;
+    // a name with a comma in it ("Cardiac,on-pump", "Ear, nose and throat surgery") spans two pieces
+    const two = i + 1 < bits.length && !catFromText(part) && catFromText(part + ',' + bits[i + 1]);
+    if (two) { part = part + ',' + bits[++i]; }
     const code = catFromText(part);
     if (code) { if (!cats.includes(code)) cats.push(code); }
     else unknown.push(part.trim());

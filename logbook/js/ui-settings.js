@@ -3,12 +3,13 @@
 
 import { YEAR_NAMES, DEFAULT_NAMES, BY_CODE } from './categories.js';
 import { sortCodes, uid, academicYear, withParents } from './engine.js';
-import { openBin } from './bin.js';
 import { S, h, toast, modal, confirmBox, cloud, catChip, catName, catShort, PICKER_ORDER, pickerOrder, settings, patchLogbook, displayName, hooks, rYear, myYearName, fill, categoryNames, setCategoryNames, catPills, tagSet, download, fileButton, todayISO, saveMany } from './ui-core.js';
-import { learnShorthand, cleanShorthand, shorthandOf, DEFAULT_SHORTHAND, cleanTagSet, defaultTagSet, tagTree, flatTree, moveTag, reparentTag, removeTag, newKey, tagSetToCsv, tagSetFromCsv, dropTag, canPlace } from './tags.js';
+import { MAX_TAGS, tagLinks as tagLinksIn, learnShorthand, cleanShorthand, shorthandOf, DEFAULT_SHORTHAND, cleanTagSet, defaultTagSet, tagTree, flatTree, moveTag, reparentTag, removeTag, newKey, tagSetToCsv, tagSetFromCsv, dropTag, canPlace } from './tags.js';
 import { pickDialog } from './ui-log.js';
+import { OPERATOR_HELP } from './search-ops.js';
+import { PRESETS, DEFAULT_ACCENT, cleanAccent, schemeCss, lightPalette } from './colors.js';
+import { DEFAULT_FORMAT, PLACEHOLDERS, cleanFormat, formatCase, formatDay } from './share-format.js';
 import { PHOTO_BUDGET_KB, PHOTO_NOTE, photoUsageKb, fmtMb } from './reflections.js';
-import { backupCard } from './backup.js';
 
 // Compact mode (S.logbook.settings.compact): body.compact (style.css, "compact mode" block). Cached in
 // localStorage so the first paint after a reload is already compact, before the logbook loads.
@@ -21,9 +22,11 @@ export function applyCompact(on) {
 // the end of style.css. Saved on this device only (Auto is a device setting, and a ward PC can stay
 // light while a phone is dark); sign-out keeps it. index.html applies it before the first paint.
 const THEME_KEY = 'apmes-logbook-theme';
+// light | dark | oled (dark with pure black: data-oled) | auto (follows the phone)
 export function applyTheme(t) {
-  const theme = t === 'dark' || t === 'auto' ? t : 'light';
-  document.documentElement.dataset.theme = theme;
+  const theme = ['dark', 'oled', 'auto'].includes(t) ? t : 'light';
+  document.documentElement.dataset.theme = theme === 'oled' ? 'dark' : theme;
+  if (theme === 'oled') document.documentElement.dataset.oled = ''; else delete document.documentElement.dataset.oled;
   try { theme === 'light' ? localStorage.removeItem(THEME_KEY) : localStorage.setItem(THEME_KEY, theme); } catch { /* storage blocked */ }
 }
 export function cachedTheme() {
@@ -31,11 +34,23 @@ export function cachedTheme() {
 }
 // Text size (S.logbook.settings.textSize): a zoom factor for the page content (style.css --text-zoom).
 const SIZE_KEY = 'apmes-logbook-textsize';
-export const TEXT_SIZES = [['0.9', 'Smaller'], ['1', 'Normal'], ['1.12', 'Larger'], ['1.25', 'Largest']];
+export const TEXT_SIZES = [['0.8', 'Smallest'], ['0.9', 'Smaller'], ['1', 'Normal'], ['1.12', 'Larger'], ['1.25', 'Largest']];
 export function applyTextSize(z) {
   const v = TEXT_SIZES.some(([k]) => k === String(z)) ? String(z) : '1';
   document.documentElement.style.setProperty('--text-zoom', v);
   try { v === '1' ? localStorage.removeItem(SIZE_KEY) : localStorage.setItem(SIZE_KEY, v); } catch { /* storage blocked */ }
+}
+// Colour (S.logbook.settings.accent, follows the account): one accent colour; colors.js works out the
+// light, dark and OLED palettes. The CSS is cached on the device so the first paint has it (index.html).
+const ACCENT_CSS_KEY = 'apmes-logbook-accent-css';
+export function applyAccent(c) {
+  const accent = cleanAccent(c) || DEFAULT_ACCENT;
+  const css = schemeCss(accent);
+  let el = document.getElementById('accent-css');
+  if (!el) { el = document.createElement('style'); el.id = 'accent-css'; document.head.append(el); }
+  el.textContent = css;
+  const meta = document.querySelector('meta[name="theme-color"]'); if (meta) meta.setAttribute('content', lightPalette(accent).accent);
+  try { accent === DEFAULT_ACCENT ? localStorage.removeItem(ACCENT_CSS_KEY) : localStorage.setItem(ACCENT_CSS_KEY, css); } catch { /* storage blocked */ }
 }
 export function cachedTextSize() {
   try { return localStorage.getItem(SIZE_KEY) || '1'; } catch { return '1'; }
@@ -44,97 +59,161 @@ export function cachedCompact() {
   try { return localStorage.getItem(COMPACT_KEY) === '1'; } catch { return false; }
 }
 
-export function renderSettings() {
+// Settings is a short menu (app.js) of these pages: Display, Logging, the Tag editor and the Recycle bin.
+// Residency year (for people not on the programme list) is on Account; reflection settings on the
+// Reflections tab (#reflset).
+export function residencyCard() {
+  return (
+    S.resident ? null : h('section', { class: 'card' },
+      h('h2', {}, 'Residency year'),
+      h('label', { class: 'field' }, 'Year used for the targets on Analytics',
+        h('select', { onchange: e => patchLogbook({ settings: { rYear: Number(e.target.value), rYearAY: academicYear() } }).then(() => toast('Saved')) },
+          YEAR_NAMES.map((r, i) => h('option', { value: String(i + 1), selected: i + 1 === rYear() }, r)))),
+      h('p', { class: 'hint', style: 'margin:4px 0 0' }, 'Programme residents get their year from the programme list automatically. If you are an APMES resident, ask the programme admins to add your email.')));
+}
+
+export function renderDisplay() {
   const st = settings();
   return h('div', {},
-    // only admins see this card
-    S.admin ? h('section', { class: 'card admin-card' },
-      h('div', { class: 'bar' }, h('h2', { style: 'margin:0' }, 'Admin portal'), h('span', { class: 'grow' }),
-        h('a', { class: 'btn small primary', href: '#admin' }, 'Open admin portal')),
-      h('p', { class: 'hint', style: 'margin:6px 0 0' }, 'Residents, ready portfolios, the portfolio template, default category names, shared templates and importing the old logbook.')) : null,
     h('section', { class: 'card' },
       h('h2', {}, 'Display'),
       h('label', { class: 'check' }, h('input', { type: 'checkbox', role: 'switch', checked: !!st.compact, onchange: e => {
         applyCompact(e.target.checked);
         patchLogbook({ settings: { compact: e.target.checked } });
       } }), 'Compact mode'),
-      h('p', { class: 'hint', style: 'margin:2px 0 0' }, 'Smaller chips, rows and spacing so more tags fit on screen. Saved to your account, so it follows you to other devices.'),
+      h('p', { class: 'hint help', style: 'margin:2px 0 0' }, 'Smaller chips, rows and spacing so more tags fit on screen. Saved to your account, so it follows you to other devices.'),
       h('label', { class: 'field', style: 'margin-top:10px' }, 'Text size',
         h('select', { onchange: e => { applyTextSize(e.target.value); patchLogbook({ settings: { textSize: e.target.value } }); } },
           TEXT_SIZES.map(([v, l]) => h('option', { value: v, selected: String(st.textSize || '1') === v }, l)))),
-      h('label', { class: 'field', style: 'margin-top:10px' }, 'Theme',
+      h('div', { class: 'field', style: 'margin-top:10px' }, 'Colour', accentPicker()),
+      h('p', { class: 'hint', style: 'margin:2px 0 0' }, 'Saved to your account. Light and dark versions are worked out to stay easy to read.'),
+      h('label', { class: 'field', style: 'margin-top:10px' }, 'Light or dark',
         h('select', { onchange: e => applyTheme(e.target.value) },
-          [['light', 'Light'], ['dark', 'Dark'], ['auto', 'Auto (match the phone)']].map(([v, l]) => h('option', { value: v, selected: cachedTheme() === v }, l)))),
-      h('p', { class: 'hint', style: 'margin:2px 0 0' }, 'Theme is saved on this device.')),
+          [['light', 'Light'], ['dark', 'Dark'], ['oled', 'OLED (pure black)'], ['auto', 'Auto (match the phone)']].map(([v, l]) => h('option', { value: v, selected: cachedTheme() === v }, l)))),
+      h('p', { class: 'hint', style: 'margin:2px 0 0' }, 'Saved on this device.'),
+      // the tab the app opens on (a link or shortcut to a tab still opens that tab)
+      h('label', { class: 'field', style: 'margin-top:10px' }, 'Open the app on',
+        h('select', { onchange: e => patchLogbook({ settings: { startTab: e.target.value } }).then(() => toast('Saved')) },
+          START_TABS.map(([v, l]) => h('option', { value: v, selected: (st.startTab || 'log') === v }, l))))));
+}
+// suggested colours, then any colour (a custom pick shows as the last swatch)
+function accentPicker() {
+  const cur = () => cleanAccent(settings().accent) || DEFAULT_ACCENT;
+  const wrap = h('div', { class: 'accent-pick', role: 'group', 'aria-label': 'Colour' });
+  const pick = c => { applyAccent(c); patchLogbook({ settings: { accent: c === DEFAULT_ACCENT ? null : c } }); paint(); };
+  const paint = () => {
+    const c = cur(), custom = !PRESETS.some(([x]) => x === c);
+    const input = h('input', { type: 'color', value: c, 'aria-label': 'Any colour', oninput: e => applyAccent(e.target.value), onchange: e => pick(e.target.value) });
+    fill(wrap,
+      ...PRESETS.map(([x, name]) => h('button', { type: 'button', class: 'swatch', title: name, 'aria-label': name, 'aria-pressed': String(c === x), style: `--sw:${x}`, onclick: () => pick(x) }, h('span', { class: 'sr' }, name))),
+      h('label', { class: 'swatch custom' + (custom ? ' on' : ''), title: 'Any colour', style: custom ? `--sw:${c}` : '' }, h('span', { 'aria-hidden': 'true' }, custom ? '' : '+'), input));
+  };
+  paint();
+  return wrap;
+}
+export const START_TABS = [['log', 'Log'], ['logbook', 'Logbook'], ['reflect', 'Reflections'], ['progress', 'Analytics']];
 
-    // year for targets: programme residents get it from the list; anyone else sets it here
-    S.resident ? null : h('section', { class: 'card' },
-      h('h2', {}, 'Residency year'),
-      h('label', { class: 'field' }, 'Year used for the targets on Analytics',
-        h('select', { onchange: e => patchLogbook({ settings: { rYear: Number(e.target.value), rYearAY: academicYear() } }).then(() => toast('Saved')) },
-          YEAR_NAMES.map((r, i) => h('option', { value: String(i + 1), selected: i + 1 === rYear() }, r)))),
-      h('p', { class: 'hint', style: 'margin:4px 0 0' }, 'Programme residents get their year from the programme list automatically. If you are an APMES resident, ask the programme admins to add your email.')),
+// ---------- Copy & share format (Logbook: Copy on a case or a day, Share day) ----------
 
+// a made-up day to preview with (never real cases: the page may be shown to others)
+const SAMPLE = [{ date: '2026-10-10', initials: 'AB', details: '34F LSCS under spinal' }, { date: '2026-10-10', initials: 'CD', details: '72M TKR, adductor canal block' }];
+export function renderShareFormat() {
+  const f = cleanFormat(settings().shareFormat);
+  const field = (k, label, rows) => h('textarea', { rows, 'aria-label': label, 'data-k': k, spellcheck: 'false', style: 'font-family:ui-monospace,Menlo,Consolas,monospace;font-size:15px', oninput: () => paint() }, f[k]);
+  const head = field('dayHead', 'Day heading', 1), each = field('dayCase', 'Each case in a day', 3), one = field('oneCase', 'One case', 3);
+  const dayOut = h('pre', { class: 'fmt-preview' }), oneOut = h('pre', { class: 'fmt-preview' });
+  const now = () => ({ dayHead: head.value, dayCase: each.value, oneCase: one.value });
+  const paint = () => { dayOut.textContent = formatDay(SAMPLE[0].date, SAMPLE, now()); oneOut.textContent = formatCase(SAMPLE[0], now()); };
+  const save = async () => { await patchLogbook({ settings: { shareFormat: cleanFormat(now()) } }); toast('Saved'); };
+  const reset = async () => {
+    if (!(await confirmBox('Reset the format', 'Go back to the default copy and share format?', 'Reset'))) return;
+    await patchLogbook({ settings: { shareFormat: null } }); hooks.render();
+  };
+  paint();
+  const lbl = (t, el, hint) => h('label', { class: 'field', style: 'margin-top:8px' }, t, el, hint ? h('span', { class: 'hint' }, hint) : null);
+  return h('div', {},
+    h('section', { class: 'card' },
+      h('h2', {}, 'Copy & share format'),
+      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'How a case or a day reads when you tap Copy or Share day on the Logbook tab. Tags are never included.'),
+      h('p', { class: 'hint help', style: 'margin:0' }, 'Fill-ins: ', ...PLACEHOLDERS.flatMap((k, i) => [i ? ' ' : '', h('code', {}, `{${k}}`)]),
+        '. {date} is 2026-10-10, {day} is 10 Oct 2026, {n} numbers the cases in a day, {count} is how many that day, {case} is the case without the initials. A line whose fill-ins are all empty is left out.'),
+      h('h3', { style: 'margin:14px 0 0' }, 'A day'),
+      lbl('Heading', head),
+      lbl('Each case', each, 'A blank line goes between cases when each takes more than one line.'),
+      h('div', { class: 'hint', style: 'margin:8px 0 2px' }, 'Preview'), dayOut,
+      h('h3', { style: 'margin:14px 0 0' }, 'One case'),
+      lbl('Format', one),
+      h('div', { class: 'hint', style: 'margin:8px 0 2px' }, 'Preview'), oneOut,
+      h('div', { class: 'bar', style: 'margin:12px 0 0' },
+        h('button', { class: 'primary', onclick: save }, 'Save'),
+        h('span', { class: 'grow' }),
+        h('button', { class: 'small linkish', onclick: reset }, 'Reset to default'))));
+}
+
+export function renderLogging() {
+  const st = settings();
+  return h('div', {},
     h('section', { class: 'card' },
       h('h2', {}, 'Logging'),
       h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: st.suggestions !== false, onchange: e => patchLogbook({ settings: { suggestions: e.target.checked } }) }),
         'Suggest tags as I type'),
-      h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !!st.enterSaves, onchange: e => patchLogbook({ settings: { enterSaves: e.target.checked } }) }),
-        'Enter key saves the case (Shift+Enter for a new line)'),
-      h('p', { class: 'hint', style: 'margin:0 0 6px' }, 'Off (the default): Enter starts a new line, and Ctrl+Enter (Cmd+Enter on a Mac) saves.'),
+      h('label', { class: 'field', style: 'margin-top:8px' }, 'Enter key in the case box',
+        h('select', { onchange: e => patchLogbook({ settings: { enterMode: e.target.value, enterSaves: null } }).then(() => toast('Saved')) },
+          [['newline', 'New line (default)'], ['double', 'Press Enter twice to save'], ['single', 'Enter saves (Shift+Enter for a new line)']].map(([v, l]) =>
+            h('option', { value: v, selected: (st.enterMode || (st.enterSaves ? 'single' : 'newline')) === v }, l)))),
+      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'Twice: Enter on an empty line saves, so a case can still take several lines. Ctrl+Enter (Cmd+Enter on a Mac) always saves.'),
       h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !!st.weeklyDigest, onchange: e => patchLogbook({ settings: { weeklyDigest: e.target.checked } }) }),
-        'Show last week’s summary on the Log page (once a week)'),
-      h('label', { class: 'field', style: 'margin-top:8px' }, 'Case box height on the Log page',
+        'Show last week’s summary on the Case tab (once a week)'),
+      h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !st.hideTips, onchange: e => patchLogbook({ settings: { hideTips: !e.target.checked } }) }),
+        'Show tips and help text'),
+      h('p', { class: 'hint', style: 'margin:0 0 6px' }, 'Off for experienced users: hides the explanations around the app (like the one at the top of the tag editor), the privacy and photo reminders, and the tips for the tags you pick.'),
+      h('label', { class: 'field', style: 'margin-top:8px' }, 'Case box height on the Case tab',
         h('select', { onchange: e => patchLogbook({ settings: { boxLines: Number(e.target.value) } }).then(() => toast('Saved')) },
           Array.from({ length: 19 }, (_, i) => i + 2).map(n => h('option', { value: String(n), selected: n === (Math.min(20, Math.max(2, Number(st.boxLines) || 3))) }, `${n} lines${n === 3 ? ' (default)' : ''}`)))),
-      h('label', { class: 'field', style: 'margin-top:8px' }, 'Logbook search',
-        h('select', { onchange: e => patchLogbook({ settings: { lbScope: e.target.value } }).then(() => toast('Saved')) },
-          [['all', 'Search everything (default)'], ['initials', 'Search initials only'], ['procedure', 'Search the procedure only']].map(([v, t]) => h('option', { value: v, selected: (st.lbScope || 'all') === v }, t)))),
-      h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !!st.lbFuzzy, onchange: e => patchLogbook({ settings: { lbFuzzy: e.target.checked } }) }),
-        'Fuzzy search in the Logbook (allows typos)'),
-      h('p', { class: 'hint', style: 'margin:0 0 6px' }, 'Also under Filter on the Logbook tab.'),
+      h('p', { class: 'hint help', style: 'margin:8px 0 6px' }, 'How the Logbook search works (everything, initials or procedure; fuzzy) is under Filter on the Logbook tab, and is remembered.'),
+      // operators in the Logbook search box (search-ops.js); off by default, so plain searches never change meaning
+      h('label', { class: 'check', style: 'margin-top:8px' }, h('input', { type: 'checkbox', role: 'switch', checked: !!st.searchOps, onchange: e => patchLogbook({ settings: { searchOps: e.target.checked } }).then(() => toast(e.target.checked ? 'Advanced search on' : 'Advanced search off')) }),
+        'Advanced search'),
+      h('div', { class: 'hint', style: 'margin:0 0 6px' },
+        h('p', { style: 'margin:0 0 4px' }, 'Lets you type operators in the Logbook and Reflections search boxes (a ? next to each lists them; tap one to add it):'),
+        h('ul', { class: 'ops-list' }, OPERATOR_HELP.map(([op, what]) => h('li', {}, h('code', {}, op), ' ', what))),
+        h('p', { style: 'margin:4px 0 0' }, 'Reflections have their own: heading:, title:, diagnosis:, case: and initials:.'),
+        h('p', { style: 'margin:4px 0 0' }, 'Off by default because a few plain searches change meaning when it’s on: a word starting with “-” leaves cases out, and OR in capitals means either.')),
       h('label', { class: 'field', style: 'margin-top:8px' }, 'Date for a new case',
         h('select', { onchange: e => patchLogbook({ settings: { defaultDate: e.target.value } }) },
           h('option', { value: 'today', selected: st.defaultDate !== 'last' }, 'Today'),
-          h('option', { value: 'last', selected: st.defaultDate === 'last' }, 'The date I used last')))),
+          h('option', { value: 'last', selected: st.defaultDate === 'last' }, 'The date I used last')))));
+}
 
-    h('section', { class: 'card' },
-      h('div', { class: 'bar' }, h('h2', { style: 'margin:0' }, 'Tag editor'), h('span', { class: 'grow' }), h('a', { class: 'btn small', href: '#tags' }, 'Open tag editor ›')),
-      h('p', { class: 'hint', style: 'margin:6px 0 0' }, 'Rename, hide and reorder the APMES tags on the Log page, group them under headers, add personal tags and shorthand, and make tag groups. Download or load your layout as a CSV file.')),
-
+export function renderReflectionSettings() {
+  const st = settings();
+  return h('div', {},
     h('section', { class: 'card' },
       h('h2', {}, 'Reflections'),
       h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: st.reflExport !== false, onchange: e => patchLogbook({ settings: { reflExport: e.target.checked } }) }),
         'New reflections are included in the portfolio export'),
-      h('p', { class: 'hint', style: 'margin:0' }, 'Untick if you write many and would rather choose which go in. Reflections already written keep their own tick.')),
-
-    // ---- recycle bin (bin agent) ----
+      h('p', { class: 'hint help', style: 'margin:0' }, 'Untick if you write many and would rather choose which go in. Reflections already written keep their own tick.')),
     h('section', { class: 'card' },
       h('h2', {}, 'Photos'),
       (() => { const kb = photoUsageKb(S.reflections), pct = Math.min(100, Math.round(kb / PHOTO_BUDGET_KB * 100));
         return [h('p', { style: 'margin:0 0 6px' }, `${fmtMb(kb)} of ${fmtMb(PHOTO_BUDGET_KB)} used by your reflection figures`),
           h('div', { style: 'height:8px;border-radius:4px;background:var(--line, #ddd);overflow:hidden' }, h('div', { style: `height:100%;width:${pct}%;background:${pct >= 90 ? 'var(--err, #b91c1c)' : 'var(--accent, #002f6c)'}` }))]; })(),
-      h('p', { class: 'hint', style: 'margin:6px 0 0' }, PHOTO_NOTE + ' They are shrunk on your phone before saving. To free space, remove figures you no longer need; deleted reflections free theirs when they leave the recycle bin (30 days).')),
+      h('p', { class: 'hint', style: 'margin:6px 0 0' }, PHOTO_NOTE + ' They are shrunk on your phone before saving. To free space, remove figures you no longer need; deleted reflections free theirs when they leave the recycle bin (30 days).')));
+}
 
-    h('section', { class: 'card' },
-      h('div', { class: 'bar' }, h('h2', { style: 'margin:0' }, 'Recycle bin'), h('span', { class: 'grow' }),
-        h('button', { class: 'small', onclick: () => openBin() }, 'Open')),
-      h('p', { class: 'hint', style: 'margin:6px 0 0' }, 'Deleted cases and reflections are kept for 30 days and can be restored.')),
-
-    backupCard(),
-
+// On the More page
+export const privacyCard = () => (
     h('section', { class: 'card' },
       h('h2', {}, 'Privacy'),
       h('p', { class: 'hint', style: 'margin:0' },
         'Your cases are stored in your own logbook in Google Cloud Firestore. Only you can read them (and the app owner, who runs the import from the old Google Form); programme admins cannot. ',
-        'Log patient initials only — no names, NRIC or hospital numbers. Programme residents share case counts per tag on the Totals tab; details are never shared. ',
-        'This device keeps an offline copy of your cases until you sign out — sign out on shared computers.')),
-
+        'Log patient initials only — no names, NRIC or hospital numbers. Programme residents share case counts per tag (Analytics → Compare with your intake); details are never shared. ',
+        'This device keeps an offline copy of your cases until you sign out — sign out on shared computers.')));
+export const creditsCard = () => (
     h('section', { class: 'card credits' },
       h('h2', {}, 'Credits'),
       h('p', { style: 'margin:0' }, 'Code by ', h('b', {}, 'Abigail Sim')),
       h('p', { style: 'margin:4px 0 0' }, 'Design and UX/UI by ', h('b', {}, 'Koh Wenjun'))));
-}
 
 // ---------- Account-tab cards: who you are, sign out ----------
 
@@ -146,8 +225,8 @@ export function youCard() {
     h('label', { class: 'field' }, 'Name (shown on your exports; the Totals table uses the name on the programme list)',
       h('input', { value: displayName(), autocomplete: 'name', onchange: e => patchLogbook({ name: e.target.value.trim() }).then(() => toast('Saved')) })),
     r
-      ? h('p', { class: 'hint' }, `On the programme list: ${r.rid}, AY${r.intake || '?'} intake, ${myYearName()}${r.status && r.status !== 'ACTIVE' ? ', ' + r.status.toLowerCase() : ''}. Your case counts (never your case details) are shared on the Totals tab.`)
-      : h('p', { class: 'hint' }, 'Not on the programme resident list, so your logbook is private and not on the Totals tab. If you are an APMES resident, ask the programme admins to add your email.'));
+      ? h('p', { class: 'hint' }, `On the programme list: ${r.rid}, AY${r.intake || '?'} intake, ${myYearName()}${r.status && r.status !== 'ACTIVE' ? ', ' + r.status.toLowerCase() : ''}. Your case counts (never your case details) are shared on Totals (Analytics → Compare with your intake).`)
+      : h('p', { class: 'hint' }, 'Not on the programme resident list, so your logbook is private and not on Totals. If you are an APMES resident, ask the programme admins to add your email.'));
 }
 
 export function signOutCard() {
@@ -170,8 +249,8 @@ function tagGroupsCard() {
   const list = (S.logbook && S.logbook.templates) || [];
   return h('section', { class: 'card', id: 'tag-groups' },
     h('h2', {}, 'Tag groups'),
-    h('p', { class: 'hint' }, 'Tags you often pick together, one tap in Quick picks on the Log page, e.g. “LSCS spinal” = LSCS + CNB(Obs) + Spinal.'),
-    list.length ? h('ul', { class: 'prog' }, list.map(t => h('li', { style: 'grid-template-columns:1fr auto' },
+    h('p', { class: 'hint help' }, 'Tags you often pick together, one tap in Quick picks on the Case tab, e.g. “LSCS spinal” = LSCS + CNB(Obs) + Spinal.'),
+    list.length ? h('ul', { class: 'prog' }, list.map(t => h('li', { style: 'grid-template-columns:1fr auto', class: tev.lastGroup === t.id ? 'te-last' : '' },
       h('span', {}, h('b', {}, t.name), ' ', h('span', { class: 'muted' }, catPills(t.cats)), t.details ? h('span', { class: 'muted' }, ` · “${t.details}”`) : null),
       h('span', { class: 'row' },
         h('button', { class: 'small', onclick: () => editTemplate(t) }, 'Edit'),
@@ -207,10 +286,15 @@ export function templateDialog(t, save, title = null) {
 }
 
 function editTemplate(t) {
+  if (t) tev.lastGroup = t.id;
   templateDialog(t, async out => {
-    const list = ((S.logbook && S.logbook.templates) || []).filter(x => x.id !== out.id);
-    const i = ((S.logbook && S.logbook.templates) || []).findIndex(x => x.id === out.id);
-    list.splice(i < 0 ? list.length : i, 0, out);
+    const all = (S.logbook && S.logbook.templates) || [];
+    const list = all.filter(x => x.id !== out.id);
+    const i = all.findIndex(x => x.id === out.id);
+    // a new group goes after the one you last edited (else at the end)
+    const after = !t && tev.lastGroup ? list.findIndex(x => x.id === tev.lastGroup) : -1;
+    list.splice(i >= 0 ? i : after >= 0 ? after + 1 : list.length, 0, out);
+    tev.lastGroup = out.id;
     await patchLogbook({ templates: list });
     hooks.render();
   });
@@ -238,11 +322,11 @@ export function categoryNamesCard() {
       : h('button', { class: 'small', onclick: () => { CN.edit = true; CN.open = true; hooks.render(); } }, 'Edit')) : null,
     ed ? h('p', { class: 'hint' }, 'Leave a box blank for the programme default (shown faintly).') : null,
     h('div', { class: 'scroll' }, h('table', { class: 'cat-names' },
-      h('thead', {}, h('tr', {}, ['Code', 'Official', 'Display name', 'Pill name'].map(t => h('th', {}, t)))),
+      h('thead', {}, h('tr', {}, ['Official', 'Display name', 'Pill name'].map(t => h('th', {}, t)))),
       h('tbody', {}, PICKER_ORDER.map(c => h('tr', {},
-        h('td', {}, c.code), h('td', { class: 'muted' }, c.name),
-        ed ? h('td', {}, h('input', { value: (cur[c.code] && cur[c.code].name) || '', placeholder: (DEFAULT_NAMES[c.code] || [])[0] || c.name, maxlength: '80', 'aria-label': `Display name for ${c.code}`, oninput: e => set(c.code, 'name', e.target.value) })) : h('td', {}, progName(c.code)),
-        ed ? h('td', {}, h('input', { value: (cur[c.code] && cur[c.code].short) || '', placeholder: (DEFAULT_NAMES[c.code] || [])[1] || c.name, maxlength: '30', 'aria-label': `Pill name for ${c.code}`, oninput: e => set(c.code, 'short', e.target.value) })) : h('td', {}, progShort(c.code)))))))));
+        h('td', { class: 'muted' }, c.name),
+        ed ? h('td', {}, h('input', { value: (cur[c.code] && cur[c.code].name) || '', placeholder: (DEFAULT_NAMES[c.code] || [])[0] || c.name, maxlength: '80', 'aria-label': `Display name for ${c.name}`, oninput: e => set(c.code, 'name', e.target.value) })) : h('td', {}, progName(c.code)),
+        ed ? h('td', {}, h('input', { value: (cur[c.code] && cur[c.code].short) || '', placeholder: (DEFAULT_NAMES[c.code] || [])[1] || c.name, maxlength: '30', 'aria-label': `Pill name for ${c.name}`, oninput: e => set(c.code, 'short', e.target.value) })) : h('td', {}, progShort(c.code)))))))));
 }
 
 // ---------- tag editor (this account; js/tags.js) ----------
@@ -251,8 +335,12 @@ export function categoryNamesCard() {
 // under section headers, and add your own tags (linked to APMES categories, or personal labels).
 // Share it as a CSV file (opens in Excel) or load someone else's.
 const saveTags = set => patchLogbook({ settings: { tagSet: cleanTagSet(set) } }).then(() => hooks.render());
-// view: the list (details, up/down) or pills (as on the Log page, drag to reorder); a search narrows both
-const tev = { mode: 'list', q: '' };
+// view: the list (details, up/down) or pills (as on the Case tab, drag to reorder); a search narrows both
+// (List or Pills is remembered with your account, like the Log page's switch)
+// last: the tag or header you last tapped (list or pills) — a new one goes right after it;
+// lastGroup: the tag group you last edited — a new group goes after it
+const tev = { q: '', last: null, lastGroup: null };
+const teMode = () => (settings().tagEditorView === 'pills' ? 'pills' : 'list');
 // cases per tag: APMES tags from the counts, your own tags by key
 function tagUsage() {
   const n = new Map();
@@ -271,7 +359,7 @@ export function renderTagEditor() {
   const linkText = n => n.kind === 'head' ? 'section header'
     : 'Personal · ' + ((n.e.links || []).length ? 'counts as ' + n.e.links.map(catShort).join(', ') : (n.e.p && n.e.p.startsWith('c:') ? 'counts under ' + catShort(n.e.p.slice(2)) : 'label only'));
   const count = n => (n.kind === 'head' ? '' : `${used(n.e.k)} case${used(n.e.k) === 1 ? '' : 's'}`);
-  const row = n => h('li', { 'data-k': n.e.k, style: `padding-left:${8 + Math.min(n.depth, 4) * 18}px`, class: `te-${n.kind}${n.e.hide ? ' te-hidden' : ''}` },
+  const row = n => h('li', { 'data-k': n.e.k, style: `padding-left:${8 + Math.min(n.depth, 4) * 18}px`, class: `te-${n.kind}${n.e.hide ? ' te-hidden' : ''}${tev.last === n.e.k ? ' te-last' : ''}` },
     // drag by the handle: onto the top or bottom of a row to go before or after it, the middle to go inside
     h('span', { class: 'te-handle', title: 'Drag to move or nest', 'aria-label': 'Drag to move or nest', onpointerdown: e => startTagDrag(e, n.e.k) }, '⠿'),
     h('button', { type: 'button', class: 'te-name', onclick: () => editTag(n) },
@@ -282,45 +370,50 @@ export function renderTagEditor() {
     h('button', { class: 'small icon-btn', 'aria-label': 'Move down', onclick: () => saveTags(moveTag(set, n.e.k, 1)) }, '↓'));
   // pills: tap to edit, drag (press and hold on a phone) onto the left or right of another to go
   // before or after it, onto its middle to go inside
-  const pill = n => h('li', { 'data-k': n.e.k, class: `te-pillitem te-${n.kind} d${Math.min(n.depth, 3)}${n.e.hide ? ' te-hidden' : ''}`, tabindex: '0', role: 'button',
+  const pill = n => h('li', { 'data-k': n.e.k, class: `te-pillitem te-${n.kind} d${Math.min(n.depth, 3)}${n.e.hide ? ' te-hidden' : ''}${tev.last === n.e.k ? ' te-last' : ''}`, tabindex: '0', role: 'button',
     title: n.kind === 'cat' ? catName(n.code) : n.kind === 'head' ? 'Section header' : linkText(n),
-    onpointerdown: e => pillDown(e, n.e.k), onclick: () => { if (!pillDragged) editTag(n); }, onkeydown: e => { if (e.key === 'Enter') editTag(n); } },
+    onpointerdown: e => pillDown(e, n.e.k, e.currentTarget), onclick: () => { if (!pillDragged) editTag(n); }, onkeydown: e => { if (e.key === 'Enter') editTag(n); } },
     h('span', { class: 'te-pill' }, nameOf(n)), n.kind === 'head' ? null : h('small', { class: 'te-n' }, String(used(n.e.k))));
   const search = h('input', { type: 'search', class: 'grow', value: tev.q, placeholder: 'Search tags, names or shorthand', 'aria-label': 'Search tags',
     oninput: e => { tev.q = e.target.value; const pos = e.target.selectionStart; hooks.render(); const el = document.querySelector('.tag-editor input[type=search]'); if (el) { el.focus(); el.setSelectionRange(pos, pos); } } });
   const modeSeg = h('span', { class: 'seg', role: 'group', 'aria-label': 'Show tags as' },
-    [['list', 'List'], ['pills', 'Pills']].map(([m, l]) => h('button', { class: 'small', 'aria-pressed': String(tev.mode === m), onclick: () => { tev.mode = m; hooks.render(); } }, l)));
+    [['list', 'List'], ['pills', 'Pills']].map(([m, l]) => h('button', { class: 'small', 'aria-pressed': String(teMode() === m), onclick: () => { if (teMode() !== m) patchLogbook({ settings: { tagEditorView: m } }).then(() => hooks.render()); } }, l)));
   return h('div', {}, h('section', { class: 'card tag-editor' },
     h('h2', {}, 'Tag editor'),
-    h('p', { class: 'hint' }, 'Lay out the Log page’s list your way. APMES tags are the programme’s categories: rename (just for you), hide, move them or put them under section headers. Personal tags are your own: link one to APMES categories and choosing it ticks them, or leave it as a label only. A personal tag under an APMES one counts towards it. Totals and exports always use APMES.'),
+    h('p', { class: 'hint help' }, 'Lay out the Case tab’s list your way. APMES tags are the programme’s categories: rename (just for you), hide, move them or put them under section headers. Personal tags are your own: link one to APMES categories and choosing it ticks them, or leave it as a label only. A personal tag under an APMES one counts towards it. Totals and exports always use APMES.'),
     h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:8px;margin:0 0 8px' },
       h('button', { class: 'small primary', onclick: () => editTag(null, 'tag') }, '+ Personal tag'),
       h('button', { class: 'small', onclick: () => editTag(null, 'head') }, '+ Section header'),
-      h('button', { class: 'small', onclick: () => document.getElementById('tag-groups')?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }, 'Tag groups ↓'),
-      h('button', { class: 'small', onclick: () => download(`tags-${todayISO()}.csv`, new Blob([tagSetToCsv(set, def)], { type: 'text/csv' })) }, 'Download as CSV'),
-      fileButton('Load a CSV…', '.csv,text/csv', file => loadTagCsv(file, def), 'btn small'),
-      h('button', { class: 'small', onclick: async () => {
-        if (!(await confirmBox('Reset tags?', 'Go back to the APMES tags in the official order, with the programme’s names? Your own tags are removed from the list (cases keep them).', 'Reset', true))) return;
-        await patchLogbook({ settings: { tagSet: defaultTagSet({}), catOrder: [], subcats: {} } }); hooks.render();
-      } }, 'Reset')),
+      h('button', { class: 'small', onclick: () => document.getElementById('tag-groups')?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }, 'Tag groups ↓')),
     h('div', { class: 'bar', style: 'gap:8px;margin:0 0 8px' }, search, modeSeg),
     words.length ? h('p', { class: 'hint', style: 'margin:0 0 6px' }, `${nodes.length} of ${all.length} shown`) : null,
-    tev.mode === 'pills'
-      ? [h('p', { class: 'hint', style: 'margin:0 0 6px' }, 'Tap a pill to edit it. Drag one (press and hold on a phone) onto the left or right of another to move it, or onto its middle to put it inside. The number is how many cases have it.'),
+    teMode() === 'pills'
+      ? [h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'Tap a pill to edit it. Drag one (press and hold on a phone) onto the left or right of another to move it, or onto its middle to put it inside. The number is how many cases have it.'),
         h('ul', { class: 'te-list te-pills' }, nodes.map(pill))]
       : h('ul', { class: 'te-list' }, nodes.map(row))),
-    tagGroupsCard());
+    tagGroupsCard(),
+    // the whole layout as a file, and starting over: rarely needed, so at the very bottom
+    h('section', { class: 'card' },
+      h('h2', {}, 'Tag list file'),
+      h('p', { class: 'hint help' }, 'Download your tags as a spreadsheet (CSV) to edit on a computer or share, load one back, or reset to the APMES tags.'),
+      h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:8px;margin:0' },
+        h('button', { class: 'small', onclick: () => download(`tags-${todayISO()}.csv`, new Blob([tagSetToCsv(set, def)], { type: 'text/csv' })) }, 'Download as CSV'),
+        fileButton('Load a CSV…', '.csv,text/csv', file => loadTagCsv(file, def), 'btn small'),
+        h('button', { class: 'small linkish', style: 'margin-left:auto', onclick: async () => {
+          if (!(await confirmBox('Reset tags?', 'Go back to the APMES tags in the official order, with the programme’s names? Your own tags are removed from the list (cases keep them).', 'Reset', true))) return;
+          await patchLogbook({ settings: { tagSet: defaultTagSet({}), catOrder: [], subcats: {} } }); hooks.render();
+        } }, 'Reset'))));
 }
 
 // Pills: a mouse drags once it moves; a finger drags after a short hold (a quick swipe still scrolls).
 let pillDragged = false;
-function pillDown(e, key) {
+function pillDown(e, key, li) {
   if (tdrag || (e.pointerType === 'mouse' && e.button !== 0)) return;
   pillDragged = false;
   const x0 = e.clientX, y0 = e.clientY, touch = e.pointerType !== 'mouse';
   let timer = null;
   const stop = () => { clearTimeout(timer); window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', stop); window.removeEventListener('pointercancel', stop); };
-  const go = ev => { stop(); pillDragged = true; startTagDrag(ev, key, true); };
+  const go = ev => { stop(); pillDragged = true; startTagDrag(ev, key, true, li); };
   const mv = ev => {
     const far = Math.abs(ev.clientX - x0) + Math.abs(ev.clientY - y0) > 8;
     if (!far) return;
@@ -332,18 +425,30 @@ function pillDown(e, key) {
 
 // ---------- drag and drop (pointer events, so touch works) ----------
 let tdrag = null;
-function startTagDrag(e, key, horiz = false) {
+// a short vibration (Android; iPhones don't allow web pages to vibrate, so nothing happens there)
+const buzz = ms => { try { if (navigator.vibrate) navigator.vibrate(ms); } catch { /* not allowed */ } };
+function startTagDrag(e, key, horiz = false, liArg = null) {
   // (a pills drag starts from a pointermove, where button is -1)
   if (tdrag || (e.type === 'pointerdown' && e.pointerType === 'mouse' && e.button !== 0)) return;
   if (e.cancelable) e.preventDefault();
-  const li = e.target.closest('li');
+  // (a pills drag starts after the pointer moved: use the pill that was pressed, not what's under it now)
+  const li = liArg || e.target.closest('li');
+  if (!li) return;
   const box = li.getBoundingClientRect();
-  const ghost = li.cloneNode(true);
-  Object.assign(ghost.style, { position: 'fixed', left: box.left + 'px', top: box.top + 'px', width: box.width + 'px', pointerEvents: 'none', opacity: '.85', zIndex: 50, background: 'var(--panel)', boxShadow: '0 6px 18px rgba(0,0,0,.25)' });
-  ghost.classList.add('te-ghost');
+  // the copy that follows the finger sits in a list of the same kind, so the list's styles still apply
+  // (a bare row in <body> wrapped onto two lines)
+  const ghost = h('ul', { class: li.parentElement.className + ' te-ghostlist', 'aria-hidden': 'true' }, li.cloneNode(true));
+  ghost.firstChild.classList.add('te-ghost');
+  Object.assign(ghost.style, { position: 'fixed', left: box.left + 'px', top: box.top + 'px', width: horiz ? 'auto' : box.width + 'px', margin: 0, pointerEvents: 'none', zIndex: 50 });
   document.body.append(ghost);
   li.classList.add('te-dragging');
-  tdrag = { key, ghost, li, dx: e.clientX - box.left, dy: e.clientY - box.top, target: null, where: null, y: e.clientY };
+  // a finger hides what it holds: lift the copy above the finger
+  const lift = e.pointerType === 'touch' ? box.height + 18 : 0;
+  // where it will land, in words, at the top of the screen (visible even under a finger)
+  const hint = h('div', { class: 'te-drop-hint', role: 'status' });
+  document.body.append(hint);
+  tdrag = { key, ghost, li, hint, dx: e.clientX - box.left, dy: e.clientY - box.top + lift, target: null, where: null, y: e.clientY };
+  buzz(15);   // picked up
   // while dragging, a finger must not scroll the page
   const noScroll = ev => { if (tdrag) ev.preventDefault(); };
   window.addEventListener('touchmove', noScroll, { passive: false });
@@ -356,6 +461,7 @@ function startTagDrag(e, key, horiz = false) {
     const under = document.elementFromPoint(ev.clientX, ev.clientY);
     const t = under && under.closest('.te-list li[data-k]');
     tdrag.target = null;
+    hint.textContent = '';
     if (!t || t.dataset.k === key) return;
     const r = t.getBoundingClientRect();
     // pills sit side by side: left / middle / right; rows (and header lines) stack: top / middle / bottom
@@ -366,8 +472,11 @@ function startTagDrag(e, key, horiz = false) {
     const ok = w => canPlace(set, key, w === 'inside' ? tk : (te.p || '')) && dropTag(set, key, tk, w) !== set;
     if (!ok(where)) where = ['before', 'after', 'inside'].find(ok);
     if (!where) return;
+    if (tdrag.lastSpot !== tk + where) { tdrag.lastSpot = tk + where; buzz(6); }   // a tick each time the drop spot changes
     tdrag.target = tk; tdrag.where = where;
     t.classList.add('drop-' + where);
+    const nm = (t.querySelector('.te-pill') || t).textContent.trim().slice(0, 40);
+    hint.textContent = where === 'inside' ? `Under “${nm}”` : `${where === 'before' ? 'Before' : 'After'} “${nm}”`;
   };
   // scroll when near the top or bottom of the screen
   const tick = () => {
@@ -382,10 +491,10 @@ function startTagDrag(e, key, horiz = false) {
     window.removeEventListener('touchmove', noScroll);
     cancelAnimationFrame(tdrag.raf);
     setTimeout(() => { pillDragged = false; }, 0);   // the click that ends a drag doesn't open the editor
-    ghost.remove(); li.classList.remove('te-dragging'); clear();
+    ghost.remove(); hint.remove(); li.classList.remove('te-dragging'); clear();
     const { target, where } = tdrag;
     tdrag = null;
-    if (ev.type === 'pointerup' && target) saveTags(dropTag(tagSet(), key, target, where));
+    if (ev.type === 'pointerup' && target) { buzz(20); saveTags(dropTag(tagSet(), key, target, where)); }
   };
   window.addEventListener('pointermove', move); window.addEventListener('pointerup', end); window.addEventListener('pointercancel', end);
 }
@@ -393,7 +502,13 @@ function startTagDrag(e, key, horiz = false) {
 // Edit one item (or add a tag / header when n is null).
 function editTag(n, kind = n ? n.kind : 'tag') {
   const set = tagSet();
+  if (n) tev.last = n.e.k;   // remembered: a new tag or header goes right after it
   const e = n ? { ...n.e, links: [...(n.e.links || [])] } : { k: newKey(kind === 'head' ? 'h' : 'u'), n: '', links: [], ...(kind === 'head' ? { hd: true } : {}) };
+  // a new one sits beside the last tapped: a tag under the same parent, a header after its top-level item
+  const last = !n && tev.last ? set.find(x => x.k === tev.last) : null;
+  const topOf = k => { let x = set.find(y => y.k === k); while (x && x.p) x = set.find(y => y.k === x.p); return x; };
+  const anchor = last ? (kind === 'head' ? topOf(last.k) : last) : null;
+  if (anchor && kind === 'tag' && anchor.p) e.p = anchor.p;
   const code = kind === 'cat' ? e.k.slice(2) : null;
   const sub = code && BY_CODE[code].parent;
   const dflt = code ? { pill: (DEFAULT_NAMES[code] || [])[1] || BY_CODE[code].name } : null;
@@ -407,12 +522,14 @@ function editTag(n, kind = n ? n.kind : 'tag') {
   const pill = h('input', { value: e.n || '', maxlength: kind === 'head' ? '60' : '40', placeholder: code ? dflt.pill : kind === 'head' ? 'e.g. Regional' : 'e.g. Interscalene' });
   const long = h('input', { value: e.l || '', maxlength: '100', placeholder: code ? ((DEFAULT_NAMES[code] || [])[0] || BY_CODE[code].name) : 'optional' });
   const hide = h('input', { type: 'checkbox', checked: !!e.hide });
+  const placeNote = anchor ? h('p', { class: 'hint', style: 'margin:0 0 6px' }, `Goes after “${anchor.n || (anchor.k.startsWith('c:') ? catShort(anchor.k.slice(2)) : '')}” (${anchor === last ? 'the last one you tapped' : 'the section of the last one you tapped'}).`) : null;
   const kw = h('textarea', { rows: '3', value: shorthandOf(e).join(', '), maxlength: '1000', placeholder: kind === 'cat' ? 'e.g. flap, free flap' : 'e.g. appy, lap appy', autocapitalize: 'off', spellcheck: 'false' });
   const linkBox = h('div', { class: 'te-links' }, PICKER_ORDER.map(c => h('label', { class: 'check' },
     h('input', { type: 'checkbox', checked: e.links.includes(c.code), onchange: ev => { e.links = ev.target.checked ? [...e.links, c.code] : e.links.filter(x => x !== c.code); } }),
     `${c.parent ? '\u00a0\u00a0' : ''}${catName(c.code)}`)));
   const m = modal(n ? (kind === 'cat' ? 'Edit APMES tag' : kind === 'head' ? 'Edit header' : 'Edit personal tag') : (kind === 'head' ? 'New section header' : 'New personal tag'), [
-    code ? h('p', { class: 'hint' }, `APMES: ${BY_CODE[code].label}. It always counts towards this APMES tag; renaming is just for you.`) : null,
+    code ? h('p', { class: 'hint' }, `APMES: ${BY_CODE[code].full}. It always counts towards this APMES tag; renaming is just for you.`) : null,
+    placeNote,
     h('label', { class: 'field' }, kind === 'head' ? 'Header' : 'Name (pill)', pill),
     kind !== 'head' ? h('label', { class: 'field' }, 'Long name (lists)', long) : null,
     kind !== 'head' ? h('label', { class: 'field' }, 'Sits under', under) : null,
@@ -440,7 +557,7 @@ function editTag(n, kind = n ? n.kind : 'tag') {
       paint();
       return box;
     })() : null,
-    kind !== 'head' ? h('label', { class: 'check', style: 'margin-top:8px' }, hide, 'Hide from the Log page (still found by search)') : null,
+    kind !== 'head' ? h('label', { class: 'check', style: 'margin-top:8px' }, hide, 'Hide from the Case tab (still found by search)') : null,
     h('div', { class: 'bar', style: 'margin-top:12px' },
       n && kind !== 'cat' ? h('button', { class: 'danger', onclick: async () => { m.close(); await saveTags(removeTag(set, e.k)); toast('Removed (cases keep the tag)'); } }, 'Remove') : null,
       n && kind === 'tag' ? h('button', { onclick: () => { m.close(); mergeTag(n); } }, 'Merge…') : null,
@@ -454,9 +571,13 @@ function editTag(n, kind = n ? n.kind : 'tag') {
         // an APMES tag left on the built-in list keeps following it (and gets later additions)
         if (code ? out.kw.join() === (DEFAULT_SHORTHAND[code] || []).join() : !out.kw.length) delete out.kw; if (!out.n && kind === 'cat') delete out.n;
         if (kind !== 'tag') delete out.links;
+        if (!n && set.filter(x => !x.k.startsWith('c:')).length >= MAX_TAGS) return toast(`You have ${MAX_TAGS} personal tags and headers, the most there can be. Remove one first.`);
         let next = n ? set.map(x => (x.k === e.k ? out : x)) : [...set, out];
         const p = sub ? 'c:' + sub : under.value;
         if ((e.p || '') !== p || !n) next = reparentTag(next, e.k, p);
+        // new, beside the same parent as the last tapped: right after it
+        if (!n && anchor && (anchor.p || '') === p) { const placed = dropTag(next, e.k, anchor.k, 'after'); if (placed !== next) next = placed; }
+        if (!n) tev.last = e.k;   // the next new one follows this one
         m.close(); await saveTags(next);
       } }, 'Save'))], { sticky: true });
 }
@@ -482,10 +603,12 @@ function mergeTag(n) {
         if (!to) return toast('Choose a tag to merge into');
         m.close();
         const code = to.startsWith('c:') ? to.slice(2) : null;
+        // what the target counts towards: an APMES tag itself, or a personal tag's links (as choosing it does)
+        const adds = code ? [code] : tagLinksIn(set, to);
         const next = cases.map(c => {
           const tags = (c.tags || []).filter(k => k !== from);
           const out = { ...c, tags: code ? tags : [...new Set([...tags, to])], updatedAt: Date.now() };
-          if (code) out.cats = sortCodes(withParents([...(c.cats || []), code]));
+          if (adds.length) out.cats = sortCodes(withParents([...(c.cats || []), ...adds]));
           if (!out.tags.length) delete out.tags;
           return out;
         });

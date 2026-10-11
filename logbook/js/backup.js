@@ -1,4 +1,4 @@
-// Personal backup (Settings → Backup): everything in your logbook as one JSON file you keep, and a
+// Personal backup (More → Export / Import): everything in your logbook as one JSON file you keep, and a
 // restore that adds back whatever is missing (it never overwrites or deletes anything). Photos are
 // left out (they are for the Word portfolio only); older backups that have them still restore them.
 
@@ -43,11 +43,18 @@ async function restoreBackup(file) {
   const haveTpl = new Set(((S.logbook && S.logbook.templates) || []).map(t => t.id));
   const newTpl = tpl.filter(t => t && t.id && !haveTpl.has(t.id));
   const other = data.email && data.email !== mine() ? h('p', { class: 'tip' }, `This backup is from ${data.email}. Its cases will be added to your logbook (${mine()}).`) : null;
-  const nothing = !cases.length && !refl.length && !newTpl.length;
+  // portfolio details, name and settings: only what this account doesn't have yet
+  const lbNow = S.logbook || {}, bk = data.logbook || {};
+  const profile = bk.profile && !lbNow.profile ? bk.profile : null;
+  const name = bk.name && !String(lbNow.name || '').trim() ? bk.name : null;
+  const setNow = lbNow.settings || {};
+  const newSettings = Object.fromEntries(Object.entries(bk.settings && typeof bk.settings === 'object' ? bk.settings : {}).filter(([k]) => !(k in setNow)));
+  const extra = [profile ? 'your portfolio details' : '', name ? 'your name' : '', Object.keys(newSettings).length ? 'settings you haven’t set here' : ''].filter(Boolean);
+  const nothing = !cases.length && !refl.length && !newTpl.length && !extra.length;
   const m = modal('Restore from backup', [
     other,
     h('p', {}, nothing ? 'Everything in this backup is already in your logbook.'
-      : `Add ${cases.length} case${cases.length === 1 ? '' : 's'}, ${refl.length} reflection${refl.length === 1 ? '' : 's'} and ${newTpl.length} template${newTpl.length === 1 ? '' : 's'} that are missing here?`),
+      : `Add ${cases.length} case${cases.length === 1 ? '' : 's'}, ${refl.length} reflection${refl.length === 1 ? '' : 's'} and ${newTpl.length} tag group${newTpl.length === 1 ? '' : 's'} that are missing here${extra.length ? ', and ' + extra.join(', ') : ''}?`),
     h('p', { class: 'hint' }, `Backup from ${data.exportedAt ? new Date(data.exportedAt).toLocaleString() : 'an unknown date'}. Nothing already in your logbook is changed or deleted.`),
     h('div', { class: 'bar', style: 'margin-top:12px' }, h('span', { class: 'grow' }),
       h('button', { onclick: () => m.close() }, nothing ? 'Close' : 'Cancel'),
@@ -58,16 +65,20 @@ async function restoreBackup(file) {
           if (S.resident) for (const img of images) await cloud.saveImage(mine(), img);   // photos: programme residents only (rules)
           for (const r of refl) await cloud.saveReflection(mine(), r);
           if (newTpl.length) await patchLogbook({ templates: [...((S.logbook && S.logbook.templates) || []), ...newTpl] });
+          if (extra.length) await patchLogbook({ ...(profile ? { profile } : {}), ...(name ? { name } : {}), ...(Object.keys(newSettings).length ? { settings: newSettings } : {}) });
           toast(`Restored ${cases.length} cases, ${refl.length} reflections`);
         } catch (err) { toast('Restore stopped: ' + err.message); }
       } }, 'Restore')),
   ]);
 }
 
-export function backupCard() {
+// extra: more ways to keep a copy, shown under the backup file (the Excel spreadsheet)
+export function backupCard(...extra) {
   const btn = h('button', { onclick: () => downloadBackup(btn) }, 'Download backup');
   return h('section', { class: 'card' },
     h('h2', {}, 'Backup'),
-    h('p', { class: 'hint' }, 'Keep your own copy of your cases, reflections, templates and portfolio details as one file. Photos are not included. Restoring adds back anything missing and never deletes.'),
-    h('div', { class: 'bar', style: 'margin-bottom:0' }, btn, fileButton('Restore from backup…', '.json,application/json', restoreBackup)));
+    extra.length ? h('h3', {}, 'Backup file') : null,
+    h('p', { class: 'hint help' }, 'Keep your own copy of your cases, reflections, tag groups, settings and portfolio details as one file. Photos are not included. Restoring adds back anything missing and never deletes.'),
+    h('div', { class: 'bar', style: 'margin-bottom:0' }, btn, fileButton('Restore from backup…', '.json,application/json', restoreBackup)),
+    ...extra);
 }

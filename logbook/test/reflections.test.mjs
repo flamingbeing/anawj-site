@@ -151,6 +151,13 @@ assert.ok(MIN_WORDS > 0);
   assert.deepEqual(ids({ cats: ['13'], details: 'LM MRI under GA' }), ['remote']);
   assert.deepEqual(ids({ cats: [], details: 'AFOI for trismus' }), ['airway']);
   assert.deepEqual(ids(null), []);
+  // a caesarean section's spinal isn't labour analgesia; a labour epidural still is
+  assert.deepEqual(ids({ cats: ['16', '17', '28'] }).includes('labour'), false);
+  assert.deepEqual(ids({ cats: ['17'], details: 'CSE for labour' }), ['labour']);
+  assert.deepEqual(ids({ cats: ['16', '17'], details: 'labour epidural topped up for LSCS' }).includes('labour'), true);
+  assert.deepEqual(ids({ cats: ['36'] }), ['polytrauma']);
+  assert.deepEqual(ids({ cats: ['13'], details: 'NO laparotomy, massive transfusion' }), ['challenging']);
+  assert.deepEqual(ids({ cats: ['18'], details: 'PQ prolonged revision hip' }), ['challenging']);
   // a heading already met drops behind one still needed
   const full = [1, 2, 3].map(i => r({ headingId: 'thoracic', initials: 'T' + i }));
   const s = suggestHeadings({ cats: ['07', '21'] }, full);

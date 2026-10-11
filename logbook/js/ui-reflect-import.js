@@ -45,7 +45,8 @@ async function compress(img) {
   throw new Error('picture too large');
 }
 
-// The whole upload flow as one view. onDone(): back to the Reflections list.
+// The whole upload flow as one view (More → Export / Import → Upload from Word, which has its own back
+// link). onDone(): "Back to reflections" when it's done.
 export function renderImport(onDone) {
   const st = { step: 'pick', file: '', items: [], images: {}, busy: false, added: 0, failed: [] };
   const root = h('div', { class: 'rimp' });
@@ -72,7 +73,6 @@ export function renderImport(onDone) {
 
   function pickView() {
     return [h('section', { class: 'card' },
-      h('div', { class: 'bar' }, h('button', { onclick: back }, '← Reflections'), h('span', { class: 'grow' })),
       h('h2', {}, 'Upload reflections from Word'),
       h('p', {}, 'Choose your portfolio (.docx). The reflection tables (Section 2: Patient’s Initials, Date, Diagnosis, Case details) are read and you can check what will be added before anything is saved.'),
       h('p', { class: 'hint' }, 'The file stays on this device: it is read in the browser and is not uploaded. Only the reflections you add are saved, as drafts.'),
@@ -93,7 +93,7 @@ export function renderImport(onDone) {
     st.refresh = () => { for (const b of [addBtn, addBtn2]) { b.textContent = addLabel(); b.disabled = st.busy || !checked().length; } countEl.textContent = `${checked().length} of ${n} ticked`; };
     const setAll = v => { for (const x of st.items) x.on = v; draw(); };
     const top = h('section', { class: 'card' },
-      h('div', { class: 'bar' }, h('button', { onclick: back }, '← Reflections'), h('button', { onclick: () => { st.step = 'pick'; draw(); } }, 'Choose another file'), h('span', { class: 'grow' })),
+      h('div', { class: 'bar' }, h('button', { onclick: () => { st.step = 'pick'; draw(); } }, 'Choose another file'), h('span', { class: 'grow' })),
       h('h2', {}, `Found ${n} reflection${n === 1 ? '' : 's'} in ${heads} heading${heads === 1 ? '' : 's'}`),
       h('p', { class: 'hint' }, `From ${st.file}. Ticked ones are added as drafts. Check the heading and the linked case; possible duplicates of reflections you already have are unticked.`),
       h('div', { class: 'bar' }, h('button', { onclick: () => setAll(true) }, 'Select all'), h('button', { onclick: () => setAll(false) }, 'Select none'), h('span', { class: 'grow' }), addBtn));
@@ -192,7 +192,7 @@ export function renderImport(onDone) {
       h('h2', {}, `Added ${st.added} reflection${st.added === 1 ? '' : 's'} as drafts`),
       h('p', { class: 'hint' }, 'Open each one to check it, link it to its case if it isn’t linked, and mark it complete.'),
       st.failed.length ? h('div', {}, h('p', { class: 'rimp-warn' }, `${st.failed.length} could not be added:`), h('ul', {}, st.failed.map(t => h('li', {}, t)))) : null,
-      h('div', { class: 'bar' }, h('button', { class: 'primary', onclick: back }, 'Back to reflections'), h('button', { onclick: () => { st.step = 'pick'; draw(); } }, 'Upload another file')))];
+      h('div', { class: 'bar' }, h('button', { class: 'primary', onclick: back }, 'Go to Reflections'), h('button', { onclick: () => { st.step = 'pick'; draw(); } }, 'Upload another file')))];
   }
 
   draw();

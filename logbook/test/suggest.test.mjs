@@ -158,4 +158,8 @@ assert.ok(suggest('45M zz', { extra: apmesShorthand(mine) }).some(s => s.code ==
 assert.ok(!suggest('45M free flap', { extra: apmesShorthand(mine) }).some(s => s.code === '32'));
 assert.ok(!suggest('45M tka', { extra: apmesShorthand(cleanTagSet([{ k: 'c:18', kw: [] }])) }).some(s => s.code === '18' && s.why === 'shorthand'));
 
+// every occurrence of a shorthand counts; lap chole is both Lap and GS
+assert.ok(suggest('diagnostic ex lap converted after lap washout', { limit: 6 }).some(s => s.code === '08' && s.why === 'shorthand'), 'second lap missed');
+assert.ok(['08', '13'].every(c => suggest('lap chole').some(s => s.code === c && s.why === 'shorthand')), 'lap chole');
+
 console.log('suggest tests passed');

@@ -1,14 +1,54 @@
 // Account tab (#account): who you are, "Portfolio details (Section 1)" (the profile that fills
-// Section 1 of the exported portfolio), and sign out. Settings are on their own tab (ui-settings.js).
+// Section 1 of the exported portfolio), and Delete account (sign out is at the bottom of More). Settings are on their own tab (ui-settings.js).
 // Profile shape and cleaning: js/profile.js (cleanProfile, SECTIONS, parseSection1).
 
 import { S, h, toast, cloud, fill, debounce, modal, hooks } from './ui-core.js';
-import { youCard, signOutCard } from './ui-settings.js';
+import { youCard, residencyCard } from './ui-settings.js';
 import { needZip } from './portfolio.js';
 import { SECTIONS, emptyProfile, cleanProfile, parseSection1 } from './profile.js';
 
 export function renderAccount() {
-  return h('div', {}, youCard(), profileCard(), signOutCard());
+  return h('div', {}, youCard(), residencyCard(), profileCard(), deleteCard());
+}
+
+// Delete account: everything goes (cases, reflections, photos, bin, portfolio details, settings) and
+// the Google sign-in. Not for residents on the programme list: their counts are part of the programme's
+// records, so a programme admin takes them off the list first.
+function deleteCard() {
+  const onList = !!S.resident;
+  const btn = h('button', { class: 'danger', disabled: onList, onclick: () => confirmDelete() }, 'Delete account…');
+  return h('section', { class: 'card danger-zone' + (onList ? ' off' : '') },
+    h('h2', {}, 'Delete account'),
+    onList
+      ? h('p', { class: 'hint' }, 'Your account is on the programme’s residents list, so it can’t be deleted here. Ask a programme admin to take you off the list first; then you can delete it.')
+      : h('p', { class: 'hint' }, 'Deletes your logbook for good: every case, reflection, photo and recycle-bin item, your portfolio details and settings, and your sign-in. It can’t be undone. ',
+        h('a', { href: '#data' }, 'Download a backup'), ' first if you might want any of it.'),
+    h('div', { class: 'bar', style: 'margin-bottom:0' }, btn));
+}
+
+function confirmDelete() {
+  if (S.resident) return;
+  if (!cloud.demo && !navigator.onLine) return toast('You’re offline. Deleting needs signal.');
+  const n = (S.cases || []).length, r = (S.reflections || []).length;
+  const word = h('input', { type: 'text', autocomplete: 'off', 'aria-label': 'Type DELETE to confirm', placeholder: 'DELETE', style: 'font-size:16px' });
+  const status = h('p', { class: 'hint', 'aria-live': 'polite' });
+  const go = h('button', { class: 'primary danger', disabled: true, onclick: async () => {
+    go.disabled = true; cancel.disabled = true;
+    try {
+      await cloud.deleteAccount(S.user.email, t => { status.textContent = t; });
+      m.close(); toast('Account deleted');
+    } catch (err) {
+      status.textContent = 'Could not finish: ' + err.message + '. Nothing else was changed; try again.';
+      go.disabled = false; cancel.disabled = false;
+    }
+  } }, 'Delete everything');
+  word.addEventListener('input', () => { go.disabled = word.value.trim() !== 'DELETE'; });
+  const cancel = h('button', { onclick: () => m.close() }, 'Cancel');
+  const m = modal('Delete account', [
+    h('p', {}, `This deletes ${n} case${n === 1 ? '' : 's'}, ${r} reflection${r === 1 ? '' : 's'}, your photos, portfolio details and settings, and your sign-in. It can’t be undone.`),
+    h('label', { class: 'field' }, 'Type DELETE to confirm', word),
+    status,
+    h('div', { class: 'bar' }, h('span', { class: 'grow' }), cancel, go)], { sticky: true });
 }
 
 // SECTIONS entries are { key, title, cols: [{ key, label }] }; tolerate small naming differences.
@@ -66,7 +106,7 @@ function profileCard() {
 
   return h('section', { class: 'card acct' },
     h('div', { class: 'bar', style: 'margin:0' }, h('h2', { style: 'margin:0' }, 'Portfolio details (Section 1)'), h('span', { class: 'grow' }), status),
-    h('p', { class: 'hint' }, 'Fills Section 1 of the exported portfolio. Only you (and the programme admins) can see it. Tap a heading to open it.'),
+    h('p', { class: 'hint help' }, 'Fills Section 1 of the exported portfolio. Only you (and the programme admins) can see it. Tap a heading to open it.'),
     h('div', { class: 'acct-import' }, h('label', { class: 'btn small' }, 'Fill from my Word portfolio',
       h('input', { type: 'file', accept: '.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document', hidden: true,
         onchange: e => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) importDocx(f); } }))),

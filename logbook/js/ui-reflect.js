@@ -9,9 +9,11 @@
 import { REFLECTION_HEADINGS, REFLECTION_SECTIONS, yearName } from './categories.js';
 import { reflectionProgress, reflectionCounts, HEADING_BY_ID, splitDetails, completeProblems, isLegacy, LIMITS, IMAGE_MAX_B64, IMAGE_MAX_SIDE, IMAGE_QUALITY, PHOTO_BUDGET_KB, PHOTO_NOTE, photoUsageKb, imageKb, fmtMb, wordCount, MIN_WORDS, suggestHeadings, moveToHeading, inExport, exportSummary, pickJustEnough } from './reflections.js';
 export { completeProblems };
-import { fmtDate, caseText, procedureText } from './engine.js';
-import { S, h, toast, cloud, debounce, hooks, rYear, effectiveIntake, residentSmo, todayISO, confirmBox, add, resetters, scheduleSummary, displayName, byNewest, catName, updateCase, settings } from './ui-core.js';
+import { fmtDate, caseText, procedureText, caseParts } from './engine.js';
+import { S, h, toast, cloud, debounce, hooks, rYear, effectiveIntake, residentSmo, todayISO, confirmBox, add, resetters, scheduleSummary, displayName, byNewest, catName, updateCase, settings, patchLogbook } from './ui-core.js';
 import { renderExportButton, caseRYear, countsByYear } from './portfolio.js';
+import { parseQuery, matchQuery, REFL_FIELDS, REFL_OPERATOR_HELP } from './search-ops.js';
+import { opsHelp } from './ui-logbook.js';
 
 const DRAFT_KEY = 'apmes-logbook-reflection-draft';
 const VIEW_KEY = 'apmes-logbook-reflection-view';
@@ -27,9 +29,16 @@ const saveView = () => { try { localStorage.setItem(VIEW_KEY, JSON.stringify({ g
 // closed by hand (met headings start closed); group / sort: how the list is grouped and ordered (this device).
 
 const mine = () => S.user.email;
-const lsGet = () => { try { return JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null'); } catch { return null; } };
-const lsSet = r => { try { r ? localStorage.setItem(DRAFT_KEY, JSON.stringify(r)) : localStorage.removeItem(DRAFT_KEY); } catch { /* blocked */ } };
-resetters.push(() => { rv.editing = null; rv.picking = null; rv.editMode = false; rv.sel.clear(); rv.view = null; lsSet(null); });
+// the unsaved editor draft is kept per account (and apart from the demo), like the Log page's
+const draftKey = () => `${DRAFT_KEY}:${cloud.demo ? 'demo:' : ''}${(S.user && S.user.email) || ''}`;
+const lsGet = () => { try { return JSON.parse(localStorage.getItem(draftKey()) || 'null'); } catch { return null; } };
+const lsSet = r => { try { r ? localStorage.setItem(draftKey(), JSON.stringify(r)) : localStorage.removeItem(draftKey()); } catch { /* blocked */ } };
+// sign-out: nothing of this person's is left for the next one (drafts, search, open headings, figure previews)
+resetters.push(() => {
+  Object.assign(rv, { editing: null, picking: null, editMode: false, view: null, q: '', filter: 'all', thumbs: {}, viewOpen: false, readyOpen: false, toolsOpen: false });
+  rv.sel.clear(); rv.openH.clear(); rv.shutH.clear();
+  try { for (const k of Object.keys(localStorage)) if (k.startsWith(DRAFT_KEY)) localStorage.removeItem(k); } catch { /* blocked */ }
+});
 
 // Live reflections for the signed-in user (app.js calls this after sign-in).
 export function watchMyReflections(email) {
@@ -52,7 +61,8 @@ const blank = (over = {}) => ({
 // From a logged case: its initials (older cases have them at the front of the details), the procedure
 // line as the diagnosis, and its case summary as the reflection's case details (summary).
 const fromCase = c => {
-  const { initials, diagnosis: rest } = c.initials ? { initials: c.initials, diagnosis: String(c.details || '').trim() } : splitDetails(c.details);
+  // the case's own initials field (even when empty); only older cases carry them at the front of the details
+  const { initials, details } = caseParts(c), rest = String(details || '').trim();
   return { initials, diagnosis: procedureText(c) || rest, summary: rest, date: c.date || null, caseId: c.id };
 };
 // preset: { headingId, subId } from a heading's "+ Add" button.
@@ -74,12 +84,16 @@ function suggestChips(c, onpick, jr = rYear() <= 3) {
     h('div', { class: 'refl-chips' }, sug.map(x => {
       const hd = HEADING_BY_ID[x.headingId];
       const sub = x.subId && hd.subs ? hd.subs.find(s => s.id === x.subId) : null;
-      const nm = shortName(hd.name) + (sub ? ' · ' + sub.name : '');
+      const nm = labelOf(hd) + (sub ? ' · ' + sub.name : '');
       return h('button', { class: 'refl-chip' + (x.needed ? ' need' : ''), title: hd.name + (x.needed ? ' (still needed)' : ' (already met)'),
         onclick: () => onpick({ headingId: x.headingId, subId: x.subId }) }, nm, x.needed ? null : h('span', { class: 'muted' }, ' ✓'));
     })));
 }
 const shortName = n => { const t = n.replace(/\s*\(.*$/, '').replace(/\s+e\.g\.?,?.*$/i, '').trim() || n; return t.length > 48 ? t.slice(0, 46) + '…' : t; };
+// a heading's name in the app: its chosen label (categories.js), else the official name shortened
+const labelOf = hd => (hd ? hd.label || shortName(hd.name) : 'Uncategorised');
+// the notes under each heading (rules, examples): on unless switched off at the bottom of the list
+const notesOn = () => settings().reflNotes !== false;
 
 const showTab = () => { if (location.hash !== '#reflect') location.hash = '#reflect'; else hooks.render(); };
 // JR follows from the reflection's date: R1–R3 at that date (from the resident's intake) is junior residency.
@@ -157,7 +171,7 @@ function chooseHeading() {
     h('p', { style: 'margin:0 0 8px' }, h('span', { class: 'muted' }, caseDate(c) + ' · '), caseText(c) || '(no details)',
       (c.cats || []).length ? h('span', { class: 'muted', style: 'display:block;font-size:13px' }, c.cats.map(catName).join(', ')) : null),
     suggestChips(c, preset => reflectOnCase(c, preset)),
-    h('p', { class: 'hint', style: 'margin:10px 0 6px' }, 'Highlighted headings still need reflections. You can change the heading later.'),
+    h('p', { class: 'hint help', style: 'margin:10px 0 6px' }, 'Highlighted headings still need reflections. You can change the heading later.'),
     h('button', { onclick: () => reflectOnCase(c) }, 'Choose the heading later')));
 }
 
@@ -167,7 +181,7 @@ function picker() {
   const ph = p.preset && HEADING_BY_ID[p.preset.headingId];
   const psub = ph && p.preset.subId && ph.subs ? ph.subs.find(s => s.id === p.preset.subId) : null;
   const linked = new Set((S.reflections || []).map(r => r.caseId).filter(Boolean));
-  // cases tagged as possible reflections (and not written yet) come first
+  // cases marked interesting (and not written yet) come first
   const cases = [...(S.cases || [])].sort(byNewest).sort((a, b) => (b.reflectTag && !linked.has(b.id)) - (a.reflectTag && !linked.has(a.id)));
   const ul = h('ul', { class: 'cases refl-pick' });
   const count = h('p', { class: 'hint', style: 'margin:6px 0 0' });
@@ -186,7 +200,7 @@ function picker() {
       const names = (c.cats || []).map(catName).join(', ');
       return h('li', { tabindex: '0', role: 'button', onclick: () => pickCase(c), onkeydown: e => { if (e.key === 'Enter') pickCase(c); } },
         h('span', { class: 'd' }, caseDate(c)),
-        h('span', { class: 't' }, c.reflectTag && !has ? h('span', { class: 'flag tagged' }, '☆ tagged') : null, caseText(c) || '(no details)', names ? h('span', { class: 'muted', style: 'display:block;font-size:13px' }, names) : null),
+        h('span', { class: 't' }, c.reflectTag && !has ? h('span', { class: 'flag tagged' }, '☆ interesting') : null, caseText(c) || '(no details)', names ? h('span', { class: 'muted', style: 'display:block;font-size:13px' }, names) : null),
         h('span', { class: 'c' }, cur ? h('span', { class: 'flag' }, 'current') : has ? h('span', { class: 'flag' }, 'has reflection') : null));
     }));
     if (!shown.length) ul.replaceChildren(h('li', { class: 'empty' }, cases.length ? 'No cases match.' : 'No cases logged yet: tap + New case above.'));
@@ -200,9 +214,9 @@ function picker() {
       h('button', { onclick: () => { rv.picking = null; hooks.render(); } }, p.relink ? '← Back to reflection' : '← Reflections'),
       h('span', { class: 'grow' })),
     h('h2', { style: 'margin:8px 0 4px' }, p.relink ? 'Change the linked case' : 'Which case is this reflection on?'),
-    ph ? h('p', { style: 'margin:0 0 4px' }, h('span', { class: 'muted' }, 'Heading: '), h('b', {}, shortName(ph.name) + (psub ? ' · ' + psub.name : ''))) : null,
+    ph ? h('p', { style: 'margin:0 0 4px' }, h('span', { class: 'muted' }, 'Heading: '), h('b', {}, labelOf(ph) + (psub ? ' · ' + psub.name : ''))) : null,
     p.preset && p.preset.uncat ? h('p', { style: 'margin:0 0 4px' }, h('span', { class: 'muted' }, 'Heading: '), h('b', {}, 'Uncategorised')) : null,
-    h('p', { class: 'hint', style: 'margin:0 0 8px' }, p.relink ? 'Pick the logged case this reflection is about.' : 'Pick a logged case: the reflection starts with its initials, date, diagnosis and case details filled in. Not logged yet? Add it here.'),
+    h('p', { class: 'hint help', style: 'margin:0 0 8px' }, p.relink ? 'Pick the logged case this reflection is about.' : 'Pick a logged case: the reflection starts with its initials, date, diagnosis and case details filled in. Not logged yet? Add it here.'),
     p.relink ? null : h('button', { class: 'small', style: 'margin:0 0 8px', onclick: newCaseForReflection }, '+ New case'),
     search, count), h('section', { class: 'card' }, ul));
 }
@@ -249,7 +263,7 @@ async function binReflections(list) {
 
 // ---------- list ----------
 
-// "Ready to write": cases tagged as possible reflections, then recent cases that fit a heading you
+// "Ready to write": cases marked interesting, then recent cases that fit a heading you
 // haven't met yet. Each opens a new reflection prefilled from the case.
 function readyLine(p) {
   const linked = new Set((S.reflections || []).map(r => r.caseId).filter(Boolean));
@@ -266,12 +280,12 @@ function readyLine(p) {
   if (!tagged.length && !suggested.length) return null;
   const line = c => `${c.date ? fmtDate(c.date) : ''} · ${[c.initials, String(c.details || '').split('\n').join(' ')].filter(Boolean).join(' ').slice(0, 60)}`;
   const row = (c, hd, isTag) => h('li', {},
-    h('span', { class: 'rt' }, isTag ? '☆ ' : '', line(c), hd ? h('small', {}, ' → ' + (HEADING_BY_ID[hd.headingId] || {}).name) : null),
+    h('span', { class: 'rt' }, isTag ? '☆ ' : '', line(c), hd ? h('small', {}, ' → ' + labelOf(HEADING_BY_ID[hd.headingId])) : null),
     h('span', { class: 'row' },
       h('button', { class: 'small primary', onclick: () => reflectOnCase(c, hd || null) }, 'Write'),
       isTag ? h('button', { class: 'small', title: 'Remove the tag', onclick: async () => { const next = { ...c }; delete next.reflectTag; await updateCase(next); hooks.render(); } }, 'Untag') : null));
   // one slim line under the header; tap to see the cases
-  const what = [tagged.length ? `☆ ${tagged.length} tagged case${tagged.length === 1 ? '' : 's'} to write up` : null,
+  const what = [tagged.length ? `☆ ${tagged.length} interesting case${tagged.length === 1 ? '' : 's'} to write up` : null,
     suggested.length ? `${suggested.length} suggestion${suggested.length === 1 ? '' : 's'}` : null].filter(Boolean).join(' · ');
   return h('details', { class: 'ready-line', open: !!rv.readyOpen, ontoggle: e => { rv.readyOpen = e.target.open; } },
     h('summary', {}, what),
@@ -293,8 +307,17 @@ function list() {
   // search and filter: headings with no match are hidden, the rest open
   const words = rv.q.toLowerCase().split(/\s+/).filter(Boolean);
   const FILTERS = { all: () => true, draft: r => r.status !== 'complete', complete: r => r.status === 'complete', uncat: r => !HEADING_BY_ID[r.headingId] };
-  const match = r => (FILTERS[rv.filter] || FILTERS.all)(r) && (!words.length || words.every(w =>
-    `${r.initials || ''} ${r.diagnosis || ''} ${r.title || ''} ${r.summary || ''} ${(r.points || []).map(x => `${x.heading || ''} ${x.text || ''}`).join(' ')} ${r.date || ''} ${r.date ? fmtDate(r.date) : ''}`.toLowerCase().includes(w)));
+  const hayOf = r => `${r.initials || ''} ${r.diagnosis || ''} ${r.title || ''} ${r.summary || ''} ${(r.points || []).map(x => `${x.heading || ''} ${x.text || ''}`).join(' ')} ${r.date || ''} ${r.date ? fmtDate(r.date) : ''}`.toLowerCase();
+  // Advanced search (Settings → Logging): operators, with the reflection's own fields
+  const ops = settings().searchOps && words.length ? parseQuery(rv.q, { fields: REFL_FIELDS }) : null;
+  const fieldOf = (r, k) => {
+    const hd = HEADING_BY_ID[r.headingId];
+    if (k === 'heading') return `${hd ? hd.name + ' ' + (hd.label || '') : 'uncategorised'} ${(hd && (hd.subs || []).find(x => x.id === r.subId) || {}).name || ''}`.toLowerCase();
+    if (k === 'case') return String(r.summary || '').toLowerCase();
+    return k === 'all' ? hayOf(r) : String(r[k] || '').toLowerCase();
+  };
+  const match = r => (FILTERS[rv.filter] || FILTERS.all)(r) && (!words.length
+    || (ops ? matchQuery(ops, k => fieldOf(r, k), null) : words.every(w => hayOf(r).includes(w))));
   const narrowed = !!words.length || rv.filter !== 'all';
   // the filter / group / sort panel folds behind one button; it says how many differ from the defaults
   const changedN = (rv.filter !== 'all') + (rv.group !== 'heading') + (rv.sort !== 'newest');
@@ -323,12 +346,16 @@ function list() {
   const head = h('section', { class: 'card' },
     h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:8px' },
       h('h2', { style: 'margin:0' }, 'Reflections'), h('span', { class: 'grow' }),
-      em ? null : h('button', { class: 'primary', onclick: () => openPicker() }, '+ New reflection'),
-      h('button', { class: em ? 'primary' : '', 'aria-pressed': String(em), onclick: () => { rv.editMode = !em; rv.sel.clear(); hooks.render(); } }, em ? 'Done' : 'Edit')),
+      // Edit then New, side by side, even on a narrow phone with large text
+      h('span', { class: 'refl-actions' },
+        h('button', { class: em ? 'primary' : '', 'aria-pressed': String(em), onclick: () => { rv.editMode = !em; rv.sel.clear(); hooks.render(); } }, em ? 'Done' : 'Edit'),
+        em ? null : h('button', { class: 'primary', onclick: () => openPicker() }, '+ New reflection'))),
     h('p', { class: 'hint', style: 'margin:6px 0 0' }, `${p.totals.counted} / ${p.totals.min} counted · ${p.totals.done} complete · ${p.totals.drafts} draft${p.totals.drafts === 1 ? '' : 's'}`),
     em ? null : readyLine(p),
     em ? null : h('div', { class: 'bar', style: 'gap:8px;margin:8px 0 0;flex-wrap:nowrap' }, search,
+      settings().searchOps ? h('button', { type: 'button', class: 'small icon-btn', title: 'Search operators', 'aria-label': 'Search operators', onclick: () => opsHelp(search, v => { rv.q = v; hooks.render(); requestAnimationFrame(() => { const el = document.querySelector('input[aria-label="Search reflections"]'); if (el) { el.focus(); const n = el.value.length; el.setSelectionRange(n, n); } }); }, REFL_OPERATOR_HELP, 'heading:lap -draft "blood pressure"') }, '?') : null,
       h('button', { class: `small${changedN ? ' primary' : ''}`, 'aria-expanded': String(viewOpen), onclick: () => { rv.viewOpen = !viewOpen; hooks.render(); } }, 'Filter & sort' + (changedN ? ` (${changedN})` : ''))),
+    em || !ops || !ops.unknown.length ? null : h('p', { class: 'hint lb-opsnote' }, ops.unknown.map(x => `“${x.op}” isn’t an operator (searched as text): did you mean ${x.suggest}?`).join(' ')),
     em || !viewOpen ? null : h('div', { class: 'refl-viewpanel' }, filterChips, viewBar));
 
   // edit-mode toolbar: select all / clear / complete / export in or out / delete selected
@@ -341,7 +368,7 @@ function list() {
     for (const [cb, li, id] of checks) { cb.checked = rv.sel.has(id); li.classList.toggle('sel', cb.checked); }
   };
   const toolbar = em ? h('section', { class: 'card refl-editbar' },
-    h('p', { class: 'hint', style: 'margin:0 0 6px' }, 'Drag ', h('span', { class: 'refl-handle-ico' }, '⠿'), ' onto another heading to move a reflection. Tick reflections to mark them complete or delete them.'),
+    h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'Drag ', h('span', { class: 'refl-handle-ico' }, '⠿'), ' onto another heading to move a reflection. Tick reflections to mark them complete or delete them.'),
     h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:8px' },
       h('button', { class: 'small', onclick: () => { all.forEach(r => r.id && rv.sel.add(r.id)); paintSel(); } }, 'Select all'),
       h('button', { class: 'small', onclick: () => { rv.sel.clear(); paintSel(); } }, 'Clear'),
@@ -355,10 +382,11 @@ function list() {
     const open = () => { if (em) { if (cb) { cb.checked = !cb.checked; cb.dispatchEvent(new Event('change')); } } else openEditor(r); };
     const li = h('li', { tabindex: '0', class: em ? 'refl-row edit' : 'refl-row', onclick: open, onkeydown: e => { if (e.key === 'Enter') open(); } },
       h('span', { class: 'd' }, em ? h('span', { class: 'refl-tools' }, rv.group === 'heading' ? h('span', { class: 'refl-handle', title: 'Drag to another heading', 'aria-label': 'Drag to another heading', onpointerdown: e => startDrag(e, r, li), onclick: e => e.stopPropagation() }, '⠿') : null, cb) : null,
-        (r.jr ? 'JR ' : '') + (r.date ? fmtDate(r.date) : '—')),
-      h('span', { class: 't' }, h('span', { class: draft ? 'refl-proc draft' : 'refl-proc' }, `${r.initials || '??'} ${r.diagnosis || ''}`), draft ? h('span', { class: 'flag err' }, 'draft') : null,
+        // the patient's initials sit on top in the left column, the date (and JR) under them
+        h('b', { class: 'refl-ini' }, r.initials || '??'), h('span', { class: 'refl-date' }, (r.jr ? 'JR ' : '') + (r.date ? fmtDate(r.date) : '—'))),
+      h('span', { class: 't' }, h('span', { class: draft ? 'refl-proc draft' : 'refl-proc' }, r.diagnosis || h('i', { class: 'muted' }, 'no diagnosis yet')), draft ? h('span', { class: 'flag err' }, 'draft') : null,
         h('span', { class: 'muted refl-wc' }, ` ${wordCount(r)} words`),
-        showHeading ? h('span', { class: 'muted refl-hd' }, HEADING_BY_ID[r.headingId] ? shortName(HEADING_BY_ID[r.headingId].name) : 'Uncategorised') : null),
+        showHeading ? h('span', { class: 'muted refl-hd' }, labelOf(HEADING_BY_ID[r.headingId])) : null),
       pts.length ? h('div', { class: 'refl-points' }, ...pts.map((t, i) => h('div', {}, `${i + 1}. ${t}`))) : null);
     if (cb) checks.push([cb, li, r.id]);
     return li;
@@ -368,22 +396,18 @@ function list() {
   const isOpen = (id, met) => em || narrowed || rv.openH.has(id) || (!met && !rv.shutH.has(id));
   const toggle = (id, met) => { if (isOpen(id, met)) { rv.openH.delete(id); rv.shutH.add(id); } else { rv.shutH.delete(id); rv.openH.add(id); } hooks.render(); };
 
-  // the rest at the bottom, like the Logbook tab: export, Word upload and the bin, the rules
-  const foot = em ? null : h('section', { class: 'card refl-foot' },
-    h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:8px;margin:0 0 6px' }, h('a', { class: 'btn small', href: '#export' }, 'Export portfolio ›')),
-    h('details', { class: 'more-tools', open: !!rv.toolsOpen, ontoggle: e => { rv.toolsOpen = e.target.open; } },
-      h('summary', {}, 'More tools: upload from Word, recycle bin'),
-      h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:8px;margin:0' },
-        h('button', { class: 'small', onclick: () => openView('import') }, 'Upload from Word'),
-        h('button', { class: 'small', onclick: () => openView('bin') }, 'Recycle bin'))),
-    h('details', { class: 'refl-rules' }, h('summary', {}, 'Rules for reflections'),
-      h('ul', { class: 'hint' },
-        h('li', {}, 'Each reflection is a different patient, under one heading only.'),
-        h('li', {}, 'Some categories require one case reflection in Junior Residency (JR, R1–R3); when not indicated, at most one case reflection can be done at the JR level per category.'),
-        h('li', {}, 'Write as many as you like: you choose which go into the portfolio when you export. Uncategorised ones are never exported.'),
-        h('li', {}, 'Generative AI use must follow the NUS guidelines on the use of AI tools in academic work.'))));
+  // at the bottom, small and without a card: the rules (export and Word upload are under More →
+  // Export / Import; the bin and photo sizes under Settings)
+  const notesSwitch = em || rv.group !== 'heading' ? null : h('label', { class: 'check refl-notes-switch' },
+    h('input', { type: 'checkbox', role: 'switch', checked: notesOn(), onchange: e => { patchLogbook({ settings: { reflNotes: e.target.checked } }); hooks.render(); } }), 'Show notes under each heading');
+  const foot = em ? null : h('details', { class: 'refl-rules refl-foot' }, h('summary', {}, 'Rules for reflections'),
+    h('ul', { class: 'hint' },
+      h('li', {}, 'Each reflection is a different patient, under one heading only.'),
+      h('li', {}, 'Some categories require one case reflection in Junior Residency (JR, R1–R3); when not indicated, at most one case reflection can be done at the JR level per category.'),
+      h('li', {}, 'Write as many as you like: you choose which go into the portfolio when you export. Uncategorised ones are never exported.'),
+      h('li', {}, 'Generative AI use must follow the NUS guidelines on the use of AI tools in academic work.')));
   const body = h('section', { class: 'card' });
-  let section = '', shown = 0;
+  let shown = 0;
   if (rv.group !== 'heading') {
     // other groupings: plain sections of rows (no + Add, counts or dragging between headings)
     const hits = sorted(narrowed ? all.filter(match) : all);
@@ -422,19 +446,21 @@ function list() {
     const hits = narrowed ? items.filter(match) : items;
     if (narrowed && !hits.length) continue;
     shown += hits.length;
-    if (hp.section !== section) { section = hp.section; add(body, h('h3', { style: 'margin-top:14px' }, section)); }
+    // no section headings (General Surgery, Trauma…): the heading names say enough (owner's choice)
     const x = exBy[hp.id];
     const opened = isOpen(hp.id, hp.met);
     add(body, h('div', { class: 'refl-h', 'data-heading': hp.id, style: 'margin:8px 0 4px' },
       h('div', { class: 'refl-hrow' },
         h('div', { class: 'grow refl-htoggle', role: 'button', tabindex: '0', 'aria-expanded': String(opened), onclick: () => toggle(hp.id, hp.met), onkeydown: e => { if (e.key === 'Enter') toggle(hp.id, hp.met); } },
           items.length ? h('span', { class: 'res-chev', 'aria-hidden': 'true' }, '›') : h('span', { class: 'res-chev blank', 'aria-hidden': 'true' }), ' ',
-          h('i', { class: `dot ${hp.met ? 'done' : hp.done ? 'ontrack' : 'due'}` }), ' ', h('b', {}, `${hp.done}/${hp.min}`), ' ', hp.name,
-          x.written > hp.done ? h('span', { class: 'muted refl-counts' }, ` · ${x.written} written`) : null),
-        em ? null : h('button', { class: 'small refl-add', title: 'Add a reflection under ' + hp.name, 'aria-label': 'Add a reflection under ' + hp.name, onclick: () => openPicker(false, { headingId: hp.id, subId: null }) }, '+ Add')),
+          h('i', { class: `dot ${hp.met ? 'done' : hp.done ? 'ontrack' : 'due'}` }), ' ', h('b', {}, `${hp.done}/${hp.min}`), ' ',
+          // the name flows beside the count (a long one wraps under itself, not below the count)
+          h('span', { class: 'refl-hname' }, hp.label, x.written > hp.done ? h('span', { class: 'muted refl-counts' }, ` · ${x.written} written`) : null)),
+        em ? null : h('button', { class: 'small refl-add', title: 'Add a reflection under ' + hp.label, 'aria-label': 'Add a reflection under ' + hp.label, onclick: () => openPicker(false, { headingId: hp.id, subId: null }) }, '+ Add')),
+      // the heading's note (rules, examples; categories.js), shown whether open or not unless switched off
+      notesOn() && hp.note ? h('div', { class: 'hint refl-note' }, hp.note) : null,
       opened ? [
-        HEADING_BY_ID[hp.id].subs ? h('div', { class: 'hint', style: 'margin:2px 0 0' }, 'Include at least one of each: ' + HEADING_BY_ID[hp.id].subs.map(s => s.name).join(' · ')) : null,
-        // sub-types are shown in the "needs at least one of each" line above, so don't repeat them here
+        // sub-types are in the note above, so a missing one isn't repeated here
         hp.issues.filter(y => !y.startsWith('Missing: ')).length ? h('div', { class: 'hint', style: 'color:var(--warn, #b45309)' }, hp.issues.filter(y => !y.startsWith('Missing: ')).join(' · ')) : null,
         hits.length ? h('ul', { class: 'cases' }, hits.map(row)) : em ? h('div', { class: 'refl-empty hint' }, 'Drop here') : null] : null));
   }
@@ -452,7 +478,7 @@ function list() {
   }
   if (narrowed && !shown) add(body, h('p', { class: 'empty' }, 'No reflections match.'));
   if (em) paintSel();
-  return h('div', {}, head, toolbar, body, foot);
+  return h('div', {}, head, toolbar, body, notesSwitch, foot);
 }
 
 // Tick or untick one reflection for the export.
@@ -570,7 +596,7 @@ function place() {
 async function moveReflection(r, headingId) {
   const before = { ...r };
   const moved = moveToHeading(r, headingId);
-  const name = shortName(HEADING_BY_ID[headingId].name);
+  const name = labelOf(HEADING_BY_ID[headingId]);
   try {
     await cloud.saveReflection(mine(), moved);
     toast(`Moved to ${name}`, { action: 'Undo', ms: 7000, onaction: async () => {
@@ -585,7 +611,8 @@ async function moveReflection(r, headingId) {
 // ---------- mark the portfolio as ready (admins generate it; js/cloud.js submissions) ----------
 
 const RS = { sub: undefined, loading: false, busy: false };
-resetters.push(() => { RS.sub = undefined; RS.loading = false; });
+// gen: bumped on sign-out, so a load still running for the last person is dropped
+resetters.push(() => { RS.sub = undefined; RS.loading = false; RS.busy = false; RS.gen = (RS.gen || 0) + 1; });
 const hashStr = s => { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return (h >>> 0).toString(36); };
 // what admins would get now: the ticked reflections, Section 1, the Section 4 numbers, and a fingerprint
 function readyPayload() {
@@ -599,6 +626,8 @@ function readyPayload() {
 }
 async function markReady(ex, update = false) {
   // no check against the portfolio rules here: the programme also reviews interim portfolios
+  // the admins read this copy from the server, so it needs a connection (offline it would wait forever)
+  if (!cloud.demo && !navigator.onLine) return toast('Marking the portfolio ready needs a connection. Try again when you have signal.');
   RS.busy = true; hooks.render();
   try {
     const { list, meta } = readyPayload();
@@ -610,7 +639,8 @@ async function markReady(ex, update = false) {
 function readyCard(ex) {
   if (RS.sub === undefined && !RS.loading) {
     RS.loading = true;
-    cloud.loadMySubmission(mine()).then(x => { RS.sub = x; RS.loading = false; if (S.tab === 'export') hooks.render(); });
+    const gen = RS.gen;
+    cloud.loadMySubmission(mine()).then(x => { if (gen !== RS.gen) return; RS.sub = x; RS.loading = false; if (S.tab === 'export') hooks.render(); });
   }
   const sub = RS.sub;
   const changed = sub && sub.fp !== readyPayload().meta.fp;
@@ -624,6 +654,7 @@ function readyCard(ex) {
       sub ? [
         h('button', { class: changed ? 'primary' : '', disabled: RS.busy, onclick: () => markReady(ex, true) }, RS.busy ? 'Saving…' : 'Update'),
         h('button', { disabled: RS.busy, onclick: async () => {
+          if (!cloud.demo && !navigator.onLine) return toast('Unmarking needs a connection. Try again when you have signal.');
           if (!(await confirmBox('Unmark the portfolio?', 'The admins will no longer be able to generate it until you mark it ready again.', 'Unmark', true))) return;
           try { await cloud.withdrawPortfolio(mine()); RS.sub = null; toast('Portfolio unmarked'); } catch (err) { toast('Could not unmark: ' + err.message); }
           hooks.render();
@@ -651,7 +682,7 @@ export function renderExportPage(onChoose = false) {
   };
   const top = h('section', { class: 'card' },
     h('h2', { style: 'margin:0 0 4px' }, 'Export portfolio (Word)'),
-    h('p', { class: 'hint', style: 'margin:0 0 8px' }, 'Your complete reflections go into the APMES portfolio, with Section 1 and the Section 4 case numbers filled in. All are included unless you leave some out.'),
+    h('p', { class: 'hint help', style: 'margin:0 0 8px' }, 'Your complete reflections go into the APMES portfolio, with Section 1 and the Section 4 case numbers filled in. All are included unless you leave some out.'),
     h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:8px;margin:0 0 10px;align-items:center' },
       h('span', {}, h('b', {}, `${ex.total} of ${complete.length} reflections included`),
         drafts || uncat ? h('span', { class: 'hint' }, ` · not exported: ${[drafts ? `${drafts} draft${drafts === 1 ? '' : 's'}` : '', uncat ? `${uncat} uncategorised` : ''].filter(Boolean).join(', ')}`) : null),
@@ -669,16 +700,14 @@ export function renderExportPage(onChoose = false) {
     h('div', { class: 'bar', style: 'align-items:center' }, h('h2', { style: 'margin:0' }, 'Choose reflections'), h('span', { class: 'grow' }), complete.length ? quick : null),
     h('p', { class: 'hint', style: 'margin:6px 0 0' }, `${ex.total} of ${complete.length} included. Untick any you’d rather leave out; your choice is kept for next time.`));
   const body = h('section', { class: 'card' });
-  let section = '';
   for (const hd of REFLECTION_HEADINGS) {
     const rs = complete.filter(r => r.headingId === hd.id).sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
     if (!rs.length) continue;
-    if (hd.section !== section) { section = hd.section; add(body, h('h3', { style: 'margin-top:14px' }, section)); }
     const x = exBy[hd.id];
     add(body, h('div', { class: 'exp-h' },
       h('div', { class: 'bar', style: 'gap:8px;align-items:center;margin:8px 0 2px' },
         h('i', { class: `dot ${x.inExport >= hd.min ? 'done' : x.inExport ? 'ontrack' : 'due'}` }),
-        h('span', { class: 'grow' }, h('b', {}, `${x.inExport} of ${hd.min}`), ' ', shortName(hd.name), h('span', { class: 'muted refl-counts' }, ` · ${rs.length} written`))),
+        h('span', { class: 'grow' }, h('b', {}, `${x.inExport} of ${hd.min}`), ' ', labelOf(hd), h('span', { class: 'muted refl-counts' }, ` · ${rs.length} written`))),
       x.warn.length ? h('div', { class: 'hint', style: 'color:var(--warn, #b45309)' }, x.warn.join(' · ')) : null,
       h('ul', { class: 'exp-list' }, rs.map(r => h('li', {},
         h('label', { class: 'check exp-row' },
@@ -798,8 +827,8 @@ function editor() {
   const paintSubs = () => {
     const hd = HEADING_BY_ID[r.headingId];
     subWrap.replaceChildren(...[
-      hd && hd.hint ? h('p', { class: 'hint' }, hd.hint) : null,
-      hd && hd.subs ? h('p', { class: 'hint' }, 'This heading should include at least one of each: ' + hd.subs.map(s => s.name).join(' · ') + '. Just describe the procedure or diagnosis below.') : null,
+      hd && hd.name !== hd.label ? h('p', { class: 'hint' }, 'Portfolio heading: ' + hd.name) : null,
+      hd && hd.note ? h('p', { class: 'hint' }, hd.note) : null,
     ].filter(Boolean));
   };
   paintSubs();
@@ -809,7 +838,7 @@ function editor() {
     h('option', { value: '', selected: !HEADING_BY_ID[r.headingId] }, 'Uncategorised (not exported)'),
     REFLECTION_HEADINGS.map(hd => {
       const g = hd.section !== sec ? (sec = hd.section) : null;
-      return [g ? h('option', { disabled: true }, `— ${g} —`) : null, h('option', { value: hd.id, selected: r.headingId === hd.id }, hd.name.length > 70 ? hd.name.slice(0, 68) + '…' : hd.name)];
+      return [g ? h('option', { disabled: true }, `— ${g} —`) : null, h('option', { value: hd.id, selected: r.headingId === hd.id }, labelOf(hd))];
     }));
 
   const lc = caseById(r.caseId);
@@ -837,14 +866,14 @@ function editor() {
     h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:8px' },
       h('label', { class: 'field' }, 'Patient initials', input('initials', { 'data-field': 'initials', maxlength: '20', autocapitalize: 'characters', style: 'font-size:16px;width:7em' })),
       h('label', { class: 'field' }, 'Date', h('input', { type: 'date', 'data-field': 'date', style: 'font-size:16px', value: r.date || '', oninput: e => { r.date = e.target.value || null; if (r.source !== 'word') setJr(r); changed(); } }))),
-    h('p', { class: 'hint' }, 'Some categories require one case reflection in Junior Residency (JR); when not indicated, at most one case reflection can be done at the JR level per category. A reflection dated in R1–R3 is marked JR in the Word export automatically.'),
+    h('p', { class: 'hint help' }, 'Some categories require one case reflection in Junior Residency (JR); when not indicated, at most one case reflection can be done at the JR level per category. A reflection dated in R1–R3 is marked JR in the Word export automatically.'),
     h('label', { class: 'field' }, 'Diagnosis / operation', input('diagnosis', { maxlength: '2000' })),
-    h('p', { class: 'hint' }, 'De-identified only: initials, no names or NRIC. Generative AI use must follow the NUS guidelines on the use of AI tools in academic work.'));
+    h('p', { class: 'hint help' }, 'De-identified only: initials, no names or NRIC. Generative AI use must follow the NUS guidelines on the use of AI tools in academic work.'));
 
   // What APMES wants covered (from the portfolio's reflection elements)
   const guide = h('details', { class: 'card', style: 'padding:12px 16px' },
     h('summary', { style: 'cursor:pointer;font-weight:600' }, 'What APMES wants covered'),
-    h('p', { class: 'hint' }, 'Write the case details, then learning points. Between them, the learning points should cover:'),
+    h('p', { class: 'hint help' }, 'Write the case details, then learning points. Between them, the learning points should cover:'),
     h('ul', { style: 'margin:4px 0 0;padding-left:20px' }, REFLECTION_SECTIONS.filter(s => s.id !== 'description' && (s.id !== 'further' || r.jr))
       .map(s => h('li', { style: 'margin-bottom:4px' }, h('b', {}, s.name), ': ', s.hint))));
 
@@ -926,9 +955,9 @@ function editor() {
     // figures: rarely needed, so collapsed after References like it (open when there are some)
     const figures = h('details', { class: 'card fold-card', open: r.figures.length > 0 },
       h('summary', {}, `Figures (optional)${r.figures.length ? ' · ' + r.figures.length : ''}`),
-      h('p', { class: 'hint', style: 'margin:8px 0 4px' }, `${PHOTO_NOTE} Your photos: ${fmtMb(usedKb())} of ${fmtMb(PHOTO_BUDGET_KB)} used.`),
-      h('p', { class: 'hint', style: 'margin:0 0 4px;color:var(--warn, #b45309)' }, 'No faces, names, NRIC, MRN or anything identifying on monitors, labels or screens. Crop before adding.'),
-      h('p', { class: 'hint', style: 'margin:0 0 8px;color:var(--warn, #b45309)' }, 'Use your own photos or diagrams. Don’t copy copyrighted figures from papers, books or websites without permission; if you adapt one, cite it under References.'),
+      h('p', { class: 'hint', style: 'margin:8px 0 4px' }, h('span', { class: 'help' }, PHOTO_NOTE + ' '), `Your photos: ${fmtMb(usedKb())} of ${fmtMb(PHOTO_BUDGET_KB)} used.`),
+      h('p', { class: 'hint help', style: 'margin:0 0 4px;color:var(--warn, #b45309)' }, 'No faces, names, NRIC, MRN or anything identifying on monitors, labels or screens. Crop before adding.'),
+      h('p', { class: 'hint help', style: 'margin:0 0 8px;color:var(--warn, #b45309)' }, 'Use your own photos or diagrams. Don’t copy copyrighted figures from papers, books or websites without permission; if you adapt one, cite it under References.'),
       r.figures.map((f, i) => {
         const im = h('img', { alt: f.caption || `Figure ${i + 1}`, style: 'max-width:100%;max-height:220px;display:block;border-radius:6px;background:#eee;min-height:60px' });
         if (rv.thumbs[f.id]) im.src = rv.thumbs[f.id];

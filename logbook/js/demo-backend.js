@@ -12,6 +12,7 @@
 export const DEMO_USER = { email: 'demo@example.com', name: 'Demo User', uid: 'demo-uid' };
 
 import { cleanReflection, cleanImage } from './reflections.js';
+import { progress } from './engine.js';
 import { cleanProfile } from './profile.js';
 export { cleanReflection, cleanImage };
 
@@ -36,7 +37,7 @@ export function cleanCase(c, now = Date.now()) {
   out.cats = [...new Set((out.cats || []).map(String))].slice(0, 40);
   if (out.dateText != null) out.dateText = String(out.dateText).slice(0, 200);
   if (out.initials != null) out.initials = String(out.initials).slice(0, 20);
-  // tagged as a possible reflection; personal subcategory tags ("16:elective")
+  // marked interesting; personal subcategory tags ("16:elective")
   if (out.reflectTag) out.reflectTag = true; else delete out.reflectTag;
   if (Array.isArray(out.tags) && out.tags.length) out.tags = [...new Set(out.tags.map(t => String(t).slice(0, 60)))].slice(0, 20); else delete out.tags;
   out.createdAt = Number(out.createdAt) || now;
@@ -130,13 +131,14 @@ export function resetDemo({ seeded = true } = {}) {
   if (seeded) seed(s);
   save(s);
   notifyAll();
+  if (seeded && typeof window !== 'undefined') loadExtras();
 }
 
 // Fake data only: a demo resident, a few made-up cases and three made-up classmates.
 function seed(s) {
   const now = new Date();
-  const intake = now.getMonth() >= 6 ? now.getFullYear() - 1 : now.getFullYear() - 2;   // an R2
-  s.residents.DEMO01 = { rid: 'DEMO01', name: 'Demo User', email: DEMO_USER.email, status: 'ACTIVE', intake, rYear: 2 };
+  const intake = now.getMonth() >= 6 ? now.getFullYear() - 2 : now.getFullYear() - 3;   // an R3
+  s.residents.DEMO01 = { rid: 'DEMO01', name: 'Demo User', email: DEMO_USER.email, status: 'ACTIVE', intake, rYear: 3 };
   const pad = n => String(n).padStart(2, '0');
   const day = n => { const d = new Date(now); d.setDate(d.getDate() - n); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };   // local date
   const cases = [
@@ -156,6 +158,8 @@ function seed(s) {
     })),
   };
   s.logbooks[DEMO_USER.email].doc.rid = 'DEMO01';
+  // two years of cases and the sample reflections come from demo-seed.js, loaded after the page starts
+  s.logbooks[DEMO_USER.email].extras = 'pending';
   // one complete reflection on the LSCS case, so the Reflections, Progress and Export pages have something in them
   const rt = t - 864e5;
   s.logbooks[DEMO_USER.email].reflections = { refl0: {
@@ -168,11 +172,17 @@ function seed(s) {
     ],
     figures: [], references: [], caseId: 'demo0', source: 'app', status: 'complete', createdAt: rt, updatedAt: rt,
   } };
-  const peers = [['DEMO02', 'Resident A', 3], ['DEMO03', 'Resident B', 7], ['DEMO04', 'Resident C', 11]];
-  for (const [rid, name, k] of peers) {
-    const counts = { '13': 4 + k % 5, '16': 3 + k % 4, '17': 5 + k % 6, '18': 6 + k % 3, '20': 10 + k, '20iii': 8 + k, '26': 2 + k % 7, '28': 4 + k % 5 };
-    s.residents[rid] = { rid, name, email: rid.toLowerCase() + '@example.com', status: 'ACTIVE', intake, rYear: 2 };
-    s.summaries[rid] = { rid, name, intake, rYear: 2, counts, total: 20 + k * 2, reflections: {}, reflectionsTotal: k % 4, updatedAt: t };
+  // made-up batchmates (the demo user is an R3): enough for Totals and the Analytics comparison
+  const peers = [['DEMO02', 'Resident A', 0.55], ['DEMO03', 'Resident B', 0.8], ['DEMO04', 'Resident C', 1.05], ['DEMO05', 'Resident D', 0.7], ['DEMO06', 'Resident E', 1.25], ['DEMO07', 'Resident F', 0.9]];
+  for (const [rid, name, f] of peers) {
+    // each tag a share of its R3 target (or of the R5 one when there's none by R3), so some are done and some not
+    const counts = {};
+    progress({}, 3).forEach((r, n) => {
+      const m = (r.milestones || []).find(x => x.by === 'R3') || (r.milestones || []).find(x => x.by === 'R5');
+      if (m) counts[r.code] = Math.max(0, Math.round(m.n * f * (0.7 + ((n * 37) % 10) / 15)));
+    });
+    s.residents[rid] = { rid, name, email: rid.toLowerCase() + '@example.com', status: 'ACTIVE', intake, rYear: 3 };
+    s.summaries[rid] = { rid, name, intake, rYear: 3, counts, total: Math.round(330 * f), reflections: {}, reflectionsTotal: Math.round(34 * f), updatedAt: t };
   }
   s.sharedTemplates.tpl1 = { id: 'tpl1', name: 'LSCS spinal', cats: ['16', '17', '28'] };
 }
@@ -192,7 +202,32 @@ function notifyCases(email) {
   for (const w of caseWatchers) if (w.email === email) w.cb(casesOf(email));
 }
 // ?demo=reset wipes and reseeds on page load (after the watcher sets above exist).
-if (mode() === 'reset') resetDemo();
+// The address then says plain ?demo, so a reload keeps what was done since.
+// The bigger sample logbook (demo-seed.js: ~350 cases, 32 reflections) loads on demand, so real users
+// never download it; it lands a moment after the first paint and the watchers repaint.
+function loadExtras() {
+  const st = load(), lb = st.logbooks[DEMO_USER.email];
+  if (!lb || lb.extras !== 'pending') return;
+  try { if (localStorage.getItem('apmes-logbook-demo-small')) return; } catch { /* no storage */ }   // the e2e test
+  import('./demo-seed.js').then(({ demoLogbook }) => {
+    const s2 = load(), lb2 = s2.logbooks[DEMO_USER.email];
+    if (!lb2 || lb2.extras !== 'pending') return;
+    const pad = n => String(n).padStart(2, '0');
+    const day = n => { const d = new Date(); d.setDate(d.getDate() - n); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
+    const { cases, reflections } = demoLogbook(day, Date.now());
+    lb2.cases ||= {}; lb2.reflections ||= {};
+    for (const c of cases) if (!lb2.cases[c.id]) lb2.cases[c.id] = cleanCase(c, c.updatedAt);
+    for (const r of reflections) if (!lb2.reflections[r.id]) lb2.reflections[r.id] = cleanReflection(r);
+    lb2.extras = 'done';
+    save(s2); notifyAll();
+  }).catch(err => console.warn('Demo sample data not loaded', err));
+}
+
+if (mode() === 'reset') {
+  resetDemo();
+  try { const q = new URLSearchParams(location.search); q.set('demo', ''); history.replaceState(null, '', location.pathname + '?' + q.toString().replace(/=(&|$)/g, '$1') + location.hash); } catch { /* not in a browser */ }
+}
+if (mode() !== null && typeof window !== 'undefined') loadExtras();
 if (typeof addEventListener === 'function') {
   addEventListener('storage', e => { if (e.key === KEY) notifyAll(); });
 }
@@ -219,6 +254,13 @@ export async function watchUser(cb) {
 
 export async function signIn() { const s = load(); s.signedOut = false; save(s); notifyAll(); }
 export async function signOut() { const s = load(); s.signedOut = true; save(s); notifyAll(); }
+// Delete account in the demo: the demo user's logbook goes (cases, reflections, photos, bin) and they're
+// signed out; signing in again starts an empty logbook (?demo=reset brings the samples back).
+export async function deleteAccount(email) {
+  const s = load(); delete s.logbooks[lc(email)]; s.signedOut = true; save(s);
+  try { localStorage.removeItem(KEY + '-images'); localStorage.removeItem(KEY + '-submissions'); } catch { /* ignore */ }
+  notifyAll();
+}
 
 export async function isAdmin(email) { return !!load().admins[lc(email)]; }
 

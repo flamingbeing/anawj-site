@@ -2,17 +2,18 @@
 // shared state and helpers are in ui-core.js. Case data comes from cloud.js (Firestore, or the
 // in-browser demo backend with ?demo).
 
-import { S, hooks, h, toast, cloud, setCases, scheduleSummary, fill, resetCaches, confirmBox, modal, setCategoryNames, categoryNames as categoryNamesNow } from './ui-core.js';
+import { S, hooks, h, toast, cloud, setCases, scheduleSummary, fill, resetCaches, patchLogbook, confirmBox, fileButton, modal, download, todayISO, settings, setCategoryNames, categoryNames as categoryNamesNow } from './ui-core.js';
 import { renderLog, logCasesChanged, clearDrafts, SHARED_KEY } from './ui-log.js';
 import { renderLogbook } from './ui-logbook.js';
 import { renderProgress, renderTotals } from './ui-progress.js';
-import { applyCompact, cachedCompact, applyTheme, cachedTheme, applyTextSize, cachedTextSize, renderSettings, renderTagEditor } from './ui-settings.js';
+import { applyCompact, cachedCompact, applyTheme, cachedTheme, applyTextSize, cachedTextSize, applyAccent, renderTagEditor, renderDisplay, renderLogging, renderReflectionSettings, renderShareFormat, START_TABS, privacyCard, creditsCard, signOutCard } from './ui-settings.js';
 import { renderAccount, flush as flushProfile } from './ui-account.js';
 import { renderAdmin, leaveAdmin } from './ui-admin.js';
 import { renderReflect, watchMyReflections, renderExportPage, renderChoosePage } from './ui-reflect.js';
-import { downloadExcel } from './ui-logbook.js';
-import { downloadBackup } from './backup.js';
-import { purgeExpired } from './bin.js';
+import { downloadExcel, uploadExcel } from './ui-logbook.js';
+import { backupCard } from './backup.js';
+import { settingsFile, readSettingsFile } from './settings-file.js';
+import { purgeExpired, openBin } from './bin.js';
 
 // Tab icons: tiny inline SVG paths (24x24, stroked), so they look the same on every phone.
 const ICONS = {
@@ -23,7 +24,14 @@ const ICONS = {
   account: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0',
   settings: 'M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1M15 4v4M9 10v4M17 16v4',
   reflect: 'M4 19.5V5a2 2 0 0 1 2-2h12v14H6a2 2 0 0 0-2 2.5zM6 21h12v-4M8 7h6M8 11h4',
-  admin: 'M12 3l2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.6 6.6 19.5l1.2-6-4.5-4.2 6.1-.7z',
+  admin: 'M5 11h14v10H5zM8 11V7a4 4 0 0 1 8 0v4M12 15v2',   // a lock: admins only
+  data: 'M12 3v12M7 10l5 5 5-5M5 21h14',
+  display: 'M3 5h18v12H3zM8 21h8M12 17v4',
+  logging: 'M12 5v14M5 12h14',
+  tags: 'M3 12V4h8l10 10-8 8L3 12zM7.5 7.5h.01',
+  reflset: 'M4 19.5V5a2 2 0 0 1 2-2h12v14H6a2 2 0 0 0-2 2.5zM6 21h12v-4',
+  sharefmt: 'M9 9h10v12H9zM5 15V3h10',
+  bin: 'M4 7h16M10 11v6M14 11v6M5 7l1 13h12l1-13M9 7V4h6v3',
   more: 'M5 12h.01M12 12h.01M19 12h.01M4 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0M11 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0M18 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0',
 };
 const icon = id => {
@@ -36,41 +44,146 @@ const icon = id => {
 };
 
 const TABS = [
-  { id: 'log', label: 'Log', render: renderLog },
+  { id: 'log', label: 'Case', render: renderLog },
   { id: 'logbook', label: 'Logbook', render: renderLogbook },
   { id: 'reflect', label: 'Reflections', render: renderReflect },
   { id: 'progress', label: 'Analytics', render: renderProgress },
   // five tabs on the bar; the rest live under More (still reachable by #totals, #account, #settings)
   { id: 'more', label: 'More', render: () => renderMore() },
-  { id: 'totals', label: 'Totals', render: renderTotals, hidden: true, under: 'more', desc: 'How your case counts compare across your intake' },
-  { id: 'account', label: 'Account', render: renderAccount, hidden: true, under: 'more', desc: 'Your name and portfolio details (Section 1); sign out' },
-  { id: 'settings', label: 'Settings', render: renderSettings, hidden: true, under: 'more', desc: 'Display, text size, logging, tag editor, recycle bin' },
-  // opened from More → Export (not in the More list)
-  { id: 'export', label: 'Export portfolio', render: () => renderExportPage(), hidden: true, under: 'more', unlisted: true },
+  // under Analytics: how your counts compare with your intake
+  { id: 'totals', label: 'Totals', render: renderTotals, hidden: true, under: 'progress', unlisted: true },
+  { id: 'account', label: 'Account', render: renderAccount, hidden: true, under: 'more', desc: 'Your name and portfolio details (Section 1); delete account' },
+  { id: 'settings', label: 'Settings', render: () => renderSettingsMenu(), hidden: true, under: 'more', desc: 'Display, logging, tag editor, copy & share format, recycle bin' },
+  { id: 'data', label: 'Export / Import', render: () => renderDataPage(), hidden: true, under: 'more', desc: 'Export the portfolio (Word); import reflections from Word; backup file and Excel' },
+  { id: 'reflimport', label: 'Import reflections from Word', render: () => renderReflImport(), hidden: true, under: 'data', unlisted: true },
+  // Settings' own pages (not in the More list)
+  { id: 'display', label: 'Display', render: renderDisplay, hidden: true, under: 'settings', unlisted: true, desc: 'Theme, text size, compact mode, the tab the app opens on' },
+  { id: 'sharefmt', label: 'Copy & share format', render: renderShareFormat, hidden: true, under: 'settings', unlisted: true, desc: 'How a copied or shared case or day reads' },
+  { id: 'logging', label: 'Logging', render: renderLogging, hidden: true, under: 'settings', unlisted: true, desc: 'Suggestions, the Enter key, case box, search, dates' },
+  // from Reflections → More tools
+  { id: 'reflset', label: 'Reflections', render: renderReflectionSettings, hidden: true, under: 'settings', unlisted: true, desc: 'New reflections in the export, photo sizes' },
+  // opened from More → Export / Import (not in the More list)
+  { id: 'export', label: 'Export portfolio', render: () => renderExportPage(), hidden: true, under: 'data', unlisted: true },
   { id: 'choose', label: 'Export portfolio', render: renderChoosePage, hidden: true, under: 'export', unlisted: true },
-  // admins open it from More (or Settings → Admin portal)
-  { id: 'admin', label: 'Admin portal', render: renderAdmin, admin: true, hidden: true, under: 'more', desc: 'Residents, ready portfolios, portfolio template, default tag names' },
+  // admins open it from More
+  { id: 'admin', label: 'Admin portal', render: renderAdmin, admin: true, hidden: true, under: 'more', desc: 'Admins only: residents, ready portfolios, portfolio template, default tag names' },
   // opened from Settings
-  { id: 'tags', label: 'Tag editor', render: renderTagEditor, hidden: true, under: 'settings', unlisted: true },
+  { id: 'tags', label: 'Tag editor', render: renderTagEditor, hidden: true, under: 'settings', unlisted: true, desc: 'APMES and personal tags, shorthand, tag groups' },
 ];
+
+// A list of pages, like the More list: icon, name, one line, ›.
+const menuItem = (id, label, desc, onclick) => h('li', {}, h('a', { href: '#' + id, 'data-go': id, onclick: e => { e.preventDefault(); onclick ? onclick() : go(id); } },
+  icon(id), h('span', { class: 'mt' }, h('b', {}, label), h('small', {}, desc)), h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')));
 
 function renderMore() {
   const items = visibleTabs().filter(t => t.under === 'more' && !t.unlisted);
   return h('div', {},
     h('section', { class: 'card more-list' }, h('h2', {}, 'More'),
-      h('ul', {}, items.map(t => h('li', {}, h('a', { href: '#' + t.id, 'data-go': t.id, onclick: e => { e.preventDefault(); go(t.id); } },
-        icon(t.id), h('span', { class: 'mt' }, h('b', {}, t.label), h('small', {}, t.desc)), h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')))))),
-    // everything that leaves the app as a file
+      h('ul', {}, items.map(t => menuItem(t.id, t.label, t.desc)))),
+    privacyCard(),
+    creditsCard(),
+    installCard(),
+    signOutCard());
+}
+
+// "Install the app" (More): Android and desktop Chrome/Edge offer their own install prompt, which we
+// keep from beforeinstallprompt; iPhone/iPad Safari has none, so it gets the Share → Add to Home Screen
+// steps. Hidden once installed (running standalone), or after "Not now" on this device.
+let installPrompt = null;
+const INSTALL_KEY = 'apmes-logbook-install-dismissed';
+addEventListener('beforeinstallprompt', e => { e.preventDefault(); installPrompt = e; if (S.tab === 'more') render(); });
+addEventListener('appinstalled', () => { installPrompt = null; if (S.tab === 'more') render(); });
+const standalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const isIOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+function installCard() {
+  let dismissed = false;
+  try { dismissed = !!localStorage.getItem(INSTALL_KEY); } catch { /* storage blocked */ }
+  if (standalone() || dismissed || (!installPrompt && !isIOS())) return null;
+  const notNow = h('button', { class: 'small linkish', onclick: e => { try { localStorage.setItem(INSTALL_KEY, '1'); } catch { /* ignore */ } e.target.closest('section').remove(); } }, 'Not now');
+  return h('section', { class: 'card install-card' },
+    h('h2', {}, 'Install the app'),
+    h('p', { class: 'hint' }, 'Open the logbook from your home screen like any other app: full screen, quicker to reach, and it works with no signal.'),
+    installPrompt
+      ? h('div', { class: 'bar', style: 'margin-bottom:0' },
+        h('button', { class: 'primary', onclick: async () => {
+          const ev = installPrompt; installPrompt = null;
+          try { ev.prompt(); const r = await ev.userChoice; if (r && r.outcome === 'accepted') toast('Installing…'); } catch { /* the browser said no */ }
+          render();
+        } }, 'Install'), h('span', { class: 'grow' }), notNow)
+      : [h('ol', { class: 'install-steps' },
+        h('li', {}, 'Open this page in ', h('b', {}, 'Safari'), ' (not Chrome).'),
+        h('li', {}, 'Tap ', h('b', {}, 'Share'), ' (the square with an arrow: at the bottom, or the top on iPad).'),
+        h('li', {}, 'Choose ', h('b', {}, 'Add to Home Screen'), ', then ', h('b', {}, 'Add'), '.')),
+        h('div', { class: 'bar', style: 'margin-bottom:0' }, h('span', { class: 'grow' }), notNow)]);
+}
+
+// Settings: a short menu of its pages (residency year on top for people not on the programme list)
+function renderSettingsMenu() {
+  const order = ['display', 'logging', 'tags', 'reflset', 'sharefmt'];
+  const pages = TABS.filter(t => t.under === 'settings').sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
+  return h('div', {},
+    h('section', { class: 'card more-list' }, h('h2', {}, 'Settings'),
+      h('ul', {}, pages.map(t => menuItem(t.id, t.label, t.desc)),
+        menuItem('bin', 'Recycle bin', 'Deleted cases and reflections, kept for 30 days', () => openBin()))),
+    settingsFileCard());
+}
+
+// Settings export / import: preferences, tags, shorthand, tag groups, formats as one small file
+// (settings-file.js). Never cases, reflections or portfolio details.
+function settingsFileCard() {
+  const exportIt = () => {
+    const f = settingsFile(S.logbook, { theme: cachedTheme() });
+    download(`logbook-settings-${todayISO()}.json`, new Blob([JSON.stringify(f, null, 2)], { type: 'application/json' }));
+  };
+  const importIt = async file => {
+    let d;
+    try { d = readSettingsFile(await file.text()); } catch (err) { return toast(err.message); }
+    const mine = (S.logbook && S.logbook.templates) || [];
+    const same = (a, b) => a.name === b.name && [...a.cats].sort().join() === [...b.cats].sort().join();
+    const newGroups = (d.templates || []).filter(t => !mine.some(m => m.id === t.id || same(m, t)));
+    const n = Object.keys(d.settings).length;
+    if (!(await confirmBox('Import settings', `Use the ${n} setting${n === 1 ? '' : 's'} in this file${newGroups.length ? ` and add ${newGroups.length} tag group${newGroups.length === 1 ? '' : 's'}` : ''}? Settings in the file replace yours (your tags and shorthand too, if the file has them); anything not in it stays. Cases, reflections and portfolio details are never touched.`, 'Import'))) return;
+    await patchLogbook({ settings: d.settings, ...(newGroups.length ? { templates: [...mine, ...newGroups].slice(0, 100) } : {}) });
+    if (d.theme) applyTheme(d.theme);
+    applyCompact(!!settings().compact); applyTextSize(settings().textSize || '1'); applyAccent(settings().accent);
+    toast('Settings imported'); render();
+  };
+  return h('section', { class: 'card' },
+    h('h2', {}, 'Settings file'),
+    h('p', { class: 'hint help' }, 'Your settings, tags and shorthand, tag groups, copy & share format and saved searches as one small file: to move them to another account or share your setup with a colleague. No cases, reflections or portfolio details.'),
+    h('div', { class: 'bar', style: 'margin-bottom:0' },
+      h('button', { onclick: exportIt }, 'Export settings'),
+      fileButton('Import settings…', '.json,application/json', importIt)));
+}
+
+// The Word upload for reflections (its module loads on first use); when done, on to Reflections
+function renderReflImport() {
+  const wrap = h('div', {}, h('section', { class: 'card' }, h('p', { class: 'hint' }, 'Loading…')));
+  import('./ui-reflect-import.js').then(m => Promise.resolve(m.renderImport(() => { location.hash = 'reflect'; })))
+    .then(node => { if (S.tab === 'reflimport') wrap.replaceChildren(node); })
+    .catch(() => wrap.replaceChildren(h('section', { class: 'card' }, h('p', {}, 'Upload from Word isn’t available yet. Try again after the app updates.'))));
+  return wrap;
+}
+
+// Export / Import: the portfolio export, the Word upload for reflections, and backups
+function renderDataPage() {
+  return h('div', {},
+    // Export is the portfolio only (it holds everything APMES needs); every other copy is a backup
     h('section', { class: 'card export-sync' }, h('h2', {}, 'Export'),
       h('h3', {}, 'Portfolio (Word)'),
-      h('p', { class: 'hint' }, 'Choose which complete reflections go in, then export the APMES portfolio with Section 1 and the Section 4 case numbers filled in.'),
-      h('div', { class: 'bar' }, h('a', { class: 'btn primary', href: '#export' }, 'Choose reflections and export ›')),
-      h('h3', {}, 'Logbook (Excel)'),
-      h('p', { class: 'hint' }, 'All your cases as a spreadsheet. To edit and upload it back, use Logbook → More tools.'),
-      h('div', { class: 'bar' }, h('button', { onclick: downloadExcel }, 'Download Excel')),
-      h('h3', {}, 'Backup'),
-      h('p', { class: 'hint' }, 'Everything in one file you keep (restore it from Settings → Backup). To copy a day into your notes, open a case and use Share or Copy as Markdown.'),
-      h('div', { class: 'bar', style: 'margin-bottom:0' }, h('button', { onclick: e => downloadBackup(e.currentTarget) }, 'Download backup'))));
+      h('p', { class: 'hint help' }, 'The APMES portfolio: choose which complete reflections go in, then export it with Section 1 and the Section 4 case numbers filled in. This is what APMES needs.'),
+      h('div', { class: 'bar', style: 'margin-bottom:0' }, h('a', { class: 'btn primary', href: '#export' }, 'Choose reflections and export ›'))),
+    h('section', { class: 'card' }, h('h2', {}, 'Import'),
+      h('h3', {}, 'Reflections from Word'),
+      h('p', { class: 'hint help' }, 'Already wrote reflections in the APMES Word portfolio? Upload the .docx to add them here. You check each one before it is saved.'),
+      h('div', { class: 'bar', style: 'margin-bottom:0' }, h('a', { class: 'btn', href: '#reflimport' }, 'Upload from Word ›')),
+      h('h3', { style: 'margin-top:16px' }, 'Logbook from Excel or CSV'),
+      h('p', { class: 'hint help' }, 'Edit your cases in a spreadsheet (Download Excel under Backup), then upload it back; or bring in a list from elsewhere. You match the columns and see every change before anything is saved.'),
+      h('div', { class: 'bar', style: 'margin-bottom:0' }, fileButton('Upload Excel/CSV…', '.xlsx,.csv,text/csv', uploadExcel))),
+    backupCard(
+      h('h3', { style: 'margin-top:16px' }, 'Spreadsheet (Excel)'),
+      h('p', { class: 'hint help' }, 'Your cases, your reflections or both as a spreadsheet: choose the dates and the columns. To edit cases and upload them back, use Import above.'),
+      h('div', { class: 'bar', style: 'margin-bottom:0' }, h('button', { onclick: downloadExcel }, 'Download Excel…'))));
 }
 
 const app = document.getElementById('app');
@@ -93,8 +206,10 @@ const tabFromHash = () => {
 };
 
 function paintTabs() {
-  const cur = TABS.find(t => t.id === S.tab);
-  const sel = (cur && cur.under) || S.tab;
+  // the bar's tab this page sits under, however deep (Settings → Display is under More)
+  let cur = TABS.find(t => t.id === S.tab);
+  while (cur && cur.under) cur = TABS.find(t => t.id === cur.under);
+  const sel = cur ? cur.id : S.tab;
   fill(tabsEl, ...visibleTabs().filter(t => !t.hidden).map(t => h('button', {
     role: 'tab', 'aria-selected': String(sel === t.id), 'data-tab': t.id,
     onclick: () => go(t.id),
@@ -121,6 +236,8 @@ window.addEventListener('hashchange', () => { const t = tabFromHash(); if (t && 
 
 function render() {
   if (!S.user) return;
+  // Settings → Logging → Show tips and help text: off hides every .help explanation (an experienced-user mode)
+  document.body.classList.toggle('no-help', !!(S.logbook && S.logbook.settings && S.logbook.settings.hideTips));
   paintTabs();
   const tab = visibleTabs().find(t => t.id === S.tab) || TABS[0];
   S.tab = tab.id;
@@ -184,7 +301,7 @@ function renderLanding(error) {
     h('ul', {},
       h('li', {}, 'Tag suggestions from what you type (age, BMI, procedure).'),
       h('li', {}, 'Works offline on your phone; syncs when you are back online.'),
-      h('li', {}, 'Analytics: progress by tag and EPA, trends; Excel download any time.'),
+      h('li', {}, 'Analytics: progress by tag, reflections and trends; Excel download any time.'),
       h('li', {}, 'Private: only you and the programme admins can see your cases.')),
     error ? h('p', { class: 'tip' }, error) : null,
     cloud.enabled ? h('div', { class: 'cta' },
@@ -196,6 +313,26 @@ function renderLanding(error) {
 async function signIn() {
   try { await cloud.signIn(); }
   catch (err) { renderLanding('Sign-in failed: ' + (err && err.message || err)); }
+}
+
+// The programme's tag groups (Admin portal) are only a starting set: each one is copied once into the
+// resident's own tag groups, where it can be edited or deleted like any other. `settings.sharedSeen`
+// remembers which were offered, so a deleted one doesn't come back; the copy's id is fixed so two
+// devices adopting at once don't make two.
+function adoptShared() {
+  const lb = S.logbook, shared = S.sharedTemplates || [];
+  if (!lb || !shared.length) return false;
+  const seen = new Set((lb.settings && lb.settings.sharedSeen) || []);
+  const fresh = shared.filter(t => t && t.id && !seen.has(String(t.id)));
+  if (!fresh.length) return false;
+  const mine = lb.templates || [];
+  const have = new Set(mine.map(t => t.id));
+  const same = t => mine.some(m => m.name === t.name && [...(m.cats || [])].sort().join() === [...(t.cats || [])].sort().join());
+  const add = fresh.filter(t => (t.cats || []).length && !have.has('sh-' + t.id) && !same(t))
+    .map(t => ({ id: 'sh-' + t.id, name: t.name || '', cats: [...t.cats], ...(t.details ? { details: t.details } : {}) }));
+  const templates = [...mine, ...add].slice(0, 100);
+  patchLogbook({ templates, settings: { sharedSeen: [...seen, ...fresh.map(t => String(t.id))].slice(-200) } });
+  return true;
 }
 
 // ---------- signed in ----------
@@ -224,8 +361,9 @@ function refreshWho(user, who, firstLogbook) {
     let lbChanged = false;
     if (lb && S.logbook === firstLogbook && JSON.stringify(lb) !== JSON.stringify(firstLogbook)) {
       S.logbook = lb; lbChanged = true;
-      applyCompact(lb.settings && lb.settings.compact); applyTextSize(lb.settings && lb.settings.textSize);
+      applyCompact(lb.settings && lb.settings.compact); applyTextSize(lb.settings && lb.settings.textSize); applyAccent(lb.settings && lb.settings.accent);
     }
+    if (adoptShared()) lbChanged = true;
     if (!lbChanged && before === JSON.stringify([S.admin, S.owner, S.pd, S.resident, S.sharedTemplates, categoryNamesNow()])) return;
     const typing = document.activeElement && /^(TEXTAREA|INPUT|SELECT)$/.test(document.activeElement.tagName);
     if (!typing && !document.querySelector('dialog[open]')) render(); else paintTabs();
@@ -243,7 +381,7 @@ async function onUser(user) {
   S.user = user;
   if (!user) {
     Object.assign(S, { admin: false, owner: false, pd: false, resident: null, logbook: null, cases: [], reflections: [], counts: {}, casesLoaded: false, casesSynced: false, sharedTemplates: [] });
-    if (signedInOnce) { clearDrafts(); resetCaches(); forgetWho(); applyCompact(false); applyTextSize('1'); }   // a shared device starts plain for the next person
+    if (signedInOnce) { clearDrafts(); resetCaches(); forgetWho(); applyCompact(false); applyTextSize('1'); applyAccent(null); }   // a shared device starts plain for the next person
     paintWho();
     renderLanding();
     return;
@@ -274,17 +412,21 @@ async function onUser(user) {
     else refreshWho(user, who, logbook);
     applyCompact(logbook.settings && logbook.settings.compact);   // per-user display settings
     applyTextSize(logbook.settings && logbook.settings.textSize);
+    applyAccent(logbook.settings && logbook.settings.accent);
     const resident = S.resident;
     if (!logbook.name && (resident?.name || user.name)) S.logbook.name = resident?.name || user.name;
     // a programme resident's logbook remembers their rid (used by admins and the rules)
     if (resident && logbook.rid !== resident.rid) cloud.saveLogbook(user.email, { rid: resident.rid }).catch(() => {});
+    adoptShared();
   } catch (err) {
     // a Firestore client closed by an earlier sign-out can't be reused: start the page afresh (once)
     if (/terminated/i.test(err.message) && !reloadFlag()) { reloadFlag('1'); location.reload(); return; }
     fill(app, h('p', { class: 'empty' }, 'Could not load your logbook: ' + err.message), h('p', { class: 'empty' }, h('button', { onclick: () => onUser(user) }, 'Try again')));
     return;
   }
-  S.tab = tabFromHash() || 'log';
+  // the tab chosen in Settings → Display, unless the address names one (a link, a shortcut, a reload)
+  const start = (S.logbook && S.logbook.settings && S.logbook.settings.startTab) || 'log';
+  S.tab = tabFromHash() || (START_TABS.some(([v]) => v === start) ? start : 'log');
   // recycle bin: drop entries older than 30 days, but only once the reflections are loaded, so an
   // image still used by a live (e.g. restored) reflection is never deleted with an old bin entry
   { let done = false, stop = null;
@@ -317,21 +459,30 @@ async function onUser(user) {
 const typingEl = el => el && (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && /^(text|search|email|number|)$/.test(el.type)));
 let fullH = 0, fullW = 0;   // the tallest visible area seen at this width (keyboard down)
 function keyboardCheck() {
-  const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-  if (window.innerWidth !== fullW) { fullW = window.innerWidth; fullH = 0; }   // rotated
-  fullH = Math.max(fullH, vh);
-  const typing = !!typingEl(document.activeElement) && vh < fullH * 0.75;
-  document.body.classList.toggle('typing', typing);
-  // how far the keyboard covers the bottom of the layout viewport
   const vv = window.visualViewport;
+  const vh = vv ? vv.height : window.innerHeight;
+  if (window.innerWidth !== fullW) { fullW = window.innerWidth; fullH = 0; }   // rotated
+  fullH = Math.max(fullH, vh, window.innerHeight);
+  // a keyboard takes at least ~120px (also small and landscape keyboards, where 25% was too much to ask)
+  const typing = !!typingEl(document.activeElement) && fullH - vh > 120;
+  document.body.classList.toggle('typing', typing);
+  // how far the keyboard covers the bottom of the layout viewport (iOS also scrolls the visible area
+  // inside it: offsetTop), and the visible area itself, for dialogs (style.css: --kb, --vvh, --vvt)
   const kb = typing && vv ? Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)) : 0;
-  document.documentElement.style.setProperty('--kb', kb + 'px');
+  const root = document.documentElement.style;
+  root.setProperty('--kb', kb + 'px');
+  root.setProperty('--vvh', Math.round(vh) + 'px');
+  root.setProperty('--vvt', Math.round(vv && typing ? vv.offsetTop : 0) + 'px');
 }
+// once per frame at most, and again when scrolling settles (iOS reports the keyboard late)
+let kbFrame = 0;
+const kbSoon = () => { if (!kbFrame) kbFrame = requestAnimationFrame(() => { kbFrame = 0; keyboardCheck(); }); };
 keyboardCheck();
-document.addEventListener('focusin', keyboardCheck);
+document.addEventListener('focusin', () => { kbSoon(); setTimeout(keyboardCheck, 350); });
 document.addEventListener('focusout', () => setTimeout(keyboardCheck, 0));
-(window.visualViewport || window).addEventListener('resize', keyboardCheck);
-if (window.visualViewport) window.visualViewport.addEventListener('scroll', keyboardCheck);
+(window.visualViewport || window).addEventListener('resize', kbSoon);
+if (window.visualViewport) window.visualViewport.addEventListener('scroll', kbSoon);
+window.addEventListener('scroll', kbSoon, { passive: true });
 
 // ---------- offline: service worker and "update available" ----------
 
@@ -384,7 +535,7 @@ function demoMenu() {
       h('button', { class: 'danger', onclick: async () => {
         m.close();
         if (!(await confirmBox('Reset demo', 'Delete everything you added in the demo (cases, reflections, images, settings) and start again with the made-up data? The uploaded portfolio template is kept.', 'Reset', true))) return;
-        clearDrafts(); resetCaches(); forgetWho(); applyCompact(false); applyTextSize('1');
+        clearDrafts(); resetCaches(); forgetWho(); applyCompact(false); applyTextSize('1'); applyAccent(null);
         cloud.resetDemo();
         location.reload();
       } }, 'Reset demo'),
