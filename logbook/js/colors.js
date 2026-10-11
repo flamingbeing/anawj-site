@@ -78,3 +78,16 @@ export function schemeCss(accent) {
     `@media (prefers-color-scheme: dark) { :root:root[data-theme="auto"] { ${decl(D)} } }`,
   ].join('\n');
 }
+
+// One colour per tab, everything in it (Settings → Display → Colourful): the same palettes as the colour picker,
+// scoped to the pages of one tab (scope: 'body[data-bar="log"]'), for light, dark, OLED and auto
+export function tabSchemeCss(accent, scope) {
+  const c = cleanAccent(accent) || DEFAULT_ACCENT;
+  const L = lightPalette(c), D = darkPalette(c), O = darkPalette(c, true);
+  return [
+    `html.colour-all ${scope} { ${decl(L)} }`,
+    `html.colour-all[data-theme="dark"] ${scope} { ${decl(D)} }`,
+    `html.colour-all[data-theme="dark"][data-oled] ${scope} { ${decl(O)} }`,
+    `@media (prefers-color-scheme: dark) { html.colour-all[data-theme="auto"] ${scope} { ${decl(D)} } }`,
+  ].join('\n');
+}

@@ -7,8 +7,9 @@ import { S, h, toast, modal, confirmBox, cloud, catChip, catName, catShort, PICK
 import { MAX_TAGS, tagLinks as tagLinksIn, learnShorthand, cleanShorthand, shorthandOf, DEFAULT_SHORTHAND, cleanTagSet, defaultTagSet, tagTree, flatTree, moveTag, reparentTag, removeTag, newKey, tagSetToCsv, tagSetFromCsv, dropTag, canPlace } from './tags.js';
 import { pickDialog } from './ui-log.js';
 import { OPERATOR_HELP } from './search-ops.js';
-import { PRESETS, DEFAULT_ACCENT, cleanAccent, schemeCss, lightPalette } from './colors.js';
+import { PRESETS, DEFAULT_ACCENT, cleanAccent, schemeCss, lightPalette, tabSchemeCss } from './colors.js';
 import { cleanMarkdown, storedMarkdown, mdCase, mdDay, reflectionPath, reflectionNote, CASE_FILLINS, REFL_FILLINS, FM_FIELDS } from './markdown.js';
+import { checkCss } from './custom-css.js';
 import { FONTS, applyFonts, fontStack, fontAvailable, cleanFontName, logChoice, saveUserFont, getUserFont, deleteUserFont } from './fonts.js';
 import { PHOTO_BUDGET_KB, PHOTO_NOTE, photoUsageKb, fmtMb } from './reflections.js';
 
@@ -96,7 +97,7 @@ export function residencyCard() {
 // the light / dark choice. The first time a device opens the app it starts from what the account had (these used to
 // follow the account), so nobody's look changes. Kept at sign-out: they are the device's, and nothing private.
 const DISPLAY_KEY = 'apmes-logbook-display';
-export const DISPLAY_KEYS = ['compact', 'textSize', 'zoom', 'accent', 'startTab', 'fontUi', 'fontUiName', 'fontLog', 'fontLogName', 'lineWidth', 'lineHeight', 'contrast', 'motion', 'tabIcons', 'tabBar', 'hideHeader', 'caseInverted', 'firstField'];
+export const DISPLAY_KEYS = ['compact', 'textSize', 'zoom', 'accent', 'startTab', 'fontUi', 'fontUiName', 'fontLog', 'fontLogName', 'lineWidth', 'lineHeight', 'contrast', 'motion', 'tabIcons', 'tabBar', 'hideHeader', 'caseInverted', 'colourful', 'customCss', 'customCssOn', 'autoFocus', 'firstField'];
 export function deviceDisplay() {
   try { const d = JSON.parse(localStorage.getItem(DISPLAY_KEY) || 'null'); return d && typeof d === 'object' && !Array.isArray(d) ? d : null; } catch { return null; }
 }
@@ -142,6 +143,28 @@ export function applyLook(d = {}) {
   c.toggle('tabs-top', d.tabBar === 'top'); c.toggle('tabs-bottom', d.tabBar === 'bottom');
   c.toggle('no-header', !!d.hideHeader);
   c.toggle('case-inverted', !!d.caseInverted);
+  const col = d.colourful === true ? 'tabs' : d.colourful;   // (a plain on/off before "everything in the tab")
+  c.toggle('colourful', col === 'tabs' || col === 'all'); c.toggle('colour-all', col === 'all');
+  if (col === 'all' && !document.getElementById('tab-colours')) {
+    const el = document.createElement('style'); el.id = 'tab-colours';
+    el.textContent = Object.entries(TAB_COLOURS).map(([t, hex]) => tabSchemeCss(hex, `body[data-bar="${t}"]`)).join('\n');
+    document.head.append(el);
+  }
+  c.toggle('no-autofocus', d.autoFocus === false);   // ui-log.js: don't open the keyboard on the Case tab
+  applyCustomCss(d);
+}
+// one colour per tab (Colourful); style.css has the same shades for the tabs-and-headings version
+export const TAB_COLOURS = { log: '#c2410c', logbook: '#0e7490', reflect: '#be123c', progress: '#1d4ed8', more: '#6d28d9' };
+export const COLOURFUL = [['off', 'Off (default)'], ['tabs', 'One colour per tab: the tabs and headings'], ['all', 'One colour per tab: everything in the tab']];
+// Custom CSS (custom-css.js): only CSS that passes checkCss, never on the Display page, and off with ?nocss
+export function applyCustomCss(d = display()) {
+  if (typeof document === 'undefined') return;
+  let el = document.getElementById('user-css');
+  const res = checkCss(d.customCss);
+  const on = !!d.customCssOn && res.ok && !!res.css && !/[?&]nocss\b/.test(location.search) && S.tab !== 'display';
+  if (!on) { if (el) el.textContent = ''; return; }
+  if (!el) { el = document.createElement('style'); el.id = 'user-css'; document.head.append(el); }
+  if (el.textContent !== res.css) el.textContent = res.css;
 }
 export const TAB_BARS = [['auto', 'Bottom on phones, top on bigger screens (default)'], ['top', 'Always at the top'], ['bottom', 'Always at the bottom']];
 
@@ -168,6 +191,10 @@ export function renderDisplay() {
       lookSelect('lineWidth', 'Line width', LINE_WIDTHS, 'normal', 'How wide text and lists go on a computer or tablet. The Case tab keeps its two panes.'),
       lookSelect('contrast', 'Contrast', CONTRASTS, 'auto', 'Higher contrast: darker text and stronger lines (lighter in dark mode).'),
       lookSelect('motion', 'Motion', MOTIONS, 'auto'),
+      h('div', { class: 'field', style: 'margin-top:10px' }, h('label', { class: 'field', style: 'margin:0' }, 'Colourful',
+        h('select', { 'aria-label': 'Colourful', onchange: e => applyDisplay(setDisplay({ colourful: e.target.value === 'off' ? null : e.target.value })) },
+          COLOURFUL.map(([v, l]) => h('option', { value: v, selected: (st.colourful === true ? 'tabs' : st.colourful || 'off') === v }, l)))),
+        h('span', { class: 'hint help' }, 'Case orange, Logbook teal, Reflections red, Analytics blue, More purple. “Everything” also colours the buttons, chips and links on that tab’s pages, in shades that stay easy to read.')),
       lookSelect('tabBar', 'Tab bar', TAB_BARS, 'auto'),
       h('label', { class: 'check', style: 'margin-top:10px' }, h('input', { type: 'checkbox', checked: !!st.caseInverted, onchange: e => applyDisplay(setDisplay({ caseInverted: e.target.checked })) }), 'Case tab upside down (phones)'),
       h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'The case box sits at the bottom, next to the keyboard and Save, with suggestions just above it; scroll up for all the tags. Like a chat app.'),
@@ -183,7 +210,8 @@ export function renderDisplay() {
       h('label', { class: 'field', style: 'margin-top:10px' }, 'Open the app on',
         h('select', { onchange: e => { setDisplay({ startTab: e.target.value }); toast('Saved'); } },
           START_TABS.map(([v, l]) => h('option', { value: v, selected: (st.startTab || 'log') === v }, l)))),
-      h('p', { class: 'hint', style: 'margin:10px 0 0' }, 'Everything on this page is saved on this device only, so a phone and a computer can each look the way that suits them.')));
+      h('p', { class: 'hint', style: 'margin:10px 0 0' }, 'Everything on this page is saved on this device only, so a phone and a computer can each look the way that suits them.')),
+    customCssCard());
 }
 // Interface font and logging font (fonts.js): a list, a box for a font installed on this device, or a font file
 // kept on this device; a sample line shows the result (Il1 O0: easy to mix up in initials)
@@ -222,6 +250,31 @@ function fontPicker(slot) {
     h('label', { class: 'field', style: 'margin:0' }, slot === 'ui' ? 'Interface font' : 'Logging font', sel),
     slot === 'log' ? h('span', { class: 'hint help' }, 'The case box, case text in the Logbook and the reflection editor.') : null,
     nameRow, fileRow, sample);
+}
+
+// Custom CSS (advanced): checked by checkCss before it is kept; the switch turns it on and off
+function customCssCard() {
+  const d = display();
+  const box = h('textarea', { rows: '6', spellcheck: 'false', 'aria-label': 'Custom CSS', placeholder: '.chip { border-radius: 6px; }', style: 'font-family:ui-monospace,Menlo,Consolas,monospace;font-size:calc(14px * var(--fs, 1));width:100%' }, d.customCss || '');
+  const note = h('p', { class: 'hint', 'aria-live': 'polite', style: 'margin:6px 0 0' });
+  const sw = h('input', { type: 'checkbox', role: 'switch', checked: !!d.customCssOn, onchange: e => { applyDisplay(setDisplay({ customCssOn: e.target.checked })); toast(e.target.checked ? 'Custom CSS on (not on this page)' : 'Custom CSS off'); } });
+  const save = () => {
+    const res = checkCss(box.value);
+    if (!res.ok) { note.textContent = 'Not saved: ' + res.problems.join(', ') + '.'; note.style.color = 'var(--err)'; return; }
+    applyDisplay(setDisplay({ customCss: res.css || null, customCssOn: !!res.css }));
+    sw.checked = !!res.css; note.style.color = ''; note.textContent = res.css ? 'Saved and on. It shows on every page except this one.' : 'Cleared.';
+  };
+  return h('section', { class: 'card' },
+    h('details', { open: !!d.customCss },
+      h('summary', {}, h('strong', {}, 'Custom CSS (advanced)')),
+      h('p', { class: 'tip', style: 'margin:8px 0' }, 'Only paste CSS you understand, never from someone you don’t trust. It can change what you see and hide things, like the privacy notes. Anything that loads from another address is refused, so it can’t send what’s on screen anywhere.'),
+      box,
+      h('div', { class: 'bar', style: 'margin:8px 0 0' }, h('button', { class: 'primary small', onclick: save }, 'Save'),
+        h('label', { class: 'check', style: 'margin:0' }, sw, 'On'),
+        h('span', { class: 'grow' }),
+        h('button', { class: 'small linkish', onclick: () => { box.value = ''; save(); } }, 'Clear')),
+      note,
+      h('p', { class: 'hint help', style: 'margin:6px 0 0' }, 'It never applies on this page, so you can always come back and fix it. If something goes wrong elsewhere, open the app with ?nocss at the end of the address. Saved on this device only; app updates can change the class names it relies on.')));
 }
 
 const lookSelect = (k, label, opts, dflt, hint) => h('div', { class: 'field', style: 'margin-top:10px' },
@@ -347,6 +400,8 @@ export function renderLogging() {
           [['newline', 'New line (default)'], ['double', 'Press Enter twice to save'], ['single', 'Enter saves (Shift+Enter for a new line)']].map(([v, l]) =>
             h('option', { value: v, selected: (st.enterMode || (st.enterSaves ? 'single' : 'newline')) === v }, l)))),
       h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'Twice: Enter on an empty line saves, so a case can still take several lines. Ctrl+Enter (Cmd+Enter on a Mac) always saves.'),
+      h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: display().autoFocus !== false, onchange: e => applyDisplay(setDisplay({ autoFocus: e.target.checked ? null : false })) }),
+        'Open the keyboard when the Case tab opens (this device)'),
       h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !!st.weeklyDigest, onchange: e => patchLogbook({ settings: { weeklyDigest: e.target.checked } }) }),
         'Show last week’s summary on the Case tab (once a week)'),
       h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !st.hideTips, onchange: e => patchLogbook({ settings: { hideTips: !e.target.checked } }) }),

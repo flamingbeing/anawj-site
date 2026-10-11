@@ -1064,3 +1064,20 @@ html.no-header:not(.who-alert).tabs-top .tabs { padding-top: env(safe-area-inset
   html.case-inverted .log-card .box-wrap { order: 11; }
   html.case-inverted .log-card .savebar { order: 12; }
 }
+/* Colourful (Settings → Display): one colour per tab, on its tab button and the headings of its pages
+   (body[data-bar] = the bar tab the page sits under). Darker shades for contrast on white, lighter in dark mode */
+html.colourful { --t-log: #c2410c; --t-logbook: #0e7490; --t-reflect: #be123c; --t-progress: #1d4ed8; --t-more: #6d28d9; }
+html.colourful[data-theme="dark"] { --t-log: #fb923c; --t-logbook: #22d3ee; --t-reflect: #fb7185; --t-progress: #93c5fd; --t-more: #c4b5fd; }
+@media (prefers-color-scheme: dark) { html.colourful[data-theme="auto"] { --t-log: #fb923c; --t-logbook: #22d3ee; --t-reflect: #fb7185; --t-progress: #93c5fd; --t-more: #c4b5fd; } }
+html.colourful .tabs button[data-tab="log"] { --t: var(--t-log); }
+html.colourful .tabs button[data-tab="logbook"] { --t: var(--t-logbook); }
+html.colourful .tabs button[data-tab="reflect"] { --t: var(--t-reflect); }
+html.colourful .tabs button[data-tab="progress"] { --t: var(--t-progress); }
+html.colourful .tabs button[data-tab="more"] { --t: var(--t-more); }
+html.colourful .tabs button .ico { color: var(--t); }
+html.colourful .tabs button[aria-selected="true"] { color: var(--t); border-top-color: var(--t); border-bottom-color: var(--t); }
+html.colourful body[data-bar="log"] { --heading: var(--t-log); }
+html.colourful body[data-bar="logbook"] { --heading: var(--t-logbook); }
+html.colourful body[data-bar="reflect"] { --heading: var(--t-reflect); }
+html.colourful body[data-bar="progress"] { --heading: var(--t-progress); }
+html.colourful body[data-bar="more"] { --heading: var(--t-more); }

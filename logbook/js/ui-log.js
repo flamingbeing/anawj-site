@@ -362,7 +362,7 @@ function renderOne(card) {
     oninput: e => { suggestedSave = null; draft.initials = cleanInitials(e.target.value); saveDraft(); paintParsed(true); suggestSoon(); },
     onkeydown: e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); ui.textarea.focus(); } } }) : null;
   const textarea = h('textarea', {
-    class: 'details', rows: String(boxLines()), style: `min-height:calc(${boxLines()} * 1.4em + 22px)`, autofocus: firstField() === 'details', enterkeyhint: enterMode() === 'single' ? 'done' : 'enter', autocapitalize: 'sentences', autocorrect: 'off', 'aria-label': 'Case summary',
+    class: 'details', rows: String(boxLines()), style: `min-height:calc(${boxLines()} * 1.4em + 22px)`, autofocus: firstField() === 'details' && !document.documentElement.classList.contains('no-autofocus'), enterkeyhint: enterMode() === 'single' ? 'done' : 'enter', autocapitalize: 'sentences', autocorrect: 'off', 'aria-label': 'Case summary',
     placeholder: placeholderRows().map(([a, b]) => `${a}  ← ${b}`).join('\n'),
     value: draft.details,
     oninput: e => { suggestedSave = null; draft.details = e.target.value; saveDraft(); suggestSoon(); paintParsed(true); },
@@ -455,7 +455,7 @@ function renderOne(card) {
   requestAnimationFrame(() => alignPlaceholder(textarea));
   // autofocus attribute is ignored on re-render; focus after insertion (not on phones' first paint
   // when that would pop the keyboard over a fresh landing — it's what the user came to do, so do it)
-  requestAnimationFrame(() => { if (document.activeElement === document.body || !document.activeElement) focusLog(); });
+  requestAnimationFrame(() => { if (!document.documentElement.classList.contains('no-autofocus') && (document.activeElement === document.body || !document.activeElement)) focusLog(); });
 }
 
 const suggestSoon = debounce(() => paintSuggest(), 120);

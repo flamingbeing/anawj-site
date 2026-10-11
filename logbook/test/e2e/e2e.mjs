@@ -1799,6 +1799,11 @@ async function run(label, ctxOpts) {
     assert(await p.getByLabel('Case date', { exact: true }).evaluate(el => el === document.activeElement), 'device first field not retained on reload');
     assert(!(await p.locator('.parsed').innerText()).includes('Age/sex'), 'disabled age detection not retained');
     await tab('logging');
+    const keyboard = p.getByLabel('Open the keyboard when the Case tab opens (this device)', { exact: true });
+    await keyboard.uncheck();
+    await tab('log');
+    assert(await p.evaluate(() => !document.activeElement.matches('input, textarea')), 'first field overrode the keyboard-off setting');
+    await tab('logging'); await keyboard.check();
     await p.getByLabel('Autodetect age and gender', { exact: true }).check();
     await first.selectOption('details');
     await tab('log');
