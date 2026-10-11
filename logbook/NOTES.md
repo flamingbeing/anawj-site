@@ -94,8 +94,15 @@ portfolio content.
   style.css (and inline in JS) is `calc(Npx * var(--fs, 1))`; fields keep `max(16px, …)` so iPhones don't zoom on
   focus. New font sizes must follow that pattern. The old Text size (a content zoom) is carried over once as the
   zoom (`migrateDisplay`, display `v: 2`). Defaults are pixel-identical to before. Compact = density.
+- **Fonts** (Display, per device; `fonts.js`, tested): Interface font and Logging font (`--font-ui`, `--font-log`;
+  logging = `textarea.details`, `ul.cases .t`, `.refl-editor` fields; "Same as the interface" by default). Choices:
+  Open Sans (default, Google Fonts as before), the device's font, Atkinson Hyperlegible Next and Lexend (woff2 in
+  `fonts/`, latin 400/700, SIL OFL, loaded only when chosen, cached by the service worker on first use), Serif and
+  Monospace (system stacks), a font installed on the device by name (`cleanFontName`; a width test says whether it
+  was found; Safari mostly ignores user-installed fonts), or the user's own file (.woff2/.woff/.ttf/.otf ≤ 3 MB,
+  IndexedDB `apmes-logbook-fonts`, FontFace API; this device only, never synced).
 - **Display is per device** (owner: people use the logbook on different devices with different needs): compact,
-  text size, zoom, colour and the start tab live in localStorage `apmes-logbook-display` (`deviceDisplay` / `setDisplay` /
+  text size, zoom, fonts, colour and the start tab live in localStorage `apmes-logbook-display` (`deviceDisplay` / `setDisplay` /
   `adoptDisplay` in ui-settings.js), light / dark in `apmes-logbook-theme`. A device with none starts from the
   account's old `settings` values (and corrects that from the server copy in the same visit). Kept at sign-out;
   wiped by Reset demo. The settings file carries this device's display values and imports them to the device.

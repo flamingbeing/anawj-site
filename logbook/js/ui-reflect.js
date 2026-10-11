@@ -1020,7 +1020,7 @@ function editor() {
       rv.editing = null; rv.thumbs = {}; lsSet(null); hooks.render();
     } }, 'Delete') : null));
 
-  return h('div', {}, fields, legacy ? null : guide, body, actions);
+  return h('div', { class: 'refl-editor' }, fields, legacy ? null : guide, body, actions);   // .refl-editor: the logging font (Settings → Display)
 }
 
 const hasContent = r => !!(r.headingId || r.initials || r.diagnosis || r.title || r.summary
