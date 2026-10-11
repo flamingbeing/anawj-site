@@ -109,6 +109,25 @@ export function catPicker({ get, toggle, getTags = null, toggleTag = null, place
     });
     items = words.length ? all.filter(n => matches(n, words)) : all.filter(n => n.kind !== 'head');
     const shown = words.length ? items : all;
+    // Pills (Settings or the switch above the list): the same items as chips, under their headers
+    if (!words.length && settings().catView === 'pills') {
+      const rows = [];
+      let cur = null;
+      for (const n of shown) {
+        if (n.kind === 'head') { rows.push(h('li', { class: 'head', role: 'presentation' }, n.e.n)); cur = null; continue; }
+        if (!cur) { cur = h('div', { class: 'chips' }); rows.push(h('li', { class: 'pill-row', role: 'presentation' }, cur)); }
+        const on = n.kind === 'cat' ? sel.has(n.code) : tagsOn.has(n.e.k);
+        add(cur, h('span', { class: `chip ${on ? 'on' : ''} ${n.kind === 'tag' ? 'tag' : ''} ${n.depth ? 'subp' : ''}`, role: 'option', tabindex: '0', 'aria-selected': String(on),
+          ...(n.kind === 'cat' ? { 'data-code': n.code, title: catName(n.code) } : { 'data-tag': n.e.k, title: n.e.l || n.e.n }),
+          onclick: () => keepPlace(list, () => { pick(n); refresh(); }), onkeydown: ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); pick(n); refresh(); } } },
+          h('span', { class: 'nm' }, n.kind === 'cat' ? catShort(n.code) : n.e.n)));
+      }
+      fill(list, ...rows);
+      list.classList.add('pills');
+      paintHl();
+      return;
+    }
+    list.classList.remove('pills');
     fill(list, ...shown.map(n => {
       const pad = `padding-left:${12 + Math.min(n.depth, 4) * 16}px`;
       if (n.kind === 'head') return h('li', { class: 'head', role: 'presentation', style: pad }, n.e.n);
@@ -193,29 +212,43 @@ function curDate() {
   return draft.date || todayISO();
 }
 
+// One line, never wrapping: Today, then as many recent weekdays as fit ("Sat 10th", newest first), a
+// calendar for any other day, and the Case | List switch. A chosen day that doesn't fit shows on the
+// calendar chip instead.
 function paintDate() {
-  const d = curDate(), t = todayISO(), y = yesterdayISO();
+  const d = curDate(), t = todayISO();
   const dateInput = h('input', {
     type: 'date', value: d, max: t, 'aria-label': 'Case date',
     onchange: e => { draft.date = parseDate(e.target.value) || null; draft.dateAt = Date.now(); saveDraft(); paintDate(); },
   });
   const pick = iso => () => { draft.date = iso === t ? null : iso; draft.dateAt = Date.now(); saveDraft(); paintDate(); ui.textarea?.focus(); };
-  const other = d !== t && d !== y && !(() => { for (let k = 2; k <= 6; k++) { const x = new Date(); x.setDate(x.getDate() - k); if (todayISO(x) === d) return true; } return false; })();
-  // the date input sits invisibly over a chip, so the row stays one line on a phone
-  const picker = h('label', { class: `chip datepick ${other ? 'on' : ''}`, title: 'Pick a date' }, other ? fmtDate(d) : '📅 Date', dateInput);
-  dateInput.addEventListener('click', () => { try { dateInput.showPicker(); } catch { /* not supported: native tap opens it */ } });
-  // the rest of the past week by weekday ("Thu 8"), for catching up on a few days
   const week = [];
-  for (let k = 2; k <= 6; k++) { const x = new Date(); x.setDate(x.getDate() - k); week.push(todayISO(x)); }
+  for (let k = 1; k <= 6; k++) { const x = new Date(); x.setDate(x.getDate() - k); week.push(todayISO(x)); }
   const wd = iso => { const [Y, M, D] = iso.split('-').map(Number); const x = new Date(Y, M - 1, D); return x.toLocaleDateString('en-GB', { weekday: 'short' }) + ' ' + nth(D); };
+  const calText = h('span', {}, '📅');
+  // the date input sits invisibly over the chip
+  const picker = h('label', { class: 'chip datepick', title: 'Pick a date', 'aria-label': 'Pick a date' }, calText, dateInput);
+  dateInput.addEventListener('click', () => { try { dateInput.showPicker(); } catch { /* not supported: native tap opens it */ } });
+  const chips = week.map(iso => h('span', { class: `chip wk ${d === iso ? 'on' : ''}`, role: 'button', tabindex: '0', 'data-date': iso, onclick: pick(iso) }, wd(iso)));
+  const mode = h('span', { class: 'seg mode-seg', role: 'group', 'aria-label': 'One case or a list' },
+    h('button', { 'data-mode': 'one', 'aria-pressed': String(draft.mode !== 'bulk'), onclick: () => { if (draft.mode === 'bulk') setMode('one'); } }, 'Case'),
+    h('button', { 'data-mode': 'bulk', 'aria-pressed': String(draft.mode === 'bulk'), title: 'Paste a list of cases', onclick: () => { if (draft.mode !== 'bulk') setMode('bulk'); } }, 'List'));
   fill(ui.datebar,
     h('span', { class: `chip ${d === t ? 'on' : ''}`, role: 'button', tabindex: '0', onclick: pick(t) }, 'Today'),
-    h('span', { class: `chip ${d === y ? 'on' : ''}`, role: 'button', tabindex: '0', onclick: pick(y) }, 'Yesterday'),
-    ...week.map(iso => h('span', { class: `chip wk ${d === iso ? 'on' : ''}`, role: 'button', tabindex: '0', onclick: pick(iso) }, wd(iso))),
-    picker,
-    draft.mode === 'bulk'
-      ? h('button', { class: 'small linkish', 'data-mode': 'one', onclick: () => setMode('one') }, 'One case')
-      : h('button', { class: 'small linkish', 'data-mode': 'bulk', onclick: () => setMode('bulk'), title: 'Paste a list of cases' }, 'Paste list'));
+    ...chips, picker, h('span', { class: 'grow' }), mode);
+  const fit = () => {
+    const bar = ui && ui.datebar;
+    if (!bar || !bar.isConnected) return;
+    chips.forEach(c => { c.hidden = false; });
+    for (let i = chips.length - 1; i >= 0 && bar.scrollWidth > bar.clientWidth + 1; i--) chips[i].hidden = true;
+    const shownSel = d === t || chips.some(c => !c.hidden && c.dataset.date === d);
+    picker.classList.toggle('on', !shownSel);
+    calText.textContent = shownSel ? '📅' : '📅 ' + fmtDate(d).replace(/ \d{4}$/, '');
+    if (!shownSel) for (let i = chips.length - 1; i >= 0 && bar.scrollWidth > bar.clientWidth + 1; i--) chips[i].hidden = true;
+  };
+  requestAnimationFrame(fit);
+  if (!ui.dateRO && 'ResizeObserver' in window) { ui.dateRO = new ResizeObserver(() => ui.refit && ui.refit()); ui.dateRO.observe(ui.datebar); }
+  ui.refit = fit;
 }
 
 function renderOne(card) {
@@ -237,7 +270,6 @@ function renderOne(card) {
   const selected = h('div', { class: 'chips selected' });
   const tip = h('div');
   const templates = h('div', { class: 'chips' });
-  const top = h('div', { class: 'chips' });
   const picker = catPicker({
     get: () => draft.cats,
     toggle: code => { draft.cats = toggleCat(draft.cats, code); saveDraft(); paintSel(); },
@@ -262,10 +294,12 @@ function renderOne(card) {
     h('div', { class: 'chiplabel', id: 'suggLabel' }, 'Suggested'), sugg,
     stillNeeded(),
     h('div', { class: 'chiplabel' }, 'Quick picks'), templates,
-    h('div', { class: 'chiplabel', id: 'topLabel' }, 'Your top categories'), top,
-    h('div', { class: 'chiplabel' }, 'All categories'), picker.el,
+    h('div', { class: 'bar cat-head' }, h('div', { class: 'chiplabel grow' }, 'All categories'),
+      h('span', { class: 'seg cat-view', role: 'group', 'aria-label': 'Show categories as' },
+        ['list', 'pills'].map(v => h('button', { class: 'small', 'aria-pressed': String((settings().catView || 'list') === v), onclick: () => { if ((settings().catView || 'list') === v) return; patchLogbook({ settings: { catView: v } }); hooks.render(); } }, v === 'list' ? 'List' : 'Pills')))),
+    picker.el,
     savebar);
-  Object.assign(ui, { textarea, parsed, sugg, selected, selExtra, tip, templates, top, picker });
+  Object.assign(ui, { textarea, parsed, sugg, selected, selExtra, tip, templates, picker });
   paintSuggest(); paintSel(); paintQuick(); paintParsed(false);
   // autofocus attribute is ignored on re-render; focus after insertion (not on phones' first paint
   // when that would pop the keyboard over a fresh landing — it's what the user came to do, so do it)
@@ -327,17 +361,8 @@ function paintSel() {
   fill(ui.tip, ...tips.map(t => h('p', { class: 'tip' }, t)));
   paintSuggest();
   ui.picker.refresh();
-  paintTop();
 }
 
-function paintTop() {
-  const top = Object.entries(S.counts).filter(([c]) => BY_CODE[c] && !BY_CODE[c].retired && !draft.cats.includes(c))
-    .sort((a, b) => b[1] - a[1]).slice(0, 8).map(([c]) => c);
-  ui.card.querySelector('#topLabel').hidden = !top.length;
-  fill(ui.top, ...top.map(code => catChip(code, {
-    onclick: () => keepPlace(ui.top, () => { draft.cats = addCat(draft.cats, code); saveDraft(); paintSel(); }),
-  })));
-}
 
 
 function applyTemplate(t) {
@@ -434,7 +459,7 @@ async function save({ another }) {
 // Case list changed (live listener): refresh counts and quick picks without touching the textarea.
 export function logCasesChanged() {
   if (!ui || !ui.card.isConnected) return;
-  if (ui.picker) { ui.picker.refresh(); paintTop(); paintQuick(); }
+  if (ui.picker) { ui.picker.refresh(); paintQuick(); }
 }
 
 // ---------- paste a list ----------
