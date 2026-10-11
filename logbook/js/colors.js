@@ -84,10 +84,19 @@ export function schemeCss(accent) {
 export function tabSchemeCss(accent, scope) {
   const c = cleanAccent(accent) || DEFAULT_ACCENT;
   const L = lightPalette(c), D = darkPalette(c), O = darkPalette(c, true);
+  for (const p of [L, D, O]) for (const k of ['s1', 's2', 's3', 's4']) delete p[k];   // the stripe at the top stays as it is
   return [
     `html.colour-all ${scope} { ${decl(L)} }`,
     `html.colour-all[data-theme="dark"] ${scope} { ${decl(D)} }`,
     `html.colour-all[data-theme="dark"][data-oled] ${scope} { ${decl(O)} }`,
     `@media (prefers-color-scheme: dark) { html.colour-all[data-theme="auto"] ${scope} { ${decl(D)} } }`,
   ].join('\n');
+}
+
+// The --t-* tab colours for "tabs and headings": each tab's accent as the light and dark palettes work it out
+export function tabVarsCss(colours) {
+  const v = pal => Object.entries(colours).map(([t, c]) => `--t-${t}: ${pal(c).accent};`).join(' ');
+  const dark = v(c => darkPalette(c));
+  return [`html.colourful { ${v(c => lightPalette(c))} }`, `html.colourful[data-theme="dark"] { ${dark} }`,
+    `@media (prefers-color-scheme: dark) { html.colourful[data-theme="auto"] { ${dark} } }`].join('\n');
 }

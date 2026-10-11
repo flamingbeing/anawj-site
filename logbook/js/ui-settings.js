@@ -7,7 +7,7 @@ import { S, h, toast, modal, confirmBox, cloud, catChip, catName, catShort, PICK
 import { MAX_TAGS, tagLinks as tagLinksIn, learnShorthand, cleanShorthand, shorthandOf, DEFAULT_SHORTHAND, cleanTagSet, defaultTagSet, tagTree, flatTree, moveTag, reparentTag, removeTag, newKey, tagSetToCsv, tagSetFromCsv, dropTag, canPlace } from './tags.js';
 import { pickDialog } from './ui-log.js';
 import { OPERATOR_HELP } from './search-ops.js';
-import { PRESETS, DEFAULT_ACCENT, cleanAccent, schemeCss, lightPalette, tabSchemeCss } from './colors.js';
+import { PRESETS, DEFAULT_ACCENT, cleanAccent, schemeCss, lightPalette, tabSchemeCss, tabVarsCss } from './colors.js';
 import { cleanMarkdown, storedMarkdown, mdCase, mdDay, reflectionPath, reflectionNote, CASE_FILLINS, REFL_FILLINS, FM_FIELDS } from './markdown.js';
 import { checkCss } from './custom-css.js';
 import { FONTS, applyFonts, fontStack, fontAvailable, cleanFontName, logChoice, saveUserFont, getUserFont, deleteUserFont } from './fonts.js';
@@ -97,7 +97,7 @@ export function residencyCard() {
 // the light / dark choice. The first time a device opens the app it starts from what the account had (these used to
 // follow the account), so nobody's look changes. Kept at sign-out: they are the device's, and nothing private.
 const DISPLAY_KEY = 'apmes-logbook-display';
-export const DISPLAY_KEYS = ['compact', 'textSize', 'zoom', 'accent', 'startTab', 'fontUi', 'fontUiName', 'fontLog', 'fontLogName', 'lineWidth', 'lineHeight', 'contrast', 'motion', 'tabIcons', 'tabBar', 'hideHeader', 'caseInverted', 'colourful', 'customCss', 'customCssOn', 'autoFocus'];
+export const DISPLAY_KEYS = ['compact', 'textSize', 'zoom', 'accent', 'startTab', 'fontUi', 'fontUiName', 'fontLog', 'fontLogName', 'lineWidth', 'lineHeight', 'contrast', 'motion', 'tabIcons', 'tabBar', 'hideHeader', 'caseInverted', 'colourful', 'customCss', 'customCssOn', 'autoFocus', 'appTitle'];
 export function deviceDisplay() {
   try { const d = JSON.parse(localStorage.getItem(DISPLAY_KEY) || 'null'); return d && typeof d === 'object' && !Array.isArray(d) ? d : null; } catch { return null; }
 }
@@ -145,16 +145,27 @@ export function applyLook(d = {}) {
   c.toggle('case-inverted', !!d.caseInverted);
   const col = d.colourful === true ? 'tabs' : d.colourful;   // (a plain on/off before "everything in the tab")
   c.toggle('colourful', col === 'tabs' || col === 'all'); c.toggle('colour-all', col === 'all');
-  if (col === 'all' && !document.getElementById('tab-colours')) {
-    const el = document.createElement('style'); el.id = 'tab-colours';
-    el.textContent = Object.entries(TAB_COLOURS).map(([t, hex]) => tabSchemeCss(hex, `body[data-bar="${t}"]`)).join('\n');
-    document.head.append(el);
+  if (col === 'tabs' || col === 'all') {
+    // with the default colour the tabs follow the NUH stripe at the top; with another colour, the brighter set
+    const set = (cleanAccent(d.accent) || DEFAULT_ACCENT) === DEFAULT_ACCENT ? NUH_TAB_COLOURS : TAB_COLOURS;
+    const css = tabVarsCss(set) + '\n' + (col === 'all' ? Object.entries(set).map(([t, hex]) => tabSchemeCss(hex, `body[data-bar="${t}"]`)).join('\n') : '');
+    let el = document.getElementById('tab-colours');
+    if (!el) { el = document.createElement('style'); el.id = 'tab-colours'; document.head.append(el); }
+    if (el.textContent !== css) el.textContent = css;
   }
-  c.toggle('no-autofocus', d.autoFocus === false);   // ui-log.js: don't open the keyboard on the Case tab
+  c.toggle('no-autofocus', d.autoFocus === false);
+  // the name in the header and the browser tab (plain text, at most 40 characters)
+  const title = cleanTitle(d.appTitle) || APP_TITLE;
+  const h1 = document.querySelector('.top h1'); if (h1 && h1.textContent !== title) h1.textContent = title;
+  if (document.title !== title) document.title = title;   // ui-log.js: don't open the keyboard on the Case tab
   applyCustomCss(d);
 }
 // one colour per tab (Colourful); style.css has the same shades for the tabs-and-headings version
 export const TAB_COLOURS = { log: '#c2410c', logbook: '#0e7490', reflect: '#be123c', progress: '#1d4ed8', more: '#6d28d9' };
+// the NUH stripe (orange, red, cyan, navy) for the default colour; More keeps the app's navy
+export const NUH_TAB_COLOURS = { log: '#e57200', logbook: '#e4002b', reflect: '#00a9e0', progress: '#002f6c', more: '#002f6c' };
+export const APP_TITLE = 'APMES Logbook';
+export const cleanTitle = s => String(s || '').replace(/[\u0000-\u001f]/g, '').replace(/\s+/g, ' ').trim().slice(0, 40);
 export const COLOURFUL = [['off', 'Off (default)'], ['tabs', 'One colour per tab: the tabs and headings'], ['all', 'One colour per tab: everything in the tab']];
 // Custom CSS (custom-css.js): only CSS that passes checkCss, never on the Display page, and off with ?nocss
 export function applyCustomCss(d = display()) {
@@ -173,6 +184,10 @@ export function renderDisplay() {
   return h('div', {},
     h('section', { class: 'card' },
       h('h2', {}, 'Display'),
+      h('label', { class: 'field' }, 'Name in the header',
+        h('input', { type: 'text', value: st.appTitle || '', placeholder: APP_TITLE, maxlength: '40', 'aria-label': 'Name in the header',
+          onchange: e => { const t = cleanTitle(e.target.value); e.target.value = t; applyDisplay(setDisplay({ appTitle: t && t !== APP_TITLE ? t : null })); } })),
+      h('p', { class: 'hint help', style: 'margin:2px 0 8px' }, 'Also the name in the browser tab. Leave it empty for APMES Logbook.'),
       h('label', { class: 'check' }, h('input', { type: 'checkbox', role: 'switch', checked: !!st.compact, onchange: e => {
         applyCompact(e.target.checked); setDisplay({ compact: e.target.checked });
       } }), 'Compact mode'),
@@ -194,7 +209,7 @@ export function renderDisplay() {
       h('div', { class: 'field', style: 'margin-top:10px' }, h('label', { class: 'field', style: 'margin:0' }, 'Colourful',
         h('select', { 'aria-label': 'Colourful', onchange: e => applyDisplay(setDisplay({ colourful: e.target.value === 'off' ? null : e.target.value })) },
           COLOURFUL.map(([v, l]) => h('option', { value: v, selected: (st.colourful === true ? 'tabs' : st.colourful || 'off') === v }, l)))),
-        h('span', { class: 'hint help' }, 'Case orange, Logbook teal, Reflections red, Analytics blue, More purple. “Everything” also colours the buttons, chips and links on that tab’s pages, in shades that stay easy to read.')),
+        h('span', { class: 'hint help' }, 'With the default colour, the tabs follow the NUH stripe at the top: Case orange, Logbook red, Reflections cyan, Analytics navy. With another colour: orange, teal, red, blue, purple. “Everything” also colours the buttons, chips and links on that tab’s pages, in shades that stay easy to read.')),
       lookSelect('tabBar', 'Tab bar', TAB_BARS, 'auto'),
       h('label', { class: 'check', style: 'margin-top:10px' }, h('input', { type: 'checkbox', checked: !!st.caseInverted, onchange: e => applyDisplay(setDisplay({ caseInverted: e.target.checked })) }), 'Case tab upside down (phones)'),
       h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'The case box sits at the bottom, next to the keyboard and Save, with suggestions just above it; scroll up for all the tags. Like a chat app.'),
@@ -287,7 +302,7 @@ const lookSelect = (k, label, opts, dflt, hint) => h('div', { class: 'field', st
 function accentPicker() {
   const cur = () => cleanAccent(display().accent) || DEFAULT_ACCENT;
   const wrap = h('div', { class: 'accent-pick', role: 'group', 'aria-label': 'Colour' });
-  const pick = c => { applyAccent(c); setDisplay({ accent: c === DEFAULT_ACCENT ? null : c }); paint(); };
+  const pick = c => { applyDisplay(setDisplay({ accent: c === DEFAULT_ACCENT ? null : c })); paint(); };   // (also redoes the Colourful shades)
   const paint = () => {
     const c = cur(), custom = !PRESETS.some(([x]) => x === c);
     const input = h('input', { type: 'color', value: c, 'aria-label': 'Any colour', oninput: e => applyAccent(e.target.value), onchange: e => pick(e.target.value) });
