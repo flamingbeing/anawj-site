@@ -1754,6 +1754,52 @@ async function run(label, ctxOpts) {
     await ta.fill('');
     await configure('newline');
   });
+  await step('navigation: demo Account, browser Back/Forward and app Back agree', async () => {
+    const q = await ctx.newPage();
+    try {
+      await q.goto(BASE);
+      await q.getByRole('link', { name: 'Try the demo', exact: true }).click();
+      await q.waitForSelector('textarea.details');
+      await q.locator('button[data-tab=more]').click();
+      await q.locator('a[data-go=account]').click();
+      await q.waitForSelector('.acct');
+      await q.goBack(); await q.waitForURL(/\?demo#more$/);
+      assert(await q.locator('a[data-go=account]').count() === 1, 'Back left the demo instead of returning to More');
+      await q.goBack(); await q.waitForURL(/\?demo#log$/);
+      await q.waitForSelector('textarea.details');
+      await q.goForward(); await q.waitForURL(/#more$/);
+      await q.locator('a[data-go=settings]').click();
+      await q.locator('a[data-go=display]').click();
+      await q.waitForURL(/#display$/);
+      const length = await q.evaluate(() => history.length);
+      await q.locator('.back-row a', { hasText: 'Settings' }).click();
+      await q.waitForURL(/#settings$/);
+      assert(await q.evaluate(() => history.length) === length, 'app Back added a loop');
+      await q.goBack(); await q.waitForURL(/#more$/);
+      await q.goForward(); await q.waitForURL(/#settings$/);
+      await q.goForward(); await q.waitForURL(/#display$/);
+      await q.waitForSelector('.back-row a');
+      await q.screenshot({ path: DIR + `navigation-${label}.png`, fullPage: true });
+      // A root screen does not trap the browser in the app.
+      await q.goBack(); await q.goBack(); await q.goBack();
+      await q.waitForURL(/\?demo#log$/);
+      await q.goBack();
+      await q.getByRole('link', { name: 'Try the demo', exact: true }).waitFor();
+    } finally { await q.close(); }
+  });
+  await step('navigation: direct Display link and reload retain a parent trail', async () => {
+    const q = await ctx.newPage();
+    try {
+      await q.goto(BASE + '?demo#display');
+      await q.waitForSelector('.back-row a');
+      const length = await q.evaluate(() => history.length);
+      await q.reload(); await q.waitForSelector('.back-row a');
+      assert(await q.evaluate(() => history.length) === length, 'reload duplicated the parent trail');
+      await q.goBack(); await q.waitForURL(/\?demo#settings$/);
+      await q.locator('.back-row a').click(); await q.waitForURL(/\?demo#more$/);
+      assert(await q.locator('a[data-go=settings]').count() === 1, 'deep-link fallback did not reach More');
+    } finally { await q.close(); }
+  });
   await step('demo badge: Reset demo wipes added data and reseeds', async () => {
     await p.goto(BASE + '?demo#log', { waitUntil: 'networkidle' });
     await p.reload({ waitUntil: 'networkidle' });

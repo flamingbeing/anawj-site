@@ -30,6 +30,12 @@ portfolio content.
   Reflection progress credits at most one complete JR reflection per heading (two for Paediatrics).
   Extra JR reflections remain saved, with a note explaining why they do not count. Heading bars,
   overall progress and shared summary counts use this same cap. Required JR cases and sub-types remain reminders.
+- **Back navigation** (`navigation.js`): tab buttons, menu items and screen links add browser history
+  consistently. Browser Back/Forward restore screens; a screen's Back link retraces the same history
+  without adding a loop. Direct child-page links get a finite parent trail (Display → Settings → More);
+  reload preserves it. The root screen can leave the app normally. The demo query stays on every screen.
+  Pending Account/profile edits flush and Admin editing state clears on all screen transitions,
+  including browser Back.
 - More → **Export / Import** (`#data`): **Export** = the Word portfolio only (it holds everything APMES needs);
   **Import** = reflections from Word (`#reflimport`) and the logbook from Excel/CSV; **Backup** = backup file and
   restore, Excel spreadsheet. Keep that wording. The Logbook and Reflections tabs have no More tools cards.
