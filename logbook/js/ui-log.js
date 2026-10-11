@@ -155,8 +155,6 @@ function renderOne(card) {
     placeholder: 'Initials + case, e.g. “AB 72M lap chole GA” or “CD LSCS spinal”',
     value: draft.details,
     oninput: e => { draft.details = e.target.value; saveDraft(); suggestSoon(); },
-    // on a phone the keyboard takes half the screen: bring the box to the top so the chips show below it
-    onpointerup: e => { if (e.pointerType === 'touch') setTimeout(() => e.target.scrollIntoView({ block: 'start', behavior: 'smooth' }), 300); },
     // Enter is a new line (a case can take several lines); Ctrl+Enter / Cmd+Enter saves
     onkeydown: e => {
       if (e.key !== 'Enter' || e.isComposing || !(e.ctrlKey || e.metaKey)) return;

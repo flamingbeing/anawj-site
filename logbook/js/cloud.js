@@ -166,11 +166,15 @@ export async function myResident(email) {
 
 // ---- the user's logbook ----
 
-export async function loadLogbook(email) {
+// { cached: true }: this device's offline copy when it has one (no wait for the server), else the server.
+export async function loadLogbook(email, { cached = false } = {}) {
   if (demo) return D.loadLogbook(email);
   email = lc(email);
   const { db, F, auth } = await sdk();
   const ref = F.doc(db, 'logbooks', email);
+  if (cached) {
+    try { const c = await F.getDocFromCache(ref); if (c.exists()) return { ...defaultLogbook(email), ...c.data() }; } catch { /* not on this device yet */ }
+  }
   let snap;
   try {
     snap = await F.getDoc(ref);

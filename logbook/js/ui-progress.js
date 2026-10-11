@@ -18,10 +18,7 @@ export function renderProgress() {
   const yr = rYear();
   const rows = progress(S.counts, yr);
   const tally = s => rows.filter(r => r.status === s).length;
-  const yearCtl = S.resident
-    ? h('span', { class: 'big' }, R_YEARS[yr - 1])
-    : h('select', { 'aria-label': 'Residency year', onchange: e => { patchLogbook({ settings: { rYear: Number(e.target.value) } }).then(() => hooks.render()); } },
-      R_YEARS.map((r, i) => h('option', { value: String(i + 1), selected: i + 1 === yr }, r)));
+  const yearCtl = h('span', { class: 'big' }, R_YEARS[yr - 1]);
 
   const head = h('section', { class: 'card' },
     h('div', { class: 'ry' },
@@ -31,7 +28,7 @@ export function renderProgress() {
     h('p', { class: 'hint', style: 'margin-top:8px' },
       `${tally('done')} done · ${tally('late')} behind · ${tally('due')} due this year · ${tally('ontrack')} on track. `,
       'Targets are cumulative: every case counts towards the R3 and R5 numbers whenever it was done.',
-      S.resident ? '' : ' Not on the programme list, so pick your year here.'),
+      S.resident ? '' : [' Not on the programme list, so your year is set in ', h('a', { href: '#settings' }, 'Settings'), '.']),
     legend(),
     h('div', { class: 'bar', style: 'margin:12px 0 0' },
       h('div', { class: 'seg' },

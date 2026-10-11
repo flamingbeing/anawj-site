@@ -47,6 +47,14 @@ export function renderSettings() {
         h('select', { onchange: e => { applyTheme(e.target.value); patchLogbook({ settings: { theme: e.target.value } }); } },
           [['light', 'Light'], ['dark', 'Dark'], ['auto', 'Auto (match the phone)']].map(([v, l]) => h('option', { value: v, selected: (st.theme || 'light') === v }, l))))),
 
+    // year for targets: programme residents get it from the list; anyone else sets it here
+    S.resident ? null : h('section', { class: 'card' },
+      h('h2', {}, 'Residency year'),
+      h('label', { class: 'field' }, 'Year used for the targets on Progress',
+        h('select', { onchange: e => patchLogbook({ settings: { rYear: Number(e.target.value) } }).then(() => toast('Saved')) },
+          R_YEARS.map((r, i) => h('option', { value: String(i + 1), selected: i + 1 === rYear() }, r)))),
+      h('p', { class: 'hint', style: 'margin:4px 0 0' }, 'Programme residents get their year from the programme list automatically. If you are an APMES resident, ask the programme admins to add your email.')),
+
     h('section', { class: 'card' },
       h('h2', {}, 'Logging'),
       h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: st.suggestions !== false, onchange: e => patchLogbook({ settings: { suggestions: e.target.checked } }) }),

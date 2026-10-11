@@ -122,13 +122,14 @@ function flushRender() {
 
 // ---------- header ----------
 
+// The header is always one line (title left, name right), so it never changes height between
+// loading, signed out and signed in. Demo / offline show as a small tag beside the name.
 function paintWho() {
-  if (!S.user) { fill(whoEl); subEl.hidden = false; subEl.textContent = 'Case log for APMES anaesthesia residents'; return; }
-  // signed in: no case count (keeps the header compact); only flag demo / offline, and hide the line otherwise
-  subEl.textContent = [cloud.demo ? 'demo' : '', navigator.onLine ? '' : 'offline'].filter(Boolean).join(' · ');
-  subEl.hidden = !subEl.textContent;
+  const flags = [cloud.demo ? 'demo' : '', navigator.onLine ? '' : 'offline'].filter(Boolean).join(' · ');
+  subEl.textContent = flags;   // kept (hidden) for tests
+  if (!S.user) { fill(whoEl, flags ? h('span', { class: 'who-flag' }, flags) : null); return; }
   document.body.dataset.cases = String(S.cases.length);   // not shown; read by tests
-  fill(whoEl, h('span', { class: 'email', title: S.user.email }, S.user.name || S.user.email));
+  fill(whoEl, flags ? h('span', { class: 'who-flag' }, flags) : null, h('span', { class: 'email', title: S.user.email }, S.user.name || S.user.email));
 }
 window.addEventListener('online', paintWho);
 window.addEventListener('offline', paintWho);
@@ -140,6 +141,7 @@ function renderLanding(error) {
   const demoHref = location.pathname + '?demo';
   fill(app, h('div', { class: 'landing' },
     h('img', { src: 'icons/icon-192.png', alt: '' }),
+    h('p', { class: 'muted', style: 'margin:0' }, 'Case log for APMES anaesthesia residents'),
     h('h2', {}, 'Log a case in seconds'),
     h('p', {}, 'Type the initials and case, tap the suggested categories, save. Your progress against the APMES targets updates as you go.'),
     h('ul', {},
@@ -162,6 +164,34 @@ async function signIn() {
 // ---------- signed in ----------
 
 let unwatch = null, unwatchRefl = null, signedInOnce = false;
+
+// Last-seen admin / PD / programme entry / shared templates per account, so the next start needn't wait
+// for the server. Wiped at sign-out (a shared device keeps nothing of the last person).
+const WHO_KEY = 'apmes-logbook-who:';
+const whoKey = email => WHO_KEY + (cloud.demo ? 'demo:' : '') + String(email || '').toLowerCase();
+function readWho(email) { try { return JSON.parse(localStorage.getItem(whoKey(email)) || 'null'); } catch { return null; } }
+function saveWho(email, w) { try { localStorage.setItem(whoKey(email), JSON.stringify(w)); } catch { /* storage blocked */ } }
+function forgetWho() { try { for (const k of Object.keys(localStorage)) if (k.startsWith(WHO_KEY)) localStorage.removeItem(k); } catch { /* ignore */ } }
+// the server's answers after a fast start: update what changed without disturbing someone typing
+function refreshWho(user, who, firstLogbook) {
+  who().then(async w => {
+    if (S.user !== user) return;
+    saveWho(user.email, w);
+    const before = JSON.stringify([S.admin, S.pd, S.resident, S.sharedTemplates]);
+    Object.assign(S, { admin: !!w.admin, pd: !!w.pd, resident: w.resident || null, sharedTemplates: w.sharedTemplates || [] });
+    // the logbook (templates, settings) from the server, unless it was changed here meanwhile
+    const lb = await cloud.loadLogbook(user.email).catch(() => null);
+    if (S.user !== user) return;
+    let lbChanged = false;
+    if (lb && S.logbook === firstLogbook && JSON.stringify(lb) !== JSON.stringify(firstLogbook)) {
+      S.logbook = lb; lbChanged = true;
+      applyCompact(lb.settings && lb.settings.compact); applyTheme(lb.settings && lb.settings.theme);
+    }
+    if (!lbChanged && before === JSON.stringify([S.admin, S.pd, S.resident, S.sharedTemplates])) return;
+    const typing = document.activeElement && /^(TEXTAREA|INPUT|SELECT)$/.test(document.activeElement.tagName);
+    if (!typing && !document.querySelector('dialog[open]')) render(); else paintTabs();
+  }).catch(err => console.warn('Refresh failed', err));
+}
 // set before reloading for a closed Firestore client, so a persistent failure can't loop
 function reloadFlag(v) {
   try { if (v === undefined) return sessionStorage.getItem('reloadedAfterTerminate'); if (v) sessionStorage.setItem('reloadedAfterTerminate', v); else sessionStorage.removeItem('reloadedAfterTerminate'); }
@@ -174,7 +204,7 @@ async function onUser(user) {
   S.user = user;
   if (!user) {
     Object.assign(S, { admin: false, pd: false, resident: null, logbook: null, cases: [], reflections: [], counts: {}, casesLoaded: false, casesSynced: false, sharedTemplates: [] });
-    if (signedInOnce) { clearDrafts(); resetCaches(); applyCompact(false); applyTheme('light'); }   // a shared device starts plain for the next person
+    if (signedInOnce) { clearDrafts(); resetCaches(); forgetWho(); applyCompact(false); applyTheme('light'); }   // a shared device starts plain for the next person
     paintWho();
     renderLanding();
     return;
@@ -182,19 +212,26 @@ async function onUser(user) {
   signedInOnce = true;
   paintWho();
   fill(app, h('p', { class: 'empty' }, 'Loading your logbook…'));
+  // Fast start: the Log screen opens from this device's copies (the logbook from the offline cache;
+  // admin / PD / programme entry / shared templates as last seen, in localStorage) and the server's
+  // answers replace them in the background. Only a first sign-in on a device waits for the server.
+  const who = () => Promise.all([
+    cloud.isAdmin(user.email).catch(() => false),
+    cloud.myResident(user.email).catch(() => null),
+    cloud.listSharedTemplates().catch(() => []),
+    cloud.isPD(user.email).catch(() => false),
+  ]).then(([admin, resident, shared, pd]) => ({ admin, resident, sharedTemplates: shared || [], pd }));
   try {
-    const [admin, resident, logbook, shared, pd] = await Promise.all([
-      cloud.isAdmin(user.email).catch(() => false),
-      cloud.myResident(user.email).catch(() => null),
-      cloud.loadLogbook(user.email),
-      cloud.listSharedTemplates().catch(() => []),
-      cloud.isPD(user.email).catch(() => false),
-    ]);
+    const known = readWho(user.email);
+    const [logbook, w] = await Promise.all([cloud.loadLogbook(user.email, { cached: true }), known ? Promise.resolve(known) : who()]);
     if (S.user !== user) return; // signed out meanwhile
     reloadFlag('');
-    Object.assign(S, { admin, pd, resident, logbook, sharedTemplates: shared || [] });
+    Object.assign(S, { admin: !!w.admin, pd: !!w.pd, resident: w.resident || null, logbook, sharedTemplates: w.sharedTemplates || [] });
+    if (!known) saveWho(user.email, w);
+    else refreshWho(user, who, logbook);
     applyCompact(logbook.settings && logbook.settings.compact);   // per-user display settings
     applyTheme(logbook.settings && logbook.settings.theme);
+    const resident = S.resident;
     if (!logbook.name && (resident?.name || user.name)) S.logbook.name = resident?.name || user.name;
     // a programme resident's logbook remembers their rid (used by admins and the rules)
     if (resident && logbook.rid !== resident.rid) cloud.saveLogbook(user.email, { rid: resident.rid }).catch(() => {});
@@ -287,7 +324,7 @@ if (cloud.demo) {
   fill(banner, h('span', {}, 'Demo: made-up data, stored only in this browser.'),
     h('button', { class: 'small', onclick: async () => {
       if (!(await confirmBox('Reset demo', 'Delete everything you added in the demo (cases, reflections, images, settings) and start again with the made-up data? The uploaded portfolio template is kept.', 'Reset', true))) return;
-      clearDrafts(); resetCaches(); applyCompact(false); applyTheme('light');
+      clearDrafts(); resetCaches(); forgetWho(); applyCompact(false); applyTheme('light');
       cloud.resetDemo();
       location.reload();
     } }, 'Reset demo'),
