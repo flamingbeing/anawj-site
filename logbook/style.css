@@ -867,3 +867,4 @@ details.an-sec[open] > summary .an-t::after { content: ' ⌄'; }
 .lb-daybtns { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; max-width: 100%; }
 .lb-daybtns > button { flex: 1 1 auto; }
 .lb-daybtns > button { white-space: nowrap; }
+.fmt-preview { margin: 0; padding: 8px 10px; border-radius: 8px; background: var(--row-alt); border: 1px solid var(--line); white-space: pre-wrap; word-break: break-word; font: 14px/1.45 ui-monospace, Menlo, Consolas, monospace; }

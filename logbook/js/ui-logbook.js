@@ -12,7 +12,7 @@ import { flatTree, tagTree } from './tags.js';
 import { editCaseDialog, logOnDate } from './ui-log.js';
 import { reflectOnCase } from './ui-reflect.js';
 import { moveToBin } from './bin.js';
-import { shareText, copyText, caseText as shareCaseText, dayText, dayMarkdown } from './share.js';
+import { shareText, copyText, caseText as shareCaseText, dayText } from './share.js';
 
 // has: tags a case must all have; not: tags it must have none of ('c:16' or a personal tag key); from/to: dates
 const FRESH = () => ({ q: '', has: [], not: [], from: '', to: '', flag: '', mode: null, limit: 150, month: null, day: null });
@@ -335,7 +335,7 @@ function calendarView(rows, flagsOf, repaint) {
           // log on this day: the Log page opens with the date already picked
           view.day <= today ? h('button', { class: 'small primary', onclick: () => logOnDate(view.day) }, '+ Log a case') : null,
           dayCases.length ? h('button', { class: 'small', onclick: () => shareText(dayText(view.day)) }, 'Share day') : null,
-          dayCases.length ? h('button', { class: 'small', title: 'Copy the day as Markdown (for notes apps)', 'aria-label': 'Copy the day as Markdown', onclick: () => copyText(dayMarkdown(view.day), 'Markdown copied: paste into your notebook') }, 'Copy') : null)),
+          dayCases.length ? h('button', { class: 'small', title: 'Copy this day (format in Settings → Copy & share)', 'aria-label': 'Copy this day', onclick: () => copyText(dayText(view.day), 'Day copied: paste it into your notes') }, 'Copy') : null)),
       dayCases.length ? h('ul', { class: 'cases' }, dayCases.map(c => caseRow(c, flagsOf))) : h('p', { class: 'empty' }, 'No cases on this day.'))
       : h('p', { class: 'hint', style: 'margin-top:10px' }, 'Tap a day to see its cases.'),
     undated.length ? h('details', { style: 'margin-top:12px' },

@@ -6,6 +6,7 @@ import { sortCodes, uid, academicYear, withParents } from './engine.js';
 import { S, h, toast, modal, confirmBox, cloud, catChip, catName, catShort, PICKER_ORDER, pickerOrder, settings, patchLogbook, displayName, hooks, rYear, myYearName, fill, categoryNames, setCategoryNames, catPills, tagSet, download, fileButton, todayISO, saveMany } from './ui-core.js';
 import { MAX_TAGS, tagLinks as tagLinksIn, learnShorthand, cleanShorthand, shorthandOf, DEFAULT_SHORTHAND, cleanTagSet, defaultTagSet, tagTree, flatTree, moveTag, reparentTag, removeTag, newKey, tagSetToCsv, tagSetFromCsv, dropTag, canPlace } from './tags.js';
 import { pickDialog } from './ui-log.js';
+import { DEFAULT_FORMAT, PLACEHOLDERS, cleanFormat, formatCase, formatDay } from './share-format.js';
 import { PHOTO_BUDGET_KB, PHOTO_NOTE, photoUsageKb, fmtMb } from './reflections.js';
 
 // Compact mode (S.logbook.settings.compact): body.compact (style.css, "compact mode" block). Cached in
@@ -71,7 +72,49 @@ export function renderDisplay() {
       h('label', { class: 'field', style: 'margin-top:10px' }, 'Theme',
         h('select', { onchange: e => applyTheme(e.target.value) },
           [['light', 'Light'], ['dark', 'Dark'], ['auto', 'Auto (match the phone)']].map(([v, l]) => h('option', { value: v, selected: cachedTheme() === v }, l)))),
-      h('p', { class: 'hint', style: 'margin:2px 0 0' }, 'Theme is saved on this device.')));
+      h('p', { class: 'hint', style: 'margin:2px 0 0' }, 'Theme is saved on this device.'),
+      // the tab the app opens on (a link or shortcut to a tab still opens that tab)
+      h('label', { class: 'field', style: 'margin-top:10px' }, 'Open the app on',
+        h('select', { onchange: e => patchLogbook({ settings: { startTab: e.target.value } }).then(() => toast('Saved')) },
+          START_TABS.map(([v, l]) => h('option', { value: v, selected: (st.startTab || 'log') === v }, l))))));
+}
+export const START_TABS = [['log', 'Log'], ['logbook', 'Logbook'], ['reflect', 'Reflections'], ['progress', 'Analytics']];
+
+// ---------- Copy & share format (Logbook: Copy on a case or a day, Share day) ----------
+
+// a made-up day to preview with (never real cases: the page may be shown to others)
+const SAMPLE = [{ date: '2026-10-10', initials: 'AB', details: '34F LSCS under spinal' }, { date: '2026-10-10', initials: 'CD', details: '72M TKR, adductor canal block' }];
+export function renderShareFormat() {
+  const f = cleanFormat(settings().shareFormat);
+  const field = (k, label, rows) => h('textarea', { rows, 'aria-label': label, 'data-k': k, spellcheck: 'false', style: 'font-family:ui-monospace,Menlo,Consolas,monospace;font-size:15px', oninput: () => paint() }, f[k]);
+  const head = field('dayHead', 'Day heading', 1), each = field('dayCase', 'Each case in a day', 3), one = field('oneCase', 'One case', 3);
+  const dayOut = h('pre', { class: 'fmt-preview' }), oneOut = h('pre', { class: 'fmt-preview' });
+  const now = () => ({ dayHead: head.value, dayCase: each.value, oneCase: one.value });
+  const paint = () => { dayOut.textContent = formatDay(SAMPLE[0].date, SAMPLE, now()); oneOut.textContent = formatCase(SAMPLE[0], now()); };
+  const save = async () => { await patchLogbook({ settings: { shareFormat: cleanFormat(now()) } }); toast('Saved'); };
+  const reset = async () => {
+    if (!(await confirmBox('Reset the format', 'Go back to the default copy and share format?', 'Reset'))) return;
+    await patchLogbook({ settings: { shareFormat: null } }); hooks.render();
+  };
+  paint();
+  const lbl = (t, el, hint) => h('label', { class: 'field', style: 'margin-top:8px' }, t, el, hint ? h('span', { class: 'hint' }, hint) : null);
+  return h('div', {},
+    h('section', { class: 'card' },
+      h('h2', {}, 'Copy & share format'),
+      h('p', { class: 'hint', style: 'margin:0 0 6px' }, 'How a case or a day reads when you tap Copy or Share day on the Logbook tab. Tags are never included.'),
+      h('p', { class: 'hint', style: 'margin:0' }, 'Fill-ins: ', ...PLACEHOLDERS.flatMap((k, i) => [i ? ' ' : '', h('code', {}, `{${k}}`)]),
+        '. {date} is 2026-10-10, {day} is 10 Oct 2026, {n} numbers the cases in a day, {count} is how many that day, {case} is the case without the initials. A line whose fill-ins are all empty is left out.'),
+      h('h3', { style: 'margin:14px 0 0' }, 'A day'),
+      lbl('Heading', head),
+      lbl('Each case', each, 'A blank line goes between cases when each takes more than one line.'),
+      h('div', { class: 'hint', style: 'margin:8px 0 2px' }, 'Preview'), dayOut,
+      h('h3', { style: 'margin:14px 0 0' }, 'One case'),
+      lbl('Format', one),
+      h('div', { class: 'hint', style: 'margin:8px 0 2px' }, 'Preview'), oneOut,
+      h('div', { class: 'bar', style: 'margin:12px 0 0' },
+        h('button', { class: 'primary', onclick: save }, 'Save'),
+        h('span', { class: 'grow' }),
+        h('button', { class: 'small linkish', onclick: reset }, 'Reset to default'))));
 }
 
 export function renderLogging() {

@@ -36,7 +36,7 @@ portfolio content.
   Paste-a-list (List mode), Plan for later. `editCaseDialog` (full screen on phones, pinned
   Delete/Cancel/Save, 6-line growing box, Tags + "Add tags"; also "New case" from the reflection picker).
 - **Logbook** (`ui-logbook.js`): Calendar (default) | List | Grid. Calendar day: + Log a case (opens Log
-  on that date), Share day, Copy (Markdown). Rows: Copy, Reflect (no swipe actions). Filter: has all of / has none of
+  on that date), Share day, Copy. Rows: Copy, Reflect (no swipe actions). Filter: has all of / has none of
   tags, dates, flag, search scope, fuzzy; Reset (everything); × in the search box clears just the text; saved searches (text, filters, "Search in"; not fuzzy); Tag N cases (bulk add/remove). Search text
   cached per case (`hayCache`, reset when the tag set changes).
 - **Reflections** (`ui-reflect.js`): list by heading, editor (Case details, learning points,
@@ -46,7 +46,11 @@ portfolio content.
   Reflections with ⓘ requirements, Trends), Compare with your intake (Totals), More tools (EPA view).
 - **More** (`app.js`): Account (with Residency year for non-programme users), Settings, Export &
   backup, Admin portal; Privacy, Credits, What's new (`WHATS_NEW` in app.js; update each release).
-- **Settings**: a menu of Display, Logging, Tag editor (`#tags`), Recycle bin.
+- **Settings**: a menu of Display (incl. the tab the app opens on, `settings.startTab`; a #hash still wins),
+  Logging, Tag editor (`#tags`), Copy & share format (`#sharefmt`), Recycle bin.
+- **Copy & share** (`share-format.js`, tested): templates in `settings.shareFormat` (dayHead, dayCase, oneCase)
+  with {date} {day} {weekday} {count} {n} {initials} {case}. Default day: `[[YYYY-MM-DD]]`, then
+  `1. AB` / case, a blank line between cases (none for a one-line case format). No tags, ever.
 - **Tag editor** (`ui-settings.js`): List | Pills (drag; hold on phones), search, case counts, edit
   dialog (name, long name, sits under, counts towards, shorthand with built-in defaults and words
   learned from your cases, hide, merge), CSV download/load, Tag groups card.

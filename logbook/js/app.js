@@ -6,7 +6,7 @@ import { S, hooks, h, toast, cloud, setCases, scheduleSummary, fill, resetCaches
 import { renderLog, logCasesChanged, clearDrafts, SHARED_KEY } from './ui-log.js';
 import { renderLogbook } from './ui-logbook.js';
 import { renderProgress, renderTotals } from './ui-progress.js';
-import { applyCompact, cachedCompact, applyTheme, cachedTheme, applyTextSize, cachedTextSize, renderTagEditor, renderDisplay, renderLogging, renderReflectionSettings, privacyCard, creditsCard } from './ui-settings.js';
+import { applyCompact, cachedCompact, applyTheme, cachedTheme, applyTextSize, cachedTextSize, renderTagEditor, renderDisplay, renderLogging, renderReflectionSettings, renderShareFormat, START_TABS, privacyCard, creditsCard } from './ui-settings.js';
 import { renderAccount, flush as flushProfile } from './ui-account.js';
 import { renderAdmin, leaveAdmin } from './ui-admin.js';
 import { renderReflect, watchMyReflections, renderExportPage, renderChoosePage } from './ui-reflect.js';
@@ -29,6 +29,7 @@ const ICONS = {
   logging: 'M12 5v14M5 12h14',
   tags: 'M3 12V4h8l10 10-8 8L3 12zM7.5 7.5h.01',
   reflset: 'M4 19.5V5a2 2 0 0 1 2-2h12v14H6a2 2 0 0 0-2 2.5zM6 21h12v-4',
+  sharefmt: 'M9 9h10v12H9zM5 15V3h10',
   bin: 'M4 7h16M10 11v6M14 11v6M5 7l1 13h12l1-13M9 7V4h6v3',
   more: 'M5 12h.01M12 12h.01M19 12h.01M4 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0M11 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0M18 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0',
 };
@@ -51,10 +52,11 @@ const TABS = [
   // under Analytics: how your counts compare with your intake
   { id: 'totals', label: 'Totals', render: renderTotals, hidden: true, under: 'progress', unlisted: true },
   { id: 'account', label: 'Account', render: renderAccount, hidden: true, under: 'more', desc: 'Your name and portfolio details (Section 1); sign out' },
-  { id: 'settings', label: 'Settings', render: () => renderSettingsMenu(), hidden: true, under: 'more', desc: 'Display, logging, tag editor, recycle bin' },
+  { id: 'settings', label: 'Settings', render: () => renderSettingsMenu(), hidden: true, under: 'more', desc: 'Display, logging, tag editor, copy & share format, recycle bin' },
   { id: 'data', label: 'Export & backup', render: () => renderDataPage(), hidden: true, under: 'more', desc: 'Portfolio (Word), Excel, backup and restore' },
   // Settings' own pages (not in the More list)
-  { id: 'display', label: 'Display', render: renderDisplay, hidden: true, under: 'settings', unlisted: true, desc: 'Theme, text size, compact mode' },
+  { id: 'display', label: 'Display', render: renderDisplay, hidden: true, under: 'settings', unlisted: true, desc: 'Theme, text size, compact mode, the tab the app opens on' },
+  { id: 'sharefmt', label: 'Copy & share format', render: renderShareFormat, hidden: true, under: 'settings', unlisted: true, desc: 'How a copied or shared case or day reads' },
   { id: 'logging', label: 'Logging', render: renderLogging, hidden: true, under: 'settings', unlisted: true, desc: 'Suggestions, the Enter key, case box, search, dates' },
   // from Reflections → More tools
   { id: 'reflset', label: 'Reflection settings', render: renderReflectionSettings, hidden: true, under: 'reflect', unlisted: true },
@@ -94,7 +96,7 @@ const whatsNewCard = () => h('section', { class: 'card' },
 
 // Settings: a short menu of its pages (residency year on top for people not on the programme list)
 function renderSettingsMenu() {
-  const order = ['display', 'logging', 'tags'];
+  const order = ['display', 'logging', 'tags', 'sharefmt'];
   const pages = TABS.filter(t => t.under === 'settings').sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
   return h('div', {},
     h('section', { class: 'card more-list' }, h('h2', {}, 'Settings'),
@@ -351,7 +353,9 @@ async function onUser(user) {
     fill(app, h('p', { class: 'empty' }, 'Could not load your logbook: ' + err.message), h('p', { class: 'empty' }, h('button', { onclick: () => onUser(user) }, 'Try again')));
     return;
   }
-  S.tab = tabFromHash() || 'log';
+  // the tab chosen in Settings → Display, unless the address names one (a link, a shortcut, a reload)
+  const start = (S.logbook && S.logbook.settings && S.logbook.settings.startTab) || 'log';
+  S.tab = tabFromHash() || (START_TABS.some(([v]) => v === start) ? start : 'log');
   // recycle bin: drop entries older than 30 days, but only once the reflections are loaded, so an
   // image still used by a live (e.g. restored) reflection is never deleted with an old bin entry
   { let done = false, stop = null;
