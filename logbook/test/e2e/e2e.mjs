@@ -576,7 +576,7 @@ async function run(label, ctxOpts) {
     await nap(300);
     assert(await nCases() === n0, 'saved with no category picked');
     const t0 = await toastText();
-    assert(/Tap at least one tag/.test(t0), 'toast ' + t0);
+    assert(/Enter again.*suggested tags/.test(t0), 'toast ' + t0);
     await p.locator('.actions .primary').click();
     await nap(300);
     assert(await nCases() === n0, 'Save button saved with no category');
@@ -727,7 +727,7 @@ async function run(label, ctxOpts) {
     await p.locator('button.primary.big').first().click();
     await nap(200);
     assert(await p.evaluate(() => document.activeElement?.type !== 'search'), 'search box focused (keyboard pops up)');
-    assert(/suggestions are highlighted/.test(await toastText()), 'toast ' + await toastText());
+    assert(/Enter again.*suggested tags/.test(await toastText()), 'toast ' + await toastText());
     // pick two categories, then save them as a template from the Log screen
     await p.locator('.chip.sugg:not(.all)').first().click();
     await nap(150);
@@ -1693,6 +1693,67 @@ async function run(label, ctxOpts) {
 
   await round4();
   await round5();
+  await step('log: additional Enter accepts suggested tags after a no-tag save', async () => {
+    const configure = async (enterMode, suggestions = true) => {
+      await p.evaluate(async settings => { const core = await import('./js/ui-core.js'); await core.patchLogbook({ settings }); }, { enterMode, suggestions });
+      await tab('log');
+    };
+    for (const [mode, initials] of [['newline', 'QX'], ['single', 'QY'], ['double', 'QZ']]) {
+      await configure(mode);
+      const ta = p.locator('textarea.details');
+      await ta.fill(`${initials} lap chole GA`);
+      await debounced();
+      const expected = await p.locator('.sugg-row .chip[data-code]:not(.all)').evaluateAll(els => els.map(e => e.dataset.code));
+      assert(expected.length > 0, 'no fixture suggestions');
+      const n = await nCases();
+      if (mode === 'newline') await p.locator('.savebar button.primary', { hasText: /^Save/ }).click();
+      else { await ta.press('End'); await ta.press('Enter'); if (mode === 'double') await ta.press('Enter'); }
+      assert(await nCases() === n, `${mode}: first save should prompt`);
+      assert(/Enter again/.test(await toastText()), `${mode}: no keyboard prompt`);
+      await ta.dispatchEvent('keydown', { key: 'Enter', repeat: true });
+      assert(await nCases() === n, 'holding Enter accepted tags');
+      if (mode === 'double') await shot('enter-suggestions');
+      await ta.press('Enter');
+      await until(async () => await nCases() === n + 1, `${mode}: extra Enter did not save`);
+      const c = (await stored()).find(c => c.initials === initials);
+      assert(c && expected.every(code => c.cats.includes(code)), `${mode}: suggested tags missing`);
+      assert((await ta.inputValue()) === '', `${mode}: box not cleared`);
+    }
+    await configure('single');
+    let ta = p.locator('textarea.details');
+    await ta.fill('QV lap chole GA');
+    let n = await nCases();
+    await ta.press('Enter');
+    await ta.fill('QW LSCS spinal');   // editing cancels the previous offer
+    await ta.press('Enter');
+    assert(await nCases() === n, 'edited case reused the previous offer');
+    await ta.press('Enter');
+    await until(async () => await nCases() === n + 1, 'edited case did not save after fresh confirmation');
+    // Mobile keyboards may provide only beforeinput. Double Enter's failed save
+    // removes the empty line, but the next line-break event must still accept.
+    await configure('double');
+    ta = p.locator('textarea.details');
+    await ta.fill('QT lap chole GA\n');
+    n = await nCases();
+    const mobileEnter = () => ta.evaluate(el => el.dispatchEvent(new InputEvent('beforeinput', { inputType: 'insertLineBreak', bubbles: true, cancelable: true })));
+    assert(await mobileEnter() === false, 'mobile double Enter not intercepted');
+    assert(await nCases() === n, 'mobile first save bypassed prompt');
+    assert(await mobileEnter() === false, 'mobile acceptance not intercepted');
+    await until(async () => await nCases() === n + 1, 'mobile extra Enter did not save');
+    await configure('single', false);
+    ta = p.locator('textarea.details');
+    await ta.fill('QS lap chole GA');
+    n = await nCases();
+    await ta.press('Enter'); await ta.press('Enter');
+    assert(await nCases() === n, 'disabled suggestions were applied');
+    await configure('single');
+    ta = p.locator('textarea.details');
+    await ta.fill('QU zzzz');
+    await ta.press('Enter'); await ta.press('Enter');
+    assert(await nCases() === n, 'case saved without suggestions');
+    await ta.fill('');
+    await configure('newline');
+  });
   await step('demo badge: Reset demo wipes added data and reseeds', async () => {
     await p.goto(BASE + '?demo#log', { waitUntil: 'networkidle' });
     await p.reload({ waitUntil: 'networkidle' });
