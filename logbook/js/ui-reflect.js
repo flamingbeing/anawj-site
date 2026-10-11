@@ -331,10 +331,10 @@ function list() {
   const head = h('section', { class: 'card' },
     h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:8px' },
       h('h2', { style: 'margin:0' }, 'Reflections'), h('span', { class: 'grow' }),
-      // New and Edit stay side by side, even on a narrow phone with large text
+      // Edit then New, side by side, even on a narrow phone with large text
       h('span', { class: 'refl-actions' },
-        em ? null : h('button', { class: 'primary', onclick: () => openPicker() }, '+ New reflection'),
-        h('button', { class: em ? 'primary' : '', 'aria-pressed': String(em), onclick: () => { rv.editMode = !em; rv.sel.clear(); hooks.render(); } }, em ? 'Done' : 'Edit'))),
+        h('button', { class: em ? 'primary' : '', 'aria-pressed': String(em), onclick: () => { rv.editMode = !em; rv.sel.clear(); hooks.render(); } }, em ? 'Done' : 'Edit'),
+        em ? null : h('button', { class: 'primary', onclick: () => openPicker() }, '+ New reflection'))),
     h('p', { class: 'hint', style: 'margin:6px 0 0' }, `${p.totals.counted} / ${p.totals.min} counted · ${p.totals.done} complete · ${p.totals.drafts} draft${p.totals.drafts === 1 ? '' : 's'}`),
     em ? null : readyLine(p),
     em ? null : h('div', { class: 'bar', style: 'gap:8px;margin:8px 0 0;flex-wrap:nowrap' }, search,
