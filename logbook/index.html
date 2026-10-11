@@ -14,16 +14,44 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="style.css">
+<!-- fetch every module and the Firebase SDK at once instead of one import at a time -->
+<link rel="modulepreload" href="js/app.js">
+<link rel="modulepreload" href="js/ui-core.js">
+<link rel="modulepreload" href="js/categories.js">
+<link rel="modulepreload" href="js/engine.js">
+<link rel="modulepreload" href="js/keywords.js">
+<link rel="modulepreload" href="js/cloud.js">
+<link rel="modulepreload" href="js/firebase-config.js">
+<link rel="modulepreload" href="js/demo-backend.js">
+<link rel="modulepreload" href="js/reflections.js">
+<link rel="modulepreload" href="js/profile.js">
+<link rel="modulepreload" href="js/ui-log.js">
+<link rel="modulepreload" href="js/suggest.js">
+<link rel="modulepreload" href="js/ui-settings.js">
+<link rel="modulepreload" href="js/bin.js">
+<link rel="modulepreload" href="js/ui-logbook.js">
+<link rel="modulepreload" href="js/importer.js">
+<link rel="modulepreload" href="js/xlsxio.js">
+<link rel="modulepreload" href="js/ui-reflect.js">
+<link rel="modulepreload" href="js/portfolio.js">
+<link rel="modulepreload" href="js/ui-progress.js">
+<link rel="modulepreload" href="js/ui-account.js">
+<link rel="modulepreload" href="js/ui-admin.js">
+<link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js" crossorigin>
+<link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js" crossorigin>
+<link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js" crossorigin>
+<!-- the font loads without holding up the first paint (system font until it arrives) -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap">
-<link rel="stylesheet" href="style.css">
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap"></noscript>
 </head>
 <body>
 <header class="top">
   <div class="brand">
     <h1>APMES Logbook</h1>
-    <p class="sub" id="sub"></p>
+    <p class="sub" id="sub" hidden></p>
   </div>
   <div id="who" class="who"></div>
 </header>
