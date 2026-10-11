@@ -3,7 +3,7 @@
 // an editable heading, the matched logbook case and warnings; checked ones are added as drafts.
 
 import { REFLECTION_HEADINGS } from './categories.js';
-import { HEADING_BY_ID, splitDetails, wordCount, IMAGE_MAX_B64 } from './reflections.js';
+import { HEADING_BY_ID, splitDetails, wordCount, IMAGE_MAX_B64, IMAGE_MAX_SIDE, IMAGE_QUALITY, PHOTO_BUDGET_KB, photoUsageKb, imageKb, fmtMb } from './reflections.js';
 import { fmtDate, caseText } from './engine.js';
 import { S, h, toast, cloud, fill } from './ui-core.js';
 import { needZip } from './portfolio.js';
@@ -16,7 +16,7 @@ const uid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(
 const casesFor = r => (r.initials && r.date ? (S.cases || []).filter(c => c.date === r.date && sameKey(c.initials || splitDetails(c.details).initials, r.initials)) : []);
 const dupOf = r => (S.reflections || []).find(x => x.headingId === r.headingId && x.date === r.date && sameKey(x.initials, r.initials));
 
-// Picture (base64) -> JPEG, longest side ≤ 1400 px, under IMAGE_MAX_B64 (as ui-reflect.js does for photos).
+// Picture (base64) -> JPEG, longest side ≤ IMAGE_MAX_SIDE, under IMAGE_MAX_B64 (as ui-reflect.js does for photos).
 async function compress(img) {
   const bytes = Uint8Array.from(atob(img.data), c => c.charCodeAt(0));
   const blob = new Blob([bytes], { type: img.mime });
@@ -29,7 +29,7 @@ async function compress(img) {
   }
   const W = src.width || src.naturalWidth, H = src.height || src.naturalHeight;
   if (!W || !H) throw new Error('picture not readable');
-  let max = 1400, q = 0.75;
+  let max = IMAGE_MAX_SIDE, q = IMAGE_QUALITY;
   for (let i = 0; i < 8; i++) {
     const k = Math.min(1, max / Math.max(W, H));
     const w = Math.max(1, Math.round(W * k)), hh = Math.max(1, Math.round(H * k));
@@ -150,7 +150,9 @@ export function renderImport(onDone) {
     st.busy = true; draw();
     st.added = 0; st.failed = [];
     const email = S.user.email;
-    const saved = {};   // docx picture rid -> stored image id (a picture used twice is stored once)
+    const saved = {};   // docx picture rid -> { id, kb } stored (a picture used twice is stored once)
+    let usedKb = photoUsageKb(S.reflections);   // the photo budget (PHOTO_BUDGET_KB) applies to imports too
+    let overBudget = 0;
     for (const x of list) {
       const r = x.r;
       try {
@@ -159,11 +161,14 @@ export function renderImport(onDone) {
           try {
             if (!saved[f.rid]) {
               const img = await compress(st.images[f.rid]);
+              const kb = imageKb(img.data);
+              if (usedKb + kb > PHOTO_BUDGET_KB) { overBudget++; throw new Error('photo budget full'); }
               const id = uid('img');
               await cloud.saveImage(email, { id, ...img, createdAt: Date.now() });
-              saved[f.rid] = id;
+              saved[f.rid] = { id, kb };
+              usedKb += kb;
             }
-            figures.push({ id: saved[f.rid], caption: f.caption, point: f.point });
+            figures.push({ id: saved[f.rid].id, caption: f.caption, point: f.point, kb: saved[f.rid].kb });
           } catch (err) { console.warn('figure skipped', err); if (f.caption) r.summary = [r.summary, 'Figure (not imported): ' + f.caption].filter(Boolean).join('\n'); }
         }
         const now = Date.now();
@@ -176,11 +181,13 @@ export function renderImport(onDone) {
         st.added++;
       } catch (err) { console.warn(err); st.failed.push(`${r.initials || '?'} ${r.date || r.dateText || ''}: ${err.message}`); }
     }
+    st.overBudget = overBudget;
     st.busy = false; st.step = 'done'; draw();
   }
 
   function doneView() {
     return [h('section', { class: 'card' },
+      st.overBudget ? h('p', { class: 'hint', style: 'color:var(--warn, #b45309)' }, `${st.overBudget} picture${st.overBudget === 1 ? '' : 's'} not added: your photos would go over ${fmtMb(PHOTO_BUDGET_KB)}. The reflections were added without them (their captions are in the summary).`) : null,
       h('h2', {}, `Added ${st.added} reflection${st.added === 1 ? '' : 's'} as drafts`),
       h('p', { class: 'hint' }, 'Open each one to check it, link it to its case if it isn’t linked, and mark it complete.'),
       st.failed.length ? h('div', {}, h('p', { class: 'rimp-warn' }, `${st.failed.length} could not be added:`), h('ul', {}, st.failed.map(t => h('li', {}, t)))) : null,
