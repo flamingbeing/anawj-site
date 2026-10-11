@@ -7,6 +7,8 @@ taps (saved as they go) and submits or declines. The resident reads the result a
 against the APMES requirements. PDs and admins see every evaluation, keep the faculty and resident
 lists, approve applications and download a CSV.
 
+What we learnt along the way (MedHub, the guidebook, decisions, operations) is in [`NOTES.md`](NOTES.md).
+
 It is a trial app for **all residents and postings**. Vanilla ES modules, no build step, same Firebase
 project as the logbook (`apmes-logbook`, free Spark plan).
 
