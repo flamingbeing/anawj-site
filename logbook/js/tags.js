@@ -16,6 +16,7 @@
 // (20i) always sit under their official parent.
 
 import { CATEGORIES, BY_CODE } from './categories.js';
+import { STOP } from './keywords.js';
 
 export const MAX_TAGS = 300;
 const ACTIVE = CATEGORIES.filter(c => !c.retired);
@@ -112,12 +113,18 @@ export const DEFAULT_SHORTHAND = {
   '07': ['dlt', 'double lumen', 'olv', 'one lung', 'vats'],
   '08': ['lap', 'laparoscopic', 'robotic', 'lsg', 'lap appy', 'lap chole'],
   '09': ['phaco', 'cataract', 'vitrectomy', 'ppv', 'squint', 'strabismus', 'ptosis', 'dcr', 'trabeculectomy'],
-  '10': ['fess', 'septoplasty', 'mastoidectomy', 'grommets', 'myringotomy', 'tympanoplasty', 'adenoidectomy'],
+  '10': ['tonsillectomy', 'adenotonsillectomy', 'tonsils', 't&a', 'fess', 'septoplasty', 'mastoidectomy', 'grommets', 'myringotomy', 'tympanoplasty', 'adenoidectomy'],
   '11': ['mll', 'microlaryngoscopy', 'dl', 'trachy', 'tracheostomy', 'rigid bronchoscopy', 'jet ventilation'],
+  '16': ['lscs', 'caesarean', 'cesarean', 'c-section', 'csection'],
+  '17': ['labour epidural', 'labor epidural', 'labour analgesia', 'labor analgesia', 'labour cse', 'labor cse'],
   '13': ['appy', 'appendicectomy', 'appendectomy', 'chole', 'hernia', 'hemicolectomy', 'anterior resection', 'mastectomy', 'wle', 'mrm', 'slnb'],
   '14': ['hyst', 'tah', 'tlh', 'lah', 'hysterectomy', 'myomectomy', 'd&c', 'dnc', 'erpc', 'hysteroscopy', 'ectopic', 'bso'],
   '15': ['crani', 'craniotomy', 'craniectomy', 'evd', 'vp shunt', 'burr hole', 'burr holes'],
   '18': ['tka', 'tkr', 'tha', 'thr', 'uka', 'hemiarthroplasty', 'dhs', 'orif', 'nof', 'acl', 'arthroscopy', 'mua', 'pfna', 'tsr', 'k wire'],
+  '26i': ['interscalene', 'supraclavicular', 'infraclavicular', 'axillary block', 'brachial plexus'],
+  '26ii': ['adductor canal', 'sciatic', 'popliteal', 'fascia iliaca', 'femoral block', 'femoral nerve block', 'ankle block', 'ipack', 'peng', 'acb', 'fnb', 'ficb'],
+  '26iii': ['esp', 'erector spinae', 'tap block', 'transversus abdominis', 'rectus sheath', 'paravertebral', 'pecs', 'serratus anterior', 'quadratus lumborum', 'ql block', 'ilioinguinal', 'penile block'],
+  '27': ['caudal'],
   '20': ['circ', 'circumcision', 'orchidopexy', 'hypospadias', 'herniotomy'],
   '23': ['sleeve', 'lsg', 'rygb', 'gastric bypass', 'oagb'],
   '24': ['acdf', 'laminectomy', 'discectomy', 'tlif', 'plif', 'xlif', 'spinal fusion', 'kyphoplasty', 'scoliosis'],
@@ -137,8 +144,8 @@ export function cleanShorthand(v) {
   return [...new Set(list.map(x => str(x, 30).toLowerCase()).filter(Boolean))].slice(0, 30);
 }
 const wordRe = w => new RegExp(`(?:^|[^a-z0-9])${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '\\s+')}(?![a-z0-9])`);
-// the case text without its leading initials ("DL 45M …"), lower case
-const caseWords = text => String(text || '').replace(/^\s*[A-Z]{2,4}(?![A-Za-z0-9])/, '').toLowerCase();
+// the case text without leading initials before an age ("DL 45M …"), lower case
+const caseWords = text => String(text || '').replace(/^\s*[A-Z]{2,4}(?=[\s\/,:;.-]+\d)/, '').toLowerCase();
 // For suggest(): [{ re, code }] from shorthand on APMES tags.
 export function apmesShorthand(set) {
   const out = [];
@@ -150,6 +157,38 @@ export function shorthandTags(set, text) {
   const words = caseWords(text);
   if (!words.trim()) return [];
   return (set || []).filter(e => e.kw && !e.k.startsWith('c:') && !e.hd && e.kw.some(w => wordRe(w).test(words))).map(e => e.k);
+}
+
+// Words from your own cases that would make good shorthand for a tag (Tag editor suggests them; you
+// choose). A word or two-word phrase qualifies when it is in at least 3 of the tag's cases (and 1 in 5
+// of them), and at least 3 in 5 of all the cases with it have the tag. Ages, numbers and filler words
+// are skipped. key: 'c:26' or a personal tag key. -> [{ w, n }] best first.
+const STOPS = new Set([...STOP, 'ga', 'la', 'ra', 'ett', 'lma', 'iv', 'pt', 'pts', 'op', 'ot', 'case', 'under', 'with', 'without', 'post', 'pre', 'left', 'right', 'lt', 'rt', 'bilateral', 'b/l']);
+export function learnShorthand(cases, key, { have = [], limit = 8 } = {}) {
+  const code = key.startsWith('c:') ? key.slice(2) : null;
+  const hasTag = c => (code ? (c.cats || []).includes(code) : (c.tags || []).includes(key));
+  const seen = new Set(have.map(w => w.toLowerCase()));
+  const inTag = new Map(), all = new Map();
+  let nTag = 0;
+  for (const c of cases || []) {
+    const text = caseWords(c.details || '');   // the initials field is never part of it
+    const toks = text.split(/[^a-z0-9&/]+/).filter(t => t.length >= 2 && !/\d/.test(t) && !STOPS.has(t));
+    const grams = new Set(toks);
+    for (let i = 0; i + 1 < toks.length; i++) grams.add(toks[i] + ' ' + toks[i + 1]);
+    const mine = hasTag(c);
+    if (mine) nTag++;
+    for (const g of grams) { all.set(g, (all.get(g) || 0) + 1); if (mine) inTag.set(g, (inTag.get(g) || 0) + 1); }
+  }
+  const out = [];
+  for (const [w, n] of inTag) {
+    if (seen.has(w) || n < 3 || n < nTag / 5 || n / all.get(w) < 0.6) continue;
+    out.push({ w, n, score: n * (n / all.get(w)) * (w.includes(' ') ? 0.8 : 1) });
+  }
+  out.sort((a, b) => b.score - a.score || a.w.localeCompare(b.w));
+  // drop a phrase when one of its words is already a better suggestion
+  const picked = [];
+  for (const x of out) { if (picked.length >= limit) break; if (x.w.includes(' ') && x.w.split(' ').some(p => picked.some(y => y.w === p))) continue; picked.push({ w: x.w, n: x.n }); }
+  return picked;
 }
 
 // The set in effect for these settings.

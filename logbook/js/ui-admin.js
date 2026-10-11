@@ -366,7 +366,7 @@ function sharedCard() {
   const save = async t => { try { await cloud.saveSharedTemplate(t); A.shared = [...list.filter(x => x.id !== t.id), t]; S.sharedTemplates = A.shared; hooks.render(); } catch (err) { toast('Could not save: ' + err.message); } };
   return h('section', { class: 'card' },
     h('h2', {}, 'Shared tag groups'),
-    h('p', { class: 'hint' }, 'Quick picks everyone sees on the Log screen.'),
+    h('p', { class: 'hint' }, 'Tag groups every resident sees at the end of the tag list on the Log page.'),
     list.length ? h('ul', { class: 'prog' }, list.map(t => h('li', { style: 'grid-template-columns:1fr auto' },
       h('span', {}, h('b', {}, t.name), ' ', h('span', { class: 'muted' }, catPills(t.cats))),
       h('span', { class: 'row' },

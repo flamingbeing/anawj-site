@@ -312,6 +312,8 @@ function renderOne(card) {
   const selected = h('div', { class: 'chips selected' });
   const tip = h('div');
   const templates = h('div', { class: 'chips quick-rest' });
+  // the programme's tag groups (Admin portal), after the full list
+  const shared = h('div', { class: 'shared-groups' });
   const picker = catPicker({
     get: () => draft.cats,
     toggle: code => { draft.cats = toggleCat(draft.cats, code); saveDraft(); paintSel(); },
@@ -341,9 +343,10 @@ function renderOne(card) {
       h('span', { class: 'seg cat-view', role: 'group', 'aria-label': 'Show tags as' },
         ['list', 'pills'].map(v => h('button', { class: 'small', 'aria-pressed': String((settings().catView || 'list') === v), onclick: () => { if ((settings().catView || 'list') === v) return; patchLogbook({ settings: { catView: v } }); hooks.render(); } }, v === 'list' ? 'List' : 'Pills')))),
     picker.el,
+    shared,
     stillNeeded(),
     savebar);
-  Object.assign(ui, { draftNote, textarea, parsed, sugg, selected, selExtra, tip, templates, picker });
+  Object.assign(ui, { shared, draftNote, textarea, parsed, sugg, selected, selExtra, tip, templates, picker });
   paintSuggest(); paintSel(); paintQuick(); paintParsed(false);
   requestAnimationFrame(() => alignPlaceholder(textarea));
   // autofocus attribute is ignored on re-render; focus after insertion (not on phones' first paint
@@ -421,6 +424,8 @@ function applyTemplate(t) {
   keepPlace(ui.templates, () => { saveDraft(); paintSel(); }); refocus();
 }
 
+const clip = (t, n) => (t.length > n ? t.slice(0, n - 1).trimEnd() + '…' : t);
+
 function paintQuick() {
   if (!ui || !ui.templates) return;
   const chips = [];
@@ -436,7 +441,7 @@ function paintQuick() {
     if (recent.length >= 1) break;
   }
   recent.forEach(({ c, proc }, i) => chips.push(h('span', {
-    class: 'chip tmpl recent', role: 'button', tabindex: '0', title: (proc || 'No details') + '\n' + c.cats.map(catFull).join('\n'),
+    class: 'chip tmpl recent', role: 'button', tabindex: '0', title: 'Same as last: ' + (proc || 'no details') + '\n' + c.cats.map(catFull).join('\n'), 'aria-label': 'Same as last: ' + (proc || 'no details'),
     onclick: () => {
       draft.cats = sortCodes(withParents(c.cats));
       draft.details = proc ? '\n' + proc : '';
@@ -445,7 +450,7 @@ function paintQuick() {
       if (ui.textarea) { ui.textarea.value = draft.details; ui.textarea.focus({ preventScroll: true }); ui.textarea.setSelectionRange(0, 0); }
       keepPlace(ui.templates, () => { saveDraft(); paintDate(); paintSel(); paintParsed(false); });
     },
-  }, i === 0 ? '↻ Same as last ' : '↻ ', h('span', {}, (proc || 'no details').slice(0, 28)), h('span', { class: 'muted', style: 'font-size:12px' }, ' ' + catPills(c.cats)))));
+  }, '↻ ', h('span', {}, clip(proc || 'no details', 30)))));
   const seen = new Set();
   const tmplChip = (t, name) => {
     const key = sortCodes(t.cats).join(',');
@@ -456,6 +461,8 @@ function paintQuick() {
   };
   for (const t of (S.logbook && S.logbook.templates) || []) chips.push(tmplChip(t, t.name));
   fill(ui.templates, ...chips.filter(Boolean));
+  const sh = (S.sharedTemplates || []).map(t => tmplChip(t, t.name)).filter(Boolean);
+  if (ui.shared) fill(ui.shared, ...(sh.length ? [h('div', { class: 'chiplabel' }, 'Programme tag groups'), h('div', { class: 'chips' }, ...sh)] : []));
 }
 
 async function save({ another }) {

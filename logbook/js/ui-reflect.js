@@ -631,7 +631,7 @@ function readyCard(ex) {
         : h('button', { class: 'primary', disabled: RS.busy || !ex.total, onclick: () => markReady(ex) }, RS.busy ? 'Saving…' : 'Mark portfolio as ready')));
 }
 
-// ---------- Export page (#export, from More → Export & Sync) ----------
+// ---------- Export page (#export, from More → Export) ----------
 
 // Choose which complete reflections go into the Word portfolio (ticks are kept for next time), then export.
 // Per heading: how many are ticked against its minimum, with warnings when a required sub-type or the
@@ -697,7 +697,7 @@ export function renderExportPage(onChoose = false) {
 export const renderChoosePage = () => renderExportPage(true);
 
 // Images of the given reflections' figures, for the Word export: { id: { data, mime, w, h } }. Missing ones are skipped.
-// The Word portfolio export button (shown in More → Export & Sync): complete reflections, Section 1
+// The Word portfolio export button (shown in More → Export): complete reflections, Section 1
 // details and the Section 4 counts.
 export function portfolioExportButton() {
   const n = (S.reflections || []).filter(inExport).length;

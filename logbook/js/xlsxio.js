@@ -59,7 +59,7 @@ export async function exportCases(cases, { name = '', counts, progressRows, rYea
   ws.columns = [
     { header: 'Date', key: 'date', width: 13, style: { numFmt: 'd mmm yyyy' } },
     { header: 'Case summary', key: 'details', width: 60 },
-    { header: 'Categories', key: 'categories', width: 60 },
+    { header: 'Tags', key: 'categories', width: 60 },
     { header: 'id', key: 'id', width: 20, hidden: true },
   ];
   styleHeader(ws.getRow(1));
@@ -102,7 +102,7 @@ const HEADERS = {
   date: /^date\b/i,
   initials: /^(?:patient(?:'?s)?\s+)?initials$/i,   // an optional column of its own
   details: /detail|summary|initials/i,
-  categories: /categor/i,
+  categories: /categor|^tags?$/i,
   id: /^id$/i,
 };
 
@@ -154,7 +154,7 @@ export async function readCasesSheet(file) {
     });
     return out;
   }
-  throw new Error('Could not find a sheet with "Date", "Case summary" (or "Case details") and "Categories" columns.');
+  throw new Error('Could not find a sheet with "Date", "Case summary" (or "Case details") and "Tags" (or "Categories") columns.');
 }
 
 // Every sheet as a grid of raw cells (Dates stay Dates; formulas give their result), for the Upload

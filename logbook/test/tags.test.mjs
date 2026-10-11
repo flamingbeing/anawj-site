@@ -1,6 +1,6 @@
 // Run with: node logbook/test/tags.test.mjs  (fake data only)
 import assert from 'node:assert/strict';
-import { cleanShorthand, apmesShorthand, shorthandTags, defaultTagSet, cleanTagSet, tagSetOf, tagTree, flatTree, tagLinks, userCatNames, tagName, tagSetToCsv, tagSetFromCsv, parseCsv } from '../js/tags.js';
+import { learnShorthand, cleanShorthand, apmesShorthand, shorthandTags, defaultTagSet, cleanTagSet, tagSetOf, tagTree, flatTree, tagLinks, userCatNames, tagName, tagSetToCsv, tagSetFromCsv, parseCsv } from '../js/tags.js';
 import { CATEGORIES } from '../js/categories.js';
 
 const ACTIVE = CATEGORIES.filter(c => !c.retired);
@@ -114,6 +114,17 @@ import('../js/tags.js').then(({ shorthandOf, DEFAULT_SHORTHAND }) => {
   const d1 = tagSetFromCsv(tagSetToCsv(d0, names), names, d0).set;
   assert.ok(!d1.some(e => e.k.startsWith('c:') && e.kw), 'built-in shorthand is not copied into the set');
 });
+// shorthand learned from your own cases: frequent in the tag, rare elsewhere; ages and filler skipped
+{
+  const cs = [];
+  for (let i = 0; i < 5; i++) cs.push({ initials: 'AB', details: '45M lap appy GA', cats: ['08', '13'] });
+  for (let i = 0; i < 6; i++) cs.push({ initials: 'CD', details: '70M TKR spinal', cats: ['18', '28'], tags: ['u:knee'] });
+  const w = learnShorthand(cs, 'c:13').map(x => x.w);
+  assert.ok(w.includes('appy') && !w.includes('45m') && !w.includes('ga'), w.join());
+  assert.ok(!learnShorthand(cs, 'c:13', { have: ['appy'] }).some(x => x.w === 'appy'), 'words you have are not suggested');
+  assert.ok(learnShorthand(cs, 'u:knee').some(x => x.w === 'tkr'), 'personal tags too');
+  assert.deepEqual(learnShorthand(cs.slice(0, 2), 'c:13'), [], 'needs at least 3 cases');
+}
 console.log('tags tests passed');
 {
   const { moveTag, reparentTag, removeTag } = await import('../js/tags.js');

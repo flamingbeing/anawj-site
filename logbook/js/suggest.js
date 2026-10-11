@@ -103,15 +103,6 @@ function grams(text, keywords) {
 
 // Words that define a category whatever residents ticked in the past (blocks are often under-logged).
 // Each hit also suggests its parent (26iii -> 26). These count as 'keyword' evidence.
-const RULES = [
-  [/\b(?:esp|erector spinae|tap block|transversus abdominis|rectus sheath|paravertebral|pecs ?(?:i|ii|1|2)?|serratus anterior|quadratus lumborum|ql block|ilioinguinal|penile block)\b/, '26iii', 0.8],
-  [/\b(?:interscalene|supraclavicular|infraclavicular|axillary block|brachial plexus)\b/, '26i', 0.8],
-  [/\b(?:adductor canal|sciatic|popliteal|fascia iliaca|femoral (?:nerve )?block|ankle block|ipack|peng(?: block)?|acb|fnb|ficb)\b/, '26ii', 0.8],
-  [/\b(?:lscs|caesarean|cesarean|c-?section)\b/, '16', 0.8],
-  [/\b(?:labou?r (?:epidural|analgesia|cse))\b/, '17', 0.8],
-  [/\bcaudal\b/, '27', 0.8],
-  [/\b(?:tonsil\w*|adenotonsil\w*|adenoid\w*|t&a)\b|\bt ?& ?a\b/, '10', 0.8],
-];
 
 // Score of a code = the strongest word for it, nudged up a little by a second independent word
 // (noisy-OR on a damped runner-up). Plain noisy-OR over-counts words that always travel together.
@@ -160,13 +151,8 @@ export function suggest(text, { limit = 6, keywords = KEYWORDS, calibration = CA
   }
 
   const lower = String(text || '').toLowerCase();
-  for (const [re, code, score] of RULES) {
-    if (!re.test(lower)) continue;
-    put(code, score, 'keyword');
-    if (BY_CODE[code].parent) put(BY_CODE[code].parent, score, 'keyword');
-  }
-  // leading capitals are the patient's initials ("DL 45M …"), not shorthand
-  const words = String(text || '').replace(/^\s*[A-Z]{2,4}(?![A-Za-z0-9])/, '').toLowerCase();
+  // leading capitals before an age are the patient's initials ("DL 45M …"), not shorthand
+  const words = String(text || '').replace(/^\s*[A-Z]{2,4}(?=[\s\/,:;.-]+\d)/, '').toLowerCase();
   // shorthand (Tag editor: built in, and your own): whole words that mean an APMES tag. A word inside
   // a longer match ("lap" in "ex lap") steps aside for it.
   const hits = [];

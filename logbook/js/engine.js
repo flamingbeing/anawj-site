@@ -368,13 +368,13 @@ export function textHas(text, word, fuzzy = false) {
 
 export const IMPORT_FIELDS = [
   { k: 'date', name: 'Date' }, { k: 'initials', name: 'Initials' }, { k: 'details', name: 'Case summary' },
-  { k: 'categories', name: 'Categories' }, { k: 'id', name: 'Case ID (to update cases already here)' },
+  { k: 'categories', name: 'Tags' }, { k: 'id', name: 'Case ID (to update cases already here)' },
 ];
 const GUESS = {
   date: /^(date|day|date of (case|surgery|op(eration)?)|op date)\b/i,
   initials: /^(patient(?:'?s)?\s+)?initials?$/i,
   details: /detail|summary|procedure|operation|surgery|case\b|description|notes?/i,
-  categories: /categor|codes?\b|apmes/i,
+  categories: /categor|^tags?$|codes?\b|apmes/i,
   id: /^(id|case id)$/i,
 };
 // Column indexes { date, initials, details, categories, id } (-1 = not in the file) from the header

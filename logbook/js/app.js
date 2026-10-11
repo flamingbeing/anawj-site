@@ -45,7 +45,7 @@ const TABS = [
   { id: 'totals', label: 'Totals', render: renderTotals, hidden: true, under: 'more', desc: 'How your case counts compare across your intake' },
   { id: 'account', label: 'Account', render: renderAccount, hidden: true, under: 'more', desc: 'Your name and portfolio details (Section 1); sign out' },
   { id: 'settings', label: 'Settings', render: renderSettings, hidden: true, under: 'more', desc: 'Display, text size, logging, tag editor, recycle bin' },
-  // opened from More → Export & Sync (not in the More list)
+  // opened from More → Export (not in the More list)
   { id: 'export', label: 'Export portfolio', render: () => renderExportPage(), hidden: true, under: 'more', unlisted: true },
   { id: 'choose', label: 'Export portfolio', render: renderChoosePage, hidden: true, under: 'export', unlisted: true },
   // admins open it from More (or Settings → Admin portal)
@@ -61,7 +61,7 @@ function renderMore() {
       h('ul', {}, items.map(t => h('li', {}, h('a', { href: '#' + t.id, 'data-go': t.id, onclick: e => { e.preventDefault(); go(t.id); } },
         icon(t.id), h('span', { class: 'mt' }, h('b', {}, t.label), h('small', {}, t.desc)), h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')))))),
     // everything that leaves the app as a file
-    h('section', { class: 'card export-sync' }, h('h2', {}, 'Export & Sync'),
+    h('section', { class: 'card export-sync' }, h('h2', {}, 'Export'),
       h('h3', {}, 'Portfolio (Word)'),
       h('p', { class: 'hint' }, 'Choose which complete reflections go in, then export the APMES portfolio with Section 1 and the Section 4 case numbers filled in.'),
       h('div', { class: 'bar' }, h('a', { class: 'btn primary', href: '#export' }, 'Choose reflections and export ›')),

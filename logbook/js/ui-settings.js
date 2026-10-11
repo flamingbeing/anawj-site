@@ -2,10 +2,10 @@
 // "You" and sign-out cards (youCard, signOutCard), used by ui-account.js.
 
 import { YEAR_NAMES, DEFAULT_NAMES, BY_CODE } from './categories.js';
-import { sortCodes, uid, academicYear } from './engine.js';
+import { sortCodes, uid, academicYear, withParents } from './engine.js';
 import { openBin } from './bin.js';
-import { S, h, toast, modal, confirmBox, cloud, catChip, catName, catShort, PICKER_ORDER, pickerOrder, settings, patchLogbook, displayName, hooks, rYear, myYearName, fill, categoryNames, setCategoryNames, catPills, tagSet, download, fileButton, todayISO } from './ui-core.js';
-import { cleanShorthand, shorthandOf, DEFAULT_SHORTHAND, cleanTagSet, defaultTagSet, tagTree, flatTree, moveTag, reparentTag, removeTag, newKey, tagSetToCsv, tagSetFromCsv, dropTag, canPlace } from './tags.js';
+import { S, h, toast, modal, confirmBox, cloud, catChip, catName, catShort, PICKER_ORDER, pickerOrder, settings, patchLogbook, displayName, hooks, rYear, myYearName, fill, categoryNames, setCategoryNames, catPills, tagSet, download, fileButton, todayISO, saveMany } from './ui-core.js';
+import { learnShorthand, cleanShorthand, shorthandOf, DEFAULT_SHORTHAND, cleanTagSet, defaultTagSet, tagTree, flatTree, moveTag, reparentTag, removeTag, newKey, tagSetToCsv, tagSetFromCsv, dropTag, canPlace } from './tags.js';
 import { pickDialog } from './ui-log.js';
 import { PHOTO_BUDGET_KB, PHOTO_NOTE, photoUsageKb, fmtMb } from './reflections.js';
 import { backupCard } from './backup.js';
@@ -251,22 +251,45 @@ export function categoryNamesCard() {
 // under section headers, and add your own tags (linked to APMES categories, or personal labels).
 // Share it as a CSV file (opens in Excel) or load someone else's.
 const saveTags = set => patchLogbook({ settings: { tagSet: cleanTagSet(set) } }).then(() => hooks.render());
+// view: the list (details, up/down) or pills (as on the Log page, drag to reorder); a search narrows both
+const tev = { mode: 'list', q: '' };
+// cases per tag: APMES tags from the counts, your own tags by key
+function tagUsage() {
+  const n = new Map();
+  for (const c of S.cases || []) for (const k of c.tags || []) n.set(k, (n.get(k) || 0) + 1);
+  return k => (k.startsWith('c:') ? (S.counts[k.slice(2)] || 0) : n.get(k) || 0);
+}
 export function renderTagEditor() {
   const set = tagSet();
-  const nodes = flatTree(tagTree(set));
-  const names = code => ({ pill: catShort(code), long: catName(code) });
+  const all = flatTree(tagTree(set));
+  const used = tagUsage();
   const def = code => ({ pill: (DEFAULT_NAMES[code] || [])[1] || BY_CODE[code].name, long: (DEFAULT_NAMES[code] || [])[0] || BY_CODE[code].name });
+  const nameOf = n => (n.kind === 'head' ? n.e.n : n.kind === 'cat' ? catShort(n.code) : n.e.n);
+  const words = (tev.q || '').toLowerCase().split(/\s+/).filter(Boolean);
+  const hay = n => [nameOf(n), n.kind === 'cat' ? catName(n.code) + ' ' + n.code : n.e.l || '', ...shorthandOf(n.e)].join(' ').toLowerCase();
+  const nodes = words.length ? all.filter(n => words.every(w => hay(n).includes(w))) : all;
   const linkText = n => n.kind === 'head' ? 'section header'
     : 'Personal · ' + ((n.e.links || []).length ? 'counts as ' + n.e.links.map(catShort).join(', ') : (n.e.p && n.e.p.startsWith('c:') ? 'counts under ' + catShort(n.e.p.slice(2)) : 'label only'));
+  const count = n => (n.kind === 'head' ? '' : `${used(n.e.k)} case${used(n.e.k) === 1 ? '' : 's'}`);
   const row = n => h('li', { 'data-k': n.e.k, style: `padding-left:${8 + Math.min(n.depth, 4) * 18}px`, class: `te-${n.kind}${n.e.hide ? ' te-hidden' : ''}` },
     // drag by the handle: onto the top or bottom of a row to go before or after it, the middle to go inside
     h('span', { class: 'te-handle', title: 'Drag to move or nest', 'aria-label': 'Drag to move or nest', onpointerdown: e => startTagDrag(e, n.e.k) }, '⠿'),
     h('button', { type: 'button', class: 'te-name', onclick: () => editTag(n) },
-      h('span', { class: 'te-pill' }, n.kind === 'head' ? n.e.n : n.kind === 'cat' ? catShort(n.code) : n.e.n),
+      h('span', { class: 'te-pill' }, nameOf(n)),
       n.kind === 'head' ? null : h('small', { class: 'muted te-sub' },
-        [n.kind === 'cat' ? 'APMES · ' + catName(n.code) : linkText(n), n.e.hide ? 'hidden' : ''].filter(Boolean).join(' · '))),
+        [n.kind === 'cat' ? 'APMES · ' + catName(n.code) : linkText(n), count(n), n.e.hide ? 'hidden' : ''].filter(Boolean).join(' · '))),
     h('button', { class: 'small icon-btn', 'aria-label': 'Move up', onclick: () => saveTags(moveTag(set, n.e.k, -1)) }, '↑'),
     h('button', { class: 'small icon-btn', 'aria-label': 'Move down', onclick: () => saveTags(moveTag(set, n.e.k, 1)) }, '↓'));
+  // pills: tap to edit, drag (press and hold on a phone) onto the left or right of another to go
+  // before or after it, onto its middle to go inside
+  const pill = n => h('li', { 'data-k': n.e.k, class: `te-pillitem te-${n.kind} d${Math.min(n.depth, 3)}${n.e.hide ? ' te-hidden' : ''}`, tabindex: '0', role: 'button',
+    title: n.kind === 'cat' ? catName(n.code) : n.kind === 'head' ? 'Section header' : linkText(n),
+    onpointerdown: e => pillDown(e, n.e.k), onclick: () => { if (!pillDragged) editTag(n); }, onkeydown: e => { if (e.key === 'Enter') editTag(n); } },
+    h('span', { class: 'te-pill' }, nameOf(n)), n.kind === 'head' ? null : h('small', { class: 'te-n' }, String(used(n.e.k))));
+  const search = h('input', { type: 'search', class: 'grow', value: tev.q, placeholder: 'Search tags, names or shorthand', 'aria-label': 'Search tags',
+    oninput: e => { tev.q = e.target.value; const pos = e.target.selectionStart; hooks.render(); const el = document.querySelector('.tag-editor input[type=search]'); if (el) { el.focus(); el.setSelectionRange(pos, pos); } } });
+  const modeSeg = h('span', { class: 'seg', role: 'group', 'aria-label': 'Show tags as' },
+    [['list', 'List'], ['pills', 'Pills']].map(([m, l]) => h('button', { class: 'small', 'aria-pressed': String(tev.mode === m), onclick: () => { tev.mode = m; hooks.render(); } }, l)));
   return h('div', {}, h('section', { class: 'card tag-editor' },
     h('h2', {}, 'Tag editor'),
     h('p', { class: 'hint' }, 'Lay out the Log page’s list your way. APMES tags are the programme’s categories: rename (just for you), hide, move them or put them under section headers. Personal tags are your own: link one to APMES categories and choosing it ticks them, or leave it as a label only. A personal tag under an APMES one counts towards it. Totals and exports always use APMES.'),
@@ -280,15 +303,39 @@ export function renderTagEditor() {
         if (!(await confirmBox('Reset tags?', 'Go back to the APMES tags in the official order, with the programme’s names? Your own tags are removed from the list (cases keep them).', 'Reset', true))) return;
         await patchLogbook({ settings: { tagSet: defaultTagSet({}), catOrder: [], subcats: {} } }); hooks.render();
       } }, 'Reset')),
-    h('ul', { class: 'te-list' }, nodes.map(row))),
+    h('div', { class: 'bar', style: 'gap:8px;margin:0 0 8px' }, search, modeSeg),
+    words.length ? h('p', { class: 'hint', style: 'margin:0 0 6px' }, `${nodes.length} of ${all.length} shown`) : null,
+    tev.mode === 'pills'
+      ? [h('p', { class: 'hint', style: 'margin:0 0 6px' }, 'Tap a pill to edit it. Drag one (press and hold on a phone) onto the left or right of another to move it, or onto its middle to put it inside. The number is how many cases have it.'),
+        h('ul', { class: 'te-list te-pills' }, nodes.map(pill))]
+      : h('ul', { class: 'te-list' }, nodes.map(row))),
     tagGroupsCard());
+}
+
+// Pills: a mouse drags once it moves; a finger drags after a short hold (a quick swipe still scrolls).
+let pillDragged = false;
+function pillDown(e, key) {
+  if (tdrag || (e.pointerType === 'mouse' && e.button !== 0)) return;
+  pillDragged = false;
+  const x0 = e.clientX, y0 = e.clientY, touch = e.pointerType !== 'mouse';
+  let timer = null;
+  const stop = () => { clearTimeout(timer); window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', stop); window.removeEventListener('pointercancel', stop); };
+  const go = ev => { stop(); pillDragged = true; startTagDrag(ev, key, true); };
+  const mv = ev => {
+    const far = Math.abs(ev.clientX - x0) + Math.abs(ev.clientY - y0) > 8;
+    if (!far) return;
+    if (touch) stop(); else go(ev);   // a finger that moves before the hold is scrolling
+  };
+  if (touch) timer = setTimeout(() => go(e), 280);
+  window.addEventListener('pointermove', mv); window.addEventListener('pointerup', stop); window.addEventListener('pointercancel', stop);
 }
 
 // ---------- drag and drop (pointer events, so touch works) ----------
 let tdrag = null;
-function startTagDrag(e, key) {
-  if (tdrag || (e.pointerType === 'mouse' && e.button !== 0)) return;
-  e.preventDefault();
+function startTagDrag(e, key, horiz = false) {
+  // (a pills drag starts from a pointermove, where button is -1)
+  if (tdrag || (e.type === 'pointerdown' && e.pointerType === 'mouse' && e.button !== 0)) return;
+  if (e.cancelable) e.preventDefault();
   const li = e.target.closest('li');
   const box = li.getBoundingClientRect();
   const ghost = li.cloneNode(true);
@@ -296,17 +343,23 @@ function startTagDrag(e, key) {
   ghost.classList.add('te-ghost');
   document.body.append(ghost);
   li.classList.add('te-dragging');
-  tdrag = { key, ghost, li, dy: e.clientY - box.top, target: null, where: null, y: e.clientY };
+  tdrag = { key, ghost, li, dx: e.clientX - box.left, dy: e.clientY - box.top, target: null, where: null, y: e.clientY };
+  // while dragging, a finger must not scroll the page
+  const noScroll = ev => { if (tdrag) ev.preventDefault(); };
+  window.addEventListener('touchmove', noScroll, { passive: false });
   const clear = () => document.querySelectorAll('.te-list li.drop-before, .te-list li.drop-after, .te-list li.drop-inside').forEach(x => x.classList.remove('drop-before', 'drop-after', 'drop-inside'));
   const move = ev => {
     tdrag.y = ev.clientY;
     ghost.style.top = (ev.clientY - tdrag.dy) + 'px';
+    if (horiz) ghost.style.left = (ev.clientX - tdrag.dx) + 'px';
     clear();
     const under = document.elementFromPoint(ev.clientX, ev.clientY);
     const t = under && under.closest('.te-list li[data-k]');
     tdrag.target = null;
     if (!t || t.dataset.k === key) return;
-    const r = t.getBoundingClientRect(), f = (ev.clientY - r.top) / r.height;
+    const r = t.getBoundingClientRect();
+    // pills sit side by side: left / middle / right; rows (and header lines) stack: top / middle / bottom
+    const f = horiz && !t.classList.contains('te-head') ? (ev.clientX - r.left) / r.width : (ev.clientY - r.top) / r.height;
     const set = tagSet();
     const tk = t.dataset.k, te = set.find(x => x.k === tk);
     let where = f < 0.3 ? 'before' : f > 0.7 ? 'after' : 'inside';
@@ -326,7 +379,9 @@ function startTagDrag(e, key) {
   tdrag.raf = requestAnimationFrame(tick);
   const end = ev => {
     window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', end); window.removeEventListener('pointercancel', end);
+    window.removeEventListener('touchmove', noScroll);
     cancelAnimationFrame(tdrag.raf);
+    setTimeout(() => { pillDragged = false; }, 0);   // the click that ends a drag doesn't open the editor
     ghost.remove(); li.classList.remove('te-dragging'); clear();
     const { target, where } = tdrag;
     tdrag = null;
@@ -371,9 +426,24 @@ function editTag(n, kind = n ? n.kind : 'tag') {
       if (!(await confirmBox('Reset shorthand?', 'Replace the words above with the built-in shorthand for this tag? Your changes to them are lost when you save.', 'Reset', true))) return;
       kw.value = DEFAULT_SHORTHAND[code].join(', ');
     } }, 'Reset to the built-in shorthand')) : null,
+    // words from your own cases with this tag: tap one to add it to the shorthand (you choose)
+    kind !== 'head' && n ? (() => {
+      const box = h('div', { class: 'chips', style: 'margin-top:6px' });
+      const paint = () => {
+        const have = cleanShorthand(kw.value);
+        const sug = learnShorthand(S.cases || [], e.k, { have });
+        fill(box, ...(sug.length ? [h('small', { class: 'hint', style: 'flex-basis:100%' }, 'From your logbook:'),
+          ...sug.map(x => h('span', { class: 'chip sugg', role: 'button', tabindex: '0', title: `In ${x.n} of your cases with this tag`,
+            onclick: () => { kw.value = [...cleanShorthand(kw.value), x.w].join(', '); paint(); } }, '+ ' + x.w))] : []));
+      };
+      kw.addEventListener('input', debounceLocal(paint));
+      paint();
+      return box;
+    })() : null,
     kind !== 'head' ? h('label', { class: 'check', style: 'margin-top:8px' }, hide, 'Hide from the Log page (still found by search)') : null,
     h('div', { class: 'bar', style: 'margin-top:12px' },
       n && kind !== 'cat' ? h('button', { class: 'danger', onclick: async () => { m.close(); await saveTags(removeTag(set, e.k)); toast('Removed (cases keep the tag)'); } }, 'Remove') : null,
+      n && kind === 'tag' ? h('button', { onclick: () => { m.close(); mergeTag(n); } }, 'Merge…') : null,
       h('span', { class: 'grow' }),
       h('button', { onclick: () => m.close() }, 'Cancel'),
       h('button', { class: 'primary', onclick: async () => {
@@ -389,6 +459,40 @@ function editTag(n, kind = n ? n.kind : 'tag') {
         if ((e.p || '') !== p || !n) next = reparentTag(next, e.k, p);
         m.close(); await saveTags(next);
       } }, 'Save'))], { sticky: true });
+}
+
+const debounceLocal = fn => { let t; return () => { clearTimeout(t); t = setTimeout(fn, 200); }; };
+
+// Merge a personal tag into another tag: its cases get the other tag instead (an APMES tag adds that
+// category), and it comes off the list.
+function mergeTag(n) {
+  const set = tagSet();
+  const from = n.e.k;
+  const targets = flatTree(tagTree(set)).filter(x => x.kind !== 'head' && x.e.k !== from);
+  const cases = (S.cases || []).filter(c => (c.tags || []).includes(from));
+  const sel = h('select', {}, h('option', { value: '' }, 'Choose a tag…'),
+    targets.map(x => h('option', { value: x.e.k }, `${'  '.repeat(Math.min(x.depth, 3))}${x.kind === 'cat' ? catShort(x.code) + ' (APMES)' : x.e.n}`)));
+  const m = modal(`Merge “${n.e.n}”`, [
+    h('p', {}, `${cases.length} case${cases.length === 1 ? '' : 's'} have “${n.e.n}”. They get the tag you choose instead, and “${n.e.n}” comes off your list.`),
+    h('label', { class: 'field' }, 'Merge into', sel),
+    h('div', { class: 'bar', style: 'margin-top:12px' }, h('span', { class: 'grow' }),
+      h('button', { onclick: () => m.close() }, 'Cancel'),
+      h('button', { class: 'primary', onclick: async () => {
+        const to = sel.value;
+        if (!to) return toast('Choose a tag to merge into');
+        m.close();
+        const code = to.startsWith('c:') ? to.slice(2) : null;
+        const next = cases.map(c => {
+          const tags = (c.tags || []).filter(k => k !== from);
+          const out = { ...c, tags: code ? tags : [...new Set([...tags, to])], updatedAt: Date.now() };
+          if (code) out.cats = sortCodes(withParents([...(c.cats || []), code]));
+          if (!out.tags.length) delete out.tags;
+          return out;
+        });
+        try { if (next.length) await saveMany(next); } catch (err) { return toast('Could not merge: ' + err.message); }
+        await saveTags(removeTag(set, from));
+        toast(`Merged into ${code ? catShort(code) : (set.find(x => x.k === to) || {}).n}: ${next.length} case${next.length === 1 ? '' : 's'} updated`);
+      } }, 'Merge'))]);
 }
 
 // Load a CSV: show what's in it and what didn't line up, then replace your layout.
