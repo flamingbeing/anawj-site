@@ -474,7 +474,7 @@ async function run(label, ctxOpts) {
       fs.writeFileSync(file, await z.generateAsync({ type: 'nodebuffer' }));
       const caseCount = await nCases();
       await tab('data'); await p.locator('main a', { hasText: 'Upload from Word' }).click();
-      await p.locator('main input[type=file]').setInputFiles(file);
+      await p.locator('main .rimp input[type=file]').setInputFiles(file);
       await p.waitForSelector('text=Found 1 reflection');
       const add = () => p.locator('main button.primary', { hasText: /^Add/ }).first();
       assert(await add().isDisabled(), 'must choose a case before importing');

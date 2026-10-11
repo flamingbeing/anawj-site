@@ -167,6 +167,9 @@ assert.equal(ambiguous.caseChoices, undefined, 'do not invent dates for ambiguou
 const sharedDiagnosis = parseRow(tr(tc(p('1. XA'), p('2. XB')), tc(p('3 Jan 2025'), p('4 Feb 2025')),
   tc(p('Shared operation'), p('Additional detail'), p('More detail')), tc(p('Shared text'))), HEADING_BY_ID.thyroid);
 assert.ok(sharedDiagnosis.caseChoices.every(c => c.diagnosis === sharedDiagnosis.diagnosis), 'keep ambiguous diagnosis text');
+const unnumbered = parseRow(tr(tc(p('XA'), p('XB')), tc(p('3 Jan 2025'), p('4 Feb 2025')),
+  tc(p('First operation'), p('Second operation')), tc(p('Shared text'))), HEADING_BY_ID.thyroid);
+assert.deepEqual(unnumbered.caseChoices.map(c => c.initials), ['XA', 'XB'], 'separate paragraphs without printed numbering');
 
 await assert.rejects(parseDocx(new Uint8Array([1, 2, 3]), JSZip), /docx/);
 console.log('reflect-import tests passed');

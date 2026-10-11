@@ -191,12 +191,14 @@ export function topLevel(xml, tag) {
 }
 const cellsOf = tr => topLevel(tr, 'tc');
 
-// A numbered initials cell may list several patients sharing one reflection. Only pair
+// An initials cell may list several patients sharing one reflection. Only pair
 // their fields when the dates align; never guess which patient a date belongs to.
 function caseChoices(initialLines, dateLines, diagnosisLines, diagnosis) {
   const groups = [];
+  const numbered = initialLines.some(l => /^\s*\d{1,3}[.)]/.test(l.text));
   let group = null;
   for (const l of initialLines) {
+    if (!numbered) { if (parseInitials([l])) groups.push([l]); continue; }
     const m = /^\s*\d{1,3}[.)]\s*(.*)$/.exec(l.text);
     if (m) { group = []; groups.push(group); if (m[1]) group.push({ ...l, text: m[1] }); }
     else if (l.text.trim()) { if (!group) return []; group.push(l); }
