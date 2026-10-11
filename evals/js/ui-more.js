@@ -1,10 +1,9 @@
-// More (#more): account, apply for a role, demo role switch, settings, guide links, privacy, sign out.
+// More (#more): account, apply for a role, demo role switch, settings, privacy, sign out.
 
 import { S, h, fill, cloud, toast, hooks, avatar, isResident, isFaculty, isStaff, confirmBox, segment, THEMES, themePref, setTheme } from './ui-core.js';
 import { residentYear } from './engine.js';
 
 const AUTOSCROLL_KEY = 'evals-autoscroll';   // 'off' turns auto-advance off (ui-form.js reads it)
-const GUIDE_URL = 'https://github.com/flamingbeing/anawj-site/tree/main/evals/reference';
 const store = {
   get(k) { try { return localStorage.getItem(k); } catch { return null; } },
   set(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch { /* private mode */ } },
@@ -17,7 +16,7 @@ export function renderMore() {
   const apply = applyCard();
   if (apply) root.append(apply);
   if (cloud.demo) root.append(demoCard());
-  root.append(settingsCard(), guideCard(), privacyCard(),
+  root.append(settingsCard(), privacyCard(),
     h('button', { class: 'n-btn n-btn--outline e-btn-quiet e-btn-big', type: 'button', onclick: signOut }, cloud.demo ? 'Sign out of the demo' : 'Sign out'));
   return root;
 }
@@ -129,15 +128,6 @@ function settingsCard() {
     h('p', { style: 'margin:16px 0 4px' }, h('b', {}, 'Theme')),
     h('div', { class: 'e-more-theme' }, theme),
     h('p', { class: 'e-small', style: 'margin:4px 0 0' }, 'Auto follows your phone’s light or dark setting. Saved on this device.'));
-}
-
-function guideCard() {
-  return h('section', { class: 'e-card' },
-    h('h2', { class: 'e-h3' }, 'Guide and forms'),
-    h('p', { class: 'e-small' }, 'The EPA requirements, form wording and guidebook extracts this app is built from.'),
-    h('ul', { style: 'margin:0;padding-left:20px' },
-      h('li', {}, h('a', { href: GUIDE_URL, target: '_blank', rel: 'noopener' }, 'Reference files (guidebook, EPAs, forms)')),
-      h('li', {}, h('a', { href: GUIDE_URL + '/guidebook', target: '_blank', rel: 'noopener' }, 'Guidebook extracts by EPA'))));
 }
 
 function privacyCard() {
