@@ -89,9 +89,10 @@ const tokens = s => norm(s).split(' ').filter(Boolean);
 // or as a run of initials ("yw" -> "yi wei")? Returns the number of tokens consumed.
 function tokenMatch(q, t, i) {
   if (t[i] === q) return 1;
-  if (q.length === 1 && t[i][0] === q) return 1; // "R Chia", "Arumugam R Kannan"
-  if (i + 1 < t.length && t[i] + t[i + 1] === q) return 2; // "Jiaxin" vs "Jia Xin"
-  if (q.length >= 2 && q.length <= 4 && i + q.length <= t.length) {
+  if (q.length === 1 && t[i][0] === q) return 1; // "R Chua", "Muthu R Kumar"
+  if (i + 1 < t.length && t[i] + t[i + 1] === q) return 2; // "Xinyi" vs "Xin Yi"
+  // initials, unless q is itself a surname ("Ng" isn't "Nathan Goh")
+  if (q.length >= 2 && q.length <= 4 && i + q.length <= t.length && !SURNAMES.has(q)) {
     for (let k = 0; k < q.length; k++) if (t[i + k][0] !== q[k]) return 0;
     return q.length;
   }
@@ -138,7 +139,7 @@ export function matchName(query, staff) {
   return {};
 }
 
-// Split a free-text list ("Tan YW, Ang KS / Swapna (KIV)") into name strings.
+// Split a free-text list ("Koh YW, Ong KS / Anjali (KIV)") into name strings.
 export function splitNameList(text) {
   return String(text ?? '')
     .split(/[\n,;\/\t]+/)
@@ -147,7 +148,7 @@ export function splitNameList(text) {
 }
 
 // Pull person names out of one roster cell, ignoring annotations.
-// "Sophia am /Leong SM pm" -> ["Sophia", "Leong SM"]; "Chaminda (Leong SM C)" -> ["Chaminda"]
+// "Sophia am /Seah MP pm" -> ["Sophia", "Seah MP"]; "Ravindra (Seah MP C)" -> ["Ravindra"]
 export function namesInCell(text) {
   return String(text ?? '')
     .replace(/\(.*?\)/g, ' ')
@@ -298,8 +299,10 @@ function juniorRoomCost(p, d, room, settings, noise, doubled) {
 
 const dayOf = (day, p) => day.staff?.[p.id] || {};
 const isAvail = (day, p) => (dayOf(day, p).status || 'avail') === 'avail';
+// working today, on the lists or elsewhere (calls, clinics)
+const canWork = (day, p) => ['avail', 'elsewhere'].includes(dayOf(day, p).status || 'avail');
 
-// A name as written on the roster, with the day's details: "Tan YW (L) (AOH) L-4pm -mtg 3pm"
+// A name as written on the roster, with the day's details: "Koh YW (L) (AOH) L-4pm -mtg 3pm"
 export function fmtSenior(p, d) {
   let s = p.name;
   if (d.liverStandby) s += ' (L)';
@@ -341,7 +344,11 @@ export function generate({ staff, day, settings = DEFAULT_SETTINGS, seed = 1 }) 
   // ---- seniors ----
   const lockedSeniors = new Set();
   for (const r of rooms) {
-    if (r.lockSenior && byId[r.lockSenior]) { rowOf[r.id].seniors.push(r.lockSenior); lockedSeniors.add(r.lockSenior); }
+    if (r.lockSenior && byId[r.lockSenior]) {
+      // a fixed person who is on leave, MC, post call or admin today isn't put in
+      if (!canWork(day, byId[r.lockSenior])) { warnings.push({ level: 'warn', text: `${r.name}: ${byId[r.lockSenior].name} is fixed here but isn't working today.` }); continue; }
+      rowOf[r.id].seniors.push(r.lockSenior); lockedSeniors.add(r.lockSenior);
+    }
   }
   // operating rooms first; AOCC takes a senior left over afterwards
   const openRooms = rooms.filter(r => !rowOf[r.id].seniors.length && r.id !== 'aocc');
@@ -461,7 +468,7 @@ export function generate({ staff, day, settings = DEFAULT_SETTINGS, seed = 1 }) 
     const free = seniors.filter(p => !usedSeniors.has(p.id) && ['SC', 'C'].includes(p.grade));
     aicPerson = free[Math.floor(rand() * free.length)] || null;
     if (!aicPerson) {
-      const sr = staff.filter(p => p.role === 'junior' && p.grade === 'Senior resident' && isAvail(day, p));
+      const sr = staff.filter(p => p.role === 'junior' && p.grade === 'Senior resident' && isAvail(day, p) && !day.rooms.some(r => r.running && r.lockJunior === p.id));
       aicPerson = sr[Math.floor(rand() * sr.length)] || null;
     }
     if (aicPerson) usedSeniors.add(aicPerson.id);
@@ -472,7 +479,10 @@ export function generate({ staff, day, settings = DEFAULT_SETTINGS, seed = 1 }) 
   const lockedJuniors = new Set();
   if (aicPerson?.role === 'junior') lockedJuniors.add(aicPerson.id);
   for (const r of rooms) {
-    if (r.lockJunior && byId[r.lockJunior]) { rowOf[r.id].juniors.push(r.lockJunior); lockedJuniors.add(r.lockJunior); }
+    if (r.lockJunior && byId[r.lockJunior]) {
+      if (!canWork(day, byId[r.lockJunior])) { warnings.push({ level: 'warn', text: `${r.name}: ${byId[r.lockJunior].name} is fixed here but isn't working today.` }); continue; }
+      rowOf[r.id].juniors.push(r.lockJunior); lockedJuniors.add(r.lockJunior);
+    }
   }
   // AOCC takes juniors left over after the OT lists, like its senior
   const jRooms = rooms.filter(r => !rowOf[r.id].juniors.length && r.id !== 'aocc');
@@ -537,7 +547,8 @@ export function generate({ staff, day, settings = DEFAULT_SETTINGS, seed = 1 }) 
     for (const [id, home] of Object.entries(homeOf)) {
       const p = byId[id];
       if (home.complex !== r.complex || home.id === r.id || isBaby(p) || home.complex === 'Clinic') continue;
-      let c = (coverLoad[id] || 0) * 20 + Math.abs((roomNum(home.name) || 0) - (roomNum(r.name) || 0)) + rand();
+      if (coverLoad[id]) continue; // one ad hoc cover per junior
+      let c = Math.abs((roomNum(home.name) || 0) - (roomNum(r.name) || 0)) + rand();
       if (home.flags.complex) c += 8;
       if (rowOf[home.id].juniors.length > 1) c -= 10;
       if (p.grade === 'MOPEX') c += 3;
@@ -667,8 +678,8 @@ export function check({ rows, staff, day, settings = DEFAULT_SETTINGS }) {
     const p = staff.find(s => s.id === id);
     const d = dayOf(day, p);
     const st = d.status || 'avail';
-    if (st === 'leave' || st === 'postcall') {
-      out.push({ level: 'error', text: `${p.name} is ${st === 'leave' ? 'on leave' : 'post call'} but rostered in ${[...new Set(uses.map(u => u.row.label))].join(', ')}.` });
+    if (['leave', 'mc', 'postcall'].includes(st)) {
+      out.push({ level: 'error', text: `${p.name} is ${{ leave: 'on leave', mc: 'on MC', postcall: 'post call' }[st]} but rostered in ${[...new Set(uses.map(u => u.row.label))].join(', ')}.` });
     }
     const asJunior = uses.filter(u => u.col === 'junior');
     if (asJunior.length > 1) out.push({ level: 'warn', text: `${p.name} is the junior in ${asJunior.map(u => u.row.label).join(' and ')}.` });
@@ -733,7 +744,7 @@ export function learnFromRosters(rosterRows, staff, settings = DEFAULT_SETTINGS)
       let p = m.person;
       if (m.ambiguous) continue;
       if (!p) {
-        // a short form ("Leong SM") is only useful once we know the full name
+        // a short form ("Seah MP") is only useful once we know the full name
         if (tokens(n).length < 2 || tokens(n).some(t => t.length <= 2)) continue;
         p = { id: 'p' + nextId++, source: 'roster', name: n, aliases: [], role: col, grade: DEFAULT_GRADE[col], posting: '', subspecs: [], avoid: [], history: {} };
         people.push(p);
@@ -792,7 +803,7 @@ export function tickFromHistory(staff, minCount = 1) {
 
 // ---------- merging a contact list ----------
 
-// Match a contact-list name ("Sophia Ang Bee Leng") to a staff entry ("Sophia Ang") either way round.
+// Match a contact-list name ("Melody Goh Bee Hoon") to a staff entry ("Melody Goh") either way round.
 export function findSameStaff(name, staff) {
   const m = matchName(name, staff);
   if (m.person) return m.person;
@@ -803,8 +814,8 @@ export function findSameStaff(name, staff) {
 }
 
 // How alike two names are as the same person: 3 the same name (any order, spacing or case),
-// 2 one is a fuller form of the other ("Tan YW" / "Tan Yi Wei Gerald"), 1 a single shared name
-// ("Shree" / "Shree Venkatesan"), 0 different people.
+// 2 one is a fuller form of the other ("Koh YW" / "Koh Yi Wen Gerald"), 1 a single shared name
+// ("Divya" / "Divya Ramesh"), 0 different people.
 export function sameNameScore(a, b) {
   const fa = [a.name, ...(a.aliases || [])].filter(Boolean), fb = [b.name, ...(b.aliases || [])].filter(Boolean);
   const sorted = n => tokens(n).sort().join(' '), squash = n => tokens(n).sort().join('');
@@ -848,6 +859,9 @@ export function mergeStaffRecords(keep, drop) {
   };
 }
 
+// added by a contact-list import ('import' is the older name for it; staff sheets give 'sheet')
+const fromContact = p => p.source === 'contact' || p.source === 'import';
+
 // What importing person c (from a contact list or staff sheet) changes on staff member p.
 // Returns { p: updated copy, changes: ['grade AC → C', …] }.
 export function importUpdate(p, c, contact = true) {
@@ -856,7 +870,7 @@ export function importUpdate(p, c, contact = true) {
   const set = (k, v, label = k) => { if (v != null && v !== '' && q[k] !== v) { changes.push(`${label} ${q[k] || '—'} → ${v}`); q[k] = v; } };
   if (contact) {
     // the contact list is older than the rosters: its role only counts for people it added itself
-    if (p.source === 'import') { set('role', c.role); set('grade', c.grade); }
+    if (fromContact(p)) { set('role', c.role); set('grade', c.grade); }
     else if (p.role === c.role) set('grade', c.grade);
   } else {
     set('role', c.role); set('grade', c.grade); set('posting', c.posting);
@@ -886,7 +900,7 @@ export function planImport(staff, people, { contact = true, skip = [] } = {}) {
   }
   // people an earlier import of the contact list added who are no longer on it
   const maybeIds = new Set(items.flatMap(i => (i.candidates || []).map(x => x.id)));
-  const stale = contact ? staff.filter(p => p.source === 'import' && !matched.has(p.id) && !maybeIds.has(p.id)) : [];
+  const stale = contact ? staff.filter(p => fromContact(p) && !matched.has(p.id) && !maybeIds.has(p.id)) : [];
   return { items, stale };
 }
 
@@ -900,24 +914,24 @@ export function mergeContacts(staff, people, newId) {
     const p = findSameStaff(c.name, out);
     if (p) {
       p.inContactList = true;
-      if (p.source === 'import') { p.role = c.role; p.grade = c.grade; p.name = c.name; }
+      if (fromContact(p)) { p.role = c.role; p.grade = c.grade; p.name = c.name; }
       else if (p.role === c.role && p.grade !== c.grade) p.grade = c.grade;
       for (const k of c.subspecs) if (!p.subspecs.includes(k)) p.subspecs.push(k);
     } else if (c.role === 'senior') {
-      out.push({ id: newId(), source: 'contact', name: c.name, aliases: [], role: c.role, grade: c.grade, posting: '', subspecs: c.subspecs, avoid: [], history: {} });
+      out.push({ id: newId(), source: 'contact', name: c.name, aliases: [], role: c.role, grade: c.grade, posting: '', subspecs: c.subspecs, avoid: [], history: {}, inContactList: true });
     } else skipped.push(c.name);
   }
   // people added by an earlier import of this list who aren't anaesthetists (admin, nursing…)
-  const stale = out.filter(p => p.source === 'import' && !p.inContactList);
-  const kept = out.filter(p => !(p.source === 'import' && !p.inContactList));
+  const stale = out.filter(p => fromContact(p) && !p.inContactList);
+  const kept = out.filter(p => !(fromContact(p) && !p.inContactList));
   kept.forEach(p => { delete p.inContactList; });
   return { staff: kept, skipped, removed: stale.map(p => p.name) };
 }
 
 // ---------- short names ----------
 
-// Common surnames in the department's names; used to tell "Tan Yi Wei" (surname first)
-// from "Swapna Thampi" (given name first).
+// Common surnames in the department's names; used to tell "Koh Yi Wen" (surname first)
+// from "Anjali Varma" (given name first).
 const SURNAMES = new Set(`tan lim lee ng ong wong goh chua chan koh teo ang yeo tay ho low toh sim chong chia seah foo
   leong loh poh neo lau yap chew phua peng chen huang zhang liu wang li hwang tham tiong khoo quek oon chern cheah eu ti
   kang boey bao cui shen wo go chionh lui er oo hong lam chang zhao zhou wu xu sun ma hu guo he lin luo song tang han
@@ -926,7 +940,7 @@ const SURNAMES = new Set(`tan lim lee ng ong wong goh chua chan koh teo ang yeo 
   foong ngiam sng ting loke au kwok kok hoo hsu chiam chin chee choy eng fong kee khor kong ku lek loo lye mak neoh ooi
   pua see sia sin siow soo tai tey tng tsang wan yee yin yoong yuen quah thio tian`.split(/\s+/).filter(Boolean));
 
-// Common given names, mostly English: written as an initial and the surname ("R Chia").
+// Common given names, mostly English: written as an initial and the surname ("R Chua").
 const COMMON_GIVEN = new Set(`aaron abigail adam adeline adrian agnes aidan aileen alan albert alex alexander alexandra alexis alfred
   alice alicia alison amanda amber amelia amy andrea andrew andy angel angela angeline anita ann anna anne annette anthony april
   arthur ashley audrey barbara ben benedict benjamin bernard beth bethany betty bianca bill bob bonnie brandon brenda brian bridget
@@ -950,20 +964,22 @@ const COMMON_GIVEN = new Set(`aaron abigail adam adeline adrian agnes aidan aile
   yvonne zachary zach zoe`.split(/\s+/).filter(Boolean));
 
 // The way names are written on the leave and post call lists:
-// "Tan Yi Wei" -> "Tan YW", "Chan Jiaxin" -> "Jiaxin", "Swapna Thampi" -> "Swapna",
-// "Eric Lee Shih Hsiung" -> "E Lee", "Richard Tierney" -> "R Tierney".
+// "Koh Yi Wen" -> "Koh YW", "Lim Xinyi" -> "Xinyi", "Anjali Varma" -> "Anjali",
+// "Gavin Teo Wen Hao" -> "G Teo", "Robert Ashford" -> "R Ashford".
 export function suggestShortName(name) {
   let t = String(name).replace(/\(.*?\)/g, ' ').replace(/[^A-Za-z\-' ]+/g, ' ').trim().split(/\s+/).filter(Boolean);
-  while (t.length > 1 && t[0].length === 1) t = t.slice(1); // "S. Surentheran"
+  while (t.length > 1 && t[0].length === 1) t = t.slice(1); // "S. Kavinesh"
   if (t.length < 2) return t[0] || '';
   const isSurname = w => SURNAMES.has(w.toLowerCase());
   if (isSurname(t[0])) {
-    const given = t.slice(1).flatMap(w => w.split('-')).filter(Boolean);
-    if (given.length === 1) return given[0].length <= 4 ? t.join(' ') : given[0]; // "Ng Peng" stays as is
+    // a trailing English name isn't part of the initials: "Koh Yi Wen Gerald" -> "Koh YW"
+    let given = t.slice(1).flatMap(w => w.split('-')).filter(Boolean);
+    if (given.length > 2 && COMMON_GIVEN.has(given[given.length - 1].toLowerCase())) given = given.slice(0, -1);
+    if (given.length === 1) return given[0].length <= 4 ? t.join(' ') : given[0]; // "Ng Kai" stays as is
     return `${t[0]} ${given.map(w => w[0].toUpperCase()).join('')}`;
   }
   if (COMMON_GIVEN.has(t[0].toLowerCase())) {
-    // the surname comes straight after the English given name(s): "Rachel Genevieve Law Rui Qi" -> Law
+    // the surname comes straight after the English given name(s): "Rebecca Victoria Lau Rui Xin" -> Lau
     let i = 1;
     while (i < t.length - 1 && COMMON_GIVEN.has(t[i].toLowerCase())) i++;
     const last = t[i];

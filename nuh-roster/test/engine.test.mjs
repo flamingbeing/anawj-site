@@ -5,14 +5,14 @@ import { matchName, namesInCell, suggestFlags, generate, check, tickFromHistory,
 const P = (id, name, role, extra = {}) => ({ id, name, role, grade: role === 'senior' ? 'C' : 'Junior resident', aliases: [], posting: '', subspecs: [], avoid: [], ...extra });
 
 // names
-const staff0 = [P('a', 'Tan Yi Wei', 'senior'), P('b', 'Leong Siaw May', 'senior'), P('c', 'Tan Yi Ling', 'senior')];
-assert.equal(matchName('Tan YW', staff0).person.id, 'a');
-assert.equal(matchName('Leong SM', staff0).person.id, 'b');
-assert.ok(matchName('Tan', staff0).ambiguous);
-assert.deepEqual(namesInCell('Sophia am /Leong SM pm'), ['Sophia', 'Leong SM']);
-assert.deepEqual(namesInCell('Chaminda (Leong SM C)'), ['Chaminda']);
-assert.deepEqual(namesInCell('Bryan Ng -mtg 8.30, 3.30'), ['Bryan Ng']);
-assert.deepEqual(namesInCell('Loh May-Han (AOH 3)'), ['Loh May-Han']);
+const staff0 = [P('a', 'Koh Yi Wen', 'senior'), P('b', 'Seah Mei Ping', 'senior'), P('c', 'Koh Yi Ling', 'senior')];
+assert.equal(matchName('Koh YW', staff0).person.id, 'a');
+assert.equal(matchName('Seah MP', staff0).person.id, 'b');
+assert.ok(matchName('Koh', staff0).ambiguous);
+assert.deepEqual(namesInCell('Melody am /Seah MP pm'), ['Melody', 'Seah MP']);
+assert.deepEqual(namesInCell('Ravindra (Seah MP C)'), ['Ravindra']);
+assert.deepEqual(namesInCell('Brandon Ong -mtg 8.30, 3.30'), ['Brandon Ong']);
+assert.deepEqual(namesInCell('Yeo Shu-Lin (AOH 3)'), ['Yeo Shu-Lin']);
 
 // flags
 assert.deepEqual(suggestFlags('pras 10mo').subspecs, ['paeds']);
@@ -70,21 +70,21 @@ const bad = [{ roomId: 'r1', label: 'MCOR 1', complex: 'MCOR', senior: 'Senior G
 const out = check({ rows: bad, staff, day: { ...day, staff: { s3: { status: 'leave' } } } }).map(w => w.text).join('\n');
 assert.match(out, /on leave/);
 assert.match(out, /Paeds list/);
-assert.equal(suggestShortName('Tan Yi Wei'), 'Tan YW');
-assert.equal(suggestShortName('Chan Jiaxin'), 'Jiaxin');
-assert.equal(suggestShortName('Swapna Thampi'), 'Swapna');
-assert.equal(suggestShortName('Eric Lee Shih Hsiung'), 'E Lee');
-assert.equal(suggestShortName('Richard Tierney'), 'R Tierney');
-assert.equal(suggestShortName('Caitlin Louise Choo Min Ci'), 'C Choo');
+assert.equal(suggestShortName('Koh Yi Wen'), 'Koh YW');
+assert.equal(suggestShortName('Lim Xinyi'), 'Xinyi');
+assert.equal(suggestShortName('Anjali Varma'), 'Anjali');
+assert.equal(suggestShortName('Gavin Teo Wen Hao'), 'G Teo');
+assert.equal(suggestShortName('Robert Ashford'), 'R Ashford');
+assert.equal(suggestShortName('Clara Louise Chew Hui Min'), 'C Chew');
 assert.equal(suggestShortName('Mary Ann Tan'), 'M Tan');
-assert.equal(suggestShortName('Terry Pan Ling Te'), 'T Pan');
-assert.equal(suggestShortName('Rachel Genevieve Law Rui Qi'), 'R Law');
-assert.equal(suggestShortName('Loh May-Han'), 'Loh MH');
+assert.equal(suggestShortName('Kenneth Pang Wei Te'), 'K Pang');
+assert.equal(suggestShortName('Rebecca Victoria Lau Rui Xin'), 'R Lau');
+assert.equal(suggestShortName('Yeo Shu-Lin'), 'Yeo SL');
 {
-  const st = [P('a', 'Tan Yi Wei', 'senior'), P('b', 'Tan Yu Wen', 'junior'), P('c', 'Swapna Thampi', 'senior'), P('d', 'Ang King Sin', 'senior', { aliases: ['Ang KS'] }), P('e', 'Swapna Rao', 'junior')];
+  const st = [P('a', 'Koh Yi Wen', 'senior'), P('b', 'Koh Yu Wei', 'junior'), P('c', 'Anjali Varma', 'senior'), P('d', 'Ong Kah Seng', 'senior', { aliases: ['Ong KS'] }), P('e', 'Anjali Rao', 'junior')];
   assert.deepEqual(suggestShortNames(st), [], 'clashing suggestions and people with short names are skipped');
   st.pop(); st.splice(1, 1);
-  assert.deepEqual(suggestShortNames(st).map(x => x.short), ['Tan YW', 'Swapna']);
+  assert.deepEqual(suggestShortNames(st).map(x => x.short), ['Koh YW', 'Anjali']);
 }
 console.log('engine tests passed');
 
@@ -92,16 +92,16 @@ console.log('engine tests passed');
 {
   const { mergeContacts, findSameStaff } = await import('../js/engine.js');
   const { cleanContactName } = await import('../js/xlsxio.js');
-  assert.equal(cleanContactName('Dr Foo Peng Xiang, Donald'), 'Donald Foo Peng Xiang');
-  assert.equal(cleanContactName('A/Prof Sophia Ang Bee Leng '), 'Sophia Ang Bee Leng');
-  assert.equal(cleanContactName('Dr Ambika D/O Paramasivan'), 'Ambika Paramasivan');
-  assert.equal(cleanContactName('Dr Ng Peng (SAF)'), 'Ng Peng');
-  const staff = [P('a', 'Sophia Ang', 'senior'), P('b', 'Donald Foo', 'senior', { grade: 'AC' }), P('c', 'Zara Lim', 'senior')];
-  assert.equal(findSameStaff('Sophia Ang Bee Leng', staff).id, 'a');
+  assert.equal(cleanContactName('Dr Wee Peng Hock, Dennis'), 'Dennis Wee Peng Hock');
+  assert.equal(cleanContactName('A/Prof Melody Goh Bee Hoon '), 'Melody Goh Bee Hoon');
+  assert.equal(cleanContactName('Dr Kamala D/O Subramaniam'), 'Kamala Subramaniam');
+  assert.equal(cleanContactName('Dr Ng Kai (SAF)'), 'Ng Kai');
+  const staff = [P('a', 'Melody Goh', 'senior'), P('b', 'Dennis Wee', 'senior', { grade: 'AC' }), P('c', 'Zara Lim', 'senior')];
+  assert.equal(findSameStaff('Melody Goh Bee Hoon', staff).id, 'a');
   let n = 0;
   const res = mergeContacts(staff, [
-    { name: 'Sophia Ang Bee Leng', role: 'senior', grade: 'C', subspecs: ['cardiac'] },
-    { name: 'Donald Foo Peng Xiang', role: 'senior', grade: 'C', subspecs: [] },
+    { name: 'Melody Goh Bee Hoon', role: 'senior', grade: 'C', subspecs: ['cardiac'] },
+    { name: 'Dennis Wee Peng Hock', role: 'senior', grade: 'C', subspecs: [] },
     { name: 'New Person Senior', role: 'senior', grade: 'AC', subspecs: ['paeds'] },
     { name: 'New Junior Person', role: 'junior', grade: 'MOPEX', subspecs: [] },
   ], () => 'n' + ++n);
@@ -116,8 +116,8 @@ console.log('engine tests passed');
 // leave and cover tags
 {
   const { missingCovers, namesInCell: nic } = await import('../js/engine.js');
-  assert.deepEqual(nic('Tan YW L-4pm / Lee AB C-OT13'), ['Tan YW', 'Lee AB']);
-  assert.deepEqual(nic('Tan YW L-4-5pm'), ['Tan YW']);
+  assert.deepEqual(nic('Koh YW L-4pm / Lee AB C-OT13'), ['Koh YW', 'Lee AB']);
+  assert.deepEqual(nic('Koh YW L-4-5pm'), ['Koh YW']);
   const rows = [
     { roomId: 'a', label: 'MOR 13', complex: 'MOR', senior: 'Senior One L-4pm', junior: '' },
     { roomId: 'b', label: 'MOR 14', complex: 'MOR', senior: 'Senior Two', junior: '' },
@@ -221,11 +221,11 @@ console.log('engine tests passed');
 // duplicates and import review (fake names only)
 {
   const { findDuplicates, sameNameScore, mergeStaffRecords, planImport } = await import('../js/engine.js');
-  const st = [P('a', 'Tan Yi Wei', 'senior'), P('b', 'Tan Yi Wei Gerald', 'senior'), P('c', 'Shree', 'junior'), P('d', 'Shree Venkatesan', 'junior'),
-    P('e', 'Cui Jiaqian', 'junior'), P('f', 'Jiaqian Cui', 'junior'), P('g', 'Lim Wei Ming', 'senior'), P('h', 'Lim Wei Ling', 'senior')];
+  const st = [P('a', 'Koh Yi Wen', 'senior'), P('b', 'Koh Yi Wen Gerald', 'senior'), P('c', 'Divya', 'junior'), P('d', 'Divya Ramesh', 'junior'),
+    P('e', 'Wu Jiahui', 'junior'), P('f', 'Jiahui Wu', 'junior'), P('g', 'Lim Wei Ming', 'senior'), P('h', 'Lim Wei Ling', 'senior')];
   assert.equal(sameNameScore(st[4], st[5]), 3, 'same name in another order');
   assert.ok(sameNameScore(st[0], st[1]) >= 2, 'an extra name');
-  assert.ok(sameNameScore({ name: 'Tan YW' }, st[1]) >= 2, 'initials');
+  assert.ok(sameNameScore({ name: 'Koh YW' }, st[1]) >= 2, 'initials');
   assert.equal(sameNameScore(st[6], st[7]), 0, 'different people');
   const pairs = findDuplicates(st).map(x => [x.a.id, x.b.id].sort().join(''));
   assert.ok(pairs.includes('ef') && pairs.includes('cd'), 'finds reordered and short-name duplicates');
@@ -233,12 +233,12 @@ console.log('engine tests passed');
   st[4].notDup = ['f'];
   assert.ok(!findDuplicates(st).some(x => [x.a.id, x.b.id].sort().join('') === 'ef'), 'pairs marked different are left out');
   const m = mergeStaffRecords({ ...st[3], subspecs: ['paeds'] }, { ...st[2], subspecs: ['neuro'], colour: 'green' });
-  assert.deepEqual(m.aliases, ['Shree']);
+  assert.deepEqual(m.aliases, ['Divya']);
   assert.deepEqual(m.subspecs, ['paeds', 'neuro']);
   assert.equal(m.colour, 'green');
-  const plan = planImport([P('x', 'Tan Yi Wei', 'senior')], [
-    { name: 'Tan Yi Wei', role: 'senior', grade: 'SC', subspecs: [] },
-    { name: 'Tan Yi Wei Gerald', role: 'senior', grade: 'C', subspecs: [] },
+  const plan = planImport([P('x', 'Koh Yi Wen', 'senior')], [
+    { name: 'Koh Yi Wen', role: 'senior', grade: 'SC', subspecs: [] },
+    { name: 'Koh Yi Wen Gerald', role: 'senior', grade: 'C', subspecs: [] },
     { name: 'New Senior Person', role: 'senior', grade: 'AC', subspecs: [] },
     { name: 'New Junior Person', role: 'junior', grade: 'MOPEX', subspecs: [] },
     { name: 'Skipped Person', role: 'senior', grade: 'C', subspecs: [] },
@@ -247,4 +247,38 @@ console.log('engine tests passed');
   assert.deepEqual(plan.items[0].changes, ['grade C → SC']);
   assert.equal(plan.items[1].candidates[0].id, 'x');
   console.log('duplicate tests passed');
+}
+
+// a fixed person who isn't working isn't put in; one ad hoc cover per junior
+{
+  const st = [P('s1', 'Senior One', 'senior'), P('s2', 'Senior Two', 'senior'), P('s3', 'Senior Three', 'senior'), P('j1', 'Junior One', 'junior')];
+  const mk = (id, name, extra = {}) => ({ id, name, complex: 'MOR', running: true, notes: '', session: 'full', ...extra });
+  const day = { rooms: [mk('m1', 'MOR 1', { lockSenior: 's1' }), mk('m2', 'MOR 2'), mk('m3', 'MOR 3')], staff: { s1: { status: 'leave' } } };
+  const res = generate({ staff: st, day, seed: 2 });
+  assert.ok(!res.rows.some(r => r.senior.includes('Senior One')), 'fixed senior on leave is left out');
+  assert.ok(res.warnings.some(w => /fixed here but isn't working/.test(w.text)));
+  const covers = res.rows.filter(r => /\(C\)/.test(r.junior)).length;
+  assert.ok(covers <= 1, `one junior covers at most one other room (got ${covers})`);
+  console.log('fixed and cover cap tests passed');
+}
+
+// review fixes: MC check, surname vs initials, trailing English name, month words, wrapped PDF lines
+{
+  const { parsePeriod, readMonthlyPdf, addDays } = await import('../js/monthly.js');
+  const st = [P('s1', 'Senior One', 'senior'), P('n', 'Nathan Goh', 'senior')];
+  const rows = [{ roomId: 'a', label: 'MOR 1', complex: 'MOR', senior: 'Senior One', junior: '' }];
+  assert.match(check({ rows, staff: st, day: { rooms: [], staff: { s1: { status: 'mc' } } } }).map(w => w.text).join(), /on MC/);
+  assert.equal(matchName('Ng', st).person, undefined, 'a surname is not initials');
+  assert.equal(suggestShortName('Koh Yi Wen Gerald'), 'Koh YW');
+  assert.equal(parsePeriod('6 Okt', '2022-10').from, '2022-10-06');
+  assert.equal(addDays('2022-12-31', 1), '2023-01-01');
+  const it = (str, x, y, w = 30) => ({ str, x, y, w });
+  const page = [it('Anaesthesia - Night List (After Office Hr) Roster', 100, 800), it('For Oct 2022', 300, 800),
+    it('AOH', 100, 700, 40), it('AOH Standby', 190, 700, 60),
+    it('1', 20, 680, 8), it('Sat', 40, 680, 15), it('Alpha One', 100, 680, 50), it('Bravo', 190, 680, 40),
+    it('2', 20, 660, 8), it('Sun', 40, 660, 15), it('Charlie', 100, 665, 40), it('Delta', 100, 655, 40), it('Echo', 190, 660, 40)];
+  const res = readMonthlyPdf([page, [it('3', 20, 780, 8), it('Mon', 40, 780, 15), it('Foxtrot', 100, 780, 40)]]);
+  assert.equal(res.data.rows[2].aoh, 'Charlie Delta', 'a name wrapped onto two lines');
+  assert.equal(res.data.rows[3].aoh, 'Foxtrot', 'a page without headers');
+  console.log('review fix tests passed');
 }

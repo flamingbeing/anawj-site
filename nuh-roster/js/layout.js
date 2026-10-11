@@ -22,7 +22,7 @@ export const DUTIES = [
 
 // lists: { postcall: [...names], leave: [...], admin: [...] }
 // colourOf(namePart) -> 'green' | 'purple' | '' for each name on the OT rows.
-// shortOf(namePart) -> the same part with the person's short name ("Tan YW (RA)").
+// shortOf(namePart) -> the same part with the person's short name ("Koh YW (RA)").
 // general: the General tab's fields ({ 'mot.cons': '…', 'eot8.s': '…' }); box: the free text
 // in the comments box at the top right.
 export function buildLayout({ date, rows, lists = {}, general = {}, box = '', colourOf = () => '', shortOf = s => s }) {

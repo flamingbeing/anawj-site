@@ -56,10 +56,11 @@ const CONTACT_GROUPS = [
 const CONTACT_SUBSPECS = { cardiac: 'cardiac', paeds: 'paeds', neuro: 'neuro', thoracic: 'thoracic', liver: 'hpb', og: 'obs' };
 
 export function cleanContactName(raw) {
-  let n = String(raw || '').replace(/\(.*?\)/g, ' ').replace(/^\s*(dr|a\/prof|prof|adj\s+a\/prof)\.?\s+/i, '')
-    .replace(/\b[DS]\/O\b|\bBte\b|\bBin\b/gi, ' ').replace(/\s+/g, ' ').trim();
-  const comma = n.match(/^(.*?),\s*(.+)$/); // "Foo Peng Xiang, Donald" -> "Donald Foo Peng Xiang"
-  if (comma) n = `${comma[2]} ${comma[1]}`;
+  let n = String(raw || '').replace(/\(.*?\)/g, ' ').replace(/^\s*((adj|clin|clinical)\.?\s+)?((asst|assoc|a)\.?\s*\/?\s*)?(prof|dr)\.?\s+(dr\.?\s+)?/i, '')
+    .replace(/\b[DS]\/O\b|\bBte\b|\bBinte\b|\bBin\b/gi, ' ').replace(/\s+/g, ' ').trim();
+  const comma = n.match(/^(.*?),\s*(.+)$/); // "Wee Peng Hock, Dennis" -> "Dennis Wee Peng Hock"
+  // only a single given name after the comma; "…, MMed" is a qualification and is dropped
+  if (comma) n = /^[A-Z][a-z]+(-[A-Z]?[a-z]+)?$/.test(comma[2]) ? `${comma[2]} ${comma[1]}` : comma[1];
   return n;
 }
 
@@ -111,7 +112,7 @@ export function readStaffSheet(ws) {
     if (!name) return;
     const grade = get('grade');
     const roleText = get('role').toLowerCase();
-    const seniorish = /consultant|\bac\b|associate/i.test(grade + ' ' + roleText);
+    const seniorish = /consultant|\bac\b|associate/i.test(grade + ' ' + roleText) || ['SC', 'C', 'VC', 'AC'].includes(normGrade(grade, false));
     people.push({
       name,
       aliases: list(get('aliases')),
