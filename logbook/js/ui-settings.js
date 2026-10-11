@@ -242,7 +242,9 @@ export function categoryNamesCard() {
 // Share it as a CSV file (opens in Excel) or load someone else's.
 const saveTags = set => patchLogbook({ settings: { tagSet: cleanTagSet(set) } }).then(() => hooks.render());
 // view: the list (details, up/down) or pills (as on the Log page, drag to reorder); a search narrows both
-const tev = { mode: 'list', q: '' };
+// (List or Pills is remembered with your account, like the Log page's switch)
+const tev = { q: '' };
+const teMode = () => (settings().tagEditorView === 'pills' ? 'pills' : 'list');
 // cases per tag: APMES tags from the counts, your own tags by key
 function tagUsage() {
   const n = new Map();
@@ -279,7 +281,7 @@ export function renderTagEditor() {
   const search = h('input', { type: 'search', class: 'grow', value: tev.q, placeholder: 'Search tags, names or shorthand', 'aria-label': 'Search tags',
     oninput: e => { tev.q = e.target.value; const pos = e.target.selectionStart; hooks.render(); const el = document.querySelector('.tag-editor input[type=search]'); if (el) { el.focus(); el.setSelectionRange(pos, pos); } } });
   const modeSeg = h('span', { class: 'seg', role: 'group', 'aria-label': 'Show tags as' },
-    [['list', 'List'], ['pills', 'Pills']].map(([m, l]) => h('button', { class: 'small', 'aria-pressed': String(tev.mode === m), onclick: () => { tev.mode = m; hooks.render(); } }, l)));
+    [['list', 'List'], ['pills', 'Pills']].map(([m, l]) => h('button', { class: 'small', 'aria-pressed': String(teMode() === m), onclick: () => { if (teMode() !== m) patchLogbook({ settings: { tagEditorView: m } }).then(() => hooks.render()); } }, l)));
   return h('div', {}, h('section', { class: 'card tag-editor' },
     h('h2', {}, 'Tag editor'),
     h('p', { class: 'hint' }, 'Lay out the Log page’s list your way. APMES tags are the programme’s categories: rename (just for you), hide, move them or put them under section headers. Personal tags are your own: link one to APMES categories and choosing it ticks them, or leave it as a label only. A personal tag under an APMES one counts towards it. Totals and exports always use APMES.'),
@@ -295,7 +297,7 @@ export function renderTagEditor() {
       } }, 'Reset')),
     h('div', { class: 'bar', style: 'gap:8px;margin:0 0 8px' }, search, modeSeg),
     words.length ? h('p', { class: 'hint', style: 'margin:0 0 6px' }, `${nodes.length} of ${all.length} shown`) : null,
-    tev.mode === 'pills'
+    teMode() === 'pills'
       ? [h('p', { class: 'hint', style: 'margin:0 0 6px' }, 'Tap a pill to edit it. Drag one (press and hold on a phone) onto the left or right of another to move it, or onto its middle to put it inside. The number is how many cases have it.'),
         h('ul', { class: 'te-list te-pills' }, nodes.map(pill))]
       : h('ul', { class: 'te-list' }, nodes.map(row))),
