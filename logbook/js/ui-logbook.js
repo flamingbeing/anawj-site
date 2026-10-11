@@ -83,7 +83,8 @@ export function renderLogbook() {
   };
   // Advanced search (Settings → Logging): operators in the box (search-ops.js); off by default
   const opsOn = () => !!settings().searchOps;
-  const partsOf = c => { const p = caseParts(c); return { initials: p.initials.toLowerCase(), case: String(p.details || '').toLowerCase() }; };
+  // title: the case's first line (initials and the first line of the details)
+  const partsOf = c => { const p = caseParts(c); return { initials: p.initials.toLowerCase(), case: String(p.details || '').toLowerCase(), title: caseText(c).split('\n')[0].toLowerCase() }; };
   // tag:16 / tag:lscs: a tag's code, or a word in its name (APMES or your own)
   const tagHas = (c, t) => (c.cats || []).some(k => k.toLowerCase() === t || `${catName(k)} ${catShort(k)} ${catFull(k)}`.toLowerCase().includes(t))
     || (c.tags || []).some(k => tagName(k).toLowerCase().includes(t));

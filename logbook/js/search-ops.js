@@ -2,7 +2,8 @@
 // search box. Pure, unit-tested.
 //
 //   initials:AB   only the initials        case:hernia   only the case text (no initials, tags, dates)
-//   tag:16        a tag, by code or name   "lap chole"   an exact phrase
+//   title:lscs    only the first line      tag:16        a tag, by code or name
+//   "lap chole"   an exact phrase          spinal AND ga  both (same as a space)
 //   -paeds        leave out                spinal OR epidural (or |)   either
 //
 // Anything else is a plain word, searched as without operators. A misspelt operator ("initals:AB",
@@ -10,15 +11,17 @@
 
 import { editDistance } from './engine.js';
 
-export const FIELDS = ['initials', 'case', 'tag'];
+export const FIELDS = ['initials', 'title', 'case', 'tag'];
 // [example, what it does, what a tap in the "?" list puts in the box, where the cursor goes in it]
 export const OPERATOR_HELP = [
   ['initials:AB', 'only cases with those initials', 'initials:', 9],
+  ['title:lscs', 'only the first line of the case', 'title:', 6],
   ['case:hernia', 'only the case text (not initials, tags or dates)', 'case:', 5],
   ['tag:16  tag:lscs', 'cases with that tag, by code or name (your own tags too)', 'tag:', 4],
   ['"lap chole"', 'that exact phrase', '""', 1],
   ['-paeds', 'leave out cases with that word (works with the others: -tag:13)', '-', 1],
   ['spinal OR epidural', 'either one (spinal | epidural works too)', 'OR ', 3],
+  ['spinal AND GA', 'both (the same as a space, as every word must match)', 'AND ', 4],
 ];
 
 // the box's text with an operator added at the cursor (a space either side as needed) and where the
@@ -45,6 +48,7 @@ export function parseQuery(q) {
     // a lone "-" or "-" before nothing useful is just a character
     if (neg && !field && phrase == null && !/^[\p{L}\p{N}]/u.test(word || '')) { word = '-' + (word || ''); neg = ''; }
     if (!neg && !field && phrase == null && (word === 'OR' || word === '|')) { tokens.push({ or: true }); continue; }
+    if (!neg && !field && phrase == null && (word === 'AND' || word === '&')) continue;   // a space does the same
     let f = field ? field.toLowerCase() : null;
     if (f && !FIELDS.includes(f)) {
       // not an operator: the whole thing is text ("GA:ETT"); a near miss of one is reported
@@ -67,7 +71,7 @@ export function parseQuery(q) {
   return { groups, unknown };
 }
 
-// Does a case match? get: { all, initials, case } lower-cased texts of the case; tagHas(text) for tag:;
+// Does a case match? get: { all, initials, title, case } lower-cased texts of the case; tagHas(text) for tag:;
 // has(hay, word) the plain-word test (fuzzy aware).
 export function matchQuery(parsed, get, tagHas, has = (hay, w) => hay.includes(w)) {
   const one = t => {
@@ -80,4 +84,4 @@ export function matchQuery(parsed, get, tagHas, has = (hay, w) => hay.includes(w
 }
 
 // whether the query uses any operator (for the "?" note), cheap
-export const usesOperators = q => /(^|\s)(-\S|"|(initials|case|tag):)|\s(OR|\|)\s/i.test(String(q || ''));
+export const usesOperators = q => /(^|\s)(-\S|"|(initials|title|case|tag):)|\s(OR|AND|\||&)\s/i.test(String(q || ''));
