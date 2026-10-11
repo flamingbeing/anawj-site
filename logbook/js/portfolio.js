@@ -620,7 +620,7 @@ const TC = { info: null, loading: false, busy: false };
 // Admin page card: upload the blank portfolio template (made with tools/build_portfolio_template.py).
 export function renderTemplateCard() {
   const card = h('section', { class: 'card' }, h('h2', {}, 'Portfolio template'),
-    h('p', { class: 'hint' }, 'The blank APMES portfolio (.docx) that “Export portfolio (Word)” fills in. Word comments in it are removed on upload. Make it from a filled portfolio with tools/build_portfolio_template.py, which clears every resident’s details. Do not upload a filled one. Without a template, exports use a plain layout.'));
+    h('p', { class: 'hint' }, 'The blank APMES portfolio (.docx) that the Word export (More → Export & Sync) fills in. Word comments in it are removed on upload. Make it from a filled portfolio with tools/build_portfolio_template.py, which clears every resident’s details. Do not upload a filled one. Without a template, exports use a plain layout.'));
   if (!cloud.saveTemplate) return card;
   if (!TC.info && !TC.loading) {
     TC.loading = true;

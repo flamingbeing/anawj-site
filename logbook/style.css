@@ -693,13 +693,13 @@ ul.cases li.refl-row.has-ex::after { content: none; }
 .refl-row.out .refl-proc { opacity: .6; }
 .refl-wc { font-size: 12px; }
 .refl-counts { font-size: 13px; }
-.refl-htoggle { cursor: pointer; }
+.refl-htoggle { cursor: pointer; min-height: 40px; display: flex; align-items: center; flex-wrap: wrap; gap: 0 4px; }
 .refl-htoggle .res-chev { display: inline-block; transition: transform .15s; }
 .refl-htoggle[aria-expanded="true"] .res-chev { transform: rotate(90deg); }
 .ready-line { margin: 8px 0 0; padding: 6px 10px; border-radius: 10px; background: var(--info-bg); }
-.ready-line > summary { cursor: pointer; font-size: 14px; color: var(--info); min-height: 32px; display: flex; align-items: center; }
+.ready-line > summary { cursor: pointer; font-size: 14px; color: var(--info); min-height: 40px; display: flex; align-items: center; }
 .refl-filters { margin-top: 6px; }
-.refl-filters .chip { min-height: 36px; }
+.refl-filters .chip { min-height: 40px; }
 .refl-export .btn.small, .refl-export button.small { min-height: 40px; }
 .flag.tagged { background: var(--warn-bg, #fff4e5); color: var(--warn, #b45309); margin-right: 6px; }
 .refl-htoggle .res-chev.blank { width: .5em; }
