@@ -29,7 +29,7 @@
   --nuhs-cyan: #00a9e0;
   --nuhs-red: #e4002b;
   --nuhs-orange: #e57200;
-  color-scheme: light dark;
+  color-scheme: light;
 }
 
 * { box-sizing: border-box; }
@@ -510,22 +510,44 @@ body.dragging-refl { user-select: none; -webkit-user-select: none; }
 .refl-rules ul { margin: 4px 0 0; padding-left: 20px; }
 button.icon-btn { min-width: 40px; }
 
-/* ---------- dark mode (follows the phone's setting) ---------- */
-@media (prefers-color-scheme: dark) {
-  :root {
+/* ---------- dark mode: Settings → Display → Theme (light by default; data-theme on <html>) ---------- */
+:root[data-theme="dark"] {
     --bg: #121417; --panel: #1c1f24; --ink: #e6e8eb; --muted: #a2abb5; --line: #333941;
     --accent: #8cc0ff; --accent-ink: #0b1a2e; --accent-soft: #1d2b3d; --chip: #1f2a36; --chip-on: #8cc0ff;
     --err: #ff9a8f; --err-bg: #3b1f1c; --warn: #f3c46e; --warn-bg: #362b12; --ok: #74dd90; --ok-bg: #15301e;
-    --info: #8cc0ff; --info-bg: #15263a; --row-alt: #181b20; --ontrack: #5f666e;
+    --info: #8cc0ff; --info-bg: #15263a; --row-alt: #181b20; --ontrack: #5f666e; color-scheme: dark;
   }
-  .top h1, section.card h2, h2, h3 { color: var(--accent); }
-  :focus-visible, input:focus, select:focus, textarea:focus { outline-color: var(--accent); }
-  input:focus, select:focus, textarea:focus { border-color: var(--accent); }
-  input, select, textarea { background: #15181c; color: var(--ink); }
-  table.totals td.late { background: #4a1f23; } table.totals td.due { background: #43361a; } table.totals td.done { background: #1d3a25; }
-  .bin-kind { background: #1f2c40; color: #b9d2f5; } .bin-kind.reflection { background: #33213c; color: #e2c4ef; }
-  img { opacity: .92; }
+:root[data-theme="dark"] .top h1, :root[data-theme="dark"] section.card h2, :root[data-theme="dark"] h2, :root[data-theme="dark"] h3 { color: var(--accent); }
+:root[data-theme="dark"] :focus-visible, :root[data-theme="dark"] input:focus, :root[data-theme="dark"] select:focus, :root[data-theme="dark"] textarea:focus { outline-color: var(--accent); }
+:root[data-theme="dark"] input:focus, :root[data-theme="dark"] select:focus, :root[data-theme="dark"] textarea:focus { border-color: var(--accent); }
+:root[data-theme="dark"] input, :root[data-theme="dark"] select, :root[data-theme="dark"] textarea { background: #15181c; color: var(--ink); }
+:root[data-theme="dark"] table.totals td.late { background: #4a1f23; }
+:root[data-theme="dark"] table.totals td.due { background: #43361a; }
+:root[data-theme="dark"] table.totals td.done { background: #1d3a25; }
+:root[data-theme="dark"] .bin-kind { background: #1f2c40; color: #b9d2f5; }
+:root[data-theme="dark"] .bin-kind.reflection { background: #33213c; color: #e2c4ef; }
+:root[data-theme="dark"] img { opacity: .92; }
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="auto"] {
+    --bg: #121417; --panel: #1c1f24; --ink: #e6e8eb; --muted: #a2abb5; --line: #333941;
+    --accent: #8cc0ff; --accent-ink: #0b1a2e; --accent-soft: #1d2b3d; --chip: #1f2a36; --chip-on: #8cc0ff;
+    --err: #ff9a8f; --err-bg: #3b1f1c; --warn: #f3c46e; --warn-bg: #362b12; --ok: #74dd90; --ok-bg: #15301e;
+    --info: #8cc0ff; --info-bg: #15263a; --row-alt: #181b20; --ontrack: #5f666e; color-scheme: dark;
+  }
+  :root[data-theme="auto"] .top h1, :root[data-theme="auto"] section.card h2, :root[data-theme="auto"] h2, :root[data-theme="auto"] h3 { color: var(--accent); }
+  :root[data-theme="auto"] :focus-visible, :root[data-theme="auto"] input:focus, :root[data-theme="auto"] select:focus, :root[data-theme="auto"] textarea:focus { outline-color: var(--accent); }
+  :root[data-theme="auto"] input:focus, :root[data-theme="auto"] select:focus, :root[data-theme="auto"] textarea:focus { border-color: var(--accent); }
+  :root[data-theme="auto"] input, :root[data-theme="auto"] select, :root[data-theme="auto"] textarea { background: #15181c; color: var(--ink); }
+  :root[data-theme="auto"] table.totals td.late { background: #4a1f23; }
+  :root[data-theme="auto"] table.totals td.due { background: #43361a; }
+  :root[data-theme="auto"] table.totals td.done { background: #1d3a25; }
+  :root[data-theme="auto"] .bin-kind { background: #1f2c40; color: #b9d2f5; }
+  :root[data-theme="auto"] .bin-kind.reflection { background: #33213c; color: #e2c4ef; }
+  :root[data-theme="auto"] img { opacity: .92; }
 }
-@media (prefers-color-scheme: dark) and (max-width: 600px) {
-  .tabs { background: rgba(28, 31, 36, .96) !important; }
+@media (max-width: 600px) {
+  :root[data-theme="dark"] .tabs { background: rgba(28, 31, 36, .96); }
+}
+@media (max-width: 600px) and (prefers-color-scheme: dark) {
+  :root[data-theme="auto"] .tabs { background: rgba(28, 31, 36, .96); }
 }
