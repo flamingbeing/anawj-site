@@ -311,3 +311,14 @@ tr.highlight td { background: #fff4c2 !important; transition: background 1s; }
 @media (min-width: 900px) { .card.scroll:has(> table.sheet) { overflow: visible; } }
 .sheet thead th { z-index: 2; box-shadow: 0 1px 0 var(--line); }
 @media (max-width: 899px) { .sheet td.room { position: sticky; left: 0; z-index: 1; background: var(--panel); } }
+
+/* Calls and clinics: person chips; dashed ones come from the monthly rosters */
+.call-field { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-height: 28px; }
+.call-field .cell-input { flex: 1 1 180px; text-align: left; }
+.pchip.inherited { border-style: dashed; border-color: var(--muted); background: transparent; }
+.pchip.unknown { color: var(--red); border-color: var(--red); }
+.call-field .from { font-size: 11px; color: var(--muted); }
+.call-field .add-name { opacity: .6; }
+.call-field:hover .add-name, .call-field:not(:has(.name)) .add-name { opacity: 1; }
+.call-field .icon.del { opacity: 0; }
+.call-field .name:hover .icon.del { opacity: 1; }

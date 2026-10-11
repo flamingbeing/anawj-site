@@ -145,7 +145,7 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
 - **Tabs:** the daily ones in work order on the left (Monthly, Cases, Roster, Premeds), the set-up ones (Staff, Settings) on the right.
 - **Less on screen:** Cases shows only the flags that are on ("+ flag" opens the rest); roster cells show + and the & / C handles on hover. Hovering a name, or opening its box, lights up every cell that person is in.
 - **Empty pages** say what's missing and have a button to the tab that fixes it.
-- **Person chip and box:** the same chip and box on Today, Cases, Roster and Premeds. The name and grade are read-only there; Edit opens the Staff tab on that person.
+- **Person chip and box:** the same chip and box on Today, Cases, Roster, Premeds and Calls/clinics. On Calls/clinics a dashed chip comes from the monthly rosters (or the MOT call team for EOT 8 and 9); × on the only one stores `-` (nobody), and "↺ monthly" goes back to the monthly roster. The name and grade are read-only there; Edit opens the Staff tab on that person.
 - **Touch screens:** no dragging, no C / & / × icons. Tapping opens the box.
 - **Design:** "Kent Ridge Clinical" (NUHS website style):
   - navy and white, Open Sans
@@ -157,7 +157,6 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
 
 - Text typed into the person box can't use "/" (it separates names in a cell) or brackets (they hold tags). "w/" becomes "with", "/" becomes "or" and brackets become [ ].
 - A comment that is only a time ("5pm") reads back as a leaving time, as in the older roster style "Name -5pm".
-- A Calls/clinics value from the monthly rosters can be replaced by typing over it, but not blanked.
 - AOH and liver duties don't make anyone post call; only the duties listed in Settings do.
 - Undo is per date and is cleared when the header date changes.
 
