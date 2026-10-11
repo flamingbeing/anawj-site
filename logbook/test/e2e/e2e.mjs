@@ -1621,13 +1621,16 @@ async function run(label, ctxOpts) {
     await nap(300);
   });
 
-  await step('compact mode toggle persists after reload', async () => {
+  await step('compact mode is per device and persists after reload', async () => {
     await tab('display');
     const sw = p.locator('label.check', { hasText: 'Compact mode' }).locator('input');
     if (!(await sw.isChecked())) await sw.check();
     await nap(600);
     assert(await p.evaluate(() => document.body.classList.contains('compact')), 'no body.compact');
     await shot3('settings-compact');
+    // display settings are this device's: saved in localStorage, never in the account
+    const where = await p.evaluate(() => [JSON.parse(localStorage.getItem('apmes-logbook-display') || '{}').compact, (JSON.parse(localStorage.getItem('apmes-logbook-demo-v1')).logbooks['demo@example.com'].doc.settings || {}).compact]);
+    assert(where[0] === true && !where[1], 'compact saved to the account, not the device: ' + where);
     await p.reload({ waitUntil: 'networkidle' });
     await p.waitForSelector('.tabs button[data-tab="log"]');
     await nap(600);

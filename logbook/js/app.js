@@ -6,7 +6,7 @@ import { S, hooks, h, toast, cloud, setCases, scheduleSummary, fill, resetCaches
 import { renderLog, logCasesChanged, clearDrafts, SHARED_KEY } from './ui-log.js';
 import { renderLogbook } from './ui-logbook.js';
 import { renderProgress, renderTotals } from './ui-progress.js';
-import { applyCompact, cachedCompact, applyTheme, cachedTheme, applyTextSize, cachedTextSize, applyAccent, renderTagEditor, renderDisplay, renderLogging, renderReflectionSettings, renderMarkdownSettings, START_TABS, privacyCard, creditsCard, signOutCard } from './ui-settings.js';
+import { applyCompact, cachedCompact, applyTheme, cachedTheme, applyTextSize, cachedTextSize, applyAccent, adoptDisplay, applyDisplay, display, setDisplay, resetDisplay, DISPLAY_KEYS, renderTagEditor, renderDisplay, renderLogging, renderReflectionSettings, renderMarkdownSettings, START_TABS, privacyCard, creditsCard, signOutCard } from './ui-settings.js';
 import { renderAccount, flush as flushProfile } from './ui-account.js';
 import { renderAdmin, leaveAdmin } from './ui-admin.js';
 import { renderReflect, watchMyReflections, renderExportPage, renderChoosePage } from './ui-reflect.js';
@@ -145,7 +145,10 @@ function connectClaudeCard() {
 // (settings-file.js). Never cases, reflections or portfolio details.
 function settingsFileCard() {
   const exportIt = () => {
-    const f = settingsFile(S.logbook, { theme: cachedTheme() });
+    // this device's display settings travel in the file (in place of any old ones in the account)
+    const dev = Object.fromEntries(DISPLAY_KEYS.map(k => [k, display()[k]]).filter(([, v]) => v != null));
+    const plain = Object.fromEntries(Object.entries((S.logbook && S.logbook.settings) || {}).filter(([k]) => !DISPLAY_KEYS.includes(k)));
+    const f = settingsFile({ ...S.logbook, settings: { ...plain, ...dev } }, { theme: cachedTheme() });
     download(`logbook-settings-${todayISO()}.json`, new Blob([JSON.stringify(f, null, 2)], { type: 'application/json' }));
   };
   const importIt = async file => {
@@ -156,9 +159,12 @@ function settingsFileCard() {
     const newGroups = (d.templates || []).filter(t => !mine.some(m => m.id === t.id || same(m, t)));
     const n = Object.keys(d.settings).length;
     if (!(await confirmBox('Import settings', `Use the ${n} setting${n === 1 ? '' : 's'} in this file${newGroups.length ? ` and add ${newGroups.length} tag group${newGroups.length === 1 ? '' : 's'}` : ''}? Settings in the file replace yours (your tags and shorthand too, if the file has them); anything not in it stays. Cases, reflections and portfolio details are never touched.`, 'Import'))) return;
-    await patchLogbook({ settings: d.settings, ...(newGroups.length ? { templates: [...mine, ...newGroups].slice(0, 100) } : {}) });
+    // display settings in the file go to this device, the rest to the account
+    const fileDisplay = Object.fromEntries(DISPLAY_KEYS.filter(k => k in d.settings).map(k => [k, d.settings[k]]));
+    const forAccount = Object.fromEntries(Object.entries(d.settings).filter(([k]) => !DISPLAY_KEYS.includes(k)));
+    await patchLogbook({ settings: forAccount, ...(newGroups.length ? { templates: [...mine, ...newGroups].slice(0, 100) } : {}) });
     if (d.theme) applyTheme(d.theme);
-    applyCompact(!!settings().compact); applyTextSize(settings().textSize || '1'); applyAccent(settings().accent);
+    applyDisplay(setDisplay(Object.fromEntries(DISPLAY_KEYS.filter(k => k in fileDisplay).map(k => [k, fileDisplay[k]]))));
     toast('Settings imported'); render();
   };
   return h('section', { class: 'card' },
@@ -381,7 +387,7 @@ function refreshWho(user, who, firstLogbook) {
     let lbChanged = false;
     if (lb && S.logbook === firstLogbook && JSON.stringify(lb) !== JSON.stringify(firstLogbook)) {
       S.logbook = lb; lbChanged = true;
-      applyCompact(lb.settings && lb.settings.compact); applyTextSize(lb.settings && lb.settings.textSize); applyAccent(lb.settings && lb.settings.accent);
+      applyDisplay(adoptDisplay(lb.settings, { fresh: true }));   // a first look made from a stale offline copy is corrected
     }
     if (lb && adoptShared()) lbChanged = true;   // never from a cached copy alone
     if (!lbChanged && before === JSON.stringify([S.admin, S.owner, S.pd, S.resident, S.sharedTemplates, categoryNamesNow()])) return;
@@ -401,7 +407,7 @@ async function onUser(user) {
   S.user = user;
   if (!user) {
     Object.assign(S, { admin: false, owner: false, pd: false, resident: null, logbook: null, cases: [], reflections: [], counts: {}, casesLoaded: false, casesSynced: false, sharedTemplates: [] });
-    if (signedInOnce) { clearDrafts(); resetCaches(); forgetWho(); applyCompact(false); applyTextSize('1'); applyAccent(null); }   // a shared device starts plain for the next person
+    if (signedInOnce) { clearDrafts(); resetCaches(); forgetWho(); }   // display settings stay: they are the device's
     paintWho();
     renderLanding();
     return;
@@ -432,9 +438,7 @@ async function onUser(user) {
     // the server's logbook replaces the cached one there, and only then are the programme's tag groups
     // copied in (a stale cache would overwrite tag groups changed on another device)
     refreshWho(user, known ? who : () => Promise.resolve(w), logbook);
-    applyCompact(logbook.settings && logbook.settings.compact);   // per-user display settings
-    applyTextSize(logbook.settings && logbook.settings.textSize);
-    applyAccent(logbook.settings && logbook.settings.accent);
+    applyDisplay(adoptDisplay(logbook.settings));   // this device's display settings (from the account the first time)
     const resident = S.resident;
     if (!logbook.name && (resident?.name || user.name)) S.logbook.name = resident?.name || user.name;
     // a programme resident's logbook remembers their rid (used by admins and the rules)
@@ -446,7 +450,7 @@ async function onUser(user) {
     return;
   }
   // the tab chosen in Settings → Display, unless the address names one (a link, a shortcut, a reload)
-  const start = (S.logbook && S.logbook.settings && S.logbook.settings.startTab) || 'log';
+  const start = display().startTab || 'log';
   S.tab = tabFromHash() || (START_TABS.some(([v]) => v === start) ? start : 'log');
   // Settings → Backup: a one-tap reminder when the last Drive / Dropbox backup is over a week old (if asked for)
   setTimeout(() => { if (S.user === user) remindBackup(); }, 3000);
@@ -558,7 +562,7 @@ function demoMenu() {
       h('button', { class: 'danger', onclick: async () => {
         m.close();
         if (!(await confirmBox('Reset demo', 'Delete everything you added in the demo (cases, reflections, images, settings) and start again with the made-up data? The uploaded portfolio template is kept.', 'Reset', true))) return;
-        clearDrafts(); resetCaches(); forgetWho(); applyCompact(false); applyTextSize('1'); applyAccent(null);
+        clearDrafts(); resetCaches(); forgetWho(); resetDisplay(); applyCompact(false); applyTextSize('1'); applyAccent(null);
         cloud.resetDemo();
         location.reload();
       } }, 'Reset demo'),
