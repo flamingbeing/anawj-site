@@ -58,8 +58,8 @@ portfolio content.
   Reflections with ⓘ requirements, Trends), Compare with your intake (Totals). EPA view and Download summary removed (owner: not useful).
 - **More** (`app.js`): Account (with Residency year for non-programme users), Settings, Export &
   backup, Admin portal; Privacy, Credits, What's new (`WHATS_NEW` in app.js; update each release).
-- **Settings**: a menu of Reflections (`#reflset`: new reflections in the export, photo sizes), Display (incl. the tab the app opens on, `settings.startTab`; a #hash still wins),
-  Logging, Tag editor (`#tags`), Copy & share format (`#sharefmt`), Recycle bin.
+- **Settings**: a menu of Display (incl. the tab the app opens on, `settings.startTab`; a #hash still wins),
+  Logging, Tag editor (`#tags`), Reflections (`#reflset`: new reflections in the export, photo sizes), Copy & share format (`#sharefmt`), Recycle bin.
 - **Copy & share** (`share-format.js`, tested): templates in `settings.shareFormat` (dayHead, dayCase, oneCase)
   with {date} {day} {weekday} {count} {n} {initials} {case}. Default day: `[[YYYY-MM-DD]]`, then
   `1. AB` / case, a blank line between cases (none for a one-line case format). No tags, ever.
