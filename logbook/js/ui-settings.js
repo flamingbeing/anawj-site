@@ -70,7 +70,7 @@ export function renderSettings() {
     // year for targets: programme residents get it from the list; anyone else sets it here
     S.resident ? null : h('section', { class: 'card' },
       h('h2', {}, 'Residency year'),
-      h('label', { class: 'field' }, 'Year used for the targets on Progress',
+      h('label', { class: 'field' }, 'Year used for the targets on Analytics',
         h('select', { onchange: e => patchLogbook({ settings: { rYear: Number(e.target.value), rYearAY: academicYear() } }).then(() => toast('Saved')) },
           YEAR_NAMES.map((r, i) => h('option', { value: String(i + 1), selected: i + 1 === rYear() }, r)))),
       h('p', { class: 'hint', style: 'margin:4px 0 0' }, 'Programme residents get their year from the programme list automatically. If you are an APMES resident, ask the programme admins to add your email.')),
@@ -229,7 +229,7 @@ export function categoryNamesCard() {
   const ed = CN.edit && S.admin;
   return h('section', { class: 'card cat-names-card' }, h('details', { class: 'more-tools', open: CN.open || ed, ontoggle: e => { CN.open = e.target.open; } },
     h('summary', {}, 'Default tag names'),
-    h('p', { class: 'hint' }, 'The programme’s names for everyone: a display name for lists and Progress, and a short name for the pills. Each resident can still rename them for themselves in the Tag editor. Exports (portfolio, Excel) always use the official APMES names.'),
+    h('p', { class: 'hint' }, 'The programme’s names for everyone: a display name for lists and Analytics, and a short name for the pills. Each resident can still rename them for themselves in the Tag editor. Exports (portfolio, Excel) always use the official APMES names.'),
     S.admin ? h('div', { class: 'bar', style: 'margin:0 0 8px' }, ed
       ? [h('button', { class: 'primary small', onclick: async () => {
           try { const n = await cloud.saveCategoryNames(edits); setCategoryNames(n); CN.edit = false; toast('Tag names saved for everyone'); hooks.render(); }

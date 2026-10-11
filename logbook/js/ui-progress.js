@@ -1,13 +1,15 @@
-// Progress (my targets) and Totals (everyone's counts, for benchmarking; counts only, never details).
+// Analytics (my targets, reflections and trends; the #progress tab) and Totals (everyone's counts, for
+// benchmarking; counts only, never details).
 
 import { R_YEARS, BY_CODE, CATEGORIES, appYear, yearName } from './categories.js';
 import { progress, epaProgress, todayISO, rYearDefault } from './engine.js';
 import { exportTotals } from './xlsxio.js';
 import { reflectionProgress, HEADING_BY_ID } from './reflections.js';
-import { S, h, toast, cloud, rYear, myYearName, settings, subcatsOf, patchLogbook, needExcel, download, displayName, hooks, add, resetters, info, catName } from './ui-core.js';
+import { S, h, toast, cloud, rYear, myYearName, settings, subcatsOf, patchLogbook, needExcel, download, displayName, hooks, add, resetters, info, catName, catShort, tagName } from './ui-core.js';
 
 const STATUS_TEXT = { late: 'Behind', due: 'Due this year', ontrack: 'On track', done: 'Done', none: 'No target' };
-const pview = { by: 'cat' };
+// open: the sections you have expanded (they start folded, showing a one-line summary)
+const pview = { by: 'cat', open: new Set() };
 
 const legend = () => h('div', { class: 'legend' },
   ['late', 'due', 'ontrack', 'done'].map(s => h('span', {}, h('i', { class: `dot ${s}` }), STATUS_TEXT[s])));
@@ -44,26 +46,90 @@ export function renderProgress() {
         h('span', { class: 'grow' }),
         h('button', { class: 'small', onclick: () => downloadSummary(rows, yr) }, 'Download summary'))));
 
-  const body = h('section', { class: 'card' });
-  let urgentCard = null;
+  let urgentSec = null, targets = null;
   if (pview.by === 'epa') {
-    for (const g of epaProgress(S.counts, yr)) {
-      add(body, h('div', { class: 'epa' }, h('h3', {}, h('i', { class: `dot ${g.status}` }), `EPA ${g.epa}`), progList(g.items)));
-    }
+    const body = h('div');
+    for (const g of epaProgress(S.counts, yr)) add(body, h('div', { class: 'epa' }, h('h3', {}, h('i', { class: `dot ${g.status}` }), `EPA ${g.epa}`), progList(g.items)));
+    targets = section('epa', 'Targets by EPA', 'Each EPA’s tags and how far along they are', body);
   } else {
-    // what needs doing comes first, in its own card at the top: behind, then due this year
+    // what needs doing: behind, then due this year
     const rank = { late: 0, due: 1 };
     const urgent = rows.filter(r => r.status in rank).sort((a, b) => rank[a.status] - rank[b.status]);
-    urgentCard = h('section', { class: 'card' },
-      h('h3', { style: 'margin:0 0 6px' }, urgent.length ? `Needs attention (${urgent.length})` : 'Nothing behind or due this year ✓'),
-      urgent.length ? progList(urgent) : null);
+    urgentSec = section('urgent', urgent.length ? `Needs attention (${urgent.length})` : 'Needs attention',
+      urgent.length ? `${tally('late')} behind · ${tally('due')} due this year` : 'Nothing behind or due this year ✓',
+      urgent.length ? progList(urgent) : h('p', { class: 'empty' }, 'Nothing behind or due this year ✓'));
     const shown = pview.hideDone ? rows.filter(r => r.status !== 'done') : rows;
-    add(body, h('div', { class: 'bar', style: 'margin:0 0 4px' }, h('h3', { style: 'margin:0' }, 'Logbook'), h('span', { class: 'grow' }),
-      h('label', { class: 'check', style: 'margin:0' }, h('input', { type: 'checkbox', checked: !!pview.hideDone, onchange: e => { pview.hideDone = e.target.checked; hooks.render(); } }), 'Hide done')),
+    const withTarget = rows.filter(r => r.status !== 'none');
+    targets = section('targets', 'Logbook', `${tally('done')} of ${withTarget.length} tags done · ${S.cases.length} cases`,
+      h('label', { class: 'check', style: 'margin:0 0 4px' }, h('input', { type: 'checkbox', checked: !!pview.hideDone, onchange: e => { pview.hideDone = e.target.checked; hooks.render(); } }), 'Hide done'),
       progList(shown));
   }
-  return h('div', {}, head, urgentCard, body, reflCard(), foot);
+  return h('div', {}, head, urgentSec, targets, reflCard(), trendsCard(), foot);
 }
+
+// A folded card: the title and a one-line summary; tap to open the full section (kept open while you stay).
+function section(id, title, summary, ...content) {
+  const open = pview.open.has(id);
+  return h('details', { class: 'card fold-card an-sec', open, ontoggle: e => { if (e.target.open) pview.open.add(id); else pview.open.delete(id); } },
+    h('summary', {}, h('span', { class: 'an-t' }, title), h('small', { class: 'an-s' }, summary)),
+    h('div', { class: 'an-body' }, ...content));
+}
+
+// ---------- trends (your cases over time; only you see these) ----------
+
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+function trendsCard() {
+  const cases = (S.cases || []).filter(c => c.date);
+  const today = todayISO();
+  const back = n => { const d = new Date(); d.setDate(d.getDate() - n); return todayISO(d); };
+  const last30 = cases.filter(c => c.date > back(30) && c.date <= today).length;
+  // cases per month, the last 12 months
+  const now = new Date();
+  const months = Array.from({ length: 12 }, (_, i) => { const d = new Date(now.getFullYear(), now.getMonth() - 11 + i, 1); return { key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`, label: MON[d.getMonth()], n: 0 }; });
+  const byMonth = new Map(months.map(m => [m.key, m]));
+  for (const c of cases) { const m = byMonth.get(c.date.slice(0, 7)); if (m) m.n++; }
+  const max = Math.max(1, ...months.map(m => m.n));
+  const bars = h('div', { class: 'an-bars', role: 'img', 'aria-label': 'Cases per month: ' + months.map(m => `${m.label} ${m.n}`).join(', ') },
+    months.map(m => h('div', { class: 'an-bar', title: `${m.label}: ${m.n}` }, h('small', {}, m.n || ''), h('i', { style: `height:${Math.round(m.n / max * 100)}%` }), h('span', {}, m.label[0]))));
+  // a year of days, a square per day (darker = more cases), weeks as columns
+  const perDay = new Map();
+  for (const c of cases) perDay.set(c.date, (perDay.get(c.date) || 0) + 1);
+  const start = new Date(); start.setDate(start.getDate() - 364 - ((start.getDay() + 6) % 7));
+  const cols = [];
+  for (let w = 0; w < 53; w++) {
+    const col = h('div', { class: 'an-wk' });
+    for (let d = 0; d < 7; d++) {
+      const day = new Date(start); day.setDate(start.getDate() + w * 7 + d);
+      const iso = todayISO(day);
+      if (iso > today) { add(col, h('i', { class: 'an-day off' })); continue; }
+      const n = perDay.get(iso) || 0;
+      add(col, h('i', { class: `an-day l${Math.min(4, n)}`, title: `${iso}: ${n} case${n === 1 ? '' : 's'}` }));
+    }
+    cols.push(col);
+  }
+  // weekdays
+  const wd = [0, 0, 0, 0, 0, 0, 0];
+  for (const c of cases) { const [y, m, d] = c.date.split('-').map(Number); wd[(new Date(y, m - 1, d).getDay() + 6) % 7]++; }
+  const wdMax = Math.max(1, ...wd);
+  // most used tags in the last 12 months (APMES and your own)
+  const from = months[0].key + '-01';
+  const tagN = new Map();
+  for (const c of cases) if (c.date >= from) {
+    for (const k of c.cats || []) tagN.set('c:' + k, (tagN.get('c:' + k) || 0) + 1);
+    for (const k of c.tags || []) tagN.set(k, (tagN.get(k) || 0) + 1);
+  }
+  const top = [...tagN].sort((a, b) => b[1] - a[1]).slice(0, 10);
+  const name = k => (k.startsWith('c:') ? catShort(k.slice(2)) : tagName(k));
+  return section('trends', 'Trends', `${last30} case${last30 === 1 ? '' : 's'} in the last 30 days · ${months[11].n} this month`,
+    h('h3', {}, 'Cases per month'), bars,
+    h('h3', {}, 'The last year'), h('div', { class: 'an-heat' }, cols),
+    h('h3', {}, 'By day of the week'),
+    h('div', { class: 'an-wd' }, ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d, i) => h('div', {}, h('span', {}, d), h('span', { class: 'meter' }, h('i', { class: 'ontrack', style: `width:${Math.round(wd[i] / wdMax * 100)}%` })), h('b', {}, String(wd[i]))))),
+    h('h3', {}, 'Most used tags (12 months)'),
+    top.length ? h('div', { class: 'an-wd' }, top.map(([k, n]) => h('div', {}, h('span', {}, name(k)), h('span', { class: 'meter' }, h('i', { class: 'done', style: `width:${Math.round(n / top[0][1] * 100)}%` })), h('b', {}, String(n))))) : h('p', { class: 'empty' }, 'No cases yet.'),
+    h('p', { class: 'hint' }, 'Only you see these.'));
+}
+
 
 // Reflections, laid out like the logbook list: each portfolio heading against its minimum.
 // The full list and editor are on the Reflections tab (#reflect).
@@ -78,9 +144,9 @@ function reflCard() {
       h('li', {}, 'Each reflection is a different patient, under one heading only.'),
       h('li', {}, 'Some headings require one reflection in Junior Residency (JR, R1–R3); otherwise at most one per heading can be at JR level.'),
       h('li', {}, 'Some headings need at least one of certain types: tap ⓘ by a heading to see them. Sub-types and JR are not counted here, so keep track of them yourself.')));
-  return h('section', { class: 'card' },
+  return section('refl', 'Reflections', `${p.totals.counted} / ${p.totals.min} counted · ${met} of ${p.headings.length} headings met`,
     h('div', { class: 'bar', style: 'margin:0 0 4px' },
-      h('h3', { style: 'margin:0' }, 'Reflections'), rulesBtn,
+      h('span', { class: 'hint' }, 'The rules'), rulesBtn,
       h('span', { class: 'grow' }),
       h('a', { class: 'btn small primary', href: '#reflect' }, 'Open reflections')),
     rulesText,

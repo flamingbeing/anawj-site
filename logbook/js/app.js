@@ -39,7 +39,7 @@ const TABS = [
   { id: 'log', label: 'Log', render: renderLog },
   { id: 'logbook', label: 'Logbook', render: renderLogbook },
   { id: 'reflect', label: 'Reflections', render: renderReflect },
-  { id: 'progress', label: 'Progress', render: renderProgress },
+  { id: 'progress', label: 'Analytics', render: renderProgress },
   // five tabs on the bar; the rest live under More (still reachable by #totals, #account, #settings)
   { id: 'more', label: 'More', render: () => renderMore() },
   { id: 'totals', label: 'Totals', render: renderTotals, hidden: true, under: 'more', desc: 'How your case counts compare across your intake' },
@@ -184,7 +184,7 @@ function renderLanding(error) {
     h('ul', {},
       h('li', {}, 'Tag suggestions from what you type (age, BMI, procedure).'),
       h('li', {}, 'Works offline on your phone; syncs when you are back online.'),
-      h('li', {}, 'Progress by tag and EPA; Excel download any time.'),
+      h('li', {}, 'Analytics: progress by tag and EPA, trends; Excel download any time.'),
       h('li', {}, 'Private: only you and the programme admins can see your cases.')),
     error ? h('p', { class: 'tip' }, error) : null,
     cloud.enabled ? h('div', { class: 'cta' },
