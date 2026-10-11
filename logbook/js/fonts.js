@@ -8,6 +8,7 @@ export const FONTS = [
   ['system', 'This device’s font'],
   ['atkinson', 'Atkinson Hyperlegible'],
   ['lexend', 'Lexend'],
+  ['inter', 'Inter'],
   ['serif', 'Serif'],
   ['mono', 'Monospace'],
   ['named', 'A font installed on this device…'],
@@ -19,6 +20,7 @@ export const STACKS = {
   system: SANS,
   atkinson: `"Atkinson Hyperlegible Next", ${SANS}`,
   lexend: `"Lexend", ${SANS}`,
+  inter: `"Inter", ${SANS}`,
   serif: 'ui-serif, Charter, "Bitstream Charter", Georgia, "Noto Serif", "Times New Roman", serif',
   mono: 'ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace',
 };

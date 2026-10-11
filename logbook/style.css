@@ -45,6 +45,8 @@ html, body { overscroll-behavior-y: none; }
 @font-face { font-family: "Atkinson Hyperlegible Next"; src: url(fonts/atkinson-700.woff2) format("woff2"); font-weight: 600 700; font-display: swap; }
 @font-face { font-family: "Lexend"; src: url(fonts/lexend-400.woff2) format("woff2"); font-weight: 400; font-display: swap; }
 @font-face { font-family: "Lexend"; src: url(fonts/lexend-700.woff2) format("woff2"); font-weight: 600 700; font-display: swap; }
+@font-face { font-family: "Inter"; src: url(fonts/inter-400.woff2) format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Inter"; src: url(fonts/inter-700.woff2) format("woff2"); font-weight: 600 700; font-display: swap; }
 :root { --font-ui: "Open Sans", system-ui, -apple-system, "Segoe UI", sans-serif; --font-log: var(--font-ui); }
 body {
   margin: 0; background: var(--bg); color: var(--ink);

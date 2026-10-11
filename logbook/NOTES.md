@@ -96,7 +96,7 @@ portfolio content.
   zoom (`migrateDisplay`, display `v: 2`). Defaults are pixel-identical to before. Compact = density.
 - **Fonts** (Display, per device; `fonts.js`, tested): Interface font and Logging font (`--font-ui`, `--font-log`;
   logging = `textarea.details`, `ul.cases .t`, `.refl-editor` fields; "Same as the interface" by default). Choices:
-  Open Sans (default, Google Fonts as before), the device's font, Atkinson Hyperlegible Next and Lexend (woff2 in
+  Open Sans (default, Google Fonts as before), the device's font, Atkinson Hyperlegible Next, Lexend and Inter (woff2 in
   `fonts/`, latin 400/700, SIL OFL, loaded only when chosen, cached by the service worker on first use), Serif and
   Monospace (system stacks), a font installed on the device by name (`cleanFontName`; a width test says whether it
   was found; Safari mostly ignores user-installed fonts), or the user's own file (.woff2/.woff/.ttf/.otf ≤ 3 MB,
