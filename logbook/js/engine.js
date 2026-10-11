@@ -199,7 +199,10 @@ export const cleanInitials = s => String(s || '').toUpperCase().replace(/[^A-Z.\
 export function splitInitials(text, keywords = KEYWORDS) {
   const s = String(text || '').trim();
   const m = s.match(/^([A-Z]{2,4})(?![A-Za-z0-9])[\s\/,:;.\-]*/);
-  if (!m || NOT_INITIALS.has(m[1]) || (keywords && keywords[m[1].toLowerCase()])) return { initials: '', details: s };
+  if (!m || NOT_INITIALS.has(m[1])) return { initials: '', details: s };
+  // a case word ("IJ", "TKR") is still initials when an age follows: "IJ 60M VATS"
+  const ageNext = /^\d{1,3}\s?(?:[MF]|yo|y\/o|yrs?|years?|\/12|\/52|m\/o|mo|d\/o)(?![A-Za-z])/i.test(s.slice(m[0].length));
+  if (keywords && keywords[m[1].toLowerCase()] && !ageNext) return { initials: '', details: s };
   return { initials: m[1], details: s.slice(m[0].length).trim() };
 }
 
@@ -248,17 +251,31 @@ function leadingDate(line, now) {
 }
 
 // Cases are separated by blank lines (one or more empty or whitespace-only lines), so a case can span
-// several lines (kept in its details). An optional date at the start of a case's first line sets its date.
+// several lines (kept in its details). A paste with no blank lines at all is read as one case per line
+// instead, wherever a line starts like a case (a date, initials, or an age such as "45F"); other lines
+// continue the case above. List markers ("1.", "-", "•") are dropped.
+// An optional date at the start of a case's first line sets its date.
 // Leading patient initials are split off as in splitInitials. suggestFn(text) -> [{ code, score }];
 // codes scoring 0.5+ are kept.
 export function parseBulk(text, suggestFn, now = new Date()) {
   const blocks = [];
   let cur = null;
   for (const raw of String(text || '').split(/\r?\n/)) {
-    const line = raw.replace(/\t+/g, ' ').trim();
+    const line = raw.replace(/\t+/g, ' ').trim().replace(/^(?:\d{1,2}[.)]|[-•*·])\s+/, '');
     if (!line) { cur = null; continue; }
     if (!cur) blocks.push(cur = []);
     cur.push(line);
+  }
+  if (blocks.length === 1 && blocks[0].length > 1) {
+    const starts = l => !!(leadingDate(l, now) || splitInitials(l).initials || /^\d{1,3}\s?(?:yo|y\/o|yr|[MF])\b/i.test(l));
+    // a line holding only a date belongs with the line after it
+    const bare = g => g.length === 1 && leadingDate(g[0], now) && !leadingDate(g[0], now).rest.trim();
+    const split = [];
+    for (const l of blocks[0]) {
+      const g = split[split.length - 1];
+      if (g && !(starts(l) && !bare(g))) g.push(l); else split.push([l]);
+    }
+    blocks.splice(0, 1, ...split);
   }
   return blocks.map(([first, ...more]) => {
     const ld = leadingDate(first, now);

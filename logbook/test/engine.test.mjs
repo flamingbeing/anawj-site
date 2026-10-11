@@ -492,6 +492,11 @@ assert.equal(rYearDefault(undefined), 1);
   assert.equal(b.date, '2026-01-03'); assert.match(b.details, /^80 yr F hip/);
   assert.equal(parseBulk('12 Mar 26 AB TKR', null, now)[0].date, '2026-03-12');
   for (const w of ['PEG', 'LP', 'ICD', 'EBL']) assert.equal(splitInitials(`${w} insertion`).initials, '', w);
+  assert.equal(splitInitials('IJ 60M VATS DLT').initials, 'IJ');
+  assert.equal(splitInitials('TKR spinal').initials, '');
+  // one case per line when nothing is separated by a blank line; list markers dropped
+  const lines = parseBulk('1. AB 45F lap chole GA\n2. CD 30F LSCS spinal\nconverted to GA\n- IJ 60M VATS DLT', null, now);
+  assert.deepEqual(lines.map(c => [c.initials, c.details]), [['AB', '45F lap chole GA'], ['CD', '30F LSCS spinal\nconverted to GA'], ['IJ', '60M VATS DLT']]);
 }
 
 console.log('engine tests passed');

@@ -105,16 +105,16 @@ function templatesCard() {
 }
 
 // Template editor, shared with the admin screen (shared templates). save(t) persists it.
-export function templateDialog(t, save) {
+export function templateDialog(t, save, title = null) {
   const e = t ? { ...t, cats: [...t.cats] } : { id: uid(), name: '', cats: [], details: '' };
   const chips = h('div', { class: 'chips selected' });
   const paint = () => fill(chips, ...(e.cats.length ? e.cats.map(c => catChip(c, { on: true })) : [h('span', { class: 'none' }, 'No categories yet')]),
     h('button', { class: 'small', onclick: () => pickDialog(e.cats, cats => { e.cats = cats; paint(); }) }, 'Choose…'));
   paint();
-  const m = modal(t ? 'Edit template' : 'New template', [
+  const m = modal(title || (t ? 'Edit template' : 'New template'), [
     h('label', { class: 'field' }, 'Name', h('input', { value: e.name, placeholder: 'e.g. LSCS spinal', oninput: ev => { e.name = ev.target.value; } })),
     h('div', { class: 'chiplabel' }, 'Categories'), chips,
-    h('label', { class: 'field', style: 'margin-top:10px' }, 'Starting text for details (optional)', h('input', { value: e.details || '', placeholder: 'e.g. LSCS spinal', oninput: ev => { e.details = ev.target.value; } })),
+    h('label', { class: 'field', style: 'margin-top:10px' }, 'Starting text for details (optional)', h('input', { value: e.details || '', placeholder: 'e.g. spinal, GA if converted', oninput: ev => { e.details = ev.target.value; } })),
     h('div', { class: 'bar', style: 'margin-top:12px' }, h('span', { class: 'grow' }),
       h('button', { onclick: () => m.close() }, 'Cancel'),
       h('button', { class: 'primary', onclick: async () => {

@@ -41,18 +41,24 @@ export function renderProgress() {
       h('button', { class: 'small', onclick: () => downloadSummary(rows, yr) }, 'Download summary')));
 
   const body = h('section', { class: 'card' });
+  let urgentCard = null;
   if (pview.by === 'epa') {
     for (const g of epaProgress(S.counts, yr)) {
       add(body, h('div', { class: 'epa' }, h('h3', {}, h('i', { class: `dot ${g.status}` }), `EPA ${g.epa}`), progList(g.items)));
     }
   } else {
-    // what needs doing comes first: behind, then due this year
+    // what needs doing comes first, in its own card at the top: behind, then due this year
     const rank = { late: 0, due: 1 };
     const urgent = rows.filter(r => r.status in rank).sort((a, b) => rank[a.status] - rank[b.status]);
-    if (urgent.length) add(body, h('h3', {}, 'Needs attention'), progList(urgent), h('h3', { style: 'margin-top:16px' }, 'All categories'));
-    add(body, progList(rows));
+    urgentCard = h('section', { class: 'card' },
+      h('h3', { style: 'margin:0 0 6px' }, urgent.length ? `Needs attention (${urgent.length})` : 'Nothing behind or due this year ✓'),
+      urgent.length ? progList(urgent) : null);
+    const shown = pview.hideDone ? rows.filter(r => r.status !== 'done') : rows;
+    add(body, h('div', { class: 'bar', style: 'margin:0 0 4px' }, h('h3', { style: 'margin:0' }, 'All categories'), h('span', { class: 'grow' }),
+      h('label', { class: 'check', style: 'margin:0' }, h('input', { type: 'checkbox', checked: !!pview.hideDone, onchange: e => { pview.hideDone = e.target.checked; hooks.render(); } }), 'Hide done')),
+      progList(shown));
   }
-  return h('div', {}, head, reflCard(), body);
+  return h('div', {}, head, urgentCard, reflCard(), body);
 }
 
 // Reflections at a glance; the full list and editor are on the Reflections tab (#reflect).

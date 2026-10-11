@@ -14,6 +14,8 @@ import { moveToBin } from './bin.js';
 const view = { q: '', cat: '', flag: '', mode: null, limit: 150, month: null, day: null };
 resetters.push(() => Object.assign(view, { q: '', cat: '', flag: '', mode: null, limit: 150, month: null, day: null }));   // next user starts unfiltered
 const MODES = [['list', 'List'], ['calendar', 'Calendar'], ['grid', 'Grid']];
+// "2026-10-06" -> "Tue"
+const weekday = iso => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); return m ? new Date(+m[1], +m[2] - 1, +m[3]).toLocaleDateString('en-GB', { weekday: 'short' }) : ''; };
 
 // Procedure-name tags; a parent (e.g. 20) is left out when one of its sub-categories (20iii) is there.
 function catTags(cats) {
@@ -34,7 +36,7 @@ export function renderLogbook() {
       if (view.cat && !(c.cats || []).includes(view.cat)) return false;
       if (view.flag && !flagsOf(c).includes(view.flag)) return false;
       if (!words.length) return true;
-      const hay = `${caseText(c)} ${c.date || c.dateText || ''} ${fmtDate(c.date) || ''} ${(c.cats || []).join(' ')}`.toLowerCase();
+      const hay = `${caseText(c)} ${c.date || c.dateText || ''} ${weekday(c.date)} ${fmtDate(c.date) || ''} ${(c.cats || []).join(' ')}`.toLowerCase();
       return words.every(w => hay.includes(w));
     });
   };
@@ -78,7 +80,7 @@ export function renderLogbook() {
 // ---------- list ----------
 
 function listView(rows, flagsOf, repaint) {
-  if (!S.cases.length) return h('p', { class: 'empty' }, 'No cases yet. Log your first one on the Log tab.');
+  if (!S.cases.length) return h('div', { class: 'empty' }, h('p', {}, 'No cases yet.'), h('a', { class: 'btn primary', href: '#log' }, 'Log your first case'));
   if (!rows.length) return h('p', { class: 'empty' }, 'No cases match.');
   const ul = h('ul', { class: 'cases' });
   let month = '';
@@ -100,7 +102,7 @@ function caseRow(c, flagsOf) {
   const flags = flagsOf(c);
   const p = caseParts(c);
   return h('li', { onclick: () => editCaseDialog(c), tabindex: '0', onkeydown: e => { if (e.key === 'Enter' && e.target === e.currentTarget) editCaseDialog(c); } },
-      h('span', { class: 'd' }, c.date ? fmtDate(c.date).replace(/ \d{4}$/, '') : (c.dateText || '—')),
+      h('span', { class: 'd' }, c.date ? [h('span', { class: 'wd' }, weekday(c.date)), ' ', fmtDate(c.date).replace(/ \d{4}$/, '')] : (c.dateText || '—')),
       h('span', { class: 't' }, p.initials ? [h('b', {}, p.initials), ' '] : null, p.details || (p.initials ? null : h('i', { class: 'muted' }, 'no details'))),
       h('span', { class: 'c' }, catTags(c.cats),
         flags.includes('needsDate') ? h('span', { class: 'flag err' }, 'needs date') : null,
@@ -117,7 +119,7 @@ const pad = n => String(n).padStart(2, '0');
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 function calendarView(rows, flagsOf, repaint) {
-  if (!S.cases.length) return h('p', { class: 'empty' }, 'No cases yet. Log your first one on the Log tab.');
+  if (!S.cases.length) return h('div', { class: 'empty' }, h('p', {}, 'No cases yet.'), h('a', { class: 'btn primary', href: '#log' }, 'Log your first case'));
   const today = todayISO();
   if (!view.month) view.month = today.slice(0, 7);
   const [y, m] = view.month.split('-').map(Number);
@@ -150,9 +152,9 @@ function calendarView(rows, flagsOf, repaint) {
   const dayCases = view.day ? (byDay.get(view.day) || []) : [];
   return h('div', {},
     h('div', { class: 'bar lb-calbar' },
-      h('button', { class: 'small', 'aria-label': 'Previous month', onclick: () => shift(-1) }, '‹'),
+      h('button', { class: 'small icon-btn', 'aria-label': 'Previous month', onclick: () => shift(-1) }, '‹'),
       h('strong', { class: 'grow', style: 'text-align:center' }, `${MONTHS[m - 1]} ${y}`, h('span', { class: 'muted', style: 'font-weight:400;font-size:13px' }, ` · ${monthN} case${monthN === 1 ? '' : 's'}`)),
-      h('button', { class: 'small', 'aria-label': 'Next month', onclick: () => shift(1) }, '›'),
+      h('button', { class: 'small icon-btn', 'aria-label': 'Next month', onclick: () => shift(1) }, '›'),
       h('button', { class: 'small', onclick: () => { view.month = today.slice(0, 7); view.day = today; repaint(); } }, 'Today')),
     grid,
     view.day ? h('div', { style: 'margin-top:12px' },

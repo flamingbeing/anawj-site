@@ -79,7 +79,7 @@ function profileCard() {
         pair(date('dob', 'Date of birth'), h('span')),
         text('graduation', 'Date and place of graduation', { placeholder: 'e.g. 12/06/2018, University of Bristol' }),
         area('postgrad', 'Postgraduate qualifications', 'with dates'),
-        pair(text('program', 'Program', { placeholder: 'NUHS Anaesthesia' }), text('programDirector', 'Program Director')),
+        pair(text('program', 'Program', { placeholder: 'e.g. NUHS Anaesthesia' }), text('programDirector', 'Program Director')),
         pair(date('residencyStart', 'Residency started'), date('seniorStart', 'Senior residency started')))),
 
     secs().map(sec => listCard(p, sec)));
