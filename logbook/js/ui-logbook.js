@@ -8,7 +8,7 @@ import { parseCsv } from './tags.js';
 import {
   S, h, toast, debounce, modal, cat, catName, catShort, tagName, catFull, catChip, PICKER_ORDER, settings, patchLogbook, needExcel, download, fileButton, catPills,
   updateCase, saveMany, deleteMany, displayName, rYear, todayISO, fill, add, resetters } from './ui-core.js';
-import { editCaseDialog } from './ui-log.js';
+import { editCaseDialog, logOnDate } from './ui-log.js';
 import { reflectOnCase } from './ui-reflect.js';
 import { moveToBin } from './bin.js';
 import { shareText, copyText, caseText as shareCaseText, dayText, dayMarkdown } from './share.js';
@@ -223,6 +223,8 @@ function calendarView(rows, flagsOf, repaint) {
     view.day ? h('div', { style: 'margin-top:12px' },
       h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 4px' },
         h('h3', { class: 'grow', style: 'margin:0' }, `${fmtDate(view.day)} (${dayCases.length})`),
+        // log on this day: the Log page opens with the date already picked
+        view.day <= today ? h('button', { class: 'small primary', onclick: () => logOnDate(view.day) }, '+ Log a case') : null,
         dayCases.length ? h('button', { class: 'small', onclick: () => shareText(dayText(view.day)) }, 'Share day') : null,
         dayCases.length ? h('button', { class: 'small', onclick: () => copyText(dayMarkdown(view.day), 'Markdown copied: paste into your notebook') }, 'Copy as Markdown') : null),
       dayCases.length ? h('ul', { class: 'cases' }, dayCases.map(c => caseRow(c, flagsOf))) : h('p', { class: 'empty' }, 'No cases on this day.'))

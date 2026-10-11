@@ -28,6 +28,14 @@ function loadDraft() {
   if (!draft.keepDate || !(Date.now() - (draft.keptAt || 0) < KEEP_MS)) draft.date = null;
 }
 const saveDraft = debounce(() => { try { localStorage.setItem(draftKey(), JSON.stringify(draft)); } catch { /* ignore */ } }, 300);
+// Open the Log page with this day picked (from the Logbook calendar's "+ Log a case").
+export function logOnDate(iso) {
+  loadDraft();
+  draft.date = iso === todayISO() ? null : iso; draft.dateAt = Date.now(); draft.mode = 'one';
+  saveDraft.cancel(); try { localStorage.setItem(draftKey(), JSON.stringify(draft)); } catch { /* ignore */ }
+  location.hash = '#log';
+}
+
 export function clearDrafts() {
   saveDraft.cancel();
   draft = EMPTY(); draftOwner = null; bulkRows = null; ui = null;
