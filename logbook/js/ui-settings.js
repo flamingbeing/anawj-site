@@ -25,6 +25,17 @@ export function applyTheme(t) {
 export function cachedTheme() {
   try { return localStorage.getItem(THEME_KEY) || 'light'; } catch { return 'light'; }
 }
+// Text size (S.logbook.settings.textSize): a zoom factor for the page content (style.css --text-zoom).
+const SIZE_KEY = 'apmes-logbook-textsize';
+export const TEXT_SIZES = [['0.9', 'Smaller'], ['1', 'Normal'], ['1.12', 'Larger'], ['1.25', 'Largest']];
+export function applyTextSize(z) {
+  const v = TEXT_SIZES.some(([k]) => k === String(z)) ? String(z) : '1';
+  document.documentElement.style.setProperty('--text-zoom', v);
+  try { v === '1' ? localStorage.removeItem(SIZE_KEY) : localStorage.setItem(SIZE_KEY, v); } catch { /* storage blocked */ }
+}
+export function cachedTextSize() {
+  try { return localStorage.getItem(SIZE_KEY) || '1'; } catch { return '1'; }
+}
 export function cachedCompact() {
   try { return localStorage.getItem(COMPACT_KEY) === '1'; } catch { return false; }
 }
@@ -43,6 +54,9 @@ export function renderSettings() {
         patchLogbook({ settings: { compact: e.target.checked } });
       } }), 'Compact mode'),
       h('p', { class: 'hint', style: 'margin:2px 0 0' }, 'Smaller chips, rows and spacing so more categories fit on screen. Saved to your account, so it follows you to other devices.'),
+      h('label', { class: 'field', style: 'margin-top:10px' }, 'Text size',
+        h('select', { onchange: e => { applyTextSize(e.target.value); patchLogbook({ settings: { textSize: e.target.value } }); } },
+          TEXT_SIZES.map(([v, l]) => h('option', { value: v, selected: String(st.textSize || '1') === v }, l)))),
       h('label', { class: 'field', style: 'margin-top:10px' }, 'Theme',
         h('select', { onchange: e => { applyTheme(e.target.value); patchLogbook({ settings: { theme: e.target.value } }); } },
           [['light', 'Light'], ['dark', 'Dark'], ['auto', 'Auto (match the phone)']].map(([v, l]) => h('option', { value: v, selected: (st.theme || 'light') === v }, l))))),

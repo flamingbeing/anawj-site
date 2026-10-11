@@ -2,7 +2,7 @@
 // Also the reusable category picker and the edit-case dialog (used by the Logbook screen).
 
 import { BY_CODE, TIPS } from './categories.js';
-import { withParents, frequentCombos, parseBulk, parseDate, fmtDate, sortCodes, uid, caseParts, caseText, cleanInitials } from './engine.js';
+import { withParents, frequentCombos, parseBulk, parseDate, fmtDate, sortCodes, uid, caseParts, caseText, cleanInitials, splitInitials, splitAge } from './engine.js';
 import { suggest } from './suggest.js';
 import {
   S, h, toast, debounce, modal, confirmBox, cat, catName, catFull, catChip, countText, PICKER_ORDER, PROGRESS_BY_CODE,
@@ -136,13 +136,18 @@ function paintDate() {
     onchange: e => { draft.date = parseDate(e.target.value) || null; draft.dateAt = Date.now(); saveDraft(); paintDate(); },
   });
   const pick = iso => () => { draft.date = iso === t ? null : iso; draft.dateAt = Date.now(); saveDraft(); paintDate(); ui.textarea?.focus(); };
-  const other = d !== t && d !== y;
+  const other = d !== t && d !== y && !(() => { for (let k = 2; k <= 6; k++) { const x = new Date(); x.setDate(x.getDate() - k); if (todayISO(x) === d) return true; } return false; })();
   // the date input sits invisibly over a chip, so the row stays one line on a phone
   const picker = h('label', { class: `chip datepick ${other ? 'on' : ''}`, title: 'Pick a date' }, other ? fmtDate(d) : '📅 Date', dateInput);
   dateInput.addEventListener('click', () => { try { dateInput.showPicker(); } catch { /* not supported: native tap opens it */ } });
+  // the rest of the past week by weekday ("Thu 8"), for catching up on a few days
+  const week = [];
+  for (let k = 2; k <= 6; k++) { const x = new Date(); x.setDate(x.getDate() - k); week.push(todayISO(x)); }
+  const wd = iso => { const [Y, M, D] = iso.split('-').map(Number); const x = new Date(Y, M - 1, D); return x.toLocaleDateString('en-GB', { weekday: 'short' }) + ' ' + D; };
   fill(ui.datebar,
     h('span', { class: `chip ${d === t ? 'on' : ''}`, role: 'button', tabindex: '0', onclick: pick(t) }, 'Today'),
     h('span', { class: `chip ${d === y ? 'on' : ''}`, role: 'button', tabindex: '0', onclick: pick(y) }, 'Yesterday'),
+    ...week.map(iso => h('span', { class: `chip wk ${d === iso ? 'on' : ''}`, role: 'button', tabindex: '0', onclick: pick(iso) }, wd(iso))),
     picker,
     draft.mode === 'bulk'
       ? h('button', { class: 'small linkish', 'data-mode': 'one', onclick: () => setMode('one') }, 'One case')
@@ -152,9 +157,9 @@ function paintDate() {
 function renderOne(card) {
   const textarea = h('textarea', {
     class: 'details', rows: '3', autofocus: true, enterkeyhint: 'enter', autocapitalize: 'sentences', autocorrect: 'off', 'aria-label': 'Case details',
-    placeholder: 'Initials + case, e.g. “AB 72M lap chole GA” or “CD LSCS spinal”',
+    placeholder: 'AB 72M   ← initials, then age/sex (optional)\nlap chole, GA ETT   ← procedure and details',
     value: draft.details,
-    oninput: e => { draft.details = e.target.value; saveDraft(); suggestSoon(); },
+    oninput: e => { draft.details = e.target.value; saveDraft(); suggestSoon(); paintParsed(true); },
     // Enter is a new line (a case can take several lines); Ctrl+Enter / Cmd+Enter saves
     onkeydown: e => {
       if (e.key !== 'Enter' || e.isComposing || !(e.ctrlKey || e.metaKey)) return;
@@ -175,22 +180,39 @@ function renderOne(card) {
     h('button', { class: 'primary big', onclick: () => save({}) }, 'Save', h('span', { class: 'kbd', title: 'Ctrl+Enter (Cmd+Enter on a Mac)' }, ' Ctrl+⏎')),
     h('button', { class: 'big', title: 'Save and keep this date for the next case', onclick: () => save({ another: true }) }, 'Save, keep date'));
 
+  // what the box was read as (initials come off into their own field; age/sex stay in the details)
+  const parsed = h('div', { class: 'parsed', 'aria-live': 'polite' });
   add(card, 
-    textarea,
+    textarea, parsed,
     h('div', { class: 'chiplabel', id: 'suggLabel' }, 'Suggested'), sugg,
     h('div', { class: 'chiplabel' }, 'Selected'), selected, tip,
     actions,
     h('div', { class: 'chiplabel' }, 'Quick picks'), templates,
     h('div', { class: 'chiplabel', id: 'topLabel' }, 'Your top categories'), top,
     h('div', { class: 'chiplabel' }, 'All categories'), picker.el);
-  Object.assign(ui, { textarea, sugg, selected, tip, templates, top, picker });
-  paintSuggest(); paintSel(); paintQuick();
+  Object.assign(ui, { textarea, parsed, sugg, selected, tip, templates, top, picker });
+  paintSuggest(); paintSel(); paintQuick(); paintParsed(false);
   // autofocus attribute is ignored on re-render; focus after insertion (not on phones' first paint
   // when that would pop the keyboard over a fresh landing — it's what the user came to do, so do it)
   requestAnimationFrame(() => { if (document.activeElement === document.body || !document.activeElement) textarea.focus({ preventScroll: true }); });
 }
 
 const suggestSoon = debounce(() => paintSuggest(), 120);
+
+// "AB · 72M · lap chole, GA ETT" under the box, plus "Draft saved" once typing pauses
+let draftNote = null;
+function paintParsed(typed) {
+  if (!ui || !ui.parsed) return;
+  const text = draft.details.trim();
+  if (!text) { fill(ui.parsed); return; }
+  const { initials, details } = splitInitials(text);
+  const { age, rest } = splitAge(details);
+  const bits = [initials ? h('span', { class: 'pi' }, h('small', {}, 'Initials '), h('b', {}, initials)) : h('span', { class: 'pi none' }, 'No initials found'),
+    age ? h('span', { class: 'pi' }, h('small', {}, 'Age/sex '), h('b', {}, age)) : null,
+    rest ? h('span', { class: 'pi grow' }, rest.split('\n')[0].slice(0, 60)) : null];
+  draftNote = h('span', { class: 'draft-note' }, typed ? 'Draft saved' : '');
+  fill(ui.parsed, ...bits.filter(Boolean), draftNote);
+}
 
 function paintSuggest() {
   if (!ui || !ui.sugg) return;
@@ -238,7 +260,6 @@ function paintTop() {
   })));
 }
 
-const lastCase = () => S.cases.reduce((best, c) => (!best || (c.createdAt || 0) > (best.createdAt || 0) ? c : best), null);
 
 function applyTemplate(t) {
   draft.cats = sortCodes(withParents([...draft.cats, ...t.cats]));
@@ -249,18 +270,28 @@ function applyTemplate(t) {
 function paintQuick() {
   if (!ui || !ui.templates) return;
   const chips = [];
-  const last = lastCase();
-  if (last && last.cats && last.cats.length) {
-    chips.push(h('span', {
-      class: 'chip tmpl', role: 'button', tabindex: '0', title: 'Same categories as your last case: ' + last.cats.map(catFull).join(', '),
-      onclick: () => {
-        draft.cats = sortCodes(withParents(last.cats));
-        // its date too, but only when it was logged in this sitting (not yesterday evening's list)
-        if (last.date && Date.now() - (last.createdAt || 0) < KEEP_MS / 3) { draft.date = last.date === todayISO() ? null : last.date; draft.dateAt = Date.now(); }
-        keepPlace(ui.templates, () => { saveDraft(); paintDate(); paintSel(); }); refocus();
-      },
-    }, '↻ Same as last', h('span', { class: 'muted', style: 'font-size:12px' }, ' ' + last.cats.join(' + '))));
+  // recent cases: one tap fills the procedure (not the patient) and the categories; type the new
+  // initials and age on the first line
+  const recent = [], keys = new Set();
+  for (const c of [...(S.cases || [])].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))) {
+    if (!c.cats || !c.cats.length) continue;
+    const proc = splitAge(caseParts(c).details).rest.replace(/\s+/g, ' ').trim();
+    const key = proc.toLowerCase() + '|' + sortCodes(c.cats).join();
+    if (keys.has(key)) continue;
+    keys.add(key); recent.push({ c, proc });
+    if (recent.length >= 3) break;
   }
+  recent.forEach(({ c, proc }, i) => chips.push(h('span', {
+    class: 'chip tmpl recent', role: 'button', tabindex: '0', title: (proc || 'No details') + '\n' + c.cats.map(catFull).join('\n'),
+    onclick: () => {
+      draft.cats = sortCodes(withParents(c.cats));
+      draft.details = proc ? '\n' + proc : '';
+      // its date too, but only when it was logged in this sitting (not yesterday evening's list)
+      if (i === 0 && c.date && Date.now() - (c.createdAt || 0) < KEEP_MS / 3) { draft.date = c.date === todayISO() ? null : c.date; draft.dateAt = Date.now(); }
+      if (ui.textarea) { ui.textarea.value = draft.details; ui.textarea.focus({ preventScroll: true }); ui.textarea.setSelectionRange(0, 0); }
+      keepPlace(ui.templates, () => { saveDraft(); paintDate(); paintSel(); paintParsed(false); });
+    },
+  }, i === 0 ? '↻ Same as last ' : '↻ ', h('span', {}, (proc || 'no details').slice(0, 28)), h('span', { class: 'muted', style: 'font-size:12px' }, ' ' + sortCodes(c.cats).join(' + ')))));
   const seen = new Set();
   const tmplChip = (t, name) => {
     const key = sortCodes(t.cats).join(',');
@@ -291,6 +322,10 @@ async function save({ another }) {
   }
   if (!details && !(await confirmBox('No case details', 'Save this case without initials or details?', 'Save'))) return;
   if (!(await okNoIds(details))) return;
+  // the same text on the same date is probably a double entry
+  const norm = t => String(t || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  const twin = (S.cases || []).find(x => x.date === curDate() && norm(caseText(x)) === norm(details));
+  if (twin && !(await confirmBox('Possible duplicate', `You already logged “${caseText(twin).slice(0, 60)}” on ${fmtDate(twin.date)}. Save another one?`, 'Save anyway'))) return;
   const c = await createCase({ date: curDate(), details, cats: draft.cats });
   const sticky = another || settings().defaultDate === 'last';
   const keep = sticky ? draft.date : null;
@@ -299,7 +334,11 @@ async function save({ another }) {
   if (ui.textarea) ui.textarea.value = '';
   paintDate(); paintSel(); paintQuick();
   ui.textarea.focus();
-  toast(`Saved ${fmtDate(c.date)} · ${c.cats.join(', ')}`, {
+  // say where it went and what it counted towards: "Saved Sat 10 Oct · 16 LSCS now 4/10"
+  const prog = PROGRESS_BY_CODE();
+  const withTarget = c.cats.map(code => prog[code]).find(p => p && p.next);
+  const counted = withTarget ? ` · ${withTarget.code} ${catName(withTarget.code)} now ${withTarget.count}/${withTarget.next.n}` : ` · ${c.cats.join(', ')}`;
+  toast(`Saved ${fmtDate(c.date)}${counted}`, {
     action: 'Undo',
     onaction: () => {
       removeCase(c.id);
@@ -325,12 +364,12 @@ let bulkRows = null;
 function renderBulk(card) {
   const ta = h('textarea', {
     class: 'details', rows: '8', value: draft.bulk || '',
-    placeholder: 'One case per line, or separate cases with an empty line. An optional date at the start, e.g.\n12/3 AB 5yo circumcision caudal\n13/3 CD 30F LSCS spinal\nEF 80F hemiarthroplasty',
+    placeholder: 'Leave an empty line between cases. An optional date at the start, e.g.\n12/3 AB 5yo\ncircumcision, caudal\n\n13/3 CD 30F\nLSCS spinal\n\nEF 80F\nhemiarthroplasty',
     oninput: e => { draft.bulk = e.target.value; saveDraft(); },
   });
   const out = h('div');
   add(card, 
-    h('p', { class: 'hint' }, 'Paste your notes or OT list: one case per line, or separate cases with an empty line when a case takes several lines. Categories are guessed for each case. Cases without a date at the start get ', h('b', {}, fmtDate(curDate())), ' (change it above).'),
+    h('p', { class: 'hint' }, 'Paste your notes or OT list with an empty line between cases (a case can take several lines). Categories are guessed for each case. Cases without a date at the start get ', h('b', {}, fmtDate(curDate())), ' (change it above).'),
     ta,
     h('div', { class: 'bar', style: 'margin-top:8px' },
       h('button', { class: 'primary', onclick: () => { bulkRows = parseBulk(ta.value, t => suggest(t)); paintBulk(out); } }, 'Review'),

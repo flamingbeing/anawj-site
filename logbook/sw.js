@@ -4,7 +4,7 @@
 // cache in IndexedDB. The Firebase SDK files themselves (versioned, never change) are cached here,
 // so the app still starts with no signal after the phone has cleared its HTTP cache.
 
-const VERSION = 'logbook-v16n';
+const VERSION = 'logbook-v16o';
 const SDK = 'https://www.gstatic.com/firebasejs/10.12.2/';
 const SDK_FILES = ['firebase-app.js', 'firebase-auth.js', 'firebase-firestore.js'].map(f => SDK + f);
 const SHELL = [

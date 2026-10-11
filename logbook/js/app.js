@@ -6,7 +6,7 @@ import { S, hooks, h, toast, cloud, setCases, scheduleSummary, fill, resetCaches
 import { renderLog, logCasesChanged, clearDrafts } from './ui-log.js';
 import { renderLogbook } from './ui-logbook.js';
 import { renderProgress, renderTotals } from './ui-progress.js';
-import { applyCompact, cachedCompact, applyTheme, cachedTheme, renderSettings } from './ui-settings.js';
+import { applyCompact, cachedCompact, applyTheme, cachedTheme, applyTextSize, cachedTextSize, renderSettings } from './ui-settings.js';
 import { renderAccount, flush as flushProfile } from './ui-account.js';
 import { renderAdmin, leaveAdmin } from './ui-admin.js';
 import { renderReflect, watchMyReflections } from './ui-reflect.js';
@@ -185,7 +185,7 @@ function refreshWho(user, who, firstLogbook) {
     let lbChanged = false;
     if (lb && S.logbook === firstLogbook && JSON.stringify(lb) !== JSON.stringify(firstLogbook)) {
       S.logbook = lb; lbChanged = true;
-      applyCompact(lb.settings && lb.settings.compact); applyTheme(lb.settings && lb.settings.theme);
+      applyCompact(lb.settings && lb.settings.compact); applyTheme(lb.settings && lb.settings.theme); applyTextSize(lb.settings && lb.settings.textSize);
     }
     if (!lbChanged && before === JSON.stringify([S.admin, S.pd, S.resident, S.sharedTemplates])) return;
     const typing = document.activeElement && /^(TEXTAREA|INPUT|SELECT)$/.test(document.activeElement.tagName);
@@ -204,7 +204,7 @@ async function onUser(user) {
   S.user = user;
   if (!user) {
     Object.assign(S, { admin: false, pd: false, resident: null, logbook: null, cases: [], reflections: [], counts: {}, casesLoaded: false, casesSynced: false, sharedTemplates: [] });
-    if (signedInOnce) { clearDrafts(); resetCaches(); forgetWho(); applyCompact(false); applyTheme('light'); }   // a shared device starts plain for the next person
+    if (signedInOnce) { clearDrafts(); resetCaches(); forgetWho(); applyCompact(false); applyTheme('light'); applyTextSize('1'); }   // a shared device starts plain for the next person
     paintWho();
     renderLanding();
     return;
@@ -231,6 +231,7 @@ async function onUser(user) {
     else refreshWho(user, who, logbook);
     applyCompact(logbook.settings && logbook.settings.compact);   // per-user display settings
     applyTheme(logbook.settings && logbook.settings.theme);
+    applyTextSize(logbook.settings && logbook.settings.textSize);
     const resident = S.resident;
     if (!logbook.name && (resident?.name || user.name)) S.logbook.name = resident?.name || user.name;
     // a programme resident's logbook remembers their rid (used by admins and the rules)
@@ -317,6 +318,7 @@ function registerSW() {
 if (cloud.onSyncError) cloud.onSyncError(err => toast('A change could not be synced: ' + (err.message || err)));
 
 applyTheme(cachedTheme());   // first paint; corrected once the logbook loads
+applyTextSize(cachedTextSize());
 if (cachedCompact()) document.body.classList.add('compact');   // first paint; corrected once the logbook loads
 paintWho();
 if (cloud.demo) {
@@ -324,7 +326,7 @@ if (cloud.demo) {
   fill(banner, h('span', {}, 'Demo: made-up data, stored only in this browser.'),
     h('button', { class: 'small', onclick: async () => {
       if (!(await confirmBox('Reset demo', 'Delete everything you added in the demo (cases, reflections, images, settings) and start again with the made-up data? The uploaded portfolio template is kept.', 'Reset', true))) return;
-      clearDrafts(); resetCaches(); forgetWho(); applyCompact(false); applyTheme('light');
+      clearDrafts(); resetCaches(); forgetWho(); applyCompact(false); applyTheme('light'); applyTextSize('1');
       cloud.resetDemo();
       location.reload();
     } }, 'Reset demo'),
