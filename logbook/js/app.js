@@ -14,6 +14,7 @@ import { downloadExcel, uploadExcel } from './ui-logbook.js';
 import { downloadNotes } from './ui-notes.js';
 import { cloudSaveSection, remindBackup } from './cloud-save.js';
 import { backupCard } from './backup.js';
+import { createNavigation } from './navigation.js';
 import { settingsFile, readSettingsFile } from './settings-file.js';
 import { purgeExpired, openBin } from './bin.js';
 
@@ -227,7 +228,7 @@ const tabFromHash = () => {
   const raw = location.hash.replace(/^#/, '');
   const id = TAB_ALIASES[raw] || raw;
   if (!visibleTabs().some(t => t.id === id)) return null;
-  if (id !== raw) history.replaceState(null, '', location.pathname + location.search + '#' + id);   // old links: #reflections → #reflect
+  if (id !== raw) history.replaceState(history.state, '', location.pathname + location.search + '#' + id);   // old links: #reflections → #reflect
   return id;
 };
 
@@ -243,22 +244,49 @@ function paintTabs() {
   tabsEl.hidden = false;
 }
 
-function go(id) {
-  if (S.tab === id) { if (id === 'log') document.querySelector('textarea.details')?.focus(); return; }
+function changeScreen(id, scroll = 0) {
   if (S.tab === 'account') flushProfile();
   if (S.tab === 'admin') leaveAdmin();
   S.tab = id;
-  history.replaceState(null, '', location.pathname + location.search + '#' + id);
   window.scrollTo(0, 0);
   render();
+  requestAnimationFrame(() => { if (S.tab === id) window.scrollTo(0, scroll); });
 }
+const navigation = createNavigation({ history, location,
+  parents: Object.fromEntries(TABS.filter(t => t.under).map(t => [t.id, t.under])),
+  allowed: id => visibleTabs().some(t => t.id === id),
+  onNavigate: changeScreen, getScroll: () => window.scrollY });
+function go(id) {
+  if (S.tab === id) { if (id === 'log') document.querySelector('textarea.details')?.focus(); return; }
+  navigation.go(id);
+}
+// Native links, menu links and tab buttons use the same history policy. Modified
+// clicks can still open a new tab, and Leave demo remains a normal document link.
+document.addEventListener('click', e => {
+  if (e.defaultPrevented || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey || !S.user) return;
+  const a = e.target.closest?.('a[href]');
+  if (!a || a.target || a.hasAttribute('download')) return;
+  const u = new URL(a.href, location.href);
+  if (u.origin !== location.origin || u.pathname !== location.pathname || u.search !== location.search) return;
+  const id = TAB_ALIASES[u.hash.slice(1)] || u.hash.slice(1);
+  if (!visibleTabs().some(t => t.id === id)) return;
+  e.preventDefault(); go(id);
+});
+// Keep scroll restoration without hitting mobile browsers' history-write limits.
+let scrollTimer = null;
+window.addEventListener('scroll', () => {
+  if (scrollTimer !== null) return;
+  scrollTimer = setTimeout(() => { scrollTimer = null; navigation.remember(); }, 500);
+}, { passive: true });
 // Enter/Space on a span chip with role=button acts like a tap (real buttons and catChip handle their own)
 document.addEventListener('keydown', e => {
   if (e.defaultPrevented || (e.key !== 'Enter' && e.key !== ' ')) return;
   const t = e.target;
   if (t && t.getAttribute && t.getAttribute('role') === 'button' && t.tagName !== 'BUTTON') { e.preventDefault(); t.click(); }
 });
-window.addEventListener('hashchange', () => { const t = tabFromHash(); if (t && t !== S.tab) { S.tab = t; render(); } });
+const syncNavigation = () => { if (S.user) { const t = tabFromHash(); if (t) navigation.sync(t); } };
+window.addEventListener('popstate', syncNavigation);
+window.addEventListener('hashchange', syncNavigation);
 
 function render() {
   if (!S.user) return;
@@ -269,7 +297,9 @@ function render() {
   S.tab = tab.id;
   const y = window.scrollY;
   // pages opened from More get a way back to the list
-  fill(app, tab.under ? h('p', { class: 'back-row' }, h('a', { class: 'btn small', href: '#' + tab.under }, '← ' + ((TABS.find(t => t.id === tab.under) || {}).label || 'More'))) : null, tab.render());
+  const backTo = tab.under && navigation.backTarget(tab.under);
+  fill(app, backTo ? h('p', { class: 'back-row' }, h('a', { class: 'btn small', href: '#' + backTo,
+    onclick: e => { e.preventDefault(); navigation.back(tab.under); } }, '← ' + ((TABS.find(t => t.id === backTo) || {}).label || 'Back'))) : null, tab.render());
   if (tab.id !== 'log') window.scrollTo(0, y);
 }
 hooks.render = render;
@@ -452,6 +482,7 @@ async function onUser(user) {
   // the tab chosen in Settings → Display, unless the address names one (a link, a shortcut, a reload)
   const start = display().startTab || 'log';
   S.tab = tabFromHash() || (START_TABS.some(([v]) => v === start) ? start : 'log');
+  navigation.initialize(S.tab);
   // Settings → Backup: a one-tap reminder when the last Drive / Dropbox backup is over a week old (if asked for)
   setTimeout(() => { if (S.user === user) remindBackup(); }, 3000);
   // recycle bin: drop entries older than 30 days, but only once the reflections are loaded, so an
