@@ -33,7 +33,7 @@ portfolio content.
   `settings.excelExport`. The Cases sheet keeps a hidden id column and a veryHidden "Export info" sheet
   (export time, date range): uploading back never deletes cases outside the range or newer than the file.
 - **Advanced search** (`search-ops.js`, tested; Settings → Logging, `settings.searchOps`, **off by default**):
-  initials: case: tag: "phrase" -word OR/|; a "?" by the box lists them (tap one to add it at the cursor); a misspelt operator is searched as
+  initials: title: (first line) case: tag: "phrase" -word OR/| AND; a "?" by the box lists them (tap one to add it at the cursor); a misspelt operator is searched as
   text with a "did you mean" note. No raw regex (owner's choice).
 - Future dates are allowed (Log date picker, calendar "+ Log a case"); they show as "upcoming".
 
