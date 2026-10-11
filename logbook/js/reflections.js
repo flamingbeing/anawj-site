@@ -12,11 +12,12 @@ export const REFLECTION_FIELDS = ['id', 'headingId', 'subId', 'initials', 'date'
 export const LIMITS = { title: 300, summary: 20000, points: 15, pointHeading: 300, pointText: 20000, figures: 10, caption: 300, references: 30, reference: 1000 };
 export const IMAGE_MAX_B64 = 700 * 1024;   // an image doc's base64 must be under this (rules allow < 750000)
 // Photos are shrunk on the phone to JPEG: longest side ≤ IMAGE_MAX_SIDE at IMAGE_QUALITY, about
-// 100–200 KB stored. Each resident has PHOTO_BUDGET_KB for all their figures (the database is
+// 60–120 KB stored. They are for the Word portfolio only: not in the backup file or the Excel export. Each resident has PHOTO_BUDGET_KB for all their figures (the database is
 // shared by the whole programme); a figure records its stored size as `kb`.
-export const IMAGE_MAX_SIDE = 1000;
+export const IMAGE_MAX_SIDE = 800;
 export const IMAGE_QUALITY = 0.7;
 export const PHOTO_BUDGET_KB = 20 * 1024;
+export const PHOTO_NOTE = 'Photos are for the final Word portfolio only. They are not in your backup file and can’t be exported to Excel.';
 export const LEGACY_FIGURE_KB = 300;       // older figures (before sizes were recorded): a typical 1400 px photo
 export const imageKb = data => Math.ceil(String(data || '').length / 1024);
 // KB used by the figures of these reflections (each image counted once).

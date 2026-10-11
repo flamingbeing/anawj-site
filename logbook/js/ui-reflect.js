@@ -7,7 +7,7 @@
 // works) and selecting several to delete. Every delete goes to the recycle bin (bin.js, 30 days).
 
 import { REFLECTION_HEADINGS, REFLECTION_SECTIONS, yearName } from './categories.js';
-import { reflectionProgress, reflectionCounts, HEADING_BY_ID, splitDetails, completeProblems, isLegacy, LIMITS, IMAGE_MAX_B64, IMAGE_MAX_SIDE, IMAGE_QUALITY, PHOTO_BUDGET_KB, photoUsageKb, imageKb, fmtMb, wordCount, MIN_WORDS, suggestHeadings, moveToHeading, inExport, exportSummary, pickJustEnough } from './reflections.js';
+import { reflectionProgress, reflectionCounts, HEADING_BY_ID, splitDetails, completeProblems, isLegacy, LIMITS, IMAGE_MAX_B64, IMAGE_MAX_SIDE, IMAGE_QUALITY, PHOTO_BUDGET_KB, PHOTO_NOTE, photoUsageKb, imageKb, fmtMb, wordCount, MIN_WORDS, suggestHeadings, moveToHeading, inExport, exportSummary, pickJustEnough } from './reflections.js';
 export { completeProblems };
 import { fmtDate, caseText } from './engine.js';
 import { S, h, toast, cloud, debounce, hooks, rYear, effectiveIntake, residentSmo, todayISO, confirmBox, add, resetters, scheduleSummary, displayName, byNewest, catName, updateCase, settings } from './ui-core.js';
@@ -913,7 +913,7 @@ function editor() {
       } catch (err) { status.textContent = 'Image not added'; toast('Could not add image: ' + err.message); }
     } });
     const figures = boxCard('Figures (optional)', null,
-      h('p', { class: 'hint', style: 'margin:0 0 4px' }, `Your photos: ${fmtMb(usedKb())} of ${fmtMb(PHOTO_BUDGET_KB)} used.`),
+      h('p', { class: 'hint', style: 'margin:0 0 4px' }, `${PHOTO_NOTE} Your photos: ${fmtMb(usedKb())} of ${fmtMb(PHOTO_BUDGET_KB)} used.`),
       h('p', { class: 'hint', style: 'margin:0 0 4px;color:var(--warn, #b45309)' }, 'No faces, names, NRIC, MRN or anything identifying on monitors, labels or screens. Crop before adding.'),
       h('p', { class: 'hint', style: 'margin:0 0 8px;color:var(--warn, #b45309)' }, 'Use your own photos or diagrams. Don’t copy copyrighted figures from papers, books or websites without permission; if you adapt one, cite it under References.'),
       r.figures.map((f, i) => {

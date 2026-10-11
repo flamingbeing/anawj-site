@@ -1,5 +1,6 @@
 // Personal backup (Settings → Backup): everything in your logbook as one JSON file you keep, and a
-// restore that adds back whatever is missing (it never overwrites or deletes anything).
+// restore that adds back whatever is missing (it never overwrites or deletes anything). Photos are
+// left out (they are for the Word portfolio only); older backups that have them still restore them.
 
 import { S, h, toast, modal, cloud, download, fileButton, saveMany, patchLogbook, todayISO, displayName } from './ui-core.js';
 import { cleanCase } from './demo-backend.js';
@@ -10,14 +11,11 @@ const FORMAT = 'apmes-logbook-backup';
 
 export async function makeBackup() {
   const reflections = S.reflections || [];
-  const ids = [...new Set(reflections.flatMap(r => (r.figures || []).map(f => f.id)).filter(Boolean))];
-  const images = {};
-  for (const id of ids) { const img = await cloud.loadImage(mine(), id); if (img) images[id] = img; }
   const lb = S.logbook || {};
   return {
     format: FORMAT, version: 1, exportedAt: new Date().toISOString(), email: mine(), name: displayName(),
     logbook: { name: lb.name || '', settings: lb.settings || {}, templates: lb.templates || [], profile: lb.profile || null },
-    cases: S.cases || [], reflections, images,
+    cases: S.cases || [], reflections,
   };
 }
 
@@ -70,6 +68,6 @@ export function backupCard() {
   const btn = h('button', { onclick: () => downloadBackup(btn) }, 'Download backup');
   return h('section', { class: 'card' },
     h('h2', {}, 'Backup'),
-    h('p', { class: 'hint' }, 'Keep your own copy of everything: cases, reflections (with pictures), templates and portfolio details, as one file. Restoring adds back anything missing and never deletes.'),
+    h('p', { class: 'hint' }, 'Keep your own copy of your cases, reflections, templates and portfolio details as one file. Photos are not included. Restoring adds back anything missing and never deletes.'),
     h('div', { class: 'bar', style: 'margin-bottom:0' }, btn, fileButton('Restore from backup…', '.json,application/json', restoreBackup)));
 }
