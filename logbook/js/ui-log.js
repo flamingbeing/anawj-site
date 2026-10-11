@@ -365,15 +365,20 @@ function renderOne(card) {
   // "Save as tag group" sits under the tag list, not in the pinned bar (keeps the bar slim)
   const groupSave = h('div', { class: 'group-save' });
   const savebar = h('div', { class: 'savebar' }, selected, selExtra, tip, actions);
+  // Two panes on wide screens (style.css .log-card.panes): the case, quick picks and Save on the left,
+  // all tags on the right, scrolling on their own. On phones the wrappers vanish (display: contents).
+  card.classList.add('panes');
   add(card,
-    h('div', { class: 'box-wrap' }, textarea, pasteBtn(textarea), clearBtn), parsed, tagRow,
-    // suggestions first, then the last case and your own templates
-    h('div', { class: 'chiplabel' }, 'Quick picks'), sugg, templates,
+    h('div', { class: 'lp-left' },
+      h('div', { class: 'box-wrap' }, textarea, pasteBtn(textarea), clearBtn), parsed, tagRow,
+      // suggestions first, then the last case and your own templates
+      h('div', { class: 'chiplabel' }, 'Quick picks'), sugg, templates),
+    h('div', { class: 'lp-right' },
     h('div', { class: 'bar cat-head' }, h('div', { class: 'chiplabel grow' }, 'All tags'),
       h('span', { class: 'seg cat-view', role: 'group', 'aria-label': 'Show tags as' },
         ['list', 'pills'].map(v => h('button', { class: 'small', 'aria-pressed': String((settings().catView || 'list') === v), onclick: () => { if ((settings().catView || 'list') === v) return; patchLogbook({ settings: { catView: v } }); hooks.render(); } }, v === 'list' ? 'List' : 'Pills')))),
     picker.el,
-    groupSave,
+    groupSave),
     stillNeeded(),
     savebar);
   // Tapping a chip, a tag in the list or a button while typing keeps the focus (and the keyboard) in the

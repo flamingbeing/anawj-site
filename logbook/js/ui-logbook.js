@@ -40,11 +40,11 @@ const MODES = [['calendar', 'Calendar'], ['list', 'List'], ['grid', 'Grid']];
 // "2026-10-06" -> "Tue"
 const weekday = iso => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); return m ? new Date(+m[1], +m[2] - 1, +m[3]).toLocaleDateString('en-GB', { weekday: 'short' }) : ''; };
 
-// Procedure-name tags; a parent (e.g. 20) is left out when one of its sub-categories (20iii) is there.
+// Tags in their short forms (full name on hover); a parent (e.g. 20) is left out when one of its sub-categories (20iii) is there.
 function catTags(cats) {
   const codes = sortCodes(cats || []);
   const shown = codes.filter(c => !codes.some(o => o !== c && cat(o).parent === c));
-  return h('span', { class: 'lb-tags' }, shown.map(c => h('span', { class: 'lb-tag', title: catFull(c) }, catName(c))));
+  return h('span', { class: 'lb-tags' }, shown.map(c => h('span', { class: 'lb-tag', title: catFull(c) }, catShort(c))));
 }
 
 export function renderLogbook() {

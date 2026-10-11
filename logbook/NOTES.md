@@ -47,8 +47,11 @@ portfolio content.
   groups), All tags, Still needed, "Save these tags as a tag group" under the tag list, pinned bar (chosen tags, Save, keep date | Save).
   Paste-a-list (List mode), Plan for later. `editCaseDialog` (full screen on phones, pinned
   Delete/Cancel/Save, 6-line growing box, Tags + "Add tags"; also "New case" from the reflection picker).
+- **Two panes** on the Case tab at >= 840px wide and >= 500px tall (tablets, unfolded foldables, computers; not
+  landscape phones): `.log-card.panes` grid, left = date, case box, quick picks, Still needed, Save; right = all tags
+  (sticky, own scroll). On phones `.lp-left` / `.lp-right` are display: contents, so the order is unchanged.
 - **Logbook** (`ui-logbook.js`): Calendar (default) | List | Grid. Calendar day: + Log a case (opens Log
-  on that date), Share day, Copy. Rows: Copy, Reflect (no swipe actions). Filter (Show, Search in; then Dates | Tags | More toggles, each open while in use; More = fuzzy, case sensitive, Save search, Tag N cases; saved searches one slim scrolling row): has all of / has none of
+  on that date), Share day, Copy. Rows: short tag names (full name on hover), Copy, Reflect (no swipe actions). Filter (Show, Search in; then Dates | Tags | More toggles, each open while in use; More = fuzzy, case sensitive, Save search, Tag N cases; saved searches one slim scrolling row): has all of / has none of
   tags, dates, flag, search scope, fuzzy; Reset (everything); × in the search box clears just the text; saved searches (text, filters, "Search in"; not fuzzy); Tag N cases (bulk add/remove). Search text
   cached per case (`hayCache`, reset when the tag set changes).
 - **Reflections** (`ui-reflect.js`): list by heading, editor (Case details, learning points,
@@ -101,7 +104,8 @@ portfolio content.
 
 - Checks: `node tools/check.mjs`; ESM syntax: `for f in logbook/js/*.js; do node --input-type=module --check < $f; done`
   (plain `node --check` misses ESM errors); unit tests: `for f in logbook/test/*.test.mjs; do node "$f"; done`.
-- Any change to a file in `sw.js` SHELL: bump `VERSION` (`logbook-v18…`). New JS files go in SHELL.
+- Any change to a file in `sw.js` SHELL: bump `VERSION` (`logbook-v20…`). New JS files go in SHELL. Check the bump
+  really landed (`grep VERSION logbook/sw.js`): a sed run from the wrong folder once left it stale for ten commits.
 - Rules: `logbook/firestore.rules` deploys on merge. Emulator: copy rules and
   `logbook/test/rules.emulator.mjs` + `evals/test/rules.emulator.mjs` into a folder with firebase-tools, then
   `firebase emulators:exec --only firestore --project demo-logbook "node logbook/test/rules.emulator.mjs; node evals/test/rules.emulator.mjs"`.
