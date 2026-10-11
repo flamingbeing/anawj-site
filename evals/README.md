@@ -10,7 +10,7 @@ lists, approve applications and download a CSV.
 What we learnt along the way (MedHub, the guidebook, decisions, operations) is in [`NOTES.md`](NOTES.md).
 
 It is a trial app for **all residents and postings**. Vanilla ES modules, no build step, same Firebase
-project as the logbook (`apmes-logbook`, free Spark plan).
+project as the logbook (`apmes-logbook`, Blaze plan, usage within the free quotas).
 
 ## Try it
 

@@ -9,11 +9,11 @@ This file collects what was learnt while building `/evals` (October 2026), so th
 | Source of truth | **EPA Guidebook v8 (July 2024)**. It overrides the AY2023 tracking template and the MedHub screenshots. |
 | Scope | Evaluations first: request and complete **DOPS, Mini-CEX and EBD**. Other MedHub modules may come later and be harmonised. |
 | Who | A **trial app for all residents and all postings**, not a pilot. |
-| Sign-in | **Google only** on the free Spark plan. The email-link sign-in and linked-emails code path is kept, switched off (`cloud.EMAIL_LINK = false`), for when a paid plan allows hospital email. |
+| Sign-in | **Google only** (decided when we thought the project was on the free Spark plan; it is on **Blaze**, so email-link sign-in could now be switched on). The email-link and linked-emails code path is kept, switched off (`cloud.EMAIL_LINK = false`). |
 | Data | **Never delete resident data.** Admins change status instead of deleting. A resident can delete only their own draft. |
 | People | Admins **or PDs** keep the faculty list and the resident list, or people apply for a role and appear in the admin panel for approval. Only **listed, ACTIVE faculty** can be assessors. |
 | Feedback | Residents **see assessor comments** (the PD agreed). |
-| Notification | **Share link or QR code** sent by the resident. No automatic emails (they would need Blaze). |
+| Notification | **Share link or QR code** sent by the resident. No automatic emails (possible on Blaze with a Cloud Function; not built). |
 | Form wording | Entrustment question label shortened to "Please briefly describe what was discussed", followed by the entrustment questions as a **plain, non-clickable list**. The "(discuss at least 2)" hint stays; it comes from the guidebook and MedHub ("centered around at least 2 entrustment questions"). |
 | Comments | **No 30-character minimum** (MedHub has one; we dropped it). |
 | Scale | The 9-point scale and the milestone scale are both **one uniform 1–9 row** of equal cells. The interface is compact. |
@@ -109,7 +109,7 @@ Pickers are full-screen **Recent | All | Write-In** lists, with recents remember
 
 - **Stack:** vanilla ES modules, no build step, GitHub Pages (`CNAME` anawj.com). The PWA service worker is `evals/sw.js`; **bump `VERSION` on every shell change**. Each app deletes only its own cache prefix (`evals-*`, `logbook-*`), because the apps share one origin.
 - **Firebase:**
-  - Project `apmes-logbook`, Spark plan, asia-southeast1.
+  - Project `apmes-logbook`, **Blaze** (pay-as-you-go) plan, asia-southeast1. Usage is within the free quotas at this scale.
   - **Shared with the logbook.** Evals reuses the logbook's `residents` collection.
   - Google popup sign-in, with a redirect fallback.
   - Firestore with a persistent offline cache.
@@ -165,7 +165,7 @@ On `sw.js` VERSION conflicts, take the higher version and keep the prefix-only c
   - Paste emails in **People → Faculty** or **People → Residents**, or approve applications there.
   - Agents in the cloud session cannot write to production Firestore. The owner, a PD or an admin has to do it in the app.
 - **Backups:**
-  - **There is no Firestore backup today.** The Spark plan has no managed backups or scheduled exports.
+  - **There is no Firestore backup today.** On Blaze, Firestore scheduled backups (or a nightly export) can be switched on in the console.
   - The proposed fix is a nightly GitHub Action that exports with the service account and stores an encrypted copy. Not built yet.
 - **Paid plan (Blaze):** pay-as-you-go with the Spark free quota still included. At this app's scale Firestore cost is expected to be near zero. Blaze is what unlocks:
   - email-link sign-in at volume and hospital email,
@@ -181,7 +181,7 @@ On `sw.js` VERSION conflicts, take the higher version and keep the prefix-only c
 
 ## 6. Open items
 
-- Linked emails / hospital-email sign-in (waits for Blaze; code path present, off).
+- Linked emails / hospital-email sign-in (the project is on Blaze; code path present, off).
 - Nightly encrypted Firestore backup Action.
 - Linking an evaluation to a logbook case (MedHub triggers evaluations from the case log; we request them directly).
 - Auto-crediting mask holding and bag ventilation alongside the airway DOPS, if the PD wants it.

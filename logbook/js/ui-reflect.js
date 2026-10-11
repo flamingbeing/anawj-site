@@ -7,7 +7,7 @@
 // works) and selecting several to delete. Every delete goes to the recycle bin (bin.js, 30 days).
 
 import { REFLECTION_HEADINGS, REFLECTION_SECTIONS, yearName } from './categories.js';
-import { reflectionProgress, reflectionCounts, HEADING_BY_ID, splitDetails, completeProblems, isLegacy, LIMITS, IMAGE_MAX_B64, wordCount, MIN_WORDS, suggestHeadings, moveToHeading, inExport, exportSummary, pickJustEnough } from './reflections.js';
+import { reflectionProgress, reflectionCounts, HEADING_BY_ID, splitDetails, completeProblems, isLegacy, LIMITS, IMAGE_MAX_B64, IMAGE_MAX_SIDE, IMAGE_QUALITY, PHOTO_BUDGET_KB, photoUsageKb, imageKb, fmtMb, wordCount, MIN_WORDS, suggestHeadings, moveToHeading, inExport, exportSummary, pickJustEnough } from './reflections.js';
 export { completeProblems };
 import { fmtDate, caseText } from './engine.js';
 import { S, h, toast, cloud, debounce, hooks, rYear, effectiveIntake, residentSmo, todayISO, confirmBox, add, resetters, scheduleSummary, displayName, byNewest, catName, updateCase, settings } from './ui-core.js';
@@ -646,7 +646,7 @@ export async function loadImagesFor(reflections) {
   return out;
 }
 
-// Phone photo -> JPEG base64 (no data: prefix), longest side ≤ 1400 px, under IMAGE_MAX_B64.
+// Phone photo -> JPEG base64 (no data: prefix), longest side ≤ IMAGE_MAX_SIDE, under IMAGE_MAX_B64.
 async function compressImage(file) {
   let src = null;
   try { if (typeof createImageBitmap === 'function') src = await createImageBitmap(file, { imageOrientation: 'from-image' }); } catch { src = null; }
@@ -659,7 +659,7 @@ async function compressImage(file) {
   }
   const W = src.width || src.naturalWidth, H = src.height || src.naturalHeight;
   if (!W || !H) throw new Error('could not read the image');
-  let max = 1400, q = 0.75;
+  let max = IMAGE_MAX_SIDE, q = IMAGE_QUALITY;
   for (let i = 0; i < 8; i++) {
     const k = Math.min(1, max / Math.max(W, H));
     const w = Math.max(1, Math.round(W * k)), hh = Math.max(1, Math.round(H * k));
@@ -690,6 +690,8 @@ function remapFigures(r, map) { for (const f of r.figures || []) if (f.point != 
 
 function editor() {
   const r = rv.editing;
+  // KB of photos across all my reflections, with this one as currently edited
+  const usedKb = () => photoUsageKb([...(S.reflections || []).filter(x => x.id !== r.id), r]);
   r.points ||= []; r.figures ||= []; r.references ||= [];
   const legacy = isLegacy(r);
   const status = h('span', { class: 'muted', style: 'font-size:13px' }, r.id ? 'Saved' : 'Not saved yet');
@@ -835,21 +837,30 @@ function editor() {
       status.textContent = 'Adding image…';
       try {
         const img = await compressImage(file);
+        const kb = imageKb(img.data);
+        if (usedKb() + kb > PHOTO_BUDGET_KB) {
+          status.textContent = 'Image not added';
+          return toast(`Your photos are using ${fmtMb(usedKb())} of ${fmtMb(PHOTO_BUDGET_KB)}. Remove a photo you no longer need (deleted reflections free theirs after 30 days in the recycle bin).`, { ms: 9000 });
+        }
         const id = newId();
         await cloud.saveImage(mine(), { id, ...img, createdAt: Date.now() });
         rv.thumbs[id] = 'data:image/jpeg;base64,' + img.data;
-        r.figures.push({ id, caption: '', point: r.points.length ? r.points.length - 1 : null });
+        r.figures.push({ id, caption: '', point: r.points.length ? r.points.length - 1 : null, kb });
         autosave.cancel(); await persist(); hooks.render();
       } catch (err) { status.textContent = 'Image not added'; toast('Could not add image: ' + err.message); }
     } });
     const figures = boxCard('Figures (optional)', null,
+      h('p', { class: 'hint', style: 'margin:0 0 4px' }, `Your photos: ${fmtMb(usedKb())} of ${fmtMb(PHOTO_BUDGET_KB)} used.`),
       h('p', { class: 'hint', style: 'margin:0 0 4px;color:var(--warn, #b45309)' }, 'No faces, names, NRIC, MRN or anything identifying on monitors, labels or screens. Crop before adding.'),
       h('p', { class: 'hint', style: 'margin:0 0 8px;color:var(--warn, #b45309)' }, 'Use your own photos or diagrams. Don’t copy copyrighted figures from papers, books or websites without permission; if you adapt one, cite it under References.'),
       r.figures.map((f, i) => {
         const im = h('img', { alt: f.caption || `Figure ${i + 1}`, style: 'max-width:100%;max-height:220px;display:block;border-radius:6px;background:#eee;min-height:60px' });
         if (rv.thumbs[f.id]) im.src = rv.thumbs[f.id];
         else cloud.loadImage(mine(), f.id).then(d => {
-          if (d && d.data) { rv.thumbs[f.id] = `data:${d.mime || 'image/jpeg'};base64,${d.data}`; im.src = rv.thumbs[f.id]; }
+          if (d && d.data) {
+            rv.thumbs[f.id] = `data:${d.mime || 'image/jpeg'};base64,${d.data}`; im.src = rv.thumbs[f.id];
+            if (!(f.kb > 0)) { f.kb = imageKb(d.data); autosave(); }   // older figure: record its real size
+          }
           else im.alt = 'Image not found';
         }).catch(() => { im.alt = 'Image not available offline'; });
         return h('div', { style: 'border:1px solid var(--line, #ddd);border-radius:10px;padding:10px;margin:0 0 10px' },
