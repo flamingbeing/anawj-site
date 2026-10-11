@@ -11,6 +11,7 @@ import {
 import { editCaseDialog } from './ui-log.js';
 import { reflectOnCase } from './ui-reflect.js';
 import { moveToBin } from './bin.js';
+import { shareText, copyText, caseText as shareCaseText, dayText, dayMarkdown } from './share.js';
 
 const view = { q: '', cat: '', flag: '', mode: null, limit: 150, month: null, day: null };
 resetters.push(() => Object.assign(view, { q: '', cat: '', flag: '', mode: null, limit: 150, month: null, day: null }));   // next user starts unfiltered
@@ -49,7 +50,7 @@ export function renderLogbook() {
     });
   };
 
-  if (!view.mode) view.mode = MODES.some(([m]) => m === settings().logbookView) ? settings().logbookView : 'list';
+  if (!view.mode) view.mode = MODES.some(([m]) => m === settings().logbookView) ? settings().logbookView : 'calendar';
   const paint = () => {
     const rows = filtered();
     fill(list, view.mode === 'grid' ? gridView(rows, paint) : view.mode === 'calendar' ? calendarView(rows, flagsOf, paint) : listView(rows, flagsOf, paint));
@@ -165,7 +166,9 @@ function caseRow(c, flagsOf) {
         !(c.cats || []).length ? h('span', { class: 'flag err' }, 'no category') : null,
         c.reflectTag && !(S.reflections || []).some(r => r.caseId === c.id) ? h('span', { class: 'flag', title: 'Tagged as a possible reflection' }, '☆ reflection?') : null,
         (c.tags || []).map(t => h('span', { class: 'flag sc-tag', title: 'Your tag' }, tagName(t))),
-        h('button', { class: 'small', style: 'margin-left:auto', title: 'Write a reflection on this case', onclick: e => { e.stopPropagation(); reflectOnCase(c); } },
+        // to your own notes (WhatsApp, Notes, Obsidian)
+        h('button', { class: 'small', style: 'margin-left:auto', title: 'Share this case', onclick: e => { e.stopPropagation(); shareText(shareCaseText(c)); } }, 'Share'),
+        h('button', { class: 'small', title: 'Write a reflection on this case', onclick: e => { e.stopPropagation(); reflectOnCase(c); } },
           (S.reflections || []).some(r => r.caseId === c.id) ? 'Reflection' : 'Reflect'))), c);
 }
 
@@ -177,7 +180,11 @@ const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 
 function calendarView(rows, flagsOf, repaint) {
   if (!S.cases.length) return h('div', { class: 'empty' }, h('p', {}, 'No cases yet.'), h('a', { class: 'btn primary', href: '#log' }, 'Log your first case'));
   const today = todayISO();
-  if (!view.month) view.month = today.slice(0, 7);
+  // opens on the latest day with cases up to today (today when there are none), so the list under it isn't empty
+  if (!view.month) {
+    const last = S.cases.map(c => c.date).filter(d => d && d <= today).sort().pop() || today;
+    view.month = last.slice(0, 7); if (!view.day) view.day = last;
+  }
   const [y, m] = view.month.split('-').map(Number);
   const byDay = new Map();
   const undated = [];
@@ -214,7 +221,10 @@ function calendarView(rows, flagsOf, repaint) {
       h('button', { class: 'small', onclick: () => { view.month = today.slice(0, 7); view.day = today; repaint(); } }, 'Today')),
     grid,
     view.day ? h('div', { style: 'margin-top:12px' },
-      h('h3', {}, `${fmtDate(view.day)} (${dayCases.length})`),
+      h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 4px' },
+        h('h3', { class: 'grow', style: 'margin:0' }, `${fmtDate(view.day)} (${dayCases.length})`),
+        dayCases.length ? h('button', { class: 'small', onclick: () => shareText(dayText(view.day)) }, 'Share day') : null,
+        dayCases.length ? h('button', { class: 'small', onclick: () => copyText(dayMarkdown(view.day), 'Markdown copied: paste into your notebook') }, 'Copy as Markdown') : null),
       dayCases.length ? h('ul', { class: 'cases' }, dayCases.map(c => caseRow(c, flagsOf))) : h('p', { class: 'empty' }, 'No cases on this day.'))
       : h('p', { class: 'hint', style: 'margin-top:10px' }, 'Tap a day to see its cases.'),
     undated.length ? h('details', { style: 'margin-top:12px' },

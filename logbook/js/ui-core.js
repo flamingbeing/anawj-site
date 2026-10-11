@@ -127,9 +127,10 @@ export const fileButton = (label, accept, onfile, cls = 'btn') => h('label', { c
 
 // A modal dialog; returns { el, close }. body: nodes. Closes on backdrop tap / Esc.
 // sticky: a tap on the backdrop doesn't close it (forms, so a stray tap doesn't lose typing)
-export function modal(title, body, { onclose, sticky } = {}) {
+// cls: extra classes on the dialog ('full': the whole screen on phones, with a .dlg-actions bar pinned)
+export function modal(title, body, { onclose, sticky, cls = '' } = {}) {
   // the title takes the initial focus, so phones don't pop a keyboard or date picker on open
-  const el = h('dialog', {}, h('h2', { tabindex: '-1', autofocus: true, style: 'outline:none' }, title), body);
+  const el = h('dialog', { class: cls }, h('h2', { tabindex: '-1', autofocus: true, style: 'outline:none' }, title), body);
   el.addEventListener('close', () => { el.remove(); onclose && onclose(); });
   if (!sticky) el.addEventListener('click', e => { if (e.target === el) el.close(); });
   document.body.append(el);

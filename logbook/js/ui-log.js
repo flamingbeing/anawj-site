@@ -9,7 +9,6 @@ import {
   createCase, updateCase, removeCase, restoreCase, saveMany, deleteMany, subcatChips, subcatsOf, settings, todayISO, hooks, fill, add, cloud, okNoIds, patchLogbook, catPills } from './ui-core.js';
 import { templateDialog } from './ui-settings.js';
 import { moveToBin } from './bin.js';
-import { shareText, copyText, caseText as shareCaseText, dayText, dayMarkdown } from './share.js';
 
 const DRAFT_KEY = 'logbook-draft-v2';
 const KEEP_MS = 12 * 3600e3; // a date kept by "Save, keep date" lasts this long
@@ -674,21 +673,22 @@ export function editCaseDialog(c, opts = {}) {
     getTags: () => e.tags || [], toggleTag: key => { Object.assign(e, toggleTagIn(e.cats, e.tags, key)); paint(); } });
   const paintSoon = debounce(paint, 120);
   paint();
+  // at least 6 lines, growing with the text
+  const grow = ta => { ta.style.height = 'auto'; ta.style.height = Math.max(ta.scrollHeight + 2, 0) + 'px'; };
+  const detailsBox = h('textarea', { rows: '6', class: 'grow-box', value: e.details, placeholder: isNew ? 'e.g. 72M lap chole GA ETT, difficult airway' : '',
+    oninput: ev => { e.details = ev.target.value; grow(ev.target); paintSoon(); } });
+  requestAnimationFrame(() => grow(detailsBox));
   const m = modal(isNew ? 'New case' : 'Edit case', [
     c.dateText && !c.date ? h('p', { class: 'tip' }, `Imported date “${c.dateText}” could not be read — please set the date.`) : null,
     h('label', { class: 'field' }, 'Date', h('input', { type: 'date', value: e.date || '', max: todayISO(), onchange: ev => { e.date = parseDate(ev.target.value); } })),
     h('label', { class: 'field' }, 'Patient initials', h('input', { value: e.initials, placeholder: 'e.g. AB', maxlength: '20', autocapitalize: 'characters', autocomplete: 'off', spellcheck: 'false', oninput: ev => { e.initials = ev.target.value; } })),
-    h('label', { class: 'field' }, 'Case summary', h('textarea', { rows: '3', value: e.details, placeholder: isNew ? 'e.g. 72M lap chole GA ETT, difficult airway' : '', oninput: ev => { e.details = ev.target.value; paintSoon(); } })),
+    h('label', { class: 'field' }, 'Case summary', detailsBox),
     h('div', { class: 'chiplabel' }, 'Categories'), sel,
     h('div', { class: 'chiplabel' }, 'Suggested'), sugg,
     h('details', {}, h('summary', {}, 'All categories'), picker.el),
     h('label', { class: 'check reflect-tag', style: 'margin-top:8px' }, h('input', { type: 'checkbox', checked: !!e.reflectTag, onchange: ev => { e.reflectTag = ev.target.checked; } }), 'Possible reflection'),
-    // to your own notes (WhatsApp, Notes, Obsidian): this case, or the whole day's list
-    isNew ? null : h('div', { class: 'bar share-row', style: 'margin:10px 0 0' },
-      h('button', { class: 'small', onclick: () => shareText(shareCaseText(c)) }, 'Share case'),
-      c.date ? h('button', { class: 'small', onclick: () => shareText(dayText(c.date)) }, "Share day's list") : null,
-      c.date ? h('button', { class: 'small', onclick: () => copyText(dayMarkdown(c.date), 'Markdown copied: paste into your notebook') }, 'Copy day as Markdown') : null),
-    h('div', { class: 'bar', style: 'margin-top:12px' },
+    // Delete / Cancel / Save stay pinned to the bottom while the form scrolls
+    h('div', { class: 'bar dlg-actions' },
       isNew ? null : h('button', { class: 'danger', onclick: async () => {
         m.close();
         // recycle bin (bin agent): kept 30 days; Undo restores it
@@ -714,6 +714,6 @@ export function editCaseDialog(c, opts = {}) {
         await updateCase(next);
         toast('Case updated', { action: 'Undo', onaction: () => restoreCase(c) });
       } }, 'Save')),
-  ]);
+  ], { cls: 'full', sticky: true });
   return m;
 }
