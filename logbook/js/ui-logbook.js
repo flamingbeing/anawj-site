@@ -233,8 +233,7 @@ export function renderLogbook() {
       counter, h('span', { class: 'grow' }),
       h('div', { class: 'seg' }, MODES.map(([m, l]) =>
         h('button', { 'aria-pressed': String(view.mode === m), onclick: () => setMode(m) }, l))))),
-  h('section', { class: 'card' }, list),
-  excelCard());
+  h('section', { class: 'card' }, list));
   paint();
   return wrap;
 
@@ -475,13 +474,6 @@ export function opsHelp(box, onchange, list = OPERATOR_HELP, example = 'tag:16 -
 
 // ---------- Excel ----------
 
-function excelCard() {
-  return h('details', { class: 'card more-tools' }, h('summary', {}, 'More tools: Excel download, Excel/CSV upload'),
-    h('p', { class: 'hint' }, 'Download your logbook as a spreadsheet, edit it on a computer, then upload it back. You will see what changes before anything is saved.'),
-    h('div', { class: 'bar', style: 'margin-bottom:0' },
-      h('button', { onclick: downloadExcel }, 'Download Excel…'),
-      fileButton('Upload Excel/CSV logbook', '.xlsx,.csv,text/csv', uploadExcel)));
-}
 
 // Excel export: logbook and/or reflections, a date range, the columns and their order. The choices
 // are saved with the account (settings.excelExport) and come back next time.
@@ -554,7 +546,7 @@ export function downloadExcel() {
 // Upload a logbook from Excel (.xlsx) or a CSV file: match the file's columns to the case fields
 // (guessed from the headers, or the names remembered from last time), see the first rows as they
 // will be read, then review what changes before anything is saved.
-async function uploadExcel(file) {
+export async function uploadExcel(file) {
   let grid;
   try {
     if (/\.csv$/i.test(file.name) || file.type === 'text/csv') {

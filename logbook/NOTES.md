@@ -26,8 +26,9 @@ portfolio content.
 - Logbook **Case summary** (the case box). Reflection **Case details** (prefilled from the case summary).
 - **Possible reflection** = the ☆ flag on a case (just a bookmark; missing it doesn't matter).
 - **Analytics** = the old Progress tab (`#progress`). Totals is under it ("Compare with your intake").
-- More → **Export & backup**: **Export** is the Word portfolio only (it holds everything APMES needs);
-  everything else is **Backup** (backup file and restore, Excel spreadsheet). Keep that wording.
+- More → **Export / Import** (`#data`): **Export** = the Word portfolio only (it holds everything APMES needs);
+  **Import** = reflections from Word (`#reflimport`) and the logbook from Excel/CSV; **Backup** = backup file and
+  restore, Excel spreadsheet. Keep that wording. The Logbook and Reflections tabs have no More tools cards.
 - **Excel backup** (`export-opts.js`, tested; dialog in `ui-logbook.js` `downloadExcel`): logbook + reflections
   (or one), date range, columns ticked and ordered, tag/date style, Summary sheet; saved as
   `settings.excelExport`. The Cases sheet keeps a hidden id column and a veryHidden "Export info" sheet
@@ -52,12 +53,12 @@ portfolio content.
   cached per case (`hayCache`, reset when the tag set changes).
 - **Reflections** (`ui-reflect.js`): list by heading, editor (Case details, learning points,
   References and Figures as folded white cards), Export page (summary + Mark ready) and Choose page
-  (ticks, Quick actions). Draft kept per account. More tools: Word upload, bin, Reflection settings.
+  (ticks, Quick actions). Draft kept per account. Only a small "Rules for reflections" (no card) at the bottom.
 - **Analytics** (`ui-progress.js`): header tally, folded sections (Needs attention, Logbook,
   Reflections with ⓘ requirements, Trends), Compare with your intake (Totals). EPA view and Download summary removed (owner: not useful).
 - **More** (`app.js`): Account (with Residency year for non-programme users), Settings, Export &
   backup, Admin portal; Privacy, Credits, What's new (`WHATS_NEW` in app.js; update each release).
-- **Settings**: a menu of Display (incl. the tab the app opens on, `settings.startTab`; a #hash still wins),
+- **Settings**: a menu of Reflections (`#reflset`: new reflections in the export, photo sizes), Display (incl. the tab the app opens on, `settings.startTab`; a #hash still wins),
   Logging, Tag editor (`#tags`), Copy & share format (`#sharefmt`), Recycle bin.
 - **Copy & share** (`share-format.js`, tested): templates in `settings.shareFormat` (dayHead, dayCase, oneCase)
   with {date} {day} {weekday} {count} {n} {initials} {case}. Default day: `[[YYYY-MM-DD]]`, then

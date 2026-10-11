@@ -1,4 +1,4 @@
-// Personal backup (More → Export & backup): everything in your logbook as one JSON file you keep, and a
+// Personal backup (More → Export / Import): everything in your logbook as one JSON file you keep, and a
 // restore that adds back whatever is missing (it never overwrites or deletes anything). Photos are
 // left out (they are for the Word portfolio only); older backups that have them still restore them.
 

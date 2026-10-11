@@ -2,7 +2,7 @@
 // shared state and helpers are in ui-core.js. Case data comes from cloud.js (Firestore, or the
 // in-browser demo backend with ?demo).
 
-import { S, hooks, h, toast, cloud, setCases, scheduleSummary, fill, resetCaches, patchLogbook, confirmBox, modal, setCategoryNames, categoryNames as categoryNamesNow } from './ui-core.js';
+import { S, hooks, h, toast, cloud, setCases, scheduleSummary, fill, resetCaches, patchLogbook, confirmBox, fileButton, modal, setCategoryNames, categoryNames as categoryNamesNow } from './ui-core.js';
 import { renderLog, logCasesChanged, clearDrafts, SHARED_KEY } from './ui-log.js';
 import { renderLogbook } from './ui-logbook.js';
 import { renderProgress, renderTotals } from './ui-progress.js';
@@ -10,7 +10,7 @@ import { applyCompact, cachedCompact, applyTheme, cachedTheme, applyTextSize, ca
 import { renderAccount, flush as flushProfile } from './ui-account.js';
 import { renderAdmin, leaveAdmin } from './ui-admin.js';
 import { renderReflect, watchMyReflections, renderExportPage, renderChoosePage } from './ui-reflect.js';
-import { downloadExcel } from './ui-logbook.js';
+import { downloadExcel, uploadExcel } from './ui-logbook.js';
 import { backupCard } from './backup.js';
 import { purgeExpired, openBin } from './bin.js';
 
@@ -53,14 +53,15 @@ const TABS = [
   { id: 'totals', label: 'Totals', render: renderTotals, hidden: true, under: 'progress', unlisted: true },
   { id: 'account', label: 'Account', render: renderAccount, hidden: true, under: 'more', desc: 'Your name and portfolio details (Section 1); sign out' },
   { id: 'settings', label: 'Settings', render: () => renderSettingsMenu(), hidden: true, under: 'more', desc: 'Display, logging, tag editor, copy & share format, recycle bin' },
-  { id: 'data', label: 'Export & backup', render: () => renderDataPage(), hidden: true, under: 'more', desc: 'Export the portfolio (Word); backup file and Excel spreadsheet' },
+  { id: 'data', label: 'Export / Import', render: () => renderDataPage(), hidden: true, under: 'more', desc: 'Export the portfolio (Word); import reflections from Word; backup file and Excel' },
+  { id: 'reflimport', label: 'Import reflections from Word', render: () => renderReflImport(), hidden: true, under: 'data', unlisted: true },
   // Settings' own pages (not in the More list)
   { id: 'display', label: 'Display', render: renderDisplay, hidden: true, under: 'settings', unlisted: true, desc: 'Theme, text size, compact mode, the tab the app opens on' },
   { id: 'sharefmt', label: 'Copy & share format', render: renderShareFormat, hidden: true, under: 'settings', unlisted: true, desc: 'How a copied or shared case or day reads' },
   { id: 'logging', label: 'Logging', render: renderLogging, hidden: true, under: 'settings', unlisted: true, desc: 'Suggestions, the Enter key, case box, search, dates' },
   // from Reflections → More tools
-  { id: 'reflset', label: 'Reflection settings', render: renderReflectionSettings, hidden: true, under: 'reflect', unlisted: true },
-  // opened from More → Export & backup (not in the More list)
+  { id: 'reflset', label: 'Reflections', render: renderReflectionSettings, hidden: true, under: 'settings', unlisted: true, desc: 'New reflections in the export, photo sizes' },
+  // opened from More → Export / Import (not in the More list)
   { id: 'export', label: 'Export portfolio', render: () => renderExportPage(), hidden: true, under: 'data', unlisted: true },
   { id: 'choose', label: 'Export portfolio', render: renderChoosePage, hidden: true, under: 'export', unlisted: true },
   // admins open it from More
@@ -88,7 +89,7 @@ const WHATS_NEW = [
   'Analytics tab: folded sections and Trends; Totals moved here (Compare with your intake)',
   'Tag editor: pills view with drag, search, case counts, merge, shorthand you can edit',
   'Logbook: calendar first, filters by tags and dates, saved searches, tag many cases at once',
-  'Export & backup in one place under More',
+  'Export / Import under More: the portfolio, Word and Excel uploads, backups',
 ];
 const whatsNewCard = () => h('section', { class: 'card' },
   h('details', { class: 'more-tools' }, h('summary', {}, 'What’s new'),
@@ -96,7 +97,7 @@ const whatsNewCard = () => h('section', { class: 'card' },
 
 // Settings: a short menu of its pages (residency year on top for people not on the programme list)
 function renderSettingsMenu() {
-  const order = ['display', 'logging', 'tags', 'sharefmt'];
+  const order = ['display', 'logging', 'tags', 'reflset', 'sharefmt'];
   const pages = TABS.filter(t => t.under === 'settings').sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
   return h('div', {},
     h('section', { class: 'card more-list' }, h('h2', {}, 'Settings'),
@@ -104,7 +105,16 @@ function renderSettingsMenu() {
         menuItem('bin', 'Recycle bin', 'Deleted cases and reflections, kept for 30 days', () => openBin()))));
 }
 
-// Export & backup: everything that leaves the app as a file, and restoring a backup
+// The Word upload for reflections (its module loads on first use); when done, on to Reflections
+function renderReflImport() {
+  const wrap = h('div', {}, h('section', { class: 'card' }, h('p', { class: 'hint' }, 'Loading…')));
+  import('./ui-reflect-import.js').then(m => Promise.resolve(m.renderImport(() => { location.hash = 'reflect'; })))
+    .then(node => { if (S.tab === 'reflimport') wrap.replaceChildren(node); })
+    .catch(() => wrap.replaceChildren(h('section', { class: 'card' }, h('p', {}, 'Upload from Word isn’t available yet. Try again after the app updates.'))));
+  return wrap;
+}
+
+// Export / Import: the portfolio export, the Word upload for reflections, and backups
 function renderDataPage() {
   return h('div', {},
     // Export is the portfolio only (it holds everything APMES needs); every other copy is a backup
@@ -112,9 +122,16 @@ function renderDataPage() {
       h('h3', {}, 'Portfolio (Word)'),
       h('p', { class: 'hint' }, 'The APMES portfolio: choose which complete reflections go in, then export it with Section 1 and the Section 4 case numbers filled in. This is what APMES needs.'),
       h('div', { class: 'bar', style: 'margin-bottom:0' }, h('a', { class: 'btn primary', href: '#export' }, 'Choose reflections and export ›'))),
+    h('section', { class: 'card' }, h('h2', {}, 'Import'),
+      h('h3', {}, 'Reflections from Word'),
+      h('p', { class: 'hint' }, 'Already wrote reflections in the APMES Word portfolio? Upload the .docx to add them here. You check each one before it is saved.'),
+      h('div', { class: 'bar', style: 'margin-bottom:0' }, h('a', { class: 'btn', href: '#reflimport' }, 'Upload from Word ›')),
+      h('h3', { style: 'margin-top:16px' }, 'Logbook from Excel or CSV'),
+      h('p', { class: 'hint' }, 'Edit your cases in a spreadsheet (Download Excel under Backup), then upload it back; or bring in a list from elsewhere. You match the columns and see every change before anything is saved.'),
+      h('div', { class: 'bar', style: 'margin-bottom:0' }, fileButton('Upload Excel/CSV…', '.xlsx,.csv,text/csv', uploadExcel))),
     backupCard(
       h('h3', { style: 'margin-top:16px' }, 'Spreadsheet (Excel)'),
-      h('p', { class: 'hint' }, 'Your cases, your reflections or both as a spreadsheet: choose the dates and the columns. To edit cases and upload them back, use Logbook → More tools.'),
+      h('p', { class: 'hint' }, 'Your cases, your reflections or both as a spreadsheet: choose the dates and the columns. To edit cases and upload them back, use Import above.'),
       h('div', { class: 'bar', style: 'margin-bottom:0' }, h('button', { onclick: downloadExcel }, 'Download Excel…'))));
 }
 

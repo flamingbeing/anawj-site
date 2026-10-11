@@ -1,4 +1,4 @@
-// Excel export choices (More → Export & backup, Logbook → More tools): what goes in (logbook,
+// Excel export choices (More → Export / Import, Logbook → More tools): what goes in (logbook,
 // reflections or both), a date range, and which columns in which order. Saved per account as
 // settings.excelExport. Pure (no DOM, no ExcelJS): xlsxio.js writes the sheets, tests cover the rest.
 

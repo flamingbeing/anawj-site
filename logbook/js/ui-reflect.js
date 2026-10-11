@@ -391,21 +391,14 @@ function list() {
   const isOpen = (id, met) => em || narrowed || rv.openH.has(id) || (!met && !rv.shutH.has(id));
   const toggle = (id, met) => { if (isOpen(id, met)) { rv.openH.delete(id); rv.shutH.add(id); } else { rv.shutH.delete(id); rv.openH.add(id); } hooks.render(); };
 
-  // the rest at the bottom, like the Logbook tab: export, Word upload and the bin, the rules
-  const foot = em ? null : h('section', { class: 'card refl-foot' },
-    h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:8px;margin:0 0 6px' }, h('a', { class: 'btn small', href: '#export' }, 'Export portfolio ›')),
-    h('details', { class: 'more-tools', open: !!rv.toolsOpen, ontoggle: e => { rv.toolsOpen = e.target.open; } },
-      h('summary', {}, 'More tools: Word upload, bin, settings'),
-      h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:8px;margin:0' },
-        h('button', { class: 'small', onclick: () => openView('import') }, 'Upload from Word'),
-        h('button', { class: 'small', onclick: () => openView('bin') }, 'Recycle bin'),
-        h('a', { class: 'btn small', href: '#reflset' }, 'Reflection settings ›'))),
-    h('details', { class: 'refl-rules' }, h('summary', {}, 'Rules for reflections'),
-      h('ul', { class: 'hint' },
-        h('li', {}, 'Each reflection is a different patient, under one heading only.'),
-        h('li', {}, 'Some categories require one case reflection in Junior Residency (JR, R1–R3); when not indicated, at most one case reflection can be done at the JR level per category.'),
-        h('li', {}, 'Write as many as you like: you choose which go into the portfolio when you export. Uncategorised ones are never exported.'),
-        h('li', {}, 'Generative AI use must follow the NUS guidelines on the use of AI tools in academic work.'))));
+  // at the bottom, small and without a card: the rules (export and Word upload are under More →
+  // Export / Import; the bin and photo sizes under Settings)
+  const foot = em ? null : h('details', { class: 'refl-rules refl-foot' }, h('summary', {}, 'Rules for reflections'),
+    h('ul', { class: 'hint' },
+      h('li', {}, 'Each reflection is a different patient, under one heading only.'),
+      h('li', {}, 'Some categories require one case reflection in Junior Residency (JR, R1–R3); when not indicated, at most one case reflection can be done at the JR level per category.'),
+      h('li', {}, 'Write as many as you like: you choose which go into the portfolio when you export. Uncategorised ones are never exported.'),
+      h('li', {}, 'Generative AI use must follow the NUS guidelines on the use of AI tools in academic work.')));
   const body = h('section', { class: 'card' });
   let section = '', shown = 0;
   if (rv.group !== 'heading') {
