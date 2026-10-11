@@ -246,6 +246,13 @@ service cloud.firestore {
     }
 
     // ---- portfolio template (word-export): the blank APMES portfolio, base64 in ≤700 KB chunks ----
+    // category display names and pill names (display only; exports keep the official names)
+    match /config/categoryNames {
+      allow read: if signedIn();
+      allow write: if isAdmin()
+        && request.resource.data.keys().hasOnly(['names', 'updatedAt'])
+        && request.resource.data.names is map && request.resource.data.names.size() <= 200;
+    }
     match /config/portfolioTemplate {
       allow read: if signedIn();
       allow write: if isAdmin()

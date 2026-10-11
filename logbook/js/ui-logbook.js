@@ -1,11 +1,11 @@
 // Logbook screen: every case, newest first (list) or by day (calendar). Search, filter, flags, edit; a grid view for bulk edits
 // and pasting rows from Excel; Excel download and upload (round trip with a preview of the changes).
 
-import { duplicates, fmtDate, caseFromRow, diffRows, sortCodes, withParents, caseParts, caseText, dateWindow } from './engine.js';
+import { duplicates, fmtDate, caseFromRow, diffRows, sortCodes, withParents, caseParts, caseText, dateWindow, nth } from './engine.js';
 import { flagCase } from './importer.js';
 import { exportCases, readCasesSheet } from './xlsxio.js';
 import {
-  S, h, toast, debounce, modal, cat, catFull, catChip, PICKER_ORDER, settings, patchLogbook, needExcel, download, fileButton,
+  S, h, toast, debounce, modal, cat, catName, categoryNames, catFull, catChip, PICKER_ORDER, settings, patchLogbook, needExcel, download, fileButton,
   updateCase, saveMany, deleteMany, displayName, rYear, todayISO, fill, add, resetters } from './ui-core.js';
 import { editCaseDialog } from './ui-log.js';
 import { reflectOnCase } from './ui-reflect.js';
@@ -21,7 +21,7 @@ const weekday = iso => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); 
 function catTags(cats) {
   const codes = sortCodes(cats || []);
   const shown = codes.filter(c => !codes.some(o => o !== c && cat(o).parent === c));
-  return h('span', { class: 'lb-tags' }, shown.map(c => h('span', { class: 'lb-tag', title: catFull(c) }, catFull(c))));
+  return h('span', { class: 'lb-tags' }, shown.map(c => h('span', { class: 'lb-tag', title: catFull(c) }, (categoryNames()[c] && categoryNames()[c].name) || catFull(c))));
 }
 
 export function renderLogbook() {
@@ -60,7 +60,7 @@ export function renderLogbook() {
   const filters = h('div', { class: 'bar lb-filters', hidden: !(view.showFilters || view.cat || view.flag) },
     h('select', { 'aria-label': 'Filter by category', onchange: e => { view.cat = e.target.value; paintFilterBtn(); paint(); } },
       h('option', { value: '' }, 'All categories'),
-      PICKER_ORDER.map(c => h('option', { value: c.code, selected: view.cat === c.code }, `${c.parent ? '  ' : ''}${c.code} ${c.name} (${S.counts[c.code] || 0})`))),
+      PICKER_ORDER.map(c => h('option', { value: c.code, selected: view.cat === c.code }, `${c.parent ? '  ' : ''}${c.code} ${catName(c.code)} (${S.counts[c.code] || 0})`))),
     h('select', { 'aria-label': 'Filter by flag', onchange: e => { view.flag = e.target.value; paintFilterBtn(); paint(); } },
       flagOpts.map(([v, l]) => h('option', { value: v, selected: view.flag === v }, l))));
   const filterBtn = h('button', { class: 'small', 'aria-expanded': String(!filters.hidden), onclick: () => {
@@ -147,7 +147,7 @@ function caseRow(c, flagsOf) {
   const flags = flagsOf(c);
   const p = caseParts(c);
   return swipeable(h('li', { 'data-date': c.date || '', onclick: () => editCaseDialog(c), tabindex: '0', onkeydown: e => { if (e.key === 'Enter' && e.target === e.currentTarget) editCaseDialog(c); } },
-      h('span', { class: 'd' }, c.date ? [h('span', { class: 'wd' }, weekday(c.date)), ' ', fmtDate(c.date).replace(/ \d{4}$/, '')] : (c.dateText || '—')),
+      h('span', { class: 'd' }, c.date ? [h('span', { class: 'wd' }, weekday(c.date)), ' ', fmtDate(c.date).replace(/ \d{4}$/, '').replace(/^(\d+)/, (_, d) => nth(Number(d)))] : (c.dateText || '—')),
       h('span', { class: 't' }, p.initials ? [h('b', {}, p.initials), ' '] : null, p.details || (p.initials ? null : h('i', { class: 'muted' }, 'no details'))),
       h('span', { class: 'c' }, catTags(c.cats),
         flags.includes('needsDate') ? h('span', { class: 'flag err' }, 'needs date') : null,

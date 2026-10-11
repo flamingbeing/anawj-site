@@ -4,7 +4,7 @@ import { R_YEARS, BY_CODE, CATEGORIES } from './categories.js';
 import { progress, epaProgress, todayISO, rYearDefault } from './engine.js';
 import { exportTotals } from './xlsxio.js';
 import { reflectionProgress } from './reflections.js';
-import { S, h, toast, cloud, rYear, settings, patchLogbook, needExcel, download, displayName, hooks, add, resetters, info } from './ui-core.js';
+import { S, h, toast, cloud, rYear, settings, patchLogbook, needExcel, download, displayName, hooks, add, resetters, info, catName } from './ui-core.js';
 
 const STATUS_TEXT = { late: 'Behind', due: 'Due this year', ontrack: 'On track', done: 'Done', none: 'No target' };
 const pview = { by: 'cat' };
@@ -93,7 +93,7 @@ function progList(items) {
     const pct = Math.min(100, Math.round((p.count / max) * 100));
     return h('li', { class: c.parent ? 'sub' : '', title: c.full || c.name },
       h('i', { class: `dot ${p.status}`, title: STATUS_TEXT[p.status] }),
-      h('span', { class: 'nm' }, h('b', {}, p.code), p.name),
+      h('span', { class: 'nm' }, h('b', {}, p.code), catName(p.code)),
       h('span', { class: 'ct' }, (p.status === 'late' || p.status === 'due') ? h('span', { class: `stw ${p.status}` }, STATUS_TEXT[p.status]) : null,
         p.status === 'none' ? String(p.count) : p.next ? `${p.count} / ${p.next.n}` : `${p.count} ✓`),
       p.milestones.length ? h('span', { class: 'meter' }, h('i', { class: p.status, style: `width:${pct}%` })) : null,
@@ -197,7 +197,7 @@ function totalsTable(people) {
     const t = BY_CODE[code].targets || {};
     const tgt = R_YEARS.filter(y => t[y] != null).map(y => `${t[y]} by ${y}`).join(' | ');
     data.rows.push({ label: BY_CODE[code].label + (tgt ? ` [${tgt}]` : ''), values: vals, statuses: sts });
-    add(tbody, h('tr', {}, h('td', { class: 'cat', title: BY_CODE[code].full }, `${code} ${BY_CODE[code].name}`, tgt ? h('small', { class: 'tgt' }, tgt) : null),
+    add(tbody, h('tr', {}, h('td', { class: 'cat', title: BY_CODE[code].full }, `${code} ${catName(code)}`, tgt ? h('small', { class: 'tgt' }, tgt) : null),
       vals.map((v, i) => h('td', { class: `n ${sts[i]}`, title: gaps[i] ? `${gaps[i]} short of the target` : '' }, String(v)))));
   }
   const totals = people.map(p => p.total || 0);

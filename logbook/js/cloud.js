@@ -18,7 +18,7 @@
 import { FIREBASE_CONFIG } from './firebase-config.js';
 import * as D from './demo-backend.js';
 import { cleanProfile } from './profile.js';
-import { plain, cleanCase, cleanSummary, cleanResident, cleanTemplate, importDocId, defaultLogbook, cleanReflection, cleanImage } from './demo-backend.js';
+import { plain, cleanCase, cleanSummary, cleanResident, cleanTemplate, importDocId, defaultLogbook, cleanReflection, cleanImage, cleanCategoryNames } from './demo-backend.js';
 
 const SDK = 'https://www.gstatic.com/firebasejs/10.12.2/';
 export const demo = (() => {
@@ -426,6 +426,21 @@ export async function saveTemplate(b64) {
   }
   // the index doc goes last, so a reader never sees parts from a half-finished upload as complete
   await F.setDoc(F.doc(db, 'config', 'portfolioTemplate'), { parts, size: Math.floor(b64.length * 3 / 4), uploadedAt: Date.now() });
+}
+
+// Category display names (config/categoryNames, admins write, everyone signed in reads).
+export async function loadCategoryNames() {
+  if (demo) return D.loadCategoryNames();
+  const { db, F } = await sdk();
+  try { const s = await F.getDoc(F.doc(db, 'config', 'categoryNames')); return s.exists() ? cleanCategoryNames(s.data().names) : {}; }
+  catch (e) { console.warn('Category names not loaded', e); return {}; }
+}
+export async function saveCategoryNames(names) {
+  if (demo) return D.saveCategoryNames(names);
+  const { db, F } = await sdk();
+  const n = cleanCategoryNames(names);
+  await queued(F.setDoc(F.doc(db, 'config', 'categoryNames'), { names: n, updatedAt: Date.now() }));
+  return n;
 }
 
 // { data: base64, size, uploadedAt } or null when none was uploaded.
