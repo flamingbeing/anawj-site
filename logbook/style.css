@@ -965,3 +965,5 @@ details.refl-foot { margin: 4px 4px 12px; }
   .log-card.panes > .savebar { grid-area: save; margin: 12px 0 -12px -12px; border-radius: 0 0 0 var(--radius, 14px); }
   .log-card.panes .lp-right .cat-head { position: sticky; top: 0; z-index: 2; background: var(--panel); margin-top: 0; }
 }
+.refl-note { margin: 0 0 4px 34px; white-space: pre-line; }
+.refl-notes-switch { margin: 4px 4px 0; font-size: 14px; }

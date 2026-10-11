@@ -10,7 +10,7 @@ import { REFLECTION_HEADINGS, REFLECTION_SECTIONS, yearName } from './categories
 import { reflectionProgress, reflectionCounts, HEADING_BY_ID, splitDetails, completeProblems, isLegacy, LIMITS, IMAGE_MAX_B64, IMAGE_MAX_SIDE, IMAGE_QUALITY, PHOTO_BUDGET_KB, PHOTO_NOTE, photoUsageKb, imageKb, fmtMb, wordCount, MIN_WORDS, suggestHeadings, moveToHeading, inExport, exportSummary, pickJustEnough } from './reflections.js';
 export { completeProblems };
 import { fmtDate, caseText, procedureText, caseParts } from './engine.js';
-import { S, h, toast, cloud, debounce, hooks, rYear, effectiveIntake, residentSmo, todayISO, confirmBox, add, resetters, scheduleSummary, displayName, byNewest, catName, updateCase, settings } from './ui-core.js';
+import { S, h, toast, cloud, debounce, hooks, rYear, effectiveIntake, residentSmo, todayISO, confirmBox, add, resetters, scheduleSummary, displayName, byNewest, catName, updateCase, settings, patchLogbook } from './ui-core.js';
 import { renderExportButton, caseRYear, countsByYear } from './portfolio.js';
 import { parseQuery, matchQuery, REFL_FIELDS, REFL_OPERATOR_HELP } from './search-ops.js';
 import { opsHelp } from './ui-logbook.js';
@@ -84,12 +84,16 @@ function suggestChips(c, onpick, jr = rYear() <= 3) {
     h('div', { class: 'refl-chips' }, sug.map(x => {
       const hd = HEADING_BY_ID[x.headingId];
       const sub = x.subId && hd.subs ? hd.subs.find(s => s.id === x.subId) : null;
-      const nm = shortName(hd.name) + (sub ? ' · ' + sub.name : '');
+      const nm = labelOf(hd) + (sub ? ' · ' + sub.name : '');
       return h('button', { class: 'refl-chip' + (x.needed ? ' need' : ''), title: hd.name + (x.needed ? ' (still needed)' : ' (already met)'),
         onclick: () => onpick({ headingId: x.headingId, subId: x.subId }) }, nm, x.needed ? null : h('span', { class: 'muted' }, ' ✓'));
     })));
 }
 const shortName = n => { const t = n.replace(/\s*\(.*$/, '').replace(/\s+e\.g\.?,?.*$/i, '').trim() || n; return t.length > 48 ? t.slice(0, 46) + '…' : t; };
+// a heading's name in the app: its chosen label (categories.js), else the official name shortened
+const labelOf = hd => (hd ? hd.label || shortName(hd.name) : 'Uncategorised');
+// the notes under each heading (rules, examples): on unless switched off at the bottom of the list
+const notesOn = () => settings().reflNotes !== false;
 
 const showTab = () => { if (location.hash !== '#reflect') location.hash = '#reflect'; else hooks.render(); };
 // JR follows from the reflection's date: R1–R3 at that date (from the resident's intake) is junior residency.
@@ -210,7 +214,7 @@ function picker() {
       h('button', { onclick: () => { rv.picking = null; hooks.render(); } }, p.relink ? '← Back to reflection' : '← Reflections'),
       h('span', { class: 'grow' })),
     h('h2', { style: 'margin:8px 0 4px' }, p.relink ? 'Change the linked case' : 'Which case is this reflection on?'),
-    ph ? h('p', { style: 'margin:0 0 4px' }, h('span', { class: 'muted' }, 'Heading: '), h('b', {}, shortName(ph.name) + (psub ? ' · ' + psub.name : ''))) : null,
+    ph ? h('p', { style: 'margin:0 0 4px' }, h('span', { class: 'muted' }, 'Heading: '), h('b', {}, labelOf(ph) + (psub ? ' · ' + psub.name : ''))) : null,
     p.preset && p.preset.uncat ? h('p', { style: 'margin:0 0 4px' }, h('span', { class: 'muted' }, 'Heading: '), h('b', {}, 'Uncategorised')) : null,
     h('p', { class: 'hint', style: 'margin:0 0 8px' }, p.relink ? 'Pick the logged case this reflection is about.' : 'Pick a logged case: the reflection starts with its initials, date, diagnosis and case details filled in. Not logged yet? Add it here.'),
     p.relink ? null : h('button', { class: 'small', style: 'margin:0 0 8px', onclick: newCaseForReflection }, '+ New case'),
@@ -276,7 +280,7 @@ function readyLine(p) {
   if (!tagged.length && !suggested.length) return null;
   const line = c => `${c.date ? fmtDate(c.date) : ''} · ${[c.initials, String(c.details || '').split('\n').join(' ')].filter(Boolean).join(' ').slice(0, 60)}`;
   const row = (c, hd, isTag) => h('li', {},
-    h('span', { class: 'rt' }, isTag ? '☆ ' : '', line(c), hd ? h('small', {}, ' → ' + (HEADING_BY_ID[hd.headingId] || {}).name) : null),
+    h('span', { class: 'rt' }, isTag ? '☆ ' : '', line(c), hd ? h('small', {}, ' → ' + labelOf(HEADING_BY_ID[hd.headingId])) : null),
     h('span', { class: 'row' },
       h('button', { class: 'small primary', onclick: () => reflectOnCase(c, hd || null) }, 'Write'),
       isTag ? h('button', { class: 'small', title: 'Remove the tag', onclick: async () => { const next = { ...c }; delete next.reflectTag; await updateCase(next); hooks.render(); } }, 'Untag') : null));
@@ -308,7 +312,7 @@ function list() {
   const ops = settings().searchOps && words.length ? parseQuery(rv.q, { fields: REFL_FIELDS }) : null;
   const fieldOf = (r, k) => {
     const hd = HEADING_BY_ID[r.headingId];
-    if (k === 'heading') return `${hd ? hd.name : 'uncategorised'} ${(hd && (hd.subs || []).find(x => x.id === r.subId) || {}).name || ''}`.toLowerCase();
+    if (k === 'heading') return `${hd ? hd.name + ' ' + (hd.label || '') : 'uncategorised'} ${(hd && (hd.subs || []).find(x => x.id === r.subId) || {}).name || ''}`.toLowerCase();
     if (k === 'case') return String(r.summary || '').toLowerCase();
     return k === 'all' ? hayOf(r) : String(r[k] || '').toLowerCase();
   };
@@ -381,7 +385,7 @@ function list() {
         (r.jr ? 'JR ' : '') + (r.date ? fmtDate(r.date) : '—')),
       h('span', { class: 't' }, h('span', { class: draft ? 'refl-proc draft' : 'refl-proc' }, `${r.initials || '??'} ${r.diagnosis || ''}`), draft ? h('span', { class: 'flag err' }, 'draft') : null,
         h('span', { class: 'muted refl-wc' }, ` ${wordCount(r)} words`),
-        showHeading ? h('span', { class: 'muted refl-hd' }, HEADING_BY_ID[r.headingId] ? shortName(HEADING_BY_ID[r.headingId].name) : 'Uncategorised') : null),
+        showHeading ? h('span', { class: 'muted refl-hd' }, labelOf(HEADING_BY_ID[r.headingId])) : null),
       pts.length ? h('div', { class: 'refl-points' }, ...pts.map((t, i) => h('div', {}, `${i + 1}. ${t}`))) : null);
     if (cb) checks.push([cb, li, r.id]);
     return li;
@@ -393,6 +397,8 @@ function list() {
 
   // at the bottom, small and without a card: the rules (export and Word upload are under More →
   // Export / Import; the bin and photo sizes under Settings)
+  const notesSwitch = em || rv.group !== 'heading' ? null : h('label', { class: 'check refl-notes-switch' },
+    h('input', { type: 'checkbox', role: 'switch', checked: notesOn(), onchange: e => { patchLogbook({ settings: { reflNotes: e.target.checked } }); hooks.render(); } }), 'Show notes under each heading');
   const foot = em ? null : h('details', { class: 'refl-rules refl-foot' }, h('summary', {}, 'Rules for reflections'),
     h('ul', { class: 'hint' },
       h('li', {}, 'Each reflection is a different patient, under one heading only.'),
@@ -448,11 +454,12 @@ function list() {
           items.length ? h('span', { class: 'res-chev', 'aria-hidden': 'true' }, '›') : h('span', { class: 'res-chev blank', 'aria-hidden': 'true' }), ' ',
           h('i', { class: `dot ${hp.met ? 'done' : hp.done ? 'ontrack' : 'due'}` }), ' ', h('b', {}, `${hp.done}/${hp.min}`), ' ',
           // the name flows beside the count (a long one wraps under itself, not below the count)
-          h('span', { class: 'refl-hname' }, hp.name, x.written > hp.done ? h('span', { class: 'muted refl-counts' }, ` · ${x.written} written`) : null)),
-        em ? null : h('button', { class: 'small refl-add', title: 'Add a reflection under ' + hp.name, 'aria-label': 'Add a reflection under ' + hp.name, onclick: () => openPicker(false, { headingId: hp.id, subId: null }) }, '+ Add')),
+          h('span', { class: 'refl-hname' }, hp.label, x.written > hp.done ? h('span', { class: 'muted refl-counts' }, ` · ${x.written} written`) : null)),
+        em ? null : h('button', { class: 'small refl-add', title: 'Add a reflection under ' + hp.label, 'aria-label': 'Add a reflection under ' + hp.label, onclick: () => openPicker(false, { headingId: hp.id, subId: null }) }, '+ Add')),
+      // the heading's note (rules, examples; categories.js), shown whether open or not unless switched off
+      notesOn() && hp.note ? h('div', { class: 'hint refl-note' }, hp.note) : null,
       opened ? [
-        HEADING_BY_ID[hp.id].subs ? h('div', { class: 'hint', style: 'margin:2px 0 0' }, 'Include at least one of each: ' + HEADING_BY_ID[hp.id].subs.map(s => s.name).join(' · ')) : null,
-        // sub-types are shown in the "needs at least one of each" line above, so don't repeat them here
+        // sub-types are in the note above, so a missing one isn't repeated here
         hp.issues.filter(y => !y.startsWith('Missing: ')).length ? h('div', { class: 'hint', style: 'color:var(--warn, #b45309)' }, hp.issues.filter(y => !y.startsWith('Missing: ')).join(' · ')) : null,
         hits.length ? h('ul', { class: 'cases' }, hits.map(row)) : em ? h('div', { class: 'refl-empty hint' }, 'Drop here') : null] : null));
   }
@@ -470,7 +477,7 @@ function list() {
   }
   if (narrowed && !shown) add(body, h('p', { class: 'empty' }, 'No reflections match.'));
   if (em) paintSel();
-  return h('div', {}, head, toolbar, body, foot);
+  return h('div', {}, head, toolbar, body, notesSwitch, foot);
 }
 
 // Tick or untick one reflection for the export.
@@ -588,7 +595,7 @@ function place() {
 async function moveReflection(r, headingId) {
   const before = { ...r };
   const moved = moveToHeading(r, headingId);
-  const name = shortName(HEADING_BY_ID[headingId].name);
+  const name = labelOf(HEADING_BY_ID[headingId]);
   try {
     await cloud.saveReflection(mine(), moved);
     toast(`Moved to ${name}`, { action: 'Undo', ms: 7000, onaction: async () => {
@@ -699,7 +706,7 @@ export function renderExportPage(onChoose = false) {
     add(body, h('div', { class: 'exp-h' },
       h('div', { class: 'bar', style: 'gap:8px;align-items:center;margin:8px 0 2px' },
         h('i', { class: `dot ${x.inExport >= hd.min ? 'done' : x.inExport ? 'ontrack' : 'due'}` }),
-        h('span', { class: 'grow' }, h('b', {}, `${x.inExport} of ${hd.min}`), ' ', shortName(hd.name), h('span', { class: 'muted refl-counts' }, ` · ${rs.length} written`))),
+        h('span', { class: 'grow' }, h('b', {}, `${x.inExport} of ${hd.min}`), ' ', labelOf(hd), h('span', { class: 'muted refl-counts' }, ` · ${rs.length} written`))),
       x.warn.length ? h('div', { class: 'hint', style: 'color:var(--warn, #b45309)' }, x.warn.join(' · ')) : null,
       h('ul', { class: 'exp-list' }, rs.map(r => h('li', {},
         h('label', { class: 'check exp-row' },
@@ -819,8 +826,8 @@ function editor() {
   const paintSubs = () => {
     const hd = HEADING_BY_ID[r.headingId];
     subWrap.replaceChildren(...[
-      hd && hd.hint ? h('p', { class: 'hint' }, hd.hint) : null,
-      hd && hd.subs ? h('p', { class: 'hint' }, 'This heading should include at least one of each: ' + hd.subs.map(s => s.name).join(' · ') + '. Just describe the procedure or diagnosis below.') : null,
+      hd && hd.name !== hd.label ? h('p', { class: 'hint' }, 'Portfolio heading: ' + hd.name) : null,
+      hd && hd.note ? h('p', { class: 'hint' }, hd.note) : null,
     ].filter(Boolean));
   };
   paintSubs();
@@ -830,7 +837,7 @@ function editor() {
     h('option', { value: '', selected: !HEADING_BY_ID[r.headingId] }, 'Uncategorised (not exported)'),
     REFLECTION_HEADINGS.map(hd => {
       const g = hd.section !== sec ? (sec = hd.section) : null;
-      return [g ? h('option', { disabled: true }, `— ${g} —`) : null, h('option', { value: hd.id, selected: r.headingId === hd.id }, hd.name.length > 70 ? hd.name.slice(0, 68) + '…' : hd.name)];
+      return [g ? h('option', { disabled: true }, `— ${g} —`) : null, h('option', { value: hd.id, selected: r.headingId === hd.id }, labelOf(hd))];
     }));
 
   const lc = caseById(r.caseId);

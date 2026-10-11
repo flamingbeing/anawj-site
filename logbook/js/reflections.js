@@ -139,7 +139,7 @@ export function reflectionProgress(reflections) {
     if (dups.length) issues.push(`Same patient used more than once (${[...new Set(dups.map(r => r.initials + ' ' + r.date))].join(', ')})`);
     const counted = mine.length;
     const met = counted >= h.min;
-    return { id: h.id, section: h.section, name: h.name, hint: h.hint || '', done: mine.length, counted, min: h.min, jrDone, jrNeeded, jrMax, subs, issues, met };
+    return { id: h.id, section: h.section, name: h.name, label: h.label || h.name, note: h.note || '', hint: h.hint || '', done: mine.length, counted, min: h.min, jrDone, jrNeeded, jrMax, subs, issues, met };
   });
   const total = headings.reduce((n, h) => n + Math.min(h.counted, h.min), 0);
   return { headings, totals: { done: done.length, counted: total, min: REFLECTION_TOTAL, drafts: (reflections || []).filter(r => r.status !== 'complete').length } };
