@@ -7,14 +7,22 @@ import { exportCases, readSheetGrid } from './xlsxio.js';
 import { parseCsv } from './tags.js';
 import {
   S, h, toast, debounce, modal, cat, catName, catShort, tagName, catFull, catChip, PICKER_ORDER, settings, patchLogbook, needExcel, download, fileButton, catPills,
-  updateCase, saveMany, deleteMany, displayName, rYear, todayISO, fill, add, resetters } from './ui-core.js';
+  updateCase, saveMany, deleteMany, displayName, rYear, todayISO, fill, add, resetters, tagSet, tagLinks, confirmBox } from './ui-core.js';
+import { flatTree, tagTree } from './tags.js';
 import { editCaseDialog, logOnDate } from './ui-log.js';
 import { reflectOnCase } from './ui-reflect.js';
 import { moveToBin } from './bin.js';
 import { shareText, copyText, caseText as shareCaseText, dayText, dayMarkdown } from './share.js';
 
-const view = { q: '', cat: '', flag: '', mode: null, limit: 150, month: null, day: null };
-resetters.push(() => Object.assign(view, { q: '', cat: '', flag: '', mode: null, limit: 150, month: null, day: null }));   // next user starts unfiltered
+// has: tags a case must all have; not: tags it must have none of ('c:16' or a personal tag key); from/to: dates
+const FRESH = () => ({ q: '', has: [], not: [], from: '', to: '', flag: '', mode: null, limit: 150, month: null, day: null });
+const view = FRESH();
+resetters.push(() => Object.assign(view, FRESH()));   // next user starts unfiltered
+const hasTag = (c, k) => (k.startsWith('c:') ? (c.cats || []).includes(k.slice(2)) : (c.tags || []).includes(k));
+const keyName = k => (k.startsWith('c:') ? catShort(k.slice(2)) : tagName(k));
+// The text a case is searched by, worked out once per version of the case (logbooks run to thousands)
+// (and again when your tags change: renamed tags are searched by their new names)
+let hayCache = new WeakMap(), hayFor = null;
 const MODES = [['calendar', 'Calendar'], ['list', 'List'], ['grid', 'Grid']];
 // "2026-10-06" -> "Tue"
 const weekday = iso => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); return m ? new Date(+m[1], +m[2] - 1, +m[3]).toLocaleDateString('en-GB', { weekday: 'short' }) : ''; };
@@ -36,16 +44,25 @@ export function renderLogbook() {
     // "last tuesday", "this week", "last month"… narrow by date; the other words search the text
     const win = dateWindow(view.q);
     const words = (win ? win.rest : view.q).toLowerCase().split(/\s+/).filter(Boolean);
-    return S.cases.filter(c => {
-      if (view.cat && !(c.cats || []).includes(view.cat)) return false;
-      if (view.flag && !flagsOf(c).includes(view.flag)) return false;
-      if (win && !(c.date && c.date >= win.from && c.date <= win.to)) return false;
-      if (!words.length) return true;
-      // Search in (Filter): everything, the initials only, or the procedure line only; fuzzy allows typos
-      const scope = settings().lbScope || 'all', fuzzy = !!settings().lbFuzzy;
-      const hay = (scope === 'initials' ? caseParts(c).initials
+    // Search in (Filter): everything, the initials only, or the procedure line only; fuzzy allows typos
+    const scope = settings().lbScope || 'all', fuzzy = !!settings().lbFuzzy;
+    if (hayFor !== settings().tagSet) { hayCache = new WeakMap(); hayFor = settings().tagSet; }
+    const hayOf = c => {
+      let m = hayCache.get(c);
+      if (!m) { m = {}; hayCache.set(c, m); }
+      if (m[scope] == null) m[scope] = (scope === 'initials' ? caseParts(c).initials
         : scope === 'procedure' ? procedureText(c)
         : `${caseText(c)} ${c.date || c.dateText || ''} ${weekday(c.date)} ${fmtDate(c.date) || ''} ${(c.cats || []).map(k => `${k} ${catName(k)} ${catShort(k)}`).join(' ')} ${(c.tags || []).map(tagName).join(' ')}`).toLowerCase();
+      return m[scope];
+    };
+    return S.cases.filter(c => {
+      if (view.flag && !flagsOf(c).includes(view.flag)) return false;
+      if (view.has.length && !view.has.every(k => hasTag(c, k))) return false;
+      if (view.not.length && view.not.some(k => hasTag(c, k))) return false;
+      if ((view.from || view.to) && !(c.date && (!view.from || c.date >= view.from) && (!view.to || c.date <= view.to))) return false;
+      if (win && !(c.date && c.date >= win.from && c.date <= win.to)) return false;
+      if (!words.length) return true;
+      const hay = hayOf(c);
       return words.every(w => textHas(hay, w, fuzzy && scope !== 'initials'));
     });
   };
@@ -55,6 +72,7 @@ export function renderLogbook() {
     const rows = filtered();
     fill(list, view.mode === 'grid' ? gridView(rows, paint) : view.mode === 'calendar' ? calendarView(rows, flagsOf, paint) : listView(rows, flagsOf, paint));
     counter.textContent = rows.length === S.cases.length ? `${S.cases.length} cases` : `${rows.length} of ${S.cases.length} cases`;
+    bulkBtn.textContent = `Tag ${rows.length === S.cases.length ? 'all ' : ''}${rows.length} case${rows.length === 1 ? '' : 's'}…`; bulkBtn.disabled = !rows.length;
   };
   const paintSoon = debounce(() => { view.limit = 150; paint(); }, 150);
 
@@ -66,22 +84,76 @@ export function renderLogbook() {
   const searchIn = h('select', { 'aria-label': 'Search in', onchange: e => { patchLogbook({ settings: { lbScope: e.target.value } }); paintFilterBtn(); paint(); } },
     [['all', 'Search everything'], ['initials', 'Search initials only'], ['procedure', 'Search the procedure only']].map(([v, t]) => h('option', { value: v, selected: (settings().lbScope || 'all') === v }, t)));
   const fuzzyBox = h('label', { class: 'check', style: 'margin:0' }, h('input', { type: 'checkbox', checked: !!settings().lbFuzzy, onchange: e => { patchLogbook({ settings: { lbFuzzy: e.target.checked } }); paintFilterBtn(); paint(); } }), 'Fuzzy search (allows typos)');
-  const filters = h('div', { class: 'bar lb-filters', hidden: !(view.showFilters || view.cat || view.flag || (settings().lbScope || 'all') !== 'all' || settings().lbFuzzy) },
-    h('select', { 'aria-label': 'Filter by tag', onchange: e => { view.cat = e.target.value; paintFilterBtn(); paint(); } },
-      h('option', { value: '' }, 'All tags'),
-      PICKER_ORDER.map(c => h('option', { value: c.code, selected: view.cat === c.code }, `${c.parent ? '  ' : ''}${catName(c.code)} (${S.counts[c.code] || 0})`))),
-    h('select', { 'aria-label': 'Filter by flag', onchange: e => { view.flag = e.target.value; paintFilterBtn(); paint(); } },
-      flagOpts.map(([v, l]) => h('option', { value: v, selected: view.flag === v }, l))),
-    searchIn, fuzzyBox);
+  // tag filters: chips you add from a list of every tag (APMES and your own)
+  const tagOptions = () => flatTree(tagTree(tagSet())).filter(n => n.kind !== 'head');
+  const tagSel = (label, list) => h('select', { class: 'small', 'aria-label': label, onchange: e => { const k = e.target.value; e.target.value = ''; if (k && !list.includes(k)) { list.push(k); refresh(); } } },
+    h('option', { value: '' }, label),
+    tagOptions().map(n => h('option', { value: n.e.k }, `${'  '.repeat(Math.min(n.depth, 3))}${keyName(n.e.k)}`)));
+  const chipsOf = list => list.map(k => h('span', { class: 'chip on', role: 'button', tabindex: '0', title: 'Remove', onclick: () => { list.splice(list.indexOf(k), 1); refresh(); } }, keyName(k), h('span', { class: 'x' }, ' ×')));
+  const hasRow = h('div', { class: 'chips lb-tagrow' });
+  const notRow = h('div', { class: 'chips lb-tagrow' });
+  const dateIn = k => h('input', { type: 'date', value: view[k], 'aria-label': k === 'from' ? 'From' : 'To', onchange: e => { view[k] = e.target.value; refresh(); } });
+  const bulkBtn = h('button', { class: 'small', onclick: () => bulkTag(filtered()) });
+  const filters = h('div', { class: 'lb-filters', hidden: !(view.showFilters || active()) },
+    h('div', { class: 'bar' }, h('span', { class: 'lb-fl' }, 'Has all of'), hasRow),
+    h('div', { class: 'bar' }, h('span', { class: 'lb-fl' }, 'Has none of'), notRow),
+    h('div', { class: 'bar' }, h('span', { class: 'lb-fl' }, 'Dates'), dateIn('from'), h('span', { class: 'muted' }, 'to'), dateIn('to')),
+    h('div', { class: 'bar' },
+      h('select', { 'aria-label': 'Filter by flag', onchange: e => { view.flag = e.target.value; refresh(); } },
+        flagOpts.map(([v, l]) => h('option', { value: v, selected: view.flag === v }, l))),
+      searchIn, fuzzyBox),
+    h('div', { class: 'bar', style: 'margin:0' },
+      h('button', { class: 'small', onclick: saveSearch }, '☆ Save this search'),
+      bulkBtn,
+      h('button', { class: 'small linkish', onclick: () => {
+        Object.assign(view, { q: '', has: [], not: [], from: '', to: '', flag: '' });
+        const box = wrap.querySelector('input[type=search]'); if (box) box.value = '';
+        filters.querySelectorAll('input[type=date]').forEach(i => { i.value = ''; });
+        refresh();
+      } }, 'Clear')));
+  const repaintFilters = () => {
+    fill(hasRow, ...chipsOf(view.has), tagSel('+ Add tag', view.has));
+    fill(notRow, ...chipsOf(view.not), tagSel('+ Add tag', view.not));
+  };
+  // saved searches: one tap to run again (stored with your account)
+  const savedRow = h('div', { class: 'chips lb-saved' });
+  const paintSaved = () => {
+    const list = settings().savedSearches || [];
+    fill(savedRow, ...list.map(x => h('span', { class: 'chip tmpl', role: 'button', tabindex: '0', title: 'Run this search', onclick: () => {
+      Object.assign(view, { q: x.q || '', has: [...(x.has || [])], not: [...(x.not || [])], from: x.from || '', to: x.to || '', flag: x.flag || '' });
+      const box = wrap.querySelector('input[type=search]'); if (box) box.value = view.q;
+      const [f, t] = filters.querySelectorAll('input[type=date]'); if (f) f.value = view.from; if (t) t.value = view.to;
+      filters.hidden = false; refresh();
+    } }, '★ ' + x.name, h('span', { class: 'x', role: 'button', 'aria-label': 'Delete saved search', onclick: async e => {
+      e.stopPropagation();
+      if (!(await confirmBox('Delete saved search', `Delete “${x.name}”?`, 'Delete', true))) return;
+      await patchLogbook({ settings: { savedSearches: (settings().savedSearches || []).filter(y => y.id !== x.id) } }); paintSaved();
+    } }, ' ×'))));
+  };
+  async function saveSearch() {
+    if (!active() && !view.q.trim()) return toast('Search or filter first, then save it');
+    const name = (prompt('Name this search', view.q.trim() || view.has.map(keyName).join(' + ') || 'My search') || '').trim().slice(0, 40);
+    if (!name) return;
+    const list = settings().savedSearches || [];
+    const x = { id: Math.random().toString(36).slice(2, 8), name, q: view.q, has: view.has, not: view.not, from: view.from, to: view.to, flag: view.flag };
+    await patchLogbook({ settings: { savedSearches: [...list, x].slice(-20) } });
+    paintSaved(); toast(`Saved “${name}”`);
+  }
+  function refresh() { paintFilterBtn(); repaintFilters(); view.limit = 150; paint(); }
+  function active() { return !!(view.has.length || view.not.length || view.from || view.to || view.flag || (settings().lbScope || 'all') !== 'all' || settings().lbFuzzy); }
   const filterBtn = h('button', { class: 'small', 'aria-expanded': String(!filters.hidden), onclick: () => {
     view.showFilters = filters.hidden; filters.hidden = !filters.hidden; filterBtn.setAttribute('aria-expanded', String(!filters.hidden));
   } });
-  const paintFilterBtn = () => { const n = (view.cat ? 1 : 0) + (view.flag ? 1 : 0) + ((settings().lbScope || 'all') !== 'all' ? 1 : 0) + (settings().lbFuzzy ? 1 : 0); filterBtn.textContent = n ? `Filter (${n})` : 'Filter'; filterBtn.classList.toggle('primary', !!n); };
-  paintFilterBtn();
+  const paintFilterBtn = () => {
+    const n = view.has.length + view.not.length + (view.from || view.to ? 1 : 0) + (view.flag ? 1 : 0) + ((settings().lbScope || 'all') !== 'all' ? 1 : 0) + (settings().lbFuzzy ? 1 : 0);
+    filterBtn.textContent = n ? `Filter (${n})` : 'Filter'; filterBtn.classList.toggle('primary', !!n);
+  };
+  paintFilterBtn(); repaintFilters(); paintSaved();
   add(wrap, h('section', { class: 'card' },
     h('div', { class: 'bar' },
       h('input', { type: 'search', class: 'grow', placeholder: 'Search: initials, procedure, “last Tuesday”, “this week”', value: view.q, 'aria-label': 'Search cases', oninput: e => { view.q = e.target.value; paintSoon(); } }),
       filterBtn),
+    savedRow,
     filters,
     h('div', { class: 'bar', style: 'margin-bottom:0' },
       counter, h('span', { class: 'grow' }),
@@ -97,6 +169,37 @@ export function renderLogbook() {
     wrap.querySelectorAll('.seg button').forEach((b, i) => b.setAttribute('aria-pressed', String(MODES[i][0] === m)));
     if (settings().logbookView !== m) patchLogbook({ settings: { logbookView: m } });  // remembered per user
   }
+}
+
+// Add a tag to, or take one off, every case in the search results.
+function bulkTag(rows) {
+  if (!rows.length) return;
+  const tags = flatTree(tagTree(tagSet())).filter(n => n.kind !== 'head');
+  const act = h('select', {}, h('option', { value: 'add' }, 'Add'), h('option', { value: 'remove' }, 'Remove'));
+  const sel = h('select', {}, h('option', { value: '' }, 'Choose a tag…'), tags.map(n => h('option', { value: n.e.k }, `${'  '.repeat(Math.min(n.depth, 3))}${keyName(n.e.k)}`)));
+  const m = modal(`Tag ${rows.length} case${rows.length === 1 ? '' : 's'}`, [
+    h('p', { class: 'hint' }, 'Applies to every case in the current search results.'),
+    h('div', { class: 'bar', style: 'gap:8px' }, act, sel),
+    h('div', { class: 'bar', style: 'margin-top:12px' }, h('span', { class: 'grow' }),
+      h('button', { onclick: () => m.close() }, 'Cancel'),
+      h('button', { class: 'primary', onclick: async () => {
+        const k = sel.value; if (!k) return toast('Choose a tag');
+        const add = act.value === 'add', code = k.startsWith('c:') ? k.slice(2) : null;
+        const next = rows.filter(c => hasTag(c, k) !== add).map(c => {
+          const out = { ...c, updatedAt: Date.now() };
+          if (code) out.cats = add ? sortCodes(withParents([...(c.cats || []), code])) : (c.cats || []).filter(x => x !== code && cat(x).parent !== code);
+          else {
+            out.tags = add ? [...new Set([...(c.tags || []), k])] : (c.tags || []).filter(x => x !== k);
+            if (add) out.cats = sortCodes(withParents([...(c.cats || []), ...tagLinks(k)]));   // a tag that counts towards APMES ticks them
+            if (!out.tags.length) delete out.tags;
+          }
+          return out;
+        });
+        m.close();
+        if (!next.length) return toast(add ? 'They all have it already' : 'None of them have it');
+        if (!(await confirmBox('Change cases?', `${add ? 'Add' : 'Remove'} “${keyName(k)}” ${add ? 'to' : 'from'} ${next.length} case${next.length === 1 ? '' : 's'}?`, add ? 'Add' : 'Remove', !add))) return;
+        try { await saveMany(next); toast(`${next.length} case${next.length === 1 ? '' : 's'} updated`); } catch (err) { toast('Could not save: ' + err.message); }
+      } }, 'Apply'))]);
 }
 
 // ---------- list ----------

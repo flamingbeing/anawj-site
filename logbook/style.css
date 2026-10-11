@@ -807,3 +807,9 @@ ul.te-list.te-pills li.drop-after { box-shadow: inset -4px 0 0 var(--accent); }
 ul.te-list.te-pills li.te-head.drop-before { box-shadow: inset 0 3px 0 var(--accent); }
 ul.te-list.te-pills li.te-head.drop-after { box-shadow: inset 0 -3px 0 var(--accent); }
 .te-ghost.te-pillitem { width: auto !important; border-radius: 999px; padding: 4px 12px; list-style: none; }
+/* Logbook filters */
+.lb-filters .bar { flex-wrap: wrap; gap: 6px; align-items: center; margin: 0 0 6px; }
+.lb-filters .lb-fl { font-size: 12px; font-weight: 600; color: var(--muted); min-width: 84px; }
+.lb-filters select.small { font-size: 14px; padding: 4px 8px; }
+.lb-saved:not(:empty) { margin: 6px 0; }
+.lb-filters input[type=date] { flex: 1 1 120px; max-width: 160px; min-width: 0; }
