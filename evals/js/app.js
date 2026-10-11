@@ -50,7 +50,8 @@ function defaultRoute() {
 }
 
 function parseHash() {
-  const raw = decodeURIComponent(location.hash.replace(/^#\/?/, ''));
+  let raw = location.hash.replace(/^#\/?/, '');
+  try { raw = decodeURIComponent(raw); } catch { /* a malformed link: use it as typed */ }
   const i = raw.indexOf('/');
   return i < 0 ? { route: raw, arg: null } : { route: raw.slice(0, i), arg: raw.slice(i + 1) || null };
 }
@@ -360,7 +361,9 @@ document.addEventListener('focusout', () => setTimeout(keyboardCheck, 0));
 function registerSW() {
   if (!('serviceWorker' in navigator) || location.protocol === 'file:') return;
   let reloading = false;
-  navigator.serviceWorker.addEventListener('controllerchange', () => { if (reloading) return; reloading = true; location.reload(); });
+  // the first install also takes control (clients.claim): no reload then, only after an update
+  const hadController = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (reloading || !hadController) return; reloading = true; location.reload(); });
   navigator.serviceWorker.register('sw.js').then(reg => {
     const offer = w => {
       const b = h('div', { class: 'e-banner e-banner--info' }, h('span', {}, 'Update available'),

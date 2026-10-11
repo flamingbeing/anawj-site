@@ -2,12 +2,11 @@
 // autosave (this device at once, the server for choices at once and text after 3 s idle), a sticky
 // "n of N required" bar, submit, decline, and a read-only view for anyone else or once submitted.
 
-import { S, h, fill, add, toast, cloud, icon, go, modal, debounce, fmtDate, fmtAgo, toMs, avatar, toolLabel, empty, draftKey } from './ui-core.js';
+import { S, h, fill, add, toast, cloud, icon, go, modal, debounce, fmtDate, fmtAgo, toMs, avatar, toolLabel, empty, draftKey, EDIT_MS } from './ui-core.js';
 import { FORMS, SCALES, ENTRUSTMENT_TEXT_KEY } from './forms.js';
 import { itemById } from './catalogue.js';
 import { validate, visibleQuestions, nextGap, identifierWarning } from './engine.js';
 
-const EDIT_MS = 15 * 60e3;              // the assessor may change a submitted form for 15 min
 const TEXT_IDLE = 3000;                 // text goes to the server after 3 s without typing
 const HOWTO_KEY = 'evals-howto-seen';
 const AUTOSCROLL_KEY = 'evals-autoscroll';   // 'off' turns auto-advance off (More)
@@ -68,6 +67,12 @@ function setTitle(t) {
 
 // ---------- the form screen ----------
 
+// The form being filled, so typing not yet sent is flushed when the phone locks or the tab closes.
+let activeForm = null;
+const flushActive = () => { if (activeForm?.root?.isConnected && activeForm.mode === 'fill') activeForm.saveText.flush(); };
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushActive(); });
+window.addEventListener('pagehide', flushActive);
+
 class FormScreen {
   constructor(ev, form, mode) {
     this.ev = ev;
@@ -89,24 +94,28 @@ class FormScreen {
     this.saveText = debounce(() => this.saveCloud(), TEXT_IDLE);
     this.lastPointer = 0;
     this.tried = false;   // a submit was attempted (then the bar's count is announced)
-    if (this.mode === 'fill') this.restoreLocal();
+    if (this.mode === 'fill') { this.restoreLocal(); activeForm = this; }
   }
 
   get editable() { return this.mode === 'fill' || this.mode === 'edit'; }
 
   // ---- drafts ----
 
-  // This device's copy wins only when it is newer than the server's (e.g. answers made offline).
+  // This device's copy wins when it only adds to the server's answers (typing that never reached the
+  // server: the app was closed within seconds, or offline), or when it is newer than the server's
+  // copy. updatedAt alone can't decide: a resident's nudge or case edit also bumps it.
   restoreLocal() {
     const local = ls.get(draftKey(this.ev.id));
     if (!local || !local.answers) return;
     const serverAt = toMs(this.ev.updatedAt) || 0;
-    const differs = JSON.stringify(local.answers) !== JSON.stringify(this.answers);
-    if (local.at > serverAt && differs) {
+    const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+    const differs = !same(local.answers, this.answers);
+    const extends_ = Object.entries(this.answers).every(([k, v]) => same(local.answers[k], v));
+    if (differs && (extends_ || local.at > serverAt)) {
       this.answers = { ...this.answers, ...local.answers };
       for (const k of Object.keys(this.answers)) if (blank(this.answers[k])) delete this.answers[k];
       this.restored = true;
-    } else if (!differs || local.at <= serverAt) ls.del(draftKey(this.ev.id));
+    } else ls.del(draftKey(this.ev.id));
   }
 
   saveLocal() { ls.set(draftKey(this.ev.id), { answers: this.answers, at: Date.now() }); }
@@ -135,7 +144,7 @@ class FormScreen {
         else if (this.sentAny) { patch.assessment = null; this.sentAny = false; }
         if (S.user?.name && this.ev.assessorName !== S.user.name) patch.assessorName = S.user.name;
         try {
-          await cloud.updateEvaluation(this.ev.id, patch, { wait: false });
+          await cloud.updateEvaluation(this.ev.id, patch, { wait: false, onError: err => { console.warn('Save failed', err); this.status('Saved on this device'); this.saveError(err); } });
           this.status('Saved');
         } catch (err) { console.warn('Save failed', err); this.status('Saved on this device'); this.saveError(err); this.again = false; }
       } while (this.again);
@@ -148,7 +157,7 @@ class FormScreen {
     if (err && err.code === 'permission-denied') {
       const cur = findLocal(this.ev.id);
       const why = cur && cur.status === 'cancelled' ? 'The resident cancelled this request.' : 'This request can no longer be changed.';
-      toast(why + ' Your answers are kept on this device.');
+      toast(why + ' Copy your answers before leaving if you want to keep them.');
     }
   }
 
@@ -296,7 +305,7 @@ class FormScreen {
       btn.disabled = false;
       const m = modal('Not sent', [
         h('p', {}, err.code === 'permission-denied' ? 'The request is no longer open, or the 15-minute edit window has passed.' : 'Could not send: ' + (err.message || err)),
-        h('p', { class: 'e-small' }, 'Your answers are kept on this device.'),
+        h('p', { class: 'e-small' }, err.code === 'permission-denied' ? 'Copy your answers now if you want to keep them.' : 'Your answers are kept on this device.'),
         h('div', { class: 'e-actions' },
           h('button', { class: 'n-btn n-btn--outline e-btn-quiet', onclick: () => copyAnswers(this.form, this.cleanAnswers()) }, 'Copy my answers'),
           h('button', { class: 'n-btn', onclick: () => m.close() }, 'OK')),

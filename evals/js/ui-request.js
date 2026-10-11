@@ -549,7 +549,9 @@ function stepCase() {
       setStep(4, { push: false });
     } catch (e) {
       F.sending = false;
-      F.error = 'Not sent: ' + (e.message || e) + '. Check your signal and try again.';
+      F.error = e?.code === 'permission-denied'
+        ? `Not sent: ${F.assessor?.name || 'this assessor'} is not on the active faculty list. Choose another assessor, or ask the PD to add them.`
+        : 'Not sent: ' + (e.message || e) + '. Check your signal and try again.';
       paint();
     }
   }

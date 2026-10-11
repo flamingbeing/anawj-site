@@ -240,7 +240,9 @@ document.addEventListener('focusout', () => setTimeout(keyboardCheck, 0));
 function registerSW() {
   if (!('serviceWorker' in navigator) || location.protocol === 'file:') return;
   let reloading = false;
-  navigator.serviceWorker.addEventListener('controllerchange', () => { if (reloading) return; reloading = true; location.reload(); });
+  // the first install also takes control (clients.claim): no reload then, only after an update
+  const hadController = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (reloading || !hadController) return; reloading = true; location.reload(); });
   navigator.serviceWorker.register('sw.js').then(reg => {
     const offer = w => {
       banner.className = 'banner';

@@ -106,6 +106,8 @@ export async function signIn() {
 
 // Signing out also wipes this device's offline copy (a shared ward PC keeps nothing).
 export async function signOut() {
+  // the assessor's unsent answers on this device go too
+  try { for (const k of Object.keys(localStorage)) if (k.startsWith('evals-draft-')) localStorage.removeItem(k); } catch {}
   if (demo) return D.signOut();
   const s = await sdk();
   for (const stop of [...live]) stop();   // before auth changes, so no listener fails as permission-denied
@@ -249,7 +251,7 @@ export async function createEvaluation(ev) {
 // Merge a patch into evaluations/{id} (null removes assessment, metrics, declineReason, …). Submit,
 // decline and resend times are stamped here. Returns the merged document as far as it is known.
 // { wait: false } returns once the write is in the local cache (autosaves), without waiting for the server.
-export async function updateEvaluation(id, patch, { wait = true } = {}) {
+export async function updateEvaluation(id, patch, { wait = true, onError = null } = {}) {
   if (demo) return D.updateEvaluation(id, patch);
   id = String(id);
   const { db, F } = await sdk();
@@ -259,6 +261,8 @@ export async function updateEvaluation(id, patch, { wait = true } = {}) {
   for (const k of remove) write[k] = F.deleteField();
   const p = queued(F.updateDoc(F.doc(db, 'evaluations', id), write));
   if (wait) await p;
+  // not awaited: a quick rejection (before ACK_WAIT) would otherwise go unnoticed
+  else p.catch(e => { if (onError) onError(e); else for (const cb of syncErrorListeners) cb(e); });
   const merged = { ...(cur || { id }), ...set };
   for (const k of remove) delete merged[k];
   known.set(id, merged);
