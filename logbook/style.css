@@ -511,21 +511,23 @@ body.dragging-refl { user-select: none; -webkit-user-select: none; }
 button.icon-btn { min-width: 40px; }
 
 /* ---------- dark mode (follows the phone's setting) ---------- */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #121417; --panel: #1c1f24; --ink: #e6e8eb; --muted: #a2abb5; --line: #333941;
-    --accent: #8cc0ff; --accent-ink: #0b1a2e; --accent-soft: #1d2b3d; --chip: #1f2a36; --chip-on: #8cc0ff;
-    --err: #ff9a8f; --err-bg: #3b1f1c; --warn: #f3c46e; --warn-bg: #362b12; --ok: #74dd90; --ok-bg: #15301e;
-    --info: #8cc0ff; --info-bg: #15263a; --row-alt: #181b20; --ontrack: #5f666e;
-  }
-  .top h1, section.card h2, h2, h3 { color: var(--accent); }
-  :focus-visible, input:focus, select:focus, textarea:focus { outline-color: var(--accent); }
-  input:focus, select:focus, textarea:focus { border-color: var(--accent); }
-  input, select, textarea { background: #15181c; color: var(--ink); }
-  table.totals td.late { background: #4a1f23; } table.totals td.due { background: #43361a; } table.totals td.done { background: #1d3a25; }
-  .bin-kind { background: #1f2c40; color: #b9d2f5; } .bin-kind.reflection { background: #33213c; color: #e2c4ef; }
-  img { opacity: .92; }
+/* Dark theme: only when chosen in Settings → Display (data-theme="dark" on <html>, set by
+   applyTheme in ui-settings.js and by the inline script in index.html before first paint). Light is
+   the default; "Auto" follows the phone's setting. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #121417; --panel: #1c1f24; --ink: #e6e8eb; --muted: #a2abb5; --line: #333941;
+  --accent: #8cc0ff; --accent-ink: #0b1a2e; --accent-soft: #1d2b3d; --chip: #1f2a36; --chip-on: #8cc0ff;
+  --err: #ff9a8f; --err-bg: #3b1f1c; --warn: #f3c46e; --warn-bg: #362b12; --ok: #74dd90; --ok-bg: #15301e;
+  --info: #8cc0ff; --info-bg: #15263a; --row-alt: #181b20; --ontrack: #5f666e;
 }
-@media (prefers-color-scheme: dark) and (max-width: 600px) {
-  .tabs { background: rgba(28, 31, 36, .96) !important; }
+:where(:root[data-theme="dark"]) .top h1, :where(:root[data-theme="dark"]) section.card h2, :where(:root[data-theme="dark"]) h2, :where(:root[data-theme="dark"]) h3 { color: var(--accent); }
+:where(:root[data-theme="dark"]) :focus-visible, :where(:root[data-theme="dark"]) input:focus, :where(:root[data-theme="dark"]) select:focus, :where(:root[data-theme="dark"]) textarea:focus { outline-color: var(--accent); }
+:where(:root[data-theme="dark"]) input:focus, :where(:root[data-theme="dark"]) select:focus, :where(:root[data-theme="dark"]) textarea:focus { border-color: var(--accent); }
+:where(:root[data-theme="dark"]) input, :where(:root[data-theme="dark"]) select, :where(:root[data-theme="dark"]) textarea { background: #15181c; color: var(--ink); }
+:where(:root[data-theme="dark"]) table.totals td.late { background: #4a1f23; } :where(:root[data-theme="dark"]) table.totals td.due { background: #43361a; } :where(:root[data-theme="dark"]) table.totals td.done { background: #1d3a25; }
+:where(:root[data-theme="dark"]) .bin-kind { background: #1f2c40; color: #b9d2f5; } :where(:root[data-theme="dark"]) .bin-kind.reflection { background: #33213c; color: #e2c4ef; }
+:where(:root[data-theme="dark"]) img { opacity: .92; }
+@media (max-width: 600px) {
+  :where(:root[data-theme="dark"]) .tabs { background: rgba(28, 31, 36, .96) !important; }
 }

@@ -18,6 +18,25 @@ export function cachedCompact() {
   try { return localStorage.getItem(COMPACT_KEY) === '1'; } catch { return false; }
 }
 
+// Theme: light (default), dark, or auto (follows the phone). Kept on this device, since "auto" is a
+// device setting; index.html applies it before the first paint.
+const THEME_KEY = 'apmes-logbook-theme';
+const THEMES = [['light', 'Light'], ['dark', 'Dark'], ['auto', 'Auto']];
+const darkQuery = typeof matchMedia === 'function' ? matchMedia('(prefers-color-scheme: dark)') : null;
+export function themePref() {
+  try { const t = localStorage.getItem(THEME_KEY); return THEMES.some(([v]) => v === t) ? t : 'light'; } catch { return 'light'; }
+}
+export function applyTheme(pref = themePref()) {
+  const dark = pref === 'dark' || (pref === 'auto' && !!darkQuery?.matches);
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#1c1f24' : '#002f6c');
+}
+darkQuery?.addEventListener?.('change', () => { if (themePref() === 'auto') applyTheme('auto'); });
+function setTheme(pref) {
+  try { pref === 'light' ? localStorage.removeItem(THEME_KEY) : localStorage.setItem(THEME_KEY, pref); } catch { /* storage blocked */ }
+  applyTheme(pref);
+}
+
 export function renderSettings() {
   const st = settings();
   return h('div', {},
@@ -31,7 +50,11 @@ export function renderSettings() {
         applyCompact(e.target.checked);
         patchLogbook({ settings: { compact: e.target.checked } });
       } }), 'Compact mode'),
-      h('p', { class: 'hint', style: 'margin:2px 0 0' }, 'Smaller chips, rows and spacing so more categories fit on screen. Saved to your account, so it follows you to other devices.')),
+      h('p', { class: 'hint', style: 'margin:2px 0 0' }, 'Smaller chips, rows and spacing so more categories fit on screen. Saved to your account, so it follows you to other devices.'),
+      h('label', { class: 'field', style: 'margin-top:12px' }, 'Theme',
+        h('select', { onchange: e => setTheme(e.target.value) },
+          THEMES.map(([v, label]) => h('option', { value: v, selected: themePref() === v }, label)))),
+      h('p', { class: 'hint', style: 'margin:2px 0 0' }, 'Auto follows your phone’s light or dark setting. Saved on this device.')),
 
     h('section', { class: 'card' },
       h('h2', {}, 'Logging'),
