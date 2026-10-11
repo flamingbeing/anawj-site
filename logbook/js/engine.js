@@ -231,19 +231,21 @@ export const caseParts = c => (c && c.initials != null
 // rest is the query without the date words), or null when the query names no date.
 const WEEKDAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 export function dateWindow(q, now = new Date()) {
-  let s = ' ' + String(q || '').toLowerCase().replace(/\s+/g, ' ') + ' ';
+  let s = ' ' + String(q || '').replace(/\s+/g, ' ') + ' ';   // the rest keeps its capitals (OR, AND, case-sensitive search)
   const day = (n = 0) => { const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + n); return todayISO(d); };
   const monday = (weeksBack = 0) => { const dow = (now.getDay() + 6) % 7; return day(-dow - 7 * weeksBack); };
   let win = null;
   const take = (re, f) => { if (win) return; const m = s.match(re); if (m) { win = f(m); s = s.replace(re, ' '); } };
-  take(/ today /, () => ({ from: day(), to: day() }));
-  take(/ yesterday /, () => ({ from: day(-1), to: day(-1) }));
-  take(/ (?:last|past) (\d{1,3}) days /, m => ({ from: day(-(Number(m[1]) - 1)), to: day() }));
-  take(/ this week /, () => ({ from: monday(), to: day() }));
-  take(/ last week /, () => { const from = monday(1); const [y, mo, d] = from.split('-').map(Number); return { from, to: todayISO(new Date(y, mo - 1, d + 6)) }; });
-  take(/ this month /, () => ({ from: todayISO(new Date(now.getFullYear(), now.getMonth(), 1)), to: day() }));
-  take(/ last month /, () => ({ from: todayISO(new Date(now.getFullYear(), now.getMonth() - 1, 1)), to: todayISO(new Date(now.getFullYear(), now.getMonth(), 0)) }));
-  take(/ (last )?(sun|mon|tue|wed|thu|fri|sat)(?:day|s|sday|nesday|r|rs|rsday|urday)? /, m => {
+  take(/ today /i, () => ({ from: day(), to: day() }));
+  take(/ yesterday /i, () => ({ from: day(-1), to: day(-1) }));
+  take(/ (?:last|past) (\d{1,3}) days /i, m => ({ from: day(-(Number(m[1]) - 1)), to: day() }));
+  take(/ this week /i, () => ({ from: monday(), to: day() }));
+  take(/ last week /i, () => { const from = monday(1); const [y, mo, d] = from.split('-').map(Number); return { from, to: todayISO(new Date(y, mo - 1, d + 6)) }; });
+  take(/ this month /i, () => ({ from: todayISO(new Date(now.getFullYear(), now.getMonth(), 1)), to: day() }));
+  take(/ last month /i, () => ({ from: todayISO(new Date(now.getFullYear(), now.getMonth() - 1, 1)), to: todayISO(new Date(now.getFullYear(), now.getMonth(), 0)) }));
+  // a weekday: "tuesday", "tues", "last tue"; a bare "sat" or "mon" stays a search word (initials)
+  take(/ (?:(last) (sun|mon|tue|wed|thu|fri|sat)(?:day|s|sday|nesday|r|rs|rsday|urday)?|()(sun|mon|tue|wed|thu|fri|sat)(?:day|s|sday|nesday|r|rs|rsday|urday)) /i, m => {
+    m = [m[0], m[1] || m[3], (m[2] || m[4]).toLowerCase()];
     const want = WEEKDAYS.indexOf(m[2]);
     let back = (now.getDay() - want + 7) % 7;
     if (m[1] && back === 0) back = 7;   // "last tuesday" on a Tuesday is a week ago
@@ -360,7 +362,7 @@ export function textHas(text, word, fuzzy = false) {
   if (!fuzzy || word.length < 4) return false;
   const max = word.length <= 6 ? 1 : 2;
   // the whole word, or its start (a letter longer or shorter, for a missed or extra letter)
-  return text.split(/[^a-z0-9]+/).some(t => t && (editDistance(word, t, max) <= max
+  return text.split(/[^\p{L}\p{N}]+/u).some(t => t && (editDistance(word, t, max) <= max
     || [0, 1, -1].some(d => t.length > word.length + d && editDistance(word, t.slice(0, word.length + d), max) <= max)));
 }
 
@@ -396,6 +398,8 @@ const swapDayMonth = v => (typeof v === 'string' ? v.replace(/^\s*(\d{1,2})([\/.
 export function rowsFromGrid(grid, map, { headerRow = true, monthFirst = false } = {}) {
   const out = [];
   out.hasIdColumn = map.id >= 0;
+  // which fields the file has: a case keeps its own value for a field the file leaves out
+  out.mapped = { date: map.date >= 0, initials: map.initials >= 0, details: map.details >= 0, categories: map.categories >= 0 };
   (grid || []).forEach((cells, n) => {
     if (headerRow && n === 0) return;
     const get = k => (map[k] >= 0 ? cells[map[k]] : undefined);
@@ -513,6 +517,16 @@ export function diffRows(existing, rows, now = Date.now()) {
     if (!c.date && c.dateText) fields.dateText = c.dateText;
     if (known) {
       const before = byId.get(c.id);
+      // a column the file doesn't have (unticked in the export, or not matched) leaves that field as it was
+      const m = rows.mapped;
+      if (m) {
+        const bp0 = caseParts(before);
+        if (!m.date) { c.date = before.date || null; fields.date = c.date; delete fields.dateText; if (before.dateText) { c.dateText = before.dateText; fields.dateText = before.dateText; } }
+        if (!m.categories) { c.cats = [...(before.cats || [])]; fields.cats = c.cats; }
+        if (!m.details && !m.initials) { c.initials = bp0.initials; c.details = bp0.details; }
+        else if (!m.initials && normText(cellStr(row.details)) === normText(bp0.details)) { c.initials = bp0.initials; c.details = bp0.details; }   // "Case details" without the initials
+        fields.initials = c.initials; fields.details = c.details;
+      }
       // initials + details as one text, or as parts (an older "AB/34F ..." case splits to the same parts as its exported text)
       const bp = caseParts(before);
       const sameText = normText(caseText(before)) === normText(caseText(c)) ||

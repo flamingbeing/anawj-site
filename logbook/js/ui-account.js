@@ -38,7 +38,9 @@ function confirmDelete() {
       await cloud.deleteAccount(S.user.email, t => { status.textContent = t; });
       m.close(); toast('Account deleted');
     } catch (err) {
-      status.textContent = 'Could not finish: ' + err.message + '. Nothing else was changed; try again.';
+      // say what really happened: nothing, part of the data, or everything but the sign-in
+      status.textContent = 'Could not finish: ' + err.message + '. ' + (err.dataGone ? 'Your logbook is deleted, but the Google sign-in is still there: sign in again and delete once more to remove it.'
+        : err.started ? 'Part of your logbook may already be deleted; try again to finish.' : 'Nothing was deleted; try again.');
       go.disabled = false; cancel.disabled = false;
     }
   } }, 'Delete everything');

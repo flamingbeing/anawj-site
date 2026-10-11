@@ -532,10 +532,13 @@ assert.equal(rYearDefault(undefined), 1);
   const now = new Date(2026, 9, 10, 9);
   assert.deepEqual(dateWindow('today', now), { from: '2026-10-10', to: '2026-10-10', rest: '' });
   assert.deepEqual(dateWindow('last tuesday', now), { from: '2026-10-06', to: '2026-10-06', rest: '' });
-  assert.deepEqual(dateWindow('LSCS this week', now), { from: '2026-10-05', to: '2026-10-10', rest: 'lscs' });
+  assert.deepEqual(dateWindow('LSCS this week', now), { from: '2026-10-05', to: '2026-10-10', rest: 'LSCS' });   // the rest keeps its capitals
+  assert.equal(dateWindow('spinal OR epidural this week', now).rest, 'spinal OR epidural');
   assert.deepEqual(dateWindow('last week', now), { from: '2026-09-28', to: '2026-10-04', rest: '' });
   assert.deepEqual(dateWindow('last month', now), { from: '2026-09-01', to: '2026-09-30', rest: '' });
-  assert.deepEqual(dateWindow('sat', now), { from: '2026-10-10', to: '2026-10-10', rest: '' });
+  assert.deepEqual(dateWindow('saturday', now), { from: '2026-10-10', to: '2026-10-10', rest: '' });
+  assert.equal(dateWindow('sat', now), null);   // a bare short day name could be initials (SAT, MON)
+  assert.equal(dateWindow('SUN lscs', now), null);
   assert.deepEqual(dateWindow('last sat', now), { from: '2026-10-03', to: '2026-10-03', rest: '' });
   assert.equal(dateWindow('lap chole', now), null);
   assert.equal(dateWindow('monitoring', now), null);
@@ -581,4 +584,21 @@ console.log('engine tests passed');
   const r2 = rowsFromGrid([['12/3/2026', 'EF lap chole', '08']], { date: 0, initials: -1, details: 1, categories: 2, id: -1 }, { headerRow: false });
   assert.equal(r2.length, 1); assert.equal(r2[0].details, 'EF lap chole');
   console.log('upload mapping tests passed');
+}
+
+// a file without some columns (unticked in the export) leaves those fields as they were
+{
+  const { rowsFromGrid, diffRows } = await import('../js/engine.js');
+  const cases = [{ id: 'k1', date: '2026-10-01', initials: 'AB', details: '34F LSCS spinal', cats: ['16', '17'] }];
+  const run = (headers, row, map) => diffRows(cases, rowsFromGrid([headers, row], map));
+  // Date + Case summary, no Tags: tags stay
+  assert.equal(run(['Date', 'Case summary', 'id'], ['2026-10-01', 'AB 34F LSCS spinal', 'k1'], { date: 0, initials: -1, details: 1, categories: -1, id: 2 }).changed.length, 0);
+  // Case summary + Tags, no Date: the date stays
+  assert.equal(run(['Case summary', 'Tags', 'id'], ['AB 34F LSCS spinal', '16, 17', 'k1'], { date: -1, initials: -1, details: 0, categories: 1, id: 2 }).changed.length, 0);
+  // Case details without the initials column: initials stay
+  assert.equal(run(['Date', 'Case details', 'Tags', 'id'], ['2026-10-01', '34F LSCS spinal', '16, 17', 'k1'], { date: 0, initials: -1, details: 1, categories: 2, id: 3 }).changed.length, 0);
+  // an edit in a column that is there still counts, and keeps the rest
+  const d = run(['Date', 'Case summary', 'id'], ['2026-10-02', 'AB 34F LSCS spinal', 'k1'], { date: 0, initials: -1, details: 1, categories: -1, id: 2 });
+  assert.equal(d.changed.length, 1); assert.equal(d.changed[0].after.date, '2026-10-02'); assert.deepEqual(d.changed[0].after.cats, ['16', '17']);
+  console.log('upload missing-column tests passed');
 }
