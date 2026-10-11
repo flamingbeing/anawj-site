@@ -59,7 +59,7 @@ portfolio content.
   cached per case (`hayCache`, reset when the tag set changes).
 - **Reflections** (`ui-reflect.js`): list by heading, editor (Case details, learning points,
   References and Figures as folded white cards), Export page (summary + Mark ready) and Choose page
-  (ticks, Quick actions). Draft kept per account. Only a small "Rules for reflections" (no card) at the bottom.
+  (ticks, Quick actions). Draft kept per account. Only a small "Rules for reflections" (no card) at the bottom. No section headings (General Surgery, Trauma…) in the list or the Choose page; the heading picker keeps them as dividers.
 - **At a glance** (`glance.js`, tested): folded Logbook / Reflections cards show a bar (status segments; tick =
   this year's goal: tags due by the end of the year / 96 x year/5 reflections) and, for programme residents with
   at least 4 in their residency year, strips vs that year (range, middle half, median, you) from the Totals

@@ -400,7 +400,7 @@ function list() {
       h('li', {}, 'Write as many as you like: you choose which go into the portfolio when you export. Uncategorised ones are never exported.'),
       h('li', {}, 'Generative AI use must follow the NUS guidelines on the use of AI tools in academic work.')));
   const body = h('section', { class: 'card' });
-  let section = '', shown = 0;
+  let shown = 0;
   if (rv.group !== 'heading') {
     // other groupings: plain sections of rows (no + Add, counts or dragging between headings)
     const hits = sorted(narrowed ? all.filter(match) : all);
@@ -439,7 +439,7 @@ function list() {
     const hits = narrowed ? items.filter(match) : items;
     if (narrowed && !hits.length) continue;
     shown += hits.length;
-    if (hp.section !== section) { section = hp.section; add(body, h('h3', { style: 'margin-top:14px' }, section)); }
+    // no section headings (General Surgery, Trauma…): the heading names say enough (owner's choice)
     const x = exBy[hp.id];
     const opened = isOpen(hp.id, hp.met);
     add(body, h('div', { class: 'refl-h', 'data-heading': hp.id, style: 'margin:8px 0 4px' },
@@ -691,11 +691,9 @@ export function renderExportPage(onChoose = false) {
     h('div', { class: 'bar', style: 'align-items:center' }, h('h2', { style: 'margin:0' }, 'Choose reflections'), h('span', { class: 'grow' }), complete.length ? quick : null),
     h('p', { class: 'hint', style: 'margin:6px 0 0' }, `${ex.total} of ${complete.length} included. Untick any you’d rather leave out; your choice is kept for next time.`));
   const body = h('section', { class: 'card' });
-  let section = '';
   for (const hd of REFLECTION_HEADINGS) {
     const rs = complete.filter(r => r.headingId === hd.id).sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
     if (!rs.length) continue;
-    if (hd.section !== section) { section = hd.section; add(body, h('h3', { style: 'margin-top:14px' }, section)); }
     const x = exBy[hd.id];
     add(body, h('div', { class: 'exp-h' },
       h('div', { class: 'bar', style: 'gap:8px;align-items:center;margin:8px 0 2px' },
