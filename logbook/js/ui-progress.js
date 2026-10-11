@@ -78,6 +78,14 @@ function reflCard() {
     h('span', { class: 'meter' }, h('i', { class: met === p.headings.length ? 'done' : 'ontrack', style: `width:${Math.min(100, Math.round(p.totals.counted / p.totals.min * 100))}%` })));
 }
 
+// your own subcategories under a category: "Interscalene 3 · Femoral 2"
+function subcatLine(code) {
+  const names = ((settings().subcats || {})[code] || []);
+  if (!names.length) return null;
+  const n = name => (S.cases || []).filter(c => (c.tags || []).includes(`${code}:${name}`)).length;
+  return h('span', { class: 'ms sc-line' }, names.map(name => `${name} ${n(name)}`).join(' · '));
+}
+
 function progList(items) {
   return h('ul', { class: 'prog' }, items.map(p => {
     const c = BY_CODE[p.code];
@@ -90,7 +98,8 @@ function progList(items) {
         p.status === 'none' ? String(p.count) : p.next ? `${p.count} / ${p.next.n}` : `${p.count} ✓`),
       p.milestones.length ? h('span', { class: 'meter' }, h('i', { class: p.status, style: `width:${pct}%` })) : null,
       p.milestones.length ? h('span', { class: 'ms' }, p.milestones.map(m => `${m.by}: ${m.n}${m.met ? ' ✓' : ''}`).join(' · ')
-        + (p.next ? ` — ${p.next.n - p.count} more by end of ${p.next.by}` : '')) : null);
+        + (p.next ? ` — ${p.next.n - p.count} more by end of ${p.next.by}` : '')) : null,
+      subcatLine(p.code));
   }));
 }
 

@@ -6,7 +6,7 @@ import { withParents, frequentCombos, parseBulk, parseDate, fmtDate, sortCodes, 
 import { suggest } from './suggest.js';
 import {
   S, h, toast, debounce, modal, confirmBox, cat, catName, catFull, catChip, countText, PICKER_ORDER, PROGRESS_BY_CODE,
-  createCase, updateCase, removeCase, restoreCase, saveMany, deleteMany, settings, todayISO, hooks, fill, add, cloud, okNoIds, patchLogbook } from './ui-core.js';
+  createCase, updateCase, removeCase, restoreCase, saveMany, deleteMany, subcatChips, settings, todayISO, hooks, fill, add, cloud, okNoIds, patchLogbook } from './ui-core.js';
 import { templateDialog } from './ui-settings.js';
 import { moveToBin } from './bin.js';
 import { shareText, copyText, caseText as shareCaseText, dayText, dayMarkdown } from './share.js';
@@ -151,7 +151,8 @@ export function renderLog() {
   else renderOne(card);
   paintDate();
   const digest = weeklyDigest();
-  return digest ? h('div', {}, digest, card) : card;
+  const planned = draft.mode === 'bulk' ? null : planCard();
+  return digest || planned ? h('div', {}, digest, planned, card) : card;
 }
 
 function setMode(m) { draft.mode = m; saveDraft(); hooks.render(); }
@@ -281,7 +282,9 @@ function paintSel() {
       ? h('button', { type: 'button', class: 'small linkish', onclick: () => templateDialog({ id: uid(), name: '', cats: [...draft.cats], details: '' }, async out => {
         await patchLogbook({ templates: [...((S.logbook && S.logbook.templates) || []), out] });
         toast(`Template “${out.name}” saved`); paintQuick(); paintSel();
-      }, 'Save as template') }, '☆ Save as template') : null);
+      }, 'Save as template') }, '☆ Save as template') : null,
+    // personal subcategories of the selected categories (Settings → My subcategories)
+    subcatChips(draft.cats, draft.tags || [], tags => keepPlace(ui.selected, () => { draft.tags = tags; saveDraft(); paintSel(); })));
   const tips = draft.cats.filter(c => TIPS[c]).map(c => TIPS[c]);
   fill(ui.tip, ...tips.map(t => h('p', { class: 'tip' }, t)));
   paintSuggest();
@@ -364,10 +367,10 @@ async function save({ another }) {
   const norm = t => String(t || '').toLowerCase().replace(/\s+/g, ' ').trim();
   const twin = (S.cases || []).find(x => x.date === curDate() && norm(caseText(x)) === norm(details));
   if (twin && !(await confirmBox('Possible duplicate', `You already logged “${caseText(twin).slice(0, 60)}” on ${fmtDate(twin.date)}. Save another one?`, 'Save anyway'))) return;
-  const c = await createCase({ date: curDate(), details, cats: draft.cats, reflectTag: !!draft.reflectTag });
+  const c = await createCase({ date: curDate(), details, cats: draft.cats, reflectTag: !!draft.reflectTag, tags: draft.tags || [] });
   const sticky = another || settings().defaultDate === 'last';
   const keep = sticky ? draft.date : null;
-  draft = { ...draft, details: '', cats: [], date: keep, keepDate: sticky, keptAt: Date.now(), dateAt: Date.now(), reflectTag: false };
+  draft = { ...draft, details: '', cats: [], date: keep, keepDate: sticky, keptAt: Date.now(), dateAt: Date.now(), reflectTag: false, tags: [] };
   if (ui.tagBox) ui.tagBox.querySelector('input').checked = false;
   saveDraft();
   if (ui.textarea) ui.textarea.value = '';
@@ -446,10 +449,77 @@ function paintBulk(out) {
     h('h3', {}, `${bulkRows.length} case${bulkRows.length === 1 ? '' : 's'}`),
     missing ? h('p', { class: 'tip' }, `${missing} case${missing === 1 ? ' has' : 's have'} no category yet.`) : null,
     h('div', { class: 'scroll' }, h('table', { class: 'bulk' }, h('thead', {}, h('tr', {}, h('th', {}, 'Date'), h('th', {}, 'Details'), h('th', {}, 'Categories'), h('th', {}))), tbody)),
-    h('div', { class: 'actions' }, h('button', { class: 'primary big', onclick: saveBulk }, `Save all ${bulkRows.length}`)));
+    h('div', { class: 'actions' }, h('button', { class: 'primary big', onclick: saveBulk }, `Save all ${bulkRows.length}`),
+      h('button', { class: 'big', title: 'Keep these as a plan and confirm each one after the list', onclick: planBulk }, 'Plan for later…')));
 }
 
 let bulkBusy = false;
+
+// ---------- planned cases (logbook.plan): paste tomorrow's list now, confirm each case after ----------
+
+const plan = () => (S.logbook && Array.isArray(S.logbook.plan) ? S.logbook.plan : []);
+const savePlan = list => patchLogbook({ plan: list });
+const isoPlus = n => { const d = new Date(); d.setDate(d.getDate() + n); return todayISO(d); };
+// the next Monday-to-Friday after today (public holidays aren't known)
+function nextWorkingDay() { for (let n = 1; n < 8; n++) { const d = new Date(); d.setDate(d.getDate() + n); if (d.getDay() % 6) return todayISO(d); } return isoPlus(1); }
+
+async function planBulk() {
+  if (!bulkRows || !bulkRows.length) return;
+  const rows = bulkRows.filter(r => r.details.trim() || String(r.initials || '').trim() || r.cats.length);
+  const put = async date => {
+    const items = rows.map(r => ({ id: uid(), date, initials: cleanInitials(r.initials), details: r.details.trim(), cats: sortCodes(r.cats) }));
+    await savePlan([...plan(), ...items].slice(-100));
+    bulkRows = null; draft.bulk = ''; saveDraft();
+    toast(`Planned ${items.length} case${items.length === 1 ? '' : 's'} for ${fmtDate(date)}: confirm them on the Log screen that day`);
+    m.close(); hooks.render();
+  };
+  const t = isoPlus(1), w = nextWorkingDay();
+  const pick = h('input', { type: 'date', min: todayISO(), value: t, 'aria-label': 'Plan for date' });
+  const m = modal('Plan for later', [
+    h('p', { class: 'hint' }, `${rows.length} case${rows.length === 1 ? '' : 's'}. On that day they wait on the Log screen: tick each one when it is done.`),
+    h('div', { class: 'bar' },
+      h('button', { class: 'primary', onclick: () => put(t) }, `Tomorrow (${fmtDate(t).replace(/ \d{4}$/, '')})`),
+      w !== t ? h('button', { onclick: () => put(w) }, `Next working day (${fmtDate(w).replace(/ \d{4}$/, '')})`) : null),
+    h('div', { class: 'bar' }, h('label', { class: 'field', style: 'margin:0' }, 'Or another day', pick), h('button', { onclick: () => pick.value && put(pick.value) }, 'Plan')),
+    h('div', { class: 'bar', style: 'margin-top:8px' }, h('span', { class: 'grow' }), h('button', { onclick: () => m.close() }, 'Cancel')),
+  ]);
+}
+
+// The Log screen's "Planned" card: today's (and overdue) planned cases, each confirmed with one tap.
+function planCard() {
+  const today = todayISO();
+  const due = plan().filter(p => p.date <= today);
+  const later = plan().filter(p => p.date > today);
+  if (!due.length && !later.length) return null;
+  const done = async (items, opts = {}) => {
+    const now = Date.now();
+    const cases = items.map((p, i) => ({ id: uid(), date: p.date, initials: p.initials || '', details: p.details || '', cats: sortCodes(p.cats || []), createdAt: now + i, updatedAt: now + i, source: 'paste' }));
+    if (cases.some(c => !c.cats.length) && !opts.quiet && !(await confirmBox('No category', 'Some of these have no category yet. Log them anyway?', 'Log'))) return;
+    await saveMany(cases);
+    const gone = new Set(items.map(p => p.id));
+    await savePlan(plan().filter(p => !gone.has(p.id)));
+    toast(`Logged ${cases.length} case${cases.length === 1 ? '' : 's'}`, { action: 'Undo', onaction: async () => { await deleteMany(cases.map(c => c.id)); await savePlan([...plan(), ...items]); hooks.render(); } });
+    hooks.render();
+  };
+  const edit = async p => {
+    draft = { ...draft, mode: 'one', details: [p.initials, p.details].filter(Boolean).join(' '), cats: [...(p.cats || [])], date: p.date === today ? null : p.date, dateAt: Date.now() };
+    saveDraft();
+    await savePlan(plan().filter(x => x.id !== p.id));
+    hooks.render();
+  };
+  const drop = async p => { await savePlan(plan().filter(x => x.id !== p.id)); toast('Removed from the plan', { action: 'Undo', onaction: async () => { await savePlan([...plan(), p]); hooks.render(); } }); hooks.render(); };
+  return h('section', { class: 'card plan' },
+    h('div', { class: 'bar', style: 'margin:0 0 4px' }, h('h3', { style: 'margin:0' }, due.length ? `Planned (${due.length})` : 'Planned'), h('span', { class: 'grow' }),
+      due.length > 1 ? h('button', { class: 'small primary', onclick: () => done(due) }, `✓ All ${due.length} done`) : null),
+    due.length ? h('ul', { class: 'plan-list' }, due.map(p => h('li', {},
+      h('span', { class: 'pt' }, p.date < today ? h('small', {}, fmtDate(p.date).replace(/ \d{4}$/, '') + ' · ') : null, p.initials ? h('b', {}, p.initials + ' ') : null, String(p.details || '').split('\n').join(' · '),
+        h('small', { class: 'muted' }, ' ' + (p.cats && p.cats.length ? sortCodes(p.cats).join(' + ') : 'no category'))),
+      h('span', { class: 'row' },
+        h('button', { class: 'small primary', 'aria-label': 'Done: log this case', onclick: () => done([p]) }, '✓ Done'),
+        h('button', { class: 'small', 'aria-label': 'Edit before logging', onclick: () => edit(p) }, 'Edit'),
+        h('button', { class: 'small danger icon-btn', 'aria-label': 'Remove from the plan', onclick: () => drop(p) }, '×'))))) : null,
+    later.length ? h('p', { class: 'hint', style: 'margin:6px 0 0' }, [...new Set(later.map(p => p.date))].sort().map(d => `${later.filter(p => p.date === d).length} planned for ${fmtDate(d).replace(/ \d{4}$/, '')}`).join(' · ')) : null);
+}
 async function saveBulk(e) {
   if (bulkBusy || !bulkRows) return;
   const btn = e && e.currentTarget;
@@ -495,7 +565,8 @@ export function editCaseDialog(c) {
   const sel = h('div', { class: 'chips selected' });
   const sugg = h('div', { class: 'chips' });
   const paint = () => {
-    fill(sel, ...(e.cats.length ? e.cats.map(code => catChip(code, { on: true, removable: true, onclick: () => { e.cats = dropCat(e.cats, code); paint(); picker.refresh(); } })) : [h('span', { class: 'none' }, 'No categories')]));
+    fill(sel, ...(e.cats.length ? e.cats.map(code => catChip(code, { on: true, removable: true, onclick: () => { e.cats = dropCat(e.cats, code); paint(); picker.refresh(); } })) : [h('span', { class: 'none' }, 'No categories')]),
+      subcatChips(e.cats, e.tags || [], tags => { e.tags = tags; paint(); }));
     const s = e.details.trim() && settings().suggestions !== false ? suggest(e.details, { limit: 6 }).filter(x => !e.cats.includes(x.code)) : [];
     fill(sugg, ...s.map(x => catChip(x.code, { cls: `sugg ${x.score >= 0.5 ? 'strong' : ''}`, onclick: () => { e.cats = addCat(e.cats, x.code); paint(); picker.refresh(); } })));
   };
@@ -529,6 +600,8 @@ export function editCaseDialog(c) {
         m.close();
         const next = { ...e, initials: cleanInitials(e.initials), details: e.details.trim() };
         if (!next.reflectTag) delete next.reflectTag;
+        next.tags = (next.tags || []).filter(t => next.cats.includes(String(t).split(':')[0]));
+        if (!next.tags.length) delete next.tags;
         await updateCase(next);
         toast('Case updated', { action: 'Undo', onaction: () => restoreCase(c) });
       } }, 'Save')),

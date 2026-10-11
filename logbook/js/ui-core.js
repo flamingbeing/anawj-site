@@ -214,12 +214,28 @@ export function okNoIds(...texts) {
   return confirmBox('Looks like an ID number', 'This looks like an NRIC, hospital or phone number. Log patient initials only, never identifiers. Save anyway?', 'Save anyway', true);
 }
 
-export async function createCase({ date, details, initials, cats, source = 'app', dateText, reflectTag = false }) {
+// Personal subcategories (settings.subcats = { '26': ['Interscalene', 'Femoral'] }): a case carries
+// them as tags '26:Interscalene'. They sit within the APMES categories and never change the counts.
+export const subcatsOf = code => ((settings().subcats || {})[code] || []);
+export function subcatChips(cats, tags, onchange) {
+  const rows = (cats || []).filter(code => subcatsOf(code).length).map(code => h('div', { class: 'subcats' },
+    h('span', { class: 'sc-l' }, code),
+    subcatsOf(code).map(name => {
+      const t = `${code}:${name}`, on = (tags || []).includes(t);
+      return h('span', { class: `chip sc ${on ? 'on' : ''}`, role: 'button', tabindex: '0', 'aria-pressed': String(on),
+        onclick: () => onchange(on ? tags.filter(x => x !== t) : [...(tags || []), t]) }, name);
+    })));
+  return rows.length ? h('div', { class: 'subcat-wrap' }, rows) : null;
+}
+
+export async function createCase({ date, details, initials, cats, source = 'app', dateText, reflectTag = false, tags = [] }) {
   const now = Date.now();
   const parts = initials == null ? splitInitials(details) : { initials: cleanInitials(initials), details: String(details || '').trim() };
   const c = { id: uid(), date: date || null, initials: parts.initials, details: parts.details, cats: sortCodes(cats), createdAt: now, updatedAt: now, source };
   if (!date && dateText) c.dateText = dateText;
   if (reflectTag) c.reflectTag = true;
+  const kept = (tags || []).filter(t => c.cats.includes(String(t).split(':')[0]));
+  if (kept.length) c.tags = kept;
   applyLocal(list => [c, ...list]);
   cloud.saveCase(mine(), c).catch(err => toast('Could not save: ' + err.message));
   return c;

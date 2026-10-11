@@ -648,3 +648,20 @@ table.totals td.due .gap { color: var(--warn); }
 .ready-list .rt { min-width: 0; font-size: 14px; }
 .ready-list .rt small { color: var(--muted); }
 .reflect-tag { margin: 6px 0 2px; font-size: 14px; }
+
+/* Planned cases (Log screen) */
+.plan { border-left: 4px solid var(--ok); }
+.plan-list { list-style: none; margin: 0; padding: 0; }
+.plan-list li { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; justify-content: space-between; padding: 8px 0; border-top: 1px solid var(--line); }
+.plan-list li:first-child { border-top: 0; }
+.plan-list .pt { flex: 1 1 12em; min-width: 0; }
+
+/* personal subcategories */
+.subcat-wrap { width: 100%; display: grid; gap: 4px; margin-top: 6px; }
+.subcats { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; }
+.subcats .sc-l { font-size: 12px; font-weight: 700; color: var(--muted); min-width: 2.2em; }
+.chip.sc { font-size: 13px; padding: 2px 12px; min-height: 40px; border-style: dashed; }
+.chip.sc.on { border-style: solid; background: var(--chip-on); color: var(--accent-ink); }
+.flag.sc-tag { background: var(--accent-soft); color: var(--accent); }
+.chip .chip-x { border: 0; background: none; color: inherit; min-height: 40px; min-width: 32px; margin: -10px -8px -10px 0; padding: 0 0 0 6px; font-size: 14px; }
+.sc-line { color: var(--accent); }

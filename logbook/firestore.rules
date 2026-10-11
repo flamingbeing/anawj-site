@@ -110,13 +110,15 @@ service cloud.firestore {
       }
     }
     function validLogbook(email, d) {
-      return d.keys().hasOnly(['email', 'name', 'rid', 'settings', 'templates', 'profile', 'updatedAt'])
+      return d.keys().hasOnly(['email', 'name', 'rid', 'settings', 'templates', 'profile', 'plan', 'updatedAt'])
         && d.email == email
         && optString(d, 'rid', 40)
         && optNumber(d, 'updatedAt')
         && optString(d, 'name', 200)
         && (!('templates' in d) || (d.templates is list && d.templates.size() <= 100))
         && (!('settings' in d) || d.settings is map)
+        // cases planned for a later day (paste tomorrow's list, confirm after)
+        && (!('plan' in d) || (d.plan is list && d.plan.size() <= 100))
         // portfolio Section 1 details (js/profile.js cleanProfile caps lists and strings)
         && (!('profile' in d) || (d.profile is map && d.profile.size() <= 30));
     }
