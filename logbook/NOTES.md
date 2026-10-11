@@ -47,6 +47,8 @@ portfolio content.
   groups), All tags, Still needed, "Save these tags as a tag group" under the tag list, pinned bar (chosen tags, Save, keep date | Save).
   Paste-a-list (List mode), Plan for later. `editCaseDialog` (full screen on phones, pinned
   Delete/Cancel/Save, 6-line growing box, Tags + "Add tags"; also "New case" from the reflection picker).
+- **Enter key** (Settings → Logging, `settings.enterMode`): New line (default; Ctrl/Cmd+Enter saves), Press Enter twice
+  (Enter on an empty line saves; also via beforeinput for phone keyboards), or Enter saves. Old `enterSaves` = single.
 - **Two panes** on the Case tab at >= 840px wide and >= 500px tall (tablets, unfolded foldables, computers; not
   landscape phones): `.log-card.panes` grid, left = date, case box, quick picks, Still needed, Save; right = all tags
   (sticky, own scroll). On phones `.lp-left` / `.lp-right` are display: contents, so the order is unchanged.

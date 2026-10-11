@@ -314,19 +314,37 @@ function alignPlaceholder(ta) {
   } catch { /* keep the plain one */ }
 }
 
+// Enter key setting (Settings → Logging); enterSaves (true) was the older on/off for 'single'
+const enterMode = () => { const m = settings().enterMode; return m === 'double' || m === 'single' ? m : settings().enterSaves ? 'single' : 'newline'; };
+// the caret sits on an empty line after some text: a second Enter
+const onEmptyLine = ta => { const before = ta.value.slice(0, ta.selectionStart); return ta.selectionStart === ta.selectionEnd && /\n[ \t]*$/.test(before) && before.trim() !== ''; };
+// drop the empty line the first Enter made, then save
+function saveFromEmptyLine(ta, another) {
+  const at = ta.selectionStart, before = ta.value.slice(0, at).replace(/\n[ \t]*$/, ''), after = ta.value.slice(at);
+  ta.value = before + after; draft.details = ta.value; saveDraft();
+  save({ another });
+}
+
 function renderOne(card) {
   const textarea = h('textarea', {
-    class: 'details', rows: String(boxLines()), style: `min-height:calc(${boxLines()} * 1.4em + 22px)`, autofocus: true, enterkeyhint: settings().enterSaves ? 'done' : 'enter', autocapitalize: 'sentences', autocorrect: 'off', 'aria-label': 'Case summary',
+    class: 'details', rows: String(boxLines()), style: `min-height:calc(${boxLines()} * 1.4em + 22px)`, autofocus: true, enterkeyhint: enterMode() === 'single' ? 'done' : 'enter', autocapitalize: 'sentences', autocorrect: 'off', 'aria-label': 'Case summary',
     placeholder: PLACEHOLDER.map(([a, b]) => `${a}  ← ${b}`).join('\n'),
     value: draft.details,
     oninput: e => { draft.details = e.target.value; saveDraft(); suggestSoon(); paintParsed(true); },
-    // Enter is a new line (a case can take several lines); Ctrl+Enter / Cmd+Enter saves
+    // Settings → Logging → Enter key: 'newline' (default; Ctrl/Cmd+Enter saves), 'double' (Enter on an empty
+    // line saves, so a case can still take several lines) or 'single' (Enter saves; Shift+Enter a new line)
     onkeydown: e => {
-      // Settings → Logging: Enter saves (Shift+Enter for a new line), or Enter is a new line (Ctrl/Cmd+Enter saves)
       if (e.key !== 'Enter' || e.isComposing) return;
-      if (settings().enterSaves ? e.shiftKey : !(e.ctrlKey || e.metaKey)) return;
-      e.preventDefault();
-      save({ another: e.altKey });
+      const mode = enterMode();
+      if (e.ctrlKey || e.metaKey) { e.preventDefault(); return save({ another: e.altKey }); }
+      if (e.shiftKey) return;
+      if (mode === 'single') { e.preventDefault(); return save({ another: e.altKey }); }
+      if (mode === 'double' && onEmptyLine(e.target)) { e.preventDefault(); saveFromEmptyLine(e.target, e.altKey); }
+    },
+    // phone keyboards that don't send a usable Enter keydown still send this
+    onbeforeinput: e => {
+      if (enterMode() !== 'double' || !/^insert(LineBreak|Paragraph)$/.test(e.inputType) || !onEmptyLine(e.target)) return;
+      e.preventDefault(); saveFromEmptyLine(e.target, false);
     },
   });
   const sugg = h('div', { class: 'chips sugg-row', 'aria-live': 'polite' });
