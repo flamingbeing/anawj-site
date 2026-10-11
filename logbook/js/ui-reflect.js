@@ -923,8 +923,8 @@ function editor() {
         autosave.cancel(); await persist(); hooks.render();
       } catch (err) { status.textContent = 'Image not added'; toast('Could not add image: ' + err.message); }
     } });
-    // figures: rarely needed, so a small collapsed line after References (open when there are some)
-    const figures = h('details', { class: 'card fig-card', open: r.figures.length > 0 },
+    // figures: rarely needed, so collapsed after References like it (open when there are some)
+    const figures = h('details', { class: 'card fold-card', open: r.figures.length > 0 },
       h('summary', {}, `Figures (optional, rarely needed)${r.figures.length ? ' · ' + r.figures.length : ''}`),
       h('p', { class: 'hint', style: 'margin:8px 0 4px' }, `${PHOTO_NOTE} Your photos: ${fmtMb(usedKb())} of ${fmtMb(PHOTO_BUDGET_KB)} used.`),
       h('p', { class: 'hint', style: 'margin:0 0 4px;color:var(--warn, #b45309)' }, 'No faces, names, NRIC, MRN or anything identifying on monitors, labels or screens. Crop before adding.'),
@@ -959,8 +959,8 @@ function editor() {
       fileIn);
 
     // references (optional, collapsed unless there are some)
-    const refs = h('details', { class: 'card', style: 'padding:12px 16px', open: r.references.length > 0 },
-      h('summary', { style: 'cursor:pointer;font-weight:600' }, `References (optional)${r.references.length ? ' · ' + r.references.length : ''}`),
+    const refs = h('details', { class: 'card fold-card', open: r.references.length > 0 },
+      h('summary', {}, `References (optional)${r.references.length ? ' · ' + r.references.length : ''}`),
       r.references.map((x, i) => h('div', { class: 'bar', style: 'gap:6px;margin:6px 0;align-items:center' },
         h('span', {}, `${i + 1}.`),
         h('input', { style: IN + ';flex:1', maxlength: String(LIMITS.reference), value: x, placeholder: 'Author. Title. Journal. Year;vol:pages.', oninput: e => { r.references[i] = e.target.value; changed(); } }),
