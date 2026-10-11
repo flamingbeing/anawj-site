@@ -640,3 +640,11 @@ table.totals td.cat .tgt { display: block; font-size: 11px; color: var(--muted);
 table.totals td .gap { font-size: 11px; font-weight: 700; }
 table.totals td.late .gap { color: var(--err); }
 table.totals td.due .gap { color: var(--warn); }
+
+/* Reflections: ready to write (tagged + suggested cases) */
+.ready-list { list-style: none; margin: 0; padding: 0; }
+.ready-list li { display: flex; gap: 8px; align-items: center; justify-content: space-between; padding: 6px 0; border-top: 1px solid var(--line); }
+.ready-list li:first-child { border-top: 0; }
+.ready-list .rt { min-width: 0; font-size: 14px; }
+.ready-list .rt small { color: var(--muted); }
+.reflect-tag { margin: 6px 0 2px; font-size: 14px; }

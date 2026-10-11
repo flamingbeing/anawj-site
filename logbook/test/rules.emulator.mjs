@@ -38,6 +38,9 @@ await t('own case', assertSucceeds(setDoc(doc(a, 'logbooks', A, 'cases', 'c1'), 
 await t('case null date', assertSucceeds(setDoc(doc(a, 'logbooks', A, 'cases', 'c2'), { ...c('c2'), date: null, dateText: '31/6/24' })));
 await t('case bad date', assertFails(setDoc(doc(a, 'logbooks', A, 'cases', 'c3'), { ...c('c3'), date: '2/1/26' })));
 await t('case id mismatch', assertFails(setDoc(doc(a, 'logbooks', A, 'cases', 'c3'), c('zz'))));
+await t('case tagged for reflection + subcategory tags', assertSucceeds(setDoc(doc(a, 'logbooks', A, 'cases', 'c4'), { ...c('c4'), reflectTag: true, tags: ['16:elective'] })));
+await t('case reflectTag not bool', assertFails(setDoc(doc(a, 'logbooks', A, 'cases', 'c5'), { ...c('c5'), reflectTag: 'yes' })));
+await t('case too many tags', assertFails(setDoc(doc(a, 'logbooks', A, 'cases', 'c5'), { ...c('c5'), tags: Array.from({ length: 21 }, (_, i) => 't' + i) })));
 await t('case extra field', assertFails(setDoc(doc(a, 'logbooks', A, 'cases', 'c3'), { ...c('c3'), nric: 'x' })));
 await t('case long details', assertFails(setDoc(doc(a, 'logbooks', A, 'cases', 'c3'), { ...c('c3'), details: 'x'.repeat(2001) })));
 await t('case 2000 details', assertSucceeds(setDoc(doc(a, 'logbooks', A, 'cases', 'c3'), { ...c('c3'), details: 'x'.repeat(2000) })));

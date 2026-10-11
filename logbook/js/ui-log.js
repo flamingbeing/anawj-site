@@ -209,6 +209,9 @@ function renderOne(card) {
     get: () => draft.cats,
     toggle: code => { draft.cats = toggleCat(draft.cats, code); saveDraft(); paintSel(); },
   });
+  // "might be worth a reflection": tag it now, write it later from the Reflections tab
+  const tagBox = h('label', { class: 'check reflect-tag' }, h('input', { type: 'checkbox', checked: !!draft.reflectTag, onchange: e => { draft.reflectTag = e.target.checked; saveDraft(); } }), '☆ Tag as a possible reflection');
+  ui.tagBox = tagBox;
   const actions = h('div', { class: 'actions' },
     h('button', { class: 'primary big', onclick: () => save({}) }, 'Save', h('span', { class: 'kbd', title: 'Ctrl+Enter (Cmd+Enter on a Mac)' }, ' Ctrl+⏎')),
     h('button', { class: 'big', title: 'Save and keep this date for the next case', onclick: () => save({ another: true }) }, 'Save, keep date'));
@@ -219,6 +222,7 @@ function renderOne(card) {
     textarea, parsed,
     h('div', { class: 'chiplabel', id: 'suggLabel' }, 'Suggested'), sugg,
     h('div', { class: 'chiplabel' }, 'Selected'), selected, tip,
+    tagBox,
     actions,
     stillNeeded(),
     h('div', { class: 'chiplabel' }, 'Quick picks'), templates,
@@ -360,10 +364,11 @@ async function save({ another }) {
   const norm = t => String(t || '').toLowerCase().replace(/\s+/g, ' ').trim();
   const twin = (S.cases || []).find(x => x.date === curDate() && norm(caseText(x)) === norm(details));
   if (twin && !(await confirmBox('Possible duplicate', `You already logged “${caseText(twin).slice(0, 60)}” on ${fmtDate(twin.date)}. Save another one?`, 'Save anyway'))) return;
-  const c = await createCase({ date: curDate(), details, cats: draft.cats });
+  const c = await createCase({ date: curDate(), details, cats: draft.cats, reflectTag: !!draft.reflectTag });
   const sticky = another || settings().defaultDate === 'last';
   const keep = sticky ? draft.date : null;
-  draft = { ...draft, details: '', cats: [], date: keep, keepDate: sticky, keptAt: Date.now(), dateAt: Date.now() };
+  draft = { ...draft, details: '', cats: [], date: keep, keepDate: sticky, keptAt: Date.now(), dateAt: Date.now(), reflectTag: false };
+  if (ui.tagBox) ui.tagBox.querySelector('input').checked = false;
   saveDraft();
   if (ui.textarea) ui.textarea.value = '';
   paintDate(); paintSel(); paintQuick();
@@ -505,6 +510,7 @@ export function editCaseDialog(c) {
     h('div', { class: 'chiplabel' }, 'Categories'), sel,
     h('div', { class: 'chiplabel' }, 'Suggested'), sugg,
     h('details', {}, h('summary', {}, 'All categories'), picker.el),
+    h('label', { class: 'check reflect-tag', style: 'margin-top:8px' }, h('input', { type: 'checkbox', checked: !!e.reflectTag, onchange: ev => { e.reflectTag = ev.target.checked; } }), '☆ Possible reflection'),
     // to your own notes (WhatsApp, Notes, Obsidian): this case, or the whole day's list
     h('div', { class: 'bar share-row', style: 'margin:10px 0 0' },
       h('button', { class: 'small', onclick: () => shareText(shareCaseText(c)) }, 'Share case'),
@@ -521,7 +527,9 @@ export function editCaseDialog(c) {
       h('button', { class: 'primary', onclick: async () => {
         if (!(await okNoIds(e.details))) return;
         m.close();
-        await updateCase({ ...e, initials: cleanInitials(e.initials), details: e.details.trim() });
+        const next = { ...e, initials: cleanInitials(e.initials), details: e.details.trim() };
+        if (!next.reflectTag) delete next.reflectTag;
+        await updateCase(next);
         toast('Case updated', { action: 'Undo', onaction: () => restoreCase(c) });
       } }, 'Save')),
   ]);
