@@ -6,7 +6,8 @@ import { withParents, frequentCombos, parseBulk, parseDate, fmtDate, sortCodes, 
 import { suggest } from './suggest.js';
 import {
   S, h, toast, debounce, modal, confirmBox, cat, catName, catFull, catChip, countText, PICKER_ORDER, PROGRESS_BY_CODE,
-  createCase, updateCase, removeCase, restoreCase, saveMany, settings, todayISO, hooks, fill, add, cloud, okNoIds } from './ui-core.js';
+  createCase, updateCase, removeCase, restoreCase, saveMany, settings, todayISO, hooks, fill, add, cloud, okNoIds, patchLogbook } from './ui-core.js';
+import { templateDialog } from './ui-settings.js';
 import { moveToBin } from './bin.js';
 
 const DRAFT_KEY = 'logbook-draft-v2';
@@ -101,7 +102,7 @@ export function catPicker({ get, toggle, placeholder = 'Search categories: code 
   }
   refresh();
   const el = h('div', { class: 'picker' }, input, list);
-  return { el, refresh, focus: () => input.focus(), input };
+  return { el, refresh, focus: opts => input.focus(opts), input };
 }
 
 // ---------- the Log screen ----------
@@ -216,7 +217,13 @@ function paintSel() {
   fill(ui.selected, ...(draft.cats.length
     ? draft.cats.map(code => catChip(code, { on: true, removable: true, cls: 'add', title: 'Remove ' + catFull(code),
       onclick: () => keepPlace(ui.selected, () => { draft.cats = dropCat(draft.cats, code); saveDraft(); paintSel(); }) }))
-    : [h('span', { class: 'none' }, 'None yet — tap a suggestion, a quick pick or search below.')]));
+    : [h('span', { class: 'none' }, 'None yet — tap a suggestion, a quick pick or search below.')]),
+    // a combination worth keeping: one tap to make it a template (no trip to Settings)
+    draft.cats.length >= 2 && !((S.logbook && S.logbook.templates) || []).some(t => sortCodes(t.cats).join() === sortCodes(draft.cats).join())
+      ? h('button', { type: 'button', class: 'small linkish', onclick: () => templateDialog({ id: uid(), name: '', cats: [...draft.cats], details: '' }, async out => {
+        await patchLogbook({ templates: [...((S.logbook && S.logbook.templates) || []), out] });
+        toast(`Template “${out.name}” saved`); paintQuick(); paintSel();
+      }, 'Save as template') }, '☆ Save as template') : null);
   const tips = draft.cats.filter(c => TIPS[c]).map(c => TIPS[c]);
   fill(ui.tip, ...tips.map(t => h('p', { class: 'tip' }, t)));
   paintSuggest();
@@ -275,7 +282,14 @@ async function save({ another }) {
   const details = draft.details.trim();
   if (!draft.cats.length) {
     // categories are counted towards credentialling, so they must be picked on purpose
-    toast('Tap at least one category (suggestions are above)'); ui.picker.focus({ preventScroll: true }); return;
+    // point at the suggestions (no keyboard popping up); with none, the search box
+    const target = ui.sugg && !ui.sugg.hidden && ui.sugg.querySelector('.chip') ? ui.sugg : null;
+    if (target) {
+      toast('Tap at least one category: suggestions are highlighted');
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      target.classList.remove('flash'); void target.offsetWidth; target.classList.add('flash');
+    } else { toast('Pick at least one category: search below'); ui.picker.focus(); }
+    return;
   }
   if (!details && !(await confirmBox('No case details', 'Save this case without initials or details?', 'Save'))) return;
   if (!(await okNoIds(details))) return;
@@ -313,12 +327,12 @@ let bulkRows = null;
 function renderBulk(card) {
   const ta = h('textarea', {
     class: 'details', rows: '8', value: draft.bulk || '',
-    placeholder: 'Separate cases with an empty line. An optional date at the start, e.g.\n12/3 AB 5yo circumcision caudal\n\n13/3 CD LSCS spinal\nconverted to GA\n\nEF 80F hemiarthroplasty',
+    placeholder: 'One case per line, or separate cases with an empty line. An optional date at the start, e.g.\n12/3 AB 5yo circumcision caudal\n13/3 CD 30F LSCS spinal\nEF 80F hemiarthroplasty',
     oninput: e => { draft.bulk = e.target.value; saveDraft(); },
   });
   const out = h('div');
   add(card, 
-    h('p', { class: 'hint' }, 'Paste your notes. Separate cases with an empty line (a case can take several lines); categories are guessed for each case. Cases without a date at the start get ', h('b', {}, fmtDate(curDate())), ' (change it above).'),
+    h('p', { class: 'hint' }, 'Paste your notes or OT list: one case per line, or separate cases with an empty line when a case takes several lines. Categories are guessed for each case. Cases without a date at the start get ', h('b', {}, fmtDate(curDate())), ' (change it above).'),
     ta,
     h('div', { class: 'bar', style: 'margin-top:8px' },
       h('button', { class: 'primary', onclick: () => { bulkRows = parseBulk(ta.value, t => suggest(t)); paintBulk(out); } }, 'Review'),
@@ -347,10 +361,10 @@ function paintBulk(out) {
         h('textarea', { rows: String(Math.min(6, Math.max(2, r.details.split('\n').length))), value: r.details, 'aria-label': 'Case details', oninput: e => { r.details = e.target.value; } })),
       h('td', {}, h('div', { class: 'chips' },
         r.cats.map(code => catChip(code, { on: true, removable: true, onclick: () => { r.cats = dropCat(r.cats, code); paintBulk(out); } })),
-        h('button', { class: 'small', onclick: () => pickDialog(r.cats, cats => { r.cats = cats; paintBulk(out); }) }, r.cats.length ? '+' : '+ Add')),
+        h('button', { class: 'small icon-btn', 'aria-label': 'Add categories', onclick: () => pickDialog(r.cats, cats => { r.cats = cats; paintBulk(out); }) }, r.cats.length ? '+' : '+ Add')),
         same || sugg.length ? h('div', { class: 'chips', style: 'margin-top:4px' }, same,
           sugg.map(s => catChip(s.code, { cls: `sugg ${s.score >= 0.5 ? 'strong' : ''}`, title: 'Suggested: ' + catFull(s.code), onclick: () => { r.cats = addCat(r.cats, s.code); paintBulk(out); } }))) : null),
-      h('td', {}, h('button', { class: 'small danger', title: 'Drop this case', onclick: () => { bulkRows.splice(i, 1); paintBulk(out); } }, '×')));
+      h('td', {}, h('button', { class: 'small danger icon-btn', title: 'Drop this case', 'aria-label': 'Drop this case', onclick: () => { bulkRows.splice(i, 1); paintBulk(out); } }, '×')));
   }));
   fill(out, 
     h('h3', {}, `${bulkRows.length} case${bulkRows.length === 1 ? '' : 's'}`),

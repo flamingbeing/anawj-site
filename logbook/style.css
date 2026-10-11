@@ -29,7 +29,7 @@
   --nuhs-cyan: #00a9e0;
   --nuhs-red: #e4002b;
   --nuhs-orange: #e57200;
-  color-scheme: light;
+  color-scheme: light dark;
 }
 
 * { box-sizing: border-box; }
@@ -103,6 +103,9 @@ section.card h3 { margin: 12px 0 6px; font-size: 14px; }
 .muted { color: var(--muted); }
 .bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
 .bar .grow { flex: 1; min-width: 160px; }
+dialog .bar .grow { min-width: 0; }   /* keep Cancel / Save on one row in dialogs */
+@keyframes flash { 0%, 100% { box-shadow: none; } 30%, 70% { box-shadow: 0 0 0 3px var(--accent); } }
+.flash { animation: flash 1.2s ease 1; border-radius: 10px; }
 .row { display: flex; gap: 8px; align-items: center; }
 .empty { text-align: center; color: var(--muted); padding: 32px 16px; }
 
@@ -215,6 +218,7 @@ ul.cases { list-style: none; margin: 0; padding: 0; }
 ul.cases li { display: grid; grid-template-columns: 74px 1fr; gap: 4px 10px; padding: 10px 4px; border-bottom: 1px solid var(--line); cursor: pointer; }
 ul.cases li:hover { background: var(--row-alt); }
 ul.cases .d { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+ul.cases .d .wd { font-weight: 600; }
 ul.cases .t { white-space: pre-wrap; word-break: break-word; }
 ul.cases .c { grid-column: 2; display: flex; flex-wrap: wrap; gap: 4px; }
 .flag { font-size: 11px; padding: 0 6px; border-radius: 999px; background: var(--warn-bg); color: var(--warn); white-space: nowrap; }
@@ -499,3 +503,28 @@ body.dragging-refl { user-select: none; -webkit-user-select: none; }
 .acct .acct-radios { gap: 16px; margin-top: 4px; }
 .acct .acct-radios .check { margin: 0; }
 /* ---- end account tab ---- */
+
+.refl-rules { margin: 4px 0 8px; }
+.refl-rules > summary { cursor: pointer; font-size: 13px; color: var(--muted); min-height: 40px; line-height: 40px; display: list-item; }
+.refl-rules ul { margin: 4px 0 0; padding-left: 20px; }
+button.icon-btn { min-width: 40px; }
+
+/* ---------- dark mode (follows the phone's setting) ---------- */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #121417; --panel: #1c1f24; --ink: #e6e8eb; --muted: #a2abb5; --line: #333941;
+    --accent: #8cc0ff; --accent-ink: #0b1a2e; --accent-soft: #1d2b3d; --chip: #1f2a36; --chip-on: #8cc0ff;
+    --err: #ff9a8f; --err-bg: #3b1f1c; --warn: #f3c46e; --warn-bg: #362b12; --ok: #74dd90; --ok-bg: #15301e;
+    --info: #8cc0ff; --info-bg: #15263a; --row-alt: #181b20; --ontrack: #5f666e;
+  }
+  .top h1, section.card h2, h2, h3 { color: var(--accent); }
+  :focus-visible, input:focus, select:focus, textarea:focus { outline-color: var(--accent); }
+  input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+  input, select, textarea { background: #15181c; color: var(--ink); }
+  table.totals td.late { background: #4a1f23; } table.totals td.due { background: #43361a; } table.totals td.done { background: #1d3a25; }
+  .bin-kind { background: #1f2c40; color: #b9d2f5; } .bin-kind.reflection { background: #33213c; color: #e2c4ef; }
+  img { opacity: .92; }
+}
+@media (prefers-color-scheme: dark) and (max-width: 600px) {
+  .tabs { background: rgba(28, 31, 36, .96) !important; }
+}
