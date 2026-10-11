@@ -1023,3 +1023,25 @@ html.rm *, html.rm *::before, html.rm *::after { animation-duration: .01ms !impo
 /* tab bar: icons only (each button keeps its name for screen readers) */
 html.tab-icons .tabs .lbl { display: none; }
 html.tab-icons .tabs svg { width: 26px; height: 26px; }
+/* icons-only on a computer: the top bar has no icons by default, so show them there */
+html.tab-icons .tabs .ico { display: block; width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+/* tab bar position (Settings → Display): auto = bottom on phones, top on bigger screens */
+@media (max-width: 600px) {
+  html.tabs-top { --tabbar-h: 0px; }
+  html.tabs-top .tabs { position: sticky; top: 0; bottom: auto; padding: 0; border-top: 0; border-bottom: 1px solid var(--line); }
+  html.tabs-top body.typing .tabs { transform: none; }
+  html.tabs-top .tabs button { height: 54px; border-top: 0; border-bottom: 2px solid transparent; }
+  html.tabs-top .tabs button[aria-selected="true"] { border-top: 0; border-bottom-color: var(--accent); }
+}
+@media (min-width: 601px) {
+  html.tabs-bottom { --tabbar-h: 59px; }
+  html.tabs-bottom .tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; justify-content: center; gap: 0; padding: 0 0 var(--safe-b); border-top: 1px solid var(--line); border-bottom: 0; background: var(--panel); overflow: hidden; }
+  html.tabs-bottom .tabs button { flex: 0 1 140px; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; height: var(--tabbar-h); padding: 4px 2px; font-size: calc(12px * var(--fs, 1)); border-bottom: 0; border-top: 2px solid transparent; }
+  html.tabs-bottom .tabs button[aria-selected="true"] { border-top-color: var(--accent); border-bottom: 0; color: var(--accent); }
+  html.tabs-bottom .tabs .ico { display: block; width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+}
+/* hide the header while there's nothing to say: it comes back for unsynced changes, no signal, the demo, signed out */
+html.no-header:not(.who-alert) .top { display: none; }
+html.no-header:not(.who-alert) main { padding-top: max(8px, env(safe-area-inset-top, 0px)); }
+html.no-header:not(.who-alert).tabs-top .tabs { padding-top: env(safe-area-inset-top, 0px); }
+@media (min-width: 601px) { html.no-header:not(.who-alert):not(.tabs-bottom) .tabs { padding-top: env(safe-area-inset-top, 0px); } }
