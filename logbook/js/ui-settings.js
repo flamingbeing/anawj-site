@@ -37,6 +37,23 @@ export function applyTextSize(z) {
   document.documentElement.style.setProperty('--text-zoom', v);
   try { v === '1' ? localStorage.removeItem(SIZE_KEY) : localStorage.setItem(SIZE_KEY, v); } catch { /* storage blocked */ }
 }
+// Colour theme (S.logbook.settings.scheme, follows the account; cached on the device for the first
+// paint): data-scheme on <html>, palettes in style.css. Default (NUHS navy) has none. Light or dark is
+// the separate applyTheme above.
+const SCHEME_KEY = 'apmes-logbook-scheme';
+export const SCHEMES = [
+  { id: 'default', name: 'Default', note: 'NUHS navy, the original', dots: ['#002f6c', '#00a9e0', '#e4002b', '#e57200'], bar: '#002f6c' },
+  { id: 'nord', name: 'Nord', note: 'Cool blue-grey, easy on the eyes', dots: ['#2e3440', '#5e81ac', '#88c0d0', '#b48ead'], bar: '#3b4252' },
+  { id: 'matcha', name: 'Matcha', note: 'Calm sage green', dots: ['#2f5a37', '#6b9f6e', '#a8cc8c', '#d7e3a3'], bar: '#2f5a37' },
+  { id: 'sakura', name: 'Sakura', note: 'Soft pink, a little cute', dots: ['#9c2f5a', '#e0659a', '#ff9fbf', '#a78bfa'], bar: '#9c2f5a' },
+  { id: 'mono', name: 'Mono', note: 'Black and white, nothing extra', dots: ['#18181b', '#5f5f68', '#d4d4d8', '#ffffff'], bar: '#18181b' },
+];
+export function applyScheme(id) {
+  const sc = SCHEMES.find(x => x.id === id) || SCHEMES[0];
+  if (sc.id === 'default') delete document.documentElement.dataset.scheme; else document.documentElement.dataset.scheme = sc.id;
+  const meta = document.querySelector('meta[name="theme-color"]'); if (meta) meta.setAttribute('content', sc.bar);
+  try { sc.id === 'default' ? localStorage.removeItem(SCHEME_KEY) : localStorage.setItem(SCHEME_KEY, sc.id); } catch { /* storage blocked */ }
+}
 export function cachedTextSize() {
   try { return localStorage.getItem(SIZE_KEY) || '1'; } catch { return '1'; }
 }
@@ -70,14 +87,25 @@ export function renderDisplay() {
       h('label', { class: 'field', style: 'margin-top:10px' }, 'Text size',
         h('select', { onchange: e => { applyTextSize(e.target.value); patchLogbook({ settings: { textSize: e.target.value } }); } },
           TEXT_SIZES.map(([v, l]) => h('option', { value: v, selected: String(st.textSize || '1') === v }, l)))),
-      h('label', { class: 'field', style: 'margin-top:10px' }, 'Theme',
+      h('div', { class: 'field', style: 'margin-top:10px' }, 'Theme', schemePicker()),
+      h('p', { class: 'hint', style: 'margin:2px 0 0' }, 'Saved to your account. Each theme has a light and a dark version.'),
+      h('label', { class: 'field', style: 'margin-top:10px' }, 'Light or dark',
         h('select', { onchange: e => applyTheme(e.target.value) },
           [['light', 'Light'], ['dark', 'Dark'], ['auto', 'Auto (match the phone)']].map(([v, l]) => h('option', { value: v, selected: cachedTheme() === v }, l)))),
-      h('p', { class: 'hint', style: 'margin:2px 0 0' }, 'Theme is saved on this device.'),
+      h('p', { class: 'hint', style: 'margin:2px 0 0' }, 'Light or dark is saved on this device.'),
       // the tab the app opens on (a link or shortcut to a tab still opens that tab)
       h('label', { class: 'field', style: 'margin-top:10px' }, 'Open the app on',
         h('select', { onchange: e => patchLogbook({ settings: { startTab: e.target.value } }).then(() => toast('Saved')) },
           START_TABS.map(([v, l]) => h('option', { value: v, selected: (st.startTab || 'log') === v }, l))))));
+}
+function schemePicker() {
+  const cur = () => settings().scheme || 'default';
+  const wrap = h('div', { class: 'scheme-pick', role: 'group', 'aria-label': 'Theme' });
+  const paint = () => fill(wrap, ...SCHEMES.map(sc => h('button', { type: 'button', 'aria-pressed': String(cur() === sc.id), onclick: () => {
+    applyScheme(sc.id); patchLogbook({ settings: { scheme: sc.id === 'default' ? null : sc.id } }); paint();
+  } }, h('span', { class: 'scheme-dots', 'aria-hidden': 'true' }, sc.dots.map(c => h('i', { style: `background:${c}` }))), h('b', {}, sc.name), h('small', {}, sc.note))));
+  paint();
+  return wrap;
 }
 export const START_TABS = [['log', 'Log'], ['logbook', 'Logbook'], ['reflect', 'Reflections'], ['progress', 'Analytics']];
 

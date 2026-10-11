@@ -60,6 +60,9 @@ portfolio content.
   greyed out for residents on the programme list: a programme admin takes them off first; `cloud.deleteAccount`
   wipes cases, reflections, images, bin, submission, members entry, logbook, then the Google sign-in), Settings, Export &
   backup, Admin portal; Privacy, Credits, What's new (`WHATS_NEW` in app.js; update each release), Sign out at the very bottom.
+- **Themes** (Display): Default (NUHS navy), Nord, Matcha, Sakura, Mono; `settings.scheme` (account) + device cache
+  for the first paint (index.html); `data-scheme` on <html>, palettes at the end of style.css (each with a dark
+  version; `--heading` and `--s1..4` stripe colours). Light/dark stays separate (`data-theme`, per device).
 - **Settings**: a menu of Display (incl. the tab the app opens on, `settings.startTab`; a #hash still wins),
   Logging, Tag editor (`#tags`), Reflections (`#reflset`: new reflections in the export, photo sizes), Copy & share format (`#sharefmt`), Recycle bin;
   then a "Settings file" card: export / import settings, tags, tag groups, formats as JSON (`settings-file.js`, tested; never cases or portfolio).

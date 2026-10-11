@@ -17,6 +17,8 @@
 <script>
   // this device's theme before the first paint (Settings → Display → Theme; light unless chosen)
   try { var t = localStorage.getItem('apmes-logbook-theme'); document.documentElement.dataset.theme = t === 'dark' || t === 'auto' ? t : 'light'; } catch (e) {}
+  // and its colour theme (Settings → Display → Theme; Default unless chosen)
+  try { var sc = localStorage.getItem('apmes-logbook-scheme'); if (/^(nord|matcha|sakura|mono)$/.test(sc || '')) document.documentElement.dataset.scheme = sc; } catch (e) {}
 </script>
 <link rel="stylesheet" href="style.css">
 <!-- fetch every module and the Firebase SDK at once instead of one import at a time -->
