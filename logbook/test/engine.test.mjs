@@ -483,4 +483,15 @@ assert.equal(rYearDefault(undefined), 1);
   assert.deepEqual(w1.getWorksheet('Totals').getRow(4).values.slice(1), [BY_CODE['16'].label, 3, 12]);
 }
 
+// "12 Mar 65 year old man": 65 is an age, not 2065; procedure abbreviations aren't initials
+{
+  const now = new Date(2026, 2, 15, 9);
+  const a = parseBulk('12 Mar 65 year old man TKR', null, now)[0];
+  assert.equal(a.date, '2026-03-12'); assert.match(a.details, /^65 year old man TKR/);
+  const b = parseBulk('3 Jan 80 yr F hip', null, now)[0];
+  assert.equal(b.date, '2026-01-03'); assert.match(b.details, /^80 yr F hip/);
+  assert.equal(parseBulk('12 Mar 26 AB TKR', null, now)[0].date, '2026-03-12');
+  for (const w of ['PEG', 'LP', 'ICD', 'EBL']) assert.equal(splitInitials(`${w} insertion`).initials, '', w);
+}
+
 console.log('engine tests passed');

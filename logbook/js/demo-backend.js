@@ -343,7 +343,7 @@ export async function saveResident(r) {
   if (!d.email || d.email !== d.email.toLowerCase()) throw new Error('email missing or not lower case');
   const s = load(); s.residents[d.rid] = d; save(s); return d;
 }
-export async function deleteResident(rid) { const s = load(); delete s.residents[rid]; save(s); }
+export async function deleteResident(rid) { const s = load(); delete s.residents[rid]; delete s.summaries[rid]; save(s); }
 
 export async function listSharedTemplates() { return Object.values(load().sharedTemplates).map(plain); }
 export async function saveSharedTemplate(t) {

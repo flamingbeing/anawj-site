@@ -12,6 +12,7 @@ export { cloud };
 export const S = {
   user: null,          // { email, name, uid }
   admin: false,
+  pd: false,           // a programme director (pds/{email}): can see Totals
   resident: null,      // residents/{rid} doc when the user is on the programme list
   logbook: null,       // logbooks/{email} doc
   cases: [],           // newest first
@@ -29,6 +30,16 @@ export const hooks = { render() {}, casesChanged() {} };
 export const settings = () => ({ suggestions: true, rYear: 1, ...(S.logbook && S.logbook.settings) });
 // A resident's year moves up each 1 July from their intake, unless an admin set it by hand (leave, repeats).
 export const residentYear = r => Number(r && (r.rYear || (r.intake && rYearDefault(r.intake)))) || null;
+// The intake to count residency years from. When an admin set the year by hand (leave, a repeat),
+// the intake is shifted so this year comes out right, keeping JR and the Section 4 columns in step.
+export function effectiveIntake(r = S.resident) {
+  if (!r) return null;
+  const ridYear = Number(String(r.rid || '').slice(0, 4));
+  const intake = Number(r.intake) || (ridYear > 2000 && ridYear < 2100 ? ridYear : null);
+  if (!r.rYear) return intake;
+  const now = new Date(), ay = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+  return ay - Number(r.rYear) + 1;
+}
 export const rYear = () => residentYear(S.resident) || Number(settings().rYear) || 1;
 export const displayName = () => (S.logbook && S.logbook.name) || (S.resident && S.resident.name) || (S.user && S.user.name) || '';
 
@@ -188,6 +199,14 @@ function applyLocal(fn) {
 }
 
 // Without `initials`, leading patient initials are split off the details ("AB 34F LSCS" -> 'AB', '34F LSCS').
+// Patient identifiers don't belong in a logbook: an NRIC/FIN (S1234567A) or a long number (a hospital
+// or phone number) asks before saving.
+const ID_RE = /\b[STFGM]\d{7}[A-Z]\b|\b\d{7,}\b/i;
+export function okNoIds(...texts) {
+  if (!texts.some(t => ID_RE.test(String(t || '')))) return Promise.resolve(true);
+  return confirmBox('Looks like an ID number', 'This looks like an NRIC, hospital or phone number. Log patient initials only, never identifiers. Save anyway?', 'Save anyway', true);
+}
+
 export async function createCase({ date, details, initials, cats, source = 'app', dateText }) {
   const now = Date.now();
   const parts = initials == null ? splitInitials(details) : { initials: cleanInitials(initials), details: String(details || '').trim() };
@@ -255,7 +274,17 @@ const writeSummaryNow = async () => {
   const s = summaryOf();
   const key = JSON.stringify([s.counts, s.total, s.rYear, s.name, s.reflections]);
   if (key === lastSummary) return;
-  try { await cloud.writeSummary(S.resident.rid, s); lastSummary = key; } catch (err) { console.warn('summary', err); }
+  try { await cloud.writeSummary(S.resident.rid, s); lastSummary = key; }
+  catch (err) {
+    // an admin changed this resident's name or intake since sign-in: reload the entry and try once more
+    if (err && err.code === 'permission-denied' && S.user) {
+      try {
+        const r = await cloud.myResident(S.user.email);
+        if (r && r.rid) { S.resident = r; const s2 = summaryOf(); await cloud.writeSummary(r.rid, s2); lastSummary = key; return; }
+      } catch (e) { console.warn('summary retry', e); }
+    }
+    console.warn('summary', err);
+  }
 };
 export const scheduleSummary = debounce(writeSummaryNow, 4000);
 

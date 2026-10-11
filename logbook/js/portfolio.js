@@ -95,7 +95,7 @@ function detailsStructured(r) {
   if (refs.length) {
     out.push([]);
     out.push([['References', true]]);
-    refs.forEach((x, n) => out.push([[`${n + 1}. ${x.replace(/^\d+[.)]\s*/, '')}`, false]]));
+    refs.forEach((x, n) => out.push([[`${n + 1}. ${x.replace(/^\d{1,2}[.)]\s+/, '')}`, false]]));
   }
   return out;
 }
@@ -326,7 +326,8 @@ export function fillSummaryXml(xml, cases, { intake = null, rYear = null } = {})
       if (!code) return tr;
       n++;
       const c = counts[code] || { total: 0 };
-      const vals = [1, 2, 3, 4, 5].map(y => (intake && y <= upTo ? String(c[y] || 0) : ''));
+      // cases dated in a year past the current one (dates entered ahead) count in the current column
+      const vals = [1, 2, 3, 4, 5].map(y => (intake && y <= upTo ? String((c[y] || 0) + (y === upTo ? [1, 2, 3, 4, 5].filter(k => k > upTo).reduce((a, k) => a + (c[k] || 0), 0) : 0)) : ''));
       vals.push(String(c.total));
       let i = 0;
       return tr.replace(/<w:tc(?:\s[^>]*)?>[\s\S]*?<\/w:tc>/g, tc => (i++ === 0 ? tc : fillCell(tc, [[[vals[i - 2], false]]])));

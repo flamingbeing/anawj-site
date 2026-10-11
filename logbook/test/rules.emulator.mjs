@@ -82,6 +82,10 @@ await t('admin writes summary', assertSucceeds(setDoc(doc(adm, 'summaries', 'R2'
 await t('resident summary under another name', assertFails(setDoc(doc(a, 'summaries', 'R1'), sum('R1', 'Mallory'))));
 await t('resident summary wrong intake', assertFails(setDoc(doc(a, 'summaries', 'R1'), { ...sum('R1'), intake: 2020 })));
 await t('admin summary any name', assertSucceeds(setDoc(doc(adm, 'summaries', 'R2'), sum('R2', ''))));
+await t('summary fake total', assertFails(setDoc(doc(a, 'summaries', 'R1'), { ...sum('R1'), total: 1e9 })));
+await t('summary negative total', assertFails(setDoc(doc(a, 'summaries', 'R1'), { ...sum('R1'), total: -1 })));
+await t('summary year out of range', assertFails(setDoc(doc(a, 'summaries', 'R1'), { ...sum('R1'), rYear: 9 })));
+await t('summary negative reflections', assertFails(setDoc(doc(a, 'summaries', 'R1'), { ...sum('R1'), reflectionsTotal: -5 })));
 await t('member lists summaries', assertSucceeds(getDocs(collection(a, 'summaries'))));
 await t('admin lists summaries', assertSucceeds(getDocs(collection(adm, 'summaries'))));
 await t('stranger cannot list summaries', assertFails(getDocs(collection(as('x@example.com'), 'summaries'))));

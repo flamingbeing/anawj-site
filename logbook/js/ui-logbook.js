@@ -6,12 +6,13 @@ import { flagCase } from './importer.js';
 import { exportCases, readCasesSheet } from './xlsxio.js';
 import {
   S, h, toast, debounce, modal, cat, catFull, catChip, PICKER_ORDER, settings, patchLogbook, needExcel, download, fileButton,
-  updateCase, saveMany, deleteMany, displayName, rYear, todayISO, fill, add } from './ui-core.js';
+  updateCase, saveMany, deleteMany, displayName, rYear, todayISO, fill, add, resetters } from './ui-core.js';
 import { editCaseDialog } from './ui-log.js';
 import { reflectOnCase } from './ui-reflect.js';
 import { moveToBin } from './bin.js';
 
 const view = { q: '', cat: '', flag: '', mode: null, limit: 150, month: null, day: null };
+resetters.push(() => Object.assign(view, { q: '', cat: '', flag: '', mode: null, limit: 150, month: null, day: null }));   // next user starts unfiltered
 const MODES = [['list', 'List'], ['calendar', 'Calendar'], ['grid', 'Grid']];
 
 // Procedure-name tags; a parent (e.g. 20) is left out when one of its sub-categories (20iii) is there.
@@ -98,7 +99,7 @@ function listView(rows, flagsOf, repaint) {
 function caseRow(c, flagsOf) {
   const flags = flagsOf(c);
   const p = caseParts(c);
-  return h('li', { onclick: () => editCaseDialog(c), tabindex: '0', onkeydown: e => { if (e.key === 'Enter') editCaseDialog(c); } },
+  return h('li', { onclick: () => editCaseDialog(c), tabindex: '0', onkeydown: e => { if (e.key === 'Enter' && e.target === e.currentTarget) editCaseDialog(c); } },
       h('span', { class: 'd' }, c.date ? fmtDate(c.date).replace(/ \d{4}$/, '') : (c.dateText || '—')),
       h('span', { class: 't' }, p.initials ? [h('b', {}, p.initials), ' '] : null, p.details || (p.initials ? null : h('i', { class: 'muted' }, 'no details'))),
       h('span', { class: 'c' }, catTags(c.cats),
@@ -257,7 +258,10 @@ async function uploadExcel(file) {
     if (rows.exportedAt) {
       const newer = d.deleted.filter(c => Math.max(c.updatedAt || 0, c.createdAt || 0) > rows.exportedAt);
       d.deleted = d.deleted.filter(c => !newer.includes(c));
-      d.kept = newer;
+      // a case edited on the phone after the download: the sheet holds the older text, so keep the edit
+      const edited = d.changed.filter(x => (x.before.updatedAt || 0) > rows.exportedAt);
+      d.changed = d.changed.filter(x => !edited.includes(x));
+      d.kept = [...newer, ...edited.map(x => x.before)];
     }
     previewDiff(d);
   } catch (err) { toast('Could not read the file: ' + err.message); }
@@ -285,7 +289,7 @@ function previewDiff(d, after) {
     section('Already in your logbook (skipped)', already, line, 'info'),
     deleted.length ? h('p', { class: 'tip' }, `${deleted.length} case${deleted.length === 1 ? ' is' : 's are'} missing from the sheet and will be deleted. Check the list below before you apply.`) : null,
     section('Deleted (not in the sheet)', deleted, line, 'warn'),
-    section('Kept (logged after this file was downloaded)', d.kept || [], line, 'info'),
+    section('Kept (logged or edited after this file was downloaded)', d.kept || [], line, 'info'),
     h('div', { class: 'bar', style: 'margin-top:12px' }, h('span', { class: 'grow' }),
       h('button', { onclick: () => m.close() }, 'Cancel'),
       nothing ? null : h('button', { class: 'primary', onclick: async () => {

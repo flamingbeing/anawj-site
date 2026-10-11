@@ -21,12 +21,12 @@ export function paraLines(p) {
   const num = /<w:numPr>/.test(pPr);
   const styleBold = /<w:pStyle w:val="(Heading\d|Title|Strong)"/i.test(pPr);
   const lines = [{ runs: [], imgs: [] }];
-  const body = p.replace(/<w:pPr>[\s\S]*?<\/w:pPr>/, '').replace(/<w:del\b[\s\S]*?<\/w:del>/g, '');
+  const body = p.replace(/<w:pPr>[\s\S]*?<\/w:pPr>/, '').replace(/<w:del\b[\s\S]*?<\/w:del>/g, '').replace(/<w:moveFrom\b[\s\S]*?<\/w:moveFrom>/g, '');
   for (const r of body.match(/<w:r(?=[\s>])[^>]*>[\s\S]*?<\/w:r>/g) || []) {
     const rPr = (r.match(/<w:rPr>[\s\S]*?<\/w:rPr>/) || [''])[0];
     const bold = styleBold || on(rPr, 'b') || /<w:rStyle w:val="Strong"/i.test(rPr);
     const u = on(rPr, 'u');
-    const re = /<w:t(?:\s[^>]*)?>([^<]*)<\/w:t>|<w:tab\/>|<w:br(?:\s[^>]*)?\/>|<w:cr\/>|r:embed="([^"]+)"|<v:imagedata[^>]*r:id="([^"]+)"/g;
+    const re = /<w:t(?:\s[^>]*)?>([^<]*)<\/w:t>|<w:tab\/>|<w:br(?:\s[^>]*)?\/>|<w:cr\/>|<a:blip\b[^>]*?\br:embed="([^"]+)"|<v:imagedata[^>]*r:id="([^"]+)"/g;
     let m;
     while ((m = re.exec(r))) {
       const line = lines[lines.length - 1];
@@ -176,7 +176,20 @@ export function parseInitials(lines) {
   return parts.join(' ').replace(/\s+/g, ' ').trim();
 }
 
-const cellsOf = tr => tr.match(/<w:tc(?:\s[^>]*)?>[\s\S]*?<\/w:tc>/g) || [];
+// The outermost <w:TAG>…</w:TAG> elements in xml, skipping same-named ones nested inside them (a
+// small table of lab results inside a reflection cell has rows and cells of its own).
+export function topLevel(xml, tag) {
+  const re = new RegExp(`<(/?)w:${tag}(?=[\\s>/])[^>]*?(/?)>`, 'g');
+  const out = [];
+  let depth = 0, start = -1, m;
+  while ((m = re.exec(xml))) {
+    if (m[2] === '/') continue;   // self-closing
+    if (!m[1]) { if (depth++ === 0) start = m.index; }
+    else if (depth > 0 && --depth === 0) { out.push(xml.slice(start, m.index + m[0].length)); start = -1; }
+  }
+  return out;
+}
+const cellsOf = tr => topLevel(tr, 'tc');
 
 // One table row -> a reflection draft (or null for an empty / prompt-only row).
 export function parseRow(tr, hd) {
@@ -214,7 +227,7 @@ export function parseDocumentXml(xml) {
     const tbl = xml.slice(a, b);
     const between = xml.slice(last, a);
     last = b;
-    const rows = tbl.match(/<w:tr(?=[\s>])[^>]*>[\s\S]*?<\/w:tr>/g) || [];
+    const rows = topLevel(tbl, 'tr');
     const hIdx = rows.findIndex(tr => /^Patient/i.test(cellLines(cellsOf(tr)[0] || '').map(l => l.text).join(' ').trim()));
     const betweenText = parasOf(between).map(p => paraLines(p).map(l => l.text).join('')).join('').trim();
     let hd = null;

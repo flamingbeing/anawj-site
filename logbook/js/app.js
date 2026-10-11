@@ -53,7 +53,7 @@ const banner = document.getElementById('banner');
 // ---------- tabs and routing (#log, #logbook, ...) ----------
 
 // Totals (names and counts of programme residents) is for the programme only; the rules agree.
-const visibleTabs = () => TABS.filter(t => (!t.admin || S.admin) && (t.id !== 'totals' || S.admin || S.resident));
+const visibleTabs = () => TABS.filter(t => (!t.admin || S.admin) && (t.id !== 'totals' || S.admin || S.pd || S.resident));
 const TAB_ALIASES = { reflections: 'reflect' };
 const tabFromHash = () => {
   const raw = location.hash.replace(/^#/, '');
@@ -82,6 +82,12 @@ function go(id) {
   window.scrollTo(0, 0);
   render();
 }
+// Enter/Space on a span chip with role=button acts like a tap (real buttons and catChip handle their own)
+document.addEventListener('keydown', e => {
+  if (e.defaultPrevented || (e.key !== 'Enter' && e.key !== ' ')) return;
+  const t = e.target;
+  if (t && t.getAttribute && t.getAttribute('role') === 'button' && t.tagName !== 'BUTTON') { e.preventDefault(); t.click(); }
+});
 window.addEventListener('hashchange', () => { const t = tabFromHash(); if (t && t !== S.tab) { S.tab = t; render(); } });
 
 function render() {
@@ -167,7 +173,7 @@ async function onUser(user) {
   if (unwatchRefl) { unwatchRefl(); unwatchRefl = null; }
   S.user = user;
   if (!user) {
-    Object.assign(S, { admin: false, resident: null, logbook: null, cases: [], reflections: [], counts: {}, casesLoaded: false, casesSynced: false, sharedTemplates: [] });
+    Object.assign(S, { admin: false, pd: false, resident: null, logbook: null, cases: [], reflections: [], counts: {}, casesLoaded: false, casesSynced: false, sharedTemplates: [] });
     if (signedInOnce) { clearDrafts(); resetCaches(); applyCompact(false); }   // a shared device starts plain for the next person
     paintWho();
     renderLanding();
@@ -177,15 +183,16 @@ async function onUser(user) {
   paintWho();
   fill(app, h('p', { class: 'empty' }, 'Loading your logbook…'));
   try {
-    const [admin, resident, logbook, shared] = await Promise.all([
+    const [admin, resident, logbook, shared, pd] = await Promise.all([
       cloud.isAdmin(user.email).catch(() => false),
       cloud.myResident(user.email).catch(() => null),
       cloud.loadLogbook(user.email),
       cloud.listSharedTemplates().catch(() => []),
+      cloud.isPD(user.email).catch(() => false),
     ]);
     if (S.user !== user) return; // signed out meanwhile
     reloadFlag('');
-    Object.assign(S, { admin, resident, logbook, sharedTemplates: shared || [] });
+    Object.assign(S, { admin, pd, resident, logbook, sharedTemplates: shared || [] });
     applyCompact(logbook.settings && logbook.settings.compact);   // per-user display setting
     if (!logbook.name && (resident?.name || user.name)) S.logbook.name = resident?.name || user.name;
     // a programme resident's logbook remembers their rid (used by admins and the rules)

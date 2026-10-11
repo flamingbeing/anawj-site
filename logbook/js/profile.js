@@ -55,7 +55,7 @@ export function cleanProfile(p) {
   for (const f of PROFILE_FIELDS) {
     const v = str(src[f.key], f.type === 'long' ? MAX_LONG : MAX_STR);
     if (f.type === 'sex') out[f.key] = v === 'M' || v === 'F' ? v : '';
-    else if (f.type === 'date') out[f.key] = ISO.test(v.trim()) ? v.trim() : '';
+    else if (f.type === 'date') out[f.key] = (ISO.test(v.trim()) && dmyToIso(v.trim())) || '';
     else out[f.key] = v;
   }
   for (const s of SECTIONS) {
@@ -75,22 +75,30 @@ export function isoToDmy(iso) {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || '');
   return m ? `${m[3]}/${m[2]}/${m[1]}` : '';
 }
+const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+// a real calendar date (no 31/02 or month 13)
+const realDate = (y, mo, d) => { const x = new Date(Date.UTC(y, mo - 1, d)); return x.getUTCFullYear() === y && x.getUTCMonth() === mo - 1 && x.getUTCDate() === d; };
+const isoOf = (y, mo, d) => (realDate(y, mo, d) ? `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}` : '');
+// "14/03/1995", "14-3-95", "1995-03-14", "14 March 1995", "14th Mar 95" -> "1995-03-14"; anything else -> ''
 export function dmyToIso(s) {
   const t = String(s || '').trim();
-  if (ISO.test(t)) return t;
-  const m = /^(\d{1,2})\s*[/.-]\s*(\d{1,2})\s*[/.-]\s*(\d{2}|\d{4})$/.exec(t);
-  if (!m) return '';
-  const d = Number(m[1]), mo = Number(m[2]);
-  let y = Number(m[3]);
-  if (m[3].length === 2) y += y > 50 ? 1900 : 2000;
-  if (d < 1 || d > 31 || mo < 1 || mo > 12) return '';
-  return `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  let m;
+  if ((m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(t))) return isoOf(+m[1], +m[2], +m[3]);
+  const year = y => (y.length === 2 ? Number(y) + (Number(y) > 50 ? 1900 : 2000) : Number(y));
+  if ((m = /^(\d{1,2})\s*[/.-]\s*(\d{1,2})\s*[/.-]\s*(\d{2}|\d{4})$/.exec(t))) return isoOf(year(m[3]), +m[2], +m[1]);
+  if ((m = /^(\d{1,2})(?:st|nd|rd|th)?[\s\-/.]*([a-z]{3,9})\.?,?[\s\-/.]*(\d{2}|\d{4})$/i.exec(t))) {
+    const mo = MONTHS.indexOf(m[2].slice(0, 3).toLowerCase()) + 1;
+    return mo ? isoOf(year(m[3]), mo, +m[1]) : '';
+  }
+  return '';
 }
 
 // ---------- locating Section 1 in document.xml (shared by the filler and the reader) ----------
 
 const nrm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-export const xmlText = x => (x.match(/<w:t(?:\s[^>]*)?>[^<]*<\/w:t>/g) || []).map(t => t.replace(/<[^>]+>/g, '')).join('')
+// Text of a run of XML: w:t text, with w:br as a line break and w:tab as a space; deleted and moved-away text left out.
+export const xmlText = x => (x.replace(/<w:(del|moveFrom)\b[\s\S]*?<\/w:\1>/g, '').match(/<w:t(?:\s[^>]*)?>[^<]*<\/w:t>|<w:br\b[^>]*\/>|<w:cr\/>|<w:tab\/>/g) || [])
+  .map(t => (/^<w:(br|cr)\b/.test(t) ? '\n' : t === '<w:tab/>' ? ' ' : t.replace(/<[^>]+>/g, ''))).join('')
   .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');
 export const PARA_RE = /<w:p(?=[\s>])[^>]*>[\s\S]*?<\/w:p>/g;
 export const ROW_RE = /<w:tr(?=[\s>])[^>]*>[\s\S]*?<\/w:tr>/g;

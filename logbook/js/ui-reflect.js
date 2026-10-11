@@ -10,7 +10,7 @@ import { REFLECTION_HEADINGS, REFLECTION_SECTIONS } from './categories.js';
 import { reflectionProgress, reflectionCounts, HEADING_BY_ID, splitDetails, completeProblems, isLegacy, LIMITS, IMAGE_MAX_B64, wordCount, MIN_WORDS, suggestHeadings, moveToHeading } from './reflections.js';
 export { completeProblems };
 import { fmtDate, caseText } from './engine.js';
-import { S, h, toast, cloud, debounce, hooks, rYear, todayISO, confirmBox, add, resetters, scheduleSummary, displayName, byNewest, catName } from './ui-core.js';
+import { S, h, toast, cloud, debounce, hooks, rYear, effectiveIntake, todayISO, confirmBox, add, resetters, scheduleSummary, displayName, byNewest, catName } from './ui-core.js';
 import { renderExportButton, caseRYear } from './portfolio.js';
 
 const DRAFT_KEY = 'apmes-logbook-reflection-draft';
@@ -90,7 +90,7 @@ function showMissing(missing) {
 }
 
 function setJr(r) {
-  const intake = S.resident && (S.resident.intake || Number(String(S.resident.rid || '').slice(0, 4)));
+  const intake = effectiveIntake();
   const y = r.date && intake ? caseRYear(r.date, intake) : null;
   r.jr = y ? y <= 3 : rYear() <= 3;
 }
@@ -246,7 +246,7 @@ function list() {
       'Each reflection is a different patient, under one heading only. Some categories require one case reflection in Junior Residency (JR, R1–R3); when not indicated, at most one case reflection can be done at the JR level per category.'),
     em ? null : h('p', { class: 'hint' }, 'Generative AI use must follow the NUS guidelines on the use of AI tools in academic work.'),
     em ? null : h('div', { class: 'bar' }, renderExportButton(() => (S.reflections || []).filter(r => r.status === 'complete'), displayName,
-      async () => ({ cases: S.cases || [], intake: (S.resident && (S.resident.intake || Number(String(S.resident.rid || '').slice(0, 4)))) || null, rYear: rYear(),
+      async () => ({ cases: S.cases || [], intake: effectiveIntake(), rYear: rYear(),
         profile: (S.logbook && S.logbook.profile) || null,
         images: await loadImagesFor((S.reflections || []).filter(r => r.status === 'complete')) }))),
     null);
@@ -467,6 +467,9 @@ function editor() {
   const legacy = isLegacy(r);
   const status = h('span', { class: 'muted', style: 'font-size:13px' }, r.id ? 'Saved' : 'Not saved yet');
   const persist = async () => {
+    // a debounced save from an earlier render can fire after the editor closed or the reflection
+    // was deleted: it must not reopen the editor or bring the reflection back
+    if (rv.editing !== r) return;
     lsSet({ ...r, restore: true });
     try {
       if (r.source !== 'word') setJr(r);   // Word imports keep the JR written in the document
