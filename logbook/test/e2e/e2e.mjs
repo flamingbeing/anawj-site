@@ -1264,6 +1264,34 @@ async function run(label, ctxOpts) {
     assert(await p.locator('details.an-sec .glance').count() >= 1, 'no glance on the cards');
   });
 
+  await step('analytics: JR credit capped with Paediatrics exception', async () => {
+    await tab('progress');
+    const before = await p.evaluate(async () => {
+      const { S, hooks } = await import('./js/ui-core.js');
+      const before = S.reflections;
+      const fake = (headingId, n, jr = true) => Array.from({ length: n }, (_, i) => ({ id: `jr-test-${headingId}-${jr}-${i}`, headingId, initials: `${headingId}${jr}${i}`, date: '2025-01-03', jr, status: 'complete' }));
+      S.reflections = [...fake('thyroid', 3), ...fake('bariatric', 3), ...fake('paeds', 3), ...fake('paeds', 1, false)];
+      hooks.render();
+      return before;
+    });
+    try {
+      await openAn('Reflections');
+      const card = p.locator('details.an-sec').filter({ has: p.locator('summary .an-t', { hasText: /^Reflections$/ }) });
+      assert(/5 \/ 96 counted/.test(await card.locator('summary').innerText()), 'overall JR count');
+      assert(/0 of .* headings met/.test(await card.locator('summary').innerText()), 'JR-only headings incorrectly met');
+      for (const [name, count, width] of [['Thyroid / Head and neck surgery', '1 / 3', '33%'], ['Bariatric surgery', '1 / 3', '33%'], ['Paediatrics', '3 / 6', '50%']]) {
+        const row = card.locator('ul.prog li').filter({ has: p.locator('.nm', { hasText: name }) });
+        assert(await row.locator('.ct').innerText() === count, `${name} counted`);
+        assert(await row.locator('.meter i').evaluate(el => el.style.width) === width, `${name} bar`);
+        assert(/extra JR.*not counted/.test(await row.innerText()), `${name} explanation`);
+      }
+      assert((await card.locator('.gl-bar').getAttribute('aria-label')).startsWith('5 of 96 reflections counted'), 'overview bar count');
+      await shot('jr-progress');
+    } finally {
+      await p.evaluate(async reflections => { const { S, hooks } = await import('./js/ui-core.js'); S.reflections = reflections; hooks.render(); }, before);
+    }
+  });
+
   await step('reflection from a logged case, complete, progress, export', async () => {
     await tab('logbook'); await lbList();
     await p.locator('ul.cases li button', { hasText: /^Reflect$/ }).first().click();

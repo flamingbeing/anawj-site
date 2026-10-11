@@ -181,8 +181,8 @@ function reflCard() {
   const [rulesBtn, rulesText] = info(h('span', {}, `${p.totals.min} reflections across ${p.headings.length} headings, each at least its minimum. `),
     h('ul', { style: 'margin:4px 0 0;padding-left:18px' },
       h('li', {}, 'Each reflection is a different patient, under one heading only.'),
-      h('li', {}, 'Some headings require one reflection in Junior Residency (JR, R1–R3); otherwise at most one per heading can be at JR level.'),
-      h('li', {}, 'Some headings need at least one of certain types: tap ⓘ by a heading to see them. Sub-types and JR are not counted here, so keep track of them yourself.')));
+      h('li', {}, 'At most one Junior Residency (JR, R1–R3) reflection counts per heading, except Paediatrics, which allows two. Extra JR reflections stay saved but do not add progress.'),
+      h('li', {}, 'Some headings require JR reflections or certain sub-types: tap ⓘ by a heading to see them. These required types remain yours to track.')));
   const rg = reflectionGlance(p.totals.counted, rYear());
   const cohort = cohortNow();
   const glance = h('div', { class: 'glance' }, meterBar(rg), cohort ? strip('Reflections counted', rg.counted, cohort.reflections, rg.total) : null);
@@ -198,7 +198,7 @@ function reflCard() {
     shown.length ? h('ul', { class: 'prog' }, shown.map(x => {
       const st = x.met ? 'done' : x.done ? 'ontrack' : 'none';
       const d = drafts(x.id);
-      // sub-types and JR are the resident's to track: shown as requirements, not counted
+      // Required types remain reminders; excess JR credit is excluded from the bar.
       const [ib, it] = needs(x);
       const extra = [d ? `${d} draft${d === 1 ? '' : 's'}` : '', ...x.issues].filter(Boolean);
       return h('li', {},
