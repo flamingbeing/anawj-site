@@ -390,7 +390,7 @@ function renderStaff(role) {
     .filter(p => !staffFilter || (p.name + ' ' + (p.aliases || []).join(' ')).toLowerCase().includes(staffFilter.toLowerCase()))
     .sort(bySeniority);
 
-  const row = p => h('tr', {},
+  const row = p => h('tr', { 'data-id': p.id, class: staffHighlight === p.id ? 'highlight' : '' },
     h('td', {}, h('input', { value: p.name, onchange: e => { p.name = e.target.value.trim(); save(); } })),
     h('td', {}, h('input', { value: (p.aliases || []).join(', '), placeholder: 'e.g. Tan YW', onchange: e => { p.aliases = splitNameList(e.target.value); save(); } })),
     h('td', {}, select(p.grade, p.role === 'senior' ? SENIOR_GRADES : JUNIOR_GRADES, v => { p.grade = v; if (v === 'Locum' && !p.colour) p.colour = 'purple'; render(); })),
@@ -658,7 +658,6 @@ const pasteText = { leave: '', postcall: '', elsewhere: '', admin: '', notAround
 let unmatched = [];
 let lockEditing = null;
 let settingsEditing = false; // "roomId:lockSenior" while picking a fixed person on the Cases tab
-let dayFilter = '';
 
 function renderDay(part) {
   const cases = part === 'cases';
@@ -671,9 +670,8 @@ function renderDay(part) {
   // fixed senior / junior: a chip, picked from the staff list only (no typing in new names)
   const lockInput = (r, key) => {
     const p = r[key] && person(r[key]);
-    if (p) return h('span', { class: 'name lock-chip', style: colourStyle(p.name), title: p.name },
-      h('span', { class: 'label' }, shortName(p) || p.name),
-      h('span', { class: 'icon del', title: 'Let the roster choose', onclick: () => { r[key] = ''; render(); } }, '×'));
+    if (p) return personChip(p, { class: 'name pchip lock-chip', onclick: e => openPersonBox(e.currentTarget, p, { kind: 'lock', room: r, key }) },
+      h('span', { class: 'icon del', title: 'Let the roster choose', onclick: e => { e.stopPropagation(); r[key] = ''; render(); } }, '×'));
     const id = r.id + ':' + key;
     if (lockEditing !== id) return h('button', { class: 'add-name', title: 'Fix someone to this room', onclick: () => { lockEditing = id; render(); } }, '+');
     const pick = v => {
@@ -715,22 +713,6 @@ function renderDay(part) {
     h('td', {}, lockInput(r, 'lockSenior')),
     h('td', {}, lockInput(r, 'lockJunior')),
   );
-
-  const flist = state.staff
-    .filter(p => !dayFilter || p.name.toLowerCase().includes(dayFilter.toLowerCase()))
-    .sort(bySeniority);
-  const staffRow = p => {
-    const s = dayOf(p.id);
-    return h('tr', { class: (s.status || 'avail') === 'avail' ? '' : 'off' },
-      h('td', {}, p.name),
-      h('td', { class: 'seen' }, p.role === 'senior' ? p.grade : `${p.grade}${p.posting ? ' · ' + postingName(p.posting) : ''}`),
-      h('td', {}, select(s.status || 'avail', STATUSES, v => { s.status = v; s.manual = true; render(); })),
-      h('td', {}, h('input', { class: 'narrow', value: s.leaveTime || '', placeholder: '4pm', title: 'Leaving at, e.g. 4pm or 4-5pm (shown as L-4pm)', onchange: e => { s.leaveTime = e.target.value.trim(); save(); } })),
-      h('td', {}, h('label', { title: 'Liver transplant standby: no complex lists' }, h('input', { type: 'checkbox', checked: s.liverStandby, onchange: e => { s.liverStandby = e.target.checked; s.manualLiver = true; save(); } }), ' (L)'),
-        p.role === 'junior' ? h('label', { title: 'Not around on the previous working day: needs premed cover', style: 'margin-left:8px' }, h('input', { type: 'checkbox', checked: s.notAroundPrev, onchange: e => { s.notAroundPrev = e.target.checked; s.manualAway = true; save(); } }), ' away yesterday') : null),
-      h('td', {}, h('input', { value: s.note || '', placeholder: p.role === 'senior' ? '(AOH 1), -mtg 5pm' : '', onchange: e => { s.note = e.target.value.trim(); save(); } })),
-    );
-  };
 
   const pasteBox = (key, label, hint) => h('div', {},
     h('label', {}, label),
@@ -774,15 +756,6 @@ function renderDay(part) {
         pasteBox('notAround', 'Juniors away on the previous working day', ''),
       ),
       h('div', { class: 'bar', style: 'margin-top:12px' }, h('button', { class: 'primary', onclick: applyPaste }, 'Apply names')),
-    ),
-    !cases && h('section', { class: 'card scroll' },
-      h('div', { class: 'bar' }, h('h2', { class: 'grow' }, 'Staff today'),
-        h('input', { placeholder: 'Filter', value: dayFilter, oninput: e => { dayFilter = e.target.value; const pos = e.target.selectionStart; render(); const i = app.querySelector('input[placeholder="Filter"]'); i.focus(); i.setSelectionRange(pos, pos); } })),
-      state.staff.length
-        ? h('table', {},
-          h('thead', {}, h('tr', {}, ['Name', 'Grade', 'Status', 'Leaves at', '', 'Note on roster'].map(t => h('th', {}, t)))),
-          h('tbody', {}, flist.map(staffRow)))
-        : h('p', { class: 'empty' }, 'Add staff on the Staff tab first.'),
     ),
   );
 }
@@ -1233,7 +1206,8 @@ function startNameDrag(e, src) {
     window.removeEventListener('pointercancel', up);
     if (!ghost) {
       // a click without dragging opens the name's details
-      if (ev.type === 'pointerup' && !src.pool && !src.cover && !src.dup) { clearTimeout(tagTimer); tagTimer = setTimeout(() => openTagEditor(chip, src), 200); }
+      if (ev.type === 'pointerup' && src.pool) { const p = person(src.pool); if (p) openPersonBox(chip, p, { kind: 'view' }); }
+      else if (ev.type === 'pointerup' && !src.cover && !src.dup) { clearTimeout(tagTimer); tagTimer = setTimeout(() => openTagEditor(chip, src), 200); }
       return;
     }
     ghost.remove();
@@ -1343,7 +1317,7 @@ function whereCard(p) {
 
 function closeTagEditor() { document.querySelector('.tag-editor')?.remove(); }
 
-function openTagEditor(chip, src) {
+function openRawEditor(chip, src) {
   closeTagEditor();
   const row = state.roster.rows[src.row];
   const parts = cellParts(row, src.key);
@@ -1421,6 +1395,163 @@ function openTagEditor(chip, src) {
     const away = e => { if (!box.contains(e.target)) { closeTagEditor(); window.removeEventListener('pointerdown', away, true); } };
     window.addEventListener('pointerdown', away, true);
   });
+}
+
+// ---- the person box: one look for a person on every daily tab (Today, Cases, Roster, Premeds) ----
+
+const personOfPart = part => matchName(namesInCell(part)[0] || '', state.staff).person;
+const isAohTag = t => /^AOH\b/i.test(t);
+// tags that belong to the roster cell rather than the person's day
+const CELL_TAGS = TAGS.filter(t => t !== 'L' && t !== 'AOH');
+
+// The day's markers after a short name: (L), (AOH), L-4pm
+function dayMarks(p) {
+  const d = state.day.staff[p.id] || {};
+  return [d.liverStandby ? '(L)' : '', d.aoh ? `(${d.aoh})` : '', d.leaveTime ? `L-${d.leaveTime}` : ''].filter(Boolean).join(' ');
+}
+// The person chip for the daily tabs: short name in their colour, then the day's markers
+function personChip(p, attrs = {}, ...extra) {
+  const marks = dayMarks(p);
+  return h('span', { class: 'name pchip', style: colourStyle(p.name), title: `${p.name} · ${p.grade}`, ...attrs },
+    h('span', { class: 'label' }, shortName(p) || p.name), marks ? h('span', { class: 'marks' }, ' ' + marks) : null, ...extra);
+}
+
+// Write a person's day details (L-, (L), (AOH), comment) into every roster cell they're physically in.
+function syncPersonCells(p) {
+  if (!state.roster || state.roster.date !== state.day.date) return;
+  const d = state.day.staff[p.id] || {};
+  for (const row of state.roster.rows) for (const key of ['senior', 'junior']) {
+    const parts = cellParts(row, key);
+    let changed = false;
+    parts.forEach((part, k) => {
+      if (isCoverPart(part) || personOfPart(part) !== p) return;
+      const cur = parseNamePart(part);
+      const postingL = p.role === 'junior' && p.posting === 'L';
+      const tags = cur.tags.filter(t => !isAohTag(t) && !(t === 'L' && !postingL));
+      if (d.liverStandby && !tags.includes('L')) tags.unshift('L');
+      if (d.aoh) tags.push(d.aoh);
+      const next = buildNamePart({ ...cur, tags, leave: d.leaveTime || '', dash: d.comment || '' });
+      if (next !== part) { parts[k] = next; changed = true; }
+    });
+    if (changed) setCellParts(row, key, parts);
+  }
+}
+
+// Open the Staff tab in edit mode on this person.
+let staffHighlight = null;
+async function goEditStaff(p) {
+  closeTagEditor();
+  state.tab = 'staff';
+  state.staffRole = p.role;
+  staffFilter = '';
+  staffHighlight = p.id;
+  if (!staffEditing()) startStaffEdit(); else render();
+  setTimeout(() => app.querySelector(`tr[data-id="${p.id}"]`)?.scrollIntoView({ block: 'center' }), 50);
+}
+
+// ctx: { kind: 'roster', src } | { kind: 'today' } | { kind: 'lock', room, key } | { kind: 'premed', row, options }
+function openPersonBox(anchor, p, ctx) {
+  closeTagEditor();
+  const d = state.day.staff[p.id] || {};
+  const roster = ctx.kind === 'roster';
+  const rrow = roster ? state.roster.rows[ctx.src.row] : null;
+  const parts = roster ? cellParts(rrow, ctx.src.key) : [];
+  const part = roster ? parts[ctx.src.part] ?? '' : '';
+  const cur = roster ? parseNamePart(part) : { tags: [], leave: '', cover: '', dash: '' };
+  const cover = roster && isCoverPart(part);
+
+  // the person's day (shared by every tab)
+  const leave = h('input', { value: d.leaveTime || (cover ? '' : cur.leave), placeholder: 'e.g. 4pm or 4-5pm' });
+  const liver = h('input', { type: 'checkbox', checked: !!d.liverStandby || (!cover && p.role === 'senior' && cur.tags.includes('L')) });
+  const aoh = h('input', { value: d.aoh || (cover ? '' : cur.tags.find(isAohTag) || ''), placeholder: 'e.g. AOH or AOH 1' });
+  const comment = h('input', { value: d.comment ?? (cover ? '' : cur.dash), placeholder: 'e.g. mtg 3pm' });
+  const away = h('input', { type: 'checkbox', checked: !!d.notAroundPrev });
+  let status = groupOf(d.status);
+  const statusBtns = BOARD.map(([k, label]) => h('button', { class: 'small', 'aria-pressed': String(k === status), onclick: e => {
+    status = k; e.currentTarget.parentNode.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b === e.currentTarget)));
+  } }, label));
+
+  // this roster cell only
+  const on = new Set(cur.tags.filter(t => CELL_TAGS.includes(t)));
+  const other = h('input', { value: cur.tags.filter(t => !TAGS.includes(t) && !/^C$/i.test(t) && !isAohTag(t)).join(', '), placeholder: 'e.g. KIV' });
+  const coverTo = h('input', { value: cur.cover, placeholder: 'e.g. OT13, KROR PACU' });
+  const coveredBox = h('input', { type: 'checkbox', checked: cover });
+  const chips = h('div', { class: 'chips' }, CELL_TAGS.map(t => {
+    const c = h('span', { class: 'chip' + (on.has(t) ? ' on' : ''), onclick: () => { if (on.has(t)) on.delete(t); else on.add(t); c.classList.toggle('on', on.has(t)); } }, t);
+    return c;
+  }));
+  const premedPick = ctx.kind === 'premed' ? select(p.name, ctx.options, () => {}) : null;
+
+  const apply = () => {
+    const rosterNow = state.roster && state.roster.date === state.day.date;
+    if (rosterNow) undoStack.push(JSON.stringify(state.roster.rows));
+    if (roster) {
+      const juniorCell = ctx.src.key === 'junior';
+      const coverText = coverTo.value.trim().replace(/^C-/i, '');
+      const tags = [...CELL_TAGS.filter(t => on.has(t)), ...splitNameList(other.value).filter(t => !/^C$/i.test(t)), ...(juniorCell && coveredBox.checked ? ['C'] : [])];
+      parts[ctx.src.part] = buildNamePart({ name: cur.name, tags, leave: '', cover: coverText, dash: '' });
+      setCellParts(rrow, ctx.src.key, parts);
+      if (juniorCell && !coveredBox.checked) syncCoverEntry(rrow, cur.name, cur.cover, cur.name, coverText);
+    }
+    const s = dayOf(p.id);
+    s.leaveTime = leave.value.trim().replace(/^L-/i, '');
+    if (liver.checked !== !!s.liverStandby) { s.liverStandby = liver.checked; s.manualLiver = true; delete s.autoLiver; }
+    s.aoh = aoh.value.trim().replace(/^\(|\)$/g, '');
+    s.comment = comment.value.trim().replace(/^-\s*/, '');
+    if (p.role === 'junior' && away.checked !== !!s.notAroundPrev) { s.notAroundPrev = away.checked; s.manualAway = true; delete s.autoAway; }
+    if (ctx.kind === 'today' && status !== groupOf(s.status)) { closeTagEditor(); setStatus(p, status); }
+    if (ctx.kind === 'premed' && premedPick.value !== p.name) ctx.setCover(premedPick.value);
+    syncPersonCells(p);
+    closeTagEditor();
+    if (rosterNow) afterRosterEdit(); else render();
+  };
+  const remove = () => {
+    closeTagEditor();
+    if (roster) dropToPool(ctx.src);
+    else if (ctx.kind === 'lock') { ctx.room[ctx.key] = ''; render(); }
+    else if (ctx.kind === 'premed') ctx.setCover('');
+  };
+  const field = (label, el, title) => [h('label', { title: title || '' }, label), el];
+  const box = h('div', { class: 'tag-editor person-box', role: 'dialog', 'aria-label': p.name,
+    onkeydown: e => { if (e.key === 'Escape') closeTagEditor(); if (e.key === 'Enter' && e.target.tagName === 'INPUT') { e.preventDefault(); apply(); } } },
+    h('div', { class: 'where' },
+      h('div', { class: 'bar', style: 'margin:0' },
+        h('div', { class: 'grow' }, h('b', { style: colourStyle(p.name) }, p.name), h('div', { class: 'seen' }, [shortName(p) !== p.name ? shortName(p) : '', p.grade, p.posting ? postingName(p.posting) : ''].filter(Boolean).join(' · '))),
+        h('button', { class: 'small', title: 'Edit their name, short names, grade and so on on the Staff tab', onclick: () => goEditStaff(p) }, 'Edit')),
+      h('ul', {}, (wherePerson(p).length ? wherePerson(p) : ['Not on any list today']).map(t => h('li', {}, t)))),
+    ctx.kind === 'today' ? [h('label', {}, 'Today'), h('div', { class: 'seg status-pick' }, statusBtns)] : null,
+    roster ? [h('label', {}, 'Tags in this room'), chips, ...field('Other tags', other), ...field('Covering (C-)', coverTo, 'Covers another room, e.g. when someone there leaves early'),
+      ctx.src.key === 'junior' ? h('label', { class: 'check', title: 'No junior is physically in this room: this person only covers it ad hoc. Shown as "Name (C)" in red.' }, coveredBox, ' Ad hoc cover here (C), not physically here') : null] : null,
+    ctx.kind === 'premed' ? field('Premed cover', premedPick) : null,
+    h('div', { class: 'seen', style: 'margin-top:6px; font-weight:600' }, 'For the whole day (shows wherever they are)'),
+    ...field('Leaving (L-)', leave),
+    h('label', { class: 'check' }, liver, ' Liver standby (L): no complex lists'),
+    ...field('AOH tag', aoh, 'Shown as (AOH) after their name'),
+    ...field('Comment (also shown in the comments box)', comment),
+    p.role === 'junior' ? h('label', { class: 'check', title: 'Not around on the previous working day: needs premed cover' }, away, ' Away on the previous working day') : null,
+    h('div', { class: 'bar', style: 'margin:8px 0 0' },
+      h('button', { class: 'primary save', onclick: apply }, 'Save'),
+      h('button', { onclick: closeTagEditor }, 'Cancel'),
+      h('span', { class: 'grow' }),
+      ['roster', 'lock', 'premed'].includes(ctx.kind) ? h('button', { onclick: remove, title: ctx.kind === 'lock' ? 'Let the roster choose' : 'Take them off here' }, 'Remove') : null),
+  );
+  document.body.append(box);
+  const rc = anchor.getBoundingClientRect();
+  const w = box.offsetWidth, hgt = box.offsetHeight;
+  box.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, rc.left)) + 'px';
+  box.style.top = (rc.bottom + hgt + 8 < window.innerHeight ? rc.bottom + 4 : Math.max(8, rc.top - hgt - 4)) + 'px';
+  setTimeout(() => {
+    const awayClick = e => { if (!box.contains(e.target)) { closeTagEditor(); window.removeEventListener('pointerdown', awayClick, true); } };
+    window.addEventListener('pointerdown', awayClick, true);
+  });
+}
+
+// A name on the roster: the person box, or (for a name not on the staff list) the plain editor.
+function openTagEditor(chip, src) {
+  const part = cellParts(state.roster.rows[src.row], src.key)[src.part] ?? '';
+  const p = personOfPart(part);
+  if (p) openPersonBox(chip, p, { kind: 'roster', src });
+  else openRawEditor(chip, src);
 }
 
 // Case notes typed on the roster also update the day's room, so flags and checks follow.
@@ -1788,15 +1919,12 @@ function manpowerBoard() {
     .sort(bySeniority);
   const chip = p => {
     const s = state.day.staff[p.id] || {};
-    return h('span', {
-      class: 'name board-chip' + (s.manual ? ' manual' : '') + (p.role === 'senior' ? ' senior' : ''), draggable: TOUCH ? null : 'true', style: colourStyle(p.name),
+    return personChip(p, {
+      class: 'name pchip board-chip' + (s.manual ? ' manual' : '') + (p.role === 'senior' ? ' senior' : ''), draggable: TOUCH ? null : 'true',
       title: `${p.name} · ${p.grade}${s.manual ? ' · set by hand' : s.auto ? ` · ${s.auto}` : ''}${s.status === 'elsewhere' ? ' · elsewhere (calls/clinics)' : ''}`,
       ondragstart: e => { e.dataTransfer.setData('text/plain', p.id); e.dataTransfer.effectAllowed = 'move'; },
-      onclick: async () => {
-        const g = await confirmChanges(p.name, [`Now: ${BOARD.find(b => b[0] === groupOf(s.status))[1]}${s.auto ? ` (${s.auto})` : ''}`], [...BOARD.map(([k, l]) => [k, l, k === groupOf(s.status) ? 'primary' : '']), ['back', 'Cancel']]);
-        if (g !== 'back') setStatus(p, g);
-      },
-    }, shortName(p) || p.name);
+      onclick: e => openPersonBox(e.currentTarget, p, { kind: 'today' }),
+    });
   };
   const col = ([key, label]) => {
     const list = people.filter(p => groupOf(state.day.staff[p.id]?.status) === key);
@@ -1810,7 +1938,7 @@ function manpowerBoard() {
   const manualCount = Object.values(state.day.staff).filter(s => s.manual).length;
   return h('section', { class: 'card' },
     h('h2', {}, 'Manpower'),
-    h('p', { class: 'hint' }, (TOUCH ? 'Tap a name to move them. ' : 'Drag a name to another group, or click it. ')
+    h('p', { class: 'hint' }, (TOUCH ? 'Tap a name to move them or change their day (leaving time, (L), comment). ' : 'Drag a name to another group, or click it to change their day (leaving time, (L), comment). ')
       + (hasMonthly() ? 'Leave, MC and post call come from the Leave, Junior and Senior rosters; anything you move by hand stays (bold border).' : 'Import the monthly rosters to fill leave, MC and post call automatically.')),
     h('div', { class: 'bar' },
       h('div', { class: 'seg', role: 'group', 'aria-label': 'Who' }, [['all', 'Everyone'], ['senior', 'Seniors'], ['junior', 'Juniors']].map(([k, l]) =>
@@ -1846,7 +1974,7 @@ function renderToday() {
     monthlyDayCard(),
     renderGeneral(),
     h('section', { class: 'card' }, h('details', {},
-      h('summary', {}, 'More: paste from the leave sheet, leave times, away yesterday, notes'),
+      h('summary', {}, 'More: load the admin draft, paste names from the leave sheet'),
       renderDay('manpower'))));
 }
 
@@ -2015,11 +2143,16 @@ function renderPremed() {
     if (needs) { needed++; if (!cur) missing++; }
     const options = [['', '— none —'], ...coverers.map(p => [p.name, `${p.name}${homeOf[p.id] ? ' · ' + homeOf[p.id] : ' · not on a list'}${load[p.name] ? ` · ${load[p.name]} room${load[p.name] > 1 ? 's' : ''}` : ''}`])];
     if (cur && !options.some(o => o[0] === cur)) options.push([cur, cur]);
+    const coverP = cur && byName(cur);
     return h('tr', { class: needs && !cur ? 'flagged' : '' },
       h('td', { class: 'room' }, row.label + ':'),
-      h('td', {}, juniors.map((j, k) => [k ? ' / ' : '', h('span', { style: colourStyle(j.part) }, j.part)])),
+      h('td', {}, h('div', { class: 'names' }, juniors.map(j => j.p
+        ? personChip(j.p, { onclick: e => openPersonBox(e.currentTarget, j.p, { kind: 'view' }) })
+        : h('span', { class: 'name', style: colourStyle(j.part) }, j.part)))),
       h('td', { class: 'seen' }, awayNames.length ? `${awayNames.join(', ')} away yesterday${mate && !cur ? ` · ${mate.name} in the same room could cover` : ''}` : ''),
-      h('td', {}, select(cur, options, v => setCover(row, v))));
+      h('td', {}, coverP
+        ? personChip(coverP, { onclick: e => openPersonBox(e.currentTarget, coverP, { kind: 'premed', options, setCover: v => setCover(row, v) }) })
+        : select('', [['', needs ? '+ Add cover (needed)' : '+ Add cover'], ...options.slice(1)], v => setCover(row, v))));
   }).filter(Boolean);
   return h('div', {},
     h('section', { class: 'card' },
@@ -2175,8 +2308,9 @@ function renderRoster() {
 function noListCard() {
   const people = noListPeople();
   const admin = state.staff.filter(p => state.day.staff[p.id]?.status === 'admin');
-  const chip = p => h('span', { class: 'name', style: colourStyle(p.name), title: `${p.name} · ${p.grade}. Drag onto the roster.`,
-    onpointerdown: TOUCH ? null : e => startNameDrag(e, { pool: p.id }) }, shortName(p));
+  const chip = p => personChip(p, { title: `${p.name} · ${p.grade}. Drag onto the roster.`,
+    onpointerdown: TOUCH ? null : e => startNameDrag(e, { pool: p.id }),
+    onclick: TOUCH ? e => openPersonBox(e.currentTarget, p, { kind: 'view' }) : null });
   const group = (title, list) => list.length ? h('div', { class: 'pool-group' }, h('b', {}, title), h('div', { class: 'pool-names' }, list.map(chip))) : null;
   return h('section', { class: 'card pool', 'data-drop': '', 'data-pool': '' },
     h('h2', {}, 'Admin / no list'),
