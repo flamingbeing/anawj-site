@@ -11,14 +11,25 @@
 import { editDistance } from './engine.js';
 
 export const FIELDS = ['initials', 'case', 'tag'];
+// [example, what it does, what a tap in the "?" list puts in the box, where the cursor goes in it]
 export const OPERATOR_HELP = [
-  ['initials:AB', 'only cases with those initials'],
-  ['case:hernia', 'only the case text (not initials, tags or dates)'],
-  ['tag:16  tag:lscs', 'cases with that tag, by code or name (your own tags too)'],
-  ['"lap chole"', 'that exact phrase'],
-  ['-paeds', 'leave out cases with that word (works with the others: -tag:13)'],
-  ['spinal OR epidural', 'either one (spinal | epidural works too)'],
+  ['initials:AB', 'only cases with those initials', 'initials:', 9],
+  ['case:hernia', 'only the case text (not initials, tags or dates)', 'case:', 5],
+  ['tag:16  tag:lscs', 'cases with that tag, by code or name (your own tags too)', 'tag:', 4],
+  ['"lap chole"', 'that exact phrase', '""', 1],
+  ['-paeds', 'leave out cases with that word (works with the others: -tag:13)', '-', 1],
+  ['spinal OR epidural', 'either one (spinal | epidural works too)', 'OR ', 3],
 ];
+
+// the box's text with an operator added at the cursor (a space either side as needed) and where the
+// cursor goes next: { text, caret }
+export function insertOperator(text, caret, insert, at) {
+  text = String(text || ''); caret = Math.max(0, Math.min(text.length, caret ?? text.length));
+  const before = text.slice(0, caret), after = text.slice(caret);
+  const pre = before && !/\s$/.test(before) ? ' ' : '';
+  const post = after && !/^\s/.test(after) ? ' ' : '';
+  return { text: before + pre + insert + post + after, caret: before.length + pre.length + at };
+}
 
 // q -> { groups: [[term, ...], ...], unknown: [{ op, suggest }] }
 // All groups must match; within a group any term may (OR). term: { field: null|'initials'|'case'|'tag', text, phrase, neg }

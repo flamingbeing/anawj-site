@@ -1,6 +1,6 @@
 // Advanced search operators (js/search-ops.js).
 import assert from 'node:assert/strict';
-import { parseQuery, matchQuery } from '../js/search-ops.js';
+import { parseQuery, matchQuery, insertOperator } from '../js/search-ops.js';
 
 const P = q => parseQuery(q).groups.map(g => g.map(t => `${t.neg ? '-' : ''}${t.field ? t.field + ':' : ''}${t.phrase ? `"${t.text}"` : t.text}`).join('|')).join(' ');
 assert.equal(P('lap chole'), 'lap chole');
@@ -35,5 +35,11 @@ assert.equal(M('-spinal'), false);
 assert.equal(M('epidural OR spinal'), true);
 assert.equal(M('epidural OR ga'), false);
 assert.equal(M(''), true);
+
+// tapping an operator in the "?" list
+assert.deepEqual(insertOperator('', 0, 'tag:', 4), { text: 'tag:', caret: 4 });
+assert.deepEqual(insertOperator('spinal', 6, '""', 1), { text: 'spinal ""', caret: 8 });
+assert.deepEqual(insertOperator('spinal GA', 6, '-', 1), { text: 'spinal - GA', caret: 8 });
+assert.deepEqual(insertOperator('spinal ', 7, 'OR ', 3), { text: 'spinal OR ', caret: 10 });
 
 console.log('search operator tests passed');

@@ -6,7 +6,7 @@ import { flagCase } from './importer.js';
 import { exportWorkbook, readSheetGrid } from './xlsxio.js';
 import { cleanExportOpts, exportTables, rangeText, CASE_COLS, REFL_COLS } from './export-opts.js';
 import { inExport } from './reflections.js';
-import { parseQuery, matchQuery, OPERATOR_HELP } from './search-ops.js';
+import { parseQuery, matchQuery, OPERATOR_HELP, insertOperator } from './search-ops.js';
 import { parseCsv } from './tags.js';
 import {
   S, h, toast, debounce, modal, cat, catName, catShort, tagName, catFull, catChip, PICKER_ORDER, settings, patchLogbook, needExcel, download, fileButton, catPills,
@@ -214,7 +214,7 @@ export function renderLogbook() {
     opsNote.hidden = !u.length;
     opsNote.textContent = u.map(x => `“${x.op}” isn’t an operator (searched as text): did you mean ${x.suggest}?`).join(' ');
   };
-  const helpBtn = opsOn() ? h('button', { type: 'button', class: 'small icon-btn', title: 'Search operators', 'aria-label': 'Search operators', onclick: opsHelp }, '?') : null;
+  const helpBtn = opsOn() ? h('button', { type: 'button', class: 'small icon-btn', title: 'Search operators', 'aria-label': 'Search operators', onclick: () => opsHelp(searchBox, v => { view.q = v; searchWrap.classList.toggle('has-text', !!v); paintOpsNote(); refresh(); }) }, '?') : null;
   paintFilterBtn(); repaintFilters(); paintSaved(); paintOpsNote();
   add(wrap, h('section', { class: 'card' },
     h('div', { class: 'bar' },
@@ -453,11 +453,19 @@ function pasteRows() {
 }
 
 // The operators, from the "?" by the search box (Advanced search on)
-function opsHelp() {
+// The operators, from the "?" by the search box (Advanced search on). Tap one to add it to the box.
+function opsHelp(box, onchange) {
+  const caret = box.selectionStart ?? box.value.length;
   const m = modal('Search operators', [
-    h('table', { class: 'ops-help' }, OPERATOR_HELP.map(([op, what]) => h('tr', {}, h('td', {}, h('code', {}, op)), h('td', {}, what)))),
+    h('p', { class: 'hint', style: 'margin:0 0 6px' }, 'Tap one to add it to the search box.'),
+    h('div', { class: 'ops-pick' }, OPERATOR_HELP.map(([op, what, insert, at]) => h('button', { type: 'button', class: 'ops-row', onclick: () => {
+      const r = insertOperator(box.value, caret, insert, at);
+      m.close();
+      box.value = r.text; onchange(r.text);
+      box.focus(); box.setSelectionRange(r.caret, r.caret);
+    } }, h('code', {}, op), h('span', {}, what)))),
     h('p', { class: 'hint' }, 'Combine them: tag:16 -GA "under spinal". Plain words, dates (“last week”), Search in and fuzzy work as usual. Turn operators off in Settings → Logging.'),
-    h('div', { class: 'bar' }, h('span', { class: 'grow' }), h('button', { class: 'primary', onclick: () => m.close() }, 'OK'))]);
+    h('div', { class: 'bar' }, h('span', { class: 'grow' }), h('button', { onclick: () => m.close() }, 'Close'))]);
 }
 
 // ---------- Excel ----------

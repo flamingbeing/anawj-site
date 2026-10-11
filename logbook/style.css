@@ -908,3 +908,7 @@ details.an-sec[open] > summary .an-t::after { content: ' ⌄'; }
 .ops-help td { padding: 6px 8px 6px 0; vertical-align: top; border-top: 1px solid var(--line); }
 .ops-help code, .ops-list code { white-space: nowrap; }
 .ops-list { margin: 0; padding-left: 18px; }
+.ops-pick { display: flex; flex-direction: column; gap: 6px; }
+.ops-pick .ops-row { display: grid; grid-template-columns: minmax(120px, auto) 1fr; gap: 10px; align-items: center; text-align: left; min-height: 48px; padding: 8px 10px; font-weight: 400; }
+.ops-pick .ops-row code { white-space: nowrap; font-size: 14px; }
+.ops-pick .ops-row span { font-size: 14px; color: var(--muted); }
