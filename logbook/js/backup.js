@@ -57,7 +57,7 @@ async function restoreBackup(file) {
         m.close();
         try {
           if (cases.length) await saveMany(cases);
-          for (const img of images) await cloud.saveImage(mine(), img);
+          if (S.resident) for (const img of images) await cloud.saveImage(mine(), img);   // photos: programme residents only (rules)
           for (const r of refl) await cloud.saveReflection(mine(), r);
           if (newTpl.length) await patchLogbook({ templates: [...((S.logbook && S.logbook.templates) || []), ...newTpl] });
           toast(`Restored ${cases.length} cases, ${refl.length} reflections`);
