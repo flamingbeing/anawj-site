@@ -73,10 +73,12 @@ main { padding: 16px; max-width: 980px; margin: 0 auto; padding-bottom: calc(32p
   .tabs button[aria-selected="true"] { border-top-color: var(--accent); border-bottom: 0; color: var(--accent); }
   .tabs .ico { display: block; width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
   .tabs .lbl { overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-  /* typing (keyboard open): the tab bar and the sticky Save bar would cover the suggestions */
-  body.typing { --tabbar-h: 0px; }
-  body.typing .tabs { display: none; }
+  /* typing (keyboard open): the tab bar sits on the keyboard (--kb, set in app.js); the sticky Save
+     bar unsticks so it doesn't cover the suggestions */
+  body.typing .tabs { transform: translateY(calc(-1 * var(--kb, 0px))); padding-bottom: 0; }
   body.typing .actions { position: static; background: none; }
+  /* a focused field scrolls clear of the tab bar riding on the keyboard */
+  html:has(body.typing) { scroll-padding-bottom: calc(var(--tabbar-h) + 12px); }
   /* suggestion chips: keep names short so several fit on a line */
   .chip .nm { max-width: 12em; }
 }
@@ -399,7 +401,6 @@ body.compact th, body.compact td { padding: 4px 6px; }
 body.compact dialog { padding: 12px; }
 @media (max-width: 600px) {
   body.compact { --tabbar-h: 47px; } /* 46px buttons + 1px border */
-  body.compact.typing { --tabbar-h: 0px; }
   body.compact .top { padding: 6px 12px 4px; padding-top: max(8px, calc(env(safe-area-inset-top, 0px) + 5px)); }
   body.compact main { padding: 6px 8px; padding-bottom: calc(16px + var(--tabbar-h) + var(--safe-b)); }
   body.compact .tabs button { height: var(--tabbar-h); min-height: 0; padding: 2px; font-size: 10px; gap: 0; }
