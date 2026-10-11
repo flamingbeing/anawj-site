@@ -45,11 +45,34 @@ async function syncHidden(announce = null) {
   } catch (err) { if (announce) toast('Could not update Totals: ' + err.message); }
 }
 
+// The change to a resident for picking year `v` ('1'…'5' or 'SMO').
+export function yearPatch(r, v) {
+  const leaving = r.status === 'SMO' ? { status: 'ACTIVE', smo: residentSmo(r) || null } : {};
+  if (v === 'SMO') return { status: 'SMO', intake: effectiveIntake(r) || null, rYear: null, smo: Number(r.smo) || null };
+  const n = Number(v), ay = academicYear(), smo = residentSmo(r), base = baseIntake(r);
+  const raw = base ? ay - base + 1 : 0;
+  // back from SMO into the senior years: count the SMO years, keep the intake
+  if (smo && n >= 4 && base && raw - n >= 0) return { ...leaving, intake: base, rYear: null, smo: raw - n || null };
+  return { ...leaving, intake: ay - n + 1, rYear: null, smo: null };
+}
+
+// A year fixed by hand (rYear, from before years moved up on their own, or set in evals) becomes the
+// intake it implies, so it moves up every 1 July like everyone else's. Shows the same year today.
+async function unfixYears() {
+  const fixed = A.residents.filter(x => x.rYear && x.status !== 'SMO');
+  for (const r of fixed) {
+    try { const patch = { intake: effectiveIntake(r), rYear: null }; await cloud.saveResident({ ...r, ...patch }); Object.assign(r, patch); }
+    catch (err) { console.warn('year not moved to intake', r.rid, err); }
+  }
+  if (fixed.length && S.tab === 'admin' && !A.editRes) hooks.render();
+}
+
 async function load() {
   A.loading = true;
   try {
     [A.residents, A.shared] = await Promise.all([cloud.listResidents(), cloud.listSharedTemplates()]);
     syncHidden();
+    unfixYears();
   } catch (err) { A.residents = []; A.shared = []; toast('Could not load: ' + err.message); }
   A.loading = false;
   if (S.tab === 'admin') hooks.render();
@@ -99,7 +122,7 @@ function residentsCard() {
   const card = h('section', { class: 'card' },
     h('div', { class: 'bar' }, h('h2', { style: 'margin:0' }, 'Residents'), h('span', { class: 'grow' }),
       A.residents ? h('button', { class: A.editRes ? 'small primary' : 'small', onclick: () => { A.editRes = !A.editRes; if (!A.editRes) A.pasted = null; hooks.render(); } }, A.editRes ? 'Done' : 'Edit') : null),
-    h('p', { class: 'hint' }, 'Programme residents share their case counts on the Totals tab. Year defaults from the intake (AY starts 1 July). Tap Edit to set it by hand (leave, repeats) or to mark someone as an SMO: cases done as an SMO count as R3 in the portfolio. Attrited residents are left off Totals (their logbook is kept); set them back to Active to show them again.'));
+    h('p', { class: 'hint' }, 'Programme residents share their case counts on the Totals tab. Years move up every 1 July from the intake. Tap Edit to change one (leave, repeats; it keeps moving up from there) or to mark someone as an SMO, which stays put: cases done as an SMO count as R3 in the portfolio. Attrited residents are left off Totals (their logbook is kept); set them back to Active to show them again.'));
   if (!A.residents) { add(card, h('p', { class: 'empty' }, 'Loading…')); return card; }
   const ed = A.editRes;
   // apply a change and save it; a refused save puts the old values back
@@ -109,28 +132,20 @@ function residentsCard() {
     try { await cloud.saveResident(r); toast('Saved ' + (r.name || r.rid)); }
     catch (err) { Object.keys(r).forEach(k => delete r[k]); Object.assign(r, prev); toast('Could not save: ' + err.message); hooks.render(); }
   };
-  const yearLabel = r => residentYearName(r) + (r.rYear && r.status !== 'SMO' ? ' (set)' : '');
-  // Year: Auto, R1…SR2 or SMO. SMO sets the status; the years spent as one are kept (smo) so their
-  // cases stay in the R3 column after moving on to SR1.
-  const setYear = (r, v) => {
-    const leaving = r.status === 'SMO' ? { status: 'ACTIVE', smo: residentSmo(r) || null } : {};
-    if (v === 'SMO') return edit(r, { status: 'SMO', intake: effectiveIntake(r) || null, rYear: null, smo: Number(r.smo) || null });
-    if (!v) return edit(r, { ...leaving, rYear: null });
-    const n = Number(v), smo = residentSmo(r), base = baseIntake(r);
-    const raw = base ? academicYear() - base + 1 : 0;
-    // back from SMO into the senior years: count the SMO years instead of fixing the year
-    if (smo && n >= 4 && base && raw - n >= 0) return edit(r, { ...leaving, intake: base, rYear: null, smo: raw - n || null });
-    return edit(r, { ...leaving, rYear: n, smo: null });
-  };
+  const yearLabel = r => residentYearName(r);
+  // Year: R1…SR2 or SMO. Years move up every 1 July: picking one sets the intake it implies (leave,
+  // repeats). SMO sets the status and stays put; the years spent as one are kept (smo) so their cases
+  // stay in the R3 column after moving on to SR1.
+  const setYear = (r, v) => edit(r, yearPatch(r, v));
   const row = r => ed ? h('tr', {},
       h('td', {}, r.rid),
       h('td', {}, h('input', { value: r.name || '', style: 'min-width:150px', onchange: e => { edit(r, { name: e.target.value.trim() }); } })),
       h('td', {}, h('input', { type: 'email', value: r.email || '', style: 'min-width:200px', onchange: e => { edit(r, { email: e.target.value.trim().toLowerCase() }); } })),
       h('td', {}, h('input', { type: 'number', value: r.intake || '', style: 'width:90px', onchange: e => { edit(r, { intake: Number(e.target.value) || null }); } })),
-      // "Auto" moves up each 1 July from the intake; a set year stays until changed (leave, repeats)
+      // moves up each 1 July; SMO stays put
       h('td', {}, h('select', { 'aria-label': `Year for ${r.name || r.rid}`, onchange: e => { setYear(r, e.target.value); hooks.render(); } },
-        h('option', { value: '', selected: !r.rYear && r.status !== 'SMO' }, `Auto (${yearName(residentYear({ intake: r.intake, smo: r.smo }) || 1)})`),
-        YEAR_NAMES.map((y, i) => h('option', { value: String(i + 1), selected: r.status !== 'SMO' && r.rYear === i + 1 }, y)),
+        residentYear(r) ? null : h('option', { value: '', selected: true }, '?'),
+        YEAR_NAMES.map((y, i) => h('option', { value: String(i + 1), selected: r.status !== 'SMO' && residentYear(r) === i + 1 }, y)),
         h('option', { value: 'SMO', selected: r.status === 'SMO' }, 'SMO (counts as R3)'))),
       h('td', {}, h('select', { onchange: e => {
         const v = e.target.value, was = r.status;
@@ -185,7 +200,7 @@ function residentsCard() {
     add(card, h('p', {}, `${rows.length} residents (${rows.filter(r => !known.has(r.rid)).length} new).`),
       h('div', { class: 'scroll' }, h('table', {}, h('thead', {}, h('tr', {}, ['ID', 'Name', 'Email', 'Intake', 'Year', 'Status'].map(t => h('th', {}, t)))),
         h('tbody', {}, rows.map(r => h('tr', {}, h('td', {}, r.rid), h('td', {}, r.name), h('td', {}, r.email), h('td', {}, String(r.intake || '')),
-          h('td', {}, residentYearName(r) + (r.rYear ? '' : ' (auto)')),
+          h('td', {}, residentYearName(r)),
           h('td', {}, r.status, r.badStatus ? h('span', { class: 'flag err', title: 'Not a known status; saved as ACTIVE' }, ` was “${r.badStatus}”`) : null)))))),
       bad.length ? h('p', { class: 'tip' }, `${bad.length} unknown status${bad.length === 1 ? '' : 'es'} will be saved as ACTIVE (allowed: ${STATUSES.join(', ')}). Change them in the table after saving.`) : null,
       h('div', { class: 'bar', style: 'margin-top:8px' },

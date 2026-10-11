@@ -60,7 +60,12 @@ export function effectiveIntake(r = S.resident) {
   if (!r.rYear || r.status === 'SMO') return intake;
   return academicYear() - Number(r.rYear) + 1;
 }
-export const rYear = () => residentYear(S.resident) || Number(settings().rYear) || 1;
+// not on the programme list: the year picked in Settings, moved up each 1 July since it was picked
+const settingsYear = () => {
+  const st = settings(), y = Number(st.rYear) || 1;
+  return st.rYearAY ? Math.min(5, Math.max(1, y + academicYear() - Number(st.rYearAY))) : y;
+};
+export const rYear = () => residentYear(S.resident) || settingsYear();
 // what to call the signed-in resident's year in the app: "SR1", "SMO"
 export const myYearName = () => (S.resident && S.resident.status === 'SMO' ? 'SMO' : yearName(rYear()));
 export const displayName = () => (S.logbook && S.logbook.name) || (S.resident && S.resident.name) || (S.user && S.user.name) || '';

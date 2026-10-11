@@ -2,7 +2,7 @@
 // "You" and sign-out cards (youCard, signOutCard), used by ui-account.js.
 
 import { YEAR_NAMES } from './categories.js';
-import { sortCodes, uid } from './engine.js';
+import { sortCodes, uid, academicYear } from './engine.js';
 import { openBin } from './bin.js';
 import { S, h, toast, modal, confirmBox, cloud, catChip, catName, PICKER_ORDER, settings, patchLogbook, displayName, hooks, rYear, myYearName, fill } from './ui-core.js';
 import { pickDialog } from './ui-log.js';
@@ -68,7 +68,7 @@ export function renderSettings() {
     S.resident ? null : h('section', { class: 'card' },
       h('h2', {}, 'Residency year'),
       h('label', { class: 'field' }, 'Year used for the targets on Progress',
-        h('select', { onchange: e => patchLogbook({ settings: { rYear: Number(e.target.value) } }).then(() => toast('Saved')) },
+        h('select', { onchange: e => patchLogbook({ settings: { rYear: Number(e.target.value), rYearAY: academicYear() } }).then(() => toast('Saved')) },
           YEAR_NAMES.map((r, i) => h('option', { value: String(i + 1), selected: i + 1 === rYear() }, r)))),
       h('p', { class: 'hint', style: 'margin:4px 0 0' }, 'Programme residents get their year from the programme list automatically. If you are an APMES resident, ask the programme admins to add your email.')),
 
