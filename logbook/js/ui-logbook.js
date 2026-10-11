@@ -114,12 +114,19 @@ export function renderLogbook() {
     h('div', { class: 'bar', style: 'margin:0' },
       h('button', { class: 'small', onclick: saveSearch }, '☆ Save this search'),
       bulkBtn,
+      // everything back to how it starts: search text, tag and date filters, search options
       h('button', { class: 'small linkish', onclick: () => {
         Object.assign(view, { q: '', has: [], not: [], from: '', to: '', flag: '' });
-        const box = wrap.querySelector('input[type=search]'); if (box) box.value = '';
+        setBox('');
         filters.querySelectorAll('input[type=date]').forEach(i => { i.value = ''; });
+        setOpts('all', false);
         refresh();
-      } }, 'Clear')));
+      } }, 'Reset')));
+  // "Search in" and fuzzy are kept with your account; a saved search can set them too
+  function setOpts(scope, fuzzy) {
+    if ((settings().lbScope || 'all') !== scope || !!settings().lbFuzzy !== fuzzy) patchLogbook({ settings: { lbScope: scope, lbFuzzy: fuzzy } });
+    searchIn.value = scope; fuzzyBox.querySelector('input').checked = fuzzy;
+  }
   const repaintFilters = () => {
     fill(hasRow, ...chipsOf(view.has), tagSel('+ Add tag', view.has));
     fill(notRow, ...chipsOf(view.not), tagSel('+ Add tag', view.not));
@@ -128,9 +135,10 @@ export function renderLogbook() {
   const savedRow = h('div', { class: 'chips lb-saved' });
   const paintSaved = () => {
     const list = settings().savedSearches || [];
-    fill(savedRow, ...list.map(x => h('span', { class: 'chip tmpl', role: 'button', tabindex: '0', title: 'Run this search', onclick: () => {
+    fill(savedRow, ...list.map(x => h('span', { class: 'chip tmpl', role: 'button', tabindex: '0', title: 'Run this search' + (x.q ? `: “${x.q}”` : ''), onclick: () => {
       Object.assign(view, { q: x.q || '', has: [...(x.has || [])], not: [...(x.not || [])], from: x.from || '', to: x.to || '', flag: x.flag || '' });
-      const box = wrap.querySelector('input[type=search]'); if (box) box.value = view.q;
+      setBox(view.q);
+      if (x.scope) setOpts(x.scope, !!x.fuzzy);
       const [f, t] = filters.querySelectorAll('input[type=date]'); if (f) f.value = view.from; if (t) t.value = view.to;
       filters.hidden = false; refresh();
     } }, '★ ' + x.name, h('span', { class: 'x', role: 'button', tabindex: '0', 'aria-label': 'Delete saved search', onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); e.target.click(); } }, onclick: async e => {
@@ -144,7 +152,7 @@ export function renderLogbook() {
     const name = (prompt('Name this search', view.q.trim() || view.has.map(keyName).join(' + ') || 'My search') || '').trim().slice(0, 40);
     if (!name) return;
     const list = settings().savedSearches || [];
-    const x = { id: Math.random().toString(36).slice(2, 8), name, q: view.q, has: [...view.has], not: [...view.not], from: view.from, to: view.to, flag: view.flag };
+    const x = { id: Math.random().toString(36).slice(2, 8), name, q: view.q, has: [...view.has], not: [...view.not], from: view.from, to: view.to, flag: view.flag, scope: settings().lbScope || 'all', fuzzy: !!settings().lbFuzzy };
     await patchLogbook({ settings: { savedSearches: [...list, x].slice(-20) } });
     paintSaved(); toast(`Saved “${name}”`);
   }
@@ -157,10 +165,16 @@ export function renderLogbook() {
     const n = view.has.length + view.not.length + (view.from || view.to ? 1 : 0) + (view.flag ? 1 : 0) + ((settings().lbScope || 'all') !== 'all' ? 1 : 0) + (settings().lbFuzzy ? 1 : 0);
     filterBtn.textContent = n ? `Filter (${n})` : 'Filter'; filterBtn.classList.toggle('primary', !!n);
   };
+  // the search box, with its own × that empties just the box (filters stay)
+  const searchBox = h('input', { type: 'search', placeholder: 'Search: initials, procedure, “last Tuesday”, “this week”', value: view.q, 'aria-label': 'Search cases',
+    oninput: e => { view.q = e.target.value; searchWrap.classList.toggle('has-text', !!view.q); paintSoon(); } });
+  const searchWrap = h('div', { class: 'search-wrap grow' + (view.q ? ' has-text' : '') }, searchBox,
+    h('button', { type: 'button', class: 'search-x', title: 'Clear the search', 'aria-label': 'Clear the search', onclick: () => { view.q = ''; setBox(''); searchBox.focus(); refresh(); } }, '×'));
+  function setBox(v) { searchBox.value = v; searchWrap.classList.toggle('has-text', !!v); }
   paintFilterBtn(); repaintFilters(); paintSaved();
   add(wrap, h('section', { class: 'card' },
     h('div', { class: 'bar' },
-      h('input', { type: 'search', class: 'grow', placeholder: 'Search: initials, procedure, “last Tuesday”, “this week”', value: view.q, 'aria-label': 'Search cases', oninput: e => { view.q = e.target.value; paintSoon(); } }),
+      searchWrap,
       filterBtn),
     savedRow,
     filters,

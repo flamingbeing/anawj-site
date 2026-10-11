@@ -861,3 +861,9 @@ details.an-sec[open] > summary .an-t::after { content: ' ⌄'; }
 .refl-actions { display: flex; gap: 8px; flex-wrap: nowrap; max-width: 100%; }
 .refl-actions > button { white-space: nowrap; }
 .refl-actions > button.primary { min-width: 0; }
+/* logbook search box with its own × (the browser's own clear button is hidden so there's only one) */
+.search-wrap { position: relative; min-width: 0; }
+.search-wrap input[type=search] { width: 100%; padding-right: 44px; }
+.search-wrap input[type=search]::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
+.search-wrap .search-x { display: none; position: absolute; right: 2px; top: 50%; transform: translateY(-50%); min-height: 40px; min-width: 40px; padding: 0; border: 0; background: none; font-size: 22px; line-height: 1; color: var(--muted); }
+.search-wrap.has-text .search-x { display: block; }
