@@ -998,6 +998,35 @@ async function run(label, ctxOpts) {
     return `today=${nToday}, backup ${data.cases.length} cases`;
   });
 
+  await step('markdown: format in Settings, Copy uses it, notes zip', async () => {
+    await tab('sharefmt');
+    assert(/^\[\[\d{4}-\d{2}-\d{2}\]\]\n1\./.test(await p.locator('pre.fmt-preview').first().innerText()), 'default preview');
+    await p.locator('select[aria-label="Tags ({{categories}})"]').selectOption('tags');
+    await p.locator('textarea[aria-label="Each case in a day"]').fill('- {{initials}} {{details}} {{categories}}');
+    await nap(100);
+    assert(/^- AB 34F LSCS spinal #/m.test(await p.locator('pre.fmt-preview').first().innerText()) || /^- \S+/m.test(await p.locator('pre.fmt-preview').first().innerText()), 'live preview');
+    await p.locator('main button.primary', { hasText: 'Save' }).click(); await nap(300);
+    const md = await p.evaluate(() => JSON.parse(localStorage.getItem('apmes-logbook-demo-v1')).logbooks['demo@example.com'].doc.settings.markdown);
+    assert(md && md.cats === 'tags' && Object.keys(md).length === 2, 'saved only the changes: ' + JSON.stringify(md));
+    const txt = await p.evaluate(async () => { const m = await import('/logbook/js/share.js'); const { S } = await import('/logbook/js/ui-core.js'); return m.dayText(S.cases[0].date); });
+    assert(/^\[\[\d{4}-\d{2}-\d{2}\]\]\n- /.test(txt) && /#\S/.test(txt), 'copy uses the format: ' + txt.slice(0, 120));
+    // the notes zip
+    await tab('data');
+    await p.locator('button', { hasText: 'Download for notes apps' }).click();
+    assert(/keep them private/i.test(await p.locator('dialog[open]').innerText()), 'privacy line');
+    const [dl] = await Promise.all([p.waitForEvent('download'), p.locator('dialog[open] button.primary', { hasText: 'Download' }).click()]);
+    const zip = await JSZip.loadAsync(fs.readFileSync(await dl.path()));
+    const names = Object.keys(zip.files).filter(n => !zip.files[n].dir);
+    assert(names.includes('Progress.md') && names.some(n => /^Cases\/\d{4}-\d{2}\.md$/.test(n)) && names.some(n => /^Reflections\/.+\.md$/.test(n)), 'zip files: ' + names.slice(0, 8).join(', '));
+    const prog = await zip.file('Progress.md').async('string');
+    assert(/\| Lower Segment Caesarean Section \| \d+ \|/.test(prog), 'Progress.md: ' + prog.slice(0, 200));
+    // back to the default for the steps that follow
+    await tab('sharefmt');
+    await p.locator('main button', { hasText: 'Reset to default' }).click();
+    await p.locator('dialog[open] button.primary', { hasText: 'Reset' }).click(); await nap(300);
+    return `${names.length} files`;
+  });
+
   await step('logbook: search, edit, delete, undo', async () => {
     await tab('logbook'); await lbList();
     await shot('logbook');

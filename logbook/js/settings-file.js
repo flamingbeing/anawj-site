@@ -1,10 +1,11 @@
 // Settings export / import (Settings → Settings file): your preferences, tag set, shorthand, tag groups,
-// copy & share format, Excel choices and saved searches as one small JSON file, to move them to another
+// Markdown format, Excel choices and saved searches as one small JSON file, to move them to another
 // account or share a setup with a colleague. Never cases, reflections or portfolio details. Pure, tested.
 
 import { cleanTagSet } from './tags.js';
 import { cleanTemplate } from './demo-backend.js';
 import { cleanFormat } from './share-format.js';
+import { storedMarkdown } from './markdown.js';
 import { cleanExportOpts } from './export-opts.js';
 
 export const SETTINGS_KIND = 'apmes-logbook-settings';
@@ -17,6 +18,7 @@ const strs = v => (Array.isArray(v) ? v.filter(x => typeof x === 'string').map(x
 const OBJECTS = {
   tagSet: v => (v == null ? null : cleanTagSet(v)),
   shareFormat: v => cleanFormat(v),
+  markdown: v => { try { return storedMarkdown(v); } catch { return null; } },
   excelExport: v => cleanExportOpts(v),
   catOrder: strs,
   subcats: v => (v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).slice(0, 100).map(([k, x]) => [String(k).slice(0, 10), strs(x)])) : {}),

@@ -387,7 +387,7 @@ function calendarView(rows, flagsOf, repaint) {
           // log on this day: the Log page opens with the date already picked
           h('button', { class: 'small primary', onclick: () => logOnDate(view.day) }, '+ Log a case'),
           dayCases.length ? h('button', { class: 'small', onclick: () => shareText(dayText(view.day, dayCases)) }, 'Share day') : null,
-          dayCases.length ? h('button', { class: 'small', title: 'Copy this day (format in Settings → Copy & share)', 'aria-label': 'Copy this day', onclick: () => copyText(dayText(view.day, dayCases), 'Day copied: paste it into your notes') }, 'Copy') : null)),
+          dayCases.length ? h('button', { class: 'small', title: 'Copy this day (format in Settings → Markdown)', 'aria-label': 'Copy this day', onclick: () => copyText(dayText(view.day, dayCases), 'Day copied: paste it into your notes') }, 'Copy') : null)),
       dayCases.length ? h('ul', { class: 'cases' }, dayCases.map(c => caseRow(c, flagsOf))) : h('p', { class: 'empty' }, 'No cases on this day.'))
       : h('p', { class: 'hint help', style: 'margin-top:10px' }, 'Tap a day to see its cases.'),
     undated.length ? h('details', { style: 'margin-top:12px' },

@@ -8,7 +8,7 @@ import { MAX_TAGS, tagLinks as tagLinksIn, learnShorthand, cleanShorthand, short
 import { pickDialog } from './ui-log.js';
 import { OPERATOR_HELP } from './search-ops.js';
 import { PRESETS, DEFAULT_ACCENT, cleanAccent, schemeCss, lightPalette } from './colors.js';
-import { DEFAULT_FORMAT, PLACEHOLDERS, cleanFormat, formatCase, formatDay } from './share-format.js';
+import { cleanMarkdown, storedMarkdown, mdCase, mdDay, reflectionPath, reflectionNote, CASE_FILLINS, REFL_FILLINS, FM_FIELDS } from './markdown.js';
 import { PHOTO_BUDGET_KB, PHOTO_NOTE, photoUsageKb, fmtMb } from './reflections.js';
 
 // Compact mode (S.logbook.settings.compact): body.compact (style.css, "compact mode" block). Cached in
@@ -113,37 +113,80 @@ function accentPicker() {
 }
 export const START_TABS = [['log', 'Log'], ['logbook', 'Logbook'], ['reflect', 'Reflections'], ['progress', 'Analytics']];
 
-// ---------- Copy & share format (Logbook: Copy on a case or a day, Share day) ----------
+// ---------- Markdown (Logbook: Copy on a case or a day, Share day; the notes export) ----------
 
 // a made-up day to preview with (never real cases: the page may be shown to others)
-const SAMPLE = [{ date: '2026-10-10', initials: 'AB', details: '34F LSCS under spinal' }, { date: '2026-10-10', initials: 'CD', details: '72M TKR, adductor canal block' }];
-export function renderShareFormat() {
-  const f = cleanFormat(settings().shareFormat);
-  const field = (k, label, rows) => h('textarea', { rows, 'aria-label': label, 'data-k': k, spellcheck: 'false', style: 'font-family:ui-monospace,Menlo,Consolas,monospace;font-size:15px', oninput: () => paint() }, f[k]);
-  const head = field('dayHead', 'Day heading', 1), each = field('dayCase', 'Each case in a day', 3), one = field('oneCase', 'One case', 3);
-  const dayOut = h('pre', { class: 'fmt-preview' }), oneOut = h('pre', { class: 'fmt-preview' });
-  const now = () => ({ dayHead: head.value, dayCase: each.value, oneCase: one.value });
-  const paint = () => { dayOut.textContent = formatDay(SAMPLE[0].date, SAMPLE, now()); oneOut.textContent = formatCase(SAMPLE[0], now()); };
-  const save = async () => { await patchLogbook({ settings: { shareFormat: cleanFormat(now()) } }); toast('Saved'); };
-  const reset = async () => {
-    if (!(await confirmBox('Reset the format', 'Go back to the default copy and share format?', 'Reset'))) return;
-    await patchLogbook({ settings: { shareFormat: null } }); hooks.render();
+const SAMPLE = [{ id: 's1', date: '2026-10-10', initials: 'AB', details: '34F LSCS under spinal', cats: ['16', '17', '28'], createdAt: 1 }, { id: 's2', date: '2026-10-10', initials: 'CD', details: '72M TKR, adductor canal block', cats: ['18', '26'], createdAt: 2 }];
+const SAMPLE_REFL = { id: 'sr', headingId: 'lscs', initials: 'AB', date: '2026-10-10', diagnosis: 'LSCS under spinal', title: 'High spinal block', status: 'complete', summary: 'Made-up example: a high block after the spinal.', points: [{ heading: 'Recognising it early', text: 'Hand weakness and bradycardia came first.' }], figures: [], references: ['Made-up reference. 2026.'] };
+// Settings → Markdown: one format for Copy / Share (Logbook tab) and the notes export (More → Export / Import),
+// saved as settings.markdown (only what differs from the default; markdown.js). Previews use your own latest
+// case, day and reflection, so you see what you'll get.
+export function renderMarkdownSettings() {
+  let m = cleanMarkdown(settings().markdown, settings().shareFormat);
+  const mono = 'font-family:ui-monospace,Menlo,Consolas,monospace;font-size:15px';
+  const area = (k, label, rows) => h('textarea', { rows, 'aria-label': label, spellcheck: 'false', style: mono, oninput: e => { m[k] = e.target.value; paint(); } }, m[k]);
+  const pick = (k, label, opts) => h('label', { class: 'field', style: 'margin-top:8px' }, label,
+    h('select', { 'aria-label': label, onchange: e => { m[k] = e.target.value; paint(); } }, opts.map(([v, t]) => h('option', { value: v, selected: m[k] === v }, t))));
+  const lbl = (t, el, hint) => h('label', { class: 'field', style: 'margin-top:8px' }, t, el, hint ? h('span', { class: 'hint help' }, hint) : null);
+  const pre = () => h('pre', { class: 'fmt-preview' });
+  const dayOut = pre(), oneOut = pre(), reflOut = h('pre', { class: 'fmt-preview', style: 'max-height:24em;overflow:auto' }), pathOut = h('div', { class: 'hint', style: 'margin:8px 0 2px' });
+  // your latest day and reflection, else made-up ones
+  const latest = [...(S.cases || [])].filter(c => c.date).sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt || 0) - (a.createdAt || 0))[0];
+  const dayList = latest ? S.cases.filter(c => c.date === latest.date).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)) : SAMPLE;
+  const refl = [...(S.reflections || [])].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))[0] || SAMPLE_REFL;
+  const ctx = { catName, catShort };
+  const paint = () => {
+    const f = cleanMarkdown(m);
+    dayOut.textContent = mdDay(dayList[0].date, dayList, f, ctx);
+    oneOut.textContent = mdCase(dayList[dayList.length - 1], f, ctx);
+    const path = reflectionPath(refl, f);
+    pathOut.textContent = 'File: ' + path;
+    reflOut.textContent = reflectionNote(refl, f, { path, images: Object.fromEntries((refl.figures || []).map(x => [x.id, `images/${x.id}.jpg`])) });
   };
+  const fmBox = k => h('label', { class: 'check', style: 'margin:0 12px 0 0;display:inline-flex' }, h('input', { type: 'checkbox', checked: m.fmFields.includes(k), onchange: e => { m.fmFields = e.target.checked ? [...m.fmFields, k] : m.fmFields.filter(x => x !== k); paint(); } }), k);
+  const save = async () => {
+    let v;
+    try { v = storedMarkdown(m); } catch (err) { return toast(err.message); }
+    await patchLogbook({ settings: { markdown: v, shareFormat: null } }); toast('Saved');
+  };
+  const reset = async () => {
+    if (!(await confirmBox('Reset the Markdown format', 'Go back to the default format for Copy, Share and the notes export?', 'Reset'))) return;
+    await patchLogbook({ settings: { markdown: null, shareFormat: null } }); hooks.render();
+  };
+  const fillins = list => h('p', { class: 'hint help', style: 'margin:4px 0 0' }, 'Fill-ins: ', ...list.flatMap((k, i) => [i ? ' ' : '', h('code', {}, `{{${k}}}`)]), '. A line whose fill-ins are all empty is left out.');
+  const fmRow = h('div', { hidden: !m.frontMatter, style: 'margin:0 0 6px' }, ...FM_FIELDS.map(fmBox));
   paint();
-  const lbl = (t, el, hint) => h('label', { class: 'field', style: 'margin-top:8px' }, t, el, hint ? h('span', { class: 'hint' }, hint) : null);
   return h('div', {},
     h('section', { class: 'card' },
-      h('h2', {}, 'Copy & share format'),
-      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'How a case or a day reads when you tap Copy or Share day on the Logbook tab. Tags are never included.'),
-      h('p', { class: 'hint help', style: 'margin:0' }, 'Fill-ins: ', ...PLACEHOLDERS.flatMap((k, i) => [i ? ' ' : '', h('code', {}, `{${k}}`)]),
-        '. {date} is 2026-10-10, {day} is 10 Oct 2026, {n} numbers the cases in a day, {count} is how many that day, {case} is the case without the initials. A line whose fill-ins are all empty is left out.'),
-      h('h3', { style: 'margin:14px 0 0' }, 'A day'),
-      lbl('Heading', head),
-      lbl('Each case', each, 'A blank line goes between cases when each takes more than one line.'),
-      h('div', { class: 'hint', style: 'margin:8px 0 2px' }, 'Preview'), dayOut,
-      h('h3', { style: 'margin:14px 0 0' }, 'One case'),
-      lbl('Format', one),
+      h('h2', {}, 'Markdown'),
+      h('p', { class: 'hint help', style: 'margin:0' }, 'One format for Copy and Share on the Logbook tab and for Download for notes apps (More → Export / Import). The default copies the date, initials and case, never the tags.'),
+      h('h3', { style: 'margin:14px 0 0' }, 'Copy and share'),
+      lbl('Day heading', area('dayHead', 'Day heading', 1), 'For example ## {{date}} or ## [[{{date}}]].'),
+      lbl('Each case in a day', area('dayCase', 'Each case in a day', 3), 'A blank line goes between cases when each takes more than one line.'),
+      fillins(CASE_FILLINS),
+      h('div', { class: 'hint', style: 'margin:8px 0 2px' }, latest ? 'Preview (your latest day)' : 'Preview'), dayOut,
+      lbl('One case', area('oneCase', 'One case', 3)),
       h('div', { class: 'hint', style: 'margin:8px 0 2px' }, 'Preview'), oneOut,
+      h('h3', { style: 'margin:14px 0 0' }, 'Dates, tags and links'),
+      pick('dateFormat', 'Dates ({{date}})', [['iso', '2026-10-10'], ['long', '10 Oct 2026'], ['dmy', '10/10/2026']]),
+      pick('cats', 'Tags ({{categories}})', [['names', 'Names (Lower Segment Caesarean Section)'], ['codes', 'Codes (16)'], ['tags', '#tags (#LSCS)']]),
+      pick('links', 'Links between notes', [['wiki', 'Wiki links [[note]] (Obsidian)'], ['md', 'Markdown links [note](note.md)']])),
+    h('section', { class: 'card' },
+      h('h2', {}, 'Notes export'),
+      h('p', { class: 'hint help', style: 'margin:0' }, 'How Download for notes apps lays out the zip: case notes, one note per reflection, Progress.md and the figures in images/.'),
+      pick('caseNotes', 'Case notes', [['month', 'One note per month'], ['day', 'One note per day']]),
+      pick('folders', 'Reflection folders', [['month', 'By month (Reflections/2026-10/)'], ['heading', 'By heading'], ['flat', 'All in Reflections/']]),
+      lbl('Reflection file name', h('input', { type: 'text', value: m.fileName, 'aria-label': 'Reflection file name', spellcheck: 'false', style: mono, oninput: e => { m.fileName = e.target.value; paint(); } }), 'Fill-ins: {{date}} {{initials}} {{heading}} {{title}} {{diagnosis}}. .md is added.'),
+      h('label', { class: 'check', style: 'margin-top:10px' }, h('input', { type: 'checkbox', checked: m.frontMatter, onchange: e => { m.frontMatter = e.target.checked; fmRow.hidden = !m.frontMatter; paint(); } }), 'Front matter (properties at the top of each note)'),
+      fmRow,
+      h('h3', { style: 'margin:14px 0 0' }, 'Reflection notes'),
+      lbl('Title', area('reflTitle', 'Reflection title', 1)),
+      lbl('Summary', area('reflSummary', 'Reflection summary', 3)),
+      lbl('Each learning point', area('reflPoint', 'Each learning point', 3), '{{point}} is its heading, {{text}} what you wrote, {{n}} its number.'),
+      lbl('Each figure', area('reflFigure', 'Each figure', 2), '{{image}} shows the picture, {{caption}} its caption.'),
+      lbl('References', area('reflRefs', 'References', 3), '{{references}} is the numbered list.'),
+      fillins(REFL_FILLINS),
+      pathOut, reflOut,
       h('div', { class: 'bar', style: 'margin:12px 0 0' },
         h('button', { class: 'primary', onclick: save }, 'Save'),
         h('span', { class: 'grow' }),
