@@ -335,7 +335,7 @@ export async function listSummaries() { return Object.values(load().summaries).m
 export async function listResidents() {
   return Object.values(load().residents).map(plain).sort((a, b) => String(a.rid).localeCompare(String(b.rid)));
 }
-const STATUSES = ['ACTIVE', 'ON LEAVE', 'GRADUATED', 'ATTRITED'];
+const STATUSES = ['ACTIVE', 'ON LEAVE', 'SMO', 'GRADUATED', 'ATTRITED'];
 export async function saveResident(r) {
   const d = cleanResident(r);
   // the same checks as firestore.rules validResident, so the demo fails where the real thing would

@@ -59,56 +59,83 @@ function profileCard() {
   const sexRadio = (v, label) => h('label', { class: 'check' },
     h('input', { type: 'radio', name: 'acct-sex', value: v, checked: p.sex === v, onchange: () => { p.sex = v; changed(); } }), label);
 
+  const personal = ['familyName', 'givenName', 'sex', 'dob', 'graduation', 'postgrad', 'program', 'programDirector', 'residencyStart', 'seniorStart'];
+  const nDone = personal.filter(k => String(p[k] || '').trim()).length;
+  const pCount = h('span', { class: 'acct-badge' + (nDone === personal.length ? ' done' : '') }, `${nDone}/${personal.length}`);
+  const pair = (...kids) => h('div', { class: 'acct-pair' }, ...kids);
+
   return h('section', { class: 'card acct' },
     h('div', { class: 'bar', style: 'margin:0' }, h('h2', { style: 'margin:0' }, 'Portfolio details (Section 1)'), h('span', { class: 'grow' }), status),
-    h('p', { class: 'hint' }, 'Used to fill Section 1 of the exported portfolio. Stored with your logbook; only you (and the programme admins, who can read logbooks) can see it.'),
+    h('p', { class: 'hint' }, 'Fills Section 1 of the exported portfolio. Only you (and the programme admins) can see it. Tap a heading to open it.'),
     h('div', { class: 'acct-import' }, h('label', { class: 'btn small' }, 'Fill from my Word portfolio',
       h('input', { type: 'file', accept: '.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document', hidden: true,
         onchange: e => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) importDocx(f); } }))),
 
-    h('details', { class: 'acct-group', open: true },
-      h('summary', {}, 'Personal details'),
+    h('details', { class: 'acct-group', open: nDone < personal.length },
+      h('summary', {}, h('span', { class: 'acct-title' }, 'Personal details'), pCount),
       h('div', { class: 'acct-body' },
-        text('familyName', 'Family name (surname)', { autocomplete: 'family-name' }),
-        text('givenName', 'Given name', { autocomplete: 'given-name' }),
+        pair(text('familyName', 'Family name', { autocomplete: 'family-name' }), text('givenName', 'Given name', { autocomplete: 'given-name' })),
         h('div', { class: 'field' }, 'Sex', h('div', { class: 'row acct-radios' }, sexRadio('M', 'Male'), sexRadio('F', 'Female'))),
-        date('dob', 'Date of birth'),
+        pair(date('dob', 'Date of birth'), h('span')),
         text('graduation', 'Date and place of graduation', { placeholder: 'e.g. 12/06/2018, University of Bristol' }),
         area('postgrad', 'Postgraduate qualifications', 'with dates'),
-        text('program', 'Program', { placeholder: 'NUHS Anaesthesia' }),
-        text('programDirector', 'Program Director'),
-        date('residencyStart', 'Commencement date of residency'),
-        date('seniorStart', 'Commencement date of senior residency'))),
+        pair(text('program', 'Program', { placeholder: 'NUHS Anaesthesia' }), text('programDirector', 'Program Director')),
+        pair(date('residencyStart', 'Residency started'), date('seniorStart', 'Senior residency started')))),
 
     secs().map(sec => listCard(p, sec)));
 }
 
+// Short names for the list headings (the export keeps the portfolio's own titles), and which
+// field leads each entry's one-line summary.
+const SHORT = { memberships: 'Memberships & activities', awards: 'Awards & prizes', scholarships: 'Scholarships', electives: 'Overseas electives',
+  projects: 'Formal project', papers: 'Papers published', courses: 'Courses, seminars & conferences', teaching: 'Teaching experience' };
+const LEAD = { memberships: 'org', awards: 'title', scholarships: 'title', electives: 'institution', projects: 'title', papers: 'title', courses: 'details', teaching: 'summary' };
+
 function listCard(p, sec) {
   if (!Array.isArray(p[sec.key])) p[sec.key] = [];
   const rows = p[sec.key];
-  const count = h('span', { class: 'acct-count muted' });
+  const badge = h('span', { class: 'acct-badge' });
   const body = h('div', { class: 'acct-rows' });
-  const paintCount = () => { count.textContent = rows.length ? `\u00a0(${rows.length})` : ''; };
-  const blank = () => Object.fromEntries(sec.cols.map(c => [c.key, '']));
+  const paintCount = () => { badge.textContent = String(rows.length); badge.hidden = !rows.length; };
+  const lead = LEAD[sec.key] || sec.cols[0].key;
+  const summary = row => {
+    const main = String(row[lead] || '').trim() || sec.cols.map(c => String(row[c.key] || '').trim()).find(Boolean) || '(empty)';
+    const rest = sec.cols.filter(c => c.key !== lead).map(c => String(row[c.key] || '').trim()).filter(v => v && v !== main);
+    return [h('span', { class: 'acct-item-main' }, main), rest.length ? h('span', { class: 'acct-item-sub' }, rest.join(' · ')) : null];
+  };
+  const edit = i => {
+    const isNew = i == null;
+    const row = isNew ? Object.fromEntries(sec.cols.map(c => [c.key, ''])) : { ...rows[i] };
+    const fields = sec.cols.map(c => h('label', { class: 'field' }, c.label,
+      c.long
+        ? h('textarea', { rows: 3, maxlength: 2000, oninput: e => { row[c.key] = e.target.value; } }, row[c.key] || '')
+        : h('input', { type: 'text', value: row[c.key] || '', maxlength: 2000, oninput: e => { row[c.key] = e.target.value; } })));
+    const m = modal((isNew ? 'Add: ' : 'Edit: ') + (SHORT[sec.key] || sec.title), [
+      h('div', { class: 'acct-edit' }, fields),
+      h('div', { class: 'bar acct-edit-bar', style: 'margin-top:12px' },
+        isNew ? null : h('button', { class: 'danger', onclick: () => { rows.splice(i, 1); m.close(); paint(); paintCount(); changed(); } }, 'Remove'),
+        h('span', { class: 'grow' }),
+        h('button', { onclick: () => m.close() }, 'Cancel'),
+        h('button', { class: 'primary', onclick: () => {
+          if (!Object.values(row).some(v => String(v).trim())) return toast('Fill in at least one field');
+          if (isNew) rows.push(row); else rows[i] = row;
+          m.close(); paint(); paintCount(); changed();
+        } }, 'Save')),
+    ], { sticky: true });
+  };
   const paint = () => {
-    fill(body, rows.map((row, i) => h('div', { class: 'acct-row' },
-      sec.cols.map(c => h('label', { class: 'field' }, c.label,
-        c.long
-          ? h('textarea', { rows: 2, maxlength: 2000, oninput: e => { row[c.key] = e.target.value; changed(); } }, row[c.key] || '')
-          : h('input', { type: 'text', value: row[c.key] || '', maxlength: 2000, oninput: e => { row[c.key] = e.target.value; changed(); } }))),
-      h('div', { class: 'bar', style: 'margin:0' }, h('span', { class: 'grow' }),
-        h('button', { class: 'small danger', onclick: () => { rows.splice(i, 1); paint(); paintCount(); changed(); } }, 'Remove')))),
-      h('div', { class: 'bar', style: 'margin:8px 0 0' },
-        h('button', { class: 'small', disabled: rows.length >= 40, onclick: () => {
-          rows.push(blank()); paint(); paintCount(); changed();
-          const ins = body.querySelectorAll('.acct-row:last-of-type input, .acct-row:last-of-type textarea'); if (ins[0]) ins[0].focus();
-        } }, '+ Add')),
+    fill(body,
+      rows.length ? h('ul', { class: 'acct-items' }, rows.map((row, i) => h('li', {},
+        h('button', { type: 'button', class: 'acct-item', onclick: () => edit(i) }, ...summary(row))))) : null,
+      h('div', { class: 'bar', style: 'margin:6px 0 0' },
+        h('button', { class: 'small', disabled: rows.length >= 40, onclick: () => edit(null) }, '+ Add')),
       sec.key === 'projects' ? h('label', { class: 'field', style: 'margin-top:10px' }, 'Remarks',
-        h('textarea', { rows: 3, maxlength: 4000, oninput: e => { p.projectRemarks = e.target.value; changed(); } }, p.projectRemarks || '')) : null);
+        h('textarea', { rows: 2, maxlength: 4000, oninput: e => { p.projectRemarks = e.target.value; changed(); } }, p.projectRemarks || '')) : null);
   };
   paint(); paintCount();
-  const filled = rows.length || (sec.key === 'projects' && p.projectRemarks);
-  return h('details', { class: 'acct-group', open: !!filled }, h('summary', {}, sec.title, count), h('div', { class: 'acct-body' }, body));
+  return h('details', { class: 'acct-group' },
+    h('summary', { title: sec.title }, h('span', { class: 'acct-title' }, SHORT[sec.key] || sec.title), badge),
+    h('div', { class: 'acct-body' }, body));
 }
 
 // ---------- fill from a Word portfolio ----------
