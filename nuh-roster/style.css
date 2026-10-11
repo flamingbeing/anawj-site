@@ -264,3 +264,9 @@ fieldset.lock[disabled] input, fieldset.lock[disabled] select, fieldset.lock[dis
 .demo-bar .grow { flex: 1; }
 @media print { .demo-bar { display: none; } }
 a.btn { text-decoration: none; }
+/* the person chip and box on the daily tabs */
+.pchip .marks { font-size: 11px; color: var(--muted); }
+.person-box { width: 320px; }
+.person-box .btn-group button { margin: 0; }
+tr.highlight td { background: #fff4c2 !important; transition: background 1s; }
+.status-pick { flex-wrap: wrap; } .status-pick button[aria-pressed=true] { background: var(--navy); color: #fff; border-color: var(--navy); }

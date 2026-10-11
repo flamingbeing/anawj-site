@@ -299,11 +299,14 @@ function juniorRoomCost(p, d, room, settings, noise, doubled) {
 const dayOf = (day, p) => day.staff?.[p.id] || {};
 const isAvail = (day, p) => (dayOf(day, p).status || 'avail') === 'avail';
 
+// A name as written on the roster, with the day's details: "Tan YW (L) (AOH) L-4pm -mtg 3pm"
 export function fmtSenior(p, d) {
   let s = p.name;
   if (d.liverStandby) s += ' (L)';
+  if (d.aoh) s += ` (${d.aoh})`;
   if (d.note) s += ' ' + d.note;
   if (d.leaveTime) s += ' L-' + d.leaveTime;
+  if (d.comment) s += ' -' + d.comment;
   return s;
 }
 
@@ -311,8 +314,10 @@ export function fmtJunior(p, d) {
   let s = p.name;
   if (p.posting) s += ` (${p.posting})`;
   if (d.liverStandby && p.posting !== 'L') s += ' (L)';
+  if (d.aoh) s += ` (${d.aoh})`;
   if (d.note) s += ' ' + d.note;
   if (d.leaveTime) s += ' L-' + d.leaveTime;
+  if (d.comment) s += ' -' + d.comment;
   return s;
 }
 
