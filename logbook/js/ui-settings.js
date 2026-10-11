@@ -15,8 +15,9 @@ export function applyCompact(on) {
   document.body.classList.toggle('compact', !!on);
   try { on ? localStorage.setItem(COMPACT_KEY, '1') : localStorage.removeItem(COMPACT_KEY); } catch { /* storage blocked */ }
 }
-// Theme (S.logbook.settings.theme): 'light' (default), 'dark', or 'auto' (follows the phone) as
-// <html data-theme>, styled at the end of style.css. Cached like compact mode for the first paint.
+// Theme: 'light' (default), 'dark', or 'auto' (follows the phone) as <html data-theme>, styled at
+// the end of style.css. Saved on this device only (Auto is a device setting, and a ward PC can stay
+// light while a phone is dark); sign-out keeps it. index.html applies it before the first paint.
 const THEME_KEY = 'apmes-logbook-theme';
 export function applyTheme(t) {
   const theme = t === 'dark' || t === 'auto' ? t : 'light';
@@ -59,8 +60,9 @@ export function renderSettings() {
         h('select', { onchange: e => { applyTextSize(e.target.value); patchLogbook({ settings: { textSize: e.target.value } }); } },
           TEXT_SIZES.map(([v, l]) => h('option', { value: v, selected: String(st.textSize || '1') === v }, l)))),
       h('label', { class: 'field', style: 'margin-top:10px' }, 'Theme',
-        h('select', { onchange: e => { applyTheme(e.target.value); patchLogbook({ settings: { theme: e.target.value } }); } },
-          [['light', 'Light'], ['dark', 'Dark'], ['auto', 'Auto (match the phone)']].map(([v, l]) => h('option', { value: v, selected: (st.theme || 'light') === v }, l))))),
+        h('select', { onchange: e => applyTheme(e.target.value) },
+          [['light', 'Light'], ['dark', 'Dark'], ['auto', 'Auto (match the phone)']].map(([v, l]) => h('option', { value: v, selected: cachedTheme() === v }, l)))),
+      h('p', { class: 'hint', style: 'margin:2px 0 0' }, 'Theme is saved on this device.')),
 
     // year for targets: programme residents get it from the list; anyone else sets it here
     S.resident ? null : h('section', { class: 'card' },

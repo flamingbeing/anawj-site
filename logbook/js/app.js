@@ -206,8 +206,8 @@ function refreshWho(user, who, firstLogbook) {
   who().then(async w => {
     if (S.user !== user) return;
     saveWho(user.email, w);
-    const before = JSON.stringify([S.admin, S.pd, S.resident, S.sharedTemplates, categoryNamesNow()]);
-    Object.assign(S, { admin: !!w.admin, pd: !!w.pd, resident: w.resident || null, sharedTemplates: w.sharedTemplates || [] });
+    const before = JSON.stringify([S.admin, S.owner, S.pd, S.resident, S.sharedTemplates, categoryNamesNow()]);
+    Object.assign(S, { admin: !!w.admin, owner: !!w.owner, pd: !!w.pd, resident: w.resident || null, sharedTemplates: w.sharedTemplates || [] });
     setCategoryNames(w.names || {});
     // the logbook (templates, settings) from the server, unless it was changed here meanwhile
     const lb = await cloud.loadLogbook(user.email).catch(() => null);
@@ -215,9 +215,9 @@ function refreshWho(user, who, firstLogbook) {
     let lbChanged = false;
     if (lb && S.logbook === firstLogbook && JSON.stringify(lb) !== JSON.stringify(firstLogbook)) {
       S.logbook = lb; lbChanged = true;
-      applyCompact(lb.settings && lb.settings.compact); applyTheme(lb.settings && lb.settings.theme); applyTextSize(lb.settings && lb.settings.textSize);
+      applyCompact(lb.settings && lb.settings.compact); applyTextSize(lb.settings && lb.settings.textSize);
     }
-    if (!lbChanged && before === JSON.stringify([S.admin, S.pd, S.resident, S.sharedTemplates, categoryNamesNow()])) return;
+    if (!lbChanged && before === JSON.stringify([S.admin, S.owner, S.pd, S.resident, S.sharedTemplates, categoryNamesNow()])) return;
     const typing = document.activeElement && /^(TEXTAREA|INPUT|SELECT)$/.test(document.activeElement.tagName);
     if (!typing && !document.querySelector('dialog[open]')) render(); else paintTabs();
   }).catch(err => console.warn('Refresh failed', err));
@@ -233,8 +233,8 @@ async function onUser(user) {
   if (unwatchRefl) { unwatchRefl(); unwatchRefl = null; }
   S.user = user;
   if (!user) {
-    Object.assign(S, { admin: false, pd: false, resident: null, logbook: null, cases: [], reflections: [], counts: {}, casesLoaded: false, casesSynced: false, sharedTemplates: [] });
-    if (signedInOnce) { clearDrafts(); resetCaches(); forgetWho(); applyCompact(false); applyTheme('light'); applyTextSize('1'); }   // a shared device starts plain for the next person
+    Object.assign(S, { admin: false, owner: false, pd: false, resident: null, logbook: null, cases: [], reflections: [], counts: {}, casesLoaded: false, casesSynced: false, sharedTemplates: [] });
+    if (signedInOnce) { clearDrafts(); resetCaches(); forgetWho(); applyCompact(false); applyTextSize('1'); }   // a shared device starts plain for the next person
     paintWho();
     renderLanding();
     return;
@@ -252,18 +252,18 @@ async function onUser(user) {
     cloud.listSharedTemplates().catch(() => []),
     cloud.isPD(user.email).catch(() => false),
     cloud.loadCategoryNames().catch(() => ({})),
-  ]).then(([admin, resident, shared, pd, names]) => ({ admin, resident, sharedTemplates: shared || [], pd, names: names || {} }));
+    cloud.isAppOwner(user.email).catch(() => false),
+  ]).then(([admin, resident, shared, pd, names, owner]) => ({ admin, resident, sharedTemplates: shared || [], pd, names: names || {}, owner }));
   try {
     const known = readWho(user.email);
     const [logbook, w] = await Promise.all([cloud.loadLogbook(user.email, { cached: true }), known ? Promise.resolve(known) : who()]);
     if (S.user !== user) return; // signed out meanwhile
     reloadFlag('');
-    Object.assign(S, { admin: !!w.admin, pd: !!w.pd, resident: w.resident || null, logbook, sharedTemplates: w.sharedTemplates || [] });
+    Object.assign(S, { admin: !!w.admin, owner: !!w.owner, pd: !!w.pd, resident: w.resident || null, logbook, sharedTemplates: w.sharedTemplates || [] });
     setCategoryNames(w.names || {});
     if (!known) saveWho(user.email, w);
     else refreshWho(user, who, logbook);
     applyCompact(logbook.settings && logbook.settings.compact);   // per-user display settings
-    applyTheme(logbook.settings && logbook.settings.theme);
     applyTextSize(logbook.settings && logbook.settings.textSize);
     const resident = S.resident;
     if (!logbook.name && (resident?.name || user.name)) S.logbook.name = resident?.name || user.name;
@@ -352,7 +352,7 @@ function registerSW() {
 
 if (cloud.onSyncError) cloud.onSyncError(err => toast('A change could not be synced: ' + (err.message || err)));
 
-applyTheme(cachedTheme());   // first paint; corrected once the logbook loads
+applyTheme(cachedTheme());   // this device's choice (Settings → Display → Theme)
 applyTextSize(cachedTextSize());
 if (cachedCompact()) document.body.classList.add('compact');   // first paint; corrected once the logbook loads
 paintWho();
@@ -361,7 +361,7 @@ if (cloud.demo) {
   fill(banner, h('span', {}, 'Demo: made-up data, stored only in this browser.'),
     h('button', { class: 'small', onclick: async () => {
       if (!(await confirmBox('Reset demo', 'Delete everything you added in the demo (cases, reflections, images, settings) and start again with the made-up data? The uploaded portfolio template is kept.', 'Reset', true))) return;
-      clearDrafts(); resetCaches(); forgetWho(); applyCompact(false); applyTheme('light'); applyTextSize('1');
+      clearDrafts(); resetCaches(); forgetWho(); applyCompact(false); applyTextSize('1');
       cloud.resetDemo();
       location.reload();
     } }, 'Reset demo'),

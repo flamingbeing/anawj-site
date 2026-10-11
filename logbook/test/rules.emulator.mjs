@@ -5,17 +5,19 @@ import { doc, getDoc, setDoc, deleteDoc, getDocs, collection, query, where, writ
 import fs from 'node:fs';
 const env = await initializeTestEnvironment({ projectId: 'demo-logbook', firestore: { rules: fs.readFileSync('firestore.rules', 'utf8'), host: '127.0.0.1', port: 8085 } });
 const as = (email, verified = true) => env.authenticatedContext(email, { email, email_verified: verified }).firestore();
-const ADMIN = 'boss@example.com', A = 'alice@example.com', B = 'bob@example.com';
+const ADMIN = 'boss@example.com', OWNER = 'owner@example.com', A = 'alice@example.com', B = 'bob@example.com';
 await env.withSecurityRulesDisabled(async ctx => {
   const db = ctx.firestore();
   await setDoc(doc(db, 'admins', ADMIN), { name: 'Boss' });
+  await setDoc(doc(db, 'admins', OWNER), { name: 'Owner' });
+  await setDoc(doc(db, 'owners', OWNER), { name: 'Owner' });
   await setDoc(doc(db, 'residents', 'R1'), { rid: 'R1', name: 'Alice', email: A, status: 'ACTIVE', intake: 2024, rYear: 2 });
   await setDoc(doc(db, 'residents', 'R2'), { rid: 'R2', name: 'Bob', email: B, status: 'ACTIVE', intake: 2024, rYear: 2 });
 });
 let n = 0, fail = 0;
 async function t(name, p) { n++; try { await p; } catch (e) { fail++; console.log('FAIL', name, e.message.slice(0, 200)); } }
 const c = id => ({ id, date: '2026-01-02', details: 'AB 5yo tonsil', cats: ['10', '20'], createdAt: 1, updatedAt: 2, source: 'app' });
-const a = as(A), b = as(B), adm = as(ADMIN), anon = env.unauthenticatedContext().firestore(), unv = as(A, false);
+const a = as(A), b = as(B), adm = as(ADMIN), own = as(OWNER), anon = env.unauthenticatedContext().firestore(), unv = as(A, false);
 const AU = as('Alice@Example.com');
 await t('own logbook create', assertSucceeds(setDoc(doc(a, 'logbooks', A), { email: A, name: 'A', rid: null, settings: {}, templates: [], updatedAt: 1 })));
 await t('mixed-case token email ok', assertSucceeds(getDoc(doc(AU, 'logbooks', A))));
@@ -24,7 +26,12 @@ await t('other logbook write', assertFails(setDoc(doc(b, 'logbooks', A), { email
 await t('logbook wrong email field', assertFails(setDoc(doc(a, 'logbooks', A), { email: B })));
 await t('unverified', assertFails(getDoc(doc(unv, 'logbooks', A))));
 await t('anon', assertFails(getDoc(doc(anon, 'logbooks', A))));
-await t('admin read logbook', assertSucceeds(getDoc(doc(adm, 'logbooks', A))));
+await t('admin cannot read logbook', assertFails(getDoc(doc(adm, 'logbooks', A))));
+await t('owner reads logbook', assertSucceeds(getDoc(doc(own, 'logbooks', A))));
+await t('owner cannot write logbook', assertFails(setDoc(doc(own, 'logbooks', A), { email: A })));
+await t('owner check own', assertSucceeds(getDoc(doc(own, 'owners', OWNER))));
+await t('owners list by admin', assertFails(getDocs(collection(adm, 'owners'))));
+await t('self add owner', assertFails(setDoc(doc(adm, 'owners', ADMIN), { name: 'x' })));
 await t('admin cannot write logbook', assertFails(setDoc(doc(adm, 'logbooks', A), { email: A })));
 const prof = { familyName: 'Fake', givenName: 'Person', sex: 'F', dob: '1990-01-02', memberships: [{ year: '2024', post: 'Member', org: 'Made-up Society', achievements: '' }], projectRemarks: 'x' };
 await t('own profile save', assertSucceeds(setDoc(doc(a, 'logbooks', A), { email: A, profile: prof, updatedAt: 3 }, { merge: true })));
@@ -51,10 +58,14 @@ await t('case bad source', assertFails(setDoc(doc(a, 'logbooks', A, 'cases', 'c4
 await t('other read cases', assertFails(getDocs(collection(b, 'logbooks', A, 'cases'))));
 await t('other write case', assertFails(setDoc(doc(b, 'logbooks', A, 'cases', 'c9'), c('c9'))));
 await t('own list cases', assertSucceeds(getDocs(collection(a, 'logbooks', A, 'cases'))));
-await t('admin list cases', assertSucceeds(getDocs(collection(adm, 'logbooks', A, 'cases'))));
-await t('admin import batch', assertSucceeds((() => { const w = writeBatch(adm); w.set(doc(adm, 'logbooks', A, 'cases', 'imp_x'), { ...c('imp_x'), source: 'import', importKey: 'x#0' }); w.set(doc(adm, 'imports', 'R1'), { keys: ['x#0'], updatedAt: 1 }); return w.commit(); })()));
+await t('admin cannot list cases', assertFails(getDocs(collection(adm, 'logbooks', A, 'cases'))));
+await t('admin cannot read a case', assertFails(getDoc(doc(adm, 'logbooks', A, 'cases', 'c1'))));
+await t('admin cannot import', assertFails((() => { const w = writeBatch(adm); w.set(doc(adm, 'logbooks', A, 'cases', 'imp_y'), { ...c('imp_y'), source: 'import', importKey: 'y#0' }); w.set(doc(adm, 'imports', 'R1'), { keys: ['y#0'], updatedAt: 1 }); return w.commit(); })()));
+await t('admin cannot read imports', assertFails(getDoc(doc(adm, 'imports', 'R1'))));
+await t('owner list cases', assertSucceeds(getDocs(collection(own, 'logbooks', A, 'cases'))));
+await t('owner import batch', assertSucceeds((() => { const w = writeBatch(own); w.set(doc(own, 'logbooks', A, 'cases', 'imp_x'), { ...c('imp_x'), source: 'import', importKey: 'x#0' }); w.set(doc(own, 'imports', 'R1'), { keys: ['x#0'], updatedAt: 1 }); return w.commit(); })()));
 await t('user cannot read imports', assertFails(getDoc(doc(a, 'imports', 'R1'))));
-await t('admin delete case', assertSucceeds(deleteDoc(doc(adm, 'logbooks', A, 'cases', 'imp_x'))));
+await t('owner delete case', assertSucceeds(deleteDoc(doc(own, 'logbooks', A, 'cases', 'imp_x'))));
 await t('own delete case', assertSucceeds(deleteDoc(doc(a, 'logbooks', A, 'cases', 'c3'))));
 await t('reflection writes closed until that phase', assertFails(setDoc(doc(a, 'logbooks', A, 'reflections', 'r1'), { x: 1 })));
 await t('logbook extra field', assertFails(setDoc(doc(a, 'logbooks', A), { email: A, junk: 'x' }, { merge: true })));
@@ -113,6 +124,7 @@ await t('legacy-section reflection', assertSucceeds(setDoc(doc(a, 'logbooks', A,
 await t('read own reflection', assertSucceeds(getDoc(doc(a, 'logbooks', A, 'reflections', 'r1'))));
 await t('other reads reflection', assertFails(getDoc(doc(b, 'logbooks', A, 'reflections', 'r1'))));
 await t('admin reads reflection', assertFails(getDoc(doc(adm, 'logbooks', A, 'reflections', 'r1'))));
+await t('owner reads reflection', assertFails(getDoc(doc(own, 'logbooks', A, 'reflections', 'r1'))));
 await t('word-imported reflection, no case', assertSucceeds(setDoc(doc(a, 'logbooks', A, 'reflections', 'rw'), { ...refl('rw'), source: 'word' })));
 await t('reflection bad source', assertFails(setDoc(doc(a, 'logbooks', A, 'reflections', 'rw2'), { ...refl('rw2'), source: 'x' })));
 await t('reflection bad status', assertFails(setDoc(doc(a, 'logbooks', A, 'reflections', 'r3'), { ...refl('r3'), status: 'done' })));
@@ -134,6 +146,7 @@ await t('own bin entry (reflection)', assertSucceeds(setDoc(doc(a, 'logbooks', A
 await t('read own bin', assertSucceeds(getDocs(collection(a, 'logbooks', A, 'bin'))));
 await t('other reads bin', assertFails(getDocs(collection(b, 'logbooks', A, 'bin'))));
 await t('admin reads bin', assertFails(getDoc(doc(adm, 'logbooks', A, 'bin', 'c_c1_x'))));
+await t('owner reads bin', assertFails(getDoc(doc(own, 'logbooks', A, 'bin', 'c_c1_x'))));
 await t('admin writes bin', assertFails(setDoc(doc(adm, 'logbooks', A, 'bin', 'c_c2_x'), binE('c_c2_x'))));
 await t('other writes bin', assertFails(setDoc(doc(b, 'logbooks', A, 'bin', 'c_c2_x'), binE('c_c2_x'))));
 await t('bin bad kind', assertFails(setDoc(doc(a, 'logbooks', A, 'bin', 'c_c2_x'), binE('c_c2_x', 'summary'))));

@@ -1,4 +1,5 @@
-// Admin (programme admins only): the resident list, importing the old Google Form workbook, shared templates.
+// Admin (programme admins only): the resident list, importing the old Google Form workbook (the app
+// owner only), shared templates.
 // Firestore rules enforce admin-only access; this screen is only hidden from everyone else.
 
 import { R_YEARS } from './categories.js';
@@ -24,7 +25,7 @@ export function leaveAdmin() { A.editRes = false; A.pasted = null; }
 export function renderAdmin() {
   if (!S.admin) return h('p', { class: 'empty' }, 'Admins only.');
   if (!A.residents && !A.loading) load();
-  return h('div', {}, h('p', { style: 'margin:0 0 8px' }, h('a', { class: 'btn small', href: '#more' }, '← More')), residentsCard(), importCard(), sharedCard(), categoryNamesCard(), renderTemplateCard());
+  return h('div', {}, h('p', { style: 'margin:0 0 8px' }, h('a', { class: 'btn small', href: '#more' }, '← More')), residentsCard(), S.owner ? importCard() : ownerOnlyCard(), sharedCard(), categoryNamesCard(), renderTemplateCard());
 }
 
 async function load() {
@@ -167,7 +168,12 @@ function residentsCard() {
   return card;
 }
 
-// ---------- importer ----------
+// ---------- importer (the app owner only: admins can't read or write residents' cases) ----------
+function ownerOnlyCard() {
+  return h('section', { class: 'card' }, h('h2', {}, 'Import the old Google Form responses'),
+    h('p', { class: 'hint', style: 'margin:0' }, 'Only the app owner can import cases into residents’ logbooks: admins can’t see anyone’s cases. The owner is set in the Firebase console (Firestore → owners). Residents can add their own past cases with Paste list on the Log screen.'));
+}
+
 
 function importCard() {
   const card = h('section', { class: 'card' }, h('h2', {}, 'Import the old Google Form responses'),

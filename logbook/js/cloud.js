@@ -149,6 +149,14 @@ export async function isAdmin(email) {
   }
 }
 
+// The app owner (owners/{email}, added in the Firebase console): reads logbooks and cases, imports.
+export async function isAppOwner(email) {
+  if (demo) return D.isAdmin(email);   // the demo admin plays the owner too
+  const { db, F } = await sdk();
+  try { return (await F.getDoc(F.doc(db, 'owners', lc(email)))).exists(); }
+  catch (e) { if (e?.code !== 'permission-denied') console.warn('Owner check failed', e); return false; }
+}
+
 // Programme directors (pds/{email}, managed with the evals app) can read the shared totals.
 export async function isPD(email) {
   if (demo) return false;
