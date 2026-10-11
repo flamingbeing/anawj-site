@@ -138,6 +138,7 @@ Pickers are full-screen **Recent | All | Write-In** lists, with recents remember
 ### Tests (run all before merging)
 
 ```
+node tools/check.mjs                                                          # cache prefixes, SHELL files, VERSION bump, generated files
 for f in evals/test/*.test.mjs logbook/test/*.test.mjs; do node "$f"; done   # unit
 npx http-server . -p 8110 -s -c-1 &                                           # static server
 node evals/test/e2e.spec.mjs                                                  # 36 e2e checks
