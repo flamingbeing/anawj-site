@@ -2,7 +2,7 @@
 // shared state and helpers are in ui-core.js. Case data comes from cloud.js (Firestore, or the
 // in-browser demo backend with ?demo).
 
-import { S, hooks, h, toast, cloud, setCases, scheduleSummary, fill, resetCaches, confirmBox, modal, setCategoryNames, categoryNames as categoryNamesNow } from './ui-core.js';
+import { S, hooks, h, toast, cloud, setCases, scheduleSummary, fill, resetCaches, patchLogbook, confirmBox, modal, setCategoryNames, categoryNames as categoryNamesNow } from './ui-core.js';
 import { renderLog, logCasesChanged, clearDrafts, SHARED_KEY } from './ui-log.js';
 import { renderLogbook } from './ui-logbook.js';
 import { renderProgress, renderTotals } from './ui-progress.js';
@@ -243,6 +243,26 @@ async function signIn() {
   catch (err) { renderLanding('Sign-in failed: ' + (err && err.message || err)); }
 }
 
+// The programme's tag groups (Admin portal) are only a starting set: each one is copied once into the
+// resident's own tag groups, where it can be edited or deleted like any other. `settings.sharedSeen`
+// remembers which were offered, so a deleted one doesn't come back; the copy's id is fixed so two
+// devices adopting at once don't make two.
+function adoptShared() {
+  const lb = S.logbook, shared = S.sharedTemplates || [];
+  if (!lb || !shared.length) return false;
+  const seen = new Set((lb.settings && lb.settings.sharedSeen) || []);
+  const fresh = shared.filter(t => t && t.id && !seen.has(String(t.id)));
+  if (!fresh.length) return false;
+  const mine = lb.templates || [];
+  const have = new Set(mine.map(t => t.id));
+  const same = t => mine.some(m => m.name === t.name && [...(m.cats || [])].sort().join() === [...(t.cats || [])].sort().join());
+  const add = fresh.filter(t => (t.cats || []).length && !have.has('sh-' + t.id) && !same(t))
+    .map(t => ({ id: 'sh-' + t.id, name: t.name || '', cats: [...t.cats], ...(t.details ? { details: t.details } : {}) }));
+  const templates = [...mine, ...add].slice(0, 100);
+  patchLogbook({ templates, settings: { sharedSeen: [...seen, ...fresh.map(t => String(t.id))].slice(-200) } });
+  return true;
+}
+
 // ---------- signed in ----------
 
 let unwatch = null, unwatchRefl = null, signedInOnce = false;
@@ -271,6 +291,7 @@ function refreshWho(user, who, firstLogbook) {
       S.logbook = lb; lbChanged = true;
       applyCompact(lb.settings && lb.settings.compact); applyTextSize(lb.settings && lb.settings.textSize);
     }
+    if (adoptShared()) lbChanged = true;
     if (!lbChanged && before === JSON.stringify([S.admin, S.owner, S.pd, S.resident, S.sharedTemplates, categoryNamesNow()])) return;
     const typing = document.activeElement && /^(TEXTAREA|INPUT|SELECT)$/.test(document.activeElement.tagName);
     if (!typing && !document.querySelector('dialog[open]')) render(); else paintTabs();
@@ -323,6 +344,7 @@ async function onUser(user) {
     if (!logbook.name && (resident?.name || user.name)) S.logbook.name = resident?.name || user.name;
     // a programme resident's logbook remembers their rid (used by admins and the rules)
     if (resident && logbook.rid !== resident.rid) cloud.saveLogbook(user.email, { rid: resident.rid }).catch(() => {});
+    adoptShared();
   } catch (err) {
     // a Firestore client closed by an earlier sign-out can't be reused: start the page afresh (once)
     if (/terminated/i.test(err.message) && !reloadFlag()) { reloadFlag('1'); location.reload(); return; }

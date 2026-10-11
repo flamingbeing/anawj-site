@@ -341,8 +341,6 @@ function renderOne(card) {
   const selected = h('div', { class: 'chips selected' });
   const tip = h('div');
   const templates = h('div', { class: 'chips quick-rest' });
-  // the programme's tag groups (Admin portal), after the full list
-  const shared = h('div', { class: 'shared-groups' });
   const picker = catPicker({
     get: () => draft.cats,
     // the list stays put under your finger while the rows above it change
@@ -376,7 +374,6 @@ function renderOne(card) {
         ['list', 'pills'].map(v => h('button', { class: 'small', 'aria-pressed': String((settings().catView || 'list') === v), onclick: () => { if ((settings().catView || 'list') === v) return; patchLogbook({ settings: { catView: v } }); hooks.render(); } }, v === 'list' ? 'List' : 'Pills')))),
     picker.el,
     groupSave,
-    shared,
     stillNeeded(),
     savebar);
   // Tapping a chip, a tag in the list or a button while typing keeps the focus (and the keyboard) in the
@@ -388,7 +385,7 @@ function renderOne(card) {
     if (t.closest('input:not([type=checkbox]), textarea, select, .datepick, .box-wrap')) return;
     if (t.closest('.chip, .picker li, label.check, [role=button], button, a.btn')) e.preventDefault();
   });
-  Object.assign(ui, { shared, draftNote, textarea, parsed, sugg, selected, selExtra, groupSave, tip, templates, picker });
+  Object.assign(ui, { draftNote, textarea, parsed, sugg, selected, selExtra, groupSave, tip, templates, picker });
   paintSuggest(); paintSel(); paintQuick(); paintParsed(false);
   requestAnimationFrame(() => alignPlaceholder(textarea));
   // autofocus attribute is ignored on re-render; focus after insertion (not on phones' first paint
@@ -510,8 +507,6 @@ function paintQuick() {
   };
   for (const t of (S.logbook && S.logbook.templates) || []) chips.push(tmplChip(t, t.name));
   fill(ui.templates, ...chips.filter(Boolean));
-  const sh = (S.sharedTemplates || []).map(t => tmplChip(t, t.name)).filter(Boolean);
-  if (ui.shared) fill(ui.shared, ...(sh.length ? [h('div', { class: 'chiplabel' }, 'Programme tag groups'), h('div', { class: 'chips' }, ...sh)] : []));
 }
 
 async function save({ another }) {

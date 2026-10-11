@@ -20,8 +20,9 @@ portfolio content.
 
 - "Tags", not categories. **APMES tags** = the programme's categories (built in, count towards
   targets); **personal tags** = your own (may link to APMES tags; under an APMES tag counts towards it).
-- **Tag groups** = the old templates (one-tap sets in Quick picks). Shared ones (Admin portal) show at
-  the end of the Log page's tag list.
+- **Tag groups** = the old templates (one-tap sets in Quick picks). The programme's ones (Admin portal) are
+  only a starting set: each is copied once into the resident's own tag groups (id `sh-<id>`,
+  `settings.sharedSeen`), where it can be edited or deleted like any other and doesn't come back.
 - Logbook **Case summary** (the case box). Reflection **Case details** (prefilled from the case summary).
 - **Possible reflection** = the ☆ flag on a case (just a bookmark; missing it doesn't matter).
 - **Analytics** = the old Progress tab (`#progress`). Totals is under it ("Compare with your intake").
@@ -31,7 +32,7 @@ portfolio content.
 
 - **Log** (`ui-log.js`): the case box (aligned example lines; Paste button; "Draft saved" sits on the
   Possible reflection line), Quick picks (suggestions + your shorthand tags, Same as last, your tag
-  groups), All tags, programme tag groups, Still needed, "Save these tags as a tag group" under the tag list, pinned bar (chosen tags, Save, keep date | Save).
+  groups), All tags, Still needed, "Save these tags as a tag group" under the tag list, pinned bar (chosen tags, Save, keep date | Save).
   Paste-a-list (List mode), Plan for later. `editCaseDialog` (full screen on phones, pinned
   Delete/Cancel/Save, 6-line growing box, Tags + "Add tags"; also "New case" from the reflection picker).
 - **Logbook** (`ui-logbook.js`): Calendar (default) | List | Grid. Calendar day: + Log a case (opens Log
