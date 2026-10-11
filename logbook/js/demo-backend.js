@@ -208,6 +208,7 @@ function notifyCases(email) {
 function loadExtras() {
   const st = load(), lb = st.logbooks[DEMO_USER.email];
   if (!lb || lb.extras !== 'pending') return;
+  try { if (localStorage.getItem('apmes-logbook-demo-small')) return; } catch { /* no storage */ }   // the e2e test
   import('./demo-seed.js').then(({ demoLogbook }) => {
     const s2 = load(), lb2 = s2.logbooks[DEMO_USER.email];
     if (!lb2 || lb2.extras !== 'pending') return;

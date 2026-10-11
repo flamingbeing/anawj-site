@@ -6,7 +6,7 @@ import { progress, todayISO, rYearDefault } from './engine.js';
 import { exportTotals } from './xlsxio.js';
 import { reflectionProgress, HEADING_BY_ID } from './reflections.js';
 import { logbookGlance, reflectionGlance, cohortGlance } from './glance.js';
-import { S, h, toast, cloud, rYear, myYearName, settings, subcatsOf, patchLogbook, needExcel, download, displayName, hooks, add, resetters, info, catName, catShort, tagName } from './ui-core.js';
+import { S, h, toast, cloud, rYear, myYearName, settings, subcatsOf, patchLogbook, needExcel, download, displayName, hooks, add, resetters, info, catName, catShort, tagName, summaryOf } from './ui-core.js';
 
 const STATUS_TEXT = { late: 'Behind', due: 'Due this year', ontrack: 'On track', done: 'Done', none: 'No target' };
 // open: the sections you have expanded (they start folded, showing a one-line summary)
@@ -262,7 +262,9 @@ export function renderTotals() {
   if (!tview.summaries && !tview.loading) loadSummaries();
   if (tview.loading && !tview.summaries) { add(card, h('p', { class: 'empty' }, 'Loading totals…')); return card; }
   if (tview.error) add(card, h('p', { class: 'tip' }, tview.error));
-  const all = tview.summaries || [];
+  // your own column is live (like the Analytics comparison), not the copy loaded when the page opened
+  const meRid = S.resident && S.resident.rid && S.casesSynced ? String(S.resident.rid) : null;
+  const all = (tview.summaries || []).map(x => meRid && String(x.rid) === meRid ? (m => ({ ...x, ...m, smo: !!m.smo, rYear: m.smo ? 3 : m.rYear }))(summaryOf()) : x);
   if (!all.length) { add(card, h('p', { class: 'empty' }, 'No programme totals yet.')); return card; }
 
   // grouped by this year's residency year; SMOs count as R3, so they sit with the R3s

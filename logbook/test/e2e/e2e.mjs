@@ -38,35 +38,44 @@ async function run(label, ctxOpts) {
   const errs = [];
   const b = await chromium.launch();
   const ctx = await b.newContext({ acceptDownloads: true, ...ctxOpts });
+  // the e2e counts cases from the six seeded ones: skip the big sample logbook (demo-seed.js)
+  await ctx.addInitScript(() => { try { localStorage.setItem('apmes-logbook-demo-small', '1'); } catch { /* none */ } });
   const p = await ctx.newPage();
+  p.setDefaultTimeout(+process.env.E2E_TIMEOUT || 10000);
   p.on('console', m => { if (m.type() === 'error') errs.push(m.text()); });
   p.on('pageerror', e => errs.push('pageerror: ' + e.message));
   const phone = label === 'phone';
   const shot = async name => { if (phone) await p.screenshot({ path: `${DIR}shots/${name}.png`, fullPage: true }); else await p.screenshot({ path: `${DIR}shots/desk-${name}.png` }); };
   const sub = () => p.evaluate(() => document.getElementById('sub').textContent);
   const nCases = async () => parseInt(await p.evaluate(() => document.body.dataset.cases), 10);
-  // Totals, Account, Settings and Admin live under More
+  // Account, Settings, Export / Import and Admin live under More; Settings is a menu of pages
+  const SETTINGS_PAGES = ['display', 'logging', 'tags', 'reflset', 'sharefmt', 'bin'];
   const tab = async t => {
-    if (['totals', 'account', 'settings', 'admin'].includes(t)) { await p.locator('.tabs button[data-tab="more"]').click(); await p.waitForTimeout(150); await p.locator(`.more-list a[data-go="${t}"]`).click(); }
+    if (SETTINGS_PAGES.includes(t)) { await tab('settings'); await p.locator(`.more-list a[data-go="${t}"]`).click(); }
+    else if (t === 'totals') { await tab('progress'); await p.evaluate(() => { location.hash = '#totals'; }); }
+    else if (['account', 'settings', 'admin', 'data'].includes(t)) { await p.locator('.tabs button[data-tab="more"]').click(); await p.waitForTimeout(150); await p.locator(`.more-list a[data-go="${t}"]`).click(); }
     else await p.locator(`.tabs button[data-tab="${t}"]`).click();
     await p.waitForTimeout(350);
   };
   const R3 = DIR + 'round3/';
   const shot3 = async name => { if (phone) await p.screenshot({ path: R3 + name + '.png', fullPage: false }); };
-  const goAdmin = async () => { await tab('settings'); await p.locator('a', { hasText: 'Open admin' }).click(); await p.waitForTimeout(400); };
+  const goAdmin = async () => { await tab('admin'); };
   const go = async t => t === 'admin' ? goAdmin() : tab(t);
   const toastText = () => p.locator('#toast').innerText();
   // the Logbook opens in the calendar; most steps want the list
   const lbList = async () => { const btn = p.locator('main .seg button', { hasText: /^List$/ }); if (await btn.count()) { await btn.first().click(); await p.waitForTimeout(200); } };
+  // the Logbook filter's Dates, Tags and More fold behind small toggles
+  const lbFold = async t => { const b = p.locator('button.lb-fold', { hasText: t }).first(); if ((await b.getAttribute('aria-expanded')) !== 'true') { await b.click(); await p.waitForTimeout(150); } };
   // Analytics sections start folded
   const openAn = async t => { const d = p.locator('details.an-sec', { hasText: t }).first(); if (!(await d.evaluate(x => x.open))) { await d.locator('summary').click(); await p.waitForTimeout(150); } };
   // the tag editor has its own page (Settings → Open tag editor)
-  const openTagEditor = async () => { await tab('settings'); await p.locator('a', { hasText: 'Open tag editor' }).click(); await p.waitForTimeout(400); return p.locator('section.tag-editor'); };
+  const openTagEditor = async () => { await tab('tags'); return p.locator('main'); };   // the editor card and the Tag list file card
   const stored = () => p.evaluate(() => { const st = JSON.parse(localStorage.getItem('apmes-logbook-demo-v1') || '{}'); return Object.values(((st.logbooks || {})['demo@example.com'] || {}).cases || {}); });
   async function step(name, fn) {
+    if (process.env.E2E_FAILFAST && results.some(r => !r.ok)) return;
     const e0 = errs.length;
     try { const note = await fn(); results.push({ step: name, ok: errs.length === e0, note: errs.length > e0 ? errs.slice(e0).join(' | ') : (note || '') }); }
-    catch (e) { results.push({ step: name, ok: false, note: e.message.split('\n')[0] }); await shot('FAIL-' + name.replace(/\W+/g, '_')).catch(() => {}); for (let i = 0; i < 3 && await p.locator('dialog[open]').count().catch(() => 0); i++) await p.keyboard.press('Escape').catch(() => {}); }
+    catch (e) { results.push({ step: name, ok: false, note: e.message.split('\n')[0] }); if (process.env.E2E_FAILFAST) console.log('FAIL ' + name + ': ' + e.message.split('\n')[0]); await shot('FAIL-' + name.replace(/\W+/g, '_')).catch(() => {}); for (let i = 0; i < 3 && await p.locator('dialog[open]').count().catch(() => 0); i++) await p.keyboard.press('Escape').catch(() => {}); }
   }
   const assert = (c, m) => { if (!c) throw new Error(m); };
 
@@ -387,8 +396,7 @@ async function run(label, ctxOpts) {
       await p.locator('dialog[open] button.danger', { hasText: 'Delete' }).click();
       await p.waitForTimeout(700);
       assert(await nCases() === n0 - 1, 'case not removed');
-      await tab('settings');
-      await p.locator('main button', { hasText: 'Open' }).filter({ hasText: /Open/ }).last().click();
+      await tab('bin');
       await p.waitForTimeout(700);
       const li = p.locator('.bin-list li', { hasText: 'ZZ LSCS' }).first();
       await li.waitFor({ timeout: 3000 });
@@ -668,12 +676,12 @@ async function run(label, ctxOpts) {
     await p.waitForTimeout(150);
     if (await p.locator('.selected .chip').count() < 2) await p.locator('.chip.sugg:not(.all)').first().click();
     await p.waitForTimeout(150);
-    await p.locator('button', { hasText: 'Save as tag group' }).click();
+    await p.locator('button', { hasText: 'as a tag group' }).click();
     await p.locator('dialog[open] input').first().fill('Chole GA');
     await p.locator('dialog[open] button.primary', { hasText: 'Save' }).click();
     await p.waitForTimeout(300);
     assert(await p.locator('.chip.tmpl', { hasText: 'Chole GA' }).count() === 1, 'template chip missing');
-    assert(await p.locator('button', { hasText: 'Save as tag group' }).count() === 0, 'button still shown for a saved combination');
+    assert(await p.locator('button', { hasText: 'as a tag group' }).count() === 0, 'button still shown for a saved combination');
     while (await p.locator('.selected .chip').count()) await p.locator('.selected .chip').first().click();
     await p.locator('textarea.details').fill('');
   });
@@ -693,7 +701,7 @@ async function run(label, ctxOpts) {
     await tab('reflect');
     const ready = p.locator('details.ready-line');
     await ready.waitFor({ timeout: 4000 });
-    assert(/☆ \d+ tagged case/.test(await ready.locator('summary').innerText()), 'tagged line: ' + await ready.locator('summary').innerText());
+    assert(/☆ \d+ interesting case/.test(await ready.locator('summary').innerText()), 'tagged line: ' + await ready.locator('summary').innerText());
     if (!(await ready.evaluate(d => d.open))) await ready.locator('summary').click();
     const row = ready.locator('li', { hasText: 'TG' });
     assert(await row.count() === 1, 'tagged case not in the tagged list');
@@ -718,7 +726,7 @@ async function run(label, ctxOpts) {
     await tab('log');
     await p.locator('textarea.details').fill('SC 40M\nshoulder arthroscopy interscalene block');
     await p.waitForTimeout(300);
-    await p.locator('input[type=search]').first().fill('26');
+    await p.locator('input[type=search]').first().fill('peripheral nerve');
     await p.locator('input[type=search]').first().press('Enter');
     await p.waitForTimeout(200);
     await p.locator('.chip.sc', { hasText: 'Interscalene' }).click();
@@ -818,8 +826,8 @@ async function run(label, ctxOpts) {
     assert(tbox.y + tbox.height < 0, 'case box should scroll away');
     await p.evaluate(() => window.scrollTo(0, 0));
     // Enter saves (setting)
-    await tab('settings');
-    await p.locator('label.check', { hasText: 'Enter key saves' }).locator('input').check();
+    await tab('logging');
+    await p.locator('label.field', { hasText: 'Enter key' }).locator('select').selectOption('single');
     await p.waitForTimeout(300);
     await tab('log');
     const ta = p.locator('textarea.details');
@@ -830,8 +838,8 @@ async function run(label, ctxOpts) {
     await ta.press('End'); await ta.press('Enter');
     await p.waitForTimeout(400);
     assert(await nCases() === n0 + 1, 'Enter did not save with the setting on');
-    await tab('settings');
-    await p.locator('label.check', { hasText: 'Enter key saves' }).locator('input').uncheck();
+    await tab('logging');
+    await p.locator('label.field', { hasText: 'Enter key' }).locator('select').selectOption('newline');
     await p.waitForTimeout(300);
     // admin renames a category for display; pills use the short name
     await goAdmin();
@@ -842,12 +850,12 @@ async function run(label, ctxOpts) {
     assert(/Peripheral nerve block/.test(await namesCard.innerText()) && /PNB/.test(await namesCard.innerText()), 'default names missing');
     await namesCard.locator('button', { hasText: /^Edit/ }).first().click();
     await p.waitForTimeout(200);
-    await p.locator('input[aria-label="Display name for 26"]').fill('Nerve blocks (single shot)');
-    await p.locator('input[aria-label="Pill name for 26"]').fill('Blocks');
+    await p.locator('input[aria-label="Display name for Peripheral nerve blocks"]').fill('Nerve blocks (single shot)');
+    await p.locator('input[aria-label="Pill name for Peripheral nerve blocks"]').fill('Blocks');
     await p.locator('button', { hasText: 'Save names' }).click();
     await p.waitForTimeout(400);
     await tab('log');
-    await p.locator('input[type=search]').first().fill('26');
+    await p.locator('input[type=search]').first().fill('peripheral nerve');
     await p.waitForTimeout(200);
     assert(/Nerve blocks \(single shot\)/.test(await p.locator('.picker').innerText()), 'display name not in the list');
     await p.locator('input[type=search]').first().press('Enter');
@@ -882,7 +890,7 @@ async function run(label, ctxOpts) {
     t = await yearTo('4');
     assert(/\bSR1\b/.test(t) && /Senior residency \(SR1–SR2\)/.test(t), 'SR1 not shown: ' + t.slice(0, 200));
     assert(!/by R[45]\b/.test(t), 'R4/R5 still shown on Progress');
-    await yearTo('2');
+    await yearTo('3');   // back to the seeded R3 (with the batchmates on Totals)
     // pages under More have a way back
     await tab('settings');
     await p.locator('main .back-row a', { hasText: '← More' }).click();
@@ -916,7 +924,7 @@ async function run(label, ctxOpts) {
     assert((await p.locator('table.totals thead').innerText()).includes('Resident C'), 'Resident C did not come back');
   });
 
-  await step('logbook: date words, share; backup and restore', async () => {
+  await step('logbook: date words, copy; backup and restore', async () => {
     await tab('logbook'); await lbList();
     const items = p.locator('ul.cases li:not(.monthhead)');
     await p.locator('input[type=search]').fill('today');
@@ -927,15 +935,16 @@ async function run(label, ctxOpts) {
     assert(nToday === todayCases && nToday > 0, `"today" shows ${nToday}, expected ${todayCases}`);
     await p.locator('input[type=search]').fill('');
     await p.waitForTimeout(300);
-    // Share on each row (not in the edit dialog); Markdown for the day
-    assert(await items.first().locator('button', { hasText: /^Share$/ }).count() === 1, 'no Share on the row');
+    // Copy on each row (not Share, not in the edit dialog); the day copies as [[date]] then 1. AB case, no tags
+    assert(await items.first().locator('button', { hasText: /^Copy$/ }).count() === 1, 'no Copy on the row');
+    assert(await items.first().locator('button', { hasText: /^Share$/ }).count() === 0, 'Share still on the row');
     await items.first().locator('.t').click();
     assert(await p.locator('dialog[open] button', { hasText: 'Share case' }).count() === 0, 'Share case still in the dialog');
-    const md = await p.evaluate(async () => { const m = await import('/logbook/js/share.js'); const { S } = await import('/logbook/js/ui-core.js'); return m.dayMarkdown(S.cases[0].date); });
-    assert(/^## \[\[\d{4}-\d{2}-\d{2}\]\] Cases \(\d+\)\n- /.test(md) && /#apmes\/\d{2}/.test(md), 'markdown ' + md.slice(0, 120));
+    const md = await p.evaluate(async () => { const m = await import('/logbook/js/share.js'); const { S } = await import('/logbook/js/ui-core.js'); return m.dayText(S.cases[0].date); });
+    assert(/^\[\[\d{4}-\d{2}-\d{2}\]\]\n1\./.test(md) && !/#apmes/.test(md), 'day text ' + md.slice(0, 120));
     await p.locator('dialog[open] button', { hasText: 'Cancel' }).click();
     // backup, delete a case, restore brings it back
-    await tab('settings');
+    await tab('data');
     const [dl] = await Promise.all([p.waitForEvent('download'), p.locator('button', { hasText: 'Download backup' }).click()]);
     const file = DIR + `backup-${label}.json`;
     await dl.saveAs(file);
@@ -947,7 +956,7 @@ async function run(label, ctxOpts) {
     await p.locator('dialog[open] button.danger', { hasText: 'Delete' }).click();
     await p.waitForTimeout(500);
     assert(await nCases() === n0 - 1, 'case not deleted');
-    await tab('settings');
+    await tab('data');
     await p.locator('label', { hasText: 'Restore from backup' }).locator('input').setInputFiles(file);
     await p.locator('dialog[open]').filter({ hasText: 'Add 1 case' }).waitFor({ timeout: 5000 });
     await p.locator('dialog[open] button.primary', { hasText: 'Restore' }).click();
@@ -985,13 +994,13 @@ async function run(label, ctxOpts) {
   await step('case box height setting; logbook search: initials only, procedure only, fuzzy', async () => {
     await tab('log');
     const h3 = await p.locator('textarea.details').evaluate(t => t.getBoundingClientRect().height);
-    await tab('settings');
+    await tab('logging');
     await p.locator('label.field', { hasText: 'Case box height' }).locator('select').selectOption('8');
     await p.waitForTimeout(300);
     await tab('log');
     const h8 = await p.locator('textarea.details').evaluate(t => t.getBoundingClientRect().height);
     assert(h8 > h3 + 60, 'box did not grow: ' + h3 + ' -> ' + h8);
-    await tab('settings');
+    await tab('logging');
     await p.locator('label.field', { hasText: 'Case box height' }).locator('select').selectOption('3');
     await p.waitForTimeout(300);
     await tab('logbook'); await lbList();
@@ -1000,6 +1009,7 @@ async function run(label, ctxOpts) {
     const btn = p.locator('button', { hasText: /^Filter/ }).first();
     if ((await btn.getAttribute('aria-expanded')) !== 'true') await btn.click();
     assert(await n('tonsillectmy') === 0, 'typo found without fuzzy');
+    await lbFold('More');
     await p.locator('label.check', { hasText: 'Fuzzy search' }).locator('input').check(); await p.waitForTimeout(300);
     assert(await n('tonsillectmy') >= 1, 'fuzzy did not find the typo');
     await p.locator('label.check', { hasText: 'Fuzzy search' }).locator('input').uncheck(); await p.waitForTimeout(300);
@@ -1040,10 +1050,10 @@ async function run(label, ctxOpts) {
     assert((await p.locator('ul.cases li:not(.monthhead) .t').allInnerTexts()).some(t => t.endsWith(' g')), 'grid edit not saved');
   });
 
-  await step('logbook calendar view: today shows the case, full-name tags', async () => {
+  await step('logbook calendar view: today shows the case, short tag names', async () => {
     await shot3('logbook-list');
     const tags = await p.locator('ul.cases .lb-tag').allInnerTexts();
-    assert(tags.some(t => /Lower Segment Caesarean Section/i.test(t)), 'no full-name LSCS tag: ' + tags.slice(0, 6).join(' | '));
+    assert(tags.some(t => t.trim() === 'LSCS') && !tags.some(t => /Lower Segment Caesarean Section/i.test(t)), 'no short LSCS tag: ' + tags.slice(0, 6).join(' | '));
     assert(!tags.some(t => /^\d+[a-z]*$/.test(t.trim())), 'numeric tag present');
     const titles = await p.locator('ul.cases .lb-tag').evaluateAll(els => els.map(e => e.title));
     assert(titles.every(t => !/\d|_\|_/.test(t) || /\d+ (months|years)|3 years/.test(t)), 'tooltip has code: ' + titles.find(t => /^\d/.test(t)));
@@ -1076,17 +1086,20 @@ async function run(label, ctxOpts) {
     await p.locator('dialog[open]', { hasText: /changed|No changes/ }).waitFor();
   };
   await step('excel export + upload round trip with one edit', async () => {
-    const [dl] = await Promise.all([p.waitForEvent('download'), p.locator('details.more-tools').evaluate(d => { d.open = true; }).then(() => p.locator('button', { hasText: 'Download Excel' }).click())]);
+    // More → Export / Import → Backup: Download Excel… opens the export choices
+    await tab('data');
+    await p.locator('button', { hasText: 'Download Excel' }).click();
+    const [dl] = await Promise.all([p.waitForEvent('download'), p.locator('dialog[open] button.primary', { hasText: 'Download' }).click()]);
     const file = `${DIR}export-${label}.xlsx`;
     await dl.saveAs(file);
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load(fs.readFileSync(file));
     const ws = wb.getWorksheet('Cases');
-    assert(ws && wb.getWorksheet('Summary'), 'sheets missing');
+    assert(ws, 'sheets missing: ' + wb.worksheets.map(w => w.name + ':' + w.state).join(', ') + ' / ' + JSON.stringify(wb.worksheets[0].getRow(1).values));
     const col2 = []; ws.eachRow((row, n) => { if (n > 1) col2.push(String(row.getCell(2).value || '')); });
     assert(col2.includes('AC 34F LSCS spinal') && col2.some(t => /^GH 45F lap chole/.test(t)) && col2.includes('QR 75M TURP spinal edited'), 'export details: ' + col2.join(' | '));
     // untouched file back in: no changes
-    await p.locator('details.more-tools').evaluate(d => { d.open = true; }); await p.locator('label', { hasText: 'Upload Excel/CSV logbook' }).locator('input').setInputFiles(file);
+    await p.locator('label', { hasText: 'Upload Excel/CSV' }).locator('input').setInputFiles(file);
     await mapReview(true);
     const t0 = await p.locator('dialog[open] p').first().innerText();
     assert(t0.startsWith('No changes found'), 'untouched upload: ' + t0 + ' / ' + (await p.locator('dialog[open]').innerText()).slice(0, 400));
@@ -1096,13 +1109,14 @@ async function run(label, ctxOpts) {
     const r = ws.getRow(2);
     r.getCell(2).value = String(r.getCell(2).value) + ' xl-edit';
     fs.writeFileSync(`${DIR}edited-${label}.xlsx`, Buffer.from(await wb.xlsx.writeBuffer()));
-    await p.locator('details.more-tools').evaluate(d => { d.open = true; }); await p.locator('label', { hasText: 'Upload Excel/CSV logbook' }).locator('input').setInputFiles(`${DIR}edited-${label}.xlsx`);
+    await p.locator('label', { hasText: 'Upload Excel/CSV' }).locator('input').setInputFiles(`${DIR}edited-${label}.xlsx`);
     await mapReview(true);
     const txt = await p.locator('dialog[open] p').first().innerText();
     await shot('excel-diff');
     assert(txt.startsWith('1 changed, 0 new, 0 deleted'), 'diff: ' + txt);
     await p.locator('dialog[open] button', { hasText: 'Apply' }).click();
     await p.waitForTimeout(400);
+    await tab('logbook'); await lbList();
     assert((await p.locator('ul.cases li:not(.monthhead) .t').allInnerTexts()).some(t => t.includes('xl-edit')), 'apply not shown');
     return txt + ` (${dl.suggestedFilename()})`;
   });
@@ -1110,9 +1124,8 @@ async function run(label, ctxOpts) {
   await step('upload a CSV with other column names: match them, month-first dates, preview, apply', async () => {
     const csv = 'When,Pt,What we did,APMES\r\n3/13/2026,XY,CSV import lap chole,"08, 13"\r\n3/14/2026,YZ,CSV import bad code,zz9\r\n';
     const f = `${DIR}upload-${label}.csv`; fs.writeFileSync(f, csv);
-    await tab('logbook'); await lbList();
-    await p.locator('details.more-tools').evaluate(d => { d.open = true; });
-    await p.locator('label', { hasText: 'Upload Excel/CSV logbook' }).locator('input').setInputFiles(f);
+    await tab('data');
+    await p.locator('label', { hasText: 'Upload Excel/CSV' }).locator('input').setInputFiles(f);
     const dlg = p.locator('dialog[open]', { hasText: 'match the columns' });
     await dlg.waitFor();
     await dlg.locator('select[aria-label="Date"]').selectOption('0');
@@ -1133,14 +1146,13 @@ async function run(label, ctxOpts) {
     const st = (await stored()).find(c => c.initials === 'XY');
     assert(st && st.date === '2026-03-13' && st.cats.includes('08'), 'csv case: ' + JSON.stringify(st));
     // the column names are remembered
-    await p.locator('details.more-tools').evaluate(d => { d.open = true; });
-    await p.locator('label', { hasText: 'Upload Excel/CSV logbook' }).locator('input').setInputFiles(f);
+    await p.locator('label', { hasText: 'Upload Excel/CSV' }).locator('input').setInputFiles(f);
     await dlg.waitFor();
     assert(await dlg.locator('select[aria-label="Case summary"]').inputValue() === '2', 'mapping not remembered');
     await dlg.locator('button', { hasText: 'Cancel' }).click();
   });
 
-  await step('progress both views', async () => {
+  await step('analytics: folded sections, glance, trends', async () => {
     await tab('progress');
     // folded sections with a one-line summary; open on tap
     assert(await p.locator('details.an-sec').count() >= 4, 'analytics sections');
@@ -1150,14 +1162,9 @@ async function run(label, ctxOpts) {
     await openAn('Trends');
     assert(await p.locator('.an-bars .an-bar').count() === 12 && await p.locator('.an-heat .an-day').count() > 300, 'trends charts');
     await shot('progress');
-    await p.locator('details.more-tools').first().evaluate(d => { d.open = true; }).catch(() => {}); await p.locator('.seg button', { hasText: 'By EPA' }).click();
-    await p.waitForTimeout(200);
-    await openAn('Targets by EPA');
-    assert(await p.locator('.epa').count() > 3, 'epa groups');
-    await shot('progress-epa');
-    await p.locator('details.more-tools').first().evaluate(d => { d.open = true; }).catch(() => {}); const [dl] = await Promise.all([p.waitForEvent('download'), p.locator('button', { hasText: 'Download summary' }).click()]);
-    await p.locator('.seg button', { hasText: 'By tag' }).click();
-    return dl.suggestedFilename();
+    // no EPA view or summary download any more; each card shows a glance before it opens
+    assert(await p.locator('.seg button', { hasText: 'By EPA' }).count() === 0 && await p.locator('button', { hasText: 'Download summary' }).count() === 0, 'EPA view / summary download still there');
+    assert(await p.locator('details.an-sec .glance').count() >= 1, 'no glance on the cards');
   });
 
   await step('reflection from a logged case, complete, progress, export', async () => {
@@ -1447,7 +1454,7 @@ async function run(label, ctxOpts) {
     await tab('more');
     assert(await p.locator('section.export-sync h2', { hasText: /^Export$/ }).count() === 1 && await p.locator('section.export-sync a', { hasText: 'Choose reflections and export' }).count() === 1, 'no link from Export');
     // the setting: new reflections start unticked
-    await tab('settings');
+    await tab('reflset');
     await p.locator('label.check', { hasText: 'New reflections are included' }).locator('input').uncheck();
     await p.waitForTimeout(300);
     const st2 = await p.evaluate(() => JSON.parse(localStorage.getItem('apmes-logbook-demo-v1')).logbooks['demo@example.com'].doc.settings);
@@ -1498,10 +1505,10 @@ async function run(label, ctxOpts) {
     assert(!bad.length, bad.join(' || '));
   });
 
-  await step('theme: light by default; Dark and Auto in Settings', async () => {
+  await step('theme: light by default; dark and auto in Settings → Display', async () => {
     assert(await p.evaluate(() => document.documentElement.dataset.theme) === 'light', 'default theme not light');
-    await tab('settings');
-    const sel = p.locator('label.field', { hasText: 'Theme' }).locator('select');
+    await tab('display');
+    const sel = p.locator('label.field', { hasText: 'Light or dark' }).locator('select');
     await sel.selectOption('dark');
     await p.waitForTimeout(500);
     const bg = await p.evaluate(() => getComputedStyle(document.body).backgroundColor);
@@ -1510,16 +1517,16 @@ async function run(label, ctxOpts) {
     await p.waitForSelector('.tabs button[data-tab="log"]');
     await p.waitForTimeout(500);
     assert(await p.evaluate(() => document.documentElement.dataset.theme) === 'dark', 'dark lost after reload');
-    await tab('settings');
-    await p.locator('label.field', { hasText: 'Theme' }).locator('select').selectOption('auto');
+    await tab('display');
+    await p.locator('label.field', { hasText: 'Light or dark' }).locator('select').selectOption('auto');
     await p.waitForTimeout(300);
     assert(await p.evaluate(() => getComputedStyle(document.body).backgroundColor) === 'rgb(243, 243, 243)', 'auto should be light when the phone is light');
-    await p.locator('label.field', { hasText: 'Theme' }).locator('select').selectOption('light');
+    await p.locator('label.field', { hasText: 'Light or dark' }).locator('select').selectOption('light');
     await p.waitForTimeout(300);
   });
 
   await step('compact mode toggle persists after reload', async () => {
-    await tab('settings');
+    await tab('display');
     const sw = p.locator('label.check', { hasText: 'Compact mode' }).locator('input');
     if (!(await sw.isChecked())) await sw.check();
     await p.waitForTimeout(600);
@@ -1535,7 +1542,7 @@ async function run(label, ctxOpts) {
     await p.waitForTimeout(300);
     await shot3('log-compact');
     await p.locator('textarea.details').fill('');
-    await tab('settings');
+    await tab('display');
     assert(await p.locator('label.check', { hasText: 'Compact mode' }).locator('input').isChecked(), 'switch not checked after reload');
     const w = await p.evaluate(() => [document.documentElement.scrollWidth, innerWidth]);
     assert(w[0] <= w[1], 'compact h-scroll');

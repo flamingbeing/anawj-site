@@ -90,4 +90,18 @@ const wb2 = new globalThis.ExcelJS.Workbook(); await wb2.xlsx.load(new Uint8Arra
 assert.deepEqual(wb2.worksheets.map(w => w.name), ['Reflections']);
 assert.equal(wb2.getWorksheet('Reflections').getRow(2).getCell(1).value instanceof Date, true);   // Excel dates by default
 
+// every tag the export writes reads back on upload, in both styles
+{
+  const { catFromText } = await import('../js/engine.js');
+  const { ACTIVE } = await import('../js/categories.js');
+  for (const c of ACTIVE) for (const style of ['full', 'short']) assert.equal(catFromText(tagText(c.code, style)), c.code, `${style} name for ${c.code}: ${tagText(c.code, style)}`);
+  // and as a cell of names joined with commas, the way the export writes them
+  const { caseFromRow } = await import('../js/engine.js');
+  for (const style of ['full', 'short']) {
+    const r = caseFromRow({ date: '2026-10-01', details: 'x', categories: ACTIVE.map(c => tagText(c.code, style)).join(', ') });
+    assert.deepEqual(r.unknown, [], style);
+    assert.deepEqual(r.cats, ACTIVE.map(c => c.code), style);
+  }
+}
+
 console.log('export options tests passed');
