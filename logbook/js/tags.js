@@ -18,7 +18,7 @@
 import { CATEGORIES, BY_CODE } from './categories.js';
 import { STOP } from './keywords.js';
 
-export const MAX_TAGS = 300;
+export const MAX_TAGS = 300;   // your own tags and headers (the APMES tags don't count)
 const ACTIVE = CATEGORIES.filter(c => !c.retired);
 const TOPS = ACTIVE.filter(c => !c.parent);
 const isCode = code => !!(BY_CODE[code] && !BY_CODE[code].retired);
@@ -50,6 +50,7 @@ export function defaultTagSet({ catOrder = null, subcats = null } = {}) {
 export function cleanTagSet(list) {
   const seen = new Set();
   const out = [];
+  let own = 0;
   for (const raw of Array.isArray(list) ? list : []) {
     if (!raw || typeof raw.k !== 'string') continue;
     const k = raw.k.slice(0, 80);
@@ -74,9 +75,10 @@ export function cleanTagSet(list) {
     const kw = cleanShorthand(raw.kw);
     if (!e.hd && (kw.length || (k.startsWith('c:') && Array.isArray(raw.kw)))) e.kw = kw;
     if (raw.hide && !e.hd) e.hide = true;
+    if (!k.startsWith('c:') && own >= MAX_TAGS) continue;
+    if (!k.startsWith('c:')) own++;
     seen.add(k);
     out.push(e);
-    if (out.length >= MAX_TAGS) break;
   }
   for (const c of ACTIVE) if (!seen.has('c:' + c.code)) { out.push({ k: 'c:' + c.code }); seen.add('c:' + c.code); }
   // built-in subcategories sit under their official parent; other parents must exist and not loop
@@ -117,7 +119,7 @@ export const DEFAULT_SHORTHAND = {
   '11': ['mll', 'microlaryngoscopy', 'dl', 'trachy', 'tracheostomy', 'rigid bronchoscopy', 'jet ventilation'],
   '16': ['lscs', 'caesarean', 'cesarean', 'c-section', 'csection'],
   '17': ['labour epidural', 'labor epidural', 'labour analgesia', 'labor analgesia', 'labour cse', 'labor cse'],
-  '13': ['appy', 'appendicectomy', 'appendectomy', 'chole', 'hernia', 'hemicolectomy', 'anterior resection', 'mastectomy', 'wle', 'mrm', 'slnb'],
+  '13': ['lap chole', 'lap appy', 'appy', 'appendicectomy', 'appendectomy', 'chole', 'hernia', 'hemicolectomy', 'anterior resection', 'mastectomy', 'wle', 'mrm', 'slnb'],
   '14': ['hyst', 'tah', 'tlh', 'lah', 'hysterectomy', 'myomectomy', 'd&c', 'dnc', 'erpc', 'hysteroscopy', 'ectopic', 'bso'],
   '15': ['crani', 'craniotomy', 'craniectomy', 'evd', 'vp shunt', 'burr hole', 'burr holes'],
   '18': ['tka', 'tkr', 'tha', 'thr', 'uka', 'hemiarthroplasty', 'dhs', 'orif', 'nof', 'acl', 'arthroscopy', 'mua', 'pfna', 'tsr', 'k wire'],
@@ -143,7 +145,7 @@ export function cleanShorthand(v) {
   const list = Array.isArray(v) ? v : String(v ?? '').split(/[,;\n]+/);
   return [...new Set(list.map(x => str(x, 30).toLowerCase()).filter(Boolean))].slice(0, 30);
 }
-const wordRe = w => new RegExp(`(?:^|[^a-z0-9])${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '\\s+')}(?![a-z0-9])`);
+const wordRe = w => new RegExp(`(?:^|[^a-z0-9])${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '\\s+')}(?![a-z0-9])`, 'g');
 // the case text without leading initials before an age ("DL 45M …"), lower case
 const caseWords = text => String(text || '').replace(/^\s*[A-Z]{2,4}(?=[\s\/,:;.-]+\d)/, '').toLowerCase();
 // For suggest(): [{ re, code }] from shorthand on APMES tags.
@@ -243,7 +245,8 @@ export function tagName(set, key) {
   const e = set.find(x => x.k === key);
   if (e && e.n) return e.n;
   const i = String(key).indexOf(':');
-  return i >= 0 && !String(key).startsWith('u:') ? String(key).slice(i + 1) : String(key);
+  // a personal tag taken off the list (cases keep it): never show its raw key
+  return String(key).startsWith('u:') ? 'Removed tag' : i >= 0 ? String(key).slice(i + 1) : String(key);
 }
 
 // ---------- sharing as a CSV file (opens in Excel; meant to be edited by hand) ----------
@@ -274,7 +277,11 @@ const norm = s => String(s ?? '').toLowerCase().replace(/[‘’`]/g, "'").repla
 // names(code) -> { pill, long } as shown now (for the built-in rows' default names).
 export function tagSetToCsv(set, names = () => ({ pill: '', long: '' })) {
   const byK = new Map(set.map(e => [e.k, e]));
-  const label = k => { const e = byK.get(k); if (!e) return ''; return e.n || (e.k.startsWith('c:') ? names(e.k.slice(2)).pill : ''); };
+  const nameOf = e => e.n || (e.k.startsWith('c:') ? names(e.k.slice(2)).pill : '');
+  // Under by name, or by ID when two rows share that name (so a round trip can't move a tag)
+  const used = new Map();
+  for (const e of set) { const nm = nameOf(e).toLowerCase(); used.set(nm, (used.get(nm) || 0) + 1); }
+  const label = k => { const e = byK.get(k); if (!e) return ''; const nm = nameOf(e); return used.get(nm.toLowerCase()) > 1 ? e.k : nm; };
   const rows = [CSV_HEAD];
   for (const n of flatTree(tagTree(set))) {
     const e = n.e;
@@ -290,7 +297,8 @@ export function tagSetToCsv(set, names = () => ({ pill: '', long: '' })) {
 // The separator is a comma, or a semicolon or tab when the first line uses those (Excel in some regions).
 export function parseCsv(text) {
   const s = String(text || '').replace(/^﻿/, '');
-  const first = s.split(/\r?\n/, 1)[0] || '';
+  // the separator: the one used most in the first lines (a title line may sit above the headings)
+  const first = s.split(/\r?\n/, 10).join('\n');
   const count = ch => first.split(ch).length - 1;
   const sep = [',', ';', '\t'].sort((x, y) => count(y) - count(x))[0];
   const rows = [];
@@ -344,7 +352,7 @@ export function tagSetFromCsv(text, names = () => ({ pill: '', long: '' }), curr
   }
   for (const e of current || []) if (e.k && e.k.startsWith('c:') && isCode(e.k.slice(2))) { addName(e.n, e.k.slice(2)); addName(e.l, e.k.slice(2)); }
   const codeOf = x => {
-    const m = /^(\d{1,2}[a-z]?)(?=$|[\s).:\-–])/i.exec(x);
+    const m = /^(\d{1,2}(?:iv|i{1,3}|[a-z])?)(?=$|[\s).:\-–])/i.exec(x);
     if (m) { const code = m[1].toLowerCase().replace(/^(\d)(?!\d)/, '0$1'); if (isCode(code)) return code; }
     return byName.get(norm(x)) || null;
   };
@@ -421,6 +429,8 @@ export function tagSetFromCsv(text, names = () => ({ pill: '', long: '' }), curr
   if (missing.length) notes.push(`${missing.length} APMES tag${missing.length === 1 ? ' isn’t' : 's aren’t'} in the file, so ${missing.length === 1 ? 'it goes' : 'they go'} at the end of the list: ${missing.map(catRef).join(', ')}`);
   const dropped = mine.filter(x => !keys.has(x.k)).map(x => x.n);
   if (dropped.length) notes.push(`${dropped.length} of your tags ${dropped.length === 1 ? 'isn’t' : 'aren’t'} in the file, so ${dropped.length === 1 ? 'it comes' : 'they come'} off the list (cases keep them): ${dropped.join(', ')}`);
+  const own = set.filter(e => !e.k.startsWith('c:')).length;
+  if (own > MAX_TAGS) errors.push(`The file has ${own} personal tags and headers; only the first ${MAX_TAGS} are kept`);
   return { set: cleanTagSet(set), errors, notes, counts, missing, dropped };
 }
 
@@ -451,8 +461,7 @@ export function moveTag(set, key, dir) {
 export function reparentTag(set, key, p) {
   const mine = blockOf(set, key);
   if (p && mine.has(p)) return set;   // not under itself
-  const moved = set.filter(e => mine.has(e.k)).map(e => (e.k === key ? { ...e, ...(p ? { p } : {}), ...(p ? {} : { p: undefined }) } : e));
-  if (!p) delete moved[0].p;
+  const moved = set.filter(e => mine.has(e.k)).map(e => { if (e.k !== key) return e; const { p: _old, ...x } = e; return p ? { ...x, p } : x; });
   const rest = set.filter(e => !mine.has(e.k));
   let at = rest.length;
   if (p) { const under = blockOf(rest, p); at = Math.max(...rest.map((e, i) => (under.has(e.k) ? i : -1))) + 1; }

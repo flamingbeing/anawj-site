@@ -9,7 +9,7 @@
 import { REFLECTION_HEADINGS, REFLECTION_SECTIONS, yearName } from './categories.js';
 import { reflectionProgress, reflectionCounts, HEADING_BY_ID, splitDetails, completeProblems, isLegacy, LIMITS, IMAGE_MAX_B64, IMAGE_MAX_SIDE, IMAGE_QUALITY, PHOTO_BUDGET_KB, PHOTO_NOTE, photoUsageKb, imageKb, fmtMb, wordCount, MIN_WORDS, suggestHeadings, moveToHeading, inExport, exportSummary, pickJustEnough } from './reflections.js';
 export { completeProblems };
-import { fmtDate, caseText, procedureText } from './engine.js';
+import { fmtDate, caseText, procedureText, caseParts } from './engine.js';
 import { S, h, toast, cloud, debounce, hooks, rYear, effectiveIntake, residentSmo, todayISO, confirmBox, add, resetters, scheduleSummary, displayName, byNewest, catName, updateCase, settings } from './ui-core.js';
 import { renderExportButton, caseRYear, countsByYear } from './portfolio.js';
 
@@ -27,9 +27,16 @@ const saveView = () => { try { localStorage.setItem(VIEW_KEY, JSON.stringify({ g
 // closed by hand (met headings start closed); group / sort: how the list is grouped and ordered (this device).
 
 const mine = () => S.user.email;
-const lsGet = () => { try { return JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null'); } catch { return null; } };
-const lsSet = r => { try { r ? localStorage.setItem(DRAFT_KEY, JSON.stringify(r)) : localStorage.removeItem(DRAFT_KEY); } catch { /* blocked */ } };
-resetters.push(() => { rv.editing = null; rv.picking = null; rv.editMode = false; rv.sel.clear(); rv.view = null; lsSet(null); });
+// the unsaved editor draft is kept per account (and apart from the demo), like the Log page's
+const draftKey = () => `${DRAFT_KEY}:${cloud.demo ? 'demo:' : ''}${(S.user && S.user.email) || ''}`;
+const lsGet = () => { try { return JSON.parse(localStorage.getItem(draftKey()) || 'null'); } catch { return null; } };
+const lsSet = r => { try { r ? localStorage.setItem(draftKey(), JSON.stringify(r)) : localStorage.removeItem(draftKey()); } catch { /* blocked */ } };
+// sign-out: nothing of this person's is left for the next one (drafts, search, open headings, figure previews)
+resetters.push(() => {
+  Object.assign(rv, { editing: null, picking: null, editMode: false, view: null, q: '', filter: 'all', thumbs: {}, viewOpen: false, readyOpen: false, toolsOpen: false });
+  rv.sel.clear(); rv.openH.clear(); rv.shutH.clear();
+  try { for (const k of Object.keys(localStorage)) if (k.startsWith(DRAFT_KEY)) localStorage.removeItem(k); } catch { /* blocked */ }
+});
 
 // Live reflections for the signed-in user (app.js calls this after sign-in).
 export function watchMyReflections(email) {
@@ -52,7 +59,8 @@ const blank = (over = {}) => ({
 // From a logged case: its initials (older cases have them at the front of the details), the procedure
 // line as the diagnosis, and its case summary as the reflection's case details (summary).
 const fromCase = c => {
-  const { initials, diagnosis: rest } = c.initials ? { initials: c.initials, diagnosis: String(c.details || '').trim() } : splitDetails(c.details);
+  // the case's own initials field (even when empty); only older cases carry them at the front of the details
+  const { initials, details } = caseParts(c), rest = String(details || '').trim();
   return { initials, diagnosis: procedureText(c) || rest, summary: rest, date: c.date || null, caseId: c.id };
 };
 // preset: { headingId, subId } from a heading's "+ Add" button.
@@ -585,7 +593,8 @@ async function moveReflection(r, headingId) {
 // ---------- mark the portfolio as ready (admins generate it; js/cloud.js submissions) ----------
 
 const RS = { sub: undefined, loading: false, busy: false };
-resetters.push(() => { RS.sub = undefined; RS.loading = false; });
+// gen: bumped on sign-out, so a load still running for the last person is dropped
+resetters.push(() => { RS.sub = undefined; RS.loading = false; RS.busy = false; RS.gen = (RS.gen || 0) + 1; });
 const hashStr = s => { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return (h >>> 0).toString(36); };
 // what admins would get now: the ticked reflections, Section 1, the Section 4 numbers, and a fingerprint
 function readyPayload() {
@@ -599,6 +608,8 @@ function readyPayload() {
 }
 async function markReady(ex, update = false) {
   // no check against the portfolio rules here: the programme also reviews interim portfolios
+  // the admins read this copy from the server, so it needs a connection (offline it would wait forever)
+  if (!cloud.demo && !navigator.onLine) return toast('Marking the portfolio ready needs a connection. Try again when you have signal.');
   RS.busy = true; hooks.render();
   try {
     const { list, meta } = readyPayload();
@@ -610,7 +621,8 @@ async function markReady(ex, update = false) {
 function readyCard(ex) {
   if (RS.sub === undefined && !RS.loading) {
     RS.loading = true;
-    cloud.loadMySubmission(mine()).then(x => { RS.sub = x; RS.loading = false; if (S.tab === 'export') hooks.render(); });
+    const gen = RS.gen;
+    cloud.loadMySubmission(mine()).then(x => { if (gen !== RS.gen) return; RS.sub = x; RS.loading = false; if (S.tab === 'export') hooks.render(); });
   }
   const sub = RS.sub;
   const changed = sub && sub.fp !== readyPayload().meta.fp;
@@ -624,6 +636,7 @@ function readyCard(ex) {
       sub ? [
         h('button', { class: changed ? 'primary' : '', disabled: RS.busy, onclick: () => markReady(ex, true) }, RS.busy ? 'Saving…' : 'Update'),
         h('button', { disabled: RS.busy, onclick: async () => {
+          if (!cloud.demo && !navigator.onLine) return toast('Unmarking needs a connection. Try again when you have signal.');
           if (!(await confirmBox('Unmark the portfolio?', 'The admins will no longer be able to generate it until you mark it ready again.', 'Unmark', true))) return;
           try { await cloud.withdrawPortfolio(mine()); RS.sub = null; toast('Portfolio unmarked'); } catch (err) { toast('Could not unmark: ' + err.message); }
           hooks.render();

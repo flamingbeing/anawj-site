@@ -1,6 +1,6 @@
 // Run with: node logbook/test/tags.test.mjs  (fake data only)
 import assert from 'node:assert/strict';
-import { learnShorthand, cleanShorthand, apmesShorthand, shorthandTags, defaultTagSet, cleanTagSet, tagSetOf, tagTree, flatTree, tagLinks, userCatNames, tagName, tagSetToCsv, tagSetFromCsv, parseCsv } from '../js/tags.js';
+import { reparentTag, learnShorthand, cleanShorthand, apmesShorthand, shorthandTags, defaultTagSet, cleanTagSet, tagSetOf, tagTree, flatTree, tagLinks, userCatNames, tagName, tagSetToCsv, tagSetFromCsv, parseCsv } from '../js/tags.js';
 import { CATEGORIES } from '../js/categories.js';
 
 const ACTIVE = CATEGORIES.filter(c => !c.retired);
@@ -124,6 +124,25 @@ import('../js/tags.js').then(({ shorthandOf, DEFAULT_SHORTHAND }) => {
   assert.ok(!learnShorthand(cs, 'c:13', { have: ['appy'] }).some(x => x.w === 'appy'), 'words you have are not suggested');
   assert.ok(learnShorthand(cs, 'u:knee').some(x => x.w === 'tkr'), 'personal tags too');
   assert.deepEqual(learnShorthand(cs.slice(0, 2), 'c:13'), [], 'needs at least 3 cases');
+}
+// review fixes: roman numerals, same names round trip, separator under a title, reparent order, cap
+{
+  const r = tagSetFromCsv('Type,Name,APMES tags,Under\r\nAPMES,Lower limb,26ii\r\nPersonal,Ankle,26iii\r\nPersonal,Knee,,26ii\r\n', names, []);
+  assert.deepEqual(r.errors, [], r.errors.join('\n'));
+  assert.equal(r.set.find(e => e.k === 'c:26ii').n, 'Lower limb');
+  assert.deepEqual(r.set.find(e => e.n === 'Ankle').links, ['26iii']);
+  const same = cleanTagSet([{ k: 'u:o1', n: 'Other', p: 'c:26' }, { k: 'u:o2', n: 'Other', p: 'c:18' }, { k: 'u:kn', n: 'Knee', p: 'u:o1' }]);
+  const back2 = tagSetFromCsv(tagSetToCsv(same, names), names, same).set;
+  assert.equal(back2.find(e => e.k === 'u:kn').p, 'u:o1', 'same-name parent kept');
+  assert.equal(tagSetFromCsv('My tags\nType;Name;APMES tags\nPersonal;Foo;26\n', names, []).set.find(e => e.n === 'Foo').links[0], '26', 'semicolons under a title');
+  const order = [{ k: 'h:h1', n: 'H', hd: true }, { k: 'u:child', n: 'C', p: 'u:par' }, { k: 'u:par', n: 'P', p: 'h:h1' }];
+  const moved = reparentTag(order, 'u:par', '');
+  assert.equal(moved.find(e => e.k === 'u:child').p, 'u:par', 'child keeps its parent');
+  assert.equal(order[1].p, 'u:par', 'input not changed');
+  const many = Array.from({ length: 320 }, (_, i) => ({ k: 'u:t' + i, n: 'T' + i }));
+  const capped = cleanTagSet(many);
+  assert.equal(capped.filter(e => e.k.startsWith('u:')).length, 300, 'cap counts your own tags only');
+  assert.equal(capped.filter(e => e.k.startsWith('c:')).length, ACTIVE.length);
 }
 console.log('tags tests passed');
 {

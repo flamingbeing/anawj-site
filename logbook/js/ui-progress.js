@@ -225,7 +225,10 @@ async function downloadSummary(rows, yr) {
 const tview = { summaries: null, loading: false, year: null, error: '' };
 // "R3 / SMO" when the R3 group has SMOs in it; residents with no year known are "Year unknown"
 const groupName = (y, all) => !y ? 'Year unknown' : y === 3 && all.some(s => s.smo) ? 'R3 / SMO' : yearName(y);
-resetters.push(() => Object.assign(tview, { summaries: null, year: null, error: '' }));
+// gen: bumped on sign-out, so a load still running for the last person is dropped
+resetters.push(() => { Object.assign(tview, { summaries: null, year: null, error: '', loading: false }); tview.gen = (tview.gen || 0) + 1; });
+// the Analytics screen's own state starts fresh for the next person too
+resetters.push(() => { pview.open.clear(); Object.assign(pview, { by: 'cat', hideDone: false, toolsOpen: false }); });
 // reload the totals next time they're shown (an admin took a row off)
 export const forgetTotals = () => { tview.summaries = null; };
 
@@ -260,6 +263,7 @@ export function renderTotals() {
 
 async function loadSummaries() {
   tview.loading = true; tview.error = '';
+  const gen = tview.gen;
   // counts are written by each resident's device: anything that isn't a whole number counts as 0
   const clean = c => Object.fromEntries(Object.entries(c && typeof c === 'object' ? c : {}).map(([k, v]) => [k, Number.isFinite(v) && v > 0 ? Math.floor(v) : 0]));
   const whole = v => (Number.isFinite(v) && v > 0 ? Math.floor(v) : 0);
@@ -275,6 +279,7 @@ async function loadSummaries() {
   };
   try {
     const [list, hidden] = await Promise.all([cloud.listSummaries(), cloud.loadTotalsHidden()]);
+    if (gen !== tview.gen) return;
     const off = new Set(hidden);   // attrited residents (Admin)
     tview.summaries = list.filter(x => !off.has(String(x.rid))).map(x => {
       const ridYear = Number(String(x.rid || '').slice(0, 4));
@@ -282,7 +287,7 @@ async function loadSummaries() {
       return { ...x, intake, rYear: yearOf({ ...x, intake }), counts: clean(x.counts), total: whole(x.total), reflectionsTotal: whole(x.reflectionsTotal) };
     });
   }
-  catch (err) { tview.summaries = []; tview.error = 'Could not load totals: ' + err.message; }
+  catch (err) { if (gen !== tview.gen) return; tview.summaries = []; tview.error = 'Could not load totals: ' + err.message; }
   tview.loading = false;
   if (S.tab === 'totals') hooks.render();
 }

@@ -192,7 +192,11 @@ function notifyCases(email) {
   for (const w of caseWatchers) if (w.email === email) w.cb(casesOf(email));
 }
 // ?demo=reset wipes and reseeds on page load (after the watcher sets above exist).
-if (mode() === 'reset') resetDemo();
+// The address then says plain ?demo, so a reload keeps what was done since.
+if (mode() === 'reset') {
+  resetDemo();
+  try { const q = new URLSearchParams(location.search); q.set('demo', ''); history.replaceState(null, '', location.pathname + '?' + q.toString().replace(/=(&|$)/g, '$1') + location.hash); } catch { /* not in a browser */ }
+}
 if (typeof addEventListener === 'function') {
   addEventListener('storage', e => { if (e.key === KEY) notifyAll(); });
 }

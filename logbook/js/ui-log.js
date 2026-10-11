@@ -193,6 +193,7 @@ export function catPicker({ get, toggle, getTags = null, toggleTag = null, place
 
 // ---------- the Log screen ----------
 
+let dateRO = null;
 let ui = null; // live parts of the screen, so a case-list update doesn't wipe what's being typed
 
 // "Still needed this year": the categories behind or due, most urgent first; tap for Progress.
@@ -286,7 +287,11 @@ function paintDate() {
     if (!shownSel) for (let i = chips.length - 1; i >= 0 && bar.scrollWidth > bar.clientWidth + 1; i--) chips[i].hidden = true;
   };
   requestAnimationFrame(fit);
-  if (!ui.dateRO && 'ResizeObserver' in window) { ui.dateRO = new ResizeObserver(() => ui.refit && ui.refit()); ui.dateRO.observe(ui.datebar); }
+  // one observer for the module, moved to the current date bar (ui is rebuilt on every render)
+  if ('ResizeObserver' in window) {
+    dateRO ||= new ResizeObserver(() => ui && ui.refit && ui.refit());
+    if (dateRO.el !== ui.datebar) { dateRO.disconnect(); dateRO.observe(ui.datebar); dateRO.el = ui.datebar; }
+  }
   ui.refit = fit;
 }
 
@@ -403,7 +408,7 @@ function paintSuggest() {
     onclick: () => { keepPlace(ui.sugg, () => { draft.cats = sortCodes(withParents([...draft.cats, ...strong])); saveDraft(); paintSel(); }); refocus(); } }, '+ All ' + strong.length) : null;
   fill(ui.sugg, ...mineChips, all, ...(list.length || mine.length ? list.map(s => catChip(s.code, {
     cls: `sugg ${s.score >= 0.5 ? 'strong' : ''}`,
-    title: `${catFull(s.code)} — ${s.why === 'age' ? 'from the age' : s.why === 'bmi' ? 'from the BMI' : s.why === 'yours' ? 'from your shorthand' : 'from your words'}`,
+    title: `${catFull(s.code)} — ${s.why === 'age' ? 'from the age' : s.why === 'bmi' ? 'from the BMI' : s.why === 'shorthand' ? 'from shorthand (Tag editor)' : 'from your words'}`,
     onclick: () => { keepPlace(ui.sugg, () => { draft.cats = addCat(draft.cats, s.code); saveDraft(); paintSel(); }); refocus(); },
   })) : [h('span', { class: 'muted', style: 'font-size:13px' }, text ? 'No suggestions: search below.' : 'Suggestions appear as you type.')]));
 }
@@ -517,7 +522,7 @@ async function save({ another }) {
       removeCase(c.id);
       // put the case back in the box, unless the next one is already being typed
       if (draft.details.trim() || draft.cats.length) return;
-      draft = { ...draft, details: caseText(c), cats: c.cats, date: c.date === todayISO() ? null : c.date };
+      draft = { ...draft, details: caseText(c), cats: c.cats, tags: c.tags || [], reflectTag: !!c.reflectTag, date: c.date === todayISO() ? null : c.date };
       saveDraft();
       if (S.tab === 'log' && ui.textarea) { ui.textarea.value = draft.details; paintDate(); paintSel(); paintQuick(); }
     },
@@ -545,7 +550,7 @@ function renderBulk(card) {
     h('p', { class: 'hint' }, 'Paste your notes or OT list with an empty line between cases (a case can take several lines). Tags are guessed for each case. Cases without a date at the start get ', h('b', {}, fmtDate(curDate())), ' (change it above).'),
     ta,
     h('div', { class: 'bar', style: 'margin-top:8px' },
-      h('button', { class: 'primary', onclick: () => { bulkRows = parseBulk(ta.value, t => suggest(t)); paintBulk(out); } }, 'Review'),
+      h('button', { class: 'primary', onclick: () => { bulkRows = parseBulk(ta.value, settings().suggestions !== false ? t => suggest(t) : null); paintBulk(out); } }, 'Review'),
       pasteBtn(ta, '📋 Paste from clipboard'),
       h('button', { onclick: () => { ta.value = ''; draft.bulk = ''; bulkRows = null; saveDraft(); fill(out); } }, 'Clear')),
     out);
@@ -598,6 +603,7 @@ function nextWorkingDay() { for (let n = 1; n < 8; n++) { const d = new Date(); 
 async function planBulk() {
   if (!bulkRows || !bulkRows.length) return;
   const rows = bulkRows.filter(r => r.details.trim() || String(r.initials || '').trim() || r.cats.length);
+  if (!(await okNoIds(...rows.map(r => r.details)))) return;
   const put = async date => {
     const items = rows.map(r => ({ id: uid(), date, initials: cleanInitials(r.initials), details: r.details.trim(), cats: sortCodes(r.cats) }));
     await savePlan([...plan(), ...items].slice(-100));
@@ -634,7 +640,9 @@ function planCard() {
     hooks.render();
   };
   const edit = async p => {
-    draft = { ...draft, mode: 'one', details: [p.initials, p.details].filter(Boolean).join(' '), cats: [...(p.cats || [])], date: p.date === today ? null : p.date, dateAt: Date.now() };
+    // don't throw away a case being typed
+    if ((draft.details.trim() || draft.cats.length) && !(await confirmBox('Replace what you’re typing?', 'The case in the box is replaced by the planned one.', 'Replace', true))) return;
+    draft = { ...draft, mode: 'one', details: [p.initials, p.details].filter(Boolean).join(' '), cats: [...(p.cats || [])], tags: [], reflectTag: false, date: p.date === today ? null : p.date, dateAt: Date.now() };
     saveDraft();
     await savePlan(plan().filter(x => x.id !== p.id));
     hooks.render();

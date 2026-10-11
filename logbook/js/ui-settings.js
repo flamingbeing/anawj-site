@@ -5,7 +5,7 @@ import { YEAR_NAMES, DEFAULT_NAMES, BY_CODE } from './categories.js';
 import { sortCodes, uid, academicYear, withParents } from './engine.js';
 import { openBin } from './bin.js';
 import { S, h, toast, modal, confirmBox, cloud, catChip, catName, catShort, PICKER_ORDER, pickerOrder, settings, patchLogbook, displayName, hooks, rYear, myYearName, fill, categoryNames, setCategoryNames, catPills, tagSet, download, fileButton, todayISO, saveMany } from './ui-core.js';
-import { learnShorthand, cleanShorthand, shorthandOf, DEFAULT_SHORTHAND, cleanTagSet, defaultTagSet, tagTree, flatTree, moveTag, reparentTag, removeTag, newKey, tagSetToCsv, tagSetFromCsv, dropTag, canPlace } from './tags.js';
+import { MAX_TAGS, tagLinks as tagLinksIn, learnShorthand, cleanShorthand, shorthandOf, DEFAULT_SHORTHAND, cleanTagSet, defaultTagSet, tagTree, flatTree, moveTag, reparentTag, removeTag, newKey, tagSetToCsv, tagSetFromCsv, dropTag, canPlace } from './tags.js';
 import { pickDialog } from './ui-log.js';
 import { PHOTO_BUDGET_KB, PHOTO_NOTE, photoUsageKb, fmtMb } from './reflections.js';
 import { backupCard } from './backup.js';
@@ -284,7 +284,7 @@ export function renderTagEditor() {
   // before or after it, onto its middle to go inside
   const pill = n => h('li', { 'data-k': n.e.k, class: `te-pillitem te-${n.kind} d${Math.min(n.depth, 3)}${n.e.hide ? ' te-hidden' : ''}`, tabindex: '0', role: 'button',
     title: n.kind === 'cat' ? catName(n.code) : n.kind === 'head' ? 'Section header' : linkText(n),
-    onpointerdown: e => pillDown(e, n.e.k), onclick: () => { if (!pillDragged) editTag(n); }, onkeydown: e => { if (e.key === 'Enter') editTag(n); } },
+    onpointerdown: e => pillDown(e, n.e.k, e.currentTarget), onclick: () => { if (!pillDragged) editTag(n); }, onkeydown: e => { if (e.key === 'Enter') editTag(n); } },
     h('span', { class: 'te-pill' }, nameOf(n)), n.kind === 'head' ? null : h('small', { class: 'te-n' }, String(used(n.e.k))));
   const search = h('input', { type: 'search', class: 'grow', value: tev.q, placeholder: 'Search tags, names or shorthand', 'aria-label': 'Search tags',
     oninput: e => { tev.q = e.target.value; const pos = e.target.selectionStart; hooks.render(); const el = document.querySelector('.tag-editor input[type=search]'); if (el) { el.focus(); el.setSelectionRange(pos, pos); } } });
@@ -314,13 +314,13 @@ export function renderTagEditor() {
 
 // Pills: a mouse drags once it moves; a finger drags after a short hold (a quick swipe still scrolls).
 let pillDragged = false;
-function pillDown(e, key) {
+function pillDown(e, key, li) {
   if (tdrag || (e.pointerType === 'mouse' && e.button !== 0)) return;
   pillDragged = false;
   const x0 = e.clientX, y0 = e.clientY, touch = e.pointerType !== 'mouse';
   let timer = null;
   const stop = () => { clearTimeout(timer); window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', stop); window.removeEventListener('pointercancel', stop); };
-  const go = ev => { stop(); pillDragged = true; startTagDrag(ev, key, true); };
+  const go = ev => { stop(); pillDragged = true; startTagDrag(ev, key, true, li); };
   const mv = ev => {
     const far = Math.abs(ev.clientX - x0) + Math.abs(ev.clientY - y0) > 8;
     if (!far) return;
@@ -332,11 +332,13 @@ function pillDown(e, key) {
 
 // ---------- drag and drop (pointer events, so touch works) ----------
 let tdrag = null;
-function startTagDrag(e, key, horiz = false) {
+function startTagDrag(e, key, horiz = false, liArg = null) {
   // (a pills drag starts from a pointermove, where button is -1)
   if (tdrag || (e.type === 'pointerdown' && e.pointerType === 'mouse' && e.button !== 0)) return;
   if (e.cancelable) e.preventDefault();
-  const li = e.target.closest('li');
+  // (a pills drag starts after the pointer moved: use the pill that was pressed, not what's under it now)
+  const li = liArg || e.target.closest('li');
+  if (!li) return;
   const box = li.getBoundingClientRect();
   const ghost = li.cloneNode(true);
   Object.assign(ghost.style, { position: 'fixed', left: box.left + 'px', top: box.top + 'px', width: box.width + 'px', pointerEvents: 'none', opacity: '.85', zIndex: 50, background: 'var(--panel)', boxShadow: '0 6px 18px rgba(0,0,0,.25)' });
@@ -454,6 +456,7 @@ function editTag(n, kind = n ? n.kind : 'tag') {
         // an APMES tag left on the built-in list keeps following it (and gets later additions)
         if (code ? out.kw.join() === (DEFAULT_SHORTHAND[code] || []).join() : !out.kw.length) delete out.kw; if (!out.n && kind === 'cat') delete out.n;
         if (kind !== 'tag') delete out.links;
+        if (!n && set.filter(x => !x.k.startsWith('c:')).length >= MAX_TAGS) return toast(`You have ${MAX_TAGS} personal tags and headers, the most there can be. Remove one first.`);
         let next = n ? set.map(x => (x.k === e.k ? out : x)) : [...set, out];
         const p = sub ? 'c:' + sub : under.value;
         if ((e.p || '') !== p || !n) next = reparentTag(next, e.k, p);
@@ -482,10 +485,12 @@ function mergeTag(n) {
         if (!to) return toast('Choose a tag to merge into');
         m.close();
         const code = to.startsWith('c:') ? to.slice(2) : null;
+        // what the target counts towards: an APMES tag itself, or a personal tag's links (as choosing it does)
+        const adds = code ? [code] : tagLinksIn(set, to);
         const next = cases.map(c => {
           const tags = (c.tags || []).filter(k => k !== from);
           const out = { ...c, tags: code ? tags : [...new Set([...tags, to])], updatedAt: Date.now() };
-          if (code) out.cats = sortCodes(withParents([...(c.cats || []), code]));
+          if (adds.length) out.cats = sortCodes(withParents([...(c.cats || []), ...adds]));
           if (!out.tags.length) delete out.tags;
           return out;
         });

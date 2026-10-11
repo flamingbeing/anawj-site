@@ -7,7 +7,7 @@ import { exportCases, readSheetGrid } from './xlsxio.js';
 import { parseCsv } from './tags.js';
 import {
   S, h, toast, debounce, modal, cat, catName, catShort, tagName, catFull, catChip, PICKER_ORDER, settings, patchLogbook, needExcel, download, fileButton, catPills,
-  updateCase, saveMany, deleteMany, displayName, rYear, todayISO, fill, add, resetters, tagSet, tagLinks, confirmBox } from './ui-core.js';
+  updateCase, saveMany, deleteMany, displayName, rYear, todayISO, fill, add, resetters, tagSet, tagLinks, confirmBox, keepTags } from './ui-core.js';
 import { flatTree, tagTree } from './tags.js';
 import { editCaseDialog, logOnDate } from './ui-log.js';
 import { reflectOnCase } from './ui-reflect.js';
@@ -20,6 +20,16 @@ const view = FRESH();
 resetters.push(() => Object.assign(view, FRESH()));   // next user starts unfiltered
 const hasTag = (c, k) => (k.startsWith('c:') ? (c.cats || []).includes(k.slice(2)) : (c.tags || []).includes(k));
 const keyName = k => (k.startsWith('c:') ? catShort(k.slice(2)) : tagName(k));
+// Every tag to filter or bulk-tag by: the tag list, then tags taken off it that cases still carry
+// (so they can be found and removed). -> [{ k, depth, label }]
+function tagChoices() {
+  const set = tagSet();
+  const out = flatTree(tagTree(set)).filter(n => n.kind !== 'head').map(n => ({ k: n.e.k, depth: n.depth, label: keyName(n.e.k) }));
+  const known = new Set(set.map(e => e.k)), gone = new Map();
+  for (const c of S.cases || []) for (const k of c.tags || []) if (!known.has(k)) gone.set(k, (gone.get(k) || 0) + 1);
+  for (const [k, n] of gone) out.push({ k, depth: 0, label: `${tagName(k)} (${n} case${n === 1 ? '' : 's'})` });
+  return out;
+}
 // The text a case is searched by, worked out once per version of the case (logbooks run to thousands)
 // (and again when your tags change: renamed tags are searched by their new names)
 let hayCache = new WeakMap(), hayFor = null;
@@ -85,23 +95,22 @@ export function renderLogbook() {
     [['all', 'Search everything'], ['initials', 'Search initials only'], ['procedure', 'Search the procedure only']].map(([v, t]) => h('option', { value: v, selected: (settings().lbScope || 'all') === v }, t)));
   const fuzzyBox = h('label', { class: 'check', style: 'margin:0' }, h('input', { type: 'checkbox', checked: !!settings().lbFuzzy, onchange: e => { patchLogbook({ settings: { lbFuzzy: e.target.checked } }); paintFilterBtn(); paint(); } }), 'Fuzzy search (allows typos)');
   // tag filters: chips you add from a list of every tag (APMES and your own)
-  const tagOptions = () => flatTree(tagTree(tagSet())).filter(n => n.kind !== 'head');
   const tagSel = (label, list) => h('select', { class: 'small', 'aria-label': label, onchange: e => { const k = e.target.value; e.target.value = ''; if (k && !list.includes(k)) { list.push(k); refresh(); } } },
     h('option', { value: '' }, label),
-    tagOptions().map(n => h('option', { value: n.e.k }, `${'  '.repeat(Math.min(n.depth, 3))}${keyName(n.e.k)}`)));
+    tagChoices().map(n => h('option', { value: n.k }, `${'  '.repeat(Math.min(n.depth, 3))}${n.label}`)));
   const chipsOf = list => list.map(k => h('span', { class: 'chip on', role: 'button', tabindex: '0', title: 'Remove', onclick: () => { list.splice(list.indexOf(k), 1); refresh(); } }, keyName(k), h('span', { class: 'x' }, ' ×')));
   const hasRow = h('div', { class: 'chips lb-tagrow' });
   const notRow = h('div', { class: 'chips lb-tagrow' });
   const dateIn = k => h('input', { type: 'date', value: view[k], 'aria-label': k === 'from' ? 'From' : 'To', onchange: e => { view[k] = e.target.value; refresh(); } });
   const bulkBtn = h('button', { class: 'small', onclick: () => bulkTag(filtered()) });
+  const flagSel = h('select', { 'aria-label': 'Filter by flag', onchange: e => { view.flag = e.target.value; refresh(); } },
+    flagOpts.map(([v, l]) => h('option', { value: v, selected: view.flag === v }, l)));
   const filters = h('div', { class: 'lb-filters', hidden: !(view.showFilters || active()) },
     h('div', { class: 'bar' }, h('span', { class: 'lb-fl' }, 'Has all of'), hasRow),
     h('div', { class: 'bar' }, h('span', { class: 'lb-fl' }, 'Has none of'), notRow),
     h('div', { class: 'bar' }, h('span', { class: 'lb-fl' }, 'Dates'), dateIn('from'), h('span', { class: 'muted' }, 'to'), dateIn('to')),
     h('div', { class: 'bar' },
-      h('select', { 'aria-label': 'Filter by flag', onchange: e => { view.flag = e.target.value; refresh(); } },
-        flagOpts.map(([v, l]) => h('option', { value: v, selected: view.flag === v }, l))),
-      searchIn, fuzzyBox),
+      flagSel, searchIn, fuzzyBox),
     h('div', { class: 'bar', style: 'margin:0' },
       h('button', { class: 'small', onclick: saveSearch }, '☆ Save this search'),
       bulkBtn,
@@ -124,7 +133,7 @@ export function renderLogbook() {
       const box = wrap.querySelector('input[type=search]'); if (box) box.value = view.q;
       const [f, t] = filters.querySelectorAll('input[type=date]'); if (f) f.value = view.from; if (t) t.value = view.to;
       filters.hidden = false; refresh();
-    } }, '★ ' + x.name, h('span', { class: 'x', role: 'button', 'aria-label': 'Delete saved search', onclick: async e => {
+    } }, '★ ' + x.name, h('span', { class: 'x', role: 'button', tabindex: '0', 'aria-label': 'Delete saved search', onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); e.target.click(); } }, onclick: async e => {
       e.stopPropagation();
       if (!(await confirmBox('Delete saved search', `Delete “${x.name}”?`, 'Delete', true))) return;
       await patchLogbook({ settings: { savedSearches: (settings().savedSearches || []).filter(y => y.id !== x.id) } }); paintSaved();
@@ -135,11 +144,11 @@ export function renderLogbook() {
     const name = (prompt('Name this search', view.q.trim() || view.has.map(keyName).join(' + ') || 'My search') || '').trim().slice(0, 40);
     if (!name) return;
     const list = settings().savedSearches || [];
-    const x = { id: Math.random().toString(36).slice(2, 8), name, q: view.q, has: view.has, not: view.not, from: view.from, to: view.to, flag: view.flag };
+    const x = { id: Math.random().toString(36).slice(2, 8), name, q: view.q, has: [...view.has], not: [...view.not], from: view.from, to: view.to, flag: view.flag };
     await patchLogbook({ settings: { savedSearches: [...list, x].slice(-20) } });
     paintSaved(); toast(`Saved “${name}”`);
   }
-  function refresh() { paintFilterBtn(); repaintFilters(); view.limit = 150; paint(); }
+  function refresh() { flagSel.value = view.flag; paintFilterBtn(); repaintFilters(); view.limit = 150; paint(); }
   function active() { return !!(view.has.length || view.not.length || view.from || view.to || view.flag || (settings().lbScope || 'all') !== 'all' || settings().lbFuzzy); }
   const filterBtn = h('button', { class: 'small', 'aria-expanded': String(!filters.hidden), onclick: () => {
     view.showFilters = filters.hidden; filters.hidden = !filters.hidden; filterBtn.setAttribute('aria-expanded', String(!filters.hidden));
@@ -174,9 +183,9 @@ export function renderLogbook() {
 // Add a tag to, or take one off, every case in the search results.
 function bulkTag(rows) {
   if (!rows.length) return;
-  const tags = flatTree(tagTree(tagSet())).filter(n => n.kind !== 'head');
+  const tags = tagChoices();
   const act = h('select', {}, h('option', { value: 'add' }, 'Add'), h('option', { value: 'remove' }, 'Remove'));
-  const sel = h('select', {}, h('option', { value: '' }, 'Choose a tag…'), tags.map(n => h('option', { value: n.e.k }, `${'  '.repeat(Math.min(n.depth, 3))}${keyName(n.e.k)}`)));
+  const sel = h('select', {}, h('option', { value: '' }, 'Choose a tag…'), tags.map(n => h('option', { value: n.k }, `${'  '.repeat(Math.min(n.depth, 3))}${n.label}`)));
   const m = modal(`Tag ${rows.length} case${rows.length === 1 ? '' : 's'}`, [
     h('p', { class: 'hint' }, 'Applies to every case in the current search results.'),
     h('div', { class: 'bar', style: 'gap:8px' }, act, sel),
@@ -187,8 +196,11 @@ function bulkTag(rows) {
         const add = act.value === 'add', code = k.startsWith('c:') ? k.slice(2) : null;
         const next = rows.filter(c => hasTag(c, k) !== add).map(c => {
           const out = { ...c, updatedAt: Date.now() };
-          if (code) out.cats = add ? sortCodes(withParents([...(c.cats || []), code])) : (c.cats || []).filter(x => x !== code && cat(x).parent !== code);
-          else {
+          if (code) {
+            out.cats = add ? sortCodes(withParents([...(c.cats || []), code])) : (c.cats || []).filter(x => x !== code && cat(x).parent !== code);
+            // your tags that sit under a removed APMES tag go with it (as in the edit dialog)
+            if (!add) { out.tags = keepTags(c.tags, out.cats); if (!out.tags.length) delete out.tags; }
+          } else {
             out.tags = add ? [...new Set([...(c.tags || []), k])] : (c.tags || []).filter(x => x !== k);
             if (add) out.cats = sortCodes(withParents([...(c.cats || []), ...tagLinks(k)]));   // a tag that counts towards APMES ticks them
             if (!out.tags.length) delete out.tags;
@@ -246,7 +258,10 @@ function swipeable(li, c) {
   }, { passive: true });
   li.addEventListener('touchend', () => {
     if (swiping) {
-      li.addEventListener('click', ev => { ev.stopPropagation(); ev.preventDefault(); }, { capture: true, once: true });
+      // swallow the click that may follow the swipe, but only just after it (phones often send none)
+      const block = ev => { ev.stopPropagation(); ev.preventDefault(); };
+      li.addEventListener('click', block, { capture: true, once: true });
+      setTimeout(() => li.removeEventListener('click', block, { capture: true }), 400);
       if (dx < -90) { li.style.transform = 'translateX(-110%)'; moveToBin('case', c, { toast: true }).catch(err => toast('Could not delete: ' + err.message)); }
       else { li.style.transform = ''; if (dx > 90) editCaseDialog(c); }
       li.classList.remove('swipe-del', 'swipe-edit');
@@ -386,7 +401,9 @@ function pasteRows() {
         const cols = l.split('\t');
         // four columns with a short letters-only second one: Date, Initials, Details, Categories (a copied export's
         // fourth column is the hidden id, not initials)
-        const four = cols.length >= 4 && /^[A-Za-z.\-]{0,6}$/.test(cols[1].trim());
+        // (an exported sheet copied whole: Date, Case summary, Tags, then the hidden id)
+        const exported = cols.length >= 4 && /^[A-Za-z0-9_-]{12,24}$/.test(cols[3].trim());
+        const four = !exported && cols.length >= 4 && /^[A-Za-z.\-]{0,6}$/.test(cols[1].trim());
         const [date, initials, details, categories] = four ? cols : [cols[0], undefined, cols[1], cols[2]];
         const r = { row: i + 1, date: (date || '').trim(), details: (details || '').trim(), categories: (categories || '').trim() };
         if (initials !== undefined) r.initials = initials.trim();
@@ -497,7 +514,8 @@ function mapColumns(fileName, grid) {
   paint();
 }
 
-const caseKey = c => `${c.date || c.dateText || ''}|${caseText(c).toLowerCase().replace(/\s+/g, ' ')}|${catText(c.cats)}`;
+// (with parents, as saved cases always have them: a pasted "15i" matches a case with 15 and 15i)
+const caseKey = c => `${c.date || c.dateText || ''}|${caseText(c).toLowerCase().replace(/\s+/g, ' ')}|${catText(withParents(c.cats || []))}`;
 
 function previewDiff(d, after) {
   const { changed, deleted, errors } = d;
