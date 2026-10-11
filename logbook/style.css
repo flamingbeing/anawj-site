@@ -1078,3 +1078,15 @@ html.colourful body[data-bar="logbook"] { --heading: var(--t-logbook); }
 html.colourful body[data-bar="reflect"] { --heading: var(--t-reflect); }
 html.colourful body[data-bar="progress"] { --heading: var(--t-progress); }
 html.colourful body[data-bar="more"] { --heading: var(--t-more); }
+/* parts of the Case tab people hide (Settings → Logging → Case tab; ui-log.js CASE_PARTS) */
+.log-card.hide-interesting .reflect-tag, .log-card.hide-parsed .parsed, .log-card.hide-groupsave .group-save,
+.log-card.hide-quick .quick-label, .log-card.hide-quick .sugg-row, .log-card.hide-quick .quick-rest { display: none; }
+/* pinned while scrolling (Settings → Display, per device): the case box on the Case tab, the search card on the
+   Logbook. --pin-top = what is already stuck at the top (the tab bar when it sits at the top of a phone) */
+:root { --pin-top: 0px; }
+@media (max-width: 600px) { html.tabs-top { --pin-top: 55px; } }
+html.pin-box .log-card .box-wrap { position: sticky; top: var(--pin-top); z-index: 6; background: var(--panel); box-shadow: 0 -8px 0 var(--panel), 0 10px 10px -10px rgba(0,0,0,.35); }
+/* upside down already keeps the box by Save at the bottom */
+@media (max-width: 600px) { html.case-inverted.pin-box .log-card .box-wrap { position: relative; top: auto; box-shadow: none; } }
+html.pin-search .lb-top { position: sticky; top: var(--pin-top); z-index: 6; max-height: calc(100dvh - var(--pin-top) - var(--tabbar-h) - 60px); overflow-y: auto; box-shadow: 0 8px 12px -10px rgba(0,0,0,.35); }
+html.pin-search .monthhead { top: calc(var(--pin-top) + var(--lb-top-h, 0px)); }

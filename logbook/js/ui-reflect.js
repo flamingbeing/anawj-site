@@ -1020,8 +1020,15 @@ function editor() {
       rv.editing = null; rv.thumbs = {}; lsSet(null); hooks.render();
     } }, 'Delete') : null));
 
-  return h('div', { class: 'refl-editor' }, fields, legacy ? null : guide, body, actions);   // .refl-editor: the logging font (Settings → Display)
+  const editor = h('div', { class: 'refl-editor' }, fields, legacy ? null : guide, body, actions);   // .refl-editor: the logging font (Settings → Display)
+  // Settings → Reflections: no spelling underlines on this device (html class from applyLook)
+  if (document.documentElement.classList.contains('refl-spell-off')) editor.querySelectorAll('textarea, input:not([type]), input[type=text]').forEach(f => { f.spellcheck = false; });
+  return editor;
 }
+// (and fields added later, like a new learning point, as they take the focus)
+if (typeof document !== 'undefined') document.addEventListener('focusin', e => {
+  if (e.target.closest && e.target.closest('.refl-editor') && document.documentElement.classList.contains('refl-spell-off')) e.target.spellcheck = false;
+});
 
 const hasContent = r => !!(r.headingId || r.initials || r.diagnosis || r.title || r.summary
   || (r.points || []).some(p => p.heading || p.text) || (r.figures || []).length || (r.references || []).some(Boolean)

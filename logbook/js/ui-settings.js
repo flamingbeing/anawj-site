@@ -2,10 +2,10 @@
 // "You" and sign-out cards (youCard, signOutCard), used by ui-account.js.
 
 import { YEAR_NAMES, DEFAULT_NAMES, BY_CODE } from './categories.js';
-import { sortCodes, uid, academicYear, withParents } from './engine.js';
-import { S, h, toast, modal, confirmBox, cloud, catChip, catName, catShort, PICKER_ORDER, pickerOrder, settings, patchLogbook, displayName, hooks, rYear, myYearName, fill, categoryNames, setCategoryNames, catPills, tagSet, download, fileButton, todayISO, saveMany } from './ui-core.js';
+import { sortCodes, uid, academicYear, withParents, weekStart } from './engine.js';
+import { S, h, toast, modal, confirmBox, cloud, catChip, catName, catShort, PICKER_ORDER, pickerOrder, settings, patchLogbook, displayName, hooks, rYear, myYearName, fill, categoryNames, setCategoryNames, catPills, tagSet, download, fileButton, todayISO, saveMany, UNDO_SECS } from './ui-core.js';
 import { MAX_TAGS, tagLinks as tagLinksIn, learnShorthand, cleanShorthand, shorthandOf, DEFAULT_SHORTHAND, cleanTagSet, defaultTagSet, tagTree, flatTree, moveTag, reparentTag, removeTag, newKey, tagSetToCsv, tagSetFromCsv, dropTag, canPlace } from './tags.js';
-import { pickDialog } from './ui-log.js';
+import { pickDialog, CASE_PARTS, AFTER_SAVE } from './ui-log.js';
 import { OPERATOR_HELP } from './search-ops.js';
 import { PRESETS, DEFAULT_ACCENT, cleanAccent, schemeCss, lightPalette, tabSchemeCss, tabVarsCss } from './colors.js';
 import { cleanMarkdown, storedMarkdown, mdCase, mdDay, reflectionPath, reflectionNote, CASE_FILLINS, REFL_FILLINS, FM_FIELDS } from './markdown.js';
@@ -97,7 +97,7 @@ export function residencyCard() {
 // the light / dark choice. The first time a device opens the app it starts from what the account had (these used to
 // follow the account), so nobody's look changes. Kept at sign-out: they are the device's, and nothing private.
 const DISPLAY_KEY = 'apmes-logbook-display';
-export const DISPLAY_KEYS = ['compact', 'textSize', 'zoom', 'accent', 'startTab', 'fontUi', 'fontUiName', 'fontLog', 'fontLogName', 'lineWidth', 'lineHeight', 'contrast', 'motion', 'tabIcons', 'tabBar', 'hideHeader', 'caseInverted', 'colourful', 'customCss', 'customCssOn', 'autoFocus', 'appTitle'];
+export const DISPLAY_KEYS = ['compact', 'textSize', 'zoom', 'accent', 'startTab', 'fontUi', 'fontUiName', 'fontLog', 'fontLogName', 'lineWidth', 'lineHeight', 'contrast', 'motion', 'tabIcons', 'tabBar', 'hideHeader', 'caseInverted', 'colourful', 'customCss', 'customCssOn', 'autoFocus', 'appTitle', 'boxCaps', 'boxCorrect', 'boxSpell', 'reflSpell', 'pinBox', 'pinSearch'];
 export function deviceDisplay() {
   try { const d = JSON.parse(localStorage.getItem(DISPLAY_KEY) || 'null'); return d && typeof d === 'object' && !Array.isArray(d) ? d : null; } catch { return null; }
 }
@@ -154,6 +154,11 @@ export function applyLook(d = {}) {
     if (el.textContent !== css) el.textContent = css;
   }
   c.toggle('no-autofocus', d.autoFocus === false);
+  // the case box's keyboard and the reflection editor's spelling (Logging / Reflections pages; read by ui-log.js, ui-reflect.js)
+  c.toggle('box-caps-off', d.boxCaps === false); c.toggle('box-correct', d.boxCorrect === true); c.toggle('box-spell-off', d.boxSpell === false);
+  c.toggle('refl-spell-off', d.reflSpell === false);
+  // pinned while scrolling: the case box (Case tab) and the search card (Logbook)
+  c.toggle('pin-box', !!d.pinBox); c.toggle('pin-search', !!d.pinSearch);
   // the name in the header and the browser tab (plain text, at most 40 characters)
   const title = cleanTitle(d.appTitle) || APP_TITLE;
   const h1 = document.querySelector('.top h1'); if (h1 && h1.textContent !== title) h1.textContent = title;
@@ -215,6 +220,9 @@ export function renderDisplay() {
       h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'The case box sits at the bottom, next to the keyboard and Save, with suggestions just above it; scroll up for all the tags. Like a chat app.'),
       h('label', { class: 'check', style: 'margin-top:10px' }, h('input', { type: 'checkbox', checked: !!st.tabIcons, onchange: e => applyDisplay(setDisplay({ tabIcons: e.target.checked })) }), 'Icons only in the tab bar'),
       h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !!st.hideHeader, onchange: e => applyDisplay(setDisplay({ hideHeader: e.target.checked })) }), 'Hide the header (the app name bar)'),
+      h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !!st.pinBox, onchange: e => applyDisplay(setDisplay({ pinBox: e.target.checked || null })) }), 'Pin the case box at the top of the Case tab'),
+      h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !!st.pinSearch, onchange: e => applyDisplay(setDisplay({ pinSearch: e.target.checked || null })) }), 'Pin the search box at the top of the Logbook'),
+      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'They stay in view while the tags or cases scroll under them.'),
       h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'It comes back by itself when something isn’t synced yet, when there’s no signal, and in the demo.'),
       h('div', { class: 'field', style: 'margin-top:10px' }, 'Colour', accentPicker()),
       h('p', { class: 'hint', style: 'margin:2px 0 0' }, 'Light and dark versions are worked out to stay easy to read.'),
@@ -429,7 +437,36 @@ export function renderLogging() {
       h('label', { class: 'field', style: 'margin-top:8px' }, 'Date for a new case',
         h('select', { onchange: e => patchLogbook({ settings: { defaultDate: e.target.value } }) },
           h('option', { value: 'today', selected: st.defaultDate !== 'last' }, 'Today'),
-          h('option', { value: 'last', selected: st.defaultDate === 'last' }, 'The date I used last')))));
+          h('option', { value: 'last', selected: st.defaultDate === 'last' }, 'The date I used last'))),
+      h('label', { class: 'field', style: 'margin-top:8px' }, 'After Save',
+        h('select', { onchange: e => patchLogbook({ settings: { afterSave: e.target.value === 'next' ? null : e.target.value } }).then(() => toast('Saved')) },
+          AFTER_SAVE.map(([v, l]) => h('option', { value: v, selected: (st.afterSave || 'next') === v }, l)))),
+      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'Keeping the tags helps with a run of the same kind of case. “Save, keep date” keeps the date either way.'),
+      h('label', { class: 'field', style: 'margin-top:8px' }, 'Undo window',
+        h('select', { onchange: e => patchLogbook({ settings: { undoSecs: Number(e.target.value) === 5 ? null : Number(e.target.value) } }).then(() => toast('Saved')) },
+          UNDO_SECS.map(([n, l]) => h('option', { value: String(n), selected: (Number(st.undoSecs) || 5) === n }, l)))),
+      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'How long Undo stays on screen after you save, clear or delete something.'),
+      h('label', { class: 'field', style: 'margin-top:8px' }, 'First day of the week',
+        h('select', { onchange: e => patchLogbook({ settings: { weekStart: Number(e.target.value) === 1 ? null : Number(e.target.value) } }).then(() => toast('Saved')) },
+          [[1, 'Monday (default)'], [0, 'Sunday'], [6, 'Saturday']].map(([n, l]) => h('option', { value: String(n), selected: weekStart(st.weekStart) === n }, l)))),
+      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'For the Logbook calendar, Analytics, “this week” and “last week” in search, and last week’s summary.')),
+    h('section', { class: 'card' },
+      h('h2', {}, 'Case tab'),
+      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'Untick what you don’t use. The case box, All tags and Save always stay.'),
+      CASE_PARTS.map(([part, label]) => h('label', { class: 'check' },
+        h('input', { type: 'checkbox', checked: !(st.caseHide || []).includes(part), onchange: e => {
+          const now = new Set(settings().caseHide || []);
+          if (e.target.checked) now.delete(part); else now.add(part);
+          patchLogbook({ settings: { caseHide: now.size ? CASE_PARTS.map(([p]) => p).filter(p => now.has(p)) : null } });
+        } }), label)),
+      h('h3', { style: 'margin-top:14px' }, 'Keyboard in the case box (this device)'),
+      h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: display().boxCaps !== false, onchange: e => applyDisplay(setDisplay({ boxCaps: e.target.checked ? null : false })) }),
+        'Capital letter at the start'),
+      h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: display().boxCorrect === true, onchange: e => applyDisplay(setDisplay({ boxCorrect: e.target.checked ? true : null })) }),
+        'Autocorrect'),
+      h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: display().boxSpell !== false, onchange: e => applyDisplay(setDisplay({ boxSpell: e.target.checked ? null : false })) }),
+        'Underline spelling mistakes'),
+      h('p', { class: 'hint help', style: 'margin:0' }, 'Autocorrect is off by default so initials and drug names stay as typed. Some keyboards ignore these.')));
 }
 
 export function renderReflectionSettings() {
@@ -439,7 +476,9 @@ export function renderReflectionSettings() {
       h('h2', {}, 'Reflections'),
       h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: st.reflExport !== false, onchange: e => patchLogbook({ settings: { reflExport: e.target.checked } }) }),
         'New reflections are included in the portfolio export'),
-      h('p', { class: 'hint help', style: 'margin:0' }, 'Untick if you write many and would rather choose which go in. Reflections already written keep their own tick.')),
+      h('p', { class: 'hint help', style: 'margin:0' }, 'Untick if you write many and would rather choose which go in. Reflections already written keep their own tick.'),
+      h('label', { class: 'check', style: 'margin-top:8px' }, h('input', { type: 'checkbox', checked: display().reflSpell !== false, onchange: e => applyDisplay(setDisplay({ reflSpell: e.target.checked ? null : false })) }),
+        'Underline spelling mistakes in reflections (this device)')),
     h('section', { class: 'card' },
       h('h2', {}, 'Photos'),
       (() => { const kb = photoUsageKb(S.reflections), pct = Math.min(100, Math.round(kb / PHOTO_BUDGET_KB * 100));

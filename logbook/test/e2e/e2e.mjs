@@ -1676,6 +1676,34 @@ async function run(label, ctxOpts) {
     assert(w[0] <= w[1], 'compact h-scroll');
   });
 
+  await step('settings: week start, Case tab parts, case box keyboard, pinned box and search', async () => {
+    await tab('logging');
+    const field = l => p.locator('label.field', { hasText: l }).locator('select');
+    const check = l => p.locator('label.check', { hasText: l }).locator('input');
+    await field('First day of the week').selectOption('0'); await nap(300);
+    await check('Quick picks').uncheck(); await check('Autocorrect').check(); await nap(300);
+    await tab('display');
+    await check('Pin the case box').check(); await check('Pin the search box').check(); await nap(200);
+    try {
+      await tab('logbook');
+      const cal = p.locator('main .seg button', { hasText: /^Calendar$/ }); if (await cal.count()) { await cal.first().click(); await nap(200); }
+      assert(await p.locator('.lb-dow').first().textContent() === 'Sun', 'calendar does not start on Sunday');
+      assert(await p.locator('.lb-top').evaluate(el => getComputedStyle(el).position) === 'sticky', 'search card not pinned');
+      await tab('log');
+      await p.waitForSelector('textarea.details');
+      assert(!(await p.locator('.sugg-row').isVisible()) && !(await p.locator('.quick-label').isVisible()), 'quick picks not hidden');
+      assert(await p.locator('textarea.details').getAttribute('autocorrect') === 'on', 'autocorrect not on');
+      assert(await p.locator('.box-wrap').evaluate(el => getComputedStyle(el).position) === 'sticky', 'case box not pinned');
+      await shot3('log-pinned');
+    } finally {
+      await tab('logging');
+      await field('First day of the week').selectOption('1');
+      await check('Quick picks').check(); await check('Autocorrect').uncheck(); await nap(300);
+      await tab('display');
+      await check('Pin the case box').uncheck(); await check('Pin the search box').uncheck(); await nap(200);
+    }
+  });
+
   await step('service worker + offline reload', async () => {
     await tab('log');
     const ok = await p.evaluate(async () => { const r = await navigator.serviceWorker.ready; return !!r.active; });

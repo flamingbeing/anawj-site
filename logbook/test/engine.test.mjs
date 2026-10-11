@@ -546,6 +546,20 @@ assert.equal(rYearDefault(undefined), 1);
   assert.equal(dateWindow('thurs', now).from, '2026-10-08');
 }
 
+// the first day of the week (Settings → Logging): Monday by default, or Sunday / Saturday
+{
+  const { dateWindow, weekStart, weekLead, weekdayNames } = await import('../js/engine.js');
+  const now = new Date(2026, 9, 10, 9);   // a Saturday
+  assert.deepEqual([undefined, null, '', 1, 0, '0', 6, 3, 'x'].map(weekStart), [1, 1, 1, 1, 0, 0, 6, 1, 1]);
+  assert.deepEqual([1, 0, 6].map(ws => weekLead(now, ws)), [5, 6, 0]);
+  assert.deepEqual(weekdayNames(0), ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']);
+  assert.deepEqual(weekdayNames(6).slice(0, 2), ['Sat', 'Sun']);
+  assert.deepEqual(dateWindow('this week', now, 0), { from: '2026-10-04', to: '2026-10-10', rest: '' });
+  assert.deepEqual(dateWindow('last week', now, 0), { from: '2026-09-27', to: '2026-10-03', rest: '' });
+  assert.deepEqual(dateWindow('this week', now, 6), { from: '2026-10-10', to: '2026-10-10', rest: '' });
+  assert.deepEqual(dateWindow('last week', now, 6), { from: '2026-10-03', to: '2026-10-09', rest: '' });
+}
+
 console.log('engine tests passed');
 
 {

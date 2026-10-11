@@ -230,10 +230,16 @@ export const caseParts = c => (c && c.initials != null
 // "last month", "last 7 days", "tuesday", "last tue". -> { from, to, rest } (ISO dates, inclusive;
 // rest is the query without the date words), or null when the query names no date.
 const WEEKDAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
-export function dateWindow(q, now = new Date()) {
+// The first day of the week (Settings → Logging, settings.weekStart): 1 Monday (default), 0 Sunday, 6 Saturday
+export const weekStart = v => { const n = v == null || v === '' ? 1 : Number(v); return [0, 1, 6].includes(n) ? n : 1; };
+// how many days a date is into its week (0 = the first day)
+export const weekLead = (d, ws = 1) => (d.getDay() - weekStart(ws) + 7) % 7;
+// day names from the first day of the week: ['Mon', …, 'Sun']
+export const weekdayNames = (ws = 1) => Array.from({ length: 7 }, (_, i) => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][(weekStart(ws) + i) % 7]);
+export function dateWindow(q, now = new Date(), ws = 1) {
   let s = ' ' + String(q || '').replace(/\s+/g, ' ') + ' ';   // the rest keeps its capitals (OR, AND, case-sensitive search)
   const day = (n = 0) => { const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + n); return todayISO(d); };
-  const monday = (weeksBack = 0) => { const dow = (now.getDay() + 6) % 7; return day(-dow - 7 * weeksBack); };
+  const monday = (weeksBack = 0) => day(-weekLead(now, ws) - 7 * weeksBack);   // the week's first day
   let win = null;
   const take = (re, f) => { if (win) return; const m = s.match(re); if (m) { win = f(m); s = s.replace(re, ' '); } };
   take(/ today /i, () => ({ from: day(), to: day() }));
