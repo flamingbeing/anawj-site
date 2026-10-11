@@ -7,7 +7,7 @@ import { S, h, toast, modal, confirmBox, cloud, catChip, catName, catShort, PICK
 import { MAX_TAGS, tagLinks as tagLinksIn, learnShorthand, cleanShorthand, shorthandOf, DEFAULT_SHORTHAND, cleanTagSet, defaultTagSet, tagTree, flatTree, moveTag, reparentTag, removeTag, newKey, tagSetToCsv, tagSetFromCsv, dropTag, canPlace } from './tags.js';
 import { pickDialog } from './ui-log.js';
 import { OPERATOR_HELP } from './search-ops.js';
-import { PRESETS, DEFAULT_ACCENT, cleanAccent, schemeCss, lightPalette } from './colors.js';
+import { PRESETS, DEFAULT_ACCENT, cleanAccent, schemeCss, lightPalette, tabSchemeCss } from './colors.js';
 import { cleanMarkdown, storedMarkdown, mdCase, mdDay, reflectionPath, reflectionNote, CASE_FILLINS, REFL_FILLINS, FM_FIELDS } from './markdown.js';
 import { checkCss } from './custom-css.js';
 import { FONTS, applyFonts, fontStack, fontAvailable, cleanFontName, logChoice, saveUserFont, getUserFont, deleteUserFont } from './fonts.js';
@@ -97,7 +97,7 @@ export function residencyCard() {
 // the light / dark choice. The first time a device opens the app it starts from what the account had (these used to
 // follow the account), so nobody's look changes. Kept at sign-out: they are the device's, and nothing private.
 const DISPLAY_KEY = 'apmes-logbook-display';
-export const DISPLAY_KEYS = ['compact', 'textSize', 'zoom', 'accent', 'startTab', 'fontUi', 'fontUiName', 'fontLog', 'fontLogName', 'lineWidth', 'lineHeight', 'contrast', 'motion', 'tabIcons', 'tabBar', 'hideHeader', 'caseInverted', 'colourful', 'customCss', 'customCssOn'];
+export const DISPLAY_KEYS = ['compact', 'textSize', 'zoom', 'accent', 'startTab', 'fontUi', 'fontUiName', 'fontLog', 'fontLogName', 'lineWidth', 'lineHeight', 'contrast', 'motion', 'tabIcons', 'tabBar', 'hideHeader', 'caseInverted', 'colourful', 'customCss', 'customCssOn', 'autoFocus'];
 export function deviceDisplay() {
   try { const d = JSON.parse(localStorage.getItem(DISPLAY_KEY) || 'null'); return d && typeof d === 'object' && !Array.isArray(d) ? d : null; } catch { return null; }
 }
@@ -143,9 +143,19 @@ export function applyLook(d = {}) {
   c.toggle('tabs-top', d.tabBar === 'top'); c.toggle('tabs-bottom', d.tabBar === 'bottom');
   c.toggle('no-header', !!d.hideHeader);
   c.toggle('case-inverted', !!d.caseInverted);
-  c.toggle('colourful', !!d.colourful);
+  const col = d.colourful === true ? 'tabs' : d.colourful;   // (a plain on/off before "everything in the tab")
+  c.toggle('colourful', col === 'tabs' || col === 'all'); c.toggle('colour-all', col === 'all');
+  if (col === 'all' && !document.getElementById('tab-colours')) {
+    const el = document.createElement('style'); el.id = 'tab-colours';
+    el.textContent = Object.entries(TAB_COLOURS).map(([t, hex]) => tabSchemeCss(hex, `body[data-bar="${t}"]`)).join('\n');
+    document.head.append(el);
+  }
+  c.toggle('no-autofocus', d.autoFocus === false);   // ui-log.js: don't open the keyboard on the Case tab
   applyCustomCss(d);
 }
+// one colour per tab (Colourful); style.css has the same shades for the tabs-and-headings version
+export const TAB_COLOURS = { log: '#c2410c', logbook: '#0e7490', reflect: '#be123c', progress: '#1d4ed8', more: '#6d28d9' };
+export const COLOURFUL = [['off', 'Off (default)'], ['tabs', 'One colour per tab: the tabs and headings'], ['all', 'One colour per tab: everything in the tab']];
 // Custom CSS (custom-css.js): only CSS that passes checkCss, never on the Display page, and off with ?nocss
 export function applyCustomCss(d = display()) {
   if (typeof document === 'undefined') return;
@@ -181,8 +191,10 @@ export function renderDisplay() {
       lookSelect('lineWidth', 'Line width', LINE_WIDTHS, 'normal', 'How wide text and lists go on a computer or tablet. The Case tab keeps its two panes.'),
       lookSelect('contrast', 'Contrast', CONTRASTS, 'auto', 'Higher contrast: darker text and stronger lines (lighter in dark mode).'),
       lookSelect('motion', 'Motion', MOTIONS, 'auto'),
-      h('label', { class: 'check', style: 'margin-top:10px' }, h('input', { type: 'checkbox', checked: !!st.colourful, onchange: e => applyDisplay(setDisplay({ colourful: e.target.checked })) }), 'Colourful: one colour per tab'),
-      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'Each tab and the headings on its pages get their own colour (Case orange, Logbook teal, Reflections red, Analytics blue, More purple).'),
+      h('div', { class: 'field', style: 'margin-top:10px' }, h('label', { class: 'field', style: 'margin:0' }, 'Colourful',
+        h('select', { 'aria-label': 'Colourful', onchange: e => applyDisplay(setDisplay({ colourful: e.target.value === 'off' ? null : e.target.value })) },
+          COLOURFUL.map(([v, l]) => h('option', { value: v, selected: (st.colourful === true ? 'tabs' : st.colourful || 'off') === v }, l)))),
+        h('span', { class: 'hint help' }, 'Case orange, Logbook teal, Reflections red, Analytics blue, More purple. “Everything” also colours the buttons, chips and links on that tab’s pages, in shades that stay easy to read.')),
       lookSelect('tabBar', 'Tab bar', TAB_BARS, 'auto'),
       h('label', { class: 'check', style: 'margin-top:10px' }, h('input', { type: 'checkbox', checked: !!st.caseInverted, onchange: e => applyDisplay(setDisplay({ caseInverted: e.target.checked })) }), 'Case tab upside down (phones)'),
       h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'The case box sits at the bottom, next to the keyboard and Save, with suggestions just above it; scroll up for all the tags. Like a chat app.'),
@@ -380,6 +392,8 @@ export function renderLogging() {
           [['newline', 'New line (default)'], ['double', 'Press Enter twice to save'], ['single', 'Enter saves (Shift+Enter for a new line)']].map(([v, l]) =>
             h('option', { value: v, selected: (st.enterMode || (st.enterSaves ? 'single' : 'newline')) === v }, l)))),
       h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'Twice: Enter on an empty line saves, so a case can still take several lines. Ctrl+Enter (Cmd+Enter on a Mac) always saves.'),
+      h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: display().autoFocus !== false, onchange: e => applyDisplay(setDisplay({ autoFocus: e.target.checked ? null : false })) }),
+        'Open the keyboard when the Case tab opens (this device)'),
       h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !!st.weeklyDigest, onchange: e => patchLogbook({ settings: { weeklyDigest: e.target.checked } }) }),
         'Show last week’s summary on the Case tab (once a week)'),
       h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !st.hideTips, onchange: e => patchLogbook({ settings: { hideTips: !e.target.checked } }) }),

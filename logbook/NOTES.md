@@ -116,7 +116,9 @@ portfolio content.
   header (`no-header`; it shows again while `who-alert` is set by paintWho: signed out, demo, offline, unsynced).
   Case tab upside down on phones (`case-inverted`: CSS `order` on the log card's items, lp-left/right being
   display: contents; tags on top, the case box last above Save; app.js render() scrolls to the bottom on entering).
-  Colourful (`colourful`: one colour per bar tab, `body[data-bar]` set in paintTabs; darker shades for contrast,
+  Keyboard on opening the Case tab (Logging page, device key `autoFocus`, html `no-autofocus` read by ui-log.js).
+  Colourful 'tabs' / 'all' ('all' = `colour-all`: the colour picker's palettes per tab, `tabSchemeCss` in colors.js,
+  scoped to `body[data-bar=…]`; TAB_COLOURS in ui-settings.js) — the older (`colourful`: one colour per bar tab, `body[data-bar]` set in paintTabs; darker shades for contrast,
   lighter in dark mode). Custom CSS (advanced; `custom-css.js` `checkCss`, tested): refused if it loads anything from
   elsewhere (url(), @import, image-set(), @font-face, @namespace, script hooks, backslash escapes), over 10 KB or with
   unbalanced braces; never applied on the Display page (applyCustomCss runs in render()); `?nocss` turns it off;
