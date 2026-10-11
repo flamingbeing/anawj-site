@@ -318,7 +318,7 @@ export function summaryOf(counts = S.counts) {
   const total = S.cases.length;
   return {
     // the name is the one on the programme list (the rules check it), never a Google display name
-    rid: r.rid, name: r.name || '', intake: r.intake || null, rYear: rYear(),
+    rid: r.rid, name: r.name || '', intake: r.intake || null, rYear: rYear(), ...(r.status === 'SMO' ? { smo: true } : {}),
     counts, total, ...reflectionCounts(S.reflections), updatedAt: Date.now(),
   };
 }
@@ -328,7 +328,7 @@ const writeSummaryNow = async () => {
   // an empty first snapshot from a new device's cache must not wipe the shared counts
   if (!S.resident || !S.resident.rid || !S.casesLoaded || !S.casesSynced) return;
   const s = summaryOf();
-  const key = JSON.stringify([s.counts, s.total, s.rYear, s.name, s.reflections]);
+  const key = JSON.stringify([s.counts, s.total, s.rYear, s.smo, s.intake, s.name, s.reflections]);
   if (key === lastSummary) return;
   try { await cloud.writeSummary(S.resident.rid, s); lastSummary = key; }
   catch (err) {
