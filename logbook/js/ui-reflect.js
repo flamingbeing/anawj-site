@@ -674,7 +674,11 @@ export function renderExportPage(onChoose = false) {
           h('input', { type: 'checkbox', checked: r.export !== false, onchange: e => setExport(r, e.target.checked) }),
           h('span', {}, h('span', { class: 'muted' }, `${r.jr ? 'JR ' : ''}${r.date ? fmtDate(r.date) : '—'} · `), `${r.initials || '??'} ${r.diagnosis || ''}`,
             r.subId && hd.subs ? h('span', { class: 'flag' }, (hd.subs.find(s2 => s2.id === r.subId) || {}).name || '') : null,
-            h('span', { class: 'muted refl-wc' }, ` · ${wordCount(r)} words`))))))));
+            h('span', { class: 'muted refl-wc' }, ` · ${wordCount(r)} words`),
+            // learning point headings, to tell similar reflections apart
+            (r.points || []).some(pt => (pt.heading || '').trim())
+              ? h('ul', { class: 'exp-points hint' }, (r.points || []).filter(pt => (pt.heading || '').trim()).map(pt => h('li', {}, pt.heading.trim())))
+              : null)))))));
   }
   if (!complete.length) add(body, h('p', { class: 'empty' }, 'No complete reflections under a heading yet. Mark reflections complete on the Reflections tab, then come back.'));
   return h('div', {}, choose, body);

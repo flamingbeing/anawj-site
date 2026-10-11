@@ -711,6 +711,8 @@ ul.exp-list li { border-bottom: 1px solid var(--line); }
 label.exp-row { display: flex; align-items: flex-start; gap: 10px; padding: 8px 2px; min-height: 44px; cursor: pointer; }
 label.exp-row input { width: 20px; height: 20px; margin: 2px 0 0; flex: none; }
 label.exp-row .flag { margin-left: 6px; }
+ul.exp-points { margin: 4px 0 0; padding-left: 18px; list-style: disc; font-size: 13px; }
+ul.exp-list ul.exp-points li { border: 0; padding: 0; }
 
 /* Settings: category order */
 ol.cat-order { list-style: none; margin: 0; padding: 0; }
