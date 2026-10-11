@@ -17,6 +17,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600;700&display=swap">
+<script>
+  // theme before the first paint (More → Settings → Theme; light unless chosen)
+  try { var t = localStorage.getItem('evals-theme'); if (t === 'auto') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; document.documentElement.dataset.theme = t === 'dark' ? 'dark' : 'light'; } catch (e) {}
+</script>
 <link rel="stylesheet" href="../design/tokens.css">
 <link rel="stylesheet" href="style.css">
 </head>

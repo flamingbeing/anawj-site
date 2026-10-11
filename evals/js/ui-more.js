@@ -1,6 +1,6 @@
 // More (#more): account, apply for a role, demo role switch, settings, guide links, privacy, sign out.
 
-import { S, h, fill, cloud, toast, hooks, avatar, isResident, isFaculty, isStaff, confirmBox } from './ui-core.js';
+import { S, h, fill, cloud, toast, hooks, avatar, isResident, isFaculty, isStaff, confirmBox, segment, THEMES, themePref, setTheme } from './ui-core.js';
 import { residentYear } from './engine.js';
 
 const AUTOSCROLL_KEY = 'evals-autoscroll';   // 'off' turns auto-advance off (ui-form.js reads it)
@@ -119,10 +119,16 @@ function settingsCard() {
     store.set(AUTOSCROLL_KEY, e.target.checked ? null : 'off');
     toast(e.target.checked ? 'Auto-scroll on' : 'Auto-scroll off');
   } });
+  const theme = h('div', {});
+  const paintTheme = () => fill(theme, segment(THEMES.map(([id, label]) => ({ id, label })), themePref(), id => { setTheme(id); paintTheme(); }));
+  paintTheme();
   return h('section', { class: 'e-card' },
     h('h2', { class: 'e-h3' }, 'Settings'),
     h('label', { class: 'e-check', for: 'more-autoscroll' }, box,
-      h('span', {}, h('b', {}, 'Scroll to the next question'), h('br'), h('span', { class: 'e-small' }, 'After you answer a question on a form. Saved on this device.'))));
+      h('span', {}, h('b', {}, 'Scroll to the next question'), h('br'), h('span', { class: 'e-small' }, 'After you answer a question on a form. Saved on this device.'))),
+    h('p', { style: 'margin:16px 0 4px' }, h('b', {}, 'Theme')),
+    h('div', { class: 'e-more-theme' }, theme),
+    h('p', { class: 'e-small', style: 'margin:4px 0 0' }, 'Auto follows your phone’s light or dark setting. Saved on this device.'));
 }
 
 function guideCard() {

@@ -54,6 +54,27 @@ export const needsAction = (ev, now = Date.now()) => ev.status === 'declined'
   || (ev.status === 'submitted' && !ev.seenAt)
   || (ev.status === 'requested' && ageHours(ev, now) >= NUDGE_HOURS);
 
+// ---------- theme ----------
+// Light (default), dark, or auto (follows the phone). Kept on this device; index.html applies it
+// before the first paint, and More → Settings changes it.
+export const THEME_KEY = 'evals-theme';
+export const THEMES = [['light', 'Light'], ['dark', 'Dark'], ['auto', 'Auto']];
+const darkQuery = typeof matchMedia === 'function' ? matchMedia('(prefers-color-scheme: dark)') : null;
+export function themePref() {
+  try { const t = localStorage.getItem(THEME_KEY); return THEMES.some(([v]) => v === t) ? t : 'light'; } catch { return 'light'; }
+}
+export function applyTheme(pref = themePref()) {
+  if (typeof document === 'undefined') return;
+  const dark = pref === 'dark' || (pref === 'auto' && !!darkQuery?.matches);
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#1c1f24' : '#002f6c');
+}
+export function setTheme(pref) {
+  try { pref === 'light' ? localStorage.removeItem(THEME_KEY) : localStorage.setItem(THEME_KEY, pref); } catch { /* storage blocked */ }
+  applyTheme(pref);
+}
+darkQuery?.addEventListener?.('change', () => { if (themePref() === 'auto') applyTheme('auto'); });
+
 // ---------- tiny DOM helper (as in nuh-roster / logbook) ----------
 
 export function h(tag, attrs = {}, ...kids) {
