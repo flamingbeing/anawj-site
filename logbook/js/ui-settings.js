@@ -81,7 +81,7 @@ export function renderDisplay() {
         applyCompact(e.target.checked);
         patchLogbook({ settings: { compact: e.target.checked } });
       } }), 'Compact mode'),
-      h('p', { class: 'hint', style: 'margin:2px 0 0' }, 'Smaller chips, rows and spacing so more tags fit on screen. Saved to your account, so it follows you to other devices.'),
+      h('p', { class: 'hint help', style: 'margin:2px 0 0' }, 'Smaller chips, rows and spacing so more tags fit on screen. Saved to your account, so it follows you to other devices.'),
       h('label', { class: 'field', style: 'margin-top:10px' }, 'Text size',
         h('select', { onchange: e => { applyTextSize(e.target.value); patchLogbook({ settings: { textSize: e.target.value } }); } },
           TEXT_SIZES.map(([v, l]) => h('option', { value: v, selected: String(st.textSize || '1') === v }, l)))),
@@ -134,8 +134,8 @@ export function renderShareFormat() {
   return h('div', {},
     h('section', { class: 'card' },
       h('h2', {}, 'Copy & share format'),
-      h('p', { class: 'hint', style: 'margin:0 0 6px' }, 'How a case or a day reads when you tap Copy or Share day on the Logbook tab. Tags are never included.'),
-      h('p', { class: 'hint', style: 'margin:0' }, 'Fill-ins: ', ...PLACEHOLDERS.flatMap((k, i) => [i ? ' ' : '', h('code', {}, `{${k}}`)]),
+      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'How a case or a day reads when you tap Copy or Share day on the Logbook tab. Tags are never included.'),
+      h('p', { class: 'hint help', style: 'margin:0' }, 'Fill-ins: ', ...PLACEHOLDERS.flatMap((k, i) => [i ? ' ' : '', h('code', {}, `{${k}}`)]),
         '. {date} is 2026-10-10, {day} is 10 Oct 2026, {n} numbers the cases in a day, {count} is how many that day, {case} is the case without the initials. A line whose fill-ins are all empty is left out.'),
       h('h3', { style: 'margin:14px 0 0' }, 'A day'),
       lbl('Heading', head),
@@ -161,15 +161,16 @@ export function renderLogging() {
         h('select', { onchange: e => patchLogbook({ settings: { enterMode: e.target.value, enterSaves: null } }).then(() => toast('Saved')) },
           [['newline', 'New line (default)'], ['double', 'Press Enter twice to save'], ['single', 'Enter saves (Shift+Enter for a new line)']].map(([v, l]) =>
             h('option', { value: v, selected: (st.enterMode || (st.enterSaves ? 'single' : 'newline')) === v }, l)))),
-      h('p', { class: 'hint', style: 'margin:0 0 6px' }, 'Twice: Enter on an empty line saves, so a case can still take several lines. Ctrl+Enter (Cmd+Enter on a Mac) always saves.'),
+      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'Twice: Enter on an empty line saves, so a case can still take several lines. Ctrl+Enter (Cmd+Enter on a Mac) always saves.'),
       h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !!st.weeklyDigest, onchange: e => patchLogbook({ settings: { weeklyDigest: e.target.checked } }) }),
         'Show last week’s summary on the Case tab (once a week)'),
       h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !st.hideTips, onchange: e => patchLogbook({ settings: { hideTips: !e.target.checked } }) }),
-        'Show tips for the tags I pick (e.g. how blocks count)'),
+        'Show tips and help text'),
+      h('p', { class: 'hint', style: 'margin:0 0 6px' }, 'Off for experienced users: hides the explanations around the app (like the one at the top of the tag editor) and the tips for the tags you pick.'),
       h('label', { class: 'field', style: 'margin-top:8px' }, 'Case box height on the Case tab',
         h('select', { onchange: e => patchLogbook({ settings: { boxLines: Number(e.target.value) } }).then(() => toast('Saved')) },
           Array.from({ length: 19 }, (_, i) => i + 2).map(n => h('option', { value: String(n), selected: n === (Math.min(20, Math.max(2, Number(st.boxLines) || 3))) }, `${n} lines${n === 3 ? ' (default)' : ''}`)))),
-      h('p', { class: 'hint', style: 'margin:8px 0 6px' }, 'How the Logbook search works (everything, initials or procedure; fuzzy) is under Filter on the Logbook tab, and is remembered.'),
+      h('p', { class: 'hint help', style: 'margin:8px 0 6px' }, 'How the Logbook search works (everything, initials or procedure; fuzzy) is under Filter on the Logbook tab, and is remembered.'),
       // operators in the Logbook search box (search-ops.js); off by default, so plain searches never change meaning
       h('label', { class: 'check', style: 'margin-top:8px' }, h('input', { type: 'checkbox', role: 'switch', checked: !!st.searchOps, onchange: e => patchLogbook({ settings: { searchOps: e.target.checked } }).then(() => toast(e.target.checked ? 'Advanced search on' : 'Advanced search off')) }),
         'Advanced search'),
@@ -191,7 +192,7 @@ export function renderReflectionSettings() {
       h('h2', {}, 'Reflections'),
       h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: st.reflExport !== false, onchange: e => patchLogbook({ settings: { reflExport: e.target.checked } }) }),
         'New reflections are included in the portfolio export'),
-      h('p', { class: 'hint', style: 'margin:0' }, 'Untick if you write many and would rather choose which go in. Reflections already written keep their own tick.')),
+      h('p', { class: 'hint help', style: 'margin:0' }, 'Untick if you write many and would rather choose which go in. Reflections already written keep their own tick.')),
     h('section', { class: 'card' },
       h('h2', {}, 'Photos'),
       (() => { const kb = photoUsageKb(S.reflections), pct = Math.min(100, Math.round(kb / PHOTO_BUDGET_KB * 100));
@@ -248,7 +249,7 @@ function tagGroupsCard() {
   const list = (S.logbook && S.logbook.templates) || [];
   return h('section', { class: 'card', id: 'tag-groups' },
     h('h2', {}, 'Tag groups'),
-    h('p', { class: 'hint' }, 'Tags you often pick together, one tap in Quick picks on the Case tab, e.g. “LSCS spinal” = LSCS + CNB(Obs) + Spinal.'),
+    h('p', { class: 'hint help' }, 'Tags you often pick together, one tap in Quick picks on the Case tab, e.g. “LSCS spinal” = LSCS + CNB(Obs) + Spinal.'),
     list.length ? h('ul', { class: 'prog' }, list.map(t => h('li', { style: 'grid-template-columns:1fr auto', class: tev.lastGroup === t.id ? 'te-last' : '' },
       h('span', {}, h('b', {}, t.name), ' ', h('span', { class: 'muted' }, catPills(t.cats)), t.details ? h('span', { class: 'muted' }, ` · “${t.details}”`) : null),
       h('span', { class: 'row' },
@@ -379,7 +380,7 @@ export function renderTagEditor() {
     [['list', 'List'], ['pills', 'Pills']].map(([m, l]) => h('button', { class: 'small', 'aria-pressed': String(teMode() === m), onclick: () => { if (teMode() !== m) patchLogbook({ settings: { tagEditorView: m } }).then(() => hooks.render()); } }, l)));
   return h('div', {}, h('section', { class: 'card tag-editor' },
     h('h2', {}, 'Tag editor'),
-    h('p', { class: 'hint' }, 'Lay out the Case tab’s list your way. APMES tags are the programme’s categories: rename (just for you), hide, move them or put them under section headers. Personal tags are your own: link one to APMES categories and choosing it ticks them, or leave it as a label only. A personal tag under an APMES one counts towards it. Totals and exports always use APMES.'),
+    h('p', { class: 'hint help' }, 'Lay out the Case tab’s list your way. APMES tags are the programme’s categories: rename (just for you), hide, move them or put them under section headers. Personal tags are your own: link one to APMES categories and choosing it ticks them, or leave it as a label only. A personal tag under an APMES one counts towards it. Totals and exports always use APMES.'),
     h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:8px;margin:0 0 8px' },
       h('button', { class: 'small primary', onclick: () => editTag(null, 'tag') }, '+ Personal tag'),
       h('button', { class: 'small', onclick: () => editTag(null, 'head') }, '+ Section header'),
@@ -387,14 +388,14 @@ export function renderTagEditor() {
     h('div', { class: 'bar', style: 'gap:8px;margin:0 0 8px' }, search, modeSeg),
     words.length ? h('p', { class: 'hint', style: 'margin:0 0 6px' }, `${nodes.length} of ${all.length} shown`) : null,
     teMode() === 'pills'
-      ? [h('p', { class: 'hint', style: 'margin:0 0 6px' }, 'Tap a pill to edit it. Drag one (press and hold on a phone) onto the left or right of another to move it, or onto its middle to put it inside. The number is how many cases have it.'),
+      ? [h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'Tap a pill to edit it. Drag one (press and hold on a phone) onto the left or right of another to move it, or onto its middle to put it inside. The number is how many cases have it.'),
         h('ul', { class: 'te-list te-pills' }, nodes.map(pill))]
       : h('ul', { class: 'te-list' }, nodes.map(row))),
     tagGroupsCard(),
     // the whole layout as a file, and starting over: rarely needed, so at the very bottom
     h('section', { class: 'card' },
       h('h2', {}, 'Tag list file'),
-      h('p', { class: 'hint' }, 'Download your tags as a spreadsheet (CSV) to edit on a computer or share, load one back, or reset to the APMES tags.'),
+      h('p', { class: 'hint help' }, 'Download your tags as a spreadsheet (CSV) to edit on a computer or share, load one back, or reset to the APMES tags.'),
       h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:8px;margin:0' },
         h('button', { class: 'small', onclick: () => download(`tags-${todayISO()}.csv`, new Blob([tagSetToCsv(set, def)], { type: 'text/csv' })) }, 'Download as CSV'),
         fileButton('Load a CSV…', '.csv,text/csv', file => loadTagCsv(file, def), 'btn small'),

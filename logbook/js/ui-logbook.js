@@ -251,7 +251,7 @@ function bulkTag(rows) {
   const act = h('select', {}, h('option', { value: 'add' }, 'Add'), h('option', { value: 'remove' }, 'Remove'));
   const sel = h('select', {}, h('option', { value: '' }, 'Choose a tag…'), tags.map(n => h('option', { value: n.k }, `${'  '.repeat(Math.min(n.depth, 3))}${n.label}`)));
   const m = modal(`Tag ${rows.length} case${rows.length === 1 ? '' : 's'}`, [
-    h('p', { class: 'hint' }, 'Applies to every case in the current search results.'),
+    h('p', { class: 'hint help' }, 'Applies to every case in the current search results.'),
     h('div', { class: 'bar', style: 'gap:8px' }, act, sel),
     h('div', { class: 'bar', style: 'margin-top:12px' }, h('span', { class: 'grow' }),
       h('button', { onclick: () => m.close() }, 'Cancel'),
@@ -387,7 +387,7 @@ function calendarView(rows, flagsOf, repaint) {
           dayCases.length ? h('button', { class: 'small', onclick: () => shareText(dayText(view.day)) }, 'Share day') : null,
           dayCases.length ? h('button', { class: 'small', title: 'Copy this day (format in Settings → Copy & share)', 'aria-label': 'Copy this day', onclick: () => copyText(dayText(view.day), 'Day copied: paste it into your notes') }, 'Copy') : null)),
       dayCases.length ? h('ul', { class: 'cases' }, dayCases.map(c => caseRow(c, flagsOf))) : h('p', { class: 'empty' }, 'No cases on this day.'))
-      : h('p', { class: 'hint', style: 'margin-top:10px' }, 'Tap a day to see its cases.'),
+      : h('p', { class: 'hint help', style: 'margin-top:10px' }, 'Tap a day to see its cases.'),
     undated.length ? h('details', { style: 'margin-top:12px' },
       h('summary', {}, `No date (${undated.length})`),
       h('ul', { class: 'cases' }, undated.map(c => caseRow(c, flagsOf)))) : null);
@@ -425,7 +425,7 @@ function gridView(rows, repaint) {
   }
   const more = rows.length > view.limit ? h('button', { onclick: () => { view.limit += 300; repaint(); } }, `Show more (${rows.length - view.limit} left)`) : null;
   return h('div', {},
-    h('p', { class: 'hint' }, 'Edit the date, initials and details directly; changes save when you leave a cell. Tap the tags to change them.'),
+    h('p', { class: 'hint help' }, 'Edit the date, initials and details directly; changes save when you leave a cell. Tap the tags to change them.'),
     h('div', { class: 'scroll' }, h('table', { class: 'grid' }, h('thead', {}, h('tr', {}, h('th', {}, 'Date'), h('th', {}, 'Initials'), h('th', {}, 'Case summary'), h('th', {}, 'Tags'))), tbody)),
     more,
     pasteRows());
@@ -461,14 +461,14 @@ function pasteRows() {
 export function opsHelp(box, onchange, list = OPERATOR_HELP, example = 'tag:lscs -GA "under spinal"') {
   const caret = box.selectionStart ?? box.value.length;
   const m = modal('Search operators', [
-    h('p', { class: 'hint', style: 'margin:0 0 6px' }, 'Tap one to add it to the search box.'),
+    h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'Tap one to add it to the search box.'),
     h('div', { class: 'ops-pick' }, list.map(([op, what, insert, at]) => h('button', { type: 'button', class: 'ops-row', onclick: () => {
       const r = insertOperator(box.value, caret, insert, at);
       m.close();
       box.value = r.text; onchange(r.text);
       box.focus(); box.setSelectionRange(r.caret, r.caret);
     } }, h('code', {}, op), h('span', {}, what)))),
-    h('p', { class: 'hint' }, `Combine them: ${example}. Plain words work as usual. Turn operators off in Settings → Logging.`),
+    h('p', { class: 'hint help' }, `Combine them: ${example}. Plain words work as usual. Turn operators off in Settings → Logging.`),
     h('div', { class: 'bar' }, h('span', { class: 'grow' }), h('button', { onclick: () => m.close() }, 'Close'))]);
 }
 
@@ -508,7 +508,7 @@ export function downloadExcel() {
         h('label', { class: 'field xp-field' }, 'From', h('input', { type: 'date', value: o.from, onchange: e => { o.from = e.target.value; paint(); } })),
         h('label', { class: 'field xp-field' }, 'To', h('input', { type: 'date', value: o.to, onchange: e => { o.to = e.target.value; paint(); } }))) : null,
       t.cases ? h('div', { class: 'xp-sec' }, h('h3', {}, 'Logbook columns'),
-        h('p', { class: 'hint' }, 'Tick the columns you want; ↑ ↓ set the order (left to right in Excel).'),
+        h('p', { class: 'hint help' }, 'Tick the columns you want; ↑ ↓ set the order (left to right in Excel).'),
         colList('caseCols', CASE_COLS),
         sel('Tags written as', 'tagStyle', [['full', 'Full name (Lower Segment Caesarean Section)'], ['short', 'Short name (LSCS)']]),
         h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: o.summary, onchange: e => { o.summary = e.target.checked; } }), 'Add a Summary sheet (counts against targets)')) : null,

@@ -988,3 +988,5 @@ details.refl-foot { margin: 4px 4px 12px; }
 ul.te-list li.te-last { box-shadow: inset 3px 0 0 var(--accent); }
 ul.te-list.te-pills li.te-pillitem.te-last { outline: 2px solid var(--accent); outline-offset: 1px; }
 ul.prog li.te-last { box-shadow: inset 3px 0 0 var(--accent); }
+/* "Show tips and help text" off: the explanations go (status lines, warnings and safety notes stay) */
+body.no-help .help { display: none !important; }

@@ -150,7 +150,7 @@ function settingsFileCard() {
   };
   return h('section', { class: 'card' },
     h('h2', {}, 'Settings file'),
-    h('p', { class: 'hint' }, 'Your settings, tags and shorthand, tag groups, copy & share format and saved searches as one small file: to move them to another account or share your setup with a colleague. No cases, reflections or portfolio details.'),
+    h('p', { class: 'hint help' }, 'Your settings, tags and shorthand, tag groups, copy & share format and saved searches as one small file: to move them to another account or share your setup with a colleague. No cases, reflections or portfolio details.'),
     h('div', { class: 'bar', style: 'margin-bottom:0' },
       h('button', { onclick: exportIt }, 'Export settings'),
       fileButton('Import settings…', '.json,application/json', importIt)));
@@ -171,18 +171,18 @@ function renderDataPage() {
     // Export is the portfolio only (it holds everything APMES needs); every other copy is a backup
     h('section', { class: 'card export-sync' }, h('h2', {}, 'Export'),
       h('h3', {}, 'Portfolio (Word)'),
-      h('p', { class: 'hint' }, 'The APMES portfolio: choose which complete reflections go in, then export it with Section 1 and the Section 4 case numbers filled in. This is what APMES needs.'),
+      h('p', { class: 'hint help' }, 'The APMES portfolio: choose which complete reflections go in, then export it with Section 1 and the Section 4 case numbers filled in. This is what APMES needs.'),
       h('div', { class: 'bar', style: 'margin-bottom:0' }, h('a', { class: 'btn primary', href: '#export' }, 'Choose reflections and export ›'))),
     h('section', { class: 'card' }, h('h2', {}, 'Import'),
       h('h3', {}, 'Reflections from Word'),
-      h('p', { class: 'hint' }, 'Already wrote reflections in the APMES Word portfolio? Upload the .docx to add them here. You check each one before it is saved.'),
+      h('p', { class: 'hint help' }, 'Already wrote reflections in the APMES Word portfolio? Upload the .docx to add them here. You check each one before it is saved.'),
       h('div', { class: 'bar', style: 'margin-bottom:0' }, h('a', { class: 'btn', href: '#reflimport' }, 'Upload from Word ›')),
       h('h3', { style: 'margin-top:16px' }, 'Logbook from Excel or CSV'),
-      h('p', { class: 'hint' }, 'Edit your cases in a spreadsheet (Download Excel under Backup), then upload it back; or bring in a list from elsewhere. You match the columns and see every change before anything is saved.'),
+      h('p', { class: 'hint help' }, 'Edit your cases in a spreadsheet (Download Excel under Backup), then upload it back; or bring in a list from elsewhere. You match the columns and see every change before anything is saved.'),
       h('div', { class: 'bar', style: 'margin-bottom:0' }, fileButton('Upload Excel/CSV…', '.xlsx,.csv,text/csv', uploadExcel))),
     backupCard(
       h('h3', { style: 'margin-top:16px' }, 'Spreadsheet (Excel)'),
-      h('p', { class: 'hint' }, 'Your cases, your reflections or both as a spreadsheet: choose the dates and the columns. To edit cases and upload them back, use Import above.'),
+      h('p', { class: 'hint help' }, 'Your cases, your reflections or both as a spreadsheet: choose the dates and the columns. To edit cases and upload them back, use Import above.'),
       h('div', { class: 'bar', style: 'margin-bottom:0' }, h('button', { onclick: downloadExcel }, 'Download Excel…'))));
 }
 
@@ -236,6 +236,8 @@ window.addEventListener('hashchange', () => { const t = tabFromHash(); if (t && 
 
 function render() {
   if (!S.user) return;
+  // Settings → Logging → Show tips and help text: off hides every .help explanation (an experienced-user mode)
+  document.body.classList.toggle('no-help', !!(S.logbook && S.logbook.settings && S.logbook.settings.hideTips));
   paintTabs();
   const tab = visibleTabs().find(t => t.id === S.tab) || TABS[0];
   S.tab = tab.id;

@@ -171,7 +171,7 @@ function chooseHeading() {
     h('p', { style: 'margin:0 0 8px' }, h('span', { class: 'muted' }, caseDate(c) + ' · '), caseText(c) || '(no details)',
       (c.cats || []).length ? h('span', { class: 'muted', style: 'display:block;font-size:13px' }, c.cats.map(catName).join(', ')) : null),
     suggestChips(c, preset => reflectOnCase(c, preset)),
-    h('p', { class: 'hint', style: 'margin:10px 0 6px' }, 'Highlighted headings still need reflections. You can change the heading later.'),
+    h('p', { class: 'hint help', style: 'margin:10px 0 6px' }, 'Highlighted headings still need reflections. You can change the heading later.'),
     h('button', { onclick: () => reflectOnCase(c) }, 'Choose the heading later')));
 }
 
@@ -216,7 +216,7 @@ function picker() {
     h('h2', { style: 'margin:8px 0 4px' }, p.relink ? 'Change the linked case' : 'Which case is this reflection on?'),
     ph ? h('p', { style: 'margin:0 0 4px' }, h('span', { class: 'muted' }, 'Heading: '), h('b', {}, labelOf(ph) + (psub ? ' · ' + psub.name : ''))) : null,
     p.preset && p.preset.uncat ? h('p', { style: 'margin:0 0 4px' }, h('span', { class: 'muted' }, 'Heading: '), h('b', {}, 'Uncategorised')) : null,
-    h('p', { class: 'hint', style: 'margin:0 0 8px' }, p.relink ? 'Pick the logged case this reflection is about.' : 'Pick a logged case: the reflection starts with its initials, date, diagnosis and case details filled in. Not logged yet? Add it here.'),
+    h('p', { class: 'hint help', style: 'margin:0 0 8px' }, p.relink ? 'Pick the logged case this reflection is about.' : 'Pick a logged case: the reflection starts with its initials, date, diagnosis and case details filled in. Not logged yet? Add it here.'),
     p.relink ? null : h('button', { class: 'small', style: 'margin:0 0 8px', onclick: newCaseForReflection }, '+ New case'),
     search, count), h('section', { class: 'card' }, ul));
 }
@@ -368,7 +368,7 @@ function list() {
     for (const [cb, li, id] of checks) { cb.checked = rv.sel.has(id); li.classList.toggle('sel', cb.checked); }
   };
   const toolbar = em ? h('section', { class: 'card refl-editbar' },
-    h('p', { class: 'hint', style: 'margin:0 0 6px' }, 'Drag ', h('span', { class: 'refl-handle-ico' }, '⠿'), ' onto another heading to move a reflection. Tick reflections to mark them complete or delete them.'),
+    h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'Drag ', h('span', { class: 'refl-handle-ico' }, '⠿'), ' onto another heading to move a reflection. Tick reflections to mark them complete or delete them.'),
     h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:8px' },
       h('button', { class: 'small', onclick: () => { all.forEach(r => r.id && rv.sel.add(r.id)); paintSel(); } }, 'Select all'),
       h('button', { class: 'small', onclick: () => { rv.sel.clear(); paintSel(); } }, 'Clear'),
@@ -682,7 +682,7 @@ export function renderExportPage(onChoose = false) {
   };
   const top = h('section', { class: 'card' },
     h('h2', { style: 'margin:0 0 4px' }, 'Export portfolio (Word)'),
-    h('p', { class: 'hint', style: 'margin:0 0 8px' }, 'Your complete reflections go into the APMES portfolio, with Section 1 and the Section 4 case numbers filled in. All are included unless you leave some out.'),
+    h('p', { class: 'hint help', style: 'margin:0 0 8px' }, 'Your complete reflections go into the APMES portfolio, with Section 1 and the Section 4 case numbers filled in. All are included unless you leave some out.'),
     h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:8px;margin:0 0 10px;align-items:center' },
       h('span', {}, h('b', {}, `${ex.total} of ${complete.length} reflections included`),
         drafts || uncat ? h('span', { class: 'hint' }, ` · not exported: ${[drafts ? `${drafts} draft${drafts === 1 ? '' : 's'}` : '', uncat ? `${uncat} uncategorised` : ''].filter(Boolean).join(', ')}`) : null),
@@ -866,14 +866,14 @@ function editor() {
     h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:8px' },
       h('label', { class: 'field' }, 'Patient initials', input('initials', { 'data-field': 'initials', maxlength: '20', autocapitalize: 'characters', style: 'font-size:16px;width:7em' })),
       h('label', { class: 'field' }, 'Date', h('input', { type: 'date', 'data-field': 'date', style: 'font-size:16px', value: r.date || '', oninput: e => { r.date = e.target.value || null; if (r.source !== 'word') setJr(r); changed(); } }))),
-    h('p', { class: 'hint' }, 'Some categories require one case reflection in Junior Residency (JR); when not indicated, at most one case reflection can be done at the JR level per category. A reflection dated in R1–R3 is marked JR in the Word export automatically.'),
+    h('p', { class: 'hint help' }, 'Some categories require one case reflection in Junior Residency (JR); when not indicated, at most one case reflection can be done at the JR level per category. A reflection dated in R1–R3 is marked JR in the Word export automatically.'),
     h('label', { class: 'field' }, 'Diagnosis / operation', input('diagnosis', { maxlength: '2000' })),
     h('p', { class: 'hint' }, 'De-identified only: initials, no names or NRIC. Generative AI use must follow the NUS guidelines on the use of AI tools in academic work.'));
 
   // What APMES wants covered (from the portfolio's reflection elements)
   const guide = h('details', { class: 'card', style: 'padding:12px 16px' },
     h('summary', { style: 'cursor:pointer;font-weight:600' }, 'What APMES wants covered'),
-    h('p', { class: 'hint' }, 'Write the case details, then learning points. Between them, the learning points should cover:'),
+    h('p', { class: 'hint help' }, 'Write the case details, then learning points. Between them, the learning points should cover:'),
     h('ul', { style: 'margin:4px 0 0;padding-left:20px' }, REFLECTION_SECTIONS.filter(s => s.id !== 'description' && (s.id !== 'further' || r.jr))
       .map(s => h('li', { style: 'margin-bottom:4px' }, h('b', {}, s.name), ': ', s.hint))));
 

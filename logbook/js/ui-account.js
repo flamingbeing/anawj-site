@@ -106,7 +106,7 @@ function profileCard() {
 
   return h('section', { class: 'card acct' },
     h('div', { class: 'bar', style: 'margin:0' }, h('h2', { style: 'margin:0' }, 'Portfolio details (Section 1)'), h('span', { class: 'grow' }), status),
-    h('p', { class: 'hint' }, 'Fills Section 1 of the exported portfolio. Only you (and the programme admins) can see it. Tap a heading to open it.'),
+    h('p', { class: 'hint help' }, 'Fills Section 1 of the exported portfolio. Only you (and the programme admins) can see it. Tap a heading to open it.'),
     h('div', { class: 'acct-import' }, h('label', { class: 'btn small' }, 'Fill from my Word portfolio',
       h('input', { type: 'file', accept: '.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document', hidden: true,
         onchange: e => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) importDocx(f); } }))),
