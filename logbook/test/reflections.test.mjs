@@ -169,3 +169,42 @@ assert.ok(MIN_WORDS > 0);
   assert.equal(cleanReflection({ id: 'x', headingId: 'thyroid', source: 'evil' }).source, undefined);
 }
 console.log('reflections tests passed');
+
+// ---------- choosing what goes into the export ----------
+{
+  const { inExport, exportSummary, pickJustEnough } = await import('../js/reflections.js');
+  const words = n => Array.from({ length: n }, (_, i) => 'w' + i).join(' ');
+  const R = (id, o) => ({ id, status: 'complete', headingId: 'bariatric', initials: 'AB', date: '2026-01-0' + (id.length % 9 + 1), jr: false, title: '', summary: words(10), points: [], ...o });
+  // the flag: stored only when off; older reflections (no flag) are in
+  assert.equal(cleanReflection({ headingId: 'lscs', export: false }).export, false);
+  assert.ok(!('export' in cleanReflection({ headingId: 'lscs', export: true })));
+  assert.ok(!('export' in cleanReflection({ headingId: 'lscs' })));
+  assert.ok(inExport(R('a', {})));
+  assert.ok(!inExport(R('a', { export: false })), 'left out');
+  assert.ok(!inExport(R('a', { status: 'draft' })), 'drafts never');
+  assert.ok(!inExport(R('a', { headingId: '' })), 'uncategorised never');
+  // uncategorised reflections can be marked complete
+  assert.deepEqual(completeProblems({ headingId: '', initials: 'AB', date: '2026-01-01', title: 'T', points: [{ heading: 'One' }] }), []);
+  // summary + warnings
+  const list = [R('a', {}), R('bb', { export: false }), R('ccc', { export: false }), R('dddd', { status: 'draft' })];
+  const b = exportSummary(list).headings.find(x => x.id === 'bariatric');
+  assert.equal(b.written, 4); assert.equal(b.complete, 3); assert.equal(b.inExport, 1);
+  assert.ok(b.warn.some(w => /1 of 3/.test(w)), 'short of the minimum: ' + b.warn);
+  assert.ok(b.warn.some(w => /JR/.test(w)) === false, 'no JR complete, so no JR warning');
+  // pick just enough: longest first, keep the JR needed (bariatric needs 1 JR, min 3)
+  const many = [R('s1', { summary: words(100) }), R('s2', { summary: words(300) }), R('s3', { summary: words(200) }), R('s4', { summary: words(50), jr: true }), R('s5', { summary: words(400) })];
+  const pick = pickJustEnough(many);
+  assert.deepEqual(Object.keys(pick).filter(k => pick[k]).sort(), ['s2', 's4', 's5'], 'JR one kept, then the two longest');
+  // sub-types: CABG needs on pump and off pump (min 2)
+  const cabg = [R('c1', { headingId: 'cabg', subId: 'on', summary: words(500) }), R('c2', { headingId: 'cabg', subId: 'on', summary: words(400) }), R('c3', { headingId: 'cabg', subId: 'off', summary: words(20) })];
+  const pc = pickJustEnough(cabg);
+  assert.deepEqual(Object.keys(pc).filter(k => pc[k]).sort(), ['c1', 'c3'], 'the off-pump one kept although short');
+  // headings without a JR rule: at most one JR while others are left
+  const thy = [R('t1', { headingId: 'thyroid', jr: true, summary: words(900) }), R('t2', { headingId: 'thyroid', jr: true, summary: words(800) }), R('t3', { headingId: 'thyroid', summary: words(10) }), R('t4', { headingId: 'thyroid', summary: words(5) })];
+  const pt = pickJustEnough(thy);
+  assert.deepEqual(Object.keys(pt).filter(k => pt[k]).sort(), ['t1', 't3', 't4']);
+  // drafts and uncategorised are left alone
+  assert.ok(!('dddd' in pickJustEnough(list)));
+  assert.ok(!('u' in pickJustEnough([R('u', { headingId: '' })])));
+}
+console.log('export choice tests passed');

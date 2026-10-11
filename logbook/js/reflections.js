@@ -7,7 +7,7 @@ import { REFLECTION_HEADINGS, REFLECTION_SECTIONS } from './categories.js';
 
 export const REFLECTION_TOTAL = REFLECTION_HEADINGS.reduce((n, h) => n + h.min, 0);   // 96
 export const SECTION_MAX = 20000;
-export const REFLECTION_FIELDS = ['id', 'headingId', 'subId', 'initials', 'date', 'jr', 'diagnosis', 'title', 'summary', 'points', 'figures', 'references', 'sections', 'caseId', 'source', 'status', 'createdAt', 'updatedAt'];
+export const REFLECTION_FIELDS = ['id', 'headingId', 'subId', 'initials', 'date', 'jr', 'diagnosis', 'title', 'summary', 'points', 'figures', 'references', 'sections', 'caseId', 'source', 'status', 'export', 'createdAt', 'updatedAt'];
 // Caps (firestore.rules checks list sizes and top-level types; string lengths inside lists are capped here).
 export const LIMITS = { title: 300, summary: 20000, points: 15, pointHeading: 300, pointText: 20000, figures: 10, caption: 300, references: 30, reference: 1000 };
 export const IMAGE_MAX_B64 = 700 * 1024;   // an image doc's base64 must be under this (rules allow < 750000)
@@ -46,6 +46,8 @@ export function cleanReflection(r, now = Date.now()) {
     caseId: r.caseId ? String(r.caseId).slice(0, 200) : null,
     ...(r.source === 'word' ? { source: 'word' } : {}),
     status: r.status === 'complete' ? 'complete' : 'draft',
+    // left out of the portfolio export (stored only when off: older reflections are in)
+    ...(r.export === false ? { export: false } : {}),
     createdAt: Number(r.createdAt) || now,
     updatedAt: now,
   };
@@ -66,8 +68,7 @@ export const isLegacy = r => !!(r && r.sections && Object.values(r.sections).som
 // The sub-type is optional too: headings with required sub-types show what is still needed instead.
 export function completeProblems(r) {
   const out = [];
-  const hd = HEADING_BY_ID[r.headingId];
-  if (!hd) out.push('heading');
+  // no heading is fine: it stays Uncategorised (not exported) until moved to one
   if (!String(r.initials || '').trim()) out.push('initials');
   if (!r.date) out.push('date');
   if (isLegacy(r)) {
@@ -125,6 +126,47 @@ export function reflectionProgress(reflections) {
   });
   const total = headings.reduce((n, h) => n + Math.min(h.counted, h.min), 0);
   return { headings, totals: { done: done.length, counted: total, min: REFLECTION_TOTAL, drafts: (reflections || []).filter(r => r.status !== 'complete').length } };
+}
+
+// ---------- choosing what goes into the portfolio export ----------
+
+// Exported: complete, under a portfolio heading (Uncategorised ones have no table), and not left out.
+export const inExport = r => !!r && r.status === 'complete' && HEADING_IDS.has(r.headingId) && r.export !== false;
+
+// Per heading: written (all, drafts too), complete, in export, and what the export is short of
+// (fewer than the minimum, a required sub-type or the JR reflections left out).
+export function exportSummary(reflections) {
+  const all = reflections || [];
+  const headings = REFLECTION_HEADINGS.map(hd => {
+    const mine = all.filter(r => r.headingId === hd.id);
+    const out = mine.filter(inExport);
+    const warn = [];
+    if (out.length < hd.min && mine.filter(r => r.status === 'complete').length > out.length) warn.push(`${out.length} of ${hd.min} needed in the export`);
+    for (const s of hd.subs || []) if (mine.some(r => r.status === 'complete' && r.subId === s.id) && !out.some(r => r.subId === s.id)) warn.push(`no ${s.name} in the export`);
+    if (hd.jr && out.filter(r => r.jr).length < hd.jr && mine.filter(r => r.status === 'complete' && r.jr).length > out.filter(r => r.jr).length) warn.push(`${hd.jr} JR needed in the export`);
+    return { id: hd.id, written: mine.length, complete: mine.filter(r => r.status === 'complete').length, inExport: out.length, min: hd.min, warn };
+  });
+  return { headings, total: all.filter(inExport).length };
+}
+
+// "Tick just enough": for each heading, the complete reflections to export: the longest (by word
+// count) that cover each required sub-type and the JR reflections needed, then the longest of the
+// rest up to the minimum (more than one JR only where the heading asks for JR ones, unless nothing
+// else is left). Returns { id: true | false } for every complete reflection under a heading.
+export function pickJustEnough(reflections) {
+  const out = {};
+  for (const hd of REFLECTION_HEADINGS) {
+    const pool = (reflections || []).filter(r => r.status === 'complete' && r.headingId === hd.id)
+      .map(r => ({ r, n: wordCount(r) })).sort((a, b) => b.n - a.n || String(a.r.id).localeCompare(String(b.r.id)));
+    const chosen = new Set();
+    const take = ok => { const x = pool.find(p => !chosen.has(p.r.id) && ok(p.r)); if (x) chosen.add(x.r.id); return !!x; };
+    for (const s of hd.subs || []) for (let i = 0; i < (s.min || 1); i++) if (!take(r => r.subId === s.id)) break;
+    const jrIn = () => pool.filter(p => chosen.has(p.r.id) && p.r.jr).length;
+    while (hd.jr && jrIn() < hd.jr && take(r => r.jr));
+    while (chosen.size < hd.min && (take(r => hd.jr || !r.jr || jrIn() < 1) || take(() => true)));
+    for (const p of pool) out[p.r.id] = chosen.has(p.r.id);
+  }
+  return out;
 }
 
 // For the shared summary: { headingId: complete count } and the total.

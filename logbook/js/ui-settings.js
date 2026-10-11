@@ -84,6 +84,12 @@ export function renderSettings() {
           h('option', { value: 'today', selected: st.defaultDate !== 'last' }, 'Today'),
           h('option', { value: 'last', selected: st.defaultDate === 'last' }, 'The date I used last')))),
 
+    h('section', { class: 'card' },
+      h('h2', {}, 'Reflections'),
+      h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: st.reflExport !== false, onchange: e => patchLogbook({ settings: { reflExport: e.target.checked } }) }),
+        'New reflections are included in the portfolio export'),
+      h('p', { class: 'hint', style: 'margin:0' }, 'Untick if you write many and would rather choose which go in. Reflections already written keep their own tick.')),
+
     templatesCard(),
     subcatsCard(),
 
@@ -98,7 +104,7 @@ export function renderSettings() {
     h('section', { class: 'card' },
       h('h2', {}, 'Privacy'),
       h('p', { class: 'hint', style: 'margin:0' },
-        'Your cases are stored in your own logbook in Google Cloud Firestore and only you (and the programme admins) can read them. ',
+        'Your cases are stored in your own logbook in Google Cloud Firestore. Only you can read them (and the app owner, who runs the import from the old Google Form); programme admins cannot. ',
         'Log patient initials only — no names, NRIC or hospital numbers. Programme residents share case counts per category on the Totals tab; details are never shared. ',
         'This device keeps an offline copy of your cases until you sign out — sign out on shared computers.')),
 

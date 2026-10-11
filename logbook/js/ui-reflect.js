@@ -7,18 +7,20 @@
 // works) and selecting several to delete. Every delete goes to the recycle bin (bin.js, 30 days).
 
 import { REFLECTION_HEADINGS, REFLECTION_SECTIONS } from './categories.js';
-import { reflectionProgress, reflectionCounts, HEADING_BY_ID, splitDetails, completeProblems, isLegacy, LIMITS, IMAGE_MAX_B64, wordCount, MIN_WORDS, suggestHeadings, moveToHeading } from './reflections.js';
+import { reflectionProgress, reflectionCounts, HEADING_BY_ID, splitDetails, completeProblems, isLegacy, LIMITS, IMAGE_MAX_B64, wordCount, MIN_WORDS, suggestHeadings, moveToHeading, inExport, exportSummary, pickJustEnough } from './reflections.js';
 export { completeProblems };
 import { fmtDate, caseText } from './engine.js';
-import { S, h, toast, cloud, debounce, hooks, rYear, effectiveIntake, residentSmo, todayISO, confirmBox, add, resetters, scheduleSummary, displayName, byNewest, catName, updateCase } from './ui-core.js';
+import { S, h, toast, cloud, debounce, hooks, rYear, effectiveIntake, residentSmo, todayISO, confirmBox, add, resetters, scheduleSummary, displayName, byNewest, catName, updateCase, settings } from './ui-core.js';
 import { renderExportButton, caseRYear } from './portfolio.js';
 
 const DRAFT_KEY = 'apmes-logbook-reflection-draft';
-const rv = { editing: null, thumbs: {}, picking: null, editMode: false, sel: new Set(), view: null };
+const rv = { editing: null, thumbs: {}, picking: null, editMode: false, sel: new Set(), view: null, q: '', filter: 'all', openH: new Set(), shutH: new Set() };
 // editing: the reflection open in the editor (or null for the list); thumbs: figure previews by image id;
 // picking: case picker state { q, relink, preset: { headingId, subId }, chosen: case awaiting a heading };
 // editMode: list edit mode (drag between headings, select to delete); sel: selected reflection ids;
 // view: 'import' (Upload from Word) or 'bin' (Recycle bin) sub-view, or null.
+// q / filter: list search and filter ('all', 'draft', 'in', 'out'); openH / shutH: headings opened or
+// closed by hand (met headings start closed).
 
 const mine = () => S.user.email;
 const lsGet = () => { try { return JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null'); } catch { return null; } };
@@ -39,7 +41,8 @@ export const summaryReflections = () => reflectionCounts(S.reflections || []);
 
 const blank = (over = {}) => ({
   id: null, headingId: '', subId: null, initials: '', date: todayISO(), jr: rYear() <= 3, diagnosis: '',
-  title: '', summary: '', points: [{ heading: '', text: '' }], figures: [], references: [], caseId: null, status: 'draft', ...over,
+  title: '', summary: '', points: [{ heading: '', text: '' }], figures: [], references: [], caseId: null, status: 'draft',
+  ...(settings().reflExport === false ? { export: false } : {}), ...over,
 });
 
 // From a logged case: initials = leading capitals, diagnosis = the rest.
@@ -156,7 +159,8 @@ function picker() {
   const ph = p.preset && HEADING_BY_ID[p.preset.headingId];
   const psub = ph && p.preset.subId && ph.subs ? ph.subs.find(s => s.id === p.preset.subId) : null;
   const linked = new Set((S.reflections || []).map(r => r.caseId).filter(Boolean));
-  const cases = [...(S.cases || [])].sort(byNewest);
+  // cases tagged as possible reflections (and not written yet) come first
+  const cases = [...(S.cases || [])].sort(byNewest).sort((a, b) => (b.reflectTag && !linked.has(b.id)) - (a.reflectTag && !linked.has(a.id)));
   const ul = h('ul', { class: 'cases refl-pick' });
   const count = h('p', { class: 'hint', style: 'margin:6px 0 0' });
   const paint = () => {
@@ -174,7 +178,7 @@ function picker() {
       const names = (c.cats || []).map(catName).join(', ');
       return h('li', { tabindex: '0', role: 'button', onclick: () => pickCase(c), onkeydown: e => { if (e.key === 'Enter') pickCase(c); } },
         h('span', { class: 'd' }, caseDate(c)),
-        h('span', { class: 't' }, caseText(c) || '(no details)', names ? h('span', { class: 'muted', style: 'display:block;font-size:13px' }, names) : null),
+        h('span', { class: 't' }, c.reflectTag && !has ? h('span', { class: 'flag tagged' }, '☆ tagged') : null, caseText(c) || '(no details)', names ? h('span', { class: 'muted', style: 'display:block;font-size:13px' }, names) : null),
         h('span', { class: 'c' }, cur ? h('span', { class: 'flag' }, 'current') : has ? h('span', { class: 'flag' }, 'has reflection') : null));
     }));
     if (!shown.length) ul.replaceChildren(h('li', { class: 'empty' }, cases.length ? 'No cases match.' : 'No cases logged yet. Log the case first, then reflect on it.'));
@@ -189,6 +193,7 @@ function picker() {
       h('span', { class: 'grow' })),
     h('h2', { style: 'margin:8px 0 4px' }, p.relink ? 'Change the linked case' : 'Which case is this reflection on?'),
     ph ? h('p', { style: 'margin:0 0 4px' }, h('span', { class: 'muted' }, 'Heading: '), h('b', {}, shortName(ph.name) + (psub ? ' · ' + psub.name : ''))) : null,
+    p.preset && p.preset.uncat ? h('p', { style: 'margin:0 0 4px' }, h('span', { class: 'muted' }, 'Heading: '), h('b', {}, 'Uncategorised')) : null,
     h('p', { class: 'hint', style: 'margin:0 0 8px' }, p.relink ? 'Pick the logged case this reflection is about.' : 'Pick a logged case: the reflection starts with its initials, date and diagnosis filled in.'),
     search, count), h('section', { class: 'card' }, ul));
 }
@@ -231,7 +236,7 @@ async function binReflections(list) {
 
 // "Ready to write": cases tagged as possible reflections, then recent cases that fit a heading you
 // haven't met yet. Each opens a new reflection prefilled from the case.
-function readyCard(p) {
+function readyLine(p) {
   const linked = new Set((S.reflections || []).map(r => r.caseId).filter(Boolean));
   const tagged = (S.cases || []).filter(c => c.reflectTag && !linked.has(c.id));
   const unmet = new Set(p.headings.filter(x => !x.met).map(x => x.id));
@@ -250,9 +255,12 @@ function readyCard(p) {
     h('span', { class: 'row' },
       h('button', { class: 'small primary', onclick: () => reflectOnCase(c, hd || null) }, 'Write'),
       isTag ? h('button', { class: 'small', title: 'Remove the tag', onclick: async () => { const next = { ...c }; delete next.reflectTag; await updateCase(next); hooks.render(); } }, 'Untag') : null));
-  return h('section', { class: 'card ready' },
-    h('h3', { style: 'margin:0 0 6px' }, 'Ready to write'),
-    tagged.length ? h('ul', { class: 'ready-list' }, tagged.slice(0, 10).map(c => row(c, suggestHeadings(c, S.reflections || [])[0] || null, true))) : null,
+  // one slim line under the header; tap to see the cases
+  const what = [tagged.length ? `☆ ${tagged.length} tagged case${tagged.length === 1 ? '' : 's'} to write up` : null,
+    suggested.length ? `${suggested.length} suggestion${suggested.length === 1 ? '' : 's'}` : null].filter(Boolean).join(' · ');
+  return h('details', { class: 'ready-line', open: !!rv.readyOpen, ontoggle: e => { rv.readyOpen = e.target.open; } },
+    h('summary', {}, what),
+    tagged.length ? h('ul', { class: 'ready-list' }, tagged.slice(0, 20).map(c => row(c, suggestHeadings(c, S.reflections || [])[0] || null, true))) : null,
     suggested.length ? [h('div', { class: 'chiplabel', style: 'margin-top:8px' }, 'Suggested for headings not yet met'),
       h('ul', { class: 'ready-list' }, suggested.map(({ c, hd }) => row(c, hd, false)))] : null);
 }
@@ -262,8 +270,23 @@ let drag = null;   // active drag { r, ghost, target, x, y, raf }
 function list() {
   const all = S.reflections || [];
   const p = reflectionProgress(all);
+  const ex = exportSummary(all);
+  const exBy = Object.fromEntries(ex.headings.map(x => [x.id, x]));
   const em = rv.editMode;
   for (const id of [...rv.sel]) if (!all.some(r => r.id === id)) rv.sel.delete(id);
+
+  // search and filter: headings with no match are hidden, the rest open
+  const words = rv.q.toLowerCase().split(/\s+/).filter(Boolean);
+  const FILTERS = { all: () => true, draft: r => r.status !== 'complete', in: r => inExport(r), out: r => r.status === 'complete' && !inExport(r) };
+  const match = r => (FILTERS[rv.filter] || FILTERS.all)(r) && (!words.length || words.every(w =>
+    `${r.initials || ''} ${r.diagnosis || ''} ${r.title || ''} ${r.summary || ''} ${(r.points || []).map(x => `${x.heading || ''} ${x.text || ''}`).join(' ')} ${r.date || ''} ${r.date ? fmtDate(r.date) : ''}`.toLowerCase().includes(w)));
+  const narrowed = !!words.length || rv.filter !== 'all';
+
+  const search = h('input', { type: 'search', value: rv.q, placeholder: 'Search reflections', 'aria-label': 'Search reflections', style: 'font-size:16px;flex:1;min-width:0',
+    oninput: debounce(e => { rv.q = e.target.value; hooks.render(); requestAnimationFrame(() => { const el = document.querySelector('input[aria-label="Search reflections"]'); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }); }, 250) });
+  const filterChips = h('div', { class: 'chips refl-filters' }, [['all', 'All'], ['draft', 'Drafts'], ['in', 'In export'], ['out', 'Not in export']].map(([k, t]) =>
+    h('span', { class: `chip ${rv.filter === k ? 'on' : ''}`, role: 'button', tabindex: '0', 'aria-pressed': String(rv.filter === k), onclick: () => { rv.filter = k; hooks.render(); } }, t)));
+
   const head = h('section', { class: 'card' },
     h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:8px' },
       h('h2', { style: 'margin:0' }, 'Reflections'), h('span', { class: 'grow' }),
@@ -275,65 +298,141 @@ function list() {
         h('button', { class: 'small', onclick: () => openView('import') }, 'Upload from Word'),
         h('button', { class: 'small', onclick: () => openView('bin') }, 'Recycle bin'))),
     h('p', { class: 'hint' }, `${p.totals.counted} / ${p.totals.min} counted · ${p.totals.done} complete · ${p.totals.drafts} draft${p.totals.drafts === 1 ? '' : 's'}.`),
+    // what goes into the Word export
+    em ? null : h('div', { class: 'bar refl-export', style: 'flex-wrap:wrap;gap:8px;margin:4px 0 0' },
+      h('span', {}, h('b', {}, `${ex.total} in export`), h('span', { class: 'hint' }, ' · tick ☑ on a reflection to include it')),
+      h('span', { class: 'grow' }),
+      h('button', { class: 'small', onclick: () => justEnough() }, 'Tick just enough'),
+      h('a', { class: 'btn small', href: '#more' }, 'Export: More → Export & Sync')),
     em ? null : h('details', { class: 'refl-rules' }, h('summary', {}, 'Rules for reflections'),
       h('ul', { class: 'hint' },
         h('li', {}, 'Each reflection is a different patient, under one heading only.'),
         h('li', {}, 'Some categories require one case reflection in Junior Residency (JR, R1–R3); when not indicated, at most one case reflection can be done at the JR level per category.'),
+        h('li', {}, 'Write as many as you like: only the ticked ones go into the portfolio export. Uncategorised ones are never exported.'),
         h('li', {}, 'Generative AI use must follow the NUS guidelines on the use of AI tools in academic work.'))),
-    em ? null : h('div', { class: 'bar', style: 'margin:4px 0 0' }, h('span', { class: 'hint' }, 'Export the portfolio (Word):'), h('a', { class: 'btn small', href: '#more' }, 'More → Export & Sync')),
-    null);
+    em ? null : readyLine(p),
+    em ? null : h('div', { class: 'bar', style: 'gap:8px;margin:8px 0 0;flex-wrap:nowrap' }, search),
+    em ? null : filterChips);
 
-  // edit-mode toolbar: select all / clear / delete selected
+  // edit-mode toolbar: select all / clear / complete / export in or out / delete selected
   const checks = [];
   const delBtn = h('button', { class: 'danger', onclick: () => deleteSelected() });
   const doneBtn = h('button', { class: 'primary', onclick: () => completeSelected() });
+  const inBtn = h('button', { onclick: () => exportSelected(true) });
+  const outBtn = h('button', { onclick: () => exportSelected(false) });
   const paintSel = () => {
     delBtn.textContent = `Delete selected (${rv.sel.size})`; delBtn.disabled = !rv.sel.size;
     doneBtn.textContent = `Mark complete (${rv.sel.size})`; doneBtn.disabled = !rv.sel.size;
+    inBtn.textContent = `Include in export (${rv.sel.size})`; inBtn.disabled = !rv.sel.size;
+    outBtn.textContent = `Leave out of export (${rv.sel.size})`; outBtn.disabled = !rv.sel.size;
     for (const [cb, li, id] of checks) { cb.checked = rv.sel.has(id); li.classList.toggle('sel', cb.checked); }
   };
   const toolbar = em ? h('section', { class: 'card refl-editbar' },
-    h('p', { class: 'hint', style: 'margin:0 0 6px' }, 'Drag ', h('span', { class: 'refl-handle-ico' }, '⠿'), ' onto another heading to move a reflection. Tick reflections to mark them complete or delete them.'),
+    h('p', { class: 'hint', style: 'margin:0 0 6px' }, 'Drag ', h('span', { class: 'refl-handle-ico' }, '⠿'), ' onto another heading to move a reflection. Tick reflections to mark them complete, choose whether they go into the export, or delete them.'),
     h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:8px' },
       h('button', { class: 'small', onclick: () => { all.forEach(r => r.id && rv.sel.add(r.id)); paintSel(); } }, 'Select all'),
       h('button', { class: 'small', onclick: () => { rv.sel.clear(); paintSel(); } }, 'Clear'),
-      h('span', { class: 'grow' }), doneBtn, delBtn)) : null;
+      h('span', { class: 'grow' }), doneBtn, inBtn, outBtn, delBtn)) : null;
 
   const row = r => {
     const cb = em ? h('input', { type: 'checkbox', class: 'refl-cb', 'aria-label': `Select ${r.initials || 'reflection'} ${r.diagnosis || ''}`, onclick: e => e.stopPropagation(),
       onchange: e => { e.target.checked ? rv.sel.add(r.id) : rv.sel.delete(r.id); paintSel(); } }) : null;
     const draft = r.status !== 'complete';
+    const headed = !!HEADING_BY_ID[r.headingId];
+    // in the export? (outside edit mode; uncategorised ones can't be)
+    const exCb = !em && headed ? h('label', { class: 'refl-ex', title: draft ? 'Goes into the export once complete' : 'Include in the portfolio export', onclick: e => e.stopPropagation() },
+      h('input', { type: 'checkbox', checked: r.export !== false, 'aria-label': `Include ${r.initials || 'reflection'} ${r.diagnosis || ''} in the export`, onchange: e => setExport(r, e.target.checked) })) : null;
     const pts = (r.points || []).map(pt => (pt && pt.heading || '').trim()).filter(Boolean);
     const open = () => { if (em) { if (cb) { cb.checked = !cb.checked; cb.dispatchEvent(new Event('change')); } } else openEditor(r); };
-    const li = h('li', { tabindex: '0', class: em ? 'refl-row edit' : 'refl-row', onclick: open, onkeydown: e => { if (e.key === 'Enter') open(); } },
+    const li = h('li', { tabindex: '0', class: `${em ? 'refl-row edit' : 'refl-row'}${exCb ? ' has-ex' : ''}${exCb && r.export === false ? ' out' : ''}`, onclick: open, onkeydown: e => { if (e.key === 'Enter') open(); } },
       h('span', { class: 'd' }, em ? h('span', { class: 'refl-tools' }, h('span', { class: 'refl-handle', title: 'Drag to another heading', 'aria-label': 'Drag to another heading', onpointerdown: e => startDrag(e, r, li), onclick: e => e.stopPropagation() }, '⠿'), cb) : null,
         (r.jr ? 'JR ' : '') + (r.date ? fmtDate(r.date) : '—')),
-      h('span', { class: 't' }, h('span', { class: draft ? 'refl-proc draft' : 'refl-proc' }, `${r.initials || '??'} ${r.diagnosis || ''}`), draft ? h('span', { class: 'flag err' }, 'draft') : null),
+      h('span', { class: 't' }, h('span', { class: draft ? 'refl-proc draft' : 'refl-proc' }, `${r.initials || '??'} ${r.diagnosis || ''}`), draft ? h('span', { class: 'flag err' }, 'draft') : null,
+        h('span', { class: 'muted refl-wc' }, ` ${wordCount(r)} words`)),
+      exCb,
       pts.length ? h('div', { class: 'refl-points' }, ...pts.map((t, i) => h('div', {}, `${i + 1}. ${t}`))) : null);
     if (cb) checks.push([cb, li, r.id]);
     return li;
   };
 
+  // a heading: tap its line to open or close it (met headings start closed)
+  const isOpen = (id, met) => em || narrowed || rv.openH.has(id) || (!met && !rv.shutH.has(id));
+  const toggle = (id, met) => { if (isOpen(id, met)) { rv.openH.delete(id); rv.shutH.add(id); } else { rv.shutH.delete(id); rv.openH.add(id); } hooks.render(); };
+
   const body = h('section', { class: 'card' });
-  let section = '';
+  let section = '', shown = 0;
   for (const hp of p.headings) {
-    if (hp.section !== section) { section = hp.section; add(body, h('h3', { style: 'margin-top:14px' }, section)); }
-    const jrTxt = '';
-    const subsTxt = '';
     const items = all.filter(r => r.headingId === hp.id);
+    const hits = narrowed ? items.filter(match) : items;
+    if (narrowed && !hits.length) continue;
+    shown += hits.length;
+    if (hp.section !== section) { section = hp.section; add(body, h('h3', { style: 'margin-top:14px' }, section)); }
+    const x = exBy[hp.id];
+    const opened = isOpen(hp.id, hp.met);
     add(body, h('div', { class: 'refl-h', 'data-heading': hp.id, style: 'margin:8px 0 4px' },
       h('div', { class: 'refl-hrow' },
-        h('div', { class: 'grow' }, h('i', { class: `dot ${hp.met ? 'done' : hp.done ? 'ontrack' : 'due'}` }), ' ', h('b', {}, `${hp.done}/${hp.min}`), ' ', hp.name, h('span', { class: 'muted' }, jrTxt + subsTxt)),
+        h('div', { class: 'grow refl-htoggle', role: 'button', tabindex: '0', 'aria-expanded': String(opened), onclick: () => toggle(hp.id, hp.met), onkeydown: e => { if (e.key === 'Enter') toggle(hp.id, hp.met); } },
+          items.length ? h('span', { class: 'res-chev', 'aria-hidden': 'true' }, '›') : h('span', { class: 'res-chev blank', 'aria-hidden': 'true' }), ' ',
+          h('i', { class: `dot ${hp.met ? 'done' : hp.done ? 'ontrack' : 'due'}` }), ' ', h('b', {}, `${hp.done}/${hp.min}`), ' ', hp.name,
+          x.written ? h('span', { class: 'muted refl-counts' }, ` · ${x.written} written · ${x.inExport} in export`) : null),
         em ? null : h('button', { class: 'small refl-add', title: 'Add a reflection under ' + hp.name, 'aria-label': 'Add a reflection under ' + hp.name, onclick: () => openPicker(false, { headingId: hp.id, subId: null }) }, '+ Add')),
-      HEADING_BY_ID[hp.id].subs ? h('div', { class: 'hint', style: 'margin:2px 0 0' }, 'Include at least one of each: ' + HEADING_BY_ID[hp.id].subs.map(s => s.name).join(' · ')) : null,
-      // sub-types are shown in the "needs at least one of each" line above, so don't repeat them here
-      hp.issues.filter(x => !x.startsWith('Missing: ')).length ? h('div', { class: 'hint', style: 'color:var(--warn, #b45309)' }, hp.issues.filter(x => !x.startsWith('Missing: ')).join(' · ')) : null,
-      items.length ? h('ul', { class: 'cases' }, items.map(row)) : em ? h('div', { class: 'refl-empty hint' }, 'Drop here') : null));
+      x.warn.length ? h('div', { class: 'hint', style: 'color:var(--warn, #b45309)' }, 'Export: ' + x.warn.join(' · ')) : null,
+      opened ? [
+        HEADING_BY_ID[hp.id].subs ? h('div', { class: 'hint', style: 'margin:2px 0 0' }, 'Include at least one of each: ' + HEADING_BY_ID[hp.id].subs.map(s => s.name).join(' · ')) : null,
+        // sub-types are shown in the "needs at least one of each" line above, so don't repeat them here
+        hp.issues.filter(y => !y.startsWith('Missing: ')).length ? h('div', { class: 'hint', style: 'color:var(--warn, #b45309)' }, hp.issues.filter(y => !y.startsWith('Missing: ')).join(' · ')) : null,
+        hits.length ? h('ul', { class: 'cases' }, hits.map(row)) : em ? h('div', { class: 'refl-empty hint' }, 'Drop here') : null] : null));
   }
+  // Uncategorised: always there (+ Add), never exported
   const orphans = all.filter(r => !HEADING_BY_ID[r.headingId]);
-  if (orphans.length) add(body, h('h3', {}, 'No heading yet'), h('ul', { class: 'cases' }, orphans.map(row)));
+  const oHits = narrowed ? orphans.filter(match) : orphans;
+  if (!narrowed || oHits.length) {
+    shown += oHits.length;
+    add(body, h('div', { class: 'refl-h', 'data-heading': '', style: 'margin:16px 0 4px' },
+      h('div', { class: 'refl-hrow' },
+        h('div', { class: 'grow' }, h('b', {}, 'Uncategorised'), h('span', { class: 'muted refl-counts' }, ` · ${orphans.length} written · not exported`)),
+        em ? null : h('button', { class: 'small refl-add', title: 'Add an uncategorised reflection', 'aria-label': 'Add an uncategorised reflection', onclick: () => openPicker(false, { headingId: '', subId: null, uncat: true }) }, '+ Add')),
+      h('div', { class: 'hint' }, 'For reflections that don’t fit a portfolio heading yet. Move one to a heading to export it.'),
+      oHits.length ? h('ul', { class: 'cases' }, oHits.map(row)) : null));
+  }
+  if (narrowed && !shown) add(body, h('p', { class: 'empty' }, 'No reflections match.'));
   if (em) paintSel();
-  return h('div', {}, head, toolbar, em ? null : readyCard(p), body);
+  return h('div', {}, head, toolbar, body);
+}
+
+// Tick or untick one reflection for the export.
+async function setExport(r, on) {
+  try { await cloud.saveReflection(mine(), { ...r, export: on }); }
+  catch (err) { toast('Could not save: ' + err.message); hooks.render(); }
+}
+
+// Edit mode: include the selected reflections in the export, or leave them out.
+async function exportSelected(on) {
+  const pick = (S.reflections || []).filter(r => rv.sel.has(r.id) && HEADING_BY_ID[r.headingId] && (r.export !== false) !== on);
+  let n = 0;
+  for (const r of pick) { try { await cloud.saveReflection(mine(), { ...r, export: on }); n++; } catch (err) { toast('Could not save: ' + err.message); break; } }
+  rv.sel.clear();
+  toast(`${n} reflection${n === 1 ? '' : 's'} ${on ? 'included in' : 'left out of'} the export`);
+  hooks.render();
+}
+
+// "Tick just enough": per heading, the longest complete reflections that meet its minimum (keeping
+// the required sub-types and JR ones) go into the export; the rest are left out. Undo puts them back.
+async function justEnough() {
+  const all = S.reflections || [];
+  const pick = pickJustEnough(all);
+  const change = all.filter(r => r.id in pick && (r.export !== false) !== pick[r.id]);
+  if (!change.length) return toast('Already just enough: nothing to change.');
+  const outN = change.filter(r => !pick[r.id]).length, inN = change.length - outN;
+  if (!await confirmBox('Tick just enough?', `For each heading, the longest complete reflections that meet its minimum go into the export (keeping the required sub-types and JR ones). ${inN ? inN + ' will be ticked, ' : ''}${outN} left out. Nothing is deleted, and you can change any of them after.`, 'Tick just enough')) return;
+  const before = change.map(r => ({ ...r }));
+  let n = 0;
+  for (const r of change) { try { await cloud.saveReflection(mine(), { ...r, export: pick[r.id] }); n++; } catch (err) { toast('Could not save: ' + err.message); break; } }
+  toast(`${exportSummary(S.reflections || []).total} reflections in the export`, { action: 'Undo', onaction: async () => {
+    for (const r of before) { try { await cloud.saveReflection(mine(), r); } catch (err) { toast('Could not undo: ' + err.message); return; } }
+    toast('Export choices put back'); hooks.render();
+  } });
+  hooks.render();
 }
 
 async function deleteSelected() {
@@ -442,10 +541,12 @@ async function moveReflection(r, headingId) {
 // The Word portfolio export button (shown in More → Export & Sync): complete reflections, Section 1
 // details and the Section 4 counts.
 export function portfolioExportButton() {
-  return renderExportButton(() => (S.reflections || []).filter(r => r.status === 'complete'), displayName,
+  const n = (S.reflections || []).filter(inExport).length;
+  return renderExportButton(() => (S.reflections || []).filter(inExport), displayName,
     async () => ({ cases: S.cases || [], intake: effectiveIntake(), rYear: rYear(), smo: residentSmo(S.resident),
       profile: (S.logbook && S.logbook.profile) || null,
-      images: await loadImagesFor((S.reflections || []).filter(r => r.status === 'complete')) }));
+      images: await loadImagesFor((S.reflections || []).filter(inExport)) }),
+    `Export ${n} reflection${n === 1 ? '' : 's'} (Word)`);
 }
 
 export async function loadImagesFor(reflections) {
@@ -544,7 +645,7 @@ function editor() {
 
   let sec = '';
   const headingSelect = h('select', { 'data-field': 'heading', style: 'font-size:16px;max-width:100%', onchange: e => { r.headingId = e.target.value; r.subId = null; paintSubs(); changed(); } },
-    h('option', { value: '' }, 'Choose a heading…'),
+    h('option', { value: '', selected: !HEADING_BY_ID[r.headingId] }, 'Uncategorised (not exported)'),
     REFLECTION_HEADINGS.map(hd => {
       const g = hd.section !== sec ? (sec = hd.section) : null;
       return [g ? h('option', { disabled: true }, `— ${g} —`) : null, h('option', { value: hd.id, selected: r.headingId === hd.id }, hd.name.length > 70 ? hd.name.slice(0, 68) + '…' : hd.name)];
@@ -697,7 +798,10 @@ function editor() {
     body = [title, summary, points, figures, refs];
   }
 
-  const actions = h('section', { class: 'card' }, h('p', { style: 'margin:0 0 8px' }, words), h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:8px' },
+  const exportBox = HEADING_BY_ID[r.headingId]
+    ? h('label', { class: 'check', style: 'margin:0 0 8px' }, h('input', { type: 'checkbox', checked: r.export !== false, onchange: e => { r.export = e.target.checked; changed(); } }), 'Include in the portfolio export', h('span', { class: 'hint' }, r.status === 'complete' ? '' : ' (once complete)'))
+    : h('p', { class: 'hint', style: 'margin:0 0 8px' }, 'Uncategorised: not exported. Choose a heading above to export it.');
+  const actions = h('section', { class: 'card' }, h('p', { style: 'margin:0 0 8px' }, words), exportBox, h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:8px' },
     r.status === 'complete'
       ? h('button', { onclick: async () => { r.status = 'draft'; await persist(); hooks.render(); } }, 'Back to draft')
       : h('button', { class: 'primary', onclick: async () => {

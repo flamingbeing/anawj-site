@@ -135,6 +135,9 @@ await t('read own reflection', assertSucceeds(getDoc(doc(a, 'logbooks', A, 'refl
 await t('other reads reflection', assertFails(getDoc(doc(b, 'logbooks', A, 'reflections', 'r1'))));
 await t('admin reads reflection', assertFails(getDoc(doc(adm, 'logbooks', A, 'reflections', 'r1'))));
 await t('owner reads reflection', assertFails(getDoc(doc(own, 'logbooks', A, 'reflections', 'r1'))));
+await t('reflection left out of the export', assertSucceeds(setDoc(doc(a, 'logbooks', A, 'reflections', 'rx'), { ...refl('rx'), export: false })));
+await t('reflection export flag must be true/false', assertFails(setDoc(doc(a, 'logbooks', A, 'reflections', 'rx'), { ...refl('rx'), export: 'no' })));
+await t('uncategorised reflection', assertSucceeds(setDoc(doc(a, 'logbooks', A, 'reflections', 'ru'), { ...refl('ru'), headingId: '' })));
 await t('word-imported reflection, no case', assertSucceeds(setDoc(doc(a, 'logbooks', A, 'reflections', 'rw'), { ...refl('rw'), source: 'word' })));
 await t('reflection bad source', assertFails(setDoc(doc(a, 'logbooks', A, 'reflections', 'rw2'), { ...refl('rw2'), source: 'x' })));
 await t('reflection bad status', assertFails(setDoc(doc(a, 'logbooks', A, 'reflections', 'r3'), { ...refl('r3'), status: 'done' })));
