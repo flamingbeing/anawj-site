@@ -5,6 +5,7 @@ import { R_YEARS, BY_CODE, CATEGORIES, appYear, yearName } from './categories.js
 import { progress, todayISO, rYearDefault } from './engine.js';
 import { exportTotals } from './xlsxio.js';
 import { reflectionProgress, HEADING_BY_ID } from './reflections.js';
+import { logbookGlance, reflectionGlance, cohortGlance } from './glance.js';
 import { S, h, toast, cloud, rYear, myYearName, settings, subcatsOf, patchLogbook, needExcel, download, displayName, hooks, add, resetters, info, catName, catShort, tagName } from './ui-core.js';
 
 const STATUS_TEXT = { late: 'Behind', due: 'Due this year', ontrack: 'On track', done: 'Done', none: 'No target' };
@@ -42,7 +43,14 @@ export function renderProgress() {
     urgent.length ? progList(urgent) : h('p', { class: 'empty' }, 'Nothing behind or due this year ✓'));
   const shown = pview.hideDone ? rows.filter(r => r.status !== 'done') : rows;
   const withTarget = rows.filter(r => r.status !== 'none');
-  const targets = section('targets', 'Logbook', `${tally('done')} of ${withTarget.length} tags done · ${S.cases.length} cases`,
+  // at a glance (before the card is opened): the bar by status with this year's goal, and your year
+  const lg = logbookGlance(rows);
+  const cohort = cohortNow();
+  const logGlance = h('div', { class: 'glance' },
+    statusBar(lg),
+    cohort ? strip('Tags done', lg.done, cohort.tags, lg.total) : null,
+    cohort ? strip('Cases logged', S.cases.length, cohort.cases) : null);
+  const targets = section('targets', 'Logbook', `${tally('done')} of ${withTarget.length} tags done · ${S.cases.length} cases`, logGlance,
     h('label', { class: 'check', style: 'margin:0 0 4px' }, h('input', { type: 'checkbox', checked: !!pview.hideDone, onchange: e => { pview.hideDone = e.target.checked; hooks.render(); } }), 'Hide done'),
     progList(shown));
   // everyone's counts (counts only) for comparison
@@ -54,11 +62,56 @@ export function renderProgress() {
 }
 
 // A folded card: the title and a one-line summary; tap to open the full section (kept open while you stay).
+// glance (optional, a .glance element): shown under the summary whether open or not.
 function section(id, title, summary, ...content) {
   const open = pview.open.has(id);
+  const glance = content[0] && content[0].classList && content[0].classList.contains('glance') ? content.shift() : null;
   return h('details', { class: 'card fold-card an-sec', open, ontoggle: e => { if (e.target.open) pview.open.add(id); else pview.open.delete(id); } },
-    h('summary', {}, h('span', { class: 'an-t' }, title), h('small', { class: 'an-s' }, summary)),
+    h('summary', {}, h('span', { class: 'an-t' }, title), h('small', { class: 'an-s' }, summary), glance),
     h('div', { class: 'an-body' }, ...content));
+}
+
+// ---------- at a glance: a progress bar with the year's goal, and where you sit in your year ----------
+
+// your residency year's spread, from the Totals summaries (programme residents only; loaded once)
+function cohortNow() {
+  if (!S.resident) return null;
+  if (!tview.summaries && !tview.loading) loadSummaries().then(() => { if (S.tab === 'progress') hooks.render(); });
+  if (!tview.summaries) return null;
+  // you, as you are right now (your saved summary may be a few minutes old)
+  const me = { rYear: rYear(), counts: S.counts, total: S.cases.length, reflectionsTotal: reflectionProgress(S.reflections || []).totals.counted };
+  return cohortGlance([...tview.summaries.filter(x => String(x.rid) !== String(S.resident.rid)), me], rYear());
+}
+const pct = (v, max) => `${Math.max(0, Math.min(100, max ? (v / max) * 100 : 0)).toFixed(1)}%`;
+// Logbook: done | on track | due | behind, out of the tags with a target; the tick is this year's goal
+function statusBar(g) {
+  const seg = (k, n) => n ? h('i', { class: `seg-${k}`, style: `width:${pct(n, g.total)}` }) : null;
+  return h('div', { class: 'gl-row' },
+    h('div', { class: 'gl-bar', role: 'img', 'aria-label': `${g.done} of ${g.total} tags done; ${g.goal} should be done by the end of this year` },
+      seg('done', g.done), seg('due', g.due), seg('late', g.late), seg('ontrack', g.ontrack),
+      h('b', { class: 'gl-goal', style: `left:${pct(g.goal, g.total)}`, title: 'Goal for the end of this year' })),
+    h('small', { class: 'gl-cap' }, g.goal > g.done ? `${g.goal - g.done} more to reach this year’s goal (the tick)` : 'This year’s goal reached ✓'));
+}
+// Reflections: counted out of 96; the tick is where steady progress over five years would be by now
+function meterBar(g) {
+  return h('div', { class: 'gl-row' },
+    h('div', { class: 'gl-bar', role: 'img', 'aria-label': `${g.counted} of ${g.total} reflections counted; about ${g.goal} by the end of this year keeps pace` },
+      h('i', { class: 'seg-done', style: `width:${pct(g.counted, g.total)}` }),
+      h('b', { class: 'gl-goal', style: `left:${pct(g.goal, g.total)}`, title: 'On pace for the end of this year' })),
+    h('small', { class: 'gl-cap' }, g.counted >= g.goal ? 'On pace for this year ✓' : `${g.goal - g.counted} more to be on pace by the end of this year (the tick)`));
+}
+// You against your year: the line runs lowest to highest, the box is the middle half, the bar in it the
+// median, the dot is you
+function strip(label, you, d, scaleMax) {
+  const max = Math.max(scaleMax || 0, d.max, you, 1);
+  const r = v => Math.round(v * 10) / 10;
+  return h('div', { class: 'gl-row' },
+    h('div', { class: 'gl-strip', role: 'img', 'aria-label': `${label}: you ${you}; your year: lowest ${d.min}, median ${r(d.median)}, highest ${d.max}` },
+      h('i', { class: 'st-range', style: `left:${pct(d.min, max)};width:${pct(d.max - d.min, max)}` }),
+      h('i', { class: 'st-box', style: `left:${pct(d.p25, max)};width:${pct(d.p75 - d.p25, max)}` }),
+      h('i', { class: 'st-med', style: `left:${pct(d.median, max)}` }),
+      h('b', { class: 'st-you', style: `left:${pct(you, max)}` })),
+    h('small', { class: 'gl-cap' }, `${label}: you ${you} · your year ${d.min}–${d.max}, median ${r(d.median)} (${d.n} residents)`));
 }
 
 // ---------- trends (your cases over time; only you see these) ----------
@@ -130,7 +183,10 @@ function reflCard() {
       h('li', {}, 'Each reflection is a different patient, under one heading only.'),
       h('li', {}, 'Some headings require one reflection in Junior Residency (JR, R1–R3); otherwise at most one per heading can be at JR level.'),
       h('li', {}, 'Some headings need at least one of certain types: tap ⓘ by a heading to see them. Sub-types and JR are not counted here, so keep track of them yourself.')));
-  return section('refl', 'Reflections', `${p.totals.counted} / ${p.totals.min} counted · ${met} of ${p.headings.length} headings met`,
+  const rg = reflectionGlance(p.totals.counted, rYear());
+  const cohort = cohortNow();
+  const glance = h('div', { class: 'glance' }, meterBar(rg), cohort ? strip('Reflections counted', rg.counted, cohort.reflections, rg.total) : null);
+  return section('refl', 'Reflections', `${p.totals.counted} / ${p.totals.min} counted · ${met} of ${p.headings.length} headings met`, glance,
     h('div', { class: 'bar', style: 'margin:0 0 4px' },
       h('span', { class: 'hint' }, 'The rules'), rulesBtn,
       h('span', { class: 'grow' }),

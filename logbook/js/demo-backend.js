@@ -12,6 +12,7 @@
 export const DEMO_USER = { email: 'demo@example.com', name: 'Demo User', uid: 'demo-uid' };
 
 import { cleanReflection, cleanImage } from './reflections.js';
+import { progress } from './engine.js';
 import { cleanProfile } from './profile.js';
 export { cleanReflection, cleanImage };
 
@@ -171,11 +172,17 @@ function seed(s) {
     ],
     figures: [], references: [], caseId: 'demo0', source: 'app', status: 'complete', createdAt: rt, updatedAt: rt,
   } };
-  const peers = [['DEMO02', 'Resident A', 3], ['DEMO03', 'Resident B', 7], ['DEMO04', 'Resident C', 11]];
-  for (const [rid, name, k] of peers) {
-    const counts = { '13': 4 + k % 5, '16': 3 + k % 4, '17': 5 + k % 6, '18': 6 + k % 3, '20': 10 + k, '20iii': 8 + k, '26': 2 + k % 7, '28': 4 + k % 5 };
-    s.residents[rid] = { rid, name, email: rid.toLowerCase() + '@example.com', status: 'ACTIVE', intake, rYear: 2 };
-    s.summaries[rid] = { rid, name, intake, rYear: 2, counts, total: 20 + k * 2, reflections: {}, reflectionsTotal: k % 4, updatedAt: t };
+  // made-up batchmates (the demo user is an R3): enough for Totals and the Analytics comparison
+  const peers = [['DEMO02', 'Resident A', 0.55], ['DEMO03', 'Resident B', 0.8], ['DEMO04', 'Resident C', 1.05], ['DEMO05', 'Resident D', 0.7], ['DEMO06', 'Resident E', 1.25], ['DEMO07', 'Resident F', 0.9]];
+  for (const [rid, name, f] of peers) {
+    // each tag a share of its R3 target (or of the R5 one when there's none by R3), so some are done and some not
+    const counts = {};
+    progress({}, 3).forEach((r, n) => {
+      const m = (r.milestones || []).find(x => x.by === 'R3') || (r.milestones || []).find(x => x.by === 'R5');
+      if (m) counts[r.code] = Math.max(0, Math.round(m.n * f * (0.7 + ((n * 37) % 10) / 15)));
+    });
+    s.residents[rid] = { rid, name, email: rid.toLowerCase() + '@example.com', status: 'ACTIVE', intake, rYear: 3 };
+    s.summaries[rid] = { rid, name, intake, rYear: 3, counts, total: Math.round(330 * f), reflections: {}, reflectionsTotal: Math.round(34 * f), updatedAt: t };
   }
   s.sharedTemplates.tpl1 = { id: 'tpl1', name: 'LSCS spinal', cats: ['16', '17', '28'] };
 }

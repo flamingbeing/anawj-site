@@ -54,6 +54,10 @@ portfolio content.
 - **Reflections** (`ui-reflect.js`): list by heading, editor (Case details, learning points,
   References and Figures as folded white cards), Export page (summary + Mark ready) and Choose page
   (ticks, Quick actions). Draft kept per account. Only a small "Rules for reflections" (no card) at the bottom.
+- **At a glance** (`glance.js`, tested): folded Logbook / Reflections cards show a bar (status segments; tick =
+  this year's goal: tags due by the end of the year / 96 x year/5 reflections) and, for programme residents with
+  at least 4 in their residency year, strips vs that year (range, middle half, median, you) from the Totals
+  summaries (counts only). No last-12-months or earlier-cohort comparisons: summaries hold current totals only.
 - **Analytics** (`ui-progress.js`): header tally, folded sections (Needs attention, Logbook,
   Reflections with ⓘ requirements, Trends), Compare with your intake (Totals). EPA view and Download summary removed (owner: not useful).
 - **More** (`app.js`): Account (with Residency year for non-programme users; Delete account at the bottom,
