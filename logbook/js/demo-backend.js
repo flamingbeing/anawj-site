@@ -410,6 +410,7 @@ export async function saveTemplate(b64) {
   templateMem = t;
   try { localStorage.setItem(TEMPLATE_KEY, JSON.stringify(t)); } catch (e) { console.warn('Demo template kept in memory only', e); }
 }
+export async function deleteTemplate() { templateMem = null; try { localStorage.removeItem(TEMPLATE_KEY); } catch { /* storage blocked */ } }
 export async function loadTemplate() {
   try { const s = localStorage.getItem(TEMPLATE_KEY); if (s) return JSON.parse(s); } catch { /* storage blocked */ }
   return templateMem;

@@ -364,6 +364,51 @@ export function textHas(text, word, fuzzy = false) {
     || [0, 1, -1].some(d => t.length > word.length + d && editDistance(word, t.slice(0, word.length + d), max) <= max)));
 }
 
+// ---------- upload: match a file's columns to the case fields ----------
+
+export const IMPORT_FIELDS = [
+  { k: 'date', name: 'Date' }, { k: 'initials', name: 'Initials' }, { k: 'details', name: 'Case details' },
+  { k: 'categories', name: 'Categories' }, { k: 'id', name: 'Case ID (to update cases already here)' },
+];
+const GUESS = {
+  date: /^(date|day|date of (case|surgery|op(eration)?)|op date)\b/i,
+  initials: /^(patient(?:'?s)?\s+)?initials?$/i,
+  details: /detail|procedure|operation|surgery|case\b|description|notes?/i,
+  categories: /categor|codes?\b|apmes/i,
+  id: /^(id|case id)$/i,
+};
+// Column indexes { date, initials, details, categories, id } (-1 = not in the file) from the header
+// row; saved: header names remembered from an earlier upload (settings.importMap), tried first.
+export function guessMapping(headers, saved = null) {
+  const hs = (headers || []).map(x => String(x ?? '').trim());
+  const out = {};
+  for (const f of IMPORT_FIELDS) {
+    const want = saved && saved[f.k];
+    let i = want ? hs.findIndex(x => x.toLowerCase() === String(want).toLowerCase()) : -1;
+    if (i < 0) i = hs.findIndex((x, j) => GUESS[f.k].test(x) && !Object.values(out).includes(j) && !(f.k === 'details' && GUESS.initials.test(x)));
+    out[f.k] = i;
+  }
+  return out;
+}
+// "3/13/2026" written month first -> "13/3/2026" (day first, as parseDate reads it).
+const swapDayMonth = v => (typeof v === 'string' ? v.replace(/^\s*(\d{1,2})([\/.\-])(\d{1,2})(?=\2|\s|$)/, '$3$2$1') : v);
+// Rows for diffRows from a grid and a mapping. headerRow: the first row holds column names.
+export function rowsFromGrid(grid, map, { headerRow = true, monthFirst = false } = {}) {
+  const out = [];
+  out.hasIdColumn = map.id >= 0;
+  (grid || []).forEach((cells, n) => {
+    if (headerRow && n === 0) return;
+    const get = k => (map[k] >= 0 ? cells[map[k]] : undefined);
+    const raw = get('date');
+    const r = { row: n + 1, date: monthFirst ? swapDayMonth(raw) : raw, details: String(get('details') ?? '').trim(), categories: String(get('categories') ?? '').trim() };
+    if (map.initials >= 0) r.initials = String(get('initials') ?? '').trim();
+    if (map.id >= 0) r.id = String(get('id') ?? '').trim();
+    if ((raw == null || raw === '') && !r.details && !r.initials && !r.categories && !r.id) return;
+    out.push(r);
+  });
+  return out;
+}
+
 // ---------- duplicates ----------
 
 const normText = s => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();

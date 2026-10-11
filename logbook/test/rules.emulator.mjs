@@ -176,8 +176,13 @@ await t('template read', assertSucceeds(getDoc(doc(a, 'config', 'portfolioTempla
 await t('template user write', assertFails(setDoc(doc(a, 'config', 'portfolioTemplate'), { parts: 1, size: 3, uploadedAt: 1 })));
 await t('template admin write', assertSucceeds(setDoc(doc(adm, 'config', 'portfolioTemplate'), { parts: 1, size: 3, uploadedAt: 1 })));
 await t('template part admin write', assertSucceeds(setDoc(doc(adm, 'config', 'portfolioTemplate_part0'), { data: 'QUJD' })));
+await t('template user delete', assertFails(deleteDoc(doc(a, 'config', 'portfolioTemplate'))));
+await t('template part user delete', assertFails(deleteDoc(doc(a, 'config', 'portfolioTemplate_part0'))));
+await t('other config user delete', assertFails(deleteDoc(doc(adm, 'config', 'somethingElse'))));
 await t('other config doc', assertFails(setDoc(doc(adm, 'config', 'other'), { data: 'x' })));
 await t('random collection', assertFails(getDoc(doc(adm, 'other', 'x'))));
+await t('template admin delete', assertSucceeds(deleteDoc(doc(adm, 'config', 'portfolioTemplate'))));
+await t('template part admin delete', assertSucceeds(deleteDoc(doc(adm, 'config', 'portfolioTemplate_part0'))));
 console.log(`${n - fail}/${n} rule checks passed`);
 await env.cleanup();
 process.exit(fail ? 1 : 0);
