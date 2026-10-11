@@ -499,4 +499,21 @@ assert.equal(rYearDefault(undefined), 1);
   assert.deepEqual(two.map(c => [c.initials, c.details]), [['AB', '45F\nlap chole GA'], ['CD', '30F\nLSCS spinal']]);
 }
 
+// date words in search (Sat 10 Oct 2026)
+{
+  const { dateWindow } = await import('../js/engine.js');
+  const now = new Date(2026, 9, 10, 9);
+  assert.deepEqual(dateWindow('today', now), { from: '2026-10-10', to: '2026-10-10', rest: '' });
+  assert.deepEqual(dateWindow('last tuesday', now), { from: '2026-10-06', to: '2026-10-06', rest: '' });
+  assert.deepEqual(dateWindow('LSCS this week', now), { from: '2026-10-05', to: '2026-10-10', rest: 'lscs' });
+  assert.deepEqual(dateWindow('last week', now), { from: '2026-09-28', to: '2026-10-04', rest: '' });
+  assert.deepEqual(dateWindow('last month', now), { from: '2026-09-01', to: '2026-09-30', rest: '' });
+  assert.deepEqual(dateWindow('sat', now), { from: '2026-10-10', to: '2026-10-10', rest: '' });
+  assert.deepEqual(dateWindow('last sat', now), { from: '2026-10-03', to: '2026-10-03', rest: '' });
+  assert.equal(dateWindow('lap chole', now), null);
+  assert.equal(dateWindow('monitoring', now), null);
+  assert.equal(dateWindow('wednesday', now).from, '2026-10-07');
+  assert.equal(dateWindow('thurs', now).from, '2026-10-08');
+}
+
 console.log('engine tests passed');
