@@ -130,13 +130,14 @@ export function resetDemo({ seeded = true } = {}) {
   if (seeded) seed(s);
   save(s);
   notifyAll();
+  if (seeded && typeof window !== 'undefined') loadExtras();
 }
 
 // Fake data only: a demo resident, a few made-up cases and three made-up classmates.
 function seed(s) {
   const now = new Date();
-  const intake = now.getMonth() >= 6 ? now.getFullYear() - 1 : now.getFullYear() - 2;   // an R2
-  s.residents.DEMO01 = { rid: 'DEMO01', name: 'Demo User', email: DEMO_USER.email, status: 'ACTIVE', intake, rYear: 2 };
+  const intake = now.getMonth() >= 6 ? now.getFullYear() - 2 : now.getFullYear() - 3;   // an R3
+  s.residents.DEMO01 = { rid: 'DEMO01', name: 'Demo User', email: DEMO_USER.email, status: 'ACTIVE', intake, rYear: 3 };
   const pad = n => String(n).padStart(2, '0');
   const day = n => { const d = new Date(now); d.setDate(d.getDate() - n); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };   // local date
   const cases = [
@@ -156,6 +157,8 @@ function seed(s) {
     })),
   };
   s.logbooks[DEMO_USER.email].doc.rid = 'DEMO01';
+  // two years of cases and the sample reflections come from demo-seed.js, loaded after the page starts
+  s.logbooks[DEMO_USER.email].extras = 'pending';
   // one complete reflection on the LSCS case, so the Reflections, Progress and Export pages have something in them
   const rt = t - 864e5;
   s.logbooks[DEMO_USER.email].reflections = { refl0: {
@@ -193,10 +196,30 @@ function notifyCases(email) {
 }
 // ?demo=reset wipes and reseeds on page load (after the watcher sets above exist).
 // The address then says plain ?demo, so a reload keeps what was done since.
+// The bigger sample logbook (demo-seed.js: ~350 cases, 32 reflections) loads on demand, so real users
+// never download it; it lands a moment after the first paint and the watchers repaint.
+function loadExtras() {
+  const st = load(), lb = st.logbooks[DEMO_USER.email];
+  if (!lb || lb.extras !== 'pending') return;
+  import('./demo-seed.js').then(({ demoLogbook }) => {
+    const s2 = load(), lb2 = s2.logbooks[DEMO_USER.email];
+    if (!lb2 || lb2.extras !== 'pending') return;
+    const pad = n => String(n).padStart(2, '0');
+    const day = n => { const d = new Date(); d.setDate(d.getDate() - n); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
+    const { cases, reflections } = demoLogbook(day, Date.now());
+    lb2.cases ||= {}; lb2.reflections ||= {};
+    for (const c of cases) if (!lb2.cases[c.id]) lb2.cases[c.id] = cleanCase(c, c.updatedAt);
+    for (const r of reflections) if (!lb2.reflections[r.id]) lb2.reflections[r.id] = cleanReflection(r);
+    lb2.extras = 'done';
+    save(s2); notifyAll();
+  }).catch(err => console.warn('Demo sample data not loaded', err));
+}
+
 if (mode() === 'reset') {
   resetDemo();
   try { const q = new URLSearchParams(location.search); q.set('demo', ''); history.replaceState(null, '', location.pathname + '?' + q.toString().replace(/=(&|$)/g, '$1') + location.hash); } catch { /* not in a browser */ }
 }
+if (mode() !== null && typeof window !== 'undefined') loadExtras();
 if (typeof addEventListener === 'function') {
   addEventListener('storage', e => { if (e.key === KEY) notifyAll(); });
 }
