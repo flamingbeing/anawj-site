@@ -39,9 +39,16 @@
 html { -webkit-text-size-adjust: 100%; }
 /* no pull-down-to-refresh (and no rubber-band bounce): a stray swipe while logging would reload the page */
 html, body { overscroll-behavior-y: none; }
+/* Fonts (Settings → Display, js/fonts.js): bundled ones load only when chosen; the logging font covers the case
+   box, case text in the Logbook and the reflection editor */
+@font-face { font-family: "Atkinson Hyperlegible Next"; src: url(fonts/atkinson-400.woff2) format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Atkinson Hyperlegible Next"; src: url(fonts/atkinson-700.woff2) format("woff2"); font-weight: 600 700; font-display: swap; }
+@font-face { font-family: "Lexend"; src: url(fonts/lexend-400.woff2) format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Lexend"; src: url(fonts/lexend-700.woff2) format("woff2"); font-weight: 600 700; font-display: swap; }
+:root { --font-ui: "Open Sans", system-ui, -apple-system, "Segoe UI", sans-serif; --font-log: var(--font-ui); }
 body {
   margin: 0; background: var(--bg); color: var(--ink);
-  font: calc(15px * var(--fs, 1))/1.45 "Open Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  font: calc(15px * var(--fs, 1))/1.45 var(--font-ui);
   padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px);
   -webkit-tap-highlight-color: transparent;
 }
@@ -990,3 +997,6 @@ ul.te-list.te-pills li.te-pillitem.te-last { outline: 2px solid var(--accent); o
 ul.prog li.te-last { box-shadow: inset 3px 0 0 var(--accent); }
 /* "Show tips and help text" off: the explanations go (status lines, warnings and safety notes stay) */
 body.no-help .help { display: none !important; }
+
+textarea.details, ul.cases .t, .refl-editor textarea, .refl-editor input[type="text"], .refl-editor input:not([type]) { font-family: var(--font-log); }
+.font-sample { margin: 4px 0 0; padding: 6px 10px; border-radius: 8px; background: var(--row-alt); border: 1px solid var(--line); font-size: calc(16px * var(--fs, 1)); }

@@ -9,6 +9,7 @@ import { pickDialog } from './ui-log.js';
 import { OPERATOR_HELP } from './search-ops.js';
 import { PRESETS, DEFAULT_ACCENT, cleanAccent, schemeCss, lightPalette } from './colors.js';
 import { cleanMarkdown, storedMarkdown, mdCase, mdDay, reflectionPath, reflectionNote, CASE_FILLINS, REFL_FILLINS, FM_FIELDS } from './markdown.js';
+import { FONTS, applyFonts, fontStack, fontAvailable, cleanFontName, logChoice, saveUserFont, getUserFont, deleteUserFont } from './fonts.js';
 import { PHOTO_BUDGET_KB, PHOTO_NOTE, photoUsageKb, fmtMb } from './reflections.js';
 
 // Compact mode (this device's display settings, below): body.compact (style.css, "compact mode" block). Cached in
@@ -95,7 +96,7 @@ export function residencyCard() {
 // the light / dark choice. The first time a device opens the app it starts from what the account had (these used to
 // follow the account), so nobody's look changes. Kept at sign-out: they are the device's, and nothing private.
 const DISPLAY_KEY = 'apmes-logbook-display';
-export const DISPLAY_KEYS = ['compact', 'textSize', 'zoom', 'accent', 'startTab'];
+export const DISPLAY_KEYS = ['compact', 'textSize', 'zoom', 'accent', 'startTab', 'fontUi', 'fontUiName', 'fontLog', 'fontLogName'];
 export function deviceDisplay() {
   try { const d = JSON.parse(localStorage.getItem(DISPLAY_KEY) || 'null'); return d && typeof d === 'object' && !Array.isArray(d) ? d : null; } catch { return null; }
 }
@@ -124,7 +125,7 @@ export function adoptDisplay(accountSettings, { fresh = false } = {}) {
   return display();   // (an old account text size becomes the zoom here too)
 }
 export function resetDisplay() { adoptedNow = false; try { localStorage.removeItem(DISPLAY_KEY); } catch { /* storage blocked */ } }
-export function applyDisplay(d = display()) { applyCompact(!!d.compact); applyTextSize(d.textSize || '1'); applyZoom(d.zoom || '1'); applyAccent(d.accent); }
+export function applyDisplay(d = display()) { applyCompact(!!d.compact); applyTextSize(d.textSize || '1'); applyZoom(d.zoom || '1'); applyAccent(d.accent); applyFonts(d); }
 
 export function renderDisplay() {
   const st = display();
@@ -143,6 +144,8 @@ export function renderDisplay() {
         h('select', { 'aria-label': 'Text size', onchange: e => { applyTextSize(e.target.value); setDisplay({ textSize: e.target.value }); } },
           TEXT_SIZES.map(([v, l]) => h('option', { value: v, selected: String(st.textSize || '1') === v }, l)))),
       h('p', { class: 'hint help', style: 'margin:2px 0 0' }, 'Only the words: buttons and spacing stay as they are.'),
+      fontPicker('ui'),
+      fontPicker('log'),
       h('div', { class: 'field', style: 'margin-top:10px' }, 'Colour', accentPicker()),
       h('p', { class: 'hint', style: 'margin:2px 0 0' }, 'Light and dark versions are worked out to stay easy to read.'),
       h('label', { class: 'field', style: 'margin-top:10px' }, 'Light or dark',
@@ -154,6 +157,45 @@ export function renderDisplay() {
           START_TABS.map(([v, l]) => h('option', { value: v, selected: (st.startTab || 'log') === v }, l)))),
       h('p', { class: 'hint', style: 'margin:10px 0 0' }, 'Everything on this page is saved on this device only, so a phone and a computer can each look the way that suits them.')));
 }
+// Interface font and logging font (fonts.js): a list, a box for a font installed on this device, or a font file
+// kept on this device; a sample line shows the result (Il1 O0: easy to mix up in initials)
+function fontPicker(slot) {
+  const k = slot === 'ui' ? 'fontUi' : 'fontLog', nk = k + 'Name';
+  const cur = () => (slot === 'ui' ? display().fontUi || 'default' : logChoice(display()) || 'same');
+  const sample = h('div', { class: 'font-sample' }, 'AB 34F LSCS under spinal · Il1 O0');
+  const nameIn = h('input', { type: 'text', value: display()[nk] || '', placeholder: 'e.g. Calibri', 'aria-label': slot === 'ui' ? 'Interface font name' : 'Logging font name', maxlength: '60',
+    onchange: e => { const n = cleanFontName(e.target.value); e.target.value = n; applyDisplay(setDisplay({ [nk]: n })); paint(); } });
+  const nameNote = h('span', { class: 'hint' });
+  const fileNote = h('span', { class: 'hint' });
+  const fileBtn = fileButton('Choose a font file…', '.woff2,.woff,.ttf,.otf', async file => {
+    try { const n = await saveUserFont(slot, file); applyDisplay(setDisplay({ [k]: 'file' })); fileNote.textContent = n; toast('Font added on this device'); }
+    catch (err) { toast(err.message); }
+    paint();
+  }, 'btn small');
+  const removeBtn = h('button', { class: 'small linkish', onclick: async () => { await deleteUserFont(slot).catch(() => {}); applyDisplay(setDisplay({ [k]: slot === 'ui' ? 'default' : null })); hooks.render(); } }, 'Remove');
+  const nameRow = h('label', { class: 'field', style: 'margin:4px 0 0' }, 'Font name', nameIn, nameNote);
+  const fileRow = h('div', { style: 'margin:4px 0 0' }, h('div', { class: 'bar', style: 'margin:0' }, fileBtn, removeBtn), fileNote,
+    h('p', { class: 'hint', style: 'margin:2px 0 0' }, 'Kept on this device only (never uploaded or synced). Use a font you are allowed to use.'));
+  const sel = h('select', { 'aria-label': slot === 'ui' ? 'Interface font' : 'Logging font', onchange: e => {
+    const v = e.target.value;
+    applyDisplay(setDisplay({ [k]: slot === 'log' && v === 'same' ? null : v })); paint();
+  } },
+    slot === 'log' ? h('option', { value: 'same', selected: cur() === 'same' }, 'Same as the interface') : null,
+    FONTS.map(([v, l]) => h('option', { value: v, selected: cur() === v }, l)));
+  const paint = () => {
+    const c = cur();
+    nameRow.hidden = c !== 'named'; fileRow.hidden = c !== 'file';
+    sample.style.fontFamily = c === 'same' ? 'var(--font-ui)' : fontStack(c, display()[nk], slot);
+    if (c === 'named') nameNote.textContent = !display()[nk] ? 'Type the name exactly as your computer shows it.' : fontAvailable(display()[nk]) ? 'Found on this device.' : 'Not found on this device (or this browser doesn’t allow it): the default font is used.';
+    if (c === 'file') getUserFont(slot).then(f => { fileNote.textContent = f ? 'Using ' + f.name : 'No file chosen yet.'; removeBtn.hidden = !f; });
+  };
+  paint();
+  return h('div', { class: 'field', style: 'margin-top:10px' },
+    h('label', { class: 'field', style: 'margin:0' }, slot === 'ui' ? 'Interface font' : 'Logging font', sel),
+    slot === 'log' ? h('span', { class: 'hint help' }, 'The case box, case text in the Logbook and the reflection editor.') : null,
+    nameRow, fileRow, sample);
+}
+
 // suggested colours, then any colour (a custom pick shows as the last swatch)
 function accentPicker() {
   const cur = () => cleanAccent(display().accent) || DEFAULT_ACCENT;
