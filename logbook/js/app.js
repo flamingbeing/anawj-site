@@ -6,7 +6,7 @@ import { S, hooks, h, toast, cloud, setCases, scheduleSummary, fill, resetCaches
 import { renderLog, logCasesChanged, clearDrafts, SHARED_KEY } from './ui-log.js';
 import { renderLogbook } from './ui-logbook.js';
 import { renderProgress, renderTotals } from './ui-progress.js';
-import { applyCompact, cachedCompact, applyTheme, cachedTheme, applyTextSize, cachedTextSize, applyZoom, cachedZoom, stepZoom, applyAccent, adoptDisplay, applyDisplay, display, setDisplay, resetDisplay, DISPLAY_KEYS, renderTagEditor, renderDisplay, renderLogging, renderReflectionSettings, renderMarkdownSettings, START_TABS, privacyCard, creditsCard, signOutCard } from './ui-settings.js';
+import { applyCompact, cachedCompact, applyTheme, cachedTheme, applyTextSize, cachedTextSize, applyZoom, cachedZoom, stepZoom, applyAccent, adoptDisplay, applyDisplay, applyCustomCss, display, setDisplay, resetDisplay, DISPLAY_KEYS, renderTagEditor, renderDisplay, renderLogging, renderReflectionSettings, renderMarkdownSettings, START_TABS, privacyCard, creditsCard, signOutCard } from './ui-settings.js';
 import { renderAccount, flush as flushProfile } from './ui-account.js';
 import { renderAdmin, leaveAdmin } from './ui-admin.js';
 import { renderReflect, watchMyReflections, renderExportPage, renderChoosePage } from './ui-reflect.js';
@@ -147,7 +147,7 @@ function connectClaudeCard() {
 function settingsFileCard() {
   const exportIt = () => {
     // this device's display settings travel in the file (in place of any old ones in the account)
-    const dev = Object.fromEntries(DISPLAY_KEYS.map(k => [k, display()[k]]).filter(([, v]) => v != null));
+    const dev = Object.fromEntries(DISPLAY_KEYS.filter(k => !/^customCss/.test(k)).map(k => [k, display()[k]]).filter(([, v]) => v != null));   // custom CSS never goes in a file to share
     const plain = Object.fromEntries(Object.entries((S.logbook && S.logbook.settings) || {}).filter(([k]) => !DISPLAY_KEYS.includes(k)));
     const f = settingsFile({ ...S.logbook, settings: { ...plain, ...dev } }, { theme: cachedTheme() });
     download(`logbook-settings-${todayISO()}.json`, new Blob([JSON.stringify(f, null, 2)], { type: 'application/json' }));
@@ -237,6 +237,7 @@ function paintTabs() {
   let cur = TABS.find(t => t.id === S.tab);
   while (cur && cur.under) cur = TABS.find(t => t.id === cur.under);
   const sel = cur ? cur.id : S.tab;
+  document.body.dataset.bar = sel;   // Settings → Display → Colourful: the page takes its tab's colour
   fill(tabsEl, ...visibleTabs().filter(t => !t.hidden).map(t => h('button', {
     role: 'tab', 'aria-selected': String(sel === t.id), 'data-tab': t.id, 'aria-label': t.label, title: t.label,   // named even with icons only
     onclick: () => go(t.id),
@@ -298,6 +299,7 @@ function render() {
   paintTabs();
   const tab = visibleTabs().find(t => t.id === S.tab) || TABS[0];
   S.tab = tab.id;
+  applyCustomCss();   // never on the Display page, so a bad rule can always be fixed there
   const y = window.scrollY;
   // pages opened from More get a way back to the list
   const backTo = tab.under && navigation.backTarget(tab.under);
