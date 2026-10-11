@@ -250,8 +250,11 @@ function changeScreen(id, scroll = 0) {
   S.tab = id;
   window.scrollTo(0, 0);
   render();
-  requestAnimationFrame(() => { if (S.tab === id) window.scrollTo(0, scroll); });
+  // the inverted Case tab always opens at the bottom, where the case box is (not where it was left)
+  requestAnimationFrame(() => { if (S.tab === id) window.scrollTo(0, id === 'log' && invertedCase() ? document.documentElement.scrollHeight : scroll); });
 }
+// Settings → Display: the Case tab upside down, on a phone-width screen
+const invertedCase = () => document.documentElement.classList.contains('case-inverted') && matchMedia('(max-width: 600px)').matches;
 const navigation = createNavigation({ history, location,
   parents: Object.fromEntries(TABS.filter(t => t.under).map(t => [t.id, t.under])),
   allowed: id => visibleTabs().some(t => t.id === id),
@@ -302,7 +305,7 @@ function render() {
     onclick: e => { e.preventDefault(); navigation.back(tab.under); } }, '← ' + ((TABS.find(t => t.id === backTo) || {}).label || 'Back'))) : null, tab.render());
   if (tab.id !== 'log') window.scrollTo(0, y);
   // the inverted Case tab (Settings → Display, phones) opens at the bottom, where the case box is
-  else if (lastRendered !== 'log' && document.documentElement.classList.contains('case-inverted') && matchMedia('(max-width: 600px)').matches) requestAnimationFrame(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  else if (lastRendered !== 'log' && invertedCase()) requestAnimationFrame(() => window.scrollTo(0, document.documentElement.scrollHeight));
   lastRendered = tab.id;
 }
 let lastRendered = '';
