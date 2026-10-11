@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import {
-  uid, todayISO, parseDate, fmtDate, withParents, countCases, rYearDefault, yearInAY, academicYear, progress, epaProgress,
+  uid, todayISO, parseDate, fmtDate, withParents, countCases, rYearDefault, yearInAY, academicYear, ocrToBulk, progress, epaProgress,
   frequentCombos, parseBulk, duplicates, caseFromRow, diffRows, catFromText, splitInitials, cleanInitials, caseParts, caseText,
 } from '../js/engine.js';
 import { BY_CODE } from '../js/categories.js';
@@ -535,3 +535,14 @@ assert.equal(rYearDefault(undefined), 1);
 }
 
 console.log('engine tests passed');
+
+// ocrToBulk: a photo's text -> Paste list cases
+{
+  const now = new Date(2026, 9, 11);
+  assert.equal(ocrToBulk('AB 34F\nLSCS spinal\n\nCD 72M\nTKR, adductor canal block', now), 'AB 34F\nLSCS spinal\n\nCD 72M\nTKR, adductor canal block');
+  assert.equal(ocrToBulk('AB 34F LSCS spinal\nCD 72M TKR ACB\nEF 5yo tonsillectomy', now), 'AB 34F LSCS spinal\n\nCD 72M TKR ACB\n\nEF 5yo tonsillectomy', 'one case per line');
+  assert.equal(ocrToBulk('12/3 GH 45F\n\nlap chole GA\n13/3 IJ 30M | appendicectomy', now), '12/3 GH 45F\nlap chole GA\n\n13/3 IJ 30M appendicectomy', 'paragraph gaps ignored; junk bars dropped');
+  assert.equal(ocrToBulk('lap chole\nLSCS spinal', now), 'lap chole\n\nLSCS spinal', 'no case starts: a case per line');
+  assert.equal(ocrToBulk('1. KL 66F\nESP block VATS', now), '1. KL 66F\nESP block VATS');
+  assert.equal(ocrToBulk('  \n~~\n', now), '');
+}

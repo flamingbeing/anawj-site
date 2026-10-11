@@ -2,11 +2,11 @@
 // Also the reusable category picker and the edit-case dialog (used by the Logbook screen).
 
 import { BY_CODE, TIPS } from './categories.js';
-import { withParents, frequentCombos, parseBulk, parseDate, fmtDate, sortCodes, uid, caseParts, caseText, cleanInitials, splitInitials, splitAge, nth } from './engine.js';
+import { withParents, frequentCombos, parseBulk, parseDate, fmtDate, sortCodes, uid, caseParts, caseText, cleanInitials, splitInitials, splitAge, nth, ocrToBulk } from './engine.js';
 import { suggest } from './suggest.js';
 import {
   S, h, toast, debounce, modal, confirmBox, cat, catName, catShort, catFull, catChip, countText, PICKER_ORDER, PROGRESS_BY_CODE,
-  createCase, updateCase, removeCase, restoreCase, saveMany, deleteMany, subcatChips, settings, todayISO, hooks, fill, add, cloud, okNoIds, patchLogbook } from './ui-core.js';
+  createCase, updateCase, removeCase, restoreCase, saveMany, deleteMany, subcatChips, settings, todayISO, hooks, fill, add, cloud, okNoIds, patchLogbook, fileButton } from './ui-core.js';
 import { templateDialog } from './ui-settings.js';
 import { moveToBin } from './bin.js';
 import { shareText, copyText, caseText as shareCaseText, dayText, dayMarkdown } from './share.js';
@@ -416,12 +416,31 @@ function renderBulk(card) {
     oninput: e => { draft.bulk = e.target.value; saveDraft(); },
   });
   const out = h('div');
+  // a photo of a list, read on this phone into the box (to check before Review)
+  const ocrNote = h('span', { class: 'hint ocr-note', 'aria-live': 'polite' });
+  const photoBtn = fileButton('📷 Read a photo', 'image/*', async file => {
+    photoBtn.classList.add('busy');
+    try {
+      const { readPhoto } = await import('./ocr.js');
+      const text = ocrToBulk(await readPhoto(file, t => { ocrNote.textContent = t; }));
+      if (!text.trim()) { ocrNote.textContent = 'No text found in that photo. Try a closer, sharper, well-lit one.'; return; }
+      ta.value = (ta.value.trim() ? ta.value.replace(/\s+$/, '') + '\n\n' : '') + text;
+      draft.bulk = ta.value; saveDraft();
+      const n = text.split(/\n\s*\n/).length;
+      ocrNote.textContent = `Read ${n} case${n === 1 ? '' : 's'}. Check the text (photos misread letters), then Review.`;
+      ta.focus({ preventScroll: true });
+    } catch (err) { ocrNote.textContent = 'Could not read the photo: ' + err.message; }
+    finally { photoBtn.classList.remove('busy'); }
+  }, 'btn small');
   add(card, 
     h('p', { class: 'hint' }, 'Paste your notes or OT list with an empty line between cases (a case can take several lines). Categories are guessed for each case. Cases without a date at the start get ', h('b', {}, fmtDate(curDate())), ' (change it above).'),
     ta,
     h('div', { class: 'bar', style: 'margin-top:8px' },
       h('button', { class: 'primary', onclick: () => { bulkRows = parseBulk(ta.value, t => suggest(t)); paintBulk(out); } }, 'Review'),
-      h('button', { onclick: () => { ta.value = ''; draft.bulk = ''; bulkRows = null; saveDraft(); fill(out); } }, 'Clear')),
+      h('button', { onclick: () => { ta.value = ''; draft.bulk = ''; bulkRows = null; saveDraft(); fill(out); } }, 'Clear'),
+      h('span', { class: 'grow' }), photoBtn),
+    ocrNote,
+    h('p', { class: 'hint ocr-privacy' }, 'Photos are read on this phone: never uploaded or kept by the app. Your camera may still save a copy, and your hospital may not allow photos of patient lists, so check first.'),
     out);
   if (bulkRows) paintBulk(out);
 }

@@ -683,3 +683,9 @@ table.cat-names td.muted { font-size: 13px; }
 
 /* pages under More: the way back */
 .back-row { margin: 0 0 8px; }
+
+/* Paste list: read a photo */
+.ocr-note { display: block; margin-top: 6px; }
+.ocr-note:empty { display: none; }
+.ocr-privacy { margin: 6px 0 0; font-size: 12px; }
+label.btn.busy { opacity: .6; pointer-events: none; }
