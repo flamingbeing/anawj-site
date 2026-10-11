@@ -26,17 +26,21 @@ export function renderProgress() {
       yearCtl,
       h('span', {}, S.resident && S.resident.status === 'SMO' ? 'SMO: cases count as R3' : yr <= 3 ? 'Junior residency (R1–R3)' : 'Senior residency (SR1–SR2)'),
       h('span', { class: 'muted' }, `${S.cases.length} cases logged`)),
-    h('p', { class: 'hint', style: 'margin-top:8px' },
-      `${tally('done')} done · ${tally('late')} behind · ${tally('due')} due this year · ${tally('ontrack')} on track `, infoBtn,
-      S.resident ? '' : [' Not on the programme list, so your year is set in ', h('a', { href: '#settings' }, 'Settings'), '.']),
+    // the counts double as the legend: one line of coloured dots
+    h('p', { class: 'legend tally', style: 'margin:8px 0 0' },
+      [['late', 'behind'], ['due', 'due this year'], ['ontrack', 'on track'], ['done', 'done']].map(([k, t], i) => h('span', {}, i ? ' · ' : '', h('i', { class: `dot ${k}` }), ` ${tally(k)} ${t}`)),
+      ' ', infoBtn),
     infoText,
-    legend(),
-    h('details', { class: 'more-tools', open: pview.by === 'epa' || !!pview.toolsOpen, ontoggle: e => { pview.toolsOpen = e.target.open; } },
+    S.resident ? null : h('p', { class: 'hint', style: 'margin:4px 0 0' }, 'Not on the programme list, so your year is set in ', h('a', { href: '#settings' }, 'Settings'), '.'),
+    pview.by === 'epa' ? h('p', { style: 'margin:6px 0 0' }, h('span', { class: 'hint' }, 'Showing by EPA · '), h('button', { class: 'small linkish', onclick: () => { pview.by = 'cat'; hooks.render(); } }, 'Back to categories')) : null);
+  // the rest at the bottom, like the Logbook and Reflections tabs
+  const foot = h('section', { class: 'card' },
+    h('details', { class: 'more-tools', open: !!pview.toolsOpen, ontoggle: e => { pview.toolsOpen = e.target.open; } },
       h('summary', {}, 'More tools: EPA view, download summary'),
       h('div', { class: 'bar', style: 'margin:0' },
         h('div', { class: 'seg' },
           h('button', { 'aria-pressed': String(pview.by === 'cat'), onclick: () => { pview.by = 'cat'; hooks.render(); } }, 'By category'),
-          h('button', { 'aria-pressed': String(pview.by === 'epa'), onclick: () => { pview.by = 'epa'; hooks.render(); } }, 'By EPA')),
+          h('button', { 'aria-pressed': String(pview.by === 'epa'), onclick: () => { pview.by = 'epa'; scrollTo(0, 0); hooks.render(); } }, 'By EPA')),
         h('span', { class: 'grow' }),
         h('button', { class: 'small', onclick: () => downloadSummary(rows, yr) }, 'Download summary'))));
 
@@ -54,28 +58,45 @@ export function renderProgress() {
       h('h3', { style: 'margin:0 0 6px' }, urgent.length ? `Needs attention (${urgent.length})` : 'Nothing behind or due this year ✓'),
       urgent.length ? progList(urgent) : null);
     const shown = pview.hideDone ? rows.filter(r => r.status !== 'done') : rows;
-    add(body, h('div', { class: 'bar', style: 'margin:0 0 4px' }, h('h3', { style: 'margin:0' }, 'All categories'), h('span', { class: 'grow' }),
+    add(body, h('div', { class: 'bar', style: 'margin:0 0 4px' }, h('h3', { style: 'margin:0' }, 'Logbook'), h('span', { class: 'grow' }),
       h('label', { class: 'check', style: 'margin:0' }, h('input', { type: 'checkbox', checked: !!pview.hideDone, onchange: e => { pview.hideDone = e.target.checked; hooks.render(); } }), 'Hide done')),
       progList(shown));
   }
-  return h('div', {}, head, urgentCard, reflCard(), body);
+  return h('div', {}, head, urgentCard, body, reflCard(), foot);
 }
 
-// Reflections at a glance; the full list and editor are on the Reflections tab (#reflect).
+// Reflections, laid out like the logbook list: each portfolio heading against its minimum.
+// The full list and editor are on the Reflections tab (#reflect).
 function reflCard() {
-  const p = reflectionProgress(S.reflections || []);
+  const all = S.reflections || [];
+  const p = reflectionProgress(all);
   const met = p.headings.filter(x => x.met).length;
-  const issues = p.headings.reduce((n, x) => n + x.issues.length, 0);
+  const drafts = id => all.filter(r => r.headingId === id && r.status !== 'complete').length;
+  const shown = pview.hideDone ? p.headings.filter(x => !x.met) : p.headings;
   return h('section', { class: 'card' },
-    h('div', { class: 'bar' },
+    h('div', { class: 'bar', style: 'margin:0 0 4px' },
       h('h3', { style: 'margin:0' }, 'Reflections'),
       h('span', { class: 'grow' }),
       h('a', { class: 'btn small primary', href: '#reflect' }, 'Open reflections')),
-    h('p', { class: 'hint', style: 'margin-top:8px' },
-      `${p.totals.counted} / ${p.totals.min} counted · ${met} of ${p.headings.length} headings met · ${p.totals.drafts} draft${p.totals.drafts === 1 ? '' : 's'}`,
-      issues ? ` · ${issues} to sort out` : '',
-      ''),
-    h('span', { class: 'meter' }, h('i', { class: met === p.headings.length ? 'done' : 'ontrack', style: `width:${Math.min(100, Math.round(p.totals.counted / p.totals.min * 100))}%` })));
+    h('p', { class: 'hint', style: 'margin:0 0 6px' },
+      `${p.totals.counted} / ${p.totals.min} counted · ${met} of ${p.headings.length} headings met`,
+      p.totals.drafts ? ` · ${p.totals.drafts} draft${p.totals.drafts === 1 ? '' : 's'}` : ''),
+    shown.length ? h('ul', { class: 'prog' }, shown.map(x => {
+      const st = x.met ? 'done' : x.done ? 'ontrack' : 'none';
+      const d = drafts(x.id);
+      const extra = [
+        ...x.subs.filter(s => s.min).map(s => `${s.name} ${s.done} / ${s.min}${s.done >= s.min ? ' ✓' : ''}`),
+        x.jrNeeded ? `JR ${x.jrDone} / ${x.jrNeeded}` : '',
+        d ? `${d} draft${d === 1 ? '' : 's'}` : '',
+        ...x.issues,
+      ].filter(Boolean);
+      return h('li', {},
+        h('i', { class: `dot ${st}`, title: x.met ? 'Done' : 'Not yet' }),
+        h('span', { class: 'nm' }, x.name),
+        h('span', { class: 'ct' }, x.met ? `${x.counted} ✓` : `${x.counted} / ${x.min}`),
+        h('span', { class: 'meter' }, h('i', { class: st, style: `width:${Math.min(100, Math.round(x.counted / Math.max(1, x.min) * 100))}%` })),
+        extra.length ? h('span', { class: 'ms' }, extra.join(' · ')) : null);
+    })) : h('p', { class: 'empty' }, 'All headings met ✓'));
 }
 
 // your own tags under a category (Tag editor): "Interscalene 3 · Femoral 2"

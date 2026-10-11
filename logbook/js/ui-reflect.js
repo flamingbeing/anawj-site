@@ -38,7 +38,7 @@ export function watchMyReflections(email) {
     S.reflections = list;
     scheduleSummary();
     // don't re-render under someone typing in the editor
-    if ((S.tab === 'reflect' && !rv.editing && !rv.picking && !rv.view && !drag) || S.tab === 'export') hooks.render();
+    if ((S.tab === 'reflect' && !rv.editing && !rv.picking && !rv.view && !drag) || S.tab === 'export' || S.tab === 'choose') hooks.render();
   });
 }
 export const summaryReflections = () => reflectionCounts(S.reflections || []);
@@ -359,7 +359,7 @@ function list() {
 
   // the rest at the bottom, like the Logbook tab: export, Word upload and the bin, the rules
   const foot = em ? null : h('section', { class: 'card refl-foot' },
-    h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:8px;margin:0 0 6px' }, h('a', { class: 'btn small', href: '#export' }, `Export portfolio (${ex.total} ticked) ›`)),
+    h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:8px;margin:0 0 6px' }, h('a', { class: 'btn small', href: '#export' }, 'Export portfolio ›')),
     h('details', { class: 'more-tools', open: !!rv.toolsOpen, ontoggle: e => { rv.toolsOpen = e.target.open; } },
       h('summary', {}, 'More tools: upload from Word, recycle bin'),
       h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:8px;margin:0' },
@@ -587,9 +587,7 @@ function readyPayload() {
   return { list, meta: { rid: (S.resident && S.resident.rid) || (S.logbook && S.logbook.rid) || null, name: displayName(), intake, rYear: rYear(), smo, fp, count: list.length, profile, counts, imageIds } };
 }
 async function markReady(ex, update = false) {
-  const short = ex.headings.filter(x => x.inExport < x.min || x.warn.length);
-  if (!update && short.length && !(await confirmBox('Mark as ready anyway?',
-    `Some headings don’t meet the portfolio rules yet: ${short.slice(0, 6).map(x => `${shortName(HEADING_BY_ID[x.id].name)} (${x.inExport} of ${x.min}${x.warn.length ? '; ' + x.warn.join(', ') : ''})`).join(' · ')}${short.length > 6 ? ` and ${short.length - 6} more` : ''}. You can still mark it ready and update it later.`, 'Mark as ready'))) return;
+  // no check against the portfolio rules here: the programme also reviews interim portfolios
   RS.busy = true; hooks.render();
   try {
     const { list, meta } = readyPayload();
@@ -627,7 +625,7 @@ function readyCard(ex) {
 // Choose which complete reflections go into the Word portfolio (ticks are kept for next time), then export.
 // Per heading: how many are ticked against its minimum, with warnings when a required sub-type or the
 // JR ones are left out. "Tick just enough" keeps the longest that meet each minimum.
-export function renderExportPage() {
+export function renderExportPage(onChoose = false) {
   const all = S.reflections || [];
   const ex = exportSummary(all);
   const exBy = Object.fromEntries(ex.headings.map(x => [x.id, x]));
@@ -642,14 +640,23 @@ export function renderExportPage() {
   };
   const top = h('section', { class: 'card' },
     h('h2', { style: 'margin:0 0 4px' }, 'Export portfolio (Word)'),
-    h('p', { class: 'hint', style: 'margin:0 0 8px' }, 'Tick the reflections to put in the portfolio. Your ticks are kept for next time. Section 1 and the Section 4 case numbers are filled in too.'),
-    h('p', { style: 'margin:0 0 8px' }, h('b', {}, `${ex.total} of ${complete.length} ticked`),
-      drafts || uncat ? h('span', { class: 'hint' }, ` · not exported: ${[drafts ? `${drafts} draft${drafts === 1 ? '' : 's'}` : '', uncat ? `${uncat} uncategorised` : ''].filter(Boolean).join(', ')}`) : null),
-    complete.length ? h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:8px;margin:0 0 10px' },
-      h('button', { class: 'small', onclick: () => justEnough() }, 'Tick just enough'),
-      h('button', { class: 'small', onclick: () => setMany(complete, true) }, 'Tick all'),
-      h('button', { class: 'small', onclick: () => setMany(complete, false) }, 'Untick all')) : null,
+    h('p', { class: 'hint', style: 'margin:0 0 8px' }, 'Your complete reflections go into the APMES portfolio, with Section 1 and the Section 4 case numbers filled in. All are included unless you leave some out.'),
+    h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:8px;margin:0 0 10px;align-items:center' },
+      h('span', {}, h('b', {}, `${ex.total} of ${complete.length} reflections included`),
+        drafts || uncat ? h('span', { class: 'hint' }, ` · not exported: ${[drafts ? `${drafts} draft${drafts === 1 ? '' : 's'}` : '', uncat ? `${uncat} uncategorised` : ''].filter(Boolean).join(', ')}`) : null),
+      complete.length ? h('a', { class: 'btn small', href: '#choose' }, 'Choose reflections ›') : null),
     portfolioExportButton());
+  if (!onChoose) return h('div', {}, top, readyCard(ex));
+  // ---- the Choose page (#choose): ticks per heading, quick actions behind one button ----
+  const quick = h('details', { class: 'quick-actions' },
+    h('summary', { class: 'btn small' }, 'Quick actions ▾'),
+    h('div', { class: 'qa-menu' },
+      h('button', { class: 'small', onclick: () => justEnough() }, 'Tick just enough (longest that meet each minimum)'),
+      h('button', { class: 'small', onclick: () => setMany(complete, true) }, 'Tick all'),
+      h('button', { class: 'small', onclick: async () => { if (await confirmBox('Untick all?', 'Nothing will be exported until you tick some again.', 'Untick all', true)) setMany(complete, false); } }, 'Untick all')));
+  const choose = h('section', { class: 'card' },
+    h('div', { class: 'bar', style: 'align-items:center' }, h('h2', { style: 'margin:0' }, 'Choose reflections'), h('span', { class: 'grow' }), complete.length ? quick : null),
+    h('p', { class: 'hint', style: 'margin:6px 0 0' }, `${ex.total} of ${complete.length} included. Untick any you’d rather leave out; your choice is kept for next time.`));
   const body = h('section', { class: 'card' });
   let section = '';
   for (const hd of REFLECTION_HEADINGS) {
@@ -669,9 +676,10 @@ export function renderExportPage() {
             r.subId && hd.subs ? h('span', { class: 'flag' }, (hd.subs.find(s2 => s2.id === r.subId) || {}).name || '') : null,
             h('span', { class: 'muted refl-wc' }, ` · ${wordCount(r)} words`))))))));
   }
-  if (!complete.length) add(body, h('p', { class: 'empty' }, 'No complete reflections under a heading yet. Mark reflections complete on the Reflections tab, then come back to export.'));
-  return h('div', {}, top, readyCard(ex), body);
+  if (!complete.length) add(body, h('p', { class: 'empty' }, 'No complete reflections under a heading yet. Mark reflections complete on the Reflections tab, then come back.'));
+  return h('div', {}, choose, body);
 }
+export const renderChoosePage = () => renderExportPage(true);
 
 // Images of the given reflections' figures, for the Word export: { id: { data, mime, w, h } }. Missing ones are skipped.
 // The Word portfolio export button (shown in More → Export & Sync): complete reflections, Section 1

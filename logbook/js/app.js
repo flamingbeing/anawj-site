@@ -9,7 +9,7 @@ import { renderProgress, renderTotals } from './ui-progress.js';
 import { applyCompact, cachedCompact, applyTheme, cachedTheme, applyTextSize, cachedTextSize, renderSettings, renderTagEditor } from './ui-settings.js';
 import { renderAccount, flush as flushProfile } from './ui-account.js';
 import { renderAdmin, leaveAdmin } from './ui-admin.js';
-import { renderReflect, watchMyReflections, renderExportPage } from './ui-reflect.js';
+import { renderReflect, watchMyReflections, renderExportPage, renderChoosePage } from './ui-reflect.js';
 import { downloadExcel } from './ui-logbook.js';
 import { downloadBackup } from './backup.js';
 import { purgeExpired } from './bin.js';
@@ -46,7 +46,8 @@ const TABS = [
   { id: 'account', label: 'Account', render: renderAccount, hidden: true, under: 'more', desc: 'Your name and portfolio details (Section 1); sign out' },
   { id: 'settings', label: 'Settings', render: renderSettings, hidden: true, under: 'more', desc: 'Display, text size, logging, templates, recycle bin' },
   // opened from More → Export & Sync (not in the More list)
-  { id: 'export', label: 'Export portfolio', render: renderExportPage, hidden: true, under: 'more', unlisted: true },
+  { id: 'export', label: 'Export portfolio', render: () => renderExportPage(), hidden: true, under: 'more', unlisted: true },
+  { id: 'choose', label: 'Export portfolio', render: renderChoosePage, hidden: true, under: 'export', unlisted: true },
   // admins open it from More (or Settings → Admin portal)
   { id: 'admin', label: 'Admin portal', render: renderAdmin, admin: true, hidden: true, under: 'more', desc: 'Residents, ready portfolios, portfolio template, default category names' },
   // opened from Settings
