@@ -11,7 +11,7 @@ import { PRESETS, DEFAULT_ACCENT, cleanAccent, schemeCss, lightPalette } from '.
 import { cleanMarkdown, storedMarkdown, mdCase, mdDay, reflectionPath, reflectionNote, CASE_FILLINS, REFL_FILLINS, FM_FIELDS } from './markdown.js';
 import { PHOTO_BUDGET_KB, PHOTO_NOTE, photoUsageKb, fmtMb } from './reflections.js';
 
-// Compact mode (S.logbook.settings.compact): body.compact (style.css, "compact mode" block). Cached in
+// Compact mode (this device's display settings, below): body.compact (style.css, "compact mode" block). Cached in
 // localStorage so the first paint after a reload is already compact, before the logbook loads.
 const COMPACT_KEY = 'apmes-logbook-compact';
 export function applyCompact(on) {
@@ -32,7 +32,7 @@ export function applyTheme(t) {
 export function cachedTheme() {
   try { return localStorage.getItem(THEME_KEY) || 'light'; } catch { return 'light'; }
 }
-// Text size (S.logbook.settings.textSize): a zoom factor for the page content (style.css --text-zoom).
+// Text size (this device's display settings): a zoom factor for the page content (style.css --text-zoom).
 const SIZE_KEY = 'apmes-logbook-textsize';
 export const TEXT_SIZES = [['0.8', 'Smallest'], ['0.9', 'Smaller'], ['1', 'Normal'], ['1.12', 'Larger'], ['1.25', 'Largest']];
 export function applyTextSize(z) {
@@ -40,7 +40,7 @@ export function applyTextSize(z) {
   document.documentElement.style.setProperty('--text-zoom', v);
   try { v === '1' ? localStorage.removeItem(SIZE_KEY) : localStorage.setItem(SIZE_KEY, v); } catch { /* storage blocked */ }
 }
-// Colour (S.logbook.settings.accent, follows the account): one accent colour; colors.js works out the
+// Colour (this device's display settings): one accent colour; colors.js works out the
 // light, dark and OLED palettes. The CSS is cached on the device so the first paint has it (index.html).
 const ACCENT_CSS_KEY = 'apmes-logbook-accent-css';
 export function applyAccent(c) {
@@ -72,35 +72,60 @@ export function residencyCard() {
       h('p', { class: 'hint', style: 'margin:4px 0 0' }, 'Programme residents get their year from the programme list automatically. If you are an APMES resident, ask the programme admins to add your email.')));
 }
 
+// Display settings belong to the device, not the account (owner: people use the logbook on different devices with
+// different needs): compact mode, text size, colour and the tab the app opens on, in localStorage DISPLAY_KEY, next to
+// the light / dark choice. The first time a device opens the app it starts from what the account had (these used to
+// follow the account), so nobody's look changes. Kept at sign-out: they are the device's, and nothing private.
+const DISPLAY_KEY = 'apmes-logbook-display';
+export const DISPLAY_KEYS = ['compact', 'textSize', 'accent', 'startTab'];
+export function deviceDisplay() {
+  try { const d = JSON.parse(localStorage.getItem(DISPLAY_KEY) || 'null'); return d && typeof d === 'object' && !Array.isArray(d) ? d : null; } catch { return null; }
+}
+export const display = () => deviceDisplay() || {};
+export function setDisplay(patch) {
+  const d = { ...display(), ...patch };
+  try { localStorage.setItem(DISPLAY_KEY, JSON.stringify(d)); } catch { /* storage blocked: this visit only */ }
+  return d;
+}
+let adoptedNow = false;
+// this device's display settings, made from the account's the first time (fresh: the server's copy replaces a
+// first guess made from a stale offline copy earlier in the same visit)
+export function adoptDisplay(accountSettings, { fresh = false } = {}) {
+  if (deviceDisplay() && !(fresh && adoptedNow)) return display();
+  adoptedNow = !fresh;
+  return setDisplay(Object.fromEntries(DISPLAY_KEYS.map(k => [k, (accountSettings || {})[k] ?? null])));
+}
+export function resetDisplay() { adoptedNow = false; try { localStorage.removeItem(DISPLAY_KEY); } catch { /* storage blocked */ } }
+export function applyDisplay(d = display()) { applyCompact(!!d.compact); applyTextSize(d.textSize || '1'); applyAccent(d.accent); }
+
 export function renderDisplay() {
-  const st = settings();
+  const st = display();
   return h('div', {},
     h('section', { class: 'card' },
       h('h2', {}, 'Display'),
       h('label', { class: 'check' }, h('input', { type: 'checkbox', role: 'switch', checked: !!st.compact, onchange: e => {
-        applyCompact(e.target.checked);
-        patchLogbook({ settings: { compact: e.target.checked } });
+        applyCompact(e.target.checked); setDisplay({ compact: e.target.checked });
       } }), 'Compact mode'),
-      h('p', { class: 'hint help', style: 'margin:2px 0 0' }, 'Smaller chips, rows and spacing so more tags fit on screen. Saved to your account, so it follows you to other devices.'),
+      h('p', { class: 'hint help', style: 'margin:2px 0 0' }, 'Smaller chips, rows and spacing so more tags fit on screen.'),
       h('label', { class: 'field', style: 'margin-top:10px' }, 'Text size',
-        h('select', { onchange: e => { applyTextSize(e.target.value); patchLogbook({ settings: { textSize: e.target.value } }); } },
+        h('select', { onchange: e => { applyTextSize(e.target.value); setDisplay({ textSize: e.target.value }); } },
           TEXT_SIZES.map(([v, l]) => h('option', { value: v, selected: String(st.textSize || '1') === v }, l)))),
       h('div', { class: 'field', style: 'margin-top:10px' }, 'Colour', accentPicker()),
-      h('p', { class: 'hint', style: 'margin:2px 0 0' }, 'Saved to your account. Light and dark versions are worked out to stay easy to read.'),
+      h('p', { class: 'hint', style: 'margin:2px 0 0' }, 'Light and dark versions are worked out to stay easy to read.'),
       h('label', { class: 'field', style: 'margin-top:10px' }, 'Light or dark',
         h('select', { onchange: e => applyTheme(e.target.value) },
           [['light', 'Light'], ['dark', 'Dark'], ['oled', 'OLED (pure black)'], ['auto', 'Auto (match the phone)']].map(([v, l]) => h('option', { value: v, selected: cachedTheme() === v }, l)))),
-      h('p', { class: 'hint', style: 'margin:2px 0 0' }, 'Saved on this device.'),
       // the tab the app opens on (a link or shortcut to a tab still opens that tab)
       h('label', { class: 'field', style: 'margin-top:10px' }, 'Open the app on',
-        h('select', { onchange: e => patchLogbook({ settings: { startTab: e.target.value } }).then(() => toast('Saved')) },
-          START_TABS.map(([v, l]) => h('option', { value: v, selected: (st.startTab || 'log') === v }, l))))));
+        h('select', { onchange: e => { setDisplay({ startTab: e.target.value }); toast('Saved'); } },
+          START_TABS.map(([v, l]) => h('option', { value: v, selected: (st.startTab || 'log') === v }, l)))),
+      h('p', { class: 'hint', style: 'margin:10px 0 0' }, 'Everything on this page is saved on this device only, so a phone and a computer can each look the way that suits them.')));
 }
 // suggested colours, then any colour (a custom pick shows as the last swatch)
 function accentPicker() {
-  const cur = () => cleanAccent(settings().accent) || DEFAULT_ACCENT;
+  const cur = () => cleanAccent(display().accent) || DEFAULT_ACCENT;
   const wrap = h('div', { class: 'accent-pick', role: 'group', 'aria-label': 'Colour' });
-  const pick = c => { applyAccent(c); patchLogbook({ settings: { accent: c === DEFAULT_ACCENT ? null : c } }); paint(); };
+  const pick = c => { applyAccent(c); setDisplay({ accent: c === DEFAULT_ACCENT ? null : c }); paint(); };
   const paint = () => {
     const c = cur(), custom = !PRESETS.some(([x]) => x === c);
     const input = h('input', { type: 'color', value: c, 'aria-label': 'Any colour', oninput: e => applyAccent(e.target.value), onchange: e => pick(e.target.value) });

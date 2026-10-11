@@ -82,7 +82,12 @@ portfolio content.
   dark accent 7:1 on cards, near-white text, neutral grey backgrounds) and writes them into <style id="accent-css">,
   cached for the first paint (index.html). Light / Dark / OLED (pure black: data-oled on top of dark) / Auto is
   separate, per device. (Fixed named themes were tried and dropped: they read as shades of one colour.)
-- **Settings**: a menu of Display (incl. the tab the app opens on, `settings.startTab`; a #hash still wins),
+- **Display is per device** (owner: people use the logbook on different devices with different needs): compact,
+  text size, colour and the start tab live in localStorage `apmes-logbook-display` (`deviceDisplay` / `setDisplay` /
+  `adoptDisplay` in ui-settings.js), light / dark in `apmes-logbook-theme`. A device with none starts from the
+  account's old `settings` values (and corrects that from the server copy in the same visit). Kept at sign-out;
+  wiped by Reset demo. The settings file carries this device's display values and imports them to the device.
+- **Settings**: a menu of Display (incl. the tab the app opens on; a #hash still wins),
   Logging, Tag editor (`#tags`), Reflections (`#reflset`: new reflections in the export, photo sizes), Markdown (`#sharefmt`), Recycle bin;
   then a "Settings file" card: export / import settings, tags, tag groups, formats as JSON (`settings-file.js`, tested; never cases or portfolio).
 - **Markdown** (Settings → Markdown, `#sharefmt`; `markdown.js`, tested in `markdown.test.mjs`): one format in
