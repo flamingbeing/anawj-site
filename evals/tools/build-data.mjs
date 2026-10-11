@@ -1,5 +1,6 @@
 // Builds evals/js/catalogue.js and evals/js/forms.js from the reference transcriptions.
 // Run from anywhere: node evals/tools/build-data.mjs
+// With --check it writes nothing and exits 1 if the committed outputs differ from a fresh build.
 // Sources: reference/apmes-epas.json (EPA Guidebook v8, the source of truth for items),
 // reference/apmes-forms.json (the three evaluator forms) and reference/guidebook/epa-01-06.md and
 // epa-07-12.md (suggested entrustment questions). The outputs are committed; re-run after editing a source.
@@ -424,8 +425,14 @@ export const formById = id => FORMS[id] || null;
 export const questionsOf = form => form.sections.flatMap(s => s.questions);
 `;
 
+const OUTPUTS = { 'js/catalogue.js': catalogue, 'js/forms.js': forms };
+if (process.argv.includes('--check')) {
+  const stale = Object.keys(OUTPUTS).filter(f => { try { return read(f) !== OUTPUTS[f]; } catch { return true; } });
+  if (stale.length) { console.error(`build-data: ${stale.join(', ')} out of date; run node evals/tools/build-data.mjs and commit`); process.exit(1); }
+  console.log('build-data: generated files up to date');
+  process.exit(0);
+}
 fs.mkdirSync(path.join(ROOT, 'js'), { recursive: true });
-fs.writeFileSync(path.join(ROOT, 'js/catalogue.js'), catalogue);
-fs.writeFileSync(path.join(ROOT, 'js/forms.js'), forms);
+for (const [f, text] of Object.entries(OUTPUTS)) fs.writeFileSync(path.join(ROOT, f), text);
 console.log(`catalogue.js: ${EPAS.length} EPAs, ${ITEMS.length} items, ${GROUPS.length} groups, ${ITEMS.filter(i => i.entrustQs.length).length} with entrustment questions`);
 console.log(`forms.js: ${Object.keys(FORMS).map(k => `${k} ${nq(k)}`).join(', ')}`);
