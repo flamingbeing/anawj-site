@@ -122,7 +122,7 @@ export function renderLogbook() {
         setOpts('all', false);
         refresh();
       } }, 'Reset')));
-  // "Search in" and fuzzy are kept with your account; a saved search can set them too
+  // "Search in" and fuzzy are kept with your account; a saved search sets "Search in" (not fuzzy)
   function setOpts(scope, fuzzy) {
     if ((settings().lbScope || 'all') !== scope || !!settings().lbFuzzy !== fuzzy) patchLogbook({ settings: { lbScope: scope, lbFuzzy: fuzzy } });
     searchIn.value = scope; fuzzyBox.querySelector('input').checked = fuzzy;
@@ -138,7 +138,7 @@ export function renderLogbook() {
     fill(savedRow, ...list.map(x => h('span', { class: 'chip tmpl', role: 'button', tabindex: '0', title: 'Run this search' + (x.q ? `: “${x.q}”` : ''), onclick: () => {
       Object.assign(view, { q: x.q || '', has: [...(x.has || [])], not: [...(x.not || [])], from: x.from || '', to: x.to || '', flag: x.flag || '' });
       setBox(view.q);
-      if (x.scope) setOpts(x.scope, !!x.fuzzy);
+      if (x.scope) setOpts(x.scope, !!settings().lbFuzzy);
       const [f, t] = filters.querySelectorAll('input[type=date]'); if (f) f.value = view.from; if (t) t.value = view.to;
       filters.hidden = false; refresh();
     } }, '★ ' + x.name, h('span', { class: 'x', role: 'button', tabindex: '0', 'aria-label': 'Delete saved search', onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); e.target.click(); } }, onclick: async e => {
@@ -152,7 +152,7 @@ export function renderLogbook() {
     const name = (prompt('Name this search', view.q.trim() || view.has.map(keyName).join(' + ') || 'My search') || '').trim().slice(0, 40);
     if (!name) return;
     const list = settings().savedSearches || [];
-    const x = { id: Math.random().toString(36).slice(2, 8), name, q: view.q, has: [...view.has], not: [...view.not], from: view.from, to: view.to, flag: view.flag, scope: settings().lbScope || 'all', fuzzy: !!settings().lbFuzzy };
+    const x = { id: Math.random().toString(36).slice(2, 8), name, q: view.q, has: [...view.has], not: [...view.not], from: view.from, to: view.to, flag: view.flag, scope: settings().lbScope || 'all' };
     await patchLogbook({ settings: { savedSearches: [...list, x].slice(-20) } });
     paintSaved(); toast(`Saved “${name}”`);
   }

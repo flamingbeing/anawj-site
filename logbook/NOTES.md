@@ -37,7 +37,7 @@ portfolio content.
   Delete/Cancel/Save, 6-line growing box, Tags + "Add tags"; also "New case" from the reflection picker).
 - **Logbook** (`ui-logbook.js`): Calendar (default) | List | Grid. Calendar day: + Log a case (opens Log
   on that date), Share day, Copy as Markdown. Rows: Share, Reflect. Filter: has all of / has none of
-  tags, dates, flag, search scope, fuzzy; Reset (everything); × in the search box clears just the text; saved searches (text, filters, scope, fuzzy); Tag N cases (bulk add/remove). Search text
+  tags, dates, flag, search scope, fuzzy; Reset (everything); × in the search box clears just the text; saved searches (text, filters, "Search in"; not fuzzy); Tag N cases (bulk add/remove). Search text
   cached per case (`hayCache`, reset when the tag set changes).
 - **Reflections** (`ui-reflect.js`): list by heading, editor (Case details, learning points,
   References and Figures as folded white cards), Export page (summary + Mark ready) and Choose page
