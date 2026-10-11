@@ -31,7 +31,7 @@ portfolio content.
 
 - **Log** (`ui-log.js`): the case box (aligned example lines; Paste button; "Draft saved" sits on the
   Possible reflection line), Quick picks (suggestions + your shorthand tags, Same as last, your tag
-  groups), All tags, programme tag groups, Still needed, pinned bar (Save, keep date | Save).
+  groups), All tags, programme tag groups, Still needed, "Save these tags as a tag group" under the tag list, pinned bar (chosen tags, Save, keep date | Save).
   Paste-a-list (List mode), Plan for later. `editCaseDialog` (full screen on phones, pinned
   Delete/Cancel/Save, 6-line growing box, Tags + "Add tags"; also "New case" from the reflection picker).
 - **Logbook** (`ui-logbook.js`): Calendar (default) | List | Grid. Calendar day: + Log a case (opens Log

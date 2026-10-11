@@ -856,3 +856,5 @@ details.an-sec[open] > summary .an-t::after { content: ' ⌄'; }
 .box-wrap .clear-btn { position: absolute; right: 6px; bottom: 6px; min-height: 40px; padding: 2px 10px; font-size: 13px; opacity: .85; background: var(--panel); }
 .box-wrap textarea:placeholder-shown ~ .clear-btn { display: none; }
 .selected .clear-tags { min-height: 32px; padding: 2px 10px; font-size: 13px; border-radius: 999px; color: var(--muted); }
+.group-save:empty { display: none; }
+.group-save { margin: 6px 0 2px; }

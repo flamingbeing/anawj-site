@@ -364,6 +364,8 @@ function renderOne(card) {
   // Only the selected categories and Save stay pinned: a slim bar at the end of the card that sticks
   // to the bottom (above the tab bar) the whole way down; the box itself scrolls away.
   const selExtra = h('div', { class: 'sel-extra' });
+  // "Save as tag group" sits under the tag list, not in the pinned bar (keeps the bar slim)
+  const groupSave = h('div', { class: 'group-save' });
   const savebar = h('div', { class: 'savebar' }, selected, selExtra, tip, actions);
   add(card,
     h('div', { class: 'box-wrap' }, textarea, pasteBtn(textarea), clearBtn), parsed, tagRow,
@@ -373,6 +375,7 @@ function renderOne(card) {
       h('span', { class: 'seg cat-view', role: 'group', 'aria-label': 'Show tags as' },
         ['list', 'pills'].map(v => h('button', { class: 'small', 'aria-pressed': String((settings().catView || 'list') === v), onclick: () => { if ((settings().catView || 'list') === v) return; patchLogbook({ settings: { catView: v } }); hooks.render(); } }, v === 'list' ? 'List' : 'Pills')))),
     picker.el,
+    groupSave,
     shared,
     stillNeeded(),
     savebar);
@@ -385,7 +388,7 @@ function renderOne(card) {
     if (t.closest('input:not([type=checkbox]), textarea, select, .datepick, .box-wrap')) return;
     if (t.closest('.chip, .picker li, label.check, [role=button], button, a.btn')) e.preventDefault();
   });
-  Object.assign(ui, { shared, draftNote, textarea, parsed, sugg, selected, selExtra, tip, templates, picker });
+  Object.assign(ui, { shared, draftNote, textarea, parsed, sugg, selected, selExtra, groupSave, tip, templates, picker });
   paintSuggest(); paintSel(); paintQuick(); paintParsed(false);
   requestAnimationFrame(() => alignPlaceholder(textarea));
   // autofocus attribute is ignored on re-render; focus after insertion (not on phones' first paint
@@ -446,13 +449,14 @@ function paintSel() {
       draft.cats = []; draft.tags = []; saveDraft(); paintSel();
       toast('Tags cleared', { action: 'Undo', onaction: () => { draft.cats = was.cats; draft.tags = was.tags; saveDraft(); paintSel(); } });
     } }, '× Clear') : null);
-  fill(ui.selExtra,
+  fill(ui.groupSave,
     // a combination worth keeping: one tap to make it a template (no trip to Settings)
     draft.cats.length >= 2 && !((S.logbook && S.logbook.templates) || []).some(t => sortCodes(t.cats).join() === sortCodes(draft.cats).join())
       ? h('button', { type: 'button', class: 'small linkish', onclick: () => templateDialog({ id: uid(), name: '', cats: [...draft.cats], details: '' }, async out => {
         await patchLogbook({ templates: [...((S.logbook && S.logbook.templates) || []), out] });
         toast(`Tag group “${out.name}” saved`); paintQuick(); paintSel();
-      }, 'Save as tag group') }, '☆ Save as tag group') : null,
+      }, 'Save as tag group') }, '☆ Save these tags as a tag group') : null);
+  fill(ui.selExtra,
     // personal subcategories of the selected categories (Settings → My subcategories)
     subcatChips(draft.cats, draft.tags || [], tags => keepPlace(ui.selExtra, () => { draft.tags = tags; saveDraft(); paintSel(); })));
   const tips = draft.cats.filter(c => TIPS[c]).map(c => TIPS[c]);
