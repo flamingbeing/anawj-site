@@ -100,15 +100,13 @@ export function renderSettings() {
 
     h('section', { class: 'card' },
       h('div', { class: 'bar' }, h('h2', { style: 'margin:0' }, 'Tag editor'), h('span', { class: 'grow' }), h('a', { class: 'btn small', href: '#tags' }, 'Open tag editor ›')),
-      h('p', { class: 'hint', style: 'margin:6px 0 0' }, 'Rename, hide and reorder the APMES tags on the Log page, group them under headers, and add personal tags. Download or load your layout as a CSV file.')),
+      h('p', { class: 'hint', style: 'margin:6px 0 0' }, 'Rename, hide and reorder the APMES tags on the Log page, group them under headers, add personal tags and shorthand, and make tag groups. Download or load your layout as a CSV file.')),
 
     h('section', { class: 'card' },
       h('h2', {}, 'Reflections'),
       h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: st.reflExport !== false, onchange: e => patchLogbook({ settings: { reflExport: e.target.checked } }) }),
         'New reflections are included in the portfolio export'),
       h('p', { class: 'hint', style: 'margin:0' }, 'Untick if you write many and would rather choose which go in. Reflections already written keep their own tick.')),
-
-    templatesCard(),
 
     // ---- recycle bin (bin agent) ----
     h('section', { class: 'card' },
@@ -166,33 +164,33 @@ export function signOutCard() {
       cloud.demo ? h('span', { class: 'muted' }, 'Demo mode: data stays in this browser.') : null));
 }
 
-// ---------- templates ----------
+// ---------- tag groups (stored as logbook.templates) ----------
 
-function templatesCard() {
+function tagGroupsCard() {
   const list = (S.logbook && S.logbook.templates) || [];
-  return h('section', { class: 'card' },
-    h('h2', {}, 'My templates'),
-    h('p', { class: 'hint' }, 'One-tap tag sets on the Log screen, e.g. “LSCS spinal” = 16 + 17 + 28. Your frequent combinations appear there automatically too.'),
+  return h('section', { class: 'card', id: 'tag-groups' },
+    h('h2', {}, 'Tag groups'),
+    h('p', { class: 'hint' }, 'Tags you often pick together, one tap in Quick picks on the Log page, e.g. “LSCS spinal” = LSCS + CNB(Obs) + Spinal.'),
     list.length ? h('ul', { class: 'prog' }, list.map(t => h('li', { style: 'grid-template-columns:1fr auto' },
       h('span', {}, h('b', {}, t.name), ' ', h('span', { class: 'muted' }, catPills(t.cats)), t.details ? h('span', { class: 'muted' }, ` · “${t.details}”`) : null),
       h('span', { class: 'row' },
         h('button', { class: 'small', onclick: () => editTemplate(t) }, 'Edit'),
         h('button', { class: 'small danger', onclick: async () => {
-          if (!(await confirmBox('Delete template', `Delete “${t.name}”?`, 'Delete', true))) return;
+          if (!(await confirmBox('Delete tag group', `Delete “${t.name}”?`, 'Delete', true))) return;
           await patchLogbook({ templates: list.filter(x => x.id !== t.id) }); hooks.render();
-          toast(`Template “${t.name}” deleted`, { action: 'Undo', onaction: async () => { await patchLogbook({ templates: list }); hooks.render(); } });
+          toast(`Tag group “${t.name}” deleted`, { action: 'Undo', onaction: async () => { await patchLogbook({ templates: list }); hooks.render(); } });
         } }, 'Delete'))))) : null,
-    h('div', { class: 'bar', style: 'margin:12px 0 0' }, h('button', { onclick: () => editTemplate(null) }, '+ New template')));
+    h('div', { class: 'bar', style: 'margin:12px 0 0' }, h('button', { onclick: () => editTemplate(null) }, '+ New tag group')));
 }
 
-// Template editor, shared with the admin screen (shared templates). save(t) persists it.
+// Tag group editor, shared with the admin screen (shared tag groups). save(t) persists it.
 export function templateDialog(t, save, title = null) {
   const e = t ? { ...t, cats: [...t.cats] } : { id: uid(), name: '', cats: [], details: '' };
   const chips = h('div', { class: 'chips selected' });
   const paint = () => fill(chips, ...(e.cats.length ? e.cats.map(c => catChip(c, { on: true })) : [h('span', { class: 'none' }, 'No tags yet')]),
     h('button', { class: 'small', onclick: () => pickDialog(e.cats, cats => { e.cats = cats; paint(); }) }, 'Choose…'));
   paint();
-  const m = modal(title || (t ? 'Edit template' : 'New template'), [
+  const m = modal(title || (t ? 'Edit tag group' : 'New tag group'), [
     h('label', { class: 'field' }, 'Name', h('input', { value: e.name, placeholder: 'e.g. LSCS spinal', oninput: ev => { e.name = ev.target.value; } })),
     h('div', { class: 'chiplabel' }, 'Tags'), chips,
     h('label', { class: 'field', style: 'margin-top:10px' }, 'Starting text for details (optional)', h('input', { value: e.details || '', placeholder: 'e.g. spinal, GA if converted', oninput: ev => { e.details = ev.target.value; } })),
@@ -269,19 +267,21 @@ export function renderTagEditor() {
         [n.kind === 'cat' ? 'APMES · ' + catName(n.code) : linkText(n), n.e.hide ? 'hidden' : ''].filter(Boolean).join(' · '))),
     h('button', { class: 'small icon-btn', 'aria-label': 'Move up', onclick: () => saveTags(moveTag(set, n.e.k, -1)) }, '↑'),
     h('button', { class: 'small icon-btn', 'aria-label': 'Move down', onclick: () => saveTags(moveTag(set, n.e.k, 1)) }, '↓'));
-  return h('section', { class: 'card tag-editor' },
+  return h('div', {}, h('section', { class: 'card tag-editor' },
     h('h2', {}, 'Tag editor'),
     h('p', { class: 'hint' }, 'Lay out the Log page’s list your way. APMES tags are the programme’s categories: rename (just for you), hide, move them or put them under section headers. Personal tags are your own: link one to APMES categories and choosing it ticks them, or leave it as a label only. A personal tag under an APMES one counts towards it. Totals and exports always use APMES.'),
     h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:8px;margin:0 0 8px' },
       h('button', { class: 'small primary', onclick: () => editTag(null, 'tag') }, '+ Personal tag'),
       h('button', { class: 'small', onclick: () => editTag(null, 'head') }, '+ Section header'),
+      h('button', { class: 'small', onclick: () => document.getElementById('tag-groups')?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }, 'Tag groups ↓'),
       h('button', { class: 'small', onclick: () => download(`tags-${todayISO()}.csv`, new Blob([tagSetToCsv(set, def)], { type: 'text/csv' })) }, 'Download as CSV'),
       fileButton('Load a CSV…', '.csv,text/csv', file => loadTagCsv(file, def), 'btn small'),
       h('button', { class: 'small', onclick: async () => {
         if (!(await confirmBox('Reset tags?', 'Go back to the APMES tags in the official order, with the programme’s names? Your own tags are removed from the list (cases keep them).', 'Reset', true))) return;
         await patchLogbook({ settings: { tagSet: defaultTagSet({}), catOrder: [], subcats: {} } }); hooks.render();
       } }, 'Reset')),
-    h('ul', { class: 'te-list' }, nodes.map(row)));
+    h('ul', { class: 'te-list' }, nodes.map(row))),
+    tagGroupsCard());
 }
 
 // ---------- drag and drop (pointer events, so touch works) ----------

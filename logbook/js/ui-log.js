@@ -403,8 +403,8 @@ function paintSel() {
     draft.cats.length >= 2 && !((S.logbook && S.logbook.templates) || []).some(t => sortCodes(t.cats).join() === sortCodes(draft.cats).join())
       ? h('button', { type: 'button', class: 'small linkish', onclick: () => templateDialog({ id: uid(), name: '', cats: [...draft.cats], details: '' }, async out => {
         await patchLogbook({ templates: [...((S.logbook && S.logbook.templates) || []), out] });
-        toast(`Template “${out.name}” saved`); paintQuick(); paintSel();
-      }, 'Save as template') }, '☆ Save as template') : null,
+        toast(`Tag group “${out.name}” saved`); paintQuick(); paintSel();
+      }, 'Save as tag group') }, '☆ Save as tag group') : null,
     // personal subcategories of the selected categories (Settings → My subcategories)
     subcatChips(draft.cats, draft.tags || [], tags => keepPlace(ui.selExtra, () => { draft.tags = tags; saveDraft(); paintSel(); })));
   const tips = draft.cats.filter(c => TIPS[c]).map(c => TIPS[c]);

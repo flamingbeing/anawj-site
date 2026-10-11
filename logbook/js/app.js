@@ -44,7 +44,7 @@ const TABS = [
   { id: 'more', label: 'More', render: () => renderMore() },
   { id: 'totals', label: 'Totals', render: renderTotals, hidden: true, under: 'more', desc: 'How your case counts compare across your intake' },
   { id: 'account', label: 'Account', render: renderAccount, hidden: true, under: 'more', desc: 'Your name and portfolio details (Section 1); sign out' },
-  { id: 'settings', label: 'Settings', render: renderSettings, hidden: true, under: 'more', desc: 'Display, text size, logging, templates, recycle bin' },
+  { id: 'settings', label: 'Settings', render: renderSettings, hidden: true, under: 'more', desc: 'Display, text size, logging, tag editor, recycle bin' },
   // opened from More → Export & Sync (not in the More list)
   { id: 'export', label: 'Export portfolio', render: () => renderExportPage(), hidden: true, under: 'more', unlisted: true },
   { id: 'choose', label: 'Export portfolio', render: renderChoosePage, hidden: true, under: 'export', unlisted: true },
