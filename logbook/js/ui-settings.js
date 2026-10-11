@@ -1,10 +1,11 @@
 // Settings tab (#settings): the Admin entry (admins only), display, logging, templates, recycle bin, privacy. Also the Account tab's
 // "You" and sign-out cards (youCard, signOutCard), used by ui-account.js.
 
-import { YEAR_NAMES } from './categories.js';
+import { YEAR_NAMES, DEFAULT_NAMES, BY_CODE } from './categories.js';
 import { sortCodes, uid, academicYear } from './engine.js';
 import { openBin } from './bin.js';
-import { S, h, toast, modal, confirmBox, cloud, catChip, catName, catShort, PICKER_ORDER, pickerOrder, settings, patchLogbook, displayName, hooks, rYear, myYearName, fill, categoryNames, setCategoryNames, catPills } from './ui-core.js';
+import { S, h, toast, modal, confirmBox, cloud, catChip, catName, catShort, PICKER_ORDER, pickerOrder, settings, patchLogbook, displayName, hooks, rYear, myYearName, fill, categoryNames, setCategoryNames, catPills, tagSet, download, fileButton, todayISO } from './ui-core.js';
+import { cleanTagSet, defaultTagSet, tagTree, flatTree, moveTag, reparentTag, removeTag, newKey, tagSetToCsv, tagSetFromCsv } from './tags.js';
 import { pickDialog } from './ui-log.js';
 import { backupCard } from './backup.js';
 
@@ -79,13 +80,16 @@ export function renderSettings() {
       h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !!st.enterSaves, onchange: e => patchLogbook({ settings: { enterSaves: e.target.checked } }) }),
         'Enter key saves the case (Shift+Enter for a new line)'),
       h('p', { class: 'hint', style: 'margin:0 0 6px' }, 'Off (the default): Enter starts a new line, and Ctrl+Enter (Cmd+Enter on a Mac) saves.'),
+      h('label', { class: 'field', style: 'margin-top:8px' }, 'Case box height on the Log page',
+        h('select', { onchange: e => patchLogbook({ settings: { boxLines: Number(e.target.value) } }).then(() => toast('Saved')) },
+          Array.from({ length: 19 }, (_, i) => i + 2).map(n => h('option', { value: String(n), selected: n === (Math.min(20, Math.max(2, Number(st.boxLines) || 3))) }, `${n} lines${n === 3 ? ' (default)' : ''}`)))),
       h('label', { class: 'field', style: 'margin-top:8px' }, 'Date for a new case',
         h('select', { onchange: e => patchLogbook({ settings: { defaultDate: e.target.value } }) },
           h('option', { value: 'today', selected: st.defaultDate !== 'last' }, 'Today'),
           h('option', { value: 'last', selected: st.defaultDate === 'last' }, 'The date I used last')))),
 
     categoryNamesCard(),
-    categoryOrderCard(),
+    tagEditorCard(),
 
     h('section', { class: 'card' },
       h('h2', {}, 'Reflections'),
@@ -94,7 +98,6 @@ export function renderSettings() {
       h('p', { class: 'hint', style: 'margin:0' }, 'Untick if you write many and would rather choose which go in. Reflections already written keep their own tick.')),
 
     templatesCard(),
-    subcatsCard(),
 
     // ---- recycle bin (bin agent) ----
     h('section', { class: 'card' },
@@ -143,34 +146,6 @@ export function signOutCard() {
         cloud.signOut();
       } }, 'Sign out'),
       cloud.demo ? h('span', { class: 'muted' }, 'Demo mode: data stays in this browser.') : null));
-}
-
-// ---------- personal subcategories ----------
-
-// Your own labels inside an APMES category (e.g. 26 → Interscalene, Femoral): tick them when logging;
-// Progress counts them under the category. They never change the APMES counts.
-function subcatsCard() {
-  const all = { ...((settings().subcats) || {}) };
-  const codes = Object.keys(all).filter(c => (all[c] || []).length).sort();
-  const save = next => patchLogbook({ settings: { subcats: next } }).then(() => hooks.render());
-  const sel = h('select', { 'aria-label': 'Category' }, PICKER_ORDER.map(c => h('option', { value: c.code }, `${c.parent ? '  ' : ''}${catName(c.code)}`)));
-  const name = h('input', { placeholder: 'e.g. Interscalene', maxlength: '40', 'aria-label': 'Subcategory name' });
-  const addIt = () => {
-    const code = sel.value, n = name.value.trim();
-    if (!n) return toast('Type a name for the subcategory');
-    const list = all[code] || [];
-    if (list.some(x => x.toLowerCase() === n.toLowerCase())) return toast('Already there');
-    if (list.length >= 20) return toast('Up to 20 per category');
-    save({ ...all, [code]: [...list, n] });
-  };
-  return h('section', { class: 'card' },
-    h('h2', {}, 'My subcategories'),
-    h('p', { class: 'hint' }, 'Your own labels within an APMES category, e.g. 26 Peripheral nerve blocks → Interscalene, Femoral. Tick them when logging; Progress counts each one. The APMES counts are unchanged.'),
-    codes.length ? h('ul', { class: 'prog' }, codes.map(code => h('li', { style: 'grid-template-columns:1fr' },
-      h('span', {}, h('b', {}, code), ' ', h('span', { class: 'muted' }, catName(code))),
-      h('div', { class: 'chips' }, all[code].map(n => h('span', { class: 'chip on' }, n,
-        h('button', { class: 'chip-x', 'aria-label': `Remove ${n}`, onclick: () => save({ ...all, [code]: all[code].filter(x => x !== n) }) }, '×'))))))) : null,
-    h('div', { class: 'bar', style: 'margin:10px 0 0' }, sel, name, h('button', { onclick: addIt }, '+ Add')));
 }
 
 // ---------- templates ----------
@@ -251,26 +226,96 @@ function categoryNamesCard() {
         ed ? h('td', {}, h('input', { value: (cur[c.code] && cur[c.code].short) || '', placeholder: catShort(c.code) === ((cur[c.code] || {}).short) ? '' : catShort(c.code), maxlength: '30', 'aria-label': `Pill name for ${c.code}`, oninput: e => set(c.code, 'short', e.target.value) })) : h('td', {}, catShort(c.code))))))));
 }
 
-// ---------- category order on the Log page (this account) ----------
+// ---------- tag editor (this account; js/tags.js) ----------
 
-const CO = { open: false };
-function categoryOrderCard() {
-  const tops = pickerOrder().filter(c => !c.parent);
-  const custom = Array.isArray(settings().catOrder) && settings().catOrder.length;
-  const move = (i, d) => {
-    const codes = tops.map(c => c.code);
-    const j = i + d;
-    if (j < 0 || j >= codes.length) return;
-    [codes[i], codes[j]] = [codes[j], codes[i]];
-    patchLogbook({ settings: { catOrder: codes } }).then(() => hooks.render());
-    hooks.render();
-  };
-  return h('details', { class: 'card more-tools', open: CO.open, ontoggle: e => { CO.open = e.target.open; } },
-    h('summary', {}, 'Category order on the Log page'),
-    h('p', { class: 'hint' }, 'Put the categories you use most at the top of the Log page’s list. Subcategories stay under their category.'),
-    custom ? h('div', { class: 'bar', style: 'margin:0 0 8px' }, h('button', { class: 'small', onclick: () => patchLogbook({ settings: { catOrder: [] } }).then(() => { toast('Back to the official order'); hooks.render(); }) }, 'Reset to the official order')) : null,
-    h('ol', { class: 'cat-order' }, tops.map((c, i) => h('li', {},
-      h('span', { class: 'grow' }, catName(c.code)),
-      h('button', { class: 'small icon-btn', 'aria-label': `Move ${catName(c.code)} up`, disabled: i === 0, onclick: () => move(i, -1) }, '↑'),
-      h('button', { class: 'small icon-btn', 'aria-label': `Move ${catName(c.code)} down`, disabled: i === tops.length - 1, onclick: () => move(i, 1) }, '↓')))));
+// Your layout of the Log page's list: rename categories for yourself, hide them, reorder them, put them
+// under section headers, and add your own tags (linked to APMES categories, or personal labels).
+// Share it as a CSV file (opens in Excel) or load someone else's.
+const TE = { open: false };
+const saveTags = set => patchLogbook({ settings: { tagSet: cleanTagSet(set) } }).then(() => hooks.render());
+function tagEditorCard() {
+  const set = tagSet();
+  const nodes = flatTree(tagTree(set));
+  const names = code => ({ pill: catShort(code), long: catName(code) });
+  const def = code => ({ pill: (DEFAULT_NAMES[code] || [])[1] || BY_CODE[code].name, long: (DEFAULT_NAMES[code] || [])[0] || BY_CODE[code].name });
+  const linkText = n => n.kind === 'cat' ? 'APMES category' : n.kind === 'head' ? 'section header'
+    : (n.e.links || []).length ? 'counts as ' + n.e.links.map(catShort).join(', ') : (n.e.p && n.e.p.startsWith('c:') ? 'under ' + catShort(n.e.p.slice(2)) : 'personal label');
+  const row = n => h('li', { style: `padding-left:${8 + Math.min(n.depth, 4) * 18}px`, class: `te-${n.kind}${n.e.hide ? ' te-hidden' : ''}` },
+    h('button', { type: 'button', class: 'te-name', onclick: () => editTag(n) },
+      h('span', { class: 'te-pill' }, n.kind === 'head' ? n.e.n : n.kind === 'cat' ? catShort(n.code) : n.e.n),
+      n.kind === 'head' ? null : h('small', { class: 'muted te-sub' },
+        [n.kind === 'cat' ? catName(n.code) : linkText(n), n.e.hide ? 'hidden' : ''].filter(Boolean).join(' · '))),
+    h('button', { class: 'small icon-btn', 'aria-label': 'Move up', onclick: () => saveTags(moveTag(set, n.e.k, -1)) }, '↑'),
+    h('button', { class: 'small icon-btn', 'aria-label': 'Move down', onclick: () => saveTags(moveTag(set, n.e.k, 1)) }, '↓'));
+  return h('details', { class: 'card more-tools tag-editor', open: TE.open, ontoggle: e => { TE.open = e.target.open; } },
+    h('summary', {}, 'Tag editor (advanced)'),
+    h('p', { class: 'hint' }, 'Lay out the Log page’s list your way. The APMES categories are built in: rename (just for you), hide, move them or put them under section headers. Add your own tags: link one to APMES categories and choosing it ticks them; with no link it’s a personal label. A tag under a category counts towards it. Totals and exports always use the APMES categories.'),
+    h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:8px;margin:0 0 8px' },
+      h('button', { class: 'small primary', onclick: () => editTag(null, 'tag') }, '+ Tag'),
+      h('button', { class: 'small', onclick: () => editTag(null, 'head') }, '+ Section header'),
+      h('button', { class: 'small', onclick: () => download(`tags-${todayISO()}.csv`, new Blob([tagSetToCsv(set, def)], { type: 'text/csv' })) }, 'Share as CSV'),
+      fileButton('Load a CSV…', '.csv,text/csv', file => loadTagCsv(file, def), 'btn small'),
+      h('button', { class: 'small', onclick: async () => {
+        if (!(await confirmBox('Reset tags?', 'Go back to the APMES categories in the official order, with the programme’s names? Your own tags are removed from the list (cases keep them).', 'Reset', true))) return;
+        await patchLogbook({ settings: { tagSet: defaultTagSet({}), catOrder: [], subcats: {} } }); hooks.render();
+      } }, 'Reset')),
+    h('ul', { class: 'te-list' }, nodes.map(row)));
+}
+
+// Edit one item (or add a tag / header when n is null).
+function editTag(n, kind = n ? n.kind : 'tag') {
+  const set = tagSet();
+  const e = n ? { ...n.e, links: [...(n.e.links || [])] } : { k: newKey(kind === 'head' ? 'h' : 'u'), n: '', links: [], ...(kind === 'head' ? { hd: true } : {}) };
+  const code = kind === 'cat' ? e.k.slice(2) : null;
+  const sub = code && BY_CODE[code].parent;
+  const dflt = code ? { pill: (DEFAULT_NAMES[code] || [])[1] || BY_CODE[code].name } : null;
+  // where it can sit: headers (anything), categories and tags (tags only); not under itself
+  const own = new Set([e.k]);
+  if (n) { let grew = true; while (grew) { grew = false; for (const x of set) if (x.p && own.has(x.p) && !own.has(x.k)) { own.add(x.k); grew = true; } } }
+  const places = flatTree(tagTree(set)).filter(x => !own.has(x.e.k) && (kind === 'tag' ? true : kind === 'cat' ? x.kind === 'head' : false));
+  const under = h('select', { disabled: !!sub || kind === 'head' },
+    h('option', { value: '' }, sub ? catShort(sub) : 'Top level'),
+    places.map(x => h('option', { value: x.e.k, selected: e.p === x.e.k }, `${'  '.repeat(Math.min(x.depth, 4))}${x.kind === 'cat' ? catShort(x.code) : x.e.n}${x.kind === 'head' ? ' (header)' : ''}`)));
+  const pill = h('input', { value: e.n || '', maxlength: kind === 'head' ? '60' : '40', placeholder: code ? dflt.pill : kind === 'head' ? 'e.g. Regional' : 'e.g. Interscalene' });
+  const long = h('input', { value: e.l || '', maxlength: '100', placeholder: code ? ((DEFAULT_NAMES[code] || [])[0] || BY_CODE[code].name) : 'optional' });
+  const hide = h('input', { type: 'checkbox', checked: !!e.hide });
+  const linkBox = h('div', { class: 'te-links' }, PICKER_ORDER.map(c => h('label', { class: 'check' },
+    h('input', { type: 'checkbox', checked: e.links.includes(c.code), onchange: ev => { e.links = ev.target.checked ? [...e.links, c.code] : e.links.filter(x => x !== c.code); } }),
+    `${c.parent ? '\u00a0\u00a0' : ''}${catName(c.code)}`)));
+  const m = modal(n ? (kind === 'cat' ? 'Edit category' : kind === 'head' ? 'Edit header' : 'Edit tag') : (kind === 'head' ? 'New section header' : 'New tag'), [
+    code ? h('p', { class: 'hint' }, `APMES category: ${BY_CODE[code].label}. It always counts towards this category; renaming is just for you.`) : null,
+    h('label', { class: 'field' }, kind === 'head' ? 'Header' : 'Name (pill)', pill),
+    kind !== 'head' ? h('label', { class: 'field' }, 'Long name (lists)', long) : null,
+    kind !== 'head' ? h('label', { class: 'field' }, 'Sits under', under) : null,
+    kind === 'tag' ? [h('div', { class: 'chiplabel' }, 'Counts towards (optional)'),
+      h('p', { class: 'hint', style: 'margin:0 0 4px' }, 'Choosing this tag ticks these APMES categories. Leave all unticked for a personal label.'), linkBox] : null,
+    kind !== 'head' ? h('label', { class: 'check', style: 'margin-top:8px' }, hide, 'Hide from the Log page (still found by search)') : null,
+    h('div', { class: 'bar', style: 'margin-top:12px' },
+      n && kind !== 'cat' ? h('button', { class: 'danger', onclick: async () => { m.close(); await saveTags(removeTag(set, e.k)); toast('Removed (cases keep the tag)'); } }, 'Remove') : null,
+      h('span', { class: 'grow' }),
+      h('button', { onclick: () => m.close() }, 'Cancel'),
+      h('button', { class: 'primary', onclick: async () => {
+        const nm = pill.value.trim();
+        if (kind !== 'cat' && !nm) return toast('Give it a name');
+        const out = { ...e, n: nm, l: long.value.trim(), hide: hide.checked };
+        if (!out.l) delete out.l; if (!out.hide) delete out.hide; if (!out.n && kind === 'cat') delete out.n;
+        if (kind !== 'tag') delete out.links;
+        let next = n ? set.map(x => (x.k === e.k ? out : x)) : [...set, out];
+        const p = sub ? 'c:' + sub : under.value;
+        if ((e.p || '') !== p || !n) next = reparentTag(next, e.k, p);
+        m.close(); await saveTags(next);
+      } }, 'Save'))], { sticky: true });
+}
+
+// Load a shared CSV: show what's in it, then replace your layout.
+async function loadTagCsv(file, def) {
+  const { set, errors, counts } = tagSetFromCsv(await file.text(), def);
+  if (!set) return toast(errors[0] || 'Could not read that file');
+  const m = modal('Load tags', [
+    h('p', {}, `${counts.tags} tag${counts.tags === 1 ? '' : 's'}, ${counts.heads} header${counts.heads === 1 ? '' : 's'} and ${counts.cats} categories.`),
+    errors.length ? h('ul', { class: 'warnings' }, errors.slice(0, 8).map(x => h('li', {}, x))) : null,
+    h('p', { class: 'hint' }, 'This replaces your tag layout. Your cases are not changed.'),
+    h('div', { class: 'bar', style: 'margin-top:12px' }, h('span', { class: 'grow' }),
+      h('button', { onclick: () => m.close() }, 'Cancel'),
+      h('button', { class: 'primary', onclick: async () => { m.close(); await saveTags(set); toast('Tags loaded'); } }, 'Replace my tags'))]);
 }

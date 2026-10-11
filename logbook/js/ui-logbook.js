@@ -1,11 +1,11 @@
 // Logbook screen: every case, newest first (list) or by day (calendar). Search, filter, flags, edit; a grid view for bulk edits
 // and pasting rows from Excel; Excel download and upload (round trip with a preview of the changes).
 
-import { duplicates, fmtDate, diffRows, sortCodes, withParents, caseParts, caseText, dateWindow, nth, cleanInitials } from './engine.js';
+import { duplicates, fmtDate, diffRows, sortCodes, withParents, caseParts, caseText, dateWindow, nth, cleanInitials, procedureText, textHas } from './engine.js';
 import { flagCase } from './importer.js';
 import { exportCases, readCasesSheet } from './xlsxio.js';
 import {
-  S, h, toast, debounce, modal, cat, catName, categoryNames, catFull, catChip, PICKER_ORDER, settings, patchLogbook, needExcel, download, fileButton, catPills,
+  S, h, toast, debounce, modal, cat, catName, catShort, tagName, catFull, catChip, PICKER_ORDER, settings, patchLogbook, needExcel, download, fileButton, catPills,
   updateCase, saveMany, deleteMany, displayName, rYear, todayISO, fill, add, resetters } from './ui-core.js';
 import { editCaseDialog } from './ui-log.js';
 import { reflectOnCase } from './ui-reflect.js';
@@ -21,7 +21,7 @@ const weekday = iso => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); 
 function catTags(cats) {
   const codes = sortCodes(cats || []);
   const shown = codes.filter(c => !codes.some(o => o !== c && cat(o).parent === c));
-  return h('span', { class: 'lb-tags' }, shown.map(c => h('span', { class: 'lb-tag', title: catFull(c) }, (categoryNames()[c] && categoryNames()[c].name) || catFull(c))));
+  return h('span', { class: 'lb-tags' }, shown.map(c => h('span', { class: 'lb-tag', title: catFull(c) }, catName(c))));
 }
 
 export function renderLogbook() {
@@ -39,8 +39,12 @@ export function renderLogbook() {
       if (view.flag && !flagsOf(c).includes(view.flag)) return false;
       if (win && !(c.date && c.date >= win.from && c.date <= win.to)) return false;
       if (!words.length) return true;
-      const hay = `${caseText(c)} ${c.date || c.dateText || ''} ${weekday(c.date)} ${fmtDate(c.date) || ''} ${(c.cats || []).join(' ')} ${(c.tags || []).join(' ')}`.toLowerCase();
-      return words.every(w => hay.includes(w));
+      // Search in (Filter): everything, the initials only, or the procedure line only; fuzzy allows typos
+      const scope = settings().lbScope || 'all', fuzzy = !!settings().lbFuzzy;
+      const hay = (scope === 'initials' ? caseParts(c).initials
+        : scope === 'procedure' ? procedureText(c)
+        : `${caseText(c)} ${c.date || c.dateText || ''} ${weekday(c.date)} ${fmtDate(c.date) || ''} ${(c.cats || []).map(k => `${k} ${catName(k)} ${catShort(k)}`).join(' ')} ${(c.tags || []).map(tagName).join(' ')}`).toLowerCase();
+      return words.every(w => textHas(hay, w, fuzzy && scope !== 'initials'));
     });
   };
 
@@ -57,16 +61,20 @@ export function renderLogbook() {
   const counter = h('span', { class: 'muted', style: 'font-size:13px' });
 
   // the two filters fold behind a Filter button (shown open while one is in use)
-  const filters = h('div', { class: 'bar lb-filters', hidden: !(view.showFilters || view.cat || view.flag) },
+  const searchIn = h('select', { 'aria-label': 'Search in', onchange: e => { patchLogbook({ settings: { lbScope: e.target.value } }); paintFilterBtn(); paint(); } },
+    [['all', 'Search everything'], ['initials', 'Search initials only'], ['procedure', 'Search the procedure only']].map(([v, t]) => h('option', { value: v, selected: (settings().lbScope || 'all') === v }, t)));
+  const fuzzyBox = h('label', { class: 'check', style: 'margin:0' }, h('input', { type: 'checkbox', checked: !!settings().lbFuzzy, onchange: e => { patchLogbook({ settings: { lbFuzzy: e.target.checked } }); paintFilterBtn(); paint(); } }), 'Fuzzy search (allows typos)');
+  const filters = h('div', { class: 'bar lb-filters', hidden: !(view.showFilters || view.cat || view.flag || (settings().lbScope || 'all') !== 'all' || settings().lbFuzzy) },
     h('select', { 'aria-label': 'Filter by category', onchange: e => { view.cat = e.target.value; paintFilterBtn(); paint(); } },
       h('option', { value: '' }, 'All categories'),
       PICKER_ORDER.map(c => h('option', { value: c.code, selected: view.cat === c.code }, `${c.parent ? '  ' : ''}${catName(c.code)} (${S.counts[c.code] || 0})`))),
     h('select', { 'aria-label': 'Filter by flag', onchange: e => { view.flag = e.target.value; paintFilterBtn(); paint(); } },
-      flagOpts.map(([v, l]) => h('option', { value: v, selected: view.flag === v }, l))));
+      flagOpts.map(([v, l]) => h('option', { value: v, selected: view.flag === v }, l))),
+    searchIn, fuzzyBox);
   const filterBtn = h('button', { class: 'small', 'aria-expanded': String(!filters.hidden), onclick: () => {
     view.showFilters = filters.hidden; filters.hidden = !filters.hidden; filterBtn.setAttribute('aria-expanded', String(!filters.hidden));
   } });
-  const paintFilterBtn = () => { const n = (view.cat ? 1 : 0) + (view.flag ? 1 : 0); filterBtn.textContent = n ? `Filter (${n})` : 'Filter'; filterBtn.classList.toggle('primary', !!n); };
+  const paintFilterBtn = () => { const n = (view.cat ? 1 : 0) + (view.flag ? 1 : 0) + ((settings().lbScope || 'all') !== 'all' ? 1 : 0) + (settings().lbFuzzy ? 1 : 0); filterBtn.textContent = n ? `Filter (${n})` : 'Filter'; filterBtn.classList.toggle('primary', !!n); };
   paintFilterBtn();
   add(wrap, h('section', { class: 'card' },
     h('div', { class: 'bar' },
@@ -155,7 +163,7 @@ function caseRow(c, flagsOf) {
         flags.includes('duplicate') ? h('span', { class: 'flag' }, 'possible duplicate') : null,
         !(c.cats || []).length ? h('span', { class: 'flag err' }, 'no category') : null,
         c.reflectTag && !(S.reflections || []).some(r => r.caseId === c.id) ? h('span', { class: 'flag', title: 'Tagged as a possible reflection' }, '☆ reflection?') : null,
-        (c.tags || []).map(t => h('span', { class: 'flag sc-tag', title: 'Your subcategory' }, t.split(':').slice(1).join(':'))),
+        (c.tags || []).map(t => h('span', { class: 'flag sc-tag', title: 'Your tag' }, tagName(t))),
         h('button', { class: 'small', style: 'margin-left:auto', title: 'Write a reflection on this case', onclick: e => { e.stopPropagation(); reflectOnCase(c); } },
           (S.reflections || []).some(r => r.caseId === c.id) ? 'Reflection' : 'Reflect'))), c);
 }

@@ -5,8 +5,8 @@ import { BY_CODE, TIPS } from './categories.js';
 import { withParents, frequentCombos, parseBulk, parseDate, fmtDate, sortCodes, uid, caseParts, caseText, cleanInitials, splitInitials, splitAge, nth } from './engine.js';
 import { suggest } from './suggest.js';
 import {
-  S, h, toast, debounce, modal, confirmBox, cat, catName, catShort, catFull, catChip, countText, pickerOrder, PROGRESS_BY_CODE,
-  createCase, updateCase, removeCase, restoreCase, saveMany, deleteMany, subcatChips, settings, todayISO, hooks, fill, add, cloud, okNoIds, patchLogbook, catPills } from './ui-core.js';
+  S, h, toast, debounce, modal, confirmBox, cat, catName, catShort, catFull, catChip, countText, logTags, tagLinks, tagChip, tagSet, keepTags, PROGRESS_BY_CODE,
+  createCase, updateCase, removeCase, restoreCase, saveMany, deleteMany, subcatChips, subcatsOf, settings, todayISO, hooks, fill, add, cloud, okNoIds, patchLogbook, catPills } from './ui-core.js';
 import { templateDialog } from './ui-settings.js';
 import { moveToBin } from './bin.js';
 import { shareText, copyText, caseText as shareCaseText, dayText, dayMarkdown } from './share.js';
@@ -38,6 +38,13 @@ export function clearDrafts() {
 
 // Adding a sub-category adds its parent; removing a parent removes its sub-categories.
 function addCat(list, code) { return sortCodes(withParents([...list, code])); }
+// Tick or untick one of your tags: ticking it also ticks the APMES categories it counts towards.
+function toggleTagIn(cats, tags, key) {
+  const on = (tags || []).includes(key);
+  return on ? { cats, tags: tags.filter(t => t !== key) } : { cats: sortCodes(withParents([...cats, ...tagLinks(key)])), tags: [...(tags || []), key] };
+}
+// your tags shown as their own chips (the ones right under a selected category show as tick-chips instead)
+const looseTags = (cats, tags) => (tags || []).filter(k => !(cats || []).some(code => subcatsOf(code).some(e => e.k === k)));
 function dropCat(list, code) { return list.filter(c => c !== code && BY_CODE[c]?.parent !== code); }
 const toggleCat = (list, code) => (list.includes(code) ? dropCat(list, code) : addCat(list, code));
 
@@ -57,9 +64,14 @@ function keepPlace(anchor, fn) {
   if (d) window.scrollBy(0, d);
 }
 // On phones, focusing the details box pops the keyboard and scrolls back up: only do it with a mouse.
+// how tall the case box starts (Settings → Logging: 2 to 20 lines)
+const boxLines = () => Math.min(20, Math.max(2, Math.round(Number(settings().boxLines) || 3)));
 const refocus = () => { if (ui.textarea && matchMedia('(pointer: fine)').matches) ui.textarea.focus({ preventScroll: true }); };
 
-export function catPicker({ get, toggle, placeholder = 'Search categories: code or name' }) {
+// The list follows your tag set (Settings → Tag editor): section headers, categories and your own tags,
+// indented under what they sit in; hidden ones only turn up in a search. getTags / toggleTag handle your
+// tags (left out: categories only).
+export function catPicker({ get, toggle, getTags = null, toggleTag = null, placeholder = 'Search categories and tags' }) {
   let q = '', hl = 0, items = [];
   const list = h('ul', { role: 'listbox' });
   const input = h('input', {
@@ -70,14 +82,18 @@ export function catPicker({ get, toggle, placeholder = 'Search categories: code 
       else if (e.key === 'ArrowUp') { hl = Math.max(0, hl - 1); paintHl(); e.preventDefault(); }
       else if (e.key === 'Enter' && q.trim()) {
         e.preventDefault();
-        if (items[hl]) { toggle(items[hl].code); q = ''; input.value = ''; hl = 0; refresh(); }
+        if (items[hl]) { pick(items[hl]); q = ''; input.value = ''; hl = 0; refresh(); }
       } else if (e.key === 'Escape') { q = ''; input.value = ''; refresh(); }
     },
   });
-  function matches(c, words) {
+  function matches(n, words) {
+    if (n.kind === 'head') return false;
+    if (n.kind === 'tag') { const hay = `${n.e.n} ${n.e.l || ''}`.toLowerCase(); return words.every(w => hay.includes(w)); }
+    const c = BY_CODE[n.code];
     const hay = `${c.code} ${c.name} ${c.label} ${catName(c.code)} ${catShort(c.code)}`.toLowerCase();
     return words.every(w => (/^\d/.test(w) ? c.code.startsWith(w.padStart(2, '0')) || c.code.startsWith(w) : hay.includes(w)));
   }
+  const pick = n => (n.kind === 'cat' ? toggle(n.code) : n.kind === 'tag' && toggleTag ? toggleTag(n.e.k) : null);
   function paintHl() {
     [...list.children].forEach((li, i) => li.classList.toggle('hl', i === hl && !!q.trim()));
     list.children[hl]?.scrollIntoView({ block: 'nearest' });
@@ -86,19 +102,53 @@ export function catPicker({ get, toggle, placeholder = 'Search categories: code 
     const sel = new Set(get());
     const prog = PROGRESS_BY_CODE();
     const words = q.toLowerCase().split(/\s+/).filter(Boolean);
-    const order = pickerOrder();
-    items = words.length ? order.filter(c => matches(c, words)) : order;
-    fill(list, ...items.map(c => {
-      const p = prog[c.code];
+    const tagsOn = new Set(getTags ? getTags() : []);
+    // hidden items (and everything under them) only in a search; your tags only when this list handles them
+    const hiddenUnder = new Set();
+    const all = logTags().filter(n => {
+      if ((n.e.p && hiddenUnder.has(n.e.p)) || n.e.hide) { hiddenUnder.add(n.e.k); if (!words.length) return false; }
+      return n.kind !== 'tag' || !!toggleTag;
+    });
+    items = words.length ? all.filter(n => matches(n, words)) : all.filter(n => n.kind !== 'head');
+    const shown = words.length ? items : all;
+    // Pills (Settings or the switch above the list): the same items as chips, under their headers
+    if (!words.length && settings().catView === 'pills') {
+      const rows = [];
+      let cur = null;
+      for (const n of shown) {
+        if (n.kind === 'head') { rows.push(h('li', { class: 'head', role: 'presentation' }, n.e.n)); cur = null; continue; }
+        if (!cur) { cur = h('div', { class: 'chips' }); rows.push(h('li', { class: 'pill-row', role: 'presentation' }, cur)); }
+        const on = n.kind === 'cat' ? sel.has(n.code) : tagsOn.has(n.e.k);
+        add(cur, h('span', { class: `chip ${on ? 'on' : ''} ${n.kind === 'tag' ? 'tag' : ''} ${n.depth ? 'subp' : ''}`, role: 'option', tabindex: '0', 'aria-selected': String(on),
+          ...(n.kind === 'cat' ? { 'data-code': n.code, title: catName(n.code) } : { 'data-tag': n.e.k, title: n.e.l || n.e.n }),
+          onclick: () => keepPlace(list, () => { pick(n); refresh(); }), onkeydown: ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); pick(n); refresh(); } } },
+          h('span', { class: 'nm' }, n.kind === 'cat' ? catShort(n.code) : n.e.n)));
+      }
+      fill(list, ...rows);
+      list.classList.add('pills');
+      paintHl();
+      return;
+    }
+    list.classList.remove('pills');
+    fill(list, ...shown.map(n => {
+      const pad = `padding-left:${12 + Math.min(n.depth, 4) * 16}px`;
+      if (n.kind === 'head') return h('li', { class: 'head', role: 'presentation', style: pad }, n.e.n);
+      if (n.kind === 'tag') {
+        const on = tagsOn.has(n.e.k);
+        return h('li', { role: 'option', 'data-tag': n.e.k, 'aria-selected': String(on), class: `tag ${n.depth ? 'sub' : ''} ${on ? 'on' : ''}`, style: pad, title: n.e.l || n.e.n,
+          onclick: () => keepPlace(list, () => { pick(n); refresh(); }) },
+          h('span', { class: 'tick' }, on ? '✓' : ''), h('span', { class: 'nm' }, n.e.n, n.e.l ? h('small', { class: 'muted' }, ' ' + n.e.l) : null), h('span', { class: 'ct' }, ''));
+      }
+      const c = BY_CODE[n.code], p = prog[c.code];
       return h('li', {
-        role: 'option', 'data-code': c.code, 'aria-selected': String(sel.has(c.code)), class: `${c.parent ? 'sub' : ''} ${sel.has(c.code) ? 'on' : ''}`, title: c.full || c.name,
-        onclick: () => keepPlace(list, () => { toggle(c.code); refresh(); }),
+        role: 'option', 'data-code': c.code, 'aria-selected': String(sel.has(c.code)), class: `${n.depth ? 'sub' : ''} ${sel.has(c.code) ? 'on' : ''}`, style: pad, title: c.full || c.name,
+        onclick: () => keepPlace(list, () => { pick(n); refresh(); }),
       },
       h('span', { class: 'tick' }, sel.has(c.code) ? '✓' : ''),
       h('span', { class: 'nm' }, catName(c.code)),
       h('span', { class: `ct ${p && p.status === 'done' ? 'met' : ''}` }, countText(c.code, prog)));
     }));
-    if (!items.length) add(list, h('li', { class: 'muted' }, 'No category matches “' + q + '”'));
+    if (words.length && !items.length) add(list, h('li', { class: 'muted' }, 'Nothing matches “' + q + '”'));
     paintHl();
   }
   refresh();
@@ -164,34 +214,48 @@ function curDate() {
   return draft.date || todayISO();
 }
 
+// One line, never wrapping: Today, then as many recent weekdays as fit ("Sat 10th", newest first), a
+// calendar for any other day, and the Case | List switch. A chosen day that doesn't fit shows on the
+// calendar chip instead.
 function paintDate() {
-  const d = curDate(), t = todayISO(), y = yesterdayISO();
+  const d = curDate(), t = todayISO();
   const dateInput = h('input', {
     type: 'date', value: d, max: t, 'aria-label': 'Case date',
     onchange: e => { draft.date = parseDate(e.target.value) || null; draft.dateAt = Date.now(); saveDraft(); paintDate(); },
   });
   const pick = iso => () => { draft.date = iso === t ? null : iso; draft.dateAt = Date.now(); saveDraft(); paintDate(); ui.textarea?.focus(); };
-  const other = d !== t && d !== y && !(() => { for (let k = 2; k <= 6; k++) { const x = new Date(); x.setDate(x.getDate() - k); if (todayISO(x) === d) return true; } return false; })();
-  // the date input sits invisibly over a chip, so the row stays one line on a phone
-  const picker = h('label', { class: `chip datepick ${other ? 'on' : ''}`, title: 'Pick a date' }, other ? fmtDate(d) : '📅 Date', dateInput);
-  dateInput.addEventListener('click', () => { try { dateInput.showPicker(); } catch { /* not supported: native tap opens it */ } });
-  // the rest of the past week by weekday ("Thu 8"), for catching up on a few days
   const week = [];
-  for (let k = 2; k <= 6; k++) { const x = new Date(); x.setDate(x.getDate() - k); week.push(todayISO(x)); }
+  for (let k = 1; k <= 6; k++) { const x = new Date(); x.setDate(x.getDate() - k); week.push(todayISO(x)); }
   const wd = iso => { const [Y, M, D] = iso.split('-').map(Number); const x = new Date(Y, M - 1, D); return x.toLocaleDateString('en-GB', { weekday: 'short' }) + ' ' + nth(D); };
+  const calText = h('span', {}, '📅');
+  // the date input sits invisibly over the chip
+  const picker = h('label', { class: 'chip datepick', title: 'Pick a date', 'aria-label': 'Pick a date' }, calText, dateInput);
+  dateInput.addEventListener('click', () => { try { dateInput.showPicker(); } catch { /* not supported: native tap opens it */ } });
+  const chips = week.map(iso => h('span', { class: `chip wk ${d === iso ? 'on' : ''}`, role: 'button', tabindex: '0', 'data-date': iso, onclick: pick(iso) }, wd(iso)));
+  const mode = h('span', { class: 'seg mode-seg', role: 'group', 'aria-label': 'One case or a list' },
+    h('button', { 'data-mode': 'one', 'aria-pressed': String(draft.mode !== 'bulk'), onclick: () => { if (draft.mode === 'bulk') setMode('one'); } }, 'Case'),
+    h('button', { 'data-mode': 'bulk', 'aria-pressed': String(draft.mode === 'bulk'), title: 'Paste a list of cases', onclick: () => { if (draft.mode !== 'bulk') setMode('bulk'); } }, 'List'));
   fill(ui.datebar,
     h('span', { class: `chip ${d === t ? 'on' : ''}`, role: 'button', tabindex: '0', onclick: pick(t) }, 'Today'),
-    h('span', { class: `chip ${d === y ? 'on' : ''}`, role: 'button', tabindex: '0', onclick: pick(y) }, 'Yesterday'),
-    ...week.map(iso => h('span', { class: `chip wk ${d === iso ? 'on' : ''}`, role: 'button', tabindex: '0', onclick: pick(iso) }, wd(iso))),
-    picker,
-    draft.mode === 'bulk'
-      ? h('button', { class: 'small linkish', 'data-mode': 'one', onclick: () => setMode('one') }, 'One case')
-      : h('button', { class: 'small linkish', 'data-mode': 'bulk', onclick: () => setMode('bulk'), title: 'Paste a list of cases' }, 'Paste list'));
+    ...chips, picker, h('span', { class: 'grow' }), mode);
+  const fit = () => {
+    const bar = ui && ui.datebar;
+    if (!bar || !bar.isConnected) return;
+    chips.forEach(c => { c.hidden = false; });
+    for (let i = chips.length - 1; i >= 0 && bar.scrollWidth > bar.clientWidth + 1; i--) chips[i].hidden = true;
+    const shownSel = d === t || chips.some(c => !c.hidden && c.dataset.date === d);
+    picker.classList.toggle('on', !shownSel);
+    calText.textContent = shownSel ? '📅' : '📅 ' + fmtDate(d).replace(/ \d{4}$/, '');
+    if (!shownSel) for (let i = chips.length - 1; i >= 0 && bar.scrollWidth > bar.clientWidth + 1; i--) chips[i].hidden = true;
+  };
+  requestAnimationFrame(fit);
+  if (!ui.dateRO && 'ResizeObserver' in window) { ui.dateRO = new ResizeObserver(() => ui.refit && ui.refit()); ui.dateRO.observe(ui.datebar); }
+  ui.refit = fit;
 }
 
 function renderOne(card) {
   const textarea = h('textarea', {
-    class: 'details', rows: '3', autofocus: true, enterkeyhint: settings().enterSaves ? 'done' : 'enter', autocapitalize: 'sentences', autocorrect: 'off', 'aria-label': 'Case details',
+    class: 'details', rows: String(boxLines()), style: `min-height:calc(${boxLines()} * 1.4em + 22px)`, autofocus: true, enterkeyhint: settings().enterSaves ? 'done' : 'enter', autocapitalize: 'sentences', autocorrect: 'off', 'aria-label': 'Case details',
     placeholder: 'AB 72M  ← initials, age/sex\nlap chole GA  ← procedure',
     value: draft.details,
     oninput: e => { draft.details = e.target.value; saveDraft(); suggestSoon(); paintParsed(true); },
@@ -208,10 +272,11 @@ function renderOne(card) {
   const selected = h('div', { class: 'chips selected' });
   const tip = h('div');
   const templates = h('div', { class: 'chips' });
-  const top = h('div', { class: 'chips' });
   const picker = catPicker({
     get: () => draft.cats,
     toggle: code => { draft.cats = toggleCat(draft.cats, code); saveDraft(); paintSel(); },
+    getTags: () => draft.tags || [],
+    toggleTag: key => { Object.assign(draft, toggleTagIn(draft.cats, draft.tags, key)); saveDraft(); paintSel(); },
   });
   // "might be worth a reflection": tag it now, write it later from the Reflections tab
   const tagBox = h('label', { class: 'check reflect-tag' }, h('input', { type: 'checkbox', checked: !!draft.reflectTag, onchange: e => { draft.reflectTag = e.target.checked; saveDraft(); } }), '☆ Tag as a possible reflection');
@@ -231,10 +296,12 @@ function renderOne(card) {
     h('div', { class: 'chiplabel', id: 'suggLabel' }, 'Suggested'), sugg,
     stillNeeded(),
     h('div', { class: 'chiplabel' }, 'Quick picks'), templates,
-    h('div', { class: 'chiplabel', id: 'topLabel' }, 'Your top categories'), top,
-    h('div', { class: 'chiplabel' }, 'All categories'), picker.el,
+    h('div', { class: 'bar cat-head' }, h('div', { class: 'chiplabel grow' }, 'All categories'),
+      h('span', { class: 'seg cat-view', role: 'group', 'aria-label': 'Show categories as' },
+        ['list', 'pills'].map(v => h('button', { class: 'small', 'aria-pressed': String((settings().catView || 'list') === v), onclick: () => { if ((settings().catView || 'list') === v) return; patchLogbook({ settings: { catView: v } }); hooks.render(); } }, v === 'list' ? 'List' : 'Pills')))),
+    picker.el,
     savebar);
-  Object.assign(ui, { textarea, parsed, sugg, selected, selExtra, tip, templates, top, picker });
+  Object.assign(ui, { textarea, parsed, sugg, selected, selExtra, tip, templates, picker });
   paintSuggest(); paintSel(); paintQuick(); paintParsed(false);
   // autofocus attribute is ignored on re-render; focus after insertion (not on phones' first paint
   // when that would pop the keyboard over a fresh landing — it's what the user came to do, so do it)
@@ -281,7 +348,8 @@ function paintSel() {
   fill(ui.selected, ...(draft.cats.length
     ? draft.cats.map(code => catChip(code, { on: true, removable: true, cls: 'add', title: 'Remove ' + catFull(code),
       onclick: () => { draft.cats = dropCat(draft.cats, code); saveDraft(); paintSel(); } }))
-    : [h('span', { class: 'none' }, 'No category yet: tap one below')]));
+    : [h('span', { class: 'none' }, 'No category yet: tap one below')]),
+    ...looseTags(draft.cats, draft.tags).map(k => tagChip(k, { onclick: () => { draft.tags = draft.tags.filter(t => t !== k); saveDraft(); paintSel(); } })));
   fill(ui.selExtra,
     // a combination worth keeping: one tap to make it a template (no trip to Settings)
     draft.cats.length >= 2 && !((S.logbook && S.logbook.templates) || []).some(t => sortCodes(t.cats).join() === sortCodes(draft.cats).join())
@@ -295,17 +363,8 @@ function paintSel() {
   fill(ui.tip, ...tips.map(t => h('p', { class: 'tip' }, t)));
   paintSuggest();
   ui.picker.refresh();
-  paintTop();
 }
 
-function paintTop() {
-  const top = Object.entries(S.counts).filter(([c]) => BY_CODE[c] && !BY_CODE[c].retired && !draft.cats.includes(c))
-    .sort((a, b) => b[1] - a[1]).slice(0, 8).map(([c]) => c);
-  ui.card.querySelector('#topLabel').hidden = !top.length;
-  fill(ui.top, ...top.map(code => catChip(code, {
-    onclick: () => keepPlace(ui.top, () => { draft.cats = addCat(draft.cats, code); saveDraft(); paintSel(); }),
-  })));
-}
 
 
 function applyTemplate(t) {
@@ -402,7 +461,7 @@ async function save({ another }) {
 // Case list changed (live listener): refresh counts and quick picks without touching the textarea.
 export function logCasesChanged() {
   if (!ui || !ui.card.isConnected) return;
-  if (ui.picker) { ui.picker.refresh(); paintTop(); paintQuick(); }
+  if (ui.picker) { ui.picker.refresh(); paintQuick(); }
 }
 
 // ---------- paste a list ----------
@@ -572,11 +631,13 @@ export function editCaseDialog(c) {
   const sugg = h('div', { class: 'chips' });
   const paint = () => {
     fill(sel, ...(e.cats.length ? e.cats.map(code => catChip(code, { on: true, removable: true, onclick: () => { e.cats = dropCat(e.cats, code); paint(); picker.refresh(); } })) : [h('span', { class: 'none' }, 'No categories')]),
+      ...looseTags(e.cats, e.tags).map(k => tagChip(k, { onclick: () => { e.tags = e.tags.filter(t => t !== k); paint(); picker.refresh(); } })),
       subcatChips(e.cats, e.tags || [], tags => { e.tags = tags; paint(); }));
     const s = e.details.trim() && settings().suggestions !== false ? suggest(e.details, { limit: 6 }).filter(x => !e.cats.includes(x.code)) : [];
     fill(sugg, ...s.map(x => catChip(x.code, { cls: `sugg ${x.score >= 0.5 ? 'strong' : ''}`, onclick: () => { e.cats = addCat(e.cats, x.code); paint(); picker.refresh(); } })));
   };
-  const picker = catPicker({ get: () => e.cats, toggle: code => { e.cats = toggleCat(e.cats, code); paint(); } });
+  const picker = catPicker({ get: () => e.cats, toggle: code => { e.cats = toggleCat(e.cats, code); paint(); },
+    getTags: () => e.tags || [], toggleTag: key => { Object.assign(e, toggleTagIn(e.cats, e.tags, key)); paint(); } });
   const paintSoon = debounce(paint, 120);
   paint();
   const m = modal('Edit case', [
@@ -606,7 +667,8 @@ export function editCaseDialog(c) {
         m.close();
         const next = { ...e, initials: cleanInitials(e.initials), details: e.details.trim() };
         if (!next.reflectTag) delete next.reflectTag;
-        next.tags = (next.tags || []).filter(t => next.cats.includes(String(t).split(':')[0]));
+        // a tag that sits under a category goes when that category is taken off; other tags stay
+        next.tags = keepTags(next.tags, next.cats);
         if (!next.tags.length) delete next.tags;
         await updateCase(next);
         toast('Case updated', { action: 'Undo', onaction: () => restoreCase(c) });

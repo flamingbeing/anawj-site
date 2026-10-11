@@ -314,20 +314,7 @@ function list() {
       h('h2', { style: 'margin:0' }, 'Reflections'), h('span', { class: 'grow' }),
       em ? null : h('button', { class: 'primary', onclick: () => openPicker() }, '+ New reflection'),
       h('button', { class: em ? 'primary' : '', 'aria-pressed': String(em), onclick: () => { rv.editMode = !em; rv.sel.clear(); hooks.render(); } }, em ? 'Done' : 'Edit')),
-    em ? null : h('details', { class: 'more-tools', open: !!rv.toolsOpen, ontoggle: e => { rv.toolsOpen = e.target.open; } },
-      h('summary', {}, 'More tools: upload from Word, recycle bin'),
-      h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:8px;margin:0' },
-        h('button', { class: 'small', onclick: () => openView('import') }, 'Upload from Word'),
-        h('button', { class: 'small', onclick: () => openView('bin') }, 'Recycle bin'))),
-    h('p', { class: 'hint' }, `${p.totals.counted} / ${p.totals.min} counted · ${p.totals.done} complete · ${p.totals.drafts} draft${p.totals.drafts === 1 ? '' : 's'}.`),
-    // choosing what goes into the Word export happens on the Export page
-    em ? null : h('div', { class: 'bar', style: 'margin:4px 0 0' }, h('a', { class: 'btn small', href: '#export' }, `Export portfolio (${ex.total} ticked) ›`)),
-    em ? null : h('details', { class: 'refl-rules' }, h('summary', {}, 'Rules for reflections'),
-      h('ul', { class: 'hint' },
-        h('li', {}, 'Each reflection is a different patient, under one heading only.'),
-        h('li', {}, 'Some categories require one case reflection in Junior Residency (JR, R1–R3); when not indicated, at most one case reflection can be done at the JR level per category.'),
-        h('li', {}, 'Write as many as you like: you choose which go into the portfolio when you export. Uncategorised ones are never exported.'),
-        h('li', {}, 'Generative AI use must follow the NUS guidelines on the use of AI tools in academic work.'))),
+    h('p', { class: 'hint', style: 'margin:6px 0 0' }, `${p.totals.counted} / ${p.totals.min} counted · ${p.totals.done} complete · ${p.totals.drafts} draft${p.totals.drafts === 1 ? '' : 's'}`),
     em ? null : readyLine(p),
     em ? null : h('div', { class: 'bar', style: 'gap:8px;margin:8px 0 0;flex-wrap:nowrap' }, search,
       h('button', { class: `small${changedN ? ' primary' : ''}`, 'aria-expanded': String(viewOpen), onclick: () => { rv.viewOpen = !viewOpen; hooks.render(); } }, 'Filter & sort' + (changedN ? ` (${changedN})` : ''))),
@@ -370,6 +357,20 @@ function list() {
   const isOpen = (id, met) => em || narrowed || rv.openH.has(id) || (!met && !rv.shutH.has(id));
   const toggle = (id, met) => { if (isOpen(id, met)) { rv.openH.delete(id); rv.shutH.add(id); } else { rv.shutH.delete(id); rv.openH.add(id); } hooks.render(); };
 
+  // the rest at the bottom, like the Logbook tab: export, Word upload and the bin, the rules
+  const foot = em ? null : h('section', { class: 'card refl-foot' },
+    h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:8px;margin:0 0 6px' }, h('a', { class: 'btn small', href: '#export' }, `Export portfolio (${ex.total} ticked) ›`)),
+    h('details', { class: 'more-tools', open: !!rv.toolsOpen, ontoggle: e => { rv.toolsOpen = e.target.open; } },
+      h('summary', {}, 'More tools: upload from Word, recycle bin'),
+      h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:8px;margin:0' },
+        h('button', { class: 'small', onclick: () => openView('import') }, 'Upload from Word'),
+        h('button', { class: 'small', onclick: () => openView('bin') }, 'Recycle bin'))),
+    h('details', { class: 'refl-rules' }, h('summary', {}, 'Rules for reflections'),
+      h('ul', { class: 'hint' },
+        h('li', {}, 'Each reflection is a different patient, under one heading only.'),
+        h('li', {}, 'Some categories require one case reflection in Junior Residency (JR, R1–R3); when not indicated, at most one case reflection can be done at the JR level per category.'),
+        h('li', {}, 'Write as many as you like: you choose which go into the portfolio when you export. Uncategorised ones are never exported.'),
+        h('li', {}, 'Generative AI use must follow the NUS guidelines on the use of AI tools in academic work.'))));
   const body = h('section', { class: 'card' });
   let section = '', shown = 0;
   if (rv.group !== 'heading') {
@@ -403,7 +404,7 @@ function list() {
     }
     if (!shown) add(body, h('p', { class: 'empty' }, narrowed ? 'No reflections match.' : 'No reflections yet.'));
     if (em) paintSel();
-    return h('div', {}, head, toolbar, body);
+    return h('div', {}, head, toolbar, body, foot);
   }
   for (const hp of p.headings) {
     const items = sorted(all.filter(r => r.headingId === hp.id));
@@ -440,7 +441,7 @@ function list() {
   }
   if (narrowed && !shown) add(body, h('p', { class: 'empty' }, 'No reflections match.'));
   if (em) paintSel();
-  return h('div', {}, head, toolbar, body);
+  return h('div', {}, head, toolbar, body, foot);
 }
 
 // Tick or untick one reflection for the export.
