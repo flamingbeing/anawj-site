@@ -878,7 +878,8 @@ function editor() {
             restructure();
           } }, 'Remove image')));
       }),
-      r.figures.length < LIMITS.figures ? h('button', { onclick: () => fileIn.click() }, '+ Add image') : h('p', { class: 'hint' }, `At most ${LIMITS.figures} images.`),
+      !S.resident ? h('p', { class: 'hint' }, 'Adding photos is for residents on the programme list. Ask an admin to add you.')
+        : r.figures.length < LIMITS.figures ? h('button', { onclick: () => fileIn.click() }, '+ Add image') : h('p', { class: 'hint' }, `At most ${LIMITS.figures} images.`),
       fileIn);
 
     // references (optional, collapsed unless there are some)

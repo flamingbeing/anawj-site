@@ -162,6 +162,7 @@ export function renderImport(onDone) {
             if (!saved[f.rid]) {
               const img = await compress(st.images[f.rid]);
               const kb = imageKb(img.data);
+              if (!S.resident) throw new Error('photos are for residents on the programme list');
               if (usedKb + kb > PHOTO_BUDGET_KB) { overBudget++; throw new Error('photo budget full'); }
               const id = uid('img');
               await cloud.saveImage(email, { id, ...img, createdAt: Date.now() });
