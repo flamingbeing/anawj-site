@@ -22,3 +22,12 @@ for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mj
 ```
 
 For evals UI changes, also run the e2e test (see `evals/README.md`).
+
+## Claude Code–Codex handovers
+
+For handover, continuation or review across assistants, read
+[the shared handover skill](.agents/skills/claude-codex-handover/SKILL.md).
+GitHub PR bodies/comments carry the branch, goal, completed work, test results,
+blockers and next steps. One assistant owns writes at a time; do not disturb active
+branches or checkouts. Handover tasks require explicit human approval before merge
+or auto-merge, even where a general rule allows immediate merging.
