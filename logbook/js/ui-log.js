@@ -470,7 +470,7 @@ function paintParsed(typed) {
   const { initials, details } = draftParts();
   const { age, rest } = settings().detectAgeSex !== false ? splitAge(details) : { age: '', rest: details };
   const bits = [initials ? h('span', { class: 'pi' }, h('small', {}, 'Initials '), h('b', {}, initials)) : h('span', { class: 'pi none' }, 'No initials found'),
-    age ? h('span', { class: 'pi' }, h('small', {}, 'Age/sex '), h('b', {}, (/^\d+m(?:o)?$/i.test(age) && /m(?:o)?$/.test(age) ? parseFloat(age) + ' months' : age.replace(/f$/, 'F')))) : null,
+    age ? h('span', { class: 'pi' }, h('small', {}, 'Age/sex '), h('b', {}, (/^\d+mo$/i.test(age) ? parseFloat(age) + ' months' : age.replace(/[mf]$/, c => c.toUpperCase())))) : null,
     rest ? h('span', { class: 'pi grow' }, rest.split('\n')[0].slice(0, 60)) : null];
   fill(ui.parsed, ...bits.filter(Boolean));
 }

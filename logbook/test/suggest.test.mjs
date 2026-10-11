@@ -31,7 +31,7 @@ assert.equal(yrs('3M circumcision'), 3, 'capital M is male, even on a paeds list
 near(yrs('8mo boy'), 8 / 12, '8mo');
 near(yrs('8 months'), 8 / 12, '8 months');
 near(yrs('8/12 hernia'), 8 / 12, '8/12');
-near(yrs('6m boy herniotomy'), 0.5, 'lower-case 6m = months');
+assert.equal(yrs('6m boy herniotomy'), 6, 'lower-case m means male in years');
 near(yrs('7y3mo girl'), 7.25, 'compound y+mo');
 near(yrs('1y 2mo tongue tie'), 14 / 12, 'compound with space');
 near(yrs('2m2w PDA ligation'), 2 / 12 + 2 / 52, 'compound m+w');
@@ -56,12 +56,12 @@ assert.equal(parseAge(''), null);
 assert.equal(parseAge(null), null);
 assert.equal(yrs('pain for 3 years ago 70/M'), 70, '"3 years ago" is not the age');
 
-// Month shorthand must agree in the parser, preview and suggested paediatric band.
-for (const unit of ['3m', '3mo']) {
-  near(yrs('AB ' + unit + ' hernia'), 0.25, unit);
+// Sex shorthand is case insensitive; explicit mo means months.
+for (const [unit, years, band] of [['6m', 6, '20iii'], ['6M', 6, '20iii'], ['6mo', 0.5, '20ii'], ['3m', 3, '20ii'], ['3mo', 0.25, '20i']]) {
+  near(yrs('AB ' + unit + ' hernia'), years, unit);
   assert.deepEqual(splitAge(unit + ' hernia'), { age: unit, rest: 'hernia' });
   const tags = suggest('AB ' + unit + ' hernia', { limit: 30 });
-  assert.ok(tags.some(x => x.code === '20i' && x.why === 'age'), unit + ' neonatal band');
+  assert.ok(tags.some(x => x.code === band && x.why === 'age'), unit + ' age band');
 }
 for (const text of ['AB 3m hernia', 'AB 3mo hernia', 'AB 80M hernia']) {
   assert.ok(!suggest(text, { detectAgeSex: false, limit: 30 }).some(x => x.why === 'age'), 'autodetect off: ' + text);
