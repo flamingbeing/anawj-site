@@ -117,7 +117,7 @@ await t('category names extra field', assertFails(setDoc(doc(adm, 'config', 'cat
 await t('member lists summaries', assertSucceeds(getDocs(collection(a, 'summaries'))));
 await t('admin lists summaries', assertSucceeds(getDocs(collection(adm, 'summaries'))));
 await t('stranger cannot list summaries', assertFails(getDocs(collection(as('x@example.com'), 'summaries'))));
-const m = as('mallory@example.com');
+const m = as('mallory@example.com'), b2 = as('carol@example.com');
 await t('stranger logbook claiming a rid', assertSucceeds(setDoc(doc(m, 'logbooks', 'mallory@example.com'), { email: 'mallory@example.com', rid: 'R1' })));
 await t('claimed rid gives no access to summaries', assertFails(getDocs(collection(m, 'summaries'))));
 await t('anon summaries', assertFails(getDocs(collection(anon, 'summaries'))));
@@ -152,6 +152,8 @@ await t('admin reads image', assertFails(getDoc(doc(adm, 'logbooks', A, 'images'
 await t('image bad mime', assertFails(setDoc(doc(a, 'logbooks', A, 'images', 'img2'), { ...img('img2'), mime: 'image/gif' })));
 await t('image too big', assertFails(setDoc(doc(a, 'logbooks', A, 'images', 'img2'), { ...img('img2'), data: 'A'.repeat(760000) })));
 await t('delete own image', assertSucceeds(deleteDoc(doc(a, 'logbooks', A, 'images', 'img1'))));
+await t('non-resident cannot add a photo', assertFails(setDoc(doc(m, 'logbooks', 'mallory@example.com', 'images', 'img9'), img('img9'))));
+await t('non-resident without a logbook cannot add a photo', assertFails(setDoc(doc(b2, 'logbooks', 'carol@example.com', 'images', 'img9'), img('img9'))));
 // ---- recycle bin (bin agent): owner only; admins no access ----
 const binE = (id, kind = 'case', data = c('c1')) => ({ id, kind, data, deletedAt: 5 });
 await t('own bin entry (case)', assertSucceeds(setDoc(doc(a, 'logbooks', A, 'bin', 'c_c1_x'), binE('c_c1_x'))));
