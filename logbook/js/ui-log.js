@@ -17,10 +17,19 @@ const yesterdayISO = () => { const d = new Date(); d.setDate(d.getDate() - 1); r
 
 // The unsent draft survives tab switches and reloads (this browser only). It is kept per account
 // (and apart from the demo), so the next person on a shared phone never sees it; sign-out wipes it.
-const EMPTY = () => ({ date: null, details: '', initials: '', cats: [], mode: 'one', bulk: '' });
+const EMPTY = () => ({ date: null, details: '', initials: '', initialsHint: '', cats: [], mode: 'one', bulk: '' });
 let draft = EMPTY(), draftOwner = null;
 let suggestedSave = null, saving = false;
 const draftText = () => [draft.initials, draft.details].filter(Boolean).join(' ').trim();
+// Keep deliberately entered initials when switching back to the combined box,
+// even if those letters also name a procedure (IJ, TKR). Editing the prefix can replace them.
+const draftParts = () => {
+  if (draft.initials) return { initials: draft.initials, details: draft.details.trim() };
+  const text = draft.details.trim(), hint = draft.initialsHint;
+  if (hint && text.slice(0, hint.length).toUpperCase() === hint && (!text.slice(hint.length) || /^\s/.test(text.slice(hint.length))))
+    return { initials: hint, details: text.slice(hint.length).trim() };
+  return splitInitials(text);
+};
 const firstField = () => ['initials', 'date'].includes(display().firstField) ? display().firstField : 'details';
 export const focusLog = () => (draft.mode === 'bulk' ? ui?.textarea : firstField() === 'date' ? ui.datebar.querySelector('input[type=date]') : firstField() === 'initials' ? ui.initials : ui.textarea)?.focus({ preventScroll: true });
 const suggestionKey = () => JSON.stringify([draftText(), curDate(), settings().detectAgeSex !== false]);
@@ -53,7 +62,7 @@ export function logOnDate(iso) {
   // a fresh case for that day; a case already being typed stays, and only its date changes
   const typing = draftText() || (draft.cats || []).length;
   if (typing) setTimeout(() => toast('Date set. The case you were typing is still in the box'), 300);
-  else Object.assign(draft, { details: '', initials: '', cats: [], tags: [], reflectTag: false });
+  else Object.assign(draft, { details: '', initials: '', initialsHint: '', cats: [], tags: [], reflectTag: false });
   draft.mode = 'one';
   draft.date = iso === todayISO() ? null : iso; draft.dateAt = Date.now(); bulkRows = null;
   saveDraft.cancel(); try { localStorage.setItem(draftKey(), JSON.stringify(draft)); } catch { /* ignore */ }
@@ -340,8 +349,8 @@ function renderOne(card) {
   suggestedSave = null;
   const separateInitials = firstField() === 'initials';
   if (separateInitials && !draft.initials) {
-    const parts = splitInitials(draft.details); draft.initials = parts.initials; draft.details = parts.details;
-  } else if (!separateInitials && draft.initials) { draft.details = draftText(); draft.initials = ''; }
+    const parts = draftParts(); draft.initials = parts.initials; draft.details = parts.details;
+  } else if (!separateInitials && draft.initials) { draft.initialsHint = draft.initials; draft.details = draftText(); draft.initials = ''; }
   saveDraft();
   const initialsInput = separateInitials ? h('input', { 'aria-label': 'Patient initials', placeholder: 'Initials (optional)', maxlength: '20', enterkeyhint: 'next', autocomplete: 'off', autocapitalize: 'characters', value: draft.initials || '',
     oninput: e => { suggestedSave = null; draft.initials = cleanInitials(e.target.value); saveDraft(); paintParsed(true); suggestSoon(); },
@@ -452,7 +461,7 @@ function paintParsed(typed) {
   const text = draftText();
   if (ui.draftNote) ui.draftNote.textContent = text && typed ? 'Draft saved' : '';
   if (!text) { fill(ui.parsed); return; }
-  const { initials, details } = draft.initials ? { initials: draft.initials, details: draft.details.trim() } : splitInitials(text);
+  const { initials, details } = draftParts();
   const { age, rest } = settings().detectAgeSex !== false ? splitAge(details) : { age: '', rest: details };
   const bits = [initials ? h('span', { class: 'pi' }, h('small', {}, 'Initials '), h('b', {}, initials)) : h('span', { class: 'pi none' }, 'No initials found'),
     age ? h('span', { class: 'pi' }, h('small', {}, 'Age/sex '), h('b', {}, (/^\d+m(?:o)?$/i.test(age) && /m(?:o)?$/.test(age) ? parseFloat(age) + ' months' : age.replace(/f$/, 'F')))) : null,
@@ -607,11 +616,11 @@ async function saveCase({ another }) {
   const norm = t => String(t || '').toLowerCase().replace(/\s+/g, ' ').trim();
   const twin = (S.cases || []).find(x => x.date === curDate() && norm(caseText(x)) === norm(details));
   if (twin && !(await confirmBox('Possible duplicate', `You already logged “${caseText(twin).slice(0, 60)}” on ${fmtDate(twin.date)}. Save another one?`, 'Save anyway'))) return;
-  const parts = firstField() === 'initials' ? (draft.initials ? { initials: draft.initials, details: draft.details.trim() } : splitInitials(draft.details)) : { details };
+  const parts = firstField() === 'initials' || draft.initialsHint ? draftParts() : { details };
   const c = await createCase({ date: curDate(), ...parts, cats: draft.cats, reflectTag: !!draft.reflectTag, tags: draft.tags || [] });
   const sticky = another || settings().defaultDate === 'last';
   const keep = sticky ? draft.date : null;
-  draft = { ...draft, details: '', initials: '', cats: [], date: keep, keepDate: sticky, keptAt: Date.now(), dateAt: Date.now(), reflectTag: false, tags: [] };
+  draft = { ...draft, details: '', initials: '', initialsHint: '', cats: [], date: keep, keepDate: sticky, keptAt: Date.now(), dateAt: Date.now(), reflectTag: false, tags: [] };
   if (ui.tagBox) ui.tagBox.querySelector('input').checked = false;
   saveDraft();
   if (ui.textarea) ui.textarea.value = '';
@@ -628,7 +637,7 @@ async function saveCase({ another }) {
       // put the case back in the box, unless the next one is already being typed: then it goes to the recycle bin
       if (draftText() || draft.cats.length) { moveToBin('case', c).then(() => toast('Removed: it is in the Recycle bin (Settings). Your new case stays in the box'), err => toast('Could not delete: ' + err.message)); return; }
       removeCase(c.id);
-      draft = { ...draft, initials: firstField() === 'initials' ? caseParts(c).initials : '', details: firstField() === 'initials' ? caseParts(c).details : caseText(c), cats: c.cats, tags: c.tags || [], reflectTag: !!c.reflectTag, date: c.date === todayISO() ? null : c.date };
+      draft = { ...draft, initials: firstField() === 'initials' ? caseParts(c).initials : '', initialsHint: caseParts(c).initials, details: firstField() === 'initials' ? caseParts(c).details : caseText(c), cats: c.cats, tags: c.tags || [], reflectTag: !!c.reflectTag, date: c.date === todayISO() ? null : c.date };
       saveDraft();
       if (S.tab === 'log' && ui.textarea) { ui.textarea.value = draft.details; if (ui.initials) ui.initials.value = draft.initials; if (ui.tagBox) ui.tagBox.querySelector('input').checked = draft.reflectTag; paintDate(); paintSel(); paintQuick(); paintParsed(false); }
     },
@@ -749,7 +758,7 @@ function planCard() {
   const edit = async p => {
     // don't throw away a case being typed
     if ((draftText() || draft.cats.length) && !(await confirmBox('Replace what you’re typing?', 'The case in the box is replaced by the planned one.', 'Replace', true))) return;
-    draft = { ...draft, mode: 'one', initials: '', details: [p.initials, p.details].filter(Boolean).join(' '), cats: [...(p.cats || [])], tags: [], reflectTag: false, date: p.date === today ? null : p.date, dateAt: Date.now() };
+    draft = { ...draft, mode: 'one', initials: '', initialsHint: p.initials || '', details: [p.initials, p.details].filter(Boolean).join(' '), cats: [...(p.cats || [])], tags: [], reflectTag: false, date: p.date === today ? null : p.date, dateAt: Date.now() };
     saveDraft();
     await savePlan(plan().filter(x => x.id !== p.id));
     hooks.render();

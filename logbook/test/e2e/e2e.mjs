@@ -1765,6 +1765,11 @@ async function run(label, ctxOpts) {
     assert(await initials.evaluate(el => el === document.activeElement), 'Initials not focused');
     await initials.fill('IJ'); await initials.press('Enter');
     assert(await summary.evaluate(el => el === document.activeElement), 'Enter did not move to summary');
+    await summary.fill('hernia');
+    await tab('logging'); await first.selectOption('details'); await tab('log');
+    assert(await summary.inputValue() === 'IJ hernia', 'switching field lost the draft');
+    await tab('logging'); await first.selectOption('initials'); await tab('log');
+    assert(await initials.inputValue() === 'IJ' && await summary.inputValue() === 'hernia', 'explicit initials became procedure text');
     for (const unit of ['3m', '3mo']) {
       await summary.fill(unit + ' hernia'); await debounced();
       assert((await p.locator('.parsed').innerText()).includes('3 months'), unit + ' preview');
