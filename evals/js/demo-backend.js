@@ -83,16 +83,21 @@ export function cleanPatch(patch, now = Date.now()) {
 }
 
 // Stamps the times a transition needs (submit, decline, (re)send) unless the caller set them, and
-// clears the old assessor's partial answers when a declined request goes to someone new.
+// clears the old assessor's partial answers and metrics when the request goes to someone new.
 export function stampPatch(cur, patch, now = Date.now()) {
   const p = { ...patch };
   const from = cur ? cur.status : null;
+  const to = p.status || from;
+  const newAssessor = !!(cur && p.assessorEmail && lc(p.assessorEmail) !== cur.assessorEmail);
   if (p.status === 'submitted' && from !== 'submitted' && p.submittedAt == null) p.submittedAt = now;
   if (p.status === 'declined' && from !== 'declined' && p.declinedAt == null) p.declinedAt = now;
-  if (p.status === 'requested' && (from === 'draft' || from === 'declined') && p.requestedAt == null) p.requestedAt = now;
-  if (from === 'declined' && p.status === 'requested' && p.assessorEmail && lc(p.assessorEmail) !== cur.assessorEmail) {
-    if (!('assessment' in p)) p.assessment = null;
-    if (!('metrics' in p)) p.metrics = null;
+  // (re)sent, reopened or handed to a new assessor: the 24 h clock starts again
+  if (to === 'requested' && (from === 'draft' || from === 'declined' || from === 'submitted' || (from === 'requested' && newAssessor)) && p.requestedAt == null) p.requestedAt = now;
+  // reopened: the revised feedback is new to the resident
+  if (from === 'submitted' && p.status === 'requested' && cur.seenAt != null && !('seenAt' in p)) p.seenAt = null;
+  if (newAssessor) {
+    if (from === 'declined' && p.status === 'requested' && !('assessment' in p)) p.assessment = null;
+    if (cur.metrics != null && !('metrics' in p)) p.metrics = null;
   }
   return p;
 }
@@ -355,7 +360,8 @@ function checkUpdate(s, cur, next) {
   if (cur.residentEmail === e) {
     if (['draft', 'requested'].includes(cur.status) && ['draft', 'requested', 'cancelled'].includes(next.status)
       && only(keys, ['request', 'status', 'assessorEmail', 'assessorName', 'formId', 'formVersion', 'epa', 'date', 'caseId', 'updatedAt', 'requestedAt',
-        'itemId', 'itemText', 'tool', 'level', 'caseKey', 'catalogueVersion', 'chasedAt'])
+        'itemId', 'itemText', 'tool', 'level', 'caseKey', 'catalogueVersion', 'chasedAt', 'metrics'])
+      && !(keys.includes('metrics') && 'metrics' in next)   // metrics may only be removed
       && (!cur.assessment || !Object.keys(cur.assessment).length
         || (!keys.some(k => ['assessorEmail', 'formId', 'itemId', 'tool'].includes(k)) && next.status !== 'draft'))
       && (next.assessorEmail === cur.assessorEmail || activeFaculty(s, next.assessorEmail))) return;

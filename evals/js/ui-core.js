@@ -29,9 +29,11 @@ export const hooks = { render() {}, dataChanged() {}, refreshRoles: async () => 
 export const isResident = () => !!S.roles.resident;
 export const isFaculty = () => !!(S.roles.faculty && S.roles.faculty.status !== 'INACTIVE');
 export const isStaff = () => !!(S.roles.admin || S.roles.pd);
-// faculty set INACTIVE keep access while requests sent to them are still open
+export const EDIT_MS = 15 * 60e3;   // the assessor may change a submitted form for 15 min
+// faculty set INACTIVE keep access while requests sent to them are still open, or still editable
 export const hasRole = () => isResident() || isFaculty() || isStaff()
-  || (!!S.roles.faculty && (S.assigned || []).some(ev => ev.status === 'requested'));
+  || (!!S.roles.faculty && (S.assigned || []).some(ev => ev.status === 'requested'
+    || (ev.status === 'submitted' && Date.now() < (toMs(ev.submittedAt) || 0) + EDIT_MS)));
 
 // The assessor's answers on this device (ui-form), kept until the server holds the outcome
 // (submitted, declined, cancelled) with no write of ours pending, so an offline submit that the

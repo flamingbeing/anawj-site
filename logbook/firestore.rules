@@ -308,7 +308,9 @@ service cloud.firestore {
         && request.resource.data.status in ['draft', 'requested', 'cancelled']
         && request.resource.data.diff(resource.data).affectedKeys()
              .hasOnly(['request', 'status', 'assessorEmail', 'assessorName', 'formId', 'formVersion', 'epa', 'date', 'caseId', 'updatedAt', 'requestedAt',
-                       'itemId', 'itemText', 'tool', 'level', 'caseKey', 'catalogueVersion', 'chasedAt'])
+                       'itemId', 'itemText', 'tool', 'level', 'caseKey', 'catalogueVersion', 'chasedAt', 'metrics'])
+        // metrics (the old assessor's open/answer times) may only be removed, when the assessor changes
+        && !('metrics' in request.resource.data && request.resource.data.diff(resource.data).affectedKeys().hasAny(['metrics']))
         && (resource.data.get('assessment', {}).size() == 0
             || (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['assessorEmail', 'formId', 'itemId', 'tool'])
                 && request.resource.data.status != 'draft'))

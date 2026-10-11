@@ -269,6 +269,26 @@ await t('clean helpers keep to the whitelist', () => {
   assert.deepEqual(Object.keys(set).sort(), ['status', 'updatedAt']);
 });
 
+await t('stampPatch: reopen, reassign and assessor change restart the clock and clear stale fields', () => {
+  const now = 5e12;
+  const sub = { status: 'submitted', assessorEmail: 'a@x.com', seenAt: 1, requestedAt: 1, metrics: { openedAt: 1 } };
+  const reopen = D.stampPatch(sub, { status: 'requested', submittedAt: null }, now);
+  assert.equal(reopen.requestedAt, now);
+  assert.equal(reopen.seenAt, null);
+  const req = { status: 'requested', assessorEmail: 'a@x.com', requestedAt: 1, metrics: { openedAt: 1 } };
+  const moved = D.stampPatch(req, { assessorEmail: 'B@x.com' }, now);
+  assert.equal(moved.requestedAt, now);
+  assert.equal(moved.metrics, null);
+  assert.equal('assessment' in moved, false);
+  const same = D.stampPatch(req, { assessorEmail: 'a@x.com', chasedAt: 2 }, now);
+  assert.equal('requestedAt' in same, false);
+  assert.equal('metrics' in same, false);
+  const declined = D.stampPatch({ ...req, status: 'declined', assessment: { q1: 3 } }, { status: 'requested', assessorEmail: 'c@x.com' }, now);
+  assert.equal(declined.assessment, null);
+  assert.equal(declined.metrics, null);
+  assert.equal(declined.requestedAt, now);
+});
+
 await t('reset reseeds', async () => {
   as('admin');
   D.resetDemo();

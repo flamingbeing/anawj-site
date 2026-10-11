@@ -254,6 +254,14 @@ await t('app: resident reassigns', assertSucceeds(write(a, 'e9', e9d, { status: 
 const e9r = (await getDoc(doc(pd, 'evaluations', 'e9'))).data();
 await t('app: new assessor submits', assertSucceeds(write(oth, 'e9', e9r, { assessment: { q1: 'High' }, status: 'submitted' })));
 await t('app: resident sees', assertSucceeds(write(a, 'e9', { ...e9r, status: 'submitted' }, { seenAt: Date.now() })));
+const e10 = cleanEval(ev('e10', { createdAt: undefined, updatedAt: undefined, requestedAt: undefined }));
+await t('app: resident sends another', assertSucceeds(setDoc(doc(a, 'evaluations', 'e10'), e10)));
+await t('app: assessor opens it', assertSucceeds(write(asr, 'e10', e10, { metrics: { openedAt: 1 } })));
+await t('app: resident moves the opened request (old metrics removed)', assertSucceeds(write(a, 'e10', { ...e10, metrics: { openedAt: 1 } }, { assessorEmail: OTHER, assessorName: 'Dr O' })));
+await t('app: metrics gone after the move', (async () => { const d = (await getDoc(doc(pd, 'evaluations', 'e10'))).data(); if ('metrics' in d) throw new Error('metrics kept'); })());
+await t('resident cannot set metrics while moving it', assertFails(updateDoc(doc(a, 'evaluations', 'e10'), { assessorEmail: ASR, assessorName: 'Dr A', metrics: { openedAt: 9 }, updatedAt: 4 })));
+const e9s = (await getDoc(doc(pd, 'evaluations', 'e9'))).data();
+await t('app: admin reopens (seenAt cleared, clock restarted)', assertSucceeds(write(adm, 'e9', e9s, { status: 'requested', submittedAt: null })));
 await t('app: pd saves faculty', assertSucceeds(setDoc(doc(pd, 'faculty', 'dr.app@example.com'), cleanFaculty({ email: 'Dr.App@example.com', name: 'Dr App' }))));
 await t('app: applies', assertSucceeds(setDoc(doc(b, 'applications', B), cleanApplication({ uid: B, email: B, name: 'Bob', role: 'faculty', note: '' }))));
 
