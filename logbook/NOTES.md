@@ -26,8 +26,9 @@ portfolio content.
 - Logbook **Case summary** (the case box). Reflection **Case details** (prefilled from the case summary).
 - **Possible reflection** = the ☆ flag on a case (just a bookmark; missing it doesn't matter).
 - **Analytics** = the old Progress tab (`#progress`). Totals is under it ("Compare with your intake").
-- More → **Export & backup** (Word portfolio, Excel, backup and restore).
-- **Excel export** (`export-opts.js`, tested; dialog in `ui-logbook.js` `downloadExcel`): logbook + reflections
+- More → **Export & backup**: **Export** is the Word portfolio only (it holds everything APMES needs);
+  everything else is **Backup** (backup file and restore, Excel spreadsheet). Keep that wording.
+- **Excel backup** (`export-opts.js`, tested; dialog in `ui-logbook.js` `downloadExcel`): logbook + reflections
   (or one), date range, columns ticked and ordered, tag/date style, Summary sheet; saved as
   `settings.excelExport`. The Cases sheet keeps a hidden id column and a veryHidden "Export info" sheet
   (export time, date range): uploading back never deletes cases outside the range or newer than the file.
@@ -41,7 +42,7 @@ portfolio content.
   Paste-a-list (List mode), Plan for later. `editCaseDialog` (full screen on phones, pinned
   Delete/Cancel/Save, 6-line growing box, Tags + "Add tags"; also "New case" from the reflection picker).
 - **Logbook** (`ui-logbook.js`): Calendar (default) | List | Grid. Calendar day: + Log a case (opens Log
-  on that date), Share day, Copy. Rows: Copy, Reflect (no swipe actions). Filter (compact, two columns; Show / Search in / Fuzzy under "More options"): has all of / has none of
+  on that date), Share day, Copy. Rows: Copy, Reflect (no swipe actions). Filter (compact, two columns; tag filters fold under "Tag filters", open while set): has all of / has none of
   tags, dates, flag, search scope, fuzzy; Reset (everything); × in the search box clears just the text; saved searches (text, filters, "Search in"; not fuzzy); Tag N cases (bulk add/remove). Search text
   cached per case (`hayCache`, reset when the tag set changes).
 - **Reflections** (`ui-reflect.js`): list by heading, editor (Case details, learning points,

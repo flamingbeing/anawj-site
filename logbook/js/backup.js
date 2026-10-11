@@ -72,10 +72,13 @@ async function restoreBackup(file) {
   ]);
 }
 
-export function backupCard() {
+// extra: more ways to keep a copy, shown under the backup file (the Excel spreadsheet)
+export function backupCard(...extra) {
   const btn = h('button', { onclick: () => downloadBackup(btn) }, 'Download backup');
   return h('section', { class: 'card' },
     h('h2', {}, 'Backup'),
+    extra.length ? h('h3', {}, 'Backup file') : null,
     h('p', { class: 'hint' }, 'Keep your own copy of your cases, reflections, tag groups, settings and portfolio details as one file. Photos are not included. Restoring adds back anything missing and never deletes.'),
-    h('div', { class: 'bar', style: 'margin-bottom:0' }, btn, fileButton('Restore from backup…', '.json,application/json', restoreBackup)));
+    h('div', { class: 'bar', style: 'margin-bottom:0' }, btn, fileButton('Restore from backup…', '.json,application/json', restoreBackup)),
+    ...extra);
 }

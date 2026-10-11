@@ -108,17 +108,18 @@ export function renderLogbook() {
   const flagSel = h('select', { 'aria-label': 'Filter by flag', onchange: e => { view.flag = e.target.value; refresh(); } },
     flagOpts.map(([v, l]) => h('option', { value: v, selected: view.flag === v }, l)));
   // compact: two columns on a phone, so the panel doesn't fill the screen
-  const resetBtn = resetLink();
   const cell = (label, ...kids) => h('div', { class: 'lb-cell' }, h('span', { class: 'lb-fl' }, label), ...kids);
+  const resetBtn = resetLink();
+  const tagSum = h('summary', {}, 'Tag filters');
+  const tagFold = h('details', { class: 'lb-more', open: !!(view.has.length || view.not.length) || undefined }, tagSum,
+    h('div', { class: 'lb-grid' }, cell('Has all of', hasRow), cell('Has none of', notRow)));
   const filters = h('div', { class: 'lb-filters', hidden: !(view.showFilters || active()) },
     h('div', { class: 'lb-grid' },
-      cell('Has all of', hasRow), cell('Has none of', notRow),
-      cell('From', dateIn('from')), cell('To', dateIn('to'))),
-    // the rarely changed ones fold away (open while one is in use)
-    h('details', { class: 'lb-more', open: !!(view.flag || (settings().lbScope || 'all') !== 'all' || settings().lbFuzzy) || undefined },
-      h('summary', {}, 'More options'),
-      h('div', { class: 'lb-grid' }, cell('Show', flagSel), cell('Search in', searchIn)),
-      h('div', { class: 'bar lb-fbar' }, fuzzyBox)),
+      cell('From', dateIn('from')), cell('To', dateIn('to')),
+      cell('Show', flagSel), cell('Search in', searchIn)),
+    h('div', { class: 'bar lb-fbar' }, fuzzyBox),
+    // the tag filters fold away (open while one is in use); the summary says how many are set
+    tagFold,
     h('div', { class: 'bar lb-fbar', style: 'margin:0' },
       h('button', { class: 'small', title: 'Save this search', onclick: saveSearch }, '☆ Save search'),
       bulkBtn, resetBtn));
@@ -140,6 +141,9 @@ export function renderLogbook() {
   const repaintFilters = () => {
     fill(hasRow, ...chipsOf(view.has), tagSel('+ Add tag', view.has));
     fill(notRow, ...chipsOf(view.not), tagSel('+ Add tag', view.not));
+    const n = view.has.length + view.not.length;
+    tagSum.textContent = n ? `Tag filters (${n})` : 'Tag filters';
+    if (n) tagFold.open = true;
   };
   // saved searches: one tap to run again (stored with your account)
   const savedRow = h('div', { class: 'chips lb-saved' });
@@ -422,7 +426,7 @@ function excelCard() {
   return h('details', { class: 'card more-tools' }, h('summary', {}, 'More tools: Excel download, Excel/CSV upload'),
     h('p', { class: 'hint' }, 'Download your logbook as a spreadsheet, edit it on a computer, then upload it back. You will see what changes before anything is saved.'),
     h('div', { class: 'bar', style: 'margin-bottom:0' },
-      h('button', { onclick: downloadExcel }, 'Export to Excel…'),
+      h('button', { onclick: downloadExcel }, 'Download Excel…'),
       fileButton('Upload Excel/CSV logbook', '.xlsx,.csv,text/csv', uploadExcel)));
 }
 
@@ -453,7 +457,7 @@ export function downloadExcel() {
     const t = exportTables(S.cases, S.reflections || [], o, ctx);
     const n = [t.cases ? `${t.cases.rows.length} case${t.cases.rows.length === 1 ? '' : 's'}` : '', t.reflections ? `${t.reflections.rows.length} reflection${t.reflections.rows.length === 1 ? '' : 's'}` : ''].filter(Boolean).join(' and ');
     fill(body,
-      seg('Export', 'what', [['both', 'Logbook + reflections'], ['logbook', 'Logbook'], ['reflections', 'Reflections']]),
+      seg('Include', 'what', [['both', 'Logbook + reflections'], ['logbook', 'Logbook'], ['reflections', 'Reflections']]),
       sel('Dates', 'range', [['all', 'All dates'], ['year', 'This residency year'], ['12m', 'The last 12 months'], ['custom', 'Choose dates']]),
       o.range === 'custom' ? h('div', { class: 'lb-grid' },
         h('label', { class: 'field xp-field' }, 'From', h('input', { type: 'date', value: o.from, onchange: e => { o.from = e.target.value; paint(); } })),
@@ -470,12 +474,12 @@ export function downloadExcel() {
         h('div', { class: 'lb-grid' },
           sel('Dates written as', 'dateStyle', [['excel', 'Excel dates (10 Oct 2026)'], ['iso', 'Text (2026-10-10)']]),
           sel('Order', 'sort', [['oldest', 'Oldest first'], ['newest', 'Newest first']]))),
-      h('p', { class: 'xp-count' }, n ? `${n}, ${rangeText(t.range)}.` : 'Nothing to export.'),
+      h('p', { class: 'xp-count' }, n ? `${n}, ${rangeText(t.range)}.` : 'Nothing to include.'),
       t.cases && (t.range.from || t.range.to) ? h('p', { class: 'hint', style: 'margin:0' }, 'Uploading this file back only changes cases within these dates.') : null);
   };
   const go = async () => {
     const t = exportTables(S.cases, S.reflections || [], o, ctx);
-    if (!(t.cases && t.cases.rows.length) && !(t.reflections && t.reflections.rows.length)) return toast('Nothing to export for these choices');
+    if (!(t.cases && t.cases.rows.length) && !(t.reflections && t.reflections.rows.length)) return toast('Nothing to include for these choices');
     patchLogbook({ settings: { excelExport: cleanExportOpts(o) } });
     try {
       await needExcel();
@@ -483,10 +487,10 @@ export function downloadExcel() {
       const kind = o.what === 'both' ? 'logbook-reflections' : o.what;
       download(`${kind}-${todayISO()}.xlsx`, blob);
       m.close();
-    } catch (err) { toast('Could not export: ' + err.message); }
+    } catch (err) { toast('Could not make the file: ' + err.message); }
   };
   paint();
-  const m = modal('Export to Excel', [body,
+  const m = modal('Excel backup', [body,
     h('div', { class: 'bar dlg-actions' },
       h('button', { class: 'small linkish', onclick: () => { o = cleanExportOpts(null); paint(); } }, 'Reset'),
       h('span', { class: 'grow' }),

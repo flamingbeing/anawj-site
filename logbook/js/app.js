@@ -53,7 +53,7 @@ const TABS = [
   { id: 'totals', label: 'Totals', render: renderTotals, hidden: true, under: 'progress', unlisted: true },
   { id: 'account', label: 'Account', render: renderAccount, hidden: true, under: 'more', desc: 'Your name and portfolio details (Section 1); sign out' },
   { id: 'settings', label: 'Settings', render: () => renderSettingsMenu(), hidden: true, under: 'more', desc: 'Display, logging, tag editor, copy & share format, recycle bin' },
-  { id: 'data', label: 'Export & backup', render: () => renderDataPage(), hidden: true, under: 'more', desc: 'Portfolio (Word), Excel, backup and restore' },
+  { id: 'data', label: 'Export & backup', render: () => renderDataPage(), hidden: true, under: 'more', desc: 'Export the portfolio (Word); backup file and Excel spreadsheet' },
   // Settings' own pages (not in the More list)
   { id: 'display', label: 'Display', render: renderDisplay, hidden: true, under: 'settings', unlisted: true, desc: 'Theme, text size, compact mode, the tab the app opens on' },
   { id: 'sharefmt', label: 'Copy & share format', render: renderShareFormat, hidden: true, under: 'settings', unlisted: true, desc: 'How a copied or shared case or day reads' },
@@ -107,15 +107,15 @@ function renderSettingsMenu() {
 // Export & backup: everything that leaves the app as a file, and restoring a backup
 function renderDataPage() {
   return h('div', {},
+    // Export is the portfolio only (it holds everything APMES needs); every other copy is a backup
     h('section', { class: 'card export-sync' }, h('h2', {}, 'Export'),
       h('h3', {}, 'Portfolio (Word)'),
-      h('p', { class: 'hint' }, 'Choose which complete reflections go in, then export the APMES portfolio with Section 1 and the Section 4 case numbers filled in.'),
-      h('div', { class: 'bar' }, h('a', { class: 'btn primary', href: '#export' }, 'Choose reflections and export ›')),
-      h('h3', {}, 'Logbook and reflections (Excel)'),
-      h('p', { class: 'hint' }, 'A spreadsheet of your cases, your reflections or both: choose the dates and the columns. To edit cases and upload them back, use Logbook → More tools.'),
-      h('div', { class: 'bar', style: 'margin-bottom:0' }, h('button', { onclick: downloadExcel }, 'Export to Excel…')),
-      h('p', { class: 'hint', style: 'margin:10px 0 0' }, 'To copy a day into your notes, use Copy or Share day on the Logbook calendar (format in Settings → Copy & share format).')),
-    backupCard());
+      h('p', { class: 'hint' }, 'The APMES portfolio: choose which complete reflections go in, then export it with Section 1 and the Section 4 case numbers filled in. This is what APMES needs.'),
+      h('div', { class: 'bar', style: 'margin-bottom:0' }, h('a', { class: 'btn primary', href: '#export' }, 'Choose reflections and export ›'))),
+    backupCard(
+      h('h3', { style: 'margin-top:16px' }, 'Spreadsheet (Excel)'),
+      h('p', { class: 'hint' }, 'Your cases, your reflections or both as a spreadsheet: choose the dates and the columns. To edit cases and upload them back, use Logbook → More tools.'),
+      h('div', { class: 'bar', style: 'margin-bottom:0' }, h('button', { onclick: downloadExcel }, 'Download Excel…'))));
 }
 
 const app = document.getElementById('app');
