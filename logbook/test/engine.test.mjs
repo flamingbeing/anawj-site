@@ -559,3 +559,26 @@ console.log('engine tests passed');
   assert.ok(!textHas('lscs spinal', 'thyroid', true));
   console.log('search helper tests passed');
 }
+{
+  const { guessMapping, rowsFromGrid, diffRows } = await import('../js/engine.js');
+  // our own export
+  assert.deepEqual(guessMapping(['Date', 'Case details', 'Categories', 'id']), { date: 0, initials: -1, details: 1, categories: 2, id: 3 });
+  // someone else's sheet
+  const m = guessMapping(['No.', 'Date of surgery', 'Patient initials', 'Procedure', 'APMES codes']);
+  assert.deepEqual(m, { date: 1, initials: 2, details: 3, categories: 4, id: -1 });
+  // remembered names win
+  assert.equal(guessMapping(['When', 'What'], { date: 'When', details: 'What' }).date, 0);
+  assert.equal(guessMapping(['When', 'What'], { date: 'When', details: 'What' }).details, 1);
+  const grid = [['Date', 'Initials', 'Procedure', 'Codes'], ['3/13/2026', 'AB', 'LSCS spinal', '16, 17'], ['', '', '', ''], ['3/14/2026', 'CD', 'TKR', 'tkr?']];
+  const rows = rowsFromGrid(grid, guessMapping(grid[0]), { monthFirst: true });
+  assert.equal(rows.length, 2, 'blank row skipped');
+  assert.equal(rows[0].date, '13/3/2026'); assert.equal(rows[0].row, 2); assert.equal(rows[0].initials, 'AB');
+  assert.equal(rows.hasIdColumn, false);
+  const d = diffRows([], rows, 1);
+  assert.equal(d.added.length, 1); assert.equal(d.added[0].date, '2026-03-13'); assert.deepEqual(d.added[0].cats.sort(), ['16', '17']);
+  assert.equal(d.errors.length, 1, 'unknown category is an error');
+  // no header row
+  const r2 = rowsFromGrid([['12/3/2026', 'EF lap chole', '08']], { date: 0, initials: -1, details: 1, categories: 2, id: -1 }, { headerRow: false });
+  assert.equal(r2.length, 1); assert.equal(r2[0].details, 'EF lap chole');
+  console.log('upload mapping tests passed');
+}

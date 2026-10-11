@@ -1,9 +1,10 @@
 // Logbook screen: every case, newest first (list) or by day (calendar). Search, filter, flags, edit; a grid view for bulk edits
 // and pasting rows from Excel; Excel download and upload (round trip with a preview of the changes).
 
-import { duplicates, fmtDate, diffRows, sortCodes, withParents, caseParts, caseText, dateWindow, nth, cleanInitials, procedureText, textHas } from './engine.js';
+import { duplicates, fmtDate, diffRows, sortCodes, withParents, caseParts, caseText, dateWindow, nth, cleanInitials, procedureText, textHas, guessMapping, rowsFromGrid, IMPORT_FIELDS, caseFromRow } from './engine.js';
 import { flagCase } from './importer.js';
-import { exportCases, readCasesSheet } from './xlsxio.js';
+import { exportCases, readSheetGrid } from './xlsxio.js';
+import { parseCsv } from './tags.js';
 import {
   S, h, toast, debounce, modal, cat, catName, catShort, tagName, catFull, catChip, PICKER_ORDER, settings, patchLogbook, needExcel, download, fileButton, catPills,
   updateCase, saveMany, deleteMany, displayName, rYear, todayISO, fill, add, resetters } from './ui-core.js';
@@ -285,11 +286,11 @@ function pasteRows() {
 // ---------- Excel ----------
 
 function excelCard() {
-  return h('details', { class: 'card more-tools' }, h('summary', {}, 'More tools: Excel download and upload'),
+  return h('details', { class: 'card more-tools' }, h('summary', {}, 'More tools: Excel download, Excel/CSV upload'),
     h('p', { class: 'hint' }, 'Download your logbook as a spreadsheet, edit it on a computer, then upload it back. You will see what changes before anything is saved.'),
     h('div', { class: 'bar', style: 'margin-bottom:0' },
       h('button', { onclick: downloadExcel }, 'Download Excel'),
-      fileButton('Upload Excel', '.xlsx', uploadExcel)));
+      fileButton('Upload Excel/CSV logbook', '.xlsx,.csv,text/csv', uploadExcel)));
 }
 
 export async function downloadExcel() {
@@ -300,22 +301,85 @@ export async function downloadExcel() {
   } catch (err) { toast('Could not export: ' + err.message); }
 }
 
+// Upload a logbook from Excel (.xlsx) or a CSV file: match the file's columns to the case fields
+// (guessed from the headers, or the names remembered from last time), see the first rows as they
+// will be read, then review what changes before anything is saved.
 async function uploadExcel(file) {
+  let grid;
   try {
-    await needExcel();
-    const rows = await readCasesSheet(file);
+    if (/\.csv$/i.test(file.name) || file.type === 'text/csv') {
+      grid = { sheets: [{ name: file.name, rows: parseCsv(await file.text()) }], exportedAt: null };
+    } else {
+      await needExcel();
+      grid = await readSheetGrid(file);
+    }
+  } catch (err) { return toast('Could not read the file: ' + err.message); }
+  if (!grid.sheets.length) return toast('That file has no rows');
+  mapColumns(file.name, grid);
+}
+
+function mapColumns(fileName, grid) {
+  const st = { sheet: 0, headerRow: true, monthFirst: false, map: null };
+  const saved = settings().importMap || null;
+  const rowsOf = () => grid.sheets[st.sheet].rows;
+  const colName = i => { let n = '', k = i + 1; while (k) { k--; n = String.fromCharCode(65 + (k % 26)) + n; k = Math.floor(k / 26); } return n; };
+  const cellShow = v => (v instanceof Date ? fmtDate(todayISO(v)) : String(v ?? '')).slice(0, 30);
+  const guess = () => { st.map = guessMapping(st.headerRow ? rowsOf()[0] || [] : [], saved); };
+  guess();
+  const body = h('div');
+  const paint = () => {
+    const rows = rowsOf(), width = Math.max(0, ...rows.slice(0, 50).map(r => r.length));
+    const head = st.headerRow ? rows[0] || [] : [];
+    const sample = rows[st.headerRow ? 1 : 0] || [];
+    const cols = Array.from({ length: width }, (_, i) => i);
+    const sel = f => h('select', { 'aria-label': f.name, onchange: e => { st.map[f.k] = Number(e.target.value); paint(); } },
+      h('option', { value: '-1', selected: st.map[f.k] < 0 }, '— not in the file —'),
+      cols.map(i => h('option', { value: String(i), selected: st.map[f.k] === i }, `${colName(i)}${head[i] ? ': ' + String(head[i]).slice(0, 30) : ''}${sample[i] !== undefined && String(sample[i]).trim() ? ` (e.g. ${cellShow(sample[i])})` : ''}`)));
+    // the first rows as they'll be read
+    const parsed = rowsFromGrid(rows.slice(0, (st.headerRow ? 1 : 0) + 8), st.map, { headerRow: st.headerRow, monthFirst: st.monthFirst }).map(r => ({ r, c: caseFromRow(r) }));
+    const ok = st.map.details >= 0 || st.map.date >= 0;
+    fill(body,
+      grid.sheets.length > 1 ? h('label', { class: 'field' }, 'Sheet', h('select', { onchange: e => { st.sheet = Number(e.target.value); guess(); paint(); } },
+        grid.sheets.map((sh, i) => h('option', { value: String(i), selected: st.sheet === i }, sh.name)))) : null,
+      h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: st.headerRow, onchange: e => { st.headerRow = e.target.checked; guess(); paint(); } }), 'The first row holds the column names'),
+      h('div', { class: 'map-grid' }, IMPORT_FIELDS.map(f => h('label', { class: 'field' }, f.name, sel(f)))),
+      st.map.initials < 0 ? h('p', { class: 'hint', style: 'margin:0 0 6px' }, 'No Initials column: initials at the start of the case details are split off.') : null,
+      h('label', { class: 'field' }, 'Dates are written', h('select', { onchange: e => { st.monthFirst = e.target.value === 'mdy'; paint(); } },
+        h('option', { value: 'dmy', selected: !st.monthFirst }, 'Day first (13/3/2026)'), h('option', { value: 'mdy', selected: st.monthFirst }, 'Month first (3/13/2026)'))),
+      h('div', { class: 'chiplabel' }, 'How the first rows will be read'),
+      h('div', { class: 'scroll' }, h('table', { class: 'map-preview' },
+        h('thead', {}, h('tr', {}, ['Row', 'Date', 'Initials', 'Details', 'Categories'].map(t => h('th', {}, t)))),
+        h('tbody', {}, parsed.map(({ r, c }) => h('tr', {},
+          h('td', { class: 'muted' }, String(r.row)),
+          h('td', { class: !c.date && c.dateText ? 'bad' : '' }, c.date ? fmtDate(c.date) : c.dateText ? `“${c.dateText}” ✗` : '—'),
+          h('td', {}, c.initials || ''),
+          h('td', {}, String(c.details || '').slice(0, 60)),
+          h('td', { class: c.unknown.length ? 'bad' : '' }, [catPills(c.cats), c.unknown.length ? ` ✗ ${c.unknown.join(', ')}` : ''].join(''))))))),
+      ok ? null : h('p', { class: 'tip' }, 'Choose at least the Date or the Case details column.'));
+    reviewBtn.disabled = !ok;
+  };
+  const reviewBtn = h('button', { class: 'primary', onclick: () => {
+    const rows = rowsFromGrid(rowsOf(), st.map, { headerRow: st.headerRow, monthFirst: st.monthFirst });
+    // remember the column names for next time
+    const head = st.headerRow ? rowsOf()[0] || [] : [];
+    if (st.headerRow) patchLogbook({ settings: { importMap: Object.fromEntries(IMPORT_FIELDS.map(f => [f.k, st.map[f.k] >= 0 ? String(head[st.map[f.k]] ?? '') : ''])) } });
+    m.close();
     const d = diffRows(S.cases, rows);
-    // cases logged or edited after the file was downloaded are not in it: never delete those
-    if (rows.exportedAt) {
-      const newer = d.deleted.filter(c => Math.max(c.updatedAt || 0, c.createdAt || 0) > rows.exportedAt);
+    // cases logged or edited after an exported file was downloaded are not in it: never delete those
+    if (grid.exportedAt) {
+      const newer = d.deleted.filter(c => Math.max(c.updatedAt || 0, c.createdAt || 0) > grid.exportedAt);
       d.deleted = d.deleted.filter(c => !newer.includes(c));
-      // a case edited on the phone after the download: the sheet holds the older text, so keep the edit
-      const edited = d.changed.filter(x => (x.before.updatedAt || 0) > rows.exportedAt);
+      const edited = d.changed.filter(x => (x.before.updatedAt || 0) > grid.exportedAt);
       d.changed = d.changed.filter(x => !edited.includes(x));
       d.kept = [...newer, ...edited.map(x => x.before)];
     }
     previewDiff(d);
-  } catch (err) { toast('Could not read the file: ' + err.message); }
+  } }, 'Review changes');
+  const m = modal('Upload logbook: match the columns', [
+    h('p', { class: 'hint' }, `${fileName}. Pick which column holds each field. Nothing is saved until you review the changes and tap Apply.`),
+    body,
+    h('div', { class: 'bar', style: 'margin-top:12px' }, h('span', { class: 'grow' }), h('button', { onclick: () => m.close() }, 'Cancel'), reviewBtn)], { sticky: true });
+  paint();
 }
 
 const caseKey = c => `${c.date || c.dateText || ''}|${caseText(c).toLowerCase().replace(/\s+/g, ' ')}|${catText(c.cats)}`;

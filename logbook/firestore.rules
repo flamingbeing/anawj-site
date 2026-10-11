@@ -269,12 +269,14 @@ service cloud.firestore {
       allow write: if isAdmin()
         && request.resource.data.keys().hasOnly(['parts', 'size', 'uploadedAt'])
         && request.resource.data.parts is int && request.resource.data.parts >= 1 && request.resource.data.parts <= 20;
+      allow delete: if isAdmin();
     }
     match /config/{part} {
       allow read: if signedIn() && part.matches('portfolioTemplate_part[0-9]+');
       allow write: if isAdmin() && part.matches('portfolioTemplate_part[0-9]+')
         && request.resource.data.keys().hasOnly(['data'])
         && request.resource.data.data is string && request.resource.data.data.size() <= 716800;
+      allow delete: if isAdmin() && part.matches('portfolioTemplate_part[0-9]+');
     }
     // ==== Evaluations (/evals): workplace-based assessments (DOPS, Mini-CEX, EBD) ====
     // The resident starts one and names an assessor from the faculty list; the assessor (signed in

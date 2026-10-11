@@ -457,6 +457,16 @@ export async function saveCategoryNames(names) {
   return n;
 }
 
+// Remove the template: the index doc first (so nobody reads a half-deleted one), then its parts.
+export async function deleteTemplate() {
+  if (demo) return D.deleteTemplate();
+  const { db, F } = await sdk();
+  const meta = await F.getDoc(F.doc(db, 'config', 'portfolioTemplate'));
+  const parts = meta.exists() ? Number(meta.data().parts) || 0 : 0;
+  await F.deleteDoc(F.doc(db, 'config', 'portfolioTemplate'));
+  for (let i = 0; i < Math.max(parts, 1); i++) await F.deleteDoc(F.doc(db, 'config', 'portfolioTemplate_part' + i)).catch(() => {});
+}
+
 // { data: base64, size, uploadedAt } or null when none was uploaded.
 export async function loadTemplate() {
   if (demo) return D.loadTemplate();

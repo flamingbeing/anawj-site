@@ -5,7 +5,7 @@
 
 import { REFLECTION_HEADINGS, REFLECTION_SECTIONS } from './categories.js';
 import { yearInAY } from './engine.js';
-import { S, h, toast, cloud, download, hooks } from './ui-core.js';
+import { S, h, toast, cloud, download, hooks, modal, confirmBox } from './ui-core.js';
 import { SECTIONS, PROFILE_FIELDS, cleanProfile, locateSection1, pdField, isoToDmy, ROW_RE, CELL_RE, PARA_RE } from './profile.js';
 
 const DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
@@ -617,6 +617,30 @@ export async function cleanTemplate(bytes, Z) {
 }
 
 const TC = { info: null, loading: false, busy: false };
+
+// What the export will find in the active template: the reflection tables, Section 1 and Section 4.
+async function checkTemplate() {
+  const t = await getTemplate();
+  if (!t) return toast('No template uploaded');
+  try {
+    const Z = await needZip();
+    const zip = await Z.loadAsync(b64ToBytes(t.data));
+    const xml = await zip.file('word/document.xml').async('string');
+    const { matched } = fillDocumentXml(xml, []);
+    const found = new Set(matched);
+    const missing = REFLECTION_HEADINGS.filter(hd => !found.has(hd.id));
+    const s1 = locateSection1(xml);
+    const s4 = /Posting period/.test(textOf(xml));
+    const m = modal('Portfolio template', [
+      h('p', {}, `Uploaded ${t.uploadedAt ? new Date(t.uploadedAt).toLocaleString() : ''} · ${Math.round((t.size || 0) / 1024)} KB`),
+      h('ul', {},
+        h('li', {}, `Reflection tables: ${found.size} of ${REFLECTION_HEADINGS.length} found`),
+        h('li', {}, `Section 1 (personal details and lists): ${s1 && s1.personal ? 'found' : 'not found'}`),
+        h('li', {}, `Section 4 (case numbers table): ${s4 ? 'found' : 'not found'}`)),
+      missing.length ? [h('p', { class: 'hint' }, 'Headings not found (their reflections won’t be filled in):'), h('ul', { class: 'hint' }, missing.map(hd => h('li', {}, hd.name)))] : null,
+      h('div', { class: 'bar', style: 'margin-top:12px' }, h('span', { class: 'grow' }), h('button', { class: 'primary', onclick: () => m.close() }, 'Close'))]);
+  } catch (err) { toast('Could not read the template: ' + err.message); }
+}
 // Admin page card: upload the blank portfolio template (made with tools/build_portfolio_template.py).
 export function renderTemplateCard() {
   const card = h('section', { class: 'card' }, h('h2', {}, 'Portfolio template'),
@@ -629,11 +653,27 @@ export function renderTemplateCard() {
   const i = TC.info;
   card.append(h('p', { class: 'muted' }, !i ? 'Loading…' : i.none ? 'No template uploaded.'
     : `Uploaded ${i.uploadedAt ? new Date(i.uploadedAt).toLocaleDateString() : ''} (${Math.round((i.size || 0) / 1024)} KB).`));
-  card.append(h('label', { class: 'btn' }, TC.busy ? 'Uploading…' : 'Upload template (.docx)',
+  const has = i && !i.none;
+  // the active template: download it, see what the export will find in it, or remove it
+  if (has) card.append(h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:8px;margin:0 0 8px' },
+    h('button', { class: 'small', onclick: async () => {
+      const t = await getTemplate();
+      if (!t) return toast('No template uploaded');
+      download('APMES portfolio template.docx', new Blob([b64ToBytes(t.data)], { type: DOCX }));
+    } }, 'Download'),
+    h('button', { class: 'small', onclick: () => checkTemplate() }, 'Check contents'),
+    h('button', { class: 'small danger', onclick: async () => {
+      if (!(await confirmBox('Delete the portfolio template?', 'Everyone’s Word export goes back to the plain layout until a new template is uploaded. Download a copy first if you may need it again.', 'Delete template', true))) return;
+      try { await cloud.deleteTemplate(); templateCache = undefined; TC.info = { none: true }; toast('Template deleted'); }
+      catch (err) { toast('Could not delete: ' + err.message); }
+      hooks.render();
+    } }, 'Delete…')));
+  card.append(h('label', { class: 'btn' }, TC.busy ? 'Uploading…' : has ? 'Replace template (.docx)' : 'Upload template (.docx)',
     h('input', { type: 'file', accept: '.docx', hidden: true, disabled: TC.busy, onchange: async e => {
       const f = e.target.files[0];
       e.target.value = '';
       if (!f) return;
+      if (has && !(await confirmBox('Replace the template?', `The template uploaded ${i.uploadedAt ? new Date(i.uploadedAt).toLocaleDateString() : ''} will be replaced for everyone’s export.`, 'Replace'))) return;
       TC.busy = true; hooks.render();
       try {
         const Z = await needZip();

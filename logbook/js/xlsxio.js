@@ -157,6 +157,26 @@ export async function readCasesSheet(file) {
   throw new Error('Could not find a sheet with "Date", "Case details" and "Categories" columns.');
 }
 
+// Every sheet as a grid of raw cells (Dates stay Dates; formulas give their result), for the Upload
+// page where the columns are matched by hand: { sheets: [{ name, rows: [[...]] }], exportedAt }.
+export async function readSheetGrid(file) {
+  const data = file && typeof file.arrayBuffer === 'function' ? await file.arrayBuffer() : file;
+  const wb = new (X().Workbook)();
+  await wb.xlsx.load(data);
+  const tag = wb.getWorksheet('Summary') && cellText(wb.getWorksheet('Summary').getCell('H1').value);
+  const exportedAt = tag && tag.startsWith(EXPORTED_TAG) ? Number(tag.slice(EXPORTED_TAG.length)) || null : null;
+  const sheets = [...wb.worksheets].sort((a, b) => (b.name === 'Cases') - (a.name === 'Cases')).map(ws => {
+    const rows = [];
+    ws.eachRow({ includeEmpty: true }, (row, n) => {
+      const out = [];
+      row.eachCell({ includeEmpty: true }, (c, i) => { const v = rawValue(c.value); out[i - 1] = v instanceof Date ? v : v == null ? '' : typeof v === 'number' ? v : cellText(c.value); });
+      rows[n - 1] = out;
+    });
+    return { name: ws.name, rows: Array.from(rows, r => r || []) };
+  }).filter(s => s.rows.some(r => r.some(v => String(v ?? '').trim())));
+  return { sheets, exportedAt };
+}
+
 // A totals matrix (categories down, residents across). Accepts either
 //   { title?, columns: ['Name', ...], rows: [{ label, values: [n, ...], statuses?: ['late'|'due'|'ontrack'|'done'|'none', ...] }], sheet? }
 // or a plain array of arrays whose first row is the header. Status cells are shaded like the Summary sheet.
