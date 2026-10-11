@@ -155,7 +155,8 @@ export function renderLog() {
   return digest || planned ? h('div', {}, digest, planned, card) : card;
 }
 
-function setMode(m) { draft.mode = m; saveDraft(); hooks.render(); }
+// saved at once (not debounced): a reload right after switching must come back in the same mode
+function setMode(m) { draft.mode = m; saveDraft.cancel(); try { localStorage.setItem(draftKey(), JSON.stringify(draft)); } catch { /* ignore */ } hooks.render(); }
 
 // A picked or kept date lasts KEEP_MS from when it was set, even if the app stays open for days.
 function curDate() {

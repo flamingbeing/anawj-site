@@ -280,7 +280,7 @@ function list() {
         h('li', {}, 'Each reflection is a different patient, under one heading only.'),
         h('li', {}, 'Some categories require one case reflection in Junior Residency (JR, R1–R3); when not indicated, at most one case reflection can be done at the JR level per category.'),
         h('li', {}, 'Generative AI use must follow the NUS guidelines on the use of AI tools in academic work.'))),
-    em ? null : h('p', { class: 'hint', style: 'margin:4px 0 0' }, 'Export the portfolio (Word) from ', h('a', { href: '#more' }, 'More → Export & Sync'), '.'),
+    em ? null : h('div', { class: 'bar', style: 'margin:4px 0 0' }, h('span', { class: 'hint' }, 'Export the portfolio (Word):'), h('a', { class: 'btn small', href: '#more' }, 'More → Export & Sync')),
     null);
 
   // edit-mode toolbar: select all / clear / delete selected
