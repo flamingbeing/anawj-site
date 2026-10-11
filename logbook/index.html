@@ -14,6 +14,10 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<script>
+  // this device's theme before the first paint (Settings → Display → Theme; light unless chosen)
+  try { var t = localStorage.getItem('apmes-logbook-theme'); document.documentElement.dataset.theme = t === 'dark' || t === 'auto' ? t : 'light'; } catch (e) {}
+</script>
 <link rel="stylesheet" href="style.css">
 <!-- fetch every module and the Firebase SDK at once instead of one import at a time -->
 <link rel="modulepreload" href="js/app.js">

@@ -12,6 +12,7 @@ export { cloud };
 export const S = {
   user: null,          // { email, name, uid }
   admin: false,
+  owner: false,        // the app owner (owners/{email}, set in the console): may read logbooks and import cases
   pd: false,           // a programme director (pds/{email}): can see Totals
   resident: null,      // residents/{rid} doc when the user is on the programme list
   logbook: null,       // logbooks/{email} doc

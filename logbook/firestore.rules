@@ -3,9 +3,10 @@ rules_version = '2';
 // APMES Logbook and Evaluations (one Firebase project, apmes-logbook, has ONE rules file: this one).
 // Paste the whole file into Firebase console → Firestore Database → Rules, then Publish. Never paste
 // a rules file from another app over it: the last paste replaces everything.
-// Least privilege: each person's logbook and cases are theirs alone; admins (listed in /admins,
-// added by hand in the console) can also read logbooks, import cases, and manage the resident
-// list. Summaries hold counts only (no case details) and are visible to admins and programme
+// Least privilege: each person's logbook and cases are theirs alone; the app owner (listed in
+// /owners, added by hand in the console, so ownership can be handed over there) can also read
+// logbooks and cases and import cases. Admins (in /admins, also added in the console) manage the
+// resident list and shared templates but cannot read anyone's logbook or cases. Summaries hold counts only (no case details) and are visible to admins and programme
 // residents (a resident's own logbook names their rid, and residents/{rid} must carry their email).
 // Anything not matched below is denied.
 service cloud.firestore {
@@ -18,6 +19,11 @@ service cloud.firestore {
     }
     function isAdmin() {
       return signedIn() && exists(/databases/$(database)/documents/admins/$(me()));
+    }
+    // the app owner: may read every logbook and its cases and import cases (never reflections,
+    // images or the recycle bin). Written only from the console; hand over by swapping the entry.
+    function isAppOwner() {
+      return signedIn() && exists(/databases/$(database)/documents/owners/$(me()));
     }
     // programme directors: a role separate from admin, so their permissions can be tuned on their own.
     // Today a PD can read the resident list, the counts summaries and every evaluation, and maintain
@@ -33,6 +39,13 @@ service cloud.firestore {
     }
     function optNumber(d, k) {
       return !(k in d) || d[k] == null || d[k] is number;
+    }
+
+    // owners: written only from the console. A user may check their own entry.
+    match /owners/{email} {
+      allow get: if isOwner(email);
+      allow list: if isAppOwner();
+      allow write: if false;
     }
 
     // admins: written only from the console. A user may check their own entry.
@@ -77,17 +90,17 @@ service cloud.firestore {
         && (!('rYear' in d) || d.rYear == null || (d.rYear is int && d.rYear >= 1 && d.rYear <= 5));
     }
 
-    // a person's logbook: owner only; admins may read
+    // a person's logbook: theirs only; the app owner may read
     match /logbooks/{email} {
-      allow read: if isOwner(email) || isAdmin();
+      allow read: if isOwner(email) || isAppOwner();
       allow create, update: if isOwner(email) && validLogbook(email, request.resource.data);
       allow delete: if isOwner(email);
 
-      // cases: owner; admins may also write (import from the old form)
+      // cases: theirs only; the app owner may also read and write (import from the old form)
       match /cases/{caseId} {
-        allow read: if isOwner(email) || isAdmin();
-        allow create, update: if (isOwner(email) || isAdmin()) && validCase(caseId, request.resource.data);
-        allow delete: if isOwner(email) || isAdmin();
+        allow read: if isOwner(email) || isAppOwner();
+        allow create, update: if (isOwner(email) || isAppOwner()) && validCase(caseId, request.resource.data);
+        allow delete: if isOwner(email) || isAppOwner();
       }
 
       // case reflections: owner only (admins have no access)
@@ -216,9 +229,9 @@ service cloud.firestore {
         && (!('reflections' in d) || d.reflections is map);
     }
 
-    // which old-form rows have been imported: admins only
+    // which old-form rows have been imported: the app owner only
     match /imports/{rid} {
-      allow read, write: if isAdmin();
+      allow read, write: if isAppOwner();
     }
 
     // templates offered to everyone: admins write
