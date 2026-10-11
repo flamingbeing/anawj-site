@@ -67,8 +67,8 @@ export function renderLogbook() {
     [['all', 'Search everything'], ['initials', 'Search initials only'], ['procedure', 'Search the procedure only']].map(([v, t]) => h('option', { value: v, selected: (settings().lbScope || 'all') === v }, t)));
   const fuzzyBox = h('label', { class: 'check', style: 'margin:0' }, h('input', { type: 'checkbox', checked: !!settings().lbFuzzy, onchange: e => { patchLogbook({ settings: { lbFuzzy: e.target.checked } }); paintFilterBtn(); paint(); } }), 'Fuzzy search (allows typos)');
   const filters = h('div', { class: 'bar lb-filters', hidden: !(view.showFilters || view.cat || view.flag || (settings().lbScope || 'all') !== 'all' || settings().lbFuzzy) },
-    h('select', { 'aria-label': 'Filter by category', onchange: e => { view.cat = e.target.value; paintFilterBtn(); paint(); } },
-      h('option', { value: '' }, 'All categories'),
+    h('select', { 'aria-label': 'Filter by tag', onchange: e => { view.cat = e.target.value; paintFilterBtn(); paint(); } },
+      h('option', { value: '' }, 'All tags'),
       PICKER_ORDER.map(c => h('option', { value: c.code, selected: view.cat === c.code }, `${c.parent ? '  ' : ''}${catName(c.code)} (${S.counts[c.code] || 0})`))),
     h('select', { 'aria-label': 'Filter by flag', onchange: e => { view.flag = e.target.value; paintFilterBtn(); paint(); } },
       flagOpts.map(([v, l]) => h('option', { value: v, selected: view.flag === v }, l))),
@@ -163,7 +163,7 @@ function caseRow(c, flagsOf) {
         flags.includes('needsDate') ? h('span', { class: 'flag err' }, 'needs date') : null,
         flags.includes('future') ? h('span', { class: 'flag' }, 'future date') : null,
         flags.includes('duplicate') ? h('span', { class: 'flag' }, 'possible duplicate') : null,
-        !(c.cats || []).length ? h('span', { class: 'flag err' }, 'no category') : null,
+        !(c.cats || []).length ? h('span', { class: 'flag err' }, 'no tag') : null,
         c.reflectTag && !(S.reflections || []).some(r => r.caseId === c.id) ? h('span', { class: 'flag', title: 'Tagged as a possible reflection' }, '☆ reflection?') : null,
         (c.tags || []).map(t => h('span', { class: 'flag sc-tag', title: 'Your tag' }, tagName(t))),
         // to your own notes (WhatsApp, Notes, Obsidian)
@@ -258,14 +258,14 @@ function gridView(rows, repaint) {
       h('td', { class: 'date' }, cell('date', { type: 'date', 'aria-label': 'Date', title: c.dateText && !c.date ? `Was written as “${c.dateText}”: pick the date` : '' })),
       h('td', { class: 'ini' }, cell('initials', { 'aria-label': 'Initials', placeholder: 'AB', autocapitalize: 'characters', size: '5' })),
       h('td', {}, cell('details', { 'aria-label': 'Details' })),
-      h('td', { class: 'cats' }, h('button', { type: 'button', class: 'grid-cats', 'aria-label': 'Categories: change', onclick: () => editCaseDialog(c) },
-        (c.cats || []).length ? catPills(c.cats) : h('span', { class: 'flag err' }, 'no category'))));
+      h('td', { class: 'cats' }, h('button', { type: 'button', class: 'grid-cats', 'aria-label': 'Tags: change', onclick: () => editCaseDialog(c) },
+        (c.cats || []).length ? catPills(c.cats) : h('span', { class: 'flag err' }, 'no tag'))));
     add(tbody, tr);
   }
   const more = rows.length > view.limit ? h('button', { onclick: () => { view.limit += 300; repaint(); } }, `Show more (${rows.length - view.limit} left)`) : null;
   return h('div', {},
-    h('p', { class: 'hint' }, 'Edit the date, initials and details directly; changes save when you leave a cell. Tap the categories to change them.'),
-    h('div', { class: 'scroll' }, h('table', { class: 'grid' }, h('thead', {}, h('tr', {}, h('th', {}, 'Date'), h('th', {}, 'Initials'), h('th', {}, 'Case summary'), h('th', {}, 'Categories'))), tbody)),
+    h('p', { class: 'hint' }, 'Edit the date, initials and details directly; changes save when you leave a cell. Tap the tags to change them.'),
+    h('div', { class: 'scroll' }, h('table', { class: 'grid' }, h('thead', {}, h('tr', {}, h('th', {}, 'Date'), h('th', {}, 'Initials'), h('th', {}, 'Case summary'), h('th', {}, 'Tags'))), tbody)),
     more,
     pasteRows());
 }
@@ -358,7 +358,7 @@ function mapColumns(fileName, grid) {
         h('option', { value: 'dmy', selected: !st.monthFirst }, 'Day first (13/3/2026)'), h('option', { value: 'mdy', selected: st.monthFirst }, 'Month first (3/13/2026)'))),
       h('div', { class: 'chiplabel' }, 'How the first rows will be read'),
       h('div', { class: 'scroll' }, h('table', { class: 'map-preview' },
-        h('thead', {}, h('tr', {}, ['Row', 'Date', 'Initials', 'Details', 'Categories'].map(t => h('th', {}, t)))),
+        h('thead', {}, h('tr', {}, ['Row', 'Date', 'Initials', 'Details', 'Tags'].map(t => h('th', {}, t)))),
         h('tbody', {}, parsed.map(({ r, c }) => h('tr', {},
           h('td', { class: 'muted' }, String(r.row)),
           h('td', { class: !c.date && c.dateText ? 'bad' : '' }, c.date ? fmtDate(c.date) : c.dateText ? `“${c.dateText}” ✗` : '—'),

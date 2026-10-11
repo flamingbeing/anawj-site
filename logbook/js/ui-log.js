@@ -3,7 +3,8 @@
 
 import { BY_CODE, TIPS } from './categories.js';
 import { withParents, parseBulk, parseDate, fmtDate, sortCodes, uid, caseParts, caseText, cleanInitials, splitInitials, splitAge, nth } from './engine.js';
-import { suggest } from './suggest.js';
+import { suggest as suggestCodes } from './suggest.js';
+import { apmesShorthand, shorthandTags } from './tags.js';
 import {
   S, h, toast, debounce, modal, confirmBox, cat, catName, catShort, catFull, catChip, countText, logTags, tagLinks, tagChip, tagSet, keepTags, PROGRESS_BY_CODE,
   createCase, updateCase, removeCase, restoreCase, saveMany, deleteMany, subcatChips, subcatsOf, settings, todayISO, hooks, fill, add, cloud, okNoIds, patchLogbook, catPills } from './ui-core.js';
@@ -84,7 +85,7 @@ const refocus = () => { if (ui.textarea && matchMedia('(pointer: fine)').matches
 // The list follows your tag set (Settings → Tag editor): section headers, categories and your own tags,
 // indented under what they sit in; hidden ones only turn up in a search. getTags / toggleTag handle your
 // tags (left out: categories only).
-export function catPicker({ get, toggle, getTags = null, toggleTag = null, placeholder = 'Search categories and tags' }) {
+export function catPicker({ get, toggle, getTags = null, toggleTag = null, placeholder = 'Search tags' }) {
   let q = '', hl = 0, items = [];
   const list = h('ul', { role: 'listbox' });
   const input = h('input', {
@@ -328,8 +329,8 @@ function renderOne(card) {
     h('div', { class: 'box-wrap' }, textarea, pasteBtn(textarea)), parsed, selExtra, tip, tagRow,
     // suggestions first, then the last case and your own templates
     h('div', { class: 'chiplabel' }, 'Quick picks'), sugg, templates,
-    h('div', { class: 'bar cat-head' }, h('div', { class: 'chiplabel grow' }, 'All categories'),
-      h('span', { class: 'seg cat-view', role: 'group', 'aria-label': 'Show categories as' },
+    h('div', { class: 'bar cat-head' }, h('div', { class: 'chiplabel grow' }, 'All tags'),
+      h('span', { class: 'seg cat-view', role: 'group', 'aria-label': 'Show tags as' },
         ['list', 'pills'].map(v => h('button', { class: 'small', 'aria-pressed': String((settings().catView || 'list') === v), onclick: () => { if ((settings().catView || 'list') === v) return; patchLogbook({ settings: { catView: v } }); hooks.render(); } }, v === 'list' ? 'List' : 'Pills')))),
     picker.el,
     stillNeeded(),
@@ -359,6 +360,9 @@ function paintParsed(typed) {
   fill(ui.parsed, ...bits.filter(Boolean));
 }
 
+// Suggestions, with your own shorthand for APMES tags (Tag editor) mixed in
+const suggest = (text, opts = {}) => suggestCodes(text, { ...opts, extra: apmesShorthand(tagSet()) });
+
 function paintSuggest() {
   if (!ui || !ui.sugg) return;
   const on = settings().suggestions !== false;
@@ -366,12 +370,15 @@ function paintSuggest() {
   if (!on) return;
   const text = draft.details.trim();
   const list = text ? suggest(text, { limit: 8 }).filter(s => !draft.cats.includes(s.code)) : [];
+  // your own tags whose shorthand you typed (choosing one ticks what it counts towards)
+  const mine = text ? shorthandTags(tagSet(), text).filter(k => !(draft.tags || []).includes(k)) : [];
+  const mineChips = mine.map(k => tagChip(k, { on: false, onclick: () => { keepPlace(ui.sugg, () => { Object.assign(draft, toggleTagIn(draft.cats, draft.tags, k)); saveDraft(); paintSel(); }); refocus(); } }));
   const strong = list.filter(s => s.score >= 0.5).map(s => s.code);
   const all = strong.length > 1 ? h('span', { class: 'chip sugg strong all', role: 'button', tabindex: '0', title: 'Add all the confident suggestions',
     onclick: () => { keepPlace(ui.sugg, () => { draft.cats = sortCodes(withParents([...draft.cats, ...strong])); saveDraft(); paintSel(); }); refocus(); } }, '+ All ' + strong.length) : null;
-  fill(ui.sugg, all, ...(list.length ? list.map(s => catChip(s.code, {
+  fill(ui.sugg, ...mineChips, all, ...(list.length || mine.length ? list.map(s => catChip(s.code, {
     cls: `sugg ${s.score >= 0.5 ? 'strong' : ''}`,
-    title: `${catFull(s.code)} — ${s.why === 'age' ? 'from the age' : s.why === 'bmi' ? 'from the BMI' : 'from your words'}`,
+    title: `${catFull(s.code)} — ${s.why === 'age' ? 'from the age' : s.why === 'bmi' ? 'from the BMI' : s.why === 'yours' ? 'from your shorthand' : 'from your words'}`,
     onclick: () => { keepPlace(ui.sugg, () => { draft.cats = addCat(draft.cats, s.code); saveDraft(); paintSel(); }); refocus(); },
   })) : [h('span', { class: 'muted', style: 'font-size:13px' }, text ? 'No suggestions: search below.' : 'Suggestions appear as you type.')]));
 }
@@ -381,7 +388,7 @@ function paintSel() {
   fill(ui.selected, ...(draft.cats.length
     ? draft.cats.map(code => catChip(code, { on: true, removable: true, cls: 'add', title: 'Remove ' + catFull(code),
       onclick: () => { draft.cats = dropCat(draft.cats, code); saveDraft(); paintSel(); } }))
-    : [h('span', { class: 'none' }, 'No category yet: tap one below')]),
+    : [h('span', { class: 'none' }, 'No tag yet: tap one below')]),
     ...looseTags(draft.cats, draft.tags).map(k => tagChip(k, { onclick: () => { draft.tags = draft.tags.filter(t => t !== k); saveDraft(); paintSel(); } })));
   fill(ui.selExtra,
     // a combination worth keeping: one tap to make it a template (no trip to Settings)
@@ -450,10 +457,10 @@ async function save({ another }) {
     // point at the suggestions (no keyboard popping up); with none, the search box
     const target = ui.sugg && !ui.sugg.hidden && ui.sugg.querySelector('.chip') ? ui.sugg : null;
     if (target) {
-      toast('Tap at least one category: suggestions are highlighted');
+      toast('Tap at least one tag: suggestions are highlighted');
       target.scrollIntoView({ behavior: 'smooth', block: 'center' });
       target.classList.remove('flash'); void target.offsetWidth; target.classList.add('flash');
-    } else { toast('Pick at least one category: search below'); ui.picker.focus(); }
+    } else { toast('Pick at least one tag: search below'); ui.picker.focus(); }
     return;
   }
   if (!details && !(await confirmBox('No case details', 'Save this case without initials or details?', 'Save'))) return;
@@ -506,7 +513,7 @@ function renderBulk(card) {
   });
   const out = h('div');
   add(card, 
-    h('p', { class: 'hint' }, 'Paste your notes or OT list with an empty line between cases (a case can take several lines). Categories are guessed for each case. Cases without a date at the start get ', h('b', {}, fmtDate(curDate())), ' (change it above).'),
+    h('p', { class: 'hint' }, 'Paste your notes or OT list with an empty line between cases (a case can take several lines). Tags are guessed for each case. Cases without a date at the start get ', h('b', {}, fmtDate(curDate())), ' (change it above).'),
     ta,
     h('div', { class: 'bar', style: 'margin-top:8px' },
       h('button', { class: 'primary', onclick: () => { bulkRows = parseBulk(ta.value, t => suggest(t)); paintBulk(out); } }, 'Review'),
@@ -525,7 +532,7 @@ function paintBulk(out) {
     // "Same as above": the categories of the case above, in one tap, when they are not all here already
     const above = i > 0 ? bulkRows[i - 1].cats : [];
     const same = above.length && !above.every(c => r.cats.includes(c)) ? h('span', {
-      class: 'chip tmpl same', role: 'button', tabindex: '0', title: 'Add the categories of the case above: ' + above.map(catFull).join(', '),
+      class: 'chip tmpl same', role: 'button', tabindex: '0', title: 'Add the tags of the case above: ' + above.map(catFull).join(', '),
       onclick: () => { r.cats = sortCodes(withParents([...r.cats, ...above])); paintBulk(out); },
     }, 'Same as above: ', h('b', {}, catPills(above))) : null;
     const sugg = on && r.details.trim() ? suggest(r.details, { limit: 4 }).filter(s => !r.cats.includes(s.code)) : [];
@@ -536,15 +543,15 @@ function paintBulk(out) {
         h('textarea', { rows: String(Math.min(6, Math.max(2, r.details.split('\n').length))), value: r.details, 'aria-label': 'Case summary', oninput: e => { r.details = e.target.value; } })),
       h('td', {}, h('div', { class: 'chips' },
         r.cats.map(code => catChip(code, { on: true, removable: true, onclick: () => { r.cats = dropCat(r.cats, code); paintBulk(out); } })),
-        h('button', { class: 'small icon-btn', 'aria-label': 'Add categories', onclick: () => pickDialog(r.cats, cats => { r.cats = cats; paintBulk(out); }) }, r.cats.length ? '+' : '+ Add')),
+        h('button', { class: 'small icon-btn', 'aria-label': 'Add tags', onclick: () => pickDialog(r.cats, cats => { r.cats = cats; paintBulk(out); }) }, r.cats.length ? '+' : '+ Add')),
         same || sugg.length ? h('div', { class: 'chips', style: 'margin-top:4px' }, same,
           sugg.map(s => catChip(s.code, { cls: `sugg ${s.score >= 0.5 ? 'strong' : ''}`, title: 'Suggested: ' + catFull(s.code), onclick: () => { r.cats = addCat(r.cats, s.code); paintBulk(out); } }))) : null),
       h('td', {}, h('button', { class: 'small danger icon-btn', title: 'Drop this case', 'aria-label': 'Drop this case', onclick: () => { bulkRows.splice(i, 1); paintBulk(out); } }, '×')));
   }));
   fill(out, 
     h('h3', {}, `${bulkRows.length} case${bulkRows.length === 1 ? '' : 's'}`),
-    missing ? h('p', { class: 'tip' }, `${missing} case${missing === 1 ? ' has' : 's have'} no category yet.`) : null,
-    h('div', { class: 'scroll' }, h('table', { class: 'bulk' }, h('thead', {}, h('tr', {}, h('th', {}, 'Date'), h('th', {}, 'Details'), h('th', {}, 'Categories'), h('th', {}))), tbody)),
+    missing ? h('p', { class: 'tip' }, `${missing} case${missing === 1 ? ' has' : 's have'} no tag yet.`) : null,
+    h('div', { class: 'scroll' }, h('table', { class: 'bulk' }, h('thead', {}, h('tr', {}, h('th', {}, 'Date'), h('th', {}, 'Details'), h('th', {}, 'Tags'), h('th', {}))), tbody)),
     h('div', { class: 'actions' }, h('button', { class: 'primary big', onclick: saveBulk }, `Save all ${bulkRows.length}`),
       h('button', { class: 'big', title: 'Keep these as a plan and confirm each one after the list', onclick: planBulk }, 'Plan for later…')));
 }
@@ -590,7 +597,7 @@ function planCard() {
   const done = async (items, opts = {}) => {
     const now = Date.now();
     const cases = items.map((p, i) => ({ id: uid(), date: p.date, initials: p.initials || '', details: p.details || '', cats: sortCodes(p.cats || []), createdAt: now + i, updatedAt: now + i, source: 'paste' }));
-    if (cases.some(c => !c.cats.length) && !opts.quiet && !(await confirmBox('No category', 'Some of these have no category yet. Log them anyway?', 'Log'))) return;
+    if (cases.some(c => !c.cats.length) && !opts.quiet && !(await confirmBox('No tag', 'Some of these have no tag yet. Log them anyway?', 'Log'))) return;
     await saveMany(cases);
     const gone = new Set(items.map(p => p.id));
     await savePlan(plan().filter(p => !gone.has(p.id)));
@@ -609,7 +616,7 @@ function planCard() {
       due.length > 1 ? h('button', { class: 'small primary', onclick: () => done(due) }, `✓ All ${due.length} done`) : null),
     due.length ? h('ul', { class: 'plan-list' }, due.map(p => h('li', {},
       h('span', { class: 'pt' }, p.date < today ? h('small', {}, fmtDate(p.date).replace(/ \d{4}$/, '') + ' · ') : null, p.initials ? h('b', {}, p.initials + ' ') : null, String(p.details || '').split('\n').join(' · '),
-        h('small', { class: 'muted' }, ' ' + (p.cats && p.cats.length ? catPills(p.cats) : 'no category'))),
+        h('small', { class: 'muted' }, ' ' + (p.cats && p.cats.length ? catPills(p.cats) : 'no tag'))),
       h('span', { class: 'row' },
         h('button', { class: 'small primary', 'aria-label': 'Done: log this case', onclick: () => done([p]) }, '✓ Done'),
         h('button', { class: 'small', 'aria-label': 'Edit before logging', onclick: () => edit(p) }, 'Edit'),
@@ -622,7 +629,7 @@ async function saveBulk(e) {
   const def = curDate();
   const rows = bulkRows.filter(r => r.details.trim() || String(r.initials || '').trim() || r.cats.length);
   if (!(await okNoIds(...rows.map(r => r.details)))) return;
-  if (rows.some(r => !r.cats.length) && !(await confirmBox('Some cases have no category', 'Save them anyway? They will not count towards any target until you add one.', 'Save all'))) return;
+  if (rows.some(r => !r.cats.length) && !(await confirmBox('Some cases have no tag', 'Save them anyway? They will not count towards any target until you add one.', 'Save all'))) return;
   const now = Date.now();
   const cases = rows.map((r, i) => ({ id: uid(), date: r.date || def, initials: cleanInitials(r.initials), details: r.details.trim(), cats: sortCodes(r.cats), createdAt: now + i, updatedAt: now + i, source: 'paste' }));
   // clear the list first: offline the save can take a few seconds, and a second tap must not repeat it
@@ -648,7 +655,7 @@ export function pickDialog(initial, done) {
   const paint = () => fill(sel, ...(cats.length ? cats.map(code => catChip(code, { on: true, removable: true, onclick: () => { cats = dropCat(cats, code); paint(); picker.refresh(); } })) : [h('span', { class: 'none' }, 'None selected')]));
   const picker = catPicker({ get: () => cats, toggle: code => { cats = toggleCat(cats, code); paint(); } });
   paint();
-  const m = modal('Categories', [sel, h('div', { style: 'height:8px' }), picker.el,
+  const m = modal('Tags', [sel, h('div', { style: 'height:8px' }), picker.el,
     h('div', { class: 'bar', style: 'margin-top:12px' }, h('span', { class: 'grow' }), h('button', { class: 'primary', onclick: () => m.close() }, 'Done'))],
   { onclose: () => done(sortCodes(cats)) });
   picker.focus();
@@ -661,31 +668,32 @@ export function editCaseDialog(c, opts = {}) {
   // older cases keep the initials at the front of the details: split them now, saved apart on Save
   const e = { ...c, ...caseParts(c), cats: [...(c.cats || [])] };
   const sel = h('div', { class: 'chips selected' });
-  const sugg = h('div', { class: 'chips' });
   const paint = () => {
-    fill(sel, ...(e.cats.length ? e.cats.map(code => catChip(code, { on: true, removable: true, onclick: () => { e.cats = dropCat(e.cats, code); paint(); picker.refresh(); } })) : [h('span', { class: 'none' }, 'No categories')]),
+    fill(sel, ...(e.cats.length ? e.cats.map(code => catChip(code, { on: true, removable: true, onclick: () => { e.cats = dropCat(e.cats, code); paint(); picker.refresh(); } })) : [h('span', { class: 'none' }, 'No tags')]),
       ...looseTags(e.cats, e.tags).map(k => tagChip(k, { onclick: () => { e.tags = e.tags.filter(t => t !== k); paint(); picker.refresh(); } })),
       subcatChips(e.cats, e.tags || [], tags => { e.tags = tags; paint(); }));
-    const s = e.details.trim() && settings().suggestions !== false ? suggest(e.details, { limit: 6 }).filter(x => !e.cats.includes(x.code)) : [];
-    fill(sugg, ...s.map(x => catChip(x.code, { cls: `sugg ${x.score >= 0.5 ? 'strong' : ''}`, onclick: () => { e.cats = addCat(e.cats, x.code); paint(); picker.refresh(); } })));
   };
   const picker = catPicker({ get: () => e.cats, toggle: code => { e.cats = toggleCat(e.cats, code); paint(); },
     getTags: () => e.tags || [], toggleTag: key => { Object.assign(e, toggleTagIn(e.cats, e.tags, key)); paint(); } });
-  const paintSoon = debounce(paint, 120);
   paint();
+  // the full list opens from the Add tags button
+  const pickWrap = h('div', { hidden: true, style: 'margin-top:8px' }, picker.el);
+  const addBtn = h('button', { type: 'button', class: 'small', style: 'margin-top:8px', 'aria-expanded': 'false', onclick: () => {
+    pickWrap.hidden = !pickWrap.hidden; addBtn.setAttribute('aria-expanded', String(!pickWrap.hidden));
+    addBtn.textContent = pickWrap.hidden ? '+ Add tags' : 'Done adding tags';
+    if (!pickWrap.hidden) picker.focus({ preventScroll: true });
+  } }, '+ Add tags');
   // at least 6 lines, growing with the text
   const grow = ta => { ta.style.height = 'auto'; ta.style.height = Math.max(ta.scrollHeight + 2, 0) + 'px'; };
   const detailsBox = h('textarea', { rows: '6', class: 'grow-box', value: e.details, placeholder: isNew ? 'e.g. 72M lap chole GA ETT, difficult airway' : '',
-    oninput: ev => { e.details = ev.target.value; grow(ev.target); paintSoon(); } });
+    oninput: ev => { e.details = ev.target.value; grow(ev.target); } });
   requestAnimationFrame(() => grow(detailsBox));
   const m = modal(isNew ? 'New case' : 'Edit case', [
     c.dateText && !c.date ? h('p', { class: 'tip' }, `Imported date “${c.dateText}” could not be read — please set the date.`) : null,
     h('label', { class: 'field' }, 'Date', h('input', { type: 'date', value: e.date || '', max: todayISO(), onchange: ev => { e.date = parseDate(ev.target.value); } })),
     h('label', { class: 'field' }, 'Patient initials', h('input', { value: e.initials, placeholder: 'e.g. AB', maxlength: '20', autocapitalize: 'characters', autocomplete: 'off', spellcheck: 'false', oninput: ev => { e.initials = ev.target.value; } })),
     h('label', { class: 'field' }, 'Case summary', detailsBox),
-    h('div', { class: 'chiplabel' }, 'Categories'), sel,
-    h('div', { class: 'chiplabel' }, 'Suggested'), sugg,
-    h('details', {}, h('summary', {}, 'All categories'), picker.el),
+    h('div', { class: 'chiplabel' }, 'Tags'), sel, addBtn, pickWrap,
     h('label', { class: 'check reflect-tag', style: 'margin-top:8px' }, h('input', { type: 'checkbox', checked: !!e.reflectTag, onchange: ev => { e.reflectTag = ev.target.checked; } }), 'Possible reflection'),
     // Delete / Cancel / Save stay pinned to the bottom while the form scrolls
     h('div', { class: 'bar dlg-actions' },
@@ -699,7 +707,7 @@ export function editCaseDialog(c, opts = {}) {
       h('button', { class: 'primary', onclick: async () => {
         if (!(await okNoIds(e.details))) return;
         if (isNew) {
-          if (!e.details.trim() && !e.cats.length) return toast('Add a case summary or a category');
+          if (!e.details.trim() && !e.cats.length) return toast('Add a case summary or a tag');
           m.close();
           const made = await createCase({ date: e.date || todayISO(), initials: e.initials, details: e.details, cats: e.cats, reflectTag: !!e.reflectTag, tags: e.tags || [] });
           toast('Case logged');

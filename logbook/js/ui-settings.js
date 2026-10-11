@@ -5,7 +5,7 @@ import { YEAR_NAMES, DEFAULT_NAMES, BY_CODE } from './categories.js';
 import { sortCodes, uid, academicYear } from './engine.js';
 import { openBin } from './bin.js';
 import { S, h, toast, modal, confirmBox, cloud, catChip, catName, catShort, PICKER_ORDER, pickerOrder, settings, patchLogbook, displayName, hooks, rYear, myYearName, fill, categoryNames, setCategoryNames, catPills, tagSet, download, fileButton, todayISO } from './ui-core.js';
-import { cleanTagSet, defaultTagSet, tagTree, flatTree, moveTag, reparentTag, removeTag, newKey, tagSetToCsv, tagSetFromCsv, dropTag, canPlace } from './tags.js';
+import { cleanShorthand, cleanTagSet, defaultTagSet, tagTree, flatTree, moveTag, reparentTag, removeTag, newKey, tagSetToCsv, tagSetFromCsv, dropTag, canPlace } from './tags.js';
 import { pickDialog } from './ui-log.js';
 import { PHOTO_BUDGET_KB, PHOTO_NOTE, photoUsageKb, fmtMb } from './reflections.js';
 import { backupCard } from './backup.js';
@@ -58,7 +58,7 @@ export function renderSettings() {
         applyCompact(e.target.checked);
         patchLogbook({ settings: { compact: e.target.checked } });
       } }), 'Compact mode'),
-      h('p', { class: 'hint', style: 'margin:2px 0 0' }, 'Smaller chips, rows and spacing so more categories fit on screen. Saved to your account, so it follows you to other devices.'),
+      h('p', { class: 'hint', style: 'margin:2px 0 0' }, 'Smaller chips, rows and spacing so more tags fit on screen. Saved to your account, so it follows you to other devices.'),
       h('label', { class: 'field', style: 'margin-top:10px' }, 'Text size',
         h('select', { onchange: e => { applyTextSize(e.target.value); patchLogbook({ settings: { textSize: e.target.value } }); } },
           TEXT_SIZES.map(([v, l]) => h('option', { value: v, selected: String(st.textSize || '1') === v }, l)))),
@@ -78,7 +78,7 @@ export function renderSettings() {
     h('section', { class: 'card' },
       h('h2', {}, 'Logging'),
       h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: st.suggestions !== false, onchange: e => patchLogbook({ settings: { suggestions: e.target.checked } }) }),
-        'Suggest categories as I type'),
+        'Suggest tags as I type'),
       h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !!st.enterSaves, onchange: e => patchLogbook({ settings: { enterSaves: e.target.checked } }) }),
         'Enter key saves the case (Shift+Enter for a new line)'),
       h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !!st.weeklyDigest, onchange: e => patchLogbook({ settings: { weeklyDigest: e.target.checked } }) }),
@@ -123,7 +123,7 @@ export function renderSettings() {
       h('h2', {}, 'Privacy'),
       h('p', { class: 'hint', style: 'margin:0' },
         'Your cases are stored in your own logbook in Google Cloud Firestore. Only you can read them (and the app owner, who runs the import from the old Google Form); programme admins cannot. ',
-        'Log patient initials only — no names, NRIC or hospital numbers. Programme residents share case counts per category on the Totals tab; details are never shared. ',
+        'Log patient initials only — no names, NRIC or hospital numbers. Programme residents share case counts per tag on the Totals tab; details are never shared. ',
         'This device keeps an offline copy of your cases until you sign out — sign out on shared computers.')),
 
     h('section', { class: 'card credits' },
@@ -166,7 +166,7 @@ function templatesCard() {
   const list = (S.logbook && S.logbook.templates) || [];
   return h('section', { class: 'card' },
     h('h2', {}, 'My templates'),
-    h('p', { class: 'hint' }, 'One-tap category sets on the Log screen, e.g. “LSCS spinal” = 16 + 17 + 28. Your frequent combinations appear there automatically too.'),
+    h('p', { class: 'hint' }, 'One-tap tag sets on the Log screen, e.g. “LSCS spinal” = 16 + 17 + 28. Your frequent combinations appear there automatically too.'),
     list.length ? h('ul', { class: 'prog' }, list.map(t => h('li', { style: 'grid-template-columns:1fr auto' },
       h('span', {}, h('b', {}, t.name), ' ', h('span', { class: 'muted' }, catPills(t.cats)), t.details ? h('span', { class: 'muted' }, ` · “${t.details}”`) : null),
       h('span', { class: 'row' },
@@ -183,17 +183,17 @@ function templatesCard() {
 export function templateDialog(t, save, title = null) {
   const e = t ? { ...t, cats: [...t.cats] } : { id: uid(), name: '', cats: [], details: '' };
   const chips = h('div', { class: 'chips selected' });
-  const paint = () => fill(chips, ...(e.cats.length ? e.cats.map(c => catChip(c, { on: true })) : [h('span', { class: 'none' }, 'No categories yet')]),
+  const paint = () => fill(chips, ...(e.cats.length ? e.cats.map(c => catChip(c, { on: true })) : [h('span', { class: 'none' }, 'No tags yet')]),
     h('button', { class: 'small', onclick: () => pickDialog(e.cats, cats => { e.cats = cats; paint(); }) }, 'Choose…'));
   paint();
   const m = modal(title || (t ? 'Edit template' : 'New template'), [
     h('label', { class: 'field' }, 'Name', h('input', { value: e.name, placeholder: 'e.g. LSCS spinal', oninput: ev => { e.name = ev.target.value; } })),
-    h('div', { class: 'chiplabel' }, 'Categories'), chips,
+    h('div', { class: 'chiplabel' }, 'Tags'), chips,
     h('label', { class: 'field', style: 'margin-top:10px' }, 'Starting text for details (optional)', h('input', { value: e.details || '', placeholder: 'e.g. spinal, GA if converted', oninput: ev => { e.details = ev.target.value; } })),
     h('div', { class: 'bar', style: 'margin-top:12px' }, h('span', { class: 'grow' }),
       h('button', { onclick: () => m.close() }, 'Cancel'),
       h('button', { class: 'primary', onclick: async () => {
-        if (!e.name.trim() || !e.cats.length) return toast('Give it a name and at least one category');
+        if (!e.name.trim() || !e.cats.length) return toast('Give it a name and at least one tag');
         const out = { id: e.id, name: e.name.trim(), cats: sortCodes(e.cats) };
         if (e.details && e.details.trim()) out.details = e.details.trim();
         m.close();
@@ -224,11 +224,11 @@ export function categoryNamesCard() {
   const set = (code, k, v) => { edits[code] = { ...(edits[code] || {}), [k]: v }; };
   const ed = CN.edit && S.admin;
   return h('section', { class: 'card cat-names-card' }, h('details', { class: 'more-tools', open: CN.open || ed, ontoggle: e => { CN.open = e.target.open; } },
-    h('summary', {}, 'Default category names'),
+    h('summary', {}, 'Default tag names'),
     h('p', { class: 'hint' }, 'The programme’s names for everyone: a display name for lists and Progress, and a short name for the pills. Each resident can still rename them for themselves in the Tag editor. Exports (portfolio, Excel) always use the official APMES names.'),
     S.admin ? h('div', { class: 'bar', style: 'margin:0 0 8px' }, ed
       ? [h('button', { class: 'primary small', onclick: async () => {
-          try { const n = await cloud.saveCategoryNames(edits); setCategoryNames(n); CN.edit = false; toast('Category names saved for everyone'); hooks.render(); }
+          try { const n = await cloud.saveCategoryNames(edits); setCategoryNames(n); CN.edit = false; toast('Tag names saved for everyone'); hooks.render(); }
           catch (err) { toast('Could not save: ' + err.message); }
         } }, 'Save names'), h('button', { class: 'small', onclick: () => { CN.edit = false; hooks.render(); } }, 'Cancel')]
       : h('button', { class: 'small', onclick: () => { CN.edit = true; CN.open = true; hooks.render(); } }, 'Edit')) : null,
@@ -272,7 +272,7 @@ export function renderTagEditor() {
       h('button', { class: 'small', onclick: () => download(`tags-${todayISO()}.csv`, new Blob([tagSetToCsv(set, def)], { type: 'text/csv' })) }, 'Download as CSV'),
       fileButton('Load a CSV…', '.csv,text/csv', file => loadTagCsv(file, def), 'btn small'),
       h('button', { class: 'small', onclick: async () => {
-        if (!(await confirmBox('Reset tags?', 'Go back to the APMES categories in the official order, with the programme’s names? Your own tags are removed from the list (cases keep them).', 'Reset', true))) return;
+        if (!(await confirmBox('Reset tags?', 'Go back to the APMES tags in the official order, with the programme’s names? Your own tags are removed from the list (cases keep them).', 'Reset', true))) return;
         await patchLogbook({ settings: { tagSet: defaultTagSet({}), catOrder: [], subcats: {} } }); hooks.render();
       } }, 'Reset')),
     h('ul', { class: 'te-list' }, nodes.map(row)));
@@ -346,16 +346,19 @@ function editTag(n, kind = n ? n.kind : 'tag') {
   const pill = h('input', { value: e.n || '', maxlength: kind === 'head' ? '60' : '40', placeholder: code ? dflt.pill : kind === 'head' ? 'e.g. Regional' : 'e.g. Interscalene' });
   const long = h('input', { value: e.l || '', maxlength: '100', placeholder: code ? ((DEFAULT_NAMES[code] || [])[0] || BY_CODE[code].name) : 'optional' });
   const hide = h('input', { type: 'checkbox', checked: !!e.hide });
+  const kw = h('input', { value: (e.kw || []).join(', '), maxlength: '300', placeholder: kind === 'cat' ? 'e.g. flap, free flap' : 'e.g. appy, lap appy', autocapitalize: 'off', spellcheck: 'false' });
   const linkBox = h('div', { class: 'te-links' }, PICKER_ORDER.map(c => h('label', { class: 'check' },
     h('input', { type: 'checkbox', checked: e.links.includes(c.code), onchange: ev => { e.links = ev.target.checked ? [...e.links, c.code] : e.links.filter(x => x !== c.code); } }),
     `${c.parent ? '\u00a0\u00a0' : ''}${catName(c.code)}`)));
   const m = modal(n ? (kind === 'cat' ? 'Edit APMES tag' : kind === 'head' ? 'Edit header' : 'Edit personal tag') : (kind === 'head' ? 'New section header' : 'New personal tag'), [
-    code ? h('p', { class: 'hint' }, `APMES: ${BY_CODE[code].label}. It always counts towards this category; renaming is just for you.`) : null,
+    code ? h('p', { class: 'hint' }, `APMES: ${BY_CODE[code].label}. It always counts towards this APMES tag; renaming is just for you.`) : null,
     h('label', { class: 'field' }, kind === 'head' ? 'Header' : 'Name (pill)', pill),
     kind !== 'head' ? h('label', { class: 'field' }, 'Long name (lists)', long) : null,
     kind !== 'head' ? h('label', { class: 'field' }, 'Sits under', under) : null,
     kind === 'tag' ? [h('div', { class: 'chiplabel' }, 'Counts towards (optional)'),
-      h('p', { class: 'hint', style: 'margin:0 0 4px' }, 'Choosing this tag ticks these APMES categories. Leave all unticked for a label only.'), linkBox] : null,
+      h('p', { class: 'hint', style: 'margin:0 0 4px' }, 'Choosing this tag ticks these APMES tags. Leave all unticked for a label only.'), linkBox] : null,
+    kind !== 'head' ? h('label', { class: 'field', style: 'margin-top:8px' }, 'Shorthand (optional)', kw,
+      h('small', { class: 'hint', style: 'display:block' }, 'Words you type for this, separated by commas. Typing one in a case suggests this tag.')) : null,
     kind !== 'head' ? h('label', { class: 'check', style: 'margin-top:8px' }, hide, 'Hide from the Log page (still found by search)') : null,
     h('div', { class: 'bar', style: 'margin-top:12px' },
       n && kind !== 'cat' ? h('button', { class: 'danger', onclick: async () => { m.close(); await saveTags(removeTag(set, e.k)); toast('Removed (cases keep the tag)'); } }, 'Remove') : null,
@@ -364,8 +367,8 @@ function editTag(n, kind = n ? n.kind : 'tag') {
       h('button', { class: 'primary', onclick: async () => {
         const nm = pill.value.trim();
         if (kind !== 'cat' && !nm) return toast('Give it a name');
-        const out = { ...e, n: nm, l: long.value.trim(), hide: hide.checked };
-        if (!out.l) delete out.l; if (!out.hide) delete out.hide; if (!out.n && kind === 'cat') delete out.n;
+        const out = { ...e, n: nm, l: long.value.trim(), hide: hide.checked, kw: kind === 'head' ? [] : cleanShorthand(kw.value) };
+        if (!out.l) delete out.l; if (!out.hide) delete out.hide; if (!out.kw.length) delete out.kw; if (!out.n && kind === 'cat') delete out.n;
         if (kind !== 'tag') delete out.links;
         let next = n ? set.map(x => (x.k === e.k ? out : x)) : [...set, out];
         const p = sub ? 'c:' + sub : under.value;

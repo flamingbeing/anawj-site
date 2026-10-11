@@ -7,8 +7,9 @@
 // Progress, targets, exports) and carry your own tags by key in case.tags.
 //
 // Stored as settings.tagSet, a list in display order:
-//   { k: 'c:26', n?, l?, p?, hide? }          built-in category (n = your pill name, l = your long name)
-//   { k: 'u:ab12cd', n, l?, p?, links?, hide? } your tag ('26:Interscalene' for older subcategories)
+//   { k: 'c:26', n?, l?, p?, hide?, kw? }          built-in category (n = your pill name, l = your long name)
+//   { k: 'u:ab12cd', n, l?, p?, links?, hide?, kw? } your tag ('26:Interscalene' for older subcategories)
+// kw = your shorthand: words that, typed in a case, suggest this tag ("appy", "free flap").
 //   { k: 'h:ab12cd', n, hd: true }             a section header
 // p = the key of the item it sits under (a header, a category or another tag). Built-in subcategories
 // (20i) always sit under their official parent.
@@ -68,6 +69,8 @@ export function cleanTagSet(list) {
       if (links.length) e.links = links;
     }
     if (typeof raw.p === 'string' && raw.p) e.p = raw.p.slice(0, 80);
+    const kw = cleanShorthand(raw.kw);
+    if (kw.length && !e.hd) e.kw = kw;
     if (raw.hide && !e.hd) e.hide = true;
     seen.add(k);
     out.push(e);
@@ -92,6 +95,29 @@ export function cleanTagSet(list) {
     while (p) { if (path.has(p)) { delete e.p; break; } path.add(p); p = (byK.get(p) || {}).p; }
   }
   return out;
+}
+
+// ---------- your shorthand ----------
+
+// "appy, Free flap,  lap appy" -> ['appy', 'free flap', 'lap appy'] (lower case, ≤ 10 words of ≤ 30 letters)
+export function cleanShorthand(v) {
+  const list = Array.isArray(v) ? v : String(v ?? '').split(/[,;\n]+/);
+  return [...new Set(list.map(x => str(x, 30).toLowerCase()).filter(Boolean))].slice(0, 10);
+}
+const wordRe = w => new RegExp(`(?:^|[^a-z0-9])${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '\\s+')}(?![a-z0-9])`);
+// the case text without its leading initials ("DL 45M …"), lower case
+const caseWords = text => String(text || '').replace(/^\s*[A-Z]{2,4}(?![A-Za-z0-9])/, '').toLowerCase();
+// For suggest(): [{ re, code }] from shorthand on APMES tags.
+export function apmesShorthand(set) {
+  const out = [];
+  for (const e of set || []) if (e.kw && e.k.startsWith('c:')) for (const w of e.kw) out.push({ re: wordRe(w), code: e.k.slice(2) });
+  return out;
+}
+// Your own tags whose shorthand appears in the text, in list order (not hidden ones' parents' rules: just the tags).
+export function shorthandTags(set, text) {
+  const words = caseWords(text);
+  if (!words.trim()) return [];
+  return (set || []).filter(e => e.kw && !e.k.startsWith('c:') && !e.hd && e.kw.some(w => wordRe(w).test(words))).map(e => e.k);
 }
 
 // The set in effect for these settings.
@@ -152,19 +178,21 @@ export function tagName(set, key) {
 // ---------- sharing as a CSV file (opens in Excel; meant to be edited by hand) ----------
 //
 // One row per item, in list order. Type is APMES (a built-in category), Personal (your own tag) or Header.
-// Under names the row it sits under, by its Name. "APMES categories" says which category an APMES row is,
+// Shorthand: words that suggest the tag when typed in a case ("appy, lap appy").
+// Under names the row it sits under, by its Name. "APMES tags" says which category an APMES row is,
 // or what a Personal tag counts towards ("26 Peripheral nerve blocks; 18"; the number is enough).
 // ID is how a re-loaded file keeps your cases linked to your tags: leave it as is, blank for new rows.
 
-export const CSV_HEAD = ['Type', 'Name', 'Full name', 'Under', 'APMES categories', 'Hidden', 'ID'];
+export const CSV_HEAD = ['Type', 'Name', 'Full name', 'Under', 'APMES tags', 'Shorthand', 'Hidden', 'ID'];
 // older and hand-typed column names
 const COLS = {
   type: ['type', 'kind'],
   name: ['name', 'tag', 'pill', 'short name'],
   long: ['full name', 'long name', 'full'],
   under: ['under', 'parent', 'sits under'],
-  links: ['apmes categories', 'apmes category', 'apmes', 'counts towards', 'categories', 'category', 'code', 'codes'],
+  links: ['apmes tags', 'apmes tag', 'apmes categories', 'apmes category', 'apmes', 'counts towards', 'categories', 'category', 'code', 'codes'],
   hidden: ['hidden', 'hide'],
+  kw: ['shorthand', 'abbreviations', 'aliases', 'short forms'],
   key: ['id', 'key'],
 };
 const TYPE_OUT = { cat: 'APMES', tag: 'Personal', head: 'Header' };
@@ -182,7 +210,7 @@ export function tagSetToCsv(set, names = () => ({ pill: '', long: '' })) {
     const nm = n.kind === 'cat' ? (e.n || names(n.code).pill) : e.n;
     const long = n.kind === 'cat' ? (e.l || names(n.code).long) : n.kind === 'head' ? '' : (e.l || '');
     const links = n.kind === 'cat' ? [catRef(n.code)] : (e.links || []).map(catRef);
-    rows.push([TYPE_OUT[n.kind], nm, long, e.p ? label(e.p) : '', links.join('; '), n.kind === 'head' ? '' : e.hide ? 'yes' : 'no', e.k]);
+    rows.push([TYPE_OUT[n.kind], nm, long, e.p ? label(e.p) : '', links.join('; '), (e.kw || []).join(', '), n.kind === 'head' ? '' : e.hide ? 'yes' : 'no', e.k]);
   }
   return rows.map(r => r.map(csvCell).join(',')).join('\r\n') + '\r\n';
 }
@@ -232,7 +260,7 @@ export function tagSetFromCsv(text, names = () => ({ pill: '', long: '' }), curr
     return Object.fromEntries(Object.entries(COLS).map(([k, list]) => [k, ix(list)]));
   };
   const hr = rows.slice(0, 10).findIndex(r => { const ci = find(r); return ci.name >= 0 && (ci.type >= 0 || ci.links >= 0); });
-  if (hr < 0) return fail('This doesn’t look like a tag file: it needs a Name column, and a Type or APMES categories column.');
+  if (hr < 0) return fail('This doesn’t look like a tag file: it needs a Name column, and a Type or APMES tags column.');
   const ci = find(rows[hr]);
   const get = (r, i) => (i >= 0 ? String(r[i] ?? '').replace(/\s+/g, ' ').trim() : '');
 
@@ -274,8 +302,8 @@ export function tagSetFromCsv(text, names = () => ({ pill: '', long: '' }), curr
     let e;
     if (kind === 'cat') {
       const code = (key.startsWith('c:') && isCode(key.slice(2)) && key.slice(2)) || good[0] || codeOf(name);
-      if (!code) { errors.push(`Row ${line}: “${name || rawType}” is marked APMES but no APMES category was recognised, so it was skipped`); return; }
-      if (keys.has('c:' + code)) { errors.push(`Row ${line}: APMES category ${catRef(code)} appears twice; the later row was skipped`); return; }
+      if (!code) { errors.push(`Row ${line}: “${name || rawType}” is marked APMES but no APMES tag was recognised, so it was skipped`); return; }
+      if (keys.has('c:' + code)) { errors.push(`Row ${line}: APMES tag ${catRef(code)} appears twice; the later row was skipped`); return; }
       e = { k: 'c:' + code };
       if (name && name !== names(code).pill) e.n = name;
       if (long && long !== names(code).long) e.l = long;
@@ -296,9 +324,11 @@ export function tagSetFromCsv(text, names = () => ({ pill: '', long: '' }), curr
       if (good.length) e.links = good.slice(0, 10);
       counts.tags++;
     }
-    for (const x of bad) errors.push(`Row ${line}: “${x}” isn’t an APMES category, so it was left out`);
+    for (const x of bad) errors.push(`Row ${line}: “${x}” isn’t an APMES tag, so it was left out`);
     if (under) unders.push([e, under, line]);
     if (hidden && kind !== 'head') e.hide = true;
+    const kw = kind === 'head' ? [] : cleanShorthand(get(r, ci.kw));
+    if (kw.length) e.kw = kw;
     keys.add(e.k);
     set.push(e);
   });
@@ -315,7 +345,7 @@ export function tagSetFromCsv(text, names = () => ({ pill: '', long: '' }), curr
     else e.p = p;
   }
   const missing = ACTIVE.filter(c => !keys.has('c:' + c.code)).map(c => c.code);
-  if (missing.length) notes.push(`${missing.length} APMES categor${missing.length === 1 ? 'y isn’t' : 'ies aren’t'} in the file, so ${missing.length === 1 ? 'it goes' : 'they go'} at the end of the list: ${missing.map(catRef).join(', ')}`);
+  if (missing.length) notes.push(`${missing.length} APMES tag${missing.length === 1 ? ' isn’t' : 's aren’t'} in the file, so ${missing.length === 1 ? 'it goes' : 'they go'} at the end of the list: ${missing.map(catRef).join(', ')}`);
   const dropped = mine.filter(x => !keys.has(x.k)).map(x => x.n);
   if (dropped.length) notes.push(`${dropped.length} of your tags ${dropped.length === 1 ? 'isn’t' : 'aren’t'} in the file, so ${dropped.length === 1 ? 'it comes' : 'they come'} off the list (cases keep them): ${dropped.join(', ')}`);
   return { set: cleanTagSet(set), errors, notes, counts, missing, dropped };

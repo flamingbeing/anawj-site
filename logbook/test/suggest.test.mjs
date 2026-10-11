@@ -141,4 +141,14 @@ for (const t of ['72y', '72yo', '72Y', '72 yo', '72yoF', '72yF', '72yrsM']) {
 }
 assert.equal(splitAge('72y lap chole').age, '72y');
 
+// common shorthand
+const top = t => suggest(t, { limit: 3 }).map(s => s.code);
+assert.ok(top('free flap').includes('32'), 'flap');
+assert.ok(top('lap appy').includes('08') && top('lap appy').includes('13'), 'lap appy');
+assert.ok(!top('ex lap').includes('08') || suggest('ex lap').find(s => s.code === '08').score < 0.5, 'ex lap is not laparoscopic');
+assert.ok(top('tka').includes('18') && top('turp').includes('34') && top('crani').includes('15'));
+assert.ok(!suggest('TT 30F lap chole').some(s => s.code === '04'), 'initials are not shorthand');
+// your own shorthand for an APMES tag
+assert.ok(suggest('45M zz procedure', { extra: [{ re: /(?:^|[^a-z0-9])zz(?![a-z0-9])/, code: '32' }] }).some(s => s.code === '32' && s.why === 'yours'));
+
 console.log('suggest tests passed');

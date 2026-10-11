@@ -32,14 +32,14 @@ export function renderProgress() {
       ' ', infoBtn),
     infoText,
     S.resident ? null : h('p', { class: 'hint', style: 'margin:4px 0 0' }, 'Not on the programme list, so your year is set in ', h('a', { href: '#settings' }, 'Settings'), '.'),
-    pview.by === 'epa' ? h('p', { style: 'margin:6px 0 0' }, h('span', { class: 'hint' }, 'Showing by EPA · '), h('button', { class: 'small linkish', onclick: () => { pview.by = 'cat'; hooks.render(); } }, 'Back to categories')) : null);
+    pview.by === 'epa' ? h('p', { style: 'margin:6px 0 0' }, h('span', { class: 'hint' }, 'Showing by EPA · '), h('button', { class: 'small linkish', onclick: () => { pview.by = 'cat'; hooks.render(); } }, 'Back to tags')) : null);
   // the rest at the bottom, like the Logbook and Reflections tabs
   const foot = h('section', { class: 'card' },
     h('details', { class: 'more-tools', open: !!pview.toolsOpen, ontoggle: e => { pview.toolsOpen = e.target.open; } },
       h('summary', {}, 'More tools: EPA view, download summary'),
       h('div', { class: 'bar', style: 'margin:0' },
         h('div', { class: 'seg' },
-          h('button', { 'aria-pressed': String(pview.by === 'cat'), onclick: () => { pview.by = 'cat'; hooks.render(); } }, 'By category'),
+          h('button', { 'aria-pressed': String(pview.by === 'cat'), onclick: () => { pview.by = 'cat'; hooks.render(); } }, 'By tag'),
           h('button', { 'aria-pressed': String(pview.by === 'epa'), onclick: () => { pview.by = 'epa'; scrollTo(0, 0); hooks.render(); } }, 'By EPA')),
         h('span', { class: 'grow' }),
         h('button', { class: 'small', onclick: () => downloadSummary(rows, yr) }, 'Download summary'))));
@@ -186,7 +186,7 @@ export function renderTotals() {
       h('span', { class: 'grow' }),
       h('button', { class: 'small', onclick: () => { tview.summaries = null; hooks.render(); } }, 'Refresh'),
       h('button', { class: 'small', onclick: () => downloadTotals(table.data) }, 'Download Excel')),
-    h('p', { class: 'hint' }, 'Case counts only, so residents can see how they compare. Under each category: its targets. Colours use each resident’s own year (tap and hold a red or amber count to see how many short).'),
+    h('p', { class: 'hint' }, 'Case counts only, so residents can see how they compare. Under each tag: its targets. Colours use each resident’s own year (tap and hold a red or amber count to see how many short).'),
     legend(),
     h('div', { class: 'scroll', style: 'margin-top:8px' }, table.el));
   return card;
@@ -251,7 +251,7 @@ function totalsTable(people) {
   add(tbody, 
     h('tr', { class: 'total' }, h('td', { class: 'cat' }, 'Total cases'), totals.map(v => h('td', { class: 'n' }, String(v)))),
     h('tr', {}, h('td', { class: 'cat', title: 'Counted towards each heading’s minimum only' }, 'Reflections', h('small', { class: 'tgt' }, 'towards the 96 needed')), refl.map(v => h('td', { class: 'n' }, String(v)))));
-  const thead = h('thead', {}, h('tr', {}, h('th', {}, 'Category'),
+  const thead = h('thead', {}, h('tr', {}, h('th', {}, 'Tag'),
     people.map(p => h('th', { class: `rot ${p.rid === meId ? 'me' : ''}`, title: p.name }, `${p.name} · ${p.smo ? 'SMO' : p.rYear ? yearName(p.rYear) : '?'}`))));
   data.title = `${tview.year ? (tview.year === 3 && people.some(p => p.smo) ? 'R3 / SMO' : 'R' + tview.year) : 'Year unknown'} totals — ${todayISO()}`;
   return { el: h('table', { class: 'totals' }, thead, tbody), data };

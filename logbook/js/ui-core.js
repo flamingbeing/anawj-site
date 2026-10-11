@@ -300,7 +300,7 @@ export function keepTags(tags, cats) {
 }
 // A chip for one of your tags (selected ones can be removed).
 export const tagChip = (key, { onclick, on = true } = {}) => h('span', { class: `chip tag ${on ? 'on' : ''}`, role: 'button', tabindex: '0', 'data-tag': key, title: 'Your tag', onclick,
-  onkeydown: e => { if ((e.key === 'Enter' || e.key === ' ') && onclick) { e.preventDefault(); onclick(e); } } }, h('span', { class: 'nm' }, tagName(key)), onclick ? h('span', { class: 'x', 'aria-label': 'remove' }, '×') : null);
+  onkeydown: e => { if ((e.key === 'Enter' || e.key === ' ') && onclick) { e.preventDefault(); onclick(e); } } }, h('span', { class: 'nm' }, tagName(key)), onclick && on ? h('span', { class: 'x', 'aria-label': 'remove' }, '×') : null);
 
 export async function createCase({ date, details, initials, cats, source = 'app', dateText, reflectTag = false, tags = [] }) {
   const now = Date.now();

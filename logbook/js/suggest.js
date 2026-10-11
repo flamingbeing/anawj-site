@@ -113,6 +113,36 @@ const RULES = [
   [/\b(?:tonsil\w*|adenotonsil\w*|adenoid\w*|t&a)\b|\bt ?& ?a\b/, '10', 0.8],
 ];
 
+// Common shorthand the old log was too sparse to learn (hand-made; whole words only). Each matching
+// pattern suggests its categories at these scores (and their parents).
+const SHORTHAND = [
+  [/\b(?:flaps?|free flap|alt flap|diep|tram flap|skin graft|ssg|split skin graft)\b/, { '32': 0.75 }],
+  [/\b(?:appy|appendic(?:ec)?tomy|appendectomy)\b/, { '13': 0.6, '06': 0.45 }],
+  [/(?<!\bex ?)\b(?:lap|laparoscopic|lsc|robotic)\b/, { '08': 0.7 }],
+  [/\b(?:ex ?lap|laparotomy|hartmann'?s?|perforat\w*)\b/, { '06': 0.6, '13': 0.5 }],
+  [/\b(?:hemicolectomy|lar|anterior resection|apr|colectomy|stoma|hernia|herniorrhaphy|ih|chole|cholecystectomy|wle|mrm|mastectomy|slnb|axillary clearance)\b/, { '13': 0.6 }],
+  [/\b(?:whipple|oesophagectomy|esophagectomy|gastrectomy|ivor lewis|fundoplication)\b/, { '05': 0.7 }],
+  [/\b(?:sleeve|lsg|rygb|roux|gastric bypass|omega loop|oagb)\b/, { '23': 0.8, '08': 0.6 }],
+  [/\b(?:cabg|avr|mvr|bentall|cpb)\b/, { '01': 0.7 }],
+  [/\b(?:opcab|opcabg|off ?pump)\b/, { '02': 0.75 }],
+  [/\b(?:vats|lobectomy|pneumonectomy|wedge resection|segmentectomy|decortication|thoracotomy)\b/, { '03': 0.7, '07': 0.6 }],
+  [/\b(?:dlt|double lumen|olv|one lung)\b/, { '07': 0.8 }],
+  [/\b(?:thyroidectomy|hemithyroid\w*|parathyroidectomy|parotidectomy|neck dissection|laryngectomy|tt|hemi ?thyroidectomy)\b/, { '04': 0.7 }],
+  [/\b(?:mll|microlaryngoscopy|dl|direct laryngoscopy|laser larynx|trachy|tracheostomy|bronchoscopy|rigid bronch\w*|jet ventilation)\b/, { '11': 0.7, '10': 0.5 }],
+  [/\b(?:fess|septo\w*|mastoid\w*|grommets?|myringotomy|tympanoplasty|turbinoplasty|adenoid\w*)\b/, { '10': 0.75 }],
+  [/\b(?:phaco|cataract|vitrectomy|ppv|squint|strabismus|ptosis|dcr|trabeculectomy|evisceration|enucleation)\b/, { '09': 0.75 }],
+  [/\b(?:hyst|tah|tlh|lah|vah|hysterectomy|myomectomy|d ?& ?c|dnc|erpc|hysteroscopy|ectopic|cystectomy|bso|salpingectomy)\b/, { '14': 0.7 }],
+  [/\b(?:tka|tkr|tha|thr|uka|hemiarthroplasty|hemi ?arthro\w*|dhs|orif|nof|acl|arthroscop\w*|mua|pfna|tsr|k ?wires?|cmn|im nail)\b/, { '18': 0.75 }],
+  [/\b(?:acdf|laminectomy|lami|discectomy|tlif|plif|xlif|spinal fusion|kyphoplasty|scoliosis)\b/, { '24': 0.75 }],
+  [/\b(?:ssep|meps?|neuromonitoring|imon|nim|tiva for monitoring)\b/, { '25': 0.8 }],
+  [/\b(?:crani|craniotomy|craniectomy|evd|vp shunt|burr ?holes?|sdh|edh|aneurysm clipping)\b/, { '15': 0.7 }],
+  [/\b(?:turp|turbt|cysto|cystoscopy|urs|ureteroscopy|pcnl|rirs|nephrectomy|pyeloplasty|orchidectomy|prostatectomy|holep|ralp|ureteric stent)\b/, { '34': 0.75 }],
+  [/\b(?:evar|tevar|fem ?pop|bypass graft|endarterectomy|cea|avf|av fistula|bka|aka|amputation|embolectomy)\b/, { '35': 0.7 }],
+  [/\b(?:mri|ct scan|angio\w*|embolisation|embolization|tace|rfa|thrombectomy|ir suite)\b/, { '33': 0.6 }],
+  [/\b(?:ktx|dckt|ldkt|ldlt|kidney transplant|liver transplant|renal transplant)\b/, { '37': 0.8 }],
+  [/\b(?:circ|circumcision|orchidopexy|hypospadias|herniotomy)\b/, { '20': 0.6 }],
+];
+
 // Score of a code = the strongest word for it, nudged up a little by a second independent word
 // (noisy-OR on a damped runner-up). Plain noisy-OR over-counts words that always travel together.
 const SECOND = 0.35;
@@ -139,7 +169,7 @@ export function calibrate(raw, table = CALIBRATION) {
 }
 
 // keywords / calibration options exist so the builder's held-out evaluation can swap tables in.
-export function suggest(text, { limit = 6, keywords = KEYWORDS, calibration = CALIBRATION } = {}) {
+export function suggest(text, { limit = 6, keywords = KEYWORDS, calibration = CALIBRATION, extra = null } = {}) {
   const ev = {};   // code -> [p, ...]
   for (const g of grams(text, keywords)) {
     const ps = keywords[g];
@@ -163,6 +193,14 @@ export function suggest(text, { limit = 6, keywords = KEYWORDS, calibration = CA
     put(code, score, 'keyword');
     if (BY_CODE[code].parent) put(BY_CODE[code].parent, score, 'keyword');
   }
+  // leading capitals are the patient's initials ("DL 45M …"), not shorthand
+  const words = String(text || '').replace(/^\s*[A-Z]{2,4}(?![A-Za-z0-9])/, '').toLowerCase();
+  for (const [re, codes] of SHORTHAND) {
+    if (!re.test(words)) continue;
+    for (const [code, score] of Object.entries(codes)) { put(code, score, 'keyword'); if (BY_CODE[code] && BY_CODE[code].parent) put(BY_CODE[code].parent, score, 'keyword'); }
+  }
+  // your own shorthand (Tag editor): words that mean an APMES category
+  for (const { re, code } of extra || []) if (re.test(words)) { put(code, 0.9, 'yours'); if (BY_CODE[code] && BY_CODE[code].parent) put(BY_CODE[code].parent, 0.9, 'yours'); }
 
   const age = parseAge(text);
   if (age) {

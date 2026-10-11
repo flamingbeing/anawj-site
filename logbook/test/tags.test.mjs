@@ -1,6 +1,6 @@
 // Run with: node logbook/test/tags.test.mjs  (fake data only)
 import assert from 'node:assert/strict';
-import { defaultTagSet, cleanTagSet, tagSetOf, tagTree, flatTree, tagLinks, userCatNames, tagName, tagSetToCsv, tagSetFromCsv, parseCsv } from '../js/tags.js';
+import { cleanShorthand, apmesShorthand, shorthandTags, defaultTagSet, cleanTagSet, tagSetOf, tagTree, flatTree, tagLinks, userCatNames, tagName, tagSetToCsv, tagSetFromCsv, parseCsv } from '../js/tags.js';
 import { CATEGORIES } from '../js/categories.js';
 
 const ACTIVE = CATEGORIES.filter(c => !c.retired);
@@ -58,8 +58,8 @@ assert.equal(tagName([], '16:elective'), 'elective', 'older subcategory key');
 // CSV round trip
 const names = code => ({ pill: 'P' + code, long: 'Long ' + code });
 const csv = tagSetToCsv(c, names);
-assert.ok(csv.startsWith('Type,Name,Full name,Under,APMES categories,Hidden,ID'));
-assert.ok(/Personal,Interscalene,,Blocks,26i Upper limb blocks,no,u:x/.test(csv), csv.split('\r\n').find(l => l.includes('Interscalene')));
+assert.ok(csv.startsWith('Type,Name,Full name,Under,APMES tags,Shorthand,Hidden,ID'));
+assert.ok(/Personal,Interscalene,,Blocks,26i Upper limb blocks,,no,u:x/.test(csv), csv.split('\r\n').find(l => l.includes('Interscalene')));
 assert.ok(/^APMES,Blocks,/m.test(csv) && /^Header,/m.test(csv));
 const back = tagSetFromCsv(csv, names, c);
 assert.deepEqual(back.errors, []); assert.deepEqual(back.notes, []);
@@ -93,6 +93,18 @@ assert.equal(odd.errors.length, 2, odd.errors.join('\n')); assert.ok(odd.set.som
 assert.ok(tagSetFromCsv('Type,Name\r\nPersonal,New one\r\n', names, c).dropped.includes('Interscalene'));
 assert.ok(tagSetFromCsv('a,b\r\n1,2', names).errors.length, 'not a tag file');
 assert.deepEqual(parseCsv('a,"b ""c""",d\n'), [['a', 'b "c"', 'd']]);
+// shorthand: stored cleaned, round-trips through the CSV, matches whole words (not the initials)
+assert.deepEqual(cleanShorthand('Appy, lap  appy;appy,'), ['appy', 'lap appy']);
+const ks = cleanTagSet([{ k: 'c:32', kw: ['flap', 'free flap'] }, { k: 'u:ap', n: 'Appendix', links: ['13'], kw: 'appy, lap appy' }, { k: 'h:z', n: 'H', hd: true, kw: ['x'] }]);
+assert.deepEqual(ks.find(e => e.k === 'u:ap').kw, ['appy', 'lap appy']);
+assert.ok(!ks.find(e => e.k === 'h:z').kw, 'headers have no shorthand');
+assert.deepEqual(shorthandTags(ks, 'AB 12M lap appy GA'), ['u:ap']);
+assert.deepEqual(shorthandTags(ks, 'happy patient'), [], 'whole words only');
+assert.deepEqual(shorthandTags([{ k: 'u:dl', n: 'DL', kw: ['dl'] }], 'DL 40F lap chole'), [], 'leading initials are not shorthand');
+assert.ok(apmesShorthand(ks).some(x => x.code === '32' && x.re.test(' free  flap')));
+const kc = tagSetFromCsv(tagSetToCsv(ks, names), names, ks);
+assert.deepEqual(kc.set.find(e => e.k === 'u:ap').kw, ['appy', 'lap appy']);
+assert.deepEqual(kc.set.find(e => e.k === 'c:32').kw, ['flap', 'free flap']);
 console.log('tags tests passed');
 {
   const { moveTag, reparentTag, removeTag } = await import('../js/tags.js');

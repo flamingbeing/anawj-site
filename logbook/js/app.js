@@ -49,7 +49,7 @@ const TABS = [
   { id: 'export', label: 'Export portfolio', render: () => renderExportPage(), hidden: true, under: 'more', unlisted: true },
   { id: 'choose', label: 'Export portfolio', render: renderChoosePage, hidden: true, under: 'export', unlisted: true },
   // admins open it from More (or Settings → Admin portal)
-  { id: 'admin', label: 'Admin portal', render: renderAdmin, admin: true, hidden: true, under: 'more', desc: 'Residents, ready portfolios, portfolio template, default category names' },
+  { id: 'admin', label: 'Admin portal', render: renderAdmin, admin: true, hidden: true, under: 'more', desc: 'Residents, ready portfolios, portfolio template, default tag names' },
   // opened from Settings
   { id: 'tags', label: 'Tag editor', render: renderTagEditor, hidden: true, under: 'settings', unlisted: true },
 ];
@@ -180,11 +180,11 @@ function renderLanding(error) {
     h('img', { src: 'icons/icon-192.png', alt: '' }),
     h('p', { class: 'muted', style: 'margin:0' }, 'Case log for APMES anaesthesia residents'),
     h('h2', {}, 'Log a case in seconds'),
-    h('p', {}, 'Type the initials and case, tap the suggested categories, save. Your progress against the APMES targets updates as you go.'),
+    h('p', {}, 'Type the initials and case, tap the suggested tags, save. Your progress against the APMES targets updates as you go.'),
     h('ul', {},
-      h('li', {}, 'Category suggestions from what you type (age, BMI, procedure).'),
+      h('li', {}, 'Tag suggestions from what you type (age, BMI, procedure).'),
       h('li', {}, 'Works offline on your phone; syncs when you are back online.'),
-      h('li', {}, 'Progress by category and EPA; Excel download any time.'),
+      h('li', {}, 'Progress by tag and EPA; Excel download any time.'),
       h('li', {}, 'Private: only you and the programme admins can see your cases.')),
     error ? h('p', { class: 'tip' }, error) : null,
     cloud.enabled ? h('div', { class: 'cta' },
