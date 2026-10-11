@@ -2,7 +2,7 @@
 // shared state and helpers are in ui-core.js. Case data comes from cloud.js (Firestore, or the
 // in-browser demo backend with ?demo).
 
-import { S, hooks, h, toast, cloud, setCases, scheduleSummary, fill, resetCaches, patchLogbook, confirmBox, fileButton, modal, setCategoryNames, categoryNames as categoryNamesNow } from './ui-core.js';
+import { S, hooks, h, toast, cloud, setCases, scheduleSummary, fill, resetCaches, patchLogbook, confirmBox, fileButton, modal, download, todayISO, settings, setCategoryNames, categoryNames as categoryNamesNow } from './ui-core.js';
 import { renderLog, logCasesChanged, clearDrafts, SHARED_KEY } from './ui-log.js';
 import { renderLogbook } from './ui-logbook.js';
 import { renderProgress, renderTotals } from './ui-progress.js';
@@ -12,6 +12,7 @@ import { renderAdmin, leaveAdmin } from './ui-admin.js';
 import { renderReflect, watchMyReflections, renderExportPage, renderChoosePage } from './ui-reflect.js';
 import { downloadExcel, uploadExcel } from './ui-logbook.js';
 import { backupCard } from './backup.js';
+import { settingsFile, readSettingsFile } from './settings-file.js';
 import { purgeExpired, openBin } from './bin.js';
 
 // Tab icons: tiny inline SVG paths (24x24, stroked), so they look the same on every phone.
@@ -102,7 +103,36 @@ function renderSettingsMenu() {
   return h('div', {},
     h('section', { class: 'card more-list' }, h('h2', {}, 'Settings'),
       h('ul', {}, pages.map(t => menuItem(t.id, t.label, t.desc)),
-        menuItem('bin', 'Recycle bin', 'Deleted cases and reflections, kept for 30 days', () => openBin()))));
+        menuItem('bin', 'Recycle bin', 'Deleted cases and reflections, kept for 30 days', () => openBin()))),
+    settingsFileCard());
+}
+
+// Settings export / import: preferences, tags, shorthand, tag groups, formats as one small file
+// (settings-file.js). Never cases, reflections or portfolio details.
+function settingsFileCard() {
+  const exportIt = () => {
+    const f = settingsFile(S.logbook, { theme: cachedTheme() });
+    download(`logbook-settings-${todayISO()}.json`, new Blob([JSON.stringify(f, null, 2)], { type: 'application/json' }));
+  };
+  const importIt = async file => {
+    let d;
+    try { d = readSettingsFile(await file.text()); } catch (err) { return toast(err.message); }
+    const mine = (S.logbook && S.logbook.templates) || [];
+    const same = (a, b) => a.name === b.name && [...a.cats].sort().join() === [...b.cats].sort().join();
+    const newGroups = (d.templates || []).filter(t => !mine.some(m => m.id === t.id || same(m, t)));
+    const n = Object.keys(d.settings).length;
+    if (!(await confirmBox('Import settings', `Use the ${n} setting${n === 1 ? '' : 's'} in this file${newGroups.length ? ` and add ${newGroups.length} tag group${newGroups.length === 1 ? '' : 's'}` : ''}? Settings in the file replace yours (your tags and shorthand too, if the file has them); anything not in it stays. Cases, reflections and portfolio details are never touched.`, 'Import'))) return;
+    await patchLogbook({ settings: d.settings, ...(newGroups.length ? { templates: [...mine, ...newGroups].slice(0, 100) } : {}) });
+    if (d.theme) applyTheme(d.theme);
+    applyCompact(!!settings().compact); applyTextSize(settings().textSize || '1');
+    toast('Settings imported'); render();
+  };
+  return h('section', { class: 'card' },
+    h('h2', {}, 'Settings file'),
+    h('p', { class: 'hint' }, 'Your settings, tags and shorthand, tag groups, copy & share format and saved searches as one small file: to move them to another account or share your setup with a colleague. No cases, reflections or portfolio details.'),
+    h('div', { class: 'bar', style: 'margin-bottom:0' },
+      h('button', { onclick: exportIt }, 'Export settings'),
+      fileButton('Import settings…', '.json,application/json', importIt)));
 }
 
 // The Word upload for reflections (its module loads on first use); when done, on to Reflections
@@ -248,7 +278,7 @@ function renderLanding(error) {
     h('ul', {},
       h('li', {}, 'Tag suggestions from what you type (age, BMI, procedure).'),
       h('li', {}, 'Works offline on your phone; syncs when you are back online.'),
-      h('li', {}, 'Analytics: progress by tag and EPA, trends; Excel download any time.'),
+      h('li', {}, 'Analytics: progress by tag, reflections and trends; Excel download any time.'),
       h('li', {}, 'Private: only you and the programme admins can see your cases.')),
     error ? h('p', { class: 'tip' }, error) : null,
     cloud.enabled ? h('div', { class: 'cta' },
