@@ -651,7 +651,8 @@ table.totals td.due .gap { color: var(--warn); }
 .ready-list li:first-child { border-top: 0; }
 .ready-list .rt { min-width: 0; font-size: 14px; }
 .ready-list .rt small { color: var(--muted); }
-.reflect-tag { margin: 6px 0 2px; font-size: 14px; }
+label.check.reflect-tag { min-height: 0; margin: 0; padding: 4px 0; gap: 6px; font-size: 14px; width: fit-content; }
+label.check.reflect-tag input { width: 18px; height: 18px; margin: 0; }
 
 /* Planned cases (Log screen) */
 .plan { border-left: 4px solid var(--ok); }
@@ -774,3 +775,4 @@ details.quick-actions > summary::-webkit-details-marker { display: none; }
 details.quick-actions .qa-menu { position: absolute; left: 0; top: calc(100% + 4px); z-index: 20; display: grid; gap: 6px; padding: 8px; min-width: 240px; max-width: calc(100vw - 32px); background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.18); }
 details.quick-actions .qa-menu button { text-align: left; }
 .legend.tally { font-size: 13px; color: var(--muted); }
+.chips.quick-rest:not(:empty) { margin-top: 6px; }

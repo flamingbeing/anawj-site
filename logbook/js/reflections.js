@@ -92,7 +92,7 @@ export function completeProblems(r) {
     for (const s of REFLECTION_SECTIONS) if (!s.optional && !String(r.sections[s.id] || '').trim()) out.push(s.name.toLowerCase());
     return out;
   }
-  if (!String(r.title || '').trim() && !String(r.summary || '').trim()) out.push('title or case summary');
+  if (!String(r.title || '').trim() && !String(r.summary || '').trim()) out.push('title or case details');
   if (!arr(r.points).some(p => p && (String(p.heading || '').trim() || String(p.text || '').trim()))) out.push('at least one learning point');
   return out;
 }

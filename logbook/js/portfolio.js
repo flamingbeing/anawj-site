@@ -477,7 +477,7 @@ export function plainDocumentXml(reflections, { name, media = null, profile = nu
   if (name) body += para('', run('Resident’s name : ' + name));
   if (profile) body += plainProfileXml(profile, H);
   body += H('SECTION 2 – CASE REFLECTIONS', 28);
-  body += para('', run('Each reflection: a title and case summary, then the learning points. “JR” above the date marks a junior residency reflection.'));
+  body += para('', run('Each reflection: a title and case details, then the learning points. “JR” above the date marks a junior residency reflection.'));
   let section = '';
   for (const hd of REFLECTION_HEADINGS) {
     if (hd.section !== section) { section = hd.section; body += H(section, 26); }

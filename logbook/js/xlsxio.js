@@ -58,7 +58,7 @@ export async function exportCases(cases, { name = '', counts, progressRows, rYea
   const ws = wb.addWorksheet('Cases', { views: [{ state: 'frozen', ySplit: 1 }] });
   ws.columns = [
     { header: 'Date', key: 'date', width: 13, style: { numFmt: 'd mmm yyyy' } },
-    { header: 'Case details', key: 'details', width: 60 },
+    { header: 'Case summary', key: 'details', width: 60 },
     { header: 'Categories', key: 'categories', width: 60 },
     { header: 'id', key: 'id', width: 20, hidden: true },
   ];
@@ -101,7 +101,7 @@ const EXPORTED_TAG = 'logbook-exported-at:';
 const HEADERS = {
   date: /^date\b/i,
   initials: /^(?:patient(?:'?s)?\s+)?initials$/i,   // an optional column of its own
-  details: /detail|initials/i,
+  details: /detail|summary|initials/i,
   categories: /categor/i,
   id: /^id$/i,
 };
@@ -154,7 +154,7 @@ export async function readCasesSheet(file) {
     });
     return out;
   }
-  throw new Error('Could not find a sheet with "Date", "Case details" and "Categories" columns.');
+  throw new Error('Could not find a sheet with "Date", "Case summary" (or "Case details") and "Categories" columns.');
 }
 
 // Every sheet as a grid of raw cells (Dates stay Dates; formulas give their result), for the Upload

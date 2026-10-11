@@ -2,7 +2,7 @@
 // Also the reusable category picker and the edit-case dialog (used by the Logbook screen).
 
 import { BY_CODE, TIPS } from './categories.js';
-import { withParents, frequentCombos, parseBulk, parseDate, fmtDate, sortCodes, uid, caseParts, caseText, cleanInitials, splitInitials, splitAge, nth } from './engine.js';
+import { withParents, parseBulk, parseDate, fmtDate, sortCodes, uid, caseParts, caseText, cleanInitials, splitInitials, splitAge, nth } from './engine.js';
 import { suggest } from './suggest.js';
 import {
   S, h, toast, debounce, modal, confirmBox, cat, catName, catShort, catFull, catChip, countText, logTags, tagLinks, tagChip, tagSet, keepTags, PROGRESS_BY_CODE,
@@ -269,7 +269,7 @@ function paintDate() {
 
 function renderOne(card) {
   const textarea = h('textarea', {
-    class: 'details', rows: String(boxLines()), style: `min-height:calc(${boxLines()} * 1.4em + 22px)`, autofocus: true, enterkeyhint: settings().enterSaves ? 'done' : 'enter', autocapitalize: 'sentences', autocorrect: 'off', 'aria-label': 'Case details',
+    class: 'details', rows: String(boxLines()), style: `min-height:calc(${boxLines()} * 1.4em + 22px)`, autofocus: true, enterkeyhint: settings().enterSaves ? 'done' : 'enter', autocapitalize: 'sentences', autocorrect: 'off', 'aria-label': 'Case summary',
     placeholder: 'AB 72M  ← initials, age/sex\nlap chole GA  ← procedure',
     value: draft.details,
     oninput: e => { draft.details = e.target.value; saveDraft(); suggestSoon(); paintParsed(true); },
@@ -285,7 +285,7 @@ function renderOne(card) {
   const sugg = h('div', { class: 'chips', 'aria-live': 'polite' });
   const selected = h('div', { class: 'chips selected' });
   const tip = h('div');
-  const templates = h('div', { class: 'chips' });
+  const templates = h('div', { class: 'chips quick-rest' });
   const picker = catPicker({
     get: () => draft.cats,
     toggle: code => { draft.cats = toggleCat(draft.cats, code); saveDraft(); paintSel(); },
@@ -293,7 +293,7 @@ function renderOne(card) {
     toggleTag: key => { Object.assign(draft, toggleTagIn(draft.cats, draft.tags, key)); saveDraft(); paintSel(); },
   });
   // "might be worth a reflection": tag it now, write it later from the Reflections tab
-  const tagBox = h('label', { class: 'check reflect-tag' }, h('input', { type: 'checkbox', checked: !!draft.reflectTag, onchange: e => { draft.reflectTag = e.target.checked; saveDraft(); } }), '☆ Tag as a possible reflection');
+  const tagBox = h('label', { class: 'check reflect-tag' }, h('input', { type: 'checkbox', checked: !!draft.reflectTag, onchange: e => { draft.reflectTag = e.target.checked; saveDraft(); } }), 'Possible reflection');
   ui.tagBox = tagBox;
   const actions = h('div', { class: 'actions' },
     h('button', { class: 'primary big', onclick: () => save({}) }, 'Save', h('span', { class: 'kbd', title: 'Ctrl+Enter (Cmd+Enter on a Mac)' }, ' Ctrl+⏎')),
@@ -307,13 +307,13 @@ function renderOne(card) {
   const savebar = h('div', { class: 'savebar' }, selected, actions);
   add(card,
     h('div', { class: 'box-wrap' }, textarea, pasteBtn(textarea)), parsed, selExtra, tip, tagBox,
-    h('div', { class: 'chiplabel', id: 'suggLabel' }, 'Suggested'), sugg,
-    stillNeeded(),
-    h('div', { class: 'chiplabel' }, 'Quick picks'), templates,
+    // suggestions first, then the last case and your own templates
+    h('div', { class: 'chiplabel' }, 'Quick picks'), sugg, templates,
     h('div', { class: 'bar cat-head' }, h('div', { class: 'chiplabel grow' }, 'All categories'),
       h('span', { class: 'seg cat-view', role: 'group', 'aria-label': 'Show categories as' },
         ['list', 'pills'].map(v => h('button', { class: 'small', 'aria-pressed': String((settings().catView || 'list') === v), onclick: () => { if ((settings().catView || 'list') === v) return; patchLogbook({ settings: { catView: v } }); hooks.render(); } }, v === 'list' ? 'List' : 'Pills')))),
     picker.el,
+    stillNeeded(),
     savebar);
   Object.assign(ui, { textarea, parsed, sugg, selected, selExtra, tip, templates, picker });
   paintSuggest(); paintSel(); paintQuick(); paintParsed(false);
@@ -342,7 +342,6 @@ function paintParsed(typed) {
 function paintSuggest() {
   if (!ui || !ui.sugg) return;
   const on = settings().suggestions !== false;
-  ui.card.querySelector('#suggLabel').hidden = !on;
   ui.sugg.hidden = !on;
   if (!on) return;
   const text = draft.details.trim();
@@ -354,7 +353,7 @@ function paintSuggest() {
     cls: `sugg ${s.score >= 0.5 ? 'strong' : ''}`,
     title: `${catFull(s.code)} — ${s.why === 'age' ? 'from the age' : s.why === 'bmi' ? 'from the BMI' : 'from your words'}`,
     onclick: () => { keepPlace(ui.sugg, () => { draft.cats = addCat(draft.cats, s.code); saveDraft(); paintSel(); }); refocus(); },
-  })) : [h('span', { class: 'muted', style: 'font-size:13px' }, text ? 'No suggestions — search below.' : 'Start typing to see suggestions.')]));
+  })) : [h('span', { class: 'muted', style: 'font-size:13px' }, text ? 'No suggestions: search below.' : 'Suggestions appear as you type.')]));
 }
 
 function paintSel() {
@@ -399,7 +398,7 @@ function paintQuick() {
     const key = proc.toLowerCase() + '|' + sortCodes(c.cats).join();
     if (keys.has(key)) continue;
     keys.add(key); recent.push({ c, proc });
-    if (recent.length >= 3) break;
+    if (recent.length >= 1) break;
   }
   recent.forEach(({ c, proc }, i) => chips.push(h('span', {
     class: 'chip tmpl recent', role: 'button', tabindex: '0', title: (proc || 'No details') + '\n' + c.cats.map(catFull).join('\n'),
@@ -421,10 +420,7 @@ function paintQuick() {
       name ? h('b', {}, name) : null, h('span', { class: name ? 'muted' : '', style: name ? 'font-size:12px' : '' }, (name ? ' ' : '') + catPills(t.cats)));
   };
   for (const t of (S.logbook && S.logbook.templates) || []) chips.push(tmplChip(t, t.name));
-  for (const t of S.sharedTemplates || []) chips.push(tmplChip(t, t.name));
-  for (const t of frequentCombos(S.cases, { min: 3, limit: 6 })) if (t.cats.length > 1) chips.push(tmplChip(t));
-  const list = chips.filter(Boolean);
-  fill(ui.templates, ...(list.length ? list : [h('span', { class: 'muted', style: 'font-size:13px' }, 'Your common combinations will appear here.')]));
+  fill(ui.templates, ...chips.filter(Boolean));
 }
 
 async function save({ another }) {
@@ -517,7 +513,7 @@ function paintBulk(out) {
       h('td', {}, h('input', { type: 'date', value: r.date || def, max: todayISO(), onchange: e => { r.date = parseDate(e.target.value); } })),
       h('td', { class: 'details' },
         h('input', { value: r.initials || '', placeholder: 'Initials', 'aria-label': 'Patient initials', autocapitalize: 'characters', maxlength: '20', oninput: e => { r.initials = e.target.value; } }),
-        h('textarea', { rows: String(Math.min(6, Math.max(2, r.details.split('\n').length))), value: r.details, 'aria-label': 'Case details', oninput: e => { r.details = e.target.value; } })),
+        h('textarea', { rows: String(Math.min(6, Math.max(2, r.details.split('\n').length))), value: r.details, 'aria-label': 'Case summary', oninput: e => { r.details = e.target.value; } })),
       h('td', {}, h('div', { class: 'chips' },
         r.cats.map(code => catChip(code, { on: true, removable: true, onclick: () => { r.cats = dropCat(r.cats, code); paintBulk(out); } })),
         h('button', { class: 'small icon-btn', 'aria-label': 'Add categories', onclick: () => pickDialog(r.cats, cats => { r.cats = cats; paintBulk(out); }) }, r.cats.length ? '+' : '+ Add')),
@@ -638,8 +634,10 @@ export function pickDialog(initial, done) {
   picker.focus();
 }
 
-// Edit (or delete) one case.
-export function editCaseDialog(c) {
+// Edit (or delete) one case. With opts.onCreated and a case with no id: a new case (from the
+// Reflections case picker), saved with createCase and handed back.
+export function editCaseDialog(c, opts = {}) {
+  const isNew = !c.id && typeof opts.onCreated === 'function';
   // older cases keep the initials at the front of the details: split them now, saved apart on Save
   const e = { ...c, ...caseParts(c), cats: [...(c.cats || [])] };
   const sel = h('div', { class: 'chips selected' });
@@ -655,22 +653,22 @@ export function editCaseDialog(c) {
     getTags: () => e.tags || [], toggleTag: key => { Object.assign(e, toggleTagIn(e.cats, e.tags, key)); paint(); } });
   const paintSoon = debounce(paint, 120);
   paint();
-  const m = modal('Edit case', [
+  const m = modal(isNew ? 'New case' : 'Edit case', [
     c.dateText && !c.date ? h('p', { class: 'tip' }, `Imported date “${c.dateText}” could not be read — please set the date.`) : null,
     h('label', { class: 'field' }, 'Date', h('input', { type: 'date', value: e.date || '', max: todayISO(), onchange: ev => { e.date = parseDate(ev.target.value); } })),
     h('label', { class: 'field' }, 'Patient initials', h('input', { value: e.initials, placeholder: 'e.g. AB', maxlength: '20', autocapitalize: 'characters', autocomplete: 'off', spellcheck: 'false', oninput: ev => { e.initials = ev.target.value; } })),
-    h('label', { class: 'field' }, 'Case details', h('textarea', { rows: '3', value: e.details, oninput: ev => { e.details = ev.target.value; paintSoon(); } })),
+    h('label', { class: 'field' }, 'Case summary', h('textarea', { rows: '3', value: e.details, placeholder: isNew ? 'e.g. 72M lap chole GA ETT, difficult airway' : '', oninput: ev => { e.details = ev.target.value; paintSoon(); } })),
     h('div', { class: 'chiplabel' }, 'Categories'), sel,
     h('div', { class: 'chiplabel' }, 'Suggested'), sugg,
     h('details', {}, h('summary', {}, 'All categories'), picker.el),
-    h('label', { class: 'check reflect-tag', style: 'margin-top:8px' }, h('input', { type: 'checkbox', checked: !!e.reflectTag, onchange: ev => { e.reflectTag = ev.target.checked; } }), '☆ Possible reflection'),
+    h('label', { class: 'check reflect-tag', style: 'margin-top:8px' }, h('input', { type: 'checkbox', checked: !!e.reflectTag, onchange: ev => { e.reflectTag = ev.target.checked; } }), 'Possible reflection'),
     // to your own notes (WhatsApp, Notes, Obsidian): this case, or the whole day's list
-    h('div', { class: 'bar share-row', style: 'margin:10px 0 0' },
+    isNew ? null : h('div', { class: 'bar share-row', style: 'margin:10px 0 0' },
       h('button', { class: 'small', onclick: () => shareText(shareCaseText(c)) }, 'Share case'),
       c.date ? h('button', { class: 'small', onclick: () => shareText(dayText(c.date)) }, "Share day's list") : null,
       c.date ? h('button', { class: 'small', onclick: () => copyText(dayMarkdown(c.date), 'Markdown copied: paste into your notebook') }, 'Copy day as Markdown') : null),
     h('div', { class: 'bar', style: 'margin-top:12px' },
-      h('button', { class: 'danger', onclick: async () => {
+      isNew ? null : h('button', { class: 'danger', onclick: async () => {
         m.close();
         // recycle bin (bin agent): kept 30 days; Undo restores it
         try { await moveToBin('case', c, { toast: true }); } catch (err) { toast('Could not delete: ' + err.message); }
@@ -679,6 +677,13 @@ export function editCaseDialog(c) {
       h('button', { onclick: () => m.close() }, 'Cancel'),
       h('button', { class: 'primary', onclick: async () => {
         if (!(await okNoIds(e.details))) return;
+        if (isNew) {
+          if (!e.details.trim() && !e.cats.length) return toast('Add a case summary or a category');
+          m.close();
+          const made = await createCase({ date: e.date || todayISO(), initials: e.initials, details: e.details, cats: e.cats, reflectTag: !!e.reflectTag, tags: e.tags || [] });
+          toast('Case logged');
+          return opts.onCreated(made);
+        }
         m.close();
         const next = { ...e, initials: cleanInitials(e.initials), details: e.details.trim() };
         if (!next.reflectTag) delete next.reflectTag;

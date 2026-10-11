@@ -9,7 +9,7 @@
 import { REFLECTION_HEADINGS, REFLECTION_SECTIONS, yearName } from './categories.js';
 import { reflectionProgress, reflectionCounts, HEADING_BY_ID, splitDetails, completeProblems, isLegacy, LIMITS, IMAGE_MAX_B64, IMAGE_MAX_SIDE, IMAGE_QUALITY, PHOTO_BUDGET_KB, PHOTO_NOTE, photoUsageKb, imageKb, fmtMb, wordCount, MIN_WORDS, suggestHeadings, moveToHeading, inExport, exportSummary, pickJustEnough } from './reflections.js';
 export { completeProblems };
-import { fmtDate, caseText } from './engine.js';
+import { fmtDate, caseText, procedureText } from './engine.js';
 import { S, h, toast, cloud, debounce, hooks, rYear, effectiveIntake, residentSmo, todayISO, confirmBox, add, resetters, scheduleSummary, displayName, byNewest, catName, updateCase, settings } from './ui-core.js';
 import { renderExportButton, caseRYear, countsByYear } from './portfolio.js';
 
@@ -49,9 +49,12 @@ const blank = (over = {}) => ({
   ...(settings().reflExport === false ? { export: false } : {}), ...over,
 });
 
-// From a logged case: initials = leading capitals, diagnosis = the rest.
-// the case's own initials field when it has one; older cases have them at the front of the details
-const fromCase = c => { const { initials, diagnosis } = c.initials ? { initials: c.initials, diagnosis: String(c.details || '').trim() } : splitDetails(c.details); return { initials, diagnosis, date: c.date || null, caseId: c.id }; };
+// From a logged case: its initials (older cases have them at the front of the details), the procedure
+// line as the diagnosis, and its case summary as the reflection's case details (summary).
+const fromCase = c => {
+  const { initials, diagnosis: rest } = c.initials ? { initials: c.initials, diagnosis: String(c.details || '').trim() } : splitDetails(c.details);
+  return { initials, diagnosis: procedureText(c) || rest, summary: rest, date: c.date || null, caseId: c.id };
+};
 // preset: { headingId, subId } from a heading's "+ Add" button.
 export function reflectOnCase(c, preset = null) {
   rv.picking = null; rv.view = null;
@@ -134,6 +137,7 @@ function pickCase(c) {
     const r = rv.editing, old = caseById(r.caseId), oldFill = old ? fromCase(old) : null, f = fromCase(c);
     r.caseId = c.id; r.initials = f.initials || r.initials; r.date = f.date || r.date;
     if (!String(r.diagnosis || '').trim() || (oldFill && r.diagnosis === oldFill.diagnosis)) r.diagnosis = f.diagnosis;
+    if (!String(r.summary || '').trim() || (oldFill && r.summary === oldFill.summary)) r.summary = f.summary;
     lsSet({ ...r, restore: true });
     rv.picking = null; rv.relinked = true; hooks.render();
     return;
@@ -185,7 +189,7 @@ function picker() {
         h('span', { class: 't' }, c.reflectTag && !has ? h('span', { class: 'flag tagged' }, '☆ tagged') : null, caseText(c) || '(no details)', names ? h('span', { class: 'muted', style: 'display:block;font-size:13px' }, names) : null),
         h('span', { class: 'c' }, cur ? h('span', { class: 'flag' }, 'current') : has ? h('span', { class: 'flag' }, 'has reflection') : null));
     }));
-    if (!shown.length) ul.replaceChildren(h('li', { class: 'empty' }, cases.length ? 'No cases match.' : 'No cases logged yet. Log the case first, then reflect on it.'));
+    if (!shown.length) ul.replaceChildren(h('li', { class: 'empty' }, cases.length ? 'No cases match.' : 'No cases logged yet: tap + New case above.'));
   };
   paint();
   const search = h('input', { type: 'search', value: p.q, placeholder: 'Search initials, details, date or procedure', style: 'font-size:16px;width:100%;box-sizing:border-box',
@@ -198,8 +202,15 @@ function picker() {
     h('h2', { style: 'margin:8px 0 4px' }, p.relink ? 'Change the linked case' : 'Which case is this reflection on?'),
     ph ? h('p', { style: 'margin:0 0 4px' }, h('span', { class: 'muted' }, 'Heading: '), h('b', {}, shortName(ph.name) + (psub ? ' · ' + psub.name : ''))) : null,
     p.preset && p.preset.uncat ? h('p', { style: 'margin:0 0 4px' }, h('span', { class: 'muted' }, 'Heading: '), h('b', {}, 'Uncategorised')) : null,
-    h('p', { class: 'hint', style: 'margin:0 0 8px' }, p.relink ? 'Pick the logged case this reflection is about.' : 'Pick a logged case: the reflection starts with its initials, date and diagnosis filled in.'),
+    h('p', { class: 'hint', style: 'margin:0 0 8px' }, p.relink ? 'Pick the logged case this reflection is about.' : 'Pick a logged case: the reflection starts with its initials, date, diagnosis and case details filled in. Not logged yet? Add it here.'),
+    p.relink ? null : h('button', { class: 'small', style: 'margin:0 0 8px', onclick: newCaseForReflection }, '+ New case'),
     search, count), h('section', { class: 'card' }, ul));
+}
+
+// Log a case from the picker, then carry on as if it had been picked.
+async function newCaseForReflection() {
+  const { editCaseDialog } = await import('./ui-log.js');
+  editCaseDialog({ date: todayISO(), initials: '', details: '', cats: [] }, { onCreated: c => { if (rv.picking) pickCase(c); else reflectOnCase(c); } });
 }
 
 // ---------- recycle bin / Word upload sub-views ----------
@@ -833,14 +844,14 @@ function editor() {
   // What APMES wants covered (from the portfolio's reflection elements)
   const guide = h('details', { class: 'card', style: 'padding:12px 16px' },
     h('summary', { style: 'cursor:pointer;font-weight:600' }, 'What APMES wants covered'),
-    h('p', { class: 'hint' }, 'Write a case summary, then learning points. Between them, the learning points should cover:'),
+    h('p', { class: 'hint' }, 'Write the case details, then learning points. Between them, the learning points should cover:'),
     h('ul', { style: 'margin:4px 0 0;padding-left:20px' }, REFLECTION_SECTIONS.filter(s => s.id !== 'description' && (s.id !== 'further' || r.jr))
       .map(s => h('li', { style: 'margin-bottom:4px' }, h('b', {}, s.name), ': ', s.hint))));
 
   let body;
   if (legacy) {
     body = [h('section', { class: 'card' },
-      h('p', { class: 'hint' }, 'This reflection uses the older one-box-per-section layout. It still exports as it is, or convert it to the portfolio layout (case summary + learning points).'),
+      h('p', { class: 'hint' }, 'This reflection uses the older one-box-per-section layout. It still exports as it is, or convert it to the portfolio layout (case details + learning points).'),
       h('button', { onclick: () => {
         const sx = r.sections || {};
         r.summary = sx.description || '';
@@ -857,11 +868,11 @@ function editor() {
   } else {
     const title = boxCard('Title', 'Bold heading of the reflection, e.g. “Airway management in a patient with trismus”.',
       h('input', { style: IN, maxlength: String(LIMITS.title), value: r.title || '', placeholder: 'Title', oninput: e => { r.title = e.target.value; changed(); } }));
-    const summary = boxCard('Case summary', 'What happened?',
+    const summary = boxCard('Case details', 'What happened?',
       h('textarea', { rows: '10', maxlength: String(LIMITS.summary), style: TA, value: r.summary || '',
         placeholder: 'What happened? Demographics, history, examination, investigations, anaesthetic plan, events, outcome.',
         oninput: e => { r.summary = e.target.value; changed(); } }));
-    title.dataset.field = summary.dataset.field = 'title or case summary';
+    title.dataset.field = summary.dataset.field = 'title or case details';
 
     const n = r.points.length;
     const points = boxCard('Learning points', 'For each point: what were the considerations, and what did you learn? Give it a short heading, then your discussion (analysis with evidence, conclusions, action plan).',

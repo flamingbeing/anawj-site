@@ -367,13 +367,13 @@ export function textHas(text, word, fuzzy = false) {
 // ---------- upload: match a file's columns to the case fields ----------
 
 export const IMPORT_FIELDS = [
-  { k: 'date', name: 'Date' }, { k: 'initials', name: 'Initials' }, { k: 'details', name: 'Case details' },
+  { k: 'date', name: 'Date' }, { k: 'initials', name: 'Initials' }, { k: 'details', name: 'Case summary' },
   { k: 'categories', name: 'Categories' }, { k: 'id', name: 'Case ID (to update cases already here)' },
 ];
 const GUESS = {
   date: /^(date|day|date of (case|surgery|op(eration)?)|op date)\b/i,
   initials: /^(patient(?:'?s)?\s+)?initials?$/i,
-  details: /detail|procedure|operation|surgery|case\b|description|notes?/i,
+  details: /detail|summary|procedure|operation|surgery|case\b|description|notes?/i,
   categories: /categor|codes?\b|apmes/i,
   id: /^(id|case id)$/i,
 };

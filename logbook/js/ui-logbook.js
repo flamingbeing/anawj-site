@@ -255,7 +255,7 @@ function gridView(rows, repaint) {
   const more = rows.length > view.limit ? h('button', { onclick: () => { view.limit += 300; repaint(); } }, `Show more (${rows.length - view.limit} left)`) : null;
   return h('div', {},
     h('p', { class: 'hint' }, 'Edit the date, initials and details directly; changes save when you leave a cell. Tap the categories to change them.'),
-    h('div', { class: 'scroll' }, h('table', { class: 'grid' }, h('thead', {}, h('tr', {}, h('th', {}, 'Date'), h('th', {}, 'Initials'), h('th', {}, 'Case details'), h('th', {}, 'Categories'))), tbody)),
+    h('div', { class: 'scroll' }, h('table', { class: 'grid' }, h('thead', {}, h('tr', {}, h('th', {}, 'Date'), h('th', {}, 'Initials'), h('th', {}, 'Case summary'), h('th', {}, 'Categories'))), tbody)),
     more,
     pasteRows());
 }
@@ -263,7 +263,7 @@ function gridView(rows, repaint) {
 // Rows copied from Excel arrive as tab-separated lines: Date, Case details, Categories (initials are split
 // off the front of the details), or Date, Initials, Case details, Categories when there are four columns.
 function pasteRows() {
-  const ta = h('textarea', { rows: '4', placeholder: 'Paste rows from Excel here: Date ⇥ Case details ⇥ Categories (or Date ⇥ Initials ⇥ Case details ⇥ Categories)' });
+  const ta = h('textarea', { rows: '4', placeholder: 'Paste rows from Excel here: Date ⇥ Case summary ⇥ Categories (or Date ⇥ Initials ⇥ Case summary ⇥ Categories)' });
   return h('div', { style: 'margin-top:16px' },
     h('h3', {}, 'Add rows from a spreadsheet'), ta,
     h('div', { class: 'bar', style: 'margin-top:8px' }, h('button', { class: 'primary', onclick: () => {
@@ -343,7 +343,7 @@ function mapColumns(fileName, grid) {
         grid.sheets.map((sh, i) => h('option', { value: String(i), selected: st.sheet === i }, sh.name)))) : null,
       h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: st.headerRow, onchange: e => { st.headerRow = e.target.checked; guess(); paint(); } }), 'The first row holds the column names'),
       h('div', { class: 'map-grid' }, IMPORT_FIELDS.map(f => h('label', { class: 'field' }, f.name, sel(f)))),
-      st.map.initials < 0 ? h('p', { class: 'hint', style: 'margin:0 0 6px' }, 'No Initials column: initials at the start of the case details are split off.') : null,
+      st.map.initials < 0 ? h('p', { class: 'hint', style: 'margin:0 0 6px' }, 'No Initials column: initials at the start of the case summary are split off.') : null,
       h('label', { class: 'field' }, 'Dates are written', h('select', { onchange: e => { st.monthFirst = e.target.value === 'mdy'; paint(); } },
         h('option', { value: 'dmy', selected: !st.monthFirst }, 'Day first (13/3/2026)'), h('option', { value: 'mdy', selected: st.monthFirst }, 'Month first (3/13/2026)'))),
       h('div', { class: 'chiplabel' }, 'How the first rows will be read'),
@@ -355,7 +355,7 @@ function mapColumns(fileName, grid) {
           h('td', {}, c.initials || ''),
           h('td', {}, String(c.details || '').slice(0, 60)),
           h('td', { class: c.unknown.length ? 'bad' : '' }, [catPills(c.cats), c.unknown.length ? ` ✗ ${c.unknown.join(', ')}` : ''].join(''))))))),
-      ok ? null : h('p', { class: 'tip' }, 'Choose at least the Date or the Case details column.'));
+      ok ? null : h('p', { class: 'tip' }, 'Choose at least the Date or the Case summary column.'));
     reviewBtn.disabled = !ok;
   };
   const reviewBtn = h('button', { class: 'primary', onclick: () => {
