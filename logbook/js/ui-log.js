@@ -44,7 +44,9 @@ function takeShared() {
 // Open the Log page with this day picked (from the Logbook calendar's "+ Log a case").
 export function logOnDate(iso) {
   loadDraft();
-  draft.date = iso === todayISO() ? null : iso; draft.dateAt = Date.now(); draft.mode = 'one';
+  // a fresh case for that day: the box and the tags start empty
+  Object.assign(draft, { details: '', cats: [], tags: [], reflectTag: false, mode: 'one' });
+  draft.date = iso === todayISO() ? null : iso; draft.dateAt = Date.now(); bulkRows = null;
   saveDraft.cancel(); try { localStorage.setItem(draftKey(), JSON.stringify(draft)); } catch { /* ignore */ }
   location.hash = '#log';
 }
@@ -327,7 +329,7 @@ function renderOne(card) {
       save({ another: e.altKey });
     },
   });
-  const sugg = h('div', { class: 'chips', 'aria-live': 'polite' });
+  const sugg = h('div', { class: 'chips sugg-row', 'aria-live': 'polite' });
   const selected = h('div', { class: 'chips selected' });
   const tip = h('div');
   const templates = h('div', { class: 'chips quick-rest' });
@@ -335,9 +337,10 @@ function renderOne(card) {
   const shared = h('div', { class: 'shared-groups' });
   const picker = catPicker({
     get: () => draft.cats,
-    toggle: code => { draft.cats = toggleCat(draft.cats, code); saveDraft(); paintSel(); },
+    // the list stays put under your finger while the rows above it change
+    toggle: code => keepPlace(picker.el, () => { draft.cats = toggleCat(draft.cats, code); saveDraft(); paintSel(); }),
     getTags: () => draft.tags || [],
-    toggleTag: key => { Object.assign(draft, toggleTagIn(draft.cats, draft.tags, key)); saveDraft(); paintSel(); },
+    toggleTag: key => keepPlace(picker.el, () => { Object.assign(draft, toggleTagIn(draft.cats, draft.tags, key)); saveDraft(); paintSel(); }),
   });
   // "might be worth a reflection": tag it now, write it later from the Reflections tab
   const tagBox = h('label', { class: 'check reflect-tag' }, h('input', { type: 'checkbox', checked: !!draft.reflectTag, onchange: e => { draft.reflectTag = e.target.checked; saveDraft(); } }), 'Possible reflection');
@@ -353,9 +356,9 @@ function renderOne(card) {
   // Only the selected categories and Save stay pinned: a slim bar at the end of the card that sticks
   // to the bottom (above the tab bar) the whole way down; the box itself scrolls away.
   const selExtra = h('div', { class: 'sel-extra' });
-  const savebar = h('div', { class: 'savebar' }, selected, actions);
+  const savebar = h('div', { class: 'savebar' }, selected, selExtra, tip, actions);
   add(card,
-    h('div', { class: 'box-wrap' }, textarea, pasteBtn(textarea)), parsed, selExtra, tip, tagRow,
+    h('div', { class: 'box-wrap' }, textarea, pasteBtn(textarea)), parsed, tagRow,
     // suggestions first, then the last case and your own templates
     h('div', { class: 'chiplabel' }, 'Quick picks'), sugg, templates,
     h('div', { class: 'bar cat-head' }, h('div', { class: 'chiplabel grow' }, 'All tags'),
@@ -365,6 +368,15 @@ function renderOne(card) {
     shared,
     stillNeeded(),
     savebar);
+  // Tapping a chip, a tag in the list or a button while typing keeps the focus (and the keyboard) in the
+  // case box, so the screen doesn't jump as the keyboard drops and comes back. Fields and the date
+  // picker still take the focus.
+  card.addEventListener('mousedown', e => {
+    if (document.activeElement !== textarea) return;
+    const t = e.target;
+    if (t.closest('input:not([type=checkbox]), textarea, select, .datepick, .box-wrap')) return;
+    if (t.closest('.chip, .picker li, label.check, [role=button], button, a.btn')) e.preventDefault();
+  });
   Object.assign(ui, { shared, draftNote, textarea, parsed, sugg, selected, selExtra, tip, templates, picker });
   paintSuggest(); paintSel(); paintQuick(); paintParsed(false);
   requestAnimationFrame(() => alignPlaceholder(textarea));

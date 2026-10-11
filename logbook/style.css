@@ -847,3 +847,8 @@ details.an-sec[open] > summary .an-t::after { content: ' ⌄'; }
 .an-wd .meter i.done { background: var(--done); }
 .an-wd b { text-align: right; font-variant-numeric: tabular-nums; }
 .an-compare a { padding: 6px 2px; min-height: 48px; }
+
+/* Log: the suggestion row keeps its height as chips come and go (less jumping while typing) */
+.log-card .sugg-row { min-height: 40px; align-items: center; }
+.savebar .tip { margin: 4px 0; font-size: 13px; }
+.savebar .sel-extra:not(:empty) { margin: 4px 0 0; }
