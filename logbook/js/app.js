@@ -82,7 +82,6 @@ function renderMore() {
       h('ul', {}, items.map(t => menuItem(t.id, t.label, t.desc)))),
     privacyCard(),
     creditsCard(),
-    whatsNewCard(),
     installCard(),
     signOutCard());
 }
@@ -117,17 +116,6 @@ function installCard() {
         h('li', {}, 'Choose ', h('b', {}, 'Add to Home Screen'), ', then ', h('b', {}, 'Add'), '.')),
         h('div', { class: 'bar', style: 'margin-bottom:0' }, h('span', { class: 'grow' }), notNow)]);
 }
-
-// The latest changes, newest first (keep it to a handful; update with each release)
-const WHATS_NEW = [
-  'Analytics tab: folded sections and Trends; Totals moved here (Compare with your intake)',
-  'Tag editor: pills view with drag, search, case counts, merge, shorthand you can edit',
-  'Logbook: calendar first, filters by tags and dates, saved searches, tag many cases at once',
-  'Export / Import under More: the portfolio, Word and Excel uploads, backups',
-];
-const whatsNewCard = () => h('section', { class: 'card' },
-  h('details', { class: 'more-tools' }, h('summary', {}, 'What’s new'),
-    h('ul', { class: 'hint', style: 'margin:4px 0 0;padding-left:18px' }, WHATS_NEW.map(t => h('li', {}, t)))));
 
 // Settings: a short menu of its pages (residency year on top for people not on the programme list)
 function renderSettingsMenu() {

@@ -59,7 +59,7 @@ portfolio content.
 - **More** (`app.js`): Account (with Residency year for non-programme users; Delete account at the bottom,
   greyed out for residents on the programme list: a programme admin takes them off first; `cloud.deleteAccount`
   wipes cases, reflections, images, bin, submission, members entry, logbook, then the Google sign-in), Settings, Export &
-  backup, Admin portal; Privacy, Credits, What's new (`WHATS_NEW` in app.js; update each release), "Install the app" card (Install button from beforeinstallprompt; Safari steps on iPhone/iPad; hidden when installed or after Not now), Sign out at the very bottom.
+  backup, Admin portal; Privacy, Credits, "Install the app" card (Install button from beforeinstallprompt; Safari steps on iPhone/iPad; hidden when installed or after Not now), Sign out at the very bottom.
 - **Colour** (Display): one accent (`settings.accent`, null = NUHS navy): 8 suggested swatches + any colour.
   `colors.js` (tested) works out light, dark and OLED palettes with contrast floors (light accent 4.5:1 with white;
   dark accent 7:1 on cards, near-white text, neutral grey backgrounds) and writes them into <style id="accent-css">,
