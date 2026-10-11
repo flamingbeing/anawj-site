@@ -145,13 +145,17 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
 - **Tabs:** the daily ones in work order on the left (Monthly, Cases, Roster, Premeds), the set-up ones (Staff, Settings) on the right.
 - **Less on screen:** Cases shows only the flags that are on ("+ flag" opens the rest); roster cells show + and the & / C handles on hover. Hovering a name, or opening its box, lights up every cell that person is in.
 - **Empty pages** say what's missing and have a button to the tab that fixes it.
+- **Steps strip** under the tabs (Monthly, Cases, Roster, Premeds): Monthly rosters → Cases → Roster → Check → Save or download, each done/to do/problem and a button there. A download or print counts as sent until the roster changes (`state.outHash`).
+- **Problems card** at the top of the Roster tab's side column: the live checks (recomputed on every render, so a status change on Today shows at once), errors first. `check()` tags each problem with `fix` (`takeOff`, `cover`, `fill`, `reseat`, `premed`), `person` and `rooms`, and the card turns these into buttons, plus Show (scrolls to the room). The generator's own messages go under "Notes from making the roster".
+- **Do it all** on Cases: loads the admin draft, makes the roster and opens its problems.
+- **Undo instead of "are you sure?"** for Generate new, Clear cases, Clear manpower, Reset to monthly rosters and restoring a saved version on the same date: the toast has an Undo button. Confirms stay only for what can't be undone.
 - **Person chip and box:** the same chip and box on Today, Cases, Roster, Premeds and Calls/clinics. On Calls/clinics a dashed chip comes from the monthly rosters (or the MOT call team for EOT 8 and 9); × on the only one stores `-` (nobody), and "↺ monthly" goes back to the monthly roster. The name and grade are read-only there; Edit opens the Staff tab on that person.
 - **Touch screens:** no dragging, no C / & / × icons. Tapping opens the box.
 - **Design:** "Kent Ridge Clinical" (NUHS website style):
   - navy and white, Open Sans
   - the four-colour band (orange, red, cyan, navy) along the top of the header, as on the logbook
   - square panels, with only controls rounded
-- **Demo mode** (`?demo`): an invented department about the real size (39 seniors, 51 juniors), every monthly roster filled for the chosen month and the months either side (more are made as the date moves on), and made-up case notes for each new day (fewer at weekends). It uses separate storage and never signs in. Bump `DEMO_VERSION` in `js/app.js` when the demo data changes, so open demos start again.
+- **Demo mode** (`?demo`): an invented department about the real size (39 seniors, 50 juniors); on the start day 5 are on leave and 2 seniors on an admin day (every weekday gets 2 senior admins); every monthly roster filled for the chosen month and the months either side (more are made as the date moves on), and made-up case notes for each new day (fewer at weekends). It uses separate storage and never signs in. Bump `DEMO_VERSION` in `js/app.js` when the demo data changes, so open demos start again.
 
 ## Known limits
 
