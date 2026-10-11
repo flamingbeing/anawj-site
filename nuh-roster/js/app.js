@@ -1486,6 +1486,7 @@ function openPersonBox(anchor, p, ctx) {
 
   const apply = () => {
     const rosterNow = state.roster && state.roster.date === state.day.date;
+    const s = dayOf(p.id);
     const before = JSON.stringify([state.day, rosterNow ? state.roster.rows : null]);
     pushUndoAll(`the change to ${p.name}`, { day: true });
     if (roster) {
@@ -1498,11 +1499,12 @@ function openPersonBox(anchor, p, ctx) {
       setCellParts(rrow, ctx.src.key, parts);
       if (juniorCell && !coveredBox.checked) syncCoverEntry(rrow, cur.name, cur.cover, cur.name, coverText);
     }
-    const s = dayOf(p.id);
-    s.leaveTime = leave.value.trim().replace(/^L-/i, '');
+    // only fields that changed are written, so a Save that changes nothing leaves no Undo step
+    const put = (k, v) => { if ((s[k] || '') !== v) s[k] = v; };
+    put('leaveTime', leave.value.trim().replace(/^L-/i, ''));
     if (liver.checked !== !!s.liverStandby) { s.liverStandby = liver.checked; s.manualLiver = true; delete s.autoLiver; }
-    s.aoh = cellSafe(aoh.value.trim().replace(/^\(|\)$/g, ''));
-    s.comment = cellSafe(comment.value.trim().replace(/^-\s*/, ''));
+    put('aoh', cellSafe(aoh.value.trim().replace(/^\(|\)$/g, '')));
+    put('comment', cellSafe(comment.value.trim().replace(/^-\s*/, '')));
     if (p.role === 'junior' && away.checked !== !!s.notAroundPrev) { s.notAroundPrev = away.checked; s.manualAway = true; delete s.autoAway; }
     if (ctx.kind === 'today' && status !== groupOf(s.status)) { closeTagEditor(); setStatus(p, status); }
     if (ctx.kind === 'premed' && premedPick.value !== p.name) ctx.setCover(premedPick.value);
