@@ -6,13 +6,13 @@ import { S, hooks, h, toast, cloud, setCases, scheduleSummary, fill, resetCaches
 import { renderLog, logCasesChanged, clearDrafts, SHARED_KEY } from './ui-log.js';
 import { renderLogbook } from './ui-logbook.js';
 import { renderProgress, renderTotals } from './ui-progress.js';
-import { applyCompact, cachedCompact, applyTheme, cachedTheme, applyTextSize, cachedTextSize, renderSettings, renderTagEditor } from './ui-settings.js';
+import { applyCompact, cachedCompact, applyTheme, cachedTheme, applyTextSize, cachedTextSize, renderTagEditor, residencyCard, renderDisplay, renderLogging, renderReflectionSettings, privacyCard, creditsCard } from './ui-settings.js';
 import { renderAccount, flush as flushProfile } from './ui-account.js';
 import { renderAdmin, leaveAdmin } from './ui-admin.js';
 import { renderReflect, watchMyReflections, renderExportPage, renderChoosePage } from './ui-reflect.js';
 import { downloadExcel } from './ui-logbook.js';
-import { downloadBackup } from './backup.js';
-import { purgeExpired } from './bin.js';
+import { backupCard } from './backup.js';
+import { purgeExpired, openBin } from './bin.js';
 
 // Tab icons: tiny inline SVG paths (24x24, stroked), so they look the same on every phone.
 const ICONS = {
@@ -24,6 +24,12 @@ const ICONS = {
   settings: 'M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1M15 4v4M9 10v4M17 16v4',
   reflect: 'M4 19.5V5a2 2 0 0 1 2-2h12v14H6a2 2 0 0 0-2 2.5zM6 21h12v-4M8 7h6M8 11h4',
   admin: 'M12 3l2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.6 6.6 19.5l1.2-6-4.5-4.2 6.1-.7z',
+  data: 'M12 3v12M7 10l5 5 5-5M5 21h14',
+  display: 'M3 5h18v12H3zM8 21h8M12 17v4',
+  logging: 'M12 5v14M5 12h14',
+  tags: 'M3 12V4h8l10 10-8 8L3 12zM7.5 7.5h.01',
+  reflset: 'M4 19.5V5a2 2 0 0 1 2-2h12v14H6a2 2 0 0 0-2 2.5zM6 21h12v-4',
+  bin: 'M4 7h16M10 11v6M14 11v6M5 7l1 13h12l1-13M9 7V4h6v3',
   more: 'M5 12h.01M12 12h.01M19 12h.01M4 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0M11 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0M18 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0',
 };
 const icon = id => {
@@ -44,33 +50,57 @@ const TABS = [
   { id: 'more', label: 'More', render: () => renderMore() },
   { id: 'totals', label: 'Totals', render: renderTotals, hidden: true, under: 'more', desc: 'How your case counts compare across your intake' },
   { id: 'account', label: 'Account', render: renderAccount, hidden: true, under: 'more', desc: 'Your name and portfolio details (Section 1); sign out' },
-  { id: 'settings', label: 'Settings', render: renderSettings, hidden: true, under: 'more', desc: 'Display, text size, logging, tag editor, recycle bin' },
-  // opened from More → Export (not in the More list)
-  { id: 'export', label: 'Export portfolio', render: () => renderExportPage(), hidden: true, under: 'more', unlisted: true },
+  { id: 'settings', label: 'Settings', render: () => renderSettingsMenu(), hidden: true, under: 'more', desc: 'Display, logging, tags, reflections and photos, recycle bin' },
+  { id: 'data', label: 'Export & backup', render: () => renderDataPage(), hidden: true, under: 'more', desc: 'Portfolio (Word), Excel, backup and restore' },
+  // Settings' own pages (not in the More list)
+  { id: 'display', label: 'Display', render: renderDisplay, hidden: true, under: 'settings', unlisted: true, desc: 'Theme, text size, compact mode' },
+  { id: 'logging', label: 'Logging', render: renderLogging, hidden: true, under: 'settings', unlisted: true, desc: 'Suggestions, the Enter key, case box, search, dates' },
+  { id: 'reflset', label: 'Reflections & photos', render: renderReflectionSettings, hidden: true, under: 'settings', unlisted: true, desc: 'What new reflections start as; photo space' },
+  // opened from More → Export & backup (not in the More list)
+  { id: 'export', label: 'Export portfolio', render: () => renderExportPage(), hidden: true, under: 'data', unlisted: true },
   { id: 'choose', label: 'Export portfolio', render: renderChoosePage, hidden: true, under: 'export', unlisted: true },
-  // admins open it from More (or Settings → Admin portal)
+  // admins open it from More
   { id: 'admin', label: 'Admin portal', render: renderAdmin, admin: true, hidden: true, under: 'more', desc: 'Residents, ready portfolios, portfolio template, default tag names' },
   // opened from Settings
-  { id: 'tags', label: 'Tag editor', render: renderTagEditor, hidden: true, under: 'settings', unlisted: true },
+  { id: 'tags', label: 'Tag editor', render: renderTagEditor, hidden: true, under: 'settings', unlisted: true, desc: 'APMES and personal tags, shorthand, tag groups' },
 ];
+
+// A list of pages, like the More list: icon, name, one line, ›.
+const menuItem = (id, label, desc, onclick) => h('li', {}, h('a', { href: '#' + id, 'data-go': id, onclick: e => { e.preventDefault(); onclick ? onclick() : go(id); } },
+  icon(id), h('span', { class: 'mt' }, h('b', {}, label), h('small', {}, desc)), h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')));
 
 function renderMore() {
   const items = visibleTabs().filter(t => t.under === 'more' && !t.unlisted);
   return h('div', {},
     h('section', { class: 'card more-list' }, h('h2', {}, 'More'),
-      h('ul', {}, items.map(t => h('li', {}, h('a', { href: '#' + t.id, 'data-go': t.id, onclick: e => { e.preventDefault(); go(t.id); } },
-        icon(t.id), h('span', { class: 'mt' }, h('b', {}, t.label), h('small', {}, t.desc)), h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')))))),
-    // everything that leaves the app as a file
+      h('ul', {}, items.map(t => menuItem(t.id, t.label, t.desc)))),
+    privacyCard(),
+    creditsCard());
+}
+
+// Settings: a short menu of its pages (residency year on top for people not on the programme list)
+function renderSettingsMenu() {
+  const order = ['display', 'logging', 'tags', 'reflset'];
+  const pages = TABS.filter(t => t.under === 'settings').sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
+  return h('div', {},
+    residencyCard(),
+    h('section', { class: 'card more-list' }, h('h2', {}, 'Settings'),
+      h('ul', {}, pages.map(t => menuItem(t.id, t.label, t.desc)),
+        menuItem('bin', 'Recycle bin', 'Deleted cases and reflections, kept for 30 days', () => openBin()))));
+}
+
+// Export & backup: everything that leaves the app as a file, and restoring a backup
+function renderDataPage() {
+  return h('div', {},
     h('section', { class: 'card export-sync' }, h('h2', {}, 'Export'),
       h('h3', {}, 'Portfolio (Word)'),
       h('p', { class: 'hint' }, 'Choose which complete reflections go in, then export the APMES portfolio with Section 1 and the Section 4 case numbers filled in.'),
       h('div', { class: 'bar' }, h('a', { class: 'btn primary', href: '#export' }, 'Choose reflections and export ›')),
       h('h3', {}, 'Logbook (Excel)'),
       h('p', { class: 'hint' }, 'All your cases as a spreadsheet. To edit and upload it back, use Logbook → More tools.'),
-      h('div', { class: 'bar' }, h('button', { onclick: downloadExcel }, 'Download Excel')),
-      h('h3', {}, 'Backup'),
-      h('p', { class: 'hint' }, 'Everything in one file you keep (restore it from Settings → Backup). To copy a day into your notes, open a case and use Share or Copy as Markdown.'),
-      h('div', { class: 'bar', style: 'margin-bottom:0' }, h('button', { onclick: e => downloadBackup(e.currentTarget) }, 'Download backup'))));
+      h('div', { class: 'bar', style: 'margin-bottom:0' }, h('button', { onclick: downloadExcel }, 'Download Excel')),
+      h('p', { class: 'hint', style: 'margin:10px 0 0' }, 'To copy a day into your notes, use Share or Copy as Markdown on the Logbook calendar.')),
+    backupCard());
 }
 
 const app = document.getElementById('app');
@@ -93,8 +123,10 @@ const tabFromHash = () => {
 };
 
 function paintTabs() {
-  const cur = TABS.find(t => t.id === S.tab);
-  const sel = (cur && cur.under) || S.tab;
+  // the bar's tab this page sits under, however deep (Settings → Display is under More)
+  let cur = TABS.find(t => t.id === S.tab);
+  while (cur && cur.under) cur = TABS.find(t => t.id === cur.under);
+  const sel = cur ? cur.id : S.tab;
   fill(tabsEl, ...visibleTabs().filter(t => !t.hidden).map(t => h('button', {
     role: 'tab', 'aria-selected': String(sel === t.id), 'data-tab': t.id,
     onclick: () => go(t.id),

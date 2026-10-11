@@ -3,12 +3,10 @@
 
 import { YEAR_NAMES, DEFAULT_NAMES, BY_CODE } from './categories.js';
 import { sortCodes, uid, academicYear, withParents } from './engine.js';
-import { openBin } from './bin.js';
 import { S, h, toast, modal, confirmBox, cloud, catChip, catName, catShort, PICKER_ORDER, pickerOrder, settings, patchLogbook, displayName, hooks, rYear, myYearName, fill, categoryNames, setCategoryNames, catPills, tagSet, download, fileButton, todayISO, saveMany } from './ui-core.js';
 import { MAX_TAGS, tagLinks as tagLinksIn, learnShorthand, cleanShorthand, shorthandOf, DEFAULT_SHORTHAND, cleanTagSet, defaultTagSet, tagTree, flatTree, moveTag, reparentTag, removeTag, newKey, tagSetToCsv, tagSetFromCsv, dropTag, canPlace } from './tags.js';
 import { pickDialog } from './ui-log.js';
 import { PHOTO_BUDGET_KB, PHOTO_NOTE, photoUsageKb, fmtMb } from './reflections.js';
-import { backupCard } from './backup.js';
 
 // Compact mode (S.logbook.settings.compact): body.compact (style.css, "compact mode" block). Cached in
 // localStorage so the first paint after a reload is already compact, before the logbook loads.
@@ -44,14 +42,21 @@ export function cachedCompact() {
   try { return localStorage.getItem(COMPACT_KEY) === '1'; } catch { return false; }
 }
 
-export function renderSettings() {
+// Settings is a short menu (app.js) of these pages: Display, Logging, the Tag editor, Reflections and
+// photos, and the Recycle bin. Residency year (for people not on the programme list) sits on the menu.
+export function residencyCard() {
+  return (
+    S.resident ? null : h('section', { class: 'card' },
+      h('h2', {}, 'Residency year'),
+      h('label', { class: 'field' }, 'Year used for the targets on Analytics',
+        h('select', { onchange: e => patchLogbook({ settings: { rYear: Number(e.target.value), rYearAY: academicYear() } }).then(() => toast('Saved')) },
+          YEAR_NAMES.map((r, i) => h('option', { value: String(i + 1), selected: i + 1 === rYear() }, r)))),
+      h('p', { class: 'hint', style: 'margin:4px 0 0' }, 'Programme residents get their year from the programme list automatically. If you are an APMES resident, ask the programme admins to add your email.')));
+}
+
+export function renderDisplay() {
   const st = settings();
   return h('div', {},
-    // only admins see this card
-    S.admin ? h('section', { class: 'card admin-card' },
-      h('div', { class: 'bar' }, h('h2', { style: 'margin:0' }, 'Admin portal'), h('span', { class: 'grow' }),
-        h('a', { class: 'btn small primary', href: '#admin' }, 'Open admin portal')),
-      h('p', { class: 'hint', style: 'margin:6px 0 0' }, 'Residents, ready portfolios, the portfolio template, default category names, shared templates and importing the old logbook.')) : null,
     h('section', { class: 'card' },
       h('h2', {}, 'Display'),
       h('label', { class: 'check' }, h('input', { type: 'checkbox', role: 'switch', checked: !!st.compact, onchange: e => {
@@ -65,16 +70,12 @@ export function renderSettings() {
       h('label', { class: 'field', style: 'margin-top:10px' }, 'Theme',
         h('select', { onchange: e => applyTheme(e.target.value) },
           [['light', 'Light'], ['dark', 'Dark'], ['auto', 'Auto (match the phone)']].map(([v, l]) => h('option', { value: v, selected: cachedTheme() === v }, l)))),
-      h('p', { class: 'hint', style: 'margin:2px 0 0' }, 'Theme is saved on this device.')),
+      h('p', { class: 'hint', style: 'margin:2px 0 0' }, 'Theme is saved on this device.')));
+}
 
-    // year for targets: programme residents get it from the list; anyone else sets it here
-    S.resident ? null : h('section', { class: 'card' },
-      h('h2', {}, 'Residency year'),
-      h('label', { class: 'field' }, 'Year used for the targets on Analytics',
-        h('select', { onchange: e => patchLogbook({ settings: { rYear: Number(e.target.value), rYearAY: academicYear() } }).then(() => toast('Saved')) },
-          YEAR_NAMES.map((r, i) => h('option', { value: String(i + 1), selected: i + 1 === rYear() }, r)))),
-      h('p', { class: 'hint', style: 'margin:4px 0 0' }, 'Programme residents get their year from the programme list automatically. If you are an APMES resident, ask the programme admins to add your email.')),
-
+export function renderLogging() {
+  const st = settings();
+  return h('div', {},
     h('section', { class: 'card' },
       h('h2', {}, 'Logging'),
       h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: st.suggestions !== false, onchange: e => patchLogbook({ settings: { suggestions: e.target.checked } }) }),
@@ -96,45 +97,38 @@ export function renderSettings() {
       h('label', { class: 'field', style: 'margin-top:8px' }, 'Date for a new case',
         h('select', { onchange: e => patchLogbook({ settings: { defaultDate: e.target.value } }) },
           h('option', { value: 'today', selected: st.defaultDate !== 'last' }, 'Today'),
-          h('option', { value: 'last', selected: st.defaultDate === 'last' }, 'The date I used last')))),
+          h('option', { value: 'last', selected: st.defaultDate === 'last' }, 'The date I used last')))));
+}
 
-    h('section', { class: 'card' },
-      h('div', { class: 'bar' }, h('h2', { style: 'margin:0' }, 'Tag editor'), h('span', { class: 'grow' }), h('a', { class: 'btn small', href: '#tags' }, 'Open tag editor ›')),
-      h('p', { class: 'hint', style: 'margin:6px 0 0' }, 'Rename, hide and reorder the APMES tags on the Log page, group them under headers, add personal tags and shorthand, and make tag groups. Download or load your layout as a CSV file.')),
-
+export function renderReflectionSettings() {
+  const st = settings();
+  return h('div', {},
     h('section', { class: 'card' },
       h('h2', {}, 'Reflections'),
       h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: st.reflExport !== false, onchange: e => patchLogbook({ settings: { reflExport: e.target.checked } }) }),
         'New reflections are included in the portfolio export'),
       h('p', { class: 'hint', style: 'margin:0' }, 'Untick if you write many and would rather choose which go in. Reflections already written keep their own tick.')),
-
-    // ---- recycle bin (bin agent) ----
     h('section', { class: 'card' },
       h('h2', {}, 'Photos'),
       (() => { const kb = photoUsageKb(S.reflections), pct = Math.min(100, Math.round(kb / PHOTO_BUDGET_KB * 100));
         return [h('p', { style: 'margin:0 0 6px' }, `${fmtMb(kb)} of ${fmtMb(PHOTO_BUDGET_KB)} used by your reflection figures`),
           h('div', { style: 'height:8px;border-radius:4px;background:var(--line, #ddd);overflow:hidden' }, h('div', { style: `height:100%;width:${pct}%;background:${pct >= 90 ? 'var(--err, #b91c1c)' : 'var(--accent, #002f6c)'}` }))]; })(),
-      h('p', { class: 'hint', style: 'margin:6px 0 0' }, PHOTO_NOTE + ' They are shrunk on your phone before saving. To free space, remove figures you no longer need; deleted reflections free theirs when they leave the recycle bin (30 days).')),
+      h('p', { class: 'hint', style: 'margin:6px 0 0' }, PHOTO_NOTE + ' They are shrunk on your phone before saving. To free space, remove figures you no longer need; deleted reflections free theirs when they leave the recycle bin (30 days).')));
+}
 
-    h('section', { class: 'card' },
-      h('div', { class: 'bar' }, h('h2', { style: 'margin:0' }, 'Recycle bin'), h('span', { class: 'grow' }),
-        h('button', { class: 'small', onclick: () => openBin() }, 'Open')),
-      h('p', { class: 'hint', style: 'margin:6px 0 0' }, 'Deleted cases and reflections are kept for 30 days and can be restored.')),
-
-    backupCard(),
-
+// On the More page
+export const privacyCard = () => (
     h('section', { class: 'card' },
       h('h2', {}, 'Privacy'),
       h('p', { class: 'hint', style: 'margin:0' },
         'Your cases are stored in your own logbook in Google Cloud Firestore. Only you can read them (and the app owner, who runs the import from the old Google Form); programme admins cannot. ',
         'Log patient initials only — no names, NRIC or hospital numbers. Programme residents share case counts per tag on the Totals tab; details are never shared. ',
-        'This device keeps an offline copy of your cases until you sign out — sign out on shared computers.')),
-
+        'This device keeps an offline copy of your cases until you sign out — sign out on shared computers.')));
+export const creditsCard = () => (
     h('section', { class: 'card credits' },
       h('h2', {}, 'Credits'),
       h('p', { style: 'margin:0' }, 'Code by ', h('b', {}, 'Abigail Sim')),
       h('p', { style: 'margin:4px 0 0' }, 'Design and UX/UI by ', h('b', {}, 'Koh Wenjun'))));
-}
 
 // ---------- Account-tab cards: who you are, sign out ----------
 
