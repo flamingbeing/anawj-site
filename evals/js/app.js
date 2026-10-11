@@ -341,20 +341,37 @@ async function onUser(user) {
   await refreshRoles();
 }
 
-// Phones: while the keyboard is up (a text box has focus and the visible area has shrunk), hide the
-// bottom nav and unstick the submit bar (style.css, body.typing).
+// Phones: while the keyboard is up (a text box has focus and the visible area has shrunk), the bottom
+// nav stays on screen just above the keyboard and the submit bar unsticks (style.css, body.typing).
+// Where the keyboard doesn't resize the page (iOS), --e-kb lifts the nav by the keyboard's height, and
+// the box being typed in is kept clear of the nav.
 const typingEl = el => el && (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && /^(text|search|email|number|tel|url|)$/.test(el.type)));
 let fullH = 0, fullW = 0;   // the tallest visible area seen at this width (keyboard down)
 function keyboardCheck() {
   const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
   if (window.innerWidth !== fullW) { fullW = window.innerWidth; fullH = 0; }   // rotated
   fullH = Math.max(fullH, vh);
-  document.body.classList.toggle('typing', !!typingEl(document.activeElement) && vh < fullH * 0.75);
+  const typing = !!typingEl(document.activeElement) && vh < fullH * 0.75;
+  document.body.classList.toggle('typing', typing);
+  const vv = window.visualViewport;
+  const kb = typing && vv ? Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)) : 0;
+  document.documentElement.style.setProperty('--e-kb', kb + 'px');
+  if (typing) setTimeout(keepFocusClear, 50);
+}
+// scroll so the focused box isn't hidden under the nav that now sits above the keyboard
+function keepFocusClear() {
+  const el = document.activeElement, nav = document.getElementById('tabs');
+  if (!typingEl(el) || !nav || !nav.getClientRects().length) return;   // no nav on this screen
+  const r = el.getBoundingClientRect();
+  const top = (window.visualViewport?.offsetTop || 0) + 64;              // below the header
+  const over = Math.min(r.bottom + 8 - nav.getBoundingClientRect().top, r.top - top);   // a tall box keeps its top
+  if (over > 0) window.scrollBy(0, over);
 }
 keyboardCheck();
 document.addEventListener('focusin', keyboardCheck);
 document.addEventListener('focusout', () => setTimeout(keyboardCheck, 0));
 (window.visualViewport || window).addEventListener('resize', keyboardCheck);
+if (window.visualViewport) window.visualViewport.addEventListener('scroll', keyboardCheck);
 
 // ---------- offline: service worker and "update available" ----------
 

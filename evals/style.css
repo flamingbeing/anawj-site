@@ -178,7 +178,10 @@ main > .e-segment:first-child, main > :first-child > .e-segment:first-child { ma
 .e-tab__icon { position: relative; display: block; line-height: 0; }
 .e-tab__label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 2px; }
 .e-tab .e-badge { position: absolute; top: -6px; left: 14px; }
-body.e-nonav .e-bottomnav, body.typing .e-bottomnav { display: none; }
+body.e-nonav .e-bottomnav { display: none; }
+/* keyboard up: the nav rides on top of it (--e-kb is the keyboard's height where the page isn't resized, e.g. iOS) */
+.e-bottomnav { transform: translateY(calc(-1 * var(--e-kb, 0px))); }
+body.typing .e-bottomnav { padding-bottom: 0; }
 
 .e-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; background: var(--n-red); color: #fff; font-size: 12px; font-weight: var(--n-semibold); line-height: 1; }
 
@@ -395,7 +398,7 @@ dialog.e-dialog > h2 { margin: 0 0 12px; font-size: var(--n-text-xl); font-weigh
 
 /* ---------- toast ---------- */
 
-#toast { position: fixed; left: 50%; bottom: calc(var(--e-nav-h) + 16px + var(--e-safe-b)); z-index: 70; display: flex; align-items: center; gap: 12px; max-width: calc(100vw - 32px); padding: 10px 16px; background: #1f2933; color: #fff; font-size: var(--n-text-sm); border-radius: var(--n-radius); opacity: 0; transform: translate(-50%, 12px); transition: opacity .2s, transform .2s; pointer-events: none; }
+#toast { position: fixed; left: 50%; bottom: calc(var(--e-nav-h) + 16px + var(--e-safe-b) + var(--e-kb, 0px)); z-index: 70; display: flex; align-items: center; gap: 12px; max-width: calc(100vw - 32px); padding: 10px 16px; background: #1f2933; color: #fff; font-size: var(--n-text-sm); border-radius: var(--n-radius); opacity: 0; transform: translate(-50%, 12px); transition: opacity .2s, transform .2s; pointer-events: none; }
 body.e-nonav #toast { bottom: calc(80px + var(--e-safe-b)); }
 #toast.show { opacity: 1; transform: translate(-50%, 0); }
 #toast.show button { pointer-events: auto; }
