@@ -330,6 +330,14 @@ function renderOne(card) {
     },
   });
   const sugg = h('div', { class: 'chips sugg-row', 'aria-live': 'polite' });
+  // empty the box in one tap (Undo puts it back); shown once there is text, where Paste was
+  const clearBtn = h('button', { type: 'button', class: 'small clear-btn', title: 'Clear the case box', 'aria-label': 'Clear the case box', onclick: () => {
+    const was = draft.details;
+    if (!was) return;
+    draft.details = ''; textarea.value = ''; saveDraft(); paintSuggest(); paintParsed(false);
+    textarea.focus({ preventScroll: true });
+    toast('Case box cleared', { action: 'Undo', onaction: () => { draft.details = was; if (ui.textarea) { ui.textarea.value = was; paintSuggest(); paintParsed(false); } saveDraft(); } });
+  } }, '× Clear');
   const selected = h('div', { class: 'chips selected' });
   const tip = h('div');
   const templates = h('div', { class: 'chips quick-rest' });
@@ -358,7 +366,7 @@ function renderOne(card) {
   const selExtra = h('div', { class: 'sel-extra' });
   const savebar = h('div', { class: 'savebar' }, selected, selExtra, tip, actions);
   add(card,
-    h('div', { class: 'box-wrap' }, textarea, pasteBtn(textarea)), parsed, tagRow,
+    h('div', { class: 'box-wrap' }, textarea, pasteBtn(textarea), clearBtn), parsed, tagRow,
     // suggestions first, then the last case and your own templates
     h('div', { class: 'chiplabel' }, 'Quick picks'), sugg, templates,
     h('div', { class: 'bar cat-head' }, h('div', { class: 'chiplabel grow' }, 'All tags'),
@@ -431,7 +439,13 @@ function paintSel() {
     ? draft.cats.map(code => catChip(code, { on: true, removable: true, cls: 'add', title: 'Remove ' + catFull(code),
       onclick: () => { draft.cats = dropCat(draft.cats, code); saveDraft(); paintSel(); } }))
     : [h('span', { class: 'none' }, 'No tag yet: tap one below')]),
-    ...looseTags(draft.cats, draft.tags).map(k => tagChip(k, { onclick: () => { draft.tags = draft.tags.filter(t => t !== k); saveDraft(); paintSel(); } })));
+    ...looseTags(draft.cats, draft.tags).map(k => tagChip(k, { onclick: () => { draft.tags = draft.tags.filter(t => t !== k); saveDraft(); paintSel(); } })),
+    // all the tags off in one tap (Undo puts them back)
+    draft.cats.length + (draft.tags || []).length > 1 ? h('button', { type: 'button', class: 'small clear-tags', title: 'Clear all tags', 'aria-label': 'Clear all tags', onclick: () => {
+      const was = { cats: draft.cats, tags: draft.tags || [] };
+      draft.cats = []; draft.tags = []; saveDraft(); paintSel();
+      toast('Tags cleared', { action: 'Undo', onaction: () => { draft.cats = was.cats; draft.tags = was.tags; saveDraft(); paintSel(); } });
+    } }, '× Clear') : null);
   fill(ui.selExtra,
     // a combination worth keeping: one tap to make it a template (no trip to Settings)
     draft.cats.length >= 2 && !((S.logbook && S.logbook.templates) || []).some(t => sortCodes(t.cats).join() === sortCodes(draft.cats).join())

@@ -852,3 +852,7 @@ details.an-sec[open] > summary .an-t::after { content: ' ⌄'; }
 .log-card .sugg-row { min-height: 40px; align-items: center; }
 .savebar .tip { margin: 4px 0; font-size: 13px; }
 .savebar .sel-extra:not(:empty) { margin: 4px 0 0; }
+/* Log: Clear in the case box (where Paste sits when it's empty) and at the end of the chosen tags */
+.box-wrap .clear-btn { position: absolute; right: 6px; bottom: 6px; min-height: 40px; padding: 2px 10px; font-size: 13px; opacity: .85; background: var(--panel); }
+.box-wrap textarea:placeholder-shown ~ .clear-btn { display: none; }
+.selected .clear-tags { min-height: 32px; padding: 2px 10px; font-size: 13px; border-radius: 999px; color: var(--muted); }
