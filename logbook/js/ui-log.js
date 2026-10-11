@@ -241,7 +241,16 @@ function renderOne(card) {
   paintSuggest(); paintSel(); paintQuick(); paintParsed(false);
   // compact the pinned box once it sticks (the marker above it has scrolled away)
   if ('IntersectionObserver' in window) {
-    const io = new IntersectionObserver(([e]) => composer.classList.toggle('stuck', !e.isIntersecting && e.boundingClientRect.top < 0));
+    // The compact box keeps its old height in the flow (a bottom margin makes up the difference),
+    // so nothing below moves when it pins. Otherwise scroll anchoring shifts the page, the marker
+    // comes back into view and the box flickers between pinned and not.
+    const io = new IntersectionObserver(([e]) => {
+      const want = !e.isIntersecting && e.boundingClientRect.top < 0;
+      if (want === composer.classList.contains('stuck')) return;
+      const h0 = composer.offsetHeight;
+      composer.classList.toggle('stuck', want);
+      composer.style.marginBottom = want ? Math.max(0, h0 - composer.offsetHeight) + 'px' : '';
+    });
     io.observe(pinMark);
   }
   // autofocus attribute is ignored on re-render; focus after insertion (not on phones' first paint
