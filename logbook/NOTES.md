@@ -114,6 +114,8 @@ portfolio content.
   reduce), icons-only tab bar (buttons keep `aria-label`; on a computer the icons are shown for it), tab bar position
   (auto = bottom on phones / top on bigger screens, or always top `tabs-top`, or always bottom `tabs-bottom`), hide the
   header (`no-header`; it shows again while `who-alert` is set by paintWho: signed out, demo, offline, unsynced).
+  Case tab upside down on phones (`case-inverted`: CSS `order` on the log card's items, lp-left/right being
+  display: contents; tags on top, the case box last above Save; app.js render() scrolls to the bottom on entering).
   Defaults are pixel-identical to before.
 - **Display is per device** (owner: people use the logbook on different devices with different needs): compact,
   text size, zoom, fonts, colour and the start tab live in localStorage `apmes-logbook-display` (`deviceDisplay` / `setDisplay` /

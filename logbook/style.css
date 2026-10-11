@@ -1045,3 +1045,21 @@ html.no-header:not(.who-alert) .top { display: none; }
 html.no-header:not(.who-alert) main { padding-top: max(8px, env(safe-area-inset-top, 0px)); }
 html.no-header:not(.who-alert).tabs-top .tabs { padding-top: env(safe-area-inset-top, 0px); }
 @media (min-width: 601px) { html.no-header:not(.who-alert):not(.tabs-bottom) .tabs { padding-top: env(safe-area-inset-top, 0px); } }
+/* the Case tab upside down on phones (Settings → Display): all tags at the top, then quick picks and the date, the
+   case box last, next to the keyboard and Save. lp-left / lp-right are display: contents here, so their children
+   are the card's own flex items */
+@media (max-width: 600px) {
+  html.case-inverted .log-card { display: flex; flex-direction: column; }
+  html.case-inverted .log-card .cat-head { order: 1; }
+  html.case-inverted .log-card .picker { order: 2; }
+  html.case-inverted .log-card .group-save { order: 3; }
+  html.case-inverted .log-card .still-needed { order: 4; margin-bottom: 8px; }
+  html.case-inverted .log-card .lp-left > .chiplabel { order: 5; }
+  html.case-inverted .log-card .lp-left > .templates, html.case-inverted .log-card .lp-left > .chips:not(.sugg-row) { order: 6; }
+  html.case-inverted .log-card .sugg-row { order: 7; }
+  html.case-inverted .log-card .datebar { order: 8; margin-top: 8px; }
+  html.case-inverted .log-card .tag-row { order: 9; }
+  html.case-inverted .log-card .parsed { order: 10; }
+  html.case-inverted .log-card .box-wrap { order: 11; }
+  html.case-inverted .log-card .savebar { order: 12; }
+}
