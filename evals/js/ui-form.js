@@ -2,7 +2,7 @@
 // autosave (this device at once, the server for choices at once and text after 3 s idle), a sticky
 // "n of N required" bar, submit, decline, and a read-only view for anyone else or once submitted.
 
-import { S, h, fill, add, toast, cloud, icon, go, modal, debounce, fmtDate, fmtAgo, toMs, avatar, toolLabel, empty, draftKey, EDIT_MS } from './ui-core.js';
+import { S, hooks, h, fill, add, toast, cloud, icon, go, modal, debounce, fmtDate, fmtAgo, toMs, avatar, toolLabel, empty, draftKey, EDIT_MS } from './ui-core.js';
 import { FORMS, SCALES, ENTRUSTMENT_TEXT_KEY } from './forms.js';
 import { itemById } from './catalogue.js';
 import { validate, visibleQuestions, nextGap, identifierWarning } from './engine.js';
@@ -45,6 +45,11 @@ export async function renderForm(id) {
   if (!ev) {
     return empty('Evaluation not found', navigator.onLine ? 'It may have been withdrawn, or it was sent to a different account.' : 'Opens when you have signal.',
       h('a', { class: 'n-btn', href: '#pending' }, 'Evaluations'));
+  }
+  if (ev.residentEmail === S.user?.email && ev.assessorEmail !== S.user?.email) {
+    history.replaceState(null, '', location.pathname + location.search + '#r/' + encodeURIComponent(ev.id));
+    setTimeout(() => hooks.render());
+    return h('p', { class: 'e-loading' }, 'Opening your request…');
   }
   const form = FORMS[ev.formId];
   if (!form) return empty('Unknown form', `This evaluation uses a form this app doesn't know (${ev.formId}).`);
@@ -334,7 +339,9 @@ class FormScreen {
         if (cloud.demo) ls.del(draftKey(this.ev.id));
         m.close();
         toast('Declined. The resident can send it to someone else.');
-        go('pending');
+        // replace, so Back doesn't return to the finished form
+        history.replaceState(null, '', location.pathname + location.search + '#pending');
+        hooks.render();
       } catch (e) {
         ok.disabled = false;
         err.textContent = 'Could not decline: ' + (e.message || e); err.hidden = false;
@@ -404,7 +411,7 @@ class FormScreen {
   subject() {
     const ev = this.ev, rq = ev.request || {};
     const kv = [['Date', rq.date ? fmtDate(rq.date) : fmtDate(ev.date)], ['Location', rq.location], ['Patient', rq.initials],
-      ['Age', rq.ageBand], ['Gender', rq.gender], ev.formId === 'ebd' && rq.coManaged ? ['Co-managed', 'Yes'] : null, ['Notes', rq.notes]]
+      ['Age', rq.ageBand], ['Gender', ({ F: 'Female', M: 'Male' })[rq.gender] || rq.gender], ev.formId === 'ebd' && rq.coManaged ? ['Co-managed', 'Yes'] : null, ['Notes', rq.notes]]
       .filter(x => x && x[1]);
     return h('section', { class: 'e-form__subject', 'aria-label': 'Evaluation subject' },
       h('h2', { class: 'e-section' }, 'Evaluation Subject'),
@@ -446,7 +453,7 @@ class FormScreen {
     const head = [
       h('span', { class: 'e-q__n' }, `${q.n}.`),
       h('span', { class: 'e-q__label', id: `${id}-label` }, label),
-      q.required ? h('span', { class: 'e-required' }, h('span', { 'aria-hidden': 'true' }, 'Required'), h('span', { class: 'e-sr' }, ', required')) : null,
+      q.required && this.editable ? h('span', { class: 'e-required' }, h('span', { 'aria-hidden': 'true' }, 'Required'), h('span', { class: 'e-sr' }, ', required')) : null,
     ];
     // the rest of a long label sits after the legend, so it is not part of the group's name
     const moreEl = more ? h('details', { class: 'e-q__more e-q__help' }, h('summary', {}, 'more'), more) : null;
@@ -586,7 +593,7 @@ class FormScreen {
       const b = h('input', { type: 'checkbox', value: o, disabled: ro || null, onchange: () => {
         let v = [...(this.answers[q.key] || [])].filter(x => x !== o);
         if (b.checked) v = o === q.exclusive ? [o] : [...v.filter(x => x !== q.exclusive), o];
-        this.answer(q, q.options.filter(x => v.includes(x)), { noAdvance: true });   // in the options' order
+        this.answer(q, q.options.filter(x => v.includes(x)), { noAdvance: !(b.checked && o === q.exclusive) });   // in the options' order; "none" moves on
         sync();
       } });
       boxes.push(b);
@@ -621,7 +628,13 @@ class FormScreen {
     };
     this.refreshers[q.key] = refresh;
     ta.addEventListener('input', () => { grow(); this.answer(q, ta.value, { text: true }); });
-    ta.addEventListener('blur', () => { if (this.mode === 'fill' && this.saveText) this.saveText.flush(); });
+    // a first answer typed, then the keyboard closed (not a tap on another control): on to the next gap
+    let startBlank = true;
+    ta.addEventListener('focus', () => { startBlank = blank(this.answers[q.key]); });
+    ta.addEventListener('blur', e => {
+      if (this.mode === 'fill' && this.saveText) this.saveText.flush();
+      if (this.editable && !ro && startBlank && !blank(this.answers[q.key]) && !e.relatedTarget) { this.tapRow = null; this.advance(q.key); }
+    });
     requestAnimationFrame(grow);
     refresh();
     const insert = s => {

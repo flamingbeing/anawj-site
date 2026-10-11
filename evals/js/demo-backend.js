@@ -277,7 +277,7 @@ function seed(s) {
     const initials = ['AB', 'CK', 'DL', 'EM', 'FN', 'GP', 'HQ', 'JR', 'KS', 'LT', 'MW', 'NY', 'PZ'][k % 13];
     const date = iso(t);
     const id = 'demo-ev-' + String(++k).padStart(2, '0');
-    const request = { date, location: formId === 'minicex' ? 'Preop Clinic' : 'Operating theatre', initials, ageBand: ['20-29', '40-49', '60-69', '70-79'][k % 4], gender: k % 2 ? 'F' : 'M' };
+    const request = { date, location: formId === 'minicex' ? 'Preop Clinic' : 'Operating theatre', initials, ageBand: ['16-40', '41-64', '65-79', '80+'][k % 4], gender: k % 2 ? 'F' : 'M' };
     if (formId === 'ebd') request.coManaged = true;
     const ev = { id, rid, residentEmail: r.email, residentName: r.name, assessorEmail, assessorName: f.name,
       formId, formVersion: 1, catalogueVersion: '2024-07-v8', itemId, itemText, tool, epa, level, caseKey: date + '|' + initials,

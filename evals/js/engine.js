@@ -156,6 +156,8 @@ export function identifierWarning(text) {
   const t = String(text || '');
   if (/\b[STFGM]\d{7}[A-Z]\b/i.test(t)) return 'This looks like an NRIC/FIN. Please remove patient identifiers.';
   if (/\d{8,}/.test(t) || /(^|[^\d-])\d{4} \d{4}(?![\d-])/.test(t)) return 'Long numbers look like record or phone numbers. Please remove them.';
+  if (/\b\d{6,7}[A-Z]\b/i.test(t) || /\b(MRN|IC|NRIC|FIN|case no|hospital no|reg no)\b\W*\w*\d/i.test(t)) return 'This looks like a record number. Please remove patient identifiers.';
+  if (/\b(Mr|Mrs|Ms|Mdm|Madam|Miss)\.? +[A-Z][a-z]+/.test(t) || /\bname\s*[:=-]/i.test(t)) return 'This looks like a patient name. Use initials only.';
   return null;
 }
 

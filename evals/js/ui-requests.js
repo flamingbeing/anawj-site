@@ -2,7 +2,7 @@
 // Request detail (#r/{id} while not submitted, via ui-result.js): status trail, share again,
 // Nudge, Change assessor, Cancel, and Send to another assessor after a decline.
 
-import { S, h, fill, toast, cloud, icon, go, toolLabel, fmtDate, fmtAgo, toMs, statusChip, row, empty, segment, modal, confirmBox, hooks } from './ui-core.js';
+import { S, h, fill, toast, cloud, icon, go, toolLabel, fmtDate, fmtAgo, toMs, statusChip, row, empty, segment, modal, confirmBox, hooks, needsAction, ageHours, NUDGE_HOURS } from './ui-core.js';
 import { statusOf, validate } from './engine.js';
 import { FORMS } from './forms.js';
 import { itemById } from './catalogue.js';
@@ -10,18 +10,10 @@ import { residentCSS, assessorPicker, shareSheet, shareEval, itemTags, tag, AGE_
 
 residentCSS();
 
-const NUDGE_HOURS = 20;
-const HOUR = 36e5;
 let filter = 'waiting';
 
 const WAITING = ['draft', 'requested', 'declined'];
-export const needsAction = (ev, now = Date.now()) => ev.status === 'declined'
-  || (ev.status === 'submitted' && !ev.seenAt)
-  || (ev.status === 'requested' && ageHours(ev, now) >= NUDGE_HOURS);
-export const ageHours = (ev, now = Date.now()) => {
-  const t = toMs(ev.chasedAt) || toMs(ev.requestedAt) || toMs(ev.createdAt);
-  return t ? (now - t) / HOUR : 0;
-};
+export { needsAction, ageHours };
 
 // "Sent 3 h ago" / "Submitted 2 d ago": the latest event for this request.
 export function ageText(ev, now = Date.now()) {
@@ -36,12 +28,13 @@ export function ageText(ev, now = Date.now()) {
 
 export function requestRow(ev, now = Date.now()) {
   const unseen = ev.status === 'submitted' && !ev.seenAt;
+  const started = ev.status === 'requested' && ev.assessment && Object.keys(ev.assessment).length > 0;
   return row({
     name: ev.assessorName || ev.assessorEmail,
     title: ev.itemText || itemById(ev.itemId)?.text || 'Evaluation',
-    meta: `${toolLabel(ev.tool)} · ${ev.assessorName || ev.assessorEmail} · ${ageText(ev, now)}`,
+    meta: [toolLabel(ev.tool) + (ev.epa ? ` · EPA ${ev.epa}` : ''), ev.assessorName || ev.assessorEmail, ageText(ev, now) + (started ? ' · started' : '')].join(' · '),
     chip: unseen ? h('span', { class: 'e-chip e-chip--submitted' }, 'New feedback') : statusChip(ev, now),
-    dot: ev.status === 'requested' && ev.assessment && Object.keys(ev.assessment).length > 0,
+    stacked: true,
     href: '#r/' + encodeURIComponent(ev.id),
   });
 }
@@ -61,13 +54,13 @@ export function renderRequests() {
     const list = lists[filter];
     fill(root,
       segment([
-        { id: 'waiting', label: 'Waiting', count: lists.waiting.filter(ev => needsAction(ev, now)).length },
+        { id: 'waiting', label: 'Open', count: lists.waiting.filter(ev => needsAction(ev, now)).length },
         { id: 'done', label: 'Done' },
         { id: 'all', label: 'All' },
       ], filter, id => { filter = id; paint(); }),
       !S.loaded.mine ? h('p', { class: 'e-loading' }, 'Loading…')
         : list.length ? h('div', { class: 'e-list' }, list.map(ev => requestRow(ev, now)))
-        : empty(filter === 'waiting' ? 'Nothing waiting' : 'No requests yet', filter === 'waiting' ? 'Requests you send show here until they are done.' : 'Send your first request from Home.',
+        : empty(filter === 'waiting' ? 'Nothing open' : 'No requests yet', filter === 'waiting' ? 'Requests you send show here until they are done.' : 'Send your first request from Home.',
           h('a', { class: 'n-btn', href: '#new' }, icon('plus'), 'Request evaluation')),
       list.length ? h('p', { class: 'e-small e-center', style: 'margin-top:16px' }, h('a', { href: '#new', class: 'n-btn e-go' }, icon('plus'), 'New request')) : null);
   };
@@ -115,7 +108,7 @@ export function caseKV(ev) {
   const rows = [
     ['Date', fmtDate(r.date || ev.date)],
     ['Location', r.location],
-    ['Patient', [r.initials, r.ageBand ? (AGE_BANDS.includes(r.ageBand) || /\d/.test(r.ageBand) ? r.ageBand + ' y' : r.ageBand) : null, r.gender].filter(Boolean).join(' · ')],
+    ['Patient', [r.initials, r.ageBand ? (AGE_BANDS.includes(r.ageBand) || /\d/.test(r.ageBand) ? r.ageBand + ' y' : r.ageBand) : null, ({ F: 'Female', M: 'Male' })[r.gender] || r.gender].filter(Boolean).join(' · ')],
     r.coManaged ? ['Co-managed', 'Confirmed'] : null,
     r.notes ? ['Note', r.notes] : null,
   ].filter(x => x && x[1]);

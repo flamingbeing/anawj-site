@@ -67,3 +67,11 @@ t('reminder', () => {
 });
 
 console.log(`admin: ${n} checks passed`);
+
+// pasted from an email client, with a header row
+{
+  const r = parseFacultyLines('Name,Email\nDr Tan Wei Ming <tan@x.com>; B <b@x.com>\n"Lim, Hui Min" <lim@x.com>\nDr Lim Hui Min lim2@x.com');
+  assert.deepEqual(r.map(x => x.rec && [x.rec.name, x.rec.email]), [['Dr Tan Wei Ming', 'tan@x.com'], ['B', 'b@x.com'], ['Lim Hui Min', 'lim@x.com'], ['Dr Lim Hui Min', 'lim2@x.com']]);
+  assert.match(parseResidentLines('Sam Two, sam2@x.com')[0].problem, /resident ID/);
+  console.log('paste formats ok');
+}

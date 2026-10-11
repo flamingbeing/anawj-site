@@ -88,23 +88,23 @@ const OBS = ['obstetric', 'obs'];
 const SYN = {
   'DOPS-2-01': ['bag mask', 'BMV', 'mask ventilation', 'facemask', 'airway'],
   'DOPS-2-02': ['LMA', 'laryngeal mask', 'SGA', 'supraglottic', 'i-gel', 'airway'],
-  'DOPS-2-03': ['ETT', 'intubation', 'laryngoscopy', 'airway'],
+  'DOPS-2-03': ['ETT', 'intubation', 'laryngoscopy', 'RSI', 'rapid sequence', 'airway'],
   'DOPS-2-04': ['obese', 'obesity', 'bariatric', 'BMV', 'mask ventilation', 'airway'],
-  'DOPS-2-05': ['obese', 'obesity', 'bariatric', 'ETT', 'intubation', 'airway'],
+  'DOPS-2-05': ['obese', 'obesity', 'bariatric', 'ETT', 'intubation', 'RSI', 'airway'],
   'DOPS-2-06': ['DLT', 'double lumen', 'OLV', 'one lung ventilation', 'thoracic', 'FOB', 'bronchoscopy'],
   'DOPS-3-01': ['spinal', 'SAB', 'subarachnoid', 'neuraxial', 'regional', 'RA'],
-  'DOPS-3-02': ['PNB', 'nerve block', 'brachial plexus', 'interscalene', 'supraclavicular', 'infraclavicular', 'axillary', 'upper limb', 'regional', 'RA'],
-  'DOPS-3-03': ['PNB', 'nerve block', 'FICB', 'fascia iliaca', 'femoral', 'popliteal', 'sciatic', 'lower limb', 'regional', 'RA'],
-  'DOPS-3-04': ['PNB', 'nerve block', 'truncal', 'ESP', 'erector spinae', 'rectus sheath', 'TAP', 'transversus abdominis', 'ilioinguinal', 'iliohypogastric', 'regional', 'RA'],
-  'DOPS-3-05': ['PNB', 'nerve block catheter', 'continuous nerve block', 'CPNB', 'catheter', 'regional', 'RA'],
+  'DOPS-3-02': ['PNB', 'nerve block', 'brachial plexus', 'interscalene', 'supraclavicular', 'infraclavicular', 'axillary', 'upper limb', 'regional', 'RA', 'ultrasound', 'USG', 'US guided'],
+  'DOPS-3-03': ['PNB', 'nerve block', 'FICB', 'fascia iliaca', 'femoral', 'popliteal', 'sciatic', 'lower limb', 'regional', 'RA', 'ultrasound', 'USG', 'US guided'],
+  'DOPS-3-04': ['PNB', 'nerve block', 'truncal', 'ESP', 'erector spinae', 'rectus sheath', 'TAP', 'transversus abdominis', 'ilioinguinal', 'iliohypogastric', 'regional', 'RA', 'ultrasound', 'USG', 'US guided'],
+  'DOPS-3-05': ['PNB', 'nerve block catheter', 'continuous nerve block', 'CPNB', 'catheter', 'regional', 'RA', 'ultrasound', 'USG', 'US guided'],
   'DOPS-4-01': ['FOI', 'AFOI', 'awake FOI', 'awake fibreoptic', 'awake fiberoptic', 'awake intubation', 'scope assisted', 'bronchoscope', 'difficult airway'],
   'DOPS-4-02': ['difficult airway', 'VL', 'videolaryngoscope', 'video laryngoscope', 'C-MAC', 'GlideScope', 'McGrath', 'hyperangulated', 'Macintosh', 'Miller', 'straight blade', 'blades'],
-  'DOPS-6-01': ['art line', 'arterial line', 'IA line', 'a-line', 'radial', 'ICU'],
-  'DOPS-6-02': ['vascath', 'dialysis catheter', 'HD catheter', 'CRRT', 'CVVH', 'ICU'],
+  'DOPS-6-01': ['art line', 'arterial line', 'IA line', 'a-line', 'radial', 'ICU', 'ultrasound', 'USG', 'US guided'],
+  'DOPS-6-02': ['vascath', 'dialysis catheter', 'HD catheter', 'CRRT', 'CVVH', 'ICU', 'ultrasound', 'USG', 'US guided'],
   'DOPS-7a-01': ['epidural', 'CSE', 'combined spinal epidural', 'labour', 'labor', 'neuraxial', ...OBS],
-  'DOPS-10-01': ['CVC', 'central line', 'central venous', 'IJ', 'internal jugular', 'cardiac'],
+  'DOPS-10-01': ['CVC', 'central line', 'central venous', 'IJ', 'internal jugular', 'cardiac', 'ultrasound', 'USG', 'US guided'],
   'MINICEX-1-01': ['PEC', 'preop', 'pre-op clinic', 'PAC', 'pre-anaesthetic', 'ward', 'preoperative'],
-  'MINICEX-2-01': ['GA', 'ETT', 'intubation', 'crisis', 'hypoxia', 'ventilation'],
+  'MINICEX-2-01': ['GA', 'ETT', 'intubation', 'RSI', 'extubation', 'TIVA', 'crisis', 'hypoxia', 'ventilation'],
   'MINICEX-2-02': ['GA', 'LMA', 'anaphylaxis', 'MH', 'malignant hyperthermia', 'crisis'],
   'MINICEX-3-01': ['PNB', 'nerve block', 'sedation', 'regional', 'RA', 'MAC'],
   'MINICEX-4-01': ['difficult airway', 'airway', 'ENT'],
@@ -113,7 +113,7 @@ const SYN = {
   'MINICEX-7b-01': ['LSCS', 'caesarean', 'cesarean', 'C-section', 'pre-eclampsia', 'PET', 'GA', ...OBS],
   'MINICEX-9-01': ['paeds', 'paediatric', 'pediatric', 'child', 'spontaneous ventilation', 'GA/SR'],
   'MINICEX-9-02': ['paeds', 'paediatric', 'pediatric', 'child', 'IPPV', 'GA'],
-  'MINICEX-11-01': ['acute pain', 'APS', 'pain rounds', 'PACU', 'recovery'],
+  'MINICEX-11-01': ['acute pain', 'APS', 'pain rounds', 'PCA', 'PCEA', 'epidural review', 'PACU', 'recovery'],
   'MINICEX-12-01': ['chronic pain', 'pain clinic'],
   'EBD-1-01': ['PEC', 'preop', 'respiratory', 'COPD', 'asthma'],
   'EBD-1-02': ['PEC', 'preop', 'cardiac', 'IHD', 'cardiovascular'],
@@ -374,8 +374,19 @@ const HAY = new Map(ITEMS.map(i => [i.id, {
   all: ' ' + norm([i.text, ...i.synonyms, i.note || ''].join(' ')) + ' ',
 }]));
 
+function wordScore(h, item, w) {
+  let s = 0;
+  if (/^\\d+[ab]?$/.test(w) && item.epa === w) s += 4;
+  if (h.syn.includes(w)) s += 4;
+  if (h.text.includes(' ' + w + ' ')) s += 3;
+  else if (h.text.includes(' ' + w)) s += 2;
+  else if (h.all.includes(' ' + w)) s += 1;
+  return s;
+}
+
 // Ranked search over text, synonyms, EPA number ("epa 3", "7a") and tool ("dops", "mini-cex").
-// Every query word must match something. rYear lifts items due this year (then overdue ones).
+// Every query word must match something ("r1" … "r5" keeps items due by that year; a trailing
+// plural "s" is dropped when the word doesn't match as typed). rYear lifts items due this year (then overdue ones).
 export function searchItems(q, { rYear } = {}) {
   let words = norm(q).replace(/\\bmini cex\\b/g, 'minicex').replace(/\\bepa (\\d+[ab]?)\\b/g, 'epa$1').split(' ').filter(Boolean);
   const phrase = norm(q);
@@ -387,12 +398,10 @@ export function searchItems(q, { rYear } = {}) {
       const epa = w.match(/^epa(\\d+[ab]?)$/);
       if (epa) { if (item.epa === epa[1] || (epa[1] === '7' && item.epa.startsWith('7'))) { score += 5; continue; } return; }
       if (TOOL_WORDS[w]) { if (item.tool === TOOL_WORDS[w]) { score += 4; continue; } return; }
-      let s = 0;
-      if (/^\\d+[ab]?$/.test(w) && item.epa === w) s += 4;
-      if (h.syn.includes(w)) s += 4;
-      if (h.text.includes(' ' + w + ' ')) s += 3;
-      else if (h.text.includes(' ' + w)) s += 2;
-      else if (h.all.includes(' ' + w)) s += 1;
+      const yr = w.match(/^r([1-5])$/);   // "r1 airway": items due by that year
+      if (yr) { if (item.byYear === Number(yr[1])) { score += 3; continue; } return; }
+      let s = wordScore(h, item, w);
+      if (!s && w.length > 3 && w.endsWith('s')) s = wordScore(h, item, w.slice(0, -1));   // "epidurals"
       if (!s) return;
       score += s;
     }

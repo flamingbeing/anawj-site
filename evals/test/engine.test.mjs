@@ -247,6 +247,9 @@ const { dops, minicex, ebd } = FORMS;
   assert.match(identifierWarning('MRN 12345678'), /numbers/);
   assert.match(identifierWarning('call 9123 4567'), /numbers/);
   assert.equal(identifierWarning('1234567'), null);
+  assert.match(identifierWarning('Patient MRN 1234567A, bed 12'), /record number/);
+  assert.match(identifierWarning('Mdm Tan for TKR'), /name/);
+  assert.equal(identifierWarning('ASA 3, ICU bed, Mallampati 2'), null);
 }
 
 // ---------- ids and dates ----------
