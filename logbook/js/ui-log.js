@@ -28,6 +28,19 @@ function loadDraft() {
   if (!draft.keepDate || !(Date.now() - (draft.keptAt || 0) < KEEP_MS)) draft.date = null;
 }
 const saveDraft = debounce(() => { try { localStorage.setItem(draftKey(), JSON.stringify(draft)); } catch { /* ignore */ } }, 300);
+// Text shared to the installed app (share sheet → Logbook; manifest share_target) arrives as
+// ?share_text=…; app.js keeps it for here: it opens in paste-a-list, so one case or a whole list works.
+export const SHARED_KEY = 'logbook-shared';
+function takeShared() {
+  let text = '';
+  try { text = sessionStorage.getItem(SHARED_KEY) || ''; sessionStorage.removeItem(SHARED_KEY); } catch { /* ignore */ }
+  if (!text.trim()) return;
+  draft.bulk = draft.bulk && draft.bulk.trim() ? draft.bulk.trimEnd() + '\n\n' + text.trim() : text.trim();
+  draft.mode = 'bulk'; bulkRows = null;
+  saveDraft.cancel(); try { localStorage.setItem(draftKey(), JSON.stringify(draft)); } catch { /* ignore */ }
+  setTimeout(() => toast('Shared text added: check it, then Review'), 300);
+}
+
 // Open the Log page with this day picked (from the Logbook calendar's "+ Log a case").
 export function logOnDate(iso) {
   loadDraft();
@@ -216,6 +229,7 @@ function weeklyDigest() {
 
 export function renderLog() {
   loadDraft();
+  takeShared();
   const card = h('section', { class: 'card log-card' });
   const datebar = h('div', { class: 'datebar', id: 'datebar' });
   add(card, datebar);

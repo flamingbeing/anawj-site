@@ -3,7 +3,7 @@
 // in-browser demo backend with ?demo).
 
 import { S, hooks, h, toast, cloud, setCases, scheduleSummary, fill, resetCaches, confirmBox, modal, setCategoryNames, categoryNames as categoryNamesNow } from './ui-core.js';
-import { renderLog, logCasesChanged, clearDrafts } from './ui-log.js';
+import { renderLog, logCasesChanged, clearDrafts, SHARED_KEY } from './ui-log.js';
 import { renderLogbook } from './ui-logbook.js';
 import { renderProgress, renderTotals } from './ui-progress.js';
 import { applyCompact, cachedCompact, applyTheme, cachedTheme, applyTextSize, cachedTextSize, renderSettings, renderTagEditor } from './ui-settings.js';
@@ -361,6 +361,17 @@ function registerSW() {
 
 if (cloud.onSyncError) cloud.onSyncError(err => toast('A change could not be synced: ' + (err.message || err)));
 
+// shared to the installed app (Android share sheet): keep the text for the Log page, tidy the address
+{
+  const q = new URLSearchParams(location.search);
+  const shared = [q.get('share_title'), q.get('share_text'), q.get('share_url')].filter(Boolean).join('\n').trim();
+  if (q.has('share_text') || q.has('share_title') || q.has('share_url')) {
+    try { if (shared) sessionStorage.setItem(SHARED_KEY, shared); } catch { /* ignore */ }
+    for (const k of ['share_title', 'share_text', 'share_url']) q.delete(k);
+    const rest = q.toString().replace(/=(&|$)/g, '$1');
+    history.replaceState(null, '', location.pathname + (rest ? '?' + rest : '') + '#log');
+  }
+}
 applyTheme(cachedTheme());   // this device's choice (Settings → Display → Theme)
 applyTextSize(cachedTextSize());
 if (cachedCompact()) document.body.classList.add('compact');   // first paint; corrected once the logbook loads
