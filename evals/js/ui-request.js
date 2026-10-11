@@ -276,6 +276,24 @@ export function lastRequest() {
 let F = null;   // flow state; reset when leaving #new
 let root = null;
 
+// The flow survives a reload or the phone killing the tab (this tab only, for 2 hours).
+const FLOW_KEY = 'evals-request-flow';
+const FLOW_MAX_AGE = 2 * 36e5;
+function keepFlow() {
+  try {
+    if (F && F.step < 4 && !F.sending) sessionStorage.setItem(FLOW_KEY, JSON.stringify({ F, at: Date.now(), user: S.user?.email || null }));
+    else sessionStorage.removeItem(FLOW_KEY);
+  } catch {}
+}
+function dropFlow() { try { sessionStorage.removeItem(FLOW_KEY); } catch {} }
+function restoreFlow() {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(FLOW_KEY) || 'null');
+    if (!saved || saved.user !== (S.user?.email || null) || Date.now() - saved.at > FLOW_MAX_AGE) return null;
+    return { ...saved.F, sending: false, error: '' };
+  } catch { return null; }
+}
+
 function startFlow({ itemId = null, step = 1 } = {}) {
   const last = lastRequest();
   F = {
@@ -303,12 +321,16 @@ function setStep(n, { push = true } = {}) {
 // leave the flow without leaving a stale #new behind in history
 function leave(route) {
   F = null;
+  dropFlow();
   history.replaceState(null, '', location.pathname + location.search + '#' + route);
   hooks.render();
 }
 
 if (typeof window !== 'undefined') {
-  window.addEventListener('hashchange', () => { if (!/^#new\b/.test(location.hash)) F = null; });
+  window.addEventListener('hashchange', () => { if (!/^#new\b/.test(location.hash)) { F = null; dropFlow(); } });
+  // typing in the case card doesn't repaint, so save the flow when the page is hidden too
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && /^#new\b/.test(location.hash)) keepFlow(); });
+  window.addEventListener('pagehide', () => { if (/^#new\b/.test(location.hash)) keepFlow(); });
   window.addEventListener('popstate', e => {
     if (!F || !/^#new\b/.test(location.hash)) return;
     if (F.step === 4) { leave('requests'); return; }
@@ -333,7 +355,10 @@ export function renderNew(arg) {
       const f = facultyByEmail(last.assessorEmail);
       if (!f || f.status !== 'INACTIVE') F.assessor = { email: last.assessorEmail, name: f?.name || last.assessorName || last.assessorEmail };
       else F.step = F.firstStep = 2;
-    } else startFlow(item ? { itemId: item.id, step: 2 } : {});
+    } else {
+      const kept = !item && restoreFlow();
+      if (kept) F = kept; else startFlow(item ? { itemId: item.id, step: 2 } : {});
+    }
   } else if (item && F.itemId !== item.id && F.step < 4) { F.itemId = item.id; }
   ensureFaculty(() => { if (F && F.step === 2) paint(); });
   root = h('div', { class: 'e-stack e-rq' });
@@ -345,6 +370,7 @@ function paint() {
   if (!root || !F) return;
   const views = { 1: stepItem, 2: stepAssessor, 3: stepCase, 4: stepShare };
   fill(root, views[F.step]());
+  keepFlow();
 }
 
 function stepHead(n, label) {
@@ -363,7 +389,7 @@ function stepItem() {
   const results = h('div', {});
   const browse = h('div', {});
   const search = h('input', { class: 'e-input', type: 'search', id: 'rq-search', placeholder: 'Search: art line, TAP, epa 3, DOPS…', autocomplete: 'off', enterkeyhint: 'search', 'aria-label': 'Search items',
-    oninput: debounce(() => paintResults(), 120) });
+    value: F.query || '', oninput: debounce(() => { F.query = search.value; paintResults(); }, 120) });
   function paintResults() {
     const q = search.value.trim();
     browse.hidden = !!q;
@@ -402,6 +428,7 @@ function stepItem() {
       return det;
     })));
 
+  if (F.query) paintResults();
   return [
     stepHead(1, 'What should be assessed?'),
     F.assessor ? chosenAssessor() : null,
@@ -501,7 +528,7 @@ function stepCase() {
     noteWarn.textContent = w || ''; noteWarn.hidden = !w;
   }
 
-  const sendBtn = h('button', { type: 'submit', class: 'n-btn e-go e-btn-big', disabled: F.sending }, F.sending ? 'Sending…' : `Send to ${F.assessor.name}`);
+  const sendBtn = h('button', { type: 'submit', class: 'n-btn e-go e-btn-big', disabled: F.sending }, F.sending ? 'Sending…' : 'Send request');
   const form = h('form', { class: 'e-card', novalidate: true, onsubmit: e => { e.preventDefault(); send(); } },
     h('div', { class: 'e-rq-field' }, h('label', { class: 'e-label', for: 'rq-date' }, 'Date of case'), date, err('date')),
     h('div', { class: 'e-rq-field' }, h('span', { class: 'e-label', id: 'rq-loc-l' }, 'Location'), locChips, locInput, err('location')),

@@ -44,6 +44,16 @@ export function pruneDrafts(list, meta) {
   for (const ev of list || []) if (ev.status !== 'requested') { try { localStorage.removeItem(draftKey(ev.id)); } catch {} }
 }
 
+// A request that needs the resident: declined, new feedback, or waiting 20 h or more (nudge).
+export const NUDGE_HOURS = 20;
+export const ageHours = (ev, now = Date.now()) => {
+  const t = toMs(ev.chasedAt) || toMs(ev.requestedAt) || toMs(ev.createdAt);
+  return t ? (now - t) / 36e5 : 0;
+};
+export const needsAction = (ev, now = Date.now()) => ev.status === 'declined'
+  || (ev.status === 'submitted' && !ev.seenAt)
+  || (ev.status === 'requested' && ageHours(ev, now) >= NUDGE_HOURS);
+
 // ---------- tiny DOM helper (as in nuh-roster / logbook) ----------
 
 export function h(tag, attrs = {}, ...kids) {
@@ -100,6 +110,13 @@ export function modal(title, body, { onclose, cls = '' } = {}) {
   el.showModal();
   return { el, close: () => el.close() };
 }
+
+// The phone's Back button closes any open sheet or full-screen overlay (rather than leaving it over
+// the page it went back to).
+if (typeof window !== 'undefined') window.addEventListener('popstate', () => {
+  for (const d of document.querySelectorAll('dialog[open]')) d.close();
+  for (const o of document.querySelectorAll('.e-qr--full')) o.remove();
+});
 
 export function confirmBox(title, text, okLabel = 'OK', danger = false) {
   return new Promise(resolve => {
@@ -178,16 +195,19 @@ export const toolLabel = t => ({ DOPS: 'DOPS', MiniCEX: 'Mini-CEX', EBD: 'EBD' }
 export const avatar = (name, cls = '') => h('span', { class: `e-avatar ${cls}`, 'aria-hidden': 'true' }, initials(name));
 
 // A list row: row({ name, title, meta, chip, dot, href | onclick })
-export function row({ name, title, meta, chip, dot, href, onclick, cls = '' }) {
+// stacked: the chip goes under the title (full-width titles on phones), meta may wrap to 2 lines
+export function row({ name, title, meta, chip, dot, href, onclick, cls = '', stacked = false }) {
   const kids = [
     name != null ? avatar(name) : null,
     h('span', { class: 'e-row__body' },
       h('span', { class: 'e-row__title' }, title),
-      meta ? h('span', { class: 'e-row__meta' }, meta) : null),
+      meta ? h('span', { class: 'e-row__meta' }, meta) : null,
+      stacked && chip ? h('span', { class: 'e-row__chips' }, chip) : null),
     dot ? h('span', { class: 'e-dot', title: 'Partly complete' }) : null,
-    chip || null,
+    stacked ? null : chip || null,
     icon('chevron', 'e-row__chev'),
   ];
+  if (stacked) cls += ' e-row--stacked';
   return href ? h('a', { class: `e-row ${cls}`, href }, kids) : h('button', { type: 'button', class: `e-row ${cls}`, onclick }, kids);
 }
 

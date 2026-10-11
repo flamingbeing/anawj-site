@@ -2,7 +2,7 @@
 // own ui-*.js file and is loaded on first use; shared state and helpers are in ui-core.js.
 // Data comes from cloud.js (Firestore, or the in-browser demo backend with ?demo).
 
-import { S, hooks, h, fill, toast, cloud, icon, initials, go, isResident, isFaculty, isStaff, hasRole, pruneDrafts, confirmBox } from './ui-core.js';
+import { S, hooks, h, fill, toast, cloud, icon, initials, go, isResident, isFaculty, isStaff, hasRole, pruneDrafts, confirmBox, needsAction } from './ui-core.js';
 
 const app = document.getElementById('app');
 const tabsEl = document.getElementById('tabs');
@@ -31,7 +31,7 @@ const ROUTES = {
 // Tabs = union of roles, fixed order. Requests/Evaluations carry a count badge.
 const TABS = [
   { id: 'home', label: 'Home', icon: 'home' },
-  { id: 'requests', label: 'Requests', icon: 'list', badge: () => S.mine.filter(ev => ev.status === 'declined' || (ev.status === 'submitted' && !ev.seenAt)).length },
+  { id: 'requests', label: 'Requests', icon: 'list', badge: () => S.mine.filter(ev => needsAction(ev)).length },
   { id: 'progress', label: 'Progress', icon: 'chart' },
   { id: 'pending', label: 'Evaluations', icon: 'clipboard', badge: () => pendingForMe().length },
   { id: 'overview', label: 'Overview', icon: 'chart' },

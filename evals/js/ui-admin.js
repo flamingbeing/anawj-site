@@ -403,22 +403,27 @@ async function reject(a, reload) {
 }
 
 // Paste parser: one person per line, fields split by comma or tab. Returns [{ line, rec, problem, dup }]
+// One person per line, or an email client's recipient list ("Dr A <a@x>; B <b@x>").
+// Accepts "Name, email", "Name<TAB>email", "Name email", "Name <email>" and "\"Last, First\" <email>";
+// skips a header row.
+const PASTE_EMAIL_RE = /[^\s<>,;"'()]+@[^\s<>,;"'()]+/;
 export function parseFacultyLines(text, existing = []) {
   const have = new Set(existing.map(f => f.email));
   const seen = new Set();
-  return String(text || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean).map(line => {
-    const parts = line.split(/\t|,/).map(s => s.trim()).filter(Boolean);
-    const ei = parts.findIndex(p => p.includes('@'));
-    if (ei < 0) return { line, problem: 'No email' };
-    const email = cleanEmail(parts[ei]);
-    const name = parts.filter((_, i) => i !== ei).join(' ').trim();
+  return String(text || '').split(/\r?\n|;/).map(s => s.trim()).filter(Boolean).map(line => {
+    const m = line.match(PASTE_EMAIL_RE);
+    if (!m) return /^\W*(name|faculty|e-?mail)\b/i.test(line) ? null : { line, problem: 'No email' };
+    const email = cleanEmail(m[0]);
+    const lt = line.indexOf('<');
+    const raw = lt >= 0 && lt < m.index ? line.slice(0, lt) : line.slice(0, m.index) + ' ' + line.slice(m.index + m[0].length);
+    const name = raw.replace(/[<>"\t,;]/g, ' ').replace(/\s+/g, ' ').trim();
     if (!validEmail(email)) return { line, problem: 'Email not valid' };
     if (!name) return { line, problem: 'No name' };
     if (seen.has(email)) return { line, rec: { name, email }, dup: 'Repeated in this list' };
     seen.add(email);
     if (have.has(email)) return { line, rec: { name, email }, dup: 'Already on the faculty list' };
     return { line, rec: { name, email, status: 'ACTIVE' } };
-  });
+  }).filter(Boolean);
 }
 
 export function parseResidentLines(text, existing = []) {
@@ -430,7 +435,7 @@ export function parseResidentLines(text, existing = []) {
     if (/^rid$/i.test(p[0])) return null;   // a header row
     const [rid, name, em, intake, ry] = p;
     const email = cleanEmail(em);
-    if (!rid) return { line, problem: 'No resident ID' };
+    if (!rid || rid.includes('@') || (name || '').includes('@')) return { line, problem: 'Missing resident ID: use ID, name, email' };
     if (!name) return { line, problem: 'No name' };
     if (!validEmail(email)) return { line, problem: 'Email not valid' };
     const yr = ry ? Number(String(ry).replace(/^r/i, '')) : null;

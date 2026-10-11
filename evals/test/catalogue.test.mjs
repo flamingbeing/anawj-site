@@ -112,3 +112,15 @@ assert.equal(searchItems('', { rYear: 3 })[0].byYear, 3);
 assert.equal(searchItems('', { rYear: 1 })[0].byYear, 1);
 
 console.log('catalogue tests passed');
+
+// shorthand, plurals and residency-year words
+{
+  const { searchItems } = await import('../js/catalogue.js');
+  const top = q => searchItems(q)[0]?.id;
+  assert.equal(top('epidurals'), 'DOPS-7a-01');
+  assert.equal(top('PCA'), 'MINICEX-11-01');
+  assert.ok(searchItems('RSI').some(i => i.id === 'DOPS-2-03'));
+  assert.ok(searchItems('USG block').every(i => i.tool === 'DOPS' || i.tool === 'MiniCEX' || i.tool === 'EBD'));
+  assert.deepEqual(searchItems('r1 airway').slice(0, 3).map(i => i.id).sort(), ['DOPS-2-01', 'DOPS-2-02', 'DOPS-2-03']);
+  console.log('search shorthand ok');
+}
