@@ -6,7 +6,7 @@ import { YEAR_NAMES, yearName } from './categories.js';
 import { academicYear } from './engine.js';
 import { countCases, sortCodes, splitInitials } from './engine.js';
 import { parseResidentsScript, parseCaseSheet, parseTotalsSheet, countCheck } from './importer.js';
-import { S, h, toast, confirmBox, cloud, needExcel, sheetRows, fileButton, hooks, add, resetters, residentYear, residentYearName, residentSmo, baseIntake, effectiveIntake, categoryNames, setCategoryNames, PICKER_ORDER } from './ui-core.js';
+import { S, h, toast, confirmBox, cloud, needExcel, sheetRows, fileButton, hooks, add, resetters, residentYear, residentYearName, residentSmo, baseIntake, effectiveIntake, catPills } from './ui-core.js';
 import { templateDialog } from './ui-settings.js';
 import { forgetTotals } from './ui-progress.js';
 import { renderTemplateCard } from './portfolio.js';
@@ -27,7 +27,7 @@ export function leaveAdmin() { A.editRes = false; A.pasted = null; }
 export function renderAdmin() {
   if (!S.admin) return h('p', { class: 'empty' }, 'Admins only.');
   if (!A.residents && !A.loading) load();
-  return h('div', {}, residentsCard(), S.owner ? importCard() : ownerOnlyCard(), sharedCard(), categoryNamesCard(), renderTemplateCard());
+  return h('div', {}, residentsCard(), S.owner ? importCard() : ownerOnlyCard(), sharedCard(), h('p', { class: 'hint' }, 'Category names are in Settings → Category names (Edit).'), renderTemplateCard());
 }
 
 // Attrited residents are left off Totals: their rids go on config/totalsHidden, kept in step with the
@@ -76,30 +76,6 @@ async function load() {
   } catch (err) { A.residents = []; A.shared = []; toast('Could not load: ' + err.message); }
   A.loading = false;
   if (S.tab === 'admin') hooks.render();
-}
-
-// ---------- category display names ----------
-
-// Shorter or friendlier names for everyone's screens: a display name (lists, Progress) and a pill name
-// (the category chips). The portfolio and Excel exports keep the official APMES names.
-function categoryNamesCard() {
-  const cur = categoryNames();
-  const edits = JSON.parse(JSON.stringify(cur));
-  const set = (code, k, v) => { edits[code] = { ...(edits[code] || {}), [k]: v }; };
-  return h('details', { class: 'card more-tools' },
-    h('summary', {}, 'Category names (display only)'),
-    h('p', { class: 'hint' }, 'Change how categories are named on screen: a display name for lists and Progress, and a short name for the pills. Leave blank for the official name. Exports (portfolio, Excel) always use the official APMES names.'),
-    h('div', { class: 'scroll' }, h('table', { class: 'cat-names' },
-      h('thead', {}, h('tr', {}, ['Code', 'Official', 'Display name', 'Pill name'].map(t => h('th', {}, t)))),
-      h('tbody', {}, PICKER_ORDER.map(c => h('tr', {},
-        h('td', {}, c.code), h('td', { class: 'muted' }, c.name),
-        h('td', {}, h('input', { value: (cur[c.code] && cur[c.code].name) || '', placeholder: c.name, maxlength: '80', 'aria-label': `Display name for ${c.code}`, oninput: e => set(c.code, 'name', e.target.value) })),
-        h('td', {}, h('input', { value: (cur[c.code] && cur[c.code].short) || '', placeholder: c.name, maxlength: '30', 'aria-label': `Pill name for ${c.code}`, oninput: e => set(c.code, 'short', e.target.value) }))))))),
-    h('div', { class: 'bar', style: 'margin:10px 0 0' },
-      h('button', { class: 'primary', onclick: async () => {
-        try { const n = await cloud.saveCategoryNames(edits); setCategoryNames(n); toast('Category names saved for everyone'); hooks.render(); }
-        catch (err) { toast('Could not save: ' + err.message); }
-      } }, 'Save names')));
 }
 
 // ---------- residents ----------
@@ -336,7 +312,7 @@ function sharedCard() {
     h('h2', {}, 'Shared templates'),
     h('p', { class: 'hint' }, 'Quick picks everyone sees on the Log screen.'),
     list.length ? h('ul', { class: 'prog' }, list.map(t => h('li', { style: 'grid-template-columns:1fr auto' },
-      h('span', {}, h('b', {}, t.name), ' ', h('span', { class: 'muted' }, sortCodes(t.cats || []).join(' + '))),
+      h('span', {}, h('b', {}, t.name), ' ', h('span', { class: 'muted' }, catPills(t.cats))),
       h('span', { class: 'row' },
         h('button', { class: 'small', onclick: () => templateDialog(t, save) }, 'Edit'),
         h('button', { class: 'small danger', onclick: async () => {

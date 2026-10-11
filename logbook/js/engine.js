@@ -393,7 +393,7 @@ const sameCats = (a, b) => sortCodes(a || []).join(',') === sortCodes(b || []).j
 // - rows whose id matches a case and whose date, initials + details (as one text) or categories differ are changed
 // - cases whose id is not in the sheet are deleted, but only if the sheet has an id column
 //   (rows.hasIdColumn from readCasesSheet, or any row carrying an id); otherwise it's an add-only import
-// - rows with unknown categories or no date and no details are errors and change nothing
+// - rows with unknown categories, a date that can't be read, or no date and no details are errors and change nothing
 // Row numbers come from row.row (as read from the sheet), else index + 2 (header in row 1).
 export function diffRows(existing, rows, now = Date.now()) {
   const byId = new Map((existing || []).map(c => [c.id, c]));
@@ -413,6 +413,12 @@ export function diffRows(existing, rows, now = Date.now()) {
       return;
     }
     if (!c.date && !c.dateText && !c.details && !c.initials) { errors.push({ row: rowNum, message: 'No date or case details' }); return; }
+    // no free-text dates: a date that can't be read is an error, unless it's an older case's own
+    // free-text date coming back unchanged
+    if (!c.date && c.dateText && !(known && (byId.get(c.id).dateText || '') === c.dateText)) {
+      errors.push({ row: rowNum, message: `Can't read the date “${c.dateText}”: use day/month/year, e.g. 13/3/2026` });
+      return;
+    }
     const fields = { date: c.date, initials: c.initials, details: c.details, cats: c.cats };
     if (!c.date && c.dateText) fields.dateText = c.dateText;
     if (known) {

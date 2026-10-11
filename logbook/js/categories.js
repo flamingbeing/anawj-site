@@ -57,6 +57,56 @@ export const CATEGORIES = [
 ];
 
 export const BY_CODE = Object.fromEntries(CATEGORIES.map(c => [c.code, c]));
+
+// The programme's display name and pill (tag) name for each category: what the app shows unless an
+// admin changes it (Settings → Category names). Exports keep the official names (label).
+export const DEFAULT_NAMES = {
+  '01': ['Cardiac on-pump surgery', 'Cardiac,on-pump'],
+  '02': ['Cardiac off-pump surgery', 'Cardiac,off-pump'],
+  '03': ['Thoracic surgery', 'Thoracic'],
+  '04': ['Head and neck surgery', 'H&N'],
+  '05': ['Upper gastrointestinal surgery', 'Upper GI'],
+  '06': ['Emergency gastrointestinal surgery', 'emGI'],
+  '07': ['One lung ventilation', 'OLV'],
+  '08': ['Laparoscopic surgery', 'Lap'],
+  '09': ['Eye surgery', 'Eye'],
+  '10': ['Ear, nose and throat surgery', 'ENT'],
+  '11': ['Shared airway surgery', 'Airway(Shared)'],
+  '12': ['Challenging airway management', 'Airway(Difficult)'],
+  '13': ['General Surgery', 'GS'],
+  '14': ['Gynaecological Surgery', 'Gynae'],
+  '15': ['Neurosurgery', 'NES'],
+  '15i': ['Emergency neurosurgery', 'emNES'],
+  '16': ['Lower Segment Caesarean Section', 'LSCS'],
+  '17': ['Obstetric Spinal/ Epidural/ CSE', 'CNB(Obs)'],
+  '18': ['Orthopaedic Surgery', 'Ortho'],
+  '19': ['Outpatient Surgery', 'Ambu'],
+  '20': ['Paediatric Surgery', 'Paeds'],
+  '20i': ['Age <3+ months', '<3mo'],
+  '20ii': ['Age 4 months to 3+ years', '<3yo'],
+  '20iii': ['Age 4 to 12 years', '<12yo'],
+  '21': ['Geriatric patient', 'Elderly'],
+  '22': ['Morbidly obese patient', 'Obese'],
+  '23': ['Bariatric surgery', 'Bariatrics'],
+  '24': ['Spine surgery', 'Spine'],
+  '25': ['Neurophysiological monitoring', 'Neuromonitoring'],
+  '26': ['Peripheral nerve block', 'PNB'],
+  '26i': ['Upper limb block', 'UL block'],
+  '26ii': ['Lower limb block', 'LL block'],
+  '26iii': ['Truncal block', 'Truncal block'],
+  '27': ['Epidural / caudal anaesthesia', 'Epidural/Caudal'],
+  '28': ['Spinal anaesthesia', 'Spinal'],
+  '29': ['Peripheral nerve block with catheter', 'Catheter'],
+  '30': ['New patient with pain', 'APS'],
+  '31': ['Chronic pain patient', 'CPS'],
+  '32': ['Plastic Surgery', 'Plastics'],
+  '33': ['Interventional radiology / MRI', 'Radio'],
+  '34': ['Urology', 'Uro'],
+  '35': ['Vascular Surgery', 'Vasc'],
+  '36': ['Emergency trauma surgery', 'Trauma'],
+  '37': ['Transplant surgery', 'Transplant'],
+  '38': ['ICU', 'ICU'],
+};
 export const ACTIVE = CATEGORIES.filter(c => !c.retired);
 export const R_YEARS = ['R1', 'R2', 'R3', 'R4', 'R5'];   // official names: exports and the portfolio keep these
 // what the app shows: senior residents are SR1 and SR2 (R4 and R5 on the forms)

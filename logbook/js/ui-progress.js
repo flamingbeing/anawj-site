@@ -93,7 +93,7 @@ function progList(items) {
     const pct = Math.min(100, Math.round((p.count / max) * 100));
     return h('li', { class: c.parent ? 'sub' : '', title: c.full || c.name },
       h('i', { class: `dot ${p.status}`, title: STATUS_TEXT[p.status] }),
-      h('span', { class: 'nm' }, h('b', {}, p.code), catName(p.code)),
+      h('span', { class: 'nm' }, catName(p.code)),
       h('span', { class: 'ct' }, (p.status === 'late' || p.status === 'due') ? h('span', { class: `stw ${p.status}` }, STATUS_TEXT[p.status]) : null,
         p.status === 'none' ? String(p.count) : p.next ? `${p.count} / ${p.next.n}` : `${p.count} ✓`),
       p.milestones.length ? h('span', { class: 'meter' }, h('i', { class: p.status, style: `width:${pct}%` })) : null,

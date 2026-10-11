@@ -4,7 +4,7 @@
 import { YEAR_NAMES } from './categories.js';
 import { sortCodes, uid, academicYear } from './engine.js';
 import { openBin } from './bin.js';
-import { S, h, toast, modal, confirmBox, cloud, catChip, catName, PICKER_ORDER, settings, patchLogbook, displayName, hooks, rYear, myYearName, fill } from './ui-core.js';
+import { S, h, toast, modal, confirmBox, cloud, catChip, catName, catShort, PICKER_ORDER, pickerOrder, settings, patchLogbook, displayName, hooks, rYear, myYearName, fill, categoryNames, setCategoryNames, catPills } from './ui-core.js';
 import { pickDialog } from './ui-log.js';
 import { backupCard } from './backup.js';
 
@@ -84,6 +84,9 @@ export function renderSettings() {
           h('option', { value: 'today', selected: st.defaultDate !== 'last' }, 'Today'),
           h('option', { value: 'last', selected: st.defaultDate === 'last' }, 'The date I used last')))),
 
+    categoryNamesCard(),
+    categoryOrderCard(),
+
     h('section', { class: 'card' },
       h('h2', {}, 'Reflections'),
       h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: st.reflExport !== false, onchange: e => patchLogbook({ settings: { reflExport: e.target.checked } }) }),
@@ -150,7 +153,7 @@ function subcatsCard() {
   const all = { ...((settings().subcats) || {}) };
   const codes = Object.keys(all).filter(c => (all[c] || []).length).sort();
   const save = next => patchLogbook({ settings: { subcats: next } }).then(() => hooks.render());
-  const sel = h('select', { 'aria-label': 'Category' }, PICKER_ORDER.map(c => h('option', { value: c.code }, `${c.code} ${c.name}`)));
+  const sel = h('select', { 'aria-label': 'Category' }, PICKER_ORDER.map(c => h('option', { value: c.code }, `${c.parent ? '  ' : ''}${catName(c.code)}`)));
   const name = h('input', { placeholder: 'e.g. Interscalene', maxlength: '40', 'aria-label': 'Subcategory name' });
   const addIt = () => {
     const code = sel.value, n = name.value.trim();
@@ -178,7 +181,7 @@ function templatesCard() {
     h('h2', {}, 'My templates'),
     h('p', { class: 'hint' }, 'One-tap category sets on the Log screen, e.g. “LSCS spinal” = 16 + 17 + 28. Your frequent combinations appear there automatically too.'),
     list.length ? h('ul', { class: 'prog' }, list.map(t => h('li', { style: 'grid-template-columns:1fr auto' },
-      h('span', {}, h('b', {}, t.name), ' ', h('span', { class: 'muted' }, sortCodes(t.cats).join(' + ')), t.details ? h('span', { class: 'muted' }, ` · “${t.details}”`) : null),
+      h('span', {}, h('b', {}, t.name), ' ', h('span', { class: 'muted' }, catPills(t.cats)), t.details ? h('span', { class: 'muted' }, ` · “${t.details}”`) : null),
       h('span', { class: 'row' },
         h('button', { class: 'small', onclick: () => editTemplate(t) }, 'Edit'),
         h('button', { class: 'small danger', onclick: async () => {
@@ -220,4 +223,54 @@ function editTemplate(t) {
     await patchLogbook({ templates: list });
     hooks.render();
   });
+}
+
+// ---------- category names (everyone sees them; admins change them for everyone) ----------
+
+const CN = { open: false, edit: false };
+function categoryNamesCard() {
+  const cur = categoryNames();
+  const edits = JSON.parse(JSON.stringify(cur));
+  const set = (code, k, v) => { edits[code] = { ...(edits[code] || {}), [k]: v }; };
+  const ed = CN.edit && S.admin;
+  return h('details', { class: 'card more-tools cat-names-card', open: CN.open || ed, ontoggle: e => { CN.open = e.target.open; } },
+    h('summary', {}, 'Category names'),
+    h('p', { class: 'hint' }, 'How categories are named on screen: a display name for lists and Progress, and a short name for the pills. Exports (portfolio, Excel) always use the official APMES names.'),
+    S.admin ? h('div', { class: 'bar', style: 'margin:0 0 8px' }, ed
+      ? [h('button', { class: 'primary small', onclick: async () => {
+          try { const n = await cloud.saveCategoryNames(edits); setCategoryNames(n); CN.edit = false; toast('Category names saved for everyone'); hooks.render(); }
+          catch (err) { toast('Could not save: ' + err.message); }
+        } }, 'Save names'), h('button', { class: 'small', onclick: () => { CN.edit = false; hooks.render(); } }, 'Cancel')]
+      : h('button', { class: 'small', onclick: () => { CN.edit = true; CN.open = true; hooks.render(); } }, 'Edit (admin)')) : null,
+    ed ? h('p', { class: 'hint' }, 'Leave a box blank for the programme default (shown faintly).') : null,
+    h('div', { class: 'scroll' }, h('table', { class: 'cat-names' },
+      h('thead', {}, h('tr', {}, ['Code', 'Official', 'Display name', 'Pill name'].map(t => h('th', {}, t)))),
+      h('tbody', {}, PICKER_ORDER.map(c => h('tr', {},
+        h('td', {}, c.code), h('td', { class: 'muted' }, c.name),
+        ed ? h('td', {}, h('input', { value: (cur[c.code] && cur[c.code].name) || '', placeholder: catName(c.code) === ((cur[c.code] || {}).name) ? '' : catName(c.code), maxlength: '80', 'aria-label': `Display name for ${c.code}`, oninput: e => set(c.code, 'name', e.target.value) })) : h('td', {}, catName(c.code)),
+        ed ? h('td', {}, h('input', { value: (cur[c.code] && cur[c.code].short) || '', placeholder: catShort(c.code) === ((cur[c.code] || {}).short) ? '' : catShort(c.code), maxlength: '30', 'aria-label': `Pill name for ${c.code}`, oninput: e => set(c.code, 'short', e.target.value) })) : h('td', {}, catShort(c.code))))))));
+}
+
+// ---------- category order on the Log page (this account) ----------
+
+const CO = { open: false };
+function categoryOrderCard() {
+  const tops = pickerOrder().filter(c => !c.parent);
+  const custom = Array.isArray(settings().catOrder) && settings().catOrder.length;
+  const move = (i, d) => {
+    const codes = tops.map(c => c.code);
+    const j = i + d;
+    if (j < 0 || j >= codes.length) return;
+    [codes[i], codes[j]] = [codes[j], codes[i]];
+    patchLogbook({ settings: { catOrder: codes } }).then(() => hooks.render());
+    hooks.render();
+  };
+  return h('details', { class: 'card more-tools', open: CO.open, ontoggle: e => { CO.open = e.target.open; } },
+    h('summary', {}, 'Category order on the Log page'),
+    h('p', { class: 'hint' }, 'Put the categories you use most at the top of the Log page’s list. Subcategories stay under their category.'),
+    custom ? h('div', { class: 'bar', style: 'margin:0 0 8px' }, h('button', { class: 'small', onclick: () => patchLogbook({ settings: { catOrder: [] } }).then(() => { toast('Back to the official order'); hooks.render(); }) }, 'Reset to the official order')) : null,
+    h('ol', { class: 'cat-order' }, tops.map((c, i) => h('li', {},
+      h('span', { class: 'grow' }, catName(c.code)),
+      h('button', { class: 'small icon-btn', 'aria-label': `Move ${catName(c.code)} up`, disabled: i === 0, onclick: () => move(i, -1) }, '↑'),
+      h('button', { class: 'small icon-btn', 'aria-label': `Move ${catName(c.code)} down`, disabled: i === tops.length - 1, onclick: () => move(i, 1) }, '↓')))));
 }

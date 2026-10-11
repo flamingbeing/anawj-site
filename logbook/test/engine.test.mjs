@@ -324,6 +324,15 @@ assert.equal(rYearDefault(undefined), 1);
   assert.deepEqual(d.errors.map(e => e.row), [5, 10]);
   assert.match(d.errors[0].message, /tkr\?/);
 
+  // no free-text dates: a new row, or a changed one, with a date that can't be read is an error
+  const dd = diffRows(existing, Object.assign([
+    { date: 'sometime in March', details: 'QR', categories: '18' },
+    { id: 'c', date: 'Feb?', details: 'EF', categories: '99' },
+  ], { hasIdColumn: false }), now);
+  assert.deepEqual(dd.errors.map(e => e.row), [2, 3]);
+  assert.match(dd.errors[0].message, /Can't read the date/);
+  assert.equal(dd.added.length, 0);
+
   // a row with an error keeps its case from being deleted
   const d2 = diffRows(existing, Object.assign([
     { id: 'a', date: '1/1/26', details: 'AB lscs', categories: 'nonsense' },
