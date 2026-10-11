@@ -6,7 +6,7 @@ import { withParents, frequentCombos, parseBulk, parseDate, fmtDate, sortCodes, 
 import { suggest } from './suggest.js';
 import {
   S, h, toast, debounce, modal, confirmBox, cat, catName, catFull, catChip, countText, PICKER_ORDER, PROGRESS_BY_CODE,
-  createCase, updateCase, removeCase, restoreCase, saveMany, settings, todayISO, hooks, fill, add, cloud, okNoIds, patchLogbook } from './ui-core.js';
+  createCase, updateCase, removeCase, restoreCase, saveMany, deleteMany, settings, todayISO, hooks, fill, add, cloud, okNoIds, patchLogbook } from './ui-core.js';
 import { templateDialog } from './ui-settings.js';
 import { moveToBin } from './bin.js';
 
@@ -428,7 +428,7 @@ async function saveBulk(e) {
   try {
     await saveMany(cases);
     draft.bulk = ''; saveDraft();
-    toast(`Saved ${cases.length} cases`);
+    toast(`Saved ${cases.length} cases`, { action: 'Undo', onaction: () => deleteMany(cases.map(c => c.id)).catch(err => toast('Could not undo: ' + err.message)) });
   } catch (err) { bulkRows = keep; toast('Could not save: ' + err.message); }
   bulkBusy = false;
   hooks.render();

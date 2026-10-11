@@ -136,6 +136,7 @@ function templatesCard() {
         h('button', { class: 'small danger', onclick: async () => {
           if (!(await confirmBox('Delete template', `Delete “${t.name}”?`, 'Delete', true))) return;
           await patchLogbook({ templates: list.filter(x => x.id !== t.id) }); hooks.render();
+          toast(`Template “${t.name}” deleted`, { action: 'Undo', onaction: async () => { await patchLogbook({ templates: list }); hooks.render(); } });
         } }, 'Delete'))))) : null,
     h('div', { class: 'bar', style: 'margin:12px 0 0' }, h('button', { onclick: () => editTemplate(null) }, '+ New template')));
 }

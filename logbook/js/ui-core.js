@@ -109,6 +109,13 @@ export function modal(title, body, { onclose, sticky } = {}) {
   return { el, close: () => el.close() };
 }
 
+// A small ⓘ button that shows or hides a longer explanation: [button, paragraph].
+export function info(...text) {
+  const p = h('p', { class: 'hint info-text', hidden: true }, ...text);
+  const b = h('button', { type: 'button', class: 'info-btn', 'aria-label': 'More about this', 'aria-expanded': 'false', onclick: () => { p.hidden = !p.hidden; b.setAttribute('aria-expanded', String(!p.hidden)); } }, 'ⓘ');
+  return [b, p];
+}
+
 export function confirmBox(title, text, okLabel = 'OK', danger = false) {
   return new Promise(resolve => {
     let ok = false;
