@@ -462,6 +462,41 @@ async function run(label, ctxOpts) {
       assert(/QA/.test(txt) && /QC/.test(txt) && !/QB CABG/.test(txt), 'wrong items added');
       return done;
     });
+    await step('r4: Word reflection with two cases requires a choice and keeps all text', async () => {
+      const wp = t => `<w:p><w:r><w:t>${t}</w:t></w:r></w:p>`;
+      const cell = (...text) => `<w:tc>${text.map(wp).join('')}</w:tc>`;
+      const row = (...cells) => `<w:tr>${cells.join('')}</w:tr>`;
+      const z = new JSZip();
+      z.file('word/document.xml', `<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${wp('Thyroid / Head and Neck Operations')}
+        <w:tbl>${row(cell('Patient’s Initials'), cell('Date'), cell('Diagnosis'), cell('Case details'))}
+        ${row(cell('1.', 'ZX', '2.', 'ZY'), cell('3 Jan 2025', '4 Feb 2025'), cell('First operation', 'Second operation'), cell('Full reflection about both cases.', 'Keep this second paragraph too.'))}</w:tbl></w:body></w:document>`);
+      const file = DIR + `two-cases-${label}.docx`;
+      fs.writeFileSync(file, await z.generateAsync({ type: 'nodebuffer' }));
+      const caseCount = await nCases();
+      await tab('data'); await p.locator('main a', { hasText: 'Upload from Word' }).click();
+      await p.locator('main .rimp input[type=file]').setInputFiles(file);
+      await p.waitForSelector('text=Found 1 reflection');
+      const add = () => p.locator('main button.primary', { hasText: /^Add/ }).first();
+      assert(await add().isDisabled(), 'must choose a case before importing');
+      await p.getByLabel('Add this reflection').uncheck();
+      await p.getByLabel('Add this reflection').check();
+      assert(await add().isDisabled(), 'reticking must still require a choice');
+      await p.getByLabel('Case to keep', { exact: true }).selectOption('0');
+      await p.getByLabel('Case to keep', { exact: true }).selectOption('1');
+      assert(await add().isEnabled(), 'chosen case enables import');
+      await shot4('word-case-choice');
+      await add().click();
+      await p.waitForSelector('text=Added 1 reflection as drafts');
+      const saved = await p.evaluate(async () => {
+        const { S } = await import('./js/ui-core.js');
+        return S.reflections.find(r => r.initials === 'ZY' && r.source === 'word');
+      });
+      assert(saved && saved.date === '2025-02-04' && saved.diagnosis === 'Second operation', 'wrong case kept');
+      assert(saved.summary === 'Full reflection about both cases.\nKeep this second paragraph too.', 'reflection text changed');
+      assert(!saved.caseChoices && saved.initials === 'ZY', 'other case fields were saved');
+      assert(await nCases() === caseCount, 'existing logbook cases changed');
+      await p.locator('main button', { hasText: 'Go to Reflections' }).click();
+    });
   }
   if (process.env.ONLY5) { await round5(); await b.close(); return { label, results, errs }; }
   if (process.env.R4) {

@@ -7,7 +7,7 @@ import { HEADING_BY_ID, splitDetails, wordCount, IMAGE_MAX_B64, IMAGE_MAX_SIDE, 
 import { fmtDate, caseText } from './engine.js';
 import { S, h, toast, cloud, fill } from './ui-core.js';
 import { needZip } from './portfolio.js';
-import { parseDocx, sameKey } from './reflect-import.js';
+import { parseDocx, sameKey, chooseImportedCase } from './reflect-import.js';
 
 const short = n => n.replace(/\s*\(.*$/, '').replace(/\s+e\.g\..*$/i, '');
 const uid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -64,7 +64,7 @@ export function renderImport(onDone) {
       st.items = res.items.map(r => {
         const m = casesFor(r);
         const dup = dupOf(r);
-        return { r, on: !dup, dup: !!dup, caseId: m.length === 1 ? m[0].id : null };
+        return { r, on: !dup, dup: !!dup, caseChoice: null, caseId: !r.caseChoices && m.length === 1 ? m[0].id : null };
       });
       st.step = 'review';
     } catch (err) { toast('Could not read the file: ' + err.message); }
@@ -82,20 +82,22 @@ export function renderImport(onDone) {
   }
 
   const checked = () => st.items.filter(x => x.on);
+  const needsChoice = () => checked().some(x => x.r.caseChoices && x.caseChoice === null);
   function reviewView() {
     const n = st.items.length;
     const heads = new Set(st.items.map(x => x.r.headingId).filter(Boolean)).size;
     const addLabel = () => (st.busy ? 'Adding…' : `Add ${checked().length} reflection${checked().length === 1 ? '' : 's'}`);
-    const addBtn = h('button', { class: 'primary', disabled: st.busy || !checked().length, onclick: doImport }, addLabel());
-    const addBtn2 = h('button', { class: 'primary', disabled: st.busy || !checked().length, onclick: doImport }, addLabel());
+    const addBtn = h('button', { class: 'primary', disabled: st.busy || !checked().length || needsChoice(), onclick: doImport }, addLabel());
+    const addBtn2 = h('button', { class: 'primary', disabled: st.busy || !checked().length || needsChoice(), onclick: doImport }, addLabel());
     const countEl = h('span', { class: 'grow muted' }, `${checked().length} of ${n} ticked`);
     // ticking a box updates the counts in place (a full redraw would jump the scroll position)
-    st.refresh = () => { for (const b of [addBtn, addBtn2]) { b.textContent = addLabel(); b.disabled = st.busy || !checked().length; } countEl.textContent = `${checked().length} of ${n} ticked`; };
+    st.refresh = () => { for (const b of [addBtn, addBtn2]) { b.textContent = addLabel(); b.disabled = st.busy || !checked().length || needsChoice(); } countEl.textContent = `${checked().length} of ${n} ticked`; };
     const setAll = v => { for (const x of st.items) x.on = v; draw(); };
     const top = h('section', { class: 'card' },
       h('div', { class: 'bar' }, h('button', { onclick: () => { st.step = 'pick'; draw(); } }, 'Choose another file'), h('span', { class: 'grow' })),
       h('h2', {}, `Found ${n} reflection${n === 1 ? '' : 's'} in ${heads} heading${heads === 1 ? '' : 's'}`),
       h('p', { class: 'hint' }, `From ${st.file}. Ticked ones are added as drafts. Check the heading and the linked case; possible duplicates of reflections you already have are unticked.`),
+      needsChoice() ? h('p', { class: 'rimp-warn' }, 'Choose which case to keep for each ticked reflection with multiple cases, or untick it.') : null,
       h('div', { class: 'bar' }, h('button', { onclick: () => setAll(true) }, 'Select all'), h('button', { onclick: () => setAll(false) }, 'Select none'), h('span', { class: 'grow' }), addBtn));
     // group by heading, in portfolio order (unrecognised headings last)
     const order = [...REFLECTION_HEADINGS.map(hd => hd.id), ''];
@@ -109,6 +111,19 @@ export function renderImport(onDone) {
 
   function item(x) {
     const r = x.r;
+    const choiceEl = r.caseChoices ? h('div', { class: 'rimp-case' },
+      h('label', {}, 'Case to keep ', h('select', { class: 'rimp-sel', 'aria-label': 'Case to keep', onchange: e => {
+        if (e.target.value === '') return;
+        x.caseChoice = Number(e.target.value);
+        x.r = chooseImportedCase(r, x.caseChoice);
+        const matches = casesFor(x.r);
+        x.caseId = matches.length === 1 ? matches[0].id : null;
+        x.dup = !!dupOf(x.r);
+        if (x.dup) x.on = false;
+        draw();
+      } }, h('option', { value: '', disabled: x.caseChoice !== null }, '— choose one case —'),
+      r.caseChoices.map((c, i) => h('option', { value: String(i), selected: x.caseChoice === i }, `${i + 1}. ${c.initials} · ${fmtDate(c.date)}${c.diagnosis ? ' · ' + c.diagnosis.slice(0, 70) : ''}`)))),
+      h('p', { class: 'hint help' }, 'The full reflection text is kept. Only the chosen case’s initials, date and diagnosis are used. Existing logbook cases and the Word file stay unchanged.')) : null;
     const hd = HEADING_BY_ID[r.headingId];
     const words = wordCount(r);
     const first = r.title || (r.summary || Object.values(r.sections || {}).join(' ')).split(/\s+/).slice(0, 12).join(' ');
@@ -139,6 +154,7 @@ export function renderImport(onDone) {
         h('div', { class: 'rimp-title' }, first ? (first.length > 90 ? first.slice(0, 90) + '…' : first) : h('span', { class: 'muted' }, '(no text)')),
         h('div', { class: 'muted rimp-meta' }, `${words} words · ${r.sections ? 'older section layout' : `${r.points.length} learning point${r.points.length === 1 ? '' : 's'}`}${r.figures.length ? ` · ${r.figures.length} figure${r.figures.length === 1 ? '' : 's'}` : ''}${r.references.length ? ` · ${r.references.length} ref${r.references.length === 1 ? '' : 's'}` : ''}`),
         h('div', { class: 'rimp-row' }, sel, subSel),
+        choiceEl,
         h('div', { class: 'rimp-case' }, caseEl),
         x.dup ? h('div', { class: 'rimp-warn' }, 'Possible duplicate: you already have a reflection with these initials and date under this heading.') : null,
         warns.length ? h('div', { class: 'rimp-warn' }, warns.join(' · ')) : null));
@@ -146,7 +162,7 @@ export function renderImport(onDone) {
 
   async function doImport() {
     const list = checked();
-    if (!list.length || st.busy) return;
+    if (!list.length || st.busy || needsChoice()) return;
     st.busy = true; draw();
     st.added = 0; st.failed = [];
     const email = S.user.email;

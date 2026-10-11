@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { readFileSync, existsSync } from 'node:fs';
 import { exportPortfolio, esc } from '../js/portfolio.js';
-import { parseDocx, parseDateCell, parseInitials, subFor, parseDetails } from '../js/reflect-import.js';
+import { parseDocx, parseDateCell, parseInitials, subFor, parseDetails, parseRow, chooseImportedCase } from '../js/reflect-import.js';
 import { HEADING_BY_ID } from '../js/reflections.js';
 
 const JSZip = createRequire(import.meta.url)('../vendor/jszip.min.js');
@@ -143,6 +143,33 @@ assert.equal(m4.subId, 'prostate');
 assert.equal(m4.diagnosis, 'HoLEP');
 assert.deepEqual(m4.points, [{ heading: 'Fluid', text: 'Watch absorption.' }]);
 assert.equal(messy.headings, 2);
+
+// Two numbered cases share one complete reflection; choosing either preserves its content.
+const paired = parseRow(tr(tc(p('1.'), p('XA'), p('2. XB')), tc(p('JR'), p('3 Jan 2025'), p('4 Feb 2025')),
+  tc(p('First operation'), p('Second operation')), tc(p('Shared title', { b: true }), p('Details about both cases.'),
+    p('Learning points', { b: true }), p('Shared lesson', { u: true }), p('Keep this entire lesson.'),
+    p('References', { b: true }), p('A made-up reference.'))), HEADING_BY_ID.thyroid);
+assert.equal(paired.caseChoices.length, 2);
+assert.deepEqual(paired.caseChoices.map(c => [c.initials, c.date, c.jr, c.diagnosis]),
+  [['XA', '2025-01-03', true, 'First operation'], ['XB', '2025-02-04', false, 'Second operation']]);
+for (const i of [0, 1]) {
+  const kept = chooseImportedCase(paired, i);
+  assert.equal(kept.initials, paired.caseChoices[i].initials);
+  assert.equal(kept.date, paired.caseChoices[i].date);
+  for (const k of ['title', 'summary', 'points', 'figures', 'references']) assert.deepEqual(kept[k], paired[k], `preserves ${k}`);
+  assert.ok(!kept.warnings.some(w => /not read|no date/.test(w)));
+}
+assert.throws(() => chooseImportedCase(paired, 2), /choose a case/);
+assert.equal(paired.initials, 'XA XB', 'selection does not mutate the parsed source');
+const ambiguous = parseRow(tr(tc(p('1. XA'), p('2. XB')), tc(p('3 Jan 2025')),
+  tc(p('Operation')), tc(p('Shared text'))), HEADING_BY_ID.thyroid);
+assert.equal(ambiguous.caseChoices, undefined, 'do not invent dates for ambiguous rows');
+const sharedDiagnosis = parseRow(tr(tc(p('1. XA'), p('2. XB')), tc(p('3 Jan 2025'), p('4 Feb 2025')),
+  tc(p('Shared operation'), p('Additional detail'), p('More detail')), tc(p('Shared text'))), HEADING_BY_ID.thyroid);
+assert.ok(sharedDiagnosis.caseChoices.every(c => c.diagnosis === sharedDiagnosis.diagnosis), 'keep ambiguous diagnosis text');
+const unnumbered = parseRow(tr(tc(p('XA'), p('XB')), tc(p('3 Jan 2025'), p('4 Feb 2025')),
+  tc(p('First operation'), p('Second operation')), tc(p('Shared text'))), HEADING_BY_ID.thyroid);
+assert.deepEqual(unnumbered.caseChoices.map(c => c.initials), ['XA', 'XB'], 'separate paragraphs without printed numbering');
 
 await assert.rejects(parseDocx(new Uint8Array([1, 2, 3]), JSZip), /docx/);
 console.log('reflect-import tests passed');
