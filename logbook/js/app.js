@@ -12,6 +12,7 @@ import { renderAdmin, leaveAdmin } from './ui-admin.js';
 import { renderReflect, watchMyReflections, renderExportPage, renderChoosePage } from './ui-reflect.js';
 import { downloadExcel, uploadExcel } from './ui-logbook.js';
 import { downloadNotes } from './ui-notes.js';
+import { cloudSaveSection, remindBackup } from './cloud-save.js';
 import { backupCard } from './backup.js';
 import { settingsFile, readSettingsFile } from './settings-file.js';
 import { purgeExpired, openBin } from './bin.js';
@@ -201,7 +202,8 @@ function renderDataPage() {
       h('h3', { style: 'margin-top:16px' }, 'Notes apps (Markdown)'),
       h('p', { class: 'hint help' }, 'Your cases and reflections as Markdown notes for Obsidian and other notes apps, with Progress.md and, if you like, the figures. Laid out as you set in Settings → Markdown.'),
       h('p', { class: 'hint' }, 'The files hold your case details: keep them private, and check hospital policy before putting them into cloud notes or AI tools.'),
-      h('div', { class: 'bar', style: 'margin-bottom:0' }, h('button', { onclick: downloadNotes }, 'Download for notes apps…'))));
+      h('div', { class: 'bar', style: 'margin-bottom:0' }, h('button', { onclick: downloadNotes }, 'Download for notes apps…')),
+      ...cloudSaveSection()));
 }
 
 const app = document.getElementById('app');
@@ -446,6 +448,8 @@ async function onUser(user) {
   // the tab chosen in Settings → Display, unless the address names one (a link, a shortcut, a reload)
   const start = (S.logbook && S.logbook.settings && S.logbook.settings.startTab) || 'log';
   S.tab = tabFromHash() || (START_TABS.some(([v]) => v === start) ? start : 'log');
+  // Settings → Backup: a one-tap reminder when the last Drive / Dropbox backup is over a week old (if asked for)
+  setTimeout(() => { if (S.user === user) remindBackup(); }, 3000);
   // recycle bin: drop entries older than 30 days, but only once the reflections are loaded, so an
   // image still used by a live (e.g. restored) reflection is never deleted with an old bin entry
   { let done = false, stop = null;
@@ -562,6 +566,7 @@ function demoMenu() {
       h('span', { class: 'grow' }),
       h('button', { onclick: () => m.close() }, 'Close'))]);
 }
-if (!cloud.enabled) renderLanding();
+if (window.__dbxReturn) fill(app, h('p', { class: 'empty' }, 'Signed in to Dropbox. You can close this window.'));   // the Dropbox popup (index.html)
+else if (!cloud.enabled) renderLanding();
 else cloud.watchUser(onUser).catch(err => renderLanding('Could not start sign-in: ' + err.message));
-registerSW();
+if (!window.__dbxReturn) registerSW();

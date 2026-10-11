@@ -95,6 +95,14 @@ portfolio content.
   references). Default day: `[[YYYY-MM-DD]]`, then `1. AB` / case, a blank line between cases; no tags. An older
   `settings.shareFormat` (the Copy & share format) carries over until the Markdown page is saved; `share-format.js`
   is kept for that and its tests. Previews use the user's own latest day and reflection.
+- **Save to Google Drive / Dropbox** (Backup card; `cloud-save.js`, ids and pure helpers in `backup-targets.js`,
+  tested): Drive = Google Identity Services token client, scope `drive.file`, folder "APMES Logbook" found or made,
+  same-day file replaced; Dropbox = PKCE in a popup (opened from the tap, its address set after the challenge), the
+  popup's return is caught in `index.html` (`window.__dbxReturn`, postMessage to the opener, app not started there),
+  App folder access, uploads to `/APMES Logbook/`. Tokens in memory only. `settings.cloudBackup` { remind, md,
+  lastAt, lastTo } (never in the settings file). Reminder: one toast per visit with a Save button when due. Both
+  stay disabled until the owner fills `GOOGLE_CLIENT_ID` / `DROPBOX_APP_KEY` (README Firebase setup step 6); the
+  real sign-ins are untested until then.
 - **Connect Claude** (`mcp/`, Settings → Connect Claude (advanced) links its README on GitHub): a read-only MCP
   server residents run locally; Google "Desktop app" OAuth (loopback, PKCE) → Firebase `signInWithIdp` → Firestore
   REST as the user, so the rules apply; only `logbooks/{own email}` and the user's own `residents` entry. Owner
