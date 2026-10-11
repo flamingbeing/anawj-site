@@ -576,7 +576,7 @@ async function run(label, ctxOpts) {
     await nap(300);
     assert(await nCases() === n0, 'saved with no category picked');
     const t0 = await toastText();
-    assert(/Tap at least one tag/.test(t0), 'toast ' + t0);
+    assert(/Enter again.*suggested tags/.test(t0), 'toast ' + t0);
     await p.locator('.actions .primary').click();
     await nap(300);
     assert(await nCases() === n0, 'Save button saved with no category');
@@ -727,7 +727,7 @@ async function run(label, ctxOpts) {
     await p.locator('button.primary.big').first().click();
     await nap(200);
     assert(await p.evaluate(() => document.activeElement?.type !== 'search'), 'search box focused (keyboard pops up)');
-    assert(/suggestions are highlighted/.test(await toastText()), 'toast ' + await toastText());
+    assert(/Enter again.*suggested tags/.test(await toastText()), 'toast ' + await toastText());
     // pick two categories, then save them as a template from the Log screen
     await p.locator('.chip.sugg:not(.all)').first().click();
     await nap(150);

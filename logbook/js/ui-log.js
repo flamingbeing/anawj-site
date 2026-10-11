@@ -344,7 +344,7 @@ function renderOne(card) {
     onkeydown: e => {
       if (e.key !== 'Enter' || e.isComposing) return;
       e.target._shiftAt = e.shiftKey ? Date.now() : 0;   // Shift+Enter is a new line in every mode (see onbeforeinput)
-      if (e.repeat && !e.shiftKey) { e.preventDefault(); return; }
+      if (e.repeat && suggestedSave && !e.shiftKey) { e.preventDefault(); return; }
       if (!e.shiftKey && applySuggestedSave()) { e.preventDefault(); return save({ another: e.altKey }); }
       const mode = enterMode();
       if (e.ctrlKey || e.metaKey) { e.preventDefault(); return save({ another: e.altKey }); }
