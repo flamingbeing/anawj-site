@@ -237,6 +237,8 @@ const KEYWORD_HEADINGS = [
   [/thyroid/i, 'thyroid'],
   [/\bLSCS\b|caesar/i, 'lscs'],
   [/craniotomy/i, 'neuro'],
+  [/massive (blood )?transfusion|\bMTP\b|\blong case\b|prolonged/i, 'challenging'],
+  [/\blabou?r\b/i, 'labour'],
 ];
 
 // Ranked heading suggestions for a case: [{ headingId, subId, name, needed }].
@@ -262,6 +264,8 @@ export function suggestHeadings(caseObj, reflections = [], opts = {}) {
     for (const [hid, sid] of m) {
       // a 27 epidural on an obstetric case (17) is labour analgesia, not a non-obstetric epidural
       if (c === '27' && cats.includes('17')) continue;
+      // obstetric neuraxial for a caesarean section (16) isn't labour analgesia, unless the case says labour
+      if (c === '17' && hid === 'labour' && cats.includes('16') && !/\blabou?r\b/i.test(details)) continue;
       push(hid, sid);
     }
   }

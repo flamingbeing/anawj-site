@@ -316,11 +316,11 @@ export function categoryNamesCard() {
       : h('button', { class: 'small', onclick: () => { CN.edit = true; CN.open = true; hooks.render(); } }, 'Edit')) : null,
     ed ? h('p', { class: 'hint' }, 'Leave a box blank for the programme default (shown faintly).') : null,
     h('div', { class: 'scroll' }, h('table', { class: 'cat-names' },
-      h('thead', {}, h('tr', {}, ['Code', 'Official', 'Display name', 'Pill name'].map(t => h('th', {}, t)))),
+      h('thead', {}, h('tr', {}, ['Official', 'Display name', 'Pill name'].map(t => h('th', {}, t)))),
       h('tbody', {}, PICKER_ORDER.map(c => h('tr', {},
-        h('td', {}, c.code), h('td', { class: 'muted' }, c.name),
-        ed ? h('td', {}, h('input', { value: (cur[c.code] && cur[c.code].name) || '', placeholder: (DEFAULT_NAMES[c.code] || [])[0] || c.name, maxlength: '80', 'aria-label': `Display name for ${c.code}`, oninput: e => set(c.code, 'name', e.target.value) })) : h('td', {}, progName(c.code)),
-        ed ? h('td', {}, h('input', { value: (cur[c.code] && cur[c.code].short) || '', placeholder: (DEFAULT_NAMES[c.code] || [])[1] || c.name, maxlength: '30', 'aria-label': `Pill name for ${c.code}`, oninput: e => set(c.code, 'short', e.target.value) })) : h('td', {}, progShort(c.code)))))))));
+        h('td', { class: 'muted' }, c.name),
+        ed ? h('td', {}, h('input', { value: (cur[c.code] && cur[c.code].name) || '', placeholder: (DEFAULT_NAMES[c.code] || [])[0] || c.name, maxlength: '80', 'aria-label': `Display name for ${c.name}`, oninput: e => set(c.code, 'name', e.target.value) })) : h('td', {}, progName(c.code)),
+        ed ? h('td', {}, h('input', { value: (cur[c.code] && cur[c.code].short) || '', placeholder: (DEFAULT_NAMES[c.code] || [])[1] || c.name, maxlength: '30', 'aria-label': `Pill name for ${c.name}`, oninput: e => set(c.code, 'short', e.target.value) })) : h('td', {}, progShort(c.code)))))))));
 }
 
 // ---------- tag editor (this account; js/tags.js) ----------
@@ -494,7 +494,7 @@ function editTag(n, kind = n ? n.kind : 'tag') {
     h('input', { type: 'checkbox', checked: e.links.includes(c.code), onchange: ev => { e.links = ev.target.checked ? [...e.links, c.code] : e.links.filter(x => x !== c.code); } }),
     `${c.parent ? '\u00a0\u00a0' : ''}${catName(c.code)}`)));
   const m = modal(n ? (kind === 'cat' ? 'Edit APMES tag' : kind === 'head' ? 'Edit header' : 'Edit personal tag') : (kind === 'head' ? 'New section header' : 'New personal tag'), [
-    code ? h('p', { class: 'hint' }, `APMES: ${BY_CODE[code].label}. It always counts towards this APMES tag; renaming is just for you.`) : null,
+    code ? h('p', { class: 'hint' }, `APMES: ${BY_CODE[code].full}. It always counts towards this APMES tag; renaming is just for you.`) : null,
     h('label', { class: 'field' }, kind === 'head' ? 'Header' : 'Name (pill)', pill),
     kind !== 'head' ? h('label', { class: 'field' }, 'Long name (lists)', long) : null,
     kind !== 'head' ? h('label', { class: 'field' }, 'Sits under', under) : null,

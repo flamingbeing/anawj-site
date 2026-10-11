@@ -2,7 +2,7 @@
 // reflections or both), a date range, and which columns in which order. Saved per account as
 // settings.excelExport. Pure (no DOM, no ExcelJS): xlsxio.js writes the sheets, tests cover the rest.
 
-import { BY_CODE, REFLECTION_HEADINGS } from './categories.js';
+import { BY_CODE, REFLECTION_HEADINGS, DEFAULT_NAMES } from './categories.js';
 import { caseParts, caseText, sortCodes, fmtDate } from './engine.js';
 
 // Logbook columns. 'summary' is initials + case in one cell, as the old form had it (and what the
@@ -40,7 +40,7 @@ export const DEFAULT_EXPORT = {
   caseCols: ['date', 'summary', 'apmes', 'personal'],
   reflCols: ['date', 'initials', 'heading', 'sub', 'diagnosis', 'title', 'summary', 'points', 'references', 'status', 'words', 'portfolio'],
   reflWhich: 'all',         // 'all' | 'complete' | 'portfolio'
-  tagStyle: 'label',        // 'label' "16) LSCS" | 'name' "LSCS" | 'code' "16"
+  tagStyle: 'full',         // 'full' "Lower Segment Caesarean Section" | 'short' "LSCS" (no tag numbers: they're internal)
   dateStyle: 'excel',       // 'excel' a date cell (10 Oct 2026) | 'iso' text 2026-10-10
   sort: 'oldest',           // 'oldest' | 'newest'
   summary: true,            // the Summary sheet (counts against targets)
@@ -65,7 +65,7 @@ export function cleanExportOpts(o) {
     caseCols: pickCols(o.caseCols, CASE_COLS, d.caseCols),
     reflCols: pickCols(o.reflCols, REFL_COLS, d.reflCols),
     reflWhich: oneOf(o.reflWhich, ['all', 'complete', 'portfolio'], d.reflWhich),
-    tagStyle: oneOf(o.tagStyle, ['label', 'name', 'code'], d.tagStyle),
+    tagStyle: o.tagStyle === 'short' || o.tagStyle === 'name' ? 'short' : 'full',
     dateStyle: oneOf(o.dateStyle, ['excel', 'iso'], d.dateStyle),
     sort: oneOf(o.sort, ['oldest', 'newest'], d.sort),
     summary: o.summary !== false,
@@ -85,7 +85,9 @@ export function dateRange(o, now = new Date()) {
 const inRange = (date, { from, to }) => (!from && !to) || (!!date && (!from || date >= from) && (!to || date <= to));
 
 const HEADING = Object.fromEntries(REFLECTION_HEADINGS.map(x => [x.id, x]));
-export const tagText = (code, style) => (style === 'code' ? code : style === 'name' ? ((BY_CODE[code] && BY_CODE[code].name) || code) : ((BY_CODE[code] && BY_CODE[code].label) || code));
+export const tagText = (code, style) => (style === 'short'
+  ? ((DEFAULT_NAMES[code] && DEFAULT_NAMES[code][1]) || (BY_CODE[code] && BY_CODE[code].name) || code)
+  : ((BY_CODE[code] && BY_CODE[code].full) || (BY_CODE[code] && BY_CODE[code].name) || code));
 const cut = s => String(s ?? '').slice(0, 32000);   // an Excel cell holds 32767 characters
 const words = r => [r.summary, ...(r.points || []).map(p => `${p.heading || ''} ${p.text || ''}`)].join(' ').split(/\s+/).filter(Boolean).length;
 

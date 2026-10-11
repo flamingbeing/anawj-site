@@ -2,7 +2,7 @@
 // search box. Pure, unit-tested.
 //
 //   initials:AB   only the initials        case:hernia   only the case text (no initials, tags, dates)
-//   title:lscs    only the first line      tag:16        a tag, by code or name
+//   title:lscs    only the first line      tag:lscs      a tag, by name
 //   "lap chole"   an exact phrase          spinal AND ga  both (same as a space)
 //   -paeds        leave out                spinal OR epidural (or |)   either
 //
@@ -31,7 +31,7 @@ export const OPERATOR_HELP = [
   ['initials:AB', 'only cases with those initials', 'initials:', 9],
   ['title:lscs', 'only the first line of the case', 'title:', 6],
   ['case:hernia', 'only the case text (not initials, tags or dates)', 'case:', 5],
-  ['tag:16  tag:lscs', 'cases with that tag, by code or name (your own tags too)', 'tag:', 4],
+  ['tag:lscs', 'cases with that tag, by name (your own tags too)', 'tag:', 4],
   ['"lap chole"', 'that exact phrase', '""', 1],
   ['-paeds', 'leave out cases with that word (works with the others: -tag:13)', '-', 1],
   ['spinal OR epidural', 'either one (spinal | epidural works too)', 'OR ', 3],

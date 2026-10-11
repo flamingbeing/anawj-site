@@ -90,6 +90,10 @@ portfolio content.
 
 ## Tags and suggestions (`tags.js`, `suggest.js`)
 
+- Tag numbers ("16", "20iii") come from the APMES portfolio's Section 4 table and the old Google Form; they stay as
+  internal IDs (Section 4 fill, old-form import, CSV IDs) but are never shown: Still needed, Totals, the Excel backup
+  (full or short names) and the Admin names table use names only.
+
 - Tag set: `settings.tagSet` on the logbook doc (per account, synced). Cases keep APMES codes in
   `cats` and personal tag keys in `tags`. The 300 cap counts personal tags and headers only.
 - Shorthand: `DEFAULT_SHORTHAND` per APMES code (editable; an APMES tag with `kw` replaces the

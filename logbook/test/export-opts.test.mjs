@@ -21,8 +21,9 @@ assert.deepEqual(dateRange({ range: '12m' }, now), { from: '2025-10-12', to: '' 
 assert.deepEqual(dateRange({ range: 'custom', from: '2026-01-01', to: '' }, now), { from: '2026-01-01', to: '' });
 assert.equal(rangeText({ from: '', to: '' }), 'all dates');
 
-assert.equal(tagText('16', 'code'), '16');
-assert.match(tagText('16', 'label'), /^16\)/);
+assert.equal(tagText('16', 'short'), 'LSCS');
+assert.equal(tagText('16', 'full'), 'Lower Segment Caesarean Section');
+assert.equal(cleanExportOpts({ tagStyle: 'code' }).tagStyle, 'full');   // the old numbered choices read as full names
 
 // tables
 const cases = [
@@ -37,10 +38,11 @@ const refl = [
 ];
 const ctx = { tagName: k => (k === 'u:x' ? 'My tag' : k), inPortfolio: r => r.status === 'complete' };
 
-let t = exportTables(cases, refl, { caseCols: ['date', 'initials', 'case', 'apmes', 'personal', 'flag', 'reflected'], tagStyle: 'code' }, ctx, now);
+let t = exportTables(cases, refl, { caseCols: ['date', 'initials', 'case', 'apmes', 'personal', 'flag', 'reflected'], tagStyle: 'short' }, ctx, now);
 assert.deepEqual(t.cases.rows.map(r => r.id), ['b', 'a', 'd', 'c']);   // oldest first, undated last
 const a = t.cases.rows[1].cells;
-assert.deepEqual(a, [{ date: '2026-10-10' }, 'AB', '34F LSCS', '16, 28', 'My tag', 'Yes', 'Yes']);
+assert.equal(a[3], 'LSCS, Spinal');
+assert.deepEqual([a[0], a[1], a[2], a[4], a[5], a[6]], [{ date: '2026-10-10' }, 'AB', '34F LSCS', 'My tag', 'Yes', 'Yes']);
 assert.deepEqual(t.cases.rows[0].cells.slice(1, 3), ['XY', '50M lap chole']);   // initials split off older cases
 assert.equal(t.cases.rows[3].cells[0], 'sometime');
 assert.equal(t.reflections.rows.length, 2);

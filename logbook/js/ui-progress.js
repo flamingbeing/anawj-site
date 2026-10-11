@@ -337,8 +337,8 @@ function totalsTable(people) {
     const t = BY_CODE[code].targets || {};
     const tgt = R_YEARS.filter(y => t[y] != null).map(y => `${t[y]} by ${appYear(y)}`).join(' | ');
     const tgtR = R_YEARS.filter(y => t[y] != null).map(y => `${t[y]} by ${y}`).join(' | ');   // the download keeps R4/R5
-    data.rows.push({ label: BY_CODE[code].label + (tgtR ? ` [${tgtR}]` : ''), values: vals, statuses: sts });
-    add(tbody, h('tr', {}, h('td', { class: 'cat', title: BY_CODE[code].full }, `${code} ${catName(code)}`, tgt ? h('small', { class: 'tgt' }, tgt) : null),
+    data.rows.push({ label: catName(code) + (tgtR ? ` [${tgtR}]` : ''), values: vals, statuses: sts });
+    add(tbody, h('tr', {}, h('td', { class: 'cat', title: BY_CODE[code].full }, catName(code), tgt ? h('small', { class: 'tgt' }, tgt) : null),
       vals.map((v, i) => h('td', { class: `n ${sts[i]}`, title: gaps[i] ? `${gaps[i]} short of the target` : '' }, String(v)))));
   }
   const totals = people.map(p => p.total || 0);

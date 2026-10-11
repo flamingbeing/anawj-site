@@ -206,7 +206,7 @@ function stillNeeded() {
   if (!need.length) return null;
   return h('a', { class: 'still-needed', href: '#progress' },
     h('span', { class: 'sn-l' }, 'Still needed:'),
-    need.map(p => h('span', { class: `sn ${p.status}` }, h('b', {}, p.code), ' ', catName(p.code), ' ', h('b', {}, `${p.next.n - p.count} more`))),
+    need.map(p => h('span', { class: `sn ${p.status}` }, catName(p.code), ' ', h('b', {}, `${p.next.n - p.count} more`))),
     h('span', { class: 'chev' }, '›'));
 }
 

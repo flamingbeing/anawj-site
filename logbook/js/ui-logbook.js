@@ -458,7 +458,7 @@ function pasteRows() {
 
 // The operators, from the "?" by the search box (Advanced search on)
 // The operators, from the "?" by the search box (Advanced search on). Tap one to add it to the box.
-export function opsHelp(box, onchange, list = OPERATOR_HELP, example = 'tag:16 -GA "under spinal"') {
+export function opsHelp(box, onchange, list = OPERATOR_HELP, example = 'tag:lscs -GA "under spinal"') {
   const caret = box.selectionStart ?? box.value.length;
   const m = modal('Search operators', [
     h('p', { class: 'hint', style: 'margin:0 0 6px' }, 'Tap one to add it to the search box.'),
@@ -510,7 +510,7 @@ export function downloadExcel() {
       t.cases ? h('div', { class: 'xp-sec' }, h('h3', {}, 'Logbook columns'),
         h('p', { class: 'hint' }, 'Tick the columns you want; ↑ ↓ set the order (left to right in Excel).'),
         colList('caseCols', CASE_COLS),
-        sel('Tags written as', 'tagStyle', [['label', 'Code and name (16) LSCS)'], ['name', 'Name only (LSCS)'], ['code', 'Code only (16)']]),
+        sel('Tags written as', 'tagStyle', [['full', 'Full name (Lower Segment Caesarean Section)'], ['short', 'Short name (LSCS)']]),
         h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: o.summary, onchange: e => { o.summary = e.target.checked; } }), 'Add a Summary sheet (counts against targets)')) : null,
       t.reflections ? h('div', { class: 'xp-sec' }, h('h3', {}, 'Reflections'),
         sel('Which', 'reflWhich', [['all', 'All, drafts too'], ['complete', 'Complete only'], ['portfolio', 'Only those in the portfolio export']]),
