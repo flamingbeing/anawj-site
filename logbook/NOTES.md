@@ -87,7 +87,7 @@ portfolio content.
 - **Tag editor** (`ui-settings.js`): List | Pills (drag; hold on phones; the dragged copy is lifted above the finger,
   a bar or highlight shows the drop spot, a label at the top says "Before/After/Under …", vibration on Android), search, case counts, edit
   dialog (name, long name, sits under, counts towards, shorthand with built-in defaults and words
-  learned from your cases, hide, merge), CSV download/load, Tag groups card.
+  learned from your cases, hide, merge), Tag groups card, then a "Tag list file" card at the bottom (CSV download / load, Reset).
 
 ## Tags and suggestions (`tags.js`, `suggest.js`)
 

@@ -376,20 +376,25 @@ export function renderTagEditor() {
     h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:8px;margin:0 0 8px' },
       h('button', { class: 'small primary', onclick: () => editTag(null, 'tag') }, '+ Personal tag'),
       h('button', { class: 'small', onclick: () => editTag(null, 'head') }, '+ Section header'),
-      h('button', { class: 'small', onclick: () => document.getElementById('tag-groups')?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }, 'Tag groups ↓'),
-      h('button', { class: 'small', onclick: () => download(`tags-${todayISO()}.csv`, new Blob([tagSetToCsv(set, def)], { type: 'text/csv' })) }, 'Download as CSV'),
-      fileButton('Load a CSV…', '.csv,text/csv', file => loadTagCsv(file, def), 'btn small'),
-      h('button', { class: 'small', onclick: async () => {
-        if (!(await confirmBox('Reset tags?', 'Go back to the APMES tags in the official order, with the programme’s names? Your own tags are removed from the list (cases keep them).', 'Reset', true))) return;
-        await patchLogbook({ settings: { tagSet: defaultTagSet({}), catOrder: [], subcats: {} } }); hooks.render();
-      } }, 'Reset')),
+      h('button', { class: 'small', onclick: () => document.getElementById('tag-groups')?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }, 'Tag groups ↓')),
     h('div', { class: 'bar', style: 'gap:8px;margin:0 0 8px' }, search, modeSeg),
     words.length ? h('p', { class: 'hint', style: 'margin:0 0 6px' }, `${nodes.length} of ${all.length} shown`) : null,
     teMode() === 'pills'
       ? [h('p', { class: 'hint', style: 'margin:0 0 6px' }, 'Tap a pill to edit it. Drag one (press and hold on a phone) onto the left or right of another to move it, or onto its middle to put it inside. The number is how many cases have it.'),
         h('ul', { class: 'te-list te-pills' }, nodes.map(pill))]
       : h('ul', { class: 'te-list' }, nodes.map(row))),
-    tagGroupsCard());
+    tagGroupsCard(),
+    // the whole layout as a file, and starting over: rarely needed, so at the very bottom
+    h('section', { class: 'card' },
+      h('h2', {}, 'Tag list file'),
+      h('p', { class: 'hint' }, 'Download your tags as a spreadsheet (CSV) to edit on a computer or share, load one back, or reset to the APMES tags.'),
+      h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:8px;margin:0' },
+        h('button', { class: 'small', onclick: () => download(`tags-${todayISO()}.csv`, new Blob([tagSetToCsv(set, def)], { type: 'text/csv' })) }, 'Download as CSV'),
+        fileButton('Load a CSV…', '.csv,text/csv', file => loadTagCsv(file, def), 'btn small'),
+        h('button', { class: 'small linkish', style: 'margin-left:auto', onclick: async () => {
+          if (!(await confirmBox('Reset tags?', 'Go back to the APMES tags in the official order, with the programme’s names? Your own tags are removed from the list (cases keep them).', 'Reset', true))) return;
+          await patchLogbook({ settings: { tagSet: defaultTagSet({}), catOrder: [], subcats: {} } }); hooks.render();
+        } }, 'Reset'))));
 }
 
 // Pills: a mouse drags once it moves; a finger drags after a short hold (a quick swipe still scrolls).
