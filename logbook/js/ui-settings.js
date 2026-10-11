@@ -31,7 +31,7 @@ export function cachedTheme() {
 }
 // Text size (S.logbook.settings.textSize): a zoom factor for the page content (style.css --text-zoom).
 const SIZE_KEY = 'apmes-logbook-textsize';
-export const TEXT_SIZES = [['0.9', 'Smaller'], ['1', 'Normal'], ['1.12', 'Larger'], ['1.25', 'Largest']];
+export const TEXT_SIZES = [['0.8', 'Smallest'], ['0.9', 'Smaller'], ['1', 'Normal'], ['1.12', 'Larger'], ['1.25', 'Largest']];
 export function applyTextSize(z) {
   const v = TEXT_SIZES.some(([k]) => k === String(z)) ? String(z) : '1';
   document.documentElement.style.setProperty('--text-zoom', v);

@@ -79,7 +79,7 @@ main { padding: 16px; max-width: 980px; margin: 0 auto; padding-bottom: calc(32p
   /* typing (keyboard open): the tab bar sits on the keyboard (--kb, set in app.js) */
   body.typing .tabs { transform: translateY(calc(-1 * var(--kb, 0px))); padding-bottom: 0; }
   /* typing: Save stays in reach, just above the tab bar on the keyboard */
-  body.typing .savebar, body.typing :not(.savebar) > .actions { position: fixed; left: 0; right: 0; bottom: calc(var(--kb, 0px) + var(--tabbar-h)); z-index: 29; margin: 0; padding: 6px 12px; background: var(--panel); border-top: 1px solid var(--line); }
+  body.typing .savebar, body.typing :not(.savebar) > .actions { position: fixed; left: 0; right: 0; bottom: calc((var(--kb, 0px) + var(--tabbar-h)) / var(--text-zoom, 1)); z-index: 29; margin: 0; padding: 6px 12px; background: var(--panel); border-top: 1px solid var(--line); }
   body.typing .savebar button.big, body.typing .actions button.big { min-height: 44px; padding-block: 6px; }
   body.typing main { padding-bottom: calc(130px + var(--tabbar-h)); }
   /* a focused field scrolls clear of the tab bar riding on the keyboard */
@@ -184,7 +184,7 @@ textarea.details { min-height: 92px; font-size: 17px; line-height: 1.4; padding:
 .selected .none { color: var(--muted); font-size: 13px; }
 .tip { margin: 8px 0 0; padding: 6px 10px; border-radius: 8px; background: var(--info-bg); color: var(--info); font-size: 13px; }
 .actions {
-  position: sticky; bottom: calc(var(--tabbar-h) + var(--safe-b)); z-index: 10;
+  position: sticky; bottom: calc((var(--tabbar-h) + var(--safe-b)) / var(--text-zoom, 1)); z-index: 10;
   display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 0 8px; margin-top: 8px; background: linear-gradient(transparent, var(--panel) 12px);
 }
 .actions .primary { flex: 1 1 auto; }
@@ -583,7 +583,7 @@ button.icon-btn { min-width: 40px; }
 .tag-row { display: flex; align-items: center; gap: 8px; }
 .tag-row .draft-note { margin-left: auto; font-size: 12px; color: var(--muted); }
 /* text size (Settings -> Display): scales the page content and dialogs, not the tab bar */
-main, dialog { zoom: var(--text-zoom, 1); }
+main, dialog { zoom: var(--text-zoom, 1); }   /* lengths measured on the real screen (tab bar, keyboard) are divided by it inside */
 
 /* More: the screens that left the tab bar */
 .more-list ul { list-style: none; margin: 0; padding: 0; }
@@ -673,7 +673,7 @@ label.check.reflect-tag input { width: 18px; height: 18px; margin: 0; }
 
 /* Log: the selected categories and Save stay pinned at the bottom (above the tab bar) while the
    categories scroll; the pills are one row that scrolls sideways so the bar stays slim */
-.savebar { position: sticky; bottom: calc(var(--tabbar-h) + var(--safe-b)); z-index: 10; margin: 12px -12px -12px; padding: 6px 12px 8px; border-radius: 0 0 var(--radius, 14px) var(--radius, 14px); background: var(--panel); border-top: 1px solid var(--line); box-shadow: 0 -6px 12px -10px rgba(0,0,0,.35); }
+.savebar { position: sticky; bottom: calc((var(--tabbar-h) + var(--safe-b)) / var(--text-zoom, 1)); z-index: 10; margin: 12px -12px -12px; padding: 6px 12px 8px; border-radius: 0 0 var(--radius, 14px) var(--radius, 14px); background: var(--panel); border-top: 1px solid var(--line); box-shadow: 0 -6px 12px -10px rgba(0,0,0,.35); }
 body.compact .savebar { margin: 6px -8px 0; padding: 4px 8px 6px; }
 .savebar .chips.selected { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; min-height: 40px; }
 .savebar .chips.selected::-webkit-scrollbar { display: none; }
@@ -793,8 +793,8 @@ dialog textarea.grow-box { min-height: calc(6 * 1.4em + 16px); resize: vertical;
 /* keyboard up on a phone: dialogs fit the visible area above it, so their buttons stay in view
    (iOS doesn't shrink 100dvh for the keyboard; --vvh/--vvt/--kb come from app.js) */
 @media (max-width: 600px) {
-  body.typing dialog { max-height: calc(var(--vvh, 100dvh) - 8px); margin-bottom: var(--kb, 0px); }
-  body.typing dialog.full { height: var(--vvh, 100dvh); max-height: var(--vvh, 100dvh); margin: var(--vvt, 0px) 0 0; padding-top: 12px; }
+  body.typing dialog { max-height: calc((var(--vvh, 100dvh) - 8px) / var(--text-zoom, 1)); margin-bottom: calc(var(--kb, 0px) / var(--text-zoom, 1)); }
+  body.typing dialog.full { height: calc(var(--vvh, 100dvh) / var(--text-zoom, 1)); max-height: calc(var(--vvh, 100dvh) / var(--text-zoom, 1)); margin: calc(var(--vvt, 0px) / var(--text-zoom, 1)) 0 0; padding-top: 12px; }
   body.typing dialog.full .dlg-actions { bottom: -16px; padding-bottom: 10px; margin-bottom: -16px; }
 }
 dialog.full[open] { display: flex; flex-direction: column; }
