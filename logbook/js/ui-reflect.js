@@ -923,8 +923,10 @@ function editor() {
         autosave.cancel(); await persist(); hooks.render();
       } catch (err) { status.textContent = 'Image not added'; toast('Could not add image: ' + err.message); }
     } });
-    const figures = boxCard('Figures (optional)', null,
-      h('p', { class: 'hint', style: 'margin:0 0 4px' }, `${PHOTO_NOTE} Your photos: ${fmtMb(usedKb())} of ${fmtMb(PHOTO_BUDGET_KB)} used.`),
+    // figures: rarely needed, so a small collapsed line after References (open when there are some)
+    const figures = h('details', { class: 'card fig-card', open: r.figures.length > 0 },
+      h('summary', {}, `Figures (optional, rarely needed)${r.figures.length ? ' · ' + r.figures.length : ''}`),
+      h('p', { class: 'hint', style: 'margin:8px 0 4px' }, `${PHOTO_NOTE} Your photos: ${fmtMb(usedKb())} of ${fmtMb(PHOTO_BUDGET_KB)} used.`),
       h('p', { class: 'hint', style: 'margin:0 0 4px;color:var(--warn, #b45309)' }, 'No faces, names, NRIC, MRN or anything identifying on monitors, labels or screens. Crop before adding.'),
       h('p', { class: 'hint', style: 'margin:0 0 8px;color:var(--warn, #b45309)' }, 'Use your own photos or diagrams. Don’t copy copyrighted figures from papers, books or websites without permission; if you adapt one, cite it under References.'),
       r.figures.map((f, i) => {
@@ -966,7 +968,7 @@ function editor() {
       r.references.length < LIMITS.references ? h('button', { style: 'margin-top:6px', onclick: () => { r.references.push(''); restructure(); } }, '+ Add reference') : null);
 
     points.dataset.field = 'at least one learning point';
-    body = [title, summary, points, figures, refs];
+    body = [title, summary, points, refs, figures];
   }
 
   const exportBox = HEADING_BY_ID[r.headingId] ? null : h('p', { class: 'hint', style: 'margin:0 0 8px' }, 'Uncategorised: not exported. Choose a heading above to export it.');

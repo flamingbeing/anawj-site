@@ -777,3 +777,7 @@ details.quick-actions .qa-menu { position: absolute; left: 0; top: calc(100% + 4
 details.quick-actions .qa-menu button { text-align: left; }
 .legend.tally { font-size: 13px; color: var(--muted); }
 .chips.quick-rest:not(:empty) { margin-top: 6px; }
+/* reflection editor: figures as a small collapsed line (discouraged) */
+details.card.fig-card { padding: 6px 16px; }
+details.fig-card > summary { cursor: pointer; font-size: 13px; color: var(--muted); padding: 4px 0; }
+details.fig-card[open] > summary { font-weight: 600; color: inherit; }
