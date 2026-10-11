@@ -140,7 +140,11 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
   - Staff edits are reviewed as a list of changes and logged.
   - Imports go through a review in which nobody is ticked by default; "Always skip" names are remembered.
   - Possible duplicates are only shown on request; merging keeps the other spelling as a short name.
-- **Undo** covers cell edits, Generate new, restoring a saved version and person box changes. Undoing Generate new only brings back the roster; day details changed since stay.
+- **Undo and Redo** cover cell edits, Generate new, restoring a saved version and person box changes (Ctrl+Z, Ctrl+Y). Undoing Generate new only brings back the roster; day details changed since stay.
+- **The header date** is written out ("Mon, 12 Oct 2026") because the native picker shows mm/dd on some phones. It has ‹ › Today and Tomorrow buttons, warns when the day isn't tomorrow, and says whether the day is saved to the team (a hash of the day and roster at the last save or restore).
+- **Tabs:** the daily ones in work order on the left (Monthly, Cases, Roster, Premeds), the set-up ones (Staff, Settings) on the right.
+- **Less on screen:** Cases shows only the flags that are on ("+ flag" opens the rest); roster cells show + and the & / C handles on hover. Hovering a name, or opening its box, lights up every cell that person is in.
+- **Empty pages** say what's missing and have a button to the tab that fixes it.
 - **Person chip and box:** the same chip and box on Today, Cases, Roster and Premeds. The name and grade are read-only there; Edit opens the Staff tab on that person.
 - **Touch screens:** no dragging, no C / & / × icons. Tapping opens the box.
 - **Design:** "Kent Ridge Clinical" (NUHS website style):
