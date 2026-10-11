@@ -249,7 +249,7 @@ function tagGroupsCard() {
   return h('section', { class: 'card', id: 'tag-groups' },
     h('h2', {}, 'Tag groups'),
     h('p', { class: 'hint' }, 'Tags you often pick together, one tap in Quick picks on the Case tab, e.g. “LSCS spinal” = LSCS + CNB(Obs) + Spinal.'),
-    list.length ? h('ul', { class: 'prog' }, list.map(t => h('li', { style: 'grid-template-columns:1fr auto' },
+    list.length ? h('ul', { class: 'prog' }, list.map(t => h('li', { style: 'grid-template-columns:1fr auto', class: tev.lastGroup === t.id ? 'te-last' : '' },
       h('span', {}, h('b', {}, t.name), ' ', h('span', { class: 'muted' }, catPills(t.cats)), t.details ? h('span', { class: 'muted' }, ` · “${t.details}”`) : null),
       h('span', { class: 'row' },
         h('button', { class: 'small', onclick: () => editTemplate(t) }, 'Edit'),
@@ -285,10 +285,15 @@ export function templateDialog(t, save, title = null) {
 }
 
 function editTemplate(t) {
+  if (t) tev.lastGroup = t.id;
   templateDialog(t, async out => {
-    const list = ((S.logbook && S.logbook.templates) || []).filter(x => x.id !== out.id);
-    const i = ((S.logbook && S.logbook.templates) || []).findIndex(x => x.id === out.id);
-    list.splice(i < 0 ? list.length : i, 0, out);
+    const all = (S.logbook && S.logbook.templates) || [];
+    const list = all.filter(x => x.id !== out.id);
+    const i = all.findIndex(x => x.id === out.id);
+    // a new group goes after the one you last edited (else at the end)
+    const after = !t && tev.lastGroup ? list.findIndex(x => x.id === tev.lastGroup) : -1;
+    list.splice(i >= 0 ? i : after >= 0 ? after + 1 : list.length, 0, out);
+    tev.lastGroup = out.id;
     await patchLogbook({ templates: list });
     hooks.render();
   });
@@ -331,7 +336,9 @@ export function categoryNamesCard() {
 const saveTags = set => patchLogbook({ settings: { tagSet: cleanTagSet(set) } }).then(() => hooks.render());
 // view: the list (details, up/down) or pills (as on the Case tab, drag to reorder); a search narrows both
 // (List or Pills is remembered with your account, like the Log page's switch)
-const tev = { q: '' };
+// last: the tag or header you last tapped (list or pills) — a new one goes right after it;
+// lastGroup: the tag group you last edited — a new group goes after it
+const tev = { q: '', last: null, lastGroup: null };
 const teMode = () => (settings().tagEditorView === 'pills' ? 'pills' : 'list');
 // cases per tag: APMES tags from the counts, your own tags by key
 function tagUsage() {
@@ -351,7 +358,7 @@ export function renderTagEditor() {
   const linkText = n => n.kind === 'head' ? 'section header'
     : 'Personal · ' + ((n.e.links || []).length ? 'counts as ' + n.e.links.map(catShort).join(', ') : (n.e.p && n.e.p.startsWith('c:') ? 'counts under ' + catShort(n.e.p.slice(2)) : 'label only'));
   const count = n => (n.kind === 'head' ? '' : `${used(n.e.k)} case${used(n.e.k) === 1 ? '' : 's'}`);
-  const row = n => h('li', { 'data-k': n.e.k, style: `padding-left:${8 + Math.min(n.depth, 4) * 18}px`, class: `te-${n.kind}${n.e.hide ? ' te-hidden' : ''}` },
+  const row = n => h('li', { 'data-k': n.e.k, style: `padding-left:${8 + Math.min(n.depth, 4) * 18}px`, class: `te-${n.kind}${n.e.hide ? ' te-hidden' : ''}${tev.last === n.e.k ? ' te-last' : ''}` },
     // drag by the handle: onto the top or bottom of a row to go before or after it, the middle to go inside
     h('span', { class: 'te-handle', title: 'Drag to move or nest', 'aria-label': 'Drag to move or nest', onpointerdown: e => startTagDrag(e, n.e.k) }, '⠿'),
     h('button', { type: 'button', class: 'te-name', onclick: () => editTag(n) },
@@ -362,7 +369,7 @@ export function renderTagEditor() {
     h('button', { class: 'small icon-btn', 'aria-label': 'Move down', onclick: () => saveTags(moveTag(set, n.e.k, 1)) }, '↓'));
   // pills: tap to edit, drag (press and hold on a phone) onto the left or right of another to go
   // before or after it, onto its middle to go inside
-  const pill = n => h('li', { 'data-k': n.e.k, class: `te-pillitem te-${n.kind} d${Math.min(n.depth, 3)}${n.e.hide ? ' te-hidden' : ''}`, tabindex: '0', role: 'button',
+  const pill = n => h('li', { 'data-k': n.e.k, class: `te-pillitem te-${n.kind} d${Math.min(n.depth, 3)}${n.e.hide ? ' te-hidden' : ''}${tev.last === n.e.k ? ' te-last' : ''}`, tabindex: '0', role: 'button',
     title: n.kind === 'cat' ? catName(n.code) : n.kind === 'head' ? 'Section header' : linkText(n),
     onpointerdown: e => pillDown(e, n.e.k, e.currentTarget), onclick: () => { if (!pillDragged) editTag(n); }, onkeydown: e => { if (e.key === 'Enter') editTag(n); } },
     h('span', { class: 'te-pill' }, nameOf(n)), n.kind === 'head' ? null : h('small', { class: 'te-n' }, String(used(n.e.k))));
@@ -494,7 +501,13 @@ function startTagDrag(e, key, horiz = false, liArg = null) {
 // Edit one item (or add a tag / header when n is null).
 function editTag(n, kind = n ? n.kind : 'tag') {
   const set = tagSet();
+  if (n) tev.last = n.e.k;   // remembered: a new tag or header goes right after it
   const e = n ? { ...n.e, links: [...(n.e.links || [])] } : { k: newKey(kind === 'head' ? 'h' : 'u'), n: '', links: [], ...(kind === 'head' ? { hd: true } : {}) };
+  // a new one sits beside the last tapped: a tag under the same parent, a header after its top-level item
+  const last = !n && tev.last ? set.find(x => x.k === tev.last) : null;
+  const topOf = k => { let x = set.find(y => y.k === k); while (x && x.p) x = set.find(y => y.k === x.p); return x; };
+  const anchor = last ? (kind === 'head' ? topOf(last.k) : last) : null;
+  if (anchor && kind === 'tag' && anchor.p) e.p = anchor.p;
   const code = kind === 'cat' ? e.k.slice(2) : null;
   const sub = code && BY_CODE[code].parent;
   const dflt = code ? { pill: (DEFAULT_NAMES[code] || [])[1] || BY_CODE[code].name } : null;
@@ -508,12 +521,14 @@ function editTag(n, kind = n ? n.kind : 'tag') {
   const pill = h('input', { value: e.n || '', maxlength: kind === 'head' ? '60' : '40', placeholder: code ? dflt.pill : kind === 'head' ? 'e.g. Regional' : 'e.g. Interscalene' });
   const long = h('input', { value: e.l || '', maxlength: '100', placeholder: code ? ((DEFAULT_NAMES[code] || [])[0] || BY_CODE[code].name) : 'optional' });
   const hide = h('input', { type: 'checkbox', checked: !!e.hide });
+  const placeNote = anchor ? h('p', { class: 'hint', style: 'margin:0 0 6px' }, `Goes after “${anchor.n || (anchor.k.startsWith('c:') ? catShort(anchor.k.slice(2)) : '')}” (${anchor === last ? 'the last one you tapped' : 'the section of the last one you tapped'}).`) : null;
   const kw = h('textarea', { rows: '3', value: shorthandOf(e).join(', '), maxlength: '1000', placeholder: kind === 'cat' ? 'e.g. flap, free flap' : 'e.g. appy, lap appy', autocapitalize: 'off', spellcheck: 'false' });
   const linkBox = h('div', { class: 'te-links' }, PICKER_ORDER.map(c => h('label', { class: 'check' },
     h('input', { type: 'checkbox', checked: e.links.includes(c.code), onchange: ev => { e.links = ev.target.checked ? [...e.links, c.code] : e.links.filter(x => x !== c.code); } }),
     `${c.parent ? '\u00a0\u00a0' : ''}${catName(c.code)}`)));
   const m = modal(n ? (kind === 'cat' ? 'Edit APMES tag' : kind === 'head' ? 'Edit header' : 'Edit personal tag') : (kind === 'head' ? 'New section header' : 'New personal tag'), [
     code ? h('p', { class: 'hint' }, `APMES: ${BY_CODE[code].full}. It always counts towards this APMES tag; renaming is just for you.`) : null,
+    placeNote,
     h('label', { class: 'field' }, kind === 'head' ? 'Header' : 'Name (pill)', pill),
     kind !== 'head' ? h('label', { class: 'field' }, 'Long name (lists)', long) : null,
     kind !== 'head' ? h('label', { class: 'field' }, 'Sits under', under) : null,
@@ -559,6 +574,9 @@ function editTag(n, kind = n ? n.kind : 'tag') {
         let next = n ? set.map(x => (x.k === e.k ? out : x)) : [...set, out];
         const p = sub ? 'c:' + sub : under.value;
         if ((e.p || '') !== p || !n) next = reparentTag(next, e.k, p);
+        // new, beside the same parent as the last tapped: right after it
+        if (!n && anchor && (anchor.p || '') === p) { const placed = dropTag(next, e.k, anchor.k, 'after'); if (placed !== next) next = placed; }
+        if (!n) tev.last = e.k;   // the next new one follows this one
         m.close(); await saveTags(next);
       } }, 'Save'))], { sticky: true });
 }

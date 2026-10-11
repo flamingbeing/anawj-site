@@ -984,3 +984,7 @@ details.refl-foot { margin: 4px 4px 12px; }
 .refl-notes-switch { margin: 4px 4px 0; font-size: 14px; }
 .refl-row .refl-ini { display: block; font-size: 15px; color: var(--ink); }
 .refl-row .refl-date { display: block; }
+/* the tag (or tag group) you last tapped: new ones go right after it */
+ul.te-list li.te-last { box-shadow: inset 3px 0 0 var(--accent); }
+ul.te-list.te-pills li.te-pillitem.te-last { outline: 2px solid var(--accent); outline-offset: 1px; }
+ul.prog li.te-last { box-shadow: inset 3px 0 0 var(--accent); }
