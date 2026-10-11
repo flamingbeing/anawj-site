@@ -15,7 +15,7 @@ import { shareText, copyText, caseText as shareCaseText, dayText, dayMarkdown } 
 
 const view = { q: '', cat: '', flag: '', mode: null, limit: 150, month: null, day: null };
 resetters.push(() => Object.assign(view, { q: '', cat: '', flag: '', mode: null, limit: 150, month: null, day: null }));   // next user starts unfiltered
-const MODES = [['list', 'List'], ['calendar', 'Calendar'], ['grid', 'Grid']];
+const MODES = [['calendar', 'Calendar'], ['list', 'List'], ['grid', 'Grid']];
 // "2026-10-06" -> "Tue"
 const weekday = iso => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); return m ? new Date(+m[1], +m[2] - 1, +m[3]).toLocaleDateString('en-GB', { weekday: 'short' }) : ''; };
 
