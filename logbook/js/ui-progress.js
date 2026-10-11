@@ -95,7 +95,7 @@ function reflCard() {
       const extra = [d ? `${d} draft${d === 1 ? '' : 's'}` : '', ...x.issues].filter(Boolean);
       return h('li', {},
         h('i', { class: `dot ${st}`, title: x.met ? 'Done' : 'Not yet' }),
-        h('span', { class: 'nm' }, x.name, ' ', ib),
+        h('span', { class: 'nm' }, x.name, ib ? ' ' : '', ib),
         h('span', { class: 'ct' }, x.met ? `${x.counted} ✓` : `${x.counted} / ${x.min}`),
         h('span', { class: 'meter' }, h('i', { class: st, style: `width:${Math.min(100, Math.round(x.counted / Math.max(1, x.min) * 100))}%` })),
         extra.length ? h('span', { class: 'ms' }, extra.join(' · ')) : null,
@@ -103,15 +103,15 @@ function reflCard() {
     })) : h('p', { class: 'empty' }, 'All headings met ✓'));
 }
 
-// one heading's requirements, behind its ⓘ
+// a heading's own requirements (sub-types, JR, notes), behind its ⓘ; none for headings with only a minimum
 function needs(x) {
   const hd = HEADING_BY_ID[x.id] || {};
-  return info(h('span', {}, [
-    `At least ${x.min} reflection${x.min === 1 ? '' : 's'}.`,
-    hd.subs && hd.subs.length ? ` Include at least one of each: ${hd.subs.map(s => s.name).join(', ')}.` : '',
-    x.jrNeeded ? ` ${x.jrNeeded} must be from Junior Residency (R1–R3).` : ' At most one from Junior Residency (R1–R3).',
-    hd.hint ? ` ${hd.hint}` : '',
-  ].join('')));
+  const t = [
+    hd.subs && hd.subs.length ? `Include at least one of each: ${hd.subs.map(s => s.name).join(', ')}.` : '',
+    x.jrNeeded ? `${x.jrNeeded} must be from Junior Residency (R1–R3).` : '',
+    hd.hint || '',
+  ].filter(Boolean);
+  return t.length ? info(t.join(' ')) : [null, null];
 }
 
 // your own tags under a category (Tag editor): "Interscalene 3 · Femoral 2"
