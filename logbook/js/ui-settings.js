@@ -359,7 +359,12 @@ function editTag(n, kind = n ? n.kind : 'tag') {
       h('p', { class: 'hint', style: 'margin:0 0 4px' }, 'Choosing this tag ticks these APMES tags. Leave all unticked for a label only.'), linkBox] : null,
     kind !== 'head' ? h('label', { class: 'field', style: 'margin-top:8px' }, 'Shorthand (optional)', kw,
       h('small', { class: 'hint', style: 'display:block' }, code ? 'Words you type for this, separated by commas. Typing one in a case suggests this tag. Starts with the built-in list: add, change or remove words.' : 'Words you type for this, separated by commas. Typing one in a case suggests this tag.')) : null,
-    code && (DEFAULT_SHORTHAND[code] || []).length ? h('button', { type: 'button', class: 'small linkish', onclick: () => { kw.value = DEFAULT_SHORTHAND[code].join(', '); } }, 'Reset to the built-in shorthand') : null,
+    // a plain text link (harder to hit by accident), with a confirmation
+    code && (DEFAULT_SHORTHAND[code] || []).length ? h('p', { style: 'margin:2px 0 0;font-size:13px' }, h('a', { href: '#', class: 'subtle-link', onclick: async ev => {
+      ev.preventDefault();
+      if (!(await confirmBox('Reset shorthand?', 'Replace the words above with the built-in shorthand for this tag? Your changes to them are lost when you save.', 'Reset', true))) return;
+      kw.value = DEFAULT_SHORTHAND[code].join(', ');
+    } }, 'Reset to the built-in shorthand')) : null,
     kind !== 'head' ? h('label', { class: 'check', style: 'margin-top:8px' }, hide, 'Hide from the Log page (still found by search)') : null,
     h('div', { class: 'bar', style: 'margin-top:12px' },
       n && kind !== 'cat' ? h('button', { class: 'danger', onclick: async () => { m.close(); await saveTags(removeTag(set, e.k)); toast('Removed (cases keep the tag)'); } }, 'Remove') : null,

@@ -793,3 +793,4 @@ dialog textarea.grow-box { min-height: calc(6 * 1.4em + 16px); resize: vertical;
 dialog.full[open] { display: flex; flex-direction: column; }
 dialog.full[open] > * { flex-shrink: 0; }
 dialog.full .dlg-actions { margin-top: auto; }
+a.subtle-link { color: var(--muted); text-decoration: underline; }
