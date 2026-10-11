@@ -198,3 +198,17 @@ console.log('engine tests passed');
   assert.ok(M.NIGHT_DUTIES.includes('junior.r1') && !M.NIGHT_DUTIES.includes('junior.df'));
   console.log('monthly tests passed');
 }
+
+// the liver standby junior gets (L) and isn't given the complex list
+{
+  const st = [P('s1', 'Senior One', 'senior'), P('s2', 'Senior Two', 'senior'), P('j1', 'Junior Liver', 'junior'), P('j2', 'Junior Other', 'junior')];
+  const mk = (id, name, complex) => ({ id, name, complex: 'MOR', running: true, notes: '', session: 'full', flags: { subspecs: [], complex, long: false }, flagsManual: true });
+  for (let seed = 1; seed <= 10; seed++) {
+    const day = { rooms: [mk('m1', 'MOR 1', true), mk('m2', 'MOR 2', false)], staff: { j1: { liverStandby: true } } };
+    const res = generate({ staff: st, day, seed });
+    const m1 = res.rows.find(r => r.label === 'MOR 1'), m2 = res.rows.find(r => r.label === 'MOR 2');
+    assert.ok(!m1.junior.includes('Junior Liver'), `liver standby junior on the complex list (seed ${seed})`);
+    assert.ok(m2.junior.includes('Junior Liver (L)'));
+  }
+  console.log('liver standby tests passed');
+}
