@@ -34,7 +34,8 @@ portfolio content.
   consistently. Browser Back/Forward restore screens; a screen's Back link retraces the same history
   without adding a loop. Direct child-page links get a finite parent trail (Display → Settings → More);
   reload preserves it. The root screen can leave the app normally. The demo query stays on every screen.
-  Account/profile and Admin changes flush on all screen transitions, including browser Back.
+  Pending Account/profile edits flush and Admin editing state clears on all screen transitions,
+  including browser Back.
 - More → **Export / Import** (`#data`): **Export** = the Word portfolio only (it holds everything APMES needs);
   **Import** = reflections from Word (`#reflimport`) and the logbook from Excel/CSV; **Backup** = backup file and
   restore, Excel spreadsheet. Keep that wording. The Logbook and Reflections tabs have no More tools cards.
