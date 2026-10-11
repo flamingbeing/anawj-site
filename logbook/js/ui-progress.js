@@ -136,7 +136,7 @@ export function renderTotals() {
       h('span', { class: 'grow' }),
       h('button', { class: 'small', onclick: () => { tview.summaries = null; hooks.render(); } }, 'Refresh'),
       h('button', { class: 'small', onclick: () => downloadTotals(table.data) }, 'Download Excel')),
-    h('p', { class: 'hint' }, 'Case counts only, so residents can see how they compare. Colours use each resident’s own year.'),
+    h('p', { class: 'hint' }, 'Case counts only, so residents can see how they compare. Under each category: its targets. Red (behind) and amber (due this year) show how many short of the target, e.g. 5 −3. Colours use each resident’s own year.'),
     legend(),
     h('div', { class: 'scroll', style: 'margin-top:8px' }, table.el));
   return card;
@@ -174,12 +174,22 @@ function totalsTable(people) {
   const meId = S.resident && S.resident.rid;
   const data = { columns: people.map(p => `${p.name} (R${p.rYear || '?'})`), rows: [] };
   const tbody = h('tbody');
+  // How far behind: the earliest target a resident has missed (behind) or must meet this year (due)
+  const short = pr => {
+    if (!pr || (pr.status !== 'late' && pr.status !== 'due')) return 0;
+    const m = pr.milestones.find(x => !x.met && (x.due === 'past' || x.due === 'now'));
+    return m ? m.n - pr.count : 0;
+  };
   for (const code of codes) {
     const vals = people.map(p => (p.counts || {})[code] || 0);
     const sts = prog.map(pr => (pr[code] ? pr[code].status : 'none'));
-    data.rows.push({ label: BY_CODE[code].label, values: vals, statuses: sts });
-    add(tbody, h('tr', {}, h('td', { class: 'cat', title: BY_CODE[code].full }, `${code} ${BY_CODE[code].name}`),
-      vals.map((v, i) => h('td', { class: `n ${sts[i]}` }, String(v)))));
+    const gaps = prog.map(pr => short(pr[code]));
+    // the targets under the name: "10 by R3 | 15 by R5"
+    const t = BY_CODE[code].targets || {};
+    const tgt = R_YEARS.filter(y => t[y] != null).map(y => `${t[y]} by ${y}`).join(' | ');
+    data.rows.push({ label: BY_CODE[code].label + (tgt ? ` [${tgt}]` : ''), values: vals.map((v, i) => (gaps[i] ? `${v} (−${gaps[i]})` : v)), statuses: sts });
+    add(tbody, h('tr', {}, h('td', { class: 'cat', title: BY_CODE[code].full }, `${code} ${BY_CODE[code].name}`, tgt ? h('small', { class: 'tgt' }, tgt) : null),
+      vals.map((v, i) => h('td', { class: `n ${sts[i]}`, title: gaps[i] ? `${gaps[i]} short of the target` : '' }, String(v), gaps[i] ? h('small', { class: 'gap' }, ` −${gaps[i]}`) : null))));
   }
   const totals = people.map(p => p.total || 0);
   const refl = people.map(p => p.reflectionsTotal || 0);
