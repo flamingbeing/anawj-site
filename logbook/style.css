@@ -903,3 +903,8 @@ details.an-sec[open] > summary .an-t::after { content: ' ⌄'; }
 .lb-saved::-webkit-scrollbar { display: none; }
 .lb-saved .chip { flex: none; min-height: 30px; padding: 2px 10px; font-size: 13px; }
 .lb-saved .chip .x { padding: 0 2px 0 6px; }
+.lb-opsnote { margin: 4px 0 0; color: var(--warn, #8a5a00); }
+.ops-help { border-collapse: collapse; width: 100%; font-size: 14px; }
+.ops-help td { padding: 6px 8px 6px 0; vertical-align: top; border-top: 1px solid var(--line); }
+.ops-help code, .ops-list code { white-space: nowrap; }
+.ops-list { margin: 0; padding-left: 18px; }

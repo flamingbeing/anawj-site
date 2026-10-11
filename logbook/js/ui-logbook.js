@@ -6,6 +6,7 @@ import { flagCase } from './importer.js';
 import { exportWorkbook, readSheetGrid } from './xlsxio.js';
 import { cleanExportOpts, exportTables, rangeText, CASE_COLS, REFL_COLS } from './export-opts.js';
 import { inExport } from './reflections.js';
+import { parseQuery, matchQuery, OPERATOR_HELP } from './search-ops.js';
 import { parseCsv } from './tags.js';
 import {
   S, h, toast, debounce, modal, cat, catName, catShort, tagName, catFull, catChip, PICKER_ORDER, settings, patchLogbook, needExcel, download, fileButton, catPills,
@@ -56,6 +57,7 @@ export function renderLogbook() {
     // "last tuesday", "this week", "last month"… narrow by date; the other words search the text
     const win = dateWindow(view.q);
     const words = (win ? win.rest : view.q).toLowerCase().split(/\s+/).filter(Boolean);
+    const ops = opsOn() && words.length ? parseQuery(win ? win.rest : view.q) : null;
     // Search in (Filter): everything, the initials only, or the procedure line only; fuzzy allows typos
     const scope = settings().lbScope || 'all', fuzzy = !!settings().lbFuzzy;
     if (hayFor !== settings().tagSet) { hayCache = new WeakMap(); hayFor = settings().tagSet; }
@@ -73,11 +75,18 @@ export function renderLogbook() {
       if (view.not.length && view.not.some(k => hasTag(c, k))) return false;
       if ((view.from || view.to) && !(c.date && (!view.from || c.date >= view.from) && (!view.to || c.date <= view.to))) return false;
       if (win && !(c.date && c.date >= win.from && c.date <= win.to)) return false;
+      if (ops) return matchQuery(ops, k => (k === 'all' ? hayOf(c) : partsOf(c)[k]), t => tagHas(c, t), (hay, w, f) => textHas(hay, w, fuzzy && f !== 'initials' && (f || scope !== 'initials')));
       if (!words.length) return true;
       const hay = hayOf(c);
       return words.every(w => textHas(hay, w, fuzzy && scope !== 'initials'));
     });
   };
+  // Advanced search (Settings → Logging): operators in the box (search-ops.js); off by default
+  const opsOn = () => !!settings().searchOps;
+  const partsOf = c => { const p = caseParts(c); return { initials: p.initials.toLowerCase(), case: String(p.details || '').toLowerCase() }; };
+  // tag:16 / tag:lscs: a tag's code, or a word in its name (APMES or your own)
+  const tagHas = (c, t) => (c.cats || []).some(k => k.toLowerCase() === t || `${catName(k)} ${catShort(k)} ${catFull(k)}`.toLowerCase().includes(t))
+    || (c.tags || []).some(k => tagName(k).toLowerCase().includes(t));
 
   if (!view.mode) view.mode = MODES.some(([m]) => m === settings().logbookView) ? settings().logbookView : 'calendar';
   const paint = () => {
@@ -195,15 +204,24 @@ export function renderLogbook() {
   };
   // the search box, with its own × that empties just the box (filters stay)
   const searchBox = h('input', { type: 'search', placeholder: 'Search: initials, procedure, “last Tuesday”, “this week”', value: view.q, 'aria-label': 'Search cases',
-    oninput: e => { view.q = e.target.value; searchWrap.classList.toggle('has-text', !!view.q); paintSoon(); } });
+    oninput: e => { view.q = e.target.value; searchWrap.classList.toggle('has-text', !!view.q); paintOpsNote(); paintSoon(); } });
   const searchWrap = h('div', { class: 'search-wrap grow' + (view.q ? ' has-text' : '') }, searchBox,
     h('button', { type: 'button', class: 'search-x', title: 'Clear the search', 'aria-label': 'Clear the search', onclick: () => { view.q = ''; setBox(''); searchBox.focus(); refresh(); } }, '×'));
-  function setBox(v) { searchBox.value = v; searchWrap.classList.toggle('has-text', !!v); }
-  paintFilterBtn(); repaintFilters(); paintSaved();
+  function setBox(v) { searchBox.value = v; searchWrap.classList.toggle('has-text', !!v); paintOpsNote(); }
+  const opsNote = h('p', { class: 'hint lb-opsnote', hidden: true });
+  const paintOpsNote = () => {
+    const u = opsOn() && view.q ? parseQuery(view.q).unknown : [];
+    opsNote.hidden = !u.length;
+    opsNote.textContent = u.map(x => `“${x.op}” isn’t an operator (searched as text): did you mean ${x.suggest}?`).join(' ');
+  };
+  const helpBtn = opsOn() ? h('button', { type: 'button', class: 'small icon-btn', title: 'Search operators', 'aria-label': 'Search operators', onclick: opsHelp }, '?') : null;
+  paintFilterBtn(); repaintFilters(); paintSaved(); paintOpsNote();
   add(wrap, h('section', { class: 'card' },
     h('div', { class: 'bar' },
       searchWrap,
+      helpBtn,
       filterBtn),
+    opsNote,
     savedRow,
     filters,
     h('div', { class: 'bar', style: 'margin-bottom:0' },
@@ -432,6 +450,14 @@ function pasteRows() {
       const d = diffRows(S.cases, rows);
       previewDiff({ ...d, deleted: [] }, () => { ta.value = ''; });
     } }, 'Add rows')));
+}
+
+// The operators, from the "?" by the search box (Advanced search on)
+function opsHelp() {
+  const m = modal('Search operators', [
+    h('table', { class: 'ops-help' }, OPERATOR_HELP.map(([op, what]) => h('tr', {}, h('td', {}, h('code', {}, op)), h('td', {}, what)))),
+    h('p', { class: 'hint' }, 'Combine them: tag:16 -GA "under spinal". Plain words, dates (“last week”), Search in and fuzzy work as usual. Turn operators off in Settings → Logging.'),
+    h('div', { class: 'bar' }, h('span', { class: 'grow' }), h('button', { class: 'primary', onclick: () => m.close() }, 'OK'))]);
 }
 
 // ---------- Excel ----------

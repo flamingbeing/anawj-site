@@ -337,7 +337,7 @@ export function procedureText(c) {
 }
 
 // Edit distance between a and b, giving up past max (returns max + 1).
-function editDistance(a, b, max) {
+export function editDistance(a, b, max) {
   if (Math.abs(a.length - b.length) > max) return max + 1;
   let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
   for (let i = 1; i <= a.length; i++) {

@@ -6,6 +6,7 @@ import { sortCodes, uid, academicYear, withParents } from './engine.js';
 import { S, h, toast, modal, confirmBox, cloud, catChip, catName, catShort, PICKER_ORDER, pickerOrder, settings, patchLogbook, displayName, hooks, rYear, myYearName, fill, categoryNames, setCategoryNames, catPills, tagSet, download, fileButton, todayISO, saveMany } from './ui-core.js';
 import { MAX_TAGS, tagLinks as tagLinksIn, learnShorthand, cleanShorthand, shorthandOf, DEFAULT_SHORTHAND, cleanTagSet, defaultTagSet, tagTree, flatTree, moveTag, reparentTag, removeTag, newKey, tagSetToCsv, tagSetFromCsv, dropTag, canPlace } from './tags.js';
 import { pickDialog } from './ui-log.js';
+import { OPERATOR_HELP } from './search-ops.js';
 import { DEFAULT_FORMAT, PLACEHOLDERS, cleanFormat, formatCase, formatDay } from './share-format.js';
 import { PHOTO_BUDGET_KB, PHOTO_NOTE, photoUsageKb, fmtMb } from './reflections.js';
 
@@ -133,6 +134,13 @@ export function renderLogging() {
         h('select', { onchange: e => patchLogbook({ settings: { boxLines: Number(e.target.value) } }).then(() => toast('Saved')) },
           Array.from({ length: 19 }, (_, i) => i + 2).map(n => h('option', { value: String(n), selected: n === (Math.min(20, Math.max(2, Number(st.boxLines) || 3))) }, `${n} lines${n === 3 ? ' (default)' : ''}`)))),
       h('p', { class: 'hint', style: 'margin:8px 0 6px' }, 'How the Logbook search works (everything, initials or procedure; fuzzy) is under Filter on the Logbook tab, and is remembered.'),
+      // operators in the Logbook search box (search-ops.js); off by default, so plain searches never change meaning
+      h('label', { class: 'check', style: 'margin-top:8px' }, h('input', { type: 'checkbox', role: 'switch', checked: !!st.searchOps, onchange: e => patchLogbook({ settings: { searchOps: e.target.checked } }).then(() => toast(e.target.checked ? 'Advanced search on' : 'Advanced search off')) }),
+        'Advanced search'),
+      h('div', { class: 'hint', style: 'margin:0 0 6px' },
+        h('p', { style: 'margin:0 0 4px' }, 'Lets you type operators in the Logbook search box (a ? next to it lists them):'),
+        h('ul', { class: 'ops-list' }, OPERATOR_HELP.map(([op, what]) => h('li', {}, h('code', {}, op), ' ', what))),
+        h('p', { style: 'margin:4px 0 0' }, 'Off by default because a few plain searches change meaning when it’s on: a word starting with “-” leaves cases out, and OR in capitals means either.')),
       h('label', { class: 'field', style: 'margin-top:8px' }, 'Date for a new case',
         h('select', { onchange: e => patchLogbook({ settings: { defaultDate: e.target.value } }) },
           h('option', { value: 'today', selected: st.defaultDate !== 'last' }, 'Today'),
