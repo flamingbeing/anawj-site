@@ -33,7 +33,7 @@ export const REMOVABLE = ['assessment', 'metrics', 'declineReason', 'declinedAt'
 const RESIDENT_FIELDS = ['rid', 'name', 'email', 'status', 'intake', 'rYear'];
 const FACULTY_FIELDS = ['email', 'name', 'status', 'updatedAt'];
 const APPLICATION_FIELDS = ['uid', 'email', 'name', 'role', 'note', 'status', 'createdAt', 'decidedAt', 'decidedBy'];
-export const RESIDENT_STATUSES = ['ACTIVE', 'ON LEAVE', 'GRADUATED', 'ATTRITED'];
+export const RESIDENT_STATUSES = ['ACTIVE', 'ON LEAVE', 'SMO', 'GRADUATED', 'ATTRITED'];
 export const STATUSES = ['draft', 'requested', 'submitted', 'declined', 'cancelled'];
 
 const pick = (o, keys) => Object.fromEntries(keys.filter(k => o[k] !== undefined).map(k => [k, o[k]]));

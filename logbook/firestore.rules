@@ -72,7 +72,7 @@ service cloud.firestore {
         && d.rid == rid
         && d.email is string && d.email == d.email.lower() && d.email.size() <= 200
         && optString(d, 'name', 200)
-        && d.status in ['ACTIVE', 'ON LEAVE', 'GRADUATED', 'ATTRITED']
+        && d.status in ['ACTIVE', 'ON LEAVE', 'SMO', 'GRADUATED', 'ATTRITED']
         && optNumber(d, 'intake')
         && (!('rYear' in d) || d.rYear == null || (d.rYear is int && d.rYear >= 1 && d.rYear <= 5));
     }

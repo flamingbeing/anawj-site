@@ -8,8 +8,10 @@ import { S, h, toast, confirmBox, cloud, needExcel, sheetRows, fileButton, hooks
 import { templateDialog } from './ui-settings.js';
 import { renderTemplateCard } from './portfolio.js';
 
-const STATUSES = ['ACTIVE', 'ON LEAVE', 'GRADUATED', 'ATTRITED'];
+const STATUSES = ['ACTIVE', 'ON LEAVE', 'SMO', 'GRADUATED', 'ATTRITED'];
 const A = { residents: null, loading: false, pasted: null, imp: null, busy: false, log: [], shared: null, editRes: false };
+// residents groups the admin has folded (by label); leavers start folded
+const collapsed = new Set(['Graduated', 'Attrited']);
 const intakeOf = rid => Number(String(rid).slice(0, 4)) || null;
 resetters.push(() => Object.assign(A, { residents: null, loading: false, pasted: null, imp: null, busy: false, log: [], shared: null, prog: null, editRes: false }));
 
@@ -36,11 +38,11 @@ async function load() {
 
 // ---------- residents ----------
 
-// Groups for the residents list: active and on-leave residents by residency year (R1–R5), then
-// graduated and attrited. Within a group, by name.
-const GONE = { GRADUATED: 'Graduated', ATTRITED: 'Attrited' };
+// Groups for the residents list: active and on-leave residents by residency year, R5 first down
+// to R1, then SMOs, then graduated and attrited. Within a group, by name.
+const GONE = { SMO: 'SMO', GRADUATED: 'Graduated', ATTRITED: 'Attrited' };
 export function groupResidents(list) {
-  const groups = new Map([...R_YEARS.map(y => [y, []]), ['Year unknown', []], ...Object.values(GONE).map(g => [g, []])]);
+  const groups = new Map([...[...R_YEARS].reverse().map(y => [y, []]), ['SMO', []], ['Year unknown', []], ['Graduated', []], ['Attrited', []]]);
   for (const r of list) {
     const y = residentYear(r);
     const key = GONE[r.status] || (y ? R_YEARS[Math.min(y, R_YEARS.length) - 1] : 'Year unknown');
@@ -79,9 +81,18 @@ function residentsCard() {
   const groups = groupResidents(A.residents);
   add(card, groups.length ? h('div', { class: 'scroll' }, h('table', { class: ed ? 'res-table edit' : 'res-table' },
     h('thead', {}, h('tr', {}, cols.map(t => h('th', {}, t)))),
-    groups.map(([label, rs]) => h('tbody', {},
-      h('tr', { class: 'res-group' }, h('th', { colspan: String(cols.length), scope: 'colgroup' }, `${label} · ${rs.length}`)),
-      rs.map(row))))) : h('p', { class: 'muted' }, 'No residents yet.'));
+    groups.map(([label, rs]) => {
+      const rowsEl = rs.map(row);
+      const shut = collapsed.has(label);
+      rowsEl.forEach(tr => { tr.hidden = shut; });
+      const btn = h('button', { type: 'button', class: 'res-toggle', 'aria-expanded': String(!shut), onclick: () => {
+        const nowShut = !collapsed.has(label);
+        nowShut ? collapsed.add(label) : collapsed.delete(label);
+        btn.setAttribute('aria-expanded', String(!nowShut));
+        rowsEl.forEach(tr => { tr.hidden = nowShut; });
+      } }, h('span', { class: 'res-chev', 'aria-hidden': 'true' }, '›'), `${label} · ${rs.length}`);
+      return h('tbody', {}, h('tr', { class: 'res-group' }, h('th', { colspan: String(cols.length), scope: 'colgroup' }, btn)), rowsEl);
+    }))) : h('p', { class: 'muted' }, 'No residents yet.'));
   if (ed) add(card, h('p', { class: 'hint', style: 'margin:6px 0 0' }, 'Changes save as you make them. The grouping updates when you tap Done.'));
   if (!ed) return card;
 

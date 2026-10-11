@@ -68,6 +68,7 @@ await t('own resident get', assertSucceeds(getDoc(doc(a, 'residents', 'R1'))));
 await t('user edit resident', assertFails(setDoc(doc(a, 'residents', 'R1'), { rid: 'R1', name: 'A', email: A, status: 'ACTIVE', intake: 2024, rYear: 5 })));
 await t('admin list residents', assertSucceeds(getDocs(collection(adm, 'residents'))));
 await t('admin save resident', assertSucceeds(setDoc(doc(adm, 'residents', 'R3'), { rid: 'R3', name: 'C', email: 'c@example.com', status: 'ON LEAVE', intake: 2023, rYear: null })));
+await t('admin save SMO resident', assertSucceeds(setDoc(doc(adm, 'residents', 'R4'), { rid: 'R4', name: 'D', email: 'd@example.com', status: 'SMO', intake: 2019, rYear: null })));
 await t('admin resident bad status', assertFails(setDoc(doc(adm, 'residents', 'R3'), { rid: 'R3', name: 'C', email: 'c@example.com', status: 'X', intake: 2023, rYear: 3 })));
 await t('admin resident upper email', assertFails(setDoc(doc(adm, 'residents', 'R3'), { rid: 'R3', name: 'C', email: 'C@example.com', status: 'ACTIVE', intake: 2023, rYear: 3 })));
 await t('admin delete resident', assertSucceeds(deleteDoc(doc(adm, 'residents', 'R3'))));

@@ -58,7 +58,7 @@ adminCSS();
 const EMAIL_RE = /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/;
 export const cleanEmail = e => String(e || '').trim().replace(/^<|>$/g, '').toLowerCase();
 export const validEmail = e => EMAIL_RE.test(cleanEmail(e));
-const RES_STATUSES = ['ACTIVE', 'ON LEAVE', 'GRADUATED', 'ATTRITED'];
+const RES_STATUSES = ['ACTIVE', 'ON LEAVE', 'SMO', 'GRADUATED', 'ATTRITED'];
 const SUPERVISION_KEY = { dops: 'q16', minicex: 'q18', ebd: 'q9' };
 const COMMENTS_KEY = { dops: 'q17', minicex: 'q19', ebd: 'q10' };
 const OVERALL_KEY = { dops: 'q14', minicex: 'q12' };   // the 9-point "overall" question (EBD has none)
