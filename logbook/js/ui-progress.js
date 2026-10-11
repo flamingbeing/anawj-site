@@ -120,8 +120,10 @@ async function downloadSummary(rows, yr) {
 
 // ---------- Totals ----------
 
-const tview = { summaries: null, loading: false, intake: null, error: '' };
-resetters.push(() => Object.assign(tview, { summaries: null, intake: null, error: '' }));
+const tview = { summaries: null, loading: false, year: null, error: '' };
+// "R3 / SMO" when the R3 group has SMOs in it; residents with no year known are "Year unknown"
+const groupName = (y, all) => !y ? 'Year unknown' : y === 3 && all.some(s => s.smo) ? 'R3 / SMO' : yearName(y);
+resetters.push(() => Object.assign(tview, { summaries: null, year: null, error: '' }));
 // reload the totals next time they're shown (an admin took a row off)
 export const forgetTotals = () => { tview.summaries = null; };
 
@@ -133,17 +135,18 @@ export function renderTotals() {
   const all = tview.summaries || [];
   if (!all.length) { add(card, h('p', { class: 'empty' }, 'No programme totals yet.')); return card; }
 
-  const intakes = [...new Set(all.map(s => s.intake).filter(Boolean))].sort((a, b) => b - a);
-  const mine = S.resident && S.resident.intake;
-  if (!tview.intake || !intakes.includes(tview.intake)) tview.intake = intakes.includes(mine) ? mine : intakes[0];
-  const people = all.filter(s => s.intake === tview.intake).sort((a, b) => String(a.name).localeCompare(String(b.name)));
+  // grouped by this year's residency year; SMOs count as R3, so they sit with the R3s
+  const years = [...new Set(all.map(s => s.rYear || 0))].sort((a, b) => (a || 9) - (b || 9));
+  const mine = rYear();
+  if (tview.year == null || !years.includes(tview.year)) tview.year = years.includes(mine) ? mine : years[0];
+  const people = all.filter(s => (s.rYear || 0) === tview.year).sort((a, b) => String(a.name).localeCompare(String(b.name)));
   const table = totalsTable(people);
 
   add(card, 
     h('div', { class: 'bar' },
       h('h2', { style: 'margin:0' }, 'Programme totals'),
-      h('select', { 'aria-label': 'Intake year', onchange: e => { tview.intake = Number(e.target.value); hooks.render(); } },
-        intakes.map(y => h('option', { value: String(y), selected: y === tview.intake }, `AY${y} intake`))),
+      h('select', { 'aria-label': 'Residency year', onchange: e => { tview.year = Number(e.target.value); hooks.render(); } },
+        years.map(y => h('option', { value: String(y), selected: y === tview.year }, groupName(y, all)))),
       h('span', { class: 'grow' }),
       h('button', { class: 'small', onclick: () => { tview.summaries = null; hooks.render(); } }, 'Refresh'),
       h('button', { class: 'small', onclick: () => downloadTotals(table.data) }, 'Download Excel')),
@@ -163,6 +166,7 @@ async function loadSummaries() {
   const ay = t => { const d = new Date(t); return d.getMonth() >= 6 ? d.getFullYear() : d.getFullYear() - 1; };
   const nowAy = ay(Date.now());
   const yearOf = x => {
+    if (x.smo) return 3;   // an SMO stays put, counted as R3
     const base = Number(x.rYear) || (x.intake && rYearDefault(x.intake)) || null;
     if (!base) return null;
     return Math.min(5, base + (x.updatedAt ? Math.max(0, nowAy - ay(x.updatedAt)) : 0));
@@ -185,7 +189,7 @@ function totalsTable(people) {
   const prog = people.map(p => Object.fromEntries(progress(p.counts || {}, p.rYear || 1).map(x => [x.code, x])));
   const codes = CATEGORIES.filter(c => !c.retired || people.some(p => (p.counts || {})[c.code])).map(c => c.code);
   const meId = S.resident && S.resident.rid;
-  const data = { columns: people.map(p => `${p.name} (R${p.rYear || '?'})`), rows: [] };
+  const data = { columns: people.map(p => `${p.name} (${p.smo ? 'SMO' : 'R' + (p.rYear || '?')})`), rows: [] };   // the download keeps R4/R5
   const tbody = h('tbody');
   // How far behind: the earliest target a resident has missed (behind) or must meet this year (due)
   const short = pr => {
@@ -212,15 +216,15 @@ function totalsTable(people) {
     h('tr', { class: 'total' }, h('td', { class: 'cat' }, 'Total cases'), totals.map(v => h('td', { class: 'n' }, String(v)))),
     h('tr', {}, h('td', { class: 'cat' }, 'Reflections'), refl.map(v => h('td', { class: 'n' }, String(v)))));
   const thead = h('thead', {}, h('tr', {}, h('th', {}, 'Category'),
-    people.map(p => h('th', { class: `rot ${p.rid === meId ? 'me' : ''}`, title: p.name }, `${p.name} · ${p.rYear ? yearName(p.rYear) : '?'}`))));
-  data.title = `AY${tview.intake} intake totals — ${todayISO()}`;
+    people.map(p => h('th', { class: `rot ${p.rid === meId ? 'me' : ''}`, title: p.name }, `${p.name} · ${p.smo ? 'SMO' : p.rYear ? yearName(p.rYear) : '?'}`))));
+  data.title = `${tview.year ? (tview.year === 3 && people.some(p => p.smo) ? 'R3 / SMO' : 'R' + tview.year) : 'Year unknown'} totals — ${todayISO()}`;
   return { el: h('table', { class: 'totals' }, thead, tbody), data };
 }
 
 async function downloadTotals(data) {
   try {
     await needExcel();
-    download(`totals-AY${tview.intake}-${todayISO()}.xlsx`, await exportTotals(data));
+    download(`totals-${tview.year ? 'R' + tview.year : 'year-unknown'}-${todayISO()}.xlsx`, await exportTotals(data));
   } catch (err) { toast('Could not export: ' + err.message); }
 }
 

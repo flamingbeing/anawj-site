@@ -309,7 +309,7 @@ async function runImport() {
       const intake = r.intake || intakeOf(g.rid);
       // keep the resident's reflection counts: admins can't read reflections themselves
       const prev = (A.prevSummaries ||= Object.fromEntries((await cloud.listSummaries()).map(x => [String(x.rid), x])))[String(g.rid)];
-      await cloud.writeSummary(g.rid, { rid: g.rid, name: r.name || '', intake, rYear: residentYear({ ...r, intake }) || 1, counts: countCases(all), total: all.length, reflections: prev?.reflections || {}, reflectionsTotal: prev?.reflectionsTotal || 0, updatedAt: Date.now() });
+      await cloud.writeSummary(g.rid, { rid: g.rid, name: r.name || '', intake, rYear: residentYear({ ...r, intake }) || 1, ...(r.status === 'SMO' ? { smo: true } : {}), counts: countCases(all), total: all.length, reflections: prev?.reflections || {}, reflectionsTotal: prev?.reflectionsTotal || 0, updatedAt: Date.now() });
       A.log.push({ cls: 'ok', text: `${r.name || g.rid}: ${res.written} written, ${res.skipped} already there` });
     } catch (err) {
       A.log.push({ cls: 'error', text: `${r.name || g.rid}: ${err.message}` });

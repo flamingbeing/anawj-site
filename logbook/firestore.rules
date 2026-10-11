@@ -220,7 +220,7 @@ service cloud.firestore {
         && d.get('intake', null) == get(/databases/$(database)/documents/residents/$(rid)).data.get('intake', null);
     }
     function validSummary(rid, d) {
-      return d.keys().hasOnly(['rid', 'name', 'intake', 'rYear', 'counts', 'total', 'reflections', 'reflectionsTotal', 'updatedAt'])
+      return d.keys().hasOnly(['rid', 'name', 'intake', 'rYear', 'smo', 'counts', 'total', 'reflections', 'reflectionsTotal', 'updatedAt'])
         && d.rid == rid
         && d.counts is map && d.counts.size() <= 100
         && d.total is int && d.total >= 0 && d.total < 100000
@@ -228,7 +228,8 @@ service cloud.firestore {
         && optNumber(d, 'intake') && optNumber(d, 'updatedAt')
         && (!('rYear' in d) || d.rYear == null || (d.rYear is int && d.rYear >= 1 && d.rYear <= 5))
         && (!('reflectionsTotal' in d) || d.reflectionsTotal == null || (d.reflectionsTotal is int && d.reflectionsTotal >= 0 && d.reflectionsTotal < 10000))
-        && (!('reflections' in d) || d.reflections is map);
+        && (!('reflections' in d) || d.reflections is map)
+        && (!('smo' in d) || d.smo is bool);   // an SMO (Totals shows them with R3)
     }
 
     // which old-form rows have been imported: the app owner only

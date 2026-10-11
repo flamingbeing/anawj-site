@@ -102,6 +102,8 @@ await t('admin summary any name', assertSucceeds(setDoc(doc(adm, 'summaries', 'R
 await t('summary fake total', assertFails(setDoc(doc(a, 'summaries', 'R1'), { ...sum('R1'), total: 1e9 })));
 await t('summary negative total', assertFails(setDoc(doc(a, 'summaries', 'R1'), { ...sum('R1'), total: -1 })));
 await t('summary year out of range', assertFails(setDoc(doc(a, 'summaries', 'R1'), { ...sum('R1'), rYear: 9 })));
+await t('SMO summary', assertSucceeds(setDoc(doc(a, 'summaries', 'R1'), { ...sum('R1'), rYear: 3, smo: true })));
+await t('summary smo must be true/false', assertFails(setDoc(doc(a, 'summaries', 'R1'), { ...sum('R1'), smo: 'yes' })));
 await t('summary negative reflections', assertFails(setDoc(doc(a, 'summaries', 'R1'), { ...sum('R1'), reflectionsTotal: -5 })));
 // attrited residents left off Totals: admins keep the hidden list
 await t('admin saves the Totals hidden list', assertSucceeds(setDoc(doc(adm, 'config', 'totalsHidden'), { rids: ['R2'], updatedAt: 1 })));

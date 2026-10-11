@@ -20,7 +20,7 @@ const KEY = 'apmes-logbook-demo-v1';
 // ---- shared field whitelists ----
 
 const CASE_FIELDS = ['id', 'date', 'dateText', 'initials', 'details', 'cats', 'createdAt', 'updatedAt', 'source', 'importKey', 'reflectionId', 'reflectTag', 'tags'];
-const SUMMARY_FIELDS = ['rid', 'name', 'intake', 'rYear', 'counts', 'total', 'reflections', 'reflectionsTotal', 'updatedAt'];
+const SUMMARY_FIELDS = ['rid', 'name', 'intake', 'rYear', 'smo', 'counts', 'total', 'reflections', 'reflectionsTotal', 'updatedAt'];
 const RESIDENT_FIELDS = ['rid', 'name', 'email', 'status', 'intake', 'rYear', 'smo'];
 const TEMPLATE_FIELDS = ['id', 'name', 'cats', 'details'];
 
@@ -50,6 +50,7 @@ export function cleanSummary(rid, s, now = Date.now()) {
   out.rid = String(rid);
   out.counts = out.counts || {};
   out.total = Number(out.total) || 0;
+  if (out.smo !== true) delete out.smo;
   out.updatedAt = now;
   return plain(out);
 }
