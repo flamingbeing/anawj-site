@@ -151,6 +151,8 @@ function settingsFileCard() {
   return h('section', { class: 'card' },
     h('h2', {}, 'Settings file'),
     h('p', { class: 'hint help' }, 'Your settings, tags and shorthand, tag groups, copy & share format and saved searches as one small file: to move them to another account or share your setup with a colleague. No cases, reflections or portfolio details.'),
+    // a saved search can hold patient initials ("AB"): say so before it is shared (shown with tips off too)
+    ((S.logbook?.settings?.savedSearches) || []).some(x => x && x.q) ? h('p', { class: 'hint' }, 'Your saved searches go in the file with their search words: delete any that name a patient before you share it.') : null,
     h('div', { class: 'bar', style: 'margin-bottom:0' },
       h('button', { onclick: exportIt }, 'Export settings'),
       fileButton('Import settings…', '.json,application/json', importIt)));
@@ -363,7 +365,7 @@ function refreshWho(user, who, firstLogbook) {
       S.logbook = lb; lbChanged = true;
       applyCompact(lb.settings && lb.settings.compact); applyTextSize(lb.settings && lb.settings.textSize); applyAccent(lb.settings && lb.settings.accent);
     }
-    if (adoptShared()) lbChanged = true;
+    if (lb && adoptShared()) lbChanged = true;   // never from a cached copy alone
     if (!lbChanged && before === JSON.stringify([S.admin, S.owner, S.pd, S.resident, S.sharedTemplates, categoryNamesNow()])) return;
     const typing = document.activeElement && /^(TEXTAREA|INPUT|SELECT)$/.test(document.activeElement.tagName);
     if (!typing && !document.querySelector('dialog[open]')) render(); else paintTabs();
@@ -409,7 +411,9 @@ async function onUser(user) {
     Object.assign(S, { admin: !!w.admin, owner: !!w.owner, pd: !!w.pd, resident: w.resident || null, logbook, sharedTemplates: w.sharedTemplates || [] });
     setCategoryNames(w.names || {});
     if (!known) saveWho(user.email, w);
-    else refreshWho(user, who, logbook);
+    // the server's logbook replaces the cached one there, and only then are the programme's tag groups
+    // copied in (a stale cache would overwrite tag groups changed on another device)
+    refreshWho(user, known ? who : () => Promise.resolve(w), logbook);
     applyCompact(logbook.settings && logbook.settings.compact);   // per-user display settings
     applyTextSize(logbook.settings && logbook.settings.textSize);
     applyAccent(logbook.settings && logbook.settings.accent);
@@ -417,7 +421,6 @@ async function onUser(user) {
     if (!logbook.name && (resident?.name || user.name)) S.logbook.name = resident?.name || user.name;
     // a programme resident's logbook remembers their rid (used by admins and the rules)
     if (resident && logbook.rid !== resident.rid) cloud.saveLogbook(user.email, { rid: resident.rid }).catch(() => {});
-    adoptShared();
   } catch (err) {
     // a Firestore client closed by an earlier sign-out can't be reused: start the page afresh (once)
     if (/terminated/i.test(err.message) && !reloadFlag()) { reloadFlag('1'); location.reload(); return; }

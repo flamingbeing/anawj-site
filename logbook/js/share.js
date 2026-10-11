@@ -9,7 +9,8 @@ import { formatCase, formatDay } from './share-format.js';
 // the user's format (Settings → Copy & share), or the default
 export const caseText = c => formatCase(c, settings().shareFormat);
 export const dayCases = date => (S.cases || []).filter(c => c.date === date).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
-export const dayText = date => formatDay(date, dayCases(date), settings().shareFormat);
+// the day's cases, or the ones given (the Logbook's calendar passes what the filter shows)
+export const dayText = (date, cases = null) => formatDay(date, cases ? [...cases].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)) : dayCases(date), settings().shareFormat);
 
 export async function copyText(text, what = 'Copied') {
   try { await navigator.clipboard.writeText(text); toast(what); return true; }

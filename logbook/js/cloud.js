@@ -145,6 +145,13 @@ export async function deleteAccount(email, onStep = () => {}) {
   if (demo) return D.deleteAccount(email);
   email = lc(email);
   const { db, F, auth, A } = await sdk();
+  // Google must have signed you in within the last few minutes to delete the sign-in: ask first, while
+  // the tap still counts (a popup after the deletes would be blocked, leaving the data gone but the sign-in)
+  const me = auth.currentUser;
+  if (me && !(Date.now() - Date.parse(me.metadata?.lastSignInTime || 0) < 4 * 60e3)) {
+    onStep('Confirm with Google…');
+    await A.reauthenticateWithPopup(me, new A.GoogleAuthProvider());
+  }
   const wipe = async path => {
     const snap = await F.getDocs(F.collection(db, ...path));
     for (let i = 0; i < snap.docs.length; i += 400) {
@@ -154,23 +161,25 @@ export async function deleteAccount(email, onStep = () => {}) {
     }
     return snap.size;
   };
-  for (const [sub, label] of [['cases', 'cases'], ['reflections', 'reflections'], ['images', 'photos'], ['bin', 'recycle bin']]) {
-    onStep(`Deleting ${label}…`);
-    await wipe(['logbooks', email, sub]);
-  }
-  onStep('Deleting the rest…');
-  await wipe(['submissions', email, 'reflections']).catch(() => 0);
-  await F.deleteDoc(F.doc(db, 'submissions', email)).catch(() => {});
-  await F.deleteDoc(F.doc(db, 'members', email)).catch(() => {});
-  await F.deleteDoc(F.doc(db, 'logbooks', email));
+  try {
+    for (const [sub, label] of [['cases', 'cases'], ['reflections', 'reflections'], ['images', 'photos'], ['bin', 'recycle bin']]) {
+      onStep(`Deleting ${label}…`);
+      await wipe(['logbooks', email, sub]);
+    }
+    onStep('Deleting the rest…');
+    await wipe(['submissions', email, 'reflections']).catch(() => 0);
+    await F.deleteDoc(F.doc(db, 'submissions', email)).catch(() => {});
+    await F.deleteDoc(F.doc(db, 'members', email)).catch(() => {});
+    await F.deleteDoc(F.doc(db, 'logbooks', email));
+  } catch (e) { throw Object.assign(e, { started: true }); }   // part of it may be gone already
   onStep('Removing the sign-in…');
   const u = auth.currentUser;
   if (u) {
     try { await A.deleteUser(u); }
     catch (e) {
-      if (e?.code !== 'auth/requires-recent-login') throw e;
-      await A.reauthenticateWithPopup(u, new A.GoogleAuthProvider());
-      await A.deleteUser(u);
+      if (e?.code !== 'auth/requires-recent-login') throw Object.assign(e, { dataGone: true });
+      try { await A.reauthenticateWithPopup(u, new A.GoogleAuthProvider()); await A.deleteUser(u); }
+      catch (e2) { throw Object.assign(e2, { dataGone: true }); }
     }
   }
   await signOut().catch(() => {});
