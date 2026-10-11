@@ -10,7 +10,7 @@ import { REFLECTION_HEADINGS, REFLECTION_SECTIONS } from './categories.js';
 import { reflectionProgress, reflectionCounts, HEADING_BY_ID, splitDetails, completeProblems, isLegacy, LIMITS, IMAGE_MAX_B64, wordCount, MIN_WORDS, suggestHeadings, moveToHeading } from './reflections.js';
 export { completeProblems };
 import { fmtDate, caseText } from './engine.js';
-import { S, h, toast, cloud, debounce, hooks, rYear, effectiveIntake, todayISO, confirmBox, add, resetters, scheduleSummary, displayName, byNewest, catName, updateCase } from './ui-core.js';
+import { S, h, toast, cloud, debounce, hooks, rYear, effectiveIntake, residentSmo, todayISO, confirmBox, add, resetters, scheduleSummary, displayName, byNewest, catName, updateCase } from './ui-core.js';
 import { renderExportButton, caseRYear } from './portfolio.js';
 
 const DRAFT_KEY = 'apmes-logbook-reflection-draft';
@@ -93,7 +93,7 @@ const PROMPTS = 'What were the considerations?\n\n\nWhat did you learn?\n';
 
 function setJr(r) {
   const intake = effectiveIntake();
-  const y = r.date && intake ? caseRYear(r.date, intake) : null;
+  const y = r.date && intake ? caseRYear(r.date, intake, residentSmo(S.resident)) : null;
   r.jr = y ? y <= 3 : rYear() <= 3;
 }
 
@@ -443,7 +443,7 @@ async function moveReflection(r, headingId) {
 // details and the Section 4 counts.
 export function portfolioExportButton() {
   return renderExportButton(() => (S.reflections || []).filter(r => r.status === 'complete'), displayName,
-    async () => ({ cases: S.cases || [], intake: effectiveIntake(), rYear: rYear(),
+    async () => ({ cases: S.cases || [], intake: effectiveIntake(), rYear: rYear(), smo: residentSmo(S.resident),
       profile: (S.logbook && S.logbook.profile) || null,
       images: await loadImagesFor((S.reflections || []).filter(r => r.status === 'complete')) }));
 }

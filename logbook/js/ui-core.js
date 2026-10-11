@@ -1,7 +1,7 @@
 // Shared UI state and helpers for the logbook screens (ui-*.js). app.js owns boot, auth and tabs.
 
-import { BY_CODE, CATEGORIES } from './categories.js';
-import { countCases, uid, todayISO, sortCodes, progress, rYearDefault, splitInitials, cleanInitials } from './engine.js';
+import { BY_CODE, CATEGORIES, yearName, appYear } from './categories.js';
+import { countCases, uid, todayISO, sortCodes, progress, rYearDefault, academicYear, splitInitials, cleanInitials } from './engine.js';
 import * as cloud from './cloud.js';
 import { reflectionCounts } from './reflections.js';
 
@@ -29,19 +29,40 @@ export const S = {
 export const hooks = { render() {}, casesChanged() {} };
 
 export const settings = () => ({ suggestions: true, rYear: 1, ...(S.logbook && S.logbook.settings) });
-// A resident's year moves up each 1 July from their intake, unless an admin set it by hand (leave, repeats).
-export const residentYear = r => Number(r && (r.rYear || (r.intake && rYearDefault(r.intake)))) || null;
+// The intake on the list, or the year the rid starts with.
+export function baseIntake(r) {
+  if (!r) return null;
+  const ridYear = Number(String(r.rid || '').slice(0, 4));
+  return Number(r.intake) || (ridYear > 2000 && ridYear < 2100 ? ridYear : null);
+}
+// Years spent as an SMO after R3 (they count as R3). While the status is SMO, each new academic year
+// past R3 adds one.
+export function residentSmo(r) {
+  const s = Math.max(0, Number(r && r.smo) || 0);
+  if (!r || r.status !== 'SMO') return s;
+  const intake = baseIntake(r);
+  return intake ? Math.max(s, academicYear() - intake + 1 - 3) : s;
+}
+// A resident's year moves up each 1 July from their intake (SMO years count as R3), unless an admin set
+// it by hand (leave, repeats). An SMO counts as R3 for targets and the portfolio.
+export const residentYear = r => {
+  if (!r) return null;
+  if (r.status === 'SMO') return 3;
+  return Number(r.rYear || (r.intake && rYearDefault(r.intake, new Date(), residentSmo(r)))) || null;
+};
+// "SR1", or "SMO" while the status is SMO
+export const residentYearName = r => (r && r.status === 'SMO' ? 'SMO' : residentYear(r) ? yearName(residentYear(r)) : '?');
 // The intake to count residency years from. When an admin set the year by hand (leave, a repeat),
 // the intake is shifted so this year comes out right, keeping JR and the Section 4 columns in step.
 export function effectiveIntake(r = S.resident) {
   if (!r) return null;
-  const ridYear = Number(String(r.rid || '').slice(0, 4));
-  const intake = Number(r.intake) || (ridYear > 2000 && ridYear < 2100 ? ridYear : null);
-  if (!r.rYear) return intake;
-  const now = new Date(), ay = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
-  return ay - Number(r.rYear) + 1;
+  const intake = baseIntake(r);
+  if (!r.rYear || r.status === 'SMO') return intake;
+  return academicYear() - Number(r.rYear) + 1;
 }
 export const rYear = () => residentYear(S.resident) || Number(settings().rYear) || 1;
+// what to call the signed-in resident's year in the app: "SR1", "SMO"
+export const myYearName = () => (S.resident && S.resident.status === 'SMO' ? 'SMO' : yearName(rYear()));
 export const displayName = () => (S.logbook && S.logbook.name) || (S.resident && S.resident.name) || (S.user && S.user.name) || '';
 
 export function setCases(cases) {
@@ -181,7 +202,7 @@ export function countText(code, prog) {
   const p = prog && prog[code];
   if (!p || p.status === 'none') return String(n);
   if (p.status === 'done') return `${n} ✓`;
-  return `${n} / ${p.next.n} by ${p.next.by}`;
+  return `${n} / ${p.next.n} by ${appYear(p.next.by)}`;
 }
 
 export function catChip(code, { on, onclick, cls = '', removable, title } = {}) {

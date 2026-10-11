@@ -1,10 +1,10 @@
 // Progress (my targets) and Totals (everyone's counts, for benchmarking; counts only, never details).
 
-import { R_YEARS, BY_CODE, CATEGORIES } from './categories.js';
+import { R_YEARS, BY_CODE, CATEGORIES, appYear, yearName } from './categories.js';
 import { progress, epaProgress, todayISO, rYearDefault } from './engine.js';
 import { exportTotals } from './xlsxio.js';
 import { reflectionProgress } from './reflections.js';
-import { S, h, toast, cloud, rYear, settings, patchLogbook, needExcel, download, displayName, hooks, add, resetters, info, catName } from './ui-core.js';
+import { S, h, toast, cloud, rYear, myYearName, settings, patchLogbook, needExcel, download, displayName, hooks, add, resetters, info, catName } from './ui-core.js';
 
 const STATUS_TEXT = { late: 'Behind', due: 'Due this year', ontrack: 'On track', done: 'Done', none: 'No target' };
 const pview = { by: 'cat' };
@@ -18,13 +18,13 @@ export function renderProgress() {
   const yr = rYear();
   const rows = progress(S.counts, yr);
   const tally = s => rows.filter(r => r.status === s).length;
-  const yearCtl = h('span', { class: 'big' }, R_YEARS[yr - 1]);
+  const yearCtl = h('span', { class: 'big' }, myYearName());
 
-  const [infoBtn, infoText] = info('Targets are cumulative: every case counts towards the R3 and R5 numbers whenever it was done.');
+  const [infoBtn, infoText] = info('Targets are cumulative: every case counts towards the R3 and SR2 numbers whenever it was done.');
   const head = h('section', { class: 'card' },
     h('div', { class: 'ry' },
       yearCtl,
-      h('span', {}, yr <= 3 ? 'Junior residency (R1–R3)' : 'Senior residency (R4–R5)'),
+      h('span', {}, S.resident && S.resident.status === 'SMO' ? 'SMO: cases count as R3' : yr <= 3 ? 'Junior residency (R1–R3)' : 'Senior residency (SR1–SR2)'),
       h('span', { class: 'muted' }, `${S.cases.length} cases logged`)),
     h('p', { class: 'hint', style: 'margin-top:8px' },
       `${tally('done')} done · ${tally('late')} behind · ${tally('due')} due this year · ${tally('ontrack')} on track `, infoBtn,
@@ -97,8 +97,8 @@ function progList(items) {
       h('span', { class: 'ct' }, (p.status === 'late' || p.status === 'due') ? h('span', { class: `stw ${p.status}` }, STATUS_TEXT[p.status]) : null,
         p.status === 'none' ? String(p.count) : p.next ? `${p.count} / ${p.next.n}` : `${p.count} ✓`),
       p.milestones.length ? h('span', { class: 'meter' }, h('i', { class: p.status, style: `width:${pct}%` })) : null,
-      p.milestones.length ? h('span', { class: 'ms' }, p.milestones.map(m => `${m.by}: ${m.n}${m.met ? ' ✓' : ''}`).join(' · ')
-        + (p.next ? ` — ${p.next.n - p.count} more by end of ${p.next.by}` : '')) : null,
+      p.milestones.length ? h('span', { class: 'ms' }, p.milestones.map(m => `${appYear(m.by)}: ${m.n}${m.met ? ' ✓' : ''}`).join(' · ')
+        + (p.next ? ` — ${p.next.n - p.count} more by end of ${appYear(p.next.by)}` : '')) : null,
       subcatLine(p.code));
   }));
 }
@@ -195,8 +195,9 @@ function totalsTable(people) {
     const gaps = prog.map(pr => short(pr[code]));
     // the targets under the name: "10 by R3 | 15 by R5"
     const t = BY_CODE[code].targets || {};
-    const tgt = R_YEARS.filter(y => t[y] != null).map(y => `${t[y]} by ${y}`).join(' | ');
-    data.rows.push({ label: BY_CODE[code].label + (tgt ? ` [${tgt}]` : ''), values: vals, statuses: sts });
+    const tgt = R_YEARS.filter(y => t[y] != null).map(y => `${t[y]} by ${appYear(y)}`).join(' | ');
+    const tgtR = R_YEARS.filter(y => t[y] != null).map(y => `${t[y]} by ${y}`).join(' | ');   // the download keeps R4/R5
+    data.rows.push({ label: BY_CODE[code].label + (tgtR ? ` [${tgtR}]` : ''), values: vals, statuses: sts });
     add(tbody, h('tr', {}, h('td', { class: 'cat', title: BY_CODE[code].full }, `${code} ${catName(code)}`, tgt ? h('small', { class: 'tgt' }, tgt) : null),
       vals.map((v, i) => h('td', { class: `n ${sts[i]}`, title: gaps[i] ? `${gaps[i]} short of the target` : '' }, String(v)))));
   }
@@ -207,7 +208,7 @@ function totalsTable(people) {
     h('tr', { class: 'total' }, h('td', { class: 'cat' }, 'Total cases'), totals.map(v => h('td', { class: 'n' }, String(v)))),
     h('tr', {}, h('td', { class: 'cat' }, 'Reflections'), refl.map(v => h('td', { class: 'n' }, String(v)))));
   const thead = h('thead', {}, h('tr', {}, h('th', {}, 'Category'),
-    people.map(p => h('th', { class: `rot ${p.rid === meId ? 'me' : ''}`, title: p.name }, `${p.name} · R${p.rYear || '?'}`))));
+    people.map(p => h('th', { class: `rot ${p.rid === meId ? 'me' : ''}`, title: p.name }, `${p.name} · ${p.rYear ? yearName(p.rYear) : '?'}`))));
   data.title = `AY${tview.intake} intake totals — ${todayISO()}`;
   return { el: h('table', { class: 'totals' }, thead, tbody), data };
 }

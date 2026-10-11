@@ -5,7 +5,7 @@
 //
 // Data (see README.md):
 //   admins/{email}                        { name }                       (added by hand in the console)
-//   residents/{rid}                       { rid, name, email, status, intake, rYear }
+//   residents/{rid}                       { rid, name, email, status, intake, rYear, smo? }  (smo: years as an SMO, counted as R3)
 //   logbooks/{email}                      { email, name, rid, settings, templates, updatedAt }
 //   logbooks/{email}/cases/{caseId}       case object (see engine.js)
 //   logbooks/{email}/reflections/{id} reflection object (see reflections.js), owner only

@@ -21,7 +21,7 @@ const KEY = 'apmes-logbook-demo-v1';
 
 const CASE_FIELDS = ['id', 'date', 'dateText', 'initials', 'details', 'cats', 'createdAt', 'updatedAt', 'source', 'importKey', 'reflectionId', 'reflectTag', 'tags'];
 const SUMMARY_FIELDS = ['rid', 'name', 'intake', 'rYear', 'counts', 'total', 'reflections', 'reflectionsTotal', 'updatedAt'];
-const RESIDENT_FIELDS = ['rid', 'name', 'email', 'status', 'intake', 'rYear'];
+const RESIDENT_FIELDS = ['rid', 'name', 'email', 'status', 'intake', 'rYear', 'smo'];
 const TEMPLATE_FIELDS = ['id', 'name', 'cats', 'details'];
 
 const pick = (o, keys) => Object.fromEntries(keys.filter(k => o[k] !== undefined).map(k => [k, o[k]]));
@@ -62,6 +62,9 @@ export function cleanResident(r) {
   out.status = out.status || 'ACTIVE';
   out.intake = out.intake == null || out.intake === '' ? null : Number(out.intake);
   out.rYear = out.rYear == null || out.rYear === '' ? null : Number(out.rYear);
+  // years spent as an SMO (logbook: they count as R3); left out when none
+  const smo = Math.floor(Number(out.smo) || 0);
+  if (smo > 0) out.smo = Math.min(10, smo); else delete out.smo;
   return plain(out);
 }
 

@@ -2,10 +2,11 @@
 // owner only), shared templates.
 // Firestore rules enforce admin-only access; this screen is only hidden from everyone else.
 
-import { R_YEARS } from './categories.js';
+import { YEAR_NAMES, yearName } from './categories.js';
+import { academicYear } from './engine.js';
 import { countCases, sortCodes, splitInitials } from './engine.js';
 import { parseResidentsScript, parseCaseSheet, parseTotalsSheet, countCheck } from './importer.js';
-import { S, h, toast, confirmBox, cloud, needExcel, sheetRows, fileButton, hooks, add, resetters, residentYear, categoryNames, setCategoryNames, PICKER_ORDER } from './ui-core.js';
+import { S, h, toast, confirmBox, cloud, needExcel, sheetRows, fileButton, hooks, add, resetters, residentYear, residentYearName, residentSmo, baseIntake, effectiveIntake, categoryNames, setCategoryNames, PICKER_ORDER } from './ui-core.js';
 import { templateDialog } from './ui-settings.js';
 import { renderTemplateCard } from './portfolio.js';
 
@@ -25,7 +26,7 @@ export function leaveAdmin() { A.editRes = false; A.pasted = null; }
 export function renderAdmin() {
   if (!S.admin) return h('p', { class: 'empty' }, 'Admins only.');
   if (!A.residents && !A.loading) load();
-  return h('div', {}, h('p', { style: 'margin:0 0 8px' }, h('a', { class: 'btn small', href: '#more' }, '← More')), residentsCard(), S.owner ? importCard() : ownerOnlyCard(), sharedCard(), categoryNamesCard(), renderTemplateCard());
+  return h('div', {}, residentsCard(), S.owner ? importCard() : ownerOnlyCard(), sharedCard(), categoryNamesCard(), renderTemplateCard());
 }
 
 async function load() {
@@ -63,14 +64,14 @@ function categoryNamesCard() {
 
 // ---------- residents ----------
 
-// Groups for the residents list: active and on-leave residents by residency year, R5 first down
+// Groups for the residents list: active and on-leave residents by residency year, SR2 first down
 // to R1, then SMOs, then graduated and attrited. Within a group, by name.
 const GONE = { SMO: 'SMO', GRADUATED: 'Graduated', ATTRITED: 'Attrited' };
 export function groupResidents(list) {
-  const groups = new Map([...[...R_YEARS].reverse().map(y => [y, []]), ['SMO', []], ['Year unknown', []], ['Graduated', []], ['Attrited', []]]);
+  const groups = new Map([...[...YEAR_NAMES].reverse().map(y => [y, []]), ['SMO', []], ['Year unknown', []], ['Graduated', []], ['Attrited', []]]);
   for (const r of list) {
     const y = residentYear(r);
-    const key = GONE[r.status] || (y ? R_YEARS[Math.min(y, R_YEARS.length) - 1] : 'Year unknown');
+    const key = GONE[r.status] || (y ? yearName(Math.min(y, YEAR_NAMES.length)) : 'Year unknown');
     groups.get(key).push(r);
   }
   for (const g of groups.values()) g.sort((a, b) => String(a.name || a.rid).localeCompare(String(b.name || b.rid)));
@@ -81,7 +82,7 @@ function residentsCard() {
   const card = h('section', { class: 'card' },
     h('div', { class: 'bar' }, h('h2', { style: 'margin:0' }, 'Residents'), h('span', { class: 'grow' }),
       A.residents ? h('button', { class: A.editRes ? 'small primary' : 'small', onclick: () => { A.editRes = !A.editRes; if (!A.editRes) A.pasted = null; hooks.render(); } }, A.editRes ? 'Done' : 'Edit') : null),
-    h('p', { class: 'hint' }, 'Programme residents share their case counts on the Totals tab. Year defaults from the intake (AY starts 1 July); change it for leave or repeats.'));
+    h('p', { class: 'hint' }, 'Programme residents share their case counts on the Totals tab. Year defaults from the intake (AY starts 1 July). Tap Edit to set it by hand (leave, repeats) or to mark someone as an SMO: cases done as an SMO count as R3 in the portfolio.'));
   if (!A.residents) { add(card, h('p', { class: 'empty' }, 'Loading…')); return card; }
   const ed = A.editRes;
   // apply a change and save it; a refused save puts the old values back
@@ -91,17 +92,35 @@ function residentsCard() {
     try { await cloud.saveResident(r); toast('Saved ' + (r.name || r.rid)); }
     catch (err) { Object.keys(r).forEach(k => delete r[k]); Object.assign(r, prev); toast('Could not save: ' + err.message); hooks.render(); }
   };
-  const yearLabel = r => (residentYear(r) ? R_YEARS[Math.min(residentYear(r), R_YEARS.length) - 1] : '?') + (r.rYear ? ' (set)' : '');
+  const yearLabel = r => residentYearName(r) + (r.rYear && r.status !== 'SMO' ? ' (set)' : '');
+  // Year: Auto, R1…SR2 or SMO. SMO sets the status; the years spent as one are kept (smo) so their
+  // cases stay in the R3 column after moving on to SR1.
+  const setYear = (r, v) => {
+    const leaving = r.status === 'SMO' ? { status: 'ACTIVE', smo: residentSmo(r) || null } : {};
+    if (v === 'SMO') return edit(r, { status: 'SMO', intake: effectiveIntake(r) || null, rYear: null, smo: Number(r.smo) || null });
+    if (!v) return edit(r, { ...leaving, rYear: null });
+    const n = Number(v), smo = residentSmo(r), base = baseIntake(r);
+    const raw = base ? academicYear() - base + 1 : 0;
+    // back from SMO into the senior years: count the SMO years instead of fixing the year
+    if (smo && n >= 4 && base && raw - n >= 0) return edit(r, { ...leaving, intake: base, rYear: null, smo: raw - n || null });
+    return edit(r, { ...leaving, rYear: n, smo: null });
+  };
   const row = r => ed ? h('tr', {},
       h('td', {}, r.rid),
       h('td', {}, h('input', { value: r.name || '', style: 'min-width:150px', onchange: e => { edit(r, { name: e.target.value.trim() }); } })),
       h('td', {}, h('input', { type: 'email', value: r.email || '', style: 'min-width:200px', onchange: e => { edit(r, { email: e.target.value.trim().toLowerCase() }); } })),
       h('td', {}, h('input', { type: 'number', value: r.intake || '', style: 'width:90px', onchange: e => { edit(r, { intake: Number(e.target.value) || null }); } })),
       // "Auto" moves up each 1 July from the intake; a set year stays until changed (leave, repeats)
-      h('td', {}, h('select', { onchange: e => { edit(r, { rYear: Number(e.target.value) || null }); } },
-        h('option', { value: '', selected: !r.rYear }, `Auto (${R_YEARS[(residentYear({ intake: r.intake }) || 1) - 1]})`),
-        R_YEARS.map((y, i) => h('option', { value: String(i + 1), selected: r.rYear === i + 1 }, y)))),
-      h('td', {}, h('select', { onchange: e => { edit(r, { status: e.target.value }); } }, STATUSES.map(s => h('option', { value: s, selected: r.status === s }, s)))),
+      h('td', {}, h('select', { 'aria-label': `Year for ${r.name || r.rid}`, onchange: e => { setYear(r, e.target.value); hooks.render(); } },
+        h('option', { value: '', selected: !r.rYear && r.status !== 'SMO' }, `Auto (${yearName(residentYear({ intake: r.intake, smo: r.smo }) || 1)})`),
+        YEAR_NAMES.map((y, i) => h('option', { value: String(i + 1), selected: r.status !== 'SMO' && r.rYear === i + 1 }, y)),
+        h('option', { value: 'SMO', selected: r.status === 'SMO' }, 'SMO (counts as R3)'))),
+      h('td', {}, h('select', { onchange: e => {
+        const v = e.target.value;
+        if (v === 'SMO') setYear(r, 'SMO');
+        else edit(r, r.status === 'SMO' ? { status: v, smo: residentSmo(r) || null } : { status: v });
+        hooks.render();
+      } }, STATUSES.map(s => h('option', { value: s, selected: r.status === s }, s)))),
       h('td', {}, h('button', { class: 'small danger', 'aria-label': `Remove ${r.name || r.rid}`, onclick: async () => {
         if (!(await confirmBox('Remove resident', `Remove ${r.name || r.rid} from the programme list? Their row leaves the Totals table; their logbook is kept.`, 'Remove', true))) return;
         try { await cloud.deleteResident(r.rid); } catch (err) { toast('Could not remove: ' + err.message); return; }
@@ -142,13 +161,13 @@ function residentsCard() {
       // undone by the script's default ACTIVE
       const keepStatus = old.status && status === 'ACTIVE' && old.status !== 'ACTIVE';
       return { ...old, rid: p.id, name: p.name || old.name, email: p.email || old.email || '', status: keepStatus ? old.status : status,
-        badStatus: status !== p.status ? p.status : null, intake, rYear: old.rYear || null };
+        badStatus: status !== p.status ? p.status : null, intake, rYear: old.rYear || null, smo: old.smo || null };
     });
     const bad = rows.filter(r => r.badStatus);
     add(card, h('p', {}, `${rows.length} residents (${rows.filter(r => !known.has(r.rid)).length} new).`),
       h('div', { class: 'scroll' }, h('table', {}, h('thead', {}, h('tr', {}, ['ID', 'Name', 'Email', 'Intake', 'Year', 'Status'].map(t => h('th', {}, t)))),
         h('tbody', {}, rows.map(r => h('tr', {}, h('td', {}, r.rid), h('td', {}, r.name), h('td', {}, r.email), h('td', {}, String(r.intake || '')),
-          h('td', {}, 'R' + (residentYear(r) || '?') + (r.rYear ? '' : ' (auto)')),
+          h('td', {}, residentYearName(r) + (r.rYear ? '' : ' (auto)')),
           h('td', {}, r.status, r.badStatus ? h('span', { class: 'flag err', title: 'Not a known status; saved as ACTIVE' }, ` was “${r.badStatus}”`) : null)))))),
       bad.length ? h('p', { class: 'tip' }, `${bad.length} unknown status${bad.length === 1 ? '' : 'es'} will be saved as ACTIVE (allowed: ${STATUSES.join(', ')}). Change them in the table after saving.`) : null,
       h('div', { class: 'bar', style: 'margin-top:8px' },

@@ -680,3 +680,6 @@ body.compact .savebar { margin: 6px -8px 0; padding: 4px 8px 6px; }
 /* Admin: category display names */
 table.cat-names input { min-width: 140px; }
 table.cat-names td.muted { font-size: 13px; }
+
+/* pages under More: the way back */
+.back-row { margin: 0 0 8px; }

@@ -83,6 +83,9 @@ await t('user edit resident', assertFails(setDoc(doc(a, 'residents', 'R1'), { ri
 await t('admin list residents', assertSucceeds(getDocs(collection(adm, 'residents'))));
 await t('admin save resident', assertSucceeds(setDoc(doc(adm, 'residents', 'R3'), { rid: 'R3', name: 'C', email: 'c@example.com', status: 'ON LEAVE', intake: 2023, rYear: null })));
 await t('admin save SMO resident', assertSucceeds(setDoc(doc(adm, 'residents', 'R4'), { rid: 'R4', name: 'D', email: 'd@example.com', status: 'SMO', intake: 2019, rYear: null })));
+await t('admin save resident with SMO years', assertSucceeds(setDoc(doc(adm, 'residents', 'R5'), { rid: 'R5', name: 'E', email: 'e@example.com', status: 'ACTIVE', intake: 2021, rYear: null, smo: 1 })));
+await t('resident SMO years must be a whole number', assertFails(setDoc(doc(adm, 'residents', 'R5'), { rid: 'R5', name: 'E', email: 'e@example.com', status: 'ACTIVE', intake: 2021, smo: 1.5 })));
+await t('resident SMO years out of range', assertFails(setDoc(doc(adm, 'residents', 'R5'), { rid: 'R5', name: 'E', email: 'e@example.com', status: 'ACTIVE', intake: 2021, smo: 11 })));
 await t('admin resident bad status', assertFails(setDoc(doc(adm, 'residents', 'R3'), { rid: 'R3', name: 'C', email: 'c@example.com', status: 'X', intake: 2023, rYear: 3 })));
 await t('admin resident upper email', assertFails(setDoc(doc(adm, 'residents', 'R3'), { rid: 'R3', name: 'C', email: 'C@example.com', status: 'ACTIVE', intake: 2023, rYear: 3 })));
 await t('admin delete resident', assertSucceeds(deleteDoc(doc(adm, 'residents', 'R3'))));
