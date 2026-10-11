@@ -105,7 +105,10 @@ portfolio content.
   index.html): line spacing (`--lh`; every line-height in style.css is `calc(x * var(--lh, 1))`), line width (narrow
   760 px / normal 980 / wide 1400; the Case tab's panes keep theirs), contrast (follow the device's Increase contrast
   by default, normal, or higher: darker text and lines), motion (follow the device's Reduce motion by default, on, or
-  reduce), icons-only tab bar (buttons keep `aria-label`). Defaults are pixel-identical to before.
+  reduce), icons-only tab bar (buttons keep `aria-label`; on a computer the icons are shown for it), tab bar position
+  (auto = bottom on phones / top on bigger screens, or always top `tabs-top`, or always bottom `tabs-bottom`), hide the
+  header (`no-header`; it shows again while `who-alert` is set by paintWho: signed out, demo, offline, unsynced).
+  Defaults are pixel-identical to before.
 - **Display is per device** (owner: people use the logbook on different devices with different needs): compact,
   text size, zoom, fonts, colour and the start tab live in localStorage `apmes-logbook-display` (`deviceDisplay` / `setDisplay` /
   `adoptDisplay` in ui-settings.js), light / dark in `apmes-logbook-theme`. A device with none starts from the
