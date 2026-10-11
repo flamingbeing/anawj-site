@@ -353,12 +353,14 @@ function calendarView(rows, flagsOf, repaint) {
       h('button', { class: 'small', onclick: () => { view.month = today.slice(0, 7); view.day = today; repaint(); } }, 'Today')),
     grid,
     view.day ? h('div', { style: 'margin-top:12px' },
-      h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 4px' },
-        h('h3', { class: 'grow', style: 'margin:0' }, `${fmtDate(view.day)} (${dayCases.length})`),
-        // log on this day: the Log page opens with the date already picked
-        view.day <= today ? h('button', { class: 'small primary', onclick: () => logOnDate(view.day) }, '+ Log a case') : null,
-        dayCases.length ? h('button', { class: 'small', onclick: () => shareText(dayText(view.day)) }, 'Share day') : null,
-        dayCases.length ? h('button', { class: 'small', onclick: () => copyText(dayMarkdown(view.day), 'Markdown copied: paste into your notebook') }, 'Copy as Markdown') : null),
+      // the day, then its buttons together on one row (none left alone on a line of its own)
+      h('div', { class: 'lb-dayhead' },
+        h('h3', { style: 'margin:0' }, `${fmtDate(view.day)} (${dayCases.length})`),
+        h('div', { class: 'lb-daybtns' },
+          // log on this day: the Log page opens with the date already picked
+          view.day <= today ? h('button', { class: 'small primary', onclick: () => logOnDate(view.day) }, '+ Log a case') : null,
+          dayCases.length ? h('button', { class: 'small', onclick: () => shareText(dayText(view.day)) }, 'Share day') : null,
+          dayCases.length ? h('button', { class: 'small', title: 'Copy the day as Markdown (for notes apps)', 'aria-label': 'Copy the day as Markdown', onclick: () => copyText(dayMarkdown(view.day), 'Markdown copied: paste into your notebook') }, 'Copy') : null)),
       dayCases.length ? h('ul', { class: 'cases' }, dayCases.map(c => caseRow(c, flagsOf))) : h('p', { class: 'empty' }, 'No cases on this day.'))
       : h('p', { class: 'hint', style: 'margin-top:10px' }, 'Tap a day to see its cases.'),
     undated.length ? h('details', { style: 'margin-top:12px' },
