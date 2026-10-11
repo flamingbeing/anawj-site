@@ -191,6 +191,31 @@ export function topLevel(xml, tag) {
 }
 const cellsOf = tr => topLevel(tr, 'tc');
 
+// A numbered initials cell may list several patients sharing one reflection. Only pair
+// their fields when the dates align; never guess which patient a date belongs to.
+function caseChoices(initialLines, dateLines, diagnosisLines, diagnosis) {
+  const groups = [];
+  let group = null;
+  for (const l of initialLines) {
+    const m = /^\s*\d{1,3}[.)]\s*(.*)$/.exec(l.text);
+    if (m) { group = []; groups.push(group); if (m[1]) group.push({ ...l, text: m[1] }); }
+    else if (l.text.trim()) { if (!group) return []; group.push(l); }
+  }
+  if (groups.length < 2 || groups.some(g => !parseInitials(g))) return [];
+  const dates = [];
+  let pending = [];
+  for (const l of dateLines) {
+    if (!l.text.trim()) continue;
+    pending.push(l);
+    const d = parseDateCell(pending);
+    if (d.date) { dates.push(d); pending = []; }
+  }
+  if (pending.length || dates.length !== groups.length) return [];
+  const diagnoses = trimBlank(diagnosisLines).filter(l => l.text.trim());
+  return groups.map((g, i) => ({ initials: parseInitials(g).slice(0, 20), ...dates[i],
+    diagnosis: diagnoses.length === groups.length ? diagnoses[i].text.trim().slice(0, 2000) : diagnosis.slice(0, 2000) }));
+}
+
 // One table row -> a reflection draft (or null for an empty / prompt-only row).
 export function parseRow(tr, hd) {
   const cells = cellsOf(tr).map(cellLines);
@@ -216,7 +241,16 @@ export function parseRow(tr, hd) {
   if (!d.date) warnings.push(d.dateText ? `date “${d.dateText}” not read` : 'no date');
   if (!initials) warnings.push('no initials');
   if (hd && hd.subs && !subId) warnings.push('sub-type not found');
-  return { headingId: hd ? hd.id : '', subId, initials: initials.slice(0, 20), date: d.date, dateText: d.dateText, jr: d.jr, diagnosis: diagnosis.slice(0, 2000), ...details, warnings };
+  const choices = caseChoices(cells[0], cells[1], diagLines, diagnosis);
+  return { headingId: hd ? hd.id : '', subId, initials: initials.slice(0, 20), date: d.date, dateText: d.dateText, jr: d.jr, diagnosis: diagnosis.slice(0, 2000), ...details, warnings,
+    ...(choices.length ? { caseChoices: choices } : {}) };
+}
+
+// Keep every word/figure of the reflection while replacing only its patient fields.
+export function chooseImportedCase(r, index) {
+  const choice = r.caseChoices && r.caseChoices[index];
+  if (!choice) throw new Error('choose a case from this reflection');
+  return { ...r, ...choice, warnings: r.warnings.filter(w => !/^no (date|initials)$|^date .* not read$/.test(w)) };
 }
 
 // document.xml -> rows grouped by heading: [{ ...reflection, figures: [{ rid, caption, point }] }].
