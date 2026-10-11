@@ -277,6 +277,7 @@ ul.prog .meter { grid-column: 2 / 4; height: 6px; border-radius: 3px; background
 ul.prog .meter i { display: block; height: 100%; background: var(--ontrack); border-radius: 3px; }
 ul.prog .meter i.late { background: var(--late); } ul.prog .meter i.due { background: var(--due); } ul.prog .meter i.done { background: var(--done); }
 ul.prog .ms { grid-column: 2 / 4; font-size: 12px; color: var(--muted); }
+ul.prog .info-text { grid-column: 2 / 4; margin: 2px 0 0; }
 .epa h3 { display: flex; align-items: center; gap: 6px; }
 
 table.totals th, table.totals td { padding: 4px 6px; font-size: 13px; }

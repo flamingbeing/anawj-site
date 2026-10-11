@@ -3,7 +3,7 @@
 import { R_YEARS, BY_CODE, CATEGORIES, appYear, yearName } from './categories.js';
 import { progress, epaProgress, todayISO, rYearDefault } from './engine.js';
 import { exportTotals } from './xlsxio.js';
-import { reflectionProgress } from './reflections.js';
+import { reflectionProgress, HEADING_BY_ID } from './reflections.js';
 import { S, h, toast, cloud, rYear, myYearName, settings, subcatsOf, patchLogbook, needExcel, download, displayName, hooks, add, resetters, info, catName } from './ui-core.js';
 
 const STATUS_TEXT = { late: 'Behind', due: 'Due this year', ontrack: 'On track', done: 'Done', none: 'No target' };
@@ -73,30 +73,45 @@ function reflCard() {
   const met = p.headings.filter(x => x.met).length;
   const drafts = id => all.filter(r => r.headingId === id && r.status !== 'complete').length;
   const shown = pview.hideDone ? p.headings.filter(x => !x.met) : p.headings;
+  const [rulesBtn, rulesText] = info(h('span', {}, `${p.totals.min} reflections across ${p.headings.length} headings, each at least its minimum. `),
+    h('ul', { style: 'margin:4px 0 0;padding-left:18px' },
+      h('li', {}, 'Each reflection is a different patient, under one heading only.'),
+      h('li', {}, 'Some headings require one reflection in Junior Residency (JR, R1–R3); otherwise at most one per heading can be at JR level.'),
+      h('li', {}, 'Some headings need at least one of certain types: tap ⓘ by a heading to see them. Sub-types and JR are not counted here, so keep track of them yourself.')));
   return h('section', { class: 'card' },
     h('div', { class: 'bar', style: 'margin:0 0 4px' },
-      h('h3', { style: 'margin:0' }, 'Reflections'),
+      h('h3', { style: 'margin:0' }, 'Reflections'), rulesBtn,
       h('span', { class: 'grow' }),
       h('a', { class: 'btn small primary', href: '#reflect' }, 'Open reflections')),
+    rulesText,
     h('p', { class: 'hint', style: 'margin:0 0 6px' },
       `${p.totals.counted} / ${p.totals.min} counted · ${met} of ${p.headings.length} headings met`,
       p.totals.drafts ? ` · ${p.totals.drafts} draft${p.totals.drafts === 1 ? '' : 's'}` : ''),
     shown.length ? h('ul', { class: 'prog' }, shown.map(x => {
       const st = x.met ? 'done' : x.done ? 'ontrack' : 'none';
       const d = drafts(x.id);
-      const extra = [
-        ...x.subs.filter(s => s.min).map(s => `${s.name} ${s.done} / ${s.min}${s.done >= s.min ? ' ✓' : ''}`),
-        x.jrNeeded ? `JR ${x.jrDone} / ${x.jrNeeded}` : '',
-        d ? `${d} draft${d === 1 ? '' : 's'}` : '',
-        ...x.issues,
-      ].filter(Boolean);
+      // sub-types and JR are the resident's to track: shown as requirements, not counted
+      const [ib, it] = needs(x);
+      const extra = [d ? `${d} draft${d === 1 ? '' : 's'}` : '', ...x.issues].filter(Boolean);
       return h('li', {},
         h('i', { class: `dot ${st}`, title: x.met ? 'Done' : 'Not yet' }),
-        h('span', { class: 'nm' }, x.name),
+        h('span', { class: 'nm' }, x.name, ' ', ib),
         h('span', { class: 'ct' }, x.met ? `${x.counted} ✓` : `${x.counted} / ${x.min}`),
         h('span', { class: 'meter' }, h('i', { class: st, style: `width:${Math.min(100, Math.round(x.counted / Math.max(1, x.min) * 100))}%` })),
-        extra.length ? h('span', { class: 'ms' }, extra.join(' · ')) : null);
+        extra.length ? h('span', { class: 'ms' }, extra.join(' · ')) : null,
+        it);
     })) : h('p', { class: 'empty' }, 'All headings met ✓'));
+}
+
+// one heading's requirements, behind its ⓘ
+function needs(x) {
+  const hd = HEADING_BY_ID[x.id] || {};
+  return info(h('span', {}, [
+    `At least ${x.min} reflection${x.min === 1 ? '' : 's'}.`,
+    hd.subs && hd.subs.length ? ` Include at least one of each: ${hd.subs.map(s => s.name).join(', ')}.` : '',
+    x.jrNeeded ? ` ${x.jrNeeded} must be from Junior Residency (R1–R3).` : ' At most one from Junior Residency (R1–R3).',
+    hd.hint ? ` ${hd.hint}` : '',
+  ].join('')));
 }
 
 // your own tags under a category (Tag editor): "Interscalene 3 · Femoral 2"
