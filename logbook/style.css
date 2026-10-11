@@ -37,6 +37,8 @@
 
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
+/* no pull-down-to-refresh (and no rubber-band bounce): a stray swipe while logging would reload the page */
+html, body { overscroll-behavior-y: none; }
 body {
   margin: 0; background: var(--bg); color: var(--ink);
   font: 15px/1.45 "Open Sans", system-ui, -apple-system, "Segoe UI", sans-serif;

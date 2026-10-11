@@ -106,6 +106,7 @@ portfolio content.
 
 - Checks: `node tools/check.mjs`; ESM syntax: `for f in logbook/js/*.js; do node --input-type=module --check < $f; done`
   (plain `node --check` misses ESM errors); unit tests: `for f in logbook/test/*.test.mjs; do node "$f"; done`.
+- Pull-down-to-refresh is off (`overscroll-behavior-y: none` on html, body).
 - Any change to a file in `sw.js` SHELL: bump `VERSION` (`logbook-v20…`). New JS files go in SHELL. Check the bump
   really landed (`grep VERSION logbook/sw.js`): a sed run from the wrong folder once left it stale for ten commits.
 - Rules: `logbook/firestore.rules` deploys on merge. Emulator: copy rules and
