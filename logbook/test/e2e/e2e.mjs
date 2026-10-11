@@ -12,7 +12,6 @@ const LB = new URL('../../', import.meta.url).pathname;   // logbook/
 const ExcelJS = require(LB + 'vendor/exceljs.min.js');
 const JSZip = require(LB + 'vendor/jszip.min.js');
 import zlib from 'node:zlib';
-const FMT = DIR + 'fmt/';
 function makePng(w, h) {
   const crcT = Array.from({ length: 256 }, (_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; });
   const crc = b => { let c = 0xffffffff; for (const x of b) c = crcT[(c ^ x) & 255] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; };
@@ -24,6 +23,7 @@ function makePng(w, h) {
 }
 import os from 'node:os';
 const DIR = (process.env.E2E_OUT || os.tmpdir() + '/logbook-e2e').replace(/\/?$/, '/');
+const FMT = DIR + 'fmt/';
 for (const d of ['shots', 'fmt', 'round3', 'round4', 'acct']) fs.mkdirSync(DIR + d, { recursive: true });
 const BASE = `http://localhost:${process.env.PORT || 8080}/logbook/`;
 const only = process.argv[2];
