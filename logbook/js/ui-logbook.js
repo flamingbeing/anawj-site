@@ -92,7 +92,7 @@ export function renderLogbook() {
 
   // the two filters fold behind a Filter button (shown open while one is in use)
   const searchIn = h('select', { 'aria-label': 'Search in', onchange: e => { patchLogbook({ settings: { lbScope: e.target.value } }); paintFilterBtn(); paint(); } },
-    [['all', 'Search everything'], ['initials', 'Search initials only'], ['procedure', 'Search the procedure only']].map(([v, t]) => h('option', { value: v, selected: (settings().lbScope || 'all') === v }, t)));
+    [['all', 'Everything'], ['initials', 'Initials only'], ['procedure', 'Procedure only']].map(([v, t]) => h('option', { value: v, selected: (settings().lbScope || 'all') === v }, t)));
   const fuzzyBox = h('label', { class: 'check', style: 'margin:0' }, h('input', { type: 'checkbox', checked: !!settings().lbFuzzy, onchange: e => { patchLogbook({ settings: { lbFuzzy: e.target.checked } }); paintFilterBtn(); paint(); } }), 'Fuzzy search (allows typos)');
   // tag filters: chips you add from a list of every tag (APMES and your own)
   const tagSel = (label, list) => h('select', { class: 'small', 'aria-label': label, onchange: e => { const k = e.target.value; e.target.value = ''; if (k && !list.includes(k)) { list.push(k); refresh(); } } },
@@ -105,23 +105,31 @@ export function renderLogbook() {
   const bulkBtn = h('button', { class: 'small', onclick: () => bulkTag(filtered()) });
   const flagSel = h('select', { 'aria-label': 'Filter by flag', onchange: e => { view.flag = e.target.value; refresh(); } },
     flagOpts.map(([v, l]) => h('option', { value: v, selected: view.flag === v }, l)));
+  // compact: two columns on a phone, so the panel doesn't fill the screen
+  const resetBtn = resetLink();
+  const cell = (label, ...kids) => h('div', { class: 'lb-cell' }, h('span', { class: 'lb-fl' }, label), ...kids);
   const filters = h('div', { class: 'lb-filters', hidden: !(view.showFilters || active()) },
-    h('div', { class: 'bar' }, h('span', { class: 'lb-fl' }, 'Has all of'), hasRow),
-    h('div', { class: 'bar' }, h('span', { class: 'lb-fl' }, 'Has none of'), notRow),
-    h('div', { class: 'bar' }, h('span', { class: 'lb-fl' }, 'Dates'), dateIn('from'), h('span', { class: 'muted' }, 'to'), dateIn('to')),
-    h('div', { class: 'bar' },
-      flagSel, searchIn, fuzzyBox),
-    h('div', { class: 'bar', style: 'margin:0' },
-      h('button', { class: 'small', onclick: saveSearch }, '☆ Save this search'),
-      bulkBtn,
-      // everything back to how it starts: search text, tag and date filters, search options
-      h('button', { class: 'small linkish', onclick: () => {
-        Object.assign(view, { q: '', has: [], not: [], from: '', to: '', flag: '' });
-        setBox('');
-        filters.querySelectorAll('input[type=date]').forEach(i => { i.value = ''; });
-        setOpts('all', false);
-        refresh();
-      } }, 'Reset')));
+    h('div', { class: 'lb-grid' },
+      cell('Has all of', hasRow), cell('Has none of', notRow),
+      cell('From', dateIn('from')), cell('To', dateIn('to'))),
+    // the rarely changed ones fold away (open while one is in use)
+    h('details', { class: 'lb-more', open: !!(view.flag || (settings().lbScope || 'all') !== 'all' || settings().lbFuzzy) || undefined },
+      h('summary', {}, 'More options'),
+      h('div', { class: 'lb-grid' }, cell('Show', flagSel), cell('Search in', searchIn)),
+      h('div', { class: 'bar lb-fbar' }, fuzzyBox)),
+    h('div', { class: 'bar lb-fbar', style: 'margin:0' },
+      h('button', { class: 'small', title: 'Save this search', onclick: saveSearch }, '☆ Save search'),
+      bulkBtn, resetBtn));
+  // everything back to how it starts: search text, tag and date filters, search options
+  function resetLink() {
+    return h('button', { class: 'small linkish', style: 'margin-left:auto', onclick: () => {
+      Object.assign(view, { q: '', has: [], not: [], from: '', to: '', flag: '' });
+      setBox('');
+      filters.querySelectorAll('input[type=date]').forEach(i => { i.value = ''; });
+      setOpts('all', false);
+      refresh();
+    } }, 'Reset');
+  }
   // "Search in" and fuzzy are kept with your account; a saved search sets "Search in" (not fuzzy)
   function setOpts(scope, fuzzy) {
     if ((settings().lbScope || 'all') !== scope || !!settings().lbFuzzy !== fuzzy) patchLogbook({ settings: { lbScope: scope, lbFuzzy: fuzzy } });
