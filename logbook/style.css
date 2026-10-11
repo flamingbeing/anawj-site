@@ -665,3 +665,17 @@ table.totals td.due .gap { color: var(--warn); }
 .flag.sc-tag { background: var(--accent-soft); color: var(--accent); }
 .chip .chip-x { border: 0; background: none; color: inherit; min-height: 40px; min-width: 32px; margin: -10px -8px -10px 0; padding: 0 0 0 6px; font-size: 14px; }
 .sc-line { color: var(--accent); }
+
+/* Log: the box, selected categories and Save stay pinned while the categories scroll */
+.composer { position: sticky; top: 0; z-index: 12; background: var(--panel); margin: 0 -12px; padding: 6px 12px 4px; }
+body.compact .composer { margin: 0 -8px; padding: 4px 8px; }
+.composer.stuck { box-shadow: 0 6px 12px -8px rgba(0,0,0,.35); border-bottom: 1px solid var(--line); }
+.composer.stuck textarea.details { min-height: 0; height: 3.7em; }
+.composer.stuck .parsed, .composer.stuck .sel-label, .composer.stuck .reflect-tag { display: none; }
+.composer.stuck .actions { position: static; margin-top: 4px; padding: 0; }
+.composer.stuck .chips.selected .none { display: none; }
+.pin-mark { height: 1px; }
+
+/* Admin: category display names */
+table.cat-names input { min-width: 140px; }
+table.cat-names td.muted { font-size: 13px; }

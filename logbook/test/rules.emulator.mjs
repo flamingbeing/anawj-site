@@ -89,6 +89,10 @@ await t('summary fake total', assertFails(setDoc(doc(a, 'summaries', 'R1'), { ..
 await t('summary negative total', assertFails(setDoc(doc(a, 'summaries', 'R1'), { ...sum('R1'), total: -1 })));
 await t('summary year out of range', assertFails(setDoc(doc(a, 'summaries', 'R1'), { ...sum('R1'), rYear: 9 })));
 await t('summary negative reflections', assertFails(setDoc(doc(a, 'summaries', 'R1'), { ...sum('R1'), reflectionsTotal: -5 })));
+await t('admin saves category names', assertSucceeds(setDoc(doc(adm, 'config', 'categoryNames'), { names: { '26': { name: 'Nerve blocks', short: 'Blocks' } }, updatedAt: 1 })));
+await t('resident reads category names', assertSucceeds(getDoc(doc(a, 'config', 'categoryNames'))));
+await t('resident cannot change category names', assertFails(setDoc(doc(a, 'config', 'categoryNames'), { names: {}, updatedAt: 2 })));
+await t('category names extra field', assertFails(setDoc(doc(adm, 'config', 'categoryNames'), { names: {}, updatedAt: 2, x: 1 })));
 await t('member lists summaries', assertSucceeds(getDocs(collection(a, 'summaries'))));
 await t('admin lists summaries', assertSucceeds(getDocs(collection(adm, 'summaries'))));
 await t('stranger cannot list summaries', assertFails(getDocs(collection(as('x@example.com'), 'summaries'))));

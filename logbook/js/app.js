@@ -2,7 +2,7 @@
 // shared state and helpers are in ui-core.js. Case data comes from cloud.js (Firestore, or the
 // in-browser demo backend with ?demo).
 
-import { S, hooks, h, toast, cloud, setCases, scheduleSummary, fill, resetCaches, confirmBox } from './ui-core.js';
+import { S, hooks, h, toast, cloud, setCases, scheduleSummary, fill, resetCaches, confirmBox, setCategoryNames, categoryNames as categoryNamesNow } from './ui-core.js';
 import { renderLog, logCasesChanged, clearDrafts } from './ui-log.js';
 import { renderLogbook } from './ui-logbook.js';
 import { renderProgress, renderTotals } from './ui-progress.js';
@@ -206,8 +206,9 @@ function refreshWho(user, who, firstLogbook) {
   who().then(async w => {
     if (S.user !== user) return;
     saveWho(user.email, w);
-    const before = JSON.stringify([S.admin, S.pd, S.resident, S.sharedTemplates]);
+    const before = JSON.stringify([S.admin, S.pd, S.resident, S.sharedTemplates, categoryNamesNow()]);
     Object.assign(S, { admin: !!w.admin, pd: !!w.pd, resident: w.resident || null, sharedTemplates: w.sharedTemplates || [] });
+    setCategoryNames(w.names || {});
     // the logbook (templates, settings) from the server, unless it was changed here meanwhile
     const lb = await cloud.loadLogbook(user.email).catch(() => null);
     if (S.user !== user) return;
@@ -216,7 +217,7 @@ function refreshWho(user, who, firstLogbook) {
       S.logbook = lb; lbChanged = true;
       applyCompact(lb.settings && lb.settings.compact); applyTheme(lb.settings && lb.settings.theme); applyTextSize(lb.settings && lb.settings.textSize);
     }
-    if (!lbChanged && before === JSON.stringify([S.admin, S.pd, S.resident, S.sharedTemplates])) return;
+    if (!lbChanged && before === JSON.stringify([S.admin, S.pd, S.resident, S.sharedTemplates, categoryNamesNow()])) return;
     const typing = document.activeElement && /^(TEXTAREA|INPUT|SELECT)$/.test(document.activeElement.tagName);
     if (!typing && !document.querySelector('dialog[open]')) render(); else paintTabs();
   }).catch(err => console.warn('Refresh failed', err));
@@ -250,13 +251,15 @@ async function onUser(user) {
     cloud.myResident(user.email).catch(() => null),
     cloud.listSharedTemplates().catch(() => []),
     cloud.isPD(user.email).catch(() => false),
-  ]).then(([admin, resident, shared, pd]) => ({ admin, resident, sharedTemplates: shared || [], pd }));
+    cloud.loadCategoryNames().catch(() => ({})),
+  ]).then(([admin, resident, shared, pd, names]) => ({ admin, resident, sharedTemplates: shared || [], pd, names: names || {} }));
   try {
     const known = readWho(user.email);
     const [logbook, w] = await Promise.all([cloud.loadLogbook(user.email, { cached: true }), known ? Promise.resolve(known) : who()]);
     if (S.user !== user) return; // signed out meanwhile
     reloadFlag('');
     Object.assign(S, { admin: !!w.admin, pd: !!w.pd, resident: w.resident || null, logbook, sharedTemplates: w.sharedTemplates || [] });
+    setCategoryNames(w.names || {});
     if (!known) saveWho(user.email, w);
     else refreshWho(user, who, logbook);
     applyCompact(logbook.settings && logbook.settings.compact);   // per-user display settings

@@ -164,7 +164,12 @@ function plainCell(v) {
 // ---------- categories ----------
 
 export const cat = code => BY_CODE[code] || { code, name: code, label: code, full: code };
-export const catName = code => cat(code).name;
+// Display names an admin set (config/categoryNames): name for lists, short for the pills. Display only.
+let NAMES = {};
+export const setCategoryNames = m => { NAMES = m || {}; };
+export const categoryNames = () => NAMES;
+export const catName = code => (NAMES[code] && NAMES[code].name) || cat(code).name;
+export const catShort = code => (NAMES[code] && NAMES[code].short) || catName(code);
 // Readable procedure name for tags and tooltips: no code, no targets.
 export const catFull = code => cat(code).full || cat(code).name;
 export const PROGRESS_BY_CODE = () => Object.fromEntries(progress(S.counts, rYear()).map(p => [p.code, p]));
@@ -182,7 +187,7 @@ export function catChip(code, { on, onclick, cls = '', removable, title } = {}) 
   return h('span', {
     class: `chip ${on ? 'on' : ''} ${cls}`, role: 'button', tabindex: '0', title: title || catFull(code),
     onclick, onkeydown: e => { if ((e.key === 'Enter' || e.key === ' ') && onclick) { e.preventDefault(); onclick(e); } },
-  }, h('span', { class: 'code' }, code), h('span', { class: 'nm' }, catName(code)), removable ? h('span', { class: 'x', 'aria-label': 'remove' }, '×') : null);
+  }, h('span', { class: 'code' }, code), h('span', { class: 'nm' }, catShort(code)), removable ? h('span', { class: 'x', 'aria-label': 'remove' }, '×') : null);
 }
 export const miniChips = cats => h('span', { class: 'chips' }, sortCodes(cats || []).map(c => h('span', { class: 'mini', title: catFull(c) }, c)));
 

@@ -244,6 +244,9 @@ export function dateWindow(q, now = new Date()) {
   return win ? { ...win, rest: s.trim() } : null;
 }
 
+// 5 -> '5th', 22 -> '22nd'
+export const nth = d => `${d}${(d % 100 >= 11 && d % 100 <= 13) ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' })[d % 10] || 'th'}`;
+
 // A leading age / sex ("45F", "72 M", "5yo", "3/12 M") on case details: { age, rest }. Optional.
 const AGE_SEX = /^\s*(\d{1,3}\s?(?:(?:yo|y\/o|yrs?|years?|\/12|\/52|m\/o|mo|d\/o)\s?[MF]?|[MF]))(?![A-Za-z])[\s,;:\-]*/i;
 export function splitAge(details) {

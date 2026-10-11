@@ -382,6 +382,20 @@ export async function importCases(email, rid, cases, onProgress) {
 
 // ---- portfolio template (word-export) ----
 // Kept under its own key: it is ~1.4 MB of base64 and must not slow every load()/save() of the demo state.
+// Category display names set by admins: { code: { name?, short? } } (display only; exports keep the official names)
+export function cleanCategoryNames(m) {
+  const out = {};
+  for (const [code, v] of Object.entries(m && typeof m === 'object' ? m : {})) {
+    if (!/^\d{2}[ivx]*$/.test(code) || !v || typeof v !== 'object') continue;
+    const name = String(v.name || '').trim().slice(0, 80), short = String(v.short || '').trim().slice(0, 30);
+    if (name || short) out[code] = { ...(name ? { name } : {}), ...(short ? { short } : {}) };
+  }
+  return out;
+}
+const NAMES_KEY = KEY + '-category-names';
+export async function loadCategoryNames() { try { return JSON.parse(localStorage.getItem(NAMES_KEY) || '{}'); } catch { return {}; } }
+export async function saveCategoryNames(names) { const n = cleanCategoryNames(names); try { localStorage.setItem(NAMES_KEY, JSON.stringify(n)); } catch { /* storage blocked */ } return n; }
+
 const TEMPLATE_KEY = KEY + '-portfolio-template';
 let templateMem = null;
 export async function saveTemplate(b64) {

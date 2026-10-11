@@ -2,10 +2,10 @@
 // Also the reusable category picker and the edit-case dialog (used by the Logbook screen).
 
 import { BY_CODE, TIPS } from './categories.js';
-import { withParents, frequentCombos, parseBulk, parseDate, fmtDate, sortCodes, uid, caseParts, caseText, cleanInitials, splitInitials, splitAge } from './engine.js';
+import { withParents, frequentCombos, parseBulk, parseDate, fmtDate, sortCodes, uid, caseParts, caseText, cleanInitials, splitInitials, splitAge, nth } from './engine.js';
 import { suggest } from './suggest.js';
 import {
-  S, h, toast, debounce, modal, confirmBox, cat, catName, catFull, catChip, countText, PICKER_ORDER, PROGRESS_BY_CODE,
+  S, h, toast, debounce, modal, confirmBox, cat, catName, catShort, catFull, catChip, countText, PICKER_ORDER, PROGRESS_BY_CODE,
   createCase, updateCase, removeCase, restoreCase, saveMany, deleteMany, subcatChips, settings, todayISO, hooks, fill, add, cloud, okNoIds, patchLogbook } from './ui-core.js';
 import { templateDialog } from './ui-settings.js';
 import { moveToBin } from './bin.js';
@@ -75,7 +75,7 @@ export function catPicker({ get, toggle, placeholder = 'Search categories: code 
     },
   });
   function matches(c, words) {
-    const hay = `${c.code} ${c.name} ${c.label}`.toLowerCase();
+    const hay = `${c.code} ${c.name} ${c.label} ${catName(c.code)} ${catShort(c.code)}`.toLowerCase();
     return words.every(w => (/^\d/.test(w) ? c.code.startsWith(w.padStart(2, '0')) || c.code.startsWith(w) : hay.includes(w)));
   }
   function paintHl() {
@@ -95,7 +95,7 @@ export function catPicker({ get, toggle, placeholder = 'Search categories: code 
       },
       h('span', { class: 'tick' }, sel.has(c.code) ? '✓' : ''),
       h('span', { class: 'code' }, c.code),
-      h('span', { class: 'nm' }, c.name),
+      h('span', { class: 'nm' }, catName(c.code)),
       h('span', { class: `ct ${p && p.status === 'done' ? 'met' : ''}` }, countText(c.code, prog)));
     }));
     if (!items.length) add(list, h('li', { class: 'muted' }, 'No category matches “' + q + '”'));
@@ -178,7 +178,7 @@ function paintDate() {
   // the rest of the past week by weekday ("Thu 8"), for catching up on a few days
   const week = [];
   for (let k = 2; k <= 6; k++) { const x = new Date(); x.setDate(x.getDate() - k); week.push(todayISO(x)); }
-  const wd = iso => { const [Y, M, D] = iso.split('-').map(Number); const x = new Date(Y, M - 1, D); return x.toLocaleDateString('en-GB', { weekday: 'short' }) + ' ' + D; };
+  const wd = iso => { const [Y, M, D] = iso.split('-').map(Number); const x = new Date(Y, M - 1, D); return x.toLocaleDateString('en-GB', { weekday: 'short' }) + ' ' + nth(D); };
   fill(ui.datebar,
     h('span', { class: `chip ${d === t ? 'on' : ''}`, role: 'button', tabindex: '0', onclick: pick(t) }, 'Today'),
     h('span', { class: `chip ${d === y ? 'on' : ''}`, role: 'button', tabindex: '0', onclick: pick(y) }, 'Yesterday'),
@@ -191,13 +191,15 @@ function paintDate() {
 
 function renderOne(card) {
   const textarea = h('textarea', {
-    class: 'details', rows: '3', autofocus: true, enterkeyhint: 'enter', autocapitalize: 'sentences', autocorrect: 'off', 'aria-label': 'Case details',
+    class: 'details', rows: '3', autofocus: true, enterkeyhint: settings().enterSaves ? 'done' : 'enter', autocapitalize: 'sentences', autocorrect: 'off', 'aria-label': 'Case details',
     placeholder: 'AB 72M  ← initials, age/sex\nlap chole GA  ← procedure',
     value: draft.details,
     oninput: e => { draft.details = e.target.value; saveDraft(); suggestSoon(); paintParsed(true); },
     // Enter is a new line (a case can take several lines); Ctrl+Enter / Cmd+Enter saves
     onkeydown: e => {
-      if (e.key !== 'Enter' || e.isComposing || !(e.ctrlKey || e.metaKey)) return;
+      // Settings → Logging: Enter saves (Shift+Enter for a new line), or Enter is a new line (Ctrl/Cmd+Enter saves)
+      if (e.key !== 'Enter' || e.isComposing) return;
+      if (settings().enterSaves ? e.shiftKey : !(e.ctrlKey || e.metaKey)) return;
       e.preventDefault();
       save({ another: e.altKey });
     },
@@ -220,18 +222,28 @@ function renderOne(card) {
 
   // what the box was read as (initials come off into their own field; age/sex stay in the details)
   const parsed = h('div', { class: 'parsed', 'aria-live': 'polite' });
-  add(card, 
+  // The box, the selected categories and Save stay pinned at the top while you scroll the
+  // categories below, so you can tag and save without scrolling back up.
+  const composer = h('div', { class: 'composer' },
     textarea, parsed,
-    h('div', { class: 'chiplabel', id: 'suggLabel' }, 'Suggested'), sugg,
-    h('div', { class: 'chiplabel' }, 'Selected'), selected, tip,
+    h('div', { class: 'chiplabel sel-label' }, 'Selected'), selected, tip,
     tagBox,
-    actions,
+    actions);
+  const pinMark = h('div', { class: 'pin-mark', 'aria-hidden': 'true' });
+  add(card,
+    pinMark, composer,
+    h('div', { class: 'chiplabel', id: 'suggLabel' }, 'Suggested'), sugg,
     stillNeeded(),
     h('div', { class: 'chiplabel' }, 'Quick picks'), templates,
     h('div', { class: 'chiplabel', id: 'topLabel' }, 'Your top categories'), top,
     h('div', { class: 'chiplabel' }, 'All categories'), picker.el);
   Object.assign(ui, { textarea, parsed, sugg, selected, tip, templates, top, picker });
   paintSuggest(); paintSel(); paintQuick(); paintParsed(false);
+  // compact the pinned box once it sticks (the marker above it has scrolled away)
+  if ('IntersectionObserver' in window) {
+    const io = new IntersectionObserver(([e]) => composer.classList.toggle('stuck', !e.isIntersecting && e.boundingClientRect.top < 0));
+    io.observe(pinMark);
+  }
   // autofocus attribute is ignored on re-render; focus after insertion (not on phones' first paint
   // when that would pop the keyboard over a fresh landing — it's what the user came to do, so do it)
   requestAnimationFrame(() => { if (document.activeElement === document.body || !document.activeElement) textarea.focus({ preventScroll: true }); });
