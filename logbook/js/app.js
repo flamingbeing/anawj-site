@@ -271,7 +271,11 @@ function render() {
   // pages opened from More get a way back to the list
   fill(app, tab.under ? h('p', { class: 'back-row' }, h('a', { class: 'btn small', href: '#' + tab.under }, '← ' + ((TABS.find(t => t.id === tab.under) || {}).label || 'More'))) : null, tab.render());
   if (tab.id !== 'log') window.scrollTo(0, y);
+  // the inverted Case tab (Settings → Display, phones) opens at the bottom, where the case box is
+  else if (lastRendered !== 'log' && document.documentElement.classList.contains('case-inverted') && matchMedia('(max-width: 600px)').matches) requestAnimationFrame(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  lastRendered = tab.id;
 }
+let lastRendered = '';
 hooks.render = render;
 
 // A live case update shouldn't yank the screen from under someone typing: the Log screen refreshes
