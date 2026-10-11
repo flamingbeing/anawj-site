@@ -46,10 +46,11 @@ export function cachedCompact() {
 export function renderSettings() {
   const st = settings();
   return h('div', {},
-    S.admin ? h('section', { class: 'card' },
-      h('div', { class: 'bar' }, h('h2', { style: 'margin:0' }, 'Admin'), h('span', { class: 'grow' }),
-        h('a', { class: 'btn small primary', href: '#admin' }, 'Open admin')),
-      h('p', { class: 'hint', style: 'margin:6px 0 0' }, 'Residents list, importing the old logbook, shared templates and the portfolio template.')) : null,
+    // only admins see this card
+    S.admin ? h('section', { class: 'card admin-card' },
+      h('div', { class: 'bar' }, h('h2', { style: 'margin:0' }, 'Admin portal'), h('span', { class: 'grow' }),
+        h('a', { class: 'btn small primary', href: '#admin' }, 'Open admin portal')),
+      h('p', { class: 'hint', style: 'margin:6px 0 0' }, 'Residents, ready portfolios, the portfolio template, default category names, shared templates and importing the old logbook.')) : null,
     h('section', { class: 'card' },
       h('h2', {}, 'Display'),
       h('label', { class: 'check' }, h('input', { type: 'checkbox', role: 'switch', checked: !!st.compact, onchange: e => {
@@ -88,8 +89,9 @@ export function renderSettings() {
           h('option', { value: 'today', selected: st.defaultDate !== 'last' }, 'Today'),
           h('option', { value: 'last', selected: st.defaultDate === 'last' }, 'The date I used last')))),
 
-    categoryNamesCard(),
-    tagEditorCard(),
+    h('section', { class: 'card' },
+      h('div', { class: 'bar' }, h('h2', { style: 'margin:0' }, 'Tag editor'), h('span', { class: 'grow' }), h('a', { class: 'btn small', href: '#tags' }, 'Open tag editor ›')),
+      h('p', { class: 'hint', style: 'margin:6px 0 0' }, 'Rename, hide and reorder the categories on the Log page, group them under headers, and add your own tags. Share your layout as a CSV file.')),
 
     h('section', { class: 'card' },
       h('h2', {}, 'Reflections'),
@@ -200,30 +202,33 @@ function editTemplate(t) {
   });
 }
 
-// ---------- category names (everyone sees them; admins change them for everyone) ----------
+// ---------- default category names (Admin portal: the programme's names for everyone) ----------
 
 const CN = { open: false, edit: false };
-function categoryNamesCard() {
+// the programme's names (an admin's, else the built-in defaults), not anyone's own tag-editor names
+const progName = code => (categoryNames()[code] && categoryNames()[code].name) || (DEFAULT_NAMES[code] || [])[0] || BY_CODE[code].name;
+const progShort = code => (categoryNames()[code] && categoryNames()[code].short) || (DEFAULT_NAMES[code] || [])[1] || progName(code);
+export function categoryNamesCard() {
   const cur = categoryNames();
   const edits = JSON.parse(JSON.stringify(cur));
   const set = (code, k, v) => { edits[code] = { ...(edits[code] || {}), [k]: v }; };
   const ed = CN.edit && S.admin;
-  return h('details', { class: 'card more-tools cat-names-card', open: CN.open || ed, ontoggle: e => { CN.open = e.target.open; } },
-    h('summary', {}, 'Category names'),
-    h('p', { class: 'hint' }, 'How categories are named on screen: a display name for lists and Progress, and a short name for the pills. Exports (portfolio, Excel) always use the official APMES names.'),
+  return h('section', { class: 'card cat-names-card' }, h('details', { class: 'more-tools', open: CN.open || ed, ontoggle: e => { CN.open = e.target.open; } },
+    h('summary', {}, 'Default category names'),
+    h('p', { class: 'hint' }, 'The programme’s names for everyone: a display name for lists and Progress, and a short name for the pills. Each resident can still rename them for themselves in the Tag editor. Exports (portfolio, Excel) always use the official APMES names.'),
     S.admin ? h('div', { class: 'bar', style: 'margin:0 0 8px' }, ed
       ? [h('button', { class: 'primary small', onclick: async () => {
           try { const n = await cloud.saveCategoryNames(edits); setCategoryNames(n); CN.edit = false; toast('Category names saved for everyone'); hooks.render(); }
           catch (err) { toast('Could not save: ' + err.message); }
         } }, 'Save names'), h('button', { class: 'small', onclick: () => { CN.edit = false; hooks.render(); } }, 'Cancel')]
-      : h('button', { class: 'small', onclick: () => { CN.edit = true; CN.open = true; hooks.render(); } }, 'Edit (admin)')) : null,
+      : h('button', { class: 'small', onclick: () => { CN.edit = true; CN.open = true; hooks.render(); } }, 'Edit')) : null,
     ed ? h('p', { class: 'hint' }, 'Leave a box blank for the programme default (shown faintly).') : null,
     h('div', { class: 'scroll' }, h('table', { class: 'cat-names' },
       h('thead', {}, h('tr', {}, ['Code', 'Official', 'Display name', 'Pill name'].map(t => h('th', {}, t)))),
       h('tbody', {}, PICKER_ORDER.map(c => h('tr', {},
         h('td', {}, c.code), h('td', { class: 'muted' }, c.name),
-        ed ? h('td', {}, h('input', { value: (cur[c.code] && cur[c.code].name) || '', placeholder: catName(c.code) === ((cur[c.code] || {}).name) ? '' : catName(c.code), maxlength: '80', 'aria-label': `Display name for ${c.code}`, oninput: e => set(c.code, 'name', e.target.value) })) : h('td', {}, catName(c.code)),
-        ed ? h('td', {}, h('input', { value: (cur[c.code] && cur[c.code].short) || '', placeholder: catShort(c.code) === ((cur[c.code] || {}).short) ? '' : catShort(c.code), maxlength: '30', 'aria-label': `Pill name for ${c.code}`, oninput: e => set(c.code, 'short', e.target.value) })) : h('td', {}, catShort(c.code))))))));
+        ed ? h('td', {}, h('input', { value: (cur[c.code] && cur[c.code].name) || '', placeholder: (DEFAULT_NAMES[c.code] || [])[0] || c.name, maxlength: '80', 'aria-label': `Display name for ${c.code}`, oninput: e => set(c.code, 'name', e.target.value) })) : h('td', {}, progName(c.code)),
+        ed ? h('td', {}, h('input', { value: (cur[c.code] && cur[c.code].short) || '', placeholder: (DEFAULT_NAMES[c.code] || [])[1] || c.name, maxlength: '30', 'aria-label': `Pill name for ${c.code}`, oninput: e => set(c.code, 'short', e.target.value) })) : h('td', {}, progShort(c.code)))))))));
 }
 
 // ---------- tag editor (this account; js/tags.js) ----------
@@ -231,9 +236,8 @@ function categoryNamesCard() {
 // Your layout of the Log page's list: rename categories for yourself, hide them, reorder them, put them
 // under section headers, and add your own tags (linked to APMES categories, or personal labels).
 // Share it as a CSV file (opens in Excel) or load someone else's.
-const TE = { open: false };
 const saveTags = set => patchLogbook({ settings: { tagSet: cleanTagSet(set) } }).then(() => hooks.render());
-function tagEditorCard() {
+export function renderTagEditor() {
   const set = tagSet();
   const nodes = flatTree(tagTree(set));
   const names = code => ({ pill: catShort(code), long: catName(code) });
@@ -247,8 +251,8 @@ function tagEditorCard() {
         [n.kind === 'cat' ? catName(n.code) : linkText(n), n.e.hide ? 'hidden' : ''].filter(Boolean).join(' · '))),
     h('button', { class: 'small icon-btn', 'aria-label': 'Move up', onclick: () => saveTags(moveTag(set, n.e.k, -1)) }, '↑'),
     h('button', { class: 'small icon-btn', 'aria-label': 'Move down', onclick: () => saveTags(moveTag(set, n.e.k, 1)) }, '↓'));
-  return h('details', { class: 'card more-tools tag-editor', open: TE.open, ontoggle: e => { TE.open = e.target.open; } },
-    h('summary', {}, 'Tag editor (advanced)'),
+  return h('section', { class: 'card tag-editor' },
+    h('h2', {}, 'Tag editor'),
     h('p', { class: 'hint' }, 'Lay out the Log page’s list your way. The APMES categories are built in: rename (just for you), hide, move them or put them under section headers. Add your own tags: link one to APMES categories and choosing it ticks them; with no link it’s a personal label. A tag under a category counts towards it. Totals and exports always use the APMES categories.'),
     h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:8px;margin:0 0 8px' },
       h('button', { class: 'small primary', onclick: () => editTag(null, 'tag') }, '+ Tag'),

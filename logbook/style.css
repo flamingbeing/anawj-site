@@ -753,3 +753,6 @@ table.map-preview td { font-size: 13px; vertical-align: top; }
 .box-wrap .paste-btn { position: absolute; right: 6px; bottom: 6px; min-height: 40px; padding: 2px 10px; font-size: 13px; opacity: .85; background: var(--panel); }
 /* only while the box is empty, so it never covers what's typed */
 .box-wrap textarea:not(:placeholder-shown) + .paste-btn { display: none; }
+
+/* Settings: the Admin portal card (admins only) */
+.card.admin-card { background: var(--accent-soft); border-color: var(--accent); }

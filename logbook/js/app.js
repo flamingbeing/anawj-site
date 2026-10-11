@@ -6,7 +6,7 @@ import { S, hooks, h, toast, cloud, setCases, scheduleSummary, fill, resetCaches
 import { renderLog, logCasesChanged, clearDrafts } from './ui-log.js';
 import { renderLogbook } from './ui-logbook.js';
 import { renderProgress, renderTotals } from './ui-progress.js';
-import { applyCompact, cachedCompact, applyTheme, cachedTheme, applyTextSize, cachedTextSize, renderSettings } from './ui-settings.js';
+import { applyCompact, cachedCompact, applyTheme, cachedTheme, applyTextSize, cachedTextSize, renderSettings, renderTagEditor } from './ui-settings.js';
 import { renderAccount, flush as flushProfile } from './ui-account.js';
 import { renderAdmin, leaveAdmin } from './ui-admin.js';
 import { renderReflect, watchMyReflections, renderExportPage } from './ui-reflect.js';
@@ -47,8 +47,10 @@ const TABS = [
   { id: 'settings', label: 'Settings', render: renderSettings, hidden: true, under: 'more', desc: 'Display, text size, logging, templates, recycle bin' },
   // opened from More → Export & Sync (not in the More list)
   { id: 'export', label: 'Export portfolio', render: renderExportPage, hidden: true, under: 'more', unlisted: true },
-  // admins open it from More (or Settings → Admin)
-  { id: 'admin', label: 'Admin', render: renderAdmin, admin: true, hidden: true, under: 'more', desc: 'Residents list, import, shared templates, portfolio template' },
+  // admins open it from More (or Settings → Admin portal)
+  { id: 'admin', label: 'Admin portal', render: renderAdmin, admin: true, hidden: true, under: 'more', desc: 'Residents, ready portfolios, portfolio template, default category names' },
+  // opened from Settings
+  { id: 'tags', label: 'Tag editor', render: renderTagEditor, hidden: true, under: 'settings', unlisted: true },
 ];
 
 function renderMore() {
@@ -123,7 +125,7 @@ function render() {
   S.tab = tab.id;
   const y = window.scrollY;
   // pages opened from More get a way back to the list
-  fill(app, tab.under ? h('p', { class: 'back-row' }, h('a', { class: 'btn small', href: '#' + tab.under }, '← More')) : null, tab.render());
+  fill(app, tab.under ? h('p', { class: 'back-row' }, h('a', { class: 'btn small', href: '#' + tab.under }, '← ' + ((TABS.find(t => t.id === tab.under) || {}).label || 'More'))) : null, tab.render());
   if (tab.id !== 'log') window.scrollTo(0, y);
 }
 hooks.render = render;

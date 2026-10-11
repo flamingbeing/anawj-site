@@ -11,7 +11,7 @@ import { reflectionProgress, reflectionCounts, HEADING_BY_ID, splitDetails, comp
 export { completeProblems };
 import { fmtDate, caseText } from './engine.js';
 import { S, h, toast, cloud, debounce, hooks, rYear, effectiveIntake, residentSmo, todayISO, confirmBox, add, resetters, scheduleSummary, displayName, byNewest, catName, updateCase, settings } from './ui-core.js';
-import { renderExportButton, caseRYear } from './portfolio.js';
+import { renderExportButton, caseRYear, countsByYear } from './portfolio.js';
 
 const DRAFT_KEY = 'apmes-logbook-reflection-draft';
 const VIEW_KEY = 'apmes-logbook-reflection-view';
@@ -571,6 +571,57 @@ async function moveReflection(r, headingId) {
 
 // ---------- images ----------
 
+// ---------- mark the portfolio as ready (admins generate it; js/cloud.js submissions) ----------
+
+const RS = { sub: undefined, loading: false, busy: false };
+resetters.push(() => { RS.sub = undefined; RS.loading = false; });
+const hashStr = s => { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return (h >>> 0).toString(36); };
+// what admins would get now: the ticked reflections, Section 1, the Section 4 numbers, and a fingerprint
+function readyPayload() {
+  const list = (S.reflections || []).filter(inExport);
+  const profile = (S.logbook && S.logbook.profile) || null;
+  const intake = effectiveIntake(), smo = residentSmo(S.resident);
+  const counts = countsByYear(S.cases || [], intake, smo);
+  const imageIds = [...new Set(list.flatMap(r => (r.figures || []).map(f => f.id)).filter(Boolean))];
+  const fp = hashStr(JSON.stringify([list.map(r => [r.id, r.updatedAt || 0]).sort(), profile, counts, displayName(), intake, rYear(), smo]));
+  return { list, meta: { rid: (S.resident && S.resident.rid) || (S.logbook && S.logbook.rid) || null, name: displayName(), intake, rYear: rYear(), smo, fp, count: list.length, profile, counts, imageIds } };
+}
+async function markReady(ex, update = false) {
+  const short = ex.headings.filter(x => x.inExport < x.min || x.warn.length);
+  if (!update && short.length && !(await confirmBox('Mark as ready anyway?',
+    `Some headings don’t meet the portfolio rules yet: ${short.slice(0, 6).map(x => `${shortName(HEADING_BY_ID[x.id].name)} (${x.inExport} of ${x.min}${x.warn.length ? '; ' + x.warn.join(', ') : ''})`).join(' · ')}${short.length > 6 ? ` and ${short.length - 6} more` : ''}. You can still mark it ready and update it later.`, 'Mark as ready'))) return;
+  RS.busy = true; hooks.render();
+  try {
+    const { list, meta } = readyPayload();
+    RS.sub = await cloud.submitPortfolio(mine(), { ...meta, readyAt: update && RS.sub ? RS.sub.readyAt : Date.now() }, list);
+    toast(update ? 'Ready portfolio updated' : 'Portfolio marked as ready: the programme admins can generate it');
+  } catch (err) { toast('Could not save: ' + err.message); }
+  RS.busy = false; hooks.render();
+}
+function readyCard(ex) {
+  if (RS.sub === undefined && !RS.loading) {
+    RS.loading = true;
+    cloud.loadMySubmission(mine()).then(x => { RS.sub = x; RS.loading = false; if (S.tab === 'export') hooks.render(); });
+  }
+  const sub = RS.sub;
+  const changed = sub && sub.fp !== readyPayload().meta.fp;
+  return h('section', { class: `card ready-card${sub ? ' is-ready' : ''}` },
+    h('h2', { style: 'margin:0 0 4px' }, 'Portfolio for the programme'),
+    sub === undefined ? h('p', { class: 'muted' }, 'Checking…')
+      : sub ? h('p', { style: 'margin:0 0 6px' }, h('b', {}, '✓ Marked ready'), ` on ${new Date(sub.readyAt).toLocaleDateString()} (${sub.count} reflection${sub.count === 1 ? '' : 's'}). The programme admins can generate it.`)
+      : h('p', { class: 'hint', style: 'margin:0 0 6px' }, 'When your ticked reflections are ready, mark the portfolio as ready: the programme admins can then generate it. They see only the ticked reflections, your Section 1 details and your Section 4 case numbers, never your cases or other reflections.'),
+    changed ? h('p', { class: 'tip' }, 'You’ve changed things since you marked it ready. Tap Update so the admins get the latest.') : null,
+    sub === undefined ? null : h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:8px;margin:0' },
+      sub ? [
+        h('button', { class: changed ? 'primary' : '', disabled: RS.busy, onclick: () => markReady(ex, true) }, RS.busy ? 'Saving…' : 'Update'),
+        h('button', { disabled: RS.busy, onclick: async () => {
+          if (!(await confirmBox('Unmark the portfolio?', 'The admins will no longer be able to generate it until you mark it ready again.', 'Unmark', true))) return;
+          try { await cloud.withdrawPortfolio(mine()); RS.sub = null; toast('Portfolio unmarked'); } catch (err) { toast('Could not unmark: ' + err.message); }
+          hooks.render();
+        } }, 'Unmark')]
+        : h('button', { class: 'primary', disabled: RS.busy || !ex.total, onclick: () => markReady(ex) }, RS.busy ? 'Saving…' : 'Mark portfolio as ready')));
+}
+
 // ---------- Export page (#export, from More → Export & Sync) ----------
 
 // Choose which complete reflections go into the Word portfolio (ticks are kept for next time), then export.
@@ -619,7 +670,7 @@ export function renderExportPage() {
             h('span', { class: 'muted refl-wc' }, ` · ${wordCount(r)} words`))))))));
   }
   if (!complete.length) add(body, h('p', { class: 'empty' }, 'No complete reflections under a heading yet. Mark reflections complete on the Reflections tab, then come back to export.'));
-  return h('div', {}, top, body);
+  return h('div', {}, top, readyCard(ex), body);
 }
 
 // Images of the given reflections' figures, for the Word export: { id: { data, mime, w, h } }. Missing ones are skipped.

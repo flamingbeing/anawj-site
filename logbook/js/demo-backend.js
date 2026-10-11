@@ -125,7 +125,7 @@ function mode() {
 export function resetDemo({ seeded = true } = {}) {
   memory = null;
   const ls = storage();
-  if (ls) { try { ls.removeItem(KEY); ls.removeItem(KEY + '-images'); } catch { /* ignore */ } }
+  if (ls) { try { ls.removeItem(KEY); ls.removeItem(KEY + '-images'); ls.removeItem(KEY + '-submissions'); } catch { /* ignore */ } }
   const s = blank();
   if (seeded) seed(s);
   save(s);
@@ -329,6 +329,36 @@ export async function loadImage(email, id) {
 }
 export async function deleteImage(email, id) {
   const m = imageStore(); delete m[lc(email) + '/' + id]; imageStoreSave(m);
+}
+
+// ---- ready portfolios (submissions) ----
+const SUB_KEY = KEY + '-submissions';
+const subs = () => { try { return JSON.parse(localStorage.getItem(SUB_KEY) || '{}'); } catch { return {}; } };
+const subsSave = m => { try { localStorage.setItem(SUB_KEY, JSON.stringify(m)); } catch (e) { console.warn('Demo submissions not saved', e); } };
+export const cleanSubmission = (email, m) => plain({
+  email: lc(email), rid: m.rid ? String(m.rid).slice(0, 40) : null, name: String(m.name || '').slice(0, 200),
+  intake: Number(m.intake) || null, rYear: Number(m.rYear) || null, smo: Math.max(0, Math.floor(Number(m.smo) || 0)),
+  readyAt: Number(m.readyAt) || Date.now(), updatedAt: Date.now(), fp: String(m.fp || '').slice(0, 100),
+  count: Math.max(0, Math.floor(Number(m.count) || 0)), profile: m.profile && typeof m.profile === 'object' ? m.profile : null,
+  counts: m.counts && typeof m.counts === 'object' ? m.counts : {},
+  imageIds: [...new Set((Array.isArray(m.imageIds) ? m.imageIds : []).map(String))].slice(0, 1000),
+});
+export async function submitPortfolio(email, meta, reflections) {
+  const m = subs();
+  const doc = cleanSubmission(email, meta);
+  m[lc(email)] = { meta: doc, reflections: reflections.map(r => cleanReflection(r)) };
+  subsSave(m);
+  return doc;
+}
+export async function withdrawPortfolio(email) { const m = subs(); delete m[lc(email)]; subsSave(m); }
+export async function loadMySubmission(email) { const x = subs()[lc(email)]; return x ? plain(x.meta) : null; }
+export async function listSubmissions() { return Object.values(subs()).map(x => plain(x.meta)); }
+export async function loadSubmission(email) {
+  const x = subs()[lc(email)];
+  if (!x) return null;
+  const images = {};
+  for (const id of x.meta.imageIds || []) { const img = imageStore()[lc(email) + '/' + id]; if (img) images[id] = plain(img); }
+  return { ...plain(x), images };
 }
 
 export async function writeSummary(rid, summary) {
