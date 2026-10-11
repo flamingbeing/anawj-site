@@ -7,7 +7,7 @@
 // `to`: the Calls/clinics field the column fills on that day. `group`: the band above the header.
 // `pdf`: the header text in the HMS file (several columns may share one; they go left to right).
 export const MONTHLY = [
-  { id: 'pain', label: 'Pain Roster', title: 'Pain Roster', cols: [
+  { id: 'pain', label: 'Pain Monthly', title: 'Pain Roster', cols: [
     { key: 'painacp.s', label: 'Pain/ACP Clinic (Senior)', group: 'Pain/ACP Clinic', to: 'painacp.s' },
     { key: 'painacp.a', label: 'Pain/ACP Clinic (Junior)', group: 'Pain/ACP Clinic', to: 'painacp.a' },
     { key: 'acute.s', label: 'Acute Pain (Senior)', group: 'Acute Pain', to: 'acute.s' },
@@ -15,21 +15,21 @@ export const MONTHLY = [
     { key: 'chronic.s', label: 'Chronic Pain (Senior)', group: 'Chronic Pain', to: 'chronic.s' },
     { key: 'chronic.a', label: 'Chronic Pain (Junior)', group: 'Chronic Pain', to: 'chronic.a' },
   ] },
-  { id: 'liver', label: 'Liver Roster', title: 'Liver Transplant Roster', match: /liver/i, cols: [
+  { id: 'liver', label: 'Liver Monthly', title: 'Liver Transplant Roster', match: /liver/i, cols: [
     { key: 'otj', label: 'OT (Junior)', liver: true },
     { key: 'ots', label: 'OT (Senior)', liver: true },
     { key: 'icu', label: 'ICU' },
     { key: 'donor', label: 'Donor' },
   ] },
-  { id: 'leave', label: 'Leave Roster', title: 'Leave Roster', match: /leave roster/i, list: true,
+  { id: 'leave', label: 'Leave Monthly', title: 'Leave Roster', match: /leave roster/i, list: true,
     cols: [{ key: 'name', label: 'Name' }, { key: 'period', label: 'Leave Period' }, { key: 'type', label: 'Leave Type' }, { key: 'remarks', label: 'Remarks' }] },
-  { id: 'aoh', label: 'AOH Roster', title: 'Night List (After Office Hr) Roster', match: /night list|after office/i, cols: [
+  { id: 'aoh', label: 'AOH Monthly', title: 'Night List (After Office Hr) Roster', match: /night list|after office/i, cols: [
     { key: 'aoh', label: 'AOH' },
     { key: 'standby', label: 'AOH Standby' },
     { key: 'exts', label: 'Extended List (Senior)' },
     { key: 'extj', label: 'Extended List (Junior)' },
   ] },
-  { id: 'junior', label: 'Junior Roster', title: 'Junior On Call Roster', match: /junior on call/i, cols: [
+  { id: 'junior', label: 'Junior Monthly', title: 'Junior On Call Roster', match: /junior on call/i, cols: [
     { key: 'r1', label: 'R1', group: 'Operating Theatre', to: 'mot.res1', night: true },
     { key: 'r2', label: 'R2', group: 'Operating Theatre', to: 'mot.res2', night: true },
     { key: 'r3', label: 'R3', group: 'Operating Theatre', to: 'mot.res3', night: true },
@@ -43,7 +43,7 @@ export const MONTHLY = [
     { key: 'sicumo', label: 'SICU MO', group: 'Intensive Care Units', to: 'sicu.res1', night: true },
     { key: 'icureg', label: 'ICU Registrar', group: 'Intensive Care Units', to: 'sicu.reg', night: true },
   ] },
-  { id: 'senior', label: 'Senior Roster', title: 'Senior On Call Roster', match: /senior on call/i, cols: [
+  { id: 'senior', label: 'Senior Monthly', title: 'Senior On Call Roster', match: /senior on call/i, cols: [
     { key: 'cons', label: 'Cons S3', group: 'Operating Theatre', to: 'mot.cons' },
     { key: 'c1', label: 'C1', group: 'Cardiac Operating Theatre', to: 'cardiac.s' },
     { key: 'c2', label: 'C2', group: 'Cardiac Operating Theatre' },

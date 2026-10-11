@@ -7,9 +7,13 @@ const staffColour = p => (p && p.role !== 'senior' && p.colour) || '';
 import { readRosterRows, readStaffSheet, buildRosterWorkbook, cellText, isContactList, readContactList, cleanContactName } from './xlsxio.js';
 import { buildLayout, COL_WIDTHS, shortName, doubleCovered, isDouble, TEAM_ROWS, DUTIES } from './layout.js';
 import * as cloud from './cloud.js';
+import { buildRosterPdf } from './pdfout.js';
+import { makeDemo } from './demo.js';
 import { MONTHLY, monthlyDef, LEAVE_TYPES, NIGHT_DUTIES, cleanCell, daysIn, weekday, monthName, addDays, readMonthlyPdf, readMonthlyXlsx, buildMonthlyWorkbook, dutiesOn, generalFromMonthly, leaveOn } from './monthly.js';
 
-const KEY = 'ot-roster-v1';
+// ?demo: a made-up department, kept apart from real data in its own storage
+const DEMO = new URLSearchParams(location.search).has('demo');
+const KEY = DEMO ? 'ot-roster-demo' : 'ot-roster-v1';
 const clone = o => JSON.parse(JSON.stringify(o));
 const today = () => {
   const d = new Date(); d.setDate(d.getDate() + 1);
@@ -40,6 +44,16 @@ try {
 } catch { /* private mode or corrupt data: start fresh */ }
 migrateRooms();
 syncRooms();
+if (DEMO && !state.staff.length) startDemo();
+
+function startDemo() {
+  const demo = makeDemo(state.day.date);
+  state.staff = demo.staff;
+  state.monthly = demo.monthly;
+  for (const r of state.day.rooms) if (demo.notes[r.name]) { r.notes = demo.notes[r.name]; r.running = true; r.flags = suggestFlags(r.notes, state.settings, r.name); }
+  state.tab = 'monthly';
+}
+const demoLink = () => location.origin + location.pathname + '?demo';
 
 // Room list changes since the first version: Remote Case -> Remote 1 + Remote 2, add KROR 1 and MCOR 9.
 // Names imported before titles were stripped ("Dr Bryan Ng", "A/Prof ..."): clean them and
@@ -205,6 +219,7 @@ function render() {
   app.replaceChildren(({ monthly: renderMonthly, roster: renderRoster, premed: renderPremed, cases: () => renderDay('cases'), staff: renderStaffTab, settings: renderSettings })[state.tab]());
   renderCloudBar();
   renderDateBar();
+  renderDemoBar();
   window.scrollTo(0, y);
   save();
 }
@@ -222,6 +237,16 @@ function switchDate(date) {
   undoStack = []; editing = null;
   lastRows = state.roster ? JSON.stringify(state.roster.rows) : null;
   render();
+}
+
+// The demo banner: what this is, and the way back out.
+function renderDemoBar() {
+  if (!DEMO || document.getElementById('demo-bar')) return;
+  document.body.prepend(h('div', { id: 'demo-bar', class: 'demo-bar' },
+    h('b', {}, 'Demo'), h('span', {}, ' · made-up staff and rosters, saved only in this browser, nothing is shared.'),
+    h('span', { class: 'grow' }),
+    h('button', { class: 'small', onclick: () => { if (confirm('Start the demo again from scratch?')) { try { localStorage.removeItem(KEY); } catch { /* no storage */ } location.reload(); } } }, 'Reset demo'),
+    h('a', { class: 'btn small', href: location.pathname }, 'Exit demo')));
 }
 
 // One date for the whole workspace, in the header.
@@ -323,10 +348,37 @@ function staffLogCard() {
 
 // The Staff tab: seniors or juniors, read-only until Edit.
 function renderStaffTab() {
-  const role = state.staffRole === 'junior' ? 'junior' : 'senior';
-  const pick = r => h('button', { 'aria-pressed': String(role === r), onclick: () => { state.staffRole = r; staffFilter = ''; render(); } },
-    `${r === 'senior' ? 'Seniors' : 'Juniors'} (${state.staff.filter(p => p.role === r).length})`);
-  return h('div', {}, h('div', { class: 'seg subtabs', role: 'group', 'aria-label': 'Staff' }, pick('senior'), pick('junior')), renderStaff(role));
+  const role = ['junior', 'postings'].includes(state.staffRole) ? state.staffRole : 'senior';
+  const pick = (r, label) => h('button', { 'aria-pressed': String(role === r), onclick: () => { state.staffRole = r; staffFilter = ''; render(); } }, label);
+  const n = r => state.staff.filter(p => p.role === r).length;
+  return h('div', {}, h('div', { class: 'seg subtabs', role: 'group', 'aria-label': 'Staff' },
+    pick('senior', `Seniors (${n('senior')})`), pick('junior', `Juniors (${n('junior')})`), pick('postings', 'Postings')),
+    role === 'postings' ? renderPostings() : renderStaff(role));
+}
+
+// Junior postings: changed here (with the staff list's Edit), later from the posting roster.
+function renderPostings() {
+  const editing = staffEditing();
+  const list = state.staff.filter(p => p.role === 'junior')
+    .filter(p => !staffFilter || (p.name + ' ' + (p.aliases || []).join(' ')).toLowerCase().includes(staffFilter.toLowerCase()))
+    .sort((a, b) => (postingName(a.posting) || '~').localeCompare(postingName(b.posting) || '~') || bySeniority(a, b));
+  const counts = {};
+  for (const p of state.staff) if (p.role === 'junior') counts[p.posting || ''] = (counts[p.posting || ''] || 0) + 1;
+  return h('div', {},
+    h('section', { class: 'card' },
+      h('h2', {}, 'Postings'),
+      h('p', { class: 'hint' }, 'Each junior\'s current posting. It shows after their name on the roster, e.g. "(RA)", and matches them to lists that suit it. Uploading the posting roster will come later.'),
+      editing
+        ? h('div', { class: 'bar sync dirty' }, h('span', {}, 'Editing the staff list.'), h('button', { class: 'primary', onclick: finishStaffEdit }, 'Review & save changes'))
+        : h('div', { class: 'bar' }, h('button', { onclick: startStaffEdit }, 'Edit postings'), h('span', { class: 'grow' }),
+          h('input', { placeholder: 'Filter names', value: staffFilter, oninput: e => { staffFilter = e.target.value; const pos = e.target.selectionStart; render(); const i = app.querySelector('input[placeholder="Filter names"]'); i.focus(); i.setSelectionRange(pos, pos); } })),
+      h('div', { class: 'stats' }, POSTINGS.filter(([k]) => counts[k]).map(([k, label]) => h('span', {}, h('b', {}, counts[k]), ' ', k ? label : 'no posting')))),
+    h('section', { class: 'card scroll' }, h('table', {},
+      h('thead', {}, h('tr', {}, ['Name', 'Grade', 'Posting'].map(t => h('th', {}, t)))),
+      h('tbody', {}, list.map(p => h('tr', {},
+        h('td', {}, h('b', { style: colourStyle(p.name) }, p.name)),
+        h('td', { class: 'seen' }, p.grade),
+        h('td', {}, editing ? select(p.posting || '', POSTINGS, v => { p.posting = v; render(); }) : postingName(p.posting) || '—')))))));
 }
 
 function renderStaff(role) {
@@ -343,7 +395,6 @@ function renderStaff(role) {
     h('td', {}, h('input', { value: (p.aliases || []).join(', '), placeholder: 'e.g. Tan YW', onchange: e => { p.aliases = splitNameList(e.target.value); save(); } })),
     h('td', {}, select(p.grade, p.role === 'senior' ? SENIOR_GRADES : JUNIOR_GRADES, v => { p.grade = v; if (v === 'Locum' && !p.colour) p.colour = 'purple'; render(); })),
     !senior && h('td', {}, select(p.colour || '', COLOURS, v => { p.colour = v; render(); })),
-    !senior && h('td', {}, select(p.posting || '', POSTINGS, v => { p.posting = v; save(); })),
     senior && h('td', {}, h('div', { class: 'chips' }, subs.map(s => {
         const on = (p.subspecs || []).includes(s.key);
         return h('span', { class: 'chip' + (on ? ' on' : ''), title: s.hard ? 'Only seniors with this subspec get these lists' : '', onclick: () => {
@@ -367,7 +418,7 @@ function renderStaff(role) {
       h('h2', {}, senior ? 'Seniors' : 'Juniors'),
       h('p', { class: 'hint' }, senior
         ? 'Tick each senior\'s subspecs and the lists they don\'t do. "Move to" moves someone to the juniors.'
-        : 'Set each junior\'s grade, posting and colour. Green marks a Baby MO: never left alone, so their senior won\'t double cover. Purple marks locums. "Move to" moves someone to the seniors.'),
+        : 'Set each junior\'s grade and colour (postings are on the Postings tab). Green marks a Baby MO: never left alone, so their senior won\'t double cover. Purple marks locums. "Move to" moves someone to the seniors.'),
       h('div', { class: 'bar sync dirty' },
         h('span', {}, `Editing the staff list. ${diffStaff(staffBackup, state.staff).length} change(s) so far; nothing is kept until you review and save.`),
         h('button', { class: 'primary', onclick: finishStaffEdit }, 'Review & save changes'),
@@ -402,7 +453,7 @@ function renderStaff(role) {
     duplicatesCard(),
     count
       ? h('section', { class: 'card scroll' }, h('table', {},
-        h('thead', {}, h('tr', {}, (senior ? ['Name', 'Short names', 'Grade', 'Subspecs', "Doesn't do", 'Move to', ''] : ['Name', 'Short names', 'Grade', 'Colour', 'Posting', 'Move to', '']).map(t => h('th', {}, t)))),
+        h('thead', {}, h('tr', {}, (senior ? ['Name', 'Short names', 'Grade', 'Subspecs', "Doesn't do", 'Move to', ''] : ['Name', 'Short names', 'Grade', 'Colour', 'Move to', '']).map(t => h('th', {}, t)))),
         h('tbody', {}, list.map(row))))
       : h('section', { class: 'card empty' }, `No ${senior ? 'seniors' : 'juniors'} yet. Import the master staff sheet, or load a few past rosters to build the list automatically.`),
   );
@@ -423,7 +474,7 @@ function renderStaffView(role) {
     !senior && h('td', { class: 'seen' }, COLOURS.find(c => c[0] === staffColour(p))[1]),
     senior
       ? h('td', {}, h('div', { class: 'chips' }, (p.subspecs || []).map(k => h('span', { class: 'chip on static' }, subLabel(k)))))
-      : h('td', {}, postingName(p.posting)),
+      : null,
     senior && h('td', {}, (p.avoid || []).join(', ')),
   );
   return h('div', {},
@@ -431,7 +482,7 @@ function renderStaffView(role) {
       h('h2', {}, senior ? 'Seniors' : 'Juniors'),
       h('p', { class: 'hint' }, senior
         ? 'The seniors the roster is generated from, with their subspecs and the lists they don\'t do.'
-        : 'The juniors the roster is generated from, with their grade and posting.'),
+        : 'The juniors the roster is generated from, with their grade. Postings are on the Postings tab.'),
       teamSyncBar(),
       h('div', { class: 'bar' },
         h('button', { onclick: startStaffEdit }, `Edit ${senior ? 'seniors' : 'juniors'}`),
@@ -442,7 +493,7 @@ function renderStaffView(role) {
     ),
     count
       ? h('section', { class: 'card scroll' }, h('table', {},
-        h('thead', {}, h('tr', {}, (senior ? ['Name', 'Short names', 'Grade', 'Subspecs', "Doesn't do"] : ['Name', 'Short names', 'Grade', 'Colour', 'Posting']).map(t => h('th', {}, t)))),
+        h('thead', {}, h('tr', {}, (senior ? ['Name', 'Short names', 'Grade', 'Subspecs', "Doesn't do"] : ['Name', 'Short names', 'Grade', 'Colour']).map(t => h('th', {}, t)))),
         h('tbody', {}, list.map(row))))
       : h('section', { class: 'card empty' }, `No ${senior ? 'seniors' : 'juniors'} yet. Click Edit to import the master staff sheet or learn from past rosters.`),
     staffLogCard(),
@@ -463,70 +514,77 @@ async function importStaffSheet([file]) {
   const plan = planImport(state.staff, people, { contact, skip: state.settings.importSkip || [] });
   const done = await reviewImport(plan, contact, file.name);
   if (!done) return;
-  const dups = findDuplicates(state.staff).length;
-  showDups = dups > 0;
   render();
-  toast(`${done} Review the changes before saving.${dups ? ` ${dups} possible duplicate(s) to check below.` : ''}`);
+  toast(`${done} Review the changes before saving.`);
 }
 
-// The import, person by person, before anything changes. Resolves to a summary, or null if cancelled.
+// The import, person by person, before anything changes. Nobody is ticked to start with.
+// Resolves to a summary, or null if cancelled.
 function reviewImport(plan, contact, fileName) {
   const label = p => `${p.name} (${p.role === 'senior' ? 'senior' : 'junior'}, ${p.grade})`;
-  const dec = new Map(); // item -> decision
-  for (const it of plan.items) {
-    if (it.kind === 'match') dec.set(it, it.changes.length ? 'update' : 'same');
-    if (it.kind === 'maybe') dec.set(it, 'same:' + it.candidates[0].id);
-    if (it.kind === 'new') dec.set(it, 'add');
-    if (it.kind === 'newJunior') dec.set(it, 'skip');
-  }
-  const removeStale = new Set(plan.stale);
+  const dec = new Map(); // item -> { on, how, always }
+  const rowOf = new Map(); // item -> its tick box
+  const refresh = () => { for (const [it, d] of dec) { const cb = rowOf.get(it); if (cb) cb.checked = d.on; } };
+  for (const it of plan.items) dec.set(it, { on: false, how: it.kind === 'maybe' ? 'same:' + it.candidates[0].id : '', always: false });
+  const removeStale = new Set();
   const of = k => plan.items.filter(i => i.kind === k);
-  const choice = (it, opts) => select(dec.get(it), opts, v => dec.set(it, v));
-  const keepOpts = [['add', 'Add'], ['skip', 'Skip this time'], ['always', 'Always skip']];
+  const tick = (checked, onchange) => h('input', { type: 'checkbox', checked, onchange: e => onchange(e.target.checked) });
+  const always = it => h('label', { class: 'check seen', title: 'Never offer this name again when importing' },
+    tick(false, v => { dec.get(it).always = v; if (v) { dec.get(it).on = false; refresh(); } }), ' Always skip');
+  const person = (it, extra) => {
+    const cb = tick(false, v => { dec.get(it).on = v; });
+    rowOf.set(it, cb);
+    return h('tr', {},
+      h('td', {}, h('label', { class: 'check' }, cb, ' ', h('b', {}, it.c.name)), h('div', { class: 'seen' }, `${it.c.role}, ${it.c.grade}`)),
+      h('td', {}, extra || null), h('td', {}, always(it)));
+  };
+  // a section with Select all / Clear for its checkboxes
   const section = (title, hint, rows, closed) => {
     if (!rows.length) return null;
-    const body = [hint ? h('p', { class: 'hint' }, hint) : null, h('table', {}, h('tbody', {}, rows))];
-    return closed
-      ? h('section', {}, h('details', {}, h('summary', {}, h('h3', { style: 'display:inline' }, `${title} (${rows.length})`)), ...body))
-      : h('section', {}, h('h3', {}, `${title} (${rows.length})`), ...body);
+    const body = h('div', {}, hint ? h('p', { class: 'hint' }, hint) : null, h('table', {}, h('tbody', {}, rows)));
+    const setAll = v => { for (const cb of body.querySelectorAll('td:first-child input[type=checkbox]')) if (cb.checked !== v) { cb.checked = v; cb.dispatchEvent(new Event('change')); } };
+    const head = [h('h3', { style: 'display:inline' }, `${title} (${rows.length})`), ' ',
+      h('button', { class: 'small', onclick: e => { e.preventDefault(); setAll(true); } }, 'Select all'), ' ',
+      h('button', { class: 'small', onclick: e => { e.preventDefault(); setAll(false); } }, 'Clear')];
+    return closed ? h('section', {}, h('details', {}, h('summary', {}, ...head), body)) : h('section', {}, h('div', { class: 'section-head' }, ...head), body);
   };
+
   return new Promise(resolve => {
     const close = v => { dlg.close(); dlg.remove(); resolve(v); };
     const apply = () => {
       const skip = new Set(state.settings.importSkip || []);
       const byId = new Map(state.staff.map(p => [p.id, p]));
       const added = [];
-      let updated = 0, skipped = 0;
+      let updated = 0;
       const create = c => ({ id: newId(), source: contact ? 'contact' : 'import', name: c.name, aliases: c.aliases || [], role: c.role, grade: c.grade, posting: c.posting || '', subspecs: c.subspecs || [], avoid: c.avoid || [], history: {} });
       for (const it of plan.items) {
         const d = dec.get(it);
-        if (d === 'update') { byId.set(it.p.id, it.p); updated++; }
-        else if (d?.startsWith('same:')) { const t = byId.get(d.slice(5)); if (t) { byId.set(t.id, importUpdate(t, it.c, contact).p); updated++; } }
-        else if (d === 'add') added.push(create(it.c));
-        else if (d === 'always') { skip.add(it.c.name); skipped++; }
-        else if (d === 'skip') skipped++;
+        if (!d) continue;
+        if (d.always) { skip.add(it.c.name); continue; }
+        if (!d.on) continue;
+        if (it.kind === 'match') { byId.set(it.p.id, it.p); updated++; }
+        else if (it.kind === 'maybe' && d.how.startsWith('same:')) { const t = byId.get(d.how.slice(5)); if (t) { byId.set(t.id, importUpdate(t, it.c, contact).p); updated++; } }
+        else added.push(create(it.c));
       }
       for (const p of removeStale) byId.delete(p.id);
       state.staff = [...byId.values(), ...added];
       state.settings.importSkip = [...skip];
-      close(`${fileName}: ${added.length} added, ${updated} updated, ${skipped} skipped${removeStale.size ? `, ${removeStale.size} removed` : ''}.`);
+      close(`${fileName}: ${added.length} added, ${updated} updated${removeStale.size ? `, ${removeStale.size} removed` : ''}.`);
     };
     const dlg = h('dialog', { class: 'changes wide' },
       h('h2', {}, `Import ${fileName}`),
-      h('p', { class: 'hint' }, `${plan.items.length} people read${contact ? ' (names, grades and subspecs only)' : ''}. Choose what happens to each one; nothing changes until you press Import.`),
+      h('p', { class: 'hint' }, `${plan.items.length} people read${contact ? ' (names, grades and subspecs only)' : ''}. Tick the people to bring in; nothing changes until you press Import.`),
       h('div', { class: 'import-review' },
         section('Might already be on the list', 'These look like someone already here, written differently. Pick who they are, or add them as a new person.',
-          of('maybe').map(it => h('tr', {}, h('td', {}, h('b', {}, it.c.name), h('div', { class: 'seen' }, it.c.grade)),
-            h('td', {}, choice(it, [...it.candidates.map(p => ['same:' + p.id, `Same as ${label(p)}`]), ...keepOpts.map(([k, l]) => [k, k === 'add' ? 'Add as a new person' : l])]))))),
-        section('New people', null, of('new').map(it => h('tr', {}, h('td', {}, h('b', {}, it.c.name), h('div', { class: 'seen' }, `${it.c.role}, ${it.c.grade}`)), h('td', {}, choice(it, keepOpts))))),
-        section('New juniors', 'Junior postings rotate, so juniors not on the staff list are skipped unless you add them.',
-          of('newJunior').map(it => h('tr', {}, h('td', {}, h('b', {}, it.c.name), h('div', { class: 'seen' }, it.c.grade)), h('td', {}, choice(it, keepOpts)))), true),
+          of('maybe').map(it => person(it, select(dec.get(it).how, [...it.candidates.map(p => ['same:' + p.id, `Same as ${label(p)}`]), ['add', 'Add as a new person']], v => { dec.get(it).how = v; })))),
+        section('New people', null, of('new').map(it => person(it))),
+        section('New juniors', 'Junior postings rotate, so juniors who aren\'t on the staff list usually stay out.', of('newJunior').map(it => person(it)), true),
         section('Changes to people on the list', null, of('match').filter(it => it.changes.length).map(it => h('tr', {},
-          h('td', {}, h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: true, onchange: e => dec.set(it, e.target.checked ? 'update' : 'same') }), ' ', h('b', {}, it.p.name))),
-          h('td', { class: 'seen' }, it.changes.join('; '))))),
-        section('No longer on the contact list', 'Added by an earlier import of the contact list but not on this one.', plan.stale.map(p => h('tr', {},
-          h('td', {}, h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: true, onchange: e => { if (e.target.checked) removeStale.add(p); else removeStale.delete(p); } }), ' Remove ', h('b', {}, p.name))),
-          h('td', { class: 'seen' }, p.grade)))),
+          h('td', {}, h('label', { class: 'check' }, tick(false, v => { dec.get(it).on = v; }), ' ', h('b', {}, it.p.name))),
+          h('td', { class: 'seen', colspan: 2 }, it.changes.join('; '))))),
+        section('No longer on the contact list', 'Added by an earlier import of the contact list but not on this one. Tick to remove them.', plan.stale.map(p => h('tr', {},
+          h('td', {}, h('label', { class: 'check' }, tick(false, v => { if (v) removeStale.add(p); else removeStale.delete(p); }), ' Remove ', h('b', {}, p.name))),
+          h('td', { class: 'seen', colspan: 2 }, p.grade)))),
         h('p', { class: 'seen' }, `${of('match').filter(it => !it.changes.length).length} already on the list with nothing to change.${of('skipped').length ? ` ${of('skipped').length} always skipped.` : ''}`)),
       h('div', { class: 'bar' },
         h('button', { class: 'primary', onclick: apply }, 'Import'),
@@ -598,6 +656,8 @@ async function learnFiles(files) {
 
 const pasteText = { leave: '', postcall: '', elsewhere: '', admin: '', notAround: '' };
 let unmatched = [];
+let lockEditing = null;
+let settingsEditing = false; // "roomId:lockSenior" while picking a fixed person on the Cases tab
 let dayFilter = '';
 
 function renderDay(part) {
@@ -608,16 +668,31 @@ function renderDay(part) {
   const avail = role => state.staff.filter(p => p.role === role && (dayOf(p.id).status || 'avail') === 'avail').length;
   const names = h('datalist', { id: 'staffNames' }, state.staff.map(p => h('option', { value: p.name })));
 
-  const lockInput = (r, key) => h('input', {
-    list: 'staffNames', value: r[key] ? person(r[key])?.name || '' : '', placeholder: 'auto',
-    onchange: e => {
-      const v = e.target.value.trim();
-      if (!v) { r[key] = ''; save(); return; }
-      const m = matchName(v, state.staff);
-      if (m.person) { r[key] = m.person.id; e.target.value = m.person.name; save(); }
-      else { toast(m.ambiguous ? `"${v}" matches several people` : `"${v}" isn't in the staff list`); e.target.value = ''; r[key] = ''; save(); }
-    },
-  });
+  // fixed senior / junior: a chip, picked from the staff list only (no typing in new names)
+  const lockInput = (r, key) => {
+    const p = r[key] && person(r[key]);
+    if (p) return h('span', { class: 'name lock-chip', style: colourStyle(p.name), title: p.name },
+      h('span', { class: 'label' }, shortName(p) || p.name),
+      h('span', { class: 'icon del', title: 'Let the roster choose', onclick: () => { r[key] = ''; render(); } }, '×'));
+    const id = r.id + ':' + key;
+    if (lockEditing !== id) return h('button', { class: 'add-name', title: 'Fix someone to this room', onclick: () => { lockEditing = id; render(); } }, '+');
+    const pick = v => {
+      if (lockEditing !== id) return; // the change event that follows Enter
+      const q = String(v).trim();
+      const exact = state.staff.find(s => s.name === q && s.role === (key === 'lockSenior' ? 'senior' : 'junior'));
+      const m = exact ? { person: exact } : matchName(q, state.staff.filter(s => s.role === (key === 'lockSenior' ? 'senior' : 'junior')));
+      if (!q) { lockEditing = null; render(); return; }
+      if (!m.person) { toast(m.ambiguous ? `"${q}" could be ${m.ambiguous.map(x => x.name).join(' or ')}` : `"${q}" isn't on the staff list. Add them on the Staff tab first.`); return; }
+      r[key] = m.person.id; lockEditing = null; render();
+    };
+    const input = nameInput({ class: 'cell-input', placeholder: 'Pick from the staff list',
+      onkeydown: e => { if (e.key === 'Escape') { lockEditing = null; render(); } if (e.key === 'Enter') { e.preventDefault(); pick(e.target.value); } },
+      onchange: e => { if (state.staff.some(s => s.name === e.target.value)) pick(e.target.value); },
+      onblur: e => setTimeout(() => { if (lockEditing === id && !e.target.value.trim()) { lockEditing = null; render(); } }, 150) },
+    key === 'lockSenior' ? 'senior' : 'junior');
+    setTimeout(() => input.focus());
+    return input;
+  };
 
   const roomRow = r => h('tr', { class: r.running ? '' : 'off' },
     h('td', {}, h('input', { type: 'checkbox', checked: r.running, 'aria-label': 'Running', onchange: e => { r.running = e.target.checked; if (r.running && !r.flagsManual) r.flags = suggestFlags(r.notes, state.settings, r.name); render(); } })),
@@ -928,7 +1003,25 @@ function setCellParts(row, key, parts) {
   row[key] = parts.map(p => key === 'premed' ? `${p} - Premed` : p).join(' / ');
 }
 
-let undoStack = [];
+let undoStack = []; // roster rows as JSON, or { all: JSON of day and roster, what } for a whole-roster change
+// Before replacing the whole roster (Generate new, restoring a saved one): keep the day and roster.
+function pushUndoAll(what) {
+  if (!state.roster || state.roster.date !== state.day.date) return;
+  undoStack.push({ all: JSON.stringify({ day: state.day, roster: state.roster }), what });
+  if (undoStack.length > 50) undoStack.shift();
+}
+function undo() {
+  const e = undoStack.pop();
+  if (!e) return;
+  if (typeof e === 'string') { state.roster.rows = JSON.parse(e); afterRosterEdit(true); return; }
+  const s = JSON.parse(e.all);
+  state.day = s.day; state.roster = s.roster;
+  lastRows = JSON.stringify(state.roster.rows);
+  logRoster([`Undo: ${e.what}`]);
+  syncRooms();
+  render();
+  toast(`Undid ${e.what}.`);
+}
 let lastRows = null; // rows as of the last logged change
 let editing = null; // "rowIndex:key" of the cell being typed in
 
@@ -1462,8 +1555,9 @@ function runGenerate(newSeed) {
   const seed = newSeed ? Math.floor(Math.random() * 1e9) : (state.roster?.seed || 1);
   const res = generate({ staff: state.staff, day: generatorDay(), settings: state.settings, seed });
   const log = state.roster?.date === state.day.date ? state.roster.log || [] : [];
-  if (state.roster?.rows?.length && state.roster.date === state.day.date && !confirm('Generate a new roster? This replaces the current one, including any changes you made by hand. (Undo can\'t bring it back, but the change log keeps a record.) To keep what\'s there, use Fill empty gaps instead.')) return;
-  undoStack = []; editing = null;
+  if (state.roster?.rows?.length && state.roster.date === state.day.date && !confirm('Generate a new roster? This replaces the current one, including any changes you made by hand (Undo brings it back). To keep what\'s there, use Fill empty gaps instead.')) return;
+  pushUndoAll('the new roster');
+  editing = null;
   state.roster = { ...res, seed, date: state.day.date, log, checks: check({ rows: res.rows, staff: state.staff, day: state.day, settings: state.settings }) };
   logRoster([log.length ? 'Generated a new roster' : 'Generated the roster']);
   lastRows = JSON.stringify(res.rows);
@@ -1558,13 +1652,32 @@ function generalPeople() {
   return ids;
 }
 
-function renderGeneral() {
+// One Calls/clinics field: typed names win; grey placeholders come from the monthly rosters or the MOT team.
+function generalField(key, role) {
   const g = state.day.general || {};
   const eff = effectiveGeneral();
   const fromMonthly = generalFromMonthly(state.monthly, state.day.date);
-  const field = (key, role) => nameInput({ value: g[key] || '', placeholder: !g[key] && eff[key] ? `${eff[key]} (${fromMonthly[key] ? 'monthly roster' : 'MOT'})` : '—', style: 'width:100%',
+  return nameInput({ value: g[key] || '', placeholder: !g[key] && eff[key] ? `${eff[key]} (${fromMonthly[key] ? 'monthly roster' : 'MOT'})` : '—', style: 'width:100%',
     onchange: e => setGeneral(key, e.target.value, role, e.target),
     onkeydown: e => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } } }, role);
+}
+
+// The calls and clinics on the Roster tab, as a compact list (the same fields as Monthly › Today).
+function callsCard() {
+  const rows = [
+    ...TEAM_ROWS.map(([k, label], i) => [`MOT ${i < 2 ? label.replace(':', '') : 'MO' + (i - 1)}`, 'mot.' + k, i < 2 ? 'senior' : 'junior']),
+    ...TEAM_ROWS.slice(0, 3).map(([k, label], i) => [`SICU ${i < 2 ? label.replace(':', '') : 'MO1'}`, 'sicu.' + k, i < 2 ? 'senior' : 'junior']),
+    ...DUTIES.flatMap(d => d.fields.map(([f, label]) => [`${d.label} · ${label}`, `${d.key}.${f}`, f === 's' ? 'senior' : 'junior'])),
+  ];
+  const filled = rows.filter(([, k]) => effectiveGeneral()[k]).length;
+  return h('section', { class: 'card' }, h('details', { open: true },
+    h('summary', {}, h('h2', { style: 'display:inline' }, 'Calls and clinics'), h('span', { class: 'seen' }, ` ${filled} of ${rows.length} filled`)),
+    h('p', { class: 'hint' }, 'The top half of the sheet. Grey names come from the monthly rosters; type to override.'),
+    h('div', { class: 'calls-list' }, rows.map(([label, key, role]) => [h('label', { class: 'seen' }, label), generalField(key, role)]))));
+}
+
+function renderGeneral() {
+  const field = generalField;
   return h('div', {},
     h('section', { class: 'card' },
       h('h2', {}, 'Calls and clinics'),
@@ -1646,7 +1759,7 @@ function syncMonthly() {
   }
 }
 
-const MONTHLY_VIEWS = [['today', 'Today'], ['pain', 'Pain Roster'], ['liver', 'Liver Roster'], ['leave', 'Leave Roster'], ['aoh', 'AOH Roster'], ['junior', 'Junior Roster'], ['senior', 'Senior Roster']];
+const MONTHLY_VIEWS = [['today', 'Today'], ['pain', 'Pain Monthly'], ['liver', 'Liver Monthly'], ['leave', 'Leave Monthly'], ['aoh', 'AOH Monthly'], ['junior', 'Junior Monthly'], ['senior', 'Senior Monthly']];
 function renderMonthly() {
   const view = MONTHLY_VIEWS.some(v => v[0] === state.monthlyView) ? state.monthlyView : 'today';
   const tabs = h('div', { class: 'seg subtabs', role: 'group', 'aria-label': 'Monthly' }, MONTHLY_VIEWS.map(([k, label]) =>
@@ -1719,7 +1832,7 @@ function monthlyDayCard() {
   const items = [];
   for (const def of MONTHLY) for (const c of def.cols) {
     const v = duty[def.id]?.[c.key];
-    if (v) items.push([def.label.replace(' Roster', ''), c.label, v]);
+    if (v) items.push([def.label.replace(' Monthly', ''), c.label, v]);
   }
   if (!items.length) return null;
   return h('section', { class: 'card' }, h('details', {},
@@ -1999,13 +2112,12 @@ function renderRoster() {
   const actions = h('div', { class: 'bar' },
     h('button', { class: 'primary', onclick: () => runGenerate(!!r) }, r ? 'Generate new' : 'Generate roster'),
     r && r.date === state.day.date && h('button', { onclick: fillGaps, title: 'Keep every name already on the roster and fill only the empty cells' }, 'Fill empty gaps'),
-    r && h('button', { disabled: !undoStack.length, onclick: () => { state.roster.rows = JSON.parse(undoStack.pop()); afterRosterEdit(true); } }, 'Undo'),
+    r && h('button', { disabled: !undoStack.length, onclick: undo }, 'Undo'),
     r && isMember() && h('button', { class: 'primary', onclick: saveRosterToCloud }, 'Save'),
-    r && h('button', { onclick: exportXlsx }, 'Download .xlsx'),
     r && h('div', { class: 'seg', role: 'group', 'aria-label': 'View' },
       h('button', { 'aria-pressed': String(rosterView === 'edit'), onclick: () => { rosterView = 'edit'; render(); } }, 'Edit'),
       h('button', { 'aria-pressed': String(rosterView === 'sheet'), onclick: () => { rosterView = 'sheet'; render(); } }, 'Sheet preview')),
-    r && rosterView === 'sheet' && h('button', { onclick: () => window.print() }, 'Print / save PDF'),
+    r && downloadButton(),
   );
   if (!r) return h('div', {}, h('section', { class: 'card' }, h('h2', {}, 'OT roster'), h('p', { class: 'hint' }, 'Generates AOCC, AIC and the OT lists: seniors, juniors and premed cover. You can edit any cell before downloading.'), actions), historyCard());
 
@@ -2047,6 +2159,7 @@ function renderRoster() {
       h('div', {},
         noListCard(),
         boxCard(),
+        callsCard(),
         historyCard(),
         rosterLogCard(),
         h('section', { class: 'card' },
@@ -2079,6 +2192,33 @@ async function exportXlsx() {
   const wb = buildRosterWorkbook(window.ExcelJS, { date: state.day.date, rows: state.roster.rows, lists: rosterLists(), general: effectiveGeneral(), box: commentsText(), colourOf, shortOf });
   const buf = await wb.xlsx.writeBuffer();
   download(`OT roster ${state.day.date}.xlsx`, new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+}
+
+let jspdf = null;
+async function exportPdf() {
+  if (!jspdf) {
+    await new Promise((ok, fail) => { const s = document.createElement('script'); s.src = 'vendor/jspdf.umd.min.js'; s.onload = ok; s.onerror = fail; document.head.append(s); });
+    jspdf = window.jspdf.jsPDF;
+  }
+  colourCache.clear();
+  const layout = buildLayout({ date: state.day.date, rows: state.roster.rows, lists: rosterLists(), general: effectiveGeneral(), box: commentsText(), colourOf, shortOf });
+  download(`OT roster ${state.day.date}.pdf`, buildRosterPdf(jspdf, layout).output('blob'));
+}
+
+// Download button: the format last picked (remembered in this browser), with a menu to change it.
+const DOWNLOADS = [['xlsx', 'Download .xlsx', exportXlsx], ['pdf', 'Download PDF', exportPdf], ['print', 'Print', () => { rosterView = 'sheet'; render(); setTimeout(() => window.print(), 100); }]];
+let downloadMenu = false;
+function downloadButton() {
+  let pick = 'xlsx';
+  try { pick = localStorage.getItem('nuh-roster-download') || 'xlsx'; } catch { /* no storage */ }
+  const cur = DOWNLOADS.find(d => d[0] === pick) || DOWNLOADS[0];
+  return h('div', { class: 'split' },
+    h('button', { onclick: () => cur[2]() }, cur[1]),
+    h('button', { class: 'caret', 'aria-label': 'Other formats', 'aria-expanded': String(downloadMenu), onclick: () => { downloadMenu = !downloadMenu; render(); } }, '▾'),
+    downloadMenu ? h('div', { class: 'menu' }, DOWNLOADS.map(([k, label, fn]) => h('button', { class: k === cur[0] ? 'on' : '', onclick: () => {
+      if (k !== 'print') { try { localStorage.setItem('nuh-roster-download', k); } catch { /* no storage */ } }
+      downloadMenu = false; render(); fn();
+    } }, label))) : null);
 }
 
 // ----- settings tab -----
@@ -2126,6 +2266,15 @@ function renderSettings() {
   );
 
   return h('div', {},
+    h('section', { class: 'card' },
+      h('div', { class: 'bar', style: 'margin:0' },
+        h('h2', { class: 'grow', style: 'margin:0' }, 'Settings'),
+        settingsEditing
+          ? h('button', { class: 'primary', onclick: () => { settingsEditing = false; render(); toast(isMember() ? 'Settings kept here. Use "Save for the team" to share them.' : 'Settings saved.'); } }, 'Done')
+          : h('button', { onclick: () => { settingsEditing = true; render(); } }, 'Edit settings')),
+      h('p', { class: 'hint', style: 'margin:0' }, settingsEditing ? 'Editing: changes apply straight away.' : 'Read only. Press Edit settings to change anything.'),
+      teamSyncBar()),
+    h('fieldset', { class: 'lock', disabled: !settingsEditing },
     h('section', { class: 'card scroll' },
       h('h2', {}, 'Subspecialties'),
       h('p', { class: 'hint' }, 'Keywords are matched as whole words in the case notes. "Required" means only seniors with that subspec can take the list. The posting is the junior posting that suits it.'),
@@ -2151,12 +2300,11 @@ function renderSettings() {
         const key = `${def.id}.${c.key}`;
         const list = st.nightDuties || NIGHT_DUTIES;
         const on = list.includes(key);
-        return h('span', { class: 'chip' + (on ? ' on' : ''), onclick: () => { st.nightDuties = on ? list.filter(k => k !== key) : [...list, key]; render(); } }, `${def.label.replace(' Roster', '')}: ${c.label}`);
+        return h('span', { class: 'chip' + (on ? ' on' : ''), onclick: () => { st.nightDuties = on ? list.filter(k => k !== key) : [...list, key]; render(); } }, `${def.label.replace(' Monthly', '')}: ${c.label}`);
       })))),
     h('section', { class: 'card' },
       h('h2', {}, 'Rooms'),
       h('p', { class: 'hint' }, 'The rooms on the roster, in order. "Running by default" rooms are ticked when you set up a new day (Clear day). Rooms in the same complex can share a senior when seniors are short. MOR 7–9 are emergency OTs, so they have no line.'),
-      teamSyncBar(),
       roomEditor(),
       h('p', { class: 'hint', style: 'margin-top:12px' }, 'Room defaults: subspecs a room always needs, one room per line, e.g. "MOR 12: cardiac". Use the keys ' + st.subspecs.map(x => x.key).join(', ') + '.'),
       h('textarea', { rows: 3, value: Object.entries(st.roomDefaults || {}).map(([room, ks]) => `${room}: ${ks.join(', ')}`).join('\n'), onchange: e => {
@@ -2174,13 +2322,22 @@ function renderSettings() {
         save(); toast(bad.length ? `Unknown subspec: ${bad.join(', ')}` : 'Room defaults updated.');
       } }),
     ),
+    ),
     isAdmin() ? membersCard() : null,
+    h('section', { class: 'card' },
+      h('h2', {}, 'Demo mode'),
+      h('p', { class: 'hint' }, 'Try the app with a made-up department: invented staff, monthly rosters and cases. The demo is kept apart from your real data and never signs in or shares anything. Send the link to anyone who wants to try it.'),
+      h('div', { class: 'bar', style: 'margin:0' },
+        DEMO ? null : h('a', { class: 'btn', href: demoLink(), target: '_blank', rel: 'noopener' }, 'Open demo'),
+        h('button', { onclick: () => navigator.clipboard.writeText(demoLink()).then(() => toast('Demo link copied.'), () => prompt('Demo link', demoLink())) }, 'Copy demo link'),
+        h('code', { class: 'seen' }, demoLink()))),
+    h('fieldset', { class: 'lock', disabled: !settingsEditing },
     h('section', { class: 'card' },
       h('h2', {}, 'Reset'),
       h('div', { class: 'bar' },
         h('button', { onclick: () => { if (confirm('Reset rules and subspecialties to the defaults? Staff are kept.')) { state.settings = clone(DEFAULT_SETTINGS); render(); } } }, 'Reset rules'),
         h('button', { onclick: () => { if (confirm('Delete everything stored in this browser (staff, day, roster)?')) { state = blankState(); syncRooms(); render(); } } }, 'Delete all data in this browser')),
-    ),
+    )),
   );
 }
 
@@ -2377,17 +2534,18 @@ function openSaved(date, snapshot, updatedAt) {
   if (local && !confirm(`Replace the roster on screen with the saved one for ${date}?`)) return;
   if (state.day.date !== date) (state.days ||= {})[state.day.date] = { day: state.day, roster: state.roster };
   delete state.days?.[date];
+  if (state.day.date === date) pushUndoAll('the restore');
   state.day = clone(snapshot.day);
   state.roster = clone(snapshot.roster);
   state.day.date = date;
-  logRoster([`Opened the version saved ${snapshot.savedAt ? when(snapshot.savedAt) : ''} by ${byName(snapshot.savedBy || snapshot.updatedBy)}`.replace('  ', ' ')]);
+  logRoster([`Restored the version saved ${snapshot.savedAt ? when(snapshot.savedAt) : ''} by ${byName(snapshot.savedBy || snapshot.updatedBy)}`.replace('  ', ' ')]);
   lastRows = JSON.stringify(state.roster.rows);
   state.cloudBase[date] = updatedAt;
-  undoStack = []; editing = null;
+  editing = null;
   syncRooms();
   state.tab = 'roster';
   render();
-  toast(`Opened the ${date} roster.`);
+  toast(`Restored the ${date} roster.${undoStack.length ? ' Undo brings back what you had.' : ''}`);
 }
 
 async function openLatest(date) {
@@ -2435,12 +2593,12 @@ function historyCard() {
       h('summary', {}, `History for ${date} (${versions.length})`),
       h('ul', { class: 'history' }, versions.map(v => h('li', {},
         h('span', {}, `${when(v.savedAt)} · ${byName(v.savedBy)}`),
-        h('button', { class: 'link', onclick: () => openSaved(date, v, meta?.updatedAt ?? v.savedAt) }, 'Open'))))) : null,
+        h('button', { class: 'link', onclick: () => openSaved(date, v, meta?.updatedAt ?? v.savedAt) }, 'Restore'))))) : null,
     recent.filter(x => x.date !== date).length ? h('details', {},
       h('summary', {}, 'Other dates'),
       h('ul', { class: 'history' }, recent.filter(x => x.date !== date).map(x => h('li', {},
         h('span', {}, `${x.date} · ${byName(x.updatedBy)}`),
-        h('button', { class: 'link', onclick: () => openLatest(x.date) }, 'Open'))))) : null,
+        h('button', { class: 'link', onclick: () => openLatest(x.date) }, 'Restore'))))) : null,
   );
 }
 

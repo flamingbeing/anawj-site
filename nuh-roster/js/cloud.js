@@ -12,7 +12,8 @@
 import { FIREBASE_CONFIG } from './firebase-config.js';
 
 const SDK = 'https://www.gstatic.com/firebasejs/10.12.2/';
-export const enabled = !!(FIREBASE_CONFIG && FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.projectId);
+// demo mode (?demo) never signs in or touches the team's data
+export const enabled = !!(FIREBASE_CONFIG && FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.projectId) && !new URLSearchParams(location.search).has('demo');
 
 let fb = null;
 async function sdk() {
