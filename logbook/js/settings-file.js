@@ -10,7 +10,7 @@ import { cleanExportOpts } from './export-opts.js';
 
 export const SETTINGS_KIND = 'apmes-logbook-settings';
 // account-specific bookkeeping that shouldn't travel with the file (your residency year is yours, not a colleague's)
-const SKIP = new Set(['sharedSeen', 'rYear', 'rYearAY', 'importMap']);
+const SKIP = new Set(['sharedSeen', 'rYear', 'rYearAY', 'importMap', 'cloudBackup']);
 // the settings a file may set: plain values, or a cleaner for the ones that hold lists and objects. A key not
 // listed here is dropped, and a value of the wrong shape never reaches the account (it would break every device)
 const str = (v, n = 200) => (typeof v === 'string' ? v.slice(0, n) : '');

@@ -15,6 +15,9 @@
 <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <script>
+  // the Dropbox sign-in popup coming back (?code=…&state=dbx-…; cloud-save.js): hand the code to the page that
+  // opened it and close; the app itself doesn't start in the popup
+  try { var dq = new URLSearchParams(location.search), ds = dq.get('state') || ''; if (window.opener && /^dbx-/.test(ds)) { window.__dbxReturn = true; window.opener.postMessage({ dbx: { code: dq.get('code') || '', state: ds, error: dq.get('error_description') || dq.get('error') || '' } }, location.origin); window.close(); } } catch (e) {}
   // this device's theme before the first paint (Settings → Display → Theme; light unless chosen)
   try { var t = localStorage.getItem('apmes-logbook-theme'); document.documentElement.dataset.theme = t === 'dark' || t === 'oled' ? 'dark' : t === 'auto' ? 'auto' : 'light'; if (t === 'oled') document.documentElement.dataset.oled = ''; } catch (e) {}
   // and its colour (Settings → Display → Colour; navy unless chosen): the palettes colors.js worked out last time
