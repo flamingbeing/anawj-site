@@ -267,10 +267,27 @@ function paintDate() {
   ui.refit = fit;
 }
 
+// The empty box's example, one line per part, with the arrows lined up (padded to the box's own font).
+const PLACEHOLDER = [['AB 72M', 'initials, age/sex'], ['lap chole', 'procedure'], ['GA ETT', 'notes']];
+function alignPlaceholder(ta) {
+  try {
+    const ctx = document.createElement('canvas').getContext('2d');
+    ctx.font = getComputedStyle(ta).font;
+    const w = t => ctx.measureText(t).width;
+    const en = w('\u2002'), hair = w('\u200A') || 1;
+    const max = Math.max(...PLACEHOLDER.map(([a]) => w(a))) + 2 * en;
+    ta.placeholder = PLACEHOLDER.map(([a, b]) => {
+      let gap = max - w(a);
+      const ens = Math.floor(gap / en); gap -= ens * en;
+      return a + '\u2002'.repeat(ens) + '\u200A'.repeat(Math.round(gap / hair)) + '← ' + b;
+    }).join('\n');
+  } catch { /* keep the plain one */ }
+}
+
 function renderOne(card) {
   const textarea = h('textarea', {
     class: 'details', rows: String(boxLines()), style: `min-height:calc(${boxLines()} * 1.4em + 22px)`, autofocus: true, enterkeyhint: settings().enterSaves ? 'done' : 'enter', autocapitalize: 'sentences', autocorrect: 'off', 'aria-label': 'Case summary',
-    placeholder: 'AB 72M  ← initials, age/sex\nlap chole GA  ← procedure\nnotes  ← optional',
+    placeholder: PLACEHOLDER.map(([a, b]) => `${a}  ← ${b}`).join('\n'),
     value: draft.details,
     oninput: e => { draft.details = e.target.value; saveDraft(); suggestSoon(); paintParsed(true); },
     // Enter is a new line (a case can take several lines); Ctrl+Enter / Cmd+Enter saves
@@ -319,6 +336,7 @@ function renderOne(card) {
     savebar);
   Object.assign(ui, { draftNote, textarea, parsed, sugg, selected, selExtra, tip, templates, picker });
   paintSuggest(); paintSel(); paintQuick(); paintParsed(false);
+  requestAnimationFrame(() => alignPlaceholder(textarea));
   // autofocus attribute is ignored on re-render; focus after insertion (not on phones' first paint
   // when that would pop the keyboard over a fresh landing — it's what the user came to do, so do it)
   requestAnimationFrame(() => { if (document.activeElement === document.body || !document.activeElement) textarea.focus({ preventScroll: true }); });
