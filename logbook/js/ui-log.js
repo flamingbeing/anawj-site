@@ -270,7 +270,7 @@ function paintDate() {
 function renderOne(card) {
   const textarea = h('textarea', {
     class: 'details', rows: String(boxLines()), style: `min-height:calc(${boxLines()} * 1.4em + 22px)`, autofocus: true, enterkeyhint: settings().enterSaves ? 'done' : 'enter', autocapitalize: 'sentences', autocorrect: 'off', 'aria-label': 'Case summary',
-    placeholder: 'AB 72M  ← initials, age/sex\nlap chole GA  ← procedure',
+    placeholder: 'AB 72M  ← initials, age/sex\nlap chole GA  ← procedure\nnotes  ← optional',
     value: draft.details,
     oninput: e => { draft.details = e.target.value; saveDraft(); suggestSoon(); paintParsed(true); },
     // Enter is a new line (a case can take several lines); Ctrl+Enter / Cmd+Enter saves
@@ -295,6 +295,8 @@ function renderOne(card) {
   // "might be worth a reflection": tag it now, write it later from the Reflections tab
   const tagBox = h('label', { class: 'check reflect-tag' }, h('input', { type: 'checkbox', checked: !!draft.reflectTag, onchange: e => { draft.reflectTag = e.target.checked; saveDraft(); } }), 'Possible reflection');
   ui.tagBox = tagBox;
+  const draftNote = h('span', { class: 'draft-note', 'aria-live': 'polite' });
+  const tagRow = h('div', { class: 'tag-row' }, tagBox, draftNote);
   const actions = h('div', { class: 'actions' },
     h('button', { class: 'primary big', onclick: () => save({}) }, 'Save', h('span', { class: 'kbd', title: 'Ctrl+Enter (Cmd+Enter on a Mac)' }, ' Ctrl+⏎')),
     h('button', { class: 'big', title: 'Save and keep this date for the next case', onclick: () => save({ another: true }) }, 'Save, keep date'));
@@ -306,7 +308,7 @@ function renderOne(card) {
   const selExtra = h('div', { class: 'sel-extra' });
   const savebar = h('div', { class: 'savebar' }, selected, actions);
   add(card,
-    h('div', { class: 'box-wrap' }, textarea, pasteBtn(textarea)), parsed, selExtra, tip, tagBox,
+    h('div', { class: 'box-wrap' }, textarea, pasteBtn(textarea)), parsed, selExtra, tip, tagRow,
     // suggestions first, then the last case and your own templates
     h('div', { class: 'chiplabel' }, 'Quick picks'), sugg, templates,
     h('div', { class: 'bar cat-head' }, h('div', { class: 'chiplabel grow' }, 'All categories'),
@@ -315,7 +317,7 @@ function renderOne(card) {
     picker.el,
     stillNeeded(),
     savebar);
-  Object.assign(ui, { textarea, parsed, sugg, selected, selExtra, tip, templates, picker });
+  Object.assign(ui, { draftNote, textarea, parsed, sugg, selected, selExtra, tip, templates, picker });
   paintSuggest(); paintSel(); paintQuick(); paintParsed(false);
   // autofocus attribute is ignored on re-render; focus after insertion (not on phones' first paint
   // when that would pop the keyboard over a fresh landing — it's what the user came to do, so do it)
@@ -324,19 +326,19 @@ function renderOne(card) {
 
 const suggestSoon = debounce(() => paintSuggest(), 120);
 
-// "AB · 72M · lap chole, GA ETT" under the box, plus "Draft saved" once typing pauses
-let draftNote = null;
+// "AB · 72M · lap chole, GA ETT" under the box; "Draft saved" (once typing pauses) sits at the end of
+// the Possible reflection line
 function paintParsed(typed) {
   if (!ui || !ui.parsed) return;
   const text = draft.details.trim();
+  if (ui.draftNote) ui.draftNote.textContent = text && typed ? 'Draft saved' : '';
   if (!text) { fill(ui.parsed); return; }
   const { initials, details } = splitInitials(text);
   const { age, rest } = splitAge(details);
   const bits = [initials ? h('span', { class: 'pi' }, h('small', {}, 'Initials '), h('b', {}, initials)) : h('span', { class: 'pi none' }, 'No initials found'),
     age ? h('span', { class: 'pi' }, h('small', {}, 'Age/sex '), h('b', {}, age.replace(/[mf]$/, c => c.toUpperCase()))) : null,
     rest ? h('span', { class: 'pi grow' }, rest.split('\n')[0].slice(0, 60)) : null];
-  draftNote = h('span', { class: 'draft-note' }, typed ? 'Draft saved' : '');
-  fill(ui.parsed, ...bits.filter(Boolean), draftNote);
+  fill(ui.parsed, ...bits.filter(Boolean));
 }
 
 function paintSuggest() {

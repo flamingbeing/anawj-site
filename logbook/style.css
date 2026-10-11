@@ -577,7 +577,8 @@ button.icon-btn { min-width: 40px; }
 .parsed .pi b { color: var(--ink); }
 .parsed .pi.none { color: var(--warn); }
 .parsed .pi.grow { flex: 1 1 8em; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.parsed .draft-note { margin-left: auto; font-size: 12px; }
+.tag-row { display: flex; align-items: center; gap: 8px; }
+.tag-row .draft-note { margin-left: auto; font-size: 12px; color: var(--muted); }
 /* text size (Settings -> Display): scales the page content and dialogs, not the tab bar */
 main, dialog { zoom: var(--text-zoom, 1); }
 
