@@ -31,7 +31,7 @@ export function renderProgress() {
       h('span', { class: 'muted' }, `${S.cases.length} cases logged`)),
     // the counts double as the legend: one line of coloured dots
     h('p', { class: 'legend tally', style: 'margin:8px 0 0' },
-      [['late', 'behind'], ['due', 'due this year'], ['ontrack', 'on track'], ['done', 'done']].map(([k, t], i) => h('span', {}, i ? ' · ' : '', h('i', { class: `dot ${k}` }), ` ${tally(k)} ${t}`)),
+      [['late', 'behind'], ['due', 'due this year'], ['ontrack', 'on track'], ['done', 'done']].map(([k, t], i) => [h('span', { style: 'white-space:nowrap' }, h('i', { class: `dot ${k}` }), ` ${tally(k)} ${t}`, i < 3 ? '\u00a0·' : ''), i < 3 ? ' ' : '']).flat(),   // a wrap never starts a line with ·
       ' ', infoBtn),
     infoText,
     S.resident ? null : h('p', { class: 'hint', style: 'margin:4px 0 0' }, 'Not on the programme list, so your year is set in ', h('a', { href: '#settings' }, 'Settings'), '.'));
