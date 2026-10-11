@@ -289,7 +289,7 @@ function excelCard() {
       fileButton('Upload Excel', '.xlsx', uploadExcel)));
 }
 
-async function downloadExcel() {
+export async function downloadExcel() {
   try {
     await needExcel();
     const blob = await exportCases(S.cases, { name: displayName(), counts: S.counts, rYear: rYear() });

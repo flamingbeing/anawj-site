@@ -252,33 +252,18 @@ function fillRow(proto, r, n, media) {
   return proto.replace(/<w:tc(?:\s[^>]*)?>[\s\S]*?<\/w:tc>/g, tc => fillCell(tc, cells[i++] || [], media));
 }
 
-// The template's rows are slots: some carry a pre-printed "JR" in the date cell or a sub-type in the
-// diagnosis cell ("On pump CABG", "Under GA"). Each reflection goes to the row that asks for it;
-// rows left empty keep their prompt; extra reflections get new rows after the last.
+// The template's rows carry pre-printed prompts ("JR" in the date cell, a sub-type such as "On pump
+// CABG" in the diagnosis cell). The export drops those prompt rows and writes each reflection into a
+// plain row (JR and the sub-type go into the reflection's own cells), numbered 1, 2, …; blank rows
+// make up the heading's minimum.
 function slotInfo(hd, tr) {
   const cells = (tr.match(/<w:tc(?:\s[^>]*)?>[\s\S]*?<\/w:tc>/g) || []).map(textOf).map(t => t.trim());
-  const label = norm(cells[2] || '');
-  const sub = label && (hd.subs || []).find(x => { const n = norm(x.name); return label.includes(n) || n.includes(label) || label.startsWith(n.slice(0, 6)); });
-  return { tr, jr: /^jr$/i.test(cells[1] || ''), sub: sub ? sub.id : null, prompt: !!label, used: false };
+  return { tr, jr: /^jr$/i.test(cells[1] || ''), prompt: !!norm(cells[2] || '') };
 }
 export function placeInSlots(hd, protoRows, list, media) {
   const slots = protoRows.map(tr => slotInfo(hd, tr));
-  const out = slots.map(() => null);
-  const take = (r, ok) => { const i = slots.findIndex(sl => !sl.used && ok(sl)); if (i < 0) return false; slots[i].used = true; out[i] = r; return true; };
-  const extra = [];
-  for (const r of list) {
-    const done = (r.subId && take(r, sl => sl.sub === r.subId))
-      || (r.jr && take(r, sl => sl.jr && !sl.sub))
-      || take(r, sl => !sl.jr && !sl.sub && !sl.prompt)
-      || take(r, sl => !sl.sub && !(sl.jr && !r.jr))
-      || take(r, sl => !sl.sub);
-    if (!done) extra.push(r);
-  }
   const plain = (slots.find(sl => !sl.jr && !sl.prompt) || slots[slots.length - 1]).tr;
-  // rows are numbered 1, 2, … in table order; slots left empty don't count
-  let n = 0;
-  const rows = slots.map((sl, i) => (out[i] ? fillRow(sl.tr, out[i], ++n, media) : sl.tr));
-  for (const r of extra) rows.push(fillRow(plain, r, ++n, media));
+  const rows = list.map((r, i) => fillRow(plain, r, i + 1, media));
   while (rows.length < hd.min) rows.push(fillRow(plain, null));
   return rows;
 }

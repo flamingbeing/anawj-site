@@ -95,7 +95,12 @@ export function renderSettings() {
       h('p', { class: 'hint', style: 'margin:0' },
         'Your cases are stored in your own logbook in Google Cloud Firestore and only you (and the programme admins) can read them. ',
         'Log patient initials only — no names, NRIC or hospital numbers. Programme residents share case counts per category on the Totals tab; details are never shared. ',
-        'This device keeps an offline copy of your cases until you sign out — sign out on shared computers.')));
+        'This device keeps an offline copy of your cases until you sign out — sign out on shared computers.')),
+
+    h('section', { class: 'card credits' },
+      h('h2', {}, 'Credits'),
+      h('p', { style: 'margin:0' }, 'Code by ', h('b', {}, 'Abigail Sim')),
+      h('p', { style: 'margin:4px 0 0' }, 'Design and UX/UI by ', h('b', {}, 'Koh Wenjun'))));
 }
 
 // ---------- Account-tab cards: who you are, sign out ----------

@@ -9,7 +9,9 @@ import { renderProgress, renderTotals } from './ui-progress.js';
 import { applyCompact, cachedCompact, applyTheme, cachedTheme, applyTextSize, cachedTextSize, renderSettings } from './ui-settings.js';
 import { renderAccount, flush as flushProfile } from './ui-account.js';
 import { renderAdmin, leaveAdmin } from './ui-admin.js';
-import { renderReflect, watchMyReflections } from './ui-reflect.js';
+import { renderReflect, watchMyReflections, portfolioExportButton } from './ui-reflect.js';
+import { downloadExcel } from './ui-logbook.js';
+import { downloadBackup } from './backup.js';
 import { purgeExpired } from './bin.js';
 
 // Tab icons: tiny inline SVG paths (24x24, stroked), so they look the same on every phone.
@@ -49,9 +51,21 @@ const TABS = [
 
 function renderMore() {
   const items = visibleTabs().filter(t => t.under === 'more');
-  return h('section', { class: 'card more-list' }, h('h2', {}, 'More'),
-    h('ul', {}, items.map(t => h('li', {}, h('a', { href: '#' + t.id, 'data-go': t.id, onclick: e => { e.preventDefault(); go(t.id); } },
-      icon(t.id), h('span', { class: 'mt' }, h('b', {}, t.label), h('small', {}, t.desc)), h('span', { class: 'chev', 'aria-hidden': 'true' }, '›'))))));
+  return h('div', {},
+    h('section', { class: 'card more-list' }, h('h2', {}, 'More'),
+      h('ul', {}, items.map(t => h('li', {}, h('a', { href: '#' + t.id, 'data-go': t.id, onclick: e => { e.preventDefault(); go(t.id); } },
+        icon(t.id), h('span', { class: 'mt' }, h('b', {}, t.label), h('small', {}, t.desc)), h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')))))),
+    // everything that leaves the app as a file
+    h('section', { class: 'card export-sync' }, h('h2', {}, 'Export & Sync'),
+      h('h3', {}, 'Portfolio (Word)'),
+      h('p', { class: 'hint' }, 'Your complete reflections in the APMES portfolio, with Section 1 and the Section 4 case numbers filled in.'),
+      h('div', { class: 'bar' }, portfolioExportButton()),
+      h('h3', {}, 'Logbook (Excel)'),
+      h('p', { class: 'hint' }, 'All your cases as a spreadsheet. To edit and upload it back, use Logbook → More tools.'),
+      h('div', { class: 'bar' }, h('button', { onclick: downloadExcel }, 'Download Excel')),
+      h('h3', {}, 'Backup'),
+      h('p', { class: 'hint' }, 'Everything in one file you keep (restore it from Settings → Backup). To copy a day into your notes, open a case and use Share or Copy as Markdown.'),
+      h('div', { class: 'bar', style: 'margin-bottom:0' }, h('button', { onclick: e => downloadBackup(e.currentTarget) }, 'Download backup'))));
 }
 
 const app = document.getElementById('app');

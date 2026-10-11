@@ -247,7 +247,7 @@ function paintParsed(typed) {
   const { initials, details } = splitInitials(text);
   const { age, rest } = splitAge(details);
   const bits = [initials ? h('span', { class: 'pi' }, h('small', {}, 'Initials '), h('b', {}, initials)) : h('span', { class: 'pi none' }, 'No initials found'),
-    age ? h('span', { class: 'pi' }, h('small', {}, 'Age/sex '), h('b', {}, age)) : null,
+    age ? h('span', { class: 'pi' }, h('small', {}, 'Age/sex '), h('b', {}, age.replace(/[mf]$/, c => c.toUpperCase()))) : null,
     rest ? h('span', { class: 'pi grow' }, rest.split('\n')[0].slice(0, 60)) : null];
   draftNote = h('span', { class: 'draft-note' }, typed ? 'Draft saved' : '');
   fill(ui.parsed, ...bits.filter(Boolean), draftNote);
