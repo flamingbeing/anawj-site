@@ -58,23 +58,39 @@ assert.equal(tagName([], '16:elective'), 'elective', 'older subcategory key');
 // CSV round trip
 const names = code => ({ pill: 'P' + code, long: 'Long ' + code });
 const csv = tagSetToCsv(c, names);
-assert.ok(csv.startsWith('Type,Tag,Long name,Under,APMES categories,Hidden,Key'));
-assert.ok(/Tag,Interscalene,,Blocks,26i Upper limb blocks,,u:x/.test(csv), csv.split('\r\n').find(l => l.includes('Interscalene')));
-const back = tagSetFromCsv(csv, names);
-assert.deepEqual(back.errors, []);
+assert.ok(csv.startsWith('Type,Name,Full name,Under,APMES categories,Hidden,ID'));
+assert.ok(/Personal,Interscalene,,Blocks,26i Upper limb blocks,no,u:x/.test(csv), csv.split('\r\n').find(l => l.includes('Interscalene')));
+assert.ok(/^APMES,Blocks,/m.test(csv) && /^Header,/m.test(csv));
+const back = tagSetFromCsv(csv, names, c);
+assert.deepEqual(back.errors, []); assert.deepEqual(back.notes, []);
 const bb = Object.fromEntries(back.set.map(e => [e.k, e]));
 assert.equal(bb['c:26'].n, 'Blocks'); assert.equal(bb['c:26'].p, 'h:reg');
 assert.equal(bb['u:x'].p, 'c:26'); assert.deepEqual(bb['u:x'].links, ['26i']);
 assert.ok(!('n' in bb['c:03']), 'default names not stored');
-// hand-written CSV from Excel: moved columns, quotes, no keys
-const hand = 'Tag,Type,Under,APMES categories\r\nRegional,Header,,\r\nBlocks,Category,Regional,"26 Peripheral nerve blocks"\r\n"Hip #, NOF",Tag,Blocks,"18; 21"\r\nSupervisor note,Tag,,\r\nBad,Tag,,99x\r\n';
-const h2 = tagSetFromCsv(hand, names);
-assert.equal(h2.errors.length, 1); assert.match(h2.errors[0], /99x/);
+// the old file format still loads
+const old = 'Type,Tag,Long name,Under,APMES categories,Hidden,Key\r\nCategory,Blocks,,,26 Peripheral nerve blocks,,c:26\r\nTag,Interscalene,,Blocks,26i,,u:x\r\n';
+const o2 = tagSetFromCsv(old, names, c);
+assert.deepEqual(o2.errors, []); assert.equal(o2.set.find(e => e.k === 'u:x').p, 'c:26');
+// hand-written CSV from Excel: moved columns, quotes, no IDs, Under below it, names instead of numbers
+const hand = 'My tags\r\n\r\nName,Type,Under,Counts towards,Extra\r\nRegional,Header,,,x\r\nBlocks,APMES,Regional,"26 Peripheral nerve blocks"\r\n"Hip #, NOF",Personal,Blocks,"18; 21"\r\nSupervisor note,,Later,\r\nBad,Personal,,99x\r\nLater,Header,,\r\nThoracic,APMES,,Thoracic surgery\r\nInterscalene,Personal,Nowhere,8\r\n';
+const h2 = tagSetFromCsv(hand, names, c);
+assert.equal(h2.errors.length, 2, h2.errors.join('\n')); assert.match(h2.errors[0], /99x/); assert.match(h2.errors[1], /Nowhere/);
 const hip = h2.set.find(e => e.n === 'Hip #, NOF');
 assert.ok(hip && hip.k.startsWith('u:'));
 assert.deepEqual(hip.links, ['18', '21']);
 assert.equal(h2.set.find(e => e.k === 'c:26').p, h2.set.find(e => e.n === 'Regional').k);
 assert.deepEqual(tagLinks(h2.set, hip.k).sort(), ['18', '21', '26']);
+assert.equal(h2.set.find(e => e.n === 'Supervisor note').p, h2.set.find(e => e.n === 'Later').k, 'Under a row further down');
+assert.ok(h2.set.some(e => e.k === 'c:03'), 'APMES by name');
+assert.equal(h2.set.find(e => e.n === 'Interscalene').k, 'u:x', 'same name keeps your tag ID');
+assert.deepEqual(h2.set.find(e => e.n === 'Interscalene').links, ['08'], 'single-digit number');
+assert.ok(h2.missing.length > 0 && h2.notes.some(n => /at the end/.test(n)), 'missing APMES reported');
+assert.ok(h2.set.filter(e => e.k.startsWith('c:')).length === ACTIVE.length, 'missing APMES added back');
+// unknown type, duplicate APMES, semicolon file
+const odd = tagSetFromCsv('Type;Name;APMES categories\r\nWeird;Foo;\r\nAPMES;A;26\r\nAPMES;B;26\r\n', names, []);
+assert.equal(odd.errors.length, 2, odd.errors.join('\n')); assert.ok(odd.set.some(e => e.n === 'Foo' && e.k.startsWith('u:')));
+// your tags missing from the file are reported
+assert.ok(tagSetFromCsv('Type,Name\r\nPersonal,New one\r\n', names, c).dropped.includes('Interscalene'));
 assert.ok(tagSetFromCsv('a,b\r\n1,2', names).errors.length, 'not a tag file');
 assert.deepEqual(parseCsv('a,"b ""c""",d\n'), [['a', 'b "c"', 'd']]);
 console.log('tags tests passed');

@@ -91,7 +91,7 @@ export function renderSettings() {
 
     h('section', { class: 'card' },
       h('div', { class: 'bar' }, h('h2', { style: 'margin:0' }, 'Tag editor'), h('span', { class: 'grow' }), h('a', { class: 'btn small', href: '#tags' }, 'Open tag editor ›')),
-      h('p', { class: 'hint', style: 'margin:6px 0 0' }, 'Rename, hide and reorder the categories on the Log page, group them under headers, and add your own tags. Share your layout as a CSV file.')),
+      h('p', { class: 'hint', style: 'margin:6px 0 0' }, 'Rename, hide and reorder the APMES tags on the Log page, group them under headers, and add personal tags. Download or load your layout as a CSV file.')),
 
     h('section', { class: 'card' },
       h('h2', {}, 'Reflections'),
@@ -242,24 +242,24 @@ export function renderTagEditor() {
   const nodes = flatTree(tagTree(set));
   const names = code => ({ pill: catShort(code), long: catName(code) });
   const def = code => ({ pill: (DEFAULT_NAMES[code] || [])[1] || BY_CODE[code].name, long: (DEFAULT_NAMES[code] || [])[0] || BY_CODE[code].name });
-  const linkText = n => n.kind === 'cat' ? 'APMES category' : n.kind === 'head' ? 'section header'
-    : (n.e.links || []).length ? 'counts as ' + n.e.links.map(catShort).join(', ') : (n.e.p && n.e.p.startsWith('c:') ? 'under ' + catShort(n.e.p.slice(2)) : 'personal label');
+  const linkText = n => n.kind === 'head' ? 'section header'
+    : 'Personal · ' + ((n.e.links || []).length ? 'counts as ' + n.e.links.map(catShort).join(', ') : (n.e.p && n.e.p.startsWith('c:') ? 'counts under ' + catShort(n.e.p.slice(2)) : 'label only'));
   const row = n => h('li', { 'data-k': n.e.k, style: `padding-left:${8 + Math.min(n.depth, 4) * 18}px`, class: `te-${n.kind}${n.e.hide ? ' te-hidden' : ''}` },
     // drag by the handle: onto the top or bottom of a row to go before or after it, the middle to go inside
     h('span', { class: 'te-handle', title: 'Drag to move or nest', 'aria-label': 'Drag to move or nest', onpointerdown: e => startTagDrag(e, n.e.k) }, '⠿'),
     h('button', { type: 'button', class: 'te-name', onclick: () => editTag(n) },
       h('span', { class: 'te-pill' }, n.kind === 'head' ? n.e.n : n.kind === 'cat' ? catShort(n.code) : n.e.n),
       n.kind === 'head' ? null : h('small', { class: 'muted te-sub' },
-        [n.kind === 'cat' ? catName(n.code) : linkText(n), n.e.hide ? 'hidden' : ''].filter(Boolean).join(' · '))),
+        [n.kind === 'cat' ? 'APMES · ' + catName(n.code) : linkText(n), n.e.hide ? 'hidden' : ''].filter(Boolean).join(' · '))),
     h('button', { class: 'small icon-btn', 'aria-label': 'Move up', onclick: () => saveTags(moveTag(set, n.e.k, -1)) }, '↑'),
     h('button', { class: 'small icon-btn', 'aria-label': 'Move down', onclick: () => saveTags(moveTag(set, n.e.k, 1)) }, '↓'));
   return h('section', { class: 'card tag-editor' },
     h('h2', {}, 'Tag editor'),
-    h('p', { class: 'hint' }, 'Lay out the Log page’s list your way. The APMES categories are built in: rename (just for you), hide, move them or put them under section headers. Add your own tags: link one to APMES categories and choosing it ticks them; with no link it’s a personal label. A tag under a category counts towards it. Totals and exports always use the APMES categories.'),
+    h('p', { class: 'hint' }, 'Lay out the Log page’s list your way. APMES tags are the programme’s categories: rename (just for you), hide, move them or put them under section headers. Personal tags are your own: link one to APMES categories and choosing it ticks them, or leave it as a label only. A personal tag under an APMES one counts towards it. Totals and exports always use APMES.'),
     h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:8px;margin:0 0 8px' },
-      h('button', { class: 'small primary', onclick: () => editTag(null, 'tag') }, '+ Tag'),
+      h('button', { class: 'small primary', onclick: () => editTag(null, 'tag') }, '+ Personal tag'),
       h('button', { class: 'small', onclick: () => editTag(null, 'head') }, '+ Section header'),
-      h('button', { class: 'small', onclick: () => download(`tags-${todayISO()}.csv`, new Blob([tagSetToCsv(set, def)], { type: 'text/csv' })) }, 'Share as CSV'),
+      h('button', { class: 'small', onclick: () => download(`tags-${todayISO()}.csv`, new Blob([tagSetToCsv(set, def)], { type: 'text/csv' })) }, 'Download as CSV'),
       fileButton('Load a CSV…', '.csv,text/csv', file => loadTagCsv(file, def), 'btn small'),
       h('button', { class: 'small', onclick: async () => {
         if (!(await confirmBox('Reset tags?', 'Go back to the APMES categories in the official order, with the programme’s names? Your own tags are removed from the list (cases keep them).', 'Reset', true))) return;
@@ -339,13 +339,13 @@ function editTag(n, kind = n ? n.kind : 'tag') {
   const linkBox = h('div', { class: 'te-links' }, PICKER_ORDER.map(c => h('label', { class: 'check' },
     h('input', { type: 'checkbox', checked: e.links.includes(c.code), onchange: ev => { e.links = ev.target.checked ? [...e.links, c.code] : e.links.filter(x => x !== c.code); } }),
     `${c.parent ? '\u00a0\u00a0' : ''}${catName(c.code)}`)));
-  const m = modal(n ? (kind === 'cat' ? 'Edit category' : kind === 'head' ? 'Edit header' : 'Edit tag') : (kind === 'head' ? 'New section header' : 'New tag'), [
-    code ? h('p', { class: 'hint' }, `APMES category: ${BY_CODE[code].label}. It always counts towards this category; renaming is just for you.`) : null,
+  const m = modal(n ? (kind === 'cat' ? 'Edit APMES tag' : kind === 'head' ? 'Edit header' : 'Edit personal tag') : (kind === 'head' ? 'New section header' : 'New personal tag'), [
+    code ? h('p', { class: 'hint' }, `APMES: ${BY_CODE[code].label}. It always counts towards this category; renaming is just for you.`) : null,
     h('label', { class: 'field' }, kind === 'head' ? 'Header' : 'Name (pill)', pill),
     kind !== 'head' ? h('label', { class: 'field' }, 'Long name (lists)', long) : null,
     kind !== 'head' ? h('label', { class: 'field' }, 'Sits under', under) : null,
     kind === 'tag' ? [h('div', { class: 'chiplabel' }, 'Counts towards (optional)'),
-      h('p', { class: 'hint', style: 'margin:0 0 4px' }, 'Choosing this tag ticks these APMES categories. Leave all unticked for a personal label.'), linkBox] : null,
+      h('p', { class: 'hint', style: 'margin:0 0 4px' }, 'Choosing this tag ticks these APMES categories. Leave all unticked for a label only.'), linkBox] : null,
     kind !== 'head' ? h('label', { class: 'check', style: 'margin-top:8px' }, hide, 'Hide from the Log page (still found by search)') : null,
     h('div', { class: 'bar', style: 'margin-top:12px' },
       n && kind !== 'cat' ? h('button', { class: 'danger', onclick: async () => { m.close(); await saveTags(removeTag(set, e.k)); toast('Removed (cases keep the tag)'); } }, 'Remove') : null,
@@ -364,13 +364,15 @@ function editTag(n, kind = n ? n.kind : 'tag') {
       } }, 'Save'))], { sticky: true });
 }
 
-// Load a shared CSV: show what's in it, then replace your layout.
+// Load a CSV: show what's in it and what didn't line up, then replace your layout.
 async function loadTagCsv(file, def) {
-  const { set, errors, counts } = tagSetFromCsv(await file.text(), def);
+  const { set, errors, notes, counts } = tagSetFromCsv(await file.text(), def, tagSet());
   if (!set) return toast(errors[0] || 'Could not read that file');
   const m = modal('Load tags', [
-    h('p', {}, `${counts.tags} tag${counts.tags === 1 ? '' : 's'}, ${counts.heads} header${counts.heads === 1 ? '' : 's'} and ${counts.cats} categories.`),
-    errors.length ? h('ul', { class: 'warnings' }, errors.slice(0, 8).map(x => h('li', {}, x))) : null,
+    h('p', {}, `${counts.cats} APMES, ${counts.tags} personal tag${counts.tags === 1 ? '' : 's'} and ${counts.heads} header${counts.heads === 1 ? '' : 's'}.`),
+    notes.length ? h('ul', { class: 'hint' }, notes.map(x => h('li', {}, x))) : null,
+    errors.length ? [h('p', { style: 'margin:8px 0 2px' }, h('b', {}, `${errors.length} thing${errors.length === 1 ? '' : 's'} didn’t line up`)),
+      h('ul', { class: 'warnings', style: 'max-height:40dvh;overflow:auto' }, errors.map(x => h('li', {}, x)))] : null,
     h('p', { class: 'hint' }, 'This replaces your tag layout. Your cases are not changed.'),
     h('div', { class: 'bar', style: 'margin-top:12px' }, h('span', { class: 'grow' }),
       h('button', { onclick: () => m.close() }, 'Cancel'),

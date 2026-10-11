@@ -149,11 +149,28 @@ export function tagName(set, key) {
   return i >= 0 && !String(key).startsWith('u:') ? String(key).slice(i + 1) : String(key);
 }
 
-// ---------- sharing as a CSV file (opens in Excel; human readable) ----------
+// ---------- sharing as a CSV file (opens in Excel; meant to be edited by hand) ----------
+//
+// One row per item, in list order. Type is APMES (a built-in category), Personal (your own tag) or Header.
+// Under names the row it sits under, by its Name. "APMES categories" says which category an APMES row is,
+// or what a Personal tag counts towards ("26 Peripheral nerve blocks; 18"; the number is enough).
+// ID is how a re-loaded file keeps your cases linked to your tags: leave it as is, blank for new rows.
 
-export const CSV_HEAD = ['Type', 'Tag', 'Long name', 'Under', 'APMES categories', 'Hidden', 'Key'];
+export const CSV_HEAD = ['Type', 'Name', 'Full name', 'Under', 'APMES categories', 'Hidden', 'ID'];
+// older and hand-typed column names
+const COLS = {
+  type: ['type', 'kind'],
+  name: ['name', 'tag', 'pill', 'short name'],
+  long: ['full name', 'long name', 'full'],
+  under: ['under', 'parent', 'sits under'],
+  links: ['apmes categories', 'apmes category', 'apmes', 'counts towards', 'categories', 'category', 'code', 'codes'],
+  hidden: ['hidden', 'hide'],
+  key: ['id', 'key'],
+};
+const TYPE_OUT = { cat: 'APMES', tag: 'Personal', head: 'Header' };
 const csvCell = v => { const s = String(v ?? ''); return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
 const catRef = code => `${code} ${BY_CODE[code].name}`;
+const norm = s => String(s ?? '').toLowerCase().replace(/[‘’`]/g, "'").replace(/\s+/g, ' ').trim();
 
 // names(code) -> { pill, long } as shown now (for the built-in rows' default names).
 export function tagSetToCsv(set, names = () => ({ pill: '', long: '' })) {
@@ -162,27 +179,30 @@ export function tagSetToCsv(set, names = () => ({ pill: '', long: '' })) {
   const rows = [CSV_HEAD];
   for (const n of flatTree(tagTree(set))) {
     const e = n.e;
-    const type = n.kind === 'head' ? 'Header' : n.kind === 'cat' ? 'Category' : 'Tag';
     const nm = n.kind === 'cat' ? (e.n || names(n.code).pill) : e.n;
-    const long = n.kind === 'cat' ? (e.l || names(n.code).long) : (e.l || '');
+    const long = n.kind === 'cat' ? (e.l || names(n.code).long) : n.kind === 'head' ? '' : (e.l || '');
     const links = n.kind === 'cat' ? [catRef(n.code)] : (e.links || []).map(catRef);
-    rows.push([type, nm, long, e.p ? label(e.p) : '', links.join('; '), e.hide ? 'yes' : '', e.k]);
+    rows.push([TYPE_OUT[n.kind], nm, long, e.p ? label(e.p) : '', links.join('; '), n.kind === 'head' ? '' : e.hide ? 'yes' : 'no', e.k]);
   }
   return rows.map(r => r.map(csvCell).join(',')).join('\r\n') + '\r\n';
 }
 
-// Split CSV text into rows of cells (quotes, doubled quotes, commas and line breaks in quotes).
+// Split CSV text into rows of cells (quotes, doubled quotes, separators and line breaks in quotes).
+// The separator is a comma, or a semicolon or tab when the first line uses those (Excel in some regions).
 export function parseCsv(text) {
+  const s = String(text || '').replace(/^﻿/, '');
+  const first = s.split(/\r?\n/, 1)[0] || '';
+  const count = ch => first.split(ch).length - 1;
+  const sep = [',', ';', '\t'].sort((x, y) => count(y) - count(x))[0];
   const rows = [];
   let row = [], cell = '', q = false;
-  const s = String(text || '').replace(/^﻿/, '');
   for (let i = 0; i < s.length; i++) {
     const ch = s[i];
     if (q) {
       if (ch === '"') { if (s[i + 1] === '"') { cell += '"'; i++; } else q = false; }
       else cell += ch;
     } else if (ch === '"') q = true;
-    else if (ch === ',') { row.push(cell); cell = ''; }
+    else if (ch === sep) { row.push(cell); cell = ''; }
     else if (ch === '\n' || ch === '\r') {
       if (ch === '\r' && s[i + 1] === '\n') i++;
       row.push(cell); rows.push(row); row = []; cell = '';
@@ -192,65 +212,113 @@ export function parseCsv(text) {
   return rows.filter(r => r.some(c => String(c).trim()));
 }
 
-// A tag set from a shared CSV: { set, errors: [string], counts: { cats, tags, heads } }. Rows are read by
-// the column names, so columns may be moved. Built-in categories are matched by the code at the start
-// of "APMES categories" (or the Key); a missing one is kept at the end. "Under" names a row above it
-// (by its Tag name, or its Key).
-export function tagSetFromCsv(text, names = () => ({ pill: '', long: '' })) {
+// A tag set from a CSV, forgiving of hand edits:
+//   { set, errors, notes, counts: { cats, tags, heads }, missing: [codes], dropped: [names] }
+// errors: rows or values that were skipped or changed; notes: the APMES categories not in the file
+// (added at the end) and your tags not in it (taken off the list; cases keep them).
+// Columns are found by name (any order, old names too, extra columns ignored; the header row may sit
+// below a title). APMES categories match by number, or by the official, programme or your own name.
+// Under matches a Name anywhere in the file (or an APMES number). Personal rows without a known ID
+// take the ID of your tag with the same name, so your cases stay linked.
+// names(code) -> { pill, long } (programme names); current = your tag set now.
+export function tagSetFromCsv(text, names = () => ({ pill: '', long: '' }), current = []) {
   const rows = parseCsv(text);
-  const errors = [];
-  if (!rows.length) return { set: null, errors: ['The file is empty.'], counts: null };
-  const head = rows[0].map(c => String(c).trim().toLowerCase());
-  const col = name => head.indexOf(name.toLowerCase());
-  const ci = { type: col('Type'), tag: col('Tag'), long: col('Long name'), under: col('Under'), links: col('APMES categories'), hidden: col('Hidden'), key: col('Key') };
-  if (ci.type < 0 || ci.tag < 0) return { set: null, errors: ['This doesn’t look like a shared tag file (it needs Type and Tag columns).'], counts: null };
-  const get = (r, i) => (i >= 0 ? String(r[i] ?? '').trim() : '');
-  const codesIn = s => s.split(/[;\n]+/).map(x => x.trim()).filter(Boolean).map(x => {
-    const m = /^(\d{1,2}[ivx]*)\b/i.exec(x);
-    const code = m ? m[1].toLowerCase().replace(/^(\d)(?!\d)/, '0$1') : null;
-    return code && isCode(code) ? code : { bad: x };
-  });
-  const set = [], byName = new Map(), keys = new Set();
+  const errors = [], notes = [];
+  const fail = msg => ({ set: null, errors: [msg], notes: [], counts: null, missing: [], dropped: [] });
+  if (!rows.length) return fail('The file is empty.');
+  const find = r => {
+    const head = r.map(norm);
+    const ix = list => head.findIndex(c => list.includes(c));
+    return Object.fromEntries(Object.entries(COLS).map(([k, list]) => [k, ix(list)]));
+  };
+  const hr = rows.slice(0, 10).findIndex(r => { const ci = find(r); return ci.name >= 0 && (ci.type >= 0 || ci.links >= 0); });
+  if (hr < 0) return fail('This doesn’t look like a tag file: it needs a Name column, and a Type or APMES categories column.');
+  const ci = find(rows[hr]);
+  const get = (r, i) => (i >= 0 ? String(r[i] ?? '').replace(/\s+/g, ' ').trim() : '');
+
+  // APMES category from a code ("26", "26i", "8", "26) ...") or a name
+  const byName = new Map();
+  const addName = (nm, code) => { const k = norm(nm); if (k && !byName.has(k)) byName.set(k, code); };
+  for (const c of ACTIVE) {
+    addName(c.name, c.code); addName(c.full, c.code); addName(names(c.code).pill, c.code); addName(names(c.code).long, c.code);
+    addName(c.label, c.code); addName(catRef(c.code), c.code);
+  }
+  for (const e of current || []) if (e.k && e.k.startsWith('c:') && isCode(e.k.slice(2))) { addName(e.n, e.k.slice(2)); addName(e.l, e.k.slice(2)); }
+  const codeOf = x => {
+    const m = /^(\d{1,2}[a-z]?)(?=$|[\s).:\-–])/i.exec(x);
+    if (m) { const code = m[1].toLowerCase().replace(/^(\d)(?!\d)/, '0$1'); if (isCode(code)) return code; }
+    return byName.get(norm(x)) || null;
+  };
+  const codesIn = s => s.split(/[;\n|]+/).map(x => x.trim()).filter(Boolean).map(x => codeOf(x) || { bad: x });
+
+  // your current tags, to keep their IDs
+  const mine = (current || []).filter(e => e && e.k && !e.k.startsWith('c:') && !e.hd);
+  const mineKeys = new Set(mine.map(e => e.k));
+  const mineByName = new Map();
+  for (const e of mine) if (!mineByName.has(norm(e.n))) mineByName.set(norm(e.n), e.k);
+  const heads = (current || []).filter(e => e && e.hd);
+
+  const set = [], keys = new Set(), unders = [];
   const counts = { cats: 0, tags: 0, heads: 0 };
-  rows.slice(1).forEach((r, i) => {
-    const line = i + 2;
-    const type = get(r, ci.type).toLowerCase();
-    const name = get(r, ci.tag), long = get(r, ci.long), under = get(r, ci.under), hidden = /^(y|yes|true|1|hidden)$/i.test(get(r, ci.hidden));
+  rows.slice(hr + 1).forEach((r, i) => {
+    const line = hr + i + 2;
+    const rawType = get(r, ci.type), t = norm(rawType);
+    const name = get(r, ci.name), long = get(r, ci.long), under = get(r, ci.under);
+    const hidden = /^(y|yes|true|1|hidden|x|✓)$/i.test(get(r, ci.hidden));
     let key = get(r, ci.key);
     const links = codesIn(get(r, ci.links));
-    for (const l of links.filter(x => typeof x === 'object')) errors.push(`Row ${line}: “${l.bad}” is not an APMES category`);
-    const good = links.filter(x => typeof x === 'string');
+    const good = [...new Set(links.filter(x => typeof x === 'string'))];
+    const bad = links.filter(x => typeof x === 'object').map(x => x.bad);
+    let kind = /^(apmes|cat|built)/.test(t) ? 'cat' : /^(head|section)/.test(t) ? 'head' : /^(personal|tag|own|my|)$/.test(t) || t.startsWith('personal') || t.startsWith('tag') ? 'tag' : null;
+    if (!kind) { errors.push(`Row ${line}: Type “${rawType}” isn’t APMES, Personal or Header, so it was read as Personal`); kind = 'tag'; }
     let e;
-    if (type.startsWith('cat')) {
-      const code = key.startsWith('c:') && isCode(key.slice(2)) ? key.slice(2) : good[0];
-      if (!code) { errors.push(`Row ${line}: no APMES category for “${name}”`); return; }
-      key = 'c:' + code;
-      e = { k: key };
+    if (kind === 'cat') {
+      const code = (key.startsWith('c:') && isCode(key.slice(2)) && key.slice(2)) || good[0] || codeOf(name);
+      if (!code) { errors.push(`Row ${line}: “${name || rawType}” is marked APMES but no APMES category was recognised, so it was skipped`); return; }
+      if (keys.has('c:' + code)) { errors.push(`Row ${line}: APMES category ${catRef(code)} appears twice; the later row was skipped`); return; }
+      e = { k: 'c:' + code };
       if (name && name !== names(code).pill) e.n = name;
       if (long && long !== names(code).long) e.l = long;
       counts.cats++;
-    } else if (type.startsWith('head')) {
+    } else if (kind === 'head') {
       if (!name) return;
-      if (!key.startsWith('h:') || keys.has(key)) key = newKey('h');
+      if (!key.startsWith('h:') || keys.has(key)) key = (heads.find(x => norm(x.n) === norm(name) && !keys.has(x.k)) || {}).k || newKey('h');
       e = { k: key, n: name, hd: true };
       counts.heads++;
-    } else if (type.startsWith('tag') || type === '') {
-      if (!name) return;
-      if (!key || key.startsWith('c:') || key.startsWith('h:') || keys.has(key)) key = newKey('u');
+    } else {
+      if (!name) { if (good.length || long) errors.push(`Row ${line}: no Name, so it was skipped`); return; }
+      if (!mineKeys.has(key) || keys.has(key)) {
+        const same = mineByName.get(norm(name));
+        key = same && !keys.has(same) ? same : (key && !key.startsWith('c:') && !key.startsWith('h:') && !keys.has(key) && /^[\w:]{3,80}$/.test(key) ? key : newKey('u'));
+      }
       e = { k: key, n: name };
       if (long) e.l = long;
-      if (good.length) e.links = good;
+      if (good.length) e.links = good.slice(0, 10);
       counts.tags++;
-    } else { errors.push(`Row ${line}: unknown type “${get(r, ci.type)}”`); return; }
-    if (keys.has(e.k)) { errors.push(`Row ${line}: “${name}” appears twice`); return; }
-    if (under) e.p = byName.get(under.toLowerCase()) || (keys.has(under) ? under : `?${under}`);
-    if (hidden) e.hide = true;
+    }
+    for (const x of bad) errors.push(`Row ${line}: “${x}” isn’t an APMES category, so it was left out`);
+    if (under) unders.push([e, under, line]);
+    if (hidden && kind !== 'head') e.hide = true;
     keys.add(e.k);
-    if (!byName.has((name || '').toLowerCase())) byName.set((name || '').toLowerCase(), e.k);
     set.push(e);
   });
-  for (const e of set) if (e.p && e.p.startsWith('?')) { errors.push(`“${e.n || e.k}” is under “${e.p.slice(1)}”, which isn’t above it in the file: put at the top level`); delete e.p; }
-  return { set: cleanTagSet(set), errors, counts };
+  // Under: a Name anywhere in the file (first match), an APMES number or name, or an ID
+  const nameKey = new Map();
+  for (const e of set) {
+    const nms = e.k.startsWith('c:') ? [e.n, names(e.k.slice(2)).pill, names(e.k.slice(2)).long] : [e.n];
+    for (const n of nms) if (n && !nameKey.has(norm(n))) nameKey.set(norm(n), e.k);
+  }
+  for (const [e, under, line] of unders) {
+    const code = codeOf(under);
+    const p = nameKey.get(norm(under)) || (code && keys.has('c:' + code) ? 'c:' + code : null) || (keys.has(under) ? under : null);
+    if (!p || p === e.k) errors.push(`Row ${line}: “${e.n || catRef(e.k.slice(2))}” is under “${under}”, which isn’t in the file, so it was put at the top level`);
+    else e.p = p;
+  }
+  const missing = ACTIVE.filter(c => !keys.has('c:' + c.code)).map(c => c.code);
+  if (missing.length) notes.push(`${missing.length} APMES categor${missing.length === 1 ? 'y isn’t' : 'ies aren’t'} in the file, so ${missing.length === 1 ? 'it goes' : 'they go'} at the end of the list: ${missing.map(catRef).join(', ')}`);
+  const dropped = mine.filter(x => !keys.has(x.k)).map(x => x.n);
+  if (dropped.length) notes.push(`${dropped.length} of your tags ${dropped.length === 1 ? 'isn’t' : 'aren’t'} in the file, so ${dropped.length === 1 ? 'it comes' : 'they come'} off the list (cases keep them): ${dropped.join(', ')}`);
+  return { set: cleanTagSet(set), errors, notes, counts, missing, dropped };
 }
 
 // ---------- editing ----------
