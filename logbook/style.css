@@ -161,8 +161,8 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .datebar { display: flex; flex-wrap: nowrap; overflow: hidden; gap: 6px; align-items: center; margin-bottom: 8px; }
 .datebar .chip { flex: none; white-space: nowrap; }
 .datebar .mode-seg { flex: none; display: inline-flex; }
-.datebar .mode-seg button { min-height: 34px; padding: 4px 12px; font-size: 14px; }
-.datebar .chip { min-height: 34px; padding: 4px 12px; }
+.datebar .mode-seg button { min-height: 40px; padding: 4px 12px; font-size: 14px; }
+.datebar .chip { min-height: 40px; padding: 4px 12px; }
 .datebar input[type="date"] { min-height: 34px; padding: 4px 8px; }
 /* the date input lies invisibly over its chip: a tap opens the native picker */
 .datebar .datepick { position: relative; overflow: hidden; }
@@ -740,4 +740,4 @@ ul.te-list .icon-btn { min-width: 40px; min-height: 40px; }
 .picker ul.pills .chip.subp { font-size: 13px; }
 .cat-head { align-items: center; margin: 10px 0 4px; }
 .cat-head .chiplabel { margin: 0; }
-.cat-view button { min-height: 32px; padding: 2px 10px; font-size: 13px; }
+.cat-view button { min-height: 40px; padding: 2px 10px; font-size: 13px; }

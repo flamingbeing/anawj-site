@@ -545,3 +545,17 @@ assert.equal(rYearDefault(undefined), 1);
 
 console.log('engine tests passed');
 
+{
+  const { procedureText, textHas } = await import('../js/engine.js');
+  assert.equal(procedureText({ initials: 'AB', details: '72M\nlap chole GA' }), 'lap chole GA', 'age line on its own: next line');
+  assert.equal(procedureText({ initials: 'AB', details: '34F LSCS spinal' }), 'LSCS spinal', 'one line: age taken off');
+  assert.equal(procedureText({ details: 'CD 5yo circumcision, caudal' }), 'circumcision, caudal', 'older case, initials in the details');
+  assert.equal(procedureText({ details: '' }), '');
+  assert.ok(textHas('laparoscopic cholecystectomy', 'chole'));
+  assert.ok(!textHas('laparoscopic cholecystectomy', 'cholecystectmy'), 'not fuzzy');
+  assert.ok(textHas('laparoscopic cholecystectomy', 'cholecystectmy', true), 'one letter missing');
+  assert.ok(textHas('laparoscopic cholecystectomy', 'lapro', true), 'typo at the start of a word');
+  assert.ok(!textHas('tkr spinal', 'tka', true), 'short words stay exact');
+  assert.ok(!textHas('lscs spinal', 'thyroid', true));
+  console.log('search helper tests passed');
+}

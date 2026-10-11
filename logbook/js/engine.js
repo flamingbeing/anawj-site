@@ -326,6 +326,44 @@ export function parseBulk(text, suggestFn, now = new Date()) {
   });
 }
 
+// ---------- search helpers (Logbook) ----------
+
+// The procedure line of a case: the first line of the details with a leading age/sex taken off; when
+// that leaves nothing ("AB 72M" on its own line), the next line ("lap chole GA").
+export function procedureText(c) {
+  const lines = String(caseParts(c).details || '').split('\n').map(s => s.trim()).filter(Boolean);
+  if (!lines.length) return '';
+  return splitAge(lines[0]).rest || lines[1] || '';
+}
+
+// Edit distance between a and b, giving up past max (returns max + 1).
+function editDistance(a, b, max) {
+  if (Math.abs(a.length - b.length) > max) return max + 1;
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    let best = i;
+    for (let j = 1; j <= b.length; j++) {
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      best = Math.min(best, cur[j]);
+    }
+    if (best > max) return max + 1;
+    prev = cur;
+  }
+  return prev[b.length];
+}
+
+// Does the (lower-case) text contain the word? fuzzy: allow a typo or two in longer words, against each
+// word of the text or its start ("cholecystectmy" finds "cholecystectomy", "lapro" finds "laparoscopic").
+export function textHas(text, word, fuzzy = false) {
+  if (text.includes(word)) return true;
+  if (!fuzzy || word.length < 4) return false;
+  const max = word.length <= 6 ? 1 : 2;
+  // the whole word, or its start (a letter longer or shorter, for a missed or extra letter)
+  return text.split(/[^a-z0-9]+/).some(t => t && (editDistance(word, t, max) <= max
+    || [0, 1, -1].some(d => t.length > word.length + d && editDistance(word, t.slice(0, word.length + d), max) <= max)));
+}
+
 // ---------- duplicates ----------
 
 const normText = s => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();

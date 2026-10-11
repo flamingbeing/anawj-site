@@ -288,6 +288,15 @@ export function subcatChips(cats, tags, onchange) {
     })));
   return rows.length ? h('div', { class: 'subcat-wrap' }, rows) : null;
 }
+// The tags a case keeps: a tag that sits under a category goes when that category isn't ticked; the
+// rest (linked or personal) stay.
+export function keepTags(tags, cats) {
+  return [...new Set(tags || [])].filter(t => {
+    const e = tagSet().find(x => x.k === t);
+    const under = e && e.p && e.p.startsWith('c:') ? e.p.slice(2) : (/^\d/.test(String(t)) ? String(t).split(':')[0] : null);
+    return !under || (cats || []).includes(under);
+  }).slice(0, 20);
+}
 // A chip for one of your tags (selected ones can be removed).
 export const tagChip = (key, { onclick, on = true } = {}) => h('span', { class: `chip tag ${on ? 'on' : ''}`, role: 'button', tabindex: '0', 'data-tag': key, title: 'Your tag', onclick,
   onkeydown: e => { if ((e.key === 'Enter' || e.key === ' ') && onclick) { e.preventDefault(); onclick(e); } } }, h('span', { class: 'nm' }, tagName(key)), onclick ? h('span', { class: 'x', 'aria-label': 'remove' }, '×') : null);
@@ -298,7 +307,7 @@ export async function createCase({ date, details, initials, cats, source = 'app'
   const c = { id: uid(), date: date || null, initials: parts.initials, details: parts.details, cats: sortCodes(cats), createdAt: now, updatedAt: now, source };
   if (!date && dateText) c.dateText = dateText;
   if (reflectTag) c.reflectTag = true;
-  const kept = (tags || []).filter(t => c.cats.includes(String(t).split(':')[0]));
+  const kept = keepTags(tags, c.cats);
   if (kept.length) c.tags = kept;
   applyLocal(list => [c, ...list]);
   cloud.saveCase(mine(), c).catch(err => toast('Could not save: ' + err.message));

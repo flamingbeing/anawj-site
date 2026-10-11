@@ -5,7 +5,7 @@ import { BY_CODE, TIPS } from './categories.js';
 import { withParents, frequentCombos, parseBulk, parseDate, fmtDate, sortCodes, uid, caseParts, caseText, cleanInitials, splitInitials, splitAge, nth } from './engine.js';
 import { suggest } from './suggest.js';
 import {
-  S, h, toast, debounce, modal, confirmBox, cat, catName, catShort, catFull, catChip, countText, logTags, tagLinks, tagChip, tagSet, PROGRESS_BY_CODE,
+  S, h, toast, debounce, modal, confirmBox, cat, catName, catShort, catFull, catChip, countText, logTags, tagLinks, tagChip, tagSet, keepTags, PROGRESS_BY_CODE,
   createCase, updateCase, removeCase, restoreCase, saveMany, deleteMany, subcatChips, subcatsOf, settings, todayISO, hooks, fill, add, cloud, okNoIds, patchLogbook, catPills } from './ui-core.js';
 import { templateDialog } from './ui-settings.js';
 import { moveToBin } from './bin.js';
@@ -64,6 +64,8 @@ function keepPlace(anchor, fn) {
   if (d) window.scrollBy(0, d);
 }
 // On phones, focusing the details box pops the keyboard and scrolls back up: only do it with a mouse.
+// how tall the case box starts (Settings → Logging: 2 to 20 lines)
+const boxLines = () => Math.min(20, Math.max(2, Math.round(Number(settings().boxLines) || 3)));
 const refocus = () => { if (ui.textarea && matchMedia('(pointer: fine)').matches) ui.textarea.focus({ preventScroll: true }); };
 
 // The list follows your tag set (Settings → Tag editor): section headers, categories and your own tags,
@@ -253,7 +255,7 @@ function paintDate() {
 
 function renderOne(card) {
   const textarea = h('textarea', {
-    class: 'details', rows: '3', autofocus: true, enterkeyhint: settings().enterSaves ? 'done' : 'enter', autocapitalize: 'sentences', autocorrect: 'off', 'aria-label': 'Case details',
+    class: 'details', rows: String(boxLines()), style: `min-height:calc(${boxLines()} * 1.4em + 22px)`, autofocus: true, enterkeyhint: settings().enterSaves ? 'done' : 'enter', autocapitalize: 'sentences', autocorrect: 'off', 'aria-label': 'Case details',
     placeholder: 'AB 72M  ← initials, age/sex\nlap chole GA  ← procedure',
     value: draft.details,
     oninput: e => { draft.details = e.target.value; saveDraft(); suggestSoon(); paintParsed(true); },
@@ -666,7 +668,7 @@ export function editCaseDialog(c) {
         const next = { ...e, initials: cleanInitials(e.initials), details: e.details.trim() };
         if (!next.reflectTag) delete next.reflectTag;
         // a tag that sits under a category goes when that category is taken off; other tags stay
-        next.tags = (next.tags || []).filter(t => { const e = tagSet().find(x => x.k === t); const under = e && e.p && e.p.startsWith('c:') ? e.p.slice(2) : (/^\d/.test(t) ? String(t).split(':')[0] : null); return !under || next.cats.includes(under); });
+        next.tags = keepTags(next.tags, next.cats);
         if (!next.tags.length) delete next.tags;
         await updateCase(next);
         toast('Case updated', { action: 'Undo', onaction: () => restoreCase(c) });
