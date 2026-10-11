@@ -71,6 +71,14 @@ assert.equal(caseRYear('2025-06-30', 2024), 1);
 assert.equal(caseRYear('2025-07-01', 2024), 2);
 assert.equal(caseRYear('2031-01-01', 2024), 5, 'clamped to R5');
 assert.equal(caseRYear(null, 2024), null);
+// a year as an SMO after R3 counts as R3, and SR1 comes after it
+assert.equal(caseRYear('2026-08-01', 2024, 1), 3, 'R3');
+assert.equal(caseRYear('2027-08-01', 2024, 1), 3, 'the SMO year');
+assert.equal(caseRYear('2028-08-01', 2024, 1), 4, 'SR1');
+{
+  const smoCases = [{ date: '2026-03-01', cats: ['10'] }, { date: '2026-09-01', cats: ['10'] }, { date: '2027-09-01', cats: ['10'] }, { date: '2028-09-01', cats: ['10'] }];
+  assert.deepEqual(countsByYear(smoCases, 2024, 1)['10'], { total: 4, 2: 1, 3: 2, 4: 1 });
+}
 {
   const cases = [
     { date: '2024-08-01', cats: ['20', '20iii'] }, { date: '2025-08-01', cats: ['20'] }, { date: null, cats: ['20', '20'] },
@@ -92,6 +100,9 @@ assert.equal(caseRYear(null, 2024), null);
   assert.deepEqual(texts(trs[3]), ['15 i) Emergency neurosurgery (EPA2)', '0', '1', '', '', '', '1']);
   assert.ok(!out.includes('Total - 125') && !out.includes('>10<'));
   assert.deepEqual(texts(trs[4])[0], 'Supervisor’s signature');
+  // an SMO (counted as R3): cases from the SMO year land in the R3 column
+  const smoOut = fillSummaryXml(xml, [...cases, { date: '2027-08-01', cats: ['20'] }], { intake: 2024, rYear: 3, smo: 1 }).xml.match(/<w:tr>[\s\S]*?<\/w:tr>/g);
+  assert.deepEqual(texts(smoOut[2]), ['20) Paediatric Surgery (EPA 9)', '1', '1', '1', '', '', '4']);
   const noIntake = fillSummaryXml(xml, cases, {}).xml.match(/<w:tr>[\s\S]*?<\/w:tr>/g);
   assert.deepEqual(texts(noIntake[2]), ['20) Paediatric Surgery (EPA 9)', '', '', '', '', '', '3'], 'no intake: total only');
 }

@@ -4,6 +4,7 @@
 // The template is APMES's document: it is never committed; tools/build_portfolio_template.py makes it.
 
 import { REFLECTION_HEADINGS, REFLECTION_SECTIONS } from './categories.js';
+import { yearInAY } from './engine.js';
 import { S, h, toast, cloud, download, hooks } from './ui-core.js';
 import { SECTIONS, PROFILE_FIELDS, cleanProfile, locateSection1, pdField, isoToDmy, ROW_RE, CELL_RE, PARA_RE } from './profile.js';
 
@@ -271,18 +272,19 @@ export function placeInSlots(hd, protoRows, list, media) {
 // ---------- Section 4: summary of experience ----------
 
 // Residency year a case falls in: the academic year starts on 1 July; intake 2024 → AY2024 is R1.
-export function caseRYear(date, intake) {
+// smo: years spent as an SMO after R3; cases from then count as R3
+export function caseRYear(date, intake, smo = 0) {
   const m = /^(\d{4})-(\d{2})/.exec(date || '');
   if (!m || !intake) return null;
   const ay = Number(m[1]) - (Number(m[2]) < 7 ? 1 : 0);
-  return Math.min(5, Math.max(1, ay - Number(intake) + 1));
+  return yearInAY(ay, intake, smo);
 }
 
 // counts[code] = { 1: n, …, 5: n, total }
-export function countsByYear(cases, intake) {
+export function countsByYear(cases, intake, smo = 0) {
   const out = {};
   for (const c of cases || []) {
-    const y = caseRYear(c.date, intake);
+    const y = caseRYear(c.date, intake, smo);
     for (const code of new Set(c.cats || [])) {
       const o = (out[code] ||= { total: 0 });
       o.total++;
@@ -298,8 +300,8 @@ const s4Code = label => { const m = /^\s*(\d+)\s*([ivx]*)\s*\)/i.exec(label); re
 // Replace the minimum numbers in the "Posting period" table with the resident's own counts: cases in
 // each residency year (blank for years not reached yet) and the total. Without an intake year only
 // the total is filled.
-export function fillSummaryXml(xml, cases, { intake = null, rYear = null } = {}) {
-  const counts = countsByYear(cases, intake);
+export function fillSummaryXml(xml, cases, { intake = null, rYear = null, smo = 0 } = {}) {
+  const counts = countsByYear(cases, intake, smo);
   const upTo = rYear || (intake ? 5 : 0);
   let n = 0;
   const out = xml.replace(/<w:tbl>[\s\S]*?<\/w:tbl>/g, tbl => {
@@ -535,7 +537,7 @@ async function setPrintLayout(zip) {
   if (f) zip.file('word/settings.xml', printLayoutSettings(await f.async('string')));
 }
 
-export async function exportPortfolio(reflections, { name = '', templateB64 = null, JSZip = null, cases = null, intake = null, rYear = null, images = null, profile = null } = {}) {
+export async function exportPortfolio(reflections, { name = '', templateB64 = null, JSZip = null, cases = null, intake = null, rYear = null, smo = 0, images = null, profile = null } = {}) {
   const Z = JSZip || await needZip();
   let zip = null, usedTemplate = false, media = null;
   if (templateB64) {
@@ -544,7 +546,7 @@ export async function exportPortfolio(reflections, { name = '', templateB64 = nu
       const xml = await zip.file('word/document.xml').async('string');
       media = newMedia(images, xml);
       let { xml: filled, matched } = fillDocumentXml(xml, reflections, { name, media });
-      if (cases) filled = fillSummaryXml(filled, cases, { intake, rYear }).xml;
+      if (cases) filled = fillSummaryXml(filled, cases, { intake, rYear, smo }).xml;
       if (profile || name) filled = fillSection1Xml(filled, profile || {}, { name }).xml;
       if (matched.length < REFLECTION_HEADINGS.length / 2) throw new Error('template headings not found');
       zip.file('word/document.xml', stripComments(filled));
@@ -572,7 +574,7 @@ async function getTemplate() {    // after the page opened is picked up at the n
 }
 
 // A button for the reflections screen (or Progress): getReflections() and getName() are called on click.
-// getExtra() (may be async) may return { cases, intake, rYear } to fill Section 4 with the resident's case
+// getExtra() (may be async) may return { cases, intake, rYear, smo } to fill Section 4 with the resident's case
 // counts, and { images } with the pictures of the reflections' figures.
 export function renderExportButton(getReflections, getName, getExtra) {
   // says up front which layout the export will use, so a missing template is noticed before exporting

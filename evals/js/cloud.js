@@ -5,7 +5,7 @@
 //
 // Data (see SPEC.md):
 //   admins/{email}, pds/{email}            roles (added by hand / by admins)
-//   residents/{rid}                        { rid, name, email, status, intake, rYear }   admins or PDs write
+//   residents/{rid}                        { rid, name, email, status, intake, rYear, smo? }   admins or PDs write
 //   faculty/{email}                        { email, name, status: ACTIVE|INACTIVE, updatedAt }   admins or PDs write
 //   applications/{uid}                     { uid, email, name, role, note, status, createdAt, decidedAt?, decidedBy? }
 //   evaluations/{id}                       see EVAL_FIELDS in demo-backend.js

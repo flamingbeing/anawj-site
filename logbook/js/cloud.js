@@ -5,7 +5,7 @@
 //
 // Data (see README.md):
 //   admins/{email}                        { name }                       (added by hand in the console)
-//   residents/{rid}                       { rid, name, email, status, intake, rYear }
+//   residents/{rid}                       { rid, name, email, status, intake, rYear, smo? }  (smo: years as an SMO, counted as R3)
 //   logbooks/{email}                      { email, name, rid, settings, templates, updatedAt }
 //   logbooks/{email}/cases/{caseId}       case object (see engine.js)
 //   logbooks/{email}/reflections/{id} reflection object (see reflections.js), owner only
@@ -426,6 +426,20 @@ export async function saveTemplate(b64) {
   }
   // the index doc goes last, so a reader never sees parts from a half-finished upload as complete
   await F.setDoc(F.doc(db, 'config', 'portfolioTemplate'), { parts, size: Math.floor(b64.length * 3 / 4), uploadedAt: Date.now() });
+}
+
+// Residents left off Totals (config/totalsHidden: attrited; admins write, everyone signed in reads).
+const cleanRids = rids => [...new Set((Array.isArray(rids) ? rids : []).map(String))].sort().slice(0, 500);
+export async function loadTotalsHidden() {
+  if (demo) return D.loadTotalsHidden();
+  const { db, F } = await sdk();
+  try { const s = await F.getDoc(F.doc(db, 'config', 'totalsHidden')); return s.exists() ? cleanRids(s.data().rids) : []; }
+  catch (e) { console.warn('Hidden list not loaded', e); return []; }
+}
+export async function saveTotalsHidden(rids) {
+  if (demo) return D.saveTotalsHidden(rids);
+  const { db, F } = await sdk();
+  await queued(F.setDoc(F.doc(db, 'config', 'totalsHidden'), { rids: cleanRids(rids), updatedAt: Date.now() }));
 }
 
 // Category display names (config/categoryNames, admins write, everyone signed in reads).

@@ -83,6 +83,9 @@ await t('user edit resident', assertFails(setDoc(doc(a, 'residents', 'R1'), { ri
 await t('admin list residents', assertSucceeds(getDocs(collection(adm, 'residents'))));
 await t('admin save resident', assertSucceeds(setDoc(doc(adm, 'residents', 'R3'), { rid: 'R3', name: 'C', email: 'c@example.com', status: 'ON LEAVE', intake: 2023, rYear: null })));
 await t('admin save SMO resident', assertSucceeds(setDoc(doc(adm, 'residents', 'R4'), { rid: 'R4', name: 'D', email: 'd@example.com', status: 'SMO', intake: 2019, rYear: null })));
+await t('admin save resident with SMO years', assertSucceeds(setDoc(doc(adm, 'residents', 'R5'), { rid: 'R5', name: 'E', email: 'e@example.com', status: 'ACTIVE', intake: 2021, rYear: null, smo: 1 })));
+await t('resident SMO years must be a whole number', assertFails(setDoc(doc(adm, 'residents', 'R5'), { rid: 'R5', name: 'E', email: 'e@example.com', status: 'ACTIVE', intake: 2021, smo: 1.5 })));
+await t('resident SMO years out of range', assertFails(setDoc(doc(adm, 'residents', 'R5'), { rid: 'R5', name: 'E', email: 'e@example.com', status: 'ACTIVE', intake: 2021, smo: 11 })));
 await t('admin resident bad status', assertFails(setDoc(doc(adm, 'residents', 'R3'), { rid: 'R3', name: 'C', email: 'c@example.com', status: 'X', intake: 2023, rYear: 3 })));
 await t('admin resident upper email', assertFails(setDoc(doc(adm, 'residents', 'R3'), { rid: 'R3', name: 'C', email: 'C@example.com', status: 'ACTIVE', intake: 2023, rYear: 3 })));
 await t('admin delete resident', assertSucceeds(deleteDoc(doc(adm, 'residents', 'R3'))));
@@ -100,6 +103,11 @@ await t('summary fake total', assertFails(setDoc(doc(a, 'summaries', 'R1'), { ..
 await t('summary negative total', assertFails(setDoc(doc(a, 'summaries', 'R1'), { ...sum('R1'), total: -1 })));
 await t('summary year out of range', assertFails(setDoc(doc(a, 'summaries', 'R1'), { ...sum('R1'), rYear: 9 })));
 await t('summary negative reflections', assertFails(setDoc(doc(a, 'summaries', 'R1'), { ...sum('R1'), reflectionsTotal: -5 })));
+// attrited residents left off Totals: admins keep the hidden list
+await t('admin saves the Totals hidden list', assertSucceeds(setDoc(doc(adm, 'config', 'totalsHidden'), { rids: ['R2'], updatedAt: 1 })));
+await t('member reads the Totals hidden list', assertSucceeds(getDoc(doc(a, 'config', 'totalsHidden'))));
+await t('resident cannot change the hidden list', assertFails(setDoc(doc(a, 'config', 'totalsHidden'), { rids: [], updatedAt: 2 })));
+await t('hidden list extra field', assertFails(setDoc(doc(adm, 'config', 'totalsHidden'), { rids: [], updatedAt: 2, x: 1 })));
 await t('admin saves category names', assertSucceeds(setDoc(doc(adm, 'config', 'categoryNames'), { names: { '26': { name: 'Nerve blocks', short: 'Blocks' } }, updatedAt: 1 })));
 await t('resident reads category names', assertSucceeds(getDoc(doc(a, 'config', 'categoryNames'))));
 await t('resident cannot change category names', assertFails(setDoc(doc(a, 'config', 'categoryNames'), { names: {}, updatedAt: 2 })));

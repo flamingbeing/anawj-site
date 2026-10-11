@@ -120,7 +120,8 @@ function render() {
   const tab = visibleTabs().find(t => t.id === S.tab) || TABS[0];
   S.tab = tab.id;
   const y = window.scrollY;
-  fill(app, tab.render());
+  // pages opened from More get a way back to the list
+  fill(app, tab.under ? h('p', { class: 'back-row' }, h('a', { class: 'btn small', href: '#' + tab.under }, '← More')) : null, tab.render());
   if (tab.id !== 'log') window.scrollTo(0, y);
 }
 hooks.render = render;

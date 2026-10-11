@@ -111,11 +111,19 @@ export function countCases(cases) {
 }
 
 // Academic year starts 1 July: intake 2026 is R1 from July 2026 to June 2027.
-export function rYearDefault(intakeYear, now = new Date()) {
+export const academicYear = (now = new Date()) => (now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1);
+// The residency year in academic year `ay`. `smo` years spent as an SMO after R3 count as R3 (so cases
+// done then land in the R3 column), and the years after them move back by as many.
+export function yearInAY(ay, intakeYear, smo = 0) {
+  const raw = Number(ay) - Number(intakeYear) + 1;
+  const s = Math.max(0, Math.floor(Number(smo) || 0));
+  const y = raw <= 3 ? raw : raw <= 3 + s ? 3 : raw - s;
+  return Math.min(5, Math.max(1, y));
+}
+export function rYearDefault(intakeYear, now = new Date(), smo = 0) {
   const intake = Number(intakeYear);
   if (!intake) return 1;
-  const ay = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
-  return Math.min(5, Math.max(1, ay - intake + 1));
+  return yearInAY(academicYear(now), intake, smo);
 }
 
 const yearNum = by => Number(String(by).replace(/\D/g, ''));

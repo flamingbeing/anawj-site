@@ -30,7 +30,7 @@ export const EVAL_FIELDS = ['id', 'rid', 'residentEmail', 'residentName', 'asses
   'declineReason', 'declinedAt', 'seenAt', 'chasedAt', 'metrics'];
 // fields a patch may remove by passing null (Firestore deleteField)
 export const REMOVABLE = ['assessment', 'metrics', 'declineReason', 'declinedAt', 'submittedAt', 'seenAt', 'chasedAt'];
-const RESIDENT_FIELDS = ['rid', 'name', 'email', 'status', 'intake', 'rYear'];
+const RESIDENT_FIELDS = ['rid', 'name', 'email', 'status', 'intake', 'rYear', 'smo'];
 const FACULTY_FIELDS = ['email', 'name', 'status', 'updatedAt'];
 const APPLICATION_FIELDS = ['uid', 'email', 'name', 'role', 'note', 'status', 'createdAt', 'decidedAt', 'decidedBy'];
 export const RESIDENT_STATUSES = ['ACTIVE', 'ON LEAVE', 'SMO', 'GRADUATED', 'ATTRITED'];
@@ -110,6 +110,9 @@ export function cleanResident(r) {
   out.status = out.status || 'ACTIVE';
   out.intake = out.intake == null || out.intake === '' ? null : Number(out.intake);
   out.rYear = out.rYear == null || out.rYear === '' ? null : Number(out.rYear);
+  // years spent as an SMO (logbook: they count as R3); left out when none
+  const smo = Math.floor(Number(out.smo) || 0);
+  if (smo > 0) out.smo = Math.min(10, smo); else delete out.smo;
   return plain(out);
 }
 

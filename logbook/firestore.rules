@@ -81,13 +81,15 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
     function validResident(rid, d) {
-      return d.keys().hasOnly(['rid', 'name', 'email', 'status', 'intake', 'rYear'])
+      return d.keys().hasOnly(['rid', 'name', 'email', 'status', 'intake', 'rYear', 'smo'])
         && d.rid == rid
         && d.email is string && d.email == d.email.lower() && d.email.size() <= 200
         && optString(d, 'name', 200)
         && d.status in ['ACTIVE', 'ON LEAVE', 'SMO', 'GRADUATED', 'ATTRITED']
         && optNumber(d, 'intake')
-        && (!('rYear' in d) || d.rYear == null || (d.rYear is int && d.rYear >= 1 && d.rYear <= 5));
+        && (!('rYear' in d) || d.rYear == null || (d.rYear is int && d.rYear >= 1 && d.rYear <= 5))
+        // years spent as an SMO after R3 (the logbook counts them as R3)
+        && (!('smo' in d) || d.smo == null || (d.smo is int && d.smo >= 0 && d.smo <= 10));
     }
 
     // a person's logbook: theirs only; the app owner may read
@@ -252,6 +254,13 @@ service cloud.firestore {
       allow write: if isAdmin()
         && request.resource.data.keys().hasOnly(['names', 'updatedAt'])
         && request.resource.data.names is map && request.resource.data.names.size() <= 200;
+    }
+    // rids left off Totals (attrited residents); admins keep it in step with the residents list
+    match /config/totalsHidden {
+      allow read: if signedIn();
+      allow write: if isAdmin()
+        && request.resource.data.keys().hasOnly(['rids', 'updatedAt'])
+        && request.resource.data.rids is list && request.resource.data.rids.size() <= 500;
     }
     match /config/portfolioTemplate {
       allow read: if signedIn();

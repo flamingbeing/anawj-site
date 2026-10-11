@@ -58,7 +58,12 @@ export const CATEGORIES = [
 
 export const BY_CODE = Object.fromEntries(CATEGORIES.map(c => [c.code, c]));
 export const ACTIVE = CATEGORIES.filter(c => !c.retired);
-export const R_YEARS = ['R1', 'R2', 'R3', 'R4', 'R5'];
+export const R_YEARS = ['R1', 'R2', 'R3', 'R4', 'R5'];   // official names: exports and the portfolio keep these
+// what the app shows: senior residents are SR1 and SR2 (R4 and R5 on the forms)
+export const YEAR_NAMES = ['R1', 'R2', 'R3', 'SR1', 'SR2'];
+export const yearName = n => YEAR_NAMES[Number(n) - 1] || '?';
+// 'R4' (a target's year) -> 'SR1'
+export const appYear = label => { const i = R_YEARS.indexOf(label); return i >= 0 ? YEAR_NAMES[i] : label; };
 
 // "20iii) Age 4 to 12 years (100 | 100)" -> "20iii"
 export function codeOf(label) {

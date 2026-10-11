@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import {
-  uid, todayISO, parseDate, fmtDate, withParents, countCases, rYearDefault, progress, epaProgress,
+  uid, todayISO, parseDate, fmtDate, withParents, countCases, rYearDefault, yearInAY, academicYear, progress, epaProgress,
   frequentCombos, parseBulk, duplicates, caseFromRow, diffRows, catFromText, splitInitials, cleanInitials, caseParts, caseText,
 } from '../js/engine.js';
 import { BY_CODE } from '../js/categories.js';
@@ -91,6 +91,17 @@ assert.equal(rYearDefault(2025, new Date(2026, 6, 1)), 2);
 assert.equal(rYearDefault(2023, new Date(2026, 9, 10)), 4);
 assert.equal(rYearDefault(2019, new Date(2026, 9, 10)), 5, 'clamped down');
 assert.equal(rYearDefault('2024', new Date(2026, 9, 10)), 3);
+// SMO years after R3 count as R3; the years after them move back
+assert.equal(academicYear(new Date(2026, 5, 30)), 2025);
+assert.equal(academicYear(new Date(2026, 6, 1)), 2026);
+assert.equal(yearInAY(2023, 2021, 1), 3, 'R3 stays R3');
+assert.equal(yearInAY(2024, 2021, 1), 3, 'the SMO year counts as R3');
+assert.equal(yearInAY(2025, 2021, 1), 4, 'back as SR1 (R4)');
+assert.equal(yearInAY(2026, 2021, 1), 5);
+assert.equal(yearInAY(2025, 2021, 2), 3, 'two SMO years');
+assert.equal(yearInAY(2022, 2021, 2), 2, 'years before R3 are untouched');
+assert.equal(yearInAY(2025, 2021, 0), 5);
+assert.equal(rYearDefault(2021, new Date(2025, 9, 10), 1), 4);
 assert.equal(rYearDefault(undefined), 1);
 
 // progress
