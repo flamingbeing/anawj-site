@@ -925,7 +925,7 @@ function editor() {
     } });
     // figures: rarely needed, so collapsed after References like it (open when there are some)
     const figures = h('details', { class: 'card fold-card', open: r.figures.length > 0 },
-      h('summary', {}, `Figures (optional, rarely needed)${r.figures.length ? ' · ' + r.figures.length : ''}`),
+      h('summary', {}, `Figures (optional)${r.figures.length ? ' · ' + r.figures.length : ''}`),
       h('p', { class: 'hint', style: 'margin:8px 0 4px' }, `${PHOTO_NOTE} Your photos: ${fmtMb(usedKb())} of ${fmtMb(PHOTO_BUDGET_KB)} used.`),
       h('p', { class: 'hint', style: 'margin:0 0 4px;color:var(--warn, #b45309)' }, 'No faces, names, NRIC, MRN or anything identifying on monitors, labels or screens. Crop before adding.'),
       h('p', { class: 'hint', style: 'margin:0 0 8px;color:var(--warn, #b45309)' }, 'Use your own photos or diagrams. Don’t copy copyrighted figures from papers, books or websites without permission; if you adapt one, cite it under References.'),
