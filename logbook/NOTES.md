@@ -27,6 +27,9 @@ portfolio content.
 - **☆ Interesting** = the star on a case (`reflectTag`; was "Possible reflection"): a bookmark for interesting cases.
   Logbook rows show "☆ interesting", Filter → Show has "Interesting", the Reflections tab offers them first.
 - **Analytics** = the old Progress tab (`#progress`). Totals is under it ("Compare with your intake").
+  Reflection progress credits at most one complete JR reflection per heading (two for Paediatrics).
+  Extra JR reflections remain saved, with a note explaining why they do not count. Heading bars,
+  overall progress and shared summary counts use this same cap. Required JR cases and sub-types remain reminders.
 - More → **Export / Import** (`#data`): **Export** = the Word portfolio only (it holds everything APMES needs);
   **Import** = reflections from Word (`#reflimport`) and the logbook from Excel/CSV; **Backup** = backup file and
   restore, Excel spreadsheet. Keep that wording. The Logbook and Reflections tabs have no More tools cards.

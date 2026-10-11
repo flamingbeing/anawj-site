@@ -20,7 +20,7 @@ const r = (o) => ({ status: 'complete', initials: 'AB', date: '2026-01-01', jr: 
   assert.deepEqual([bar.done, bar.min, bar.jrNeeded], [0, 3, 1]);
   assert.deepEqual(bar.issues, [], 'JR is a reminder, not an issue');
 }
-// counts only (JR and sub-types are reminders, not enforced), duplicates, drafts not counted
+// JR credit capped; required types remain reminders; duplicates and drafts.
 {
   const list = [
     r({ id: '1', headingId: 'bariatric', initials: 'AA', jr: true }),
@@ -38,8 +38,9 @@ const r = (o) => ({ status: 'complete', initials: 'AB', date: '2026-01-01', jr: 
   assert.equal(by.bariatric.met, true);
   assert.equal(by.bariatric.jrDone, 1);
   assert.equal(by.bariatric.issues.length, 1);   // duplicate patient
-  assert.deepEqual(by.thyroid.issues, []);
-  assert.equal(by.thyroid.counted, 2);
+  assert.ok(by.thyroid.issues.some(i => /1 extra JR.*not counted/.test(i)));
+  assert.equal(by.thyroid.counted, 1);
+  assert.equal(p.totals.counted, 7);
   assert.equal(by.cabg.met, true, 'sub-types not enforced');
   assert.deepEqual(by.cabg.issues, []);
   assert.ok(by.lap.issues.some(i => /Same patient/.test(i)));
@@ -47,12 +48,29 @@ const r = (o) => ({ status: 'complete', initials: 'AB', date: '2026-01-01', jr: 
   assert.equal(p.totals.done, 8);
   assert.equal(p.totals.drafts, 1);
   const c = reflectionCounts(list);
-  assert.deepEqual(c.reflections, { bariatric: 3, thyroid: 2, cabg: 2, lap: 1 });
-  assert.equal(c.reflectionsTotal, 8);
+  assert.deepEqual(c.reflections, { bariatric: 3, thyroid: 1, cabg: 2, lap: 1 });
+  assert.equal(c.reflectionsTotal, 7);
   // past the minimum, the shared count stops there
   const extra = [...list, ...[1, 2, 3].map(i => r({ headingId: 'bariatric', initials: 'Z' + i, date: '2026-02-0' + i }))];
   assert.equal(reflectionCounts(extra).reflections.bariatric, 3);
-  assert.equal(reflectionCounts(extra).reflectionsTotal, 8);
+  assert.equal(reflectionCounts(extra).reflectionsTotal, 7);
+}
+// The JR cap applies even to headings requiring JR, with the Paediatrics exception.
+{
+  const { REFLECTION_HEADINGS } = await import('../js/categories.js');
+  for (const hd of REFLECTION_HEADINGS) {
+    const list = Array.from({ length: hd.min + 2 }, (_, i) => r({ headingId: hd.id, initials: `P${i}`, jr: true }));
+    const p = reflectionProgress(list);
+    const h = p.headings.find(x => x.id === hd.id);
+    const limit = hd.id === 'paeds' ? 2 : 1;
+    assert.equal(h.counted, limit, `${hd.id}: JR cap`);
+    assert.equal(h.done, list.length, 'all completed reflections remain saved');
+    assert.equal(h.met, limit >= hd.min, 'excess JR cannot meet heading');
+    assert.equal(reflectionCounts(list).reflectionsTotal, limit);
+    const mixed = [...list, r({ headingId: hd.id, initials: 'SR' }), r({ headingId: hd.id, initials: 'DR', jr: true, status: 'draft' })];
+    assert.equal(reflectionProgress(mixed).headings.find(x => x.id === hd.id).counted, limit + 1, 'SR counts; draft does not');
+    assert.equal(reflectionCounts(mixed).reflectionsTotal, Math.min(limit + 1, hd.min));
+  }
 }
 // whitelist
 {
