@@ -21,7 +21,7 @@ export async function makeBackup() {
   };
 }
 
-async function downloadBackup(btn) {
+export async function downloadBackup(btn) {
   btn.disabled = true;
   try {
     const data = await makeBackup();

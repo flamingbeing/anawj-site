@@ -4,7 +4,7 @@
 import { R_YEARS } from './categories.js';
 import { sortCodes, uid } from './engine.js';
 import { openBin } from './bin.js';
-import { S, h, toast, modal, confirmBox, cloud, catChip, settings, patchLogbook, displayName, hooks, rYear, fill } from './ui-core.js';
+import { S, h, toast, modal, confirmBox, cloud, catChip, catName, PICKER_ORDER, settings, patchLogbook, displayName, hooks, rYear, fill } from './ui-core.js';
 import { pickDialog } from './ui-log.js';
 import { backupCard } from './backup.js';
 
@@ -80,6 +80,7 @@ export function renderSettings() {
           h('option', { value: 'last', selected: st.defaultDate === 'last' }, 'The date I used last')))),
 
     templatesCard(),
+    subcatsCard(),
 
     // ---- recycle bin (bin agent) ----
     h('section', { class: 'card' },
@@ -94,7 +95,12 @@ export function renderSettings() {
       h('p', { class: 'hint', style: 'margin:0' },
         'Your cases are stored in your own logbook in Google Cloud Firestore and only you (and the programme admins) can read them. ',
         'Log patient initials only — no names, NRIC or hospital numbers. Programme residents share case counts per category on the Totals tab; details are never shared. ',
-        'This device keeps an offline copy of your cases until you sign out — sign out on shared computers.')));
+        'This device keeps an offline copy of your cases until you sign out — sign out on shared computers.')),
+
+    h('section', { class: 'card credits' },
+      h('h2', {}, 'Credits'),
+      h('p', { style: 'margin:0' }, 'Code by ', h('b', {}, 'Abigail Sim')),
+      h('p', { style: 'margin:4px 0 0' }, 'Design and UX/UI by ', h('b', {}, 'Koh Wenjun'))));
 }
 
 // ---------- Account-tab cards: who you are, sign out ----------
@@ -123,6 +129,34 @@ export function signOutCard() {
         cloud.signOut();
       } }, 'Sign out'),
       cloud.demo ? h('span', { class: 'muted' }, 'Demo mode: data stays in this browser.') : null));
+}
+
+// ---------- personal subcategories ----------
+
+// Your own labels inside an APMES category (e.g. 26 → Interscalene, Femoral): tick them when logging;
+// Progress counts them under the category. They never change the APMES counts.
+function subcatsCard() {
+  const all = { ...((settings().subcats) || {}) };
+  const codes = Object.keys(all).filter(c => (all[c] || []).length).sort();
+  const save = next => patchLogbook({ settings: { subcats: next } }).then(() => hooks.render());
+  const sel = h('select', { 'aria-label': 'Category' }, PICKER_ORDER.map(c => h('option', { value: c.code }, `${c.code} ${c.name}`)));
+  const name = h('input', { placeholder: 'e.g. Interscalene', maxlength: '40', 'aria-label': 'Subcategory name' });
+  const addIt = () => {
+    const code = sel.value, n = name.value.trim();
+    if (!n) return toast('Type a name for the subcategory');
+    const list = all[code] || [];
+    if (list.some(x => x.toLowerCase() === n.toLowerCase())) return toast('Already there');
+    if (list.length >= 20) return toast('Up to 20 per category');
+    save({ ...all, [code]: [...list, n] });
+  };
+  return h('section', { class: 'card' },
+    h('h2', {}, 'My subcategories'),
+    h('p', { class: 'hint' }, 'Your own labels within an APMES category, e.g. 26 Peripheral nerve blocks → Interscalene, Femoral. Tick them when logging; Progress counts each one. The APMES counts are unchanged.'),
+    codes.length ? h('ul', { class: 'prog' }, codes.map(code => h('li', { style: 'grid-template-columns:1fr' },
+      h('span', {}, h('b', {}, code), ' ', h('span', { class: 'muted' }, catName(code))),
+      h('div', { class: 'chips' }, all[code].map(n => h('span', { class: 'chip on' }, n,
+        h('button', { class: 'chip-x', 'aria-label': `Remove ${n}`, onclick: () => save({ ...all, [code]: all[code].filter(x => x !== n) }) }, '×'))))))) : null,
+    h('div', { class: 'bar', style: 'margin:10px 0 0' }, sel, name, h('button', { onclick: addIt }, '+ Add')));
 }
 
 // ---------- templates ----------

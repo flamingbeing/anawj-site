@@ -119,12 +119,14 @@ const S1 = R({ headingId: 'thyroid', initials: 'GH', date: '2024-12-21', jr: tru
   assert.ok(ensureNamespaces('<w:document xmlns:w="x" xmlns:r="y">').includes('xmlns:pic='));
   assert.equal((ensureNamespaces('<w:document xmlns:w="x" xmlns:r="y">').match(/xmlns:r=/g) || []).length, 1);
 
-  // numbering ignores pre-printed empty slots: slot 1 asks for JR, slot 2 is plain
+  // pre-printed prompt rows (JR, a sub-type) are dropped; reflections fill plain rows numbered from 1
   const hd = REFLECTION_HEADINGS.find(x => x.id === 'thyroid');
-  const row = (a, b) => `<w:tr>${[a, b, '', ''].map(tc).join('')}</w:tr>`;
-  const rows = placeInSlots(hd, [row('', 'JR'), row('', ''), row('', '')], [R({ headingId: 'thyroid', initials: 'ZZ', date: '2025-01-01', diagnosis: 'x' })]);
-  assert.ok(rows[0].includes('>JR<') && !rows[0].includes('ZZ'), 'JR slot keeps its prompt');
-  assert.ok(rows[1].includes('>1.<') && rows[1].includes('ZZ'), 'first filled row is 1.');
+  const row = (a, b, c = '') => `<w:tr>${[a, b, c, ''].map(tc).join('')}</w:tr>`;
+  const rows = placeInSlots(hd, [row('', 'JR'), row('', '', 'On pump CABG'), row('', '')], [R({ headingId: 'thyroid', initials: 'ZZ', date: '2025-01-01', diagnosis: 'x' })]);
+  assert.ok(!rows.some(r => r.includes('On pump CABG')), 'sub-type prompt row dropped');
+  assert.ok(rows[0].includes('>1.<') && rows[0].includes('ZZ'), 'first row is the reflection, numbered 1.');
+  assert.ok(!rows.slice(1).some(r => />JR</.test(r)), 'empty JR prompt row dropped');
+  assert.equal(rows.length, Math.max(1, hd.min), 'blank rows make up the minimum');
   const rows2 = placeInSlots(hd, [row('', 'JR'), row('', '')], [S1, R({ headingId: 'thyroid', initials: 'YY', date: '2025-01-01' }), R({ headingId: 'thyroid', initials: 'XX', date: '2025-02-01' })]);
   assert.deepEqual(rows2.map(r => (r.match(/>(\d+)\.</) || [])[1]), ['1', '2', '3']);
 

@@ -2,7 +2,8 @@
 // spreadsheet round trips. Pure functions only (no DOM), so it can be tested in Node.
 
 import { CATEGORIES, BY_CODE, R_YEARS, codeOf } from './categories.js';
-import { KEYWORDS } from './keywords.js';
+import { KEYWORDS, STOP } from './keywords.js';
+const STOP_WORDS = new Set(STOP);
 
 // ---------- ids and dates ----------
 
@@ -198,12 +199,17 @@ export const cleanInitials = s => String(s || '').toUpperCase().replace(/[^A-Z.\
 // Line breaks inside the rest are kept.
 export function splitInitials(text, keywords = KEYWORDS) {
   const s = String(text || '').trim();
-  const m = s.match(/^([A-Z]{2,4})(?![A-Za-z0-9])[\s\/,:;.\-]*/);
-  if (!m || NOT_INITIALS.has(m[1])) return { initials: '', details: s };
-  // a case word ("IJ", "TKR") is still initials when an age follows: "IJ 60M VATS"
+  // the first run of 2-4 letters, in any case ("ab 45f lap chole" -> AB); stored in capitals
+  const m = s.match(/^([A-Za-z]{2,4})(?![A-Za-z0-9])[\s\/,:;.\-]*/);
+  if (!m) return { initials: '', details: s };
+  const word = m[1], up = word.toUpperCase(), lower = word !== up;
+  // a case word ("IJ", "TKR", "lap") is still initials when an age follows: "IJ 60M VATS", "lap 45f …"
   const ageNext = /^\d{1,3}\s?(?:[MF]|yo|y\/o|yrs?|years?|\/12|\/52|m\/o|mo|d\/o)(?![A-Za-z])/i.test(s.slice(m[0].length));
-  if (keywords && keywords[m[1].toLowerCase()] && !ageNext) return { initials: '', details: s };
-  return { initials: m[1], details: s.slice(m[0].length).trim() };
+  const caseWord = NOT_INITIALS.has(up) || (keywords && keywords[word.toLowerCase()]) || (lower && STOP_WORDS.has(word.toLowerCase()));
+  if (caseWord && !ageNext) return { initials: '', details: s };
+  // lower case: a 4-letter word ("circ", "knee") needs an age after it to count as initials
+  if (lower && up.length === 4 && !ageNext) return { initials: '', details: s };
+  return { initials: up, details: s.slice(m[0].length).trim() };
 }
 
 // A case's initials and details for display and editing: the initials field when the case has one,

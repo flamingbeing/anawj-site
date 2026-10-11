@@ -280,10 +280,7 @@ function list() {
         h('li', {}, 'Each reflection is a different patient, under one heading only.'),
         h('li', {}, 'Some categories require one case reflection in Junior Residency (JR, R1–R3); when not indicated, at most one case reflection can be done at the JR level per category.'),
         h('li', {}, 'Generative AI use must follow the NUS guidelines on the use of AI tools in academic work.'))),
-    em ? null : h('div', { class: 'bar' }, renderExportButton(() => (S.reflections || []).filter(r => r.status === 'complete'), displayName,
-      async () => ({ cases: S.cases || [], intake: effectiveIntake(), rYear: rYear(),
-        profile: (S.logbook && S.logbook.profile) || null,
-        images: await loadImagesFor((S.reflections || []).filter(r => r.status === 'complete')) }))),
+    em ? null : h('div', { class: 'bar', style: 'margin:4px 0 0' }, h('span', { class: 'hint' }, 'Export the portfolio (Word):'), h('a', { class: 'btn small', href: '#more' }, 'More → Export & Sync')),
     null);
 
   // edit-mode toolbar: select all / clear / delete selected
@@ -442,6 +439,15 @@ async function moveReflection(r, headingId) {
 // ---------- images ----------
 
 // Images of the given reflections' figures, for the Word export: { id: { data, mime, w, h } }. Missing ones are skipped.
+// The Word portfolio export button (shown in More → Export & Sync): complete reflections, Section 1
+// details and the Section 4 counts.
+export function portfolioExportButton() {
+  return renderExportButton(() => (S.reflections || []).filter(r => r.status === 'complete'), displayName,
+    async () => ({ cases: S.cases || [], intake: effectiveIntake(), rYear: rYear(),
+      profile: (S.logbook && S.logbook.profile) || null,
+      images: await loadImagesFor((S.reflections || []).filter(r => r.status === 'complete')) }));
+}
+
 export async function loadImagesFor(reflections) {
   const ids = [...new Set((reflections || []).flatMap(r => (r.figures || []).map(f => f.id)).filter(Boolean))];
   const out = {};

@@ -364,7 +364,14 @@ assert.equal(rYearDefault(undefined), 1);
   assert.deepEqual(splitInitials('GA lap chole'), { initials: '', details: 'GA lap chole' });
   assert.deepEqual(splitInitials('ABCDE x'), { initials: '', details: 'ABCDE x' }, '5 letters: not initials');
   assert.deepEqual(splitInitials('A 5yo'), { initials: '', details: 'A 5yo' });
-  assert.deepEqual(splitInitials('Ab 5yo'), { initials: '', details: 'Ab 5yo' });
+  // the first run of letters is initials in any case, saved in capitals
+  assert.deepEqual(splitInitials('Ab 5yo'), { initials: 'AB', details: '5yo' });
+  assert.deepEqual(splitInitials('ab 45f\nlap chole'), { initials: 'AB', details: '45f\nlap chole' });
+  assert.deepEqual(splitInitials('cd LSCS spinal'), { initials: 'CD', details: 'LSCS spinal' });
+  assert.deepEqual(splitInitials('lap chole GA'), { initials: '', details: 'lap chole GA' }, 'lower-case case word');
+  assert.deepEqual(splitInitials('the patient'), { initials: '', details: 'the patient' }, 'common word');
+  assert.deepEqual(splitInitials('circ caudal'), { initials: '', details: 'circ caudal' }, 'lower-case 4 letters needs an age');
+  assert.deepEqual(splitInitials('abcd 45f x'), { initials: 'ABCD', details: '45f x' });
   assert.deepEqual(splitInitials('AB2 x'), { initials: '', details: 'AB2 x' });
   assert.deepEqual(splitInitials('  AB  '), { initials: 'AB', details: '' });
   assert.deepEqual(splitInitials('AB 72M\nlap chole'), { initials: 'AB', details: '72M\nlap chole' });

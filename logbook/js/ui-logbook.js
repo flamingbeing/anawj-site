@@ -39,7 +39,7 @@ export function renderLogbook() {
       if (view.flag && !flagsOf(c).includes(view.flag)) return false;
       if (win && !(c.date && c.date >= win.from && c.date <= win.to)) return false;
       if (!words.length) return true;
-      const hay = `${caseText(c)} ${c.date || c.dateText || ''} ${weekday(c.date)} ${fmtDate(c.date) || ''} ${(c.cats || []).join(' ')}`.toLowerCase();
+      const hay = `${caseText(c)} ${c.date || c.dateText || ''} ${weekday(c.date)} ${fmtDate(c.date) || ''} ${(c.cats || []).join(' ')} ${(c.tags || []).join(' ')}`.toLowerCase();
       return words.every(w => hay.includes(w));
     });
   };
@@ -155,6 +155,7 @@ function caseRow(c, flagsOf) {
         flags.includes('duplicate') ? h('span', { class: 'flag' }, 'possible duplicate') : null,
         !(c.cats || []).length ? h('span', { class: 'flag err' }, 'no category') : null,
         c.reflectTag && !(S.reflections || []).some(r => r.caseId === c.id) ? h('span', { class: 'flag', title: 'Tagged as a possible reflection' }, '☆ reflection?') : null,
+        (c.tags || []).map(t => h('span', { class: 'flag sc-tag', title: 'Your subcategory' }, t.split(':').slice(1).join(':'))),
         h('button', { class: 'small', style: 'margin-left:auto', title: 'Write a reflection on this case', onclick: e => { e.stopPropagation(); reflectOnCase(c); } },
           (S.reflections || []).some(r => r.caseId === c.id) ? 'Reflection' : 'Reflect'))), c);
 }
@@ -288,7 +289,7 @@ function excelCard() {
       fileButton('Upload Excel', '.xlsx', uploadExcel)));
 }
 
-async function downloadExcel() {
+export async function downloadExcel() {
   try {
     await needExcel();
     const blob = await exportCases(S.cases, { name: displayName(), counts: S.counts, rYear: rYear() });

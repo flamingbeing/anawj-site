@@ -78,6 +78,14 @@ function reflCard() {
     h('span', { class: 'meter' }, h('i', { class: met === p.headings.length ? 'done' : 'ontrack', style: `width:${Math.min(100, Math.round(p.totals.counted / p.totals.min * 100))}%` })));
 }
 
+// your own subcategories under a category: "Interscalene 3 · Femoral 2"
+function subcatLine(code) {
+  const names = ((settings().subcats || {})[code] || []);
+  if (!names.length) return null;
+  const n = name => (S.cases || []).filter(c => (c.tags || []).includes(`${code}:${name}`)).length;
+  return h('span', { class: 'ms sc-line' }, names.map(name => `${name} ${n(name)}`).join(' · '));
+}
+
 function progList(items) {
   return h('ul', { class: 'prog' }, items.map(p => {
     const c = BY_CODE[p.code];
@@ -90,7 +98,8 @@ function progList(items) {
         p.status === 'none' ? String(p.count) : p.next ? `${p.count} / ${p.next.n}` : `${p.count} ✓`),
       p.milestones.length ? h('span', { class: 'meter' }, h('i', { class: p.status, style: `width:${pct}%` })) : null,
       p.milestones.length ? h('span', { class: 'ms' }, p.milestones.map(m => `${m.by}: ${m.n}${m.met ? ' ✓' : ''}`).join(' · ')
-        + (p.next ? ` — ${p.next.n - p.count} more by end of ${p.next.by}` : '')) : null);
+        + (p.next ? ` — ${p.next.n - p.count} more by end of ${p.next.by}` : '')) : null,
+      subcatLine(p.code));
   }));
 }
 
@@ -136,7 +145,7 @@ export function renderTotals() {
       h('span', { class: 'grow' }),
       h('button', { class: 'small', onclick: () => { tview.summaries = null; hooks.render(); } }, 'Refresh'),
       h('button', { class: 'small', onclick: () => downloadTotals(table.data) }, 'Download Excel')),
-    h('p', { class: 'hint' }, 'Case counts only, so residents can see how they compare. Under each category: its targets. Red (behind) and amber (due this year) show how many short of the target, e.g. 5 −3. Colours use each resident’s own year.'),
+    h('p', { class: 'hint' }, 'Case counts only, so residents can see how they compare. Under each category: its targets. Colours use each resident’s own year (tap and hold a red or amber count to see how many short).'),
     legend(),
     h('div', { class: 'scroll', style: 'margin-top:8px' }, table.el));
   return card;
@@ -187,9 +196,9 @@ function totalsTable(people) {
     // the targets under the name: "10 by R3 | 15 by R5"
     const t = BY_CODE[code].targets || {};
     const tgt = R_YEARS.filter(y => t[y] != null).map(y => `${t[y]} by ${y}`).join(' | ');
-    data.rows.push({ label: BY_CODE[code].label + (tgt ? ` [${tgt}]` : ''), values: vals.map((v, i) => (gaps[i] ? `${v} (−${gaps[i]})` : v)), statuses: sts });
+    data.rows.push({ label: BY_CODE[code].label + (tgt ? ` [${tgt}]` : ''), values: vals, statuses: sts });
     add(tbody, h('tr', {}, h('td', { class: 'cat', title: BY_CODE[code].full }, `${code} ${BY_CODE[code].name}`, tgt ? h('small', { class: 'tgt' }, tgt) : null),
-      vals.map((v, i) => h('td', { class: `n ${sts[i]}`, title: gaps[i] ? `${gaps[i]} short of the target` : '' }, String(v), gaps[i] ? h('small', { class: 'gap' }, ` −${gaps[i]}`) : null))));
+      vals.map((v, i) => h('td', { class: `n ${sts[i]}`, title: gaps[i] ? `${gaps[i]} short of the target` : '' }, String(v)))));
   }
   const totals = people.map(p => p.total || 0);
   const refl = people.map(p => p.reflectionsTotal || 0);
