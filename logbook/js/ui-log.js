@@ -136,8 +136,8 @@ function weeklyDigest() {
     h('div', { class: 'bar', style: 'margin:0' },
       h('b', {}, `Last week: ${n} case${n === 1 ? '' : 's'} logged`), h('span', { class: 'grow' }),
       h('button', { class: 'small', 'aria-label': 'Dismiss until next week', onclick: () => { try { localStorage.setItem(key, from); } catch { /* ignore */ } card.remove(); } }, 'OK')),
-    h('p', { class: 'hint', style: 'margin:4px 0 0' }, n ? 'Nice work. ' : 'Nothing logged last week: catch up with the weekday chips or Paste list. ',
-      h('a', { href: '#progress' }, 'See what is still needed')));
+    h('p', { class: 'hint', style: 'margin:4px 0 8px' }, n ? 'Nice work.' : 'Nothing logged last week: catch up with the weekday chips or Paste list.'),
+    h('a', { class: 'btn small', href: '#progress' }, 'See what is still needed'));
   return card;
 }
 
