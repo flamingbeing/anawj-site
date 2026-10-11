@@ -138,12 +138,22 @@ portfolio content.
   logbook (`demo-seed.js`); counts in the steps start from those six. Navigation goes through the `tab()`
   helper: Settings pages (`display`, `logging`, `tags`, `reflset`, `sharefmt`, `bin` = the Recycle bin dialog),
   `data` (Export / Import), `totals` (by hash, under Analytics). On a wide screen the Case tab is two panes.
-- Owner preferences: merge your own PRs once unit tests and e2e pass, then report. The owner may say
+- Owner preferences: merge your own PRs once unit tests and e2e pass, then report. Exception: a Claude Code ↔
+  Codex handover PR waits for the owner's explicit approval (see the handover skill once it is on main). The owner may say
   "no e2e yet": then only unit tests and quick browser checks. Show phone screenshots of UI changes. When the
   owner asks "should we / can we", answer and propose; for multi-part changes say the plan first and wait when
   asked ("let me know what you are going to do"). Owner's calls so far: no tag renames (APMES tag names stay),
   no raw regex, no swipe actions, no tag numbers on screen, no What's new, frictionless logging first.
-- Gotchas: the shell's cwd resets between commands, so `cd logbook &&` every time (a relative `sw.js` sed once
+- Working alongside another assistant (Claude Code and Codex each run in their own cloud environment and share
+  nothing but GitHub): one owner per PR and per area at a time; start from current `main`; keep PRs small and
+  merged promptly so the other side's branch doesn't drift. Claude Code watches the PRs it opens and acts on
+  every comment, review and failure there: a comment on one of its open PRs wakes it, so don't post on it
+  unless you mean to reach it (or the owner has stopped it first). Pass work across with a PR link via the owner.
+- After a big batch, a review pass pays: three reviewers in parallel, one per area (Case tab; Logbook search,
+  Excel and upload; settings, account, reflections), each asked for concrete scenarios and to reproduce in the
+  demo, found ~16 real bugs in Oct 2026 (#117). Verify each finding before fixing; add a unit test when the
+  logic is pure.
+- Gotchas (Claude Code's cloud shell; Codex may differ): the shell's cwd resets between commands, so `cd logbook &&` every time (a relative `sw.js` sed once
   missed for ten commits). Long Python edits: write the script to the scratchpad and run it (inline heredocs with
   quotes broke). Regex edits by id can hit a sub-type with the same id (`chronic` is a heading and a regional
   sub-type). The local test server (`python3 -m http.server 8080` from the repo root) dies now and then: restart.
@@ -162,3 +172,15 @@ portfolio content.
 - Per-user state resets on sign-out (`resetters`), including Analytics, Reflections view, drafts;
   async loads (Totals, ready portfolio) are dropped after sign-out (`gen` counters).
 - Pill drag uses the pressed element; CSV Under uses IDs when names repeat; roman sub-codes (26ii).
+- Upload reads back every tag name the export writes (full, short, names with commas: "Cardiac,on-pump");
+  a column missing from the file (unticked in the export) leaves that field as it was; a file without the
+  hidden "Export info" sheet only deletes cases dated within it. Unit tests in export-opts and engine tests.
+- Search date words keep the rest of the query as typed (OR / AND, case-sensitive); a bare SAT/MON/SUN is a
+  search word (initials), only full day names or "last sat" are dates.
+- Case tab: Shift+Enter never saves; Undo of a save restores ☆ Interesting; a picked day survives a reload
+  (12 h); "+ Log a case" keeps a case being typed; Same as last keeps line 1 (initials, age).
+- Settings file: only known keys, each cleaned to the shape the app reads (a bad savedSearches broke the
+  Logbook tab on every device); rYear / rYearAY / importMap / sharedSeen never travel.
+- Programme tag groups are adopted only from the server logbook, never a cached copy (it overwrote groups
+  changed on another device). Delete account re-authenticates before deleting anything.
+- Totals: your own column is live (summaryOf), not the copy loaded when Analytics opened.
