@@ -169,7 +169,7 @@ function chooseHeading() {
     h('div', { class: 'bar' }, h('button', { onclick: () => { p.chosen = null; hooks.render(); } }, '← Cases'), h('span', { class: 'grow' })),
     h('h2', { style: 'margin:8px 0 4px' }, 'Which heading?'),
     h('p', { style: 'margin:0 0 8px' }, h('span', { class: 'muted' }, caseDate(c) + ' · '), caseText(c) || '(no details)',
-      (c.cats || []).length ? h('span', { class: 'muted', style: 'display:block;font-size:13px' }, c.cats.map(catName).join(', ')) : null),
+      (c.cats || []).length ? h('span', { class: 'muted', style: 'display:block;font-size:calc(13px * var(--fs, 1))' }, c.cats.map(catName).join(', ')) : null),
     suggestChips(c, preset => reflectOnCase(c, preset)),
     h('p', { class: 'hint help', style: 'margin:10px 0 6px' }, 'Highlighted headings still need reflections. You can change the heading later.'),
     h('button', { onclick: () => reflectOnCase(c) }, 'Choose the heading later')));
@@ -200,13 +200,13 @@ function picker() {
       const names = (c.cats || []).map(catName).join(', ');
       return h('li', { tabindex: '0', role: 'button', onclick: () => pickCase(c), onkeydown: e => { if (e.key === 'Enter') pickCase(c); } },
         h('span', { class: 'd' }, caseDate(c)),
-        h('span', { class: 't' }, c.reflectTag && !has ? h('span', { class: 'flag tagged' }, '☆ interesting') : null, caseText(c) || '(no details)', names ? h('span', { class: 'muted', style: 'display:block;font-size:13px' }, names) : null),
+        h('span', { class: 't' }, c.reflectTag && !has ? h('span', { class: 'flag tagged' }, '☆ interesting') : null, caseText(c) || '(no details)', names ? h('span', { class: 'muted', style: 'display:block;font-size:calc(13px * var(--fs, 1))' }, names) : null),
         h('span', { class: 'c' }, cur ? h('span', { class: 'flag' }, 'current') : has ? h('span', { class: 'flag' }, 'has reflection') : null));
     }));
     if (!shown.length) ul.replaceChildren(h('li', { class: 'empty' }, cases.length ? 'No cases match.' : 'No cases logged yet: tap + New case above.'));
   };
   paint();
-  const search = h('input', { type: 'search', value: p.q, placeholder: 'Search initials, details, date or procedure', style: 'font-size:16px;width:100%;box-sizing:border-box',
+  const search = h('input', { type: 'search', value: p.q, placeholder: 'Search initials, details, date or procedure', style: 'font-size:calc(16px * var(--fs, 1));width:100%;box-sizing:border-box',
     'aria-label': 'Search cases', oninput: e => { p.q = e.target.value; paint(); } });
   setTimeout(() => search.focus(), 0);
   return h('div', {}, h('section', { class: 'card' },
@@ -338,7 +338,7 @@ function list() {
     viewSel('Group by', 'group', [['heading', 'Heading'], ['month', 'Month'], ['year', 'Residency year'], ['status', 'Status'], ['none', 'None']]),
     viewSel('Sort', 'sort', [['newest', 'Newest first'], ['oldest', 'Oldest first'], ['longest', 'Longest'], ['shortest', 'Shortest'], ['az', 'A–Z']]));
 
-  const search = h('input', { type: 'search', value: rv.q, placeholder: 'Search reflections', 'aria-label': 'Search reflections', style: 'font-size:16px;flex:1;min-width:0',
+  const search = h('input', { type: 'search', value: rv.q, placeholder: 'Search reflections', 'aria-label': 'Search reflections', style: 'font-size:calc(16px * var(--fs, 1));flex:1;min-width:0',
     oninput: debounce(e => { rv.q = e.target.value; hooks.render(); requestAnimationFrame(() => { const el = document.querySelector('input[aria-label="Search reflections"]'); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }); }, 250) });
   const filterChips = h('div', { class: 'chips refl-filters' }, [['all', 'All'], ['draft', 'Drafts'], ['complete', 'Complete'], ['uncat', 'Uncategorised']].map(([k, t]) =>
     h('span', { class: `chip ${rv.filter === k ? 'on' : ''}`, role: 'button', tabindex: '0', 'aria-pressed': String(rv.filter === k), onclick: () => { rv.filter = k; hooks.render(); } }, t)));
@@ -782,8 +782,8 @@ const newId = () => 'img' + Date.now().toString(36) + Math.random().toString(36)
 
 // ---------- editor ----------
 
-const TA = 'font-size:16px;width:100%;box-sizing:border-box;line-height:1.4';
-const IN = 'font-size:16px;width:100%;box-sizing:border-box';
+const TA = 'font-size:calc(16px * var(--fs, 1));width:100%;box-sizing:border-box;line-height:1.4';
+const IN = 'font-size:calc(16px * var(--fs, 1));width:100%;box-sizing:border-box';
 const boxCard = (label, hint, ...kids) => h('section', { class: 'card' },
   h('h3', { style: 'margin:0 0 4px' }, label), hint ? h('p', { class: 'hint', style: 'margin:0 0 8px' }, hint) : null, ...kids);
 const nonEmpty = s => !!String(s || '').trim();
@@ -797,7 +797,7 @@ function editor() {
   const usedKb = () => photoUsageKb([...(S.reflections || []).filter(x => x.id !== r.id), r]);
   r.points ||= []; r.figures ||= []; r.references ||= [];
   const legacy = isLegacy(r);
-  const status = h('span', { class: 'muted', style: 'font-size:13px' }, r.id ? 'Saved' : 'Not saved yet');
+  const status = h('span', { class: 'muted', style: 'font-size:calc(13px * var(--fs, 1))' }, r.id ? 'Saved' : 'Not saved yet');
   const persist = async () => {
     // a debounced save from an earlier render can fire after the editor closed or the reflection
     // was deleted: it must not reopen the editor or bring the reflection back
@@ -816,7 +816,7 @@ function editor() {
   const paintWords = () => {
     const n = wordCount(r), ok = n >= MIN_WORDS;
     words.textContent = ok ? `${n} words ✓ meets the ${MIN_WORDS}-word guide` : `${n} / ${MIN_WORDS} words (suggested minimum)`;
-    words.style.cssText = `font-size:13px;font-weight:600;color:${ok ? 'var(--ok, #15803d)' : 'var(--warn, #b45309)'}`;
+    words.style.cssText = `font-size:calc(13px * var(--fs, 1));font-weight:600;color:${ok ? 'var(--ok, #15803d)' : 'var(--warn, #b45309)'}`;
   };
   paintWords();
   const changed = () => { status.textContent = 'Editing…'; paintWords(); lsSet({ ...r, restore: true }); autosave(); };
@@ -834,7 +834,7 @@ function editor() {
   paintSubs();
 
   let sec = '';
-  const headingSelect = h('select', { 'data-field': 'heading', style: 'font-size:16px;max-width:100%', onchange: e => { r.headingId = e.target.value; r.subId = null; paintSubs(); changed(); } },
+  const headingSelect = h('select', { 'data-field': 'heading', style: 'font-size:calc(16px * var(--fs, 1));max-width:100%', onchange: e => { r.headingId = e.target.value; r.subId = null; paintSubs(); changed(); } },
     h('option', { value: '', selected: !HEADING_BY_ID[r.headingId] }, 'Uncategorised (not exported)'),
     REFLECTION_HEADINGS.map(hd => {
       const g = hd.section !== sec ? (sec = hd.section) : null;
@@ -845,18 +845,18 @@ function editor() {
   const linkBox = r.caseId
     ? h('div', { class: 'refl-case', style: 'border:1px solid var(--line, #ddd);border-radius:10px;padding:8px 10px;margin:8px 0' },
       h('div', { class: 'bar', style: 'gap:8px;align-items:center' },
-        h('b', { style: 'font-size:13px' }, 'Linked case'), h('span', { class: 'grow' }),
+        h('b', { style: 'font-size:calc(13px * var(--fs, 1))' }, 'Linked case'), h('span', { class: 'grow' }),
         h('button', { class: 'small', onclick: () => openPicker(true) }, 'Change case'),
         h('button', { class: 'small', onclick: () => { r.caseId = null; restructure(); } }, 'Unlink')),
       lc ? h('div', {}, h('span', { class: 'muted' }, caseDate(lc) + ' · '), caseText(lc) || '(no details)',
-        (lc.cats || []).length ? h('div', { class: 'muted', style: 'font-size:13px' }, lc.cats.map(catName).join(', ')) : null)
+        (lc.cats || []).length ? h('div', { class: 'muted', style: 'font-size:calc(13px * var(--fs, 1))' }, lc.cats.map(catName).join(', ')) : null)
         : h('div', { class: 'hint' }, S.casesLoaded === false ? 'Loading case…' : 'The linked case is no longer in your logbook. Change case to link another.'))
     : h('div', { style: 'border:1px solid var(--line, #ddd);border-radius:10px;padding:8px 10px;margin:8px 0' },
       h('p', { style: 'margin:0 0 6px' }, h('b', {}, r.source === 'word' ? 'Imported from Word. ' : 'No case linked. '), 'Linking it to a logged case is optional.'),
       h('button', { onclick: () => openPicker(true) }, 'Link to a case'));
   if (rv.relinked) { rv.relinked = false; setTimeout(() => { status.textContent = 'Editing…'; autosave(); }, 0); }
 
-  const input = (key, attrs = {}) => h('input', { style: 'font-size:16px', value: r[key] ?? '', ...attrs, oninput: e => { r[key] = e.target.value || (key === 'date' ? null : ''); changed(); } });
+  const input = (key, attrs = {}) => h('input', { style: 'font-size:calc(16px * var(--fs, 1))', value: r[key] ?? '', ...attrs, oninput: e => { r[key] = e.target.value || (key === 'date' ? null : ''); changed(); } });
   const fields = h('section', { class: 'card' },
     h('div', { class: 'bar' }, h('button', { onclick: close }, '← Reflections'), h('span', { class: 'grow' }), status),
     linkBox,
@@ -864,8 +864,8 @@ function editor() {
     h('label', { class: 'field' }, 'Heading', headingSelect),
     subWrap,
     h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:8px' },
-      h('label', { class: 'field' }, 'Patient initials', input('initials', { 'data-field': 'initials', maxlength: '20', autocapitalize: 'characters', style: 'font-size:16px;width:7em' })),
-      h('label', { class: 'field' }, 'Date', h('input', { type: 'date', 'data-field': 'date', style: 'font-size:16px', value: r.date || '', oninput: e => { r.date = e.target.value || null; if (r.source !== 'word') setJr(r); changed(); } }))),
+      h('label', { class: 'field' }, 'Patient initials', input('initials', { 'data-field': 'initials', maxlength: '20', autocapitalize: 'characters', style: 'font-size:calc(16px * var(--fs, 1));width:7em' })),
+      h('label', { class: 'field' }, 'Date', h('input', { type: 'date', 'data-field': 'date', style: 'font-size:calc(16px * var(--fs, 1))', value: r.date || '', oninput: e => { r.date = e.target.value || null; if (r.source !== 'word') setJr(r); changed(); } }))),
     h('p', { class: 'hint help' }, 'Some categories require one case reflection in Junior Residency (JR); when not indicated, at most one case reflection can be done at the JR level per category. A reflection dated in R1–R3 is marked JR in the Word export automatically.'),
     h('label', { class: 'field' }, 'Diagnosis / operation', input('diagnosis', { maxlength: '2000' })),
     h('p', { class: 'hint help' }, 'De-identified only: initials, no names or NRIC. Generative AI use must follow the NUS guidelines on the use of AI tools in academic work.'));
@@ -907,7 +907,7 @@ function editor() {
     const points = boxCard('Learning points', 'For each point: what were the considerations, and what did you learn? Give it a short heading, then your discussion (analysis with evidence, conclusions, action plan).',
       r.points.map((p, i) => h('div', { style: 'border:1px solid var(--line, #ddd);border-radius:10px;padding:10px;margin:0 0 10px' },
         h('div', { class: 'bar', style: 'gap:6px;align-items:center;margin-bottom:6px' },
-          h('b', { style: 'font-size:16px' }, `${i + 1}.`),
+          h('b', { style: 'font-size:calc(16px * var(--fs, 1))' }, `${i + 1}.`),
           h('input', { style: IN + ';flex:1', maxlength: String(LIMITS.pointHeading), value: p.heading || '', placeholder: 'Heading, e.g. Choice of airway management in trismus',
             'aria-label': `Learning point ${i + 1} heading`, oninput: e => { p.heading = e.target.value; changed(); } })),
         h('textarea', { rows: '6', maxlength: String(LIMITS.pointText), style: TA, value: p.text || '', placeholder: 'What were the considerations?\nWhat did you learn?',
@@ -973,7 +973,7 @@ function editor() {
           h('label', { class: 'field', style: 'display:block;margin-top:6px' }, `Caption (Figure ${i + 1}: …)`,
             h('input', { style: IN, maxlength: String(LIMITS.caption), value: f.caption || '', placeholder: 'e.g. Apnoeic oxygenation', oninput: e => { f.caption = e.target.value; changed(); } })),
           h('label', { class: 'field', style: 'display:block' }, 'Place after',
-            h('select', { style: 'font-size:16px;max-width:100%', onchange: e => { f.point = e.target.value === '' ? null : Number(e.target.value); changed(); } },
+            h('select', { style: 'font-size:calc(16px * var(--fs, 1));max-width:100%', onchange: e => { f.point = e.target.value === '' ? null : Number(e.target.value); changed(); } },
               r.points.map((p, k) => h('option', { value: String(k), selected: f.point === k }, `Learning point ${k + 1}${nonEmpty(p.heading) ? ': ' + p.heading.slice(0, 40) : ''}`)),
               h('option', { value: '', selected: f.point == null }, 'End (after all learning points)'))),
           h('div', { class: 'bar' }, h('span', { class: 'grow' }), h('button', { class: 'danger', onclick: async () => {

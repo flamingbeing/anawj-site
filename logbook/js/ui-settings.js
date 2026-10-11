@@ -32,13 +32,28 @@ export function applyTheme(t) {
 export function cachedTheme() {
   try { return localStorage.getItem(THEME_KEY) || 'light'; } catch { return 'light'; }
 }
-// Text size (this device's display settings): a zoom factor for the page content (style.css --text-zoom).
-const SIZE_KEY = 'apmes-logbook-textsize';
-export const TEXT_SIZES = [['0.8', 'Smallest'], ['0.9', 'Smaller'], ['1', 'Normal'], ['1.12', 'Larger'], ['1.25', 'Largest']];
+// Text size (this device's display settings): the words only (style.css font sizes × --fs); the layout stays.
+// Interface zoom: everything, header and tab bar too (body zoom, --ui-zoom), like a notes app's zoom level;
+// Ctrl/Cmd + / − / 0 on a computer (app.js). Both cached on the device for the first paint (index.html).
+const SIZE_KEY = 'apmes-logbook-textsize', ZOOM_KEY = 'apmes-logbook-zoom';
+export const TEXT_SIZES = [['0.85', 'Smallest'], ['0.92', 'Smaller'], ['1', 'Normal'], ['1.1', 'Larger'], ['1.2', 'Largest']];
+export const ZOOMS = ['0.8', '0.9', '1', '1.1', '1.25', '1.5'];
 export function applyTextSize(z) {
   const v = TEXT_SIZES.some(([k]) => k === String(z)) ? String(z) : '1';
-  document.documentElement.style.setProperty('--text-zoom', v);
+  document.documentElement.style.setProperty('--fs', v);
   try { v === '1' ? localStorage.removeItem(SIZE_KEY) : localStorage.setItem(SIZE_KEY, v); } catch { /* storage blocked */ }
+}
+export function applyZoom(z) {
+  const v = ZOOMS.includes(String(z)) ? String(z) : '1';
+  document.documentElement.style.setProperty('--ui-zoom', v);
+  try { v === '1' ? localStorage.removeItem(ZOOM_KEY) : localStorage.setItem(ZOOM_KEY, v); } catch { /* storage blocked */ }
+}
+// one step in or out (or back to 100%), saved on this device
+export function stepZoom(dir) {
+  const i = ZOOMS.indexOf(String(display().zoom || '1'));
+  const v = dir === 0 ? '1' : ZOOMS[Math.max(0, Math.min(ZOOMS.length - 1, (i < 0 ? 2 : i) + dir))];
+  applyZoom(v); setDisplay({ zoom: v });
+  return v;
 }
 // Colour (this device's display settings): one accent colour; colors.js works out the
 // light, dark and OLED palettes. The CSS is cached on the device so the first paint has it (index.html).
@@ -54,6 +69,9 @@ export function applyAccent(c) {
 }
 export function cachedTextSize() {
   try { return localStorage.getItem(SIZE_KEY) || '1'; } catch { return '1'; }
+}
+export function cachedZoom() {
+  try { return localStorage.getItem(ZOOM_KEY) || '1'; } catch { return '1'; }
 }
 export function cachedCompact() {
   try { return localStorage.getItem(COMPACT_KEY) === '1'; } catch { return false; }
@@ -77,11 +95,20 @@ export function residencyCard() {
 // the light / dark choice. The first time a device opens the app it starts from what the account had (these used to
 // follow the account), so nobody's look changes. Kept at sign-out: they are the device's, and nothing private.
 const DISPLAY_KEY = 'apmes-logbook-display';
-export const DISPLAY_KEYS = ['compact', 'textSize', 'accent', 'startTab'];
+export const DISPLAY_KEYS = ['compact', 'textSize', 'zoom', 'accent', 'startTab'];
 export function deviceDisplay() {
   try { const d = JSON.parse(localStorage.getItem(DISPLAY_KEY) || 'null'); return d && typeof d === 'object' && !Array.isArray(d) ? d : null; } catch { return null; }
 }
-export const display = () => deviceDisplay() || {};
+export const display = () => migrateDisplay(deviceDisplay()) || {};
+// before Interface zoom, "Text size" zoomed the page content: carry it over as the zoom (closest step) once
+const OLD_SIZES = { '0.8': '0.8', '0.9': '0.9', '1.12': '1.1', '1.25': '1.25' };
+function migrateDisplay(d) {
+  if (!d || d.v === 2) return d;
+  const out = { ...d, v: 2 };
+  if (OLD_SIZES[String(d.textSize)] && !d.zoom) { out.zoom = OLD_SIZES[String(d.textSize)]; out.textSize = '1'; }
+  try { localStorage.setItem(DISPLAY_KEY, JSON.stringify(out)); } catch { /* storage blocked */ }
+  return out;
+}
 export function setDisplay(patch) {
   const d = { ...display(), ...patch };
   try { localStorage.setItem(DISPLAY_KEY, JSON.stringify(d)); } catch { /* storage blocked: this visit only */ }
@@ -93,10 +120,11 @@ let adoptedNow = false;
 export function adoptDisplay(accountSettings, { fresh = false } = {}) {
   if (deviceDisplay() && !(fresh && adoptedNow)) return display();
   adoptedNow = !fresh;
-  return setDisplay(Object.fromEntries(DISPLAY_KEYS.map(k => [k, (accountSettings || {})[k] ?? null])));
+  try { localStorage.setItem(DISPLAY_KEY, JSON.stringify(Object.fromEntries(DISPLAY_KEYS.map(k => [k, (accountSettings || {})[k] ?? null])))); } catch { /* storage blocked */ }
+  return display();   // (an old account text size becomes the zoom here too)
 }
 export function resetDisplay() { adoptedNow = false; try { localStorage.removeItem(DISPLAY_KEY); } catch { /* storage blocked */ } }
-export function applyDisplay(d = display()) { applyCompact(!!d.compact); applyTextSize(d.textSize || '1'); applyAccent(d.accent); }
+export function applyDisplay(d = display()) { applyCompact(!!d.compact); applyTextSize(d.textSize || '1'); applyZoom(d.zoom || '1'); applyAccent(d.accent); }
 
 export function renderDisplay() {
   const st = display();
@@ -107,9 +135,14 @@ export function renderDisplay() {
         applyCompact(e.target.checked); setDisplay({ compact: e.target.checked });
       } }), 'Compact mode'),
       h('p', { class: 'hint help', style: 'margin:2px 0 0' }, 'Smaller chips, rows and spacing so more tags fit on screen.'),
+      h('label', { class: 'field', style: 'margin-top:10px' }, 'Interface zoom',
+        h('select', { 'aria-label': 'Interface zoom', onchange: e => { applyZoom(e.target.value); setDisplay({ zoom: e.target.value }); } },
+          ZOOMS.map(v => h('option', { value: v, selected: String(st.zoom || '1') === v }, `${Math.round(v * 100)}%${v === '1' ? ' (default)' : ''}`)))),
+      h('p', { class: 'hint help', style: 'margin:2px 0 0' }, 'Everything bigger or smaller, the header and tabs too. On a computer: Ctrl + and Ctrl − (⌘ on a Mac), Ctrl 0 for 100%.'),
       h('label', { class: 'field', style: 'margin-top:10px' }, 'Text size',
-        h('select', { onchange: e => { applyTextSize(e.target.value); setDisplay({ textSize: e.target.value }); } },
+        h('select', { 'aria-label': 'Text size', onchange: e => { applyTextSize(e.target.value); setDisplay({ textSize: e.target.value }); } },
           TEXT_SIZES.map(([v, l]) => h('option', { value: v, selected: String(st.textSize || '1') === v }, l)))),
+      h('p', { class: 'hint help', style: 'margin:2px 0 0' }, 'Only the words: buttons and spacing stay as they are.'),
       h('div', { class: 'field', style: 'margin-top:10px' }, 'Colour', accentPicker()),
       h('p', { class: 'hint', style: 'margin:2px 0 0' }, 'Light and dark versions are worked out to stay easy to read.'),
       h('label', { class: 'field', style: 'margin-top:10px' }, 'Light or dark',
@@ -148,7 +181,7 @@ const SAMPLE_REFL = { id: 'sr', headingId: 'lscs', initials: 'AB', date: '2026-1
 // case, day and reflection, so you see what you'll get.
 export function renderMarkdownSettings() {
   let m = cleanMarkdown(settings().markdown, settings().shareFormat);
-  const mono = 'font-family:ui-monospace,Menlo,Consolas,monospace;font-size:15px';
+  const mono = 'font-family:ui-monospace,Menlo,Consolas,monospace;font-size:calc(15px * var(--fs, 1))';
   const area = (k, label, rows) => h('textarea', { rows, 'aria-label': label, spellcheck: 'false', style: mono, oninput: e => { m[k] = e.target.value; paint(); } }, m[k]);
   const pick = (k, label, opts) => h('label', { class: 'field', style: 'margin-top:8px' }, label,
     h('select', { 'aria-label': label, onchange: e => { m[k] = e.target.value; paint(); } }, opts.map(([v, t]) => h('option', { value: v, selected: m[k] === v }, t))));
@@ -606,7 +639,7 @@ function editTag(n, kind = n ? n.kind : 'tag') {
     kind !== 'head' ? h('label', { class: 'field', style: 'margin-top:8px' }, 'Shorthand (optional)', kw,
       h('small', { class: 'hint', style: 'display:block' }, code ? 'Words you type for this, separated by commas. Typing one in a case suggests this tag. Starts with the built-in list: add, change or remove words.' : 'Words you type for this, separated by commas. Typing one in a case suggests this tag.')) : null,
     // a plain text link (harder to hit by accident), with a confirmation
-    code && (DEFAULT_SHORTHAND[code] || []).length ? h('p', { style: 'margin:2px 0 0;font-size:13px' }, h('a', { href: '#', class: 'subtle-link', onclick: async ev => {
+    code && (DEFAULT_SHORTHAND[code] || []).length ? h('p', { style: 'margin:2px 0 0;font-size:calc(13px * var(--fs, 1))' }, h('a', { href: '#', class: 'subtle-link', onclick: async ev => {
       ev.preventDefault();
       if (!(await confirmBox('Reset shorthand?', 'Replace the words above with the built-in shorthand for this tag? Your changes to them are lost when you save.', 'Reset', true))) return;
       kw.value = DEFAULT_SHORTHAND[code].join(', ');

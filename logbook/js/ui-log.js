@@ -460,7 +460,7 @@ function paintSuggest() {
     cls: `sugg ${s.score >= 0.5 ? 'strong' : ''}`,
     title: `${catFull(s.code)} — ${s.why === 'age' ? 'from the age' : s.why === 'bmi' ? 'from the BMI' : s.why === 'shorthand' ? 'from shorthand (Tag editor)' : 'from your words'}`,
     onclick: () => { keepPlace(ui.sugg, () => { draft.cats = addCat(draft.cats, s.code); saveDraft(); paintSel(); }); refocus(); },
-  })) : [h('span', { class: 'muted help', style: 'font-size:13px' }, text ? 'No suggestions: search below.' : 'Suggestions appear as you type.')]));
+  })) : [h('span', { class: 'muted help', style: 'font-size:calc(13px * var(--fs, 1))' }, text ? 'No suggestions: search below.' : 'Suggestions appear as you type.')]));
 }
 
 function paintSel() {
@@ -536,7 +536,7 @@ function paintQuick() {
     if (!t.cats || !t.cats.length || (!name && seen.has(key))) return null;
     seen.add(key);
     return h('span', { class: 'chip tmpl', role: 'button', tabindex: '0', title: t.cats.map(catFull).join('\n'), onclick: () => applyTemplate(t) },
-      name ? h('b', {}, name) : null, h('span', { class: name ? 'muted' : '', style: name ? 'font-size:12px' : '' }, (name ? ' ' : '') + catPills(t.cats)));
+      name ? h('b', {}, name) : null, h('span', { class: name ? 'muted' : '', style: name ? 'font-size:calc(12px * var(--fs, 1))' : '' }, (name ? ' ' : '') + catPills(t.cats)));
   };
   for (const t of (S.logbook && S.logbook.templates) || []) chips.push(tmplChip(t, t.name));
   fill(ui.templates, ...chips.filter(Boolean));

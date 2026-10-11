@@ -6,7 +6,7 @@ import { S, hooks, h, toast, cloud, setCases, scheduleSummary, fill, resetCaches
 import { renderLog, logCasesChanged, clearDrafts, SHARED_KEY } from './ui-log.js';
 import { renderLogbook } from './ui-logbook.js';
 import { renderProgress, renderTotals } from './ui-progress.js';
-import { applyCompact, cachedCompact, applyTheme, cachedTheme, applyTextSize, cachedTextSize, applyAccent, adoptDisplay, applyDisplay, display, setDisplay, resetDisplay, DISPLAY_KEYS, renderTagEditor, renderDisplay, renderLogging, renderReflectionSettings, renderMarkdownSettings, START_TABS, privacyCard, creditsCard, signOutCard } from './ui-settings.js';
+import { applyCompact, cachedCompact, applyTheme, cachedTheme, applyTextSize, cachedTextSize, applyZoom, cachedZoom, stepZoom, applyAccent, adoptDisplay, applyDisplay, display, setDisplay, resetDisplay, DISPLAY_KEYS, renderTagEditor, renderDisplay, renderLogging, renderReflectionSettings, renderMarkdownSettings, START_TABS, privacyCard, creditsCard, signOutCard } from './ui-settings.js';
 import { renderAccount, flush as flushProfile } from './ui-account.js';
 import { renderAdmin, leaveAdmin } from './ui-admin.js';
 import { renderReflect, watchMyReflections, renderExportPage, renderChoosePage } from './ui-reflect.js';
@@ -333,7 +333,7 @@ function renderLanding(error) {
     cloud.enabled ? h('div', { class: 'cta' },
       h('button', { class: 'primary big', onclick: signIn }, 'Sign in with Google'),
       cloud.demo ? null : h('a', { class: 'btn', href: demoHref }, 'Try the demo')) : h('p', { class: 'tip' }, 'Sign-in is not configured.'),
-    h('p', { style: 'font-size:13px' }, 'Anyone with a Google account can keep a private logbook. APMES residents on the programme list also appear on the shared totals (counts only), which only the programme can see.')));
+    h('p', { style: 'font-size:calc(13px * var(--fs, 1))' }, 'Anyone with a Google account can keep a private logbook. APMES residents on the programme list also appear on the shared totals (counts only), which only the programme can see.')));
 }
 
 async function signIn() {
@@ -552,6 +552,17 @@ if (cloud.onSyncError) cloud.onSyncError(err => toast('A change could not be syn
 }
 applyTheme(cachedTheme());   // this device's choice (Settings → Display → Theme)
 applyTextSize(cachedTextSize());
+applyZoom(cachedZoom());
+// Interface zoom from the keyboard, like a notes app or a browser: Ctrl/Cmd + (or =), Ctrl/Cmd −, Ctrl/Cmd 0
+addEventListener('keydown', e => {
+  if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+  const dir = e.key === '+' || e.key === '=' ? 1 : e.key === '-' || e.key === '_' ? -1 : e.key === '0' ? 0 : null;
+  if (dir === null) return;
+  e.preventDefault();   // instead of the browser's own zoom, so the setting and the screen agree
+  const v = stepZoom(dir);
+  toast(`Zoom ${Math.round(v * 100)}%`, { ms: 1200 });
+  if (S.tab === 'display') render();
+});
 if (cachedCompact()) document.body.classList.add('compact');   // first paint; corrected once the logbook loads
 paintWho();
 // Demo: what it is, Reset and Leave (from the header badge)

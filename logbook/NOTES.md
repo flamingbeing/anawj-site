@@ -82,8 +82,14 @@ portfolio content.
   dark accent 7:1 on cards, near-white text, neutral grey backgrounds) and writes them into <style id="accent-css">,
   cached for the first paint (index.html). Light / Dark / OLED (pure black: data-oled on top of dark) / Auto is
   separate, per device. (Fixed named themes were tried and dropped: they read as shades of one colour.)
+- **Zoom and text size** (Display, per device): Interface zoom 80–150% = `body { zoom: var(--ui-zoom) }` (header and
+  tab bar too; Ctrl/Cmd + − 0 on a computer, app.js); lengths measured on the real screen (tab bar, keyboard,
+  visual viewport) are divided by `--ui-zoom` where used inside. Text size = the words only: every font size in
+  style.css (and inline in JS) is `calc(Npx * var(--fs, 1))`; fields keep `max(16px, …)` so iPhones don't zoom on
+  focus. New font sizes must follow that pattern. The old Text size (a content zoom) is carried over once as the
+  zoom (`migrateDisplay`, display `v: 2`). Defaults are pixel-identical to before. Compact = density.
 - **Display is per device** (owner: people use the logbook on different devices with different needs): compact,
-  text size, colour and the start tab live in localStorage `apmes-logbook-display` (`deviceDisplay` / `setDisplay` /
+  text size, zoom, colour and the start tab live in localStorage `apmes-logbook-display` (`deviceDisplay` / `setDisplay` /
   `adoptDisplay` in ui-settings.js), light / dark in `apmes-logbook-theme`. A device with none starts from the
   account's old `settings` values (and corrects that from the server copy in the same visit). Kept at sign-out;
   wiped by Reset demo. The settings file carries this device's display values and imports them to the device.
