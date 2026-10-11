@@ -81,6 +81,8 @@ export function renderSettings() {
         'Suggest categories as I type'),
       h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !!st.enterSaves, onchange: e => patchLogbook({ settings: { enterSaves: e.target.checked } }) }),
         'Enter key saves the case (Shift+Enter for a new line)'),
+      h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !!st.weeklyDigest, onchange: e => patchLogbook({ settings: { weeklyDigest: e.target.checked } }) }),
+        'Show last week’s summary on the Log page (once a week)'),
       h('p', { class: 'hint', style: 'margin:0 0 6px' }, 'Off (the default): Enter starts a new line, and Ctrl+Enter (Cmd+Enter on a Mac) saves.'),
       h('label', { class: 'field', style: 'margin-top:8px' }, 'Case box height on the Log page',
         h('select', { onchange: e => patchLogbook({ settings: { boxLines: Number(e.target.value) } }).then(() => toast('Saved')) },

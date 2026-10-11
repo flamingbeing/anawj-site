@@ -156,6 +156,18 @@ function seed(s) {
     })),
   };
   s.logbooks[DEMO_USER.email].doc.rid = 'DEMO01';
+  // one complete reflection on the LSCS case, so the Reflections, Progress and Export pages have something in them
+  const rt = t - 864e5;
+  s.logbooks[DEMO_USER.email].reflections = { refl0: {
+    id: 'refl0', headingId: 'lscs', subId: null, initials: 'AB', date: day(1), jr: true, diagnosis: 'LSCS under spinal',
+    title: 'High spinal block during caesarean section',
+    summary: 'Made-up example. A term parturient for elective caesarean section under spinal anaesthesia. Shortly after the intrathecal injection she reported difficulty breathing and weak hands, with hypotension and bradycardia. The block was rising quickly. I called for help, tilted the table head up slightly, supported ventilation with oxygen by mask and gave vasopressors and atropine. She did not need intubation; the block settled and surgery went ahead. Mother and baby were well afterwards.',
+    points: [
+      { heading: 'Recognising a high block early', text: 'Hand weakness, difficulty speaking and a falling heart rate are early signs. Checking the block height early and often, and asking the patient how her hands and breathing feel, let me act before she lost her airway reflexes.' },
+      { heading: 'A plan before the block goes in', text: 'Having vasopressors drawn up, the airway equipment checked and a second pair of hands ready made the response calm and quick. I now say the plan for a high block out loud at the sign-in.' },
+    ],
+    figures: [], references: [], caseId: 'demo0', source: 'app', status: 'complete', createdAt: rt, updatedAt: rt,
+  } };
   const peers = [['DEMO02', 'Resident A', 3], ['DEMO03', 'Resident B', 7], ['DEMO04', 'Resident C', 11]];
   for (const [rid, name, k] of peers) {
     const counts = { '13': 4 + k % 5, '16': 3 + k % 4, '17': 5 + k % 6, '18': 6 + k % 3, '20': 10 + k, '20iii': 8 + k, '26': 2 + k % 7, '28': 4 + k % 5 };

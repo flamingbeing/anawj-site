@@ -187,8 +187,9 @@ function stillNeeded() {
 }
 
 // Once a week (from Monday): last week's count and what is still needed. Dismissed until next week.
+// Off unless turned on in Settings → Logging.
 function weeklyDigest() {
-  if (!S.cases || !S.cases.length) return null;
+  if (!settings().weeklyDigest || !S.cases || !S.cases.length) return null;
   const now = new Date(), dow = (now.getDay() + 6) % 7;
   const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dow);
   const from = todayISO(new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() - 7)), to = todayISO(new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() - 1));

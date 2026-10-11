@@ -2,7 +2,7 @@
 // shared state and helpers are in ui-core.js. Case data comes from cloud.js (Firestore, or the
 // in-browser demo backend with ?demo).
 
-import { S, hooks, h, toast, cloud, setCases, scheduleSummary, fill, resetCaches, confirmBox, setCategoryNames, categoryNames as categoryNamesNow } from './ui-core.js';
+import { S, hooks, h, toast, cloud, setCases, scheduleSummary, fill, resetCaches, confirmBox, modal, setCategoryNames, categoryNames as categoryNamesNow } from './ui-core.js';
 import { renderLog, logCasesChanged, clearDrafts } from './ui-log.js';
 import { renderLogbook } from './ui-logbook.js';
 import { renderProgress, renderTotals } from './ui-progress.js';
@@ -156,14 +156,17 @@ function flushRender() {
 // loading, signed out and signed in. Demo / offline show as a small tag beside the name.
 function paintWho() {
   const flags = [cloud.demo ? 'demo' : '', navigator.onLine ? '' : 'offline'].filter(Boolean).join(' · ');
+  // the demo is a small badge in the header (tap for Reset / Leave), so the app looks as it does for real
+  const flag = cloud.demo ? h('button', { type: 'button', class: 'who-flag demo-flag', title: 'Demo: tap to reset or leave', onclick: demoMenu }, navigator.onLine ? 'demo ▾' : 'demo · offline ▾')
+    : flags ? h('span', { class: 'who-flag' }, flags) : null;
   // sync: cases saved on this phone but not yet on the server (no signal), or all synced
   const sync = !S.user || cloud.demo ? null : S.pending
     ? h('span', { class: 'sync wait', title: navigator.onLine ? 'Saving to the server…' : 'Saved on this phone; will sync when there is signal' }, navigator.onLine ? '⟳ Saving' : '⏳ Will sync')
     : S.casesSynced ? h('span', { class: 'sync ok', title: 'All your cases are saved to the server' }, '✓ Synced') : null;
   subEl.textContent = flags;   // kept (hidden) for tests
-  if (!S.user) { fill(whoEl, flags ? h('span', { class: 'who-flag' }, flags) : null); return; }
+  if (!S.user) { fill(whoEl, flag); return; }
   document.body.dataset.cases = String(S.cases.length);   // not shown; read by tests
-  fill(whoEl, sync, flags ? h('span', { class: 'who-flag' }, flags) : null, h('span', { class: 'email', title: S.user.email }, S.user.name || S.user.email));
+  fill(whoEl, sync, flag, h('span', { class: 'email', title: S.user.email }, S.user.name || S.user.email));
 }
 window.addEventListener('online', paintWho);
 window.addEventListener('offline', paintWho);
@@ -362,17 +365,21 @@ applyTheme(cachedTheme());   // this device's choice (Settings → Display → T
 applyTextSize(cachedTextSize());
 if (cachedCompact()) document.body.classList.add('compact');   // first paint; corrected once the logbook loads
 paintWho();
-if (cloud.demo) {
-  banner.className = 'banner warn';
-  fill(banner, h('span', {}, 'Demo: made-up data, stored only in this browser.'),
-    h('button', { class: 'small', onclick: async () => {
-      if (!(await confirmBox('Reset demo', 'Delete everything you added in the demo (cases, reflections, images, settings) and start again with the made-up data? The uploaded portfolio template is kept.', 'Reset', true))) return;
-      clearDrafts(); resetCaches(); forgetWho(); applyCompact(false); applyTextSize('1');
-      cloud.resetDemo();
-      location.reload();
-    } }, 'Reset demo'),
-    h('a', { href: location.pathname, class: 'btn small' }, 'Leave demo'));
-  banner.hidden = false;
+// Demo: what it is, Reset and Leave (from the header badge)
+function demoMenu() {
+  const m = modal('Demo', [
+    h('p', {}, 'Made-up data, stored only in this browser. Try anything: nothing is sent anywhere.'),
+    h('div', { class: 'bar', style: 'margin-top:12px;flex-wrap:wrap' },
+      h('button', { class: 'danger', onclick: async () => {
+        m.close();
+        if (!(await confirmBox('Reset demo', 'Delete everything you added in the demo (cases, reflections, images, settings) and start again with the made-up data? The uploaded portfolio template is kept.', 'Reset', true))) return;
+        clearDrafts(); resetCaches(); forgetWho(); applyCompact(false); applyTextSize('1');
+        cloud.resetDemo();
+        location.reload();
+      } }, 'Reset demo'),
+      h('a', { href: location.pathname, class: 'btn' }, 'Leave demo'),
+      h('span', { class: 'grow' }),
+      h('button', { onclick: () => m.close() }, 'Close'))]);
 }
 if (!cloud.enabled) renderLanding();
 else cloud.watchUser(onUser).catch(err => renderLanding('Could not start sign-in: ' + err.message));
