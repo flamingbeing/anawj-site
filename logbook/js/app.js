@@ -157,7 +157,7 @@ function flushRender() {
 function paintWho() {
   const flags = [cloud.demo ? 'demo' : '', navigator.onLine ? '' : 'offline'].filter(Boolean).join(' · ');
   // the demo is a small badge in the header (tap for Reset / Leave), so the app looks as it does for real
-  const flag = cloud.demo ? h('button', { type: 'button', class: 'who-flag demo-flag', title: 'Demo: tap to reset or leave', onclick: demoMenu }, navigator.onLine ? 'demo ▾' : 'demo · offline ▾')
+  const flag = cloud.demo ? h('button', { type: 'button', class: 'demo-flag', title: 'Demo: tap to reset or leave', onclick: demoMenu }, h('span', { class: 'who-flag' }, navigator.onLine ? 'demo ▾' : 'demo · offline ▾'))
     : flags ? h('span', { class: 'who-flag' }, flags) : null;
   // sync: cases saved on this phone but not yet on the server (no signal), or all synced
   const sync = !S.user || cloud.demo ? null : S.pending
