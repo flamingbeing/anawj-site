@@ -1763,6 +1763,7 @@ async function run(label, ctxOpts) {
     const initials = p.getByLabel('Patient initials', { exact: true });
     const summary = p.getByLabel('Case summary', { exact: true });
     assert(await initials.evaluate(el => el === document.activeElement), 'Initials not focused');
+    assert(!(await summary.getAttribute('placeholder')).includes('initials') && (await summary.getAttribute('placeholder')).includes('age/sex'), 'initials-first example not updated');
     await initials.fill('IJ'); await initials.press('Enter');
     assert(await summary.evaluate(el => el === document.activeElement), 'Enter did not move to summary');
     await summary.fill('hernia');
@@ -1790,6 +1791,7 @@ async function run(label, ctxOpts) {
     assert(await date.evaluate(el => el === document.activeElement), 'Date not focused');
     await date.press('Enter');
     assert(await summary.evaluate(el => el === document.activeElement), 'Date Enter did not move to summary');
+    assert(!(await summary.getAttribute('placeholder')).includes('age/sex') && !(await summary.getAttribute('placeholder')).includes('72M') && (await summary.getAttribute('placeholder')).includes('initials'), 'autodetect-off example not updated');
     await summary.fill('AB 80M hernia'); await debounced();
     assert(!(await p.locator('.parsed').innerText()).includes('Age/sex'), 'disabled age preview');
     assert(await p.locator('.sugg-row [title*="from the age"]').count() === 0, 'disabled age suggestions');
@@ -1801,6 +1803,7 @@ async function run(label, ctxOpts) {
     await first.selectOption('details');
     await tab('log');
     assert(await summary.evaluate(el => el === document.activeElement), 'default summary not focused');
+    assert((await summary.getAttribute('placeholder')).includes('initials, age/sex'), 'default example not restored');
     await summary.fill('AB 80M hernia'); await debounced();
     assert(await p.locator('.sugg-row [data-code="21"]').count() === 1, 'geriatric detection not restored');
     await summary.fill('');

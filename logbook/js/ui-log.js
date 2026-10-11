@@ -318,15 +318,21 @@ function paintDate() {
 }
 
 // The empty box's example, one line per part, with the arrows lined up (padded to the box's own font).
-const PLACEHOLDER = [['AB 72M', 'initials, age/sex'], ['lap chole', 'procedure'], ['GA ETT', 'notes']];
+const placeholderRows = () => {
+  const initials = firstField() !== 'initials', age = settings().detectAgeSex !== false;
+  return [...(initials || age ? [[[initials ? 'AB' : '', age ? '72M' : ''].filter(Boolean).join(' '),
+    [initials ? 'initials' : '', age ? 'age/sex' : ''].filter(Boolean).join(', ')]] : []),
+    ['lap chole', 'procedure'], ['GA ETT', 'notes']];
+};
 function alignPlaceholder(ta) {
   try {
     const ctx = document.createElement('canvas').getContext('2d');
     ctx.font = getComputedStyle(ta).font;
     const w = t => ctx.measureText(t).width;
     const en = w('\u2002'), hair = w('\u200A') || 1;
-    const max = Math.max(...PLACEHOLDER.map(([a]) => w(a))) + 2 * en;
-    ta.placeholder = PLACEHOLDER.map(([a, b]) => {
+    const rows = placeholderRows();
+    const max = Math.max(...rows.map(([a]) => w(a))) + 2 * en;
+    ta.placeholder = rows.map(([a, b]) => {
       let gap = max - w(a);
       const ens = Math.floor(gap / en); gap -= ens * en;
       return a + '\u2002'.repeat(ens) + '\u200A'.repeat(Math.round(gap / hair)) + '← ' + b;
@@ -352,12 +358,12 @@ function renderOne(card) {
     const parts = draftParts(); draft.initials = parts.initials; draft.details = parts.details;
   } else if (!separateInitials && draft.initials) { draft.initialsHint = draft.initials; draft.details = draftText(); draft.initials = ''; }
   saveDraft();
-  const initialsInput = separateInitials ? h('input', { 'aria-label': 'Patient initials', placeholder: 'Initials (optional)', maxlength: '20', enterkeyhint: 'next', autocomplete: 'off', autocapitalize: 'characters', value: draft.initials || '',
+  const initialsInput = separateInitials ? h('input', { 'aria-label': 'Patient initials', placeholder: 'AB (initials, optional)', maxlength: '20', enterkeyhint: 'next', autocomplete: 'off', autocapitalize: 'characters', value: draft.initials || '',
     oninput: e => { suggestedSave = null; draft.initials = cleanInitials(e.target.value); saveDraft(); paintParsed(true); suggestSoon(); },
     onkeydown: e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); ui.textarea.focus(); } } }) : null;
   const textarea = h('textarea', {
     class: 'details', rows: String(boxLines()), style: `min-height:calc(${boxLines()} * 1.4em + 22px)`, autofocus: firstField() === 'details', enterkeyhint: enterMode() === 'single' ? 'done' : 'enter', autocapitalize: 'sentences', autocorrect: 'off', 'aria-label': 'Case summary',
-    placeholder: PLACEHOLDER.map(([a, b]) => `${a}  ← ${b}`).join('\n'),
+    placeholder: placeholderRows().map(([a, b]) => `${a}  ← ${b}`).join('\n'),
     value: draft.details,
     oninput: e => { suggestedSave = null; draft.details = e.target.value; saveDraft(); suggestSoon(); paintParsed(true); },
     // Settings → Logging → Enter key: 'newline' (default; Ctrl/Cmd+Enter saves), 'double' (Enter on an empty
@@ -657,7 +663,7 @@ let bulkRows = null;
 function renderBulk(card) {
   const ta = h('textarea', {
     class: 'details', rows: '8', value: draft.bulk || '',
-    placeholder: 'Leave an empty line between cases. An optional date at the start, e.g.\n12/3 AB 5yo\ncircumcision, caudal\n\n13/3 CD 30F\nLSCS spinal\n\nEF 80F\nhemiarthroplasty',
+    placeholder: settings().detectAgeSex !== false ? 'Leave an empty line between cases. An optional date at the start, e.g.\n12/3 AB 5yo\ncircumcision, caudal\n\n13/3 CD 30F\nLSCS spinal\n\nEF 80F\nhemiarthroplasty' : 'Leave an empty line between cases. An optional date at the start, e.g.\n12/3 AB\ncircumcision, caudal\n\n13/3 CD\nLSCS spinal\n\nEF\nhemiarthroplasty',
     oninput: e => { draft.bulk = e.target.value; saveDraft(); },
   });
   ui.textarea = ta;
