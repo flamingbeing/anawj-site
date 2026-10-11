@@ -14,6 +14,17 @@ export function applyCompact(on) {
   document.body.classList.toggle('compact', !!on);
   try { on ? localStorage.setItem(COMPACT_KEY, '1') : localStorage.removeItem(COMPACT_KEY); } catch { /* storage blocked */ }
 }
+// Theme (S.logbook.settings.theme): 'light' (default), 'dark', or 'auto' (follows the phone) as
+// <html data-theme>, styled at the end of style.css. Cached like compact mode for the first paint.
+const THEME_KEY = 'apmes-logbook-theme';
+export function applyTheme(t) {
+  const theme = t === 'dark' || t === 'auto' ? t : 'light';
+  document.documentElement.dataset.theme = theme;
+  try { theme === 'light' ? localStorage.removeItem(THEME_KEY) : localStorage.setItem(THEME_KEY, theme); } catch { /* storage blocked */ }
+}
+export function cachedTheme() {
+  try { return localStorage.getItem(THEME_KEY) || 'light'; } catch { return 'light'; }
+}
 export function cachedCompact() {
   try { return localStorage.getItem(COMPACT_KEY) === '1'; } catch { return false; }
 }
@@ -31,7 +42,10 @@ export function renderSettings() {
         applyCompact(e.target.checked);
         patchLogbook({ settings: { compact: e.target.checked } });
       } }), 'Compact mode'),
-      h('p', { class: 'hint', style: 'margin:2px 0 0' }, 'Smaller chips, rows and spacing so more categories fit on screen. Saved to your account, so it follows you to other devices.')),
+      h('p', { class: 'hint', style: 'margin:2px 0 0' }, 'Smaller chips, rows and spacing so more categories fit on screen. Saved to your account, so it follows you to other devices.'),
+      h('label', { class: 'field', style: 'margin-top:10px' }, 'Theme',
+        h('select', { onchange: e => { applyTheme(e.target.value); patchLogbook({ settings: { theme: e.target.value } }); } },
+          [['light', 'Light'], ['dark', 'Dark'], ['auto', 'Auto (match the phone)']].map(([v, l]) => h('option', { value: v, selected: (st.theme || 'light') === v }, l))))),
 
     h('section', { class: 'card' },
       h('h2', {}, 'Logging'),
