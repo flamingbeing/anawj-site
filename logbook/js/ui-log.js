@@ -25,7 +25,8 @@ function loadDraft() {
   draftOwner = draftKey(); draft = EMPTY(); bulkRows = null;
   try { draft = { ...draft, ...JSON.parse(localStorage.getItem(draftOwner) || '{}') }; } catch { /* storage unavailable */ }
   // a kept date only lasts for one sitting, never into tomorrow's list
-  if (!draft.keepDate || !(Date.now() - (draft.keptAt || 0) < KEEP_MS)) draft.date = null;
+  // a picked day survives a reload in the same sitting (phones unload the app when you switch away)
+  if (!(Date.now() - Math.max(draft.keepDate ? draft.keptAt || 0 : 0, draft.dateAt || 0) < KEEP_MS)) draft.date = null;
 }
 const saveDraft = debounce(() => { try { localStorage.setItem(draftKey(), JSON.stringify(draft)); } catch { /* ignore */ } }, 300);
 // Text shared to the installed app (share sheet → Logbook; manifest share_target) arrives as
@@ -44,8 +45,11 @@ function takeShared() {
 // Open the Log page with this day picked (from the Logbook calendar's "+ Log a case").
 export function logOnDate(iso) {
   loadDraft();
-  // a fresh case for that day: the box and the tags start empty
-  Object.assign(draft, { details: '', cats: [], tags: [], reflectTag: false, mode: 'one' });
+  // a fresh case for that day; a case already being typed stays, and only its date changes
+  const typing = (draft.details || '').trim() || (draft.cats || []).length;
+  if (typing) setTimeout(() => toast('Date set. The case you were typing is still in the box'), 300);
+  else Object.assign(draft, { details: '', cats: [], tags: [], reflectTag: false });
+  draft.mode = 'one';
   draft.date = iso === todayISO() ? null : iso; draft.dateAt = Date.now(); bulkRows = null;
   saveDraft.cancel(); try { localStorage.setItem(draftKey(), JSON.stringify(draft)); } catch { /* ignore */ }
   location.hash = '#log';
@@ -335,6 +339,7 @@ function renderOne(card) {
     // line saves, so a case can still take several lines) or 'single' (Enter saves; Shift+Enter a new line)
     onkeydown: e => {
       if (e.key !== 'Enter' || e.isComposing) return;
+      e.target._shiftAt = e.shiftKey ? Date.now() : 0;   // Shift+Enter is a new line in every mode (see onbeforeinput)
       const mode = enterMode();
       if (e.ctrlKey || e.metaKey) { e.preventDefault(); return save({ another: e.altKey }); }
       if (e.shiftKey) return;
@@ -343,8 +348,10 @@ function renderOne(card) {
     },
     // phone keyboards that don't send a usable Enter keydown still send this
     onbeforeinput: e => {
-      if (enterMode() !== 'double' || !/^insert(LineBreak|Paragraph)$/.test(e.inputType) || !onEmptyLine(e.target)) return;
-      e.preventDefault(); saveFromEmptyLine(e.target, false);
+      if (!/^insert(LineBreak|Paragraph)$/.test(e.inputType) || Date.now() - (e.target._shiftAt || 0) < 1000) return;
+      const mode = enterMode();
+      if (mode === 'single') { e.preventDefault(); save({}); }
+      else if (mode === 'double' && onEmptyLine(e.target)) { e.preventDefault(); saveFromEmptyLine(e.target, false); }
     },
   });
   const sugg = h('div', { class: 'chips sugg-row', 'aria-live': 'polite' });
@@ -514,10 +521,12 @@ function paintQuick() {
     class: 'chip tmpl recent', role: 'button', tabindex: '0', title: 'Same as last: ' + (proc || 'no details') + '\n' + c.cats.map(catFull).join('\n'), 'aria-label': 'Same as last: ' + (proc || 'no details'),
     onclick: () => {
       draft.cats = sortCodes(withParents(c.cats));
-      draft.details = proc ? '\n' + proc : '';
+      // the procedure goes on line 2; a first line already typed (initials, age) stays
+      draft.details = (draft.details || '').split('\n')[0] + (proc ? '\n' + proc : '');
+      draft.tags = [];
       // its date too, but only when it was logged in this sitting (not yesterday evening's list)
       if (i === 0 && c.date && Date.now() - (c.createdAt || 0) < KEEP_MS / 3) { draft.date = c.date === todayISO() ? null : c.date; draft.dateAt = Date.now(); }
-      if (ui.textarea) { ui.textarea.value = draft.details; ui.textarea.focus({ preventScroll: true }); ui.textarea.setSelectionRange(0, 0); }
+      if (ui.textarea) { const end = draft.details.indexOf('\n'); ui.textarea.value = draft.details; ui.textarea.focus({ preventScroll: true }); ui.textarea.setSelectionRange(end < 0 ? draft.details.length : end, end < 0 ? draft.details.length : end); }
       keepPlace(ui.templates, () => { saveDraft(); paintDate(); paintSel(); paintParsed(false); });
     },
   }, '↻ ', h('span', {}, clip(proc || 'no details', 30)))));
@@ -568,12 +577,12 @@ async function save({ another }) {
   toast(`Saved ${fmtDate(c.date)}${counted}`, {
     action: 'Undo',
     onaction: () => {
+      // put the case back in the box, unless the next one is already being typed: then it goes to the recycle bin
+      if (draft.details.trim() || draft.cats.length) { moveToBin('case', c).then(() => toast('Removed: it is in the Recycle bin (Settings). Your new case stays in the box'), err => toast('Could not delete: ' + err.message)); return; }
       removeCase(c.id);
-      // put the case back in the box, unless the next one is already being typed
-      if (draft.details.trim() || draft.cats.length) return;
       draft = { ...draft, details: caseText(c), cats: c.cats, tags: c.tags || [], reflectTag: !!c.reflectTag, date: c.date === todayISO() ? null : c.date };
       saveDraft();
-      if (S.tab === 'log' && ui.textarea) { ui.textarea.value = draft.details; paintDate(); paintSel(); paintQuick(); }
+      if (S.tab === 'log' && ui.textarea) { ui.textarea.value = draft.details; if (ui.tagBox) ui.tagBox.querySelector('input').checked = draft.reflectTag; paintDate(); paintSel(); paintQuick(); paintParsed(false); }
     },
   });
 }

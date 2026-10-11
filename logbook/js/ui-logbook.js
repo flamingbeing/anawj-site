@@ -148,6 +148,8 @@ export function renderLogbook() {
     tagBtn.textContent = n ? `Tags (${n})` : 'Tags';
     tagBtn.classList.toggle('on', !!n);
     moreBtn.classList.toggle('on', !!(settings().lbFuzzy || settings().lbCase));
+    // a fold in use opens (a saved search with tags or dates); closing is left to the toggle
+    for (const [b, body, on] of [[dateBtn, datePanel, view.from || view.to], [tagBtn, tagPanel, n]]) if (on && body.hidden) { body.hidden = false; b.setAttribute('aria-expanded', 'true'); }
   };
   const filters = h('div', { class: 'lb-filters', hidden: !(view.showFilters || active()) },
     h('div', { class: 'lb-grid' }, cell('Show', flagSel), cell('Search in', searchIn)),
@@ -208,7 +210,7 @@ export function renderLogbook() {
     filterBtn.textContent = n ? `Filter (${n})` : 'Filter'; filterBtn.classList.toggle('primary', !!n);
   };
   // the search box, with its own × that empties just the box (filters stay)
-  const searchBox = h('input', { type: 'search', placeholder: 'Search: initials, procedure, “last Tuesday”, “this week”', value: view.q, 'aria-label': 'Search cases',
+  const searchBox = h('input', { type: 'search', placeholder: 'Search cases, or “last Tuesday”', value: view.q, 'aria-label': 'Search cases',
     oninput: e => { view.q = e.target.value; searchWrap.classList.toggle('has-text', !!view.q); paintOpsNote(); paintSoon(); } });
   const searchWrap = h('div', { class: 'search-wrap grow' + (view.q ? ' has-text' : '') }, searchBox,
     h('button', { type: 'button', class: 'search-x', title: 'Clear the search', 'aria-label': 'Clear the search', onclick: () => { view.q = ''; setBox(''); searchBox.focus(); refresh(); } }, '×'));
@@ -384,8 +386,8 @@ function calendarView(rows, flagsOf, repaint) {
         h('div', { class: 'lb-daybtns' },
           // log on this day: the Log page opens with the date already picked
           h('button', { class: 'small primary', onclick: () => logOnDate(view.day) }, '+ Log a case'),
-          dayCases.length ? h('button', { class: 'small', onclick: () => shareText(dayText(view.day)) }, 'Share day') : null,
-          dayCases.length ? h('button', { class: 'small', title: 'Copy this day (format in Settings → Copy & share)', 'aria-label': 'Copy this day', onclick: () => copyText(dayText(view.day), 'Day copied: paste it into your notes') }, 'Copy') : null)),
+          dayCases.length ? h('button', { class: 'small', onclick: () => shareText(dayText(view.day, dayCases)) }, 'Share day') : null,
+          dayCases.length ? h('button', { class: 'small', title: 'Copy this day (format in Settings → Copy & share)', 'aria-label': 'Copy this day', onclick: () => copyText(dayText(view.day, dayCases), 'Day copied: paste it into your notes') }, 'Copy') : null)),
       dayCases.length ? h('ul', { class: 'cases' }, dayCases.map(c => caseRow(c, flagsOf))) : h('p', { class: 'empty' }, 'No cases on this day.'))
       : h('p', { class: 'hint help', style: 'margin-top:10px' }, 'Tap a day to see its cases.'),
     undated.length ? h('details', { style: 'margin-top:12px' },
@@ -610,6 +612,13 @@ function mapColumns(fileName, grid) {
     // a file limited to some dates: cases outside them were never in it, so never delete those
     const rg = grid.range || {};
     if (rg.from || rg.to) d.deleted = d.deleted.filter(c => c.date && (!rg.from || c.date >= rg.from) && (!rg.to || c.date <= rg.to));
+    else if (!grid.exportedAt && d.deleted.length) {
+      // a file without our export info (a CSV, or saved again by another app): its dates are unknown, so only
+      // cases dated between the first and last case it holds can go (a year's export never empties earlier years)
+      const ids = new Set(rows.map(r => r.id).filter(Boolean));
+      const dates = S.cases.filter(c => ids.has(c.id) && c.date).map(c => c.date).sort();
+      d.deleted = dates.length ? d.deleted.filter(c => c.date && c.date >= dates[0] && c.date <= dates[dates.length - 1]) : [];
+    }
     // cases logged or edited after an exported file was downloaded are not in it: never delete those
     if (grid.exportedAt) {
       const newer = d.deleted.filter(c => Math.max(c.updatedAt || 0, c.createdAt || 0) > grid.exportedAt);
