@@ -1,7 +1,7 @@
 // Logbook screen: every case, newest first (list) or by day (calendar). Search, filter, flags, edit; a grid view for bulk edits
 // and pasting rows from Excel; Excel download and upload (round trip with a preview of the changes).
 
-import { duplicates, fmtDate, diffRows, sortCodes, withParents, caseParts, caseText, dateWindow, nth, cleanInitials, procedureText, textHas, guessMapping, rowsFromGrid, IMPORT_FIELDS, caseFromRow } from './engine.js';
+import { duplicates, fmtDate, diffRows, sortCodes, withParents, caseParts, caseText, dateWindow, nth, cleanInitials, procedureText, textHas, guessMapping, rowsFromGrid, IMPORT_FIELDS, caseFromRow, weekLead, weekdayNames } from './engine.js';
 import { flagCase } from './importer.js';
 import { exportWorkbook, readSheetGrid } from './xlsxio.js';
 import { cleanExportOpts, exportTables, rangeText, CASE_COLS, REFL_COLS } from './export-opts.js';
@@ -10,7 +10,7 @@ import { parseQuery, matchQuery, OPERATOR_HELP, insertOperator } from './search-
 import { parseCsv } from './tags.js';
 import {
   S, h, toast, debounce, modal, cat, catName, catShort, tagName, catFull, catChip, PICKER_ORDER, settings, patchLogbook, needExcel, download, fileButton, catPills,
-  updateCase, saveMany, deleteMany, displayName, rYear, todayISO, fill, add, resetters, tagSet, tagLinks, confirmBox, keepTags } from './ui-core.js';
+  updateCase, saveMany, deleteMany, displayName, rYear, todayISO, fill, add, resetters, tagSet, tagLinks, confirmBox, keepTags, hooks } from './ui-core.js';
 import { flatTree, tagTree } from './tags.js';
 import { editCaseDialog, logOnDate } from './ui-log.js';
 import { reflectOnCase } from './ui-reflect.js';
@@ -21,6 +21,8 @@ import { shareText, copyText, caseText as shareCaseText, dayText } from './share
 const FRESH = () => ({ q: '', has: [], not: [], from: '', to: '', flag: '', mode: null, limit: 150, month: null, day: null });
 const view = FRESH();
 resetters.push(() => Object.assign(view, FRESH()));   // next user starts unfiltered
+// open the Logbook on a day (Settings → Logging → After Save: "Go to the Logbook"); ui-log.js calls it through hooks
+hooks.showDay = iso => { view.month = iso.slice(0, 7); view.day = iso; };
 const hasTag = (c, k) => (k.startsWith('c:') ? (c.cats || []).includes(k.slice(2)) : (c.tags || []).includes(k));
 const keyName = k => (k.startsWith('c:') ? catShort(k.slice(2)) : tagName(k));
 // Every tag to filter or bulk-tag by: the tag list, then tags taken off it that cases still carry
@@ -55,7 +57,7 @@ export function renderLogbook() {
 
   const filtered = () => {
     // "last tuesday", "this week", "last month"… narrow by date; the other words search the text
-    const win = dateWindow(view.q);
+    const win = dateWindow(view.q, new Date(), settings().weekStart);
     // Search in (Filter): everything, the initials only, or the procedure line only; fuzzy allows typos;
     // case sensitive (off by default) keeps capitals apart ("GA" doesn't find "gastrectomy")
     const scope = settings().lbScope || 'all', fuzzy = !!settings().lbFuzzy, cs = !!settings().lbCase;
@@ -223,7 +225,7 @@ export function renderLogbook() {
   };
   const helpBtn = opsOn() ? h('button', { type: 'button', class: 'small icon-btn', title: 'Search operators', 'aria-label': 'Search operators', onclick: () => opsHelp(searchBox, v => { view.q = v; searchWrap.classList.toggle('has-text', !!v); paintOpsNote(); refresh(); }) }, '?') : null;
   paintFilterBtn(); repaintFilters(); paintSaved(); paintOpsNote();
-  add(wrap, h('section', { class: 'card' },
+  const top = h('section', { class: 'card lb-top' },
     h('div', { class: 'bar' },
       searchWrap,
       helpBtn,
@@ -234,8 +236,10 @@ export function renderLogbook() {
     h('div', { class: 'bar', style: 'margin-bottom:0' },
       counter, h('span', { class: 'grow' }),
       h('div', { class: 'seg' }, MODES.map(([m, l]) =>
-        h('button', { 'aria-pressed': String(view.mode === m), onclick: () => setMode(m) }, l))))),
-  h('section', { class: 'card' }, list));
+        h('button', { 'aria-pressed': String(view.mode === m), onclick: () => setMode(m) }, l)))));
+  // pinned (Settings → Display): the month headings in List stick just under it
+  if ('ResizeObserver' in window) new ResizeObserver(() => wrap.style.setProperty('--lb-top-h', top.offsetHeight + 'px')).observe(top);
+  add(wrap, top, h('section', { class: 'card' }, list));
   paint();
   return wrap;
 
@@ -354,9 +358,10 @@ function calendarView(rows, flagsOf, repaint) {
   }
   const shift = d => { const t = new Date(y, m - 1 + d, 1); view.month = `${t.getFullYear()}-${pad(t.getMonth() + 1)}`; view.day = null; repaint(); };
   const first = new Date(y, m - 1, 1);
-  const lead = (first.getDay() + 6) % 7;           // Monday first
+  const ws = settings().weekStart;
+  const lead = weekLead(first, ws);                // Monday first unless set (Settings → Logging)
   const days = new Date(y, m, 0).getDate();
-  const grid = h('div', { class: 'lb-cal', role: 'grid' }, ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => h('div', { class: 'lb-dow' }, d)));
+  const grid = h('div', { class: 'lb-cal', role: 'grid' }, weekdayNames(ws).map(d => h('div', { class: 'lb-dow' }, d)));
   for (let i = 0; i < lead; i++) add(grid, h('div', { class: 'lb-day blank' }));
   let monthN = 0;
   for (let d = 1; d <= days; d++) {

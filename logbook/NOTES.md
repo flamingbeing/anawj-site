@@ -126,6 +126,20 @@ portfolio content.
   unbalanced braces; never applied on the Display page (applyCustomCss runs in render()); `?nocss` turns it off;
   device only and never in the settings file.
   Defaults are pixel-identical to before.
+- **Quality-of-life settings** (Oct 2026). Account (`settings`, Logging page): First day of the week (`weekStart`
+  1 Monday default / 0 Sunday / 6 Saturday; `weekStart`/`weekLead`/`weekdayNames` in engine.js, tested; used by the
+  Logbook calendar, Analytics heatmap and By day of the week, `dateWindow` "this/last week", last week's summary);
+  After Save (`afterSave`: next (default) / keepTags / closed = keyboard down / logbook = `hooks.showDay` set by
+  ui-logbook.js, then #logbook on that day; Undo then puts the case back, and kept tags don't count as a new case);
+  Undo window (`undoSecs` 5 default / 10 / 20 / 30: any toast with a button stays at least that long, ui-core `toast`);
+  Case tab card: parts to hide (`caseHide`, CASE_PARTS in ui-log.js: interesting, parsed, quick, still, groupsave,
+  plan; `.log-card.hide-*` in style.css; the case box, All tags and Save always stay). Device (`DISPLAY_KEYS`, html
+  classes from applyLook): case box keyboard (`boxCaps` false → `box-caps-off`, `boxCorrect` true → `box-correct`,
+  `boxSpell` false → `box-spell-off`; read in renderOne), reflection spelling (`reflSpell` false → `refl-spell-off`,
+  Reflections settings; ui-reflect.js sets spellcheck on the editor's fields and on focus), Display: Pin the case box
+  (`pinBox` → `pin-box`: `.box-wrap` sticky at `--pin-top`, the phone top tab bar's height when it sits on top; not
+  when the Case tab is upside down) and Pin the search box (`pinSearch` → `pin-search`: `.lb-top` sticky, its height in
+  `--lb-top-h` so List's month headings stick under it). All in the settings file.
 - **Display is per device** (owner: people use the logbook on different devices with different needs): compact,
   text size, zoom, fonts, colour and the start tab live in localStorage `apmes-logbook-display` (`deviceDisplay` / `setDisplay` /
   `adoptDisplay` in ui-settings.js), light / dark in `apmes-logbook-theme`. A device with none starts from the

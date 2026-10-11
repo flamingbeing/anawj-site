@@ -2,7 +2,7 @@
 // Also the reusable category picker and the edit-case dialog (used by the Logbook screen).
 
 import { BY_CODE, TIPS } from './categories.js';
-import { withParents, parseBulk, parseDate, fmtDate, sortCodes, uid, caseParts, caseText, cleanInitials, splitInitials, splitAge, nth } from './engine.js';
+import { withParents, parseBulk, parseDate, fmtDate, sortCodes, uid, caseParts, caseText, cleanInitials, splitInitials, splitAge, nth, weekLead } from './engine.js';
 import { suggest as suggestCodes } from './suggest.js';
 import { apmesShorthand, shorthandTags } from './tags.js';
 import {
@@ -202,6 +202,24 @@ export function catPicker({ get, toggle, getTags = null, toggleTag = null, place
 
 // ---------- the Log screen ----------
 
+// Parts of the Case tab people can hide (Settings → Logging, settings.caseHide); tags can always be picked from All tags
+export const CASE_PARTS = [
+  ['interesting', '☆ Interesting'],
+  ['parsed', 'What the box was read as (initials · details)'],
+  ['quick', 'Quick picks (suggestions, Same as last, tag groups)'],
+  ['still', 'Still needed'],
+  ['groupsave', 'Save these tags as a tag group'],
+  ['plan', 'Plan for later'],
+];
+const caseHidden = part => (settings().caseHide || []).includes(part);
+// What Save does next (Settings → Logging, settings.afterSave)
+export const AFTER_SAVE = [
+  ['next', 'Ready for the next case (default)'],
+  ['keepTags', 'Ready for the next case, keeping the tags'],
+  ['closed', 'Ready for the next case, keyboard closed'],
+  ['logbook', 'Go to the Logbook, on that day'],
+];
+
 let dateRO = null;
 let ui = null; // live parts of the screen, so a case-list update doesn't wipe what's being typed
 
@@ -217,11 +235,11 @@ function stillNeeded() {
     h('span', { class: 'chev' }, '›'));
 }
 
-// Once a week (from Monday): last week's count and what is still needed. Dismissed until next week.
-// Off unless turned on in Settings → Logging.
+// Once a week (from the week's first day: Monday unless set): last week's count and what is still needed.
+// Dismissed until next week. Off unless turned on in Settings → Logging.
 function weeklyDigest() {
   if (!settings().weeklyDigest || !S.cases || !S.cases.length) return null;
-  const now = new Date(), dow = (now.getDay() + 6) % 7;
+  const now = new Date(), dow = weekLead(now, settings().weekStart);
   const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dow);
   const from = todayISO(new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() - 7)), to = todayISO(new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() - 1));
   const key = `logbook-digest:${(S.user && S.user.email) || ''}`;
@@ -248,7 +266,7 @@ export function renderLog() {
   else renderOne(card);
   paintDate();
   const digest = weeklyDigest();
-  const planned = draft.mode === 'bulk' ? null : planCard();
+  const planned = draft.mode === 'bulk' || caseHidden('plan') ? null : planCard();
   return digest || planned ? h('div', {}, digest, planned, card) : card;
 }
 
@@ -305,6 +323,7 @@ function paintDate() {
 }
 
 // The empty box's example, one line per part, with the arrows lined up (padded to the box's own font).
+const htmlHas = c => document.documentElement.classList.contains(c);
 const PLACEHOLDER = [['AB 72M', 'initials, age/sex'], ['lap chole', 'procedure'], ['GA ETT', 'notes']];
 function alignPlaceholder(ta) {
   try {
@@ -335,7 +354,9 @@ function saveFromEmptyLine(ta, another) {
 function renderOne(card) {
   suggestedSave = null;
   const textarea = h('textarea', {
-    class: 'details', rows: String(boxLines()), style: `min-height:calc(${boxLines()} * 1.4em + 22px)`, autofocus: !document.documentElement.classList.contains('no-autofocus'), enterkeyhint: enterMode() === 'single' ? 'done' : 'enter', autocapitalize: 'sentences', autocorrect: 'off', 'aria-label': 'Case summary',
+    class: 'details', rows: String(boxLines()), style: `min-height:calc(${boxLines()} * 1.4em + 22px)`, autofocus: !document.documentElement.classList.contains('no-autofocus'), enterkeyhint: enterMode() === 'single' ? 'done' : 'enter', 'aria-label': 'Case summary',
+    // Settings → Logging (this device): capitals, autocorrect, spelling underlines (html classes, applyLook)
+    autocapitalize: htmlHas('box-caps-off') ? 'off' : 'sentences', autocorrect: htmlHas('box-correct') ? 'on' : 'off', spellcheck: htmlHas('box-spell-off') ? 'false' : 'true',
     placeholder: PLACEHOLDER.map(([a, b]) => `${a}  ← ${b}`).join('\n'),
     value: draft.details,
     oninput: e => { suggestedSave = null; draft.details = e.target.value; saveDraft(); suggestSoon(); paintParsed(true); },
@@ -404,15 +425,16 @@ function renderOne(card) {
     h('div', { class: 'lp-left' },
       h('div', { class: 'box-wrap' }, textarea, pasteBtn(textarea), clearBtn), parsed, tagRow,
       // suggestions first, then the last case and your own templates
-      h('div', { class: 'chiplabel' }, 'Quick picks'), sugg, templates),
+      h('div', { class: 'chiplabel quick-label' }, 'Quick picks'), sugg, templates),
     h('div', { class: 'lp-right' },
     h('div', { class: 'bar cat-head' }, h('div', { class: 'chiplabel grow' }, 'All tags'),
       h('span', { class: 'seg cat-view', role: 'group', 'aria-label': 'Show tags as' },
         ['list', 'pills'].map(v => h('button', { class: 'small', 'aria-pressed': String((settings().catView || 'list') === v), onclick: () => { if ((settings().catView || 'list') === v) return; patchLogbook({ settings: { catView: v } }); hooks.render(); } }, v === 'list' ? 'List' : 'Pills')))),
     picker.el,
     groupSave),
-    stillNeeded(),
+    caseHidden('still') ? null : stillNeeded(),
     savebar);
+  for (const [part] of CASE_PARTS) card.classList.toggle('hide-' + part, caseHidden(part));
   // Tapping a chip, a tag in the list or a button while typing keeps the focus (and the keyboard) in the
   // case box, so the screen doesn't jump as the keyboard drops and comes back. Fields and the date
   // picker still take the focus.
@@ -579,7 +601,7 @@ async function saveCase({ another }) {
     suggestedSave = cats.length ? { key: suggestionKey(), cats, tags } : null;
     // categories are counted towards credentialling, so they must be picked on purpose
     // point at the suggestions (no keyboard popping up); with none, the search box
-    const target = ui.sugg && !ui.sugg.hidden && ui.sugg.querySelector('.chip') ? ui.sugg : null;
+    const target = ui.sugg && !ui.sugg.hidden && !caseHidden('quick') && ui.sugg.querySelector('.chip') ? ui.sugg : null;
     if (target) {
       toast(suggestedSave ? 'Press Enter again to apply suggested tags and save, or tap a tag' : 'Tap at least one tag: suggestions are highlighted');
       if (suggestedSave) ui.textarea.focus();
@@ -598,12 +620,16 @@ async function saveCase({ another }) {
   const c = await createCase({ date: curDate(), details, cats: draft.cats, reflectTag: !!draft.reflectTag, tags: draft.tags || [] });
   const sticky = another || settings().defaultDate === 'last';
   const keep = sticky ? draft.date : null;
-  draft = { ...draft, details: '', cats: [], date: keep, keepDate: sticky, keptAt: Date.now(), dateAt: Date.now(), reflectTag: false, tags: [] };
+  const next = settings().afterSave;
+  const keepTags = next === 'keepTags' ? { cats: draft.cats, tags: draft.tags || [] } : { cats: [], tags: [] };
+  draft = { ...draft, details: '', ...keepTags, date: keep, keepDate: sticky, keptAt: Date.now(), dateAt: Date.now(), reflectTag: false };
   if (ui.tagBox) ui.tagBox.querySelector('input').checked = false;
   saveDraft();
   if (ui.textarea) ui.textarea.value = '';
   paintDate(); paintSel(); paintQuick();
-  ui.textarea.focus();
+  if (next === 'logbook') { hooks.showDay?.(c.date); location.hash = '#logbook'; }
+  else if (next === 'closed') ui.textarea.blur();
+  else ui.textarea.focus();
   // say where it went and what it counted towards: "Saved Sat 10 Oct · 16 LSCS now 4/10"
   const prog = PROGRESS_BY_CODE();
   const withTarget = c.cats.map(code => prog[code]).find(p => p && p.next);
@@ -612,7 +638,8 @@ async function saveCase({ another }) {
     action: 'Undo',
     onaction: () => {
       // put the case back in the box, unless the next one is already being typed: then it goes to the recycle bin
-      if (draft.details.trim() || draft.cats.length) { moveToBin('case', c).then(() => toast('Removed: it is in the Recycle bin (Settings). Your new case stays in the box'), err => toast('Could not delete: ' + err.message)); return; }
+      // (tags kept for the next case by After Save don't count as the next one)
+      if (draft.details.trim() || (draft.cats.length && JSON.stringify(draft.cats) !== JSON.stringify(c.cats))) { moveToBin('case', c).then(() => toast('Removed: it is in the Recycle bin (Settings). Your new case stays in the box'), err => toast('Could not delete: ' + err.message)); return; }
       removeCase(c.id);
       draft = { ...draft, details: caseText(c), cats: c.cats, tags: c.tags || [], reflectTag: !!c.reflectTag, date: c.date === todayISO() ? null : c.date };
       saveDraft();

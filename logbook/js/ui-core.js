@@ -108,7 +108,11 @@ export function debounce(fn, ms) {
 }
 
 // toast('Saved', { action: 'Undo', onaction }) — one at a time, the newest wins.
-export function toast(msg, { action, onaction, ms = 4500 } = {}) {
+// A toast with a button (Undo) stays at least as long as Settings → Logging → Undo window says (settings.undoSecs).
+export const UNDO_SECS = [[5, '5 seconds (default)'], [10, '10 seconds'], [20, '20 seconds'], [30, '30 seconds']];
+const undoMs = () => (UNDO_SECS.some(([n]) => n === Number(settings().undoSecs)) ? Number(settings().undoSecs) * 1000 : 4500);
+export function toast(msg, { action, onaction, ms } = {}) {
+  ms = action ? Math.max(ms || 0, undoMs()) : ms || 4500;
   const t = document.getElementById('toast');
   fill(t, h('span', {}, msg), action ? h('button', { onclick: () => { t.classList.remove('show'); onaction(); } }, action) : null);
   t.classList.add('show');

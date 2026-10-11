@@ -2,7 +2,7 @@
 // benchmarking; counts only, never details).
 
 import { R_YEARS, BY_CODE, CATEGORIES, appYear, yearName } from './categories.js';
-import { progress, todayISO, rYearDefault } from './engine.js';
+import { progress, todayISO, rYearDefault, weekLead, weekdayNames } from './engine.js';
 import { exportTotals } from './xlsxio.js';
 import { reflectionProgress, HEADING_BY_ID } from './reflections.js';
 import { logbookGlance, reflectionGlance, cohortGlance } from './glance.js';
@@ -133,7 +133,8 @@ function trendsCard() {
   // a year of days, a square per day (darker = more cases), weeks as columns
   const perDay = new Map();
   for (const c of cases) perDay.set(c.date, (perDay.get(c.date) || 0) + 1);
-  const start = new Date(); start.setDate(start.getDate() - 364 - ((start.getDay() + 6) % 7));
+  const ws = settings().weekStart;
+  const start = new Date(); start.setDate(start.getDate() - 364 - weekLead(start, ws));
   const cols = [];
   for (let w = 0; w < 53; w++) {
     const col = h('div', { class: 'an-wk' });
@@ -148,7 +149,7 @@ function trendsCard() {
   }
   // weekdays
   const wd = [0, 0, 0, 0, 0, 0, 0];
-  for (const c of cases) { const [y, m, d] = c.date.split('-').map(Number); wd[(new Date(y, m - 1, d).getDay() + 6) % 7]++; }
+  for (const c of cases) { const [y, m, d] = c.date.split('-').map(Number); wd[weekLead(new Date(y, m - 1, d), ws)]++; }
   const wdMax = Math.max(1, ...wd);
   // most used tags in the last 12 months (APMES and your own)
   const from = months[0].key + '-01';
@@ -163,7 +164,7 @@ function trendsCard() {
     h('h3', {}, 'Cases per month'), bars,
     h('h3', {}, 'The last year'), h('div', { class: 'an-heat' }, cols),
     h('h3', {}, 'By day of the week'),
-    h('div', { class: 'an-wd' }, ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d, i) => h('div', {}, h('span', {}, d), h('span', { class: 'meter' }, h('i', { class: 'ontrack', style: `width:${Math.round(wd[i] / wdMax * 100)}%` })), h('b', {}, String(wd[i]))))),
+    h('div', { class: 'an-wd' }, weekdayNames(ws).map((d, i) => h('div', {}, h('span', {}, d), h('span', { class: 'meter' }, h('i', { class: 'ontrack', style: `width:${Math.round(wd[i] / wdMax * 100)}%` })), h('b', {}, String(wd[i]))))),
     h('h3', {}, 'Most used tags (12 months)'),
     top.length ? h('div', { class: 'an-wd' }, top.map(([k, n]) => h('div', {}, h('span', {}, name(k)), h('span', { class: 'meter' }, h('i', { class: 'done', style: `width:${Math.round(n / top[0][1] * 100)}%` })), h('b', {}, String(n))))) : h('p', { class: 'empty' }, 'No cases yet.'),
     h('p', { class: 'hint help' }, 'Only you see these.'));

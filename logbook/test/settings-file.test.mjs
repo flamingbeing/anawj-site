@@ -39,4 +39,9 @@ const ss = readSettingsFile(JSON.stringify({ kind: SETTINGS_KIND, settings: { sa
 assert.equal(ss.length, 1); assert.deepEqual(ss[0].has, ['c:26']); assert.equal(ss[0].q, 'block');
 assert.equal('rYear' in settingsFile({ settings: { rYear: 4, compact: true } }).settings, false);
 
+// the newer Logging / Display choices travel; the hidden Case tab parts stay a list of strings
+const qol = readSettingsFile(JSON.stringify({ kind: SETTINGS_KIND, settings: { weekStart: 0, afterSave: 'logbook', undoSecs: 20, caseHide: ['quick', 7, 'still'], pinBox: true, pinSearch: true, boxCorrect: true, reflSpell: false } })).settings;
+assert.deepEqual(qol, { weekStart: 0, afterSave: 'logbook', undoSecs: 20, caseHide: ['quick', 'still'], pinBox: true, pinSearch: true, boxCorrect: true, reflSpell: false });
+assert.deepEqual(readSettingsFile(JSON.stringify({ kind: SETTINGS_KIND, settings: { caseHide: 'quick' } })).settings.caseHide, []);
+
 console.log('settings file tests passed');
