@@ -1,6 +1,6 @@
 import {
   DEFAULT_SETTINGS, DEFAULT_ROOMS, JUNIOR_GRADES, SENIOR_GRADES, DEFAULT_GRADE, OLD_GRADES, POSTINGS, postingName, bySeniority, STATUSES, COLOURS, COLOUR_ARGB, isBaby,
-  matchName, splitNameList, namesInCell, suggestFlags, generate, check, learnFromRosters, tickFromHistory, remoteRoom, suggestShortNames, mergeContacts, pacuRoom, isPacu, fmtSenior, fmtJunior, SPECIAL_ROWS, isCoverPart, coverTarget,
+  matchName, splitNameList, namesInCell, suggestFlags, generate, check, learnFromRosters, tickFromHistory, remoteRoom, suggestShortNames, mergeContacts, planImport, importUpdate, findDuplicates, mergeStaffRecords, pacuRoom, isPacu, fmtSenior, fmtJunior, SPECIAL_ROWS, isCoverPart, coverTarget,
 } from './engine.js';
 // Seniors are always shown in black; juniors may be green (Baby MO) or purple (locum).
 const staffColour = p => (p && p.role !== 'senior' && p.colour) || '';
@@ -382,6 +382,7 @@ function renderStaff(role) {
             toast(n ? `Ticked ${n} subspec(s). Check them before generating.` : 'Nothing new to tick.');
           } }, 'Tick subspecs from past rosters'),
           h('label', { class: 'seen' }, ' if seen ≥ ', h('input', { type: 'number', min: 1, max: 20, value: tickMin, style: 'width:56px', onchange: e => { tickMin = Math.max(1, +e.target.value || 1); } }), ' times')),
+        h('button', { title: 'Look for people on the staff list twice under different spellings', onclick: () => { showDups = true; render(); } }, 'Find duplicates'),
         h('button', { title: 'Fill in short names (e.g. Tan YW, Swapna) for everyone who has none', onclick: () => {
           const props = suggestShortNames(state.staff);
           if (!props.length) return toast('Everyone already has a short name, or the suggestions would clash.');
@@ -396,7 +397,9 @@ function renderStaff(role) {
         h('input', { placeholder: 'Filter names', value: staffFilter, oninput: e => { staffFilter = e.target.value; const pos = e.target.selectionStart; render(); const i = app.querySelector('input[placeholder="Filter names"]'); i.focus(); i.setSelectionRange(pos, pos); } }),
       ),
       h('div', { class: 'stats' }, h('span', {}, h('b', {}, count), senior ? ' seniors' : ' juniors')),
+      importSkipNote(),
     ),
+    duplicatesCard(),
     count
       ? h('section', { class: 'card scroll' }, h('table', {},
         h('thead', {}, h('tr', {}, (senior ? ['Name', 'Short names', 'Grade', 'Subspecs', "Doesn't do", 'Move to', ''] : ['Name', 'Short names', 'Grade', 'Colour', 'Posting', 'Move to', '']).map(t => h('th', {}, t)))),
@@ -432,6 +435,7 @@ function renderStaffView(role) {
       teamSyncBar(),
       h('div', { class: 'bar' },
         h('button', { onclick: startStaffEdit }, `Edit ${senior ? 'seniors' : 'juniors'}`),
+        h('button', { title: 'Look for people on the staff list twice under different spellings', onclick: () => { showDups = true; startStaffEdit(); } }, 'Find duplicates'),
         h('span', { class: 'grow' }),
         h('input', { placeholder: 'Filter names', value: staffFilter, oninput: e => { staffFilter = e.target.value; const pos = e.target.selectionStart; render(); const i = app.querySelector('input[placeholder="Filter names"]'); i.focus(); i.setSelectionRange(pos, pos); } })),
       h('div', { class: 'stats' }, h('span', {}, h('b', {}, count), senior ? ' seniors' : ' juniors')),
@@ -447,24 +451,130 @@ function renderStaffView(role) {
 
 async function importStaffSheet([file]) {
   const wb = await readWorkbook(file);
-  if (isContactList(wb.worksheets[0])) {
-    const { people } = readContactList(wb.worksheets[0]);
-    const res = mergeContacts(state.staff, people, newId);
-    state.staff = res.staff;
-    render();
-    toast(`Contact list: read ${people.length} anaesthetists (names, grades and subspecs only).${res.skipped.length ? ` ${res.skipped.length} juniors not on the staff list were left out, since postings rotate.` : ''}${res.removed.length ? ` ${res.removed.length} non-anaesthetist entries from an earlier import removed.` : ''} Review the changes before saving.`);
-    return;
+  const ws = wb.worksheets[0];
+  const contact = isContactList(ws);
+  let people;
+  if (contact) people = readContactList(ws).people;
+  else {
+    const res = readStaffSheet(ws);
+    if (res.error) return toast(res.error);
+    people = res.people;
   }
-  const res = readStaffSheet(wb.worksheets[0]);
-  if (res.error) return toast(res.error);
-  let added = 0, updated = 0;
-  for (const p of res.people) {
-    const m = matchName(p.name, state.staff).person;
-    if (m) { Object.assign(m, { ...p, history: m.history, aliases: [...new Set([...(m.aliases || []), ...p.aliases])] }); updated++; }
-    else { state.staff.push({ id: newId(), history: {}, source: 'import', ...p }); added++; }
-  }
-  toast(`Staff sheet: ${added} added, ${updated} updated.`);
+  const plan = planImport(state.staff, people, { contact, skip: state.settings.importSkip || [] });
+  const done = await reviewImport(plan, contact, file.name);
+  if (!done) return;
+  const dups = findDuplicates(state.staff).length;
+  showDups = dups > 0;
   render();
+  toast(`${done} Review the changes before saving.${dups ? ` ${dups} possible duplicate(s) to check below.` : ''}`);
+}
+
+// The import, person by person, before anything changes. Resolves to a summary, or null if cancelled.
+function reviewImport(plan, contact, fileName) {
+  const label = p => `${p.name} (${p.role === 'senior' ? 'senior' : 'junior'}, ${p.grade})`;
+  const dec = new Map(); // item -> decision
+  for (const it of plan.items) {
+    if (it.kind === 'match') dec.set(it, it.changes.length ? 'update' : 'same');
+    if (it.kind === 'maybe') dec.set(it, 'same:' + it.candidates[0].id);
+    if (it.kind === 'new') dec.set(it, 'add');
+    if (it.kind === 'newJunior') dec.set(it, 'skip');
+  }
+  const removeStale = new Set(plan.stale);
+  const of = k => plan.items.filter(i => i.kind === k);
+  const choice = (it, opts) => select(dec.get(it), opts, v => dec.set(it, v));
+  const keepOpts = [['add', 'Add'], ['skip', 'Skip this time'], ['always', 'Always skip']];
+  const section = (title, hint, rows, closed) => {
+    if (!rows.length) return null;
+    const body = [hint ? h('p', { class: 'hint' }, hint) : null, h('table', {}, h('tbody', {}, rows))];
+    return closed
+      ? h('section', {}, h('details', {}, h('summary', {}, h('h3', { style: 'display:inline' }, `${title} (${rows.length})`)), ...body))
+      : h('section', {}, h('h3', {}, `${title} (${rows.length})`), ...body);
+  };
+  return new Promise(resolve => {
+    const close = v => { dlg.close(); dlg.remove(); resolve(v); };
+    const apply = () => {
+      const skip = new Set(state.settings.importSkip || []);
+      const byId = new Map(state.staff.map(p => [p.id, p]));
+      const added = [];
+      let updated = 0, skipped = 0;
+      const create = c => ({ id: newId(), source: contact ? 'contact' : 'import', name: c.name, aliases: c.aliases || [], role: c.role, grade: c.grade, posting: c.posting || '', subspecs: c.subspecs || [], avoid: c.avoid || [], history: {} });
+      for (const it of plan.items) {
+        const d = dec.get(it);
+        if (d === 'update') { byId.set(it.p.id, it.p); updated++; }
+        else if (d?.startsWith('same:')) { const t = byId.get(d.slice(5)); if (t) { byId.set(t.id, importUpdate(t, it.c, contact).p); updated++; } }
+        else if (d === 'add') added.push(create(it.c));
+        else if (d === 'always') { skip.add(it.c.name); skipped++; }
+        else if (d === 'skip') skipped++;
+      }
+      for (const p of removeStale) byId.delete(p.id);
+      state.staff = [...byId.values(), ...added];
+      state.settings.importSkip = [...skip];
+      close(`${fileName}: ${added.length} added, ${updated} updated, ${skipped} skipped${removeStale.size ? `, ${removeStale.size} removed` : ''}.`);
+    };
+    const dlg = h('dialog', { class: 'changes wide' },
+      h('h2', {}, `Import ${fileName}`),
+      h('p', { class: 'hint' }, `${plan.items.length} people read${contact ? ' (names, grades and subspecs only)' : ''}. Choose what happens to each one; nothing changes until you press Import.`),
+      h('div', { class: 'import-review' },
+        section('Might already be on the list', 'These look like someone already here, written differently. Pick who they are, or add them as a new person.',
+          of('maybe').map(it => h('tr', {}, h('td', {}, h('b', {}, it.c.name), h('div', { class: 'seen' }, it.c.grade)),
+            h('td', {}, choice(it, [...it.candidates.map(p => ['same:' + p.id, `Same as ${label(p)}`]), ...keepOpts.map(([k, l]) => [k, k === 'add' ? 'Add as a new person' : l])]))))),
+        section('New people', null, of('new').map(it => h('tr', {}, h('td', {}, h('b', {}, it.c.name), h('div', { class: 'seen' }, `${it.c.role}, ${it.c.grade}`)), h('td', {}, choice(it, keepOpts))))),
+        section('New juniors', 'Junior postings rotate, so juniors not on the staff list are skipped unless you add them.',
+          of('newJunior').map(it => h('tr', {}, h('td', {}, h('b', {}, it.c.name), h('div', { class: 'seen' }, it.c.grade)), h('td', {}, choice(it, keepOpts)))), true),
+        section('Changes to people on the list', null, of('match').filter(it => it.changes.length).map(it => h('tr', {},
+          h('td', {}, h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: true, onchange: e => dec.set(it, e.target.checked ? 'update' : 'same') }), ' ', h('b', {}, it.p.name))),
+          h('td', { class: 'seen' }, it.changes.join('; '))))),
+        section('No longer on the contact list', 'Added by an earlier import of the contact list but not on this one.', plan.stale.map(p => h('tr', {},
+          h('td', {}, h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: true, onchange: e => { if (e.target.checked) removeStale.add(p); else removeStale.delete(p); } }), ' Remove ', h('b', {}, p.name))),
+          h('td', { class: 'seen' }, p.grade)))),
+        h('p', { class: 'seen' }, `${of('match').filter(it => !it.changes.length).length} already on the list with nothing to change.${of('skipped').length ? ` ${of('skipped').length} always skipped.` : ''}`)),
+      h('div', { class: 'bar' },
+        h('button', { class: 'primary', onclick: apply }, 'Import'),
+        h('button', { onclick: () => close(null) }, 'Cancel')));
+    dlg.addEventListener('cancel', e => { e.preventDefault(); close(null); });
+    document.body.append(dlg);
+    dlg.showModal();
+  });
+}
+
+// ---- duplicates on the staff list ----
+
+let showDups = false;
+// Move a person's day records (status, flags, fixed rooms) to the person they were merged into.
+function remapStaffId(from, to) {
+  const days = [state.day, ...Object.values(state.days || {}).map(r => r.day)].filter(Boolean);
+  for (const d of days) {
+    if (d.staff?.[from]) { d.staff[to] ||= d.staff[from]; delete d.staff[from]; }
+    for (const r of d.rooms || []) { if (r.lockSenior === from) r.lockSenior = to; if (r.lockJunior === from) r.lockJunior = to; }
+  }
+}
+function mergePair(keep, drop) {
+  state.staff = state.staff.filter(p => p !== drop).map(p => p === keep ? mergeStaffRecords(keep, drop) : p);
+  remapStaffId(drop.id, keep.id);
+  toast(`Merged ${drop.name} into ${keep.name}. ${drop.name} is kept as a short name.`);
+  render();
+}
+function duplicatesCard() {
+  if (!showDups) return null;
+  const pairs = findDuplicates(state.staff);
+  const who = p => h('div', {}, h('b', {}, p.name), h('div', { class: 'seen' }, `${p.role === 'senior' ? 'Senior' : 'Junior'} · ${p.grade}${(p.aliases || []).length ? ' · ' + p.aliases.join(', ') : ''}`));
+  return h('section', { class: 'card' },
+    h('div', { class: 'bar' }, h('h2', { class: 'grow', style: 'margin:0' }, `Possible duplicates (${pairs.length})`), h('button', { onclick: () => { showDups = false; render(); } }, 'Close')),
+    pairs.length
+      ? h('table', {}, h('tbody', {}, pairs.map(({ a, b }) => h('tr', {},
+        h('td', {}, who(a)), h('td', {}, who(b)),
+        h('td', {}, h('div', { class: 'btn-group' },
+          h('button', { title: `Keep ${a.name}; ${b.name} becomes a short name`, onclick: () => mergePair(a, b) }, `Keep ${a.name}`),
+          h('button', { title: `Keep ${b.name}; ${a.name} becomes a short name`, onclick: () => mergePair(b, a) }, `Keep ${b.name}`),
+          h('button', { onclick: () => { a.notDup = [...new Set([...(a.notDup || []), b.id])]; b.notDup = [...new Set([...(b.notDup || []), a.id])]; render(); } }, 'Different people')))))))
+      : h('p', { class: 'hint' }, 'No likely duplicates.'));
+}
+function importSkipNote() {
+  const list = state.settings.importSkip || [];
+  if (!list.length) return null;
+  return h('details', { class: 'seen', style: 'margin-top:8px' }, h('summary', {}, `${list.length} name(s) are always skipped when importing`),
+    h('div', { class: 'chips', style: 'margin-top:6px' }, list.map(n => h('span', { class: 'chip static' }, n, ' ',
+      h('button', { class: 'link', title: 'Import this name again next time', onclick: () => { state.settings.importSkip = list.filter(x => x !== n); render(); } }, '×')))));
 }
 
 async function learnFiles(files) {

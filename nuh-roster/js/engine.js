@@ -797,6 +797,94 @@ export function findSameStaff(name, staff) {
   return hits.length === 1 ? hits[0] : null;
 }
 
+// How alike two names are as the same person: 3 the same name (any order, spacing or case),
+// 2 one is a fuller form of the other ("Tan YW" / "Tan Yi Wei Gerald"), 1 a single shared name
+// ("Shree" / "Shree Venkatesan"), 0 different people.
+export function sameNameScore(a, b) {
+  const fa = [a.name, ...(a.aliases || [])].filter(Boolean), fb = [b.name, ...(b.aliases || [])].filter(Boolean);
+  const sorted = n => tokens(n).sort().join(' '), squash = n => tokens(n).sort().join('');
+  if (fa.some(x => fb.some(y => sorted(x) === sorted(y) || squash(x) === squash(y)))) return 3;
+  const one = (x, ys) => nameMatchesForms(x, ys);
+  return Math.max(...fa.map(x => one(x, fb)), ...fb.map(y => one(y, fa)));
+}
+
+// Pairs of staff who look like the same person, most likely first. Pairs marked as different
+// people (notDup) are left out; a single shared first name only counts when nobody else has it.
+export function findDuplicates(staff) {
+  const out = [];
+  for (let i = 0; i < staff.length; i++) for (let j = i + 1; j < staff.length; j++) {
+    const a = staff[i], b = staff[j];
+    if ((a.notDup || []).includes(b.id) || (b.notDup || []).includes(a.id)) continue;
+    const sc = sameNameScore(a, b);
+    if (!sc) continue;
+    if (sc === 1) {
+      const short = tokens(a.name).length <= tokens(b.name).length ? a : b;
+      if (staff.filter(p => p !== short && sameNameScore(short, p)).length > 1) continue;
+    }
+    out.push({ a, b, score: sc });
+  }
+  return out.sort((x, y) => y.score - x.score || x.a.name.localeCompare(y.a.name));
+}
+
+// Fold one person into another: the kept record gets the other's names as short names and
+// anything it lacks (subspecs, lists they don't do, history, posting, colour).
+export function mergeStaffRecords(keep, drop) {
+  const names = new Set((keep.aliases || []).map(norm));
+  const aliases = [...(keep.aliases || [])];
+  for (const n of [drop.name, ...(drop.aliases || [])]) if (n && norm(n) !== norm(keep.name) && !names.has(norm(n))) { names.add(norm(n)); aliases.push(n); }
+  const history = { ...(keep.history || {}) };
+  for (const [k, v] of Object.entries(drop.history || {})) history[k] = (history[k] || 0) + v;
+  return {
+    ...keep, aliases, history,
+    subspecs: [...new Set([...(keep.subspecs || []), ...(drop.subspecs || [])])],
+    avoid: [...new Set([...(keep.avoid || []), ...(drop.avoid || [])])],
+    posting: keep.posting || drop.posting || '',
+    colour: keep.colour || drop.colour || '',
+  };
+}
+
+// What importing person c (from a contact list or staff sheet) changes on staff member p.
+// Returns { p: updated copy, changes: ['grade AC → C', …] }.
+export function importUpdate(p, c, contact = true) {
+  const q = { ...p, subspecs: [...(p.subspecs || [])], aliases: [...(p.aliases || [])] };
+  const changes = [];
+  const set = (k, v, label = k) => { if (v != null && v !== '' && q[k] !== v) { changes.push(`${label} ${q[k] || '—'} → ${v}`); q[k] = v; } };
+  if (contact) {
+    // the contact list is older than the rosters: its role only counts for people it added itself
+    if (p.source === 'import') { set('role', c.role); set('grade', c.grade); }
+    else if (p.role === c.role) set('grade', c.grade);
+  } else {
+    set('role', c.role); set('grade', c.grade); set('posting', c.posting);
+    for (const k of c.avoid || []) if (!(q.avoid ||= []).includes(k)) { q.avoid = [...q.avoid, k]; changes.push(`doesn't do + ${k}`); }
+  }
+  for (const k of c.subspecs || []) if (!q.subspecs.includes(k)) { q.subspecs.push(k); changes.push(`subspec + ${k}`); }
+  for (const n of [...(c.aliases || []), ...(norm(c.name) !== norm(p.name) ? [c.name] : [])]) {
+    if (n && norm(n) !== norm(q.name) && !q.aliases.some(a => norm(a) === norm(n))) { q.aliases.push(n); changes.push(`also known as ${n}`); }
+  }
+  return { p: q, changes };
+}
+
+// How an import would go, before anything changes: people matched (with what changes),
+// people who might be someone already on the list, new people, and names set to always skip.
+export function planImport(staff, people, { contact = true, skip = [] } = {}) {
+  const skipSet = new Set(skip.map(norm));
+  const items = [];
+  const matched = new Set();
+  for (const c of people) {
+    if (skipSet.has(norm(c.name))) { items.push({ kind: 'skipped', c }); continue; }
+    const p = findSameStaff(c.name, staff);
+    if (p && !matched.has(p.id)) { matched.add(p.id); items.push({ kind: 'match', c, p, ...importUpdate(p, c, contact) }); continue; }
+    const candidates = staff.map(s => ({ s, sc: sameNameScore({ name: c.name, aliases: c.aliases || [] }, s) }))
+      .filter(x => x.sc).sort((a, b) => b.sc - a.sc).slice(0, 4).map(x => x.s);
+    if (candidates.length) items.push({ kind: 'maybe', c, candidates });
+    else items.push({ kind: contact && c.role === 'junior' ? 'newJunior' : 'new', c });
+  }
+  // people an earlier import of the contact list added who are no longer on it
+  const maybeIds = new Set(items.flatMap(i => (i.candidates || []).map(x => x.id)));
+  const stale = contact ? staff.filter(p => p.source === 'import' && !matched.has(p.id) && !maybeIds.has(p.id)) : [];
+  return { items, stale };
+}
+
 // Fold contact-list people into the staff list. Matched people get the list's subspecs added,
 // and its grade only if their role hasn't changed since (rosters are newer than the list).
 // New seniors are added; new juniors are not, since junior postings rotate.
