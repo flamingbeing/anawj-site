@@ -6,6 +6,7 @@ assert.equal(FONTS[0][0], 'default');
 assert.match(STACKS.default, /^"Open Sans", /);   // the default stays the font the app always had
 assert.equal(fontStack('nope'), STACKS.default);
 assert.equal(fontStack('atkinson'), STACKS.atkinson);
+assert.match(fontStack('inter'), /^"Inter", /);
 assert.match(fontStack('mono'), /monospace$/);
 // a typed name can't break out of the CSS
 assert.equal(cleanFontName('  Calibri  Light '), 'Calibri Light');
