@@ -3,6 +3,7 @@
 //
 //   members/{uid}  { site, initials, code, joinedAt }       codes/{site}  { code, setAt, setBy }   (admins only)
 //   admins/{email} {}                                       patients/{id} { site, created, deleted?, f: { id: {v,t,by} } }
+//   forms/blank    { b64, name, size, setAt, setBy }        (the blank paper form, .docx; admins upload, members read)
 
 import { FIREBASE_CONFIG } from './firebase-config.js';
 
@@ -116,6 +117,19 @@ export async function push(rec, ids) {
   const body = { site: rec.site, created: rec.created, f };
   if (rec.deleted) body.deleted = rec.deleted;
   await F.setDoc(F.doc(db, 'patients', rec.id), plain(body), { merge: true });
+}
+
+// The blank paper data collection form (null if none yet). Firestore keeps a copy on the phone for offline use.
+export async function blankForm() {
+  const { db, F } = await sdk();
+  const ref = F.doc(db, 'forms', 'blank');
+  let s;
+  try { s = await F.getDoc(ref); } catch (e) { if (e?.code === 'permission-denied') return null; throw e; }
+  return s.exists() ? s.data() : null;
+}
+export async function setBlankForm(b64, name, size) {
+  const { auth, db, F } = await sdk();
+  await F.setDoc(F.doc(db, 'forms', 'blank'), { b64, name, size, setAt: Date.now(), setBy: auth.currentUser.email.toLowerCase() });
 }
 
 // ---- admin

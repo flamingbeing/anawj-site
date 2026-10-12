@@ -10,6 +10,8 @@ rules_version = '2';
 // Data:
 //   patients/{id}   { site, created, deleted?, f: { fieldId: { v, t, by, auto? } } }
 //                   members read and write their own hospital's patients; admins all of them.
+//   forms/blank     the blank paper data collection form (.docx, base64), uploaded by an admin:
+//                   { b64, name, size, setAt, setBy }; members and admins read it (the Form view fills it in).
 service cloud.firestore {
   match /databases/{database}/documents {
     function sites() { return ['NTF', 'NUH', 'SGH', 'CGH', 'TTSH', 'KTPH', 'WH']; }
@@ -51,6 +53,15 @@ service cloud.firestore {
         && request.resource.data.initials is string && request.resource.data.initials.size() <= 6;
       allow get, delete: if signedIn() && uid == request.auth.uid;
       allow read, delete: if admin();
+    }
+
+    match /forms/{id} {
+      allow read: if admin() || member();
+      allow write: if admin() && id == 'blank'
+        && request.resource.data.keys().hasOnly(['b64', 'name', 'size', 'setAt', 'setBy'])
+        && request.resource.data.b64 is string && request.resource.data.b64.size() < 1000000
+        && request.resource.data.name is string && request.resource.data.name.size() <= 200;
+      allow delete: if admin();
     }
 
     match /patients/{pid} {
