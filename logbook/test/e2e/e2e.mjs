@@ -1515,6 +1515,27 @@ async function run(label, ctxOpts) {
     return log1.join(' / ');
   });
 
+  await step('admin: one-off initials fix (owner) moves longer and one-letter initials out of the case text', async () => {
+    await p.evaluate(async () => {
+      const cloud = await import('./js/cloud.js');
+      const mk = (id, details) => ({ id, date: '2026-09-01', details, initials: '', cats: ['16'], source: 'import', createdAt: 1, updatedAt: 1 });
+      await cloud.saveCases('demo@example.com', [mk('fx1', 'ABCDEF 45F lap chole'), mk('fx2', 'K/30F LSCS spinal'), mk('fx3', 'ELECTIVE LSCS spinal')]);
+    });
+    await go('admin');
+    const card = p.locator('section.card', { has: p.locator('h2', { hasText: 'Fix initials' }) });
+    await card.getByRole('button', { name: 'Check all logbooks' }).click();
+    await card.getByRole('button', { name: /^Fix \d+ case/ }).waitFor();
+    assert(/ABCDEF 45F lap chole/.test(await card.innerText()), 'fix preview missing the long initials');
+    await card.getByRole('button', { name: /^Fix \d+ case/ }).click();
+    await p.locator('dialog[open] button', { hasText: /^Fix$/ }).click();
+    await card.getByText(/^Fixed \d+ case/).waitFor();
+    const got = await p.evaluate(async () => { const cloud = await import('./js/cloud.js'); return Object.fromEntries((await cloud.listCases('demo@example.com')).filter(c => /^fx/.test(c.id)).map(c => [c.id, [c.initials, c.details]])); });
+    assert(JSON.stringify(got) === JSON.stringify({ fx1: ['ABCDEF', '45F lap chole'], fx2: ['K', '30F LSCS spinal'], fx3: ['', 'ELECTIVE LSCS spinal'] }), 'initials not fixed: ' + JSON.stringify(got));
+    await card.getByRole('button', { name: 'Check all logbooks' }).click();
+    await card.getByText(/nothing to fix/).waitFor();
+    await p.evaluate(async () => { const cloud = await import('./js/cloud.js'); await cloud.deleteCases('demo@example.com', ['fx1', 'fx2', 'fx3']); });
+  });
+
   await step('totals shows imported intake', async () => {
     await tab('totals');
     await p.locator('button', { hasText: 'Refresh' }).click();

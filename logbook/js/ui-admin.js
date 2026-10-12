@@ -4,7 +4,7 @@
 
 import { YEAR_NAMES, yearName } from './categories.js';
 import { academicYear } from './engine.js';
-import { countCases, sortCodes, splitInitials } from './engine.js';
+import { countCases, sortCodes, splitInitials, initialsFixes } from './engine.js';
 import { parseResidentsScript, parseCaseSheet, parseTotalsSheet, countCheck } from './importer.js';
 import { S, h, toast, confirmBox, cloud, needExcel, sheetRows, fileButton, hooks, add, resetters, residentYear, residentYearName, residentSmo, baseIntake, effectiveIntake, catPills, download, todayISO } from './ui-core.js';
 import { templateDialog, categoryNamesCard } from './ui-settings.js';
@@ -27,7 +27,7 @@ export function leaveAdmin() { A.editRes = false; A.pasted = null; }
 export function renderAdmin() {
   if (!S.admin) return h('p', { class: 'empty' }, 'Admins only.');
   if (!A.residents && !A.loading) load();
-  return h('div', {}, residentsCard(), S.owner ? importCard() : ownerOnlyCard(), readyPortfoliosCard(), sharedCard(), categoryNamesCard(), renderTemplateCard());
+  return h('div', {}, residentsCard(), S.owner ? importCard() : ownerOnlyCard(), S.owner ? initialsFixCard() : null, readyPortfoliosCard(), sharedCard(), categoryNamesCard(), renderTemplateCard());
 }
 
 // Attrited residents are left off Totals: their rids go on config/totalsHidden, kept in step with the
@@ -250,6 +250,53 @@ function residentsCard() {
         h('button', { onclick: () => { A.pasted = null; hooks.render(); } }, 'Cancel')));
   }
   return card;
+}
+
+// ---------- one-off initials fix (the app owner only) ----------
+// Older imports, pastes and spreadsheets kept longer (5–8 letter) or one-letter initials inside the case text, with
+// an empty initials field. Check reads every logbook's cases (the owner may), Fix writes initials + details back.
+// Running it again finds nothing. Fake data only in the demo.
+const IF = { scan: null, busy: false, msg: '' };
+resetters.push(() => Object.assign(IF, { scan: null, busy: false, msg: '' }));
+function initialsFixCard() {
+  const card = h('section', { class: 'card' }, h('h2', {}, 'Fix initials in older cases (one-off)'),
+    h('p', { class: 'hint' }, 'Finds cases whose initials are still at the start of the case text (e.g. “ABCDEF 45F lap chole”, “K/45F hernia”) in every logbook, shows them, and moves the initials into their own field. Nothing changes until you press Fix.'));
+  const scan = IF.scan, n = scan ? scan.reduce((t, x) => t + x.fixes.length, 0) : 0;
+  add(card, h('div', { class: 'bar', style: 'margin-bottom:6px' },
+    h('button', { disabled: IF.busy, onclick: checkInitials }, scan ? 'Check again' : 'Check all logbooks'),
+    scan && n ? h('button', { class: 'primary', disabled: IF.busy, onclick: () => fixInitials(scan, n) }, `Fix ${n} case${n === 1 ? '' : 's'}`) : null),
+    IF.msg ? h('p', { class: 'hint', 'aria-live': 'polite', style: 'margin:0 0 6px' }, IF.msg) : null);
+  if (scan && n) add(card, h('ul', { class: 'fix-list' }, scan.filter(x => x.fixes.length).map(x => h('li', {},
+    h('b', {}, x.email), ` · ${x.fixes.length} case${x.fixes.length === 1 ? '' : 's'}`,
+    x.fixes.slice(0, 3).map(f => h('div', { class: 'hint', style: 'margin:2px 0 0' }, `“${f.before.slice(0, 60)}” → ${f.initials} · ${f.details.slice(0, 50)}`))))));
+  return card;
+}
+async function checkInitials() {
+  IF.busy = true; IF.msg = 'Checking…'; hooks.render();
+  try {
+    const emails = await cloud.listLogbookEmails(), out = [];
+    for (let i = 0; i < emails.length; i++) {
+      IF.msg = `Checking ${i + 1} of ${emails.length} logbooks…`; hooks.render();
+      out.push({ email: emails[i], fixes: initialsFixes(await cloud.listCases(emails[i])) });
+    }
+    const n = out.reduce((t, x) => t + x.fixes.length, 0);
+    IF.scan = out; IF.msg = n ? `${n} case${n === 1 ? '' : 's'} in ${out.filter(x => x.fixes.length).length} logbook(s) can be fixed. A few from each are shown.` : `Checked ${emails.length} logbooks: nothing to fix.`;
+  } catch (err) { IF.msg = 'Could not check: ' + err.message; }
+  IF.busy = false; hooks.render();
+}
+async function fixInitials(scan, n) {
+  if (!(await confirmBox('Fix initials', `Move the initials of ${n} case${n === 1 ? '' : 's'} into their own field? The case text keeps everything else.`, 'Fix'))) return;
+  IF.busy = true; hooks.render();
+  let done = 0;
+  try {
+    for (const x of scan) if (x.fixes.length) {
+      await cloud.fixCaseInitials(x.email, x.fixes, k => { IF.msg = `Fixing… ${done + k} of ${n}`; hooks.render(); });
+      done += x.fixes.length;
+    }
+    IF.scan = null; IF.msg = `Fixed ${done} case${done === 1 ? '' : 's'}. Check again to confirm nothing is left.`;
+    toast(`Fixed initials in ${done} cases`);
+  } catch (err) { IF.msg = `Stopped after ${done} of ${n}: ${err.message}. Check again, then Fix the rest.`; }
+  IF.busy = false; hooks.render();
 }
 
 // ---------- importer (the app owner only: admins can't read or write residents' cases) ----------

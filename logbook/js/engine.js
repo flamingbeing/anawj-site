@@ -205,23 +205,34 @@ export const cleanInitials = s => String(s || '').toUpperCase().replace(/[^A-Z.\
 // "AB 34F LSCS spinal" / "AB/34F ..." -> { initials: 'AB', details: '34F LSCS spinal' }. Leading 2–4 letters,
 // unless they are a known case word ("LSCS spinal", "TKR"). Longer initials (5–8 letters, from older cases) count
 // only when an age or a "/" follows ("ABCDEF 45F …", "ABCDEF/45F …"): on their own, "ELECTIVE LSCS" or "spinal
-// anaesthesia" would lose their first word. No initials -> { initials: '', details }.
+// anaesthesia" would lose their first word. One capital letter counts the same way ("A 45F …"); a lower-case "a"
+// is the word. No initials -> { initials: '', details }.
 // Line breaks inside the rest are kept.
 export function splitInitials(text, keywords = KEYWORDS) {
   const s = String(text || '').trim();
-  // the first run of 2-8 letters, in any case ("ab 45f lap chole" -> AB); stored in capitals
-  const m = s.match(/^([A-Za-z]{2,8})(?![A-Za-z0-9])[\s\/,:;.\-]*/);
+  // the first run of 1-8 letters, in any case ("ab 45f lap chole" -> AB); stored in capitals
+  const m = s.match(/^([A-Za-z]{1,8})(?![A-Za-z0-9])[\s\/,:;.\-]*/);
   if (!m) return { initials: '', details: s };
   const word = m[1], up = word.toUpperCase(), lower = word !== up;
   // a case word ("IJ", "TKR", "lap") is still initials when an age follows: "IJ 60M VATS", "lap 45f …"
   const ageNext = /^\d{1,3}\s?(?:(?:yo|y\/o|yrs?|years?|y|\/12|\/52|m\/o|mo|d\/o)\s?[MF]?|[MF])(?![A-Za-z])/i.test(s.slice(m[0].length));
-  if (up.length > 4 && !ageNext && !/^\s*\//.test(s.slice(word.length))) return { initials: '', details: s };
+  if ((up.length > 4 || up.length === 1) && !ageNext && !/^\s*\//.test(s.slice(word.length))) return { initials: '', details: s };
+  if (up.length === 1 && lower) return { initials: '', details: s };
   const caseWord = NOT_INITIALS.has(up) || (keywords && keywords[word.toLowerCase()]) || (lower && STOP_WORDS.has(word.toLowerCase()));
   if (caseWord && !ageNext) return { initials: '', details: s };
   // lower case: a 4-letter word ("circ", "knee") needs an age after it to count as initials
   if (lower && up.length === 4 && !ageNext) return { initials: '', details: s };
   return { initials: up, details: s.slice(m[0].length).trim() };
 }
+
+// The one-off initials fix (Admin → owner): cases with no initials whose case text starts with initials under the
+// current rules (older imports, pastes and spreadsheets kept 5–8 letter or one-letter initials in the details).
+// -> [{ id, initials, details, before }]
+export const initialsFixes = cases => (cases || []).flatMap(c => {
+  if (!c || String(c.initials || '').trim()) return [];
+  const p = splitInitials(c.details);
+  return p.initials ? [{ id: c.id, initials: p.initials, details: p.details, before: String(c.details || '') }] : [];
+});
 
 // A case's initials and details for display and editing: the initials field when the case has one,
 // else split off the details (cases logged before initials had their own field).

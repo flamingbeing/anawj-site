@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import {
   uid, todayISO, parseDate, fmtDate, withParents, countCases, rYearDefault, yearInAY, academicYear, progress, epaProgress,
-  frequentCombos, parseBulk, duplicates, caseFromRow, diffRows, catFromText, splitInitials, cleanInitials, caseParts, caseText,
+  frequentCombos, parseBulk, duplicates, caseFromRow, diffRows, catFromText, splitInitials, cleanInitials, caseParts, caseText, initialsFixes,
 } from '../js/engine.js';
 import { BY_CODE } from '../js/categories.js';
 
@@ -390,7 +390,22 @@ assert.equal(rYearDefault(undefined), 1);
   assert.deepEqual(splitInitials('ABCDEFGHI 45F x'), { initials: '', details: 'ABCDEFGHI 45F x' }, '9 letters: never initials');
   for (const t of ['ELECTIVE LSCS spinal', 'spinal anaesthesia', 'CARDIAC case', 'REPAIR of hernia', 'carotid endarterectomy GA']) assert.equal(splitInitials(t).initials, '', t);
   assert.deepEqual(caseParts({ details: 'ABCDEF 60M TKR' }), { initials: 'ABCDEF', details: '60M TKR' }, 'an older case splits on the fly');
-  assert.deepEqual(splitInitials('A 5yo'), { initials: '', details: 'A 5yo' });
+  // the one-off fix: only cases with no initials whose text starts with initials under the current rules
+  assert.deepEqual(initialsFixes([
+    { id: 'a', initials: '', details: 'ABCDEF 45F lap chole' },
+    { id: 'b', initials: 'QR', details: 'ST 30F x' },
+    { id: 'c', initials: '', details: 'ELECTIVE LSCS spinal' },
+    { id: 'd', details: 'K/45F hernia' },
+    { id: 'e', initials: '', details: 'lap chole GA' },
+  ]), [
+    { id: 'a', initials: 'ABCDEF', details: '45F lap chole', before: 'ABCDEF 45F lap chole' },
+    { id: 'd', initials: 'K', details: '45F hernia', before: 'K/45F hernia' },
+  ]);
+  // one capital letter: initials before an age or a /; a lower-case "a" is the word
+  assert.deepEqual(splitInitials('A 5yo'), { initials: 'A', details: '5yo' });
+  assert.deepEqual(splitInitials('K/45F lap chole'), { initials: 'K', details: '45F lap chole' });
+  assert.deepEqual(splitInitials('A lap chole'), { initials: '', details: 'A lap chole' });
+  assert.deepEqual(splitInitials('a 45f lady'), { initials: '', details: 'a 45f lady' });
   // the first run of letters is initials in any case, saved in capitals
   assert.deepEqual(splitInitials('Ab 5yo'), { initials: 'AB', details: '5yo' });
   assert.deepEqual(splitInitials('ab 45f\nlap chole'), { initials: 'AB', details: '45f\nlap chole' });
