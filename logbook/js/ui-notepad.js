@@ -11,6 +11,7 @@
 
 import { S, h, toast, fill, hooks, writes, cloud, transients, settings, patchLogbook, resetters, todayISO, modal } from './ui-core.js';
 import { uid, fmtDate, caseParts } from './engine.js';
+import { barTabs, arrangeTabs, display, setTabOnBar } from './ui-settings.js';
 import { MAX_NOTES, LIMITS, sortNotes, filterNotes, noteTitle, noteIndex, cleanNoteIndex, sameIndex, parseNote, toggleCheck, plainLines } from './notepad.js';
 
 const SAVE_MS = 3000;
@@ -139,9 +140,12 @@ export function renderNotes() {
       : h('ul', { class: 'notes-rows' }, rows.map(noteRow)));
   };
   const narrowed = nv.day || nv.caseId;
+  // Notes lives in More until it's put on the tab bar: offer it here (a full bar asks which tab it replaces)
+  const offBar = !arrangeTabs(barTabs().map(([id]) => id), display()).shown.includes('notes');
   fill(el,
     h('div', { class: 'notes-head' }, h('h2', { style: 'margin:0' }, 'Notes'), h('span', { class: 'muted notes-count' }, loading ? '' : `${list.length} of ${MAX_NOTES}`)),
     h('p', { class: 'hint help' }, 'Your own notes: private, never in your portfolio.'),
+    offBar ? h('p', { class: 'notes-onbar' }, h('button', { class: 'small', onclick: () => setTabOnBar('notes', true, () => hooks.render()) }, 'Add Notes to the tab bar')) : null,
     h('details', { class: 'fold help note-format' }, h('summary', {}, 'Formatting'),
       h('ul', { class: 'hint' }, ...[['# Heading', 'a heading'], ['**bold**', 'bold'], ['- item  or  1. item', 'a list'], ['- [ ] to-do', 'a box to tick'], ['https://…', 'a link']]
         .map(([k, v]) => h('li', {}, h('code', {}, k), ' ' + v)))),

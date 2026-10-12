@@ -62,10 +62,10 @@ const TABS = [
   { id: 'more', label: 'More', render: () => renderMore() },
   // under Analytics: how your counts compare with your intake
   { id: 'totals', label: 'Totals', render: renderTotals, hidden: true, under: 'progress', unlisted: true },
-  { id: 'account', label: 'Account', render: renderAccount, hidden: true, under: 'more', desc: 'Your name and portfolio details (Section 1); delete account' },
-  { id: 'settings', label: 'Settings', render: () => renderSettingsMenu(), hidden: true, under: 'more', desc: 'Display, logging, tag editor, Markdown, recycle bin' },
-  { id: 'recovery', label: 'Recent changes / Recover drafts', render: renderRecovery, hidden: true, under: 'more', desc: 'Retry sync, recover unfinished drafts and restore recent versions on this device' },
-  { id: 'data', label: 'Export / Import', render: () => renderDataPage(), hidden: true, under: 'more', desc: 'Export the portfolio (Word); import reflections from Word; backup file, Excel and Markdown export' },
+  { id: 'account', bar: true, label: 'Account', render: renderAccount, hidden: true, under: 'more', desc: 'Your name and portfolio details (Section 1); delete account' },
+  { id: 'settings', bar: true, label: 'Settings', render: () => renderSettingsMenu(), hidden: true, under: 'more', desc: 'Display, logging, tag editor, Markdown, recycle bin' },
+  { id: 'recovery', bar: true, short: 'Recover', label: 'Recent changes / Recover drafts', render: renderRecovery, hidden: true, under: 'more', desc: 'Retry sync, recover unfinished drafts and restore recent versions on this device' },
+  { id: 'data', bar: true, short: 'Export', label: 'Export / Import', render: () => renderDataPage(), hidden: true, under: 'more', desc: 'Export the portfolio (Word); import reflections from Word; backup file, Excel and Markdown export' },
   { id: 'reflimport', label: 'Import reflections from Word', render: () => renderReflImport(), hidden: true, under: 'data', unlisted: true },
   // Settings' own pages (not in the More list)
   { id: 'display', label: 'Display', render: renderDisplay, hidden: true, under: 'settings', unlisted: true, desc: 'Light or dark, colour, zoom, text size, borders; fonts and more under Advanced' },
@@ -80,7 +80,7 @@ const TABS = [
   { id: 'export', label: 'Export portfolio', render: () => renderExportPage(), hidden: true, under: 'data', unlisted: true },
   { id: 'choose', label: 'Export portfolio', render: renderChoosePage, hidden: true, under: 'export', unlisted: true },
   // admins open it from More
-  { id: 'admin', label: 'Admin portal', render: renderAdmin, admin: true, hidden: true, under: 'more', desc: 'Admins only: ready portfolios, programme totals, residents, settings' },
+  { id: 'admin', bar: true, short: 'Admin', label: 'Admin portal', render: renderAdmin, admin: true, hidden: true, under: 'more', desc: 'Admins only: ready portfolios, programme totals, residents, settings' },
   { id: 'admintotals', label: 'Programme totals', render: renderTotals, admin: true, hidden: true, under: 'admin', unlisted: true },
   { id: 'adminresidents', label: 'Residents', render: renderAdminResidents, admin: true, hidden: true, under: 'admin', unlisted: true },
   { id: 'adminadv', label: 'Advanced admin settings', render: renderAdminAdvanced, admin: true, hidden: true, under: 'admin', unlisted: true },
@@ -95,7 +95,7 @@ const menuItem = (id, label, desc, onclick) => h('li', {}, h('a', { href: '#' + 
 function renderMore() {
   const items = visibleTabs().filter(t => t.under === 'more' && !t.unlisted);
   // tabs hidden from the bar (Advanced display) come first, so they are one tap away
-  const { hidden } = arrangeTabs(visibleTabs().filter(t => !t.hidden).map(t => t.id), display());
+  const hidden = arrangeTabs(barCandidates(), display()).hidden.filter(id => !TABS.find(t => t.id === id).hidden);
   return h('div', {},
     h('section', { class: 'card more-list' }, h('h2', {}, 'More'),
       h('ul', {}, hidden.map(id => TABS.find(t => t.id === id)).map(t => menuItem(t.id, t.label, t.id === 'notes' ? t.desc : 'Hidden from the tab bar')), items.map(t => menuItem(t.id, t.label, t.desc)))),
@@ -296,6 +296,8 @@ const banner = document.getElementById('banner');
 
 // Totals (names and counts of programme residents) is for the programme only; the rules agree.
 const visibleTabs = () => TABS.filter(t => (!t.admin || S.admin) && (t.id !== 'totals' || S.admin || S.pd || S.resident));
+// the tabs that can sit on the bar: the main ones, and the pages in the More list (bar: true), when put there
+const barCandidates = () => visibleTabs().filter(t => !t.hidden || t.bar).map(t => t.id);
 const TAB_ALIASES = { reflections: 'reflect' };
 const tabFromHash = () => {
   const raw = location.hash.replace(/^#/, '');
@@ -309,13 +311,13 @@ function paintTabs() {
   // the bar's tab this page sits under, however deep (Settings → Display is under More)
   let cur = TABS.find(t => t.id === S.tab);
   while (cur && cur.under) cur = TABS.find(t => t.id === cur.under);
-  let sel = cur ? cur.id : S.tab;
-  document.body.dataset.bar = sel;   // Settings → Display → Colourful: the page takes its tab's colour
-  // Advanced display → the tab bar's order and hidden tabs (this device)
-  const bar = visibleTabs().filter(t => !t.hidden), { shown } = arrangeTabs(bar.map(t => t.id), display());
-  if (!shown.includes(sel)) sel = 'more';   // a tab hidden from the bar (Notes) is reached through More
+  document.body.dataset.bar = cur ? cur.id : S.tab;   // Settings → Display → Colourful: the page takes its tab's colour
+  // Advanced display → the tab bar's order and hidden tabs (this device); a page on the bar (Settings) is selected
+  // for its own pages too, and anything else off the bar under More
+  const bar = visibleTabs(), { shown, sel } = barTabOf(S.tab);
   // same tabs as before: only move the selection, so the bar never blinks while changing tab (swipe included)
   const key = shown.map(id => id + ':' + bar.find(t => t.id === id).label).join('|');
+  tabsEl.classList.toggle('many', shown.length > 5);
   if (tabsEl.dataset.key === key && tabsEl.children.length) {
     for (const b of tabsEl.children) b.setAttribute('aria-selected', String(b.dataset.tab === sel));
     tabsEl.hidden = false;
@@ -325,7 +327,7 @@ function paintTabs() {
   fill(tabsEl, ...shown.map(id => bar.find(t => t.id === id)).map(t => h('button', {
     role: 'tab', 'aria-selected': String(sel === t.id), 'data-tab': t.id, 'aria-label': t.label, title: t.label,   // named even with icons only
     onclick: () => go(t.id),
-  }, icon(t.id), h('span', { class: 'lbl' }, t.label))));
+  }, icon(t.id), h('span', { class: 'lbl' }, t.short || t.label))));
   tabsEl.hidden = false;
 }
 
@@ -419,10 +421,10 @@ const scrollsSideways = el => { for (let n = el; n && n !== document.body; n = n
 const reduceMotion = () => { const c = document.documentElement.classList; return c.contains('rm') || (c.contains('rm-auto') && matchMedia('(prefers-reduced-motion: reduce)').matches); };
 // the bar tab a page sits under, however deep; a tab kept off the bar (Notes) counts as More
 function barTabOf(id) {
+  const { shown } = arrangeTabs(barCandidates(), display());
   let cur = TABS.find(t => t.id === id);
-  while (cur && cur.under) cur = TABS.find(t => t.id === cur.under);
+  while (cur && cur.under && !shown.includes(cur.id)) cur = TABS.find(t => t.id === cur.under);
   const sel = cur ? cur.id : id;
-  const { shown } = arrangeTabs(visibleTabs().filter(t => !t.hidden).map(t => t.id), display());
   return { shown, sel: shown.includes(sel) ? sel : 'more' };
 }
 const swipeTarget = dx => { const { shown, sel } = barTabOf(S.tab), i = shown.indexOf(sel); return i < 0 ? null : shown[i + (dx < 0 ? 1 : -1)] || null; };
@@ -728,7 +730,7 @@ async function onUser(user) {
   // the tab chosen in Settings → Display, unless the address names one (a link, a shortcut, a reload)
   const start = display().startTab || 'log';
   // a start tab hidden from the bar gives way to the first tab on it
-  const onBar = arrangeTabs(TABS.filter(t => !t.hidden).map(t => t.id), display()).shown;
+  const onBar = arrangeTabs(barCandidates(), display()).shown;
   S.tab = tabFromHash() || (START_TABS.some(([v]) => v === start) && onBar.includes(start) ? start : onBar.find(id => id !== 'more') || 'log');
   navigation.initialize(S.tab);
   // Settings → Backup: a one-tap reminder when the last Drive / Dropbox backup is over a week old (if asked for)

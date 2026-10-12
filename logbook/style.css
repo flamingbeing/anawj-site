@@ -88,6 +88,7 @@ main { padding: 16px; max-width: 980px; margin: 0 auto; padding-bottom: calc(32p
   .tabs button[aria-selected="true"] { border-top-color: var(--accent); border-bottom: 0; color: var(--accent); }
   .tabs .ico { display: block; width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
   .tabs .lbl { overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  .tabs.many .lbl { font-size: .92em; }
   /* typing (keyboard open): the tab bar sits on the keyboard (--kb, set in app.js) */
   body.typing .tabs { transform: translateY(calc(-1 * var(--kb, 0px))); padding-bottom: 0; }
   /* typing: Save stays in reach, just above the tab bar on the keyboard */
@@ -1086,6 +1087,7 @@ html.tab-icons .tabs .ico { display: block; width: 24px; height: 24px; fill: non
   html.tabs-bottom .tabs button { flex: 0 1 140px; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; height: var(--tabbar-h); padding: 4px 2px; font-size: calc(12px * var(--fs, 1)); border-bottom: 0; border-top: 2px solid transparent; }
   html.tabs-bottom .tabs button[aria-selected="true"] { border-top-color: var(--accent); border-bottom: 0; color: var(--accent); }
   html.tabs-bottom .tabs .ico { display: block; width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  html.tabs-bottom .tabs.many button { font-size: calc(11px * var(--fs, 1)); }
 }
 /* hide the header while there's nothing to say: it comes back for unsynced changes, no signal, signed out (not for the demo: Leave / Reset demo sit by Sign out on More) */
 html.no-header:not(.who-alert) .top { display: none; }
@@ -1209,6 +1211,7 @@ dialog.tag-info p { overflow-wrap: anywhere; }
 
 /* ---- Notes (ui-notepad.js) ---- */
 .notes-head { display: flex; align-items: baseline; gap: 10px; justify-content: space-between; }
+.notes-onbar { margin: 0 0 8px; }
 .notes-count { font-size: calc(13px * var(--fs, 1)); }
 .notes-filter { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 6px 0; }
 ul.notes-rows { list-style: none; margin: 0; padding: 0; }

@@ -188,18 +188,47 @@ export const BORDER_MIX = [0, 25, 50, 75];
 export const ROUNDS = [['Square', 0], ['Slightly rounded', 0.5], ['Normal (default)', 1], ['Very round', 1.7]];
 export const roundLevel = d => (Number.isInteger(d.round) && d.round >= 0 && d.round < ROUNDS.length ? d.round : 2);
 // The tab bar (Advanced display, per device): the order of its tabs and which are hidden. More always stays
-// (Settings live there) and at least two tabs stay on the bar; hidden ones are listed on the More page.
-export const BAR_TABS = [['log', 'Case'], ['logbook', 'Logbook'], ['reflect', 'Reflections'], ['progress', 'Analytics'], ['notes', 'Notes'], ['more', 'More']];
-// tabs off the bar until someone puts them there (Notes lives in More by default)
-const OFF_BAR = ['notes'];
+// (Settings live there), at least two and at most seven (MAX_BAR, More included) stay on the bar; hidden main tabs
+// are listed first on the More page. Every page in the More list can go on the bar too (Admin portal: admins only).
+export const BAR_TABS = [['log', 'Case'], ['logbook', 'Logbook'], ['reflect', 'Reflections'], ['progress', 'Analytics'], ['notes', 'Notes'],
+  ['account', 'Account'], ['settings', 'Settings'], ['recovery', 'Recover drafts'], ['data', 'Export / Import'], ['admin', 'Admin portal'], ['more', 'More']];
+export const barTabs = () => BAR_TABS.filter(([id]) => id !== 'admin' || S.admin);
+// tabs off the bar until someone puts them there (they live in More by default)
+const OFF_BAR = ['notes', 'account', 'settings', 'recovery', 'data', 'admin'];
+export const MAX_BAR = 7;
 export function arrangeTabs(ids, d = {}) {
   const order = Array.isArray(d.tabOrder) ? d.tabOrder : [];
   const at = id => (order.includes(id) ? order.indexOf(id) : order.length + ids.indexOf(id));
   const sorted = [...ids].sort((a, b) => at(a) - at(b));
   // an OFF_BAR tab stays off until someone shows it in Arrange tabs (which saves the order with it in)
   const hidden = new Set([...(Array.isArray(d.tabHidden) ? d.tabHidden : []), ...OFF_BAR.filter(id => !order.includes(id) || !Array.isArray(d.tabHidden))].filter(id => id !== 'more'));
+  // over the limit (saved by hand, or an old settings file): the last ones in the order go to More
+  for (const id of [...sorted].reverse()) if (sorted.filter(k => !hidden.has(k)).length > MAX_BAR && id !== 'more' && !hidden.has(id)) hidden.add(id);
   const shown = sorted.filter(id => !hidden.has(id));
   return shown.length >= 2 ? { sorted, shown, hidden: sorted.filter(id => hidden.has(id)) } : { sorted, shown: sorted, hidden: [] };
+}
+// Show or hide one tab on the bar (Arrange tabs, Show or hide, the Notes page); then() runs after a change.
+// Fewer than two tabs: a toast. More than seven: asks which tab it replaces (taking that tab's place).
+export function setTabOnBar(id, show, then = () => {}) {
+  const all = barTabs();
+  const { sorted, shown, hidden } = arrangeTabs(all.map(([k]) => k), display());
+  const next = new Set(hidden); if (show) next.delete(id); else next.add(id);
+  const n = all.length - next.size;
+  const label = k => BAR_TABS.find(([x]) => x === k)[1];
+  if (n < 2) { toast('Keep at least two tabs on the bar'); then(); return; }
+  if (n > MAX_BAR) {
+    const m = modal(`The tab bar holds ${MAX_BAR} tabs`, [
+      h('p', {}, `Put ${label(id)} in place of:`),
+      h('div', { class: 'bar' }, shown.filter(k => k !== 'more').map(k => h('button', { onclick: () => {
+        const order = sorted.filter(x => x !== id); order.splice(order.indexOf(k), 0, id);
+        applyDisplay(setDisplay({ tabHidden: [...next, k], tabOrder: order })); hooks.paintTabs?.(); m.close();
+      } }, label(k)))),
+      h('div', { class: 'bar' }, h('span', { class: 'grow' }), h('button', { onclick: () => m.close() }, 'Cancel')),
+    ], { onclose: () => then() });
+    return;
+  }
+  // an empty list (not null) means "everything on the bar", so Notes doesn't drop back into More
+  applyDisplay(setDisplay({ tabHidden: [...next], tabOrder: sorted })); hooks.paintTabs?.(); then();
 }
 export const borderLevel = d => (Number.isInteger(d.borders) && d.borders >= 0 && d.borders < BORDERS.length - 1 ? d.borders : BORDERS.length - 1);
 // Display preview (owner): a made-up case row, chips and buttons drawn with the app's own classes, so colour,
@@ -331,21 +360,16 @@ export function renderDisplayAdvanced() {
 function tabArranger() {
   const wrap = h('div', { class: 'tab-arranger field', style: 'margin-top:10px' });
   const paint = () => {
-    const { sorted: order, hidden } = arrangeTabs(BAR_TABS.map(([id]) => id), display());
+    const { sorted: order, hidden } = arrangeTabs(barTabs().map(([id]) => id), display());
     const move = (id, by) => { const o = [...order], i = o.indexOf(id), j = i + by; if (j < 0 || j >= o.length) return; [o[i], o[j]] = [o[j], o[i]]; applyDisplay(setDisplay({ tabOrder: o })); hooks.paintTabs?.(); paint(); };
     const hideSet = new Set(hidden);
-    const toggle = (id, show) => {
-      const next = new Set(hideSet); if (show) next.delete(id); else next.add(id);
-      if (BAR_TABS.length - next.size < 2) { toast('Keep at least two tabs on the bar'); return paint(); }
-      // an empty list (not null) means "everything on the bar", so Notes doesn't drop back into More
-      applyDisplay(setDisplay({ tabHidden: [...next], tabOrder: order })); hooks.paintTabs?.(); paint();
-    };
+    const toggle = (id, show) => setTabOnBar(id, show, paint);
     fill(wrap, h('span', {}, 'Tabs on the bar'),
       h('ul', { class: 'tab-order' }, order.map((id, i) => h('li', {},
         h('label', { class: 'check', style: 'flex:1;min-height:40px' }, h('input', { type: 'checkbox', checked: !hideSet.has(id), disabled: id === 'more', 'aria-label': 'Show ' + BAR_TABS.find(([k]) => k === id)[1], onchange: e => toggle(id, e.target.checked) }), BAR_TABS.find(([k]) => k === id)[1]),
         h('button', { class: 'small icon-btn', type: 'button', disabled: i === 0, 'aria-label': 'Move up', onclick: () => move(id, -1) }, '↑'),
         h('button', { class: 'small icon-btn', type: 'button', disabled: i === order.length - 1, 'aria-label': 'Move down', onclick: () => move(id, 1) }, '↓')))),
-      h('p', { class: 'hint help', style: 'margin:0' }, 'Hidden tabs are listed at the top of More. More always stays (Settings live there).'));
+      h('p', { class: 'hint help', style: 'margin:0' }, `Up to ${MAX_BAR} tabs fit on the bar. Hidden tabs are listed at the top of More. More always stays (Settings live there).`));
   };
   paint();
   return wrap;
@@ -646,7 +670,7 @@ export function renderShowHide() {
     if (show) now.delete(part); else now.add(part);
     return save({ caseHide: now.size ? CASE_PARTS.map(([p]) => p).filter(p => now.has(p)) : null });
   };
-  const { hidden } = arrangeTabs(BAR_TABS.map(([id]) => id), d);
+  const { hidden } = arrangeTabs(barTabs().map(([id]) => id), d);
   return h('div', { class: 'showhide' },
     basicCard(),
     h('section', { class: 'card' },
@@ -675,14 +699,9 @@ export function renderShowHide() {
       h('h3', { style: 'margin-top:0' }, 'Header and tabs (this device)'),
       sw('Show the header (the app’s name and your name)', !d.hideHeader, v => applyDisplay(setDisplay({ hideHeader: !v }))),
       sw('Swipe left or right to change tab', d.swipeTabs !== false, v => applyDisplay(setDisplay({ swipeTabs: v ? null : false }))),
-      BAR_TABS.filter(([id]) => id !== 'more').map(([id, label]) => sw(`${label} on the tab bar`, !hidden.includes(id), v => {
-        const { sorted, hidden: now } = arrangeTabs(BAR_TABS.map(([k]) => k), display());
-        const next = new Set(now); if (v) next.delete(id); else next.add(id);
-        if (BAR_TABS.length - next.size < 2) { toast('Keep at least two tabs on the bar'); return hooks.render(); }
-        applyDisplay(setDisplay({ tabHidden: [...next], tabOrder: sorted })); hooks.paintTabs?.(); hooks.render();
-      })),
-      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'Hidden tabs are first in More. The order is in Display → Advanced.'),
-      groupReset('the header, swiping and the usual tabs (Notes goes back into More)', () => { applyDisplay(setDisplay({ hideHeader: null, swipeTabs: null, tabHidden: null, tabOrder: null })); hooks.paintTabs?.(); })));
+      barTabs().filter(([id]) => id !== 'more').map(([id, label]) => sw(`${label} on the tab bar`, !hidden.includes(id), v => setTabOnBar(id, v, () => hooks.render()))),
+      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, `Up to ${MAX_BAR} tabs fit, More included. Hidden tabs are first in More. The order is in Display → Advanced.`),
+      groupReset('the header, swiping and the usual tabs (Notes and the More pages go back into More)', () => { applyDisplay(setDisplay({ hideHeader: null, swipeTabs: null, tabHidden: null, tabOrder: null })); hooks.paintTabs?.(); })));
 }
 
 export function renderReflectionSettings() {
