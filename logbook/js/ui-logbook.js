@@ -339,6 +339,13 @@ function rowMenu(c) {
       : h('button', { class: 'small row-btn row-more', title: 'Copy, reflect or edit', 'aria-label': 'Copy, reflect or edit this case', onclick: open }, '⋯'));
 }
 
+// The tags line scrolls sideways when it's longer than the row: then it takes the keyboard focus too, so the arrow
+// keys can scroll it (a scrolling area nobody can reach by keyboard is an accessibility error)
+function tagRow(el) {
+  requestAnimationFrame(() => { if (el.isConnected && el.scrollWidth > el.clientWidth + 1) { el.tabIndex = 0; el.setAttribute('aria-label', 'Tags'); el.setAttribute('role', 'group'); } });
+  return el;
+}
+
 function caseRow(c, flagsOf) {
   const flags = flagsOf(c);
   const p = caseParts(c);
@@ -348,14 +355,14 @@ function caseRow(c, flagsOf) {
         h('span', { class: 'dt' }, c.date ? [h('span', { class: 'wd' }, weekday(c.date)), ' ', fmtDate(c.date).replace(/ \d{4}$/, '')] : (c.dateText || '—'))),
       h('span', { class: 't' }, p.details || h('i', { class: 'muted' }, 'no details')),
       // tags on the left (wrapping), Copy and Reflect on the right, the same size whatever they say
-      h('span', { class: 'c' }, h('span', { class: 'c-tags' }, catTags(c.cats),
+      h('span', { class: 'c' }, tagRow(h('span', { class: 'c-tags' }, catTags(c.cats),
         flags.includes('needsDate') ? h('span', { class: 'flag err' }, 'needs date') : null,
         flags.includes('future') ? h('span', { class: 'flag', title: 'Dated after today' }, 'upcoming') : null,
         flags.includes('duplicate') ? h('span', { class: 'flag' }, 'possible duplicate') : null,
         !(c.cats || []).length ? h('span', { class: 'flag err' }, 'no tag') : null,
         c.reflectTag ? h('span', { class: 'flag', title: 'Marked interesting' }, ic('star'), 'interesting') : null,
         (c.tags || []).map(t => h('span', { class: 'flag sc-tag', title: 'Your tag' }, tagName(t))),
-        caseHasNotes(c.id) ? h('button', { class: 'flag note-flag', type: 'button', title: 'Open your notes on this case', 'aria-label': 'Open your notes on this case', onclick: e => { e.stopPropagation(); openNotes({ caseId: c.id }); } }, ic('note'), 'note') : null),
+        caseHasNotes(c.id) ? h('button', { class: 'flag note-flag', type: 'button', title: 'Open your notes on this case', 'aria-label': 'Open your notes on this case', onclick: e => { e.stopPropagation(); openNotes({ caseId: c.id }); } }, ic('note'), 'note') : null)),
         document.documentElement.classList.contains('row-menu') ? rowMenu(c) : h('span', { class: 'acts' },
           // to your own notes (paste into WhatsApp, Notes, Obsidian); off unless switched on (Advanced display, row-copy)
           !document.documentElement.classList.contains('row-copy') ? null : h('button', { class: 'small row-btn', title: 'Copy this case', 'aria-label': 'Copy this case', onclick: e => { e.stopPropagation(); copyText(shareCaseText(c), 'Case copied: paste it into your notes'); } }, rowIcon('copy'), h('span', { class: 'lbl' }, 'Copy')),

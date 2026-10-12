@@ -431,7 +431,8 @@ async function run(label, ctxOpts) {
     await step('r4: delete a logbook case -> bin -> restore', async () => {
       await tab('logbook'); await lbList();
       const n0 = await nCases();
-      await p.locator('main li', { hasText: 'ZZ LSCS' }).first().click();
+      // the initials sit over the date in the row, the details beside them
+      await p.locator('main ul.cases li', { has: p.locator('.d .ini', { hasText: /^ZZ$/ }) }).filter({ hasText: 'LSCS' }).first().click();
       await p.locator('dialog[open] button.danger', { hasText: 'Delete' }).click();
       await nap(700);
       assert(await nCases() === n0 - 1, 'case not removed');
@@ -1565,7 +1566,7 @@ async function run(label, ctxOpts) {
     await card.getByRole('button', { name: /^Fix \d+ case/ }).click();
     await p.locator('dialog[open] button', { hasText: /^Fix$/ }).click();
     await card.getByText(/^Fixed \d+ case/).waitFor();
-    const got = await p.evaluate(async () => { const cloud = await import('./js/cloud.js'); return Object.fromEntries((await cloud.listCases('demo@example.com')).filter(c => /^fx/.test(c.id)).map(c => [c.id, [c.initials, c.details]])); });
+    const got = await p.evaluate(async () => { const cloud = await import('./js/cloud.js'); return Object.fromEntries((await cloud.listCases('demo@example.com')).filter(c => /^fx\d$/.test(c.id)).map(c => [c.id, [c.initials, c.details]]));   // only this step's cases (a random id can start with fx) });
     assert(JSON.stringify(got) === JSON.stringify({ fx1: ['ABCDEF', '45F lap chole'], fx2: ['K', '30F LSCS spinal'], fx3: ['', 'ELECTIVE LSCS spinal'] }), 'initials not fixed: ' + JSON.stringify(got));
     await card.getByRole('button', { name: 'Check all logbooks' }).click();
     await card.getByText(/nothing to fix/).waitFor();
