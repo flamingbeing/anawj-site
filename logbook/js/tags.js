@@ -147,7 +147,7 @@ export function cleanShorthand(v) {
 }
 const wordRe = w => new RegExp(`(?:^|[^a-z0-9])${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '\\s+')}(?![a-z0-9])`, 'g');
 // the case text without leading initials before an age ("DL 45M …"), lower case
-const caseWords = text => String(text || '').replace(/^\s*[A-Z]{2,4}(?=[\s\/,:;.-]+\d)/, '').toLowerCase();
+const caseWords = text => String(text || '').replace(/^\s*[A-Z]{2,8}(?=[\s\/,:;.-]+\d)/, '').toLowerCase();
 // For suggest(): [{ re, code }] from shorthand on APMES tags.
 export function apmesShorthand(set) {
   const out = [];

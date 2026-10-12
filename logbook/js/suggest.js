@@ -79,7 +79,7 @@ export function parseBMI(text) {
 // split on anything but letters/digits/&, blank out stop words and numbers so bigrams don't span them.
 export function tokens(text, keywords = KEYWORDS) {
   // "ABC lap chole": ABC is the patient, but "TKR ..." or "LSCS ..." on their own are the case
-  const lead = String(text || '').match(/^\s*([A-Z]{2,4})\b/);
+  const lead = String(text || '').match(/^\s*([A-Z]{2,4})\b/) || String(text || '').match(/^\s*([A-Z]{5,8})(?=[\s\/,:;.-]*\/|[\s,:;.-]+\d)/);   // longer initials only before an age or /
   const known = lead && keywords[lead[1].toLowerCase()];
   const s = (lead && !known ? String(text).replace(lead[0], ' ') : String(text || '')).toLowerCase();
   return (s.match(/[a-z0-9&]+/g) || []).map(t => {
@@ -151,7 +151,7 @@ export function suggest(text, { limit = 6, keywords = KEYWORDS, calibration = CA
 
   const lower = String(text || '').toLowerCase();
   // leading capitals before an age are the patient's initials ("DL 45M …"), not shorthand
-  const words = String(text || '').replace(/^\s*[A-Z]{2,4}(?=[\s\/,:;.-]+\d)/, '').toLowerCase();
+  const words = String(text || '').replace(/^\s*[A-Z]{2,8}(?=[\s\/,:;.-]+\d)/, '').toLowerCase();
   // shorthand (Tag editor: built in, and your own): whole words that mean an APMES tag. A word inside
   // a longer match ("lap" in "ex lap") steps aside for it.
   const hits = [];

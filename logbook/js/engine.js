@@ -202,17 +202,20 @@ const NOT_INITIALS = new Set(['GA', 'LA', 'RA', 'MAC', 'ETT', 'LMA', 'ASA', 'OT'
 // Patient initials as stored: upper case, letters, '-' and '.' only, at most 20 characters.
 export const cleanInitials = s => String(s || '').toUpperCase().replace(/[^A-Z.\-]/g, '').slice(0, 20);
 
-// "AB 34F LSCS spinal" / "AB/34F ..." -> { initials: 'AB', details: '34F LSCS spinal' }. Leading 2–4 capitals,
-// unless they are a known case word ("LSCS spinal", "TKR"). No initials -> { initials: '', details }.
+// "AB 34F LSCS spinal" / "AB/34F ..." -> { initials: 'AB', details: '34F LSCS spinal' }. Leading 2–4 letters,
+// unless they are a known case word ("LSCS spinal", "TKR"). Longer initials (5–8 letters, from older cases) count
+// only when an age or a "/" follows ("ABCDEF 45F …", "ABCDEF/45F …"): on their own, "ELECTIVE LSCS" or "spinal
+// anaesthesia" would lose their first word. No initials -> { initials: '', details }.
 // Line breaks inside the rest are kept.
 export function splitInitials(text, keywords = KEYWORDS) {
   const s = String(text || '').trim();
-  // the first run of 2-4 letters, in any case ("ab 45f lap chole" -> AB); stored in capitals
-  const m = s.match(/^([A-Za-z]{2,4})(?![A-Za-z0-9])[\s\/,:;.\-]*/);
+  // the first run of 2-8 letters, in any case ("ab 45f lap chole" -> AB); stored in capitals
+  const m = s.match(/^([A-Za-z]{2,8})(?![A-Za-z0-9])[\s\/,:;.\-]*/);
   if (!m) return { initials: '', details: s };
   const word = m[1], up = word.toUpperCase(), lower = word !== up;
   // a case word ("IJ", "TKR", "lap") is still initials when an age follows: "IJ 60M VATS", "lap 45f …"
   const ageNext = /^\d{1,3}\s?(?:(?:yo|y\/o|yrs?|years?|y|\/12|\/52|m\/o|mo|d\/o)\s?[MF]?|[MF])(?![A-Za-z])/i.test(s.slice(m[0].length));
+  if (up.length > 4 && !ageNext && !/^\s*\//.test(s.slice(word.length))) return { initials: '', details: s };
   const caseWord = NOT_INITIALS.has(up) || (keywords && keywords[word.toLowerCase()]) || (lower && STOP_WORDS.has(word.toLowerCase()));
   if (caseWord && !ageNext) return { initials: '', details: s };
   // lower case: a 4-letter word ("circ", "knee") needs an age after it to count as initials
