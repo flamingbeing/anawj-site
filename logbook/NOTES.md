@@ -241,6 +241,11 @@ portfolio content.
   lastAt, lastTo } (never in the settings file). Reminder: one toast per visit with a Save button when due. The
   owner filled `GOOGLE_CLIENT_ID` and `DROPBOX_APP_KEY` (both public) in Oct 2026. Dropbox stays in development
   mode until the owner applies for production (its icons are 64 and 256 px from `icons/icon-512.png`).
+- **Show or hide** (Settings → Show or hide, `#showhide`, `renderShowHide` in `ui-settings.js`; Oct 2026, from Codex's
+  list): every switch that hides part of the app, grouped Tips and help / Case tab / Logbook / Header and tabs, each
+  group with its own "Reset this group" (the other groups stay). The same settings as on their own pages (hideTips,
+  weeklyDigest, reflNotes, caseHide; this device's rowMenu, hideHeader, tabHidden / tabOrder). e2e:
+  `test/e2e/simpler.mjs` (Basic mode joins it).
 - **Notes** (`#notes`; `ui-notepad.js`, pure helpers in `notepad.js`, tested; Oct 2026, owner's spec via Codex):
   a resident's own notepad: teaching points, doses, to-dos. Private (owner-only rules: no admin, PD or app-owner
   access), never in the portfolio. A bar tab that starts off the bar (`OFF_BAR` in `ui-settings.js`): first in More
@@ -352,8 +357,8 @@ portfolio content.
   - Watch for `.bar .grow { min-width: 160px }`: it wraps toolbars on phones (Unlink, Save / Retry). Buttons centre
     their content (`justify-content: center`), which shifted calendar days.
   - Show only what helps: owner prefers a ✓ on rows over calendar badges, small text over cards for guidance.
-  - The e2e also has Codex's `recovery.mjs` and `usability.mjs`, `cloud-save.mjs`, `notepad.mjs` and `tag-editor.mjs`:
-    run all of them before merging.
+  - The e2e also has Codex's `recovery.mjs` and `usability.mjs`, `cloud-save.mjs`, `notepad.mjs`, `tag-editor.mjs`
+    and `simpler.mjs`: run all of them before merging.
   - Accessibility: `test/e2e/a11y.mjs` (axe-core 4.13.0, pinned in `tools/vendor/axe.min.js`, MPL-2.0; WCAG 2.2 A/AA)
     is **not** one of those (owner: not on every e2e). Run it after UI changes or before a release, about 75 s:
     every screen plus the edit-case dialog and reflection editor in light at phone and desk sizes, dark on the main
