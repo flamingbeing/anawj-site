@@ -3,7 +3,7 @@
 
 import { YEAR_NAMES, DEFAULT_NAMES, BY_CODE } from './categories.js';
 import { sortCodes, uid, academicYear, withParents, weekStart, humanAge } from './engine.js';
-import { S, h, toast, modal, confirmBox, cloud, writes, catChip, catName, catShort, PICKER_ORDER, pickerOrder, settings, patchLogbook, displayName, hooks, rYear, myYearName, fill, categoryNames, setCategoryNames, catPills, tagSet, download, fileButton, todayISO, saveMany, UNDO_SECS } from './ui-core.js';
+import { S, h, toast, modal, confirmBox, cloud, writes, catChip, catName, catShort, PICKER_ORDER, pickerOrder, settings, patchLogbook, displayName, hooks, rYear, myYearName, fill, categoryNames, setCategoryNames, catPills, tagSet, download, fileButton, todayISO, saveMany, UNDO_SECS, rowIcon } from './ui-core.js';
 import { MAX_TAGS, tagLinks as tagLinksIn, learnShorthand, cleanShorthand, shorthandOf, DEFAULT_SHORTHAND, cleanTagSet, defaultTagSet, tagTree, flatTree, moveTag, reparentTag, removeTag, newKey, tagSetToCsv, tagSetFromCsv, dropTag, canPlace } from './tags.js';
 import { pickDialog, CASE_PARTS, AFTER_SAVE } from './ui-log.js';
 import { OPERATOR_HELP } from './search-ops.js';
@@ -178,6 +178,24 @@ export const APP_TITLE = 'APMES Logbook';
 export const BORDERS = ['Borderless', 'Faint', 'Light', 'Soft', 'Normal (default)'];
 export const BORDER_MIX = [0, 25, 50, 75];
 export const borderLevel = d => (Number.isInteger(d.borders) && d.borders >= 0 && d.borders < BORDERS.length - 1 ? d.borders : BORDERS.length - 1);
+// Display preview (owner): a made-up case row, chips and buttons drawn with the app's own classes, so colour,
+// borders, fonts, text size and compact show at once; it stays in view while the page scrolls
+export const displayPreview = () => h('div', { class: 'display-preview', 'aria-hidden': 'true' },
+  h('div', { class: 'dp-label' }, 'Preview'),
+  h('ul', { class: 'cases' }, h('li', { tabindex: '-1' },
+    h('span', { class: 'd' }, h('span', { class: 'wd' }, 'Sun'), ' 11th Oct'),
+    h('span', { class: 't' }, h('b', {}, 'AB'), ' 34F LSCS under spinal'),
+    h('span', { class: 'c' }, h('span', { class: 'c-tags' }, h('span', { class: 'lb-tags' }, ['LSCS', 'CNB(Obs)', 'Spinal'].map(t => h('span', { class: 'lb-tag' }, t)))),
+      h('span', { class: 'acts' }, h('button', { class: 'small row-btn', tabindex: '-1', type: 'button' }, rowIcon('copy'), h('span', { class: 'lbl' }, 'Copy')),
+        h('button', { class: 'small row-btn has-refl', tabindex: '-1', type: 'button' }, rowIcon('done'), h('span', { class: 'lbl' }, 'Reflect')))))),
+  h('div', { class: 'chips' }, h('span', { class: 'chip on' }, 'Spinal'), h('span', { class: 'chip' }, 'LSCS'), h('span', { class: 'chip' }, 'GA'),
+    h('span', { class: 'grow' }), h('button', { class: 'small primary', tabindex: '-1', type: 'button' }, 'Save')));
+// "Reset this page" (owner): puts only this page's choices back to their defaults, after asking
+export const resetLink = (what, run) => h('p', { class: 'reset-row' }, h('button', { class: 'small linkish', type: 'button', onclick: async () => {
+  if (!await confirmBox('Reset this page', `Put ${what} back to the defaults?`, 'Reset')) return;
+  await run(); hooks.render(); toast('Back to the defaults');
+} }, 'Reset this page'));
+
 // a link to a settings page's own Advanced page, like a row of the More list
 export const advancedLink = (id, label, desc) => h('section', { class: 'card more-list' },
   h('ul', {}, h('li', {}, h('a', { href: '#' + id, 'data-go': id },
@@ -200,6 +218,7 @@ export function renderDisplay() {
   const st = display();
   const bordersNote = h('span', { class: 'hint', style: 'margin:0' }, BORDERS[borderLevel(st)]);
   return h('div', {},
+    displayPreview(),
     h('section', { class: 'card' },
       h('h2', {}, 'Display'),
       h('label', { class: 'field', style: 'margin-top:4px' }, 'Light or dark',
@@ -232,12 +251,16 @@ export function renderDisplay() {
         h('select', { onchange: e => { setDisplay({ startTab: e.target.value }); toast('Saved'); } },
           START_TABS.map(([v, l]) => h('option', { value: v, selected: (st.startTab || 'log') === v }, l)))),
       h('p', { class: 'hint', style: 'margin:10px 0 0' }, 'Everything on this page is saved on this device only, so a phone and a computer can each look the way that suits them.')),
+    resetLink('light or dark, colour, Colourful, zoom, text size, compact, borders and the start tab on this device', () => {
+      applyTheme('light'); applyDisplay(setDisplay({ accent: null, colourful: null, zoom: null, textSize: null, compact: null, borders: null, startTab: null }));
+    }),
     advancedLink('displayadv', 'Advanced display settings', 'Name in the header, fonts, line spacing and width, contrast, motion, the tab bar and header, pinning, custom CSS'));
 }
 // Settings → Display → Advanced display settings (#displayadv): the rest of the look, then custom CSS
 export function renderDisplayAdvanced() {
   const st = display();
   return h('div', {},
+    displayPreview(),
     h('section', { class: 'card' },
       h('h2', {}, 'Advanced display'),
       h('label', { class: 'field' }, 'Name in the header',
@@ -260,7 +283,9 @@ export function renderDisplayAdvanced() {
       h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !!st.pinSearch, onchange: e => applyDisplay(setDisplay({ pinSearch: e.target.checked || null })) }), 'Pin the search box at the top of the Logbook'),
       h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'They stay in view while the tags or cases scroll under them.'),
       h('p', { class: 'hint', style: 'margin:10px 0 0' }, 'Everything on this page is saved on this device only, so a phone and a computer can each look the way that suits them.')),
-    customCssCard());
+    customCssCard(),
+    resetLink('the name in the header, fonts, line spacing and width, contrast, motion, the tab bar and header options, upside down, pinning and custom CSS (switched off; your CSS is kept) on this device', () =>
+      applyDisplay(setDisplay({ appTitle: null, fontUi: null, fontUiName: null, fontLog: null, fontLogName: null, lineWidth: null, lineHeight: null, contrast: null, motion: null, tabBar: null, tabIcons: null, hideHeader: null, caseInverted: null, pinBox: null, pinSearch: null, customCssOn: null }))));
 }
 // Interface font and logging font (fonts.js): a list, a box for a font installed on this device, or a font file
 // kept on this device; a sample line shows the result (Il1 O0: easy to mix up in initials)
@@ -524,7 +549,11 @@ export function renderLoggingAdvanced() {
         'Autocorrect'),
       h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: display().boxSpell !== false, onchange: e => applyDisplay(setDisplay({ boxSpell: e.target.checked ? null : false })) }),
         'Underline spelling mistakes'),
-      h('p', { class: 'hint help', style: 'margin:0' }, 'Autocorrect is off by default so initials and drug names stay as typed. Some keyboards ignore these.')));
+      h('p', { class: 'hint help', style: 'margin:0' }, 'Autocorrect is off by default so initials and drug names stay as typed. Some keyboards ignore these.')),
+    resetLink('everything on this page (the initials box, keyboard, box height, undo, the week, the weekly summary, tips, advanced search and the Case tab parts)', async () => {
+      await patchLogbook({ settings: { boxLines: null, undoSecs: null, weekStart: null, weeklyDigest: null, hideTips: null, searchOps: null, caseHide: null } });
+      applyDisplay(setDisplay({ autoFocus: null, firstField: null, boxCaps: null, boxCorrect: null, boxSpell: null }));
+    }));
 }
 
 export function renderReflectionSettings() {
@@ -534,14 +563,15 @@ export function renderReflectionSettings() {
       h('h2', {}, 'Reflections'),
       h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: st.reflExport !== false, onchange: e => patchLogbook({ settings: { reflExport: e.target.checked } }) }),
         'New reflections are included in the portfolio export'),
+      h('p', { class: 'hint help', style: 'margin:0' }, 'Untick if you write many and would rather choose which go in. Reflections already written keep their own tick.'),
       h('label', { class: 'field', style: 'margin-top:10px' }, 'Learning points in new reflections',
         h('select', { onchange: e => patchLogbook({ settings: { reflPoints: e.target.value === 'free' ? 'free' : null } }).then(() => toast('Saved')) },
           h('option', { value: 'numbered', selected: settings().reflPoints !== 'free' }, 'Numbered points with headings (default)'),
           h('option', { value: 'free', selected: settings().reflPoints === 'free' }, 'Free text (one box)'))),
       h('p', { class: 'hint help', style: 'margin:0' }, 'Each reflection can still be switched at the top of its Learning points.'),
-      h('p', { class: 'hint help', style: 'margin:0' }, 'Untick if you write many and would rather choose which go in. Reflections already written keep their own tick.'),
       h('label', { class: 'check', style: 'margin-top:8px' }, h('input', { type: 'checkbox', checked: display().reflSpell !== false, onchange: e => applyDisplay(setDisplay({ reflSpell: e.target.checked ? null : false })) }),
-        'Underline spelling mistakes in reflections (this device)')),
+        'Underline spelling mistakes in reflections (this device)'),
+      resetLink('new reflections in the export, learning points and spelling', async () => { await patchLogbook({ settings: { reflExport: null, reflPoints: null } }); applyDisplay(setDisplay({ reflSpell: null })); })),
     h('section', { class: 'card' },
       h('h2', {}, 'Photos'),
       (() => { const kb = photoUsageKb(S.reflections), pct = Math.min(100, Math.round(kb / PHOTO_BUDGET_KB * 100));

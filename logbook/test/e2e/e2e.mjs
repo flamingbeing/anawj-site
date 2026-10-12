@@ -1658,6 +1658,22 @@ async function run(label, ctxOpts) {
     await p.goBack(); await p.waitForFunction(() => !document.querySelector('.refl-editor'));
   });
 
+  await step('settings: search finds an option on an Advanced page; Display preview; reset this page', async () => {
+    await tab('settings');
+    await p.getByLabel('Search settings').fill('undo');
+    const hit = p.locator('.settings-search ul a', { hasText: 'Undo window' });
+    await hit.waitFor();
+    await hit.click();
+    await p.waitForURL(/#loggingadv$/);
+    await p.locator('label.field.flash', { hasText: 'Undo window' }).waitFor();
+    await tab('display');
+    assert(await p.locator('.display-preview .row-btn').count() === 2, 'no Display preview');
+    await p.locator('input[type=range][aria-label="Borders"]').fill('1'); await nap(150);
+    await p.locator('.reset-row button', { hasText: 'Reset this page' }).click();
+    await p.locator('dialog[open] button', { hasText: /^Reset$/ }).click(); await nap(300);
+    assert(!(await p.evaluate(() => document.documentElement.classList.contains('edges'))), 'reset did not put borders back');
+  });
+
   await step('admin tab hidden for non-admins', async () => {
     const KEY = 'apmes-logbook-demo-v1';
     const saved = await p.evaluate(k => localStorage.getItem(k), KEY);

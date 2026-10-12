@@ -183,6 +183,13 @@ portfolio content.
   `cloud.listLogbookEmails` / `fixCaseInitials`): reads every logbook's cases, lists those with an empty initials
   field whose text starts with initials under these rules (older imports, pastes, spreadsheets), and writes initials +
   details back after a confirm. Re-running finds nothing. The rules already let the app owner read and update cases.
+- **Settings tools** (Oct 2026): **Search** on the Settings page (app.js `settingsSearch`): the first search of a visit
+  draws Display, Advanced display, Logging, Advanced logging, Reflections and Markdown off screen and indexes their
+  headings, field labels, switches and folds (with the hint under each), so it never goes stale; a result opens the
+  page and scrolls to the option, which flashes (`findAfterRender`). **Display preview** (`displayPreview`, top of
+  both Display pages, sticky): a made-up row, chips and buttons with the app's own classes. **Reset this page**
+  (`resetLink`) on Display, Advanced display, Advanced logging and Reflections (Codex's on Logging): only that page's
+  keys, after a confirm; custom CSS is switched off but kept, own font files stay stored.
 - **Display is per device** (owner: people use the logbook on different devices with different needs): compact,
   text size, zoom, fonts, colour and the start tab live in localStorage `apmes-logbook-display` (`deviceDisplay` / `setDisplay` /
   `adoptDisplay` in ui-settings.js), light / dark in `apmes-logbook-theme`. A device with none starts from the

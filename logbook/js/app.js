@@ -67,7 +67,7 @@ const TABS = [
   { id: 'displayadv', label: 'Advanced display', render: renderDisplayAdvanced, hidden: true, under: 'display', unlisted: true },
   { id: 'loggingadv', label: 'Advanced logging', render: renderLoggingAdvanced, hidden: true, under: 'logging', unlisted: true },
   { id: 'sharefmt', label: 'Markdown', render: renderMarkdownSettings, hidden: true, under: 'settings', unlisted: true, desc: 'How Copy, Share and the notes export read' },
-  { id: 'logging', label: 'Logging', render: renderLogging, hidden: true, under: 'settings', unlisted: true, desc: 'Suggestions, first field, the Enter key, dates, after Save; more under Advanced' },
+  { id: 'logging', label: 'Logging', render: renderLogging, hidden: true, under: 'settings', unlisted: true, desc: 'Suggestions, the Enter key, dates, after Save; more under Advanced' },
   // from Reflections → More tools
   { id: 'reflset', label: 'Reflections', render: renderReflectionSettings, hidden: true, under: 'settings', unlisted: true, desc: 'New reflections in the export, photo sizes' },
   // opened from More → Export / Import (not in the More list)
@@ -128,11 +128,66 @@ function installCard() {
         h('div', { class: 'bar', style: 'margin-bottom:0' }, h('span', { class: 'grow' }), notNow)]);
 }
 
+// Search in Settings (owner): the options of every settings page and its Advanced page, read from the pages
+// themselves (each is drawn once, off screen, the first time someone types), so the index never goes stale.
+// A result opens its page and scrolls to the option, which flashes.
+const SEARCH_PAGES = ['display', 'displayadv', 'logging', 'loggingadv', 'reflset', 'sharefmt'];
+let settingsIndex = null, findAfterRender = '';
+const optionText = n => {
+  if (n.matches('label.field')) return [...n.childNodes].filter(c => c.nodeType === 3).map(c => c.textContent).join(' ').trim();
+  if (n.matches('label.check')) return n.textContent.trim();
+  return n.textContent.trim();
+};
+function buildSettingsIndex() {
+  const out = [], seen = new Set();
+  for (const id of SEARCH_PAGES) {
+    const t = TABS.find(x => x.id === id);
+    let el; try { el = t.render(); } catch { continue; }
+    for (const n of el.querySelectorAll('h2, h3, label.field, label.check, summary, .more-list b')) {
+      const text = optionText(n).replace(/\s+/g, ' ').slice(0, 90);
+      if (!text || text.length < 3 || seen.has(id + text)) continue;
+      seen.add(id + text);
+      out.push({ id, page: t.label, text, hint: (n => (n && n.matches('p.hint') ? n.textContent : ''))(n.closest('label') && n.closest('label').nextElementSibling).slice(0, 160) });
+    }
+  }
+  return out;
+}
+const searchSettings = (index, q) => {
+  const words = String(q || '').toLowerCase().split(/\s+/).filter(Boolean);
+  if (!words.length) return [];
+  return index.filter(x => { const hay = (x.text + ' ' + x.hint + ' ' + x.page).toLowerCase(); return words.every(w => hay.includes(w)); }).slice(0, 12);
+};
+function showFound() {
+  const want = findAfterRender; findAfterRender = '';
+  requestAnimationFrame(() => {
+    const n = [...app.querySelectorAll('h2, h3, label.field, label.check, summary')].find(x => optionText(x).replace(/\s+/g, ' ').startsWith(want.slice(0, 60)));
+    if (!n) return;
+    const target = n.closest('label, details, section') || n;
+    if (target.matches('details')) target.open = true;
+    target.scrollIntoView({ block: 'center' });
+    target.classList.remove('flash'); void target.offsetWidth; target.classList.add('flash');
+  });
+}
+function settingsSearch() {
+  const results = h('ul', {});
+  const box = h('input', { type: 'search', placeholder: 'Search settings, e.g. font, undo, initials', 'aria-label': 'Search settings', autocomplete: 'off', enterkeyhint: 'search',
+    oninput: () => {
+      settingsIndex ||= buildSettingsIndex();
+      const found = searchSettings(settingsIndex, box.value);
+      fill(results, ...found.map(x => h('li', {}, h('a', { href: '#' + x.id, 'data-go': x.id, onclick: e => { e.preventDefault(); findAfterRender = x.text; go(x.id); } },
+        h('span', { class: 'mt' }, h('b', {}, x.text), h('small', {}, x.page)), h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')))),
+        box.value.trim() && !found.length ? h('li', { class: 'hint', style: 'padding:10px 4px' }, 'No setting matches. Try another word.') : null);
+    } });
+  return h('section', { class: 'card more-list settings-search' }, box, results);
+}
+
 // Settings: a short menu of its pages (residency year on top for people not on the programme list)
 function renderSettingsMenu() {
   const order = ['display', 'logging', 'tags', 'reflset', 'sharefmt'];
   const pages = TABS.filter(t => t.under === 'settings').sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
+  settingsIndex = null;   // drawn again on the first search of this visit
   return h('div', {},
+    settingsSearch(),
     h('section', { class: 'card more-list' }, h('h2', {}, 'Settings'),
       h('ul', {}, pages.map(t => menuItem(t.id, t.label, t.desc)),
         menuItem('bin', 'Recycle bin', 'Deleted cases and reflections, kept for 30 days', () => openBin()))),
@@ -316,6 +371,7 @@ function render() {
   fill(app, backTo ? h('p', { class: 'back-row' }, h('a', { class: 'btn small', href: '#' + backTo,
     onclick: e => { e.preventDefault(); navigation.back(tab.under); } }, '← ' + ((TABS.find(t => t.id === backTo) || {}).label || 'Back'))) : null, tab.render());
   if (tab.id !== 'log') window.scrollTo(0, y);
+  if (findAfterRender) showFound();
   // the inverted Case tab (Settings → Display, phones) opens at the bottom, where the case box is
   else if (lastRendered !== 'log' && invertedCase()) requestAnimationFrame(() => window.scrollTo(0, document.documentElement.scrollHeight));
   lastRendered = tab.id;

@@ -117,6 +117,20 @@ export function debounce(fn, ms) {
   return d;
 }
 
+// Row buttons: an icon (alone on phones, where two labelled buttons don't fit beside the tags) and a label
+const ROW_ICONS = {
+  copy: 'M9 9h11v11H9zM5 15H4V4h11v1',
+  reflect: 'M4 19.5V5a2 2 0 0 1 2-2h12v14H6a2 2 0 0 0-2 2.5zM6 21h12v-4M8 7h6M8 11h4',   // the Reflections tab's book
+  done: 'M5 12.5l4.5 4.5L19 7.5',
+};
+function rowIcon(k) {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('class', 'ico'); svg.setAttribute('aria-hidden', 'true');
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path'); path.setAttribute('d', ROW_ICONS[k]);
+  svg.append(path); return svg;
+}
+export { rowIcon };
+
 // toast('Saved', { action: 'Undo', onaction }) — one at a time, the newest wins.
 // A toast with a button (Undo) stays at least as long as Settings → Logging → Undo window says (settings.undoSecs).
 export const UNDO_SECS = [[5, '5 seconds (default)'], [10, '10 seconds'], [20, '20 seconds'], [30, '30 seconds']];
