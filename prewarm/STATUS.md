@@ -6,13 +6,11 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 
 ## Now
 
-- **Claude Code, Prewarming Webapp** (branch `ccr-13264f37-d28edu`): bug hunt from 17:53 UTC 12 Oct 2026 (owner: at
-  least 2 hours, anything that makes a missed variable likelier). Merged #257 to #280 and batch B (default timepoint,
-  early-save check, number fit, investigation Remove asks, arm 3 hides pre-warming in exports). Next: accessibility
-  check on the new prompts, then a summary for the owner.
-  Questions for the owner: should the no-pre-warming group get pre-op temperatures (the app skips that table for
-  them)? Is intra-op time 0 induction or knife to skin (the app's "Induction" box; the schema says "Knife to skin
-  (induction)")? Advise not to lock patients during the study day. Real patients start 13 Oct 2026.
+- **Claude Code, Prewarming Webapp** (branch `ccr-13264f37-d28edu`): bug hunt 17:53 to 20:45 UTC 12 Oct 2026 done
+  (#257 to #285). Nothing half-done. Questions for the owner: should the no-pre-warming group get pre-op
+  temperatures (the app skips that table for them)? Is intra-op time 0 induction or knife to skin (the app's
+  "Induction" box; the schema says "Knife to skin (induction)")? Advise: don't lock patients during the study day;
+  set both phones' clocks to automatic; check +/− and the iOS time wheel on a real phone. Real patients start 13 Oct 2026.
 
 ## Waiting on the owner
 
@@ -28,36 +26,20 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 
 ## Recently done
 
-- Unsaved readings come back after the phone closes the app; toasts no longer block taps on Log / tabs.
-- Two patients at once: home list shows each patient's due reading; alerts cover every patient being charted.
-- Top bar: a reading due now on the other tab shows too (a temperature due now on the Others tab, BP on Temperatures).
-- Batch B: reading opens on the latest due unsaved timepoint; early saves ask; numbers shrink to fit; other windows' saves merge; arm 3 pre-warming hidden in exports; text cells cut to 32000.
+- #285: unsaved readings come back after the phone closes the app; toasts no longer block taps on Log / tabs.
+- #283, #284: two patients at once: home list shows each one's due reading; alerts cover patients opened on this phone.
+- #282: a reading due now on the other tab shows in the top bar too.
+- #281: reading opens on the latest due unsaved timepoint; early saves ask; numbers shrink to fit; arm 3 pre-warming hidden in exports.
 - #280: double taps locked out; typed temperature kept when the screen redraws; banner floats under the bar.
 - #276: warming yes / no follows its logged start time; saved No after the start flagged.
 - #275: Prewarm off due alerts; alerts due together share one banner; AF specify as New onset / Existing.
 - #273: deleted patients can be restored; a deleted patient can't be charted into.
-- #270: a reading saved late asks when it was taken; Change time on saved readings.
-- #269: `fullcase.e2e.mjs`: a whole case per group, every op-day cell exported.
-- #267: duplicate Subject IDs flagged; storage-full bar; lock warns about patients still being charted; join-code flake fixed.
-- #265: sync heals the server's last-write to the newest value; edits before sign-in resent; Save sends only changes and asks before overwriting the other phone's reading; clearing a time asks.
-- #263: typed form answers checked; due alerts on every patient screen for every series; screen kept awake after app switches.
-- #261: blank readings not saved, part-blank asks; Still to fill lists saved-with-blanks and columns hidden in Settings.
-- #259: hidden follow-ups not exported, nested follow-ups hide, BMI worked out, NA warming start (no pre-warming), Subject ID / group correctable.
-- #257: update reload asks before losing a reading; stray key-time taps ask; times out of order flagged.
-- This PR: top-bar clock labelled "Time now".
-- #255: time stays on the right when nothing is due.
-- #252: BP, HR, BIS tick above Intra-op details; swipe to change tab; pull-to-refresh off.
-- #251: tab "Others"; "Perioperative data" full width; Still to fill back to amber.
-- #249: warming time boxes lavender (not beige) and Still to fill navy, so amber / orange / red only mean a timing alarm.
-- #248: two tabs (Temperatures / BP, HR, BIS; other forms on the BP tab); sign-offs named by section with a tick box.
-- #246: "Still to fill" checklist; Baseline / End readings due at In OT / Surgery end; Mark complete asks first.
-- #244: "Study admins" card: admins add / remove admins by email (rules: create only, lower-case email id, no removing yourself).
-- #241: stress-test fixes: past midnight, readings after surgery end, BP number checks, back button with an unsaved reading; `edge.e2e.mjs`.
 
 ## Decisions
 
 - 12 Oct 2026: amber, orange and red are kept for timing alarms (warming boxes lavender); Still to fill stays amber (owner).
 - 12 Oct 2026: top-bar clock reads "Time now".
+- 12 Oct 2026: due alerts for other patients only once opened on this phone (a teammate's synced patient doesn't beep).
 - 12 Oct 2026: second tab renamed Others; Other data renamed Perioperative data, a full-width box.
 - 12 Oct 2026: thermal sensation keeps carrying over like the rest (owner: no need to change).
 
