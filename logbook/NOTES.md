@@ -286,3 +286,11 @@ portfolio content.
 - Programme tag groups are adopted only from the server logbook, never a cached copy (it overwrote groups
   changed on another device). Delete account re-authenticates before deleting anything.
 - Totals: your own column is live (summaryOf), not the copy loaded when Analytics opened.
+
+### Device recovery (Codex robustness review)
+
+Case creation, individual edits/Undo and reflection editor saves first commit immutable recovery records on the device (IndexedDB, with localStorage fallback). Server transactions compare the editor’s base version before replacing a record. Offline saves stay usable; rejected saves keep the editor/input. More → Recent changes / Recover drafts shows pending/failed sync, explicit retries, both sides of a concurrent edit, and the last 100 saved versions. Pending/failed/conflicting changes never expire automatically. History is private to the browser/account and is cleared on sign-out; it is not a backup. Existing batch imports and reflection metadata operations keep their existing cloud APIs.
+
+Case and reflection drafts use separate document slots, including when session storage is cloned into a duplicated tab. Case input writes synchronously and flushes on pagehide/hidden; draft status reports storage failures. Recovering a draft preserves the currently open draft in its previous slot.
+
+Run `logbook/test/e2e/recovery.mjs` beside the full E2E suite for rejected writes, immediate reload, two-tab drafts, offline reconnect, conflicts, failed reflection Close and denied storage. It accepts `PLAYWRIGHT_PATH`/`CHROMIUM_PATH` for cloud-runtime paths and uses fake demo records only.

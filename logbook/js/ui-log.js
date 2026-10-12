@@ -7,9 +7,10 @@ import { suggest as suggestCodes } from './suggest.js';
 import { apmesShorthand, shorthandTags } from './tags.js';
 import {
   S, h, toast, debounce, modal, confirmBox, cat, catName, catShort, catFull, catChip, countText, logTags, tagLinks, tagChip, tagSet, keepTags, PROGRESS_BY_CODE,
-  createCase, updateCase, removeCase, restoreCase, saveMany, deleteMany, subcatChips, subcatsOf, settings, todayISO, hooks, fill, add, cloud, okNoIds, patchLogbook, catPills } from './ui-core.js';
+  createCase, updateCase, removeCase, restoreCase, saveMany, deleteMany, subcatChips, subcatsOf, settings, todayISO, hooks, fill, add, cloud, writes, okNoIds, patchLogbook, catPills } from './ui-core.js';
 import { display, templateDialog } from './ui-settings.js';
 import { moveToBin } from './bin.js';
+import { createDraftSlot, listDrafts } from './drafts.js';
 
 const DRAFT_KEY = 'logbook-draft-v2';
 const KEEP_MS = 12 * 3600e3; // a date kept by "Save, keep date" lasts this long
@@ -18,7 +19,7 @@ const yesterdayISO = () => { const d = new Date(); d.setDate(d.getDate() - 1); r
 // The unsent draft survives tab switches and reloads (this browser only). It is kept per account
 // (and apart from the demo), so the next person on a shared phone never sees it; sign-out wipes it.
 const EMPTY = () => ({ date: null, details: '', initials: '', initialsHint: '', cats: [], mode: 'one', bulk: '' });
-let draft = EMPTY(), draftOwner = null;
+let draft = EMPTY(), draftOwner = null, draftSlot = null, draftError = '';
 let suggestedSave = null, saving = false;
 const draftText = () => [draft.initials, draft.details].filter(Boolean).join(' ').trim();
 // Keep deliberately entered initials when switching back to the combined box,
@@ -37,12 +38,26 @@ const draftKey = () => `${DRAFT_KEY}:${cloud.demo ? 'demo:' : ''}${(S.user && S.
 function loadDraft() {
   if (draftOwner === draftKey()) return;
   draftOwner = draftKey(); draft = EMPTY(); bulkRows = null;
-  try { draft = { ...draft, ...JSON.parse(localStorage.getItem(draftOwner) || '{}') }; } catch { /* storage unavailable */ }
+  draftSlot = createDraftSlot(DRAFT_KEY, draftOwner.slice(DRAFT_KEY.length + 1));
+  draft = { ...draft, ...(draftSlot.initial || {}) };
+  saveDraft();
   // a kept date only lasts for one sitting, never into tomorrow's list
   // a picked day survives a reload in the same sitting (phones unload the app when you switch away)
   if (!(Date.now() - Math.max(draft.keepDate ? draft.keptAt || 0 : 0, draft.dateAt || 0) < KEEP_MS)) draft.date = null;
 }
-const saveDraft = debounce(() => { try { localStorage.setItem(draftKey(), JSON.stringify(draft)); } catch { /* ignore */ } }, 300);
+function saveDraft() {
+  if (!draftSlot || draftOwner !== draftKey()) return;
+  try { draftSlot.save({ ...draft, savedAt: Date.now() }); draftError = ''; }
+  catch { draftError = 'Draft not saved: storage unavailable. Keep this page open.'; }
+  if (ui?.draftNote) ui.draftNote.textContent = draftError || (draftText() || draft.bulk ? 'Draft saved on this device' : '');
+}
+saveDraft.cancel = () => {};
+window.addEventListener('pagehide', saveDraft);
+document.addEventListener('visibilitychange', () => { if (document.hidden) saveDraft(); });
+export function recoverableCaseDrafts() {
+  try { return listDrafts(DRAFT_KEY, draftKey().slice(DRAFT_KEY.length + 1)).filter(x => x.value.details || x.value.initials || x.value.bulk); } catch { return []; }
+}
+export function recoverCaseDraft(value) { loadDraft(); saveDraft(); draftSlot = createDraftSlot(DRAFT_KEY, draftOwner.slice(DRAFT_KEY.length + 1)); draft = { ...EMPTY(), ...value }; saveDraft(); location.hash = '#log'; hooks.render(); }
 // Text shared to the installed app (share sheet → Logbook; manifest share_target) arrives as
 // ?share_text=…; app.js keeps it for here: it opens in paste-a-list, so one case or a whole list works.
 export const SHARED_KEY = 'logbook-shared';
@@ -52,7 +67,7 @@ function takeShared() {
   if (!text.trim()) return;
   draft.bulk = draft.bulk && draft.bulk.trim() ? draft.bulk.trimEnd() + '\n\n' + text.trim() : text.trim();
   draft.mode = 'bulk'; bulkRows = null;
-  saveDraft.cancel(); try { localStorage.setItem(draftKey(), JSON.stringify(draft)); } catch { /* ignore */ }
+  saveDraft();
   setTimeout(() => toast('Shared text added: check it, then Review'), 300);
 }
 
@@ -65,14 +80,14 @@ export function logOnDate(iso) {
   else Object.assign(draft, { details: '', initials: '', initialsHint: '', cats: [], tags: [], reflectTag: false });
   draft.mode = 'one';
   draft.date = iso === todayISO() ? null : iso; draft.dateAt = Date.now(); bulkRows = null;
-  saveDraft.cancel(); try { localStorage.setItem(draftKey(), JSON.stringify(draft)); } catch { /* ignore */ }
+  saveDraft();
   location.hash = '#log';
 }
 
 export function clearDrafts() {
   suggestedSave = null;
   saveDraft.cancel();
-  draft = EMPTY(); draftOwner = null; bulkRows = null; ui = null;
+  draft = EMPTY(); draftOwner = null; draftSlot = null; bulkRows = null; ui = null;
   try { for (const k of Object.keys(localStorage)) if (k.startsWith('logbook-draft-')) localStorage.removeItem(k); } catch { /* ignore */ }
 }
 
@@ -283,7 +298,7 @@ export function renderLog() {
 }
 
 // saved at once (not debounced): a reload right after switching must come back in the same mode
-function setMode(m) { draft.mode = m; saveDraft.cancel(); try { localStorage.setItem(draftKey(), JSON.stringify(draft)); } catch { /* ignore */ } hooks.render(); }
+function setMode(m) { draft.mode = m; saveDraft(); hooks.render(); }
 
 // A picked or kept date lasts KEEP_MS from when it was set, even if the app stays open for days.
 function curDate() {
@@ -432,7 +447,11 @@ function renderOne(card) {
   const tagBox = h('label', { class: 'check reflect-tag' }, h('input', { type: 'checkbox', checked: !!draft.reflectTag, onchange: e => { draft.reflectTag = e.target.checked; saveDraft(); } }), '☆ Interesting');
   ui.tagBox = tagBox;
   const draftNote = h('span', { class: 'draft-note', 'aria-live': 'polite' });
-  const tagRow = h('div', { class: 'tag-row' }, tagBox, draftNote);
+  const syncNote = h('a', { href: '#recovery', class: 'draft-note', 'aria-live': 'polite' });
+  const paintSync = () => { const jobs = writes.entries(); syncNote.textContent = writes.error() || (jobs.some(x => x.state === 'failed' || x.state === 'conflict') ? 'Save needs attention · Retry / Recover' : writes.pending() ? 'Saved locally · pending sync' : jobs.length ? 'Synced · Recent changes' : 'Recent changes / Recover drafts'); };
+  const offSync = writes.onChange(() => { if (syncNote.isConnected) paintSync(); else offSync(); });
+  paintSync();
+  const tagRow = h('div', { class: 'tag-row' }, tagBox, draftNote, syncNote);
   const actions = h('div', { class: 'actions' },
     h('button', { class: 'big', title: 'Save and keep this date for the next case', onclick: () => save({ another: true }) }, 'Save, keep date'),
     h('button', { class: 'primary big', onclick: () => save({}) }, 'Save', h('span', { class: 'kbd', title: 'Ctrl+Enter (Cmd+Enter on a Mac)' }, ' Ctrl+⏎')));
@@ -487,7 +506,7 @@ const suggestSoon = debounce(() => paintSuggest(), 120);
 function paintParsed(typed) {
   if (!ui || !ui.parsed) return;
   const text = draftText();
-  if (ui.draftNote) ui.draftNote.textContent = text && typed ? 'Draft saved' : '';
+  if (ui.draftNote) ui.draftNote.textContent = draftError || (text ? 'Draft saved on this device' : '');
   if (!text) { fill(ui.parsed); return; }
   const { initials, details } = draftParts();
   const { age, rest } = settings().detectAgeSex !== false ? splitAge(details) : { age: '', rest: details };
@@ -615,7 +634,7 @@ function applySuggestedSave() {
 async function save(opts) {
   if (saving) return;
   saving = true;
-  try { await saveCase(opts); } finally { saving = false; }
+  try { await saveCase(opts); } catch (err) { toast('Could not save: ' + err.message); } finally { saving = false; }
 }
 
 async function saveCase({ another }) {
@@ -645,12 +664,18 @@ async function saveCase({ another }) {
   const twin = (S.cases || []).find(x => x.date === curDate() && norm(caseText(x)) === norm(details));
   if (twin && !(await confirmBox('Possible duplicate', `You already logged “${caseText(twin).slice(0, 60)}” on ${fmtDate(twin.date)}. Save another one?`, 'Save anyway'))) return;
   const parts = firstField() === 'initials' || draft.initialsHint ? draftParts() : { details };
-  const c = await createCase({ date: curDate(), ...parts, cats: draft.cats, reflectTag: !!draft.reflectTag, tags: draft.tags || [] });
+  const owner = S.user?.email, inputAtSave = JSON.stringify(draft);
+  draft.caseId ||= uid(); draft.caseCreatedAt ||= Date.now(); saveDraft();
+  const c = await createCase({ id: draft.caseId, createdAt: draft.caseCreatedAt, date: curDate(), ...parts, cats: draft.cats, reflectTag: !!draft.reflectTag, tags: draft.tags || [] });
+  if (S.user?.email !== owner) return;
+  const currentInput = { ...draft }; delete currentInput.caseId; delete currentInput.caseCreatedAt;
+  const originalInput = JSON.parse(inputAtSave); delete originalInput.caseId; delete originalInput.caseCreatedAt;
+  if (JSON.stringify(currentInput) !== JSON.stringify(originalInput)) { draft.caseId = null; draft.caseCreatedAt = null; saveDraft(); toast('Previous case saved. Your new input stays in the box.'); return; }
   const sticky = another || settings().defaultDate === 'last';
   const keep = sticky ? draft.date : null;
   const next = settings().afterSave;
   const keepTags = next === 'keepTags' ? { cats: draft.cats, tags: draft.tags || [] } : { cats: [], tags: [] };
-  draft = { ...draft, details: '', initials: '', initialsHint: '', ...keepTags, date: keep, keepDate: sticky, keptAt: Date.now(), dateAt: Date.now(), reflectTag: false };
+  draft = { ...draft, details: '', initials: '', initialsHint: '', caseId: null, caseCreatedAt: null, ...keepTags, date: keep, keepDate: sticky, keptAt: Date.now(), dateAt: Date.now(), reflectTag: false };
   if (ui.tagBox) ui.tagBox.querySelector('input').checked = false;
   saveDraft();
   if (ui.textarea) ui.textarea.value = '';
@@ -852,6 +877,7 @@ export function pickDialog(initial, done) {
 export function editCaseDialog(c, opts = {}) {
   const isNew = !c.id && typeof opts.onCreated === 'function';
   // older cases keep the initials at the front of the details: split them now, saved apart on Save
+  let base = JSON.parse(JSON.stringify(c)), created = false;
   const e = { ...c, ...caseParts(c), cats: [...(c.cats || [])] };
   const sel = h('div', { class: 'chips selected' });
   const paint = () => {
@@ -890,23 +916,34 @@ export function editCaseDialog(c, opts = {}) {
       } }, 'Delete'),
       h('span', { class: 'grow' }),
       h('button', { onclick: () => m.close() }, 'Cancel'),
-      h('button', { class: 'primary', onclick: async () => {
-        if (!(await okNoIds(e.details))) return;
-        if (isNew) {
+      h('button', { class: 'primary', onclick: async ev => {
+        const button = ev.currentTarget, owner = S.user?.email;
+        if (!(await okNoIds(e.details)) || S.user?.email !== owner) return;
+        button.disabled = true;
+        try {
+        if (isNew && !created) {
           if (!e.details.trim() && !e.cats.length) return toast('Add a case summary or a tag');
-          m.close();
-          const made = await createCase({ date: e.date || todayISO(), initials: e.initials, details: e.details, cats: e.cats, reflectTag: !!e.reflectTag, tags: e.tags || [] });
-          toast('Case logged');
+          e.id ||= uid(); e.createdAt ||= Date.now();
+          const inputAtSave = JSON.stringify(e);
+          const made = await createCase({ id: e.id, createdAt: e.createdAt, date: e.date || todayISO(), initials: e.initials, details: e.details, cats: e.cats, reflectTag: !!e.reflectTag, tags: e.tags || [] });
+          base = made; created = true;
+          if (S.user?.email !== owner || JSON.stringify(e) !== inputAtSave) return toast('Case saved. Newer edits remain open.');
+          m.close(); toast('Case logged');
           return opts.onCreated(made);
         }
-        m.close();
         const next = { ...e, initials: cleanInitials(e.initials), details: e.details.trim() };
         if (!next.reflectTag) delete next.reflectTag;
         // a tag that sits under a category goes when that category is taken off; other tags stay
         next.tags = keepTags(next.tags, next.cats);
         if (!next.tags.length) delete next.tags;
-        await updateCase(next);
-        toast('Case updated', { action: 'Undo', onaction: () => restoreCase(c) });
+        const inputAtSave = JSON.stringify(e);
+        const saved = await updateCase(next, { base });
+        base = saved;
+        if (S.user?.email !== owner || JSON.stringify(e) !== inputAtSave) return toast('Case saved. Newer edits remain open.');
+        m.close();
+        if (isNew) { toast('Case logged'); return opts.onCreated(saved); }
+        toast('Case updated', { action: 'Undo', onaction: () => restoreCase(c, saved).catch(err => toast(err.message)) });
+        } catch (err) { toast('Could not save: ' + err.message); } finally { button.disabled = false; }
       } }, 'Save')),
   ], { cls: 'full', sticky: true });
   return m;

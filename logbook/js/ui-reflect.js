@@ -10,10 +10,11 @@ import { REFLECTION_HEADINGS, REFLECTION_SECTIONS, yearName } from './categories
 import { reflectionProgress, reflectionCounts, HEADING_BY_ID, splitDetails, completeProblems, isLegacy, LIMITS, IMAGE_MAX_B64, IMAGE_MAX_SIDE, IMAGE_QUALITY, PHOTO_BUDGET_KB, PHOTO_NOTE, photoUsageKb, imageKb, fmtMb, wordCount, MIN_WORDS, suggestHeadings, moveToHeading, inExport, exportSummary, pickJustEnough } from './reflections.js';
 export { completeProblems };
 import { fmtDate, caseText, procedureText, caseParts } from './engine.js';
-import { S, h, toast, cloud, debounce, hooks, rYear, effectiveIntake, residentSmo, todayISO, confirmBox, add, resetters, scheduleSummary, displayName, byNewest, catName, updateCase, settings, patchLogbook } from './ui-core.js';
+import { S, h, toast, cloud, writes, debounce, hooks, rYear, effectiveIntake, residentSmo, todayISO, confirmBox, add, resetters, scheduleSummary, displayName, byNewest, catName, updateCase, settings, patchLogbook } from './ui-core.js';
 import { renderExportButton, caseRYear, countsByYear } from './portfolio.js';
 import { parseQuery, matchQuery, REFL_FIELDS, REFL_OPERATOR_HELP } from './search-ops.js';
 import { opsHelp } from './ui-logbook.js';
+import { createDraftSlot } from './drafts.js';
 
 const DRAFT_KEY = 'apmes-logbook-reflection-draft';
 const VIEW_KEY = 'apmes-logbook-reflection-view';
@@ -31,11 +32,14 @@ const saveView = () => { try { localStorage.setItem(VIEW_KEY, JSON.stringify({ g
 const mine = () => S.user.email;
 // the unsaved editor draft is kept per account (and apart from the demo), like the Log page's
 const draftKey = () => `${DRAFT_KEY}:${cloud.demo ? 'demo:' : ''}${(S.user && S.user.email) || ''}`;
-const lsGet = () => { try { return JSON.parse(localStorage.getItem(draftKey()) || 'null'); } catch { return null; } };
-const lsSet = r => { try { r ? localStorage.setItem(draftKey(), JSON.stringify(r)) : localStorage.removeItem(draftKey()); } catch { /* blocked */ } };
+let reflectionSlot, slotOwner;
+const slot = () => { if (slotOwner !== draftKey()) { slotOwner = draftKey(); reflectionSlot = createDraftSlot(DRAFT_KEY, slotOwner.slice(DRAFT_KEY.length + 1)); } return reflectionSlot; };
+const lsGet = () => slot().initial;
+const lsSet = r => { try { r ? slot().save(r) : slot().clear(); slot().initial = r; return true; } catch { return false; } };
 // sign-out: nothing of this person's is left for the next one (drafts, search, open headings, figure previews)
 resetters.push(() => {
   Object.assign(rv, { editing: null, picking: null, editMode: false, view: null, q: '', filter: 'all', thumbs: {}, viewOpen: false, readyOpen: false, toolsOpen: false });
+  reflectionSlot = null; slotOwner = null;
   rv.sel.clear(); rv.openH.clear(); rv.shutH.clear();
   try { for (const k of Object.keys(localStorage)) if (k.startsWith(DRAFT_KEY)) localStorage.removeItem(k); } catch { /* blocked */ }
 });
@@ -43,12 +47,16 @@ resetters.push(() => {
 // Live reflections for the signed-in user (app.js calls this after sign-in).
 export function watchMyReflections(email) {
   S.reflections = [];
-  return cloud.watchReflections(email, list => {
-    S.reflections = list;
+  let raw = [];
+  const paint = () => {
+    if (S.user?.email !== email) return;
+    S.reflections = writes.overlay('reflection', email, raw);
     scheduleSummary();
-    // don't re-render under someone typing in the editor
     if ((S.tab === 'reflect' && !rv.editing && !rv.picking && !rv.view && !drag) || S.tab === 'export' || S.tab === 'choose') hooks.render();
-  });
+  };
+  const offQueue = writes.onChange(paint);
+  const offCloud = cloud.watchReflections(email, list => { raw = list; paint(); });
+  return () => { offQueue(); offCloud(); };
 }
 export const summaryReflections = () => reflectionCounts(S.reflections || []);
 
@@ -121,6 +129,7 @@ function setJr(r) {
   r.jr = y ? y <= 3 : rYear() <= 3;
 }
 
+hooks.recoverReflection = r => { slot(); reflectionSlot = createDraftSlot(DRAFT_KEY, slotOwner.slice(DRAFT_KEY.length + 1)); lsSet({ ...r, restore: true }); openEditor(r); };
 function openEditor(r) {
   rv.editing = JSON.parse(JSON.stringify(r));
   showTab();
@@ -791,25 +800,41 @@ const nonEmpty = s => !!String(s || '').trim();
 // Move figures along with their learning points when points are removed or reordered.
 function remapFigures(r, map) { for (const f of r.figures || []) if (f.point != null) f.point = map(f.point); }
 
+const editorSessions = new WeakMap();
 function editor() {
   const r = rv.editing;
   // KB of photos across all my reflections, with this one as currently edited
   const usedKb = () => photoUsageKb([...(S.reflections || []).filter(x => x.id !== r.id), r]);
   r.points ||= []; r.figures ||= []; r.references ||= [];
   const legacy = isLegacy(r);
-  const status = h('span', { class: 'muted', style: 'font-size:calc(13px * var(--fs, 1))' }, r.id ? 'Saved' : 'Not saved yet');
+  const owner = mine();
+  const current = () => rv.editing === r && S.user?.email === owner;
+  if (!editorSessions.has(r)) editorSessions.set(r, { base: JSON.parse(JSON.stringify(S.reflections.find(x => x.id === r.id) || null)), saving: null });
+  const session = editorSessions.get(r);
+  const status = h('span', { class: 'muted', 'aria-live': 'polite', style: 'font-size:calc(13px * var(--fs, 1))' }, r.id ? 'Saved' : 'Not saved yet');
   const persist = async () => {
-    // a debounced save from an earlier render can fire after the editor closed or the reflection
-    // was deleted: it must not reopen the editor or bring the reflection back
-    if (rv.editing !== r) return;
+    if (rv.editing !== r || S.user?.email !== owner) return false;
+    while (session.saving) { await session.saving; if (rv.editing !== r || S.user?.email !== owner) return false; }
+    if (r.source !== 'word') setJr(r);
+    r.id ||= Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    r.createdAt ||= Date.now();
     lsSet({ ...r, restore: true });
-    try {
-      if (r.source !== 'word') setJr(r);   // Word imports keep the JR written in the document
-      r.id ||= Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-      r.createdAt ||= Date.now();
-      await cloud.saveReflection(mine(), r);
-      status.textContent = 'Saved';
-    } catch (err) { status.textContent = 'Saved on this device only'; toast('Could not save: ' + err.message); }
+    const payload = JSON.parse(JSON.stringify(r));
+    status.textContent = 'Saving…';
+    session.saving = (async () => {
+      try {
+        const saved = await writes.save('reflection', owner, payload, session.base);
+        session.base = saved;
+        if (rv.editing === r && S.user?.email === owner) status.textContent = writes.status('reflection', r.id) === 'synced' ? 'Synced' : 'Saved locally · pending sync';
+        if (rv.editing !== r || S.user?.email !== owner) return false;
+        if (JSON.stringify(r) !== JSON.stringify(payload)) { status.textContent = 'Newer edits kept · save again'; return false; }
+        return true;
+      } catch (err) {
+        if (rv.editing === r && S.user?.email === owner) { status.textContent = 'Save failed · retry or open Recent changes'; toast('Could not save: ' + err.message); }
+        return false;
+      }
+    })();
+    try { return await session.saving; } finally { session.saving = null; }
   };
   const autosave = debounce(persist, 1200);
   const words = h('span', { 'aria-live': 'polite' });
@@ -819,9 +844,9 @@ function editor() {
     words.style.cssText = `font-size:calc(13px * var(--fs, 1));font-weight:600;color:${ok ? 'var(--ok, #15803d)' : 'var(--warn, #b45309)'}`;
   };
   paintWords();
-  const changed = () => { status.textContent = 'Editing…'; paintWords(); lsSet({ ...r, restore: true }); autosave(); };
+  const changed = () => { if (!current()) return; paintWords(); status.textContent = lsSet({ ...r, restore: true }) ? 'Draft saved on this device' : 'Draft not saved · storage unavailable'; autosave(); };
   const restructure = () => { changed(); hooks.render(); };   // list changed: save and redraw
-  const close = async () => { autosave.cancel(); if (hasContent(r)) await persist(); rv.editing = null; rv.thumbs = {}; lsSet(null); hooks.render(); };
+  const close = async () => { if (!current()) return; autosave.cancel(); if (hasContent(r) && !await persist() || !current()) return; rv.editing = null; rv.thumbs = {}; lsSet(null); hooks.render(); };
 
   const subWrap = h('div');
   const paintSubs = () => {
@@ -858,7 +883,7 @@ function editor() {
 
   const input = (key, attrs = {}) => h('input', { style: 'font-size:calc(16px * var(--fs, 1))', value: r[key] ?? '', ...attrs, oninput: e => { r[key] = e.target.value || (key === 'date' ? null : ''); changed(); } });
   const fields = h('section', { class: 'card' },
-    h('div', { class: 'bar' }, h('button', { onclick: close }, '← Reflections'), h('span', { class: 'grow' }), status),
+    h('div', { class: 'bar' }, h('button', { onclick: close }, '← Reflections'), h('span', { class: 'grow' }), status, h('button', { onclick: persist }, 'Save / Retry')),
     linkBox,
     !r.headingId ? suggestChips(lc, x => { r.headingId = x.headingId; r.subId = null; restructure(); }, r.jr) : null,
     h('label', { class: 'field' }, 'Heading', headingSelect),
@@ -940,13 +965,15 @@ function editor() {
       status.textContent = 'Adding image…';
       try {
         const img = await compressImage(file);
+        if (!current()) return;
         const kb = imageKb(img.data);
         if (usedKb() + kb > PHOTO_BUDGET_KB) {
           status.textContent = 'Image not added';
           return toast(`Your photos are using ${fmtMb(usedKb())} of ${fmtMb(PHOTO_BUDGET_KB)}. Remove a photo you no longer need (deleted reflections free theirs after 30 days in the recycle bin).`, { ms: 9000 });
         }
         const id = newId();
-        await cloud.saveImage(mine(), { id, ...img, createdAt: Date.now() });
+        await cloud.saveImage(owner, { id, ...img, createdAt: Date.now() });
+        if (!current()) return;
         rv.thumbs[id] = 'data:image/jpeg;base64,' + img.data;
         r.figures.push({ id, caption: '', point: r.points.length ? r.points.length - 1 : null, kb });
         autosave.cancel(); await persist(); hooks.render();
@@ -1007,15 +1034,16 @@ function editor() {
       : h('button', { class: 'primary', onclick: async () => {
         const missing = completeProblems(r);
         if (missing.length) { showMissing(missing); return toast('Before marking complete: ' + missing.join(', ')); }
-        r.status = 'complete'; autosave.cancel(); await persist(); toast('Reflection complete'); rv.editing = null; rv.thumbs = {}; lsSet(null); hooks.render();
+        r.status = 'complete'; autosave.cancel(); if (!await persist()) { if (current()) { r.status = 'draft'; lsSet({ ...r, restore: true }); } return; } if (!current()) return; toast('Reflection complete'); rv.editing = null; rv.thumbs = {}; lsSet(null); hooks.render();
       } }, 'Mark complete'),
     h('span', { class: 'grow' }),
     r.id || r.figures.length ? h('button', { class: 'danger', onclick: async () => {
       if (!await confirmBox('Delete reflection?', 'Move this reflection to the recycle bin? It can be restored for 30 days.', 'Move to bin', true)) return;
+      if (!current()) return;
       autosave.cancel();
-      if (!r.id) await persist();   // images saved but the reflection never was: save it so the bin keeps both
+      if (!r.id && !await persist()) return;   // images saved but the reflection never was: save it so the bin keeps both
       const n = await binReflections([JSON.parse(JSON.stringify(r))]);
-      if (!n) return;
+      if (!n || !current()) return;
       toast('Reflection moved to the recycle bin', { action: 'Recycle bin', onaction: () => openView('bin') });
       rv.editing = null; rv.thumbs = {}; lsSet(null); hooks.render();
     } }, 'Delete') : null));

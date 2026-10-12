@@ -2,8 +2,9 @@
 // shared state and helpers are in ui-core.js. Case data comes from cloud.js (Firestore, or the
 // in-browser demo backend with ?demo).
 
-import { S, hooks, h, toast, cloud, setCases, scheduleSummary, fill, resetCaches, patchLogbook, confirmBox, fileButton, modal, download, todayISO, settings, setCategoryNames, categoryNames as categoryNamesNow } from './ui-core.js';
+import { S, hooks, h, toast, cloud, writes, setCases, scheduleSummary, fill, resetCaches, patchLogbook, confirmBox, fileButton, modal, download, todayISO, settings, setCategoryNames, categoryNames as categoryNamesNow } from './ui-core.js';
 import { renderLog, focusLog, logCasesChanged, clearDrafts, SHARED_KEY } from './ui-log.js';
+import { renderRecovery } from './ui-recovery.js';
 import { renderLogbook } from './ui-logbook.js';
 import { renderProgress, renderTotals } from './ui-progress.js';
 import { applyCompact, cachedCompact, applyTheme, cachedTheme, applyTextSize, cachedTextSize, applyZoom, cachedZoom, stepZoom, applyAccent, adoptDisplay, applyDisplay, applyCustomCss, display, setDisplay, resetDisplay, DISPLAY_KEYS, renderTagEditor, renderDisplay, renderDisplayAdvanced, renderLogging, renderLoggingAdvanced, renderReflectionSettings, renderMarkdownSettings, START_TABS, privacyCard, creditsCard, signOutCard } from './ui-settings.js';
@@ -28,6 +29,7 @@ const ICONS = {
   settings: 'M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1M15 4v4M9 10v4M17 16v4',
   reflect: 'M4 19.5V5a2 2 0 0 1 2-2h12v14H6a2 2 0 0 0-2 2.5zM6 21h12v-4M8 7h6M8 11h4',
   admin: 'M5 11h14v10H5zM8 11V7a4 4 0 0 1 8 0v4M12 15v2',   // a lock: admins only
+  recovery: 'M3 11a9 9 0 1 1 3 8M3 4v7h7M12 7v5l3 2',
   data: 'M12 3v12M7 10l5 5 5-5M5 21h14',
   display: 'M3 5h18v12H3zM8 21h8M12 17v4',
   logging: 'M12 5v14M5 12h14',
@@ -57,6 +59,7 @@ const TABS = [
   { id: 'totals', label: 'Totals', render: renderTotals, hidden: true, under: 'progress', unlisted: true },
   { id: 'account', label: 'Account', render: renderAccount, hidden: true, under: 'more', desc: 'Your name and portfolio details (Section 1); delete account' },
   { id: 'settings', label: 'Settings', render: () => renderSettingsMenu(), hidden: true, under: 'more', desc: 'Display, logging, tag editor, Markdown, recycle bin' },
+  { id: 'recovery', label: 'Recent changes / Recover drafts', render: renderRecovery, hidden: true, under: 'more', desc: 'Retry sync, recover unfinished drafts and restore recent versions on this device' },
   { id: 'data', label: 'Export / Import', render: () => renderDataPage(), hidden: true, under: 'more', desc: 'Export the portfolio (Word); import reflections from Word; backup file, Excel and notes apps' },
   { id: 'reflimport', label: 'Import reflections from Word', render: () => renderReflImport(), hidden: true, under: 'data', unlisted: true },
   // Settings' own pages (not in the More list)
@@ -344,7 +347,9 @@ function paintWho() {
   const flag = cloud.demo ? h('button', { type: 'button', class: 'demo-flag', title: 'Demo: tap to reset or leave', onclick: demoMenu }, h('span', { class: 'who-flag' }, navigator.onLine ? 'demo ▾' : 'demo · offline ▾'))
     : flags ? h('span', { class: 'who-flag' }, flags) : null;
   // sync: cases saved on this phone but not yet on the server (no signal), or all synced
-  const sync = !S.user || cloud.demo ? null : S.pending
+  const sync = !S.user ? null : writes.pending()
+    ? h('a', { href: '#recovery', class: 'sync wait' }, writes.entries().some(x => x.state === 'failed' || x.state === 'conflict') ? 'Save needs attention' : 'Saved locally · pending sync')
+    : cloud.demo ? null : S.pending
     ? h('span', { class: 'sync wait', title: navigator.onLine ? 'Saving to the server…' : 'Saved on this phone; will sync when there is signal' }, navigator.onLine ? '⟳ Saving' : '⏳ Will sync')
     : S.casesSynced ? h('span', { class: 'sync ok', title: 'All your cases are saved to the server' }, '✓ Synced') : null;
   subEl.textContent = flags;   // kept (hidden) for tests
@@ -354,6 +359,7 @@ function paintWho() {
   document.body.dataset.cases = String(S.cases.length);   // not shown; read by tests
   fill(whoEl, sync, flag, h('span', { class: 'email', title: S.user.email }, S.user.name || S.user.email));
 }
+hooks.writesChanged = () => { paintWho(); if (S.tab === 'recovery') render(); };
 window.addEventListener('online', paintWho);
 window.addEventListener('offline', paintWho);
 
@@ -450,12 +456,16 @@ async function onUser(user) {
   S.user = user;
   if (!user) {
     Object.assign(S, { admin: false, owner: false, pd: false, resident: null, logbook: null, cases: [], reflections: [], counts: {}, casesLoaded: false, casesSynced: false, sharedTemplates: [] });
-    if (signedInOnce) { clearDrafts(); resetCaches(); forgetWho(); }   // display settings stay: they are the device's
-    paintWho();
-    renderLanding();
+    const cleanup = signedInOnce ? writes.forget() : Promise.resolve();
+    if (signedInOnce) { clearDrafts(); resetCaches(); forgetWho(); }
+    document.querySelectorAll('dialog[open]').forEach(el => el.close());
+    paintWho(); renderLanding();
+    try { await cleanup; } catch (err) { if (!S.user) renderLanding('Could not clear device recovery: ' + err.message); }
     return;
   }
   signedInOnce = true;
+  await writes.activate(user.email);
+  if (S.user !== user) return;
   paintWho();
   // an outline of the Log screen while the logbook loads (index.html starts with the same)
   if (!app.querySelector('.skeleton')) app.innerHTML = SKELETON;

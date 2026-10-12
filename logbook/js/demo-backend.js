@@ -330,7 +330,7 @@ export async function deleteCases(email, ids) {
 
 // ---- reflections (logbooks/{email}/reflections/{id}) ----
 
-function reflectionsOf(email) {
+export function reflectionsOf(email) {
   const lb = load().logbooks[email];
   return lb && lb.reflections ? Object.values(lb.reflections).map(plain).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)) : [];
 }

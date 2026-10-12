@@ -1099,3 +1099,6 @@ html.edges-fill :is(input[type="text"], input[type="search"], input[type="email"
 html.edges-fill :is(button, .btn):not(.primary):not(.link):not(.linkish):not(.search-x),
 html.edges-fill .chip:not(.on) { background: color-mix(in srgb, var(--ink) 6%, var(--panel)); }
 input[type="range"] { accent-color: var(--accent); width: 100%; min-height: 32px; }
+
+/* Recovery actions remain usable at phone sizes. */
+a.sync.wait, a.draft-note { display:inline-flex; align-items:center; min-height:40px; padding:4px; }
