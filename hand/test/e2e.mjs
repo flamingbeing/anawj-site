@@ -26,6 +26,31 @@ try {
   assert.deepEqual(missing, [], 'in-page links resolve');
   // no horizontal scroll at phone width
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'no sideways scroll');
+  // figures animate: the picture changes over time, Pause stops it on the complete diagram, Play restarts it
+  const fig = '[data-fig="distal"]';
+  await page.$eval(fig, e => e.scrollIntoView());
+  await page.waitForTimeout(300);
+  const f1 = await page.$eval(fig + ' .fig-art', e => e.innerHTML);
+  await page.waitForTimeout(1200);
+  assert.notEqual(await page.$eval(fig + ' .fig-art', e => e.innerHTML), f1, 'figure animates');
+  assert.match(await page.textContent(fig + ' .fig-btn'), /Pause/);
+  await page.click(fig + ' .fig-btn');
+  assert.match(await page.textContent(fig + ' .fig-btn'), /Play/);
+  const paused = await page.$eval(fig + ' .fig-art', e => e.innerHTML);
+  await page.waitForTimeout(500);
+  assert.equal(await page.$eval(fig + ' .fig-art', e => e.innerHTML), paused, 'paused stays still');
+  assert.match(paused, /AND HERE/, 'paused shows the complete diagram');
+  // every figure has its GIF
+  for (const [name] of figs) {
+    const r = await page.request.get(BASE + `gifs/${name}.gif`);
+    assert.ok(r.ok() && (await r.body()).subarray(0, 3).toString() === 'GIF', `gifs/${name}.gif`);
+  }
+  // reduced motion: still pictures, nothing plays
+  const rm = await (await b.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' })).newPage();
+  await rm.goto(BASE);
+  assert.match(await rm.textContent('[data-fig="nerves"] .fig-btn'), /Play/);
+  await rm.close();
+
   // the 10 rules are there
   assert.equal(await page.$$eval('ol.rules > li', l => l.length), 10);
 
@@ -51,6 +76,7 @@ try {
     await page.goto(BASE);
     for (const id of ['rules', 'picture', 'sensation', 'tendons', 'infection', 'photos', 'call', 'quiz']) {
       if (id === 'picture') await page.$eval('#pic-cut', d => { d.open = true; });
+      await page.evaluate(() => document.querySelectorAll('.fig-btn').forEach(b => { if (/Pause/.test(b.textContent)) b.click(); }));
       const s = await page.$(`#${id}`);
       await s.screenshot({ path: `${SHOTS}/${id}.png` });
     }

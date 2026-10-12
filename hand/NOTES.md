@@ -17,4 +17,8 @@ Lasting decisions for `hand/`. Status and next steps: `STATUS.md`.
 - Generic to any hospital: "per unit protocol" for drugs and splints; no hospital-specific numbers or names.
 - Figures are drawn in `app.js` from one hand geometry (`FINGERS`, `shapes()`); the hand is a LEFT hand palm side so
   radial is on the left. Label radial/ulnar on any new figure.
+- Figures animate (owner, 12 Oct 2026): each `FIGS.x(s)` draws time s of a loop of `dur` seconds and must end on
+  a hold showing the complete diagram; that frame is the still (reduced motion, paused, print). They play only on
+  screen, with a Pause/Play button (WCAG 2.2.2). After changing a figure, regenerate `gifs/` with
+  `hand/tools/make-gifs.mjs`.
 - Clinical content is a teaching aid, not a protocol; the footer says so.
