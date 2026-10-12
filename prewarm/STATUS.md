@@ -6,12 +6,12 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 
 ## Now
 
-- **Claude Code, Prewarming Webapp** (branch `ccr-13264f37-d28edu`): plan written (`PLAN.md`), waiting for the
-  owner's approval and the four "Still to confirm" answers. No app code yet.
+- **Claude Code, Prewarming Webapp** (branch `ccr-13264f37-d28edu`, PR #192): plan updated for the paper data collection form;
+  waiting for the owner's approval and the seven "Still to confirm" answers. No app code yet.
 
 ## Waiting on the owner
 
-- Approve `PLAN.md`; answer its "Still to confirm" list (blinding, patient ID, sites, keeping data).
+- Approve `PLAN.md`; answer its seven "Still to confirm" questions.
 - Before PR 2: create the Firebase project and the steps in `PLAN.md` → "What the owner needs to do".
 
 ## Next
