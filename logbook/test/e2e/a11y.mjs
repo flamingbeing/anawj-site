@@ -33,6 +33,7 @@ const SCREENS = [
   ['Display', hash('display'), true],
   ['Advanced display', hash('displayadv'), false],
   ['Logging', hash('logging'), false],
+  ['Show or hide', hash('showhide'), false],
   ['Advanced logging', hash('loggingadv'), false],
   ['Tag editor', hash('tags'), false],
   ['Reflection settings', hash('reflset'), false],

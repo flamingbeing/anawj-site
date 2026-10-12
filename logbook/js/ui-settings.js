@@ -617,6 +617,55 @@ export function renderLoggingAdvanced() {
     }));
 }
 
+// Settings → Show or hide: every switch that hides part of the app, grouped by area, each group with its own
+// reset. The same settings as on their own pages (Logging, Display, Reflections), gathered in one place.
+const groupReset = (what, run) => h('p', { class: 'reset-row' }, h('button', { class: 'small linkish', type: 'button', onclick: async () => {
+  if (!await confirmBox('Reset this group', `Show ${what} again?`, 'Reset')) return;
+  await run(); hooks.render(); toast('Back to the defaults');
+} }, 'Reset this group'));
+const sw = (label, on, set, hint) => [h('label', { class: 'check' }, h('input', { type: 'checkbox', role: 'switch', 'aria-label': label, checked: !!on, onchange: e => set(e.target.checked) }), label), hint ? h('p', { class: 'hint help', style: 'margin:0 0 6px 28px' }, hint) : null];
+export function renderShowHide() {
+  const st = settings(), d = display();
+  const save = patch => patchLogbook({ settings: patch });
+  const caseOn = part => !(st.caseHide || []).includes(part);
+  const setCase = (part, show) => {
+    const now = new Set(settings().caseHide || []);
+    if (show) now.delete(part); else now.add(part);
+    return save({ caseHide: now.size ? CASE_PARTS.map(([p]) => p).filter(p => now.has(p)) : null });
+  };
+  const { hidden } = arrangeTabs(BAR_TABS.map(([id]) => id), d);
+  return h('div', { class: 'showhide' },
+    h('section', { class: 'card' },
+      h('h2', {}, 'Show or hide'),
+      h('p', { class: 'hint help', style: 'margin:0' }, 'Everything you can hide, by area. Each group has its own reset, so you can bring one area back without touching the rest. The same switches are on their own pages too.')),
+    h('section', { class: 'card', 'data-group': 'tips' },
+      h('h3', { style: 'margin-top:0' }, 'Tips and help'),
+      sw('Show tips and help text', !st.hideTips, v => save({ hideTips: !v }).then(() => hooks.render()), 'Explanations around the app, the privacy and photo reminders, and the tips for the tags you pick.'),
+      sw('Show last week’s summary on the Case tab', !!st.weeklyDigest, v => save({ weeklyDigest: v })),
+      sw('Show notes under each reflection heading', st.reflNotes !== false, v => save({ reflNotes: v })),
+      groupReset('the tips, the weekly summary and the reflection heading notes', () => save({ hideTips: null, weeklyDigest: null, reflNotes: null }))),
+    h('section', { class: 'card', 'data-group': 'case' },
+      h('h3', { style: 'margin-top:0' }, 'Case tab'),
+      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'The case box, All tags and Save always stay.'),
+      CASE_PARTS.map(([part, label]) => sw(label, caseOn(part), v => setCase(part, v))),
+      groupReset('every part of the Case tab', () => save({ caseHide: null }))),
+    h('section', { class: 'card', 'data-group': 'logbook' },
+      h('h3', { style: 'margin-top:0' }, 'Logbook (this device)'),
+      sw('Copy and Reflect buttons on each case', !d.rowMenu, v => applyDisplay(setDisplay({ rowMenu: v ? null : true })), 'Off: one ⋯ button on each row instead.'),
+      groupReset('the row buttons', () => applyDisplay(setDisplay({ rowMenu: null })))),
+    h('section', { class: 'card', 'data-group': 'bar' },
+      h('h3', { style: 'margin-top:0' }, 'Header and tabs (this device)'),
+      sw('Show the header (the app’s name and your name)', !d.hideHeader, v => applyDisplay(setDisplay({ hideHeader: !v }))),
+      BAR_TABS.filter(([id]) => id !== 'more').map(([id, label]) => sw(`${label} on the tab bar`, !hidden.includes(id), v => {
+        const { sorted, hidden: now } = arrangeTabs(BAR_TABS.map(([k]) => k), display());
+        const next = new Set(now); if (v) next.delete(id); else next.add(id);
+        if (BAR_TABS.length - next.size < 2) { toast('Keep at least two tabs on the bar'); return hooks.render(); }
+        applyDisplay(setDisplay({ tabHidden: [...next], tabOrder: sorted })); hooks.paintTabs?.(); hooks.render();
+      })),
+      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'Hidden tabs are first in More. The order is in Display → Advanced.'),
+      groupReset('the header and the usual tabs (Notes goes back into More)', () => { applyDisplay(setDisplay({ hideHeader: null, tabHidden: null, tabOrder: null })); hooks.paintTabs?.(); })));
+}
+
 export function renderReflectionSettings() {
   const st = settings();
   return h('div', {},
