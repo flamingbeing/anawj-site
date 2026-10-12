@@ -1362,3 +1362,27 @@ ul.cases .c-tags { -webkit-mask-image: linear-gradient(to right, #000 calc(100% 
 .box-wrap .paste-btn, .box-wrap .clear-btn { z-index: 2; }
 /* the line under the box: only what the age was read as */
 .parsed .pi b { font-weight: 700; }
+
+/* ---------- polish 5: the note editor reads like a page (Notes, Bear) ---------- */
+.note-editor .note-top { gap: 6px; }
+.note-editor .note-back { font-size: calc(16px * var(--fs, 1)); }
+.note-menu-wrap { position: relative; }
+.note-more { font-size: calc(20px * var(--fs, 1)); line-height: 1; padding-bottom: 6px; }
+.note-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 20; min-width: 160px; display: flex; flex-direction: column; padding: 6px; gap: 2px; background: var(--panel); border: 1px solid var(--edge, var(--line)); border-radius: calc(12px * var(--round, 1)); box-shadow: 0 8px 24px rgba(0, 0, 0, .18); }
+.note-menu[hidden] { display: none; }
+.note-menu button { justify-content: flex-start; border: 0; background: none; min-height: 40px; }
+.note-menu button:hover { background: var(--row-alt); }
+/* no boxes: the title is a heading, the body plain text; a thin line shows only while typing in it */
+.note-editor .note-title, .note-editor .note-body { border: 0; background: transparent; padding-left: 0; padding-right: 0; box-shadow: none; }
+.note-editor .note-title { font-size: calc(22px * var(--fs, 1)); font-weight: 700; margin: 10px 0 2px; }
+.note-editor .note-title:focus, .note-editor .note-body:focus { outline: none; border-color: transparent; }
+.note-editor .note-body { min-height: 50vh; resize: none; line-height: calc(1.55 * var(--lh, 1)); }
+/* the info line: grey, small, its parts as plain text you can tap */
+.note-meta { gap: 2px 8px; font-size: calc(13px * var(--fs, 1)); color: var(--muted); margin: 0 0 6px; padding-bottom: 8px; border-bottom: 1px solid var(--edge, var(--line)); }
+.note-meta .note-date { position: relative; cursor: pointer; color: var(--muted); min-height: 32px; }
+.note-meta .note-date input[type="date"] { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0; opacity: 0; border: 0; padding: 0; cursor: pointer; }
+.note-meta .linkish { background: none; border: 0; padding: 0 2px; min-height: 32px; color: var(--accent); font-size: inherit; font-weight: 600; }
+.note-meta .note-dot { color: var(--muted); }
+.note-meta .note-case { color: var(--ink); }
+.note-editor .note-back { display: inline-flex; align-items: center; gap: 2px; min-height: 40px; padding-right: 8px; color: var(--accent); font-weight: 600; text-decoration: none; }
+.note-editor .note-back .back-chev { font-size: 1.7em; line-height: 1; margin: -4px 2px 0 -2px; font-weight: 400; }
