@@ -377,3 +377,4 @@ dialog.ask p { margin: 0 0 6px; }
 .third.bot .links.two { margin-top: 0; }
 .resetline { margin: 4px 0 0; text-align: center; }
 .resetline .link { font-size: 12px; color: var(--muted); }
+.pacutimes { grid-template-columns: 1fr 1fr; margin-bottom: 8px; }

@@ -92,6 +92,10 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   "BP, HR, BIS". "Reset this subject" (small, bottom part) asks twice, then clears every entry except the Subject
   ID, group and hospital, on every phone. "PACU view" on the home list: tapping a participant opens only their
   PACU page (to hand the phone to the PACU nurse); back returns to that list.
+- **PACU page times; temperature ticks** (owner, 12 Oct 2026): the PACU page starts with PACU in / To ward boxes
+  (tap logs now, tap again to change) so the PACU nurse logs them there. The Temperatures tab has "Mark pre-warming
+  temps complete" (not for the no-pre-warming group) and "Mark intra-op temps complete" (`sign_prewarm`,
+  `sign_iotemp`, already in the export and the Word form).
 - **Never send an empty `f`** (lesson, 12 Oct 2026): `setDoc(…, { f: {} }, { merge: true })` replaces the server's
   `f` with an empty map (an empty map is a leaf in the merge). Lock / unlock / delete sent one and wiped the server
   copy's readings; push now omits an empty `f`, lock sends the full record, and each phone resends all its patients
