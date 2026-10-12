@@ -43,5 +43,19 @@ export const dropboxArg = obj => JSON.stringify(obj).replace(/[\u007f-￿]/g, c 
 export const driveQuery = (name, { folder = false, parent = '' } = {}) =>
   [`name = '${String(name).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`, 'trashed = false', folder ? "mimeType = 'application/vnd.google-apps.folder'" : '', parent ? `'${parent}' in parents` : ''].filter(Boolean).join(' and ');
 
-// The popup's return (?code=…&state=dbx-…): the page in the popup hands it to the page that opened it and closes
-export const isDropboxReturn = (search, hasOpener) => hasOpener && /^dbx-/.test(new URLSearchParams(search).get('state') || '');
+// Google's OAuth page for a Drive token (implicit grant: the token comes back in the address's #fragment)
+export function googleAuthUrl({ clientId, redirectUri, state, loginHint = '' }) {
+  const q = new URLSearchParams({ client_id: clientId, redirect_uri: redirectUri, response_type: 'token', scope: DRIVE_SCOPE, state, include_granted_scopes: 'true' });
+  if (loginHint) q.set('login_hint', loginHint);
+  return `https://accounts.google.com/o/oauth2/v2/auth?${q}`;
+}
+
+// Coming back from Google or Dropbox (index.html keeps the raw address): Dropbox puts its answer in ?query,
+// Google in #fragment. Our states start dbx- / gdr-; anything else isn't ours (null).
+export function parseCloudReturn({ search = '', hash = '' } = {}) {
+  const q = new URLSearchParams(search), f = new URLSearchParams(String(hash).replace(/^#/, ''));
+  const qs = q.get('state') || '', fs = f.get('state') || '';
+  if (/^dbx-/.test(qs)) return { to: 'dropbox', state: qs, code: q.get('code') || '', error: q.get('error_description') || q.get('error') || '' };
+  if (/^gdr-/.test(fs)) return { to: 'drive', state: fs, token: f.get('access_token') || '', expiresIn: Number(f.get('expires_in')) || 3600, error: f.get('error_description') || f.get('error') || '' };
+  return null;
+}

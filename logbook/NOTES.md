@@ -222,10 +222,14 @@ portfolio content.
   `settings.shareFormat` (the Copy & share format) carries over until the Markdown page is saved; `share-format.js`
   is kept for that and its tests. Previews use the user's own latest day and reflection.
 - **Save to Google Drive / Dropbox** (Backup card; `cloud-save.js`, ids and pure helpers in `backup-targets.js`,
-  tested): Drive = Google Identity Services token client, scope `drive.file`, folder "APMES Logbook" found or made,
-  same-day file replaced; Dropbox = PKCE in a popup (opened from the tap, its address set after the challenge), the
-  popup's return is caught in `index.html` (`window.__dbxReturn`, postMessage to the opener, app not started there),
-  App folder access, uploads to `/APMES Logbook/`. Tokens in memory only. `settings.cloudBackup` { remind, md,
+  tested): sign-in leaves the page and comes back, no popups (Oct 2026: on the owner's phone popups lost their
+  opener, so Drive stayed on a blank page and Dropbox did nothing). Drive = OAuth implicit grant (token in the
+  `#fragment`), scope `drive.file`, folder "APMES Logbook" found or made, same-day file replaced; Dropbox = PKCE,
+  code in `?query`, App folder access, uploads to `/APMES Logbook/`. Both redirect to `https://anawj.com/logbook/`
+  (registered with both). sessionStorage `apmes-logbook-cloud-pending` {to, state, verifier, demo} before leaving;
+  `index.html` stores the answer in `apmes-logbook-cloud-return` and tidies the address to `#data` (`?demo` kept);
+  `resumeCloudSave` (from `onUser`) waits for the server's cases and reflections, then saves. States start `gdr-` /
+  `dbx-`; a mismatch saves nothing. e2e: `test/e2e/cloud-save.mjs` fakes both. Tokens in memory only. `settings.cloudBackup` { remind, md,
   lastAt, lastTo } (never in the settings file). Reminder: one toast per visit with a Save button when due. The
   owner filled `GOOGLE_CLIENT_ID` and `DROPBOX_APP_KEY` (both public) in Oct 2026. Dropbox stays in development
   mode until the owner applies for production (its icons are 64 and 256 px from `icons/icon-512.png`).
@@ -320,7 +324,7 @@ portfolio content.
   - Watch for `.bar .grow { min-width: 160px }`: it wraps toolbars on phones (Unlink, Save / Retry). Buttons centre
     their content (`justify-content: center`), which shifted calendar days.
   - Show only what helps: owner prefers a ✓ on rows over calendar badges, small text over cards for guidance.
-  - The e2e also has Codex's `recovery.mjs` and `usability.mjs`: run all three before merging.
+  - The e2e also has Codex's `recovery.mjs` and `usability.mjs`, and `cloud-save.mjs`: run all four before merging.
   - The cloud session's safety filter refuses to write or push credentials, even public ones (the MCP Desktop
     client secret): the owner commits those via a GitHub web edit (GitHub secret scanning: "It's a false
     positive"). `.claude/settings.json` allows pushing to `claude/*` branches so a push isn't blocked.

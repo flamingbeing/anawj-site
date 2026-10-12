@@ -13,7 +13,7 @@ import { renderAdmin, renderAdminResidents, renderAdminAdvanced, leaveAdmin } fr
 import { renderReflect, watchMyReflections, renderExportPage, renderChoosePage } from './ui-reflect.js';
 import { downloadExcel, uploadExcel } from './ui-logbook.js';
 import { downloadNotes } from './ui-notes.js';
-import { cloudSaveSection, remindBackup } from './cloud-save.js';
+import { cloudSaveSection, remindBackup, resumeCloudSave } from './cloud-save.js';
 import { backupCard } from './backup.js';
 import { createNavigation } from './navigation.js';
 import { settingsFile, readSettingsFile } from './settings-file.js';
@@ -611,6 +611,8 @@ async function onUser(user) {
   navigation.initialize(S.tab);
   // Settings → Backup: a one-tap reminder when the last Drive / Dropbox backup is over a week old (if asked for)
   setTimeout(() => { if (S.user === user) remindBackup(); }, 3000);
+  // back from a Drive / Dropbox sign-in: finish that save
+  resumeCloudSave();
   // recycle bin: drop entries older than 30 days, but only once the reflections are loaded, so an
   // image still used by a live (e.g. restored) reflection is never deleted with an old bin entry
   { let done = false, stop = null;
@@ -738,7 +740,6 @@ function demoMenu() {
       h('span', { class: 'grow' }),
       h('button', { onclick: () => m.close() }, 'Close'))]);
 }
-if (window.__dbxReturn) fill(app, h('p', { class: 'empty' }, 'Signed in to Dropbox. You can close this window.'));   // the Dropbox popup (index.html)
-else if (!cloud.enabled) renderLanding();
+if (!cloud.enabled) renderLanding();
 else cloud.watchUser(onUser).catch(err => renderLanding('Could not start sign-in: ' + err.message));
-if (!window.__dbxReturn) registerSW();
+registerSW();
