@@ -78,6 +78,12 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
 - **Due time warms up** (owner, 12 Oct 2026): the "due hh:mm" beside each timepoint is plain until 2 min before,
   then an amber pill with a slow pulse (soon), an orange-red pill with a stronger pulse from due to 5 min past (now),
   and a red pill with a fast pulse after that (late); plain once the reading is saved. Reduced motion: colours only.
+- **Nothing easy to miss intra-op** (owner, 12 Oct 2026): intra-op Baseline (temps and BP / HR / BIS) is due at In OT,
+  End at Surgery end, so the top bar asks for them and they count as missed. "Still to fill" (`gaps()`, patient
+  screen above Mark data collection as complete, refreshed every second) lists readings missed by over 5 min (link to
+  the first), essential times skipped, warming marked Yes with no start time, Induction not logged 20 min after In OT,
+  Intra-op details / PACU unanswered once Surgery end / PACU in is logged, and the comfort questions. Intra-op details
+  and PACU boxes show "n to answer". Mark data collection as complete lists the gaps and asks first.
 - **Edge cases** (stress test, 12 Oct 2026; `prewarm/test/edge.e2e.mjs`): times are minutes after midnight, so every
   "now vs due" compare uses `nowFor(p, s)` (the clock on the same day as the series' start): a case past midnight
   counts right. Readings due after their stage ended (into OT for pre-warming, surgery end for intra-op temps and

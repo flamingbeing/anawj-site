@@ -24,7 +24,8 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 
 ## Recently done
 
-- This PR: "Study admins" card: admins add / remove admins by email (rules: create only, lower-case email id, no removing yourself).
+- This PR: "Still to fill" checklist; Baseline / End readings due at In OT / Surgery end; Mark complete asks first.
+- #244: "Study admins" card: admins add / remove admins by email (rules: create only, lower-case email id, no removing yourself).
 - #241: stress-test fixes: past midnight, readings after surgery end, BP number checks, back button with an unsaved reading; `edge.e2e.mjs`.
 - #239–#240: top bar shows the time now, with a countdown to the next thing to log beside it.
 - #238: BP, HR, BIS typed boxes (no − / +; keyboard stays up from box to box).
