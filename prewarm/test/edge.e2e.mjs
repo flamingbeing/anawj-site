@@ -108,11 +108,11 @@ await tryit(async () => {
   log(!await pg.$('dialog.ask[open]'), 'Log then next: no prompt when nothing typed');
   await ctx.close();
 });
-// G. Other data: Enter on the last question, Shift+Enter back
+// G. Perioperative data: Enter on the last question, Shift+Enter back
 await tryit(async () => {
   const { ctx, pg } = await fresh();
   await open(pg, 0);
-  await pg.click('#haemolink'); await pg.click('.minicard'); await pg.waitForSelector('details.sect');
+  await pg.click('#haemolink'); await pg.click('a.widebox'); await pg.waitForSelector('details.sect');
   const last = pg.locator('details.sect').last().locator('.fld').last().locator('input, .chip').first();
   await last.focus(); await pg.keyboard.press('Enter');
   log(!await pg.$('dialog.ask[open]'), 'Enter on the last question: no error, no prompt');

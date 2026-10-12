@@ -498,7 +498,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
   // and pulses as its next reading falls due
   const tabs = $('#ptabs'); tabs.hidden = false;
   tabs.innerHTML = `<a role="tab" id="templink" href="#/p/${id}" aria-selected="${main}" data-state="${haemoState(p, defaultSeries(p))}">Temperatures</a>`
-    + `<a role="tab" id="haemolink" href="#/p/${id}/haemo" aria-selected="${!main}" data-state="${haemoState(p)}">BP, HR, BIS</a>`;
+    + `<a role="tab" id="haemolink" href="#/p/${id}/haemo" aria-selected="${!main}" data-state="${haemoState(p)}">Others</a>`;
   const refreshBar = topBar(p, s, () => draw());
   let editing = null; // event whose time is being changed
   let typing = null; // the BP / HR / BIS box with the keyboard up
@@ -612,7 +612,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
       <a href="#/p/${id}/form/intraop">Intra-op details${done('intraop')}<small>${todo(INTRAOP_Q, 'io_done') || 'Blood, products, tests'}</small></a>
       <a href="#/p/${id}/form/pacu">PACU${done('pacu')}<small>${todo(PACU_Q, 'pacu_in') || 'Temp, NuDESC, delay'}</small></a>
       </nav>
-      <div class="textlinks"><a class="minicard" href="#/p/${id}/data">Other data</a></div>`;
+      <a class="widebox" href="#/p/${id}/data">Perioperative data</a>`;
   }
   // previous / next timepoint: big buttons either side of the tabs and the timepoint strip
   function navHtml() {
@@ -873,7 +873,7 @@ const vitalsCollected = p => Object.keys(p.f).some(k => /^haemo_/.test(k) && val
 // question, ↑ to the one before; on a row of choices ← → move along it and Enter or Space picks one and moves on.
 route(/^\/p\/(\w+)\/data$/, id => {
   const p = patients[id]; if (!p) return go('#/');
-  header(sid(p) + ' · Other data', `#/p/${id}/haemo`);
+  header(sid(p) + ' · Perioperative data', `#/p/${id}/haemo`);
   topBar(p, defaultSeries(p));
   const get = k => val(p, k);
   const closed = new Set();

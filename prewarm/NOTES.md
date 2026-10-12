@@ -79,8 +79,8 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   then an amber pill with a slow pulse (soon), an orange-red pill with a stronger pulse from due to 5 min past (now),
   and a red pill with a fast pulse after that (late); plain once the reading is saved. Reduced motion: colours only.
 - **Two tabs** (owner, 12 Oct 2026): a thin tab bar under the top bar on the patient screen: **Temperatures** (the
-  main screen: times, pre-warming / intra-op temps, comfort, Form view / Sheet view) and **BP, HR, BIS** (the vitals,
-  plus the Intra-op details, PACU and Other data links). The tab you're not on warms up and pulses when its next
+  main screen: times, pre-warming / intra-op temps, comfort, Form view / Sheet view) and **Others** (BP, HR, BIS,
+  plus the Intra-op details and PACU boxes and a full-width **Perioperative data** box, formerly "Other data"). The tab you're not on warms up and pulses when its next
   reading falls due. "Still to fill" and Mark data collection as complete are on both tabs. Intra-op details, PACU and
   Other data go back to the BP, HR, BIS tab. Sign-offs name their section ("Mark BP, HR, BIS complete", "Mark PACU
   complete"…) and show a ticked green box with who and when once marked (`tickHtml`).

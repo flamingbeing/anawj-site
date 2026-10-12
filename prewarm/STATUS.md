@@ -24,7 +24,8 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 
 ## Recently done
 
-- This PR: warming time boxes lavender (not beige) and Still to fill navy, so amber / orange / red only mean a timing alarm.
+- This PR: tab "Others"; "Perioperative data" full width; Still to fill back to amber.
+- #249: warming time boxes lavender (not beige) and Still to fill navy, so amber / orange / red only mean a timing alarm.
 - #248: two tabs (Temperatures / BP, HR, BIS; other forms on the BP tab); sign-offs named by section with a tick box.
 - #246: "Still to fill" checklist; Baseline / End readings due at In OT / Surgery end; Mark complete asks first.
 - #244: "Study admins" card: admins add / remove admins by email (rules: create only, lower-case email id, no removing yourself).
@@ -46,7 +47,8 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 
 ## Decisions
 
-- 12 Oct 2026: amber, orange and red are kept for timing alarms only (warming boxes lavender, Still to fill navy).
+- 12 Oct 2026: amber, orange and red are kept for timing alarms (warming boxes lavender); Still to fill stays amber (owner).
+- 12 Oct 2026: second tab renamed Others; Other data renamed Perioperative data, a full-width box.
 - 12 Oct 2026: thermal sensation keeps carrying over like the rest (owner: no need to change).
 
 - 12 Oct 2026: patient screen split into two tabs, Temperatures and BP, HR, BIS (other forms on the BP tab); Mark data collection as complete on both; section sign-offs named, ticked box once marked.
