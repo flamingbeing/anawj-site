@@ -6,8 +6,9 @@ import { countCases, uid, todayISO, sortCodes, progress, rYearDefault, academicY
 import * as cloud from './cloud.js';
 import { reflectionCounts } from './reflections.js';
 import { writes } from './writes.js';
+import { transients } from './transients.js';
 
-export { cloud, writes };
+export { cloud, writes, transients };
 
 // ---------- state ----------
 
@@ -129,6 +130,8 @@ export function toast(msg, { action, onaction, ms } = {}) {
   toast.t = setTimeout(() => t.classList.remove('show'), ms);
 }
 
+export function clearToast() { clearTimeout(toast.t); const el = document.getElementById('toast'); if (el) { el.classList.remove('show'); fill(el); } }
+
 export function download(name, blob) {
   const a = h('a', { href: URL.createObjectURL(blob), download: name });
   document.body.append(a); a.click(); a.remove();
@@ -144,11 +147,19 @@ export const fileButton = (label, accept, onfile, cls = 'btn') => h('label', { c
 export function modal(title, body, { onclose, sticky, cls = '' } = {}) {
   // the title takes the initial focus, so phones don't pop a keyboard or date picker on open
   const el = h('dialog', { class: cls }, h('h2', { tabindex: '-1', autofocus: true, style: 'outline:none' }, title), body);
-  el.addEventListener('close', () => { el.remove(); onclose && onclose(); });
-  if (!sticky) el.addEventListener('click', e => { if (e.target === el) el.close(); });
-  document.body.append(el);
-  el.showModal();
-  return { el, close: () => el.close() };
+  const previousFocus = document.activeElement;
+  const caret = previousFocus && typeof previousFocus.selectionStart === 'number' ? [previousFocus.selectionStart, previousFocus.selectionEnd] : null;
+  let finished = false;
+  const finish = () => {
+    if (finished) return; finished = true; el.remove(); onclose?.();
+    if (previousFocus?.isConnected) { previousFocus.focus({ preventScroll: true }); if (caret) previousFocus.setSelectionRange(...caret); }
+  };
+  const view = transients?.open(() => { el.close(); finish(); });
+  const close = () => { el.close(); if (view?.active) return view.close(); finish(); return Promise.resolve(); };
+  el.addEventListener('close', () => { if (view?.active) void view.close(); else finish(); });
+  if (!sticky) el.addEventListener('click', e => { if (e.target === el) void close(); });
+  document.body.append(el); el.showModal();
+  return { el, close };
 }
 
 // A small ⓘ button that shows or hides a longer explanation: [button, paragraph].
@@ -208,7 +219,8 @@ function plainCell(v) {
 export const cat = code => BY_CODE[code] || { code, name: code, label: code, full: code };
 // Display names an admin set (config/categoryNames): name for lists, short for the pills. Display only.
 let NAMES = {};
-export const setCategoryNames = m => { NAMES = m || {}; };
+export let categoryNamesRevision = 0;
+export const setCategoryNames = m => { NAMES = m || {}; categoryNamesRevision++; };
 export const categoryNames = () => NAMES;
 // ---------- tags (Settings → Tag editor; js/tags.js) ----------
 // The tag set in effect for the signed-in user, rebuilt when their settings change.
@@ -323,7 +335,9 @@ export async function createCase({ id, createdAt, date, details, initials, cats,
   if (reflectTag) c.reflectTag = true;
   const kept = keepTags(tags, c.cats);
   if (kept.length) c.tags = kept;
-  const saved = await writes.save('case', mine(), c, null);
+  const owner = mine();
+  const saved = await writes.save('case', owner, c, null);
+  if (S.user?.email !== owner) throw new Error('Account changed; this save belongs to the previous account');
   applyLocal(list => [saved, ...list.filter(x => x.id !== saved.id)]);
   return saved;
 }
@@ -331,19 +345,25 @@ export async function createCase({ id, createdAt, date, details, initials, cats,
 export async function updateCase(c, { base = S.cases.find(x => x.id === c.id) || null } = {}) {
   const next = { ...c, cats: sortCodes(c.cats), updatedAt: Date.now() };
   if (next.date) delete next.dateText;
-  const saved = await writes.save('case', mine(), next, base);
+  const owner = mine();
+  const saved = await writes.save('case', owner, next, base);
+  if (S.user?.email !== owner) throw new Error('Account changed; this save belongs to the previous account');
   applyLocal(list => list.map(x => (x.id === c.id ? saved : x)));
   return saved;
 }
 
 export async function removeCase(id) {
   const base = S.cases.find(x => x.id === id) || null;
-  await writes.save('case', mine(), { id, _deleted: true }, base);
+  const owner = mine();
+  await writes.save('case', owner, { id, _deleted: true }, base);
+  if (S.user?.email !== owner) throw new Error('Account changed; this delete belongs to the previous account');
   applyLocal(list => list.filter(x => x.id !== id));
 }
 
 export async function restoreCase(c, base = S.cases.find(x => x.id === c.id) || null) {
-  const saved = await writes.save('case', mine(), c, base);
+  const owner = mine();
+  const saved = await writes.save('case', owner, c, base);
+  if (S.user?.email !== owner) throw new Error('Account changed; this save belongs to the previous account');
   applyLocal(list => [saved, ...list.filter(x => x.id !== c.id)]);
 }
 

@@ -46,3 +46,5 @@ assert.deepEqual(qol, { weekStart: 0, afterSave: 'logbook', undoSecs: 20, caseHi
 assert.deepEqual(readSettingsFile(JSON.stringify({ kind: SETTINGS_KIND, settings: { caseHide: 'quick' } })).settings.caseHide, []);
 
 console.log('settings file tests passed');
+
+assert.equal(readSettingsFile(JSON.stringify(settingsFile({settings:{compactTags:true,firstField:'date'}}))).settings.compactTags,true);

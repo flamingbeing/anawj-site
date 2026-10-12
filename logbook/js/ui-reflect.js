@@ -10,7 +10,7 @@ import { REFLECTION_HEADINGS, REFLECTION_SECTIONS, yearName } from './categories
 import { reflectionProgress, reflectionCounts, HEADING_BY_ID, splitDetails, completeProblems, isLegacy, LIMITS, IMAGE_MAX_B64, IMAGE_MAX_SIDE, IMAGE_QUALITY, PHOTO_BUDGET_KB, PHOTO_NOTE, photoUsageKb, imageKb, fmtMb, wordCount, MIN_WORDS, suggestHeadings, moveToHeading, inExport, exportSummary, pickJustEnough } from './reflections.js';
 export { completeProblems };
 import { fmtDate, caseText, procedureText, caseParts } from './engine.js';
-import { S, h, toast, cloud, writes, debounce, hooks, rYear, effectiveIntake, residentSmo, todayISO, confirmBox, add, resetters, scheduleSummary, displayName, byNewest, catName, updateCase, settings, patchLogbook } from './ui-core.js';
+import { S, h, toast, cloud, writes, transients, debounce, hooks, rYear, effectiveIntake, residentSmo, todayISO, confirmBox, add, resetters, scheduleSummary, displayName, byNewest, catName, updateCase, settings, patchLogbook } from './ui-core.js';
 import { renderExportButton, caseRYear, countsByYear } from './portfolio.js';
 import { parseQuery, matchQuery, REFL_FIELDS, REFL_OPERATOR_HELP } from './search-ops.js';
 import { opsHelp } from './ui-logbook.js';
@@ -74,7 +74,10 @@ const fromCase = c => {
   return { initials, diagnosis: procedureText(c) || rest, summary: rest, date: c.date || null, caseId: c.id };
 };
 // preset: { headingId, subId } from a heading's "+ Add" button.
-export function reflectOnCase(c, preset = null) {
+export async function reflectOnCase(c, preset = null) {
+  if (headingTransient?.active) await headingTransient.close();
+  if (pickerTransient?.active) await pickerTransient.close();
+  if (subTransient?.active) await subTransient.close();
   rv.picking = null; rv.view = null;
   const existing = (S.reflections || []).find(r => r.caseId === c.id);
   if (existing) {
@@ -103,7 +106,7 @@ const labelOf = hd => (hd ? hd.label || shortName(hd.name) : 'Uncategorised');
 // the notes under each heading (rules, examples): on unless switched off at the bottom of the list
 const notesOn = () => settings().reflNotes !== false;
 
-const showTab = () => { if (location.hash !== '#reflect') location.hash = '#reflect'; else hooks.render(); };
+const showTab = () => { if (location.hash !== '#reflect') { if (hooks.navigate) void hooks.navigate('reflect'); else location.hash = '#reflect'; } else hooks.render(); };
 // JR follows from the reflection's date: R1–R3 at that date (from the resident's intake) is junior residency.
 // Without a known intake, the current residency year decides.
 // Mark complete was refused: outline the fields that are still needed in red and scroll to the first.
@@ -130,7 +133,9 @@ function setJr(r) {
 }
 
 hooks.recoverReflection = r => { slot(); reflectionSlot = createDraftSlot(DRAFT_KEY, slotOwner.slice(DRAFT_KEY.length + 1)); lsSet({ ...r, restore: true }); openEditor(r); };
-function openEditor(r) {
+let editorTransient = null;
+async function openEditor(r) {
+  if (editorTransient?.active) await editorTransient.close();
   rv.editing = JSON.parse(JSON.stringify(r));
   showTab();
 }
@@ -150,10 +155,12 @@ export function renderReflect() {
 // ---------- case picker ----------
 
 // relink: change the case of the reflection open in the editor (keeps what has been written).
+let pickerTransient = null, headingTransient = null, subTransient = null;
 function openPicker(relink = false, preset = null) { rv.picking = { q: '', relink, preset }; showTab(); }
 
-function pickCase(c) {
-  const p = rv.picking;
+async function pickCase(c) {
+  const p = rv.picking, owner = mine();
+  if (!p || (p.relink && !rv.editing)) return;
   const other = (S.reflections || []).find(r => r.caseId === c.id && (!p.relink || r.id !== rv.editing.id));
   if (p.relink) {
     if (other) return toast('That case already has a reflection. Each reflection must be a different patient.');
@@ -162,7 +169,10 @@ function pickCase(c) {
     if (!String(r.diagnosis || '').trim() || (oldFill && r.diagnosis === oldFill.diagnosis)) r.diagnosis = f.diagnosis;
     if (!String(r.summary || '').trim() || (oldFill && r.summary === oldFill.summary)) r.summary = f.summary;
     lsSet({ ...r, restore: true });
-    rv.picking = null; rv.relinked = true; hooks.render();
+    rv.relinked = true;
+    if (pickerTransient?.active) await pickerTransient.close();
+    if (S.user?.email !== owner) return;
+    rv.picking = null; hooks.render();
     return;
   }
   if (other || p.preset) return reflectOnCase(c, p.preset);
@@ -174,8 +184,9 @@ function pickCase(c) {
 // Step 2 of the general "+ New reflection": choose a heading (suggested from the case) or skip.
 function chooseHeading() {
   const p = rv.picking, c = p.chosen;
+  if (!headingTransient?.active) headingTransient = transients.open(() => { if (rv.picking !== p) return; p.chosen = null; hooks.render(); });
   return h('div', {}, h('section', { class: 'card' },
-    h('div', { class: 'bar' }, h('button', { onclick: () => { p.chosen = null; hooks.render(); } }, '← Cases'), h('span', { class: 'grow' })),
+    h('div', { class: 'bar' }, h('button', { onclick: () => headingTransient.close() }, '← Cases'), h('span', { class: 'grow' })),
     h('h2', { style: 'margin:8px 0 4px' }, 'Which heading?'),
     h('p', { style: 'margin:0 0 8px' }, h('span', { class: 'muted' }, caseDate(c) + ' · '), caseText(c) || '(no details)',
       (c.cats || []).length ? h('span', { class: 'muted', style: 'display:block;font-size:calc(13px * var(--fs, 1))' }, c.cats.map(catName).join(', ')) : null),
@@ -186,6 +197,7 @@ function chooseHeading() {
 
 function picker() {
   const p = rv.picking;
+  if (!pickerTransient?.active) pickerTransient = transients.open(() => { if (rv.picking !== p) return; rv.picking = null; hooks.render(); });
   if (p.chosen) return chooseHeading();
   const ph = p.preset && HEADING_BY_ID[p.preset.headingId];
   const psub = ph && p.preset.subId && ph.subs ? ph.subs.find(s => s.id === p.preset.subId) : null;
@@ -207,7 +219,7 @@ function picker() {
       const has = linked.has(c.id) && !(p.relink && rv.editing && rv.editing.caseId === c.id);
       const cur = p.relink && rv.editing && rv.editing.caseId === c.id;
       const names = (c.cats || []).map(catName).join(', ');
-      return h('li', { tabindex: '0', role: 'button', onclick: () => pickCase(c), onkeydown: e => { if (e.key === 'Enter') pickCase(c); } },
+      return h('li', { tabindex: '0', role: 'button', onclick: () => pickCase(c), onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); void pickCase(c); } } },
         h('span', { class: 'd' }, caseDate(c)),
         h('span', { class: 't' }, c.reflectTag && !has ? h('span', { class: 'flag tagged' }, '☆ interesting') : null, caseText(c) || '(no details)', names ? h('span', { class: 'muted', style: 'display:block;font-size:calc(13px * var(--fs, 1))' }, names) : null),
         h('span', { class: 'c' }, cur ? h('span', { class: 'flag' }, 'current') : has ? h('span', { class: 'flag' }, 'has reflection') : null));
@@ -220,7 +232,7 @@ function picker() {
   setTimeout(() => search.focus(), 0);
   return h('div', {}, h('section', { class: 'card' },
     h('div', { class: 'bar' },
-      h('button', { onclick: () => { rv.picking = null; hooks.render(); } }, p.relink ? '← Back to reflection' : '← Reflections'),
+      h('button', { onclick: () => pickerTransient.close() }, p.relink ? '← Back to reflection' : '← Reflections'),
       h('span', { class: 'grow' })),
     h('h2', { style: 'margin:8px 0 4px' }, p.relink ? 'Change the linked case' : 'Which case is this reflection on?'),
     ph ? h('p', { style: 'margin:0 0 4px' }, h('span', { class: 'muted' }, 'Heading: '), h('b', {}, labelOf(ph) + (psub ? ' · ' + psub.name : ''))) : null,
@@ -243,9 +255,10 @@ async function loadMod(path) {
   try { return await import(path); } catch (err) { console.warn(err); return null; }
 }
 function subView() {
-  const back = () => { rv.view = null; hooks.render(); };
-  const wrap = h('div', {}, h('section', { class: 'card' }, h('p', { class: 'hint' }, 'Loading…')));
   const which = rv.view;
+  if (!subTransient?.active) subTransient = transients.open(() => { if (rv.view !== which) return; rv.view = null; hooks.render(); });
+  const back = () => subTransient.close();
+  const wrap = h('div', {}, h('section', { class: 'card' }, h('p', { class: 'hint' }, 'Loading…')));
   loadMod(which === 'bin' ? './bin.js' : './ui-reflect-import.js').then(m => {
     if (rv.view !== which) return;
     const fn = m && (which === 'bin' ? m.renderBin : m.renderImport);
@@ -809,6 +822,10 @@ function editor() {
   const legacy = isLegacy(r);
   const owner = mine();
   const current = () => rv.editing === r && S.user?.email === owner;
+  if (!editorTransient?.active) editorTransient = transients.open(() => {
+    if (!current()) return;
+    lsSet({ ...r, restore: false }); rv.editing = null; rv.thumbs = {}; hooks.render();
+  });
   if (!editorSessions.has(r)) editorSessions.set(r, { base: JSON.parse(JSON.stringify(S.reflections.find(x => x.id === r.id) || null)), saving: null });
   const session = editorSessions.get(r);
   const status = h('span', { class: 'muted', 'aria-live': 'polite', style: 'font-size:calc(13px * var(--fs, 1))' }, r.id ? 'Saved' : 'Not saved yet');
@@ -846,7 +863,7 @@ function editor() {
   paintWords();
   const changed = () => { if (!current()) return; paintWords(); status.textContent = lsSet({ ...r, restore: true }) ? 'Draft saved on this device' : 'Draft not saved · storage unavailable'; autosave(); };
   const restructure = () => { changed(); hooks.render(); };   // list changed: save and redraw
-  const close = async () => { if (!current()) return; autosave.cancel(); if (hasContent(r) && !await persist() || !current()) return; rv.editing = null; rv.thumbs = {}; lsSet(null); hooks.render(); };
+  const close = async () => { if (!current()) return; autosave.cancel(); if (hasContent(r) && !await persist() || !current()) return; await editorTransient.close(); if (S.user?.email !== owner) return; rv.editing = null; rv.thumbs = {}; lsSet(null); hooks.render(); };
 
   const subWrap = h('div');
   const paintSubs = () => {
@@ -1034,7 +1051,7 @@ function editor() {
       : h('button', { class: 'primary', onclick: async () => {
         const missing = completeProblems(r);
         if (missing.length) { showMissing(missing); return toast('Before marking complete: ' + missing.join(', ')); }
-        r.status = 'complete'; autosave.cancel(); if (!await persist()) { if (current()) { r.status = 'draft'; lsSet({ ...r, restore: true }); } return; } if (!current()) return; toast('Reflection complete'); rv.editing = null; rv.thumbs = {}; lsSet(null); hooks.render();
+        r.status = 'complete'; autosave.cancel(); if (!await persist()) { if (current()) { r.status = 'draft'; lsSet({ ...r, restore: true }); } return; } if (!current()) return; await editorTransient.close(); if (S.user?.email !== owner) return; toast('Reflection complete'); rv.editing = null; rv.thumbs = {}; lsSet(null); hooks.render();
       } }, 'Mark complete'),
     h('span', { class: 'grow' }),
     r.id || r.figures.length ? h('button', { class: 'danger', onclick: async () => {
@@ -1044,6 +1061,7 @@ function editor() {
       if (!r.id && !await persist()) return;   // images saved but the reflection never was: save it so the bin keeps both
       const n = await binReflections([JSON.parse(JSON.stringify(r))]);
       if (!n || !current()) return;
+      await editorTransient.close(); if (S.user?.email !== owner) return;
       toast('Reflection moved to the recycle bin', { action: 'Recycle bin', onaction: () => openView('bin') });
       rv.editing = null; rv.thumbs = {}; lsSet(null); hooks.render();
     } }, 'Delete') : null));
@@ -1058,6 +1076,6 @@ if (typeof document !== 'undefined') document.addEventListener('focusin', e => {
   if (e.target.closest && e.target.closest('.refl-editor') && document.documentElement.classList.contains('refl-spell-off')) e.target.spellcheck = false;
 });
 
-const hasContent = r => !!(r.headingId || r.initials || r.diagnosis || r.title || r.summary
+export const hasContent = r => !!(r.headingId || r.initials || r.diagnosis || r.title || r.summary
   || (r.points || []).some(p => p.heading || p.text) || (r.figures || []).length || (r.references || []).some(Boolean)
   || Object.values(r.sections || {}).some(Boolean));

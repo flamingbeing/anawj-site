@@ -46,10 +46,11 @@ resetters.push(() => { binCache = []; });   // never hand one user's deleted cas
 export async function moveToBin(kind, item, extra = {}) {
   const items = Array.isArray(item) ? item : [item];
   if (!items.length) return [];
-  const now = Date.now();
+  const owner = mine(), now = Date.now();
   const entries = items.map((it, i) => binEntry(kind, it, now + i));   // distinct ids for same-id items
   // in parallel: offline, each write waits up to ACK_WAIT before it counts as queued
-  await Promise.all(entries.map(e => cloud.saveBinEntry(mine(), e)));
+  await Promise.all(entries.map(e => cloud.saveBinEntry(owner, e)));
+  if (S.user?.email !== owner) throw new Error('Account changed; the original record has not been deleted');
   binCache = [...entries, ...binCache];
   if (kind === 'case') {
     if (entries.length === 1) await removeCase(entries[0].data.id);
