@@ -24,7 +24,8 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 
 ## Recently done
 
-- This PR: stress-test fixes: past midnight, readings after surgery end, BP number checks, back button with an unsaved reading; `edge.e2e.mjs`.
+- This PR: "Study admins" card: admins add / remove admins by email (rules: create only, lower-case email id, no removing yourself).
+- #241: stress-test fixes: past midnight, readings after surgery end, BP number checks, back button with an unsaved reading; `edge.e2e.mjs`.
 - #239–#240: top bar shows the time now, with a countdown to the next thing to log beside it.
 - #238: BP, HR, BIS typed boxes (no − / +; keyboard stays up from box to box).
 - #237: ask to save before leaving a reading with unsaved changes (Save / Don't save / Stay here).
@@ -41,6 +42,8 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 - #205–#209: NUHS app theme, one-screen main screen, timer and Log next event, ‹ › timepoints, screen size.
 
 ## Decisions
+
+- 12 Oct 2026: admins manage admins in the app (all equal; nobody removes themselves).
 
 - 12 Oct 2026: all remaining template data gets entry forms under "Other data" (small box beside Form view / Sheet view);
   "Spreadsheet view" is now "Sheet view"; vital-signs tick is automatic; the BP, HR, BIS box flashes like the due time.

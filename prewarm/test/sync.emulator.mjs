@@ -107,6 +107,19 @@ try {
   await ad.click('[data-copy="NUH-TEST-CODE"]');
   await toastSays(ad, /Code copied/);
   assert.equal(await ad.evaluate(() => navigator.clipboard.readText()), 'NUH-TEST-CODE');
+  // study admins: the admin adds a second admin by email, can't remove themselves, then removes the second
+  assert.match(await ad.textContent('#admins'), /lead@example\.com \(you\)/);
+  assert.equal(await ad.$('[data-rmadmin="lead@example.com"]'), null, 'no Remove beside yourself');
+  await ad.fill('#newadmin', 'Second@Example.com');
+  ad.once('dialog', d => d.accept());
+  await ad.click('#addadmin button');
+  await toastSays(ad, /second@example\.com added/);
+  await ad.waitForSelector('[data-rmadmin="second@example.com"]');
+  assert.match(await ad.textContent('#admins'), /added by lead@example\.com/);
+  ad.once('dialog', d => d.accept());
+  await ad.click('[data-rmadmin="second@example.com"]');
+  await toastSays(ad, /Removed/);
+  await ad.waitForFunction(() => !document.querySelector('[data-rmadmin="second@example.com"]'));
   // the admin uploads the blank Word form (made-up fixture; it isn't the whole form, so they confirm)
   ad.once('dialog', d => d.accept());
   const zip = new JSZip(); for (const [k, v] of Object.entries(fixtureFiles())) zip.file(k, v);
@@ -190,7 +203,7 @@ try {
   await bb.waitForSelector('#code', { timeout: 15000 });
 
   assert.deepEqual(errors, []);
-  console.log('prewarm sync: ok (two phones, join code, readings both ways, admin email-link sign-in, codes, join link and QR, blank Word form upload and Form view, lock, log out)');
+  console.log('prewarm sync: ok (two phones, join code, readings both ways, admin email-link sign-in, managing admins, codes, join link and QR, blank Word form upload and Form view, lock, log out)');
 } finally {
   await b.close();
 }

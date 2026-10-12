@@ -1261,8 +1261,8 @@ route(/^\/admin$/, async () => {
   header('Study admin', '#/settings');
   if (!shared.admin) { paint(`<p class="note">Sign in as a study admin from Settings.</p>`); return; }
   paint(`<p class="muted">Loading…</p>`);
-  let codes = {}, people = [], bf = null;
-  try { [codes, people, bf] = await Promise.all([cloud.codes(), cloud.members(), cloud.blankForm()]); } catch (e) { paint(`<p class="note">${esc(cloud.friendly(e))}</p>`); return; }
+  let codes = {}, people = [], bf = null, admins = [], me = '';
+  try { [codes, people, bf, admins, me] = await Promise.all([cloud.codes(), cloud.members(), cloud.blankForm(), cloud.admins(), cloud.myEmail()]); } catch (e) { paint(`<p class="note">${esc(cloud.friendly(e))}</p>`); return; }
   paint(`<div class="stack">
 
     <p class="muted small">Send each hospital’s team its join link (or show the QR code): it opens the app ready to join, no typing. Share it only with that team. A new code makes old links stop working for new phones; phones already in stay in.</p>
@@ -1273,6 +1273,12 @@ route(/^\/admin$/, async () => {
         ${codes[x] ? `<div class="sharerow"><button class="primary" data-share="${x}">Share join link</button><button class="secondary" data-qr="${x}">QR code</button></div><div class="qr" id="qr-${x}" hidden></div>` : ''}
         ${who.length ? `<ul class="plain">${who.map(m => `<li>${esc(m.initials || '—')} <small class="muted">joined ${new Date(m.joinedAt).toLocaleDateString()}</small> <button class="link" data-rm="${m.uid}">Remove</button></li>`).join('')}</ul>` : '<small class="muted">No phones yet</small>'}</div>`;
     }).join('')}
+    <div class="fld" id="admins"><b>Study admins</b>
+      <small class="muted">Admins see every hospital, make join codes, remove phones, lock patients and upload the form. To add one, type their email: they then open Settings on their phone, tap “Study admin? Sign in by email” and use the emailed link.</small>
+      <ul class="plain">${admins.sort((a, b) => a.email.localeCompare(b.email)).map(a => `<li>${esc(a.email)}${a.email === me ? ' <small class="muted">(you)</small>' : ''}
+        ${a.addedBy ? `<small class="muted">added by ${esc(a.addedBy)}${a.addedAt ? ', ' + new Date(a.addedAt).toLocaleDateString([], { day: 'numeric', month: 'short' }) : ''}</small>` : ''}
+        ${a.email === me ? '' : `<button class="link" data-rmadmin="${esc(a.email)}">Remove</button>`}</li>`).join('')}</ul>
+      <form class="addrow" id="addadmin"><input type="email" id="newadmin" placeholder="name@hospital.sg" autocomplete="off" aria-label="New admin’s email" required><button class="secondary">Add admin</button></form></div>
     <div class="fld"><b>Blank data collection form</b>
       <small class="muted">${bf ? `${esc(bf.name)}, uploaded ${new Date(bf.setAt).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' })} by ${esc(bf.setBy)}.` : 'Not uploaded yet.'} The Form view fills this Word file in for each patient; teams can download it or save it as a PDF. Its file details (author, editor, company) are removed on upload.</small>
       <label class="secondary filebtn">${bf ? 'Replace' : 'Upload'} the blank form (.docx)<input type="file" id="blankup" accept=".docx" hidden></label></div></div>`);
@@ -1284,7 +1290,21 @@ route(/^\/admin$/, async () => {
     try { await cloud.setBlankForm(r.b64, f.name, r.size); blankCache = null; toast('Blank form saved'); render(); }
     catch (err) { toast(cloud.friendly(err)); }
   };
+  $('#addadmin').onsubmit = async e => {
+    e.preventDefault();
+    const em = $('#newadmin').value.trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) return toast('Check the email address.');
+    if (admins.some(a => a.email === em)) return toast(em + ' is already an admin.');
+    if (!confirm(`Make ${em} a study admin?\n\nThey’ll see every hospital’s patients, make join codes, remove phones, lock patients and add or remove admins.`)) return;
+    try { await cloud.addAdmin(em); toast(em + ' added. They sign in from Settings: “Study admin? Sign in by email”.'); render(); } catch (err) { toast(cloud.friendly(err)); }
+  };
   view.onclick = async e => {
+    const ra = e.target.closest('[data-rmadmin]');
+    if (ra) {
+      if (!confirm(`Remove ${ra.dataset.rmadmin} as a study admin?\n\nThey lose admin access straight away (their phone keeps only what a team member would see, if it joined a team).`)) return;
+      try { await cloud.removeAdmin(ra.dataset.rmadmin); toast('Removed'); render(); } catch (err) { toast(cloud.friendly(err)); }
+      return;
+    }
     const sh = e.target.closest('[data-share]');
     if (sh) {
       const x = sh.dataset.share, url = joinLink(x, codes[x].code);

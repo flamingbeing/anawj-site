@@ -127,6 +127,10 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   - Phones join with their hospital's code (anonymous sign-in); the rules accept a `members/{uid}` entry only with that
     hospital's current code. Members read and write only their hospital's patients. A new code stops new joins with
     the old one; phones already in stay in until an admin removes them.
+  - **Managing admins** (owner, 12 Oct 2026): the admin screen's "Study admins" card lists `admins/{email}`
+    ({ addedBy, addedAt }); any admin adds one by email (confirm first) or removes one (confirm first); nobody removes
+    themselves (rules), so there's always one. All admins are equal. The new admin signs in from Settings ("Study
+    admin? Sign in by email").
   - Admins sign in with an emailed link (Firebase "Email link" sign-in), not Google: phone browsers block the
     Google pop-up's helper page on `prewarm-study.firebaseapp.com` ("missing initial state"), and the self-hosted
     helper at `anawj.com/__/auth` belongs to the logbook's project. `admins/{email}` (lower-case email) lists them. The first admin is added by hand in the
