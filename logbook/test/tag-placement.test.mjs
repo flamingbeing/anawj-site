@@ -1,0 +1,20 @@
+// Insertion must preserve hierarchy and reject stale/invalid anchors. Fake tags only.
+import assert from 'node:assert/strict';
+import { defaultTagSet, cleanTagSet, placeNewTag } from '../js/tags.js';
+const base = cleanTagSet([...defaultTagSet({}), { k: 'u:parent', n: 'Checklist' }, { k: 'u:child', p: 'u:parent', n: 'Child' }]);
+const note = { k: 'u:new', n: 'New' };
+let placed = placeNewTag(base, note, '', 'u:parent');
+assert.equal(placed.findIndex(x => x.k === note.k), placed.findIndex(x => x.k === 'u:child') + 1);
+placed = placeNewTag(base, note, '', '$start');
+assert.equal(placed[0].k, note.k);
+placed = placeNewTag(base, note, 'u:parent', '$start');
+assert.equal(placed.findIndex(x => x.k === note.k), placed.findIndex(x => x.k === 'u:parent') + 1);
+assert.equal(placed.find(x => x.k === note.k).p, 'u:parent');
+placed = placeNewTag(base, note, 'u:child', '$end');
+assert.equal(placed.find(x => x.k === note.k).p, 'u:child');
+assert.throws(() => placeNewTag(base, note, '', 'u:missing'), /placement has changed/);
+assert.throws(() => placeNewTag(base, note, '', 'u:child'), /placement has changed/);
+assert.throws(() => placeNewTag(base, { k: 'h:new', hd: true, n: 'Header' }, 'u:parent'), /valid parent/);
+assert.throws(() => placeNewTag(base, note, 'u:missing'), /valid parent/);
+assert.deepEqual(base, cleanTagSet([...defaultTagSet({}), { k: 'u:parent', n: 'Checklist' }, { k: 'u:child', p: 'u:parent', n: 'Child' }]));
+console.log('PASS tag insertion placement');
