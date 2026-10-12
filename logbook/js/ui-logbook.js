@@ -11,11 +11,12 @@ import { parseCsv } from './tags.js';
 import {
   S, h, toast, debounce, modal, cat, categoryNamesRevision, catName, catShort, tagName, catFull, catChip, PICKER_ORDER, settings, patchLogbook, needExcel, download, fileButton, catPills,
   updateCase, saveMany, deleteMany, displayName, rYear, todayISO, fill, add, resetters, tagSet, tagLinks, confirmBox, keepTags, hooks, rowIcon } from './ui-core.js';
+import { dayHasNotes, caseHasNotes, openNotes, ensureNotes } from './ui-notepad.js';
 import { flatTree, tagTree } from './tags.js';
 import { editCaseDialog, logOnDate } from './ui-log.js';
 import { reflectOnCase } from './ui-reflect.js';
 import { moveToBin } from './bin.js';
-import { shareText, copyText, caseText as shareCaseText, dayText } from './share.js';
+import { shareText, copyText, caseText as shareCaseText, dayTextWithNotes } from './share.js';
 
 // has: tags a case must all have; not: tags it must have none of ('c:16' or a personal tag key); from/to: dates
 const FRESH = () => ({ q: '', has: [], not: [], from: '', to: '', flag: '', mode: null, limit: 150, month: null, day: null });
@@ -345,7 +346,8 @@ function caseRow(c, flagsOf) {
         flags.includes('duplicate') ? h('span', { class: 'flag' }, 'possible duplicate') : null,
         !(c.cats || []).length ? h('span', { class: 'flag err' }, 'no tag') : null,
         c.reflectTag ? h('span', { class: 'flag', title: 'Marked interesting' }, '☆ interesting') : null,
-        (c.tags || []).map(t => h('span', { class: 'flag sc-tag', title: 'Your tag' }, tagName(t)))),
+        (c.tags || []).map(t => h('span', { class: 'flag sc-tag', title: 'Your tag' }, tagName(t))),
+        caseHasNotes(c.id) ? h('button', { class: 'flag note-flag', type: 'button', title: 'Open your notes on this case', 'aria-label': 'Open your notes on this case', onclick: e => { e.stopPropagation(); openNotes({ caseId: c.id }); } }, '✎ note') : null),
         document.documentElement.classList.contains('row-menu') ? rowMenu(c) : h('span', { class: 'acts' },
           // to your own notes (paste into WhatsApp, Notes, Obsidian)
           h('button', { class: 'small row-btn', title: 'Copy this case', 'aria-label': 'Copy this case', onclick: e => { e.stopPropagation(); copyText(shareCaseText(c), 'Case copied: paste it into your notes'); } }, rowIcon('copy'), h('span', { class: 'lbl' }, 'Copy')),
@@ -389,11 +391,14 @@ function calendarView(rows, flagsOf, repaint) {
     const tint = cs.length ? Math.min(4, cs.length) : 0;
     add(grid, h('button', {
       class: `lb-day t${tint} ${iso === today ? 'today' : ''} ${iso === view.day ? 'sel' : ''}`,
-      'aria-label': `${d} ${MONTHS[m - 1]}: ${cs.length} case${cs.length === 1 ? '' : 's'}`, 'aria-pressed': String(iso === view.day),
+      'aria-label': `${d} ${MONTHS[m - 1]}: ${cs.length} case${cs.length === 1 ? '' : 's'}${dayHasNotes(iso) ? ', has notes' : ''}`, 'aria-pressed': String(iso === view.day),
       onclick: () => { view.day = view.day === iso ? null : iso; repaint(); },
-    }, h('span', { class: 'n' }, d), h('span', { class: 'lb-count' + (cs.length ? '' : ' none'), 'aria-hidden': cs.length ? null : 'true' }, cs.length || ''), flagged ? h('i', { class: 'lb-dot', title: 'Has a flagged case' }) : null));
+    }, h('span', { class: 'n' }, d), h('span', { class: 'lb-count' + (cs.length ? '' : ' none'), 'aria-hidden': cs.length ? null : 'true' }, cs.length || ''), flagged ? h('i', { class: 'lb-dot', title: 'Has a flagged case' }) : null,
+      dayHasNotes(iso) ? h('i', { class: 'lb-note', title: 'Has notes' }) : null));
   }
   const dayCases = view.day ? (byDay.get(view.day) || []) : [];
+  const dayNotes = dayHasNotes(view.day);
+  if (dayNotes) ensureNotes();   // the day's Copy includes its notes: have them ready before the tap
   return h('div', {},
     h('div', { class: 'bar lb-calbar' },
       h('button', { class: 'small icon-btn', 'aria-label': 'Previous month', onclick: () => shift(-1) }, '‹'),
@@ -408,8 +413,9 @@ function calendarView(rows, flagsOf, repaint) {
         h('div', { class: 'lb-daybtns' },
           // log on this day: the Log page opens with the date already picked
           h('button', { class: 'small primary', onclick: () => logOnDate(view.day) }, '+ Log a case'),
-          dayCases.length ? h('button', { class: 'small', onclick: () => shareText(dayText(view.day, dayCases)) }, 'Share day') : null,
-          dayCases.length ? h('button', { class: 'small', title: 'Copy this day (format in Settings → Markdown)', 'aria-label': 'Copy this day', onclick: () => copyText(dayText(view.day, dayCases), 'Day copied: paste it into your notes') }, 'Copy') : null)),
+          dayCases.length || dayNotes ? h('button', { class: 'small', onclick: async () => shareText(await dayTextWithNotes(view.day, dayCases)) }, 'Share day') : null,
+          dayCases.length || dayNotes ? h('button', { class: 'small', title: 'Copy this day (format in Settings → Markdown)', 'aria-label': 'Copy this day', onclick: async () => copyText(await dayTextWithNotes(view.day, dayCases), 'Day copied: paste it into your notes') }, 'Copy') : null,
+          dayNotes ? h('button', { class: 'small', onclick: () => openNotes({ day: view.day }) }, '✎ Notes') : null)),
       dayCases.length ? h('ul', { class: 'cases' }, dayCases.map(c => caseRow(c, flagsOf))) : h('p', { class: 'empty' }, view.day === today ? 'No cases yet today.' : 'No cases on this day.'))
       : h('p', { class: 'hint help', style: 'margin-top:10px' }, 'Tap a day to see its cases.'),
     undated.length ? h('details', { style: 'margin-top:12px' },

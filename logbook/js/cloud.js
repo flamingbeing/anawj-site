@@ -10,7 +10,8 @@
 //   logbooks/{email}/cases/{caseId}       case object (see engine.js)
 //   logbooks/{email}/reflections/{id} reflection object (see reflections.js), owner only
 //   logbooks/{email}/images/{id}      { id, data (base64 JPEG), mime, w, h, createdAt }  reflection figures, owner only
-//   logbooks/{email}/bin/{id}         { id, kind: case | reflection, data, deletedAt }  recycle bin (30 days), owner only
+//   logbooks/{email}/notes/{id}       { id, date, title, body, caseId?, createdAt, updatedAt }  personal notes (notepad.js), owner only
+//   logbooks/{email}/bin/{id}         { id, kind: case | reflection | note, data, deletedAt }  recycle bin (30 days), owner only
 //   summaries/{rid}                       counts only, readable by everyone signed in
 //   imports/{rid}                         { email, keys: [importKey], updatedAt }  (which old-form rows are in)
 //   sharedTemplates/{id}                  { id, name, cats, details? }
@@ -19,6 +20,7 @@ import { FIREBASE_CONFIG } from './firebase-config.js';
 import { checkWrite } from './recovery-store.js';
 import * as D from './demo-backend.js';
 import { cleanProfile } from './profile.js';
+import { cleanNote } from './notepad.js';
 import { plain, cleanCase, cleanSummary, cleanResident, cleanTemplate, importDocId, defaultLogbook, cleanReflection, cleanImage, cleanCategoryNames, cleanSubmission } from './demo-backend.js';
 export { cleanSubmission };
 
@@ -163,7 +165,7 @@ export async function deleteAccount(email, onStep = () => {}) {
     return snap.size;
   };
   try {
-    for (const [sub, label] of [['cases', 'cases'], ['reflections', 'reflections'], ['images', 'photos'], ['bin', 'recycle bin']]) {
+    for (const [sub, label] of [['cases', 'cases'], ['reflections', 'reflections'], ['images', 'photos'], ['notes', 'notes'], ['bin', 'recycle bin']]) {
       onStep(`Deleting ${label}…`);
       await wipe(['logbooks', email, sub]);
     }
@@ -283,17 +285,21 @@ export async function saveCase(email, c) {
 // The recovery queue supplies durable offline storage. On reconnect, a transaction
 // checks the version the editor started from before replacing an existing record.
 // No new document fields/permissions are needed; history remains private to this device.
-export function cleanWrite(kind, input) { return input._deleted ? { id: String(input.id), _deleted: true } : kind === 'case' ? cleanCase(input) : cleanReflection(input); }
+const CLEAN = { case: cleanCase, reflection: cleanReflection, note: cleanNote };
+const COLLECTION = { case: 'cases', reflection: 'reflections', note: 'notes' };
+export function cleanWrite(kind, input) { return input._deleted ? { id: String(input.id), _deleted: true } : CLEAN[kind](input); }
+// Every note write comes through here too (notes: saved after a pause in typing, ui-notepad.js)
 export async function commitRecord(email, kind, input, base) {
-  const collection = kind === 'case' ? 'cases' : 'reflections';
+  const collection = COLLECTION[kind];
   const deleted = input._deleted === true;
   const doc = cleanWrite(kind, input);
-  const canonical = value => value ? (kind === 'case' ? cleanCase(value, 0) : cleanReflection(value, 0)) : null;
+  const canonical = value => value ? CLEAN[kind](value, 0) : null;
   const compare = current => checkWrite(canonical(current), deleted ? null : doc, canonical(base));
   if (demo) {
-    const list = kind === 'case' ? await D.listCases(email) : D.reflectionsOf(lc(email));
+    const list = kind === 'case' ? await D.listCases(email) : kind === 'note' ? D.notesOf(lc(email)) : D.reflectionsOf(lc(email));
     const current = list.find(x => x.id === doc.id) || null;
     if (!compare(current)) return doc;
+    if (kind === 'note') return deleted ? (D.deleteNote(email, doc.id), doc) : D.saveNote(email, doc);
     if (deleted) { await (kind === 'case' ? D.deleteCase(email, doc.id) : D.deleteReflection(email, doc.id)); return doc; }
     return kind === 'case' ? D.saveCase(email, doc) : D.saveReflection(email, doc);
   }
@@ -346,6 +352,19 @@ export function watchReflections(email, cb) {
       const list = snap.docs.map(d => ({ ...d.data(), id: d.id })).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
       cb(list, { fromCache: snap.metadata.fromCache });
     }, e => { console.error('Reflection listener failed', e); for (const l of syncErrorListeners) l(e); });
+  });
+  return () => { stopped = true; if (stop) stop(); };
+}
+
+// Live list of the user's notes (owner only). Started only when notes are needed (ui-notepad.js), never at sign-in.
+export function watchNotes(email, cb) {
+  if (demo) return D.watchNotes(email, cb);
+  let stop = null, stopped = false;
+  sdk().then(({ db, F }) => {
+    if (stopped) return;
+    stop = F.onSnapshot(F.collection(db, 'logbooks', lc(email), 'notes'), snap => {
+      cb(snap.docs.map(d => ({ ...d.data(), id: d.id })), { fromCache: snap.metadata.fromCache });
+    }, e => { console.error('Notes listener failed', e); for (const l of syncErrorListeners) l(e); });
   });
   return () => { stopped = true; if (stop) stop(); };
 }

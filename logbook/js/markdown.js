@@ -13,12 +13,15 @@
 import { fmtDate, caseParts, sortCodes } from './engine.js';
 import { BY_CODE, DEFAULT_NAMES } from './categories.js';
 import { HEADING_BY_ID } from './reflections.js';
+import { notesMd, sortNotes } from './notepad.js';
 
 export const DEFAULT_MARKDOWN = {
   // Copy / Share (the same as the Copy & share format's default before this page existed)
   dayHead: '[[{{date}}]]',
   dayCase: '{{n}}. {{initials}}\n{{details}}',
   oneCase: '[[{{date}}]]\n{{initials}}\n{{details}}',
+  // the day's own notes (More → Notes), after its cases; or put {{notes}} in the day heading to place them there
+  dayNotes: '## Notes\n\n{{notes}}',
   dateFormat: 'iso',            // 'iso' 2026-10-10 | 'long' 10 Oct 2026 | 'dmy' 10/10/2026
   cats: 'names',                // {{categories}}: 'names' | 'codes' | 'tags' (#LSCS)
   links: 'wiki',                // 'wiki' [[note]] | 'md' [note](note.md)
@@ -37,7 +40,7 @@ export const DEFAULT_MARKDOWN = {
 export const CASE_FILLINS = ['date', 'iso', 'day', 'weekday', 'n', 'count', 'initials', 'details', 'categories', 'categoryCodes', 'tags', 'reflection'];
 export const REFL_FILLINS = ['title', 'date', 'iso', 'day', 'initials', 'diagnosis', 'heading', 'status', 'summary', 'point', 'text', 'n', 'image', 'caption', 'references'];
 export const FM_FIELDS = ['date', 'heading', 'status', 'tags', 'initials', 'diagnosis', 'jr'];
-const TEXT_KEYS = ['dayHead', 'dayCase', 'oneCase', 'fileName', 'reflTitle', 'reflSummary', 'reflPoint', 'reflFigure', 'reflRefs'];
+const TEXT_KEYS = ['dayHead', 'dayCase', 'dayNotes', 'oneCase', 'fileName', 'reflTitle', 'reflSummary', 'reflPoint', 'reflFigure', 'reflRefs'];
 const CHOICES = { dateFormat: ['iso', 'long', 'dmy'], cats: ['names', 'codes', 'tags'], links: ['wiki', 'md'], caseNotes: ['month', 'day'], folders: ['month', 'heading', 'flat'] };
 const MAX_FIELD = 1000;
 export const MAX_JSON = 8 * 1024;   // what settings.markdown may take in the account
@@ -125,12 +128,18 @@ function caseVals(c, n, count, f, ctx) {
 // Copy / Share: one case, and a day (heading, then each case; a blank line between cases when the case
 // format takes more than one line, none for a one-line format)
 export function mdCase(c, m, ctx = {}) { const f = cleanMarkdown(m); return fill(f.oneCase, caseVals(c, 1, 1, f, ctx)); }
-export function mdDay(date, cases, m, ctx = {}) {
+// notes: that day's notes (More → Notes); {{notes}} in the day heading puts them there, otherwise they follow the
+// cases in the dayNotes format. A day without notes gets no Notes heading.
+export function mdDay(date, cases, m, ctx = {}, notes = []) {
   const f = cleanMarkdown(m);
-  const head = fill(f.dayHead, { date: fmtMdDate(date, f.dateFormat), iso: date || '', day: date ? fmtDate(date) : 'No date', weekday: weekday(date), count: cases.length });
+  const nText = notesMd(notes);
+  const vals = { date: fmtMdDate(date, f.dateFormat), iso: date || '', day: date ? fmtDate(date) : 'No date', weekday: weekday(date), count: cases.length };
+  const inHead = /\{\{?notes\}?\}/.test(f.dayHead);
+  const head = fill(f.dayHead, inHead ? { ...vals, notes: nText } : vals);
   const sep = f.dayCase.includes('\n') ? '\n\n' : '\n';
   const body = cases.map((c, i) => fill(f.dayCase, caseVals(c, i + 1, cases.length, f, ctx))).join(sep);
-  return head ? `${head}\n${body}` : body;
+  const tail = !inHead && nText ? fill(f.dayNotes, { ...vals, notes: nText }) : '';
+  return [head, body].filter(Boolean).join('\n') + (tail ? (head || body ? '\n\n' : '') + tail : '');
 }
 
 // ---- the notes export ----
@@ -180,18 +189,24 @@ export function reflectionNote(r, m, { path = '', images = {}, caseLink = '' } =
 }
 
 // case notes: one per month ("Cases/2026-10.md") or per day ("Cases/2026-10/2026-10-10.md")
-export function caseNotes(cases, m, ctx = {}) {
+// notes: dated notes join their day (a day with only notes still gets its note); undated notes go in Notes.md
+export function caseNotes(cases, m, ctx = {}, notes = []) {
   const f = cleanMarkdown(m);
-  const byDay = new Map();
+  const byDay = new Map(), notesBy = new Map();
+  for (const n of notes) if (n.date) { if (!notesBy.has(n.date)) notesBy.set(n.date, []); notesBy.get(n.date).push(n); }
   for (const c of [...cases].sort((a, b) => String(a.date || '9999').localeCompare(String(b.date || '9999')) || (a.createdAt || 0) - (b.createdAt || 0))) {
     const k = c.date || ''; if (!byDay.has(k)) byDay.set(k, []); byDay.get(k).push(c);
   }
+  for (const d of notesBy.keys()) if (!byDay.has(d)) byDay.set(d, []);
+  const order = [...byDay.keys()].sort((a, b) => String(a || '9999').localeCompare(String(b || '9999')));
+  const sorted = new Map(order.map(k => [k, byDay.get(k)]));
+  byDay.clear(); for (const [k, v] of sorted) byDay.set(k, v);
   const files = [];
-  const dayText = (date, list) => (date ? mdDay(date, list, f, ctx) : `## No date\n${list.map((c, i) => fill(f.dayCase, caseVals(c, i + 1, list.length, f, ctx))).join('\n')}`);
+  const dayText = (date, list) => (date ? mdDay(date, list, f, ctx, notesBy.get(date) || []) : `## No date\n${list.map((c, i) => fill(f.dayCase, caseVals(c, i + 1, list.length, f, ctx))).join('\n')}`);
   if (f.caseNotes === 'day') {
     for (const [date, list] of byDay) {
       const path = date ? `Cases/${date.slice(0, 7)}/${date}.md` : 'Cases/No date.md';
-      const fm = f.frontMatter ? frontMatter({ date, cases: String(list.length), tags: ['apmes/cases'] }) : '';
+      const fm = f.frontMatter ? frontMatter({ date, cases: String(list.length), ...(notesBy.has(date) ? { notes: String(notesBy.get(date).length) } : {}), tags: ['apmes/cases'] }) : '';
       files.push({ path, text: fm + dayText(date, list) + '\n' });
     }
   } else {
@@ -224,15 +239,18 @@ export function progressNote(rows, refl, { year = '', today = '', ctx = {} } = {
 
 // Every file of the export: [{ path, text }]; figures come separately (the caller fetches the pictures).
 // opts: { cases: true, reflections: true, progress: true }; images: { [imageId]: 'images/<file>' }
-export function exportNotes({ cases = [], reflections = [], m = null, ctx = {}, images = {}, progress = null, opts = {} }) {
+export function exportNotes({ cases = [], reflections = [], notes = [], m = null, ctx = {}, images = {}, progress = null, opts = {} }) {
   const f = cleanMarkdown(m);
-  const o = { cases: true, reflections: true, progress: true, ...opts };
+  const o = { cases: true, reflections: true, progress: true, notes: true, ...opts };
+  const myNotes = o.notes ? notes : [];
   const files = [], used = new Set();
   const reflPath = new Map();
   if (o.reflections) for (const r of reflections) reflPath.set(r.id, reflectionPath(r, f, used));
   const byCase = new Map(reflections.filter(r => r.caseId && reflPath.has(r.id)).map(r => [r.caseId, r]));
   const caseCtx = { ...ctx, reflectionLink: c => { const r = byCase.get(c.id); return r ? noteLink(reflPath.get(r.id), r.title || 'Reflection', f.links) : ''; } };
-  if (o.cases) files.push(...caseNotes(cases, f, caseCtx));
+  if (o.cases || myNotes.some(n => n.date)) files.push(...caseNotes(o.cases ? cases : [], f, caseCtx, myNotes));
+  const undated = myNotes.filter(n => !n.date);
+  if (undated.length) files.push({ path: 'Notes.md', text: (f.frontMatter ? frontMatter({ notes: String(undated.length), tags: ['apmes/notes'] }) : '') + '# Notes\n\n' + notesMd(sortNotes(undated)) + '\n' });
   if (o.reflections) for (const r of reflections) {
     const path = reflPath.get(r.id);
     const c = r.caseId && o.cases ? cases.find(x => x.id === r.caseId) : null;
