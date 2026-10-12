@@ -72,6 +72,10 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   reads as the next day's once the test runs over 12 h later (`nowFor` picks the nearest day).
 - **Long reading numbers** (12 Oct 2026): `fitNums()` shrinks a reading's number until it fits its box (CSS
   container units didn't work under the app's zoom); checked at 320 and 390 px, zoom 1 and 1.25.
+- **Two patients at once** (12 Oct 2026): the next patient pre-warms while the last is in surgery, so due alerts
+  cover every patient being charted on the phone (not deleted, locked or complete; changed in the last 12 hours),
+  other patients' alerts start with their Subject ID, and the home list shows each one's reading due within 2 min,
+  now or late. The top bar's countdown also shows the other tab's reading once it is due.
 - **Never send an empty `f`** (lesson, 12 Oct 2026): `setDoc(…, { f: {} }, { merge: true })` replaces the server's
   `f` with an empty map (an empty map is a leaf in the merge). Lock / unlock / delete sent one and wiped the server
   copy's readings; push now omits an empty `f`, lock sends the full record, and each phone resends all its patients

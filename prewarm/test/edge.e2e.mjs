@@ -395,6 +395,19 @@ await tryit(async () => {
   log((await pg.textContent('#clock .next')) === main, 'Others tab top bar shows the temperature due: ' + await pg.textContent('#clock .next'));
   await ctx.close();
 });
+// V. two patients at once (the next pre-warms while the last is in surgery): the home list shows what each needs now,
+// and the open patient's screen alerts for the other one too
+await tryit(async () => {
+  const { ctx, pg } = await fresh();
+  await pg.waitForTimeout(1200);
+  const lines = await pg.$$eval('.dueline:not([hidden])', els => els.map(e => e.textContent));
+  log(lines.length === 2 && lines.every(t => /^Temp \d+ min: due now$/.test(t)), 'home list shows each patient\'s due reading: ' + JSON.stringify(lines));
+  await pg.evaluate(() => localStorage.removeItem('prewarm-demo:alerted'));
+  await open(pg, 1); await pg.waitForTimeout(1500);
+  const bn = await pg.evaluate(() => document.querySelector('.banner')?.textContent || '');
+  log(/DEMO-01: Temperature \d+ min reading due now/.test(bn), 'other patient\'s due reading alerts on this screen: ' + bn);
+  await ctx.close();
+});
 await b.close();
 if (fails.length) { console.error('prewarm edge: FAIL\n- ' + fails.join('\n- ')); process.exit(1); }
-console.log('prewarm edge: ok (midnight, surgery end, double-tap Save, BP checks, back button, Log, Enter, still to fill, swipe, stray taps, time order, corrections, BMI, follow-ups, blanks, typed answers, alerts everywhere, duplicates, storage full, lock warning, late readings, delete and restore, prewarm off alert, warming yes / no, touch double taps, typing then leaving, other tab due)');
+console.log('prewarm edge: ok (midnight, surgery end, double-tap Save, BP checks, back button, Log, Enter, still to fill, swipe, stray taps, time order, corrections, BMI, follow-ups, blanks, typed answers, alerts everywhere, duplicates, storage full, lock warning, late readings, delete and restore, prewarm off alert, warming yes / no, touch double taps, typing then leaving, other tab due, two patients)');
