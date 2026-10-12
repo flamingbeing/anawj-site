@@ -411,7 +411,8 @@ hooks.paintTabs = () => paintTabs();
 // screen finishes the slide, then the real page takes the copy's place underneath (same spot, same scroll), so
 // nothing pops. Otherwise both spring back. A sub-page counts as the bar tab it sits under. Never from fields,
 // dialogs, drag handles, the tag pills being dragged, anything that scrolls sideways (tables, the date chips) or the
-// screen's edges (the phone's own Back gesture). Reduce motion: no sliding, it just switches.
+// screen's edges (the phone's own Back gesture). Works anywhere on the screen, including the empty background under a
+// short page (owner). Reduce motion: no sliding, it just switches.
 let swipe = null;
 const snaps = new Map();   // bar tab → still copy of its page (inert, no ids), taken when leaving it
 const scrollsSideways = el => { for (let n = el; n && n !== document.body; n = n.parentElement) if (n.scrollWidth > n.clientWidth + 2 && /auto|scroll/.test(getComputedStyle(n).overflowX)) return true; return false; };
@@ -447,15 +448,16 @@ function endSwipe(s) {
   document.documentElement.classList.remove('swiping');
   move(app, 0);
 }
-app.addEventListener('touchstart', e => {
+document.addEventListener('touchstart', e => {
   swipe = null;
-  if (!document.documentElement.classList.contains('swipe-tabs') || e.touches.length !== 1) return;
+  if (!S.user || !document.documentElement.classList.contains('swipe-tabs') || e.touches.length !== 1) return;
   const t = e.target, x = e.touches[0].clientX;
   if (x < 20 || x > innerWidth - 20) return;
-  if (t.closest('input, textarea, select, dialog, [contenteditable], .dragging, .te-pillitem, .te-handle, .refl-handle, li.refl-row.edit') || scrollsSideways(t)) return;
+  // anywhere on the screen, the background under a short page included; not on the tab bar or a banner
+  if (t.closest('#tabs, .banner, input, textarea, select, dialog, [contenteditable], .dragging, .te-pillitem, .te-handle, .refl-handle, li.refl-row.edit') || scrollsSideways(t)) return;
   swipe = { x, y: e.touches[0].clientY, at: Date.now(), lock: '', dx: 0, target: null, peek: null };
 }, { passive: true });
-app.addEventListener('touchmove', e => {
+document.addEventListener('touchmove', e => {
   const s = swipe;
   if (!s || e.touches.length !== 1) return;
   const dx = e.touches[0].clientX - s.x, dy = e.touches[0].clientY - s.y;
@@ -483,8 +485,8 @@ const springBack = s => {
   move(app, 0); if (s.peek) move(s.peek, from < 0 ? innerWidth : -innerWidth);
   anims[0].finished.catch(() => {}).then(() => endSwipe(s));
 };
-app.addEventListener('touchcancel', () => { const s = swipe; swipe = null; if (s && s.lock) springBack(s); }, { passive: true });
-app.addEventListener('touchend', async e => {
+document.addEventListener('touchcancel', () => { const s = swipe; swipe = null; if (s && s.lock) springBack(s); }, { passive: true });
+document.addEventListener('touchend', async e => {
   const s = swipe; swipe = null;
   if (!s || !e.changedTouches.length) return;
   const dx = e.changedTouches[0].clientX - s.x, dy = e.changedTouches[0].clientY - s.y;

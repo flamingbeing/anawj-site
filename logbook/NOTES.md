@@ -216,7 +216,8 @@ portfolio content.
   them; a hidden start tab gives way to the first one on the bar. All set at first paint where it matters.
 - **Optional interaction** (Advanced display, device): **Swipe left or right to change tab** (`swipeTabs`, html
   `swipe-tabs`; app.js touch handlers on main). **On by default** (owner, Oct 2026: `swipeTabs: false` = off, the
-  switch is also in Show or hide → Header and tabs). Like a deck of cards (owner, Oct 2026: no popping in, no bar
+  switch is also in Show or hide → Header and tabs). Touch handlers on the document, so the empty background under
+  a short page swipes too (owner); never from the tab bar or a banner. Like a deck of cards (owner, Oct 2026: no popping in, no bar
   moving): the page follows the finger and the next tab's page comes in beside it while dragging, as a still copy of
   that page from when it was last left (`snaps`, taken in `changeScreen`; inert, no ids) or a loading card for a tab
   not opened yet (`makePeek`, fixed at the page's unscrolled top). Letting go after a quick swipe (≥ 70 px, mostly
