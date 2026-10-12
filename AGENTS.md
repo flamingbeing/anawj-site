@@ -10,6 +10,8 @@ Static site on GitHub Pages (public repo: no names, patient data or real evaluat
 - `nuh-roster/`: NUH anaesthesia daily roster (own Firebase project `nuh-roster`). Start with `nuh-roster/NOTES.md`: its department section (grades, postings, roster sheet, notation, HMS monthly rosters, short names) applies to any app dealing with NUH anaesthesia staff.
 - `apmes/`: APMES programme documents (not secret): the EPA Guidebook v8 and requirements transcribed (the evals
   data is built from them), and the blank portfolio template the logbook tests use. See `apmes/README.md`.
+  Before adding a programme file, check its cover/contributor pages and file details (author, embedded files) for
+  names; add a cleaned copy.
 - `design/tokens.css`: shared design tokens.
 
 Rules that bite:
