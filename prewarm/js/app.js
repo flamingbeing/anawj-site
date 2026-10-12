@@ -77,13 +77,36 @@ const sharing = () => cloud.enabled && (shared.member || shared.admin);
 // send changed fields; Firestore keeps them on the phone and sends them when there is signal
 // patients with changes sent but not yet confirmed by the server (no signal), kept across reloads; Log out warns
 let pending = read('pending', {});
+// when this phone was last fully in step with the server (nothing waiting to send, team's changes received)
+let lastSync = read('lastSync', 0);
+function synced() {
+  if (Object.keys(pending).length) return;
+  lastSync = Date.now(); write('lastSync', lastSync); showSync();
+}
+function syncText() {
+  if (!sharing()) return '';
+  const n = Object.keys(pending).map(id => patients[id]).filter(p => p && !p.deleted).length;
+  const when = !lastSync ? '' : (() => {
+    const m = (Date.now() - lastSync) / 60000, d = new Date(lastSync);
+    if (m < 1) return 'just now';
+    if (m < 60) return Math.floor(m) + ' min ago';
+    const t = d.toTimeString().slice(0, 5);
+    return d.toDateString() === new Date().toDateString() ? 'at ' + t : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ' ' + t;
+  })();
+  if (n) return `Not synced: ${n} patient${n === 1 ? '' : 's'} waiting for signal.${when ? ' Last synced ' + when + '.' : ''}`;
+  return when ? `Synced ${when}.` : 'Not synced yet.';
+}
+// every "last synced" line on screen
+function showSync() { const t = syncText(); document.querySelectorAll('.syncline').forEach(el => { el.textContent = t; el.classList.toggle('late', /^Not/.test(t)); }); }
+setInterval(showSync, 20000);
 function sync(p, ids) {
   if (!sharing()) return;
   p.site ||= val(p, 'site') || shared.member?.site || settings.site;
   if (!p.site) return;
   const tok = Date.now() + Math.random();
   pending[p.id] = tok; write('pending', pending);
-  cloud.push(p, ids).then(() => { if (pending[p.id] === tok) { delete pending[p.id]; write('pending', pending); } })
+  showSync();
+  cloud.push(p, ids).then(() => { if (pending[p.id] === tok) { delete pending[p.id]; write('pending', pending); synced(); } })
     .catch(e => toast(cloud.friendly(e)));
 }
 // Log out (owner, 12 Oct 2026): leaves the team and deletes every patient on this phone, after a warning, and a
@@ -93,9 +116,9 @@ async function logOut(btn) {
   const who = shared.member ? `the ${shared.member.site} team` : 'the study';
   if (!confirm(`Log out of ${who} on this phone?\n\nThis deletes all ${n} patient${n === 1 ? '' : 's'} from this phone. What has synced stays with your team.`)) return;
   btn.disabled = true; btn.textContent = 'Checking everything has synced…';
-  if (Object.keys(pending).length && await cloud.flushed(6000)) { pending = {}; write('pending', pending); }
+  if (Object.keys(pending).length && await cloud.flushed(6000)) { pending = {}; write('pending', pending); synced(); }
   const unsynced = Object.keys(pending).map(id => patients[id]).filter(p => p && !p.deleted).map(sid);
-  if (unsynced.length && !confirm(`Not synced yet: ${unsynced.join(', ')}.\n\nThese changes haven’t reached your team (no signal?). Logging out now loses them. Cancel, get signal and wait a moment, or Export Excel first.\n\nLog out anyway and lose them?`)) {
+  if (unsynced.length && !confirm(`Not synced yet: ${unsynced.join(', ')}.${lastSync ? ' ' + syncText().replace(/^Not synced:[^.]*\. ?/, '') : ''}\n\nThese changes haven’t reached your team (no signal?). Logging out now loses them. Cancel, get signal and wait a moment, or Export Excel first.\n\nLog out anyway and lose them?`)) {
     btn.disabled = false; btn.textContent = 'Log out'; return;
   }
   shared.unwatch?.();
@@ -107,7 +130,8 @@ async function logOut(btn) {
 async function watch() {
   shared.unwatch?.(); shared.unwatch = null;
   if (!sharing()) return;
-  shared.unwatch = await cloud.watchPatients(shared.admin ? null : shared.member.site, list => {
+  shared.unwatch = await cloud.watchPatients(shared.admin ? null : shared.member.site, (list, meta) => {
+    if (meta.server) synced();
     let changed = false;
     for (const r of list) {
       const local = patients[r.id];
@@ -155,7 +179,7 @@ if (cloud.enabled) cloud.onUser(async u => {
   uploadLocal();
   await watch();
   // changes held over from an earlier visit go out with the next signal: then nothing is pending
-  if (sharing() && Object.keys(pending).length) cloud.flushed(600000).then(ok => { if (ok) { pending = {}; write('pending', pending); } });
+  if (sharing() && Object.keys(pending).length) cloud.flushed(600000).then(ok => { if (ok) { pending = {}; write('pending', pending); synced(); } });
   document.body.dataset.cloud = 'ready';
   // redraw only when sharing changed, so a half-typed join code isn't wiped
   if (before !== !!(shared.member || shared.admin) && !view.contains(document.activeElement)) render();
@@ -231,7 +255,7 @@ function home() {
       return `<li><a href="#/p/${p.id}"${val(p, 'done') ? ` data-done="${esc(val(p, 'done'))}"` : ''}><b>${esc(sid(p))}${val(p, 'site') ? ` <small>${esc(val(p, 'site'))}</small>` : ''}</b><span${val(p, 'done') ? ' class="okline"' : ''}>${esc(status(p))}</span>
         <small>${e ? 'Last entry ' + new Date(e.t).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) + (e.by ? ' by ' + esc(e.by) : '') : 'No entries yet'}</small></a></li>`;
     }).join('')}</ul>` : `<p class="muted">No patients yet. Tap <b>New patient</b> on the morning of surgery.</p>`}
-    <p class="muted small">${sharing() ? `Shared with the ${esc(shared.admin ? 'whole study (admin)' : shared.member.site + ' team')}. Readings sync when there is signal.` : `Data stays on this phone. <a href="#/settings">Join your hospital’s team</a> to share patients.`} Study IDs only: no names or hospital numbers.</p>`);
+    <p class="muted small">${sharing() ? `Shared with the ${esc(shared.admin ? 'whole study (admin)' : shared.member.site + ' team')}. Readings sync when there is signal. <b class="syncline">${esc(syncText())}</b>` : `Data stays on this phone. <a href="#/settings">Join your hospital’s team</a> to share patients.`} Study IDs only: no names or hospital numbers.</p>`);
   $('#new').onclick = () => go('#/new');
   // a patient marked complete: warn on the first tap, open on the second
   view.querySelectorAll('.list a[data-done]').forEach(a => a.onclick = e => {
@@ -884,9 +908,9 @@ function sharingHtml() {
   const chips = `<div class="seg sites">${SITES.map(x => `<button type="button" class="chip" data-site="${x}" aria-pressed="${settings.site === x}" ${shared.member ? 'disabled' : ''}>${x}</button>`).join('')}</div>`;
   if (!cloud.enabled) return `${chips}<small class="muted">New patients on this phone are recorded at this hospital. Sharing is off in demo mode.</small>`;
   if (shared.email && !shared.admin) return `<p class="note">${esc(shared.email)} isn’t on the study’s admin list. Ask the owner to add it.</p><button class="secondary" id="leave">Log out</button>`;
-  if (shared.admin) return `<p class="ok-box">Signed in as study admin (${esc(shared.email)}). You see every hospital’s patients.</p>
+  if (shared.admin) return `<p class="ok-box">Signed in as study admin (${esc(shared.email)}). You see every hospital’s patients.<br><span class="syncline">${esc(syncText())}</span></p>
     <a class="secondary" href="#/admin">Join codes and members</a><button class="secondary" id="leave">Log out</button>`;
-  if (shared.member) return `<p class="ok-box">Sharing with the ${esc(shared.member.site)} team. Readings sync when there is signal.</p><button class="secondary" id="leave">Log out</button>
+  if (shared.member) return `<p class="ok-box">Sharing with the ${esc(shared.member.site)} team. Readings sync when there is signal.<br><span class="syncline">${esc(syncText())}</span></p><button class="secondary" id="leave">Log out</button>
     <small class="muted">Logging out deletes every patient on this phone (it warns first, and again if something hasn’t synced).</small>`;
   return `<label class="lab" for="code">Join code</label><input id="code" autocomplete="off" autocapitalize="characters" placeholder="e.g. NTF-…">
     <small class="muted">From a study admin, or just open the join link they sent. The code says which hospital. Joining shares this phone’s patients with that hospital’s team.</small>

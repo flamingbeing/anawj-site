@@ -53,6 +53,9 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   leaves the team / signs out, deletes every patient and Firestore's offline copy on the phone, keeps settings, reloads.
 - **Admin join codes** (owner, 12 Oct 2026): the code is shown big; tapping it copies it. "New code" is a small link
   and warns first: the old code, link and QR stop working for new phones; phones already in stay in (use Remove).
+- **Last synced** (owner, 12 Oct 2026): home page and Settings show "Synced just now / N min ago / at 14:20 / 12 Oct
+  14:20", or "Not synced: N patients waiting for signal. Last synced …" (amber). `lastSync` is set when nothing is
+  pending and the server has confirmed the phone's copy (a server snapshot, a confirmed push, or waitForPendingWrites).
 - **Screen size** (Settings, this phone only): Smaller / Small / Normal / Large / Larger zooms the whole app
   (`--ui-zoom` on body). Normal by default.
 - **Form view** (owner, 12 Oct 2026): the study's real paper form (data collection form v3.2, .docx) with text put in:
