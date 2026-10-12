@@ -5,7 +5,9 @@
 // a day's notes in the Logbook, the Markdown export, a backup) and then stays for the visit. Typing saves after
 // 3 s of quiet, and at once when the note is left, the field loses focus or the page is hidden; every write goes
 // through the durable write queue (writes.js → cloud.commitRecord 'note'), so notes work offline too.
-// settings.noteIndex (which days and cases have notes) lets the Logbook mark them without reading any note.
+// The note index (which days and cases have notes; its own owner-only doc, meta/noteIndex) lets the Logbook mark
+// them without reading any note. It used to live in settings.noteIndex, which the app owner can read; it moves on the
+// first sync and the old copy is cleared.
 
 import { S, h, toast, fill, hooks, writes, cloud, transients, settings, patchLogbook, resetters, todayISO, modal } from './ui-core.js';
 import { uid, fmtDate, caseParts } from './engine.js';
@@ -44,13 +46,35 @@ function stopNotes() { if (stop) stop(); stop = null; owner = null; raw = []; re
 resetters.push(() => { stopNotes(); Object.assign(nv, { q: '', day: '', caseId: '', editing: null, preview: false }); });
 writes.onChange(() => { if (owner) { apply(); if (synced) syncIndex(); } });
 
-// keep settings.noteIndex in step (only from the server's copy, so a stale offline cache never overwrites it)
-function syncIndex() {
-  if (!Array.isArray(S.notes) || !S.logbook) return;
-  const next = noteIndex(S.notes);
-  if (!sameIndex(next, settings().noteIndex)) patchLogbook({ settings: { noteIndex: next } });
+// the index doc, read the first time the Logbook asks (one small read), then kept live for the visit
+let idxStop = null, idxOwner = null;
+function watchIndex() {
+  const me = mine();
+  if (!me || idxOwner === me) return;
+  if (idxStop) idxStop();
+  idxOwner = me;
+  idxStop = cloud.watchNoteIndex(me, data => {
+    if (idxOwner !== me) return;
+    const next = data ? cleanNoteIndex(data) : null;
+    if (JSON.stringify(next) === JSON.stringify(S.noteIndex)) return;
+    S.noteIndex = next;
+    if (S.tab === 'logbook') queueMicrotask(() => hooks.render());   // only the Logbook shows note marks
+  });
 }
-export const notesIndex = () => cleanNoteIndex(settings().noteIndex);
+resetters.push(() => { if (idxStop) idxStop(); idxStop = null; idxOwner = null; S.noteIndex = null; });
+
+// keep the index in step (only from the server's copy of the notes, so a stale offline cache never overwrites it)
+function syncIndex() {
+  const me = mine();
+  if (!Array.isArray(S.notes) || !S.logbook || !me) return;
+  watchIndex();
+  const next = noteIndex(S.notes);
+  if (!sameIndex(next, S.noteIndex)) { S.noteIndex = next; cloud.saveNoteIndex(me, next).catch(e => console.error('Note index not saved', e)); }
+  // the old copy in the logbook doc (readable by the app owner) goes
+  if (settings().noteIndex != null) patchLogbook({ settings: { noteIndex: null } });
+}
+// until the index doc has arrived, an older settings.noteIndex still marks the days
+export const notesIndex = () => { watchIndex(); return cleanNoteIndex(S.noteIndex || settings().noteIndex); };
 export const dayHasNotes = date => !!date && notesIndex().days.includes(date);
 export const caseHasNotes = id => !!id && notesIndex().cases.includes(id);
 

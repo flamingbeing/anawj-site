@@ -165,7 +165,7 @@ export async function deleteAccount(email, onStep = () => {}) {
     return snap.size;
   };
   try {
-    for (const [sub, label] of [['cases', 'cases'], ['reflections', 'reflections'], ['images', 'photos'], ['notes', 'notes'], ['bin', 'recycle bin']]) {
+    for (const [sub, label] of [['cases', 'cases'], ['reflections', 'reflections'], ['images', 'photos'], ['notes', 'notes'], ['meta', 'notes index'], ['bin', 'recycle bin']]) {
       onStep(`Deleting ${label}…`);
       await wipe(['logbooks', email, sub]);
     }
@@ -362,11 +362,34 @@ export function watchNotes(email, cb) {
   let stop = null, stopped = false;
   sdk().then(({ db, F }) => {
     if (stopped) return;
-    stop = F.onSnapshot(F.collection(db, 'logbooks', lc(email), 'notes'), snap => {
+    // with metadata changes, so a cache that already matches the server still reports fromCache: false (ui-notepad.js)
+    stop = F.onSnapshot(F.collection(db, 'logbooks', lc(email), 'notes'), { includeMetadataChanges: true }, snap => {
       cb(snap.docs.map(d => ({ ...d.data(), id: d.id })), { fromCache: snap.metadata.fromCache });
     }, e => { console.error('Notes listener failed', e); for (const l of syncErrorListeners) l(e); });
   });
   return () => { stopped = true; if (stop) stop(); };
+}
+
+// Which days and cases have notes ({ days, cases, n }), so the Logbook can mark them without reading a note. Its own
+// owner-only doc (logbooks/{email}/meta/noteIndex), not the logbook doc, which the app owner can read. One small read
+// when the Logbook first needs it. cb(index or null, meta). Returns an unsubscribe function.
+export function watchNoteIndex(email, cb) {
+  if (demo) return D.watchNoteIndex(email, cb);
+  let stop = null, stopped = false;
+  sdk().then(({ db, F }) => {
+    if (stopped) return;
+    stop = F.onSnapshot(F.doc(db, 'logbooks', lc(email), 'meta', 'noteIndex'), snap => {
+      cb(snap.exists() ? snap.data() : null, { fromCache: snap.metadata.fromCache });
+    }, e => console.error('Note index listener failed', e));
+  });
+  return () => { stopped = true; if (stop) stop(); };
+}
+export async function saveNoteIndex(email, idx) {
+  if (demo) return D.saveNoteIndex(email, idx);
+  const { db, F } = await sdk();
+  const doc = { days: idx.days, cases: idx.cases, n: idx.n, updatedAt: Date.now() };
+  await queued(F.setDoc(F.doc(db, 'logbooks', lc(email), 'meta', 'noteIndex'), doc));
+  return doc;
 }
 
 export async function saveReflection(email, r) {

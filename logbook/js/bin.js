@@ -92,9 +92,11 @@ export async function restoreFromBin(id) {
     if (S.cases.some(c => c.id === out.id)) out.id = uid();
     await restoreCase(out);    // updates S.cases, the counts and the summary
   } else if (e.kind === 'note') {
-    if (Array.isArray(S.notes) && S.notes.length >= MAX_NOTES) throw new Error(`you already have ${MAX_NOTES} notes; delete one first`);
+    // the notes may not be loaded yet (they load on first use): load them, so the limit and the id check hold
+    const have = (await (await import('./ui-notepad.js')).ensureNotes().catch(() => null)) || S.notes || [];
+    if (have.length >= MAX_NOTES) throw new Error(`you already have ${MAX_NOTES} notes; delete one first`);
     out = { ...e.data };
-    if ((S.notes || []).some(n => n.id === out.id)) out.id = uid();
+    if (have.some(n => n.id === out.id)) out.id = uid();
     out = await writes.save('note', mine(), out, null);
   } else {
     out = { ...e.data };

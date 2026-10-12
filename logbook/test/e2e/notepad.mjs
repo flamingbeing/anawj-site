@@ -9,7 +9,7 @@ try { for (const width of [390, 1280]) {
   await ctx.addInitScript(() => localStorage.setItem('apmes-logbook-demo-small', '1'));
   const p = await ctx.newPage(), errors = [];
   p.on('pageerror', e => errors.push(e.message)); p.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
-  const S = () => p.evaluate(async () => { const { S } = await import('./js/ui-core.js'); return { notes: S.notes, index: S.logbook?.settings?.noteIndex || null }; });
+  const S = () => p.evaluate(async () => { const { S } = await import('./js/ui-core.js'); return { notes: S.notes, index: S.noteIndex || null }; });
   const today = await p.evaluate(() => 0) || null;
   await p.goto(base + '?demo#log'); await p.waitForSelector('textarea.details');
   const iso = await p.evaluate(async () => (await import('./js/engine.js')).todayISO());
@@ -42,6 +42,8 @@ try { for (const width of [390, 1280]) {
   assert.match(await p.locator('.notes-count').innerText(), /^1 of 100$/);
   assert.match(await p.locator('ul.notes-rows').innerText(), /Fake teaching point/);
   assert.deepEqual((await S()).index, { days: [iso], cases: [], n: 1 });
+  // the index lives in its own owner-only doc, never in the logbook doc the app owner can read
+  assert.equal(await p.evaluate(async () => { const { S } = await import('./js/ui-core.js'); return S.logbook.settings.noteIndex ?? null; }), null);
 
   // an undated note goes on top; Back closes the editor and keeps what was typed
   await p.getByRole('button', { name: '+ New note' }).click();
@@ -75,7 +77,7 @@ try { for (const width of [390, 1280]) {
   await p.locator('dialog[open] .pick-cases li').first().click();
   await p.locator('.note-link').waitFor();
   await p.getByRole('button', { name: 'Done' }).click();
-  await p.waitForFunction(async () => { const { S } = await import('./js/ui-core.js'); return (S.logbook.settings.noteIndex?.cases || []).length === 1; });
+  await p.waitForFunction(async () => { const { S } = await import('./js/ui-core.js'); return (S.noteIndex?.cases || []).length === 1; });
   const caseId = (await S()).index.cases[0];
   await p.locator('[role=tab][data-tab=logbook]').click();
   const list = p.locator('main .seg button').filter({ hasText: /^List$/ }); await list.first().click();

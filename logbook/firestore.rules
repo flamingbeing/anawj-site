@@ -117,6 +117,12 @@ service cloud.firestore {
         allow read, delete: if isOwner(email);
         allow create, update: if isOwner(email) && validNote(id, request.resource.data);
       }
+      // which days and cases have notes (meta/noteIndex), so the Logbook can mark them without reading a note: owner
+      // only like the notes (it used to sit in the logbook doc's settings, which the app owner can read)
+      match /meta/{id} {
+        allow read, delete: if isOwner(email);
+        allow create, update: if isOwner(email) && id == 'noteIndex' && validNoteIndex(request.resource.data);
+      }
 
       // reflection figures (base64 JPEG/PNG, one per doc): owner only. Adding one needs a place on
       // the programme's residents list (isMember), so the shared database only holds residents' photos.
@@ -189,6 +195,13 @@ service cloud.firestore {
         && d.data is string && d.data.size() < 750000
         && d.mime in ['image/jpeg', 'image/png']
         && optNumber(d, 'w') && optNumber(d, 'h') && optNumber(d, 'createdAt');
+    }
+    function validNoteIndex(d) {
+      return d.keys().hasOnly(['days', 'cases', 'n', 'updatedAt'])
+        && d.days is list && d.days.size() <= 100
+        && d.cases is list && d.cases.size() <= 100
+        && d.n is int && d.n >= 0
+        && optNumber(d, 'updatedAt');
     }
     function validNote(id, d) {
       return d.keys().hasOnly(['id', 'date', 'title', 'body', 'caseId', 'createdAt', 'updatedAt'])
