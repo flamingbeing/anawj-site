@@ -75,6 +75,9 @@ assert.ok(note.includes('## References\n\n1. Doe J. 2026.') && !note.includes('2
 const mdNote = reflectionNote(r, { ...DEFAULT_MARKDOWN, links: 'md', frontMatter: false }, { path, images: { img1: 'images/img1.jpg' } });
 assert.ok(mdNote.startsWith('# High spinal') && mdNote.includes('![Block height](../../images/img1.jpg)'), mdNote);
 assert.ok(!reflectionNote({ id: 'x', status: 'draft' }, DEFAULT_MARKDOWN).includes('undefined'));
+// free-text learning points: one "Learning points" section, not "Learning point 1"
+const freeNote = reflectionNote({ ...r, points: [{ heading: '', text: 'One flowing discussion.' }], figures: [] }, DEFAULT_MARKDOWN, { path });
+assert.ok(freeNote.includes('## Learning points\n\nOne flowing discussion.') && !freeNote.includes('Learning point 1'), freeNote);
 
 // case notes by month and by day
 const months = caseNotes(cases, DEFAULT_MARKDOWN);

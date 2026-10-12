@@ -253,3 +253,13 @@ console.log('export choice tests passed');
   assert.ok(!('kb' in kept.figures[1]));
   console.log('photo budget tests passed');
 }
+
+// free-text learning points
+{
+  const { isFreeText, joinPoints } = await import('../js/reflections.js');
+  assert.equal(isFreeText({ points: [{ heading: '', text: 'x' }] }), true);
+  assert.equal(isFreeText({ points: [{ heading: 'H', text: 'x' }] }), false);
+  assert.equal(isFreeText({ points: [{ heading: '', text: 'a' }, { heading: '', text: 'b' }] }), false);
+  assert.equal(joinPoints([{ heading: 'Early signs', text: 'Hands weak.' }, { heading: '', text: 'Plan ahead.' }, { heading: ' ', text: ' ' }]), 'Early signs\nHands weak.\n\nPlan ahead.');
+  console.log('free text tests passed');
+}

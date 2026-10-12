@@ -124,6 +124,10 @@ const S1 = R({ headingId: 'thyroid', initials: 'GH', date: '2024-12-21', jr: tru
     '', 'References', '1. Author A. A made-up paper. 2020.', '2. Author B. Another. 2021.']);
   assert.equal(c[3][0][0][1], true, 'title bold');
   assert.deepEqual(c[3][7][0][1], { u: true }, 'learning point heading underlined');
+  // free-text learning points (one point, no heading): the text under Learning Points, no "1." line
+  const free = rowCells(R({ ...S1, points: [{ heading: '', text: 'Para one.\n\nPara two.' }], figures: [], references: [] }), 1)[3]
+    .map(p => (Array.isArray(p) ? p.map(x => x[0]).join('') : '[img]'));
+  assert.deepEqual(free.slice(free.indexOf('Learning Points')), ['Learning Points', 'Para one.', '', 'Para two.']);
   assert.deepEqual(c[2].map(p => p[0][0]), ['Total thyroidectomy', 'Retrosternal goitre']);
   assert.deepEqual(imageSize(200, 100), [2194560, 1097280]);
   assert.deepEqual(imageSize(100, 1000), [Math.round(3200400 / 10), 3200400], 'tall images capped at 3.5 in');

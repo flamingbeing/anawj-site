@@ -1636,6 +1636,28 @@ async function run(label, ctxOpts) {
     assert(widths.length === 1, 'row buttons of different widths: ' + widths);
   });
 
+  await step('reflection: free-text learning points; APMES notes last; linked case on one line', async () => {
+    await tab('reflect');
+    await p.evaluate(async () => { const { reflectOnCase } = await import('./js/ui-reflect.js'); reflectOnCase({ id: 'fake-free', date: '2026-10-10', initials: 'ZF', details: 'Fake free text case', cats: ['13'] }); });
+    await p.waitForSelector('input[placeholder="Title"]');
+    await p.locator('input[aria-label="Learning point 1 heading"]').fill('Fake heading');
+    await p.locator('textarea[aria-label="Learning point 1 text"]').fill('Fake discussion.');
+    // the editor's last block is the small APMES notes fold, not a card
+    assert(await p.evaluate(() => { const e = document.querySelector('.refl-editor'); return e.lastElementChild.matches('details.refl-guide') && !e.lastElementChild.classList.contains('card'); }), 'APMES notes not last');
+    await p.locator('.refl-editor .seg button', { hasText: /^Free text$/ }).click();
+    await p.locator('dialog[open] button', { hasText: /^Join$/ }).click();
+    const box = p.locator('textarea[aria-label="Learning points text"]');
+    await box.waitFor();
+    assert(await box.inputValue() === 'Fake heading\nFake discussion.', 'points not joined: ' + await box.inputValue());
+    assert(await p.locator('input[aria-label="Learning point 1 heading"]').count() === 0, 'heading still shown in free text');
+    await box.fill('One fake flowing discussion.');
+    await p.locator('input[placeholder="Title"]').fill('Fake free text title');   // a redraw keeps the mode
+    assert(await box.isVisible(), 'free text mode lost');
+    await p.locator('.refl-editor .seg button', { hasText: /^Numbered$/ }).click();
+    assert(await p.locator('textarea[aria-label="Learning point 1 text"]').inputValue() === 'One fake flowing discussion.', 'numbered lost the text');
+    await p.goBack(); await p.waitForFunction(() => !document.querySelector('.refl-editor'));
+  });
+
   await step('admin tab hidden for non-admins', async () => {
     const KEY = 'apmes-logbook-demo-v1';
     const saved = await p.evaluate(k => localStorage.getItem(k), KEY);
@@ -1835,11 +1857,11 @@ async function run(label, ctxOpts) {
     await ta.fill('');
     await configure('newline');
   });
-  await step('logging: first field, optional autodetection and month shorthand', async () => {
+  await step('logging: separate initials box, optional autodetection and month shorthand', async () => {
     if (phone) { await tab('displayadv'); await p.getByLabel('Case tab upside down (phones)', { exact: true }).check(); }
-    await tab('logging');
-    const first = p.getByLabel('First field for a new case', { exact: true });
-    await first.selectOption('initials');
+    // Settings → Advanced logging → Separate initials box (device)
+    const setSeparate = async on => { await tab('loggingadv'); await p.getByLabel('Separate initials box', { exact: true }).setChecked(on); };
+    await setSeparate(true);
     await tab('log');
     const initials = p.getByLabel('Patient initials', { exact: true });
     const summary = p.getByLabel('Case summary', { exact: true });
@@ -1848,9 +1870,9 @@ async function run(label, ctxOpts) {
     await initials.fill('IJ'); await initials.press('Enter');
     assert(await summary.evaluate(el => el === document.activeElement), 'Enter did not move to summary');
     await summary.fill('hernia');
-    await tab('logging'); await first.selectOption('details'); await tab('log');
+    await setSeparate(false); await tab('log');
     assert(await summary.inputValue() === 'IJ hernia', 'switching field lost the draft');
-    await tab('logging'); await first.selectOption('initials'); await tab('log');
+    await setSeparate(true); await tab('log');
     assert(await initials.inputValue() === 'IJ' && await summary.inputValue() === 'hernia', 'explicit initials became procedure text');
     for (const [unit, preview, band] of [['6m', '6 years · male', '20iii'], ['6M', '6 years · male', '20iii'], ['6mo', '6 months', '20ii'], ['3m', '3 years · male', '20ii'], ['3mo', '3 months', '20i']]) {
       await summary.fill(unit + ' hernia'); await debounced();
@@ -1866,18 +1888,15 @@ async function run(label, ctxOpts) {
     assert(await initials.evaluate(el => el === document.activeElement), 'save did not return to first field');
     await tab('logging');
     await p.getByLabel('Autodetect age and gender', { exact: true }).uncheck();
-    await first.selectOption('date');
+    await setSeparate(false);
     await tab('log');
-    const date = p.getByLabel('Case date', { exact: true });
-    assert(await date.evaluate(el => el === document.activeElement), 'Date not focused');
-    await date.press('Enter');
-    assert(await summary.evaluate(el => el === document.activeElement), 'Date Enter did not move to summary');
+    assert(await summary.evaluate(el => el === document.activeElement), 'summary not focused with the initials box off');
     assert(!(await summary.getAttribute('placeholder')).includes('age/sex') && !(await summary.getAttribute('placeholder')).includes('72M') && (await summary.getAttribute('placeholder')).includes('initials'), 'autodetect-off example not updated');
     await summary.fill('AB 80M hernia'); await debounced();
     assert(!(await p.locator('.parsed').innerText()).includes('Age/sex'), 'disabled age preview');
     assert(await p.locator('.sugg-row [title*="from the age"]').count() === 0, 'disabled age suggestions');
     await p.reload(); await p.waitForSelector('textarea.details');
-    assert(await p.getByLabel('Case date', { exact: true }).evaluate(el => el === document.activeElement), 'device first field not retained on reload');
+    assert(await summary.evaluate(el => el === document.activeElement) && await p.getByLabel('Patient initials', { exact: true }).count() === 0, 'initials box setting not retained on reload');
     assert(!(await p.locator('.parsed').innerText()).includes('Age/sex'), 'disabled age detection not retained');
     await tab('loggingadv');
     const keyboard = p.getByLabel('Open the keyboard when the Case tab opens (this device)', { exact: true });
@@ -1887,7 +1906,6 @@ async function run(label, ctxOpts) {
     await tab('loggingadv'); await keyboard.check();
     await tab('logging');
     await p.getByLabel('Autodetect age and gender', { exact: true }).check();
-    await first.selectOption('details');
     await tab('log');
     assert(await summary.evaluate(el => el === document.activeElement), 'default summary not focused');
     assert((await summary.getAttribute('placeholder')).includes('initials, age/sex'), 'default example not restored');

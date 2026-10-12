@@ -433,9 +433,9 @@ export function renderLogging() {
   const st = settings();
   const preview = h('div', { class: 'logging-preview', 'aria-live': 'polite' });
   const paintPreview = () => {
-    const current = settings(), first = display().firstField || 'details';
+    const current = settings(), separate = display().firstField === 'initials';
     fill(preview, h('b', {}, 'Example of your logging style'),
-      h('p', {}, 'First field: ' + ({ details: 'Case summary', initials: 'Initials', date: 'Date' }[first]) + '. ' + (current.detectAgeSex !== false ? 'AB 6m lap chole → AB · ' + humanAge('6m') + ' · lap chole' : 'AB lap chole → initials and case details; age and gender detection off.')),
+      h('p', {}, (separate ? 'Initials in their own box. ' : 'Initials at the start of the case box. ') + (current.detectAgeSex !== false ? 'AB 6m lap chole → AB · ' + humanAge('6m') + ' · lap chole' : 'AB lap chole → initials and case details; age and gender detection off.')),
       h('p', {}, 'Enter: ' + ({ newline: 'new line', single: 'save', double: 'save on an empty line (double Enter)' }[current.enterMode || (current.enterSaves ? 'single' : 'newline')]) + '. After Save: ' + (AFTER_SAVE.find(([v]) => v === (current.afterSave || 'next'))?.[1] || 'Next case') + '.'));
   };
   paintPreview();
@@ -448,12 +448,7 @@ export function renderLogging() {
       h('label', { class: 'check' }, h('input', { type: 'checkbox', 'aria-label': 'Autodetect age and gender', checked: st.detectAgeSex !== false,
         onchange: e => patchLogbook({ settings: { detectAgeSex: e.target.checked } }).then(paintPreview) }), 'Autodetect age and gender'),
       h('p', { class: 'hint' }, 'Age and gender are optional for APMES. Turning this off stops age-based Paediatrics and Geriatric suggestions. Choose those tags yourself when needed; explicit words can still suggest them.'),
-      h('h3', {}, 'Start a case'), h('p', { class: 'hint' }, 'Device settings · summary first by default; other devices keep their own style.'),
-      h('label', { class: 'field' }, 'First field for a new case',
-        h('select', { 'aria-label': 'First field for a new case', onchange: e => { setDisplay({ firstField: e.target.value }); toast('Saved on this device'); paintPreview(); } },
-          [['details', 'Case summary (default)'], ['initials', 'Initials'], ['date', 'Date']].map(([v, l]) =>
-            h('option', { value: v, selected: (display().firstField || 'details') === v }, l)))),
-      h('p', { class: 'hint help' }, 'Starts here when you open the Case tab or save a case. This device only. Enter in Initials moves to the case summary.'),
+      h('h3', {}, 'Start a case'), h('p', { class: 'hint' }, 'Device setting · other devices keep their own style.'),
       h('label', { class: 'check' }, h('input', { type: 'checkbox', 'aria-label': 'Show common tags first', checked: !!display().compactTags, onchange: e => { setDisplay({ compactTags: e.target.checked }); paintPreview(); } }), 'Show common tags first'),
       h('p', { class: 'hint' }, 'Off by default. A compact shortlist from your recent cases; all tags stay searchable and can be expanded.'),
       h('h3', {}, 'Save and continue'), h('p', { class: 'hint' }, 'Account settings · defaults: Enter adds a line, Today, next case.'),
@@ -471,7 +466,7 @@ export function renderLogging() {
           AFTER_SAVE.map(([v, l]) => h('option', { value: v, selected: (st.afterSave || 'next') === v }, l)))),
       h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'Keeping the tags helps with a run of the same kind of case. “Save, keep date” keeps the date either way.')),
     h('section', { class: 'card' }, preview, h('button', { onclick: async () => {
-      try { await patchLogbook({ settings: { suggestions: true, detectAgeSex: true, enterMode: 'newline', enterSaves: null, defaultDate: 'today', afterSave: null } }); setDisplay({ firstField: null, compactTags: null }); hooks.render(); toast('Everyday logging defaults restored'); } catch (err) { toast(err.message); }
+      try { await patchLogbook({ settings: { suggestions: true, detectAgeSex: true, enterMode: 'newline', enterSaves: null, defaultDate: 'today', afterSave: null } }); setDisplay({ compactTags: null }); hooks.render(); toast('Everyday logging defaults restored'); } catch (err) { toast(err.message); }
     } }, 'Reset these logging defaults'), h('p', { class: 'hint' }, 'Resets only the choices on this page. Advanced logging settings keep their current values.')),
     advancedLink('loggingadv', 'Advanced logging settings', 'The keyboard, case box height, parts of the Case tab, undo, the week, tips, advanced search'));
 }
@@ -482,6 +477,10 @@ export function renderLoggingAdvanced() {
   return h('div', {},
     h('section', { class: 'card' },
       h('h2', {}, 'Advanced logging'),
+      // a separate Initials box above the case box, where the Case tab starts (device; was "First field for a new case")
+      h('label', { class: 'check' }, h('input', { type: 'checkbox', 'aria-label': 'Separate initials box', checked: display().firstField === 'initials', onchange: e => { setDisplay({ firstField: e.target.checked ? 'initials' : null }); toast('Saved on this device'); } }),
+        'Separate initials box (this device)'),
+      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'An Initials box above the case box; the Case tab starts there and Enter moves on to the case. Off: type the initials at the start of the case, e.g. “AB 72M lap chole”.'),
       h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: display().autoFocus !== false, onchange: e => applyDisplay(setDisplay({ autoFocus: e.target.checked ? null : false })) }),
         'Open the keyboard when the Case tab opens (this device)'),
       h('label', { class: 'field', style: 'margin-top:8px' }, 'Case box height on the Case tab',
@@ -535,6 +534,11 @@ export function renderReflectionSettings() {
       h('h2', {}, 'Reflections'),
       h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: st.reflExport !== false, onchange: e => patchLogbook({ settings: { reflExport: e.target.checked } }) }),
         'New reflections are included in the portfolio export'),
+      h('label', { class: 'field', style: 'margin-top:10px' }, 'Learning points in new reflections',
+        h('select', { onchange: e => patchLogbook({ settings: { reflPoints: e.target.value === 'free' ? 'free' : null } }).then(() => toast('Saved')) },
+          h('option', { value: 'numbered', selected: settings().reflPoints !== 'free' }, 'Numbered points with headings (default)'),
+          h('option', { value: 'free', selected: settings().reflPoints === 'free' }, 'Free text (one box)'))),
+      h('p', { class: 'hint help', style: 'margin:0' }, 'Each reflection can still be switched at the top of its Learning points.'),
       h('p', { class: 'hint help', style: 'margin:0' }, 'Untick if you write many and would rather choose which go in. Reflections already written keep their own tick.'),
       h('label', { class: 'check', style: 'margin-top:8px' }, h('input', { type: 'checkbox', checked: display().reflSpell !== false, onchange: e => applyDisplay(setDisplay({ reflSpell: e.target.checked ? null : false })) }),
         'Underline spelling mistakes in reflections (this device)')),

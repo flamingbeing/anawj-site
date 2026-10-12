@@ -7,10 +7,10 @@
 // works) and selecting several to delete. Every delete goes to the recycle bin (bin.js, 30 days).
 
 import { REFLECTION_HEADINGS, REFLECTION_SECTIONS, yearName } from './categories.js';
-import { reflectionProgress, reflectionCounts, HEADING_BY_ID, splitDetails, completeProblems, isLegacy, LIMITS, IMAGE_MAX_B64, IMAGE_MAX_SIDE, IMAGE_QUALITY, PHOTO_BUDGET_KB, PHOTO_NOTE, photoUsageKb, imageKb, fmtMb, wordCount, MIN_WORDS, suggestHeadings, moveToHeading, inExport, exportSummary, pickJustEnough } from './reflections.js';
+import { reflectionProgress, reflectionCounts, HEADING_BY_ID, splitDetails, completeProblems, isLegacy, isFreeText, joinPoints, LIMITS, IMAGE_MAX_B64, IMAGE_MAX_SIDE, IMAGE_QUALITY, PHOTO_BUDGET_KB, PHOTO_NOTE, photoUsageKb, imageKb, fmtMb, wordCount, MIN_WORDS, suggestHeadings, moveToHeading, inExport, exportSummary, pickJustEnough } from './reflections.js';
 export { completeProblems };
 import { fmtDate, caseText, procedureText, caseParts } from './engine.js';
-import { S, h, toast, cloud, writes, transients, debounce, hooks, rYear, effectiveIntake, residentSmo, todayISO, confirmBox, add, resetters, scheduleSummary, displayName, byNewest, catName, updateCase, settings, patchLogbook } from './ui-core.js';
+import { S, h, toast, cloud, writes, transients, debounce, hooks, rYear, effectiveIntake, residentSmo, todayISO, confirmBox, add, resetters, scheduleSummary, displayName, byNewest, catName, updateCase, settings, patchLogbook, info } from './ui-core.js';
 import { renderExportButton, caseRYear, countsByYear } from './portfolio.js';
 import { parseQuery, matchQuery, REFL_FIELDS, REFL_OPERATOR_HELP } from './search-ops.js';
 import { opsHelp } from './ui-logbook.js';
@@ -19,6 +19,12 @@ import { createDraftSlot } from './drafts.js';
 const DRAFT_KEY = 'apmes-logbook-reflection-draft';
 const VIEW_KEY = 'apmes-logbook-reflection-view';
 const savedView = (() => { try { return JSON.parse(localStorage.getItem(VIEW_KEY) || '{}') || {}; } catch { return {}; } })();
+const pointsMode = new WeakMap();   // the reflection being edited -> 'numbered' | 'free', kept while it is open
+// reflections switched to free text on this device (ids), so they open that way again; a one-point reflection whose
+// heading isn't written yet looks the same, so the shape alone can't tell
+const FREE_KEY = 'apmes-logbook-refl-free';
+const freeIds = () => { try { return new Set(JSON.parse(localStorage.getItem(FREE_KEY) || '[]')); } catch { return new Set(); } };
+const markFree = (id, on) => { if (!id) return; const s = freeIds(); if (on) s.add(id); else s.delete(id); try { localStorage.setItem(FREE_KEY, JSON.stringify([...s].slice(-500))); } catch { /* storage blocked */ } };
 const rv = { editing: null, thumbs: {}, picking: null, editMode: false, sel: new Set(), view: null, q: '', filter: 'all', openH: new Set(), shutH: new Set(),
   group: savedView.group || 'heading', sort: savedView.sort || 'newest', viewOpen: false };
 const saveView = () => { try { localStorage.setItem(VIEW_KEY, JSON.stringify({ group: rv.group, sort: rv.sort })); } catch { /* blocked */ } };
@@ -870,7 +876,7 @@ function editor() {
     const hd = HEADING_BY_ID[r.headingId];
     subWrap.replaceChildren(...[
       hd && hd.name !== hd.label ? h('p', { class: 'hint' }, 'Portfolio heading: ' + hd.name) : null,
-      hd && hd.note ? h('p', { class: 'hint' }, hd.note) : null,
+      hd && hd.note ? h('p', { class: 'hint', style: 'white-space:pre-line' }, hd.note) : null,   // (examples, then the JR rule on its own line)
     ].filter(Boolean));
   };
   paintSubs();
@@ -886,8 +892,8 @@ function editor() {
   const lc = caseById(r.caseId);
   const linkBox = r.caseId
     ? h('div', { class: 'refl-case', style: 'border:1px solid var(--edge, var(--line, #ddd));border-radius:10px;padding:8px 10px;margin:8px 0' },
-      h('div', { class: 'bar', style: 'gap:8px;align-items:center' },
-        h('b', { style: 'font-size:calc(13px * var(--fs, 1))' }, 'Linked case'), h('span', { class: 'grow' }),
+      h('div', { class: 'bar', style: 'gap:8px;align-items:center;flex-wrap:nowrap' },
+        h('b', { style: 'font-size:calc(13px * var(--fs, 1));margin-right:auto' }, 'Linked case'),
         h('button', { class: 'small', onclick: () => openPicker(true) }, 'Change case'),
         h('button', { class: 'small', onclick: () => { r.caseId = null; restructure(); } }, 'Unlink')),
       lc ? h('div', {}, h('span', { class: 'muted' }, caseDate(lc) + ' · '), caseText(lc) || '(no details)',
@@ -900,7 +906,7 @@ function editor() {
 
   const input = (key, attrs = {}) => h('input', { style: 'font-size:calc(16px * var(--fs, 1))', value: r[key] ?? '', ...attrs, oninput: e => { r[key] = e.target.value || (key === 'date' ? null : ''); changed(); } });
   const fields = h('section', { class: 'card' },
-    h('div', { class: 'bar' }, h('button', { onclick: close }, '← Reflections'), h('span', { class: 'grow' }), status, h('button', { onclick: persist }, 'Save / Retry')),
+    h('div', { class: 'bar', style: 'flex-wrap:nowrap' }, h('button', { onclick: close }, '← Reflections'), h('span', { style: 'flex:1;min-width:0' }), status, h('button', { onclick: persist }, 'Save / Retry')),
     linkBox,
     !r.headingId ? suggestChips(lc, x => { r.headingId = x.headingId; r.subId = null; restructure(); }, r.jr) : null,
     h('label', { class: 'field' }, 'Heading', headingSelect),
@@ -908,13 +914,13 @@ function editor() {
     h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:8px' },
       h('label', { class: 'field' }, 'Patient initials', input('initials', { 'data-field': 'initials', maxlength: '20', autocapitalize: 'characters', style: 'font-size:calc(16px * var(--fs, 1));width:7em' })),
       h('label', { class: 'field' }, 'Date', h('input', { type: 'date', 'data-field': 'date', style: 'font-size:calc(16px * var(--fs, 1))', value: r.date || '', oninput: e => { r.date = e.target.value || null; if (r.source !== 'word') setJr(r); changed(); } }))),
-    h('p', { class: 'hint help' }, 'Some categories require one case reflection in Junior Residency (JR); when not indicated, at most one case reflection can be done at the JR level per category. A reflection dated in R1–R3 is marked JR in the Word export automatically.'),
+    h('p', { class: 'hint help' }, 'Dated in R1–R3: marked JR in the Word export. ', ...info('Some categories require one case reflection in Junior Residency (JR); when not indicated, at most one case reflection can be done at the JR level per category. A reflection dated in R1–R3 is marked JR in the Word export automatically.')),
     h('label', { class: 'field' }, 'Diagnosis / operation', input('diagnosis', { maxlength: '2000' })),
     h('p', { class: 'hint help' }, 'De-identified only: initials, no names or NRIC. Generative AI use must follow the NUS guidelines on the use of AI tools in academic work.'));
 
   // What APMES wants covered (from the portfolio's reflection elements)
-  const guide = h('details', { class: 'card', style: 'padding:12px 16px' },
-    h('summary', { style: 'cursor:pointer;font-weight:600' }, 'What APMES wants covered'),
+  const guide = h('details', { class: 'refl-guide help' },
+    h('summary', {}, 'What APMES wants covered'),
     h('p', { class: 'hint help' }, 'Write the case details, then learning points. Between them, the learning points should cover:'),
     h('ul', { style: 'margin:4px 0 0;padding-left:20px' }, REFLECTION_SECTIONS.filter(s => s.id !== 'description' && (s.id !== 'further' || r.jr))
       .map(s => h('li', { style: 'margin-bottom:4px' }, h('b', {}, s.name), ': ', s.hint))));
@@ -946,7 +952,32 @@ function editor() {
     title.dataset.field = summary.dataset.field = 'title or case details';
 
     const n = r.points.length;
-    const points = boxCard('Learning points', 'For each point: what were the considerations, and what did you learn? Give it a short heading, then your discussion (analysis with evidence, conclusions, action plan).',
+    // Numbered points or free text (one box: saved as one point with no heading, exported without "1."). The choice
+    // shows for this reflection; a reflection that already reads as free text opens that way; new ones follow
+    // Settings → Reflections.
+    if (!pointsMode.has(r)) pointsMode.set(r, isFreeText(r) && (freeIds().has(r.id) || settings().reflPoints === 'free') ? 'free' : 'numbered');
+    const free = pointsMode.get(r) === 'free';
+    if (free && r.id && !freeIds().has(r.id)) markFree(r.id, true);   // a new reflection, saved since it was switched
+    const setMode = async m => {
+      if ((m === 'free') === free) return;
+      if (m === 'free' && (r.points.length > 1 || r.points.some(p => nonEmpty(p.heading)))) {
+        if (!await confirmBox('Free text', 'Join the learning points into one text? Each heading goes on its own line above its discussion.', 'Join')) return;
+        r.points = [{ heading: '', text: joinPoints(r.points) }];
+        for (const f of r.figures || []) f.point = null;
+        changed();
+      }
+      if (!r.points.length) r.points = [{ heading: '', text: '' }];
+      pointsMode.set(r, m); markFree(r.id, m === 'free'); restructure();
+    };
+    const modeSeg = h('span', { class: 'seg', role: 'group', 'aria-label': 'Learning points as', style: 'margin:0 0 8px' },
+      [['numbered', 'Numbered'], ['free', 'Free text']].map(([v, l]) => h('button', { class: 'small', type: 'button', 'aria-pressed': String((v === 'free') === free), onclick: () => setMode(v) }, l)));
+    const freeBox = () => [
+      h('textarea', { rows: '12', maxlength: String(LIMITS.pointText), style: TA, value: (r.points[0] || {}).text || '', placeholder: 'What were the considerations? What did you learn? Analysis with evidence, conclusions, action plan.',
+        'aria-label': 'Learning points text', oninput: e => { r.points = [{ heading: '', text: e.target.value }]; changed(); } }),
+      !nonEmpty((r.points[0] || {}).text) ? h('button', { class: 'small', style: 'margin-top:6px', onclick: () => { r.points = [{ heading: '', text: PROMPTS }]; restructure(); } }, 'Use prompts') : null,
+      h('p', { class: 'hint help', style: 'margin:6px 0 0' }, 'Numbered points with short headings read more clearly in the portfolio.')];
+    const points = free ? boxCard('Learning points', 'What were the considerations, and what did you learn? Your discussion: analysis with evidence, conclusions, action plan.', modeSeg, ...freeBox())
+      : boxCard('Learning points', 'For each point: what were the considerations, and what did you learn? Give it a short heading, then your discussion (analysis with evidence, conclusions, action plan).', modeSeg,
       r.points.map((p, i) => h('div', { style: 'border:1px solid var(--edge, var(--line, #ddd));border-radius:10px;padding:10px;margin:0 0 10px' },
         h('div', { class: 'bar', style: 'gap:6px;align-items:center;margin-bottom:6px' },
           h('b', { style: 'font-size:calc(16px * var(--fs, 1))' }, `${i + 1}.`),
@@ -1016,7 +1047,7 @@ function editor() {
           im,
           h('label', { class: 'field', style: 'display:block;margin-top:6px' }, `Caption (Figure ${i + 1}: …)`,
             h('input', { style: IN, maxlength: String(LIMITS.caption), value: f.caption || '', placeholder: 'e.g. Apnoeic oxygenation', oninput: e => { f.caption = e.target.value; changed(); } })),
-          h('label', { class: 'field', style: 'display:block' }, 'Place after',
+          free ? null : h('label', { class: 'field', style: 'display:block' }, 'Place after',
             h('select', { style: 'font-size:calc(16px * var(--fs, 1));max-width:100%', onchange: e => { f.point = e.target.value === '' ? null : Number(e.target.value); changed(); } },
               r.points.map((p, k) => h('option', { value: String(k), selected: f.point === k }, `Learning point ${k + 1}${nonEmpty(p.heading) ? ': ' + p.heading.slice(0, 40) : ''}`)),
               h('option', { value: '', selected: f.point == null }, 'End (after all learning points)'))),
@@ -1066,7 +1097,7 @@ function editor() {
       rv.editing = null; rv.thumbs = {}; lsSet(null); hooks.render();
     } }, 'Delete') : null));
 
-  const editor = h('div', { class: 'refl-editor' }, fields, legacy ? null : guide, body, actions);   // .refl-editor: the logging font (Settings → Display)
+  const editor = h('div', { class: 'refl-editor' }, fields, body, actions, legacy ? null : guide);   // the APMES notes last, small (owner)   // .refl-editor: the logging font (Settings → Display)
   // Settings → Reflections: no spelling underlines on this device (html class from applyLook)
   if (document.documentElement.classList.contains('refl-spell-off')) editor.querySelectorAll('textarea, input:not([type]), input[type=text]').forEach(f => { f.spellcheck = false; });
   return editor;

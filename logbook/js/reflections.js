@@ -76,6 +76,12 @@ export function cleanReflection(r, now = Date.now()) {
   return out;
 }
 
+// Free-text learning points (owner, Oct 2026): one point with no heading. Exports print the text under "Learning
+// Points" with no "1." line; the editor shows one box (Settings → Reflections sets what new ones start with).
+export const isFreeText = r => !!(r && Array.isArray(r.points) && r.points.length === 1 && !String((r.points[0] || {}).heading || '').trim());
+// points joined into one text, each heading on its own line above its discussion (Numbered → Free text)
+export const joinPoints = points => (points || []).map(p => [p && p.heading, p && p.text].map(x => String(x || '').trim()).filter(Boolean).join('\n')).filter(Boolean).join('\n\n');
+
 // True when the reflection uses the old one-box-per-section layout (no summary or learning points).
 export const isLegacy = r => !!(r && r.sections && Object.values(r.sections).some(v => String(v || '').trim())
   && !String(r.summary || '').trim() && !arr(r.points).some(p => p && (String(p.heading || '').trim() || String(p.text || '').trim())));

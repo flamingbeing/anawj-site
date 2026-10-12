@@ -84,9 +84,10 @@ function detailsStructured(r) {
   if (pts.length || figs.length) {
     out.push([]);
     out.push([['Learning Points', true]]);
+    const free = pts.length === 1 && !String(pts[0].heading || '').trim();   // free text: no "1." line
     pts.forEach((p, n) => {
       if (n) out.push([]);
-      out.push([[`${n + 1}. ${String(p.heading || '').trim()}`.trimEnd(), { u: true }]]);
+      if (!free) out.push([[`${n + 1}. ${String(p.heading || '').trim()}`.trimEnd(), { u: true }]]);
       out.push(...textParas(p.text));
       for (const f of figs) if (f.point === p.i) figure(f);
     });
