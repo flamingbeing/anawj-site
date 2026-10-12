@@ -294,7 +294,7 @@ function bulkTag(rows) {
 
 // ---------- list ----------
 
-// A month heading: tap it to jump to a date (the first case on or before it).
+// A month heading: a thin sticky line; tap it anywhere to jump to a date (the first case on or before it).
 function monthHead(label, ul) {
   const input = h('input', { type: 'date', class: 'jump-date', 'aria-label': 'Jump to a date', max: todayISO(), onchange: e => {
     const d = e.target.value; if (!d) return;
@@ -302,7 +302,7 @@ function monthHead(label, ul) {
     if (!row) { toast('No cases on or before ' + fmtDate(d) + ' in this list'); return; }
     row.scrollIntoView({ behavior: 'smooth', block: 'center' }); row.classList.remove('flash'); void row.offsetWidth; row.classList.add('flash');
   } });
-  return h('li', { class: 'monthhead' }, h('span', {}, label), h('label', { class: 'jump', title: 'Jump to a date' }, ic('calendar'), 'Jump', input));
+  return h('li', { class: 'monthhead' }, h('label', { class: 'jump', title: 'Jump to a date' }, h('span', { class: 'mh-name' }, label), h('span', { class: 'mh-jump' }, ic('calendar'), 'Jump'), input));
 }
 
 function listView(rows, flagsOf, repaint) {
@@ -315,8 +315,6 @@ function listView(rows, flagsOf, repaint) {
     if (m !== month) { month = m; add(ul, monthHead(m, ul)); }
     add(ul, caseRow(c, flagsOf));
   }
-  // month headers are sticky and not tappable
-  ul.querySelectorAll('.monthhead').forEach(li => { li.style.cursor = 'default'; });
   const more = rows.length > view.limit
     ? h('div', { class: 'bar', style: 'justify-content:center;margin-top:12px' }, h('button', { onclick: () => { view.limit += 300; repaint(); } }, `Show more (${rows.length - view.limit} left)`))
     : null;
@@ -341,21 +339,30 @@ function rowMenu(c) {
       : h('button', { class: 'small row-btn row-more', title: 'Copy, reflect or edit', 'aria-label': 'Copy, reflect or edit this case', onclick: open }, '⋯'));
 }
 
+// The tags line scrolls sideways when it's longer than the row: then it takes the keyboard focus too, so the arrow
+// keys can scroll it (a scrolling area nobody can reach by keyboard is an accessibility error)
+function tagRow(el) {
+  requestAnimationFrame(() => { if (el.isConnected && el.scrollWidth > el.clientWidth + 1) { el.tabIndex = 0; el.setAttribute('aria-label', 'Tags'); el.setAttribute('role', 'group'); } });
+  return el;
+}
+
 function caseRow(c, flagsOf) {
   const flags = flagsOf(c);
   const p = caseParts(c);
   return h('li', { 'data-date': c.date || '', onclick: () => editCaseDialog(c), tabindex: '0', onkeydown: e => { if (e.key === 'Enter' && e.target === e.currentTarget) editCaseDialog(c); } },
-      h('span', { class: 'd' }, c.date ? [h('span', { class: 'wd' }, weekday(c.date)), ' ', fmtDate(c.date).replace(/ \d{4}$/, '').replace(/^(\d+)/, (_, d) => nth(Number(d)))] : (c.dateText || '—')),
-      h('span', { class: 't' }, p.initials ? [h('b', {}, p.initials), ' '] : null, p.details || (p.initials ? null : h('i', { class: 'muted' }, 'no details'))),
+      // the left column: the initials on top, the date on one line under them (like Reflections; owner, 13 Oct 2026)
+      h('span', { class: 'd' }, p.initials ? h('b', { class: 'ini' }, p.initials) : null,
+        h('span', { class: 'dt' }, c.date ? [h('span', { class: 'wd' }, weekday(c.date)), ' ', fmtDate(c.date).replace(/ \d{4}$/, '')] : (c.dateText || '—'))),
+      h('span', { class: 't' }, p.details || h('i', { class: 'muted' }, 'no details')),
       // tags on the left (wrapping), Copy and Reflect on the right, the same size whatever they say
-      h('span', { class: 'c' }, h('span', { class: 'c-tags' }, catTags(c.cats),
+      h('span', { class: 'c' }, tagRow(h('span', { class: 'c-tags' }, catTags(c.cats),
         flags.includes('needsDate') ? h('span', { class: 'flag err' }, 'needs date') : null,
         flags.includes('future') ? h('span', { class: 'flag', title: 'Dated after today' }, 'upcoming') : null,
         flags.includes('duplicate') ? h('span', { class: 'flag' }, 'possible duplicate') : null,
         !(c.cats || []).length ? h('span', { class: 'flag err' }, 'no tag') : null,
         c.reflectTag ? h('span', { class: 'flag', title: 'Marked interesting' }, ic('star'), 'interesting') : null,
         (c.tags || []).map(t => h('span', { class: 'flag sc-tag', title: 'Your tag' }, tagName(t))),
-        caseHasNotes(c.id) ? h('button', { class: 'flag note-flag', type: 'button', title: 'Open your notes on this case', 'aria-label': 'Open your notes on this case', onclick: e => { e.stopPropagation(); openNotes({ caseId: c.id }); } }, ic('note'), 'note') : null),
+        caseHasNotes(c.id) ? h('button', { class: 'flag note-flag', type: 'button', title: 'Open your notes on this case', 'aria-label': 'Open your notes on this case', onclick: e => { e.stopPropagation(); openNotes({ caseId: c.id }); } }, ic('note'), 'note') : null)),
         document.documentElement.classList.contains('row-menu') ? rowMenu(c) : h('span', { class: 'acts' },
           // to your own notes (paste into WhatsApp, Notes, Obsidian); off unless switched on (Advanced display, row-copy)
           !document.documentElement.classList.contains('row-copy') ? null : h('button', { class: 'small row-btn', title: 'Copy this case', 'aria-label': 'Copy this case', onclick: e => { e.stopPropagation(); copyText(shareCaseText(c), 'Case copied: paste it into your notes'); } }, rowIcon('copy'), h('span', { class: 'lbl' }, 'Copy')),

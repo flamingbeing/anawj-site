@@ -1326,3 +1326,29 @@ select:not([multiple]) { background-image: url("data:image/svg+xml,%3Csvg xmlns=
 .refl-pill.jr { margin-left: 4px; font-weight: 500; }
 .refl-pill.jr.met { color: var(--ink); }   /* green ground, normal text (contrast at this weight), with a ✓ */
 html.no-wc .refl-wc.in-list { display: none; }
+
+/* ---------- polish 3: lists ---------- */
+/* case rows: the initials on top in the left column, the date on one line under them (like Reflections) */
+ul.cases li { grid-template-columns: 84px 1fr; }
+ul.cases .d .ini { display: block; font-size: calc(15px * var(--fs, 1)); color: var(--ink); font-weight: 700; }
+ul.cases .d .dt, .refl-row .refl-date { display: block; white-space: nowrap; }
+body.compact ul.cases li { grid-template-columns: 76px 1fr; }
+.refl-row .refl-jr { margin-left: 5px; font-size: calc(10px * var(--fs, 1)); font-weight: 700; color: var(--muted); letter-spacing: .03em; vertical-align: 2px; }
+/* tags on one line that scrolls sideways (the tab swipe leaves sideways scrollers alone) */
+ul.cases .c-tags { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; }
+ul.cases .c-tags::-webkit-scrollbar { display: none; }
+ul.cases .c-tags > * { flex: none; }
+ul.cases .c { align-items: center; }
+/* month headers: a thin sticky line on the card's own colour; the whole line opens the date to jump to */
+ul.cases li.monthhead { display: block; padding: 0; background: var(--panel); border-bottom: 1px solid var(--edge, var(--line)); }
+ul.cases li.monthhead .jump { display: flex; width: 100%; align-items: center; justify-content: space-between; min-height: 36px; padding: 2px 4px; color: inherit; font-size: inherit; font-weight: inherit; text-transform: inherit; letter-spacing: inherit; cursor: pointer; }
+.monthhead .mh-jump { display: inline-flex; align-items: center; gap: 4px; color: var(--accent); font-weight: 600; text-transform: none; letter-spacing: 0; }
+/* Reflections headings: the counts together, never split over two lines */
+.refl-pills { display: inline-flex; gap: 4px; white-space: nowrap; vertical-align: 1px; }
+.refl-pills .refl-pill.jr { margin-left: 0; }
+/* Analytics cards: the chevron sits on the title row; the summary bar runs the card's full width */
+details.an-sec > summary::after { top: 22px; }
+details.an-sec > summary .glance { width: 100%; }
+.an-year { margin: 0 0 12px; }
+.an-year h3 { margin: 0 0 2px; }
+ul.cases .c-tags { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 18px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 18px), transparent); padding-right: 12px; }

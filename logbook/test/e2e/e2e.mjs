@@ -431,7 +431,8 @@ async function run(label, ctxOpts) {
     await step('r4: delete a logbook case -> bin -> restore', async () => {
       await tab('logbook'); await lbList();
       const n0 = await nCases();
-      await p.locator('main li', { hasText: 'ZZ LSCS' }).first().click();
+      // the initials sit over the date in the row, the details beside them
+      await p.locator('main ul.cases li', { has: p.locator('.d .ini', { hasText: /^ZZ$/ }) }).filter({ hasText: 'LSCS' }).first().click();
       await p.locator('dialog[open] button.danger', { hasText: 'Delete' }).click();
       await nap(700);
       assert(await nCases() === n0 - 1, 'case not removed');
@@ -656,9 +657,10 @@ async function run(label, ctxOpts) {
     await search.fill('34F LSCS spinal');
     await debounced();
     const items = p.locator('ul.cases li:not(.monthhead)');
-    const row = items.filter({ has: p.locator('.t b', { hasText: /^AB$/ }) }).filter({ has: p.locator('.t', { hasText: /^AB 34F LSCS spinal$/ }) }).first();
+    const row = items.filter({ has: p.locator('.d b.ini', { hasText: /^AB$/ }) }).filter({ has: p.locator('.t', { hasText: /^34F LSCS spinal$/ }) }).first();
     assert(await row.count() === 1, 'no row with bold AB: ' + (await items.locator('.t').allInnerTexts()).join(' | '));
-    assert((await row.locator('.t').innerText()).trim() === 'AB 34F LSCS spinal', 'row text ' + await row.locator('.t').innerText());
+    // the initials sit on top of the date in the left column; the details beside them
+    assert((await row.locator('.d .ini').innerText()).trim() === 'AB' && (await row.locator('.t').innerText()).trim() === '34F LSCS spinal', 'row text ' + await row.innerText());
     await row.locator('.t').click();
     const ini = p.locator('dialog[open] label', { hasText: 'Patient initials' }).locator('input');
     assert(await ini.inputValue() === 'AB', 'initials field ' + await ini.inputValue());
@@ -669,14 +671,14 @@ async function run(label, ctxOpts) {
     await nap(400);
     const c = (await stored()).find(x => x.details === '34F LSCS spinal');
     assert(c && c.initials === 'AC', 'stored after edit ' + JSON.stringify(c));
-    await until(async () => await items.filter({ has: p.locator('.t b', { hasText: /^AC$/ }) }).filter({ has: p.locator('.t', { hasText: /^AC 34F LSCS spinal$/ }) }).count() === 1, 'list not updated');
+    await until(async () => await items.filter({ has: p.locator('.d b.ini', { hasText: /^AC$/ }) }).filter({ has: p.locator('.t', { hasText: /^34F LSCS spinal$/ }) }).count() === 1, 'list not updated');
     // older seeded case (initials still at the front of the details) opens split
     await search.fill('lap chole');
     await debounced();
     const old = (await stored()).find(x => /^GH /.test(x.details || ''));
     assert(old && old.initials == null, 'seeded case not in the old format: ' + JSON.stringify(old));
     const orow = items.filter({ hasText: '45F lap chole' }).first();
-    assert(await orow.locator('.t b').innerText() === 'GH', 'old case not shown with bold initials');
+    assert(await orow.locator('.d b.ini').innerText() === 'GH', 'old case not shown with bold initials');
     await orow.locator('.t').click();
     assert(await ini.inputValue() === 'GH', 'old initials ' + await ini.inputValue());
     assert(await p.locator('dialog[open] textarea').inputValue() === '45F lap chole', 'old details ' + await p.locator('dialog[open] textarea').inputValue());
@@ -1091,7 +1093,7 @@ async function run(label, ctxOpts) {
     await debounced();
     const items = p.locator('ul.cases li:not(.monthhead)');
     assert(await items.count() === 1, 'search hits ' + await items.count());
-    assert(/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun) /.test(await items.first().locator('.d').innerText()), 'no weekday: ' + await items.first().locator('.d').innerText());
+    assert(/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun) /.test(await items.first().locator('.d .dt').innerText()), 'no weekday: ' + await items.first().locator('.d').innerText());
     await items.first().locator('.t').click();
     await p.locator('dialog[open] textarea').fill('75M TURP spinal edited');
     await p.locator('dialog[open] button', { hasText: /^Save$/ }).click();
@@ -1564,7 +1566,8 @@ async function run(label, ctxOpts) {
     await card.getByRole('button', { name: /^Fix \d+ case/ }).click();
     await p.locator('dialog[open] button', { hasText: /^Fix$/ }).click();
     await card.getByText(/^Fixed \d+ case/).waitFor();
-    const got = await p.evaluate(async () => { const cloud = await import('./js/cloud.js'); return Object.fromEntries((await cloud.listCases('demo@example.com')).filter(c => /^fx/.test(c.id)).map(c => [c.id, [c.initials, c.details]])); });
+    // only this step's cases (fx1–fx3; a random id can start with fx)
+    const got = await p.evaluate(async () => { const cloud = await import('./js/cloud.js'); return Object.fromEntries((await cloud.listCases('demo@example.com')).filter(c => /^fx\d$/.test(c.id)).map(c => [c.id, [c.initials, c.details]])); });
     assert(JSON.stringify(got) === JSON.stringify({ fx1: ['ABCDEF', '45F lap chole'], fx2: ['K', '30F LSCS spinal'], fx3: ['', 'ELECTIVE LSCS spinal'] }), 'initials not fixed: ' + JSON.stringify(got));
     await card.getByRole('button', { name: 'Check all logbooks' }).click();
     await card.getByText(/nothing to fix/).waitFor();
