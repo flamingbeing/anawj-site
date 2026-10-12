@@ -10,8 +10,8 @@
 
 import { FIREBASE_CONFIG } from '../js/firebase-config.js';
 
-const PLACEHOLDER_ID = 'REPLACE_ME.apps.googleusercontent.com';
-const PLACEHOLDER_SECRET = 'REPLACE_ME';
+const PLACEHOLDER_ID = '474134277199-7ma8hij2lirbhk18d9l0i5033c2soc5c.apps.googleusercontent.com';
+const PLACEHOLDER_SECRET = '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';
 
 export const CLIENT_ID = process.env.APMES_GOOGLE_CLIENT_ID || PLACEHOLDER_ID;
 export const CLIENT_SECRET = process.env.APMES_GOOGLE_CLIENT_SECRET || PLACEHOLDER_SECRET;
