@@ -1,9 +1,9 @@
 // End-to-end run of the logbook in demo mode. Fake data only.
 // Run (from the repo root, with a static server on the repo root at port 8080, e.g. python3 -m http.server 8080):
 //   node logbook/test/e2e/mkfake.cjs "$OUT/fake-old-form.xlsx"   (once: a made-up old-form workbook)
-//   E2E_OUT=/tmp/logbook-e2e E2E_BLANK=/path/to/blank-portfolio.docx node logbook/test/e2e/e2e.mjs [phone|desk]
-// E2E_OUT: where downloads and screenshots go (default: the OS temp dir). E2E_BLANK: a blank APMES
-// portfolio .docx for the template/Section 1 steps (not in the repo; those steps fail without it).
+//   E2E_OUT=/tmp/logbook-e2e node logbook/test/e2e/e2e.mjs [phone|desk]
+// E2E_OUT: where downloads and screenshots go (default: the OS temp dir). E2E_BLANK: another blank APMES
+// portfolio .docx for the template/Section 1 steps (default: apmes/templates/portfolio-template-blank.docx).
 // Phone and desk run at the same time (about 1.5 min for both); each step prints its time and the
 // slowest five are listed. E2E_ONLY=<words>: only up to the last step whose name has the words.
 // E2E_FAILFAST=1: stop at the first failure. E2E_NAP: cap on the short pauses (ms, default 160).
@@ -116,7 +116,7 @@ async function run(label, ctxOpts) {
   // ===================== round 5: Account tab (portfolio Section 1) =====================
   async function round5() {
     const ACCT = DIR + 'acct/';
-    const BLANK = process.env.E2E_BLANK || DIR + 'original-blank.docx';
+    const BLANK = process.env.E2E_BLANK || new URL('../../../apmes/templates/portfolio-template-blank.docx', import.meta.url).pathname;
     fs.mkdirSync(ACCT, { recursive: true });
     const field = lbl => p.locator('.acct label.field', { hasText: lbl }).first().locator('input, textarea').first();
     const group = t => p.locator('.acct details.acct-group', { has: p.locator('summary', { hasText: t }) }).first();

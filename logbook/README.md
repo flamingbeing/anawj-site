@@ -101,7 +101,7 @@ Each test uses fake data only and runs with plain node:
 
 ```sh
 for f in logbook/test/*.test.mjs; do node "$f" || break; done
-# optional, local only (never commit the template): PORTFOLIO_TEMPLATE=blank.docx node logbook/test/profile.test.mjs
+# uses the blank template in apmes/templates/ (PORTFOLIO_TEMPLATE=other.docx to try another): node logbook/test/profile.test.mjs
 # fills Section 1 of the real template with a made-up profile and reads it back (parseSection1)
 ```
 

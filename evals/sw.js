@@ -3,7 +3,7 @@
 // Firebase traffic (auth, Firestore) always goes to the network; Firestore keeps its own offline
 // cache in IndexedDB. The Firebase SDK files (versioned, never change) are cached here.
 
-const VERSION = 'evals-v16a';
+const VERSION = 'evals-v17';
 const SDK = 'https://www.gstatic.com/firebasejs/10.12.2/';
 const SDK_FILES = ['firebase-app.js', 'firebase-auth.js', 'firebase-firestore.js'].map(f => SDK + f);
 const SHELL = [
@@ -12,7 +12,7 @@ const SHELL = [
   'js/catalogue.js', 'js/forms.js', 'js/engine.js',
   'js/ui-home.js', 'js/ui-request.js', 'js/ui-requests.js', 'js/ui-result.js', 'js/ui-progress.js',
   'js/ui-pending.js', 'js/ui-form.js', 'js/ui-admin.js', 'js/ui-more.js',
-  'js/vendor/qrcode.js', 'reference/guidebook/dops-expectations.md',
+  'js/vendor/qrcode.js', '../apmes/guidebook/dops-expectations.md',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/maskable-512.png', 'icons/apple-touch-icon.png', 'icons/favicon-32.png',
 ];
 

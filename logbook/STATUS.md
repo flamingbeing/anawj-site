@@ -5,12 +5,13 @@ Lasting rules and lessons go in `NOTES.md`; finished work leaves "Recently done"
 Each session edits only its own line under **Now**. Update this file when a task finishes, a decision is made, or
 before compacting (`/save-state` in Claude Code, `$save-state` in Codex).
 
-Last updated: 2026-10-12 by Claude Code "Logbook code editing" session.
+Last updated: 2026-10-12 by Claude Code "APMES Logbook" session.
 
 ## Now
 
-- **Claude Code, "APMES Logbook" session** (branch `claude/clever-gates-pm6sas`): idle; signed in to Firebase CLI
-  for this session at the owner's request, nothing run with it yet (each use needs the owner's OK).
+- **Claude Code, "APMES Logbook" session** (branch `claude/clever-gates-pm6sas`): idle after #183 (`/apmes/` folder,
+  blank portfolio template committed for tests, Word export now ticks Female). Firebase CLI signed in for this
+  session, unused (each use needs the owner's OK).
 - **Claude Code, "Logbook code editing" session** (branch `ccr-2994049c-4e5tlt`): idle after #181. Still signed in
   to the Firebase CLI (usage counts only; each use needs the owner's OK). Owns the axe check, PR previews and the
   Codex / Firebase plugin setup.
@@ -37,6 +38,7 @@ Last updated: 2026-10-12 by Claude Code "Logbook code editing" session.
 
 ## Recently done
 
+- #183 APMES documents in `/apmes/`; blank portfolio template in the repo; Word export ticks Female (was never ticked).
 - #181 Notes review fixes: note index moved to owner-only `meta/noteIndex` (rules deployed), bin restore keeps the
   100-note limit, notes listener metadata, 34 new rules tests; previews no longer break on reload (service workers
   key the page by `'./'`).
@@ -53,6 +55,9 @@ Last updated: 2026-10-12 by Claude Code "Logbook code editing" session.
 
 ## Decisions log
 
+- 2026-10-12: APMES programme documents aren't secret: they live in `/apmes/` at the repo root (guidebook, data,
+  blank portfolio template; originals may be added). No faculty names (the MedHub guide stays out unless blacked
+  out); published authors cited in the guidebook are fine.
 - 2026-10-12: Batch from the "APMES Logbook 2" session: new Analytics parts (pace forecast over the last 6 months,
   gone quiet, tap-through, reflection to-dos) are Advanced only, not in Basic mode; swipe between tabs on by default
   for everyone (its switch also in Show or hide); merge each PR once tests pass.

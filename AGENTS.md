@@ -8,6 +8,8 @@ Static site on GitHub Pages (public repo: no names, patient data or real evaluat
 - `evals/`: APMES workplace-based assessments. Start with `evals/NOTES.md` (decisions, MedHub, forms, operations), then `evals/README.md`.
 - `logbook/`: APMES case logbook. Start with `logbook/NOTES.md` (principles, words, screens, tags, demo, how to test), then `logbook/README.md`.
 - `nuh-roster/`: NUH anaesthesia daily roster (own Firebase project `nuh-roster`). Start with `nuh-roster/NOTES.md`: its department section (grades, postings, roster sheet, notation, HMS monthly rosters, short names) applies to any app dealing with NUH anaesthesia staff.
+- `apmes/`: APMES programme documents (not secret): the EPA Guidebook v8 and requirements transcribed (the evals
+  data is built from them), and the blank portfolio template the logbook tests use. See `apmes/README.md`.
 - `design/tokens.css`: shared design tokens.
 
 Rules that bite:
@@ -21,7 +23,7 @@ Rules that bite:
   never need the secret. A manual run (Run workflow) deploys both files over the live rules: ask the owner first.
   A new Firestore-backed app needs a matrix entry and paths filter in the workflow, and the owner grants that
   service account Firebase Rules Admin on the new project.
-- `evals/js/catalogue.js` and `evals/js/forms.js` are generated. Edit `evals/reference/` or `evals/tools/build-data.mjs`, then run `node evals/tools/build-data.mjs`.
+- `evals/js/catalogue.js` and `evals/js/forms.js` are generated. Edit `apmes/` (the transcribed APMES documents) or `evals/tools/build-data.mjs`, then run `node evals/tools/build-data.mjs`.
 - Changing any file in an app's `sw.js` SHELL list means bumping that app's `VERSION`.
 
 Before merging, run:
@@ -32,8 +34,7 @@ for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mj
 ```
 
 - Logbook changes: `tools/test-logbook.sh` runs all of the above plus the full e2e and every focused browser test
-  (about 10 min; `quick` skips the full e2e). Its portfolio-template steps need `E2E_BLANK` (a blank APMES portfolio
-  .docx, not in the repo). After UI changes also run `node logbook/test/e2e/a11y.mjs` (accessibility).
+  (about 10 min; `quick` skips the full e2e). Its portfolio-template steps use `apmes/templates/portfolio-template-blank.docx`. After UI changes also run `node logbook/test/e2e/a11y.mjs` (accessibility).
 - Rules changes (`logbook/firestore.rules`): `tools/test-rules.sh` runs the logbook and evals rules suites in the
   local emulator (fake accounts, demo project; no sign-in, never the live projects).
 - Evals UI changes: also run the e2e test (see `evals/README.md`).

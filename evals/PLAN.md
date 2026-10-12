@@ -1,6 +1,6 @@
 # APMES /evals v1 plan (FINAL)
 
-This is the build plan for /evals. The scope, sign-in methods, share-link notification, NUHS design language and public-repo constraints were decided with the user (see `evals/README.md`) and are not reopened here. Form facts are taken from `evals/reference/apmes-forms.json`; item facts from `evals/reference/apmes-epas.json` (guidebook v8 wins); and the MedHub facts from a review of the official app (v1.4.8). No MedHub code, icons or images go into the repo.
+This is the build plan for /evals. The scope, sign-in methods, share-link notification, NUHS design language and public-repo constraints were decided with the user (see `evals/README.md`) and are not reopened here. Form facts are taken from `apmes/data/apmes-forms.json` (then `evals/reference/`); item facts from `apmes/data/apmes-epas.json` (guidebook v8 wins); and the MedHub facts from a review of the official app (v1.4.8). No MedHub code, icons or images go into the repo.
 
 **Form facts the build depends on.**
 - **DOPS (19 questions).**

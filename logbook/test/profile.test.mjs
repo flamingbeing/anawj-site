@@ -1,5 +1,5 @@
 // Run with: node logbook/test/profile.test.mjs  (made-up profile only)
-// Optional: PORTFOLIO_TEMPLATE=blank.docx also fills a real blank APMES template and reads it back;
+// Also fills the real blank APMES template (apmes/templates/; PORTFOLIO_TEMPLATE=other.docx) and reads it back;
 // PORTFOLIO_OUT=out.docx writes that export (with made-up reflections) for a visual check.
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
@@ -65,9 +65,9 @@ assert.match(plain, /PERSONAL DETAILS/);
 assert.match(plain, /Testperson/);
 assert.match(plain, /Society &lt;3&gt; &amp; Co/);
 
-// ---- the real blank template (local only; never committed) ----
-const TPL = process.env.PORTFOLIO_TEMPLATE;
-if (TPL && existsSync(TPL)) {
+// ---- the real blank template (apmes/templates/) ----
+const TPL = process.env.PORTFOLIO_TEMPLATE || new URL('../../apmes/templates/portfolio-template-blank.docx', import.meta.url);
+if (existsSync(TPL)) {
   const zip = await JSZip.loadAsync(readFileSync(TPL));
   const xml = await zip.file('word/document.xml').async('string');
   const { xml: out, found } = fillSection1Xml(xml, FAKE, { name: 'Ignored Name' });
@@ -81,7 +81,7 @@ if (TPL && existsSync(TPL)) {
   assert.match(txt, /Commencement\s*Date of Residency\s*:\s*01\/07\/2020/);
   assert.match(txt, /Date of\s*:\s*01\/07\/2023/);
   assert.match(txt, /☐\s*Male\s*☒\s*Female/);
-  assert.match(out, /<w14:checked w14:val="1"\/>/);
+  if (/w14:checkbox/.test(xml)) assert.match(out, /<w14:checked w14:val="1"\/>/);   // a template with Word checkboxes ticks the box too
   // a blank template reads back as an empty profile; name falls back when the profile has none
   assert.deepEqual(parseSection1(xml), emptyProfile());
   assert.match(fillSection1Xml(xml, {}, { name: 'Fallback Name' }).xml.replace(/<[^>]+>/g, ''), /Resident’s name\s*:\s*Fallback Name/);

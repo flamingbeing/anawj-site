@@ -2,8 +2,8 @@
 # Every check the logbook needs before merging, in one go (fake data only):
 #   tools/test-logbook.sh            everything (about 10 minutes)
 #   tools/test-logbook.sh quick      repo check, unit tests and the focused browser tests (no full e2e)
-# It starts a static server on port 8080 if none is running (and stops it after). The full e2e's portfolio
-# template steps need a blank APMES portfolio .docx (not in the repo): set E2E_BLANK=/path/to/it.
+# It starts a static server on port 8080 if none is running (and stops it after). The portfolio template steps
+# use apmes/templates/portfolio-template-blank.docx.
 # Accessibility (logbook/test/e2e/a11y.mjs) and the rules emulator (tools/test-rules.sh) are run on their own.
 set -u
 cd "$(dirname "$0")/.."
@@ -23,7 +23,6 @@ echo 'done'
 
 if [ "${1:-}" != quick ]; then
   step 'full e2e (phone and desk)'
-  [ -n "${E2E_BLANK:-}" ] || echo 'note: E2E_BLANK not set, so the portfolio template steps will fail'
   mkdir -p "$OUT/e2e"; [ -f "$OUT/e2e/fake-old-form.xlsx" ] || node logbook/test/e2e/mkfake.cjs "$OUT/e2e/fake-old-form.xlsx" >/dev/null
   E2E_OUT="$OUT/e2e" timeout 600 node logbook/test/e2e/e2e.mjs >"$OUT/e2e.txt" 2>&1 || fail=1
   grep -E '^== |^FAIL|console errors' "$OUT/e2e.txt"
