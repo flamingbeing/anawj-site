@@ -69,6 +69,10 @@ try {
   assert.match(await page.textContent('.tp'), /0 min/);
   await page.click('.num[data-type="chest"]');
   assert.equal((await page.textContent('.num[data-type="chest"]')).trim(), '36.5', 'an empty temperature starts at 36.5');
+  // anywhere on an empty temperature's card does the same
+  await page.click('.card[data-fill="arm"] .clab');
+  assert.equal((await page.textContent('.num[data-type="arm"]')).trim(), '36.5', 'tapping the card label fills 36.5');
+  assert.equal(await page.$('.card[data-fill="arm"]'), null, 'a filled card is no longer one big target');
   await page.click('.num[data-type="core"]');
   await page.click('.num[data-type="core"]');
   await page.fill('input.num', '366');

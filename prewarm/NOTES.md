@@ -41,7 +41,7 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
 - **Form view** (owner, 12 Oct 2026): the day-of-surgery pages of the paper data collection form v3.2 (intervention,
   intraoperative, intraoperative readings, PACU with patient satisfaction), filled in; one A4 page each when printed.
   "Save as PDF / Print" opens the browser's print screen. Spreadsheet view stays for checking readings.
-- **Defaults on tap:** an empty temperature becomes 36.5 (then + / −, or tap again to type); an empty time becomes now.
+- **Defaults on tap:** an empty temperature becomes 36.5 (anywhere on its card, owner 12 Oct 2026) (then + / −, or tap again to type); an empty time becomes now.
 - Gown set temp follows "Warming off" (NA for later timepoints) until someone picks a value on that screen.
 - - **Entry screen:** option B ("change what moved"): values carry over from the last saved timepoint; + / − nudges;
   tap the number to type ("365" → 36.5). Hidden readings (Settings) stay blank.
