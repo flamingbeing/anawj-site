@@ -5,13 +5,12 @@ Lasting rules and lessons go in `NOTES.md`; finished work leaves "Recently done"
 Each session edits only its own line under **Now**. Update this file when a task finishes, a decision is made, or
 before compacting (`/save-state` in Claude Code, `$save-state` in Codex).
 
-Last updated: 2026-10-12 by Claude Code, Logbook 3 (log3).
+Last updated: 2026-10-12 by Claude Code, Logbook 1 (log1).
 
 ## Now
 
-- **Claude Code, Logbook 1 (log1)** (branch `claude/clever-gates-pm6sas`): adding the EPA Guidebook v8 PDF (names
-  removed) to `apmes/originals/`; before that #183 (`/apmes/` folder, blank portfolio template, Word export ticks
-  Female). Firebase CLI signed in for this session, unused (each use needs the owner's OK).
+- **Claude Code, Logbook 1 (log1)** (branch `claude/clever-gates-pm6sas`, no open PR): idle after #186. Firebase CLI
+  signed in for this session, unused (each use needs the owner's OK).
 - **Claude Code, Logbook 3 (log3)** (branch `ccr-2994049c-4e5tlt`): idle after #181. Still signed in
   to the Firebase CLI (usage counts only; each use needs the owner's OK). Owns the axe check, PR previews and the
   Codex / Firebase plugin setup.
@@ -27,6 +26,8 @@ Last updated: 2026-10-12 by Claude Code, Logbook 3 (log3).
 - Dropbox developer console: tick `files.metadata.read` so "Keep backups for…" can remove old Dropbox files.
 - Dropbox: apply for production approval when ready (only listed accounts can use it until then).
 - MCP connector: test `node server.mjs login` on a computer.
+- Optional: send the AY2023 evaluations tracking spreadsheet for `apmes/originals/` (checked for names first).
+- Residents who exported a Word portfolio with Female selected before #183: the box was left unticked; re-export.
 
 ## Next (agreed queue)
 
@@ -38,6 +39,7 @@ Last updated: 2026-10-12 by Claude Code, Logbook 3 (log3).
 
 ## Recently done
 
+- #186 EPA Guidebook v8 PDF in `apmes/originals/` (cover with names replaced, file details removed).
 - #183 APMES documents in `/apmes/`; blank portfolio template in the repo; Word export ticks Female (was never ticked).
 - #181 Notes review fixes: note index moved to owner-only `meta/noteIndex` (rules deployed), bin restore keeps the
   100-note limit, notes listener metadata, 34 new rules tests; previews no longer break on reload (service workers
@@ -48,10 +50,6 @@ Last updated: 2026-10-12 by Claude Code, Logbook 3 (log3).
 - #175 Reflection formatting buttons (off by default); Word export shows real bold and bullets.
 - #173 Backup as one spreadsheet (CSV); Restore reads it.
 - #172 Basic mode (one switch, off by default).
-- #170 Settings → Show or hide, a reset per group.
-- #166 Notes (private notepad, max 100) and the 3 accessibility fixes.
-- #160–#162 Save to Drive / Dropbox fixed (same-page sign-in), compressed `.json.gz`, keep-for-N-days.
-- #159 Firebase sign-in helper self-hosted on anawj.com (fixes "missing initial state" on Android).
 
 ## Decisions log
 
