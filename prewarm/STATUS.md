@@ -39,7 +39,7 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 
 - 12 Oct 2026: all remaining template data gets entry forms under "Other data" (small box beside Form view / Sheet view);
   "Spreadsheet view" is now "Sheet view"; vital-signs tick is automatic; the BP, HR, BIS box flashes like the due time.
-- 12 Oct 2026: warming labels Prewarm on / off, Underbody warm, Gown warm; beige once set; times numbered; room temp 20.
+- 12 Oct 2026: warming labels Prewarm on / off, Underbody warm, Gown warm; light grey until tapped, beige once set; times numbered; room temp 20.
 - 12 Oct 2026: locked patients are hidden from team phones completely (rules + query); admins see them read only.
 - 12 Oct 2026: admins lock patients from the home page (select, all but latest); locked = nobody opens them.
 - 12 Oct 2026: Log out (deletes the phone's patients, warns, warns again if unsynced) replaces Stop sharing. Join links sent
