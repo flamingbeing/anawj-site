@@ -3,7 +3,7 @@
 
 import { HEADERS, SECTIONS, SCREENING_HEADERS } from './headers.js';
 import { FIELDS, SCREENING, SERIES, EXTRA, IX_COLS, PAGES, colIndex, shownValue } from './schema.js';
-import { val } from './store.js';
+import { val, isGone } from './store.js';
 import { buildXlsx, dateSerial, timeSerial } from './xlsx.js';
 
 export function cellFor(f, v) {
@@ -29,7 +29,7 @@ function exportValue(p, f) {
 }
 
 export function workbookSheets(patients, screening) {
-  const live = patients.filter(p => !p.deleted).sort(bySortKey);
+  const live = patients.filter(p => !isGone(p)).sort(bySortKey);
   const row1 = new Array(HEADERS.length).fill(null);
   for (const [title, a] of SECTIONS) row1[colIndex(a)] = { s: title, style: 'section' };
   const data = {

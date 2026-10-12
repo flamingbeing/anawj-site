@@ -86,3 +86,6 @@ export function readFile(text) {
   if (d.v > 1) throw new Error('This file is from a newer version of the app. Reload the app and try again.');
   return { patients: Array.isArray(d.patients) ? d.patients : [], screening: Array.isArray(d.screening) ? d.screening : [], from: d.from || '', at: d.at };
 }
+
+// deleted, and not restored since (a restore is the field "restored": its time is after the delete)
+export const isGone = p => !!p.deleted && p.deleted > (p.f?.restored?.t || 0);

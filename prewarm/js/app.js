@@ -1,6 +1,6 @@
 // Prewarming study: op-day screens. Data stays on this phone for now (localStorage); sharing comes with Firebase.
 import { PAGES, SERIES, BY_ID, EXTRA_BY_ID, IX_COLS, SITES, calc, normaliseTemp, isShown } from './schema.js';
-import { newRecord, setVal, val, lastEdit, mergeRecord } from './store.js';
+import { newRecord, setVal, val, lastEdit, mergeRecord, isGone } from './store.js';
 import { workbook } from './export.js';
 import * as cloud from './cloud.js';
 import { qrcode } from './vendor/qrcode.js';
@@ -96,7 +96,7 @@ function synced() {
 }
 function syncText() {
   if (!sharing()) return '';
-  const n = Object.keys(pending).map(id => patients[id]).filter(p => p && !p.deleted).length;
+  const n = Object.keys(pending).map(id => patients[id]).filter(p => p && !isGone(p)).length;
   const when = !lastSync ? '' : (() => {
     const m = (Date.now() - lastSync) / 60000, d = new Date(lastSync);
     if (m < 1) return 'just now';
@@ -127,12 +127,12 @@ function sync(p, ids, withLock = false) {
 // Log out (owner, 12 Oct 2026): leaves the team and deletes every patient on this phone, after a warning, and a
 // second one if some changes haven't reached the team yet. Settings (initials, display) stay.
 async function logOut(btn) {
-  const n = Object.values(patients).filter(p => !p.deleted).length;
+  const n = Object.values(patients).filter(p => !isGone(p)).length;
   const who = shared.member ? `the ${shared.member.site} team` : 'the study';
   if (!confirm(`Log out of ${who} on this phone?\n\nThis deletes all ${n} patient${n === 1 ? '' : 's'} from this phone. What has synced stays with your team.`)) return;
   btn.disabled = true; btn.textContent = 'Checking everything has synced…';
   if (Object.keys(pending).length && await cloud.flushed(6000)) { pending = {}; write('pending', pending); synced(); }
-  const unsynced = Object.keys(pending).map(id => patients[id]).filter(p => p && !p.deleted).map(sid);
+  const unsynced = Object.keys(pending).map(id => patients[id]).filter(p => p && !isGone(p)).map(sid);
   if (unsynced.length && !confirm(`Not synced yet: ${unsynced.join(', ')}.${lastSync ? ' ' + syncText().replace(/^Not synced:[^.]*\. ?/, '') : ''}\n\nThese changes haven’t reached your team (no signal?). Logging out now loses them. Cancel, get signal and wait a moment, or Export Excel first.\n\nLog out anyway and lose them?`)) {
     btn.disabled = false; btn.textContent = 'Log out'; return;
   }
@@ -335,6 +335,8 @@ function render() {
   // a locked patient can't be opened (by anyone) until a study admin unlocks it
   const pm = /^\/p\/(\w+)/.exec(h);
   // a locked patient can't be opened from a team phone; an admin opens it read only
+  // a deleted patient isn't charted into (it wouldn't be exported): back to the list, which says where to restore it
+  if (pm && patients[pm[1]] && isGone(patients[pm[1]])) { toast(`${sid(patients[pm[1]])} was deleted. Restore it in Settings › Delete participants.`); location.replace('#/'); return; }
   const lockedHere = !!(pm && patients[pm[1]]?.lock?.on);
   if (lockedHere && !canLock()) { toast('Locked by the study admin'); location.replace('#/'); return; }
   document.body.classList.toggle('ro', lockedHere);
@@ -398,7 +400,7 @@ function setLock(ids, on) {
 }
 function home() {
   header('Prewarming study' + (DEMO ? ' (demo)' : ''), null, `<a class="iconbtn" href="#/settings" aria-label="Settings">⚙</a>`);
-  const list = Object.values(patients).filter(p => !p.deleted).sort((a, b) => (lastEdit(b)?.t || b.created) - (lastEdit(a)?.t || a.created));
+  const list = Object.values(patients).filter(p => !isGone(p)).sort((a, b) => (lastEdit(b)?.t || b.created) - (lastEdit(a)?.t || a.created));
   if (selecting && !canLock()) selecting = null;
   const latest = list[0];
   paint(`
@@ -466,7 +468,7 @@ route(/^\/new$/, () => {
     const id = $('#sid').value.trim();
     if (!id) return toast('Enter the Subject ID.');
     if (!arm) return toast('Choose the randomisation group.');
-    if (Object.values(patients).some(p => !p.deleted && String(val(p, 'enrol_id')).toLowerCase() === id.toLowerCase())) return toast('That Subject ID is already on this phone.');
+    if (Object.values(patients).some(p => !isGone(p) && String(val(p, 'enrol_id')).toLowerCase() === id.toLowerCase())) return toast('That Subject ID is already on this phone.');
     const p = newRecord(); set(p, 'enrol_id', id); set(p, 'arm', arm); if (settings.site) set(p, 'site', settings.site); patients[p.id] = p; saveAll();
     go('#/p/' + p.id);
   };
@@ -1047,7 +1049,7 @@ route(/^\/p\/(\w+)\/data$/, id => {
     // Subject ID: never blank, never the same as another patient's here
     if (f.id === 'enrol_id') {
       const v = i.value.trim();
-      const clash = Object.values(patients).some(q => q !== p && !q.deleted && String(val(q, 'enrol_id') || '').toLowerCase() === v.toLowerCase());
+      const clash = Object.values(patients).some(q => q !== p && !isGone(q) && String(val(q, 'enrol_id') || '').toLowerCase() === v.toLowerCase());
       if (!v || clash) { toast(v ? 'That Subject ID is already used by another patient.' : 'The Subject ID can’t be blank.'); i.value = get('enrol_id') ?? ''; return; }
       set(p, 'enrol_id', v); $('#title').textContent = sid(p) + ' · Perioperative data'; return;
     }
@@ -1203,14 +1205,19 @@ route(/^\/p\/(\w+)\/sheet$/, id => {
 // ---------- delete participants (from Settings; the only place patients are deleted)
 route(/^\/delete$/, () => {
   header('Delete participants', '#/settings');
-  const list = Object.values(patients).filter(p => !p.deleted).sort((a, b) => String(sid(a)).localeCompare(String(sid(b))));
+  const list = Object.values(patients).filter(p => !isGone(p)).sort((a, b) => String(sid(a)).localeCompare(String(sid(b))));
+  const gone = Object.values(patients).filter(isGone).sort((a, b) => b.deleted - a.deleted);
   paint(`<p class="muted small">${sharing() ? `Deleting removes the participant from this phone and from your team’s phones.` : 'Deleting removes the participant from this phone.'} Tap Delete, then tap again to confirm.</p>
     ${list.length ? `<ul class="list dellist">${list.map(p => {
       const e = lastEdit(p);
       return `<li><div><b>${esc(sid(p))}${val(p, 'site') ? ` <small>${esc(val(p, 'site'))}</small>` : ''}</b><small>${esc(status(p))} · ${e ? 'last entry ' + new Date(e.t).toLocaleDateString([], { day: 'numeric', month: 'short' }) : 'no entries'}</small></div>
         ${p.lock?.on ? `<span class="muted small">${LOCK_ICON} Locked</span>` : `<button class="danger" data-del="${p.id}" aria-label="Delete ${esc(sid(p))}">Delete</button>`}</li>`;
-    }).join('')}</ul>` : `<p class="muted">No participants on this phone.</p>`}`);
+    }).join('')}</ul>` : `<p class="muted">No participants on this phone.</p>`}
+    ${gone.length ? `<h2>Deleted</h2><p class="muted small">Deleted by mistake? Restore brings it back${sharing() ? ' on every phone in the team' : ''}.</p>
+      <ul class="list dellist">${gone.map(p => `<li><div><b>${esc(sid(p))}</b><small>deleted ${new Date(p.deleted).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</small></div><button class="secondary" data-restore="${p.id}">Restore</button></li>`).join('')}</ul>` : ''}`);
   view.onclick = e => {
+    const r = e.target.closest('[data-restore]');
+    if (r) { const p = patients[r.dataset.restore]; if (p) { set(p, 'restored', 1); toast(sid(p) + ' restored'); render(); } return; }
     const b = e.target.closest('[data-del]'); if (!b) return;
     const p = patients[b.dataset.del]; if (!p) return;
     if (!b.dataset.sure) { b.dataset.sure = 1; b.textContent = 'Tap again'; b.setAttribute('aria-label', 'Tap again to delete ' + sid(p)); return; }
@@ -1584,7 +1591,7 @@ route(/^\/admin$/, async () => {
 // ---------- export
 route(/^\/export$/, () => {
   header('Export', '#/settings');
-  const n = Object.values(patients).filter(p => !p.deleted).length;
+  const n = Object.values(patients).filter(p => !isGone(p)).length;
   paint(`<div class="stack">
     <p>An Excel file in the study template’s layout: one row per patient, the template’s 572 columns, filled from everything entered here (op day and Perioperative data), so rows paste into the master sheet.</p>
     <ul class="muted small"><li><b>Data Collection</b>: the template sheet</li><li><b>Readings</b>: every reading with the time it was saved and who saved it</li>
