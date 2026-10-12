@@ -79,7 +79,7 @@ export function setCases(cases) {
   S.casesLoaded = true;
 }
 let rawCases = [];
-writes.configure({ backend: cloud.commitRecord, getOwner: () => S.user?.email || null });
+writes.configure({ backend: cloud.commitRecord, normalize: cloud.cleanWrite, getOwner: () => S.user?.email || null });
 writes.onChange(() => {
   if (!S.user) return;
   if (S.casesLoaded) { setCases(rawCases); hooks.casesChanged?.(); }

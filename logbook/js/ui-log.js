@@ -877,7 +877,7 @@ export function pickDialog(initial, done) {
 export function editCaseDialog(c, opts = {}) {
   const isNew = !c.id && typeof opts.onCreated === 'function';
   // older cases keep the initials at the front of the details: split them now, saved apart on Save
-  const base = JSON.parse(JSON.stringify(c));
+  let base = JSON.parse(JSON.stringify(c)), created = false;
   const e = { ...c, ...caseParts(c), cats: [...(c.cats || [])] };
   const sel = h('div', { class: 'chips selected' });
   const paint = () => {
@@ -917,13 +917,17 @@ export function editCaseDialog(c, opts = {}) {
       h('span', { class: 'grow' }),
       h('button', { onclick: () => m.close() }, 'Cancel'),
       h('button', { class: 'primary', onclick: async ev => {
-        if (!(await okNoIds(e.details))) return;
-        const button = ev.currentTarget; button.disabled = true;
+        const button = ev.currentTarget, owner = S.user?.email;
+        if (!(await okNoIds(e.details)) || S.user?.email !== owner) return;
+        button.disabled = true;
         try {
-        if (isNew) {
+        if (isNew && !created) {
           if (!e.details.trim() && !e.cats.length) return toast('Add a case summary or a tag');
           e.id ||= uid(); e.createdAt ||= Date.now();
+          const inputAtSave = JSON.stringify(e);
           const made = await createCase({ id: e.id, createdAt: e.createdAt, date: e.date || todayISO(), initials: e.initials, details: e.details, cats: e.cats, reflectTag: !!e.reflectTag, tags: e.tags || [] });
+          base = made; created = true;
+          if (S.user?.email !== owner || JSON.stringify(e) !== inputAtSave) return toast('Case saved. Newer edits remain open.');
           m.close(); toast('Case logged');
           return opts.onCreated(made);
         }
@@ -932,8 +936,12 @@ export function editCaseDialog(c, opts = {}) {
         // a tag that sits under a category goes when that category is taken off; other tags stay
         next.tags = keepTags(next.tags, next.cats);
         if (!next.tags.length) delete next.tags;
+        const inputAtSave = JSON.stringify(e);
         const saved = await updateCase(next, { base });
+        base = saved;
+        if (S.user?.email !== owner || JSON.stringify(e) !== inputAtSave) return toast('Case saved. Newer edits remain open.');
         m.close();
+        if (isNew) { toast('Case logged'); return opts.onCreated(saved); }
         toast('Case updated', { action: 'Undo', onaction: () => restoreCase(c, saved).catch(err => toast(err.message)) });
         } catch (err) { toast('Could not save: ' + err.message); } finally { button.disabled = false; }
       } }, 'Save')),

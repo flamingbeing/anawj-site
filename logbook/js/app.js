@@ -456,9 +456,11 @@ async function onUser(user) {
   S.user = user;
   if (!user) {
     Object.assign(S, { admin: false, owner: false, pd: false, resident: null, logbook: null, cases: [], reflections: [], counts: {}, casesLoaded: false, casesSynced: false, sharedTemplates: [] });
-    if (signedInOnce) { try { await writes.forget(); } catch (err) { toast('Could not clear device recovery: ' + err.message); } clearDrafts(); resetCaches(); forgetWho(); }   // display settings stay: they are the device's
-    paintWho();
-    renderLanding();
+    const cleanup = signedInOnce ? writes.forget() : Promise.resolve();
+    if (signedInOnce) { clearDrafts(); resetCaches(); forgetWho(); }
+    document.querySelectorAll('dialog[open]').forEach(el => el.close());
+    paintWho(); renderLanding();
+    try { await cleanup; } catch (err) { if (!S.user) renderLanding('Could not clear device recovery: ' + err.message); }
     return;
   }
   signedInOnce = true;

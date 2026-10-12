@@ -808,6 +808,7 @@ function editor() {
   r.points ||= []; r.figures ||= []; r.references ||= [];
   const legacy = isLegacy(r);
   const owner = mine();
+  const current = () => rv.editing === r && S.user?.email === owner;
   if (!editorSessions.has(r)) editorSessions.set(r, { base: JSON.parse(JSON.stringify(S.reflections.find(x => x.id === r.id) || null)), saving: null });
   const session = editorSessions.get(r);
   const status = h('span', { class: 'muted', 'aria-live': 'polite', style: 'font-size:calc(13px * var(--fs, 1))' }, r.id ? 'Saved' : 'Not saved yet');
@@ -825,6 +826,8 @@ function editor() {
         const saved = await writes.save('reflection', owner, payload, session.base);
         session.base = saved;
         if (rv.editing === r && S.user?.email === owner) status.textContent = writes.status('reflection', r.id) === 'synced' ? 'Synced' : 'Saved locally · pending sync';
+        if (rv.editing !== r || S.user?.email !== owner) return false;
+        if (JSON.stringify(r) !== JSON.stringify(payload)) { status.textContent = 'Newer edits kept · save again'; return false; }
         return true;
       } catch (err) {
         if (rv.editing === r && S.user?.email === owner) { status.textContent = 'Save failed · retry or open Recent changes'; toast('Could not save: ' + err.message); }
@@ -841,9 +844,9 @@ function editor() {
     words.style.cssText = `font-size:calc(13px * var(--fs, 1));font-weight:600;color:${ok ? 'var(--ok, #15803d)' : 'var(--warn, #b45309)'}`;
   };
   paintWords();
-  const changed = () => { paintWords(); status.textContent = lsSet({ ...r, restore: true }) ? 'Draft saved on this device' : 'Draft not saved · storage unavailable'; autosave(); };
+  const changed = () => { if (!current()) return; paintWords(); status.textContent = lsSet({ ...r, restore: true }) ? 'Draft saved on this device' : 'Draft not saved · storage unavailable'; autosave(); };
   const restructure = () => { changed(); hooks.render(); };   // list changed: save and redraw
-  const close = async () => { autosave.cancel(); if (hasContent(r) && !await persist()) return; rv.editing = null; rv.thumbs = {}; lsSet(null); hooks.render(); };
+  const close = async () => { if (!current()) return; autosave.cancel(); if (hasContent(r) && !await persist() || !current()) return; rv.editing = null; rv.thumbs = {}; lsSet(null); hooks.render(); };
 
   const subWrap = h('div');
   const paintSubs = () => {
@@ -962,13 +965,15 @@ function editor() {
       status.textContent = 'Adding image…';
       try {
         const img = await compressImage(file);
+        if (!current()) return;
         const kb = imageKb(img.data);
         if (usedKb() + kb > PHOTO_BUDGET_KB) {
           status.textContent = 'Image not added';
           return toast(`Your photos are using ${fmtMb(usedKb())} of ${fmtMb(PHOTO_BUDGET_KB)}. Remove a photo you no longer need (deleted reflections free theirs after 30 days in the recycle bin).`, { ms: 9000 });
         }
         const id = newId();
-        await cloud.saveImage(mine(), { id, ...img, createdAt: Date.now() });
+        await cloud.saveImage(owner, { id, ...img, createdAt: Date.now() });
+        if (!current()) return;
         rv.thumbs[id] = 'data:image/jpeg;base64,' + img.data;
         r.figures.push({ id, caption: '', point: r.points.length ? r.points.length - 1 : null, kb });
         autosave.cancel(); await persist(); hooks.render();
@@ -1029,15 +1034,16 @@ function editor() {
       : h('button', { class: 'primary', onclick: async () => {
         const missing = completeProblems(r);
         if (missing.length) { showMissing(missing); return toast('Before marking complete: ' + missing.join(', ')); }
-        r.status = 'complete'; autosave.cancel(); if (!await persist()) { r.status = 'draft'; return; } toast('Reflection complete'); rv.editing = null; rv.thumbs = {}; lsSet(null); hooks.render();
+        r.status = 'complete'; autosave.cancel(); if (!await persist()) { if (current()) { r.status = 'draft'; lsSet({ ...r, restore: true }); } return; } if (!current()) return; toast('Reflection complete'); rv.editing = null; rv.thumbs = {}; lsSet(null); hooks.render();
       } }, 'Mark complete'),
     h('span', { class: 'grow' }),
     r.id || r.figures.length ? h('button', { class: 'danger', onclick: async () => {
       if (!await confirmBox('Delete reflection?', 'Move this reflection to the recycle bin? It can be restored for 30 days.', 'Move to bin', true)) return;
+      if (!current()) return;
       autosave.cancel();
       if (!r.id && !await persist()) return;   // images saved but the reflection never was: save it so the bin keeps both
       const n = await binReflections([JSON.parse(JSON.stringify(r))]);
-      if (!n) return;
+      if (!n || !current()) return;
       toast('Reflection moved to the recycle bin', { action: 'Recycle bin', onaction: () => openView('bin') });
       rv.editing = null; rv.thumbs = {}; lsSet(null); hooks.render();
     } }, 'Delete') : null));

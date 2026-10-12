@@ -37,6 +37,33 @@ for (const width of [390, 1280]) {
   await p.waitForSelector('input[placeholder="Title"]');await p.locator('input[placeholder="Title"]').fill('Fake recoverable reflection');
   await p.getByRole('button',{name:'← Reflections',exact:true}).click();assert.equal(await p.locator('.refl-editor').count(),1);
   await p.reload();await p.waitForSelector('.refl-editor');assert.equal(await p.locator('input[placeholder="Title"]').inputValue(),'Fake recoverable reflection');
+  await p.reload();await p.waitForSelector('.refl-editor');assert.equal(await p.locator('input[placeholder="Title"]').inputValue(),'Fake recoverable reflection');
+  // Editing while Close is awaiting its immutable snapshot must keep the newer draft.
+  await p.evaluate(async()=>{const {writes,S}=await import('./js/ui-core.js');writes.configure({backend:async(_,__,record)=>{await new Promise(r=>setTimeout(r,100));return record;},getOwner:()=>S.user?.email});
+    document.querySelector('input[placeholder="Title"]').value='Before close';document.querySelector('input[placeholder="Title"]').dispatchEvent(new Event('input',{bubbles:true}));
+    [...document.querySelectorAll('button')].find(x=>x.textContent==='← Reflections').click();
+    setTimeout(()=>{const x=document.querySelector('input[placeholder="Title"]');x.value='Typed during Close';x.dispatchEvent(new Event('input',{bubbles:true}));},30);
+  });
+  await p.waitForTimeout(250);assert.equal(await p.locator('.refl-editor').count(),1);assert.equal(await p.locator('input[placeholder="Title"]').inputValue(),'Typed during Close');
+  // Native async event handling plus new input during a case modal Save.
+  await p.evaluate(async()=>{const {S,writes,cloud}=await import('./js/ui-core.js');writes.configure({backend:async(...args)=>{await new Promise(r=>setTimeout(r,100));return cloud.commitRecord(...args);}});const {editCaseDialog}=await import('./js/ui-log.js');editCaseDialog(S.cases.find(x=>x.id!=='offline-proof'));});
+  await p.locator('dialog textarea').fill('Before modal save');
+  await p.evaluate(()=>{document.querySelector('dialog button.primary').click();setTimeout(()=>{const x=document.querySelector('dialog textarea');x.value='Typed during modal save';x.dispatchEvent(new Event('input',{bubbles:true}));},30);});
+  await p.waitForTimeout(250);assert.equal(await p.locator('dialog[open]').count(),1);assert.equal(await p.locator('dialog textarea').inputValue(),'Typed during modal save');
+  await p.locator('dialog button.primary').click();await p.waitForFunction(()=>!document.querySelector('dialog[open]'));
+  // Recovery confirmation must not transfer a previous account's data after an account change.
+  await p.evaluate(()=>location.hash='#recovery');await p.waitForURL(/#recovery$/);await p.getByRole('heading',{name:'Saved versions and sync'}).waitFor();
+  await p.getByRole('button',{name:'Restore this version',exact:true}).first().click();await p.waitForSelector('dialog[open]');
+  await p.evaluate(async()=>{const {S,writes}=await import('./js/ui-core.js');globalThis.originalUser=S.user;S.user={email:'fake-other@example.com'};await writes.activate(S.user.email);globalThis.leakedWrites=[];writes.configure({backend:async(email,kind,record)=>{leakedWrites.push({email,kind,record});return record;}});});
+  await p.getByRole('button',{name:'Restore',exact:true}).click();await p.waitForTimeout(100);assert.equal(await p.evaluate(()=>leakedWrites.length),0);
+  await p.evaluate(async()=>{const {S,writes}=await import('./js/ui-core.js');S.user=originalUser;await writes.activate(S.user.email);});
+  // Cleanup errors are explicit; an unreadable database cannot be treated as empty.
+  const cleanup=await p.evaluate(async()=>{const {recoveryStore}=await import('./js/recovery-store.js');const owner='fake-cleanup@example.com';await recoveryStore.put({key:'fake-cleanup',owner,record:{details:'Fake private'}});const tx=IDBDatabase.prototype.transaction;IDBDatabase.prototype.transaction=function(){throw Error('Denied transaction');};let rejected=false;try{await recoveryStore.forget(owner);}catch{rejected=true;}finally{IDBDatabase.prototype.transaction=tx;}const retained=(await recoveryStore.list(owner)).length;await recoveryStore.forget(owner);return {rejected,retained};});
+  assert.deepEqual(cleanup,{rejected:true,retained:1});
+  // Signed-out UI is hidden immediately, while durable cleanup is still running.
+  await p.evaluate(async()=>{const {cloud,writes}=await import('./js/ui-core.js');const forget=writes.forget;writes.forget=async()=>{await new Promise(r=>setTimeout(r,400));return forget();};await cloud.signOut();});
+  assert.equal(await p.locator('textarea.details, .refl-editor, dialog[open]').count(),0);
+  await p.waitForTimeout(450);
   assert.deepEqual(errors,[]);await ctx.close();
   // Both storage mechanisms denied: Save must retain all input, and never say Draft saved.
   const denied=await b.newContext({viewport:{width,height:844},serviceWorkers:'block'});

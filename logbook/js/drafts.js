@@ -9,10 +9,11 @@ export function createDraftSlot(prefix, owner, storage = localStorage, session =
   try { initial = JSON.parse(storage.getItem(previous || prefix + ':' + owner) || 'null'); } catch { /* readable storage unavailable */ }
   // Copy on open rather than reusing the old slot: two documents can never
   // overwrite one another even when the browser clones session storage.
-  try { session.setItem(pointer, key); } catch { /* still a unique in-memory slot */ }
+  const remember = () => { try { session.setItem(pointer, key); } catch { /* recoverable through Recent changes */ } };
+  if (initial !== null) { try { storage.setItem(key, JSON.stringify(initial)); remember(); } catch { /* keep the previous pointer until a successful write */ } }
   return {
     key, initial,
-    save(value) { storage.setItem(key, JSON.stringify(value)); },
+    save(value) { storage.setItem(key, JSON.stringify(value)); remember(); },
     clear() { storage.removeItem(key); },
   };
 }

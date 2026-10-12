@@ -2,7 +2,7 @@ import { recoveryStore, recordSignature } from './recovery-store.js';
 const copy = value => JSON.parse(JSON.stringify(value));
 const keyOf = job => job.kind + ':' + job.record.id;
 const terminal = new Set(['synced', 'archived']);
-export function createWriteQueue({ store, backend, getOwner = () => null, online = () => true, delay = ms => new Promise(r => setTimeout(r, ms)) }) {
+export function createWriteQueue({ store, backend, getOwner = () => null, normalize = (_kind, value) => value, online = () => true, delay = ms => new Promise(r => setTimeout(r, ms)) }) {
   let owner = null, generation = 0, jobs = [], loading = null, storageError = '';
   const running = new Map(), listeners = new Set();
   const notify = () => { for (const fn of listeners) fn(); };
@@ -13,8 +13,9 @@ export function createWriteQueue({ store, backend, getOwner = () => null, online
     if (running.has(id)) return running.get(id);
     const email = owner, gen = generation;
     const task = (async () => {
-      for (const job of ordered().filter(x => keyOf(x) === id && !terminal.has(x.state))) {
-        if (!current(email, gen) || !online() || job.state !== 'pending') break;
+      while (true) {
+        const job = ordered().find(x => keyOf(x) === id && !terminal.has(x.state));
+        if (!job || !current(email, gen) || !online() || job.state !== 'pending') break;
         try {
           const result = await backend(email, job.kind, copy(job.record), copy(job.base));
           if (!current(email, gen)) return;
@@ -32,7 +33,11 @@ export function createWriteQueue({ store, backend, getOwner = () => null, online
       // Keep a short device history; failed/conflicting/pending records never expire here.
       const old = ordered().filter(x => terminal.has(x.state)).slice(0, -100);
       for (const job of old) { await store.remove(job.key); jobs = jobs.filter(x => x !== job); }
-    })().finally(() => { if (running.get(id) === task) running.delete(id); });
+    })().finally(() => {
+      if (running.get(id) !== task) return;
+      running.delete(id);
+      if (current(email, gen) && online() && ordered().find(x => keyOf(x) === id && !terminal.has(x.state))?.state === 'pending') void drain(id).catch(error => { storageError = error.message; notify(); });
+    });
     running.set(id, task); return task;
   }
   async function activate(email) {
@@ -47,7 +52,7 @@ export function createWriteQueue({ store, backend, getOwner = () => null, online
   }
   function kick() { if (owner && getOwner() === owner) for (const id of new Set(jobs.map(keyOf))) void drain(id).catch(error => { storageError = error.message; notify(); }); }
   async function save(kind, email, record, base = null) {
-    record = copy(record); base = copy(base);
+    record = copy(normalize(kind, copy(record))); base = copy(base);
     if (getOwner() !== email) throw new Error('Account changed; the editor has not been saved');
     await activate(email); const gen = generation;
     const previous = [...ordered()].reverse().find(x => x.kind === kind && x.record.id === record.id && !terminal.has(x.state));
@@ -95,7 +100,7 @@ export function createWriteQueue({ store, backend, getOwner = () => null, online
     if (old) await store.forget(old);
   }
   return { activate, save, overlay, retry, archive, forget, kick,
-    configure(config) { backend = config.backend; getOwner = config.getOwner; },
+    configure(config) { if (config.backend) backend = config.backend; if (config.getOwner) getOwner = config.getOwner; if (config.normalize) normalize = config.normalize; },
     onChange(fn) { listeners.add(fn); return () => listeners.delete(fn); },
     entries: () => copy(ordered().reverse()),
     pending: () => jobs.filter(x => !terminal.has(x.state)).length,

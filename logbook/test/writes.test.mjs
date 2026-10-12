@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createWriteQueue } from '../js/writes.js';
 import { checkWrite } from '../js/recovery-store.js';
+import { cleanCase } from '../js/demo-backend.js';
 import { createDraftSlot } from '../js/drafts.js';
 const clone = x => structuredClone(x);
 function fixture() {
@@ -45,4 +46,26 @@ test('late acknowledgement from previous account cannot reinsert private history
 test('duplicate tabs clone reload draft but own independent storage keys', () => {
   const m=new Map(),sm=new Map();const storage={getItem:k=>m.get(k)||null,setItem:(k,v)=>m.set(k,v),removeItem:k=>m.delete(k)},session={getItem:k=>sm.get(k)||null,setItem:(k,v)=>sm.set(k,v)};
   const a=createDraftSlot('draft','a',storage,session);a.save({details:'A'});const b=createDraftSlot('draft','a',storage,session);assert.equal(b.initial.details,'A');b.save({details:'B'});a.save({details:'AA'});assert.notEqual(a.key,b.key);assert.equal(JSON.parse(m.get(b.key)).details,'B');
+});
+
+test('edits arriving during an in-flight write drain without an online event or manual flush', async () => {
+  const f=fixture();let finish,started;const called=new Promise(r=>started=r),first={id:'1',details:'one'},second={...first,details:'two'};
+  const backend=f.config.backend;let calls=0;f.config.backend=async (...args)=>{if(++calls===1){started();await new Promise(r=>finish=r);}return backend(...args);};
+  const q=createWriteQueue(f.config);const one=q.save('case','a',first);await called;const two=q.save('case','a',second,first);await two;finish();await one;
+  for(let i=0;i<20&&q.status('case','1')!=='synced';i++)await new Promise(r=>setTimeout(r,5));
+  assert.equal(q.status('case','1'),'synced');assert.equal(f.remote.get('1').details,'two');
+});
+test('unchanged recovered reflection survives repeated reloads', () => {
+  const m=new Map(),sm=new Map();const storage={getItem:k=>m.get(k)||null,setItem:(k,v)=>m.set(k,v),removeItem:k=>m.delete(k)},session={getItem:k=>sm.get(k)||null,setItem:(k,v)=>sm.set(k,v)};
+  createDraftSlot('reflection','a',storage,session).save({title:'Keep',restore:true});
+  assert.equal(createDraftSlot('reflection','a',storage,session).initial.title,'Keep');
+  assert.equal(createDraftSlot('reflection','a',storage,session).initial.title,'Keep');
+});
+
+test('canonical offline versions do not conflict when the backend removes empty/false fields', async () => {
+ const f=fixture();f.online(false);f.config.normalize=(kind,value)=>cleanCase(value);const backend=f.config.backend;
+ f.config.backend=(email,kind,record,base)=>backend(email,kind,cleanCase(record),base);
+ const q=createWriteQueue(f.config);const first=await q.save('case','a',{id:'normal',details:'one',tags:[],reflectTag:false});
+ assert.equal(first.tags,undefined);assert.equal(first.reflectTag,undefined);
+ await q.save('case','a',{...first,details:'two'},first);f.online(true);assert.equal(await q.flush(),true);assert.equal(f.remote.get('normal').details,'two');
 });

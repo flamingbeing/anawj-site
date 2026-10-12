@@ -55,7 +55,19 @@ export const recoveryStore = {
     try { await transaction('readwrite', store => store.delete(key)); } catch { /* fallback may be in use */ }
     try { localStorage.removeItem(PREFIX + key); } catch { /* blocked */ }
   },
-  async forget(owner) { for (const r of await this.list(owner)) await this.remove(r.key); },
+  async forget(owner) {
+    const failed = [];
+    // Cleanup must never mistake an unreadable IndexedDB for an empty database.
+    if (typeof indexedDB !== 'undefined') {
+      try {
+        const records = await transaction('readonly', store => store.index('owner').getAll(owner));
+        for (const r of records.filter(x => x.realm === realm)) await transaction('readwrite', store => store.delete(r.key));
+      } catch (err) { failed.push(err); }
+    }
+    try { for (const r of fallbackRecords(owner).filter(x => x.realm === realm)) localStorage.removeItem(PREFIX + r.key); }
+    catch (err) { failed.push(err); }
+    if (failed.length) throw new Error('Some device recovery copies could not be removed. Close other logbook tabs and clear this site’s storage before sharing the device.');
+  },
 };
 
 // Pure equality for concurrency checks. The backend refreshes updatedAt on
