@@ -289,7 +289,9 @@ try {
   await axe('delete participants'); await shot('delete');
   const delBtn = page.locator('.dellist li', { hasText: 'TEST-02' }).locator('[data-del]');
   await delBtn.click(); await delBtn.click();
-  await page.waitForFunction(() => !/TEST-02/.test(document.querySelector('main').textContent));
+  // it moves to the Deleted list, where it can be restored
+  await page.waitForSelector('[data-restore]');
+  assert.equal(await page.locator('.dellist li', { hasText: 'TEST-02' }).locator('[data-del]').count(), 0);
   await page.goto(BASE + '?demo#/');
   assert.doesNotMatch(await page.textContent('.list'), /TEST-02/, 'deleted from the list');
   // mark data collection complete (bottom of the main screen): shown at the top and in the patient list

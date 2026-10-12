@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { inflateRawSync } from 'node:zlib';
 import { HEADERS, SECTIONS, SCREENING_HEADERS } from '../js/headers.js';
 import { FIELDS, BY_ID, PAGES, SCREENING, SITES, EXTRA, colLetter, colIndex, calc, normaliseTemp, isShown, shownValue } from '../js/schema.js';
-import { newRecord, setVal, val, mergeRecord, mergeInto, packFile, readFile } from '../js/store.js';
+import { newRecord, setVal, val, mergeRecord, mergeInto, packFile, readFile, isGone } from '../js/store.js';
 import { workbook, workbookSheets, cellFor, ixText } from '../js/export.js';
 import { dateSerial, timeSerial } from '../js/xlsx.js';
 
@@ -141,6 +141,15 @@ assert.equal(cellFor(BY_ID.age, ''), null);
   setVal(p, 'io_ix_rows', JSON.stringify([{ time: '10:30', hb: '9.8', test: 'ROTEM', ct: '60' }]));
   assert.equal(workbookSheets([p], [])[0].rows[2][BY_ID.io_ix.colIndex], '10:30, Hb 9.8, ROTEM, CT or R 60');
   assert.equal(ixText('not json'), '');
+  // deleted, then restored (a later "restored" field): back in the export
+  const dr = newRecord(); setVal(dr, 'enrol_id', 'DEL-1', 'A', 1000); dr.deleted = 2000;
+  assert.equal(isGone(dr), true);
+  assert.equal(workbookSheets([dr], [])[0].rows.length, 2, 'deleted: not exported');
+  setVal(dr, 'restored', 1, 'A', 3000);
+  assert.equal(isGone(dr), false);
+  assert.equal(workbookSheets([dr], [])[0].rows.length, 3, 'restored: exported');
+  dr.deleted = 4000;
+  assert.equal(isGone(dr), true, 'deleted again');
   // hidden follow-ups aren't exported (TXA answered No after a bolus was typed); no pre-warming exports NA for its start
   setVal(p, 'io_txa', 1); setVal(p, 'io_txa_bolus', '1000');
   assert.equal(workbookSheets([p], [])[0].rows[2][BY_ID.io_txa_bolus.colIndex], 1000);

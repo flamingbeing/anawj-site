@@ -294,6 +294,22 @@ await tryit(async () => {
   log(/Taken 09:59/.test(await pg.textContent('main')), 'Change time (9.59 read as 09:59)');
   await ctx.close();
 });
+// Q. a deleted patient can be restored (Settings › Delete participants), and can't be charted into while deleted
+await tryit(async () => {
+  const { ctx, pg } = await fresh();
+  await open(pg, 0);
+  const pid = pg.url().match(/#\/p\/(\w+)/)[1];
+  await pg.goto('http://localhost:8080/prewarm/?demo#/delete'); await pg.waitForSelector('.dellist');
+  const del = pg.locator('.dellist li', { hasText: 'DEMO-01' }).locator('[data-del]');
+  await del.click(); await del.click(); await pg.waitForTimeout(200);
+  await pg.goto(`http://localhost:8080/prewarm/?demo#/p/${pid}`); await pg.waitForTimeout(300);
+  log(!/#\/p\//.test(pg.url()) && /was deleted\. Restore it in Settings/.test(await pg.textContent('#toast')), 'a deleted patient can’t be opened');
+  await pg.goto('http://localhost:8080/prewarm/?demo#/delete'); await pg.waitForSelector('[data-restore]');
+  await pg.click('[data-restore]'); await pg.waitForTimeout(200);
+  await pg.goto('http://localhost:8080/prewarm/?demo#/'); await pg.waitForSelector('.list');
+  log(/DEMO-01/.test(await pg.textContent('.list')), 'restored patient back on the list');
+  await ctx.close();
+});
 await b.close();
 if (fails.length) { console.error('prewarm edge: FAIL\n- ' + fails.join('\n- ')); process.exit(1); }
-console.log('prewarm edge: ok (midnight, surgery end, double-tap Save, BP checks, back button, Log, Enter, still to fill, swipe, stray taps, time order, corrections, BMI, follow-ups, blanks, typed answers, alerts everywhere, duplicates, storage full, lock warning, late readings)');
+console.log('prewarm edge: ok (midnight, surgery end, double-tap Save, BP checks, back button, Log, Enter, still to fill, swipe, stray taps, time order, corrections, BMI, follow-ups, blanks, typed answers, alerts everywhere, duplicates, storage full, lock warning, late readings, delete and restore)');
