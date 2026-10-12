@@ -85,6 +85,8 @@ a { color: var(--navy); }
 .textlinks a.minicard small { font-weight: 400; font-size: 11px; color: var(--muted); }
 .links.one { grid-template-columns: 1fr; }
 .links.two { grid-template-columns: 1fr 1fr; margin-top: 12px; }
+/* Perioperative data: the full width under Intra-op details and PACU */
+a.widebox { display: grid; align-content: center; min-height: 52px; margin-top: 6px; padding: 6px 12px; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-card); color: var(--navy); font-weight: 600; text-decoration: none; }
 details.sect { margin-top: 12px; }
 details.sect > summary { display: flex; align-items: baseline; gap: 8px; min-height: var(--tap); padding: 6px 2px; cursor: pointer; font-size: 16px; font-weight: 700; color: var(--navy); }
 details.sect > summary small { font-size: 12px; font-weight: 400; color: var(--muted); }
@@ -344,7 +346,7 @@ dialog.ask p { margin: 0 0 6px; }
 .askbtns button { min-height: var(--tap); }
 
 /* what's still missing (patient screen, above Mark data collection as complete) */
-.gaps { margin-top: 12px; padding: 10px 12px; border: 1px solid var(--line); border-left: 4px solid var(--navy); border-radius: var(--r-card); background: var(--card); color: var(--ink); font-size: 14px; }
-.gaps b { color: var(--navy); }
+.gaps { margin-top: 12px; padding: 10px 12px; border: 1px solid var(--warn); border-radius: var(--r-card); background: var(--warn-soft); color: var(--ink); font-size: 14px; }
+.gaps b { color: var(--warn); }
 .gaps ul { margin: 4px 0 0; padding-left: 18px; display: grid; gap: 4px; }
-.gaps a { color: var(--navy); font-weight: 600; }
+.gaps a { color: var(--warn); font-weight: 600; }

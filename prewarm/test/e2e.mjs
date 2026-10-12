@@ -177,8 +177,9 @@ try {
   assert.ok(await page.$('[data-done]'), 'Mark data collection as complete on this tab too');
   // other data: the rest of the study's pages on one page, under headers open by default, from the small box on the
   // BP, HR, BIS tab; Enter and the arrow keys move between questions
-  assert.equal((await page.textContent('.textlinks a.minicard')).trim(), 'Other data', 'no caption on the Other data box');
-  await page.click('.textlinks a.minicard');
+  assert.equal((await page.textContent('a.widebox')).trim(), 'Perioperative data', 'full-width Perioperative data box');
+  assert.equal((await page.textContent('#haemolink')).trim(), 'Others', 'second tab is Others');
+  await page.click('a.widebox');
   await page.waitForSelector('details.sect');
   assert.equal(await page.$$eval('details.sect[open]', x => x.length), 8, 'pre-op, meds, bloods, day 1 x2, day 2 x2, discharge, all open');
   await page.fill('#f-age', '67'); await page.keyboard.press('Enter');
