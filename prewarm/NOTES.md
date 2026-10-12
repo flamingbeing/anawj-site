@@ -72,7 +72,8 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   once after its first server snapshot (`resync1`). The sync emulator test checks the server copy keeps its readings.
 - **Warming time labels** (owner, 12 Oct 2026): Gown on (pre-warming gown put on), Prewarm on, Prewarm off, Underbody
   warm, Gown warm (the intra-op Bair Huggers). Those are all the Bair Hugger items on the paper form. They are coloured warm
-  beige (`.tchip.warm`: fill #efe2d2, labels #7a4a00); the other times stay blue.
+  beige before and after they are set (`.tchip.warm`: #f7efe5 empty, #efe2d2 set, labels #7a4a00); the
+  other times stay blue.
 - **Screen size** (Settings, this phone only): Smaller / Small / Normal / Large / Larger zooms the whole app
   (`--ui-zoom` on body). Normal by default.
 - **Form view** (owner, 12 Oct 2026): the study's real paper form (data collection form v3.2, .docx) with text put in:
