@@ -394,6 +394,10 @@ portfolio content.
 - Owner preferences (merging, screenshots, planning, new options): see "Working with the owner" in `AGENTS.md`.
   Logbook calls so far: no tag renames (APMES tag names stay), no raw regex, no swipe actions on cases, no tag
   numbers on screen, no What's new, frictionless logging first.
+- **Testing in Firefox (Gecko)**: Playwright's Firefox installs fine into the scratchpad (only Chromium is preinstalled;
+  don't re-download Chromium): `PLAYWRIGHT_BROWSERS_PATH=<scratchpad>/pw node /opt/node22/lib/node_modules/playwright/cli.js install firefox`,
+  then `firefox.launch()` with the same `PLAYWRIGHT_BROWSERS_PATH` (no `isMobile` in Firefox; set a mobile viewport and
+  user agent). Desktop Gecko has no dynamic toolbar or add-ons, so phone-only Firefox issues may still need the owner.
 - **Ad blockers hide class names on their lists** (Oct 2026): EasyList (uBlock Origin etc., common on Firefox for
   Android; Chrome on Android has no add-ons) has `##.adv-link`, so the Advanced settings links vanished on the owner's
   Firefox while Chrome showed them. Avoid ad-like class and id names (adv-, ad-, advert, banner-ad, sponsor…); when
