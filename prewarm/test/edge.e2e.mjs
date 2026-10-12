@@ -63,8 +63,10 @@ await tryit(async () => {
   pg.once('dialog', d => { asked = d.message(); d.dismiss(); });
   await pg.fill('input[data-in="sbp"]', '320'); await pg.click('#save'); await pg.waitForTimeout(300);
   log(/unusual/.test(asked), 'BP 320 asked: ' + asked);
-  pg.once('dialog', d => d.accept());
+  // OK to the unusual value, then to the blank boxes (BIS)
+  const ok = d => d.accept(); pg.on('dialog', ok);
   await pg.click('#save'); await pg.waitForTimeout(300);
+  pg.off('dialog', ok);
   log(/saved/.test(await pg.textContent('#toast')), 'BP 320 saved after OK');
   await ctx.close();
 });
@@ -202,6 +204,24 @@ await tryit(async () => {
   log(!await pg.$('#f-ihd_mi_years') && !await pg.$('.chip[data-f="ihd_mi"]'), 'IHD No hides both follow-ups');
   await ctx.close();
 });
+// L. an all-blank reading isn't saved; a part-blank one asks, then shows in Still to fill; columns hidden in Settings show too
+await tryit(async () => {
+  const { ctx, pg } = await fresh();
+  await open(pg, 0);
+  await pg.click('#haemolink'); await pg.waitForSelector('input[data-in="sbp"]');
+  await pg.click('.strip a:has-text("60")'); await pg.waitForSelector('input[data-in="sbp"]');
+  for (const k of ['sbp', 'dbp', 'map', 'hr', 'bis']) await pg.fill(`input[data-in="${k}"]`, '');
+  await pg.click('#save'); await pg.waitForTimeout(300);
+  log(/Nothing entered for 60 min/.test(await pg.textContent('#toast')), 'blank reading not saved');
+  await pg.fill('input[data-in="sbp"]', '118');
+  pg.once('dialog', d => d.accept()); await pg.click('#save'); await pg.waitForTimeout(400);
+  await pg.waitForFunction(() => !!document.querySelector('#gaps'), null, { timeout: 4000 });
+  log(/BP, HR, BIS saved with blanks: .*60 min \(Diastolic BP, Mean BP, Heart rate, BIS\)/.test(await pg.textContent('#gaps')), 'part-blank reading listed: ' + (await pg.textContent('#gaps')).replace(/\s+/g, ' ').slice(0, 300));
+  await pg.evaluate(() => { const k = 'prewarm-demo:settings'; const s = JSON.parse(localStorage.getItem(k) || '{}'); s.hide = { ...(s.hide || {}), ts: true }; localStorage.setItem(k, JSON.stringify(s)); });
+  await pg.reload(); await pg.waitForSelector('#gaps');
+  log(/Hidden in Settings \(not being recorded\): thermal sensation/.test(await pg.textContent('#gaps')), 'hidden column listed');
+  await ctx.close();
+});
 await b.close();
 if (fails.length) { console.error('prewarm edge: FAIL\n- ' + fails.join('\n- ')); process.exit(1); }
-console.log('prewarm edge: ok (midnight, surgery end, double-tap Save, BP checks, back button, Log, Enter, still to fill, swipe, stray taps, time order, corrections, BMI, follow-ups)');
+console.log('prewarm edge: ok (midnight, surgery end, double-tap Save, BP checks, back button, Log, Enter, still to fill, swipe, stray taps, time order, corrections, BMI, follow-ups, blanks)');

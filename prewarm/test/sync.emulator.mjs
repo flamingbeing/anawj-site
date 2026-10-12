@@ -54,6 +54,7 @@ try {
   await a.fill('#sid', 'SYNC-01'); await a.click('.seg .chip[data-v="1"]'); await a.click('button[type=submit]');
   await a.waitForSelector('.times');
   await a.click('.num[data-type="core"]'); await a.click('.num[data-type="core"]'); await a.fill('input.num', '366'); await a.keyboard.press('Enter');
+  a.once('dialog', d => d.accept()); // only core entered: Save asks about the blank boxes
   await a.click('#save');
   await toastSays(a, /0 min saved/);
 
@@ -70,6 +71,7 @@ try {
   // phone B adds the 5-min reading; phone A gets it
   await bb.goto(bb.url().replace('/sheet', '/prewarm/5'));
   await bb.click('[data-step="1"][data-c="core"]');
+  bb.once('dialog', d => d.accept());
   await bb.click('#save');
   await a.goto(BASE + '#/');
   await a.click('.list a'); await a.click('.textlinks a[href$="/sheet"]');

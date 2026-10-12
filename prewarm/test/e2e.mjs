@@ -104,6 +104,12 @@ try {
   assert.equal((await page.textContent('.num[data-type="chest"]')).trim(), '36.4');
   await page.click('.chip[data-c="ts"][data-v="1"]');
   await axe('reading'); await shot('reading');
+  // thigh and calf are still blank: Save asks first (Cancel keeps the reading open)
+  let blanks = ''; page.once('dialog', d => { blanks = d.message(); d.dismiss(); });
+  await page.click('#save'); await page.waitForTimeout(200);
+  assert.match(blanks, /Thigh, Calf, Set temp on gown are blank/);
+  assert.match(await page.textContent('.tp'), /0 min/, 'not saved after Cancel');
+  page.once('dialog', d => d.accept());
   await page.click('#save');
   await page.waitForFunction(() => /5 min/.test(document.querySelector('.tp')?.textContent || ''));
   assert.equal((await page.textContent('.num[data-type="core"]')).trim(), '36.6', 'carried over from the last reading');
@@ -125,6 +131,7 @@ try {
   assert.match(await page.textContent('.tp'), /5 min/, 'Stay keeps the screen');
   assert.equal((await page.textContent('.num[data-type="core"]')).trim(), '36.7', 'and the change');
   await page.click('.strip a:has-text("10")');
+  page.once('dialog', d => d.accept()); // thigh and calf are still blank
   await page.click('dialog.ask [data-a="save"]');
   await page.waitForFunction(() => /10 min/.test(document.querySelector('.tp')?.textContent || ''));
   await page.click('.strip a:has-text("5")');
@@ -223,6 +230,7 @@ try {
   assert.ok(await hd.evaluate(el => el.isConnected), 'the same box: no redraw while typing');
   await page.click('input[data-in="hr"]'); await page.keyboard.type('64');
   assert.equal(await page.inputValue('input[data-in="dbp"]'), '70');
+  page.once('dialog', d => d.accept()); // mean BP and BIS left blank
   await page.click('#save');
   await page.waitForFunction(() => /15/.test(document.querySelector('.tp')?.textContent || ''));
   await page.click('.strip a:has-text("Base")');

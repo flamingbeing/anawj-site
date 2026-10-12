@@ -87,6 +87,8 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   stored, so switching back brings it back). BMI is worked out from weight and height like the TXA total (unless
   typed). The no-pre-warming group exports NA for active warming start. Perioperative data starts with "Subject ID
   and group" to correct mistakes: the ID can't be blank or a duplicate; the group asks first and can't be cleared.
+  Save refuses an all-blank reading (it would stop the timepoint counting as missed) and asks when some boxes are
+  blank; saved readings with blank boxes and readings hidden in Settings are listed in Still to fill.
 - **Two tabs** (owner, 12 Oct 2026): a thin tab bar under the top bar on the patient screen: **Temperatures** (the
   main screen: times, pre-warming / intra-op temps, comfort, Form view / Sheet view) and **Others** (BP, HR, BIS,
   plus the Intra-op details and PACU boxes and a full-width **Perioperative data** box, formerly "Other data"). The tab you're not on warms up and pulses when its next
