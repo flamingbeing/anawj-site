@@ -16,8 +16,8 @@ Last updated: 2026-10-12 by Claude Code, Logbook 2 (log2).
 - **Claude Code, Logbook 3 (log3)** (branch `ccr-2994049c-4e5tlt`): idle, nothing half-done. Still signed in to the
   Firebase CLI (usage counts only; each use needs the owner's OK). Owns the axe check, PR previews and the Codex /
   Firebase plugin setup.
-- **Claude Code, Logbook 2 (log2)** (branch `ccr-afac5e7a-99esax`): Profiles PR (Advanced, Basic, Basic: logbook
-  only) after #210 (tab bar up to 7). Next for log2: the Admin profile (Next, item 1). Codex plugin and Firebase CLI
+- **Claude Code, Logbook 2 (log2)** (branch `ccr-afac5e7a-99esax`): profiles follow-up (Basic the default, items
+  can be turned back on, no settings hidden, page renamed) after #214. Next for log2: the Admin profile (Next, item 1). Codex plugin and Firebase CLI
   signed in for this session, both unused (each use needs the owner's OK).
 - **Codex**: no open logbook task (handed its remaining batch to Claude on #163).
 
@@ -56,6 +56,7 @@ Last updated: 2026-10-12 by Claude Code, Logbook 2 (log2).
 
 ## Recently done
 
+- #214 Profiles: Advanced, Basic, Basic: logbook only (replaces Basic mode), at the top of Show or hide.
 - #210 Tab bar: up to seven tabs; any More page (Account, Settings, Recover drafts, Export / Import, Admin
   portal) can be a tab; an eighth asks which tab it replaces; Add Notes to the tab bar on the Notes page.
 - #200 Advanced display / logging links were hidden by ad blockers (EasyList `##.adv-link`, owner's Firefox): class
@@ -76,6 +77,11 @@ Last updated: 2026-10-12 by Claude Code, Logbook 2 (log2).
 ## Decisions log
 
 - 2026-10-12: Tab bar holds up to 7 tabs (More included); every More page can be a tab (owner).
+- 2026-10-12: Soft shadows around cards are the default (lines are the option). The Display preview is marked
+  clearly as a preview.
+- 2026-10-12: Basic is the default profile for everyone (existing accounts too, unless they pick Advanced). Profiles
+  hide interface items only, never settings, and every hidden item can be turned back on. Show or hide renamed
+  "Profiles or hide items".
 - 2026-10-12: Profiles replace Basic mode: Advanced (default, hides nothing), Basic, Basic: logbook only (Basic
   without reflections, for those submitting reflections separately). One place: top of Show or hide. Basic moves
   Analytics into More and drops reflection figures and references. Admin profile next; Generic dropped.

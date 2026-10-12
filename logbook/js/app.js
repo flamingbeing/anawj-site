@@ -72,7 +72,7 @@ const TABS = [
   { id: 'displayadv', label: 'Advanced display', render: renderDisplayAdvanced, hidden: true, under: 'display', unlisted: true },
   { id: 'loggingadv', label: 'Advanced logging', render: renderLoggingAdvanced, hidden: true, under: 'logging', unlisted: true },
   { id: 'sharefmt', label: 'Markdown', render: renderMarkdownSettings, hidden: true, under: 'settings', unlisted: true, desc: 'How Copy, Share and the notes export read' },
-  { id: 'showhide', label: 'Show or hide', render: renderShowHide, hidden: true, under: 'settings', unlisted: true, desc: 'Your profile (Advanced, Basic, logbook only) and everything you can hide' },
+  { id: 'showhide', label: 'Profiles or hide items', render: renderShowHide, hidden: true, under: 'settings', unlisted: true, desc: 'Your profile (Advanced, Basic, logbook only) and everything you can hide' },
   { id: 'logging', label: 'Logging', render: renderLogging, hidden: true, under: 'settings', unlisted: true, desc: 'Suggestions, the Enter key, dates, after Save; more under Advanced' },
   // from Reflections → More tools
   { id: 'reflset', label: 'Reflections', render: renderReflectionSettings, hidden: true, under: 'settings', unlisted: true, desc: 'New reflections in the export, photo sizes' },
@@ -194,14 +194,13 @@ function renderSettingsMenu() {
   const order = ['display', 'logging', 'showhide', 'tags', 'reflset', 'sharefmt'];
   const pages = TABS.filter(t => t.under === 'settings').sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
   settingsIndex = null;   // drawn again on the first search of this visit
-  const basic = basicMode();
   return h('div', {},
     settingsSearch(),
     h('section', { class: 'card more-list' }, h('h2', {}, 'Settings'),
       h('ul', {}, pages.map(t => menuItem(t.id, t.label, t.desc)),
         menuItem('bin', 'Recycle bin', 'Deleted cases and reflections, kept for 30 days', () => openBin()))),
-    basic ? null : settingsFileCard(),
-    basic ? null : connectClaudeCard());
+    settingsFileCard(),
+    connectClaudeCard());
 }
 
 // Connect Claude (advanced): the read-only MCP server residents run on their own computer (logbook/mcp/README.md)

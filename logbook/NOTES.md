@@ -209,7 +209,7 @@ portfolio content.
   keys, after a confirm; custom CSS is switched off but kept, own font files stay stored.
 - **Look options, Oct 2026** (device keys): **Corners** (Display, `round` 0 Square / 1 / 2 Normal / 3 Very round): every
   border-radius in style.css (and the reflection editor's inline ones) is `calc(Npx * var(--round, 1))`; tag tick
-  boxes cap at 1.2 so they never look like radio buttons. **Soft shadows instead of lines** (`shadows`, cards only).
+  boxes cap at 1.2 so they never look like radio buttons. **Soft shadows instead of lines** (`shadows`, cards only; **on by default**, owner 12 Oct 2026: `shadows: false` = lines).
   **Bigger tap targets on the Case tab** (Advanced display, `bigTaps`). **Tab bar order and hidden tabs** (Advanced
   display, `tabOrder` / `tabHidden`, `arrangeTabs` in ui-settings.js): ↑ ↓ and a switch per tab; More can't be
   hidden, at least two and at most seven (`MAX_BAR`, More included; owner, Oct 2026) stay. Every page in the More list
@@ -273,28 +273,33 @@ portfolio content.
   lastAt, lastTo } (never in the settings file). Reminder: one toast per visit with a Save button when due. The
   owner filled `GOOGLE_CLIENT_ID` and `DROPBOX_APP_KEY` (both public) in Oct 2026. Dropbox stays in development
   mode until the owner applies for production (its icons are 64 and 256 px from `icons/icon-512.png`).
-- **Show or hide** (Settings → Show or hide, `#showhide`, `renderShowHide` in `ui-settings.js`; Oct 2026, from Codex's
+- **Profiles or hide items** (Settings → Profiles or hide items, was Show or hide; `#showhide`, `renderShowHide` in `ui-settings.js`; Oct 2026, from Codex's
   list): every switch that hides part of the app, grouped Tips and help / Case tab / Logbook / Header and tabs, each
   group with its own "Reset this group" (the other groups stay); a Reflections group too (formatting buttons,
   heading notes). The same settings as on their own pages (hideTips, weeklyDigest, reflNotes, caseHide, reflToolbar; this device's rowMenu, hideHeader, tabHidden / tabOrder). e2e:
   `test/e2e/simpler.mjs`.
-- **Profiles** (`settings.mode`, the whole account; `PROFILES`, `profile()`, `basicMode()`, `logbookOnly()` in
-  `ui-core.js`; `profileCard` at the top of Settings → Show or hide, the **only** place (owner, Oct 2026: two Basic
-  switches confused); body classes `basic`, `logbook-only`). Named so both Basic ones read as Basic (owner):
-  - **Advanced** (default, nothing saved): hides nothing. Only the Basic profiles hide anything.
-  - **Basic** (was Basic mode; `settings.basic: true` still reads as Basic): same tabs and buttons in the same places;
-    hidden: every optional Case tab part but "what the box was read as" (quick picks, ☆, Still needed, tag group
-    saving, Plan for later), the Logbook Grid view and search operators, Analytics Trends / forecasts / Gone quiet /
-    to-dos / links, the Advanced display / logging links (`advancedLink` says "… are hidden in the Basic profile.
-    Change profile ›": a silently missing link looked like a bug to the owner), the settings file and Connect Claude
-    cards, and reflection **Figures and References** (shown anyway when a reflection already has some). **Analytics
-    moves into More** (off the bar by default, like Notes; can be put back on the bar).
+- **Profiles** (`settings.mode`, the whole account; `PROFILES`, `profile()`, `basicMode()`, `logbookOnly()`,
+  `BASIC_ITEMS`, `basicHides()` in `ui-core.js`; `profileCard` at the top of Settings → **Profiles or hide items**
+  (`#showhide`), the **only** place (owner, Oct 2026: two Basic switches confused); body classes `basic`,
+  `logbook-only`). Named so both Basic ones read as Basic (owner). **Basic is the default for everyone** (owner, 12
+  Oct 2026: nothing saved = Basic; Advanced is saved as `mode: 'advanced'`). The e2e demo account starts in Advanced
+  (`demoDoc` in demo-backend.js, when `apmes-logbook-demo-small` is set) since the tests check every feature.
+  - **Profiles hide interface items only, never settings** (owner): the advanced settings links, settings file and
+    Connect Claude cards always show. **Every hidden item can be turned back on**, so all on is Advanced again
+    (owner): `settings.basicOn` lists them (Case tab parts as `case:<part>` via `caseShown` / `setCaseShown`, used
+    by the Logging page and the Case tab group too; `grid`, `analytics`, `reflExtras`, `reflect` from the profile
+    card's "Hidden in this profile" switches); the tabs are the tab bar switches. Picking a profile starts from its
+    defaults (`basicOn` cleared) and moves this device's saved tabs.
+  - **Basic**: hides the optional Case tab parts but "what the box was read as" (quick picks, ☆, Still needed, tag
+    group saving, Plan for later), the Logbook Grid, Analytics trends / forecasts / Gone quiet / to-dos / links,
+    reflection Figures and References (shown anyway when a reflection has some); Analytics off the bar (in More).
+    Search operators are not hidden (already off by default; a setting).
   - **Basic: logbook only**: Basic without reflections, for residents allowed to submit reflections separately (the
-    PCs still need compiled case logs). No Reflections tab (its page stays in More for ones already written; no
-    switch for it on the bar), no Reflect buttons or row-menu item, no ☆ Interesting (edit dialog, Logbook filter),
-    no reflection headings card in Analytics.
-  - Choosing a profile changes no other setting (Advanced brings everything back); it also moves this device's saved
-    tabs (Analytics into More for Basic, back for Advanced). Admin profile planned next (owner: no Generic).
+    PCs still need compiled case logs): Reflections off the bar (in More, for ones already written), no Reflect
+    buttons or row-menu item, no ☆ Interesting (edit dialog, Logbook filter), no reflection headings card.
+  - **Advanced**: hides nothing. Admin profile planned next (owner: no Generic).
+  - Display preview (`displayPreview`): dashed accent edge, faint stripes and a "Preview only: not a real case" pill,
+    so it never reads as a real case (owner).
   e2e: `simpler.mjs`.
 - **One spreadsheet (CSV)** (Backup card, "Download as one spreadsheet"; `backup-csv.js`, tested; Oct 2026, from
   Codex's list): the backup as one CSV for Excel: a `logbook` row (settings, tag groups, portfolio details) then a row

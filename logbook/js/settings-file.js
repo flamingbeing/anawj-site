@@ -22,6 +22,7 @@ const OBJECTS = {
   excelExport: v => cleanExportOpts(v),
   catOrder: strs,
   caseHide: v => strs(v).slice(0, 20),
+  basicOn: v => strs(v).slice(0, 30),
   tabOrder: v => strs(v).slice(0, 10),
   tabHidden: v => strs(v).slice(0, 10),
   subcats: v => (v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).slice(0, 100).map(([k, x]) => [String(k).slice(0, 10), strs(x)])) : {}),

@@ -87,6 +87,13 @@ export const importDocId = key =>
 export function defaultLogbook(email, name = '') {
   return { email, name, rid: null, settings: {}, templates: [], updatedAt: Date.now() };
 }
+// the demo's own logbook. The e2e tests (apmes-logbook-demo-small) check every feature, so theirs starts in Advanced;
+// everyone else starts in Basic, the default profile
+function demoDoc(email, name) {
+  const doc = defaultLogbook(email, name);
+  try { if (localStorage.getItem('apmes-logbook-demo-small')) doc.settings = { mode: 'advanced' }; } catch { /* no storage */ }
+  return doc;
+}
 
 // ---- storage ----
 
@@ -152,7 +159,7 @@ function seed(s) {
   ];
   const t = now.getTime();
   s.logbooks[DEMO_USER.email] = {
-    doc: defaultLogbook(DEMO_USER.email, DEMO_USER.name),
+    doc: demoDoc(DEMO_USER.email, DEMO_USER.name),
     cases: Object.fromEntries(cases.map(([ago, details, cats], i) => {
       const id = 'demo' + i;
       return [id, { id, date: day(ago), details, cats, createdAt: t - ago * 864e5, updatedAt: t - ago * 864e5, source: 'app' }];
@@ -276,7 +283,7 @@ export async function loadLogbook(email) {
   email = lc(email);
   const s = load();
   const lb = book(s, email);
-  if (!lb.doc) { lb.doc = defaultLogbook(email, email === DEMO_USER.email ? DEMO_USER.name : ''); save(s); }
+  if (!lb.doc) { lb.doc = demoDoc(email, email === DEMO_USER.email ? DEMO_USER.name : ''); save(s); }
   return plain(lb.doc);
 }
 
