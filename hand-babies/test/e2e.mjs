@@ -51,8 +51,9 @@ try {
   assert.match(await rm.textContent('[data-fig="nerves"] .fig-btn'), /Play/);
   await rm.close();
 
-  // the 10 rules are there
-  assert.equal(await page.$$eval('ol.rules > li', l => l.length), 10);
+  // no 10 rules, no emoji
+  assert.equal(await page.$('#rules'), null);
+  assert.doesNotMatch(await page.evaluate(() => document.body.innerText), /[\u{1F000}-\u{1FAFF}\u{2600}-\u{26FF}\u{25B6}\u{275A}]/u);
 
   if (fs.existsSync(AXE)) {
     await page.evaluate(() => document.querySelectorAll('details').forEach(d => { d.open = true; }));
@@ -72,13 +73,13 @@ try {
   ed.on('pageerror', e => errors.push('edit: ' + e.message));
   await ed.goto(BASE + 'edit.html');
   const fr = ed.frameLocator('#frame');
-  await fr.locator('#rules .lead').waitFor();
+  await fr.locator('#picture .lead').waitFor();
   await ed.waitForTimeout(300);
   // figures are stopped inside the editor so they can be selected
   assert.match(await fr.locator('[data-fig="distal"] .fig-btn').textContent(), /Play/);
-  await fr.locator('#rules .lead').click();
+  await fr.locator('#picture .lead').click();
   await ed.click('#aEdit');
-  await fr.locator('#rules .lead').evaluate(el => { el.textContent = 'Your senior decides from your exam. Edited line.'; });
+  await fr.locator('#picture .lead').evaluate(el => { el.textContent = 'Tap the case in front of you. Edited line.'; });
   await ed.click('#eSave');
   assert.equal(await ed.textContent('#count'), '1');
   await fr.locator('#t-look').click();
@@ -95,14 +96,14 @@ try {
   const preview = await ed.inputValue('#preview');
   assert.match(preview, /Suggested by: Test MO/);
   assert.match(preview, /## Page: \/hand-babies\//);
-  assert.match(preview, /Was:\n> Your senior decides from your exam and your photos/);
-  assert.match(preview, /Now:\n> Your senior decides from your exam\. Edited line\./);
+  assert.match(preview, /Was:\n> Tap the one in front of you\./);
+  assert.match(preview, /Now:\n> Tap the case in front of you\. Edited line\./);
   assert.match(preview, /Comment:\n> Add a photo of a real cascade/);
   await ed.evaluate(() => { window.open = u => { window.__opened = u; }; });
   await ed.click('#openIssue');
   const issue = await ed.evaluate(() => window.__opened);
   assert.match(issue, /^https:\/\/github\.com\/flamingbeing\/anawj-site\/issues\/new\?title=Page%20edits%3A%20%2Fhand-babies%2F/);
-  if (SHOTS) { await ed.click('#sendClose'); await fr.locator('#rules .lead').click(); await ed.screenshot({ path: `${SHOTS}/edit.png` }); }
+  if (SHOTS) { await ed.click('#sendClose'); await fr.locator('#picture .lead').click(); await ed.screenshot({ path: `${SHOTS}/edit.png` }); }
   // pages outside this app can't be opened in the editor
   await ed.fill('#path', '/logbook/');
   await ed.press('#path', 'Enter');
@@ -112,7 +113,7 @@ try {
 
   if (SHOTS) {
     await page.goto(BASE);
-    for (const id of ['rules', 'picture', 'sensation', 'tendons', 'infection', 'photos', 'call']) {
+    for (const id of ['picture', 'sensation', 'tendons', 'infection', 'photos', 'call']) {
       if (id === 'picture') await page.$eval('#pic-cut', d => { d.open = true; });
       await page.evaluate(() => document.querySelectorAll('.fig-btn').forEach(b => { if (/Pause/.test(b.textContent)) b.click(); }));
       const s = await page.$(`#${id}`);
