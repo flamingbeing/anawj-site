@@ -5,9 +5,9 @@ change can be checked on a phone before it is merged. anawj.com itself stays on 
 merge to `main`, as before. (Cloudflare now steers new projects to Workers rather than Pages: "Start new
 projects with Workers".)
 
-- Each branch gets a steady preview address, `https://<branch>-anawj-preview.<subdomain>.workers.dev/`, and each
+- Each branch gets a steady preview address, `https://<branch>-anawj-preview.kohwenjun.workers.dev/`, and each
   build a one-off one. Cloudflare posts the links on the PR (a comment and a Workers Builds check) and updates
-  them on every push. `<subdomain>` is the Cloudflare account's workers.dev name.
+  them on every push. The copy of `main` is at <https://anawj-preview.kohwenjun.workers.dev/>.
 - **Open the apps in demo mode:** `…/logbook/?demo`, `…/evals/?demo`, `…/nuh-roster/?demo`. Demo mode keeps
   everything in the browser.
 - **Signing in does not work on previews, on purpose.** Google sign-in only works from domains listed in each
@@ -36,8 +36,12 @@ Cloudflare's screens change now and then; the names below are close enough to fi
      preview`** (the defaults). Root path: `/`.
 4. **Deploy.** The first build puts a copy of `main` at `anawj-preview.<subdomain>.workers.dev` (unlisted,
    noindex; it is refreshed on each merge to `main`, which is harmless).
-5. In the Worker: **Settings → Builds**: turn on **builds for preview (non-production) branches** and leave **pull
-   request comments** on.
+5. In the Worker: **Settings → Builds** (two tabs, **Production** and **Previews Base**):
+   - Previews Base: turn on **Builds for Preview branches**, and click **Enable Preview URLs** if a yellow
+     "Preview URLs are disabled" box shows (without it, PR builds make no link).
+   - Both tabs: pick or create an **API token** (e.g. "anawj-preview build token"). "Configured API token
+     unavailable" means builds can't deploy: the first PR preview failed until one was set.
+   - Leave **pull request comments** on.
 6. Check it: push to any open PR; within a minute or two a Workers Builds check and a comment with the preview
    link should appear. Open `<link>/logbook/?demo` on your phone.
 
