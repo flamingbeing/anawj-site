@@ -150,16 +150,15 @@ try {
   await ad.locator('.selrow', { hasText: 'SYNC-01' }).locator('input').check();
   ad.once('dialog', d => d.accept());
   await ad.click('#lock');
+  // a team phone doesn't get a locked patient at all: it goes from phone A, and the server refuses to send it
   await a.goto(BASE + '#/');
-  await a.waitForSelector('.list a.locked', { timeout: 15000 });
-  await a.click('.list a.locked');
-  await toastSays(a, /Locked by the study admin/);
-  assert.doesNotMatch(a.url(), /#\/p\//, 'phone A stays on the list');
+  await a.waitForFunction(() => !/SYNC-01/.test(document.querySelector('main').textContent), null, { timeout: 15000 });
+  assert.ok(!(await a.evaluate(() => localStorage.getItem('prewarm:patients'))).includes('SYNC-01'), 'not kept on phone A');
   if (SHOTS) await a.screenshot({ path: SHOTS + '/locked.png' });
   await ad.click('#select');
   await ad.locator('.selrow', { hasText: 'SYNC-01' }).locator('input').check();
   await ad.click('#unlock');
-  await a.waitForFunction(() => !document.querySelector('.list a.locked') && /SYNC-01/.test(document.querySelector('.list').textContent), null, { timeout: 15000 });
+  await a.waitForFunction(() => /SYNC-01/.test(document.querySelector('.list')?.textContent || ''), null, { timeout: 15000 });
   // locking and unlocking keep the readings on the server copy
   const docs = await (await fetch(`${FS}/patients`, { headers: { Authorization: 'Bearer owner' } })).json();
   const sync01 = docs.documents.find(d => /SYNC-01/.test(JSON.stringify(d.fields.f)));

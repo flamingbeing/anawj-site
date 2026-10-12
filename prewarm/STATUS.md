@@ -30,6 +30,7 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 
 ## Decisions
 
+- 12 Oct 2026: locked patients are hidden from team phones completely (rules + query); admins see them read only.
 - 12 Oct 2026: admins lock patients from the home page (select, all but latest); locked = nobody opens them.
 - 12 Oct 2026: Log out (deletes the phone's patients, warns, warns again if unsynced) replaces Stop sharing. Join links sent
   to the teams and working (owner).
