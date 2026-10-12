@@ -310,6 +310,22 @@ await tryit(async () => {
   log(/DEMO-01/.test(await pg.textContent('.list')), 'restored patient back on the list');
   await ctx.close();
 });
+// R. Prewarm off due alerts like a reading (10-min group: 10 min after Prewarm on)
+await tryit(async () => {
+  const { ctx, pg } = await fresh('2026-10-13T10:00:00');
+  await pg.evaluate(() => { localStorage.setItem('prewarm-demo:settings', JSON.stringify({ me: 'TT' })); });
+  await pg.goto('http://localhost:8080/prewarm/?demo#/new'); await pg.reload(); await pg.waitForSelector('#sid');
+  await pg.fill('#sid', 'ALERT-1'); await pg.click('.seg .chip[data-v="2"]'); await pg.click('button[type=submit]'); await pg.waitForSelector('#lognext');
+  await pg.click('#lognext'); await pg.click('#lognext'); // Gown on, Prewarm on
+  const seen = [];
+  for (let i = 0; i < 12; i++) {
+    await pg.clock.fastForward('01:00'); await pg.waitForTimeout(150);
+    const t = await pg.evaluate(() => { const b = document.querySelector('#banner'); return b && !b.hidden ? b.textContent : ''; });
+    if (t && !seen.includes(t)) seen.push(t);
+  }
+  log(seen.some(t => /Prewarm off due now \(10 min of warming\)/.test(t)), 'Prewarm off alert: ' + JSON.stringify(seen));
+  await ctx.close();
+});
 await b.close();
 if (fails.length) { console.error('prewarm edge: FAIL\n- ' + fails.join('\n- ')); process.exit(1); }
-console.log('prewarm edge: ok (midnight, surgery end, double-tap Save, BP checks, back button, Log, Enter, still to fill, swipe, stray taps, time order, corrections, BMI, follow-ups, blanks, typed answers, alerts everywhere, duplicates, storage full, lock warning, late readings, delete and restore)');
+console.log('prewarm edge: ok (midnight, surgery end, double-tap Save, BP checks, back button, Log, Enter, still to fill, swipe, stray taps, time order, corrections, BMI, follow-ups, blanks, typed answers, alerts everywhere, duplicates, storage full, lock warning, late readings, delete and restore, prewarm off alert)');
