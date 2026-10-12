@@ -39,6 +39,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .clock { display: flex; align-items: center; gap: 8px; flex: 1 0 auto; margin-left: 8px; color: var(--navy); }
 /* the next thing to log sits in the middle of the bar, between the title and the time now */
 .clock .next { margin: 0 auto; justify-items: center; text-align: center; }
+/* nothing due yet (no Prewarm on / Induction): the time now still sits on the right, by the Log button */
+.clock .now:first-child { margin-left: auto; }
 .clock > div { display: grid; justify-items: end; line-height: 1.15; text-align: right; min-width: 0; }
 .clock small { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .clock b { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
