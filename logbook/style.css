@@ -1052,7 +1052,6 @@ html.lw-narrow main:not(:has(.log-card.panes)) { max-width: 760px; }
 html.lw-wide main:not(:has(.log-card.panes)) { max-width: 1400px; }
 html.lw-full main:not(:has(.log-card.panes)) { max-width: none; }
 /* while a swipe pushes the page sideways (app.js), it never makes the window scroll sideways */
-html.swipe-tabs, html.swipe-tabs body { overflow-x: clip; }   /* always, and on body too: a page sliding off the right edge otherwise widens the phone's layout viewport, so the fixed tab bar drops and slides back */
 .swipe-peek { position: fixed; z-index: 5; margin: 0; pointer-events: none; will-change: transform; }
 /* higher contrast: darker text and stronger lines; "auto" follows the device's Increase contrast */
 html.hc:root:root:root { --ink: #000; --muted: #2e3338; --line: #737a82; --row-alt: #eef0f2; }

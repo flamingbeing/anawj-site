@@ -224,9 +224,10 @@ portfolio content.
   horizontal, < 0.7 s) or past a third of the screen finishes the slide (both on one Web Animations clock), then the
   real page is drawn underneath at the copy's height on screen and the copy goes; otherwise both spring back. The next
   tab is the next/previous on the bar (order and hidden tabs honoured; `barTabOf`: a sub-page counts as the bar tab
-  it sits under, an off-bar tab as More). `html.swipe-tabs` and its body clip sideways overflow all the time: a page
-  sliding off the right edge otherwise widened the phone's layout viewport, so the fixed tab bar dropped and slid
-  back. `paintTabs` only moves the selection when the bar's tabs are unchanged (no rebuild, no flash). Never from fields, dialogs, drag handles, tag-editor pills, anything that scrolls sideways, or within 20 px of
+  it sits under, an off-bar tab as More). While swiping the page is pinned (`pin`: position fixed over a spacer of
+  its height): a page in the flow sliding off the right edge widened the phone's layout viewport, so the fixed tab bar
+  dropped and slid back. Don't clip overflow on html/body for this: on Chrome for Android that stopped the page
+  scrolling to the very bottom (the last card, e.g. Advanced display settings, hid behind the tab bar). `paintTabs` only moves the selection when the bar's tabs are unchanged (no rebuild, no flash). Never from fields, dialogs, drag handles, tag-editor pills, anything that scrolls sideways, or within 20 px of
   the screen's edges (the phone's Back gesture). Reduce motion: switches without sliding.
   **Fewer buttons on Logbook rows** (`rowMenu`, html `row-menu`): one ⋯ opens Copy / Write or Open the reflection /
   Edit the case; a ✓ still marks cases with a reflection.

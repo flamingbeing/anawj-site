@@ -443,10 +443,24 @@ function makePeek(id, top) {
   return c;
 }
 const move = (el, x) => { el.style.transform = x ? `translateX(${x}px)` : ''; };
+// While swiping, the page is pinned where it is (position: fixed over a spacer of its height, so the scroll stays):
+// a fixed page sliding past the screen's edge doesn't widen the phone's layout viewport, which moved the tab bar.
+// (Clipping overflow on html/body instead stopped Chrome on Android scrolling to the very bottom.)
+let spacer = null;
+function pin() {
+  const r = app.getBoundingClientRect();
+  spacer = h('div', { 'aria-hidden': 'true', style: `height:${app.offsetHeight}px` });
+  app.before(spacer);
+  Object.assign(app.style, { position: 'fixed', top: r.top + 'px', left: r.left + 'px', width: r.width + 'px', margin: '0', zIndex: '4' });
+}
+function unpin() {
+  if (spacer) { spacer.remove(); spacer = null; }
+  Object.assign(app.style, { position: '', top: '', left: '', width: '', margin: '', zIndex: '' });
+}
 function endSwipe(s) {
   if (s.peek) s.peek.remove();
   document.documentElement.classList.remove('swiping');
-  move(app, 0);
+  move(app, 0); unpin();
 }
 document.addEventListener('touchstart', e => {
   swipe = null;
@@ -468,6 +482,7 @@ document.addEventListener('touchmove', e => {
       s.top = app.getBoundingClientRect().top + window.scrollY;   // the page's top when scrolled to the top
       s.peekTop = Math.max(0, s.top - window.scrollY);   // where the new page will sit: no higher than the screen's top
       document.documentElement.classList.add('swiping');
+      if (!reduceMotion()) pin();
     } else return;
   }
   e.preventDefault();   // sideways now: the page follows the finger (held back where there's no tab to go to)
@@ -507,10 +522,10 @@ document.addEventListener('touchend', async e => {
   const peek = s.peek, y = s.top - s.peekTop;
   move(app, w); anims[0].cancel();
   await go(next);
-  window.scrollTo(0, y);
   requestAnimationFrame(() => {
-    if (y) window.scrollTo(0, y);   // after the screen change's own scroll
-    move(app, 0); peek.remove(); anims[1].cancel();
+    unpin(); move(app, 0);
+    window.scrollTo(0, y);   // after the screen change's own scroll
+    peek.remove(); anims[1].cancel();
     document.documentElement.classList.remove('swiping');
   });
 }, { passive: true });
