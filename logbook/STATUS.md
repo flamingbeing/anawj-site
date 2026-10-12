@@ -9,13 +9,12 @@ Last updated: 2026-10-12 by Claude Code "APMES Logbook" session.
 
 ## Now
 
-- **Claude Code, "APMES Logbook" session** (branch `claude/clever-gates-pm6sas`): `/apmes/` folder PR (APMES
-  documents moved out of `evals/reference/`, blank portfolio template committed for tests) and the Word export's
-  Sex tick-box fix it uncovered. Firebase CLI signed in for this session, unused (each use needs the owner's OK).
-- **Claude Code, "Logbook code editing" session** (branch `ccr-2994049c-4e5tlt`): fix PR from the Oct 12 Notes
-  security review and speed audit (owner's go): note index moved to owner-only `meta/noteIndex`, bin restore limit,
-  notes listener metadata, rules tests, and the Cloudflare preview reload fix (service workers key navigations by
-  `'./'`). Owns the axe check, PR previews and the Codex / Firebase plugin setup.
+- **Claude Code, "APMES Logbook" session** (branch `claude/clever-gates-pm6sas`): idle after #183 (`/apmes/` folder,
+  blank portfolio template committed for tests, Word export now ticks Female). Firebase CLI signed in for this
+  session, unused (each use needs the owner's OK).
+- **Claude Code, "Logbook code editing" session** (branch `ccr-2994049c-4e5tlt`): idle after #181. Still signed in
+  to the Firebase CLI (usage counts only; each use needs the owner's OK). Owns the axe check, PR previews and the
+  Codex / Firebase plugin setup.
 - **Claude Code, "APMES Logbook 2" session** (branch `ccr-afac5e7a-99esax`): owner's batch of 8 in three PRs: A
   Reflections tab (topic headings, one-line header, pinned search + sticky topics), then B (page width, demo header
   and Leave demo, swipe on by default and following the finger), then C (Analytics, Advanced only).
@@ -39,6 +38,10 @@ Last updated: 2026-10-12 by Claude Code "APMES Logbook" session.
 
 ## Recently done
 
+- #183 APMES documents in `/apmes/`; blank portfolio template in the repo; Word export ticks Female (was never ticked).
+- #181 Notes review fixes: note index moved to owner-only `meta/noteIndex` (rules deployed), bin restore keeps the
+  100-note limit, notes listener metadata, 34 new rules tests; previews no longer break on reload (service workers
+  key the page by `'./'`).
 - #176 Firebase plugin installed in cloud sessions, ask-first rule; #164 Codex plugin + CLI auto-setup; #167 ask before Codex.
 - #169 / #171 / #174 PR previews on Cloudflare Workers (`<branch>-anawj-preview.kohwenjun.workers.dev`).
 - #165 axe-core accessibility check (`test/e2e/a11y.mjs`, on demand); #168 shared instructions moved to AGENTS.md.
