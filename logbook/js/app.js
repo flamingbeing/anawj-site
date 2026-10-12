@@ -413,21 +413,21 @@ function render() {
   const inHeader = back && brand && !document.documentElement.classList.contains('no-header');
   if (inHeader) brand.prepend(back);
   document.body.classList.toggle('header-back', !!inHeader);
-  const dir = slideDirection(lastRendered, tab.id), ghost = dir ? pageGhost() : null;
+  const dir = slideDirection(lastRendered, tab.id);
   fill(app, inHeader ? null : back, tab.render());
   if (tab.id !== 'log') window.scrollTo(0, y);
   if (findAfterRender) showFound();
   // the inverted Case tab (Settings → Display, phones) opens at the bottom, where the case box is
   else if (lastRendered !== 'log' && invertedCase()) requestAnimationFrame(() => window.scrollTo(0, document.documentElement.scrollHeight));
   lastRendered = tab.id;
-  if (ghost) slidePages(ghost, dir);
+  if (dir) slidePages(dir);
 }
 let lastRendered = '';
 
-// Going into a page under a tab slides it in from the right over the one you left, which moves a little left and
-// dims; going back slides the page off to the right (owner's Apple-apps review). The page you left is a still copy
-// (the ghost), fixed where it was on the screen; the real page is pinned while it moves, so nothing widens the
-// screen. Only within one bar tab (switching tabs never slides) and not while swiping or with Reduce motion.
+// Going into a page under a tab slides it in from the right as it fades in; going back, from the left (owner's
+// Apple-apps review). Only the new page moves (no copy of the old one, so nothing on the screen is there twice); it
+// is pinned while it moves, so nothing widens the screen. Only within one bar tab (switching tabs never slides) and
+// not while swiping or with Reduce motion.
 const depthOf = id => { let n = 0; for (let t = TABS.find(x => x.id === id); t && t.under; t = TABS.find(x => x.id === t.under)) n++; return n; };
 function slideDirection(from, to) {
   if (!from || from === to || reduceMotion() || document.documentElement.classList.contains('swiping') || !app.firstChild) return 0;
@@ -435,41 +435,21 @@ function slideDirection(from, to) {
   const a = depthOf(from), b = depthOf(to);
   return b > a ? 1 : b < a ? -1 : 0;
 }
-function pageGhost() {
-  // a plain <div> (not a second <main>), with main's padding, holding a copy of the page
-  const r = app.getBoundingClientRect(), cs = getComputedStyle(app);
-  const g = h('div', { class: 'page-ghost', 'aria-hidden': 'true' });
-  g.append(...[...app.childNodes].map(n => n.cloneNode(true)));
-  g.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
-  g.inert = true;
-  Object.assign(g.style, { top: r.top + 'px', left: r.left + 'px', width: r.width + 'px', padding: cs.padding, boxSizing: cs.boxSizing });
-  return g;
-}
 let sliding = null;
-function slidePages(ghost, dir) {
+function slidePages(dir) {
   sliding?.();   // a slide still running ends now
-  document.body.append(ghost);
   pin();
-  const w = innerWidth, opts = { duration: 320, easing: 'cubic-bezier(.2, .7, .2, 1)', fill: 'forwards' };
-  const from = edgeDrag || 0; edgeDrag = 0;
-  // forward: the new page comes in from the right on top; back: the old page leaves to the right on top
-  if (dir > 0) ghost.style.zIndex = '3'; else ghost.style.zIndex = '5';
-  app.classList.add('sliding-in');
-  const anims = dir > 0
-    ? [app.animate([{ transform: `translateX(${w}px)` }, { transform: 'translateX(0)' }], opts),
-      ghost.animate([{ transform: 'translateX(0)', opacity: 1 }, { transform: `translateX(${-w * 0.3}px)`, opacity: 0.6 }], opts)]
-    : [app.animate([{ transform: `translateX(${-w * 0.3 + from * 0.3}px)`, opacity: 0.6 }, { transform: 'translateX(0)', opacity: 1 }], opts),
-      ghost.animate([{ transform: `translateX(${from}px)` }, { transform: `translateX(${w}px)` }], opts)];
-  const t0 = document.timeline.currentTime; anims.forEach(a => { a.startTime = t0; });
-  const done = () => { if (sliding !== done) return; sliding = null; anims.forEach(a => a.cancel()); ghost.remove(); unpin(); app.classList.remove('sliding-in'); };
+  const x = Math.round(innerWidth * 0.3) * dir;
+  const a = app.animate([{ transform: `translateX(${x}px)`, opacity: 0 }, { transform: 'translateX(0)', opacity: 1 }], { duration: 280, easing: 'cubic-bezier(.2, .7, .2, 1)' });
+  const done = () => { if (sliding !== done) return; sliding = null; a.cancel(); unpin(); };
   sliding = done;
-  anims[0].finished.then(done, done);
+  a.finished.then(done, done);
 }
 
 // Swipe from the left edge to go back (Accessibility; only in the app on an iPhone or iPad home screen, where the
 // phone has no Back gesture of its own; on unless switched off): the page follows the finger, and letting go past a
-// third of the screen (or after a quick flick) goes back, the page carrying on off to the right.
-let edge = null, edgeDrag = 0;
+// third of the screen (or after a quick flick) goes back.
+let edge = null;
 document.addEventListener('touchstart', e => {
   edge = null;
   if (!S.user || display().edgeBack === false || !IPHONE_APP() || e.touches.length !== 1 || e.touches[0].clientX > 20) return;
@@ -499,7 +479,6 @@ const edgeEnd = (e, cancel) => {
     return;
   }
   move(app, 0); unpin();
-  edgeDrag = reduceMotion() ? 0 : s.dx;
   navigation.back(s.under);
 };
 document.addEventListener('touchend', e => edgeEnd(e, false), { passive: true });

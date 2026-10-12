@@ -1313,10 +1313,6 @@ body.header-back .top h1 { display: none; }
 .back-row .back-link { display: inline-flex; align-items: center; gap: 2px; min-height: 40px; padding-right: 8px; color: var(--accent); font-weight: 600; text-decoration: none; font-size: calc(17px * var(--fs, 1)); }
 .back-row .back-chev { font-size: 1.7em; line-height: 1; margin: -4px 2px 0 -2px; font-weight: 400; }
 main > .back-row { margin: -6px 0 6px; }
-/* a page sliding in or out: the one on top is opaque, with a soft shadow on its leading edge */
-.page-ghost { position: fixed; margin: 0; pointer-events: none; will-change: transform; background: var(--bg); }
-main.sliding-in { background: var(--bg); will-change: transform; }
-main.sliding-in, .page-ghost { box-shadow: -10px 0 24px -12px rgba(0, 0, 0, .25); }
 /* the calendar's month name opens a month picker (an invisible month input over it) */
 .lb-monthpick { position: relative; text-align: center; cursor: pointer; min-height: 40px; display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 0 4px; border-radius: calc(8px * var(--round, 1)); }
 .lb-monthpick input[type="month"] { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0; opacity: 0; border: 0; padding: 0; cursor: pointer; }
