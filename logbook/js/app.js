@@ -384,6 +384,30 @@ let lastRendered = '';
 hooks.render = render;
 hooks.paintTabs = () => paintTabs();
 
+// Advanced display → Swipe left or right to change tab (off by default; html.swipe-tabs): a quick, mostly sideways
+// swipe on a bar tab's page moves to the next or previous tab on the bar. Never from fields, dialogs, the tag pills
+// being dragged, or anything that scrolls sideways (tables, the date chips), and never on pages under a tab.
+let swipe = null;
+const scrollsSideways = el => { for (let n = el; n && n !== document.body; n = n.parentElement) if (n.scrollWidth > n.clientWidth + 2 && /auto|scroll/.test(getComputedStyle(n).overflowX)) return true; return false; };
+app.addEventListener('touchstart', e => {
+  swipe = null;
+  if (!document.documentElement.classList.contains('swipe-tabs') || e.touches.length !== 1) return;
+  const t = e.target;
+  if (t.closest('input, textarea, select, dialog, [contenteditable], .dragging, .te-pillitem, .te-handle, .refl-handle, li.refl-row.edit') || scrollsSideways(t)) return;
+  swipe = { x: e.touches[0].clientX, y: e.touches[0].clientY, at: Date.now() };
+}, { passive: true });
+app.addEventListener('touchend', e => {
+  const s = swipe; swipe = null;
+  if (!s || !e.changedTouches.length) return;
+  const dx = e.changedTouches[0].clientX - s.x, dy = e.changedTouches[0].clientY - s.y;
+  if (Date.now() - s.at > 700 || Math.abs(dx) < 70 || Math.abs(dx) < 2 * Math.abs(dy)) return;
+  const bar = arrangeTabs(visibleTabs().filter(t => !t.hidden).map(t => t.id), display()).shown;
+  const i = bar.indexOf(S.tab);
+  if (i < 0) return;
+  const next = bar[i + (dx < 0 ? 1 : -1)];
+  if (next) go(next);
+}, { passive: true });
+
 // A live case update shouldn't yank the screen from under someone typing: the Log screen refreshes
 // its counts in place; other screens re-render when nothing is being edited.
 let pendingRender = false;

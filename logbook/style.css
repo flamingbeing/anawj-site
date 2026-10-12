@@ -1153,3 +1153,11 @@ html.big-taps .log-card .savebar button.big { min-height: 54px; }
 .tab-order { list-style: none; margin: 4px 0 6px; padding: 0; font-weight: 400; }
 .tab-order li { display: flex; align-items: center; gap: 6px; border-top: 1px solid var(--edge, var(--line)); }
 .tab-order li:first-child { border-top: 0; }
+/* Fewer buttons on Logbook rows (Advanced display): one ⋯ and a ✓ for a reflection */
+ul.cases .row-more { width: 40px; font-size: calc(20px * var(--fs, 1)); line-height: 1; padding: 0 0 6px; }
+ul.cases .refl-done { display: inline-flex; align-items: center; color: var(--accent); }
+ul.cases .refl-done .ico { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.row-menu-list { display: grid; gap: 8px; margin-top: 8px; }
+.row-menu-list button { justify-content: flex-start; min-height: 48px; }
+.row-menu-list button.has-refl { color: var(--accent); font-weight: 600; }
+.row-menu-list .ico { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }

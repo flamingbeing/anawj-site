@@ -316,6 +316,22 @@ function listView(rows, flagsOf, repaint) {
 }
 
 // One case: date, details, procedure tags, flags. Tap to edit. Shared by the list and the calendar.
+// Advanced display → Fewer buttons on Logbook rows: one ⋯ that opens Copy / Reflect / Edit; a ✓ marks a reflection
+function rowMenu(c) {
+  const has = (S.reflections || []).some(r => r.caseId === c.id);
+  const open = e => {
+    e.stopPropagation();
+    const m = modal(caseText(c).slice(0, 60) || 'Case', h('div', { class: 'row-menu-list' },
+      h('button', { onclick: () => { m.close(); copyText(shareCaseText(c), 'Case copied: paste it into your notes'); } }, rowIcon('copy'), ' Copy'),
+      h('button', { class: has ? 'has-refl' : '', onclick: () => { m.close(); reflectOnCase(c); } }, rowIcon(has ? 'done' : 'reflect'), has ? ' Open the reflection' : ' Write a reflection'),
+      h('button', { onclick: () => { m.close(); editCaseDialog(c); } }, ' Edit the case'),
+      h('button', { class: 'linkish', onclick: () => m.close() }, 'Cancel')));
+  };
+  return h('span', { class: 'acts' },
+    has ? h('span', { class: 'refl-done', title: 'Has a reflection', 'aria-label': 'Has a reflection' }, rowIcon('done')) : null,
+    h('button', { class: 'small row-btn row-more', title: 'Copy, reflect or edit', 'aria-label': 'Copy, reflect or edit this case', onclick: open }, '⋯'));
+}
+
 function caseRow(c, flagsOf) {
   const flags = flagsOf(c);
   const p = caseParts(c);
@@ -330,7 +346,7 @@ function caseRow(c, flagsOf) {
         !(c.cats || []).length ? h('span', { class: 'flag err' }, 'no tag') : null,
         c.reflectTag ? h('span', { class: 'flag', title: 'Marked interesting' }, '☆ interesting') : null,
         (c.tags || []).map(t => h('span', { class: 'flag sc-tag', title: 'Your tag' }, tagName(t)))),
-        h('span', { class: 'acts' },
+        document.documentElement.classList.contains('row-menu') ? rowMenu(c) : h('span', { class: 'acts' },
           // to your own notes (paste into WhatsApp, Notes, Obsidian)
           h('button', { class: 'small row-btn', title: 'Copy this case', 'aria-label': 'Copy this case', onclick: e => { e.stopPropagation(); copyText(shareCaseText(c), 'Case copied: paste it into your notes'); } }, rowIcon('copy'), h('span', { class: 'lbl' }, 'Copy')),
           // ✓ and filled once the case has a reflection (opens it); the same width either way, so the row never wraps
