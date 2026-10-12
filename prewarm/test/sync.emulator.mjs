@@ -5,6 +5,9 @@
 // tools/test-prewarm-sync.sh does all of that.
 const { chromium } = await import(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/node_modules/playwright/index.mjs');
 import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+import { fixtureFiles } from './fixture-form.mjs';
+const JSZip = createRequire(import.meta.url)('../../logbook/vendor/jszip.min.js');
 const SHOTS = process.env.SHOTS;
 const BASE = `http://localhost:${process.env.PORT || 8080}/prewarm/?emulator`;
 const FS = 'http://127.0.0.1:8085/v1/projects/demo-prewarm/databases/(default)/documents';
@@ -92,6 +95,17 @@ try {
   assert.match(await ad.textContent('main'), /AA/, 'members listed');
   await ad.click('[data-newcode="WH"]');
   await ad.waitForFunction(() => /WH-[A-Z2-9]{8}/.test(document.querySelector('main').textContent), null, { timeout: 15000 });
+  // the admin uploads the blank Word form (made-up fixture; it isn't the whole form, so they confirm)
+  ad.once('dialog', d => d.accept());
+  const zip = new JSZip(); for (const [k, v] of Object.entries(fixtureFiles())) zip.file(k, v);
+  await ad.setInputFiles('#blankup', { name: 'blank form.docx', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', buffer: await zip.generateAsync({ type: 'nodebuffer' }) });
+  await toastSays(ad, /Blank form saved/);
+  await ad.waitForFunction(() => /blank form\.docx, uploaded/.test(document.querySelector('main').textContent), null, { timeout: 15000 });
+  // phone A's Form view now fills in the Word form
+  await a.goto(BASE + '#/');
+  await a.click('.list a'); await a.click('.textlinks a[href$="/form"]');
+  await a.waitForSelector('#doc section.docx', { timeout: 20000 });
+  assert.match(await a.textContent('#doc'), /SYNC-01|S\s*Y\s*N\s*C/);
   // QR code and join link for WH
   await ad.click('[data-qr="WH"]');
   await ad.waitForSelector('#qr-WH svg');
@@ -121,7 +135,7 @@ try {
   await ad.waitForFunction(() => /SYNC-01/.test(document.querySelector('.list')?.textContent || ''), null, { timeout: 15000 });
 
   assert.deepEqual(errors, []);
-  console.log('prewarm sync: ok (two phones, join code, readings both ways, admin email-link sign-in, codes, join link and QR)');
+  console.log('prewarm sync: ok (two phones, join code, readings both ways, admin email-link sign-in, codes, join link and QR, blank Word form upload and Form view)');
 } finally {
   await b.close();
 }

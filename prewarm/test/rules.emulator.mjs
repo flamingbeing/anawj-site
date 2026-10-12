@@ -74,6 +74,16 @@ await t('admin removes a member', assertSucceeds(deleteDoc(doc(adm, 'members', '
 await t('removed member loses access', assertFails(getDoc(doc(c, 'patients', 'sgh1'))));
 await t('admin adds an admin', assertSucceeds(setDoc(doc(adm, 'admins', 'second@example.com'), { name: 'Second' })));
 // a code change keeps existing members in, and the old code stops working for new phones
+// the blank paper form
+const form = (extra = {}) => ({ b64: 'UEsDBA==', name: 'form.docx', size: 6, setAt: 5, setBy: ADMIN, ...extra });
+await t('admin uploads the blank form', assertSucceeds(setDoc(doc(adm, 'forms', 'blank'), form())));
+await t('member reads the blank form', assertSucceeds(getDoc(doc(a, 'forms', 'blank'))));
+await t('stranger cannot read the form', assertFails(getDoc(doc(stranger, 'forms', 'blank'))));
+await t('signed out cannot read the form', assertFails(getDoc(doc(nobody, 'forms', 'blank'))));
+await t('member cannot replace the form', assertFails(setDoc(doc(a, 'forms', 'blank'), form())));
+await t('form only as forms/blank', assertFails(setDoc(doc(adm, 'forms', 'other'), form())));
+await t('form with extra fields', assertFails(setDoc(doc(adm, 'forms', 'blank'), form({ note: 'x' }))));
+await t('form too big', assertFails(setDoc(doc(adm, 'forms', 'blank'), form({ b64: 'A'.repeat(1000001) }))));
 await t('admin changes NUH code', assertSucceeds(setDoc(doc(adm, 'codes', 'NUH'), { code: 'NUH-CODE-2', setAt: 4, setBy: ADMIN })));
 await t('existing member still reads', assertSucceeds(getDoc(doc(a, 'patients', 'p1'))));
 await t('old code refused', assertFails(join(b, 'phoneB', 'NUH', 'NUH-CODE-1')));

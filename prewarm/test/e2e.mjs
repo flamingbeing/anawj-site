@@ -4,6 +4,9 @@
 const { chromium } = await import(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/node_modules/playwright/index.mjs');
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
+import { fixtureFiles } from './fixture-form.mjs';
+const JSZip = createRequire(import.meta.url)('../../logbook/vendor/jszip.min.js');
 const AXE = new URL('../../tools/vendor/axe.min.js', import.meta.url).pathname;
 const BASE = `http://localhost:${process.env.PORT || 8080}/prewarm/`;
 const SHOTS = process.env.SHOTS;
@@ -123,6 +126,21 @@ try {
   assert.ok(await page.$('#print'));
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 390, 'no sideways scroll');
   await axe('form view (print)'); await shot('form-print');
+  // the study's Word form (demo: chosen on this tab; live: uploaded by an admin), filled in: shown, downloaded
+  assert.match(await page.textContent('main'), /simple version/);
+  const zip = new JSZip(); for (const [k, v] of Object.entries(fixtureFiles())) zip.file(k, v);
+  await page.setInputFiles('#blankfile', { name: 'blank form.docx', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', buffer: await zip.generateAsync({ type: 'nodebuffer' }) });
+  await page.waitForSelector('#doc section.docx', { timeout: 20000 });
+  await page.waitForFunction(() => !document.querySelector('#dl').disabled);
+  assert.match(await page.textContent('#doc'), /☒ 10-minute prewarming/);
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 390, 'Word pages fit the phone');
+  await shot('form-word');
+  const [wdl] = await Promise.all([page.waitForEvent('download'), page.click('#dl')]);
+  assert.equal(wdl.suggestedFilename(), 'TEST-02 data collection form.docx');
+  const got = await JSZip.loadAsync(fs.readFileSync(await wdl.path()));
+  const docXml = await got.file('word/document.xml').async('string');
+  assert.match(docXml, /w14:checked w14:val="1"/, 'ticked in the Word file');
+  assert.doesNotMatch(await got.file('docProps/core.xml').async('string'), /Test Author/, 'file details removed');
   await page.goBack();
 
   // spreadsheet view
