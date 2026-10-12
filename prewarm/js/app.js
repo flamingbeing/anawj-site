@@ -448,6 +448,7 @@ function setLock(ids, on) {
   }
   saveAll();
 }
+let homeStop = null;
 function home() {
   header('Prewarming study' + (DEMO ? ' (demo)' : ''), null, `<a class="iconbtn" href="#/settings" aria-label="Settings">⚙</a>`);
   const list = Object.values(patients).filter(p => !isGone(p)).sort((a, b) => (lastEdit(b)?.t || b.created) - (lastEdit(a)?.t || a.created));
@@ -465,13 +466,26 @@ function home() {
       // the same Subject ID on two records (e.g. made on two phones without signal): readings are split between them
       const twin = list.some(q => q !== p && String(val(q, 'enrol_id') || '').toLowerCase() === String(val(p, 'enrol_id') || '').toLowerCase() && (val(q, 'site') || '') === (val(p, 'site') || ''));
       const body = `<b>${esc(sid(p))}${val(p, 'site') ? ` <small>${esc(val(p, 'site'))}</small>` : ''}</b>${twin ? '<span class="twinline">Same Subject ID twice: readings may be split. Fill in one and correct the other’s ID (Perioperative data), or delete it in Settings.</span>' : ''}<span${locked ? ' class="lockline"' : val(p, 'done') ? ' class="okline"' : ''}>${locked ? `${LOCK_ICON} Locked by the study admin${canLock() ? ' · read only' : ''}` : esc(status(p))}</span>
-        <small>${e ? 'Last entry ' + new Date(e.t).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) + (e.by ? ' by ' + esc(e.by) : '') : 'No entries yet'}</small>`;
+        <span class="dueline" data-due="${p.id}" hidden></span><small>${e ? 'Last entry ' + new Date(e.t).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) + (e.by ? ' by ' + esc(e.by) : '') : 'No entries yet'}</small>`;
       if (selecting) return `<li><label class="selrow"><input type="checkbox" data-sel="${p.id}" ${selecting.has(p.id) ? 'checked' : ''}><span>${body}</span></label></li>`;
       if (locked) return `<li><a href="${canLock() ? '#/p/' + p.id : '#/'}" class="locked"${canLock() ? '' : ' data-locked="1"'}>${body}</a></li>`;
       return `<li><a href="#/p/${p.id}"${val(p, 'done') ? ` data-done="${esc(val(p, 'done'))}"` : ''}>${body}</a></li>`;
     }).join('')}</ul>` : `<p class="muted">No patients yet. Tap <b>New patient</b> on the morning of surgery.</p>`}
     <p class="muted small">${sharing() ? `Shared with the ${esc(shared.admin ? 'whole study (admin)' : shared.member.site + ' team')}. Readings sync when there is signal. <b class="syncline">${esc(syncText())}</b>` : `Data stays on this phone. <a href="#/settings">Join your hospital’s team</a> to share patients.`} Study IDs only: no names or hospital numbers.</p>`);
   $('#new').onclick = () => go('#/new');
+  // what each patient being charted needs now (a reading or Prewarm off due within 2 min, or late)
+  const dues = () => view.querySelectorAll('[data-due]').forEach(el => {
+    const q = patients[el.dataset.due], n = q && charting(q) ? nextDue(q, defaultSeries(q)) : null;
+    const show = n && n.left <= 2;
+    el.hidden = !show;
+    if (show) { el.dataset.state = n.left > 0 ? 'soon' : n.left > -5 ? 'now' : 'late'; el.textContent = `${n.label}: ${n.left > 0 ? 'in ' + mmss(n.left) : n.left > -5 ? 'due now' : 'late ' + mmss(-n.left)}`; }
+  });
+  dues();
+  // home() also redraws itself (choosing patients to lock): one timer and one alert loop at a time
+  homeStop?.();
+  const div = setInterval(dues, 1000), stopAlerts = startAlerts(null);
+  homeStop = () => { clearInterval(div); stopAlerts(); homeStop = null; };
+  cleanup.push(homeStop);
   view.querySelectorAll('.list a[data-locked]').forEach(a => a.onclick = e => { e.preventDefault(); toast('Locked by the study admin'); });
   if ($('#select')) $('#select').onclick = () => { selecting = new Set(); home(); };
   if (selecting) {
@@ -963,29 +977,37 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
 // ---------- due alerts (only while the app is open)
 // On every patient screen (both tabs, the forms, Perioperative data): a reading of any series falling due alerts
 // (banner, vibrate, beep, as set in Settings), and the screen is kept awake, taken again after switching apps.
+// patients still being charted on this phone (not deleted, locked or marked complete; changed in the last 12 hours)
+const charting = q => !isGone(q) && !q.lock?.on && !val(q, 'done') && Date.now() - (lastEdit(q)?.t || q.created || 0) < 12 * 3600e3;
+// alerts for patient p (or, with p null, every patient being charted); other patients' alerts carry their Subject ID,
+// since the next patient pre-warms while the last one is in surgery
 function startAlerts(p) {
   const alerted = new Set(read('alerted', []));
   let lock = null;
-  const awake = () => { if (settings.remind.awake && navigator.wakeLock && document.visibilityState === 'visible') navigator.wakeLock.request('screen').then(l => { lock = l; }).catch(() => {}); };
+  const awake = () => { if (p && settings.remind.awake && navigator.wakeLock && document.visibilityState === 'visible') navigator.wakeLock.request('screen').then(l => { lock = l; }).catch(() => {}); };
   awake();
   document.addEventListener('visibilitychange', awake);
   const iv = setInterval(() => {
     // everything falling due this second goes in one banner, with one buzz / beep
     const due = [];
-    const hit = (tag, msg) => { if (alerted.has(tag)) return; alerted.add(tag); due.push(msg); };
-    // stopping the warming on time matters as much as a reading: Prewarm off due alerts too
-    const nx = nextEvent(p);
-    if (nx?.id === 'ev_wstop' && nx.due != null) {
-      const now = nowFor(p, 'prewarm');
-      if (now >= nx.due && now <= nx.due + 5) hit(p.id + 'ev_wstop' + val(p, 'pw_start'), `Prewarm off due now (${WARM_MIN[val(p, 'arm')]} min of warming): tap Log`);
-    }
-    for (const s of ['prewarm', 'iotemp', 'haemo']) {
-      if (s === 'prewarm' && noWarming(p)) continue;
-      const now = nowFor(p, s);
-      for (const x of pointsFor(p, s)) {
-        const d = dueOf(p, s, x), tag = p.id + s + x.key + (val(p, SERIES[s].ref[0]) || '');
-        if (d == null || !expected(p, s, d) || savedAt(p, s, x.key) || now < d || now > d + 5) continue;
-        hit(tag, `${s === 'haemo' ? 'BP, HR, BIS' : 'Temperature'} ${x.label} reading due now`);
+    const others = Object.values(patients).filter(q => q !== p && q.id !== p?.id && charting(q));
+    for (const q of p ? [p, ...others] : others) {
+      const pre = q === p ? '' : sid(q) + ': ';
+      const hit = (tag, msg) => { if (alerted.has(tag)) return; alerted.add(tag); due.push(pre + msg); };
+      // stopping the warming on time matters as much as a reading: Prewarm off due alerts too
+      const nx = nextEvent(q);
+      if (nx?.id === 'ev_wstop' && nx.due != null) {
+        const now = nowFor(q, 'prewarm');
+        if (now >= nx.due && now <= nx.due + 5) hit(q.id + 'ev_wstop' + val(q, 'pw_start'), `Prewarm off due now (${WARM_MIN[val(q, 'arm')]} min of warming): tap Log`);
+      }
+      for (const s of ['prewarm', 'iotemp', 'haemo']) {
+        if (s === 'prewarm' && noWarming(q)) continue;
+        const now = nowFor(q, s);
+        for (const x of pointsFor(q, s)) {
+          const d = dueOf(q, s, x), tag = q.id + s + x.key + (val(q, SERIES[s].ref[0]) || '');
+          if (d == null || !expected(q, s, d) || savedAt(q, s, x.key) || now < d || now > d + 5) continue;
+          hit(tag, `${s === 'haemo' ? 'BP, HR, BIS' : 'Temperature'} ${x.label} reading due now`);
+        }
       }
     }
     if (!due.length) return;
@@ -994,7 +1016,9 @@ function startAlerts(p) {
     if (settings.remind.vibrate && navigator.vibrate) navigator.vibrate([300, 150, 300]);
     if (settings.remind.beep) beep();
   }, 1000);
-  cleanup.push(() => { clearInterval(iv); document.removeEventListener('visibilitychange', awake); lock?.release?.().catch(() => {}); });
+  const stop = () => { clearInterval(iv); document.removeEventListener('visibilitychange', awake); lock?.release?.().catch(() => {}); };
+  cleanup.push(stop);
+  return stop;
 }
 let actx;
 // three short beeps, loud enough for theatre; sound needs a tap first on phones, and is suspended again after

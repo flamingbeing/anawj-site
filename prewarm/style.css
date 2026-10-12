@@ -230,6 +230,11 @@ input:focus { border-color: var(--navy); }
 .ixrow .link { grid-column: 1 / -1; justify-self: end; }
 /* last on the screen, apart from Save, so it isn't tapped by accident */
 .okline { color: var(--ok); }
+/* home list: a reading due on a patient being charted */
+.dueline { display: block; justify-self: start; width: fit-content; margin: 2px 0; padding: 1px 8px; border-radius: var(--r); font-weight: 700; }
+.dueline[data-state="soon"] { background: var(--warn-soft); color: var(--warn); }
+.dueline[data-state="now"] { background: #fde3d3; color: #9a3412; }
+.dueline[data-state="late"] { background: var(--err); color: #fff; }
 .lockline { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-weight: 600; }
 .ico { width: 1.1em; height: 1.1em; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.15em; }
 /* a locked patient opened by an admin: read only */
