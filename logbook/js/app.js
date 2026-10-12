@@ -64,7 +64,7 @@ const TABS = [
   // Faculty / PCs: programme analytics instead of your own
   { id: 'progress', label: 'Analytics', render: () => (facultyMode() ? renderProgramme() : renderProgress()), desc: 'Your progress against the APMES targets' },
   // a personal notepad: on the bar only if chosen (Arrange tabs); otherwise first in More
-  { id: 'notes', label: 'Notes', render: renderNotes, desc: 'Your own notes: private, never in your portfolio' },
+  { id: 'notes', label: 'Notes', moreLabel: 'Notes (beta)', render: renderNotes, desc: 'Your own notes: private, never in your portfolio' },
   // five tabs on the bar; the rest live under More (still reachable by #totals, #account, #settings)
   { id: 'more', label: 'More', render: () => renderMore() },
   { id: 'caselog', label: 'Case log', render: () => renderCaseLog(), faculty: true, hidden: true, under: 'caselogs', unlisted: true },
@@ -109,7 +109,7 @@ function renderMore() {
     .sort((a, b) => (a === 'caselogs') - (b === 'caselogs'));
   return h('div', {},
     h('section', { class: 'card more-list' }, h('h2', {}, 'More'),
-      h('ul', {}, hidden.map(id => TABS.find(t => t.id === id)).map(t => menuItem(t.id, t.label, t.desc || 'Hidden from the tab bar')), items.map(t => menuItem(t.id, t.label, t.desc)))),
+      h('ul', {}, hidden.map(id => TABS.find(t => t.id === id)).map(t => menuItem(t.id, t.moreLabel || t.label, t.desc || 'Hidden from the tab bar')), items.map(t => menuItem(t.id, t.moreLabel || t.label, t.desc)))),
     privacyCard(),
     creditsCard(),
     installCard(),
@@ -162,11 +162,14 @@ function buildSettingsIndex() {
   for (const id of SEARCH_PAGES) {
     const t = TABS.find(x => x.id === id);
     let el; try { el = t.render(); } catch { continue; }
-    for (const n of el.querySelectorAll('h2, h3, label.field, label.check, summary, .more-list b')) {
+    for (const n of el.querySelectorAll('h2, h3, label.field, label.check, legend, summary, .more-list b')) {
       const text = optionText(n).replace(/\s+/g, ' ').slice(0, 90);
       if (!text || text.length < 3 || seen.has(id + text)) continue;
       seen.add(id + text);
-      out.push({ id, page: t.label, text, hint: (n => (n && n.matches('p.hint') ? n.textContent : ''))(n.closest('label') && n.closest('label').nextElementSibling).slice(0, 160) });
+      // the help line under it; a ✓ list (legend) also finds its choices
+      const hint = n.matches('legend') ? [...n.parentElement.querySelectorAll(':scope > p.hint, .pick-l')].map(x => x.textContent).join(' · ')
+        : (x => (x && x.matches('p.hint') ? x.textContent : ''))(n.closest('label') && n.closest('label').nextElementSibling);
+      out.push({ id, page: t.label, text, hint: hint.replace(/ⓘ/g, '').trim().slice(0, 160) });
     }
   }
   return out;
@@ -179,9 +182,9 @@ const searchSettings = (index, q) => {
 function showFound() {
   const want = findAfterRender; findAfterRender = '';
   requestAnimationFrame(() => {
-    const n = [...app.querySelectorAll('h2, h3, label.field, label.check, summary')].find(x => optionText(x).replace(/\s+/g, ' ').startsWith(want.slice(0, 60)));
+    const n = [...app.querySelectorAll('h2, h3, label.field, label.check, legend, summary')].find(x => optionText(x).replace(/\s+/g, ' ').startsWith(want.slice(0, 60)));
     if (!n) return;
-    const target = n.closest('label, details, section') || n;
+    const target = n.closest('fieldset, label, details, section') || n;
     if (target.matches('details')) target.open = true;
     target.scrollIntoView({ block: 'center' });
     target.classList.remove('flash'); void target.offsetWidth; target.classList.add('flash');

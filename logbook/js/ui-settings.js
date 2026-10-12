@@ -3,7 +3,7 @@
 
 import { YEAR_NAMES, DEFAULT_NAMES, BY_CODE } from './categories.js';
 import { sortCodes, uid, academicYear, withParents, weekStart, humanAge } from './engine.js';
-import { S, h, toast, modal, confirmBox, cloud, writes, catChip, catName, catShort, PICKER_ORDER, pickerOrder, settings, patchLogbook, displayName, hooks, rYear, myYearName, fill, PROFILES, profile, basicMode, facultyRole, BASIC_ITEMS, basicHides, setBasicOn, caseShown, setCaseShown, categoryNames, setCategoryNames, catPills, tagSet, resetters, download, fileButton, todayISO, saveMany, UNDO_SECS, rowIcon } from './ui-core.js';
+import { S, h, info, toast, modal, confirmBox, cloud, writes, catChip, catName, catShort, PICKER_ORDER, pickerOrder, settings, patchLogbook, displayName, hooks, rYear, myYearName, fill, PROFILES, profile, basicMode, facultyRole, BASIC_ITEMS, basicHides, setBasicOn, caseShown, setCaseShown, categoryNames, setCategoryNames, catPills, tagSet, resetters, download, fileButton, todayISO, saveMany, UNDO_SECS, rowIcon } from './ui-core.js';
 import { MAX_TAGS, tagLinks as tagLinksIn, learnShorthand, cleanShorthand, shorthandOf, DEFAULT_SHORTHAND, cleanTagSet, defaultTagSet, tagTree, flatTree, moveTag, reparentTag, removeTag, newKey, tagSetToCsv, tagSetFromCsv, dropTag, canPlace, placeNewTag } from './tags.js';
 import { pickDialog, CASE_PARTS, AFTER_SAVE } from './ui-log.js';
 import { OPERATOR_HELP } from './search-ops.js';
@@ -280,75 +280,95 @@ export function applyCustomCss(d = display()) {
 }
 export const TAB_BARS = [['auto', 'Bottom on phones, top on bigger screens (default)'], ['top', 'Always at the top'], ['bottom', 'Always at the bottom']];
 
+// Settings rows (owner, 13 Oct 2026): a switch for on or off, a ✓ list for two to five choices, help in one line
+// with ⓘ for the rest. The pages carry class set-page (style.css, "settings rows").
+const help = (line, ...more) => {
+  if (!more.length) return h('p', { class: 'hint help' }, line);
+  const [b, p] = info(...more);
+  return [h('p', { class: 'hint help' }, line, '\u00a0', b), p];
+};
+// label: the words, or [words, a shorter name for screen readers and tests]
+const toggle = (label, on, set, line, ...more) => {
+  const [text, name] = Array.isArray(label) ? label : [label, label];
+  return [h('label', { class: 'check' }, h('input', { type: 'checkbox', role: 'switch', 'aria-label': name, checked: !!on, onchange: e => set(e.target.checked) }), text),
+    line ? help(line, ...more) : null];
+};
+function pick(label, opts, cur, set, line, ...more) {
+  const name = 'pick-' + label.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  return h('fieldset', { class: 'pick' }, h('legend', {}, label),
+    h('div', { class: 'pick-list' }, opts.map(([v, l]) => h('label', { class: 'pick-opt' },
+      h('input', { type: 'radio', name, value: String(v), checked: String(cur) === String(v), onchange: () => set(v) }),
+      h('span', { class: 'pick-l' }, l), h('span', { class: 'tick', 'aria-hidden': 'true' }, '✓')))),
+    line ? help(line, ...more) : null);
+}
+// a display key as a ✓ list; the default is saved as nothing
+const lookPick = (k, label, opts, dflt, line, ...more) =>
+  pick(label, opts, display()[k] ?? dflt, v => applyDisplay(setDisplay({ [k]: v === dflt ? null : v })), line, ...more);
+const DEVICE_NOTE = () => h('p', { class: 'hint', style: 'margin:10px 0 0' }, 'Everything on this page is saved on this device only, so a phone and a computer can each look the way that suits them.');
+const THEMES = [['light', 'Light'], ['dark', 'Dark'], ['oled', 'OLED (pure black)'], ['auto', 'Auto (match the phone)']];
+const slider = (label, names, level, dflt, onLevel) => {
+  const note = h('span', { class: 'hint', style: 'margin:0' }, names[level]);
+  return h('div', { class: 'field', style: 'margin-top:10px' }, h('label', { class: 'field', style: 'margin:0' }, label,
+    h('input', { type: 'range', min: '0', max: String(names.length - 1), step: '1', value: String(level), 'aria-label': label, 'aria-valuetext': names[level],
+      oninput: e => { const n = Number(e.target.value); e.target.setAttribute('aria-valuetext', names[n]); note.textContent = names[n]; onLevel(n === dflt ? null : n); } })), note);
+};
+
 export function renderDisplay() {
   const st = display();
-  const bordersNote = h('span', { class: 'hint', style: 'margin:0' }, BORDERS[borderLevel(st)]);
-  return h('div', {},
+  return h('div', { class: 'set-page' },
     displayPreview(),
     h('section', { class: 'card' },
       h('h2', {}, 'Display'),
-      h('label', { class: 'field', style: 'margin-top:4px' }, 'Light or dark',
-        h('select', { onchange: e => applyTheme(e.target.value) },
-          [['light', 'Light'], ['dark', 'Dark'], ['oled', 'OLED (pure black)'], ['auto', 'Auto (match the phone)']].map(([v, l]) => h('option', { value: v, selected: cachedTheme() === v }, l)))),
+      pick('Light or dark', THEMES, cachedTheme(), v => applyTheme(v)),
       h('div', { class: 'field', style: 'margin-top:10px' }, 'Colour', accentPicker()),
-      h('p', { class: 'hint', style: 'margin:2px 0 0' }, 'Light and dark versions are worked out to stay easy to read.'),
-      h('div', { class: 'field', style: 'margin-top:10px' }, h('label', { class: 'field', style: 'margin:0' }, 'Colourful',
-        h('select', { 'aria-label': 'Colourful', onchange: e => applyDisplay(setDisplay({ colourful: e.target.value === 'off' ? null : e.target.value })) },
-          COLOURFUL.map(([v, l]) => h('option', { value: v, selected: (st.colourful === true ? 'tabs' : st.colourful || 'off') === v }, l)))),
-        h('span', { class: 'hint help' }, 'With the default colour, the tabs follow the NUH stripe at the top: Case orange, Logbook red, Reflections cyan, Analytics navy. With another colour: orange, teal, red, blue, purple. “Everything” also colours the buttons, chips and links on that tab’s pages, in shades that stay easy to read.')),
-      h('label', { class: 'check' }, h('input', { type: 'checkbox', role: 'switch', checked: !!st.compact, onchange: e => {
-        applyCompact(e.target.checked); setDisplay({ compact: e.target.checked });
-      } }), 'Compact mode'),
-      h('p', { class: 'hint help', style: 'margin:2px 0 0' }, 'Smaller chips, rows and spacing so more tags fit on screen.'),
-      h('div', { class: 'field', style: 'margin-top:10px' }, h('label', { class: 'field', style: 'margin:0' }, 'Borders',
-        h('input', { type: 'range', min: '0', max: String(BORDERS.length - 1), step: '1', value: String(borderLevel(st)), 'aria-label': 'Borders',
-          'aria-valuetext': BORDERS[borderLevel(st)], oninput: e => { const n = Number(e.target.value); e.target.setAttribute('aria-valuetext', BORDERS[n]); bordersNote.textContent = BORDERS[n]; applyDisplay(setDisplay({ borders: n === BORDERS.length - 1 ? null : n })); } })),
-        bordersNote),
-      (() => { const note = h('span', { class: 'hint', style: 'margin:0' }, ROUNDS[roundLevel(st)][0]);
-        return h('div', { class: 'field', style: 'margin-top:10px' }, h('label', { class: 'field', style: 'margin:0' }, 'Corners',
-          h('input', { type: 'range', min: '0', max: String(ROUNDS.length - 1), step: '1', value: String(roundLevel(st)), 'aria-label': 'Corners', 'aria-valuetext': ROUNDS[roundLevel(st)][0],
-            oninput: e => { const n = Number(e.target.value); e.target.setAttribute('aria-valuetext', ROUNDS[n][0]); note.textContent = ROUNDS[n][0]; applyDisplay(setDisplay({ round: n === 2 ? null : n })); } })), note); })(),
-      h('label', { class: 'check', style: 'margin-top:6px' }, h('input', { type: 'checkbox', checked: st.shadows !== false, onchange: e => applyDisplay(setDisplay({ shadows: e.target.checked ? null : false })) }), 'Soft shadows instead of lines around cards (default)'),
+      help('Light and dark versions stay easy to read.'),
+      pick('Colourful', COLOURFUL, st.colourful === true ? 'tabs' : st.colourful || 'off', v => applyDisplay(setDisplay({ colourful: v === 'off' ? null : v })),
+        'A colour for each tab.', 'With the default colour, the tabs follow the NUH stripe at the top: Case orange, Logbook red, Reflections cyan, Analytics navy. With another colour: orange, teal, red, blue, purple. “Everything” also colours the buttons, chips and links on that tab’s pages, in shades that stay easy to read.'),
+      toggle('Compact mode', st.compact, v => { applyCompact(v); setDisplay({ compact: v }); }, 'Smaller chips, rows and spacing, so more tags fit.'),
+      slider('Borders', BORDERS, borderLevel(st), BORDERS.length - 1, n => applyDisplay(setDisplay({ borders: n }))),
+      slider('Corners', ROUNDS.map(([n]) => n), roundLevel(st), 2, n => applyDisplay(setDisplay({ round: n }))),
+      toggle('Soft shadows instead of lines around cards (default)', st.shadows !== false, v => applyDisplay(setDisplay({ shadows: v ? null : false }))),
       // the tab the app opens on (a link or shortcut to a tab still opens that tab)
-      h('label', { class: 'field', style: 'margin-top:10px' }, 'Open the app on',
-        h('select', { onchange: e => { setDisplay({ startTab: e.target.value }); toast('Saved'); } },
-          START_TABS.map(([v, l]) => h('option', { value: v, selected: (st.startTab || 'log') === v }, l)))),
-      h('p', { class: 'hint', style: 'margin:10px 0 0' }, 'Everything on this page is saved on this device only, so a phone and a computer can each look the way that suits them.')),
+      pick('Open the app on', START_TABS, st.startTab || 'log', v => { setDisplay({ startTab: v }); toast('Saved'); }),
+      DEVICE_NOTE()),
     resetLink('light or dark, colour, Colourful, compact, borders, corners, shadows and the start tab on this device', () => {
       applyTheme('light'); applyDisplay(setDisplay({ accent: null, colourful: null, compact: null, borders: null, round: null, shadows: null, startTab: null }));
     }),
-    advancedLink('displayadv', 'Advanced display settings', 'Name in the header, fonts, line spacing and width, the tab bar and header, pinning, custom CSS'));
+    advancedLink('displayadv', 'Advanced display settings', 'The header and tab bar, Logbook rows, fonts and spacing, the Case tab layout, custom CSS'));
 }
-// Settings → Display → Advanced display settings (#displayadv): the rest of the look, then custom CSS
+// Settings → Display → Advanced display settings (#displayadv), under headings (owner, 13 Oct 2026): the header and
+// tab bar, Logbook rows, text, the Case tab layout, then custom CSS
 export function renderDisplayAdvanced() {
   const st = display();
-  return h('div', {},
+  const set = (k, off = null) => v => applyDisplay(setDisplay({ [k]: v || off }));
+  return h('div', { class: 'set-page' },
     displayPreview(),
     h('section', { class: 'card' },
       h('h2', {}, 'Advanced display'),
+      h('h3', {}, 'Header and tab bar'),
       h('label', { class: 'field' }, 'Name in the header',
         h('input', { type: 'text', value: st.appTitle || '', placeholder: APP_TITLE, maxlength: '40', 'aria-label': 'Name in the header',
           onchange: e => { const t = cleanTitle(e.target.value); e.target.value = t; applyDisplay(setDisplay({ appTitle: t && t !== APP_TITLE ? t : null })); } })),
-      h('p', { class: 'hint help', style: 'margin:2px 0 8px' }, 'Also the name in the browser tab. Leave it empty for APMES Logbook.'),
+      help('Also the name in the browser tab. Empty: APMES Logbook.'),
+      toggle('Hide the header (the app name bar)', st.hideHeader, v => applyDisplay(setDisplay({ hideHeader: v })),
+        'It comes back when something needs you.', 'It comes back by itself when something isn’t synced yet, when there’s no signal, and in the demo.'),
+      lookPick('tabBar', 'Tab bar', TAB_BARS, 'auto'),
+      toggle('Icons only in the tab bar', st.tabIcons, v => applyDisplay(setDisplay({ tabIcons: v }))),
+      tabArranger(),
+      h('h3', {}, 'Logbook rows'),
+      toggle('Fewer buttons on Logbook rows (a ⋯ menu)', st.rowMenu, set('rowMenu'), 'Copy and Reflect move into one ⋯ button.', 'A ✓ still shows cases with a reflection.'),
+      toggle('Copy button on each Logbook row', st.rowCopy, set('rowCopy'), 'Copy day still copies the whole day.', 'Off unless you switch it on. The ⋯ menu, if you use it, still copies one case.'),
+      h('h3', {}, 'Text'),
       fontPicker('ui'),
       fontPicker('log'),
-      lookSelect('lineHeight', 'Line spacing', LINE_HEIGHTS, '1'),
-      lookSelect('lineWidth', 'Page width', LINE_WIDTHS, 'normal', 'How wide the app gets on a computer or tablet (was “Line width”). Phones always use the full screen. The Case tab keeps its two panes.'),
-      lookSelect('tabBar', 'Tab bar', TAB_BARS, 'auto'),
-      tabArranger(),
-      h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !!st.rowMenu, onchange: e => applyDisplay(setDisplay({ rowMenu: e.target.checked || null })) }), 'Fewer buttons on Logbook rows (a ⋯ menu)'),
-      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'Copy and Reflect move into one ⋯ button; a ✓ still shows cases with a reflection.'),
-      h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !!st.rowCopy, onchange: e => applyDisplay(setDisplay({ rowCopy: e.target.checked || null })) }), 'Copy button on each Logbook row'),
-      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'Off unless you switch it on. Copy day, and the ⋯ menu if you use it, still copy.'),
-      h('label', { class: 'check', style: 'margin-top:10px' }, h('input', { type: 'checkbox', checked: !!st.tabIcons, onchange: e => applyDisplay(setDisplay({ tabIcons: e.target.checked })) }), 'Icons only in the tab bar'),
-      h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !!st.hideHeader, onchange: e => applyDisplay(setDisplay({ hideHeader: e.target.checked })) }), 'Hide the header (the app name bar)'),
-      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'It comes back by itself when something isn’t synced yet, when there’s no signal, and in the demo.'),
-      h('label', { class: 'check', style: 'margin-top:10px' }, h('input', { type: 'checkbox', checked: !!st.caseInverted, onchange: e => applyDisplay(setDisplay({ caseInverted: e.target.checked })) }), 'Case tab upside down (phones)'),
-      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'The case box sits at the bottom, next to the keyboard and Save, with suggestions just above it; scroll up for all the tags. Like a chat app.'),
-      h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !!st.pinBox, onchange: e => applyDisplay(setDisplay({ pinBox: e.target.checked || null })) }), 'Pin the case box at the top of the Case tab'),
-      h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !!st.pinSearch, onchange: e => applyDisplay(setDisplay({ pinSearch: e.target.checked || null })) }), 'Pin the search box at the top of the Logbook and Reflections'),
-      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'They stay in view while the tags or cases scroll under them.'),
-      h('p', { class: 'hint', style: 'margin:10px 0 0' }, 'Everything on this page is saved on this device only, so a phone and a computer can each look the way that suits them.')),
+      lookPick('lineHeight', 'Line spacing', LINE_HEIGHTS, '1'),
+      lookPick('lineWidth', 'Page width', LINE_WIDTHS, 'normal', 'How wide the app gets on a computer or tablet.', 'Was “Line width”. Phones always use the full screen. The Case tab keeps its two panes.'),
+      h('h3', {}, 'Case tab layout'),
+      toggle('Case tab upside down (phones)', st.caseInverted, v => applyDisplay(setDisplay({ caseInverted: v })),
+        'The case box at the bottom, by the keyboard, like a chat app.', 'Save sits beside it and the suggestions just above it; scroll up for all the tags.'),
+      toggle('Pin the case box at the top of the Case tab', st.pinBox, set('pinBox')),
+      toggle('Pin the search box at the top of the Logbook and Reflections', st.pinSearch, set('pinSearch'), 'They stay in view while the list scrolls under them.'),
+      DEVICE_NOTE()),
     customCssCard(),
     resetLink('the name in the header, fonts, line spacing and width, the tab bar (order and hidden tabs) and header options, the Logbook row buttons, upside down, pinning and custom CSS (switched off; your CSS is kept) on this device', () =>
       applyDisplay(setDisplay({ appTitle: null, fontUi: null, fontUiName: null, fontLog: null, fontLogName: null, lineWidth: null, lineHeight: null, tabBar: null, tabIcons: null, hideHeader: null, caseInverted: null, pinBox: null, pinSearch: null, customCssOn: null, tabOrder: null, tabHidden: null, rowMenu: null, rowCopy: null }))));
@@ -358,7 +378,7 @@ export function renderDisplayAdvanced() {
 export const IPHONE_APP = () => (/iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1)) && (navigator.standalone === true || matchMedia('(display-mode: standalone)').matches);
 export function renderAccessibility() {
   const st = display();
-  return h('div', {},
+  return h('div', { class: 'set-page' },
     displayPreview(),
     h('section', { class: 'card' },
       h('h2', {}, 'Accessibility'),
@@ -366,21 +386,18 @@ export function renderAccessibility() {
       h('label', { class: 'field', style: 'margin-top:4px' }, 'Interface zoom',
         h('select', { 'aria-label': 'Interface zoom', onchange: e => { applyZoom(e.target.value); setDisplay({ zoom: e.target.value }); } },
           ZOOMS.map(v => h('option', { value: v, selected: String(st.zoom || '1') === v }, `${Math.round(v * 100)}%${v === '1' ? ' (default)' : ''}`)))),
-      h('p', { class: 'hint help', style: 'margin:2px 0 0' }, 'Everything bigger or smaller, the header and tabs too. On a computer: Ctrl + and Ctrl − (⌘ on a Mac), Ctrl 0 for 100%.'),
-      h('label', { class: 'field', style: 'margin-top:10px' }, 'Text size',
-        h('select', { 'aria-label': 'Text size', onchange: e => { applyTextSize(e.target.value); setDisplay({ textSize: e.target.value }); } },
-          TEXT_SIZES.map(([v, l]) => h('option', { value: v, selected: String(st.textSize || '1') === v }, l)))),
-      h('p', { class: 'hint help', style: 'margin:2px 0 0' }, 'Only the words: buttons and spacing stay as they are.'),
-      h('label', { class: 'check', style: 'margin-top:10px' }, h('input', { type: 'checkbox', checked: !!st.bigTaps, onchange: e => applyDisplay(setDisplay({ bigTaps: e.target.checked || null })) }), 'Bigger tap targets on the Case tab'),
-      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'Larger chips, tag rows, tick boxes and Save buttons, easier to hit on a phone.'),
+      help('Everything bigger or smaller, the header and tabs too.', 'On a computer: Ctrl + and Ctrl − (⌘ on a Mac), Ctrl 0 for 100%.'),
+      pick('Text size', TEXT_SIZES, String(st.textSize || '1'), v => { applyTextSize(v); setDisplay({ textSize: v }); }, 'Only the words: buttons and spacing stay as they are.'),
+      toggle('Bigger tap targets on the Case tab', st.bigTaps, v => applyDisplay(setDisplay({ bigTaps: v || null })), 'Larger chips, tag rows, tick boxes and Save buttons.'),
       h('h3', {}, 'Contrast and motion'),
-      lookSelect('contrast', 'Contrast', CONTRASTS, 'auto', 'Higher contrast: darker text and stronger lines (lighter in dark mode).'),
-      lookSelect('motion', 'Motion', MOTIONS, 'auto', 'Reduce motion: pages, folds and swipes switch at once instead of sliding.'),
+      lookPick('contrast', 'Contrast', CONTRASTS, 'auto', 'Higher: darker text and stronger lines (lighter in dark mode).'),
+      lookPick('motion', 'Motion', MOTIONS, 'auto', 'Reduce: pages, folds and swipes switch at once instead of sliding.'),
       h('h3', {}, 'Gestures'),
-      h('label', { class: 'check', style: 'margin-top:10px' }, h('input', { type: 'checkbox', checked: st.swipeTabs !== false, onchange: e => applyDisplay(setDisplay({ swipeTabs: e.target.checked ? null : false })) }), 'Swipe left or right to change tab'),
-      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'On unless you switch it off. The page follows your finger to the next or previous tab on the bar, also from pages under a tab. Not while typing, from the screen’s edges, or on tables and lists that scroll sideways.'),
-      h('label', { class: 'check', style: 'margin-top:10px' }, h('input', { type: 'checkbox', checked: st.edgeBack !== false, onchange: e => applyDisplay(setDisplay({ edgeBack: e.target.checked ? null : false })) }), 'Swipe from the left edge to go back (iPhone app)'),
-      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, IPHONE_APP() ? 'On unless you switch it off: from a page under a tab, drag from the screen’s left edge to the right.' : 'Only in the app added to an iPhone or iPad home screen. Android phones use their own Back gesture from the edges.'),
+      toggle('Swipe left or right to change tab', st.swipeTabs !== false, v => applyDisplay(setDisplay({ swipeTabs: v ? null : false })),
+        'The page follows your finger to the next tab.', 'On unless you switch it off. Also from pages under a tab. Not while typing, from the screen’s edges, or on tables and lists that scroll sideways.'),
+      toggle('Swipe from the left edge to go back (iPhone app)', st.edgeBack !== false, v => applyDisplay(setDisplay({ edgeBack: v ? null : false })),
+        IPHONE_APP() ? 'From a page under a tab, drag from the left edge.' : 'Only in the app added to an iPhone or iPad home screen.',
+        IPHONE_APP() ? 'On unless you switch it off.' : 'Android phones use their own Back gesture from the edges.'),
       h('p', { class: 'hint', style: 'margin:10px 0 0' }, 'Everything on this page is saved on this device only.')),
     resetLink('zoom, text size, bigger tap targets, swiping, contrast, motion and edge swipe on this device', () =>
       applyDisplay(setDisplay({ zoom: null, textSize: null, bigTaps: null, swipeTabs: null, contrast: null, motion: null, edgeBack: null }))));
@@ -467,12 +484,6 @@ function customCssCard() {
       note,
       h('p', { class: 'hint help', style: 'margin:6px 0 0' }, 'It never applies on this page, so you can always come back and fix it. If something goes wrong elsewhere, open the app with ?nocss at the end of the address. Saved on this device only; app updates can change the class names it relies on.')));
 }
-
-const lookSelect = (k, label, opts, dflt, hint) => h('div', { class: 'field', style: 'margin-top:10px' },
-  h('label', { class: 'field', style: 'margin:0' }, label,
-    h('select', { 'aria-label': label, onchange: e => applyDisplay(setDisplay({ [k]: e.target.value === dflt ? null : e.target.value })) },
-      opts.map(([v, l]) => h('option', { value: v, selected: String(display()[k] ?? dflt) === v }, l)))),
-  hint ? h('span', { class: 'hint help' }, hint) : null);
 
 // suggested colours, then any colour (a custom pick shows as the last swatch)
 function accentPicker() {
@@ -573,6 +584,7 @@ export function renderMarkdownSettings() {
         h('button', { class: 'small linkish', onclick: reset }, 'Reset to default'))));
 }
 
+const ENTER_MODES = [['newline', 'New line (default)'], ['double', 'Press Enter twice to save'], ['single', 'Enter saves (Shift+Enter for a new line)']];
 export function renderLogging() {
   const st = settings();
   const preview = h('div', { class: 'logging-preview', 'aria-live': 'polite' });
@@ -583,89 +595,67 @@ export function renderLogging() {
       h('p', {}, 'Enter: ' + ({ newline: 'new line', single: 'save', double: 'save on an empty line (double Enter)' }[current.enterMode || (current.enterSaves ? 'single' : 'newline')]) + '. After Save: ' + (AFTER_SAVE.find(([v]) => v === (current.afterSave || 'next'))?.[1] || 'Next case') + '.'));
   };
   paintPreview();
-  return h('div', {},
+  const save = (patch, note) => patchLogbook({ settings: patch }).then(() => { if (note) toast(note); paintPreview(); });
+  return h('div', { class: 'set-page' },
     h('section', { class: 'card' },
       h('h2', {}, 'Logging'),
       h('h3', {}, 'Recognise details'), h('p', { class: 'hint' }, 'Account settings · on by default; follows you between devices.'),
-      h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: st.suggestions !== false, onchange: e => patchLogbook({ settings: { suggestions: e.target.checked } }).then(paintPreview) }),
-        'Suggest tags as I type'),
-      h('label', { class: 'check' }, h('input', { type: 'checkbox', 'aria-label': 'Autodetect age and gender', checked: st.detectAgeSex !== false,
-        onchange: e => patchLogbook({ settings: { detectAgeSex: e.target.checked } }).then(paintPreview) }), 'Autodetect age and gender'),
-      h('p', { class: 'hint' }, 'Age and gender are optional for APMES. Turning this off stops age-based Paediatrics and Geriatric suggestions. Choose those tags yourself when needed; explicit words can still suggest them.'),
+      toggle('Suggest tags as I type', st.suggestions !== false, v => save({ suggestions: v })),
+      toggle('Autodetect age and gender', st.detectAgeSex !== false, v => save({ detectAgeSex: v }),
+        'Optional for APMES.', 'Turning this off stops age-based Paediatrics and Geriatric suggestions. Choose those tags yourself when needed; explicit words can still suggest them.'),
       h('h3', {}, 'Start a case'), h('p', { class: 'hint' }, 'Device setting · other devices keep their own style.'),
-      h('label', { class: 'check' }, h('input', { type: 'checkbox', 'aria-label': 'Show common tags first', checked: !!display().compactTags, onchange: e => { setDisplay({ compactTags: e.target.checked }); paintPreview(); } }), 'Show common tags first'),
-      h('p', { class: 'hint' }, 'Off by default. A compact shortlist from your recent cases; all tags stay searchable and can be expanded.'),
+      toggle('Show common tags first', display().compactTags, v => { setDisplay({ compactTags: v }); paintPreview(); },
+        'A shortlist from your recent cases.', 'Off by default. All tags stay searchable and can be expanded.'),
       h('h3', {}, 'Save and continue'), h('p', { class: 'hint' }, 'Account settings · defaults: Enter adds a line, Today, next case.'),
-      h('label', { class: 'field', style: 'margin-top:8px' }, 'Enter key in the case box',
-        h('select', { onchange: e => patchLogbook({ settings: { enterMode: e.target.value, enterSaves: null } }).then(() => { toast('Saved'); paintPreview(); }) },
-          [['newline', 'New line (default)'], ['double', 'Press Enter twice to save'], ['single', 'Enter saves (Shift+Enter for a new line)']].map(([v, l]) =>
-            h('option', { value: v, selected: (st.enterMode || (st.enterSaves ? 'single' : 'newline')) === v }, l)))),
-      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'Twice: Enter on an empty line saves, so a case can still take several lines. Ctrl+Enter (Cmd+Enter on a Mac) always saves.'),
-      h('label', { class: 'field', style: 'margin-top:8px' }, 'Date for a new case',
-        h('select', { onchange: e => patchLogbook({ settings: { defaultDate: e.target.value } }).then(paintPreview) },
-          h('option', { value: 'today', selected: st.defaultDate !== 'last' }, 'Today'),
-          h('option', { value: 'last', selected: st.defaultDate === 'last' }, 'The date I used last'))),
-      h('label', { class: 'field', style: 'margin-top:8px' }, 'After Save',
-        h('select', { onchange: e => patchLogbook({ settings: { afterSave: e.target.value === 'next' ? null : e.target.value } }).then(() => { toast('Saved'); paintPreview(); }) },
-          AFTER_SAVE.map(([v, l]) => h('option', { value: v, selected: (st.afterSave || 'next') === v }, l)))),
-      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'Keeping the tags helps with a run of the same kind of case. “Save, keep date” keeps the date either way.')),
+      pick('Enter key in the case box', ENTER_MODES, st.enterMode || (st.enterSaves ? 'single' : 'newline'), v => save({ enterMode: v, enterSaves: null }, 'Saved'),
+        'Ctrl+Enter (Cmd+Enter on a Mac) always saves.', 'Twice: Enter on an empty line saves, so a case can still take several lines.'),
+      pick('Date for a new case', [['today', 'Today'], ['last', 'The date I used last']], st.defaultDate === 'last' ? 'last' : 'today', v => save({ defaultDate: v })),
+      pick('After Save', AFTER_SAVE, st.afterSave || 'next', v => save({ afterSave: v === 'next' ? null : v }, 'Saved'),
+        '“Save, keep date” keeps the date either way.', 'Keeping the tags helps with a run of the same kind of case.')),
     h('section', { class: 'card' }, preview, h('button', { onclick: async () => {
       try { await patchLogbook({ settings: { suggestions: true, detectAgeSex: true, enterMode: 'newline', enterSaves: null, defaultDate: 'today', afterSave: null } }); setDisplay({ compactTags: null }); hooks.render(); toast('Everyday logging defaults restored'); } catch (err) { toast(err.message); }
     } }, 'Reset these logging defaults'), h('p', { class: 'hint' }, 'Resets only the choices on this page. Advanced logging settings keep their current values.')),
-    advancedLink('loggingadv', 'Advanced logging settings', 'The keyboard, case box height, parts of the Case tab, undo, the week, tips, advanced search'));
+    advancedLink('loggingadv', 'Advanced logging settings', 'The Case tab, the keyboard, search, dates and undo, tips'));
 }
 
-// Settings → Logging → Advanced logging settings (#loggingadv)
+// Settings → Logging → Advanced logging settings (#loggingadv), under headings (owner, 13 Oct 2026): the Case tab,
+// the keyboard in the case box, search, dates and undo, help
 export function renderLoggingAdvanced() {
   const st = settings();
-  return h('div', {},
+  const save = (patch, note = 'Saved') => patchLogbook({ settings: patch }).then(() => note && toast(note));
+  return h('div', { class: 'set-page' },
     h('section', { class: 'card' },
       h('h2', {}, 'Advanced logging'),
-      // a separate Initials box above the case box, where the Case tab starts (device; was "First field for a new case")
-      h('label', { class: 'check' }, h('input', { type: 'checkbox', 'aria-label': 'Separate initials box', checked: display().firstField === 'initials', onchange: e => { setDisplay({ firstField: e.target.checked ? 'initials' : null }); toast('Saved on this device'); } }),
-        'Separate initials box (this device)'),
-      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'An Initials box above the case box; the Case tab starts there and Enter moves on to the case. Off: type the initials at the start of the case, e.g. “AB 72M lap chole”.'),
-      h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: display().autoFocus !== false, onchange: e => applyDisplay(setDisplay({ autoFocus: e.target.checked ? null : false })) }),
-        'Open the keyboard when the Case tab opens (this device)'),
+      h('h3', {}, 'Case tab'),
+      help('Switch off what you don’t use. The case box, All tags and Save always stay.'),
+      CASE_PARTS.map(([part, label]) => toggle(label, caseShown(part), v => setCaseShown(part, v, CASE_PARTS.map(([p]) => p)))),
       h('label', { class: 'field', style: 'margin-top:8px' }, 'Case box height on the Case tab',
-        h('select', { onchange: e => patchLogbook({ settings: { boxLines: Number(e.target.value) } }).then(() => toast('Saved')) },
+        h('select', { onchange: e => save({ boxLines: Number(e.target.value) }) },
           Array.from({ length: 19 }, (_, i) => i + 2).map(n => h('option', { value: String(n), selected: n === (Math.min(20, Math.max(2, Number(st.boxLines) || 3))) }, `${n} lines${n === 3 ? ' (default)' : ''}`)))),
-      h('label', { class: 'field', style: 'margin-top:8px' }, 'Undo window',
-        h('select', { onchange: e => patchLogbook({ settings: { undoSecs: Number(e.target.value) === 5 ? null : Number(e.target.value) } }).then(() => toast('Saved')) },
-          UNDO_SECS.map(([n, l]) => h('option', { value: String(n), selected: (Number(st.undoSecs) || 5) === n }, l)))),
-      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'How long Undo stays on screen after you save, clear or delete something.'),
-      h('label', { class: 'field', style: 'margin-top:8px' }, 'First day of the week',
-        h('select', { onchange: e => patchLogbook({ settings: { weekStart: Number(e.target.value) === 1 ? null : Number(e.target.value) } }).then(() => toast('Saved')) },
-          [[1, 'Monday (default)'], [0, 'Sunday'], [6, 'Saturday']].map(([n, l]) => h('option', { value: String(n), selected: weekStart(st.weekStart) === n }, l)))),
-      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'For the Logbook calendar, Analytics, “this week” and “last week” in search, and last week’s summary.'),
-      h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !!st.weeklyDigest, onchange: e => patchLogbook({ settings: { weeklyDigest: e.target.checked } }) }),
-        'Show last week’s summary on the Case tab (once a week)'),
-      h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !st.hideTips, onchange: e => patchLogbook({ settings: { hideTips: !e.target.checked } }) }),
-        'Show tips and help text'),
-      h('p', { class: 'hint', style: 'margin:0 0 6px' }, 'Off for experienced users: hides the explanations around the app (like the one at the top of the tag editor), the privacy and photo reminders, and the tips for the tags you pick.'),
-      h('p', { class: 'hint help', style: 'margin:8px 0 6px' }, 'How the Logbook search works (everything, initials or procedure; fuzzy) is under Filter on the Logbook tab, and is remembered.'),
+      // a separate Initials box above the case box, where the Case tab starts (device; was "First field for a new case")
+      toggle(['Separate initials box (this device)', 'Separate initials box'], display().firstField === 'initials', v => { setDisplay({ firstField: v ? 'initials' : null }); toast('Saved on this device'); },
+        'An Initials box above the case box.', 'The Case tab starts there and Enter moves on to the case. Off: type the initials at the start of the case, e.g. “AB 72M lap chole”.'),
+      toggle('Open the keyboard when the Case tab opens (this device)', display().autoFocus !== false, v => applyDisplay(setDisplay({ autoFocus: v ? null : false }))),
+      h('h3', {}, 'Keyboard in the case box (this device)'),
+      toggle('Capital letter at the start', display().boxCaps !== false, v => applyDisplay(setDisplay({ boxCaps: v ? null : false }))),
+      toggle('Autocorrect', display().boxCorrect === true, v => applyDisplay(setDisplay({ boxCorrect: v ? true : null })), 'Off by default, so initials and drug names stay as typed.'),
+      toggle('Underline spelling mistakes', display().boxSpell !== false, v => applyDisplay(setDisplay({ boxSpell: v ? null : false })), 'Some keyboards ignore these.'),
+      h('h3', {}, 'Search'),
+      help('How the Logbook search works (everything, initials or procedure; fuzzy) is under Filter on the Logbook tab.'),
       // operators in the Logbook search box (search-ops.js); off by default, so plain searches never change meaning
-      h('label', { class: 'check', style: 'margin-top:8px' }, h('input', { type: 'checkbox', role: 'switch', checked: !!st.searchOps, onchange: e => patchLogbook({ settings: { searchOps: e.target.checked } }).then(() => toast(e.target.checked ? 'Advanced search on' : 'Advanced search off')) }),
-        'Advanced search'),
-      h('div', { class: 'hint', style: 'margin:0 0 6px' },
-        h('p', { style: 'margin:0 0 4px' }, 'Lets you type operators in the Logbook and Reflections search boxes (a ? next to each lists them; tap one to add it):'),
-        h('ul', { class: 'ops-list' }, OPERATOR_HELP.map(([op, what]) => h('li', {}, h('code', {}, op), ' ', what))),
-        h('p', { style: 'margin:4px 0 0' }, 'Reflections have their own: heading:, title:, diagnosis:, case: and initials:.'),
-        h('p', { style: 'margin:4px 0 0' }, 'Off by default because a few plain searches change meaning when it’s on: a word starting with “-” leaves cases out, and OR in capitals means either.'))),
-    h('section', { class: 'card' },
-      h('h2', {}, 'Case tab'),
-      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'Untick what you don’t use. The case box, All tags and Save always stay.'),
-      CASE_PARTS.map(([part, label]) => h('label', { class: 'check' },
-        h('input', { type: 'checkbox', checked: caseShown(part), onchange: e => setCaseShown(part, e.target.checked, CASE_PARTS.map(([p]) => p)) }), label)),
-      h('h3', { style: 'margin-top:14px' }, 'Keyboard in the case box (this device)'),
-      h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: display().boxCaps !== false, onchange: e => applyDisplay(setDisplay({ boxCaps: e.target.checked ? null : false })) }),
-        'Capital letter at the start'),
-      h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: display().boxCorrect === true, onchange: e => applyDisplay(setDisplay({ boxCorrect: e.target.checked ? true : null })) }),
-        'Autocorrect'),
-      h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: display().boxSpell !== false, onchange: e => applyDisplay(setDisplay({ boxSpell: e.target.checked ? null : false })) }),
-        'Underline spelling mistakes'),
-      h('p', { class: 'hint help', style: 'margin:0' }, 'Autocorrect is off by default so initials and drug names stay as typed. Some keyboards ignore these.')),
-    resetLink('everything on this page (the initials box, keyboard, box height, undo, the week, the weekly summary, tips, advanced search and the Case tab parts)', async () => {
+      toggle('Advanced search', st.searchOps, v => save({ searchOps: v }, v ? 'Advanced search on' : 'Advanced search off'),
+        'Operators in the Logbook and Reflections search boxes.',
+        'A ? next to each box lists them; tap one to add it: ', h('ul', { class: 'ops-list' }, OPERATOR_HELP.map(([op, what]) => h('li', {}, h('code', {}, op), ' ', what))),
+        'Reflections have their own: heading:, title:, diagnosis:, case: and initials:. Off by default because a few plain searches change meaning when it’s on: a word starting with “-” leaves cases out, and OR in capitals means either.'),
+      h('h3', {}, 'Dates and Undo'),
+      pick('First day of the week', [[1, 'Monday (default)'], [0, 'Sunday'], [6, 'Saturday']], weekStart(st.weekStart), n => save({ weekStart: n === 1 ? null : n }),
+        'For the calendar, Analytics and “this week” in search.', 'Also “last week” in search, and last week’s summary.'),
+      pick('Undo window', UNDO_SECS, Number(st.undoSecs) || 5, n => save({ undoSecs: n === 5 ? null : n }), 'How long Undo stays after you save, clear or delete.'),
+      h('h3', {}, 'Help'),
+      toggle('Show tips and help text', !st.hideTips, v => save({ hideTips: !v }, null),
+        'Off for experienced users.', 'Hides the explanations around the app (like the one at the top of the tag editor), the privacy and photo reminders, and the tips for the tags you pick.'),
+      toggle('Show last week’s summary on the Case tab (once a week)', st.weeklyDigest, v => save({ weeklyDigest: v }, null))),
+    resetLink('everything on this page (the Case tab parts, box height, the initials box, keyboard, advanced search, the week, undo, tips and the weekly summary)', async () => {
       await patchLogbook({ settings: { boxLines: null, undoSecs: null, weekStart: null, weeklyDigest: null, hideTips: null, searchOps: null, caseHide: null } });
       applyDisplay(setDisplay({ autoFocus: null, firstField: null, boxCaps: null, boxCorrect: null, boxSpell: null }));
     }));
@@ -713,14 +703,14 @@ const groupReset = (what, run) => h('p', { class: 'reset-row' }, h('button', { c
   if (!await confirmBox('Reset this group', `Show ${what} again?`, 'Reset')) return;
   await run(); hooks.render(); toast('Back to the defaults');
 } }, 'Reset this group'));
-const sw = (label, on, set, hint) => [h('label', { class: 'check' }, h('input', { type: 'checkbox', role: 'switch', 'aria-label': label, checked: !!on, onchange: e => set(e.target.checked) }), label), hint ? h('p', { class: 'hint help', style: 'margin:0 0 6px 28px' }, hint) : null];
+const sw = (label, on, set, hint) => [h('label', { class: 'check' }, h('input', { type: 'checkbox', role: 'switch', 'aria-label': label, checked: !!on, onchange: e => set(e.target.checked) }), label), hint ? h('p', { class: 'hint help' }, hint) : null];
 export function renderShowHide() {
   const st = settings(), d = display();
   const save = patch => patchLogbook({ settings: patch });
   const caseOn = caseShown;
   const setCase = (part, show) => setCaseShown(part, show, CASE_PARTS.map(([p]) => p));
   const { hidden } = arrangeTabs(barTabs().map(([id]) => id), d);
-  return h('div', { class: 'showhide' },
+  return h('div', { class: 'showhide set-page' },
     profileCard(),
     h('section', { class: 'card' },
       h('h2', {}, 'Hide items'),
@@ -758,24 +748,17 @@ export function renderShowHide() {
 
 export function renderReflectionSettings() {
   const st = settings();
-  return h('div', {},
+  return h('div', { class: 'set-page' },
     h('section', { class: 'card' },
       h('h2', {}, 'Reflections'),
-      h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: st.reflExport !== false, onchange: e => patchLogbook({ settings: { reflExport: e.target.checked } }) }),
-        'New reflections are included in the portfolio export'),
-      h('p', { class: 'hint help', style: 'margin:0' }, 'Untick if you write many and would rather choose which go in. Reflections already written keep their own tick.'),
-      h('label', { class: 'field', style: 'margin-top:10px' }, 'Learning points in new reflections',
-        h('select', { onchange: e => patchLogbook({ settings: { reflPoints: e.target.value === 'free' ? 'free' : null } }).then(() => toast('Saved')) },
-          h('option', { value: 'numbered', selected: settings().reflPoints !== 'free' }, 'Numbered points with headings (default)'),
-          h('option', { value: 'free', selected: settings().reflPoints === 'free' }, 'Free text (one box)'))),
-      h('p', { class: 'hint help', style: 'margin:0' }, 'Each reflection can still be switched at the top of its Learning points.'),
-      h('label', { class: 'check', style: 'margin-top:8px' }, h('input', { type: 'checkbox', 'aria-label': 'Formatting buttons', checked: !!display().reflToolbar, onchange: e => applyDisplay(setDisplay({ reflToolbar: e.target.checked || null })) }),
-        'Formatting buttons (this device)'),
-      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'Bold, bullet and numbered lists above each box. The Word export shows them as real bold and bullets.'),
-      h('label', { class: 'check', style: 'margin-top:8px' }, h('input', { type: 'checkbox', checked: display().reflSpell !== false, onchange: e => applyDisplay(setDisplay({ reflSpell: e.target.checked ? null : false })) }),
-        'Underline spelling mistakes in reflections (this device)'),
-      h('label', { class: 'check', style: 'margin-top:8px' }, h('input', { type: 'checkbox', checked: !display().hideWords, onchange: e => applyDisplay(setDisplay({ hideWords: e.target.checked ? null : true })) }),
-        'Word counts in the Reflections list (this device)'),
+      toggle('New reflections are included in the portfolio export', st.reflExport !== false, v => patchLogbook({ settings: { reflExport: v } }),
+        'Each reflection keeps its own tick.', 'Switch off if you write many and would rather choose which go in. Reflections already written keep their own tick.'),
+      pick('Learning points in new reflections', [['numbered', 'Numbered points with headings (default)'], ['free', 'Free text (one box)']], st.reflPoints === 'free' ? 'free' : 'numbered',
+        v => patchLogbook({ settings: { reflPoints: v === 'free' ? 'free' : null } }).then(() => toast('Saved')), 'Each reflection can still be switched at the top of its Learning points.'),
+      toggle('Formatting buttons (this device)', display().reflToolbar, v => applyDisplay(setDisplay({ reflToolbar: v || null })),
+        'Bold, bullet and numbered lists above each box.', 'The Word export shows them as real bold and bullets.'),
+      toggle('Underline spelling mistakes in reflections (this device)', display().reflSpell !== false, v => applyDisplay(setDisplay({ reflSpell: v ? null : false }))),
+      toggle('Word counts in the Reflections list (this device)', !display().hideWords, v => applyDisplay(setDisplay({ hideWords: v ? null : true }))),
       resetLink('new reflections in the export, learning points, formatting buttons, spelling and word counts', async () => { await patchLogbook({ settings: { reflExport: null, reflPoints: null } }); applyDisplay(setDisplay({ reflSpell: null, reflToolbar: null, hideWords: null })); })),
     h('section', { class: 'card' },
       h('h2', {}, 'Photos'),

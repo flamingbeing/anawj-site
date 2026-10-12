@@ -9,10 +9,10 @@ Last updated: 2026-10-13 by Claude Code, Logbook 1 (log1).
 
 ## Now
 
-- **Claude Code, Logbook 1 (log1)** (branch `claude/clever-gates-pm6sas`, no open PR): polish batch (Next, item 1):
-  PRs 1–5 merged (#250, #254, #268, #272, #274), JR count / word counts merged (#264). Next: PR 6a then 6b (layout
-  approved 13 Oct, "agree and merge": build, test, merge each without asking). Nothing half-done. Owner's picks are in
-  the artifact https://claude.ai/artifact/8Kfho8SPgupTbqe6t2g5bi (store `picks/owner`).
+- **Claude Code, Logbook 1 (log1)** (branch `claude/clever-gates-pm6sas`): polish batch (Next, item 1): PRs 1–5
+  and #264 merged; PR 6a (settings regroup) in #289, merging after the checks. Then 6b (layout approved 13 Oct,
+  "agree and merge": build, test, merge without asking). Owner's picks: artifact
+  https://claude.ai/artifact/8Kfho8SPgupTbqe6t2g5bi (store `picks/owner`).
 - **Claude Code, Logbook 3 (log3)** (branch `ccr-2994049c-4e5tlt`): idle, nothing half-done. Still signed in to the
   Firebase CLI (usage counts only; each use needs the owner's OK). Owns the axe check, PR previews and the Codex /
   Firebase plugin setup.
@@ -75,6 +75,7 @@ Last updated: 2026-10-13 by Claude Code, Logbook 1 (log1).
 
 ## Recently done
 
+- #289 Polish 6a: settings pages use switches, ✓ lists and one-line help (ⓘ for more); Advanced pages under headings.
 - #274 Polish 5: the note editor reads like a page (‹ Notes, ⋯ menu with Preview and Delete, Done; no boxes; one info line).
 - #272 Polish 4: the initials and age/sex marked inside the case box; the line under it says only what the age means.
 - #268 Polish 3: initials over the date on case rows, one-line tags, thin month headers, calmer Analytics cards.
@@ -83,7 +84,6 @@ Last updated: 2026-10-13 by Claude Code, Logbook 1 (log1).
 - #250 Polish 1: tap feedback, smooth folds, line icons instead of emoji, tidier Case screen, empty screens, row Copy off by default.
 - #217 Basic the default profile; hidden items can be turned back on; no settings hidden; Profiles or hide items; soft
   shadows by default; the Display preview marked clearly.
-- #214 Profiles: Advanced, Basic, Basic: logbook only (replaces Basic mode), at the top of Show or hide.
 
 ## Decisions log
 

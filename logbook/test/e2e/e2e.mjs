@@ -76,6 +76,8 @@ async function run(label, ctxOpts) {
     else await p.locator(`.tabs button[data-tab="${t}"]`).click();
     await nap(350);
   };
+  // a ✓ list on a settings page (fieldset.pick): tap the choice with this value
+  const choose = (legend, v) => p.locator('fieldset.pick', { has: p.locator('legend', { hasText: legend }) }).locator('label.pick-opt', { has: p.locator(`input[value="${v}"]`) }).click();
   const R3 = DIR + 'round3/';
   const shot3 = async name => { if (phone) await p.screenshot({ path: R3 + name + '.png', fullPage: false }); };
   // the Admin portal, or one of its pages (Residents, Advanced admin settings, Programme totals)
@@ -913,7 +915,7 @@ async function run(label, ctxOpts) {
     }
     // Enter saves (setting)
     await tab('logging');
-    await p.locator('label.field', { hasText: 'Enter key' }).locator('select').selectOption('single');
+    await choose('Enter key', 'single');
     await nap(300);
     await tab('log');
     const ta = p.locator('textarea.details');
@@ -925,7 +927,7 @@ async function run(label, ctxOpts) {
     await nap(400);
     assert(await nCases() === n0 + 1, 'Enter did not save with the setting on');
     await tab('logging');
-    await p.locator('label.field', { hasText: 'Enter key' }).locator('select').selectOption('newline');
+    await choose('Enter key', 'newline');
     await nap(300);
     // admin renames a category for display; pills use the short name
     await goAdmin('adminadv');
@@ -1700,7 +1702,7 @@ async function run(label, ctxOpts) {
     await hit.waitFor();
     await hit.click();
     await p.waitForURL(/#loggingadv$/);
-    await p.locator('label.field.flash', { hasText: 'Undo window' }).waitFor();
+    await p.locator('fieldset.pick.flash', { hasText: 'Undo window' }).waitFor();
     await tab('display');
     assert(await p.locator('.display-preview .row-btn').count() >= 1, 'no Display preview');
     await p.locator('input[type=range][aria-label="Borders"]').fill('1'); await nap(150);
@@ -1774,8 +1776,7 @@ async function run(label, ctxOpts) {
 
   await step('page width Full; the demo: header can hide, Leave / Reset demo by Sign out', async () => {
     await tab('displayadv');
-    const width = p.locator('select[aria-label="Page width"]');
-    await width.selectOption('full'); await nap(150);
+    await choose('Page width', 'full'); await nap(150);
     try {
       assert(await p.evaluate(() => document.documentElement.classList.contains('lw-full')), 'Full page width not applied');
       await p.getByLabel('Hide the header (the app name bar)').check(); await nap(150);
@@ -1789,7 +1790,7 @@ async function run(label, ctxOpts) {
     } finally {
       await tab('displayadv');
       await p.getByLabel('Hide the header (the app name bar)').uncheck();
-      await p.locator('select[aria-label="Page width"]').selectOption('normal'); await nap(150);
+      await choose('Page width', 'normal'); await nap(150);
     }
   });
 
@@ -1836,8 +1837,7 @@ async function run(label, ctxOpts) {
   await step('theme: light by default; dark and auto in Settings → Display', async () => {
     assert(await p.evaluate(() => document.documentElement.dataset.theme) === 'light', 'default theme not light');
     await tab('display');
-    const sel = p.locator('label.field', { hasText: 'Light or dark' }).locator('select');
-    await sel.selectOption('dark');
+    await choose('Light or dark', 'dark');
     await nap(500);
     const bg = await p.evaluate(() => getComputedStyle(document.body).backgroundColor);
     assert(await p.evaluate(() => document.documentElement.dataset.theme) === 'dark' && bg === 'rgb(18, 20, 23)', 'dark not applied: ' + bg);
@@ -1846,10 +1846,10 @@ async function run(label, ctxOpts) {
     await nap(500);
     assert(await p.evaluate(() => document.documentElement.dataset.theme) === 'dark', 'dark lost after reload');
     await tab('display');
-    await p.locator('label.field', { hasText: 'Light or dark' }).locator('select').selectOption('auto');
+    await choose('Light or dark', 'auto');
     await nap(300);
     assert(await p.evaluate(() => getComputedStyle(document.body).backgroundColor) === 'rgb(243, 243, 243)', 'auto should be light when the phone is light');
-    await p.locator('label.field', { hasText: 'Light or dark' }).locator('select').selectOption('light');
+    await choose('Light or dark', 'light');
     await nap(300);
   });
 
@@ -1881,9 +1881,8 @@ async function run(label, ctxOpts) {
 
   await step('settings: week start, Case tab parts, case box keyboard, pinned box and search, borderless', async () => {
     await tab('loggingadv');
-    const field = l => p.locator('label.field', { hasText: l }).locator('select');
     const check = l => p.locator('label.check', { hasText: l }).locator('input');
-    await field('First day of the week').selectOption('0'); await nap(300);
+    await choose('First day of the week', '0'); await nap(300);
     await check('Quick picks').uncheck(); await check('Autocorrect').check(); await nap(300);
     await tab('displayadv');
     await check('Pin the case box').check(); await check('Pin the search box').check(); await nap(200);
@@ -1912,7 +1911,7 @@ async function run(label, ctxOpts) {
       await shot3('log-pinned');
     } finally {
       await tab('loggingadv');
-      await field('First day of the week').selectOption('1');
+      await choose('First day of the week', '1');
       await check('Quick picks').check(); await check('Autocorrect').uncheck(); await nap(300);
       await tab('displayadv');
       await check('Pin the case box').uncheck(); await check('Pin the search box').uncheck(); await nap(200);
