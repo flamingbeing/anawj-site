@@ -2,7 +2,7 @@
 // The blank form itself is not in this repo (it carries staff names in its file details): an admin uploads it once and
 // it is kept in the study's Firebase. docx-fill.js does the typing; this file says what goes where, in form order.
 import { WordForm } from './docx-fill.js';
-import { PAGES, EXTRA, SERIES, BY_ID, EXTRA_BY_ID, IX_COLS } from './schema.js';
+import { PAGES, EXTRA, SERIES, BY_ID, EXTRA_BY_ID, IX_COLS, shownValue } from './schema.js';
 import { val } from './store.js';
 
 const field = id => BY_ID[id] || EXTRA_BY_ID[id];
@@ -25,7 +25,8 @@ const ddmmyy = t => { const d = new Date(t); return [d.getDate(), d.getMonth() +
 // Fill document.xml for one patient. Returns { xml, missed } (missed: places the form didn't have, for tests).
 export function fillForm(xml, rec) {
   const F = new WordForm(xml);
-  const v = id => { const x = val(rec, id); return x == null || x === '' ? null : x; };
+  // hidden follow-ups (their question answered No) are left blank, as on the export
+  const v = id => { const x = shownValue(id, k => val(rec, k)); return x == null || x === '' ? null : x; };
   const lab = id => { const x = v(id); if (x == null) return null; const o = field(id)?.opts?.find(([k]) => String(k) === String(x)); return o ? o[1] : String(x); };
   const pick = (id, map) => { const x = v(id); return x == null ? null : map[x]; };
   const yn = (cell, id, opts) => cell.tick(lab(id), opts);
