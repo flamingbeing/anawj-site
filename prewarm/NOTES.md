@@ -70,6 +70,8 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   `f` with an empty map (an empty map is a leaf in the merge). Lock / unlock / delete sent one and wiped the server
   copy's readings; push now omits an empty `f`, lock sends the full record, and each phone resends all its patients
   once after its first server snapshot (`resync1`). The sync emulator test checks the server copy keeps its readings.
+- **Warming time labels** (owner, 12 Oct 2026): Gown on (pre-warming gown put on), Prewarm on, Prewarm off, Underbody
+  warm, Gown warm (the intra-op Bair Huggers). Those are all the Bair Hugger items on the paper form.
 - **Screen size** (Settings, this phone only): Smaller / Small / Normal / Large / Larger zooms the whole app
   (`--ui-zoom` on body). Normal by default.
 - **Form view** (owner, 12 Oct 2026): the study's real paper form (data collection form v3.2, .docx) with text put in:

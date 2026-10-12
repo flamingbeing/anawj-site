@@ -365,8 +365,8 @@ route(/^\/new$/, () => {
 
 // ---------- patient main screen: event times, temperatures, then links to the other forms in the order they are
 // filled in. BP/HR/BIS uses the same reading screen without the times.
-const EVENTS = [['pw_gown', 'Gown on'], ['pw_start', 'Warm on', 'pw'], ['ev_wstop', 'Warm off', 'pw'], ['ev_ot', 'In OT'],
-  ['io_knife', 'Induction'], ['io_flip', 'Prone'], ['io_under_start', 'Under­body'], ['io_gown_start', 'Gown warmer'],
+const EVENTS = [['pw_gown', 'Gown on'], ['pw_start', 'Prewarm on', 'pw'], ['ev_wstop', 'Prewarm off', 'pw'], ['ev_ot', 'In OT'],
+  ['io_knife', 'Induction'], ['io_flip', 'Prone'], ['io_under_start', 'Under­body warm'], ['io_gown_start', 'Gown warm'],
   ['io_done', 'Surgery end'], ['pacu_in', 'PACU in'], ['pacu_out', 'To ward']];
 const EVENT_FULL = { pw_gown: 'Gown on', ev_ot: 'In OT', pacu_in: 'PACU arrival', io_flip: 'Flipped prone', pw_start: 'Active warming started', ev_wstop: 'Active warming stopped', io_knife: 'Induction (knife to skin)', io_under_start: 'Underbody Bair Hugger on',
   io_gown_start: 'Gown Bair Hugger on', io_done: 'Surgery completed (post-extubation)', pacu_out: 'Transfer to ward' };
@@ -377,7 +377,7 @@ const mmss = m => { const sec = Math.max(0, Math.floor(m * 60)), h = Math.floor(
   return h ? `${h}:${String(mm).padStart(2, '0')}:${ss}` : `${mm}:${ss}`; };
 function clockHtml(p, s) {
   const now = nowMin();
-  const anchors = s === 'prewarm' ? [['pw_start', 'Warming'], ['pw_gown', 'Gown on']]
+  const anchors = s === 'prewarm' ? [['pw_start', 'Prewarm'], ['pw_gown', 'Gown on']]
     : [['io_knife', 'Induction'], ['ev_ot', 'In OT']];
   const [aid, alabel] = anchors.find(([id]) => toMin(val(p, id)) != null) || [];
   let timer = `<span class="lbl">Now</span> <b>${fromMin(Math.floor(now))}</b>`;
@@ -392,7 +392,7 @@ function nextEvent(p) {
   const last = evs.reduce((i, id, j) => val(p, id) ? j : i, -1);
   const id = evs.slice(last + 1).find(x => !val(p, x));
   if (!id) return null;
-  const label = EVENTS.find(([f]) => f === id)[1].replace('Warm ', 'Warming ').replace('\u00ad', '');
+  const label = EVENTS.find(([f]) => f === id)[1].replace('\u00ad', '');
   const due = id === 'ev_wstop' && toMin(val(p, 'pw_start')) != null && WARM_MIN[val(p, 'arm')] ? toMin(val(p, 'pw_start')) + WARM_MIN[val(p, 'arm')] : null;
   return { id, label, due };
 }
@@ -515,7 +515,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     const due = dueOf(p, s, pt);
     const grp = s === 'prewarm' ? `<span class="badge">${GROUPS.find(g => String(g[0]) === String(val(p, 'arm')))?.[1] || 'Group not set'}</span>` : '';
     paint(`${main && val(p, 'done') ? `<p class="ok-box donetop">✓ Data collection complete <small>${esc(val(p, 'done'))}</small></p>` : ''}${main ? comfortHtml('sat_pre', 'Comfortable before surgery?') + timesHtml() : ''}${navHtml()}
-      <div class="tp"><div><b>${pt.label}</b> ${grp}</div><div class="due" id="due">${due != null ? 'due ' + fromMin(Math.round(due)) : pt.key === 'base' ? (s === 'prewarm' ? '' : 'on arrival in OT') : pt.min != null ? `<span class="hint">Set “${s === 'prewarm' ? 'Warming on' : 'Induction'}” for due times</span>` : ''}</div></div>
+      <div class="tp"><div><b>${pt.label}</b> ${grp}</div><div class="due" id="due">${due != null ? 'due ' + fromMin(Math.round(due)) : pt.key === 'base' ? (s === 'prewarm' ? '' : 'on arrival in OT') : pt.min != null ? `<span class="hint">Set “${s === 'prewarm' ? 'Prewarm on' : 'Induction'}” for due times</span>` : ''}</div></div>
       ${isSaved ? `<p class="muted small tight">Saved ${esc(savedAt(p, s, pt.key))}${p.f['at_' + s + '_' + pt.key]?.by ? ' by ' + esc(p.f['at_' + s + '_' + pt.key].by) : ''}. Changes save when you tap Save.</p>` : ''}
       <div class="board">${cols.map(card).join('')}</div>
       <button class="save big" id="save">${isSaved ? 'Save changes' : `Save ${pt.label} reading`}</button>
