@@ -314,6 +314,14 @@ function paintTabs() {
   // Advanced display → the tab bar's order and hidden tabs (this device)
   const bar = visibleTabs().filter(t => !t.hidden), { shown } = arrangeTabs(bar.map(t => t.id), display());
   if (!shown.includes(sel)) sel = 'more';   // a tab hidden from the bar (Notes) is reached through More
+  // same tabs as before: only move the selection, so the bar never blinks while changing tab (swipe included)
+  const key = shown.map(id => id + ':' + bar.find(t => t.id === id).label).join('|');
+  if (tabsEl.dataset.key === key && tabsEl.children.length) {
+    for (const b of tabsEl.children) b.setAttribute('aria-selected', String(b.dataset.tab === sel));
+    tabsEl.hidden = false;
+    return;
+  }
+  tabsEl.dataset.key = key;
   fill(tabsEl, ...shown.map(id => bar.find(t => t.id === id)).map(t => h('button', {
     role: 'tab', 'aria-selected': String(sel === t.id), 'data-tab': t.id, 'aria-label': t.label, title: t.label,   // named even with icons only
     onclick: () => go(t.id),
@@ -413,7 +421,8 @@ function barTabOf(id) {
   return { shown, sel: shown.includes(sel) ? sel : 'more' };
 }
 const swipeTarget = dx => { const { shown, sel } = barTabOf(S.tab), i = shown.indexOf(sel); return i < 0 ? null : shown[i + (dx < 0 ? 1 : -1)] || null; };
-const slide = (x, ms) => { document.documentElement.classList.toggle('swiping', !!x); app.style.transition = ms ? `transform ${ms}ms ease-out, opacity ${ms}ms ease-out` : 'none'; app.style.transform = x ? `translateX(${x}px)` : ''; app.style.opacity = x ? String(Math.max(.4, 1 - Math.abs(x) / innerWidth)) : ''; };
+const slide = (x, ms) => { document.documentElement.classList.add('swiping'); app.style.transition = ms ? `transform ${ms}ms ease-out` : 'none'; app.style.transform = x ? `translateX(${x}px)` : ''; app.style.opacity = ''; };
+const snapBack = () => { slide(0, 150); setTimeout(settle, 170); };
 const settle = () => { document.documentElement.classList.remove('swiping'); app.style.transition = ''; app.style.transform = ''; app.style.opacity = ''; };
 app.addEventListener('touchstart', e => {
   swipe = null;
@@ -434,23 +443,38 @@ app.addEventListener('touchmove', e => {
   e.preventDefault();   // sideways now: the page follows the finger (held back where there's no tab to go to)
   if (!reduceMotion()) slide(swipeTarget(dx) ? dx : dx / 4, 0);
 }, { passive: false });
-app.addEventListener('touchcancel', () => { if (swipe && swipe.lock) slide(0, 150); swipe = null; }, { passive: true });
-app.addEventListener('touchend', e => {
+app.addEventListener('touchcancel', () => { if (swipe && swipe.lock) snapBack(); swipe = null; }, { passive: true });
+app.addEventListener('touchend', async e => {
   const s = swipe; swipe = null;
   if (!s || !e.changedTouches.length) return;
   const dx = e.changedTouches[0].clientX - s.x, dy = e.changedTouches[0].clientY - s.y;
   const quick = Date.now() - s.at <= 700 && Math.abs(dx) >= 70 && Math.abs(dx) >= 2 * Math.abs(dy);
   const far = s.lock === 'x' && Math.abs(dx) > innerWidth / 3;
   const next = (quick || far) && swipeTarget(dx);
-  if (!next) { if (s.lock) slide(0, 150); return; }
+  if (!next) { if (s.lock) snapBack(); return; }
   if (reduceMotion()) { settle(); go(next); return; }
-  const w = dx < 0 ? -innerWidth : innerWidth;
-  slide(w, 140);
-  setTimeout(async () => {
-    await go(next);
-    slide(-w / 3, 0);   // the new page comes in from the other side
-    requestAnimationFrame(() => requestAnimationFrame(() => { slide(0, 160); setTimeout(settle, 180); }));
-  }, 140);
+  // Both pages move together, side by side: a still copy of the old page carries on off the screen while the new
+  // page comes in right behind it, so there is never an empty gap (the copy is inert and gone after the slide).
+  slide(0, 0);   // measure the page where it rests, not where the finger left it
+  const w = dx < 0 ? -innerWidth : innerWidth, r = app.getBoundingClientRect();
+  const ghost = app.cloneNode(true);
+  ghost.removeAttribute('id'); ghost.setAttribute('aria-hidden', 'true'); ghost.inert = true;
+  ghost.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
+  ghost.className = 'swipe-ghost';
+  Object.assign(ghost.style, { top: r.top + 'px', left: r.left + 'px', width: r.width + 'px', transform: `translateX(${dx}px)`, opacity: '' });
+  document.body.append(ghost);
+  app.style.opacity = '0';   // hidden for the moment the new page is drawn
+  await go(next);
+  const from = dx - w;   // where the new page sits: just beside the old one
+  slide(from, 0); app.style.opacity = '';   // in place beside the old page, fully drawn before anything moves
+  // one clock for both, so they stay joined the whole way
+  const ms = 200, opts = { duration: ms, easing: 'ease-out', fill: 'forwards' };
+  const anims = [ghost.animate([{ transform: `translateX(${dx}px)` }, { transform: `translateX(${w}px)` }], opts),
+    app.animate([{ transform: `translateX(${from}px)` }, { transform: 'translateX(0)' }], opts)];
+  const t0 = document.timeline.currentTime;
+  anims.forEach(an => { an.startTime = t0; });
+  await anims[1].finished.catch(() => {});
+  ghost.remove(); anims.forEach(an => an.cancel()); settle();
 }, { passive: true });
 
 // A live case update shouldn't yank the screen from under someone typing: the Log screen refreshes

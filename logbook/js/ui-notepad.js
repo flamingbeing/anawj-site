@@ -141,7 +141,10 @@ export function renderNotes() {
   const narrowed = nv.day || nv.caseId;
   fill(el,
     h('div', { class: 'notes-head' }, h('h2', { style: 'margin:0' }, 'Notes'), h('span', { class: 'muted notes-count' }, loading ? '' : `${list.length} of ${MAX_NOTES}`)),
-    h('p', { class: 'hint help' }, 'Your own notes: private, never in your portfolio. # heading, **bold**, - list, 1. list, - [ ] to-do and links work.'),
+    h('p', { class: 'hint help' }, 'Your own notes: private, never in your portfolio.'),
+    h('details', { class: 'fold help note-format' }, h('summary', {}, 'Formatting'),
+      h('ul', { class: 'hint' }, ...[['# Heading', 'a heading'], ['**bold**', 'bold'], ['- item  or  1. item', 'a list'], ['- [ ] to-do', 'a box to tick'], ['https://…', 'a link']]
+        .map(([k, v]) => h('li', {}, h('code', {}, k), ' ' + v)))),
     h('div', { class: 'bar' }, search,
       h('button', { class: 'primary', disabled: loading, onclick: () => {
         if (full) return toast(`You have ${MAX_NOTES} notes, the most allowed. Delete or export some to make room.`);
@@ -196,7 +199,9 @@ function editor(n) {
   s.status = t => { status.textContent = t; };
   const touch = () => { s.dirty = true; status.textContent = 'Not saved yet'; clearTimeout(s.timer); s.timer = setTimeout(() => persist(n), SAVE_MS); };
   const title = h('input', { class: 'note-title', placeholder: 'Title', 'aria-label': 'Note title', maxlength: String(LIMITS.title), value: n.title || '',
-    oninput: e => { n.title = e.target.value; touch(); }, onblur: () => persist(n) });
+    oninput: e => { n.title = e.target.value; touch(); }, onblur: () => persist(n),
+    // Enter in the one-line title moves on to the note itself (as in a notes app), never a lost line break
+    onkeydown: e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); if (nv.preview) modeBtn.click(); body.focus(); body.setSelectionRange(0, 0); } } });
   const date = h('input', { type: 'date', 'aria-label': 'Note date', value: n.date || '', onchange: e => { n.date = e.target.value || null; touch(); paintMeta(); } });
   const body = h('textarea', { class: 'note-body', rows: '12', placeholder: 'Write your note… (- [ ] for a to-do)', 'aria-label': 'Note text', maxlength: String(LIMITS.body), spellcheck: 'true',
     oninput: e => { n.body = e.target.value; touch(); }, onblur: () => persist(n) });

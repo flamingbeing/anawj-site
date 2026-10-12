@@ -211,8 +211,10 @@ portfolio content.
   switch is also in Show or hide → Header and tabs). The page follows the finger (`slide`, transform on main;
   `html.swiping` clips sideways overflow); letting go after a quick swipe (≥ 70 px, mostly horizontal, < 0.7 s) or
   past a third of the screen goes to the next/previous tab on the bar (order and hidden tabs honoured; `barTabOf`: a
-  sub-page counts as the bar tab it sits under, an off-bar tab as More) and the new page slides in; otherwise it springs
-  back. Never from fields, dialogs, drag handles, tag-editor pills, anything that scrolls sideways, or within 20 px of
+  sub-page counts as the bar tab it sits under, an off-bar tab as More) and the new page slides in right beside the old
+  one (an inert copy of the old page, `.swipe-ghost`, carries on off screen; both run on one Web Animations clock, so
+  there is no gap; owner reported a big gap and a flashing bar, Oct 2026); otherwise it springs back. `paintTabs` only
+  moves the selection when the bar's tabs are unchanged (no rebuild, no flash). Never from fields, dialogs, drag handles, tag-editor pills, anything that scrolls sideways, or within 20 px of
   the screen's edges (the phone's Back gesture). Reduce motion: switches without sliding.
   **Fewer buttons on Logbook rows** (`rowMenu`, html `row-menu`): one ⋯ opens Copy / Write or Open the reflection /
   Edit the case; a ✓ still marks cases with a reflection.
@@ -284,7 +286,8 @@ portfolio content.
   (`MAX_NOTES`, the app enforces it: the rules can't count). A new note takes today's date (or the filtered day /
   linked case's day); "No date" makes it undated. Order: undated first (latest change first), then newest day first,
   then as written. Search over title and body. Optional `caseId` ("Link to a case…"). Body is Markdown text, shown
-  through `parseNote` → elements (never innerHTML): # headings, **bold**, - / 1. lists, - [ ] to-dos that tick in
+  through `parseNote` → elements (never innerHTML; the list page keeps the syntax in a small "Formatting" fold;
+  Enter in the title moves to the note text): # headings, **bold**, - / 1. lists, - [ ] to-dos that tick in
   Preview, http(s)/mailto links only. No images. Delete → recycle bin (kind `note`, 30 days; restore refuses past 100).
   Firebase cost: notes are not read at sign-in; `ensureNotes()` starts the listener on first need (the page, a day
   with notes in the Logbook, the Markdown export, a backup) and keeps it for the visit. Typing saves after 3 s of
