@@ -241,6 +241,26 @@ portfolio content.
   lastAt, lastTo } (never in the settings file). Reminder: one toast per visit with a Save button when due. The
   owner filled `GOOGLE_CLIENT_ID` and `DROPBOX_APP_KEY` (both public) in Oct 2026. Dropbox stays in development
   mode until the owner applies for production (its icons are 64 and 256 px from `icons/icon-512.png`).
+- **Notes** (`#notes`; `ui-notepad.js`, pure helpers in `notepad.js`, tested; Oct 2026, owner's spec via Codex):
+  a resident's own notepad: teaching points, doses, to-dos. Private (owner-only rules: no admin, PD or app-owner
+  access), never in the portfolio. A bar tab that starts off the bar (`OFF_BAR` in `ui-settings.js`): first in More
+  with "Your own notes: private, never in your portfolio"; Arrange tabs can put it on the bar (it stays off until
+  `tabOrder` holds it, so people who arranged tabs before Notes existed don't get it on their bar). At most 100
+  (`MAX_NOTES`, the app enforces it: the rules can't count). A new note takes today's date (or the filtered day /
+  linked case's day); "No date" makes it undated. Order: undated first (latest change first), then newest day first,
+  then as written. Search over title and body. Optional `caseId` ("Link to a case…"). Body is Markdown text, shown
+  through `parseNote` → elements (never innerHTML): # headings, **bold**, - / 1. lists, - [ ] to-dos that tick in
+  Preview, http(s)/mailto links only. No images. Delete → recycle bin (kind `note`, 30 days; restore refuses past 100).
+  Firebase cost: notes are not read at sign-in; `ensureNotes()` starts the listener on first need (the page, a day
+  with notes in the Logbook, the Markdown export, a backup) and keeps it for the visit. Typing saves after 3 s of
+  quiet, on blur, on leaving (Back, another tab) and on pagehide / hidden, through `writes.save('note')` →
+  `cloud.commitRecord` (offline queue, conflict check). `settings.noteIndex` { days, cases, n } (updated only from the
+  server's copy) lets the Logbook show a bar on days with notes, "✎ Notes" on the day and "✎ note" on linked case
+  rows without reading notes; it's skipped in the settings file. Copy / Share for a day adds its notes after the
+  cases in Settings → Markdown's "A day's notes" format (default `## Notes` then `{{notes}}`: each note as `### title`
+  and its text); `{{notes}}` in the day heading places them there instead; no notes, no heading. The Markdown export
+  (renamed from "Notes apps") puts dated notes in their day's case note (a notes-only day gets one) and undated ones
+  in `Notes.md`. The backup file holds notes; restore adds missing ones up to the limit. e2e: `test/e2e/notepad.mjs`.
 - **Connect Claude** (`mcp/`, Settings → Connect Claude (advanced) links its README on GitHub): a read-only MCP
   server residents run locally; Google "Desktop app" OAuth (loopback, PKCE) → Firebase `signInWithIdp` → Firestore
   REST as the user, so the rules apply; only `logbooks/{own email}` and the user's own `residents` entry. Owner
@@ -332,13 +352,15 @@ portfolio content.
   - Watch for `.bar .grow { min-width: 160px }`: it wraps toolbars on phones (Unlink, Save / Retry). Buttons centre
     their content (`justify-content: center`), which shifted calendar days.
   - Show only what helps: owner prefers a ✓ on rows over calendar badges, small text over cards for guidance.
-  - The e2e also has Codex's `recovery.mjs` and `usability.mjs`, and `cloud-save.mjs`: run all four before merging.
+  - The e2e also has Codex's `recovery.mjs` and `usability.mjs`, `cloud-save.mjs`, `notepad.mjs` and `tag-editor.mjs`:
+    run all of them before merging.
   - Accessibility: `test/e2e/a11y.mjs` (axe-core 4.13.0, pinned in `tools/vendor/axe.min.js`, MPL-2.0; WCAG 2.2 A/AA)
-    is **not** one of the four (owner: not on every e2e). Run it after UI changes or before a release, about 75 s:
+    is **not** one of those (owner: not on every e2e). Run it after UI changes or before a release, about 75 s:
     every screen plus the edit-case dialog and reflection editor in light at phone and desk sizes, dark on the main
     screens (`A11Y_DARK=all` for every one); `A11Y_ONLY=<words>` checks only matching screens. Serious or critical
-    problems fail it. Add new screens to its `SCREENS` list. Oct 2026 first run: 3 open problems (calendar grid's
-    children, Totals' scroll box on phones and the Markdown preview `<pre>` not reachable by keyboard).
+    problems fail it. Add new screens to its `SCREENS` list (Notes and its editor are in it). Oct 2026 first run found 3 problems, all fixed
+    in #166: the calendar is now a labelled group (a grid role needs row/cell children), and Totals' sideways scroll
+    box and the Markdown previews are focusable with names. Now 0 serious or critical.
   - The cloud session's safety filter refuses to write or push credentials, even public ones (the MCP Desktop
     client secret): the owner commits those via a GitHub web edit (GitHub secret scanning: "It's a false
     positive"). `.claude/settings.json` allows pushing to `claude/*` branches so a push isn't blocked.
@@ -405,4 +427,4 @@ Run `logbook/test/e2e/usability.mjs` beside recovery and the full E2E suite. Bot
 
 The first tap selects a tag in List or Pills and opens a small read-only details card. Edit is explicit; Add after uses the selection as an insertion anchor. Close / Escape / browser Back dismiss the card and retain selection. New tags and section headers offer separate Sits under and Place after controls, a searchable sibling list, Beginning / End and a placement preview. Insertion preserves child subtrees and existing APMES parent restrictions. Changing parent resets placement to its end. A changed layout or account refuses a stale dialog save. Selection clears with the account caches.
 
-Notes v1 is planned separately: private teaching points, doses and to-dos under More by default, never portfolio content; max 100, dated/undated Markdown text without images. Day Copy/Share and Markdown ZIP will use a {{notes}} fill-in; backup restore adds missing notes only. This tag PR does not add Notes yet.
+Notes v1 followed in its own PR (Claude, after the handover): see **Notes** under "Where things are".

@@ -12,6 +12,7 @@
 export const DEMO_USER = { email: 'demo@example.com', name: 'Demo User', uid: 'demo-uid' };
 
 import { cleanReflection, cleanImage } from './reflections.js';
+import { cleanNote } from './notepad.js';
 import { progress } from './engine.js';
 import { cleanProfile } from './profile.js';
 export { cleanReflection, cleanImage };
@@ -191,12 +192,14 @@ function seed(s) {
 
 const caseWatchers = new Set();   // { email, cb }
 const userWatchers = new Set();
-const reflWatchers = new Set();   // { email, cb }
+const reflWatchers = new Set();
+const noteWatchers = new Set();   // { email, cb }
 
 function notifyAll() {
   for (const w of caseWatchers) w.cb(casesOf(w.email));
   for (const cb of userWatchers) cb(currentUser());
   for (const w of reflWatchers) w.cb(reflectionsOf(w.email));
+  for (const w of noteWatchers) w.cb(notesOf(w.email));
 }
 function notifyCases(email) {
   for (const w of caseWatchers) if (w.email === email) w.cb(casesOf(email));
@@ -360,6 +363,32 @@ export async function deleteReflection(email, id) {
   if (lb.reflections) delete lb.reflections[id];
   save(s);
   notifyReflections(email);
+}
+
+// ---- notes (logbooks/{email}/notes/{id}) ----
+export function notesOf(email) {
+  const lb = load().logbooks[email];
+  return lb && lb.notes ? Object.values(lb.notes).map(plain) : [];
+}
+function notifyNotes(email) { for (const w of noteWatchers) if (w.email === email) w.cb(notesOf(email)); }
+export function watchNotes(email, cb) {
+  const w = { email: lc(email), cb: list => cb(list, meta) };
+  noteWatchers.add(w);
+  w.cb(notesOf(w.email));
+  return () => noteWatchers.delete(w);
+}
+export function saveNote(email, n) {
+  email = lc(email);
+  const s = load(), lb = book(s, email), doc = cleanNote(n);
+  (lb.notes ||= {})[doc.id] = doc;
+  save(s); notifyNotes(email);
+  return doc;
+}
+export function deleteNote(email, id) {
+  email = lc(email);
+  const s = load(), lb = book(s, email);
+  if (lb.notes) delete lb.notes[id];
+  save(s); notifyNotes(email);
 }
 
 // ---- reflection images (logbooks/{email}/images/{id}) ----

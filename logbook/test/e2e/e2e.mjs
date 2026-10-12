@@ -1052,7 +1052,7 @@ async function run(label, ctxOpts) {
     assert(/^\[\[\d{4}-\d{2}-\d{2}\]\]\n- /.test(txt) && /#\S/.test(txt), 'copy uses the format: ' + txt.slice(0, 120));
     // the notes zip
     await tab('data');
-    await p.locator('button', { hasText: 'Download for notes apps' }).click();
+    await p.locator('button', { hasText: 'Download Markdown export' }).click();
     assert(/keep them private/i.test(await p.locator('dialog[open]').innerText()), 'privacy line');
     const [dl] = await Promise.all([p.waitForEvent('download'), p.locator('dialog[open] button.primary', { hasText: 'Download' }).click()]);
     const zip = await JSZip.loadAsync(fs.readFileSync(await dl.path()));

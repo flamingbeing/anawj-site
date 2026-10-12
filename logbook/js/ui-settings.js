@@ -188,12 +188,15 @@ export const ROUNDS = [['Square', 0], ['Slightly rounded', 0.5], ['Normal (defau
 export const roundLevel = d => (Number.isInteger(d.round) && d.round >= 0 && d.round < ROUNDS.length ? d.round : 2);
 // The tab bar (Advanced display, per device): the order of its tabs and which are hidden. More always stays
 // (Settings live there) and at least two tabs stay on the bar; hidden ones are listed on the More page.
-export const BAR_TABS = [['log', 'Case'], ['logbook', 'Logbook'], ['reflect', 'Reflections'], ['progress', 'Analytics'], ['more', 'More']];
+export const BAR_TABS = [['log', 'Case'], ['logbook', 'Logbook'], ['reflect', 'Reflections'], ['progress', 'Analytics'], ['notes', 'Notes'], ['more', 'More']];
+// tabs off the bar until someone puts them there (Notes lives in More by default)
+const OFF_BAR = ['notes'];
 export function arrangeTabs(ids, d = {}) {
   const order = Array.isArray(d.tabOrder) ? d.tabOrder : [];
   const at = id => (order.includes(id) ? order.indexOf(id) : order.length + ids.indexOf(id));
   const sorted = [...ids].sort((a, b) => at(a) - at(b));
-  const hidden = new Set((Array.isArray(d.tabHidden) ? d.tabHidden : []).filter(id => id !== 'more'));
+  // an OFF_BAR tab stays off until someone shows it in Arrange tabs (which saves the order with it in)
+  const hidden = new Set([...(Array.isArray(d.tabHidden) ? d.tabHidden : []), ...OFF_BAR.filter(id => !order.includes(id) || !Array.isArray(d.tabHidden))].filter(id => id !== 'more'));
   const shown = sorted.filter(id => !hidden.has(id));
   return shown.length >= 2 ? { sorted, shown, hidden: sorted.filter(id => hidden.has(id)) } : { sorted, shown: sorted, hidden: [] };
 }
@@ -329,7 +332,8 @@ function tabArranger() {
     const toggle = (id, show) => {
       const next = new Set(hideSet); if (show) next.delete(id); else next.add(id);
       if (BAR_TABS.length - next.size < 2) { toast('Keep at least two tabs on the bar'); return paint(); }
-      applyDisplay(setDisplay({ tabHidden: next.size ? [...next] : null, tabOrder: order })); hooks.paintTabs?.(); paint();
+      // an empty list (not null) means "everything on the bar", so Notes doesn't drop back into More
+      applyDisplay(setDisplay({ tabHidden: [...next], tabOrder: order })); hooks.paintTabs?.(); paint();
     };
     fill(wrap, h('span', {}, 'Tabs on the bar'),
       h('ul', { class: 'tab-order' }, order.map((id, i) => h('li', {},
@@ -444,8 +448,9 @@ export function renderMarkdownSettings() {
   const pick = (k, label, opts) => h('label', { class: 'field', style: 'margin-top:8px' }, label,
     h('select', { 'aria-label': label, onchange: e => { m[k] = e.target.value; paint(); } }, opts.map(([v, t]) => h('option', { value: v, selected: m[k] === v }, t))));
   const lbl = (t, el, hint) => h('label', { class: 'field', style: 'margin-top:8px' }, t, el, hint ? h('span', { class: 'hint help' }, hint) : null);
-  const pre = () => h('pre', { class: 'fmt-preview' });
-  const dayOut = pre(), oneOut = pre(), reflOut = h('pre', { class: 'fmt-preview', style: 'max-height:24em;overflow:auto' }), pathOut = h('div', { class: 'hint', style: 'margin:8px 0 2px' });
+  // previews can scroll, so each is focusable and named for the keyboard
+  const pre = name => h('pre', { class: 'fmt-preview', tabindex: '0', 'aria-label': name });
+  const dayOut = pre('Preview of a day'), oneOut = pre('Preview of one case'), reflOut = h('pre', { class: 'fmt-preview', style: 'max-height:24em;overflow:auto', tabindex: '0', 'aria-label': 'Preview of a reflection note' }), pathOut = h('div', { class: 'hint', style: 'margin:8px 0 2px' });
   // your latest day and reflection, else made-up ones
   const latest = [...(S.cases || [])].filter(c => c.date).sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt || 0) - (a.createdAt || 0))[0];
   const dayList = latest ? S.cases.filter(c => c.date === latest.date).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)) : SAMPLE;
@@ -475,11 +480,12 @@ export function renderMarkdownSettings() {
   return h('div', {},
     h('section', { class: 'card' },
       h('h2', {}, 'Markdown'),
-      h('p', { class: 'hint help', style: 'margin:0' }, 'One format for Copy and Share on the Logbook tab and for Download for notes apps (More → Export / Import). The default copies the date, initials and case, never the tags.'),
+      h('p', { class: 'hint help', style: 'margin:0' }, 'One format for Copy and Share on the Logbook tab and for the Markdown export (More → Export / Import). The default copies the date, initials and case, never the tags.'),
       h('h3', { style: 'margin:14px 0 0' }, 'Copy and share'),
       lbl('Day heading', area('dayHead', 'Day heading', 1), 'For example ## {{date}} or ## [[{{date}}]].'),
       lbl('Each case in a day', area('dayCase', 'Each case in a day', 3), 'A blank line goes between cases when each takes more than one line.'),
       fillins(CASE_FILLINS),
+      lbl('A day’s notes (More → Notes)', area('dayNotes', 'A day’s notes', 2), 'Follows the cases when the day has notes. {{notes}} is each note (### title, then its text). Or put {{notes}} in the day heading to place them there.'),
       h('div', { class: 'hint', style: 'margin:8px 0 2px' }, latest ? 'Preview (your latest day)' : 'Preview'), dayOut,
       lbl('One case', area('oneCase', 'One case', 3)),
       h('div', { class: 'hint', style: 'margin:8px 0 2px' }, 'Preview'), oneOut,
@@ -488,8 +494,8 @@ export function renderMarkdownSettings() {
       pick('cats', 'Tags ({{categories}})', [['names', 'Names (Lower Segment Caesarean Section)'], ['codes', 'Codes (16)'], ['tags', '#tags (#LSCS)']]),
       pick('links', 'Links between notes', [['wiki', 'Wiki links [[note]] (Obsidian)'], ['md', 'Markdown links [note](note.md)']])),
     h('section', { class: 'card' },
-      h('h2', {}, 'Notes export'),
-      h('p', { class: 'hint help', style: 'margin:0' }, 'How Download for notes apps lays out the zip: case notes, one note per reflection, Progress.md and the figures in images/.'),
+      h('h2', {}, 'Markdown export'),
+      h('p', { class: 'hint help', style: 'margin:0' }, 'How the Markdown export lays out the zip: case notes (with each day’s notes), one note per reflection, Notes.md for undated notes, Progress.md and the figures in images/.'),
       pick('caseNotes', 'Case notes', [['month', 'One note per month'], ['day', 'One note per day']]),
       pick('folders', 'Reflection folders', [['month', 'By month (Reflections/2026-10/)'], ['heading', 'By heading'], ['flat', 'All in Reflections/']]),
       lbl('Reflection file name', h('input', { type: 'text', value: m.fileName, 'aria-label': 'Reflection file name', spellcheck: 'false', style: mono, oninput: e => { m.fileName = e.target.value; paint(); } }), 'Fill-ins: {{date}} {{initials}} {{heading}} {{title}} {{diagnosis}}. .md is added.'),

@@ -1,5 +1,5 @@
-// Recycle bin: deleted cases and reflections are kept for 30 days, then purged.
-//   logbooks/{email}/bin/{id} = { id, kind: 'case' | 'reflection', data: <the item>, deletedAt }   owner only
+// Recycle bin: deleted cases, reflections and notes are kept for 30 days, then purged.
+//   logbooks/{email}/bin/{id} = { id, kind: 'case' | 'reflection' | 'note', data: <the item>, deletedAt }   owner only
 // A binned reflection's figures stay in logbooks/{email}/images until its bin entry is purged or
 // deleted forever, so a restore brings the figures back too.
 //
@@ -9,7 +9,8 @@
 // purgeExpired()                 drop entries older than 30 days; app.js runs it once after sign-in
 // renderBin() / openBin()        the bin view (element) / the same in a dialog
 
-import { S, h, toast, modal, confirmBox, cloud, fill, removeCase, deleteMany, restoreCase, miniChips, resetters } from './ui-core.js';
+import { S, h, toast, modal, confirmBox, cloud, writes, fill, removeCase, deleteMany, restoreCase, miniChips, resetters } from './ui-core.js';
+import { cleanNote, noteTitle, MAX_NOTES } from './notepad.js';
 import { cleanCase } from './demo-backend.js';
 import { cleanReflection } from './reflections.js';
 import { REFLECTION_HEADINGS } from './categories.js';
@@ -21,7 +22,7 @@ const mine = () => S.user.email;
 
 // ---- pure helpers (node-tested) ----
 
-export const binId = (kind, id, now = Date.now()) => `${kind === 'case' ? 'c' : 'r'}_${String(id).slice(0, 60)}_${now.toString(36)}`;
+export const binId = (kind, id, now = Date.now()) => `${kind === 'case' ? 'c' : kind === 'note' ? 'n' : 'r'}_${String(id).slice(0, 60)}_${now.toString(36)}`;
 export const daysAgo = (deletedAt, now = Date.now()) => Math.max(0, Math.floor((now - deletedAt) / DAY));
 export const daysLeft = (deletedAt, now = Date.now()) => Math.max(0, Math.ceil((deletedAt + BIN_DAYS * DAY - now) / DAY));
 export const isExpired = (e, now = Date.now()) => !(Number(e.deletedAt) > now - BIN_DAYS * DAY);
@@ -32,8 +33,8 @@ export function binLabel(e, now = Date.now()) {
   return `deleted ${ago === 0 ? 'today' : ago === 1 ? '1 day ago' : ago + ' days ago'} · ${left} day${left === 1 ? '' : 's'} left`;
 }
 export function binEntry(kind, item, now = Date.now()) {
-  if (kind !== 'case' && kind !== 'reflection') throw new Error('Unknown bin kind: ' + kind);
-  const data = kind === 'case' ? cleanCase(item, item.updatedAt || now) : cleanReflection(item);
+  if (kind !== 'case' && kind !== 'reflection' && kind !== 'note') throw new Error('Unknown bin kind: ' + kind);
+  const data = kind === 'case' ? cleanCase(item, item.updatedAt || now) : kind === 'note' ? cleanNote(item, item.updatedAt || now) : cleanReflection(item);
   return { id: binId(kind, data.id, now), kind, data, deletedAt: now };
 }
 
@@ -55,6 +56,10 @@ export async function moveToBin(kind, item, extra = {}) {
   if (kind === 'case') {
     if (entries.length === 1) await removeCase(entries[0].data.id);
     else await deleteMany(entries.map(e => e.data.id));
+  } else if (kind === 'note') {
+    // through the write queue, so it works offline; the open notes list drops them at once
+    await Promise.all(entries.map(e => writes.save('note', owner, { id: e.data.id, _deleted: true }, items.find(x => x.id === e.data.id) || null)));
+    if (Array.isArray(S.notes)) { const gone = new Set(entries.map(e => e.data.id)); S.notes = S.notes.filter(n => !gone.has(n.id)); }
   } else {
     await Promise.all(entries.map(e => cloud.deleteReflection(mine(), e.data.id)));
     if (Array.isArray(S.reflections)) {
@@ -63,7 +68,7 @@ export async function moveToBin(kind, item, extra = {}) {
     }
   }
   if (extra.toast) {
-    const n = entries.length, what = kind === 'case' ? 'case' : 'reflection';
+    const n = entries.length, what = kind === 'case' ? 'case' : kind === 'note' ? 'note' : 'reflection';
     toast(`${n === 1 ? what[0].toUpperCase() + what.slice(1) : n + ' ' + what + 's'} moved to the recycle bin`, {
       action: 'Undo', onaction: () => Promise.all(entries.map(e => restoreFromBin(e.id))).catch(err => toast('Could not restore: ' + err.message)),
     });
@@ -86,6 +91,11 @@ export async function restoreFromBin(id) {
     out = { ...e.data };
     if (S.cases.some(c => c.id === out.id)) out.id = uid();
     await restoreCase(out);    // updates S.cases, the counts and the summary
+  } else if (e.kind === 'note') {
+    if (Array.isArray(S.notes) && S.notes.length >= MAX_NOTES) throw new Error(`you already have ${MAX_NOTES} notes; delete one first`);
+    out = { ...e.data };
+    if ((S.notes || []).some(n => n.id === out.id)) out.id = uid();
+    out = await writes.save('note', mine(), out, null);
   } else {
     out = { ...e.data };
     if ((S.reflections || []).some(r => r.id === out.id)) out.id = uid();
@@ -135,13 +145,15 @@ const HEADING = Object.fromEntries(REFLECTION_HEADINGS.map(x => [x.id, x.name]))
 
 function row(e) {
   const d = e.data || {};
-  const isCase = e.kind === 'case';
-  const title = isCase ? (caseText(d) || '(no details)') : (d.title || d.diagnosis || '(untitled reflection)');
+  const isCase = e.kind === 'case', isNote = e.kind === 'note';
+  const what = isCase ? 'case' : isNote ? 'note' : 'reflection';
+  const title = isCase ? (caseText(d) || '(no details)') : isNote ? noteTitle(d) : (d.title || d.diagnosis || '(untitled reflection)');
   const sub = isCase
     ? [h('span', {}, d.date ? fmtDate(d.date) : (d.dateText || 'no date')), ' ', miniChips(d.cats)]
+    : isNote ? [h('span', {}, d.date ? fmtDate(d.date) : 'No date')]
     : [h('span', {}, [HEADING[d.headingId] || d.headingId || '', d.date ? ' · ' + fmtDate(d.date) : ''].join(''))];
   return h('li', { class: 'bin-row' },
-    h('span', { class: 'bin-kind ' + e.kind, title: isCase ? 'Case' : 'Reflection' }, isCase ? 'Case' : 'Refl'),
+    h('span', { class: 'bin-kind ' + e.kind, title: what[0].toUpperCase() + what.slice(1) }, isCase ? 'Case' : isNote ? 'Note' : 'Refl'),
     h('div', { class: 'bin-main' },
       h('div', { class: 'bin-title' }, title),
       h('div', { class: 'bin-sub' }, sub),
@@ -149,11 +161,11 @@ function row(e) {
     h('div', { class: 'bin-actions' },
       h('button', { class: 'small primary', onclick: async ev => {
         ev.target.disabled = true;
-        try { await restoreFromBin(e.id); toast(isCase ? 'Case restored' : 'Reflection restored'); }
+        try { await restoreFromBin(e.id); toast(what[0].toUpperCase() + what.slice(1) + ' restored'); }
         catch (err) { ev.target.disabled = false; toast('Could not restore: ' + err.message); }
       } }, 'Restore'),
       h('button', { class: 'small danger', onclick: async () => {
-        if (!(await confirmBox('Delete forever', `Delete this ${isCase ? 'case' : 'reflection'} for good? This cannot be undone.`, 'Delete forever', true))) return;
+        if (!(await confirmBox('Delete forever', `Delete this ${what} for good? This cannot be undone.`, 'Delete forever', true))) return;
         try { await deleteForever(e.id); toast('Deleted for good'); } catch (err) { toast('Could not delete: ' + err.message); }
       } }, 'Delete forever')));
 }
@@ -163,7 +175,7 @@ export function renderBin({ title = true } = {}) {
   const list = h('div', {}, h('p', { class: 'empty' }, 'Loading…'));
   const el = h('section', { class: title ? 'card bin-view' : 'bin-view' },
     title ? h('h2', {}, 'Recycle bin') : null,
-    h('p', { class: 'hint' }, `Deleted cases and reflections are kept for ${BIN_DAYS} days, then removed for good.`),
+    h('p', { class: 'hint' }, `Deleted cases, reflections and notes are kept for ${BIN_DAYS} days, then removed for good.`),
     list);
   if (!S.user) { fill(list, h('p', { class: 'empty' }, 'Sign in to see your recycle bin.')); return el; }
   let seen = false, stop = null;

@@ -47,6 +47,21 @@ const SCREENS = [
     await p.evaluate(async () => { const { S } = await import('./js/ui-core.js'); const { editCaseDialog } = await import('./js/ui-log.js'); editCaseDialog(S.cases[0]); });
     await p.waitForSelector('dialog[open]');
   }, true],
+  ['Notes', hash('notes'), true],
+  ['Note editor', async p => {
+    await hash('notes')(p);
+    await p.getByRole('button', { name: '+ New note' }).click();
+    await p.getByLabel('Note title').fill('Fake a11y note');
+    await p.getByLabel('Note text').fill('# Fake heading\n- [ ] fake to-do\n[fake link](https://example.com)');
+    await p.waitForSelector('.note-editor');
+  }, true],
+  ['Note preview', async p => {
+    await hash('notes')(p);
+    await p.getByRole('button', { name: '+ New note' }).click();
+    await p.getByLabel('Note text').fill('# Fake heading\n- [ ] fake to-do\n- [x] fake done\n**bold** [fake link](https://example.com)');
+    await p.getByRole('button', { name: 'Preview' }).click();
+    await p.waitForSelector('.note-view:not([hidden])');
+  }, false],
   ['Reflection editor', async p => {
     await hash('reflect')(p);
     await p.evaluate(async () => { const { reflectOnCase } = await import('./js/ui-reflect.js'); await reflectOnCase({ id: 'fake-a11y', date: '2026-10-10', initials: 'ZZ', details: 'Fake case for the accessibility check', cats: ['13'] }); });
