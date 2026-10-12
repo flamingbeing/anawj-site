@@ -1196,3 +1196,6 @@ button.note-flag { cursor: pointer; font: inherit; border: 1px solid var(--edge,
 .notes-status { font-size: calc(13px * var(--fs, 1)); }
 .note-top { display: flex; align-items: center; gap: 8px; }
 .pick-cases li { grid-template-columns: 1fr !important; }
+
+/* Basic mode (settings.basic): advanced settings pages are hidden (their links); the app is otherwise the same */
+body.basic .adv-link { display: none; }

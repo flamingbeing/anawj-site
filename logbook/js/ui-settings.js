@@ -220,7 +220,7 @@ export const resetLink = (what, run) => h('p', { class: 'reset-row' }, h('button
 } }, 'Reset this page'));
 
 // a link to a settings page's own Advanced page, like a row of the More list
-export const advancedLink = (id, label, desc) => h('section', { class: 'card more-list' },
+export const advancedLink = (id, label, desc) => h('section', { class: 'card more-list adv-link' },
   h('ul', {}, h('li', {}, h('a', { href: '#' + id, 'data-go': id },
     h('span', { class: 'mt' }, h('b', {}, label), h('small', {}, desc)), h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')))));
 export const cleanTitle = s => String(s || '').replace(/[\u0000-\u001f]/g, '').replace(/\s+/g, ' ').trim().slice(0, 40);
@@ -617,6 +617,14 @@ export function renderLoggingAdvanced() {
     }));
 }
 
+// Basic mode (settings.basic, the whole account): one switch, at the top of Settings and of Show or hide
+export const basicCard = () => h('section', { class: 'card basic-card' },
+  h('label', { class: 'check', style: 'font-weight:600' }, h('input', { type: 'checkbox', role: 'switch', 'aria-label': 'Basic mode', checked: !!settings().basic,
+    onchange: e => patchLogbook({ settings: { basic: e.target.checked || null } }).then(() => { hooks.render(); toast(e.target.checked ? 'Basic mode on' : 'Basic mode off'); }) }), 'Basic mode'),
+  h('p', { class: 'hint', style: 'margin:0 0 0 28px' }, settings().basic
+    ? 'On: a simpler app. Tabs and buttons stay where they are; quick picks, the Logbook grid, search operators, Analytics trends and advanced settings are hidden. Turn it off to bring them all back.'
+    : 'A simpler app for getting started: the same tabs and buttons, without the extras (quick picks, the Logbook grid, search operators, Analytics trends, advanced settings). Your other settings are kept.'));
+
 // Settings → Show or hide: every switch that hides part of the app, grouped by area, each group with its own
 // reset. The same settings as on their own pages (Logging, Display, Reflections), gathered in one place.
 const groupReset = (what, run) => h('p', { class: 'reset-row' }, h('button', { class: 'small linkish', type: 'button', onclick: async () => {
@@ -635,6 +643,7 @@ export function renderShowHide() {
   };
   const { hidden } = arrangeTabs(BAR_TABS.map(([id]) => id), d);
   return h('div', { class: 'showhide' },
+    basicCard(),
     h('section', { class: 'card' },
       h('h2', {}, 'Show or hide'),
       h('p', { class: 'hint help', style: 'margin:0' }, 'Everything you can hide, by area. Each group has its own reset, so you can bring one area back without touching the rest. The same switches are on their own pages too.')),
