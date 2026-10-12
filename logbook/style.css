@@ -1233,8 +1233,8 @@ details.note-format ul { margin: 0 0 4px; padding-left: 18px; } details.note-for
 .note-top { display: flex; align-items: center; gap: 8px; }
 .pick-cases li { grid-template-columns: 1fr !important; }
 
-/* Basic mode (settings.basic): advanced settings pages are hidden (their links); the app is otherwise the same */
-body.basic .adv-link { display: none; }
+/* Basic mode (settings.basic): advancedLink draws a line saying the advanced page is hidden, instead of the link */
+.more-settings-note { margin: 12px 4px; }
 
 /* reflection formatting buttons (Settings → Reflections, this device) */
 .fmt-bar { display: flex; gap: 6px; margin: 0 0 4px; }

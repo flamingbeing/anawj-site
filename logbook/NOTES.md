@@ -277,8 +277,9 @@ portfolio content.
 - **Basic mode** (`settings.basic`, the whole account; `basicMode()` in `ui-core.js`; a switch at the top of Settings
   and of Show or hide; body class `basic`): a simpler app for new residents. Same tabs and buttons in the same places;
   hidden: every optional Case tab part but "what the box was read as" (quick picks, ☆, Still needed, tag group saving,
-  Plan for later), the Logbook Grid view and search operators, Analytics Trends, the Advanced display / logging links,
-  the settings file and Connect Claude cards. It changes no other setting, so off brings everything back. e2e:
+  Plan for later), the Logbook Grid view and search operators, Analytics Trends, the Advanced display / logging links
+  (`advancedLink` draws "… are hidden while Basic mode is on. Turn off Basic mode ›" instead, from the setting itself:
+  a silently missing link looked like a bug to the owner, Oct 2026), the settings file and Connect Claude cards. It changes no other setting, so off brings everything back. e2e:
   `simpler.mjs`.
 - **One spreadsheet (CSV)** (Backup card, "Download as one spreadsheet"; `backup-csv.js`, tested; Oct 2026, from
   Codex's list): the backup as one CSV for Excel: a `logbook` row (settings, tag groups, portfolio details) then a row
@@ -393,6 +394,10 @@ portfolio content.
 - Owner preferences (merging, screenshots, planning, new options): see "Working with the owner" in `AGENTS.md`.
   Logbook calls so far: no tag renames (APMES tag names stay), no raw regex, no swipe actions on cases, no tag
   numbers on screen, no What's new, frictionless logging first.
+- **Ad blockers hide class names on their lists** (Oct 2026): EasyList (uBlock Origin etc., common on Firefox for
+  Android; Chrome on Android has no add-ons) has `##.adv-link`, so the Advanced settings links vanished on the owner's
+  Firefox while Chrome showed them. Avoid ad-like class and id names (adv-, ad-, advert, banner-ad, sponsor…); when
+  something is missing on one browser only, check https://easylist.to/easylist/easylist.txt for its class first.
 - Learned in Oct 2026 (Claude Code session, PRs #133–#152):
   - How a new option is built here: per device (`DISPLAY_KEYS`, html classes from `applyLook`, first paint in
     index.html) unless it belongs to the account; "Reset this page" and the settings file must cover it; defaults
