@@ -48,6 +48,9 @@ Last updated: 2026-10-12 by Claude Code "Logbook code editing" session.
 
 ## Decisions log
 
+- 2026-10-12: The local Firestore emulator (fake accounts, demo project) may be used without asking; signing in to
+  or touching the live projects still needs the owner's OK. One-command checks: `tools/test-logbook.sh`, `tools/test-rules.sh`.
+- 2026-10-12: Owner working preferences moved to AGENTS.md "Working with the owner" (all apps, Claude and Codex).
 - 2026-10-12: The owner approved building Codex's remaining list (Show or hide, Basic mode, CSV, formatting buttons)
   and merging each without asking, once tests pass.
 - 2026-10-12: Never run Codex, or use the Firebase plugin / CLI, without the owner's OK in that session (CLAUDE.md).

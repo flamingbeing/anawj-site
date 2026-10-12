@@ -360,26 +360,20 @@ portfolio content.
   logbook (`demo-seed.js`); counts in the steps start from those six. Navigation goes through the `tab()`
   helper: Settings pages (`display`, `logging`, `tags`, `reflset`, `sharefmt`, `bin` = the Recycle bin dialog),
   `data` (Export / Import), `totals` (by hash, under Analytics). On a wide screen the Case tab is two panes.
-- Owner preferences: merge your own PRs once unit tests and e2e pass, then report. Exception: a Claude Code ↔
-  Codex handover PR waits for the owner's explicit approval (see the handover skill once it is on main). The owner may say
-  "no e2e yet": then only unit tests and quick browser checks. Show phone screenshots of UI changes. When the
-  owner asks "should we / can we", answer and propose; for multi-part changes say the plan first and wait when
-  asked ("let me know what you are going to do"). Owner's calls so far: no tag renames (APMES tag names stay),
-  no raw regex, no swipe actions, no tag numbers on screen, no What's new, frictionless logging first.
+- Owner preferences (merging, screenshots, planning, new options): see "Working with the owner" in `AGENTS.md`.
+  Logbook calls so far: no tag renames (APMES tag names stay), no raw regex, no swipe actions on cases, no tag
+  numbers on screen, no What's new, frictionless logging first.
 - Learned in Oct 2026 (Claude Code session, PRs #133–#152):
-  - The owner plans in batches: collect the list, agree it, then build PR by PR (each merged before the next).
-    When Codex is busy, plan only; never merge into an area Codex owns. A Codex PR based on an older main conflicts
-    with yours: merge it through your own branch with one merge commit (GitHub then marks it merged), never push
-    to Codex's branch.
-  - New options are per device (`DISPLAY_KEYS`, html classes from `applyLook`, first paint in index.html) unless
-    they belong to the account; default off; "Reset this page" and the settings file must cover them; defaults
+  - How a new option is built here: per device (`DISPLAY_KEYS`, html classes from `applyLook`, first paint in
+    index.html) unless it belongs to the account; "Reset this page" and the settings file must cover it; defaults
     must stay pixel-identical (screenshot-diff a worktree of origin/main served on another port).
   - Everyday choices on a settings page, the rest on its Advanced page (`#displayadv`, `#loggingadv`, `#adminadv`).
   - Watch for `.bar .grow { min-width: 160px }`: it wraps toolbars on phones (Unlink, Save / Retry). Buttons centre
     their content (`justify-content: center`), which shifted calendar days.
   - Show only what helps: owner prefers a ✓ on rows over calendar badges, small text over cards for guidance.
-  - The e2e also has Codex's `recovery.mjs` and `usability.mjs`, `cloud-save.mjs`, `notepad.mjs`, `tag-editor.mjs`
-    and `simpler.mjs`: run all of them before merging.
+  - All the logbook checks in one go: `tools/test-logbook.sh` (repo check, unit tests, full e2e, and the focused
+    runners recovery / usability / cloud-save / notepad / tag-editor / simpler; `quick` skips the full e2e). Add new
+    focused runners to it. Rules: `tools/test-rules.sh` (emulator, fake accounts, both suites).
   - Accessibility: `test/e2e/a11y.mjs` (axe-core 4.13.0, pinned in `tools/vendor/axe.min.js`, MPL-2.0; WCAG 2.2 A/AA)
     is **not** one of those (owner: not on every e2e). Run it after UI changes or before a release, about 75 s:
     every screen plus the edit-case dialog and reflection editor in light at phone and desk sizes, dark on the main
