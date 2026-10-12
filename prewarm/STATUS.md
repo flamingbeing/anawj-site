@@ -7,9 +7,10 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 ## Now
 
 - **Claude Code, Prewarming Webapp** (branch `ccr-13264f37-d28edu`): bug hunt from 17:53 UTC 12 Oct 2026 (owner: at
-  least 2 hours, anything that makes a missed variable likelier). Merged so far #257, #259, #261 (below). Ideas not yet
-  done: duplicate Subject IDs across phones (home-list warning), sync / offline edge cases, Word form gaps
-  (screen_id, op date, nd_* items have no place on the form). The owner and their MO start real patients 13 Oct 2026.
+  least 2 hours, anything that makes a missed variable likelier). Merged so far #257 #259 #261 #263 #265. Still to do:
+  duplicate Subject IDs across phones (warn on the home list), storage-full warning hidden by the "saved" toast,
+  "All but latest" lock could catch a second active patient (advise the owner not to lock during the study day),
+  existing sync-test flake (wrong WH join link sometimes says "Not allowed"). Real patients start 13 Oct 2026.
 
 ## Waiting on the owner
 
@@ -25,6 +26,8 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 
 ## Recently done
 
+- #265: sync heals the server's last-write to the newest value; edits before sign-in resent; Save sends only changes and asks before overwriting the other phone's reading; clearing a time asks.
+- #263: typed form answers checked; due alerts on every patient screen for every series; screen kept awake after app switches.
 - #261: blank readings not saved, part-blank asks; Still to fill lists saved-with-blanks and columns hidden in Settings.
 - #259: hidden follow-ups not exported, nested follow-ups hide, BMI worked out, NA warming start (no pre-warming), Subject ID / group correctable.
 - #257: update reload asks before losing a reading; stray key-time taps ask; times out of order flagged.
