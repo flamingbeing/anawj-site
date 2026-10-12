@@ -1,0 +1,68 @@
+rules_version = '2';
+
+// Prewarming study (Firebase project prewarm-study). Deployed by the "Deploy Firestore rules" workflow on merge to main.
+//
+// Who:
+//   members/{uid}   a phone that joined with its hospital's code (anonymous sign-in): { site, initials, code, joinedAt }
+//   admins/{email}  owner and investigators, signed in with Google (the owner adds the first one in the console)
+//   codes/{site}    each hospital's join code: { code, setAt, setBy }; only admins read or change it
+// Data:
+//   patients/{id}   { site, created, deleted?, f: { fieldId: { v, t, by, auto? } } }
+//                   members read and write their own hospital's patients; admins all of them.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function sites() { return ['NTF', 'NUH', 'SGH', 'CGH', 'TTSH', 'KTPH', 'WH']; }
+    function signedIn() { return request.auth != null; }
+    function email() { return request.auth.token.email.lower(); }
+    function admin() {
+      return signedIn() && request.auth.token.get('email_verified', false) == true
+        && exists(/databases/$(database)/documents/admins/$(email()));
+    }
+    function memberDoc() { return /databases/$(database)/documents/members/$(request.auth.uid); }
+    function member() { return signedIn() && exists(memberDoc()); }
+    function memberSite() { return get(memberDoc()).data.site; }
+    function canUse(site) { return admin() || (member() && memberSite() == site); }
+
+    match /admins/{adminEmail} {
+      // a Google user may check whether they are an admin; admins manage the list
+      allow get: if signedIn() && request.auth.token.get('email', '') != '' && adminEmail == email();
+      allow read, write: if admin();
+    }
+
+    match /codes/{site} {
+      allow read: if admin();
+      allow write: if admin() && site in sites()
+        && request.resource.data.keys().hasOnly(['code', 'setAt', 'setBy'])
+        && request.resource.data.code is string && request.resource.data.code.size() >= 6 && request.resource.data.code.size() <= 40;
+    }
+
+    match /members/{uid} {
+      // joining: only with the hospital's current code
+      allow create: if signedIn() && uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['site', 'initials', 'code', 'joinedAt'])
+        && request.resource.data.site in sites()
+        && request.resource.data.initials is string && request.resource.data.initials.size() <= 6
+        && exists(/databases/$(database)/documents/codes/$(request.resource.data.site))
+        && request.resource.data.code == get(/databases/$(database)/documents/codes/$(request.resource.data.site)).data.code;
+      // a member may change only their initials, and may leave
+      allow update: if signedIn() && uid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['initials'])
+        && request.resource.data.initials is string && request.resource.data.initials.size() <= 6;
+      allow get, delete: if signedIn() && uid == request.auth.uid;
+      allow read, delete: if admin();
+    }
+
+    match /patients/{pid} {
+      function shape(d) {
+        return d.keys().hasOnly(['site', 'created', 'deleted', 'f'])
+          && d.site in sites() && d.f is map && d.f.size() <= 900
+          && d.created is number && (!('deleted' in d) || d.deleted is number);
+      }
+      allow read: if canUse(resource.data.site);
+      allow create: if canUse(request.resource.data.site) && shape(request.resource.data);
+      allow update: if canUse(resource.data.site) && shape(request.resource.data)
+        && request.resource.data.site == resource.data.site;
+      allow delete: if admin();
+    }
+  }
+}

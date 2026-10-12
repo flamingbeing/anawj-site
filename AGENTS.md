@@ -18,7 +18,7 @@ Static site on GitHub Pages (public repo: no names, patient data or real evaluat
 Rules that bite:
 
 - `logbook/firestore.rules` is the one rules file for both logbook and evals (Firebase project `apmes-logbook`). It deploys automatically on merge to main; never ask the owner to paste rules.
-- `nuh-roster/firestore.rules` (Firebase project `nuh-roster`) deploys the same way.
+- `nuh-roster/firestore.rules` (Firebase project `nuh-roster`) and `prewarm/firestore.rules` (project `prewarm-study`) deploy the same way.
   How: `.github/workflows/deploy-firestore-rules.yml` deploys a changed file to its project on merge to main
   (check the "Deploy Firestore rules" run in Actions). It compiles the rules first, so a syntax error fails the run
   and leaves the live rules as they were. It signs in with the `FIREBASE_SERVICE_ACCOUNT` secret (service account
@@ -38,7 +38,7 @@ for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mj
 
 - Logbook changes: `tools/test-logbook.sh` runs all of the above plus the full e2e and every focused browser test
   (about 10 min; `quick` skips the full e2e). Its portfolio-template steps use `apmes/templates/portfolio-template-blank.docx`. After UI changes also run `node logbook/test/e2e/a11y.mjs` (accessibility).
-- Rules changes (`logbook/firestore.rules`): `tools/test-rules.sh` runs the logbook and evals rules suites in the
+- Rules changes (`logbook/firestore.rules`, `prewarm/firestore.rules`): `tools/test-rules.sh` runs the logbook, evals and prewarm rules suites in the
   local emulator (fake accounts, demo project; no sign-in, never the live projects).
 - Evals UI changes: also run the e2e test (see `evals/README.md`).
 - Prewarming UI changes: also run `node prewarm/test/e2e.mjs` (see `prewarm/README.md`).

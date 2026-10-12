@@ -17,4 +17,18 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
 - **Entry screen:** option B ("change what moved"): values carry over from the last saved timepoint; + / − nudges;
   tap the number to type ("365" → 36.5). Hidden readings (Settings) stay blank.
 - **Alerts** only work while the app is open; locked-phone alerts would need push notifications.
+- **Sharing** (`js/cloud.js`, `firestore.rules`, Firebase project `prewarm-study`):
+  - Phones join with their hospital's code (anonymous sign-in); the rules accept a `members/{uid}` entry only with that
+    hospital's current code. Members read and write only their hospital's patients. A new code stops new joins with
+    the old one; phones already in stay in until an admin removes them.
+  - Admins sign in with Google; `admins/{email}` (lower-case email) lists them. The first admin is added by hand in the
+    Firebase console; after that admins can add others there. Admins see every hospital, make codes, remove phones.
+  - Each patient is one document; each field is merged on its own (`f.<id>: {v, t, by}`), newest edit wins when
+    copies meet. localStorage stays the phone's working copy; Firestore keeps its own offline cache and sends when
+    there is signal.
+  - Membership is checked on the server, not the local cache (a refused join briefly shows in the cache).
+  - Remote changes redraw the list, patient and form-view screens; on reading and form screens a bar offers to show
+    them, so a half-entered reading is never lost.
+- **Testing sharing:** `tools/test-rules.sh` (rules, 52 checks) and `tools/test-prewarm-sync.sh` (two phones in a
+  browser against the local Firestore and Auth emulators, `?emulator` on localhost only). Never the live project.
 - Changing any file in `sw.js` SHELL means bumping `VERSION`.
