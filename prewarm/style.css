@@ -127,11 +127,11 @@ details.sect > .stack { margin-top: 4px; }
 .tchip b { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--muted); }
 .tchip.set { border: 1px solid transparent; background: var(--chip); }
 .tchip.set span { color: var(--navy); } .tchip.set b { color: var(--ink); }
-/* gown and Bair Hugger times: light grey until tapped (labels 5.9:1), warm beige once set (labels 5.9:1) */
+/* gown and Bair Hugger times: light grey until tapped (labels 5.9:1), lavender once set (labels 8:1); amber, orange and red are kept for timing alarms only */
 .tchip.warm { background: #e6e6e6; }
 .tchip.warm span, .tchip.warm b { color: #50565c; }
-.tchip.warm.set { background: #efe2d2; border-color: transparent; }
-.tchip.warm.set span { color: #7a4a00; } .tchip.warm.set b { color: var(--ink); }
+.tchip.warm.set { background: #ebe5f7; border-color: transparent; }
+.tchip.warm.set span { color: #4f2f86; } .tchip.warm.set b { color: var(--ink); }
 .tchip.warm.edit:not(.set) { background: var(--card); }
 .tchip.edit { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; border: 1px solid var(--navy); color: var(--ink); }
 .tchip.edit input { width: auto; flex: 1; padding: 4px 6px; }
@@ -344,7 +344,7 @@ dialog.ask p { margin: 0 0 6px; }
 .askbtns button { min-height: var(--tap); }
 
 /* what's still missing (patient screen, above Mark data collection as complete) */
-.gaps { margin-top: 12px; padding: 10px 12px; border: 1px solid var(--warn); border-radius: var(--r-card); background: var(--warn-soft); color: var(--ink); font-size: 14px; }
-.gaps b { color: var(--warn); }
+.gaps { margin-top: 12px; padding: 10px 12px; border: 1px solid var(--line); border-left: 4px solid var(--navy); border-radius: var(--r-card); background: var(--card); color: var(--ink); font-size: 14px; }
+.gaps b { color: var(--navy); }
 .gaps ul { margin: 4px 0 0; padding-left: 18px; display: grid; gap: 4px; }
-.gaps a { color: var(--warn); font-weight: 600; }
+.gaps a { color: var(--navy); font-weight: 600; }
