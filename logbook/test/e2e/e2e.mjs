@@ -1755,7 +1755,7 @@ async function run(label, ctxOpts) {
       await until(async () => await nCases() === n + 1, `${mode}: extra Enter did not save`);
       const c = (await stored()).find(c => c.initials === initials);
       assert(c && expected.every(code => c.cats.includes(code)), `${mode}: suggested tags missing`);
-      assert((await ta.inputValue()) === '', `${mode}: box not cleared`);
+      await until(async () => (await ta.inputValue()) === '', `${mode}: box not cleared`);
     }
     await configure('single');
     let ta = p.locator('textarea.details');

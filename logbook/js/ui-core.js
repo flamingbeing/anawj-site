@@ -5,8 +5,9 @@ import { tagSetOf, tagTree, flatTree, userCatNames, tagName as tagNameIn, tagLin
 import { countCases, uid, todayISO, sortCodes, progress, rYearDefault, academicYear, splitInitials, cleanInitials } from './engine.js';
 import * as cloud from './cloud.js';
 import { reflectionCounts } from './reflections.js';
+import { writes } from './writes.js';
 
-export { cloud };
+export { cloud, writes };
 
 // ---------- state ----------
 
@@ -72,10 +73,18 @@ export const myYearName = () => (S.resident && S.resident.status === 'SMO' ? 'SM
 export const displayName = () => (S.logbook && S.logbook.name) || (S.resident && S.resident.name) || (S.user && S.user.name) || '';
 
 export function setCases(cases) {
-  S.cases = [...cases].sort(byNewest);
+  rawCases = cases;
+  S.cases = writes.overlay('case', S.user?.email, cases).sort(byNewest);
   S.counts = countCases(S.cases);
   S.casesLoaded = true;
 }
+let rawCases = [];
+writes.configure({ backend: cloud.commitRecord, getOwner: () => S.user?.email || null });
+writes.onChange(() => {
+  if (!S.user) return;
+  if (S.casesLoaded) { setCases(rawCases); hooks.casesChanged?.(); }
+  hooks.writesChanged?.();
+});
 export const byNewest = (a, b) => (b.date || '0').localeCompare(a.date || '0') || (b.createdAt || 0) - (a.createdAt || 0);
 
 // ---------- tiny DOM helper (as in nuh-roster) ----------
@@ -306,35 +315,36 @@ export function keepTags(tags, cats) {
 export const tagChip = (key, { onclick, on = true } = {}) => h('span', { class: `chip tag ${on ? 'on' : ''}`, role: 'button', tabindex: '0', 'data-tag': key, title: 'Your tag', onclick,
   onkeydown: e => { if ((e.key === 'Enter' || e.key === ' ') && onclick) { e.preventDefault(); onclick(e); } } }, h('span', { class: 'nm' }, tagName(key)), onclick && on ? h('span', { class: 'x', 'aria-label': 'remove' }, '×') : null);
 
-export async function createCase({ date, details, initials, cats, source = 'app', dateText, reflectTag = false, tags = [] }) {
+export async function createCase({ id, createdAt, date, details, initials, cats, source = 'app', dateText, reflectTag = false, tags = [] }) {
   const now = Date.now();
   const parts = initials == null ? splitInitials(details) : { initials: cleanInitials(initials), details: String(details || '').trim() };
-  const c = { id: uid(), date: date || null, initials: parts.initials, details: parts.details, cats: sortCodes(cats), createdAt: now, updatedAt: now, source };
+  const c = { id: id || uid(), date: date || null, initials: parts.initials, details: parts.details, cats: sortCodes(cats), createdAt: createdAt || now, updatedAt: now, source };
   if (!date && dateText) c.dateText = dateText;
   if (reflectTag) c.reflectTag = true;
   const kept = keepTags(tags, c.cats);
   if (kept.length) c.tags = kept;
-  applyLocal(list => [c, ...list]);
-  cloud.saveCase(mine(), c).catch(err => toast('Could not save: ' + err.message));
-  return c;
+  const saved = await writes.save('case', mine(), c, null);
+  applyLocal(list => [saved, ...list.filter(x => x.id !== saved.id)]);
+  return saved;
 }
 
-export async function updateCase(c) {
+export async function updateCase(c, { base = S.cases.find(x => x.id === c.id) || null } = {}) {
   const next = { ...c, cats: sortCodes(c.cats), updatedAt: Date.now() };
   if (next.date) delete next.dateText;
-  applyLocal(list => list.map(x => (x.id === c.id ? next : x)));
-  cloud.saveCase(mine(), next).catch(err => toast('Could not save: ' + err.message));
-  return next;
+  const saved = await writes.save('case', mine(), next, base);
+  applyLocal(list => list.map(x => (x.id === c.id ? saved : x)));
+  return saved;
 }
 
 export async function removeCase(id) {
+  const base = S.cases.find(x => x.id === id) || null;
+  await writes.save('case', mine(), { id, _deleted: true }, base);
   applyLocal(list => list.filter(x => x.id !== id));
-  cloud.deleteCase(mine(), id).catch(err => toast('Could not delete: ' + err.message));
 }
 
-export async function restoreCase(c) {
-  applyLocal(list => [c, ...list.filter(x => x.id !== c.id)]);
-  cloud.saveCase(mine(), c).catch(err => toast('Could not restore: ' + err.message));
+export async function restoreCase(c, base = S.cases.find(x => x.id === c.id) || null) {
+  const saved = await writes.save('case', mine(), c, base);
+  applyLocal(list => [saved, ...list.filter(x => x.id !== c.id)]);
 }
 
 export async function saveMany(cases) {

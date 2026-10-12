@@ -16,6 +16,7 @@
 //   sharedTemplates/{id}                  { id, name, cats, details? }
 
 import { FIREBASE_CONFIG } from './firebase-config.js';
+import { checkWrite } from './recovery-store.js';
 import * as D from './demo-backend.js';
 import { cleanProfile } from './profile.js';
 import { plain, cleanCase, cleanSummary, cleanResident, cleanTemplate, importDocId, defaultLogbook, cleanReflection, cleanImage, cleanCategoryNames, cleanSubmission } from './demo-backend.js';
@@ -277,6 +278,30 @@ export async function saveCase(email, c) {
   const doc = cleanCase(c);
   await queued(F.setDoc(F.doc(db, 'logbooks', lc(email), 'cases', doc.id), doc));
   return doc;
+}
+
+// The recovery queue supplies durable offline storage. On reconnect, a transaction
+// checks the version the editor started from before replacing an existing record.
+// No new document fields/permissions are needed; history remains private to this device.
+export async function commitRecord(email, kind, input, base) {
+  const collection = kind === 'case' ? 'cases' : 'reflections';
+  const deleted = input._deleted === true;
+  const doc = deleted ? { id: input.id, _deleted: true } : kind === 'case' ? cleanCase(input) : cleanReflection(input);
+  if (demo) {
+    const list = kind === 'case' ? await D.listCases(email) : D.reflectionsOf(lc(email));
+    const current = list.find(x => x.id === doc.id) || null;
+    if (!checkWrite(current, deleted ? null : doc, base)) return doc;
+    if (deleted) { await (kind === 'case' ? D.deleteCase(email, doc.id) : D.deleteReflection(email, doc.id)); return doc; }
+    return kind === 'case' ? D.saveCase(email, doc) : D.saveReflection(email, doc);
+  }
+  const { db, F } = await sdk();
+  const ref = F.doc(db, 'logbooks', lc(email), collection, doc.id);
+  return F.runTransaction(db, async tx => {
+    const snap = await tx.get(ref);
+    const current = snap.exists() ? { ...snap.data(), id: snap.id } : null;
+    if (!checkWrite(current, deleted ? null : doc, base)) return doc;
+    if (deleted) tx.delete(ref); else tx.set(ref, doc); return doc;
+  });
 }
 
 export async function deleteCase(email, id) {

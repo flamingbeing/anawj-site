@@ -1,6 +1,9 @@
 // Run with: node logbook/test/bin.test.mjs  (demo backend, fake data only)
 import assert from 'node:assert/strict';
 globalThis.location = { search: '?demo' };
+// Device recovery storage: explicit in-memory browser adapter for this Node test.
+const device = new Map();
+globalThis.localStorage = { getItem: k => device.get(k) || null, setItem: (k,v) => { device.set(k,String(v)); Object.defineProperty(localStorage,k,{value:String(v),configurable:true,enumerable:true}); }, removeItem: k => { device.delete(k); delete localStorage[k]; } };
 const cloud = await import('../js/cloud.js');
 const { resetDemo, DEMO_USER } = await import('../js/demo-backend.js');
 const { S, setCases, resetCaches } = await import('../js/ui-core.js');
