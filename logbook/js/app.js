@@ -395,28 +395,62 @@ let lastRendered = '';
 hooks.render = render;
 hooks.paintTabs = () => paintTabs();
 
-// Advanced display → Swipe left or right to change tab (off by default; html.swipe-tabs): a quick, mostly sideways
-// swipe on a bar tab's page moves to the next or previous tab on the bar. Never from fields, dialogs, the tag pills
-// being dragged, or anything that scrolls sideways (tables, the date chips), and never on pages under a tab.
+// Swipe left or right to change tab (Advanced display, and Show or hide → Header and tabs; on unless switched off on
+// this device: html.swipe-tabs). The page follows the finger; letting go after a quick swipe (≥ 70 px, mostly
+// sideways, < 0.7 s) or past a third of the screen moves to the next or previous tab on the bar, and the new page
+// slides in. A sub-page counts as the bar tab it sits under. Never from fields, dialogs, drag handles, the tag pills
+// being dragged, anything that scrolls sideways (tables, the date chips) or the screen's edges (the phone's own Back
+// gesture). Reduce motion: no sliding, it just switches.
 let swipe = null;
 const scrollsSideways = el => { for (let n = el; n && n !== document.body; n = n.parentElement) if (n.scrollWidth > n.clientWidth + 2 && /auto|scroll/.test(getComputedStyle(n).overflowX)) return true; return false; };
+const reduceMotion = () => { const c = document.documentElement.classList; return c.contains('rm') || (c.contains('rm-auto') && matchMedia('(prefers-reduced-motion: reduce)').matches); };
+// the bar tab a page sits under, however deep; a tab kept off the bar (Notes) counts as More
+function barTabOf(id) {
+  let cur = TABS.find(t => t.id === id);
+  while (cur && cur.under) cur = TABS.find(t => t.id === cur.under);
+  const sel = cur ? cur.id : id;
+  const { shown } = arrangeTabs(visibleTabs().filter(t => !t.hidden).map(t => t.id), display());
+  return { shown, sel: shown.includes(sel) ? sel : 'more' };
+}
+const swipeTarget = dx => { const { shown, sel } = barTabOf(S.tab), i = shown.indexOf(sel); return i < 0 ? null : shown[i + (dx < 0 ? 1 : -1)] || null; };
+const slide = (x, ms) => { document.documentElement.classList.toggle('swiping', !!x); app.style.transition = ms ? `transform ${ms}ms ease-out, opacity ${ms}ms ease-out` : 'none'; app.style.transform = x ? `translateX(${x}px)` : ''; app.style.opacity = x ? String(Math.max(.4, 1 - Math.abs(x) / innerWidth)) : ''; };
+const settle = () => { document.documentElement.classList.remove('swiping'); app.style.transition = ''; app.style.transform = ''; app.style.opacity = ''; };
 app.addEventListener('touchstart', e => {
   swipe = null;
   if (!document.documentElement.classList.contains('swipe-tabs') || e.touches.length !== 1) return;
-  const t = e.target;
+  const t = e.target, x = e.touches[0].clientX;
+  if (x < 20 || x > innerWidth - 20) return;
   if (t.closest('input, textarea, select, dialog, [contenteditable], .dragging, .te-pillitem, .te-handle, .refl-handle, li.refl-row.edit') || scrollsSideways(t)) return;
-  swipe = { x: e.touches[0].clientX, y: e.touches[0].clientY, at: Date.now() };
+  swipe = { x, y: e.touches[0].clientY, at: Date.now(), lock: '' };
 }, { passive: true });
+app.addEventListener('touchmove', e => {
+  const s = swipe;
+  if (!s || e.touches.length !== 1) return;
+  const dx = e.touches[0].clientX - s.x, dy = e.touches[0].clientY - s.y;
+  if (!s.lock) {
+    if (Math.abs(dy) > 10 && Math.abs(dy) * 2 > Math.abs(dx)) { swipe = null; return; }   // scrolling: leave it alone
+    if (Math.abs(dx) > 10 && Math.abs(dx) > 2 * Math.abs(dy)) s.lock = 'x'; else return;
+  }
+  e.preventDefault();   // sideways now: the page follows the finger (held back where there's no tab to go to)
+  if (!reduceMotion()) slide(swipeTarget(dx) ? dx : dx / 4, 0);
+}, { passive: false });
+app.addEventListener('touchcancel', () => { if (swipe && swipe.lock) slide(0, 150); swipe = null; }, { passive: true });
 app.addEventListener('touchend', e => {
   const s = swipe; swipe = null;
   if (!s || !e.changedTouches.length) return;
   const dx = e.changedTouches[0].clientX - s.x, dy = e.changedTouches[0].clientY - s.y;
-  if (Date.now() - s.at > 700 || Math.abs(dx) < 70 || Math.abs(dx) < 2 * Math.abs(dy)) return;
-  const bar = arrangeTabs(visibleTabs().filter(t => !t.hidden).map(t => t.id), display()).shown;
-  const i = bar.indexOf(S.tab);
-  if (i < 0) return;
-  const next = bar[i + (dx < 0 ? 1 : -1)];
-  if (next) go(next);
+  const quick = Date.now() - s.at <= 700 && Math.abs(dx) >= 70 && Math.abs(dx) >= 2 * Math.abs(dy);
+  const far = s.lock === 'x' && Math.abs(dx) > innerWidth / 3;
+  const next = (quick || far) && swipeTarget(dx);
+  if (!next) { if (s.lock) slide(0, 150); return; }
+  if (reduceMotion()) { settle(); go(next); return; }
+  const w = dx < 0 ? -innerWidth : innerWidth;
+  slide(w, 140);
+  setTimeout(async () => {
+    await go(next);
+    slide(-w / 3, 0);   // the new page comes in from the other side
+    requestAnimationFrame(() => requestAnimationFrame(() => { slide(0, 160); setTimeout(settle, 180); }));
+  }, 140);
 }, { passive: true });
 
 // A live case update shouldn't yank the screen from under someone typing: the Log screen refreshes
@@ -455,7 +489,7 @@ function paintWho() {
     : S.casesSynced ? h('span', { class: 'sync ok', title: 'All your cases are saved to the server' }, '✓ Synced') : null;
   subEl.textContent = flags;   // kept (hidden) for tests
   // a hidden header (Settings → Display) shows again while there is something to say: not synced, offline, demo, signed out
-  document.documentElement.classList.toggle('who-alert', !S.user || cloud.demo || !navigator.onLine || !!S.pending);
+  document.documentElement.classList.toggle('who-alert', !S.user || !navigator.onLine || !!S.pending);
   if (!S.user) { fill(whoEl, flag); return; }
   document.body.dataset.cases = String(S.cases.length);   // not shown; read by tests
   fill(whoEl, sync, flag, h('span', { class: 'email', title: S.user.email }, S.user.name || S.user.email));
@@ -736,17 +770,19 @@ addEventListener('keydown', e => {
 if (cachedCompact()) document.body.classList.add('compact');   // first paint; corrected once the logbook loads
 paintWho();
 // Demo: what it is, Reset and Leave (from the header badge)
+// Reset demo (the demo badge's menu, and the link by Sign out on More): asks first, then starts again
+async function resetDemo() {
+  if (!(await confirmBox('Reset demo', 'Delete everything you added in the demo (cases, reflections, images, settings) and start again with the made-up data? The uploaded portfolio template is kept.', 'Reset', true))) return;
+  clearDrafts(); resetCaches(); forgetWho(); resetDisplay(); applyCompact(false); applyTextSize('1'); applyAccent(null);
+  cloud.resetDemo();
+  location.reload();
+}
+hooks.resetDemo = resetDemo;
 function demoMenu() {
   const m = modal('Demo', [
     h('p', {}, 'Made-up data, stored only in this browser. Try anything: nothing is sent anywhere.'),
     h('div', { class: 'bar', style: 'margin-top:12px;flex-wrap:wrap' },
-      h('button', { class: 'danger', onclick: async () => {
-        await m.close();
-        if (!(await confirmBox('Reset demo', 'Delete everything you added in the demo (cases, reflections, images, settings) and start again with the made-up data? The uploaded portfolio template is kept.', 'Reset', true))) return;
-        clearDrafts(); resetCaches(); forgetWho(); resetDisplay(); applyCompact(false); applyTextSize('1'); applyAccent(null);
-        cloud.resetDemo();
-        location.reload();
-      } }, 'Reset demo'),
+      h('button', { class: 'danger', onclick: async () => { await m.close(); resetDemo(); } }, 'Reset demo'),
       h('a', { href: location.pathname, class: 'btn' }, 'Leave demo'),
       h('span', { class: 'grow' }),
       h('button', { onclick: () => m.close() }, 'Close'))]);

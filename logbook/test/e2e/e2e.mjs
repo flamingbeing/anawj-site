@@ -1698,7 +1698,7 @@ async function run(label, ctxOpts) {
 
   await step('optional: ⋯ menu on Logbook rows; swipe between tabs (not from the case box)', async () => {
     await tab('displayadv');
-    await p.getByLabel('Swipe left or right to change tab').check();
+    assert(await p.getByLabel('Swipe left or right to change tab').isChecked(), 'swipe between tabs not on by default');
     await p.getByLabel('Fewer buttons on Logbook rows (a ⋯ menu)').check(); await nap(150);
     try {
       await tab('logbook'); await lbList();
@@ -1717,10 +1717,41 @@ async function run(label, ctxOpts) {
       await tab('log'); await p.waitForSelector('textarea.details');
       await swipe(300, 100, 'textarea.details'); await nap(300);
       assert(/#log$/.test(p.url()), 'a swipe in the case box changed tab');
+      // a page under a tab counts as that tab: Settings → Display is under More, so a swipe right goes to Analytics
+      await tab('display');
+      await swipe(100, 300, 'main .back-row'); await p.waitForURL(/#progress$/);
+      await until(async () => !(await p.locator('main#app').evaluate(el => el.style.transform)), 'page left mid-slide');
+      // switched off: no change of tab
+      await tab('displayadv');
+      await p.getByLabel('Swipe left or right to change tab').uncheck(); await nap(150);
+      await tab('logbook');
+      await swipe(300, 100, 'main section.card'); await nap(400);
+      assert(/#logbook$/.test(p.url()), 'swiped with the switch off');
     } finally {
       await tab('displayadv');
-      await p.getByLabel('Swipe left or right to change tab').uncheck();
+      await p.getByLabel('Swipe left or right to change tab').check();
       await p.getByLabel('Fewer buttons on Logbook rows (a ⋯ menu)').uncheck();
+    }
+  });
+
+  await step('page width Full; the demo: header can hide, Leave / Reset demo by Sign out', async () => {
+    await tab('displayadv');
+    const width = p.locator('select[aria-label="Page width"]');
+    await width.selectOption('full'); await nap(150);
+    try {
+      assert(await p.evaluate(() => document.documentElement.classList.contains('lw-full')), 'Full page width not applied');
+      await p.getByLabel('Hide the header (the app name bar)').check(); await nap(150);
+      await tab('more');
+      await until(async () => !(await p.locator('header.top').isVisible()), 'header still shown in the demo');
+      assert(await p.locator('main a.btn', { hasText: 'Leave demo' }).count() === 1, 'no Leave demo by Sign out');
+      assert(await p.locator('main button', { hasText: 'Reset demo' }).count() === 1, 'no Reset demo link by Sign out');
+      await p.locator('main button', { hasText: 'Reset demo' }).click();
+      await p.locator('dialog[open]').getByRole('button', { name: 'Cancel' }).click(); await nap(150);
+      await shot3('more-demo-no-header');
+    } finally {
+      await tab('displayadv');
+      await p.getByLabel('Hide the header (the app name bar)').uncheck();
+      await p.locator('select[aria-label="Page width"]').selectOption('normal'); await nap(150);
     }
   });
 
