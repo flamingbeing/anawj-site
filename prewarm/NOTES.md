@@ -78,6 +78,8 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
 - **Due time warms up** (owner, 12 Oct 2026): the "due hh:mm" beside each timepoint is plain until 2 min before,
   then an amber pill with a slow pulse (soon), an orange-red pill with a stronger pulse from due to 5 min past (now),
   and a red pill with a fast pulse after that (late); plain once the reading is saved. Reduced motion: colours only.
+- **BP, HR, BIS are typed boxes** (owner, 12 Oct 2026): no − / + (the numbers are big); plain boxes that stay boxes
+  (no redraw while typing), so tapping the next box or Enter ("next" on the keyboard) keeps the keyboard up. Save as before.
 - **Ask before leaving an unsaved reading** (owner, 12 Oct 2026): readings (temperatures, BP / HR / BIS) still save only
   on Save (carried-over values count once someone confirms them; no auto-save). Changing a value and then leaving
   (another timepoint, ‹ ›, the tabs, BP, HR, BIS, back, Sign-off, a team update) asks "Save the 5 min reading?": Save /

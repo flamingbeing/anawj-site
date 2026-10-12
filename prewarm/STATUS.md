@@ -24,7 +24,8 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 
 ## Recently done
 
-- This PR: ask to save before leaving a reading with unsaved changes (Save / Don't save / Stay here).
+- This PR: BP, HR, BIS typed boxes (no − / +; keyboard stays up from box to box).
+- #237: ask to save before leaving a reading with unsaved changes (Save / Don't save / Stay here).
 - #235: Other data on one page (headers open by default), keyboard entry (Enter / arrows); box caption removed.
 - #231–#233: "Other data" box (pre-op, meds, bloods, day 1 and 2 chart review and analgesia, discharge: every remaining
   template field as a form); Spreadsheet view renamed Sheet view; Word form's "Vital Signs Data Collected" ticks

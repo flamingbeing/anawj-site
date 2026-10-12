@@ -456,6 +456,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
   header(main ? sid(p) : sid(p) + ' · BP, HR, BIS', main ? '#/' : '#/p/' + id);
   const refreshBar = topBar(p, main ? s : 'iotemp', () => draw());
   let editing = null; // event whose time is being changed
+  let typing = null; // the BP / HR / BIS box with the keyboard up
   // default timepoint: the unsaved one nearest its due time, else the first unsaved
   if (!key) {
     const open = pts.filter(x => !savedAt(p, s, x.key));
@@ -500,6 +501,12 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
       return `<a role="listitem" href="#/p/${id}/${s}/${x.key}" class="${x.key === pt.key ? 'on' : ''} ${done ? 'done' : missed ? 'missed' : ''}">${x.key === 'base' ? 'Base' : x.key === 'end' ? 'End' : x.min}</a>`;
     }).join('')}</div>`;
   }
+  function isChanged(k) { const v = draft[k]; return v != null && was[k] != null && String(v) !== String(was[k]); }
+  function hintOf(c) {
+    const v = draft[c.key];
+    if (c.key === 'map' && v == null) { const m = calc('map', k => draft[k]); if (m) return `<button class="link" data-map="${m}">use ${m}</button>`; }
+    return isChanged(c.key) ? 'was ' + was[c.key] : was[c.key] != null ? 'same' : '';
+  }
   function card(c) {
     const v = draft[c.key];
     if (c.type === 'code') {
@@ -510,9 +517,13 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
       return `<div class="card wide inline"><div class="clab">Gown set <small>°C</small></div>
         <div class="seg seven">${['38', '39', '40', '41', '42', '43', 'NA'].map(o => `<button class="chip" aria-pressed="${String(v) === o}" data-c="set" data-v="${o}">${o}</button>`).join('')}</div></div>`;
     }
-    const changed = v != null && was[c.key] != null && String(v) !== String(was[c.key]);
-    let hint = changed ? 'was ' + was[c.key] : was[c.key] != null ? 'same' : '';
-    if (c.key === 'map' && v == null) { const m = calc('map', k => draft[k]); if (m) hint = `<button class="link" data-map="${m}">use ${m}</button>`; }
+    const changed = isChanged(c.key), hint = hintOf(c);
+    // BP, HR, BIS: plain boxes that stay boxes, so the keyboard stays up from one to the next (owner, 12 Oct 2026)
+    if (s === 'haemo') {
+      const last = c === cols[cols.length - 1];
+      return `<div class="card typed ${changed ? 'changed' : ''}" data-k="${c.key}"><div class="clab"><span>${c.label}</span><small>${hint}</small></div>
+        <input class="num" id="in-${c.key}" data-in="${c.key}" inputmode="numeric" enterkeyhint="${last ? 'done' : 'next'}" autocomplete="off" aria-label="${c.label}" value="${esc(v ?? '')}"></div>`;
+    }
     // an empty temperature: the whole card is one big target that puts in 36.5
     const fill = (c.temp || c.key === 'room') && v == null;
     return `<div class="card ${changed ? 'changed' : ''}${fill ? ' fill' : ''}" ${fill ? `data-fill="${c.key}"` : ''}><div class="clab">${c.label}<small>${hint}</small></div>
@@ -574,6 +585,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
       ${main ? comfortHtml('sat_post', 'Comfortable after surgery?') + linksHtml() + doneHtml(p) : signoffHtml(p, s)}`);
     refreshBar();
     if (editing) { const i = $('#evtime'); i?.focus(); }
+    if (typing) { const i = view.querySelector(`[data-in="${typing}"]`); i?.focus(); }
     const st = view.querySelector('.strip'), on = st?.querySelector('.on');
     if (on) st.scrollLeft = on.offsetLeft - st.offsetLeft - (st.clientWidth - on.offsetWidth) / 2;
   }
@@ -649,8 +661,26 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     if (e.target.id !== 'evtime' || !editing) return;
     set(p, editing, e.target.value || null); editing = null; draw();
   };
-  view.onfocusout = e => { if (e.target.id === 'evtime') setTimeout(() => { if (editing && !view.contains(document.activeElement)) { editing = null; draw(); } }, 0); };
-  cleanup.push(() => { view.onchange = view.onfocusout = null; });
+  // typed boxes (BP, HR, BIS): no redraw while typing, so moving to the next box keeps the keyboard up
+  view.onfocusin = e => { if (e.target.dataset.in) typing = e.target.dataset.in; };
+  view.oninput = e => {
+    const k = e.target.dataset.in; if (!k) return;
+    const v = e.target.value.trim(); draft[k] = v === '' ? null : v;
+    for (const c of cols) {
+      const cd = view.querySelector(`.card[data-k="${c.key}"]`); if (!cd) continue;
+      cd.classList.toggle('changed', isChanged(c.key)); cd.querySelector('.clab small').innerHTML = hintOf(c);
+    }
+  };
+  view.onkeydown = e => {
+    if (e.key !== 'Enter' || !e.target.dataset.in) return;
+    e.preventDefault();
+    const all = [...view.querySelectorAll('[data-in]')], next = all[all.indexOf(e.target) + 1];
+    if (next) next.focus(); else e.target.blur();
+  };
+  view.onfocusout = e => {
+    if (e.target.dataset.in) setTimeout(() => { if (!view.querySelector('[data-in]:focus')) typing = null; }, 0);
+    if (e.target.id === 'evtime') setTimeout(() => { if (editing && !view.contains(document.activeElement)) { editing = null; draw(); } }, 0); };
+  cleanup.push(() => { view.onchange = view.onfocusout = view.onfocusin = view.oninput = view.onkeydown = null; });
   // the due time warms up as it nears the clock: soon (2 min), now (to 5 min past), late; plain once saved
   startAlerts(p, s, () => {
     const el = $('#due'); if (!el) return;
