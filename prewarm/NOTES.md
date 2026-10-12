@@ -79,8 +79,11 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   then an amber pill with a slow pulse (soon), an orange-red pill with a stronger pulse from due to 5 min past (now),
   and a red pill with a fast pulse after that (late); plain once the reading is saved. Reduced motion: colours only.
 - **Other data** (owner, 12 Oct 2026): a small box beside Form view / Sheet view opens the remaining template pages
-  (pre-op, pre-op medication, pre-op investigations, day 1 and 2 chart review and analgesia, discharge), each a form of
-  every field in template order (`OTHER_PAGES`; no sign-off). The main screen stays the op-day bedside screen.
+  (pre-op, pre-op medication, pre-op investigations, day 1 and 2 chart review and analgesia, discharge) on one page
+  (`#/p/<id>/data`), each a collapsible header (open by default) over every field in template order (`OTHER_PAGES`; no
+  sign-off). The box has no caption. Keyboard entry on a computer: Enter / ↓ next question, Shift+Enter / ↑ previous;
+  on a row of choices ← → move, Enter picks (never clears) and moves on, Space picks or clears; date and time boxes keep
+  their own arrow keys. At ≥700 px each label sits beside its box. The main screen stays the op-day bedside screen.
 - **Vital signs data collected** (paper form, intra-op readings page; no template column): ticked on the Word form
   once any BP / HR / BIS value is in; the BP screen says so. The BP, HR, BIS box on the main screen warms up and
   pulses like the due time for its next 15-min reading (misses older than 15 min are let go).

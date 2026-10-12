@@ -24,7 +24,8 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 
 ## Recently done
 
-- This PR: "Other data" box (pre-op, meds, bloods, day 1 and 2 chart review and analgesia, discharge: every remaining
+- This PR: Other data on one page (headers open by default), keyboard entry (Enter / arrows); box caption removed.
+- #231–#233: "Other data" box (pre-op, meds, bloods, day 1 and 2 chart review and analgesia, discharge: every remaining
   template field as a form); Spreadsheet view renamed Sheet view; Word form's "Vital Signs Data Collected" ticks
   itself once any BP / HR / BIS value is in; the BP, HR, BIS box warms up and pulses like the due time.
 - #229: due time warms up (soon / now / late) and pulses. #228: warming boxes plain until set; room temp 20.
@@ -39,6 +40,8 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 
 - 12 Oct 2026: all remaining template data gets entry forms under "Other data" (small box beside Form view / Sheet view);
   "Spreadsheet view" is now "Sheet view"; vital-signs tick is automatic; the BP, HR, BIS box flashes like the due time.
+- 12 Oct 2026: Other data is one page with collapsible headers, all open by default, built for keyboard entry on a
+  computer (Enter and arrow keys); the Other data box has no caption.
 - 12 Oct 2026: warming labels Prewarm on / off, Underbody warm, Gown warm; light grey until tapped, beige once set; times numbered; room temp 20.
 - 12 Oct 2026: locked patients are hidden from team phones completely (rules + query); admins see them read only.
 - 12 Oct 2026: admins lock patients from the home page (select, all but latest); locked = nobody opens them.
