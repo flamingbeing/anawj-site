@@ -97,7 +97,7 @@ export function residencyCard() {
 // the light / dark choice. The first time a device opens the app it starts from what the account had (these used to
 // follow the account), so nobody's look changes. Kept at sign-out: they are the device's, and nothing private.
 const DISPLAY_KEY = 'apmes-logbook-display';
-export const DISPLAY_KEYS = ['compact', 'textSize', 'zoom', 'accent', 'startTab', 'fontUi', 'fontUiName', 'fontLog', 'fontLogName', 'lineWidth', 'lineHeight', 'contrast', 'motion', 'tabIcons', 'tabBar', 'hideHeader', 'caseInverted', 'colourful', 'customCss', 'customCssOn', 'autoFocus', 'appTitle', 'boxCaps', 'boxCorrect', 'boxSpell', 'reflSpell', 'pinBox', 'pinSearch', 'firstField', 'compactTags', 'borders', 'round', 'shadows', 'bigTaps', 'tabOrder', 'tabHidden', 'swipeTabs', 'rowMenu'];
+export const DISPLAY_KEYS = ['compact', 'textSize', 'zoom', 'accent', 'startTab', 'fontUi', 'fontUiName', 'fontLog', 'fontLogName', 'lineWidth', 'lineHeight', 'contrast', 'motion', 'tabIcons', 'tabBar', 'hideHeader', 'caseInverted', 'colourful', 'customCss', 'customCssOn', 'autoFocus', 'appTitle', 'boxCaps', 'boxCorrect', 'boxSpell', 'reflSpell', 'pinBox', 'pinSearch', 'firstField', 'compactTags', 'borders', 'round', 'shadows', 'bigTaps', 'tabOrder', 'tabHidden', 'swipeTabs', 'rowMenu', 'reflToolbar'];
 export function deviceDisplay() {
   try { const d = JSON.parse(localStorage.getItem(DISPLAY_KEY) || 'null'); return d && typeof d === 'object' && !Array.isArray(d) ? d : null; } catch { return null; }
 }
@@ -168,7 +168,7 @@ export function applyLook(d = {}) {
   if (rl !== 2) document.documentElement.style.setProperty('--round', String(ROUNDS[rl][1])); else document.documentElement.style.removeProperty('--round');
   c.toggle('shadows', !!d.shadows); c.toggle('big-taps', !!d.bigTaps);
   // swipe between the bar's tabs (app.js); one ⋯ menu on Logbook rows instead of Copy and Reflect (ui-logbook.js)
-  c.toggle('swipe-tabs', !!d.swipeTabs); c.toggle('row-menu', !!d.rowMenu);
+  c.toggle('swipe-tabs', !!d.swipeTabs); c.toggle('row-menu', !!d.rowMenu); c.toggle('refl-toolbar', !!d.reflToolbar);
   // the name in the header and the browser tab (plain text, at most 40 characters)
   const title = cleanTitle(d.appTitle) || APP_TITLE;
   const h1 = document.querySelector('.top h1'); if (h1 && h1.textContent !== title) h1.textContent = title;
@@ -651,13 +651,17 @@ export function renderShowHide() {
       h('h3', { style: 'margin-top:0' }, 'Tips and help'),
       sw('Show tips and help text', !st.hideTips, v => save({ hideTips: !v }).then(() => hooks.render()), 'Explanations around the app, the privacy and photo reminders, and the tips for the tags you pick.'),
       sw('Show last week’s summary on the Case tab', !!st.weeklyDigest, v => save({ weeklyDigest: v })),
-      sw('Show notes under each reflection heading', st.reflNotes !== false, v => save({ reflNotes: v })),
-      groupReset('the tips, the weekly summary and the reflection heading notes', () => save({ hideTips: null, weeklyDigest: null, reflNotes: null }))),
+      groupReset('the tips and the weekly summary', () => save({ hideTips: null, weeklyDigest: null }))),
     h('section', { class: 'card', 'data-group': 'case' },
       h('h3', { style: 'margin-top:0' }, 'Case tab'),
       h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'The case box, All tags and Save always stay.'),
       CASE_PARTS.map(([part, label]) => sw(label, caseOn(part), v => setCase(part, v))),
       groupReset('every part of the Case tab', () => save({ caseHide: null }))),
+    h('section', { class: 'card', 'data-group': 'reflections' },
+      h('h3', { style: 'margin-top:0' }, 'Reflections'),
+      sw('Formatting buttons (this device)', !!d.reflToolbar, v => applyDisplay(setDisplay({ reflToolbar: v || null })), 'Bold, bullet and numbered lists above each box.'),
+      sw('Show notes under each heading', st.reflNotes !== false, v => save({ reflNotes: v })),
+      groupReset('the reflection defaults (no formatting buttons, heading notes on)', () => { applyDisplay(setDisplay({ reflToolbar: null })); return save({ reflNotes: null }); })),
     h('section', { class: 'card', 'data-group': 'logbook' },
       h('h3', { style: 'margin-top:0' }, 'Logbook (this device)'),
       sw('Copy and Reflect buttons on each case', !d.rowMenu, v => applyDisplay(setDisplay({ rowMenu: v ? null : true })), 'Off: one ⋯ button on each row instead.'),
@@ -688,9 +692,12 @@ export function renderReflectionSettings() {
           h('option', { value: 'numbered', selected: settings().reflPoints !== 'free' }, 'Numbered points with headings (default)'),
           h('option', { value: 'free', selected: settings().reflPoints === 'free' }, 'Free text (one box)'))),
       h('p', { class: 'hint help', style: 'margin:0' }, 'Each reflection can still be switched at the top of its Learning points.'),
+      h('label', { class: 'check', style: 'margin-top:8px' }, h('input', { type: 'checkbox', 'aria-label': 'Formatting buttons', checked: !!display().reflToolbar, onchange: e => applyDisplay(setDisplay({ reflToolbar: e.target.checked || null })) }),
+        'Formatting buttons (this device)'),
+      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'Bold, bullet and numbered lists above each box. The Word export shows them as real bold and bullets.'),
       h('label', { class: 'check', style: 'margin-top:8px' }, h('input', { type: 'checkbox', checked: display().reflSpell !== false, onchange: e => applyDisplay(setDisplay({ reflSpell: e.target.checked ? null : false })) }),
         'Underline spelling mistakes in reflections (this device)'),
-      resetLink('new reflections in the export, learning points and spelling', async () => { await patchLogbook({ settings: { reflExport: null, reflPoints: null } }); applyDisplay(setDisplay({ reflSpell: null })); })),
+      resetLink('new reflections in the export, learning points, formatting buttons and spelling', async () => { await patchLogbook({ settings: { reflExport: null, reflPoints: null } }); applyDisplay(setDisplay({ reflSpell: null, reflToolbar: null })); })),
     h('section', { class: 'card' },
       h('h2', {}, 'Photos'),
       (() => { const kb = photoUsageKb(S.reflections), pct = Math.min(100, Math.round(kb / PHOTO_BUDGET_KB * 100));
