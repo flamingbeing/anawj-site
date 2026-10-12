@@ -8,8 +8,9 @@ rules_version = '2';
 //   admins/{email}  owner and investigators, signed in by email link (the owner adds the first one in the console)
 //   codes/{site}    each hospital's join code: { code, setAt, setBy }; only admins read or change it
 // Data:
-//   patients/{id}   { site, created, deleted?, f: { fieldId: { v, t, by, auto? } } }
+//   patients/{id}   { site, created, deleted?, lock?, f: { fieldId: { v, t, by, auto? } } }
 //                   members read and write their own hospital's patients; admins all of them.
+//                   lock { on, t, by }: only admins set it; while on, members can't change the patient.
 //   forms/blank     the blank paper data collection form (.docx, base64), uploaded by an admin:
 //                   { b64, name, size, setAt, setBy }; members and admins read it (the Form view fills it in).
 service cloud.firestore {
@@ -66,14 +67,19 @@ service cloud.firestore {
 
     match /patients/{pid} {
       function shape(d) {
-        return d.keys().hasOnly(['site', 'created', 'deleted', 'f'])
+        return d.keys().hasOnly(['site', 'created', 'deleted', 'lock', 'f'])
           && d.site in sites() && d.f is map && d.f.size() <= 900
-          && d.created is number && (!('deleted' in d) || d.deleted is number);
+          && d.created is number && (!('deleted' in d) || d.deleted is number)
+          && (!('lock' in d) || (d.lock is map && d.lock.keys().hasOnly(['on', 't', 'by'])
+            && d.lock.on is bool && d.lock.t is number && d.lock.by is string && d.lock.by.size() <= 80));
       }
+      function locked(d) { return 'lock' in d && d.lock.on == true; }
       allow read: if canUse(resource.data.site);
-      allow create: if canUse(request.resource.data.site) && shape(request.resource.data);
+      allow create: if canUse(request.resource.data.site) && shape(request.resource.data)
+        && (admin() || !('lock' in request.resource.data));
       allow update: if canUse(resource.data.site) && shape(request.resource.data)
-        && request.resource.data.site == resource.data.site;
+        && request.resource.data.site == resource.data.site
+        && (admin() || (!locked(resource.data) && request.resource.data.get('lock', null) == resource.data.get('lock', null)));
       allow delete: if admin();
     }
   }

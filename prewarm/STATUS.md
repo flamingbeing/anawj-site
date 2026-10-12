@@ -30,6 +30,7 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 
 ## Decisions
 
+- 12 Oct 2026: admins lock patients from the home page (select, all but latest); locked = nobody opens them.
 - 12 Oct 2026: Log out (deletes the phone's patients, warns, warns again if unsynced) replaces Stop sharing. Join links sent
   to the teams and working (owner).
 - 12 Oct 2026: completed patients warn before opening; Export Excel moves to Settings.

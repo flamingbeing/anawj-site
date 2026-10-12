@@ -56,6 +56,10 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
 - **Last synced** (owner, 12 Oct 2026): home page and Settings show "Synced just now / N min ago / at 14:20 / 12 Oct
   14:20", or "Not synced: N patients waiting for signal. Last synced …" (amber). `lastSync` is set when nothing is
   pending and the server has confirmed the phone's copy (a server snapshot, a confirmed push, or waitForPendingWrites).
+- **Locking** (owner, 12 Oct 2026): a study admin taps "Select to lock" on the home page, picks patients (or "All
+  but <latest>": everyone except the most recently edited), then Lock / Unlock. A locked patient can't be opened by
+  anyone (admins too) until unlocked; the rules stop members changing it or its lock (`lock { on, t, by }`, later t
+  wins when merging). Demo mode lets anyone try it. A change refused because of a lock stops counting as unsynced.
 - **Screen size** (Settings, this phone only): Smaller / Small / Normal / Large / Larger zooms the whole app
   (`--ui-zoom` on body). Normal by default.
 - **Form view** (owner, 12 Oct 2026): the study's real paper form (data collection form v3.2, .docx) with text put in:

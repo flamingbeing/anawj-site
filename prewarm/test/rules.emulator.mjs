@@ -69,6 +69,18 @@ await t('code too short', assertFails(setDoc(doc(adm, 'codes', 'WH'), { code: '1
 await t('code for unknown hospital', assertFails(setDoc(doc(adm, 'codes', 'XYZ'), { code: 'XYZ-CODE-1', setAt: 3, setBy: ADMIN })));
 await t('admin lists members', assertSucceeds(getDocs(collection(adm, 'members'))));
 await t('admin reads all patients', assertSucceeds(getDocs(collection(adm, 'patients'))));
+// locking (admins only; a locked patient can't be changed by members)
+const L = (on, t = 10) => ({ lock: { on, t, by: ADMIN } });
+await t('member creates p4', assertSucceeds(setDoc(doc(a, 'patients', 'p4'), pat('NUH'))));
+await t('member cannot lock', assertFails(setDoc(doc(a, 'patients', 'p4'), L(true), { merge: true })));
+await t('member cannot create a locked patient', assertFails(setDoc(doc(a, 'patients', 'p5'), { ...pat('NUH'), ...L(true) })));
+await t('admin locks', assertSucceeds(setDoc(doc(adm, 'patients', 'p4'), L(true), { merge: true })));
+await t('member cannot write a locked patient', assertFails(setDoc(doc(a, 'patients', 'p4'), { f: { x: { v: 1, t: 11, by: 'AB' } } }, { merge: true })));
+await t('member cannot unlock', assertFails(setDoc(doc(a, 'patients', 'p4'), L(false, 12), { merge: true })));
+await t('member still reads a locked patient', assertSucceeds(getDoc(doc(a, 'patients', 'p4'))));
+await t('lock must be { on, t, by }', assertFails(setDoc(doc(adm, 'patients', 'p4'), { lock: { on: 'yes', t: 1, by: ADMIN } }, { merge: true })));
+await t('admin unlocks', assertSucceeds(setDoc(doc(adm, 'patients', 'p4'), L(false, 13), { merge: true })));
+await t('member writes again once unlocked', assertSucceeds(setDoc(doc(a, 'patients', 'p4'), { f: { x: { v: 2, t: 14, by: 'AB' } } }, { merge: true })));
 await t('admin writes any hospital', assertSucceeds(setDoc(doc(adm, 'patients', 'sgh1'), { f: { x: { v: 1, t: 1, by: 'L' } } }, { merge: true })));
 await t('admin removes a member', assertSucceeds(deleteDoc(doc(adm, 'members', 'phoneC'))));
 await t('removed member loses access', assertFails(getDoc(doc(c, 'patients', 'sgh1'))));

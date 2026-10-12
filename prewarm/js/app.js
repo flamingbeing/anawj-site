@@ -99,15 +99,19 @@ function syncText() {
 // every "last synced" line on screen
 function showSync() { const t = syncText(); document.querySelectorAll('.syncline').forEach(el => { el.textContent = t; el.classList.toggle('late', /^Not/.test(t)); }); }
 setInterval(showSync, 20000);
-function sync(p, ids) {
+function sync(p, ids, withLock = false) {
   if (!sharing()) return;
   p.site ||= val(p, 'site') || shared.member?.site || settings.site;
   if (!p.site) return;
   const tok = Date.now() + Math.random();
   pending[p.id] = tok; write('pending', pending);
   showSync();
-  cloud.push(p, ids).then(() => { if (pending[p.id] === tok) { delete pending[p.id]; write('pending', pending); synced(); } })
-    .catch(e => toast(cloud.friendly(e)));
+  const done = () => { if (pending[p.id] === tok) { delete pending[p.id]; write('pending', pending); synced(); } };
+  cloud.push(p, ids, withLock).then(done).catch(e => {
+    // refused (e.g. an admin locked the patient meanwhile): the server drops the change, so it isn't waiting either
+    if (e?.code === 'permission-denied') { done(); toast(`${sid(p)}: not saved to the team (locked by the study admin?)`); }
+    else toast(cloud.friendly(e));
+  });
 }
 // Log out (owner, 12 Oct 2026): leaves the team and deletes every patient on this phone, after a warning, and a
 // second one if some changes haven't reached the team yet. Settings (initials, display) stay.
@@ -143,7 +147,9 @@ async function watch() {
     if (!changed) return;
     saveAll();
     const h = location.hash.slice(1) || '/';
-    if (/^\/$|^\/p\/\w+$|\/sheet$/.test(h) && !view.contains(document.activeElement)) render();
+    // redraw unless someone is typing (a focused link or button is fine)
+    const typing = view.contains(document.activeElement) && document.activeElement.matches('input, textarea, select');
+    if (/^\/$|^\/p\/\w+$|\/sheet$/.test(h) && !typing) render();
     else { shared.stale = true; const b = $('#fresh'); if (b) b.hidden = false; }
   }, e => toast(cloud.friendly(e)));
 }
@@ -229,6 +235,9 @@ function render() {
   cleanup.forEach(f => f()); cleanup = [];
   shared.stale = false; $('#fresh').hidden = true;
   const h = location.hash.slice(1) || '/';
+  // a locked patient can't be opened (by anyone) until a study admin unlocks it
+  const pm = /^\/p\/(\w+)/.exec(h);
+  if (pm && patients[pm[1]]?.lock?.on) { toast('Locked by the study admin'); location.replace('#/'); return; }
   for (const [re, fn] of routes) { const m = re.exec(h); if (m) { fn(...m.slice(1)); window.scrollTo(0, 0); return; } }
   home();
 }
@@ -243,20 +252,55 @@ function header(title, back, extra = '') {
 
 // ---------- home
 route(/^\/$/, home);
+// Locking (owner, 12 Oct 2026): a study admin (or anyone, in demo mode) picks patients on the home page and locks
+// them; nobody can open a locked patient, and the rules stop members changing it, until an admin unlocks it.
+const canLock = () => shared.admin || DEMO;
+let selecting = null; // Set of patient ids while choosing which to lock / unlock
+function setLock(ids, on) {
+  const by = shared.email || settings.me || 'admin';
+  for (const id of ids) {
+    const p = patients[id]; if (!p) continue;
+    p.lock = { on, t: Date.now(), by };
+    sync(p, [], true);
+  }
+  saveAll();
+}
 function home() {
   header('Prewarming study' + (DEMO ? ' (demo)' : ''), null, `<a class="iconbtn" href="#/settings" aria-label="Settings">⚙</a>`);
   const list = Object.values(patients).filter(p => !p.deleted).sort((a, b) => (lastEdit(b)?.t || b.created) - (lastEdit(a)?.t || a.created));
+  if (selecting && !canLock()) selecting = null;
+  const latest = list[0];
   paint(`
     ${settings.me && settings.site ? '' : `<div class="note">Add your ${settings.me ? '' : 'initials and '}hospital in <a href="#/settings">Settings</a>${settings.me ? '' : ' so each reading shows who entered it'}.</div>`}
     <button class="primary big" id="new">+ New patient</button>
-    <h2>Patients on this phone</h2>
+    <div class="listhead"><h2>Patients on this phone</h2>${canLock() && list.length && !selecting ? '<button class="link" id="select">Select to lock</button>' : ''}</div>
+    ${selecting ? `<div class="seltools"><span>${selecting.size} selected</span>
+      ${latest && list.length > 1 ? `<button class="secondary" id="selall">All but ${esc(sid(latest))} (latest)</button>` : ''}<button class="secondary" id="selnone">None</button>
+      <button class="primary" id="lock" ${selecting.size ? '' : 'disabled'}>Lock</button><button class="secondary" id="unlock" ${selecting.size ? '' : 'disabled'}>Unlock</button><button class="link" id="seldone">Done</button></div>` : ''}
     ${list.length ? `<ul class="list">${list.map(p => {
-      const e = lastEdit(p);
-      return `<li><a href="#/p/${p.id}"${val(p, 'done') ? ` data-done="${esc(val(p, 'done'))}"` : ''}><b>${esc(sid(p))}${val(p, 'site') ? ` <small>${esc(val(p, 'site'))}</small>` : ''}</b><span${val(p, 'done') ? ' class="okline"' : ''}>${esc(status(p))}</span>
-        <small>${e ? 'Last entry ' + new Date(e.t).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) + (e.by ? ' by ' + esc(e.by) : '') : 'No entries yet'}</small></a></li>`;
+      const e = lastEdit(p), locked = p.lock?.on;
+      const body = `<b>${esc(sid(p))}${val(p, 'site') ? ` <small>${esc(val(p, 'site'))}</small>` : ''}</b><span${locked ? ' class="lockline"' : val(p, 'done') ? ' class="okline"' : ''}>${locked ? '🔒 Locked by the study admin' : esc(status(p))}</span>
+        <small>${e ? 'Last entry ' + new Date(e.t).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) + (e.by ? ' by ' + esc(e.by) : '') : 'No entries yet'}</small>`;
+      if (selecting) return `<li><label class="selrow"><input type="checkbox" data-sel="${p.id}" ${selecting.has(p.id) ? 'checked' : ''}><span>${body}</span></label></li>`;
+      if (locked) return `<li><a href="#/" class="locked" data-locked="1">${body}</a></li>`;
+      return `<li><a href="#/p/${p.id}"${val(p, 'done') ? ` data-done="${esc(val(p, 'done'))}"` : ''}>${body}</a></li>`;
     }).join('')}</ul>` : `<p class="muted">No patients yet. Tap <b>New patient</b> on the morning of surgery.</p>`}
     <p class="muted small">${sharing() ? `Shared with the ${esc(shared.admin ? 'whole study (admin)' : shared.member.site + ' team')}. Readings sync when there is signal. <b class="syncline">${esc(syncText())}</b>` : `Data stays on this phone. <a href="#/settings">Join your hospital’s team</a> to share patients.`} Study IDs only: no names or hospital numbers.</p>`);
   $('#new').onclick = () => go('#/new');
+  view.querySelectorAll('.list a[data-locked]').forEach(a => a.onclick = e => { e.preventDefault(); toast('Locked by the study admin'); });
+  if ($('#select')) $('#select').onclick = () => { selecting = new Set(); home(); };
+  if (selecting) {
+    view.querySelectorAll('[data-sel]').forEach(c => c.onchange = () => { c.checked ? selecting.add(c.dataset.sel) : selecting.delete(c.dataset.sel); home(); });
+    if ($('#selall')) $('#selall').onclick = () => { selecting = new Set(list.filter(p => p !== latest).map(p => p.id)); home(); };
+    $('#selnone').onclick = () => { selecting = new Set(); home(); };
+    $('#seldone').onclick = () => { selecting = null; home(); };
+    $('#lock').onclick = () => {
+      const n = selecting.size;
+      if (!confirm(`Lock ${n} patient${n === 1 ? '' : 's'}?\n\nNobody can open ${n === 1 ? 'it' : 'them'} until an admin unlocks${sharing() ? ', and phones can’t change ' + (n === 1 ? 'it' : 'them') : ''}.`)) return;
+      setLock(selecting, true); toast(n + ' locked'); selecting = null; home();
+    };
+    $('#unlock').onclick = () => { const n = selecting.size; setLock(selecting, false); toast(n + ' unlocked'); selecting = null; home(); };
+  }
   // a patient marked complete: warn on the first tap, open on the second
   view.querySelectorAll('.list a[data-done]').forEach(a => a.onclick = e => {
     if (a.dataset.warned) return;
@@ -694,7 +738,7 @@ route(/^\/delete$/, () => {
     ${list.length ? `<ul class="list dellist">${list.map(p => {
       const e = lastEdit(p);
       return `<li><div><b>${esc(sid(p))}${val(p, 'site') ? ` <small>${esc(val(p, 'site'))}</small>` : ''}</b><small>${esc(status(p))} · ${e ? 'last entry ' + new Date(e.t).toLocaleDateString([], { day: 'numeric', month: 'short' }) : 'no entries'}</small></div>
-        <button class="danger" data-del="${p.id}" aria-label="Delete ${esc(sid(p))}">Delete</button></li>`;
+        ${p.lock?.on ? '<span class="muted small">🔒 Locked</span>' : `<button class="danger" data-del="${p.id}" aria-label="Delete ${esc(sid(p))}">Delete</button>`}</li>`;
     }).join('')}</ul>` : `<p class="muted">No participants on this phone.</p>`}`);
   view.onclick = e => {
     const b = e.target.closest('[data-del]'); if (!b) return;

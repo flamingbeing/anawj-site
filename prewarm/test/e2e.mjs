@@ -18,6 +18,7 @@ const errors = [];
 page.on('pageerror', e => errors.push(e.message));
 page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
 let n = 0;
+const toastSaysE = re => page.waitForFunction(r => new RegExp(r).test(document.querySelector('#toast')?.textContent || ''), re.source, { timeout: 5000 });
 const shot = async name => { if (SHOTS) await page.screenshot({ path: `${SHOTS}/${String(++n).padStart(2, '0')}-${name}.png`, fullPage: true }); };
 const axe = async name => {
   if (!fs.existsSync(AXE)) return;
@@ -209,6 +210,28 @@ try {
   assert.doesNotMatch(page.url(), /#\/p\//, 'still on the list');
   await page.click('.list a:has-text("DEMO-01")');
   await page.waitForSelector('.donetop');
+  // locking (demo mode lets anyone try it): select all but the latest, lock; locked rows can't be opened
+  await page.goto(BASE + '?demo#/');
+  await page.click('#select');
+  const latestId = await page.$eval('[data-sel]', c => c.dataset.sel);
+  await page.click('#selall');
+  assert.equal(await page.isChecked(`[data-sel="${latestId}"]`), false, 'the latest stays out');
+  page.once('dialog', d => d.accept());
+  await page.click('#lock');
+  await page.waitForSelector('.list a.locked');
+  assert.match(await page.textContent('.list a.locked'), /Locked by the study admin/);
+  await axe('home with locked patients'); await shot('locked');
+  await page.click('.list a.locked');
+  await toastSaysE(/Locked by the study admin/);
+  const lockedHref = await page.evaluate(() => Object.entries(JSON.parse(localStorage.getItem('prewarm-demo:patients'))).find(([, p]) => p.lock?.on)[0]);
+  await page.goto(BASE + '?demo#/p/' + lockedHref);
+  await page.waitForFunction(() => location.hash === '#/');
+  // unlock them all again
+  await page.click('#select');
+  const nSel = await page.$$eval('[data-sel]', x => x.length);
+  for (let i = 0; i < nSel; i++) await page.locator('[data-sel]').nth(i).check();
+  await page.click('#unlock');
+  assert.equal(await page.$('.list a.locked'), null, 'unlocked');
   await page.goto(BASE + '?demo#/');
   assert.equal(await page.$('a[href="#/export"]'), null, 'no export on the home page');
   await page.goto(BASE + '?demo#/settings');

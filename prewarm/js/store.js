@@ -43,6 +43,8 @@ export function mergeRecord(a, b) {
     if (newer(rec.f[k], x)) { rec.f[k] = x; changed++; }
   }
   if (b.deleted && (!rec.deleted || b.deleted > rec.deleted)) { rec.deleted = b.deleted; changed++; }
+  // lock { on, t, by }: set by a study admin; the later one wins
+  if (b.lock && (!rec.lock || b.lock.t > rec.lock.t)) { rec.lock = b.lock; changed++; }
   rec.created = Math.min(a.created || Infinity, b.created || Infinity);
   return { rec, changed };
 }
