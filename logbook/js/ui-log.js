@@ -498,8 +498,12 @@ function renderOne(card) {
     h('button', { class: 'linkish keep-date', title: 'Save and keep this date for the next case', onclick: () => save({ another: true }) }, 'Save, keep date'),
     h('button', { class: 'primary big', onclick: () => save({}) }, 'Save', h('span', { class: 'kbd', title: 'Ctrl+Enter (Cmd+Enter on a Mac)' }, ' Ctrl+⏎')));
 
-  // what the box was read as (initials come off into their own field; age/sex stay in the details)
+  // what the box was read as: the initials and the age/sex are marked inside the box itself (a copy of its text
+  // behind it, transparent but for the marks; owner's Apple-apps review), and the line under it says only what the
+  // age means ("6m = 6 years · male"), the one thing worth checking
   const parsed = h('div', { class: 'parsed', 'aria-live': 'polite' });
+  const boxMarks = h('div', { class: 'box-marks', 'aria-hidden': 'true' });
+  textarea.addEventListener('scroll', () => { boxMarks.scrollTop = textarea.scrollTop; });
   // Only the selected categories and Save stay pinned: a slim bar at the end of the card that sticks
   // to the bottom (above the tab bar) the whole way down; the box itself scrolls away.
   const selExtra = h('div', { class: 'sel-extra' });
@@ -512,7 +516,7 @@ function renderOne(card) {
   add(card,
     h('div', { class: 'lp-left' },
       initialsInput ? h('label', { class: 'field log-initials' }, 'Initials', initialsInput) : null,
-      h('div', { class: 'box-wrap' }, textarea, pasteBtn(textarea), clearBtn), parsed, tagRow,
+      h('div', { class: 'box-wrap' }, boxMarks, textarea, pasteBtn(textarea), clearBtn), parsed, tagRow,
       // suggestions first, then the last case and your own templates
       h('div', { class: 'chiplabel quick-label' }, 'Quick picks'), sugg, templates),
     h('div', { class: 'lp-right' },
@@ -533,7 +537,7 @@ function renderOne(card) {
     if (t.closest('input:not([type=checkbox]), textarea, select, .datepick, .box-wrap')) return;
     if (t.closest('.chip, .picker li, label.check, [role=button], button, a.btn')) e.preventDefault();
   });
-  Object.assign(ui, { initials: initialsInput, draftNote, textarea, parsed, sugg, selected, selExtra, groupSave, tip, enterHint, templates, picker, paintCommon });
+  Object.assign(ui, { initials: initialsInput, draftNote, textarea, parsed, boxMarks, sugg, selected, selExtra, groupSave, tip, enterHint, templates, picker, paintCommon });
   paintSuggest(); paintSel(); paintQuick(); paintParsed(false);
   requestAnimationFrame(() => alignPlaceholder(textarea));
   // autofocus attribute is ignored on re-render; focus after insertion (not on phones' first paint
@@ -550,13 +554,36 @@ function paintParsed(typed) {
   const text = draftText();
   paintEnterHint();
   if (ui.draftNote) ui.draftNote.textContent = draftError || (text ? 'Draft saved' : '');
-  if (!text) { fill(ui.parsed); return; }
+  if (!text) { fill(ui.parsed); paintMarks([]); return; }
   const { initials, details } = draftParts();
-  const { age, rest } = settings().detectAgeSex !== false ? splitAge(details) : { age: '', rest: details };
-  const bits = [initials ? h('span', { class: 'pi' }, h('small', {}, 'Initials '), h('b', {}, initials)) : h('span', { class: 'pi none' }, 'No initials found'),
-    age ? h('span', { class: 'pi' }, h('small', {}, 'Age/sex '), h('b', {}, humanAge(age))) : null,
-    rest ? h('span', { class: 'pi grow' }, rest.split('\n')[0].slice(0, 60)) : null];
-  fill(ui.parsed, ...bits.filter(Boolean));
+  const { age } = settings().detectAgeSex !== false ? splitAge(details) : { age: '' };
+  fill(ui.parsed, age ? h('span', { class: 'pi' }, h('b', {}, age), ` = ${humanAge(age)}`) : null);
+  // where they are in the box's own text (the initials only when they're in the box, not in their own field)
+  const v = ui.textarea ? ui.textarea.value : '', lead = v.length - v.trimStart().length, marks = [];
+  let at = lead;
+  if (initials && !draft.initials && v.slice(lead, lead + initials.length).toUpperCase() === initials.toUpperCase()) { marks.push(['ini', lead, lead + initials.length]); at = lead + initials.length; }
+  if (age) {
+    const rem = v.slice(at), from = at + rem.length - rem.trimStart().length;
+    const m = v.slice(from).match(/^[^\s,;:]+(?:\s?[mf](?![a-z]))?/i);
+    if (m && m[0].replace(/\s+/g, '').toLowerCase() === age.toLowerCase()) marks.push(['age', from, from + m[0].length]);
+  }
+  paintMarks(marks);
+}
+// the copy of the box's text behind it, with the marks; same font, padding and wrapping as the box
+function paintMarks(marks) {
+  const ta = ui && ui.textarea, el = ui && ui.boxMarks;
+  if (!ta || !el) return;
+  // match the box exactly (it may be pinned, compact, bigger text, another font): copy what decides where text wraps
+  const cs = getComputedStyle(ta);
+  for (const k of ['fontFamily', 'fontSize', 'fontWeight', 'lineHeight', 'letterSpacing', 'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'borderTopWidth', 'borderRightWidth', 'borderBottomWidth', 'borderLeftWidth', 'tabSize']) el.style[k] = cs[k];
+  Object.assign(el.style, { top: ta.offsetTop + 'px', left: ta.offsetLeft + 'px', width: ta.offsetWidth + 'px', height: ta.offsetHeight + 'px' });
+  el.hidden = !marks.length;
+  const v = ta.value, parts = [];
+  let i = 0;
+  for (const [k, a, b] of marks) { parts.push(v.slice(i, a), h('mark', { class: 'm-' + k }, v.slice(a, b))); i = b; }
+  parts.push(v.slice(i), '\n');
+  fill(el, ...parts);
+  el.scrollTop = ta.scrollTop;
 }
 
 // Suggestions, with your own shorthand for APMES tags (Tag editor) mixed in

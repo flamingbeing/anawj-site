@@ -1352,3 +1352,13 @@ details.an-sec > summary .glance { width: 100%; }
 .an-year { margin: 0 0 12px; }
 .an-year h3 { margin: 0 0 2px; }
 ul.cases .c-tags { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 18px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 18px), transparent); padding-right: 12px; }
+
+/* ---------- polish 4: what the case box was read as, marked in the box ---------- */
+/* a copy of the box's text on top of it, the words see-through and only the marks showing, like a highlighter pen */
+.box-wrap .box-marks { position: absolute; z-index: 1; margin: 0; box-sizing: border-box; border-style: solid; border-color: transparent; color: transparent; white-space: pre-wrap; overflow-wrap: break-word; word-break: normal; overflow: hidden; pointer-events: none; }
+.box-wrap .box-marks mark { color: transparent; border-radius: 4px; box-shadow: 0 0 0 1px transparent; }
+.box-wrap .box-marks mark.m-ini { background: color-mix(in srgb, var(--accent) 22%, transparent); }
+.box-wrap .box-marks mark.m-age { background: color-mix(in srgb, var(--warn, #b45309) 24%, transparent); }
+.box-wrap .paste-btn, .box-wrap .clear-btn { z-index: 2; }
+/* the line under the box: only what the age was read as */
+.parsed .pi b { font-weight: 700; }
