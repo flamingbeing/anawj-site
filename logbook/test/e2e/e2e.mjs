@@ -67,6 +67,8 @@ async function run(label, ctxOpts) {
   // Account, Settings, Export / Import and Admin live under More; Settings is a menu of pages
   const SETTINGS_PAGES = ['display', 'logging', 'tags', 'reflset', 'sharefmt', 'bin'];
   const tab = async t => {
+    // a settings page's Advanced page: open the page, then its Advanced link
+    if (t === 'displayadv' || t === 'loggingadv') { await tab(t.replace('adv', '')); await p.locator(`a[data-go="${t}"]`).click(); await nap(350); return; }
     if (SETTINGS_PAGES.includes(t)) { await tab('settings'); await p.locator(`.more-list a[data-go="${t}"]`).click(); }
     else if (t === 'totals') { await tab('progress'); await p.evaluate(() => { location.hash = '#totals'; }); }
     else if (['account', 'settings', 'admin', 'data'].includes(t)) { await p.locator('.tabs button[data-tab="more"]').click(); await nap(150); await p.locator(`.more-list a[data-go="${t}"]`).click(); }
@@ -1091,13 +1093,13 @@ async function run(label, ctxOpts) {
   await step('case box height setting; logbook search: initials only, procedure only, fuzzy', async () => {
     await tab('log');
     const h3 = await p.locator('textarea.details').evaluate(t => t.getBoundingClientRect().height);
-    await tab('logging');
+    await tab('loggingadv');
     await p.locator('label.field', { hasText: 'Case box height' }).locator('select').selectOption('8');
     await nap(300);
     await tab('log');
     const h8 = await p.locator('textarea.details').evaluate(t => t.getBoundingClientRect().height);
     assert(h8 > h3 + 60, 'box did not grow: ' + h3 + ' -> ' + h8);
-    await tab('logging');
+    await tab('loggingadv');
     await p.locator('label.field', { hasText: 'Case box height' }).locator('select').selectOption('3');
     await nap(300);
     await tab('logbook'); await lbList();
@@ -1676,14 +1678,17 @@ async function run(label, ctxOpts) {
     assert(w[0] <= w[1], 'compact h-scroll');
   });
 
-  await step('settings: week start, Case tab parts, case box keyboard, pinned box and search', async () => {
-    await tab('logging');
+  await step('settings: week start, Case tab parts, case box keyboard, pinned box and search, borderless', async () => {
+    await tab('loggingadv');
     const field = l => p.locator('label.field', { hasText: l }).locator('select');
     const check = l => p.locator('label.check', { hasText: l }).locator('input');
     await field('First day of the week').selectOption('0'); await nap(300);
     await check('Quick picks').uncheck(); await check('Autocorrect').check(); await nap(300);
-    await tab('display');
+    await tab('displayadv');
     await check('Pin the case box').check(); await check('Pin the search box').check(); await nap(200);
+    // Borders all the way down: lines gone, fields filled
+    await tab('display');
+    await p.locator('input[type=range][aria-label="Borders"]').fill('0'); await nap(200);
     try {
       await tab('logbook');
       const cal = p.locator('main .seg button', { hasText: /^Calendar$/ }); if (await cal.count()) { await cal.first().click(); await nap(200); }
@@ -1694,13 +1699,17 @@ async function run(label, ctxOpts) {
       assert(!(await p.locator('.sugg-row').isVisible()) && !(await p.locator('.quick-label').isVisible()), 'quick picks not hidden');
       assert(await p.locator('textarea.details').getAttribute('autocorrect') === 'on', 'autocorrect not on');
       assert(await p.locator('.box-wrap').evaluate(el => getComputedStyle(el).position) === 'sticky', 'case box not pinned');
+      assert(await p.evaluate(() => document.documentElement.classList.contains('edges-fill')), 'borderless not applied');
+      assert(await p.locator('section.card').first().evaluate(el => getComputedStyle(el).borderTopColor).then(c => /\/ 0\)$|, 0\)$|^transparent$/.test(c)), 'card border still shows when borderless');
       await shot3('log-pinned');
     } finally {
-      await tab('logging');
+      await tab('loggingadv');
       await field('First day of the week').selectOption('1');
       await check('Quick picks').check(); await check('Autocorrect').uncheck(); await nap(300);
-      await tab('display');
+      await tab('displayadv');
       await check('Pin the case box').uncheck(); await check('Pin the search box').uncheck(); await nap(200);
+      await tab('display');
+      await p.locator('input[type=range][aria-label="Borders"]').fill('4'); await nap(200);
     }
   });
 
@@ -1783,7 +1792,7 @@ async function run(label, ctxOpts) {
     await configure('newline');
   });
   await step('logging: first field, optional autodetection and month shorthand', async () => {
-    if (phone) { await tab('display'); await p.getByLabel('Case tab upside down (phones)', { exact: true }).check(); }
+    if (phone) { await tab('displayadv'); await p.getByLabel('Case tab upside down (phones)', { exact: true }).check(); }
     await tab('logging');
     const first = p.getByLabel('First field for a new case', { exact: true });
     await first.selectOption('initials');
@@ -1826,12 +1835,13 @@ async function run(label, ctxOpts) {
     await p.reload(); await p.waitForSelector('textarea.details');
     assert(await p.getByLabel('Case date', { exact: true }).evaluate(el => el === document.activeElement), 'device first field not retained on reload');
     assert(!(await p.locator('.parsed').innerText()).includes('Age/sex'), 'disabled age detection not retained');
-    await tab('logging');
+    await tab('loggingadv');
     const keyboard = p.getByLabel('Open the keyboard when the Case tab opens (this device)', { exact: true });
     await keyboard.uncheck();
     await tab('log');
     assert(await p.evaluate(() => !document.activeElement.matches('input, textarea')), 'first field overrode the keyboard-off setting');
-    await tab('logging'); await keyboard.check();
+    await tab('loggingadv'); await keyboard.check();
+    await tab('logging');
     await p.getByLabel('Autodetect age and gender', { exact: true }).check();
     await first.selectOption('details');
     await tab('log');
@@ -1840,7 +1850,7 @@ async function run(label, ctxOpts) {
     await summary.fill('AB 80M hernia'); await debounced();
     assert(await p.locator('.sugg-row [data-code="21"]').count() === 1, 'geriatric detection not restored');
     await summary.fill('');
-    if (phone) { await tab('display'); await p.getByLabel('Case tab upside down (phones)', { exact: true }).uncheck(); await tab('log'); }
+    if (phone) { await tab('displayadv'); await p.getByLabel('Case tab upside down (phones)', { exact: true }).uncheck(); await tab('log'); }
   });
   await step('navigation: demo Account, browser Back/Forward and app Back agree', async () => {
     const q = await ctx.newPage();

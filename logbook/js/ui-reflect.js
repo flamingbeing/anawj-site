@@ -843,7 +843,7 @@ function editor() {
 
   const lc = caseById(r.caseId);
   const linkBox = r.caseId
-    ? h('div', { class: 'refl-case', style: 'border:1px solid var(--line, #ddd);border-radius:10px;padding:8px 10px;margin:8px 0' },
+    ? h('div', { class: 'refl-case', style: 'border:1px solid var(--edge, var(--line, #ddd));border-radius:10px;padding:8px 10px;margin:8px 0' },
       h('div', { class: 'bar', style: 'gap:8px;align-items:center' },
         h('b', { style: 'font-size:calc(13px * var(--fs, 1))' }, 'Linked case'), h('span', { class: 'grow' }),
         h('button', { class: 'small', onclick: () => openPicker(true) }, 'Change case'),
@@ -851,7 +851,7 @@ function editor() {
       lc ? h('div', {}, h('span', { class: 'muted' }, caseDate(lc) + ' · '), caseText(lc) || '(no details)',
         (lc.cats || []).length ? h('div', { class: 'muted', style: 'font-size:calc(13px * var(--fs, 1))' }, lc.cats.map(catName).join(', ')) : null)
         : h('div', { class: 'hint' }, S.casesLoaded === false ? 'Loading case…' : 'The linked case is no longer in your logbook. Change case to link another.'))
-    : h('div', { style: 'border:1px solid var(--line, #ddd);border-radius:10px;padding:8px 10px;margin:8px 0' },
+    : h('div', { style: 'border:1px solid var(--edge, var(--line, #ddd));border-radius:10px;padding:8px 10px;margin:8px 0' },
       h('p', { style: 'margin:0 0 6px' }, h('b', {}, r.source === 'word' ? 'Imported from Word. ' : 'No case linked. '), 'Linking it to a logged case is optional.'),
       h('button', { onclick: () => openPicker(true) }, 'Link to a case'));
   if (rv.relinked) { rv.relinked = false; setTimeout(() => { status.textContent = 'Editing…'; autosave(); }, 0); }
@@ -905,7 +905,7 @@ function editor() {
 
     const n = r.points.length;
     const points = boxCard('Learning points', 'For each point: what were the considerations, and what did you learn? Give it a short heading, then your discussion (analysis with evidence, conclusions, action plan).',
-      r.points.map((p, i) => h('div', { style: 'border:1px solid var(--line, #ddd);border-radius:10px;padding:10px;margin:0 0 10px' },
+      r.points.map((p, i) => h('div', { style: 'border:1px solid var(--edge, var(--line, #ddd));border-radius:10px;padding:10px;margin:0 0 10px' },
         h('div', { class: 'bar', style: 'gap:6px;align-items:center;margin-bottom:6px' },
           h('b', { style: 'font-size:calc(16px * var(--fs, 1))' }, `${i + 1}.`),
           h('input', { style: IN + ';flex:1', maxlength: String(LIMITS.pointHeading), value: p.heading || '', placeholder: 'Heading, e.g. Choice of airway management in trismus',
@@ -968,7 +968,7 @@ function editor() {
           }
           else im.alt = 'Image not found';
         }).catch(() => { im.alt = 'Image not available offline'; });
-        return h('div', { style: 'border:1px solid var(--line, #ddd);border-radius:10px;padding:10px;margin:0 0 10px' },
+        return h('div', { style: 'border:1px solid var(--edge, var(--line, #ddd));border-radius:10px;padding:10px;margin:0 0 10px' },
           im,
           h('label', { class: 'field', style: 'display:block;margin-top:6px' }, `Caption (Figure ${i + 1}: …)`,
             h('input', { style: IN, maxlength: String(LIMITS.caption), value: f.caption || '', placeholder: 'e.g. Apnoeic oxygenation', oninput: e => { f.caption = e.target.value; changed(); } })),
