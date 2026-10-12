@@ -254,6 +254,27 @@ await tryit(async () => {
   log(seen.some(t => /Temperature .* reading due now/.test(t)), 'temperature due alert there too');
   await ctx.close();
 });
+// O. same Subject ID twice is flagged on the list; storage full stays on screen; locking a patient still being
+// charted says so
+await tryit(async () => {
+  const { ctx, pg } = await fresh();
+  await pg.evaluate(() => {
+    const k = 'prewarm-demo:patients', all = JSON.parse(localStorage.getItem(k));
+    const two = Object.values(all).find(r => r.f.enrol_id?.v === 'DEMO-02'); two.f.enrol_id.v = 'DEMO-01';
+    localStorage.setItem(k, JSON.stringify(all));
+  });
+  await pg.reload(); await pg.waitForSelector('.list');
+  log((await pg.$$('.twinline')).length === 2, 'both records with the same Subject ID flagged');
+  let asked = ''; pg.once('dialog', d => { asked = d.message(); d.dismiss(); });
+  await pg.click('#select'); await pg.locator('[data-sel]').first().check(); await pg.click('#lock'); await pg.waitForTimeout(200);
+  log(/Still being charted\?/.test(asked), 'lock warns about a patient changed in the last 3 hours: ' + asked.slice(0, 120));
+  await pg.click('#seldone');
+  await pg.locator('.list a').first().click(); await pg.waitForSelector('#clock');
+  await pg.evaluate(() => { Storage.prototype.setItem = () => { throw new Error('QuotaExceededError'); }; });
+  await pg.click('.chip[data-sat="sat_pre"][data-v="1"]'); await pg.waitForTimeout(300);
+  log(/couldn’t store the last change/.test(await pg.textContent('#storefull').catch(() => '')), 'storage full stays on screen');
+  await ctx.close();
+});
 await b.close();
 if (fails.length) { console.error('prewarm edge: FAIL\n- ' + fails.join('\n- ')); process.exit(1); }
-console.log('prewarm edge: ok (midnight, surgery end, double-tap Save, BP checks, back button, Log, Enter, still to fill, swipe, stray taps, time order, corrections, BMI, follow-ups, blanks, typed answers, alerts everywhere)');
+console.log('prewarm edge: ok (midnight, surgery end, double-tap Save, BP checks, back button, Log, Enter, still to fill, swipe, stray taps, time order, corrections, BMI, follow-ups, blanks, typed answers, alerts everywhere, duplicates, storage full, lock warning)');

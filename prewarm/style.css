@@ -354,3 +354,7 @@ dialog.ask p { margin: 0 0 6px; }
 .gaps b { color: var(--warn); }
 .gaps ul { margin: 4px 0 0; padding-left: 18px; display: grid; gap: 4px; }
 .gaps a { color: var(--warn); font-weight: 600; }
+
+/* the phone couldn't store a change: stays until a write works again */
+.storefull { position: sticky; top: 0; z-index: 9; padding: 10px 12px; background: var(--err); color: #fff; font-weight: 700; text-align: center; }
+.twinline { display: block; font-size: 12px; font-weight: 600; color: var(--warn); }
