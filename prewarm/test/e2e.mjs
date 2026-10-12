@@ -55,6 +55,12 @@ try {
   // running timer from warming on, and the next event to note (10-min group: warming off 10 min later)
   assert.match(await page.textContent('#clock'), /Warming \+\d+:\d\d/);
   assert.match(await page.textContent('#clock'), /Next: Warming off \d\d:\d\d/);
+  // the app bar's Log button sets the next event to now (then cleared again from its box)
+  assert.match(await page.textContent('#lognext'), /Log\s*Warming off/);
+  await page.click('#lognext');
+  assert.match(await page.textContent('[data-ev="ev_wstop"] b'), /^\d\d:\d\d$/, 'Log sets warming off to now');
+  await page.click('[data-ev="ev_wstop"]'); await page.click('[data-evclear="ev_wstop"]');
+  assert.equal(await page.textContent('[data-ev="ev_wstop"] b'), 'tap');
   // the 0-min reading is due now: the banner shows and hides on a tap
   await page.waitForSelector('#banner:not([hidden])');
   await page.click('#banner');
@@ -67,6 +73,12 @@ try {
 
   // pre-warming reading, option B: empty temp taps to 36.5, type core, nudge chest, pick sensation, save
   assert.match(await page.textContent('.tp'), /0 min/);
+  // previous / next timepoint buttons beside the strip
+  const at = () => page.textContent('.strip a.on');
+  const before = await at();
+  assert.ok(await page.$('span.pn.prev'), 'no previous before the first timepoint');
+  await page.click('.pn.next'); await page.waitForFunction(b => document.querySelector('.strip a.on')?.textContent !== b, before);
+  await page.click('.pn.prev'); await page.waitForFunction(b => document.querySelector('.strip a.on')?.textContent === b, before);
   await page.click('.num[data-type="chest"]');
   assert.equal((await page.textContent('.num[data-type="chest"]')).trim(), '36.5', 'an empty temperature starts at 36.5');
   // anywhere on an empty temperature's card does the same

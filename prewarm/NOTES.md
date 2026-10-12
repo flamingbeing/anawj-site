@@ -35,6 +35,9 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   else gown on, during pre-warming; from induction, else in OT, intra-op; the clock time before either) and the next
   event to note (the first unset of gown on, warming on, warming off, in OT, induction, surgery end, PACU arrival,
   to ward, after the last one set; warming off shows its expected time, 30 or 10 min after warming on).
+- **Quick controls** (owner, 12 Oct 2026): a navy Log button in the app bar sets the next event to now (it replaced
+  the Spreadsheet view icon; Spreadsheet view is the text link at the bottom). Big ‹ › buttons either side of the tabs
+  and timepoint strip go to the previous / next timepoint. Event time boxes are squarer, six per row (two rows).
 - **Mark section complete** sits at the very bottom of the screen, below the links, so it isn't tapped by accident.
 - **Screen size** (Settings, this phone only): Smaller / Small / Normal / Large / Larger zooms the whole app
   (`--ui-zoom` on body). Normal by default.

@@ -237,10 +237,10 @@ route(/^\/new$/, () => {
 
 // ---------- patient main screen: event times, temperatures, then links to the other forms in the order they are
 // filled in. BP/HR/BIS uses the same reading screen without the times.
-const EVENTS = [['pw_gown', 'Gown on'], ['pw_start', 'Warming on', 'pw'], ['ev_wstop', 'Warming off', 'pw'], ['ev_ot', 'In OT'],
-  ['io_knife', 'Induction'], ['io_flip', 'Prone'], ['io_under_start', 'Underbody'], ['io_gown_start', 'Gown BH'],
-  ['io_done', 'Surgery end'], ['pacu_in', 'PACU arrival'], ['pacu_out', 'To ward']];
-const EVENT_FULL = { io_flip: 'Flipped prone', pw_start: 'Active warming started', ev_wstop: 'Active warming stopped', io_knife: 'Induction (knife to skin)', io_under_start: 'Underbody Bair Hugger on',
+const EVENTS = [['pw_gown', 'Gown on'], ['pw_start', 'Warm on', 'pw'], ['ev_wstop', 'Warm off', 'pw'], ['ev_ot', 'In OT'],
+  ['io_knife', 'Induction'], ['io_flip', 'Prone'], ['io_under_start', 'Under­body'], ['io_gown_start', 'Gown BH'],
+  ['io_done', 'Surgery end'], ['pacu_in', 'PACU in'], ['pacu_out', 'To ward']];
+const EVENT_FULL = { pw_gown: 'Gown on', ev_ot: 'In OT', pacu_in: 'PACU arrival', io_flip: 'Flipped prone', pw_start: 'Active warming started', ev_wstop: 'Active warming stopped', io_knife: 'Induction (knife to skin)', io_under_start: 'Underbody Bair Hugger on',
   io_gown_start: 'Gown Bair Hugger on', io_done: 'Surgery completed (post-extubation)', pacu_out: 'Transfer to ward' };
 // Running timer and the next event to note, in the app bar of the patient screen
 const ESSENTIAL = ['pw_gown', 'pw_start', 'ev_wstop', 'ev_ot', 'io_knife', 'io_done', 'pacu_in', 'pacu_out'];
@@ -254,28 +254,34 @@ function clockHtml(p, s) {
   const [aid, alabel] = anchors.find(([id]) => toMin(val(p, id)) != null) || [];
   let timer = `<span class="lbl">Now</span> <b>${fromMin(Math.floor(now))}</b>`;
   if (aid) { let m = now - toMin(val(p, aid)); if (m < 0) m += 1440; timer = `<span class="lbl">${alabel} +</span><b>${mmss(m)}</b>`; }
-  const evs = ESSENTIAL.filter(id => !(noWarming(p) && (id === 'pw_start' || id === 'ev_wstop')));
-  const last = evs.reduce((i, id, j) => val(p, id) ? j : i, -1);
-  const next = evs.slice(last + 1).find(id => !val(p, id));
-  let note = '';
-  if (next) {
-    const label = EVENTS.find(([f]) => f === next)[1];
-    let at = '';
-    if (next === 'ev_wstop' && toMin(val(p, 'pw_start')) != null && WARM_MIN[val(p, 'arm')]) {
-      const due = toMin(val(p, 'pw_start')) + WARM_MIN[val(p, 'arm')];
-      at = now >= due ? ' <i>now</i>' : ' ' + fromMin(due);
-    }
-    note = `Next: ${label}${at}`;
-  }
+  const nx = nextEvent(p);
+  const note = nx ? `Next: ${nx.label}${nx.due == null ? '' : now >= nx.due ? ' <i>now</i>' : ' ' + fromMin(nx.due)}` : '';
   return `<span>${timer}</span>${note ? `<small>${note}</small>` : ''}`;
 }
+// the next event to note: the first unset one after the last one set (warming off: when it is expected)
+function nextEvent(p) {
+  const evs = ESSENTIAL.filter(id => !(noWarming(p) && (id === 'pw_start' || id === 'ev_wstop')));
+  const last = evs.reduce((i, id, j) => val(p, id) ? j : i, -1);
+  const id = evs.slice(last + 1).find(x => !val(p, x));
+  if (!id) return null;
+  const label = EVENTS.find(([f]) => f === id)[1].replace('Warm ', 'Warming ').replace('\u00ad', '');
+  const due = id === 'ev_wstop' && toMin(val(p, 'pw_start')) != null && WARM_MIN[val(p, 'arm')] ? toMin(val(p, 'pw_start')) + WARM_MIN[val(p, 'arm')] : null;
+  return { id, label, due };
+}
+// app-bar button that logs the next event as now
+const logBtnHtml = p => { const nx = nextEvent(p); return nx ? `<b>Log</b><small>${esc(nx.label)}</small>` : ''; };
 const defaultSeries = p => noWarming(p) || val(p, 'ev_ot') || val(p, 'io_knife') ? 'iotemp' : 'prewarm';
 route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s, key) => {
   const p = patients[id]; if (!p) return go('#/');
   if (!s || (s === 'prewarm' && noWarming(p))) s = defaultSeries(p);
   const main = s !== 'haemo';
   const def = SERIES[s], pts = pointsFor(p, s);
-  header(main ? sid(p) : sid(p) + ' · BP, HR, BIS', main ? '#/' : '#/p/' + id, `${main ? `<div class="clock" id="clock">${clockHtml(p, s)}</div>` : ''}<a class="iconbtn" href="#/p/${id}/sheet" aria-label="Spreadsheet view">▦</a>`);
+  header(main ? sid(p) : sid(p) + ' · BP, HR, BIS', main ? '#/' : '#/p/' + id, main ? `<div class="clock" id="clock">${clockHtml(p, s)}</div><button class="logbtn" id="lognext" ${nextEvent(p) ? '' : 'hidden'}>${logBtnHtml(p)}</button>` : '');
+  if (main) $('#lognext').onclick = () => {
+    const nx = nextEvent(p); if (!nx) return;
+    const t = nowHM();
+    set(p, nx.id, t); toast(`${nx.label} ${t}. Tap its box to change.`); draw();
+  };
   let editing = null; // event whose time is being changed
   // default timepoint: the unsaved one nearest its due time, else the first unsaved
   if (!key) {
@@ -351,6 +357,14 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
       </nav>
       <p class="textlinks"><a href="#/p/${id}/form">Form view</a><a href="#/p/${id}/sheet">Spreadsheet view</a></p>`;
   }
+  // previous / next timepoint: big buttons either side of the tabs and the timepoint strip
+  function navHtml() {
+    const i = pts.findIndex(x => x.key === pt.key);
+    const btn = (x, cls, sym, word) => x
+      ? `<a class="pn ${cls}" href="#/p/${id}/${s}/${x.key}" aria-label="${word}: ${esc(x.label)}">${sym}</a>`
+      : `<span class="pn ${cls}" aria-hidden="true">${sym}</span>`;
+    return `<div class="nav2">${btn(pts[i - 1], 'prev', '‹', 'Previous')}<div class="mid">${main ? tabsHtml() : ''}${strip()}</div>${btn(pts[i + 1], 'next', '›', 'Next')}</div>`;
+  }
   function tabsHtml() {
     if (noWarming(p)) return `<h2 class="sect">Intra-op temperatures</h2>`;
     return `<div class="tabs2" role="tablist">${['prewarm', 'iotemp'].map(x => `<a role="tab" aria-selected="${x === s}" href="#/p/${id}/${x}">${x === 'prewarm' ? 'Pre-warming' : 'Intra-op'}</a>`).join('')}</div>`;
@@ -359,7 +373,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     if (s === 'prewarm' && !setTouched && cols.some(c => c.key === 'set') && setTempNA(p, pt)) draft.set = 'NA';
     const due = dueOf(p, s, pt);
     const grp = s === 'prewarm' ? `<span class="badge">${GROUPS.find(g => String(g[0]) === String(val(p, 'arm')))?.[1] || 'Group not set'}</span>` : '';
-    paint(`${main ? comfortHtml('sat_pre', 'Comfortable before surgery?') + timesHtml() + tabsHtml() : ''}${strip()}
+    paint(`${main ? comfortHtml('sat_pre', 'Comfortable before surgery?') + timesHtml() : ''}${navHtml()}
       <div class="tp"><div><b>${pt.label}</b> ${grp}</div><div class="due" id="due">${due != null ? 'due ' + fromMin(Math.round(due)) : pt.key === 'base' ? (s === 'prewarm' ? '' : 'on arrival in OT') : pt.min != null ? `<span class="hint">Set “${s === 'prewarm' ? 'Warming on' : 'Induction'}” for due times</span>` : ''}</div></div>
       ${isSaved ? `<p class="muted small tight">Saved ${esc(savedAt(p, s, pt.key))}${p.f['at_' + s + '_' + pt.key]?.by ? ' by ' + esc(p.f['at_' + s + '_' + pt.key].by) : ''}. Changes save when you tap Save.</p>` : ''}
       <div class="board">${cols.map(card).join('')}</div>
@@ -367,6 +381,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
       ${s === 'haemo' && settings.hide.haemo15 ? `<p class="muted small">Only baseline is entered here; the 15-min rows come from the monitor download. Turn them on in Settings.</p>` : ''}
       ${main ? comfortHtml('sat_post', 'Comfortable after surgery?') + linksHtml() : ''}${signoffHtml(p, s)}`);
     const ck = $('#clock'); if (ck) ck.innerHTML = clockHtml(p, s);
+    const lb = $('#lognext'); if (lb) { const h = logBtnHtml(p); if (lb.innerHTML !== h) lb.innerHTML = h; lb.hidden = !h; }
     if (editing) { const i = $('#evtime'); i?.focus(); }
     const st = view.querySelector('.strip'), on = st?.querySelector('.on');
     if (on) st.scrollLeft = on.offsetLeft - st.offsetLeft - (st.clientWidth - on.offsetWidth) / 2;
