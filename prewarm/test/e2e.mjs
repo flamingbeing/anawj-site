@@ -196,6 +196,27 @@ try {
   await axe('form view'); await shot('form-view');
   await page.goBack();
 
+  // BP, HR, BIS: typed boxes (no − / +); Enter goes to the next box without a redraw, so the keyboard stays up
+  await page.click('#haemolink');
+  await page.waitForSelector('input[data-in="sbp"]');
+  assert.equal(await page.$('[data-step]'), null, 'no − / + on BP, HR, BIS');
+  const hd = await page.$('input[data-in="dbp"]');
+  await page.fill('input[data-in="sbp"]', '120');
+  await page.focus('input[data-in="sbp"]'); await page.keyboard.press('Enter');
+  assert.equal(await page.evaluate(() => document.activeElement.dataset.in), 'dbp', 'Enter moves to diastolic');
+  await page.keyboard.type('70');
+  assert.ok(await hd.evaluate(el => el.isConnected), 'the same box: no redraw while typing');
+  await page.click('input[data-in="hr"]'); await page.keyboard.type('64');
+  assert.equal(await page.inputValue('input[data-in="dbp"]'), '70');
+  await page.click('#save');
+  await page.waitForFunction(() => /15/.test(document.querySelector('.tp')?.textContent || ''));
+  await page.click('.strip a:has-text("Base")');
+  await page.waitForSelector('input[data-in="sbp"]');
+  assert.equal(await page.inputValue('input[data-in="hr"]'), '64', 'saved');
+  await axe('bp hr bis'); await shot('haemo');
+  await page.goBack(); await page.goBack(); await page.goBack();
+  await page.waitForSelector('#haemolink');
+
   // intra-op details: TXA total worked out, transfusion volumes
   await page.click('.links a[href$="/form/intraop"]');
   await page.click('.chip[data-f="io_txa"][data-v="1"]');

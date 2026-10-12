@@ -175,6 +175,8 @@ span.pn { color: var(--line); }
 .num { font: 600 1.6rem/1.1 var(--num); font-variant-numeric: tabular-nums; text-align: center; background: none; border: 0; color: var(--ink); width: 100%; min-width: 0; min-height: var(--tap); padding: 0; cursor: text; }
 .num .muted { font-size: 1rem; font-weight: 400; }
 input.num { border: 2px solid var(--navy); border-radius: var(--r); background: var(--card); }
+.card.typed input.num { border: 1px solid var(--line-input); }
+.card.typed input.num:focus { border: 2px solid var(--navy); }
 .k, .chip { min-height: var(--tap); border-radius: var(--r); border: 1px solid var(--line); background: var(--key); color: var(--navy); font-size: 1.4rem; font-weight: 600; cursor: pointer; touch-action: manipulation; -webkit-user-select: none; user-select: none; }
 .k:active, .chip:active { background: var(--soft); }
 .chip { font-size: 15px; padding: 4px 8px; background: var(--chip); color: var(--ink); font-weight: 400; }
