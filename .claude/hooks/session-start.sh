@@ -1,6 +1,6 @@
 #!/bin/bash
 # Cloud sessions only: set up the OpenAI Codex plugin for Claude Code (/codex:review, /codex:rescue …)
-# and the Codex CLI it drives. Each step is skipped when already done. Signing in to OpenAI can't be
+# and the Codex CLI it drives, and the Firebase plugin. Each step is skipped when already done. Signing in to OpenAI can't be
 # automated with a ChatGPT account: run `codex login --device-auth` once per session, or add an
 # OPENAI_API_KEY secret to the cloud environment and this signs in with it.
 set -uo pipefail
@@ -16,6 +16,15 @@ if ! claude plugin marketplace list 2>/dev/null | grep -q openai-codex; then
 fi
 if ! claude plugin list 2>/dev/null | grep -q 'codex@openai-codex'; then
   claude plugin install codex@openai-codex >/dev/null 2>&1 || echo "Codex plugin: install failed" >&2
+fi
+
+# Firebase plugin (official; its MCP server runs `npx -y firebase-tools mcp`). Sign-in stays manual and per
+# session, with the owner's approval (CLAUDE.md).
+if ! claude plugin marketplace list 2>/dev/null | grep -q '> firebase$'; then
+  claude plugin marketplace add firebase/firebase-tools >/dev/null 2>&1 || echo "Firebase plugin: marketplace add failed" >&2
+fi
+if ! claude plugin list 2>/dev/null | grep -q 'firebase@firebase'; then
+  claude plugin install firebase@firebase >/dev/null 2>&1 || echo "Firebase plugin: install failed" >&2
 fi
 
 if ! command -v codex >/dev/null 2>&1; then

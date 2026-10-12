@@ -9,7 +9,11 @@
     "ask": [
       "Agent(codex:codex-rescue)",
       "Bash(codex *)",
-      "Bash(node *codex-companion.mjs*)"
+      "Bash(node *codex-companion.mjs*)",
+      "mcp__plugin_firebase_firebase",
+      "Bash(firebase *)",
+      "Bash(npx firebase-tools*)",
+      "Bash(npx -y firebase-tools*)"
     ]
   },
   "hooks": {

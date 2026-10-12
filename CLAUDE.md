@@ -5,9 +5,18 @@
 The shared instructions are in `AGENTS.md` (imported above); put anything that applies to Codex too there.
 Only Claude Code–specific notes belong in this file.
 
-## Codex plugin in Claude Code sessions
+## Codex and Firebase plugins in Claude Code sessions
 
 Cloud sessions install the OpenAI Codex plugin and CLI (`.claude/hooks/session-start.sh`). **Never run Codex
 without the owner's approval in that session**: no `/codex:*` command, `codex-rescue` agent, `codex` CLI call or
 `codex-companion.mjs` run until the owner says yes to that use, and keep the stop-time review gate off. Say what
 you would ask Codex and why, then wait. (`.claude/settings.json` also makes these calls ask first.)
+
+Cloud sessions also install the official Firebase plugin (`firebase/firebase-tools` marketplace; its MCP server runs
+`npx -y firebase-tools mcp`). It acts with the owner's own Google access, so it can read live data, including
+residents' private reflections and notes that the Firestore rules hide even from the app owner. **Never use it
+without the owner's approval in that session**: no Firebase MCP tool call, `firebase` or `npx firebase-tools`
+command, and no `firebase login`, until the owner says yes to that use. Prefer settings, rules and usage over
+reading documents; never change projects, rules, auth or data through it (rules deploy only through the merge
+workflow). Sign-in is per session and only when a task needs it. (`.claude/settings.json` makes these calls ask
+first.)
