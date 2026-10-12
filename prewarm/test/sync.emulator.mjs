@@ -26,7 +26,6 @@ async function phone(initials) {
   await page.goto(BASE + '#/settings');
   await page.waitForSelector('body[data-cloud=ready]');
   await page.fill('#me', initials); await page.dispatchEvent('#me', 'change');
-  await page.click('[data-site="NUH"]');
   return page;
 }
 const toastSays = (page, re) => page.waitForFunction(r => new RegExp(r).test(document.querySelector('#toast')?.textContent || ''), re.source, { timeout: 15000 })
@@ -36,10 +35,12 @@ try {
   const a = await phone('AA');
   // wrong code is refused
   await a.fill('#code', 'WRONG-CODE'); await a.click('#join');
+  await toastSays(a, /isn’t a join code/);
+  await a.fill('#code', 'NUH-WRONG123'); await a.click('#join');
   await toastSays(a, /isn’t right for NUH/);
   if (!(await a.$('#code'))) throw new Error('after wrong code: ' + (await a.textContent('main')).replace(/\s+/g, ' ').slice(0, 300));
   if (SHOTS) await a.screenshot({ path: SHOTS + '/sync-join.png', fullPage: true });
-  await a.fill('#code', 'NUH-TEST-CODE'); await a.click('#join');
+  await a.fill('#code', 'nuh-test-code'); await a.click('#join');
   await toastSays(a, /Joined the NUH team/);
   assert.match(await a.textContent('main'), /Sharing with the NUH team/);
   if (SHOTS) await a.screenshot({ path: SHOTS + '/sync-joined.png' });
@@ -59,7 +60,7 @@ try {
   await bb.goto(BASE + '#/');
   await bb.waitForFunction(() => /SYNC-01/.test(document.querySelector('.list')?.textContent || ''), null, { timeout: 15000 });
   await bb.click('.list a');
-  await bb.click('.links a[href$="/sheet"]');
+  await bb.click('.textlinks a[href$="/sheet"]');
   await bb.waitForFunction(() => /36\.6/.test(document.querySelector('.sheet')?.textContent || ''), null, { timeout: 15000 });
 
   // phone B adds the 5-min reading; phone A gets it
@@ -67,7 +68,7 @@ try {
   await bb.click('[data-step="1"][data-c="core"]');
   await bb.click('#save');
   await a.goto(BASE + '#/');
-  await a.click('.list a'); await a.click('.links a[href$="/sheet"]');
+  await a.click('.list a'); await a.click('.textlinks a[href$="/sheet"]');
   await a.waitForFunction(() => /36\.7/.test(document.querySelector('.sheet')?.textContent || ''), null, { timeout: 15000 });
 
   // an admin signs in with an emailed link and makes a join code
@@ -101,6 +102,7 @@ try {
   c.on('pageerror', e => errors.push('C: ' + e.message));
   await c.goto(`${BASE}#/join/WH/${wh}`);
   await c.waitForSelector('#joinlink');
+  await c.waitForSelector('body[data-cloud=ready]');
   if (SHOTS) await c.screenshot({ path: SHOTS + '/join-link.png' });
   await c.fill('#me', 'cc');
   await c.click('#joinlink');

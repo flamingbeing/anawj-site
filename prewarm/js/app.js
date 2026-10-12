@@ -244,7 +244,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
   if (!s || (s === 'prewarm' && noWarming(p))) s = defaultSeries(p);
   const main = s !== 'haemo';
   const def = SERIES[s], pts = pointsFor(p, s);
-  header(main ? sid(p) : sid(p) + ' · BP, HR, BIS', main ? '#/' : '#/p/' + id, `<a class="iconbtn" href="#/p/${id}/sheet" aria-label="Form view">▦</a>`);
+  header(main ? sid(p) : sid(p) + ' · BP, HR, BIS', main ? '#/' : '#/p/' + id, `<a class="iconbtn" href="#/p/${id}/sheet" aria-label="Spreadsheet view">▦</a>`);
   let editing = null; // event whose time is being changed
   // default timepoint: the unsaved one nearest its due time, else the first unsaved
   if (!key) {
@@ -298,6 +298,17 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
       return `<button class="tchip ${v ? 'set' : ''}" data-ev="${f}" aria-label="${full}: ${v ? v + ', tap to change' : 'tap to set now'}"><span>${l}</span><b>${v ? esc(v) : 'tap'}</b></button>`;
     }).join('')}</div>`;
   }
+  // patient comfort: pre-op question at the top, post-op at the bottom; one line once answered
+  const COMFORT = BY_ID.sat_pre.opts;
+  let satEdit = null;
+  function comfortHtml(id, label) {
+    const v = val(p, id);
+    if (v != null && satEdit !== id) {
+      return `<div class="comfort done"><span>${label}: <b>${esc(COMFORT.find(o => String(o[0]) === String(v))?.[1] || v)}</b></span><button class="link" data-satedit="${id}">Change</button></div>`;
+    }
+    return `<div class="comfort"><span class="lab">${label}</span><small class="muted">Ask the patient</small>
+      <div class="seg comfort5">${COMFORT.map(([ov, ol]) => `<button class="chip" data-sat="${id}" data-v="${ov}" aria-pressed="${String(v) === String(ov)}">${ol.replace('omfortable', 'omfort&shy;able')}</button>`).join('')}</div></div>`;
+  }
   function linksHtml() {
     const done = pg => val(p, 'sign_' + pg) ? ' ✓' : '';
     const haemo = pointsFor(p, 'haemo').filter(x => savedAt(p, 'haemo', x.key)).length;
@@ -305,8 +316,8 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
       <a href="#/p/${id}/haemo">BP, HR, BIS${done('haemo')}<small>${haemo ? haemo + ' saved' : 'Baseline in OT'}</small></a>
       <a href="#/p/${id}/form/intraop">Intra-op details${done('intraop')}<small>Blood, products, tests</small></a>
       <a href="#/p/${id}/form/pacu">PACU${done('pacu')}<small>Temp, NuDESC, delay</small></a>
-      <a href="#/p/${id}/form/satis">Satisfaction${done('satis')}<small>Pre- and post-op comfort</small></a>
-      <a href="#/p/${id}/sheet">Form view<small>All readings like the paper form</small></a></nav>
+      </nav>
+      <p class="textlinks"><a href="#/p/${id}/sheet">Spreadsheet view</a></p>
       <button class="danger" id="del">Delete this patient</button>`;
   }
   function tabsHtml() {
@@ -317,14 +328,14 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     if (s === 'prewarm' && !setTouched && cols.some(c => c.key === 'set') && setTempNA(p, pt)) draft.set = 'NA';
     const due = dueOf(p, s, pt);
     const grp = s === 'prewarm' ? `<span class="badge">${GROUPS.find(g => String(g[0]) === String(val(p, 'arm')))?.[1] || 'Group not set'}</span>` : '';
-    paint(`${main ? timesHtml() + tabsHtml() : ''}${strip()}
+    paint(`${main ? comfortHtml('sat_pre', 'Comfortable before surgery?') + timesHtml() + tabsHtml() : ''}${strip()}
       <div class="tp"><div><b>${pt.label}</b> ${grp}</div><div class="due" id="due">${due != null ? 'due ' + fromMin(Math.round(due)) : pt.key === 'base' ? (s === 'prewarm' ? '' : 'on arrival in OT') : ''}</div></div>
       ${due == null && pt.min != null ? `<p class="note small">Set the “${s === 'prewarm' ? 'Active warming started' : 'Induction'}” time to see when each reading is due.</p>` : ''}
       ${isSaved ? `<p class="muted small">Saved at ${esc(savedAt(p, s, pt.key))}${p.f['at_' + s + '_' + pt.key]?.by ? ' by ' + esc(p.f['at_' + s + '_' + pt.key].by) : ''}. Changes save when you tap Save.</p>` : ''}
       <div class="board">${cols.map(card).join('')}</div>
       <button class="save big" id="save">${isSaved ? 'Save changes' : `Save ${pt.label} reading`}</button>
       ${s === 'haemo' && settings.hide.haemo15 ? `<p class="muted small">Only baseline is entered here; the 15-min rows come from the monitor download. Turn them on in Settings.</p>` : ''}
-      ${signoffHtml(p, s)}${main ? linksHtml() : ''}`);
+      ${signoffHtml(p, s)}${main ? comfortHtml('sat_post', 'Comfortable after surgery?') + linksHtml() : ''}`);
     if (editing) { const i = $('#evtime'); i?.focus(); }
     const st = view.querySelector('.strip'), on = st?.querySelector('.on');
     if (on) st.scrollLeft = on.offsetLeft - st.offsetLeft - (st.clientWidth - on.offsetWidth) / 2;
@@ -356,6 +367,10 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     if (chip) { if (chip.dataset.c === 'set') setTouched = true; draft[chip.dataset.c] = draft[chip.dataset.c] === chip.dataset.v ? null : chip.dataset.v; draw(); return; }
     const m = t.closest('[data-map]');
     if (m) { draft.map = m.dataset.map; draw(); return; }
+    const sat = t.closest('[data-sat]');
+    if (sat) { const cur = val(p, sat.dataset.sat); set(p, sat.dataset.sat, String(cur) === sat.dataset.v ? null : +sat.dataset.v); satEdit = null; draw(); return; }
+    const se = t.closest('[data-satedit]');
+    if (se) { satEdit = se.dataset.satedit; draw(); return; }
     const ev = t.closest('[data-ev]');
     if (ev) {
       // tap an empty time: now; tap a set one: change it
@@ -529,7 +544,7 @@ function ixTable(p) {
 // ---------- form view: readings laid out like the paper form
 route(/^\/p\/(\w+)\/sheet$/, id => {
   const p = patients[id]; if (!p) return go('#/');
-  header(sid(p) + ' · Form view', '#/p/' + id);
+  header(sid(p) + ' · Spreadsheet view', '#/p/' + id);
   const cell = (s, pt, c) => { const v = val(p, `${s}_${pt.key}_${c.key}`); return `<td><a href="#/p/${id}/${s}/${pt.key}" aria-label="${esc(pt.label + ' ' + c.label + ': ' + (v ?? 'empty'))}">${v == null ? '' : esc(c.key === 'ts' && v > 0 ? '+' + v : v)}</a></td>`; };
   const pw = SERIES.prewarm, it = SERIES.iotemp, hd = SERIES.haemo;
   paint(`
@@ -564,10 +579,12 @@ route(/^\/settings$/, () => {
   view.querySelectorAll('[data-site]').forEach(b => b.onclick = () => { if (shared.member) return; settings.site = settings.site === b.dataset.site ? '' : b.dataset.site; saveSettings(); render(); });
   $('#me').onchange = e => { settings.me = e.target.value.trim().toUpperCase(); saveSettings(); if (shared.member) cloud.setInitials(settings.me).catch(() => {}); toast('Saved'); };
   $('#join')?.addEventListener('click', async e => {
-    const code = $('#code').value.trim();
-    if (!settings.site) return toast('Choose your hospital first.');
-    if (!code) return toast('Enter the join code for ' + settings.site + '.');
-    await joinTeam(settings.site, code, e.target);
+    const code = $('#code').value.trim().toUpperCase();
+    if (!code) return toast('Enter the join code.');
+    // codes start with their hospital: NTF-XXXXXXXX
+    const site = siteOfCode(code);
+    if (!site) return toast('That isn’t a join code. It starts with the hospital, e.g. NTF-.');
+    await joinTeam(site, code, e.target);
     render();
   });
   $('#leave')?.addEventListener('click', async e => {
@@ -604,9 +621,9 @@ function sharingHtml() {
   if (shared.email && !shared.admin) return `<p class="note">${esc(shared.email)} isn’t on the study’s admin list. Ask the owner to add it.</p><button class="secondary" id="leave">Sign out</button>`;
   if (shared.admin) return `<p class="ok-box">Signed in as study admin (${esc(shared.email)}). You see every hospital’s patients.</p>
     <a class="secondary" href="#/admin">Join codes and members</a><button class="secondary" id="leave">Sign out</button>`;
-  if (shared.member) return `${chips}<p class="ok-box">Sharing with the ${esc(shared.member.site)} team. Readings sync when there is signal.</p><button class="secondary" id="leave">Stop sharing on this phone</button>`;
-  return `${chips}<label class="lab" for="code">Join code for your hospital</label><input id="code" autocomplete="off" autocapitalize="characters">
-    <small class="muted">From a study admin. Joining shares this phone’s patients with your hospital’s team.</small>
+  if (shared.member) return `<p class="ok-box">Sharing with the ${esc(shared.member.site)} team. Readings sync when there is signal.</p><button class="secondary" id="leave">Stop sharing on this phone</button>`;
+  return `<label class="lab" for="code">Join code</label><input id="code" autocomplete="off" autocapitalize="characters" placeholder="e.g. NTF-…">
+    <small class="muted">From a study admin, or just open the join link they sent. The code says which hospital. Joining shares this phone’s patients with that hospital’s team.</small>
     <button class="primary" id="join">Join</button>
     <button class="link" id="adminin">Study admin? Sign in by email</button>
     <div id="adminbox" class="stack" hidden><label class="lab" for="adminemail">Your admin email</label>
@@ -624,6 +641,7 @@ route(/^\/confirm$/, () => {
   $('#adminfinish').onclick = () => finishAdmin($('#adminconfirm').value.trim().toLowerCase());
 });
 
+const siteOfCode = code => SITES.find(x => code.startsWith(x + '-')) || null;
 async function joinTeam(site, code, btn) {
   btn.disabled = true; btn.textContent = 'Joining…';
   try {
@@ -748,8 +766,10 @@ if ('serviceWorker' in navigator && !DEMO) {
     if (reg.waiting) offer(reg.waiting);
     reg.addEventListener('updatefound', () => { const w = reg.installing; w?.addEventListener('statechange', () => { if (w.state === 'installed' && navigator.serviceWorker.controller) offer(w); }); });
   }).catch(() => {});
+  // reload only when an update takes over, not when the first install claims the page (that wiped a half-filled form)
+  const hadController = !!navigator.serviceWorker.controller;
   let reloaded = false;
-  navigator.serviceWorker.addEventListener('controllerchange', () => { if (!reloaded) { reloaded = true; location.reload(); } });
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadController && !reloaded) { reloaded = true; location.reload(); } });
 }
 
 render();

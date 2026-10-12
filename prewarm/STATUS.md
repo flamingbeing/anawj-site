@@ -6,7 +6,8 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 
 ## Now
 
-- **Claude Code, Prewarming Webapp** (branch `ccr-13264f37-d28edu`): join links and QR codes on the admin screen.
+- **Claude Code, Prewarming Webapp** (branch `ccr-13264f37-d28edu`): PR #199 (join links, hospital from code, comfort
+  on the main screen, Spreadsheet view). Next: NUHS design system restyle, then a printable Form view like the Word form.
 
 ## Waiting on the owner
 
