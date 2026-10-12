@@ -7,7 +7,7 @@
 // Empty = not set up yet: the buttons say so.
 
 export const GOOGLE_CLIENT_ID = '474134277199-c97g6vd5s79c7muk50qghq5urederrqn.apps.googleusercontent.com';
-export const DROPBOX_APP_KEY = '';
+export const DROPBOX_APP_KEY = 'tsuusabolodgy0y';
 
 export const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 export const FOLDER = 'APMES Logbook';
