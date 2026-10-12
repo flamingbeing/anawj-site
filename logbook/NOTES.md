@@ -226,9 +226,12 @@ portfolio content.
   opener, so Drive stayed on a blank page and Dropbox did nothing). Drive = OAuth implicit grant (token in the
   `#fragment`), scope `drive.file`, folder "APMES Logbook" found or made, same-day file replaced; Dropbox = PKCE,
   code in `?query`, App folder access, uploads to `/APMES Logbook/`. Both redirect to `https://anawj.com/logbook/`
-  (registered with both). sessionStorage `apmes-logbook-cloud-pending` {to, state, verifier, demo} before leaving;
+  (registered with both). localStorage `apmes-logbook-cloud-pending` {to, state, verifier, demo, at} before leaving
+  (not sessionStorage: a home-screen app may finish sign-in in a browser tab; 15 min limit);
   `index.html` stores the answer in `apmes-logbook-cloud-return` and tidies the address to `#data` (`?demo` kept);
-  `resumeCloudSave` (from `onUser`) waits for the server's cases and reflections, then saves. States start `gdr-` /
+  `resumeCloudSave` (from `onUser`) waits for the server's cases and reflections, then saves. The reflections
+  listener needs `includeMetadataChanges` for that: without it an unchanged offline copy never reports `fromCache:
+  false` (the first version waited 30 s and gave up on the owner's phone; demo e2e can't see it). States start `gdr-` /
   `dbx-`; a mismatch saves nothing. e2e: `test/e2e/cloud-save.mjs` fakes both. Tokens in memory only. `settings.cloudBackup` { remind, md,
   lastAt, lastTo } (never in the settings file). Reminder: one toast per visit with a Save button when due. The
   owner filled `GOOGLE_CLIENT_ID` and `DROPBOX_APP_KEY` (both public) in Oct 2026. Dropbox stays in development

@@ -341,7 +341,8 @@ export function watchReflections(email, cb) {
   let stop = null, stopped = false;
   sdk().then(({ db, F }) => {
     if (stopped) return;
-    stop = F.onSnapshot(F.collection(db, 'logbooks', lc(email), 'reflections'), snap => {
+    // with metadata changes, so callers learn when the server has confirmed an unchanged offline copy
+    stop = F.onSnapshot(F.collection(db, 'logbooks', lc(email), 'reflections'), { includeMetadataChanges: true }, snap => {
       const list = snap.docs.map(d => ({ ...d.data(), id: d.id })).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
       cb(list, { fromCache: snap.metadata.fromCache });
     }, e => { console.error('Reflection listener failed', e); for (const l of syncErrorListeners) l(e); });

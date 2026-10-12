@@ -47,7 +47,7 @@ try { for (const width of [390, 1280]) {
   await p.getByText(/Saved to Google Drive: 1 file/).waitFor();
   await openBackup();
   assert.deepEqual(uploads, ['drive']);
-  assert.equal(await p.evaluate(() => sessionStorage.length), 0);
+  assert.equal(await p.evaluate(() => sessionStorage.length + (localStorage.getItem('apmes-logbook-cloud-pending') ? 1 : 0)), 0);
   // the token lasts the visit: a second save goes straight up
   await p.getByRole('button', { name: 'Save to Google Drive', exact: true }).click();
   await p.waitForFunction(() => document.body.innerText.includes('Saved to Google Drive'));

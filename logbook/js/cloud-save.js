@@ -4,8 +4,9 @@
 // over a week old). Tokens are kept in memory for this visit only.
 //
 // Sign-in leaves the page and comes back (no popups: on phones the popup often loses its link to the app, so
-// Drive was left on a blank page and Dropbox did nothing). Before leaving, sessionStorage keeps what we're
-// waiting for; index.html keeps the answer and returns to #data; resumeCloudSave finishes the save.
+// Drive was left on a blank page and Dropbox did nothing). Before leaving, localStorage keeps what we're
+// waiting for (not sessionStorage: a home-screen app may finish the sign-in in a browser tab); index.html
+// keeps the answer and returns to #data; resumeCloudSave finishes the save.
 
 import { S, h, toast, todayISO, settings, patchLogbook } from './ui-core.js';
 import { GOOGLE_CLIENT_ID, DROPBOX_APP_KEY, FOLDER, cleanCloudBackup, backupDue, pkcePair, dropboxAuthUrl, googleAuthUrl, parseCloudReturn, dropboxArg, driveQuery } from './backup-targets.js';
@@ -30,12 +31,12 @@ async function saved(to, n) {
 
 // ---- leaving for the sign-in, and coming back ----
 
-const PENDING = 'apmes-logbook-cloud-pending', RETURN = 'apmes-logbook-cloud-return';
+const PENDING = 'apmes-logbook-cloud-pending', RETURN = 'apmes-logbook-cloud-return', PENDING_MS = 15 * 60e3;
 const redirectUri = () => location.origin + location.pathname;   // https://anawj.com/logbook/ (registered with Google and Dropbox)
 const randomState = prefix => prefix + crypto.getRandomValues(new Uint32Array(2)).join('');
 async function leaveToSignIn(to) {
   const state = randomState(to === 'drive' ? 'gdr-' : 'dbx-');
-  const pending = { to, state, demo: !!demo };
+  const pending = { to, state, demo: !!demo, at: Date.now() };
   let url;
   if (to === 'drive') url = googleAuthUrl({ clientId: GOOGLE_CLIENT_ID, redirectUri: redirectUri(), state, loginHint: S.user && S.user.email });
   else {
@@ -43,19 +44,21 @@ async function leaveToSignIn(to) {
     pending.verifier = verifier;
     url = dropboxAuthUrl({ appKey: DROPBOX_APP_KEY, redirectUri: redirectUri(), challenge, state });
   }
-  try { sessionStorage.setItem(PENDING, JSON.stringify(pending)); } catch { return toast('Not saved: this browser won’t keep the sign-in (private mode?)'); }
+  try { localStorage.setItem(PENDING, JSON.stringify(pending)); } catch { return toast('Not saved: this browser won’t keep the sign-in (private mode?)'); }
   location.assign(url);
 }
-const take = key => { try { const v = JSON.parse(sessionStorage.getItem(key) || 'null'); sessionStorage.removeItem(key); return v; } catch { return null; } };
+const take = (store, key) => { try { const v = JSON.parse(store.getItem(key) || 'null'); store.removeItem(key); return v; } catch { return null; } };
 
 // after sign-in on the page Google or Dropbox sent us back to: finish the save that was waiting
 export async function resumeCloudSave() {
-  const back = take(RETURN), pending = take(PENDING);
+  const back = take(sessionStorage, RETURN);
   const r = back && parseCloudReturn(back);
   if (!r) return;
+  const p = take(localStorage, PENDING), pending = p && Date.now() - (p.at || 0) < PENDING_MS ? p : null;
   const where = r.to === 'drive' ? 'Google Drive' : 'Dropbox';
   if (!pending || pending.to !== r.to || pending.state !== r.state) return toast(`Not saved to ${where}: the sign-in didn’t match. Tap Save again.`);
   if (r.error) return toast(`Not saved to ${where}: ${/denied/i.test(r.error) ? 'sign-in was cancelled' : r.error}`);
+  toast(`Saving to ${where}…`);
   try {
     // the backup must hold everything: wait for the server's copy of the cases and reflections
     for (const t0 = Date.now(); !(S.casesSynced && S.reflectionsSynced); await new Promise(res => setTimeout(res, 250)))
