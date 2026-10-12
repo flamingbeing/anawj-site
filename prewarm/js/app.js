@@ -546,7 +546,7 @@ const EVENTS = [['pw_gown', 'Gown on'], ['pw_start', 'Prewarm on', 'pw'], ['ev_w
   ['io_done', 'Surgery end'], ['pacu_in', 'PACU in'], ['pacu_out', 'To ward']];
 // the gown and Bair Hugger times, coloured warm (owner, 12 Oct 2026)
 const WARM_EVENTS = new Set(['pw_gown', 'pw_start', 'ev_wstop', 'io_under_start', 'io_gown_start']);
-const EVENT_FULL = { pw_gown: 'Gown on', ev_ot: 'In OT', pacu_in: 'PACU arrival', io_flip: 'Flipped prone', pw_start: 'Active warming started', ev_wstop: 'Active warming stopped', io_knife: 'Induction (knife to skin)', io_under_start: 'Underbody Bair Hugger on',
+const EVENT_FULL = { pw_gown: 'Gown on', ev_ot: 'In OT', pacu_in: 'PACU arrival', io_flip: 'Flipped prone', pw_start: 'Active warming started', ev_wstop: 'Active warming stopped', io_knife: 'Induction', io_under_start: 'Underbody Bair Hugger on',
   io_gown_start: 'Gown Bair Hugger on', io_done: 'Surgery completed (post-extubation)', pacu_out: 'Transfer to ward' };
 // Running timer and the next event to note, in the app bar of the patient screen
 const ESSENTIAL = ['pw_gown', 'pw_start', 'ev_wstop', 'ev_ot', 'io_knife', 'io_done', 'pacu_in', 'pacu_out'];
@@ -625,15 +625,17 @@ function topBar(p, s, onLog) {
 const defaultSeries = p => noWarming(p) || val(p, 'ev_ot') || val(p, 'io_knife') ? 'iotemp' : 'prewarm';
 route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s, key) => {
   const p = patients[id]; if (!p) return go('#/');
-  if (!s || (s === 'prewarm' && noWarming(p))) s = defaultSeries(p);
+  // the no-pre-warming group keeps the Pre-warming tab, which just says so (owner, 12 Oct 2026)
+  if (!s) s = defaultSeries(p);
+  const noPw = s === 'prewarm' && noWarming(p);
   const main = s !== 'haemo';
   const def = SERIES[s], pts = pointsFor(p, s);
   header(sid(p), '#/');
   // two tabs under the bar (owner, 12 Oct 2026): temperatures, and BP / HR / BIS with the other forms; each warms up
   // and pulses as its next reading falls due
-  const tabs = $('#ptabs'); tabs.hidden = false;
-  tabs.innerHTML = `<a role="tab" id="templink" href="#/p/${id}" aria-selected="${main}" data-state="${haemoState(p, defaultSeries(p))}">Temperatures</a>`
-    + `<a role="tab" id="haemolink" href="#/p/${id}/haemo" aria-selected="${!main}" data-state="${haemoState(p)}">Others</a>`;
+  // key times fill the top of the screen on both tabs; the tab bar sits under them (owner, 12 Oct 2026)
+  const ptabsHtml = () => `<nav class="ptabs" role="tablist" aria-label="Readings"><a role="tab" id="templink" href="#/p/${id}" aria-selected="${main}" data-state="${haemoState(p, defaultSeries(p))}">Temperatures</a>`
+    + `<a role="tab" id="haemolink" href="#/p/${id}/haemo" aria-selected="${!main}" data-state="${haemoState(p)}">Others</a></nav>`;
   const refreshBar = topBar(p, s, () => draw());
   // swipe left / right to change tab (owner, 12 Oct 2026); not from the timepoint strip or a box being typed in
   let sw = null;
@@ -805,8 +807,8 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     return `<div class="comfort"><span class="lab">${label}<small>ask the patient</small></span>
       <div class="seg comfort5">${COMFORT.map(([ov, ol]) => `<button class="chip" data-sat="${id}" data-v="${ov}" aria-pressed="${String(v) === String(ov)}">${ol.replace('omfortable', 'omfort&shy;able')}</button>`).join('')}</div></div>`;
   }
+  // the other forms, Still to fill and Mark complete: the same on both tabs (owner, 12 Oct 2026)
   function linksHtml() {
-    if (main) return `<div class="textlinks"><a href="#/p/${id}/form">Form view</a><a href="#/p/${id}/sheet">Sheet view</a></div>`;
     const done = pg => val(p, 'sign_' + pg) ? ' ✓' : '';
     // once their stage has come: how many questions are left
     const todo = (ids, from) => {
@@ -818,7 +820,8 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
       <a href="#/p/${id}/form/intraop">Intra-op details${done('intraop')}<small>${todo(INTRAOP_Q, 'io_done') || 'Blood, products, tests'}</small></a>
       <a href="#/p/${id}/form/pacu">PACU${done('pacu')}<small>${todo(PACU_Q, 'pacu_in') || 'Temp, NuDESC, delay'}</small></a>
       </nav>
-      <a class="widebox" href="#/p/${id}/data">Perioperative data</a>`;
+      <a class="widebox" href="#/p/${id}/data">Perioperative data</a>
+      <div class="textlinks"><a href="#/p/${id}/form">Form view</a><a href="#/p/${id}/sheet">Sheet view</a></div>`;
   }
   // previous / next timepoint: big buttons either side of the tabs and the timepoint strip
   function navHtml() {
@@ -829,7 +832,6 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     return `<div class="nav2">${btn(pts[i - 1], 'prev', '‹', 'Previous')}<div class="mid">${main ? tabsHtml() : ''}${strip()}</div>${btn(pts[i + 1], 'next', '›', 'Next')}</div>`;
   }
   function tabsHtml() {
-    if (noWarming(p)) return `<h2 class="sect">Intra-op temperatures</h2>`;
     return `<div class="tabs2" role="tablist">${['prewarm', 'iotemp'].map(x => `<a role="tab" aria-selected="${x === s}" href="#/p/${id}/${x}">${x === 'prewarm' ? 'Pre-warming' : 'Intra-op'}</a>`).join('')}</div>`;
   }
   function draw() {
@@ -846,11 +848,13 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     keep();
     const due = dueOf(p, s, pt);
     const grp = s === 'prewarm' ? `<span class="badge">${GROUPS.find(g => String(g[0]) === String(val(p, 'arm')))?.[1] || 'Group not set'}</span>` : '';
-    paint(`${main && val(p, 'done') ? `<p class="ok-box donetop">✓ Data collection complete <small>${esc(val(p, 'done'))}</small></p>` : ''}${main ? comfortHtml('sat_pre', 'Comfortable before surgery?') + timesHtml() : ''}${navHtml()}
+    const reading = noPw ? `<div class="nav2"><span></span><div class="mid">${tabsHtml()}</div><span></span></div>
+      <p class="note nopw">No pre-warming: this patient is in the no pre-warming group. Intra-op temperatures are on the Intra-op tab.</p>` : `${navHtml()}
       <div class="tp"><div><b>${pt.label}</b> ${grp}</div><div class="due" id="due">${due != null ? 'due ' + fromMin(Math.round(due)) : pt.key === 'base' ? (s === 'prewarm' ? '' : 'on arrival in OT') : pt.min != null ? `<span class="hint">Log ${s === 'prewarm' ? 'Prewarm on' : 'Induction'} first</span>` : ''}</div></div>
       ${isSaved ? `<p class="muted small tight">Taken ${esc(savedAt(p, s, pt.key))}${p.f['at_' + s + '_' + pt.key]?.by ? ' (saved by ' + esc(p.f['at_' + s + '_' + pt.key].by) + ')' : ''} <button class="link" data-attime>Change time</button>. Changes save when you tap Save.</p>` : ''}
       <div class="board">${cols.map(card).join('')}</div>
-      <button class="save big" id="save">${isSaved ? 'Save changes' : `Save ${pt.label} reading`}</button>
+      <button class="save big" id="save">${isSaved ? 'Save changes' : `Save ${pt.label} reading`}</button>`;
+    paint(`${val(p, 'done') ? `<p class="ok-box donetop">✓ Data collection complete <small>${esc(val(p, 'done'))}</small></p>` : ''}${timesHtml()}${ptabsHtml()}${main ? comfortHtml('sat_pre', 'Comfortable before surgery?') : ''}${reading}
       ${s === 'haemo' && vitalsCollected(p) ? '<p class="okline small">✓ Vital signs data collected: ticked on the paper form</p>' : ''}
       ${s === 'haemo' && settings.hide.haemo15 ? `<p class="muted small">Only baseline is entered here; the 15-min rows come from the monitor download. Turn them on in Settings.</p>` : ''}
       ${main ? comfortHtml('sat_post', 'Comfortable after surgery?') + linksHtml() + gapsHtml(p) + doneHtml(p) : signoffHtml(p, s) + linksHtml() + gapsHtml(p) + doneHtml(p)}`);

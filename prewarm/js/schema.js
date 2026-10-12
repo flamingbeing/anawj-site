@@ -57,7 +57,7 @@ const SERIES = {
       { key: 'ts', label: 'Thermal sensation', type: 'code', opts: THERMAL }],
   },
   iotemp: {
-    ref: ['io_knife'], refLabel: 'knife to skin',
+    ref: ['io_knife'], refLabel: 'induction',
     points: [BASELINE, ...tp(0, 60, 5), ...tp(75, 300, 15), END],
     cols: [...TEMPS,
       { key: 'under', label: 'Underbody warming', type: 'code', opts: YN, carry: true },
@@ -65,7 +65,7 @@ const SERIES = {
       { key: 'room', label: 'Room temp', type: 'num', unit: '°C', carry: true }],
   },
   haemo: {
-    ref: ['io_knife'], refLabel: 'knife to skin',
+    ref: ['io_knife'], refLabel: 'induction',
     points: [BASELINE, ...tp(15, 300, 15), END],
     cols: [
       { key: 'sbp', label: 'Systolic BP', type: 'int', unit: 'mmHg' },
@@ -148,7 +148,7 @@ export const PAGES = [
   ], series: 'prewarm' },
   { id: 'intraop', title: 'Intra-op', section: 4, opday: true, signoff: true, fields: [
     { id: 'io_flip', label: 'Patient flipped', type: 'time' },
-    { id: 'io_knife', label: 'Knife to skin (induction)', type: 'time' },
+    { id: 'io_knife', label: 'Induction', type: 'time' },
     { id: 'io_under_start', label: 'Underbody Bair Hugger started', type: 'time' },
     { id: 'io_gown_start', label: 'Intra-op gown Bair Hugger started', type: 'time' },
     { id: 'io_done', label: 'Surgery completed (post-extubation)', type: 'time' },

@@ -7,9 +7,8 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 ## Now
 
 - **Claude Code, Prewarming Webapp** (branch `ccr-13264f37-d28edu`): bug hunt 17:53 to 20:45 UTC 12 Oct 2026 done
-  (#257 to #285). Nothing half-done. Questions for the owner: should the no-pre-warming group get pre-op
-  temperatures (the app skips that table for them)? Is intra-op time 0 induction or knife to skin (the app's
-  "Induction" box; the schema says "Knife to skin (induction)")? Advise: don't lock patients during the study day;
+  (#257 to #285). Nothing half-done. Owner answered: intra-op time 0 is induction; no pre-op
+  temperatures for no pre-warming (tab kept, says so). Advise: don't lock patients during the study day;
   set both phones' clocks to automatic; check +/− and the iOS time wheel on a real phone. Real patients start 13 Oct 2026.
 
 ## Waiting on the owner
@@ -26,6 +25,7 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 
 ## Recently done
 
+- Layout: key times on top, tab bar under them, same bottom part on both tabs; no-pre-warming Pre-warming tab.
 - #285: unsaved readings come back after the phone closes the app; toasts no longer block taps on Log / tabs.
 - #283, #284: two patients at once: home list shows each one's due reading; alerts cover patients opened on this phone.
 - #282: a reading due now on the other tab shows in the top bar too.
@@ -37,6 +37,7 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 
 ## Decisions
 
+- 12 Oct 2026: intra-op time 0 is induction; no-pre-warming group keeps a Pre-warming tab saying so; times on top, tab bar below, shared bottom part (owner).
 - 12 Oct 2026: amber, orange and red are kept for timing alarms (warming boxes lavender); Still to fill stays amber (owner).
 - 12 Oct 2026: top-bar clock reads "Time now".
 - 12 Oct 2026: due alerts for other patients only once opened on this phone (a teammate's synced patient doesn't beep).
