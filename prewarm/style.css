@@ -272,6 +272,10 @@ body.ro main .k, body.ro main .num, body.ro main .chip, body.ro main .tchip, bod
 html, body { overscroll-behavior-y: none; }
 /* the two tabs under the bar: temperatures, BP / HR / BIS */
 .ptabs:not([hidden]) { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; max-width: 600px; margin: 0 auto; padding: 0 12px 5px; }
+/* on the patient screens the tab bar sits under the key times (owner, 12 Oct 2026) */
+main .ptabs:not([hidden]) { width: 100%; max-width: none; padding: 0; margin: 2px 0 0; }
+main .ptabs a { min-height: 34px; font-size: 15px; }
+.note.nopw { margin-top: 4px; background: var(--card); border: 1px solid var(--line); color: var(--ink); }
 .ptabs a { display: grid; place-items: center; min-height: 32px; border-radius: var(--r); border: 1px solid var(--line); color: var(--navy); font-size: 14px; font-weight: 600; text-decoration: none; background: var(--card); }
 .ptabs a[aria-selected="true"] { background: var(--navy); border-color: var(--navy); color: #fff; }
 .ptabs a[aria-selected="false"][data-state="soon"] { background: var(--warn-soft); border-color: var(--warn); color: var(--warn); animation: duepulse 2s ease-in-out infinite; --pulse: rgba(138, 90, 0, .35); }

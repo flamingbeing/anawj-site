@@ -442,6 +442,29 @@ await tryit(async () => {
   log((await pg.textContent('.num[data-type="core"]')).trim() !== '37.2', 'Don\'t save forgets it: ' + await pg.textContent('.num[data-type="core"]'));
   await ctx.close();
 });
+// X. layout: key times on top, the Temperatures / Others tab bar under them on both tabs, Save on screen;
+// the no-pre-warming group keeps a Pre-warming tab that just says so
+await tryit(async () => {
+  const { ctx, pg } = await fresh();
+  await open(pg, 1);
+  const below = () => pg.evaluate(() => !!(document.querySelector('.times')?.compareDocumentPosition(document.querySelector('main .ptabs')) & Node.DOCUMENT_POSITION_FOLLOWING));
+  log(await below(), 'tab bar under the key times (Temperatures)');
+  // the bottom part (other forms, Still to fill, Mark complete) is the same on both tabs
+  const bottom = () => pg.evaluate(() => [...document.querySelectorAll('nav.links a, a.widebox, .textlinks a, .gaps h3, [data-done]')].map(e => e.textContent.trim().split('\n')[0]).join('|'));
+  const tb = await bottom();
+  await pg.click('#haemolink'); await pg.waitForSelector('[data-in="sbp"]');
+  log(tb && tb === await bottom(), 'same bottom part on both tabs: ' + tb + ' / ' + await bottom());
+  log(await below(), 'tab bar under the key times (Others)');
+  const sv = await pg.locator('#save').boundingBox();
+  log(sv.y + sv.height <= 844, 'Others: Save on screen without scrolling: ' + (sv.y + sv.height));
+  await pg.goto('http://localhost:8080/prewarm/?demo#/new'); await pg.waitForSelector('#sid');
+  await pg.fill('#sid', 'NOPW-X'); await pg.click('.seg .chip[data-v="3"]'); await pg.click('button[type=submit]');
+  await pg.waitForSelector('.tabs2');
+  log(/Intra-op/.test(await pg.textContent('.tabs2 [aria-selected="true"]')), 'no pre-warming opens on Intra-op');
+  await pg.click('.tabs2 a:first-child'); await pg.waitForSelector('.nopw');
+  log(/No pre-warming/.test(await pg.textContent('.nopw')) && !await pg.$('#save'), 'Pre-warming tab says no pre-warming, nothing to save');
+  await ctx.close();
+});
 await b.close();
 if (fails.length) { console.error('prewarm edge: FAIL\n- ' + fails.join('\n- ')); process.exit(1); }
-console.log('prewarm edge: ok (midnight, surgery end, double-tap Save, BP checks, back button, Log, Enter, still to fill, swipe, stray taps, time order, corrections, BMI, follow-ups, blanks, typed answers, alerts everywhere, duplicates, storage full, lock warning, late readings, delete and restore, prewarm off alert, warming yes / no, touch double taps, typing then leaving, other tab due, two patients, app closed mid-reading)');
+console.log('prewarm edge: ok (midnight, surgery end, double-tap Save, BP checks, back button, Log, Enter, still to fill, swipe, stray taps, time order, corrections, BMI, follow-ups, blanks, typed answers, alerts everywhere, duplicates, storage full, lock warning, late readings, delete and restore, prewarm off alert, warming yes / no, touch double taps, typing then leaving, other tab due, two patients, app closed mid-reading, layout)');

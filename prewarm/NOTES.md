@@ -81,6 +81,11 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   the keyboard still up), it is kept in localStorage (`unsaved:<patient>:<series>:<timepoint>`); reopening that
   reading brings it back with a toast, unless any of its boxes was saved since. Save or "Don't save" clears it.
   Toasts let taps through (`pointer-events: none`): they sat over Log, Back and the tabs for 2.6 s.
+- **Patient screen layout** (owner, 12 Oct 2026): key times at the top on both tabs, then the Temperatures / Others
+  tab bar, then the tab's readings; the bottom part (Intra-op details, PACU, Perioperative data, Form / Sheet view,
+  Still to fill, Mark complete) is the same on both tabs. The no-pre-warming group keeps a Pre-warming tab that says
+  "No pre-warming". Intra-op time 0 is induction (`io_knife`, labelled Induction; the paper form's row reads
+  "Knife-to-skin start time (Induction)").
 - **Never send an empty `f`** (lesson, 12 Oct 2026): `setDoc(…, { f: {} }, { merge: true })` replaces the server's
   `f` with an empty map (an empty map is a leaf in the merge). Lock / unlock / delete sent one and wiped the server
   copy's readings; push now omits an empty `f`, lock sends the full record, and each phone resends all its patients

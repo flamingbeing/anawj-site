@@ -192,9 +192,9 @@ try {
   assert.doesNotMatch(await got.file('docProps/core.xml').async('string'), /Test Author/, 'file details removed');
   await page.goBack();
 
-  // two tabs under the bar: Temperatures and BP, HR, BIS (which holds the other forms' links)
+  // two tabs under the key times: Temperatures and Others; the other forms' links are on both
   assert.equal(await page.getAttribute('#templink', 'aria-selected'), 'true');
-  assert.equal(await page.$('.links a[href$="/form/intraop"]'), null, 'other forms are on the BP, HR, BIS tab');
+  assert.ok(await page.$('.links a[href$="/form/intraop"]'), 'other forms are on the Temperatures tab too');
   await page.click('#haemolink');
   await page.waitForSelector('input[data-in="sbp"]');
   assert.equal(await page.getAttribute('#haemolink', 'aria-selected'), 'true');
