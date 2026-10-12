@@ -277,8 +277,9 @@ portfolio content.
 - **Basic mode** (`settings.basic`, the whole account; `basicMode()` in `ui-core.js`; a switch at the top of Settings
   and of Show or hide; body class `basic`): a simpler app for new residents. Same tabs and buttons in the same places;
   hidden: every optional Case tab part but "what the box was read as" (quick picks, ☆, Still needed, tag group saving,
-  Plan for later), the Logbook Grid view and search operators, Analytics Trends, the Advanced display / logging links,
-  the settings file and Connect Claude cards. It changes no other setting, so off brings everything back. e2e:
+  Plan for later), the Logbook Grid view and search operators, Analytics Trends, the Advanced display / logging links
+  (`advancedLink` draws "… are hidden while Basic mode is on. Turn off Basic mode ›" instead, from the setting itself:
+  a silently missing link looked like a bug to the owner, Oct 2026), the settings file and Connect Claude cards. It changes no other setting, so off brings everything back. e2e:
   `simpler.mjs`.
 - **One spreadsheet (CSV)** (Backup card, "Download as one spreadsheet"; `backup-csv.js`, tested; Oct 2026, from
   Codex's list): the backup as one CSV for Excel: a `logbook` row (settings, tag groups, portfolio details) then a row

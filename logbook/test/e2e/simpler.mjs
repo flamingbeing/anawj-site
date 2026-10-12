@@ -67,9 +67,14 @@ try { for (const width of [390, 1280]) {
   assert.ok(!/at your pace/.test(await p.locator('main').innerText()));
   await p.evaluate(() => { location.hash = '#display'; });
   assert.equal(await p.locator('a[data-go=displayadv]').isVisible(), false);
+  // ...but it says so, with a way back (a silently missing link looked like a bug)
+  await p.locator('.adv-hidden').filter({ hasText: 'hidden while Basic mode is on' }).waitFor();
   await p.evaluate(() => { location.hash = '#showhide'; });
   await p.getByLabel('Basic mode', { exact: true }).uncheck();
   await p.waitForFunction(() => !document.body.classList.contains('basic'));
+  await p.evaluate(() => { location.hash = '#display'; });
+  await p.locator('a[data-go=displayadv]').waitFor();
+  assert.equal(await p.locator('.adv-hidden').count(), 0);
   await p.locator('[role=tab][data-tab=logbook]').click();
   await p.locator('main .seg button').filter({ hasText: /^Grid$/ }).waitFor();
   await p.locator('[role=tab][data-tab=progress]').click();
