@@ -1,0 +1,538 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#002f6c">
+<title>Hand assessment</title>
+<meta name="description" content="Crash course for new hand surgery MOs: accurate sensation, 2-point discrimination, individual tendon testing, Kanavel's signs and photos for remote review.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23002f6c'/%3E%3Ctext x='16' y='23' font-size='18' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='700'%3EH%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="../design/tokens.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="bar">
+  <div class="title"><b>Hand assessment</b> <span>crash course for new MOs</span></div>
+  <nav aria-label="Sections">
+    <a href="#rules">Rules</a>
+    <a href="#picture">By picture</a>
+    <a href="#sensation">Sensation</a>
+    <a href="#tendons">Tendons</a>
+    <a href="#infection">Infection</a>
+    <a href="#photos">Photos</a>
+    <a href="#call">Call</a>
+    <a href="#words">Words</a>
+    <a href="#quiz">Quiz</a>
+  </nav>
+</header>
+<button id="update" class="update" hidden>Update available: tap to reload</button>
+
+<main>
+
+<!-- ============================================================ RULES -->
+<section id="rules">
+  <h2>The 10 rules</h2>
+  <p class="lead">Your senior will decide on surgery from <b>your exam and your photos</b>. If either is wrong, the patient gets the wrong plan. Read this box if nothing else.</p>
+  <ol class="rules">
+    <li><b>Examine sensation before any local anaesthetic</b> (digital block, wound infiltration). Ask ED whether LA was already given. Numb from LA = exam useless.</li>
+    <li><b>Test sensation distal to the wound</b>, on the <b>radial and ulnar side of the pulp separately</b>. Testing proximal to the cut and writing "sensation intact" tells us nothing. <a href="#sens-where">Why ↓</a></li>
+    <li><b>Test each tendon on its own</b>: FDP and FDS for every finger at risk, FPL for the thumb, extensors at the MCP. "Able to make a fist" is not a tendon exam. <a href="#tendons">How ↓</a></li>
+    <li><b>Full movement does not mean the tendon is intact.</b> A tendon can be 90% cut and still move. Pain or weakness against resistance = partial cut until proven otherwise. A wound over a tendon usually gets explored anyway.</li>
+    <li><b>Look before you touch.</b> The resting posture (the <a href="#t-look">cascade</a>) shows a cut flexor before you test anything, even in a child or a drunk patient.</li>
+    <li><b>Bright pulsatile bleeding from the side of a finger = digital artery cut = assume the digital nerve is cut too</b> (the nerve lies right next to it, just volar). Press and elevate; <b>never clamp blindly</b>, it crushes the nerve.</li>
+    <li><b>Photos: always two views.</b> One <b>zoomed out</b> (whole hand and wrist: which hand, which finger, which side) and one <b>zoomed in</b> (wound fills the frame). Wipe the blood off first. <a href="#photos">How ↓</a></li>
+    <li><b>Use the right words:</b> left/right, dominant hand, <b>thumb / index / middle / ring / little</b>, volar/dorsal, radial/ulnar side, and the level (DIP, middle phalanx, PIP…). Never "4th finger", "medial", "lateral". <a href="#words">Words ↓</a></li>
+    <li><b>Red swollen finger: check Kanavel's 4 signs.</b> A wound over a knuckle from a punch is a <b>fight bite</b> until proven otherwise, however small. <a href="#infection">Infection ↓</a></li>
+    <li><b>Take the rings off now</b> (all fingers, before swelling). Glass injury → X-ray for glass. Document the time of injury.</li>
+  </ol>
+
+  <h3>Exam order (every hand, 5 minutes)</h3>
+  <ol class="flow">
+    <li><b>History:</b> age, <b>dominant hand</b>, <b>job</b> (and hobbies: musician? sport?), mechanism (knife / glass / saw / crush / bite / punch / high-pressure gun), <b>time of injury</b>, position of the hand when cut (fist or open), smoker, diabetes, tetanus, anticoagulants.</li>
+    <li><b>Look:</b> where exactly is the wound, the <b>resting cascade</b>, swelling, colour, deformity, rotation.</li>
+    <li><b>Perfusion:</b> colour, capillary refill vs the next finger, pulp turgor, temperature.</li>
+    <li><b>Sensation (before LA):</b> distal to the wound, radial and ulnar sides, light touch then 2PD.</li>
+    <li><b>Tendons:</b> each one on its own, then against resistance (pain? weak?).</li>
+    <li><b>Bones and joints:</b> tenderness, rotation (fist), stability; X-ray.</li>
+    <li><b>Photos</b> (wide + close, plus extras for the picture), then <b>call</b> with a structured message.</li>
+  </ol>
+</section>
+
+<!-- ============================================================ BY PICTURE -->
+<section id="picture">
+  <h2>By clinical picture</h2>
+  <p class="lead">Tap the one in front of you. Each shows what to examine, what to photograph and when to call your senior <b>now</b>.</p>
+
+  <details class="pic" id="pic-cut">
+    <summary><span class="ic">🔪</span> Cut / laceration (finger, palm, wrist)</summary>
+    <div class="cols">
+      <div><h4>Examine</h4>
+        <ul>
+          <li>Exact site: digit, volar/dorsal, radial/ulnar side, level (e.g. "volar, radial side, over proximal phalanx" = flexor zone II).</li>
+          <li>Cascade at rest. A finger lying straighter than its neighbours = flexor cut.</li>
+          <li>Perfusion of the digit (cap refill, colour, turgor) vs neighbours.</li>
+          <li>Sensation <b>distal</b> to the cut: radial and ulnar pulp separately, light touch + <a href="#sens-2pd">2PD</a>, compare to the same finger on the other hand.</li>
+          <li>FDP and FDS of every finger near the cut, FPL if thumb/thenar. Extensors at MCP if dorsal. Then <b>against resistance</b>: pain? weak?</li>
+          <li>Glass: X-ray (most glass > 2 mm shows).</li>
+          <li><b>Volar wrist cut ("spaghetti wrist"):</b> test median (thumb abduction, index pulp), ulnar (finger spreading, little pulp), radial and ulnar pulses, every finger flexor and wrist flexor (FCR, FCU, PL).</li>
+        </ul></div>
+      <div><h4>Photos</h4>
+        <ul class="photo">
+          <li>Wide: whole hand + wrist, the side with the wound.</li>
+          <li>Close-up: wound fills half the frame, after cleaning.</li>
+          <li>Cascade: side view, hand relaxed palm up.</li>
+          <li>Short video of each at-risk finger: FDP test, FDS test.</li>
+        </ul>
+        <h4 class="red">Call now if</h4>
+        <ul><li>Pale / cold / no cap refill digit.</li><li>Uncontrolled bleeding despite 10 min pressure + elevation.</li><li>Multiple tendons/nerves at the wrist.</li></ul>
+        <p class="miss"><b>Common miss:</b> testing sensation over the palm for a finger cut; "flexes all fingers" without isolating FDS; not noticing that the patient was gripping (knife or glass) when cut, so the tendon end has retracted <a href="#t-partial">away from the skin wound</a>.</p>
+      </div>
+    </div>
+  </details>
+
+  <details class="pic" id="pic-infect">
+    <summary><span class="ic">🔥</span> Red, swollen finger or hand (infection)</summary>
+    <div class="cols">
+      <div><h4>Examine</h4>
+        <ul>
+          <li><b>Kanavel's 4 signs</b> (flexor sheath infection): held flexed, sausage swelling, tender along the sheath, pain on passive extension. <a href="#infection">Details ↓</a></li>
+          <li>Where is the pus? Nail fold (paronychia), pulp (felon), sheath, web space, palm, dorsum, joint.</li>
+          <li>Any puncture, splinter, bite, injection, recent manicure? Diabetes, immunosuppression, IV drug use.</li>
+          <li><b>Mark the edge of the redness with a pen, write date and time on the skin</b>, photograph it.</li>
+          <li>Temperature, HR, BP; WCC, CRP, glucose; X-ray (foreign body, gas, bone).</li>
+        </ul></div>
+      <div><h4>Photos</h4>
+        <ul class="photo">
+          <li>Wide: both hands side by side, palms up (swelling is obvious only when compared).</li>
+          <li>Close-up of the finger: volar and side view.</li>
+          <li>Dorsal view (palm infections swell the back of the hand).</li>
+          <li>After pen marking, with the time written.</li>
+        </ul>
+        <h4 class="red">Call now if</h4>
+        <ul><li>Any Kanavel sign, or a swollen whole finger.</li><li>Pain out of proportion, rapid spread, dusky skin, blisters, crepitus, unwell: think <b>necrotising fasciitis</b>.</li><li>Sepsis.</li></ul>
+        <p class="miss"><b>Common miss:</b> calling it "cellulitis" without checking passive extension and sheath tenderness; treating dorsal swelling as the problem when the pus is in the palm.</p>
+      </div>
+    </div>
+  </details>
+
+  <details class="pic" id="pic-bite">
+    <summary><span class="ic">🦷</span> Bite, or punch with a wound over the knuckle</summary>
+    <div class="cols">
+      <div><h4>Examine</h4>
+        <ul>
+          <li><b>Fight bite:</b> small wound over an MCP (often ring/little, dominant hand) after punching someone in the mouth. Patients often deny it. <b>Assume the tooth went into the joint.</b></li>
+          <li>Look at the wound <b>with the fist clenched</b> as well as open: in a fist the tendon and joint capsule sit under the skin wound; when the finger straightens the tendon cut slides proximal and hides.</li>
+          <li>Extensor (MCP extension) of that finger, against resistance.</li>
+          <li>Joint: swelling, pain on moving the MCP.</li>
+          <li>X-ray: tooth fragment, metacarpal head fracture ("boxer's" neck fracture is common too).</li>
+          <li>Animal bites (cat especially): small deep punctures, high infection risk; check for sheath signs.</li>
+        </ul></div>
+      <div><h4>Photos</h4>
+        <ul class="photo">
+          <li>Wide: dorsum of the hand, fingers straight.</li>
+          <li>Close-up: wound.</li>
+          <li><b>Same close-up with the fist clenched.</b></li>
+        </ul>
+        <h4 class="red">Call now if</h4>
+        <ul><li>Every fight bite: usually needs washout in theatre.</li><li>Any Kanavel sign after a bite.</li></ul>
+        <p class="miss"><b>Common miss:</b> a 3 mm "abrasion" over the knuckle sent home with oral antibiotics, back in 3 days with septic arthritis.</p>
+      </div>
+    </div>
+  </details>
+
+  <details class="pic" id="pic-crush">
+    <summary><span class="ic">🔨</span> Crush, suspected fracture or dislocation</summary>
+    <div class="cols">
+      <div><h4>Examine</h4>
+        <ul>
+          <li><b>Rotation:</b> ask for a loose fist. All fingertips should point towards the scaphoid (base of the thumb) and <b>not overlap</b>. A finger crossing over its neighbour (scissoring) = rotated fracture, needs fixing. If pain stops a fist, look end-on at the nails with fingers half bent: nail planes should line up. Compare with the other hand.</li>
+          <li>Swelling, deformity, open wound over a fracture (= <b>open fracture</b>: antibiotics, tetanus per protocol).</li>
+          <li>Perfusion and sensation distal to the injury.</li>
+          <li>Tendons: can the patient flex and extend each joint? (A mallet finger is a tendon or bony avulsion: DIP droops, can't straighten actively.)</li>
+          <li>X-ray: <b>PA and true lateral of the injured finger</b> (not just "hand"), oblique for metacarpals.</li>
+        </ul></div>
+      <div><h4>Photos</h4>
+        <ul class="photo">
+          <li>Wide: hand, palm down, fingers straight.</li>
+          <li><b>Loose fist</b> from the front (rotation).</li>
+          <li>End-on view of the fingertips (nail alignment).</li>
+          <li>X-rays: photo of the screen, straight on, whole image, one per view.</li>
+        </ul>
+        <h4 class="red">Call now if</h4>
+        <ul><li>Unreduced dislocation, open fracture, ischaemic digit, compartment syndrome signs (tense, pain on passive stretch).</li></ul>
+        <p class="miss"><b>Common miss:</b> rotation not checked; X-ray of the "hand" where the finger lateral is overlapped by the other fingers.</p>
+      </div>
+    </div>
+  </details>
+
+  <details class="pic" id="pic-tip">
+    <summary><span class="ic">💅</span> Fingertip, nailbed injury or amputation</summary>
+    <div class="cols">
+      <div><h4>Examine</h4>
+        <ul>
+          <li>Level of tissue loss: pulp only? bone exposed? through nail? Which way is the loss angled (more volar or more dorsal)?</li>
+          <li>Nail: avulsed, lifted out of the fold, subungual haematoma size; nailbed laceration with a tuft fracture = open fracture.</li>
+          <li>Amputation: level, clean cut vs crush/avulsion, condition of the part, time of injury, smoker, job, dominance, patient's wishes.</li>
+          <li><b>Amputated part:</b> wrap in saline-moist gauze → sealed bag → bag in ice-water. <b>Never put it directly on ice or in water.</b></li>
+        </ul></div>
+      <div><h4>Photos</h4>
+        <ul class="photo">
+          <li>Wide: whole hand, palm and back.</li>
+          <li>Close-up of the stump: from the front (volar), the side and end-on.</li>
+          <li>Amputated part: both sides, next to a ruler.</li>
+          <li>X-ray of the hand <b>and of the part</b>.</li>
+        </ul>
+        <h4 class="red">Call now if</h4>
+        <ul><li>Any amputation proximal to the nail fold, thumb amputation, multiple digits, any child: possible replant, time matters.</li></ul>
+      </div>
+    </div>
+  </details>
+
+  <details class="pic" id="pic-inject">
+    <summary><span class="ic">💉</span> High-pressure injection (paint, grease, hydraulic, fuel)</summary>
+    <div class="cols">
+      <div><h4>Examine</h4>
+        <ul>
+          <li>Tiny entry wound, often on the index fingertip or palm, <b>looks harmless</b>. Patient may have little pain at first.</li>
+          <li>What substance, what pressure, time. Swelling tracking up the finger/palm, perfusion, sensation.</li>
+          <li>X-ray (lead paint and air show the spread).</li>
+          <li>Elevate. <b>No digital block</b> (it adds pressure in the finger).</li>
+        </ul></div>
+      <div><h4>Photos</h4>
+        <ul class="photo"><li>Wide + close-up of the entry point; whole limb if swelling spreads.</li></ul>
+        <h4 class="red">Call now</h4>
+        <ul><li><b>Always.</b> Surgical emergency: needs urgent debridement; amputation risk rises by the hour.</li></ul>
+      </div>
+    </div>
+  </details>
+
+  <details class="pic" id="pic-vasc">
+    <summary><span class="ic">🩸</span> Pale, cold or blue finger</summary>
+    <div class="cols">
+      <div><h4>Examine (compare with the next finger)</h4>
+        <ul>
+          <li><b>Colour:</b> white = no arterial inflow; blue/purple and swollen = venous congestion.</li>
+          <li><b>Capillary refill:</b> press the pulp or nailbed, release, count. Normal &lt; 2 s, same as neighbours. Instant refill in a dusky finger = congested.</li>
+          <li><b>Pulp turgor:</b> flat and soft = arterial; tense = venous.</li>
+          <li><b>Temperature</b> vs neighbours.</li>
+          <li>Doppler both digital arteries if available. A finger survives on one digital artery, so pink does not mean both are intact.</li>
+        </ul></div>
+      <div><h4>Photos</h4>
+        <ul class="photo"><li>Wide: the hand with neighbouring fingers for colour comparison, in normal light, no flash (flash changes colour).</li><li>Close-up of the digit.</li></ul>
+        <h4 class="red">Call now</h4>
+        <ul><li><b>Always.</b> Revascularisation is time-critical.</li></ul>
+      </div>
+    </div>
+  </details>
+</section>
+
+<!-- ============================================================ SENSATION -->
+<section id="sensation">
+  <h2>Sensation</h2>
+
+  <h3 id="sens-where">1. Where to test: distal to the wound, each side separately</h3>
+  <p>Each finger has <b>two</b> digital nerves: <b>radial digital nerve</b> on the radial side, <b>ulnar digital nerve</b> on the ulnar side, running along the volar-lateral edge next to the digital artery. Each supplies its own half of the finger <b>distal</b> to where it runs. So:</p>
+  <div class="fig" data-fig="distal" role="img" aria-label="Finger with a cut over the radial side of the proximal phalanx. The radial half of the finger distal to the cut may be numb: test the radial half of the pulp and compare with the ulnar half. Testing proximal to the cut proves nothing."></div>
+  <ul>
+    <li><b>Test the pulp (fingertip) on the radial half and the ulnar half separately</b>, for every finger distal to the wound. Use the side of the tip, not the middle.</li>
+    <li>Skin <b>proximal</b> to the cut is supplied by nerve that hasn't been cut yet. It will always feel normal. Writing "sensation intact" from there is false reassurance.</li>
+    <li><b>A cut in the palm</b> can divide a <b>common digital nerve</b>, which splits into the facing sides of two fingers. So a palm cut between middle and ring can numb the ulnar side of the middle finger <b>and</b> the radial side of the ring finger. Test both fingers either side of a palm wound.</li>
+  </ul>
+  <div class="fig" data-fig="palmcut" role="img" aria-label="Hand palm view: a cut in the palm between the middle and ring fingers divides a common digital nerve, numbing the ulnar half of the middle finger and the radial half of the ring finger."></div>
+  <p class="callout tip"><b>Pulsatile bleed from the side of a finger?</b> The digital artery is cut. The nerve sits just volar to it, so it is very likely cut too, even if the patient says it feels "a bit normal". Say so to your senior.</p>
+
+  <h3 id="sens-lt">2. Light touch: always a comparison</h3>
+  <ol>
+    <li>Patient's hand resting palm up on a pillow or table. Patient looks away.</li>
+    <li>Touch the normal side (e.g. the uninjured ulnar pulp, or the same finger on the other hand) lightly with your fingertip or cotton wool, then the side at risk.</li>
+    <li>Ask: <b>"Does this feel the same as this, or different?"</b> Not "can you feel this?" (patients feel pressure even with a cut nerve and will say yes).</li>
+    <li>If different: "Numb, reduced, or tingly? If normal is 10 out of 10, what is this?" (the <b>Ten test</b>: quick, works in children from about 5 years).</li>
+  </ol>
+  <p class="callout warn">"Altered" or "a bit numb" on one side of the pulp after a cut on that side = <b>nerve cut until proven otherwise</b>. Partial nerve cuts often feel "a bit different", not numb.</p>
+
+  <h3 id="sens-2pd">3. Two-point discrimination (2PD): the exact method</h3>
+  <p>The most objective bedside test. Do it properly or don't write a number.</p>
+  <div class="fig" data-fig="twopd" role="img" aria-label="Fingertip: two points placed in line with the length of the finger, both on one half of the pulp, is correct. Two points placed across the finger, one on each side of the midline, is wrong because each point is on a different nerve."></div>
+  <div class="cols">
+    <div>
+      <h4>Tool</h4>
+      <ul>
+        <li>2PD disc (Disk-Criminator) or calipers if your unit has them.</li>
+        <li>Otherwise a <b>paperclip</b>: bend open into a U, set the two ends at the distance you want with a ruler, check <b>both tips are level</b> (touch at the same time) and blunt. Make two: one at 5 mm, one at 10 mm. One single straight end is your "one point".</li>
+      </ul>
+      <h4>Position</h4>
+      <ul>
+        <li>Hand <b>supported, palm up</b>, fingers still (rest the back of the finger on the table or your hand). A moving finger gives moving 2PD, which is a different test.</li>
+        <li>Demonstrate on a normal finger first with eyes open: "This is one. This is two."</li>
+        <li>Then <b>eyes closed</b> or looking away.</li>
+      </ul>
+    </div>
+    <div>
+      <h4>Technique</h4>
+      <ol>
+        <li>Test the <b>pulp</b>, distal to the DIP crease, on the radial half, then the ulnar half.</li>
+        <li>Points <b>in line with the length of the finger</b> (longitudinal), both on one half of the pulp. Never across the midline: then each point lands on a different nerve and even a cut nerve "passes".</li>
+        <li><b>Light pressure: just until the skin blanches</b>, not digging in. Both points touch at the same moment. Hold ~2 s, then ask "one or two?"</li>
+        <li><b>Randomly mix one point and two points.</b> Don't always start with two. Patients learn the pattern.</li>
+        <li>Start at 5 mm. Correct in at least <b>7 of 10</b> (or 2 of 3 if short of time) = passes at that distance. If not, go wider (8, 10, 15 mm) until they pass.</li>
+        <li>Record the <b>smallest distance passed</b>, for each side, and the same side on the uninjured finger.</li>
+      </ol>
+    </div>
+  </div>
+  <table class="t">
+    <caption>Interpreting static 2PD at the fingertip</caption>
+    <tr><th>Distance</th><th>Meaning</th></tr>
+    <tr><td>≤ 5–6 mm</td><td>Normal</td></tr>
+    <tr><td>6–10 mm</td><td>Reduced: suspicious if the other side is 4 mm</td></tr>
+    <tr><td>&gt; 10 mm</td><td>Abnormal: nerve cut likely after a wound on that side</td></tr>
+    <tr><td>Can't tell 1 from 2</td><td>Only protective sensation</td></tr>
+  </table>
+  <p class="callout tip"><b>Compare, don't just quote numbers.</b> A labourer with thick calluses may be 8 mm everywhere. What matters: <b>this side vs the other side of the same finger, vs the same finger on the other hand</b>. Write it like this: <i>"Left index: 2PD radial pulp 12 mm, ulnar pulp 4 mm (right index 4/4 mm)."</i></p>
+
+  <h3 id="sens-kids">4. Children, unconscious or uncooperative patients</h3>
+  <ul>
+    <li><b>Wrinkle test:</b> soak the hand in warm water for 10–30 min. Denervated skin <b>does not wrinkle</b>. Photograph the wrinkled vs smooth pulp.</li>
+    <li><b>Dry skin:</b> denervated skin stops sweating; a plastic pen glides over it instead of dragging.</li>
+    <li>Watch what the child avoids using. Ten test from about 5 years.</li>
+    <li>If you cannot assess, <b>say "unable to assess"</b>, not "intact".</li>
+  </ul>
+
+  <h3 id="sens-nerves">5. Which nerve supplies where (and the best spot to test)</h3>
+  <div class="fig" data-fig="nerves" role="img" aria-label="Nerve territories of the left hand. Palm side: median nerve supplies the thumb, index, middle and radial half of the ring finger and the radial palm; ulnar nerve supplies the ulnar half of the ring finger, the little finger and the ulnar palm. Back of the hand: radial nerve supplies the radial back of the hand, thumb and the back of the index, middle and half the ring finger up to about the PIP; beyond that the median nerve; ulnar nerve supplies the ulnar back of the hand. Best test spots: index pulp for median, little finger pulp for ulnar, back of the first web space for radial."></div>
+  <table class="t">
+    <tr><th>Nerve</th><th>Best sensory spot</th><th>Quick motor test</th></tr>
+    <tr><td><b>Median</b></td><td>Index fingertip pulp</td><td><b>Thumb abduction</b>: back of hand flat on table, lift thumb straight up towards the ceiling against resistance; feel the thenar muscle (APB) contract. <b>AIN</b>: make an "OK" ring with thumb and index (tips flex = FPL + index FDP)</td></tr>
+    <tr><td><b>Ulnar</b></td><td>Little fingertip pulp</td><td><b>Spread fingers</b> against resistance, feel the 1st dorsal interosseous (between thumb and index on the back); cross middle over index. <b>Froment's</b>: hold paper between thumb and index side; thumb IP flexing to hold on = weak adductor</td></tr>
+    <tr><td><b>Radial</b> (sensory in hand only)</td><td>Back of the first web space</td><td>Extend the wrist and the fingers at the MCPs (PIN / radial in the forearm); none in the hand</td></tr>
+  </table>
+  <p class="small">Palmar cutaneous branch of the median nerve supplies the base of the thenar eminence (spared in carpal tunnel). Dorsal branch of the ulnar nerve supplies the ulnar back of the hand; a cut on the ulnar side of the wrist can divide it alone.</p>
+
+  <h3>6. Pitfalls that make your sensation exam worthless</h3>
+  <ul class="cross">
+    <li>Testing after local anaesthetic, or after a ring block "to clean the wound".</li>
+    <li>Testing proximal to the wound, or on the middle of the pulp instead of each side.</li>
+    <li>Asking "can you feel this?" instead of "same or different?".</li>
+    <li>2PD points across the finger, pressing hard enough to dent, always starting with two, patient watching.</li>
+    <li>Not comparing with the other side and the other hand.</li>
+    <li>Writing "NV intact" for a whole hand. Write each digit and side.</li>
+  </ul>
+</section>
+
+<!-- ============================================================ TENDONS -->
+<section id="tendons">
+  <h2>Tendons: test each one on its own</h2>
+
+  <h3 id="t-look">1. Look first: the cascade and tenodesis</h3>
+  <p>With the hand relaxed, palm up, wrist neutral, the fingers rest <b>progressively more bent from index to little</b>: the cascade. A finger lying <b>straighter than it should</b> has lost its flexor pull.</p>
+  <div class="fig" data-fig="cascade" role="img" aria-label="Side view of the resting fingers: normally the index is slightly bent and each finger towards the little finger is more bent. When both flexor tendons of the middle finger are cut, it lies straight and breaks the cascade."></div>
+  <ul>
+    <li><b>Tenodesis test</b> (works in children and patients who won't cooperate): gently extend the patient's wrist → the fingers curl into flexion; flex the wrist → the fingers straighten. A finger that doesn't curl with wrist extension = flexor cut. A finger that doesn't straighten with wrist flexion = extensor cut.</li>
+    <li>Photograph the cascade (side view). It is often the single most useful picture for your senior.</li>
+  </ul>
+
+  <h3 id="t-flex">2. Flexors</h3>
+  <div class="cols">
+    <div class="card">
+      <h4>FDP (bends the fingertip, DIP)</h4>
+      <div class="fig" data-fig="fdp" role="img" aria-label="FDP test: hold the middle phalanx so the PIP stays straight, patient bends the fingertip at the DIP."></div>
+      <ol>
+        <li>Hold the patient's <b>middle phalanx</b> firmly, PIP straight.</li>
+        <li>"Bend just the tip of your finger."</li>
+        <li>DIP bends = FDP working. Then press back against the tip: pain? weak vs other hand?</li>
+      </ol>
+      <p class="small">Do every finger, not just the cut one.</p>
+    </div>
+    <div class="card">
+      <h4>FDS (bends the middle joint, PIP)</h4>
+      <div class="fig" data-fig="fds" role="img" aria-label="FDS test: hold the other fingers fully straight, patient bends the tested finger; it bends at the PIP and the fingertip stays floppy."></div>
+      <ol>
+        <li>Hold <b>all the other fingers fully straight</b> (flat on the table). This blocks FDP, which shares one muscle belly for middle, ring and little.</li>
+        <li>"Bend this finger."</li>
+        <li>Bends at the <b>PIP with a floppy DIP</b> (you can wiggle the tip) = FDS working. If the DIP bends too, you didn't hold the others straight enough.</li>
+      </ol>
+      <p class="small"><b>Index:</b> its FDP is independent, so this test can mislead. Ask for a firm pulp-to-pulp pinch with the thumb: FDS working = pinch with the DIP straight/hyperextended; tip-to-tip pinch with the DIP bent = relying on FDP. <b>Little:</b> FDS is weak or absent in a fair number of people. Compare with the other hand before calling it cut.</p>
+    </div>
+  </div>
+  <div class="card">
+    <h4>FPL (bends the thumb tip)</h4>
+    <p>Hold the thumb's <b>proximal phalanx</b> still, "bend the tip of your thumb". IP flexes = FPL working. Test against resistance.</p>
+  </div>
+
+  <h3 id="t-partial">3. Partial cuts and where the tendon end went</h3>
+  <ul>
+    <li><b>Full movement ≠ intact.</b> Up to 90% of a tendon can be cut with full active movement. Signs of a partial cut: <b>pain</b> on movement or against resistance, <b>weakness</b> vs the other hand, catching/triggering. Write "FDP flexes fully but painful and weak against resistance", not "intact".</li>
+    <li><b>Fist at the time of injury</b> (gripping a knife or a breaking glass): the tendon was cut with the finger bent, so when the finger straightens the cut sits <b>distal</b> to the skin wound, hidden. Ask how the hand was positioned.</li>
+    <li>A wound over the line of a tendon in a zone where the tendon lies right under the skin (fingers, palm, wrist) is usually explored regardless. Your job is to report accurately, not to rule it out.</li>
+  </ul>
+
+  <h3 id="t-ext">4. Extensors</h3>
+  <table class="t">
+    <tr><th>Tendon</th><th>Test</th><th>Trap</th></tr>
+    <tr><td><b>EDC</b> (each finger)</td><td>From a fist, straighten each finger <b>at the MCP (knuckle)</b>. Then hold the others bent and lift one finger at a time. Resist: pain? weak?</td><td>The fingers' IP joints straighten through the small hand muscles even with EDC cut: watch the <b>MCP</b>. The <b>juncturae</b> (cross-links on the back of the hand) let a neighbour pull a cut finger up weakly when the cut is proximal to them.</td></tr>
+    <tr><td><b>EIP / EDM</b></td><td>Make a fist, then stick out the index and little only ("horns").</td><td>Separate tendons to index and little; test with a wound over the ulnar wrist or the index metacarpal.</td></tr>
+    <tr><td><b>EPL</b></td><td>Palm flat on the table, <b>lift the thumb up off the table</b> (retropulsion). Feel the tendon tighten on the ulnar side of the snuffbox.</td><td>The thumb IP can still straighten via the thenar muscles with EPL cut. Thumb IP extension alone is not the test.</td></tr>
+    <tr><td><b>EPB / APL</b></td><td>Resist thumb MCP extension and abduction; feel the radial border of the snuffbox.</td><td></td></tr>
+    <tr><td><b>Central slip</b> (wound over the PIP, dorsal)</td><td><b>Elson test:</b> bend the PIP 90° over the table edge, patient straightens the middle phalanx against your finger. Intact: DIP stays floppy. Cut: no PIP power and the <b>DIP goes rigid</b>.</td><td>The finger looks normal on day 1; the boutonnière deformity appears days to weeks later. Any dorsal PIP wound: test, photograph, tell your senior.</td></tr>
+    <tr><td><b>Terminal tendon</b> (mallet)</td><td>Fingertip droops at the DIP; can't straighten it actively but you can passively.</td><td>X-ray for a bony fragment. Splint position matters; ask your unit.</td></tr>
+    <tr><td><b>Wrist</b> (FCR, FCU, PL, ECRL/B, ECU)</td><td>Resist wrist flexion / extension and feel each tendon tighten.</td><td>Volar wrist cut: check all of them plus median and ulnar nerves.</td></tr>
+  </table>
+
+  <h3 id="t-zones">5. Zones (say the zone to your senior)</h3>
+  <div class="fig" data-fig="zones" role="img" aria-label="Flexor tendon zones on the palm side. Zone 1: distal to the FDS insertion on the middle phalanx. Zone 2: from the distal palmar crease (A1 pulley) to the FDS insertion, both tendons inside the sheath. Zone 3: palm. Zone 4: carpal tunnel. Zone 5: wrist and forearm. Thumb zones T1 to T3."></div>
+  <p><b>Extensor zones:</b> odd numbers over joints: <b>I</b> DIP, II middle phalanx, <b>III</b> PIP, IV proximal phalanx, <b>V</b> MCP, VI metacarpal, <b>VII</b> wrist (under the retinaculum), VIII distal forearm. Thumb: T-I IP, T-II proximal phalanx, T-III MCP, T-IV metacarpal.</p>
+
+  <h3>6. Document like this</h3>
+  <p class="example">Right middle finger: FDP flexes DIP fully, painless against resistance. FDS flexes PIP with floppy DIP, <b>painful and weak</b> against resistance vs left. Index and ring FDP/FDS normal. Cascade: middle slightly straighter than ring. Video sent.</p>
+  <p class="callout tip"><b>Send short videos</b> (5–10 s) of the FDP and FDS test for each finger at risk, and the patient making a fist and opening it. A video of movement tells your senior more than any photo.</p>
+</section>
+
+<!-- ============================================================ INFECTION -->
+<section id="infection">
+  <h2>Infection: Kanavel's signs and the look-alikes</h2>
+  <div class="card kanavel">
+    <h3>Kanavel's 4 signs: flexor sheath infection</h3>
+    <ol>
+      <li><b>Finger held slightly bent</b> at rest (most comfortable for a swollen sheath).</li>
+      <li><b>Fusiform (sausage) swelling</b> of the whole finger, not just one spot.</li>
+      <li><b>Tender along the flexor sheath</b> on the volar side, from fingertip to the distal palm (press along the line of the tendon; compare with the sides of the finger).</li>
+      <li><b>Pain on passive extension</b>: gently straighten the finger yourself. Often the earliest and most telling.</li>
+    </ol>
+    <p>Early on not all 4 are present. <b>Even one or two, with a swollen finger: call your senior.</b> It can destroy the tendon within a day and usually needs theatre washout. Start treatment per unit protocol after cultures; elevate.</p>
+    <p class="small">Thumb and little finger sheaths connect to the radial and ulnar bursae at the wrist: infection can spread from one to the other (horseshoe abscess). Swelling and tenderness over the wrist or thenar/hypothenar = more urgent.</p>
+  </div>
+  <table class="t">
+    <tr><th>Condition</th><th>What you see</th><th>Key point</th></tr>
+    <tr><td><b>Paronychia</b></td><td>Red, swollen, pus at the nail fold</td><td>Sheath not tender; finger not sausage-shaped</td></tr>
+    <tr><td><b>Felon</b> (pulp abscess)</td><td>Tense, very painful fingertip pulp</td><td>Swelling stops at the DIP crease; no tenderness along the sheath proximal to it</td></tr>
+    <tr><td><b>Herpetic whitlow</b></td><td>Clear or cloudy vesicles on the fingertip, burning pain</td><td><b>Do not incise.</b> Ask about cold sores, healthcare work</td></tr>
+    <tr><td><b>Web space (collar-stud) abscess</b></td><td>Swollen web, fingers either side pushed apart</td><td>Pus on both palm and back of the web, connected</td></tr>
+    <tr><td><b>Deep palmar space</b></td><td>Loss of the palm's hollow, <b>very swollen back of hand</b></td><td>The back swells because lymph drains dorsally; the pus is in the palm</td></tr>
+    <tr><td><b>Septic joint</b></td><td>Swollen joint, pain on any movement of that joint</td><td>Think fight bite over the MCP</td></tr>
+    <tr><td><b>Necrotising fasciitis</b></td><td>Pain out of proportion, rapid spread, dusky skin, bullae, crepitus, unwell</td><td>Emergency; diabetics, IV drug use</td></tr>
+    <tr><td><b>Gout / pseudogout</b></td><td>Red hot joint, often known history</td><td>Can mimic infection; don't assume</td></tr>
+  </table>
+  <p class="callout tip"><b>Mark and time it:</b> draw the edge of the redness with a skin marker, write date and time next to it, photograph it. The next doctor (and your senior on the phone) can see if it is spreading.</p>
+</section>
+
+<!-- ============================================================ PHOTOS -->
+<section id="photos">
+  <h2>Photos your senior can use</h2>
+  <p class="lead">Your senior is deciding from a phone screen whether to come in, book theatre or send home. A close-up of a red blob is unusable.</p>
+  <div class="fig" data-fig="photo" role="img" aria-label="Three examples. Close-up only: you cannot tell which hand, finger or side. Far away only: you cannot see the wound. Correct: send both, one wide view of the whole hand and wrist and one close-up of the wound."></div>
+
+  <div class="callout must">
+    <b>Always 2 views, minimum:</b>
+    <ol>
+      <li><b>Wide (context):</b> whole hand <b>and wrist</b> in the frame, fingers spread. Shows which hand, which finger, palm or back, and the level of the wound.</li>
+      <li><b>Close-up:</b> the wound fills about half the frame, sharp, edges visible.</li>
+    </ol>
+  </div>
+
+  <h3>Before you press the button</h3>
+  <ol class="checklist">
+    <li><b>Clean:</b> wipe off blood and dried clot with saline gauze; press to stop oozing for a moment. Remove dressings fully.</li>
+    <li><b>Background:</b> plain blue or green drape / towel. Not bloody sheets, not the patient's lap, no clutter.</li>
+    <li><b>Light:</b> good room light or daylight; avoid shadows from your own head. Flash makes wet wounds glare and changes colour; if you use it, check the result.</li>
+    <li><b>Square-on:</b> phone parallel to the skin, straight above it, not at an angle (angles distort size and position).</li>
+    <li><b>Focus:</b> tap the wound on the screen. Move the phone closer instead of digital zoom.</li>
+    <li><b>Scale:</b> a paper ruler or tape measure next to the wound for the close-up.</li>
+    <li><b>Check it:</b> zoom into your own photo. If you can't tell what it shows, neither can your senior.</li>
+  </ol>
+
+  <h3>Extra views for the picture</h3>
+  <table class="t">
+    <tr><th>Situation</th><th>Add</th></tr>
+    <tr><td>Flexor-side cut</td><td>Cascade (side view, relaxed, palm up); video of FDP and FDS per finger</td></tr>
+    <tr><td>Dorsal cut / knuckle</td><td>Close-up with fingers straight <b>and</b> with fist clenched</td></tr>
+    <tr><td>Fracture / crush</td><td>Loose fist from the front (rotation); end-on view of the fingertips</td></tr>
+    <tr><td>Swollen / infected</td><td>Both hands side by side (palm and back); after pen marking with time</td></tr>
+    <tr><td>Fingertip / amputation</td><td>Stump from front, side and end-on; amputated part both sides with a ruler</td></tr>
+    <tr><td>Pale / dusky finger</td><td>Wide view with neighbours for colour, normal light, no flash</td></tr>
+    <tr><td>X-rays</td><td>Photo of the screen straight on, whole image, every view (PA, lateral, oblique), no glare; or tell your senior where to find it on PACS</td></tr>
+  </table>
+
+  <h3>Label every photo set in your message</h3>
+  <p class="example">"Photos 1–2: <b>LEFT</b> hand (non-dominant), palm side. Wound on the ulnar side of the <b>ring</b> finger over the proximal phalanx. Photo 3: cascade. Video 1: ring FDP, video 2: ring FDS."</p>
+  <p class="small"><b>Privacy:</b> follow your hospital's clinical photography policy (approved app/device, consent). No face, name, IC or wristband in the frame; crop out tattoos and jewellery that identify. Delete from personal devices once sent through the approved route.</p>
+</section>
+
+<!-- ============================================================ CALL -->
+<section id="call">
+  <h2>Calling or messaging your senior</h2>
+  <p class="lead">Same order every time. Fill the blanks, copy, send with the photos.</p>
+  <pre id="tpl" class="tpl">HAND REFERRAL
+[Age] [M/F], [RIGHT/LEFT]-hand dominant, job: [  ]
+Injured: [RIGHT/LEFT] hand. Mechanism: [knife/glass/saw/crush/bite/punch] at [time], [how many h] ago. Hand [open/in a fist] when injured.
+Background: smoker [Y/N], diabetes [Y/N], anticoagulants [Y/N]. Tetanus [given/up to date]. Antibiotics [given/not].
+
+WOUND: [size] cm [transverse/oblique] laceration, [volar/dorsal], [radial/ulnar] side of [digit], over [level], = flexor/extensor zone [ ].
+PERFUSION: [digit] cap refill [ ] s (neighbours [ ] s), colour [ ], turgor [ ].
+SENSATION (before LA): [digit] radial pulp 2PD [ ] mm, ulnar pulp [ ] mm; other hand same digit [ ]/[ ] mm. Light touch [same/reduced/numb].
+TENDONS: [digit] FDP [flexes/doesn't]; FDS [flexes/doesn't]; pain/weak against resistance [Y/N]. Cascade [normal/finger straight]. Extensors [ ].
+BONES: X-ray [findings]. Rotation [normal/scissoring].
+INFECTION (if relevant): Kanavel held flexed [Y/N], sausage [Y/N], sheath tender [Y/N], pain on passive extension [Y/N]. Margin marked at [time].
+PHOTOS: 1 wide, 2 close-up, 3 [ ], videos [ ].
+QUESTION: [come to see / theatre today / clinic / OK to close in ED?]</pre>
+  <button id="copy" class="btn">Copy template</button> <span id="copied" class="small" role="status"></span>
+
+  <h3>A good example</h3>
+  <p class="example">35M, right-hand dominant, chef. Cut <b>left</b> index on a broken glass at 20:00 (2 h ago), hand gripping the glass. Non-smoker, no diabetes. Tetanus given.<br>
+  Wound: 1.5 cm oblique laceration, volar, <b>radial side of left index over the proximal phalanx</b> = zone II. Bled briskly, controlled with pressure.<br>
+  Perfusion: index cap refill 2 s, same as middle, pink.<br>
+  Sensation (before LA): <b>radial pulp 2PD 12 mm, ulnar pulp 4 mm</b>; right index 4/4 mm. Says radial side "feels thick".<br>
+  Tendons: index FDP flexes fully but <b>painful against resistance</b>; FDS (pinch test) flexes, painless. Cascade normal. Middle finger normal.<br>
+  X-ray: no glass, no fracture.<br>
+  Photos 1 wide, 2 close-up, 3 cascade; videos FDP + FDS.<br>
+  Q: likely radial digital nerve cut ± partial FDP. For exploration: today or next list?</p>
+
+  <h3>A bad example (don't)</h3>
+  <p class="example bad">"Finger lac, NV intact, able to flex and extend all fingers, photo sent." <i>Which hand? Which finger? Tested where? Each tendon? Before LA? Which photo?</i></p>
+</section>
+
+<!-- ============================================================ WORDS -->
+<section id="words">
+  <h2>Words to use</h2>
+  <table class="t">
+    <tr><th>Say</th><th>Not</th></tr>
+    <tr><td><b>Thumb, index, middle, ring, little</b></td><td>"1st–5th finger", "4th finger" (is the thumb 1st? nobody knows)</td></tr>
+    <tr><td><b>Radial / ulnar</b> side</td><td>Medial / lateral, left / right side of the finger (changes with palm up/down)</td></tr>
+    <tr><td><b>Volar</b> (palmar) / <b>dorsal</b></td><td>Front / back, anterior / posterior</td></tr>
+    <tr><td><b>Distal phalanx, DIP, middle phalanx, PIP, proximal phalanx, MCP</b>, metacarpal, wrist crease. Thumb: IP, proximal phalanx, MCP</td><td>"Near the tip", "on the finger"</td></tr>
+    <tr><td><b>Dominant hand</b>, job</td><td>(often left out, always asked)</td></tr>
+    <tr><td><b>Transverse / oblique / longitudinal</b>, length in cm, flap direction</td><td>"Small cut"</td></tr>
+  </table>
+</section>
+
+<!-- ============================================================ QUIZ -->
+<section id="quiz">
+  <h2>Quick quiz: spot the mistake</h2>
+  <p class="lead">Tap each to see the answer.</p>
+  <details class="q"><summary>Cut on the volar radial side of the index over the proximal phalanx. MO tests sensation over the thenar eminence and index base: "sensation intact".</summary>
+    <p>Tested <b>proximal</b> to the cut and in the wrong territory. Test the <b>radial half of the index pulp</b> vs the ulnar half and vs the other index.</p></details>
+  <details class="q"><summary>2PD on a fingertip: the two points placed side by side across the pulp. Patient gets 10/10 right at 5 mm.</summary>
+    <p>Across the midline each point hits a different digital nerve, so a cut nerve still "passes". Points <b>along</b> the finger, on one half of the pulp at a time.</p></details>
+  <details class="q"><summary>Patient with a middle finger cut flexes all fingers into a full fist: "FDS and FDP intact".</summary>
+    <p>A fist uses FDP for all fingers together. FDS must be isolated (hold the other fingers straight) and FDP isolated (hold the middle phalanx). Then test against resistance for partial cuts.</p></details>
+  <details class="q"><summary>ED did a ring block to wash the wound. MO then documents "2PD 4 mm both sides".</summary>
+    <p>Impossible after a ring block. The number is fabricated or wrong. Sensation must be examined <b>before</b> LA; if LA was given, write "not assessable, LA given at [time]".</p></details>
+  <details class="q"><summary>3 mm wound over the ring finger knuckle after "hitting a wall". Washed, steri-stripped, oral antibiotics, home.</summary>
+    <p>Fight bite until proven otherwise. Examine with fist clenched, X-ray, call your senior: often needs washout of the joint in theatre.</p></details>
+  <details class="q"><summary>Swollen red index finger, held slightly bent. MO writes "cellulitis, for IV antibiotics", no other findings.</summary>
+    <p>Check all <b>Kanavel's signs</b>: sausage swelling, tender along the sheath, pain on passive extension. Flexor sheath infection needs a hand surgeon now. Mark the margin with time; photos of both hands.</p></details>
+  <details class="q"><summary>Photo sent: a close-up of a bloody 1 cm wound filling the screen. Message: "finger lac, pls advise".</summary>
+    <p>No context (which hand, finger, side, level), blood obscures the wound, no scale. Clean it, send <b>wide + close-up</b>, label hand/finger/side, add cascade and the exam findings.</p></details>
+  <details class="q"><summary>Dorsal wound over the PIP of the middle finger; patient straightens the finger fully. "Extensor intact, close and discharge."</summary>
+    <p>Central slip cuts can still extend fully at first through the lateral bands; boutonnière comes later. Do the <b>Elson test</b>, against resistance, and discuss with your senior.</p></details>
+  <details class="q"><summary>Pulsatile bleeding from the ulnar side of the little finger. MO clamps it with artery forceps to stop it.</summary>
+    <p>Blind clamping crushes the digital nerve next to the artery. <b>Pressure and elevation</b> for 10 minutes. And assume the ulnar digital nerve is cut.</p></details>
+  <details class="q"><summary>Thumb laceration on the dorsum over the proximal phalanx. Patient extends the thumb IP: "EPL intact".</summary>
+    <p>The thenar muscles can extend the IP through the extensor hood. Test <b>retropulsion</b>: palm flat on table, lift thumb off it, feel EPL tighten.</p></details>
+</section>
+
+<footer>
+  <p>Teaching aid for new hand surgery MOs. Follow your department's protocols and your senior's instructions. No patient data is stored; works offline once opened.</p>
+</footer>
+</main>
+<script src="app.js"></script>
+</body>
+</html>
