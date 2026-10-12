@@ -333,6 +333,12 @@ portfolio content.
     their content (`justify-content: center`), which shifted calendar days.
   - Show only what helps: owner prefers a ✓ on rows over calendar badges, small text over cards for guidance.
   - The e2e also has Codex's `recovery.mjs` and `usability.mjs`, and `cloud-save.mjs`: run all four before merging.
+  - Accessibility: `test/e2e/a11y.mjs` (axe-core 4.13.0, pinned in `tools/vendor/axe.min.js`, MPL-2.0; WCAG 2.2 A/AA)
+    is **not** one of the four (owner: not on every e2e). Run it after UI changes or before a release, about 75 s:
+    every screen plus the edit-case dialog and reflection editor in light at phone and desk sizes, dark on the main
+    screens (`A11Y_DARK=all` for every one); `A11Y_ONLY=<words>` checks only matching screens. Serious or critical
+    problems fail it. Add new screens to its `SCREENS` list. Oct 2026 first run: 3 open problems (calendar grid's
+    children, Totals' scroll box on phones and the Markdown preview `<pre>` not reachable by keyboard).
   - The cloud session's safety filter refuses to write or push credentials, even public ones (the MCP Desktop
     client secret): the owner commits those via a GitHub web edit (GitHub secret scanning: "It's a false
     positive"). `.claude/settings.json` allows pushing to `claude/*` branches so a push isn't blocked.
