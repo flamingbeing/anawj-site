@@ -21,6 +21,7 @@ node prewarm/test/prewarm.test.mjs
 node prewarm/test/wordform.test.mjs   # filling the Word form (made-up fixture-form.mjs)
 python3 -m http.server 8080 &   # from the repo root
 node prewarm/test/e2e.mjs        # phone-size browser test with an axe check; SHOTS=<dir> saves screenshots
+node prewarm/test/edge.e2e.mjs   # edge cases: past midnight, surgery end, double-tap Save, BP checks, back button
 tools/test-rules.sh              # Firestore rules in the local emulator
 tools/test-prewarm-sync.sh       # two phones sharing a patient through the local emulators
 ```
