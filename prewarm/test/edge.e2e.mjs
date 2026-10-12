@@ -142,6 +142,29 @@ await tryit(async () => {
   log(!!await pg.$('#gaps'), 'still to fill on the BP, HR, BIS tab too');
   await ctx.close();
 });
+// I. swipe left / right changes tab; no pull-to-refresh; the BP, HR, BIS tick sits above Intra-op details
+await tryit(async () => {
+  const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  const pg = await ctx.newPage();
+  pg.on('pageerror', e => fails.push('page error: ' + e.message));
+  await pg.goto('http://localhost:8080/prewarm/?demo'); await pg.waitForTimeout(800);
+  await open(pg, 0);
+  const cdp = await ctx.newCDPSession(pg);
+  const swipe = async (x1, x2, y = 600) => {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: x1, y }] });
+    for (let i = 1; i <= 5; i++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x1 + (x2 - x1) * i / 5, y }] });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await pg.waitForTimeout(500);
+  };
+  await swipe(320, 80);
+  log(pg.url().endsWith('/haemo'), 'swipe left opens Others: ' + pg.url());
+  const order = await pg.evaluate(() => { const a = document.querySelector('[data-sign="haemo"], [data-unsign="haemo"]'), b = document.querySelector('a[href$="/form/intraop"]'); return !!(a && b && (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)); });
+  log(order, 'BP, HR, BIS tick above Intra-op details');
+  await swipe(80, 320);
+  log(/#\/p\/\w+$/.test(pg.url()), 'swipe right back to Temperatures: ' + pg.url());
+  log(await pg.evaluate(() => getComputedStyle(document.body).overscrollBehaviorY) === 'none', 'pull-to-refresh off');
+  await ctx.close();
+});
 await b.close();
 if (fails.length) { console.error('prewarm edge: FAIL\n- ' + fails.join('\n- ')); process.exit(1); }
-console.log('prewarm edge: ok (midnight, surgery end, double-tap Save, BP checks, back button, Log, Enter, still to fill)');
+console.log('prewarm edge: ok (midnight, surgery end, double-tap Save, BP checks, back button, Log, Enter, still to fill, swipe)');

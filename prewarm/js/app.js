@@ -500,6 +500,20 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
   tabs.innerHTML = `<a role="tab" id="templink" href="#/p/${id}" aria-selected="${main}" data-state="${haemoState(p, defaultSeries(p))}">Temperatures</a>`
     + `<a role="tab" id="haemolink" href="#/p/${id}/haemo" aria-selected="${!main}" data-state="${haemoState(p)}">Others</a>`;
   const refreshBar = topBar(p, s, () => draw());
+  // swipe left / right to change tab (owner, 12 Oct 2026); not from the timepoint strip or a box being typed in
+  let sw = null;
+  const swStart = e => { const t = e.touches[0]; sw = e.touches.length === 1 && !e.target.closest('.strip, input, .tchip.edit') ? { x: t.clientX, y: t.clientY, at: Date.now() } : null; };
+  const swEnd = e => {
+    if (!sw) return;
+    const t = e.changedTouches[0], dx = t.clientX - sw.x, dy = t.clientY - sw.y, quick = Date.now() - sw.at < 700;
+    sw = null;
+    if (!quick || Math.abs(dx) < 70 || Math.abs(dy) > Math.abs(dx) * 0.6) return;
+    if (dx < 0 && main) go(`#/p/${id}/haemo`);
+    else if (dx > 0 && !main) go('#/p/' + id);
+  };
+  view.addEventListener('touchstart', swStart, { passive: true });
+  view.addEventListener('touchend', swEnd, { passive: true });
+  cleanup.push(() => { view.removeEventListener('touchstart', swStart); view.removeEventListener('touchend', swEnd); });
   let editing = null; // event whose time is being changed
   let typing = null; // the BP / HR / BIS box with the keyboard up
   // default timepoint: the unsaved one nearest its due time, else the first unsaved
@@ -640,7 +654,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
       <button class="save big" id="save">${isSaved ? 'Save changes' : `Save ${pt.label} reading`}</button>
       ${s === 'haemo' && vitalsCollected(p) ? '<p class="okline small">✓ Vital signs data collected: ticked on the paper form</p>' : ''}
       ${s === 'haemo' && settings.hide.haemo15 ? `<p class="muted small">Only baseline is entered here; the 15-min rows come from the monitor download. Turn them on in Settings.</p>` : ''}
-      ${main ? comfortHtml('sat_post', 'Comfortable after surgery?') + linksHtml() + gapsHtml(p) + doneHtml(p) : linksHtml() + gapsHtml(p) + signoffHtml(p, s) + doneHtml(p)}`);
+      ${main ? comfortHtml('sat_post', 'Comfortable after surgery?') + linksHtml() + gapsHtml(p) + doneHtml(p) : signoffHtml(p, s) + linksHtml() + gapsHtml(p) + doneHtml(p)}`);
     refreshBar();
     if (editing) { const i = $('#evtime'); i?.focus(); }
     if (typing) { const i = view.querySelector(`[data-in="${typing}"]`); i?.focus(); }
@@ -756,7 +770,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     const tl = $('#templink'); if (tl) tl.dataset.state = haemoState(p, defaultSeries(p));
     const gp = $('#gaps'), h = gapsHtml(p);
     if (gp && gp.outerHTML !== h) { if (h) gp.outerHTML = h; else gp.remove(); }
-    else if (!gp && h) view.querySelector('.sign')?.insertAdjacentHTML('beforebegin', h);
+    else if (!gp && h) $('[data-done], [data-undone]')?.closest('.sign')?.insertAdjacentHTML('beforebegin', h);
   }, 1000);
   cleanup.push(() => clearInterval(hl));
 });

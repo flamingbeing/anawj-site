@@ -24,7 +24,8 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 
 ## Recently done
 
-- This PR: tab "Others"; "Perioperative data" full width; Still to fill back to amber.
+- This PR: BP, HR, BIS tick above Intra-op details; swipe to change tab; pull-to-refresh off.
+- #251: tab "Others"; "Perioperative data" full width; Still to fill back to amber.
 - #249: warming time boxes lavender (not beige) and Still to fill navy, so amber / orange / red only mean a timing alarm.
 - #248: two tabs (Temperatures / BP, HR, BIS; other forms on the BP tab); sign-offs named by section with a tick box.
 - #246: "Still to fill" checklist; Baseline / End readings due at In OT / Surgery end; Mark complete asks first.
