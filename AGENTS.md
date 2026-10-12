@@ -33,6 +33,17 @@ for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mj
 
 For evals UI changes, also run the e2e test (see `evals/README.md`).
 
+## Status and decisions (before compacting)
+
+Each app keeps a short `STATUS.md` beside its `NOTES.md` (start: `logbook/STATUS.md`): what each session is doing
+now, what waits on the owner, the agreed next steps, recently merged PRs and a dated decisions log.
+
+- Read the app's `STATUS.md` (then `NOTES.md`) before starting work, and after any context compaction.
+- Update it when a task finishes, a decision is made, before compacting and before a session ends: the
+  [save-state skill](.agents/skills/save-state/SKILL.md) (`/save-state` in Claude Code, `$save-state` in Codex).
+- Edit only your own session's line under "Now". Lasting rules and lessons go in `NOTES.md` (or here, if they apply
+  to the whole repo).
+
 ## PR previews
 
 Every PR gets a preview of the whole site on Cloudflare (Workers Builds; [PREVIEWS.md](PREVIEWS.md): setup,
