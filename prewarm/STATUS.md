@@ -24,7 +24,8 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 
 ## Recently done
 
-- This PR: two tabs (Temperatures / BP, HR, BIS; other forms on the BP tab); sign-offs named by section with a tick box.
+- This PR: warming time boxes lavender (not beige) and Still to fill navy, so amber / orange / red only mean a timing alarm.
+- #248: two tabs (Temperatures / BP, HR, BIS; other forms on the BP tab); sign-offs named by section with a tick box.
 - #246: "Still to fill" checklist; Baseline / End readings due at In OT / Surgery end; Mark complete asks first.
 - #244: "Study admins" card: admins add / remove admins by email (rules: create only, lower-case email id, no removing yourself).
 - #241: stress-test fixes: past midnight, readings after surgery end, BP number checks, back button with an unsaved reading; `edge.e2e.mjs`.
@@ -44,6 +45,9 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 - #205–#209: NUHS app theme, one-screen main screen, timer and Log next event, ‹ › timepoints, screen size.
 
 ## Decisions
+
+- 12 Oct 2026: amber, orange and red are kept for timing alarms only (warming boxes lavender, Still to fill navy).
+- 12 Oct 2026: thermal sensation keeps carrying over like the rest (owner: no need to change).
 
 - 12 Oct 2026: patient screen split into two tabs, Temperatures and BP, HR, BIS (other forms on the BP tab); Mark data collection as complete on both; section sign-offs named, ticked box once marked.
 
