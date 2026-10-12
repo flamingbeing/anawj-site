@@ -1,6 +1,21 @@
-# APMES workplace-based assessment reference
+# APMES documents
 
-**The EPA Guidebook (v8, July 2024) is the source of truth.** Where the AY2023 tracking template or anything else here disagrees with it, follow the guidebook. The guidebook's assessment tables are in [`apmes-epas.json`](apmes-epas.json), with a cross-check of every tracking-template item (`crosscheck`) and the disagreements found (`notes`): for example, central venous catheter insertion is a DOPS (EPA 10) in the guidebook but a Mini-CEX in the template.
+The programme's documents for the APMES apps on this site (`/evals`, `/logbook`). They aren't secret, so they live here in
+the public repo (and are served at anawj.com/apmes/), but **no faculty or resident names and no real evaluation data**.
+
+| Folder | What's in it |
+|---|---|
+| [`guidebook/`](guidebook/) | The EPA Guidebook v8 transcribed in full (Markdown). The evals app opens `dops-expectations.md` for the DOPS checklist. |
+| [`data/`](data/) | The guidebook's assessment tables, the AY2023 tracking template and the three MedHub evaluator forms, as JSON. `node evals/tools/build-data.mjs` builds the evals app's `js/catalogue.js` and `js/forms.js` from these and the guidebook; edit wording here, then re-run it. |
+| [`templates/`](templates/) | `portfolio-template-blank.docx`: the blank JCST Anaesthesiology Residency Training Portfolio. The logbook tests fill it and read it back (`tools/test-logbook.sh`). |
+
+Original files (PDF, spreadsheet) can be added under `originals/` with their version in the name. Leave out anything
+showing faculty names, such as the screenshots in the MedHub resident guide, unless blacked out. Names of published
+authors the guidebook cites are fine (owner, 12 Oct 2026). Moved here from `evals/reference/` on 12 Oct 2026.
+
+## Workplace-based assessment reference
+
+**The EPA Guidebook (v8, July 2024) is the source of truth.** Where the AY2023 tracking template or anything else here disagrees with it, follow the guidebook. The guidebook's assessment tables are in [`apmes-epas.json`](data/apmes-epas.json), with a cross-check of every tracking-template item (`crosscheck`) and the disagreements found (`notes`): for example, central venous catheter insertion is a DOPS (EPA 10) in the guidebook but a Mini-CEX in the template.
 
 **The guidebook's text is transcribed in full** under [`guidebook/`](guidebook/), with no personal names (cited authors in the Appendix and the EPA 7 attachments are left out):
 
@@ -11,11 +26,11 @@
 
 Reference material for the evaluations app and other APMES tools, transcribed from programme documents the user supplied on 2026-10-10:
 
-- **Evaluations_Tracking_TemplateAY2023.xlsx**: which DOPS, Mini-CEX and EBD assessments each resident must complete, and by which residency year. Transcribed in full, cell by cell, into [`apmes-requirements.json`](apmes-requirements.json) and summarised below.
+- **Evaluations_Tracking_TemplateAY2023.xlsx**: which DOPS, Mini-CEX and EBD assessments each resident must complete, and by which residency year. Transcribed in full, cell by cell, into [`apmes-requirements.json`](data/apmes-requirements.json) and summarised below.
 - **RESIDENT GUIDE FOR LOGGING DOPS & MINI CEX UNDER MEDHUB (ver 19 Jul 2023)**: how residents trigger these assessments in MedHub today. The workflow and fields are described below.
-- **Three MedHub app screenshots of the evaluator's side** (EBD, Mini-CEX, DOPS; since removed from the repo because they showed names and real ratings): transcribed question by question into [`apmes-forms.json`](apmes-forms.json) and summarised below.
+- **Three MedHub app screenshots of the evaluator's side** (EBD, Mini-CEX, DOPS; since removed from the repo because they showed names and real ratings): transcribed question by question into [`apmes-forms.json`](data/apmes-forms.json) and summarised below.
 
-The original files are not in this repository, which is public. The guide's screenshots show real faculty names, and both documents are programme-internal. Keep the originals with the programme. If a newer template comes out, re-transcribe it here and say which version it is.
+The original files aren't in this folder yet (see `originals/` above); the MedHub guide stays out because its screenshots show real faculty names. If a newer template or guidebook comes out, re-transcribe it here and say which version it is.
 
 ## Assessment types
 
@@ -46,7 +61,7 @@ How to read the template:
 - **Two difficult-airway items:** the R3 DOPS on difficult airway intubation must use three different types of laryngoscope blade (curved, hyperangulated, straight) and/or different models of videolaryngoscope. The R5 EBD on difficult airway must cover alternative intubation approaches such as awake intubation +/- front of neck access.
 - **Typos fixed:** "A\wake flexible bronchoscopy" became "Awake …". Bullet characters and line breaks were flattened. Wording is otherwise as in the template.
 
-The full item list, with exact wording, is in [`apmes-requirements.json`](apmes-requirements.json).
+The full item list, with exact wording, is in [`apmes-requirements.json`](data/apmes-requirements.json).
 
 ## How residents trigger an assessment in MedHub today
 

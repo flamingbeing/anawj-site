@@ -19,7 +19,7 @@ Read with `evals/PLAN.md` (the why and the UX detail). This file fixes **names, 
 | `sw.js` | shell | Copy of logbook/sw.js pattern, `VERSION = 'evals-v2'`, SHELL lists every evals file. |
 | `js/app.js` | shell | Boot, auth state, role detection, tabs, hash routing, update banner, demo banner. |
 | `js/ui-core.js` | shell | `S` state, `hooks`, `h`, `fill`, `add`, `toast`, `debounce`, `icon(name)`, `go(route)`, `fmtDate`, `initials(name)`, `statusChip(ev)`. Copy helpers from logbook/js/ui-core.js. |
-| `tools/build-data.mjs` | data | Node script: reads `reference/apmes-epas.json` + `reference/apmes-forms.json` (+ `reference/guidebook/*.md` for entrustment questions if easy) and writes `js/catalogue.js` and `js/forms.js` (committed, generated header comment). |
+| `tools/build-data.mjs` | data | Node script: reads `apmes/data/apmes-epas.json` + `apmes/data/apmes-forms.json` (+ `apmes/guidebook/*.md` for entrustment questions if easy) and writes `js/catalogue.js` and `js/forms.js` (committed, generated header comment). |
 | `js/catalogue.js` | data | Generated. Exports below. |
 | `js/forms.js` | data | Generated. Exports below. |
 | `js/engine.js` | data | Pure logic, no DOM. Exports below. |

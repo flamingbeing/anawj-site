@@ -1,5 +1,5 @@
 // Run with: node logbook/test/portfolio.test.mjs  (made-up reflections only)
-// Optional: PORTFOLIO_TEMPLATE=blank.docx PORTFOLIO_OUT=out.docx also fills a real blank template.
+// Also fills the real blank template (apmes/templates/; PORTFOLIO_TEMPLATE=other.docx); PORTFOLIO_OUT=out.docx saves it.
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -58,8 +58,8 @@ const z = await JSZip.loadAsync(new Uint8Array(await blob.arrayBuffer()));
 assert.ok((await z.file('word/document.xml').async('string')).includes('Paediatrics (Min 6)'));
 if (process.env.PLAIN_OUT) writeFileSync(process.env.PLAIN_OUT, new Uint8Array(await blob.arrayBuffer()));
 
-if (process.env.PORTFOLIO_TEMPLATE) {
-  const b64 = readFileSync(process.env.PORTFOLIO_TEMPLATE).toString('base64');
+{ // the real blank template (apmes/templates/; PORTFOLIO_TEMPLATE=other.docx to try another)
+  const b64 = readFileSync(process.env.PORTFOLIO_TEMPLATE || new URL('../../apmes/templates/portfolio-template-blank.docx', import.meta.url)).toString('base64');
   const out = await exportPortfolio(refl, { name: 'Test Resident', templateB64: b64, JSZip });
   assert.equal(out.usedTemplate, true);
   if (process.env.PORTFOLIO_OUT) writeFileSync(process.env.PORTFOLIO_OUT, new Uint8Array(await out.arrayBuffer()));
