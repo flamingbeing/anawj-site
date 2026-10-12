@@ -494,6 +494,7 @@ function topBar(p, s, onLog) {
   };
   const iv = setInterval(refresh, 1000);
   cleanup.push(() => clearInterval(iv));
+  startAlerts(p);
   return refresh;
 }
 const defaultSeries = p => noWarming(p) || val(p, 'ev_ot') || val(p, 'io_knife') ? 'iotemp' : 'prewarm';
@@ -774,16 +775,18 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     if (e.target.id === 'evtime') setTimeout(() => { if (editing && !view.contains(document.activeElement)) { editing = null; draw(); } }, 0); };
   cleanup.push(() => { view.onchange = view.onfocusout = view.onfocusin = view.oninput = view.onkeydown = null; });
   // the due time warms up as it nears the clock: soon (2 min), now (to 5 min past), late; plain once saved
-  startAlerts(p, s, () => {
+  const dueTick = () => {
     const el = $('#due'); if (!el) return;
     const d = dueOf(p, s, pt); if (d == null) return;
     const left = d - nowFor(p, s);
     el.textContent = 'due ' + fromMin(Math.round(d)) + (left > 0 ? ` · in ${Math.floor(left)}:${String(Math.floor((left % 1) * 60)).padStart(2, '0')}` : left > -5 ? ' · now' : ' · late');
     el.dataset.state = isSaved ? 'saved' : left > 2 ? 'later' : left > 0 ? 'soon' : left > -5 ? 'now' : 'late';
-  });
+  };
+  dueTick();
   // the BP, HR, BIS box warms up the same way for its next 15-min reading; the still-to-fill list keeps up as
   // readings fall due (main screen)
   const hl = setInterval(() => {
+    dueTick();
     const a = $('#haemolink'); if (a) a.dataset.state = haemoState(p);
     const tl = $('#templink'); if (tl) tl.dataset.state = haemoState(p, defaultSeries(p));
     const gp = $('#gaps'), h = gapsHtml(p);
@@ -794,24 +797,29 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
 });
 
 // ---------- due alerts (only while the app is open)
-function startAlerts(p, s, tick) {
+// On every patient screen (both tabs, the forms, Perioperative data): a reading of any series falling due alerts
+// (banner, vibrate, beep, as set in Settings), and the screen is kept awake, taken again after switching apps.
+function startAlerts(p) {
   const alerted = new Set(read('alerted', []));
   let lock = null;
-  if (settings.remind.awake && navigator.wakeLock) navigator.wakeLock.request('screen').then(l => { lock = l; }).catch(() => {});
+  const awake = () => { if (settings.remind.awake && navigator.wakeLock && document.visibilityState === 'visible') navigator.wakeLock.request('screen').then(l => { lock = l; }).catch(() => {}); };
+  awake();
+  document.addEventListener('visibilitychange', awake);
   const iv = setInterval(() => {
-    tick();
-    const now = nowFor(p, s);
-    for (const x of pointsFor(p, s)) {
-      const d = dueOf(p, s, x), tag = p.id + s + x.key + (val(p, SERIES[s].ref[0]) || '');
-      if (d == null || !expected(p, s, d) || savedAt(p, s, x.key) || alerted.has(tag) || now < d || now > d + 5) continue;
-      alerted.add(tag); write('alerted', [...alerted].slice(-200));
-      if (settings.remind.banner) { const b = $('#banner'); b.textContent = `${x.label} reading due now (tap to hide)`; b.hidden = false; setTimeout(() => { b.hidden = true; }, 15000); }
-      if (settings.remind.vibrate && navigator.vibrate) navigator.vibrate([300, 150, 300]);
-      if (settings.remind.beep) beep();
+    for (const s of ['prewarm', 'iotemp', 'haemo']) {
+      if (s === 'prewarm' && noWarming(p)) continue;
+      const now = nowFor(p, s);
+      for (const x of pointsFor(p, s)) {
+        const d = dueOf(p, s, x), tag = p.id + s + x.key + (val(p, SERIES[s].ref[0]) || '');
+        if (d == null || !expected(p, s, d) || savedAt(p, s, x.key) || alerted.has(tag) || now < d || now > d + 5) continue;
+        alerted.add(tag); write('alerted', [...alerted].slice(-200));
+        if (settings.remind.banner) { const b = $('#banner'); b.textContent = `${s === 'haemo' ? 'BP, HR, BIS' : 'Temperature'} ${x.label} reading due now (tap to hide)`; b.hidden = false; setTimeout(() => { b.hidden = true; }, 15000); }
+        if (settings.remind.vibrate && navigator.vibrate) navigator.vibrate([300, 150, 300]);
+        if (settings.remind.beep) beep();
+      }
     }
   }, 1000);
-  tick();
-  cleanup.push(() => { clearInterval(iv); lock?.release?.().catch(() => {}); });
+  cleanup.push(() => { clearInterval(iv); document.removeEventListener('visibilitychange', awake); lock?.release?.().catch(() => {}); });
 }
 let actx;
 function beep() {
@@ -966,7 +974,9 @@ route(/^\/p\/(\w+)\/data$/, id => {
       if (!v || clash) { toast(v ? 'That Subject ID is already used by another patient.' : 'The Subject ID can’t be blank.'); i.value = get('enrol_id') ?? ''; return; }
       set(p, 'enrol_id', v); $('#title').textContent = sid(p) + ' · Perioperative data'; return;
     }
-    set(p, f.id, f.temp ? normaliseTemp(i.value) : i.value.trim());
+    const tv = typedValue(f, i.value);
+    if (tv == null) { i.value = val(p, f.id) ?? ''; return; }
+    set(p, f.id, tv);
     if (REDRAW.has(f.id)) return draw();
     // BMI is worked out from weight and height (unless typed in): update its box without a redraw (focus stays)
     if (f.id === 'wt' || f.id === 'ht') { recalc(p); const b = view.querySelector('#f-bmi'); if (b) b.value = val(p, 'bmi') ?? ''; }
@@ -1042,7 +1052,9 @@ route(/^\/p\/(\w+)\/form\/(\w+)$/, (id, pg) => {
     if (i.dataset.ix != null) { const rows = ixRows(p); rows[+i.dataset.ix][i.dataset.k] = i.value.trim(); set(p, 'io_ix_rows', JSON.stringify(rows)); return; }
     if (!i.dataset.f) return;
     const f = field(i.dataset.f);
-    set(p, f.id, f.temp ? normaliseTemp(i.value) : i.value.trim());
+    const tv = typedValue(f, i.value);
+    if (tv == null) { i.value = val(p, f.id) ?? ''; return; }
+    set(p, f.id, tv);
     // redraw only when other fields depend on this one, so the next box keeps focus
     if (REDRAW.has(f.id)) { recalc(p); draw(); }
   };
@@ -1055,6 +1067,15 @@ function recalc(p) {
     const c = calc(kind, k => val(p, k));
     if (c != null && !p.lock?.on && (val(p, id) == null || p.f[id]?.auto)) { setVal(p, id, String(c), settings.me); p.f[id].auto = true; saveAll(); sync(p, [id]); }
   }
+}
+// a typed form answer: numbers only where a number is asked; a temperature outside 25–45 °C is asked about.
+// null: refused (the box goes back to what was saved)
+function typedValue(f, raw) {
+  const v = f.temp ? normaliseTemp(raw) : String(raw).trim();
+  if (v === '') return v;
+  if ((f.type === 'num' || f.type === 'int') && !/^-?\d+(\.\d+)?$/.test(v)) { toast(`${f.label}: numbers only.`); return null; }
+  if (f.temp && (+v < 25 || +v > 45) && !confirm(`${f.label} ${v} °C looks unusual. Keep it?`)) return null;
+  return v;
 }
 function fieldHtml(f, get) {
   if (!f || !isShown(f, get)) return '';
