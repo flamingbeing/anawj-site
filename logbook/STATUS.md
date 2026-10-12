@@ -5,17 +5,16 @@ Lasting rules and lessons go in `NOTES.md`; finished work leaves "Recently done"
 Each session edits only its own line under **Now**. Update this file when a task finishes, a decision is made, or
 before compacting (`/save-state` in Claude Code, `$save-state` in Codex).
 
-Last updated: 2026-10-12 by Claude Code, Logbook 3 (log3).
+Last updated: 2026-10-12 by Claude Code, Logbook 1 (log1).
 
 ## Now
 
-- **Claude Code, "APMES Logbook" session** (branch `claude/clever-gates-pm6sas`): idle after #183 (`/apmes/` folder,
-  blank portfolio template committed for tests, Word export now ticks Female). Firebase CLI signed in for this
-  session, unused (each use needs the owner's OK).
-- **Claude Code, Logbook 3 (log3)** (branch `ccr-2994049c-4e5tlt`): idle after #181. Still signed in
-  to the Firebase CLI (usage counts only; each use needs the owner's OK). Owns the axe check, PR previews and the
-  Codex / Firebase plugin setup.
-- **Claude Code, "APMES Logbook 2" session** (branch `ccr-afac5e7a-99esax`): owner's batch of 8 done in three PRs
+- **Claude Code, Logbook 1 (log1)** (branch `claude/clever-gates-pm6sas`, no open PR): idle after #186. Firebase CLI
+  signed in for this session, unused (each use needs the owner's OK).
+- **Claude Code, Logbook 3 (log3)** (branch `ccr-2994049c-4e5tlt`): idle, nothing half-done. Still signed in to the
+  Firebase CLI (usage counts only; each use needs the owner's OK). Owns the axe check, PR previews and the Codex /
+  Firebase plugin setup.
+- **Claude Code, Logbook 2 (log2)** (branch `ccr-afac5e7a-99esax`): owner's batch of 8 done in three PRs
   (#180 Reflections tab, #184 page width / demo / swipe, then Analytics). Next: profiles (Basic APMES, Advanced
   APMES, Generic, Admin), planned on top of Basic mode, waiting on the owner's go.
 - **Codex**: no open logbook task (handed its remaining batch to Claude on #163).
@@ -27,6 +26,8 @@ Last updated: 2026-10-12 by Claude Code, Logbook 3 (log3).
 - Dropbox developer console: tick `files.metadata.read` so "Keep backups for…" can remove old Dropbox files.
 - Dropbox: apply for production approval when ready (only listed accounts can use it until then).
 - MCP connector: test `node server.mjs login` on a computer.
+- Optional: send the AY2023 evaluations tracking spreadsheet for `apmes/originals/` (checked for names first).
+- Residents who exported a Word portfolio with Female selected before #183: the box was left unticked; re-export.
 
 ## Next (agreed queue)
 
@@ -43,7 +44,7 @@ Last updated: 2026-10-12 by Claude Code, Logbook 3 (log3).
 - #184 Page width (Full), header can hide in the demo, Leave / Reset demo by Sign out, swipe on by default and
   following the finger.
 - #180 Reflections tab: topics as headings, one-line header, pinned search with sticky topics.
-
+- #186 EPA Guidebook v8 PDF in `apmes/originals/` (cover with names replaced, file details removed).
 - #183 APMES documents in `/apmes/`; blank portfolio template in the repo; Word export ticks Female (was never ticked).
 - #181 Notes review fixes: note index moved to owner-only `meta/noteIndex` (rules deployed), bin restore keeps the
   100-note limit, notes listener metadata, 34 new rules tests; previews no longer break on reload (service workers
@@ -54,15 +55,16 @@ Last updated: 2026-10-12 by Claude Code, Logbook 3 (log3).
 - #175 Reflection formatting buttons (off by default); Word export shows real bold and bullets.
 - #173 Backup as one spreadsheet (CSV); Restore reads it.
 - #172 Basic mode (one switch, off by default).
-- #170 Settings → Show or hide, a reset per group.
-- #166 Notes (private notepad, max 100) and the 3 accessibility fixes.
-- #160–#162 Save to Drive / Dropbox fixed (same-page sign-in), compressed `.json.gz`, keep-for-N-days.
-- #159 Firebase sign-in helper self-hosted on anawj.com (fixes "missing initial state" on Android).
 
 ## Decisions log
 
+- 2026-10-12: The EPA Guidebook v8 PDF goes in `apmes/originals/` as a cleaned copy: the cover page's contributor and
+  acknowledgement names replaced by a plain cover, file details (staff names, SingHealth sensitivity label) removed.
 - 2026-10-12: Session names: Logbook 1 / 2 / 3 (log1 / log2 / log3). log1 = branch `claude/clever-gates-pm6sas`,
-  log2 = `ccr-afac5e7a-99esax`, log3 = `ccr-2994049c-4e5tlt`. Each renames its own line under Now.
+  log2 = `ccr-afac5e7a-99esax`, log3 = `ccr-2994049c-4e5tlt`. Each renames its own line under Now; the session
+  titles in the app are "Logbook 1 (log1)" etc.
+- 2026-10-12: When the owner types `/compact` the session gets no turn to save first: the owner says "save state"
+  (or `/save-state`) before `/compact`.
 - 2026-10-12: APMES programme documents aren't secret: they live in `/apmes/` at the repo root (guidebook, data,
   blank portfolio template; originals may be added). No faculty names (the MedHub guide stays out unless blacked
   out); published authors cited in the guidebook are fine.
