@@ -316,6 +316,9 @@ let leaveGuard = null, shown = location.hash, at = history.state?.i ?? 0, restor
 function render() {
   if (restoring && location.hash === shown) { restoring = false; return; }
   restoring = false;
+  // a box still being typed in (swipe, phone back): let it commit first, so the leave check sees it and a form's
+  // answer is saved before its screen goes
+  if (view.contains(document.activeElement) && document.activeElement.matches('input, textarea, select')) document.activeElement.blur();
   const g = leaveGuard?.();
   if (g) {
     const to = location.hash, i = history.state?.i;
@@ -345,6 +348,17 @@ function render() {
 }
 window.addEventListener('hashchange', render);
 window.addEventListener('beforeunload', e => { if (leaveGuard?.()) e.preventDefault(); });
+// After a tap that moves or redraws the screen (Save, Log, a time, a comfort answer), taps are ignored for a moment: a
+// double tap otherwise lands on whatever moved under the finger (the next timepoint's Save, the next event's Log).
+// Prompts (the save dialog) aren't affected.
+// Only a tap near the one just handled is ignored (a double tap lands in the same place; a quick tap elsewhere is fine).
+let tapLockUntil = 0, tapAt = { x: -99, y: -99 }, lockAt = tapAt;
+document.addEventListener('pointerdown', e => { tapAt = { x: e.clientX, y: e.clientY }; }, true);
+const lockTaps = (ms = 700) => { tapLockUntil = Date.now() + ms; lockAt = tapAt; };
+document.addEventListener('click', e => {
+  if (Date.now() >= tapLockUntil || e.target.closest('dialog')) return;
+  if (Math.hypot(e.clientX - lockAt.x, e.clientY - lockAt.y) < 48) { e.stopImmediatePropagation(); e.preventDefault(); }
+}, true);
 // ask for a 24-hour time (hh:mm); null if cancelled or not a time
 function askTime(q, def) {
   const r = prompt(q + '\n\n24-hour time, e.g. 08:05', def || '');
@@ -374,6 +388,15 @@ function askLeave(g, proceed) {
 }
 $('#fresh').onclick = () => render();
 $('#banner').onclick = () => { $('#banner').hidden = true; };
+// the due banner floats over the top of the page, just under the bar: nothing moves under a finger as it appears
+// (it used to push the page down, so a tap meant for Save landed on another box); a tap on it only hides it
+let bannerTimer;
+function showBanner(text, ms) {
+  const b = $('#banner');
+  b.style.top = Math.max(0, $('header.bar').getBoundingClientRect().bottom) + 'px';
+  b.textContent = text; b.hidden = false;
+  clearTimeout(bannerTimer); bannerTimer = setTimeout(() => { b.hidden = true; }, ms);
+}
 function header(title, back, extra = '') {
   $('#ptabs').hidden = true; $('#ptabs').innerHTML = '';
   $('#title').textContent = title;
@@ -541,6 +564,7 @@ function topBar(p, s, onLog) {
     const nx = nextEvent(p); if (!nx) return;
     const t = nowHM();
     set(p, nx.id, t); toast(`${nx.label} ${t}. Tap its box to change.`); refresh(); onLog?.();
+    lockTaps(); // the button relabels to the next event at once: a double tap mustn't log that one too
   };
   const iv = setInterval(refresh, 1000);
   cleanup.push(() => clearInterval(iv));
@@ -575,6 +599,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
   view.addEventListener('touchend', swEnd, { passive: true });
   cleanup.push(() => { view.removeEventListener('touchstart', swStart); view.removeEventListener('touchend', swEnd); });
   let editing = null; // event whose time is being changed
+  let alive = true; cleanup.push(() => { alive = false; });
   let typing = null; // the BP / HR / BIS box with the keyboard up
   // default timepoint: the unsaved one nearest its due time, else the first unsaved
   if (!key) {
@@ -780,7 +805,8 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     const m = t.closest('[data-map]');
     if (m) { draft.map = m.dataset.map; draw(); return; }
     const sat = t.closest('[data-sat]');
-    if (sat) { const cur = val(p, sat.dataset.sat); set(p, sat.dataset.sat, String(cur) === sat.dataset.v ? null : +sat.dataset.v); satEdit = null; draw(); return; }
+    // an answer can be changed, not cleared by tapping it again; the row collapses, so taps pause a moment
+    if (sat) { set(p, sat.dataset.sat, +sat.dataset.v); satEdit = null; draw(); lockTaps(); return; }
     const se = t.closest('[data-satedit]');
     if (se) { satEdit = se.dataset.satedit; draw(); return; }
     const ev = t.closest('[data-ev]');
@@ -790,7 +816,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
       if (!val(p, ev.dataset.ev)) {
         const skipped = skippedBefore(p, ev.dataset.ev);
         if (skipped.length && !confirm(`${skipped.join(', ')} ${skipped.length === 1 ? 'isn’t' : 'aren’t'} logged yet.\n\nLog ${evLabel(ev.dataset.ev)} now (${nowHM()})?`)) return;
-        set(p, ev.dataset.ev, nowHM());
+        set(p, ev.dataset.ev, nowHM()); lockTaps();
       } else editing = ev.dataset.ev;
       draw(); return;
     }
@@ -809,7 +835,15 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
       inp.className = 'num'; inp.inputMode = 'decimal'; inp.value = draft[k] ?? ''; inp.setAttribute('aria-label', c.label);
       n.replaceWith(inp); inp.focus(); inp.select();
       let ended = false; // removing the box on redraw fires blur again
-      const done = () => { if (ended) return; ended = true; const v = c.temp ? normaliseTemp(inp.value) : inp.value.trim(); draft[k] = v === '' ? null : v; draw(); };
+      const done = () => {
+        if (ended) return; ended = true;
+        const v = c.temp ? normaliseTemp(inp.value) : inp.value.trim(); draft[k] = v === '' ? null : v;
+        // the number goes back in place now and the screen redraws a moment later: redrawing at once swapped the
+        // buttons under a finger already on its way to Save, + or ›, and that first tap was lost
+        const b = document.createElement('button'); b.className = 'num'; b.dataset.type = k; b.textContent = draft[k] ?? 'tap';
+        if (inp.isConnected) inp.replaceWith(b);
+        setTimeout(() => { if (alive) draw(); }, 400);
+      };
       inp.onblur = done; inp.onkeydown = ev => { if (ev.key === 'Enter') inp.blur(); };
       return;
     }
@@ -820,6 +854,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     }
     if (t.closest('#save')) {
       if (!commit()) return;
+      lockTaps(); // a double tap on Save mustn't save the next timepoint too
       const next = pts.slice(pts.indexOf(pt) + 1).find(x => !savedAt(p, s, x.key));
       go(`#/p/${id}/${s}/` + (next ? next.key : pt.key));
       return;
@@ -912,7 +947,7 @@ function startAlerts(p) {
     }
     if (!due.length) return;
     write('alerted', [...alerted].slice(-200));
-    if (settings.remind.banner) { const b = $('#banner'); b.textContent = due.join(' · ') + ' (tap to hide)'; b.hidden = false; setTimeout(() => { b.hidden = true; }, 15000); }
+    if (settings.remind.banner) showBanner(due.join(' · ') + ' (tap to hide)', 15000);
     if (settings.remind.vibrate && navigator.vibrate) navigator.vibrate([300, 150, 300]);
     if (settings.remind.beep) beep();
   }, 1000);
@@ -1251,7 +1286,8 @@ route(/^\/delete$/, () => {
     if (r) { const p = patients[r.dataset.restore]; if (p) { set(p, 'restored', 1); toast(sid(p) + ' restored'); render(); } return; }
     const b = e.target.closest('[data-del]'); if (!b) return;
     const p = patients[b.dataset.del]; if (!p) return;
-    if (!b.dataset.sure) { b.dataset.sure = 1; b.textContent = 'Tap again'; b.setAttribute('aria-label', 'Tap again to delete ' + sid(p)); return; }
+    if (!b.dataset.sure) { b.dataset.sure = Date.now(); b.textContent = 'Tap again'; b.setAttribute('aria-label', 'Tap again to delete ' + sid(p)); return; }
+    if (Date.now() - b.dataset.sure < 600) return; // a double tap isn't a second, deliberate tap
     p.deleted = Date.now(); saveAll(); sync(p, []); toast(sid(p) + ' deleted'); render();
   };
   cleanup.push(() => { view.onclick = null; });
@@ -1449,7 +1485,7 @@ route(/^\/settings$/, () => {
     saveSettings();
   };
   $('#test').onclick = () => {
-    if (settings.remind.banner) { const b = $('#banner'); b.textContent = 'Test: reading due now'; b.hidden = false; setTimeout(() => { b.hidden = true; }, 4000); }
+    if (settings.remind.banner) showBanner('Test: reading due now', 4000);
     if (settings.remind.vibrate && navigator.vibrate) navigator.vibrate([300, 150, 300]);
     if (settings.remind.beep) beep();
   };

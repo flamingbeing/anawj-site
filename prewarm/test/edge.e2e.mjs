@@ -4,7 +4,7 @@
 const { chromium } = await import(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/node_modules/playwright/index.mjs');
 const b = await chromium.launch();
 const fails = [];
-const tryit = async f => { try { await f(); } catch (e) { fails.push('error: ' + e.message.split('\n')[0]); } };
+const tryit = async f => { try { await f(); } catch (e) { fails.push('error: ' + e.message.split('\n')[0] + ' @ ' + (e.stack.match(/edge.e2e.mjs:(\d+)/)?.[1] || '?')); } };
 const log = (ok, msg) => { if (!ok) fails.push(msg); };
 async function fresh(time) {
   const ctx = await b.newContext({ viewport: { width: 390, height: 844 } });
@@ -177,7 +177,7 @@ await tryit(async () => {
   pg.once('dialog', d => d.accept()); await pg.click('[data-ev="ev_ot"]'); await pg.waitForTimeout(200);
   pg.once('dialog', d => d.accept()); await pg.click('[data-ev="io_knife"]'); await pg.waitForTimeout(200);
   const ot = await pg.textContent('[data-ev="ev_ot"] b'), [h, m] = ot.split(':').map(Number), early = `${String((h + 23) % 24).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-  await pg.click('[data-ev="io_knife"]'); await pg.fill('#evtime', early); await pg.keyboard.press('Tab'); await pg.waitForTimeout(1500);
+  await pg.waitForTimeout(700); await pg.click('[data-ev="io_knife"]'); await pg.fill('#evtime', early); await pg.keyboard.press('Tab'); await pg.waitForTimeout(1500);
   log(/Times out of order: Induction \d\d:\d\d is before In OT/.test(await pg.textContent('#gaps')), 'Induction an hour before In OT is listed');
   await ctx.close();
 });
@@ -301,7 +301,7 @@ await tryit(async () => {
   const pid = pg.url().match(/#\/p\/(\w+)/)[1];
   await pg.goto('http://localhost:8080/prewarm/?demo#/delete'); await pg.waitForSelector('.dellist');
   const del = pg.locator('.dellist li', { hasText: 'DEMO-01' }).locator('[data-del]');
-  await del.click(); await del.click(); await pg.waitForTimeout(200);
+  await del.click(); await pg.waitForTimeout(700); await del.click(); await pg.waitForTimeout(200);
   await pg.goto(`http://localhost:8080/prewarm/?demo#/p/${pid}`); await pg.waitForTimeout(300);
   log(!/#\/p\//.test(pg.url()) && /was deleted\. Restore it in Settings/.test(await pg.textContent('#toast')), 'a deleted patient can’t be opened');
   await pg.goto('http://localhost:8080/prewarm/?demo#/delete'); await pg.waitForSelector('[data-restore]');
@@ -316,7 +316,7 @@ await tryit(async () => {
   await pg.evaluate(() => { localStorage.setItem('prewarm-demo:settings', JSON.stringify({ me: 'TT' })); });
   await pg.goto('http://localhost:8080/prewarm/?demo#/new'); await pg.reload(); await pg.waitForSelector('#sid');
   await pg.fill('#sid', 'ALERT-1'); await pg.click('.seg .chip[data-v="2"]'); await pg.click('button[type=submit]'); await pg.waitForSelector('#lognext');
-  await pg.click('#lognext'); await pg.click('#lognext'); // Gown on, Prewarm on
+  await pg.click('#lognext'); await pg.waitForTimeout(800); await pg.click('#lognext'); // Gown on, Prewarm on (not a double tap)
   const seen = [];
   for (let i = 0; i < 12; i++) {
     await pg.clock.fastForward('01:00'); await pg.waitForTimeout(150);
@@ -345,6 +345,46 @@ await tryit(async () => {
   } else log(false, `test setup: 55 min due ${due} is before gown start ${t}`);
   await ctx.close();
 });
+// T. real touch double taps (100 ms apart) on Save and Log; typing a temperature then swiping / pressing back
+await tryit(async () => {
+  const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  const pg = await ctx.newPage();
+  pg.on('pageerror', e => fails.push('page error: ' + e.message));
+  await pg.clock.install({ time: new Date('2026-10-13T09:00:00') });
+  await pg.goto('http://localhost:8080/prewarm/?demo'); await pg.waitForTimeout(800);
+  await open(pg, 0);
+  const cdp = await ctx.newCDPSession(pg);
+  const tapAt = async (x, y) => { await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] }); await pg.waitForTimeout(40); await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); };
+  const dbl = async sel => { const r = await pg.locator(sel).boundingBox(); const x = r.x + r.width / 2, y = r.y + r.height / 2; await tapAt(x, y); await pg.waitForTimeout(100); await tapAt(x, y); await pg.waitForTimeout(600); };
+  const ok = d => d.type() === 'prompt' ? d.accept(d.defaultValue()) : d.accept(); pg.on('dialog', ok);
+  // Save
+  const before = await pg.$$eval('.strip a.done', a => a.length);
+  await pg.locator('#save').scrollIntoViewIfNeeded();
+  await dbl('#save');
+  const after = await pg.$$eval('.strip a.done', a => a.length);
+  log(after === before + 1, `double-tap Save saves one timepoint (saved ${before} → ${after})`);
+  // Log
+  const setBefore = await pg.$$eval('.tchip.set', a => a.length);
+  await dbl('#lognext');
+  const setAfter = await pg.$$eval('.tchip.set', a => a.length);
+  log(setAfter === setBefore + 1, `double-tap Log logs one event (times set ${setBefore} → ${setAfter})`);
+  pg.off('dialog', ok);
+  // typing a temperature, then swiping to Others: the typed value counts, so leaving asks
+  await pg.goto(pg.url().replace(/(#\/p\/\w+).*$/, '$1')); await pg.waitForSelector('.num[data-type="core"]');
+  await pg.click('.num[data-type="core"]'); await pg.waitForSelector('input.num');
+  await pg.keyboard.type('372');
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 320, y: 600 }] });
+  for (let i = 1; i <= 5; i++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: 320 - 48 * i, y: 600 }] });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); await pg.waitForTimeout(500);
+  log(!!await pg.$('dialog.ask[open]'), 'typed temperature then swipe: asks to save');
+  if (await pg.$('dialog.ask[open]')) await pg.click('dialog.ask [data-a="stay"]');
+  log(/37\.2/.test(await pg.textContent('.num[data-type="core"]')), 'and the typed 37.2 is kept: ' + await pg.textContent('.num[data-type="core"]'));
+  // typing then the phone's back button
+  await pg.click('.num[data-type="core"]'); await pg.waitForSelector('input.num'); await pg.keyboard.press('Control+A'); await pg.keyboard.type('368');
+  await pg.goBack(); await pg.waitForTimeout(400);
+  log(!!await pg.$('dialog.ask[open]'), 'typed temperature then back: asks to save');
+  await ctx.close();
+});
 await b.close();
 if (fails.length) { console.error('prewarm edge: FAIL\n- ' + fails.join('\n- ')); process.exit(1); }
-console.log('prewarm edge: ok (midnight, surgery end, double-tap Save, BP checks, back button, Log, Enter, still to fill, swipe, stray taps, time order, corrections, BMI, follow-ups, blanks, typed answers, alerts everywhere, duplicates, storage full, lock warning, late readings, delete and restore, prewarm off alert, warming yes / no)');
+console.log('prewarm edge: ok (midnight, surgery end, double-tap Save, BP checks, back button, Log, Enter, still to fill, swipe, stray taps, time order, corrections, BMI, follow-ups, blanks, typed answers, alerts everywhere, duplicates, storage full, lock warning, late readings, delete and restore, prewarm off alert, warming yes / no, touch double taps, typing then leaving)');

@@ -65,6 +65,10 @@ try {
   assert.match(await page.textContent('#clock .now'), /Time now\s*\d\d:\d\d/);
   assert.match(await page.textContent('#clock .next'), /Temp 0 min\s*now/);
   assert.equal(await page.getAttribute('#clock .next', 'data-state'), 'now');
+  // the 0-min reading is due now: the banner floats over the top of the page (nothing moves) and hides on a tap
+  await page.waitForSelector('#banner:not([hidden])');
+  assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('#banner')).position), 'fixed');
+  await page.click('#banner');
   // the app bar's Log button sets the next event to now (then cleared again from its box)
   assert.match(await page.textContent('#lognext'), /Log\s*Prewarm off/);
   await page.click('#lognext');
@@ -74,9 +78,6 @@ try {
   await page.click('[data-evclear="ev_wstop"]');
   assert.match(cleared, /Clear the Prewarm off time/, 'Clear asks first');
   assert.equal(await page.textContent('[data-ev="ev_wstop"] b'), 'tap');
-  // the 0-min reading is due now: the banner shows and hides on a tap
-  await page.waitForSelector('#banner:not([hidden])');
-  await page.click('#banner');
   // changing a set time
   await page.click('[data-ev="pw_start"]');
   await page.waitForSelector('#evtime');
@@ -128,6 +129,7 @@ try {
   // warming stopped: set temp becomes NA for later timepoints
   page.once('dialog', d => d.accept()); // Gown on is still empty
   await page.click('[data-ev="ev_wstop"]');
+  await page.waitForTimeout(800); // a quick second tap in the same place is ignored (double-tap guard)
   await page.click('[data-ev="ev_wstop"]');
   await page.fill('#evtime', '07:31');
   // leaving a reading with unsaved changes asks first: Stay keeps them, Save saves and goes on
@@ -288,7 +290,7 @@ try {
   await page.waitForSelector('.dellist');
   await axe('delete participants'); await shot('delete');
   const delBtn = page.locator('.dellist li', { hasText: 'TEST-02' }).locator('[data-del]');
-  await delBtn.click(); await delBtn.click();
+  await delBtn.click(); await page.waitForTimeout(700); await delBtn.click(); // a double tap isn't a deliberate second tap
   // it moves to the Deleted list, where it can be restored
   await page.waitForSelector('[data-restore]');
   assert.equal(await page.locator('.dellist li', { hasText: 'TEST-02' }).locator('[data-del]').count(), 0);
