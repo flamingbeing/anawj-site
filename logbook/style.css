@@ -1161,3 +1161,8 @@ ul.cases .refl-done .ico { width: 20px; height: 20px; fill: none; stroke: curren
 .row-menu-list button { justify-content: flex-start; min-height: 48px; }
 .row-menu-list button.has-refl { color: var(--accent); font-weight: 600; }
 .row-menu-list .ico { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* Read-only tag details: keep a floating card small on phones. */
+dialog.tag-info { width: min(420px, calc(100% - 32px)); max-height: calc(var(--vvh, 100dvh) - 120px); }
+dialog.tag-info p { overflow-wrap: anywhere; }
+.te-name[aria-pressed="true"] .te-pill { color: var(--accent); }

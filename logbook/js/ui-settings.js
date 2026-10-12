@@ -3,8 +3,8 @@
 
 import { YEAR_NAMES, DEFAULT_NAMES, BY_CODE } from './categories.js';
 import { sortCodes, uid, academicYear, withParents, weekStart, humanAge } from './engine.js';
-import { S, h, toast, modal, confirmBox, cloud, writes, catChip, catName, catShort, PICKER_ORDER, pickerOrder, settings, patchLogbook, displayName, hooks, rYear, myYearName, fill, categoryNames, setCategoryNames, catPills, tagSet, download, fileButton, todayISO, saveMany, UNDO_SECS, rowIcon } from './ui-core.js';
-import { MAX_TAGS, tagLinks as tagLinksIn, learnShorthand, cleanShorthand, shorthandOf, DEFAULT_SHORTHAND, cleanTagSet, defaultTagSet, tagTree, flatTree, moveTag, reparentTag, removeTag, newKey, tagSetToCsv, tagSetFromCsv, dropTag, canPlace } from './tags.js';
+import { S, h, toast, modal, confirmBox, cloud, writes, catChip, catName, catShort, PICKER_ORDER, pickerOrder, settings, patchLogbook, displayName, hooks, rYear, myYearName, fill, categoryNames, setCategoryNames, catPills, tagSet, resetters, download, fileButton, todayISO, saveMany, UNDO_SECS, rowIcon } from './ui-core.js';
+import { MAX_TAGS, tagLinks as tagLinksIn, learnShorthand, cleanShorthand, shorthandOf, DEFAULT_SHORTHAND, cleanTagSet, defaultTagSet, tagTree, flatTree, moveTag, reparentTag, removeTag, newKey, tagSetToCsv, tagSetFromCsv, dropTag, canPlace, placeNewTag } from './tags.js';
 import { pickDialog, CASE_PARTS, AFTER_SAVE } from './ui-log.js';
 import { OPERATOR_HELP } from './search-ops.js';
 import { PRESETS, DEFAULT_ACCENT, cleanAccent, schemeCss, lightPalette, tabSchemeCss, tabVarsCss } from './colors.js';
@@ -774,6 +774,7 @@ const saveTags = set => patchLogbook({ settings: { tagSet: cleanTagSet(set) } })
 // last: the tag or header you last tapped (list or pills) — a new one goes right after it;
 // lastGroup: the tag group you last edited — a new group goes after it
 const tev = { q: '', last: null, lastGroup: null };
+resetters.push(() => { tev.q = ''; tev.last = null; tev.lastGroup = null; });
 const teMode = () => (settings().tagEditorView === 'pills' ? 'pills' : 'list');
 // cases per tag: APMES tags from the counts, your own tags by key
 function tagUsage() {
@@ -796,17 +797,17 @@ export function renderTagEditor() {
   const row = n => h('li', { 'data-k': n.e.k, style: `padding-left:${8 + Math.min(n.depth, 4) * 18}px`, class: `te-${n.kind}${n.e.hide ? ' te-hidden' : ''}${tev.last === n.e.k ? ' te-last' : ''}` },
     // drag by the handle: onto the top or bottom of a row to go before or after it, the middle to go inside
     h('span', { class: 'te-handle', title: 'Drag to move or nest', 'aria-label': 'Drag to move or nest', onpointerdown: e => startTagDrag(e, n.e.k) }, '⠿'),
-    h('button', { type: 'button', class: 'te-name', onclick: () => editTag(n) },
+    h('button', { type: 'button', class: 'te-name', 'aria-pressed': String(tev.last === n.e.k), onclick: () => selectTag(n) },
       h('span', { class: 'te-pill' }, nameOf(n)),
       n.kind === 'head' ? null : h('small', { class: 'muted te-sub' },
         [n.kind === 'cat' ? 'APMES · ' + catName(n.code) : linkText(n), count(n), n.e.hide ? 'hidden' : ''].filter(Boolean).join(' · '))),
     h('button', { class: 'small icon-btn', 'aria-label': 'Move up', onclick: () => saveTags(moveTag(set, n.e.k, -1)) }, '↑'),
     h('button', { class: 'small icon-btn', 'aria-label': 'Move down', onclick: () => saveTags(moveTag(set, n.e.k, 1)) }, '↓'));
-  // pills: tap to edit, drag (press and hold on a phone) onto the left or right of another to go
+  // pills: tap to select, drag (press and hold on a phone) onto the left or right of another to go
   // before or after it, onto its middle to go inside
-  const pill = n => h('li', { 'data-k': n.e.k, class: `te-pillitem te-${n.kind} d${Math.min(n.depth, 3)}${n.e.hide ? ' te-hidden' : ''}${tev.last === n.e.k ? ' te-last' : ''}`, tabindex: '0', role: 'button',
+  const pill = n => h('li', { 'data-k': n.e.k, class: `te-pillitem te-${n.kind} d${Math.min(n.depth, 3)}${n.e.hide ? ' te-hidden' : ''}${tev.last === n.e.k ? ' te-last' : ''}`, tabindex: '0', role: 'button', 'aria-pressed': String(tev.last === n.e.k),
     title: n.kind === 'cat' ? catName(n.code) : n.kind === 'head' ? 'Section header' : linkText(n),
-    onpointerdown: e => pillDown(e, n.e.k, e.currentTarget), onclick: () => { if (!pillDragged) editTag(n); }, onkeydown: e => { if (e.key === 'Enter') editTag(n); } },
+    onpointerdown: e => pillDown(e, n.e.k, e.currentTarget), onclick: () => { if (!pillDragged) selectTag(n); }, onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectTag(n); } } },
     h('span', { class: 'te-pill' }, nameOf(n)), n.kind === 'head' ? null : h('small', { class: 'te-n' }, String(used(n.e.k))));
   const search = h('input', { type: 'search', class: 'grow', value: tev.q, placeholder: 'Search tags, names or shorthand', 'aria-label': 'Search tags',
     oninput: e => { tev.q = e.target.value; const pos = e.target.selectionStart; hooks.render(); const el = document.querySelector('.tag-editor input[type=search]'); if (el) { el.focus(); el.setSelectionRange(pos, pos); } } });
@@ -822,7 +823,7 @@ export function renderTagEditor() {
     h('div', { class: 'bar', style: 'gap:8px;margin:0 0 8px' }, search, modeSeg),
     words.length ? h('p', { class: 'hint', style: 'margin:0 0 6px' }, `${nodes.length} of ${all.length} shown`) : null,
     teMode() === 'pills'
-      ? [h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'Tap a pill to edit it. Drag one (press and hold on a phone) onto the left or right of another to move it, or onto its middle to put it inside. The number is how many cases have it.'),
+      ? [h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'Tap a pill to select it and see its details. Drag one (press and hold on a phone) onto the left or right of another to move it, or onto its middle to put it inside. The number is how many cases have it.'),
         h('ul', { class: 'te-list te-pills' }, nodes.map(pill))]
       : h('ul', { class: 'te-list' }, nodes.map(row))),
     tagGroupsCard(),
@@ -837,6 +838,40 @@ export function renderTagEditor() {
           if (!(await confirmBox('Reset tags?', 'Go back to the APMES tags in the official order, with the programme’s names? Your own tags are removed from the list (cases keep them).', 'Reset', true))) return;
           await patchLogbook({ settings: { tagSet: defaultTagSet({}), catOrder: [], subcats: {} } }); hooks.render();
         } }, 'Reset'))));
+}
+
+// Selecting is read-only. The small floating card is a transient view, so Back /
+// Escape dismiss it and restore focus without losing the insertion anchor.
+function selectTag(n) {
+  const owner = S.user?.email;
+  tev.last = n.e.k;
+  document.querySelectorAll('.tag-editor li[data-k]').forEach(li => {
+    const selected = li.dataset.k === tev.last;
+    li.classList.toggle('te-last', selected);
+    (li.matches('[role=button]') ? li : li.querySelector('.te-name'))?.setAttribute('aria-pressed', String(selected));
+  });
+  const name = n.kind === 'cat' ? catShort(n.code) : n.e.n;
+  const parent = n.e.p ? tagSet().find(e => e.k === n.e.p) : null;
+  const nameOf = e => e.k.startsWith('c:') ? catShort(e.k.slice(2)) : e.n;
+  const links = tagLinksIn(tagSet(), n.e.k);
+  const next = async action => {
+    await m.close();
+    if (S.user?.email !== owner) return;
+    const selected = flatTree(tagTree(tagSet())).find(x => x.e.k === n.e.k);
+    if (!selected) return toast('This tag was removed. Select another tag.');
+    action(selected);
+  };
+  const m = modal(name, [
+    h('p', { class: 'hint' }, n.kind === 'head' ? 'Section header' : n.kind === 'cat' ? 'APMES · ' + catName(n.code) : 'Personal tag'),
+    parent ? h('p', {}, 'Under ', nameOf(parent)) : null,
+    n.kind !== 'head' ? [h('p', {}, `${tagUsage()(n.e.k)} cases · ${n.e.hide ? 'Hidden (search still finds it)' : 'Shown on Case'}`),
+      h('p', {}, links.length ? 'Counts towards: ' + links.map(catName).join(', ') : 'Label only; no APMES credit'),
+      shorthandOf(n.e).length ? h('p', { class: 'hint' }, 'Shorthand: ' + shorthandOf(n.e).join(', ')) : null] : null,
+    h('div', { class: 'bar', style: 'flex-wrap:wrap;margin-bottom:0' },
+      h('button', { onclick: () => next(selected => editTag(selected)) }, 'Edit'),
+      h('button', { class: 'primary', onclick: () => next(() => editTag(null, 'tag')) }, 'Add after'),
+      h('button', { onclick: () => m.close() }, 'Close')),
+  ], { cls: 'tag-info' });
 }
 
 // Pills: a mouse drags once it moves; a finger drags after a short hold (a quick swipe still scrolls).
@@ -935,7 +970,12 @@ function startTagDrag(e, key, horiz = false, liArg = null) {
 
 // Edit one item (or add a tag / header when n is null).
 function editTag(n, kind = n ? n.kind : 'tag') {
-  const set = tagSet();
+  const set = tagSet(), owner = S.user?.email;
+  const current = () => {
+    if (S.user?.email !== owner) { toast('Account changed; nothing was saved'); return false; }
+    if (JSON.stringify(tagSet()) !== JSON.stringify(set)) { toast('Your tag layout changed while this was open. Close and reopen to use the latest layout.'); return false; }
+    return true;
+  };
   if (n) tev.last = n.e.k;   // remembered: a new tag or header goes right after it
   const e = n ? { ...n.e, links: [...(n.e.links || [])] } : { k: newKey(kind === 'head' ? 'h' : 'u'), n: '', links: [], ...(kind === 'head' ? { hd: true } : {}) };
   // a new one sits beside the last tapped: a tag under the same parent, a header after its top-level item
@@ -950,23 +990,46 @@ function editTag(n, kind = n ? n.kind : 'tag') {
   const own = new Set([e.k]);
   if (n) { let grew = true; while (grew) { grew = false; for (const x of set) if (x.p && own.has(x.p) && !own.has(x.k)) { own.add(x.k); grew = true; } } }
   const places = flatTree(tagTree(set)).filter(x => !own.has(x.e.k) && (kind === 'tag' ? true : kind === 'cat' ? x.kind === 'head' : false));
-  const under = h('select', { disabled: !!sub || kind === 'head' },
+  const under = h('select', { 'aria-label': 'Sits under', disabled: !!sub || kind === 'head' },
     h('option', { value: '' }, sub ? catShort(sub) : 'Top level'),
     places.map(x => h('option', { value: x.e.k, selected: e.p === x.e.k }, `${'  '.repeat(Math.min(x.depth, 4))}${x.kind === 'cat' ? catShort(x.code) : x.e.n}${x.kind === 'head' ? ' (header)' : ''}`)));
   const pill = h('input', { value: e.n || '', maxlength: kind === 'head' ? '60' : '40', placeholder: code ? dflt.pill : kind === 'head' ? 'e.g. Regional' : 'e.g. Interscalene' });
   const long = h('input', { value: e.l || '', maxlength: '100', placeholder: code ? ((DEFAULT_NAMES[code] || [])[0] || BY_CODE[code].name) : 'optional' });
   const hide = h('input', { type: 'checkbox', checked: !!e.hide });
-  const placeNote = anchor ? h('p', { class: 'hint', style: 'margin:0 0 6px' }, `Goes after “${anchor.n || (anchor.k.startsWith('c:') ? catShort(anchor.k.slice(2)) : '')}” (${anchor === last ? 'the last one you tapped' : 'the section of the last one you tapped'}).`) : null;
+  const nameOf = x => x.k.startsWith('c:') ? catShort(x.k.slice(2)) : x.n;
+  const parentValue = () => sub ? 'c:' + sub : under.value;
+  const after = h('select', { 'aria-label': 'Place after' });
+  const placement = h('p', { class: 'hint', role: 'status' });
+  const findAnchor = h('input', { type: 'search', placeholder: 'Find a placement tag', 'aria-label': 'Find a placement tag' });
+  let selectedAfter = anchor && (anchor.p || '') === parentValue() ? anchor.k : '$end';
+  const preview = () => {
+    const parent = set.find(x => x.k === parentValue());
+    const sibling = set.find(x => x.k === selectedAfter);
+    placement.textContent = `${parent ? 'Under “' + nameOf(parent) + '”' : 'Top level'} · ${selectedAfter === '$start' ? 'at the beginning' : selectedAfter === '$end' ? 'at the end' : 'after “' + nameOf(sibling) + '” (including its children)'}`;
+  };
+  const anchorLabel = x => [nameOf(x), x.k.startsWith('c:') ? catName(x.k.slice(2)) : x.l || '', x.hd ? 'section header' : ''].filter((v, i, a) => v && a.indexOf(v) === i).join(' · ');
+  const paintAfter = () => {
+    const q = findAnchor.value.trim().toLowerCase();
+    const siblings = set.filter(x => (x.p || '') === parentValue() && x.k !== e.k);
+    fill(after, h('option', { value: '$start' }, 'Beginning'), h('option', { value: '$end' }, 'End'),
+      siblings.filter(x => x.k === selectedAfter || !q || (anchorLabel(x) + ' ' + shorthandOf(x).join(' ')).toLowerCase().includes(q)).map(x => h('option', { value: x.k }, anchorLabel(x))));
+    if (!siblings.some(x => x.k === selectedAfter)) selectedAfter = selectedAfter === '$start' ? '$start' : '$end';
+    after.value = selectedAfter; preview();
+  };
+  after.addEventListener('change', () => { selectedAfter = after.value; preview(); });
+  findAnchor.addEventListener('input', paintAfter);
+  under.addEventListener('change', () => { selectedAfter = '$end'; findAnchor.value = ''; paintAfter(); });
+  paintAfter();
   const kw = h('textarea', { rows: '3', value: shorthandOf(e).join(', '), maxlength: '1000', placeholder: kind === 'cat' ? 'e.g. flap, free flap' : 'e.g. appy, lap appy', autocapitalize: 'off', spellcheck: 'false' });
   const linkBox = h('div', { class: 'te-links' }, PICKER_ORDER.map(c => h('label', { class: 'check' },
     h('input', { type: 'checkbox', checked: e.links.includes(c.code), onchange: ev => { e.links = ev.target.checked ? [...e.links, c.code] : e.links.filter(x => x !== c.code); } }),
     `${c.parent ? '\u00a0\u00a0' : ''}${catName(c.code)}`)));
   const m = modal(n ? (kind === 'cat' ? 'Edit APMES tag' : kind === 'head' ? 'Edit header' : 'Edit personal tag') : (kind === 'head' ? 'New section header' : 'New personal tag'), [
     code ? h('p', { class: 'hint' }, `APMES: ${BY_CODE[code].full}. It always counts towards this APMES tag; renaming is just for you.`) : null,
-    placeNote,
     h('label', { class: 'field' }, kind === 'head' ? 'Header' : 'Name (pill)', pill),
     kind !== 'head' ? h('label', { class: 'field' }, 'Long name (lists)', long) : null,
     kind !== 'head' ? h('label', { class: 'field' }, 'Sits under', under) : null,
+    !n ? [h('label', { class: 'field' }, 'Find a placement tag', findAnchor), h('label', { class: 'field' }, 'Place after', after), placement] : null,
     kind === 'tag' ? [h('div', { class: 'chiplabel' }, 'Counts towards (optional)'),
       h('p', { class: 'hint', style: 'margin:0 0 4px' }, 'Choosing this tag ticks these APMES tags. Leave all unticked for a label only.'), linkBox] : null,
     kind !== 'head' ? h('label', { class: 'field', style: 'margin-top:8px' }, 'Shorthand (optional)', kw,
@@ -993,11 +1056,12 @@ function editTag(n, kind = n ? n.kind : 'tag') {
     })() : null,
     kind !== 'head' ? h('label', { class: 'check', style: 'margin-top:8px' }, hide, 'Hide from the Case tab (still found by search)') : null,
     h('div', { class: 'bar', style: 'margin-top:12px' },
-      n && kind !== 'cat' ? h('button', { class: 'danger', onclick: async () => { m.close(); await saveTags(removeTag(set, e.k)); toast('Removed (cases keep the tag)'); } }, 'Remove') : null,
-      n && kind === 'tag' ? h('button', { onclick: async () => { await m.close(); mergeTag(n); } }, 'Merge…') : null,
+      n && kind !== 'cat' ? h('button', { class: 'danger', onclick: async () => { if (!current()) return; await m.close(); if (S.user?.email !== owner) return; await saveTags(removeTag(set, e.k)); toast('Removed (cases keep the tag)'); } }, 'Remove') : null,
+      n && kind === 'tag' ? h('button', { onclick: async () => { if (!current()) return; await m.close(); if (S.user?.email === owner) mergeTag(n); } }, 'Merge…') : null,
       h('span', { class: 'grow' }),
       h('button', { onclick: () => m.close() }, 'Cancel'),
       h('button', { class: 'primary', onclick: async () => {
+        if (!current()) return;
         const nm = pill.value.trim();
         if (kind !== 'cat' && !nm) return toast('Give it a name');
         const out = { ...e, n: nm, l: long.value.trim(), hide: hide.checked, kw: kind === 'head' ? [] : cleanShorthand(kw.value) };
@@ -1006,13 +1070,18 @@ function editTag(n, kind = n ? n.kind : 'tag') {
         if (code ? out.kw.join() === (DEFAULT_SHORTHAND[code] || []).join() : !out.kw.length) delete out.kw; if (!out.n && kind === 'cat') delete out.n;
         if (kind !== 'tag') delete out.links;
         if (!n && set.filter(x => !x.k.startsWith('c:')).length >= MAX_TAGS) return toast(`You have ${MAX_TAGS} personal tags and headers, the most there can be. Remove one first.`);
-        let next = n ? set.map(x => (x.k === e.k ? out : x)) : [...set, out];
-        const p = sub ? 'c:' + sub : under.value;
-        if ((e.p || '') !== p || !n) next = reparentTag(next, e.k, p);
-        // new, beside the same parent as the last tapped: right after it
-        if (!n && anchor && (anchor.p || '') === p) { const placed = dropTag(next, e.k, anchor.k, 'after'); if (placed !== next) next = placed; }
-        if (!n) tev.last = e.k;   // the next new one follows this one
-        m.close(); await saveTags(next);
+        const p = parentValue();
+        let next;
+        try {
+          next = n ? set.map(x => (x.k === e.k ? out : x)) : placeNewTag(set, out, p, selectedAfter);
+          if (n && (e.p || '') !== p) next = reparentTag(next, e.k, p);
+        } catch (err) { return toast(err.message); }
+        try {
+          await patchLogbook({ settings: { tagSet: cleanTagSet(next) } });
+          if (S.user?.email !== owner) return;
+          if (!n) tev.last = e.k;
+          await m.close(); hooks.render();
+        } catch (err) { toast('Could not save: ' + err.message); }
       } }, 'Save'))], { sticky: true });
 }
 
