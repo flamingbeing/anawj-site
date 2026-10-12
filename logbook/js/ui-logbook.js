@@ -10,7 +10,7 @@ import { parseQuery, matchQuery, OPERATOR_HELP, insertOperator } from './search-
 import { parseCsv } from './tags.js';
 import {
   S, h, toast, debounce, modal, cat, categoryNamesRevision, catName, catShort, tagName, catFull, catChip, PICKER_ORDER, settings, patchLogbook, needExcel, download, fileButton, catPills,
-  updateCase, saveMany, deleteMany, displayName, rYear, todayISO, fill, add, resetters, tagSet, tagLinks, confirmBox, keepTags, hooks, rowIcon, basicHides } from './ui-core.js';
+  updateCase, saveMany, deleteMany, displayName, rYear, todayISO, fill, add, resetters, tagSet, tagLinks, confirmBox, keepTags, hooks, rowIcon, ic, emptyState, basicHides } from './ui-core.js';
 import { dayHasNotes, caseHasNotes, openNotes, ensureNotes } from './ui-notepad.js';
 import { flatTree, tagTree } from './tags.js';
 import { editCaseDialog, logOnDate } from './ui-log.js';
@@ -112,7 +112,7 @@ export function renderLogbook() {
   const paintSoon = debounce(() => { view.limit = 150; paint(); }, 150);
 
   const nFlag = f => S.cases.filter(c => flagsOf(c).includes(f)).length;
-  const flagOpts = [['', 'All cases'], ['needsDate', `Needs a date (${nFlag('needsDate')})`], ['duplicate', `Possible duplicates (${nFlag('duplicate')})`], ['future', `Upcoming (${nFlag('future')})`], ...(basicHides('reflect') ? [] : [['interesting', `☆ Interesting (${S.cases.filter(c => c.reflectTag).length})`]])];
+  const flagOpts = [['', 'All cases'], ['needsDate', `Needs a date (${nFlag('needsDate')})`], ['duplicate', `Possible duplicates (${nFlag('duplicate')})`], ['future', `Upcoming (${nFlag('future')})`], ...(basicHides('reflect') ? [] : [['interesting', `Interesting (${S.cases.filter(c => c.reflectTag).length})`]])];
   const counter = h('span', { class: 'muted', style: 'font-size:calc(13px * var(--fs, 1))' });
 
   // the two filters fold behind a Filter button (shown open while one is in use)
@@ -145,7 +145,7 @@ export function renderLogbook() {
   const tagPanel = h('div', { class: 'lb-grid lb-panel' }, cell('Has all of', hasRow), cell('Has none of', notRow));
   const morePanel = h('div', { class: 'lb-panel' },
     h('div', { class: 'bar lb-fbar' }, fuzzyBox, caseBox),
-    h('div', { class: 'bar lb-fbar', style: 'margin:0' }, h('button', { class: 'small', title: 'Save this search', onclick: saveSearch }, '☆ Save search'), bulkBtn));
+    h('div', { class: 'bar lb-fbar', style: 'margin:0' }, h('button', { class: 'small', title: 'Save this search', onclick: saveSearch }, ic('star'), 'Save search'), bulkBtn));
   const dateBtn = fold(datePanel, view.from || view.to);
   const tagBtn = fold(tagPanel, view.has.length || view.not.length);
   const moreBtn = fold(morePanel, settings().lbFuzzy || settings().lbCase);
@@ -195,7 +195,7 @@ export function renderLogbook() {
       if (x.scope) setOpts(x.scope, !!settings().lbFuzzy);
       const [f, t] = filters.querySelectorAll('input[type=date]'); if (f) f.value = view.from; if (t) t.value = view.to;
       filters.hidden = false; refresh();
-    } }, '★ ' + x.name, h('span', { class: 'x', role: 'button', tabindex: '0', 'aria-label': 'Delete saved search', onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); e.target.click(); } }, onclick: async e => {
+    } }, ic('star'), x.name, h('span', { class: 'x', role: 'button', tabindex: '0', 'aria-label': 'Delete saved search', onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); e.target.click(); } }, onclick: async e => {
       e.stopPropagation();
       if (!(await confirmBox('Delete saved search', `Delete “${x.name}”?`, 'Delete', true))) return;
       await patchLogbook({ settings: { savedSearches: (settings().savedSearches || []).filter(y => y.id !== x.id) } }); paintSaved();
@@ -302,12 +302,12 @@ function monthHead(label, ul) {
     if (!row) { toast('No cases on or before ' + fmtDate(d) + ' in this list'); return; }
     row.scrollIntoView({ behavior: 'smooth', block: 'center' }); row.classList.remove('flash'); void row.offsetWidth; row.classList.add('flash');
   } });
-  return h('li', { class: 'monthhead' }, h('span', {}, label), h('label', { class: 'jump', title: 'Jump to a date' }, '📅 Jump', input));
+  return h('li', { class: 'monthhead' }, h('span', {}, label), h('label', { class: 'jump', title: 'Jump to a date' }, ic('calendar'), 'Jump', input));
 }
 
 function listView(rows, flagsOf, repaint) {
-  if (!S.cases.length) return h('div', { class: 'empty' }, h('p', {}, 'No cases yet.'), h('a', { class: 'btn primary', href: '#log' }, 'Log your first case'));
-  if (!rows.length) return h('p', { class: 'empty' }, 'No cases match.');
+  if (!S.cases.length) return emptyState('logbook', 'No cases yet', 'Cases you log show here, newest first.', h('a', { class: 'btn primary', href: '#log' }, 'Log your first case'));
+  if (!rows.length) return emptyState('search', 'No cases match', 'Try fewer words, or clear the filters.');
   const ul = h('ul', { class: 'cases' });
   let month = '';
   for (const c of rows.slice(0, view.limit)) {
@@ -353,12 +353,12 @@ function caseRow(c, flagsOf) {
         flags.includes('future') ? h('span', { class: 'flag', title: 'Dated after today' }, 'upcoming') : null,
         flags.includes('duplicate') ? h('span', { class: 'flag' }, 'possible duplicate') : null,
         !(c.cats || []).length ? h('span', { class: 'flag err' }, 'no tag') : null,
-        c.reflectTag ? h('span', { class: 'flag', title: 'Marked interesting' }, '☆ interesting') : null,
+        c.reflectTag ? h('span', { class: 'flag', title: 'Marked interesting' }, ic('star'), 'interesting') : null,
         (c.tags || []).map(t => h('span', { class: 'flag sc-tag', title: 'Your tag' }, tagName(t))),
-        caseHasNotes(c.id) ? h('button', { class: 'flag note-flag', type: 'button', title: 'Open your notes on this case', 'aria-label': 'Open your notes on this case', onclick: e => { e.stopPropagation(); openNotes({ caseId: c.id }); } }, '✎ note') : null),
+        caseHasNotes(c.id) ? h('button', { class: 'flag note-flag', type: 'button', title: 'Open your notes on this case', 'aria-label': 'Open your notes on this case', onclick: e => { e.stopPropagation(); openNotes({ caseId: c.id }); } }, ic('note'), 'note') : null),
         document.documentElement.classList.contains('row-menu') ? rowMenu(c) : h('span', { class: 'acts' },
-          // to your own notes (paste into WhatsApp, Notes, Obsidian)
-          h('button', { class: 'small row-btn', title: 'Copy this case', 'aria-label': 'Copy this case', onclick: e => { e.stopPropagation(); copyText(shareCaseText(c), 'Case copied: paste it into your notes'); } }, rowIcon('copy'), h('span', { class: 'lbl' }, 'Copy')),
+          // to your own notes (paste into WhatsApp, Notes, Obsidian); off unless switched on (Advanced display, row-copy)
+          !document.documentElement.classList.contains('row-copy') ? null : h('button', { class: 'small row-btn', title: 'Copy this case', 'aria-label': 'Copy this case', onclick: e => { e.stopPropagation(); copyText(shareCaseText(c), 'Case copied: paste it into your notes'); } }, rowIcon('copy'), h('span', { class: 'lbl' }, 'Copy')),
           // ✓ and filled once the case has a reflection (opens it); the same width either way, so the row never wraps.
           // Basic: logbook only has no Reflect button (unless turned back on).
           basicHides('reflect') ? null : (S.reflections || []).some(r => r.caseId === c.id)
@@ -372,7 +372,7 @@ const pad = n => String(n).padStart(2, '0');
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 function calendarView(rows, flagsOf, repaint) {
-  if (!S.cases.length) return h('div', { class: 'empty' }, h('p', {}, 'No cases yet.'), h('a', { class: 'btn primary', href: '#log' }, 'Log your first case'));
+  if (!S.cases.length) return emptyState('logbook', 'No cases yet', 'Cases you log show here on their day.', h('a', { class: 'btn primary', href: '#log' }, 'Log your first case'));
   const today = todayISO();
   // opens on today (owner): the day's cases, or "No cases yet today" with + Log a case
   if (!view.month) { view.month = today.slice(0, 7); if (!view.day) view.day = today; }
@@ -422,12 +422,12 @@ function calendarView(rows, flagsOf, repaint) {
       h('div', { class: 'lb-dayhead' },
         h('h3', { style: 'margin:0' }, `${fmtDate(view.day)} (${dayCases.length})`),
         h('div', { class: 'lb-daybtns' },
-          // log on this day: the Log page opens with the date already picked
-          h('button', { class: 'small primary', onclick: () => logOnDate(view.day) }, '+ Log a case'),
           dayCases.length || dayNotes ? h('button', { class: 'small', onclick: async () => shareText(await dayTextWithNotes(view.day, dayCases)) }, 'Share day') : null,
           dayCases.length || dayNotes ? h('button', { class: 'small', title: 'Copy this day (format in Settings → Markdown)', 'aria-label': 'Copy this day', onclick: async () => copyText(await dayTextWithNotes(view.day, dayCases), 'Day copied: paste it into your notes') }, 'Copy') : null,
-          dayNotes ? h('button', { class: 'small', onclick: () => openNotes({ day: view.day }) }, '✎ Notes') : null)),
-      dayCases.length ? h('ul', { class: 'cases' }, dayCases.map(c => caseRow(c, flagsOf))) : h('p', { class: 'empty' }, view.day === today ? 'No cases yet today.' : 'No cases on this day.'))
+          dayNotes ? h('button', { class: 'small', onclick: () => openNotes({ day: view.day }) }, ic('note'), 'Notes') : null,
+          // log on this day (the Log page opens with the date already picked): last, at the right like a main action
+          h('button', { class: 'small primary', onclick: () => logOnDate(view.day) }, '+ Log a case'))),
+      dayCases.length ? h('ul', { class: 'cases' }, dayCases.map(c => caseRow(c, flagsOf))) : emptyState('calendar', view.day === today ? 'No cases yet today' : 'No cases on this day'))
       : h('p', { class: 'hint help', style: 'margin-top:10px' }, 'Tap a day to see its cases.'),
     undated.length ? h('details', { style: 'margin-top:12px' },
       h('summary', {}, `No date (${undated.length})`),

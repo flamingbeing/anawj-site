@@ -8,7 +8,7 @@ import { reflectionProgress, HEADING_BY_ID } from './reflections.js';
 import { logbookGlance, reflectionGlance, cohortGlance } from './glance.js';
 import { paceForecast, paceText, goneQuiet, reflectionTodos } from './analytics.js';
 import { reflectOnCase, openReflection } from './ui-reflect.js';
-import { S, h, toast, cloud, rYear, myYearName, settings, subcatsOf, patchLogbook, needExcel, download, displayName, hooks, add, resetters, info, catName, catShort, tagName, summaryOf, basicHides } from './ui-core.js';
+import { S, h, ic, toast, cloud, rYear, myYearName, settings, subcatsOf, patchLogbook, needExcel, download, displayName, hooks, add, resetters, info, catName, catShort, tagName, summaryOf, basicHides } from './ui-core.js';
 
 const STATUS_TEXT = { late: 'Behind', due: 'Due this year', ontrack: 'On track', done: 'Done', none: 'No target' };
 // Advanced mode only (not Basic): pace forecast, Gone quiet, Reflection to-dos, and numbers that open their cases
@@ -241,8 +241,8 @@ function todoCard() {
   const days = r => Math.floor((Date.now() - (r.updatedAt || r.createdAt || 0)) / 864e5);
   const n = interesting.length + stale.length;
   return section('todo', `Reflection to-dos (${n})`,
-    [interesting.length ? `☆ ${interesting.length} to write up` : '', stale.length ? `${stale.length} draft${stale.length === 1 ? '' : 's'} untouched 30+ days` : ''].filter(Boolean).join(' · '),
-    interesting.length ? [h('h3', {}, '☆ Interesting cases to write up'),
+    [interesting.length ? `${interesting.length} interesting to write up` : '', stale.length ? `${stale.length} draft${stale.length === 1 ? '' : 's'} untouched 30+ days` : ''].filter(Boolean).join(' · '),
+    interesting.length ? [h('h3', {}, ic('star'), 'Interesting cases to write up'),
       h('ul', { class: 'an-list an-todo' }, interesting.slice(0, 20).map(c => h('li', {}, h('span', { class: 'grow' }, caseLine(c)),
         h('button', { class: 'small primary', onclick: () => reflectOnCase(c) }, 'Write'))))] : null,
     stale.length ? [h('h3', {}, 'Drafts untouched for 30 days or more'),

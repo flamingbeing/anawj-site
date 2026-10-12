@@ -6,7 +6,7 @@ import { withParents, parseBulk, parseDate, fmtDate, sortCodes, uid, caseParts, 
 import { suggest as suggestCodes } from './suggest.js';
 import { apmesShorthand, shorthandTags } from './tags.js';
 import {
-  S, h, toast, debounce, modal, confirmBox, cat, catName, catShort, catFull, catChip, countText, logTags, tagLinks, tagName, tagChip, tagSet, keepTags, PROGRESS_BY_CODE,
+  S, h, ic, toast, debounce, modal, confirmBox, cat, catName, catShort, catFull, catChip, countText, logTags, tagLinks, tagName, tagChip, tagSet, keepTags, PROGRESS_BY_CODE,
   createCase, updateCase, removeCase, restoreCase, saveMany, deleteMany, subcatChips, subcatsOf, settings, todayISO, hooks, fill, add, cloud, writes, okNoIds, patchLogbook, catPills, basicHides, caseShown } from './ui-core.js';
 import { display, templateDialog } from './ui-settings.js';
 import { moveToBin } from './bin.js';
@@ -50,7 +50,7 @@ function saveDraft() {
   if (!draftSlot || draftOwner !== draftKey()) return;
   try { draftSlot.save({ ...draft, savedAt: Date.now() }); draftError = ''; }
   catch { draftError = 'Draft not saved: storage unavailable. Keep this page open.'; }
-  if (ui?.draftNote) ui.draftNote.textContent = draftError || (draftText() || draft.bulk ? 'Draft saved on this device' : '');
+  if (ui?.draftNote) ui.draftNote.textContent = draftError || (draftText() || draft.bulk ? 'Draft saved' : '');
 }
 saveDraft.cancel = () => {};
 window.addEventListener('pagehide', saveDraft);
@@ -124,7 +124,7 @@ function keepPlace(anchor, fn) {
 // On phones, focusing the details box pops the keyboard and scrolls back up: only do it with a mouse.
 // how tall the case box starts (Settings → Logging: 2 to 20 lines)
 const boxLines = () => Math.min(20, Math.max(2, Math.round(Number(settings().boxLines) || 3)));
-// "📋 Paste": the clipboard into a box (filled when empty, else on a new line). Browsers that can't read
+// Paste: the clipboard into a box (filled when empty, else on a new line). Browsers that can't read
 // the clipboard (or a refused permission) get a hint to long-press and paste instead.
 async function pasteInto(ta, after) {
   let text = '';
@@ -137,7 +137,8 @@ async function pasteInto(ta, after) {
   ta.focus({ preventScroll: true });
   after && after();
 }
-const pasteBtn = (ta, label = '📋 Paste') => h('button', { type: 'button', class: 'small paste-btn', title: 'Paste from the clipboard', onclick: () => pasteInto(ta) }, label);
+// in the case box's corner it is the icon alone; elsewhere the icon and a label
+const pasteBtn = (ta, label = '') => h('button', { type: 'button', class: 'small paste-btn' + (label ? '' : ' icon-only'), title: 'Paste from the clipboard', 'aria-label': label || 'Paste from the clipboard', onclick: () => pasteInto(ta) }, ic('paste'), label);
 const refocus = () => { if (ui.textarea && matchMedia('(pointer: fine)').matches) ui.textarea.focus({ preventScroll: true }); };
 
 // The list follows your tag set (Settings → Tag editor): section headers, categories and your own tags,
@@ -254,7 +255,7 @@ export function catPicker({ get, toggle, getTags = null, toggleTag = null, place
 
 // Parts of the Case tab people can hide (Settings → Logging, settings.caseHide); tags can always be picked from All tags
 export const CASE_PARTS = [
-  ['interesting', '☆ Interesting'],
+  ['interesting', 'Interesting'],
   ['parsed', 'What the box was read as (initials · details)'],
   ['quick', 'Quick picks (suggestions, Same as last, tag groups)'],
   ['still', 'Still needed'],
@@ -344,9 +345,9 @@ function paintDate() {
   const week = [];
   for (let k = 1; k <= 6; k++) { const x = new Date(); x.setDate(x.getDate() - k); week.push(todayISO(x)); }
   const wd = iso => { const [Y, M, D] = iso.split('-').map(Number); const x = new Date(Y, M - 1, D); return x.toLocaleDateString('en-GB', { weekday: 'short' }) + ' ' + nth(D); };
-  const calText = h('span', {}, '📅');
+  const calText = h('span', {});
   // the date input sits invisibly over the chip
-  const picker = h('label', { class: 'chip datepick', title: 'Pick a date', 'aria-label': 'Pick a date' }, calText, dateInput);
+  const picker = h('label', { class: 'chip datepick', title: 'Pick a date', 'aria-label': 'Pick a date' }, ic('calendar'), calText, dateInput);
   dateInput.addEventListener('click', () => { try { dateInput.showPicker(); } catch { /* not supported: native tap opens it */ } });
   const chips = week.map(iso => h('span', { class: `chip wk ${d === iso ? 'on' : ''}`, role: 'button', tabindex: '0', 'data-date': iso, onclick: pick(iso) }, wd(iso)));
   const mode = h('span', { class: 'seg mode-seg', role: 'group', 'aria-label': 'One case or a list' },
@@ -362,7 +363,7 @@ function paintDate() {
     for (let i = chips.length - 1; i >= 0 && bar.scrollWidth > bar.clientWidth + 1; i--) chips[i].hidden = true;
     const shownSel = d === t || chips.some(c => !c.hidden && c.dataset.date === d);
     picker.classList.toggle('on', !shownSel);
-    calText.textContent = shownSel ? '📅' : '📅 ' + fmtDate(d).replace(/ \d{4}$/, '');
+    calText.textContent = shownSel ? '' : fmtDate(d).replace(/ \d{4}$/, '');
     if (!shownSel) for (let i = chips.length - 1; i >= 0 && bar.scrollWidth > bar.clientWidth + 1; i--) chips[i].hidden = true;
   };
   requestAnimationFrame(fit);
@@ -450,13 +451,13 @@ function renderOne(card) {
   });
   const sugg = h('div', { class: 'chips sugg-row', 'aria-live': 'polite' });
   // empty the box in one tap (Undo puts it back); shown once there is text, where Paste was
-  const clearBtn = h('button', { type: 'button', class: 'small clear-btn', title: 'Clear the case box', 'aria-label': 'Clear the case box', onclick: () => {
+  const clearBtn = h('button', { type: 'button', class: 'small clear-btn icon-only', title: 'Clear the case box', 'aria-label': 'Clear the case box', onclick: () => {
     const was = draft.details;
     if (!was) return;
     draft.details = ''; textarea.value = ''; saveDraft(); paintSuggest(); paintParsed(false);
     textarea.focus({ preventScroll: true });
     toast('Case box cleared', { action: 'Undo', onaction: () => { draft.details = was; if (ui.textarea) { ui.textarea.value = was; paintSuggest(); paintParsed(false); } saveDraft(); } });
-  } }, '× Clear');
+  } }, ic('clear'));
   const selected = h('div', { class: 'chips selected' });
   const tip = h('div');
   const templates = h('div', { class: 'chips quick-rest' });
@@ -481,17 +482,20 @@ function renderOne(card) {
   };
   paintCommon();
   // "Interesting": a star on the case (reflectTag), to find it again; the Reflections tab offers these first
-  const tagBox = h('label', { class: 'check reflect-tag' }, h('input', { type: 'checkbox', checked: !!draft.reflectTag, onchange: e => { draft.reflectTag = e.target.checked; saveDraft(); } }), '☆ Interesting');
+  const tagBox = h('label', { class: 'check reflect-tag' }, h('input', { type: 'checkbox', checked: !!draft.reflectTag, onchange: e => { draft.reflectTag = e.target.checked; saveDraft(); } }), ic('star'), 'Interesting');
   ui.tagBox = tagBox;
   const draftNote = h('span', { class: 'draft-note', 'aria-live': 'polite' });
-  const syncNote = h('a', { href: '#recovery', class: 'draft-note', 'aria-live': 'polite' });
-  const paintSync = () => { const jobs = writes.entries(); syncNote.textContent = writes.error() || (jobs.some(x => x.state === 'failed' || x.state === 'conflict') ? 'Save needs attention · Retry / Recover' : writes.pending() ? 'Saved locally · pending sync' : jobs.length ? 'Synced · Recent changes' : 'Recent changes / Recover drafts'); };
+  // one quiet line under the box: the star on the left, the draft and sync state on the right, then a short
+  // link to Recent changes / Recover drafts (its words say what needs doing when a save needs attention)
+  const syncNote = h('a', { href: '#recovery', class: 'draft-note sync-note', title: 'Recent changes / Recover drafts', 'aria-live': 'polite' });
+  const paintSync = () => { const jobs = writes.entries(); syncNote.textContent = writes.error() || (jobs.some(x => x.state === 'failed' || x.state === 'conflict') ? 'Save needs attention' : writes.pending() ? 'Pending sync' : jobs.length ? 'Synced' : 'Recover'); };
   const offSync = writes.onChange(() => { if (syncNote.isConnected) paintSync(); else offSync(); });
   paintSync();
   const tagRow = h('div', { class: 'tag-row' }, tagBox, draftNote, syncNote);
   const enterHint = h('p', { class: 'hint enter-suggestion-hint', 'aria-live': 'polite', hidden: true });
+  // one wide Save; saving and keeping the date for the next case is the small text button beside it
   const actions = h('div', { class: 'actions' },
-    h('button', { class: 'big', title: 'Save and keep this date for the next case', onclick: () => save({ another: true }) }, 'Save, keep date'),
+    h('button', { class: 'linkish keep-date', title: 'Save and keep this date for the next case', onclick: () => save({ another: true }) }, 'Save, keep date'),
     h('button', { class: 'primary big', onclick: () => save({}) }, 'Save', h('span', { class: 'kbd', title: 'Ctrl+Enter (Cmd+Enter on a Mac)' }, ' Ctrl+⏎')));
 
   // what the box was read as (initials come off into their own field; age/sex stay in the details)
@@ -545,7 +549,7 @@ function paintParsed(typed) {
   if (!ui || !ui.parsed) return;
   const text = draftText();
   paintEnterHint();
-  if (ui.draftNote) ui.draftNote.textContent = draftError || (text ? 'Draft saved on this device' : '');
+  if (ui.draftNote) ui.draftNote.textContent = draftError || (text ? 'Draft saved' : '');
   if (!text) { fill(ui.parsed); return; }
   const { initials, details } = draftParts();
   const { age, rest } = settings().detectAgeSex !== false ? splitAge(details) : { age: '', rest: details };
@@ -586,7 +590,7 @@ function paintSel() {
   fill(ui.selected, ...(draft.cats.length
     ? draft.cats.map(code => catChip(code, { on: true, removable: true, cls: 'add', title: 'Remove ' + catFull(code),
       onclick: () => { draft.cats = dropCat(draft.cats, code); saveDraft(); paintSel(); } }))
-    : [h('span', { class: 'none' }, 'No tag yet: tap one below')]),
+    : [h('span', { class: 'none' }, 'No tag yet: pick one above')]),
     ...looseTags(draft.cats, draft.tags).map(k => tagChip(k, { onclick: () => { draft.tags = draft.tags.filter(t => t !== k); saveDraft(); paintSel(); } })),
     // all the tags off in one tap (Undo puts them back)
     draft.cats.length + (draft.tags || []).length > 1 ? h('button', { type: 'button', class: 'small clear-tags', title: 'Clear all tags', 'aria-label': 'Clear all tags', onclick: () => {
@@ -600,7 +604,7 @@ function paintSel() {
       ? h('button', { type: 'button', class: 'small linkish', onclick: () => templateDialog({ id: uid(), name: '', cats: [...draft.cats], details: '' }, async out => {
         await patchLogbook({ templates: [...((S.logbook && S.logbook.templates) || []), out] });
         toast(`Tag group “${out.name}” saved`); paintQuick(); paintSel();
-      }, 'Save as tag group') }, '☆ Save these tags as a tag group') : null);
+      }, 'Save as tag group') }, 'Save these tags as a tag group') : null);
   fill(ui.selExtra,
     // personal subcategories of the selected categories (Settings → My subcategories)
     subcatChips(draft.cats, draft.tags || [], tags => keepPlace(ui.selExtra, () => { draft.tags = tags; saveDraft(); paintSel(); })));
@@ -647,7 +651,7 @@ function paintQuick() {
       if (ui.textarea) { const end = draft.details.indexOf('\n'); ui.textarea.value = draft.details; ui.textarea.focus({ preventScroll: true }); ui.textarea.setSelectionRange(end < 0 ? draft.details.length : end, end < 0 ? draft.details.length : end); }
       keepPlace(ui.templates, () => { saveDraft(); paintDate(); paintSel(); paintParsed(false); });
     },
-  }, '↻ ', h('span', {}, clip(proc || 'no details', 30)))));
+  }, ic('again'), h('span', {}, clip(proc || 'no details', 30)))));
   const seen = new Set();
   const tmplChip = (t, name) => {
     const key = sortCodes(t.cats).join(',');
@@ -778,7 +782,7 @@ function renderBulk(card) {
     ta,
     h('div', { class: 'bar', style: 'margin-top:8px' },
       h('button', { class: 'primary', onclick: () => { bulkRows = parseBulk(ta.value, settings().suggestions !== false ? t => suggest(t) : null); paintBulk(out); } }, 'Review'),
-      pasteBtn(ta, '📋 Paste from clipboard'),
+      pasteBtn(ta, 'Paste from clipboard'),
       h('button', { onclick: () => { ta.value = ''; draft.bulk = ''; bulkRows = null; saveDraft(); fill(out); } }, 'Clear')),
     out);
   if (bulkRows) paintBulk(out);
@@ -969,7 +973,7 @@ export function editCaseDialog(c, opts = {}) {
     h('label', { class: 'field' }, 'Patient initials', h('input', { value: e.initials, placeholder: 'e.g. AB', maxlength: '20', autocapitalize: 'characters', autocomplete: 'off', spellcheck: 'false', oninput: ev => { e.initials = ev.target.value; saveEditDraft(); } })),
     h('label', { class: 'field' }, 'Case summary', detailsBox),
     h('div', { class: 'chiplabel' }, 'Tags'), sel, addBtn, pickWrap,
-    basicHides('reflect') ? null : h('label', { class: 'check reflect-tag', style: 'margin-top:8px' }, h('input', { type: 'checkbox', checked: !!e.reflectTag, onchange: ev => { e.reflectTag = ev.target.checked; saveEditDraft(); } }), '☆ Interesting'),
+    basicHides('reflect') ? null : h('label', { class: 'check reflect-tag', style: 'margin-top:8px' }, h('input', { type: 'checkbox', checked: !!e.reflectTag, onchange: ev => { e.reflectTag = ev.target.checked; saveEditDraft(); } }), ic('star'), 'Interesting'),
     draftStatus,
     // Delete / Cancel / Save stay pinned to the bottom while the form scrolls
     h('div', { class: 'bar dlg-actions' },

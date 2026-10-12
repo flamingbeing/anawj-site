@@ -415,6 +415,35 @@ let lastRendered = '';
 hooks.render = render;
 hooks.paintTabs = () => paintTabs();
 
+// Folds open and close smoothly (owner's Apple-apps review): every <details> grows to its height or shrinks to its
+// title row, with the chevron turning (style.css). The height is held for a moment first, so content a fold draws
+// when it opens (its toggle handler) is in place before it is measured. Not menus (Quick actions), not while
+// another handler took the click, and not with Reduce motion: then it just opens.
+const FOLD_MS = 220, FOLD_EASE = 'cubic-bezier(.2, .7, .2, 1)';
+document.addEventListener('click', e => {
+  const sum = e.target.closest('summary');
+  const d = sum && sum.parentElement;
+  if (!d || d.tagName !== 'DETAILS' || sum !== d.querySelector(':scope > summary') || e.defaultPrevented || d.classList.contains('quick-actions') || d._folding || reduceMotion()) return;
+  const inner = e.target.closest('a, button, input, select, textarea, label');   // a control inside the title row
+  if (inner && inner !== sum && sum.contains(inner)) return;
+  e.preventDefault();
+  const opening = !d.open;
+  const from = d.getBoundingClientRect().height;
+  d._folding = true;
+  d.style.height = from + 'px'; d.style.overflow = 'clip';
+  if (opening) d.open = true;
+  setTimeout(() => requestAnimationFrame(() => {
+    d.style.height = '';
+    let to;
+    if (opening) to = d.getBoundingClientRect().height;
+    else { const cs = getComputedStyle(d); to = sum.getBoundingClientRect().bottom - d.getBoundingClientRect().top + parseFloat(cs.paddingBottom) + parseFloat(cs.borderBottomWidth); }
+    const done = () => { if (!opening) d.open = false; d.style.height = ''; d.style.overflow = ''; d._folding = false; };
+    if (Math.abs(to - from) < 2 || !d.animate) return done();
+    const a = d.animate({ height: [from + 'px', to + 'px'] }, { duration: FOLD_MS, easing: FOLD_EASE });
+    a.onfinish = a.oncancel = done;
+  }));
+});
+
 // Swipe left or right to change tab (Advanced display, and Show or hide → Header and tabs; on unless switched off on
 // this device: html.swipe-tabs). Like a deck of cards: the page follows the finger and the next tab's page comes in
 // beside it as you drag (a still copy of that page from when it was last left, `snaps`; a plain loading card for a

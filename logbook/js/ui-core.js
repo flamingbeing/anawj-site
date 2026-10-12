@@ -173,19 +173,35 @@ export function debounce(fn, ms) {
   return d;
 }
 
-// Row buttons: an icon (alone on phones, where two labelled buttons don't fit beside the tags) and a label
-const ROW_ICONS = {
+// One set of line icons (24x24, stroked, like the tab bar's) instead of emoji, so every phone draws them alike.
+// rowIcon: the Logbook row buttons (an icon alone on phones, where two labelled buttons don't fit beside the tags).
+// ic: an icon inside text or a button, sized to the words (style.css .ico.i).
+const ICON_PATHS = {
   copy: 'M9 9h11v11H9zM5 15H4V4h11v1',
   reflect: 'M4 19.5V5a2 2 0 0 1 2-2h12v14H6a2 2 0 0 0-2 2.5zM6 21h12v-4M8 7h6M8 11h4',   // the Reflections tab's book
   done: 'M5 12.5l4.5 4.5L19 7.5',
+  paste: 'M9 3h6v4H9zM9 5H5v16h14V5h-4M9 12h6M9 16h4',   // a clipboard
+  calendar: 'M4 6h16v15H4zM4 10h16M8 3v5M16 3v5',
+  star: 'M12 3.5l2.6 5.3 5.9.9-4.25 4.1 1 5.8L12 16.9l-5.25 2.7 1-5.8L3.5 9.7l5.9-.9z',
+  again: 'M4 12a8 8 0 0 1 13.7-5.6L20 8.5M20 3.5v5h-5M20 12a8 8 0 0 1-13.7 5.6L4 15.5M4 20.5v-5h5',   // log the same again
+  clear: 'M6 6l12 12M18 6L6 18',
+  note: 'M4 20h4L19 9l-4-4L4 16zM13 7l4 4',   // a pencil
+  logbook: 'M4 5h16M4 10h16M4 15h16M4 20h10',   // the tab bar's
+  notes: 'M6 3h9l4 4v14H6zM14 3v5h5M9 12h7M9 16h5',
+  search: 'M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM20 20l-4-4',
 };
-function rowIcon(k) {
+const svgIcon = (k, cls) => {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('class', 'ico'); svg.setAttribute('aria-hidden', 'true');
-  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path'); path.setAttribute('d', ROW_ICONS[k]);
+  svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('class', cls); svg.setAttribute('aria-hidden', 'true');
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path'); path.setAttribute('d', ICON_PATHS[k]);
   svg.append(path); return svg;
-}
-export { rowIcon };
+};
+export const rowIcon = k => svgIcon(k, 'ico');
+export const ic = k => svgIcon(k, 'ico i');
+// An empty list: a soft icon, one bold line, a grey hint and the button to fill it (style.css .empty-state).
+// Keeps the class "empty" so the old look-ups still find it.
+export const emptyState = (icon, title, hint, action) => h('div', { class: 'empty empty-state' },
+  icon ? svgIcon(icon, 'ico') : null, h('b', {}, title), hint ? h('p', {}, hint) : null, action || null);
 
 // toast('Saved', { action: 'Undo', onaction }) — one at a time, the newest wins.
 // A toast with a button (Undo) stays at least as long as Settings → Logging → Undo window says (settings.undoSecs).

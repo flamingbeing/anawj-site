@@ -1261,3 +1261,45 @@ ul.cl-heads li.met { color: var(--ink); } ul.cl-heads li:not(.met) { color: var(
 ul.cl-behind li { padding: 2px 0; }
 .cl-sum { margin: 0 0 8px; }
 table.totals th.cl-col { text-align: center; white-space: nowrap; }
+
+/* ---------- polish (owner's Apple-apps review, 13 Oct 2026): taps, motion, icons, the Case screen ---------- */
+/* one speed and easing for things that move (folds, the box's buttons, pressed states); Motion → Reduce stops them */
+:root { --dur: 220ms; --ease: cubic-bezier(.2, .7, .2, 1); }
+/* line icons inside words and buttons (ic() in ui-core.js), sized to the text, instead of emoji */
+.ico.i { width: 1.15em; height: 1.15em; flex: none; vertical-align: -.2em; margin-inline-end: .3em; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+:is(button, .btn, .chip, label.check, .jump, a) > .ico.i { margin-inline-end: 0; }
+label.check.reflect-tag .ico.i { margin-inline-start: -2px; }
+label.check.reflect-tag:has(input:checked) .ico.i { fill: currentColor; color: var(--warn, #b45309); }
+.flag .ico.i { width: 1em; height: 1em; margin-inline-end: .2em; }
+/* taps answer at once: buttons and chips dim while pressed, rows go grey (no hover on a phone to say "this is it") */
+:is(button, .btn, .chip, [role=button], summary):not(:disabled) { transition: opacity var(--dur) var(--ease), background-color var(--dur) var(--ease); }
+:is(button, .btn, .chip, [role=button]):not(:disabled):active { opacity: .6; transition-duration: 0s; }
+:is(ul.cases > li:not(.monthhead), .more-list a, .picker li, details > summary, ul.ready-list li, .notes-list li):active { background-color: color-mix(in srgb, var(--ink) 8%, transparent); }
+details:not(.quick-actions) > summary::after { transition: transform var(--dur) var(--ease); }
+/* an empty list: icon, one bold line, a grey hint, the button that fills it */
+.empty-state { display: grid; justify-items: center; gap: 6px; padding: 28px 16px; }
+.empty-state > .ico { width: 40px; height: 40px; fill: none; stroke: var(--muted); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; opacity: .7; margin-bottom: 4px; }
+.empty-state > b { color: var(--ink); font-size: calc(16px * var(--fs, 1)); }
+.empty-state > p { margin: 0; max-width: 32em; font-size: calc(14px * var(--fs, 1)); }
+.empty-state > .btn, .empty-state > button { margin-top: 8px; }
+/* the case box: Paste (empty) or Clear (typed) is a small round icon in its top corner, clear of the words */
+.box-wrap textarea.details { padding-right: 48px; }
+.box-wrap .paste-btn.icon-only, .box-wrap .clear-btn { top: 6px; bottom: auto; right: 6px; width: 36px; min-height: 36px; height: 36px; padding: 0; border-radius: 50%; opacity: .75; font-size: calc(15px * var(--fs, 1)); }
+.box-wrap .paste-btn.icon-only:hover, .box-wrap .clear-btn:hover { opacity: 1; }
+/* one quiet line under the box: the star left, "Draft saved · Recover" right; no empty gap when nothing is typed */
+.parsed:empty { display: none; }
+.tag-row { min-height: 40px; flex-wrap: nowrap; }
+.tag-row .draft-note { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.tag-row .draft-note:empty { display: none; }
+.tag-row .sync-note { flex: none; margin-left: auto; color: var(--accent); text-decoration: none; font-weight: 600; }
+.tag-row .draft-note:not(:empty) { padding-right: 0; }
+.tag-row .draft-note:not(:empty) + .sync-note { margin-left: 0; padding-left: 0; }
+.tag-row .draft-note:not(:empty) + .sync-note::before { content: '·'; margin-inline: 0 6px; color: var(--muted); font-weight: 400; }
+/* Save is the one wide button; "Save, keep date" is small text beside it */
+.actions { flex-wrap: nowrap; align-items: center; }
+.actions .keep-date { flex: none; background: none; border-color: transparent; color: var(--accent); font-weight: 600; padding-inline: 6px; font-size: calc(14px * var(--fs, 1)); white-space: nowrap; }
+.actions .primary { flex: 1 1 auto; }
+/* the date row: smaller chips, a calendar icon instead of the emoji */
+.datebar .chip, .datebar .mode-seg button { min-height: 36px; padding: 2px 11px; font-size: calc(14px * var(--fs, 1)); }
+.datebar .datepick .ico.i + span:not(:empty) { margin-inline-start: 4px; }
+.monthhead .jump { display: inline-flex; align-items: center; gap: 4px; }

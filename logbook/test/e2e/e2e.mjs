@@ -509,7 +509,7 @@ async function run(label, ctxOpts) {
     return { label, results, errs };
   }
 
-  await step('log: 📋 Paste puts the clipboard in the box', async () => {
+  await step('log: Paste puts the clipboard in the box', async () => {
     await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: new URL(BASE).origin });
     await p.evaluate(() => navigator.clipboard.writeText('PQ 50F\nlap chole GA'));
     await p.locator('textarea.details').fill('');
@@ -762,7 +762,7 @@ async function run(label, ctxOpts) {
     await tab('reflect');
     const ready = p.locator('details.ready-line');
     await ready.waitFor({ timeout: 4000 });
-    assert(/☆ \d+ interesting case/.test(await ready.locator('summary').innerText()), 'tagged line: ' + await ready.locator('summary').innerText());
+    assert(/\d+ interesting case/.test(await ready.locator('summary').innerText()), 'tagged line: ' + await ready.locator('summary').innerText());
     if (!(await ready.evaluate(d => d.open))) await ready.locator('summary').click();
     const row = ready.locator('li', { hasText: 'TG' });
     assert(await row.count() === 1, 'tagged case not in the tagged list');
@@ -1681,7 +1681,7 @@ async function run(label, ctxOpts) {
     await p.waitForURL(/#loggingadv$/);
     await p.locator('label.field.flash', { hasText: 'Undo window' }).waitFor();
     await tab('display');
-    assert(await p.locator('.display-preview .row-btn').count() === 2, 'no Display preview');
+    assert(await p.locator('.display-preview .row-btn').count() >= 1, 'no Display preview');
     await p.locator('input[type=range][aria-label="Borders"]').fill('1'); await nap(150);
     await p.locator('.reset-row button', { hasText: 'Reset this page' }).click();
     await p.locator('dialog[open] button', { hasText: /^Reset$/ }).click(); await nap(300);

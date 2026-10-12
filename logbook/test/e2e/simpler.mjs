@@ -108,7 +108,8 @@ try { for (const width of [390, 1280]) {
   await p.locator('main .seg button').filter({ hasText: /^List$/ }).click();
   await p.locator('ul.cases li').first().waitFor();
   assert.equal(await p.locator('main button[aria-label*="reflection on this case"]').count(), 0);
-  assert.ok(await p.locator('main button[aria-label="Copy this case"]').count() > 0);
+  // Copy on each row is off by default (Advanced display), so a logbook-only row has no buttons
+  assert.equal(await p.locator('main button[aria-label="Copy this case"]').count(), 0);
   await p.locator('[role=tab][data-tab=more]').click();
   await p.locator('.more-list a[data-go=reflect]').click();
   await p.locator('main h2').filter({ hasText: 'Reflections' }).first().waitFor();

@@ -9,7 +9,7 @@
 // them without reading any note. It used to live in settings.noteIndex, which the app owner can read; it moves on the
 // first sync and the old copy is cleared.
 
-import { S, h, toast, fill, hooks, writes, cloud, transients, settings, patchLogbook, resetters, todayISO, modal } from './ui-core.js';
+import { S, h, toast, fill, hooks, writes, cloud, transients, settings, patchLogbook, resetters, todayISO, modal, emptyState } from './ui-core.js';
 import { uid, fmtDate, caseParts } from './engine.js';
 import { barTabs, arrangeTabs, display, setTabOnBar } from './ui-settings.js';
 import { MAX_NOTES, LIMITS, sortNotes, filterNotes, noteTitle, noteIndex, cleanNoteIndex, sameIndex, parseNote, toggleCheck, plainLines } from './notepad.js';
@@ -135,8 +135,8 @@ export function renderNotes() {
   const paintList = () => {
     const rows = filterNotes(list, nv);
     fill(listEl, loading ? h('p', { class: 'empty' }, 'Loading…')
-      : !list.length ? h('div', { class: 'empty' }, h('p', {}, 'No notes yet.'), h('p', { class: 'hint help' }, 'Writing about a case for your portfolio? Use Reflect instead.'))
-      : !rows.length ? h('p', { class: 'empty' }, 'No notes match.')
+      : !list.length ? emptyState('notes', 'No notes yet', 'Writing about a case for your portfolio? Use Reflect instead.')
+      : !rows.length ? emptyState('search', 'No notes match')
       : h('ul', { class: 'notes-rows' }, rows.map(noteRow)));
   };
   const narrowed = nv.day || nv.caseId;

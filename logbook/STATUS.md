@@ -5,14 +5,14 @@ Lasting rules and lessons go in `NOTES.md`; finished work leaves "Recently done"
 Each session edits only its own line under **Now**. Update this file when a task finishes, a decision is made, or
 before compacting (`/save-state` in Claude Code, `$save-state` in Codex).
 
-Last updated: 2026-10-12 by Claude Code, Logbook 2 (log2).
+Last updated: 2026-10-13 by Claude Code, Logbook 1 (log1).
 
 ## Now
 
-- **Claude Code, Logbook 1 (log1)** (branch `claude/clever-gates-pm6sas`, no open PR): idle after #200. Next for
-  log1: "PR B" usability ideas from the owner's UX review, waiting on the owner's pick (Next, item 2). Firebase CLI
-  signed in for this session, unused (each use needs the owner's OK). Playwright Firefox (Gecko) can be installed to
-  the scratchpad for Firefox checks (see NOTES, Working on it).
+- **Claude Code, Logbook 1 (log1)** (branch `claude/clever-gates-pm6sas`): polish batch from the owner's Apple-apps
+  review (Next, item 1), PR 1 of 6 open (small fixes for everyone). Owner's picks are in the artifact
+  https://claude.ai/artifact/8Kfho8SPgupTbqe6t2g5bi (store `picks/owner`). Also doing the Reflections rows (log2's
+  area, owner's OK 13 Oct: log2 has stopped).
 - **Claude Code, Logbook 3 (log3)** (branch `ccr-2994049c-4e5tlt`): idle, nothing half-done. Still signed in to the
   Firebase CLI (usage counts only; each use needs the owner's OK). Owns the axe check, PR previews and the Codex /
   Firebase plugin setup.
@@ -37,11 +37,26 @@ Last updated: 2026-10-12 by Claude Code, Logbook 2 (log2).
 
 ## Next (agreed queue)
 
-1. **PR B, usability and clearer design** (log1; from the owner's Bear comparison, 12 Oct; the owner wants
-   usability and clearer design, not a new look; waiting on the owner's pick): one tap on a case opens it, smaller
-   case rows (Copy / Reflect lighter), no repeated date in the day view, today vs the picked day clearly different on
-   the calendar, a tidy one-line status under the case box, one main button per screen. Not the Reflections list or
-   page width (log2's area).
+1. **Polish batch** (log1; owner's Apple-apps review and picks, 13 Oct; one PR each, merged before the next):
+   1. Small fixes for everyone: tap feedback, smooth folds, line icons instead of emoji, "pick one above", Paste /
+      Clear as a round icon in the case box's corner, one status line (star · Draft saved · Recover), one wide Save
+      with "Save, keep date" as small text, smaller date chips, + Log a case at the right, Copy on each row off by
+      default (Advanced display / Show or hide bring it back), empty screens with an icon and a hint.
+   2. Moving around: "‹ Settings" replaces the app name in the header on sub-pages; pages slide in and out; edge
+      swipe back only in the iPhone home-screen app (switchable); a new Accessibility page (text size, zoom,
+      contrast, motion, bigger taps, swipe between tabs, edge swipe back, press and hold); tap the month title to
+      pick a month; Filter opens smoothly, dropdowns styled to match; settings use switches and checkmark lists, help
+      cut to one line plus ⓘ.
+   3. Lists and Analytics: initials beside the date on every case row (like Reflections), for everyone; thin sticky
+      month headers you tap to jump; tags on one line that scrolls sideways; Reflection rows stop wrapping (dates,
+      headings); each Analytics card shows one number and one bar, the detail inside.
+   4. Recognised words highlighted inside the case box (replaces the read-back line under it).
+   5. Note editor: no boxes, one grey info line (date, linked case), Delete and Preview in a ⋯ menu.
+   6. Seven separate settings, all off by default, in Advanced display / logging (regrouped and reordered then):
+      flat look (a new end of the Borders slider that also drops page cards), page titles in the header,
+      filled / tinted / plain buttons, calendar as plain numbers with counts, shorter case rows, press and hold a row
+      for its menu (no swipe: swipe changes tabs), icons instead of words on common buttons.
+   Skipped by the owner: the selected tab's look, text styles, dark mode default (stays Light), segmented switches.
 2. Later, low priority: lazy-load rarely used modules (admin, portfolio, importer, xlsxio, backup, progress) to cut
    first-visit time (now 3.5–4.2 s on a slow phone; repeat visits 0.6–0.8 s). Measure before and after.
 3. Parked ideas, only if asked:
@@ -72,6 +87,10 @@ Last updated: 2026-10-12 by Claude Code, Logbook 2 (log2).
 
 ## Decisions log
 
+- 2026-10-13: Polish batch from the Apple-apps review (Next, item 1). Seven new looks are separate settings, off by
+  default, not one "Clean" switch. Initials beside the date for everyone. Edge swipe back only in the iPhone
+  home-screen app (Android's own Back gesture uses the edges). Copy on each Logbook row is off by default. log1 may
+  change the Reflections rows (log2's area).
 - 2026-10-12: Tab bar holds up to 7 tabs (More included); every More page can be a tab (owner).
 - 2026-10-12: Faculty / PCs profile (was "Admin profile") for faculty, PDs and admins; their default. PCs are added
   as admins (no PC role). Case logs = counts per tag per resident (no case details); active faculty may read the
