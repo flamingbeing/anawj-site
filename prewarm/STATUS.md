@@ -6,9 +6,10 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 
 ## Now
 
-- **Claude Code, Prewarming Webapp** (branch `ccr-13264f37-d28edu`): from about 18:00 UTC 12 Oct 2026, a 2–3 hour
-  bug hunt (owner's ask): anything that makes it likelier a variable isn't logged. Test every edge case, fix and
-  merge PR by PR, save state regularly. The owner and their MO start using the app on real patients on 13 Oct 2026.
+- **Claude Code, Prewarming Webapp** (branch `ccr-13264f37-d28edu`): bug hunt from 17:53 UTC 12 Oct 2026 (owner: at
+  least 2 hours, anything that makes a missed variable likelier). Merged so far #257, #259, #261 (below). Ideas not yet
+  done: duplicate Subject IDs across phones (home-list warning), sync / offline edge cases, Word form gaps
+  (screen_id, op date, nd_* items have no place on the form). The owner and their MO start real patients 13 Oct 2026.
 
 ## Waiting on the owner
 
@@ -24,6 +25,9 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 
 ## Recently done
 
+- #261: blank readings not saved, part-blank asks; Still to fill lists saved-with-blanks and columns hidden in Settings.
+- #259: hidden follow-ups not exported, nested follow-ups hide, BMI worked out, NA warming start (no pre-warming), Subject ID / group correctable.
+- #257: update reload asks before losing a reading; stray key-time taps ask; times out of order flagged.
 - This PR: top-bar clock labelled "Time now".
 - #255: time stays on the right when nothing is due.
 - #252: BP, HR, BIS tick above Intra-op details; swipe to change tab; pull-to-refresh off.
