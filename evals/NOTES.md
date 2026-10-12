@@ -198,6 +198,7 @@ A quick contrast check for both themes is worth running after any colour change:
 - **Changing the domain** (logbook, roster and evals all live on anawj.com). What to change:
   - `CNAME` and DNS.
   - Add the new domain to **Firebase Auth → Authorised domains** in both projects (`apmes-logbook`, `nuh-roster`). Otherwise sign-in fails.
+  - Change `authDomain` in `logbook/js/firebase-config.js`, `evals/js/firebase-config.js` and `/__/firebase/init.json`, and add `https://<new domain>/__/auth/handler` to the OAuth Web client's redirect URIs (see logbook/README.md, sign-in).
   - The roster keeps data in localStorage, which is per origin, so users must export it before the move and import it after.
   - Old share links and QR codes in chats break unless the old domain redirects.
   - Installed PWAs need reinstalling from the new domain.
