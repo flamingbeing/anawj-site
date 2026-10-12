@@ -5,12 +5,14 @@ Lasting rules and lessons go in `NOTES.md`; finished work leaves "Recently done"
 Each session edits only its own line under **Now**. Update this file when a task finishes, a decision is made, or
 before compacting (`/save-state` in Claude Code, `$save-state` in Codex).
 
-Last updated: 2026-10-12 by Claude Code, Logbook 2 (log2).
+Last updated: 2026-10-12 by Claude Code, Logbook 1 (log1).
 
 ## Now
 
-- **Claude Code, Logbook 1 (log1)** (branch `claude/clever-gates-pm6sas`, no open PR): idle after #186. Firebase CLI
-  signed in for this session, unused (each use needs the owner's OK).
+- **Claude Code, Logbook 1 (log1)** (branch `claude/clever-gates-pm6sas`, no open PR): idle after #200. Next for
+  log1: "PR B" usability ideas from the owner's UX review, waiting on the owner's pick (Next, item 2). Firebase CLI
+  signed in for this session, unused (each use needs the owner's OK). Playwright Firefox (Gecko) can be installed to
+  the scratchpad for Firefox checks (see NOTES, Working on it).
 - **Claude Code, Logbook 3 (log3)** (branch `ccr-2994049c-4e5tlt`): idle, nothing half-done. Still signed in to the
   Firebase CLI (usage counts only; each use needs the owner's OK). Owns the axe check, PR previews and the Codex /
   Firebase plugin setup.
@@ -21,14 +23,18 @@ Last updated: 2026-10-12 by Claude Code, Logbook 2 (log2).
 
 ## Waiting on the owner
 
-- Try on a real phone: pins (now also the Reflections search, with sticky topic names), swipe between tabs (now on by
-  default, follows the finger), keyboard behaviour; Notes; Basic mode; formatting buttons; the new Analytics parts.
+- Try on a real phone: pins (now also the Reflections search, with sticky topic names), swipe between tabs (cards that
+  slide in with the finger, also on the background; #191), keyboard behaviour; Notes; Basic mode; formatting buttons; the new Analytics parts.
 - Admin → Advanced → "Fix initials in older cases" (one-off).
 - Dropbox developer console: tick `files.metadata.read` so "Keep backups for…" can remove old Dropbox files.
 - Dropbox: apply for production approval when ready (only listed accounts can use it until then).
 - MCP connector: test `node server.mjs login` on a computer.
 - Optional: send the AY2023 evaluations tracking spreadsheet for `apmes/originals/` (checked for names first).
 - Residents who exported a Word portfolio with Female selected before #183: the box was left unticked; re-export.
+- Optional: add Playwright Firefox to the environment's setup script so new sessions can test in Gecko:
+  `PLAYWRIGHT_BROWSERS_PATH="$HOME/.cache/pw-firefox" npx --yes playwright@1.56.1 install firefox || true`.
+- Installed app (Firefox/Chrome on Android): Google sign-in ends on a "missing initial state" page, but closing it
+  leaves you signed in. Left as is unless residents complain (fix idea: full-page sign-in in the installed app).
 
 ## Next (agreed queue)
 
@@ -42,14 +48,25 @@ Last updated: 2026-10-12 by Claude Code, Logbook 2 (log2).
      Totals; no summary written). Largest and riskiest: plan in detail before building.
    - Order: A the switch (Basic / Advanced), B Admin, C Generic. Open questions for the owner: anything to add to or
      drop from Basic; PDs get Admin too?; can Generic save a case with no tags?
-2. Later, low priority: lazy-load rarely used modules (admin, portfolio, importer, xlsxio, backup, progress) to cut
+   - From log1's review (12 Oct): the profile choice in one place only (today Basic mode has a switch in Settings and
+     in Show or hide, which confused the owner), and nothing hidden silently (see #200's "hidden while Basic mode is on").
+2. **PR B, usability and clearer design** (log1; from the owner's Bear comparison, 12 Oct; the owner wants
+   usability and clearer design, not a new look; waiting on the owner's pick): one tap on a case opens it, smaller
+   case rows (Copy / Reflect lighter), no repeated date in the day view, today vs the picked day clearly different on
+   the calendar, a tidy one-line status under the case box, one main button per screen. Not the Reflections list or
+   page width (log2's area).
+3. Later, low priority: lazy-load rarely used modules (admin, portfolio, importer, xlsxio, backup, progress) to cut
    first-visit time (now 3.5–4.2 s on a slow phone; repeat visits 0.6–0.8 s). Measure before and after.
-3. Parked ideas, only if asked:
+4. Parked ideas, only if asked:
    - Changed-records-only sync for cases (`syncAt` + delete tombstones; plan in chat on 12 Oct). Firestore usage
      12 Oct: busiest day 23.6k reads / 16.7k writes (bulk work), normal day ~4k reads; free tier 50k/20k a day.
 
 ## Recently done
 
+- #200 Advanced display / logging links were hidden by ad blockers (EasyList `##.adv-link`, owner's Firefox): class
+  renamed; Basic mode now says it hides them, with a way to turn it off.
+- #191 Swipe between tabs like cards (next page follows the finger, steady tab bar, also on the background); Notes:
+  Enter in the title moves on, Formatting fold; shorter Logbook search hint; Interesting on one line.
 - #189 Analytics (Advanced only): pace forecast and Off pace, Gone quiet, Reflection to-dos, tags and month bars
   open their cases.
 - #184 Page width (Full), header can hide in the demo, Leave / Reset demo by Sign out, swipe on by default and
@@ -60,11 +77,15 @@ Last updated: 2026-10-12 by Claude Code, Logbook 2 (log2).
 - #181 Notes review fixes: note index moved to owner-only `meta/noteIndex` (rules deployed), bin restore keeps the
   100-note limit, notes listener metadata, 34 new rules tests; previews no longer break on reload (service workers
   key the page by `'./'`).
-- #169 / #171 / #174 PR previews on Cloudflare Workers (`<branch>-anawj-preview.kohwenjun.workers.dev`).
-- #165 axe-core accessibility check (`test/e2e/a11y.mjs`, on demand); #168 shared instructions moved to AGENTS.md.
 
 ## Decisions log
 
+- 2026-10-12: UX review vs Bear: the owner wants better usability and clearer design, not a "cleaner look" option.
+- 2026-10-12: Swipe between tabs works like cards: the next page follows the finger (a still copy of the page, or a
+  loading card for a tab not opened yet), no gap, no popping in, the tab bar never moves; works on the background too.
+- 2026-10-12: Basic mode never hides silently: where it hides something, say so with a way to turn it off. Two Basic
+  switches (Settings, Show or hide) confused the owner; profiles (log2) should have one place only.
+- 2026-10-12: Installed-app sign-in error page ("missing initial state") left as is for now: sign-in still works.
 - 2026-10-12: Reflections list: topics as headings with a count pill (owner); "+ New" instead of "+ New reflection";
   "Pin the search box" covers Reflections too, with sticky topic names.
 - 2026-10-12: "Line width" renamed "Page width" with a Full choice; the demo no longer forces the header back; Leave /
