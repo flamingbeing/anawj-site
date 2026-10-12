@@ -33,8 +33,9 @@ try { for (const width of [390, 1280]) {
   await p.getByLabel('Note text').fill('Fake dose reminder\n- [ ] fake to-do\n- [x] fake done');
   assert.equal(await p.locator('.notes-status').innerText(), 'Not saved yet');
   await p.waitForFunction(() => document.querySelector('.notes-status')?.textContent === 'Saved', null, { timeout: 6000 });
-  // ticking a to-do in Preview saves the body
-  await p.getByRole('button', { name: 'Preview' }).click();
+  // ticking a to-do in Preview (in the ⋯ menu) saves the body
+  await p.getByRole('button', { name: 'More options' }).click();
+  await p.getByRole('menuitem', { name: 'Preview' }).click();
   await p.locator('.note-view input[type=checkbox]').first().check();
   await p.waitForFunction(async () => { const { S } = await import('./js/ui-core.js'); return S.notes?.[0]?.body.includes('- [x] fake to-do'); });
   await p.getByRole('button', { name: 'Done' }).click();
@@ -72,7 +73,7 @@ try { for (const width of [390, 1280]) {
 
   // link a note to a case: the case row gets a note button that opens it
   await p.locator('ul.notes-rows li').first().click();
-  await p.getByRole('button', { name: 'Edit' }).click().catch(() => {});
+  if (await p.locator('.note-view:not([hidden])').count()) { await p.getByRole('button', { name: 'More options' }).click(); await p.getByRole('menuitem', { name: 'Edit' }).click(); }
   await p.getByRole('button', { name: 'Link to a case…' }).click();
   await p.locator('dialog[open] .pick-cases li').first().click();
   await p.locator('.note-link').waitFor();
@@ -89,7 +90,8 @@ try { for (const width of [390, 1280]) {
 
   // delete goes to the recycle bin, and restores
   await p.locator('ul.notes-rows li').filter({ hasText: 'Fake undated scratch' }).click();
-  await p.getByRole('button', { name: 'Delete' }).click();
+  await p.getByRole('button', { name: 'More options' }).click();
+  await p.getByRole('menuitem', { name: 'Delete' }).click();
   await p.getByText('Note moved to the recycle bin').waitFor();
   await p.waitForFunction(() => document.querySelectorAll('ul.notes-rows li').length === 1);
   await p.getByRole('button', { name: 'Undo' }).click();

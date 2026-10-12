@@ -62,7 +62,8 @@ const SCREENS = [
     await hash('notes')(p);
     await p.getByRole('button', { name: '+ New note' }).click();
     await p.getByLabel('Note text').fill('# Fake heading\n- [ ] fake to-do\n- [x] fake done\n**bold** [fake link](https://example.com)');
-    await p.getByRole('button', { name: 'Preview' }).click();
+    await p.getByRole('button', { name: 'More options' }).click();
+    await p.getByRole('menuitem', { name: 'Preview' }).click();
     await p.waitForSelector('.note-view:not([hidden])');
   }, false],
   ['Reflection editor', async p => {

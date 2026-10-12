@@ -210,20 +210,25 @@ function editor(n) {
   const body = h('textarea', { class: 'note-body', rows: '12', placeholder: 'Write your note… (- [ ] for a to-do)', 'aria-label': 'Note text', maxlength: String(LIMITS.body), spellcheck: 'true',
     oninput: e => { n.body = e.target.value; touch(); }, onblur: () => persist(n) });
   body.value = n.body || '';
+  // one grey line under the title (like Notes and Bear): the date (tap it to change; the date box sits invisibly over
+  // it), No date, and the linked case or a way to link one
   const meta = h('div', { class: 'note-meta' });
+  const dateText = h('span', {});
   const paintMeta = () => {
     const c = n.caseId && caseOf(n.caseId);
+    dateText.textContent = n.date ? fmtDate(n.date) : 'No date';
     fill(meta,
-      h('label', { class: 'note-date' }, 'Date ', date),
-      n.date ? h('button', { class: 'small', type: 'button', onclick: () => { n.date = null; date.value = ''; touch(); paintMeta(); } }, 'No date') : null,
-      n.caseId ? h('span', { class: 'note-link' }, h('span', { class: 'flag note-case' }, '↗ ' + (c ? caseLabel(c) : 'a deleted case')),
-        h('button', { class: 'small', type: 'button', onclick: () => { delete n.caseId; touch(); paintMeta(); } }, 'Unlink'))
-        : h('button', { class: 'small', type: 'button', onclick: () => pickCase(n, () => { touch(); paintMeta(); }) }, 'Link to a case…'));
+      h('label', { class: 'note-date', title: 'Change the date' }, dateText, date),
+      n.date ? h('button', { class: 'linkish', type: 'button', onclick: () => { n.date = null; date.value = ''; touch(); paintMeta(); } }, 'No date') : null,
+      h('span', { class: 'note-dot', 'aria-hidden': 'true' }, '·'),
+      n.caseId ? h('span', { class: 'note-link' }, h('span', { class: 'note-case' }, '↗ ' + (c ? caseLabel(c) : 'a deleted case')),
+        h('button', { class: 'linkish', type: 'button', onclick: () => { delete n.caseId; touch(); paintMeta(); } }, 'Unlink'))
+        : h('button', { class: 'linkish', type: 'button', onclick: () => pickCase(n, () => { touch(); paintMeta(); }) }, 'Link to a case…'));
   };
   paintMeta();
   const view = h('div', { class: 'note-view' });
   const paintView = () => fill(view, renderBody(n.body, line => { n.body = toggleCheck(n.body, line); body.value = n.body; touch(); persist(n); paintView(); }));
-  const modeBtn = h('button', { class: 'small', type: 'button', 'aria-pressed': String(nv.preview), onclick: () => { nv.preview = !nv.preview; paint(); if (!nv.preview) body.focus(); } });
+  const modeBtn = h('button', { type: 'button', 'aria-pressed': String(nv.preview), onclick: () => { closeMenu(); nv.preview = !nv.preview; paint(); if (!nv.preview) body.focus(); } });
   const paint = () => {
     modeBtn.textContent = nv.preview ? 'Edit' : 'Preview';
     modeBtn.setAttribute('aria-pressed', String(nv.preview));
@@ -231,7 +236,8 @@ function editor(n) {
     if (nv.preview) paintView();
   };
   paint();
-  const del = h('button', { class: 'small danger', type: 'button', onclick: async () => {
+  const del = h('button', { class: 'danger', type: 'button', onclick: async () => {
+    closeMenu();
     const st = sessions.get(n);
     clearTimeout(st?.timer);
     if (!st?.base) { nv.editing = null; editorTransient?.close(); hooks.render(); return; }   // never saved: nothing to bin
@@ -241,10 +247,19 @@ function editor(n) {
     nv.editing = null; if (editorTransient?.active) editorTransient.close(); else hooks.render();
   } }, 'Delete');
   setTimeout(() => { if (!s.base && !nv.preview) title.focus(); }, 0);
+  // the top bar: ‹ Notes, whether it's saved, a ⋯ menu (Preview or Edit, Delete) and Done; no boxes below it
+  const menu = h('div', { class: 'note-menu', role: 'menu', hidden: true }, modeBtn, del);
+  [modeBtn, del].forEach(b => b.setAttribute('role', 'menuitem'));
+  const closeMenu = () => { menu.hidden = true; more.setAttribute('aria-expanded', 'false'); };
+  const more = h('button', { class: 'small icon-btn note-more', type: 'button', 'aria-label': 'More options', 'aria-haspopup': 'menu', 'aria-expanded': 'false', onclick: e => {
+    e.stopPropagation();
+    menu.hidden = !menu.hidden; more.setAttribute('aria-expanded', String(!menu.hidden));
+    if (!menu.hidden) setTimeout(() => document.addEventListener('click', ev => { if (!menu.contains(ev.target)) closeMenu(); }, { once: true }), 0);
+  } }, '⋯');
   return h('section', { class: 'card note-editor' },
-    h('div', { class: 'note-top' }, h('button', { class: 'small', type: 'button', onclick: closeEditor }, '← Notes'), h('span', { style: 'flex:1' }), status, modeBtn),
-    title, meta, body, view,
-    h('div', { class: 'note-top', style: 'margin-top:10px' }, del, h('span', { style: 'flex:1' }), h('button', { class: 'primary', type: 'button', onclick: closeEditor }, 'Done')));
+    h('div', { class: 'note-top' }, h('a', { class: 'back-link note-back', href: '#notes', onclick: e => { e.preventDefault(); closeEditor(); } }, h('span', { class: 'back-chev', 'aria-hidden': 'true' }, '‹'), 'Notes'),
+      h('span', { style: 'flex:1' }), status, h('span', { class: 'note-menu-wrap' }, more, menu), h('button', { class: 'small primary', type: 'button', onclick: closeEditor }, 'Done')),
+    title, meta, body, view);
 }
 
 // the body as elements (never innerHTML): headings, paragraphs, lists and to-dos that tick

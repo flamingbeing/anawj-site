@@ -145,6 +145,9 @@ portfolio content.
   of its text on top, `.box-marks`, styled from the box's own computed font and padding so the wrapping matches).
   The line under the box says only what the age was read as ("6m = 6 years · male"): kept on purpose, as the check
   that 6m means years and 6mo months. The initials and procedure are no longer repeated there.
+- **Note editor** (polish 5): a page, not a form. Top bar: ‹ Notes, Saved / Not saved yet, a ⋯ menu (Preview or
+  Edit, Delete) and Done. The title is a borderless heading, the body plain text; one grey line under the title holds
+  the date (tap to change), No date, and the linked case or Link to a case….
 - **Reflections list JR count** (owner, 13 Oct 2026): a heading's JR rule ("One / Two from JR") shows as a small
   "JR 0/1" pill beside its count, green when met, and leaves the note under the heading (`listNote`; a qualifier stays:
   "JR: with neuromonitoring"). The editor still shows the full note. Word counts on the list can be hidden
