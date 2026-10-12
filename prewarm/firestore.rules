@@ -1,6 +1,7 @@
 rules_version = '2';
 
-// Prewarming study (Firebase project prewarm-study). Deployed by the "Deploy Firestore rules" workflow on merge to main.
+// Prewarming study (Firebase project prewarm-study). Deployed by the "Deploy Firestore rules" workflow on merge to main
+// (only when this file changes; check the run in Actions).
 //
 // Who:
 //   members/{uid}   a phone that joined with its hospital's code (anonymous sign-in): { site, initials, code, joinedAt }
