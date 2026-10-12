@@ -24,6 +24,11 @@ const view = FRESH();
 resetters.push(() => Object.assign(view, FRESH()));   // next user starts unfiltered
 // open the Logbook on a day (Settings → Logging → After Save: "Go to the Logbook"); ui-log.js calls it through hooks
 hooks.showDay = iso => { view.month = iso.slice(0, 7); view.day = iso; };
+// open the Logbook (List) on the cases behind a number in Analytics: a tag ('c:16' or a personal tag key) and/or a
+// date range. Other filters are cleared so the list matches the number tapped.
+hooks.showCases = ({ tag = null, from = '', to = '' } = {}) => {
+  Object.assign(view, { q: '', has: tag ? [tag] : [], not: [], from, to, flag: '', limit: 150, mode: 'list' });
+};
 const hasTag = (c, k) => (k.startsWith('c:') ? (c.cats || []).includes(k.slice(2)) : (c.tags || []).includes(k));
 const keyName = k => (k.startsWith('c:') ? catShort(k.slice(2)) : tagName(k));
 // Every tag to filter or bulk-tag by: the tag list, then tags taken off it that cases still carry

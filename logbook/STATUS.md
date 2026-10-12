@@ -14,9 +14,9 @@ Last updated: 2026-10-12 by Claude Code, Logbook 1 (log1).
 - **Claude Code, Logbook 3 (log3)** (branch `ccr-2994049c-4e5tlt`): idle, nothing half-done. Still signed in to the
   Firebase CLI (usage counts only; each use needs the owner's OK). Owns the axe check, PR previews and the Codex /
   Firebase plugin setup.
-- **Claude Code, "APMES Logbook 2" session** (branch `ccr-afac5e7a-99esax`): owner's batch of 8 in three PRs: A
-  Reflections tab (topic headings, one-line header, pinned search + sticky topics), then B (page width, demo header
-  and Leave demo, swipe on by default and following the finger), then C (Analytics, Advanced only).
+- **Claude Code, Logbook 2 (log2)** (branch `ccr-afac5e7a-99esax`): owner's batch of 8 done in three PRs
+  (#180 Reflections tab, #184 page width / demo / swipe, then Analytics). Next: profiles (Basic APMES, Advanced
+  APMES, Generic, Admin), planned on top of Basic mode, waiting on the owner's go.
 - **Codex**: no open logbook task (handed its remaining batch to Claude on #163).
 
 ## Waiting on the owner
@@ -39,6 +39,11 @@ Last updated: 2026-10-12 by Claude Code, Logbook 1 (log1).
 
 ## Recently done
 
+- Analytics (Advanced only): pace forecast and Off pace, Gone quiet, Reflection to-dos, tags and month bars open
+  their cases.
+- #184 Page width (Full), header can hide in the demo, Leave / Reset demo by Sign out, swipe on by default and
+  following the finger.
+- #180 Reflections tab: topics as headings, one-line header, pinned search with sticky topics.
 - #186 EPA Guidebook v8 PDF in `apmes/originals/` (cover with names replaced, file details removed).
 - #183 APMES documents in `/apmes/`; blank portfolio template in the repo; Word export ticks Female (was never ticked).
 - #181 Notes review fixes: note index moved to owner-only `meta/noteIndex` (rules deployed), bin restore keeps the
