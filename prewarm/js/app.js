@@ -368,6 +368,8 @@ route(/^\/new$/, () => {
 const EVENTS = [['pw_gown', 'Gown on'], ['pw_start', 'Prewarm on', 'pw'], ['ev_wstop', 'Prewarm off', 'pw'], ['ev_ot', 'In OT'],
   ['io_knife', 'Induction'], ['io_flip', 'Prone'], ['io_under_start', 'Under­body warm'], ['io_gown_start', 'Gown warm'],
   ['io_done', 'Surgery end'], ['pacu_in', 'PACU in'], ['pacu_out', 'To ward']];
+// the gown and Bair Hugger times, coloured warm (owner, 12 Oct 2026)
+const WARM_EVENTS = new Set(['pw_gown', 'pw_start', 'ev_wstop', 'io_under_start', 'io_gown_start']);
 const EVENT_FULL = { pw_gown: 'Gown on', ev_ot: 'In OT', pacu_in: 'PACU arrival', io_flip: 'Flipped prone', pw_start: 'Active warming started', ev_wstop: 'Active warming stopped', io_knife: 'Induction (knife to skin)', io_under_start: 'Underbody Bair Hugger on',
   io_gown_start: 'Gown Bair Hugger on', io_done: 'Surgery completed (post-extubation)', pacu_out: 'Transfer to ward' };
 // Running timer and the next event to note, in the app bar of the patient screen
@@ -474,7 +476,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     return `<div class="times">${EVENTS.filter(([, , pw]) => !(pw && noWarming(p))).map(([f, l]) => {
       const v = val(p, f), full = EVENT_FULL[f] || l;
       if (editing === f) return `<div class="tchip edit"><span>${l}</span><input type="time" id="evtime" value="${v === 'NA' ? '' : esc(v || '')}" aria-label="${full}"><button class="link" data-evclear="${f}">Clear</button></div>`;
-      return `<button class="tchip ${v ? 'set' : ''}" data-ev="${f}" aria-label="${full}: ${v ? v + ', tap to change' : 'tap to set now'}"><span>${l}</span><b>${v ? esc(v) : 'tap'}</b></button>`;
+      return `<button class="tchip ${v ? 'set' : ''}${WARM_EVENTS.has(f) ? ' warm' : ''}" data-ev="${f}" aria-label="${full}: ${v ? v + ', tap to change' : 'tap to set now'}"><span>${l}</span><b>${v ? esc(v) : 'tap'}</b></button>`;
     }).join('')}</div>`;
   }
   // patient comfort: pre-op question at the top, post-op at the bottom; one line once answered
