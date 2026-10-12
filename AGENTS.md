@@ -9,6 +9,7 @@ Static site on GitHub Pages (public repo: no names, patient data or real evaluat
 - `logbook/`: APMES case logbook. Start with `logbook/NOTES.md` (principles, words, screens, tags, demo, how to test), then `logbook/README.md`.
 - `nuh-roster/`: NUH anaesthesia daily roster (own Firebase project `nuh-roster`). Start with `nuh-roster/NOTES.md`: its department section (grades, postings, roster sheet, notation, HMS monthly rosters, short names) applies to any app dealing with NUH anaesthesia staff.
 - `prewarm/`: prewarming study op-day data collection (temperatures every 5 min, export to the study's Excel template). Start with `prewarm/NOTES.md`, then `prewarm/PLAN.md`.
+- `hand/`: hand surgery exam crash course for new MOs (one static page, no data). Start with `hand/NOTES.md`.
 - `apmes/`: APMES programme documents (not secret): the EPA Guidebook v8 and requirements transcribed (the evals
   data is built from them), and the blank portfolio template the logbook tests use. See `apmes/README.md`.
   Before adding a programme file, check its cover/contributor pages and file details (author, embedded files) for
@@ -42,6 +43,7 @@ for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mj
   local emulator (fake accounts, demo project; no sign-in, never the live projects).
 - Evals UI changes: also run the e2e test (see `evals/README.md`).
 - Prewarming UI changes: also run `node prewarm/test/e2e.mjs` (see `prewarm/README.md`).
+- Hand assessment changes: run `node hand/test/e2e.mjs` (see `hand/README.md`).
 
 ## Working with the owner
 
