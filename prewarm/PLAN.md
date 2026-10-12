@@ -119,7 +119,7 @@ form's order and wording, so the app feels like the form they know.
 ## Answers (owner, 12 Oct 2026)
 
 Group shown only on the pre-warming screen; Subject ID (exported in the Enrollment ID column); owner and study
-investigators are admins (hospital names still to come); keep data until the study ends; BP/HR/BIS: baseline live,
+investigators are admins; hospitals NTF, NUH, SGH, CGH, TTSH, KTPH, WH; keep data until the study ends; BP/HR/BIS: baseline live,
 15-min rows off by default (a setting turns them on); transfusion: units in the template column, volumes on the
 Extra sheet; thermal sensation −3 … +3.
 

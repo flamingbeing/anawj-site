@@ -96,6 +96,8 @@ try {
   // settings and export
   await page.goto(BASE + '?demo#/settings');
   await page.fill('#me', 'tt'); await page.dispatchEvent('#me', 'change');
+  await page.click('[data-site="NUH"]');
+  assert.equal(await page.getAttribute('[data-site="NUH"]', 'aria-pressed'), 'true');
   await axe('settings'); await shot('settings');
   await page.goto(BASE + '?demo#/export');
   const [dl] = await Promise.all([page.waitForEvent('download'), page.click('#xl')]);

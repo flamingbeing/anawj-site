@@ -239,9 +239,13 @@ export { SERIES };
 export const FIELDS = PAGES.flatMap(p => p.fields.map(f => ({ ...f, page: p.id })));
 export const BY_ID = Object.fromEntries(FIELDS.map((f, i) => [f.id, { ...f, colIndex: i }]));
 
+// Study hospitals (owner, 12 Oct 2026). Each phone picks its hospital in Settings; new patients take it.
+export const SITES = ['NTF', 'NUH', 'SGH', 'CGH', 'TTSH', 'KTPH', 'WH'];
+
 // Op-day items the template has no column for: exported on the "Extra" sheet
 const NUDESC = [[0, '0'], [1, '1'], [2, '2']];
 export const EXTRA = [
+  { id: 'site', label: 'Hospital', type: 'word', opts: SITES },
   { id: 'ev_wstop', label: 'Active warming stopped', type: 'time' },
   { id: 'ev_ot', label: 'Arrived in OT', type: 'time' },
   ...[['rbc', 'RBC'], ['plt', 'Platelets'], ['ffp', 'FFP'], ['cryo', 'Cryoprecipitate']].map(([k, l]) => ({ id: `io_${k}_ml`, label: l + ' volume', type: 'int', unit: 'mL' })),
