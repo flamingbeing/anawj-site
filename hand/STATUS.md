@@ -6,8 +6,8 @@ Last updated: 2026-10-12 by Claude Code, hand assessment session.
 
 ## Now
 
-- **Claude Code, hand assessment** (branch `claude/amazing-goodall-erq636`): first version built (one page,
-  9 figures, quiz, referral template). Nothing half-done.
+- **Claude Code, hand assessment** (branch `claude/amazing-goodall-erq636`): figures animated + GIF copies.
+  Nothing half-done.
 
 ## Waiting on the owner
 
@@ -20,7 +20,15 @@ Last updated: 2026-10-12 by Claude Code, hand assessment session.
 2. Department-specific bits (who to call, photo app, ED protocol) if the owner wants them.
 3. Link from a landing page once one exists.
 
+## Recently done
+
+- #207: first version (one page, 9 figures, quiz, referral template).
+- Animated figures with Pause/Play, GIF copies in `hand/gifs/` for sharing.
+
 ## Decisions
+
+- 2026-10-12: figures become playable animations, still for reduced motion; GIFs for forwarding (owner asked for
+  "gifs or playable animations").
 
 - 2026-10-12: single static page, no data stored, offline via `sw.js`; drawn SVG figures; content prioritised over
   design (owner).

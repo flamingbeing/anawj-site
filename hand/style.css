@@ -72,8 +72,13 @@ table.t th { background: var(--navy); color: #fff; text-align: left; padding: 6p
 table.t td { border-bottom: 1px solid var(--line); padding: 6px 8px; vertical-align: top; }
 table.t tr:nth-child(even) td { background: #fafafa; }
 
-.fig { margin: 10px 0 12px; text-align: center; }
-.fig > svg { width: 100%; height: auto; max-width: 560px; }
+.fig { margin: 10px auto 12px; text-align: center; position: relative; max-width: 560px; }
+.fig-art { cursor: pointer; }
+.fig-art > svg { display: block; width: 100%; height: auto; }
+.fig-bar { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; }
+.fig-btn { font: 600 .78rem/1 system-ui, sans-serif; color: var(--navy); background: #fff; border: 1px solid #b9c3d0; border-radius: 999px; padding: 6px 10px; cursor: pointer; opacity: .9; }
+.fig-btn:hover { background: var(--blue-bg); }
+.fig-gif { font-size: .8rem; padding: 6px 0; }
 .fig svg text { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
 
 details.q { border: 1px solid var(--line); border-radius: 6px; margin: 8px 0; }
@@ -89,7 +94,7 @@ details.q p::before { content: "Answer: "; font-weight: 700; color: var(--green)
 footer { padding: 16px 0; color: var(--muted); font-size: .85rem; }
 
 @media print {
-  .bar, .update, #copy { display: none; }
+  .bar, .update, #copy, .fig-bar { display: none; }
   details.pic, details.q { break-inside: avoid; }
   details > *:not(summary) { display: block; }
   section { break-inside: auto; }
