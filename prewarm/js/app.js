@@ -559,6 +559,10 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     if (nan.length) { toast('Check ' + nan.map(c => c.label).join(', ') + ': numbers only.'); return false; }
     const odd = typed.filter(c => +draft[c.key] < SANE[c.key][0] || +draft[c.key] > SANE[c.key][1]);
     if (odd.length && !confirm(odd.map(c => `${c.label} ${draft[c.key]}`).join(', ') + ' looks unusual. Save anyway?')) return false;
+    // a blank reading isn't saved (it would stop the timepoint counting as missed); a part-blank one asks first
+    const blank = cols.filter(c => draft[c.key] == null || draft[c.key] === '');
+    if (blank.length === cols.length) { toast('Nothing entered for ' + pt.label + ' yet.'); return false; }
+    if (blank.length && !confirm(`${blank.map(c => c.label).join(', ')} ${blank.length === 1 ? 'is' : 'are'} blank.\n\nSave the ${pt.label} reading without ${blank.length === 1 ? 'it' : 'them'}?`)) return false;
     for (const c of cols) setVal(p, `${s}_${pt.key}_${c.key}`, draft[c.key] == null ? null : (c.type === 'code' ? +draft[c.key] : String(draft[c.key])), settings.me);
     if (!isSaved) setVal(p, `at_${s}_${pt.key}`, nowHM(), settings.me);
     saveAll();
@@ -840,6 +844,18 @@ function gaps(p) {
   if (!noWarming(p)) missed('prewarm', 'Pre-warming temps not saved');
   missed('iotemp', 'Intra-op temps not saved');
   missed('haemo', 'BP, HR, BIS not saved');
+  // saved readings with a blank box (asked about at Save, listed so it can be filled in later)
+  for (const [s, what] of [['prewarm', 'Pre-warming temps'], ['iotemp', 'Intra-op temps'], ['haemo', 'BP, HR, BIS']]) {
+    if (s === 'prewarm' && noWarming(p)) continue;
+    const part = pointsFor(p, s).filter(x => savedAt(p, s, x.key)).map(x => {
+      const miss = colsFor(s, x).filter(c => get(`${s}_${x.key}_${c.key}`) == null);
+      return miss.length ? `${x.key === 'base' ? 'Baseline' : x.key === 'end' ? 'End' : x.min + ' min'} (${miss.map(c => c.label).join(', ')})` : null;
+    }).filter(Boolean);
+    add(what + ' saved with blanks', part, at(s));
+  }
+  // readings switched off in Settings are never asked for: say so while collecting
+  const off = Object.entries({ skin: 'chest, arm, thigh, calf', set: 'gown set temp', ts: 'thermal sensation', warm: 'warming yes / no', room: 'room temp', bis: 'BIS', haemo15: 'BP, HR, BIS every 15 min' }).filter(([k]) => settings.hide[k]).map(([, l]) => l);
+  if (off.length && !get('done')) add('Hidden in Settings (not being recorded)', off, '#/settings');
   // in OT a while with no induction time: the intra-op readings have no due times, so nothing else would flag them
   const ot = toMin(get('ev_ot'));
   if (ot != null && !get('io_knife') && ((nowMin() - ot + 1440) % 1440) > 20 && !get('io_done')) add('Induction not logged', ['intra-op readings fall due from it'], '#/p/' + p.id);
