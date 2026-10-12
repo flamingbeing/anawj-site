@@ -30,7 +30,7 @@ const OBJECTS = {
 };
 const PLAIN = new Set(['accent', 'boxLines', 'catView', 'compact', 'compactTags', 'defaultDate', 'detectAgeSex', 'firstField', 'enterMode', 'enterSaves', 'hideTips', 'lbCase', 'lbFuzzy', 'lbScope', 'logbookView',
   'reflExport', 'reflNotes', 'searchOps', 'startTab', 'suggestions', 'tagEditorView', 'textSize', 'zoom', 'fontUi', 'fontUiName', 'fontLog', 'fontLogName', 'lineWidth', 'lineHeight', 'contrast', 'motion', 'tabIcons', 'tabBar', 'hideHeader', 'caseInverted', 'colourful', 'autoFocus', 'appTitle', 'weeklyDigest',
-  'basic', 'weekStart', 'afterSave', 'undoSecs', 'boxCaps', 'boxCorrect', 'boxSpell', 'reflSpell', 'pinBox', 'pinSearch', 'borders', 'reflPoints', 'round', 'shadows', 'bigTaps', 'swipeTabs', 'rowMenu']);
+  'basic', 'weekStart', 'afterSave', 'undoSecs', 'boxCaps', 'boxCorrect', 'boxSpell', 'reflSpell', 'pinBox', 'pinSearch', 'borders', 'reflPoints', 'round', 'shadows', 'bigTaps', 'swipeTabs', 'rowMenu', 'reflToolbar']);
 const MAX_JSON = 400 * 1024;
 
 export function settingsFile(logbook, { theme } = {}) {
