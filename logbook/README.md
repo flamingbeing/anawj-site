@@ -38,6 +38,8 @@ The project is on Blaze (pay-as-you-go); its free daily quotas, which usage stay
 
 Sign-in uses a Google popup, falling back to a redirect if popups are blocked (e.g. some home-screen apps). If redirect sign-in fails on iPhone home-screen installs, open the page in Safari once to sign in.
 
+The Firebase sign-in helper pages are self-hosted at `/__/auth/` (copied from `https://apmes-logbook.firebaseapp.com/__/auth/handler`, `handler.js`, `experiments.js`, `iframe`, `iframe.js`) with `/__/firebase/init.json`, and `authDomain` is `anawj.com` in both apps' `firebase-config.js`. This keeps sign-in on the same site, so Chrome's storage partitioning doesn't break the redirect ("Unable to process request due to missing initial state"). `.nojekyll` stops GitHub Pages dropping the `__` folder. Google Cloud console → APIs & Services → Credentials → the Web client (auto created by Google Service) → Authorised redirect URIs must include `https://anawj.com/__/auth/handler`. Refresh the copied files now and then (Firebase updates them rarely).
+
 ## Data model
 
 | Path | Contents | Who |
