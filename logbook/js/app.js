@@ -16,6 +16,7 @@ import { downloadNotes } from './ui-notes.js';
 import { cloudSaveSection, remindBackup, resumeCloudSave } from './cloud-save.js';
 import { backupCard } from './backup.js';
 import { createNavigation } from './navigation.js';
+import { renderNotes, leaveNotes } from './ui-notepad.js';
 import { settingsFile, readSettingsFile } from './settings-file.js';
 import { purgeExpired, openBin } from './bin.js';
 
@@ -37,6 +38,7 @@ const ICONS = {
   reflset: 'M4 19.5V5a2 2 0 0 1 2-2h12v14H6a2 2 0 0 0-2 2.5zM6 21h12v-4',
   sharefmt: 'M9 9h10v12H9zM5 15V3h10',
   bin: 'M4 7h16M10 11v6M14 11v6M5 7l1 13h12l1-13M9 7V4h6v3',
+  notes: 'M6 3h9l4 4v14H6zM14 3v5h5M9 12h7M9 16h5',
   more: 'M5 12h.01M12 12h.01M19 12h.01M4 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0M11 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0M18 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0',
 };
 const icon = id => {
@@ -53,6 +55,8 @@ const TABS = [
   { id: 'logbook', label: 'Logbook', render: renderLogbook },
   { id: 'reflect', label: 'Reflections', render: renderReflect },
   { id: 'progress', label: 'Analytics', render: renderProgress },
+  // a personal notepad: on the bar only if chosen (Arrange tabs); otherwise first in More
+  { id: 'notes', label: 'Notes', render: renderNotes, desc: 'Your own notes: private, never in your portfolio' },
   // five tabs on the bar; the rest live under More (still reachable by #totals, #account, #settings)
   { id: 'more', label: 'More', render: () => renderMore() },
   // under Analytics: how your counts compare with your intake
@@ -60,7 +64,7 @@ const TABS = [
   { id: 'account', label: 'Account', render: renderAccount, hidden: true, under: 'more', desc: 'Your name and portfolio details (Section 1); delete account' },
   { id: 'settings', label: 'Settings', render: () => renderSettingsMenu(), hidden: true, under: 'more', desc: 'Display, logging, tag editor, Markdown, recycle bin' },
   { id: 'recovery', label: 'Recent changes / Recover drafts', render: renderRecovery, hidden: true, under: 'more', desc: 'Retry sync, recover unfinished drafts and restore recent versions on this device' },
-  { id: 'data', label: 'Export / Import', render: () => renderDataPage(), hidden: true, under: 'more', desc: 'Export the portfolio (Word); import reflections from Word; backup file, Excel and notes apps' },
+  { id: 'data', label: 'Export / Import', render: () => renderDataPage(), hidden: true, under: 'more', desc: 'Export the portfolio (Word); import reflections from Word; backup file, Excel and Markdown export' },
   { id: 'reflimport', label: 'Import reflections from Word', render: () => renderReflImport(), hidden: true, under: 'data', unlisted: true },
   // Settings' own pages (not in the More list)
   { id: 'display', label: 'Display', render: renderDisplay, hidden: true, under: 'settings', unlisted: true, desc: 'Light or dark, colour, zoom, text size, borders; fonts and more under Advanced' },
@@ -92,7 +96,7 @@ function renderMore() {
   const { hidden } = arrangeTabs(visibleTabs().filter(t => !t.hidden).map(t => t.id), display());
   return h('div', {},
     h('section', { class: 'card more-list' }, h('h2', {}, 'More'),
-      h('ul', {}, hidden.map(id => TABS.find(t => t.id === id)).map(t => menuItem(t.id, t.label, 'Hidden from the tab bar')), items.map(t => menuItem(t.id, t.label, t.desc)))),
+      h('ul', {}, hidden.map(id => TABS.find(t => t.id === id)).map(t => menuItem(t.id, t.label, t.id === 'notes' ? t.desc : 'Hidden from the tab bar')), items.map(t => menuItem(t.id, t.label, t.desc)))),
     privacyCard(),
     creditsCard(),
     installCard(),
@@ -271,10 +275,10 @@ function renderDataPage() {
       h('h3', { style: 'margin-top:16px' }, 'Spreadsheet (Excel)'),
       h('p', { class: 'hint help' }, 'Your cases, your reflections or both as a spreadsheet: choose the dates and the columns. To edit cases and upload them back, use Import above.'),
       h('div', { class: 'bar', style: 'margin-bottom:0' }, h('button', { onclick: downloadExcel }, 'Download Excel…')),
-      h('h3', { style: 'margin-top:16px' }, 'Notes apps (Markdown)'),
-      h('p', { class: 'hint help' }, 'Your cases and reflections as Markdown notes for Obsidian and other notes apps, with Progress.md and, if you like, the figures. Laid out as you set in Settings → Markdown.'),
+      h('h3', { style: 'margin-top:16px' }, 'Markdown export (Obsidian and notes apps)'),
+      h('p', { class: 'hint help' }, 'Your cases, reflections and notes as Markdown files for Obsidian and other notes apps, with Progress.md and, if you like, the figures. Laid out as you set in Settings → Markdown.'),
       h('p', { class: 'hint' }, 'The files hold your case details: keep them private, and check hospital policy before putting them into cloud notes or AI tools.'),
-      h('div', { class: 'bar', style: 'margin-bottom:0' }, h('button', { onclick: downloadNotes }, 'Download for notes apps…')),
+      h('div', { class: 'bar', style: 'margin-bottom:0' }, h('button', { onclick: downloadNotes }, 'Download Markdown export…')),
       ...cloudSaveSection()));
 }
 
@@ -301,10 +305,11 @@ function paintTabs() {
   // the bar's tab this page sits under, however deep (Settings → Display is under More)
   let cur = TABS.find(t => t.id === S.tab);
   while (cur && cur.under) cur = TABS.find(t => t.id === cur.under);
-  const sel = cur ? cur.id : S.tab;
+  let sel = cur ? cur.id : S.tab;
   document.body.dataset.bar = sel;   // Settings → Display → Colourful: the page takes its tab's colour
   // Advanced display → the tab bar's order and hidden tabs (this device)
   const bar = visibleTabs().filter(t => !t.hidden), { shown } = arrangeTabs(bar.map(t => t.id), display());
+  if (!shown.includes(sel)) sel = 'more';   // a tab hidden from the bar (Notes) is reached through More
   fill(tabsEl, ...shown.map(id => bar.find(t => t.id === id)).map(t => h('button', {
     role: 'tab', 'aria-selected': String(sel === t.id), 'data-tab': t.id, 'aria-label': t.label, title: t.label,   // named even with icons only
     onclick: () => go(t.id),
@@ -314,6 +319,7 @@ function paintTabs() {
 
 function changeScreen(id, scroll = 0) {
   if (S.tab === 'account') flushProfile();
+  if (S.tab === 'notes' && id !== 'notes') leaveNotes();
   if (/^admin/.test(S.tab || '') && !/^admin/.test(id)) leaveAdmin();
   S.tab = id;
   window.scrollTo(0, 0);

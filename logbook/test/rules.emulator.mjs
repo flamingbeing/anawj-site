@@ -194,6 +194,25 @@ await t('bin missing deletedAt', assertFails(setDoc(doc(a, 'logbooks', A, 'bin',
 await t('bin data too many keys', assertFails(setDoc(doc(a, 'logbooks', A, 'bin', 'c_c2_x'), binE('c_c2_x', 'case', Object.fromEntries(Array.from({ length: 41 }, (_, i) => ['k' + i, i]))))));
 await t('admin deletes bin entry', assertFails(deleteDoc(doc(adm, 'logbooks', A, 'bin', 'c_c1_x'))));
 await t('owner deletes bin entry', assertSucceeds(deleteDoc(doc(a, 'logbooks', A, 'bin', 'c_c1_x'))));
+// ---- notes (More → Notes): owner only; nobody else, not even admins or the app owner ----
+const note = (id, extra = {}) => ({ id, date: '2026-10-12', title: 'Fake note', body: '- [ ] fake to-do', createdAt: 1, updatedAt: 2, ...extra });
+await t('own note', assertSucceeds(setDoc(doc(a, 'logbooks', A, 'notes', 'n1'), note('n1'))));
+await t('own undated note with case link', assertSucceeds(setDoc(doc(a, 'logbooks', A, 'notes', 'n2'), note('n2', { date: null, caseId: 'c1' }))));
+await t('read own notes', assertSucceeds(getDocs(collection(a, 'logbooks', A, 'notes'))));
+await t('other reads notes', assertFails(getDocs(collection(b, 'logbooks', A, 'notes'))));
+await t('admin reads note', assertFails(getDoc(doc(adm, 'logbooks', A, 'notes', 'n1'))));
+await t('app owner reads note', assertFails(getDoc(doc(own, 'logbooks', A, 'notes', 'n1'))));
+await t('other writes note', assertFails(setDoc(doc(b, 'logbooks', A, 'notes', 'n3'), note('n3'))));
+await t('app owner writes note', assertFails(setDoc(doc(own, 'logbooks', A, 'notes', 'n3'), note('n3'))));
+await t('note id mismatch', assertFails(setDoc(doc(a, 'logbooks', A, 'notes', 'n3'), note('zz'))));
+await t('note extra field', assertFails(setDoc(doc(a, 'logbooks', A, 'notes', 'n3'), note('n3', { images: [] }))));
+await t('note body too long', assertFails(setDoc(doc(a, 'logbooks', A, 'notes', 'n3'), note('n3', { body: 'x'.repeat(20001) }))));
+await t('note body missing', assertFails(setDoc(doc(a, 'logbooks', A, 'notes', 'n3'), { id: 'n3', title: 'x' })));
+await t('note bad date', assertFails(setDoc(doc(a, 'logbooks', A, 'notes', 'n3'), note('n3', { date: '12/10/2026' }))));
+await t('note title too long', assertFails(setDoc(doc(a, 'logbooks', A, 'notes', 'n3'), note('n3', { title: 'x'.repeat(201) }))));
+await t('own note in bin', assertSucceeds(setDoc(doc(a, 'logbooks', A, 'bin', 'n_n1_x'), binE('n_n1_x', 'note', note('n1')))));
+await t('other deletes note', assertFails(deleteDoc(doc(b, 'logbooks', A, 'notes', 'n1'))));
+await t('owner deletes note', assertSucceeds(deleteDoc(doc(a, 'logbooks', A, 'notes', 'n1'))));
 // portfolio template: everyone signed in reads, admins write
 await t('template read', assertSucceeds(getDoc(doc(a, 'config', 'portfolioTemplate'))));
 await t('template user write', assertFails(setDoc(doc(a, 'config', 'portfolioTemplate'), { parts: 1, size: 3, uploadedAt: 1 })));

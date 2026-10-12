@@ -1,0 +1,244 @@
+// Notes (More → Notes, or on the tab bar via Arrange tabs): a resident's own notepad. Private (owner-only
+// rules), never in the portfolio. Pure helpers in notepad.js.
+//
+// Firebase cost: notes are not read at sign-in. The listener starts the first time notes are needed (this page,
+// a day's notes in the Logbook, the Markdown export, a backup) and then stays for the visit. Typing saves after
+// 3 s of quiet, and at once when the note is left, the field loses focus or the page is hidden; every write goes
+// through the durable write queue (writes.js → cloud.commitRecord 'note'), so notes work offline too.
+// settings.noteIndex (which days and cases have notes) lets the Logbook mark them without reading any note.
+
+import { S, h, toast, fill, hooks, writes, cloud, transients, settings, patchLogbook, resetters, todayISO, modal } from './ui-core.js';
+import { uid, fmtDate, caseParts } from './engine.js';
+import { MAX_NOTES, LIMITS, sortNotes, filterNotes, noteTitle, noteIndex, cleanNoteIndex, sameIndex, parseNote, toggleCheck, plainLines } from './notepad.js';
+
+const SAVE_MS = 3000;
+const mine = () => S.user && S.user.email;
+// q: search; day / caseId: what the list is narrowed to; editing: the note open in the editor; preview: its view mode
+export const nv = { q: '', day: '', caseId: '', editing: null, preview: false };
+
+// ---------- loading (lazy) ----------
+
+let stop = null, owner = null, raw = [], ready = null, readyResolve = null, synced = false;
+function apply() {
+  if (!owner || owner !== mine()) return;
+  S.notes = sortNotes(writes.overlay('note', owner, raw));
+}
+// resolves once the first list has arrived (from the offline cache or the server)
+export function ensureNotes() {
+  const me = mine();
+  if (!me) return Promise.resolve([]);
+  if (owner === me && ready) return ready.then(() => S.notes || []);   // the current list, not the first one
+  stopNotes();
+  owner = me; synced = false;
+  ready = new Promise(r => { readyResolve = r; });
+  stop = cloud.watchNotes(me, (list, meta = {}) => {
+    if (owner !== me) return;
+    raw = list; apply();
+    if (!meta.fromCache) { synced = true; syncIndex(); }
+    if (readyResolve) { readyResolve(S.notes); readyResolve = null; }
+    if (S.tab === 'notes' && !nv.editing) queueMicrotask(() => { if (S.tab === 'notes' && !nv.editing && !document.activeElement?.closest?.('.notes-page input')) hooks.render(); });
+  });
+  return ready;
+}
+function stopNotes() { if (stop) stop(); stop = null; owner = null; raw = []; ready = null; readyResolve = null; S.notes = null; }
+resetters.push(() => { stopNotes(); Object.assign(nv, { q: '', day: '', caseId: '', editing: null, preview: false }); });
+writes.onChange(() => { if (owner) { apply(); if (synced) syncIndex(); } });
+
+// keep settings.noteIndex in step (only from the server's copy, so a stale offline cache never overwrites it)
+function syncIndex() {
+  if (!Array.isArray(S.notes) || !S.logbook) return;
+  const next = noteIndex(S.notes);
+  if (!sameIndex(next, settings().noteIndex)) patchLogbook({ settings: { noteIndex: next } });
+}
+export const notesIndex = () => cleanNoteIndex(settings().noteIndex);
+export const dayHasNotes = date => !!date && notesIndex().days.includes(date);
+export const caseHasNotes = id => !!id && notesIndex().cases.includes(id);
+
+// open Notes on a day's notes, or a case's (from the Logbook)
+export function openNotes({ day = '', caseId = '' } = {}) {
+  Object.assign(nv, { day, caseId, q: '', editing: null, preview: false });
+  hooks.navigate ? hooks.navigate('notes') : (location.hash = '#notes');
+}
+
+// ---------- saving ----------
+
+const sessions = new Map();   // note object → { base, timer, saving, dirty }
+const blank = n => !String(n.title || '').trim() && !String(n.body || '').trim();
+async function persist(n) {
+  const s = sessions.get(n);
+  if (!s || !s.dirty) return true;
+  clearTimeout(s.timer); s.timer = null;
+  const me = mine();
+  if (!me || me !== s.owner) return false;
+  while (s.saving) await s.saving;
+  if (!s.dirty) return true;
+  // an empty new note is never written
+  if (!s.base && blank(n)) { s.dirty = false; return true; }
+  s.dirty = false;
+  const payload = JSON.parse(JSON.stringify(n));
+  s.status?.('Saving…');
+  s.saving = writes.save('note', me, payload, s.base).then(saved => {
+    s.base = JSON.parse(JSON.stringify(saved));
+    s.status?.(s.dirty ? 'Not saved yet' : 'Saved');
+    return true;
+  }, err => { s.dirty = true; s.status?.('Not saved: ' + err.message); return false; }).finally(() => { s.saving = null; });
+  return s.saving;
+}
+const flushOpen = () => { if (nv.editing) persist(nv.editing); };
+if (typeof window !== 'undefined') {
+  window.addEventListener('pagehide', flushOpen);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushOpen(); });
+}
+// leaving the page (another tab, Back): save what is open
+export function leaveNotes() { if (nv.editing) { const n = nv.editing; persist(n); nv.editing = null; editorTransient?.close(); } }
+
+// ---------- the page ----------
+
+const caseOf = id => (S.cases || []).find(c => c.id === id) || null;
+const caseLabel = c => { const p = caseParts(c); return [c.date ? fmtDate(c.date) : '', p.initials, p.details].filter(Boolean).join(' · ').slice(0, 90); };
+
+export function renderNotes() {
+  if (nv.editing) return editor(nv.editing);
+  const el = h('section', { class: 'card notes-page' });
+  ensureNotes();
+  const loading = !Array.isArray(S.notes);
+  const list = loading ? [] : S.notes;
+  const full = list.length >= MAX_NOTES;
+  const search = h('input', { type: 'search', class: 'grow', placeholder: 'Search notes', 'aria-label': 'Search notes', value: nv.q,
+    oninput: e => { nv.q = e.target.value; paintList(); } });
+  const listEl = h('div', { class: 'notes-list' });
+  const paintList = () => {
+    const rows = filterNotes(list, nv);
+    fill(listEl, loading ? h('p', { class: 'empty' }, 'Loading…')
+      : !list.length ? h('div', { class: 'empty' }, h('p', {}, 'No notes yet.'), h('p', { class: 'hint help' }, 'Writing about a case for your portfolio? Use Reflect instead.'))
+      : !rows.length ? h('p', { class: 'empty' }, 'No notes match.')
+      : h('ul', { class: 'notes-rows' }, rows.map(noteRow)));
+  };
+  const narrowed = nv.day || nv.caseId;
+  fill(el,
+    h('div', { class: 'notes-head' }, h('h2', { style: 'margin:0' }, 'Notes'), h('span', { class: 'muted notes-count' }, loading ? '' : `${list.length} of ${MAX_NOTES}`)),
+    h('p', { class: 'hint help' }, 'Your own notes: private, never in your portfolio. # heading, **bold**, - list, 1. list, - [ ] to-do and links work.'),
+    h('div', { class: 'bar' }, search,
+      h('button', { class: 'primary', disabled: loading, onclick: () => {
+        if (full) return toast(`You have ${MAX_NOTES} notes, the most allowed. Delete or export some to make room.`);
+        newNote();
+      } }, '+ New note')),
+    narrowed ? h('p', { class: 'notes-filter' }, h('span', {}, nv.day ? `Notes on ${fmtDate(nv.day)}` : `Notes on the case ${caseOf(nv.caseId) ? caseLabel(caseOf(nv.caseId)) : ''}`),
+      ' ', h('button', { class: 'small', onclick: () => { nv.day = ''; nv.caseId = ''; hooks.render(); } }, 'Show all')) : null,
+    full ? h('p', { class: 'tip' }, `You have ${MAX_NOTES} notes, the most allowed. Delete old ones (they stay in the recycle bin for 30 days) or keep them in a Markdown export.`) : null,
+    listEl);
+  paintList();
+  return el;
+}
+
+function noteRow(n) {
+  const preview = plainLines(n.body).slice((n.title || '').trim() ? 0 : 1, 3).join(' · ');
+  const c = n.caseId && caseOf(n.caseId);
+  return h('li', { tabindex: '0', onclick: () => openEditor(n), onkeydown: e => { if (e.key === 'Enter' && e.target === e.currentTarget) openEditor(n); } },
+    h('span', { class: 'd' }, n.date ? fmtDate(n.date) : 'No date'),
+    h('span', { class: 'note-main' }, h('b', {}, noteTitle(n)), preview ? h('span', { class: 'muted note-preview' }, preview.slice(0, 160)) : null,
+      c ? h('span', { class: 'flag note-case', title: 'Linked case' }, '↗ ' + caseLabel(c)) : null));
+}
+
+function newNote() {
+  const n = { id: uid(), date: nv.day || todayISO(), title: '', body: '', createdAt: Date.now() };
+  if (nv.caseId) { n.caseId = nv.caseId; const c = caseOf(nv.caseId); if (c && c.date && !nv.day) n.date = c.date; }
+  openEditor(n, true);
+}
+
+let editorTransient = null;
+function openEditor(n, fresh = false) {
+  const copy = JSON.parse(JSON.stringify(n));
+  sessions.set(copy, { base: fresh ? null : JSON.parse(JSON.stringify(n)), owner: mine(), dirty: false, timer: null, saving: null });
+  nv.editing = copy; nv.preview = !fresh && !!String(copy.body || '').trim();
+  if (!editorTransient?.active) editorTransient = transients.open(() => {
+    if (nv.editing) { persist(nv.editing); nv.editing = null; }
+    hooks.render();
+  });
+  hooks.render();
+  window.scrollTo(0, 0);
+}
+function closeEditor() {
+  const n = nv.editing;
+  if (n) persist(n);
+  nv.editing = null;
+  if (editorTransient?.active) editorTransient.close(); else hooks.render();
+}
+
+function editor(n) {
+  const s = sessions.get(n) || { base: null, owner: mine(), dirty: false };
+  if (!sessions.has(n)) sessions.set(n, s);
+  const status = h('span', { class: 'muted notes-status', 'aria-live': 'polite' }, s.base ? 'Saved' : 'Not saved yet');
+  s.status = t => { status.textContent = t; };
+  const touch = () => { s.dirty = true; status.textContent = 'Not saved yet'; clearTimeout(s.timer); s.timer = setTimeout(() => persist(n), SAVE_MS); };
+  const title = h('input', { class: 'note-title', placeholder: 'Title', 'aria-label': 'Note title', maxlength: String(LIMITS.title), value: n.title || '',
+    oninput: e => { n.title = e.target.value; touch(); }, onblur: () => persist(n) });
+  const date = h('input', { type: 'date', 'aria-label': 'Note date', value: n.date || '', onchange: e => { n.date = e.target.value || null; touch(); paintMeta(); } });
+  const body = h('textarea', { class: 'note-body', rows: '12', placeholder: 'Write your note… (- [ ] for a to-do)', 'aria-label': 'Note text', maxlength: String(LIMITS.body), spellcheck: 'true',
+    oninput: e => { n.body = e.target.value; touch(); }, onblur: () => persist(n) });
+  body.value = n.body || '';
+  const meta = h('div', { class: 'note-meta' });
+  const paintMeta = () => {
+    const c = n.caseId && caseOf(n.caseId);
+    fill(meta,
+      h('label', { class: 'note-date' }, 'Date ', date),
+      n.date ? h('button', { class: 'small', type: 'button', onclick: () => { n.date = null; date.value = ''; touch(); paintMeta(); } }, 'No date') : null,
+      n.caseId ? h('span', { class: 'note-link' }, h('span', { class: 'flag note-case' }, '↗ ' + (c ? caseLabel(c) : 'a deleted case')),
+        h('button', { class: 'small', type: 'button', onclick: () => { delete n.caseId; touch(); paintMeta(); } }, 'Unlink'))
+        : h('button', { class: 'small', type: 'button', onclick: () => pickCase(n, () => { touch(); paintMeta(); }) }, 'Link to a case…'));
+  };
+  paintMeta();
+  const view = h('div', { class: 'note-view' });
+  const paintView = () => fill(view, renderBody(n.body, line => { n.body = toggleCheck(n.body, line); body.value = n.body; touch(); persist(n); paintView(); }));
+  const modeBtn = h('button', { class: 'small', type: 'button', 'aria-pressed': String(nv.preview), onclick: () => { nv.preview = !nv.preview; paint(); if (!nv.preview) body.focus(); } });
+  const paint = () => {
+    modeBtn.textContent = nv.preview ? 'Edit' : 'Preview';
+    modeBtn.setAttribute('aria-pressed', String(nv.preview));
+    body.hidden = nv.preview; view.hidden = !nv.preview;
+    if (nv.preview) paintView();
+  };
+  paint();
+  const del = h('button', { class: 'small danger', type: 'button', onclick: async () => {
+    const st = sessions.get(n);
+    clearTimeout(st?.timer);
+    if (!st?.base) { nv.editing = null; editorTransient?.close(); hooks.render(); return; }   // never saved: nothing to bin
+    await persist(n);
+    try { const { moveToBin } = await import('./bin.js'); await moveToBin('note', { ...n }, { toast: true }); }
+    catch (err) { return toast('Could not delete: ' + err.message); }
+    nv.editing = null; if (editorTransient?.active) editorTransient.close(); else hooks.render();
+  } }, 'Delete');
+  setTimeout(() => { if (!s.base && !nv.preview) title.focus(); }, 0);
+  return h('section', { class: 'card note-editor' },
+    h('div', { class: 'note-top' }, h('button', { class: 'small', type: 'button', onclick: closeEditor }, '← Notes'), h('span', { style: 'flex:1' }), status, modeBtn),
+    title, meta, body, view,
+    h('div', { class: 'note-top', style: 'margin-top:10px' }, del, h('span', { style: 'flex:1' }), h('button', { class: 'primary', type: 'button', onclick: closeEditor }, 'Done')));
+}
+
+// the body as elements (never innerHTML): headings, paragraphs, lists and to-dos that tick
+export function renderBody(text, onTick) {
+  const blocks = parseNote(text);
+  if (!blocks.length) return h('p', { class: 'muted' }, 'Nothing written yet.');
+  const inl = parts => parts.map(p => p.t === 'b' ? h('strong', {}, p.v) : p.t === 'a' ? h('a', { href: p.href, target: '_blank', rel: 'noopener noreferrer' }, p.v) : p.v)
+    .flatMap(x => (typeof x === 'string' ? x.split('\n').flatMap((t, i) => (i ? [h('br'), t] : [t])) : [x]));
+  return blocks.map(b => b.t === 'h' ? h('h' + (b.level + 2), {}, inl(b.inl))
+    : b.t === 'p' ? h('p', {}, inl(b.inl))
+    : h(b.t, { class: b.items.some(i => i.check !== null) ? 'note-todos' : null }, b.items.map(i => h('li', {},
+      i.check === null ? inl(i.inl) : h('label', { class: 'check' + (i.check ? ' done' : '') }, h('input', { type: 'checkbox', checked: i.check, onchange: () => onTick && onTick(i.line) }), h('span', {}, inl(i.inl)))))));
+}
+
+// link a note to one of your cases: that day's cases first, then the last two weeks, searchable
+async function pickCase(n, done) {
+  const all = [...(S.cases || [])].filter(c => c.date).sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt || 0) - (a.createdAt || 0));
+  const q = h('input', { type: 'search', placeholder: 'Search your cases', 'aria-label': 'Search your cases' });
+  const ul = h('ul', { class: 'cases pick-cases' });
+  const paint = () => {
+    const words = q.value.toLowerCase().split(/\s+/).filter(Boolean);
+    const rows = (words.length ? all.filter(c => words.every(w => caseLabel(c).toLowerCase().includes(w))) : [...all.filter(c => c.date === n.date), ...all.filter(c => c.date !== n.date)]).slice(0, 30);
+    fill(ul, rows.length ? rows.map(c => h('li', { tabindex: '0', onclick: () => choose(c), onkeydown: e => { if (e.key === 'Enter') choose(c); } }, caseLabel(c))) : h('li', { class: 'muted' }, 'No cases match.'));
+  };
+  const choose = c => { n.caseId = c.id; m.close(); done(); };
+  q.oninput = paint;
+  const m = modal('Link to a case', [q, ul, h('div', { class: 'bar' }, h('span', { class: 'grow' }), h('button', { onclick: () => m.close() }, 'Cancel'))]);
+  paint();
+  q.focus();
+}
