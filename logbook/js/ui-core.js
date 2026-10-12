@@ -33,6 +33,10 @@ export const S = {
 export const hooks = { render() {}, casesChanged() {} };
 
 export const settings = () => ({ suggestions: true, rYear: 1, ...(S.logbook && S.logbook.settings) });
+// Basic mode (Settings, settings.basic): a simpler app for new residents. Tabs and buttons stay where they are;
+// the extras go (quick picks and the other optional Case tab parts, the Logbook grid and search operators,
+// Analytics trends, advanced settings). Nothing else is changed, so turning it off brings everything back.
+export const basicMode = () => !!settings().basic;
 // The intake on the list, or the year the rid starts with.
 export function baseIntake(r) {
   if (!r) return null;

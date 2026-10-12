@@ -245,7 +245,19 @@ portfolio content.
   list): every switch that hides part of the app, grouped Tips and help / Case tab / Logbook / Header and tabs, each
   group with its own "Reset this group" (the other groups stay). The same settings as on their own pages (hideTips,
   weeklyDigest, reflNotes, caseHide; this device's rowMenu, hideHeader, tabHidden / tabOrder). e2e:
-  `test/e2e/simpler.mjs` (Basic mode joins it).
+  `test/e2e/simpler.mjs`.
+- **Basic mode** (`settings.basic`, the whole account; `basicMode()` in `ui-core.js`; a switch at the top of Settings
+  and of Show or hide; body class `basic`): a simpler app for new residents. Same tabs and buttons in the same places;
+  hidden: every optional Case tab part but "what the box was read as" (quick picks, ☆, Still needed, tag group saving,
+  Plan for later), the Logbook Grid view and search operators, Analytics Trends, the Advanced display / logging links,
+  the settings file and Connect Claude cards. It changes no other setting, so off brings everything back. e2e:
+  `simpler.mjs`.
+- **One spreadsheet (CSV)** (Backup card, "Download as one spreadsheet"; `backup-csv.js`, tested; Oct 2026, from
+  Codex's list): the backup as one CSV for Excel: a `logbook` row (settings, tag groups, portfolio details) then a row
+  per case, reflection and note (photos left out). Readable columns (Kind, ID, Date, Initials, Title, Text, Tags,
+  Heading, Status, Linked case, Updated) and a Data column with each record's JSON, which Restore from backup reads
+  (`looksLikeBackupCsv` → `csvToBackup`), so the same preview and add-only restore apply. A BOM for Excel; cells that
+  start like a formula get a leading `'`; comma, semicolon or tab separators load. e2e: `simpler.mjs`.
 - **Notes** (`#notes`; `ui-notepad.js`, pure helpers in `notepad.js`, tested; Oct 2026, owner's spec via Codex):
   a resident's own notepad: teaching points, doses, to-dos. Private (owner-only rules: no admin, PD or app-owner
   access), never in the portfolio. A bar tab that starts off the bar (`OFF_BAR` in `ui-settings.js`): first in More

@@ -49,8 +49,8 @@ try { for (const width of [390, 1280]) {
   await p.getByRole('button', { name: 'No date' }).click();
   await p.goBack();
   await p.waitForFunction(() => !document.querySelector('.note-editor'));
-  await p.waitForFunction(() => document.querySelectorAll('ul.notes-rows li').length === 2);
-  assert.match(await p.locator('ul.notes-rows li').first().innerText(), /No date[\s\S]*Fake undated scratch/);
+  // the blur saves it once with today's date, then leaving saves it undated: wait for the second save
+  await p.waitForFunction(() => document.querySelectorAll('ul.notes-rows li').length === 2 && /No date[\s\S]*Fake undated scratch/.test(document.querySelector('ul.notes-rows li').innerText));
 
   // search
   await p.getByLabel('Search notes').fill('dose');

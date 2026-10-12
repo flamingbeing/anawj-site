@@ -7,7 +7,7 @@ import { suggest as suggestCodes } from './suggest.js';
 import { apmesShorthand, shorthandTags } from './tags.js';
 import {
   S, h, toast, debounce, modal, confirmBox, cat, catName, catShort, catFull, catChip, countText, logTags, tagLinks, tagName, tagChip, tagSet, keepTags, PROGRESS_BY_CODE,
-  createCase, updateCase, removeCase, restoreCase, saveMany, deleteMany, subcatChips, subcatsOf, settings, todayISO, hooks, fill, add, cloud, writes, okNoIds, patchLogbook, catPills } from './ui-core.js';
+  createCase, updateCase, removeCase, restoreCase, saveMany, deleteMany, subcatChips, subcatsOf, settings, todayISO, hooks, fill, add, cloud, writes, okNoIds, patchLogbook, catPills, basicMode } from './ui-core.js';
 import { display, templateDialog } from './ui-settings.js';
 import { moveToBin } from './bin.js';
 import { createDraftSlot, listDrafts } from './drafts.js';
@@ -261,7 +261,7 @@ export const CASE_PARTS = [
   ['groupsave', 'Save these tags as a tag group'],
   ['plan', 'Plan for later'],
 ];
-const caseHidden = part => (settings().caseHide || []).includes(part);
+const caseHidden = part => (basicMode() && part !== 'parsed') || (settings().caseHide || []).includes(part);
 // What Save does next (Settings → Logging, settings.afterSave)
 export const AFTER_SAVE = [
   ['next', 'Ready for the next case (default)'],

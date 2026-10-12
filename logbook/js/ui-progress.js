@@ -6,7 +6,7 @@ import { progress, todayISO, rYearDefault, weekLead, weekdayNames } from './engi
 import { exportTotals } from './xlsxio.js';
 import { reflectionProgress, HEADING_BY_ID } from './reflections.js';
 import { logbookGlance, reflectionGlance, cohortGlance } from './glance.js';
-import { S, h, toast, cloud, rYear, myYearName, settings, subcatsOf, patchLogbook, needExcel, download, displayName, hooks, add, resetters, info, catName, catShort, tagName, summaryOf } from './ui-core.js';
+import { S, h, toast, cloud, rYear, myYearName, settings, subcatsOf, patchLogbook, needExcel, download, displayName, hooks, add, resetters, info, catName, catShort, tagName, summaryOf, basicMode } from './ui-core.js';
 
 const STATUS_TEXT = { late: 'Behind', due: 'Due this year', ontrack: 'On track', done: 'Done', none: 'No target' };
 // open: the sections you have expanded (they start folded, showing a one-line summary)
@@ -58,7 +58,7 @@ export function renderProgress() {
     h('ul', {}, h('li', {}, h('a', { href: '#totals' },
       h('span', { class: 'mt' }, h('b', {}, 'Compare with your intake'), h('small', {}, 'Case counts per tag across residents in your year (Totals)')),
       h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')))));
-  return h('div', {}, head, urgentSec, targets, reflCard(), trendsCard(), compare);
+  return h('div', {}, head, urgentSec, targets, reflCard(), basicMode() ? null : trendsCard(), compare);
 }
 
 // A folded card: the title and a one-line summary; tap to open the full section (kept open while you stay).

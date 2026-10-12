@@ -10,7 +10,7 @@ import { parseQuery, matchQuery, OPERATOR_HELP, insertOperator } from './search-
 import { parseCsv } from './tags.js';
 import {
   S, h, toast, debounce, modal, cat, categoryNamesRevision, catName, catShort, tagName, catFull, catChip, PICKER_ORDER, settings, patchLogbook, needExcel, download, fileButton, catPills,
-  updateCase, saveMany, deleteMany, displayName, rYear, todayISO, fill, add, resetters, tagSet, tagLinks, confirmBox, keepTags, hooks, rowIcon } from './ui-core.js';
+  updateCase, saveMany, deleteMany, displayName, rYear, todayISO, fill, add, resetters, tagSet, tagLinks, confirmBox, keepTags, hooks, rowIcon, basicMode } from './ui-core.js';
 import { dayHasNotes, caseHasNotes, openNotes, ensureNotes } from './ui-notepad.js';
 import { flatTree, tagTree } from './tags.js';
 import { editCaseDialog, logOnDate } from './ui-log.js';
@@ -40,6 +40,7 @@ function tagChoices() {
 // (and again when your tags change: renamed tags are searched by their new names)
 let hayCache = new WeakMap(), hayFor = null, hayNames = -1;
 const MODES = [['calendar', 'Calendar'], ['list', 'List'], ['grid', 'Grid']];
+const modes = () => (basicMode() ? MODES.filter(([m]) => m !== 'grid') : MODES);
 // "2026-10-06" -> "Tue"
 const weekday = iso => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); return m ? new Date(+m[1], +m[2] - 1, +m[3]).toLocaleDateString('en-GB', { weekday: 'short' }) : ''; };
 
@@ -88,7 +89,7 @@ export function renderLogbook() {
     });
   };
   // Advanced search (Settings → Logging): operators in the box (search-ops.js); off by default
-  const opsOn = () => !!settings().searchOps;
+  const opsOn = () => !!settings().searchOps && !basicMode();
   // title: the case's first line (initials and the first line of the details)
   const partsOf = (c, cs) => { const p = caseParts(c), low = t => (cs ? t : t.toLowerCase()); return { initials: low(p.initials), case: low(String(p.details || '')), title: low(caseText(c).split('\n')[0]) }; };
   // tag:16 / tag:lscs: a tag's code, or a word in its name (APMES or your own)
@@ -96,6 +97,7 @@ export function renderLogbook() {
     || (c.tags || []).some(k => tagName(k).toLowerCase().includes(t));
 
   if (!view.mode) view.mode = MODES.some(([m]) => m === settings().logbookView) ? settings().logbookView : 'calendar';
+  if (!modes().some(([m]) => m === view.mode)) view.mode = 'calendar';   // no grid in Basic mode
   const paint = () => {
     const rows = filtered();
     fill(list, view.mode === 'grid' ? gridView(rows, paint) : view.mode === 'calendar' ? calendarView(rows, flagsOf, paint) : listView(rows, flagsOf, paint));
@@ -236,7 +238,7 @@ export function renderLogbook() {
     filters,
     h('div', { class: 'bar', style: 'margin-bottom:0' },
       counter, h('span', { class: 'grow' }),
-      h('div', { class: 'seg' }, MODES.map(([m, l]) =>
+      h('div', { class: 'seg' }, modes().map(([m, l]) =>
         h('button', { 'aria-pressed': String(view.mode === m), onclick: () => setMode(m) }, l)))));
   // pinned (Settings → Display): the month headings in List stick just under it
   if ('ResizeObserver' in window) new ResizeObserver(() => wrap.style.setProperty('--lb-top-h', top.offsetHeight + 'px')).observe(top);
@@ -246,7 +248,7 @@ export function renderLogbook() {
 
   function setMode(m) {
     view.mode = m; view.limit = 150; paint();
-    wrap.querySelectorAll('.seg button').forEach((b, i) => b.setAttribute('aria-pressed', String(MODES[i][0] === m)));
+    wrap.querySelectorAll('.seg button').forEach((b, i) => b.setAttribute('aria-pressed', String(modes()[i][0] === m)));
     if (settings().logbookView !== m) patchLogbook({ settings: { logbookView: m } });  // remembered per user
   }
 }
