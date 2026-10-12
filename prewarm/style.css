@@ -33,7 +33,15 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .bar .row { display: flex; align-items: center; gap: 2px; min-height: 50px; padding: 0 4px 0 12px; max-width: 600px; margin: 0 auto; }
 .bar #back:not([hidden]) + h1 { margin-left: -4px; }
 .bar .row:has(#back:not([hidden])) { padding-left: 2px; }
-.bar h1 { flex: 1; margin: 0; font-size: 17px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bar h1 { flex: 0 1 auto; margin: 0; font-size: 17px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* running timer and next event (patient screen) */
+#extra { display: flex; align-items: center; gap: 2px; min-width: 0; }
+.clock { display: grid; justify-items: end; line-height: 1.15; min-width: 0; text-align: right; color: var(--navy); }
+.clock b { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.clock small { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.clock small i { font-style: normal; font-weight: 700; color: var(--warn); }
+.clock .lbl { font-size: 11px; color: var(--muted); margin-right: 2px; }
+.bar #extra { flex: 1 1 auto; justify-content: flex-end; }
 .iconbtn { background: none; border: 0; color: inherit; font-size: 1.5rem; line-height: 1; min-width: var(--tap); min-height: var(--tap); display: inline-flex; align-items: center; justify-content: center; text-decoration: none; cursor: pointer; border-radius: var(--r); }
 
 main { max-width: 600px; margin: 0 auto; padding: 8px 12px calc(28px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 6px; }
@@ -150,7 +158,8 @@ input:focus { border-color: var(--navy); }
 .ixrow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-card); padding: 8px; }
 .ixrow label { display: grid; gap: 2px; font-size: 12px; color: var(--muted); }
 .ixrow .link { grid-column: 1 / -1; justify-self: end; }
-.sign { color: var(--ok); font-weight: 600; font-size: 13px; text-align: center; }
+/* last on the screen, apart from Save, so it isn't tapped by accident */
+.sign { color: var(--ok); font-weight: 600; font-size: 13px; text-align: center; margin-top: 24px; padding-top: 12px; border-top: 1px solid var(--line); }
 .sign .link { font-weight: 400; }
 .links { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
 .links a { display: grid; align-content: center; gap: 0; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-card); padding: 6px 10px; text-decoration: none; color: var(--navy); font-weight: 600; min-height: 52px; line-height: 1.25; }

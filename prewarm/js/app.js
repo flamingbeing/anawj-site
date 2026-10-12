@@ -242,13 +242,40 @@ const EVENTS = [['pw_gown', 'Gown on'], ['pw_start', 'Warming on', 'pw'], ['ev_w
   ['io_done', 'Surgery end'], ['pacu_in', 'PACU arrival'], ['pacu_out', 'To ward']];
 const EVENT_FULL = { io_flip: 'Flipped prone', pw_start: 'Active warming started', ev_wstop: 'Active warming stopped', io_knife: 'Induction (knife to skin)', io_under_start: 'Underbody Bair Hugger on',
   io_gown_start: 'Gown Bair Hugger on', io_done: 'Surgery completed (post-extubation)', pacu_out: 'Transfer to ward' };
+// Running timer and the next event to note, in the app bar of the patient screen
+const ESSENTIAL = ['pw_gown', 'pw_start', 'ev_wstop', 'ev_ot', 'io_knife', 'io_done', 'pacu_in', 'pacu_out'];
+const WARM_MIN = { 1: 30, 2: 10 };
+const mmss = m => { const sec = Math.max(0, Math.floor(m * 60)), h = Math.floor(sec / 3600), mm = Math.floor(sec / 60) % 60, ss = String(sec % 60).padStart(2, '0');
+  return h ? `${h}:${String(mm).padStart(2, '0')}:${ss}` : `${mm}:${ss}`; };
+function clockHtml(p, s) {
+  const now = nowMin();
+  const anchors = s === 'prewarm' ? [['pw_start', 'Warming'], ['pw_gown', 'Gown on']]
+    : [['io_knife', 'Induction'], ['ev_ot', 'In OT']];
+  const [aid, alabel] = anchors.find(([id]) => toMin(val(p, id)) != null) || [];
+  let timer = `<span class="lbl">Now</span> <b>${fromMin(Math.floor(now))}</b>`;
+  if (aid) { let m = now - toMin(val(p, aid)); if (m < 0) m += 1440; timer = `<span class="lbl">${alabel} +</span><b>${mmss(m)}</b>`; }
+  const evs = ESSENTIAL.filter(id => !(noWarming(p) && (id === 'pw_start' || id === 'ev_wstop')));
+  const last = evs.reduce((i, id, j) => val(p, id) ? j : i, -1);
+  const next = evs.slice(last + 1).find(id => !val(p, id));
+  let note = '';
+  if (next) {
+    const label = EVENTS.find(([f]) => f === next)[1];
+    let at = '';
+    if (next === 'ev_wstop' && toMin(val(p, 'pw_start')) != null && WARM_MIN[val(p, 'arm')]) {
+      const due = toMin(val(p, 'pw_start')) + WARM_MIN[val(p, 'arm')];
+      at = now >= due ? ' <i>now</i>' : ' ' + fromMin(due);
+    }
+    note = `Next: ${label}${at}`;
+  }
+  return `<span>${timer}</span>${note ? `<small>${note}</small>` : ''}`;
+}
 const defaultSeries = p => noWarming(p) || val(p, 'ev_ot') || val(p, 'io_knife') ? 'iotemp' : 'prewarm';
 route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s, key) => {
   const p = patients[id]; if (!p) return go('#/');
   if (!s || (s === 'prewarm' && noWarming(p))) s = defaultSeries(p);
   const main = s !== 'haemo';
   const def = SERIES[s], pts = pointsFor(p, s);
-  header(main ? sid(p) : sid(p) + ' · BP, HR, BIS', main ? '#/' : '#/p/' + id, `<a class="iconbtn" href="#/p/${id}/sheet" aria-label="Spreadsheet view">▦</a>`);
+  header(main ? sid(p) : sid(p) + ' · BP, HR, BIS', main ? '#/' : '#/p/' + id, `${main ? `<div class="clock" id="clock">${clockHtml(p, s)}</div>` : ''}<a class="iconbtn" href="#/p/${id}/sheet" aria-label="Spreadsheet view">▦</a>`);
   let editing = null; // event whose time is being changed
   // default timepoint: the unsaved one nearest its due time, else the first unsaved
   if (!key) {
@@ -336,7 +363,8 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
       <div class="board">${cols.map(card).join('')}</div>
       <button class="save big" id="save">${isSaved ? 'Save changes' : `Save ${pt.label} reading`}</button>
       ${s === 'haemo' && settings.hide.haemo15 ? `<p class="muted small">Only baseline is entered here; the 15-min rows come from the monitor download. Turn them on in Settings.</p>` : ''}
-      ${signoffHtml(p, s)}${main ? comfortHtml('sat_post', 'Comfortable after surgery?') + linksHtml() : ''}`);
+      ${main ? comfortHtml('sat_post', 'Comfortable after surgery?') + linksHtml() : ''}${signoffHtml(p, s)}`);
+    const ck = $('#clock'); if (ck) ck.innerHTML = clockHtml(p, s);
     if (editing) { const i = $('#evtime'); i?.focus(); }
     const st = view.querySelector('.strip'), on = st?.querySelector('.on');
     if (on) st.scrollLeft = on.offsetLeft - st.offsetLeft - (st.clientWidth - on.offsetWidth) / 2;
@@ -413,7 +441,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
   };
   view.onfocusout = e => { if (e.target.id === 'evtime') setTimeout(() => { if (editing && !view.contains(document.activeElement)) { editing = null; draw(); } }, 0); };
   cleanup.push(() => { view.onchange = view.onfocusout = null; });
-  startAlerts(p, s, () => { const el = $('#due'); if (el) { const d = dueOf(p, s, pt); if (d != null) { const left = d - nowMin(); el.textContent = 'due ' + fromMin(Math.round(d)) + (left > 0 ? ` · in ${Math.floor(left)}:${String(Math.floor((left % 1) * 60)).padStart(2, '0')}` : left > -5 ? ' · now' : ' · late'); } } });
+  startAlerts(p, s, () => { const ck = $('#clock'); if (ck) ck.innerHTML = clockHtml(p, s); const el = $('#due'); if (el) { const d = dueOf(p, s, pt); if (d != null) { const left = d - nowMin(); el.textContent = 'due ' + fromMin(Math.round(d)) + (left > 0 ? ` · in ${Math.floor(left)}:${String(Math.floor((left % 1) * 60)).padStart(2, '0')}` : left > -5 ? ' · now' : ' · late'); } } });
 });
 
 // ---------- due alerts (only while the app is open)

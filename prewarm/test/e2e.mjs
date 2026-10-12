@@ -52,6 +52,9 @@ try {
   await page.click('[data-ev="pw_start"]');
   assert.match(await page.textContent('[data-ev="pw_start"] b'), /^\d\d:\d\d$/, 'tapping an empty time sets now');
   assert.match(await page.textContent('#due'), /due \d\d:\d\d/);
+  // running timer from warming on, and the next event to note (10-min group: warming off 10 min later)
+  assert.match(await page.textContent('#clock'), /Warming \+\d+:\d\d/);
+  assert.match(await page.textContent('#clock'), /Next: Warming off \d\d:\d\d/);
   // the 0-min reading is due now: the banner shows and hides on a tap
   await page.waitForSelector('#banner:not([hidden])');
   await page.click('#banner');
