@@ -23,9 +23,16 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
 - **Join by code:** the hospital comes from the code's prefix (NTF-…), so nobody picks a hospital to join.
 - **Service worker:** the page reloads only when an update takes over, never on the first install (a reload wiped the
   initials typed on the join screen).
-- **Look:** the NUHS design system (`design/tokens.css`, Open Sans from Google Fonts), like evals: navy bar with the
-  orange / red / navy stripe, flat white cards with 5px corners, light navy headings, cyan-underlined tabs, green Save.
+- **Look:** the NUHS design system's app theme (the owner's "Kent Ridge Clinical" design system artifact, Mobile and
+  web app section; `design/tokens.css`, Open Sans): white app bar with the four-quarter band (orange / red / stripe
+  blue #178fd7 / navy), grey #f3f3f3 ground, white cards with 14px corners and hairlines, 10px controls, navy as the
+  only accent (Save, selected chips, active tab), bold navy titles, 44px tap targets, dark toast at the top.
   Links are navy (link blue is under 4.5:1 on the grey page).
+- **One screen per timepoint** (owner, 12 Oct 2026): the main screen fits a 390 × 844 phone down to Save without
+  scrolling (e2e checks it): − value + on one row, chip rows with the label on the left, the "set the start time"
+  hint in the due slot. Delete patient is on the Spreadsheet view, not the main screen.
+- **Screen size** (Settings, this phone only): Smaller / Small / Normal / Large / Larger zooms the whole app
+  (`--ui-zoom` on body). Normal by default.
 - **Form view** (owner, 12 Oct 2026): the day-of-surgery pages of the paper data collection form v3.2 (intervention,
   intraoperative, intraoperative readings, PACU with patient satisfaction), filled in; one A4 page each when printed.
   "Save as PDF / Print" opens the browser's print screen. Spreadsheet view stays for checking readings.

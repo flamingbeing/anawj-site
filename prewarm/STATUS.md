@@ -6,8 +6,8 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 
 ## Now
 
-- **Claude Code, Prewarming Webapp** (branch `ccr-13264f37-d28edu`, no open PR): nothing half-done. Next task agreed
-  but not started: Form view filled into the real Word form (see Next, item 1).
+- **Claude Code, Prewarming Webapp** (branch `ccr-13264f37-d28edu`): app-theme restyle, one-screen main screen,
+  screen-size setting (PR open). Then the Word-form Form view (Next, item 1).
 
 ## Waiting on the owner
 
@@ -42,6 +42,8 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 
 ## Decisions
 
+- 12 Oct 2026: NUHS app theme (design system artifact, kr-app); main screen fits one phone screen; Delete moves to the
+  Spreadsheet view; Screen size setting (per phone, Normal by default).
 - 12 Oct 2026: Form view should be the Word form itself, filled in; the blank form is uploaded by an admin (private),
   outputs Word download + PDF/print.
 - 12 Oct 2026: NUHS design system look (as evals); "Form view" = paper-form layout, "Spreadsheet view" = grid.
