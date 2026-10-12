@@ -307,6 +307,8 @@ function render() {
 }
 window.addEventListener('hashchange', render);
 window.addEventListener('beforeunload', e => { if (leaveGuard?.()) e.preventDefault(); });
+// run fn now, or after the save prompt when a reading on screen has unsaved changes
+function afterAsking(fn) { const g = leaveGuard?.(); if (g) askLeave(g, () => { leaveGuard = null; fn(); }); else fn(); }
 function askLeave(g, proceed) {
   const d = document.createElement('dialog');
   d.className = 'ask';
@@ -467,6 +469,13 @@ function nextEvent(p) {
   const label = EVENTS.find(([f]) => f === id)[1].replace('\u00ad', '');
   const due = id === 'ev_wstop' && toMin(val(p, 'pw_start')) != null && WARM_MIN[val(p, 'arm')] ? toMin(val(p, 'pw_start')) + WARM_MIN[val(p, 'arm')] : null;
   return { id, label, due };
+}
+const evLabel = id => EVENTS.find(([f]) => f === id)[1].replace('\u00ad', '');
+// the key times before this one that are still empty (none for times outside the key sequence)
+function skippedBefore(p, id) {
+  const evs = ESSENTIAL.filter(x => !(noWarming(p) && (x === 'pw_start' || x === 'ev_wstop')));
+  const i = evs.indexOf(id);
+  return i < 0 ? [] : evs.slice(0, i).filter(x => !val(p, x)).map(evLabel);
 }
 // app-bar button that logs the next event as now
 const logBtnHtml = p => { const nx = nextEvent(p); return nx ? `<b>Log</b><small>${esc(nx.label)}</small>` : ''; };
@@ -696,8 +705,13 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     if (se) { satEdit = se.dataset.satedit; draw(); return; }
     const ev = t.closest('[data-ev]');
     if (ev) {
-      // tap an empty time: now; tap a set one: change it
-      if (!val(p, ev.dataset.ev)) set(p, ev.dataset.ev, nowHM()); else editing = ev.dataset.ev;
+      // tap an empty time: now; tap a set one: change it. Logging one while an earlier key time is still empty
+      // asks first: a stray tap on Surgery end would otherwise stop the intra-op readings counting as due
+      if (!val(p, ev.dataset.ev)) {
+        const skipped = skippedBefore(p, ev.dataset.ev);
+        if (skipped.length && !confirm(`${skipped.join(', ')} ${skipped.length === 1 ? 'isn’t' : 'aren’t'} logged yet.\n\nLog ${evLabel(ev.dataset.ev)} now (${nowHM()})?`)) return;
+        set(p, ev.dataset.ev, nowHM());
+      } else editing = ev.dataset.ev;
       draw(); return;
     }
     const clr = t.closest('[data-evclear]');
@@ -834,6 +848,12 @@ function gaps(p) {
   const last = evs.reduce((i, id, j) => get(id) ? j : i, -1);
   const label = id => EVENTS.find(([f]) => f === id)[1].replace('\u00ad', '');
   add('Times not logged', evs.slice(0, last).filter(id => !get(id)).map(label), '#/p/' + p.id);
+  // key times going backwards (more than a few minutes; past midnight counts forward): usually a mistyped time
+  const logged = evs.filter(id => toMin(get(id)) != null);
+  add('Times out of order', logged.slice(1).map((id, k) => [logged[k], id]).filter(([a, b]) => {
+    const d = (toMin(get(b)) - toMin(get(a)) + 1440) % 1440;
+    return d > 720;
+  }).map(([a, b]) => `${label(b)} ${get(b)} is before ${label(a)} ${get(a)}`), '#/p/' + p.id);
   // warming marked Yes on a reading, but its start time not logged
   const yes = col => SERIES.iotemp.points.some(x => String(get(`iotemp_${x.key}_${col}`)) === '1');
   add('Warming on, start time not logged', [['under', 'io_under_start'], ['gown', 'io_gown_start']].filter(([c, id]) => yes(c) && !get(id)).map(([, id]) => label(id)), '#/p/' + p.id);
@@ -1450,14 +1470,21 @@ route(/^\/export$/, () => {
 // ---------- offline shell and updates
 if ('serviceWorker' in navigator && !DEMO) {
   navigator.serviceWorker.register('sw.js').then(reg => {
-    const offer = w => { const b = $('#update'); b.hidden = false; b.onclick = () => w.postMessage('skipWaiting'); };
+    // updating reloads the app: an unsaved reading on screen is asked about first
+    const offer = w => { const b = $('#update'); b.hidden = false; b.onclick = () => afterAsking(() => w.postMessage('skipWaiting')); };
     if (reg.waiting) offer(reg.waiting);
     reg.addEventListener('updatefound', () => { const w = reg.installing; w?.addEventListener('statechange', () => { if (w.state === 'installed' && navigator.serviceWorker.controller) offer(w); }); });
   }).catch(() => {});
   // reload only when an update takes over, not when the first install claims the page (that wiped a half-filled form)
   const hadController = !!navigator.serviceWorker.controller;
   let reloaded = false;
-  navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadController && !reloaded) { reloaded = true; location.reload(); } });
+  const reload = () => { reloaded = true; location.reload(); };
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController || reloaded) return;
+    // another tab took the update while a reading is half-entered here: wait for a tap rather than lose it
+    if (leaveGuard?.()) { const b = $('#update'); b.hidden = false; b.onclick = () => afterAsking(reload); }
+    else reload();
+  });
 }
 
 render();
