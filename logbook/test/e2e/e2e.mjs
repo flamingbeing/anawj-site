@@ -307,6 +307,19 @@ async function run(label, ctxOpts) {
       return 'heading ' + id;
     });
 
+    await step('reflections list: JR count beside the heading count; word counts can be hidden', async () => {
+      const bar = p.locator('.refl-h[data-heading="bariatric"]');
+      assert(/^JR \d\/1$/.test((await bar.locator('.refl-pill.jr').innerText()).trim()), 'no JR count beside Bariatric');
+      assert(!/from JR/.test(await bar.innerText()), 'the JR rule is still in the note');
+      const wc = p.locator('.refl-wc.in-list').first();
+      if (await wc.count()) {
+        await p.evaluate(async () => { const m = await import('/logbook/js/ui-settings.js'); m.applyDisplay(m.setDisplay({ hideWords: true })); });
+        assert(!(await wc.isVisible()), 'word counts still shown');
+        await p.evaluate(async () => { const m = await import('/logbook/js/ui-settings.js'); m.applyDisplay(m.setDisplay({ hideWords: null })); });
+        assert(await wc.isVisible(), 'word counts did not come back');
+      }
+    });
+
     await step('r4: heading suggestions for LSCS case', async () => {
       await p.locator('main button[aria-label="New reflection"]').click();
       await nap(300);
