@@ -6,14 +6,15 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 
 ## Now
 
-- **Claude Code, Prewarming Webapp** (branch `ccr-13264f37-d28edu`): PR #199 (join links, hospital from code, comfort
-  on the main screen, Spreadsheet view). Next: NUHS design system restyle, then a printable Form view like the Word form.
+- **Claude Code, Prewarming Webapp** (branch `ccr-13264f37-d28edu`): NUHS restyle and printable Form view.
 
 ## Waiting on the owner
 
 - Send each hospital team its join link (admin screen → Share join link), privately; test with a second phone.
 
 ## Recently done
+
+- #199: join links and QR codes, hospital from the code, comfort on the main screen, Spreadsheet view.
 
 - #198: admin sign-in by email link (owner signed in and made the NTF code).
 

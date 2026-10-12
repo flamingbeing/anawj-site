@@ -23,6 +23,12 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
 - **Join by code:** the hospital comes from the code's prefix (NTF-…), so nobody picks a hospital to join.
 - **Service worker:** the page reloads only when an update takes over, never on the first install (a reload wiped the
   initials typed on the join screen).
+- **Look:** the NUHS design system (`design/tokens.css`, Open Sans from Google Fonts), like evals: navy bar with the
+  orange / red / navy stripe, flat white cards with 5px corners, light navy headings, cyan-underlined tabs, green Save.
+  Links are navy (link blue is under 4.5:1 on the grey page).
+- **Form view** (owner, 12 Oct 2026): the day-of-surgery pages of the paper data collection form v3.2 (intervention,
+  intraoperative, intraoperative readings, PACU with patient satisfaction), filled in; one A4 page each when printed.
+  "Save as PDF / Print" opens the browser's print screen. Spreadsheet view stays for checking readings.
 - **Defaults on tap:** an empty temperature becomes 36.5 (then + / −, or tap again to type); an empty time becomes now.
 - Gown set temp follows "Warming off" (NA for later timepoints) until someone picks a value on that screen.
 - - **Entry screen:** option B ("change what moved"): values carry over from the last saved timepoint; + / − nudges;
