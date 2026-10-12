@@ -12,8 +12,8 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 
 ## Waiting on the owner
 
-- Upload the blank paper form (.docx) on the admin screen, then check a patient's Form view on a phone (Download
-  Word file, Save as PDF / Print).
+- Blank Word form uploaded (12 Oct 2026). Still to do: check one patient's Form view on a phone (Download Word file,
+  Save as PDF / Print).
 - Open the app once as admin with signal (resends every patient so older records get the `locked` flag) and take
   "Update available" on both phones.
 
