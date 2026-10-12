@@ -101,6 +101,10 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   changed on the other phone while open here asks before writing over it (Cancel shows theirs). `push` always sends
   `auto`, so a typed BMI / TXA total / NuDESC isn't recalculated over elsewhere. A member's patient locked with
   unsent changes stays on the phone with a warning. Clearing a time asks first; an emptied time picker doesn't clear.
+  The home list flags two records with the same Subject ID (same site): readings may be split. Locking warns about
+  patients changed in the last 3 hours and not marked complete. A failed local write shows a sticky red bar
+  (`#storefull`) instead of a toast that "… saved" would replace. A team listener refused right after a wrong join code
+  rechecks membership and stops quietly (it used to overwrite "That code isn't right" with "Not allowed").
 - **Two tabs** (owner, 12 Oct 2026): a thin tab bar under the top bar on the patient screen: **Temperatures** (the
   main screen: times, pre-warming / intra-op temps, comfort, Form view / Sheet view) and **Others** (BP, HR, BIS,
   plus the Intra-op details and PACU boxes and a full-width **Perioperative data** box, formerly "Other data"). The tab you're not on warms up and pulses when its next

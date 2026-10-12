@@ -8,9 +8,8 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 
 - **Claude Code, Prewarming Webapp** (branch `ccr-13264f37-d28edu`): bug hunt from 17:53 UTC 12 Oct 2026 (owner: at
   least 2 hours, anything that makes a missed variable likelier). Merged so far #257 #259 #261 #263 #265. Still to do:
-  duplicate Subject IDs across phones (warn on the home list), storage-full warning hidden by the "saved" toast,
-  "All but latest" lock could catch a second active patient (advise the owner not to lock during the study day),
-  existing sync-test flake (wrong WH join link sometimes says "Not allowed"). Real patients start 13 Oct 2026.
+  (this PR: duplicate Subject IDs flagged, storage-full bar, lock warning, join-code flake fixed). Next: more edge
+  cases. Advise the owner not to lock patients during the study day. Real patients start 13 Oct 2026.
 
 ## Waiting on the owner
 

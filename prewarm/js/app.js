@@ -25,7 +25,14 @@ function paint(html) {
 
 // ---------- storage
 const read = (k, d) => { try { return JSON.parse(localStorage.getItem(NS + k)) ?? d; } catch { return d; } };
-const write = (k, v) => { try { localStorage.setItem(NS + k, JSON.stringify(v)); return true; } catch { toast('Not saved: this phone’s storage is full or blocked.'); return false; } };
+// a failed write stays on screen (a toast would be replaced at once by "… saved"): what's not stored here is lost on
+// reload unless it reached the team
+const write = (k, v) => {
+  try { localStorage.setItem(NS + k, JSON.stringify(v)); if (k === 'patients') document.getElementById('storefull')?.remove(); return true; } catch {
+    if (!document.getElementById('storefull')) document.body.insertAdjacentHTML('afterbegin', '<div id="storefull" class="storefull" role="alert">This phone couldn’t store the last change (storage full or blocked). Don’t close the app: export Excel from Settings, or ask the study admin.</div>');
+    return false;
+  }
+};
 let patients = read('patients', {});
 const settings = Object.assign({ me: '', site: '', hide: { skin: false, set: false, ts: false, warm: false, room: false, haemo15: false, bis: false },
   remind: { vibrate: true, beep: true, banner: true, awake: true } }, read('settings', {}));
@@ -185,7 +192,12 @@ async function watch() {
     const typing = view.contains(document.activeElement) && document.activeElement.matches('input, textarea, select');
     if (/^\/$|^\/p\/\w+$|\/sheet$/.test(h) && !typing && !leaveGuard?.()) render();
     else { shared.stale = true; const b = $('#fresh'); if (b) b.hidden = false; }
-  }, e => toast(cloud.friendly(e)));
+  }, async e => {
+    // refused right after a wrong join code (the phone's own copy of the refused join made it look like a member):
+    // check with the server; not a member means just stop listening, the join screen already said why
+    if (e?.code === 'permission-denied' && !shared.admin && !(await cloud.member())) { shared.member = null; shared.unwatch?.(); shared.unwatch = null; return; }
+    toast(cloud.friendly(e));
+  });
 }
 // Repair (12 Oct 2026): a lock, unlock or delete briefly sent an empty f, which wiped the readings on the server copy.
 // Once, after the phone has the server's latest (so nothing newer is overwritten), send every patient whole again.
@@ -390,7 +402,9 @@ function home() {
       <button class="primary" id="lock" ${selecting.size ? '' : 'disabled'}>${LOCK_ICON} Lock</button><button class="secondary" id="unlock" ${selecting.size ? '' : 'disabled'}>Unlock</button><button class="link" id="seldone">Done</button></div>` : ''}
     ${list.length ? `<ul class="list">${list.map(p => {
       const e = lastEdit(p), locked = p.lock?.on;
-      const body = `<b>${esc(sid(p))}${val(p, 'site') ? ` <small>${esc(val(p, 'site'))}</small>` : ''}</b><span${locked ? ' class="lockline"' : val(p, 'done') ? ' class="okline"' : ''}>${locked ? `${LOCK_ICON} Locked by the study admin${canLock() ? ' · read only' : ''}` : esc(status(p))}</span>
+      // the same Subject ID on two records (e.g. made on two phones without signal): readings are split between them
+      const twin = list.some(q => q !== p && String(val(q, 'enrol_id') || '').toLowerCase() === String(val(p, 'enrol_id') || '').toLowerCase() && (val(q, 'site') || '') === (val(p, 'site') || ''));
+      const body = `<b>${esc(sid(p))}${val(p, 'site') ? ` <small>${esc(val(p, 'site'))}</small>` : ''}</b>${twin ? '<span class="twinline">Same Subject ID twice: readings may be split. Fill in one and correct the other’s ID (Perioperative data), or delete it in Settings.</span>' : ''}<span${locked ? ' class="lockline"' : val(p, 'done') ? ' class="okline"' : ''}>${locked ? `${LOCK_ICON} Locked by the study admin${canLock() ? ' · read only' : ''}` : esc(status(p))}</span>
         <small>${e ? 'Last entry ' + new Date(e.t).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) + (e.by ? ' by ' + esc(e.by) : '') : 'No entries yet'}</small>`;
       if (selecting) return `<li><label class="selrow"><input type="checkbox" data-sel="${p.id}" ${selecting.has(p.id) ? 'checked' : ''}><span>${body}</span></label></li>`;
       if (locked) return `<li><a href="${canLock() ? '#/p/' + p.id : '#/'}" class="locked"${canLock() ? '' : ' data-locked="1"'}>${body}</a></li>`;
@@ -407,7 +421,9 @@ function home() {
     $('#seldone').onclick = () => { selecting = null; home(); };
     $('#lock').onclick = () => {
       const n = selecting.size;
-      if (!confirm(`Lock ${n} patient${n === 1 ? '' : 's'}?\n\nNobody can open ${n === 1 ? 'it' : 'them'} until an admin unlocks${sharing() ? ', and phones can’t change ' + (n === 1 ? 'it' : 'them') : ''}.`)) return;
+      // a patient changed in the last 3 hours and not marked complete may still be charted on a team phone
+      const busy = [...selecting].map(id => patients[id]).filter(p => p && !val(p, 'done') && Date.now() - (lastEdit(p)?.t || 0) < 3 * 3600e3).map(sid);
+      if (!confirm(`Lock ${n} patient${n === 1 ? '' : 's'}?\n\nNobody can open ${n === 1 ? 'it' : 'them'} until an admin unlocks${sharing() ? ', and phones can’t change ' + (n === 1 ? 'it' : 'them') : ''}.${busy.length ? `\n\nStill being charted? ${busy.join(', ')} changed in the last 3 hours and ${busy.length === 1 ? 'isn’t' : 'aren’t'} marked complete: a team phone's unsent readings for ${busy.length === 1 ? 'it' : 'them'} would be refused.` : ''}`)) return;
       setLock(selecting, true); toast(n + ' locked'); selecting = null; home();
     };
     $('#unlock').onclick = () => { const n = selecting.size; setLock(selecting, false); toast(n + ' unlocked'); selecting = null; home(); };
