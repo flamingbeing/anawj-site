@@ -213,6 +213,33 @@ try {
   assert.ok(asked.some(m => /changed on another phone \(BB\)/.test(m)), 'A is asked before writing over B: ' + JSON.stringify(asked));
   await a.waitForFunction(() => /BB/.test(document.querySelector('main').textContent), null, { timeout: 5000 });
 
+  // a phone reloaded while offline with an unsent change: when signal comes back, the change still reaches the server
+  for (const pg of [a]) { await pg.goto(BASE + '#/'); await pg.click('.list a'); await pg.click('#haemolink'); await pg.click('a.widebox'); await pg.waitForSelector('#f-age'); }
+  await a.context().setOffline(true);
+  await a.fill('#f-age', '55'); await a.keyboard.press('Tab'); await a.waitForTimeout(300);
+  await a.reload(); await a.waitForSelector('#f-age', { timeout: 20000 });
+  assert.equal(await a.inputValue('#f-age'), '55', 'kept on the phone across the reload');
+  await a.context().setOffline(false);
+  let landed = false;
+  for (let i = 0; i < 60 && !landed; i++) { await a.waitForTimeout(500); landed = await serverAge() === '55' && await localAge(bb) === '55'; }
+  assert.ok(landed, `offline change survives a reload: server ${await serverAge()}, B ${await localAge(bb)}`);
+
+  // both phones save the same reading without seeing each other's (A offline): all settle on the later save (B's)
+  await a.goto(`${BASE}#/p/${pid}/prewarm/20`); await a.waitForSelector('#save');
+  await bb.goto(`${BASE}#/p/${pid}/prewarm/20`); await bb.waitForSelector('#save');
+  await a.context().setOffline(true);
+  const okAll = d => d.type() === 'prompt' ? d.accept(d.defaultValue()) : d.accept();
+  a.on('dialog', okAll); bb.on('dialog', okAll);
+  await a.click('[data-step="1"][data-c="core"]'); await a.click('#save'); await a.waitForTimeout(400);
+  await bb.click('[data-step="-1"][data-c="core"]'); await bb.click('[data-step="-1"][data-c="core"]'); await bb.click('#save'); await bb.waitForTimeout(400);
+  const coreOf = async pg => pg.evaluate(() => Object.values(JSON.parse(localStorage.getItem('prewarm:patients'))).find(r => JSON.stringify(r).includes('SYNC-01'))?.f.prewarm_20_core?.v);
+  const bVal = await coreOf(bb);
+  await a.context().setOffline(false);
+  let same = false;
+  for (let i = 0; i < 60 && !same; i++) { await a.waitForTimeout(500); same = await coreOf(a) === bVal && await coreOf(bb) === bVal; }
+  a.off('dialog', okAll); bb.off('dialog', okAll);
+  assert.ok(same, `same reading saved on both: A ${await coreOf(a)}, B ${await coreOf(bb)} (expected B's ${bVal})`);
+
   // phone A logs out with a change that hasn't synced (offline): two warnings; cancelling keeps everything
   await a.goto(BASE + '#/');
   await a.click('.list a'); await a.waitForSelector('.board');
@@ -239,7 +266,7 @@ try {
   await bb.waitForSelector('#code', { timeout: 15000 });
 
   assert.deepEqual(errors, []);
-  console.log('prewarm sync: ok (two phones, join code, readings both ways, admin email-link sign-in, managing admins, codes, join link and QR, blank Word form upload and Form view, lock, offline edits heal, open reading asks, log out)');
+  console.log('prewarm sync: ok (two phones, join code, readings both ways, admin email-link sign-in, managing admins, codes, join link and QR, blank Word form upload and Form view, lock, offline edits heal, open reading asks, reload offline, same reading on both, log out)');
 } finally {
   await b.close();
 }
