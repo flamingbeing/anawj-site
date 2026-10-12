@@ -30,6 +30,10 @@ const settings = Object.assign({ me: '', site: '', hide: { skin: false, set: fal
   remind: { vibrate: true, beep: true, banner: true, awake: true } }, read('settings', {}));
 const saveAll = () => write('patients', patients);
 const saveSettings = () => write('settings', settings);
+// Interface size (this phone only): zooms the whole screen. Normal is 100%.
+const SIZES = [['0.85', 'Smaller'], ['0.92', 'Small'], ['1', 'Normal'], ['1.1', 'Large'], ['1.25', 'Larger']];
+const applySize = z => document.documentElement.style.setProperty('--ui-zoom', SIZES.some(([k]) => k === String(z)) ? String(z) : '1');
+applySize(settings.zoom);
 if (navigator.storage?.persist) navigator.storage.persist().catch(() => {});
 
 if (DEMO && !Object.keys(patients).length) {
@@ -277,19 +281,18 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
   function card(c) {
     const v = draft[c.key];
     if (c.type === 'code') {
-      return `<div class="card wide"><div class="clab">${c.label}${c.key === 'ts' ? ' <small>−3 cold … +3 hot</small>' : ''}</div>
+      return `<div class="card ${c.opts.length > 2 ? 'wide inline' : ''}" ${c.key === 'ts' ? 'title="−3 cold … +3 hot" aria-label="Thermal sensation, −3 cold to +3 hot" role="group"' : ''}><div class="clab">${c.label}</div>
         <div class="seg ${c.opts.length > 2 ? 'seven' : 'two'}">${c.opts.map(([ov, ol]) => `<button class="chip" aria-pressed="${String(v) === String(ov)}" data-c="${c.key}" data-v="${ov}">${c.key === 'ts' ? ol.split(' ')[0] : ol}</button>`).join('')}</div></div>`;
     }
     if (c.key === 'set') {
-      return `<div class="card wide"><div class="clab">Gown set temp <small>°C</small></div>
+      return `<div class="card wide inline"><div class="clab">Gown set <small>°C</small></div>
         <div class="seg seven">${['38', '39', '40', '41', '42', '43', 'NA'].map(o => `<button class="chip" aria-pressed="${String(v) === o}" data-c="set" data-v="${o}">${o}</button>`).join('')}</div></div>`;
     }
     const changed = v != null && was[c.key] != null && String(v) !== String(was[c.key]);
     let hint = changed ? 'was ' + was[c.key] : was[c.key] != null ? 'same' : '';
     if (c.key === 'map' && v == null) { const m = calc('map', k => draft[k]); if (m) hint = `<button class="link" data-map="${m}">use ${m}</button>`; }
     return `<div class="card ${changed ? 'changed' : ''}"><div class="clab">${c.label}<small>${hint}</small></div>
-      <button class="num" data-type="${c.key}">${v ?? '<span class="muted">tap</span>'}</button>
-      <div class="pm"><button class="k" data-step="-1" data-c="${c.key}" aria-label="${c.label} down">−</button><button class="k" data-step="1" data-c="${c.key}" aria-label="${c.label} up">+</button></div></div>`;
+      <div class="pm"><button class="k" data-step="-1" data-c="${c.key}" aria-label="${c.label} down">−</button><button class="num" data-type="${c.key}">${v ?? '<span class="muted">tap</span>'}</button><button class="k" data-step="1" data-c="${c.key}" aria-label="${c.label} up">+</button></div></div>`;
   }
   function timesHtml() {
     return `<div class="times">${EVENTS.filter(([, , pw]) => !(pw && noWarming(p))).map(([f, l]) => {
@@ -306,7 +309,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     if (v != null && satEdit !== id) {
       return `<div class="comfort done"><span>${label}: <b>${esc(COMFORT.find(o => String(o[0]) === String(v))?.[1] || v)}</b></span><button class="link" data-satedit="${id}">Change</button></div>`;
     }
-    return `<div class="comfort"><span class="lab">${label}</span><small class="muted">Ask the patient</small>
+    return `<div class="comfort"><span class="lab">${label}<small>ask the patient</small></span>
       <div class="seg comfort5">${COMFORT.map(([ov, ol]) => `<button class="chip" data-sat="${id}" data-v="${ov}" aria-pressed="${String(v) === String(ov)}">${ol.replace('omfortable', 'omfort&shy;able')}</button>`).join('')}</div></div>`;
   }
   function linksHtml() {
@@ -317,8 +320,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
       <a href="#/p/${id}/form/intraop">Intra-op details${done('intraop')}<small>Blood, products, tests</small></a>
       <a href="#/p/${id}/form/pacu">PACU${done('pacu')}<small>Temp, NuDESC, delay</small></a>
       </nav>
-      <p class="textlinks"><a href="#/p/${id}/form">Form view</a><a href="#/p/${id}/sheet">Spreadsheet view</a></p>
-      <button class="danger" id="del">Delete this patient</button>`;
+      <p class="textlinks"><a href="#/p/${id}/form">Form view</a><a href="#/p/${id}/sheet">Spreadsheet view</a></p>`;
   }
   function tabsHtml() {
     if (noWarming(p)) return `<h2 class="sect">Intra-op temperatures</h2>`;
@@ -329,9 +331,8 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     const due = dueOf(p, s, pt);
     const grp = s === 'prewarm' ? `<span class="badge">${GROUPS.find(g => String(g[0]) === String(val(p, 'arm')))?.[1] || 'Group not set'}</span>` : '';
     paint(`${main ? comfortHtml('sat_pre', 'Comfortable before surgery?') + timesHtml() + tabsHtml() : ''}${strip()}
-      <div class="tp"><div><b>${pt.label}</b> ${grp}</div><div class="due" id="due">${due != null ? 'due ' + fromMin(Math.round(due)) : pt.key === 'base' ? (s === 'prewarm' ? '' : 'on arrival in OT') : ''}</div></div>
-      ${due == null && pt.min != null ? `<p class="note small">Set the “${s === 'prewarm' ? 'Active warming started' : 'Induction'}” time to see when each reading is due.</p>` : ''}
-      ${isSaved ? `<p class="muted small">Saved at ${esc(savedAt(p, s, pt.key))}${p.f['at_' + s + '_' + pt.key]?.by ? ' by ' + esc(p.f['at_' + s + '_' + pt.key].by) : ''}. Changes save when you tap Save.</p>` : ''}
+      <div class="tp"><div><b>${pt.label}</b> ${grp}</div><div class="due" id="due">${due != null ? 'due ' + fromMin(Math.round(due)) : pt.key === 'base' ? (s === 'prewarm' ? '' : 'on arrival in OT') : pt.min != null ? `<span class="hint">Set “${s === 'prewarm' ? 'Warming on' : 'Induction'}” for due times</span>` : ''}</div></div>
+      ${isSaved ? `<p class="muted small tight">Saved ${esc(savedAt(p, s, pt.key))}${p.f['at_' + s + '_' + pt.key]?.by ? ' by ' + esc(p.f['at_' + s + '_' + pt.key].by) : ''}. Changes save when you tap Save.</p>` : ''}
       <div class="board">${cols.map(card).join('')}</div>
       <button class="save big" id="save">${isSaved ? 'Save changes' : `Save ${pt.label} reading`}</button>
       ${s === 'haemo' && settings.hide.haemo15 ? `<p class="muted small">Only baseline is entered here; the 15-min rows come from the monitor download. Turn them on in Settings.</p>` : ''}
@@ -379,10 +380,6 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     }
     const clr = t.closest('[data-evclear]');
     if (clr) { set(p, clr.dataset.evclear, null); editing = null; draw(); return; }
-    if (t.closest('#del')) {
-      if (!t.dataset.sure) { t.dataset.sure = 1; t.textContent = 'Tap again to delete ' + sid(p); return; }
-      p.deleted = Date.now(); saveAll(); sync(p, []); go('#/'); return;
-    }
     const n = t.closest('.num[data-type]');
     if (n) {
       const k = n.dataset.type, c = cols.find(x => x.key === k);
@@ -452,7 +449,7 @@ document.addEventListener('pointerdown', () => { try { actx ||= new AudioContext
 // ---------- section sign-off (replaces the paper form's Name / Signature / Date)
 function signoffHtml(p, pg) {
   const v = val(p, 'sign_' + pg);
-  return `<div class="sign">${v ? `Marked complete: ${esc(v)} <button class="link" data-unsign="${pg}">Undo</button>` : `<button class="secondary" data-sign="${pg}">Mark section complete</button>`}</div>`;
+  return `<div class="sign">${v ? `Marked complete: ${esc(v)} <button class="link" data-unsign="${pg}">Undo</button>` : `<button class="link" data-sign="${pg}">Mark section complete</button>`}</div>`;
 }
 function signoffClick(p, pg, t) {
   if (t.closest('[data-sign]')) {
@@ -555,7 +552,13 @@ route(/^\/p\/(\w+)\/sheet$/, id => {
       ${it.points.map(x => `<tr><th>${x.key === 'base' ? 'Baseline' : x.key === 'end' ? 'End' : x.min}</th>${it.cols.map(c => cell('iotemp', x, c)).join('')}</tr>`).join('')}</tbody></table></div>
     <h2>Haemodynamics</h2><div class="scroll" tabindex="0"><table class="grid sheet"><thead><tr><th>From induction</th>${hd.cols.map(c => `<th>${c.label}</th>`).join('')}</tr></thead><tbody>
       ${hd.points.map(x => `<tr><th>${x.key === 'base' ? 'Baseline' : x.key === 'end' ? 'End' : x.min}</th>${hd.cols.map(c => cell('haemo', x, c)).join('')}</tr>`).join('')}</tbody></table></div>
-    <p class="muted small">Tap a cell to change that reading.</p>`);
+    <p class="muted small">Tap a cell to change that reading.</p>
+    <button class="danger" id="del">Delete this patient</button>`);
+  $('#del').onclick = e => {
+    const t = e.target;
+    if (!t.dataset.sure) { t.dataset.sure = 1; t.textContent = 'Tap again to delete ' + sid(p); return; }
+    p.deleted = Date.now(); saveAll(); sync(p, []); go('#/');
+  };
 });
 
 // ---------- form view: the day-of-surgery pages of the paper data collection form (v3.2), filled in, for printing
@@ -650,6 +653,9 @@ route(/^\/settings$/, () => {
   paint(`<div class="stack">
     <label class="lab" for="me">Your initials</label><input id="me" value="${esc(settings.me)}" maxlength="6" autocapitalize="characters" autocomplete="off">
     <small class="muted">Saved with each reading as “entered by”.</small>
+    <h2>Screen size</h2>
+    <div class="seg sizes" role="group" aria-label="Screen size">${SIZES.map(([k, l]) => `<button type="button" class="chip" data-zoom="${k}" aria-pressed="${String(settings.zoom || '1') === k}">${l}</button>`).join('')}</div>
+    <small class="muted">Makes text and buttons bigger or smaller on this phone.</small>
     <h2>Hospital and sharing</h2>
     ${sharingHtml()}
     <h2>Readings to enter live</h2>
@@ -661,6 +667,10 @@ route(/^\/settings$/, () => {
     <p class="muted small">Works while the app is open on screen.</p>
     ${tog('remind', 'banner', 'Banner')}${tog('remind', 'vibrate', 'Vibrate', 'Android only')}${tog('remind', 'beep', 'Short beep')}${tog('remind', 'awake', 'Keep the screen on during readings')}
     <button class="secondary" id="test">Test the alert</button></div>`);
+  view.querySelectorAll('[data-zoom]').forEach(b => b.onclick = () => {
+    settings.zoom = b.dataset.zoom; saveSettings(); applySize(settings.zoom);
+    view.querySelectorAll('[data-zoom]').forEach(x => x.setAttribute('aria-pressed', x === b));
+  });
   view.querySelectorAll('[data-site]').forEach(b => b.onclick = () => { if (shared.member) return; settings.site = settings.site === b.dataset.site ? '' : b.dataset.site; saveSettings(); render(); });
   $('#me').onchange = e => { settings.me = e.target.value.trim().toUpperCase(); saveSettings(); if (shared.member) cloud.setInitials(settings.me).catch(() => {}); toast('Saved'); };
   $('#join')?.addEventListener('click', async e => {
@@ -701,7 +711,7 @@ route(/^\/settings$/, () => {
 });
 
 function sharingHtml() {
-  const chips = `<div class="seg">${SITES.map(x => `<button type="button" class="chip" data-site="${x}" aria-pressed="${settings.site === x}" ${shared.member ? 'disabled' : ''}>${x}</button>`).join('')}</div>`;
+  const chips = `<div class="seg sites">${SITES.map(x => `<button type="button" class="chip" data-site="${x}" aria-pressed="${settings.site === x}" ${shared.member ? 'disabled' : ''}>${x}</button>`).join('')}</div>`;
   if (!cloud.enabled) return `${chips}<small class="muted">New patients on this phone are recorded at this hospital. Sharing is off in demo mode.</small>`;
   if (shared.email && !shared.admin) return `<p class="note">${esc(shared.email)} isn’t on the study’s admin list. Ask the owner to add it.</p><button class="secondary" id="leave">Sign out</button>`;
   if (shared.admin) return `<p class="ok-box">Signed in as study admin (${esc(shared.email)}). You see every hospital’s patients.</p>

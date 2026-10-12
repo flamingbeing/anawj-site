@@ -39,6 +39,10 @@ try {
   await page.waitForSelector('.times');
   // pre-op comfort at the top, one line once answered; post-op comfort at the bottom
   assert.match(await page.textContent('.comfort'), /before surgery/);
+  if (SHOTS) await page.screenshot({ path: SHOTS + '/fit.png' });
+  // one timepoint fits a 390 x 844 phone: Save is on screen without scrolling
+  const sv = await page.locator('#save').boundingBox();
+  assert.ok(sv.y + sv.height <= 844, 'Save is below the fold: ' + (sv.y + sv.height));
   await page.click('.chip[data-sat="sat_pre"][data-v="2"]');
   assert.match(await page.textContent('.comfort.done'), /Neutral/);
   assert.ok(await page.$('.chip[data-sat="sat_post"]'), 'post-op comfort at the bottom');
@@ -106,6 +110,7 @@ try {
   await page.click('.textlinks a[href$="/sheet"]');
   await page.waitForSelector('.sheet');
   assert.match(await page.textContent('.sheet'), /36\.6/);
+  assert.ok(await page.$('#del'), 'delete is on the spreadsheet view');
   await axe('form view'); await shot('form-view');
   await page.goBack();
 
@@ -133,6 +138,13 @@ try {
   await page.click('[data-site="NUH"]');
   assert.equal(await page.getAttribute('[data-site="NUH"]', 'aria-pressed'), 'true');
   await axe('settings'); await shot('settings');
+  // screen size: zooms the whole app on this phone, and is remembered
+  await page.click('[data-zoom="1.25"]');
+  assert.equal(await page.evaluate(() => getComputedStyle(document.body).zoom), '1.25');
+  await page.reload(); await page.waitForSelector('#me');
+  assert.equal(await page.getAttribute('[data-zoom="1.25"]', 'aria-pressed'), 'true');
+  assert.equal(await page.evaluate(() => getComputedStyle(document.body).zoom), '1.25');
+  await page.click('[data-zoom="1"]');
   await page.goto(BASE + '?demo#/export');
   const [dl] = await Promise.all([page.waitForEvent('download'), page.click('#xl')]);
   const file = await dl.path();
