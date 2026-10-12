@@ -18,6 +18,11 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   compact grid (tap an empty one = now; tap a set one to change or clear it), then all temperatures with a
   Pre-warming / Intra-op switch (opens on Intra-op once the patient is in OT), then links to the other forms in the
   order they're filled in (BP/HR/BIS, intra-op details, PACU, satisfaction, form view).
+- **Patient comfort** (owner, 12 Oct 2026): pre-op question at the top of the main screen, post-op at the bottom (no
+  separate screen); one line once answered. "Spreadsheet view" (was Form view) is a text link under the other forms.
+- **Join by code:** the hospital comes from the code's prefix (NTF-…), so nobody picks a hospital to join.
+- **Service worker:** the page reloads only when an update takes over, never on the first install (a reload wiped the
+  initials typed on the join screen).
 - **Defaults on tap:** an empty temperature becomes 36.5 (then + / −, or tap again to type); an empty time becomes now.
 - Gown set temp follows "Warming off" (NA for later timepoints) until someone picks a value on that screen.
 - - **Entry screen:** option B ("change what moved"): values carry over from the last saved timepoint; + / − nudges;
@@ -31,6 +36,9 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
     Google pop-up's helper page on `prewarm-study.firebaseapp.com` ("missing initial state"), and the self-hosted
     helper at `anawj.com/__/auth` belongs to the logbook's project. `admins/{email}` (lower-case email) lists them. The first admin is added by hand in the
     Firebase console; after that admins can add others there. Admins see every hospital, make codes, remove phones.
+  - **Join links** (owner, 12 Oct 2026): the admin screen shares `anawj.com/prewarm/#/join/{site}/{code}` or shows it as
+    a QR code (vendored qrcode-generator, as in evals). The code sits after the `#`, so it never reaches a server, and
+    the app drops it from the address bar once joined. Codes stay long (8 characters); a link means nobody types them.
   - Each patient is one document; each field is merged on its own (`f.<id>: {v, t, by}`), newest edit wins when
     copies meet. localStorage stays the phone's working copy; Firestore keeps its own offline cache and sends when
     there is signal.

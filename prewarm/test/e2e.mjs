@@ -37,6 +37,12 @@ try {
   await page.click('button[type=submit]');
   // the patient opens on the main screen: times, then pre-warming temperatures
   await page.waitForSelector('.times');
+  // pre-op comfort at the top, one line once answered; post-op comfort at the bottom
+  assert.match(await page.textContent('.comfort'), /before surgery/);
+  await page.click('.chip[data-sat="sat_pre"][data-v="2"]');
+  assert.match(await page.textContent('.comfort.done'), /Neutral/);
+  assert.ok(await page.$('.chip[data-sat="sat_post"]'), 'post-op comfort at the bottom');
+  assert.equal(await page.$('.links a[href$="/form/satis"]'), null, 'no separate satisfaction screen');
   assert.match(await page.textContent('.tabs2 [aria-selected="true"]'), /Pre-warming/);
   assert.match(await page.textContent('.badge'), /10 min pre-warming/, 'group shows with the pre-warming temperatures');
   await page.click('[data-ev="pw_start"]');
@@ -87,7 +93,7 @@ try {
   await shot('intraop-temps');
 
   // form view
-  await page.click('.links a[href$="/sheet"]');
+  await page.click('.textlinks a[href$="/sheet"]');
   await page.waitForSelector('.sheet');
   assert.match(await page.textContent('.sheet'), /36\.6/);
   await axe('form view'); await shot('form-view');
