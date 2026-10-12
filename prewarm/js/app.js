@@ -318,7 +318,9 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     const changed = v != null && was[c.key] != null && String(v) !== String(was[c.key]);
     let hint = changed ? 'was ' + was[c.key] : was[c.key] != null ? 'same' : '';
     if (c.key === 'map' && v == null) { const m = calc('map', k => draft[k]); if (m) hint = `<button class="link" data-map="${m}">use ${m}</button>`; }
-    return `<div class="card ${changed ? 'changed' : ''}"><div class="clab">${c.label}<small>${hint}</small></div>
+    // an empty temperature: the whole card is one big target that puts in 36.5
+    const fill = c.temp && v == null;
+    return `<div class="card ${changed ? 'changed' : ''}${fill ? ' fill' : ''}" ${fill ? `data-fill="${c.key}"` : ''}><div class="clab">${c.label}<small>${hint}</small></div>
       <div class="pm"><button class="k" data-step="-1" data-c="${c.key}" aria-label="${c.label} down">−</button><button class="num" data-type="${c.key}">${v ?? '<span class="muted">tap</span>'}</button><button class="k" data-step="1" data-c="${c.key}" aria-label="${c.label} up">+</button></div></div>`;
   }
   function timesHtml() {
@@ -394,6 +396,8 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     if (st && e.detail === 0) { bump(st.dataset.c, +st.dataset.step); draw(); return; } // keyboard
     const chip = t.closest('.chip[data-c]');
     if (chip) { if (chip.dataset.c === 'set') setTouched = true; draft[chip.dataset.c] = draft[chip.dataset.c] === chip.dataset.v ? null : chip.dataset.v; draw(); return; }
+    const fl = t.closest('.card[data-fill]');
+    if (fl && !t.closest('[data-step]')) { draft[fl.dataset.fill] = '36.5'; draw(); return; }
     const m = t.closest('[data-map]');
     if (m) { draft.map = m.dataset.map; draw(); return; }
     const sat = t.closest('[data-sat]');

@@ -109,6 +109,7 @@ a { color: var(--navy); }
 .board { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
 .card { min-width: 0; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-card); padding: 3px 5px 5px; display: grid; gap: 1px; }
 .card.changed { border-color: var(--navy); box-shadow: inset 0 0 0 1px var(--navy); }
+.card.fill { cursor: pointer; }
 .card.wide { grid-column: 1 / -1; }
 /* a row of chips with its label on the left */
 .card.inline { grid-template-columns: 74px minmax(0, 1fr); align-items: center; gap: 4px; }
