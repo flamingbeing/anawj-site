@@ -1,5 +1,5 @@
 // Sharing through Firestore (Firebase project prewarm-study). Phones join with their hospital's code (anonymous
-// sign-in); admins sign in with Google. Access is decided by firestore.rules. Demo mode (?demo) never connects.
+// sign-in); admins sign in with an emailed link. Access is decided by firestore.rules. Demo mode (?demo) never connects.
 //
 //   members/{uid}  { site, initials, code, joinedAt }       codes/{site}  { code, setAt, setBy }   (admins only)
 //   admins/{email} {}                                       patients/{id} { site, created, deleted?, f: { id: {v,t,by} } }
@@ -12,9 +12,10 @@ const params = new URLSearchParams(location.search);
 const EMU = params.has('emulator') && ['localhost', '127.0.0.1'].includes(location.hostname);
 export const enabled = !!FIREBASE_CONFIG?.apiKey && !params.has('demo');
 
-let fb = null;
-async function sdk() {
-  if (fb) return fb;
+let fb = null, starting = null;
+// one start even when several calls arrive together (a second initializeApp would throw)
+function sdk() { return fb ? Promise.resolve(fb) : (starting ||= start()); }
+async function start() {
   const [app, auth, fs] = await Promise.all([import(SDK + 'firebase-app.js'), import(SDK + 'firebase-auth.js'), import(SDK + 'firebase-firestore.js')]);
   const a = app.initializeApp(EMU ? { ...FIREBASE_CONFIG, projectId: 'demo-prewarm' } : FIREBASE_CONFIG);
   let db;
@@ -31,7 +32,9 @@ const plain = o => JSON.parse(JSON.stringify(o));
 const friendly = e => {
   if (e?.code === 'permission-denied') return 'Not allowed. Check the hospital and code.';
   if (e?.code === 'unavailable') return 'No connection. Try again with signal.';
-  if (e?.code === 'auth/popup-closed-by-user' || e?.code === 'auth/cancelled-popup-request') return 'Sign-in was cancelled.';
+  if (e?.code === 'auth/invalid-action-code' || e?.code === 'auth/expired-action-code') return 'That sign-in link has expired or was used already. Send a new one.';
+  if (e?.code === 'auth/invalid-email') return 'Check the email address.';
+  if (e?.code === 'auth/operation-not-allowed') return 'Email-link sign-in isn’t switched on in Firebase yet.';
   return 'Something went wrong: ' + (e?.message || e);
 };
 export { friendly };
@@ -78,11 +81,24 @@ export async function leave() {
   await A.signOut(auth);
 }
 
-export async function adminSignIn() {
+// Admins sign in with an emailed link (no Google pop-up: phone browsers block the pop-up's helper page on
+// prewarm-study.firebaseapp.com from passing the result back to anawj.com). The link opens the app again.
+const EMAIL_KEY = 'prewarm:adminEmail';
+export async function sendAdminLink(email) {
   const { auth, A } = await sdk();
-  const p = new A.GoogleAuthProvider();
-  p.setCustomParameters({ prompt: 'select_account' });
-  await A.signInWithPopup(auth, p);
+  const url = location.origin + location.pathname + (EMU ? '?emulator&adminlink' : '?adminlink');
+  await A.sendSignInLinkToEmail(auth, email, { url, handleCodeInApp: true });
+  try { localStorage.setItem(EMAIL_KEY, email); } catch { /* asked again when the link opens */ }
+}
+export function isAdminLink() { return /[?&]oobCode=/.test(location.href) && /[?&]mode=signIn/.test(location.href); }
+export function savedAdminEmail() { try { return localStorage.getItem(EMAIL_KEY) || ''; } catch { return ''; } }
+export async function finishAdminLink(email) {
+  const { auth, A } = await sdk();
+  if (auth.currentUser?.isAnonymous) { try { await leave(); } catch { /* signed out anyway */ } }
+  await A.signInWithEmailLink(auth, email, location.href);
+  try { localStorage.removeItem(EMAIL_KEY); } catch { /* fine */ }
+  // drop the one-time code from the address
+  history.replaceState(null, '', location.pathname + (EMU ? '?emulator' : '') + '#/admin');
 }
 
 // Patients of one hospital (or all, for an admin); cb gets the changed records

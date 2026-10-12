@@ -5,7 +5,7 @@ rules_version = '2';
 //
 // Who:
 //   members/{uid}   a phone that joined with its hospital's code (anonymous sign-in): { site, initials, code, joinedAt }
-//   admins/{email}  owner and investigators, signed in with Google (the owner adds the first one in the console)
+//   admins/{email}  owner and investigators, signed in by email link (the owner adds the first one in the console)
 //   codes/{site}    each hospital's join code: { code, setAt, setBy }; only admins read or change it
 // Data:
 //   patients/{id}   { site, created, deleted?, f: { fieldId: { v, t, by, auto? } } }
@@ -25,7 +25,7 @@ service cloud.firestore {
     function canUse(site) { return admin() || (member() && memberSite() == site); }
 
     match /admins/{adminEmail} {
-      // a Google user may check whether they are an admin; admins manage the list
+      // a signed-in user may check whether their email is an admin; admins manage the list
       allow get: if signedIn() && request.auth.token.get('email', '') != '' && adminEmail == email();
       allow read, write: if admin();
     }

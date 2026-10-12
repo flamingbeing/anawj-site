@@ -104,6 +104,17 @@ function uploadLocal() {
   }
   saveAll(); write(key, true);
 }
+// opened from an admin's emailed sign-in link
+async function finishAdmin(email) {
+  if (!email) return toast('Enter the email the link was sent to.');
+  try { await cloud.finishAdminLink(email); toast('Signed in'); }
+  catch (err) { toast(cloud.friendly(err)); go('#/settings'); }
+}
+if (cloud.enabled && cloud.isAdminLink()) {
+  const email = cloud.savedAdminEmail();
+  if (email) finishAdmin(email);
+  else location.hash = '#/confirm';
+}
 if (cloud.enabled) cloud.onUser(async u => {
   const before = !!(shared.member || shared.admin);
   shared.member = u ? await cloud.member() : null;
@@ -566,10 +577,15 @@ route(/^\/settings$/, () => {
     try { await cloud.leave(); } catch { /* signed out anyway */ }
     render();
   });
-  $('#adminin')?.addEventListener('click', async () => {
-    try { await cloud.adminSignIn(); shared.admin = await cloud.isAdmin(); if (!shared.admin) { toast('This Google account isn’t a study admin.'); await cloud.leave(); } else { await watch(); go('#/admin'); } }
-    catch (err) { toast(cloud.friendly(err)); }
+  $('#adminin')?.addEventListener('click', () => { $('#adminbox').hidden = false; $('#adminemail').focus(); });
+  $('#adminsend')?.addEventListener('click', async e => {
+    const email = $('#adminemail').value.trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return toast('Enter your email address.');
+    e.target.disabled = true;
+    try { await cloud.sendAdminLink(email); $('#adminbox').innerHTML = `<p class="ok-box">Sign-in link sent to ${esc(email)}. Open it on this phone, in this browser.</p>`; }
+    catch (err) { e.target.disabled = false; toast(cloud.friendly(err)); }
   });
+
   view.onchange = e => {
     const i = e.target; if (!i.dataset.g) return;
     if (i.dataset.g === 'hide') settings.hide[i.dataset.k] = !i.checked; else settings.remind[i.dataset.k] = i.checked;
@@ -586,14 +602,28 @@ route(/^\/settings$/, () => {
 function sharingHtml() {
   const chips = `<div class="seg">${SITES.map(x => `<button type="button" class="chip" data-site="${x}" aria-pressed="${settings.site === x}" ${shared.member ? 'disabled' : ''}>${x}</button>`).join('')}</div>`;
   if (!cloud.enabled) return `${chips}<small class="muted">New patients on this phone are recorded at this hospital. Sharing is off in demo mode.</small>`;
+  if (shared.email && !shared.admin) return `<p class="note">${esc(shared.email)} isn’t on the study’s admin list. Ask the owner to add it.</p><button class="secondary" id="leave">Sign out</button>`;
   if (shared.admin) return `<p class="ok-box">Signed in as study admin (${esc(shared.email)}). You see every hospital’s patients.</p>
     <a class="secondary" href="#/admin">Join codes and members</a><button class="secondary" id="leave">Sign out</button>`;
   if (shared.member) return `${chips}<p class="ok-box">Sharing with the ${esc(shared.member.site)} team. Readings sync when there is signal.</p><button class="secondary" id="leave">Stop sharing on this phone</button>`;
   return `${chips}<label class="lab" for="code">Join code for your hospital</label><input id="code" autocomplete="off" autocapitalize="characters">
     <small class="muted">From a study admin. Joining shares this phone’s patients with your hospital’s team.</small>
     <button class="primary" id="join">Join</button>
-    <button class="link" id="adminin">Study admin? Sign in with Google</button>`;
+    <button class="link" id="adminin">Study admin? Sign in by email</button>
+    <div id="adminbox" class="stack" hidden><label class="lab" for="adminemail">Your admin email</label>
+      <input id="adminemail" type="email" autocomplete="email" inputmode="email">
+      <button class="secondary" id="adminsend">Email me a sign-in link</button></div>`;
 }
+
+// an admin's sign-in link opened in another browser: ask for the email again
+route(/^\/confirm$/, () => {
+  header('Finish signing in', '#/');
+  if (!cloud.isAdminLink()) return go('#/settings');
+  paint(`<div class="stack"><p>This sign-in link was opened in a different browser from the one that asked for it. Type the email it was sent to.</p>
+    <label class="lab" for="adminconfirm">Email</label><input id="adminconfirm" type="email" autocomplete="email">
+    <button class="primary" id="adminfinish">Sign in</button></div>`);
+  $('#adminfinish').onclick = () => finishAdmin($('#adminconfirm').value.trim().toLowerCase());
+});
 
 // ---------- admin: join codes and members
 route(/^\/admin$/, async () => {
