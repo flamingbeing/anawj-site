@@ -98,7 +98,7 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   outside usual ranges (`SANE`) Save asks first. Leaving an unsaved reading: each history entry carries `state.i`;
   back / a link is stepped back while the prompt is up and redone after, so the phone's back button never leaves the
   app past an unsaved reading. The automatic set-temp NA (after Log Prewarm off) doesn't count as a change.
-- **Top bar** (owner, 12 Oct 2026): on the right the time now ("Now 16:08", above the time boxes); to its left the next
+- **Top bar** (owner, 12 Oct 2026): on the right the time now ("Time now 16:08", above the time boxes); to its left the next
   thing to log and a countdown: the reading due most recently on this screen (Temp or BP, until the next is due) or the
   next one, or warming off, whichever is first ("Temp 20 min · in 1:42" / "now" / "late 5:29"), coloured and pulsing
   like the due time, centred between the title and the time; before anything is due (no Prewarm on / Induction yet)

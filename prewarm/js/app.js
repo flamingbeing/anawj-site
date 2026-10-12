@@ -445,7 +445,7 @@ function clockHtml(p, s) {
     const left = n.left, st = left > 2 ? 'later' : left > 0 ? 'soon' : left > -5 ? 'now' : 'late';
     next = `<div class="next" data-state="${st}"><small>${esc(n.label)}</small><b>${left > 0 ? 'in ' + mmss(left) : left > -5 ? 'now' : 'late ' + mmss(-left)}</b></div>`;
   }
-  return `${next}<div class="now"><small>Now</small><b>${fromMin(Math.floor(nowMin()))}</b></div>`;
+  return `${next}<div class="now"><small>Time now</small><b>${fromMin(Math.floor(nowMin()))}</b></div>`;
 }
 function nextDue(p, s) {
   const now = nowFor(p, s), all = [];

@@ -6,9 +6,9 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 
 ## Now
 
-- **Claude Code, Prewarming Webapp** (branch `ccr-13264f37-d28edu`): nothing half-done. Last change (this PR): Other
-  data pages, Sheet view rename, vital-signs tick, BP / HR / BIS box warms up. The owner and their MO start using the
-  app on real patients on 13 Oct 2026.
+- **Claude Code, Prewarming Webapp** (branch `ccr-13264f37-d28edu`): from about 18:00 UTC 12 Oct 2026, a 2–3 hour
+  bug hunt (owner's ask): anything that makes it likelier a variable isn't logged. Test every edge case, fix and
+  merge PR by PR, save state regularly. The owner and their MO start using the app on real patients on 13 Oct 2026.
 
 ## Waiting on the owner
 
@@ -24,31 +24,20 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 
 ## Recently done
 
-- This PR: BP, HR, BIS tick above Intra-op details; swipe to change tab; pull-to-refresh off.
+- This PR: top-bar clock labelled "Time now".
+- #255: time stays on the right when nothing is due.
+- #252: BP, HR, BIS tick above Intra-op details; swipe to change tab; pull-to-refresh off.
 - #251: tab "Others"; "Perioperative data" full width; Still to fill back to amber.
 - #249: warming time boxes lavender (not beige) and Still to fill navy, so amber / orange / red only mean a timing alarm.
 - #248: two tabs (Temperatures / BP, HR, BIS; other forms on the BP tab); sign-offs named by section with a tick box.
 - #246: "Still to fill" checklist; Baseline / End readings due at In OT / Surgery end; Mark complete asks first.
 - #244: "Study admins" card: admins add / remove admins by email (rules: create only, lower-case email id, no removing yourself).
 - #241: stress-test fixes: past midnight, readings after surgery end, BP number checks, back button with an unsaved reading; `edge.e2e.mjs`.
-- #239–#240: top bar shows the time now, with a countdown to the next thing to log beside it.
-- #238: BP, HR, BIS typed boxes (no − / +; keyboard stays up from box to box).
-- #237: ask to save before leaving a reading with unsaved changes (Save / Don't save / Stay here).
-- #235: Other data on one page (headers open by default), keyboard entry (Enter / arrows); box caption removed.
-- #231–#233: "Other data" box (pre-op, meds, bloods, day 1 and 2 chart review and analgesia, discharge: every remaining
-  template field as a form); Spreadsheet view renamed Sheet view; Word form's "Vital Signs Data Collected" ticks
-  itself once any BP / HR / BIS value is in; the BP, HR, BIS box warms up and pulses like the due time.
-- #229: due time warms up (soon / now / late) and pulses. #228: warming boxes plain until set; room temp 20.
-- #227: time boxes numbered 1–11. #223–#226: warming labels (Prewarm on / off, Underbody warm, Gown warm), beige.
-- #222: locked patients hidden from team phones (rules + query, `locked` flag). #221: read only for admins, lock icon.
-- #220: fix: lock / unlock / delete wiped readings on the server copy (empty `f` merge); one-off resend repairs.
-- #219: admins lock patients. #218: last synced line. #216: Log out (deletes the phone's patients, warns if unsynced).
-- #211–#215: Word form filled in (admin uploads the blank), delete participants page, complete marker, warnings.
-- #205–#209: NUHS app theme, one-screen main screen, timer and Log next event, ‹ › timepoints, screen size.
 
 ## Decisions
 
 - 12 Oct 2026: amber, orange and red are kept for timing alarms (warming boxes lavender); Still to fill stays amber (owner).
+- 12 Oct 2026: top-bar clock reads "Time now".
 - 12 Oct 2026: second tab renamed Others; Other data renamed Perioperative data, a full-width box.
 - 12 Oct 2026: thermal sensation keeps carrying over like the rest (owner: no need to change).
 
