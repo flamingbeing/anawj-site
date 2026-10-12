@@ -532,9 +532,9 @@ async function run(label, ctxOpts) {
     await shot('log-suggest');
     const n0 = await nCases();
     await p.locator('button', { hasText: 'Save, keep date' }).click();
-    await nap(300);
-    assert(await nCases() === n0 + 1, 'count did not go up');
-    assert((await ta.inputValue()) === '', 'textarea not cleared');
+    // The live count can update before the durable queue finishes and clears the
+    // editor. Poll both completion conditions rather than assuming a 160ms save.
+    await until(async () => await nCases() === n0 + 1 && (await ta.inputValue()) === '', 'save did not finish: count / editor');
     return `sugg=${sugg.join(',')}`;
   });
 
