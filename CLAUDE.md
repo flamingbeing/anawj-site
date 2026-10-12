@@ -30,6 +30,13 @@ for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mj
 
 For evals UI changes, also run the e2e test (see `evals/README.md`).
 
+## Codex plugin in Claude Code sessions
+
+Cloud sessions install the OpenAI Codex plugin and CLI (`.claude/hooks/session-start.sh`). **Never run Codex
+without the owner's approval in that session**: no `/codex:*` command, `codex-rescue` agent, `codex` CLI call or
+`codex-companion.mjs` run until the owner says yes to that use, and keep the stop-time review gate off. Say what
+you would ask Codex and why, then wait. (`.claude/settings.json` also makes these calls ask first.)
+
 ## Claude Code–Codex handovers
 
 Both assistants run in separate cloud environments. Use
