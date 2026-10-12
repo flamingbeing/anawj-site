@@ -1,0 +1,8 @@
+# Files the Cloudflare preview Worker doesn't serve (see PREVIEWS.md); GitHub Pages ignores this file.
+.git
+.github
+.claude
+.agents
+wrangler.jsonc
+node_modules
+.wrangler

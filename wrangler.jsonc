@@ -1,0 +1,9 @@
+// Cloudflare Workers config for the PR previews only (see PREVIEWS.md). anawj.com itself is GitHub Pages and
+// ignores this file. A static-assets-only Worker: no server code, the repo root served as it is.
+{
+  "name": "anawj-preview",
+  "compatibility_date": "2026-10-01",
+  "assets": { "directory": "." },
+  // a preview link per branch and per build, posted on the PR by Workers Builds
+  "preview_urls": true
+}

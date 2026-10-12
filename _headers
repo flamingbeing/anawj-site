@@ -1,4 +1,4 @@
-# Read only by Cloudflare Pages (the PR previews, see PREVIEWS.md); GitHub Pages, which serves anawj.com,
+# Read only by Cloudflare (the PR previews, see PREVIEWS.md); GitHub Pages, which serves anawj.com,
 # ignores this file. Keeps every preview out of search engines.
 /*
   X-Robots-Tag: noindex, nofollow
