@@ -162,11 +162,14 @@ function buildSettingsIndex() {
   for (const id of SEARCH_PAGES) {
     const t = TABS.find(x => x.id === id);
     let el; try { el = t.render(); } catch { continue; }
-    for (const n of el.querySelectorAll('h2, h3, label.field, label.check, summary, .more-list b')) {
+    for (const n of el.querySelectorAll('h2, h3, label.field, label.check, legend, summary, .more-list b')) {
       const text = optionText(n).replace(/\s+/g, ' ').slice(0, 90);
       if (!text || text.length < 3 || seen.has(id + text)) continue;
       seen.add(id + text);
-      out.push({ id, page: t.label, text, hint: (n => (n && n.matches('p.hint') ? n.textContent : ''))(n.closest('label') && n.closest('label').nextElementSibling).slice(0, 160) });
+      // the help line under it; a ✓ list (legend) also finds its choices
+      const hint = n.matches('legend') ? [...n.parentElement.querySelectorAll(':scope > p.hint, .pick-l')].map(x => x.textContent).join(' · ')
+        : (x => (x && x.matches('p.hint') ? x.textContent : ''))(n.closest('label') && n.closest('label').nextElementSibling);
+      out.push({ id, page: t.label, text, hint: hint.replace(/ⓘ/g, '').trim().slice(0, 160) });
     }
   }
   return out;
@@ -179,9 +182,9 @@ const searchSettings = (index, q) => {
 function showFound() {
   const want = findAfterRender; findAfterRender = '';
   requestAnimationFrame(() => {
-    const n = [...app.querySelectorAll('h2, h3, label.field, label.check, summary')].find(x => optionText(x).replace(/\s+/g, ' ').startsWith(want.slice(0, 60)));
+    const n = [...app.querySelectorAll('h2, h3, label.field, label.check, legend, summary')].find(x => optionText(x).replace(/\s+/g, ' ').startsWith(want.slice(0, 60)));
     if (!n) return;
-    const target = n.closest('label, details, section') || n;
+    const target = n.closest('fieldset, label, details, section') || n;
     if (target.matches('details')) target.open = true;
     target.scrollIntoView({ block: 'center' });
     target.classList.remove('flash'); void target.offsetWidth; target.classList.add('flash');

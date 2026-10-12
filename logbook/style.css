@@ -1386,3 +1386,38 @@ ul.cases .c-tags { -webkit-mask-image: linear-gradient(to right, #000 calc(100% 
 .note-meta .note-case { color: var(--ink); }
 .note-editor .note-back { display: inline-flex; align-items: center; gap: 2px; min-height: 40px; padding-right: 8px; color: var(--accent); font-weight: 600; text-decoration: none; }
 .note-editor .note-back .back-chev { font-size: 1.7em; line-height: 1; margin: -4px 2px 0 -2px; font-weight: 400; }
+
+/* Settings rows (owner, 13 Oct 2026; .set-page in ui-settings.js): on or off is a switch at the row's end, two to
+   five choices a list with a ✓, help one grey line (ⓘ for the rest) */
+.set-page label.check { justify-content: space-between; gap: 12px; padding: 4px 0; }
+.set-page label.check > input[type=checkbox] {
+  appearance: none; -webkit-appearance: none; order: 2; margin: 0 0 0 auto; flex: none; position: relative; cursor: pointer;
+  width: 46px; height: 28px; min-height: 0; padding: 0; border: 0; border-radius: 14px;
+  background: color-mix(in srgb, var(--muted) 45%, var(--panel)); transition: background var(--dur, 220ms) var(--ease, ease);
+}
+.set-page label.check > input[type=checkbox]::before {
+  content: ''; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .3); transition: transform var(--dur, 220ms) var(--ease, ease);
+}
+.set-page label.check > input[type=checkbox]:checked { background: var(--accent); }
+.set-page label.check > input[type=checkbox]:checked::before { transform: translateX(18px); }
+.set-page label.check > input[type=checkbox]:disabled { opacity: .45; cursor: default; }
+.set-page label.check > input[type=checkbox]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.set-page h3 { margin: 18px 0 4px; }
+.set-page h2 + h3 { margin-top: 4px; }
+.set-page p.hint.help { margin: 0 0 8px; }
+.set-page label.check + p.hint.help { margin-top: -4px; }
+.set-page .info-text { margin: -2px 0 10px; }
+.set-page .info-text .ops-list { margin: 4px 0; }
+.set-page fieldset.pick { border: 0; padding: 0; margin: 10px 0 8px; min-width: 0; }
+.set-page fieldset.pick > legend { padding: 0; margin-bottom: 4px; font-size: calc(13px * var(--fs, 1)); font-weight: 600; }
+.pick-list { border: 1px solid var(--edge, var(--line)); border-radius: calc(10px * var(--round, 1)); background: var(--panel); overflow: hidden; }
+.pick-opt { position: relative; display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 6px 12px; cursor: pointer; font-size: calc(15px * var(--fs, 1)); }
+.pick-opt + .pick-opt { border-top: 1px solid var(--line); }
+.pick-opt input { position: absolute; left: 12px; opacity: 0; width: 1px; height: 1px; margin: 0; }
+.pick-opt .pick-l { flex: 1; min-width: 0; }
+.pick-opt .tick { color: var(--accent); font-weight: 700; visibility: hidden; }
+.pick-opt:has(input:checked) .tick { visibility: visible; }
+.pick-opt:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }
+.pick-opt:active { background: color-mix(in srgb, var(--ink) 6%, transparent); }
+body.compact .pick-opt { min-height: 40px; padding: 4px 10px; }

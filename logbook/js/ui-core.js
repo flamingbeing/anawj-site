@@ -265,7 +265,7 @@ export function modal(title, body, { onclose, sticky, cls = '' } = {}) {
 
 // A small ⓘ button that shows or hides a longer explanation: [button, paragraph].
 export function info(...text) {
-  const p = h('p', { class: 'hint info-text', hidden: true }, ...text);
+  const p = h('div', { class: 'hint info-text', hidden: true }, ...text);
   const b = h('button', { type: 'button', class: 'info-btn', 'aria-label': 'More about this', 'aria-expanded': 'false', onclick: () => { p.hidden = !p.hidden; b.setAttribute('aria-expanded', String(!p.hidden)); } }, 'ⓘ');
   return [b, p];
 }

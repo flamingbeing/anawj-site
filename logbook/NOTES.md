@@ -148,6 +148,12 @@ portfolio content.
 - **Note editor** (polish 5): a page, not a form. Top bar: ‹ Notes, Saved / Not saved yet, a ⋯ menu (Preview or
   Edit, Delete) and Done. The title is a borderless heading, the body plain text; one grey line under the title holds
   the date (tap to change), No date, and the linked case or Link to a case….
+- **Settings pages** (polish 6a): every settings page (class `set-page`) uses the helpers at the top of the Display
+  code in ui-settings.js: `toggle()` (a switch at the row's end; one help line, ⓘ for the rest), `pick()` (two to
+  five choices as a list with a ✓; real radio buttons, so the keyboard and screen readers work) and `help()`. Keep
+  help to one short line; longer text goes behind ⓘ. Bigger choices (zoom, box height, fonts) stay dropdowns.
+  Advanced display and Advanced logging are grouped under headings. Settings search also reads the ✓ lists (their
+  name and choices, so "oled" finds Light or dark).
 - **Reflections list JR count** (owner, 13 Oct 2026): a heading's JR rule ("One / Two from JR") shows as a small
   "JR 0/1" pill beside its count, green when met, and leaves the note under the heading (`listNote`; a qualifier stays:
   "JR: with neuromonitoring"). The editor still shows the full note. Word counts on the list can be hidden
@@ -211,14 +217,15 @@ portfolio content.
   title and counts (`--refl-hide`, `pinHead` in ui-reflect.js) so only the search row stays, and an open topic's name
   sticks under it (`--refl-top-h`) while its reflections scroll; not in edit mode). All in the settings file.
 - **Settings pages: everyday first, Advanced below** (owner, Oct 2026). Display (`#display`): light/dark, colour,
-  Colourful, zoom, text size, compact, Borders, the start tab; then a link row to **Advanced display** (`#displayadv`,
-  `renderDisplayAdvanced`: name in the header, fonts, line spacing/width, contrast, motion, tab bar, icons only, hide
-  header, upside down, pins, custom CSS — never applied on either Display page). Logging (`#logging`): suggestions,
-  age/gender detection, first field, Enter key, date for a new case, After Save; then **Advanced logging**
-  (`#loggingadv`, `renderLoggingAdvanced`: keyboard on opening, case box height, undo window, week start, weekly
-  summary, tips, advanced search, the Case tab card). Sub-pages are TABS entries `under` their page (Back trail and
-  the bar's tab follow); `advancedLink` in ui-settings.js draws the row. New options go on the Advanced page unless most
-  people would change them. e2e: `tab('displayadv')` / `tab('loggingadv')`.
+  Colourful, compact, Borders, Corners, shadows, the start tab; then a link row to **Advanced display**
+  (`#displayadv`, `renderDisplayAdvanced`, under headings: Header and tab bar · Logbook rows · Text · Case tab layout;
+  custom CSS last, never applied on either Display page). Accessibility (`#access`): zoom, text size, bigger taps,
+  contrast, motion, gestures. Logging (`#logging`): suggestions, age/gender detection, common tags first, Enter key,
+  date for a new case, After Save; then **Advanced logging** (`#loggingadv`, `renderLoggingAdvanced`, under headings:
+  Case tab · Keyboard in the case box · Search · Dates and Undo · Help). Sub-pages are TABS entries `under` their page
+  (Back trail and the bar's tab follow); `advancedLink` in ui-settings.js draws the row. New options go on the
+  Advanced page unless most people would change them. e2e: `tab('displayadv')` / `tab('loggingadv')`, and
+  `choose(legend, value)` for a ✓ list.
 - **Borders** (Display, per device `borders`: 0 Borderless, 1 Faint, 2 Light, 3 Soft, null = Normal; a range input):
   every border in style.css (and the reflection editor's inline ones) uses `var(--edge, var(--line))`; `html.edges`
   sets `--edge` on every element to `--line` mixed with transparent at `--edge-mix` (0/25/50/75%), so it follows the
