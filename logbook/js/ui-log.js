@@ -534,7 +534,7 @@ function renderOne(card) {
   requestAnimationFrame(() => alignPlaceholder(textarea));
   // autofocus attribute is ignored on re-render; focus after insertion (not on phones' first paint
   // when that would pop the keyboard over a fresh landing — it's what the user came to do, so do it)
-  requestAnimationFrame(() => { if (!document.documentElement.classList.contains('no-autofocus') && (document.activeElement === document.body || !document.activeElement)) focusLog(); });
+  requestAnimationFrame(() => { if (!document.documentElement.classList.contains('no-autofocus') && (document.activeElement === document.body || !document.activeElement || document.activeElement.closest('#tabs'))) focusLog(); });   // the tapped tab button keeps focus now the bar isn't rebuilt
 }
 
 const suggestSoon = debounce(() => paintSuggest(), 120);

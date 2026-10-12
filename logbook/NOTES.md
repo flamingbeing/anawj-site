@@ -216,11 +216,18 @@ portfolio content.
   them; a hidden start tab gives way to the first one on the bar. All set at first paint where it matters.
 - **Optional interaction** (Advanced display, device): **Swipe left or right to change tab** (`swipeTabs`, html
   `swipe-tabs`; app.js touch handlers on main). **On by default** (owner, Oct 2026: `swipeTabs: false` = off, the
-  switch is also in Show or hide → Header and tabs). The page follows the finger (`slide`, transform on main;
-  `html.swiping` clips sideways overflow); letting go after a quick swipe (≥ 70 px, mostly horizontal, < 0.7 s) or
-  past a third of the screen goes to the next/previous tab on the bar (order and hidden tabs honoured; `barTabOf`: a
-  sub-page counts as the bar tab it sits under, an off-bar tab as More) and the new page slides in; otherwise it springs
-  back. Never from fields, dialogs, drag handles, tag-editor pills, anything that scrolls sideways, or within 20 px of
+  switch is also in Show or hide → Header and tabs). Touch handlers on the document, so the empty background under
+  a short page swipes too (owner); never from the tab bar or a banner. Like a deck of cards (owner, Oct 2026: no popping in, no bar
+  moving): the page follows the finger and the next tab's page comes in beside it while dragging, as a still copy of
+  that page from when it was last left (`snaps`, taken in `changeScreen`; inert, no ids) or a loading card for a tab
+  not opened yet (`makePeek`, fixed at the page's unscrolled top). Letting go after a quick swipe (≥ 70 px, mostly
+  horizontal, < 0.7 s) or past a third of the screen finishes the slide (both on one Web Animations clock), then the
+  real page is drawn underneath at the copy's height on screen and the copy goes; otherwise both spring back. The next
+  tab is the next/previous on the bar (order and hidden tabs honoured; `barTabOf`: a sub-page counts as the bar tab
+  it sits under, an off-bar tab as More). While swiping the page is pinned (`pin`: position fixed over a spacer of
+  its height): a page in the flow sliding off the right edge widened the phone's layout viewport, so the fixed tab bar
+  dropped and slid back. Don't clip overflow on html/body for this: on Chrome for Android that stopped the page
+  scrolling to the very bottom (the last card, e.g. Advanced display settings, hid behind the tab bar). `paintTabs` only moves the selection when the bar's tabs are unchanged (no rebuild, no flash). Never from fields, dialogs, drag handles, tag-editor pills, anything that scrolls sideways, or within 20 px of
   the screen's edges (the phone's Back gesture). Reduce motion: switches without sliding.
   **Fewer buttons on Logbook rows** (`rowMenu`, html `row-menu`): one ⋯ opens Copy / Write or Open the reflection /
   Edit the case; a ✓ still marks cases with a reflection.
@@ -292,7 +299,8 @@ portfolio content.
   (`MAX_NOTES`, the app enforces it: the rules can't count). A new note takes today's date (or the filtered day /
   linked case's day); "No date" makes it undated. Order: undated first (latest change first), then newest day first,
   then as written. Search over title and body. Optional `caseId` ("Link to a case…"). Body is Markdown text, shown
-  through `parseNote` → elements (never innerHTML): # headings, **bold**, - / 1. lists, - [ ] to-dos that tick in
+  through `parseNote` → elements (never innerHTML; the list page keeps the syntax in a small "Formatting" fold;
+  Enter in the title moves to the note text): # headings, **bold**, - / 1. lists, - [ ] to-dos that tick in
   Preview, http(s)/mailto links only. No images. Delete → recycle bin (kind `note`, 30 days; restore refuses past 100).
   Firebase cost: notes are not read at sign-in; `ensureNotes()` starts the listener on first need (the page, a day
   with notes in the Logbook, the Markdown export, a backup) and keeps it for the visit. Typing saves after 3 s of

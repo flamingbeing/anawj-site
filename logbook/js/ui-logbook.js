@@ -220,7 +220,7 @@ export function renderLogbook() {
     filterBtn.textContent = n ? `Filter (${n})` : 'Filter'; filterBtn.classList.toggle('primary', !!n);
   };
   // the search box, with its own × that empties just the box (filters stay)
-  const searchBox = h('input', { type: 'search', placeholder: 'Search cases, or “last Tuesday”', value: view.q, 'aria-label': 'Search cases',
+  const searchBox = h('input', { type: 'search', placeholder: 'Search, or “last Tuesday”', value: view.q, 'aria-label': 'Search cases',
     oninput: e => { view.q = e.target.value; searchWrap.classList.toggle('has-text', !!view.q); paintOpsNote(); paintSoon(); } });
   const searchWrap = h('div', { class: 'search-wrap grow' + (view.q ? ' has-text' : '') }, searchBox,
     h('button', { type: 'button', class: 'search-x', title: 'Clear the search', 'aria-label': 'Clear the search', onclick: () => { view.q = ''; setBox(''); searchBox.focus(); refresh(); } }, '×'));

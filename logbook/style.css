@@ -680,7 +680,7 @@ table.totals td.due .gap { color: var(--warn); }
 .ready-list li:first-child { border-top: 0; }
 .ready-list .rt { min-width: 0; font-size: calc(14px * var(--fs, 1)); }
 .ready-list .rt small { color: var(--muted); }
-label.check.reflect-tag { min-height: 0; margin: 0; padding: 4px 0; gap: 6px; font-size: calc(14px * var(--fs, 1)); width: fit-content; }
+label.check.reflect-tag { white-space: nowrap; flex-shrink: 0; min-height: 0; margin: 0; padding: 4px 0; gap: 6px; font-size: calc(14px * var(--fs, 1)); width: fit-content; }
 label.check.reflect-tag input { width: 18px; height: 18px; margin: 0; }
 
 /* Planned cases (Log screen) */
@@ -1052,7 +1052,7 @@ html.lw-narrow main:not(:has(.log-card.panes)) { max-width: 760px; }
 html.lw-wide main:not(:has(.log-card.panes)) { max-width: 1400px; }
 html.lw-full main:not(:has(.log-card.panes)) { max-width: none; }
 /* while a swipe pushes the page sideways (app.js), it never makes the window scroll sideways */
-html.swiping { overflow-x: clip; }
+.swipe-peek { position: fixed; z-index: 5; margin: 0; pointer-events: none; will-change: transform; }
 /* higher contrast: darker text and stronger lines; "auto" follows the device's Increase contrast */
 html.hc:root:root:root { --ink: #000; --muted: #2e3338; --line: #737a82; --row-alt: #eef0f2; }
 html.hc:root:root:root[data-theme="dark"] { --ink: #fff; --muted: #e8e8e8; --line: #a0a6ad; }
@@ -1074,7 +1074,7 @@ html.tab-icons .tabs .ico { display: block; width: 24px; height: 24px; fill: non
 /* tab bar position (Settings → Display): auto = bottom on phones, top on bigger screens */
 @media (max-width: 600px) {
   html.tabs-top { --tabbar-h: 0px; }
-  html.tabs-top .tabs { position: sticky; top: 0; bottom: auto; padding: 0; border-top: 0; border-bottom: 1px solid var(--edge, var(--line)); }
+  html.tabs-top .tabs { position: sticky; top: 0; z-index: 20; bottom: auto; padding: 0; border-top: 0; border-bottom: 1px solid var(--edge, var(--line)); }
   html.tabs-top body.typing .tabs { transform: none; }
   html.tabs-top .tabs button { height: 54px; border-top: 0; border-bottom: 2px solid transparent; }
   html.tabs-top .tabs button[aria-selected="true"] { border-top: 0; border-bottom-color: var(--accent); }
@@ -1219,6 +1219,8 @@ ul.notes-rows .d { color: var(--muted); font-size: calc(13px * var(--fs, 1)); }
 .note-case, .note-flag { align-self: flex-start; }
 button.note-flag { cursor: pointer; font: inherit; border: 1px solid var(--edge, var(--line)); background: transparent; color: inherit; min-height: 0; }
 .note-editor .note-title { width: 100%; font-weight: 600; font-size: calc(17px * var(--fs, 1)); margin: 8px 0; }
+details.note-format { margin: 2px 0 8px; } details.note-format > summary { cursor: pointer; color: var(--muted); font-size: calc(14px * var(--fs, 1)); min-height: 32px; line-height: 32px; width: fit-content; }
+details.note-format ul { margin: 0 0 4px; padding-left: 18px; } details.note-format code { font-size: .92em; background: var(--soft, rgba(0,0,0,.05)); padding: 0 4px; border-radius: 4px; }
 .note-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
 .note-meta .note-date { display: flex; align-items: center; gap: 6px; }
 .note-link { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }

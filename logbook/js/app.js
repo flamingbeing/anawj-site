@@ -314,6 +314,14 @@ function paintTabs() {
   // Advanced display → the tab bar's order and hidden tabs (this device)
   const bar = visibleTabs().filter(t => !t.hidden), { shown } = arrangeTabs(bar.map(t => t.id), display());
   if (!shown.includes(sel)) sel = 'more';   // a tab hidden from the bar (Notes) is reached through More
+  // same tabs as before: only move the selection, so the bar never blinks while changing tab (swipe included)
+  const key = shown.map(id => id + ':' + bar.find(t => t.id === id).label).join('|');
+  if (tabsEl.dataset.key === key && tabsEl.children.length) {
+    for (const b of tabsEl.children) b.setAttribute('aria-selected', String(b.dataset.tab === sel));
+    tabsEl.hidden = false;
+    return;
+  }
+  tabsEl.dataset.key = key;
   fill(tabsEl, ...shown.map(id => bar.find(t => t.id === id)).map(t => h('button', {
     role: 'tab', 'aria-selected': String(sel === t.id), 'data-tab': t.id, 'aria-label': t.label, title: t.label,   // named even with icons only
     onclick: () => go(t.id),
@@ -322,6 +330,7 @@ function paintTabs() {
 }
 
 function changeScreen(id, scroll = 0) {
+  snapPage();   // for swiping back to it (a still copy)
   if (S.tab === 'account') flushProfile();
   if (S.tab === 'notes' && id !== 'notes') leaveNotes();
   if (/^admin/.test(S.tab || '') && !/^admin/.test(id)) leaveAdmin();
@@ -396,12 +405,16 @@ hooks.render = render;
 hooks.paintTabs = () => paintTabs();
 
 // Swipe left or right to change tab (Advanced display, and Show or hide → Header and tabs; on unless switched off on
-// this device: html.swipe-tabs). The page follows the finger; letting go after a quick swipe (≥ 70 px, mostly
-// sideways, < 0.7 s) or past a third of the screen moves to the next or previous tab on the bar, and the new page
-// slides in. A sub-page counts as the bar tab it sits under. Never from fields, dialogs, drag handles, the tag pills
-// being dragged, anything that scrolls sideways (tables, the date chips) or the screen's edges (the phone's own Back
-// gesture). Reduce motion: no sliding, it just switches.
+// this device: html.swipe-tabs). Like a deck of cards: the page follows the finger and the next tab's page comes in
+// beside it as you drag (a still copy of that page from when it was last left, `snaps`; a plain loading card for a
+// tab not opened yet). Letting go after a quick swipe (≥ 70 px, mostly sideways, < 0.7 s) or past a third of the
+// screen finishes the slide, then the real page takes the copy's place underneath (same spot, same scroll), so
+// nothing pops. Otherwise both spring back. A sub-page counts as the bar tab it sits under. Never from fields,
+// dialogs, drag handles, the tag pills being dragged, anything that scrolls sideways (tables, the date chips) or the
+// screen's edges (the phone's own Back gesture). Works anywhere on the screen, including the empty background under a
+// short page (owner). Reduce motion: no sliding, it just switches.
 let swipe = null;
+const snaps = new Map();   // bar tab → still copy of its page (inert, no ids), taken when leaving it
 const scrollsSideways = el => { for (let n = el; n && n !== document.body; n = n.parentElement) if (n.scrollWidth > n.clientWidth + 2 && /auto|scroll/.test(getComputedStyle(n).overflowX)) return true; return false; };
 const reduceMotion = () => { const c = document.documentElement.classList; return c.contains('rm') || (c.contains('rm-auto') && matchMedia('(prefers-reduced-motion: reduce)').matches); };
 // the bar tab a page sits under, however deep; a tab kept off the bar (Notes) counts as More
@@ -413,44 +426,108 @@ function barTabOf(id) {
   return { shown, sel: shown.includes(sel) ? sel : 'more' };
 }
 const swipeTarget = dx => { const { shown, sel } = barTabOf(S.tab), i = shown.indexOf(sel); return i < 0 ? null : shown[i + (dx < 0 ? 1 : -1)] || null; };
-const slide = (x, ms) => { document.documentElement.classList.toggle('swiping', !!x); app.style.transition = ms ? `transform ${ms}ms ease-out, opacity ${ms}ms ease-out` : 'none'; app.style.transform = x ? `translateX(${x}px)` : ''; app.style.opacity = x ? String(Math.max(.4, 1 - Math.abs(x) / innerWidth)) : ''; };
-const settle = () => { document.documentElement.classList.remove('swiping'); app.style.transition = ''; app.style.transform = ''; app.style.opacity = ''; };
-app.addEventListener('touchstart', e => {
+function snapPage() {
+  if (!document.documentElement.classList.contains('swipe-tabs') || !matchMedia('(pointer: coarse)').matches || !S.tab || !barTabOf(S.tab).shown.includes(S.tab)) return;   // touch screens only
+  const c = app.cloneNode(true);
+  c.removeAttribute('id'); c.removeAttribute('style');
+  c.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
+  snaps.set(S.tab, c);
+}
+// the incoming page: its copy, or a loading card, fixed where the page's top sits when scrolled to the top
+function makePeek(id, top) {
+  const c = (snaps.get(id) || h('main', {}, h('section', { class: 'card skeleton' }, h('div', { class: 'sk-row' }, h('i'), h('i'), h('i')), h('div', { class: 'sk-box' }), h('div', { class: 'sk-line' })))).cloneNode(true);
+  c.className = 'swipe-peek'; c.inert = true; c.setAttribute('aria-hidden', 'true');
+  const r = app.getBoundingClientRect();
+  Object.assign(c.style, { top: top + 'px', left: (r.left - (parseFloat(app.style.transform.slice(11)) || 0)) + 'px', width: r.width + 'px' });
+  document.body.append(c);
+  return c;
+}
+const move = (el, x) => { el.style.transform = x ? `translateX(${x}px)` : ''; };
+// While swiping, the page is pinned where it is (position: fixed over a spacer of its height, so the scroll stays):
+// a fixed page sliding past the screen's edge doesn't widen the phone's layout viewport, which moved the tab bar.
+// (Clipping overflow on html/body instead stopped Chrome on Android scrolling to the very bottom.)
+let spacer = null;
+function pin() {
+  const r = app.getBoundingClientRect();
+  spacer = h('div', { 'aria-hidden': 'true', style: `height:${app.offsetHeight}px` });
+  app.before(spacer);
+  Object.assign(app.style, { position: 'fixed', top: r.top + 'px', left: r.left + 'px', width: r.width + 'px', margin: '0', zIndex: '4' });
+}
+function unpin() {
+  if (spacer) { spacer.remove(); spacer = null; }
+  Object.assign(app.style, { position: '', top: '', left: '', width: '', margin: '', zIndex: '' });
+}
+function endSwipe(s) {
+  if (s.peek) s.peek.remove();
+  document.documentElement.classList.remove('swiping');
+  move(app, 0); unpin();
+}
+document.addEventListener('touchstart', e => {
   swipe = null;
-  if (!document.documentElement.classList.contains('swipe-tabs') || e.touches.length !== 1) return;
+  if (!S.user || !document.documentElement.classList.contains('swipe-tabs') || e.touches.length !== 1) return;
   const t = e.target, x = e.touches[0].clientX;
   if (x < 20 || x > innerWidth - 20) return;
-  if (t.closest('input, textarea, select, dialog, [contenteditable], .dragging, .te-pillitem, .te-handle, .refl-handle, li.refl-row.edit') || scrollsSideways(t)) return;
-  swipe = { x, y: e.touches[0].clientY, at: Date.now(), lock: '' };
+  // anywhere on the screen, the background under a short page included; not on the tab bar or a banner
+  if (t.closest('#tabs, .banner, input, textarea, select, dialog, [contenteditable], .dragging, .te-pillitem, .te-handle, .refl-handle, li.refl-row.edit') || scrollsSideways(t)) return;
+  swipe = { x, y: e.touches[0].clientY, at: Date.now(), lock: '', dx: 0, target: null, peek: null };
 }, { passive: true });
-app.addEventListener('touchmove', e => {
+document.addEventListener('touchmove', e => {
   const s = swipe;
   if (!s || e.touches.length !== 1) return;
   const dx = e.touches[0].clientX - s.x, dy = e.touches[0].clientY - s.y;
   if (!s.lock) {
     if (Math.abs(dy) > 10 && Math.abs(dy) * 2 > Math.abs(dx)) { swipe = null; return; }   // scrolling: leave it alone
-    if (Math.abs(dx) > 10 && Math.abs(dx) > 2 * Math.abs(dy)) s.lock = 'x'; else return;
+    if (Math.abs(dx) > 10 && Math.abs(dx) > 2 * Math.abs(dy)) {
+      s.lock = 'x';
+      s.top = app.getBoundingClientRect().top + window.scrollY;   // the page's top when scrolled to the top
+      s.peekTop = Math.max(0, s.top - window.scrollY);   // where the new page will sit: no higher than the screen's top
+      document.documentElement.classList.add('swiping');
+      if (!reduceMotion()) pin();
+    } else return;
   }
   e.preventDefault();   // sideways now: the page follows the finger (held back where there's no tab to go to)
-  if (!reduceMotion()) slide(swipeTarget(dx) ? dx : dx / 4, 0);
+  s.dx = dx;
+  if (reduceMotion()) return;
+  const target = swipeTarget(dx);
+  if (target !== s.target) { if (s.peek) s.peek.remove(); s.target = target; s.peek = target ? makePeek(target, s.peekTop) : null; }
+  move(app, target ? dx : dx / 4);
+  if (s.peek) move(s.peek, dx - (dx < 0 ? -innerWidth : innerWidth));
 }, { passive: false });
-app.addEventListener('touchcancel', () => { if (swipe && swipe.lock) slide(0, 150); swipe = null; }, { passive: true });
-app.addEventListener('touchend', e => {
+const springBack = s => {
+  const opts = { duration: 160, easing: 'ease-out' }, from = parseFloat(app.style.transform.slice(11)) || 0;
+  const anims = [app.animate([{ transform: `translateX(${from}px)` }, { transform: 'translateX(0)' }], opts)];
+  if (s.peek) anims.push(s.peek.animate([{ transform: s.peek.style.transform }, { transform: `translateX(${from < 0 ? innerWidth : -innerWidth}px)` }], opts));
+  move(app, 0); if (s.peek) move(s.peek, from < 0 ? innerWidth : -innerWidth);
+  anims[0].finished.catch(() => {}).then(() => endSwipe(s));
+};
+document.addEventListener('touchcancel', () => { const s = swipe; swipe = null; if (s && s.lock) springBack(s); }, { passive: true });
+document.addEventListener('touchend', async e => {
   const s = swipe; swipe = null;
   if (!s || !e.changedTouches.length) return;
   const dx = e.changedTouches[0].clientX - s.x, dy = e.changedTouches[0].clientY - s.y;
   const quick = Date.now() - s.at <= 700 && Math.abs(dx) >= 70 && Math.abs(dx) >= 2 * Math.abs(dy);
   const far = s.lock === 'x' && Math.abs(dx) > innerWidth / 3;
   const next = (quick || far) && swipeTarget(dx);
-  if (!next) { if (s.lock) slide(0, 150); return; }
-  if (reduceMotion()) { settle(); go(next); return; }
-  const w = dx < 0 ? -innerWidth : innerWidth;
-  slide(w, 140);
-  setTimeout(async () => {
-    await go(next);
-    slide(-w / 3, 0);   // the new page comes in from the other side
-    requestAnimationFrame(() => requestAnimationFrame(() => { slide(0, 160); setTimeout(settle, 180); }));
-  }, 140);
+  if (!next) { if (s.lock) springBack(s); return; }
+  if (reduceMotion() || !s.peek || s.target !== next) { endSwipe(s); go(next); return; }
+  // finish the slide: both cards on one clock, so they stay joined
+  const w = dx < 0 ? -innerWidth : innerWidth, ms = Math.max(120, Math.min(240, 240 * (1 - Math.abs(dx) / innerWidth)));
+  const opts = { duration: ms, easing: 'ease-out', fill: 'forwards' };
+  const anims = [app.animate([{ transform: `translateX(${dx}px)` }, { transform: `translateX(${w}px)` }], opts),
+    s.peek.animate([{ transform: `translateX(${dx - w}px)` }, { transform: 'translateX(0)' }], opts)];
+  const t0 = document.timeline.currentTime;
+  anims.forEach(an => { an.startTime = t0; });
+  await anims[1].finished.catch(() => {});
+  // the real page goes in underneath the copy, at the copy's height on the screen, then the copy goes
+  const peek = s.peek, y = s.top - s.peekTop;
+  move(app, w); anims[0].cancel();
+  await go(next);
+  requestAnimationFrame(() => {
+    unpin(); move(app, 0);
+    window.scrollTo(0, y);   // after the screen change's own scroll
+    peek.remove(); anims[1].cancel();
+    document.documentElement.classList.remove('swiping');
+  });
 }, { passive: true });
 
 // A live case update shouldn't yank the screen from under someone typing: the Log screen refreshes
