@@ -174,7 +174,12 @@ input:focus { border-color: var(--navy); }
 .ixrow .link { grid-column: 1 / -1; justify-self: end; }
 /* last on the screen, apart from Save, so it isn't tapped by accident */
 .okline { color: var(--ok); }
-.lockline { color: var(--muted); font-weight: 600; }
+.lockline { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-weight: 600; }
+.ico { width: 1.1em; height: 1.1em; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.15em; }
+/* a locked patient opened by an admin: read only */
+body.ro main::before { content: "Locked: read only. Unlock it on the home page to change it."; display: block; padding: 8px 12px; border-radius: var(--r); background: var(--warn-soft); color: var(--warn); font-weight: 600; }
+body.ro #save, body.ro .logbtn, body.ro [data-done], body.ro [data-undone], body.ro [data-sign], body.ro [data-unsign], body.ro #addix, body.ro [data-rmix] { display: none !important; }
+body.ro main .k, body.ro main .num, body.ro main .chip, body.ro main .tchip, body.ro main input, body.ro main select, body.ro main textarea, body.ro main [data-use], body.ro main [data-map] { pointer-events: none; opacity: .65; }
 .list a.locked { background: var(--bg); border-style: dashed; color: var(--muted); }
 .listhead { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 .listhead .link { font-size: 14px; }

@@ -79,6 +79,7 @@ await t('member cannot write a locked patient', assertFails(setDoc(doc(a, 'patie
 await t('member cannot unlock', assertFails(setDoc(doc(a, 'patients', 'p4'), L(false, 12), { merge: true })));
 await t('member still reads a locked patient', assertSucceeds(getDoc(doc(a, 'patients', 'p4'))));
 await t('lock must be { on, t, by }', assertFails(setDoc(doc(adm, 'patients', 'p4'), { lock: { on: 'yes', t: 1, by: ADMIN } }, { merge: true })));
+await t('admin cannot change a locked patient either', assertFails(setDoc(doc(adm, 'patients', 'p4'), { f: { x: { v: 9, t: 12, by: 'L' } } }, { merge: true })));
 await t('admin unlocks', assertSucceeds(setDoc(doc(adm, 'patients', 'p4'), L(false, 13), { merge: true })));
 await t('member writes again once unlocked', assertSucceeds(setDoc(doc(a, 'patients', 'p4'), { f: { x: { v: 2, t: 14, by: 'AB' } } }, { merge: true })));
 await t('admin writes any hospital', assertSucceeds(setDoc(doc(adm, 'patients', 'sgh1'), { f: { x: { v: 1, t: 1, by: 'L' } } }, { merge: true })));

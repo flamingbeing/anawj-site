@@ -69,7 +69,10 @@ const toMin = hm => { const m = /^(\d{1,2}):(\d{2})$/.exec(hm || ''); return m ?
 const fromMin = m => `${String(Math.floor(((m % 1440) + 1440) % 1440 / 60)).padStart(2, '0')}:${String(((m % 60) + 60) % 60).padStart(2, '0')}`;
 const nowMin = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes() + d.getSeconds() / 60; };
 const sid = p => val(p, 'enrol_id') || 'New patient';
-function set(p, id, v) { if (setVal(p, id, v, settings.me)) { saveAll(); sync(p, [id]); } }
+function set(p, id, v) {
+  if (p.lock?.on) return toast('Locked: read only. Unlock it on the home page to change it.');
+  if (setVal(p, id, v, settings.me)) { saveAll(); sync(p, [id]); }
+}
 
 // ---------- sharing
 const shared = { member: null, admin: false, email: '', unwatch: null, stale: false };
@@ -248,7 +251,10 @@ function render() {
   const h = location.hash.slice(1) || '/';
   // a locked patient can't be opened (by anyone) until a study admin unlocks it
   const pm = /^\/p\/(\w+)/.exec(h);
-  if (pm && patients[pm[1]]?.lock?.on) { toast('Locked by the study admin'); location.replace('#/'); return; }
+  // a locked patient can't be opened from a team phone; an admin opens it read only
+  const lockedHere = !!(pm && patients[pm[1]]?.lock?.on);
+  if (lockedHere && !canLock()) { toast('Locked by the study admin'); location.replace('#/'); return; }
+  document.body.classList.toggle('ro', lockedHere);
   for (const [re, fn] of routes) { const m = re.exec(h); if (m) { fn(...m.slice(1)); window.scrollTo(0, 0); return; } }
   home();
 }
@@ -266,13 +272,15 @@ route(/^\/$/, home);
 // Locking (owner, 12 Oct 2026): a study admin (or anyone, in demo mode) picks patients on the home page and locks
 // them; nobody can open a locked patient, and the rules stop members changing it, until an admin unlocks it.
 const canLock = () => shared.admin || DEMO;
+const LOCK_ICON = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
 let selecting = null; // Set of patient ids while choosing which to lock / unlock
 function setLock(ids, on) {
   const by = shared.email || settings.me || 'admin';
   for (const id of ids) {
     const p = patients[id]; if (!p) continue;
     p.lock = { on, t: Date.now(), by };
-    sync(p, Object.keys(p.f), true);
+    // locking sends the whole record (repairs a server copy); unlocking only the lock (all a locked patient allows)
+    sync(p, on ? Object.keys(p.f) : [], true);
   }
   saveAll();
 }
@@ -287,13 +295,13 @@ function home() {
     <div class="listhead"><h2>Patients on this phone</h2>${canLock() && list.length && !selecting ? '<button class="link" id="select">Select to lock</button>' : ''}</div>
     ${selecting ? `<div class="seltools"><span>${selecting.size} selected</span>
       ${latest && list.length > 1 ? `<button class="secondary" id="selall">All but ${esc(sid(latest))} (latest)</button>` : ''}<button class="secondary" id="selnone">None</button>
-      <button class="primary" id="lock" ${selecting.size ? '' : 'disabled'}>Lock</button><button class="secondary" id="unlock" ${selecting.size ? '' : 'disabled'}>Unlock</button><button class="link" id="seldone">Done</button></div>` : ''}
+      <button class="primary" id="lock" ${selecting.size ? '' : 'disabled'}>${LOCK_ICON} Lock</button><button class="secondary" id="unlock" ${selecting.size ? '' : 'disabled'}>Unlock</button><button class="link" id="seldone">Done</button></div>` : ''}
     ${list.length ? `<ul class="list">${list.map(p => {
       const e = lastEdit(p), locked = p.lock?.on;
-      const body = `<b>${esc(sid(p))}${val(p, 'site') ? ` <small>${esc(val(p, 'site'))}</small>` : ''}</b><span${locked ? ' class="lockline"' : val(p, 'done') ? ' class="okline"' : ''}>${locked ? '🔒 Locked by the study admin' : esc(status(p))}</span>
+      const body = `<b>${esc(sid(p))}${val(p, 'site') ? ` <small>${esc(val(p, 'site'))}</small>` : ''}</b><span${locked ? ' class="lockline"' : val(p, 'done') ? ' class="okline"' : ''}>${locked ? `${LOCK_ICON} Locked by the study admin${canLock() ? ' · read only' : ''}` : esc(status(p))}</span>
         <small>${e ? 'Last entry ' + new Date(e.t).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) + (e.by ? ' by ' + esc(e.by) : '') : 'No entries yet'}</small>`;
       if (selecting) return `<li><label class="selrow"><input type="checkbox" data-sel="${p.id}" ${selecting.has(p.id) ? 'checked' : ''}><span>${body}</span></label></li>`;
-      if (locked) return `<li><a href="#/" class="locked" data-locked="1">${body}</a></li>`;
+      if (locked) return `<li><a href="${canLock() ? '#/p/' + p.id : '#/'}" class="locked"${canLock() ? '' : ' data-locked="1"'}>${body}</a></li>`;
       return `<li><a href="#/p/${p.id}"${val(p, 'done') ? ` data-done="${esc(val(p, 'done'))}"` : ''}>${body}</a></li>`;
     }).join('')}</ul>` : `<p class="muted">No patients yet. Tap <b>New patient</b> on the morning of surgery.</p>`}
     <p class="muted small">${sharing() ? `Shared with the ${esc(shared.admin ? 'whole study (admin)' : shared.member.site + ' team')}. Readings sync when there is signal. <b class="syncline">${esc(syncText())}</b>` : `Data stays on this phone. <a href="#/settings">Join your hospital’s team</a> to share patients.`} Study IDs only: no names or hospital numbers.</p>`);
@@ -566,6 +574,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
       return;
     }
     if (t.closest('#save')) {
+      if (p.lock?.on) return toast('Locked: read only. Unlock it on the home page to change it.');
       const bad = cols.filter(c => c.temp && draft[c.key] != null && (+draft[c.key] < 25 || +draft[c.key] > 45 || Number.isNaN(+draft[c.key])));
       if (bad.length) return toast('Check ' + bad.map(c => c.label).join(', ') + ': temperatures should be 25–45 °C.');
       for (const c of cols) setVal(p, `${s}_${pt.key}_${c.key}`, draft[c.key] == null ? null : (c.type === 'code' ? +draft[c.key] : String(draft[c.key])), settings.me);
@@ -693,7 +702,7 @@ const REDRAW = new Set(['io_txa_bolus', 'io_txa_inf', ...Object.values(BY_ID).fi
 function recalc(p) {
   for (const [id, kind] of [['io_txa_total', 'txa'], ['pacu_nudesc', 'nudesc']]) {
     const c = calc(kind, k => val(p, k));
-    if (c != null && (val(p, id) == null || p.f[id]?.auto)) { setVal(p, id, String(c), settings.me); p.f[id].auto = true; saveAll(); sync(p, [id]); }
+    if (c != null && !p.lock?.on && (val(p, id) == null || p.f[id]?.auto)) { setVal(p, id, String(c), settings.me); p.f[id].auto = true; saveAll(); sync(p, [id]); }
   }
 }
 function fieldHtml(f, get) {
@@ -749,7 +758,7 @@ route(/^\/delete$/, () => {
     ${list.length ? `<ul class="list dellist">${list.map(p => {
       const e = lastEdit(p);
       return `<li><div><b>${esc(sid(p))}${val(p, 'site') ? ` <small>${esc(val(p, 'site'))}</small>` : ''}</b><small>${esc(status(p))} · ${e ? 'last entry ' + new Date(e.t).toLocaleDateString([], { day: 'numeric', month: 'short' }) : 'no entries'}</small></div>
-        ${p.lock?.on ? '<span class="muted small">🔒 Locked</span>' : `<button class="danger" data-del="${p.id}" aria-label="Delete ${esc(sid(p))}">Delete</button>`}</li>`;
+        ${p.lock?.on ? `<span class="muted small">${LOCK_ICON} Locked</span>` : `<button class="danger" data-del="${p.id}" aria-label="Delete ${esc(sid(p))}">Delete</button>`}</li>`;
     }).join('')}</ul>` : `<p class="muted">No participants on this phone.</p>`}`);
   view.onclick = e => {
     const b = e.target.closest('[data-del]'); if (!b) return;
@@ -1044,9 +1053,7 @@ route(/^\/admin$/, async () => {
   let codes = {}, people = [], bf = null;
   try { [codes, people, bf] = await Promise.all([cloud.codes(), cloud.members(), cloud.blankForm()]); } catch (e) { paint(`<p class="note">${esc(cloud.friendly(e))}</p>`); return; }
   paint(`<div class="stack">
-    <div class="fld"><b>Blank data collection form</b>
-      <small class="muted">${bf ? `${esc(bf.name)}, uploaded ${new Date(bf.setAt).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' })} by ${esc(bf.setBy)}.` : 'Not uploaded yet.'} The Form view fills this Word file in for each patient; teams can download it or save it as a PDF. Its file details (author, editor, company) are removed on upload.</small>
-      <label class="secondary filebtn">${bf ? 'Replace' : 'Upload'} the blank form (.docx)<input type="file" id="blankup" accept=".docx" hidden></label></div>
+
     <p class="muted small">Send each hospital’s team its join link (or show the QR code): it opens the app ready to join, no typing. Share it only with that team. A new code makes old links stop working for new phones; phones already in stay in.</p>
     ${SITES.map(x => {
       const who = people.filter(m => m.site === x);
@@ -1054,7 +1061,10 @@ route(/^\/admin$/, async () => {
         <div class="coderow">${codes[x] ? `<button class="codebig" data-copy="${esc(codes[x].code)}" aria-label="Copy the ${x} join code">${esc(codes[x].code)}<small>tap to copy</small></button>` : '<span class="muted">no code yet</span>'}<button class="${codes[x] ? 'link' : 'secondary'}" data-newcode="${x}">${codes[x] ? 'New code' : 'Make code'}</button></div>
         ${codes[x] ? `<div class="sharerow"><button class="primary" data-share="${x}">Share join link</button><button class="secondary" data-qr="${x}">QR code</button></div><div class="qr" id="qr-${x}" hidden></div>` : ''}
         ${who.length ? `<ul class="plain">${who.map(m => `<li>${esc(m.initials || '—')} <small class="muted">joined ${new Date(m.joinedAt).toLocaleDateString()}</small> <button class="link" data-rm="${m.uid}">Remove</button></li>`).join('')}</ul>` : '<small class="muted">No phones yet</small>'}</div>`;
-    }).join('')}</div>`);
+    }).join('')}
+    <div class="fld"><b>Blank data collection form</b>
+      <small class="muted">${bf ? `${esc(bf.name)}, uploaded ${new Date(bf.setAt).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' })} by ${esc(bf.setBy)}.` : 'Not uploaded yet.'} The Form view fills this Word file in for each patient; teams can download it or save it as a PDF. Its file details (author, editor, company) are removed on upload.</small>
+      <label class="secondary filebtn">${bf ? 'Replace' : 'Upload'} the blank form (.docx)<input type="file" id="blankup" accept=".docx" hidden></label></div></div>`);
   $('#blankup').onchange = async e => {
     const f = e.target.files[0]; if (!f) return;
     let r;
