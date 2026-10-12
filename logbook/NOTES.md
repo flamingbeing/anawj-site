@@ -217,7 +217,8 @@ portfolio content.
   the bar) can go on the bar, off by default like Notes; its own pages select it (Display → Settings). An eighth asks
   which tab it replaces and takes that tab's place (`setTabOnBar`; also the Notes page's "Add Notes to the tab bar").
   Hidden main tabs are listed first on More ("Hidden from the tab bar"; the More pages stay in their own list) and
-  links still open them; a hidden start tab gives way to the first one on the bar. All set at first paint where it matters.
+  links still open them; a hidden start tab gives way to the first one on the bar. A tab missing from the saved
+  order goes just before More, so More stays last. All set at first paint where it matters.
 - **Optional interaction** (Advanced display, device): **Swipe left or right to change tab** (`swipeTabs`, html
   `swipe-tabs`; app.js touch handlers on main). **On by default** (owner, Oct 2026: `swipeTabs: false` = off, the
   switch is also in Show or hide → Header and tabs). Touch handlers on the document, so the empty background under
@@ -303,7 +304,8 @@ portfolio content.
     Generic profile): tab bar **Case logs** (`#caselogs`, `ui-caselogs.js`: residents by year with total cases, tags
     behind / due, reflections; tap → `#caselog`, that resident's counts per tag against the targets (`totalsTable`
     with one column), reflection headings met, Excel download), then **Analytics** as programme analytics
-    (`renderProgramme`: who's behind, the tags most residents are behind on, then Programme totals), then More (their own
+    (`renderProgramme`: who's behind, the tags most residents are behind on, then Programme totals), then the Admin
+    portal for admins (left of More; owner), then More (their own
     Case, Logbook, Reflections first). All from the counts summaries, never case details. The rules let active
     faculty read `summaries/` (counts are no secret, owner); they still can't read the residents list, cases,
     reflections or notes. Case logs is listed in More for them in other profiles.
