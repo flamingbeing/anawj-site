@@ -28,6 +28,7 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 
 ## Recently done
 
+- Unsaved readings come back after the phone closes the app; toasts no longer block taps on Log / tabs.
 - Two patients at once: home list shows each patient's due reading; alerts cover every patient being charted.
 - Top bar: a reading due now on the other tab shows too (a temperature due now on the Others tab, BP on Temperatures).
 - Batch B: reading opens on the latest due unsaved timepoint; early saves ask; numbers shrink to fit; other windows' saves merge; arm 3 pre-warming hidden in exports; text cells cut to 32000.
