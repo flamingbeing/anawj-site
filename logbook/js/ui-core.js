@@ -22,6 +22,7 @@ export const S = {
   cases: [],           // newest first
   reflections: [],     // logbooks/{email}/reflections (ui-reflect.js keeps it live)
   notes: null,         // logbooks/{email}/notes once something needs them (ui-notepad.js); null = not loaded
+  noteIndex: null,     // logbooks/{email}/meta/noteIndex: which days and cases have notes (ui-notepad.js)
   counts: {},
   casesLoaded: false,
   casesSynced: false,  // a snapshot has come from the server (not only the offline cache)

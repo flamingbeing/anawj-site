@@ -289,9 +289,12 @@ portfolio content.
   Firebase cost: notes are not read at sign-in; `ensureNotes()` starts the listener on first need (the page, a day
   with notes in the Logbook, the Markdown export, a backup) and keeps it for the visit. Typing saves after 3 s of
   quiet, on blur, on leaving (Back, another tab) and on pagehide / hidden, through `writes.save('note')` →
-  `cloud.commitRecord` (offline queue, conflict check). `settings.noteIndex` { days, cases, n } (updated only from the
-  server's copy) lets the Logbook show a bar on days with notes, "✎ Notes" on the day and "✎ note" on linked case
-  rows without reading notes; it's skipped in the settings file. Copy / Share for a day adds its notes after the
+  `cloud.commitRecord` (offline queue, conflict check). The note index { days, cases, n } (`logbooks/{email}/meta/
+  noteIndex`, owner only; updated only from the server's copy of the notes) lets the Logbook show a bar on days with
+  notes, "✎ Notes" on the day and "✎ note" on linked case rows without reading notes: one small read when the Logbook
+  first asks. It moved out of `settings.noteIndex` (Oct 2026 review: the logbook doc is readable by the app owner); the
+  first sync clears the old copy, and backups and the settings file never carry it. Bin restore loads the notes first,
+  so the 100 limit holds; the notes listener uses `includeMetadataChanges` like reflections. Copy / Share for a day adds its notes after the
   cases in Settings → Markdown's "A day's notes" format (default `## Notes` then `{{notes}}`: each note as `### title`
   and its text); `{{notes}}` in the day heading places them there instead; no notes, no heading. The Markdown export
   (renamed from "Notes apps") puts dated notes in their day's case note (a notes-only day gets one) and undated ones
@@ -413,6 +416,9 @@ portfolio content.
 - Branch work: after a merge, restart the branch from `origin/main`.
 
 ## Review findings fixed (Oct 2026), worth not regressing
+
+- Cloudflare previews: a service worker must key cached navigations by the folder (`'./'`), never `'index.html'`:
+  Workers static assets answer `index.html` with a 307 to the folder, and a cached redirect breaks reloads.
 
 - Saved searches must store copies of filter arrays; flag select resets with Clear.
 - Case rows have no swipe actions (owner: off); per-case Copy, not Share.

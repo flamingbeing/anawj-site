@@ -3,7 +3,7 @@
 // Firebase traffic (auth, Firestore) always goes to the network; Firestore keeps its own offline
 // cache in IndexedDB. The Firebase SDK files (versioned, never change) are cached here.
 
-const VERSION = 'evals-v16';
+const VERSION = 'evals-v16a';
 const SDK = 'https://www.gstatic.com/firebasejs/10.12.2/';
 const SDK_FILES = ['firebase-app.js', 'firebase-auth.js', 'firebase-firestore.js'].map(f => SDK + f);
 const SHELL = [
@@ -54,7 +54,9 @@ self.addEventListener('fetch', e => {
   e.respondWith((async () => {
     const cache = await caches.open(VERSION);
     // navigations: the cached shell, whatever the query (?demo) or hash
-    const key = req.mode === 'navigate' ? 'index.html' : req;
+    // (keyed by the folder, './': Cloudflare previews answer 'index.html' with a redirect to the folder, and a cached
+    // redirect can't be served for a navigation, so reloading failed there; GitHub Pages serves both directly)
+    const key = req.mode === 'navigate' ? './' : req;
     const hit = await cache.match(key, { ignoreSearch: req.mode === 'navigate' });
     if (hit) return hit;
     try {

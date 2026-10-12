@@ -13,13 +13,15 @@ import { ensureNotes } from './ui-notepad.js';
 const mine = () => S.user.email;
 const FORMAT = 'apmes-logbook-backup';
 
+// the note index is rebuilt from the notes, and must never go back into the logbook doc (the app owner can read it)
+const noIndex = st => Object.fromEntries(Object.entries(st || {}).filter(([k]) => k !== 'noteIndex'));
 export async function makeBackup() {
   const reflections = S.reflections || [];
   const lb = S.logbook || {};
   const notes = (await ensureNotes().catch(() => null)) || [];   // personal notes load on first use
   return {
     format: FORMAT, version: 1, exportedAt: new Date().toISOString(), email: mine(), name: displayName(),
-    logbook: { name: lb.name || '', settings: lb.settings || {}, templates: lb.templates || [], profile: lb.profile || null },
+    logbook: { name: lb.name || '', settings: noIndex(lb.settings), templates: lb.templates || [], profile: lb.profile || null },
     cases: S.cases || [], reflections, notes,
   };
 }
@@ -79,7 +81,7 @@ async function restoreBackup(file) {
   const profile = bk.profile && !lbNow.profile ? bk.profile : null;
   const name = bk.name && !String(lbNow.name || '').trim() ? bk.name : null;
   const setNow = lbNow.settings || {};
-  const newSettings = Object.fromEntries(Object.entries(bk.settings && typeof bk.settings === 'object' ? bk.settings : {}).filter(([k]) => !(k in setNow)));
+  const newSettings = Object.fromEntries(Object.entries(bk.settings && typeof bk.settings === 'object' ? noIndex(bk.settings) : {}).filter(([k]) => !(k in setNow)));
   const extra = [profile ? 'your portfolio details' : '', name ? 'your name' : '', Object.keys(newSettings).length ? 'settings you haven’t set here' : ''].filter(Boolean);
   const nothing = !cases.length && !refl.length && !notes.length && !newTpl.length && !extra.length;
   const m = modal('Restore from backup', [

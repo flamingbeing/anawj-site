@@ -391,6 +391,24 @@ export function deleteNote(email, id) {
   save(s); notifyNotes(email);
 }
 
+// ---- the note index (logbooks/{email}/meta/noteIndex) ----
+const noteIndexWatchers = new Set();
+export function watchNoteIndex(email, cb) {
+  const w = { email: lc(email), cb };
+  noteIndexWatchers.add(w);
+  const lb = load().logbooks[w.email];
+  cb(lb && lb.noteIndex ? plain(lb.noteIndex) : null, meta);
+  return () => noteIndexWatchers.delete(w);
+}
+export function saveNoteIndex(email, idx) {
+  email = lc(email);
+  const s = load(), lb = book(s, email), doc = { days: idx.days, cases: idx.cases, n: idx.n, updatedAt: Date.now() };
+  lb.noteIndex = doc;
+  save(s);
+  for (const w of noteIndexWatchers) if (w.email === email) w.cb(plain(doc), meta);
+  return doc;
+}
+
 // ---- reflection images (logbooks/{email}/images/{id}) ----
 // Kept under their own key (base64 is large) so load()/save() of the demo state stays fast.
 const IMAGES_KEY = KEY + '-images';
