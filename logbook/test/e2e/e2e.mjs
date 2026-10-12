@@ -66,7 +66,7 @@ async function run(label, ctxOpts) {
   const sub = () => p.evaluate(() => document.getElementById('sub').textContent);
   const nCases = async () => parseInt(await p.evaluate(() => document.body.dataset.cases), 10);
   // Account, Settings, Export / Import and Admin live under More; Settings is a menu of pages
-  const SETTINGS_PAGES = ['display', 'logging', 'tags', 'reflset', 'sharefmt', 'bin'];
+  const SETTINGS_PAGES = ['display', 'access', 'logging', 'tags', 'reflset', 'sharefmt', 'bin'];
   const tab = async t => {
     // a settings page's Advanced page: open the page, then its Advanced link
     if (t === 'displayadv' || t === 'loggingadv') { await tab(t.replace('adv', '')); await p.locator(`a[data-go="${t}"]`).click(); await nap(350); return; }
@@ -966,7 +966,7 @@ async function run(label, ctxOpts) {
     await yearTo('3');   // back to the seeded R3 (with the batchmates on Totals)
     // pages under More have a way back
     await tab('settings');
-    await p.locator('main .back-row a', { hasText: '← More' }).click();
+    await p.locator('.back-row a', { hasText: 'More' }).click();
     await nap(300);
     assert(await p.locator('.more-list').count() === 1, 'back did not open the More list');
   });
@@ -1622,7 +1622,8 @@ async function run(label, ctxOpts) {
     const flag = id => refl.find(r => r.id === id).export !== false;
     assert(flag('eb1') && flag('eb22') && flag('eb4444') && !flag('eb333'), 'just enough picked ' + JSON.stringify(refl.filter(r => r.id.startsWith('eb')).map(r => [r.id, r.export])));
     assert(/3 of 3/.test(await p.locator('.exp-h', { hasText: 'Bariatric' }).innerText()), 'bariatric not at 3 of 3');
-    await p.locator('main a, main button', { hasText: 'Export portfolio' }).first().click(); await nap(400);
+    // back to the export page: "‹ Export portfolio" in the header
+    await p.locator('.back-row a', { hasText: 'Export portfolio' }).first().click(); await nap(400);
     assert(await p.locator('main button', { hasText: /^Export \d+ reflections? \(Word\)$/ }).count() === 1, 'export button missing');
     // More → Export / Import links here
     await tab('data');
@@ -1716,8 +1717,9 @@ async function run(label, ctxOpts) {
   });
 
   await step('optional: ⋯ menu on Logbook rows; swipe between tabs (not from the case box)', async () => {
-    await tab('displayadv');
+    await tab('access');
     assert(await p.getByLabel('Swipe left or right to change tab').isChecked(), 'swipe between tabs not on by default');
+    await tab('displayadv');
     await p.getByLabel('Fewer buttons on Logbook rows (a ⋯ menu)').check(); await nap(150);
     try {
       await tab('logbook'); await lbList();
@@ -1738,17 +1740,18 @@ async function run(label, ctxOpts) {
       assert(/#log$/.test(p.url()), 'a swipe in the case box changed tab');
       // a page under a tab counts as that tab: Settings → Display is under More, so a swipe right goes to Analytics
       await tab('display');
-      await swipe(100, 300, 'main .back-row'); await p.waitForURL(/#progress$/);
+      await swipe(100, 300, 'main section.card'); await p.waitForURL(/#progress$/);
       await until(async () => !(await p.locator('main#app').evaluate(el => el.style.transform)), 'page left mid-slide');
       // switched off: no change of tab
-      await tab('displayadv');
+      await tab('access');
       await p.getByLabel('Swipe left or right to change tab').uncheck(); await nap(150);
       await tab('logbook');
       await swipe(300, 100, 'main section.card'); await nap(400);
       assert(/#logbook$/.test(p.url()), 'swiped with the switch off');
     } finally {
-      await tab('displayadv');
+      await tab('access');
       await p.getByLabel('Swipe left or right to change tab').check();
+      await tab('displayadv');
       await p.getByLabel('Fewer buttons on Logbook rows (a ⋯ menu)').uncheck();
     }
   });

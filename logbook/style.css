@@ -1305,3 +1305,19 @@ details:not(.quick-actions) > summary::after { transition: transform var(--dur) 
 .monthhead .jump { display: inline-flex; align-items: center; gap: 4px; }
 /* the invisible date input covers the whole calendar chip, border included (a 40 px tap target) */
 .datebar .datepick input[type="date"] { inset: -1px; width: calc(100% + 2px); height: calc(100% + 2px); }
+
+/* ---------- polish 2: moving around ---------- */
+/* "‹ Settings" in the header on pages under a tab, in place of the app's name; plain text, no box */
+body.header-back .top h1 { display: none; }
+.top .back-row { margin: 0; }
+.back-row .back-link { display: inline-flex; align-items: center; gap: 2px; min-height: 40px; padding-right: 8px; color: var(--accent); font-weight: 600; text-decoration: none; font-size: calc(17px * var(--fs, 1)); }
+.back-row .back-chev { font-size: 1.7em; line-height: 1; margin: -4px 2px 0 -2px; font-weight: 400; }
+main > .back-row { margin: -6px 0 6px; }
+/* the calendar's month name opens a month picker (an invisible month input over it) */
+.lb-monthpick { position: relative; text-align: center; cursor: pointer; min-height: 40px; display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 0 4px; border-radius: calc(8px * var(--round, 1)); }
+.lb-monthpick input[type="month"] { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0; opacity: 0; border: 0; padding: 0; cursor: pointer; }
+.lb-monthpick:active { background-color: color-mix(in srgb, var(--ink) 8%, transparent); }
+/* dropdowns drawn alike on every phone: the app's own chevron instead of the browser's arrow */
+select:not([multiple]) { appearance: none; -webkit-appearance: none; padding-right: 34px; }
+select:not([multiple]) { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%23888d96' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important; background-position: right 12px center !important; background-size: 12px 8px !important; }

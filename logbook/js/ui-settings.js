@@ -97,7 +97,7 @@ export function residencyCard() {
 // the light / dark choice. The first time a device opens the app it starts from what the account had (these used to
 // follow the account), so nobody's look changes. Kept at sign-out: they are the device's, and nothing private.
 const DISPLAY_KEY = 'apmes-logbook-display';
-export const DISPLAY_KEYS = ['compact', 'textSize', 'zoom', 'accent', 'startTab', 'fontUi', 'fontUiName', 'fontLog', 'fontLogName', 'lineWidth', 'lineHeight', 'contrast', 'motion', 'tabIcons', 'tabBar', 'hideHeader', 'caseInverted', 'colourful', 'customCss', 'customCssOn', 'autoFocus', 'appTitle', 'boxCaps', 'boxCorrect', 'boxSpell', 'reflSpell', 'pinBox', 'pinSearch', 'firstField', 'compactTags', 'borders', 'round', 'shadows', 'bigTaps', 'tabOrder', 'tabHidden', 'swipeTabs', 'rowMenu', 'rowCopy', 'reflToolbar'];
+export const DISPLAY_KEYS = ['compact', 'textSize', 'zoom', 'accent', 'startTab', 'fontUi', 'fontUiName', 'fontLog', 'fontLogName', 'lineWidth', 'lineHeight', 'contrast', 'motion', 'tabIcons', 'tabBar', 'hideHeader', 'caseInverted', 'colourful', 'customCss', 'customCssOn', 'autoFocus', 'appTitle', 'boxCaps', 'boxCorrect', 'boxSpell', 'reflSpell', 'pinBox', 'pinSearch', 'firstField', 'compactTags', 'borders', 'round', 'shadows', 'bigTaps', 'tabOrder', 'tabHidden', 'swipeTabs', 'rowMenu', 'rowCopy', 'reflToolbar', 'edgeBack'];
 export function deviceDisplay() {
   try { const d = JSON.parse(localStorage.getItem(DISPLAY_KEY) || 'null'); return d && typeof d === 'object' && !Array.isArray(d) ? d : null; } catch { return null; }
 }
@@ -294,14 +294,6 @@ export function renderDisplay() {
         h('select', { 'aria-label': 'Colourful', onchange: e => applyDisplay(setDisplay({ colourful: e.target.value === 'off' ? null : e.target.value })) },
           COLOURFUL.map(([v, l]) => h('option', { value: v, selected: (st.colourful === true ? 'tabs' : st.colourful || 'off') === v }, l)))),
         h('span', { class: 'hint help' }, 'With the default colour, the tabs follow the NUH stripe at the top: Case orange, Logbook red, Reflections cyan, Analytics navy. With another colour: orange, teal, red, blue, purple. “Everything” also colours the buttons, chips and links on that tab’s pages, in shades that stay easy to read.')),
-      h('label', { class: 'field', style: 'margin-top:10px' }, 'Interface zoom',
-        h('select', { 'aria-label': 'Interface zoom', onchange: e => { applyZoom(e.target.value); setDisplay({ zoom: e.target.value }); } },
-          ZOOMS.map(v => h('option', { value: v, selected: String(st.zoom || '1') === v }, `${Math.round(v * 100)}%${v === '1' ? ' (default)' : ''}`)))),
-      h('p', { class: 'hint help', style: 'margin:2px 0 0' }, 'Everything bigger or smaller, the header and tabs too. On a computer: Ctrl + and Ctrl − (⌘ on a Mac), Ctrl 0 for 100%.'),
-      h('label', { class: 'field', style: 'margin-top:10px' }, 'Text size',
-        h('select', { 'aria-label': 'Text size', onchange: e => { applyTextSize(e.target.value); setDisplay({ textSize: e.target.value }); } },
-          TEXT_SIZES.map(([v, l]) => h('option', { value: v, selected: String(st.textSize || '1') === v }, l)))),
-      h('p', { class: 'hint help', style: 'margin:2px 0 0' }, 'Only the words: buttons and spacing stay as they are.'),
       h('label', { class: 'check' }, h('input', { type: 'checkbox', role: 'switch', checked: !!st.compact, onchange: e => {
         applyCompact(e.target.checked); setDisplay({ compact: e.target.checked });
       } }), 'Compact mode'),
@@ -320,10 +312,10 @@ export function renderDisplay() {
         h('select', { onchange: e => { setDisplay({ startTab: e.target.value }); toast('Saved'); } },
           START_TABS.map(([v, l]) => h('option', { value: v, selected: (st.startTab || 'log') === v }, l)))),
       h('p', { class: 'hint', style: 'margin:10px 0 0' }, 'Everything on this page is saved on this device only, so a phone and a computer can each look the way that suits them.')),
-    resetLink('light or dark, colour, Colourful, zoom, text size, compact, borders, corners, shadows and the start tab on this device', () => {
-      applyTheme('light'); applyDisplay(setDisplay({ accent: null, colourful: null, zoom: null, textSize: null, compact: null, borders: null, round: null, shadows: null, startTab: null }));
+    resetLink('light or dark, colour, Colourful, compact, borders, corners, shadows and the start tab on this device', () => {
+      applyTheme('light'); applyDisplay(setDisplay({ accent: null, colourful: null, compact: null, borders: null, round: null, shadows: null, startTab: null }));
     }),
-    advancedLink('displayadv', 'Advanced display settings', 'Name in the header, fonts, line spacing and width, contrast, motion, the tab bar and header, pinning, custom CSS'));
+    advancedLink('displayadv', 'Advanced display settings', 'Name in the header, fonts, line spacing and width, the tab bar and header, pinning, custom CSS'));
 }
 // Settings → Display → Advanced display settings (#displayadv): the rest of the look, then custom CSS
 export function renderDisplayAdvanced() {
@@ -340,14 +332,8 @@ export function renderDisplayAdvanced() {
       fontPicker('log'),
       lookSelect('lineHeight', 'Line spacing', LINE_HEIGHTS, '1'),
       lookSelect('lineWidth', 'Page width', LINE_WIDTHS, 'normal', 'How wide the app gets on a computer or tablet (was “Line width”). Phones always use the full screen. The Case tab keeps its two panes.'),
-      lookSelect('contrast', 'Contrast', CONTRASTS, 'auto', 'Higher contrast: darker text and stronger lines (lighter in dark mode).'),
-      lookSelect('motion', 'Motion', MOTIONS, 'auto'),
       lookSelect('tabBar', 'Tab bar', TAB_BARS, 'auto'),
       tabArranger(),
-      h('label', { class: 'check', style: 'margin-top:10px' }, h('input', { type: 'checkbox', checked: !!st.bigTaps, onchange: e => applyDisplay(setDisplay({ bigTaps: e.target.checked || null })) }), 'Bigger tap targets on the Case tab'),
-      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'Larger chips, tag rows, tick boxes and Save buttons, easier to hit on a phone.'),
-      h('label', { class: 'check', style: 'margin-top:10px' }, h('input', { type: 'checkbox', checked: st.swipeTabs !== false, onchange: e => applyDisplay(setDisplay({ swipeTabs: e.target.checked ? null : false })) }), 'Swipe left or right to change tab'),
-      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'On unless you switch it off. The page follows your finger to the next or previous tab on the bar, also from pages under a tab. Not while typing, from the screen’s edges, or on tables and lists that scroll sideways.'),
       h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !!st.rowMenu, onchange: e => applyDisplay(setDisplay({ rowMenu: e.target.checked || null })) }), 'Fewer buttons on Logbook rows (a ⋯ menu)'),
       h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'Copy and Reflect move into one ⋯ button; a ✓ still shows cases with a reflection.'),
       h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !!st.rowCopy, onchange: e => applyDisplay(setDisplay({ rowCopy: e.target.checked || null })) }), 'Copy button on each Logbook row'),
@@ -362,8 +348,40 @@ export function renderDisplayAdvanced() {
       h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'They stay in view while the tags or cases scroll under them.'),
       h('p', { class: 'hint', style: 'margin:10px 0 0' }, 'Everything on this page is saved on this device only, so a phone and a computer can each look the way that suits them.')),
     customCssCard(),
-    resetLink('the name in the header, fonts, line spacing and width, contrast, motion, the tab bar (order and hidden tabs) and header options, bigger tap targets, upside down, pinning and custom CSS (switched off; your CSS is kept) on this device', () =>
-      applyDisplay(setDisplay({ appTitle: null, fontUi: null, fontUiName: null, fontLog: null, fontLogName: null, lineWidth: null, lineHeight: null, contrast: null, motion: null, tabBar: null, tabIcons: null, hideHeader: null, caseInverted: null, pinBox: null, pinSearch: null, customCssOn: null, bigTaps: null, tabOrder: null, tabHidden: null, swipeTabs: null, rowMenu: null, rowCopy: null }))));
+    resetLink('the name in the header, fonts, line spacing and width, the tab bar (order and hidden tabs) and header options, the Logbook row buttons, upside down, pinning and custom CSS (switched off; your CSS is kept) on this device', () =>
+      applyDisplay(setDisplay({ appTitle: null, fontUi: null, fontUiName: null, fontLog: null, fontLogName: null, lineWidth: null, lineHeight: null, tabBar: null, tabIcons: null, hideHeader: null, caseInverted: null, pinBox: null, pinSearch: null, customCssOn: null, tabOrder: null, tabHidden: null, rowMenu: null, rowCopy: null }))));
+}
+// Settings → Accessibility (#access; owner, 13 Oct 2026): size, contrast, motion and the gestures, gathered from
+// Display and Advanced display. All this device's.
+export const IPHONE_APP = () => (/iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1)) && (navigator.standalone === true || matchMedia('(display-mode: standalone)').matches);
+export function renderAccessibility() {
+  const st = display();
+  return h('div', {},
+    displayPreview(),
+    h('section', { class: 'card' },
+      h('h2', {}, 'Accessibility'),
+      h('h3', {}, 'Size'),
+      h('label', { class: 'field', style: 'margin-top:4px' }, 'Interface zoom',
+        h('select', { 'aria-label': 'Interface zoom', onchange: e => { applyZoom(e.target.value); setDisplay({ zoom: e.target.value }); } },
+          ZOOMS.map(v => h('option', { value: v, selected: String(st.zoom || '1') === v }, `${Math.round(v * 100)}%${v === '1' ? ' (default)' : ''}`)))),
+      h('p', { class: 'hint help', style: 'margin:2px 0 0' }, 'Everything bigger or smaller, the header and tabs too. On a computer: Ctrl + and Ctrl − (⌘ on a Mac), Ctrl 0 for 100%.'),
+      h('label', { class: 'field', style: 'margin-top:10px' }, 'Text size',
+        h('select', { 'aria-label': 'Text size', onchange: e => { applyTextSize(e.target.value); setDisplay({ textSize: e.target.value }); } },
+          TEXT_SIZES.map(([v, l]) => h('option', { value: v, selected: String(st.textSize || '1') === v }, l)))),
+      h('p', { class: 'hint help', style: 'margin:2px 0 0' }, 'Only the words: buttons and spacing stay as they are.'),
+      h('label', { class: 'check', style: 'margin-top:10px' }, h('input', { type: 'checkbox', checked: !!st.bigTaps, onchange: e => applyDisplay(setDisplay({ bigTaps: e.target.checked || null })) }), 'Bigger tap targets on the Case tab'),
+      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'Larger chips, tag rows, tick boxes and Save buttons, easier to hit on a phone.'),
+      h('h3', {}, 'Contrast and motion'),
+      lookSelect('contrast', 'Contrast', CONTRASTS, 'auto', 'Higher contrast: darker text and stronger lines (lighter in dark mode).'),
+      lookSelect('motion', 'Motion', MOTIONS, 'auto', 'Reduce motion: pages, folds and swipes switch at once instead of sliding.'),
+      h('h3', {}, 'Gestures'),
+      h('label', { class: 'check', style: 'margin-top:10px' }, h('input', { type: 'checkbox', checked: st.swipeTabs !== false, onchange: e => applyDisplay(setDisplay({ swipeTabs: e.target.checked ? null : false })) }), 'Swipe left or right to change tab'),
+      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'On unless you switch it off. The page follows your finger to the next or previous tab on the bar, also from pages under a tab. Not while typing, from the screen’s edges, or on tables and lists that scroll sideways.'),
+      h('label', { class: 'check', style: 'margin-top:10px' }, h('input', { type: 'checkbox', checked: st.edgeBack !== false, onchange: e => applyDisplay(setDisplay({ edgeBack: e.target.checked ? null : false })) }), 'Swipe from the left edge to go back (iPhone app)'),
+      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, IPHONE_APP() ? 'On unless you switch it off: from a page under a tab, drag from the screen’s left edge to the right.' : 'Only in the app added to an iPhone or iPad home screen. Android phones use their own Back gesture from the edges.'),
+      h('p', { class: 'hint', style: 'margin:10px 0 0' }, 'Everything on this page is saved on this device only.')),
+    resetLink('zoom, text size, bigger tap targets, swiping, contrast, motion and edge swipe on this device', () =>
+      applyDisplay(setDisplay({ zoom: null, textSize: null, bigTaps: null, swipeTabs: null, contrast: null, motion: null, edgeBack: null }))));
 }
 // Advanced display → the tab bar's order and hidden tabs (arrangeTabs): ↑ ↓ to move, a switch to show or hide
 function tabArranger() {

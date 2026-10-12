@@ -198,6 +198,21 @@ const svgIcon = (k, cls) => {
 };
 export const rowIcon = k => svgIcon(k, 'ico');
 export const ic = k => svgIcon(k, 'ico i');
+// Show or hide a panel (Filter, its Dates / Tags / More folds) by growing or shrinking it, like a fold; with
+// Reduce motion (Accessibility) it just appears. el.hidden is set at once when showing, after the shrink when hiding.
+const motionOff = () => { const c = document.documentElement.classList; return c.contains('rm') || (c.contains('rm-auto') && matchMedia('(prefers-reduced-motion: reduce)').matches); };
+export function reveal(el, show) {
+  el._reveal?.cancel();
+  if (!show && el.hidden) return;
+  if (motionOff() || !el.animate) { el.hidden = !show; return; }
+  el.hidden = false;
+  const full = el.offsetHeight;
+  el.style.overflow = 'clip';
+  const a = el.animate({ height: show ? ['0px', full + 'px'] : [full + 'px', '0px'], opacity: show ? [0, 1] : [1, 0] }, { duration: 220, easing: 'cubic-bezier(.2, .7, .2, 1)' });
+  el._reveal = a;
+  const end = () => { if (el._reveal !== a) return; el._reveal = null; el.style.overflow = ''; if (!show) el.hidden = true; };
+  a.onfinish = end; a.oncancel = () => { if (el._reveal === a) { el._reveal = null; el.style.overflow = ''; el.hidden = !show; } };
+}
 // An empty list: a soft icon, one bold line, a grey hint and the button to fill it (style.css .empty-state).
 // Keeps the class "empty" so the old look-ups still find it.
 export const emptyState = (icon, title, hint, action) => h('div', { class: 'empty empty-state' },

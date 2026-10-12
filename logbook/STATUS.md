@@ -10,7 +10,8 @@ Last updated: 2026-10-13 by Claude Code, Logbook 1 (log1).
 ## Now
 
 - **Claude Code, Logbook 1 (log1)** (branch `claude/clever-gates-pm6sas`): polish batch from the owner's Apple-apps
-  review (Next, item 1), PR 1 of 6 open (small fixes for everyone). Owner's picks are in the artifact
+  review (Next, item 1): PR 1 merged (#250); PR 2 open (moving around). Settings controls (switches, checkmark lists,
+  one-line help) moved from PR 2 to PR 6, with the regrouping of the Advanced pages. Owner's picks are in the artifact
   https://claude.ai/artifact/8Kfho8SPgupTbqe6t2g5bi (store `picks/owner`). Also doing the Reflections rows (log2's
   area, owner's OK 13 Oct: log2 has stopped).
 - **Claude Code, Logbook 3 (log3)** (branch `ccr-2994049c-4e5tlt`): idle, nothing half-done. Still signed in to the
@@ -45,8 +46,7 @@ Last updated: 2026-10-13 by Claude Code, Logbook 1 (log1).
    2. Moving around: "‹ Settings" replaces the app name in the header on sub-pages; pages slide in and out; edge
       swipe back only in the iPhone home-screen app (switchable); a new Accessibility page (text size, zoom,
       contrast, motion, bigger taps, swipe between tabs, edge swipe back, press and hold); tap the month title to
-      pick a month; Filter opens smoothly, dropdowns styled to match; settings use switches and checkmark lists, help
-      cut to one line plus ⓘ.
+      pick a month; Filter opens smoothly, dropdowns styled to match.
    3. Lists and Analytics: initials beside the date on every case row (like Reflections), for everyone; thin sticky
       month headers you tap to jump; tags on one line that scrolls sideways; Reflection rows stop wrapping (dates,
       headings); each Analytics card shows one number and one bar, the detail inside.
@@ -55,7 +55,8 @@ Last updated: 2026-10-13 by Claude Code, Logbook 1 (log1).
    6. Seven separate settings, all off by default, in Advanced display / logging (regrouped and reordered then):
       flat look (a new end of the Borders slider that also drops page cards), page titles in the header,
       filled / tinted / plain buttons, calendar as plain numbers with counts, shorter case rows, press and hold a row
-      for its menu (no swipe: swipe changes tabs), icons instead of words on common buttons.
+      for its menu (no swipe: swipe changes tabs), icons instead of words on common buttons. With it: settings use
+      switches and checkmark lists, help cut to one line plus ⓘ.
    Skipped by the owner: the selected tab's look, text styles, dark mode default (stays Light), segmented switches.
 2. Later, low priority: lazy-load rarely used modules (admin, portfolio, importer, xlsxio, backup, progress) to cut
    first-visit time (now 3.5–4.2 s on a slow phone; repeat visits 0.6–0.8 s). Measure before and after.
@@ -65,6 +66,7 @@ Last updated: 2026-10-13 by Claude Code, Logbook 1 (log1).
 
 ## Recently done
 
+- #250 Polish 1: tap feedback, smooth folds, line icons instead of emoji, tidier Case screen, empty screens, row Copy off by default.
 - #217 Basic the default profile; hidden items can be turned back on; no settings hidden; Profiles or hide items; soft
   shadows by default; the Display preview marked clearly.
 - #214 Profiles: Advanced, Basic, Basic: logbook only (replaces Basic mode), at the top of Show or hide.

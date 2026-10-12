@@ -127,6 +127,15 @@ portfolio content.
   buttons, `rowIcon` on Logbook rows), never emoji; empty lists use `emptyState(icon, title, hint, button)`; buttons,
   chips and rows show a pressed state; one speed for motion (`--dur`, `--ease` in style.css). New looks are separate
   settings, off by default (the plan is in STATUS, Next).
+- **Moving around** (polish 2): on a page under a tab, "‹ Settings" (the page it goes back to) replaces the app's name
+  in the header (in the page instead when the header is hidden). Going into a page slides it in from the right as it
+  fades in; going back, from the left. Only the new page moves: a still copy of the old page (tried first) put every
+  button on the screen twice for a moment, which broke look-ups. Only within one bar tab, never while swiping or with
+  Reduce motion. In the iPhone / iPad
+  home-screen app only, a drag from the left edge goes back (Accessibility → edge swipe; Android uses its own Back
+  gesture there). Settings → Accessibility (`#access`) holds zoom, text size, bigger taps, contrast, motion and the
+  gestures. Filter and its folds grow open (`reveal()` in ui-core.js); dropdowns draw the app's own chevron; the
+  calendar's month name opens a month picker (not in Firefox on a computer, which has none).
 - **More** (`app.js`): Account (with Residency year for non-programme users; Delete account at the bottom,
   greyed out for residents on the programme list: a programme admin takes them off first; `cloud.deleteAccount`
   wipes cases, reflections, images, bin, submission, members entry, logbook, then the Google sign-in), Settings, Export &
