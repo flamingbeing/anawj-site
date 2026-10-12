@@ -10,7 +10,7 @@ import { parseQuery, matchQuery, OPERATOR_HELP, insertOperator } from './search-
 import { parseCsv } from './tags.js';
 import {
   S, h, toast, debounce, modal, cat, categoryNamesRevision, catName, catShort, tagName, catFull, catChip, PICKER_ORDER, settings, patchLogbook, needExcel, download, fileButton, catPills,
-  updateCase, saveMany, deleteMany, displayName, rYear, todayISO, fill, add, resetters, tagSet, tagLinks, confirmBox, keepTags, hooks, rowIcon, basicMode, logbookOnly } from './ui-core.js';
+  updateCase, saveMany, deleteMany, displayName, rYear, todayISO, fill, add, resetters, tagSet, tagLinks, confirmBox, keepTags, hooks, rowIcon, basicHides } from './ui-core.js';
 import { dayHasNotes, caseHasNotes, openNotes, ensureNotes } from './ui-notepad.js';
 import { flatTree, tagTree } from './tags.js';
 import { editCaseDialog, logOnDate } from './ui-log.js';
@@ -45,7 +45,7 @@ function tagChoices() {
 // (and again when your tags change: renamed tags are searched by their new names)
 let hayCache = new WeakMap(), hayFor = null, hayNames = -1;
 const MODES = [['calendar', 'Calendar'], ['list', 'List'], ['grid', 'Grid']];
-const modes = () => (basicMode() ? MODES.filter(([m]) => m !== 'grid') : MODES);
+const modes = () => (basicHides('grid') ? MODES.filter(([m]) => m !== 'grid') : MODES);
 // "2026-10-06" -> "Tue"
 const weekday = iso => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); return m ? new Date(+m[1], +m[2] - 1, +m[3]).toLocaleDateString('en-GB', { weekday: 'short' }) : ''; };
 
@@ -94,7 +94,7 @@ export function renderLogbook() {
     });
   };
   // Advanced search (Settings → Logging): operators in the box (search-ops.js); off by default
-  const opsOn = () => !!settings().searchOps && !basicMode();
+  const opsOn = () => !!settings().searchOps;
   // title: the case's first line (initials and the first line of the details)
   const partsOf = (c, cs) => { const p = caseParts(c), low = t => (cs ? t : t.toLowerCase()); return { initials: low(p.initials), case: low(String(p.details || '')), title: low(caseText(c).split('\n')[0]) }; };
   // tag:16 / tag:lscs: a tag's code, or a word in its name (APMES or your own)
@@ -102,7 +102,7 @@ export function renderLogbook() {
     || (c.tags || []).some(k => tagName(k).toLowerCase().includes(t));
 
   if (!view.mode) view.mode = MODES.some(([m]) => m === settings().logbookView) ? settings().logbookView : 'calendar';
-  if (!modes().some(([m]) => m === view.mode)) view.mode = 'calendar';   // no grid in Basic mode
+  if (!modes().some(([m]) => m === view.mode)) view.mode = 'calendar';   // no grid (a Basic profile)
   const paint = () => {
     const rows = filtered();
     fill(list, view.mode === 'grid' ? gridView(rows, paint) : view.mode === 'calendar' ? calendarView(rows, flagsOf, paint) : listView(rows, flagsOf, paint));
@@ -112,7 +112,7 @@ export function renderLogbook() {
   const paintSoon = debounce(() => { view.limit = 150; paint(); }, 150);
 
   const nFlag = f => S.cases.filter(c => flagsOf(c).includes(f)).length;
-  const flagOpts = [['', 'All cases'], ['needsDate', `Needs a date (${nFlag('needsDate')})`], ['duplicate', `Possible duplicates (${nFlag('duplicate')})`], ['future', `Upcoming (${nFlag('future')})`], ...(logbookOnly() ? [] : [['interesting', `☆ Interesting (${S.cases.filter(c => c.reflectTag).length})`]])];
+  const flagOpts = [['', 'All cases'], ['needsDate', `Needs a date (${nFlag('needsDate')})`], ['duplicate', `Possible duplicates (${nFlag('duplicate')})`], ['future', `Upcoming (${nFlag('future')})`], ...(basicHides('reflect') ? [] : [['interesting', `☆ Interesting (${S.cases.filter(c => c.reflectTag).length})`]])];
   const counter = h('span', { class: 'muted', style: 'font-size:calc(13px * var(--fs, 1))' });
 
   // the two filters fold behind a Filter button (shown open while one is in use)
@@ -331,13 +331,13 @@ function rowMenu(c) {
     e.stopPropagation();
     const m = modal(caseText(c).slice(0, 60) || 'Case', h('div', { class: 'row-menu-list' },
       h('button', { onclick: () => { m.close(); copyText(shareCaseText(c), 'Case copied: paste it into your notes'); } }, rowIcon('copy'), ' Copy'),
-      logbookOnly() ? null : h('button', { class: has ? 'has-refl' : '', onclick: () => { m.close(); reflectOnCase(c); } }, rowIcon(has ? 'done' : 'reflect'), has ? ' Open the reflection' : ' Write a reflection'),
+      basicHides('reflect') ? null : h('button', { class: has ? 'has-refl' : '', onclick: () => { m.close(); reflectOnCase(c); } }, rowIcon(has ? 'done' : 'reflect'), has ? ' Open the reflection' : ' Write a reflection'),
       h('button', { onclick: () => { m.close(); editCaseDialog(c); } }, ' Edit the case'),
       h('button', { class: 'linkish', onclick: () => m.close() }, 'Cancel')));
   };
   return h('span', { class: 'acts' },
-    has && !logbookOnly() ? h('span', { class: 'refl-done', title: 'Has a reflection', 'aria-label': 'Has a reflection' }, rowIcon('done')) : null,
-    logbookOnly() ? h('button', { class: 'small row-btn row-more', title: 'Copy or edit', 'aria-label': 'Copy or edit this case', onclick: open }, '⋯')
+    has && !basicHides('reflect') ? h('span', { class: 'refl-done', title: 'Has a reflection', 'aria-label': 'Has a reflection' }, rowIcon('done')) : null,
+    basicHides('reflect') ? h('button', { class: 'small row-btn row-more', title: 'Copy or edit', 'aria-label': 'Copy or edit this case', onclick: open }, '⋯')
       : h('button', { class: 'small row-btn row-more', title: 'Copy, reflect or edit', 'aria-label': 'Copy, reflect or edit this case', onclick: open }, '⋯'));
 }
 
@@ -360,8 +360,8 @@ function caseRow(c, flagsOf) {
           // to your own notes (paste into WhatsApp, Notes, Obsidian)
           h('button', { class: 'small row-btn', title: 'Copy this case', 'aria-label': 'Copy this case', onclick: e => { e.stopPropagation(); copyText(shareCaseText(c), 'Case copied: paste it into your notes'); } }, rowIcon('copy'), h('span', { class: 'lbl' }, 'Copy')),
           // ✓ and filled once the case has a reflection (opens it); the same width either way, so the row never wraps.
-          // Basic: logbook only has no Reflect button.
-          logbookOnly() ? null : (S.reflections || []).some(r => r.caseId === c.id)
+          // Basic: logbook only has no Reflect button (unless turned back on).
+          basicHides('reflect') ? null : (S.reflections || []).some(r => r.caseId === c.id)
             ? h('button', { class: 'small row-btn has-refl', title: 'Open the reflection on this case', 'aria-label': 'Open the reflection on this case', onclick: e => { e.stopPropagation(); reflectOnCase(c); } }, rowIcon('done'), h('span', { class: 'lbl' }, 'Reflect'))
             : h('button', { class: 'small row-btn', title: 'Write a reflection on this case', 'aria-label': 'Write a reflection on this case', onclick: e => { e.stopPropagation(); reflectOnCase(c); } }, rowIcon('reflect'), h('span', { class: 'lbl' }, 'Reflect')))));
 }

@@ -34,21 +34,47 @@ export const S = {
 export const hooks = { render() {}, casesChanged() {} };
 
 export const settings = () => ({ suggestions: true, rYear: 1, ...(S.logbook && S.logbook.settings) });
-// Profiles (settings.mode, the whole account; at the top of Settings → Show or hide). Advanced (the default) hides
-// nothing. Basic is a simpler app for new residents: tabs and buttons stay where they are; the extras go (quick picks
-// and the other optional Case tab parts, the Logbook grid and search operators, Analytics trends and forecasts,
-// advanced settings, reflection figures and references), and Analytics moves into More. Basic: logbook only is Basic
-// without reflections, for residents who submit theirs separately (Reflections moves into More, for ones already
-// written; no Reflect buttons or ☆ Interesting). Nothing else is changed, so Advanced brings everything back.
-// settings.basic (before profiles) reads as Basic.
+// Profiles (settings.mode, the whole account; at the top of Settings → Profiles or hide items). Basic is the default
+// for everyone (owner, 12 Oct 2026): a simpler app, the same tabs and buttons in the same places without the extras
+// (the optional Case tab parts, the Logbook grid, Analytics trends and forecasts, reflection figures and references),
+// and Analytics in More. Basic: logbook only is Basic without reflections, for residents who submit theirs separately
+// (Reflections in More, for ones already written; no Reflect buttons or ☆ Interesting). Advanced hides nothing.
+// Profiles hide interface items only, never settings, and each item can be turned back on (BASIC_ITEMS).
 export const PROFILES = [
-  ['advanced', 'Advanced', 'Everything: quick picks, the Logbook grid, search operators, Analytics trends and forecasts, advanced settings.'],
-  ['basic', 'Basic', 'A simpler app for getting started: the same tabs and buttons without the extras. Analytics is in More.'],
+  ['basic', 'Basic', 'A simpler app (the default): the same tabs and buttons without the extras. Analytics is in More.'],
   ['logbook', 'Basic: logbook only', 'Basic without reflections, if you submit your reflections separately. Reflections you already wrote stay in More.'],
+  ['advanced', 'Advanced', 'Everything: quick picks, the Logbook grid, Analytics trends and forecasts, reflection figures and references.'],
 ];
-export const profile = () => { const s = settings(); return s.mode === 'basic' || s.mode === 'logbook' ? s.mode : s.basic ? 'basic' : 'advanced'; };
+export const profile = () => { const m = settings().mode; return m === 'advanced' || m === 'logbook' ? m : 'basic'; };
 export const basicMode = () => profile() !== 'advanced';
 export const logbookOnly = () => profile() === 'logbook';
+// What a Basic profile hides is interface only (never a setting), and each can be turned back on (Profiles or hide
+// items; settings.basicOn lists them), so all on is Advanced again. Case tab parts are 'case:<part>'. 'reflect'
+// (Reflect buttons, ☆ Interesting, the reflection headings card) only in Basic: logbook only. The tabs (Analytics,
+// Reflections) are tab bar switches instead.
+export const BASIC_ITEMS = [
+  ['grid', 'The Logbook grid view'],
+  ['analytics', 'Analytics trends, forecasts, Gone quiet, reflection to-dos and links to cases'],
+  ['reflExtras', 'Figures and references in reflections'],
+  ['reflect', 'Reflect buttons, ☆ Interesting and reflection headings in Analytics', 'logbook'],
+];
+export const basicHides = item => {
+  const p = profile();
+  if (p === 'advanced' || (item === 'reflect' && p !== 'logbook') || item === 'case:parsed') return false;
+  return !(settings().basicOn || []).includes(item);
+};
+// the Case tab parts (Logging and Profiles or hide items; settings.caseHide, and the profile's)
+export const caseShown = part => !(settings().caseHide || []).includes(part) && !basicHides('case:' + part);
+export function setCaseShown(part, show, parts) {
+  const hide = new Set(settings().caseHide || []), on = new Set(settings().basicOn || []);
+  if (show) { hide.delete(part); if (basicHides('case:' + part)) on.add('case:' + part); } else hide.add(part);
+  return patchLogbook({ settings: { caseHide: hide.size ? parts.filter(p => hide.has(p)) : null, basicOn: on.size ? [...on] : null } });
+}
+export function setBasicOn(item, on) {
+  const now = new Set(settings().basicOn || []);
+  if (on) now.add(item); else now.delete(item);
+  return patchLogbook({ settings: { basicOn: now.size ? [...now] : null } });
+}
 // The intake on the list, or the year the rid starts with.
 export function baseIntake(r) {
   if (!r) return null;

@@ -3,7 +3,7 @@
 
 import { YEAR_NAMES, DEFAULT_NAMES, BY_CODE } from './categories.js';
 import { sortCodes, uid, academicYear, withParents, weekStart, humanAge } from './engine.js';
-import { S, h, toast, modal, confirmBox, cloud, writes, catChip, catName, catShort, PICKER_ORDER, pickerOrder, settings, patchLogbook, displayName, hooks, rYear, myYearName, fill, PROFILES, profile, basicMode, logbookOnly, categoryNames, setCategoryNames, catPills, tagSet, resetters, download, fileButton, todayISO, saveMany, UNDO_SECS, rowIcon } from './ui-core.js';
+import { S, h, toast, modal, confirmBox, cloud, writes, catChip, catName, catShort, PICKER_ORDER, pickerOrder, settings, patchLogbook, displayName, hooks, rYear, myYearName, fill, PROFILES, profile, basicMode, BASIC_ITEMS, basicHides, setBasicOn, caseShown, setCaseShown, categoryNames, setCategoryNames, catPills, tagSet, resetters, download, fileButton, todayISO, saveMany, UNDO_SECS, rowIcon } from './ui-core.js';
 import { MAX_TAGS, tagLinks as tagLinksIn, learnShorthand, cleanShorthand, shorthandOf, DEFAULT_SHORTHAND, cleanTagSet, defaultTagSet, tagTree, flatTree, moveTag, reparentTag, removeTag, newKey, tagSetToCsv, tagSetFromCsv, dropTag, canPlace, placeNewTag } from './tags.js';
 import { pickDialog, CASE_PARTS, AFTER_SAVE } from './ui-log.js';
 import { OPERATOR_HELP } from './search-ops.js';
@@ -166,7 +166,8 @@ export function applyLook(d = {}) {
   // corners, card shadows instead of lines, bigger tap targets on the Case tab
   const rl = roundLevel(d);
   if (rl !== 2) document.documentElement.style.setProperty('--round', String(ROUNDS[rl][1])); else document.documentElement.style.removeProperty('--round');
-  c.toggle('shadows', !!d.shadows); c.toggle('big-taps', !!d.bigTaps);
+  c.toggle('shadows', d.shadows !== false);   // soft shadows by default (owner, 12 Oct 2026); false = lines
+  c.toggle('big-taps', !!d.bigTaps);
   // swipe between the bar's tabs (app.js; on unless switched off: swipeTabs false); one ⋯ menu on Logbook rows
   // instead of Copy and Reflect (ui-logbook.js)
   c.toggle('swipe-tabs', d.swipeTabs !== false); c.toggle('row-menu', !!d.rowMenu); c.toggle('refl-toolbar', !!d.reflToolbar);
@@ -193,20 +194,17 @@ export const roundLevel = d => (Number.isInteger(d.round) && d.round >= 0 && d.r
 export const BAR_TABS = [['log', 'Case'], ['logbook', 'Logbook'], ['reflect', 'Reflections'], ['progress', 'Analytics'], ['notes', 'Notes'],
   ['account', 'Account'], ['settings', 'Settings'], ['recovery', 'Recover drafts'], ['data', 'Export / Import'], ['admin', 'Admin portal'], ['more', 'More']];
 export const barTabs = () => BAR_TABS.filter(([id]) => id !== 'admin' || S.admin);
-// the tabs with a switch: Basic: logbook only has no Reflections tab (its page stays in More)
-const switchable = id => id !== 'reflect' || !logbookOnly();
 // tabs off the bar until someone puts them there (they live in More by default); the Basic profiles keep Analytics
-// in More too
+// in More too, and Basic: logbook only Reflections
 const OFF_BAR = ['notes', 'account', 'settings', 'recovery', 'data', 'admin'];
-const offBar = mode => (mode === 'advanced' ? OFF_BAR : [...OFF_BAR, 'progress']);
+const offBar = mode => (mode === 'advanced' ? OFF_BAR : mode === 'logbook' ? [...OFF_BAR, 'progress', 'reflect'] : [...OFF_BAR, 'progress']);
 export const MAX_BAR = 7;
 export function arrangeTabs(ids, d = {}, mode = profile()) {
   const order = Array.isArray(d.tabOrder) ? d.tabOrder : [];
   const at = id => (order.includes(id) ? order.indexOf(id) : order.length + ids.indexOf(id));
   const sorted = [...ids].sort((a, b) => at(a) - at(b));
   // an OFF_BAR tab stays off until someone shows it in Arrange tabs (which saves the order with it in)
-  // Basic: logbook only keeps Reflections off the bar (listed in More)
-  const hidden = new Set([...(Array.isArray(d.tabHidden) ? d.tabHidden : []), ...(mode === 'logbook' ? ['reflect'] : []), ...offBar(mode).filter(id => !order.includes(id) || !Array.isArray(d.tabHidden))].filter(id => id !== 'more'));
+  const hidden = new Set([...(Array.isArray(d.tabHidden) ? d.tabHidden : []), ...offBar(mode).filter(id => !order.includes(id) || !Array.isArray(d.tabHidden))].filter(id => id !== 'more'));
   // over the limit (saved by hand, or an old settings file): the last ones in the order go to More
   for (const id of [...sorted].reverse()) if (sorted.filter(k => !hidden.has(k)).length > MAX_BAR && id !== 'more' && !hidden.has(id)) hidden.add(id);
   const shown = sorted.filter(id => !hidden.has(id));
@@ -239,7 +237,7 @@ export const borderLevel = d => (Number.isInteger(d.borders) && d.borders >= 0 &
 // Display preview (owner): a made-up case row, chips and buttons drawn with the app's own classes, so colour,
 // borders, fonts, text size and compact show at once; it stays in view while the page scrolls
 export const displayPreview = () => h('div', { class: 'display-preview', 'aria-hidden': 'true' },
-  h('div', { class: 'dp-label' }, 'Preview'),
+  h('div', { class: 'dp-label' }, 'Preview only: not a real case'),
   h('ul', { class: 'cases' }, h('li', { tabindex: '-1' },
     h('span', { class: 'd' }, h('span', { class: 'wd' }, 'Sun'), ' 11th Oct'),
     h('span', { class: 't' }, h('b', {}, 'AB'), ' 34F LSCS under spinal'),
@@ -254,12 +252,9 @@ export const resetLink = (what, run) => h('p', { class: 'reset-row' }, h('button
   await run(); hooks.render(); toast('Back to the defaults');
 } }, 'Reset this page'));
 
-// a link to a settings page's own Advanced page, like a row of the More list. Basic mode hides it, but says so
-// (owner, Oct 2026: a link that silently vanished looked like a bug), decided here from the setting itself
-export const advancedLink = (id, label, desc) => basicMode()
-  ? h('p', { class: 'hint more-settings-note' }, `${label} are hidden in the ${PROFILES.find(([k]) => k === profile())[1]} profile. `,
-    h('a', { href: '#showhide', 'data-go': 'showhide' }, 'Change profile ›'))
-  : h('section', { class: 'card more-list more-settings' },
+// a link to a settings page's own Advanced page, like a row of the More list (never hidden: profiles hide interface
+// items, not settings)
+export const advancedLink = (id, label, desc) => h('section', { class: 'card more-list more-settings' },
   h('ul', {}, h('li', {}, h('a', { href: '#' + id, 'data-go': id },
     h('span', { class: 'mt' }, h('b', {}, label), h('small', {}, desc)), h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')))));
 export const cleanTitle = s => String(s || '').replace(/[\u0000-\u001f]/g, '').replace(/\s+/g, ' ').trim().slice(0, 40);
@@ -312,7 +307,7 @@ export function renderDisplay() {
         return h('div', { class: 'field', style: 'margin-top:10px' }, h('label', { class: 'field', style: 'margin:0' }, 'Corners',
           h('input', { type: 'range', min: '0', max: String(ROUNDS.length - 1), step: '1', value: String(roundLevel(st)), 'aria-label': 'Corners', 'aria-valuetext': ROUNDS[roundLevel(st)][0],
             oninput: e => { const n = Number(e.target.value); e.target.setAttribute('aria-valuetext', ROUNDS[n][0]); note.textContent = ROUNDS[n][0]; applyDisplay(setDisplay({ round: n === 2 ? null : n })); } })), note); })(),
-      h('label', { class: 'check', style: 'margin-top:6px' }, h('input', { type: 'checkbox', checked: !!st.shadows, onchange: e => applyDisplay(setDisplay({ shadows: e.target.checked || null })) }), 'Soft shadows instead of lines around cards'),
+      h('label', { class: 'check', style: 'margin-top:6px' }, h('input', { type: 'checkbox', checked: st.shadows !== false, onchange: e => applyDisplay(setDisplay({ shadows: e.target.checked ? null : false })) }), 'Soft shadows instead of lines around cards (default)'),
       // the tab the app opens on (a link or shortcut to a tab still opens that tab)
       h('label', { class: 'field', style: 'margin-top:10px' }, 'Open the app on',
         h('select', { onchange: e => { setDisplay({ startTab: e.target.value }); toast('Saved'); } },
@@ -366,12 +361,11 @@ function tabArranger() {
   const wrap = h('div', { class: 'tab-arranger field', style: 'margin-top:10px' });
   const paint = () => {
     const { sorted: order, hidden } = arrangeTabs(barTabs().map(([id]) => id), display());
-    // ↑ ↓ swap with the next tab in the list (a tab without a switch is skipped over)
-    const move = (id, by) => { const vis = order.filter(switchable), other = vis[vis.indexOf(id) + by]; if (!other) return; const o = [...order], i = o.indexOf(id), j = o.indexOf(other); [o[i], o[j]] = [o[j], o[i]]; applyDisplay(setDisplay({ tabOrder: o })); hooks.paintTabs?.(); paint(); };
+    const move = (id, by) => { const o = [...order], i = o.indexOf(id), j = i + by; if (j < 0 || j >= o.length) return; [o[i], o[j]] = [o[j], o[i]]; applyDisplay(setDisplay({ tabOrder: o })); hooks.paintTabs?.(); paint(); };
     const hideSet = new Set(hidden);
     const toggle = (id, show) => setTabOnBar(id, show, paint);
     fill(wrap, h('span', {}, 'Tabs on the bar'),
-      h('ul', { class: 'tab-order' }, order.filter(switchable).map((id, i, order) => h('li', {},
+      h('ul', { class: 'tab-order' }, order.map((id, i) => h('li', {},
         h('label', { class: 'check', style: 'flex:1;min-height:40px' }, h('input', { type: 'checkbox', checked: !hideSet.has(id), disabled: id === 'more', 'aria-label': 'Show ' + BAR_TABS.find(([k]) => k === id)[1], onchange: e => toggle(id, e.target.checked) }), BAR_TABS.find(([k]) => k === id)[1]),
         h('button', { class: 'small icon-btn', type: 'button', disabled: i === 0, 'aria-label': 'Move up', onclick: () => move(id, -1) }, '↑'),
         h('button', { class: 'small icon-btn', type: 'button', disabled: i === order.length - 1, 'aria-label': 'Move down', onclick: () => move(id, 1) }, '↓')))),
@@ -633,11 +627,7 @@ export function renderLoggingAdvanced() {
       h('h2', {}, 'Case tab'),
       h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'Untick what you don’t use. The case box, All tags and Save always stay.'),
       CASE_PARTS.map(([part, label]) => h('label', { class: 'check' },
-        h('input', { type: 'checkbox', checked: !(st.caseHide || []).includes(part), onchange: e => {
-          const now = new Set(settings().caseHide || []);
-          if (e.target.checked) now.delete(part); else now.add(part);
-          patchLogbook({ settings: { caseHide: now.size ? CASE_PARTS.map(([p]) => p).filter(p => now.has(p)) : null } });
-        } }), label)),
+        h('input', { type: 'checkbox', checked: caseShown(part), onchange: e => setCaseShown(part, e.target.checked, CASE_PARTS.map(([p]) => p)) }), label)),
       h('h3', { style: 'margin-top:14px' }, 'Keyboard in the case box (this device)'),
       h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: display().boxCaps !== false, onchange: e => applyDisplay(setDisplay({ boxCaps: e.target.checked ? null : false })) }),
         'Capital letter at the start'),
@@ -652,30 +642,39 @@ export function renderLoggingAdvanced() {
     }));
 }
 
-// Profiles (settings.mode, the whole account; PROFILES in ui-core.js): one place only, at the top of Show or hide
-// (owner, Oct 2026: two Basic mode switches confused). Choosing one also moves this device's tabs (Analytics into
-// More for the Basic profiles, back for Advanced); other devices follow the profile's defaults.
+// Profiles (settings.mode, the whole account; PROFILES in ui-core.js): one place only, at the top of Profiles or hide
+// items (owner, Oct 2026: two Basic mode switches confused). Picking one starts from its defaults (settings.basicOn
+// cleared) and moves this device's tabs (Analytics, and Reflections for logbook only, into More; back for Advanced);
+// other devices follow the profile's defaults. In a Basic profile every hidden item has a switch to bring it back.
 export function profileCard() {
   const cur = profile();
   const pick = async mode => {
-    if (mode === profile()) return;
-    await patchLogbook({ settings: { mode: mode === 'advanced' ? null : mode, basic: null } });
+    const was = profile();
+    if (mode === was) return;
+    await patchLogbook({ settings: { mode: mode === 'basic' ? null : mode, basic: null, basicOn: null } });
     const d = display();
     if (Array.isArray(d.tabHidden)) {
-      const hid = new Set(d.tabHidden); if (mode === 'advanced') hid.delete('progress'); else hid.add('progress');
+      const hid = new Set(d.tabHidden);
+      if (mode === 'advanced') hid.delete('progress'); else hid.add('progress');
+      if (mode === 'logbook') hid.add('reflect'); else if (was === 'logbook') hid.delete('reflect');
       applyDisplay(setDisplay({ tabHidden: [...hid] }));
     }
     hooks.paintTabs?.(); hooks.render(); toast(`Profile: ${PROFILES.find(([k]) => k === mode)[1]}`);
   };
+  const items = BASIC_ITEMS.filter(([, , only]) => !only || only === cur);
   return h('section', { class: 'card profile-card' },
     h('h2', {}, 'Profile'),
     h('div', { role: 'radiogroup', 'aria-label': 'Profile' }, PROFILES.map(([k, label, hint]) => h('label', { class: 'check profile-opt' },
       h('input', { type: 'radio', name: 'profile', value: k, checked: k === cur, onchange: () => pick(k) }),
       h('span', {}, h('b', {}, label), h('small', { class: 'hint' }, hint))))),
-    h('p', { class: 'hint help', style: 'margin:6px 0 0' }, 'For your whole account. Switching never changes your cases or reflections, and Advanced brings everything back.'));
+    basicMode() ? h('div', { class: 'profile-items' },
+      h('h3', {}, 'Hidden in this profile'),
+      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'Turn any back on. The Case tab parts and the tabs are below (Case tab, Header and tabs).'),
+      items.map(([k, label]) => sw(label, !basicHides(k), v => setBasicOn(k, v).then(() => hooks.render())))) : null,
+    h('p', { class: 'hint help', style: 'margin:6px 0 0' }, 'For your whole account. Profiles only show or hide parts of the screen: your settings, cases and reflections never change. Picking a profile starts from its defaults.'));
 }
 
-// Settings → Show or hide: every switch that hides part of the app, grouped by area, each group with its own
+// Settings → Profiles or hide items: the profile, then every switch that hides part of the app, grouped by area, each group with its own
 // reset. The same settings as on their own pages (Logging, Display, Reflections), gathered in one place.
 const groupReset = (what, run) => h('p', { class: 'reset-row' }, h('button', { class: 'small linkish', type: 'button', onclick: async () => {
   if (!await confirmBox('Reset this group', `Show ${what} again?`, 'Reset')) return;
@@ -685,19 +684,15 @@ const sw = (label, on, set, hint) => [h('label', { class: 'check' }, h('input', 
 export function renderShowHide() {
   const st = settings(), d = display();
   const save = patch => patchLogbook({ settings: patch });
-  const caseOn = part => !(st.caseHide || []).includes(part);
-  const setCase = (part, show) => {
-    const now = new Set(settings().caseHide || []);
-    if (show) now.delete(part); else now.add(part);
-    return save({ caseHide: now.size ? CASE_PARTS.map(([p]) => p).filter(p => now.has(p)) : null });
-  };
+  const caseOn = caseShown;
+  const setCase = (part, show) => setCaseShown(part, show, CASE_PARTS.map(([p]) => p));
   const { hidden } = arrangeTabs(barTabs().map(([id]) => id), d);
   return h('div', { class: 'showhide' },
     profileCard(),
     h('section', { class: 'card' },
-      h('h2', {}, 'Show or hide'),
+      h('h2', {}, 'Hide items'),
       h('p', { class: 'hint help', style: 'margin:0' }, 'Everything you can hide, by area. Each group has its own reset, so you can bring one area back without touching the rest. The same switches are on their own pages too.'),
-      basicMode() ? h('p', { class: 'hint', style: 'margin:6px 0 0' }, 'The Basic profiles also hide the extras listed above, whatever these switches say.') : null),
+      ),
     h('section', { class: 'card', 'data-group': 'tips' },
       h('h3', { style: 'margin-top:0' }, 'Tips and help'),
       sw('Show tips and help text', !st.hideTips, v => save({ hideTips: !v }).then(() => hooks.render()), 'Explanations around the app, the privacy and photo reminders, and the tips for the tags you pick.'),
@@ -708,7 +703,7 @@ export function renderShowHide() {
       h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'The case box, All tags and Save always stay.'),
       CASE_PARTS.map(([part, label]) => sw(label, caseOn(part), v => setCase(part, v))),
       groupReset('every part of the Case tab', () => save({ caseHide: null }))),
-    logbookOnly() ? null : h('section', { class: 'card', 'data-group': 'reflections' },
+    h('section', { class: 'card', 'data-group': 'reflections' },
       h('h3', { style: 'margin-top:0' }, 'Reflections'),
       sw('Formatting buttons (this device)', !!d.reflToolbar, v => applyDisplay(setDisplay({ reflToolbar: v || null })), 'Bold, bullet and numbered lists above each box.'),
       sw('Show notes under each heading', st.reflNotes !== false, v => save({ reflNotes: v })),
@@ -721,7 +716,7 @@ export function renderShowHide() {
       h('h3', { style: 'margin-top:0' }, 'Header and tabs (this device)'),
       sw('Show the header (the app’s name and your name)', !d.hideHeader, v => applyDisplay(setDisplay({ hideHeader: !v }))),
       sw('Swipe left or right to change tab', d.swipeTabs !== false, v => applyDisplay(setDisplay({ swipeTabs: v ? null : false }))),
-      barTabs().filter(([id]) => id !== 'more' && switchable(id)).map(([id, label]) => sw(`${label} on the tab bar`, !hidden.includes(id), v => setTabOnBar(id, v, () => hooks.render()))),
+      barTabs().filter(([id]) => id !== 'more').map(([id, label]) => sw(`${label} on the tab bar`, !hidden.includes(id), v => setTabOnBar(id, v, () => hooks.render()))),
       h('p', { class: 'hint help', style: 'margin:0 0 6px' }, `Up to ${MAX_BAR} tabs fit, More included. Hidden tabs are first in More. The order is in Display → Advanced.`),
       groupReset('the header, swiping and the usual tabs (Notes and the More pages go back into More)', () => { applyDisplay(setDisplay({ hideHeader: null, swipeTabs: null, tabHidden: null, tabOrder: null })); hooks.paintTabs?.(); })));
 }

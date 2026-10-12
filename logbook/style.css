@@ -140,7 +140,7 @@ textarea { width: 100%; resize: vertical; }
 label.field { display: grid; gap: 4px; font-size: calc(13px * var(--fs, 1)); font-weight: 600; margin-bottom: 10px; }
 label.field input, label.field select { width: 100%; }
 label.check { display: flex; gap: 8px; align-items: center; min-height: 40px; }
-label.check input { width: 20px; height: 20px; }
+label.check input { width: 20px; height: 20px; flex: none; }
 /* Profile (Show or hide): a name and one line per choice */
 label.check.profile-opt { align-items: flex-start; padding: 6px 0; }
 label.check.profile-opt input { margin-top: 2px; flex: none; }
@@ -1183,6 +1183,10 @@ details.an-sec > summary { align-items: flex-start; padding-right: 30px; }
 /* Display preview: a made-up row drawn with the app's own classes, in view while the page scrolls */
 .display-preview { position: sticky; top: var(--pin-top, 0px); z-index: 6; background: var(--panel); border: 1px solid var(--edge, var(--line)); border-radius: var(--radius, calc(14px * var(--round, 1))); padding: 6px 12px 10px; margin-bottom: 12px; box-shadow: 0 8px 12px -12px rgba(0,0,0,.4); pointer-events: none; }
 .display-preview .dp-label { font-size: calc(11px * var(--fs, 1)); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+/* clearly only a preview (owner): a dashed accent edge, faint stripes and a labelled pill */
+.display-preview { border: 2px dashed var(--accent); background: repeating-linear-gradient(135deg, var(--panel) 0 10px, color-mix(in srgb, var(--accent) 6%, var(--panel)) 10px 20px); }
+.display-preview .dp-label { display: inline-block; margin: 2px 0 2px; padding: 1px 9px; border-radius: 999px; background: var(--accent); color: var(--accent-ink, #fff); }
+html.shadows .display-preview { border-color: var(--accent); }
 .display-preview ul.cases li { border-bottom: 0; padding: 6px 22px 6px 0; cursor: default; }
 .display-preview .chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .display-preview .chips .grow { flex: 1; }

@@ -1691,7 +1691,9 @@ async function run(label, ctxOpts) {
   await step('display: corners, shadows, bigger tap targets; tab bar order and hidden tabs (listed on More)', async () => {
     await tab('display');
     await p.locator('input[type=range][aria-label="Corners"]').fill('0');
-    await p.getByLabel('Soft shadows instead of lines around cards').check(); await nap(150);
+    await p.getByLabel('Soft shadows instead of lines around cards (default)').uncheck(); await nap(150);
+    assert(await p.evaluate(() => !document.documentElement.classList.contains('shadows')), 'shadows not off');
+    await p.getByLabel('Soft shadows instead of lines around cards (default)').check(); await nap(150);
     assert(await p.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--round').trim() === '0' && document.documentElement.classList.contains('shadows')), 'corners or shadows not applied');
     await tab('displayadv');
     await p.getByLabel('Show Reflections').uncheck();
@@ -1706,7 +1708,7 @@ async function run(label, ctxOpts) {
     await tab('display');
     await p.locator('.reset-row button', { hasText: 'Reset this page' }).click();
     await p.locator('dialog[open] button', { hasText: /^Reset$/ }).click(); await nap(300);
-    assert(await p.evaluate(() => !document.documentElement.style.getPropertyValue('--round') && !document.documentElement.classList.contains('shadows')), 'display reset left corners/shadows');
+    assert(await p.evaluate(() => !document.documentElement.style.getPropertyValue('--round') && document.documentElement.classList.contains('shadows')), 'display reset left corners or turned the default shadows off');
   });
 
   await step('optional: ⋯ menu on Logbook rows; swipe between tabs (not from the case box)', async () => {
