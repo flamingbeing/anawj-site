@@ -112,7 +112,7 @@ await tryit(async () => {
 await tryit(async () => {
   const { ctx, pg } = await fresh();
   await open(pg, 0);
-  await pg.click('.minicard'); await pg.waitForSelector('details.sect');
+  await pg.click('#haemolink'); await pg.click('.minicard'); await pg.waitForSelector('details.sect');
   const last = pg.locator('details.sect').last().locator('.fld').last().locator('input, .chip').first();
   await last.focus(); await pg.keyboard.press('Enter');
   log(!await pg.$('dialog.ask[open]'), 'Enter on the last question: no error, no prompt');
@@ -127,7 +127,6 @@ await tryit(async () => {
   await open(pg, 1);
   await pg.click('[data-ev="io_done"]'); await pg.waitForTimeout(300);
   log(/End of surgery/.test(await pg.textContent('#clock .next')), 'after Surgery end the top bar asks for the End reading');
-  log(/\d+ to answer/.test(await pg.textContent('.links a[href$="/form/intraop"]')), 'Intra-op details shows how many are left');
   await pg.clock.fastForward('00:06:00'); await pg.waitForTimeout(1500);
   const g = await pg.textContent('#gaps');
   log(/Intra-op temps not saved:[^:]*End/.test(g), 'missed End temp listed: ' + g);
@@ -138,6 +137,9 @@ await tryit(async () => {
   log(/Still to fill/.test(msg) && !/Data collection complete/.test(await pg.textContent('main')), 'Mark complete asks first; Cancel leaves it open');
   await pg.click('#gaps a[href*="/iotemp/"]'); await pg.waitForTimeout(400);
   log(pg.url().includes('/iotemp/'), 'the link opens the first missed intra-op temp');
+  await pg.click('#haemolink'); await pg.waitForSelector('input[data-in="sbp"]');
+  log(/\d+ to answer/.test(await pg.textContent('.links a[href$="/form/intraop"]')), 'Intra-op details (BP, HR, BIS tab) shows how many are left');
+  log(!!await pg.$('#gaps'), 'still to fill on the BP, HR, BIS tab too');
   await ctx.close();
 });
 await b.close();

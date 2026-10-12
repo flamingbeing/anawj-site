@@ -327,6 +327,7 @@ function askLeave(g, proceed) {
 $('#fresh').onclick = () => render();
 $('#banner').onclick = () => { $('#banner').hidden = true; };
 function header(title, back, extra = '') {
+  $('#ptabs').hidden = true; $('#ptabs').innerHTML = '';
   $('#title').textContent = title;
   $('#back').hidden = !back; $('#back').onclick = () => go(back);
   $('#extra').innerHTML = extra;
@@ -492,7 +493,12 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
   if (!s || (s === 'prewarm' && noWarming(p))) s = defaultSeries(p);
   const main = s !== 'haemo';
   const def = SERIES[s], pts = pointsFor(p, s);
-  header(main ? sid(p) : sid(p) + ' · BP, HR, BIS', main ? '#/' : '#/p/' + id);
+  header(sid(p), '#/');
+  // two tabs under the bar (owner, 12 Oct 2026): temperatures, and BP / HR / BIS with the other forms; each warms up
+  // and pulses as its next reading falls due
+  const tabs = $('#ptabs'); tabs.hidden = false;
+  tabs.innerHTML = `<a role="tab" id="templink" href="#/p/${id}" aria-selected="${main}" data-state="${haemoState(p, defaultSeries(p))}">Temperatures</a>`
+    + `<a role="tab" id="haemolink" href="#/p/${id}/haemo" aria-selected="${!main}" data-state="${haemoState(p)}">BP, HR, BIS</a>`;
   const refreshBar = topBar(p, s, () => draw());
   let editing = null; // event whose time is being changed
   let typing = null; // the BP / HR / BIS box with the keyboard up
@@ -594,6 +600,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
       <div class="seg comfort5">${COMFORT.map(([ov, ol]) => `<button class="chip" data-sat="${id}" data-v="${ov}" aria-pressed="${String(v) === String(ov)}">${ol.replace('omfortable', 'omfort&shy;able')}</button>`).join('')}</div></div>`;
   }
   function linksHtml() {
+    if (main) return `<div class="textlinks"><a href="#/p/${id}/form">Form view</a><a href="#/p/${id}/sheet">Sheet view</a></div>`;
     const done = pg => val(p, 'sign_' + pg) ? ' ✓' : '';
     // once their stage has come: how many questions are left
     const todo = (ids, from) => {
@@ -601,13 +608,11 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
       const n = ids.map(field).filter(f => f && isShown(f, k => val(p, k)) && val(p, f.id) == null).length;
       return n ? `${n} to answer` : '';
     };
-    const haemo = pointsFor(p, 'haemo').filter(x => savedAt(p, 'haemo', x.key)).length;
-    return `<nav class="links" aria-label="Other forms">
-      <a href="#/p/${id}/haemo" id="haemolink" data-state="${haemoState(p)}">BP, HR, BIS${done('haemo')}<small>${haemo ? haemo + ' saved' : 'Baseline in OT'}</small></a>
+    return `<nav class="links two" aria-label="Other forms">
       <a href="#/p/${id}/form/intraop">Intra-op details${done('intraop')}<small>${todo(INTRAOP_Q, 'io_done') || 'Blood, products, tests'}</small></a>
       <a href="#/p/${id}/form/pacu">PACU${done('pacu')}<small>${todo(PACU_Q, 'pacu_in') || 'Temp, NuDESC, delay'}</small></a>
       </nav>
-      <div class="textlinks"><a class="minicard" href="#/p/${id}/data">Other data</a><a href="#/p/${id}/form">Form view</a><a href="#/p/${id}/sheet">Sheet view</a></div>`;
+      <div class="textlinks"><a class="minicard" href="#/p/${id}/data">Other data</a></div>`;
   }
   // previous / next timepoint: big buttons either side of the tabs and the timepoint strip
   function navHtml() {
@@ -629,13 +634,13 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     const due = dueOf(p, s, pt);
     const grp = s === 'prewarm' ? `<span class="badge">${GROUPS.find(g => String(g[0]) === String(val(p, 'arm')))?.[1] || 'Group not set'}</span>` : '';
     paint(`${main && val(p, 'done') ? `<p class="ok-box donetop">✓ Data collection complete <small>${esc(val(p, 'done'))}</small></p>` : ''}${main ? comfortHtml('sat_pre', 'Comfortable before surgery?') + timesHtml() : ''}${navHtml()}
-      <div class="tp"><div><b>${pt.label}</b> ${grp}</div><div class="due" id="due">${due != null ? 'due ' + fromMin(Math.round(due)) : pt.key === 'base' ? (s === 'prewarm' ? '' : 'on arrival in OT') : pt.min != null ? `<span class="hint">Set “${s === 'prewarm' ? 'Prewarm on' : 'Induction'}” for due times</span>` : ''}</div></div>
+      <div class="tp"><div><b>${pt.label}</b> ${grp}</div><div class="due" id="due">${due != null ? 'due ' + fromMin(Math.round(due)) : pt.key === 'base' ? (s === 'prewarm' ? '' : 'on arrival in OT') : pt.min != null ? `<span class="hint">Log ${s === 'prewarm' ? 'Prewarm on' : 'Induction'} first</span>` : ''}</div></div>
       ${isSaved ? `<p class="muted small tight">Saved ${esc(savedAt(p, s, pt.key))}${p.f['at_' + s + '_' + pt.key]?.by ? ' by ' + esc(p.f['at_' + s + '_' + pt.key].by) : ''}. Changes save when you tap Save.</p>` : ''}
       <div class="board">${cols.map(card).join('')}</div>
       <button class="save big" id="save">${isSaved ? 'Save changes' : `Save ${pt.label} reading`}</button>
       ${s === 'haemo' && vitalsCollected(p) ? '<p class="okline small">✓ Vital signs data collected: ticked on the paper form</p>' : ''}
       ${s === 'haemo' && settings.hide.haemo15 ? `<p class="muted small">Only baseline is entered here; the 15-min rows come from the monitor download. Turn them on in Settings.</p>` : ''}
-      ${main ? comfortHtml('sat_post', 'Comfortable after surgery?') + linksHtml() + gapsHtml(p) + doneHtml(p) : signoffHtml(p, s)}`);
+      ${main ? comfortHtml('sat_post', 'Comfortable after surgery?') + linksHtml() + gapsHtml(p) + doneHtml(p) : linksHtml() + gapsHtml(p) + signoffHtml(p, s) + doneHtml(p)}`);
     refreshBar();
     if (editing) { const i = $('#evtime'); i?.focus(); }
     if (typing) { const i = view.querySelector(`[data-in="${typing}"]`); i?.focus(); }
@@ -748,10 +753,10 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
   // readings fall due (main screen)
   const hl = setInterval(() => {
     const a = $('#haemolink'); if (a) a.dataset.state = haemoState(p);
-    if (!main) return;
+    const tl = $('#templink'); if (tl) tl.dataset.state = haemoState(p, defaultSeries(p));
     const gp = $('#gaps'), h = gapsHtml(p);
     if (gp && gp.outerHTML !== h) { if (h) gp.outerHTML = h; else gp.remove(); }
-    else if (!gp && h) $('[data-done], [data-undone]')?.closest('.sign')?.insertAdjacentHTML('beforebegin', h);
+    else if (!gp && h) view.querySelector('.sign')?.insertAdjacentHTML('beforebegin', h);
   }, 1000);
   cleanup.push(() => clearInterval(hl));
 });
@@ -831,14 +836,18 @@ function gapsHtml(p) {
   return `<div class="gaps" id="gaps"><b>Still to fill</b><ul>${g.map(x => `<li><a href="${x.href}">${esc(x.what)}</a>: ${x.items.map(esc).join(', ')}</li>`).join('')}</ul></div>`;
 }
 function doneHtml(p) {
-  const v = val(p, 'done');
-  return `<div class="sign">${v ? `Data collection complete: ${esc(v)} <button class="link" data-undone>Undo</button>` : `<button class="link" data-done>Mark data collection as complete</button>`}</div>`;
+  return tickHtml(!!val(p, 'done'), 'data collection', val(p, 'done') || '', 'data-undone', 'data-done').replace('Mark data collection complete', 'Mark data collection as complete').replace('<b>data collection complete', '<b>Data collection complete');
 }
 
 // ---------- section sign-off (replaces the paper form's Name / Signature / Date)
+// each sign-off names its section, and shows a ticked box once marked (owner, 12 Oct 2026)
+const SECTION = { haemo: 'BP, HR, BIS', intraop: 'Intra-op details', pacu: 'PACU', satis: 'Patient comfort' };
+const tickHtml = (on, label, who, undo, mark) => on
+  ? `<div class="sign on"><span class="tick" aria-hidden="true">✓</span><span><b>${esc(label)} complete</b><small>${esc(who)}</small></span><button class="link" ${undo}>Undo</button></div>`
+  : `<div class="sign"><button class="tickbtn" ${mark}><span class="tick" aria-hidden="true"></span>Mark ${esc(label)} complete</button></div>`;
 function signoffHtml(p, pg) {
-  const v = val(p, 'sign_' + pg);
-  return `<div class="sign">${v ? `Marked complete: ${esc(v)} <button class="link" data-unsign="${pg}">Undo</button>` : `<button class="link" data-sign="${pg}">Mark section complete</button>`}</div>`;
+  const name = SECTION[pg] || PAGES.find(x => x.id === pg)?.title || 'section';
+  return tickHtml(!!val(p, 'sign_' + pg), name, val(p, 'sign_' + pg) || '', `data-unsign="${pg}"`, `data-sign="${pg}"`);
 }
 function signoffClick(p, pg, t) {
   if (t.closest('[data-sign]')) {
@@ -848,10 +857,10 @@ function signoffClick(p, pg, t) {
 }
 
 // BP / HR / BIS: the next 15-min reading's state, like the due time (readings missed by over 15 min are let go)
-function haemoState(p) {
-  const now = nowFor(p, 'haemo');
-  const lefts = pointsFor(p, 'haemo').filter(x => !savedAt(p, 'haemo', x.key))
-    .map(x => dueOf(p, 'haemo', x)).filter(d => d != null && expected(p, 'haemo', d)).map(d => d - now).filter(l => l > -15);
+function haemoState(p, s = 'haemo') {
+  const now = nowFor(p, s);
+  const lefts = pointsFor(p, s).filter(x => !savedAt(p, s, x.key))
+    .map(x => dueOf(p, s, x)).filter(d => d != null && expected(p, s, d)).map(d => d - now).filter(l => l > (s === 'haemo' ? -15 : -5));
   if (!lefts.length) return 'later';
   const left = Math.min(...lefts);
   return left > 2 ? 'later' : left > 0 ? 'soon' : left > -5 ? 'now' : 'late';
@@ -864,7 +873,7 @@ const vitalsCollected = p => Object.keys(p.f).some(k => /^haemo_/.test(k) && val
 // question, ↑ to the one before; on a row of choices ← → move along it and Enter or Space picks one and moves on.
 route(/^\/p\/(\w+)\/data$/, id => {
   const p = patients[id]; if (!p) return go('#/');
-  header(sid(p) + ' · Other data', '#/p/' + id);
+  header(sid(p) + ' · Other data', `#/p/${id}/haemo`);
   topBar(p, defaultSeries(p));
   const get = k => val(p, k);
   const closed = new Set();
@@ -934,7 +943,7 @@ route(/^\/p\/(\w+)\/form\/(\w+)$/, (id, pg) => {
   const p = patients[id]; if (!p) return go('#/');
   if (OTHER_PAGES.includes(pg)) return go(`#/p/${id}/data`);
   if (!FORM[pg]) return go('#/p/' + id);
-  header(sid(p) + ' · ' + PAGES.find(x => x.id === pg).title, '#/p/' + id);
+  header(sid(p) + ' · ' + (SECTION[pg] || PAGES.find(x => x.id === pg).title), `#/p/${id}/haemo`);
   topBar(p, defaultSeries(p));
   const get = k => val(p, k);
   const draw = () => {
