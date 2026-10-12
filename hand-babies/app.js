@@ -1,4 +1,4 @@
-// Hand assessment: draws the teaching figures (inline SVG), copy button, offline worker. No data leaves the phone.
+// Hand assessment: draws the teaching figures (inline SVG), offline worker. No data leaves the phone.
 'use strict';
 
 const SKIN = '#f6dcc8', EDGE = '#8a6450', CREASE = '#c49a82';
@@ -335,19 +335,6 @@ function tick() {
 }
 window.handFigs = { FIGS, still }; // used by tools/make-gifs.mjs
 
-
-// copy the referral template
-const copyBtn = document.getElementById('copy');
-copyBtn?.addEventListener('click', async () => {
-  const text = document.getElementById('tpl').textContent;
-  const msg = document.getElementById('copied');
-  try { await navigator.clipboard.writeText(text); msg.textContent = 'Copied. Paste into your message and fill the blanks.'; }
-  catch {
-    const r = document.createRange(); r.selectNodeContents(document.getElementById('tpl'));
-    const s = getSelection(); s.removeAllRanges(); s.addRange(r);
-    msg.textContent = 'Selected: use your phone\'s Copy.';
-  }
-});
 
 // opening a scenario from a link (#pic-cut etc.) opens it
 function openFromHash() {

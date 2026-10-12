@@ -9,7 +9,7 @@ const BASE = `http://localhost:${process.env.PORT || 8080}/hand-babies/`;
 const SHOTS = process.env.SHOTS;
 
 const b = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH, args: ['--no-sandbox'] } : {});
-const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, permissions: ['clipboard-read', 'clipboard-write'] });
+const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
 const page = await ctx.newPage();
 const errors = [];
 page.on('pageerror', e => errors.push(e.message));
@@ -67,14 +67,9 @@ try {
   await page.goto(BASE + '#pic-infect');
   assert.ok(await page.$eval('#pic-infect', d => d.open), 'hash opens scenario');
 
-  // copy template
-  await page.click('#copy');
-  await page.waitForFunction(() => document.getElementById('copied').textContent.length > 0);
-  assert.match(await page.evaluate(() => navigator.clipboard.readText()), /HAND REFERRAL/);
-
   if (SHOTS) {
     await page.goto(BASE);
-    for (const id of ['rules', 'picture', 'sensation', 'tendons', 'infection', 'photos', 'call', 'quiz']) {
+    for (const id of ['rules', 'picture', 'sensation', 'tendons', 'infection', 'photos', 'call']) {
       if (id === 'picture') await page.$eval('#pic-cut', d => { d.open = true; });
       await page.evaluate(() => document.querySelectorAll('.fig-btn').forEach(b => { if (/Pause/.test(b.textContent)) b.click(); }));
       const s = await page.$(`#${id}`);
