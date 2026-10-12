@@ -9,6 +9,7 @@
   --navy: #002f6c;          /* n-navy */
   --navy-hover: #2c6597;    /* n-navy-hover */
   --cyan: #00a9e0;          /* n-cyan: marks only, never text on white */
+  --stripe-blue: #178fd7;   /* n-stripe-blue: third quarter of the top band */
   --link: #337ab7;          /* n-blue */
   --link-hover: #d7340b;    /* n-hover-light */
   --orange: #e57200;        /* n-orange */
@@ -45,7 +46,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 .top { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; padding: 17px 16px 12px; }
 /* NUHS four-colour band along the top of the header, as on the logbook */
-.top { background: linear-gradient(90deg, var(--orange) 0 25%, var(--red) 25% 50%, var(--cyan) 50% 75%, var(--navy) 75% 100%) top / 100% 5px no-repeat, var(--panel); border-bottom: 1px solid var(--line); }
+.top { background: linear-gradient(90deg, var(--orange) 0 25%, var(--red) 25% 50%, var(--stripe-blue) 50% 75%, var(--navy) 75% 100%) top / 100% 5px no-repeat, var(--panel); border-bottom: 1px solid var(--line); }
 .top h1 { margin: 0; font-size: 1.125rem; font-weight: 600; color: var(--navy); }
 .privacy { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
 .team { display: flex; gap: 8px; flex-wrap: wrap; }

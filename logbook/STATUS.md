@@ -86,6 +86,8 @@ Last updated: 2026-10-12 by Claude Code, Logbook 1 (log1).
 - 2026-10-12: Basic mode never hides silently: where it hides something, say so with a way to turn it off. Two Basic
   switches (Settings, Show or hide) confused the owner; profiles (log2) should have one place only.
 - 2026-10-12: Installed-app sign-in error page ("missing initial state") left as is for now: sign-in still works.
+- 2026-10-12: The top band's third quarter is the NUHS site's blue `#178fd7`, not cyan (owner): the site's stripe is four
+  equal quarters (orange, red, blue, navy). Logbook, evals, roster, privacy and `design/` all use it; NUH tab colours too.
 - 2026-10-12: Reflections list: topics as headings with a count pill (owner); "+ New" instead of "+ New reflection";
   "Pin the search box" covers Reflections too, with sticky topic names.
 - 2026-10-12: "Line width" renamed "Page width" with a Full choice; the demo no longer forces the header back; Leave /

@@ -11,7 +11,7 @@ Unofficial. The values were read from the public site's stylesheet (`main.min.cs
 
 - **Navy and white.** Navy `#002F6C` carries the heavy parts: side panel, footer, primary buttons. Most of the page is white.
 - **Light, large headings.** Open Sans 300 in navy. Size does the work, not weight.
-- **Colour as a thin line.** Orange, red and cyan appear as stripes and underlines, rarely as fills. The header has an orange / red / navy stripe; quick-action tiles have a 4px coloured bar underneath.
+- **Colour as a thin line.** Orange, red, blue and cyan appear as stripes and underlines, rarely as fills. The header has a stripe of four equal quarters (orange, red, blue, navy); quick-action tiles have a 4px coloured bar underneath.
 - **Square, flat blocks.** Full-width bands, no rounding, no shadow. Only buttons and inputs get a 5px radius.
 - **Two-up feature bands.** Half photo, half soft colour (beige, periwinkle, pale blue) with a centred Light heading and one outline button. The image side alternates.
 
@@ -26,6 +26,7 @@ Unofficial. The values were read from the public site's stylesheet (`main.min.cs
 | `--n-blue-bright` | `#1C8ED7` | Full-width gallery band |
 | `--n-orange` | `#E57200` | Brand stripe, first tile bar |
 | `--n-red` | `#E4002B` | Brand stripe, alert button |
+| `--n-stripe-blue` | `#178FD7` | Third quarter of the brand stripe (not cyan) |
 | `--n-hover-light` | `#D7340B` | Link / outline-button hover on light backgrounds |
 | `--n-hover-dark` | `#F7941D` | Link / outline-button hover on navy |
 | `--n-navy-hover` | `#2C6597` | Primary button hover |
@@ -66,7 +67,7 @@ Open Sans, weights 300 / 400 / 600 / 700, from Google Fonts. Base 16px, line hei
 ## Components (in `tokens.css`)
 
 - `.n-btn` (navy), `--secondary` (link blue), `--alert` (red), `--outline` (the "View More" button: thin border in the band's text colour, 14px text).
-- `.n-stripe`: the orange / red / navy header bar (1 : 1 : 2).
+- `.n-stripe`: the header bar, four equal quarters: orange, red, blue (`--n-stripe-blue`), navy. Give it four empty children. Apps draw the same four quarters as a 5px band along the top of their header.
 - `.n-tile`: line icon + label with a coloured bottom bar. Set `--n-tile` per tile.
 - `.n-dark`: navy surface that flips text to white and hover to orange.
 - `.n-menu`: large Light menu on navy with a cyan block for `aria-current`.

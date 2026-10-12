@@ -24,14 +24,15 @@
   --done: #2da44e;
   --tabbar-h: 0px;
   --safe-b: env(safe-area-inset-bottom, 0px);
-  /* NUHS palette: navy, cyan, red, orange */
+  /* NUHS palette: navy, cyan, red, orange, and the stripe's blue (the third quarter of the top band; not cyan) */
   --nuhs-navy: #002f6c;
   --nuhs-cyan: #00a9e0;
+  --nuhs-blue: #178fd7;
   --nuhs-red: #e4002b;
   --nuhs-orange: #e57200;
   /* what a colour theme (Settings → Display → Theme) changes beyond the palette above */
   --heading: var(--nuhs-navy);
-  --s1: var(--nuhs-orange); --s2: var(--nuhs-red); --s3: var(--nuhs-cyan); --s4: var(--nuhs-navy);
+  --s1: var(--nuhs-orange); --s2: var(--nuhs-red); --s3: var(--nuhs-blue); --s4: var(--nuhs-navy);
   color-scheme: light;
 }
 
