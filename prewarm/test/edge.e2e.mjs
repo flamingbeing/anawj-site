@@ -385,6 +385,16 @@ await tryit(async () => {
   log(!!await pg.$('dialog.ask[open]'), 'typed temperature then back: asks to save');
   await ctx.close();
 });
+// U. a temperature due now also shows in the Others tab's top bar (BP isn't due before In OT)
+await tryit(async () => {
+  const { ctx, pg } = await fresh();
+  await open(pg, 0);
+  const main = await pg.textContent('#clock .next'), st = await pg.getAttribute('#clock .next', 'data-state');
+  log(/Temp/.test(main) && /now|late/.test(st), 'demo pre-warming patient has a temperature due: ' + main);
+  await pg.click('#haemolink'); await pg.waitForSelector('#haemolink[aria-selected="true"], .haemo, #clock'); await pg.waitForTimeout(400);
+  log((await pg.textContent('#clock .next')) === main, 'Others tab top bar shows the temperature due: ' + await pg.textContent('#clock .next'));
+  await ctx.close();
+});
 await b.close();
 if (fails.length) { console.error('prewarm edge: FAIL\n- ' + fails.join('\n- ')); process.exit(1); }
-console.log('prewarm edge: ok (midnight, surgery end, double-tap Save, BP checks, back button, Log, Enter, still to fill, swipe, stray taps, time order, corrections, BMI, follow-ups, blanks, typed answers, alerts everywhere, duplicates, storage full, lock warning, late readings, delete and restore, prewarm off alert, warming yes / no, touch double taps, typing then leaving)');
+console.log('prewarm edge: ok (midnight, surgery end, double-tap Save, BP checks, back button, Log, Enter, still to fill, swipe, stray taps, time order, corrections, BMI, follow-ups, blanks, typed answers, alerts everywhere, duplicates, storage full, lock warning, late readings, delete and restore, prewarm off alert, warming yes / no, touch double taps, typing then leaving, other tab due)');
