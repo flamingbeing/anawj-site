@@ -7,7 +7,7 @@ import { renderLog, focusLog, logCasesChanged, clearDrafts, SHARED_KEY } from '.
 import { renderRecovery } from './ui-recovery.js';
 import { renderLogbook } from './ui-logbook.js';
 import { renderProgress, renderTotals } from './ui-progress.js';
-import { applyCompact, cachedCompact, applyTheme, cachedTheme, applyTextSize, cachedTextSize, applyZoom, cachedZoom, stepZoom, applyAccent, adoptDisplay, applyDisplay, applyCustomCss, display, setDisplay, resetDisplay, DISPLAY_KEYS, renderTagEditor, renderDisplay, renderDisplayAdvanced, renderLogging, renderLoggingAdvanced, renderReflectionSettings, renderMarkdownSettings, renderShowHide, START_TABS, arrangeTabs, privacyCard, creditsCard, signOutCard } from './ui-settings.js';
+import { applyCompact, cachedCompact, applyTheme, cachedTheme, applyTextSize, cachedTextSize, applyZoom, cachedZoom, stepZoom, applyAccent, adoptDisplay, applyDisplay, applyCustomCss, display, setDisplay, resetDisplay, DISPLAY_KEYS, renderTagEditor, renderDisplay, renderDisplayAdvanced, renderAccessibility, IPHONE_APP, renderLogging, renderLoggingAdvanced, renderReflectionSettings, renderMarkdownSettings, renderShowHide, START_TABS, arrangeTabs, privacyCard, creditsCard, signOutCard } from './ui-settings.js';
 import { renderAccount, flush as flushProfile } from './ui-account.js';
 import { renderCaseLogs, renderCaseLog, renderProgramme } from './ui-caselogs.js';
 import { renderAdmin, renderAdminResidents, renderAdminAdvanced, leaveAdmin } from './ui-admin.js';
@@ -36,6 +36,7 @@ const ICONS = {
   recovery: 'M3 11a9 9 0 1 1 3 8M3 4v7h7M12 7v5l3 2',
   data: 'M12 3v12M7 10l5 5 5-5M5 21h14',
   display: 'M3 5h18v12H3zM8 21h8M12 17v4',
+  access: 'M12 5.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zM5 8l7 1.5L19 8M12 9.5V14M12 14l-3 7M12 14l3 7',   // a figure, arms out
   logging: 'M12 5v14M5 12h14',
   showhide: 'M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z',
   tags: 'M3 12V4h8l10 10-8 8L3 12zM7.5 7.5h.01',
@@ -75,7 +76,8 @@ const TABS = [
   { id: 'data', bar: true, short: 'Export', label: 'Export / Import', render: () => renderDataPage(), hidden: true, under: 'more', desc: 'Export the portfolio (Word); import reflections from Word; backup file, Excel and Markdown export' },
   { id: 'reflimport', label: 'Import reflections from Word', render: () => renderReflImport(), hidden: true, under: 'data', unlisted: true },
   // Settings' own pages (not in the More list)
-  { id: 'display', label: 'Display', render: renderDisplay, hidden: true, under: 'settings', unlisted: true, desc: 'Light or dark, colour, zoom, text size, borders; fonts and more under Advanced' },
+  { id: 'display', label: 'Display', render: renderDisplay, hidden: true, under: 'settings', unlisted: true, desc: 'Light or dark, colour, compact, borders; fonts and more under Advanced' },
+  { id: 'access', label: 'Accessibility', render: renderAccessibility, hidden: true, under: 'settings', unlisted: true, desc: 'Zoom, text size, bigger taps, contrast, motion, swipe gestures' },
   { id: 'displayadv', label: 'Advanced display', render: renderDisplayAdvanced, hidden: true, under: 'display', unlisted: true },
   { id: 'loggingadv', label: 'Advanced logging', render: renderLoggingAdvanced, hidden: true, under: 'logging', unlisted: true },
   { id: 'sharefmt', label: 'Markdown', render: renderMarkdownSettings, hidden: true, under: 'settings', unlisted: true, desc: 'How Copy, Share and the notes export read' },
@@ -148,7 +150,7 @@ function installCard() {
 // Search in Settings (owner): the options of every settings page and its Advanced page, read from the pages
 // themselves (each is drawn once, off screen, the first time someone types), so the index never goes stale.
 // A result opens its page and scrolls to the option, which flashes.
-const SEARCH_PAGES = ['display', 'displayadv', 'logging', 'loggingadv', 'reflset', 'sharefmt'];
+const SEARCH_PAGES = ['display', 'displayadv', 'access', 'logging', 'loggingadv', 'reflset', 'sharefmt'];
 let settingsIndex = null, findAfterRender = '';
 const optionText = n => {
   if (n.matches('label.field')) return [...n.childNodes].filter(c => c.nodeType === 3).map(c => c.textContent).join(' ').trim();
@@ -200,7 +202,7 @@ function settingsSearch() {
 
 // Settings: a short menu of its pages (residency year on top for people not on the programme list)
 function renderSettingsMenu() {
-  const order = ['display', 'logging', 'showhide', 'tags', 'reflset', 'sharefmt'];
+  const order = ['display', 'access', 'logging', 'showhide', 'tags', 'reflset', 'sharefmt'];
   const pages = TABS.filter(t => t.under === 'settings').sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
   settingsIndex = null;   // drawn again on the first search of this visit
   return h('div', {},
@@ -401,17 +403,107 @@ function render() {
   S.tab = tab.id;
   applyCustomCss();   // never on the Display page, so a bad rule can always be fixed there
   const y = window.scrollY;
-  // pages opened from More get a way back to the list
+  // pages under a tab get a way back: "‹ Settings" in the header, in place of the app's name (owner, 13 Oct 2026),
+  // or at the top of the page when the header is hidden (Advanced display)
   const backTo = tab.under && navigation.backTarget(tab.under);
-  fill(app, backTo ? h('p', { class: 'back-row' }, h('a', { class: 'btn small', href: '#' + backTo,
-    onclick: e => { e.preventDefault(); navigation.back(tab.under); } }, '← ' + ((TABS.find(t => t.id === backTo) || {}).label || 'Back'))) : null, tab.render());
+  const back = backTo ? h('p', { class: 'back-row' }, h('a', { class: 'back-link', href: '#' + backTo,
+    onclick: e => { e.preventDefault(); navigation.back(tab.under); } }, h('span', { class: 'back-chev', 'aria-hidden': 'true' }, '‹'), (TABS.find(t => t.id === backTo) || {}).label || 'Back')) : null;
+  const brand = document.querySelector('.top .brand');
+  brand?.querySelector('.back-row')?.remove();
+  const inHeader = back && brand && !document.documentElement.classList.contains('no-header');
+  if (inHeader) brand.prepend(back);
+  document.body.classList.toggle('header-back', !!inHeader);
+  const dir = slideDirection(lastRendered, tab.id), ghost = dir ? pageGhost() : null;
+  fill(app, inHeader ? null : back, tab.render());
   if (tab.id !== 'log') window.scrollTo(0, y);
   if (findAfterRender) showFound();
   // the inverted Case tab (Settings → Display, phones) opens at the bottom, where the case box is
   else if (lastRendered !== 'log' && invertedCase()) requestAnimationFrame(() => window.scrollTo(0, document.documentElement.scrollHeight));
   lastRendered = tab.id;
+  if (ghost) slidePages(ghost, dir);
 }
 let lastRendered = '';
+
+// Going into a page under a tab slides it in from the right over the one you left, which moves a little left and
+// dims; going back slides the page off to the right (owner's Apple-apps review). The page you left is a still copy
+// (the ghost), fixed where it was on the screen; the real page is pinned while it moves, so nothing widens the
+// screen. Only within one bar tab (switching tabs never slides) and not while swiping or with Reduce motion.
+const depthOf = id => { let n = 0; for (let t = TABS.find(x => x.id === id); t && t.under; t = TABS.find(x => x.id === t.under)) n++; return n; };
+function slideDirection(from, to) {
+  if (!from || from === to || reduceMotion() || document.documentElement.classList.contains('swiping') || !app.firstChild) return 0;
+  if (barTabOf(from).sel !== barTabOf(to).sel) return 0;
+  const a = depthOf(from), b = depthOf(to);
+  return b > a ? 1 : b < a ? -1 : 0;
+}
+function pageGhost() {
+  // a plain <div> (not a second <main>), with main's padding, holding a copy of the page
+  const r = app.getBoundingClientRect(), cs = getComputedStyle(app);
+  const g = h('div', { class: 'page-ghost', 'aria-hidden': 'true' });
+  g.append(...[...app.childNodes].map(n => n.cloneNode(true)));
+  g.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
+  g.inert = true;
+  Object.assign(g.style, { top: r.top + 'px', left: r.left + 'px', width: r.width + 'px', padding: cs.padding, boxSizing: cs.boxSizing });
+  return g;
+}
+let sliding = null;
+function slidePages(ghost, dir) {
+  sliding?.();   // a slide still running ends now
+  document.body.append(ghost);
+  pin();
+  const w = innerWidth, opts = { duration: 320, easing: 'cubic-bezier(.2, .7, .2, 1)', fill: 'forwards' };
+  const from = edgeDrag || 0; edgeDrag = 0;
+  // forward: the new page comes in from the right on top; back: the old page leaves to the right on top
+  if (dir > 0) ghost.style.zIndex = '3'; else ghost.style.zIndex = '5';
+  app.classList.add('sliding-in');
+  const anims = dir > 0
+    ? [app.animate([{ transform: `translateX(${w}px)` }, { transform: 'translateX(0)' }], opts),
+      ghost.animate([{ transform: 'translateX(0)', opacity: 1 }, { transform: `translateX(${-w * 0.3}px)`, opacity: 0.6 }], opts)]
+    : [app.animate([{ transform: `translateX(${-w * 0.3 + from * 0.3}px)`, opacity: 0.6 }, { transform: 'translateX(0)', opacity: 1 }], opts),
+      ghost.animate([{ transform: `translateX(${from}px)` }, { transform: `translateX(${w}px)` }], opts)];
+  const t0 = document.timeline.currentTime; anims.forEach(a => { a.startTime = t0; });
+  const done = () => { if (sliding !== done) return; sliding = null; anims.forEach(a => a.cancel()); ghost.remove(); unpin(); app.classList.remove('sliding-in'); };
+  sliding = done;
+  anims[0].finished.then(done, done);
+}
+
+// Swipe from the left edge to go back (Accessibility; only in the app on an iPhone or iPad home screen, where the
+// phone has no Back gesture of its own; on unless switched off): the page follows the finger, and letting go past a
+// third of the screen (or after a quick flick) goes back, the page carrying on off to the right.
+let edge = null, edgeDrag = 0;
+document.addEventListener('touchstart', e => {
+  edge = null;
+  if (!S.user || display().edgeBack === false || !IPHONE_APP() || e.touches.length !== 1 || e.touches[0].clientX > 20) return;
+  const tab = TABS.find(t => t.id === S.tab);
+  if (!tab || !tab.under || e.target.closest('dialog, #tabs')) return;
+  edge = { x: e.touches[0].clientX, y: e.touches[0].clientY, at: Date.now(), lock: false, dx: 0, under: tab.under };
+}, { passive: true });
+document.addEventListener('touchmove', e => {
+  const s = edge;
+  if (!s || e.touches.length !== 1) return;
+  const dx = e.touches[0].clientX - s.x, dy = e.touches[0].clientY - s.y;
+  if (!s.lock) {
+    if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) { edge = null; return; }
+    if (dx > 10) { s.lock = true; if (!reduceMotion()) pin(); } else return;
+  }
+  e.preventDefault();
+  s.dx = Math.max(0, dx);
+  if (!reduceMotion()) move(app, s.dx);
+}, { passive: false });
+const edgeEnd = (e, cancel) => {
+  const s = edge; edge = null;
+  if (!s || !s.lock) return;
+  const go = !cancel && (s.dx > innerWidth / 3 || (s.dx > 60 && Date.now() - s.at < 500));
+  if (!go) {
+    const a = app.animate([{ transform: `translateX(${s.dx}px)` }, { transform: 'translateX(0)' }], { duration: 160, easing: 'ease-out' });
+    move(app, 0); a.finished.catch(() => {}).then(unpin);
+    return;
+  }
+  move(app, 0); unpin();
+  edgeDrag = reduceMotion() ? 0 : s.dx;
+  navigation.back(s.under);
+};
+document.addEventListener('touchend', e => edgeEnd(e, false), { passive: true });
+document.addEventListener('touchcancel', e => edgeEnd(e, true), { passive: true });
 hooks.render = render;
 hooks.paintTabs = () => paintTabs();
 

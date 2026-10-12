@@ -10,7 +10,7 @@ import { parseQuery, matchQuery, OPERATOR_HELP, insertOperator } from './search-
 import { parseCsv } from './tags.js';
 import {
   S, h, toast, debounce, modal, cat, categoryNamesRevision, catName, catShort, tagName, catFull, catChip, PICKER_ORDER, settings, patchLogbook, needExcel, download, fileButton, catPills,
-  updateCase, saveMany, deleteMany, displayName, rYear, todayISO, fill, add, resetters, tagSet, tagLinks, confirmBox, keepTags, hooks, rowIcon, ic, emptyState, basicHides } from './ui-core.js';
+  updateCase, saveMany, deleteMany, displayName, rYear, todayISO, fill, add, resetters, tagSet, tagLinks, confirmBox, keepTags, hooks, rowIcon, ic, emptyState, reveal, basicHides } from './ui-core.js';
 import { dayHasNotes, caseHasNotes, openNotes, ensureNotes } from './ui-notepad.js';
 import { flatTree, tagTree } from './tags.js';
 import { editCaseDialog, logOnDate } from './ui-log.js';
@@ -137,7 +137,7 @@ export function renderLogbook() {
   // Dates, Tags and More fold behind one row of small toggles (a fold opens by itself while in use);
   // the toggles say what is set ("1 Oct – 31 Oct", "Tags (2)")
   const fold = (body, open) => {
-    const b = h('button', { type: 'button', class: 'small lb-fold', 'aria-expanded': String(!!open), onclick: () => { body.hidden = !body.hidden; b.setAttribute('aria-expanded', String(!body.hidden)); } });
+    const b = h('button', { type: 'button', class: 'small lb-fold', 'aria-expanded': String(!!open), onclick: () => { const open = body.hidden; reveal(body, open); b.setAttribute('aria-expanded', String(open)); } });
     body.hidden = !open;
     return b;
   };
@@ -213,7 +213,7 @@ export function renderLogbook() {
   function refresh() { flagSel.value = view.flag; paintFilterBtn(); repaintFilters(); view.limit = 150; paint(); }
   function active() { return !!(view.has.length || view.not.length || view.from || view.to || view.flag || (settings().lbScope || 'all') !== 'all' || settings().lbFuzzy || settings().lbCase); }
   const filterBtn = h('button', { class: 'small', 'aria-expanded': String(!filters.hidden), onclick: () => {
-    view.showFilters = filters.hidden; filters.hidden = !filters.hidden; filterBtn.setAttribute('aria-expanded', String(!filters.hidden));
+    const open = filters.hidden; view.showFilters = open; reveal(filters, open); filterBtn.setAttribute('aria-expanded', String(open));
   } });
   const paintFilterBtn = () => {
     const n = view.has.length + view.not.length + (view.from || view.to ? 1 : 0) + (view.flag ? 1 : 0) + ((settings().lbScope || 'all') !== 'all' ? 1 : 0) + (settings().lbFuzzy ? 1 : 0) + (settings().lbCase ? 1 : 0);
@@ -369,6 +369,8 @@ function caseRow(c, flagsOf) {
 // ---------- calendar ----------
 
 const pad = n => String(n).padStart(2, '0');
+// browsers without a month picker (Firefox on a computer) keep the plain title and its arrows
+const MONTH_INPUT = (() => { const i = document.createElement('input'); i.setAttribute('type', 'month'); return i.type === 'month'; })();
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 function calendarView(rows, flagsOf, repaint) {
@@ -413,7 +415,11 @@ function calendarView(rows, flagsOf, repaint) {
   return h('div', {},
     h('div', { class: 'bar lb-calbar' },
       h('button', { class: 'small icon-btn', 'aria-label': 'Previous month', onclick: () => shift(-1) }, '‹'),
-      h('strong', { class: 'grow', style: 'text-align:center' }, `${MONTHS[m - 1]} ${y}`, h('span', { class: 'muted', style: 'font-weight:400;font-size:calc(13px * var(--fs, 1))' }, ` · ${monthN} case${monthN === 1 ? '' : 's'}`)),
+      // tap the month's name to pick another month (a month picker sits invisibly over it, like the Case tab's date chip)
+      h('label', { class: 'grow lb-monthpick', title: 'Pick a month' }, h('strong', {}, `${MONTHS[m - 1]} ${y}`),
+        h('span', { class: 'muted', style: 'font-weight:400;font-size:calc(13px * var(--fs, 1))' }, ` · ${monthN} case${monthN === 1 ? '' : 's'}`),
+        !MONTH_INPUT ? null : h('input', { type: 'month', 'aria-label': 'Pick a month', value: view.month, onclick: e => { try { e.target.showPicker(); } catch { /* the native tap opens it */ } },
+          onchange: e => { if (/^\d{4}-\d{2}$/.test(e.target.value)) { view.month = e.target.value; view.day = null; repaint(); } } })),
       h('button', { class: 'small icon-btn', 'aria-label': 'Next month', onclick: () => shift(1) }, '›'),
       h('button', { class: 'small', onclick: () => { view.month = today.slice(0, 7); view.day = today; repaint(); } }, 'Today')),
     grid,

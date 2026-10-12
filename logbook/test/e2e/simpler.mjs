@@ -54,6 +54,7 @@ try { for (const width of [390, 1280]) {
   const prof = () => p.locator('.profile-card');
   assert.equal(await p.evaluate(async () => { const { S, profile } = await import('./js/ui-core.js'); const was = S.logbook.settings; S.logbook.settings = { ...was, mode: null }; const out = profile(); S.logbook.settings = was; return out; }), 'basic', 'Basic is the default');
   await p.evaluate(() => { location.hash = '#settings'; });
+  await p.waitForFunction(() => !document.querySelector('.page-ghost'));   // the page left behind slides away first
   assert.equal(await p.locator('.profile-card, .basic-card').count(), 0, 'the profile is in Profiles or hide items only');
   const tabsAdvanced = await tabsNow();
   await pickProfile('basic');
