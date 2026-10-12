@@ -891,7 +891,7 @@ function editor() {
 
   const lc = caseById(r.caseId);
   const linkBox = r.caseId
-    ? h('div', { class: 'refl-case', style: 'border:1px solid var(--edge, var(--line, #ddd));border-radius:10px;padding:8px 10px;margin:8px 0' },
+    ? h('div', { class: 'refl-case', style: 'border:1px solid var(--edge, var(--line, #ddd));border-radius:calc(10px * var(--round, 1));padding:8px 10px;margin:8px 0' },
       h('div', { class: 'bar', style: 'gap:8px;align-items:center;flex-wrap:nowrap' },
         h('b', { style: 'font-size:calc(13px * var(--fs, 1));margin-right:auto' }, 'Linked case'),
         h('button', { class: 'small', onclick: () => openPicker(true) }, 'Change case'),
@@ -899,7 +899,7 @@ function editor() {
       lc ? h('div', {}, h('span', { class: 'muted' }, caseDate(lc) + ' · '), caseText(lc) || '(no details)',
         (lc.cats || []).length ? h('div', { class: 'muted', style: 'font-size:calc(13px * var(--fs, 1))' }, lc.cats.map(catName).join(', ')) : null)
         : h('div', { class: 'hint' }, S.casesLoaded === false ? 'Loading case…' : 'The linked case is no longer in your logbook. Change case to link another.'))
-    : h('div', { style: 'border:1px solid var(--edge, var(--line, #ddd));border-radius:10px;padding:8px 10px;margin:8px 0' },
+    : h('div', { style: 'border:1px solid var(--edge, var(--line, #ddd));border-radius:calc(10px * var(--round, 1));padding:8px 10px;margin:8px 0' },
       h('p', { style: 'margin:0 0 6px' }, h('b', {}, r.source === 'word' ? 'Imported from Word. ' : 'No case linked. '), 'Linking it to a logged case is optional.'),
       h('button', { onclick: () => openPicker(true) }, 'Link to a case'));
   if (rv.relinked) { rv.relinked = false; setTimeout(() => { status.textContent = 'Editing…'; autosave(); }, 0); }
@@ -978,7 +978,7 @@ function editor() {
       h('p', { class: 'hint help', style: 'margin:6px 0 0' }, 'Numbered points with short headings read more clearly in the portfolio.')];
     const points = free ? boxCard('Learning points', 'What were the considerations, and what did you learn? Your discussion: analysis with evidence, conclusions, action plan.', modeSeg, ...freeBox())
       : boxCard('Learning points', 'For each point: what were the considerations, and what did you learn? Give it a short heading, then your discussion (analysis with evidence, conclusions, action plan).', modeSeg,
-      r.points.map((p, i) => h('div', { style: 'border:1px solid var(--edge, var(--line, #ddd));border-radius:10px;padding:10px;margin:0 0 10px' },
+      r.points.map((p, i) => h('div', { style: 'border:1px solid var(--edge, var(--line, #ddd));border-radius:calc(10px * var(--round, 1));padding:10px;margin:0 0 10px' },
         h('div', { class: 'bar', style: 'gap:6px;align-items:center;margin-bottom:6px' },
           h('b', { style: 'font-size:calc(16px * var(--fs, 1))' }, `${i + 1}.`),
           h('input', { style: IN + ';flex:1', maxlength: String(LIMITS.pointHeading), value: p.heading || '', placeholder: 'Heading, e.g. Choice of airway management in trismus',
@@ -1034,7 +1034,7 @@ function editor() {
       h('p', { class: 'hint help', style: 'margin:0 0 4px;color:var(--warn, #b45309)' }, 'No faces, names, NRIC, MRN or anything identifying on monitors, labels or screens. Crop before adding.'),
       h('p', { class: 'hint help', style: 'margin:0 0 8px;color:var(--warn, #b45309)' }, 'Use your own photos or diagrams. Don’t copy copyrighted figures from papers, books or websites without permission; if you adapt one, cite it under References.'),
       r.figures.map((f, i) => {
-        const im = h('img', { alt: f.caption || `Figure ${i + 1}`, style: 'max-width:100%;max-height:220px;display:block;border-radius:6px;background:#eee;min-height:60px' });
+        const im = h('img', { alt: f.caption || `Figure ${i + 1}`, style: 'max-width:100%;max-height:220px;display:block;border-radius:calc(6px * var(--round, 1));background:#eee;min-height:60px' });
         if (rv.thumbs[f.id]) im.src = rv.thumbs[f.id];
         else cloud.loadImage(mine(), f.id).then(d => {
           if (d && d.data) {
@@ -1043,7 +1043,7 @@ function editor() {
           }
           else im.alt = 'Image not found';
         }).catch(() => { im.alt = 'Image not available offline'; });
-        return h('div', { style: 'border:1px solid var(--edge, var(--line, #ddd));border-radius:10px;padding:10px;margin:0 0 10px' },
+        return h('div', { style: 'border:1px solid var(--edge, var(--line, #ddd));border-radius:calc(10px * var(--round, 1));padding:10px;margin:0 0 10px' },
           im,
           h('label', { class: 'field', style: 'display:block;margin-top:6px' }, `Caption (Figure ${i + 1}: …)`,
             h('input', { style: IN, maxlength: String(LIMITS.caption), value: f.caption || '', placeholder: 'e.g. Apnoeic oxygenation', oninput: e => { f.caption = e.target.value; changed(); } })),

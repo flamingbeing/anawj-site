@@ -1674,6 +1674,27 @@ async function run(label, ctxOpts) {
     assert(!(await p.evaluate(() => document.documentElement.classList.contains('edges'))), 'reset did not put borders back');
   });
 
+  await step('display: corners, shadows, bigger tap targets; tab bar order and hidden tabs (listed on More)', async () => {
+    await tab('display');
+    await p.locator('input[type=range][aria-label="Corners"]').fill('0');
+    await p.getByLabel('Soft shadows instead of lines around cards').check(); await nap(150);
+    assert(await p.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--round').trim() === '0' && document.documentElement.classList.contains('shadows')), 'corners or shadows not applied');
+    await tab('displayadv');
+    await p.getByLabel('Show Reflections').uncheck();
+    await p.locator('.tab-order li', { hasText: 'Logbook' }).getByRole('button', { name: 'Move up' }).click(); await nap(150);
+    assert(JSON.stringify(await p.locator('.tabs button').evaluateAll(bs => bs.map(b => b.dataset.tab))) === JSON.stringify(['logbook', 'log', 'progress', 'more']), 'tab bar not rearranged');
+    await p.locator('.tabs button[data-tab="more"]').click(); await nap(300);
+    assert(/Reflections/.test(await p.locator('.more-list li').first().innerText()), 'hidden tab not first on More');
+    await tab('displayadv');
+    await p.locator('.reset-row button', { hasText: 'Reset this page' }).click();
+    await p.locator('dialog[open] button', { hasText: /^Reset$/ }).click(); await nap(300);
+    assert(await p.locator('.tabs button').count() === 5, 'reset did not bring the tab back');
+    await tab('display');
+    await p.locator('.reset-row button', { hasText: 'Reset this page' }).click();
+    await p.locator('dialog[open] button', { hasText: /^Reset$/ }).click(); await nap(300);
+    assert(await p.evaluate(() => !document.documentElement.style.getPropertyValue('--round') && !document.documentElement.classList.contains('shadows')), 'display reset left corners/shadows');
+  });
+
   await step('admin tab hidden for non-admins', async () => {
     const KEY = 'apmes-logbook-demo-v1';
     const saved = await p.evaluate(k => localStorage.getItem(k), KEY);

@@ -97,7 +97,7 @@ export function residencyCard() {
 // the light / dark choice. The first time a device opens the app it starts from what the account had (these used to
 // follow the account), so nobody's look changes. Kept at sign-out: they are the device's, and nothing private.
 const DISPLAY_KEY = 'apmes-logbook-display';
-export const DISPLAY_KEYS = ['compact', 'textSize', 'zoom', 'accent', 'startTab', 'fontUi', 'fontUiName', 'fontLog', 'fontLogName', 'lineWidth', 'lineHeight', 'contrast', 'motion', 'tabIcons', 'tabBar', 'hideHeader', 'caseInverted', 'colourful', 'customCss', 'customCssOn', 'autoFocus', 'appTitle', 'boxCaps', 'boxCorrect', 'boxSpell', 'reflSpell', 'pinBox', 'pinSearch', 'firstField', 'compactTags', 'borders'];
+export const DISPLAY_KEYS = ['compact', 'textSize', 'zoom', 'accent', 'startTab', 'fontUi', 'fontUiName', 'fontLog', 'fontLogName', 'lineWidth', 'lineHeight', 'contrast', 'motion', 'tabIcons', 'tabBar', 'hideHeader', 'caseInverted', 'colourful', 'customCss', 'customCssOn', 'autoFocus', 'appTitle', 'boxCaps', 'boxCorrect', 'boxSpell', 'reflSpell', 'pinBox', 'pinSearch', 'firstField', 'compactTags', 'borders', 'round', 'shadows', 'bigTaps', 'tabOrder', 'tabHidden'];
 export function deviceDisplay() {
   try { const d = JSON.parse(localStorage.getItem(DISPLAY_KEY) || 'null'); return d && typeof d === 'object' && !Array.isArray(d) ? d : null; } catch { return null; }
 }
@@ -163,6 +163,10 @@ export function applyLook(d = {}) {
   const bl = borderLevel(d), soft = bl < BORDERS.length - 1;
   c.toggle('edges', soft); c.toggle('edges-fill', bl <= 1);
   if (soft) document.documentElement.style.setProperty('--edge-mix', BORDER_MIX[bl] + '%'); else document.documentElement.style.removeProperty('--edge-mix');
+  // corners, card shadows instead of lines, bigger tap targets on the Case tab
+  const rl = roundLevel(d);
+  if (rl !== 2) document.documentElement.style.setProperty('--round', String(ROUNDS[rl][1])); else document.documentElement.style.removeProperty('--round');
+  c.toggle('shadows', !!d.shadows); c.toggle('big-taps', !!d.bigTaps);
   // the name in the header and the browser tab (plain text, at most 40 characters)
   const title = cleanTitle(d.appTitle) || APP_TITLE;
   const h1 = document.querySelector('.top h1'); if (h1 && h1.textContent !== title) h1.textContent = title;
@@ -177,6 +181,20 @@ export const APP_TITLE = 'APMES Logbook';
 // Borders (Display, per device): how strong the lines around cards, fields, buttons and chips are; the last is the default
 export const BORDERS = ['Borderless', 'Faint', 'Light', 'Soft', 'Normal (default)'];
 export const BORDER_MIX = [0, 25, 50, 75];
+// Corners (Display, per device): every border-radius in style.css is multiplied by --round; Normal is the default
+export const ROUNDS = [['Square', 0], ['Slightly rounded', 0.5], ['Normal (default)', 1], ['Very round', 1.7]];
+export const roundLevel = d => (Number.isInteger(d.round) && d.round >= 0 && d.round < ROUNDS.length ? d.round : 2);
+// The tab bar (Advanced display, per device): the order of its tabs and which are hidden. More always stays
+// (Settings live there) and at least two tabs stay on the bar; hidden ones are listed on the More page.
+export const BAR_TABS = [['log', 'Case'], ['logbook', 'Logbook'], ['reflect', 'Reflections'], ['progress', 'Analytics'], ['more', 'More']];
+export function arrangeTabs(ids, d = {}) {
+  const order = Array.isArray(d.tabOrder) ? d.tabOrder : [];
+  const at = id => (order.includes(id) ? order.indexOf(id) : order.length + ids.indexOf(id));
+  const sorted = [...ids].sort((a, b) => at(a) - at(b));
+  const hidden = new Set((Array.isArray(d.tabHidden) ? d.tabHidden : []).filter(id => id !== 'more'));
+  const shown = sorted.filter(id => !hidden.has(id));
+  return shown.length >= 2 ? { sorted, shown, hidden: sorted.filter(id => hidden.has(id)) } : { sorted, shown: sorted, hidden: [] };
+}
 export const borderLevel = d => (Number.isInteger(d.borders) && d.borders >= 0 && d.borders < BORDERS.length - 1 ? d.borders : BORDERS.length - 1);
 // Display preview (owner): a made-up case row, chips and buttons drawn with the app's own classes, so colour,
 // borders, fonts, text size and compact show at once; it stays in view while the page scrolls
@@ -246,13 +264,18 @@ export function renderDisplay() {
         h('input', { type: 'range', min: '0', max: String(BORDERS.length - 1), step: '1', value: String(borderLevel(st)), 'aria-label': 'Borders',
           'aria-valuetext': BORDERS[borderLevel(st)], oninput: e => { const n = Number(e.target.value); e.target.setAttribute('aria-valuetext', BORDERS[n]); bordersNote.textContent = BORDERS[n]; applyDisplay(setDisplay({ borders: n === BORDERS.length - 1 ? null : n })); } })),
         bordersNote),
+      (() => { const note = h('span', { class: 'hint', style: 'margin:0' }, ROUNDS[roundLevel(st)][0]);
+        return h('div', { class: 'field', style: 'margin-top:10px' }, h('label', { class: 'field', style: 'margin:0' }, 'Corners',
+          h('input', { type: 'range', min: '0', max: String(ROUNDS.length - 1), step: '1', value: String(roundLevel(st)), 'aria-label': 'Corners', 'aria-valuetext': ROUNDS[roundLevel(st)][0],
+            oninput: e => { const n = Number(e.target.value); e.target.setAttribute('aria-valuetext', ROUNDS[n][0]); note.textContent = ROUNDS[n][0]; applyDisplay(setDisplay({ round: n === 2 ? null : n })); } })), note); })(),
+      h('label', { class: 'check', style: 'margin-top:6px' }, h('input', { type: 'checkbox', checked: !!st.shadows, onchange: e => applyDisplay(setDisplay({ shadows: e.target.checked || null })) }), 'Soft shadows instead of lines around cards'),
       // the tab the app opens on (a link or shortcut to a tab still opens that tab)
       h('label', { class: 'field', style: 'margin-top:10px' }, 'Open the app on',
         h('select', { onchange: e => { setDisplay({ startTab: e.target.value }); toast('Saved'); } },
           START_TABS.map(([v, l]) => h('option', { value: v, selected: (st.startTab || 'log') === v }, l)))),
       h('p', { class: 'hint', style: 'margin:10px 0 0' }, 'Everything on this page is saved on this device only, so a phone and a computer can each look the way that suits them.')),
-    resetLink('light or dark, colour, Colourful, zoom, text size, compact, borders and the start tab on this device', () => {
-      applyTheme('light'); applyDisplay(setDisplay({ accent: null, colourful: null, zoom: null, textSize: null, compact: null, borders: null, startTab: null }));
+    resetLink('light or dark, colour, Colourful, zoom, text size, compact, borders, corners, shadows and the start tab on this device', () => {
+      applyTheme('light'); applyDisplay(setDisplay({ accent: null, colourful: null, zoom: null, textSize: null, compact: null, borders: null, round: null, shadows: null, startTab: null }));
     }),
     advancedLink('displayadv', 'Advanced display settings', 'Name in the header, fonts, line spacing and width, contrast, motion, the tab bar and header, pinning, custom CSS'));
 }
@@ -274,6 +297,9 @@ export function renderDisplayAdvanced() {
       lookSelect('contrast', 'Contrast', CONTRASTS, 'auto', 'Higher contrast: darker text and stronger lines (lighter in dark mode).'),
       lookSelect('motion', 'Motion', MOTIONS, 'auto'),
       lookSelect('tabBar', 'Tab bar', TAB_BARS, 'auto'),
+      tabArranger(),
+      h('label', { class: 'check', style: 'margin-top:10px' }, h('input', { type: 'checkbox', checked: !!st.bigTaps, onchange: e => applyDisplay(setDisplay({ bigTaps: e.target.checked || null })) }), 'Bigger tap targets on the Case tab'),
+      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'Larger chips, tag rows, tick boxes and Save buttons, easier to hit on a phone.'),
       h('label', { class: 'check', style: 'margin-top:10px' }, h('input', { type: 'checkbox', checked: !!st.tabIcons, onchange: e => applyDisplay(setDisplay({ tabIcons: e.target.checked })) }), 'Icons only in the tab bar'),
       h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !!st.hideHeader, onchange: e => applyDisplay(setDisplay({ hideHeader: e.target.checked })) }), 'Hide the header (the app name bar)'),
       h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'It comes back by itself when something isn’t synced yet, when there’s no signal, and in the demo.'),
@@ -284,9 +310,32 @@ export function renderDisplayAdvanced() {
       h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'They stay in view while the tags or cases scroll under them.'),
       h('p', { class: 'hint', style: 'margin:10px 0 0' }, 'Everything on this page is saved on this device only, so a phone and a computer can each look the way that suits them.')),
     customCssCard(),
-    resetLink('the name in the header, fonts, line spacing and width, contrast, motion, the tab bar and header options, upside down, pinning and custom CSS (switched off; your CSS is kept) on this device', () =>
-      applyDisplay(setDisplay({ appTitle: null, fontUi: null, fontUiName: null, fontLog: null, fontLogName: null, lineWidth: null, lineHeight: null, contrast: null, motion: null, tabBar: null, tabIcons: null, hideHeader: null, caseInverted: null, pinBox: null, pinSearch: null, customCssOn: null }))));
+    resetLink('the name in the header, fonts, line spacing and width, contrast, motion, the tab bar (order and hidden tabs) and header options, bigger tap targets, upside down, pinning and custom CSS (switched off; your CSS is kept) on this device', () =>
+      applyDisplay(setDisplay({ appTitle: null, fontUi: null, fontUiName: null, fontLog: null, fontLogName: null, lineWidth: null, lineHeight: null, contrast: null, motion: null, tabBar: null, tabIcons: null, hideHeader: null, caseInverted: null, pinBox: null, pinSearch: null, customCssOn: null, bigTaps: null, tabOrder: null, tabHidden: null }))));
 }
+// Advanced display → the tab bar's order and hidden tabs (arrangeTabs): ↑ ↓ to move, a switch to show or hide
+function tabArranger() {
+  const wrap = h('div', { class: 'tab-arranger field', style: 'margin-top:10px' });
+  const paint = () => {
+    const { sorted: order, hidden } = arrangeTabs(BAR_TABS.map(([id]) => id), display());
+    const move = (id, by) => { const o = [...order], i = o.indexOf(id), j = i + by; if (j < 0 || j >= o.length) return; [o[i], o[j]] = [o[j], o[i]]; applyDisplay(setDisplay({ tabOrder: o })); hooks.paintTabs?.(); paint(); };
+    const hideSet = new Set(hidden);
+    const toggle = (id, show) => {
+      const next = new Set(hideSet); if (show) next.delete(id); else next.add(id);
+      if (BAR_TABS.length - next.size < 2) { toast('Keep at least two tabs on the bar'); return paint(); }
+      applyDisplay(setDisplay({ tabHidden: next.size ? [...next] : null, tabOrder: order })); hooks.paintTabs?.(); paint();
+    };
+    fill(wrap, h('span', {}, 'Tabs on the bar'),
+      h('ul', { class: 'tab-order' }, order.map((id, i) => h('li', {},
+        h('label', { class: 'check', style: 'flex:1;min-height:40px' }, h('input', { type: 'checkbox', checked: !hideSet.has(id), disabled: id === 'more', 'aria-label': 'Show ' + BAR_TABS.find(([k]) => k === id)[1], onchange: e => toggle(id, e.target.checked) }), BAR_TABS.find(([k]) => k === id)[1]),
+        h('button', { class: 'small icon-btn', type: 'button', disabled: i === 0, 'aria-label': 'Move up', onclick: () => move(id, -1) }, '↑'),
+        h('button', { class: 'small icon-btn', type: 'button', disabled: i === order.length - 1, 'aria-label': 'Move down', onclick: () => move(id, 1) }, '↓')))),
+      h('p', { class: 'hint help', style: 'margin:0' }, 'Hidden tabs are listed at the top of More. More always stays (Settings live there).'));
+  };
+  paint();
+  return wrap;
+}
+
 // Interface font and logging font (fonts.js): a list, a box for a font installed on this device, or a font file
 // kept on this device; a sample line shows the result (Il1 O0: easy to mix up in initials)
 function fontPicker(slot) {
@@ -576,7 +625,7 @@ export function renderReflectionSettings() {
       h('h2', {}, 'Photos'),
       (() => { const kb = photoUsageKb(S.reflections), pct = Math.min(100, Math.round(kb / PHOTO_BUDGET_KB * 100));
         return [h('p', { style: 'margin:0 0 6px' }, `${fmtMb(kb)} of ${fmtMb(PHOTO_BUDGET_KB)} used by your reflection figures`),
-          h('div', { style: 'height:8px;border-radius:4px;background:var(--line, #ddd);overflow:hidden' }, h('div', { style: `height:100%;width:${pct}%;background:${pct >= 90 ? 'var(--err, #b91c1c)' : 'var(--accent, #002f6c)'}` }))]; })(),
+          h('div', { style: 'height:8px;border-radius:calc(4px * var(--round, 1));background:var(--line, #ddd);overflow:hidden' }, h('div', { style: `height:100%;width:${pct}%;background:${pct >= 90 ? 'var(--err, #b91c1c)' : 'var(--accent, #002f6c)'}` }))]; })(),
       h('p', { class: 'hint', style: 'margin:6px 0 0' }, PHOTO_NOTE + ' They are shrunk on your phone before saving. To free space, remove figures you no longer need; deleted reflections free theirs when they leave the recycle bin (30 days).')));
 }
 
