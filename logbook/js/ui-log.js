@@ -332,6 +332,7 @@ function curDate() {
 // calendar for any other day, and the Case | List switch. A chosen day that doesn't fit shows on the
 // calendar chip instead.
 function paintDate() {
+  paintEnterHint();
   const d = curDate(), t = todayISO();
   const dateInput = h('input', {
     type: 'date', value: d, 'aria-label': 'Case date',
@@ -919,7 +920,7 @@ export function pickDialog(initial, done) {
   paint();
   const m = modal('Tags', [sel, h('div', { style: 'height:8px' }), picker.el,
     h('div', { class: 'bar', style: 'margin-top:12px' }, h('span', { class: 'grow' }), h('button', { class: 'primary', onclick: () => m.close() }, 'Done'))],
-  { onclose: () => done(sortCodes(cats)) });
+  { onclose: state => { if (!state?.accountChanged) done(sortCodes(cats)); } });
   picker.focus();
 }
 

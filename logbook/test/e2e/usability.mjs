@@ -12,6 +12,7 @@ try { for (const width of [390,1280]) {
  await tags.press('Tab');assert.equal(await p.evaluate(()=>document.activeElement.getAttribute('role')),'option');await p.keyboard.press('Space');assert.equal(await p.locator('.picker [data-code="01"]').getAttribute('aria-selected'),'false');await p.keyboard.press('ArrowDown');assert.equal(await p.evaluate(()=>document.activeElement.dataset.code),'02');
  await p.locator('textarea.details').fill('AB 6m lap chole');assert.match(await p.locator('.parsed').innerText(),/6 years · male/);assert.equal(await p.locator('textarea.details').inputValue(),'AB 6m lap chole');
  await p.locator('.savebar button.primary').click();assert.match(await p.locator('.enter-suggestion-hint').innerText(),/Enter again.*lap/i);
+ await p.locator('.datebar [data-date]').first().click();assert.equal(await p.locator('.enter-suggestion-hint').isVisible(),false);
  await p.locator('textarea.details').fill('AB 6mo hernia');assert.equal(await p.locator('.enter-suggestion-hint').isVisible(),false);assert.match(await p.locator('.parsed').innerText(),/6 months/);
  // Back dismisses the top modal and restores text cursor, then the underlying route.
  await p.evaluate(async()=>{const ta=document.querySelector('textarea.details');ta.focus();ta.setSelectionRange(3,3);const {S}=await import('./js/ui-core.js');const {editCaseDialog}=await import('./js/ui-log.js');editCaseDialog(S.cases[0]);});

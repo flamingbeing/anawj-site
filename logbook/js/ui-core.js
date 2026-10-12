@@ -147,12 +147,12 @@ export const fileButton = (label, accept, onfile, cls = 'btn') => h('label', { c
 export function modal(title, body, { onclose, sticky, cls = '' } = {}) {
   // the title takes the initial focus, so phones don't pop a keyboard or date picker on open
   const el = h('dialog', { class: cls }, h('h2', { tabindex: '-1', autofocus: true, style: 'outline:none' }, title), body);
-  const previousFocus = document.activeElement;
+  const ownerUser = S.user, previousFocus = document.activeElement;
   const caret = previousFocus && typeof previousFocus.selectionStart === 'number' ? [previousFocus.selectionStart, previousFocus.selectionEnd] : null;
   let finished = false;
   const finish = () => {
-    if (finished) return; finished = true; el.remove(); onclose?.();
-    if (previousFocus?.isConnected) { previousFocus.focus({ preventScroll: true }); if (caret) previousFocus.setSelectionRange(...caret); }
+    if (finished) return; finished = true; el.remove(); const accountChanged = S.user !== ownerUser; onclose?.({ accountChanged });
+    if (!accountChanged && previousFocus?.isConnected) { previousFocus.focus({ preventScroll: true }); if (caret) previousFocus.setSelectionRange(...caret); }
   };
   const view = transients?.open(() => { el.close(); finish(); });
   const close = () => { el.close(); if (view?.active) return view.close(); finish(); return Promise.resolve(); };
@@ -177,7 +177,7 @@ export function confirmBox(title, text, okLabel = 'OK', danger = false) {
       h('div', { class: 'bar' }, h('span', { class: 'grow' }),
         h('button', { onclick: () => m.close() }, 'Cancel'),
         h('button', { class: danger ? 'primary danger' : 'primary', onclick: () => { ok = true; m.close(); } }, okLabel)),
-    ], { onclose: () => resolve(ok) });
+    ], { onclose: state => resolve(state?.accountChanged ? false : ok) });
   });
 }
 
