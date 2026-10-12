@@ -919,14 +919,19 @@ function startAlerts(p) {
   cleanup.push(() => { clearInterval(iv); document.removeEventListener('visibilitychange', awake); lock?.release?.().catch(() => {}); });
 }
 let actx;
+// three short beeps, loud enough for theatre; sound needs a tap first on phones, and is suspended again after
+// switching apps, so every tap (and each beep) wakes it up
 function beep() {
   try {
     actx ||= new AudioContext();
-    const o = actx.createOscillator(), g = actx.createGain();
-    o.frequency.value = 880; g.gain.value = 0.15; o.connect(g); g.connect(actx.destination); o.start(); o.stop(actx.currentTime + 0.25);
+    if (actx.state !== 'running') actx.resume?.();
+    for (let i = 0; i < 3; i++) {
+      const o = actx.createOscillator(), g = actx.createGain(), t0 = actx.currentTime + i * 0.35;
+      o.frequency.value = 880; g.gain.value = 0.5; o.connect(g); g.connect(actx.destination); o.start(t0); o.stop(t0 + 0.2);
+    }
   } catch { /* sound needs a tap first on some phones */ }
 }
-document.addEventListener('pointerdown', () => { try { actx ||= new AudioContext(); actx.resume?.(); } catch {} }, { once: true });
+document.addEventListener('pointerdown', () => { try { actx ||= new AudioContext(); if (actx.state !== 'running') actx.resume?.(); } catch { /* no sound */ } });
 
 // ---------- the patient's op-day data collection marked complete (bottom of the main screen, so it isn't tapped by
 // accident); shown at the top of the main screen and in the patient list. The Word form's sign-off lines use it.

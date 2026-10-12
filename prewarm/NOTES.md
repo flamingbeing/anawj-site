@@ -112,7 +112,8 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   change). Settings › Delete participants lists deleted ones with Restore (to every phone in the team). A deleted
   patient can't be opened (back to the list with a note), so nobody charts into a record the export leaves out.
   Prewarm off falling due alerts like a reading (banner, vibrate, beep); alerts due in the same second share one
-  banner. AF "specify" on discharge is New onset / Existing (chips), so it always ticks the Word form.
+  banner, with three loud beeps (sound resumed on every tap, as phones suspend it after an app switch). AF "specify"
+  on discharge is New onset / Existing (chips), so it always ticks the Word form.
   Underbody / gown warming yes / no: a reading due after its logged start time defaults to Yes until someone picks;
   saved readings still saying No after the start are listed in Still to fill.
 - **Two tabs** (owner, 12 Oct 2026): a thin tab bar under the top bar on the patient screen: **Temperatures** (the
