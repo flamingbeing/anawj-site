@@ -92,9 +92,7 @@ a { color: var(--navy); }
 .tchip b { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--muted); }
 .tchip.set { border: 1px solid transparent; background: var(--chip); }
 .tchip.set span { color: var(--navy); } .tchip.set b { color: var(--ink); }
-/* gown and Bair Hugger times: warm beige before and after they're set (labels 6.6:1 empty, 5.9:1 set) */
-.tchip.warm { background: #f7efe5; border-color: #a8834f; color: #7a4a00; }
-.tchip.warm b { color: #7a4a00; }
+/* gown and Bair Hugger times: warm beige once set (labels 5.9:1); untapped they look like the rest */
 .tchip.warm.set { background: #efe2d2; border-color: transparent; }
 .tchip.warm.set span { color: #7a4a00; } .tchip.warm.set b { color: var(--ink); }
 .tchip.edit { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; border: 1px solid var(--navy); color: var(--ink); }
