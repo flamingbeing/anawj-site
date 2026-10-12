@@ -9,9 +9,9 @@
 // keeps the answer and returns to #data; resumeCloudSave finishes the save.
 
 import { S, h, toast, todayISO, settings, patchLogbook } from './ui-core.js';
-import { GOOGLE_CLIENT_ID, DROPBOX_APP_KEY, FOLDER, cleanCloudBackup, backupDue, pkcePair, dropboxAuthUrl, googleAuthUrl, parseCloudReturn, dropboxArg, driveQuery } from './backup-targets.js';
+import { GOOGLE_CLIENT_ID, DROPBOX_APP_KEY, FOLDER, KEEP_DAYS, staleBackups, cleanCloudBackup, backupDue, pkcePair, dropboxAuthUrl, googleAuthUrl, parseCloudReturn, dropboxArg, driveQuery } from './backup-targets.js';
 import { demo } from './cloud.js';
-import { makeBackup } from './backup.js';
+import { makeBackup, gzipBlob } from './backup.js';
 import { makeNotesZip } from './ui-notes.js';
 
 export const driveReady = () => !!GOOGLE_CLIENT_ID;
@@ -20,13 +20,18 @@ export const dropboxReady = () => !!DROPBOX_APP_KEY;
 // what goes up: the backup file, and the notes zip if chosen
 async function filesToSave() {
   const data = await makeBackup();
-  const out = [{ name: `logbook-backup-${todayISO()}.json`, type: 'application/json', blob: new Blob([JSON.stringify(data)], { type: 'application/json' }) }];
+  const out = [{ name: `logbook-backup-${todayISO()}.json.gz`, type: 'application/gzip', blob: await gzipBlob(JSON.stringify(data)) }];
   if (cleanCloudBackup(settings().cloudBackup).md) out.push({ name: `apmes-logbook-notes-${todayISO()}.zip`, type: 'application/zip', blob: (await makeNotesZip()).blob });
   return { files: out, cases: data.cases.length };
 }
-async function saved(to, n) {
+// after the upload: remove the app's own backups older than the chosen number of days (a failure there
+// never undoes the save; it is only mentioned)
+async function saved(to, n, prune) {
+  let tidy = '';
+  try { const gone = await prune(staleNames => staleBackups(staleNames, todayISO(), cleanCloudBackup(settings().cloudBackup).keepDays)); if (gone) tidy = `; removed ${gone} older`; }
+  catch (err) { console.warn('Old backups not removed', err); tidy = ` (old backups not removed: ${err.message})`; }
   await patchLogbook({ settings: { cloudBackup: { ...cleanCloudBackup(settings().cloudBackup), lastAt: Date.now(), lastTo: to } } });
-  toast(`Saved to ${to === 'drive' ? 'Google Drive' : 'Dropbox'}: ${n} file${n === 1 ? '' : 's'} in “${FOLDER}”`);
+  toast(`Saved to ${to === 'drive' ? 'Google Drive' : 'Dropbox'}: ${n} file${n === 1 ? '' : 's'} in “${FOLDER}”${tidy}`);
 }
 
 // ---- leaving for the sign-in, and coming back ----
@@ -103,7 +108,18 @@ async function uploadDrive(token) {
   let folder = await driveFind(token, driveQuery(FOLDER, { folder: true }));
   folder ||= await driveApi(token, 'https://www.googleapis.com/drive/v3/files', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: FOLDER, mimeType: 'application/vnd.google-apps.folder' }) });
   for (const f of files) await driveUpload(token, f, folder.id);
-  await saved('drive', files.length);
+  await saved('drive', files.length, async pick => {
+    if (!cleanCloudBackup(settings().cloudBackup).keepDays) return 0;
+    const r = await driveApi(token, `https://www.googleapis.com/drive/v3/files?${new URLSearchParams({ q: `'${folder.id}' in parents and trashed = false`, fields: 'files(id,name)', pageSize: '1000', spaces: 'drive' })}`);
+    const stale = new Set(pick((r.files || []).map(f => f.name)));
+    let gone = 0;
+    for (const f of (r.files || []).filter(f => stale.has(f.name))) {
+      const res = await fetch(`https://www.googleapis.com/drive/v3/files/${f.id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok && res.status !== 404) throw new Error(`Google Drive: ${res.status}`);
+      gone++;
+    }
+    return gone;
+  });
 }
 export async function saveToDrive(btn) {
   if (!driveReady()) return toast('Google Drive isn’t set up for this app yet');
@@ -124,7 +140,18 @@ async function uploadDropbox(token) {
     if (res.status === 401) dbxToken = null;
     if (!res.ok) throw new Error(`Dropbox: ${res.status} ${(await res.text().catch(() => '')).slice(0, 120)}`);
   }
-  await saved('dropbox', files.length);
+  await saved('dropbox', files.length, async pick => {
+    if (!cleanCloudBackup(settings().cloudBackup).keepDays) return 0;
+    const rpc = async (path, body) => {
+      const res = await fetch(`https://api.dropboxapi.com/2/${path}`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: dropboxArg(body) });
+      if (!res.ok) throw new Error(`Dropbox: ${res.status} ${(await res.text().catch(() => '')).slice(0, 120)}`);
+      return res.json();
+    };
+    const list = await rpc('files/list_folder', { path: `/${FOLDER}`, limit: 2000 });
+    const stale = pick((list.entries || []).filter(e => e['.tag'] === 'file').map(e => e.name));
+    for (const name of stale) await rpc('files/delete_v2', { path: `/${FOLDER}/${name}` });
+    return stale.length;
+  });
 }
 export async function saveToDropbox(btn) {
   if (!dropboxReady()) return toast('Dropbox isn’t set up for this app yet');
@@ -144,11 +171,13 @@ export function cloudSaveSection() {
   const when = c.lastAt ? `Last saved ${new Date(c.lastAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })} to ${c.lastTo === 'drive' ? 'Google Drive' : 'Dropbox'}.` : 'Not saved to Google Drive or Dropbox yet.';
   return [
     h('h3', { style: 'margin-top:16px' }, 'Google Drive and Dropbox'),
-    h('p', { class: 'hint help' }, `Writes the backup file into an “${FOLDER}” folder in your own Drive or Dropbox. The app can see only the files it made there. Nothing runs in the background: each save is a tap. The first save each visit goes to Google or Dropbox to sign in, then comes back here.`),
+    h('p', { class: 'hint help' }, `Writes a compressed backup file (.json.gz, which Restore reads) into an “${FOLDER}” folder in your own Drive or Dropbox. The app can see only the files it made there. Nothing runs in the background: each save is a tap. The first save each visit goes to Google or Dropbox to sign in, then comes back here.`),
     !driveReady() || !dropboxReady() ? h('p', { class: 'hint' }, !driveReady() && !dropboxReady() ? 'Google Drive and Dropbox aren’t set up for this app yet (the app owner registers them once).'
       : `${driveReady() ? 'Dropbox' : 'Google Drive'} isn’t set up for this app yet (the app owner registers it once).`) : null,
     h('div', { class: 'bar' }, drive, dbx),
     h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: c.md, onchange: e => set({ md: e.target.checked }) }), 'Also save the notes zip (Markdown)'),
+    h('label', {}, 'Keep backups in Drive / Dropbox for ', h('select', { 'aria-label': 'Keep backups in Drive / Dropbox for', onchange: e => set({ keepDays: Number(e.target.value) }) },
+      ...KEEP_DAYS.map(d => h('option', { value: String(d), selected: c.keepDays === d }, d ? `${d} days` : 'always')))),
     h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: c.remind, onchange: e => set({ remind: e.target.checked }) }), 'Remind me to back up when I open the app and the last backup is over 7 days old'),
     h('p', { class: 'hint', style: 'margin:4px 0 0' }, when),
   ];

@@ -2,11 +2,12 @@
 // owner's ids and a browser, so they are checked by hand (README).
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { cleanCloudBackup, backupDue, pkcePair, dropboxAuthUrl, dropboxArg, driveQuery, googleAuthUrl, parseCloudReturn, DRIVE_SCOPE, REMIND_DAYS } from '../js/backup-targets.js';
+import { cleanCloudBackup, backupDue, pkcePair, dropboxAuthUrl, dropboxArg, driveQuery, googleAuthUrl, parseCloudReturn, staleBackups, DRIVE_SCOPE, REMIND_DAYS } from '../js/backup-targets.js';
 
 assert.equal(DRIVE_SCOPE, 'https://www.googleapis.com/auth/drive.file');   // only the files the app makes
-assert.deepEqual(cleanCloudBackup(null), { remind: false, md: false, lastAt: 0, lastTo: '' });
-assert.deepEqual(cleanCloudBackup({ remind: 1, md: 'yes', lastAt: -5, lastTo: 'ftp', extra: 1 }), { remind: true, md: true, lastAt: 0, lastTo: '' });
+assert.deepEqual(cleanCloudBackup(null), { remind: false, md: false, keepDays: 0, lastAt: 0, lastTo: '' });
+assert.deepEqual(cleanCloudBackup({ remind: 1, md: 'yes', keepDays: 7, lastAt: -5, lastTo: 'ftp', extra: 1 }), { remind: true, md: true, keepDays: 0, lastAt: 0, lastTo: '' });
+assert.equal(cleanCloudBackup({ keepDays: 30 }).keepDays, 30);
 
 // the reminder: only when asked for, and the last backup is older than a week (or there was none)
 const day = 864e5, now = 100 * day;
@@ -44,5 +45,11 @@ assert.deepEqual(parseCloudReturn({ hash: '#error=access_denied&state=gdr-9' }),
 assert.equal(parseCloudReturn({ search: '?code=x&state=other' }), null);
 assert.equal(parseCloudReturn({ hash: '#log' }), null);
 assert.equal(parseCloudReturn(), null);
+
+// old backups to delete: only the app's dated files, older than the cut-off; 0 keeps everything
+const names = ['logbook-backup-2026-10-12.json.gz', 'logbook-backup-2026-09-12.json.gz', 'logbook-backup-2026-09-11.json', 'apmes-logbook-notes-2026-01-01.zip', 'my-notes.txt', 'logbook-backup-2020-01-01.json.bak', 'logbook-backup-2026-09-11.json.gz'];
+assert.deepEqual(staleBackups(names, '2026-10-12', 30), ['logbook-backup-2026-09-11.json', 'apmes-logbook-notes-2026-01-01.zip', 'logbook-backup-2026-09-11.json.gz']);
+assert.deepEqual(staleBackups(names, '2026-10-12', 90), ['apmes-logbook-notes-2026-01-01.zip']);
+assert.deepEqual(staleBackups(names, '2026-10-12', 0), []);
 
 console.log('backup targets tests passed');

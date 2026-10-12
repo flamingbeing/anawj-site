@@ -14,10 +14,11 @@ export const FOLDER = 'APMES Logbook';
 export const REMIND_DAYS = 7;
 
 // Settings → the stored choice ({ remind, md, lastAt, lastTo }), cleaned
+export const KEEP_DAYS = [0, 90, 30];   // how long the app's own Drive / Dropbox backups are kept (0 = all)
 export function cleanCloudBackup(v) {
   const o = v && typeof v === 'object' && !Array.isArray(v) ? v : {};
   return {
-    remind: !!o.remind, md: !!o.md,
+    remind: !!o.remind, md: !!o.md, keepDays: KEEP_DAYS.includes(o.keepDays) ? o.keepDays : 0,
     lastAt: Number.isFinite(o.lastAt) && o.lastAt > 0 ? o.lastAt : 0,
     lastTo: o.lastTo === 'drive' || o.lastTo === 'dropbox' ? o.lastTo : '',
   };
@@ -58,4 +59,13 @@ export function parseCloudReturn({ search = '', hash = '' } = {}) {
   if (/^dbx-/.test(qs)) return { to: 'dropbox', state: qs, code: q.get('code') || '', error: q.get('error_description') || q.get('error') || '' };
   if (/^gdr-/.test(fs)) return { to: 'drive', state: fs, token: f.get('access_token') || '', expiresIn: Number(f.get('expires_in')) || 3600, error: f.get('error_description') || f.get('error') || '' };
   return null;
+}
+
+// The app's own dated files (backup .json / .json.gz and the notes zip) older than keepDays before today, to
+// delete after a save. Today's files and anything else in the folder are never chosen; keepDays 0 keeps all.
+const DATED = /^(?:logbook-backup-(\d{4}-\d{2}-\d{2})\.json(?:\.gz)?|apmes-logbook-notes-(\d{4}-\d{2}-\d{2})\.zip)$/;
+export function staleBackups(names, today, keepDays) {
+  if (!keepDays) return [];
+  const cut = new Date(Date.parse(today + 'T00:00:00Z') - keepDays * 864e5).toISOString().slice(0, 10);
+  return names.filter(n => { const m = DATED.exec(n); return m && (m[1] || m[2]) < cut; });
 }
