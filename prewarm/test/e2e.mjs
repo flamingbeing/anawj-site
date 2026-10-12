@@ -69,7 +69,10 @@ try {
   assert.match(await page.textContent('#lognext'), /Log\s*Prewarm off/);
   await page.click('#lognext');
   assert.match(await page.textContent('[data-ev="ev_wstop"] b'), /^\d\d:\d\d$/, 'Log sets warming off to now');
-  await page.click('[data-ev="ev_wstop"]'); await page.click('[data-evclear="ev_wstop"]');
+  await page.click('[data-ev="ev_wstop"]');
+  let cleared = ''; page.once('dialog', d => { cleared = d.message(); d.accept(); });
+  await page.click('[data-evclear="ev_wstop"]');
+  assert.match(cleared, /Clear the Prewarm off time/, 'Clear asks first');
   assert.equal(await page.textContent('[data-ev="ev_wstop"] b'), 'tap');
   // the 0-min reading is due now: the banner shows and hides on a tap
   await page.waitForSelector('#banner:not([hidden])');

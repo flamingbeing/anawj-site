@@ -93,6 +93,14 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   temperature outside 25–45 °C asks first; 366 reads as 36.6 (`typedValue`). Due alerts (banner, vibrate, beep) run on
   every patient screen for every series (a BP reading falling due on the Temperatures tab or a form alerts too), and
   the screen-awake lock is taken again after switching apps (`startAlerts`, started from `topBar`).
+  Sync (review, 12 Oct 2026): the server keeps whichever write arrives last, not the newest, so `watch()` heals: any
+  field this phone holds newer (`t`) than the copy it just heard is sent again; both phones and the server settle on
+  the newest (proven in the emulator test: without it, server 60 / A 60 / B 70). On the first server word each
+  session, patients the server never had are sent whole, and pending entries from an earlier session are dropped
+  (they were just re-sent if still newer). Save sends only the boxes that changed (plus the save time); a reading
+  changed on the other phone while open here asks before writing over it (Cancel shows theirs). `push` always sends
+  `auto`, so a typed BMI / TXA total / NuDESC isn't recalculated over elsewhere. A member's patient locked with
+  unsent changes stays on the phone with a warning. Clearing a time asks first; an emptied time picker doesn't clear.
 - **Two tabs** (owner, 12 Oct 2026): a thin tab bar under the top bar on the patient screen: **Temperatures** (the
   main screen: times, pre-warming / intra-op temps, comfort, Form view / Sheet view) and **Others** (BP, HR, BIS,
   plus the Intra-op details and PACU boxes and a full-width **Perioperative data** box, formerly "Other data"). The tab you're not on warms up and pulses when its next

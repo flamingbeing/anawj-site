@@ -179,6 +179,40 @@ try {
   const sync01 = docs.documents.find(d => /SYNC-01/.test(JSON.stringify(d.fields.f)));
   assert.ok(sync01 && Object.keys(sync01.fields.f.mapValue.fields).length > 5, 'readings still on the server after lock / unlock');
 
+  // the server keeps whichever write arrives last, so the phones heal it: A edits age offline, B edits it later
+  // online; when A reconnects, A's older queued edit lands last, and B sends its newer one again: all settle on B's
+  const serverAge = async () => {
+    const all = await (await fetch(`${FS}/patients`, { headers: { Authorization: 'Bearer owner' } })).json();
+    const doc = all.documents.find(x => /SYNC-01/.test(JSON.stringify(x.fields.f)));
+    return doc?.fields.f.mapValue.fields.age?.mapValue.fields.v?.stringValue;
+  };
+  const localAge = pg => pg.evaluate(() => Object.values(JSON.parse(localStorage.getItem('prewarm:patients'))).find(r => JSON.stringify(r).includes('SYNC-01'))?.f.age?.v);
+  for (const pg of [a, bb]) { await pg.goto(BASE + '#/'); await pg.click('.list a'); await pg.click('#haemolink'); await pg.click('a.widebox'); await pg.waitForSelector('#f-age'); }
+  await a.context().setOffline(true);
+  await a.fill('#f-age', '60'); await a.keyboard.press('Tab'); await a.waitForTimeout(300);
+  await bb.fill('#f-age', '70'); await bb.keyboard.press('Tab');
+  for (let i = 0; i < 30 && await serverAge() !== '70'; i++) await bb.waitForTimeout(300);
+  await a.context().setOffline(false);
+  let settled = false;
+  for (let i = 0; i < 60 && !settled; i++) { await a.waitForTimeout(500); settled = await serverAge() === '70' && await localAge(a) === '70' && await localAge(bb) === '70'; }
+  assert.ok(settled, `newest edit wins everywhere: server ${await serverAge()}, A ${await localAge(a)}, B ${await localAge(bb)}`);
+
+  // a reading screen left open while the other phone saves that reading: Save asks before writing over it
+  const pid = a.url().match(/#\/p\/(\w+)/)[1];
+  await a.goto(`${BASE}#/p/${pid}/prewarm/10`); await a.waitForSelector('#save');
+  await bb.goto(`${BASE}#/p/${pid}/prewarm/10`); await bb.waitForSelector('#save');
+  await bb.click('[data-step="1"][data-c="core"]');
+  bb.once('dialog', d => d.accept());
+  await bb.click('#save'); await toastSays(bb, /10 min saved/);
+  await a.waitForFunction(() => !document.querySelector('#fresh').hidden, null, { timeout: 15000 });
+  const asked = [];
+  const answer = d => { asked.push(d.message()); /blank/.test(d.message()) ? d.accept() : d.dismiss(); };
+  a.on('dialog', answer);
+  await a.click('#save'); await a.waitForTimeout(500);
+  a.off('dialog', answer);
+  assert.ok(asked.some(m => /changed on another phone \(BB\)/.test(m)), 'A is asked before writing over B: ' + JSON.stringify(asked));
+  await a.waitForFunction(() => /BB/.test(document.querySelector('main').textContent), null, { timeout: 5000 });
+
   // phone A logs out with a change that hasn't synced (offline): two warnings; cancelling keeps everything
   await a.goto(BASE + '#/');
   await a.click('.list a'); await a.waitForSelector('.board');
@@ -205,7 +239,7 @@ try {
   await bb.waitForSelector('#code', { timeout: 15000 });
 
   assert.deepEqual(errors, []);
-  console.log('prewarm sync: ok (two phones, join code, readings both ways, admin email-link sign-in, managing admins, codes, join link and QR, blank Word form upload and Form view, lock, log out)');
+  console.log('prewarm sync: ok (two phones, join code, readings both ways, admin email-link sign-in, managing admins, codes, join link and QR, blank Word form upload and Form view, lock, offline edits heal, open reading asks, log out)');
 } finally {
   await b.close();
 }
