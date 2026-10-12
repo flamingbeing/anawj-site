@@ -382,7 +382,14 @@ assert.equal(rYearDefault(undefined), 1);
   assert.deepEqual(splitInitials('TKR left'), { initials: '', details: 'TKR left' });
   assert.deepEqual(splitInitials('VATS lobectomy'), { initials: '', details: 'VATS lobectomy' });
   assert.deepEqual(splitInitials('GA lap chole'), { initials: '', details: 'GA lap chole' });
-  assert.deepEqual(splitInitials('ABCDE x'), { initials: '', details: 'ABCDE x' }, '5 letters: not initials');
+  // longer initials (older cases, up to 8 letters): only before an age or a /
+  assert.deepEqual(splitInitials('ABCDE x'), { initials: '', details: 'ABCDE x' }, '5 letters without an age: not initials');
+  assert.deepEqual(splitInitials('ABCDE 45F lap chole'), { initials: 'ABCDE', details: '45F lap chole' });
+  assert.deepEqual(splitInitials('ABCDEFGH/30F LSCS'), { initials: 'ABCDEFGH', details: '30F LSCS' });
+  assert.deepEqual(splitInitials('abcdef 5yo circ'), { initials: 'ABCDEF', details: '5yo circ' });
+  assert.deepEqual(splitInitials('ABCDEFGHI 45F x'), { initials: '', details: 'ABCDEFGHI 45F x' }, '9 letters: never initials');
+  for (const t of ['ELECTIVE LSCS spinal', 'spinal anaesthesia', 'CARDIAC case', 'REPAIR of hernia', 'carotid endarterectomy GA']) assert.equal(splitInitials(t).initials, '', t);
+  assert.deepEqual(caseParts({ details: 'ABCDEF 60M TKR' }), { initials: 'ABCDEF', details: '60M TKR' }, 'an older case splits on the fly');
   assert.deepEqual(splitInitials('A 5yo'), { initials: '', details: 'A 5yo' });
   // the first run of letters is initials in any case, saved in capitals
   assert.deepEqual(splitInitials('Ab 5yo'), { initials: 'AB', details: '5yo' });
