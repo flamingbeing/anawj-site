@@ -217,7 +217,7 @@ export const PAGES = [
     { id: 'dc_hai_other', label: 'Other infection, specify', type: 'text', show: { f: 'dc_hai_type', in: [1] } },
     { id: 'dc_mace', label: 'Major adverse cardiac event', type: 'code', opts: [[0, 'No'], [1, 'Myocardial infarction'], [2, 'Stroke'], [3, 'Heart failure'], [4, 'Revascularisation incl. PCI'], [5, 'CABG']] },
     yn('dc_af', 'Atrial fibrillation'),
-    { id: 'dc_af_spec', label: 'AF, specify', type: 'text', ...ifYes('dc_af') },
+    { id: 'dc_af_spec', label: 'AF, specify', type: 'word', opts: ['New onset', 'Existing'], ...ifYes('dc_af') },
     yn('dc_aki', 'Acute kidney injury'),
     yn('dc_delirium', 'Post-operative delirium'),
     yn('dc_icu', 'Unplanned ICU admission'),
