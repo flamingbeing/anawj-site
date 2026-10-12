@@ -1,6 +1,6 @@
 # Prewarming study app: plan
 
-Status: **draft, waiting for the owner's approval.** Nothing is built yet.
+Status: **approved 12 Oct 2026.** PR 1 (offline app on one phone) built; PR 2 (sharing) next.
 
 A phone app for the op-day data of the prewarming RCT (optimal pre-warming time to prevent inadvertent perioperative
 hypothermia; multi-level spine surgery; groups 0, 10 and 30 min). It is for the readings that must be taken at the
@@ -116,7 +116,14 @@ form's order and wording, so the app feels like the form they know.
 4. Give `firebase-rules-deployer@apmes-logbook.iam.gserviceaccount.com` the Firebase Rules Admin role on the new
    project.
 
-## Still to confirm
+## Answers (owner, 12 Oct 2026)
+
+Group shown only on the pre-warming screen; Subject ID (exported in the Enrollment ID column); owner and study
+investigators are admins (hospital names still to come); keep data until the study ends; BP/HR/BIS: baseline live,
+15-min rows off by default (a setting turns them on); transfusion: units in the template column, volumes on the
+Extra sheet; thermal sensation −3 … +3.
+
+## Questions as asked
 
 1. **Blinding.** The protocol says the recruiter is blinded to the group. Can every investigator using the app see
    the randomisation group? If not, the group can be hidden except on the pre-warming screen, or shown only to
