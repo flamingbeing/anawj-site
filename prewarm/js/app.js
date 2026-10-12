@@ -1,5 +1,5 @@
 // Prewarming study: op-day screens. Data stays on this phone for now (localStorage); sharing comes with Firebase.
-import { PAGES, SERIES, BY_ID, EXTRA_BY_ID, IX_COLS, calc, normaliseTemp, isShown } from './schema.js';
+import { PAGES, SERIES, BY_ID, EXTRA_BY_ID, IX_COLS, SITES, calc, normaliseTemp, isShown } from './schema.js';
 import { newRecord, setVal, val, lastEdit } from './store.js';
 import { workbook } from './export.js';
 
@@ -24,7 +24,7 @@ function paint(html) {
 const read = (k, d) => { try { return JSON.parse(localStorage.getItem(NS + k)) ?? d; } catch { return d; } };
 const write = (k, v) => { try { localStorage.setItem(NS + k, JSON.stringify(v)); return true; } catch { toast('Not saved: this phone’s storage is full or blocked.'); return false; } };
 let patients = read('patients', {});
-const settings = Object.assign({ me: '', hide: { skin: false, set: false, ts: false, warm: false, room: false, haemo15: true, bis: false },
+const settings = Object.assign({ me: '', site: '', hide: { skin: false, set: false, ts: false, warm: false, room: false, haemo15: true, bis: false },
   remind: { vibrate: true, beep: true, banner: true, awake: true } }, read('settings', {}));
 const saveAll = () => write('patients', patients);
 const saveSettings = () => write('settings', settings);
@@ -108,12 +108,12 @@ function home() {
   header('Prewarming study' + (DEMO ? ' (demo)' : ''), null, `<a class="iconbtn" href="#/settings" aria-label="Settings">⚙</a>`);
   const list = Object.values(patients).filter(p => !p.deleted).sort((a, b) => (lastEdit(b)?.t || b.created) - (lastEdit(a)?.t || a.created));
   paint(`
-    ${settings.me ? '' : `<div class="note">Add your initials in <a href="#/settings">Settings</a> so each reading shows who entered it.</div>`}
+    ${settings.me && settings.site ? '' : `<div class="note">Add your ${settings.me ? '' : 'initials and '}hospital in <a href="#/settings">Settings</a>${settings.me ? '' : ' so each reading shows who entered it'}.</div>`}
     <button class="primary big" id="new">+ New patient</button>
     <h2>Patients on this phone</h2>
     ${list.length ? `<ul class="list">${list.map(p => {
       const e = lastEdit(p);
-      return `<li><a href="#/p/${p.id}"><b>${esc(sid(p))}</b><span>${esc(status(p))}</span>
+      return `<li><a href="#/p/${p.id}"><b>${esc(sid(p))}${val(p, 'site') ? ` <small>${esc(val(p, 'site'))}</small>` : ''}</b><span>${esc(status(p))}</span>
         <small>${e ? 'Last entry ' + new Date(e.t).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) + (e.by ? ' by ' + esc(e.by) : '') : 'No entries yet'}</small></a></li>`;
     }).join('')}</ul>` : `<p class="muted">No patients yet. Tap <b>New patient</b> on the morning of surgery.</p>`}
     <a class="secondary big" href="#/export">Export Excel</a>
@@ -143,7 +143,7 @@ route(/^\/new$/, () => {
     if (!id) return toast('Enter the Subject ID.');
     if (!arm) return toast('Choose the randomisation group.');
     if (Object.values(patients).some(p => !p.deleted && String(val(p, 'enrol_id')).toLowerCase() === id.toLowerCase())) return toast('That Subject ID is already on this phone.');
-    const p = newRecord(); set(p, 'enrol_id', id); set(p, 'arm', arm); patients[p.id] = p; saveAll();
+    const p = newRecord(); set(p, 'enrol_id', id); set(p, 'arm', arm); if (settings.site) set(p, 'site', settings.site); patients[p.id] = p; saveAll();
     go('#/p/' + p.id);
   };
 });
@@ -453,6 +453,9 @@ route(/^\/settings$/, () => {
   paint(`<div class="stack">
     <label class="lab" for="me">Your initials</label><input id="me" value="${esc(settings.me)}" maxlength="6" autocapitalize="characters" autocomplete="off">
     <small class="muted">Saved with each reading as “entered by”.</small>
+    <span class="lab">Your hospital</span>
+    <div class="seg">${SITES.map(x => `<button type="button" class="chip" data-site="${x}" aria-pressed="${settings.site === x}">${x}</button>`).join('')}</div>
+    <small class="muted">New patients on this phone are recorded at this hospital.</small>
     <h2>Readings to enter live</h2>
     <p class="muted small">Untick what you’ll fill in later from the Fortuna monitor or Epic. Core temperature is always on.</p>
     ${tog('hide', 'skin', 'Skin temps: chest, arm, thigh, calf')}${tog('hide', 'set', 'Gown set temp (pre-warming)')}${tog('hide', 'ts', 'Thermal sensation (pre-warming)')}
@@ -462,6 +465,7 @@ route(/^\/settings$/, () => {
     <p class="muted small">Works while the app is open on screen.</p>
     ${tog('remind', 'banner', 'Banner')}${tog('remind', 'vibrate', 'Vibrate', 'Android only')}${tog('remind', 'beep', 'Short beep')}${tog('remind', 'awake', 'Keep the screen on during readings')}
     <button class="secondary" id="test">Test the alert</button></div>`);
+  view.querySelectorAll('[data-site]').forEach(b => b.onclick = () => { settings.site = settings.site === b.dataset.site ? '' : b.dataset.site; saveSettings(); render(); });
   $('#me').onchange = e => { settings.me = e.target.value.trim().toUpperCase(); saveSettings(); toast('Saved'); };
   view.onchange = e => {
     const i = e.target; if (!i.dataset.g) return;

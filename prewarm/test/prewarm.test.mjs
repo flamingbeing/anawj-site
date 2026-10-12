@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { inflateRawSync } from 'node:zlib';
 import { HEADERS, SECTIONS, SCREENING_HEADERS } from '../js/headers.js';
-import { FIELDS, BY_ID, PAGES, SCREENING, colLetter, colIndex, calc, normaliseTemp, isShown } from '../js/schema.js';
+import { FIELDS, BY_ID, PAGES, SCREENING, SITES, EXTRA, colLetter, colIndex, calc, normaliseTemp, isShown } from '../js/schema.js';
 import { newRecord, setVal, val, mergeRecord, mergeInto, packFile, readFile } from '../js/store.js';
 import { workbook, workbookSheets, cellFor, ixText } from '../js/export.js';
 import { dateSerial, timeSerial } from '../js/xlsx.js';
@@ -129,6 +129,9 @@ assert.equal(cellFor(BY_ID.age, ''), null);
   assert.deepEqual(rd.rows[1].slice(0, 3), ['E2', 'Pre-warming', '5 min']);
   assert.match(rd.rows[1][5], /Core 36.5/);
   assert.equal(ex.rows[0][0].s, 'Subject ID');
+  assert.equal(ex.rows[0][1].s, 'Hospital');
+  assert.deepEqual(SITES, ['NTF', 'NUH', 'SGH', 'CGH', 'TTSH', 'KTPH', 'WH']);
+  assert.equal(EXTRA[0].id, 'site');
   // investigation rows go in the template's one cell as text
   setVal(p, 'io_ix_rows', JSON.stringify([{ time: '10:30', hb: '9.8', test: 'ROTEM', ct: '60' }]));
   assert.equal(workbookSheets([p], [])[0].rows[2][BY_ID.io_ix.colIndex], '10:30, Hb 9.8, ROTEM, CT or R 60');

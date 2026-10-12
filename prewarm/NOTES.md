@@ -6,6 +6,8 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   names). Only the transcribed headers are here. Fake patients only, in tests and demo.
 - **Study IDs only:** the app never asks for names, initials or hospital numbers. The Subject ID is exported in the
   template's Enrollment ID column (B).
+- **Hospitals:** NTF, NUH, SGH, CGH, TTSH, KTPH, WH (`SITES` in `schema.js`). Each phone picks one in Settings; new
+  patients record it (`site`, on the Extra sheet). With sharing, the join code will set it.
 - **Blinding:** the randomisation group shows only on the pre-warming screen (and when the patient is created).
 - **Columns:** `schema.js` lists fields in template column order; field n is column n. `test/prewarm.test.mjs` pins
   anchor columns. Never insert a template field out of order. Items with no template column go in `EXTRA` (exported

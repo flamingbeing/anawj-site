@@ -12,12 +12,11 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 ## Waiting on the owner
 
 - Try it on a phone (preview link on PR #192, `?demo`).
-- Hospital names or codes for the sites.
-- Before PR 2: create the Firebase project (steps in `PLAN.md` → "What the owner needs to do").
+- Before PR 2: web config is in (#193, project `prewarm-study`); still confirm Anonymous + Google sign-in are on, `anawj.com` is an authorised domain, and the rules deployer has Firebase Rules Admin on the project.
 
 ## Next
 
-1. PR 2: sharing (join code per hospital, Firestore sync, rules with emulator tests, deploy workflow entry).
+1. PR 2: sharing (join code per hospital (NTF, NUH, SGH, CGH, TTSH, KTPH, WH), Firestore sync, rules with emulator tests, deploy workflow entry).
 2. PR 3: admin (codes, members), export across hospitals, polish.
 
 ## Decisions
