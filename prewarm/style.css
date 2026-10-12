@@ -36,7 +36,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .bar h1 { flex: 0 1 auto; margin: 0; font-size: 17px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* running timer and next event (patient screen) */
 #extra { display: flex; align-items: center; gap: 2px; min-width: 0; }
-.clock { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; margin-left: 8px; color: var(--navy); }
+.clock { display: flex; align-items: center; gap: 8px; flex: 1 0 auto; margin-left: 8px; color: var(--navy); }
+/* the next thing to log sits in the middle of the bar, between the title and the time now */
+.clock .next { margin: 0 auto; justify-items: center; text-align: center; }
 .clock > div { display: grid; justify-items: end; line-height: 1.15; text-align: right; min-width: 0; }
 .clock small { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .clock b { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
