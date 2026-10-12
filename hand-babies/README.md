@@ -10,6 +10,7 @@ senior can assess remotely. Lives at `anawj.com/hand-babies/`. No data, no sign-
   offline worker.
 - `gifs/`: GIF copy of each animation for sharing in chats. Made by `node hand-babies/tools/make-gifs.mjs` (server on 8080,
   needs ffmpeg); rerun after changing a figure. `style.css`: layout. `sw.js`: offline cache (bump `VERSION` on any change).
+- `edit.html`: page editor for suggesting changes (sends a GitHub issue); see NOTES.md "Edits sent from the page editor".
 - Decisions and content rules: `NOTES.md`. Status: `STATUS.md`.
 
 Test (phone size, axe accessibility, every figure drew and animates, pause, reduced motion, GIFs exist, in-page links

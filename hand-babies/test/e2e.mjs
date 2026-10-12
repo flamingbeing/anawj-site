@@ -67,6 +67,49 @@ try {
   await page.goto(BASE + '#pic-infect');
   assert.ok(await page.$eval('#pic-infect', d => d.open), 'hash opens scenario');
 
+  // page editor: tap a line, change it, see it in the message that would be sent as a GitHub issue
+  const ed = await ctx.newPage();
+  ed.on('pageerror', e => errors.push('edit: ' + e.message));
+  await ed.goto(BASE + 'edit.html');
+  const fr = ed.frameLocator('#frame');
+  await fr.locator('#rules .lead').waitFor();
+  await ed.waitForTimeout(300);
+  // figures are stopped inside the editor so they can be selected
+  assert.match(await fr.locator('[data-fig="distal"] .fig-btn').textContent(), /Play/);
+  await fr.locator('#rules .lead').click();
+  await ed.click('#aEdit');
+  await fr.locator('#rules .lead').evaluate(el => { el.textContent = 'Your senior decides from your exam. Edited line.'; });
+  await ed.click('#eSave');
+  assert.equal(await ed.textContent('#count'), '1');
+  await fr.locator('#t-look').click();
+  await ed.click('#aComment');
+  await ed.fill('#noteText', 'Add a photo of a real cascade');
+  await ed.click('#noteDlg button[value=ok]');
+  await ed.waitForFunction(() => document.getElementById('count').textContent === '2');
+  // a figure can take a comment but not a text edit
+  await fr.locator('[data-fig="nerves"] svg').click();
+  assert.equal(await ed.isHidden('#aEdit'), true, 'no text edit on a figure');
+  await ed.click('#aCancel');
+  await ed.click('#send');
+  await ed.fill('#who', 'Test MO');
+  const preview = await ed.inputValue('#preview');
+  assert.match(preview, /Suggested by: Test MO/);
+  assert.match(preview, /## Page: \/hand-babies\//);
+  assert.match(preview, /Was:\n> Your senior decides from your exam and your photos/);
+  assert.match(preview, /Now:\n> Your senior decides from your exam\. Edited line\./);
+  assert.match(preview, /Comment:\n> Add a photo of a real cascade/);
+  await ed.evaluate(() => { window.open = u => { window.__opened = u; }; });
+  await ed.click('#openIssue');
+  const issue = await ed.evaluate(() => window.__opened);
+  assert.match(issue, /^https:\/\/github\.com\/flamingbeing\/anawj-site\/issues\/new\?title=Page%20edits%3A%20%2Fhand-babies%2F/);
+  if (SHOTS) { await ed.click('#sendClose'); await fr.locator('#rules .lead').click(); await ed.screenshot({ path: `${SHOTS}/edit.png` }); }
+  // pages outside this app can't be opened in the editor
+  await ed.fill('#path', '/logbook/');
+  await ed.press('#path', 'Enter');
+  await ed.waitForTimeout(500);
+  assert.equal(new URL(await fr.locator('body').evaluate(() => location.href)).pathname, '/hand-babies/');
+  await ed.close();
+
   if (SHOTS) {
     await page.goto(BASE);
     for (const id of ['rules', 'picture', 'sensation', 'tendons', 'infection', 'photos', 'call']) {
