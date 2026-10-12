@@ -6,50 +6,44 @@ Last updated: 2026-10-12 by Claude Code, hand assessment session.
 
 ## Now
 
-- **Claude Code, hand assessment** (branch `claude/amazing-goodall-erq636`): fixed the update bar that did nothing when tapped on a phone.
-  Nothing half-done.
+- **Claude Code, hand assessment** (branch `claude/amazing-goodall-erq636`, no open PR): nothing half-done. Owner
+  to check on their phone that the page reached the 3D version after #260 (close and reopen the tab).
 
 ## Waiting on the owner
 
-- Clinical read-through by the owner / a hand surgeon (2PD cut-offs, index/little FDS caveats, local preferences
-  for referral wording, splinting, antibiotics).
+- Check the 3D poses on a phone and say which, if any, look anatomically off.
+- Clinical read-through by the owner / a hand surgeon (2PD cut-offs, index/little FDS caveats, Elson wording,
+  local preferences for splinting and antibiotics).
+- Suggested edits arrive as GitHub issues titled `Page edits:`; say "apply the page edits" to have them made.
 
 ## Next (ideas, not agreed)
 
-1. Real clinical photos (consented, de-identified) for good vs bad examples, or short videos of each tendon test.
-2. Department-specific bits (who to call, photo app, ED protocol) if the owner wants them.
-3. Link from a landing page once one exists.
+1. Points dropped with the 10 rules (rings off early; a spurting digital artery means the nerve is likely cut):
+   add back into the case cards if the owner wants.
+2. Real clinical photos (consented, de-identified) or short videos of each tendon test.
+3. 3D for the remaining flat diagrams (sensation finger, 2PD, zones) if the owner asks; ✓/✗ marks in figures kept.
+4. Optional `edit.` shortcut address like edit.anantf.com (needs a separate redirect site).
+5. Delete the `hand/` redirect stub once old links have passed through.
 
 ## Recently done
 
-- #258: 3D animations for tendon tests (added FPL, EDC, EIP/EDM, EPL, Elson), kinder wording.
-
+- #260: updates switch on by themselves; the update bar only reloads (tap did nothing on the owner's phone).
+- #258: 3D animations (three.js) for cascade, FDP, FDS, nerve map; new FPL, EDC, EIP/EDM, EPL, Elson; kinder wording.
 - #253: removed the 10 rules and the emoji.
-
-- #247: page editor (edit.html, sends GitHub issues).
-
-- #245: page cut to about half, plainer wording.
-
-- #207: first version (one page, 9 figures, quiz, referral template).
-- #242: animated figures with Pause/Play, GIF copies in `hand-babies/gifs/` for sharing.
-- Moved from `/hand/` to `/hand-babies/`; `/hand/` redirects and its worker clears the old offline copy.
+- #247: page editor (`edit.html`, sends GitHub issues).
+- #245: page cut to about half, plainer local wording; quiz, Words, privacy and template removed.
+- #243: moved from `/hand/` to `/hand-babies/` (redirect + cache cleanup at `/hand/`).
+- #242: animated figures with Play/Pause, GIF copies in `gifs/`.
+- #207: first version.
 
 ## Decisions
 
-- 2026-10-12: 3D animations (three.js, vendored) for the tendon tests, cascade and nerve map; 2D kept for
-  the sensation, 2PD, zones and photo diagrams. Calling example is plain text.
-
-- 2026-10-12: no "10 rules" section and no emoji on the page (owner); the page opens on "By case".
-
-- 2026-10-12: page editor like edit.anantf.com (owner): `hand-babies/edit.html`, issues to flamingbeing/anawj-site.
-
-- 2026-10-12: cut the page (owner): quiz, Words section, privacy guide and referral template removed; calling
-  section is one short example.
-
-- 2026-10-12: site and folder renamed `hand-babies` (owner). Keep the `hand/` redirect stub for a while, then delete it.
-
-- 2026-10-12: figures become playable animations, still for reduced motion; GIFs for forwarding (owner asked for
-  "gifs or playable animations").
-
-- 2026-10-12: single static page, no data stored, offline via `sw.js`; drawn SVG figures; content prioritised over
-  design (owner).
+- 2026-10-12: new versions activate themselves; the bar only reloads (owner's tap did nothing).
+- 2026-10-12: 3D animations (three.js r160, vendored) for tendon tests, cascade and nerve map; 2D kept for the
+  sensation, 2PD, palm cut, zones and photo diagrams. Calling example is plain text. Tone instructive, not blunt.
+- 2026-10-12: no "10 rules" section and no emoji; the page opens on "By case".
+- 2026-10-12: page editor like edit.anantf.com: `hand-babies/edit.html`, issues to flamingbeing/anawj-site.
+- 2026-10-12: page cut: no quiz, Words section, privacy guide or referral template; one short calling example.
+- 2026-10-12: site and folder renamed `hand-babies`; keep the `hand/` redirect stub for a while.
+- 2026-10-12: figures are playable animations (still for reduced motion) with GIFs for forwarding.
+- 2026-10-12: single static page, no data stored, offline via `sw.js`; content over design.
