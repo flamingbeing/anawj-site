@@ -324,3 +324,9 @@ dialog.ask::backdrop { background: rgba(0, 0, 0, .35); }
 dialog.ask p { margin: 0 0 6px; }
 .askbtns { display: grid; gap: 8px; margin-top: 12px; }
 .askbtns button { min-height: var(--tap); }
+
+/* what's still missing (patient screen, above Mark data collection as complete) */
+.gaps { margin-top: 12px; padding: 10px 12px; border: 1px solid var(--warn); border-radius: var(--r-card); background: var(--warn-soft); color: var(--ink); font-size: 14px; }
+.gaps b { color: var(--warn); }
+.gaps ul { margin: 4px 0 0; padding-left: 18px; display: grid; gap: 4px; }
+.gaps a { color: var(--warn); font-weight: 600; }

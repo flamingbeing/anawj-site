@@ -234,8 +234,13 @@ function pointsFor(p, s) {
 }
 // due time (minutes after midnight) of a timepoint, from the reference event
 function dueOf(p, s, pt) {
-  if (pt.min == null) return null;
   const ref = refOf(p, s);
+  // intra-op baseline is due on arrival in OT, the end-of-surgery reading at surgery end (same day as the start)
+  if (s !== 'prewarm' && (pt.key === 'base' || pt.key === 'end')) {
+    const t = toMin(val(p, pt.key === 'base' ? 'ev_ot' : 'io_done'));
+    return t == null || ref == null ? t : t + 1440 * Math.round((ref - t) / 1440);
+  }
+  if (pt.min == null) return null;
   return ref == null ? null : ref + pt.min;
 }
 // usual ranges for typed readings: outside them, Save asks first
@@ -590,11 +595,17 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
   }
   function linksHtml() {
     const done = pg => val(p, 'sign_' + pg) ? ' ✓' : '';
+    // once their stage has come: how many questions are left
+    const todo = (ids, from) => {
+      if (!val(p, from)) return '';
+      const n = ids.map(field).filter(f => f && isShown(f, k => val(p, k)) && val(p, f.id) == null).length;
+      return n ? `${n} to answer` : '';
+    };
     const haemo = pointsFor(p, 'haemo').filter(x => savedAt(p, 'haemo', x.key)).length;
     return `<nav class="links" aria-label="Other forms">
       <a href="#/p/${id}/haemo" id="haemolink" data-state="${haemoState(p)}">BP, HR, BIS${done('haemo')}<small>${haemo ? haemo + ' saved' : 'Baseline in OT'}</small></a>
-      <a href="#/p/${id}/form/intraop">Intra-op details${done('intraop')}<small>Blood, products, tests</small></a>
-      <a href="#/p/${id}/form/pacu">PACU${done('pacu')}<small>Temp, NuDESC, delay</small></a>
+      <a href="#/p/${id}/form/intraop">Intra-op details${done('intraop')}<small>${todo(INTRAOP_Q, 'io_done') || 'Blood, products, tests'}</small></a>
+      <a href="#/p/${id}/form/pacu">PACU${done('pacu')}<small>${todo(PACU_Q, 'pacu_in') || 'Temp, NuDESC, delay'}</small></a>
       </nav>
       <div class="textlinks"><a class="minicard" href="#/p/${id}/data">Other data</a><a href="#/p/${id}/form">Form view</a><a href="#/p/${id}/sheet">Sheet view</a></div>`;
   }
@@ -624,7 +635,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
       <button class="save big" id="save">${isSaved ? 'Save changes' : `Save ${pt.label} reading`}</button>
       ${s === 'haemo' && vitalsCollected(p) ? '<p class="okline small">✓ Vital signs data collected: ticked on the paper form</p>' : ''}
       ${s === 'haemo' && settings.hide.haemo15 ? `<p class="muted small">Only baseline is entered here; the 15-min rows come from the monitor download. Turn them on in Settings.</p>` : ''}
-      ${main ? comfortHtml('sat_post', 'Comfortable after surgery?') + linksHtml() + doneHtml(p) : signoffHtml(p, s)}`);
+      ${main ? comfortHtml('sat_post', 'Comfortable after surgery?') + linksHtml() + gapsHtml(p) + doneHtml(p) : signoffHtml(p, s)}`);
     refreshBar();
     if (editing) { const i = $('#evtime'); i?.focus(); }
     if (typing) { const i = view.querySelector(`[data-in="${typing}"]`); i?.focus(); }
@@ -693,6 +704,8 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     }
     if (t.closest('[data-done]')) {
       if (!settings.me) return toast('Add your initials in Settings first.');
+      const g = gaps(p);
+      if (g.length && !confirm(`Still to fill:\n${g.map(x => `• ${x.what}: ${x.items.join(', ')}`).join('\n')}\n\nMark data collection complete anyway?`)) return;
       set(p, 'done', `${settings.me} ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} ${nowHM()}`);
       toast('Data collection marked complete'); draw(); window.scrollTo(0, 0); return;
     }
@@ -731,8 +744,15 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     el.textContent = 'due ' + fromMin(Math.round(d)) + (left > 0 ? ` · in ${Math.floor(left)}:${String(Math.floor((left % 1) * 60)).padStart(2, '0')}` : left > -5 ? ' · now' : ' · late');
     el.dataset.state = isSaved ? 'saved' : left > 2 ? 'later' : left > 0 ? 'soon' : left > -5 ? 'now' : 'late';
   });
-  // the BP, HR, BIS box warms up the same way for its next 15-min reading
-  const hl = setInterval(() => { const a = $('#haemolink'); if (a) a.dataset.state = haemoState(p); }, 1000);
+  // the BP, HR, BIS box warms up the same way for its next 15-min reading; the still-to-fill list keeps up as
+  // readings fall due (main screen)
+  const hl = setInterval(() => {
+    const a = $('#haemolink'); if (a) a.dataset.state = haemoState(p);
+    if (!main) return;
+    const gp = $('#gaps'), h = gapsHtml(p);
+    if (gp && gp.outerHTML !== h) { if (h) gp.outerHTML = h; else gp.remove(); }
+    else if (!gp && h) $('[data-done], [data-undone]')?.closest('.sign')?.insertAdjacentHTML('beforebegin', h);
+  }, 1000);
   cleanup.push(() => clearInterval(hl));
 });
 
@@ -768,6 +788,48 @@ document.addEventListener('pointerdown', () => { try { actx ||= new AudioContext
 
 // ---------- the patient's op-day data collection marked complete (bottom of the main screen, so it isn't tapped by
 // accident); shown at the top of the main screen and in the patient list. The Word form's sign-off lines use it.
+// What's still missing (owner, 12 Oct 2026: nothing easy to miss during intra-op collection): readings whose time
+// has passed, times skipped, warming marked on with no start time, and the forms' unanswered questions once their
+// stage has come. Each: { what, items, href }.
+const INTRAOP_Q = ['io_tech', 'io_ebl', 'io_cs', 'io_cs_vol', 'io_cs_ret', 'io_pcc', 'io_pcc_dose', 'io_txa', 'io_txa_bolus', 'io_txa_inf', 'io_txa_total', 'io_fib', 'io_fib_dose'];
+const PACU_Q = ['pacu_temp', 'pacu_shiver', 'pacu_ponv', 'pacu_hypot', 'pacu_tx', 'pacu_pain', 'nd_dis', 'nd_beh', 'nd_com', 'nd_ill', 'nd_psy', 'pacu_delay', 'pacu_delay1h', 'pacu_delay_why'];
+function gaps(p) {
+  const out = [], get = k => val(p, k), at = s => `#/p/${p.id}/${s}`;
+  const add = (what, items, href) => { if (items.length) out.push({ what, items, href }); };
+  // readings: the link opens the first one missed
+  const missed = (s, what) => {
+    const xs = pointsFor(p, s).filter(x => {
+      const d = dueOf(p, s, x);
+      return d != null && !savedAt(p, s, x.key) && expected(p, s, d) && nowFor(p, s) > d + 5;
+    });
+    if (xs.length) add(what, xs.map(x => x.key === 'base' ? 'Baseline' : x.key === 'end' ? 'End' : x.min + ' min'), at(s) + '/' + xs[0].key);
+  };
+  if (!noWarming(p)) missed('prewarm', 'Pre-warming temps not saved');
+  missed('iotemp', 'Intra-op temps not saved');
+  missed('haemo', 'BP, HR, BIS not saved');
+  // in OT a while with no induction time: the intra-op readings have no due times, so nothing else would flag them
+  const ot = toMin(get('ev_ot'));
+  if (ot != null && !get('io_knife') && ((nowMin() - ot + 1440) % 1440) > 20 && !get('io_done')) add('Induction not logged', ['intra-op readings fall due from it'], '#/p/' + p.id);
+  // times: any essential one skipped before the latest one logged
+  const evs = ESSENTIAL.filter(id => !(noWarming(p) && (id === 'pw_start' || id === 'ev_wstop')));
+  const last = evs.reduce((i, id, j) => get(id) ? j : i, -1);
+  const label = id => EVENTS.find(([f]) => f === id)[1].replace('\u00ad', '');
+  add('Times not logged', evs.slice(0, last).filter(id => !get(id)).map(label), '#/p/' + p.id);
+  // warming marked Yes on a reading, but its start time not logged
+  const yes = col => SERIES.iotemp.points.some(x => String(get(`iotemp_${x.key}_${col}`)) === '1');
+  add('Warming on, start time not logged', [['under', 'io_under_start'], ['gown', 'io_gown_start']].filter(([c, id]) => yes(c) && !get(id)).map(([, id]) => label(id)), '#/p/' + p.id);
+  const unanswered = ids => ids.map(field).filter(f => f && isShown(f, get) && get(f.id) == null).map(f => f.label);
+  if (get('io_done')) add('Intra-op details unanswered', unanswered(INTRAOP_Q), `#/p/${p.id}/form/intraop`);
+  if (get('pacu_in')) add('PACU unanswered', unanswered(PACU_Q), `#/p/${p.id}/form/pacu`);
+  if (get('ev_ot') && get('sat_pre') == null) add('Comfort not asked', ['Before surgery'], '#/p/' + p.id);
+  if (get('pacu_in') && get('sat_post') == null) add('Comfort not asked', ['After surgery'], '#/p/' + p.id);
+  return out;
+}
+function gapsHtml(p) {
+  const g = gaps(p);
+  if (!g.length) return '';
+  return `<div class="gaps" id="gaps"><b>Still to fill</b><ul>${g.map(x => `<li><a href="${x.href}">${esc(x.what)}</a>: ${x.items.map(esc).join(', ')}</li>`).join('')}</ul></div>`;
+}
 function doneHtml(p) {
   const v = val(p, 'done');
   return `<div class="sign">${v ? `Data collection complete: ${esc(v)} <button class="link" data-undone>Undo</button>` : `<button class="link" data-done>Mark data collection as complete</button>`}</div>`;
@@ -788,7 +850,7 @@ function signoffClick(p, pg, t) {
 // BP / HR / BIS: the next 15-min reading's state, like the due time (readings missed by over 15 min are let go)
 function haemoState(p) {
   const now = nowFor(p, 'haemo');
-  const lefts = pointsFor(p, 'haemo').filter(x => x.min != null && !savedAt(p, 'haemo', x.key))
+  const lefts = pointsFor(p, 'haemo').filter(x => !savedAt(p, 'haemo', x.key))
     .map(x => dueOf(p, 'haemo', x)).filter(d => d != null && expected(p, 'haemo', d)).map(d => d - now).filter(l => l > -15);
   if (!lefts.length) return 'later';
   const left = Math.min(...lefts);

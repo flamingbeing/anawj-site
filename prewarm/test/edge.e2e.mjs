@@ -118,6 +118,28 @@ await tryit(async () => {
   log(!await pg.$('dialog.ask[open]'), 'Enter on the last question: no error, no prompt');
   await ctx.close();
 });
+// H. intra-op: after Surgery end the End readings fall due; once missed they and the unanswered details are listed,
+// and Mark data collection as complete lists them first
+await tryit(async () => {
+  const { ctx, pg } = await fresh('2026-10-13T10:00:00');
+  await pg.evaluate(() => { const k = 'prewarm-demo:settings'; const s = JSON.parse(localStorage.getItem(k) || '{}'); s.me = 'AB'; localStorage.setItem(k, JSON.stringify(s)); });
+  await pg.reload(); await pg.waitForTimeout(600);
+  await open(pg, 1);
+  await pg.click('[data-ev="io_done"]'); await pg.waitForTimeout(300);
+  log(/End of surgery/.test(await pg.textContent('#clock .next')), 'after Surgery end the top bar asks for the End reading');
+  log(/\d+ to answer/.test(await pg.textContent('.links a[href$="/form/intraop"]')), 'Intra-op details shows how many are left');
+  await pg.clock.fastForward('00:06:00'); await pg.waitForTimeout(1500);
+  const g = await pg.textContent('#gaps');
+  log(/Intra-op temps not saved:[^:]*End/.test(g), 'missed End temp listed: ' + g);
+  log(/BP, HR, BIS not saved:[^:]*End/.test(g), 'missed End BP listed');
+  log(/Intra-op details unanswered: .*Blood loss/.test(g), 'unanswered intra-op details listed');
+  let msg = ''; pg.once('dialog', d => { msg = d.message(); d.dismiss(); });
+  await pg.click('[data-done]'); await pg.waitForTimeout(300);
+  log(/Still to fill/.test(msg) && !/Data collection complete/.test(await pg.textContent('main')), 'Mark complete asks first; Cancel leaves it open');
+  await pg.click('#gaps a[href*="/iotemp/"]'); await pg.waitForTimeout(400);
+  log(pg.url().includes('/iotemp/'), 'the link opens the first missed intra-op temp');
+  await ctx.close();
+});
 await b.close();
 if (fails.length) { console.error('prewarm edge: FAIL\n- ' + fails.join('\n- ')); process.exit(1); }
-console.log('prewarm edge: ok (midnight, surgery end, double-tap Save, BP checks, back button, Log, Enter)');
+console.log('prewarm edge: ok (midnight, surgery end, double-tap Save, BP checks, back button, Log, Enter, still to fill)');
