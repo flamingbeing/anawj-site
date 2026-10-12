@@ -84,6 +84,7 @@ a { color: var(--navy); }
 .textlinks a.minicard { display: grid; padding: 6px 10px; border: 1px solid var(--line); border-radius: var(--r); background: var(--card); text-decoration: none; color: var(--navy); line-height: 1.2; }
 .textlinks a.minicard small { font-weight: 400; font-size: 11px; color: var(--muted); }
 .links.one { grid-template-columns: 1fr; }
+.links.two { grid-template-columns: 1fr 1fr; margin-top: 12px; }
 details.sect { margin-top: 12px; }
 details.sect > summary { display: flex; align-items: baseline; gap: 8px; min-height: var(--tap); padding: 6px 2px; cursor: pointer; font-size: 16px; font-weight: 700; color: var(--navy); }
 details.sect > summary small { font-size: 12px; font-weight: 400; color: var(--muted); }
@@ -249,6 +250,23 @@ body.ro main .k, body.ro main .num, body.ro main .chip, body.ro main .tchip, bod
 .donetop small { font-weight: 400; }
 .sign { color: var(--ok); font-weight: 600; font-size: 13px; text-align: center; margin-top: 24px; padding-top: 12px; border-top: 1px solid var(--line); }
 .sign .link { font-weight: 400; }
+.sign + .sign { margin-top: 8px; }
+/* sign-offs: an empty box to tick, then a ticked box with who and when */
+.tickbtn { display: inline-flex; align-items: center; gap: 10px; min-height: var(--tap); padding: 4px 12px; border: 0; background: none; color: var(--navy); font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; }
+.sign .tick { display: inline-grid; place-items: center; flex: 0 0 auto; width: 26px; height: 26px; border: 2px solid var(--navy); border-radius: 6px; background: var(--card); color: #fff; font-size: 18px; line-height: 1; }
+.sign.on { display: flex; align-items: center; justify-content: center; gap: 10px; text-align: left; }
+.sign.on .tick { background: var(--ok); border-color: var(--ok); }
+.sign.on b { display: block; font-size: 15px; }
+.sign.on small { display: block; font-weight: 400; color: var(--muted); }
+/* the two tabs under the bar: temperatures, BP / HR / BIS */
+.ptabs:not([hidden]) { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; max-width: 600px; margin: 0 auto; padding: 0 12px 5px; }
+.ptabs a { display: grid; place-items: center; min-height: 32px; border-radius: var(--r); border: 1px solid var(--line); color: var(--navy); font-size: 14px; font-weight: 600; text-decoration: none; background: var(--card); }
+.ptabs a[aria-selected="true"] { background: var(--navy); border-color: var(--navy); color: #fff; }
+.ptabs a[aria-selected="false"][data-state="soon"] { background: var(--warn-soft); border-color: var(--warn); color: var(--warn); animation: duepulse 2s ease-in-out infinite; --pulse: rgba(138, 90, 0, .35); }
+.ptabs a[aria-selected="false"][data-state="now"] { background: #fde3d3; border-color: #9a3412; color: #9a3412; animation: duepulse 1.2s ease-in-out infinite; --pulse: rgba(229, 114, 0, .55); }
+.ptabs a[aria-selected="false"][data-state="late"] { background: var(--err); border-color: var(--err); color: #fff; animation: duepulse .7s ease-in-out infinite; --pulse: rgba(180, 35, 24, .6); }
+.ptabs a[aria-selected="true"][data-state="now"], .ptabs a[aria-selected="true"][data-state="late"] { box-shadow: inset 0 -3px 0 var(--err); }
+@media (prefers-reduced-motion: reduce) { .ptabs a { animation: none !important; } }
 .links { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
 .links a { display: grid; align-content: center; gap: 0; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-card); padding: 6px 10px; text-decoration: none; color: var(--navy); font-weight: 600; min-height: 52px; line-height: 1.25; }
 .links small { color: var(--muted); font-weight: 400; font-size: 12px; }

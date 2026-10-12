@@ -167,8 +167,16 @@ try {
   assert.doesNotMatch(await got.file('docProps/core.xml').async('string'), /Test Author/, 'file details removed');
   await page.goBack();
 
-  // other data: the rest of the study's pages on one page, under headers open by default, from the small box beside
-  // Form view / Sheet view; Enter and the arrow keys move between questions
+  // two tabs under the bar: Temperatures and BP, HR, BIS (which holds the other forms' links)
+  assert.equal(await page.getAttribute('#templink', 'aria-selected'), 'true');
+  assert.equal(await page.$('.links a[href$="/form/intraop"]'), null, 'other forms are on the BP, HR, BIS tab');
+  await page.click('#haemolink');
+  await page.waitForSelector('input[data-in="sbp"]');
+  assert.equal(await page.getAttribute('#haemolink', 'aria-selected'), 'true');
+  assert.match(await page.textContent('[data-sign="haemo"]'), /Mark BP, HR, BIS complete/, 'the sign-off names its section');
+  assert.ok(await page.$('[data-done]'), 'Mark data collection as complete on this tab too');
+  // other data: the rest of the study's pages on one page, under headers open by default, from the small box on the
+  // BP, HR, BIS tab; Enter and the arrow keys move between questions
   assert.equal((await page.textContent('.textlinks a.minicard')).trim(), 'Other data', 'no caption on the Other data box');
   await page.click('.textlinks a.minicard');
   await page.waitForSelector('details.sect');
@@ -187,7 +195,8 @@ try {
   await page.click('details.sect >> nth=0 >> summary');
   assert.equal(await page.$$eval('details.sect[open]', x => x.length), 7, 'a header folds its section');
   await axe('other data'); await shot('other-data');
-  await page.goBack();
+  await page.goBack(); await page.waitForSelector('input[data-in="sbp"]');
+  await page.goBack(); await page.waitForSelector('.textlinks a[href$="/sheet"]');
 
   // sheet view
   await page.click('.textlinks a[href$="/sheet"]');
@@ -215,8 +224,6 @@ try {
   await page.waitForSelector('input[data-in="sbp"]');
   assert.equal(await page.inputValue('input[data-in="hr"]'), '64', 'saved');
   await axe('bp hr bis'); await shot('haemo');
-  await page.goBack(); await page.goBack(); await page.goBack();
-  await page.waitForSelector('#haemolink');
 
   // intra-op details: TXA total worked out, transfusion volumes
   await page.click('.links a[href$="/form/intraop"]');
