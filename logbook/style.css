@@ -733,6 +733,24 @@ table.cat-names td.muted { font-size: calc(13px * var(--fs, 1)); }
 .refl-filters .chip { min-height: 40px; }
 .flag.tagged { background: var(--warn-bg, #fff4e5); color: var(--warn, #b45309); margin-right: 6px; }
 .refl-htoggle .res-chev.blank { width: .5em; }
+/* the header: title left, Edit and + New on the right of the same line (wrapping below, still on the right, only
+   when they can't fit) */
+.refl-headbar > h2 { flex: 1 1 auto; min-width: 0; }
+.refl-headbar > .refl-actions { margin-left: auto; }
+/* topics read as headings: a bold navy name, the count as a pill (green met, grey some, amber none), a line between
+   topics; the + sits at the right of the name */
+.refl-h { margin: 10px 0 6px; }
+.refl-h + .refl-h { border-top: 1px solid var(--edge, var(--line)); border-radius: 0; padding-top: 4px; }
+.refl-h.refl-drop { border-radius: calc(10px * var(--round, 1)); }
+.refl-h.refl-uncat { margin-top: 16px; }
+.refl-topics .refl-h > ul.cases > li:last-child { border-bottom: 0; }
+.refl-topic { font-size: calc(17px * var(--fs, 1)); color: var(--heading); }
+.refl-hstatic { cursor: default; }
+.refl-pill { display: inline-block; font-size: calc(13px * var(--fs, 1)); font-weight: 600; line-height: calc(1.5 * var(--lh, 1)); padding: 0 8px; border-radius: calc(999px * var(--round, 1)); white-space: nowrap; vertical-align: 1px; background: var(--chip); color: var(--ink); }
+.refl-pill.met { background: var(--ok-bg); color: var(--ok); }
+.refl-pill.none { background: var(--warn-bg); color: var(--warn); }
+.refl-hrow > .refl-add { margin-top: 2px; min-width: 44px; padding: 0 10px; font-size: calc(20px * var(--fs, 1)); line-height: 1; font-weight: 600; color: var(--heading); background: var(--chip); border-color: transparent; }
+.refl-h > .refl-note { margin-left: 22px; margin-top: 0; }
 .refl-view { display: inline-flex; align-items: center; gap: 4px; }
 .refl-view select { min-height: 40px; }
 .refl-hd { display: block; font-size: calc(12px * var(--fs, 1)); }
@@ -1107,6 +1125,10 @@ html.pin-box .log-card .box-wrap { position: sticky; top: var(--pin-top); z-inde
 @media (max-width: 600px) { html.case-inverted.pin-box .log-card .box-wrap { position: relative; top: auto; box-shadow: none; } }
 html.pin-search .lb-top { position: sticky; top: var(--pin-top); z-index: 6; max-height: calc(100dvh - var(--pin-top) - var(--tabbar-h) - 60px); overflow-y: auto; box-shadow: 0 8px 12px -10px rgba(0,0,0,.35); }
 html.pin-search .monthhead { top: calc(var(--pin-top) + var(--lb-top-h, 0px)); }
+/* Reflections: the header card sticks with only its search row in view (--refl-hide = the title and counts above
+   it, set by pinHead in ui-reflect.js); an open topic's name stays just under it while its reflections scroll by */
+html.pin-search .refl-top.pinnable { position: sticky; top: calc(var(--pin-top) - var(--refl-hide, 0px)); z-index: 6; box-shadow: 0 8px 12px -10px rgba(0,0,0,.35); }
+html.pin-search .refl-topics .refl-h.open > .refl-hrow { position: sticky; top: calc(var(--pin-top) + var(--refl-top-h, 0px) - 1px); z-index: 4; background: var(--panel); box-shadow: 0 -4px 0 var(--panel); }
 /* Borders (Settings → Display, per device): borders use --edge, which is --line unless softened here. Set on every
    element so it follows the --line in force there (themes, contrast, colours). Borderless and Faint give fields,
    buttons and chips a light fill so they can still be seen */

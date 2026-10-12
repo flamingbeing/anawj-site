@@ -15,6 +15,9 @@ Last updated: 2026-10-12 by Claude Code "Logbook code editing" session.
   security review and speed audit (owner's go): note index moved to owner-only `meta/noteIndex`, bin restore limit,
   notes listener metadata, rules tests, and the Cloudflare preview reload fix (service workers key navigations by
   `'./'`). Owns the axe check, PR previews and the Codex / Firebase plugin setup.
+- **Claude Code, "APMES Logbook 2" session** (branch `ccr-afac5e7a-99esax`): owner's batch of 8 in three PRs: A
+  Reflections tab (topic headings, one-line header, pinned search + sticky topics), then B (page width, demo header
+  and Leave demo, swipe on by default and following the finger), then C (Analytics, Advanced only).
 - **Codex**: no open logbook task (handed its remaining batch to Claude on #163).
 
 ## Waiting on the owner
@@ -47,6 +50,10 @@ Last updated: 2026-10-12 by Claude Code "Logbook code editing" session.
 - #159 Firebase sign-in helper self-hosted on anawj.com (fixes "missing initial state" on Android).
 
 ## Decisions log
+
+- 2026-10-12: Batch from the "APMES Logbook 2" session: new Analytics parts (pace forecast over the last 6 months,
+  gone quiet, tap-through, reflection to-dos) are Advanced only, not in Basic mode; swipe between tabs on by default
+  for everyone (its switch also in Show or hide); merge each PR once tests pass.
 
 - 2026-10-12: The local Firestore emulator (fake accounts, demo project) may be used without asking; signing in to
   or touching the live projects still needs the owner's OK. One-command checks: `tools/test-logbook.sh`, `tools/test-rules.sh`.
