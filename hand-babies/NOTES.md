@@ -15,6 +15,12 @@ Lasting decisions for `hand-babies/`. Status and next steps: `STATUS.md`.
 - Lives at `anawj.com/hand-babies/` (moved from `/hand/`, 12 Oct 2026). `hand/` holds only a redirect and a worker
   that clears the old `hand-*` caches; its cache cleanup must never touch `hand-babies-*` (same prefix start).
 
+## Updates (offline worker)
+
+A new version activates itself once it has cached the page (`skipWaiting` in install); the page then shows "Update
+available: tap to reload", which only reloads. Don't go back to waiting for a tap to activate: on a phone the tap did
+nothing (12 Oct 2026). Bump `VERSION` in `sw.js` whenever a SHELL file changes.
+
 ## Content rules
 
 - No emoji, no "10 rules" box (owner, 12 Oct 2026). One long page, sticky section chips; scenarios are `<details>` cards (open from a link like `#pic-infect`).

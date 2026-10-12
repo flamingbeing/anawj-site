@@ -1,15 +1,17 @@
 // Offline copy of the hand assessment page (pattern from prewarm/sw.js). Bump VERSION whenever any SHELL file
-// changes: the new worker installs alongside the old one and the page offers "Update available".
+// changes. A new version switches itself on as soon as it has cached the page (no data here, so nothing to lose);
+// the page then offers "Update available: tap to reload", which only reloads. (Waiting for a tap to activate failed
+// on some phones: the tap did nothing, 12 Oct 2026.)
 
-const VERSION = 'hand-babies-v5';
+const VERSION = 'hand-babies-v6';
 const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'hand3d.js', 'vendor/three.module.min.js', 'edit.html', '../design/tokens.css'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(VERSION).then(c => Promise.all(
-    SHELL.map(u => c.add(new Request(u, { cache: 'reload' })).catch(() => {})))));
+    SHELL.map(u => c.add(new Request(u, { cache: 'reload' })).catch(() => {})))).then(() => self.skipWaiting()));
 });
 
-// The page asks a waiting worker to take over when the user taps the update bar.
+// Older pages ask a waiting worker to take over (kept so they can still switch to this version).
 self.addEventListener('message', e => { if (e.data === 'skipWaiting') self.skipWaiting(); });
 
 self.addEventListener('activate', e => {
