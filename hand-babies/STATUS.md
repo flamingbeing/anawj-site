@@ -6,7 +6,7 @@ Last updated: 2026-10-12 by Claude Code, hand assessment session.
 
 ## Now
 
-- **Claude Code, hand assessment** (branch `claude/amazing-goodall-erq636`): removed the 10 rules and the emoji.
+- **Claude Code, hand assessment** (branch `claude/amazing-goodall-erq636`): 3D animations for tendon tests (added FPL, EDC, EIP/EDM, EPL, Elson), kinder wording.
   Nothing half-done.
 
 ## Waiting on the owner
@@ -22,6 +22,8 @@ Last updated: 2026-10-12 by Claude Code, hand assessment session.
 
 ## Recently done
 
+- #253: removed the 10 rules and the emoji.
+
 - #247: page editor (edit.html, sends GitHub issues).
 
 - #245: page cut to about half, plainer wording.
@@ -31,6 +33,9 @@ Last updated: 2026-10-12 by Claude Code, hand assessment session.
 - Moved from `/hand/` to `/hand-babies/`; `/hand/` redirects and its worker clears the old offline copy.
 
 ## Decisions
+
+- 2026-10-12: 3D animations (three.js, vendored) for the tendon tests, cascade and nerve map; 2D kept for
+  the sensation, 2PD, zones and photo diagrams. Calling example is plain text.
 
 - 2026-10-12: no "10 rules" section and no emoji on the page (owner); the page opens on "By case".
 

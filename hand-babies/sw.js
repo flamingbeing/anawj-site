@@ -1,8 +1,8 @@
 // Offline copy of the hand assessment page (pattern from prewarm/sw.js). Bump VERSION whenever any SHELL file
 // changes: the new worker installs alongside the old one and the page offers "Update available".
 
-const VERSION = 'hand-babies-v4';
-const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'edit.html', '../design/tokens.css'];
+const VERSION = 'hand-babies-v5';
+const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'hand3d.js', 'vendor/three.module.min.js', 'edit.html', '../design/tokens.css'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(VERSION).then(c => Promise.all(

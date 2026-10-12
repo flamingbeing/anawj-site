@@ -28,6 +28,11 @@ Lasting decisions for `hand-babies/`. Status and next steps: `STATUS.md`.
   a hold showing the complete diagram; that frame is the still (reduced motion, paused, print). They play only on
   screen, with a Pause/Play button (WCAG 2.2.2). After changing a figure, regenerate `gifs/` with
   `hand-babies/tools/make-gifs.mjs`.
+- 3D figures (owner, 12 Oct 2026: "more 3 dimensional"): tendon tests, cascade and nerve map are posed on a 3D hand
+  in `hand3d.js` (left hand; palm faces +Y, fingers -Z, thumb -X; flexion = +rotation about a joint's X; thumb `lift`
+  about the long axis = EPL retropulsion). One WebGL renderer draws each figure, then 2D labels go on top. Users can
+  drag sideways to turn. GIFs hold the camera still (`HAND_GIF`) to stay small; regenerate after any change.
+- Tone: instructive and kind, never scolding ("so a normal result there doesn't tell you…", not "is wrong").
 - Clinical content is a teaching aid, not a protocol; the footer says so.
 
 ## Edits sent from the page editor
