@@ -23,9 +23,12 @@ Last updated: 2026-10-12 by Claude Code, hand assessment session.
 ## Recently done
 
 - #207: first version (one page, 9 figures, quiz, referral template).
-- Animated figures with Pause/Play, GIF copies in `hand/gifs/` for sharing.
+- #242: animated figures with Pause/Play, GIF copies in `hand-babies/gifs/` for sharing.
+- Moved from `/hand/` to `/hand-babies/`; `/hand/` redirects and its worker clears the old offline copy.
 
 ## Decisions
+
+- 2026-10-12: site and folder renamed `hand-babies` (owner). Keep the `hand/` redirect stub for a while, then delete it.
 
 - 2026-10-12: figures become playable animations, still for reduced motion; GIFs for forwarding (owner asked for
   "gifs or playable animations").

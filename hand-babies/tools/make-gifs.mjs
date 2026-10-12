@@ -1,6 +1,6 @@
-// Makes hand/gifs/<figure>.gif from the page's animated figures, for sharing in chats.
+// Makes hand-babies/gifs/<figure>.gif from the page's animated figures, for sharing in chats.
 // Run from the repo root with a static server on port 8080 (python3 -m http.server 8080):
-//   node hand/tools/make-gifs.mjs            needs ffmpeg; rerun after changing a figure in hand/app.js
+//   node hand-babies/tools/make-gifs.mjs            needs ffmpeg; rerun after changing a figure in hand-babies/app.js
 const { chromium } = await import(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/node_modules/playwright/index.mjs');
 import fs from 'node:fs';
 import os from 'node:os';
@@ -12,7 +12,7 @@ const FPS = 12, WIDTH = 560;
 fs.mkdirSync(OUT, { recursive: true });
 const b = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH, args: ['--no-sandbox'] } : {});
 const page = await (await b.newContext({ viewport: { width: WIDTH + 40, height: 900 }, reducedMotion: 'reduce' })).newPage();
-await page.goto(`http://localhost:${process.env.PORT || 8080}/hand/`);
+await page.goto(`http://localhost:${process.env.PORT || 8080}/hand-babies/`);
 const names = await page.$$eval('[data-fig]', els => els.map(e => e.dataset.fig));
 for (const name of names) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'handgif-'));
