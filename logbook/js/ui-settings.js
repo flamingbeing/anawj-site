@@ -97,7 +97,7 @@ export function residencyCard() {
 // the light / dark choice. The first time a device opens the app it starts from what the account had (these used to
 // follow the account), so nobody's look changes. Kept at sign-out: they are the device's, and nothing private.
 const DISPLAY_KEY = 'apmes-logbook-display';
-export const DISPLAY_KEYS = ['compact', 'textSize', 'zoom', 'accent', 'startTab', 'fontUi', 'fontUiName', 'fontLog', 'fontLogName', 'lineWidth', 'lineHeight', 'contrast', 'motion', 'tabIcons', 'tabBar', 'hideHeader', 'caseInverted', 'colourful', 'customCss', 'customCssOn', 'autoFocus', 'appTitle', 'boxCaps', 'boxCorrect', 'boxSpell', 'reflSpell', 'pinBox', 'pinSearch', 'firstField'];
+export const DISPLAY_KEYS = ['compact', 'textSize', 'zoom', 'accent', 'startTab', 'fontUi', 'fontUiName', 'fontLog', 'fontLogName', 'lineWidth', 'lineHeight', 'contrast', 'motion', 'tabIcons', 'tabBar', 'hideHeader', 'caseInverted', 'colourful', 'customCss', 'customCssOn', 'autoFocus', 'appTitle', 'boxCaps', 'boxCorrect', 'boxSpell', 'reflSpell', 'pinBox', 'pinSearch', 'firstField', 'borders'];
 export function deviceDisplay() {
   try { const d = JSON.parse(localStorage.getItem(DISPLAY_KEY) || 'null'); return d && typeof d === 'object' && !Array.isArray(d) ? d : null; } catch { return null; }
 }
@@ -159,6 +159,10 @@ export function applyLook(d = {}) {
   c.toggle('refl-spell-off', d.reflSpell === false);
   // pinned while scrolling: the case box (Case tab) and the search card (Logbook)
   c.toggle('pin-box', !!d.pinBox); c.toggle('pin-search', !!d.pinSearch);
+  // Borders: softer lines (--edge, style.css); at Borderless / Faint fields, buttons and chips get a light fill instead
+  const bl = borderLevel(d), soft = bl < BORDERS.length - 1;
+  c.toggle('edges', soft); c.toggle('edges-fill', bl <= 1);
+  if (soft) document.documentElement.style.setProperty('--edge-mix', BORDER_MIX[bl] + '%'); else document.documentElement.style.removeProperty('--edge-mix');
   // the name in the header and the browser tab (plain text, at most 40 characters)
   const title = cleanTitle(d.appTitle) || APP_TITLE;
   const h1 = document.querySelector('.top h1'); if (h1 && h1.textContent !== title) h1.textContent = title;
@@ -170,14 +174,22 @@ export const TAB_COLOURS = { log: '#c2410c', logbook: '#0e7490', reflect: '#be12
 // the NUH stripe (orange, red, cyan, navy) for the default colour; More keeps the app's navy
 export const NUH_TAB_COLOURS = { log: '#e57200', logbook: '#e4002b', reflect: '#00a9e0', progress: '#002f6c', more: '#002f6c' };
 export const APP_TITLE = 'APMES Logbook';
+// Borders (Display, per device): how strong the lines around cards, fields, buttons and chips are; the last is the default
+export const BORDERS = ['Borderless', 'Faint', 'Light', 'Soft', 'Normal (default)'];
+export const BORDER_MIX = [0, 25, 50, 75];
+export const borderLevel = d => (Number.isInteger(d.borders) && d.borders >= 0 && d.borders < BORDERS.length - 1 ? d.borders : BORDERS.length - 1);
+// a link to a settings page's own Advanced page, like a row of the More list
+export const advancedLink = (id, label, desc) => h('section', { class: 'card more-list' },
+  h('ul', {}, h('li', {}, h('a', { href: '#' + id, 'data-go': id },
+    h('span', { class: 'mt' }, h('b', {}, label), h('small', {}, desc)), h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')))));
 export const cleanTitle = s => String(s || '').replace(/[\u0000-\u001f]/g, '').replace(/\s+/g, ' ').trim().slice(0, 40);
 export const COLOURFUL = [['off', 'Off (default)'], ['tabs', 'One colour per tab: the tabs and headings'], ['all', 'One colour per tab: everything in the tab']];
-// Custom CSS (custom-css.js): only CSS that passes checkCss, never on the Display page, and off with ?nocss
+// Custom CSS (custom-css.js): only CSS that passes checkCss, never on the Display pages (basic and advanced), and off with ?nocss
 export function applyCustomCss(d = display()) {
   if (typeof document === 'undefined') return;
   let el = document.getElementById('user-css');
   const res = checkCss(d.customCss);
-  const on = !!d.customCssOn && res.ok && !!res.css && !/[?&]nocss\b/.test(location.search) && S.tab !== 'display';
+  const on = !!d.customCssOn && res.ok && !!res.css && !/[?&]nocss\b/.test(location.search) && S.tab !== 'display' && S.tab !== 'displayadv';
   if (!on) { if (el) el.textContent = ''; return; }
   if (!el) { el = document.createElement('style'); el.id = 'user-css'; document.head.append(el); }
   if (el.textContent !== res.css) el.textContent = res.css;
@@ -186,17 +198,19 @@ export const TAB_BARS = [['auto', 'Bottom on phones, top on bigger screens (defa
 
 export function renderDisplay() {
   const st = display();
+  const bordersNote = h('span', { class: 'hint', style: 'margin:0' }, BORDERS[borderLevel(st)]);
   return h('div', {},
     h('section', { class: 'card' },
       h('h2', {}, 'Display'),
-      h('label', { class: 'field' }, 'Name in the header',
-        h('input', { type: 'text', value: st.appTitle || '', placeholder: APP_TITLE, maxlength: '40', 'aria-label': 'Name in the header',
-          onchange: e => { const t = cleanTitle(e.target.value); e.target.value = t; applyDisplay(setDisplay({ appTitle: t && t !== APP_TITLE ? t : null })); } })),
-      h('p', { class: 'hint help', style: 'margin:2px 0 8px' }, 'Also the name in the browser tab. Leave it empty for APMES Logbook.'),
-      h('label', { class: 'check' }, h('input', { type: 'checkbox', role: 'switch', checked: !!st.compact, onchange: e => {
-        applyCompact(e.target.checked); setDisplay({ compact: e.target.checked });
-      } }), 'Compact mode'),
-      h('p', { class: 'hint help', style: 'margin:2px 0 0' }, 'Smaller chips, rows and spacing so more tags fit on screen.'),
+      h('label', { class: 'field', style: 'margin-top:4px' }, 'Light or dark',
+        h('select', { onchange: e => applyTheme(e.target.value) },
+          [['light', 'Light'], ['dark', 'Dark'], ['oled', 'OLED (pure black)'], ['auto', 'Auto (match the phone)']].map(([v, l]) => h('option', { value: v, selected: cachedTheme() === v }, l)))),
+      h('div', { class: 'field', style: 'margin-top:10px' }, 'Colour', accentPicker()),
+      h('p', { class: 'hint', style: 'margin:2px 0 0' }, 'Light and dark versions are worked out to stay easy to read.'),
+      h('div', { class: 'field', style: 'margin-top:10px' }, h('label', { class: 'field', style: 'margin:0' }, 'Colourful',
+        h('select', { 'aria-label': 'Colourful', onchange: e => applyDisplay(setDisplay({ colourful: e.target.value === 'off' ? null : e.target.value })) },
+          COLOURFUL.map(([v, l]) => h('option', { value: v, selected: (st.colourful === true ? 'tabs' : st.colourful || 'off') === v }, l)))),
+        h('span', { class: 'hint help' }, 'With the default colour, the tabs follow the NUH stripe at the top: Case orange, Logbook red, Reflections cyan, Analytics navy. With another colour: orange, teal, red, blue, purple. “Everything” also colours the buttons, chips and links on that tab’s pages, in shades that stay easy to read.')),
       h('label', { class: 'field', style: 'margin-top:10px' }, 'Interface zoom',
         h('select', { 'aria-label': 'Interface zoom', onchange: e => { applyZoom(e.target.value); setDisplay({ zoom: e.target.value }); } },
           ZOOMS.map(v => h('option', { value: v, selected: String(st.zoom || '1') === v }, `${Math.round(v * 100)}%${v === '1' ? ' (default)' : ''}`)))),
@@ -205,34 +219,46 @@ export function renderDisplay() {
         h('select', { 'aria-label': 'Text size', onchange: e => { applyTextSize(e.target.value); setDisplay({ textSize: e.target.value }); } },
           TEXT_SIZES.map(([v, l]) => h('option', { value: v, selected: String(st.textSize || '1') === v }, l)))),
       h('p', { class: 'hint help', style: 'margin:2px 0 0' }, 'Only the words: buttons and spacing stay as they are.'),
+      h('label', { class: 'check' }, h('input', { type: 'checkbox', role: 'switch', checked: !!st.compact, onchange: e => {
+        applyCompact(e.target.checked); setDisplay({ compact: e.target.checked });
+      } }), 'Compact mode'),
+      h('p', { class: 'hint help', style: 'margin:2px 0 0' }, 'Smaller chips, rows and spacing so more tags fit on screen.'),
+      h('div', { class: 'field', style: 'margin-top:10px' }, h('label', { class: 'field', style: 'margin:0' }, 'Borders',
+        h('input', { type: 'range', min: '0', max: String(BORDERS.length - 1), step: '1', value: String(borderLevel(st)), 'aria-label': 'Borders',
+          'aria-valuetext': BORDERS[borderLevel(st)], oninput: e => { const n = Number(e.target.value); e.target.setAttribute('aria-valuetext', BORDERS[n]); bordersNote.textContent = BORDERS[n]; applyDisplay(setDisplay({ borders: n === BORDERS.length - 1 ? null : n })); } })),
+        bordersNote),
+      // the tab the app opens on (a link or shortcut to a tab still opens that tab)
+      h('label', { class: 'field', style: 'margin-top:10px' }, 'Open the app on',
+        h('select', { onchange: e => { setDisplay({ startTab: e.target.value }); toast('Saved'); } },
+          START_TABS.map(([v, l]) => h('option', { value: v, selected: (st.startTab || 'log') === v }, l)))),
+      h('p', { class: 'hint', style: 'margin:10px 0 0' }, 'Everything on this page is saved on this device only, so a phone and a computer can each look the way that suits them.')),
+    advancedLink('displayadv', 'Advanced display settings', 'Name in the header, fonts, line spacing and width, contrast, motion, the tab bar and header, pinning, custom CSS'));
+}
+// Settings → Display → Advanced display settings (#displayadv): the rest of the look, then custom CSS
+export function renderDisplayAdvanced() {
+  const st = display();
+  return h('div', {},
+    h('section', { class: 'card' },
+      h('h2', {}, 'Advanced display'),
+      h('label', { class: 'field' }, 'Name in the header',
+        h('input', { type: 'text', value: st.appTitle || '', placeholder: APP_TITLE, maxlength: '40', 'aria-label': 'Name in the header',
+          onchange: e => { const t = cleanTitle(e.target.value); e.target.value = t; applyDisplay(setDisplay({ appTitle: t && t !== APP_TITLE ? t : null })); } })),
+      h('p', { class: 'hint help', style: 'margin:2px 0 8px' }, 'Also the name in the browser tab. Leave it empty for APMES Logbook.'),
       fontPicker('ui'),
       fontPicker('log'),
       lookSelect('lineHeight', 'Line spacing', LINE_HEIGHTS, '1'),
       lookSelect('lineWidth', 'Line width', LINE_WIDTHS, 'normal', 'How wide text and lists go on a computer or tablet. The Case tab keeps its two panes.'),
       lookSelect('contrast', 'Contrast', CONTRASTS, 'auto', 'Higher contrast: darker text and stronger lines (lighter in dark mode).'),
       lookSelect('motion', 'Motion', MOTIONS, 'auto'),
-      h('div', { class: 'field', style: 'margin-top:10px' }, h('label', { class: 'field', style: 'margin:0' }, 'Colourful',
-        h('select', { 'aria-label': 'Colourful', onchange: e => applyDisplay(setDisplay({ colourful: e.target.value === 'off' ? null : e.target.value })) },
-          COLOURFUL.map(([v, l]) => h('option', { value: v, selected: (st.colourful === true ? 'tabs' : st.colourful || 'off') === v }, l)))),
-        h('span', { class: 'hint help' }, 'With the default colour, the tabs follow the NUH stripe at the top: Case orange, Logbook red, Reflections cyan, Analytics navy. With another colour: orange, teal, red, blue, purple. “Everything” also colours the buttons, chips and links on that tab’s pages, in shades that stay easy to read.')),
       lookSelect('tabBar', 'Tab bar', TAB_BARS, 'auto'),
-      h('label', { class: 'check', style: 'margin-top:10px' }, h('input', { type: 'checkbox', checked: !!st.caseInverted, onchange: e => applyDisplay(setDisplay({ caseInverted: e.target.checked })) }), 'Case tab upside down (phones)'),
-      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'The case box sits at the bottom, next to the keyboard and Save, with suggestions just above it; scroll up for all the tags. Like a chat app.'),
       h('label', { class: 'check', style: 'margin-top:10px' }, h('input', { type: 'checkbox', checked: !!st.tabIcons, onchange: e => applyDisplay(setDisplay({ tabIcons: e.target.checked })) }), 'Icons only in the tab bar'),
       h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !!st.hideHeader, onchange: e => applyDisplay(setDisplay({ hideHeader: e.target.checked })) }), 'Hide the header (the app name bar)'),
+      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'It comes back by itself when something isn’t synced yet, when there’s no signal, and in the demo.'),
+      h('label', { class: 'check', style: 'margin-top:10px' }, h('input', { type: 'checkbox', checked: !!st.caseInverted, onchange: e => applyDisplay(setDisplay({ caseInverted: e.target.checked })) }), 'Case tab upside down (phones)'),
+      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'The case box sits at the bottom, next to the keyboard and Save, with suggestions just above it; scroll up for all the tags. Like a chat app.'),
       h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !!st.pinBox, onchange: e => applyDisplay(setDisplay({ pinBox: e.target.checked || null })) }), 'Pin the case box at the top of the Case tab'),
       h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !!st.pinSearch, onchange: e => applyDisplay(setDisplay({ pinSearch: e.target.checked || null })) }), 'Pin the search box at the top of the Logbook'),
       h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'They stay in view while the tags or cases scroll under them.'),
-      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'It comes back by itself when something isn’t synced yet, when there’s no signal, and in the demo.'),
-      h('div', { class: 'field', style: 'margin-top:10px' }, 'Colour', accentPicker()),
-      h('p', { class: 'hint', style: 'margin:2px 0 0' }, 'Light and dark versions are worked out to stay easy to read.'),
-      h('label', { class: 'field', style: 'margin-top:10px' }, 'Light or dark',
-        h('select', { onchange: e => applyTheme(e.target.value) },
-          [['light', 'Light'], ['dark', 'Dark'], ['oled', 'OLED (pure black)'], ['auto', 'Auto (match the phone)']].map(([v, l]) => h('option', { value: v, selected: cachedTheme() === v }, l)))),
-      // the tab the app opens on (a link or shortcut to a tab still opens that tab)
-      h('label', { class: 'field', style: 'margin-top:10px' }, 'Open the app on',
-        h('select', { onchange: e => { setDisplay({ startTab: e.target.value }); toast('Saved'); } },
-          START_TABS.map(([v, l]) => h('option', { value: v, selected: (st.startTab || 'log') === v }, l)))),
       h('p', { class: 'hint', style: 'margin:10px 0 0' }, 'Everything on this page is saved on this device only, so a phone and a computer can each look the way that suits them.')),
     customCssCard());
 }
@@ -408,31 +434,56 @@ export function renderLogging() {
   return h('div', {},
     h('section', { class: 'card' },
       h('h2', {}, 'Logging'),
+      h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: st.suggestions !== false, onchange: e => patchLogbook({ settings: { suggestions: e.target.checked } }) }),
+        'Suggest tags as I type'),
+      h('label', { class: 'check' }, h('input', { type: 'checkbox', 'aria-label': 'Autodetect age and gender', checked: st.detectAgeSex !== false,
+        onchange: e => patchLogbook({ settings: { detectAgeSex: e.target.checked } }) }), 'Autodetect age and gender'),
+      h('p', { class: 'hint' }, 'Age and gender are optional for APMES. Turning this off stops age-based Paediatrics and Geriatric suggestions. Choose those tags yourself when needed; explicit words can still suggest them.'),
       h('label', { class: 'field' }, 'First field for a new case',
         h('select', { 'aria-label': 'First field for a new case', onchange: e => { setDisplay({ firstField: e.target.value }); toast('Saved on this device'); } },
           [['details', 'Case summary (default)'], ['initials', 'Initials'], ['date', 'Date']].map(([v, l]) =>
             h('option', { value: v, selected: (display().firstField || 'details') === v }, l)))),
       h('p', { class: 'hint help' }, 'Starts here when you open the Case tab or save a case. This device only. Enter in Initials moves to the case summary.'),
-      h('label', { class: 'check' }, h('input', { type: 'checkbox', 'aria-label': 'Autodetect age and gender', checked: st.detectAgeSex !== false,
-        onchange: e => patchLogbook({ settings: { detectAgeSex: e.target.checked } }) }), 'Autodetect age and gender'),
-      h('p', { class: 'hint' }, 'Age and gender are optional for APMES. Turning this off stops age-based Paediatrics and Geriatric suggestions. Choose those tags yourself when needed; explicit words can still suggest them.'),
-      h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: st.suggestions !== false, onchange: e => patchLogbook({ settings: { suggestions: e.target.checked } }) }),
-        'Suggest tags as I type'),
       h('label', { class: 'field', style: 'margin-top:8px' }, 'Enter key in the case box',
         h('select', { onchange: e => patchLogbook({ settings: { enterMode: e.target.value, enterSaves: null } }).then(() => toast('Saved')) },
           [['newline', 'New line (default)'], ['double', 'Press Enter twice to save'], ['single', 'Enter saves (Shift+Enter for a new line)']].map(([v, l]) =>
             h('option', { value: v, selected: (st.enterMode || (st.enterSaves ? 'single' : 'newline')) === v }, l)))),
       h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'Twice: Enter on an empty line saves, so a case can still take several lines. Ctrl+Enter (Cmd+Enter on a Mac) always saves.'),
+      h('label', { class: 'field', style: 'margin-top:8px' }, 'Date for a new case',
+        h('select', { onchange: e => patchLogbook({ settings: { defaultDate: e.target.value } }) },
+          h('option', { value: 'today', selected: st.defaultDate !== 'last' }, 'Today'),
+          h('option', { value: 'last', selected: st.defaultDate === 'last' }, 'The date I used last'))),
+      h('label', { class: 'field', style: 'margin-top:8px' }, 'After Save',
+        h('select', { onchange: e => patchLogbook({ settings: { afterSave: e.target.value === 'next' ? null : e.target.value } }).then(() => toast('Saved')) },
+          AFTER_SAVE.map(([v, l]) => h('option', { value: v, selected: (st.afterSave || 'next') === v }, l)))),
+      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'Keeping the tags helps with a run of the same kind of case. “Save, keep date” keeps the date either way.')),
+    advancedLink('loggingadv', 'Advanced logging settings', 'The keyboard, case box height, parts of the Case tab, undo, the week, tips, advanced search'));
+}
+
+// Settings → Logging → Advanced logging settings (#loggingadv)
+export function renderLoggingAdvanced() {
+  const st = settings();
+  return h('div', {},
+    h('section', { class: 'card' },
+      h('h2', {}, 'Advanced logging'),
       h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: display().autoFocus !== false, onchange: e => applyDisplay(setDisplay({ autoFocus: e.target.checked ? null : false })) }),
         'Open the keyboard when the Case tab opens (this device)'),
+      h('label', { class: 'field', style: 'margin-top:8px' }, 'Case box height on the Case tab',
+        h('select', { onchange: e => patchLogbook({ settings: { boxLines: Number(e.target.value) } }).then(() => toast('Saved')) },
+          Array.from({ length: 19 }, (_, i) => i + 2).map(n => h('option', { value: String(n), selected: n === (Math.min(20, Math.max(2, Number(st.boxLines) || 3))) }, `${n} lines${n === 3 ? ' (default)' : ''}`)))),
+      h('label', { class: 'field', style: 'margin-top:8px' }, 'Undo window',
+        h('select', { onchange: e => patchLogbook({ settings: { undoSecs: Number(e.target.value) === 5 ? null : Number(e.target.value) } }).then(() => toast('Saved')) },
+          UNDO_SECS.map(([n, l]) => h('option', { value: String(n), selected: (Number(st.undoSecs) || 5) === n }, l)))),
+      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'How long Undo stays on screen after you save, clear or delete something.'),
+      h('label', { class: 'field', style: 'margin-top:8px' }, 'First day of the week',
+        h('select', { onchange: e => patchLogbook({ settings: { weekStart: Number(e.target.value) === 1 ? null : Number(e.target.value) } }).then(() => toast('Saved')) },
+          [[1, 'Monday (default)'], [0, 'Sunday'], [6, 'Saturday']].map(([n, l]) => h('option', { value: String(n), selected: weekStart(st.weekStart) === n }, l)))),
+      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'For the Logbook calendar, Analytics, “this week” and “last week” in search, and last week’s summary.'),
       h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !!st.weeklyDigest, onchange: e => patchLogbook({ settings: { weeklyDigest: e.target.checked } }) }),
         'Show last week’s summary on the Case tab (once a week)'),
       h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !st.hideTips, onchange: e => patchLogbook({ settings: { hideTips: !e.target.checked } }) }),
         'Show tips and help text'),
       h('p', { class: 'hint', style: 'margin:0 0 6px' }, 'Off for experienced users: hides the explanations around the app (like the one at the top of the tag editor), the privacy and photo reminders, and the tips for the tags you pick.'),
-      h('label', { class: 'field', style: 'margin-top:8px' }, 'Case box height on the Case tab',
-        h('select', { onchange: e => patchLogbook({ settings: { boxLines: Number(e.target.value) } }).then(() => toast('Saved')) },
-          Array.from({ length: 19 }, (_, i) => i + 2).map(n => h('option', { value: String(n), selected: n === (Math.min(20, Math.max(2, Number(st.boxLines) || 3))) }, `${n} lines${n === 3 ? ' (default)' : ''}`)))),
       h('p', { class: 'hint help', style: 'margin:8px 0 6px' }, 'How the Logbook search works (everything, initials or procedure; fuzzy) is under Filter on the Logbook tab, and is remembered.'),
       // operators in the Logbook search box (search-ops.js); off by default, so plain searches never change meaning
       h('label', { class: 'check', style: 'margin-top:8px' }, h('input', { type: 'checkbox', role: 'switch', checked: !!st.searchOps, onchange: e => patchLogbook({ settings: { searchOps: e.target.checked } }).then(() => toast(e.target.checked ? 'Advanced search on' : 'Advanced search off')) }),
@@ -441,23 +492,7 @@ export function renderLogging() {
         h('p', { style: 'margin:0 0 4px' }, 'Lets you type operators in the Logbook and Reflections search boxes (a ? next to each lists them; tap one to add it):'),
         h('ul', { class: 'ops-list' }, OPERATOR_HELP.map(([op, what]) => h('li', {}, h('code', {}, op), ' ', what))),
         h('p', { style: 'margin:4px 0 0' }, 'Reflections have their own: heading:, title:, diagnosis:, case: and initials:.'),
-        h('p', { style: 'margin:4px 0 0' }, 'Off by default because a few plain searches change meaning when it’s on: a word starting with “-” leaves cases out, and OR in capitals means either.')),
-      h('label', { class: 'field', style: 'margin-top:8px' }, 'Date for a new case',
-        h('select', { onchange: e => patchLogbook({ settings: { defaultDate: e.target.value } }) },
-          h('option', { value: 'today', selected: st.defaultDate !== 'last' }, 'Today'),
-          h('option', { value: 'last', selected: st.defaultDate === 'last' }, 'The date I used last'))),
-      h('label', { class: 'field', style: 'margin-top:8px' }, 'After Save',
-        h('select', { onchange: e => patchLogbook({ settings: { afterSave: e.target.value === 'next' ? null : e.target.value } }).then(() => toast('Saved')) },
-          AFTER_SAVE.map(([v, l]) => h('option', { value: v, selected: (st.afterSave || 'next') === v }, l)))),
-      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'Keeping the tags helps with a run of the same kind of case. “Save, keep date” keeps the date either way.'),
-      h('label', { class: 'field', style: 'margin-top:8px' }, 'Undo window',
-        h('select', { onchange: e => patchLogbook({ settings: { undoSecs: Number(e.target.value) === 5 ? null : Number(e.target.value) } }).then(() => toast('Saved')) },
-          UNDO_SECS.map(([n, l]) => h('option', { value: String(n), selected: (Number(st.undoSecs) || 5) === n }, l)))),
-      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'How long Undo stays on screen after you save, clear or delete something.'),
-      h('label', { class: 'field', style: 'margin-top:8px' }, 'First day of the week',
-        h('select', { onchange: e => patchLogbook({ settings: { weekStart: Number(e.target.value) === 1 ? null : Number(e.target.value) } }).then(() => toast('Saved')) },
-          [[1, 'Monday (default)'], [0, 'Sunday'], [6, 'Saturday']].map(([n, l]) => h('option', { value: String(n), selected: weekStart(st.weekStart) === n }, l)))),
-      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'For the Logbook calendar, Analytics, “this week” and “last week” in search, and last week’s summary.')),
+        h('p', { style: 'margin:4px 0 0' }, 'Off by default because a few plain searches change meaning when it’s on: a word starting with “-” leaves cases out, and OR in capitals means either.'))),
     h('section', { class: 'card' },
       h('h2', {}, 'Case tab'),
       h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'Untick what you don’t use. The case box, All tags and Save always stay.'),

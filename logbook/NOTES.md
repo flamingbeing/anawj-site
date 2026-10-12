@@ -141,6 +141,21 @@ portfolio content.
   (`pinBox` → `pin-box`: `.box-wrap` sticky at `--pin-top`, the phone top tab bar's height when it sits on top; not
   when the Case tab is upside down) and Pin the search box (`pinSearch` → `pin-search`: `.lb-top` sticky, its height in
   `--lb-top-h` so List's month headings stick under it). All in the settings file.
+- **Settings pages: everyday first, Advanced below** (owner, Oct 2026). Display (`#display`): light/dark, colour,
+  Colourful, zoom, text size, compact, Borders, the start tab; then a link row to **Advanced display** (`#displayadv`,
+  `renderDisplayAdvanced`: name in the header, fonts, line spacing/width, contrast, motion, tab bar, icons only, hide
+  header, upside down, pins, custom CSS — never applied on either Display page). Logging (`#logging`): suggestions,
+  age/gender detection, first field, Enter key, date for a new case, After Save; then **Advanced logging**
+  (`#loggingadv`, `renderLoggingAdvanced`: keyboard on opening, case box height, undo window, week start, weekly
+  summary, tips, advanced search, the Case tab card). Sub-pages are TABS entries `under` their page (Back trail and
+  the bar's tab follow); `advancedLink` in ui-settings.js draws the row. New options go on the Advanced page unless most
+  people would change them. e2e: `tab('displayadv')` / `tab('loggingadv')`.
+- **Borders** (Display, per device `borders`: 0 Borderless, 1 Faint, 2 Light, 3 Soft, null = Normal; a range input):
+  every border in style.css (and the reflection editor's inline ones) uses `var(--edge, var(--line))`; `html.edges`
+  sets `--edge` on every element to `--line` mixed with transparent at `--edge-mix` (0/25/50/75%), so it follows the
+  `--line` of themes, contrast and colours. `html.edges-fill` (Borderless, Faint) gives fields, plain buttons and
+  chips a light fill so they stay visible. Tag tick boxes keep `--line`. Also set at first paint (index.html).
+  Defaults pixel-identical to before.
 - **Display is per device** (owner: people use the logbook on different devices with different needs): compact,
   text size, zoom, fonts, colour and the start tab live in localStorage `apmes-logbook-display` (`deviceDisplay` / `setDisplay` /
   `adoptDisplay` in ui-settings.js), light / dark in `apmes-logbook-theme`. A device with none starts from the
