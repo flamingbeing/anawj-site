@@ -297,7 +297,7 @@ let raf = 0, last = 0;
 for (const el of document.querySelectorAll('[data-fig]')) {
   const f = FIGS[el.dataset.fig];
   if (!f) continue;
-  el.innerHTML = `<div class="fig-art">${still(f)}</div><div class="fig-bar"><button type="button" class="fig-btn" aria-label="Play animation">▶ Play</button><a class="fig-gif" href="gifs/${el.dataset.fig}.gif" download>Save GIF to share</a></div>`;
+  el.innerHTML = `<div class="fig-art">${still(f)}</div><div class="fig-bar"><button type="button" class="fig-btn" aria-label="Play animation">Play</button><a class="fig-gif" href="gifs/${el.dataset.fig}.gif" download>Save GIF to share</a></div>`;
   // the picture keeps the text description; the buttons beside it stay reachable
   const art0 = el.querySelector('.fig-art');
   for (const a of ['role', 'aria-label']) if (el.hasAttribute(a)) { art0.setAttribute(a, el.getAttribute(a)); el.removeAttribute(a); }
@@ -310,7 +310,7 @@ for (const el of document.querySelectorAll('[data-fig]')) {
 }
 function setPlaying(st, on) {
   st.playing = on;
-  st.btn.textContent = on ? '❚❚ Pause' : '▶ Play';
+  st.btn.textContent = on ? 'Pause' : 'Play';
   st.btn.setAttribute('aria-label', on ? 'Pause animation' : 'Play animation');
   if (on) st.start = performance.now() - st.at * 1000; // resume where it stopped
   else st.art.innerHTML = still(st.f);                  // paused: show the complete diagram

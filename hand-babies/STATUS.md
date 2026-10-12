@@ -6,7 +6,7 @@ Last updated: 2026-10-12 by Claude Code, hand assessment session.
 
 ## Now
 
-- **Claude Code, hand assessment** (branch `claude/amazing-goodall-erq636`): page editor added (edit.html, sends GitHub issues).
+- **Claude Code, hand assessment** (branch `claude/amazing-goodall-erq636`): removed the 10 rules and the emoji.
   Nothing half-done.
 
 ## Waiting on the owner
@@ -22,6 +22,8 @@ Last updated: 2026-10-12 by Claude Code, hand assessment session.
 
 ## Recently done
 
+- #247: page editor (edit.html, sends GitHub issues).
+
 - #245: page cut to about half, plainer wording.
 
 - #207: first version (one page, 9 figures, quiz, referral template).
@@ -29,6 +31,8 @@ Last updated: 2026-10-12 by Claude Code, hand assessment session.
 - Moved from `/hand/` to `/hand-babies/`; `/hand/` redirects and its worker clears the old offline copy.
 
 ## Decisions
+
+- 2026-10-12: no "10 rules" section and no emoji on the page (owner); the page opens on "By case".
 
 - 2026-10-12: page editor like edit.anantf.com (owner): `hand-babies/edit.html`, issues to flamingbeing/anawj-site.
 

@@ -17,7 +17,7 @@ Lasting decisions for `hand-babies/`. Status and next steps: `STATUS.md`.
 
 ## Content rules
 
-- One long page, sticky section chips; scenarios are `<details>` cards (open from a link like `#pic-infect`).
+- No emoji, no "10 rules" box (owner, 12 Oct 2026). One long page, sticky section chips; scenarios are `<details>` cards (open from a link like `#pic-infect`).
 - Short, plain, practical (owner, 12 Oct 2026): not textbook; good English the way Singapore doctors talk (MO,
   ED, OT, TW, ATT, nec fasc). No quiz, no privacy guide, no referral template: one short example message only.
 - Plain words, short. Each scenario: Examine / Photos / Call now if / Common miss.
