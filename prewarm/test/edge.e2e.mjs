@@ -222,6 +222,38 @@ await tryit(async () => {
   log(/Hidden in Settings \(not being recorded\): thermal sensation/.test(await pg.textContent('#gaps')), 'hidden column listed');
   await ctx.close();
 });
+// M. typed form answers: letters refused where a number is asked; an odd temperature asked about
+await tryit(async () => {
+  const { ctx, pg } = await fresh();
+  await open(pg, 0);
+  await pg.click('#haemolink'); await pg.click('a[href$="/form/intraop"]'); await pg.waitForSelector('#f-io_ebl');
+  await pg.fill('#f-io_ebl', '500o'); await pg.keyboard.press('Tab'); await pg.waitForTimeout(200);
+  log(/Blood loss: numbers only/.test(await pg.textContent('#toast')) && await pg.inputValue('#f-io_ebl') === '', 'EBL with a letter refused');
+  await pg.fill('#f-io_ebl', '500'); await pg.keyboard.press('Tab'); await pg.waitForTimeout(200);
+  await pg.goBack(); await pg.click('a[href$="/form/pacu"]'); await pg.waitForSelector('#f-pacu_temp');
+  let asked = ''; pg.once('dialog', d => { asked = d.message(); d.dismiss(); });
+  await pg.fill('#f-pacu_temp', '3.66'); await pg.keyboard.press('Tab'); await pg.waitForTimeout(200);
+  log(/3\.66 °C looks unusual/.test(asked) && await pg.inputValue('#f-pacu_temp') === '', 'PACU temp 3.66 asked about, Cancel clears it');
+  await pg.fill('#f-pacu_temp', '366'); await pg.keyboard.press('Tab'); await pg.waitForTimeout(200);
+  await pg.goBack(); await pg.click('a[href$="/form/pacu"]'); await pg.waitForSelector('#f-pacu_temp');
+  log(await pg.inputValue('#f-pacu_temp') === '36.6', 'PACU temp 366 read as 36.6');
+  await ctx.close();
+});
+// N. alerts fire on every patient screen for every series: a BP reading falling due while on Intra-op details
+await tryit(async () => {
+  const { ctx, pg } = await fresh('2026-10-13T10:00:00');
+  await open(pg, 1);
+  await pg.click('#haemolink'); await pg.click('a[href$="/form/intraop"]'); await pg.waitForSelector('#f-io_ebl');
+  const seen = [];
+  for (let i = 0; i < 16; i++) {
+    await pg.clock.fastForward('01:00'); await pg.waitForTimeout(150);
+    const t = await pg.evaluate(() => { const b = document.querySelector('#banner'); return b && !b.hidden ? b.textContent : ''; });
+    if (t && !seen.includes(t)) seen.push(t);
+  }
+  log(seen.some(t => /BP, HR, BIS .* reading due now/.test(t)), 'BP due alert on the Intra-op details screen: ' + JSON.stringify(seen));
+  log(seen.some(t => /Temperature .* reading due now/.test(t)), 'temperature due alert there too');
+  await ctx.close();
+});
 await b.close();
 if (fails.length) { console.error('prewarm edge: FAIL\n- ' + fails.join('\n- ')); process.exit(1); }
-console.log('prewarm edge: ok (midnight, surgery end, double-tap Save, BP checks, back button, Log, Enter, still to fill, swipe, stray taps, time order, corrections, BMI, follow-ups, blanks)');
+console.log('prewarm edge: ok (midnight, surgery end, double-tap Save, BP checks, back button, Log, Enter, still to fill, swipe, stray taps, time order, corrections, BMI, follow-ups, blanks, typed answers, alerts everywhere)');
