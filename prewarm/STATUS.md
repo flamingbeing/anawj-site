@@ -6,30 +6,40 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 
 ## Now
 
-- **Claude Code, Prewarming Webapp** (branch `ccr-13264f37-d28edu`): Word-form Form view (PR open).
+- **Claude Code, Prewarming Webapp** (branch `ccr-13264f37-d28edu`): nothing half-done. Last change (this PR): Other
+  data pages, Sheet view rename, vital-signs tick, BP / HR / BIS box warms up. The owner and their MO start using the
+  app on real patients on 13 Oct 2026.
 
 ## Waiting on the owner
 
 - Upload the blank paper form (.docx) on the admin screen, then check a patient's Form view on a phone (Download
   Word file, Save as PDF / Print).
+- Open the app once as admin with signal (resends every patient so older records get the `locked` flag) and take
+  "Update available" on both phones.
 
 ## Next
 
-1. Export across hospitals for admins, a members' view of who entered what, polish after phone testing.
+1. Polish from the first day of real use (13 Oct 2026).
+2. Export across hospitals for admins; a members' view of who entered what.
 
 ## Recently done
 
-- #209: Log button for the next event, ‹ › timepoints, squarer time boxes (two rows).
-- #208: tap anywhere on an empty temperature card for 36.5.
-- #206: running timer and next event in the app bar; Mark section complete at the bottom.
-- #205: NUHS app theme; main screen fits one phone screen; Screen size setting; Delete moved to Spreadsheet view.
-- #201: NUHS design system look; printable HTML Form view (4 day-of-surgery pages); Save as PDF / Print.
-- #199: join links and QR codes, hospital read from the code, comfort questions on the main screen, Spreadsheet view.
-- #198: admin sign-in by email link (owner signed in and made the NTF code).
-- #197: main screen = times + all temperatures + links; rules first deployed to `prewarm-study` (run #19).
+- This PR: "Other data" box (pre-op, meds, bloods, day 1 and 2 chart review and analgesia, discharge: every remaining
+  template field as a form); Spreadsheet view renamed Sheet view; Word form's "Vital Signs Data Collected" ticks
+  itself once any BP / HR / BIS value is in; the BP, HR, BIS box warms up and pulses like the due time.
+- #229: due time warms up (soon / now / late) and pulses. #228: warming boxes plain until set; room temp 20.
+- #227: time boxes numbered 1–11. #223–#226: warming labels (Prewarm on / off, Underbody warm, Gown warm), beige.
+- #222: locked patients hidden from team phones (rules + query, `locked` flag). #221: read only for admins, lock icon.
+- #220: fix: lock / unlock / delete wiped readings on the server copy (empty `f` merge); one-off resend repairs.
+- #219: admins lock patients. #218: last synced line. #216: Log out (deletes the phone's patients, warns if unsynced).
+- #211–#215: Word form filled in (admin uploads the blank), delete participants page, complete marker, warnings.
+- #205–#209: NUHS app theme, one-screen main screen, timer and Log next event, ‹ › timepoints, screen size.
 
 ## Decisions
 
+- 12 Oct 2026: all remaining template data gets entry forms under "Other data" (small box beside Form view / Sheet view);
+  "Spreadsheet view" is now "Sheet view"; vital-signs tick is automatic; the BP, HR, BIS box flashes like the due time.
+- 12 Oct 2026: warming labels Prewarm on / off, Underbody warm, Gown warm; beige once set; times numbered; room temp 20.
 - 12 Oct 2026: locked patients are hidden from team phones completely (rules + query); admins see them read only.
 - 12 Oct 2026: admins lock patients from the home page (select, all but latest); locked = nobody opens them.
 - 12 Oct 2026: Log out (deletes the phone's patients, warns, warns again if unsynced) replaces Stop sharing. Join links sent
