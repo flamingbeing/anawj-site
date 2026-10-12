@@ -20,3 +20,8 @@ command, and no `firebase login`, until the owner says yes to that use. Prefer s
 reading documents; never change projects, rules, auth or data through it (rules deploy only through the merge
 workflow). Sign-in is per session and only when a task needs it. (`.claude/settings.json` makes these calls ask
 first.)
+
+Exception: the **local Firestore emulator** with fake accounts and the demo project (`tools/test-rules.sh`, or
+`firebase emulators:exec --project demo-logbook …`) is fine without asking (owner, 12 Oct 2026): it never signs in or
+touches the live projects. Commands that sign in, deploy or talk to `apmes-logbook` / `nuh-roster` still need the
+owner's OK.
