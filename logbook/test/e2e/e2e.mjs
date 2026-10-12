@@ -781,7 +781,7 @@ async function run(label, ctxOpts) {
     const te = await openTagEditor();
     await te.locator('button', { hasText: '+ Personal tag' }).click();
     await p.locator('dialog[open] label.field', { hasText: 'Name (pill)' }).locator('input').fill('Interscalene');
-    await p.locator('dialog[open] select').selectOption({ label: 'PNB' });
+    await p.locator('dialog[open] label.field', { hasText: 'Sits under' }).locator('select').selectOption({ label: 'PNB' });
     await p.locator('dialog[open] button.primary', { hasText: 'Save' }).click();
     await nap(400);
     await tab('log');
@@ -834,6 +834,7 @@ async function run(label, ctxOpts) {
     let te = await openTagEditor();
     for (let i = 0; i < 3; i++) { await te.locator('ul.te-list li', { has: p.locator('.te-pill', { hasText: /^ICU$/ }) }).locator('button[aria-label="Move up"]').click(); await nap(200); }
     await te.locator('button.te-name', { has: p.locator('.te-pill', { hasText: /^LSCS$/ }) }).click();
+    await p.locator('dialog[open]').getByRole('button', { name: 'Edit', exact: true }).click();
     await p.locator('dialog[open] label.field', { hasText: 'Name (pill)' }).locator('input').fill('C-section');
     await p.locator('dialog[open] button.primary', { hasText: 'Save' }).click(); await nap(300);
     await te.locator('button', { hasText: '+ Personal tag' }).click();

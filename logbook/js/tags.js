@@ -509,3 +509,17 @@ export function dropTag(set, key, target, where) {
   const at = where === 'before' ? idx[0] : idx[idx.length - 1] + 1;
   return cleanTagSet([...rest.slice(0, at), ...moved, ...rest.slice(at)]);
 }
+
+// Explicit Add-dialog placement. Empty groups accept beginning/end; anchors must
+// still be siblings. Keep whole subtrees together, as with drag and drop.
+export function placeNewTag(set, item, parent, after = '$end') {
+  if (set.some(e => e.k === item.k)) throw new Error('This tag already exists');
+  const withItem = [...set, item];
+  if (!canPlace(withItem, item.k, parent)) throw new Error('Choose a valid parent');
+  const siblings = set.filter(e => (e.p || '') === parent);
+  if (!['$start', '$end'].includes(after) && !siblings.some(e => e.k === after)) throw new Error('The placement has changed. Choose where to put the tag again.');
+  let next = reparentTag(withItem, item.k, parent);
+  const target = after === '$start' ? siblings[0]?.k : after === '$end' ? siblings.at(-1)?.k : after;
+  if (target) next = dropTag(next, item.k, target, after === '$start' ? 'before' : 'after');
+  return next;
+}

@@ -394,3 +394,9 @@ Natural-language date search protects quoted phrases, field operands and exclusi
 Logging keeps Claude’s everyday/Advanced split. Everyday controls are grouped by task with device/account scope, defaults, a live fake example and a reset limited to this page. Optional device `compactTags` shows six common recent tags, with the full picker expandable/searchable; settings-file import/export carries the preference. Additional-Enter confirmation names suggested tags in a persistent inline hint. Age previews use words (6m/6M = six years male; 6mo = six months; 3m = three years male; 3mo = three months) without changing the saved input. Unambiguous months+weeks compounds retain their meaning.
 
 Run `logbook/test/e2e/usability.mjs` beside recovery and the full E2E suite. Both focused runners accept cloud-specific Playwright/Chromium paths and fail nonzero on assertion failure. Fake data only.
+
+### Tag editor selection and insertion (Codex next batch)
+
+The first tap selects a tag in List or Pills and opens a small read-only details card. Edit is explicit; Add after uses the selection as an insertion anchor. Close / Escape / browser Back dismiss the card and retain selection. New tags and section headers offer separate Sits under and Place after controls, a searchable sibling list, Beginning / End and a placement preview. Insertion preserves child subtrees and existing APMES parent restrictions. Changing parent resets placement to its end. A changed layout or account refuses a stale dialog save. Selection clears with the account caches.
+
+Notes v1 is planned separately: private teaching points, doses and to-dos under More by default, never portfolio content; max 100, dated/undated Markdown text without images. Day Copy/Share and Markdown ZIP will use a {{notes}} fill-in; backup restore adds missing notes only. This tag PR does not add Notes yet.
