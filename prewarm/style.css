@@ -86,7 +86,8 @@ a { color: var(--navy); }
 .dellist .danger { margin: 0; flex: none; min-width: 96px; }
 /* event times: compact grid of chips */
 .times { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; }
-.tchip { display: grid; align-content: center; justify-items: center; gap: 1px; text-align: center; padding: 3px 2px; min-height: 52px; min-width: 0; border-radius: var(--r); border: 1px dashed #9aa1a9; background: var(--card); color: var(--muted); cursor: pointer; line-height: 1.1; }
+.tchip { position: relative; display: grid; align-content: center; justify-items: center; gap: 1px; text-align: center; padding: 11px 2px 2px; min-height: 52px; min-width: 0; border-radius: var(--r); border: 1px dashed #9aa1a9; background: var(--card); color: var(--muted); cursor: pointer; line-height: 1.1; }
+.tchip .tn { position: absolute; top: 2px; left: 5px; font-size: 10px; font-style: normal; font-weight: 700; line-height: 1; }
 .tchip span { font-size: 11px; max-width: 100%; overflow-wrap: anywhere; hyphens: manual; }
 .tchip b { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--muted); }
 .tchip.set { border: 1px solid transparent; background: var(--chip); }
