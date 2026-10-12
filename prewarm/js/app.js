@@ -595,6 +595,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     draft[c.key] = mine ?? was[c.key];
   }
   let setTouched = false; // gown set temp follows "warming off" until someone picks a value
+  const warmTouched = new Set(); // underbody / gown warming follow their logged start time until someone picks
   const isSaved = !!savedAt(p, s, pt.key);
   // when each box was last changed as the screen opened: a later change came from the other phone
   const openT = Object.fromEntries(cols.map(c => [c.key, p.f[`${s}_${pt.key}_${c.key}`]?.t || 0]));
@@ -725,6 +726,12 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
   function draw() {
     const clean = base == null || snap() === base;
     if (s === 'prewarm' && !setTouched && cols.some(c => c.key === 'set') && setTempNA(p, pt)) draft.set = 'NA';
+    // underbody / gown warming: a reading due after its logged start time is Yes unless someone picks otherwise
+    if (s === 'iotemp' && !isSaved) for (const [c, ev] of [['under', 'io_under_start'], ['gown', 'io_gown_start']]) {
+      if (warmTouched.has(c) || !cols.some(x => x.key === c)) continue;
+      const st = toMin(val(p, ev)), d = dueOf(p, s, pt);
+      if (st != null && d != null && (d - st + 1440) % 1440 < 720) draft[c] = '1';
+    }
     // an automatic change (set temp NA once warming is off) isn't something to ask about
     if (clean) base = snap();
     const due = dueOf(p, s, pt);
@@ -767,7 +774,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     const st = t.closest('[data-step]');
     if (st && e.detail === 0) { bump(st.dataset.c, +st.dataset.step); draw(); return; } // keyboard
     const chip = t.closest('.chip[data-c]');
-    if (chip) { if (chip.dataset.c === 'set') setTouched = true; draft[chip.dataset.c] = draft[chip.dataset.c] === chip.dataset.v ? null : chip.dataset.v; draw(); return; }
+    if (chip) { if (chip.dataset.c === 'set') setTouched = true; warmTouched.add(chip.dataset.c); draft[chip.dataset.c] = draft[chip.dataset.c] === chip.dataset.v ? null : chip.dataset.v; draw(); return; }
     const fl = t.closest('.card[data-fill]');
     if (fl && !t.closest('[data-step]')) { draft[fl.dataset.fill] = fl.dataset.fill === 'room' ? '20.0' : '36.5'; draw(); return; }
     const m = t.closest('[data-map]');
@@ -970,6 +977,14 @@ function gaps(p) {
   }).map(([a, b]) => `${label(b)} ${get(b)} is before ${label(a)} ${get(a)}`), '#/p/' + p.id);
   // warming marked Yes on a reading, but its start time not logged
   const yes = col => SERIES.iotemp.points.some(x => String(get(`iotemp_${x.key}_${col}`)) === '1');
+  const afterStart = (col, ev) => {
+    const st = toMin(get(ev)); if (st == null) return [];
+    return SERIES.iotemp.points.filter(x => savedAt(p, 'iotemp', x.key) && String(get(`iotemp_${x.key}_${col}`)) === '0')
+      .filter(x => { const d = dueOf(p, 'iotemp', x); return d != null && (d - st + 1440) % 1440 < 720 && d - st > 0; })
+      .map(x => x.key === 'end' ? 'End' : x.key === 'base' ? 'Baseline' : x.min + ' min');
+  };
+  add('Underbody warming says No after its start time', afterStart('under', 'io_under_start'), at('iotemp'));
+  add('Gown warming says No after its start time', afterStart('gown', 'io_gown_start'), at('iotemp'));
   add('Warming on, start time not logged', [['under', 'io_under_start'], ['gown', 'io_gown_start']].filter(([c, id]) => yes(c) && !get(id)).map(([, id]) => label(id)), '#/p/' + p.id);
   const unanswered = ids => ids.map(field).filter(f => f && isShown(f, get) && get(f.id) == null).map(f => f.label);
   if (get('io_done')) add('Intra-op details unanswered', unanswered(INTRAOP_Q), `#/p/${p.id}/form/intraop`);
