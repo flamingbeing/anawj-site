@@ -135,7 +135,7 @@ async function watch() {
   shared.unwatch?.(); shared.unwatch = null;
   if (!sharing()) return;
   shared.unwatch = await cloud.watchPatients(shared.admin ? null : shared.member.site, (list, meta) => {
-    if (meta.server) synced();
+    if (meta.server) { synced(); resyncOnce(); }
     let changed = false;
     for (const r of list) {
       const local = patients[r.id];
@@ -152,6 +152,17 @@ async function watch() {
     if (/^\/$|^\/p\/\w+$|\/sheet$/.test(h) && !typing) render();
     else { shared.stale = true; const b = $('#fresh'); if (b) b.hidden = false; }
   }, e => toast(cloud.friendly(e)));
+}
+// Repair (12 Oct 2026): a lock, unlock or delete briefly sent an empty f, which wiped the readings on the server copy.
+// Once, after the phone has the server's latest (so nothing newer is overwritten), send every patient whole again.
+function resyncOnce() {
+  if (read('resync1', false) || !sharing()) return;
+  write('resync1', true);
+  for (const p of Object.values(patients)) {
+    const site = val(p, 'site') || p.site;
+    if (!shared.admin && site !== shared.member?.site) continue;
+    if (Object.keys(p.f).length) sync(p, Object.keys(p.f));
+  }
 }
 function uploadLocal() {
   if (!shared.member) return;
@@ -261,7 +272,7 @@ function setLock(ids, on) {
   for (const id of ids) {
     const p = patients[id]; if (!p) continue;
     p.lock = { on, t: Date.now(), by };
-    sync(p, [], true);
+    sync(p, Object.keys(p.f), true);
   }
   saveAll();
 }
