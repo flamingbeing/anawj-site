@@ -118,10 +118,15 @@ export async function finishAdminLink(email) {
 // Patients of one hospital (or all, for an admin); cb gets the changed records
 export async function watchPatients(site, cb, onError) {
   const { db, F } = await sdk();
-  const q = site ? F.query(F.collection(db, 'patients'), F.where('site', '==', site)) : F.collection(db, 'patients');
+  // members only get their hospital's unlocked patients (the rules refuse anything else); admins get everything
+  const q = site ? F.query(F.collection(db, 'patients'), F.where('site', '==', site), F.where('locked', '==', false)) : F.collection(db, 'patients');
   // metadata changes too, so the app hears when the phone's copy is confirmed by the server (its "last synced")
-  return F.onSnapshot(q, { includeMetadataChanges: true }, snap => cb(snap.docChanges().filter(c => c.type !== 'removed').map(c => ({ id: c.doc.id, ...c.doc.data() })),
-    { server: !snap.metadata.fromCache && !snap.metadata.hasPendingWrites }), onError);
+  // removed: patients that left the query (for a member: locked by an admin)
+  return F.onSnapshot(q, { includeMetadataChanges: true }, snap => {
+    const ch = snap.docChanges();
+    cb(ch.filter(c => c.type !== 'removed').map(c => ({ id: c.doc.id, ...c.doc.data() })),
+      { server: !snap.metadata.fromCache && !snap.metadata.hasPendingWrites, removed: ch.filter(c => c.type === 'removed').map(c => c.doc.id) });
+  }, onError);
 }
 
 // Send changed fields of a record; merges into the shared copy field by field
@@ -130,7 +135,7 @@ export async function push(rec, ids, withLock = false) {
   const f = {};
   for (const k of ids) if (rec.f[k]) f[k] = rec.f[k];
   // never send an empty f: merging {} would replace the patient's readings on the server with nothing
-  const body = { site: rec.site, created: rec.created };
+  const body = { site: rec.site, created: rec.created, locked: !!rec.lock?.on };
   if (Object.keys(f).length) body.f = f;
   if (rec.deleted) body.deleted = rec.deleted;
   // only an admin's lock / unlock sends it (the rules refuse it from anyone else)

@@ -58,9 +58,14 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   14:20", or "Not synced: N patients waiting for signal. Last synced …" (amber). `lastSync` is set when nothing is
   pending and the server has confirmed the phone's copy (a server snapshot, a confirmed push, or waitForPendingWrites).
 - **Locking** (owner, 12 Oct 2026): a study admin taps "Select to lock" on the home page, picks patients (or "All
-  but <latest>": everyone except the most recently edited), then Lock / Unlock. A locked patient can't be opened by
-  anyone (admins too) until unlocked; the rules stop members changing it or its lock (`lock { on, t, by }`, later t
-  wins when merging). Demo mode lets anyone try it. A change refused because of a lock stops counting as unsynced.
+  but <latest>": everyone except the most recently edited), then Lock / Unlock. A locked patient is hidden from team
+  phones completely: the rules let members read only `locked == false` records, their query asks for that, and a
+  patient that leaves the query is deleted from the phone (it comes back when unlocked). Admins (anyone in demo mode)
+  open it read only (body.ro). Locked records are read only for everyone; an admin can only change `lock` / `locked`.
+  `locked` (bool) mirrors `lock.on` on every record; older records got it from each phone's one-off resend
+  (`resync2`), and stay hidden from members until then. Lock icon: an inline SVG padlock, no emoji.
+  - Lesson: no `get(field, default)` in a read rule that guards a query: Firestore treats fields the query doesn't
+    constrain as missing, so the default lets an unfiltered query through. Require the field (`locked == false`).
 - **Never send an empty `f`** (lesson, 12 Oct 2026): `setDoc(…, { f: {} }, { merge: true })` replaces the server's
   `f` with an empty map (an empty map is a leaf in the merge). Lock / unlock / delete sent one and wiped the server
   copy's readings; push now omits an empty `f`, lock sends the full record, and each phone resends all its patients

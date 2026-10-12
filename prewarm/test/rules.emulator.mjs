@@ -19,7 +19,7 @@ async function t(name, p) { n++; try { await p; } catch (e) { fail++; console.lo
 const adm = google(ADMIN), stranger = google('someone@example.com'), unv = google(ADMIN, false);
 const a = anonUser('phoneA'), b = anonUser('phoneB'), c = anonUser('phoneC'), nobody = env.unauthenticatedContext().firestore();
 const join = (db, uid, site, code, extra = {}) => setDoc(doc(db, 'members', uid), { site, initials: 'AB', code, joinedAt: 1, ...extra });
-const pat = (site, f = {}) => ({ site, created: 1, f });
+const pat = (site, f = {}) => ({ site, created: 1, locked: false, f });
 
 // joining
 await t('join with the right code', assertSucceeds(join(a, 'phoneA', 'NUH', 'NUH-CODE-1')));
@@ -48,7 +48,7 @@ await t('member cannot create other-hospital patient', assertFails(setDoc(doc(a,
 await t('member cannot move a patient', assertFails(setDoc(doc(a, 'patients', 'p1'), { site: 'SGH' }, { merge: true })));
 await t('member cannot read other hospital', assertFails(getDoc(doc(a, 'patients', 'sgh1'))));
 await t('member cannot write other hospital', assertFails(setDoc(doc(a, 'patients', 'sgh1'), { f: { x: { v: 1 } } }, { merge: true })));
-await t('member lists own hospital', assertSucceeds(getDocs(query(collection(a, 'patients'), where('site', '==', 'NUH')))));
+await t('member lists own hospital', assertSucceeds(getDocs(query(collection(a, 'patients'), where('site', '==', 'NUH'), where('locked', '==', false)))));
 await t('member cannot list everything', assertFails(getDocs(collection(a, 'patients'))));
 await t('member cannot hard-delete', assertFails(deleteDoc(doc(a, 'patients', 'p1'))));
 await t('unknown patient field', assertFails(setDoc(doc(a, 'patients', 'p3'), { ...pat('NUH'), name: 'Real Person' })));
@@ -70,17 +70,23 @@ await t('code for unknown hospital', assertFails(setDoc(doc(adm, 'codes', 'XYZ')
 await t('admin lists members', assertSucceeds(getDocs(collection(adm, 'members'))));
 await t('admin reads all patients', assertSucceeds(getDocs(collection(adm, 'patients'))));
 // locking (admins only; a locked patient can't be changed by members)
-const L = (on, t = 10) => ({ lock: { on, t, by: ADMIN } });
+const L = (on, t = 10) => ({ lock: { on, t, by: ADMIN }, locked: on });
 await t('member creates p4', assertSucceeds(setDoc(doc(a, 'patients', 'p4'), pat('NUH'))));
 await t('member cannot lock', assertFails(setDoc(doc(a, 'patients', 'p4'), L(true), { merge: true })));
 await t('member cannot create a locked patient', assertFails(setDoc(doc(a, 'patients', 'p5'), { ...pat('NUH'), ...L(true) })));
 await t('admin locks', assertSucceeds(setDoc(doc(adm, 'patients', 'p4'), L(true), { merge: true })));
 await t('member cannot write a locked patient', assertFails(setDoc(doc(a, 'patients', 'p4'), { f: { x: { v: 1, t: 11, by: 'AB' } } }, { merge: true })));
 await t('member cannot unlock', assertFails(setDoc(doc(a, 'patients', 'p4'), L(false, 12), { merge: true })));
-await t('member still reads a locked patient', assertSucceeds(getDoc(doc(a, 'patients', 'p4'))));
+await t('member cannot read a locked patient', assertFails(getDoc(doc(a, 'patients', 'p4'))));
+await t('member query for unlocked patients', assertSucceeds(getDocs(query(collection(a, 'patients'), where('site', '==', 'NUH'), where('locked', '==', false)))));
+await t('member query never returns a locked patient', getDocs(query(collection(a, 'patients'), where('site', '==', 'NUH'))).then(r => { if (r.docs.some(d => d.id === 'p4')) throw new Error('locked patient returned'); }, () => {}));
+await t('admin reads a locked patient', assertSucceeds(getDoc(doc(adm, 'patients', 'p4'))));
+await t('locked must match lock.on', assertFails(setDoc(doc(adm, 'patients', 'p4'), { locked: false }, { merge: true })));
+await t('member cannot mark locked without a lock', assertFails(setDoc(doc(a, 'patients', 'p6'), { ...pat('NUH'), locked: true })));
 await t('lock must be { on, t, by }', assertFails(setDoc(doc(adm, 'patients', 'p4'), { lock: { on: 'yes', t: 1, by: ADMIN } }, { merge: true })));
 await t('admin cannot change a locked patient either', assertFails(setDoc(doc(adm, 'patients', 'p4'), { f: { x: { v: 9, t: 12, by: 'L' } } }, { merge: true })));
 await t('admin unlocks', assertSucceeds(setDoc(doc(adm, 'patients', 'p4'), L(false, 13), { merge: true })));
+await t('member reads it again once unlocked', assertSucceeds(getDoc(doc(a, 'patients', 'p4'))));
 await t('member writes again once unlocked', assertSucceeds(setDoc(doc(a, 'patients', 'p4'), { f: { x: { v: 2, t: 14, by: 'AB' } } }, { merge: true })));
 await t('admin writes any hospital', assertSucceeds(setDoc(doc(adm, 'patients', 'sgh1'), { f: { x: { v: 1, t: 1, by: 'L' } } }, { merge: true })));
 await t('admin removes a member', assertSucceeds(deleteDoc(doc(adm, 'members', 'phoneC'))));

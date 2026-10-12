@@ -140,6 +140,12 @@ async function watch() {
   shared.unwatch = await cloud.watchPatients(shared.admin ? null : shared.member.site, (list, meta) => {
     if (meta.server) { synced(); resyncOnce(); }
     let changed = false;
+    // a member's phone: a patient locked by an admin leaves the team's query, so it goes from this phone
+    if (!shared.admin) for (const id of meta.removed || []) {
+      if (!patients[id]) continue;
+      delete patients[id]; delete pending[id]; changed = true;
+    }
+    if (changed) write('pending', pending);
     for (const r of list) {
       const local = patients[r.id];
       if (!local) { patients[r.id] = { ...r, f: { ...r.f } }; changed = true; continue; }
@@ -159,8 +165,9 @@ async function watch() {
 // Repair (12 Oct 2026): a lock, unlock or delete briefly sent an empty f, which wiped the readings on the server copy.
 // Once, after the phone has the server's latest (so nothing newer is overwritten), send every patient whole again.
 function resyncOnce() {
-  if (read('resync1', false) || !sharing()) return;
-  write('resync1', true);
+  // resync2: also gives older records the locked flag the team's query filters on
+  if (read('resync2', false) || !sharing()) return;
+  write('resync2', true);
   for (const p of Object.values(patients)) {
     const site = val(p, 'site') || p.site;
     if (!shared.admin && site !== shared.member?.site) continue;
