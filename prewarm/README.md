@@ -8,7 +8,8 @@ store with a fake patient.
 - `js/headers.js`: the eCRF template's 572 headers and sections, verbatim. `js/schema.js`: every template column as a
   field, in column order, plus op-day extras the template lacks. `js/app.js`: the screens. `js/store.js`: records with
   a timestamp per field (merge-ready for sharing). `js/xlsx.js` + `js/export.js`: the Excel export.
-- Data stays on the phone (localStorage) until sharing (Firebase, PR 2) is added.
+- Sharing: `js/cloud.js` + `firestore.rules` (Firebase project `prewarm-study`; deployed on merge by the "Deploy
+  Firestore rules" workflow). Without joining, data stays on the phone.
 
 Tests (fake data only):
 
@@ -16,4 +17,6 @@ Tests (fake data only):
 node prewarm/test/prewarm.test.mjs
 python3 -m http.server 8080 &   # from the repo root
 node prewarm/test/e2e.mjs        # phone-size browser test with an axe check; SHOTS=<dir> saves screenshots
+tools/test-rules.sh              # Firestore rules in the local emulator
+tools/test-prewarm-sync.sh       # two phones sharing a patient through the local emulators
 ```

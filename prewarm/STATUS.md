@@ -6,17 +6,19 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 
 ## Now
 
-- **Claude Code, Prewarming Webapp** (branch `ccr-13264f37-d28edu`, PR #194): hospitals added; next is PR 2 (sharing)
-  once the owner confirms the Firebase console steps.
+- **Claude Code, Prewarming Webapp** (branch `ccr-13264f37-d28edu`): PR 2 (sharing) built; rules, browser and two-phone
+  sync tests pass.
 
 ## Waiting on the owner
 
-- Try it on a phone: `anawj.com/prewarm/?demo`.
-- Confirm the Firebase console steps not yet checked: Firestore in `asia-southeast1` (production mode), Anonymous and
-  Google sign-in on, `anawj.com` an authorised domain; optionally limit the API key to `anawj.com` / `localhost`
-  referrers. (Project `prewarm-study` exists, config is on main, Rules Admin granted.)
+- Add yourself as the first admin: Firebase console → Firestore → collection `admins`, document ID = your Google
+  email in lower case (any field, e.g. `name`). Then in the app: Settings → "Study admin? Sign in with Google" →
+  "Join codes and members" → make a code for each hospital and give it to that team.
+- Try it on a phone: `anawj.com/prewarm/` (real) or `?demo` (fake patient, no sharing).
 
 ## Recently done
+
+- PR 2: sharing (join code per hospital, Firestore sync, rules, admin screen for codes and members).
 
 - #194: study hospitals (NTF, NUH, SGH, CGH, TTSH, KTPH, WH) in Settings, on patients and in the export.
 - #193: `prewarm/js/firebase-config.js`, web config for Firebase project `prewarm-study` (no Analytics).
@@ -24,8 +26,7 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 
 ## Next
 
-1. PR 2: sharing (join code per hospital (NTF, NUH, SGH, CGH, TTSH, KTPH, WH), Firestore sync, rules with emulator tests, deploy workflow entry).
-2. PR 3: admin (codes, members), export across hospitals, polish.
+1. PR 3: export across hospitals for admins, a members' view of who entered what, polish after phone testing.
 
 ## Decisions
 

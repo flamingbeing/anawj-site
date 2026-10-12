@@ -1,6 +1,6 @@
 # Prewarming study app: plan
 
-Status: **approved 12 Oct 2026.** PR 1 (offline app on one phone) built; PR 2 (sharing) next.
+Status: **approved 12 Oct 2026.** PR 1 (offline app) and PR 2 (sharing) built; PR 3 (admin polish) next.
 
 A phone app for the op-day data of the prewarming RCT (optimal pre-warming time to prevent inadvertent perioperative
 hypothermia; multi-level spine surgery; groups 0, 10 and 30 min). It is for the readings that must be taken at the

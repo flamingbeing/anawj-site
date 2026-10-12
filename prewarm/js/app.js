@@ -1,7 +1,8 @@
 // Prewarming study: op-day screens. Data stays on this phone for now (localStorage); sharing comes with Firebase.
 import { PAGES, SERIES, BY_ID, EXTRA_BY_ID, IX_COLS, SITES, calc, normaliseTemp, isShown } from './schema.js';
-import { newRecord, setVal, val, lastEdit } from './store.js';
+import { newRecord, setVal, val, lastEdit, mergeRecord } from './store.js';
 import { workbook } from './export.js';
+import * as cloud from './cloud.js';
 
 const DEMO = new URLSearchParams(location.search).has('demo');
 const NS = DEMO ? 'prewarm-demo:' : 'prewarm:';
@@ -47,7 +48,61 @@ const toMin = hm => { const m = /^(\d{1,2}):(\d{2})$/.exec(hm || ''); return m ?
 const fromMin = m => `${String(Math.floor(((m % 1440) + 1440) % 1440 / 60)).padStart(2, '0')}:${String(((m % 60) + 60) % 60).padStart(2, '0')}`;
 const nowMin = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes() + d.getSeconds() / 60; };
 const sid = p => val(p, 'enrol_id') || 'New patient';
-function set(p, id, v) { if (setVal(p, id, v, settings.me)) saveAll(); }
+function set(p, id, v) { if (setVal(p, id, v, settings.me)) { saveAll(); sync(p, [id]); } }
+
+// ---------- sharing
+const shared = { member: null, admin: false, email: '', unwatch: null, stale: false };
+const sharing = () => cloud.enabled && (shared.member || shared.admin);
+// send changed fields; Firestore keeps them on the phone and sends them when there is signal
+function sync(p, ids) {
+  if (!sharing()) return;
+  p.site ||= val(p, 'site') || shared.member?.site || settings.site;
+  if (!p.site) return;
+  cloud.push(p, ids).catch(e => toast(cloud.friendly(e)));
+}
+async function watch() {
+  shared.unwatch?.(); shared.unwatch = null;
+  if (!sharing()) return;
+  shared.unwatch = await cloud.watchPatients(shared.admin ? null : shared.member.site, list => {
+    let changed = false;
+    for (const r of list) {
+      const local = patients[r.id];
+      if (!local) { patients[r.id] = { ...r, f: { ...r.f } }; changed = true; continue; }
+      const m = mergeRecord(local, r);
+      // in place: open screens hold this object
+      if (m.changed) { Object.assign(local, m.rec, { site: local.site || r.site }); changed = true; }
+    }
+    if (!changed) return;
+    saveAll();
+    const h = location.hash.slice(1) || '/';
+    if (/^\/$|^\/p\/\w+$|\/sheet$/.test(h) && !view.contains(document.activeElement)) render();
+    else { shared.stale = true; const b = $('#fresh'); if (b) b.hidden = false; }
+  }, e => toast(cloud.friendly(e)));
+}
+function uploadLocal() {
+  if (!shared.member) return;
+  const key = 'uploaded:' + shared.member.site;
+  if (read(key, false)) return;
+  for (const p of Object.values(patients)) {
+    const site = val(p, 'site') || p.site;
+    if (site && site !== shared.member.site) continue;
+    if (!site) setVal(p, 'site', shared.member.site, settings.me);
+    sync(p, Object.keys(p.f));
+  }
+  saveAll(); write(key, true);
+}
+if (cloud.enabled) cloud.onUser(async u => {
+  const before = !!(shared.member || shared.admin);
+  shared.member = u ? await cloud.member() : null;
+  shared.admin = u && !u.isAnonymous ? await cloud.isAdmin() : false;
+  shared.email = u?.email || '';
+  if (shared.member) { settings.site = shared.member.site; if (!settings.me && shared.member.initials) settings.me = shared.member.initials; saveSettings(); }
+  uploadLocal();
+  await watch();
+  document.body.dataset.cloud = 'ready';
+  // redraw only when sharing changed, so a half-typed join code isn't wiped
+  if (before !== !!(shared.member || shared.admin) && !view.contains(document.activeElement)) render();
+});
 let toastTimer;
 function toast(t) { const el = $('#toast'); el.textContent = t; el.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.hidden = true; }, 2600); }
 
@@ -91,11 +146,13 @@ function go(hash) { if (location.hash !== hash) location.hash = hash; else rende
 let cleanup = [];
 function render() {
   cleanup.forEach(f => f()); cleanup = [];
+  shared.stale = false; $('#fresh').hidden = true;
   const h = location.hash.slice(1) || '/';
   for (const [re, fn] of routes) { const m = re.exec(h); if (m) { fn(...m.slice(1)); window.scrollTo(0, 0); return; } }
   home();
 }
 window.addEventListener('hashchange', render);
+$('#fresh').onclick = () => render();
 function header(title, back, extra = '') {
   $('#title').textContent = title;
   $('#back').hidden = !back; $('#back').onclick = () => go(back);
@@ -117,7 +174,7 @@ function home() {
         <small>${e ? 'Last entry ' + new Date(e.t).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) + (e.by ? ' by ' + esc(e.by) : '') : 'No entries yet'}</small></a></li>`;
     }).join('')}</ul>` : `<p class="muted">No patients yet. Tap <b>New patient</b> on the morning of surgery.</p>`}
     <a class="secondary big" href="#/export">Export Excel</a>
-    <p class="muted small">Data stays on this phone until sharing is switched on. Study IDs only: no names or hospital numbers.</p>`);
+    <p class="muted small">${sharing() ? `Shared with the ${esc(shared.admin ? 'whole study (admin)' : shared.member.site + ' team')}. Readings sync when there is signal.` : `Data stays on this phone. <a href="#/settings">Join your hospital’s team</a> to share patients.`} Study IDs only: no names or hospital numbers.</p>`);
   $('#new').onclick = () => go('#/new');
 }
 function status(p) {
@@ -181,7 +238,7 @@ route(/^\/p\/(\w+)$/, id => {
   view.querySelectorAll('input[type=time]').forEach(i => i.onchange = () => set(p, i.dataset.f, i.value));
   $('#del').onclick = e => {
     if (!e.target.dataset.sure) { e.target.dataset.sure = 1; e.target.textContent = 'Tap again to delete ' + sid(p); return; }
-    p.deleted = Date.now(); saveAll(); go('#/');
+    p.deleted = Date.now(); saveAll(); sync(p, []); go('#/');
   };
 });
 
@@ -297,6 +354,7 @@ route(/^\/p\/(\w+)\/read\/(prewarm|iotemp|haemo)(?:\/(\w+))?$/, (id, s, key) => 
       for (const c of cols) setVal(p, `${s}_${pt.key}_${c.key}`, draft[c.key] == null ? null : (c.type === 'code' ? +draft[c.key] : String(draft[c.key])), settings.me);
       if (!isSaved) setVal(p, `at_${s}_${pt.key}`, nowHM(), settings.me);
       saveAll();
+      sync(p, [...cols.map(c => `${s}_${pt.key}_${c.key}`), `at_${s}_${pt.key}`]);
       toast(pt.label + ' saved');
       const next = pts.slice(pts.indexOf(pt) + 1).find(x => !savedAt(p, s, x.key));
       go(`#/p/${id}/read/${s}` + (next ? '/' + next.key : '/' + pt.key));
@@ -398,7 +456,7 @@ const REDRAW = new Set(['io_txa_bolus', 'io_txa_inf', ...Object.values(BY_ID).fi
 function recalc(p) {
   for (const [id, kind] of [['io_txa_total', 'txa'], ['pacu_nudesc', 'nudesc']]) {
     const c = calc(kind, k => val(p, k));
-    if (c != null && (val(p, id) == null || p.f[id]?.auto)) { setVal(p, id, String(c), settings.me); p.f[id].auto = true; saveAll(); }
+    if (c != null && (val(p, id) == null || p.f[id]?.auto)) { setVal(p, id, String(c), settings.me); p.f[id].auto = true; saveAll(); sync(p, [id]); }
   }
 }
 function fieldHtml(f, get) {
@@ -453,9 +511,8 @@ route(/^\/settings$/, () => {
   paint(`<div class="stack">
     <label class="lab" for="me">Your initials</label><input id="me" value="${esc(settings.me)}" maxlength="6" autocapitalize="characters" autocomplete="off">
     <small class="muted">Saved with each reading as “entered by”.</small>
-    <span class="lab">Your hospital</span>
-    <div class="seg">${SITES.map(x => `<button type="button" class="chip" data-site="${x}" aria-pressed="${settings.site === x}">${x}</button>`).join('')}</div>
-    <small class="muted">New patients on this phone are recorded at this hospital.</small>
+    <h2>Hospital and sharing</h2>
+    ${sharingHtml()}
     <h2>Readings to enter live</h2>
     <p class="muted small">Untick what you’ll fill in later from the Fortuna monitor or Epic. Core temperature is always on.</p>
     ${tog('hide', 'skin', 'Skin temps: chest, arm, thigh, calf')}${tog('hide', 'set', 'Gown set temp (pre-warming)')}${tog('hide', 'ts', 'Thermal sensation (pre-warming)')}
@@ -465,8 +522,27 @@ route(/^\/settings$/, () => {
     <p class="muted small">Works while the app is open on screen.</p>
     ${tog('remind', 'banner', 'Banner')}${tog('remind', 'vibrate', 'Vibrate', 'Android only')}${tog('remind', 'beep', 'Short beep')}${tog('remind', 'awake', 'Keep the screen on during readings')}
     <button class="secondary" id="test">Test the alert</button></div>`);
-  view.querySelectorAll('[data-site]').forEach(b => b.onclick = () => { settings.site = settings.site === b.dataset.site ? '' : b.dataset.site; saveSettings(); render(); });
-  $('#me').onchange = e => { settings.me = e.target.value.trim().toUpperCase(); saveSettings(); toast('Saved'); };
+  view.querySelectorAll('[data-site]').forEach(b => b.onclick = () => { if (shared.member) return; settings.site = settings.site === b.dataset.site ? '' : b.dataset.site; saveSettings(); render(); });
+  $('#me').onchange = e => { settings.me = e.target.value.trim().toUpperCase(); saveSettings(); if (shared.member) cloud.setInitials(settings.me).catch(() => {}); toast('Saved'); };
+  $('#join')?.addEventListener('click', async e => {
+    const code = $('#code').value.trim();
+    if (!settings.site) return toast('Choose your hospital first.');
+    if (!code) return toast('Enter the join code for ' + settings.site + '.');
+    e.target.disabled = true; e.target.textContent = 'Joining…';
+    try { await cloud.join(settings.site, code, settings.me); shared.member = await cloud.member(); uploadLocal(); await watch(); toast('Joined the ' + settings.site + ' team'); }
+    catch (err) { shared.member = null; toast(err?.code === 'permission-denied' ? 'That code isn’t right for ' + settings.site + '. Ask a study admin.' : cloud.friendly(err)); }
+    render();
+  });
+  $('#leave')?.addEventListener('click', async e => {
+    if (!e.target.dataset.sure) { e.target.dataset.sure = 1; e.target.textContent = 'Tap again to stop sharing on this phone'; return; }
+    shared.unwatch?.(); shared.member = null; shared.admin = false;
+    try { await cloud.leave(); } catch { /* signed out anyway */ }
+    render();
+  });
+  $('#adminin')?.addEventListener('click', async () => {
+    try { await cloud.adminSignIn(); shared.admin = await cloud.isAdmin(); if (!shared.admin) { toast('This Google account isn’t a study admin.'); await cloud.leave(); } else { await watch(); go('#/admin'); } }
+    catch (err) { toast(cloud.friendly(err)); }
+  });
   view.onchange = e => {
     const i = e.target; if (!i.dataset.g) return;
     if (i.dataset.g === 'hide') settings.hide[i.dataset.k] = !i.checked; else settings.remind[i.dataset.k] = i.checked;
@@ -478,6 +554,49 @@ route(/^\/settings$/, () => {
     if (settings.remind.beep) beep();
   };
   cleanup.push(() => { view.onchange = null; });
+});
+
+function sharingHtml() {
+  const chips = `<div class="seg">${SITES.map(x => `<button type="button" class="chip" data-site="${x}" aria-pressed="${settings.site === x}" ${shared.member ? 'disabled' : ''}>${x}</button>`).join('')}</div>`;
+  if (!cloud.enabled) return `${chips}<small class="muted">New patients on this phone are recorded at this hospital. Sharing is off in demo mode.</small>`;
+  if (shared.admin) return `<p class="ok-box">Signed in as study admin (${esc(shared.email)}). You see every hospital’s patients.</p>
+    <a class="secondary" href="#/admin">Join codes and members</a><button class="secondary" id="leave">Sign out</button>`;
+  if (shared.member) return `${chips}<p class="ok-box">Sharing with the ${esc(shared.member.site)} team. Readings sync when there is signal.</p><button class="secondary" id="leave">Stop sharing on this phone</button>`;
+  return `${chips}<label class="lab" for="code">Join code for your hospital</label><input id="code" autocomplete="off" autocapitalize="characters">
+    <small class="muted">From a study admin. Joining shares this phone’s patients with your hospital’s team.</small>
+    <button class="primary" id="join">Join</button>
+    <button class="link" id="adminin">Study admin? Sign in with Google</button>`;
+}
+
+// ---------- admin: join codes and members
+route(/^\/admin$/, async () => {
+  header('Study admin', '#/settings');
+  if (!shared.admin) { paint(`<p class="note">Sign in as a study admin from Settings.</p>`); return; }
+  paint(`<p class="muted">Loading…</p>`);
+  let codes = {}, people = [];
+  try { [codes, people] = await Promise.all([cloud.codes(), cloud.members()]); } catch (e) { paint(`<p class="note">${esc(cloud.friendly(e))}</p>`); return; }
+  paint(`<div class="stack">
+    <p class="muted small">Give each hospital’s team its code. A new code stops new phones joining with the old one; phones already in stay in.</p>
+    ${SITES.map(x => {
+      const who = people.filter(m => m.site === x);
+      return `<div class="fld"><b>${x}</b>
+        <div class="coderow"><span class="mono">${codes[x] ? esc(codes[x].code) : '<span class="muted">no code yet</span>'}</span><button class="secondary" data-newcode="${x}">${codes[x] ? 'New code' : 'Make code'}</button></div>
+        ${who.length ? `<ul class="plain">${who.map(m => `<li>${esc(m.initials || '—')} <small class="muted">joined ${new Date(m.joinedAt).toLocaleDateString()}</small> <button class="link" data-rm="${m.uid}">Remove</button></li>`).join('')}</ul>` : '<small class="muted">No phones yet</small>'}</div>`;
+    }).join('')}</div>`);
+  view.onclick = async e => {
+    const nc = e.target.closest('[data-newcode]');
+    if (nc) {
+      const abc = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789', b = crypto.getRandomValues(new Uint8Array(8));
+      const code = nc.dataset.newcode + '-' + Array.from(b, x => abc[x % abc.length]).join('');
+      try { await cloud.setCode(nc.dataset.newcode, code); render(); } catch (err) { toast(cloud.friendly(err)); }
+    }
+    const rm = e.target.closest('[data-rm]');
+    if (rm) {
+      if (!rm.dataset.sure) { rm.dataset.sure = 1; rm.textContent = 'Tap again to remove'; return; }
+      try { await cloud.removeMember(rm.dataset.rm); render(); } catch (err) { toast(cloud.friendly(err)); }
+    }
+  };
+  cleanup.push(() => { view.onclick = null; });
 });
 
 // ---------- export
