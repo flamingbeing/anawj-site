@@ -47,6 +47,10 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
 - **Readings to enter live:** all on by default, BP / HR / BIS every 15 min included (owner, 12 Oct 2026; settings v2
   turned it on once for phones that had it off).
 - **Export Excel** is in Settings (owner, 12 Oct 2026), not on the home page.
+- **Log out** (owner, 12 Oct 2026; replaced "Stop sharing on this phone" and the admins' "Sign out"): warns first (how many
+  patients will go), tries to sync for a few seconds, and warns again naming any patient with changes the server
+  hasn't confirmed (`pending`, kept across reloads; cleared when Firestore's waitForPendingWrites resolves). Then it
+  leaves the team / signs out, deletes every patient and Firestore's offline copy on the phone, keeps settings, reloads.
 - **Screen size** (Settings, this phone only): Smaller / Small / Normal / Large / Larger zooms the whole app
   (`--ui-zoom` on body). Normal by default.
 - **Form view** (owner, 12 Oct 2026): the study's real paper form (data collection form v3.2, .docx) with text put in:

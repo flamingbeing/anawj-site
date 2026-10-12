@@ -134,8 +134,31 @@ try {
   await ad.goto(BASE + '#/');
   await ad.waitForFunction(() => /SYNC-01/.test(document.querySelector('.list')?.textContent || ''), null, { timeout: 15000 });
 
+  // phone A logs out with a change that hasn't synced (offline): two warnings; cancelling keeps everything
+  await a.goto(BASE + '#/');
+  await a.click('.list a'); await a.waitForSelector('.board');
+  await a.context().setOffline(true);
+  await a.click('[data-ev="pw_gown"]');
+  const said = [];
+  a.on('dialog', d => { said.push(d.message()); said.length === 1 ? d.accept() : d.dismiss(); });
+  await a.goto(BASE + '#/settings');
+  await a.click('#leave');
+  await a.waitForFunction(() => document.querySelector('#leave') && !document.querySelector('#leave').disabled, null, { timeout: 20000 });
+  assert.match(said[0], /deletes all 1 patient from this phone/);
+  assert.match(said[1] || '', /Not synced yet: SYNC-01/);
+  await a.context().setOffline(false);
+  // phone B logs out: one warning, then its patients are gone and it's no longer in the team
+  bb.on('dialog', d => d.accept());
+  await bb.goto(BASE + '#/settings');
+  await bb.waitForSelector('#leave');
+  await Promise.all([bb.waitForNavigation({ timeout: 20000 }), bb.click('#leave')]);
+  await bb.waitForSelector('body[data-cloud=ready]', { timeout: 20000 });
+  assert.equal(await bb.$('.list a'), null, 'no patients on phone B');
+  await bb.goto(BASE + '#/settings');
+  await bb.waitForSelector('#code', { timeout: 15000 });
+
   assert.deepEqual(errors, []);
-  console.log('prewarm sync: ok (two phones, join code, readings both ways, admin email-link sign-in, codes, join link and QR, blank Word form upload and Form view)');
+  console.log('prewarm sync: ok (two phones, join code, readings both ways, admin email-link sign-in, codes, join link and QR, blank Word form upload and Form view, log out)');
 } finally {
   await b.close();
 }

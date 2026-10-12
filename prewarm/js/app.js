@@ -75,11 +75,34 @@ function set(p, id, v) { if (setVal(p, id, v, settings.me)) { saveAll(); sync(p,
 const shared = { member: null, admin: false, email: '', unwatch: null, stale: false };
 const sharing = () => cloud.enabled && (shared.member || shared.admin);
 // send changed fields; Firestore keeps them on the phone and sends them when there is signal
+// patients with changes sent but not yet confirmed by the server (no signal), kept across reloads; Log out warns
+let pending = read('pending', {});
 function sync(p, ids) {
   if (!sharing()) return;
   p.site ||= val(p, 'site') || shared.member?.site || settings.site;
   if (!p.site) return;
-  cloud.push(p, ids).catch(e => toast(cloud.friendly(e)));
+  const tok = Date.now() + Math.random();
+  pending[p.id] = tok; write('pending', pending);
+  cloud.push(p, ids).then(() => { if (pending[p.id] === tok) { delete pending[p.id]; write('pending', pending); } })
+    .catch(e => toast(cloud.friendly(e)));
+}
+// Log out (owner, 12 Oct 2026): leaves the team and deletes every patient on this phone, after a warning, and a
+// second one if some changes haven't reached the team yet. Settings (initials, display) stay.
+async function logOut(btn) {
+  const n = Object.values(patients).filter(p => !p.deleted).length;
+  const who = shared.member ? `the ${shared.member.site} team` : 'the study';
+  if (!confirm(`Log out of ${who} on this phone?\n\nThis deletes all ${n} patient${n === 1 ? '' : 's'} from this phone. What has synced stays with your team.`)) return;
+  btn.disabled = true; btn.textContent = 'Checking everything has synced…';
+  if (Object.keys(pending).length && await cloud.flushed(6000)) { pending = {}; write('pending', pending); }
+  const unsynced = Object.keys(pending).map(id => patients[id]).filter(p => p && !p.deleted).map(sid);
+  if (unsynced.length && !confirm(`Not synced yet: ${unsynced.join(', ')}.\n\nThese changes haven’t reached your team (no signal?). Logging out now loses them. Cancel, get signal and wait a moment, or Export Excel first.\n\nLog out anyway and lose them?`)) {
+    btn.disabled = false; btn.textContent = 'Log out'; return;
+  }
+  shared.unwatch?.();
+  await cloud.logOut();
+  try { for (const k of Object.keys(localStorage)) if (k.startsWith(NS) && k !== NS + 'settings') localStorage.removeItem(k); } catch { /* storage blocked */ }
+  location.replace(location.pathname + location.search + '#/');
+  location.reload();
 }
 async function watch() {
   shared.unwatch?.(); shared.unwatch = null;
@@ -131,6 +154,8 @@ if (cloud.enabled) cloud.onUser(async u => {
   if (shared.member) { settings.site = shared.member.site; if (!settings.me && shared.member.initials) settings.me = shared.member.initials; saveSettings(); }
   uploadLocal();
   await watch();
+  // changes held over from an earlier visit go out with the next signal: then nothing is pending
+  if (sharing() && Object.keys(pending).length) cloud.flushed(600000).then(ok => { if (ok) { pending = {}; write('pending', pending); } });
   document.body.dataset.cloud = 'ready';
   // redraw only when sharing changed, so a half-typed join code isn't wiped
   if (before !== !!(shared.member || shared.admin) && !view.contains(document.activeElement)) render();
@@ -819,12 +844,7 @@ route(/^\/settings$/, () => {
     await joinTeam(site, code, e.target);
     render();
   });
-  $('#leave')?.addEventListener('click', async e => {
-    if (!e.target.dataset.sure) { e.target.dataset.sure = 1; e.target.textContent = 'Tap again to stop sharing on this phone'; return; }
-    shared.unwatch?.(); shared.member = null; shared.admin = false;
-    try { await cloud.leave(); } catch { /* signed out anyway */ }
-    render();
-  });
+  $('#leave')?.addEventListener('click', e => logOut(e.target));
   $('#adminin')?.addEventListener('click', () => { $('#adminbox').hidden = false; $('#adminemail').focus(); });
   $('#adminsend')?.addEventListener('click', async e => {
     const email = $('#adminemail').value.trim().toLowerCase();
@@ -850,10 +870,11 @@ route(/^\/settings$/, () => {
 function sharingHtml() {
   const chips = `<div class="seg sites">${SITES.map(x => `<button type="button" class="chip" data-site="${x}" aria-pressed="${settings.site === x}" ${shared.member ? 'disabled' : ''}>${x}</button>`).join('')}</div>`;
   if (!cloud.enabled) return `${chips}<small class="muted">New patients on this phone are recorded at this hospital. Sharing is off in demo mode.</small>`;
-  if (shared.email && !shared.admin) return `<p class="note">${esc(shared.email)} isn’t on the study’s admin list. Ask the owner to add it.</p><button class="secondary" id="leave">Sign out</button>`;
+  if (shared.email && !shared.admin) return `<p class="note">${esc(shared.email)} isn’t on the study’s admin list. Ask the owner to add it.</p><button class="secondary" id="leave">Log out</button>`;
   if (shared.admin) return `<p class="ok-box">Signed in as study admin (${esc(shared.email)}). You see every hospital’s patients.</p>
-    <a class="secondary" href="#/admin">Join codes and members</a><button class="secondary" id="leave">Sign out</button>`;
-  if (shared.member) return `<p class="ok-box">Sharing with the ${esc(shared.member.site)} team. Readings sync when there is signal.</p><button class="secondary" id="leave">Stop sharing on this phone</button>`;
+    <a class="secondary" href="#/admin">Join codes and members</a><button class="secondary" id="leave">Log out</button>`;
+  if (shared.member) return `<p class="ok-box">Sharing with the ${esc(shared.member.site)} team. Readings sync when there is signal.</p><button class="secondary" id="leave">Log out</button>
+    <small class="muted">Logging out deletes every patient on this phone (it warns first, and again if something hasn’t synced).</small>`;
   return `<label class="lab" for="code">Join code</label><input id="code" autocomplete="off" autocapitalize="characters" placeholder="e.g. NTF-…">
     <small class="muted">From a study admin, or just open the join link they sent. The code says which hospital. Joining shares this phone’s patients with that hospital’s team.</small>
     <button class="primary" id="join">Join</button>

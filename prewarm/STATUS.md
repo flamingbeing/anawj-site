@@ -12,7 +12,6 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 
 - Upload the blank paper form (.docx) on the admin screen, then check a patient's Form view on a phone (Download
   Word file, Save as PDF / Print).
-- Send each hospital team its join link (admin screen → Share join link), privately; test with a second phone.
 
 ## Next
 
@@ -31,6 +30,8 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 
 ## Decisions
 
+- 12 Oct 2026: Log out (deletes the phone's patients, warns, warns again if unsynced) replaces Stop sharing. Join links sent
+  to the teams and working (owner).
 - 12 Oct 2026: completed patients warn before opening; Export Excel moves to Settings.
 - 12 Oct 2026: Cloudflare PR previews fixed by the owner (build settings); main copy at
   anawj-preview.kohwenjun.workers.dev.
