@@ -89,7 +89,7 @@ The old data is the Google Form responses workbook (tabs **Case** and **AY20xx T
 - `js/demo-backend.js`: the `?demo` stand-in for `cloud.js` (localStorage, fake admin `demo@example.com`).
 - `js/app.js`: boot, sign-in, tabs, service worker. Each screen is in `js/ui-*.js` (`ui-core.js` holds shared state and helpers).
 - `sw.js`: offline app shell (cache-first). **Bump `VERSION` in `sw.js` whenever any file changes**, otherwise installed phones keep the old copy; with a new version the app shows "Update available — Reload".
-- `firestore.rules`: access rules for the whole project, logbook and evaluations (paste into the console).
+- `firestore.rules`: access rules for the whole project, logbook and evaluations (deployed automatically on merge to `main`).
 
 ## Tests
 
