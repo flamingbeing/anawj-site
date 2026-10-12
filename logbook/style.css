@@ -1324,4 +1324,5 @@ select:not([multiple]) { background-image: url("data:image/svg+xml,%3Csvg xmlns=
 
 /* Reflections list: the JR rule as a small count beside the heading's count; word counts can be hidden */
 .refl-pill.jr { margin-left: 4px; font-weight: 500; }
+.refl-pill.jr.met { color: var(--ink); }   /* green ground, normal text (contrast at this weight), with a ✓ */
 html.no-wc .refl-wc.in-list { display: none; }

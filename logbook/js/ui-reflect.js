@@ -498,7 +498,7 @@ function list() {
           h('span', { class: 'refl-hname' }, h('b', { class: 'refl-topic' }, hp.label), ' ',
             h('span', { class: `refl-pill ${hp.met ? 'met' : hp.done ? 'some' : 'none'}`, 'aria-label': `${hp.done} of ${hp.min} counted${hp.met ? ', met' : ''}` }, `${hp.done}/${hp.min}`),
             // the JR rule ("One from JR") as its own small count beside it, not a line in the note (owner, 13 Oct 2026)
-            hp.jrNeeded ? h('span', { class: `refl-pill jr ${hp.jrDone >= hp.jrNeeded ? 'met' : ''}`, title: `${hp.jrNeeded === 1 ? 'One' : 'Two'} from JR`, 'aria-label': `${Math.min(hp.jrDone, hp.jrNeeded)} of ${hp.jrNeeded} from JR` }, `JR ${Math.min(hp.jrDone, hp.jrNeeded)}/${hp.jrNeeded}`) : null,
+            hp.jrNeeded ? h('span', { class: `refl-pill jr ${hp.jrDone >= hp.jrNeeded ? 'met' : ''}`, title: `${hp.jrNeeded === 1 ? 'One' : 'Two'} from JR`, 'aria-label': `${Math.min(hp.jrDone, hp.jrNeeded)} of ${hp.jrNeeded} from JR` }, `JR ${Math.min(hp.jrDone, hp.jrNeeded)}/${hp.jrNeeded}${hp.jrDone >= hp.jrNeeded ? ' ✓' : ''}`) : null,
             x.written > hp.done ? h('span', { class: 'muted refl-counts' }, ` · ${x.written} written`) : null)),
         em ? null : h('button', { class: 'small icon-btn refl-add', title: 'Add a reflection under ' + hp.label, 'aria-label': 'Add a reflection under ' + hp.label, onclick: () => openPicker(false, { headingId: hp.id, subId: null }) }, '+')),
       // the heading's note (rules, examples; categories.js), shown whether open or not unless switched off

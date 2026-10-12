@@ -309,7 +309,7 @@ async function run(label, ctxOpts) {
 
     await step('reflections list: JR count beside the heading count; word counts can be hidden', async () => {
       const bar = p.locator('.refl-h[data-heading="bariatric"]');
-      assert(/^JR \d\/1$/.test((await bar.locator('.refl-pill.jr').innerText()).trim()), 'no JR count beside Bariatric');
+      assert(/^JR \d\/1( ✓)?$/.test((await bar.locator('.refl-pill.jr').innerText()).trim()), 'no JR count beside Bariatric');
       assert(!/from JR/.test(await bar.innerText()), 'the JR rule is still in the note');
       const wc = p.locator('.refl-wc.in-list').first();
       if (await wc.count()) {
