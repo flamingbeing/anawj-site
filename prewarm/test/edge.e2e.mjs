@@ -485,9 +485,13 @@ await tryit(async () => {
   for (let k = 1; k <= 5; k++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: 320 - 48 * k, y }] });
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); await pg.waitForTimeout(500);
   log(!pg.url().endsWith('/haemo'), 'a swipe on the key times doesn\'t change tab');
+  log(!!await pg.$('[data-sign="prewarm"]') && !!await pg.$('[data-sign="iotemp"]'), 'pre-warming and intra-op temps complete ticks on the Temperatures tab');
   await pg.goto('http://localhost:8080/prewarm/?demo#/'); await pg.waitForTimeout(400);
   await pg.click('a[href="#/pacu"]'); await pg.click('a[href^="#/pacu/"] >> nth=0'); await pg.waitForTimeout(500);
   log(/· PACU$/.test(await pg.textContent('#title')) && /#\/pacu\/\w+$/.test(pg.url()), 'PACU view opens the PACU page: ' + await pg.textContent('#title'));
+  // PACU in / To ward on the PACU page: a tap logs now
+  await pg.click('[data-pev="pacu_in"]'); await pg.waitForTimeout(300);
+  log(/^\d\d:\d\d$/.test(await pg.textContent('[data-pev="pacu_in"] b')), 'PACU in logged from the PACU page');
   await pg.click('#back'); await pg.waitForTimeout(300);
   log(pg.url().endsWith('#/pacu'), 'and back returns to the PACU list');
   await ctx.close();

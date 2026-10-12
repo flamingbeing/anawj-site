@@ -861,7 +861,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
       <section class="third mid">${ptabsHtml()}${main ? comfortHtml('sat_pre', 'Comfortable before surgery?') : ''}${reading}
       ${s === 'haemo' && vitalsCollected(p) ? '<p class="okline small">✓ Vital signs data collected: ticked on the paper form</p>' : ''}
       ${s === 'haemo' && settings.hide.haemo15 ? `<p class="muted small">Only baseline is entered here; the 15-min rows come from the monitor download. Turn them on in Settings.</p>` : ''}
-      ${main ? comfortHtml('sat_post', 'Comfortable after surgery?') : signoffHtml(p, s)}</section>
+      ${main ? (noWarming(p) ? '' : signoffHtml(p, 'prewarm')) + signoffHtml(p, 'iotemp') + comfortHtml('sat_post', 'Comfortable after surgery?') : signoffHtml(p, s)}</section>
       <section class="third bot" aria-label="Other forms and checks">${linksHtml()}${gapsHtml(p)}${doneHtml(p)}
       <p class="resetline"><button class="link" id="resetsub">Reset this subject</button></p></section>`);
     refreshBar();
@@ -1157,7 +1157,7 @@ function doneHtml(p) {
 
 // ---------- section sign-off (replaces the paper form's Name / Signature / Date)
 // each sign-off names its section, and shows a ticked box once marked (owner, 12 Oct 2026)
-const SECTION = { haemo: 'BP, HR, BIS', intraop: 'Intra-op details', pacu: 'PACU', satis: 'Patient comfort' };
+const SECTION = { prewarm: 'pre-warming temps', iotemp: 'intra-op temps', haemo: 'BP, HR, BIS', intraop: 'Intra-op details', pacu: 'PACU', satis: 'Patient comfort' };
 const tickHtml = (on, label, who, undo, mark) => on
   ? `<div class="sign on"><span class="tick" aria-hidden="true">✓</span><span><b>${esc(label)} complete</b><small>${esc(who)}</small></span><button class="link" ${undo}>Undo</button></div>`
   : `<div class="sign"><button class="tickbtn" ${mark}><span class="tick" aria-hidden="true"></span>Mark ${esc(label)} complete</button></div>`;
@@ -1166,6 +1166,8 @@ function signoffHtml(p, pg) {
   return tickHtml(!!val(p, 'sign_' + pg), name, val(p, 'sign_' + pg) || '', `data-unsign="${pg}"`, `data-sign="${pg}"`);
 }
 function signoffClick(p, pg, t) {
+  // the tick names its own section (the Temperatures tab has two)
+  pg = t.closest('[data-sign]')?.dataset.sign || t.closest('[data-unsign]')?.dataset.unsign || pg;
   if (t.closest('[data-sign]')) {
     if (!settings.me) return toast('Add your initials in Settings first.');
     set(p, 'sign_' + pg, `${settings.me} ${new Date().toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' })} ${nowHM()}`); render();
@@ -1309,7 +1311,10 @@ function formPage(id, pg, back) {
   const get = k => val(p, k);
   const draw = () => {
     const y = window.scrollY;
-    paint(`<div class="stack">${FORM[pg].map(group => {
+    // PACU in / To ward on the PACU page, so the PACU nurse logs them there (owner, 12 Oct 2026)
+    const pt = pg === 'pacu' ? `<div class="times pacutimes">${[['pacu_in', 'PACU in'], ['pacu_out', 'To ward']].map(([f, l]) =>
+      `<button class="tchip ${get(f) ? 'set' : ''}" data-pev="${f}" aria-label="${EVENT_FULL[f] || l}: ${get(f) ? get(f) + ', tap to change' : 'tap to set now'}"><span>${l}</span><b>${get(f) ? esc(get(f)) : 'tap'}</b></button>`).join('')}</div>` : '';
+    paint(`${pt}<div class="stack">${FORM[pg].map(group => {
       if (group[0] === 'h') return `<h2>${group[1]}</h2>`;
       if (group[0] === 'tx') return txTable(p);
       if (group[0] === 'ix') return ixTable(p);
@@ -1324,6 +1329,18 @@ function formPage(id, pg, back) {
     const u = e.target.closest('[data-use]');
     if (u) { set(p, u.dataset.use, u.dataset.v); draw(); return; }
     if (e.target.closest('#addix')) { const rows = ixRows(p); rows.push({ time: nowHM() }); set(p, 'io_ix_rows', JSON.stringify(rows)); draw(); return; }
+    const pe = e.target.closest('[data-pev]');
+    if (pe) {
+      const f = pe.dataset.pev, label = f === 'pacu_in' ? 'PACU in' : 'To ward';
+      if (!get(f)) {
+        if (f === 'pacu_out' && !get('pacu_in') && !confirm('PACU in isn’t logged yet. Log To ward now anyway?')) return;
+        set(p, f, nowHM()); toast(`${label} ${get(f)}. Tap it to change.`); lockTaps();
+      } else {
+        const v = askTime(`${label} time`, get(f));
+        if (v) set(p, f, v);
+      }
+      draw(); return;
+    }
     const rm = e.target.closest('[data-rmix]');
     if (rm && !confirm('Remove this investigation result?')) return;
     if (rm) { const rows = ixRows(p); rows.splice(+rm.dataset.rmix, 1); set(p, 'io_ix_rows', rows.length ? JSON.stringify(rows) : null); draw(); return; }

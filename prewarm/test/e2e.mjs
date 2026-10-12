@@ -301,7 +301,7 @@ try {
   // mark data collection complete (bottom of the main screen): shown at the top and in the patient list
   await page.click('.list a:has-text("DEMO-01")');
   await page.waitForSelector('[data-done]');
-  assert.equal(await page.$('[data-sign]'), null, 'no per-section mark on the main screen');
+  assert.ok(await page.$('[data-sign="iotemp"], [data-unsign="iotemp"]'), 'intra-op temps complete tick on the main screen');
   await page.click('[data-done]');
   assert.match(await page.textContent('.donetop'), /Data collection complete\s*TT \d+ \w+ \d{4} \d\d:\d\d/);
   await page.goto(BASE + '?demo#/');
