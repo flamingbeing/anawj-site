@@ -1622,7 +1622,8 @@ async function run(label, ctxOpts) {
     const flag = id => refl.find(r => r.id === id).export !== false;
     assert(flag('eb1') && flag('eb22') && flag('eb4444') && !flag('eb333'), 'just enough picked ' + JSON.stringify(refl.filter(r => r.id.startsWith('eb')).map(r => [r.id, r.export])));
     assert(/3 of 3/.test(await p.locator('.exp-h', { hasText: 'Bariatric' }).innerText()), 'bariatric not at 3 of 3');
-    await p.locator('main a, main button', { hasText: 'Export portfolio' }).first().click(); await nap(400);
+    // back to the export page: "‹ Export portfolio" in the header
+    await p.locator('.back-row a', { hasText: 'Export portfolio' }).first().click(); await nap(400);
     assert(await p.locator('main button', { hasText: /^Export \d+ reflections? \(Word\)$/ }).count() === 1, 'export button missing');
     // More → Export / Import links here
     await tab('data');
