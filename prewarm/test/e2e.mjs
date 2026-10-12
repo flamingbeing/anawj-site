@@ -200,7 +200,17 @@ try {
   assert.match(await page.textContent('.donetop'), /Data collection complete\s*TT \d+ \w+ \d{4} \d\d:\d\d/);
   await page.goto(BASE + '?demo#/');
   assert.match(await page.textContent('.list'), /DEMO-01[\s\S]*✓ Data collection complete/);
-  await page.goto(BASE + '?demo#/export');
+  // tapping a completed patient warns first, opens on the second tap
+  await page.click('.list a:has-text("DEMO-01")');
+  assert.match(await page.textContent('.list a.warned'), /marked complete .*Tap again to open/);
+  assert.doesNotMatch(page.url(), /#\/p\//, 'still on the list');
+  await page.click('.list a:has-text("DEMO-01")');
+  await page.waitForSelector('.donetop');
+  await page.goto(BASE + '?demo#/');
+  assert.equal(await page.$('a[href="#/export"]'), null, 'no export on the home page');
+  await page.goto(BASE + '?demo#/settings');
+  await page.click('a[href="#/export"]');
+  await page.waitForSelector('#xl');
   const [dl] = await Promise.all([page.waitForEvent('download'), page.click('#xl')]);
   const file = await dl.path();
   const head = fs.readFileSync(file).subarray(0, 2).toString();

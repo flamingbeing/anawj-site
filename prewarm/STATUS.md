@@ -31,6 +31,7 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 
 ## Decisions
 
+- 12 Oct 2026: completed patients warn before opening; Export Excel moves to Settings.
 - 12 Oct 2026: Cloudflare PR previews fixed by the owner (build settings); main copy at
   anawj-preview.kohwenjun.workers.dev.
 - 12 Oct 2026: "Mark data collection as complete" (one per patient) replaces the main screen's section mark; shown at the

@@ -203,12 +203,17 @@ function home() {
     <h2>Patients on this phone</h2>
     ${list.length ? `<ul class="list">${list.map(p => {
       const e = lastEdit(p);
-      return `<li><a href="#/p/${p.id}"><b>${esc(sid(p))}${val(p, 'site') ? ` <small>${esc(val(p, 'site'))}</small>` : ''}</b><span${val(p, 'done') ? ' class="okline"' : ''}>${esc(status(p))}</span>
+      return `<li><a href="#/p/${p.id}"${val(p, 'done') ? ` data-done="${esc(val(p, 'done'))}"` : ''}><b>${esc(sid(p))}${val(p, 'site') ? ` <small>${esc(val(p, 'site'))}</small>` : ''}</b><span${val(p, 'done') ? ' class="okline"' : ''}>${esc(status(p))}</span>
         <small>${e ? 'Last entry ' + new Date(e.t).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) + (e.by ? ' by ' + esc(e.by) : '') : 'No entries yet'}</small></a></li>`;
     }).join('')}</ul>` : `<p class="muted">No patients yet. Tap <b>New patient</b> on the morning of surgery.</p>`}
-    <a class="secondary big" href="#/export">Export Excel</a>
     <p class="muted small">${sharing() ? `Shared with the ${esc(shared.admin ? 'whole study (admin)' : shared.member.site + ' team')}. Readings sync when there is signal.` : `Data stays on this phone. <a href="#/settings">Join your hospital’s team</a> to share patients.`} Study IDs only: no names or hospital numbers.</p>`);
   $('#new').onclick = () => go('#/new');
+  // a patient marked complete: warn on the first tap, open on the second
+  view.querySelectorAll('.list a[data-done]').forEach(a => a.onclick = e => {
+    if (a.dataset.warned) return;
+    e.preventDefault(); a.dataset.warned = 1; a.classList.add('warned');
+    a.insertAdjacentHTML('beforeend', `<em class="warnline">Data collection was marked complete${a.dataset.done ? ' (' + esc(a.dataset.done) + ')' : ''}. Tap again to open it; any change is recorded with your initials.</em>`);
+  });
 }
 function status(p) {
   if (val(p, 'done')) return '✓ Data collection complete';
@@ -795,6 +800,8 @@ route(/^\/settings$/, () => {
     <p class="muted small">Works while the app is open on screen.</p>
     ${tog('remind', 'banner', 'Banner')}${tog('remind', 'vibrate', 'Vibrate', 'Android only')}${tog('remind', 'beep', 'Short beep')}${tog('remind', 'awake', 'Keep the screen on during readings')}
     <button class="secondary" id="test">Test the alert</button>
+    <h2>Export</h2>
+    <a class="secondary" href="#/export">Export Excel</a>
     <h2>Participants</h2>
     <a class="secondary" href="#/delete">Delete participants</a></div>`);
   view.querySelectorAll('[data-zoom]').forEach(b => b.onclick = () => {
@@ -977,7 +984,7 @@ route(/^\/admin$/, async () => {
 
 // ---------- export
 route(/^\/export$/, () => {
-  header('Export', '#/');
+  header('Export', '#/settings');
   const n = Object.values(patients).filter(p => !p.deleted).length;
   paint(`<div class="stack">
     <p>An Excel file in the study template’s layout: one row per patient, the template’s 572 columns, op-day columns filled and the rest blank, so rows paste into the master sheet.</p>

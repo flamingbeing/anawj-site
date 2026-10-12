@@ -41,10 +41,12 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
 - **Mark data collection as complete** (owner, 12 Oct 2026): one button at the very bottom of the patient's main
   screen (below the links and a divider, so it isn't tapped by accident), stored as `done` ("AB 12 Oct 2026 14:20").
   Once marked: a green line at the top of the main screen and "✓ Data collection complete" in the patient list; Undo at
-  the bottom. The Word form's sign-off lines use it on op-day pages with data that have no sign-off of their own. The
+  the bottom. In the patient list, tapping a completed patient warns first (amber row: who marked it and when); a
+  second tap opens it. The Word form's sign-off lines use it on op-day pages with data that have no sign-off of their own. The
   per-section sign-offs stay on the BP / HR / BIS screen and the other forms.
 - **Readings to enter live:** all on by default, BP / HR / BIS every 15 min included (owner, 12 Oct 2026; settings v2
   turned it on once for phones that had it off).
+- **Export Excel** is in Settings (owner, 12 Oct 2026), not on the home page.
 - **Screen size** (Settings, this phone only): Smaller / Small / Normal / Large / Larger zooms the whole app
   (`--ui-zoom` on body). Normal by default.
 - **Form view** (owner, 12 Oct 2026): the study's real paper form (data collection form v3.2, .docx) with text put in:
