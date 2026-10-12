@@ -24,6 +24,10 @@ This file collects what was learnt while building `/evals` (October 2026), so th
 | Repo | Public. **No names, patient data or real evaluation data** in the repo. Programme originals stay with the programme. |
 | Merging | "automerge": evals PRs are squash-merged once tests pass. **Firestore rules auto-deploy on merge to main**, so never ask the owner to paste rules. |
 | Platform | Static web app (PWA) on GitHub Pages. Electron might come later; nothing in the app blocks that. |
+| Theme | **Light by default.** More → Settings → Theme is a Light / Dark / Auto toggle, saved **per device** (the logbook's theme is per device too). |
+| Keyboard | The bottom nav **stays visible above the phone keyboard** (evals and logbook). |
+| More screen | The "Guide and forms" card is removed for now (the reference files stay in the repo). |
+| Logbook privacy | **Cases and logbook record: the resident and the app owner only.** Admins see counts, not cases. Reflections stay private to the resident (the owner included). Only residents on the programme list can add photos; 20 MB of photos each. |
 
 ## 2. MedHub, as it works today (from the official Android app 1.4.8 and the resident guide)
 
@@ -129,6 +133,24 @@ Pickers are full-screen **Recent | All | Write-In** lists, with recents remember
   - A settle correction runs after 450 ms.
   - Measuring at pointerdown, not at click, fixed a drift of about 21px per question.
   - `labelParts` folds long labels only for supervision questions; folding others split labels at "e.g.".
+- **Saving answers** (`ui-form.js`, `cloud.js`):
+  - Autosave uses `updateEvaluation(id, patch, { wait: false, onError })`: a rejection that arrives before the 3 s ack wait is reported (before, the form said "Saved").
+  - `restoreLocal()` keeps the device copy when it only adds to the server's answers, not just when it is newer (a resident's nudge bumps `updatedAt`).
+  - Unsent text is flushed on `visibilitychange`/`pagehide`. Sign-out removes `evals-draft-*`.
+- **State changes** (`stampPatch` in `demo-backend.js`, used by both backends): reopen, reassign and assessor change restart `requestedAt`; reopen clears `seenAt`; a new assessor drops the old `metrics` (rules let the resident remove `metrics`, never set it).
+- **Navigation:**
+  - The phone's Back closes open sheets and the full-screen QR (`popstate` listener in `ui-core.js`).
+  - The request flow survives a reload (`sessionStorage` `evals-request-flow`, 2 h).
+  - A resident opening their own `#e/` link is sent to `#r/`.
+  - After a decline, `replaceState` to `#pending`.
+  - First visit doesn't reload when the service worker takes control (`hadController` check, also in the logbook).
+- **`needsAction`** lives in `ui-core.js`, so the Requests badge equals Home's "Needs action" count.
+- **Search** (`build-data.mjs` template): drops a trailing plural "s" and understands `r1`…`r5`; synonyms include RSI, PCA, USG/ultrasound, TIVA, extubation.
+- **Faculty paste** accepts email-client lists (`Name <email>; …`, `"Last, First" <email>`) and skips a header row.
+- **Theme** (`style.css`):
+  - Surfaces and text on filled accents are variables (`--e-surface`, `--e-on-accent`, `--e-hover`, `--e-track`, `--e-row-alt`, `--e-nav-bg`, `--e-due`), so dark mode is one block at the end of the file. Never hard-code `#fff`.
+  - The inline script in `index.html` sets `data-theme` before the first paint; the QR code stays black on white.
+- **Keyboard:** `--e-kb` (from `visualViewport`) lifts the nav on iOS; `keepFocusClear()` scrolls the focused box above it.
 - **Demo:**
   - Modes: `?demo` (resident), `?demo=assessor`, `?demo=admin`, `?demo=reset`.
   - One shared localStorage store, `apmes-evals-demo-v1`.
@@ -144,7 +166,7 @@ npx http-server . -p 8110 -s -c-1 &                                           # 
 node evals/test/e2e.spec.mjs                                                  # 36 e2e checks
 ```
 
-- **Rules:** the emulator suites (`logbook/test/rules.emulator.mjs` and `evals/test/rules.emulator.mjs`) run under `firebase emulators:exec --only firestore --project demo-logbook`. At the last run, logbook passed 112/112 and evals 185/185.
+- **Rules:** the emulator suites (`logbook/test/rules.emulator.mjs` and `evals/test/rules.emulator.mjs`) run under `firebase emulators:exec --only firestore --project demo-logbook`. At the last run, logbook passed 154/154 and evals 191/191 (the logbook session has since added more).
 - **Playwright** is installed globally. Use executable `/opt/pw-browsers/chromium` in the cloud container.
 - **e2e failing with `ERR_CONNECTION_REFUSED`** means the static server isn't running on port 8110.
 
@@ -158,6 +180,8 @@ PRs are squash-merged, so the working branch falls behind main, and force-push i
 4. Push, open the PR, then squash-merge it with the expected head SHA.
 
 On `sw.js` VERSION conflicts, take the higher version and keep the prefix-only cache cleanup.
+
+A quick contrast check for both themes is worth running after any colour change: set `localStorage['evals-theme']` to `dark`/`light` with Playwright `addInitScript`, walk the routes, and compare each visible text node's colour against its background (WCAG AA). The last run passed on 13 screens in both themes.
 
 ## 5. Operations
 
@@ -179,7 +203,30 @@ On `sw.js` VERSION conflicts, take the higher version and keep the prefix-only c
   - Old share links and QR codes in chats break unless the old domain redirects.
   - Installed PWAs need reinstalling from the new domain.
 
-## 6. Open items
+## 6. Working alongside the logbook session, and limits of this environment
+
+- **The logbook has its own Claude session** (branch `claude/clever-gates-pm6sas`, title "APMES Logbook"). It owns `logbook/`.
+  - Before editing logbook files, check it isn't mid-change: `get_session` status, and its open PRs.
+  - Keep logbook edits small, merge them, then tell it with `send_message` (what changed, files, the sw VERSION) so it merges main before its next change.
+  - Twice it shipped the same feature first (logbook theme, keyboard nav); check main before building.
+- **Logbook data and roles** (`logbook/firestore.rules`):
+  - `owners/{email}`, set by hand in the console, is the app owner. They may read logbooks and cases and import cases, but never reflections, images or the bin. Hand over by swapping the entry.
+  - Admins can't read logbooks or cases; they read `summaries/` (counts per category, completed reflections per heading) and portfolios marked ready (`submissions/`).
+  - Photo writes need `isMember()` (on the residents list).
+  - Photos are 800–1000 px JPEG with a 20 MB budget per resident (`PHOTO_BUDGET_KB`, figures record `kb`). They stay in Firestore: at 150 residents that is about 3 GB, around US$0.40/month on Blaze, and photos still work offline. Moving to Firebase Storage needs the console bucket (asia-southeast1), loses offline adds, and isn't worth it yet.
+- **Owner-set IDs:**
+  - The Google Drive web client ID and the Dropbox app key are in `logbook/js/backup-targets.js`; both are public.
+  - The Claude connector's Desktop client (`logbook/mcp/config.mjs`) needs the owner to paste its ID and secret via a GitHub web edit. The agent's safety check refuses to commit a `client_secret`, even for a non-confidential desktop client and even with the owner's go-ahead.
+  - Dropbox stays in development mode until the owner applies for production (icons are 64 and 256 px from `logbook/icons/icon-512.png`).
+- **Privacy policy:** `privacy/index.html`, live at https://anawj.com/privacy/. Keep it in step with the rules when roles change.
+- **What this cloud agent can't do:**
+  - Write production Firestore.
+  - Edit its own permission settings.
+  - Delete remote branches.
+  - Push after a blocked credential attempt (the classifier stays wary for a while). Wait, or ask the owner.
+  - A stray branch `claude/privacy-page` was left by mistake; the owner can delete it.
+
+## 7. Open items
 
 - Linked emails / hospital-email sign-in (the project is on Blaze; code path present, off).
 - Nightly encrypted Firestore backup Action.
@@ -187,3 +234,21 @@ On `sw.js` VERSION conflicts, take the higher version and keep the prefix-only c
 - Auto-crediting mask holding and bag ventilation alongside the airway DOPS, if the PD wants it.
 - Flagging requests abandoned for more than 3 days, and the 24-hour / end-of-rotation deadlines in the PD overview.
 - Electron wrapper, if ever needed.
+- Firestore scheduled backups (switch on in the console; the project is on Blaze).
+- The Claude connector's Desktop client secret (owner's GitHub web edit), then a live `node server.mjs login` test.
+- **Ease-of-use backlog** (from a review of other assessment apps and a phone test; the owner hasn't picked yet):
+  - **Consultant:**
+    - a dictation hint on comment boxes;
+    - the entrustment text box above the question list, or show 3 with "show all";
+    - "fill in on this phone" with later confirmation on the assessor's own account;
+    - assessor-started assessments with a resident "Assess me" QR;
+    - an add-to-home-screen prompt for faculty.
+  - **Resident:**
+    - the result screen leads with comments and the supervision level;
+    - a better Nudge (WhatsApp text filled in, a suggestion at 24 h);
+    - "what to get next" on Progress.
+  - **PD:**
+    - turnaround figures (form time, % within 24 h per assessor, stale requests);
+    - tappable Overview tiles;
+    - a CSV with per-form question labels;
+    - feedback-quality flags (empty comments, every item the same score).
