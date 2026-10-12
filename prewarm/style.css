@@ -307,3 +307,10 @@ body.ro main .k, body.ro main .num, body.ro main .chip, body.ro main .tchip, bod
   .fpage h3 { margin: 6px 0 4px; } .fpage h4 { margin: 6px 0 3px; }
   .scroll { overflow: visible; }
 }
+
+/* ask to save before leaving a reading with changes */
+dialog.ask { border: 0; border-radius: var(--r-card); padding: 16px; width: min(340px, calc(100vw - 32px)); background: var(--card); color: var(--ink); box-shadow: 0 8px 30px rgba(0, 0, 0, .25); }
+dialog.ask::backdrop { background: rgba(0, 0, 0, .35); }
+dialog.ask p { margin: 0 0 6px; }
+.askbtns { display: grid; gap: 8px; margin-top: 12px; }
+.askbtns button { min-height: var(--tap); }

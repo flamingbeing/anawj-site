@@ -158,7 +158,7 @@ async function watch() {
     const h = location.hash.slice(1) || '/';
     // redraw unless someone is typing (a focused link or button is fine)
     const typing = view.contains(document.activeElement) && document.activeElement.matches('input, textarea, select');
-    if (/^\/$|^\/p\/\w+$|\/sheet$/.test(h) && !typing) render();
+    if (/^\/$|^\/p\/\w+$|\/sheet$/.test(h) && !typing && !leaveGuard?.()) render();
     else { shared.stale = true; const b = $('#fresh'); if (b) b.hidden = false; }
   }, e => toast(cloud.friendly(e)));
 }
@@ -252,7 +252,19 @@ const routes = [];
 const route = (re, fn) => routes.push([re, fn]);
 function go(hash) { if (location.hash !== hash) location.hash = hash; else render(); }
 let cleanup = [];
+// a reading screen with changes not yet saved sets this: it returns { what, save } while there is something to lose
+let leaveGuard = null, shown = location.hash;
 function render() {
+  // leaving (another timepoint, BP / HR / BIS, back, a team update): ask to save first
+  const g = leaveGuard?.();
+  if (g) {
+    const to = location.hash;
+    if (to !== shown) history.replaceState(null, '', shown || '#/');
+    if (document.querySelector('dialog.ask[open]')) return;
+    askLeave(g, () => { leaveGuard = null; if (to !== shown) go(to); else render(); });
+    return;
+  }
+  leaveGuard = null; shown = location.hash;
   cleanup.forEach(f => f()); cleanup = [];
   shared.stale = false; $('#fresh').hidden = true;
   const h = location.hash.slice(1) || '/';
@@ -266,6 +278,24 @@ function render() {
   home();
 }
 window.addEventListener('hashchange', render);
+window.addEventListener('beforeunload', e => { if (leaveGuard?.()) e.preventDefault(); });
+function askLeave(g, proceed) {
+  const d = document.createElement('dialog');
+  d.className = 'ask';
+  d.innerHTML = `<p><b>Save the ${esc(g.what)}?</b></p><p class="muted small">You changed it but haven’t saved.</p>
+    <div class="askbtns"><button class="save" data-a="save">Save</button><button class="secondary" data-a="drop">Don’t save</button><button class="link" data-a="stay">Stay here</button></div>`;
+  document.body.append(d);
+  d.onclick = e => {
+    const a = e.target.closest('[data-a]')?.dataset.a || (e.target === d ? 'stay' : null);
+    if (!a) return;
+    if (a === 'save' && !g.save()) { d.close(); return; }
+    d.close();
+    if (a !== 'stay') proceed();
+  };
+  d.onclose = () => d.remove();
+  d.showModal();
+  d.querySelector('[data-a="save"]').focus();
+}
 $('#fresh').onclick = () => render();
 $('#banner').onclick = () => { $('#banner').hidden = true; };
 function header(title, back, extra = '') {
@@ -446,6 +476,22 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
   }
   let setTouched = false; // gown set temp follows "warming off" until someone picks a value
   const isSaved = !!savedAt(p, s, pt.key);
+  // what's on screen when it opens; anything changed from that is asked about before leaving
+  const snap = () => JSON.stringify(cols.map(c => draft[c.key] == null ? null : String(draft[c.key])));
+  let base = null;
+  leaveGuard = () => !p.lock?.on && base != null && snap() !== base ? { what: pt.label + ' reading', save: commit } : null;
+  function commit() {
+    if (p.lock?.on) { toast('Locked: read only. Unlock it on the home page to change it.'); return false; }
+    const bad = cols.filter(c => c.temp && draft[c.key] != null && (+draft[c.key] < 25 || +draft[c.key] > 45 || Number.isNaN(+draft[c.key])));
+    if (bad.length) { toast('Check ' + bad.map(c => c.label).join(', ') + ': temperatures should be 25–45 °C.'); return false; }
+    for (const c of cols) setVal(p, `${s}_${pt.key}_${c.key}`, draft[c.key] == null ? null : (c.type === 'code' ? +draft[c.key] : String(draft[c.key])), settings.me);
+    if (!isSaved) setVal(p, `at_${s}_${pt.key}`, nowHM(), settings.me);
+    saveAll();
+    sync(p, [...cols.map(c => `${s}_${pt.key}_${c.key}`), `at_${s}_${pt.key}`]);
+    toast(pt.label + ' saved');
+    base = snap();
+    return true;
+  }
 
   function strip() {
     const now = nowMin();
@@ -515,6 +561,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
   }
   function draw() {
     if (s === 'prewarm' && !setTouched && cols.some(c => c.key === 'set') && setTempNA(p, pt)) draft.set = 'NA';
+    if (base == null) base = snap();
     const due = dueOf(p, s, pt);
     const grp = s === 'prewarm' ? `<span class="badge">${GROUPS.find(g => String(g[0]) === String(val(p, 'arm')))?.[1] || 'Group not set'}</span>` : '';
     paint(`${main && val(p, 'done') ? `<p class="ok-box donetop">✓ Data collection complete <small>${esc(val(p, 'done'))}</small></p>` : ''}${main ? comfortHtml('sat_pre', 'Comfortable before surgery?') + timesHtml() : ''}${navHtml()}
@@ -585,14 +632,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
       return;
     }
     if (t.closest('#save')) {
-      if (p.lock?.on) return toast('Locked: read only. Unlock it on the home page to change it.');
-      const bad = cols.filter(c => c.temp && draft[c.key] != null && (+draft[c.key] < 25 || +draft[c.key] > 45 || Number.isNaN(+draft[c.key])));
-      if (bad.length) return toast('Check ' + bad.map(c => c.label).join(', ') + ': temperatures should be 25–45 °C.');
-      for (const c of cols) setVal(p, `${s}_${pt.key}_${c.key}`, draft[c.key] == null ? null : (c.type === 'code' ? +draft[c.key] : String(draft[c.key])), settings.me);
-      if (!isSaved) setVal(p, `at_${s}_${pt.key}`, nowHM(), settings.me);
-      saveAll();
-      sync(p, [...cols.map(c => `${s}_${pt.key}_${c.key}`), `at_${s}_${pt.key}`]);
-      toast(pt.label + ' saved');
+      if (!commit()) return;
       const next = pts.slice(pts.indexOf(pt) + 1).find(x => !savedAt(p, s, x.key));
       go(`#/p/${id}/${s}/` + (next ? next.key : pt.key));
       return;

@@ -78,6 +78,11 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
 - **Due time warms up** (owner, 12 Oct 2026): the "due hh:mm" beside each timepoint is plain until 2 min before,
   then an amber pill with a slow pulse (soon), an orange-red pill with a stronger pulse from due to 5 min past (now),
   and a red pill with a fast pulse after that (late); plain once the reading is saved. Reduced motion: colours only.
+- **Ask before leaving an unsaved reading** (owner, 12 Oct 2026): readings (temperatures, BP / HR / BIS) still save only
+  on Save (carried-over values count once someone confirms them; no auto-save). Changing a value and then leaving
+  (another timepoint, ‹ ›, the tabs, BP, HR, BIS, back, Sign-off, a team update) asks "Save the 5 min reading?": Save /
+  Don't save / Stay here (`leaveGuard` + `askLeave` in `render()`). A team update doesn't redraw over unsaved changes;
+  the "New readings" bar shows instead.
 - **Other data** (owner, 12 Oct 2026): a small box beside Form view / Sheet view opens the remaining template pages
   (pre-op, pre-op medication, pre-op investigations, day 1 and 2 chart review and analgesia, discharge) on one page
   (`#/p/<id>/data`), each a collapsible header (open by default) over every field in template order (`OTHER_PAGES`; no
