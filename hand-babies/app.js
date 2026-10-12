@@ -285,19 +285,12 @@ if ('IntersectionObserver' in window) {
 
 // offline: cache the page; offer a reload when a new version is ready
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  // A new version switches itself on (see sw.js); the bar then just reloads the page to show it.
   const hadController = !!navigator.serviceWorker.controller; // first visit: nothing to update
+  const offer = () => { const b = document.getElementById('update'); b.hidden = false; b.onclick = () => location.reload(); };
   navigator.serviceWorker.register('sw.js').then(reg => {
-    const show = w => {
-      const b = document.getElementById('update'); b.hidden = false;
-      b.onclick = () => w.postMessage('skipWaiting');
-    };
-    if (reg.waiting && hadController) show(reg.waiting);
-    reg.addEventListener('updatefound', () => {
-      const w = reg.installing;
-      w?.addEventListener('statechange', () => { if (w.state === 'installed' && hadController) show(w); });
-    });
+    // a version installed under an older worker may still be waiting for a tap: switch it on now
+    if (reg.waiting && hadController) reg.waiting.postMessage('skipWaiting');
   }).catch(() => {});
-  // reload only when a new version takes over, not when the first worker claims this page
-  let reloaded = !hadController;
-  navigator.serviceWorker.addEventListener('controllerchange', () => { if (!reloaded) { reloaded = true; location.reload(); } });
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadController) offer(); });
 }

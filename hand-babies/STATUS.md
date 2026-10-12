@@ -6,7 +6,7 @@ Last updated: 2026-10-12 by Claude Code, hand assessment session.
 
 ## Now
 
-- **Claude Code, hand assessment** (branch `claude/amazing-goodall-erq636`): 3D animations for tendon tests (added FPL, EDC, EIP/EDM, EPL, Elson), kinder wording.
+- **Claude Code, hand assessment** (branch `claude/amazing-goodall-erq636`): fixed the update bar that did nothing when tapped on a phone.
   Nothing half-done.
 
 ## Waiting on the owner
@@ -21,6 +21,8 @@ Last updated: 2026-10-12 by Claude Code, hand assessment session.
 3. Link from a landing page once one exists.
 
 ## Recently done
+
+- #258: 3D animations for tendon tests (added FPL, EDC, EIP/EDM, EPL, Elson), kinder wording.
 
 - #253: removed the 10 rules and the emoji.
 
