@@ -179,6 +179,29 @@ await tryit(async () => {
   log(/Times out of order: Induction \d\d:\d\d is before In OT/.test(await pg.textContent('#gaps')), 'Induction an hour before In OT is listed');
   await ctx.close();
 });
+// K. Perioperative data: Subject ID and group can be corrected (never blank, never a duplicate; group asks first);
+// BMI is worked out from weight and height; a follow-up of a follow-up hides when the first answer goes to No
+await tryit(async () => {
+  const { ctx, pg } = await fresh();
+  await open(pg, 0);
+  await pg.click('#haemolink'); await pg.click('a.widebox'); await pg.waitForSelector('#f-enrol_id');
+  await pg.fill('#f-enrol_id', 'DEMO-02'); await pg.keyboard.press('Tab'); await pg.waitForTimeout(200);
+  log(/already used/.test(await pg.textContent('#toast')) && await pg.inputValue('#f-enrol_id') === 'DEMO-01', 'duplicate Subject ID refused');
+  await pg.fill('#f-enrol_id', 'DEMO-01A'); await pg.keyboard.press('Tab'); await pg.waitForTimeout(200);
+  log(/DEMO-01A/.test(await pg.textContent('#title')), 'Subject ID corrected');
+  let asked = ''; pg.once('dialog', d => { asked = d.message(); d.accept(); });
+  await pg.click('.chip[data-f="arm"][data-v="2"]'); await pg.waitForTimeout(200);
+  log(/Change the group to 10 min/.test(asked) && await pg.getAttribute('.chip[data-f="arm"][data-v="2"]', 'aria-pressed') === 'true', 'group corrected after asking');
+  await pg.click('.chip[data-f="arm"][data-v="2"]'); await pg.waitForTimeout(200);
+  log(await pg.getAttribute('.chip[data-f="arm"][data-v="2"]', 'aria-pressed') === 'true', 'group never cleared by a second tap');
+  await pg.fill('#f-wt', '70'); await pg.keyboard.press('Tab'); await pg.fill('#f-ht', '175'); await pg.keyboard.press('Tab'); await pg.waitForTimeout(200);
+  log(await pg.inputValue('#f-bmi') === '22.9', 'BMI worked out: ' + await pg.inputValue('#f-bmi'));
+  await pg.click('.chip[data-f="ihd"][data-v="1"]'); await pg.click('.chip[data-f="ihd_mi"][data-v="0"]'); await pg.waitForTimeout(200);
+  log(!!await pg.$('#f-ihd_mi_years'), 'years since MI shown');
+  await pg.click('.chip[data-f="ihd"][data-v="0"]'); await pg.waitForTimeout(200);
+  log(!await pg.$('#f-ihd_mi_years') && !await pg.$('.chip[data-f="ihd_mi"]'), 'IHD No hides both follow-ups');
+  await ctx.close();
+});
 await b.close();
 if (fails.length) { console.error('prewarm edge: FAIL\n- ' + fails.join('\n- ')); process.exit(1); }
-console.log('prewarm edge: ok (midnight, surgery end, double-tap Save, BP checks, back button, Log, Enter, still to fill, swipe, stray taps, time order)');
+console.log('prewarm edge: ok (midnight, surgery end, double-tap Save, BP checks, back button, Log, Enter, still to fill, swipe, stray taps, time order, corrections, BMI, follow-ups)');

@@ -915,6 +915,8 @@ route(/^\/p\/(\w+)\/data$/, id => {
   const draw = () => {
     const y = window.scrollY;
     paint(`<p class="muted small">Usually from Epic or the chart, after the day of surgery. Fill in what you have; the rest stays blank.</p>
+      <details class="sect" data-pg="study" ${closed.has('study') ? '' : 'open'}><summary><span>Subject ID and group</span><small>to correct a mistake</small></summary>
+        <div class="stack">${fieldHtml(field('enrol_id'), get)}${fieldHtml(field('arm'), get)}</div></details>
       ${OTHER_PAGES.map(pg => `<details class="sect" data-pg="${pg}" ${closed.has(pg) ? '' : 'open'}><summary><span>${esc(PAGES.find(x => x.id === pg).title)}</span>
         <small>${filled(pg) ? filled(pg) + ' of ' + FORM[pg].length + ' filled' : 'Not started'}</small></summary>
         <div class="stack">${FORM[pg].map(([k]) => fieldHtml(field(k), get)).join('')}</div></details>`).join('')}`);
@@ -927,13 +929,31 @@ route(/^\/p\/(\w+)\/data$/, id => {
   const keyOf = fld => fld.querySelector('[data-f]')?.dataset.f;
   const focusStop = fld => { if (!fld) return; const t = fld.querySelector('input, .chip[aria-pressed="true"]') || fld.querySelector('.chip'); t.focus(); if (t.select && t.type === 'text') t.select(); };
   const move = (k, by) => { const all = stops(); const i = all.findIndex(f => keyOf(f) === k); focusStop(all[i + by]); };
-  const pick = b => { const f = field(b.dataset.f); const v = f.type === 'code' ? +b.dataset.v : b.dataset.v; set(p, f.id, String(get(f.id)) === String(v) ? null : v); draw(); };
+  const pick = b => {
+    const f = field(b.dataset.f); const v = f.type === 'code' ? +b.dataset.v : b.dataset.v;
+    // the group can be corrected, never cleared; it sets the pre-warming due times
+    if (f.id === 'arm') {
+      if (String(get('arm')) === String(v)) return;
+      if (!confirm(`Change the group to ${GROUPS.find(g => String(g[0]) === String(v))?.[1] || v}?\n\nOnly to correct a mistake. The pre-warming due times change with it.`)) return draw();
+      set(p, 'arm', v); return draw();
+    }
+    set(p, f.id, String(get(f.id)) === String(v) ? null : v); draw();
+  };
   view.onclick = e => { const b = e.target.closest('.chip[data-f]'); if (b) pick(b); };
   view.onchange = e => {
     const i = e.target; if (!i.dataset.f) return;
     const f = field(i.dataset.f);
+    // Subject ID: never blank, never the same as another patient's here
+    if (f.id === 'enrol_id') {
+      const v = i.value.trim();
+      const clash = Object.values(patients).some(q => q !== p && !q.deleted && String(val(q, 'enrol_id') || '').toLowerCase() === v.toLowerCase());
+      if (!v || clash) { toast(v ? 'That Subject ID is already used by another patient.' : 'The Subject ID can’t be blank.'); i.value = get('enrol_id') ?? ''; return; }
+      set(p, 'enrol_id', v); $('#title').textContent = sid(p) + ' · Perioperative data'; return;
+    }
     set(p, f.id, f.temp ? normaliseTemp(i.value) : i.value.trim());
     if (REDRAW.has(f.id)) return draw();
+    // BMI is worked out from weight and height (unless typed in): update its box without a redraw (focus stays)
+    if (f.id === 'wt' || f.id === 'ht') { recalc(p); const b = view.querySelector('#f-bmi'); if (b) b.value = val(p, 'bmi') ?? ''; }
     const d = i.closest('details[data-pg]'), n = d && filled(d.dataset.pg);
     if (d) d.querySelector('summary small').textContent = n ? n + ' of ' + FORM[d.dataset.pg].length + ' filled' : 'Not started';
   };
@@ -1015,7 +1035,7 @@ route(/^\/p\/(\w+)\/form\/(\w+)$/, (id, pg) => {
 const REDRAW = new Set(['io_txa_bolus', 'io_txa_inf', ...Object.values(BY_ID).filter(f => f.show).map(f => f.show.f)]);
 // totals worked out from other fields fill in when empty or when they still hold the old worked-out value
 function recalc(p) {
-  for (const [id, kind] of [['io_txa_total', 'txa'], ['pacu_nudesc', 'nudesc']]) {
+  for (const [id, kind] of [['io_txa_total', 'txa'], ['pacu_nudesc', 'nudesc'], ['bmi', 'bmi']]) {
     const c = calc(kind, k => val(p, k));
     if (c != null && !p.lock?.on && (val(p, id) == null || p.f[id]?.auto)) { setVal(p, id, String(c), settings.me); p.f[id].auto = true; saveAll(); sync(p, [id]); }
   }
@@ -1452,7 +1472,7 @@ route(/^\/export$/, () => {
   header('Export', '#/settings');
   const n = Object.values(patients).filter(p => !p.deleted).length;
   paint(`<div class="stack">
-    <p>An Excel file in the study template’s layout: one row per patient, the template’s 572 columns, op-day columns filled and the rest blank, so rows paste into the master sheet.</p>
+    <p>An Excel file in the study template’s layout: one row per patient, the template’s 572 columns, filled from everything entered here (op day and Perioperative data), so rows paste into the master sheet.</p>
     <ul class="muted small"><li><b>Data Collection</b>: the template sheet</li><li><b>Readings</b>: every reading with the time it was saved and who saved it</li>
     <li><b>Extra</b>: items the template has no column for (transfusion volumes, investigation rows, PACU transfusion, NuDESC items, sign-offs)</li></ul>
     <button class="primary big" id="xl" ${n ? '' : 'disabled'}>Export ${n} patient${n === 1 ? '' : 's'}</button></div>`);

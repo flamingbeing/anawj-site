@@ -315,8 +315,18 @@ export function normaliseTemp(s) {
   return t;
 }
 
-export function isShown(f, get) {
+// shown when its question's answer matches, and that question is itself shown (so a follow-up of a follow-up hides
+// when the first answer goes back to No)
+export function isShown(f, get, depth = 0) {
   if (!f.show) return true;
   const v = get(f.show.f);
-  return f.show.in.some(x => String(x) === String(v));
+  if (!f.show.in.some(x => String(x) === String(v))) return false;
+  const parent = BY_ID[f.show.f] || EXTRA_BY_ID[f.show.f];
+  return !parent || depth > 5 || isShown(parent, get, depth + 1);
+}
+// the value as it should be exported: a hidden follow-up's old answer is left out (it stays stored, so switching
+// the answer back brings it back)
+export function shownValue(id, get) {
+  const f = BY_ID[id] || EXTRA_BY_ID[id];
+  return f && !isShown(f, get) ? null : get(id);
 }

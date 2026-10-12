@@ -185,9 +185,9 @@ try {
   assert.equal((await page.textContent('#haemolink')).trim(), 'Others', 'second tab is Others');
   await page.click('a.widebox');
   await page.waitForSelector('details.sect');
-  assert.equal(await page.$$eval('details.sect[open]', x => x.length), 8, 'pre-op, meds, bloods, day 1 x2, day 2 x2, discharge, all open');
+  assert.equal(await page.$$eval('details.sect[open]', x => x.length), 9, 'Subject ID and group, pre-op, meds, bloods, day 1 x2, day 2 x2, discharge, all open');
   await page.fill('#f-age', '67'); await page.keyboard.press('Enter');
-  assert.match(await page.textContent('details.sect >> nth=0 >> summary'), /1 of \d+ filled/, 'Enter saves the answer');
+  assert.match(await page.textContent('details.sect[data-pg="preop"] summary'), /1 of \d+ filled/, 'Enter saves the answer');
   const nextKey = await page.evaluate(() => document.activeElement.dataset.f);
   assert.ok(nextKey && nextKey !== 'age', 'Enter moves to the next question');
   await page.keyboard.press('ArrowUp');
@@ -197,8 +197,8 @@ try {
     await page.keyboard.press('ArrowRight'); await page.keyboard.press('Enter');
     assert.equal(await page.getAttribute(`.chip[data-f="${nextKey}"][data-v]:nth-child(2)`, 'aria-pressed'), 'true', '→ then Enter picks the second choice');
   }
-  await page.click('details.sect >> nth=0 >> summary');
-  assert.equal(await page.$$eval('details.sect[open]', x => x.length), 7, 'a header folds its section');
+  await page.click('details.sect[data-pg="preop"] summary');
+  assert.equal(await page.$$eval('details.sect[open]', x => x.length), 8, 'a header folds its section');
   await axe('other data'); await shot('other-data');
   await page.goBack(); await page.waitForSelector('input[data-in="sbp"]');
   await page.goBack(); await page.waitForSelector('.textlinks a[href$="/sheet"]');

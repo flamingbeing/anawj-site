@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { inflateRawSync } from 'node:zlib';
 import { HEADERS, SECTIONS, SCREENING_HEADERS } from '../js/headers.js';
-import { FIELDS, BY_ID, PAGES, SCREENING, SITES, EXTRA, colLetter, colIndex, calc, normaliseTemp, isShown } from '../js/schema.js';
+import { FIELDS, BY_ID, PAGES, SCREENING, SITES, EXTRA, colLetter, colIndex, calc, normaliseTemp, isShown, shownValue } from '../js/schema.js';
 import { newRecord, setVal, val, mergeRecord, mergeInto, packFile, readFile } from '../js/store.js';
 import { workbook, workbookSheets, cellFor, ixText } from '../js/export.js';
 import { dateSerial, timeSerial } from '../js/xlsx.js';
@@ -55,8 +55,13 @@ assert.equal(calc('map', id => ({ sbp: '120', dbp: '60' })[id]), 80);
 assert.equal(normaliseTemp('365'), '36.5');
 assert.equal(normaliseTemp('36,5'), '36.5');
 assert.equal(normaliseTemp('120'), '120');
-assert.equal(isShown(BY_ID.ihd_mi_years, id => ({ ihd_mi: 0 })[id]), true);
-assert.equal(isShown(BY_ID.ihd_mi_years, id => ({ ihd_mi: 1 })[id]), false);
+assert.equal(isShown(BY_ID.ihd_mi_years, id => ({ ihd: 1, ihd_mi: 0 })[id]), true);
+// a follow-up of a follow-up hides when the first answer goes back to No, and its old value isn't exported
+assert.equal(isShown(BY_ID.ihd_mi_years, id => ({ ihd: 0, ihd_mi: 0 })[id]), false);
+assert.equal(shownValue('ihd_mi_years', id => ({ ihd: 0, ihd_mi: 0, ihd_mi_years: 3 })[id]), null);
+assert.equal(shownValue('io_txa_bolus', id => ({ io_txa: 0, io_txa_bolus: '1000' })[id]), null);
+assert.equal(shownValue('io_txa_bolus', id => ({ io_txa: 1, io_txa_bolus: '1000' })[id]), '1000');
+assert.equal(isShown(BY_ID.ihd_mi_years, id => ({ ihd: 1, ihd_mi: 1 })[id]), false);
 
 // records and merging
 {
@@ -136,6 +141,13 @@ assert.equal(cellFor(BY_ID.age, ''), null);
   setVal(p, 'io_ix_rows', JSON.stringify([{ time: '10:30', hb: '9.8', test: 'ROTEM', ct: '60' }]));
   assert.equal(workbookSheets([p], [])[0].rows[2][BY_ID.io_ix.colIndex], '10:30, Hb 9.8, ROTEM, CT or R 60');
   assert.equal(ixText('not json'), '');
+  // hidden follow-ups aren't exported (TXA answered No after a bolus was typed); no pre-warming exports NA for its start
+  setVal(p, 'io_txa', 1); setVal(p, 'io_txa_bolus', '1000');
+  assert.equal(workbookSheets([p], [])[0].rows[2][BY_ID.io_txa_bolus.colIndex], 1000);
+  setVal(p, 'io_txa', 0);
+  assert.equal(workbookSheets([p], [])[0].rows[2][BY_ID.io_txa_bolus.colIndex], null);
+  setVal(p, 'arm', 3);
+  assert.equal(workbookSheets([p], [])[0].rows[2][BY_ID.pw_start.colIndex], 'NA');
   assert.equal(calc('nudesc', id => ({ nd_dis: 1, nd_beh: 2 })[id]), 3);
 
   // the file is a valid zip whose sheet carries the values

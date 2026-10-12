@@ -2,7 +2,7 @@
 // patient per row from row 3) and "Screening Number". No DOM (tested in node).
 
 import { HEADERS, SECTIONS, SCREENING_HEADERS } from './headers.js';
-import { FIELDS, SCREENING, SERIES, EXTRA, IX_COLS, PAGES, colIndex } from './schema.js';
+import { FIELDS, SCREENING, SERIES, EXTRA, IX_COLS, PAGES, colIndex, shownValue } from './schema.js';
 import { val } from './store.js';
 import { buildXlsx, dateSerial, timeSerial } from './xlsx.js';
 
@@ -20,13 +20,21 @@ export function cellFor(f, v) {
 const sortKey = r => String(val(r, 'enrol_id') || val(r, 'screen_id') || '~' + r.created);
 const bySortKey = (a, b) => sortKey(a).localeCompare(sortKey(b), undefined, { numeric: true });
 
+// what goes in a template cell: hidden follow-ups left out; active warming start is NA for the no-pre-warming group
+// (the template asks for NA; there's no time box for it in that group)
+function exportValue(p, f) {
+  const v = shownValue(f.id, k => val(p, k));
+  if ((v == null || v === '') && f.id === 'pw_start' && String(val(p, 'arm')) === '3') return 'NA';
+  return v;
+}
+
 export function workbookSheets(patients, screening) {
   const live = patients.filter(p => !p.deleted).sort(bySortKey);
   const row1 = new Array(HEADERS.length).fill(null);
   for (const [title, a] of SECTIONS) row1[colIndex(a)] = { s: title, style: 'section' };
   const data = {
     name: 'Data Collection',
-    rows: [row1, HEADERS.map(h => ({ s: h, style: 'head' })), ...live.map(p => FIELDS.map(f => f.id === 'io_ix' ? (ixText(val(p, 'io_ix_rows')) || cellFor(f, val(p, f.id))) : cellFor(f, val(p, f.id))))],
+    rows: [row1, HEADERS.map(h => ({ s: h, style: 'head' })), ...live.map(p => FIELDS.map(f => f.id === 'io_ix' ? (ixText(val(p, 'io_ix_rows')) || cellFor(f, val(p, f.id))) : cellFor(f, exportValue(p, f))))],
     merges: SECTIONS.map(([, a, b]) => `${a}1:${b}1`),
     widths: HEADERS.map(() => 14),
     freeze: 2,
@@ -50,7 +58,7 @@ export function workbookSheets(patients, screening) {
   }
   const signs = PAGES.filter(pg => pg.signoff).map(pg => pg.id);
   const extra = [['Subject ID', ...EXTRA.map(f => f.label), ...signs.map(s => 'Complete: ' + PAGES.find(p => p.id === s).title)]];
-  for (const p of live) extra.push([sid(p), ...EXTRA.map(f => f.type === 'rows' ? ixText(val(p, f.id)) || null : cellFor(f, val(p, f.id))),
+  for (const p of live) extra.push([sid(p), ...EXTRA.map(f => f.type === 'rows' ? ixText(val(p, f.id)) || null : cellFor(f, shownValue(f.id, k => val(p, k)))),
     ...signs.map(s => val(p, 'sign_' + s))]);
   const head = r => r.map(h => ({ s: h, style: 'head' }));
   return [data, scr,
