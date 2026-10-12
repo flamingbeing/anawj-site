@@ -51,6 +51,13 @@ resetters.push(() => {
 });
 
 // Live reflections for the signed-in user (app.js calls this after sign-in).
+// A heading's note in the Reflections list without its JR rule, which the JR count beside the name shows instead:
+// "One from JR" goes; "One from JR with neuromonitoring" keeps "JR: with neuromonitoring". The editor keeps it all.
+const listNote = note => String(note || '').split('\n').map(l => {
+  const m = l.match(/^(One|Two) from JR\b\s*(.*)$/);
+  return !m ? l : m[2] ? 'JR: ' + m[2].replace(/^\((.*)\)$/, '$1') : '';
+}).filter(Boolean).join('\n');
+
 export function watchMyReflections(email) {
   S.reflections = []; S.reflectionsSynced = false;
   let raw = [];
@@ -419,7 +426,7 @@ function list() {
         // the patient's initials sit on top in the left column, the date (and JR) under them
         h('b', { class: 'refl-ini' }, r.initials || '??'), h('span', { class: 'refl-date' }, (r.jr ? 'JR ' : '') + (r.date ? fmtDate(r.date) : '—'))),
       h('span', { class: 't' }, h('span', { class: draft ? 'refl-proc draft' : 'refl-proc' }, r.diagnosis || h('i', { class: 'muted' }, 'no diagnosis yet')), draft ? h('span', { class: 'flag err' }, 'draft') : null,
-        h('span', { class: 'muted refl-wc' }, ` ${wordCount(r)} words`),
+        h('span', { class: 'muted refl-wc in-list' }, ` ${wordCount(r)} words`),   // hidden by Settings → Reflections (html.no-wc)
         showHeading ? h('span', { class: 'muted refl-hd' }, labelOf(HEADING_BY_ID[r.headingId])) : null),
       pts.length ? h('div', { class: 'refl-points' }, ...pts.map((t, i) => h('div', {}, `${i + 1}. ${t}`))) : null);
     if (cb) checks.push([cb, li, r.id]);
@@ -490,10 +497,12 @@ function list() {
           // the topic is the heading: its name in bold, then the count as a pill coloured by status (met / some / none)
           h('span', { class: 'refl-hname' }, h('b', { class: 'refl-topic' }, hp.label), ' ',
             h('span', { class: `refl-pill ${hp.met ? 'met' : hp.done ? 'some' : 'none'}`, 'aria-label': `${hp.done} of ${hp.min} counted${hp.met ? ', met' : ''}` }, `${hp.done}/${hp.min}`),
+            // the JR rule ("One from JR") as its own small count beside it, not a line in the note (owner, 13 Oct 2026)
+            hp.jrNeeded ? h('span', { class: `refl-pill jr ${hp.jrDone >= hp.jrNeeded ? 'met' : ''}`, title: `${hp.jrNeeded === 1 ? 'One' : 'Two'} from JR`, 'aria-label': `${Math.min(hp.jrDone, hp.jrNeeded)} of ${hp.jrNeeded} from JR` }, `JR ${Math.min(hp.jrDone, hp.jrNeeded)}/${hp.jrNeeded}${hp.jrDone >= hp.jrNeeded ? ' ✓' : ''}`) : null,
             x.written > hp.done ? h('span', { class: 'muted refl-counts' }, ` · ${x.written} written`) : null)),
         em ? null : h('button', { class: 'small icon-btn refl-add', title: 'Add a reflection under ' + hp.label, 'aria-label': 'Add a reflection under ' + hp.label, onclick: () => openPicker(false, { headingId: hp.id, subId: null }) }, '+')),
       // the heading's note (rules, examples; categories.js), shown whether open or not unless switched off
-      notesOn() && hp.note ? h('div', { class: 'hint refl-note' }, hp.note) : null,
+      notesOn() && listNote(hp.note) ? h('div', { class: 'hint refl-note' }, listNote(hp.note)) : null,
       opened ? [
         // sub-types are in the note above, so a missing one isn't repeated here
         hp.issues.filter(y => !y.startsWith('Missing: ')).length ? h('div', { class: 'hint', style: 'color:var(--warn, #b45309)' }, hp.issues.filter(y => !y.startsWith('Missing: ')).join(' · ')) : null,

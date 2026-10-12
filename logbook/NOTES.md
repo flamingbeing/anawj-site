@@ -136,6 +136,10 @@ portfolio content.
   gesture there). Settings → Accessibility (`#access`) holds zoom, text size, bigger taps, contrast, motion and the
   gestures. Filter and its folds grow open (`reveal()` in ui-core.js); dropdowns draw the app's own chevron; the
   calendar's month name opens a month picker (not in Firefox on a computer, which has none).
+- **Reflections list JR count** (owner, 13 Oct 2026): a heading's JR rule ("One / Two from JR") shows as a small
+  "JR 0/1" pill beside its count, green when met, and leaves the note under the heading (`listNote`; a qualifier stays:
+  "JR: with neuromonitoring"). The editor still shows the full note. Word counts on the list can be hidden
+  (Settings → Reflections, this device: `hideWords`).
 - **More** (`app.js`): Account (with Residency year for non-programme users; Delete account at the bottom,
   greyed out for residents on the programme list: a programme admin takes them off first; `cloud.deleteAccount`
   wipes cases, reflections, images, bin, submission, members entry, logbook, then the Google sign-in), Settings, Export &

@@ -97,7 +97,7 @@ export function residencyCard() {
 // the light / dark choice. The first time a device opens the app it starts from what the account had (these used to
 // follow the account), so nobody's look changes. Kept at sign-out: they are the device's, and nothing private.
 const DISPLAY_KEY = 'apmes-logbook-display';
-export const DISPLAY_KEYS = ['compact', 'textSize', 'zoom', 'accent', 'startTab', 'fontUi', 'fontUiName', 'fontLog', 'fontLogName', 'lineWidth', 'lineHeight', 'contrast', 'motion', 'tabIcons', 'tabBar', 'hideHeader', 'caseInverted', 'colourful', 'customCss', 'customCssOn', 'autoFocus', 'appTitle', 'boxCaps', 'boxCorrect', 'boxSpell', 'reflSpell', 'pinBox', 'pinSearch', 'firstField', 'compactTags', 'borders', 'round', 'shadows', 'bigTaps', 'tabOrder', 'tabHidden', 'swipeTabs', 'rowMenu', 'rowCopy', 'reflToolbar', 'edgeBack'];
+export const DISPLAY_KEYS = ['compact', 'textSize', 'zoom', 'accent', 'startTab', 'fontUi', 'fontUiName', 'fontLog', 'fontLogName', 'lineWidth', 'lineHeight', 'contrast', 'motion', 'tabIcons', 'tabBar', 'hideHeader', 'caseInverted', 'colourful', 'customCss', 'customCssOn', 'autoFocus', 'appTitle', 'boxCaps', 'boxCorrect', 'boxSpell', 'reflSpell', 'pinBox', 'pinSearch', 'firstField', 'compactTags', 'borders', 'round', 'shadows', 'bigTaps', 'tabOrder', 'tabHidden', 'swipeTabs', 'rowMenu', 'rowCopy', 'reflToolbar', 'edgeBack', 'hideWords'];
 export function deviceDisplay() {
   try { const d = JSON.parse(localStorage.getItem(DISPLAY_KEY) || 'null'); return d && typeof d === 'object' && !Array.isArray(d) ? d : null; } catch { return null; }
 }
@@ -173,6 +173,8 @@ export function applyLook(d = {}) {
   c.toggle('swipe-tabs', d.swipeTabs !== false); c.toggle('row-menu', !!d.rowMenu); c.toggle('refl-toolbar', !!d.reflToolbar);
   // Copy on each Logbook row: off by default (owner, 13 Oct 2026); the ⋯ menu, Copy day and the case itself still copy
   c.toggle('row-copy', !!d.rowCopy);
+  // word counts on the Reflections list: on unless switched off (Settings → Reflections; owner, 13 Oct 2026)
+  c.toggle('no-wc', !!d.hideWords);
   // the name in the header and the browser tab (plain text, at most 40 characters)
   const title = cleanTitle(d.appTitle) || APP_TITLE;
   const h1 = document.querySelector('.top h1'); if (h1 && h1.textContent !== title) h1.textContent = title;
@@ -738,7 +740,8 @@ export function renderShowHide() {
       h('h3', { style: 'margin-top:0' }, 'Reflections'),
       sw('Formatting buttons (this device)', !!d.reflToolbar, v => applyDisplay(setDisplay({ reflToolbar: v || null })), 'Bold, bullet and numbered lists above each box.'),
       sw('Show notes under each heading', st.reflNotes !== false, v => save({ reflNotes: v })),
-      groupReset('the reflection defaults (no formatting buttons, heading notes on)', () => { applyDisplay(setDisplay({ reflToolbar: null })); return save({ reflNotes: null }); })),
+      sw('Word counts in the list (this device)', !d.hideWords, v => applyDisplay(setDisplay({ hideWords: v ? null : true }))),
+      groupReset('the reflection defaults (no formatting buttons, heading notes and word counts on)', () => { applyDisplay(setDisplay({ reflToolbar: null, hideWords: null })); return save({ reflNotes: null }); })),
     h('section', { class: 'card', 'data-group': 'logbook' },
       h('h3', { style: 'margin-top:0' }, 'Logbook (this device)'),
       sw('Copy and Reflect buttons on each case', !d.rowMenu, v => applyDisplay(setDisplay({ rowMenu: v ? null : true })), 'Off: one ⋯ button on each row instead.'),
@@ -771,7 +774,9 @@ export function renderReflectionSettings() {
       h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'Bold, bullet and numbered lists above each box. The Word export shows them as real bold and bullets.'),
       h('label', { class: 'check', style: 'margin-top:8px' }, h('input', { type: 'checkbox', checked: display().reflSpell !== false, onchange: e => applyDisplay(setDisplay({ reflSpell: e.target.checked ? null : false })) }),
         'Underline spelling mistakes in reflections (this device)'),
-      resetLink('new reflections in the export, learning points, formatting buttons and spelling', async () => { await patchLogbook({ settings: { reflExport: null, reflPoints: null } }); applyDisplay(setDisplay({ reflSpell: null, reflToolbar: null })); })),
+      h('label', { class: 'check', style: 'margin-top:8px' }, h('input', { type: 'checkbox', checked: !display().hideWords, onchange: e => applyDisplay(setDisplay({ hideWords: e.target.checked ? null : true })) }),
+        'Word counts in the Reflections list (this device)'),
+      resetLink('new reflections in the export, learning points, formatting buttons, spelling and word counts', async () => { await patchLogbook({ settings: { reflExport: null, reflPoints: null } }); applyDisplay(setDisplay({ reflSpell: null, reflToolbar: null, hideWords: null })); })),
     h('section', { class: 'card' },
       h('h2', {}, 'Photos'),
       (() => { const kb = photoUsageKb(S.reflections), pct = Math.min(100, Math.round(kb / PHOTO_BUDGET_KB * 100));
