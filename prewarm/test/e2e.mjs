@@ -117,6 +117,9 @@ try {
   await page.click('.tabs2 a:has-text("Intra-op")');
   await page.waitForFunction(() => /Baseline/.test(document.querySelector('.tp')?.textContent || ''));
   assert.doesNotMatch(await page.textContent('main'), /10 min pre-warming/, 'group hidden outside the pre-warming temperatures');
+  // an empty room temp fills 20.0 when its card is tapped
+  await page.click('.card[data-fill="room"] .clab');
+  assert.equal((await page.textContent('.num[data-type="room"]')).trim(), '20.0', 'room temp starts at 20');
   await shot('intraop-temps');
 
   // form view: the paper form's day-of-surgery pages, filled in, with Save as PDF / Print

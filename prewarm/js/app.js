@@ -468,7 +468,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     let hint = changed ? 'was ' + was[c.key] : was[c.key] != null ? 'same' : '';
     if (c.key === 'map' && v == null) { const m = calc('map', k => draft[k]); if (m) hint = `<button class="link" data-map="${m}">use ${m}</button>`; }
     // an empty temperature: the whole card is one big target that puts in 36.5
-    const fill = c.temp && v == null;
+    const fill = (c.temp || c.key === 'room') && v == null;
     return `<div class="card ${changed ? 'changed' : ''}${fill ? ' fill' : ''}" ${fill ? `data-fill="${c.key}"` : ''}><div class="clab">${c.label}<small>${hint}</small></div>
       <div class="pm"><button class="k" data-step="-1" data-c="${c.key}" aria-label="${c.label} down">−</button><button class="num" data-type="${c.key}">${v ?? '<span class="muted">tap</span>'}</button><button class="k" data-step="1" data-c="${c.key}" aria-label="${c.label} up">+</button></div></div>`;
   }
@@ -531,7 +531,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
   }
   draw();
   const step = { core: 0.1, chest: 0.1, arm: 0.1, thigh: 0.1, calf: 0.1, room: 0.5, sbp: 1, dbp: 1, map: 1, hr: 1, bis: 1 };
-  const start = { core: 36.5, chest: 36.5, arm: 36.5, thigh: 36.5, calf: 36.5, room: 21, sbp: 120, dbp: 70, map: 85, hr: 75, bis: 50 };
+  const start = { core: 36.5, chest: 36.5, arm: 36.5, thigh: 36.5, calf: 36.5, room: 20, sbp: 120, dbp: 70, map: 85, hr: 75, bis: 50 };
   function bump(k, dir) {
     const cur = parseFloat(draft[k]);
     const n = Number.isFinite(cur) ? cur + dir * step[k] : start[k];
@@ -555,7 +555,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     const chip = t.closest('.chip[data-c]');
     if (chip) { if (chip.dataset.c === 'set') setTouched = true; draft[chip.dataset.c] = draft[chip.dataset.c] === chip.dataset.v ? null : chip.dataset.v; draw(); return; }
     const fl = t.closest('.card[data-fill]');
-    if (fl && !t.closest('[data-step]')) { draft[fl.dataset.fill] = '36.5'; draw(); return; }
+    if (fl && !t.closest('[data-step]')) { draft[fl.dataset.fill] = fl.dataset.fill === 'room' ? '20.0' : '36.5'; draw(); return; }
     const m = t.closest('[data-map]');
     if (m) { draft.map = m.dataset.map; draw(); return; }
     const sat = t.closest('[data-sat]');
@@ -574,7 +574,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     if (n) {
       const k = n.dataset.type, c = cols.find(x => x.key === k);
       // an empty temperature starts at 36.5; tap again to type
-      if (c.temp && draft[k] == null) { draft[k] = '36.5'; draw(); return; }
+      if ((c.temp || k === 'room') && draft[k] == null) { draft[k] = k === 'room' ? '20.0' : '36.5'; draw(); return; }
       const inp = document.createElement('input');
       inp.className = 'num'; inp.inputMode = 'decimal'; inp.value = draft[k] ?? ''; inp.setAttribute('aria-label', c.label);
       n.replaceWith(inp); inp.focus(); inp.select();
