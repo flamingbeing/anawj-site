@@ -72,7 +72,7 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   once after its first server snapshot (`resync1`). The sync emulator test checks the server copy keeps its readings.
 - **Warming time labels** (owner, 12 Oct 2026): Gown on (pre-warming gown put on), Prewarm on, Prewarm off, Underbody
   warm, Gown warm (the intra-op Bair Huggers). Those are all the Bair Hugger items on the paper form. They are coloured warm
-  beige once set (`.tchip.warm.set`: #efe2d2, labels #7a4a00; untapped they look like the rest); the
+  beige once set (`.tchip.warm.set`: #efe2d2, labels #7a4a00; light grey #e6e6e6 until tapped, labels #50565c); the
   other times stay blue. The time boxes are numbered in the order they happen (1 Gown on … 11 To ward; renumbered
   without the pre-warming ones for the no-pre-warming group), a small number in each box's top corner.
 - **Due time warms up** (owner, 12 Oct 2026): the "due hh:mm" beside each timepoint is plain until 2 min before,
