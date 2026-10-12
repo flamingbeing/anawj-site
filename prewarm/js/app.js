@@ -27,10 +27,12 @@ function paint(html) {
 const read = (k, d) => { try { return JSON.parse(localStorage.getItem(NS + k)) ?? d; } catch { return d; } };
 const write = (k, v) => { try { localStorage.setItem(NS + k, JSON.stringify(v)); return true; } catch { toast('Not saved: this phone’s storage is full or blocked.'); return false; } };
 let patients = read('patients', {});
-const settings = Object.assign({ me: '', site: '', hide: { skin: false, set: false, ts: false, warm: false, room: false, haemo15: true, bis: false },
+const settings = Object.assign({ me: '', site: '', hide: { skin: false, set: false, ts: false, warm: false, room: false, haemo15: false, bis: false },
   remind: { vibrate: true, beep: true, banner: true, awake: true } }, read('settings', {}));
 const saveAll = () => write('patients', patients);
 const saveSettings = () => write('settings', settings);
+// settings v2 (owner, 12 Oct 2026): every reading is entered live by default, BP / HR / BIS every 15 min included
+if ((settings.v || 0) < 2) { settings.hide.haemo15 = false; settings.v = 2; saveSettings(); }
 // Interface size (this phone only): zooms the whole screen. Normal is 100%.
 const SIZES = [['0.85', 'Smaller'], ['0.92', 'Small'], ['1', 'Normal'], ['1.1', 'Large'], ['1.25', 'Larger']];
 const applySize = z => document.documentElement.style.setProperty('--ui-zoom', SIZES.some(([k]) => k === String(z)) ? String(z) : '1');
@@ -600,13 +602,26 @@ route(/^\/p\/(\w+)\/sheet$/, id => {
       ${it.points.map(x => `<tr><th>${x.key === 'base' ? 'Baseline' : x.key === 'end' ? 'End' : x.min}</th>${it.cols.map(c => cell('iotemp', x, c)).join('')}</tr>`).join('')}</tbody></table></div>
     <h2>Haemodynamics</h2><div class="scroll" tabindex="0"><table class="grid sheet"><thead><tr><th>From induction</th>${hd.cols.map(c => `<th>${c.label}</th>`).join('')}</tr></thead><tbody>
       ${hd.points.map(x => `<tr><th>${x.key === 'base' ? 'Baseline' : x.key === 'end' ? 'End' : x.min}</th>${hd.cols.map(c => cell('haemo', x, c)).join('')}</tr>`).join('')}</tbody></table></div>
-    <p class="muted small">Tap a cell to change that reading.</p>
-    <button class="danger" id="del">Delete this patient</button>`);
-  $('#del').onclick = e => {
-    const t = e.target;
-    if (!t.dataset.sure) { t.dataset.sure = 1; t.textContent = 'Tap again to delete ' + sid(p); return; }
-    p.deleted = Date.now(); saveAll(); sync(p, []); go('#/');
+    <p class="muted small">Tap a cell to change that reading.</p>`);
+});
+
+// ---------- delete participants (from Settings; the only place patients are deleted)
+route(/^\/delete$/, () => {
+  header('Delete participants', '#/settings');
+  const list = Object.values(patients).filter(p => !p.deleted).sort((a, b) => String(sid(a)).localeCompare(String(sid(b))));
+  paint(`<p class="muted small">${sharing() ? `Deleting removes the participant from this phone and from your team’s phones.` : 'Deleting removes the participant from this phone.'} Tap Delete, then tap again to confirm.</p>
+    ${list.length ? `<ul class="list dellist">${list.map(p => {
+      const e = lastEdit(p);
+      return `<li><div><b>${esc(sid(p))}${val(p, 'site') ? ` <small>${esc(val(p, 'site'))}</small>` : ''}</b><small>${esc(status(p))} · ${e ? 'last entry ' + new Date(e.t).toLocaleDateString([], { day: 'numeric', month: 'short' }) : 'no entries'}</small></div>
+        <button class="danger" data-del="${p.id}" aria-label="Delete ${esc(sid(p))}">Delete</button></li>`;
+    }).join('')}</ul>` : `<p class="muted">No participants on this phone.</p>`}`);
+  view.onclick = e => {
+    const b = e.target.closest('[data-del]'); if (!b) return;
+    const p = patients[b.dataset.del]; if (!p) return;
+    if (!b.dataset.sure) { b.dataset.sure = 1; b.textContent = 'Tap again'; b.setAttribute('aria-label', 'Tap again to delete ' + sid(p)); return; }
+    p.deleted = Date.now(); saveAll(); sync(p, []); toast(sid(p) + ' deleted'); render();
   };
+  cleanup.push(() => { view.onclick = null; });
 });
 
 // ---------- form view: the study's Word form (uploaded once by an admin) filled in for this patient: download it,
@@ -765,7 +780,9 @@ route(/^\/settings$/, () => {
     <h2>When a reading is due</h2>
     <p class="muted small">Works while the app is open on screen.</p>
     ${tog('remind', 'banner', 'Banner')}${tog('remind', 'vibrate', 'Vibrate', 'Android only')}${tog('remind', 'beep', 'Short beep')}${tog('remind', 'awake', 'Keep the screen on during readings')}
-    <button class="secondary" id="test">Test the alert</button></div>`);
+    <button class="secondary" id="test">Test the alert</button>
+    <h2>Participants</h2>
+    <a class="secondary" href="#/delete">Delete participants</a></div>`);
   view.querySelectorAll('[data-zoom]').forEach(b => b.onclick = () => {
     settings.zoom = b.dataset.zoom; saveSettings(); applySize(settings.zoom);
     view.querySelectorAll('[data-zoom]').forEach(x => x.setAttribute('aria-pressed', x === b));
