@@ -330,6 +330,7 @@ function paintTabs() {
 }
 
 function changeScreen(id, scroll = 0) {
+  snapPage();   // for swiping back to it (a still copy)
   if (S.tab === 'account') flushProfile();
   if (S.tab === 'notes' && id !== 'notes') leaveNotes();
   if (/^admin/.test(S.tab || '') && !/^admin/.test(id)) leaveAdmin();
@@ -404,12 +405,15 @@ hooks.render = render;
 hooks.paintTabs = () => paintTabs();
 
 // Swipe left or right to change tab (Advanced display, and Show or hide → Header and tabs; on unless switched off on
-// this device: html.swipe-tabs). The page follows the finger; letting go after a quick swipe (≥ 70 px, mostly
-// sideways, < 0.7 s) or past a third of the screen moves to the next or previous tab on the bar, and the new page
-// slides in. A sub-page counts as the bar tab it sits under. Never from fields, dialogs, drag handles, the tag pills
-// being dragged, anything that scrolls sideways (tables, the date chips) or the screen's edges (the phone's own Back
-// gesture). Reduce motion: no sliding, it just switches.
+// this device: html.swipe-tabs). Like a deck of cards: the page follows the finger and the next tab's page comes in
+// beside it as you drag (a still copy of that page from when it was last left, `snaps`; a plain loading card for a
+// tab not opened yet). Letting go after a quick swipe (≥ 70 px, mostly sideways, < 0.7 s) or past a third of the
+// screen finishes the slide, then the real page takes the copy's place underneath (same spot, same scroll), so
+// nothing pops. Otherwise both spring back. A sub-page counts as the bar tab it sits under. Never from fields,
+// dialogs, drag handles, the tag pills being dragged, anything that scrolls sideways (tables, the date chips) or the
+// screen's edges (the phone's own Back gesture). Reduce motion: no sliding, it just switches.
 let swipe = null;
+const snaps = new Map();   // bar tab → still copy of its page (inert, no ids), taken when leaving it
 const scrollsSideways = el => { for (let n = el; n && n !== document.body; n = n.parentElement) if (n.scrollWidth > n.clientWidth + 2 && /auto|scroll/.test(getComputedStyle(n).overflowX)) return true; return false; };
 const reduceMotion = () => { const c = document.documentElement.classList; return c.contains('rm') || (c.contains('rm-auto') && matchMedia('(prefers-reduced-motion: reduce)').matches); };
 // the bar tab a page sits under, however deep; a tab kept off the bar (Notes) counts as More
@@ -421,16 +425,35 @@ function barTabOf(id) {
   return { shown, sel: shown.includes(sel) ? sel : 'more' };
 }
 const swipeTarget = dx => { const { shown, sel } = barTabOf(S.tab), i = shown.indexOf(sel); return i < 0 ? null : shown[i + (dx < 0 ? 1 : -1)] || null; };
-const slide = (x, ms) => { document.documentElement.classList.add('swiping'); app.style.transition = ms ? `transform ${ms}ms ease-out` : 'none'; app.style.transform = x ? `translateX(${x}px)` : ''; app.style.opacity = ''; };
-const snapBack = () => { slide(0, 150); setTimeout(settle, 170); };
-const settle = () => { document.documentElement.classList.remove('swiping'); app.style.transition = ''; app.style.transform = ''; app.style.opacity = ''; };
+function snapPage() {
+  if (!document.documentElement.classList.contains('swipe-tabs') || !matchMedia('(pointer: coarse)').matches || !S.tab || !barTabOf(S.tab).shown.includes(S.tab)) return;   // touch screens only
+  const c = app.cloneNode(true);
+  c.removeAttribute('id'); c.removeAttribute('style');
+  c.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
+  snaps.set(S.tab, c);
+}
+// the incoming page: its copy, or a loading card, fixed where the page's top sits when scrolled to the top
+function makePeek(id, top) {
+  const c = (snaps.get(id) || h('main', {}, h('section', { class: 'card skeleton' }, h('div', { class: 'sk-row' }, h('i'), h('i'), h('i')), h('div', { class: 'sk-box' }), h('div', { class: 'sk-line' })))).cloneNode(true);
+  c.className = 'swipe-peek'; c.inert = true; c.setAttribute('aria-hidden', 'true');
+  const r = app.getBoundingClientRect();
+  Object.assign(c.style, { top: top + 'px', left: (r.left - (parseFloat(app.style.transform.slice(11)) || 0)) + 'px', width: r.width + 'px' });
+  document.body.append(c);
+  return c;
+}
+const move = (el, x) => { el.style.transform = x ? `translateX(${x}px)` : ''; };
+function endSwipe(s) {
+  if (s.peek) s.peek.remove();
+  document.documentElement.classList.remove('swiping');
+  move(app, 0);
+}
 app.addEventListener('touchstart', e => {
   swipe = null;
   if (!document.documentElement.classList.contains('swipe-tabs') || e.touches.length !== 1) return;
   const t = e.target, x = e.touches[0].clientX;
   if (x < 20 || x > innerWidth - 20) return;
   if (t.closest('input, textarea, select, dialog, [contenteditable], .dragging, .te-pillitem, .te-handle, .refl-handle, li.refl-row.edit') || scrollsSideways(t)) return;
-  swipe = { x, y: e.touches[0].clientY, at: Date.now(), lock: '' };
+  swipe = { x, y: e.touches[0].clientY, at: Date.now(), lock: '', dx: 0, target: null, peek: null };
 }, { passive: true });
 app.addEventListener('touchmove', e => {
   const s = swipe;
@@ -438,12 +461,29 @@ app.addEventListener('touchmove', e => {
   const dx = e.touches[0].clientX - s.x, dy = e.touches[0].clientY - s.y;
   if (!s.lock) {
     if (Math.abs(dy) > 10 && Math.abs(dy) * 2 > Math.abs(dx)) { swipe = null; return; }   // scrolling: leave it alone
-    if (Math.abs(dx) > 10 && Math.abs(dx) > 2 * Math.abs(dy)) s.lock = 'x'; else return;
+    if (Math.abs(dx) > 10 && Math.abs(dx) > 2 * Math.abs(dy)) {
+      s.lock = 'x';
+      s.top = app.getBoundingClientRect().top + window.scrollY;   // the page's top when scrolled to the top
+      s.peekTop = Math.max(0, s.top - window.scrollY);   // where the new page will sit: no higher than the screen's top
+      document.documentElement.classList.add('swiping');
+    } else return;
   }
   e.preventDefault();   // sideways now: the page follows the finger (held back where there's no tab to go to)
-  if (!reduceMotion()) slide(swipeTarget(dx) ? dx : dx / 4, 0);
+  s.dx = dx;
+  if (reduceMotion()) return;
+  const target = swipeTarget(dx);
+  if (target !== s.target) { if (s.peek) s.peek.remove(); s.target = target; s.peek = target ? makePeek(target, s.peekTop) : null; }
+  move(app, target ? dx : dx / 4);
+  if (s.peek) move(s.peek, dx - (dx < 0 ? -innerWidth : innerWidth));
 }, { passive: false });
-app.addEventListener('touchcancel', () => { if (swipe && swipe.lock) snapBack(); swipe = null; }, { passive: true });
+const springBack = s => {
+  const opts = { duration: 160, easing: 'ease-out' }, from = parseFloat(app.style.transform.slice(11)) || 0;
+  const anims = [app.animate([{ transform: `translateX(${from}px)` }, { transform: 'translateX(0)' }], opts)];
+  if (s.peek) anims.push(s.peek.animate([{ transform: s.peek.style.transform }, { transform: `translateX(${from < 0 ? innerWidth : -innerWidth}px)` }], opts));
+  move(app, 0); if (s.peek) move(s.peek, from < 0 ? innerWidth : -innerWidth);
+  anims[0].finished.catch(() => {}).then(() => endSwipe(s));
+};
+app.addEventListener('touchcancel', () => { const s = swipe; swipe = null; if (s && s.lock) springBack(s); }, { passive: true });
 app.addEventListener('touchend', async e => {
   const s = swipe; swipe = null;
   if (!s || !e.changedTouches.length) return;
@@ -451,30 +491,26 @@ app.addEventListener('touchend', async e => {
   const quick = Date.now() - s.at <= 700 && Math.abs(dx) >= 70 && Math.abs(dx) >= 2 * Math.abs(dy);
   const far = s.lock === 'x' && Math.abs(dx) > innerWidth / 3;
   const next = (quick || far) && swipeTarget(dx);
-  if (!next) { if (s.lock) snapBack(); return; }
-  if (reduceMotion()) { settle(); go(next); return; }
-  // Both pages move together, side by side: a still copy of the old page carries on off the screen while the new
-  // page comes in right behind it, so there is never an empty gap (the copy is inert and gone after the slide).
-  slide(0, 0);   // measure the page where it rests, not where the finger left it
-  const w = dx < 0 ? -innerWidth : innerWidth, r = app.getBoundingClientRect();
-  const ghost = app.cloneNode(true);
-  ghost.removeAttribute('id'); ghost.setAttribute('aria-hidden', 'true'); ghost.inert = true;
-  ghost.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
-  ghost.className = 'swipe-ghost';
-  Object.assign(ghost.style, { top: r.top + 'px', left: r.left + 'px', width: r.width + 'px', transform: `translateX(${dx}px)`, opacity: '' });
-  document.body.append(ghost);
-  app.style.opacity = '0';   // hidden for the moment the new page is drawn
-  await go(next);
-  const from = dx - w;   // where the new page sits: just beside the old one
-  slide(from, 0); app.style.opacity = '';   // in place beside the old page, fully drawn before anything moves
-  // one clock for both, so they stay joined the whole way
-  const ms = 200, opts = { duration: ms, easing: 'ease-out', fill: 'forwards' };
-  const anims = [ghost.animate([{ transform: `translateX(${dx}px)` }, { transform: `translateX(${w}px)` }], opts),
-    app.animate([{ transform: `translateX(${from}px)` }, { transform: 'translateX(0)' }], opts)];
+  if (!next) { if (s.lock) springBack(s); return; }
+  if (reduceMotion() || !s.peek || s.target !== next) { endSwipe(s); go(next); return; }
+  // finish the slide: both cards on one clock, so they stay joined
+  const w = dx < 0 ? -innerWidth : innerWidth, ms = Math.max(120, Math.min(240, 240 * (1 - Math.abs(dx) / innerWidth)));
+  const opts = { duration: ms, easing: 'ease-out', fill: 'forwards' };
+  const anims = [app.animate([{ transform: `translateX(${dx}px)` }, { transform: `translateX(${w}px)` }], opts),
+    s.peek.animate([{ transform: `translateX(${dx - w}px)` }, { transform: 'translateX(0)' }], opts)];
   const t0 = document.timeline.currentTime;
   anims.forEach(an => { an.startTime = t0; });
   await anims[1].finished.catch(() => {});
-  ghost.remove(); anims.forEach(an => an.cancel()); settle();
+  // the real page goes in underneath the copy, at the copy's height on the screen, then the copy goes
+  const peek = s.peek, y = s.top - s.peekTop;
+  move(app, w); anims[0].cancel();
+  await go(next);
+  window.scrollTo(0, y);
+  requestAnimationFrame(() => {
+    if (y) window.scrollTo(0, y);   // after the screen change's own scroll
+    move(app, 0); peek.remove(); anims[1].cancel();
+    document.documentElement.classList.remove('swiping');
+  });
 }, { passive: true });
 
 // A live case update shouldn't yank the screen from under someone typing: the Log screen refreshes
