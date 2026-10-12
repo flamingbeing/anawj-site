@@ -1,6 +1,7 @@
 # Logbook: working notes
 
-Decisions, conventions and how to work on the APMES logbook (`logbook/`). Read this, then `README.md`
+Decisions, conventions and how to work on the APMES logbook (`logbook/`). What's happening now (sessions, open
+work, what waits on the owner, the next steps, a dated decisions log) is in `STATUS.md`. Read this, then `README.md`
 (data model, Firestore layout, rules). Public repo: never commit real names, emails, case details or
 portfolio content.
 
