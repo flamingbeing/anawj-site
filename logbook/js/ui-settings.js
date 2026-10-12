@@ -97,7 +97,7 @@ export function residencyCard() {
 // the light / dark choice. The first time a device opens the app it starts from what the account had (these used to
 // follow the account), so nobody's look changes. Kept at sign-out: they are the device's, and nothing private.
 const DISPLAY_KEY = 'apmes-logbook-display';
-export const DISPLAY_KEYS = ['compact', 'textSize', 'zoom', 'accent', 'startTab', 'fontUi', 'fontUiName', 'fontLog', 'fontLogName', 'lineWidth', 'lineHeight', 'contrast', 'motion', 'tabIcons', 'tabBar', 'hideHeader', 'caseInverted', 'colourful', 'customCss', 'customCssOn', 'autoFocus', 'appTitle', 'boxCaps', 'boxCorrect', 'boxSpell', 'reflSpell', 'pinBox', 'pinSearch', 'firstField', 'compactTags', 'borders', 'round', 'shadows', 'bigTaps', 'tabOrder', 'tabHidden'];
+export const DISPLAY_KEYS = ['compact', 'textSize', 'zoom', 'accent', 'startTab', 'fontUi', 'fontUiName', 'fontLog', 'fontLogName', 'lineWidth', 'lineHeight', 'contrast', 'motion', 'tabIcons', 'tabBar', 'hideHeader', 'caseInverted', 'colourful', 'customCss', 'customCssOn', 'autoFocus', 'appTitle', 'boxCaps', 'boxCorrect', 'boxSpell', 'reflSpell', 'pinBox', 'pinSearch', 'firstField', 'compactTags', 'borders', 'round', 'shadows', 'bigTaps', 'tabOrder', 'tabHidden', 'swipeTabs', 'rowMenu'];
 export function deviceDisplay() {
   try { const d = JSON.parse(localStorage.getItem(DISPLAY_KEY) || 'null'); return d && typeof d === 'object' && !Array.isArray(d) ? d : null; } catch { return null; }
 }
@@ -167,6 +167,8 @@ export function applyLook(d = {}) {
   const rl = roundLevel(d);
   if (rl !== 2) document.documentElement.style.setProperty('--round', String(ROUNDS[rl][1])); else document.documentElement.style.removeProperty('--round');
   c.toggle('shadows', !!d.shadows); c.toggle('big-taps', !!d.bigTaps);
+  // swipe between the bar's tabs (app.js); one ⋯ menu on Logbook rows instead of Copy and Reflect (ui-logbook.js)
+  c.toggle('swipe-tabs', !!d.swipeTabs); c.toggle('row-menu', !!d.rowMenu);
   // the name in the header and the browser tab (plain text, at most 40 characters)
   const title = cleanTitle(d.appTitle) || APP_TITLE;
   const h1 = document.querySelector('.top h1'); if (h1 && h1.textContent !== title) h1.textContent = title;
@@ -300,6 +302,10 @@ export function renderDisplayAdvanced() {
       tabArranger(),
       h('label', { class: 'check', style: 'margin-top:10px' }, h('input', { type: 'checkbox', checked: !!st.bigTaps, onchange: e => applyDisplay(setDisplay({ bigTaps: e.target.checked || null })) }), 'Bigger tap targets on the Case tab'),
       h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'Larger chips, tag rows, tick boxes and Save buttons, easier to hit on a phone.'),
+      h('label', { class: 'check', style: 'margin-top:10px' }, h('input', { type: 'checkbox', checked: !!st.swipeTabs, onchange: e => applyDisplay(setDisplay({ swipeTabs: e.target.checked || null })) }), 'Swipe left or right to change tab'),
+      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'Moves to the next or previous tab on the bar. Not while typing, or on tables and lists that scroll sideways.'),
+      h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !!st.rowMenu, onchange: e => applyDisplay(setDisplay({ rowMenu: e.target.checked || null })) }), 'Fewer buttons on Logbook rows (a ⋯ menu)'),
+      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'Copy and Reflect move into one ⋯ button; a ✓ still shows cases with a reflection.'),
       h('label', { class: 'check', style: 'margin-top:10px' }, h('input', { type: 'checkbox', checked: !!st.tabIcons, onchange: e => applyDisplay(setDisplay({ tabIcons: e.target.checked })) }), 'Icons only in the tab bar'),
       h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !!st.hideHeader, onchange: e => applyDisplay(setDisplay({ hideHeader: e.target.checked })) }), 'Hide the header (the app name bar)'),
       h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'It comes back by itself when something isn’t synced yet, when there’s no signal, and in the demo.'),
@@ -311,7 +317,7 @@ export function renderDisplayAdvanced() {
       h('p', { class: 'hint', style: 'margin:10px 0 0' }, 'Everything on this page is saved on this device only, so a phone and a computer can each look the way that suits them.')),
     customCssCard(),
     resetLink('the name in the header, fonts, line spacing and width, contrast, motion, the tab bar (order and hidden tabs) and header options, bigger tap targets, upside down, pinning and custom CSS (switched off; your CSS is kept) on this device', () =>
-      applyDisplay(setDisplay({ appTitle: null, fontUi: null, fontUiName: null, fontLog: null, fontLogName: null, lineWidth: null, lineHeight: null, contrast: null, motion: null, tabBar: null, tabIcons: null, hideHeader: null, caseInverted: null, pinBox: null, pinSearch: null, customCssOn: null, bigTaps: null, tabOrder: null, tabHidden: null }))));
+      applyDisplay(setDisplay({ appTitle: null, fontUi: null, fontUiName: null, fontLog: null, fontLogName: null, lineWidth: null, lineHeight: null, contrast: null, motion: null, tabBar: null, tabIcons: null, hideHeader: null, caseInverted: null, pinBox: null, pinSearch: null, customCssOn: null, bigTaps: null, tabOrder: null, tabHidden: null, swipeTabs: null, rowMenu: null }))));
 }
 // Advanced display → the tab bar's order and hidden tabs (arrangeTabs): ↑ ↓ to move, a switch to show or hide
 function tabArranger() {

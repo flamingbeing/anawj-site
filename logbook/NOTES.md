@@ -197,6 +197,12 @@ portfolio content.
   display, `tabOrder` / `tabHidden`, `arrangeTabs` in ui-settings.js): ↑ ↓ and a switch per tab; More can't be
   hidden, at least two stay; hidden tabs are listed first on More ("Hidden from the tab bar") and links still open
   them; a hidden start tab gives way to the first one on the bar. All set at first paint where it matters.
+- **Optional interaction** (Advanced display, device, off by default): **Swipe left or right to change tab**
+  (`swipeTabs`, html `swipe-tabs`; app.js touch handlers on main): a quick sideways swipe (≥ 70 px, mostly
+  horizontal, < 0.7 s) on a bar tab's page goes to the next/previous tab on the bar (order and hidden tabs honoured);
+  never from fields, dialogs, drag handles, tag-editor pills or anything that scrolls sideways, never on sub-pages.
+  **Fewer buttons on Logbook rows** (`rowMenu`, html `row-menu`): one ⋯ opens Copy / Write or Open the reflection /
+  Edit the case; a ✓ still marks cases with a reflection.
 - **Display is per device** (owner: people use the logbook on different devices with different needs): compact,
   text size, zoom, fonts, colour and the start tab live in localStorage `apmes-logbook-display` (`deviceDisplay` / `setDisplay` /
   `adoptDisplay` in ui-settings.js), light / dark in `apmes-logbook-theme`. A device with none starts from the

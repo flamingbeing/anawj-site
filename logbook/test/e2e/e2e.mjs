@@ -1695,6 +1695,34 @@ async function run(label, ctxOpts) {
     assert(await p.evaluate(() => !document.documentElement.style.getPropertyValue('--round') && !document.documentElement.classList.contains('shadows')), 'display reset left corners/shadows');
   });
 
+  await step('optional: ⋯ menu on Logbook rows; swipe between tabs (not from the case box)', async () => {
+    await tab('displayadv');
+    await p.getByLabel('Swipe left or right to change tab').check();
+    await p.getByLabel('Fewer buttons on Logbook rows (a ⋯ menu)').check(); await nap(150);
+    try {
+      await tab('logbook'); await lbList();
+      assert(await p.locator('ul.cases .row-btn:not(.row-more)').count() === 0 && await p.locator('ul.cases .row-more').count() > 0, 'row menu not shown');
+      await p.locator('ul.cases .row-more').first().click();
+      const list = p.locator('dialog[open] .row-menu-list');
+      assert(/Copy[\s\S]*reflection[\s\S]*Edit the case/.test(await list.innerText()), 'row menu items');
+      await list.getByRole('button', { name: 'Cancel' }).click();
+      const swipe = (x0, x1, sel) => p.evaluate(([x0, x1, sel]) => {
+        const el = document.querySelector(sel), mk = x => new Touch({ identifier: 1, target: el, clientX: x, clientY: 300 });
+        el.dispatchEvent(new TouchEvent('touchstart', { touches: [mk(x0)], changedTouches: [mk(x0)], bubbles: true }));
+        el.dispatchEvent(new TouchEvent('touchend', { touches: [], changedTouches: [mk(x1)], bubbles: true }));
+      }, [x0, x1, sel]);
+      await swipe(300, 100, 'main section.card'); await p.waitForURL(/#reflect$/);
+      await swipe(100, 300, 'main section.card'); await p.waitForURL(/#logbook$/);
+      await tab('log'); await p.waitForSelector('textarea.details');
+      await swipe(300, 100, 'textarea.details'); await nap(300);
+      assert(/#log$/.test(p.url()), 'a swipe in the case box changed tab');
+    } finally {
+      await tab('displayadv');
+      await p.getByLabel('Swipe left or right to change tab').uncheck();
+      await p.getByLabel('Fewer buttons on Logbook rows (a ⋯ menu)').uncheck();
+    }
+  });
+
   await step('admin tab hidden for non-admins', async () => {
     const KEY = 'apmes-logbook-demo-v1';
     const saved = await p.evaluate(k => localStorage.getItem(k), KEY);
