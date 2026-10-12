@@ -20,7 +20,7 @@ const casesLink = (label, opts, title) => advanced()
 // open: the sections you have expanded (they start folded, showing a one-line summary)
 const pview = { open: new Set() };
 
-const legend = () => h('div', { class: 'legend' },
+export const legend = () => h('div', { class: 'legend' },
   ['late', 'due', 'ontrack', 'done'].map(s => h('span', {}, h('i', { class: `dot ${s}` }), STATUS_TEXT[s])));
 
 // ---------- Progress ----------
@@ -296,6 +296,9 @@ resetters.push(() => { Object.assign(tview, { summaries: null, year: null, error
 resetters.push(() => { pview.open.clear(); Object.assign(pview, { hideDone: false }); });
 // reload the totals next time they're shown (an admin took a row off)
 export const forgetTotals = () => { tview.summaries = null; };
+// the programme's summaries for Case logs (ui-caselogs.js): { summaries, loading, error, year }, loading them once
+export function programme() { if (!tview.summaries && !tview.loading) loadSummaries(); return tview; }
+export const groupYearName = groupName;
 
 export function renderTotals() {
   const card = h('section', { class: 'card' });
@@ -357,10 +360,10 @@ async function loadSummaries() {
   }
   catch (err) { if (gen !== tview.gen) return; tview.summaries = []; tview.error = 'Could not load totals: ' + err.message; }
   tview.loading = false;
-  if (S.tab === 'totals' || S.tab === 'admintotals') hooks.render();
+  if (['totals', 'admintotals', 'caselogs', 'caselog', 'progress'].includes(S.tab)) hooks.render();
 }
 
-function totalsTable(people) {
+export function totalsTable(people) {
   const prog = people.map(p => Object.fromEntries(progress(p.counts || {}, p.rYear || 1).map(x => [x.code, x])));
   const codes = CATEGORIES.filter(c => !c.retired || people.some(p => (p.counts || {})[c.code])).map(c => c.code);
   const meId = S.resident && S.resident.rid;
@@ -396,10 +399,10 @@ function totalsTable(people) {
   return { el: h('table', { class: 'totals' }, thead, tbody), data };
 }
 
-async function downloadTotals(data) {
+export async function downloadTotals(data, name = `totals-${tview.year ? 'R' + tview.year : 'year-unknown'}-${todayISO()}.xlsx`) {
   try {
     await needExcel();
-    download(`totals-${tview.year ? 'R' + tview.year : 'year-unknown'}-${todayISO()}.xlsx`, await exportTotals(data));
+    download(name, await exportTotals(data));
   } catch (err) { toast('Could not export: ' + err.message); }
 }
 

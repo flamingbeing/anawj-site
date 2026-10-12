@@ -1252,3 +1252,12 @@ details.note-format ul { margin: 0 0 4px; padding-left: 18px; } details.note-for
 /* reflection formatting buttons (Settings → Reflections, this device) */
 .fmt-bar { display: flex; gap: 6px; margin: 0 0 4px; }
 .fmt-bar button { min-width: 44px; }
+
+/* Case logs (Faculty / PCs profile, ui-caselogs.js) */
+ul.caselog-list, ul.cl-heads, ul.cl-behind { list-style: none; margin: 0; padding: 0; }
+.cl-n { font-weight: 600; white-space: nowrap; } .cl-n .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
+ul.cl-heads li { padding: 6px 0; } ul.cl-heads li + li, ul.cl-behind li + li { border-top: 1px solid var(--edge, var(--line)); }
+ul.cl-heads li.met { color: var(--ink); } ul.cl-heads li:not(.met) { color: var(--muted); }
+ul.cl-behind li { padding: 2px 0; }
+.cl-sum { margin: 0 0 8px; }
+table.totals th.cl-col { text-align: center; white-space: nowrap; }

@@ -40,13 +40,25 @@ export const settings = () => ({ suggestions: true, rYear: 1, ...(S.logbook && S
 // and Analytics in More. Basic: logbook only is Basic without reflections, for residents who submit theirs separately
 // (Reflections in More, for ones already written; no Reflect buttons or ☆ Interesting). Advanced hides nothing.
 // Profiles hide interface items only, never settings, and each item can be turned back on (BASIC_ITEMS).
+// Faculty / PCs (faculty, PDs and admins, who include the programme coordinators; their default, outside the demo):
+// residents' case logs first (Case logs: counts per tag from the summaries, never case details), then programme
+// analytics, then More; their own Case, Logbook, Reflections and Notes tabs start in More.
 export const PROFILES = [
   ['basic', 'Basic', 'A simpler app (the default): the same tabs and buttons without the extras. Analytics is in More.'],
   ['logbook', 'Basic: logbook only', 'Basic without reflections, if you submit your reflections separately. Reflections you already wrote stay in More.'],
   ['advanced', 'Advanced', 'Everything: quick picks, the Logbook grid, Analytics trends and forecasts, reflection figures and references.'],
+  ['faculty', 'Faculty / PCs', 'For faculty, PDs and programme coordinators: residents’ case logs first, then programme analytics, then More.'],
 ];
-export const profile = () => { const m = settings().mode; return m === 'advanced' || m === 'logbook' ? m : 'basic'; };
-export const basicMode = () => profile() !== 'advanced';
+// may use Faculty / PCs: admins (PCs), PDs and active faculty (the rules let them read the counts summaries)
+export const facultyRole = () => !!(S.admin || S.pd || S.faculty);
+export const profile = () => {
+  const m = settings().mode;
+  if (m === 'advanced' || m === 'logbook' || m === 'basic') return m;
+  if (m === 'faculty') return facultyRole() ? 'faculty' : 'basic';
+  return facultyRole() && !cloud.demo ? 'faculty' : 'basic';
+};
+export const facultyMode = () => profile() === 'faculty';
+export const basicMode = () => profile() === 'basic' || profile() === 'logbook';
 export const logbookOnly = () => profile() === 'logbook';
 // What a Basic profile hides is interface only (never a setting), and each can be turned back on (Profiles or hide
 // items; settings.basicOn lists them), so all on is Advanced again. Case tab parts are 'case:<part>'. 'reflect'
@@ -60,7 +72,7 @@ export const BASIC_ITEMS = [
 ];
 export const basicHides = item => {
   const p = profile();
-  if (p === 'advanced' || (item === 'reflect' && p !== 'logbook') || item === 'case:parsed') return false;
+  if ((p !== 'basic' && p !== 'logbook') || (item === 'reflect' && p !== 'logbook') || item === 'case:parsed') return false;
   return !(settings().basicOn || []).includes(item);
 };
 // the Case tab parts (Logging and Profiles or hide items; settings.caseHide, and the profile's)

@@ -13,6 +13,8 @@ await env.withSecurityRulesDisabled(async ctx => {
   await setDoc(doc(db, 'owners', OWNER), { name: 'Owner' });
   await setDoc(doc(db, 'residents', 'R1'), { rid: 'R1', name: 'Alice', email: A, status: 'ACTIVE', intake: 2024, rYear: 2 });
   await setDoc(doc(db, 'residents', 'R2'), { rid: 'R2', name: 'Bob', email: B, status: 'ACTIVE', intake: 2024, rYear: 2 });
+  await setDoc(doc(db, 'faculty', 'fac@example.com'), { email: 'fac@example.com', name: 'Fac', status: 'ACTIVE' });
+  await setDoc(doc(db, 'faculty', 'gone@example.com'), { email: 'gone@example.com', name: 'Gone', status: 'INACTIVE' });
 });
 let n = 0, fail = 0;
 async function t(name, p) { n++; try { await p; } catch (e) { fail++; console.log('FAIL', name, e.message.slice(0, 200)); } }
@@ -117,6 +119,11 @@ await t('category names extra field', assertFails(setDoc(doc(adm, 'config', 'cat
 await t('member lists summaries', assertSucceeds(getDocs(collection(a, 'summaries'))));
 await t('admin lists summaries', assertSucceeds(getDocs(collection(adm, 'summaries'))));
 await t('stranger cannot list summaries', assertFails(getDocs(collection(as('x@example.com'), 'summaries'))));
+await t('active faculty list summaries', assertSucceeds(getDocs(collection(as('fac@example.com'), 'summaries'))));
+await t('inactive faculty cannot list summaries', assertFails(getDocs(collection(as('gone@example.com'), 'summaries'))));
+await t('faculty cannot write summaries', assertFails(setDoc(doc(as('fac@example.com'), 'summaries', 'R1'), sum('R1'))));
+await t('faculty cannot list residents', assertFails(getDocs(collection(as('fac@example.com'), 'residents'))));
+await t('faculty cannot read cases', assertFails(getDocs(collection(as('fac@example.com'), 'logbooks', A, 'cases'))));
 const m = as('mallory@example.com'), b2 = as('carol@example.com');
 await t('stranger logbook claiming a rid', assertSucceeds(setDoc(doc(m, 'logbooks', 'mallory@example.com'), { email: 'mallory@example.com', rid: 'R1' })));
 await t('claimed rid gives no access to summaries', assertFails(getDocs(collection(m, 'summaries'))));

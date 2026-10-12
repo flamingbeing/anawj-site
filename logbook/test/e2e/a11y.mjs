@@ -33,7 +33,7 @@ const SCREENS = [
   ['Display', hash('display'), true],
   ['Advanced display', hash('displayadv'), false],
   ['Logging', hash('logging'), false],
-  ['Show or hide', hash('showhide'), false],
+  ['Profiles or hide items', hash('showhide'), false],
   ['Advanced logging', hash('loggingadv'), false],
   ['Tag editor', hash('tags'), false],
   ['Reflection settings', hash('reflset'), false],
@@ -43,6 +43,8 @@ const SCREENS = [
   ['Admin portal', hash('admin'), false],
   ['Admin residents', hash('adminresidents'), false],
   ['Advanced admin', hash('adminadv'), false],
+  ['Case logs', hash('caselogs'), false],
+  ['Case log', async p => { await hash('caselogs')(p); await p.locator('.caselog-list a').first().click(); await p.locator('table.totals').waitFor(); }, false],
   ['Edit case dialog', async p => {
     await hash('logbook')(p);
     await p.evaluate(async () => { const { S } = await import('./js/ui-core.js'); const { editCaseDialog } = await import('./js/ui-log.js'); editCaseDialog(S.cases[0]); });
