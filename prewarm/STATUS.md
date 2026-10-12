@@ -6,8 +6,8 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 
 ## Now
 
-- **Claude Code, Prewarming Webapp** (branch `ccr-13264f37-d28edu`): PR 2 (sharing) built; rules, browser and two-phone
-  sync tests pass.
+- **Claude Code, Prewarming Webapp** (branch `ccr-13264f37-d28edu`): main screen reorganised by when data are entered
+  (times + all temperatures, links to the rest); tests pass.
 
 ## Waiting on the owner
 
@@ -18,7 +18,8 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 
 ## Recently done
 
-- PR 2: sharing (join code per hospital, Firestore sync, rules, admin screen for codes and members).
+- #196: sharing (join code per hospital, Firestore sync, rules, admin screen).
+
 
 - #194: study hospitals (NTF, NUH, SGH, CGH, TTSH, KTPH, WH) in Settings, on patients and in the export.
 - #193: `prewarm/js/firebase-config.js`, web config for Firebase project `prewarm-study` (no Analytics).
@@ -29,6 +30,9 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 1. PR 3: export across hospitals for admins, a members' view of who entered what, polish after phone testing.
 
 ## Decisions
+
+- 12 Oct 2026: main screen = event times (compact) + all temperatures, links to other forms in fill-in order; empty
+  temperature taps to 36.5, empty time taps to now.
 
 - 12 Oct 2026: scope is op-day bedside data; template timepoints; intraop 0 min = induction; entry screen option B;
   join code, new Firebase project, several hospitals; group shown only on the pre-warming screen; Subject ID in the

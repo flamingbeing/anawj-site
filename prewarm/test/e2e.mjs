@@ -35,21 +35,34 @@ try {
   await page.fill('#sid', 'TEST-02');
   await page.click('.seg .chip[data-v="2"]');
   await page.click('button[type=submit]');
-  await page.waitForSelector('.tiles');
-  await page.click('[data-now="pw_start"]');
-  assert.match(await page.inputValue('input[data-f="pw_start"]'), /^\d\d:\d\d$/);
+  // the patient opens on the main screen: times, then pre-warming temperatures
+  await page.waitForSelector('.times');
+  assert.match(await page.textContent('.tabs2 [aria-selected="true"]'), /Pre-warming/);
+  assert.match(await page.textContent('.badge'), /10 min pre-warming/, 'group shows with the pre-warming temperatures');
+  await page.click('[data-ev="pw_start"]');
+  assert.match(await page.textContent('[data-ev="pw_start"] b'), /^\d\d:\d\d$/, 'tapping an empty time sets now');
+  assert.match(await page.textContent('#due'), /due \d\d:\d\d/);
+  // the 0-min reading is due now: the banner shows and hides on a tap
+  await page.waitForSelector('#banner:not([hidden])');
+  await page.click('#banner');
+  // changing a set time
+  await page.click('[data-ev="pw_start"]');
+  await page.waitForSelector('#evtime');
   await axe('patient'); await shot('patient');
+  await page.fill('#evtime', '07:30');
+  assert.equal(await page.textContent('[data-ev="pw_start"] b'), '07:30');
 
-  // pre-warming reading, option B: type core, nudge chest, pick sensation, save
-  await page.click('a[href$="/read/prewarm"]');
-  await page.waitForSelector('.board');
+  // pre-warming reading, option B: empty temp taps to 36.5, type core, nudge chest, pick sensation, save
   assert.match(await page.textContent('.tp'), /0 min/);
-  assert.match(await page.textContent('.badge'), /10 min pre-warming/, 'group shows on the pre-warming screen');
+  await page.click('.num[data-type="chest"]');
+  assert.equal((await page.textContent('.num[data-type="chest"]')).trim(), '36.5', 'an empty temperature starts at 36.5');
+  await page.click('.num[data-type="core"]');
   await page.click('.num[data-type="core"]');
   await page.fill('input.num', '366');
   await page.keyboard.press('Enter');
   assert.equal((await page.textContent('.num[data-type="core"]')).trim(), '36.6', '366 is read as 36.6');
-  await page.click('[data-step="1"][data-c="chest"]');
+  await page.click('[data-step="-1"][data-c="chest"]');
+  assert.equal((await page.textContent('.num[data-type="chest"]')).trim(), '36.4');
   await page.click('.chip[data-c="ts"][data-v="1"]');
   await axe('reading'); await shot('reading');
   await page.click('#save');
@@ -60,23 +73,28 @@ try {
   await shot('reading-next');
 
   // warming stopped: set temp becomes NA for later timepoints
-  await page.goBack(); await page.goBack();
-  await page.waitForSelector('.tiles');
-  await page.fill('input[data-f="ev_wstop"]', '00:00');
-  await page.dispatchEvent('input[data-f="ev_wstop"]', 'change');
+  await page.click('[data-ev="ev_wstop"]');
+  await page.click('[data-ev="ev_wstop"]');
+  await page.fill('#evtime', '07:31');
+  await page.click('.strip a:has-text("10")');
+  await page.waitForFunction(() => /10 min/.test(document.querySelector('.tp')?.textContent || ''));
+  await page.waitForFunction(() => document.querySelector('.chip[data-c="set"][data-v="NA"]')?.getAttribute('aria-pressed') === 'true', null, { timeout: 5000 });
 
-  // group is not shown on the hub
-  assert.doesNotMatch(await page.textContent('main'), /10 min pre-warming/, 'group hidden outside the pre-warming screen');
+  // intra-op tab: group not shown
+  await page.click('.tabs2 a:has-text("Intra-op")');
+  await page.waitForFunction(() => /Baseline/.test(document.querySelector('.tp')?.textContent || ''));
+  assert.doesNotMatch(await page.textContent('main'), /10 min pre-warming/, 'group hidden outside the pre-warming temperatures');
+  await shot('intraop-temps');
 
   // form view
-  await page.click('a[href$="/sheet"]');
+  await page.click('.links a[href$="/sheet"]');
   await page.waitForSelector('.sheet');
   assert.match(await page.textContent('.sheet'), /36\.6/);
   await axe('form view'); await shot('form-view');
   await page.goBack();
 
   // intra-op details: TXA total worked out, transfusion volumes
-  await page.click('a[href$="/form/intraop"]');
+  await page.click('.links a[href$="/form/intraop"]');
   await page.click('.chip[data-f="io_txa"][data-v="1"]');
   await page.fill('#f-io_txa_bolus', '1000'); await page.dispatchEvent('#f-io_txa_bolus', 'change');
   await page.fill('#f-io_txa_inf', '500'); await page.dispatchEvent('#f-io_txa_inf', 'change');
@@ -87,7 +105,7 @@ try {
   await page.goBack();
 
   // PACU: NuDESC total
-  await page.click('a[href$="/form/pacu"]');
+  await page.click('.links a[href$="/form/pacu"]');
   await page.click('.chip[data-f="nd_dis"][data-v="1"]');
   await page.click('.chip[data-f="nd_psy"][data-v="2"]');
   assert.equal(await page.inputValue('#f-pacu_nudesc'), '3');

@@ -39,7 +39,20 @@ if (DEMO && !Object.keys(patients).length) {
     ['core', 'chest', 'arm', 'thigh', 'calf'].forEach((c, i) => setVal(p, `prewarm_${m}_${c}`, String(t[i]), 'DM'));
     setVal(p, `prewarm_${m}_set`, '43', 'DM'); setVal(p, `prewarm_${m}_ts`, m ? 1 : 0, 'DM'); setVal(p, `at_prewarm_${m}`, hm(22 - m), 'DM');
   });
-  patients[p.id] = p; saveAll();
+  patients[p.id] = p;
+  // a second patient already in OT, induction 50 min ago
+  const q = newRecord(Date.now() - 7200e3);
+  setVal(q, 'enrol_id', 'DEMO-02', 'DM'); setVal(q, 'arm', 2, 'DM'); setVal(q, 'pw_gown', hm(95), 'DM'); setVal(q, 'pw_start', hm(90), 'DM'); setVal(q, 'ev_wstop', hm(80), 'DM');
+  setVal(q, 'ev_ot', hm(65), 'DM'); setVal(q, 'io_knife', hm(50), 'DM'); setVal(q, 'io_flip', hm(42), 'DM'); setVal(q, 'io_under_start', hm(40), 'DM');
+  [['base', 36.4], [0, 36.3], [5, 36.2], [10, 36.1], [15, 36.0], [20, 35.9], [25, 35.9], [30, 35.8], [35, 35.8], [40, 35.9], [45, 35.9]].forEach(([m, core], i) => {
+    setVal(q, `iotemp_${m}_core`, core.toFixed(1), 'DM');
+    ['chest', 'arm', 'thigh', 'calf'].forEach((c, j) => setVal(q, `iotemp_${m}_${c}`, (34.2 - j * 0.6 - i * 0.05).toFixed(1), 'DM'));
+    setVal(q, `iotemp_${m}_under`, m === 'base' || m < 10 ? 0 : 1, 'DM'); setVal(q, `iotemp_${m}_gown`, 0, 'DM'); setVal(q, `iotemp_${m}_room`, '21.0', 'DM');
+    setVal(q, `at_iotemp_${m}`, m === 'base' ? hm(55) : hm(50 - m), 'DM');
+  });
+  setVal(q, 'haemo_base_sbp', '132', 'DM'); setVal(q, 'haemo_base_dbp', '78', 'DM'); setVal(q, 'haemo_base_map', '96', 'DM'); setVal(q, 'haemo_base_hr', '72', 'DM'); setVal(q, 'at_haemo_base', hm(55), 'DM');
+  patients[q.id] = q;
+  saveAll();
 }
 
 // ---------- helpers
@@ -153,6 +166,7 @@ function render() {
 }
 window.addEventListener('hashchange', render);
 $('#fresh').onclick = () => render();
+$('#banner').onclick = () => { $('#banner').hidden = true; };
 function header(title, back, extra = '') {
   $('#title').textContent = title;
   $('#back').hidden = !back; $('#back').onclick = () => go(back);
@@ -205,54 +219,21 @@ route(/^\/new$/, () => {
   };
 });
 
-// ---------- patient hub
-const EVENTS = [['pw_gown', 'Gown on'], ['pw_start', 'Active warming started', 'pw'], ['ev_wstop', 'Active warming stopped', 'pw'], ['ev_ot', 'Arrived in OT'],
-  ['io_knife', 'Induction (knife to skin)'], ['io_flip', 'Flipped prone'], ['io_under_start', 'Underbody Bair Hugger on'], ['io_gown_start', 'Gown Bair Hugger on'],
-  ['io_done', 'Surgery completed (post-extubation)'], ['pacu_in', 'PACU arrival'], ['pacu_out', 'Transfer to ward']];
-route(/^\/p\/(\w+)$/, id => {
+// ---------- patient main screen: event times, temperatures, then links to the other forms in the order they are
+// filled in. BP/HR/BIS uses the same reading screen without the times.
+const EVENTS = [['pw_gown', 'Gown on'], ['pw_start', 'Warming on', 'pw'], ['ev_wstop', 'Warming off', 'pw'], ['ev_ot', 'In OT'],
+  ['io_knife', 'Induction'], ['io_flip', 'Prone'], ['io_under_start', 'Underbody'], ['io_gown_start', 'Gown BH'],
+  ['io_done', 'Surgery end'], ['pacu_in', 'PACU arrival'], ['pacu_out', 'To ward']];
+const EVENT_FULL = { io_flip: 'Flipped prone', pw_start: 'Active warming started', ev_wstop: 'Active warming stopped', io_knife: 'Induction (knife to skin)', io_under_start: 'Underbody Bair Hugger on',
+  io_gown_start: 'Gown Bair Hugger on', io_done: 'Surgery completed (post-extubation)', pacu_out: 'Transfer to ward' };
+const defaultSeries = p => noWarming(p) || val(p, 'ev_ot') || val(p, 'io_knife') ? 'iotemp' : 'prewarm';
+route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s, key) => {
   const p = patients[id]; if (!p) return go('#/');
-  header(sid(p), '#/', `<a class="iconbtn" href="#/p/${id}/sheet" aria-label="Form view">▦</a>`);
-  const count = s => pointsFor(p, s).filter(x => savedAt(p, s, x.key)).length;
-  const signed = pg => val(p, 'sign_' + pg) ? ' ✓' : '';
-  paint(`
-    <div class="tiles">
-      <a class="tile" href="#/p/${id}/read/prewarm"><b>Pre-warming temps${signed('prewarm')}</b><span>${count('prewarm')} of ${SERIES.prewarm.points.length}</span></a>
-      <a class="tile" href="#/p/${id}/read/iotemp"><b>Intra-op temps${signed('iotemp')}</b><span>${count('iotemp')} of ${SERIES.iotemp.points.length}</span></a>
-      <a class="tile" href="#/p/${id}/read/haemo"><b>BP, HR, BIS${signed('haemo')}</b><span>${count('haemo')} saved</span></a>
-      <a class="tile" href="#/p/${id}/form/intraop"><b>Intra-op details${signed('intraop')}</b><span>Blood, products, tests</span></a>
-      <a class="tile" href="#/p/${id}/form/pacu"><b>PACU${signed('pacu')}</b><span>Temp, NuDESC, delay</span></a>
-      <a class="tile" href="#/p/${id}/form/satis"><b>Satisfaction${signed('satis')}</b><span>Pre- and post-op comfort</span></a>
-    </div>
-    <h2>Times</h2>
-    <ul class="events">${EVENTS.filter(([, , pw]) => !(pw && noWarming(p))).map(([f, l]) => {
-      const v = val(p, f), na = f === 'pw_start' && v === 'NA';
-      return `<li><span>${l}</span><input type="time" data-f="${f}" value="${na ? '' : esc(v || '')}" aria-label="${l}">
-        <button class="small-btn" data-now="${f}">${v ? 'Redo' : 'Now'}</button></li>`;
-    }).join('')}</ul>
-    <button class="danger" id="del">Delete this patient</button>`);
-  view.querySelectorAll('[data-now]').forEach(b => b.onclick = () => {
-    const f = b.dataset.now;
-    if (val(p, f) && b.textContent === 'Redo' && !b.dataset.sure) { b.dataset.sure = 1; b.textContent = 'Tap again'; return; }
-    set(p, f, nowHM()); render();
-  });
-  view.querySelectorAll('input[type=time]').forEach(i => i.onchange = () => set(p, i.dataset.f, i.value));
-  $('#del').onclick = e => {
-    if (!e.target.dataset.sure) { e.target.dataset.sure = 1; e.target.textContent = 'Tap again to delete ' + sid(p); return; }
-    p.deleted = Date.now(); saveAll(); sync(p, []); go('#/');
-  };
-});
-
-// ---------- reading screen (option B: change what moved)
-route(/^\/p\/(\w+)\/read\/(prewarm|iotemp|haemo)(?:\/(\w+))?$/, (id, s, key) => {
-  const p = patients[id]; if (!p) return go('#/');
+  if (!s || (s === 'prewarm' && noWarming(p))) s = defaultSeries(p);
+  const main = s !== 'haemo';
   const def = SERIES[s], pts = pointsFor(p, s);
-  const title = { prewarm: 'Pre-warming', iotemp: 'Intra-op temps', haemo: 'BP, HR, BIS' }[s];
-  header(sid(p) + ' · ' + title, '#/p/' + id);
-  if (s === 'prewarm' && noWarming(p)) {
-    paint(`<p class="note">${GROUPS[2][1]}: no pre-warming readings for this patient. The first reading is intra-op baseline.</p>
-      <a class="primary big" href="#/p/${id}/read/iotemp">Intra-op temps</a>`);
-    return;
-  }
+  header(main ? sid(p) : sid(p) + ' · BP, HR, BIS', main ? '#/' : '#/p/' + id, `<a class="iconbtn" href="#/p/${id}/sheet" aria-label="Form view">▦</a>`);
+  let editing = null; // event whose time is being changed
   // default timepoint: the unsaved one nearest its due time, else the first unsaved
   if (!key) {
     const open = pts.filter(x => !savedAt(p, s, x.key));
@@ -271,14 +252,14 @@ route(/^\/p\/(\w+)\/read\/(prewarm|iotemp|haemo)(?:\/(\w+))?$/, (id, s, key) => 
     was[c.key] = prev ? val(p, `${s}_${prev.key}_${c.key}`) : null;
     draft[c.key] = mine ?? was[c.key];
   }
-  if (s === 'prewarm' && setTempNA(p, pt)) draft.set = 'NA';
+  let setTouched = false; // gown set temp follows "warming off" until someone picks a value
   const isSaved = !!savedAt(p, s, pt.key);
 
   function strip() {
     const now = nowMin();
     return `<div class="strip" role="list">${pts.map(x => {
       const done = savedAt(p, s, x.key), due = dueOf(p, s, x), missed = !done && due != null && now > due + 5;
-      return `<a role="listitem" href="#/p/${id}/read/${s}/${x.key}" class="${x.key === pt.key ? 'on' : ''} ${done ? 'done' : missed ? 'missed' : ''}">${x.key === 'base' ? 'Base' : x.key === 'end' ? 'End' : x.min}</a>`;
+      return `<a role="listitem" href="#/p/${id}/${s}/${x.key}" class="${x.key === pt.key ? 'on' : ''} ${done ? 'done' : missed ? 'missed' : ''}">${x.key === 'base' ? 'Base' : x.key === 'end' ? 'End' : x.min}</a>`;
     }).join('')}</div>`;
   }
   function card(c) {
@@ -298,21 +279,47 @@ route(/^\/p\/(\w+)\/read\/(prewarm|iotemp|haemo)(?:\/(\w+))?$/, (id, s, key) => 
       <button class="num" data-type="${c.key}">${v ?? '<span class="muted">tap</span>'}</button>
       <div class="pm"><button class="k" data-step="-1" data-c="${c.key}" aria-label="${c.label} down">−</button><button class="k" data-step="1" data-c="${c.key}" aria-label="${c.label} up">+</button></div></div>`;
   }
+  function timesHtml() {
+    return `<div class="times">${EVENTS.filter(([, , pw]) => !(pw && noWarming(p))).map(([f, l]) => {
+      const v = val(p, f), full = EVENT_FULL[f] || l;
+      if (editing === f) return `<div class="tchip edit"><span>${l}</span><input type="time" id="evtime" value="${v === 'NA' ? '' : esc(v || '')}" aria-label="${full}"><button class="link" data-evclear="${f}">Clear</button></div>`;
+      return `<button class="tchip ${v ? 'set' : ''}" data-ev="${f}" aria-label="${full}: ${v ? v + ', tap to change' : 'tap to set now'}"><span>${l}</span><b>${v ? esc(v) : 'tap'}</b></button>`;
+    }).join('')}</div>`;
+  }
+  function linksHtml() {
+    const done = pg => val(p, 'sign_' + pg) ? ' ✓' : '';
+    const haemo = pointsFor(p, 'haemo').filter(x => savedAt(p, 'haemo', x.key)).length;
+    return `<nav class="links" aria-label="Other forms">
+      <a href="#/p/${id}/haemo">BP, HR, BIS${done('haemo')}<small>${haemo ? haemo + ' saved' : 'Baseline in OT'}</small></a>
+      <a href="#/p/${id}/form/intraop">Intra-op details${done('intraop')}<small>Blood, products, tests</small></a>
+      <a href="#/p/${id}/form/pacu">PACU${done('pacu')}<small>Temp, NuDESC, delay</small></a>
+      <a href="#/p/${id}/form/satis">Satisfaction${done('satis')}<small>Pre- and post-op comfort</small></a>
+      <a href="#/p/${id}/sheet">Form view<small>All readings like the paper form</small></a></nav>
+      <button class="danger" id="del">Delete this patient</button>`;
+  }
+  function tabsHtml() {
+    if (noWarming(p)) return `<h2 class="sect">Intra-op temperatures</h2>`;
+    return `<div class="tabs2" role="tablist">${['prewarm', 'iotemp'].map(x => `<a role="tab" aria-selected="${x === s}" href="#/p/${id}/${x}">${x === 'prewarm' ? 'Pre-warming' : 'Intra-op'}</a>`).join('')}</div>`;
+  }
   function draw() {
+    if (s === 'prewarm' && !setTouched && cols.some(c => c.key === 'set') && setTempNA(p, pt)) draft.set = 'NA';
     const due = dueOf(p, s, pt);
     const grp = s === 'prewarm' ? `<span class="badge">${GROUPS.find(g => String(g[0]) === String(val(p, 'arm')))?.[1] || 'Group not set'}</span>` : '';
-    paint(`${strip()}
+    paint(`${main ? timesHtml() + tabsHtml() : ''}${strip()}
       <div class="tp"><div><b>${pt.label}</b> ${grp}</div><div class="due" id="due">${due != null ? 'due ' + fromMin(Math.round(due)) : pt.key === 'base' ? (s === 'prewarm' ? '' : 'on arrival in OT') : ''}</div></div>
       ${due == null && pt.min != null ? `<p class="note small">Set the “${s === 'prewarm' ? 'Active warming started' : 'Induction'}” time to see when each reading is due.</p>` : ''}
       ${isSaved ? `<p class="muted small">Saved at ${esc(savedAt(p, s, pt.key))}${p.f['at_' + s + '_' + pt.key]?.by ? ' by ' + esc(p.f['at_' + s + '_' + pt.key].by) : ''}. Changes save when you tap Save.</p>` : ''}
       <div class="board">${cols.map(card).join('')}</div>
       <button class="save big" id="save">${isSaved ? 'Save changes' : `Save ${pt.label} reading`}</button>
       ${s === 'haemo' && settings.hide.haemo15 ? `<p class="muted small">Only baseline is entered here; the 15-min rows come from the monitor download. Turn them on in Settings.</p>` : ''}
-      ${signoffHtml(p, s)}`);
+      ${signoffHtml(p, s)}${main ? linksHtml() : ''}`);
+    if (editing) { const i = $('#evtime'); i?.focus(); }
+    const st = view.querySelector('.strip'), on = st?.querySelector('.on');
+    if (on) st.scrollLeft = on.offsetLeft - st.offsetLeft - (st.clientWidth - on.offsetWidth) / 2;
   }
   draw();
   const step = { core: 0.1, chest: 0.1, arm: 0.1, thigh: 0.1, calf: 0.1, room: 0.5, sbp: 1, dbp: 1, map: 1, hr: 1, bis: 1 };
-  const start = { core: 36.5, chest: 34, arm: 33, thigh: 32.5, calf: 31.5, room: 21, sbp: 120, dbp: 70, map: 85, hr: 75, bis: 50 };
+  const start = { core: 36.5, chest: 36.5, arm: 36.5, thigh: 36.5, calf: 36.5, room: 21, sbp: 120, dbp: 70, map: 85, hr: 75, bis: 50 };
   function bump(k, dir) {
     const cur = parseFloat(draft[k]);
     const n = Number.isFinite(cur) ? cur + dir * step[k] : start[k];
@@ -334,12 +341,26 @@ route(/^\/p\/(\w+)\/read\/(prewarm|iotemp|haemo)(?:\/(\w+))?$/, (id, s, key) => 
     const st = t.closest('[data-step]');
     if (st && e.detail === 0) { bump(st.dataset.c, +st.dataset.step); draw(); return; } // keyboard
     const chip = t.closest('.chip[data-c]');
-    if (chip) { draft[chip.dataset.c] = draft[chip.dataset.c] === chip.dataset.v ? null : chip.dataset.v; draw(); return; }
+    if (chip) { if (chip.dataset.c === 'set') setTouched = true; draft[chip.dataset.c] = draft[chip.dataset.c] === chip.dataset.v ? null : chip.dataset.v; draw(); return; }
     const m = t.closest('[data-map]');
     if (m) { draft.map = m.dataset.map; draw(); return; }
+    const ev = t.closest('[data-ev]');
+    if (ev) {
+      // tap an empty time: now; tap a set one: change it
+      if (!val(p, ev.dataset.ev)) set(p, ev.dataset.ev, nowHM()); else editing = ev.dataset.ev;
+      draw(); return;
+    }
+    const clr = t.closest('[data-evclear]');
+    if (clr) { set(p, clr.dataset.evclear, null); editing = null; draw(); return; }
+    if (t.closest('#del')) {
+      if (!t.dataset.sure) { t.dataset.sure = 1; t.textContent = 'Tap again to delete ' + sid(p); return; }
+      p.deleted = Date.now(); saveAll(); sync(p, []); go('#/'); return;
+    }
     const n = t.closest('.num[data-type]');
     if (n) {
       const k = n.dataset.type, c = cols.find(x => x.key === k);
+      // an empty temperature starts at 36.5; tap again to type
+      if (c.temp && draft[k] == null) { draft[k] = '36.5'; draw(); return; }
       const inp = document.createElement('input');
       inp.className = 'num'; inp.inputMode = 'decimal'; inp.value = draft[k] ?? ''; inp.setAttribute('aria-label', c.label);
       n.replaceWith(inp); inp.focus(); inp.select();
@@ -357,11 +378,17 @@ route(/^\/p\/(\w+)\/read\/(prewarm|iotemp|haemo)(?:\/(\w+))?$/, (id, s, key) => 
       sync(p, [...cols.map(c => `${s}_${pt.key}_${c.key}`), `at_${s}_${pt.key}`]);
       toast(pt.label + ' saved');
       const next = pts.slice(pts.indexOf(pt) + 1).find(x => !savedAt(p, s, x.key));
-      go(`#/p/${id}/read/${s}` + (next ? '/' + next.key : '/' + pt.key));
+      go(`#/p/${id}/${s}/` + (next ? next.key : pt.key));
       return;
     }
     signoffClick(p, s, t);
   };
+  view.onchange = e => {
+    if (e.target.id !== 'evtime' || !editing) return;
+    set(p, editing, e.target.value || null); editing = null; draw();
+  };
+  view.onfocusout = e => { if (e.target.id === 'evtime') setTimeout(() => { if (editing && !view.contains(document.activeElement)) { editing = null; draw(); } }, 0); };
+  cleanup.push(() => { view.onchange = view.onfocusout = null; });
   startAlerts(p, s, () => { const el = $('#due'); if (el) { const d = dueOf(p, s, pt); if (d != null) { const left = d - nowMin(); el.textContent = 'due ' + fromMin(Math.round(d)) + (left > 0 ? ` · in ${Math.floor(left)}:${String(Math.floor((left % 1) * 60)).padStart(2, '0')}` : left > -5 ? ' · now' : ' · late'); } } });
 });
 
@@ -377,7 +404,7 @@ function startAlerts(p, s, tick) {
       const d = dueOf(p, s, x), tag = p.id + s + x.key + (val(p, SERIES[s].ref[0]) || '');
       if (d == null || savedAt(p, s, x.key) || alerted.has(tag) || now < d || now > d + 5) continue;
       alerted.add(tag); write('alerted', [...alerted].slice(-200));
-      if (settings.remind.banner) { const b = $('#banner'); b.textContent = `${x.label} reading due now`; b.hidden = false; setTimeout(() => { b.hidden = true; }, 15000); }
+      if (settings.remind.banner) { const b = $('#banner'); b.textContent = `${x.label} reading due now (tap to hide)`; b.hidden = false; setTimeout(() => { b.hidden = true; }, 15000); }
       if (settings.remind.vibrate && navigator.vibrate) navigator.vibrate([300, 150, 300]);
       if (settings.remind.beep) beep();
     }
@@ -491,7 +518,7 @@ function ixTable(p) {
 route(/^\/p\/(\w+)\/sheet$/, id => {
   const p = patients[id]; if (!p) return go('#/');
   header(sid(p) + ' · Form view', '#/p/' + id);
-  const cell = (s, pt, c) => { const v = val(p, `${s}_${pt.key}_${c.key}`); return `<td><a href="#/p/${id}/read/${s}/${pt.key}" aria-label="${esc(pt.label + ' ' + c.label + ': ' + (v ?? 'empty'))}">${v == null ? '' : esc(c.key === 'ts' && v > 0 ? '+' + v : v)}</a></td>`; };
+  const cell = (s, pt, c) => { const v = val(p, `${s}_${pt.key}_${c.key}`); return `<td><a href="#/p/${id}/${s}/${pt.key}" aria-label="${esc(pt.label + ' ' + c.label + ': ' + (v ?? 'empty'))}">${v == null ? '' : esc(c.key === 'ts' && v > 0 ? '+' + v : v)}</a></td>`; };
   const pw = SERIES.prewarm, it = SERIES.iotemp, hd = SERIES.haemo;
   paint(`
     ${noWarming(p) ? '' : `<h2>Pre-warming, every 5 minutes</h2><div class="scroll"><table class="grid sheet"><thead><tr><th>Time (min)</th>${pw.points.map(x => `<th>${x.min}</th>`).join('')}</tr></thead><tbody>
