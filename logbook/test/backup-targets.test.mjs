@@ -2,7 +2,7 @@
 // owner's ids and a browser, so they are checked by hand (README).
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { cleanCloudBackup, backupDue, pkcePair, dropboxAuthUrl, dropboxArg, driveQuery, isDropboxReturn, DRIVE_SCOPE, REMIND_DAYS } from '../js/backup-targets.js';
+import { cleanCloudBackup, backupDue, pkcePair, dropboxAuthUrl, dropboxArg, driveQuery, googleAuthUrl, parseCloudReturn, DRIVE_SCOPE, REMIND_DAYS } from '../js/backup-targets.js';
 
 assert.equal(DRIVE_SCOPE, 'https://www.googleapis.com/auth/drive.file');   // only the files the app makes
 assert.deepEqual(cleanCloudBackup(null), { remind: false, md: false, lastAt: 0, lastTo: '' });
@@ -31,9 +31,18 @@ assert.deepEqual(JSON.parse(dropboxArg({ path: '/é' })), { path: '/é' });
 assert.equal(driveQuery("O'Neil", { folder: true }), "name = 'O\\'Neil' and trashed = false and mimeType = 'application/vnd.google-apps.folder'");
 assert.equal(driveQuery('a.json', { parent: 'F1' }), "name = 'a.json' and trashed = false and 'F1' in parents");
 
-// the popup's return is recognised only in a popup, with our state
-assert.equal(isDropboxReturn('?code=x&state=dbx-12', true), true);
-assert.equal(isDropboxReturn('?code=x&state=dbx-12', false), false);
-assert.equal(isDropboxReturn('?code=x&state=other', true), false);
+const g = new URL(googleAuthUrl({ clientId: 'id', redirectUri: 'https://anawj.com/logbook/', state: 'gdr-1', loginHint: 'a@b.c' }));
+assert.equal(g.origin + g.pathname, 'https://accounts.google.com/o/oauth2/v2/auth');
+assert.deepEqual(Object.fromEntries(g.searchParams), { client_id: 'id', redirect_uri: 'https://anawj.com/logbook/', response_type: 'token', scope: DRIVE_SCOPE, state: 'gdr-1', include_granted_scopes: 'true', login_hint: 'a@b.c' });
+assert.equal(new URL(googleAuthUrl({ clientId: 'id', redirectUri: 'r', state: 's' })).searchParams.has('login_hint'), false);
+
+// the way back: Dropbox answers in ?query, Google in #fragment; other states aren't ours
+assert.deepEqual(parseCloudReturn({ search: '?code=x&state=dbx-12' }), { to: 'dropbox', state: 'dbx-12', code: 'x', error: '' });
+assert.deepEqual(parseCloudReturn({ search: '?error=access_denied&error_description=No&state=dbx-12' }), { to: 'dropbox', state: 'dbx-12', code: '', error: 'No' });
+assert.deepEqual(parseCloudReturn({ hash: '#state=gdr-9&access_token=T&expires_in=3599&token_type=Bearer' }), { to: 'drive', state: 'gdr-9', token: 'T', expiresIn: 3599, error: '' });
+assert.deepEqual(parseCloudReturn({ hash: '#error=access_denied&state=gdr-9' }), { to: 'drive', state: 'gdr-9', token: '', expiresIn: 3600, error: 'access_denied' });
+assert.equal(parseCloudReturn({ search: '?code=x&state=other' }), null);
+assert.equal(parseCloudReturn({ hash: '#log' }), null);
+assert.equal(parseCloudReturn(), null);
 
 console.log('backup targets tests passed');

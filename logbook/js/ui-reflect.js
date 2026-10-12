@@ -52,7 +52,7 @@ resetters.push(() => {
 
 // Live reflections for the signed-in user (app.js calls this after sign-in).
 export function watchMyReflections(email) {
-  S.reflections = [];
+  S.reflections = []; S.reflectionsSynced = false;
   let raw = [];
   const paint = () => {
     if (S.user?.email !== email) return;
@@ -61,7 +61,7 @@ export function watchMyReflections(email) {
     if ((S.tab === 'reflect' && !rv.editing && !rv.picking && !rv.view && !drag) || S.tab === 'export' || S.tab === 'choose') hooks.render();
   };
   const offQueue = writes.onChange(paint);
-  const offCloud = cloud.watchReflections(email, list => { raw = list; paint(); });
+  const offCloud = cloud.watchReflections(email, (list, meta = {}) => { raw = list; if (!meta.fromCache) S.reflectionsSynced = true; paint(); });
   return () => { offQueue(); offCloud(); };
 }
 export const summaryReflections = () => reflectionCounts(S.reflections || []);

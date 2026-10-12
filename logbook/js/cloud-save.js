@@ -2,9 +2,14 @@
 // chosen the notes zip, into an "APMES Logbook" folder in the user's own Drive or Dropbox. No server and no
 // background sync: each save is a tap while signed in (an optional reminder offers one when the last backup is
 // over a week old). Tokens are kept in memory for this visit only.
+//
+// Sign-in leaves the page and comes back (no popups: on phones the popup often loses its link to the app, so
+// Drive was left on a blank page and Dropbox did nothing). Before leaving, sessionStorage keeps what we're
+// waiting for; index.html keeps the answer and returns to #data; resumeCloudSave finishes the save.
 
 import { S, h, toast, todayISO, settings, patchLogbook } from './ui-core.js';
-import { GOOGLE_CLIENT_ID, DROPBOX_APP_KEY, DRIVE_SCOPE, FOLDER, cleanCloudBackup, backupDue, pkcePair, dropboxAuthUrl, dropboxArg, driveQuery } from './backup-targets.js';
+import { GOOGLE_CLIENT_ID, DROPBOX_APP_KEY, FOLDER, cleanCloudBackup, backupDue, pkcePair, dropboxAuthUrl, googleAuthUrl, parseCloudReturn, dropboxArg, driveQuery } from './backup-targets.js';
+import { demo } from './cloud.js';
 import { makeBackup } from './backup.js';
 import { makeNotesZip } from './ui-notes.js';
 
@@ -23,32 +28,54 @@ async function saved(to, n) {
   toast(`Saved to ${to === 'drive' ? 'Google Drive' : 'Dropbox'}: ${n} file${n === 1 ? '' : 's'} in “${FOLDER}”`);
 }
 
-// ---- Google Drive: Google Identity Services token client, drive.file ----
+// ---- leaving for the sign-in, and coming back ----
 
-let gis = null, driveToken = null;
-export function loadGis() {
-  if (!driveReady()) return Promise.resolve(null);
-  return (gis ||= new Promise((resolve, reject) => {
-    const s = document.createElement('script');
-    s.src = 'https://accounts.google.com/gsi/client'; s.async = true;
-    s.onload = () => resolve(window.google);
-    s.onerror = () => { gis = null; reject(new Error('Could not load Google sign-in (offline?)')); };
-    document.head.append(s);
-  }));
+const PENDING = 'apmes-logbook-cloud-pending', RETURN = 'apmes-logbook-cloud-return';
+const redirectUri = () => location.origin + location.pathname;   // https://anawj.com/logbook/ (registered with Google and Dropbox)
+const randomState = prefix => prefix + crypto.getRandomValues(new Uint32Array(2)).join('');
+async function leaveToSignIn(to) {
+  const state = randomState(to === 'drive' ? 'gdr-' : 'dbx-');
+  const pending = { to, state, demo: !!demo };
+  let url;
+  if (to === 'drive') url = googleAuthUrl({ clientId: GOOGLE_CLIENT_ID, redirectUri: redirectUri(), state, loginHint: S.user && S.user.email });
+  else {
+    const { verifier, challenge } = await pkcePair();
+    pending.verifier = verifier;
+    url = dropboxAuthUrl({ appKey: DROPBOX_APP_KEY, redirectUri: redirectUri(), challenge, state });
+  }
+  try { sessionStorage.setItem(PENDING, JSON.stringify(pending)); } catch { return toast('Not saved: this browser won’t keep the sign-in (private mode?)'); }
+  location.assign(url);
 }
-// asks for a token: the popup has to open straight from the tap, so this never awaits before requesting
-function driveAuth() {
-  if (driveToken && driveToken.exp > Date.now() + 60e3) return Promise.resolve(driveToken.token);
-  if (!window.google?.accounts?.oauth2) return Promise.reject(new Error('Google is still loading: tap again in a moment'));
-  return new Promise((resolve, reject) => {
-    const client = window.google.accounts.oauth2.initTokenClient({
-      client_id: GOOGLE_CLIENT_ID, scope: DRIVE_SCOPE,
-      callback: r => { if (r.error) return reject(new Error(r.error_description || r.error)); driveToken = { token: r.access_token, exp: Date.now() + (Number(r.expires_in) || 3600) * 1000 }; resolve(r.access_token); },
-      error_callback: e => reject(new Error(e && e.type === 'popup_closed' ? 'Google sign-in was closed' : (e && (e.message || e.type)) || 'Google sign-in failed')),
-    });
-    client.requestAccessToken({ prompt: '', login_hint: S.user && S.user.email });
-  });
+const take = key => { try { const v = JSON.parse(sessionStorage.getItem(key) || 'null'); sessionStorage.removeItem(key); return v; } catch { return null; } };
+
+// after sign-in on the page Google or Dropbox sent us back to: finish the save that was waiting
+export async function resumeCloudSave() {
+  const back = take(RETURN), pending = take(PENDING);
+  const r = back && parseCloudReturn(back);
+  if (!r) return;
+  const where = r.to === 'drive' ? 'Google Drive' : 'Dropbox';
+  if (!pending || pending.to !== r.to || pending.state !== r.state) return toast(`Not saved to ${where}: the sign-in didn’t match. Tap Save again.`);
+  if (r.error) return toast(`Not saved to ${where}: ${/denied/i.test(r.error) ? 'sign-in was cancelled' : r.error}`);
+  try {
+    // the backup must hold everything: wait for the server's copy of the cases and reflections
+    for (const t0 = Date.now(); !(S.casesSynced && S.reflectionsSynced); await new Promise(res => setTimeout(res, 250)))
+      if (Date.now() - t0 > 30e3) throw new Error('your logbook didn’t finish loading (no signal?). Tap Save again.');
+    if (r.to === 'drive') {
+      driveToken = { token: r.token, exp: Date.now() + r.expiresIn * 1000 };
+      await uploadDrive(r.token);
+    } else {
+      const res = await fetch('https://api.dropboxapi.com/oauth2/token', { method: 'POST', body: new URLSearchParams({ code: r.code, grant_type: 'authorization_code', client_id: DROPBOX_APP_KEY, redirect_uri: redirectUri(), code_verifier: pending.verifier || '' }) });
+      const t = await res.json().catch(() => ({}));
+      if (!res.ok || !t.access_token) throw new Error('Dropbox: ' + (t.error_description || t.error || res.status));
+      dbxToken = { token: t.access_token, exp: Date.now() + (Number(t.expires_in) || 14400) * 1000 };
+      await uploadDropbox(dbxToken.token);
+    }
+  } catch (err) { toast('Not saved: ' + err.message); }
 }
+
+// ---- Google Drive: OAuth token for drive.file (the app sees only the files it made) ----
+
+let driveToken = null;
 async function driveApi(token, url, init = {}) {
   const res = await fetch(url, { ...init, headers: { ...(init.headers || {}), Authorization: `Bearer ${token}` } });
   if (res.status === 401) driveToken = null;
@@ -68,65 +95,39 @@ async function driveUpload(token, file, parent) {
   const url = existing ? `https://www.googleapis.com/upload/drive/v3/files/${existing.id}?uploadType=multipart` : 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
   return driveApi(token, url, { method: existing ? 'PATCH' : 'POST', body });
 }
+async function uploadDrive(token) {
+  const { files } = await filesToSave();
+  let folder = await driveFind(token, driveQuery(FOLDER, { folder: true }));
+  folder ||= await driveApi(token, 'https://www.googleapis.com/drive/v3/files', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: FOLDER, mimeType: 'application/vnd.google-apps.folder' }) });
+  for (const f of files) await driveUpload(token, f, folder.id);
+  await saved('drive', files.length);
+}
 export async function saveToDrive(btn) {
   if (!driveReady()) return toast('Google Drive isn’t set up for this app yet');
-  const auth = driveAuth();   // first: the popup must open from the tap itself
+  if (!(driveToken && driveToken.exp > Date.now() + 60e3)) return leaveToSignIn('drive');
   if (btn) btn.disabled = true;
-  try {
-    const token = await auth;
-    const { files } = await filesToSave();
-    let folder = await driveFind(token, driveQuery(FOLDER, { folder: true }));
-    folder ||= await driveApi(token, 'https://www.googleapis.com/drive/v3/files', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: FOLDER, mimeType: 'application/vnd.google-apps.folder' }) });
-    for (const f of files) await driveUpload(token, f, folder.id);
-    await saved('drive', files.length);
-  } catch (err) { toast('Not saved: ' + err.message); }
+  try { await uploadDrive(driveToken.token); } catch (err) { toast('Not saved: ' + err.message); }
   if (btn) btn.disabled = false;
 }
 
-// ---- Dropbox: OAuth with PKCE in a popup, "App folder" access ----
+// ---- Dropbox: OAuth with PKCE, "App folder" access ----
 
 let dbxToken = null;
-const redirectUri = () => location.origin + location.pathname;   // https://anawj.com/logbook/ (registered in the Dropbox app)
-function dropboxAuth() {
-  if (dbxToken && dbxToken.exp > Date.now() + 60e3) return Promise.resolve(dbxToken.token);
-  // the popup opens at once (from the tap); its address is set after the PKCE challenge is worked out
-  const win = window.open('about:blank', 'dropbox-auth', 'width=560,height=720');
-  if (!win) return Promise.reject(new Error('the sign-in window was blocked: allow pop-ups for this site'));
-  return (async () => {
-    const { verifier, challenge } = await pkcePair();
-    const state = 'dbx-' + crypto.getRandomValues(new Uint32Array(2)).join('');
-    win.location.href = dropboxAuthUrl({ appKey: DROPBOX_APP_KEY, redirectUri: redirectUri(), challenge, state });
-    const code = await new Promise((resolve, reject) => {
-      const done = (fn, v) => { removeEventListener('message', onMsg); clearInterval(timer); fn(v); };
-      const onMsg = e => {
-        if (e.origin !== location.origin || !e.data || !e.data.dbx || e.data.dbx.state !== state) return;
-        e.data.dbx.code ? done(resolve, e.data.dbx.code) : done(reject, new Error(e.data.dbx.error || 'Dropbox sign-in was cancelled'));
-      };
-      addEventListener('message', onMsg);
-      const timer = setInterval(() => { if (win.closed) done(reject, new Error('Dropbox sign-in was closed')); }, 700);
-    });
-    const res = await fetch('https://api.dropboxapi.com/oauth2/token', { method: 'POST', body: new URLSearchParams({ code, grant_type: 'authorization_code', client_id: DROPBOX_APP_KEY, redirect_uri: redirectUri(), code_verifier: verifier }) });
-    const t = await res.json().catch(() => ({}));
-    if (!res.ok || !t.access_token) throw new Error('Dropbox: ' + (t.error_description || t.error || res.status));
-    dbxToken = { token: t.access_token, exp: Date.now() + (Number(t.expires_in) || 14400) * 1000 };
-    return dbxToken.token;
-  })();
+async function uploadDropbox(token) {
+  const { files } = await filesToSave();
+  for (const f of files) {
+    const res = await fetch('https://content.dropboxapi.com/2/files/upload', { method: 'POST', body: f.blob, headers: {
+      Authorization: `Bearer ${token}`, 'Content-Type': 'application/octet-stream', 'Dropbox-API-Arg': dropboxArg({ path: `/${FOLDER}/${f.name}`, mode: 'overwrite', mute: true }) } });
+    if (res.status === 401) dbxToken = null;
+    if (!res.ok) throw new Error(`Dropbox: ${res.status} ${(await res.text().catch(() => '')).slice(0, 120)}`);
+  }
+  await saved('dropbox', files.length);
 }
 export async function saveToDropbox(btn) {
   if (!dropboxReady()) return toast('Dropbox isn’t set up for this app yet');
-  const auth = dropboxAuth();
+  if (!(dbxToken && dbxToken.exp > Date.now() + 60e3)) return leaveToSignIn('dropbox');
   if (btn) btn.disabled = true;
-  try {
-    const token = await auth;
-    const { files } = await filesToSave();
-    for (const f of files) {
-      const res = await fetch('https://content.dropboxapi.com/2/files/upload', { method: 'POST', body: f.blob, headers: {
-        Authorization: `Bearer ${token}`, 'Content-Type': 'application/octet-stream', 'Dropbox-API-Arg': dropboxArg({ path: `/${FOLDER}/${f.name}`, mode: 'overwrite', mute: true }) } });
-      if (res.status === 401) dbxToken = null;
-      if (!res.ok) throw new Error(`Dropbox: ${res.status} ${(await res.text().catch(() => '')).slice(0, 120)}`);
-    }
-    await saved('dropbox', files.length);
-  } catch (err) { toast('Not saved: ' + err.message); }
+  try { await uploadDropbox(dbxToken.token); } catch (err) { toast('Not saved: ' + err.message); }
   if (btn) btn.disabled = false;
 }
 
@@ -134,14 +135,13 @@ export async function saveToDropbox(btn) {
 
 export function cloudSaveSection() {
   const c = cleanCloudBackup(settings().cloudBackup);
-  if (driveReady()) loadGis().catch(() => {});   // ready before the tap, so the popup isn't blocked
   const set = patch => patchLogbook({ settings: { cloudBackup: { ...cleanCloudBackup(settings().cloudBackup), ...patch } } });
   const drive = h('button', { disabled: !driveReady(), onclick: () => saveToDrive(drive) }, 'Save to Google Drive');
   const dbx = h('button', { disabled: !dropboxReady(), onclick: () => saveToDropbox(dbx) }, 'Save to Dropbox');
   const when = c.lastAt ? `Last saved ${new Date(c.lastAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })} to ${c.lastTo === 'drive' ? 'Google Drive' : 'Dropbox'}.` : 'Not saved to Google Drive or Dropbox yet.';
   return [
     h('h3', { style: 'margin-top:16px' }, 'Google Drive and Dropbox'),
-    h('p', { class: 'hint help' }, `Writes the backup file into an “${FOLDER}” folder in your own Drive or Dropbox. The app can see only the files it made there. Nothing runs in the background: each save is a tap.`),
+    h('p', { class: 'hint help' }, `Writes the backup file into an “${FOLDER}” folder in your own Drive or Dropbox. The app can see only the files it made there. Nothing runs in the background: each save is a tap. The first save each visit goes to Google or Dropbox to sign in, then comes back here.`),
     !driveReady() || !dropboxReady() ? h('p', { class: 'hint' }, !driveReady() && !dropboxReady() ? 'Google Drive and Dropbox aren’t set up for this app yet (the app owner registers them once).'
       : `${driveReady() ? 'Dropbox' : 'Google Drive'} isn’t set up for this app yet (the app owner registers it once).`) : null,
     h('div', { class: 'bar' }, drive, dbx),
@@ -151,14 +151,13 @@ export function cloudSaveSection() {
   ];
 }
 
-// once per visit, after sign-in: a one-tap reminder (the save itself still needs the tap, for the sign-in popup)
+// once per visit, after sign-in: a one-tap reminder (the save itself is a tap: it may go to the sign-in page)
 let reminded = false;
 export function remindBackup() {
   if (reminded || !S.user || !backupDue(settings().cloudBackup) || (!driveReady() && !dropboxReady())) return;
   reminded = true;
   const c = cleanCloudBackup(settings().cloudBackup);
   const to = c.lastTo === 'dropbox' && dropboxReady() ? 'dropbox' : driveReady() ? 'drive' : 'dropbox';
-  if (to === 'drive') loadGis().catch(() => {});
   setTimeout(() => toast(c.lastAt ? `Your last backup was over ${7} days ago` : 'Back up your logbook to the cloud?', {
     action: to === 'drive' ? 'Save to Drive' : 'Save to Dropbox', ms: 15000,
     onaction: () => (to === 'drive' ? saveToDrive() : saveToDropbox()),
