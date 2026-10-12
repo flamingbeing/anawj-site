@@ -9,14 +9,9 @@ Last updated: 2026-10-12 by Claude Code, Logbook 3 (log3).
 
 ## Now
 
-<<<<<<< HEAD
-- **Claude Code, "APMES Logbook" session** (branch `claude/clever-gates-pm6sas`): idle; signed in to Firebase CLI
-  for this session at the owner's request, nothing run with it yet (each use needs the owner's OK).
-=======
 - **Claude Code, "APMES Logbook" session** (branch `claude/clever-gates-pm6sas`): idle after #183 (`/apmes/` folder,
   blank portfolio template committed for tests, Word export now ticks Female). Firebase CLI signed in for this
   session, unused (each use needs the owner's OK).
->>>>>>> origin/main
 - **Claude Code, Logbook 3 (log3)** (branch `ccr-2994049c-4e5tlt`): idle after #181. Still signed in
   to the Firebase CLI (usage counts only; each use needs the owner's OK). Owns the axe check, PR previews and the
   Codex / Firebase plugin setup.
@@ -43,10 +38,7 @@ Last updated: 2026-10-12 by Claude Code, Logbook 3 (log3).
 
 ## Recently done
 
-<<<<<<< HEAD
-=======
 - #183 APMES documents in `/apmes/`; blank portfolio template in the repo; Word export ticks Female (was never ticked).
->>>>>>> origin/main
 - #181 Notes review fixes: note index moved to owner-only `meta/noteIndex` (rules deployed), bin restore keeps the
   100-note limit, notes listener metadata, 34 new rules tests; previews no longer break on reload (service workers
   key the page by `'./'`).
