@@ -406,6 +406,7 @@ function askLeave(g, proceed) {
     const a = e.target.closest('[data-a]')?.dataset.a || (e.target === d ? 'stay' : null);
     if (!a) return;
     if (a === 'save' && !g.save()) { d.close(); return; }
+    if (a === 'drop') g.drop?.();
     d.close();
     if (a !== 'stay') proceed();
   };
@@ -680,7 +681,33 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
   // what's on screen when it opens; anything changed from that is asked about before leaving
   const snap = () => JSON.stringify(cols.map(c => draft[c.key] == null ? null : String(draft[c.key])));
   let base = null;
-  leaveGuard = () => !p.lock?.on && base != null && snap() !== base ? { what: pt.label + ' reading', save: commit } : null;
+  // an unsaved reading is also kept on the phone as it's typed: if the phone closes the app (another app opened, low
+  // memory, flat battery), it comes back when the reading is opened again, unless the reading was saved since
+  const DKEY = `unsaved:${p.id}:${s}:${pt.key}`;
+  const dropDraft = () => { try { localStorage.removeItem(NS + DKEY); } catch { /* fine */ } };
+  const keep = () => {
+    if (base == null || p.lock?.on) return;
+    const d = { ...draft };
+    // a temperature still being typed counts too
+    const open = view.querySelector('input.num[data-k]');
+    if (open) { const k = open.dataset.k, v = cols.find(c => c.key === k)?.temp ? normaliseTemp(open.value) : open.value.trim(); d[k] = v === '' ? null : v; }
+    if (JSON.stringify(cols.map(c => d[c.key] == null ? null : String(d[c.key]))) === base) dropDraft();
+    else write(DKEY, { t: Date.now(), v: d });
+  };
+  const kept = read(DKEY, null);
+  let restored = false;
+  if (kept && !p.lock?.on && Date.now() - kept.t < 12 * 3600e3 && cols.every(c => openT[c.key] <= kept.t)) {
+    base = snap();
+    for (const c of cols) if (c.key in kept.v) draft[c.key] = kept.v[c.key];
+    // the restored set temp / warming answers stay as they were (not recalculated)
+    setTouched = true; warmTouched.add('under'); warmTouched.add('gown');
+    restored = snap() !== base;
+    if (!restored) dropDraft();
+  } else if (kept) dropDraft();
+  const hide = () => { if (document.visibilityState === 'hidden') keep(); };
+  document.addEventListener('visibilitychange', hide); window.addEventListener('pagehide', keep);
+  cleanup.push(() => { document.removeEventListener('visibilitychange', hide); window.removeEventListener('pagehide', keep); });
+  leaveGuard = () => !p.lock?.on && base != null && snap() !== base ? { what: pt.label + ' reading', save: commit, drop: dropDraft } : null;
   function commit() {
     if (p.lock?.on) { toast('Locked: read only. Unlock it on the home page to change it.'); return false; }
     const bad = cols.filter(c => c.temp && draft[c.key] != null && (+draft[c.key] < 25 || +draft[c.key] > 45 || Number.isNaN(+draft[c.key])));
@@ -699,7 +726,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     const theirs = cols.filter(c => (p.f[`${s}_${pt.key}_${c.key}`]?.t || 0) !== openT[c.key]);
     if (theirs.length) {
       const by = p.f[`${s}_${pt.key}_${theirs[0].key}`]?.by;
-      if (!confirm(`The ${pt.label} reading was changed on another phone${by ? ' (' + by + ')' : ''} while you had it open: ${theirs.map(c => `${c.label} ${val(p, `${s}_${pt.key}_${c.key}`) ?? 'blank'}`).join(', ')}.\n\nOK: save yours over it. Cancel: show theirs.`)) { leaveGuard = null; render(); return false; }
+      if (!confirm(`The ${pt.label} reading was changed on another phone${by ? ' (' + by + ')' : ''} while you had it open: ${theirs.map(c => `${c.label} ${val(p, `${s}_${pt.key}_${c.key}`) ?? 'blank'}`).join(', ')}.\n\nOK: save yours over it. Cancel: show theirs.`)) { dropDraft(); leaveGuard = null; render(); return false; }
     }
     // saved more than 5 min after it was due (typed in later): ask when it was taken; that time goes on the forms
     let takenAt = nowHM();
@@ -718,6 +745,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     saveAll();
     if (sent.length) sync(p, sent);
     toast(pt.label + ' saved');
+    dropDraft();
     base = snap();
     for (const c of cols) openT[c.key] = p.f[`${s}_${pt.key}_${c.key}`]?.t || 0;
     return true;
@@ -815,6 +843,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     }
     // an automatic change (set temp NA once warming is off) isn't something to ask about
     if (clean) base = snap();
+    keep();
     const due = dueOf(p, s, pt);
     const grp = s === 'prewarm' ? `<span class="badge">${GROUPS.find(g => String(g[0]) === String(val(p, 'arm')))?.[1] || 'Group not set'}</span>` : '';
     paint(`${main && val(p, 'done') ? `<p class="ok-box donetop">✓ Data collection complete <small>${esc(val(p, 'done'))}</small></p>` : ''}${main ? comfortHtml('sat_pre', 'Comfortable before surgery?') + timesHtml() : ''}${navHtml()}
@@ -833,6 +862,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     if (on) st.scrollLeft = on.offsetLeft - st.offsetLeft - (st.clientWidth - on.offsetWidth) / 2;
   }
   draw();
+  if (restored) toast(`Unsaved ${pt.label} reading brought back. Check it, then Save.`);
   const step = { core: 0.1, chest: 0.1, arm: 0.1, thigh: 0.1, calf: 0.1, room: 0.5, sbp: 1, dbp: 1, map: 1, hr: 1, bis: 1 };
   const start = { core: 36.5, chest: 36.5, arm: 36.5, thigh: 36.5, calf: 36.5, room: 20, sbp: 120, dbp: 70, map: 85, hr: 75, bis: 50 };
   function bump(k, dir) {
@@ -889,7 +919,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
       // an empty temperature starts at 36.5; tap again to type
       if ((c.temp || k === 'room') && draft[k] == null) { draft[k] = k === 'room' ? '20.0' : '36.5'; draw(); return; }
       const inp = document.createElement('input');
-      inp.className = 'num'; inp.inputMode = 'decimal'; inp.value = draft[k] ?? ''; inp.setAttribute('aria-label', c.label);
+      inp.className = 'num'; inp.dataset.k = k; inp.inputMode = 'decimal'; inp.value = draft[k] ?? ''; inp.setAttribute('aria-label', c.label);
       n.replaceWith(inp); inp.focus(); inp.select();
       let ended = false; // removing the box on redraw fires blur again
       const done = () => {
@@ -939,6 +969,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
   view.oninput = e => {
     const k = e.target.dataset.in; if (!k) return;
     const v = e.target.value.trim(); draft[k] = v === '' ? null : v;
+    keep();
     for (const c of cols) {
       const cd = view.querySelector(`.card[data-k="${c.key}"]`); if (!cd) continue;
       cd.classList.toggle('changed', isChanged(c.key)); cd.querySelector('.clab small').innerHTML = hintOf(c);

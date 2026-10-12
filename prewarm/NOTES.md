@@ -77,6 +77,10 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   complete; a teammate's patient synced from another theatre doesn't beep here), other patients' alerts start with
   their Subject ID, the screen stays awake on the home list too, and the home list shows each one's reading due within 2 min,
   now or late. The top bar's countdown also shows the other tab's reading once it is due.
+- **Unsaved readings survive the app closing** (12 Oct 2026): as a reading is typed (including a temperature with
+  the keyboard still up), it is kept in localStorage (`unsaved:<patient>:<series>:<timepoint>`); reopening that
+  reading brings it back with a toast, unless any of its boxes was saved since. Save or "Don't save" clears it.
+  Toasts let taps through (`pointer-events: none`): they sat over Log, Back and the tabs for 2.6 s.
 - **Never send an empty `f`** (lesson, 12 Oct 2026): `setDoc(…, { f: {} }, { merge: true })` replaces the server's
   `f` with an empty map (an empty map is a leaf in the merge). Lock / unlock / delete sent one and wiped the server
   copy's readings; push now omits an empty `f`, lock sends the full record, and each phone resends all its patients

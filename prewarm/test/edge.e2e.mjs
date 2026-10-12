@@ -416,6 +416,32 @@ await tryit(async () => {
   log(/DEMO-01: Temperature \d+ min reading due now/.test(bn), 'other patient\'s due reading alerts on this screen: ' + bn);
   await ctx.close();
 });
+// W. the phone closes the app with a reading half typed: it comes back when reopened; Don't save forgets it
+await tryit(async () => {
+  const { ctx, pg } = await fresh();
+  pg.on('dialog', d => d.accept());
+  await open(pg, 1);
+  await pg.click('#haemolink'); await pg.waitForSelector('[data-in="sbp"]');
+  await pg.fill('[data-in="sbp"]', '133');
+  await pg.reload(); await pg.waitForSelector('[data-in="sbp"]');
+  log(await pg.inputValue('[data-in="sbp"]') === '133', 'typed BP back after the app closed: ' + await pg.inputValue('[data-in="sbp"]'));
+  log(/brought back/.test(await pg.textContent('#toast')), 'and it says so');
+  // a temperature being typed (keyboard still up) when the app closes
+  await pg.click('#templink'); await pg.waitForSelector('dialog.ask[open]'); await pg.click('dialog.ask [data-a="drop"]');
+  await pg.waitForSelector('.num[data-type="core"]'); await pg.waitForTimeout(800);
+  await pg.click('.num[data-type="core"]'); await pg.waitForTimeout(800);
+  if (!await pg.$('input.num')) await pg.click('.num[data-type="core"]');
+  await pg.waitForSelector('input.num');
+  await pg.keyboard.press('Control+A'); await pg.keyboard.type('372');
+  await pg.reload(); await pg.waitForSelector('.num[data-type="core"]');
+  log((await pg.textContent('.num[data-type="core"]')).trim() === '37.2', 'temperature being typed back after the app closed: ' + await pg.textContent('.num[data-type="core"]'));
+  // Don't save: gone when reopened
+  await pg.click('#haemolink'); await pg.waitForSelector('dialog.ask[open]'); await pg.click('dialog.ask [data-a="drop"]');
+  await pg.waitForSelector('[data-in="sbp"]');
+  await pg.click('#templink'); await pg.waitForSelector('.num[data-type="core"]');
+  log((await pg.textContent('.num[data-type="core"]')).trim() !== '37.2', 'Don\'t save forgets it: ' + await pg.textContent('.num[data-type="core"]'));
+  await ctx.close();
+});
 await b.close();
 if (fails.length) { console.error('prewarm edge: FAIL\n- ' + fails.join('\n- ')); process.exit(1); }
-console.log('prewarm edge: ok (midnight, surgery end, double-tap Save, BP checks, back button, Log, Enter, still to fill, swipe, stray taps, time order, corrections, BMI, follow-ups, blanks, typed answers, alerts everywhere, duplicates, storage full, lock warning, late readings, delete and restore, prewarm off alert, warming yes / no, touch double taps, typing then leaving, other tab due, two patients)');
+console.log('prewarm edge: ok (midnight, surgery end, double-tap Save, BP checks, back button, Log, Enter, still to fill, swipe, stray taps, time order, corrections, BMI, follow-ups, blanks, typed answers, alerts everywhere, duplicates, storage full, lock warning, late readings, delete and restore, prewarm off alert, warming yes / no, touch double taps, typing then leaving, other tab due, two patients, app closed mid-reading)');
