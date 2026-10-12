@@ -57,6 +57,10 @@ for (const width of [390, 1280]) {
   await p.evaluate(async()=>{const {S,writes}=await import('./js/ui-core.js');globalThis.originalUser=S.user;S.user={email:'fake-other@example.com'};await writes.activate(S.user.email);globalThis.leakedWrites=[];writes.configure({backend:async(email,kind,record)=>{leakedWrites.push({email,kind,record});return record;}});});
   await p.getByRole('button',{name:'Restore',exact:true}).click();await p.waitForTimeout(100);assert.equal(await p.evaluate(()=>leakedWrites.length),0);
   await p.evaluate(async()=>{const {S,writes}=await import('./js/ui-core.js');S.user=originalUser;await writes.activate(S.user.email);});
+  // Closing a tag dialog after account replacement must not run its old editing callback.
+  await p.evaluate(async()=>{const {pickDialog}=await import('./js/ui-log.js');globalThis.foreignTagEdits=0;pickDialog(['08'],()=>foreignTagEdits++);});await p.waitForSelector('dialog[open]');
+  await p.evaluate(async()=>{const {S,transients}=await import('./js/ui-core.js');S.user={email:'fake-other@example.com'};transients.reset();document.querySelectorAll('dialog[open]').forEach(el=>el.close());});await p.waitForFunction(()=>!document.querySelector('dialog[open]'));assert.equal(await p.evaluate(()=>foreignTagEdits),0);
+  await p.evaluate(async()=>{const {S,writes}=await import('./js/ui-core.js');S.user=originalUser;await writes.activate(S.user.email);});
   // Cleanup errors are explicit; an unreadable database cannot be treated as empty.
   const cleanup=await p.evaluate(async()=>{const {recoveryStore}=await import('./js/recovery-store.js');const owner='fake-cleanup@example.com';await recoveryStore.put({key:'fake-cleanup',owner,record:{details:'Fake private'}});const tx=IDBDatabase.prototype.transaction;IDBDatabase.prototype.transaction=function(){throw Error('Denied transaction');};let rejected=false;try{await recoveryStore.forget(owner);}catch{rejected=true;}finally{IDBDatabase.prototype.transaction=tx;}const retained=(await recoveryStore.list(owner)).length;await recoveryStore.forget(owner);return {rejected,retained};});
   assert.deepEqual(cleanup,{rejected:true,retained:1});

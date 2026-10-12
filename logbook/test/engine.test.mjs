@@ -616,3 +616,26 @@ console.log('engine tests passed');
   assert.equal(d.changed.length, 1); assert.equal(d.changed[0].after.date, '2026-10-02'); assert.deepEqual(d.changed[0].after.cats, ['16', '17']);
   console.log('upload missing-column tests passed');
 }
+
+// Date terms inside quoted phrases, operators and exclusions stay literal.
+{
+ const {dateWindow}=await import('../js/engine.js');const now=new Date(2026,9,10);
+ assert.equal(dateWindow('"discussed yesterday"',now),null);
+ assert.equal(dateWindow('case:yesterday',now),null);
+ assert.equal(dateWindow('-yesterday',now),null);
+ assert.equal(dateWindow('"yesterday" OR case:today last week',now).rest,'"yesterday" OR case:today');
+ assert.equal(dateWindow('"discussed yesterday" today',now).from,'2026-10-10');
+ assert.equal(dateWindow('"unfinished yesterday',now),null);
+}
+
+{
+ const {humanAge}=await import('../js/engine.js');
+ for(const input of ['6m','6M'])assert.equal(humanAge(input),'6 years · male');
+ assert.equal(humanAge('3m'),'3 years · male');assert.equal(humanAge('3mo'),'3 months');assert.equal(humanAge('6mo'),'6 months');assert.equal(humanAge('1moF'),'1 month · female');assert.equal(humanAge('3/12'),'3 months');
+}
+
+{
+ const {dateWindow,humanAge,splitAge}=await import('../js/engine.js');
+ assert.equal(dateWindow('today "lap  chole"',new Date(2026,9,10)).rest,'"lap  chole"');
+ assert.equal(humanAge(splitAge('2m2w hernia').age),'2 months 2 weeks');
+}

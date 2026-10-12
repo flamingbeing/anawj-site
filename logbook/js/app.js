@@ -2,7 +2,7 @@
 // shared state and helpers are in ui-core.js. Case data comes from cloud.js (Firestore, or the
 // in-browser demo backend with ?demo).
 
-import { S, hooks, h, toast, cloud, writes, setCases, scheduleSummary, fill, resetCaches, patchLogbook, confirmBox, fileButton, modal, download, todayISO, settings, setCategoryNames, categoryNames as categoryNamesNow } from './ui-core.js';
+import { S, hooks, h, toast, clearToast, cloud, writes, transients, setCases, scheduleSummary, fill, resetCaches, patchLogbook, confirmBox, fileButton, modal, download, todayISO, settings, setCategoryNames, categoryNames as categoryNamesNow } from './ui-core.js';
 import { renderLog, focusLog, logCasesChanged, clearDrafts, SHARED_KEY } from './ui-log.js';
 import { renderRecovery } from './ui-recovery.js';
 import { renderLogbook } from './ui-logbook.js';
@@ -265,10 +265,12 @@ const navigation = createNavigation({ history, location,
   parents: Object.fromEntries(TABS.filter(t => t.under).map(t => [t.id, t.under])),
   allowed: id => visibleTabs().some(t => t.id === id),
   onNavigate: changeScreen, getScroll: () => window.scrollY });
-function go(id) {
+async function go(id) {
+  await transients.dismissAll();
   if (S.tab === id) { if (id === 'log') focusLog(); return; }
   navigation.go(id);
 }
+hooks.navigate = go;
 // Native links, menu links and tab buttons use the same history policy. Modified
 // clicks can still open a new tab, and Leave demo remains a normal document link.
 document.addEventListener('click', e => {
@@ -453,13 +455,24 @@ function reloadFlag(v) {
 async function onUser(user) {
   if (unwatch) { unwatch(); unwatch = null; }
   if (unwatchRefl) { unwatchRefl(); unwatchRefl = null; }
+  const previousUser = S.user;
   S.user = user;
+  if (previousUser && user && previousUser.email !== user.email) {
+    const cleanup = writes.forget();
+    Object.assign(S, { cases: [], reflections: [], counts: {}, casesLoaded: false, casesSynced: false, logbook: null });
+    clearDrafts(); resetCaches(); forgetWho(); clearToast(); transients.reset();
+    document.querySelectorAll('dialog[open]').forEach(el => el.close());
+    app.innerHTML = SKELETON;
+    try { await cleanup; } catch (err) { if (S.user === user) toast(err.message); }
+    if (S.user !== user) return;
+  }
   if (!user) {
     Object.assign(S, { admin: false, owner: false, pd: false, resident: null, logbook: null, cases: [], reflections: [], counts: {}, casesLoaded: false, casesSynced: false, sharedTemplates: [] });
     const cleanup = signedInOnce ? writes.forget() : Promise.resolve();
     if (signedInOnce) { clearDrafts(); resetCaches(); forgetWho(); }
+    transients.reset();
     document.querySelectorAll('dialog[open]').forEach(el => el.close());
-    paintWho(); renderLanding();
+    clearToast(); paintWho(); renderLanding();
     try { await cleanup; } catch (err) { if (!S.user) renderLanding('Could not clear device recovery: ' + err.message); }
     return;
   }
@@ -625,7 +638,7 @@ function demoMenu() {
     h('p', {}, 'Made-up data, stored only in this browser. Try anything: nothing is sent anywhere.'),
     h('div', { class: 'bar', style: 'margin-top:12px;flex-wrap:wrap' },
       h('button', { class: 'danger', onclick: async () => {
-        m.close();
+        await m.close();
         if (!(await confirmBox('Reset demo', 'Delete everything you added in the demo (cases, reflections, images, settings) and start again with the made-up data? The uploaded portfolio template is kept.', 'Reset', true))) return;
         clearDrafts(); resetCaches(); forgetWho(); resetDisplay(); applyCompact(false); applyTextSize('1'); applyAccent(null);
         cloud.resetDemo();
