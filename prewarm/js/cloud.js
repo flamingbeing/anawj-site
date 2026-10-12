@@ -133,7 +133,8 @@ export async function watchPatients(site, cb, onError) {
 export async function push(rec, ids, withLock = false) {
   const { db, F } = await sdk();
   const f = {};
-  for (const k of ids) if (rec.f[k]) f[k] = rec.f[k];
+  // auto always sent: the merge is deep, so a typed value would otherwise keep an old auto flag and be recalculated over
+  for (const k of ids) if (rec.f[k]) f[k] = { ...rec.f[k], auto: !!rec.f[k].auto };
   // never send an empty f: merging {} would replace the patient's readings on the server with nothing
   const body = { site: rec.site, created: rec.created, locked: !!rec.lock?.on };
   if (Object.keys(f).length) body.f = f;

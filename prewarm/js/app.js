@@ -80,6 +80,7 @@ const sharing = () => cloud.enabled && (shared.member || shared.admin);
 // send changed fields; Firestore keeps them on the phone and sends them when there is signal
 // patients with changes sent but not yet confirmed by the server (no signal), kept across reloads; Log out warns
 let pending = read('pending', {});
+const sessionStart = Date.now();
 // when this phone was last fully in step with the server (nothing waiting to send, team's changes received)
 let lastSync = read('lastSync', 0);
 function synced() {
@@ -137,22 +138,46 @@ async function logOut(btn) {
 async function watch() {
   shared.unwatch?.(); shared.unwatch = null;
   if (!sharing()) return;
+  const seen = new Set();
+  let healedAll = false;
   shared.unwatch = await cloud.watchPatients(shared.admin ? null : shared.member.site, (list, meta) => {
-    if (meta.server) { synced(); resyncOnce(); }
     let changed = false;
-    // a member's phone: a patient locked by an admin leaves the team's query, so it goes from this phone
+    // a member's phone: a patient locked by an admin leaves the team's query, so it goes from this phone, unless it
+    // has changes the server never took: then it stays here (export it, ask the admin to unlock)
     if (!shared.admin) for (const id of meta.removed || []) {
       if (!patients[id]) continue;
+      if (pending[id]) { toast(`${sid(patients[id])} was locked by the study admin before your last changes reached the team. They stay on this phone: ask the admin to unlock it.`); continue; }
       delete patients[id]; delete pending[id]; changed = true;
     }
     if (changed) write('pending', pending);
     for (const r of list) {
+      seen.add(r.id);
       const local = patients[r.id];
       if (!local) { patients[r.id] = { ...r, f: { ...r.f } }; changed = true; continue; }
       const m = mergeRecord(local, r);
       // in place: open screens hold this object
       if (m.changed) { Object.assign(local, m.rec, { site: local.site || r.site }); changed = true; }
+      // heal (bug hunt, 12 Oct 2026): the server keeps whichever write arrived last, not the newest; anything this
+      // phone holds newer than the copy it just heard goes back up, so both phones and the server settle on the newest
+      if (!local.lock?.on && !r.lock?.on) {
+        const newer = Object.keys(local.f).filter(k => (local.f[k]?.t || 0) > (r.f?.[k]?.t || 0));
+        if (newer.length) sync(local, newer);
+      }
     }
+    if (meta.server && !healedAll) {
+      healedAll = true;
+      // patients on this phone the server has never had (made before sign-in finished, or before signal): send whole
+      for (const p of Object.values(patients)) {
+        if (seen.has(p.id) || p.lock?.on || !Object.keys(p.f).length) continue;
+        const site = val(p, 'site') || p.site;
+        if (!shared.admin && site && site !== shared.member?.site) continue;
+        sync(p, Object.keys(p.f));
+      }
+      // changes waiting from an earlier visit were sent again just above if still newer: stop counting them
+      for (const [id, tok] of Object.entries(pending)) if (tok < sessionStart) delete pending[id];
+      write('pending', pending);
+    }
+    if (meta.server) { synced(); resyncOnce(); }
     if (!changed) return;
     saveAll();
     const h = location.hash.slice(1) || '/';
@@ -205,8 +230,7 @@ if (cloud.enabled) cloud.onUser(async u => {
   if (shared.member) { settings.site = shared.member.site; if (!settings.me && shared.member.initials) settings.me = shared.member.initials; saveSettings(); }
   uploadLocal();
   await watch();
-  // changes held over from an earlier visit go out with the next signal: then nothing is pending
-  if (sharing() && Object.keys(pending).length) cloud.flushed(600000).then(ok => { if (ok) { pending = {}; write('pending', pending); synced(); } });
+  // changes held over from an earlier visit: the first word from the server sends again anything still newer (watch)
   document.body.dataset.cloud = 'ready';
   // redraw only when sharing changed, so a half-typed join code isn't wiped
   if (before !== !!(shared.member || shared.admin) && !view.contains(document.activeElement)) render();
@@ -546,6 +570,8 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
   }
   let setTouched = false; // gown set temp follows "warming off" until someone picks a value
   const isSaved = !!savedAt(p, s, pt.key);
+  // when each box was last changed as the screen opened: a later change came from the other phone
+  const openT = Object.fromEntries(cols.map(c => [c.key, p.f[`${s}_${pt.key}_${c.key}`]?.t || 0]));
   // what's on screen when it opens; anything changed from that is asked about before leaving
   const snap = () => JSON.stringify(cols.map(c => draft[c.key] == null ? null : String(draft[c.key])));
   let base = null;
@@ -564,12 +590,20 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     const blank = cols.filter(c => draft[c.key] == null || draft[c.key] === '');
     if (blank.length === cols.length) { toast('Nothing entered for ' + pt.label + ' yet.'); return false; }
     if (blank.length && !confirm(`${blank.map(c => c.label).join(', ')} ${blank.length === 1 ? 'is' : 'are'} blank.\n\nSave the ${pt.label} reading without ${blank.length === 1 ? 'it' : 'them'}?`)) return false;
-    for (const c of cols) setVal(p, `${s}_${pt.key}_${c.key}`, draft[c.key] == null ? null : (c.type === 'code' ? +draft[c.key] : String(draft[c.key])), settings.me);
-    if (!isSaved) setVal(p, `at_${s}_${pt.key}`, nowHM(), settings.me);
+    // the other phone saved this reading while it was open here: ask before writing over it (Cancel shows theirs)
+    const theirs = cols.filter(c => (p.f[`${s}_${pt.key}_${c.key}`]?.t || 0) !== openT[c.key]);
+    if (theirs.length) {
+      const by = p.f[`${s}_${pt.key}_${theirs[0].key}`]?.by;
+      if (!confirm(`The ${pt.label} reading was changed on another phone${by ? ' (' + by + ')' : ''} while you had it open: ${theirs.map(c => `${c.label} ${val(p, `${s}_${pt.key}_${c.key}`) ?? 'blank'}`).join(', ')}.\n\nOK: save yours over it. Cancel: show theirs.`)) { leaveGuard = null; render(); return false; }
+    }
+    // only what changed goes out (with the save time): an unchanged box never overwrites the other phone's newer one
+    const sent = cols.map(c => `${s}_${pt.key}_${c.key}`).filter((id, i) => setVal(p, id, draft[cols[i].key] == null ? null : (cols[i].type === 'code' ? +draft[cols[i].key] : String(draft[cols[i].key])), settings.me));
+    if (!savedAt(p, s, pt.key)) { setVal(p, `at_${s}_${pt.key}`, nowHM(), settings.me); sent.push(`at_${s}_${pt.key}`); }
     saveAll();
-    sync(p, [...cols.map(c => `${s}_${pt.key}_${c.key}`), `at_${s}_${pt.key}`]);
+    if (sent.length) sync(p, sent);
     toast(pt.label + ' saved');
     base = snap();
+    for (const c of cols) openT[c.key] = p.f[`${s}_${pt.key}_${c.key}`]?.t || 0;
     return true;
   }
 
@@ -720,7 +754,11 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
       draw(); return;
     }
     const clr = t.closest('[data-evclear]');
-    if (clr) { set(p, clr.dataset.evclear, null); editing = null; draw(); return; }
+    if (clr) {
+      const id = clr.dataset.evclear;
+      if (val(p, id) && !confirm(`Clear the ${evLabel(id)} time (${val(p, id)})?`)) return;
+      set(p, id, null); editing = null; draw(); return;
+    }
     const n = t.closest('.num[data-type]');
     if (n) {
       const k = n.dataset.type, c = cols.find(x => x.key === k);
@@ -752,7 +790,9 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
   };
   view.onchange = e => {
     if (e.target.id !== 'evtime' || !editing) return;
-    set(p, editing, e.target.value || null); editing = null; draw();
+    // an emptied picker doesn't clear the time (that's the Clear button, which asks)
+    if (e.target.value) set(p, editing, e.target.value);
+    editing = null; draw();
   };
   // typed boxes (BP, HR, BIS): no redraw while typing, so moving to the next box keeps the keyboard up
   view.onfocusin = e => { if (e.target.dataset.in) typing = e.target.dataset.in; };
