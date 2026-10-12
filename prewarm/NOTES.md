@@ -66,6 +66,12 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   (`resync2`), and stay hidden from members until then. Lock icon: an inline SVG padlock, no emoji.
   - Lesson: no `get(field, default)` in a read rule that guards a query: Firestore treats fields the query doesn't
     constrain as missing, so the default lets an unfiltered query through. Require the field (`locked == false`).
+- **Readings saved ahead of time** (12 Oct 2026): a reading opens on the latest due timepoint still unsaved (else
+  the next one), and saving one more than 3 min before it is due asks first (probably the wrong timepoint, and the
+  real one would never be asked for). Tests that type key times use times relative to now: a fixed clock time
+  reads as the next day's once the test runs over 12 h later (`nowFor` picks the nearest day).
+- **Long reading numbers** (12 Oct 2026): `fitNums()` shrinks a reading's number until it fits its box (CSS
+  container units didn't work under the app's zoom); checked at 320 and 390 px, zoom 1 and 1.25.
 - **Never send an empty `f`** (lesson, 12 Oct 2026): `setDoc(…, { f: {} }, { merge: true })` replaces the server's
   `f` with an empty map (an empty map is a leaf in the merge). Lock / unlock / delete sent one and wiped the server
   copy's readings; push now omits an empty `f`, lock sends the full record, and each phone resends all its patients

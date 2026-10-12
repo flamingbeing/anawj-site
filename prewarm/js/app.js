@@ -34,6 +34,20 @@ const write = (k, v) => {
   }
 };
 let patients = read('patients', {});
+// another window of the app on this phone saved: take its changes (newest value per field wins, as between phones)
+// so neither window writes its stale copy over the other's
+window.addEventListener('storage', e => {
+  if (e.key !== NS + 'patients' || !e.newValue) return;
+  let other; try { other = JSON.parse(e.newValue); } catch { return; }
+  let changed = false;
+  for (const r of Object.values(other || {})) {
+    const local = patients[r.id];
+    if (!local) { patients[r.id] = r; changed = true; continue; }
+    const m = mergeRecord(local, r);
+    if (m.changed) { Object.assign(local, m.rec); changed = true; }
+  }
+  if (changed) { shared.stale = true; const b = document.getElementById('fresh'); if (b) b.hidden = false; }
+});
 const settings = Object.assign({ me: '', site: '', hide: { skin: false, set: false, ts: false, warm: false, room: false, haemo15: false, bis: false },
   remind: { vibrate: true, beep: true, banner: true, awake: true } }, read('settings', {}));
 const saveAll = () => write('patients', patients);
@@ -359,6 +373,19 @@ document.addEventListener('click', e => {
   if (Date.now() >= tapLockUntil || e.target.closest('dialog')) return;
   if (Math.hypot(e.clientX - lockAt.x, e.clientY - lockAt.y) < 48) { e.stopImmediatePropagation(); e.preventDefault(); }
 }, true);
+// a reading's number shrinks until it fits between − and + (Large / Larger sizes and small phones cut 36.7 to "36.")
+function fitNums() {
+  const fit = n => {
+    n.style.fontSize = '';
+    let f = parseFloat(getComputedStyle(n).fontSize);
+    while (n.scrollWidth > n.clientWidth + 1 && f > 11) { f -= 1; n.style.fontSize = f + 'px'; }
+    return f;
+  };
+  for (const n of view.querySelectorAll('.pm .num')) {
+    // still tiny (Larger size on a small phone): narrower − / + make room
+    if (fit(n) < 16) { n.parentElement.style.gridTemplateColumns = '32px minmax(0, 1fr) 32px'; n.parentElement.style.gap = '2px'; fit(n); }
+  }
+}
 // ask for a 24-hour time (hh:mm); null if cancelled or not a time
 function askTime(q, def) {
   const r = prompt(q + '\n\n24-hour time, e.g. 08:05', def || '');
@@ -601,12 +628,15 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
   let editing = null; // event whose time is being changed
   let alive = true; cleanup.push(() => { alive = false; });
   let typing = null; // the BP / HR / BIS box with the keyboard up
-  // default timepoint: the unsaved one nearest its due time, else the first unsaved
+  // default timepoint: the one due most recently while unsaved (until the next is due), else the next one coming up,
+  // else the first unsaved (the nearest-due rule opened the next timepoint once a reading was 2.5 min late)
   if (!key) {
     const open = pts.filter(x => !savedAt(p, s, x.key));
     const now = nowFor(p, s);
-    const timed = open.filter(x => dueOf(p, s, x) != null).sort((a, b) => Math.abs(dueOf(p, s, a) - now) - Math.abs(dueOf(p, s, b) - now));
-    key = (timed[0] || open[0] || pts[pts.length - 1]).key;
+    const timed = pts.map(x => ({ x, d: dueOf(p, s, x) })).filter(t => t.d != null && expected(p, s, t.d)).sort((a, b) => a.d - b.d);
+    const cur = timed.filter(t => t.d <= now).pop();
+    const pick = cur && !savedAt(p, s, cur.x.key) ? cur.x : timed.find(t => t.d > now && !savedAt(p, s, t.x.key))?.x;
+    key = (pick || open[0] || pts[pts.length - 1]).key;
   }
   const pt = def.points.find(x => x.key === key) || pts[0];
   const idx = def.points.indexOf(pt);
@@ -651,6 +681,9 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     // saved more than 5 min after it was due (typed in later): ask when it was taken; that time goes on the forms
     let takenAt = nowHM();
     const dueAt = dueOf(p, s, pt);
+    // saved well before it's due: probably the wrong timepoint (it would then never be asked for)
+    if (!savedAt(p, s, pt.key) && dueAt != null && dueAt - nowFor(p, s) > 3
+      && !confirm(`The ${pt.label} reading isn't due until ${fromMin(Math.round(dueAt))} (in ${Math.round(dueAt - nowFor(p, s))} min). Save it now anyway?`)) return false;
     if (!savedAt(p, s, pt.key) && dueAt != null && nowFor(p, s) - dueAt > 5) {
       const t = askTime(`The ${pt.label} reading was due at ${fromMin(Math.round(dueAt))}. What time was it taken?`, fromMin(Math.round(dueAt)));
       if (!t) return false;
@@ -770,6 +803,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
       ${s === 'haemo' && settings.hide.haemo15 ? `<p class="muted small">Only baseline is entered here; the 15-min rows come from the monitor download. Turn them on in Settings.</p>` : ''}
       ${main ? comfortHtml('sat_post', 'Comfortable after surgery?') + linksHtml() + gapsHtml(p) + doneHtml(p) : signoffHtml(p, s) + linksHtml() + gapsHtml(p) + doneHtml(p)}`);
     refreshBar();
+    fitNums();
     if (editing) { const i = $('#evtime'); i?.focus(); }
     if (typing) { const i = view.querySelector(`[data-in="${typing}"]`); i?.focus(); }
     const st = view.querySelector('.strip'), on = st?.querySelector('.on');
@@ -841,7 +875,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
         // the number goes back in place now and the screen redraws a moment later: redrawing at once swapped the
         // buttons under a finger already on its way to Save, + or ›, and that first tap was lost
         const b = document.createElement('button'); b.className = 'num'; b.dataset.type = k; b.textContent = draft[k] ?? 'tap';
-        if (inp.isConnected) inp.replaceWith(b);
+        if (inp.isConnected) { inp.replaceWith(b); fitNums(); }
         setTimeout(() => { if (alive) draw(); }, 400);
       };
       inp.onblur = done; inp.onkeydown = ev => { if (ev.key === 'Enter') inp.blur(); };
@@ -871,8 +905,10 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
   };
   view.onchange = e => {
     if (e.target.id !== 'evtime' || !editing) return;
-    // an emptied picker doesn't clear the time (that's the Clear button, which asks)
-    if (e.target.value) set(p, editing, e.target.value);
+    // an emptied picker doesn't clear the time (that's the Clear button, which asks) and keeps the editor open
+    // (typing a time on a keyboard fires change with an empty value at the first digit)
+    if (!e.target.value) return;
+    set(p, editing, e.target.value);
     editing = null; draw();
   };
   // typed boxes (BP, HR, BIS): no redraw while typing, so moving to the next box keeps the keyboard up
@@ -1189,6 +1225,7 @@ route(/^\/p\/(\w+)\/form\/(\w+)$/, (id, pg) => {
     if (u) { set(p, u.dataset.use, u.dataset.v); draw(); return; }
     if (e.target.closest('#addix')) { const rows = ixRows(p); rows.push({ time: nowHM() }); set(p, 'io_ix_rows', JSON.stringify(rows)); draw(); return; }
     const rm = e.target.closest('[data-rmix]');
+    if (rm && !confirm('Remove this investigation result?')) return;
     if (rm) { const rows = ixRows(p); rows.splice(+rm.dataset.rmix, 1); set(p, 'io_ix_rows', rows.length ? JSON.stringify(rows) : null); draw(); return; }
     signoffClick(p, pg, e.target);
   };

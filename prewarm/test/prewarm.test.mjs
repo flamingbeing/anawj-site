@@ -150,6 +150,12 @@ assert.equal(cellFor(BY_ID.age, ''), null);
   assert.equal(workbookSheets([dr], [])[0].rows.length, 3, 'restored: exported');
   dr.deleted = 4000;
   assert.equal(isGone(dr), true, 'deleted again');
+  // corrected to the no pre-warming group: its pre-warming readings aren't exported; very long text is cut to fit a cell
+  const nw = newRecord(); setVal(nw, 'enrol_id', 'NW-1', 'A'); setVal(nw, 'arm', 1, 'A'); setVal(nw, 'prewarm_0_core', '36.5', 'A');
+  assert.equal(workbookSheets([nw], [])[0].rows[2][BY_ID.prewarm_0_core.colIndex], 36.5);
+  setVal(nw, 'arm', 3, 'A');
+  assert.equal(workbookSheets([nw], [])[0].rows[2][BY_ID.prewarm_0_core.colIndex], null);
+  assert.equal(cellFor({ type: 'text' }, 'x'.repeat(40000)).length, 32000);
   // hidden follow-ups aren't exported (TXA answered No after a bolus was typed); no pre-warming exports NA for its start
   setVal(p, 'io_txa', 1); setVal(p, 'io_txa_bolus', '1000');
   assert.equal(workbookSheets([p], [])[0].rows[2][BY_ID.io_txa_bolus.colIndex], 1000);

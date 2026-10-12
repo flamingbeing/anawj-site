@@ -82,8 +82,10 @@ try {
   await page.click('[data-ev="pw_start"]');
   await page.waitForSelector('#evtime');
   await axe('patient'); await shot('patient');
-  await page.fill('#evtime', '07:30');
-  assert.equal(await page.textContent('[data-ev="pw_start"] b'), '07:30');
+  // two hours ago (a fixed clock time would read as tomorrow's when the test runs more than 12 h later)
+  const ago = new Date(Date.now() - 2 * 3600e3), PW = String(ago.getHours()).padStart(2, '0') + ':' + String(ago.getMinutes()).padStart(2, '0');
+  await page.fill('#evtime', PW);
+  assert.equal(await page.textContent('[data-ev="pw_start"] b'), PW);
 
   // pre-warming reading, option B: empty temp taps to 36.5, type core, nudge chest, pick sensation, save
   assert.match(await page.textContent('.tp'), /0 min/);
@@ -113,14 +115,14 @@ try {
   await page.click('#save'); await page.waitForTimeout(200);
   assert.match(blanks, /Thigh, Calf, Set temp on gown are blank/);
   assert.match(await page.textContent('.tp'), /0 min/, 'not saved after Cancel');
-  // Prewarm on was moved to 07:30, so this reading is late: Save also asks when it was taken (due time filled in)
+  // Prewarm on was moved two hours back, so this reading is late: Save also asks when it was taken (due time filled in)
   const asked2 = [];
   const ans = d => { asked2.push(d.type() + ': ' + d.message()); d.type() === 'prompt' ? d.accept(d.defaultValue()) : d.accept(); };
   page.on('dialog', ans);
   await page.click('#save');
   await page.waitForFunction(() => /5 min/.test(document.querySelector('.tp')?.textContent || ''));
   page.off('dialog', ans);
-  assert.ok(asked2.some(m => /^prompt: The 0 min reading was due at 07:30\. What time was it taken\?/.test(m)), 'late reading asks when it was taken: ' + JSON.stringify(asked2));
+  assert.ok(asked2.some(m => m.startsWith(`prompt: The 0 min reading was due at ${PW}. What time was it taken?`)), 'late reading asks when it was taken: ' + JSON.stringify(asked2));
   assert.equal((await page.textContent('.num[data-type="core"]')).trim(), '36.6', 'carried over from the last reading');
   await page.click('[data-step="1"][data-c="core"]');
   assert.equal((await page.textContent('.num[data-type="core"]')).trim(), '36.7');

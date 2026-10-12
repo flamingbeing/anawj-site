@@ -7,8 +7,9 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 ## Now
 
 - **Claude Code, Prewarming Webapp** (branch `ccr-13264f37-d28edu`): bug hunt from 17:53 UTC 12 Oct 2026 (owner: at
-  least 2 hours, anything that makes a missed variable likelier). Merged #257 #259 #261 #263 #265 #267 #269 #270
-  #273 #275 #276. An agent is stress-testing the UI like a rushed clinician; act on its findings next.
+  least 2 hours, anything that makes a missed variable likelier). Merged #257 to #280 and batch B (default timepoint,
+  early-save check, number fit, investigation Remove asks, arm 3 hides pre-warming in exports). Next: accessibility
+  check on the new prompts, then a summary for the owner.
   Questions for the owner: should the no-pre-warming group get pre-op temperatures (the app skips that table for
   them)? Is intra-op time 0 induction or knife to skin (the app's "Induction" box; the schema says "Knife to skin
   (induction)")? Advise not to lock patients during the study day. Real patients start 13 Oct 2026.
@@ -27,6 +28,8 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 
 ## Recently done
 
+- Batch B: reading opens on the latest due unsaved timepoint; early saves ask; numbers shrink to fit; other windows' saves merge; arm 3 pre-warming hidden in exports; text cells cut to 32000.
+- #280: double taps locked out; typed temperature kept when the screen redraws; banner floats under the bar.
 - #276: warming yes / no follows its logged start time; saved No after the start flagged.
 - #275: Prewarm off due alerts; alerts due together share one banner; AF specify as New onset / Existing.
 - #273: deleted patients can be restored; a deleted patient can't be charted into.
