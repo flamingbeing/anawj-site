@@ -111,6 +111,21 @@ try {
   await page.click('[data-ev="ev_wstop"]');
   await page.click('[data-ev="ev_wstop"]');
   await page.fill('#evtime', '07:31');
+  // leaving a reading with unsaved changes asks first: Stay keeps them, Save saves and goes on
+  await page.click('.strip a:has-text("10")');
+  await page.waitForSelector('dialog.ask[open]');
+  assert.match(await page.textContent('dialog.ask'), /Save the 5 min reading\?/);
+  await axe('save prompt');
+  await page.click('dialog.ask [data-a="stay"]');
+  assert.match(await page.textContent('.tp'), /5 min/, 'Stay keeps the screen');
+  assert.equal((await page.textContent('.num[data-type="core"]')).trim(), '36.7', 'and the change');
+  await page.click('.strip a:has-text("10")');
+  await page.click('dialog.ask [data-a="save"]');
+  await page.waitForFunction(() => /10 min/.test(document.querySelector('.tp')?.textContent || ''));
+  await page.click('.strip a:has-text("5")');
+  await page.waitForFunction(() => /5 min/.test(document.querySelector('.tp')?.textContent || ''));
+  assert.equal((await page.textContent('.num[data-type="core"]')).trim(), '36.7', 'Save in the prompt saved it');
+  assert.equal(await page.$('dialog.ask'), null, 'no prompt when nothing changed');
   await page.click('.strip a:has-text("10")');
   await page.waitForFunction(() => /10 min/.test(document.querySelector('.tp')?.textContent || ''));
   await page.waitForFunction(() => document.querySelector('.chip[data-c="set"][data-v="NA"]')?.getAttribute('aria-pressed') === 'true', null, { timeout: 5000 });
@@ -125,7 +140,9 @@ try {
   await shot('intraop-temps');
 
   // form view: the paper form's day-of-surgery pages, filled in, with Save as PDF / Print
+  // (the room temp above wasn't saved: Don't save leaves without it)
   await page.click('.textlinks a[href$="/form"]');
+  await page.click('dialog.ask [data-a="drop"]');
   await page.waitForSelector('.fpage');
   assert.equal((await page.$$('.fpage')).length, 4);
   assert.match(await page.textContent('.form'), /PRE-OPERATIVE \(INTERVENTION\)[\s\S]*☒ 10-minute prewarming/);
