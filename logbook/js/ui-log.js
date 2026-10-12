@@ -31,8 +31,9 @@ const draftParts = () => {
     return { initials: hint, details: text.slice(hint.length).trim() };
   return splitInitials(text);
 };
-const firstField = () => ['initials', 'date'].includes(display().firstField) ? display().firstField : 'details';
-export const focusLog = () => (draft.mode === 'bulk' ? ui?.textarea : firstField() === 'date' ? ui.datebar.querySelector('input[type=date]') : firstField() === 'initials' ? ui.initials : ui.textarea)?.focus({ preventScroll: true });
+// Settings → Advanced logging → Separate initials box (device firstField 'initials'; an older 'date' counts as off)
+const firstField = () => (display().firstField === 'initials' ? 'initials' : 'details');
+export const focusLog = () => (draft.mode === 'bulk' ? ui?.textarea : firstField() === 'initials' ? ui.initials : ui.textarea)?.focus({ preventScroll: true });
 const suggestionKey = () => JSON.stringify([draftText(), curDate(), settings().detectAgeSex !== false]);
 const draftKey = () => `${DRAFT_KEY}:${cloud.demo ? 'demo:' : ''}${(S.user && S.user.email) || ''}`;
 function loadDraft() {

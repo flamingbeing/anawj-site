@@ -169,7 +169,8 @@ export function reflectionNote(r, m, { path = '', images = {}, caseLink = '' } =
   };
   const parts = [fill(f.reflTitle, base), fill(f.reflSummary, base), caseLink];
   (r.points || []).forEach((pt, i) => {
-    parts.push(fill(f.reflPoint, { ...base, n: i + 1, point: pt.heading || `Learning point ${i + 1}`, text: String(pt.text || '').trim() }));
+    const free = (r.points || []).length === 1 && !String(pt.heading || '').trim();   // free text: "Learning points"
+    parts.push(fill(f.reflPoint, { ...base, n: i + 1, point: pt.heading || (free ? 'Learning points' : `Learning point ${i + 1}`), text: String(pt.text || '').trim() }));
     for (const fg of figs.filter(x => x.point === i)) parts.push(figText(fg));
   });
   for (const fg of figs.filter(x => x.point == null || x.point >= (r.points || []).length)) parts.push(figText(fg));

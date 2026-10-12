@@ -213,7 +213,8 @@ export function formatReflection(r) {
   ];
   if (r.diagnosis) out.push(`Diagnosis / case: ${r.diagnosis}`);
   if (r.summary) out.push('', '## Case summary', r.summary);
-  (r.points || []).forEach((p, i) => out.push('', `## Learning point ${i + 1}${p.heading ? `: ${p.heading}` : ''}`, p.text || ''));
+  const free = (r.points || []).length === 1 && !(r.points[0] || {}).heading;   // free-text learning points
+  (r.points || []).forEach((p, i) => out.push('', free ? '## Learning points' : `## Learning point ${i + 1}${p.heading ? `: ${p.heading}` : ''}`, p.text || ''));
   for (const [k, name] of LEGACY) if (r.sections && String(r.sections[k] || '').trim()) out.push('', `## ${name}`, r.sections[k]);
   if ((r.references || []).length) out.push('', '## References', ...r.references.map((x, i) => `${i + 1}. ${x}`));
   if ((r.figures || []).length) out.push('', `Figures: ${r.figures.length} (images are not read; captions: ${r.figures.map(f => f.caption || 'none').join('; ')})`);

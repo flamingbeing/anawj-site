@@ -89,6 +89,17 @@ portfolio content.
   summaries (counts only). No last-12-months or earlier-cohort comparisons: summaries hold current totals only.
 - **Analytics** (`ui-progress.js`): header tally, folded sections (Needs attention, Logbook,
   Reflections with ⓘ requirements, Trends), Compare with your intake (Totals). EPA view and Download summary removed (owner: not useful).
+- **Reflection editor** (Oct 2026 tidy): Linked case with Change case and Unlink on one row; the heading note keeps its
+  line breaks (examples, then the JR rule); the JR rule is one line with ⓘ; "What APMES wants covered" is a small fold
+  at the very end, no card (`.refl-guide`, hidden with tips off). **Free-text learning points**: a Numbered | Free
+  text switch on the Learning points card. Free text = one point with no heading (`isFreeText` / `joinPoints` in
+  reflections.js, tested), so no data change; the Word export prints the text under Learning Points without "1.",
+  the Markdown notes and the Claude connector say "Learning points". Numbered → Free text joins the points (asks
+  first; figures go to the end). The editor opens a reflection as free text when it was switched on this device
+  (localStorage `apmes-logbook-refl-free`) or the default is free (Settings → Reflections, `settings.reflPoints`);
+  a one-point reflection without a heading yet looks the same, so the shape alone never decides.
+- **Separate initials box** (Advanced logging, device `firstField: 'initials'`; was "First field for a new case",
+  whose Date choice only moved an invisible cursor and was dropped: an older 'date' counts as off).
 - **Admin portal** (`ui-admin.js`, admins only): Ready portfolios, then link rows to Programme totals (`#admintotals`,
   the Totals table full width), Residents (`#adminresidents`) and Advanced admin settings (`#adminadv`: shared tag
   groups, default tag names, portfolio template, the owner's import and one-off initials fix). Sub-pages are TABS
