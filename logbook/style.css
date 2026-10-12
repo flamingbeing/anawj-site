@@ -1303,3 +1303,5 @@ details:not(.quick-actions) > summary::after { transition: transform var(--dur) 
 .datebar .chip, .datebar .mode-seg button { min-height: 40px; padding: 2px 11px; font-size: calc(14px * var(--fs, 1)); }
 .datebar .datepick .ico.i + span:not(:empty) { margin-inline-start: 4px; }
 .monthhead .jump { display: inline-flex; align-items: center; gap: 4px; }
+/* the invisible date input covers the whole calendar chip, border included (a 40 px tap target) */
+.datebar .datepick input[type="date"] { inset: -1px; width: calc(100% + 2px); height: calc(100% + 2px); }
