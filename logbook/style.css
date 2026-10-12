@@ -1060,6 +1060,7 @@ html.no-header:not(.who-alert).tabs-top .tabs { padding-top: env(safe-area-inset
   html.case-inverted .log-card .datebar { order: 8; margin-top: 8px; }
   html.case-inverted .log-card .tag-row { order: 9; }
   html.case-inverted .log-card .parsed { order: 10; }
+  html.case-inverted .log-card .log-initials { order: 11; }
   html.case-inverted .log-card .box-wrap { order: 11; }
   html.case-inverted .log-card .savebar { order: 12; }
 }
