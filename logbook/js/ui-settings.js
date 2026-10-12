@@ -127,15 +127,15 @@ export function adoptDisplay(accountSettings, { fresh = false } = {}) {
 }
 export function resetDisplay() { adoptedNow = false; try { localStorage.removeItem(DISPLAY_KEY); } catch { /* storage blocked */ } }
 export function applyDisplay(d = display()) { applyCompact(!!d.compact); applyTextSize(d.textSize || '1'); applyZoom(d.zoom || '1'); applyAccent(d.accent); applyFonts(d); applyLook(d); }
-// line width, line spacing, contrast, motion, icons-only tabs: classes on <html> and --lh (style.css, end); also set at
+// page width (lineWidth), line spacing, contrast, motion, icons-only tabs: classes on <html> and --lh (style.css, end); also set at
 // first paint from the same localStorage entry (index.html)
-export const LINE_WIDTHS = [['narrow', 'Narrow (easier to read on a big screen)'], ['normal', 'Normal (default)'], ['wide', 'Wide (use the whole screen)']];
+export const LINE_WIDTHS = [['narrow', 'Narrow (easier to read on a big screen)'], ['normal', 'Normal (default)'], ['wide', 'Wide'], ['full', 'Full (no limit)']];
 export const LINE_HEIGHTS = [['0.9', 'Tight'], ['1', 'Normal (default)'], ['1.15', 'Relaxed'], ['1.3', 'Loose']];
 export const CONTRASTS = [['auto', 'Follow the device (default)'], ['normal', 'Normal'], ['high', 'Higher contrast']];
 export const MOTIONS = [['auto', 'Follow the device (default)'], ['full', 'Animations on'], ['reduce', 'Reduce motion']];
 export function applyLook(d = {}) {
   const c = document.documentElement.classList;
-  c.toggle('lw-narrow', d.lineWidth === 'narrow'); c.toggle('lw-wide', d.lineWidth === 'wide');
+  c.toggle('lw-narrow', d.lineWidth === 'narrow'); c.toggle('lw-wide', d.lineWidth === 'wide'); c.toggle('lw-full', d.lineWidth === 'full');
   document.documentElement.style.setProperty('--lh', LINE_HEIGHTS.some(([v]) => v === String(d.lineHeight)) ? String(d.lineHeight) : '1');
   const ct = d.contrast || 'auto'; c.toggle('hc', ct === 'high'); c.toggle('hc-auto', ct === 'auto');
   const mo = d.motion || 'auto'; c.toggle('rm', mo === 'reduce'); c.toggle('rm-auto', mo === 'auto');
@@ -167,8 +167,9 @@ export function applyLook(d = {}) {
   const rl = roundLevel(d);
   if (rl !== 2) document.documentElement.style.setProperty('--round', String(ROUNDS[rl][1])); else document.documentElement.style.removeProperty('--round');
   c.toggle('shadows', !!d.shadows); c.toggle('big-taps', !!d.bigTaps);
-  // swipe between the bar's tabs (app.js); one ⋯ menu on Logbook rows instead of Copy and Reflect (ui-logbook.js)
-  c.toggle('swipe-tabs', !!d.swipeTabs); c.toggle('row-menu', !!d.rowMenu); c.toggle('refl-toolbar', !!d.reflToolbar);
+  // swipe between the bar's tabs (app.js; on unless switched off: swipeTabs false); one ⋯ menu on Logbook rows
+  // instead of Copy and Reflect (ui-logbook.js)
+  c.toggle('swipe-tabs', d.swipeTabs !== false); c.toggle('row-menu', !!d.rowMenu); c.toggle('refl-toolbar', !!d.reflToolbar);
   // the name in the header and the browser tab (plain text, at most 40 characters)
   const title = cleanTitle(d.appTitle) || APP_TITLE;
   const h1 = document.querySelector('.top h1'); if (h1 && h1.textContent !== title) h1.textContent = title;
@@ -298,15 +299,15 @@ export function renderDisplayAdvanced() {
       fontPicker('ui'),
       fontPicker('log'),
       lookSelect('lineHeight', 'Line spacing', LINE_HEIGHTS, '1'),
-      lookSelect('lineWidth', 'Line width', LINE_WIDTHS, 'normal', 'How wide text and lists go on a computer or tablet. The Case tab keeps its two panes.'),
+      lookSelect('lineWidth', 'Page width', LINE_WIDTHS, 'normal', 'How wide the app gets on a computer or tablet (was “Line width”). Phones always use the full screen. The Case tab keeps its two panes.'),
       lookSelect('contrast', 'Contrast', CONTRASTS, 'auto', 'Higher contrast: darker text and stronger lines (lighter in dark mode).'),
       lookSelect('motion', 'Motion', MOTIONS, 'auto'),
       lookSelect('tabBar', 'Tab bar', TAB_BARS, 'auto'),
       tabArranger(),
       h('label', { class: 'check', style: 'margin-top:10px' }, h('input', { type: 'checkbox', checked: !!st.bigTaps, onchange: e => applyDisplay(setDisplay({ bigTaps: e.target.checked || null })) }), 'Bigger tap targets on the Case tab'),
       h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'Larger chips, tag rows, tick boxes and Save buttons, easier to hit on a phone.'),
-      h('label', { class: 'check', style: 'margin-top:10px' }, h('input', { type: 'checkbox', checked: !!st.swipeTabs, onchange: e => applyDisplay(setDisplay({ swipeTabs: e.target.checked || null })) }), 'Swipe left or right to change tab'),
-      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'Moves to the next or previous tab on the bar. Not while typing, or on tables and lists that scroll sideways.'),
+      h('label', { class: 'check', style: 'margin-top:10px' }, h('input', { type: 'checkbox', checked: st.swipeTabs !== false, onchange: e => applyDisplay(setDisplay({ swipeTabs: e.target.checked ? null : false })) }), 'Swipe left or right to change tab'),
+      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'On unless you switch it off. The page follows your finger to the next or previous tab on the bar, also from pages under a tab. Not while typing, from the screen’s edges, or on tables and lists that scroll sideways.'),
       h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !!st.rowMenu, onchange: e => applyDisplay(setDisplay({ rowMenu: e.target.checked || null })) }), 'Fewer buttons on Logbook rows (a ⋯ menu)'),
       h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'Copy and Reflect move into one ⋯ button; a ✓ still shows cases with a reflection.'),
       h('label', { class: 'check', style: 'margin-top:10px' }, h('input', { type: 'checkbox', checked: !!st.tabIcons, onchange: e => applyDisplay(setDisplay({ tabIcons: e.target.checked })) }), 'Icons only in the tab bar'),
@@ -669,6 +670,7 @@ export function renderShowHide() {
     h('section', { class: 'card', 'data-group': 'bar' },
       h('h3', { style: 'margin-top:0' }, 'Header and tabs (this device)'),
       sw('Show the header (the app’s name and your name)', !d.hideHeader, v => applyDisplay(setDisplay({ hideHeader: !v }))),
+      sw('Swipe left or right to change tab', d.swipeTabs !== false, v => applyDisplay(setDisplay({ swipeTabs: v ? null : false }))),
       BAR_TABS.filter(([id]) => id !== 'more').map(([id, label]) => sw(`${label} on the tab bar`, !hidden.includes(id), v => {
         const { sorted, hidden: now } = arrangeTabs(BAR_TABS.map(([k]) => k), display());
         const next = new Set(now); if (v) next.delete(id); else next.add(id);
@@ -676,7 +678,7 @@ export function renderShowHide() {
         applyDisplay(setDisplay({ tabHidden: [...next], tabOrder: sorted })); hooks.paintTabs?.(); hooks.render();
       })),
       h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'Hidden tabs are first in More. The order is in Display → Advanced.'),
-      groupReset('the header and the usual tabs (Notes goes back into More)', () => { applyDisplay(setDisplay({ hideHeader: null, tabHidden: null, tabOrder: null })); hooks.paintTabs?.(); })));
+      groupReset('the header, swiping and the usual tabs (Notes goes back into More)', () => { applyDisplay(setDisplay({ hideHeader: null, swipeTabs: null, tabHidden: null, tabOrder: null })); hooks.paintTabs?.(); })));
 }
 
 export function renderReflectionSettings() {
@@ -745,7 +747,10 @@ export function signOutCard() {
         if (!ok && !(await confirmBox('Not synced yet', 'Some cases or changes on this device have not reached the server yet (no signal?). Signing out now deletes them. Wait for signal and try again, or sign out anyway?', 'Sign out anyway', true))) return;
         cloud.signOut();
       } }, 'Sign out'),
-      cloud.demo ? h('span', { class: 'muted' }, 'Demo mode: data stays in this browser.') : null));
+      // the demo: Leave demo beside Sign out (the header badge can be hidden now), Reset as a link that asks first
+      cloud.demo ? h('a', { href: location.pathname, class: 'btn' }, 'Leave demo') : null,
+      cloud.demo ? h('button', { type: 'button', class: 'link', style: 'margin-left:auto;padding:10px 4px;min-height:44px', onclick: () => hooks.resetDemo?.() }, 'Reset demo') : null),
+    cloud.demo ? h('p', { class: 'muted', style: 'margin:8px 0 0' }, 'Demo mode: data stays in this browser.') : null);
 }
 
 // ---------- tag groups (stored as logbook.templates) ----------

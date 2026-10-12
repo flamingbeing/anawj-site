@@ -1041,6 +1041,9 @@ textarea.details, ul.cases .t, .refl-editor textarea, .refl-editor input[type="t
 /* line width: narrow keeps lines short on wide screens (the Case tab's two panes keep their width); wide uses the screen */
 html.lw-narrow main:not(:has(.log-card.panes)) { max-width: 760px; }
 html.lw-wide main:not(:has(.log-card.panes)) { max-width: 1400px; }
+html.lw-full main:not(:has(.log-card.panes)) { max-width: none; }
+/* while a swipe pushes the page sideways (app.js), it never makes the window scroll sideways */
+html.swiping { overflow-x: clip; }
 /* higher contrast: darker text and stronger lines; "auto" follows the device's Increase contrast */
 html.hc:root:root:root { --ink: #000; --muted: #2e3338; --line: #737a82; --row-alt: #eef0f2; }
 html.hc:root:root:root[data-theme="dark"] { --ink: #fff; --muted: #e8e8e8; --line: #a0a6ad; }
@@ -1074,7 +1077,7 @@ html.tab-icons .tabs .ico { display: block; width: 24px; height: 24px; fill: non
   html.tabs-bottom .tabs button[aria-selected="true"] { border-top-color: var(--accent); border-bottom: 0; color: var(--accent); }
   html.tabs-bottom .tabs .ico { display: block; width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 }
-/* hide the header while there's nothing to say: it comes back for unsynced changes, no signal, the demo, signed out */
+/* hide the header while there's nothing to say: it comes back for unsynced changes, no signal, signed out (not for the demo: Leave / Reset demo sit by Sign out on More) */
 html.no-header:not(.who-alert) .top { display: none; }
 html.no-header:not(.who-alert) main { padding-top: max(8px, env(safe-area-inset-top, 0px)); }
 html.no-header:not(.who-alert).tabs-top .tabs { padding-top: env(safe-area-inset-top, 0px); }

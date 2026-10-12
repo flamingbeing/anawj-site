@@ -9,12 +9,12 @@ Last updated: 2026-10-12 by Claude Code, Logbook 3 (log3).
 
 ## Now
 
-- **Claude Code, "APMES Logbook" session** (branch `claude/clever-gates-pm6sas`): idle after #183 (`/apmes/` folder,
-  blank portfolio template committed for tests, Word export now ticks Female). Firebase CLI signed in for this
-  session, unused (each use needs the owner's OK).
-- **Claude Code, Logbook 3 (log3)** (branch `ccr-2994049c-4e5tlt`): idle after #181. Still signed in
-  to the Firebase CLI (usage counts only; each use needs the owner's OK). Owns the axe check, PR previews and the
-  Codex / Firebase plugin setup.
+- **Claude Code, Logbook 1 (log1)** (branch `claude/clever-gates-pm6sas`): adding the EPA Guidebook v8 PDF (names
+  removed) to `apmes/originals/`; before that #183 (`/apmes/` folder, blank portfolio template, Word export ticks
+  Female). Firebase CLI signed in for this session, unused (each use needs the owner's OK).
+- **Claude Code, Logbook 3 (log3)** (branch `ccr-2994049c-4e5tlt`): idle, nothing half-done. Still signed in to the
+  Firebase CLI (usage counts only; each use needs the owner's OK). Owns the axe check, PR previews and the Codex /
+  Firebase plugin setup.
 - **Claude Code, "APMES Logbook 2" session** (branch `ccr-afac5e7a-99esax`): owner's batch of 8 in three PRs: A
   Reflections tab (topic headings, one-line header, pinned search + sticky topics), then B (page width, demo header
   and Leave demo, swipe on by default and following the finger), then C (Analytics, Advanced only).
@@ -55,8 +55,13 @@ Last updated: 2026-10-12 by Claude Code, Logbook 3 (log3).
 
 ## Decisions log
 
+- 2026-10-12: The EPA Guidebook v8 PDF goes in `apmes/originals/` as a cleaned copy: the cover page's contributor and
+  acknowledgement names replaced by a plain cover, file details (staff names, SingHealth sensitivity label) removed.
 - 2026-10-12: Session names: Logbook 1 / 2 / 3 (log1 / log2 / log3). log1 = branch `claude/clever-gates-pm6sas`,
-  log2 = `ccr-afac5e7a-99esax`, log3 = `ccr-2994049c-4e5tlt`. Each renames its own line under Now.
+  log2 = `ccr-afac5e7a-99esax`, log3 = `ccr-2994049c-4e5tlt`. Each renames its own line under Now; the session
+  titles in the app are "Logbook 1 (log1)" etc.
+- 2026-10-12: When the owner types `/compact` the session gets no turn to save first: the owner says "save state"
+  (or `/save-state`) before `/compact`.
 - 2026-10-12: APMES programme documents aren't secret: they live in `/apmes/` at the repo root (guidebook, data,
   blank portfolio template; originals may be added). No faculty names (the MedHub guide stays out unless blacked
   out); published authors cited in the guidebook are fine.

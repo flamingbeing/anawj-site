@@ -15,7 +15,8 @@ portfolio content.
 - Rarely used things fold away: Figures (optional), References, More tools, Analytics sections.
 - Tags count towards credentialling, so they are picked on purpose: nothing is auto-ticked when
   "Suggest tags as I type" is off, and Save needs at least one tag.
-- The demo should look like the real app: no yellow bar, just a small "demo ▾" badge in the header.
+- The demo should look like the real app: no yellow bar, just a small "demo ▾" badge in the header. Leave demo
+  and Reset demo (a link that asks first) also sit by Sign out on More, so the header can be hidden in the demo too.
 
 ## Words used in the app
 
@@ -135,12 +136,13 @@ portfolio content.
   was found; Safari mostly ignores user-installed fonts), or the user's own file (.woff2/.woff/.ttf/.otf ≤ 3 MB,
   IndexedDB `apmes-logbook-fonts`, FontFace API; this device only, never synced).
 - **Look options** (Display, per device; `applyLook` in ui-settings.js, classes on `<html>`, also set at first paint in
-  index.html): line spacing (`--lh`; every line-height in style.css is `calc(x * var(--lh, 1))`), line width (narrow
-  760 px / normal 980 / wide 1400; the Case tab's panes keep theirs), contrast (follow the device's Increase contrast
+  index.html): line spacing (`--lh`; every line-height in style.css is `calc(x * var(--lh, 1))`), **Page width** (key
+  `lineWidth`, was "Line width"; narrow 760 px / normal 980 / wide 1400 / full = no limit; phones are always full; the
+  Case tab's panes keep theirs), contrast (follow the device's Increase contrast
   by default, normal, or higher: darker text and lines), motion (follow the device's Reduce motion by default, on, or
   reduce), icons-only tab bar (buttons keep `aria-label`; on a computer the icons are shown for it), tab bar position
   (auto = bottom on phones / top on bigger screens, or always top `tabs-top`, or always bottom `tabs-bottom`), hide the
-  header (`no-header`; it shows again while `who-alert` is set by paintWho: signed out, demo, offline, unsynced).
+  header (`no-header`; it shows again while `who-alert` is set by paintWho: signed out, offline, unsynced; not for the demo since Oct 2026).
   Case tab upside down on phones (`case-inverted`: CSS `order` on the log card's items, lp-left/right being
   display: contents; tags on top, the case box last above Save; app.js render() scrolls to the bottom on entering).
   Keyboard on opening the Case tab (Logging page, device key `autoFocus`, html `no-autofocus` read by ui-log.js).
@@ -204,10 +206,14 @@ portfolio content.
   display, `tabOrder` / `tabHidden`, `arrangeTabs` in ui-settings.js): ↑ ↓ and a switch per tab; More can't be
   hidden, at least two stay; hidden tabs are listed first on More ("Hidden from the tab bar") and links still open
   them; a hidden start tab gives way to the first one on the bar. All set at first paint where it matters.
-- **Optional interaction** (Advanced display, device, off by default): **Swipe left or right to change tab**
-  (`swipeTabs`, html `swipe-tabs`; app.js touch handlers on main): a quick sideways swipe (≥ 70 px, mostly
-  horizontal, < 0.7 s) on a bar tab's page goes to the next/previous tab on the bar (order and hidden tabs honoured);
-  never from fields, dialogs, drag handles, tag-editor pills or anything that scrolls sideways, never on sub-pages.
+- **Optional interaction** (Advanced display, device): **Swipe left or right to change tab** (`swipeTabs`, html
+  `swipe-tabs`; app.js touch handlers on main). **On by default** (owner, Oct 2026: `swipeTabs: false` = off, the
+  switch is also in Show or hide → Header and tabs). The page follows the finger (`slide`, transform on main;
+  `html.swiping` clips sideways overflow); letting go after a quick swipe (≥ 70 px, mostly horizontal, < 0.7 s) or
+  past a third of the screen goes to the next/previous tab on the bar (order and hidden tabs honoured; `barTabOf`: a
+  sub-page counts as the bar tab it sits under, an off-bar tab as More) and the new page slides in; otherwise it springs
+  back. Never from fields, dialogs, drag handles, tag-editor pills, anything that scrolls sideways, or within 20 px of
+  the screen's edges (the phone's Back gesture). Reduce motion: switches without sliding.
   **Fewer buttons on Logbook rows** (`rowMenu`, html `row-menu`): one ⋯ opens Copy / Write or Open the reflection /
   Edit the case; a ✓ still marks cases with a reflection.
 - **Display is per device** (owner: people use the logbook on different devices with different needs): compact,
