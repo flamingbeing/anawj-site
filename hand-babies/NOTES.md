@@ -18,6 +18,8 @@ Lasting decisions for `hand-babies/`. Status and next steps: `STATUS.md`.
 ## Content rules
 
 - One long page, sticky section chips; scenarios are `<details>` cards (open from a link like `#pic-infect`).
+- Short, plain, practical (owner, 12 Oct 2026): not textbook; good English the way Singapore doctors talk (MO,
+  ED, OT, TW, ATT, nec fasc). No quiz, no privacy guide, no referral template: one short example message only.
 - Plain words, short. Each scenario: Examine / Photos / Call now if / Common miss.
 - Generic to any hospital: "per unit protocol" for drugs and splints; no hospital-specific numbers or names.
 - Figures are drawn in `app.js` from one hand geometry (`FINGERS`, `shapes()`); the hand is a LEFT hand palm side so
