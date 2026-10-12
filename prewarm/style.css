@@ -77,6 +77,21 @@ a { color: var(--navy); }
 .textlinks a.minicard { display: grid; padding: 6px 10px; border: 1px solid var(--line); border-radius: var(--r); background: var(--card); text-decoration: none; color: var(--navy); line-height: 1.2; }
 .textlinks a.minicard small { font-weight: 400; font-size: 11px; color: var(--muted); }
 .links.one { grid-template-columns: 1fr; }
+details.sect { margin-top: 12px; }
+details.sect > summary { display: flex; align-items: baseline; gap: 8px; min-height: var(--tap); padding: 6px 2px; cursor: pointer; font-size: 16px; font-weight: 700; color: var(--navy); }
+details.sect > summary small { font-size: 12px; font-weight: 400; color: var(--muted); }
+details.sect > summary::-webkit-details-marker { display: none; }
+details.sect > summary::before { content: '▸'; display: inline-block; width: 14px; transition: transform .15s; }
+details.sect[open] > summary::before { transform: rotate(90deg); }
+/* on a computer, label beside its box so more questions fit on the screen */
+@media (min-width: 700px) {
+  details.sect .fld { grid-template-columns: 220px 1fr; align-items: center; column-gap: 12px; padding: 6px 12px; }
+  details.sect .fld > .lab, details.sect .fld > small { grid-column: 1; }
+  details.sect .fld > input, details.sect .fld > .seg { grid-column: 2; grid-row: 1 / span 2; }
+  details.sect > .stack { gap: 6px; }
+}
+details.sect > .stack { margin-top: 4px; }
+.fld:focus-within { border-color: var(--navy); box-shadow: 0 0 0 1px var(--navy); }
 /* the BP, HR, BIS box warms up like the due time */
 .links a[data-state="soon"] { background: var(--warn-soft); border-color: var(--warn); color: var(--warn); animation: duepulse 2s ease-in-out infinite; --pulse: rgba(138, 90, 0, .35); }
 .links a[data-state="now"] { background: #fde3d3; border-color: #9a3412; color: #9a3412; animation: duepulse 1.2s ease-in-out infinite; --pulse: rgba(229, 114, 0, .55); }

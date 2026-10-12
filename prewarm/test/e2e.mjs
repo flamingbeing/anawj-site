@@ -149,14 +149,26 @@ try {
   assert.doesNotMatch(await got.file('docProps/core.xml').async('string'), /Test Author/, 'file details removed');
   await page.goBack();
 
-  // other data: the rest of the study's pages, from the small box beside Form view / Sheet view
+  // other data: the rest of the study's pages on one page, under headers open by default, from the small box beside
+  // Form view / Sheet view; Enter and the arrow keys move between questions
+  assert.equal((await page.textContent('.textlinks a.minicard')).trim(), 'Other data', 'no caption on the Other data box');
   await page.click('.textlinks a.minicard');
-  await page.waitForSelector('.links.one a');
-  assert.equal(await page.$$eval('.links.one a', x => x.length), 8, 'pre-op, meds, bloods, day 1 x2, day 2 x2, discharge');
-  await page.click('.links.one a >> nth=0');
-  await page.fill('#f-age', '67'); await page.dispatchEvent('#f-age', 'change');
-  await page.goBack(); await page.waitForSelector('.links.one a');
-  assert.match(await page.textContent('.links.one a >> nth=0'), /1 of \d+ filled/);
+  await page.waitForSelector('details.sect');
+  assert.equal(await page.$$eval('details.sect[open]', x => x.length), 8, 'pre-op, meds, bloods, day 1 x2, day 2 x2, discharge, all open');
+  await page.fill('#f-age', '67'); await page.keyboard.press('Enter');
+  assert.match(await page.textContent('details.sect >> nth=0 >> summary'), /1 of \d+ filled/, 'Enter saves the answer');
+  const nextKey = await page.evaluate(() => document.activeElement.dataset.f);
+  assert.ok(nextKey && nextKey !== 'age', 'Enter moves to the next question');
+  await page.keyboard.press('ArrowUp');
+  assert.equal(await page.evaluate(() => document.activeElement.id), 'f-age', '↑ goes back');
+  await page.keyboard.press('ArrowDown');
+  if (await page.evaluate(() => document.activeElement.classList.contains('chip'))) {
+    await page.keyboard.press('ArrowRight'); await page.keyboard.press('Enter');
+    assert.equal(await page.getAttribute(`.chip[data-f="${nextKey}"][data-v]:nth-child(2)`, 'aria-pressed'), 'true', '→ then Enter picks the second choice');
+  }
+  await page.click('details.sect >> nth=0 >> summary');
+  assert.equal(await page.$$eval('details.sect[open]', x => x.length), 7, 'a header folds its section');
+  await axe('other data'); await shot('other-data');
   await page.goBack();
 
   // sheet view
