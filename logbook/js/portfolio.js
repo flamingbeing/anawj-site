@@ -61,10 +61,27 @@ export function dateRuns(iso) {
 }
 
 const lines = s => String(s || '').split(/\r?\n/).map(x => x.trimEnd());
+// One line of reflection text as runs. The formatting buttons (Settings → Reflections) write a little Markdown,
+// which becomes Word formatting here: **bold**, "- " bullets as "• ", "# heading" as a bold line. Anything else is as typed.
+export function mdRuns(line) {
+  let l = String(line || '');
+  const head = /^#{1,3}\s+(.*)$/.exec(l);
+  if (head) return [[head[1].replace(/\*\*/g, ''), true]];
+  l = l.replace(/^(\s*)[-*+]\s+/, (m, ind) => ind + '• ');
+  const out = [];
+  let last = 0;
+  for (const m of l.matchAll(/\*\*([^*]+)\*\*/g)) {
+    if (m.index > last) out.push([l.slice(last, m.index), false]);
+    out.push([m[1], true]);
+    last = m.index + m[0].length;
+  }
+  if (last < l.length) out.push([l.slice(last), false]);
+  return out.length ? out : [[l, false]];
+}
 // Text split into paragraphs; blank lines kept (as empty paragraphs), leading/trailing blanks dropped.
 const textParas = s => {
   const ls = lines(String(s || '').trim());
-  return ls.length === 1 && !ls[0] ? [] : ls.map(l => (l ? [[l, false]] : []));
+  return ls.length === 1 && !ls[0] ? [] : ls.map(l => (l ? mdRuns(l) : []));
 };
 export const isStructured = r => !!(r && (String(r.title || '').trim() || String(r.summary || '').trim()
   || (r.points || []).some(p => p && (String(p.heading || '').trim() || String(p.text || '').trim()))));

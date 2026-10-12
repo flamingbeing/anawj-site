@@ -72,6 +72,30 @@ try { for (const width of [390, 1280]) {
   await p.locator('.an-sec summary').filter({ hasText: 'Trends' }).waitFor();
   assert.deepEqual(await p.locator('[role=tab]').evaluateAll(t => t.map(x => x.dataset.tab)), tabsBasic);   // same tabs either way
 
+  // reflection formatting buttons: off by default, on from Show or hide; they write Markdown the Word export formats
+  await p.evaluate(async () => { const { reflectOnCase } = await import('./js/ui-reflect.js'); await reflectOnCase({ id: 'fake-fmt', date: '2026-10-10', initials: 'ZZ', details: 'Fake formatting case', cats: ['13'] }); });
+  await p.waitForSelector('.refl-editor');
+  assert.equal(await p.locator('.fmt-bar').count(), 0);
+  await p.goBack(); await p.waitForFunction(() => !document.querySelector('.refl-editor'));
+  await p.evaluate(() => { location.hash = '#showhide'; });
+  await group('reflections').getByLabel('Formatting buttons (this device)').check();
+  await p.evaluate(async () => { const { reflectOnCase } = await import('./js/ui-reflect.js'); await reflectOnCase({ id: 'fake-fmt2', date: '2026-10-10', initials: 'ZZ', details: 'Fake formatting case', cats: ['13'] }); });
+  await p.waitForSelector('.refl-editor .fmt-bar');
+  const box = p.getByLabel('Learning point 1 text', { exact: true });
+  await box.fill('first idea\nsecond idea');
+  await box.evaluate(t => t.setSelectionRange(0, t.value.length));
+  const bar = box.locator('xpath=preceding-sibling::div[contains(@class,"fmt-bar")][1]');
+  await bar.getByRole('button', { name: 'Bullet list' }).click();
+  assert.equal(await box.inputValue(), '- first idea\n- second idea');
+  await box.evaluate(t => t.setSelectionRange(2, 7));
+  await bar.getByRole('button', { name: 'Bold' }).click();
+  assert.equal(await box.inputValue(), '- **first** idea\n- second idea');
+  await p.goBack(); await p.waitForFunction(() => !document.querySelector('.refl-editor'));
+  await p.evaluate(() => { location.hash = '#showhide'; });
+  await group('reflections').getByRole('button', { name: 'Reset this group' }).click();
+  await p.locator('dialog[open]').getByRole('button', { name: 'Reset' }).click();
+  await p.waitForFunction(async () => { const { display } = await import('./js/ui-settings.js'); return !display().reflToolbar; });
+
   // the backup as one spreadsheet: it downloads, and Restore reads it (adding only what's missing)
   await p.evaluate(() => { location.hash = '#data'; });
   for (const sm of await p.locator('details:not([open]) > summary').all()) await sm.click().catch(() => {});

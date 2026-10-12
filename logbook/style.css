@@ -1199,3 +1199,7 @@ button.note-flag { cursor: pointer; font: inherit; border: 1px solid var(--edge,
 
 /* Basic mode (settings.basic): advanced settings pages are hidden (their links); the app is otherwise the same */
 body.basic .adv-link { display: none; }
+
+/* reflection formatting buttons (Settings → Reflections, this device) */
+.fmt-bar { display: flex; gap: 6px; margin: 0 0 4px; }
+.fmt-bar button { min-width: 44px; }
