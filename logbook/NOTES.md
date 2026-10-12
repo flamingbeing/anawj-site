@@ -190,6 +190,13 @@ portfolio content.
   both Display pages, sticky): a made-up row, chips and buttons with the app's own classes. **Reset this page**
   (`resetLink`) on Display, Advanced display, Advanced logging and Reflections (Codex's on Logging): only that page's
   keys, after a confirm; custom CSS is switched off but kept, own font files stay stored.
+- **Look options, Oct 2026** (device keys): **Corners** (Display, `round` 0 Square / 1 / 2 Normal / 3 Very round): every
+  border-radius in style.css (and the reflection editor's inline ones) is `calc(Npx * var(--round, 1))`; tag tick
+  boxes cap at 1.2 so they never look like radio buttons. **Soft shadows instead of lines** (`shadows`, cards only).
+  **Bigger tap targets on the Case tab** (Advanced display, `bigTaps`). **Tab bar order and hidden tabs** (Advanced
+  display, `tabOrder` / `tabHidden`, `arrangeTabs` in ui-settings.js): ↑ ↓ and a switch per tab; More can't be
+  hidden, at least two stay; hidden tabs are listed first on More ("Hidden from the tab bar") and links still open
+  them; a hidden start tab gives way to the first one on the bar. All set at first paint where it matters.
 - **Display is per device** (owner: people use the logbook on different devices with different needs): compact,
   text size, zoom, fonts, colour and the start tab live in localStorage `apmes-logbook-display` (`deviceDisplay` / `setDisplay` /
   `adoptDisplay` in ui-settings.js), light / dark in `apmes-logbook-theme`. A device with none starts from the

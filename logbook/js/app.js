@@ -7,7 +7,7 @@ import { renderLog, focusLog, logCasesChanged, clearDrafts, SHARED_KEY } from '.
 import { renderRecovery } from './ui-recovery.js';
 import { renderLogbook } from './ui-logbook.js';
 import { renderProgress, renderTotals } from './ui-progress.js';
-import { applyCompact, cachedCompact, applyTheme, cachedTheme, applyTextSize, cachedTextSize, applyZoom, cachedZoom, stepZoom, applyAccent, adoptDisplay, applyDisplay, applyCustomCss, display, setDisplay, resetDisplay, DISPLAY_KEYS, renderTagEditor, renderDisplay, renderDisplayAdvanced, renderLogging, renderLoggingAdvanced, renderReflectionSettings, renderMarkdownSettings, START_TABS, privacyCard, creditsCard, signOutCard } from './ui-settings.js';
+import { applyCompact, cachedCompact, applyTheme, cachedTheme, applyTextSize, cachedTextSize, applyZoom, cachedZoom, stepZoom, applyAccent, adoptDisplay, applyDisplay, applyCustomCss, display, setDisplay, resetDisplay, DISPLAY_KEYS, renderTagEditor, renderDisplay, renderDisplayAdvanced, renderLogging, renderLoggingAdvanced, renderReflectionSettings, renderMarkdownSettings, START_TABS, arrangeTabs, privacyCard, creditsCard, signOutCard } from './ui-settings.js';
 import { renderAccount, flush as flushProfile } from './ui-account.js';
 import { renderAdmin, renderAdminResidents, renderAdminAdvanced, leaveAdmin } from './ui-admin.js';
 import { renderReflect, watchMyReflections, renderExportPage, renderChoosePage } from './ui-reflect.js';
@@ -88,9 +88,11 @@ const menuItem = (id, label, desc, onclick) => h('li', {}, h('a', { href: '#' + 
 
 function renderMore() {
   const items = visibleTabs().filter(t => t.under === 'more' && !t.unlisted);
+  // tabs hidden from the bar (Advanced display) come first, so they are one tap away
+  const { hidden } = arrangeTabs(visibleTabs().filter(t => !t.hidden).map(t => t.id), display());
   return h('div', {},
     h('section', { class: 'card more-list' }, h('h2', {}, 'More'),
-      h('ul', {}, items.map(t => menuItem(t.id, t.label, t.desc)))),
+      h('ul', {}, hidden.map(id => TABS.find(t => t.id === id)).map(t => menuItem(t.id, t.label, 'Hidden from the tab bar')), items.map(t => menuItem(t.id, t.label, t.desc)))),
     privacyCard(),
     creditsCard(),
     installCard(),
@@ -301,7 +303,9 @@ function paintTabs() {
   while (cur && cur.under) cur = TABS.find(t => t.id === cur.under);
   const sel = cur ? cur.id : S.tab;
   document.body.dataset.bar = sel;   // Settings → Display → Colourful: the page takes its tab's colour
-  fill(tabsEl, ...visibleTabs().filter(t => !t.hidden).map(t => h('button', {
+  // Advanced display → the tab bar's order and hidden tabs (this device)
+  const bar = visibleTabs().filter(t => !t.hidden), { shown } = arrangeTabs(bar.map(t => t.id), display());
+  fill(tabsEl, ...shown.map(id => bar.find(t => t.id === id)).map(t => h('button', {
     role: 'tab', 'aria-selected': String(sel === t.id), 'data-tab': t.id, 'aria-label': t.label, title: t.label,   // named even with icons only
     onclick: () => go(t.id),
   }, icon(t.id), h('span', { class: 'lbl' }, t.label))));
@@ -378,6 +382,7 @@ function render() {
 }
 let lastRendered = '';
 hooks.render = render;
+hooks.paintTabs = () => paintTabs();
 
 // A live case update shouldn't yank the screen from under someone typing: the Log screen refreshes
 // its counts in place; other screens re-render when nothing is being edited.
@@ -576,7 +581,9 @@ async function onUser(user) {
   }
   // the tab chosen in Settings → Display, unless the address names one (a link, a shortcut, a reload)
   const start = display().startTab || 'log';
-  S.tab = tabFromHash() || (START_TABS.some(([v]) => v === start) ? start : 'log');
+  // a start tab hidden from the bar gives way to the first tab on it
+  const onBar = arrangeTabs(TABS.filter(t => !t.hidden).map(t => t.id), display()).shown;
+  S.tab = tabFromHash() || (START_TABS.some(([v]) => v === start) && onBar.includes(start) ? start : onBar.find(id => id !== 'more') || 'log');
   navigation.initialize(S.tab);
   // Settings → Backup: a one-tap reminder when the last Drive / Dropbox backup is over a week old (if asked for)
   setTimeout(() => { if (S.user === user) remindBackup(); }, 3000);
