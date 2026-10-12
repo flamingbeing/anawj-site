@@ -160,6 +160,10 @@ try {
   await ad.locator('.selrow', { hasText: 'SYNC-01' }).locator('input').check();
   await ad.click('#unlock');
   await a.waitForFunction(() => !document.querySelector('.list a.locked') && /SYNC-01/.test(document.querySelector('.list').textContent), null, { timeout: 15000 });
+  // locking and unlocking keep the readings on the server copy
+  const docs = await (await fetch(`${FS}/patients`, { headers: { Authorization: 'Bearer owner' } })).json();
+  const sync01 = docs.documents.find(d => /SYNC-01/.test(JSON.stringify(d.fields.f)));
+  assert.ok(sync01 && Object.keys(sync01.fields.f.mapValue.fields).length > 5, 'readings still on the server after lock / unlock');
 
   // phone A logs out with a change that hasn't synced (offline): two warnings; cancelling keeps everything
   await a.goto(BASE + '#/');
