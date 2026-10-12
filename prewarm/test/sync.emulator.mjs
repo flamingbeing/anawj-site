@@ -44,9 +44,8 @@ try {
   // phone A starts a patient and saves the 0-min pre-warming reading
   await a.goto(BASE + '#/new');
   await a.fill('#sid', 'SYNC-01'); await a.click('.seg .chip[data-v="1"]'); await a.click('button[type=submit]');
-  await a.waitForSelector('.tiles');
-  await a.click('a[href$="/read/prewarm"]');
-  await a.click('.num[data-type="core"]'); await a.fill('input.num', '366'); await a.keyboard.press('Enter');
+  await a.waitForSelector('.times');
+  await a.click('.num[data-type="core"]'); await a.click('.num[data-type="core"]'); await a.fill('input.num', '366'); await a.keyboard.press('Enter');
   await a.click('#save');
   await toastSays(a, /0 min saved/);
 
@@ -57,15 +56,15 @@ try {
   await bb.goto(BASE + '#/');
   await bb.waitForFunction(() => /SYNC-01/.test(document.querySelector('.list')?.textContent || ''), null, { timeout: 15000 });
   await bb.click('.list a');
-  await bb.click('a[href$="/sheet"]');
+  await bb.click('.links a[href$="/sheet"]');
   await bb.waitForFunction(() => /36\.6/.test(document.querySelector('.sheet')?.textContent || ''), null, { timeout: 15000 });
 
   // phone B adds the 5-min reading; phone A gets it
-  await bb.goto(bb.url().replace('/sheet', '/read/prewarm/5'));
+  await bb.goto(bb.url().replace('/sheet', '/prewarm/5'));
   await bb.click('[data-step="1"][data-c="core"]');
   await bb.click('#save');
   await a.goto(BASE + '#/');
-  await a.click('.list a'); await a.click('a[href$="/sheet"]');
+  await a.click('.list a'); await a.click('.links a[href$="/sheet"]');
   await a.waitForFunction(() => /36\.7/.test(document.querySelector('.sheet')?.textContent || ''), null, { timeout: 15000 });
 
   assert.deepEqual(errors, []);

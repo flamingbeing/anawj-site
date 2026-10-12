@@ -14,7 +14,13 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   on the "Extra" sheet).
 - **Readings:** saving a timepoint stamps `at_<series>_<point>` with the clock time and initials; the Readings sheet
   is built from those. Gown set temp is NA for the no-pre-warming group and after "Active warming stopped".
-- **Entry screen:** option B ("change what moved"): values carry over from the last saved timepoint; + / − nudges;
+- **Screens follow the day** (owner, 12 Oct 2026): opening a patient lands on one main screen: the event times as a
+  compact grid (tap an empty one = now; tap a set one to change or clear it), then all temperatures with a
+  Pre-warming / Intra-op switch (opens on Intra-op once the patient is in OT), then links to the other forms in the
+  order they're filled in (BP/HR/BIS, intra-op details, PACU, satisfaction, form view).
+- **Defaults on tap:** an empty temperature becomes 36.5 (then + / −, or tap again to type); an empty time becomes now.
+- Gown set temp follows "Warming off" (NA for later timepoints) until someone picks a value on that screen.
+- - **Entry screen:** option B ("change what moved"): values carry over from the last saved timepoint; + / − nudges;
   tap the number to type ("365" → 36.5). Hidden readings (Settings) stay blank.
 - **Alerts** only work while the app is open; locked-phone alerts would need push notifications.
 - **Sharing** (`js/cloud.js`, `firestore.rules`, Firebase project `prewarm-study`):
