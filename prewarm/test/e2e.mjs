@@ -112,9 +112,14 @@ try {
   await page.click('#save'); await page.waitForTimeout(200);
   assert.match(blanks, /Thigh, Calf, Set temp on gown are blank/);
   assert.match(await page.textContent('.tp'), /0 min/, 'not saved after Cancel');
-  page.once('dialog', d => d.accept());
+  // Prewarm on was moved to 07:30, so this reading is late: Save also asks when it was taken (due time filled in)
+  const asked2 = [];
+  const ans = d => { asked2.push(d.type() + ': ' + d.message()); d.type() === 'prompt' ? d.accept(d.defaultValue()) : d.accept(); };
+  page.on('dialog', ans);
   await page.click('#save');
   await page.waitForFunction(() => /5 min/.test(document.querySelector('.tp')?.textContent || ''));
+  page.off('dialog', ans);
+  assert.ok(asked2.some(m => /^prompt: The 0 min reading was due at 07:30\. What time was it taken\?/.test(m)), 'late reading asks when it was taken: ' + JSON.stringify(asked2));
   assert.equal((await page.textContent('.num[data-type="core"]')).trim(), '36.6', 'carried over from the last reading');
   await page.click('[data-step="1"][data-c="core"]');
   assert.equal((await page.textContent('.num[data-type="core"]')).trim(), '36.7');
@@ -134,9 +139,11 @@ try {
   assert.match(await page.textContent('.tp'), /5 min/, 'Stay keeps the screen');
   assert.equal((await page.textContent('.num[data-type="core"]')).trim(), '36.7', 'and the change');
   await page.click('.strip a:has-text("10")');
-  page.once('dialog', d => d.accept()); // thigh and calf are still blank
+  // thigh and calf are still blank, and the reading is late: OK to both (the due time as when it was taken)
+  page.on('dialog', ans);
   await page.click('dialog.ask [data-a="save"]');
   await page.waitForFunction(() => /10 min/.test(document.querySelector('.tp')?.textContent || ''));
+  page.off('dialog', ans);
   await page.click('.strip a:has-text("5")');
   await page.waitForFunction(() => /5 min/.test(document.querySelector('.tp')?.textContent || ''));
   assert.equal((await page.textContent('.num[data-type="core"]')).trim(), '36.7', 'Save in the prompt saved it');

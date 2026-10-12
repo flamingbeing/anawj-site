@@ -275,6 +275,25 @@ await tryit(async () => {
   log(/couldn’t store the last change/.test(await pg.textContent('#storefull').catch(() => '')), 'storage full stays on screen');
   await ctx.close();
 });
+// P. a reading saved late asks when it was taken (that time is what the forms show); Change time fixes it later
+await tryit(async () => {
+  const { ctx, pg } = await fresh('2026-10-13T10:00:00');
+  await open(pg, 1);
+  await pg.click('#haemolink'); await pg.waitForSelector('input[data-in="sbp"]');
+  const tp = (await pg.textContent('.tp b')).trim();
+  const due = (await pg.textContent('#due')).match(/\d\d:\d\d/)?.[0];
+  let q = ''; const ans = d => { if (d.type() === 'prompt') { q = d.message(); d.accept('09:58'); } else d.accept(); };
+  pg.on('dialog', ans);
+  await pg.click('#save'); await pg.waitForTimeout(400);
+  pg.off('dialog', ans);
+  log(new RegExp(`The ${tp} reading was due at ${due}`).test(q), `late ${tp} asks when it was taken: ${q}`);
+  await pg.click(`.strip a:has-text("${tp.replace(' min', '')}")`); await pg.waitForSelector('[data-attime]');
+  log(/Taken 09:58/.test(await pg.textContent('main')), 'the time given is kept');
+  pg.once('dialog', d => d.accept('9.59'));
+  await pg.click('[data-attime]'); await pg.waitForTimeout(300);
+  log(/Taken 09:59/.test(await pg.textContent('main')), 'Change time (9.59 read as 09:59)');
+  await ctx.close();
+});
 await b.close();
 if (fails.length) { console.error('prewarm edge: FAIL\n- ' + fails.join('\n- ')); process.exit(1); }
-console.log('prewarm edge: ok (midnight, surgery end, double-tap Save, BP checks, back button, Log, Enter, still to fill, swipe, stray taps, time order, corrections, BMI, follow-ups, blanks, typed answers, alerts everywhere, duplicates, storage full, lock warning)');
+console.log('prewarm edge: ok (midnight, surgery end, double-tap Save, BP checks, back button, Log, Enter, still to fill, swipe, stray taps, time order, corrections, BMI, follow-ups, blanks, typed answers, alerts everywhere, duplicates, storage full, lock warning, late readings)');

@@ -105,6 +105,9 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   patients changed in the last 3 hours and not marked complete. A failed local write shows a sticky red bar
   (`#storefull`) instead of a toast that "… saved" would replace. A team listener refused right after a wrong join code
   rechecks membership and stops quietly (it used to overwrite "That code isn't right" with "Not allowed").
+  A reading first saved more than 5 min after it was due asks what time it was taken (due time filled in; `askTime`):
+  that time is the reading's time on the Word form and Readings sheet. A saved reading shows "Taken hh:mm (saved by
+  XX) · Change time". `fullcase.e2e.mjs` runs a whole case per group and checks every op-day cell is exported.
 - **Two tabs** (owner, 12 Oct 2026): a thin tab bar under the top bar on the patient screen: **Temperatures** (the
   main screen: times, pre-warming / intra-op temps, comfort, Form view / Sheet view) and **Others** (BP, HR, BIS,
   plus the Intra-op details and PACU boxes and a full-width **Perioperative data** box, formerly "Other data"). The tab you're not on warms up and pulses when its next

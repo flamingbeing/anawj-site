@@ -343,6 +343,14 @@ function render() {
 }
 window.addEventListener('hashchange', render);
 window.addEventListener('beforeunload', e => { if (leaveGuard?.()) e.preventDefault(); });
+// ask for a 24-hour time (hh:mm); null if cancelled or not a time
+function askTime(q, def) {
+  const r = prompt(q + '\n\n24-hour time, e.g. 08:05', def || '');
+  if (r == null) return null;
+  const m = /^\s*(\d{1,2})[:.]?(\d{2})\s*$/.exec(r);
+  if (!m || +m[1] > 23 || +m[2] > 59) { toast('Enter the time as hh:mm, e.g. 08:05.'); return null; }
+  return `${m[1].padStart(2, '0')}:${m[2]}`;
+}
 // run fn now, or after the save prompt when a reading on screen has unsaved changes
 function afterAsking(fn) { const g = leaveGuard?.(); if (g) askLeave(g, () => { leaveGuard = null; fn(); }); else fn(); }
 function askLeave(g, proceed) {
@@ -612,9 +620,17 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
       const by = p.f[`${s}_${pt.key}_${theirs[0].key}`]?.by;
       if (!confirm(`The ${pt.label} reading was changed on another phone${by ? ' (' + by + ')' : ''} while you had it open: ${theirs.map(c => `${c.label} ${val(p, `${s}_${pt.key}_${c.key}`) ?? 'blank'}`).join(', ')}.\n\nOK: save yours over it. Cancel: show theirs.`)) { leaveGuard = null; render(); return false; }
     }
+    // saved more than 5 min after it was due (typed in later): ask when it was taken; that time goes on the forms
+    let takenAt = nowHM();
+    const dueAt = dueOf(p, s, pt);
+    if (!savedAt(p, s, pt.key) && dueAt != null && nowFor(p, s) - dueAt > 5) {
+      const t = askTime(`The ${pt.label} reading was due at ${fromMin(Math.round(dueAt))}. What time was it taken?`, fromMin(Math.round(dueAt)));
+      if (!t) return false;
+      takenAt = t;
+    }
     // only what changed goes out (with the save time): an unchanged box never overwrites the other phone's newer one
     const sent = cols.map(c => `${s}_${pt.key}_${c.key}`).filter((id, i) => setVal(p, id, draft[cols[i].key] == null ? null : (cols[i].type === 'code' ? +draft[cols[i].key] : String(draft[cols[i].key])), settings.me));
-    if (!savedAt(p, s, pt.key)) { setVal(p, `at_${s}_${pt.key}`, nowHM(), settings.me); sent.push(`at_${s}_${pt.key}`); }
+    if (!savedAt(p, s, pt.key)) { setVal(p, `at_${s}_${pt.key}`, takenAt, settings.me); sent.push(`at_${s}_${pt.key}`); }
     saveAll();
     if (sent.length) sync(p, sent);
     toast(pt.label + ' saved');
@@ -713,7 +729,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     const grp = s === 'prewarm' ? `<span class="badge">${GROUPS.find(g => String(g[0]) === String(val(p, 'arm')))?.[1] || 'Group not set'}</span>` : '';
     paint(`${main && val(p, 'done') ? `<p class="ok-box donetop">✓ Data collection complete <small>${esc(val(p, 'done'))}</small></p>` : ''}${main ? comfortHtml('sat_pre', 'Comfortable before surgery?') + timesHtml() : ''}${navHtml()}
       <div class="tp"><div><b>${pt.label}</b> ${grp}</div><div class="due" id="due">${due != null ? 'due ' + fromMin(Math.round(due)) : pt.key === 'base' ? (s === 'prewarm' ? '' : 'on arrival in OT') : pt.min != null ? `<span class="hint">Log ${s === 'prewarm' ? 'Prewarm on' : 'Induction'} first</span>` : ''}</div></div>
-      ${isSaved ? `<p class="muted small tight">Saved ${esc(savedAt(p, s, pt.key))}${p.f['at_' + s + '_' + pt.key]?.by ? ' by ' + esc(p.f['at_' + s + '_' + pt.key].by) : ''}. Changes save when you tap Save.</p>` : ''}
+      ${isSaved ? `<p class="muted small tight">Taken ${esc(savedAt(p, s, pt.key))}${p.f['at_' + s + '_' + pt.key]?.by ? ' (saved by ' + esc(p.f['at_' + s + '_' + pt.key].by) + ')' : ''} <button class="link" data-attime>Change time</button>. Changes save when you tap Save.</p>` : ''}
       <div class="board">${cols.map(card).join('')}</div>
       <button class="save big" id="save">${isSaved ? 'Save changes' : `Save ${pt.label} reading`}</button>
       ${s === 'haemo' && vitalsCollected(p) ? '<p class="okline small">✓ Vital signs data collected: ticked on the paper form</p>' : ''}
@@ -786,6 +802,11 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
       let ended = false; // removing the box on redraw fires blur again
       const done = () => { if (ended) return; ended = true; const v = c.temp ? normaliseTemp(inp.value) : inp.value.trim(); draft[k] = v === '' ? null : v; draw(); };
       inp.onblur = done; inp.onkeydown = ev => { if (ev.key === 'Enter') inp.blur(); };
+      return;
+    }
+    if (t.closest('[data-attime]')) {
+      const v = askTime(`What time was the ${pt.label} reading taken?`, savedAt(p, s, pt.key));
+      if (v) { set(p, `at_${s}_${pt.key}`, v); draw(); }
       return;
     }
     if (t.closest('#save')) {
