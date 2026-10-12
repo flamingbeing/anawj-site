@@ -203,7 +203,7 @@ function home() {
     <h2>Patients on this phone</h2>
     ${list.length ? `<ul class="list">${list.map(p => {
       const e = lastEdit(p);
-      return `<li><a href="#/p/${p.id}"><b>${esc(sid(p))}${val(p, 'site') ? ` <small>${esc(val(p, 'site'))}</small>` : ''}</b><span>${esc(status(p))}</span>
+      return `<li><a href="#/p/${p.id}"><b>${esc(sid(p))}${val(p, 'site') ? ` <small>${esc(val(p, 'site'))}</small>` : ''}</b><span${val(p, 'done') ? ' class="okline"' : ''}>${esc(status(p))}</span>
         <small>${e ? 'Last entry ' + new Date(e.t).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) + (e.by ? ' by ' + esc(e.by) : '') : 'No entries yet'}</small></a></li>`;
     }).join('')}</ul>` : `<p class="muted">No patients yet. Tap <b>New patient</b> on the morning of surgery.</p>`}
     <a class="secondary big" href="#/export">Export Excel</a>
@@ -211,6 +211,7 @@ function home() {
   $('#new').onclick = () => go('#/new');
 }
 function status(p) {
+  if (val(p, 'done')) return '✓ Data collection complete';
   if (val(p, 'pacu_in')) return 'PACU';
   if (val(p, 'io_knife') || val(p, 'ev_ot')) return 'In OT';
   if (val(p, 'pw_start') || val(p, 'pw_gown')) return 'Pre-warming';
@@ -376,13 +377,13 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     if (s === 'prewarm' && !setTouched && cols.some(c => c.key === 'set') && setTempNA(p, pt)) draft.set = 'NA';
     const due = dueOf(p, s, pt);
     const grp = s === 'prewarm' ? `<span class="badge">${GROUPS.find(g => String(g[0]) === String(val(p, 'arm')))?.[1] || 'Group not set'}</span>` : '';
-    paint(`${main ? comfortHtml('sat_pre', 'Comfortable before surgery?') + timesHtml() : ''}${navHtml()}
+    paint(`${main && val(p, 'done') ? `<p class="ok-box donetop">✓ Data collection complete <small>${esc(val(p, 'done'))}</small></p>` : ''}${main ? comfortHtml('sat_pre', 'Comfortable before surgery?') + timesHtml() : ''}${navHtml()}
       <div class="tp"><div><b>${pt.label}</b> ${grp}</div><div class="due" id="due">${due != null ? 'due ' + fromMin(Math.round(due)) : pt.key === 'base' ? (s === 'prewarm' ? '' : 'on arrival in OT') : pt.min != null ? `<span class="hint">Set “${s === 'prewarm' ? 'Warming on' : 'Induction'}” for due times</span>` : ''}</div></div>
       ${isSaved ? `<p class="muted small tight">Saved ${esc(savedAt(p, s, pt.key))}${p.f['at_' + s + '_' + pt.key]?.by ? ' by ' + esc(p.f['at_' + s + '_' + pt.key].by) : ''}. Changes save when you tap Save.</p>` : ''}
       <div class="board">${cols.map(card).join('')}</div>
       <button class="save big" id="save">${isSaved ? 'Save changes' : `Save ${pt.label} reading`}</button>
       ${s === 'haemo' && settings.hide.haemo15 ? `<p class="muted small">Only baseline is entered here; the 15-min rows come from the monitor download. Turn them on in Settings.</p>` : ''}
-      ${main ? comfortHtml('sat_post', 'Comfortable after surgery?') + linksHtml() : ''}${signoffHtml(p, s)}`);
+      ${main ? comfortHtml('sat_post', 'Comfortable after surgery?') + linksHtml() + doneHtml(p) : signoffHtml(p, s)}`);
     const ck = $('#clock'); if (ck) ck.innerHTML = clockHtml(p, s);
     const lb = $('#lognext'); if (lb) { const h = logBtnHtml(p); if (lb.innerHTML !== h) lb.innerHTML = h; lb.hidden = !h; }
     if (editing) { const i = $('#evtime'); i?.focus(); }
@@ -455,6 +456,12 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
       go(`#/p/${id}/${s}/` + (next ? next.key : pt.key));
       return;
     }
+    if (t.closest('[data-done]')) {
+      if (!settings.me) return toast('Add your initials in Settings first.');
+      set(p, 'done', `${settings.me} ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} ${nowHM()}`);
+      toast('Data collection marked complete'); draw(); window.scrollTo(0, 0); return;
+    }
+    if (t.closest('[data-undone]')) { set(p, 'done', null); draw(); return; }
     signoffClick(p, s, t);
   };
   view.onchange = e => {
@@ -495,6 +502,13 @@ function beep() {
   } catch { /* sound needs a tap first on some phones */ }
 }
 document.addEventListener('pointerdown', () => { try { actx ||= new AudioContext(); actx.resume?.(); } catch {} }, { once: true });
+
+// ---------- the patient's op-day data collection marked complete (bottom of the main screen, so it isn't tapped by
+// accident); shown at the top of the main screen and in the patient list. The Word form's sign-off lines use it.
+function doneHtml(p) {
+  const v = val(p, 'done');
+  return `<div class="sign">${v ? `Data collection complete: ${esc(v)} <button class="link" data-undone>Undo</button>` : `<button class="link" data-done>Mark data collection as complete</button>`}</div>`;
+}
 
 // ---------- section sign-off (replaces the paper form's Name / Signature / Date)
 function signoffHtml(p, pg) {

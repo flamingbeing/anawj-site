@@ -37,6 +37,11 @@ assert.match(text, /Name: TT .*Date: 12 Oct 2026$/m);
 assert.equal((text.match(/Name: TT/g) || []).length, 1);
 assert.ok(missed.length > 0, 'the fixture is only part of the form');
 
+// "data collection complete" signs the op-day pages with data that have no sign-off of their own
+const done = fillForm(xml, { id: 'd', created: t, f: { ...f, sign_prewarm: undefined, done: { v: 'CD 13 Oct 2026 09:00', t } } }).xml.replace(/<[^>]+>/g, '');
+assert.match(done, /Name: CD .*Date: 13 Oct 2026$/m);
+assert.doesNotMatch(done.split('PREOPERATIVE')[1].split('Subject ID')[0], /Name: CD/, 'not on the pre-op page');
+
 // a long Subject ID: the five boxes become one
 const long = fillForm(xml, { id: 'y', created: t, f: { enrol_id: { v: 'NTF-0012', t } } }).xml;
 assert.match(long, /<w:gridSpan w:val="5"\/>/);
