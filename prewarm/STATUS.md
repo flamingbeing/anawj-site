@@ -33,6 +33,8 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 
 ## Decisions
 
+- 12 Oct 2026: "Mark data collection as complete" (one per patient) replaces the main screen's section mark; shown at the
+  top of the main screen and in the patient list.
 - 12 Oct 2026: delete participants only from Settings → Delete participants; every reading entered live by default.
 - 12 Oct 2026: Log button (next event), ‹ › timepoints, squarer time boxes, Mark section complete at the bottom, tap an
   empty temperature card for 36.5, running timer and next event in the app bar.

@@ -192,7 +192,8 @@ export function fillForm(xml, rec) {
       const di = h.cells.findIndex(cl => F.cellLabel(cl) === 'date of entry:');
       [...ddmmyy(Math.min(...ts))].forEach((ch, i) => h.cells[di + 1 + i] && F.cell(h.cells[di + 1 + i], ch));
     }
-    const s = (fp.sign || []).map(pg => v('sign_' + pg)).find(Boolean);
+    // the page's own sign-off, else "data collection complete" on the op-day pages that have data
+    const s = (fp.sign || []).map(pg => v('sign_' + pg)).find(Boolean) || (fp.sign && ts.length ? v('done') : null);
     const line = signs.find(P => F.order(P.p) > F.order(h.tr) && (!heads[n + 1] || F.order(P.p) < F.order(heads[n + 1].tr)));
     if (s && line) F.sign(line, s);
   });

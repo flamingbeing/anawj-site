@@ -251,6 +251,7 @@ export const EXTRA = [
   ...[['rbc', 'RBC'], ['plt', 'Platelets'], ['ffp', 'FFP'], ['cryo', 'Cryoprecipitate']].map(([k, l]) => ({ id: `io_${k}_ml`, label: l + ' volume', type: 'int', unit: 'mL' })),
   { id: 'io_ix_rows', label: 'Intra-op investigations', type: 'rows' },
   yn('pacu_tx', 'Need for transfusion in PACU'),
+  { id: 'done', label: 'Data collection complete (initials, date, time)', type: 'text' },
   ...[['dis', 'Disorientation'], ['beh', 'Inappropriate behaviour'], ['com', 'Inappropriate communication'], ['ill', 'Illusions / hallucinations'], ['psy', 'Psychomotor retardation']]
     .map(([k, l]) => ({ id: 'nd_' + k, label: l, type: 'code', opts: NUDESC })),
 ];
