@@ -366,7 +366,7 @@ route(/^\/new$/, () => {
 // ---------- patient main screen: event times, temperatures, then links to the other forms in the order they are
 // filled in. BP/HR/BIS uses the same reading screen without the times.
 const EVENTS = [['pw_gown', 'Gown on'], ['pw_start', 'Warm on', 'pw'], ['ev_wstop', 'Warm off', 'pw'], ['ev_ot', 'In OT'],
-  ['io_knife', 'Induction'], ['io_flip', 'Prone'], ['io_under_start', 'Under­body'], ['io_gown_start', 'Gown BH'],
+  ['io_knife', 'Induction'], ['io_flip', 'Prone'], ['io_under_start', 'Under­body'], ['io_gown_start', 'Gown warmer'],
   ['io_done', 'Surgery end'], ['pacu_in', 'PACU in'], ['pacu_out', 'To ward']];
 const EVENT_FULL = { pw_gown: 'Gown on', ev_ot: 'In OT', pacu_in: 'PACU arrival', io_flip: 'Flipped prone', pw_start: 'Active warming started', ev_wstop: 'Active warming stopped', io_knife: 'Induction (knife to skin)', io_under_start: 'Underbody Bair Hugger on',
   io_gown_start: 'Gown Bair Hugger on', io_done: 'Surgery completed (post-extubation)', pacu_out: 'Transfer to ward' };
