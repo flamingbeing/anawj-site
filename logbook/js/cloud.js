@@ -456,6 +456,22 @@ export async function listCases(email) {
   return (await F.getDocs(F.collection(db, 'logbooks', lc(email), 'cases'))).docs.map(d => ({ ...d.data(), id: d.id }));
 }
 
+// The one-off initials fix (the app owner): every logbook's email, then the fixed cases written back.
+// fixes: [{ id, initials, details }] from engine.js initialsFixes. onProgress(done, total) after each batch.
+export async function listLogbookEmails() {
+  if (demo) return D.listLogbookEmails();
+  const { db, F } = await sdk();
+  return (await F.getDocs(F.collection(db, 'logbooks'))).docs.map(d => d.id);
+}
+export async function fixCaseInitials(email, fixes, onProgress) {
+  if (demo) return D.fixCaseInitials(email, fixes, onProgress);
+  email = lc(email);
+  const now = Date.now();
+  await inBatches(fixes, (b, f, F, db) => b.update(F.doc(db, 'logbooks', email, 'cases', f.id), { initials: f.initials, details: f.details, updatedAt: now }),
+    async (b, part, n) => { await b.commit(); if (onProgress) onProgress(n, fixes.length); });
+  return fixes.length;
+}
+
 // ---- import from the old Google Form (admins) ----
 // Writes only cases whose importKey is not yet recorded in imports/{rid}, so re-running an import
 // after new form responses costs only the new rows (the free tier allows 20k writes a day).

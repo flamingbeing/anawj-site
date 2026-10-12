@@ -156,6 +156,12 @@ portfolio content.
   `--line` of themes, contrast and colours. `html.edges-fill` (Borderless, Faint) gives fields, plain buttons and
   chips a light fill so they stay visible. Tag tick boxes keep `--line`. Also set at first paint (index.html).
   Defaults pixel-identical to before.
+- **Patient initials** (`splitInitials`, engine.js, tested): 2–4 letters as always; 5–8 letters and one capital letter
+  only before an age or "/" ("ABCDEF 45F …", "K/30F …"), so "ELECTIVE LSCS" or "a 45f lady" keep their first word.
+  **One-off fix** (Admin, owner only, `initialsFixCard` in ui-admin.js; `initialsFixes` in engine.js, tested;
+  `cloud.listLogbookEmails` / `fixCaseInitials`): reads every logbook's cases, lists those with an empty initials
+  field whose text starts with initials under these rules (older imports, pastes, spreadsheets), and writes initials +
+  details back after a confirm. Re-running finds nothing. The rules already let the app owner read and update cases.
 - **Display is per device** (owner: people use the logbook on different devices with different needs): compact,
   text size, zoom, fonts, colour and the start tab live in localStorage `apmes-logbook-display` (`deviceDisplay` / `setDisplay` /
   `adoptDisplay` in ui-settings.js), light / dark in `apmes-logbook-theme`. A device with none starts from the

@@ -447,6 +447,15 @@ export async function saveSharedTemplate(t) {
 export async function deleteSharedTemplate(id) { const s = load(); delete s.sharedTemplates[id]; save(s); }
 
 export async function listCases(email) { return casesOf(lc(email)); }
+export async function listLogbookEmails() { return Object.keys(load().logbooks); }
+export async function fixCaseInitials(email, fixes, onProgress) {
+  email = lc(email);
+  const s = load(), lb = book(s, email), now = Date.now();
+  for (const f of fixes) if (lb.cases[f.id]) Object.assign(lb.cases[f.id], { initials: f.initials, details: f.details, updatedAt: now });
+  save(s); notifyCases(email);
+  if (onProgress) onProgress(fixes.length, fixes.length);
+  return fixes.length;
+}
 
 export async function importCases(email, rid, cases, onProgress) {
   email = lc(email);
