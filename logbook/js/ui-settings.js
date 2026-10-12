@@ -3,7 +3,7 @@
 
 import { YEAR_NAMES, DEFAULT_NAMES, BY_CODE } from './categories.js';
 import { sortCodes, uid, academicYear, withParents, weekStart, humanAge } from './engine.js';
-import { S, h, toast, modal, confirmBox, cloud, writes, catChip, catName, catShort, PICKER_ORDER, pickerOrder, settings, patchLogbook, displayName, hooks, rYear, myYearName, fill, categoryNames, setCategoryNames, catPills, tagSet, resetters, download, fileButton, todayISO, saveMany, UNDO_SECS, rowIcon } from './ui-core.js';
+import { S, h, toast, modal, confirmBox, cloud, writes, catChip, catName, catShort, PICKER_ORDER, pickerOrder, settings, patchLogbook, displayName, hooks, rYear, myYearName, fill, PROFILES, profile, basicMode, logbookOnly, categoryNames, setCategoryNames, catPills, tagSet, resetters, download, fileButton, todayISO, saveMany, UNDO_SECS, rowIcon } from './ui-core.js';
 import { MAX_TAGS, tagLinks as tagLinksIn, learnShorthand, cleanShorthand, shorthandOf, DEFAULT_SHORTHAND, cleanTagSet, defaultTagSet, tagTree, flatTree, moveTag, reparentTag, removeTag, newKey, tagSetToCsv, tagSetFromCsv, dropTag, canPlace, placeNewTag } from './tags.js';
 import { pickDialog, CASE_PARTS, AFTER_SAVE } from './ui-log.js';
 import { OPERATOR_HELP } from './search-ops.js';
@@ -193,15 +193,20 @@ export const roundLevel = d => (Number.isInteger(d.round) && d.round >= 0 && d.r
 export const BAR_TABS = [['log', 'Case'], ['logbook', 'Logbook'], ['reflect', 'Reflections'], ['progress', 'Analytics'], ['notes', 'Notes'],
   ['account', 'Account'], ['settings', 'Settings'], ['recovery', 'Recover drafts'], ['data', 'Export / Import'], ['admin', 'Admin portal'], ['more', 'More']];
 export const barTabs = () => BAR_TABS.filter(([id]) => id !== 'admin' || S.admin);
-// tabs off the bar until someone puts them there (they live in More by default)
+// the tabs with a switch: Basic: logbook only has no Reflections tab (its page stays in More)
+const switchable = id => id !== 'reflect' || !logbookOnly();
+// tabs off the bar until someone puts them there (they live in More by default); the Basic profiles keep Analytics
+// in More too
 const OFF_BAR = ['notes', 'account', 'settings', 'recovery', 'data', 'admin'];
+const offBar = mode => (mode === 'advanced' ? OFF_BAR : [...OFF_BAR, 'progress']);
 export const MAX_BAR = 7;
-export function arrangeTabs(ids, d = {}) {
+export function arrangeTabs(ids, d = {}, mode = profile()) {
   const order = Array.isArray(d.tabOrder) ? d.tabOrder : [];
   const at = id => (order.includes(id) ? order.indexOf(id) : order.length + ids.indexOf(id));
   const sorted = [...ids].sort((a, b) => at(a) - at(b));
   // an OFF_BAR tab stays off until someone shows it in Arrange tabs (which saves the order with it in)
-  const hidden = new Set([...(Array.isArray(d.tabHidden) ? d.tabHidden : []), ...OFF_BAR.filter(id => !order.includes(id) || !Array.isArray(d.tabHidden))].filter(id => id !== 'more'));
+  // Basic: logbook only keeps Reflections off the bar (listed in More)
+  const hidden = new Set([...(Array.isArray(d.tabHidden) ? d.tabHidden : []), ...(mode === 'logbook' ? ['reflect'] : []), ...offBar(mode).filter(id => !order.includes(id) || !Array.isArray(d.tabHidden))].filter(id => id !== 'more'));
   // over the limit (saved by hand, or an old settings file): the last ones in the order go to More
   for (const id of [...sorted].reverse()) if (sorted.filter(k => !hidden.has(k)).length > MAX_BAR && id !== 'more' && !hidden.has(id)) hidden.add(id);
   const shown = sorted.filter(id => !hidden.has(id));
@@ -251,9 +256,9 @@ export const resetLink = (what, run) => h('p', { class: 'reset-row' }, h('button
 
 // a link to a settings page's own Advanced page, like a row of the More list. Basic mode hides it, but says so
 // (owner, Oct 2026: a link that silently vanished looked like a bug), decided here from the setting itself
-export const advancedLink = (id, label, desc) => settings().basic
-  ? h('p', { class: 'hint more-settings-note' }, `${label} are hidden while Basic mode is on. `,
-    h('a', { href: '#settings', 'data-go': 'settings' }, 'Turn off Basic mode ›'))
+export const advancedLink = (id, label, desc) => basicMode()
+  ? h('p', { class: 'hint more-settings-note' }, `${label} are hidden in the ${PROFILES.find(([k]) => k === profile())[1]} profile. `,
+    h('a', { href: '#showhide', 'data-go': 'showhide' }, 'Change profile ›'))
   : h('section', { class: 'card more-list more-settings' },
   h('ul', {}, h('li', {}, h('a', { href: '#' + id, 'data-go': id },
     h('span', { class: 'mt' }, h('b', {}, label), h('small', {}, desc)), h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')))));
@@ -361,11 +366,12 @@ function tabArranger() {
   const wrap = h('div', { class: 'tab-arranger field', style: 'margin-top:10px' });
   const paint = () => {
     const { sorted: order, hidden } = arrangeTabs(barTabs().map(([id]) => id), display());
-    const move = (id, by) => { const o = [...order], i = o.indexOf(id), j = i + by; if (j < 0 || j >= o.length) return; [o[i], o[j]] = [o[j], o[i]]; applyDisplay(setDisplay({ tabOrder: o })); hooks.paintTabs?.(); paint(); };
+    // ↑ ↓ swap with the next tab in the list (a tab without a switch is skipped over)
+    const move = (id, by) => { const vis = order.filter(switchable), other = vis[vis.indexOf(id) + by]; if (!other) return; const o = [...order], i = o.indexOf(id), j = o.indexOf(other); [o[i], o[j]] = [o[j], o[i]]; applyDisplay(setDisplay({ tabOrder: o })); hooks.paintTabs?.(); paint(); };
     const hideSet = new Set(hidden);
     const toggle = (id, show) => setTabOnBar(id, show, paint);
     fill(wrap, h('span', {}, 'Tabs on the bar'),
-      h('ul', { class: 'tab-order' }, order.map((id, i) => h('li', {},
+      h('ul', { class: 'tab-order' }, order.filter(switchable).map((id, i, order) => h('li', {},
         h('label', { class: 'check', style: 'flex:1;min-height:40px' }, h('input', { type: 'checkbox', checked: !hideSet.has(id), disabled: id === 'more', 'aria-label': 'Show ' + BAR_TABS.find(([k]) => k === id)[1], onchange: e => toggle(id, e.target.checked) }), BAR_TABS.find(([k]) => k === id)[1]),
         h('button', { class: 'small icon-btn', type: 'button', disabled: i === 0, 'aria-label': 'Move up', onclick: () => move(id, -1) }, '↑'),
         h('button', { class: 'small icon-btn', type: 'button', disabled: i === order.length - 1, 'aria-label': 'Move down', onclick: () => move(id, 1) }, '↓')))),
@@ -646,13 +652,28 @@ export function renderLoggingAdvanced() {
     }));
 }
 
-// Basic mode (settings.basic, the whole account): one switch, at the top of Settings and of Show or hide
-export const basicCard = () => h('section', { class: 'card basic-card' },
-  h('label', { class: 'check', style: 'font-weight:600' }, h('input', { type: 'checkbox', role: 'switch', 'aria-label': 'Basic mode', checked: !!settings().basic,
-    onchange: e => patchLogbook({ settings: { basic: e.target.checked || null } }).then(() => { hooks.render(); toast(e.target.checked ? 'Basic mode on' : 'Basic mode off'); }) }), 'Basic mode'),
-  h('p', { class: 'hint', style: 'margin:0 0 0 28px' }, settings().basic
-    ? 'On: a simpler app. Tabs and buttons stay where they are; quick picks, the Logbook grid, search operators, Analytics trends and advanced settings are hidden. Turn it off to bring them all back.'
-    : 'A simpler app for getting started: the same tabs and buttons, without the extras (quick picks, the Logbook grid, search operators, Analytics trends, advanced settings). Your other settings are kept.'));
+// Profiles (settings.mode, the whole account; PROFILES in ui-core.js): one place only, at the top of Show or hide
+// (owner, Oct 2026: two Basic mode switches confused). Choosing one also moves this device's tabs (Analytics into
+// More for the Basic profiles, back for Advanced); other devices follow the profile's defaults.
+export function profileCard() {
+  const cur = profile();
+  const pick = async mode => {
+    if (mode === profile()) return;
+    await patchLogbook({ settings: { mode: mode === 'advanced' ? null : mode, basic: null } });
+    const d = display();
+    if (Array.isArray(d.tabHidden)) {
+      const hid = new Set(d.tabHidden); if (mode === 'advanced') hid.delete('progress'); else hid.add('progress');
+      applyDisplay(setDisplay({ tabHidden: [...hid] }));
+    }
+    hooks.paintTabs?.(); hooks.render(); toast(`Profile: ${PROFILES.find(([k]) => k === mode)[1]}`);
+  };
+  return h('section', { class: 'card profile-card' },
+    h('h2', {}, 'Profile'),
+    h('div', { role: 'radiogroup', 'aria-label': 'Profile' }, PROFILES.map(([k, label, hint]) => h('label', { class: 'check profile-opt' },
+      h('input', { type: 'radio', name: 'profile', value: k, checked: k === cur, onchange: () => pick(k) }),
+      h('span', {}, h('b', {}, label), h('small', { class: 'hint' }, hint))))),
+    h('p', { class: 'hint help', style: 'margin:6px 0 0' }, 'For your whole account. Switching never changes your cases or reflections, and Advanced brings everything back.'));
+}
 
 // Settings → Show or hide: every switch that hides part of the app, grouped by area, each group with its own
 // reset. The same settings as on their own pages (Logging, Display, Reflections), gathered in one place.
@@ -672,10 +693,11 @@ export function renderShowHide() {
   };
   const { hidden } = arrangeTabs(barTabs().map(([id]) => id), d);
   return h('div', { class: 'showhide' },
-    basicCard(),
+    profileCard(),
     h('section', { class: 'card' },
       h('h2', {}, 'Show or hide'),
-      h('p', { class: 'hint help', style: 'margin:0' }, 'Everything you can hide, by area. Each group has its own reset, so you can bring one area back without touching the rest. The same switches are on their own pages too.')),
+      h('p', { class: 'hint help', style: 'margin:0' }, 'Everything you can hide, by area. Each group has its own reset, so you can bring one area back without touching the rest. The same switches are on their own pages too.'),
+      basicMode() ? h('p', { class: 'hint', style: 'margin:6px 0 0' }, 'The Basic profiles also hide the extras listed above, whatever these switches say.') : null),
     h('section', { class: 'card', 'data-group': 'tips' },
       h('h3', { style: 'margin-top:0' }, 'Tips and help'),
       sw('Show tips and help text', !st.hideTips, v => save({ hideTips: !v }).then(() => hooks.render()), 'Explanations around the app, the privacy and photo reminders, and the tips for the tags you pick.'),
@@ -686,7 +708,7 @@ export function renderShowHide() {
       h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'The case box, All tags and Save always stay.'),
       CASE_PARTS.map(([part, label]) => sw(label, caseOn(part), v => setCase(part, v))),
       groupReset('every part of the Case tab', () => save({ caseHide: null }))),
-    h('section', { class: 'card', 'data-group': 'reflections' },
+    logbookOnly() ? null : h('section', { class: 'card', 'data-group': 'reflections' },
       h('h3', { style: 'margin-top:0' }, 'Reflections'),
       sw('Formatting buttons (this device)', !!d.reflToolbar, v => applyDisplay(setDisplay({ reflToolbar: v || null })), 'Bold, bullet and numbered lists above each box.'),
       sw('Show notes under each heading', st.reflNotes !== false, v => save({ reflNotes: v })),
@@ -699,7 +721,7 @@ export function renderShowHide() {
       h('h3', { style: 'margin-top:0' }, 'Header and tabs (this device)'),
       sw('Show the header (the app’s name and your name)', !d.hideHeader, v => applyDisplay(setDisplay({ hideHeader: !v }))),
       sw('Swipe left or right to change tab', d.swipeTabs !== false, v => applyDisplay(setDisplay({ swipeTabs: v ? null : false }))),
-      barTabs().filter(([id]) => id !== 'more').map(([id, label]) => sw(`${label} on the tab bar`, !hidden.includes(id), v => setTabOnBar(id, v, () => hooks.render()))),
+      barTabs().filter(([id]) => id !== 'more' && switchable(id)).map(([id, label]) => sw(`${label} on the tab bar`, !hidden.includes(id), v => setTabOnBar(id, v, () => hooks.render()))),
       h('p', { class: 'hint help', style: 'margin:0 0 6px' }, `Up to ${MAX_BAR} tabs fit, More included. Hidden tabs are first in More. The order is in Display → Advanced.`),
       groupReset('the header, swiping and the usual tabs (Notes and the More pages go back into More)', () => { applyDisplay(setDisplay({ hideHeader: null, swipeTabs: null, tabHidden: null, tabOrder: null })); hooks.paintTabs?.(); })));
 }

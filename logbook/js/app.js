@@ -2,12 +2,12 @@
 // shared state and helpers are in ui-core.js. Case data comes from cloud.js (Firestore, or the
 // in-browser demo backend with ?demo).
 
-import { S, hooks, h, toast, clearToast, cloud, writes, transients, setCases, scheduleSummary, fill, resetCaches, patchLogbook, confirmBox, fileButton, modal, download, todayISO, settings, setCategoryNames, categoryNames as categoryNamesNow } from './ui-core.js';
+import { S, hooks, h, toast, basicMode, logbookOnly, clearToast, cloud, writes, transients, setCases, scheduleSummary, fill, resetCaches, patchLogbook, confirmBox, fileButton, modal, download, todayISO, settings, setCategoryNames, categoryNames as categoryNamesNow } from './ui-core.js';
 import { renderLog, focusLog, logCasesChanged, clearDrafts, SHARED_KEY } from './ui-log.js';
 import { renderRecovery } from './ui-recovery.js';
 import { renderLogbook } from './ui-logbook.js';
 import { renderProgress, renderTotals } from './ui-progress.js';
-import { applyCompact, cachedCompact, applyTheme, cachedTheme, applyTextSize, cachedTextSize, applyZoom, cachedZoom, stepZoom, applyAccent, adoptDisplay, applyDisplay, applyCustomCss, display, setDisplay, resetDisplay, DISPLAY_KEYS, renderTagEditor, renderDisplay, renderDisplayAdvanced, renderLogging, renderLoggingAdvanced, renderReflectionSettings, renderMarkdownSettings, renderShowHide, basicCard, START_TABS, arrangeTabs, privacyCard, creditsCard, signOutCard } from './ui-settings.js';
+import { applyCompact, cachedCompact, applyTheme, cachedTheme, applyTextSize, cachedTextSize, applyZoom, cachedZoom, stepZoom, applyAccent, adoptDisplay, applyDisplay, applyCustomCss, display, setDisplay, resetDisplay, DISPLAY_KEYS, renderTagEditor, renderDisplay, renderDisplayAdvanced, renderLogging, renderLoggingAdvanced, renderReflectionSettings, renderMarkdownSettings, renderShowHide, START_TABS, arrangeTabs, privacyCard, creditsCard, signOutCard } from './ui-settings.js';
 import { renderAccount, flush as flushProfile } from './ui-account.js';
 import { renderAdmin, renderAdminResidents, renderAdminAdvanced, leaveAdmin } from './ui-admin.js';
 import { renderReflect, watchMyReflections, renderExportPage, renderChoosePage } from './ui-reflect.js';
@@ -54,8 +54,8 @@ const icon = id => {
 const TABS = [
   { id: 'log', label: 'Case', render: renderLog },
   { id: 'logbook', label: 'Logbook', render: renderLogbook },
-  { id: 'reflect', label: 'Reflections', render: renderReflect },
-  { id: 'progress', label: 'Analytics', render: renderProgress },
+  { id: 'reflect', label: 'Reflections', render: renderReflect, desc: 'Your reflections' },
+  { id: 'progress', label: 'Analytics', render: renderProgress, desc: 'Your progress against the APMES targets' },
   // a personal notepad: on the bar only if chosen (Arrange tabs); otherwise first in More
   { id: 'notes', label: 'Notes', render: renderNotes, desc: 'Your own notes: private, never in your portfolio' },
   // five tabs on the bar; the rest live under More (still reachable by #totals, #account, #settings)
@@ -63,7 +63,7 @@ const TABS = [
   // under Analytics: how your counts compare with your intake
   { id: 'totals', label: 'Totals', render: renderTotals, hidden: true, under: 'progress', unlisted: true },
   { id: 'account', bar: true, label: 'Account', render: renderAccount, hidden: true, under: 'more', desc: 'Your name and portfolio details (Section 1); delete account' },
-  { id: 'settings', bar: true, label: 'Settings', render: () => renderSettingsMenu(), hidden: true, under: 'more', desc: 'Display, logging, tag editor, Markdown, recycle bin' },
+  { id: 'settings', bar: true, label: 'Settings', render: () => renderSettingsMenu(), hidden: true, under: 'more', desc: 'Profile, display, logging, tag editor, Markdown, recycle bin' },
   { id: 'recovery', bar: true, short: 'Recover', label: 'Recent changes / Recover drafts', render: renderRecovery, hidden: true, under: 'more', desc: 'Retry sync, recover unfinished drafts and restore recent versions on this device' },
   { id: 'data', bar: true, short: 'Export', label: 'Export / Import', render: () => renderDataPage(), hidden: true, under: 'more', desc: 'Export the portfolio (Word); import reflections from Word; backup file, Excel and Markdown export' },
   { id: 'reflimport', label: 'Import reflections from Word', render: () => renderReflImport(), hidden: true, under: 'data', unlisted: true },
@@ -72,7 +72,7 @@ const TABS = [
   { id: 'displayadv', label: 'Advanced display', render: renderDisplayAdvanced, hidden: true, under: 'display', unlisted: true },
   { id: 'loggingadv', label: 'Advanced logging', render: renderLoggingAdvanced, hidden: true, under: 'logging', unlisted: true },
   { id: 'sharefmt', label: 'Markdown', render: renderMarkdownSettings, hidden: true, under: 'settings', unlisted: true, desc: 'How Copy, Share and the notes export read' },
-  { id: 'showhide', label: 'Show or hide', render: renderShowHide, hidden: true, under: 'settings', unlisted: true, desc: 'Everything you can hide, by area, each with its own reset' },
+  { id: 'showhide', label: 'Show or hide', render: renderShowHide, hidden: true, under: 'settings', unlisted: true, desc: 'Your profile (Advanced, Basic, logbook only) and everything you can hide' },
   { id: 'logging', label: 'Logging', render: renderLogging, hidden: true, under: 'settings', unlisted: true, desc: 'Suggestions, the Enter key, dates, after Save; more under Advanced' },
   // from Reflections → More tools
   { id: 'reflset', label: 'Reflections', render: renderReflectionSettings, hidden: true, under: 'settings', unlisted: true, desc: 'New reflections in the export, photo sizes' },
@@ -98,7 +98,7 @@ function renderMore() {
   const hidden = arrangeTabs(barCandidates(), display()).hidden.filter(id => !TABS.find(t => t.id === id).hidden);
   return h('div', {},
     h('section', { class: 'card more-list' }, h('h2', {}, 'More'),
-      h('ul', {}, hidden.map(id => TABS.find(t => t.id === id)).map(t => menuItem(t.id, t.label, t.id === 'notes' ? t.desc : 'Hidden from the tab bar')), items.map(t => menuItem(t.id, t.label, t.desc)))),
+      h('ul', {}, hidden.map(id => TABS.find(t => t.id === id)).map(t => menuItem(t.id, t.label, t.desc || 'Hidden from the tab bar')), items.map(t => menuItem(t.id, t.label, t.desc)))),
     privacyCard(),
     creditsCard(),
     installCard(),
@@ -194,10 +194,9 @@ function renderSettingsMenu() {
   const order = ['display', 'logging', 'showhide', 'tags', 'reflset', 'sharefmt'];
   const pages = TABS.filter(t => t.under === 'settings').sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
   settingsIndex = null;   // drawn again on the first search of this visit
-  const basic = !!settings().basic;
+  const basic = basicMode();
   return h('div', {},
     settingsSearch(),
-    basicCard(),
     h('section', { class: 'card more-list' }, h('h2', {}, 'Settings'),
       h('ul', {}, pages.map(t => menuItem(t.id, t.label, t.desc)),
         menuItem('bin', 'Recycle bin', 'Deleted cases and reflections, kept for 30 days', () => openBin()))),
@@ -386,7 +385,8 @@ function render() {
   if (!S.user) return;
   // Settings → Logging → Show tips and help text: off hides every .help explanation (an experienced-user mode)
   document.body.classList.toggle('no-help', !!(S.logbook && S.logbook.settings && S.logbook.settings.hideTips));
-  document.body.classList.toggle('basic', !!(S.logbook && S.logbook.settings && S.logbook.settings.basic));
+  document.body.classList.toggle('basic', basicMode());
+  document.body.classList.toggle('logbook-only', logbookOnly());
   paintTabs();
   const tab = visibleTabs().find(t => t.id === S.tab) || TABS[0];
   S.tab = tab.id;

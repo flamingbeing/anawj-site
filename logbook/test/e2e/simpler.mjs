@@ -1,4 +1,4 @@
-// Fake data only. Settings → Show or hide (grouped switches, a reset per group), Basic mode, and the backup as one
+// Fake data only. Settings → Show or hide (grouped switches, a reset per group), profiles, and the backup as one
 // spreadsheet (CSV download and restore).
 import assert from 'node:assert/strict';
 const { chromium } = await import(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/node_modules/playwright/index.mjs');
@@ -46,32 +46,62 @@ try { for (const width of [390, 1280]) {
   await p.locator('dialog[open]').getByRole('button', { name: 'Reset' }).click();
   await p.waitForFunction(async () => { const { display } = await import('./js/ui-settings.js'); return !display().rowMenu; });
 
-  // Basic mode: the same tabs and buttons, without the extras; off brings them all back
+  // Profiles (top of Show or hide, the only place): Basic keeps the tabs and buttons where they are, without the
+  // extras, and Analytics moves into More; Advanced brings everything back
+  const tabsNow = () => p.locator('[role=tab]').evaluateAll(t => t.map(x => x.dataset.tab));
+  const pickProfile = async k => { await p.evaluate(() => { location.hash = '#showhide'; }); await p.locator(`.profile-card input[value=${k}]`).check(); };
   await p.evaluate(() => { location.hash = '#settings'; });
-  await p.getByLabel('Basic mode', { exact: true }).check();
+  assert.equal(await p.locator('.profile-card, .basic-card').count(), 0, 'the profile is in Show or hide only');
+  const tabsAdvanced = await tabsNow();
+  await pickProfile('basic');
   await p.waitForFunction(() => document.body.classList.contains('basic'));
+  await p.evaluate(() => { location.hash = '#settings'; });
   assert.equal(await p.locator('.connect-claude, section:has(h2:text("Connect Claude (advanced)"))').count(), 0);
+  assert.deepEqual(await tabsNow(), tabsAdvanced.filter(t => t !== 'progress'), 'Analytics moves into More');
+  await p.locator('[role=tab][data-tab=more]').click();
+  await p.locator('.more-list a[data-go=progress]').waitFor();
   await p.locator('[role=tab][data-tab=log]').click(); await p.waitForSelector('textarea.details');
-  const tabsBasic = await p.locator('[role=tab]').evaluateAll(t => t.map(x => x.dataset.tab));
   await p.locator('textarea.details').fill('ZZ 30F fake LSCS spinal');
   assert.doesNotMatch(await p.locator('main').innerText(), /quick picks|still needed|interesting/i);
   await p.locator('textarea.details').fill('');
   await p.locator('[role=tab][data-tab=logbook]').click();
   assert.equal(await p.locator('main .seg button').filter({ hasText: /^Grid$/ }).count(), 0);
-  await p.locator('[role=tab][data-tab=progress]').click();
+  await p.evaluate(() => { location.hash = '#progress'; });
   await p.locator('.an-sec').first().waitFor();
   assert.equal(await p.locator('.an-sec summary').filter({ hasText: 'Trends' }).count(), 0);
-  // the Advanced-only Analytics parts: no forecast, Gone quiet, Reflection to-dos or links to cases in Basic mode
+  // the Advanced-only Analytics parts: no forecast, Gone quiet, Reflection to-dos or links to cases in Basic
   assert.equal(await p.locator('.an-sec summary').filter({ hasText: /Gone quiet|Reflection to-dos/ }).count(), 0);
   assert.equal(await p.locator('a.an-link').count(), 0);
   assert.ok(!/at your pace/.test(await p.locator('main').innerText()));
   await p.evaluate(() => { location.hash = '#display'; });
   assert.equal(await p.locator('a[data-go=displayadv]').isVisible(), false);
   // ...but it says so, with a way back (a silently missing link looked like a bug)
-  await p.locator('.more-settings-note').filter({ hasText: 'hidden while Basic mode is on' }).waitFor();
-  await p.evaluate(() => { location.hash = '#showhide'; });
-  await p.getByLabel('Basic mode', { exact: true }).uncheck();
-  await p.waitForFunction(() => !document.body.classList.contains('basic'));
+  await p.locator('.more-settings-note').filter({ hasText: 'hidden in the Basic profile' }).waitFor();
+  // Basic reflections: no Figures or References
+  await p.evaluate(async () => { const { reflectOnCase } = await import('./js/ui-reflect.js'); await reflectOnCase({ id: 'fake-basic', date: '2026-10-10', initials: 'ZZ', details: 'Fake basic case', cats: ['13'] }); });
+  await p.waitForSelector('.refl-editor');
+  assert.equal(await p.locator('.refl-editor summary').filter({ hasText: /Figures|References/ }).count(), 0);
+  await p.goBack(); await p.waitForFunction(() => !document.querySelector('.refl-editor'));
+
+  // Basic: logbook only: Basic without reflections (no Reflections tab or Reflect buttons; the page stays in More)
+  await pickProfile('logbook');
+  await p.waitForFunction(() => document.body.classList.contains('logbook-only'));
+  assert.deepEqual(await tabsNow(), tabsAdvanced.filter(t => t !== 'progress' && t !== 'reflect'));
+  assert.equal(await group('bar').getByLabel('Reflections on the tab bar').count(), 0);
+  assert.equal(await p.locator('.showhide [data-group=reflections]').count(), 0);
+  await p.locator('[role=tab][data-tab=logbook]').click();
+  await p.locator('main .seg button').filter({ hasText: /^List$/ }).click();
+  await p.locator('ul.cases li').first().waitFor();
+  assert.equal(await p.locator('main button[aria-label*="reflection on this case"]').count(), 0);
+  assert.ok(await p.locator('main button[aria-label="Copy this case"]').count() > 0);
+  await p.locator('[role=tab][data-tab=more]').click();
+  await p.locator('.more-list a[data-go=reflect]').click();
+  await p.locator('main h2').filter({ hasText: 'Reflections' }).first().waitFor();
+
+  await pickProfile('advanced');
+  await p.waitForFunction(() => !document.body.classList.contains('basic') && !document.body.classList.contains('logbook-only'));
+  assert.ok(!(await st()).s.mode, 'Advanced is the default (nothing saved)');
+  assert.deepEqual(await tabsNow(), tabsAdvanced);
   await p.evaluate(() => { location.hash = '#display'; });
   await p.locator('a[data-go=displayadv]').waitFor();
   assert.equal(await p.locator('.more-settings-note').count(), 0);
@@ -79,7 +109,8 @@ try { for (const width of [390, 1280]) {
   await p.locator('main .seg button').filter({ hasText: /^Grid$/ }).waitFor();
   await p.locator('[role=tab][data-tab=progress]').click();
   await p.locator('.an-sec summary').filter({ hasText: 'Trends' }).waitFor();
-  assert.deepEqual(await p.locator('[role=tab]').evaluateAll(t => t.map(x => x.dataset.tab)), tabsBasic);   // same tabs either way
+  // settings saved before profiles: basic: true reads as Basic
+  assert.equal(await p.evaluate(async () => { const { S, profile } = await import('./js/ui-core.js'); const was = S.logbook.settings; S.logbook.settings = { ...was, basic: true }; const out = profile(); S.logbook.settings = was; return out; }), 'basic');
 
   // reflection formatting buttons: off by default, on from Show or hide; they write Markdown the Word export formats
   await p.evaluate(async () => { const { reflectOnCase } = await import('./js/ui-reflect.js'); await reflectOnCase({ id: 'fake-fmt', date: '2026-10-10', initials: 'ZZ', details: 'Fake formatting case', cats: ['13'] }); });

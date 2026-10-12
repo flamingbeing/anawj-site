@@ -7,7 +7,7 @@ import { suggest as suggestCodes } from './suggest.js';
 import { apmesShorthand, shorthandTags } from './tags.js';
 import {
   S, h, toast, debounce, modal, confirmBox, cat, catName, catShort, catFull, catChip, countText, logTags, tagLinks, tagName, tagChip, tagSet, keepTags, PROGRESS_BY_CODE,
-  createCase, updateCase, removeCase, restoreCase, saveMany, deleteMany, subcatChips, subcatsOf, settings, todayISO, hooks, fill, add, cloud, writes, okNoIds, patchLogbook, catPills, basicMode } from './ui-core.js';
+  createCase, updateCase, removeCase, restoreCase, saveMany, deleteMany, subcatChips, subcatsOf, settings, todayISO, hooks, fill, add, cloud, writes, okNoIds, patchLogbook, catPills, basicMode, logbookOnly } from './ui-core.js';
 import { display, templateDialog } from './ui-settings.js';
 import { moveToBin } from './bin.js';
 import { createDraftSlot, listDrafts } from './drafts.js';
@@ -969,7 +969,7 @@ export function editCaseDialog(c, opts = {}) {
     h('label', { class: 'field' }, 'Patient initials', h('input', { value: e.initials, placeholder: 'e.g. AB', maxlength: '20', autocapitalize: 'characters', autocomplete: 'off', spellcheck: 'false', oninput: ev => { e.initials = ev.target.value; saveEditDraft(); } })),
     h('label', { class: 'field' }, 'Case summary', detailsBox),
     h('div', { class: 'chiplabel' }, 'Tags'), sel, addBtn, pickWrap,
-    h('label', { class: 'check reflect-tag', style: 'margin-top:8px' }, h('input', { type: 'checkbox', checked: !!e.reflectTag, onchange: ev => { e.reflectTag = ev.target.checked; saveEditDraft(); } }), '☆ Interesting'),
+    logbookOnly() ? null : h('label', { class: 'check reflect-tag', style: 'margin-top:8px' }, h('input', { type: 'checkbox', checked: !!e.reflectTag, onchange: ev => { e.reflectTag = ev.target.checked; saveEditDraft(); } }), '☆ Interesting'),
     draftStatus,
     // Delete / Cancel / Save stay pinned to the bottom while the form scrolls
     h('div', { class: 'bar dlg-actions' },

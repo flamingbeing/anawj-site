@@ -5,7 +5,7 @@ Lasting rules and lessons go in `NOTES.md`; finished work leaves "Recently done"
 Each session edits only its own line under **Now**. Update this file when a task finishes, a decision is made, or
 before compacting (`/save-state` in Claude Code, `$save-state` in Codex).
 
-Last updated: 2026-10-12 by Claude Code, Logbook 1 (log1).
+Last updated: 2026-10-12 by Claude Code, Logbook 2 (log2).
 
 ## Now
 
@@ -16,9 +16,9 @@ Last updated: 2026-10-12 by Claude Code, Logbook 1 (log1).
 - **Claude Code, Logbook 3 (log3)** (branch `ccr-2994049c-4e5tlt`): idle, nothing half-done. Still signed in to the
   Firebase CLI (usage counts only; each use needs the owner's OK). Owns the axe check, PR previews and the Codex /
   Firebase plugin setup.
-- **Claude Code, Logbook 2 (log2)** (branch `ccr-afac5e7a-99esax`, no open PR): idle after #189; the owner's batch
-  of 8 is done (#180, #184, #189). Codex plugin and Firebase CLI signed in for this session, both unused (each use
-  needs the owner's OK). Next for log2: profiles (Next, item 1), waiting on the owner's go.
+- **Claude Code, Logbook 2 (log2)** (branch `ccr-afac5e7a-99esax`): Profiles PR (Advanced, Basic, Basic: logbook
+  only) after #210 (tab bar up to 7). Next for log2: the Admin profile (Next, item 1). Codex plugin and Firebase CLI
+  signed in for this session, both unused (each use needs the owner's OK).
 - **Codex**: no open logbook task (handed its remaining batch to Claude on #163).
 
 ## Waiting on the owner
@@ -38,18 +38,11 @@ Last updated: 2026-10-12 by Claude Code, Logbook 1 (log1).
 
 ## Next (agreed queue)
 
-1. **Profiles** (log2; planned 12 Oct, parked until Basic mode landed, now ready to revisit; needs the owner's go
-   and answers first). One account setting under Settings → Profile; switching never changes data:
-   - Basic APMES = today's Basic mode (#172), Advanced APMES = today's app (the default for new accounts).
-   - Admin (admins and PDs only; layout, not access: the rules stay the gatekeeper): opens on programme analytics built
-     from `summaries/` (per residency year: tags on track / due / behind, reflection headings met, who's behind,
-     spread strips). PDs can already read summaries, so no rules change.
-   - Generic (no APMES requirements: no APMES tags, targets, Still needed, reflection headings, Word portfolio or
-     Totals; no summary written). Largest and riskiest: plan in detail before building.
-   - Order: A the switch (Basic / Advanced), B Admin, C Generic. Open questions for the owner: anything to add to or
-     drop from Basic; PDs get Admin too?; can Generic save a case with no tags?
-   - From log1's review (12 Oct): the profile choice in one place only (today Basic mode has a switch in Settings and
-     in Show or hide, which confused the owner), and nothing hidden silently (see #200's "hidden while Basic mode is on").
+1. **Admin profile** (log2; next after the Profiles PR): for admins, PDs and the PCs (programme coordinators, the
+   admin staff), layout not access (the rules stay the gatekeeper): opens on programme analytics built from
+   `summaries/` (per residency year: tags on track / due / behind, reflection headings met, who's behind, spread
+   strips) and easy-to-read compiled case logs. Open questions for the owner: PDs get it too?; what PCs need to see
+   first. Generic profile dropped (owner, 12 Oct).
 2. **PR B, usability and clearer design** (log1; from the owner's Bear comparison, 12 Oct; the owner wants
    usability and clearer design, not a new look; waiting on the owner's pick): one tap on a case opens it, smaller
    case rows (Copy / Reflect lighter), no repeated date in the day view, today vs the picked day clearly different on
@@ -63,6 +56,8 @@ Last updated: 2026-10-12 by Claude Code, Logbook 1 (log1).
 
 ## Recently done
 
+- #210 Tab bar: up to seven tabs; any More page (Account, Settings, Recover drafts, Export / Import, Admin
+  portal) can be a tab; an eighth asks which tab it replaces; Add Notes to the tab bar on the Notes page.
 - #200 Advanced display / logging links were hidden by ad blockers (EasyList `##.adv-link`, owner's Firefox): class
   renamed; Basic mode now says it hides them, with a way to turn it off.
 - #191 Swipe between tabs like cards (next page follows the finger, steady tab bar, also on the background); Notes:
@@ -80,6 +75,10 @@ Last updated: 2026-10-12 by Claude Code, Logbook 1 (log1).
 
 ## Decisions log
 
+- 2026-10-12: Tab bar holds up to 7 tabs (More included); every More page can be a tab (owner).
+- 2026-10-12: Profiles replace Basic mode: Advanced (default, hides nothing), Basic, Basic: logbook only (Basic
+  without reflections, for those submitting reflections separately). One place: top of Show or hide. Basic moves
+  Analytics into More and drops reflection figures and references. Admin profile next; Generic dropped.
 - 2026-10-12: UX review vs Bear: the owner wants better usability and clearer design, not a "cleaner look" option.
 - 2026-10-12: Swipe between tabs works like cards: the next page follows the finger (a still copy of the page, or a
   loading card for a tab not opened yet), no gap, no popping in, the tab bar never moves; works on the background too.

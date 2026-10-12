@@ -141,6 +141,11 @@ label.field { display: grid; gap: 4px; font-size: calc(13px * var(--fs, 1)); fon
 label.field input, label.field select { width: 100%; }
 label.check { display: flex; gap: 8px; align-items: center; min-height: 40px; }
 label.check input { width: 20px; height: 20px; }
+/* Profile (Show or hide): a name and one line per choice */
+label.check.profile-opt { align-items: flex-start; padding: 6px 0; }
+label.check.profile-opt input { margin-top: 2px; flex: none; }
+.profile-opt > span { display: flex; flex-direction: column; gap: 2px; }
+.profile-opt small { font-size: 13px; }
 
 .scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 table { border-collapse: collapse; width: 100%; }
