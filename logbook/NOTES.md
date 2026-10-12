@@ -95,6 +95,14 @@ portfolio content.
   summaries (counts only). No last-12-months or earlier-cohort comparisons: summaries hold current totals only.
 - **Analytics** (`ui-progress.js`): header tally, folded sections (Needs attention, Logbook,
   Reflections with ⓘ requirements, Trends), Compare with your intake (Totals). EPA view and Download summary removed (owner: not useful).
+  **Advanced mode only** (owner, Oct 2026; none of it in Basic mode; pure helpers in `analytics.js`, tested):
+  pace forecast on each tag row ("about 4 months at your pace", over the last 6 months, or since the first case if
+  more recent; future-dated cases don't count), tags on track whose next target won't be reached by the end of its
+  year join Needs attention as "Off pace"; **Gone quiet** (still needed, last logged 60+ days ago; never-logged tags
+  left out); **Reflection to-dos** (☆ Interesting cases with no reflection → Write; drafts untouched 30+ days →
+  Finish, `openReflection` in ui-reflect.js). Tag names (rows, Gone quiet, top tags) and month bars open the
+  Logbook List on those cases (`hooks.showCases` in ui-logbook.js clears other filters). Heatmap days aren't links:
+  9 px squares are too small to tap (the tap-target check needs 40 px).
 - **Reflection editor** (Oct 2026 tidy): Linked case with Change case and Unlink on one row; the heading note keeps its
   line breaks (examples, then the JR rule); the JR rule is one line with ⓘ; "What APMES wants covered" is a small fold
   at the very end, no card (`.refl-guide`, hidden with tips off). **Free-text learning points**: a Numbered | Free

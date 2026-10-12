@@ -61,6 +61,10 @@ try { for (const width of [390, 1280]) {
   await p.locator('[role=tab][data-tab=progress]').click();
   await p.locator('.an-sec').first().waitFor();
   assert.equal(await p.locator('.an-sec summary').filter({ hasText: 'Trends' }).count(), 0);
+  // the Advanced-only Analytics parts: no forecast, Gone quiet, Reflection to-dos or links to cases in Basic mode
+  assert.equal(await p.locator('.an-sec summary').filter({ hasText: /Gone quiet|Reflection to-dos/ }).count(), 0);
+  assert.equal(await p.locator('a.an-link').count(), 0);
+  assert.ok(!/at your pace/.test(await p.locator('main').innerText()));
   await p.evaluate(() => { location.hash = '#display'; });
   assert.equal(await p.locator('a[data-go=displayadv]').isVisible(), false);
   await p.evaluate(() => { location.hash = '#showhide'; });
