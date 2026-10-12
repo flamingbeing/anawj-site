@@ -136,6 +136,11 @@ portfolio content.
   gesture there). Settings → Accessibility (`#access`) holds zoom, text size, bigger taps, contrast, motion and the
   gestures. Filter and its folds grow open (`reveal()` in ui-core.js); dropdowns draw the app's own chevron; the
   calendar's month name opens a month picker (not in Firefox on a computer, which has none).
+- **Lists** (polish 3): case rows put the initials on top of the date in the left column (like Reflections) and the
+  details beside them; tags stay on one line that scrolls sideways (fading at the edge); month headers are a thin
+  sticky line you tap anywhere to jump to a date. Reflection rows: initials with a small JR, the date on one line
+  ("11 Sep", or "11 Sep 25" in an earlier year); a heading's counts never split over two lines. Analytics cards show
+  the summary and one bar folded; "You and your year" (the spread strips) is inside the opened card.
 - **Reflections list JR count** (owner, 13 Oct 2026): a heading's JR rule ("One / Two from JR") shows as a small
   "JR 0/1" pill beside its count, green when met, and leaves the note under the heading (`listNote`; a qualifier stays:
   "JR: with neuromonitoring"). The editor still shows the full note. Word counts on the list can be hidden

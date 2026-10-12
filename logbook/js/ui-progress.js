@@ -63,14 +63,14 @@ export function renderProgress() {
     h('p', { class: 'hint help', style: 'margin:6px 0 0' }, 'Worth asking for these lists. Tags you haven’t logged yet are under Logbook.')) : null;
   const shown = pview.hideDone ? rows.filter(r => r.status !== 'done') : rows;
   const withTarget = rows.filter(r => r.status !== 'none');
-  // at a glance (before the card is opened): the bar by status with this year's goal, and your year
+  // at a glance (before the card is opened): the summary line and one bar by status with this year's goal; where
+  // you sit in your year is inside the card (owner's Apple-apps review: one number and one bar, the detail inside)
   const lg = logbookGlance(rows);
   const cohort = cohortNow();
-  const logGlance = h('div', { class: 'glance' },
-    statusBar(lg),
-    cohort ? strip('Tags done', lg.done, cohort.tags, lg.total) : null,
-    cohort ? strip('Cases logged', S.cases.length, cohort.cases) : null);
+  const logGlance = h('div', { class: 'glance' }, statusBar(lg));
   const targets = section('targets', 'Logbook', `${tally('done')} of ${withTarget.length} tags done · ${S.cases.length} cases`, logGlance,
+    cohort ? h('div', { class: 'glance an-year' }, h('h3', {}, 'You and your year'),
+      strip('Tags done', lg.done, cohort.tags, lg.total), strip('Cases logged', S.cases.length, cohort.cases)) : null,
     h('label', { class: 'check', style: 'margin:0 0 4px' }, h('input', { type: 'checkbox', checked: !!pview.hideDone, onchange: e => { pview.hideDone = e.target.checked; hooks.render(); } }), 'Hide done'),
     progList(shown, fc));
   // everyone's counts (counts only) for comparison
@@ -207,8 +207,9 @@ function reflCard() {
       h('li', {}, 'Some headings require JR reflections or certain sub-types: tap ⓘ by a heading to see them. These required types remain yours to track.')));
   const rg = reflectionGlance(p.totals.counted, rYear());
   const cohort = cohortNow();
-  const glance = h('div', { class: 'glance' }, meterBar(rg), cohort ? strip('Reflections counted', rg.counted, cohort.reflections, rg.total) : null);
+  const glance = h('div', { class: 'glance' }, meterBar(rg));
   return section('refl', 'Reflections', `${p.totals.counted} / ${p.totals.min} counted · ${met} of ${p.headings.length} headings met`, glance,
+    cohort ? h('div', { class: 'glance an-year' }, h('h3', {}, 'You and your year'), strip('Reflections counted', rg.counted, cohort.reflections, rg.total)) : null,
     h('div', { class: 'bar', style: 'margin:0 0 4px' },
       h('span', { class: 'hint' }, 'The rules'), rulesBtn,
       h('span', { class: 'grow' }),

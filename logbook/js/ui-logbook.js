@@ -294,7 +294,7 @@ function bulkTag(rows) {
 
 // ---------- list ----------
 
-// A month heading: tap it to jump to a date (the first case on or before it).
+// A month heading: a thin sticky line; tap it anywhere to jump to a date (the first case on or before it).
 function monthHead(label, ul) {
   const input = h('input', { type: 'date', class: 'jump-date', 'aria-label': 'Jump to a date', max: todayISO(), onchange: e => {
     const d = e.target.value; if (!d) return;
@@ -302,7 +302,7 @@ function monthHead(label, ul) {
     if (!row) { toast('No cases on or before ' + fmtDate(d) + ' in this list'); return; }
     row.scrollIntoView({ behavior: 'smooth', block: 'center' }); row.classList.remove('flash'); void row.offsetWidth; row.classList.add('flash');
   } });
-  return h('li', { class: 'monthhead' }, h('span', {}, label), h('label', { class: 'jump', title: 'Jump to a date' }, ic('calendar'), 'Jump', input));
+  return h('li', { class: 'monthhead' }, h('label', { class: 'jump', title: 'Jump to a date' }, h('span', { class: 'mh-name' }, label), h('span', { class: 'mh-jump' }, ic('calendar'), 'Jump'), input));
 }
 
 function listView(rows, flagsOf, repaint) {
@@ -315,8 +315,6 @@ function listView(rows, flagsOf, repaint) {
     if (m !== month) { month = m; add(ul, monthHead(m, ul)); }
     add(ul, caseRow(c, flagsOf));
   }
-  // month headers are sticky and not tappable
-  ul.querySelectorAll('.monthhead').forEach(li => { li.style.cursor = 'default'; });
   const more = rows.length > view.limit
     ? h('div', { class: 'bar', style: 'justify-content:center;margin-top:12px' }, h('button', { onclick: () => { view.limit += 300; repaint(); } }, `Show more (${rows.length - view.limit} left)`))
     : null;
@@ -345,8 +343,10 @@ function caseRow(c, flagsOf) {
   const flags = flagsOf(c);
   const p = caseParts(c);
   return h('li', { 'data-date': c.date || '', onclick: () => editCaseDialog(c), tabindex: '0', onkeydown: e => { if (e.key === 'Enter' && e.target === e.currentTarget) editCaseDialog(c); } },
-      h('span', { class: 'd' }, c.date ? [h('span', { class: 'wd' }, weekday(c.date)), ' ', fmtDate(c.date).replace(/ \d{4}$/, '').replace(/^(\d+)/, (_, d) => nth(Number(d)))] : (c.dateText || '—')),
-      h('span', { class: 't' }, p.initials ? [h('b', {}, p.initials), ' '] : null, p.details || (p.initials ? null : h('i', { class: 'muted' }, 'no details'))),
+      // the left column: the initials on top, the date on one line under them (like Reflections; owner, 13 Oct 2026)
+      h('span', { class: 'd' }, p.initials ? h('b', { class: 'ini' }, p.initials) : null,
+        h('span', { class: 'dt' }, c.date ? [h('span', { class: 'wd' }, weekday(c.date)), ' ', fmtDate(c.date).replace(/ \d{4}$/, '')] : (c.dateText || '—'))),
+      h('span', { class: 't' }, p.details || h('i', { class: 'muted' }, 'no details')),
       // tags on the left (wrapping), Copy and Reflect on the right, the same size whatever they say
       h('span', { class: 'c' }, h('span', { class: 'c-tags' }, catTags(c.cats),
         flags.includes('needsDate') ? h('span', { class: 'flag err' }, 'needs date') : null,
