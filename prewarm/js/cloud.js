@@ -119,7 +119,9 @@ export async function finishAdminLink(email) {
 export async function watchPatients(site, cb, onError) {
   const { db, F } = await sdk();
   const q = site ? F.query(F.collection(db, 'patients'), F.where('site', '==', site)) : F.collection(db, 'patients');
-  return F.onSnapshot(q, snap => cb(snap.docChanges().filter(c => c.type !== 'removed').map(c => ({ id: c.doc.id, ...c.doc.data() }))), onError);
+  // metadata changes too, so the app hears when the phone's copy is confirmed by the server (its "last synced")
+  return F.onSnapshot(q, { includeMetadataChanges: true }, snap => cb(snap.docChanges().filter(c => c.type !== 'removed').map(c => ({ id: c.doc.id, ...c.doc.data() })),
+    { server: !snap.metadata.fromCache && !snap.metadata.hasPendingWrites }), onError);
 }
 
 // Send changed fields of a record; merges into the shared copy field by field

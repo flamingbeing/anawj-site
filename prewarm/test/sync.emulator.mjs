@@ -46,6 +46,7 @@ try {
   await a.fill('#code', 'nuh-test-code'); await a.click('#join');
   await toastSays(a, /Joined the NUH team/);
   assert.match(await a.textContent('main'), /Sharing with the NUH team/);
+  await a.waitForFunction(() => /Synced just now/.test(document.querySelector('.syncline')?.textContent || ''), null, { timeout: 15000 });
   if (SHOTS) await a.screenshot({ path: SHOTS + '/sync-joined.png' });
 
   // phone A starts a patient and saves the 0-min pre-warming reading
@@ -157,6 +158,8 @@ try {
   await a.waitForFunction(() => document.querySelector('#leave') && !document.querySelector('#leave').disabled, null, { timeout: 20000 });
   assert.match(said[0], /deletes all 1 patient from this phone/);
   assert.match(said[1] || '', /Not synced yet: SYNC-01/);
+  assert.match(said[1], /Last synced/);
+  assert.match(await a.textContent('.syncline'), /Not synced: 1 patient waiting for signal/);
   await a.context().setOffline(false);
   // phone B logs out: one warning, then its patients are gone and it's no longer in the team
   bb.on('dialog', d => d.accept());
