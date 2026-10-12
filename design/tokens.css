@@ -17,6 +17,7 @@
   --n-blue-bright: #1c8ed7; /* full-width "gallery" band */
   --n-orange: #e57200;      /* top stripe, first quick tile */
   --n-red: #e4002b;         /* top stripe, alert button */
+  --n-stripe-blue: #178fd7; /* third quarter of the brand stripe. Not cyan: the site's stripe uses this blue */
 
   /* Interaction */
   --n-hover-light: #d7340b; /* link and outline-button hover on light backgrounds */
@@ -83,11 +84,12 @@
 .n-page :focus-visible { outline: 3px solid var(--n-focus); outline-offset: 2px; }
 .n-container { max-width: var(--n-container); margin: 0 auto; padding: 0 16px; }
 
-/* Brand stripe: the orange / red / navy bar above the header */
-.n-stripe { display: grid; grid-template-columns: 1fr 1fr 2fr; height: 6px; }
+/* Brand stripe: four equal quarters, orange / red / blue / navy, above the header (as on nuhs.edu.sg) */
+.n-stripe { display: grid; grid-template-columns: repeat(4, 1fr); height: 6px; }
 .n-stripe > :nth-child(1) { background: var(--n-orange); }
 .n-stripe > :nth-child(2) { background: var(--n-red); }
-.n-stripe > :nth-child(3) { background: var(--n-navy); }
+.n-stripe > :nth-child(3) { background: var(--n-stripe-blue); }
+.n-stripe > :nth-child(4) { background: var(--n-navy); }
 
 /* Buttons */
 .n-btn {

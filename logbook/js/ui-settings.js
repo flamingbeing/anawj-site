@@ -178,8 +178,8 @@ export function applyLook(d = {}) {
 }
 // one colour per tab (Colourful); style.css has the same shades for the tabs-and-headings version
 export const TAB_COLOURS = { log: '#c2410c', logbook: '#0e7490', reflect: '#be123c', progress: '#1d4ed8', more: '#6d28d9' };
-// the NUH stripe (orange, red, cyan, navy) for the default colour; More keeps the app's navy
-export const NUH_TAB_COLOURS = { log: '#e57200', logbook: '#e4002b', reflect: '#00a9e0', progress: '#002f6c', more: '#002f6c' };
+// the NUH stripe (orange, red, blue, navy) for the default colour; More keeps the app's navy
+export const NUH_TAB_COLOURS = { log: '#e57200', logbook: '#e4002b', reflect: '#178fd7', progress: '#002f6c', more: '#002f6c' };
 export const APP_TITLE = 'APMES Logbook';
 // Borders (Display, per device): how strong the lines around cards, fields, buttons and chips are; the last is the default
 export const BORDERS = ['Borderless', 'Faint', 'Light', 'Soft', 'Normal (default)'];
