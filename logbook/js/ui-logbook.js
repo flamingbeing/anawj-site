@@ -10,7 +10,7 @@ import { parseQuery, matchQuery, OPERATOR_HELP, insertOperator } from './search-
 import { parseCsv } from './tags.js';
 import {
   S, h, toast, debounce, modal, cat, categoryNamesRevision, catName, catShort, tagName, catFull, catChip, PICKER_ORDER, settings, patchLogbook, needExcel, download, fileButton, catPills,
-  updateCase, saveMany, deleteMany, displayName, rYear, todayISO, fill, add, resetters, tagSet, tagLinks, confirmBox, keepTags, hooks } from './ui-core.js';
+  updateCase, saveMany, deleteMany, displayName, rYear, todayISO, fill, add, resetters, tagSet, tagLinks, confirmBox, keepTags, hooks, rowIcon } from './ui-core.js';
 import { flatTree, tagTree } from './tags.js';
 import { editCaseDialog, logOnDate } from './ui-log.js';
 import { reflectOnCase } from './ui-reflect.js';
@@ -337,19 +337,6 @@ function caseRow(c, flagsOf) {
           (S.reflections || []).some(r => r.caseId === c.id)
             ? h('button', { class: 'small row-btn has-refl', title: 'Open the reflection on this case', 'aria-label': 'Open the reflection on this case', onclick: e => { e.stopPropagation(); reflectOnCase(c); } }, rowIcon('done'), h('span', { class: 'lbl' }, 'Reflect'))
             : h('button', { class: 'small row-btn', title: 'Write a reflection on this case', 'aria-label': 'Write a reflection on this case', onclick: e => { e.stopPropagation(); reflectOnCase(c); } }, rowIcon('reflect'), h('span', { class: 'lbl' }, 'Reflect')))));
-}
-
-// Row buttons: an icon (alone on phones, where two labelled buttons don't fit beside the tags) and a label
-const ROW_ICONS = {
-  copy: 'M9 9h11v11H9zM5 15H4V4h11v1',
-  reflect: 'M4 19.5V5a2 2 0 0 1 2-2h12v14H6a2 2 0 0 0-2 2.5zM6 21h12v-4M8 7h6M8 11h4',   // the Reflections tab's book
-  done: 'M5 12.5l4.5 4.5L19 7.5',
-};
-function rowIcon(k) {
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('class', 'ico'); svg.setAttribute('aria-hidden', 'true');
-  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path'); path.setAttribute('d', ROW_ICONS[k]);
-  svg.append(path); return svg;
 }
 
 // ---------- calendar ----------

@@ -1132,3 +1132,11 @@ details.an-sec > summary { align-items: flex-start; padding-right: 30px; }
 .refl-guide { margin: 4px 6px 18px; font-size: calc(13px * var(--fs, 1)); color: var(--muted); }
 .refl-guide > summary { font-weight: 600; min-height: 40px; display: flex; align-items: center; }
 .refl-guide ul { font-size: calc(13px * var(--fs, 1)); }
+.settings-search input[type=search] { width: 100%; } .settings-search ul { margin-top: 6px; }
+/* Display preview: a made-up row drawn with the app's own classes, in view while the page scrolls */
+.display-preview { position: sticky; top: var(--pin-top, 0px); z-index: 6; background: var(--panel); border: 1px solid var(--edge, var(--line)); border-radius: var(--radius, 14px); padding: 6px 12px 10px; margin-bottom: 12px; box-shadow: 0 8px 12px -12px rgba(0,0,0,.4); pointer-events: none; }
+.display-preview .dp-label { font-size: calc(11px * var(--fs, 1)); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.display-preview ul.cases li { border-bottom: 0; padding: 6px 22px 6px 0; cursor: default; }
+.display-preview .chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.display-preview .chips .grow { flex: 1; }
+.reset-row { margin: 4px 4px 16px; text-align: right; }
