@@ -326,6 +326,25 @@ await tryit(async () => {
   log(seen.some(t => /Prewarm off due now \(10 min of warming\)/.test(t)), 'Prewarm off alert: ' + JSON.stringify(seen));
   await ctx.close();
 });
+// S. a reading due after Underbody warm / Gown warm was logged defaults to Yes for it; saved No after it is listed
+await tryit(async () => {
+  const { ctx, pg } = await fresh();
+  await open(pg, 1);
+  const st = await pg.textContent('[data-ev="io_gown_start"] b');
+  if (!/\d\d:\d\d/.test(st)) { await pg.click('[data-ev="io_gown_start"]'); await pg.waitForTimeout(200); }
+  const t = await pg.textContent('[data-ev="io_gown_start"] b');
+  await pg.click('.strip a:has-text("55")'); await pg.waitForSelector('#save');
+  const due = (await pg.textContent('#due')).match(/\d\d:\d\d/)?.[0];
+  if (due >= t) {
+    log(await pg.getAttribute('.chip[data-c="gown"][data-v="1"]', 'aria-pressed') === 'true', `gown warming Yes by default (start ${t}, due ${due})`);
+    await pg.click('.chip[data-c="gown"][data-v="0"]');
+    const ok = d => d.type() === 'prompt' ? d.accept(d.defaultValue()) : d.accept(); pg.on('dialog', ok);
+    await pg.click('#save'); await pg.waitForTimeout(400); pg.off('dialog', ok);
+    await pg.goto(pg.url().replace(/\/iotemp\/\w+$/, '')); await pg.waitForSelector('#gaps');
+    log(/Gown warming says No after its start time: .*55 min/.test(await pg.textContent('#gaps')), 'saved No after the start listed');
+  } else log(false, `test setup: 55 min due ${due} is before gown start ${t}`);
+  await ctx.close();
+});
 await b.close();
 if (fails.length) { console.error('prewarm edge: FAIL\n- ' + fails.join('\n- ')); process.exit(1); }
-console.log('prewarm edge: ok (midnight, surgery end, double-tap Save, BP checks, back button, Log, Enter, still to fill, swipe, stray taps, time order, corrections, BMI, follow-ups, blanks, typed answers, alerts everywhere, duplicates, storage full, lock warning, late readings, delete and restore, prewarm off alert)');
+console.log('prewarm edge: ok (midnight, surgery end, double-tap Save, BP checks, back button, Log, Enter, still to fill, swipe, stray taps, time order, corrections, BMI, follow-ups, blanks, typed answers, alerts everywhere, duplicates, storage full, lock warning, late readings, delete and restore, prewarm off alert, warming yes / no)');
