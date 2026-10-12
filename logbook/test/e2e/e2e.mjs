@@ -1566,7 +1566,8 @@ async function run(label, ctxOpts) {
     await card.getByRole('button', { name: /^Fix \d+ case/ }).click();
     await p.locator('dialog[open] button', { hasText: /^Fix$/ }).click();
     await card.getByText(/^Fixed \d+ case/).waitFor();
-    const got = await p.evaluate(async () => { const cloud = await import('./js/cloud.js'); return Object.fromEntries((await cloud.listCases('demo@example.com')).filter(c => /^fx\d$/.test(c.id)).map(c => [c.id, [c.initials, c.details]]));   // only this step's cases (a random id can start with fx) });
+    // only this step's cases (fx1–fx3; a random id can start with fx)
+    const got = await p.evaluate(async () => { const cloud = await import('./js/cloud.js'); return Object.fromEntries((await cloud.listCases('demo@example.com')).filter(c => /^fx\d$/.test(c.id)).map(c => [c.id, [c.initials, c.details]])); });
     assert(JSON.stringify(got) === JSON.stringify({ fx1: ['ABCDEF', '45F lap chole'], fx2: ['K', '30F LSCS spinal'], fx3: ['', 'ELECTIVE LSCS spinal'] }), 'initials not fixed: ' + JSON.stringify(got));
     await card.getByRole('button', { name: 'Check all logbooks' }).click();
     await card.getByText(/nothing to fix/).waitFor();
