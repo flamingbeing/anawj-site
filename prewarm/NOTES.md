@@ -116,6 +116,13 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   on discharge is New onset / Existing (chips), so it always ticks the Word form.
   Underbody / gown warming yes / no: a reading due after its logged start time defaults to Yes until someone picks;
   saved readings still saying No after the start are listed in Still to fill.
+  Taps (UI stress test, 12 Oct 2026): after a tap that moves or redraws the screen (Save, Log, a time box, a comfort
+  answer) a second tap within 0.7 s and 48 px is ignored (`lockTaps`): a double tap used to save the next timepoint
+  too or log the next event. "Tap again to delete" ignores a second tap within 0.6 s. `render()` blurs a box being
+  typed in first, so a swipe or the phone's back button commits it (the leave prompt sees it; a form answer saves).
+  A typed temperature goes back in place at once and the screen redraws 0.4 s later (a full redraw swapped Save
+  under a finger already on its way, so the first Save tap was lost). The due banner floats over the page under the
+  bar (`showBanner`) instead of pushing it down. Comfort answers change but don't clear on a second tap.
 - **Two tabs** (owner, 12 Oct 2026): a thin tab bar under the top bar on the patient screen: **Temperatures** (the
   main screen: times, pre-warming / intra-op temps, comfort, Form view / Sheet view) and **Others** (BP, HR, BIS,
   plus the Intra-op details and PACU boxes and a full-width **Perioperative data** box, formerly "Other data"). The tab you're not on warms up and pulses when its next
