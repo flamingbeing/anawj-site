@@ -1,11 +1,11 @@
 // Browser test of the hand assessment page at phone size, with an axe accessibility check.
 // Run from the repo root with a static server on port 8080 (python3 -m http.server 8080):
-//   node hand/test/e2e.mjs            SHOTS=<dir> also saves phone screenshots of each section
+//   node hand-babies/test/e2e.mjs            SHOTS=<dir> also saves phone screenshots of each section
 const { chromium } = await import(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/node_modules/playwright/index.mjs');
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 const AXE = new URL('../../tools/vendor/axe.min.js', import.meta.url).pathname;
-const BASE = `http://localhost:${process.env.PORT || 8080}/hand/`;
+const BASE = `http://localhost:${process.env.PORT || 8080}/hand-babies/`;
 const SHOTS = process.env.SHOTS;
 
 const b = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH, args: ['--no-sandbox'] } : {});
