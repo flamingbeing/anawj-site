@@ -7,10 +7,11 @@ the public repo (and are served at anawj.com/apmes/), but **no faculty or reside
 |---|---|
 | [`guidebook/`](guidebook/) | The EPA Guidebook v8 transcribed in full (Markdown). The evals app opens `dops-expectations.md` for the DOPS checklist. |
 | [`data/`](data/) | The guidebook's assessment tables, the AY2023 tracking template and the three MedHub evaluator forms, as JSON. `node evals/tools/build-data.mjs` builds the evals app's `js/catalogue.js` and `js/forms.js` from these and the guidebook; edit wording here, then re-run it. |
+| [`originals/`](originals/) | [`EPA-Guidebook-v8.pdf`](originals/EPA-Guidebook-v8.pdf): the guidebook itself (26 July 2024), with its embedded forms and attachments. Public copy: the cover page, which listed the contributors and acknowledgements by name, is replaced by a plain one, and the file details (staff names, the sensitivity label) are removed, here and in the embedded files. The other 128 pages are unchanged. |
 | [`templates/`](templates/) | `portfolio-template-blank.docx`: the blank JCST Anaesthesiology Residency Training Portfolio. The logbook tests fill it and read it back (`tools/test-logbook.sh`). |
 
-Original files (PDF, spreadsheet) can be added under `originals/` with their version in the name. Leave out anything
-showing faculty names, such as the screenshots in the MedHub resident guide, unless blacked out. Names of published
+More original files (such as the AY2023 tracking spreadsheet) go in `originals/` with their version in the name. Leave out
+anything showing faculty or staff names (a contributor list, file details), such as the screenshots in the MedHub resident guide, unless blacked out. Names of published
 authors the guidebook cites are fine (owner, 12 Oct 2026). Moved here from `evals/reference/` on 12 Oct 2026.
 
 ## Workplace-based assessment reference
@@ -30,7 +31,7 @@ Reference material for the evaluations app and other APMES tools, transcribed fr
 - **RESIDENT GUIDE FOR LOGGING DOPS & MINI CEX UNDER MEDHUB (ver 19 Jul 2023)**: how residents trigger these assessments in MedHub today. The workflow and fields are described below.
 - **Three MedHub app screenshots of the evaluator's side** (EBD, Mini-CEX, DOPS; since removed from the repo because they showed names and real ratings): transcribed question by question into [`apmes-forms.json`](data/apmes-forms.json) and summarised below.
 
-The original files aren't in this folder yet (see `originals/` above); the MedHub guide stays out because its screenshots show real faculty names. If a newer template or guidebook comes out, re-transcribe it here and say which version it is.
+The guidebook PDF is in `originals/`; the tracking spreadsheet isn't yet. The MedHub resident guide stays out because its screenshots show real faculty names. If a newer template or guidebook comes out, re-transcribe it here and say which version it is.
 
 ## Assessment types
 
