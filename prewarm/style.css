@@ -81,6 +81,9 @@ a { color: var(--navy); }
 .list span { font-weight: 600; }
 .list small { color: var(--muted); }
 
+.dellist li { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-card); padding: 8px 8px 8px 14px; }
+.dellist li div { display: grid; min-width: 0; }
+.dellist .danger { margin: 0; flex: none; min-width: 96px; }
 /* event times: compact grid of chips */
 .times { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; }
 .tchip { display: grid; align-content: center; justify-items: center; gap: 1px; text-align: center; padding: 3px 2px; min-height: 52px; min-width: 0; border-radius: var(--r); border: 1px dashed #9aa1a9; background: var(--card); color: var(--muted); cursor: pointer; line-height: 1.1; }
