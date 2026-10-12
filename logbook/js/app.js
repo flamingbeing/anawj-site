@@ -9,7 +9,7 @@ import { renderLogbook } from './ui-logbook.js';
 import { renderProgress, renderTotals } from './ui-progress.js';
 import { applyCompact, cachedCompact, applyTheme, cachedTheme, applyTextSize, cachedTextSize, applyZoom, cachedZoom, stepZoom, applyAccent, adoptDisplay, applyDisplay, applyCustomCss, display, setDisplay, resetDisplay, DISPLAY_KEYS, renderTagEditor, renderDisplay, renderDisplayAdvanced, renderLogging, renderLoggingAdvanced, renderReflectionSettings, renderMarkdownSettings, START_TABS, privacyCard, creditsCard, signOutCard } from './ui-settings.js';
 import { renderAccount, flush as flushProfile } from './ui-account.js';
-import { renderAdmin, leaveAdmin } from './ui-admin.js';
+import { renderAdmin, renderAdminResidents, renderAdminAdvanced, leaveAdmin } from './ui-admin.js';
 import { renderReflect, watchMyReflections, renderExportPage, renderChoosePage } from './ui-reflect.js';
 import { downloadExcel, uploadExcel } from './ui-logbook.js';
 import { downloadNotes } from './ui-notes.js';
@@ -74,7 +74,10 @@ const TABS = [
   { id: 'export', label: 'Export portfolio', render: () => renderExportPage(), hidden: true, under: 'data', unlisted: true },
   { id: 'choose', label: 'Export portfolio', render: renderChoosePage, hidden: true, under: 'export', unlisted: true },
   // admins open it from More
-  { id: 'admin', label: 'Admin portal', render: renderAdmin, admin: true, hidden: true, under: 'more', desc: 'Admins only: residents, ready portfolios, portfolio template, default tag names' },
+  { id: 'admin', label: 'Admin portal', render: renderAdmin, admin: true, hidden: true, under: 'more', desc: 'Admins only: ready portfolios, programme totals, residents, settings' },
+  { id: 'admintotals', label: 'Programme totals', render: renderTotals, admin: true, hidden: true, under: 'admin', unlisted: true },
+  { id: 'adminresidents', label: 'Residents', render: renderAdminResidents, admin: true, hidden: true, under: 'admin', unlisted: true },
+  { id: 'adminadv', label: 'Advanced admin settings', render: renderAdminAdvanced, admin: true, hidden: true, under: 'admin', unlisted: true },
   // opened from Settings
   { id: 'tags', label: 'Tag editor', render: renderTagEditor, hidden: true, under: 'settings', unlisted: true, desc: 'APMES and personal tags, shorthand, tag groups' },
 ];
@@ -252,7 +255,7 @@ function paintTabs() {
 
 function changeScreen(id, scroll = 0) {
   if (S.tab === 'account') flushProfile();
-  if (S.tab === 'admin') leaveAdmin();
+  if (/^admin/.test(S.tab || '') && !/^admin/.test(id)) leaveAdmin();
   S.tab = id;
   window.scrollTo(0, 0);
   render();
@@ -326,7 +329,7 @@ let pendingRender = false;
 hooks.casesChanged = () => {
   paintWho();
   if (S.tab === 'log') return logCasesChanged();
-  if (S.tab === 'account' || S.tab === 'admin' || S.tab === 'totals') return;
+  if (S.tab === 'account' || /^admin/.test(S.tab || '') || S.tab === 'totals') return;
   pendingRender = true;
   setTimeout(flushRender, 250);
 };

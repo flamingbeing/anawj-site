@@ -347,7 +347,7 @@ function accentPicker() {
   paint();
   return wrap;
 }
-export const START_TABS = [['log', 'Log'], ['logbook', 'Logbook'], ['reflect', 'Reflections'], ['progress', 'Analytics']];
+export const START_TABS = [['log', 'Case'], ['logbook', 'Logbook'], ['reflect', 'Reflections'], ['progress', 'Analytics']];
 
 // ---------- Markdown (Logbook: Copy on a case or a day, Share day; the notes export) ----------
 
@@ -657,7 +657,7 @@ export function categoryNamesCard() {
   const set = (code, k, v) => { edits[code] = { ...(edits[code] || {}), [k]: v }; };
   const ed = CN.edit && S.admin;
   return h('section', { class: 'card cat-names-card' }, h('details', { class: 'more-tools', open: CN.open || ed, ontoggle: e => { CN.open = e.target.open; } },
-    h('summary', {}, 'Default tag names'),
+    h('summary', {}, 'Default tag names', (n => n ? h('span', { class: 'muted', style: 'font-weight:400' }, ` · ${n} renamed`) : null)(Object.keys(categoryNames() || {}).length)),
     h('p', { class: 'hint' }, 'The programme’s names for everyone: a display name for lists and Analytics, and a short name for the pills. Each resident can still rename them for themselves in the Tag editor. Exports (portfolio, Excel) always use the official APMES names.'),
     S.admin ? h('div', { class: 'bar', style: 'margin:0 0 8px' }, ed
       ? [h('button', { class: 'primary small', onclick: async () => {

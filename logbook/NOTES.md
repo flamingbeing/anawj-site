@@ -70,8 +70,11 @@ portfolio content.
 - **Two panes** on the Case tab at >= 840px wide and >= 500px tall (tablets, unfolded foldables, computers; not
   landscape phones): `.log-card.panes` grid, left = date, case box, quick picks, Still needed, Save; right = all tags
   (sticky, own scroll). On phones `.lp-left` / `.lp-right` are display: contents, so the order is unchanged.
-- **Logbook** (`ui-logbook.js`): Calendar (default) | List | Grid. Calendar day: + Log a case (opens Log
-  on that date), Share day, Copy. Rows: short tag names (full name on hover), Copy, Reflect (no swipe actions). Filter (Show, Search in; then Dates | Tags | More toggles, each open while in use; More = fuzzy, case sensitive, Save search, Tag N cases; saved searches one slim scrolling row): has all of / has none of
+- **Logbook** (`ui-logbook.js`): Calendar (default; opens on today, "No cases yet today" when empty) | List | Grid.
+  Calendar days all share one layout (number on top, a reserved spot for the count) so nothing shifts. Calendar day:
+  + Log a case (opens Log on that date), Share day, Copy. Rows: slim tag pills (short names, full name on hover) on the
+  left, Copy and Reflect on the right at one fixed size (icons only at ≤ 600 px; labels on bigger screens); Reflect is
+  filled with a ✓ once the case has a reflection (opens it). No swipe actions. Filter (Show, Search in; then Dates | Tags | More toggles, each open while in use; More = fuzzy, case sensitive, Save search, Tag N cases; saved searches one slim scrolling row): has all of / has none of
   tags, dates, flag, search scope, fuzzy; Reset (everything); × in the search box clears just the text; saved searches (text, filters, "Search in"; not fuzzy); Tag N cases (bulk add/remove). Search text
   cached per case (`hayCache`, reset when the tag set changes).
 - **Reflections** (`ui-reflect.js`): list by heading, editor (Case details, learning points,
@@ -86,6 +89,13 @@ portfolio content.
   summaries (counts only). No last-12-months or earlier-cohort comparisons: summaries hold current totals only.
 - **Analytics** (`ui-progress.js`): header tally, folded sections (Needs attention, Logbook,
   Reflections with ⓘ requirements, Trends), Compare with your intake (Totals). EPA view and Download summary removed (owner: not useful).
+- **Admin portal** (`ui-admin.js`, admins only): Ready portfolios, then link rows to Programme totals (`#admintotals`,
+  the Totals table full width), Residents (`#adminresidents`) and Advanced admin settings (`#adminadv`: shared tag
+  groups, default tag names, portfolio template, the owner's import and one-off initials fix). Sub-pages are TABS
+  entries `under: 'admin'`; `onAdmin()` covers them all. e2e: `goAdmin('adminresidents' | 'adminadv')`.
+- **Fold-outs**: every `<details>` (except the reflection Quick actions menu) shows one chevron at the right of its
+  summary (style.css, end), down when closed, up when open; the old per-place markers are gone. Folds that hold
+  things say how many in the summary ("Figures (optional) · 2", "Default tag names · 3 renamed"). e2e checks it.
 - **More** (`app.js`): Account (with Residency year for non-programme users; Delete account at the bottom,
   greyed out for residents on the programme list: a programme admin takes them off first; `cloud.deleteAccount`
   wipes cases, reflections, images, bin, submission, members entry, logbook, then the Google sign-in), Settings, Export &

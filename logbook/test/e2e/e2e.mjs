@@ -78,7 +78,8 @@ async function run(label, ctxOpts) {
   };
   const R3 = DIR + 'round3/';
   const shot3 = async name => { if (phone) await p.screenshot({ path: R3 + name + '.png', fullPage: false }); };
-  const goAdmin = async () => { await tab('admin'); };
+  // the Admin portal, or one of its pages (Residents, Advanced admin settings, Programme totals)
+  const goAdmin = async (sub = '') => { await tab('admin'); if (sub) { await p.locator(`a[data-go="${sub}"]`).click(); await nap(350); } };
   const go = async t => t === 'admin' ? goAdmin() : tab(t);
   const toastText = () => p.locator('#toast').innerText();
   // the Logbook opens in the calendar; most steps want the list
@@ -225,7 +226,7 @@ async function run(label, ctxOpts) {
     });
 
     await step('account: export uses blank template (uploaded via admin) with Section 1 filled', async () => {
-      await goAdmin();
+      await goAdmin('adminadv');
       const card = p.locator('section.card', { has: p.locator('h2', { hasText: 'Portfolio template' }) });
       await card.locator('input[type=file]').setInputFiles(BLANK);
       await p.waitForFunction(() => /Template saved/.test(document.getElementById('toast')?.textContent || ''), null, { timeout: 15000 });
@@ -250,7 +251,7 @@ async function run(label, ctxOpts) {
       const ct = await z.file('[Content_Types].xml').async('string');
       assert(!/comments/i.test(ct), 'comments in content types');
       // the active template: download it, check its contents, delete asks first (cancelled here)
-      await goAdmin();
+      await goAdmin('adminadv');
       const tcard = p.locator('section.card', { has: p.locator('h2', { hasText: 'Portfolio template' }) });
       const [tdl] = await Promise.all([p.waitForEvent('download'), tcard.locator('button', { hasText: /^Download$/ }).click()]);
       assert(/template\.docx$/.test(tdl.suggestedFilename()), 'template download name ' + tdl.suggestedFilename());
@@ -911,7 +912,7 @@ async function run(label, ctxOpts) {
     await p.locator('label.field', { hasText: 'Enter key' }).locator('select').selectOption('newline');
     await nap(300);
     // admin renames a category for display; pills use the short name
-    await goAdmin();
+    await goAdmin('adminadv');
     const namesCard = p.locator('section.cat-names-card details');
     await namesCard.evaluate(d => { d.open = true; });
     // read-only until Edit; built-in defaults shown
@@ -936,7 +937,7 @@ async function run(label, ctxOpts) {
 
   await step('year names: SMO counts as R3, SR1; back to More', async () => {
     const yearTo = async v => {
-      await goAdmin();
+      await goAdmin('adminresidents');
       const card = p.locator('section.card', { has: p.locator('h2', { hasText: 'Residents' }) });
       if (await card.locator('button', { hasText: /^Edit$/ }).count()) await card.locator('button', { hasText: /^Edit$/ }).click();
       await p.locator('select[aria-label="Year for Demo User"]').selectOption(v);
@@ -972,7 +973,7 @@ async function run(label, ctxOpts) {
   await step('attrited resident comes off Totals', async () => {
     await tab('totals'); await nap(600);
     assert((await p.locator('table.totals thead').innerText()).includes('Resident C'), 'Resident C not on Totals to start with');
-    await goAdmin();
+    await goAdmin('adminresidents');
     const card = p.locator('section.card', { has: p.locator('h2', { hasText: 'Residents' }) });
     if (await card.locator('button', { hasText: /^Edit$/ }).count()) await card.locator('button', { hasText: /^Edit$/ }).click();
     const row = p.locator('main table tbody tr', { has: p.locator('select[aria-label="Year for Resident C"]') });
@@ -983,7 +984,7 @@ async function run(label, ctxOpts) {
     const head = await p.locator('table.totals thead').innerText();
     assert(!head.includes('Resident C') && head.includes('Resident B'), 'Totals header: ' + head);
     // un-archive: back to Active brings the row back, counts intact
-    await goAdmin();
+    await goAdmin('adminresidents');
     if (await card.locator('button', { hasText: /^Edit$/ }).count()) await card.locator('button', { hasText: /^Edit$/ }).click();
     // attrited residents sit in a collapsed group: open it
     const attr = card.locator('tbody', { has: p.locator('tr.res-group', { hasText: /Attrited · / }) });
@@ -1442,6 +1443,8 @@ async function run(label, ctxOpts) {
     await goAdmin();
     assert(p.url().endsWith('#admin'), 'url ' + p.url());
     assert(await p.locator('.tabs button[aria-selected="true"]').getAttribute('data-tab') === 'more', 'More not highlighted on admin');
+    assert(/Ready portfolios/.test(await p.locator('main').innerText()) && await p.locator('a[data-go="adminresidents"]').count() === 1, 'admin portal: Ready portfolios and the Residents link');
+    await goAdmin('adminresidents');
     await p.waitForSelector('section.card h2:text-is("Residents")');
     const resCard = p.locator('section.card', { has: p.locator('h2', { hasText: /^Residents$/ }) });
     assert(await resCard.locator('textarea').count() === 0, 'paste box shown before Edit');
@@ -1458,7 +1461,7 @@ async function run(label, ctxOpts) {
     await row.waitFor();
     await row.locator('select').first().selectOption('3');
     await nap(300);
-    await tab('log'); await goAdmin(); await nap(300);
+    await tab('log'); await goAdmin('adminresidents'); await nap(300);
     assert(await resCard.locator('table select').count() === 0, 'admin did not reopen read-only');
     const groups = await resCard.locator('tr.res-group').allInnerTexts();
     assert(groups.length >= 2 && groups.every(g => /^›?\s*(R[1-3]|SR[12]|SMO|Year unknown|Graduated|Attrited) · \d+$/.test(g.trim())), 'groups ' + groups);
@@ -1493,6 +1496,7 @@ async function run(label, ctxOpts) {
   });
 
   await step('admin: import fake workbook + countCheck', async () => {
+    await goAdmin('adminadv');
     await p.locator('label', { hasText: 'Choose workbook' }).locator('input').setInputFiles(DIR + 'fake-old-form.xlsx');
     await p.waitForSelector('text=count check', { timeout: 15000 });
     const txt = await p.locator('main').innerText();
@@ -1521,7 +1525,7 @@ async function run(label, ctxOpts) {
       const mk = (id, details) => ({ id, date: '2026-09-01', details, initials: '', cats: ['16'], source: 'import', createdAt: 1, updatedAt: 1 });
       await cloud.saveCases('demo@example.com', [mk('fx1', 'ABCDEF 45F lap chole'), mk('fx2', 'K/30F LSCS spinal'), mk('fx3', 'ELECTIVE LSCS spinal')]);
     });
-    await go('admin');
+    await goAdmin('adminadv');
     const card = p.locator('section.card', { has: p.locator('h2', { hasText: 'Fix initials' }) });
     await card.getByRole('button', { name: 'Check all logbooks' }).click();
     await card.getByRole('button', { name: /^Fix \d+ case/ }).waitFor();
@@ -1612,6 +1616,24 @@ async function run(label, ctxOpts) {
     const st2 = await p.evaluate(() => JSON.parse(localStorage.getItem('apmes-logbook-demo-v1')).logbooks['demo@example.com'].doc.settings);
     assert(st2.reflExport === false, 'setting not saved');
     await p.locator('label.check', { hasText: 'New reflections are included' }).locator('input').check();
+  });
+
+  await step('folds show a chevron; calendar days keep their layout; Copy and Reflect keep their size', async () => {
+    const pages = ['progress', 'adminadv', 'reflect'];
+    for (const pg of pages) {
+      if (pg === 'adminadv') await goAdmin('adminadv'); else await tab(pg);
+      const missing = await p.evaluate(() => [...document.querySelectorAll('main details:not(.quick-actions) > summary')].filter(s => getComputedStyle(s, '::after').borderRightStyle !== 'solid').map(s => s.textContent.slice(0, 30)));
+      assert(!missing.length, `${pg}: folds without a chevron: ${missing}`);
+    }
+    await tab('logbook');
+    const cal = p.locator('main .seg button', { hasText: /^Calendar$/ }); if (await cal.count()) { await cal.first().click(); await nap(200); }
+    // the number sits at the same height in empty and busy days
+    const tops = await p.evaluate(() => [...document.querySelectorAll('.lb-day:not(.blank)')].map(d => Math.round(d.querySelector('.n').getBoundingClientRect().top - d.getBoundingClientRect().top)));
+    assert(new Set(tops).size === 1, 'day numbers at different heights: ' + [...new Set(tops)]);
+    assert(await p.locator('.lb-day.sel.today').count() === 1, 'calendar did not open on today');
+    await lbList();
+    const widths = await p.evaluate(() => [...new Set([...document.querySelectorAll('ul.cases .row-btn')].slice(0, 40).map(b => Math.round(b.getBoundingClientRect().width)))]);
+    assert(widths.length === 1, 'row buttons of different widths: ' + widths);
   });
 
   await step('admin tab hidden for non-admins', async () => {

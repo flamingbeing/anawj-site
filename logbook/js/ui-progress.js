@@ -317,7 +317,7 @@ async function loadSummaries() {
   }
   catch (err) { if (gen !== tview.gen) return; tview.summaries = []; tview.error = 'Could not load totals: ' + err.message; }
   tview.loading = false;
-  if (S.tab === 'totals') hooks.render();
+  if (S.tab === 'totals' || S.tab === 'admintotals') hooks.render();
 }
 
 function totalsTable(people) {

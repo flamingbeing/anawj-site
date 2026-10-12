@@ -247,7 +247,20 @@ ul.cases li:hover { background: var(--row-alt); }
 ul.cases .d { font-size: calc(13px * var(--fs, 1)); color: var(--muted); font-variant-numeric: tabular-nums; }
 ul.cases .d .wd { font-weight: 600; }
 ul.cases .t { white-space: pre-wrap; word-break: break-word; }
-ul.cases .c { grid-column: 2; display: flex; flex-wrap: wrap; gap: 4px; }
+ul.cases .c { grid-column: 2; display: flex; align-items: flex-start; gap: 6px 8px; }
+ul.cases .c-tags { flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding-top: 4px; }
+ul.cases .acts { flex: none; display: flex; gap: 6px; }
+/* Copy and Reflect: one fixed width each, whatever the label ("✓ Reflect" once there is a reflection) */
+ul.cases .row-btn { width: 6.2em; padding-left: 4px; padding-right: 4px; white-space: nowrap; gap: 4px; }
+ul.cases .row-btn .ico { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+ul.cases .row-btn.has-refl .ico { stroke-width: 2.6; }
+/* phones: icons only, square buttons (the names stay for screen readers and as tooltips) */
+@media (max-width: 600px) {
+  ul.cases .row-btn { width: 40px; min-height: 36px; padding: 0; }
+  ul.cases .row-btn .lbl { display: none; }
+  ul.cases .row-btn .ico { width: 20px; height: 20px; }
+}
+ul.cases .row-btn.has-refl { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
 .flag { font-size: calc(11px * var(--fs, 1)); padding: 0 6px; border-radius: 999px; background: var(--warn-bg); color: var(--warn); white-space: nowrap; }
 .flag.err { background: var(--err-bg); color: var(--err); }
 .monthhead { position: sticky; top: 0; background: var(--bg); font-size: calc(12px * var(--fs, 1)); font-weight: 700; color: var(--muted); padding: 10px 4px 4px; text-transform: uppercase; letter-spacing: .03em; z-index: 1; }
@@ -357,17 +370,19 @@ input:focus, select:focus, textarea:focus { border-color: var(--heading); box-sh
 
 /* ---- logbook-tab ---- */
 .lb-tags { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
-.lb-tag { font-size: calc(12px * var(--fs, 1)); line-height: calc(1.35 * var(--lh, 1)); padding: 1px 8px; border-radius: 10px; background: var(--chip); border: 1px solid var(--edge, var(--line)); white-space: normal; overflow-wrap: anywhere; max-width: 100%; }
+.lb-tag { font-size: calc(12px * var(--fs, 1)); line-height: calc(1.35 * var(--lh, 1)); padding: 2px 9px; border-radius: 999px; background: var(--chip); border: 0; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--edge, var(--line)) 55%, transparent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .lb-calbar { gap: 6px; margin-bottom: 8px; }
 .lb-cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; }
 .lb-dow { font-size: calc(11px * var(--fs, 1)); font-weight: 700; color: var(--muted); text-align: center; padding: 2px 0; }
-.lb-day { position: relative; min-width: 0; min-height: 44px; padding: 3px 0 0; margin: 0; border: 1px solid var(--edge, var(--line)); border-radius: 6px; background: var(--bg); color: inherit; font: inherit; display: flex; flex-direction: column; align-items: center; gap: 2px; cursor: pointer; }
+.lb-day { position: relative; min-width: 0; min-height: 44px; padding: 4px 0; margin: 0; border: 1px solid var(--edge, var(--line)); border-radius: 6px; background: var(--bg); color: inherit; font: inherit; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 1px; cursor: pointer; }
+/* every day the same layout: the number at the top, a spot for the count under it (empty days keep the spot) */
+.lb-day .lb-count.none { visibility: hidden; }
 .lb-day.blank { border: 0; background: none; cursor: default; }
-.lb-day .n { font-size: calc(12px * var(--fs, 1)); color: var(--muted); }
+.lb-day .n { font-size: calc(12px * var(--fs, 1)); line-height: calc(16px * var(--fs, 1)); color: var(--muted); }
 .lb-day.today .n { color: var(--accent); font-weight: 700; }
 .lb-day.today { border-color: var(--accent); }
 .lb-day.sel { outline: 2px solid var(--accent); outline-offset: -1px; }
-.lb-count { font-size: calc(12px * var(--fs, 1)); font-weight: 700; min-width: 20px; padding: 0 5px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
+.lb-count { font-size: calc(11px * var(--fs, 1)); line-height: calc(16px * var(--fs, 1)); min-height: calc(16px * var(--fs, 1)); font-weight: 700; min-width: 18px; padding: 0 5px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); box-sizing: border-box; }
 .lb-day.t2 .lb-count { background: color-mix(in srgb, var(--accent) 35%, transparent); }
 .lb-day.t3 .lb-count { background: color-mix(in srgb, var(--accent) 60%, transparent); color: var(--accent-ink); }
 .lb-day.t4 .lb-count { background: var(--accent); color: var(--accent-ink); }
@@ -508,8 +523,6 @@ body.dragging-refl { user-select: none; -webkit-user-select: none; }
 .acct details.acct-group { border-top: 1px solid var(--edge, var(--line, #e5e7eb)); padding: 4px 0; }
 .acct details.acct-group > summary { font-weight: 600; cursor: pointer; padding: 6px 0; min-height: 44px; box-sizing: border-box; display: flex; align-items: center; gap: 8px; list-style: none; }
 .acct details.acct-group > summary::-webkit-details-marker { display: none; }
-.acct details.acct-group > summary::before { content: '›'; display: inline-block; width: 14px; font-size: calc(20px * var(--fs, 1)); line-height: calc(1 * var(--lh, 1)); color: var(--muted); transition: transform .15s; }
-.acct details.acct-group[open] > summary::before { transform: rotate(90deg); }
 .acct .acct-title { flex: 1 1 auto; }
 .acct .acct-badge { font-size: calc(12px * var(--fs, 1)); font-weight: 600; min-width: 22px; text-align: center; padding: 1px 8px; border-radius: 999px; background: var(--row-alt); color: var(--muted); }
 .acct .acct-badge.done { background: var(--ok-bg); color: var(--ok); }
@@ -532,7 +545,7 @@ body.dragging-refl { user-select: none; -webkit-user-select: none; }
 /* ---- end account tab ---- */
 
 .refl-rules { margin: 4px 0 8px; }
-.refl-rules > summary { cursor: pointer; font-size: calc(13px * var(--fs, 1)); color: var(--muted); min-height: 40px; line-height: 40px; display: list-item; }
+.refl-rules > summary { cursor: pointer; font-size: calc(13px * var(--fs, 1)); color: var(--muted); min-height: 40px; line-height: 40px; display: flex; align-items: center; }
 .refl-rules ul { margin: 4px 0 0; padding-left: 20px; }
 button.icon-btn { min-width: 40px; }
 
@@ -862,8 +875,6 @@ details.an-sec > summary { display: flex; flex-direction: column; align-items: f
 details.an-sec > summary .an-t { font-weight: 700; color: var(--heading); font-size: calc(15px * var(--fs, 1)); }
 details.an-sec > summary .an-s { font-weight: 400; color: var(--muted); font-size: calc(13px * var(--fs, 1)); }
 details.an-sec > summary::marker { content: ''; }
-details.an-sec > summary .an-t::after { content: ' ›'; color: var(--muted); }
-details.an-sec[open] > summary .an-t::after { content: ' ⌄'; }
 .an-body h3 { font-size: calc(13px * var(--fs, 1)); margin: 14px 0 6px; color: var(--muted); }
 .an-bars { display: grid; grid-template-columns: repeat(12, 1fr); gap: 4px; height: 120px; align-items: end; }
 .an-bar { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; font-size: calc(11px * var(--fs, 1)); color: var(--muted); }
@@ -1103,3 +1114,17 @@ input[type="range"] { accent-color: var(--accent); width: 100%; min-height: 32px
 /* Recovery actions remain usable at phone sizes. */
 a.sync.wait, a.draft-note { display:inline-flex; align-items:center; min-height:40px; padding:4px; }
 .fix-list { list-style: none; margin: 0; padding: 0; } .fix-list li { padding: 6px 0; border-top: 1px solid var(--edge, var(--line)); }
+/* Fold-outs (owner: make it obvious they open): one chevron on every <details>, at the right of its title row,
+   pointing down when closed and up when open; the whole row highlights when pressed. The browser's own marker is
+   hidden (it vanished anyway on flex summaries). The reflection Quick actions menu draws its own button. */
+details > summary { list-style: none; position: relative; padding-right: 30px; border-radius: 8px; cursor: pointer; }
+details > summary::-webkit-details-marker { display: none; }
+details > summary::marker { content: ''; }
+details:not(.quick-actions) > summary::after { content: ''; position: absolute; right: 10px; top: 50%; width: 7px; height: 7px;
+  border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: translateY(-75%) rotate(45deg); transition: transform .15s; }
+details[open]:not(.quick-actions) > summary::after { transform: translateY(-25%) rotate(-135deg); }
+details.quick-actions > summary { padding-right: 0; }
+details:not(.quick-actions) > summary:hover { background: var(--row-alt); }
+details > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+details.card > summary, details.fold-card > summary, details.more-tools > summary { min-height: 44px; display: flex; align-items: center; }
+details.an-sec > summary { align-items: flex-start; padding-right: 30px; }
