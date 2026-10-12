@@ -24,7 +24,8 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 
 ## Recently done
 
-- This PR: top bar shows the time now, with a countdown to the next thing to log beside it.
+- This PR: stress-test fixes: past midnight, readings after surgery end, BP number checks, back button with an unsaved reading; `edge.e2e.mjs`.
+- #239–#240: top bar shows the time now, with a countdown to the next thing to log beside it.
 - #238: BP, HR, BIS typed boxes (no − / +; keyboard stays up from box to box).
 - #237: ask to save before leaving a reading with unsaved changes (Save / Don't save / Stay here).
 - #235: Other data on one page (headers open by default), keyboard entry (Enter / arrows); box caption removed.

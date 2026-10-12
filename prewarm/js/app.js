@@ -235,8 +235,24 @@ function pointsFor(p, s) {
 // due time (minutes after midnight) of a timepoint, from the reference event
 function dueOf(p, s, pt) {
   if (pt.min == null) return null;
-  const ref = SERIES[s].ref.map(id => toMin(val(p, id))).find(x => x != null);
+  const ref = refOf(p, s);
   return ref == null ? null : ref + pt.min;
+}
+// usual ranges for typed readings: outside them, Save asks first
+const SANE = { sbp: [40, 260], dbp: [20, 160], map: [30, 200], hr: [20, 220], bis: [0, 100], room: [10, 40] };
+const refOf = (p, s) => SERIES[s].ref.map(id => toMin(val(p, id))).find(x => x != null) ?? null;
+// the clock counted from the same day as the series' start, so a case running past midnight still compares right
+function nowFor(p, s) {
+  const n = nowMin(), r = refOf(p, s);
+  return r == null ? n : n + 1440 * Math.round((r - n) / 1440);
+}
+// readings due after that stage ended (into OT for pre-warming, surgery end for intra-op) aren't expected
+function expected(p, s, due) {
+  let end = toMin(val(p, s === 'prewarm' ? 'ev_ot' : 'io_done'));
+  const r = refOf(p, s);
+  if (end == null || r == null) return true;
+  while (end < r) end += 1440;
+  return due <= end;
 }
 const savedAt = (p, s, key) => val(p, `at_${s}_${key}`);
 const noWarming = p => String(val(p, 'arm')) === '3';
@@ -252,19 +268,26 @@ const routes = [];
 const route = (re, fn) => routes.push([re, fn]);
 function go(hash) { if (location.hash !== hash) location.hash = hash; else render(); }
 let cleanup = [];
-// a reading screen with changes not yet saved sets this: it returns { what, save } while there is something to lose
-let leaveGuard = null, shown = location.hash;
+// a reading screen with changes not yet saved sets this: it returns { what, save } while there is something to lose.
+// Each history entry carries its place (state.i), so leaving can be undone by stepping back the same way and redone
+// once answered: the phone's back button never walks out of the app past an unsaved reading.
+let leaveGuard = null, shown = location.hash, at = history.state?.i ?? 0, restoring = false;
 function render() {
-  // leaving (another timepoint, BP / HR / BIS, back, a team update): ask to save first
+  if (restoring && location.hash === shown) { restoring = false; return; }
+  restoring = false;
   const g = leaveGuard?.();
   if (g) {
-    const to = location.hash;
-    if (to !== shown) history.replaceState(null, '', shown || '#/');
-    if (document.querySelector('dialog.ask[open]')) return;
-    askLeave(g, () => { leaveGuard = null; if (to !== shown) go(to); else render(); });
+    const to = location.hash, i = history.state?.i;
+    const asking = !!document.querySelector('dialog.ask[open]');
+    if (to === shown) { if (!asking) askLeave(g, () => { leaveGuard = null; render(); }); return; }
+    const delta = i == null ? 1 : i - at;
+    if (delta) { restoring = true; history.go(-delta); }
+    else history.replaceState(history.state, '', shown);
+    if (!asking) askLeave(g, () => { leaveGuard = null; if (delta) history.go(delta); else go(to); });
     return;
   }
   leaveGuard = null; shown = location.hash;
+  if (history.state?.i == null) history.replaceState({ i: ++at }, ''); else at = history.state.i;
   cleanup.forEach(f => f()); cleanup = [];
   shared.stale = false; $('#fresh').hidden = true;
   const h = location.hash.slice(1) || '/';
@@ -410,24 +433,24 @@ const mmss = m => { const sec = Math.max(0, Math.floor(m * 60)), h = Math.floor(
 // top bar (owner, 12 Oct 2026): on the right the time now (it sits above the time boxes); to its left a countdown to the
 // next thing to log: the next reading due on this screen, or warming off, whichever comes first
 function clockHtml(p, s) {
-  const now = nowMin(), n = nextDue(p, s);
+  const n = nextDue(p, s);
   let next = '';
   if (n) {
-    const left = n.due - now, st = left > 2 ? 'later' : left > 0 ? 'soon' : left > -5 ? 'now' : 'late';
+    const left = n.left, st = left > 2 ? 'later' : left > 0 ? 'soon' : left > -5 ? 'now' : 'late';
     next = `<div class="next" data-state="${st}"><small>${esc(n.label)}</small><b>${left > 0 ? 'in ' + mmss(left) : left > -5 ? 'now' : 'late ' + mmss(-left)}</b></div>`;
   }
-  return `${next}<div class="now"><small>Now</small><b>${fromMin(Math.floor(now))}</b></div>`;
+  return `${next}<div class="now"><small>Now</small><b>${fromMin(Math.floor(nowMin()))}</b></div>`;
 }
 function nextDue(p, s) {
-  const now = nowMin(), all = [];
+  const now = nowFor(p, s), all = [];
   // the reading due most recently (until the next one is due), else the next one coming up
-  const timed = pointsFor(p, s).map(x => ({ x, due: dueOf(p, s, x) })).filter(t => t.due != null).sort((a, b) => a.due - b.due);
+  const timed = pointsFor(p, s).map(x => ({ x, due: dueOf(p, s, x) })).filter(t => t.due != null && expected(p, s, t.due)).sort((a, b) => a.due - b.due);
   const cur = timed.filter(t => t.due <= now).pop(), up = timed.find(t => t.due > now && !savedAt(p, s, t.x.key));
   const pick = cur && !savedAt(p, s, cur.x.key) ? cur : up;
-  if (pick) all.push({ label: (s === 'haemo' ? 'BP ' : 'Temp ') + pick.x.label, due: pick.due });
+  if (pick) all.push({ label: (s === 'haemo' ? 'BP ' : 'Temp ') + pick.x.label, left: pick.due - now });
   const nx = nextEvent(p);
-  if (nx?.due != null) all.push({ label: nx.label, due: nx.due });
-  return all.sort((a, b) => a.due - b.due)[0] || null;
+  if (nx?.due != null) all.push({ label: nx.label, left: nx.due - nowFor(p, 'prewarm') });
+  return all.sort((a, b) => a.left - b.left)[0] || null;
 }
 // the next event to note: the first unset one after the last one set (warming off: when it is expected)
 function nextEvent(p) {
@@ -471,7 +494,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
   // default timepoint: the unsaved one nearest its due time, else the first unsaved
   if (!key) {
     const open = pts.filter(x => !savedAt(p, s, x.key));
-    const now = nowMin();
+    const now = nowFor(p, s);
     const timed = open.filter(x => dueOf(p, s, x) != null).sort((a, b) => Math.abs(dueOf(p, s, a) - now) - Math.abs(dueOf(p, s, b) - now));
     key = (timed[0] || open[0] || pts[pts.length - 1]).key;
   }
@@ -496,6 +519,12 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     if (p.lock?.on) { toast('Locked: read only. Unlock it on the home page to change it.'); return false; }
     const bad = cols.filter(c => c.temp && draft[c.key] != null && (+draft[c.key] < 25 || +draft[c.key] > 45 || Number.isNaN(+draft[c.key])));
     if (bad.length) { toast('Check ' + bad.map(c => c.label).join(', ') + ': temperatures should be 25–45 °C.'); return false; }
+    // BP, HR, BIS and room temp: numbers only; unusual ones are asked about, not refused
+    const typed = cols.filter(c => SANE[c.key] && draft[c.key] != null);
+    const nan = typed.filter(c => !/^\d+(\.\d)?$/.test(String(draft[c.key])));
+    if (nan.length) { toast('Check ' + nan.map(c => c.label).join(', ') + ': numbers only.'); return false; }
+    const odd = typed.filter(c => +draft[c.key] < SANE[c.key][0] || +draft[c.key] > SANE[c.key][1]);
+    if (odd.length && !confirm(odd.map(c => `${c.label} ${draft[c.key]}`).join(', ') + ' looks unusual. Save anyway?')) return false;
     for (const c of cols) setVal(p, `${s}_${pt.key}_${c.key}`, draft[c.key] == null ? null : (c.type === 'code' ? +draft[c.key] : String(draft[c.key])), settings.me);
     if (!isSaved) setVal(p, `at_${s}_${pt.key}`, nowHM(), settings.me);
     saveAll();
@@ -506,9 +535,9 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
   }
 
   function strip() {
-    const now = nowMin();
+    const now = nowFor(p, s);
     return `<div class="strip" role="list">${pts.map(x => {
-      const done = savedAt(p, s, x.key), due = dueOf(p, s, x), missed = !done && due != null && now > due + 5;
+      const done = savedAt(p, s, x.key), due = dueOf(p, s, x), missed = !done && due != null && now > due + 5 && expected(p, s, due);
       return `<a role="listitem" href="#/p/${id}/${s}/${x.key}" class="${x.key === pt.key ? 'on' : ''} ${done ? 'done' : missed ? 'missed' : ''}">${x.key === 'base' ? 'Base' : x.key === 'end' ? 'End' : x.min}</a>`;
     }).join('')}</div>`;
   }
@@ -582,8 +611,10 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     return `<div class="tabs2" role="tablist">${['prewarm', 'iotemp'].map(x => `<a role="tab" aria-selected="${x === s}" href="#/p/${id}/${x}">${x === 'prewarm' ? 'Pre-warming' : 'Intra-op'}</a>`).join('')}</div>`;
   }
   function draw() {
+    const clean = base == null || snap() === base;
     if (s === 'prewarm' && !setTouched && cols.some(c => c.key === 'set') && setTempNA(p, pt)) draft.set = 'NA';
-    if (base == null) base = snap();
+    // an automatic change (set temp NA once warming is off) isn't something to ask about
+    if (clean) base = snap();
     const due = dueOf(p, s, pt);
     const grp = s === 'prewarm' ? `<span class="badge">${GROUPS.find(g => String(g[0]) === String(val(p, 'arm')))?.[1] || 'Group not set'}</span>` : '';
     paint(`${main && val(p, 'done') ? `<p class="ok-box donetop">✓ Data collection complete <small>${esc(val(p, 'done'))}</small></p>` : ''}${main ? comfortHtml('sat_pre', 'Comfortable before surgery?') + timesHtml() : ''}${navHtml()}
@@ -696,7 +727,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
   startAlerts(p, s, () => {
     const el = $('#due'); if (!el) return;
     const d = dueOf(p, s, pt); if (d == null) return;
-    const left = d - nowMin();
+    const left = d - nowFor(p, s);
     el.textContent = 'due ' + fromMin(Math.round(d)) + (left > 0 ? ` · in ${Math.floor(left)}:${String(Math.floor((left % 1) * 60)).padStart(2, '0')}` : left > -5 ? ' · now' : ' · late');
     el.dataset.state = isSaved ? 'saved' : left > 2 ? 'later' : left > 0 ? 'soon' : left > -5 ? 'now' : 'late';
   });
@@ -712,10 +743,10 @@ function startAlerts(p, s, tick) {
   if (settings.remind.awake && navigator.wakeLock) navigator.wakeLock.request('screen').then(l => { lock = l; }).catch(() => {});
   const iv = setInterval(() => {
     tick();
-    const now = nowMin();
+    const now = nowFor(p, s);
     for (const x of pointsFor(p, s)) {
       const d = dueOf(p, s, x), tag = p.id + s + x.key + (val(p, SERIES[s].ref[0]) || '');
-      if (d == null || savedAt(p, s, x.key) || alerted.has(tag) || now < d || now > d + 5) continue;
+      if (d == null || !expected(p, s, d) || savedAt(p, s, x.key) || alerted.has(tag) || now < d || now > d + 5) continue;
       alerted.add(tag); write('alerted', [...alerted].slice(-200));
       if (settings.remind.banner) { const b = $('#banner'); b.textContent = `${x.label} reading due now (tap to hide)`; b.hidden = false; setTimeout(() => { b.hidden = true; }, 15000); }
       if (settings.remind.vibrate && navigator.vibrate) navigator.vibrate([300, 150, 300]);
@@ -756,9 +787,9 @@ function signoffClick(p, pg, t) {
 
 // BP / HR / BIS: the next 15-min reading's state, like the due time (readings missed by over 15 min are let go)
 function haemoState(p) {
-  const now = nowMin();
+  const now = nowFor(p, 'haemo');
   const lefts = pointsFor(p, 'haemo').filter(x => x.min != null && !savedAt(p, 'haemo', x.key))
-    .map(x => dueOf(p, 'haemo', x)).filter(d => d != null).map(d => d - now).filter(l => l > -15);
+    .map(x => dueOf(p, 'haemo', x)).filter(d => d != null && expected(p, 'haemo', d)).map(d => d - now).filter(l => l > -15);
   if (!lefts.length) return 'later';
   const left = Math.min(...lefts);
   return left > 2 ? 'later' : left > 0 ? 'soon' : left > -5 ? 'now' : 'late';

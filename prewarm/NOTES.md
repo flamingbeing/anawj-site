@@ -78,6 +78,13 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
 - **Due time warms up** (owner, 12 Oct 2026): the "due hh:mm" beside each timepoint is plain until 2 min before,
   then an amber pill with a slow pulse (soon), an orange-red pill with a stronger pulse from due to 5 min past (now),
   and a red pill with a fast pulse after that (late); plain once the reading is saved. Reduced motion: colours only.
+- **Edge cases** (stress test, 12 Oct 2026; `prewarm/test/edge.e2e.mjs`): times are minutes after midnight, so every
+  "now vs due" compare uses `nowFor(p, s)` (the clock on the same day as the series' start): a case past midnight
+  counts right. Readings due after their stage ended (into OT for pre-warming, surgery end for intra-op temps and
+  BP) aren't counted as missed, alerted or counted down (`expected`). BP / HR / BIS / room temp: numbers only;
+  outside usual ranges (`SANE`) Save asks first. Leaving an unsaved reading: each history entry carries `state.i`;
+  back / a link is stepped back while the prompt is up and redone after, so the phone's back button never leaves the
+  app past an unsaved reading. The automatic set-temp NA (after Log Prewarm off) doesn't count as a change.
 - **Top bar** (owner, 12 Oct 2026): on the right the time now ("Now 16:08", above the time boxes); to its left the next
   thing to log and a countdown: the reading due most recently on this screen (Temp or BP, until the next is due) or the
   next one, or warming off, whichever is first ("Temp 20 min · in 1:42" / "now" / "late 5:29"), coloured and pulsing
