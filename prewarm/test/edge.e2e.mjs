@@ -152,14 +152,16 @@ await tryit(async () => {
   await pg.goto('http://localhost:8080/prewarm/?demo'); await pg.waitForTimeout(800);
   await open(pg, 0);
   const cdp = await ctx.newCDPSession(pg);
-  const swipe = async (x1, x2, y = 600) => {
+  // from the reading's heading row (a touch that starts on a −/+ button is its hold-to-repeat, not a swipe)
+  const swipe = async (x1, x2, y) => {
+    y ??= await pg.evaluate(() => { const r = document.querySelector('.tp').getBoundingClientRect(); return r.top + r.height / 2; });
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: x1, y }] });
     for (let i = 1; i <= 5; i++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x1 + (x2 - x1) * i / 5, y }] });
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
     await pg.waitForTimeout(500);
   };
   await swipe(320, 80);
-  log(pg.url().endsWith('/haemo'), 'swipe left opens Others: ' + pg.url());
+  log(pg.url().endsWith('/haemo'), 'swipe left opens BP, HR, BIS: ' + pg.url());
   const order = await pg.evaluate(() => { const a = document.querySelector('[data-sign="haemo"], [data-unsign="haemo"]'), b = document.querySelector('a[href$="/form/intraop"]'); return !!(a && b && (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)); });
   log(order, 'BP, HR, BIS tick above Intra-op details');
   await swipe(80, 320);
@@ -373,8 +375,9 @@ await tryit(async () => {
   await pg.goto(pg.url().replace(/(#\/p\/\w+).*$/, '$1')); await pg.waitForSelector('.num[data-type="core"]');
   await pg.click('.num[data-type="core"]'); await pg.waitForSelector('input.num');
   await pg.keyboard.type('372');
-  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 320, y: 600 }] });
-  for (let i = 1; i <= 5; i++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: 320 - 48 * i, y: 600 }] });
+  const ty = await pg.evaluate(() => { const r = document.querySelector('.tp').getBoundingClientRect(); return r.top + r.height / 2; });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 320, y: ty }] });
+  for (let i = 1; i <= 5; i++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: 320 - 48 * i, y: ty }] });
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); await pg.waitForTimeout(500);
   log(!!await pg.$('dialog.ask[open]'), 'typed temperature then swipe: asks to save');
   if (await pg.$('dialog.ask[open]')) await pg.click('dialog.ask [data-a="stay"]');
@@ -465,6 +468,30 @@ await tryit(async () => {
   log(/No pre-warming/.test(await pg.textContent('.nopw')) && !await pg.$('#save'), 'Pre-warming tab says no pre-warming, nothing to save');
   await ctx.close();
 });
+// Y. Reset this subject asks twice (Cancel on the second keeps everything); PACU view opens only the PACU page;
+// swiping on the key times doesn't change tab
+await tryit(async () => {
+  const { ctx, pg } = await fresh();
+  await open(pg, 1);
+  let n = 0; const one = d => { n++; n === 2 ? d.dismiss() : d.accept(); }; pg.on('dialog', one);
+  await pg.click('#resetsub'); await pg.waitForTimeout(400); pg.off('dialog', one);
+  log(n === 2 && /\d\d:\d\d/.test(await pg.textContent('.times')), 'reset asks twice; Cancel keeps the times');
+  pg.on('dialog', d => d.accept());
+  await pg.click('#resetsub'); await pg.waitForTimeout(800);
+  log(!/\d\d:\d\d/.test(await pg.textContent('.times')) && /DEMO-02/.test(await pg.textContent('#title')), 'reset clears the times, keeps the Subject ID');
+  const cdp = await ctx.newCDPSession(pg);
+  const y = await pg.evaluate(() => { const r = document.querySelector('.third.top').getBoundingClientRect(); return r.top + r.height / 2; });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 320, y }] });
+  for (let k = 1; k <= 5; k++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: 320 - 48 * k, y }] });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); await pg.waitForTimeout(500);
+  log(!pg.url().endsWith('/haemo'), 'a swipe on the key times doesn\'t change tab');
+  await pg.goto('http://localhost:8080/prewarm/?demo#/'); await pg.waitForTimeout(400);
+  await pg.click('a[href="#/pacu"]'); await pg.click('a[href^="#/pacu/"] >> nth=0'); await pg.waitForTimeout(500);
+  log(/· PACU$/.test(await pg.textContent('#title')) && /#\/pacu\/\w+$/.test(pg.url()), 'PACU view opens the PACU page: ' + await pg.textContent('#title'));
+  await pg.click('#back'); await pg.waitForTimeout(300);
+  log(pg.url().endsWith('#/pacu'), 'and back returns to the PACU list');
+  await ctx.close();
+});
 await b.close();
 if (fails.length) { console.error('prewarm edge: FAIL\n- ' + fails.join('\n- ')); process.exit(1); }
-console.log('prewarm edge: ok (midnight, surgery end, double-tap Save, BP checks, back button, Log, Enter, still to fill, swipe, stray taps, time order, corrections, BMI, follow-ups, blanks, typed answers, alerts everywhere, duplicates, storage full, lock warning, late readings, delete and restore, prewarm off alert, warming yes / no, touch double taps, typing then leaving, other tab due, two patients, app closed mid-reading, layout)');
+console.log('prewarm edge: ok (midnight, surgery end, double-tap Save, BP checks, back button, Log, Enter, still to fill, swipe, stray taps, time order, corrections, BMI, follow-ups, blanks, typed answers, alerts everywhere, duplicates, storage full, lock warning, late readings, delete and restore, prewarm off alert, warming yes / no, touch double taps, typing then leaving, other tab due, two patients, app closed mid-reading, layout, reset, PACU view)');

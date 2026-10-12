@@ -203,7 +203,7 @@ try {
   // other data: the rest of the study's pages on one page, under headers open by default, from the small box on the
   // BP, HR, BIS tab; Enter and the arrow keys move between questions
   assert.equal((await page.textContent('a.widebox')).trim(), 'Perioperative data', 'full-width Perioperative data box');
-  assert.equal((await page.textContent('#haemolink')).trim(), 'Others', 'second tab is Others');
+  assert.equal((await page.textContent('#haemolink')).trim(), 'BP, HR, BIS', 'second tab is BP, HR, BIS');
   await page.click('a.widebox');
   await page.waitForSelector('details.sect');
   assert.equal(await page.$$eval('details.sect[open]', x => x.length), 9, 'Subject ID and group, pre-op, meds, bloods, day 1 x2, day 2 x2, discharge, all open');
