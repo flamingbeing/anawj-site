@@ -11,6 +11,13 @@ Rules that bite:
 
 - `logbook/firestore.rules` is the one rules file for both logbook and evals (Firebase project `apmes-logbook`). It deploys automatically on merge to main; never ask the owner to paste rules.
 - `nuh-roster/firestore.rules` (Firebase project `nuh-roster`) deploys the same way.
+  How: `.github/workflows/deploy-firestore-rules.yml` deploys a changed file to its project on merge to main
+  (check the "Deploy Firestore rules" run in Actions). It compiles the rules first, so a syntax error fails the run
+  and leaves the live rules as they were. It signs in with the `FIREBASE_SERVICE_ACCOUNT` secret (service account
+  `firebase-rules-deployer@apmes-logbook.iam.gserviceaccount.com`, Firebase Rules Admin on both projects); sessions
+  never need the secret. A manual run (Run workflow) deploys both files over the live rules: ask the owner first.
+  A new Firestore-backed app needs a matrix entry and paths filter in the workflow, and the owner grants that
+  service account Firebase Rules Admin on the new project.
 - `evals/js/catalogue.js` and `evals/js/forms.js` are generated. Edit `evals/reference/` or `evals/tools/build-data.mjs`, then run `node evals/tools/build-data.mjs`.
 - Changing any file in an app's `sw.js` SHELL list means bumping that app's `VERSION`.
 
