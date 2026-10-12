@@ -78,6 +78,10 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
 - **Due time warms up** (owner, 12 Oct 2026): the "due hh:mm" beside each timepoint is plain until 2 min before,
   then an amber pill with a slow pulse (soon), an orange-red pill with a stronger pulse from due to 5 min past (now),
   and a red pill with a fast pulse after that (late); plain once the reading is saved. Reduced motion: colours only.
+- **Bug hunt** (12 Oct 2026 evening): "Update available" (and an update taken in another tab) asks to save an unsaved
+  reading before reloading (`afterAsking`). Tapping an empty key time while an earlier key time is still empty asks
+  first (a stray Surgery end would stop intra-op readings counting as due); Log next always goes in order. Key times
+  going backwards (over 12 h counts as past midnight) are listed in Still to fill as "Times out of order".
 - **Two tabs** (owner, 12 Oct 2026): a thin tab bar under the top bar on the patient screen: **Temperatures** (the
   main screen: times, pre-warming / intra-op temps, comfort, Form view / Sheet view) and **Others** (BP, HR, BIS,
   plus the Intra-op details and PACU boxes and a full-width **Perioperative data** box, formerly "Other data"). The tab you're not on warms up and pulses when its next

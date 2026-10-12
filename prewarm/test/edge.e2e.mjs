@@ -165,6 +165,20 @@ await tryit(async () => {
   log(await pg.evaluate(() => getComputedStyle(document.body).overscrollBehaviorY) === 'none', 'pull-to-refresh off');
   await ctx.close();
 });
+// J. a stray tap on a key time with earlier ones empty asks first; times out of order are listed
+await tryit(async () => {
+  const { ctx, pg } = await fresh();
+  await open(pg, 0);
+  let msg = ''; pg.once('dialog', d => { msg = d.message(); d.dismiss(); });
+  await pg.click('[data-ev="io_done"]'); await pg.waitForTimeout(300);
+  log(/In OT, Induction aren’t logged yet/.test(msg) && (await pg.textContent('[data-ev="io_done"] b')) === 'tap', 'stray Surgery end asks first; Cancel leaves it empty: ' + msg);
+  pg.once('dialog', d => d.accept()); await pg.click('[data-ev="ev_ot"]'); await pg.waitForTimeout(200);
+  pg.once('dialog', d => d.accept()); await pg.click('[data-ev="io_knife"]'); await pg.waitForTimeout(200);
+  const ot = await pg.textContent('[data-ev="ev_ot"] b'), [h, m] = ot.split(':').map(Number), early = `${String((h + 23) % 24).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  await pg.click('[data-ev="io_knife"]'); await pg.fill('#evtime', early); await pg.keyboard.press('Tab'); await pg.waitForTimeout(1500);
+  log(/Times out of order: Induction \d\d:\d\d is before In OT/.test(await pg.textContent('#gaps')), 'Induction an hour before In OT is listed');
+  await ctx.close();
+});
 await b.close();
 if (fails.length) { console.error('prewarm edge: FAIL\n- ' + fails.join('\n- ')); process.exit(1); }
-console.log('prewarm edge: ok (midnight, surgery end, double-tap Save, BP checks, back button, Log, Enter, still to fill, swipe)');
+console.log('prewarm edge: ok (midnight, surgery end, double-tap Save, BP checks, back button, Log, Enter, still to fill, swipe, stray taps, time order)');
