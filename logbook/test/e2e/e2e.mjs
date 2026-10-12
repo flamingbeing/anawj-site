@@ -30,6 +30,7 @@ const FMT = DIR + 'fmt/';
 for (const d of ['shots', 'fmt', 'round3', 'round4', 'acct']) fs.mkdirSync(DIR + d, { recursive: true });
 const BASE = `http://localhost:${process.env.PORT || 8080}/logbook/`;
 const only = process.argv[2];
+if (only && !['phone', 'desk'].includes(only)) throw new Error('Profile must be phone or desk');
 // E2E_ONLY=<words>: run every step up to the last one whose name contains the words (the earlier ones set
 // the stage: the cases and settings later steps expect), then stop. A dry pass first lists the step names
 // in the order they run, without running them.
@@ -1943,3 +1944,6 @@ for (const o of out) {
   console.log('console errors:', o.errs.length ? o.errs : 'none');
 }
 console.log(`total ${secs(Date.now() - T0)}`);
+
+// Printed failures must also fail CI and scripts, including fail-fast runs.
+if (out.some(o => o.results.some(r => !r.ok) || o.errs.length)) process.exitCode = 1;
