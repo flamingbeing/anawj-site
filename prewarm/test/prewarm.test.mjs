@@ -161,4 +161,12 @@ function unzip(bytes) {
   return out;
 }
 
+// lock: the later lock / unlock wins when records merge
+{
+  const a = { id: 'L', created: 1, f: {}, lock: { on: true, t: 5, by: 'admin' } };
+  const b = { id: 'L', created: 1, f: {}, lock: { on: false, t: 9, by: 'admin' } };
+  assert.equal(mergeRecord(a, b).rec.lock.on, false);
+  assert.equal(mergeRecord(b, a).rec.lock.on, false, 'an older lock does not win');
+  assert.equal(mergeRecord({ id: 'L', created: 1, f: {} }, a).rec.lock.on, true);
+}
 console.log('prewarm: ok');

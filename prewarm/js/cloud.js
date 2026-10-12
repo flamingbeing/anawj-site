@@ -2,7 +2,7 @@
 // sign-in); admins sign in with an emailed link. Access is decided by firestore.rules. Demo mode (?demo) never connects.
 //
 //   members/{uid}  { site, initials, code, joinedAt }       codes/{site}  { code, setAt, setBy }   (admins only)
-//   admins/{email} {}                                       patients/{id} { site, created, deleted?, f: { id: {v,t,by} } }
+//   admins/{email} {}                                       patients/{id} { site, created, deleted?, lock?, f: { id: {v,t,by} } }
 //   forms/blank    { b64, name, size, setAt, setBy }        (the blank paper form, .docx; admins upload, members read)
 
 import { FIREBASE_CONFIG } from './firebase-config.js';
@@ -125,12 +125,14 @@ export async function watchPatients(site, cb, onError) {
 }
 
 // Send changed fields of a record; merges into the shared copy field by field
-export async function push(rec, ids) {
+export async function push(rec, ids, withLock = false) {
   const { db, F } = await sdk();
   const f = {};
   for (const k of ids) if (rec.f[k]) f[k] = rec.f[k];
   const body = { site: rec.site, created: rec.created, f };
   if (rec.deleted) body.deleted = rec.deleted;
+  // only an admin's lock / unlock sends it (the rules refuse it from anyone else)
+  if (withLock && rec.lock) body.lock = rec.lock;
   await F.setDoc(F.doc(db, 'patients', rec.id), plain(body), { merge: true });
 }
 

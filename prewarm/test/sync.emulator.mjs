@@ -145,6 +145,21 @@ try {
   // the admin sees the NUH patient
   await ad.goto(BASE + '#/');
   await ad.waitForFunction(() => /SYNC-01/.test(document.querySelector('.list')?.textContent || ''), null, { timeout: 15000 });
+  // the admin locks it: phone A sees it locked and can't open it; then the admin unlocks it
+  await ad.click('#select');
+  await ad.locator('.selrow', { hasText: 'SYNC-01' }).locator('input').check();
+  ad.once('dialog', d => d.accept());
+  await ad.click('#lock');
+  await a.goto(BASE + '#/');
+  await a.waitForSelector('.list a.locked', { timeout: 15000 });
+  await a.click('.list a.locked');
+  await toastSays(a, /Locked by the study admin/);
+  assert.doesNotMatch(a.url(), /#\/p\//, 'phone A stays on the list');
+  if (SHOTS) await a.screenshot({ path: SHOTS + '/locked.png' });
+  await ad.click('#select');
+  await ad.locator('.selrow', { hasText: 'SYNC-01' }).locator('input').check();
+  await ad.click('#unlock');
+  await a.waitForFunction(() => !document.querySelector('.list a.locked') && /SYNC-01/.test(document.querySelector('.list').textContent), null, { timeout: 15000 });
 
   // phone A logs out with a change that hasn't synced (offline): two warnings; cancelling keeps everything
   await a.goto(BASE + '#/');
@@ -172,7 +187,7 @@ try {
   await bb.waitForSelector('#code', { timeout: 15000 });
 
   assert.deepEqual(errors, []);
-  console.log('prewarm sync: ok (two phones, join code, readings both ways, admin email-link sign-in, codes, join link and QR, blank Word form upload and Form view, log out)');
+  console.log('prewarm sync: ok (two phones, join code, readings both ways, admin email-link sign-in, codes, join link and QR, blank Word form upload and Form view, lock, log out)');
 } finally {
   await b.close();
 }
