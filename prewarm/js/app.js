@@ -616,6 +616,8 @@ function topBar(p, s, onLog) {
   };
   const iv = setInterval(refresh, 1000);
   cleanup.push(() => clearInterval(iv));
+  // patients opened here today get due alerts on every screen (kept a day)
+  write('opened', Object.fromEntries([...Object.entries(read('opened', {})).filter(([, t]) => Date.now() - t < 864e5), [p.id, Date.now()]]));
   startAlerts(p);
   return refresh;
 }
@@ -984,13 +986,15 @@ const charting = q => !isGone(q) && !q.lock?.on && !val(q, 'done') && Date.now()
 function startAlerts(p) {
   const alerted = new Set(read('alerted', []));
   let lock = null;
-  const awake = () => { if (p && settings.remind.awake && navigator.wakeLock && document.visibilityState === 'visible') navigator.wakeLock.request('screen').then(l => { lock = l; }).catch(() => {}); };
+  const awake = () => { if ((p || Object.values(patients).some(q => charting(q) && Date.now() - (read('opened', {})[q.id] || 0) < 12 * 3600e3)) && settings.remind.awake && navigator.wakeLock && document.visibilityState === 'visible') navigator.wakeLock.request('screen').then(l => { lock = l; }).catch(() => {}); };
   awake();
   document.addEventListener('visibilitychange', awake);
   const iv = setInterval(() => {
     // everything falling due this second goes in one banner, with one buzz / beep
     const due = [];
-    const others = Object.values(patients).filter(q => q !== p && q.id !== p?.id && charting(q));
+    // other patients only if opened on this phone today (not a teammate's patient in another theatre)
+    const opened = read('opened', {});
+    const others = Object.values(patients).filter(q => q.id !== p?.id && charting(q) && Date.now() - (opened[q.id] || 0) < 12 * 3600e3);
     for (const q of p ? [p, ...others] : others) {
       const pre = q === p ? '' : sid(q) + ': ';
       const hit = (tag, msg) => { if (alerted.has(tag)) return; alerted.add(tag); due.push(pre + msg); };
