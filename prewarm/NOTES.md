@@ -82,6 +82,11 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   reading before reloading (`afterAsking`). Tapping an empty key time while an earlier key time is still empty asks
   first (a stray Surgery end would stop intra-op readings counting as due); Log next always goes in order. Key times
   going backwards (over 12 h counts as past midnight) are listed in Still to fill as "Times out of order".
+  Follow-ups: `isShown` also needs the question's own question shown (a follow-up of a follow-up hides when the first
+  answer is No), and a hidden follow-up's stored value is left out of the Excel and Word exports (`shownValue`; kept
+  stored, so switching back brings it back). BMI is worked out from weight and height like the TXA total (unless
+  typed). The no-pre-warming group exports NA for active warming start. Perioperative data starts with "Subject ID
+  and group" to correct mistakes: the ID can't be blank or a duplicate; the group asks first and can't be cleared.
 - **Two tabs** (owner, 12 Oct 2026): a thin tab bar under the top bar on the patient screen: **Temperatures** (the
   main screen: times, pre-warming / intra-op temps, comfort, Form view / Sheet view) and **Others** (BP, HR, BIS,
   plus the Intra-op details and PACU boxes and a full-width **Perioperative data** box, formerly "Other data"). The tab you're not on warms up and pulses when its next
