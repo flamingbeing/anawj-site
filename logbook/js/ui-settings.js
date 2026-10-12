@@ -97,7 +97,7 @@ export function residencyCard() {
 // the light / dark choice. The first time a device opens the app it starts from what the account had (these used to
 // follow the account), so nobody's look changes. Kept at sign-out: they are the device's, and nothing private.
 const DISPLAY_KEY = 'apmes-logbook-display';
-export const DISPLAY_KEYS = ['compact', 'textSize', 'zoom', 'accent', 'startTab', 'fontUi', 'fontUiName', 'fontLog', 'fontLogName', 'lineWidth', 'lineHeight', 'contrast', 'motion', 'tabIcons', 'tabBar', 'hideHeader', 'caseInverted', 'colourful', 'customCss', 'customCssOn', 'autoFocus', 'appTitle', 'boxCaps', 'boxCorrect', 'boxSpell', 'reflSpell', 'pinBox', 'pinSearch', 'firstField', 'compactTags', 'borders', 'round', 'shadows', 'bigTaps', 'tabOrder', 'tabHidden', 'swipeTabs', 'rowMenu', 'reflToolbar'];
+export const DISPLAY_KEYS = ['compact', 'textSize', 'zoom', 'accent', 'startTab', 'fontUi', 'fontUiName', 'fontLog', 'fontLogName', 'lineWidth', 'lineHeight', 'contrast', 'motion', 'tabIcons', 'tabBar', 'hideHeader', 'caseInverted', 'colourful', 'customCss', 'customCssOn', 'autoFocus', 'appTitle', 'boxCaps', 'boxCorrect', 'boxSpell', 'reflSpell', 'pinBox', 'pinSearch', 'firstField', 'compactTags', 'borders', 'round', 'shadows', 'bigTaps', 'tabOrder', 'tabHidden', 'swipeTabs', 'rowMenu', 'rowCopy', 'reflToolbar'];
 export function deviceDisplay() {
   try { const d = JSON.parse(localStorage.getItem(DISPLAY_KEY) || 'null'); return d && typeof d === 'object' && !Array.isArray(d) ? d : null; } catch { return null; }
 }
@@ -171,6 +171,8 @@ export function applyLook(d = {}) {
   // swipe between the bar's tabs (app.js; on unless switched off: swipeTabs false); one ⋯ menu on Logbook rows
   // instead of Copy and Reflect (ui-logbook.js)
   c.toggle('swipe-tabs', d.swipeTabs !== false); c.toggle('row-menu', !!d.rowMenu); c.toggle('refl-toolbar', !!d.reflToolbar);
+  // Copy on each Logbook row: off by default (owner, 13 Oct 2026); the ⋯ menu, Copy day and the case itself still copy
+  c.toggle('row-copy', !!d.rowCopy);
   // the name in the header and the browser tab (plain text, at most 40 characters)
   const title = cleanTitle(d.appTitle) || APP_TITLE;
   const h1 = document.querySelector('.top h1'); if (h1 && h1.textContent !== title) h1.textContent = title;
@@ -247,7 +249,7 @@ export const displayPreview = () => h('div', { class: 'display-preview', 'aria-h
     h('span', { class: 'd' }, h('span', { class: 'wd' }, 'Sun'), ' 11th Oct'),
     h('span', { class: 't' }, h('b', {}, 'AB'), ' 34F LSCS under spinal'),
     h('span', { class: 'c' }, h('span', { class: 'c-tags' }, h('span', { class: 'lb-tags' }, ['LSCS', 'CNB(Obs)', 'Spinal'].map(t => h('span', { class: 'lb-tag' }, t)))),
-      h('span', { class: 'acts' }, h('button', { class: 'small row-btn', tabindex: '-1', type: 'button' }, rowIcon('copy'), h('span', { class: 'lbl' }, 'Copy')),
+      h('span', { class: 'acts' }, document.documentElement.classList.contains('row-copy') ? h('button', { class: 'small row-btn', tabindex: '-1', type: 'button' }, rowIcon('copy'), h('span', { class: 'lbl' }, 'Copy')) : null,
         h('button', { class: 'small row-btn has-refl', tabindex: '-1', type: 'button' }, rowIcon('done'), h('span', { class: 'lbl' }, 'Reflect')))))),
   h('div', { class: 'chips' }, h('span', { class: 'chip on' }, 'Spinal'), h('span', { class: 'chip' }, 'LSCS'), h('span', { class: 'chip' }, 'GA'),
     h('span', { class: 'grow' }), h('button', { class: 'small primary', tabindex: '-1', type: 'button' }, 'Save')));
@@ -348,6 +350,8 @@ export function renderDisplayAdvanced() {
       h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'On unless you switch it off. The page follows your finger to the next or previous tab on the bar, also from pages under a tab. Not while typing, from the screen’s edges, or on tables and lists that scroll sideways.'),
       h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !!st.rowMenu, onchange: e => applyDisplay(setDisplay({ rowMenu: e.target.checked || null })) }), 'Fewer buttons on Logbook rows (a ⋯ menu)'),
       h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'Copy and Reflect move into one ⋯ button; a ✓ still shows cases with a reflection.'),
+      h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !!st.rowCopy, onchange: e => applyDisplay(setDisplay({ rowCopy: e.target.checked || null })) }), 'Copy button on each Logbook row'),
+      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'Off unless you switch it on. Copy day, and the ⋯ menu if you use it, still copy.'),
       h('label', { class: 'check', style: 'margin-top:10px' }, h('input', { type: 'checkbox', checked: !!st.tabIcons, onchange: e => applyDisplay(setDisplay({ tabIcons: e.target.checked })) }), 'Icons only in the tab bar'),
       h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !!st.hideHeader, onchange: e => applyDisplay(setDisplay({ hideHeader: e.target.checked })) }), 'Hide the header (the app name bar)'),
       h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'It comes back by itself when something isn’t synced yet, when there’s no signal, and in the demo.'),
@@ -359,7 +363,7 @@ export function renderDisplayAdvanced() {
       h('p', { class: 'hint', style: 'margin:10px 0 0' }, 'Everything on this page is saved on this device only, so a phone and a computer can each look the way that suits them.')),
     customCssCard(),
     resetLink('the name in the header, fonts, line spacing and width, contrast, motion, the tab bar (order and hidden tabs) and header options, bigger tap targets, upside down, pinning and custom CSS (switched off; your CSS is kept) on this device', () =>
-      applyDisplay(setDisplay({ appTitle: null, fontUi: null, fontUiName: null, fontLog: null, fontLogName: null, lineWidth: null, lineHeight: null, contrast: null, motion: null, tabBar: null, tabIcons: null, hideHeader: null, caseInverted: null, pinBox: null, pinSearch: null, customCssOn: null, bigTaps: null, tabOrder: null, tabHidden: null, swipeTabs: null, rowMenu: null }))));
+      applyDisplay(setDisplay({ appTitle: null, fontUi: null, fontUiName: null, fontLog: null, fontLogName: null, lineWidth: null, lineHeight: null, contrast: null, motion: null, tabBar: null, tabIcons: null, hideHeader: null, caseInverted: null, pinBox: null, pinSearch: null, customCssOn: null, bigTaps: null, tabOrder: null, tabHidden: null, swipeTabs: null, rowMenu: null, rowCopy: null }))));
 }
 // Advanced display → the tab bar's order and hidden tabs (arrangeTabs): ↑ ↓ to move, a switch to show or hide
 function tabArranger() {
@@ -720,7 +724,8 @@ export function renderShowHide() {
     h('section', { class: 'card', 'data-group': 'logbook' },
       h('h3', { style: 'margin-top:0' }, 'Logbook (this device)'),
       sw('Copy and Reflect buttons on each case', !d.rowMenu, v => applyDisplay(setDisplay({ rowMenu: v ? null : true })), 'Off: one ⋯ button on each row instead.'),
-      groupReset('the row buttons', () => applyDisplay(setDisplay({ rowMenu: null })))),
+      sw('Copy button on each case', !!d.rowCopy, v => applyDisplay(setDisplay({ rowCopy: v || null })), 'Off by default: Copy day still copies the whole day.'),
+      groupReset('the row buttons', () => applyDisplay(setDisplay({ rowMenu: null, rowCopy: null })))),
     h('section', { class: 'card', 'data-group': 'bar' },
       h('h3', { style: 'margin-top:0' }, 'Header and tabs (this device)'),
       sw('Show the header (the app’s name and your name)', !d.hideHeader, v => applyDisplay(setDisplay({ hideHeader: !v }))),

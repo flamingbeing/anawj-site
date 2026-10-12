@@ -66,7 +66,7 @@ try { for (const width of [390, 1280]) {
   await p.getByRole('button', { name: 'Copy this day' }).click();
   await p.waitForTimeout(300);
   assert.match(await p.evaluate(() => navigator.clipboard.readText()), /## Notes\n\n### Fake teaching point\nFake dose reminder/);
-  await p.getByRole('button', { name: '✎ Notes' }).click();
+  await p.getByRole('button', { name: 'Notes', exact: true }).click();
   await p.locator('.notes-filter').filter({ hasText: 'Notes on' }).waitFor();
   assert.equal(await p.locator('ul.notes-rows li').count(), 1);
 

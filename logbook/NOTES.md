@@ -121,6 +121,12 @@ portfolio content.
 - **Fold-outs**: every `<details>` (except the reflection Quick actions menu) shows one chevron at the right of its
   summary (style.css, end), down when closed, up when open; the old per-place markers are gone. Folds that hold
   things say how many in the summary ("Figures (optional) · 2", "Default tag names · 3 renamed"). e2e checks it.
+  They open and close smoothly (one click listener in `app.js`: the height is held, then animated; not for the
+  Quick actions menu, a control inside the summary, or Reduce motion).
+- **Look and feel** (owner's Apple-apps review, 13 Oct 2026): line icons from `ui-core.js` (`ic(name)` inside text and
+  buttons, `rowIcon` on Logbook rows), never emoji; empty lists use `emptyState(icon, title, hint, button)`; buttons,
+  chips and rows show a pressed state; one speed for motion (`--dur`, `--ease` in style.css). New looks are separate
+  settings, off by default (the plan is in STATUS, Next).
 - **More** (`app.js`): Account (with Residency year for non-programme users; Delete account at the bottom,
   greyed out for residents on the programme list: a programme admin takes them off first; `cloud.deleteAccount`
   wipes cases, reflections, images, bin, submission, members entry, logbook, then the Google sign-in), Settings, Export &
