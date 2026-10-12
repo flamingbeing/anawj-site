@@ -75,6 +75,9 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   beige once set (`.tchip.warm.set`: #efe2d2, labels #7a4a00; untapped they look like the rest); the
   other times stay blue. The time boxes are numbered in the order they happen (1 Gown on … 11 To ward; renumbered
   without the pre-warming ones for the no-pre-warming group), a small number in each box's top corner.
+- **Due time warms up** (owner, 12 Oct 2026): the "due hh:mm" beside each timepoint is plain until 2 min before,
+  then an amber pill with a slow pulse (soon), an orange-red pill with a stronger pulse from due to 5 min past (now),
+  and a red pill with a fast pulse after that (late); plain once the reading is saved. Reduced motion: colours only.
 - **Screen size** (Settings, this phone only): Smaller / Small / Normal / Large / Larger zooms the whole app
   (`--ui-zoom` on body). Normal by default.
 - **Form view** (owner, 12 Oct 2026): the study's real paper form (data collection form v3.2, .docx) with text put in:

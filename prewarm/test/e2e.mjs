@@ -56,6 +56,8 @@ try {
   await page.click('[data-ev="pw_start"]');
   assert.match(await page.textContent('[data-ev="pw_start"] b'), /^\d\d:\d\d$/, 'tapping an empty time sets now');
   assert.match(await page.textContent('#due'), /due \d\d:\d\d/);
+  // the 0-min reading is due right now: the due time shows its 'now' state
+  await page.waitForFunction(() => document.querySelector('#due')?.dataset.state === 'now', null, { timeout: 5000 });
   // running timer from warming on, and the next event to note (10-min group: warming off 10 min later)
   assert.match(await page.textContent('#clock'), /Prewarm \+\d+:\d\d/);
   assert.match(await page.textContent('#clock'), /Next: Prewarm off \d\d:\d\d/);
