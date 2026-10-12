@@ -8,6 +8,9 @@ store with a fake patient.
 - `js/headers.js`: the eCRF template's 572 headers and sections, verbatim. `js/schema.js`: every template column as a
   field, in column order, plus op-day extras the template lacks. `js/app.js`: the screens. `js/store.js`: records with
   a timestamp per field (merge-ready for sharing). `js/xlsx.js` + `js/export.js`: the Excel export.
+- Form view: `js/wordform.js` (where each field goes on the paper form v3.2), `js/docx-fill.js` (ticks boxes and types
+  into blanks and cells of the Word XML, keeping everything else byte for byte), `js/wordview.js` (download; show with
+  vendored docx-preview to print / save as PDF). The blank form is uploaded by an admin, never committed here.
 - Sharing: `js/cloud.js` + `firestore.rules` (Firebase project `prewarm-study`; deployed on merge by the "Deploy
   Firestore rules" workflow). Without joining, data stays on the phone.
 
@@ -15,6 +18,7 @@ Tests (fake data only):
 
 ```
 node prewarm/test/prewarm.test.mjs
+node prewarm/test/wordform.test.mjs   # filling the Word form (made-up fixture-form.mjs)
 python3 -m http.server 8080 &   # from the repo root
 node prewarm/test/e2e.mjs        # phone-size browser test with an axe check; SHOTS=<dir> saves screenshots
 tools/test-rules.sh              # Firestore rules in the local emulator

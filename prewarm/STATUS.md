@@ -6,42 +6,38 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 
 ## Now
 
-- **Claude Code, Prewarming Webapp** (branch `ccr-13264f37-d28edu`): app-theme restyle, one-screen main screen,
-  screen-size setting (PR open). Then the Word-form Form view (Next, item 1).
+- **Claude Code, Prewarming Webapp** (branch `ccr-13264f37-d28edu`): Word-form Form view (PR open).
 
 ## Waiting on the owner
 
+- Upload the blank paper form (.docx) on the admin screen, then check a patient's Form view on a phone (Download
+  Word file, Save as PDF / Print).
 - Send each hospital team its join link (admin screen → Share join link), privately; test with a second phone.
 - Cloudflare previews: builds for #199 failed instantly with no log and were filed under "production/builds", not
   branch previews. Check the anawj-preview Worker's build settings in the Cloudflare dashboard.
 
 ## Next
 
-1. **Form view from the real Word form** (owner, 12 Oct 2026). Use the paper data collection form v3.2 (.docx, 14
-   pages) as the base and only put text in it: values on the blank lines, ☐ → ☒ for chosen options, every page kept
-   (unfilled ones blank). Decisions:
-   - **Template stays private:** an admin uploads the blank .docx once from the admin screen; it's stored in the
-     study's Firebase (≈245 KB, so base64 in one document under 1 MB, or chunked) and only members/admins can read it.
-     Needs a rules change + emulator tests. Strip `docProps` (creator, lastModifiedBy, company) on upload. Never commit
-     the form to the repo (staff name in its file details).
-   - **Outputs:** "Download Word file" (filled .docx, exact formatting; JSZip is vendored in `logbook/vendor`) and
-     "Save as PDF / Print" (render the filled .docx in the app, e.g. vendored docx-preview, then the browser's print).
-   - The form's thermal sensation image is the −3 … +3 scale already used; it also holds an MME conversion chart.
-   - The current HTML Form view (#201) stays until this replaces it.
-2. Export across hospitals for admins, a members' view of who entered what, polish after phone testing.
+1. Export across hospitals for admins, a members' view of who entered what, polish after phone testing.
 
 ## Recently done
 
+- #209: Log button for the next event, ‹ › timepoints, squarer time boxes (two rows).
+- #208: tap anywhere on an empty temperature card for 36.5.
+- #206: running timer and next event in the app bar; Mark section complete at the bottom.
+- #205: NUHS app theme; main screen fits one phone screen; Screen size setting; Delete moved to Spreadsheet view.
 - #201: NUHS design system look; printable HTML Form view (4 day-of-surgery pages); Save as PDF / Print.
 - #199: join links and QR codes, hospital read from the code, comfort questions on the main screen, Spreadsheet view.
 - #198: admin sign-in by email link (owner signed in and made the NTF code).
 - #197: main screen = times + all temperatures + links; rules first deployed to `prewarm-study` (run #19).
-- #196: sharing (join code per hospital, Firestore sync, rules, admin screen).
-- #194: study hospitals (NTF, NUH, SGH, CGH, TTSH, KTPH, WH).
-- #193: Firebase web config for `prewarm-study`. #192: plan and the offline op-day app.
 
 ## Decisions
 
+- 12 Oct 2026: "Mark data collection as complete" (one per patient) replaces the main screen's section mark; shown at the
+  top of the main screen and in the patient list.
+- 12 Oct 2026: delete participants only from Settings → Delete participants; every reading entered live by default.
+- 12 Oct 2026: Log button (next event), ‹ › timepoints, squarer time boxes, Mark section complete at the bottom, tap an
+  empty temperature card for 36.5, running timer and next event in the app bar.
 - 12 Oct 2026: NUHS app theme (design system artifact, kr-app); main screen fits one phone screen; Delete moves to the
   Spreadsheet view; Screen size setting (per phone, Normal by default).
 - 12 Oct 2026: Form view should be the Word form itself, filled in; the blank form is uploaded by an admin (private),

@@ -4,6 +4,9 @@
 const { chromium } = await import(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/node_modules/playwright/index.mjs');
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
+import { fixtureFiles } from './fixture-form.mjs';
+const JSZip = createRequire(import.meta.url)('../../logbook/vendor/jszip.min.js');
 const AXE = new URL('../../tools/vendor/axe.min.js', import.meta.url).pathname;
 const BASE = `http://localhost:${process.env.PORT || 8080}/prewarm/`;
 const SHOTS = process.env.SHOTS;
@@ -123,13 +126,28 @@ try {
   assert.ok(await page.$('#print'));
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 390, 'no sideways scroll');
   await axe('form view (print)'); await shot('form-print');
+  // the study's Word form (demo: chosen on this tab; live: uploaded by an admin), filled in: shown, downloaded
+  assert.match(await page.textContent('main'), /simple version/);
+  const zip = new JSZip(); for (const [k, v] of Object.entries(fixtureFiles())) zip.file(k, v);
+  await page.setInputFiles('#blankfile', { name: 'blank form.docx', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', buffer: await zip.generateAsync({ type: 'nodebuffer' }) });
+  await page.waitForSelector('#doc section.docx', { timeout: 20000 });
+  await page.waitForFunction(() => !document.querySelector('#dl').disabled);
+  assert.match(await page.textContent('#doc'), /☒ 10-minute prewarming/);
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 390, 'Word pages fit the phone');
+  await shot('form-word');
+  const [wdl] = await Promise.all([page.waitForEvent('download'), page.click('#dl')]);
+  assert.equal(wdl.suggestedFilename(), 'TEST-02 data collection form.docx');
+  const got = await JSZip.loadAsync(fs.readFileSync(await wdl.path()));
+  const docXml = await got.file('word/document.xml').async('string');
+  assert.match(docXml, /w14:checked w14:val="1"/, 'ticked in the Word file');
+  assert.doesNotMatch(await got.file('docProps/core.xml').async('string'), /Test Author/, 'file details removed');
   await page.goBack();
 
   // spreadsheet view
   await page.click('.textlinks a[href$="/sheet"]');
   await page.waitForSelector('.sheet');
   assert.match(await page.textContent('.sheet'), /36\.6/);
-  assert.ok(await page.$('#del'), 'delete is on the spreadsheet view');
+  assert.equal(await page.$('#del'), null, 'no delete on the spreadsheet view');
   await axe('form view'); await shot('form-view');
   await page.goBack();
 
@@ -164,6 +182,24 @@ try {
   assert.equal(await page.getAttribute('[data-zoom="1.25"]', 'aria-pressed'), 'true');
   assert.equal(await page.evaluate(() => getComputedStyle(document.body).zoom), '1.25');
   await page.click('[data-zoom="1"]');
+  // every reading live by default; deleting participants only from Settings
+  assert.equal(await page.isChecked('[data-k="haemo15"]'), true, 'BP, HR and BIS every 15 min on by default');
+  await page.click('a[href="#/delete"]');
+  await page.waitForSelector('.dellist');
+  await axe('delete participants'); await shot('delete');
+  const delBtn = page.locator('.dellist li', { hasText: 'TEST-02' }).locator('[data-del]');
+  await delBtn.click(); await delBtn.click();
+  await page.waitForFunction(() => !/TEST-02/.test(document.querySelector('main').textContent));
+  await page.goto(BASE + '?demo#/');
+  assert.doesNotMatch(await page.textContent('.list'), /TEST-02/, 'deleted from the list');
+  // mark data collection complete (bottom of the main screen): shown at the top and in the patient list
+  await page.click('.list a:has-text("DEMO-01")');
+  await page.waitForSelector('[data-done]');
+  assert.equal(await page.$('[data-sign]'), null, 'no per-section mark on the main screen');
+  await page.click('[data-done]');
+  assert.match(await page.textContent('.donetop'), /Data collection complete\s*TT \d+ \w+ \d{4} \d\d:\d\d/);
+  await page.goto(BASE + '?demo#/');
+  assert.match(await page.textContent('.list'), /DEMO-01[\s\S]*✓ Data collection complete/);
   await page.goto(BASE + '?demo#/export');
   const [dl] = await Promise.all([page.waitForEvent('download'), page.click('#xl')]);
   const file = await dl.path();

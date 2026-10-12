@@ -30,7 +30,7 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   Links are navy (link blue is under 4.5:1 on the grey page).
 - **One screen per timepoint** (owner, 12 Oct 2026): the main screen fits a 390 × 844 phone down to Save without
   scrolling (e2e checks it): − value + on one row, chip rows with the label on the left, the "set the start time"
-  hint in the due slot. Delete patient is on the Spreadsheet view, not the main screen.
+  hint in the due slot. Patients are deleted only on Settings → Delete participants (owner, 12 Oct 2026), nowhere else.
 - **Timer and next event** (owner, 12 Oct 2026): the patient screen's app bar shows a running timer (from warming on,
   else gown on, during pre-warming; from induction, else in OT, intra-op; the clock time before either) and the next
   event to note (the first unset of gown on, warming on, warming off, in OT, induction, surgery end, PACU arrival,
@@ -38,12 +38,26 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
 - **Quick controls** (owner, 12 Oct 2026): a navy Log button in the app bar sets the next event to now (it replaced
   the Spreadsheet view icon; Spreadsheet view is the text link at the bottom). Big ‹ › buttons either side of the tabs
   and timepoint strip go to the previous / next timepoint. Event time boxes are squarer, six per row (two rows).
-- **Mark section complete** sits at the very bottom of the screen, below the links, so it isn't tapped by accident.
+- **Mark data collection as complete** (owner, 12 Oct 2026): one button at the very bottom of the patient's main
+  screen (below the links and a divider, so it isn't tapped by accident), stored as `done` ("AB 12 Oct 2026 14:20").
+  Once marked: a green line at the top of the main screen and "✓ Data collection complete" in the patient list; Undo at
+  the bottom. The Word form's sign-off lines use it on op-day pages with data that have no sign-off of their own. The
+  per-section sign-offs stay on the BP / HR / BIS screen and the other forms.
+- **Readings to enter live:** all on by default, BP / HR / BIS every 15 min included (owner, 12 Oct 2026; settings v2
+  turned it on once for phones that had it off).
 - **Screen size** (Settings, this phone only): Smaller / Small / Normal / Large / Larger zooms the whole app
   (`--ui-zoom` on body). Normal by default.
-- **Form view** (owner, 12 Oct 2026): the day-of-surgery pages of the paper data collection form v3.2 (intervention,
-  intraoperative, intraoperative readings, PACU with patient satisfaction), filled in; one A4 page each when printed.
-  "Save as PDF / Print" opens the browser's print screen. Spreadsheet view stays for checking readings.
+- **Form view** (owner, 12 Oct 2026): the study's real paper form (data collection form v3.2, .docx) with text put in:
+  ☐ → ☒ (and the Word tick box's checked flag), values over the blank lines and into empty cells, Subject ID on every
+  page, Date of Entry and the sign-off (Name, Date) on pages with data; every page kept, unfilled ones blank.
+  "Download Word file" gives the exact file; "Save as PDF / Print" shows it with docx-preview (Calibri via Carlito) and
+  prints. docx-preview doesn't paginate like Word, so a long section can run onto an extra printed page.
+  - The blank form is uploaded once by an admin (admin screen) to `forms/blank` (base64; members and admins read it;
+    Firestore keeps a copy for offline use). Its file details (creator, last edited by, company) are removed on
+    upload; never commit the form (staff name in its file details). The upload lists places the map didn't find.
+  - Without an uploaded form (or not sharing), the Form view shows the older simple HTML version. Demo: choose a blank
+    .docx on the Form view; it stays in that browser tab.
+  - Subject ID: one character per box; longer IDs get the five boxes merged into one.
 - **Defaults on tap:** an empty temperature becomes 36.5 (anywhere on its card, owner 12 Oct 2026) (then + / −, or tap again to type); an empty time becomes now.
 - Gown set temp follows "Warming off" (NA for later timepoints) until someone picks a value on that screen.
 - - **Entry screen:** option B ("change what moved"): values carry over from the last saved timepoint; + / − nudges;

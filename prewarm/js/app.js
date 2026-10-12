@@ -4,6 +4,7 @@ import { newRecord, setVal, val, lastEdit, mergeRecord } from './store.js';
 import { workbook } from './export.js';
 import * as cloud from './cloud.js';
 import { qrcode } from './vendor/qrcode.js';
+import * as wordview from './wordview.js';
 
 const DEMO = new URLSearchParams(location.search).has('demo');
 const NS = DEMO ? 'prewarm-demo:' : 'prewarm:';
@@ -26,10 +27,12 @@ function paint(html) {
 const read = (k, d) => { try { return JSON.parse(localStorage.getItem(NS + k)) ?? d; } catch { return d; } };
 const write = (k, v) => { try { localStorage.setItem(NS + k, JSON.stringify(v)); return true; } catch { toast('Not saved: this phone’s storage is full or blocked.'); return false; } };
 let patients = read('patients', {});
-const settings = Object.assign({ me: '', site: '', hide: { skin: false, set: false, ts: false, warm: false, room: false, haemo15: true, bis: false },
+const settings = Object.assign({ me: '', site: '', hide: { skin: false, set: false, ts: false, warm: false, room: false, haemo15: false, bis: false },
   remind: { vibrate: true, beep: true, banner: true, awake: true } }, read('settings', {}));
 const saveAll = () => write('patients', patients);
 const saveSettings = () => write('settings', settings);
+// settings v2 (owner, 12 Oct 2026): every reading is entered live by default, BP / HR / BIS every 15 min included
+if ((settings.v || 0) < 2) { settings.hide.haemo15 = false; settings.v = 2; saveSettings(); }
 // Interface size (this phone only): zooms the whole screen. Normal is 100%.
 const SIZES = [['0.85', 'Smaller'], ['0.92', 'Small'], ['1', 'Normal'], ['1.1', 'Large'], ['1.25', 'Larger']];
 const applySize = z => document.documentElement.style.setProperty('--ui-zoom', SIZES.some(([k]) => k === String(z)) ? String(z) : '1');
@@ -200,7 +203,7 @@ function home() {
     <h2>Patients on this phone</h2>
     ${list.length ? `<ul class="list">${list.map(p => {
       const e = lastEdit(p);
-      return `<li><a href="#/p/${p.id}"><b>${esc(sid(p))}${val(p, 'site') ? ` <small>${esc(val(p, 'site'))}</small>` : ''}</b><span>${esc(status(p))}</span>
+      return `<li><a href="#/p/${p.id}"><b>${esc(sid(p))}${val(p, 'site') ? ` <small>${esc(val(p, 'site'))}</small>` : ''}</b><span${val(p, 'done') ? ' class="okline"' : ''}>${esc(status(p))}</span>
         <small>${e ? 'Last entry ' + new Date(e.t).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) + (e.by ? ' by ' + esc(e.by) : '') : 'No entries yet'}</small></a></li>`;
     }).join('')}</ul>` : `<p class="muted">No patients yet. Tap <b>New patient</b> on the morning of surgery.</p>`}
     <a class="secondary big" href="#/export">Export Excel</a>
@@ -208,6 +211,7 @@ function home() {
   $('#new').onclick = () => go('#/new');
 }
 function status(p) {
+  if (val(p, 'done')) return '✓ Data collection complete';
   if (val(p, 'pacu_in')) return 'PACU';
   if (val(p, 'io_knife') || val(p, 'ev_ot')) return 'In OT';
   if (val(p, 'pw_start') || val(p, 'pw_gown')) return 'Pre-warming';
@@ -373,13 +377,13 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     if (s === 'prewarm' && !setTouched && cols.some(c => c.key === 'set') && setTempNA(p, pt)) draft.set = 'NA';
     const due = dueOf(p, s, pt);
     const grp = s === 'prewarm' ? `<span class="badge">${GROUPS.find(g => String(g[0]) === String(val(p, 'arm')))?.[1] || 'Group not set'}</span>` : '';
-    paint(`${main ? comfortHtml('sat_pre', 'Comfortable before surgery?') + timesHtml() : ''}${navHtml()}
+    paint(`${main && val(p, 'done') ? `<p class="ok-box donetop">✓ Data collection complete <small>${esc(val(p, 'done'))}</small></p>` : ''}${main ? comfortHtml('sat_pre', 'Comfortable before surgery?') + timesHtml() : ''}${navHtml()}
       <div class="tp"><div><b>${pt.label}</b> ${grp}</div><div class="due" id="due">${due != null ? 'due ' + fromMin(Math.round(due)) : pt.key === 'base' ? (s === 'prewarm' ? '' : 'on arrival in OT') : pt.min != null ? `<span class="hint">Set “${s === 'prewarm' ? 'Warming on' : 'Induction'}” for due times</span>` : ''}</div></div>
       ${isSaved ? `<p class="muted small tight">Saved ${esc(savedAt(p, s, pt.key))}${p.f['at_' + s + '_' + pt.key]?.by ? ' by ' + esc(p.f['at_' + s + '_' + pt.key].by) : ''}. Changes save when you tap Save.</p>` : ''}
       <div class="board">${cols.map(card).join('')}</div>
       <button class="save big" id="save">${isSaved ? 'Save changes' : `Save ${pt.label} reading`}</button>
       ${s === 'haemo' && settings.hide.haemo15 ? `<p class="muted small">Only baseline is entered here; the 15-min rows come from the monitor download. Turn them on in Settings.</p>` : ''}
-      ${main ? comfortHtml('sat_post', 'Comfortable after surgery?') + linksHtml() : ''}${signoffHtml(p, s)}`);
+      ${main ? comfortHtml('sat_post', 'Comfortable after surgery?') + linksHtml() + doneHtml(p) : signoffHtml(p, s)}`);
     const ck = $('#clock'); if (ck) ck.innerHTML = clockHtml(p, s);
     const lb = $('#lognext'); if (lb) { const h = logBtnHtml(p); if (lb.innerHTML !== h) lb.innerHTML = h; lb.hidden = !h; }
     if (editing) { const i = $('#evtime'); i?.focus(); }
@@ -452,6 +456,12 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
       go(`#/p/${id}/${s}/` + (next ? next.key : pt.key));
       return;
     }
+    if (t.closest('[data-done]')) {
+      if (!settings.me) return toast('Add your initials in Settings first.');
+      set(p, 'done', `${settings.me} ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} ${nowHM()}`);
+      toast('Data collection marked complete'); draw(); window.scrollTo(0, 0); return;
+    }
+    if (t.closest('[data-undone]')) { set(p, 'done', null); draw(); return; }
     signoffClick(p, s, t);
   };
   view.onchange = e => {
@@ -492,6 +502,13 @@ function beep() {
   } catch { /* sound needs a tap first on some phones */ }
 }
 document.addEventListener('pointerdown', () => { try { actx ||= new AudioContext(); actx.resume?.(); } catch {} }, { once: true });
+
+// ---------- the patient's op-day data collection marked complete (bottom of the main screen, so it isn't tapped by
+// accident); shown at the top of the main screen and in the patient list. The Word form's sign-off lines use it.
+function doneHtml(p) {
+  const v = val(p, 'done');
+  return `<div class="sign">${v ? `Data collection complete: ${esc(v)} <button class="link" data-undone>Undo</button>` : `<button class="link" data-done>Mark data collection as complete</button>`}</div>`;
+}
 
 // ---------- section sign-off (replaces the paper form's Name / Signature / Date)
 function signoffHtml(p, pg) {
@@ -599,19 +616,83 @@ route(/^\/p\/(\w+)\/sheet$/, id => {
       ${it.points.map(x => `<tr><th>${x.key === 'base' ? 'Baseline' : x.key === 'end' ? 'End' : x.min}</th>${it.cols.map(c => cell('iotemp', x, c)).join('')}</tr>`).join('')}</tbody></table></div>
     <h2>Haemodynamics</h2><div class="scroll" tabindex="0"><table class="grid sheet"><thead><tr><th>From induction</th>${hd.cols.map(c => `<th>${c.label}</th>`).join('')}</tr></thead><tbody>
       ${hd.points.map(x => `<tr><th>${x.key === 'base' ? 'Baseline' : x.key === 'end' ? 'End' : x.min}</th>${hd.cols.map(c => cell('haemo', x, c)).join('')}</tr>`).join('')}</tbody></table></div>
-    <p class="muted small">Tap a cell to change that reading.</p>
-    <button class="danger" id="del">Delete this patient</button>`);
-  $('#del').onclick = e => {
-    const t = e.target;
-    if (!t.dataset.sure) { t.dataset.sure = 1; t.textContent = 'Tap again to delete ' + sid(p); return; }
-    p.deleted = Date.now(); saveAll(); sync(p, []); go('#/');
-  };
+    <p class="muted small">Tap a cell to change that reading.</p>`);
 });
 
-// ---------- form view: the day-of-surgery pages of the paper data collection form (v3.2), filled in, for printing
-route(/^\/p\/(\w+)\/form$/, id => {
+// ---------- delete participants (from Settings; the only place patients are deleted)
+route(/^\/delete$/, () => {
+  header('Delete participants', '#/settings');
+  const list = Object.values(patients).filter(p => !p.deleted).sort((a, b) => String(sid(a)).localeCompare(String(sid(b))));
+  paint(`<p class="muted small">${sharing() ? `Deleting removes the participant from this phone and from your team’s phones.` : 'Deleting removes the participant from this phone.'} Tap Delete, then tap again to confirm.</p>
+    ${list.length ? `<ul class="list dellist">${list.map(p => {
+      const e = lastEdit(p);
+      return `<li><div><b>${esc(sid(p))}${val(p, 'site') ? ` <small>${esc(val(p, 'site'))}</small>` : ''}</b><small>${esc(status(p))} · ${e ? 'last entry ' + new Date(e.t).toLocaleDateString([], { day: 'numeric', month: 'short' }) : 'no entries'}</small></div>
+        <button class="danger" data-del="${p.id}" aria-label="Delete ${esc(sid(p))}">Delete</button></li>`;
+    }).join('')}</ul>` : `<p class="muted">No participants on this phone.</p>`}`);
+  view.onclick = e => {
+    const b = e.target.closest('[data-del]'); if (!b) return;
+    const p = patients[b.dataset.del]; if (!p) return;
+    if (!b.dataset.sure) { b.dataset.sure = 1; b.textContent = 'Tap again'; b.setAttribute('aria-label', 'Tap again to delete ' + sid(p)); return; }
+    p.deleted = Date.now(); saveAll(); sync(p, []); toast(sid(p) + ' deleted'); render();
+  };
+  cleanup.push(() => { view.onclick = null; });
+});
+
+// ---------- form view: the study's Word form (uploaded once by an admin) filled in for this patient: download it,
+// or show it and print / save as PDF. Without the Word form yet: a simple version of the day-of-surgery pages.
+let blankCache = null;
+async function blankForm() {
+  if (blankCache) return blankCache;
+  if (DEMO) { try { blankCache = JSON.parse(sessionStorage.getItem(NS + 'blank')); } catch { /* none */ } return blankCache; }
+  if (!sharing()) return null;
+  try { blankCache = await cloud.blankForm(); } catch { /* offline and never fetched */ }
+  return blankCache;
+}
+function noBlankNote() {
+  if (DEMO) return `<div class="note">Demo: this is a simple version. To see the study’s Word form filled in, choose its blank .docx (kept only in this browser tab).
+    <label class="secondary filebtn">Choose the blank form<input type="file" id="blankfile" accept=".docx" hidden></label></div>`;
+  if (shared.admin) return `<p class="note">This is a simple version. Upload the study’s blank Word form on the <a href="#/admin">admin screen</a> to fill in the real form.</p>`;
+  if (sharing()) return `<p class="note">This is a simple version: your study admin hasn’t uploaded the blank Word form yet.</p>`;
+  return `<p class="note">This is a simple version. <a href="#/settings">Join your hospital’s team</a> to fill in the study’s Word form.</p>`;
+}
+route(/^\/p\/(\w+)\/form$/, async id => {
   const p = patients[id]; if (!p) return go('#/');
   header(sid(p) + ' · Form view', '#/p/' + id);
+  const here = location.hash, still = () => location.hash === here;
+  paint(`<p class="muted">Loading the form…</p>`);
+  const b = await blankForm();
+  if (!still()) return;
+  if (!b) {
+    simpleForm(p, id, noBlankNote());
+    const inp = $('#blankfile');
+    if (inp) inp.onchange = async () => {
+      try { const r = await wordview.prepareBlank(inp.files[0]); blankCache = { b64: r.b64, name: inp.files[0].name, setAt: Date.now() }; }
+      catch (e) { toast(e.message); return; }
+      try { sessionStorage.setItem(NS + 'blank', JSON.stringify(blankCache)); } catch { /* this visit only */ }
+      render();
+    };
+    return;
+  }
+  paint(`<div class="noprint stack"><div class="sharerow"><button class="primary" id="dl" disabled>Download Word file</button><button class="secondary" id="print" disabled>Save as PDF / Print</button></div>
+    <p class="muted small">The study’s data collection form, filled in. Pages with no data stay blank. To save a PDF, choose “Save as PDF” as the printer (iPhone: Share → Print).</p></div>
+    <div id="doc" class="wordview"><p class="muted">Filling in the form…</p></div>`);
+  let file;
+  try { file = await wordview.filledDocx(b.b64, p); if (!still()) return; await wordview.show(file, $('#doc')); }
+  catch (e) { if (still()) $('#doc').innerHTML = `<p class="note">Couldn’t open the form: ${esc(e.message)}</p>`; return; }
+  if (!still()) return;
+  $('#dl').disabled = $('#print').disabled = false;
+  $('#dl').onclick = () => {
+    const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = `${sid(p)} data collection form.docx`;
+    document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 30000);
+  };
+  $('#print').onclick = () => window.print();
+  // the Word pages carry their own margins
+  const pageStyle = document.createElement('style'); pageStyle.textContent = '@page { size: A4; margin: 0; }'; document.head.append(pageStyle);
+  const refit = () => wordview.fit($('#doc'));
+  addEventListener('resize', refit);
+  cleanup.push(() => { pageStyle.remove(); removeEventListener('resize', refit); });
+});
+function simpleForm(p, id, note = '') {
   const v = k => val(p, k);
   const t = k => esc(v(k) ?? '');
   const box = on => on ? '☒' : '☐';
@@ -627,7 +708,7 @@ route(/^\/p\/(\w+)\/form$/, id => {
   const arm = String(v('arm'));
   const ix = (() => { try { return JSON.parse(v('io_ix_rows')) || []; } catch { return []; } })();
   const comfort = k => BY_ID.sat_pre.opts.map(([o, l]) => `${box(String(v(k)) === String(o))} ${l}`).join('<br>');
-  paint(`<div class="noprint stack"><button class="primary big" id="print">Save as PDF / Print</button>
+  paint(`${note}<div class="noprint stack"><button class="primary big" id="print">Save as PDF / Print</button>
     <p class="muted small">Opens the phone’s print screen: choose “Save as PDF” as the printer (on iPhone: Share → Print, then share the preview).</p></div>
   <div class="form">
   <section class="fpage" tabindex="0" aria-label="Pre-operative intervention page">${head}
@@ -691,7 +772,7 @@ route(/^\/p\/(\w+)\/form$/, id => {
     ${foot('pacu')}</section>
   </div>`);
   $('#print').onclick = () => window.print();
-});
+}
 
 // ---------- settings
 route(/^\/settings$/, () => {
@@ -713,7 +794,9 @@ route(/^\/settings$/, () => {
     <h2>When a reading is due</h2>
     <p class="muted small">Works while the app is open on screen.</p>
     ${tog('remind', 'banner', 'Banner')}${tog('remind', 'vibrate', 'Vibrate', 'Android only')}${tog('remind', 'beep', 'Short beep')}${tog('remind', 'awake', 'Keep the screen on during readings')}
-    <button class="secondary" id="test">Test the alert</button></div>`);
+    <button class="secondary" id="test">Test the alert</button>
+    <h2>Participants</h2>
+    <a class="secondary" href="#/delete">Delete participants</a></div>`);
   view.querySelectorAll('[data-zoom]').forEach(b => b.onclick = () => {
     settings.zoom = b.dataset.zoom; saveSettings(); applySize(settings.zoom);
     view.querySelectorAll('[data-zoom]').forEach(x => x.setAttribute('aria-pressed', x === b));
@@ -838,9 +921,12 @@ route(/^\/admin$/, async () => {
   header('Study admin', '#/settings');
   if (!shared.admin) { paint(`<p class="note">Sign in as a study admin from Settings.</p>`); return; }
   paint(`<p class="muted">Loading…</p>`);
-  let codes = {}, people = [];
-  try { [codes, people] = await Promise.all([cloud.codes(), cloud.members()]); } catch (e) { paint(`<p class="note">${esc(cloud.friendly(e))}</p>`); return; }
+  let codes = {}, people = [], bf = null;
+  try { [codes, people, bf] = await Promise.all([cloud.codes(), cloud.members(), cloud.blankForm()]); } catch (e) { paint(`<p class="note">${esc(cloud.friendly(e))}</p>`); return; }
   paint(`<div class="stack">
+    <div class="fld"><b>Blank data collection form</b>
+      <small class="muted">${bf ? `${esc(bf.name)}, uploaded ${new Date(bf.setAt).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' })} by ${esc(bf.setBy)}.` : 'Not uploaded yet.'} The Form view fills this Word file in for each patient; teams can download it or save it as a PDF. Its file details (author, editor, company) are removed on upload.</small>
+      <label class="secondary filebtn">${bf ? 'Replace' : 'Upload'} the blank form (.docx)<input type="file" id="blankup" accept=".docx" hidden></label></div>
     <p class="muted small">Send each hospital’s team its join link (or show the QR code): it opens the app ready to join, no typing. Share it only with that team. A new code makes old links stop working for new phones; phones already in stay in.</p>
     ${SITES.map(x => {
       const who = people.filter(m => m.site === x);
@@ -849,6 +935,14 @@ route(/^\/admin$/, async () => {
         ${codes[x] ? `<div class="sharerow"><button class="primary" data-share="${x}">Share join link</button><button class="secondary" data-qr="${x}">QR code</button></div><div class="qr" id="qr-${x}" hidden></div>` : ''}
         ${who.length ? `<ul class="plain">${who.map(m => `<li>${esc(m.initials || '—')} <small class="muted">joined ${new Date(m.joinedAt).toLocaleDateString()}</small> <button class="link" data-rm="${m.uid}">Remove</button></li>`).join('')}</ul>` : '<small class="muted">No phones yet</small>'}</div>`;
     }).join('')}</div>`);
+  $('#blankup').onchange = async e => {
+    const f = e.target.files[0]; if (!f) return;
+    let r;
+    try { r = await wordview.prepareBlank(f); } catch (err) { toast(err.message); return; }
+    if (r.missed.length && !confirm(`${r.missed.length} place(s) didn’t match the v3.2 form and will stay blank:\n${r.missed.slice(0, 12).join('\n')}${r.missed.length > 12 ? '\n…' : ''}\n\nUpload anyway?`)) return;
+    try { await cloud.setBlankForm(r.b64, f.name, r.size); blankCache = null; toast('Blank form saved'); render(); }
+    catch (err) { toast(cloud.friendly(err)); }
+  };
   view.onclick = async e => {
     const sh = e.target.closest('[data-share]');
     if (sh) {
