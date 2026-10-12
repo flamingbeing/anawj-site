@@ -35,12 +35,12 @@ For evals UI changes, also run the e2e test (see `evals/README.md`).
 
 ## PR previews
 
-Every PR gets a preview of the whole site on Cloudflare Pages ([PREVIEWS.md](PREVIEWS.md): setup, limits).
-For a PR that changes anything visible, find its preview link (the "Cloudflare Pages" check or comment on the
-PR) and give the owner direct demo-mode links to the changed screens, e.g. `<preview>/logbook/?demo#notes`.
-Previews can't sign in (by design): check signed-in behaviour with tests or the emulator, and never add preview
-domains to Firebase or the Google / Dropbox OAuth clients. If no preview appears, Cloudflare isn't connected
-yet: say so and fall back to screenshots.
+Every PR gets a preview of the whole site on Cloudflare (Workers Builds; [PREVIEWS.md](PREVIEWS.md): setup,
+limits; config in `wrangler.jsonc`, `.assetsignore`, `_headers`). For a PR that changes anything visible, find its
+preview link (the Workers Builds check or comment on the PR) and give the owner direct demo-mode links to the
+changed screens, e.g. `<preview>/logbook/?demo#notes`. Previews can't sign in (by design): check signed-in
+behaviour with tests or the emulator, and never add preview domains to Firebase or the Google / Dropbox OAuth
+clients. If no preview appears, Cloudflare isn't connected yet: say so and fall back to screenshots.
 
 ## Claude Code–Codex handovers
 
