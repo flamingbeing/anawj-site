@@ -75,11 +75,34 @@ function set(p, id, v) { if (setVal(p, id, v, settings.me)) { saveAll(); sync(p,
 const shared = { member: null, admin: false, email: '', unwatch: null, stale: false };
 const sharing = () => cloud.enabled && (shared.member || shared.admin);
 // send changed fields; Firestore keeps them on the phone and sends them when there is signal
+// patients with changes sent but not yet confirmed by the server (no signal), kept across reloads; Log out warns
+let pending = read('pending', {});
 function sync(p, ids) {
   if (!sharing()) return;
   p.site ||= val(p, 'site') || shared.member?.site || settings.site;
   if (!p.site) return;
-  cloud.push(p, ids).catch(e => toast(cloud.friendly(e)));
+  const tok = Date.now() + Math.random();
+  pending[p.id] = tok; write('pending', pending);
+  cloud.push(p, ids).then(() => { if (pending[p.id] === tok) { delete pending[p.id]; write('pending', pending); } })
+    .catch(e => toast(cloud.friendly(e)));
+}
+// Log out (owner, 12 Oct 2026): leaves the team and deletes every patient on this phone, after a warning, and a
+// second one if some changes haven't reached the team yet. Settings (initials, display) stay.
+async function logOut(btn) {
+  const n = Object.values(patients).filter(p => !p.deleted).length;
+  const who = shared.member ? `the ${shared.member.site} team` : 'the study';
+  if (!confirm(`Log out of ${who} on this phone?\n\nThis deletes all ${n} patient${n === 1 ? '' : 's'} from this phone. What has synced stays with your team.`)) return;
+  btn.disabled = true; btn.textContent = 'Checking everything has synced…';
+  if (Object.keys(pending).length && await cloud.flushed(6000)) { pending = {}; write('pending', pending); }
+  const unsynced = Object.keys(pending).map(id => patients[id]).filter(p => p && !p.deleted).map(sid);
+  if (unsynced.length && !confirm(`Not synced yet: ${unsynced.join(', ')}.\n\nThese changes haven’t reached your team (no signal?). Logging out now loses them. Cancel, get signal and wait a moment, or Export Excel first.\n\nLog out anyway and lose them?`)) {
+    btn.disabled = false; btn.textContent = 'Log out'; return;
+  }
+  shared.unwatch?.();
+  await cloud.logOut();
+  try { for (const k of Object.keys(localStorage)) if (k.startsWith(NS) && k !== NS + 'settings') localStorage.removeItem(k); } catch { /* storage blocked */ }
+  location.replace(location.pathname + location.search + '#/');
+  location.reload();
 }
 async function watch() {
   shared.unwatch?.(); shared.unwatch = null;
@@ -131,6 +154,8 @@ if (cloud.enabled) cloud.onUser(async u => {
   if (shared.member) { settings.site = shared.member.site; if (!settings.me && shared.member.initials) settings.me = shared.member.initials; saveSettings(); }
   uploadLocal();
   await watch();
+  // changes held over from an earlier visit go out with the next signal: then nothing is pending
+  if (sharing() && Object.keys(pending).length) cloud.flushed(600000).then(ok => { if (ok) { pending = {}; write('pending', pending); } });
   document.body.dataset.cloud = 'ready';
   // redraw only when sharing changed, so a half-typed join code isn't wiped
   if (before !== !!(shared.member || shared.admin) && !view.contains(document.activeElement)) render();
@@ -279,18 +304,31 @@ function nextEvent(p) {
 }
 // app-bar button that logs the next event as now
 const logBtnHtml = p => { const nx = nextEvent(p); return nx ? `<b>Log</b><small>${esc(nx.label)}</small>` : ''; };
+// The patient screens' top bar (main screen, BP / HR / BIS, intra-op details, PACU): running timer, next event and
+// its Log button. Returns a function that redraws it; it also ticks every second while the screen is open.
+function topBar(p, s, onLog) {
+  $('#extra').innerHTML = `<div class="clock" id="clock">${clockHtml(p, s)}</div><button class="logbtn" id="lognext" ${nextEvent(p) ? '' : 'hidden'}>${logBtnHtml(p)}</button>`;
+  const refresh = () => {
+    const ck = $('#clock'); if (ck) ck.innerHTML = clockHtml(p, s);
+    const lb = $('#lognext'); if (lb) { const h = logBtnHtml(p); if (lb.innerHTML !== h) lb.innerHTML = h; lb.hidden = !h; }
+  };
+  $('#lognext').onclick = () => {
+    const nx = nextEvent(p); if (!nx) return;
+    const t = nowHM();
+    set(p, nx.id, t); toast(`${nx.label} ${t}. Tap its box to change.`); refresh(); onLog?.();
+  };
+  const iv = setInterval(refresh, 1000);
+  cleanup.push(() => clearInterval(iv));
+  return refresh;
+}
 const defaultSeries = p => noWarming(p) || val(p, 'ev_ot') || val(p, 'io_knife') ? 'iotemp' : 'prewarm';
 route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s, key) => {
   const p = patients[id]; if (!p) return go('#/');
   if (!s || (s === 'prewarm' && noWarming(p))) s = defaultSeries(p);
   const main = s !== 'haemo';
   const def = SERIES[s], pts = pointsFor(p, s);
-  header(main ? sid(p) : sid(p) + ' · BP, HR, BIS', main ? '#/' : '#/p/' + id, main ? `<div class="clock" id="clock">${clockHtml(p, s)}</div><button class="logbtn" id="lognext" ${nextEvent(p) ? '' : 'hidden'}>${logBtnHtml(p)}</button>` : '');
-  if (main) $('#lognext').onclick = () => {
-    const nx = nextEvent(p); if (!nx) return;
-    const t = nowHM();
-    set(p, nx.id, t); toast(`${nx.label} ${t}. Tap its box to change.`); draw();
-  };
+  header(main ? sid(p) : sid(p) + ' · BP, HR, BIS', main ? '#/' : '#/p/' + id);
+  const refreshBar = topBar(p, main ? s : 'iotemp', () => draw());
   let editing = null; // event whose time is being changed
   // default timepoint: the unsaved one nearest its due time, else the first unsaved
   if (!key) {
@@ -389,8 +427,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
       <button class="save big" id="save">${isSaved ? 'Save changes' : `Save ${pt.label} reading`}</button>
       ${s === 'haemo' && settings.hide.haemo15 ? `<p class="muted small">Only baseline is entered here; the 15-min rows come from the monitor download. Turn them on in Settings.</p>` : ''}
       ${main ? comfortHtml('sat_post', 'Comfortable after surgery?') + linksHtml() + doneHtml(p) : signoffHtml(p, s)}`);
-    const ck = $('#clock'); if (ck) ck.innerHTML = clockHtml(p, s);
-    const lb = $('#lognext'); if (lb) { const h = logBtnHtml(p); if (lb.innerHTML !== h) lb.innerHTML = h; lb.hidden = !h; }
+    refreshBar();
     if (editing) { const i = $('#evtime'); i?.focus(); }
     const st = view.querySelector('.strip'), on = st?.querySelector('.on');
     if (on) st.scrollLeft = on.offsetLeft - st.offsetLeft - (st.clientWidth - on.offsetWidth) / 2;
@@ -475,7 +512,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
   };
   view.onfocusout = e => { if (e.target.id === 'evtime') setTimeout(() => { if (editing && !view.contains(document.activeElement)) { editing = null; draw(); } }, 0); };
   cleanup.push(() => { view.onchange = view.onfocusout = null; });
-  startAlerts(p, s, () => { const ck = $('#clock'); if (ck) ck.innerHTML = clockHtml(p, s); const el = $('#due'); if (el) { const d = dueOf(p, s, pt); if (d != null) { const left = d - nowMin(); el.textContent = 'due ' + fromMin(Math.round(d)) + (left > 0 ? ` · in ${Math.floor(left)}:${String(Math.floor((left % 1) * 60)).padStart(2, '0')}` : left > -5 ? ' · now' : ' · late'); } } });
+  startAlerts(p, s, () => { const el = $('#due'); if (el) { const d = dueOf(p, s, pt); if (d != null) { const left = d - nowMin(); el.textContent = 'due ' + fromMin(Math.round(d)) + (left > 0 ? ` · in ${Math.floor(left)}:${String(Math.floor((left % 1) * 60)).padStart(2, '0')}` : left > -5 ? ' · now' : ' · late'); } } });
 });
 
 // ---------- due alerts (only while the app is open)
@@ -538,6 +575,7 @@ const FORM = {
 route(/^\/p\/(\w+)\/form\/(intraop|pacu|satis)$/, (id, pg) => {
   const p = patients[id]; if (!p) return go('#/');
   header(sid(p) + ' · ' + PAGES.find(x => x.id === pg).title, '#/p/' + id);
+  topBar(p, defaultSeries(p));
   const get = k => val(p, k);
   const draw = () => {
     const y = window.scrollY;
@@ -819,12 +857,7 @@ route(/^\/settings$/, () => {
     await joinTeam(site, code, e.target);
     render();
   });
-  $('#leave')?.addEventListener('click', async e => {
-    if (!e.target.dataset.sure) { e.target.dataset.sure = 1; e.target.textContent = 'Tap again to stop sharing on this phone'; return; }
-    shared.unwatch?.(); shared.member = null; shared.admin = false;
-    try { await cloud.leave(); } catch { /* signed out anyway */ }
-    render();
-  });
+  $('#leave')?.addEventListener('click', e => logOut(e.target));
   $('#adminin')?.addEventListener('click', () => { $('#adminbox').hidden = false; $('#adminemail').focus(); });
   $('#adminsend')?.addEventListener('click', async e => {
     const email = $('#adminemail').value.trim().toLowerCase();
@@ -850,10 +883,11 @@ route(/^\/settings$/, () => {
 function sharingHtml() {
   const chips = `<div class="seg sites">${SITES.map(x => `<button type="button" class="chip" data-site="${x}" aria-pressed="${settings.site === x}" ${shared.member ? 'disabled' : ''}>${x}</button>`).join('')}</div>`;
   if (!cloud.enabled) return `${chips}<small class="muted">New patients on this phone are recorded at this hospital. Sharing is off in demo mode.</small>`;
-  if (shared.email && !shared.admin) return `<p class="note">${esc(shared.email)} isn’t on the study’s admin list. Ask the owner to add it.</p><button class="secondary" id="leave">Sign out</button>`;
+  if (shared.email && !shared.admin) return `<p class="note">${esc(shared.email)} isn’t on the study’s admin list. Ask the owner to add it.</p><button class="secondary" id="leave">Log out</button>`;
   if (shared.admin) return `<p class="ok-box">Signed in as study admin (${esc(shared.email)}). You see every hospital’s patients.</p>
-    <a class="secondary" href="#/admin">Join codes and members</a><button class="secondary" id="leave">Sign out</button>`;
-  if (shared.member) return `<p class="ok-box">Sharing with the ${esc(shared.member.site)} team. Readings sync when there is signal.</p><button class="secondary" id="leave">Stop sharing on this phone</button>`;
+    <a class="secondary" href="#/admin">Join codes and members</a><button class="secondary" id="leave">Log out</button>`;
+  if (shared.member) return `<p class="ok-box">Sharing with the ${esc(shared.member.site)} team. Readings sync when there is signal.</p><button class="secondary" id="leave">Log out</button>
+    <small class="muted">Logging out deletes every patient on this phone (it warns first, and again if something hasn’t synced).</small>`;
   return `<label class="lab" for="code">Join code</label><input id="code" autocomplete="off" autocapitalize="characters" placeholder="e.g. NTF-…">
     <small class="muted">From a study admin, or just open the join link they sent. The code says which hospital. Joining shares this phone’s patients with that hospital’s team.</small>
     <button class="primary" id="join">Join</button>
@@ -938,7 +972,7 @@ route(/^\/admin$/, async () => {
     ${SITES.map(x => {
       const who = people.filter(m => m.site === x);
       return `<div class="fld"><b>${x}</b>
-        <div class="coderow"><span class="mono">${codes[x] ? esc(codes[x].code) : '<span class="muted">no code yet</span>'}</span><button class="secondary" data-newcode="${x}">${codes[x] ? 'New code' : 'Make code'}</button></div>
+        <div class="coderow">${codes[x] ? `<button class="codebig" data-copy="${esc(codes[x].code)}" aria-label="Copy the ${x} join code">${esc(codes[x].code)}<small>tap to copy</small></button>` : '<span class="muted">no code yet</span>'}<button class="${codes[x] ? 'link' : 'secondary'}" data-newcode="${x}">${codes[x] ? 'New code' : 'Make code'}</button></div>
         ${codes[x] ? `<div class="sharerow"><button class="primary" data-share="${x}">Share join link</button><button class="secondary" data-qr="${x}">QR code</button></div><div class="qr" id="qr-${x}" hidden></div>` : ''}
         ${who.length ? `<ul class="plain">${who.map(m => `<li>${esc(m.initials || '—')} <small class="muted">joined ${new Date(m.joinedAt).toLocaleDateString()}</small> <button class="link" data-rm="${m.uid}">Remove</button></li>`).join('')}</ul>` : '<small class="muted">No phones yet</small>'}</div>`;
     }).join('')}</div>`);
@@ -967,7 +1001,13 @@ route(/^\/admin$/, async () => {
       else { box.hidden = true; qb.textContent = 'QR code'; }
       return;
     }
+    const cp = e.target.closest('[data-copy]');
+    if (cp) {
+      try { await navigator.clipboard.writeText(cp.dataset.copy); toast('Code copied'); } catch { prompt('Copy this join code', cp.dataset.copy); }
+      return;
+    }
     const nc = e.target.closest('[data-newcode]');
+    if (nc && codes[nc.dataset.newcode] && !confirm(`Make a new join code for ${nc.dataset.newcode}?\n\nThe current code, its join link and QR code stop working: phones that haven’t joined yet need the new link.\n\nPhones already in the ${nc.dataset.newcode} team stay in. To take a phone out, use Remove under the members.`)) return;
     if (nc) {
       const abc = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789', b = crypto.getRandomValues(new Uint8Array(8));
       const code = nc.dataset.newcode + '-' + Array.from(b, x => abc[x % abc.length]).join('');

@@ -82,6 +82,19 @@ export async function leave() {
   await A.signOut(auth);
 }
 
+// Every change sent from this phone has reached the server (false if not within ms: no signal)
+export async function flushed(ms = 5000) {
+  const { db, F } = await sdk();
+  return Promise.race([F.waitForPendingWrites(db).then(() => true), new Promise(ok => setTimeout(() => ok(false), ms))]);
+}
+// Log out: leave the team (or sign out an admin) and delete Firestore's copy of the study data on this phone.
+// The page reloads afterwards (Firestore can't be used again once its copy is cleared).
+export async function logOut() {
+  const { db, F } = await sdk();
+  try { await leave(); } catch { /* signed out below anyway */ }
+  try { await F.terminate(db); await F.clearIndexedDbPersistence(db); } catch { /* cleared on the next start */ }
+}
+
 // Admins sign in with an emailed link (no Google pop-up: phone browsers block the pop-up's helper page on
 // prewarm-study.firebaseapp.com from passing the result back to anawj.com). The link opens the app again.
 const EMAIL_KEY = 'prewarm:adminEmail';

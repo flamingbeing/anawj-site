@@ -35,7 +35,7 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   else gown on, during pre-warming; from induction, else in OT, intra-op; the clock time before either) and the next
   event to note (the first unset of gown on, warming on, warming off, in OT, induction, surgery end, PACU arrival,
   to ward, after the last one set; warming off shows its expected time, 30 or 10 min after warming on).
-- **Quick controls** (owner, 12 Oct 2026): a navy Log button in the app bar sets the next event to now (it replaced
+- **Quick controls** (owner, 12 Oct 2026): a navy Log button in the app bar (main screen, BP / HR / BIS, intra-op details and PACU, with the timer) sets the next event to now (it replaced
   the Spreadsheet view icon; Spreadsheet view is the text link at the bottom). Big ‹ › buttons either side of the tabs
   and timepoint strip go to the previous / next timepoint. Event time boxes are squarer, six per row (two rows).
 - **Mark data collection as complete** (owner, 12 Oct 2026): one button at the very bottom of the patient's main
@@ -47,6 +47,12 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
 - **Readings to enter live:** all on by default, BP / HR / BIS every 15 min included (owner, 12 Oct 2026; settings v2
   turned it on once for phones that had it off).
 - **Export Excel** is in Settings (owner, 12 Oct 2026), not on the home page.
+- **Log out** (owner, 12 Oct 2026; replaced "Stop sharing on this phone" and the admins' "Sign out"): warns first (how many
+  patients will go), tries to sync for a few seconds, and warns again naming any patient with changes the server
+  hasn't confirmed (`pending`, kept across reloads; cleared when Firestore's waitForPendingWrites resolves). Then it
+  leaves the team / signs out, deletes every patient and Firestore's offline copy on the phone, keeps settings, reloads.
+- **Admin join codes** (owner, 12 Oct 2026): the code is shown big; tapping it copies it. "New code" is a small link
+  and warns first: the old code, link and QR stop working for new phones; phones already in stay in (use Remove).
 - **Screen size** (Settings, this phone only): Smaller / Small / Normal / Large / Larger zooms the whole app
   (`--ui-zoom` on body). Normal by default.
 - **Form view** (owner, 12 Oct 2026): the study's real paper form (data collection form v3.2, .docx) with text put in:
