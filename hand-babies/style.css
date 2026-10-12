@@ -85,3 +85,4 @@ footer { padding: 16px 0; color: var(--muted); font-size: .85rem; }
   details > *:not(summary) { display: block; }
   section { break-inside: auto; }
 }
+.fig3d { display: block; width: 100%; height: auto; touch-action: pan-y; cursor: grab; background: #fff; }

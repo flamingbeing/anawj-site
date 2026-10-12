@@ -3,7 +3,6 @@
 
 const SKIN = '#f6dcc8', EDGE = '#8a6450', CREASE = '#c49a82';
 const RED = '#d7263d', GREEN = '#1a8a3a', BLUE = '#1f6fb5', ORANGE = '#e07b00', PURPLE = '#7b4fb0', INK = '#222';
-const MED = 'rgba(31,111,181,.38)', ULN = 'rgba(224,123,0,.42)', RAD = 'rgba(26,138,58,.38)';
 
 // Stylised LEFT hand, palm side (thumb on the left = radial). viewBox 0 0 200 270.
 const FINGERS = [
@@ -157,52 +156,6 @@ const FIGS = {
     return svg('0 0 380 230', tip(0, true) + tip(190, false));
   }, { dur: 9 }),
 
-  // nerve territories, one nerve at a time, then all
-  nerves: Object.assign(s => {
-    const split = 114, all = ph(s, 7.6, 8);
-    const act = [win(s, 0, 2.6, .4), win(s, 2.6, 5.2, .4), win(s, 5.2, 7.8, .4)];
-    const base = [.38, .42, .38], C = [C_MED, C_ULN, C_RAD];
-    const al = i => base[i] * all + (1 - all) * (.07 + .55 * act[i]);
-    const MED_ = rgba(C[0], al(0)), ULN_ = rgba(C[1], al(1)), RAD_ = rgba(C[2], al(2));
-    const volar = () => `<rect x="0" y="0" width="${split}" height="270" fill="${MED_}"/><rect x="${split}" y="0" width="100" height="270" fill="${ULN_}"/>`;
-    const dorsal = () => `<rect x="0" y="0" width="${split}" height="80" fill="${MED_}"/><rect x="0" y="80" width="${split}" height="190" fill="${RAD_}"/><rect x="${split}" y="0" width="100" height="270" fill="${ULN_}"/>`;
-    const dot = (x, y, i) => {
-      const pulse = act[i] * (1 - all) * (.5 + .5 * Math.sin(s * 8));
-      return `<circle cx="${x}" cy="${y}" r="${(6 + 4 * pulse).toFixed(1)}" fill="none" stroke="${INK}" stroke-width="${(2.5 + pulse).toFixed(1)}"/><circle cx="${x}" cy="${y}" r="2" fill="${INK}"/>`;
-    };
-    const caps = [['MEDIAN', 'test the index fingertip pulp', BLUE], ['ULNAR', 'test the little fingertip pulp', ORANGE], ['RADIAL', 'test the back of the 1st web space', GREEN]];
-    return svg('0 0 400 330', `
-      <g transform="translate(0 6)">${hand(volar)}${dot(63, 50, 0)}${dot(137.5, 72, 1)}</g>
-      <g transform="translate(400 6) scale(-1 1)">${hand(dorsal)}${dot(48, 134, 2)}</g>
-      ${t(100, 292, 'PALM side', { anchor: 'middle', bold: true })}${t(300, 292, 'BACK of hand', { anchor: 'middle', bold: true })}
-      ${t(100, 306, '(LEFT hand)', { anchor: 'middle', size: 10, fill: '#555' })}${t(300, 306, '(LEFT hand)', { anchor: 'middle', size: 10, fill: '#555' })}
-      ${caps.map(([n, d, c], i) => op(act[i] * (1 - all), `${t(200, 325, `${n}: ${d}`, { anchor: 'middle', bold: true, fill: c, size: 13 })}`)).join('')}
-      ${op(all, `<rect x="8" y="314" width="14" height="12" fill="${rgba(C_MED, .38)}"/>${t(26, 324, 'Median')}
-      <rect x="86" y="314" width="14" height="12" fill="${rgba(C_ULN, .42)}"/>${t(104, 324, 'Ulnar')}
-      <rect x="156" y="314" width="14" height="12" fill="${rgba(C_RAD, .38)}"/>${t(174, 324, 'Radial')}
-      <circle cx="240" cy="320" r="5" fill="none" stroke="${INK}" stroke-width="2"/>${t(250, 324, '= best spot to test')}`)}`);
-  }, { dur: 10 }),
-
-  // fingers relax into the cascade; the cut middle finger stays straight
-  cascade: Object.assign(s => {
-    const k = ph(s, .4, 2.2), flag = ph(s, 2.3, 2.8);
-    const row = (oy, broken) => ['Index', 'Middle', 'Ring', 'Little'].map((n, i) => {
-      const x = 22 + i * 92, cut = broken && i === 1, a = cut ? 0 : [8, 14, 20, 26][i] * k;
-      const pink = cut && flag > .5;
-      return finger(chain(x, oy, [a, a, a], [36, 22, 17]), { color: pink ? '#f7b3bd' : SKIN, w: 12, base: false })
-        + t(x + 34, oy + 72, n, { anchor: 'middle', size: 11, fill: pink ? RED : INK, bold: pink });
-    }).join('');
-    return svg('0 0 380 250', `
-      ${t(4, 16, 'Normal cascade: each finger more bent, index → little', { bold: true, fill: GREEN, size: 12 })}
-      ${row(36, false)}
-      ${t(4, 136, 'Middle finger flexors cut: it lies straight', { bold: true, fill: RED, size: 12 })}
-      ${row(156, true)}
-      ${t(190, 246, 'side view, hand relaxing; dots = MCP, PIP, DIP joints', { anchor: 'middle', size: 10, fill: '#555' })}`);
-  }, { dur: 6 }),
-
-  fdp: Object.assign(s => sideTest('fdp', s), { dur: 5.5 }),
-  fds: Object.assign(s => sideTest('fds', s), { dur: 6.5 }),
-
   // zones light up one by one, then all
   zones: Object.assign(s => {
     const all = ph(s, 6.4, 6.9);
@@ -249,63 +202,26 @@ const FIGS = {
 };
 function shapesOnly() { return `<g fill="${SKIN}" stroke="${EDGE}" stroke-width="3">${shapes()}</g>`; }
 
-// side-view finger: start at (x,y) pointing right, each joint bends by angs[i] degrees towards the palm (down)
-function chain(x, y, angs, L = [70, 42, 32]) {
-  const pts = [[x, y]]; let a = 0, px = x, py = y;
-  angs.forEach((d, i) => { a += d; px += L[i] * Math.cos(a * Math.PI / 180); py += L[i] * Math.sin(a * Math.PI / 180); pts.push([px, py]); });
-  return pts; // [MCP, PIP, DIP, tip]
-}
-function finger(pts, { color = SKIN, w = 15, base = true } = {}) {
-  const all = base ? [[pts[0][0] - 50, pts[0][1]], ...pts] : pts;
-  const d = 'M' + all.map(p => p.map(n => n.toFixed(1)).join(' ')).join(' L');
-  return `<path d="${d}" fill="none" stroke="${EDGE}" stroke-width="${w + 3}" stroke-linecap="round" stroke-linejoin="round"/><path d="${d}" fill="none" stroke="${color}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"/>`
-    + pts.slice(0, 3).map(p => `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="2.6" fill="${EDGE}"/>`).join('');
-}
-const jl = (p, s, dy = -14) => t(p[0], p[1] + dy, s, { anchor: 'middle', size: 9, fill: '#555' });
-
-// FDP / FDS test drawings: side view, palm side down, examiner's hold in grey; s = time in the loop
-function sideTest(kind, s) {
-  const defs = `<defs>${arrowDef('ag' + kind, GREEN)}</defs>`;
-  const hold = ph(s, .2, .7);
-  if (kind === 'fdp') {
-    const dip = 60 * (ph(s, 1, 1.8) - ph(s, 2.4, 3) + ph(s, 3.4, 4.2));
-    const p = chain(70, 56, [0, 0, dip]), pf = chain(70, 56, [0, 0, 60]);
-    return svg('0 0 260 160', `${defs}${finger(p)}
-      ${op(hold, `<rect x="${p[1][0] + 4}" y="36" width="${p[2][0] - p[1][0] - 8}" height="40" rx="9" fill="rgba(90,90,90,.5)"/>${t((p[1][0] + p[2][0]) / 2, 28, 'hold here', { anchor: 'middle', size: 10, bold: true })}`)}
-      ${jl(p[0], 'MCP')}${jl(p[1], 'PIP', 30)}${jl(p[2], 'DIP', 30)}
-      ${op(ph(s, 1, 1.4), `<path d="M${pf[2][0] + 22} ${pf[2][1] - 8} A28 28 0 0 1 ${pf[3][0] + 14} ${pf[3][1] + 4}" fill="none" stroke="${GREEN}" stroke-width="2.5" marker-end="url(#ag${kind})"/>`)}
-      ${op(ph(s, 1.6, 2), `${t(130, 132, 'Tip bends at DIP = FDP ✓', { anchor: 'middle', fill: GREEN, bold: true, size: 12 })}${t(130, 148, 'you keep the PIP straight', { anchor: 'middle', size: 10 })}`)}
-      ${t(8, 90, 'palm side ↓', { size: 9, fill: '#555' })}`);
-  }
-  const pip = 75 * ph(s, 1, 2);
-  const wig = win(s, 2.5, 4.6, .2) * 20 * Math.sin((s - 2.5) * 2 * Math.PI / .8);
-  const ghost = chain(70, 30, [0, 0, 0]);
-  const p = chain(70, 60, [0, pip, wig]), pf = chain(70, 60, [0, 75, 0]);
-  return svg('0 0 260 170', `${defs}${finger(ghost, { color: '#eee' })}
-    ${op(hold, `<rect x="${ghost[1][0] - 30}" y="14" width="${ghost[3][0] - ghost[1][0] + 40}" height="32" rx="8" fill="rgba(90,90,90,.45)"/>${t(150, 10, 'other fingers held fully straight', { anchor: 'middle', size: 10, bold: true })}`)}
-    ${finger(p)}${jl(p[0], 'MCP', 24)}${op(ph(s, 1.8, 2.2), t(pf[1][0] - 12, pf[1][1] + 22, 'PIP', { size: 9, fill: '#555', anchor: 'end' }) + t(pf[2][0] - 12, pf[2][1] + 4, 'DIP', { size: 9, fill: '#555', anchor: 'end' }))}
-    ${op(ph(s, 1.8, 2.2), `<path d="M${pf[1][0] + 16} ${pf[1][1] - 4} A26 26 0 0 1 ${pf[1][0] + 18} ${pf[1][1] + 30}" fill="none" stroke="${GREEN}" stroke-width="2.5" marker-end="url(#ag${kind})"/>`)}
-    ${op(ph(s, 2.5, 2.9), `${t(pf[2][0] + 22, pf[2][1] + 2, 'DIP floppy', { size: 10, fill: '#555' })}${t(pf[2][0] + 22, pf[2][1] + 15, '(you can wiggle it)', { size: 10, fill: '#555' })}`)}
-    ${op(ph(s, 1.8, 2.2), t(8, 152, 'Bends at PIP, tip floppy = FDS ✓', { fill: GREEN, bold: true, size: 12 }))}`);
-}
-
 // Figures: draw the still frame, then play the loop while on screen. Tap the button (or the figure) to pause.
-const still = f => f(f.dur);
+// A figure is { dur, still?, mount(art) -> { draw(s) } }; the drawn (SVG) ones above are wrapped by svgFig, the 3D
+// ones come from hand3d.js through handFigs.add.
+const svgFig = f => ({ dur: f.dur, mount: art => ({ draw: s => { art.innerHTML = f(s); } }) });
+const stillAt = f => f.still ?? f.dur; // the frame that shows the complete diagram
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const figs = [];
-let raf = 0, last = 0;
-for (const el of document.querySelectorAll('[data-fig]')) {
-  const f = FIGS[el.dataset.fig];
-  if (!f) continue;
-  el.innerHTML = `<div class="fig-art">${still(f)}</div><div class="fig-bar"><button type="button" class="fig-btn" aria-label="Play animation">Play</button><a class="fig-gif" href="gifs/${el.dataset.fig}.gif" download>Save GIF to share</a></div>`;
+let raf = 0, last = 0, vis = null;
+function setup(el, f) {
+  el.innerHTML = `<div class="fig-art"></div><div class="fig-bar"><button type="button" class="fig-btn" aria-label="Play animation">Play</button><a class="fig-gif" href="gifs/${el.dataset.fig}.gif" download>Save GIF to share</a></div>`;
   // the picture keeps the text description; the buttons beside it stay reachable
-  const art0 = el.querySelector('.fig-art');
-  for (const a of ['role', 'aria-label']) if (el.hasAttribute(a)) { art0.setAttribute(a, el.getAttribute(a)); el.removeAttribute(a); }
-  const st = { el, f, art: el.querySelector('.fig-art'), btn: el.querySelector('.fig-btn'), playing: false, visible: false, start: 0, at: 0 };
+  const art = el.querySelector('.fig-art');
+  for (const a of ['role', 'aria-label']) if (el.hasAttribute(a)) { art.setAttribute(a, el.getAttribute(a)); el.removeAttribute(a); }
+  const st = { el, f, art, view: f.mount(art), btn: el.querySelector('.fig-btn'), playing: false, visible: !vis, start: 0, at: 0 };
+  st.view.draw(stillAt(f));
   figs.push(st);
   const toggle = () => setPlaying(st, !st.playing);
   st.btn.addEventListener('click', e => { e.stopPropagation(); toggle(); });
-  st.art.addEventListener('click', toggle);
+  art.addEventListener('click', toggle);
+  vis?.observe(el);
   if (!reduce) setPlaying(st, true);
 }
 function setPlaying(st, on) {
@@ -313,13 +229,13 @@ function setPlaying(st, on) {
   st.btn.textContent = on ? 'Pause' : 'Play';
   st.btn.setAttribute('aria-label', on ? 'Pause animation' : 'Play animation');
   if (on) st.start = performance.now() - st.at * 1000; // resume where it stopped
-  else st.art.innerHTML = still(st.f);                  // paused: show the complete diagram
+  else st.view.draw(stillAt(st.f));                     // paused: show the complete diagram
   if (on) tick();
 }
 if ('IntersectionObserver' in window) {
-  const vis = new IntersectionObserver(es => { for (const e of es) { const st = figs.find(f => f.el === e.target); if (st) st.visible = e.isIntersecting; } tick(); });
-  figs.forEach(st => vis.observe(st.el));
-} else figs.forEach(st => { st.visible = true; });
+  vis = new IntersectionObserver(es => { for (const e of es) { const st = figs.find(f => f.el === e.target); if (st) st.visible = e.isIntersecting; } tick(); });
+}
+for (const el of document.querySelectorAll('[data-fig]')) if (FIGS[el.dataset.fig]) setup(el, svgFig(FIGS[el.dataset.fig]));
 function tick() {
   if (raf) return;
   raf = requestAnimationFrame(function frame(now) {
@@ -328,14 +244,19 @@ function tick() {
     if (!live.length) return;
     if (now - last > 40) { // ~25 frames a second is plenty
       last = now;
-      for (const st of live) { st.at = ((now - st.start) / 1000) % st.f.dur; st.art.innerHTML = st.f(st.at); }
+      for (const st of live) { st.at = ((now - st.start) / 1000) % st.f.dur; st.view.draw(st.at); }
     }
     raf = requestAnimationFrame(frame);
   });
 }
-// used by tools/make-gifs.mjs, and by edit.html to stop the figures so they can be selected
-window.handFigs = { FIGS, still, pauseAll: () => figs.forEach(st => { if (st.playing) setPlaying(st, false); }) };
-
+// add: hand3d.js registers its figures; renderAt: tools/make-gifs.mjs draws one frame; pauseAll: edit.html stops the
+// figures so they can be selected
+window.handFigs = {
+  FIGS,
+  add(name, f) { document.querySelectorAll(`[data-fig="${name}"]`).forEach(el => { if (!el.querySelector('.fig-art')) setup(el, f); }); },
+  renderAt(name, s) { const st = figs.find(x => x.el.dataset.fig === name); if (st) { if (st.playing) setPlaying(st, false); st.view.draw(s); return st.f.dur; } },
+  pauseAll: () => figs.forEach(st => { if (st.playing) setPlaying(st, false); }),
+};
 
 // opening a scenario from a link (#pic-cut etc.) opens it
 function openFromHash() {

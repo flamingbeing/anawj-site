@@ -17,10 +17,29 @@ page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
 
 try {
   await page.goto(BASE);
-  // every figure drew
-  const figs = await page.$$eval('[data-fig]', els => els.map(e => [e.dataset.fig, !!e.querySelector('svg')]));
-  assert.ok(figs.length >= 9, 'figures present');
-  for (const [name, ok] of figs) assert.ok(ok, `figure ${name} drew`);
+  // every figure drew: drawn diagrams as SVG, the 3D ones (hand3d.js) on a canvas with a real picture in it
+  await page.waitForFunction(() => [...document.querySelectorAll('[data-fig]')].every(e => e.querySelector('.fig-art svg, .fig-art canvas')));
+  const figs = await page.$$eval('[data-fig]', els => els.map(e => [e.dataset.fig, e.querySelector('canvas') ? 'canvas' : 'svg']));
+  assert.ok(figs.length >= 14, 'figures present');
+  const threeD = figs.filter(f => f[1] === 'canvas').map(f => f[0]);
+  assert.deepEqual(threeD.sort(), ['cascade', 'edc', 'eipedm', 'elson', 'epl', 'fdp', 'fds', 'fpl', 'nerves']);
+  for (const name of threeD) {
+    const shades = await page.$eval(`[data-fig="${name}"] canvas`, c => {
+      const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data, seen = new Set();
+      for (let i = 0; i < d.length; i += 4 * 97) seen.add((d[i] >> 4) * 256 + (d[i + 1] >> 4) * 16 + (d[i + 2] >> 4));
+      return seen.size;
+    });
+    assert.ok(shades > 40, `3D figure ${name} has a picture (${shades} shades)`);
+  }
+  // dragging turns a 3D figure, without pausing it
+  {
+    const c = await page.$('[data-fig="fdp"] canvas'); await c.scrollIntoViewIfNeeded();
+    await page.evaluate(() => window.handFigs.renderAt('fdp', 2));
+    const before = await c.evaluate(el => el.toDataURL());
+    const box = await c.boundingBox();
+    await page.mouse.move(box.x + 100, box.y + 150); await page.mouse.down(); await page.mouse.move(box.x + 220, box.y + 150, { steps: 5 }); await page.mouse.up();
+    assert.notEqual(await c.evaluate(el => el.toDataURL()), before, 'drag turns the hand');
+  }
   // every in-page link has a target
   const missing = await page.$$eval('a[href^="#"]', as => as.map(a => a.getAttribute('href').slice(1)).filter(id => !document.getElementById(id)));
   assert.deepEqual(missing, [], 'in-page links resolve');
@@ -88,7 +107,7 @@ try {
   await ed.click('#noteDlg button[value=ok]');
   await ed.waitForFunction(() => document.getElementById('count').textContent === '2');
   // a figure can take a comment but not a text edit
-  await fr.locator('[data-fig="nerves"] svg').click();
+  await fr.locator('[data-fig="nerves"] canvas').click();
   assert.equal(await ed.isHidden('#aEdit'), true, 'no text edit on a figure');
   await ed.click('#aCancel');
   await ed.click('#send');
