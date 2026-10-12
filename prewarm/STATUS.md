@@ -7,9 +7,10 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 ## Now
 
 - **Claude Code, Prewarming Webapp** (branch `ccr-13264f37-d28edu`): bug hunt from 17:53 UTC 12 Oct 2026 (owner: at
-  least 2 hours, anything that makes a missed variable likelier). Merged so far #257 #259 #261 #263 #265. Still to do:
-  (this PR: duplicate Subject IDs flagged, storage-full bar, lock warning, join-code flake fixed). Next: more edge
-  cases. Advise the owner not to lock patients during the study day. Real patients start 13 Oct 2026.
+  least 2 hours, anything that makes a missed variable likelier). Merged #257 #259 #261 #263 #265 #267 #269 #270.
+  Questions for the owner: should the no-pre-warming group get pre-op temperatures (the app skips that table for
+  them)? Is intra-op time 0 induction or knife to skin (the app's "Induction" box; the schema says "Knife to skin
+  (induction)")? Advise not to lock patients during the study day. Real patients start 13 Oct 2026.
 
 ## Waiting on the owner
 
@@ -25,6 +26,9 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 
 ## Recently done
 
+- #270: a reading saved late asks when it was taken; Change time on saved readings.
+- #269: `fullcase.e2e.mjs`: a whole case per group, every op-day cell exported.
+- #267: duplicate Subject IDs flagged; storage-full bar; lock warns about patients still being charted; join-code flake fixed.
 - #265: sync heals the server's last-write to the newest value; edits before sign-in resent; Save sends only changes and asks before overwriting the other phone's reading; clearing a time asks.
 - #263: typed form answers checked; due alerts on every patient screen for every series; screen kept awake after app switches.
 - #261: blank readings not saved, part-blank asks; Still to fill lists saved-with-blanks and columns hidden in Settings.
