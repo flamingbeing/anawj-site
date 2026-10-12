@@ -42,6 +42,10 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .clock small i { font-style: normal; font-weight: 700; color: var(--warn); }
 .clock .lbl { font-size: 11px; color: var(--muted); margin-right: 2px; }
 .bar #extra { flex: 1 1 auto; justify-content: flex-end; }
+.logbtn { display: grid; justify-items: center; align-content: center; min-width: 60px; max-width: 84px; min-height: var(--tap); margin-left: 6px; padding: 2px 6px; border: 0; border-radius: var(--r); background: var(--navy); color: #fff; line-height: 1.1; cursor: pointer; touch-action: manipulation; }
+.logbtn b { font-size: 15px; }
+.logbtn small { font-size: 11px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.logbtn:active { background: var(--n-navy-hover); }
 .iconbtn { background: none; border: 0; color: inherit; font-size: 1.5rem; line-height: 1; min-width: var(--tap); min-height: var(--tap); display: inline-flex; align-items: center; justify-content: center; text-decoration: none; cursor: pointer; border-radius: var(--r); }
 
 main { max-width: 600px; margin: 0 auto; padding: 8px 12px calc(28px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 6px; }
@@ -78,9 +82,9 @@ a { color: var(--navy); }
 .list small { color: var(--muted); }
 
 /* event times: compact grid of chips */
-.times { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
-.tchip { display: grid; align-content: center; text-align: left; padding: 1px 8px; min-height: 40px; min-width: 0; border-radius: var(--r); border: 1px dashed #9aa1a9; background: var(--card); color: var(--muted); cursor: pointer; line-height: 1.15; }
-.tchip span { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.times { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; }
+.tchip { display: grid; align-content: center; justify-items: center; gap: 1px; text-align: center; padding: 3px 2px; min-height: 52px; min-width: 0; border-radius: var(--r); border: 1px dashed #9aa1a9; background: var(--card); color: var(--muted); cursor: pointer; line-height: 1.1; }
+.tchip span { font-size: 11px; max-width: 100%; overflow-wrap: anywhere; hyphens: manual; }
 .tchip b { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--muted); }
 .tchip.set { border: 1px solid transparent; background: var(--chip); }
 .tchip.set span { color: var(--navy); } .tchip.set b { color: var(--ink); }
@@ -93,6 +97,12 @@ a { color: var(--navy); }
 .tabs2 a[aria-selected="true"] { border-bottom-color: var(--navy); color: var(--ink); font-weight: 600; }
 .sect { margin: 0; }
 
+/* previous / next timepoint either side of the tabs and strip */
+.nav2 { display: grid; grid-template-columns: 48px minmax(0, 1fr) 48px; gap: 4px; align-items: stretch; }
+.nav2 .mid { display: grid; gap: 4px; min-width: 0; align-content: end; }
+.pn { display: flex; align-items: center; justify-content: center; min-height: var(--tap); border-radius: var(--r); border: 1px solid var(--line); background: var(--card); color: var(--navy); font-size: 2rem; font-weight: 600; line-height: 1; text-decoration: none; touch-action: manipulation; }
+.pn:active { background: var(--soft); }
+span.pn { color: var(--line); }
 /* timepoint strip */
 .strip { position: relative; display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
 .strip a { flex: none; min-width: 42px; min-height: 36px; display: flex; align-items: center; justify-content: center; border-radius: var(--r); border: 1px solid var(--line); background: var(--card); text-decoration: none; color: var(--muted); font-weight: 600; font-size: 13px; font-variant-numeric: tabular-nums; }
