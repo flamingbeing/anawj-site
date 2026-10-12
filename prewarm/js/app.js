@@ -3,6 +3,7 @@ import { PAGES, SERIES, BY_ID, EXTRA_BY_ID, IX_COLS, SITES, calc, normaliseTemp,
 import { newRecord, setVal, val, lastEdit, mergeRecord } from './store.js';
 import { workbook } from './export.js';
 import * as cloud from './cloud.js';
+import { qrcode } from './vendor/qrcode.js';
 
 const DEMO = new URLSearchParams(location.search).has('demo');
 const NS = DEMO ? 'prewarm-demo:' : 'prewarm:';
@@ -566,9 +567,7 @@ route(/^\/settings$/, () => {
     const code = $('#code').value.trim();
     if (!settings.site) return toast('Choose your hospital first.');
     if (!code) return toast('Enter the join code for ' + settings.site + '.');
-    e.target.disabled = true; e.target.textContent = 'Joining…';
-    try { await cloud.join(settings.site, code, settings.me); shared.member = await cloud.member(); uploadLocal(); await watch(); toast('Joined the ' + settings.site + ' team'); }
-    catch (err) { shared.member = null; toast(err?.code === 'permission-denied' ? 'That code isn’t right for ' + settings.site + '. Ask a study admin.' : cloud.friendly(err)); }
+    await joinTeam(settings.site, code, e.target);
     render();
   });
   $('#leave')?.addEventListener('click', async e => {
@@ -625,6 +624,55 @@ route(/^\/confirm$/, () => {
   $('#adminfinish').onclick = () => finishAdmin($('#adminconfirm').value.trim().toLowerCase());
 });
 
+async function joinTeam(site, code, btn) {
+  btn.disabled = true; btn.textContent = 'Joining…';
+  try {
+    await cloud.join(site, code, settings.me);
+    shared.member = await cloud.member();
+    settings.site = site; saveSettings();
+    uploadLocal(); await watch();
+    toast('Joined the ' + site + ' team');
+    return true;
+  } catch (err) {
+    shared.member = null;
+    toast(err?.code === 'permission-denied' ? 'That code isn’t right for ' + site + '. Ask a study admin.' : cloud.friendly(err));
+    return false;
+  }
+}
+
+// ---------- join link: #/join/{site}/{code} (after the #, so the code never reaches a server)
+const joinLink = (site, code) => location.origin + location.pathname + (/emulator/.test(location.search) ? '?emulator' : '') + `#/join/${site}/${encodeURIComponent(code)}`;
+route(/^\/join\/([A-Z]+)\/([^/]+)$/, (site, enc) => {
+  const code = decodeURIComponent(enc);
+  // the code shouldn't stay in the history or a bookmark
+  const forget = () => history.replaceState(null, '', location.pathname + location.search + '#/');
+  header('Join the ' + site + ' team', '#/');
+  if (!SITES.includes(site) || !cloud.enabled) { forget(); paint(`<p class="note">This join link doesn’t work${cloud.enabled ? '' : ' in demo mode'}.</p>`); return; }
+  if (shared.member?.site === site) { forget(); paint(`<p class="ok-box">This phone is already in the ${site} team.</p><a class="primary big" href="#/">Patients</a>`); return; }
+  paint(`<div class="stack">
+    <p>Join the <b>${site}</b> prewarming study team on this phone. You’ll see and enter ${site}’s patients, and they sync when there is signal.</p>
+    ${shared.member ? `<p class="note">This phone is in the ${esc(shared.member.site)} team now; joining moves it to ${site}.</p>` : ''}
+    <label class="lab" for="me">Your initials</label><input id="me" value="${esc(settings.me)}" maxlength="6" autocapitalize="characters" autocomplete="off">
+    <small class="muted">Saved with each reading as “entered by”.</small>
+    <button class="primary big" id="joinlink">Join ${site}</button></div>`);
+  $('#joinlink').onclick = async e => {
+    settings.me = $('#me').value.trim().toUpperCase(); saveSettings();
+    if (!settings.me) return toast('Add your initials first.');
+    if (shared.member) { shared.unwatch?.(); try { await cloud.leave(); } catch { /* out anyway */ } shared.member = null; }
+    if (await joinTeam(site, code, e.target)) { forget(); render(); }
+    else { e.target.disabled = false; e.target.textContent = 'Join ' + site; }
+  };
+});
+
+function qrSvg(text) {
+  const qr = qrcode(0, 'M');
+  qr.addData(text); qr.make();
+  const n = qr.getModuleCount(), q = 4;
+  let d = '';
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (qr.isDark(r, c)) d += `M${c + q},${r + q}h1v1h-1z`;
+  return `<svg viewBox="0 0 ${n + 2 * q} ${n + 2 * q}" shape-rendering="crispEdges" role="img" aria-label="QR code of the join link"><rect width="100%" height="100%" fill="#fff"/><path d="${d}" fill="#000"/></svg>`;
+}
+
 // ---------- admin: join codes and members
 route(/^\/admin$/, async () => {
   header('Study admin', '#/settings');
@@ -633,14 +681,31 @@ route(/^\/admin$/, async () => {
   let codes = {}, people = [];
   try { [codes, people] = await Promise.all([cloud.codes(), cloud.members()]); } catch (e) { paint(`<p class="note">${esc(cloud.friendly(e))}</p>`); return; }
   paint(`<div class="stack">
-    <p class="muted small">Give each hospital’s team its code. A new code stops new phones joining with the old one; phones already in stay in.</p>
+    <p class="muted small">Send each hospital’s team its join link (or show the QR code): it opens the app ready to join, no typing. Share it only with that team. A new code makes old links stop working for new phones; phones already in stay in.</p>
     ${SITES.map(x => {
       const who = people.filter(m => m.site === x);
       return `<div class="fld"><b>${x}</b>
         <div class="coderow"><span class="mono">${codes[x] ? esc(codes[x].code) : '<span class="muted">no code yet</span>'}</span><button class="secondary" data-newcode="${x}">${codes[x] ? 'New code' : 'Make code'}</button></div>
+        ${codes[x] ? `<div class="sharerow"><button class="primary" data-share="${x}">Share join link</button><button class="secondary" data-qr="${x}">QR code</button></div><div class="qr" id="qr-${x}" hidden></div>` : ''}
         ${who.length ? `<ul class="plain">${who.map(m => `<li>${esc(m.initials || '—')} <small class="muted">joined ${new Date(m.joinedAt).toLocaleDateString()}</small> <button class="link" data-rm="${m.uid}">Remove</button></li>`).join('')}</ul>` : '<small class="muted">No phones yet</small>'}</div>`;
     }).join('')}</div>`);
   view.onclick = async e => {
+    const sh = e.target.closest('[data-share]');
+    if (sh) {
+      const x = sh.dataset.share, url = joinLink(x, codes[x].code);
+      const text = `Prewarming study: tap to join the ${x} team on your phone`;
+      try { if (navigator.share) { await navigator.share({ title: 'Join the ' + x + ' team', text, url }); return; } } catch (err) { if (err?.name === 'AbortError') return; }
+      try { await navigator.clipboard.writeText(url); toast('Join link copied: paste it into a message'); }
+      catch { prompt('Copy this join link', url); }
+      return;
+    }
+    const qb = e.target.closest('[data-qr]');
+    if (qb) {
+      const x = qb.dataset.qr, box = $('#qr-' + x);
+      if (box.hidden) { box.innerHTML = qrSvg(joinLink(x, codes[x].code)) + `<small class="muted">Scan with the phone camera to join ${x}.</small>`; box.hidden = false; qb.textContent = 'Hide QR'; }
+      else { box.hidden = true; qb.textContent = 'QR code'; }
+      return;
+    }
     const nc = e.target.closest('[data-newcode]');
     if (nc) {
       const abc = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789', b = crypto.getRandomValues(new Uint8Array(8));

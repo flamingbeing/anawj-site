@@ -104,4 +104,7 @@ input { font: inherit; font-size: 16px; padding: 10px; border: 1px solid var(--l
 .links { display: grid; gap: 6px; margin-top: 8px; }
 .links a { display: flex; justify-content: space-between; align-items: center; gap: 8px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px; text-decoration: none; color: var(--navy); font-weight: 700; min-height: 48px; }
 .links small { color: var(--muted); font-weight: 400; text-align: right; }
+.sharerow { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.qr { display: grid; justify-items: center; gap: 6px; padding: 8px 0; }
+.qr svg { width: min(240px, 70vw); height: auto; }
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(20px + env(safe-area-inset-bottom, 0px)); background: #222; color: #fff; padding: 10px 16px; border-radius: 10px; max-width: calc(100% - 32px); z-index: 10; }

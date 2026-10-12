@@ -91,13 +91,35 @@ try {
   assert.match(await ad.textContent('main'), /AA/, 'members listed');
   await ad.click('[data-newcode="WH"]');
   await ad.waitForFunction(() => /WH-[A-Z2-9]{8}/.test(document.querySelector('main').textContent), null, { timeout: 15000 });
+  // QR code and join link for WH
+  await ad.click('[data-qr="WH"]');
+  await ad.waitForSelector('#qr-WH svg');
   if (SHOTS) await ad.screenshot({ path: SHOTS + '/admin.png', fullPage: true });
+  const wh = (await ad.textContent('main')).match(/WH-[A-Z2-9]{8}/)[0];
+  // a new phone opens the WH join link: no code to type
+  const c = await (await b.newContext({ viewport: { width: 390, height: 844 } })).newPage();
+  c.on('pageerror', e => errors.push('C: ' + e.message));
+  await c.goto(`${BASE}#/join/WH/${wh}`);
+  await c.waitForSelector('#joinlink');
+  if (SHOTS) await c.screenshot({ path: SHOTS + '/join-link.png' });
+  await c.fill('#me', 'cc');
+  await c.click('#joinlink');
+  await toastSays(c, /Joined the WH team/);
+  assert.doesNotMatch(c.url(), /WH-/, 'the code leaves the address bar');
+  await c.goto(BASE + '#/settings');
+  await c.waitForFunction(() => /Sharing with the WH team/.test(document.querySelector('main')?.textContent || ''), null, { timeout: 15000 });
+  // a wrong link is refused
+  const d = await (await b.newContext()).newPage();
+  await d.goto(`${BASE}#/join/WH/WH-WRONG123`);
+  await d.waitForSelector('body[data-cloud=ready]');
+  await d.fill('#me', 'dd'); await d.click('#joinlink');
+  await toastSays(d, /isn’t right for WH/);
   // the admin sees the NUH patient
   await ad.goto(BASE + '#/');
   await ad.waitForFunction(() => /SYNC-01/.test(document.querySelector('.list')?.textContent || ''), null, { timeout: 15000 });
 
   assert.deepEqual(errors, []);
-  console.log('prewarm sync: ok (two phones, join code, readings both ways, admin email-link sign-in and codes)');
+  console.log('prewarm sync: ok (two phones, join code, readings both ways, admin email-link sign-in, codes, join link and QR)');
 } finally {
   await b.close();
 }

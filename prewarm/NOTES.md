@@ -31,6 +31,9 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
     Google pop-up's helper page on `prewarm-study.firebaseapp.com` ("missing initial state"), and the self-hosted
     helper at `anawj.com/__/auth` belongs to the logbook's project. `admins/{email}` (lower-case email) lists them. The first admin is added by hand in the
     Firebase console; after that admins can add others there. Admins see every hospital, make codes, remove phones.
+  - **Join links** (owner, 12 Oct 2026): the admin screen shares `anawj.com/prewarm/#/join/{site}/{code}` or shows it as
+    a QR code (vendored qrcode-generator, as in evals). The code sits after the `#`, so it never reaches a server, and
+    the app drops it from the address bar once joined. Codes stay long (8 characters); a link means nobody types them.
   - Each patient is one document; each field is merged on its own (`f.<id>: {v, t, by}`), newest edit wins when
     copies meet. localStorage stays the phone's working copy; Firestore keeps its own offline cache and sends when
     there is signal.

@@ -6,17 +6,15 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 
 ## Now
 
-- **Claude Code, Prewarming Webapp** (branch `ccr-13264f37-d28edu`): admin sign-in moved from Google pop-up (failed on
-  phones: "missing initial state") to an emailed link; emulator test covers it.
+- **Claude Code, Prewarming Webapp** (branch `ccr-13264f37-d28edu`): join links and QR codes on the admin screen.
 
 ## Waiting on the owner
 
-- Firebase console (`prewarm-study`) → Authentication → Sign-in method → Email/Password: turn it on and tick
-  "Email link (passwordless sign-in)". Then in the app: Settings → "Study admin? Sign in by email" → open the email
-  on the same phone → "Join codes and members" → make each hospital's code.
-- Try it on a phone: `anawj.com/prewarm/` (real) or `?demo` (fake patients, no sharing).
+- Send each hospital team its join link (admin screen → Share join link), privately; test with a second phone.
 
 ## Recently done
+
+- #198: admin sign-in by email link (owner signed in and made the NTF code).
 
 - #197: main screen = times + all temperatures + links; rules first deployed to `prewarm-study` (run #19).
 
@@ -32,6 +30,8 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 1. PR 3: export across hospitals for admins, a members' view of who entered what, polish after phone testing.
 
 ## Decisions
+
+- 12 Oct 2026: keep 8-character codes; teams join by link or QR instead of typing (4 digits too easy to guess).
 
 - 12 Oct 2026: admins sign in by email link, not Google (phone browsers broke the Google pop-up).
 
