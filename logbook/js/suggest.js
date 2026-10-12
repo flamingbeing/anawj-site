@@ -12,8 +12,8 @@ const ROMAN = /^(?:i|ii|iii|iv)$/;
 const num = s => parseFloat(s);
 
 // -> { years } | null. Takes the first age-like phrase in the text (ages come early in case notes).
-// From the old log: "78M"/"65/F" is sex (capital M is always male, even "3M" on a paeds list),
-// while a lower-case "9m" under 24 is months ("9m boy", "1y 2mo", "2m2w").
+// A bare M/m or F/f means sex in years ("6m" = six-year-old male).
+// Use explicit month units ("6mo", "6 months", "6/12"); compound "2m2w" stays months + weeks.
 export function parseAge(text) {
   const s = String(text || '').replace(/\s+/g, ' ');
   const lower = s.toLowerCase();
@@ -55,7 +55,6 @@ export function parseAge(text) {
     if (/\b(?:from|fall|fell|of|x|sp|ns)\s*$/.test(before)) return null;   // "fall from 3m"
     if (m[1].length === 3 && m[1][0] === '0') return null;                  // NRIC "083F"
     const n = num(m[1]);
-    if (m[3] === 'm' && !m[2] && n < 24) return n / 12;                     // lower-case "9m" = months
     return n;
   }, s);
   add(/(?<![\w/])([mf])\s?(\d{2,3})\b(?![\/\d.])/g, m => {
@@ -132,7 +131,7 @@ export function calibrate(raw, table = CALIBRATION) {
 }
 
 // keywords / calibration options exist so the builder's held-out evaluation can swap tables in.
-export function suggest(text, { limit = 6, keywords = KEYWORDS, calibration = CALIBRATION, extra = null } = {}) {
+export function suggest(text, { limit = 6, keywords = KEYWORDS, calibration = CALIBRATION, extra = null, detectAgeSex = true } = {}) {
   const ev = {};   // code -> [p, ...]
   for (const g of grams(text, keywords)) {
     const ps = keywords[g];
@@ -166,7 +165,7 @@ export function suggest(text, { limit = 6, keywords = KEYWORDS, calibration = CA
     put(x.code, SHORTHAND_SCORE, 'shorthand'); if (BY_CODE[x.code] && BY_CODE[x.code].parent) put(BY_CODE[x.code].parent, SHORTHAND_SCORE, 'shorthand');
   }
 
-  const age = parseAge(text);
+  const age = detectAgeSex ? parseAge(text) : null;
   if (age) {
     const y = age.years;
     if (y >= 65) put('21', AGE_SCORE['21'], 'age');

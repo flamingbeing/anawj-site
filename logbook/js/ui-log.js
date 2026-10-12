@@ -8,7 +8,7 @@ import { apmesShorthand, shorthandTags } from './tags.js';
 import {
   S, h, toast, debounce, modal, confirmBox, cat, catName, catShort, catFull, catChip, countText, logTags, tagLinks, tagChip, tagSet, keepTags, PROGRESS_BY_CODE,
   createCase, updateCase, removeCase, restoreCase, saveMany, deleteMany, subcatChips, subcatsOf, settings, todayISO, hooks, fill, add, cloud, okNoIds, patchLogbook, catPills } from './ui-core.js';
-import { templateDialog } from './ui-settings.js';
+import { display, templateDialog } from './ui-settings.js';
 import { moveToBin } from './bin.js';
 
 const DRAFT_KEY = 'logbook-draft-v2';
@@ -17,10 +17,22 @@ const yesterdayISO = () => { const d = new Date(); d.setDate(d.getDate() - 1); r
 
 // The unsent draft survives tab switches and reloads (this browser only). It is kept per account
 // (and apart from the demo), so the next person on a shared phone never sees it; sign-out wipes it.
-const EMPTY = () => ({ date: null, details: '', cats: [], mode: 'one', bulk: '' });
+const EMPTY = () => ({ date: null, details: '', initials: '', initialsHint: '', cats: [], mode: 'one', bulk: '' });
 let draft = EMPTY(), draftOwner = null;
 let suggestedSave = null, saving = false;
-const suggestionKey = () => JSON.stringify([draft.details.trim(), curDate()]);
+const draftText = () => [draft.initials, draft.details].filter(Boolean).join(' ').trim();
+// Keep deliberately entered initials when switching back to the combined box,
+// even if those letters also name a procedure (IJ, TKR). Editing the prefix can replace them.
+const draftParts = () => {
+  if (draft.initials) return { initials: draft.initials, details: draft.details.trim() };
+  const text = draft.details.trim(), hint = draft.initialsHint;
+  if (hint && text.slice(0, hint.length).toUpperCase() === hint && (!text.slice(hint.length) || /^\s/.test(text.slice(hint.length))))
+    return { initials: hint, details: text.slice(hint.length).trim() };
+  return splitInitials(text);
+};
+const firstField = () => ['initials', 'date'].includes(display().firstField) ? display().firstField : 'details';
+export const focusLog = () => (draft.mode === 'bulk' ? ui?.textarea : firstField() === 'date' ? ui.datebar.querySelector('input[type=date]') : firstField() === 'initials' ? ui.initials : ui.textarea)?.focus({ preventScroll: true });
+const suggestionKey = () => JSON.stringify([draftText(), curDate(), settings().detectAgeSex !== false]);
 const draftKey = () => `${DRAFT_KEY}:${cloud.demo ? 'demo:' : ''}${(S.user && S.user.email) || ''}`;
 function loadDraft() {
   if (draftOwner === draftKey()) return;
@@ -48,9 +60,9 @@ function takeShared() {
 export function logOnDate(iso) {
   loadDraft();
   // a fresh case for that day; a case already being typed stays, and only its date changes
-  const typing = (draft.details || '').trim() || (draft.cats || []).length;
+  const typing = draftText() || (draft.cats || []).length;
   if (typing) setTimeout(() => toast('Date set. The case you were typing is still in the box'), 300);
-  else Object.assign(draft, { details: '', cats: [], tags: [], reflectTag: false });
+  else Object.assign(draft, { details: '', initials: '', initialsHint: '', cats: [], tags: [], reflectTag: false });
   draft.mode = 'one';
   draft.date = iso === todayISO() ? null : iso; draft.dateAt = Date.now(); bulkRows = null;
   saveDraft.cancel(); try { localStorage.setItem(draftKey(), JSON.stringify(draft)); } catch { /* ignore */ }
@@ -286,6 +298,7 @@ function paintDate() {
   const d = curDate(), t = todayISO();
   const dateInput = h('input', {
     type: 'date', value: d, 'aria-label': 'Case date',
+    onkeydown: e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); ui.textarea?.focus(); } },
     onchange: e => { draft.date = parseDate(e.target.value) || null; draft.dateAt = Date.now(); saveDraft(); paintDate(); },
   });
   const pick = iso => () => { draft.date = iso === t ? null : iso; draft.dateAt = Date.now(); saveDraft(); paintDate(); ui.textarea?.focus(); };
@@ -324,15 +337,21 @@ function paintDate() {
 
 // The empty box's example, one line per part, with the arrows lined up (padded to the box's own font).
 const htmlHas = c => document.documentElement.classList.contains(c);
-const PLACEHOLDER = [['AB 72M', 'initials, age/sex'], ['lap chole', 'procedure'], ['GA ETT', 'notes']];
+const placeholderRows = () => {
+  const initials = firstField() !== 'initials', age = settings().detectAgeSex !== false;
+  return [...(initials || age ? [[[initials ? 'AB' : '', age ? '72M' : ''].filter(Boolean).join(' '),
+    [initials ? 'initials' : '', age ? 'age/sex' : ''].filter(Boolean).join(', ')]] : []),
+    ['lap chole', 'procedure'], ['GA ETT', 'notes']];
+};
 function alignPlaceholder(ta) {
   try {
     const ctx = document.createElement('canvas').getContext('2d');
     ctx.font = getComputedStyle(ta).font;
     const w = t => ctx.measureText(t).width;
     const en = w('\u2002'), hair = w('\u200A') || 1;
-    const max = Math.max(...PLACEHOLDER.map(([a]) => w(a))) + 2 * en;
-    ta.placeholder = PLACEHOLDER.map(([a, b]) => {
+    const rows = placeholderRows();
+    const max = Math.max(...rows.map(([a]) => w(a))) + 2 * en;
+    ta.placeholder = rows.map(([a, b]) => {
       let gap = max - w(a);
       const ens = Math.floor(gap / en); gap -= ens * en;
       return a + '\u2002'.repeat(ens) + '\u200A'.repeat(Math.round(gap / hair)) + '← ' + b;
@@ -353,11 +372,19 @@ function saveFromEmptyLine(ta, another) {
 
 function renderOne(card) {
   suggestedSave = null;
+  const separateInitials = firstField() === 'initials';
+  if (separateInitials && !draft.initials) {
+    const parts = draftParts(); draft.initials = parts.initials; draft.details = parts.details;
+  } else if (!separateInitials && draft.initials) { draft.initialsHint = draft.initials; draft.details = draftText(); draft.initials = ''; }
+  saveDraft();
+  const initialsInput = separateInitials ? h('input', { 'aria-label': 'Patient initials', placeholder: 'AB (initials, optional)', maxlength: '20', enterkeyhint: 'next', autocomplete: 'off', autocapitalize: 'characters', value: draft.initials || '',
+    oninput: e => { suggestedSave = null; draft.initials = cleanInitials(e.target.value); draft.initialsHint = ''; saveDraft(); paintParsed(true); suggestSoon(); },
+    onkeydown: e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); ui.textarea.focus(); } } }) : null;
   const textarea = h('textarea', {
-    class: 'details', rows: String(boxLines()), style: `min-height:calc(${boxLines()} * 1.4em + 22px)`, autofocus: !document.documentElement.classList.contains('no-autofocus'), enterkeyhint: enterMode() === 'single' ? 'done' : 'enter', 'aria-label': 'Case summary',
+    class: 'details', rows: String(boxLines()), style: `min-height:calc(${boxLines()} * 1.4em + 22px)`, autofocus: firstField() === 'details' && !document.documentElement.classList.contains('no-autofocus'), enterkeyhint: enterMode() === 'single' ? 'done' : 'enter', 'aria-label': 'Case summary',
     // Settings → Logging (this device): capitals, autocorrect, spelling underlines (html classes, applyLook)
     autocapitalize: htmlHas('box-caps-off') ? 'off' : 'sentences', autocorrect: htmlHas('box-correct') ? 'on' : 'off', spellcheck: htmlHas('box-spell-off') ? 'false' : 'true',
-    placeholder: PLACEHOLDER.map(([a, b]) => `${a}  ← ${b}`).join('\n'),
+    placeholder: placeholderRows().map(([a, b]) => `${a}  ← ${b}`).join('\n'),
     value: draft.details,
     oninput: e => { suggestedSave = null; draft.details = e.target.value; saveDraft(); suggestSoon(); paintParsed(true); },
     // Settings → Logging → Enter key: 'newline' (default; Ctrl/Cmd+Enter saves), 'double' (Enter on an empty
@@ -423,6 +450,7 @@ function renderOne(card) {
   card.classList.add('panes');
   add(card,
     h('div', { class: 'lp-left' },
+      initialsInput ? h('label', { class: 'field log-initials' }, 'Initials', initialsInput) : null,
       h('div', { class: 'box-wrap' }, textarea, pasteBtn(textarea), clearBtn), parsed, tagRow,
       // suggestions first, then the last case and your own templates
       h('div', { class: 'chiplabel quick-label' }, 'Quick picks'), sugg, templates),
@@ -444,13 +472,12 @@ function renderOne(card) {
     if (t.closest('input:not([type=checkbox]), textarea, select, .datepick, .box-wrap')) return;
     if (t.closest('.chip, .picker li, label.check, [role=button], button, a.btn')) e.preventDefault();
   });
-  Object.assign(ui, { draftNote, textarea, parsed, sugg, selected, selExtra, groupSave, tip, templates, picker });
+  Object.assign(ui, { initials: initialsInput, draftNote, textarea, parsed, sugg, selected, selExtra, groupSave, tip, templates, picker });
   paintSuggest(); paintSel(); paintQuick(); paintParsed(false);
   requestAnimationFrame(() => alignPlaceholder(textarea));
   // autofocus attribute is ignored on re-render; focus after insertion (not on phones' first paint
   // when that would pop the keyboard over a fresh landing — it's what the user came to do, so do it)
-  // (Settings → Logging: off on this device leaves the keyboard closed until the box is tapped)
-  requestAnimationFrame(() => { if (!document.documentElement.classList.contains('no-autofocus') && (document.activeElement === document.body || !document.activeElement)) textarea.focus({ preventScroll: true }); });
+  requestAnimationFrame(() => { if (!document.documentElement.classList.contains('no-autofocus') && (document.activeElement === document.body || !document.activeElement)) focusLog(); });
 }
 
 const suggestSoon = debounce(() => paintSuggest(), 120);
@@ -459,19 +486,19 @@ const suggestSoon = debounce(() => paintSuggest(), 120);
 // the Interesting line
 function paintParsed(typed) {
   if (!ui || !ui.parsed) return;
-  const text = draft.details.trim();
+  const text = draftText();
   if (ui.draftNote) ui.draftNote.textContent = text && typed ? 'Draft saved' : '';
   if (!text) { fill(ui.parsed); return; }
-  const { initials, details } = splitInitials(text);
-  const { age, rest } = splitAge(details);
+  const { initials, details } = draftParts();
+  const { age, rest } = settings().detectAgeSex !== false ? splitAge(details) : { age: '', rest: details };
   const bits = [initials ? h('span', { class: 'pi' }, h('small', {}, 'Initials '), h('b', {}, initials)) : h('span', { class: 'pi none' }, 'No initials found'),
-    age ? h('span', { class: 'pi' }, h('small', {}, 'Age/sex '), h('b', {}, age.replace(/[mf]$/, c => c.toUpperCase()))) : null,
+    age ? h('span', { class: 'pi' }, h('small', {}, 'Age/sex '), h('b', {}, (/^\d+mo$/i.test(age) ? parseFloat(age) + ' months' : age.replace(/[mf]$/, c => c.toUpperCase())))) : null,
     rest ? h('span', { class: 'pi grow' }, rest.split('\n')[0].slice(0, 60)) : null];
   fill(ui.parsed, ...bits.filter(Boolean));
 }
 
 // Suggestions, with your own shorthand for APMES tags (Tag editor) mixed in
-const suggest = (text, opts = {}) => suggestCodes(text, { ...opts, extra: apmesShorthand(tagSet()) });
+const suggest = (text, opts = {}) => suggestCodes(text, { ...opts, detectAgeSex: settings().detectAgeSex !== false, extra: apmesShorthand(tagSet()) });
 
 function paintSuggest() {
   if (!ui || !ui.sugg) return;
@@ -592,11 +619,11 @@ async function save(opts) {
 }
 
 async function saveCase({ another }) {
-  const details = draft.details.trim();
+  const details = draftText();
   if (!draft.cats.length) {
     paintSuggest();   // a quick Enter must not depend on the typing debounce
     const tags = settings().suggestions !== false && details ? shorthandTags(tagSet(), details).filter(k => !(draft.tags || []).includes(k)) : [];
-    const codes = settings().suggestions !== false && details ? suggest(details, { limit: 8 }).map(s => s.code) : [];
+    const codes = settings().suggestions !== false && details ? suggest(draft.details.trim(), { limit: 8 }).map(s => s.code) : [];
     const cats = sortCodes(withParents([...codes, ...tags.flatMap(tagLinks)]));
     suggestedSave = cats.length ? { key: suggestionKey(), cats, tags } : null;
     // categories are counted towards credentialling, so they must be picked on purpose
@@ -617,19 +644,21 @@ async function saveCase({ another }) {
   const norm = t => String(t || '').toLowerCase().replace(/\s+/g, ' ').trim();
   const twin = (S.cases || []).find(x => x.date === curDate() && norm(caseText(x)) === norm(details));
   if (twin && !(await confirmBox('Possible duplicate', `You already logged “${caseText(twin).slice(0, 60)}” on ${fmtDate(twin.date)}. Save another one?`, 'Save anyway'))) return;
-  const c = await createCase({ date: curDate(), details, cats: draft.cats, reflectTag: !!draft.reflectTag, tags: draft.tags || [] });
+  const parts = firstField() === 'initials' || draft.initialsHint ? draftParts() : { details };
+  const c = await createCase({ date: curDate(), ...parts, cats: draft.cats, reflectTag: !!draft.reflectTag, tags: draft.tags || [] });
   const sticky = another || settings().defaultDate === 'last';
   const keep = sticky ? draft.date : null;
   const next = settings().afterSave;
   const keepTags = next === 'keepTags' ? { cats: draft.cats, tags: draft.tags || [] } : { cats: [], tags: [] };
-  draft = { ...draft, details: '', ...keepTags, date: keep, keepDate: sticky, keptAt: Date.now(), dateAt: Date.now(), reflectTag: false };
+  draft = { ...draft, details: '', initials: '', initialsHint: '', ...keepTags, date: keep, keepDate: sticky, keptAt: Date.now(), dateAt: Date.now(), reflectTag: false };
   if (ui.tagBox) ui.tagBox.querySelector('input').checked = false;
   saveDraft();
   if (ui.textarea) ui.textarea.value = '';
+  if (ui.initials) ui.initials.value = '';
   paintDate(); paintSel(); paintQuick();
   if (next === 'logbook') { hooks.showDay?.(c.date); location.hash = '#logbook'; }
-  else if (next === 'closed') ui.textarea.blur();
-  else ui.textarea.focus();
+  else if (next === 'closed') document.activeElement?.blur();
+  else focusLog();
   // say where it went and what it counted towards: "Saved Sat 10 Oct · 16 LSCS now 4/10"
   const prog = PROGRESS_BY_CODE();
   const withTarget = c.cats.map(code => prog[code]).find(p => p && p.next);
@@ -639,11 +668,11 @@ async function saveCase({ another }) {
     onaction: () => {
       // put the case back in the box, unless the next one is already being typed: then it goes to the recycle bin
       // (tags kept for the next case by After Save don't count as the next one)
-      if (draft.details.trim() || (draft.cats.length && JSON.stringify(draft.cats) !== JSON.stringify(c.cats))) { moveToBin('case', c).then(() => toast('Removed: it is in the Recycle bin (Settings). Your new case stays in the box'), err => toast('Could not delete: ' + err.message)); return; }
+      if (draftText() || (draft.cats.length && JSON.stringify(draft.cats) !== JSON.stringify(c.cats))) { moveToBin('case', c).then(() => toast('Removed: it is in the Recycle bin (Settings). Your new case stays in the box'), err => toast('Could not delete: ' + err.message)); return; }
       removeCase(c.id);
-      draft = { ...draft, details: caseText(c), cats: c.cats, tags: c.tags || [], reflectTag: !!c.reflectTag, date: c.date === todayISO() ? null : c.date };
+      draft = { ...draft, initials: firstField() === 'initials' ? caseParts(c).initials : '', initialsHint: caseParts(c).initials, details: firstField() === 'initials' ? caseParts(c).details : caseText(c), cats: c.cats, tags: c.tags || [], reflectTag: !!c.reflectTag, date: c.date === todayISO() ? null : c.date };
       saveDraft();
-      if (S.tab === 'log' && ui.textarea) { ui.textarea.value = draft.details; if (ui.tagBox) ui.tagBox.querySelector('input').checked = draft.reflectTag; paintDate(); paintSel(); paintQuick(); paintParsed(false); }
+      if (S.tab === 'log' && ui.textarea) { ui.textarea.value = draft.details; if (ui.initials) ui.initials.value = draft.initials; if (ui.tagBox) ui.tagBox.querySelector('input').checked = draft.reflectTag; paintDate(); paintSel(); paintQuick(); paintParsed(false); }
     },
   });
 }
@@ -661,9 +690,10 @@ let bulkRows = null;
 function renderBulk(card) {
   const ta = h('textarea', {
     class: 'details', rows: '8', value: draft.bulk || '',
-    placeholder: 'Leave an empty line between cases. An optional date at the start, e.g.\n12/3 AB 5yo\ncircumcision, caudal\n\n13/3 CD 30F\nLSCS spinal\n\nEF 80F\nhemiarthroplasty',
+    placeholder: settings().detectAgeSex !== false ? 'Leave an empty line between cases. An optional date at the start, e.g.\n12/3 AB 5yo\ncircumcision, caudal\n\n13/3 CD 30F\nLSCS spinal\n\nEF 80F\nhemiarthroplasty' : 'Leave an empty line between cases. An optional date at the start, e.g.\n12/3 AB\ncircumcision, caudal\n\n13/3 CD\nLSCS spinal\n\nEF\nhemiarthroplasty',
     oninput: e => { draft.bulk = e.target.value; saveDraft(); },
   });
+  ui.textarea = ta;
   const out = h('div');
   add(card, 
     h('p', { class: 'hint help' }, 'Paste your notes or OT list with an empty line between cases (a case can take several lines). Tags are guessed for each case. Cases without a date at the start get ', h('b', {}, fmtDate(curDate())), ' (change it above).'),
@@ -760,8 +790,8 @@ function planCard() {
   };
   const edit = async p => {
     // don't throw away a case being typed
-    if ((draft.details.trim() || draft.cats.length) && !(await confirmBox('Replace what you’re typing?', 'The case in the box is replaced by the planned one.', 'Replace', true))) return;
-    draft = { ...draft, mode: 'one', details: [p.initials, p.details].filter(Boolean).join(' '), cats: [...(p.cats || [])], tags: [], reflectTag: false, date: p.date === today ? null : p.date, dateAt: Date.now() };
+    if ((draftText() || draft.cats.length) && !(await confirmBox('Replace what you’re typing?', 'The case in the box is replaced by the planned one.', 'Replace', true))) return;
+    draft = { ...draft, mode: 'one', initials: '', initialsHint: p.initials || '', details: [p.initials, p.details].filter(Boolean).join(' '), cats: [...(p.cats || [])], tags: [], reflectTag: false, date: p.date === today ? null : p.date, dateAt: Date.now() };
     saveDraft();
     await savePlan(plan().filter(x => x.id !== p.id));
     hooks.render();
