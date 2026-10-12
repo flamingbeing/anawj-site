@@ -55,6 +55,8 @@ Last updated: 2026-10-12 by Claude Code, Logbook 3 (log3).
 
 ## Decisions log
 
+- 2026-10-12: Session names: Logbook 1 / 2 / 3 (log1 / log2 / log3). log1 = branch `claude/clever-gates-pm6sas`,
+  log2 = `ccr-afac5e7a-99esax`, log3 = `ccr-2994049c-4e5tlt`. Each renames its own line under Now.
 - 2026-10-12: APMES programme documents aren't secret: they live in `/apmes/` at the repo root (guidebook, data,
   blank portfolio template; originals may be added). No faculty names (the MedHub guide stays out unless blacked
   out); published authors cited in the guidebook are fine.
