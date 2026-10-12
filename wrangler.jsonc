@@ -5,5 +5,7 @@
   "compatibility_date": "2026-10-01",
   "assets": { "directory": "." },
   // a preview link per branch and per build, posted on the PR by Workers Builds
-  "preview_urls": true
+  "preview_urls": true,
+  // required by `wrangler preview` (Worker Previews), even when empty: previews use the same settings
+  "previews": {}
 }
