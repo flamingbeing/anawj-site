@@ -6,7 +6,7 @@ Last updated: 2026-10-12 by Claude Code, hand assessment session.
 
 ## Now
 
-- **Claude Code, hand assessment** (branch `claude/amazing-goodall-erq636`): page cut to about half, plainer wording.
+- **Claude Code, hand assessment** (branch `claude/amazing-goodall-erq636`): page editor added (edit.html, sends GitHub issues).
   Nothing half-done.
 
 ## Waiting on the owner
@@ -22,11 +22,15 @@ Last updated: 2026-10-12 by Claude Code, hand assessment session.
 
 ## Recently done
 
+- #245: page cut to about half, plainer wording.
+
 - #207: first version (one page, 9 figures, quiz, referral template).
 - #242: animated figures with Pause/Play, GIF copies in `hand-babies/gifs/` for sharing.
 - Moved from `/hand/` to `/hand-babies/`; `/hand/` redirects and its worker clears the old offline copy.
 
 ## Decisions
+
+- 2026-10-12: page editor like edit.anantf.com (owner): `hand-babies/edit.html`, issues to flamingbeing/anawj-site.
 
 - 2026-10-12: cut the page (owner): quiz, Words section, privacy guide and referral template removed; calling
   section is one short example.

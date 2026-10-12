@@ -333,7 +333,8 @@ function tick() {
     raf = requestAnimationFrame(frame);
   });
 }
-window.handFigs = { FIGS, still }; // used by tools/make-gifs.mjs
+// used by tools/make-gifs.mjs, and by edit.html to stop the figures so they can be selected
+window.handFigs = { FIGS, still, pauseAll: () => figs.forEach(st => { if (st.playing) setPlaying(st, false); }) };
 
 
 // opening a scenario from a link (#pic-cut etc.) opens it

@@ -1,8 +1,8 @@
 // Offline copy of the hand assessment page (pattern from prewarm/sw.js). Bump VERSION whenever any SHELL file
 // changes: the new worker installs alongside the old one and the page offers "Update available".
 
-const VERSION = 'hand-babies-v2';
-const SHELL = ['./', 'index.html', 'style.css', 'app.js', '../design/tokens.css'];
+const VERSION = 'hand-babies-v3';
+const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'edit.html', '../design/tokens.css'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(VERSION).then(c => Promise.all(
@@ -28,7 +28,9 @@ self.addEventListener('fetch', e => {
   e.respondWith((async () => {
     const cache = await caches.open(VERSION);
     // navigations: the cached page, keyed by the folder (see prewarm/sw.js for why not 'index.html')
-    const key = req.mode === 'navigate' ? './' : req;
+    // (only the page itself: edit.html is a separate page and must not get the shell)
+    const shell = req.mode === 'navigate' && /\/(index\.html)?$/.test(url.pathname);
+    const key = shell ? './' : req;
     const hit = await cache.match(key, { ignoreSearch: req.mode === 'navigate' });
     if (hit) return hit;
     try {
@@ -36,8 +38,8 @@ self.addEventListener('fetch', e => {
       if (res.ok && res.type === 'basic') cache.put(key, res.clone());
       return res;
     } catch (err) {
-      const shell = req.mode === 'navigate' && await cache.match('./');
-      if (shell) return shell;
+      const page = shell && await cache.match('./');
+      if (page) return page;
       throw err;
     }
   })());
