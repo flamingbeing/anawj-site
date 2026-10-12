@@ -92,7 +92,17 @@ try {
   assert.doesNotMatch(await page.textContent('main'), /10 min pre-warming/, 'group hidden outside the pre-warming temperatures');
   await shot('intraop-temps');
 
-  // form view
+  // form view: the paper form's day-of-surgery pages, filled in, with Save as PDF / Print
+  await page.click('.textlinks a[href$="/form"]');
+  await page.waitForSelector('.fpage');
+  assert.equal((await page.$$('.fpage')).length, 4);
+  assert.match(await page.textContent('.form'), /PRE-OPERATIVE \(INTERVENTION\)[\s\S]*☒ 10-minute prewarming/);
+  assert.ok(await page.$('#print'));
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 390, 'no sideways scroll');
+  await axe('form view (print)'); await shot('form-print');
+  await page.goBack();
+
+  // spreadsheet view
   await page.click('.textlinks a[href$="/sheet"]');
   await page.waitForSelector('.sheet');
   assert.match(await page.textContent('.sheet'), /36\.6/);
