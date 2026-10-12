@@ -285,7 +285,8 @@ export function renderTotals() {
       h('button', { class: 'small', onclick: () => downloadTotals(table.data) }, 'Download Excel')),
     h('p', { class: 'hint help' }, 'Case counts only, so residents can see how they compare. Under each tag: its targets. Colours use each resident’s own year (tap and hold a red or amber count to see how many short).'),
     legend(),
-    h('div', { class: 'scroll', style: 'margin-top:8px' }, table.el));
+    // scrolls sideways on phones: focusable and named so the keyboard can reach it
+    h('div', { class: 'scroll', style: 'margin-top:8px', tabindex: '0', role: 'region', 'aria-label': 'Totals table' }, table.el));
   return card;
 }
 

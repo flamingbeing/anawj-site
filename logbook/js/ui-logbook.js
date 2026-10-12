@@ -380,7 +380,9 @@ function calendarView(rows, flagsOf, repaint) {
   const ws = settings().weekStart;
   const lead = weekLead(first, ws);                // Monday first unless set (Settings → Logging)
   const days = new Date(y, m, 0).getDate();
-  const grid = h('div', { class: 'lb-cal', role: 'grid' }, weekdayNames(ws).map(d => h('div', { class: 'lb-dow' }, d)));
+  // a labelled group of day buttons (a role=grid would need rows and cells around them); the weekday letters are
+  // decoration, each day's button says its own date
+  const grid = h('div', { class: 'lb-cal', role: 'group', 'aria-label': `Days of ${MONTHS[m - 1]} ${y}` }, weekdayNames(ws).map(d => h('div', { class: 'lb-dow', 'aria-hidden': 'true' }, d)));
   for (let i = 0; i < lead; i++) add(grid, h('div', { class: 'lb-day blank' }));
   let monthN = 0;
   for (let d = 1; d <= days; d++) {

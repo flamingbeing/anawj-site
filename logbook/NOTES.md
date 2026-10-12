@@ -358,8 +358,9 @@ portfolio content.
     is **not** one of those (owner: not on every e2e). Run it after UI changes or before a release, about 75 s:
     every screen plus the edit-case dialog and reflection editor in light at phone and desk sizes, dark on the main
     screens (`A11Y_DARK=all` for every one); `A11Y_ONLY=<words>` checks only matching screens. Serious or critical
-    problems fail it. Add new screens to its `SCREENS` list (Notes and its editor are in it). Oct 2026 first run: 3 open problems (calendar grid's
-    children, Totals' scroll box on phones and the Markdown preview `<pre>` not reachable by keyboard).
+    problems fail it. Add new screens to its `SCREENS` list (Notes and its editor are in it). Oct 2026 first run found 3 problems, all fixed
+    in #166: the calendar is now a labelled group (a grid role needs row/cell children), and Totals' sideways scroll
+    box and the Markdown previews are focusable with names. Now 0 serious or critical.
   - The cloud session's safety filter refuses to write or push credentials, even public ones (the MCP Desktop
     client secret): the owner commits those via a GitHub web edit (GitHub secret scanning: "It's a false
     positive"). `.claude/settings.json` allows pushing to `claude/*` branches so a push isn't blocked.

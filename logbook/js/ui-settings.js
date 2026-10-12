@@ -448,8 +448,9 @@ export function renderMarkdownSettings() {
   const pick = (k, label, opts) => h('label', { class: 'field', style: 'margin-top:8px' }, label,
     h('select', { 'aria-label': label, onchange: e => { m[k] = e.target.value; paint(); } }, opts.map(([v, t]) => h('option', { value: v, selected: m[k] === v }, t))));
   const lbl = (t, el, hint) => h('label', { class: 'field', style: 'margin-top:8px' }, t, el, hint ? h('span', { class: 'hint help' }, hint) : null);
-  const pre = () => h('pre', { class: 'fmt-preview' });
-  const dayOut = pre(), oneOut = pre(), reflOut = h('pre', { class: 'fmt-preview', style: 'max-height:24em;overflow:auto' }), pathOut = h('div', { class: 'hint', style: 'margin:8px 0 2px' });
+  // previews can scroll, so each is focusable and named for the keyboard
+  const pre = name => h('pre', { class: 'fmt-preview', tabindex: '0', 'aria-label': name });
+  const dayOut = pre('Preview of a day'), oneOut = pre('Preview of one case'), reflOut = h('pre', { class: 'fmt-preview', style: 'max-height:24em;overflow:auto', tabindex: '0', 'aria-label': 'Preview of a reflection note' }), pathOut = h('div', { class: 'hint', style: 'margin:8px 0 2px' });
   // your latest day and reflection, else made-up ones
   const latest = [...(S.cases || [])].filter(c => c.date).sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt || 0) - (a.createdAt || 0))[0];
   const dayList = latest ? S.cases.filter(c => c.date === latest.date).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)) : SAMPLE;
