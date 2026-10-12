@@ -213,6 +213,43 @@ await t('note title too long', assertFails(setDoc(doc(a, 'logbooks', A, 'notes',
 await t('own note in bin', assertSucceeds(setDoc(doc(a, 'logbooks', A, 'bin', 'n_n1_x'), binE('n_n1_x', 'note', note('n1')))));
 await t('other deletes note', assertFails(deleteDoc(doc(b, 'logbooks', A, 'notes', 'n1'))));
 await t('owner deletes note', assertSucceeds(deleteDoc(doc(a, 'logbooks', A, 'notes', 'n1'))));
+// the gaps the Oct 2026 review listed
+await t('anon reads notes', assertFails(getDocs(collection(anon, 'logbooks', A, 'notes'))));
+await t('unverified reads notes', assertFails(getDocs(collection(unv, 'logbooks', A, 'notes'))));
+await t('unverified writes note', assertFails(setDoc(doc(unv, 'logbooks', A, 'notes', 'n4'), note('n4'))));
+await t('anon writes note', assertFails(setDoc(doc(anon, 'logbooks', A, 'notes', 'n4'), note('n4'))));
+await t('admin lists notes', assertFails(getDocs(collection(adm, 'logbooks', A, 'notes'))));
+await t('app owner lists notes', assertFails(getDocs(collection(own, 'logbooks', A, 'notes'))));
+await t('admin writes note', assertFails(setDoc(doc(adm, 'logbooks', A, 'notes', 'n4'), note('n4'))));
+await t('admin deletes note', assertFails(deleteDoc(doc(adm, 'logbooks', A, 'notes', 'n2'))));
+await t('app owner deletes note', assertFails(deleteDoc(doc(own, 'logbooks', A, 'notes', 'n2'))));
+await t('mixed-case token reads own notes', assertSucceeds(getDocs(collection(AU, 'logbooks', A, 'notes'))));
+await t('other updates existing note', assertFails(setDoc(doc(b, 'logbooks', A, 'notes', 'n2'), note('n2', { body: 'changed' }))));
+await t('note caseId too long', assertFails(setDoc(doc(a, 'logbooks', A, 'notes', 'n4'), note('n4', { caseId: 'x'.repeat(201) }))));
+await t('note id too long', assertFails(setDoc(doc(a, 'logbooks', A, 'notes', 'x'.repeat(101)), note('x'.repeat(101)))));
+await t('note body not a string', assertFails(setDoc(doc(a, 'logbooks', A, 'notes', 'n4'), note('n4', { body: 5 }))));
+await t('note title not a string', assertFails(setDoc(doc(a, 'logbooks', A, 'notes', 'n4'), note('n4', { title: 5 }))));
+await t('note updatedAt not a number', assertFails(setDoc(doc(a, 'logbooks', A, 'notes', 'n4'), note('n4', { updatedAt: 'now' }))));
+await t('own note bin entry', assertSucceeds(setDoc(doc(a, 'logbooks', A, 'bin', 'n_n9_x'), binE('n_n9_x', 'note', note('n9')))));
+await t('other reads note bin entry', assertFails(getDoc(doc(b, 'logbooks', A, 'bin', 'n_n9_x'))));
+await t('admin reads note bin entry', assertFails(getDoc(doc(adm, 'logbooks', A, 'bin', 'n_n9_x'))));
+await t('app owner reads note bin entry', assertFails(getDoc(doc(own, 'logbooks', A, 'bin', 'n_n9_x'))));
+await t('other writes note bin entry', assertFails(setDoc(doc(b, 'logbooks', A, 'bin', 'n_n8_x'), binE('n_n8_x', 'note', note('n8')))));
+// the note index (meta/noteIndex): owner only, checked fields, no other meta docs
+const idx = (o = {}) => ({ days: ['2026-10-12'], cases: ['c1'], n: 2, updatedAt: 1, ...o });
+await t('own note index', assertSucceeds(setDoc(doc(a, 'logbooks', A, 'meta', 'noteIndex'), idx())));
+await t('read own note index', assertSucceeds(getDoc(doc(a, 'logbooks', A, 'meta', 'noteIndex'))));
+await t('app owner reads note index', assertFails(getDoc(doc(own, 'logbooks', A, 'meta', 'noteIndex'))));
+await t('admin reads note index', assertFails(getDoc(doc(adm, 'logbooks', A, 'meta', 'noteIndex'))));
+await t('other reads note index', assertFails(getDoc(doc(b, 'logbooks', A, 'meta', 'noteIndex'))));
+await t('anon reads note index', assertFails(getDoc(doc(anon, 'logbooks', A, 'meta', 'noteIndex'))));
+await t('other writes note index', assertFails(setDoc(doc(b, 'logbooks', A, 'meta', 'noteIndex'), idx())));
+await t('app owner writes note index', assertFails(setDoc(doc(own, 'logbooks', A, 'meta', 'noteIndex'), idx())));
+await t('note index extra field', assertFails(setDoc(doc(a, 'logbooks', A, 'meta', 'noteIndex'), idx({ titles: ['x'] }))));
+await t('note index too many days', assertFails(setDoc(doc(a, 'logbooks', A, 'meta', 'noteIndex'), idx({ days: Array(101).fill('2026-10-12') }))));
+await t('note index n not a number', assertFails(setDoc(doc(a, 'logbooks', A, 'meta', 'noteIndex'), idx({ n: '2' }))));
+await t('other meta doc', assertFails(setDoc(doc(a, 'logbooks', A, 'meta', 'other'), idx())));
+await t('owner deletes note index', assertSucceeds(deleteDoc(doc(a, 'logbooks', A, 'meta', 'noteIndex'))));
 // portfolio template: everyone signed in reads, admins write
 await t('template read', assertSucceeds(getDoc(doc(a, 'config', 'portfolioTemplate'))));
 await t('template user write', assertFails(setDoc(doc(a, 'config', 'portfolioTemplate'), { parts: 1, size: 3, uploadedAt: 1 })));
