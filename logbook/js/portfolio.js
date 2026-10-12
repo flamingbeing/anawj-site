@@ -649,7 +649,7 @@ export function renderTemplateCard() {
   if (!cloud.saveTemplate) return card;
   if (!TC.info && !TC.loading) {
     TC.loading = true;
-    getTemplate().then(t => { TC.info = t ? { size: t.size, uploadedAt: t.uploadedAt } : { none: true }; TC.loading = false; if (S.tab === 'admin') hooks.render(); });
+    getTemplate().then(t => { TC.info = t ? { size: t.size, uploadedAt: t.uploadedAt } : { none: true }; TC.loading = false; if (/^admin/.test(S.tab || '')) hooks.render(); });
   }
   const i = TC.info;
   card.append(h('p', { class: 'muted' }, !i ? 'Loading…' : i.none ? 'No template uploaded.'

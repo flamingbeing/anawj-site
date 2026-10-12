@@ -24,10 +24,32 @@ const demoOk = () => !cloud.demo || confirmBox('Demo mode', 'The demo stores dat
 // Leaving the admin screen ends residents editing, so it opens read-only next time.
 export function leaveAdmin() { A.editRes = false; A.pasted = null; }
 
+// The Admin portal (owner, Oct 2026): what admins come for first, then links to the rest. Ready portfolios on the
+// page; Programme totals (#admintotals), Residents (#adminresidents) and Advanced admin settings (#adminadv) are
+// pages under it (TABS in app.js), so Back returns here and More stays the highlighted tab.
+const onAdmin = () => /^admin/.test(S.tab || '');
+const adminOnly = () => (S.admin ? null : h('p', { class: 'empty' }, 'Admins only.'));
+const linkRow = (id, label, desc) => h('li', {}, h('a', { href: '#' + id, 'data-go': id },
+  h('span', { class: 'mt' }, h('b', {}, label), h('small', {}, desc)), h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')));
 export function renderAdmin() {
-  if (!S.admin) return h('p', { class: 'empty' }, 'Admins only.');
+  if (!S.admin) return adminOnly();
   if (!A.residents && !A.loading) load();
-  return h('div', {}, residentsCard(), S.owner ? importCard() : ownerOnlyCard(), S.owner ? initialsFixCard() : null, readyPortfoliosCard(), sharedCard(), categoryNamesCard(), renderTemplateCard());
+  const n = (A.residents || []).length;
+  return h('div', {}, readyPortfoliosCard(),
+    h('section', { class: 'card more-list admin-links' }, h('ul', {},
+      linkRow('admintotals', 'Programme totals', 'Case counts by residency year; Excel download'),
+      linkRow('adminresidents', 'Residents', A.residents ? `${n} on the programme list · years, status, paste the list` : 'The programme list: years, status, paste the list'),
+      linkRow('adminadv', 'Advanced admin settings', `Shared tag groups, default tag names, portfolio template${S.owner ? ', import, initials fix' : ''}`))));
+}
+export function renderAdminResidents() {
+  if (!S.admin) return adminOnly();
+  if (!A.residents && !A.loading) load();
+  return h('div', {}, residentsCard());
+}
+export function renderAdminAdvanced() {
+  if (!S.admin) return adminOnly();
+  if (!A.residents && !A.loading) load();
+  return h('div', {}, sharedCard(), categoryNamesCard(), renderTemplateCard(), S.owner ? importCard() : ownerOnlyCard(), S.owner ? initialsFixCard() : null);
 }
 
 // Attrited residents are left off Totals: their rids go on config/totalsHidden, kept in step with the
@@ -64,7 +86,7 @@ async function unfixYears() {
     try { const patch = { intake: effectiveIntake(r), rYear: null }; await cloud.saveResident({ ...r, ...patch }); Object.assign(r, patch); }
     catch (err) { console.warn('year not moved to intake', r.rid, err); }
   }
-  if (fixed.length && S.tab === 'admin' && !A.editRes) hooks.render();
+  if (fixed.length && onAdmin() && !A.editRes) hooks.render();
 }
 
 // ---------- ready portfolios (residents marked theirs ready; generate one or all) ----------
@@ -83,7 +105,7 @@ const safeName = s => String(s || 'resident').replace(/[\\/:*?"<>|]+/g, ' ').tri
 function readyPortfoliosCard() {
   if (!RP.list && !RP.loading) {
     RP.loading = true;
-    cloud.listSubmissions().then(l => { RP.list = l; }).catch(err => { RP.list = []; toast('Could not load ready portfolios: ' + err.message); }).finally(() => { RP.loading = false; if (S.tab === 'admin') hooks.render(); });
+    cloud.listSubmissions().then(l => { RP.list = l; }).catch(err => { RP.list = []; toast('Could not load ready portfolios: ' + err.message); }).finally(() => { RP.loading = false; if (onAdmin()) hooks.render(); });
   }
   const list = (RP.list || []).slice().sort((a, b) => String(a.name).localeCompare(String(b.name)));
   const readyEmails = new Set(list.map(x => x.email));
@@ -131,7 +153,7 @@ async function load() {
     unfixYears();
   } catch (err) { A.residents = []; A.shared = []; toast('Could not load: ' + err.message); }
   A.loading = false;
-  if (S.tab === 'admin') hooks.render();
+  if (onAdmin()) hooks.render();
 }
 
 // ---------- residents ----------

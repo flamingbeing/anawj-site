@@ -322,17 +322,34 @@ function caseRow(c, flagsOf) {
   return h('li', { 'data-date': c.date || '', onclick: () => editCaseDialog(c), tabindex: '0', onkeydown: e => { if (e.key === 'Enter' && e.target === e.currentTarget) editCaseDialog(c); } },
       h('span', { class: 'd' }, c.date ? [h('span', { class: 'wd' }, weekday(c.date)), ' ', fmtDate(c.date).replace(/ \d{4}$/, '').replace(/^(\d+)/, (_, d) => nth(Number(d)))] : (c.dateText || '—')),
       h('span', { class: 't' }, p.initials ? [h('b', {}, p.initials), ' '] : null, p.details || (p.initials ? null : h('i', { class: 'muted' }, 'no details'))),
-      h('span', { class: 'c' }, catTags(c.cats),
+      // tags on the left (wrapping), Copy and Reflect on the right, the same size whatever they say
+      h('span', { class: 'c' }, h('span', { class: 'c-tags' }, catTags(c.cats),
         flags.includes('needsDate') ? h('span', { class: 'flag err' }, 'needs date') : null,
         flags.includes('future') ? h('span', { class: 'flag', title: 'Dated after today' }, 'upcoming') : null,
         flags.includes('duplicate') ? h('span', { class: 'flag' }, 'possible duplicate') : null,
         !(c.cats || []).length ? h('span', { class: 'flag err' }, 'no tag') : null,
         c.reflectTag ? h('span', { class: 'flag', title: 'Marked interesting' }, '☆ interesting') : null,
-        (c.tags || []).map(t => h('span', { class: 'flag sc-tag', title: 'Your tag' }, tagName(t))),
-        // to your own notes (paste into WhatsApp, Notes, Obsidian)
-        h('button', { class: 'small', style: 'margin-left:auto', title: 'Copy this case', 'aria-label': 'Copy this case', onclick: e => { e.stopPropagation(); copyText(shareCaseText(c), 'Case copied: paste it into your notes'); } }, 'Copy'),
-        h('button', { class: 'small', title: 'Write a reflection on this case', onclick: e => { e.stopPropagation(); reflectOnCase(c); } },
-          (S.reflections || []).some(r => r.caseId === c.id) ? 'Reflection' : 'Reflect')));
+        (c.tags || []).map(t => h('span', { class: 'flag sc-tag', title: 'Your tag' }, tagName(t)))),
+        h('span', { class: 'acts' },
+          // to your own notes (paste into WhatsApp, Notes, Obsidian)
+          h('button', { class: 'small row-btn', title: 'Copy this case', 'aria-label': 'Copy this case', onclick: e => { e.stopPropagation(); copyText(shareCaseText(c), 'Case copied: paste it into your notes'); } }, rowIcon('copy'), h('span', { class: 'lbl' }, 'Copy')),
+          // ✓ and filled once the case has a reflection (opens it); the same width either way, so the row never wraps
+          (S.reflections || []).some(r => r.caseId === c.id)
+            ? h('button', { class: 'small row-btn has-refl', title: 'Open the reflection on this case', 'aria-label': 'Open the reflection on this case', onclick: e => { e.stopPropagation(); reflectOnCase(c); } }, rowIcon('done'), h('span', { class: 'lbl' }, 'Reflect'))
+            : h('button', { class: 'small row-btn', title: 'Write a reflection on this case', 'aria-label': 'Write a reflection on this case', onclick: e => { e.stopPropagation(); reflectOnCase(c); } }, rowIcon('reflect'), h('span', { class: 'lbl' }, 'Reflect')))));
+}
+
+// Row buttons: an icon (alone on phones, where two labelled buttons don't fit beside the tags) and a label
+const ROW_ICONS = {
+  copy: 'M9 9h11v11H9zM5 15H4V4h11v1',
+  reflect: 'M4 19.5V5a2 2 0 0 1 2-2h12v14H6a2 2 0 0 0-2 2.5zM6 21h12v-4M8 7h6M8 11h4',   // the Reflections tab's book
+  done: 'M5 12.5l4.5 4.5L19 7.5',
+};
+function rowIcon(k) {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('class', 'ico'); svg.setAttribute('aria-hidden', 'true');
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path'); path.setAttribute('d', ROW_ICONS[k]);
+  svg.append(path); return svg;
 }
 
 // ---------- calendar ----------
@@ -343,11 +360,8 @@ const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 
 function calendarView(rows, flagsOf, repaint) {
   if (!S.cases.length) return h('div', { class: 'empty' }, h('p', {}, 'No cases yet.'), h('a', { class: 'btn primary', href: '#log' }, 'Log your first case'));
   const today = todayISO();
-  // opens on the latest day with cases up to today (today when there are none), so the list under it isn't empty
-  if (!view.month) {
-    const last = S.cases.map(c => c.date).filter(d => d && d <= today).sort().pop() || today;
-    view.month = last.slice(0, 7); if (!view.day) view.day = last;
-  }
+  // opens on today (owner): the day's cases, or "No cases yet today" with + Log a case
+  if (!view.month) { view.month = today.slice(0, 7); if (!view.day) view.day = today; }
   const [y, m] = view.month.split('-').map(Number);
   const byDay = new Map();
   const undated = [];
@@ -374,7 +388,7 @@ function calendarView(rows, flagsOf, repaint) {
       class: `lb-day t${tint} ${iso === today ? 'today' : ''} ${iso === view.day ? 'sel' : ''}`,
       'aria-label': `${d} ${MONTHS[m - 1]}: ${cs.length} case${cs.length === 1 ? '' : 's'}`, 'aria-pressed': String(iso === view.day),
       onclick: () => { view.day = view.day === iso ? null : iso; repaint(); },
-    }, h('span', { class: 'n' }, d), cs.length ? h('span', { class: 'lb-count' }, cs.length) : null, flagged ? h('i', { class: 'lb-dot', title: 'Has a flagged case' }) : null));
+    }, h('span', { class: 'n' }, d), h('span', { class: 'lb-count' + (cs.length ? '' : ' none'), 'aria-hidden': cs.length ? null : 'true' }, cs.length || ''), flagged ? h('i', { class: 'lb-dot', title: 'Has a flagged case' }) : null));
   }
   const dayCases = view.day ? (byDay.get(view.day) || []) : [];
   return h('div', {},
@@ -393,7 +407,7 @@ function calendarView(rows, flagsOf, repaint) {
           h('button', { class: 'small primary', onclick: () => logOnDate(view.day) }, '+ Log a case'),
           dayCases.length ? h('button', { class: 'small', onclick: () => shareText(dayText(view.day, dayCases)) }, 'Share day') : null,
           dayCases.length ? h('button', { class: 'small', title: 'Copy this day (format in Settings → Markdown)', 'aria-label': 'Copy this day', onclick: () => copyText(dayText(view.day, dayCases), 'Day copied: paste it into your notes') }, 'Copy') : null)),
-      dayCases.length ? h('ul', { class: 'cases' }, dayCases.map(c => caseRow(c, flagsOf))) : h('p', { class: 'empty' }, 'No cases on this day.'))
+      dayCases.length ? h('ul', { class: 'cases' }, dayCases.map(c => caseRow(c, flagsOf))) : h('p', { class: 'empty' }, view.day === today ? 'No cases yet today.' : 'No cases on this day.'))
       : h('p', { class: 'hint help', style: 'margin-top:10px' }, 'Tap a day to see its cases.'),
     undated.length ? h('details', { style: 'margin-top:12px' },
       h('summary', {}, `No date (${undated.length})`),
