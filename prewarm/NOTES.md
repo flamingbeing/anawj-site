@@ -51,6 +51,7 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   patients will go), tries to sync for a few seconds, and warns again naming any patient with changes the server
   hasn't confirmed (`pending`, kept across reloads; cleared when Firestore's waitForPendingWrites resolves). Then it
   leaves the team / signs out, deletes every patient and Firestore's offline copy on the phone, keeps settings, reloads.
+- **Admin screen:** the blank Word form card is at the bottom (owner, 12 Oct 2026).
 - **Admin join codes** (owner, 12 Oct 2026): the code is shown big; tapping it copies it. "New code" is a small link
   and warns first: the old code, link and QR stop working for new phones; phones already in stay in (use Remove).
 - **Last synced** (owner, 12 Oct 2026): home page and Settings show "Synced just now / N min ago / at 14:20 / 12 Oct

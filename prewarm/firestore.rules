@@ -10,7 +10,8 @@ rules_version = '2';
 // Data:
 //   patients/{id}   { site, created, deleted?, lock?, f: { fieldId: { v, t, by, auto? } } }
 //                   members read and write their own hospital's patients; admins all of them.
-//                   lock { on, t, by }: only admins set it; while on, members can't change the patient.
+//                   lock { on, t, by }: only admins set it; while on, the patient is read only for everyone
+//                   (an admin can only unlock it).
 //   forms/blank     the blank paper data collection form (.docx, base64), uploaded by an admin:
 //                   { b64, name, size, setAt, setBy }; members and admins read it (the Form view fills it in).
 service cloud.firestore {
@@ -79,7 +80,9 @@ service cloud.firestore {
         && (admin() || !('lock' in request.resource.data));
       allow update: if canUse(resource.data.site) && shape(request.resource.data)
         && request.resource.data.site == resource.data.site
-        && (admin() || (!locked(resource.data) && request.resource.data.get('lock', null) == resource.data.get('lock', null)));
+        && (locked(resource.data)
+          ? admin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lock'])
+          : admin() || request.resource.data.get('lock', null) == resource.data.get('lock', null));
       allow delete: if admin();
     }
   }

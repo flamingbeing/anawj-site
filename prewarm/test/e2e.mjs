@@ -221,11 +221,15 @@ try {
   await page.waitForSelector('.list a.locked');
   assert.match(await page.textContent('.list a.locked'), /Locked by the study admin/);
   await axe('home with locked patients'); await shot('locked');
+  // an admin (anyone, in demo mode) opens a locked patient read only
   await page.click('.list a.locked');
-  await toastSaysE(/Locked by the study admin/);
-  const lockedHref = await page.evaluate(() => Object.entries(JSON.parse(localStorage.getItem('prewarm-demo:patients'))).find(([, p]) => p.lock?.on)[0]);
-  await page.goto(BASE + '?demo#/p/' + lockedHref);
-  await page.waitForFunction(() => location.hash === '#/');
+  await page.waitForSelector('.board');
+  assert.ok(await page.evaluate(() => document.body.classList.contains('ro')), 'read only');
+  assert.equal(await page.isVisible('#save'), false, 'no Save');
+  assert.equal(await page.isVisible('#lognext'), false, 'no Log');
+  await shot('locked-readonly');
+  await page.goto(BASE + '?demo#/');
+  assert.equal(await page.evaluate(() => document.body.classList.contains('ro')), false);
   // unlock them all again
   await page.click('#select');
   const nSel = await page.$$eval('[data-sel]', x => x.length);
