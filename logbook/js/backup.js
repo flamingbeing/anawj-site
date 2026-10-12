@@ -2,10 +2,12 @@
 // restore that adds back whatever is missing (it never overwrites or deletes anything). Photos are
 // left out (they are for the Word portfolio only); older backups that have them still restore them.
 
-import { S, h, toast, modal, cloud, writes, download, fileButton, saveMany, patchLogbook, todayISO, displayName } from './ui-core.js';
+import { S, h, toast, modal, cloud, writes, download, fileButton, saveMany, patchLogbook, todayISO, displayName, catName } from './ui-core.js';
 import { cleanCase } from './demo-backend.js';
 import { cleanReflection } from './reflections.js';
 import { cleanNote, MAX_NOTES } from './notepad.js';
+import { backupToCsv, csvToBackup, looksLikeBackupCsv } from './backup-csv.js';
+import { HEADING_BY_ID } from './reflections.js';
 import { ensureNotes } from './ui-notepad.js';
 
 const mine = () => S.user.email;
@@ -31,6 +33,17 @@ export async function backupText(file) {
   return new Response(file.stream().pipeThrough(new DecompressionStream('gzip'))).text();
 }
 
+// the same backup as one spreadsheet (backup-csv.js): Excel shows it; Restore reads it back
+export async function downloadBackupCsv(btn) {
+  btn.disabled = true;
+  try {
+    const data = await makeBackup();
+    download(`logbook-backup-${todayISO()}.csv`, new Blob([backupToCsv(data, { catName, headingName: id => (HEADING_BY_ID[id] && HEADING_BY_ID[id].name) || id || '' })], { type: 'text/csv' }));
+    toast(`Spreadsheet saved: ${data.cases.length} cases, ${data.reflections.length} reflections, ${data.notes.length} notes`);
+  } catch (err) { toast('Could not make the spreadsheet: ' + err.message); }
+  btn.disabled = false;
+}
+
 export async function downloadBackup(btn) {
   btn.disabled = true;
   try {
@@ -43,7 +56,7 @@ export async function downloadBackup(btn) {
 
 async function restoreBackup(file) {
   let data;
-  try { data = JSON.parse(await backupText(file)); } catch { toast('That file is not a logbook backup'); return; }
+  try { const text = await backupText(file); data = looksLikeBackupCsv(text) ? csvToBackup(text, FORMAT) : JSON.parse(text); } catch { toast('That file is not a logbook backup'); return; }
   if (!data || data.format !== FORMAT || !Array.isArray(data.cases)) { toast('That file is not a logbook backup'); return; }
   const haveCases = new Set((S.cases || []).map(c => c.id));
   const haveRefl = new Set((S.reflections || []).map(r => r.id));
@@ -95,10 +108,14 @@ async function restoreBackup(file) {
 // extra: more ways to keep a copy, shown under the backup file (the Excel spreadsheet)
 export function backupCard(...extra) {
   const btn = h('button', { onclick: () => downloadBackup(btn) }, 'Download backup');
+  const csvBtn = h('button', { onclick: () => downloadBackupCsv(csvBtn) }, 'Download as one spreadsheet');
   return h('section', { class: 'card' },
     h('h2', {}, 'Backup'),
     extra.length ? h('h3', {}, 'Backup file') : null,
     h('p', { class: 'hint help' }, 'Keep your own copy of your cases, reflections, notes, tag groups, settings and portfolio details as one file. Photos are not included. Restoring adds back anything missing and never deletes.'),
-    h('div', { class: 'bar', style: 'margin-bottom:0' }, btn, fileButton('Restore from backup…', '.json,.gz,application/json,application/gzip', restoreBackup)),
+    h('div', { class: 'bar', style: 'margin-bottom:0' }, btn, fileButton('Restore from backup…', '.json,.gz,.csv,application/json,application/gzip,text/csv', restoreBackup)),
+    h('h3', { style: 'margin-top:16px' }, 'One spreadsheet (CSV)'),
+    h('p', { class: 'hint help' }, 'The same backup as one spreadsheet you can open in Excel: a row for each case, reflection and note (photos left out). Restore from backup reads it too, using its Data column, so keep that column as it is.'),
+    h('div', { class: 'bar', style: 'margin-bottom:0' }, csvBtn),
     ...extra);
 }

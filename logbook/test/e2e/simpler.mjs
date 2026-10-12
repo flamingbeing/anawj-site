@@ -1,4 +1,5 @@
-// Fake data only. Settings → Show or hide (grouped switches, a reset per group) and Basic mode.
+// Fake data only. Settings → Show or hide (grouped switches, a reset per group), Basic mode, and the backup as one
+// spreadsheet (CSV download and restore).
 import assert from 'node:assert/strict';
 const { chromium } = await import(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/node_modules/playwright/index.mjs');
 const base = `http://localhost:${process.env.PORT || 8080}/logbook/`;
@@ -70,6 +71,25 @@ try { for (const width of [390, 1280]) {
   await p.locator('[role=tab][data-tab=progress]').click();
   await p.locator('.an-sec summary').filter({ hasText: 'Trends' }).waitFor();
   assert.deepEqual(await p.locator('[role=tab]').evaluateAll(t => t.map(x => x.dataset.tab)), tabsBasic);   // same tabs either way
+
+  // the backup as one spreadsheet: it downloads, and Restore reads it (adding only what's missing)
+  await p.evaluate(() => { location.hash = '#data'; });
+  for (const sm of await p.locator('details:not([open]) > summary').all()) await sm.click().catch(() => {});
+  const dl = p.waitForEvent('download');
+  await p.getByRole('button', { name: 'Download as one spreadsheet' }).click();
+  const file = await dl;
+  assert.match(file.suggestedFilename(), /^logbook-backup-\d{4}-\d{2}-\d{2}\.csv$/);
+  const csv = await p.evaluate(async () => {
+    const { makeBackup } = await import('./js/backup.js'); const { backupToCsv } = await import('./js/backup-csv.js');
+    const d = await makeBackup();
+    d.cases = [...d.cases, { id: 'fake-csv-case', date: '2026-10-01', initials: 'ZZ', details: 'Fake CSV case', cats: ['01'], createdAt: 1, updatedAt: 1, source: 'app' }];
+    d.notes = [...d.notes, { id: 'fake-csv-note', date: null, title: 'Fake CSV note', body: 'x', createdAt: 1, updatedAt: 1 }];
+    return backupToCsv(d);
+  });
+  await p.locator('input[type=file][accept*=".gz"]').setInputFiles({ name: 'logbook-backup.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) });
+  await p.locator('dialog[open]').filter({ hasText: /Add 1 case, 0 reflections, 1 note/ }).waitFor();
+  await p.locator('dialog[open]').getByRole('button', { name: 'Restore', exact: true }).click();
+  await p.getByText(/Restored 1 cases, 0 reflections, 1 notes/).waitFor();
 
   assert.deepEqual(errors, []); await ctx.close(); console.log(`PASS show or hide ${width === 390 ? 'phone' : 'desktop'}`);
 } } finally { await b.close(); }
