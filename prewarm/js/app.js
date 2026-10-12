@@ -550,15 +550,22 @@ function clockHtml(p, s) {
   return `${next}<div class="now"><small>Time now</small><b>${fromMin(Math.floor(nowMin()))}</b></div>`;
 }
 function nextDue(p, s) {
-  const now = nowFor(p, s), all = [];
-  // the reading due most recently (until the next one is due), else the next one coming up
-  const timed = pointsFor(p, s).map(x => ({ x, due: dueOf(p, s, x) })).filter(t => t.due != null && expected(p, s, t.due)).sort((a, b) => a.due - b.due);
-  const cur = timed.filter(t => t.due <= now).pop(), up = timed.find(t => t.due > now && !savedAt(p, s, t.x.key));
-  const pick = cur && !savedAt(p, s, cur.x.key) ? cur : up;
-  if (pick) all.push({ label: (s === 'haemo' ? 'BP ' : 'Temp ') + pick.x.label, left: pick.due - now });
+  const all = [], mine = duePick(p, s);
+  if (mine) all.push(mine);
+  // the other tab's reading once it is due and this tab's isn't (a temperature due now shows on the Others tab too)
+  const other = duePick(p, s === 'haemo' ? defaultSeries(p) : 'haemo');
+  if (other && other.left <= 0 && !(mine?.left <= 0)) all.push(other);
   const nx = nextEvent(p);
   if (nx?.due != null) all.push({ label: nx.label, left: nx.due - nowFor(p, 'prewarm') });
   return all.sort((a, b) => a.left - b.left)[0] || null;
+}
+// the reading due most recently (until the next one is due), else the next one coming up
+function duePick(p, s) {
+  const now = nowFor(p, s);
+  const timed = pointsFor(p, s).map(x => ({ x, due: dueOf(p, s, x) })).filter(t => t.due != null && expected(p, s, t.due)).sort((a, b) => a.due - b.due);
+  const cur = timed.filter(t => t.due <= now).pop(), up = timed.find(t => t.due > now && !savedAt(p, s, t.x.key));
+  const pick = cur && !savedAt(p, s, cur.x.key) ? cur : up;
+  return pick ? { label: (s === 'haemo' ? 'BP ' : 'Temp ') + pick.x.label, left: pick.due - now } : null;
 }
 // the next event to note: the first unset one after the last one set (warming off: when it is expected)
 function nextEvent(p) {
