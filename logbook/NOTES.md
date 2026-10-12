@@ -212,8 +212,12 @@ portfolio content.
   boxes cap at 1.2 so they never look like radio buttons. **Soft shadows instead of lines** (`shadows`, cards only).
   **Bigger tap targets on the Case tab** (Advanced display, `bigTaps`). **Tab bar order and hidden tabs** (Advanced
   display, `tabOrder` / `tabHidden`, `arrangeTabs` in ui-settings.js): ↑ ↓ and a switch per tab; More can't be
-  hidden, at least two stay; hidden tabs are listed first on More ("Hidden from the tab bar") and links still open
-  them; a hidden start tab gives way to the first one on the bar. All set at first paint where it matters.
+  hidden, at least two and at most seven (`MAX_BAR`, More included; owner, Oct 2026) stay. Every page in the More list
+  (Account, Settings, Recover drafts, Export / Import, Admin portal for admins; `bar: true` in TABS, a `short` label on
+  the bar) can go on the bar, off by default like Notes; its own pages select it (Display → Settings). An eighth asks
+  which tab it replaces and takes that tab's place (`setTabOnBar`; also the Notes page's "Add Notes to the tab bar").
+  Hidden main tabs are listed first on More ("Hidden from the tab bar"; the More pages stay in their own list) and
+  links still open them; a hidden start tab gives way to the first one on the bar. All set at first paint where it matters.
 - **Optional interaction** (Advanced display, device): **Swipe left or right to change tab** (`swipeTabs`, html
   `swipe-tabs`; app.js touch handlers on main). **On by default** (owner, Oct 2026: `swipeTabs: false` = off, the
   switch is also in Show or hide → Header and tabs). Touch handlers on the document, so the empty background under

@@ -99,12 +99,36 @@ try { for (const width of [390, 1280]) {
   const backup = await p.evaluate(async () => { const { makeBackup } = await import('./js/backup.js'); return (await makeBackup()).notes.map(n => n.title || n.body); });
   assert.equal(backup.length, 2);
 
-  // Arrange tabs can put Notes on the bar
-  await p.evaluate(() => { location.hash = '#displayadv'; });
-  await p.getByLabel('Show Notes', { exact: true }).check();
+  // the Notes page offers the tab bar
+  const barTabs = () => p.locator('[role=tab]').evaluateAll(t => t.map(x => x.dataset.tab));
+  await p.evaluate(() => { location.hash = '#notes'; });
+  await p.getByRole('button', { name: 'Add Notes to the tab bar' }).click();
   await p.locator('[role=tab][data-tab=notes]').waitFor();
-  await p.getByLabel('Show Notes', { exact: true }).uncheck();
-  await p.waitForFunction(() => !document.querySelector('[role=tab][data-tab=notes]'));
+  assert.deepEqual(await barTabs(), ['log', 'logbook', 'reflect', 'progress', 'notes', 'more']);
+  assert.equal(await p.getByRole('button', { name: 'Add Notes to the tab bar' }).count(), 0);
+  // the More pages can go on the bar too, and their own pages select them; seven tabs at most, so an eighth asks
+  // which tab it replaces (and takes its place)
+  await p.evaluate(() => { location.hash = '#displayadv'; });
+  await p.getByLabel('Show Settings', { exact: true }).check();
+  await p.locator('[role=tab][data-tab=settings][aria-selected=true]').waitFor();   // Display → Advanced is under Settings
+  await p.getByLabel('Show Export / Import', { exact: true }).check();
+  await p.locator('dialog[open]').getByRole('button', { name: 'Cancel' }).click();
+  assert.equal(await p.locator('[role=tab][data-tab=data]').count(), 0);
+  assert.equal(await p.getByLabel('Show Export / Import', { exact: true }).isChecked(), false);
+  await p.getByLabel('Show Export / Import', { exact: true }).check();
+  await p.locator('dialog[open]').getByRole('button', { name: 'Notes' }).click();
+  await p.locator('[role=tab][data-tab=data]').filter({ hasText: 'Export' }).waitFor();
+  assert.deepEqual(await barTabs(), ['log', 'logbook', 'reflect', 'progress', 'data', 'settings', 'more']);
+  // More still lists every page; a hidden main tab comes first
+  await p.getByLabel('Show Analytics', { exact: true }).uncheck();
+  await p.locator('[role=tab][data-tab=more]').click();
+  assert.match(await p.locator('.more-list li').first().innerText(), /Analytics/);
+  assert.equal(await p.locator('.more-list a[data-go=settings]').count(), 1);
+  // over seven (a settings file, say): the last ones before More go to More
+  assert.deepEqual(await p.evaluate(async () => { const { arrangeTabs, BAR_TABS } = await import('./js/ui-settings.js');
+    return arrangeTabs(BAR_TABS.map(([id]) => id), { tabHidden: [], tabOrder: BAR_TABS.map(([id]) => id) }).shown; }),
+    ['log', 'logbook', 'reflect', 'progress', 'notes', 'account', 'more']);
+  await p.evaluate(async () => { const { applyDisplay, setDisplay } = await import('./js/ui-settings.js'); applyDisplay(setDisplay({ tabHidden: null, tabOrder: null })); });
 
   // at 100 notes, no more
   await p.evaluate(async () => {
