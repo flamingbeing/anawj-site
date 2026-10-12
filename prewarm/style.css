@@ -260,6 +260,8 @@ body.ro main .k, body.ro main .num, body.ro main .chip, body.ro main .tchip, bod
 .sign.on .tick { background: var(--ok); border-color: var(--ok); }
 .sign.on b { display: block; font-size: 15px; }
 .sign.on small { display: block; font-weight: 400; color: var(--muted); }
+/* no pull-to-refresh: a pull while scrolling up shouldn't reload mid-case */
+html, body { overscroll-behavior-y: none; }
 /* the two tabs under the bar: temperatures, BP / HR / BIS */
 .ptabs:not([hidden]) { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; max-width: 600px; margin: 0 auto; padding: 0 12px 5px; }
 .ptabs a { display: grid; place-items: center; min-height: 32px; border-radius: var(--r); border: 1px solid var(--line); color: var(--navy); font-size: 14px; font-weight: 600; text-decoration: none; background: var(--card); }
