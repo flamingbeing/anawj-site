@@ -199,11 +199,14 @@ export const barTabs = () => BAR_TABS.filter(([id]) => (id !== 'admin' || S.admi
 // person's own Case, Logbook and Reflections in More instead.
 const OFF_BAR = ['caselogs', 'notes', 'account', 'settings', 'recovery', 'data', 'admin'];
 const PROFILE_OFF = { advanced: [], basic: ['progress'], logbook: ['progress', 'reflect'], faculty: ['log', 'logbook', 'reflect'] };
-const offBar = mode => [...OFF_BAR.filter(id => mode !== 'faculty' || id !== 'caselogs'), ...(PROFILE_OFF[mode] || [])];
+// (Faculty / PCs also puts the Admin portal on the bar, for admins: the tab is theirs only)
+const offBar = mode => [...OFF_BAR.filter(id => mode !== 'faculty' || (id !== 'caselogs' && id !== 'admin')), ...(PROFILE_OFF[mode] || [])];
 export const MAX_BAR = 7;
 export function arrangeTabs(ids, d = {}, mode = profile()) {
   const order = Array.isArray(d.tabOrder) ? d.tabOrder : [];
-  const at = id => (order.includes(id) ? order.indexOf(id) : order.length + ids.indexOf(id));
+  // a tab not in the saved order goes just before More (More stays last unless moved)
+  const before = order.includes('more') ? order.indexOf('more') - 0.5 : order.length;
+  const at = id => (order.includes(id) ? order.indexOf(id) : id === 'more' ? order.length + 1e3 : before + ids.indexOf(id) / 1e3);
   const sorted = [...ids].sort((a, b) => at(a) - at(b));
   // an OFF_BAR tab stays off until someone shows it in Arrange tabs (which saves the order with it in)
   const hidden = new Set([...(Array.isArray(d.tabHidden) ? d.tabHidden : []), ...offBar(mode).filter(id => !order.includes(id) || !Array.isArray(d.tabHidden))].filter(id => id !== 'more'));
@@ -660,9 +663,9 @@ export function profileCard() {
       // this device's saved tabs: the old profile's hidden tabs back, the new one's away
       const hid = new Set(d.tabHidden);
       for (const id of PROFILE_OFF[was] || []) hid.delete(id);
-      if (was === 'faculty') hid.add('caselogs');
+      if (was === 'faculty') { hid.add('caselogs'); hid.add('admin'); }
       for (const id of PROFILE_OFF[mode] || []) hid.add(id);
-      if (mode === 'faculty') hid.delete('caselogs');
+      if (mode === 'faculty') { hid.delete('caselogs'); hid.delete('admin'); }
       applyDisplay(setDisplay({ tabHidden: [...hid] }));
     }
     hooks.paintTabs?.(); hooks.render(); toast(`Profile: ${PROFILES.find(([k]) => k === mode)[1]}`);

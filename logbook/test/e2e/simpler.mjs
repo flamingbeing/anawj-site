@@ -133,7 +133,10 @@ try { for (const width of [390, 1280]) {
   // Faculty / PCs (faculty, PDs and admins; the demo user is an admin): Case logs, Analytics (the programme's), More
   await pickProfile('faculty');
   await p.waitForFunction(() => document.body.classList.contains('faculty-profile'));
-  assert.deepEqual(await tabsNow(), ['caselogs', 'progress', 'more']);
+  assert.deepEqual(await tabsNow(), ['caselogs', 'progress', 'admin', 'more'], 'admins get the Admin portal left of More');
+  await p.locator('[role=tab][data-tab=admin]').click();
+  await p.locator('a[data-go=adminresidents]').click();
+  assert.equal(await p.locator('[role=tab][data-tab=admin]').getAttribute('aria-selected'), 'true', 'Admin portal pages sit under its tab');
   await p.locator('[role=tab][data-tab=caselogs]').click();
   await p.locator('.caselog-list li').filter({ hasText: 'Resident A' }).waitFor();
   assert.match(await p.locator('.caselog-list li').filter({ hasText: 'Resident A' }).innerText(), /\d+ cases/);
