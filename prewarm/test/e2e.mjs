@@ -58,9 +58,10 @@ try {
   assert.match(await page.textContent('#due'), /due \d\d:\d\d/);
   // the 0-min reading is due right now: the due time shows its 'now' state
   await page.waitForFunction(() => document.querySelector('#due')?.dataset.state === 'now', null, { timeout: 5000 });
-  // running timer from warming on, and the next event to note (10-min group: warming off 10 min later)
-  assert.match(await page.textContent('#clock'), /Prewarm \+\d+:\d\d/);
-  assert.match(await page.textContent('#clock'), /Next: Prewarm off \d\d:\d\d/);
+  // the top bar: the time now, and to its left what to log next and when (the 0-min temperature, due now)
+  assert.match(await page.textContent('#clock .now'), /Now\s*\d\d:\d\d/);
+  assert.match(await page.textContent('#clock .next'), /Temp 0 min\s*now/);
+  assert.equal(await page.getAttribute('#clock .next', 'data-state'), 'now');
   // the app bar's Log button sets the next event to now (then cleared again from its box)
   assert.match(await page.textContent('#lognext'), /Log\s*Prewarm off/);
   await page.click('#lognext');

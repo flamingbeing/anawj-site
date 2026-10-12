@@ -407,16 +407,27 @@ const ESSENTIAL = ['pw_gown', 'pw_start', 'ev_wstop', 'ev_ot', 'io_knife', 'io_d
 const WARM_MIN = { 1: 30, 2: 10 };
 const mmss = m => { const sec = Math.max(0, Math.floor(m * 60)), h = Math.floor(sec / 3600), mm = Math.floor(sec / 60) % 60, ss = String(sec % 60).padStart(2, '0');
   return h ? `${h}:${String(mm).padStart(2, '0')}:${ss}` : `${mm}:${ss}`; };
+// top bar (owner, 12 Oct 2026): on the right the time now (it sits above the time boxes); to its left a countdown to the
+// next thing to log: the next reading due on this screen, or warming off, whichever comes first
 function clockHtml(p, s) {
-  const now = nowMin();
-  const anchors = s === 'prewarm' ? [['pw_start', 'Prewarm'], ['pw_gown', 'Gown on']]
-    : [['io_knife', 'Induction'], ['ev_ot', 'In OT']];
-  const [aid, alabel] = anchors.find(([id]) => toMin(val(p, id)) != null) || [];
-  let timer = `<span class="lbl">Now</span> <b>${fromMin(Math.floor(now))}</b>`;
-  if (aid) { let m = now - toMin(val(p, aid)); if (m < 0) m += 1440; timer = `<span class="lbl">${alabel} +</span><b>${mmss(m)}</b>`; }
+  const now = nowMin(), n = nextDue(p, s);
+  let next = '';
+  if (n) {
+    const left = n.due - now, st = left > 2 ? 'later' : left > 0 ? 'soon' : left > -5 ? 'now' : 'late';
+    next = `<div class="next" data-state="${st}"><small>${esc(n.label)}</small><b>${left > 0 ? 'in ' + mmss(left) : left > -5 ? 'now' : 'late ' + mmss(-left)}</b></div>`;
+  }
+  return `${next}<div class="now"><small>Now</small><b>${fromMin(Math.floor(now))}</b></div>`;
+}
+function nextDue(p, s) {
+  const now = nowMin(), all = [];
+  // the reading due most recently (until the next one is due), else the next one coming up
+  const timed = pointsFor(p, s).map(x => ({ x, due: dueOf(p, s, x) })).filter(t => t.due != null).sort((a, b) => a.due - b.due);
+  const cur = timed.filter(t => t.due <= now).pop(), up = timed.find(t => t.due > now && !savedAt(p, s, t.x.key));
+  const pick = cur && !savedAt(p, s, cur.x.key) ? cur : up;
+  if (pick) all.push({ label: (s === 'haemo' ? 'BP ' : 'Temp ') + pick.x.label, due: pick.due });
   const nx = nextEvent(p);
-  const note = nx ? `Next: ${nx.label}${nx.due == null ? '' : now >= nx.due ? ' <i>now</i>' : ' ' + fromMin(nx.due)}` : '';
-  return `<span>${timer}</span>${note ? `<small>${note}</small>` : ''}`;
+  if (nx?.due != null) all.push({ label: nx.label, due: nx.due });
+  return all.sort((a, b) => a.due - b.due)[0] || null;
 }
 // the next event to note: the first unset one after the last one set (warming off: when it is expected)
 function nextEvent(p) {
@@ -454,7 +465,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
   const main = s !== 'haemo';
   const def = SERIES[s], pts = pointsFor(p, s);
   header(main ? sid(p) : sid(p) + ' · BP, HR, BIS', main ? '#/' : '#/p/' + id);
-  const refreshBar = topBar(p, main ? s : 'iotemp', () => draw());
+  const refreshBar = topBar(p, s, () => draw());
   let editing = null; // event whose time is being changed
   let typing = null; // the BP / HR / BIS box with the keyboard up
   // default timepoint: the unsaved one nearest its due time, else the first unsaved

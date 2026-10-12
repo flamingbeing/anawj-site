@@ -78,6 +78,10 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
 - **Due time warms up** (owner, 12 Oct 2026): the "due hh:mm" beside each timepoint is plain until 2 min before,
   then an amber pill with a slow pulse (soon), an orange-red pill with a stronger pulse from due to 5 min past (now),
   and a red pill with a fast pulse after that (late); plain once the reading is saved. Reduced motion: colours only.
+- **Top bar** (owner, 12 Oct 2026): on the right the time now ("Now 16:08", above the time boxes); to its left the next
+  thing to log and a countdown: the reading due most recently on this screen (Temp or BP, until the next is due) or the
+  next one, or warming off, whichever is first ("Temp 20 min · in 1:42" / "now" / "late 5:29"), coloured and pulsing
+  like the due time. Then the Log button for the next event. The old "Prewarm + 12:34" elapsed timer is gone.
 - **BP, HR, BIS are typed boxes** (owner, 12 Oct 2026): no − / + (the numbers are big); plain boxes that stay boxes
   (no redraw while typing), so tapping the next box or Enter ("next" on the keyboard) keeps the keyboard up. Save as before.
 - **Ask before leaving an unsaved reading** (owner, 12 Oct 2026): readings (temperatures, BP / HR / BIS) still save only

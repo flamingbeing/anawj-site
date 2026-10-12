@@ -36,11 +36,16 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .bar h1 { flex: 0 1 auto; margin: 0; font-size: 17px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* running timer and next event (patient screen) */
 #extra { display: flex; align-items: center; gap: 2px; min-width: 0; }
-.clock { display: grid; justify-items: end; line-height: 1.15; min-width: 0; text-align: right; color: var(--navy); }
-.clock b { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.clock { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; margin-left: 8px; color: var(--navy); }
+.clock > div { display: grid; justify-items: end; line-height: 1.15; text-align: right; min-width: 0; }
 .clock small { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-.clock small i { font-style: normal; font-weight: 700; color: var(--warn); }
-.clock .lbl { font-size: 11px; color: var(--muted); margin-right: 2px; }
+.clock b { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.clock .next b { font-size: 15px; }
+.clock .next[data-state="soon"], .clock .next[data-state="now"], .clock .next[data-state="late"] { padding: 1px 8px; border-radius: var(--r); }
+.clock .next[data-state] small { color: inherit; }
+.clock .next[data-state="soon"] { background: var(--warn-soft); color: var(--warn); animation: duepulse 2s ease-in-out infinite; --pulse: rgba(138, 90, 0, .35); }
+.clock .next[data-state="now"] { background: #fde3d3; color: #9a3412; animation: duepulse 1.2s ease-in-out infinite; --pulse: rgba(229, 114, 0, .55); }
+.clock .next[data-state="late"] { background: var(--err); color: #fff; animation: duepulse .7s ease-in-out infinite; --pulse: rgba(180, 35, 24, .6); }
 .bar #extra { flex: 1 1 auto; justify-content: flex-end; }
 .logbtn { display: grid; justify-items: center; align-content: center; min-width: 60px; max-width: 84px; min-height: var(--tap); margin-left: 6px; padding: 2px 6px; border: 0; border-radius: var(--r); background: var(--navy); color: #fff; line-height: 1.1; cursor: pointer; touch-action: manipulation; }
 .logbtn b { font-size: 15px; }
@@ -155,7 +160,7 @@ span.pn { color: var(--line); }
 .due[data-state="now"] { background: #fde3d3; color: #9a3412; animation: duepulse 1.2s ease-in-out infinite; --pulse: rgba(229, 114, 0, .55); }
 .due[data-state="late"] { background: var(--err); color: #fff; animation: duepulse .7s ease-in-out infinite; --pulse: rgba(180, 35, 24, .6); }
 @keyframes duepulse { 0%, 100% { box-shadow: 0 0 0 0 var(--pulse); } 50% { box-shadow: 0 0 0 6px transparent; } }
-@media (prefers-reduced-motion: reduce) { .due[data-state] { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .due[data-state], .clock .next[data-state] { animation: none; } }
 .due .hint { font-size: 12px; font-weight: 400; color: var(--warn); }
 .badge { font-size: 12px; background: var(--chip); color: var(--navy); border-radius: var(--r-full); padding: 2px 8px; vertical-align: middle; font-weight: 600; }
 
