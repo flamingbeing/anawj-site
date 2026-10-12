@@ -90,7 +90,7 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   own backgrounds (key times blue-grey; tab bar and readings; shared bottom part beige). Swipe changes tab only in
   the middle part (a touch starting on a −/+ button is its hold-to-repeat, not a swipe). The second tab is named
   "BP, HR, BIS". "Reset this subject" (small, bottom part) asks twice, then clears every entry except the Subject
-  ID, group and hospital, on every phone. "PACU view" on the home list: tapping a participant opens only their
+  ID, group and hospital, on every phone. "PACU view" button beside New patient: tapping a participant opens only their
   PACU page (to hand the phone to the PACU nurse); back returns to that list.
 - **PACU page times; temperature ticks** (owner, 12 Oct 2026): the PACU page starts with PACU in / To ward boxes
   (tap logs now, tap again to change) so the PACU nurse logs them there. The Temperatures tab has "Mark pre-warming

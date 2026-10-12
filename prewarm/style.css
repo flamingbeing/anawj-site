@@ -378,3 +378,6 @@ dialog.ask p { margin: 0 0 6px; }
 .resetline { margin: 4px 0 0; text-align: center; }
 .resetline .link { font-size: 12px; color: var(--muted); }
 .pacutimes { grid-template-columns: 1fr 1fr; margin-bottom: 8px; }
+/* home: New patient and PACU view side by side */
+.newrow { display: grid; grid-template-columns: 2fr 1fr; gap: 8px; }
+#pacuview { font-weight: 600; color: var(--navy); border-color: var(--navy); }
