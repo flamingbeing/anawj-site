@@ -1234,7 +1234,7 @@ details.note-format ul { margin: 0 0 4px; padding-left: 18px; } details.note-for
 .pick-cases li { grid-template-columns: 1fr !important; }
 
 /* Basic mode (settings.basic): advancedLink draws a line saying the advanced page is hidden, instead of the link */
-.adv-hidden { margin: 12px 4px; }
+.more-settings-note { margin: 12px 4px; }
 
 /* reflection formatting buttons (Settings → Reflections, this device) */
 .fmt-bar { display: flex; gap: 6px; margin: 0 0 4px; }

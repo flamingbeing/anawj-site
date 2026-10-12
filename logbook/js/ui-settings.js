@@ -223,9 +223,9 @@ export const resetLink = (what, run) => h('p', { class: 'reset-row' }, h('button
 // a link to a settings page's own Advanced page, like a row of the More list. Basic mode hides it, but says so
 // (owner, Oct 2026: a link that silently vanished looked like a bug), decided here from the setting itself
 export const advancedLink = (id, label, desc) => settings().basic
-  ? h('p', { class: 'hint adv-hidden' }, `${label} are hidden while Basic mode is on. `,
+  ? h('p', { class: 'hint more-settings-note' }, `${label} are hidden while Basic mode is on. `,
     h('a', { href: '#settings', 'data-go': 'settings' }, 'Turn off Basic mode ›'))
-  : h('section', { class: 'card more-list adv-link' },
+  : h('section', { class: 'card more-list more-settings' },
   h('ul', {}, h('li', {}, h('a', { href: '#' + id, 'data-go': id },
     h('span', { class: 'mt' }, h('b', {}, label), h('small', {}, desc)), h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')))));
 export const cleanTitle = s => String(s || '').replace(/[\u0000-\u001f]/g, '').replace(/\s+/g, ' ').trim().slice(0, 40);

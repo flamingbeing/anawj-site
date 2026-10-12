@@ -394,6 +394,10 @@ portfolio content.
 - Owner preferences (merging, screenshots, planning, new options): see "Working with the owner" in `AGENTS.md`.
   Logbook calls so far: no tag renames (APMES tag names stay), no raw regex, no swipe actions on cases, no tag
   numbers on screen, no What's new, frictionless logging first.
+- **Ad blockers hide class names on their lists** (Oct 2026): EasyList (uBlock Origin etc., common on Firefox for
+  Android; Chrome on Android has no add-ons) has `##.adv-link`, so the Advanced settings links vanished on the owner's
+  Firefox while Chrome showed them. Avoid ad-like class and id names (adv-, ad-, advert, banner-ad, sponsor…); when
+  something is missing on one browser only, check https://easylist.to/easylist/easylist.txt for its class first.
 - Learned in Oct 2026 (Claude Code session, PRs #133–#152):
   - How a new option is built here: per device (`DISPLAY_KEYS`, html classes from `applyLook`, first paint in
     index.html) unless it belongs to the account; "Reset this page" and the settings file must cover it; defaults
