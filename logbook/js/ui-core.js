@@ -34,10 +34,21 @@ export const S = {
 export const hooks = { render() {}, casesChanged() {} };
 
 export const settings = () => ({ suggestions: true, rYear: 1, ...(S.logbook && S.logbook.settings) });
-// Basic mode (Settings, settings.basic): a simpler app for new residents. Tabs and buttons stay where they are;
-// the extras go (quick picks and the other optional Case tab parts, the Logbook grid and search operators,
-// Analytics trends, advanced settings). Nothing else is changed, so turning it off brings everything back.
-export const basicMode = () => !!settings().basic;
+// Profiles (settings.mode, the whole account; at the top of Settings → Show or hide). Advanced (the default) hides
+// nothing. Basic is a simpler app for new residents: tabs and buttons stay where they are; the extras go (quick picks
+// and the other optional Case tab parts, the Logbook grid and search operators, Analytics trends and forecasts,
+// advanced settings, reflection figures and references), and Analytics moves into More. Basic: logbook only is Basic
+// without reflections, for residents who submit theirs separately (Reflections moves into More, for ones already
+// written; no Reflect buttons or ☆ Interesting). Nothing else is changed, so Advanced brings everything back.
+// settings.basic (before profiles) reads as Basic.
+export const PROFILES = [
+  ['advanced', 'Advanced', 'Everything: quick picks, the Logbook grid, search operators, Analytics trends and forecasts, advanced settings.'],
+  ['basic', 'Basic', 'A simpler app for getting started: the same tabs and buttons without the extras. Analytics is in More.'],
+  ['logbook', 'Basic: logbook only', 'Basic without reflections, if you submit your reflections separately. Reflections you already wrote stay in More.'],
+];
+export const profile = () => { const s = settings(); return s.mode === 'basic' || s.mode === 'logbook' ? s.mode : s.basic ? 'basic' : 'advanced'; };
+export const basicMode = () => profile() !== 'advanced';
+export const logbookOnly = () => profile() === 'logbook';
 // The intake on the list, or the year the rid starts with.
 export function baseIntake(r) {
   if (!r) return null;

@@ -278,13 +278,24 @@ portfolio content.
   group with its own "Reset this group" (the other groups stay); a Reflections group too (formatting buttons,
   heading notes). The same settings as on their own pages (hideTips, weeklyDigest, reflNotes, caseHide, reflToolbar; this device's rowMenu, hideHeader, tabHidden / tabOrder). e2e:
   `test/e2e/simpler.mjs`.
-- **Basic mode** (`settings.basic`, the whole account; `basicMode()` in `ui-core.js`; a switch at the top of Settings
-  and of Show or hide; body class `basic`): a simpler app for new residents. Same tabs and buttons in the same places;
-  hidden: every optional Case tab part but "what the box was read as" (quick picks, ☆, Still needed, tag group saving,
-  Plan for later), the Logbook Grid view and search operators, Analytics Trends, the Advanced display / logging links
-  (`advancedLink` draws "… are hidden while Basic mode is on. Turn off Basic mode ›" instead, from the setting itself:
-  a silently missing link looked like a bug to the owner, Oct 2026), the settings file and Connect Claude cards. It changes no other setting, so off brings everything back. e2e:
-  `simpler.mjs`.
+- **Profiles** (`settings.mode`, the whole account; `PROFILES`, `profile()`, `basicMode()`, `logbookOnly()` in
+  `ui-core.js`; `profileCard` at the top of Settings → Show or hide, the **only** place (owner, Oct 2026: two Basic
+  switches confused); body classes `basic`, `logbook-only`). Named so both Basic ones read as Basic (owner):
+  - **Advanced** (default, nothing saved): hides nothing. Only the Basic profiles hide anything.
+  - **Basic** (was Basic mode; `settings.basic: true` still reads as Basic): same tabs and buttons in the same places;
+    hidden: every optional Case tab part but "what the box was read as" (quick picks, ☆, Still needed, tag group
+    saving, Plan for later), the Logbook Grid view and search operators, Analytics Trends / forecasts / Gone quiet /
+    to-dos / links, the Advanced display / logging links (`advancedLink` says "… are hidden in the Basic profile.
+    Change profile ›": a silently missing link looked like a bug to the owner), the settings file and Connect Claude
+    cards, and reflection **Figures and References** (shown anyway when a reflection already has some). **Analytics
+    moves into More** (off the bar by default, like Notes; can be put back on the bar).
+  - **Basic: logbook only**: Basic without reflections, for residents allowed to submit reflections separately (the
+    PCs still need compiled case logs). No Reflections tab (its page stays in More for ones already written; no
+    switch for it on the bar), no Reflect buttons or row-menu item, no ☆ Interesting (edit dialog, Logbook filter),
+    no reflection headings card in Analytics.
+  - Choosing a profile changes no other setting (Advanced brings everything back); it also moves this device's saved
+    tabs (Analytics into More for Basic, back for Advanced). Admin profile planned next (owner: no Generic).
+  e2e: `simpler.mjs`.
 - **One spreadsheet (CSV)** (Backup card, "Download as one spreadsheet"; `backup-csv.js`, tested; Oct 2026, from
   Codex's list): the backup as one CSV for Excel: a `logbook` row (settings, tag groups, portfolio details) then a row
   per case, reflection and note (photos left out). Readable columns (Kind, ID, Date, Initials, Title, Text, Tags,

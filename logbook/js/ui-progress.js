@@ -8,7 +8,7 @@ import { reflectionProgress, HEADING_BY_ID } from './reflections.js';
 import { logbookGlance, reflectionGlance, cohortGlance } from './glance.js';
 import { paceForecast, paceText, goneQuiet, reflectionTodos } from './analytics.js';
 import { reflectOnCase, openReflection } from './ui-reflect.js';
-import { S, h, toast, cloud, rYear, myYearName, settings, subcatsOf, patchLogbook, needExcel, download, displayName, hooks, add, resetters, info, catName, catShort, tagName, summaryOf, basicMode } from './ui-core.js';
+import { S, h, toast, cloud, rYear, myYearName, settings, subcatsOf, patchLogbook, needExcel, download, displayName, hooks, add, resetters, info, catName, catShort, tagName, summaryOf, basicMode, logbookOnly } from './ui-core.js';
 
 const STATUS_TEXT = { late: 'Behind', due: 'Due this year', ontrack: 'On track', done: 'Done', none: 'No target' };
 // Advanced mode only (not Basic): pace forecast, Gone quiet, Reflection to-dos, and numbers that open their cases
@@ -78,7 +78,7 @@ export function renderProgress() {
     h('ul', {}, h('li', {}, h('a', { href: '#totals' },
       h('span', { class: 'mt' }, h('b', {}, 'Compare with your intake'), h('small', {}, 'Case counts per tag across residents in your year (Totals)')),
       h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')))));
-  return h('div', {}, head, urgentSec, quietSec, targets, reflCard(), advanced() ? todoCard() : null, basicMode() ? null : trendsCard(), compare);
+  return h('div', {}, head, urgentSec, quietSec, targets, logbookOnly() ? null : reflCard(), advanced() ? todoCard() : null, basicMode() ? null : trendsCard(), compare);
 }
 
 // A folded card: the title and a one-line summary; tap to open the full section (kept open while you stay).

@@ -10,7 +10,7 @@ import { parseQuery, matchQuery, OPERATOR_HELP, insertOperator } from './search-
 import { parseCsv } from './tags.js';
 import {
   S, h, toast, debounce, modal, cat, categoryNamesRevision, catName, catShort, tagName, catFull, catChip, PICKER_ORDER, settings, patchLogbook, needExcel, download, fileButton, catPills,
-  updateCase, saveMany, deleteMany, displayName, rYear, todayISO, fill, add, resetters, tagSet, tagLinks, confirmBox, keepTags, hooks, rowIcon, basicMode } from './ui-core.js';
+  updateCase, saveMany, deleteMany, displayName, rYear, todayISO, fill, add, resetters, tagSet, tagLinks, confirmBox, keepTags, hooks, rowIcon, basicMode, logbookOnly } from './ui-core.js';
 import { dayHasNotes, caseHasNotes, openNotes, ensureNotes } from './ui-notepad.js';
 import { flatTree, tagTree } from './tags.js';
 import { editCaseDialog, logOnDate } from './ui-log.js';
@@ -112,7 +112,7 @@ export function renderLogbook() {
   const paintSoon = debounce(() => { view.limit = 150; paint(); }, 150);
 
   const nFlag = f => S.cases.filter(c => flagsOf(c).includes(f)).length;
-  const flagOpts = [['', 'All cases'], ['needsDate', `Needs a date (${nFlag('needsDate')})`], ['duplicate', `Possible duplicates (${nFlag('duplicate')})`], ['future', `Upcoming (${nFlag('future')})`], ['interesting', `☆ Interesting (${S.cases.filter(c => c.reflectTag).length})`]];
+  const flagOpts = [['', 'All cases'], ['needsDate', `Needs a date (${nFlag('needsDate')})`], ['duplicate', `Possible duplicates (${nFlag('duplicate')})`], ['future', `Upcoming (${nFlag('future')})`], ...(logbookOnly() ? [] : [['interesting', `☆ Interesting (${S.cases.filter(c => c.reflectTag).length})`]])];
   const counter = h('span', { class: 'muted', style: 'font-size:calc(13px * var(--fs, 1))' });
 
   // the two filters fold behind a Filter button (shown open while one is in use)
@@ -331,13 +331,14 @@ function rowMenu(c) {
     e.stopPropagation();
     const m = modal(caseText(c).slice(0, 60) || 'Case', h('div', { class: 'row-menu-list' },
       h('button', { onclick: () => { m.close(); copyText(shareCaseText(c), 'Case copied: paste it into your notes'); } }, rowIcon('copy'), ' Copy'),
-      h('button', { class: has ? 'has-refl' : '', onclick: () => { m.close(); reflectOnCase(c); } }, rowIcon(has ? 'done' : 'reflect'), has ? ' Open the reflection' : ' Write a reflection'),
+      logbookOnly() ? null : h('button', { class: has ? 'has-refl' : '', onclick: () => { m.close(); reflectOnCase(c); } }, rowIcon(has ? 'done' : 'reflect'), has ? ' Open the reflection' : ' Write a reflection'),
       h('button', { onclick: () => { m.close(); editCaseDialog(c); } }, ' Edit the case'),
       h('button', { class: 'linkish', onclick: () => m.close() }, 'Cancel')));
   };
   return h('span', { class: 'acts' },
-    has ? h('span', { class: 'refl-done', title: 'Has a reflection', 'aria-label': 'Has a reflection' }, rowIcon('done')) : null,
-    h('button', { class: 'small row-btn row-more', title: 'Copy, reflect or edit', 'aria-label': 'Copy, reflect or edit this case', onclick: open }, '⋯'));
+    has && !logbookOnly() ? h('span', { class: 'refl-done', title: 'Has a reflection', 'aria-label': 'Has a reflection' }, rowIcon('done')) : null,
+    logbookOnly() ? h('button', { class: 'small row-btn row-more', title: 'Copy or edit', 'aria-label': 'Copy or edit this case', onclick: open }, '⋯')
+      : h('button', { class: 'small row-btn row-more', title: 'Copy, reflect or edit', 'aria-label': 'Copy, reflect or edit this case', onclick: open }, '⋯'));
 }
 
 function caseRow(c, flagsOf) {
@@ -358,8 +359,9 @@ function caseRow(c, flagsOf) {
         document.documentElement.classList.contains('row-menu') ? rowMenu(c) : h('span', { class: 'acts' },
           // to your own notes (paste into WhatsApp, Notes, Obsidian)
           h('button', { class: 'small row-btn', title: 'Copy this case', 'aria-label': 'Copy this case', onclick: e => { e.stopPropagation(); copyText(shareCaseText(c), 'Case copied: paste it into your notes'); } }, rowIcon('copy'), h('span', { class: 'lbl' }, 'Copy')),
-          // ✓ and filled once the case has a reflection (opens it); the same width either way, so the row never wraps
-          (S.reflections || []).some(r => r.caseId === c.id)
+          // ✓ and filled once the case has a reflection (opens it); the same width either way, so the row never wraps.
+          // Basic: logbook only has no Reflect button.
+          logbookOnly() ? null : (S.reflections || []).some(r => r.caseId === c.id)
             ? h('button', { class: 'small row-btn has-refl', title: 'Open the reflection on this case', 'aria-label': 'Open the reflection on this case', onclick: e => { e.stopPropagation(); reflectOnCase(c); } }, rowIcon('done'), h('span', { class: 'lbl' }, 'Reflect'))
             : h('button', { class: 'small row-btn', title: 'Write a reflection on this case', 'aria-label': 'Write a reflection on this case', onclick: e => { e.stopPropagation(); reflectOnCase(c); } }, rowIcon('reflect'), h('span', { class: 'lbl' }, 'Reflect')))));
 }
