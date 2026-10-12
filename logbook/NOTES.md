@@ -84,6 +84,10 @@ portfolio content.
   Headings show their `label` (owner's choice, categories.js; the official `name` stays in the Word export) and a
   `note` under each (rules, examples, JR), hidden with "Show notes under each heading" at the bottom (`settings.reflNotes`,
   on by default). Chosen in the owner's "Reflection Heading Names" artifact.
+  List look (owner, Oct 2026): each topic reads as a heading: a bold navy name (`.refl-topic`), the count as a pill
+  after it (`.refl-pill` met = green, some = grey, none = amber; replaced the dot and bold count), a line between
+  topics, and a quiet "+" (still `.refl-add`, label "Add a reflection under …"). Header: title, Edit and "+ New"
+  (`aria-label` "New reflection") on one line; if they can't fit, the buttons wrap below on the right.
 - **At a glance** (`glance.js`, tested): folded Logbook / Reflections cards show a bar (status segments; tick =
   this year's goal: tags due by the end of the year / 96 x year/5 reflections) and, for programme residents with
   at least 4 in their residency year, strips vs that year (range, middle half, median, you) from the Totals
@@ -162,7 +166,9 @@ portfolio content.
   Reflections settings; ui-reflect.js sets spellcheck on the editor's fields and on focus), Display: Pin the case box
   (`pinBox` → `pin-box`: `.box-wrap` sticky at `--pin-top`, the phone top tab bar's height when it sits on top; not
   when the Case tab is upside down) and Pin the search box (`pinSearch` → `pin-search`: `.lb-top` sticky, its height in
-  `--lb-top-h` so List's month headings stick under it). All in the settings file.
+  `--lb-top-h` so List's month headings stick under it; on Reflections `.refl-top` sticks at minus the height of its
+  title and counts (`--refl-hide`, `pinHead` in ui-reflect.js) so only the search row stays, and an open topic's name
+  sticks under it (`--refl-top-h`) while its reflections scroll; not in edit mode). All in the settings file.
 - **Settings pages: everyday first, Advanced below** (owner, Oct 2026). Display (`#display`): light/dark, colour,
   Colourful, zoom, text size, compact, Borders, the start tab; then a link row to **Advanced display** (`#displayadv`,
   `renderDisplayAdvanced`: name in the header, fonts, line spacing/width, contrast, motion, tab bar, icons only, hide

@@ -371,20 +371,24 @@ function list() {
   const filterChips = h('div', { class: 'chips refl-filters' }, [['all', 'All'], ['draft', 'Drafts'], ['complete', 'Complete'], ['uncat', 'Uncategorised']].map(([k, t]) =>
     h('span', { class: `chip ${rv.filter === k ? 'on' : ''}`, role: 'button', tabindex: '0', 'aria-pressed': String(rv.filter === k), onclick: () => { rv.filter = k; hooks.render(); } }, t)));
 
-  const head = h('section', { class: 'card' },
-    h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:8px' },
-      h('h2', { style: 'margin:0' }, 'Reflections'), h('span', { class: 'grow' }),
-      // Edit then New, side by side, even on a narrow phone with large text
-      h('span', { class: 'refl-actions' },
-        h('button', { class: em ? 'primary' : '', 'aria-pressed': String(em), onclick: () => { rv.editMode = !em; rv.sel.clear(); hooks.render(); } }, em ? 'Done' : 'Edit'),
-        em ? null : h('button', { class: 'primary', onclick: () => openPicker() }, '+ New reflection'))),
-    h('p', { class: 'hint', style: 'margin:6px 0 0' }, `${p.totals.counted} / ${p.totals.min} counted · ${p.totals.done} complete · ${p.totals.drafts} draft${p.totals.drafts === 1 ? '' : 's'}`),
-    em ? null : readyLine(p),
-    em ? null : h('div', { class: 'bar', style: 'gap:8px;margin:8px 0 0;flex-wrap:nowrap' }, search,
+  // the search row: pinned under the top with Settings → Display → "Pin the search box" (the title and counts
+  // above it scroll away; refl-top's sticky top is minus their height, measured in pinHead below)
+  const searchPart = em ? null : h('div', { class: 'refl-top-search' },
+    h('div', { class: 'bar', style: 'gap:8px;margin:8px 0 0;flex-wrap:nowrap' }, search,
       settings().searchOps ? h('button', { type: 'button', class: 'small icon-btn', title: 'Search operators', 'aria-label': 'Search operators', onclick: () => opsHelp(search, v => { rv.q = v; hooks.render(); requestAnimationFrame(() => { const el = document.querySelector('input[aria-label="Search reflections"]'); if (el) { el.focus(); const n = el.value.length; el.setSelectionRange(n, n); } }); }, REFL_OPERATOR_HELP, 'heading:lap -draft "blood pressure"') }, '?') : null,
       h('button', { class: `small${changedN ? ' primary' : ''}`, 'aria-expanded': String(viewOpen), onclick: () => { rv.viewOpen = !viewOpen; hooks.render(); } }, 'Filter & sort' + (changedN ? ` (${changedN})` : ''))),
-    em || !ops || !ops.unknown.length ? null : h('p', { class: 'hint lb-opsnote' }, ops.unknown.map(x => `“${x.op}” isn’t an operator (searched as text): did you mean ${x.suggest}?`).join(' ')),
-    em || !viewOpen ? null : h('div', { class: 'refl-viewpanel' }, filterChips, viewBar));
+    !ops || !ops.unknown.length ? null : h('p', { class: 'hint lb-opsnote' }, ops.unknown.map(x => `“${x.op}” isn’t an operator (searched as text): did you mean ${x.suggest}?`).join(' ')),
+    !viewOpen ? null : h('div', { class: 'refl-viewpanel' }, filterChips, viewBar));
+  const head = h('section', { class: 'card refl-top' + (searchPart ? ' pinnable' : '') },
+    // title, Edit and + New on one line; if they can't fit (large text or zoom) the buttons wrap below, on the right
+    h('div', { class: 'bar refl-headbar' },
+      h('h2', { style: 'margin:0' }, 'Reflections'),
+      h('span', { class: 'refl-actions' },
+        h('button', { class: em ? 'primary' : '', 'aria-pressed': String(em), onclick: () => { rv.editMode = !em; rv.sel.clear(); hooks.render(); } }, em ? 'Done' : 'Edit'),
+        em ? null : h('button', { class: 'primary', title: 'New reflection', 'aria-label': 'New reflection', onclick: () => openPicker() }, '+ New'))),
+    h('p', { class: 'hint', style: 'margin:6px 0 0' }, `${p.totals.counted} / ${p.totals.min} counted · ${p.totals.done} complete · ${p.totals.drafts} draft${p.totals.drafts === 1 ? '' : 's'}`),
+    em ? null : readyLine(p),
+    searchPart);
 
   // edit-mode toolbar: select all / clear / complete / export in or out / delete selected
   const checks = [];
@@ -467,7 +471,7 @@ function list() {
     }
     if (!shown) add(body, h('p', { class: 'empty' }, narrowed ? 'No reflections match.' : 'No reflections yet.'));
     if (em) paintSel();
-    return h('div', {}, head, toolbar, body, foot);
+    return pinHead(head, h('div', {}, head, toolbar, body, foot));
   }
   for (const hp of p.headings) {
     const items = sorted(all.filter(r => r.headingId === hp.id));
@@ -477,14 +481,15 @@ function list() {
     // no section headings (General Surgery, Trauma…): the heading names say enough (owner's choice)
     const x = exBy[hp.id];
     const opened = isOpen(hp.id, hp.met);
-    add(body, h('div', { class: 'refl-h', 'data-heading': hp.id, style: 'margin:8px 0 4px' },
+    add(body, h('div', { class: 'refl-h' + (opened && hits.length ? ' open' : ''), 'data-heading': hp.id },
       h('div', { class: 'refl-hrow' },
         h('div', { class: 'grow refl-htoggle', role: 'button', tabindex: '0', 'aria-expanded': String(opened), onclick: () => toggle(hp.id, hp.met), onkeydown: e => { if (e.key === 'Enter') toggle(hp.id, hp.met); } },
           items.length ? h('span', { class: 'res-chev', 'aria-hidden': 'true' }, '›') : h('span', { class: 'res-chev blank', 'aria-hidden': 'true' }), ' ',
-          h('i', { class: `dot ${hp.met ? 'done' : hp.done ? 'ontrack' : 'due'}` }), ' ', h('b', {}, `${hp.done}/${hp.min}`), ' ',
-          // the name flows beside the count (a long one wraps under itself, not below the count)
-          h('span', { class: 'refl-hname' }, hp.label, x.written > hp.done ? h('span', { class: 'muted refl-counts' }, ` · ${x.written} written`) : null)),
-        em ? null : h('button', { class: 'small refl-add', title: 'Add a reflection under ' + hp.label, 'aria-label': 'Add a reflection under ' + hp.label, onclick: () => openPicker(false, { headingId: hp.id, subId: null }) }, '+ Add')),
+          // the topic is the heading: its name in bold, then the count as a pill coloured by status (met / some / none)
+          h('span', { class: 'refl-hname' }, h('b', { class: 'refl-topic' }, hp.label), ' ',
+            h('span', { class: `refl-pill ${hp.met ? 'met' : hp.done ? 'some' : 'none'}`, 'aria-label': `${hp.done} of ${hp.min} counted${hp.met ? ', met' : ''}` }, `${hp.done}/${hp.min}`),
+            x.written > hp.done ? h('span', { class: 'muted refl-counts' }, ` · ${x.written} written`) : null)),
+        em ? null : h('button', { class: 'small icon-btn refl-add', title: 'Add a reflection under ' + hp.label, 'aria-label': 'Add a reflection under ' + hp.label, onclick: () => openPicker(false, { headingId: hp.id, subId: null }) }, '+')),
       // the heading's note (rules, examples; categories.js), shown whether open or not unless switched off
       notesOn() && hp.note ? h('div', { class: 'hint refl-note' }, hp.note) : null,
       opened ? [
@@ -497,16 +502,32 @@ function list() {
   const oHits = narrowed ? orphans.filter(match) : orphans;
   if (!narrowed || oHits.length) {
     shown += oHits.length;
-    add(body, h('div', { class: 'refl-h', 'data-heading': '', style: 'margin:16px 0 4px' },
+    add(body, h('div', { class: 'refl-h refl-uncat' + (oHits.length ? ' open' : ''), 'data-heading': '' },
       h('div', { class: 'refl-hrow' },
-        h('div', { class: 'grow' }, h('b', {}, 'Uncategorised'), h('span', { class: 'muted refl-counts' }, ` · ${orphans.length} written · not exported`)),
-        em ? null : h('button', { class: 'small refl-add', title: 'Add an uncategorised reflection', 'aria-label': 'Add an uncategorised reflection', onclick: () => openPicker(false, { headingId: '', subId: null, uncat: true }) }, '+ Add')),
+        h('div', { class: 'grow refl-htoggle refl-hstatic' }, h('span', { class: 'refl-hname' }, h('b', { class: 'refl-topic' }, 'Uncategorised'), h('span', { class: 'muted refl-counts' }, ` · ${orphans.length} written · not exported`))),
+        em ? null : h('button', { class: 'small icon-btn refl-add', title: 'Add an uncategorised reflection', 'aria-label': 'Add an uncategorised reflection', onclick: () => openPicker(false, { headingId: '', subId: null, uncat: true }) }, '+')),
       h('div', { class: 'hint' }, 'For reflections that don’t fit a portfolio heading yet. Move one to a heading to export it.'),
       oHits.length ? h('ul', { class: 'cases' }, oHits.map(row)) : null));
   }
   if (narrowed && !shown) add(body, h('p', { class: 'empty' }, 'No reflections match.'));
   if (em) paintSel();
-  return h('div', {}, head, toolbar, body, notesSwitch, foot);
+  if (!em) body.classList.add('refl-topics');
+  return pinHead(head, h('div', {}, head, toolbar, body, notesSwitch, foot));
+}
+
+// Pinned search (html.pin-search): refl-top sticks with its top at minus the height above the search row, so only
+// the search row stays in view; --refl-top-h (what stays in view) puts open topic names just under it.
+function pinHead(head, wrap) {
+  const sp = head.querySelector('.refl-top-search');
+  if (!sp || !('ResizeObserver' in window)) return wrap;
+  const measure = () => {
+    if (!head.isConnected) return;
+    const hide = Math.max(0, Math.round(sp.getBoundingClientRect().top - head.getBoundingClientRect().top) - 8);
+    head.style.setProperty('--refl-hide', hide + 'px');
+    wrap.style.setProperty('--refl-top-h', (head.offsetHeight - hide) + 'px');
+  };
+  new ResizeObserver(measure).observe(head);
+  return wrap;
 }
 
 // Tick or untick one reflection for the export.
