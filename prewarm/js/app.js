@@ -885,18 +885,29 @@ function startAlerts(p) {
   awake();
   document.addEventListener('visibilitychange', awake);
   const iv = setInterval(() => {
+    // everything falling due this second goes in one banner, with one buzz / beep
+    const due = [];
+    const hit = (tag, msg) => { if (alerted.has(tag)) return; alerted.add(tag); due.push(msg); };
+    // stopping the warming on time matters as much as a reading: Prewarm off due alerts too
+    const nx = nextEvent(p);
+    if (nx?.id === 'ev_wstop' && nx.due != null) {
+      const now = nowFor(p, 'prewarm');
+      if (now >= nx.due && now <= nx.due + 5) hit(p.id + 'ev_wstop' + val(p, 'pw_start'), `Prewarm off due now (${WARM_MIN[val(p, 'arm')]} min of warming): tap Log`);
+    }
     for (const s of ['prewarm', 'iotemp', 'haemo']) {
       if (s === 'prewarm' && noWarming(p)) continue;
       const now = nowFor(p, s);
       for (const x of pointsFor(p, s)) {
         const d = dueOf(p, s, x), tag = p.id + s + x.key + (val(p, SERIES[s].ref[0]) || '');
-        if (d == null || !expected(p, s, d) || savedAt(p, s, x.key) || alerted.has(tag) || now < d || now > d + 5) continue;
-        alerted.add(tag); write('alerted', [...alerted].slice(-200));
-        if (settings.remind.banner) { const b = $('#banner'); b.textContent = `${s === 'haemo' ? 'BP, HR, BIS' : 'Temperature'} ${x.label} reading due now (tap to hide)`; b.hidden = false; setTimeout(() => { b.hidden = true; }, 15000); }
-        if (settings.remind.vibrate && navigator.vibrate) navigator.vibrate([300, 150, 300]);
-        if (settings.remind.beep) beep();
+        if (d == null || !expected(p, s, d) || savedAt(p, s, x.key) || now < d || now > d + 5) continue;
+        hit(tag, `${s === 'haemo' ? 'BP, HR, BIS' : 'Temperature'} ${x.label} reading due now`);
       }
     }
+    if (!due.length) return;
+    write('alerted', [...alerted].slice(-200));
+    if (settings.remind.banner) { const b = $('#banner'); b.textContent = due.join(' · ') + ' (tap to hide)'; b.hidden = false; setTimeout(() => { b.hidden = true; }, 15000); }
+    if (settings.remind.vibrate && navigator.vibrate) navigator.vibrate([300, 150, 300]);
+    if (settings.remind.beep) beep();
   }, 1000);
   cleanup.push(() => { clearInterval(iv); document.removeEventListener('visibilitychange', awake); lock?.release?.().catch(() => {}); });
 }

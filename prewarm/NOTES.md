@@ -111,6 +111,8 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   Delete / restore: a patient is gone only if deleted after its last "restored" field (`isGone` in store.js; no rules
   change). Settings › Delete participants lists deleted ones with Restore (to every phone in the team). A deleted
   patient can't be opened (back to the list with a note), so nobody charts into a record the export leaves out.
+  Prewarm off falling due alerts like a reading (banner, vibrate, beep); alerts due in the same second share one
+  banner. AF "specify" on discharge is New onset / Existing (chips), so it always ticks the Word form.
 - **Two tabs** (owner, 12 Oct 2026): a thin tab bar under the top bar on the patient screen: **Temperatures** (the
   main screen: times, pre-warming / intra-op temps, comfort, Form view / Sheet view) and **Others** (BP, HR, BIS,
   plus the Intra-op details and PACU boxes and a full-width **Perioperative data** box, formerly "Other data"). The tab you're not on warms up and pulses when its next
