@@ -1267,6 +1267,19 @@ async function run(label, ctxOpts) {
     // no EPA view or summary download any more; each card shows a glance before it opens
     assert(await p.locator('.seg button', { hasText: 'By EPA' }).count() === 0 && await p.locator('button', { hasText: 'Download summary' }).count() === 0, 'EPA view / summary download still there');
     assert(await p.locator('details.an-sec .glance').count() >= 1, 'no glance on the cards');
+    // Advanced: a tag name opens its cases in the Logbook (List, that tag only); the forecast is on the rows
+    assert(/at your pace|in the last 6 months/.test(await p.locator('details.an-sec[open] ul.prog').first().innerText()), 'no pace forecast on the rows');
+    const link = p.locator('details.an-sec[open] ul.prog a.an-link').first();
+    const name = (await link.innerText()).trim();
+    await link.click(); await p.waitForURL(/#logbook$/);
+    await until(async () => (await p.locator('.lb-top').innerText()).includes('Tags (1)'), 'Logbook not filtered to the tag');
+    assert((await p.locator('.lb-top').innerText()).includes(name.split(' ')[0]), 'filtered to another tag');
+    await p.locator('.lb-top button', { hasText: 'Reset' }).click(); await nap(150);
+    // a month's bar opens that month's cases (List, the dates filled in)
+    await tab('progress');
+    await p.locator('.an-bars a.an-bar').last().click(); await p.waitForURL(/#logbook$/);
+    await until(async () => /Dates|–/.test(await p.locator('.lb-top').innerText()) && (await p.locator('.lb-top').innerText()).includes('Filter (1)'), 'month bar did not filter by dates');
+    await p.locator('.lb-top button', { hasText: 'Reset' }).click(); await nap(150);
   });
 
   await step('analytics: JR credit capped with Paediatrics exception', async () => {

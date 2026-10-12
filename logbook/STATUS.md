@@ -5,23 +5,24 @@ Lasting rules and lessons go in `NOTES.md`; finished work leaves "Recently done"
 Each session edits only its own line under **Now**. Update this file when a task finishes, a decision is made, or
 before compacting (`/save-state` in Claude Code, `$save-state` in Codex).
 
-Last updated: 2026-10-12 by Claude Code, Logbook 1 (log1).
+Last updated: 2026-10-12 by Claude Code, Logbook 2 (log2).
 
 ## Now
 
 - **Claude Code, Logbook 1 (log1)** (branch `claude/clever-gates-pm6sas`, no open PR): idle after #186. Firebase CLI
   signed in for this session, unused (each use needs the owner's OK).
-- **Claude Code, Logbook 3 (log3)** (branch `ccr-2994049c-4e5tlt`): idle after #181. Still signed in
-  to the Firebase CLI (usage counts only; each use needs the owner's OK). Owns the axe check, PR previews and the
-  Codex / Firebase plugin setup.
-- **Claude Code, "APMES Logbook 2" session** (branch `ccr-afac5e7a-99esax`): owner's batch of 8 in three PRs: A
-  Reflections tab (topic headings, one-line header, pinned search + sticky topics), then B (page width, demo header
-  and Leave demo, swipe on by default and following the finger), then C (Analytics, Advanced only).
+- **Claude Code, Logbook 3 (log3)** (branch `ccr-2994049c-4e5tlt`): idle, nothing half-done. Still signed in to the
+  Firebase CLI (usage counts only; each use needs the owner's OK). Owns the axe check, PR previews and the Codex /
+  Firebase plugin setup.
+- **Claude Code, Logbook 2 (log2)** (branch `ccr-afac5e7a-99esax`, no open PR): idle after #189; the owner's batch
+  of 8 is done (#180, #184, #189). Codex plugin and Firebase CLI signed in for this session, both unused (each use
+  needs the owner's OK). Next for log2: profiles (Next, item 1), waiting on the owner's go.
 - **Codex**: no open logbook task (handed its remaining batch to Claude on #163).
 
 ## Waiting on the owner
 
-- Try on a real phone: pins, swipe between tabs, keyboard behaviour; Notes; Basic mode; formatting buttons.
+- Try on a real phone: pins (now also the Reflections search, with sticky topic names), swipe between tabs (now on by
+  default, follows the finger), keyboard behaviour; Notes; Basic mode; formatting buttons; the new Analytics parts.
 - Admin → Advanced → "Fix initials in older cases" (one-off).
 - Dropbox developer console: tick `files.metadata.read` so "Keep backups for…" can remove old Dropbox files.
 - Dropbox: apply for production approval when ready (only listed accounts can use it until then).
@@ -31,32 +32,52 @@ Last updated: 2026-10-12 by Claude Code, Logbook 1 (log1).
 
 ## Next (agreed queue)
 
-1. Later, low priority: lazy-load rarely used modules (admin, portfolio, importer, xlsxio, backup, progress) to cut
+1. **Profiles** (log2; planned 12 Oct, parked until Basic mode landed, now ready to revisit; needs the owner's go
+   and answers first). One account setting under Settings → Profile; switching never changes data:
+   - Basic APMES = today's Basic mode (#172), Advanced APMES = today's app (the default for new accounts).
+   - Admin (admins and PDs only; layout, not access: the rules stay the gatekeeper): opens on programme analytics built
+     from `summaries/` (per residency year: tags on track / due / behind, reflection headings met, who's behind,
+     spread strips). PDs can already read summaries, so no rules change.
+   - Generic (no APMES requirements: no APMES tags, targets, Still needed, reflection headings, Word portfolio or
+     Totals; no summary written). Largest and riskiest: plan in detail before building.
+   - Order: A the switch (Basic / Advanced), B Admin, C Generic. Open questions for the owner: anything to add to or
+     drop from Basic; PDs get Admin too?; can Generic save a case with no tags?
+2. Later, low priority: lazy-load rarely used modules (admin, portfolio, importer, xlsxio, backup, progress) to cut
    first-visit time (now 3.5–4.2 s on a slow phone; repeat visits 0.6–0.8 s). Measure before and after.
-2. Parked ideas, only if asked:
+3. Parked ideas, only if asked:
    - Changed-records-only sync for cases (`syncAt` + delete tombstones; plan in chat on 12 Oct). Firestore usage
      12 Oct: busiest day 23.6k reads / 16.7k writes (bulk work), normal day ~4k reads; free tier 50k/20k a day.
 
 ## Recently done
 
+- #189 Analytics (Advanced only): pace forecast and Off pace, Gone quiet, Reflection to-dos, tags and month bars
+  open their cases.
+- #184 Page width (Full), header can hide in the demo, Leave / Reset demo by Sign out, swipe on by default and
+  following the finger.
+- #180 Reflections tab: topics as headings, one-line header, pinned search with sticky topics.
 - #186 EPA Guidebook v8 PDF in `apmes/originals/` (cover with names replaced, file details removed).
 - #183 APMES documents in `/apmes/`; blank portfolio template in the repo; Word export ticks Female (was never ticked).
 - #181 Notes review fixes: note index moved to owner-only `meta/noteIndex` (rules deployed), bin restore keeps the
   100-note limit, notes listener metadata, 34 new rules tests; previews no longer break on reload (service workers
   key the page by `'./'`).
-- #176 Firebase plugin installed in cloud sessions, ask-first rule; #164 Codex plugin + CLI auto-setup; #167 ask before Codex.
 - #169 / #171 / #174 PR previews on Cloudflare Workers (`<branch>-anawj-preview.kohwenjun.workers.dev`).
 - #165 axe-core accessibility check (`test/e2e/a11y.mjs`, on demand); #168 shared instructions moved to AGENTS.md.
-- #175 Reflection formatting buttons (off by default); Word export shows real bold and bullets.
-- #173 Backup as one spreadsheet (CSV); Restore reads it.
-- #172 Basic mode (one switch, off by default).
 
 ## Decisions log
+
+- 2026-10-12: Reflections list: topics as headings with a count pill (owner); "+ New" instead of "+ New reflection";
+  "Pin the search box" covers Reflections too, with sticky topic names.
+- 2026-10-12: "Line width" renamed "Page width" with a Full choice; the demo no longer forces the header back; Leave /
+  Reset demo sit by Sign out.
+- 2026-10-12: Heatmap days in Analytics aren't links (9 px, too small to tap); month bars and tag names are.
 
 - 2026-10-12: The EPA Guidebook v8 PDF goes in `apmes/originals/` as a cleaned copy: the cover page's contributor and
   acknowledgement names replaced by a plain cover, file details (staff names, SingHealth sensitivity label) removed.
 - 2026-10-12: Session names: Logbook 1 / 2 / 3 (log1 / log2 / log3). log1 = branch `claude/clever-gates-pm6sas`,
-  log2 = `ccr-afac5e7a-99esax`, log3 = `ccr-2994049c-4e5tlt`. Each renames its own line under Now.
+  log2 = `ccr-afac5e7a-99esax`, log3 = `ccr-2994049c-4e5tlt`. Each renames its own line under Now; the session
+  titles in the app are "Logbook 1 (log1)" etc.
+- 2026-10-12: When the owner types `/compact` the session gets no turn to save first: the owner says "save state"
+  (or `/save-state`) before `/compact`.
 - 2026-10-12: APMES programme documents aren't secret: they live in `/apmes/` at the repo root (guidebook, data,
   blank portfolio template; originals may be added). No faculty names (the MedHub guide stays out unless blacked
   out); published authors cited in the guidebook are fine.

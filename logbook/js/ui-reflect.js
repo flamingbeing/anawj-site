@@ -145,6 +145,8 @@ async function openEditor(r) {
   rv.editing = JSON.parse(JSON.stringify(r));
   showTab();
 }
+// open a reflection in the editor from elsewhere (Analytics → Reflection to-dos)
+export const openReflection = r => openEditor(r);
 const caseById = id => (id && (S.cases || []).find(c => c.id === id)) || null;
 const caseDate = c => (c.date ? fmtDate(c.date) : c.dateText || '—');
 

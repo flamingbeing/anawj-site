@@ -911,6 +911,15 @@ details.an-sec > summary::marker { content: ''; }
 .an-day.l2 { background: color-mix(in srgb, var(--accent) 55%, transparent); }
 .an-day.l3 { background: color-mix(in srgb, var(--accent) 80%, transparent); }
 .an-day.l4 { background: var(--accent); }
+/* Analytics (Advanced): numbers and names open their cases in the Logbook; Gone quiet and Reflection to-dos lists */
+a.an-bar { text-decoration: none; }
+a.an-bar:focus-visible { outline-offset: 1px; }
+.an-link { display: inline-flex; align-items: center; min-height: 40px; color: inherit; text-decoration: underline dotted color-mix(in srgb, currentColor 45%, transparent); text-underline-offset: 3px; }
+.an-list { list-style: none; margin: 0; padding: 0; }
+.an-list > li { padding: 6px 0; border-bottom: 1px solid var(--edge, var(--line)); }
+.an-list > li:last-child { border-bottom: 0; }
+.an-todo > li { display: flex; align-items: center; gap: 8px; }
+.an-todo > li .grow { flex: 1; min-width: 0; }
 .an-wd > div { display: grid; grid-template-columns: minmax(70px, 34%) 1fr 34px; gap: 8px; align-items: center; font-size: calc(13px * var(--fs, 1)); margin: 3px 0; }
 .an-wd .meter { height: 8px; border-radius: calc(4px * var(--round, 1)); background: var(--chip); overflow: hidden; display: block; }
 .an-wd .meter i { display: block; height: 100%; background: var(--ontrack); }

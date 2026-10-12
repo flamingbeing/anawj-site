@@ -2,13 +2,21 @@
 // benchmarking; counts only, never details).
 
 import { R_YEARS, BY_CODE, CATEGORIES, appYear, yearName } from './categories.js';
-import { progress, todayISO, rYearDefault, weekLead, weekdayNames } from './engine.js';
+import { progress, todayISO, rYearDefault, weekLead, weekdayNames, fmtDate } from './engine.js';
 import { exportTotals } from './xlsxio.js';
 import { reflectionProgress, HEADING_BY_ID } from './reflections.js';
 import { logbookGlance, reflectionGlance, cohortGlance } from './glance.js';
+import { paceForecast, paceText, goneQuiet, reflectionTodos } from './analytics.js';
+import { reflectOnCase, openReflection } from './ui-reflect.js';
 import { S, h, toast, cloud, rYear, myYearName, settings, subcatsOf, patchLogbook, needExcel, download, displayName, hooks, add, resetters, info, catName, catShort, tagName, summaryOf, basicMode } from './ui-core.js';
 
 const STATUS_TEXT = { late: 'Behind', due: 'Due this year', ontrack: 'On track', done: 'Done', none: 'No target' };
+// Advanced mode only (not Basic): pace forecast, Gone quiet, Reflection to-dos, and numbers that open their cases
+const advanced = () => !basicMode();
+// a tag name that opens the Logbook on its cases (Advanced); plain text in Basic mode
+const casesLink = (label, opts, title) => advanced()
+  ? h('a', { class: 'an-link', href: '#logbook', title: title || 'Show these cases in the Logbook', onclick: () => hooks.showCases?.(opts) }, label)
+  : label;
 // open: the sections you have expanded (they start folded, showing a one-line summary)
 const pview = { open: new Set() };
 
@@ -35,12 +43,24 @@ export function renderProgress() {
       ' ', infoBtn),
     infoText,
     S.resident ? null : h('p', { class: 'hint', style: 'margin:4px 0 0' }, 'Not on the programme list, so your year is set in ', h('a', { href: '#settings' }, 'Settings'), '.'));
-  // what needs doing: behind, then due this year
-  const rank = { late: 0, due: 1 };
-  const urgent = rows.filter(r => r.status in rank).sort((a, b) => rank[a.status] - rank[b.status]);
+  // Advanced: your pace over the last 6 months; tags on track whose next target won't be reached in time are "off pace"
+  const fc = advanced() ? paceForecast(rows, S.cases, yr, todayISO()) : {};
+  const offPace = r => r.status === 'ontrack' && fc[r.code] && fc[r.code].offPace;
+  // what needs doing: behind, then due this year, then off pace
+  const rank = { late: 0, due: 1, offpace: 2 };
+  const rankOf = r => (r.status in rank ? rank[r.status] : offPace(r) ? rank.offpace : -1);
+  const urgent = rows.filter(r => rankOf(r) >= 0).sort((a, b) => rankOf(a) - rankOf(b));
+  const nOff = urgent.filter(offPace).length;
   const urgentSec = section('urgent', urgent.length ? `Needs attention (${urgent.length})` : 'Needs attention',
-    urgent.length ? `${tally('late')} behind · ${tally('due')} due this year` : 'Nothing behind or due this year ✓',
-    urgent.length ? progList(urgent) : h('p', { class: 'empty' }, 'Nothing behind or due this year ✓'));
+    urgent.length ? `${tally('late')} behind · ${tally('due')} due this year${nOff ? ` · ${nOff} off pace` : ''}` : 'Nothing behind or due this year ✓',
+    urgent.length ? progList(urgent, fc) : h('p', { class: 'empty' }, 'Nothing behind or due this year ✓'),
+    nOff ? h('p', { class: 'hint help', style: 'margin:6px 0 0' }, 'Off pace: on track for now, but at the pace of your last 6 months the next target won’t be reached by the end of its year.') : null);
+  // Advanced: tags still needed that haven't been logged for 60 days or more
+  const quiet = advanced() ? goneQuiet(rows, S.cases, todayISO()) : [];
+  const quietSec = quiet.length ? section('quiet', `Gone quiet (${quiet.length})`, 'Still needed, nothing logged in 60 days or more',
+    h('ul', { class: 'an-list' }, quiet.map(x => h('li', {}, casesLink(catName(x.code), { tag: 'c:' + x.code }),
+      h('small', { class: 'muted' }, ` · last ${fmtDate(x.last)} (${x.days} days ago)`)))),
+    h('p', { class: 'hint help', style: 'margin:6px 0 0' }, 'Worth asking for these lists. Tags you haven’t logged yet are under Logbook.')) : null;
   const shown = pview.hideDone ? rows.filter(r => r.status !== 'done') : rows;
   const withTarget = rows.filter(r => r.status !== 'none');
   // at a glance (before the card is opened): the bar by status with this year's goal, and your year
@@ -52,13 +72,13 @@ export function renderProgress() {
     cohort ? strip('Cases logged', S.cases.length, cohort.cases) : null);
   const targets = section('targets', 'Logbook', `${tally('done')} of ${withTarget.length} tags done · ${S.cases.length} cases`, logGlance,
     h('label', { class: 'check', style: 'margin:0 0 4px' }, h('input', { type: 'checkbox', checked: !!pview.hideDone, onchange: e => { pview.hideDone = e.target.checked; hooks.render(); } }), 'Hide done'),
-    progList(shown));
+    progList(shown, fc));
   // everyone's counts (counts only) for comparison
   const compare = h('section', { class: 'card more-list an-compare' },
     h('ul', {}, h('li', {}, h('a', { href: '#totals' },
       h('span', { class: 'mt' }, h('b', {}, 'Compare with your intake'), h('small', {}, 'Case counts per tag across residents in your year (Totals)')),
       h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')))));
-  return h('div', {}, head, urgentSec, targets, reflCard(), basicMode() ? null : trendsCard(), compare);
+  return h('div', {}, head, urgentSec, quietSec, targets, reflCard(), advanced() ? todoCard() : null, basicMode() ? null : trendsCard(), compare);
 }
 
 // A folded card: the title and a one-line summary; tap to open the full section (kept open while you stay).
@@ -129,7 +149,8 @@ function trendsCard() {
   for (const c of cases) { const m = byMonth.get(c.date.slice(0, 7)); if (m) m.n++; }
   const max = Math.max(1, ...months.map(m => m.n));
   const bars = h('div', { class: 'an-bars', role: 'img', 'aria-label': 'Cases per month: ' + months.map(m => `${m.label} ${m.n}`).join(', ') },
-    months.map(m => h('div', { class: 'an-bar', title: `${m.label}: ${m.n}` }, h('small', {}, m.n || ''), h('i', { style: `height:${Math.round(m.n / max * 100)}%` }), h('span', {}, m.label[0]))));
+    months.map(m => h('a', { class: 'an-bar', href: '#logbook', title: `${m.label}: ${m.n} (show these cases)`, 'aria-label': `${m.label}: ${m.n} cases`,
+      onclick: () => hooks.showCases?.({ from: m.key + '-01', to: m.key + '-31' }) }, h('small', {}, m.n || ''), h('i', { style: `height:${Math.round(m.n / max * 100)}%` }), h('span', {}, m.label[0]))));
   // a year of days, a square per day (darker = more cases), weeks as columns
   const perDay = new Map();
   for (const c of cases) perDay.set(c.date, (perDay.get(c.date) || 0) + 1);
@@ -166,7 +187,7 @@ function trendsCard() {
     h('h3', {}, 'By day of the week'),
     h('div', { class: 'an-wd' }, weekdayNames(ws).map((d, i) => h('div', {}, h('span', {}, d), h('span', { class: 'meter' }, h('i', { class: 'ontrack', style: `width:${Math.round(wd[i] / wdMax * 100)}%` })), h('b', {}, String(wd[i]))))),
     h('h3', {}, 'Most used tags (12 months)'),
-    top.length ? h('div', { class: 'an-wd' }, top.map(([k, n]) => h('div', {}, h('span', {}, name(k)), h('span', { class: 'meter' }, h('i', { class: 'done', style: `width:${Math.round(n / top[0][1] * 100)}%` })), h('b', {}, String(n))))) : h('p', { class: 'empty' }, 'No cases yet.'),
+    top.length ? h('div', { class: 'an-wd' }, top.map(([k, n]) => h('div', {}, h('span', {}, casesLink(name(k), { tag: k, from })), h('span', { class: 'meter' }, h('i', { class: 'done', style: `width:${Math.round(n / top[0][1] * 100)}%` })), h('b', {}, String(n))))) : h('p', { class: 'empty' }, 'No cases yet.'),
     h('p', { class: 'hint help' }, 'Only you see these.'));
 }
 
@@ -212,6 +233,23 @@ function reflCard() {
     })) : h('p', { class: 'empty' }, 'All headings met ✓'));
 }
 
+// Reflection to-dos (Advanced): ☆ Interesting cases with no reflection yet, and drafts not touched for 30 days
+function todoCard() {
+  const { interesting, stale } = reflectionTodos(S.cases, S.reflections);
+  if (!interesting.length && !stale.length) return null;
+  const caseLine = c => [c.date ? fmtDate(c.date) : '', [c.initials, String(c.details || '').split('\n').join(' ')].filter(Boolean).join(' ').slice(0, 60)].filter(Boolean).join(' · ');
+  const days = r => Math.floor((Date.now() - (r.updatedAt || r.createdAt || 0)) / 864e5);
+  const n = interesting.length + stale.length;
+  return section('todo', `Reflection to-dos (${n})`,
+    [interesting.length ? `☆ ${interesting.length} to write up` : '', stale.length ? `${stale.length} draft${stale.length === 1 ? '' : 's'} untouched 30+ days` : ''].filter(Boolean).join(' · '),
+    interesting.length ? [h('h3', {}, '☆ Interesting cases to write up'),
+      h('ul', { class: 'an-list an-todo' }, interesting.slice(0, 20).map(c => h('li', {}, h('span', { class: 'grow' }, caseLine(c)),
+        h('button', { class: 'small primary', onclick: () => reflectOnCase(c) }, 'Write'))))] : null,
+    stale.length ? [h('h3', {}, 'Drafts untouched for 30 days or more'),
+      h('ul', { class: 'an-list an-todo' }, stale.slice(0, 20).map(r => h('li', {}, h('span', { class: 'grow' }, [r.initials, r.diagnosis || 'no diagnosis yet'].filter(Boolean).join(' · '), h('small', { class: 'muted' }, ` · ${days(r)} days`)),
+        h('button', { class: 'small', onclick: () => openReflection(r) }, 'Finish'))))] : null);
+}
+
 // a heading's note (sub-types, JR, examples), behind its ⓘ; none for headings without one
 function needs(x) {
   const hd = HEADING_BY_ID[x.id] || {};
@@ -228,19 +266,20 @@ function subcatLine(code) {
   return h('span', { class: 'ms sc-line' }, tags.map(e => `${e.n} ${n(e.k)}`).join(' · '));
 }
 
-function progList(items) {
+function progList(items, fc = {}) {
   return h('ul', { class: 'prog' }, items.map(p => {
+    const f = fc[p.code], off = p.status === 'ontrack' && f && f.offPace;
     const c = BY_CODE[p.code];
     const max = Math.max(1, ...p.milestones.map(m => m.n));
     const pct = Math.min(100, Math.round((p.count / max) * 100));
     return h('li', { class: c.parent ? 'sub' : '', title: c.full || c.name },
       h('i', { class: `dot ${p.status}`, title: STATUS_TEXT[p.status] }),
-      h('span', { class: 'nm' }, catName(p.code)),
-      h('span', { class: 'ct' }, (p.status === 'late' || p.status === 'due') ? h('span', { class: `stw ${p.status}` }, STATUS_TEXT[p.status]) : null,
+      h('span', { class: 'nm' }, casesLink(catName(p.code), { tag: 'c:' + p.code })),
+      h('span', { class: 'ct' }, (p.status === 'late' || p.status === 'due') ? h('span', { class: `stw ${p.status}` }, STATUS_TEXT[p.status]) : off ? h('span', { class: 'stw due' }, 'Off pace') : null,
         p.status === 'none' ? String(p.count) : p.next ? `${p.count} / ${p.next.n}` : `${p.count} ✓`),
       p.milestones.length ? h('span', { class: 'meter' }, h('i', { class: p.status, style: `width:${pct}%` })) : null,
       p.milestones.length ? h('span', { class: 'ms' }, p.milestones.map(m => `${appYear(m.by)}: ${m.n}${m.met ? ' ✓' : ''}`).join(' · ')
-        + (p.next ? ` — ${p.next.n - p.count} more by end of ${appYear(p.next.by)}` : '')) : null,
+        + (p.next ? ` — ${p.next.n - p.count} more by end of ${appYear(p.next.by)}` : '') + (f ? `, ${paceText(f)}` : '')) : null,
       subcatLine(p.code));
   }));
 }
