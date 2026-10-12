@@ -10,8 +10,8 @@ Last updated: 2026-10-13 by Claude Code, Logbook 1 (log1).
 ## Now
 
 - **Claude Code, Logbook 1 (log1)** (branch `claude/clever-gates-pm6sas`): polish batch from the owner's Apple-apps
-  review (Next, item 1): PR 1 and 2 merged (#250, #254), JR count / word counts merged (#264); PR 3 open (lists and
-  Analytics). Settings controls (switches, checkmark lists,
+  review (Next, item 1): PRs 1–3 merged (#250, #254, #268), JR count / word counts merged (#264); PR 4 open (marks
+  in the case box). Settings controls (switches, checkmark lists,
   one-line help) moved from PR 2 to PR 6, with the regrouping of the Advanced pages. Owner's picks are in the artifact
   https://claude.ai/artifact/8Kfho8SPgupTbqe6t2g5bi (store `picks/owner`). Also doing the Reflections rows (log2's
   area, owner's OK 13 Oct: log2 has stopped).
@@ -67,6 +67,7 @@ Last updated: 2026-10-13 by Claude Code, Logbook 1 (log1).
 
 ## Recently done
 
+- #268 Polish 3: initials over the date on case rows, one-line tags, thin month headers, calmer Analytics cards.
 - #264 Reflections list: "JR 0/1" beside each heading's count (the JR rule left the note); word counts can be hidden.
 - #254 Polish 2: "‹ Settings" in the header, pages slide in, iPhone edge swipe back, Settings → Accessibility, month picker.
 - #250 Polish 1: tap feedback, smooth folds, line icons instead of emoji, tidier Case screen, empty screens, row Copy off by default.
