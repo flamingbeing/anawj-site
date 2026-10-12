@@ -315,7 +315,7 @@ export function renderDisplayAdvanced() {
       h('label', { class: 'check', style: 'margin-top:10px' }, h('input', { type: 'checkbox', checked: !!st.caseInverted, onchange: e => applyDisplay(setDisplay({ caseInverted: e.target.checked })) }), 'Case tab upside down (phones)'),
       h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'The case box sits at the bottom, next to the keyboard and Save, with suggestions just above it; scroll up for all the tags. Like a chat app.'),
       h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !!st.pinBox, onchange: e => applyDisplay(setDisplay({ pinBox: e.target.checked || null })) }), 'Pin the case box at the top of the Case tab'),
-      h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !!st.pinSearch, onchange: e => applyDisplay(setDisplay({ pinSearch: e.target.checked || null })) }), 'Pin the search box at the top of the Logbook'),
+      h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !!st.pinSearch, onchange: e => applyDisplay(setDisplay({ pinSearch: e.target.checked || null })) }), 'Pin the search box at the top of the Logbook and Reflections'),
       h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'They stay in view while the tags or cases scroll under them.'),
       h('p', { class: 'hint', style: 'margin:10px 0 0' }, 'Everything on this page is saved on this device only, so a phone and a computer can each look the way that suits them.')),
     customCssCard(),

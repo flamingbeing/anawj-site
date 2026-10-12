@@ -308,7 +308,7 @@ async function run(label, ctxOpts) {
     });
 
     await step('r4: heading suggestions for LSCS case', async () => {
-      await p.locator('main button', { hasText: '+ New reflection' }).click();
+      await p.locator('main button[aria-label="New reflection"]').click();
       await nap(300);
       await p.locator('input[type=search]').fill('ZZ LSCS');
       await debounced();
@@ -1372,10 +1372,10 @@ async function run(label, ctxOpts) {
 
   await step('reflections tab: new reflection via the case picker', async () => {
     await tab('reflect');
-    assert(await p.locator('button', { hasText: '+ New reflection' }).count() === 1, 'no + New reflection');
+    assert(await p.locator('main button[aria-label="New reflection"]').count() === 1, 'no + New button');
     await shot3('reflections-tab');
     const n0 = await p.locator('ul.cases li').count();
-    await p.locator('button', { hasText: '+ New reflection' }).click();
+    await p.locator('main button[aria-label="New reflection"]').click();
     await p.waitForSelector('ul.refl-pick li');
     assert(await p.locator('ul.refl-pick li .flag', { hasText: 'has reflection' }).count() >= 1, 'linked case not marked');
     await p.locator('input[aria-label="Search cases"]').fill('TKR');
@@ -1826,6 +1826,13 @@ async function run(label, ctxOpts) {
       const cal = p.locator('main .seg button', { hasText: /^Calendar$/ }); if (await cal.count()) { await cal.first().click(); await nap(200); }
       assert(await p.locator('.lb-dow').first().textContent() === 'Sun', 'calendar does not start on Sunday');
       assert(await p.locator('.lb-top').evaluate(el => getComputedStyle(el).position) === 'sticky', 'search card not pinned');
+      // Reflections: the header card sticks with only its search row in view, open topic names stick under it
+      await tab('reflect');
+      const rt = p.locator('section.refl-top');
+      assert(await rt.evaluate(el => getComputedStyle(el).position) === 'sticky', 'reflections search not pinned');
+      await until(async () => parseFloat(await rt.evaluate(el => el.style.getPropertyValue('--refl-hide'))) > 20, 'title and counts not scrolled away when pinned');
+      const openRow = p.locator('.refl-topics .refl-h.open > .refl-hrow').first();
+      if (await openRow.count()) assert(await openRow.evaluate(el => getComputedStyle(el).position) === 'sticky', 'open topic name not sticky');
       await tab('log');
       await p.waitForSelector('textarea.details');
       assert(!(await p.locator('.sugg-row').isVisible()) && !(await p.locator('.quick-label').isVisible()), 'quick picks not hidden');
