@@ -70,6 +70,14 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   `f` with an empty map (an empty map is a leaf in the merge). Lock / unlock / delete sent one and wiped the server
   copy's readings; push now omits an empty `f`, lock sends the full record, and each phone resends all its patients
   once after its first server snapshot (`resync1`). The sync emulator test checks the server copy keeps its readings.
+- **Warming time labels** (owner, 12 Oct 2026): Gown on (pre-warming gown put on), Prewarm on, Prewarm off, Underbody
+  warm, Gown warm (the intra-op Bair Huggers). Those are all the Bair Hugger items on the paper form. They are coloured warm
+  beige once set (`.tchip.warm.set`: #efe2d2, labels #7a4a00; untapped they look like the rest); the
+  other times stay blue. The time boxes are numbered in the order they happen (1 Gown on … 11 To ward; renumbered
+  without the pre-warming ones for the no-pre-warming group), a small number in each box's top corner.
+- **Due time warms up** (owner, 12 Oct 2026): the "due hh:mm" beside each timepoint is plain until 2 min before,
+  then an amber pill with a slow pulse (soon), an orange-red pill with a stronger pulse from due to 5 min past (now),
+  and a red pill with a fast pulse after that (late); plain once the reading is saved. Reduced motion: colours only.
 - **Screen size** (Settings, this phone only): Smaller / Small / Normal / Large / Larger zooms the whole app
   (`--ui-zoom` on body). Normal by default.
 - **Form view** (owner, 12 Oct 2026): the study's real paper form (data collection form v3.2, .docx) with text put in:
@@ -83,7 +91,7 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   - Without an uploaded form (or not sharing), the Form view shows the older simple HTML version. Demo: choose a blank
     .docx on the Form view; it stays in that browser tab.
   - Subject ID: one character per box; longer IDs get the five boxes merged into one.
-- **Defaults on tap:** an empty temperature becomes 36.5 (anywhere on its card, owner 12 Oct 2026) (then + / −, or tap again to type); an empty time becomes now.
+- **Defaults on tap:** an empty room temp becomes 20.0 (owner, 12 Oct 2026); an empty temperature becomes 36.5 (anywhere on its card, owner 12 Oct 2026) (then + / −, or tap again to type); an empty time becomes now.
 - Gown set temp follows "Warming off" (NA for later timepoints) until someone picks a value on that screen.
 - - **Entry screen:** option B ("change what moved"): values carry over from the last saved timepoint; + / − nudges;
   tap the number to type ("365" → 36.5). Hidden readings (Settings) stay blank.

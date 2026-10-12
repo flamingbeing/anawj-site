@@ -56,11 +56,13 @@ try {
   await page.click('[data-ev="pw_start"]');
   assert.match(await page.textContent('[data-ev="pw_start"] b'), /^\d\d:\d\d$/, 'tapping an empty time sets now');
   assert.match(await page.textContent('#due'), /due \d\d:\d\d/);
+  // the 0-min reading is due right now: the due time shows its 'now' state
+  await page.waitForFunction(() => document.querySelector('#due')?.dataset.state === 'now', null, { timeout: 5000 });
   // running timer from warming on, and the next event to note (10-min group: warming off 10 min later)
-  assert.match(await page.textContent('#clock'), /Warming \+\d+:\d\d/);
-  assert.match(await page.textContent('#clock'), /Next: Warming off \d\d:\d\d/);
+  assert.match(await page.textContent('#clock'), /Prewarm \+\d+:\d\d/);
+  assert.match(await page.textContent('#clock'), /Next: Prewarm off \d\d:\d\d/);
   // the app bar's Log button sets the next event to now (then cleared again from its box)
-  assert.match(await page.textContent('#lognext'), /Log\s*Warming off/);
+  assert.match(await page.textContent('#lognext'), /Log\s*Prewarm off/);
   await page.click('#lognext');
   assert.match(await page.textContent('[data-ev="ev_wstop"] b'), /^\d\d:\d\d$/, 'Log sets warming off to now');
   await page.click('[data-ev="ev_wstop"]'); await page.click('[data-evclear="ev_wstop"]');
@@ -117,6 +119,9 @@ try {
   await page.click('.tabs2 a:has-text("Intra-op")');
   await page.waitForFunction(() => /Baseline/.test(document.querySelector('.tp')?.textContent || ''));
   assert.doesNotMatch(await page.textContent('main'), /10 min pre-warming/, 'group hidden outside the pre-warming temperatures');
+  // an empty room temp fills 20.0 when its card is tapped
+  await page.click('.card[data-fill="room"] .clab');
+  assert.equal((await page.textContent('.num[data-type="room"]')).trim(), '20.0', 'room temp starts at 20');
   await shot('intraop-temps');
 
   // form view: the paper form's day-of-surgery pages, filled in, with Save as PDF / Print

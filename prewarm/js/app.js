@@ -365,9 +365,11 @@ route(/^\/new$/, () => {
 
 // ---------- patient main screen: event times, temperatures, then links to the other forms in the order they are
 // filled in. BP/HR/BIS uses the same reading screen without the times.
-const EVENTS = [['pw_gown', 'Gown on'], ['pw_start', 'Warm on', 'pw'], ['ev_wstop', 'Warm off', 'pw'], ['ev_ot', 'In OT'],
-  ['io_knife', 'Induction'], ['io_flip', 'Prone'], ['io_under_start', 'Under­body'], ['io_gown_start', 'Gown BH'],
+const EVENTS = [['pw_gown', 'Gown on'], ['pw_start', 'Prewarm on', 'pw'], ['ev_wstop', 'Prewarm off', 'pw'], ['ev_ot', 'In OT'],
+  ['io_knife', 'Induction'], ['io_flip', 'Prone'], ['io_under_start', 'Under­body warm'], ['io_gown_start', 'Gown warm'],
   ['io_done', 'Surgery end'], ['pacu_in', 'PACU in'], ['pacu_out', 'To ward']];
+// the gown and Bair Hugger times, coloured warm (owner, 12 Oct 2026)
+const WARM_EVENTS = new Set(['pw_gown', 'pw_start', 'ev_wstop', 'io_under_start', 'io_gown_start']);
 const EVENT_FULL = { pw_gown: 'Gown on', ev_ot: 'In OT', pacu_in: 'PACU arrival', io_flip: 'Flipped prone', pw_start: 'Active warming started', ev_wstop: 'Active warming stopped', io_knife: 'Induction (knife to skin)', io_under_start: 'Underbody Bair Hugger on',
   io_gown_start: 'Gown Bair Hugger on', io_done: 'Surgery completed (post-extubation)', pacu_out: 'Transfer to ward' };
 // Running timer and the next event to note, in the app bar of the patient screen
@@ -377,7 +379,7 @@ const mmss = m => { const sec = Math.max(0, Math.floor(m * 60)), h = Math.floor(
   return h ? `${h}:${String(mm).padStart(2, '0')}:${ss}` : `${mm}:${ss}`; };
 function clockHtml(p, s) {
   const now = nowMin();
-  const anchors = s === 'prewarm' ? [['pw_start', 'Warming'], ['pw_gown', 'Gown on']]
+  const anchors = s === 'prewarm' ? [['pw_start', 'Prewarm'], ['pw_gown', 'Gown on']]
     : [['io_knife', 'Induction'], ['ev_ot', 'In OT']];
   const [aid, alabel] = anchors.find(([id]) => toMin(val(p, id)) != null) || [];
   let timer = `<span class="lbl">Now</span> <b>${fromMin(Math.floor(now))}</b>`;
@@ -392,7 +394,7 @@ function nextEvent(p) {
   const last = evs.reduce((i, id, j) => val(p, id) ? j : i, -1);
   const id = evs.slice(last + 1).find(x => !val(p, x));
   if (!id) return null;
-  const label = EVENTS.find(([f]) => f === id)[1].replace('Warm ', 'Warming ').replace('\u00ad', '');
+  const label = EVENTS.find(([f]) => f === id)[1].replace('\u00ad', '');
   const due = id === 'ev_wstop' && toMin(val(p, 'pw_start')) != null && WARM_MIN[val(p, 'arm')] ? toMin(val(p, 'pw_start')) + WARM_MIN[val(p, 'arm')] : null;
   return { id, label, due };
 }
@@ -466,15 +468,16 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     let hint = changed ? 'was ' + was[c.key] : was[c.key] != null ? 'same' : '';
     if (c.key === 'map' && v == null) { const m = calc('map', k => draft[k]); if (m) hint = `<button class="link" data-map="${m}">use ${m}</button>`; }
     // an empty temperature: the whole card is one big target that puts in 36.5
-    const fill = c.temp && v == null;
+    const fill = (c.temp || c.key === 'room') && v == null;
     return `<div class="card ${changed ? 'changed' : ''}${fill ? ' fill' : ''}" ${fill ? `data-fill="${c.key}"` : ''}><div class="clab">${c.label}<small>${hint}</small></div>
       <div class="pm"><button class="k" data-step="-1" data-c="${c.key}" aria-label="${c.label} down">−</button><button class="num" data-type="${c.key}">${v ?? '<span class="muted">tap</span>'}</button><button class="k" data-step="1" data-c="${c.key}" aria-label="${c.label} up">+</button></div></div>`;
   }
   function timesHtml() {
-    return `<div class="times">${EVENTS.filter(([, , pw]) => !(pw && noWarming(p))).map(([f, l]) => {
-      const v = val(p, f), full = EVENT_FULL[f] || l;
-      if (editing === f) return `<div class="tchip edit"><span>${l}</span><input type="time" id="evtime" value="${v === 'NA' ? '' : esc(v || '')}" aria-label="${full}"><button class="link" data-evclear="${f}">Clear</button></div>`;
-      return `<button class="tchip ${v ? 'set' : ''}" data-ev="${f}" aria-label="${full}: ${v ? v + ', tap to change' : 'tap to set now'}"><span>${l}</span><b>${v ? esc(v) : 'tap'}</b></button>`;
+    // numbered in the order they happen (owner, 12 Oct 2026)
+    return `<div class="times">${EVENTS.filter(([, , pw]) => !(pw && noWarming(p))).map(([f, l], i) => {
+      const v = val(p, f), full = EVENT_FULL[f] || l, n = `<i class="tn" aria-hidden="true">${i + 1}</i>`;
+      if (editing === f) return `<div class="tchip edit"><span>${i + 1}. ${l}</span><input type="time" id="evtime" value="${v === 'NA' ? '' : esc(v || '')}" aria-label="${full}"><button class="link" data-evclear="${f}">Clear</button></div>`;
+      return `<button class="tchip ${v ? 'set' : ''}${WARM_EVENTS.has(f) ? ' warm' : ''}" data-ev="${f}" aria-label="${i + 1}, ${full}: ${v ? v + ', tap to change' : 'tap to set now'}">${n}<span>${l}</span><b>${v ? esc(v) : 'tap'}</b></button>`;
     }).join('')}</div>`;
   }
   // patient comfort: pre-op question at the top, post-op at the bottom; one line once answered
@@ -515,7 +518,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     const due = dueOf(p, s, pt);
     const grp = s === 'prewarm' ? `<span class="badge">${GROUPS.find(g => String(g[0]) === String(val(p, 'arm')))?.[1] || 'Group not set'}</span>` : '';
     paint(`${main && val(p, 'done') ? `<p class="ok-box donetop">✓ Data collection complete <small>${esc(val(p, 'done'))}</small></p>` : ''}${main ? comfortHtml('sat_pre', 'Comfortable before surgery?') + timesHtml() : ''}${navHtml()}
-      <div class="tp"><div><b>${pt.label}</b> ${grp}</div><div class="due" id="due">${due != null ? 'due ' + fromMin(Math.round(due)) : pt.key === 'base' ? (s === 'prewarm' ? '' : 'on arrival in OT') : pt.min != null ? `<span class="hint">Set “${s === 'prewarm' ? 'Warming on' : 'Induction'}” for due times</span>` : ''}</div></div>
+      <div class="tp"><div><b>${pt.label}</b> ${grp}</div><div class="due" id="due">${due != null ? 'due ' + fromMin(Math.round(due)) : pt.key === 'base' ? (s === 'prewarm' ? '' : 'on arrival in OT') : pt.min != null ? `<span class="hint">Set “${s === 'prewarm' ? 'Prewarm on' : 'Induction'}” for due times</span>` : ''}</div></div>
       ${isSaved ? `<p class="muted small tight">Saved ${esc(savedAt(p, s, pt.key))}${p.f['at_' + s + '_' + pt.key]?.by ? ' by ' + esc(p.f['at_' + s + '_' + pt.key].by) : ''}. Changes save when you tap Save.</p>` : ''}
       <div class="board">${cols.map(card).join('')}</div>
       <button class="save big" id="save">${isSaved ? 'Save changes' : `Save ${pt.label} reading`}</button>
@@ -528,7 +531,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
   }
   draw();
   const step = { core: 0.1, chest: 0.1, arm: 0.1, thigh: 0.1, calf: 0.1, room: 0.5, sbp: 1, dbp: 1, map: 1, hr: 1, bis: 1 };
-  const start = { core: 36.5, chest: 36.5, arm: 36.5, thigh: 36.5, calf: 36.5, room: 21, sbp: 120, dbp: 70, map: 85, hr: 75, bis: 50 };
+  const start = { core: 36.5, chest: 36.5, arm: 36.5, thigh: 36.5, calf: 36.5, room: 20, sbp: 120, dbp: 70, map: 85, hr: 75, bis: 50 };
   function bump(k, dir) {
     const cur = parseFloat(draft[k]);
     const n = Number.isFinite(cur) ? cur + dir * step[k] : start[k];
@@ -552,7 +555,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     const chip = t.closest('.chip[data-c]');
     if (chip) { if (chip.dataset.c === 'set') setTouched = true; draft[chip.dataset.c] = draft[chip.dataset.c] === chip.dataset.v ? null : chip.dataset.v; draw(); return; }
     const fl = t.closest('.card[data-fill]');
-    if (fl && !t.closest('[data-step]')) { draft[fl.dataset.fill] = '36.5'; draw(); return; }
+    if (fl && !t.closest('[data-step]')) { draft[fl.dataset.fill] = fl.dataset.fill === 'room' ? '20.0' : '36.5'; draw(); return; }
     const m = t.closest('[data-map]');
     if (m) { draft.map = m.dataset.map; draw(); return; }
     const sat = t.closest('[data-sat]');
@@ -571,7 +574,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     if (n) {
       const k = n.dataset.type, c = cols.find(x => x.key === k);
       // an empty temperature starts at 36.5; tap again to type
-      if (c.temp && draft[k] == null) { draft[k] = '36.5'; draw(); return; }
+      if ((c.temp || k === 'room') && draft[k] == null) { draft[k] = k === 'room' ? '20.0' : '36.5'; draw(); return; }
       const inp = document.createElement('input');
       inp.className = 'num'; inp.inputMode = 'decimal'; inp.value = draft[k] ?? ''; inp.setAttribute('aria-label', c.label);
       n.replaceWith(inp); inp.focus(); inp.select();
@@ -607,7 +610,14 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
   };
   view.onfocusout = e => { if (e.target.id === 'evtime') setTimeout(() => { if (editing && !view.contains(document.activeElement)) { editing = null; draw(); } }, 0); };
   cleanup.push(() => { view.onchange = view.onfocusout = null; });
-  startAlerts(p, s, () => { const el = $('#due'); if (el) { const d = dueOf(p, s, pt); if (d != null) { const left = d - nowMin(); el.textContent = 'due ' + fromMin(Math.round(d)) + (left > 0 ? ` · in ${Math.floor(left)}:${String(Math.floor((left % 1) * 60)).padStart(2, '0')}` : left > -5 ? ' · now' : ' · late'); } } });
+  // the due time warms up as it nears the clock: soon (2 min), now (to 5 min past), late; plain once saved
+  startAlerts(p, s, () => {
+    const el = $('#due'); if (!el) return;
+    const d = dueOf(p, s, pt); if (d == null) return;
+    const left = d - nowMin();
+    el.textContent = 'due ' + fromMin(Math.round(d)) + (left > 0 ? ` · in ${Math.floor(left)}:${String(Math.floor((left % 1) * 60)).padStart(2, '0')}` : left > -5 ? ' · now' : ' · late');
+    el.dataset.state = isSaved ? 'saved' : left > 2 ? 'later' : left > 0 ? 'soon' : left > -5 ? 'now' : 'late';
+  });
 });
 
 // ---------- due alerts (only while the app is open)
