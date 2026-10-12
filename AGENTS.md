@@ -31,7 +31,27 @@ node tools/check.mjs
 for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mjs; do node "$f"; done
 ```
 
-For evals UI changes, also run the e2e test (see `evals/README.md`).
+- Logbook changes: `tools/test-logbook.sh` runs all of the above plus the full e2e and every focused browser test
+  (about 10 min; `quick` skips the full e2e). Its portfolio-template steps need `E2E_BLANK` (a blank APMES portfolio
+  .docx, not in the repo). After UI changes also run `node logbook/test/e2e/a11y.mjs` (accessibility).
+- Rules changes (`logbook/firestore.rules`): `tools/test-rules.sh` runs the logbook and evals rules suites in the
+  local emulator (fake accounts, demo project; no sign-in, never the live projects).
+- Evals UI changes: also run the e2e test (see `evals/README.md`).
+
+## Working with the owner
+
+- **Merging:** merge your own PRs once the checks above pass, then report (with the PR link). Exceptions: Claude
+  Code–Codex handover PRs wait for the owner's explicit approval; the owner may say "auto-merge" for a batch, or
+  "no e2e yet" (then unit tests and quick browser checks).
+- **Planning:** for multi-part work, say the plan first and wait when asked; the owner plans in batches, then it's
+  built PR by PR, each merged before the next. When the owner asks "should we / can we", answer and propose.
+  While another session or Codex works in an area, plan only and don't merge into it.
+- **Show it:** phone screenshots (390 px) of UI changes, plus preview links once a PR has one (see PR previews).
+- **New options:** optional settings, off by default, per device unless they belong to the account; existing
+  defaults stay exactly as they look now.
+- **Writing for the owner:** plain words, short; say what changed for residents and what the owner needs to do.
+- **Keep the repo public-safe:** fake data only; never commit secrets, tokens or credentials (the owner commits
+  any needed public client IDs themselves).
 
 ## Status and decisions (before compacting)
 
