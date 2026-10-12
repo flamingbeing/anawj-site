@@ -19,6 +19,15 @@ export async function makeBackup() {
   };
 }
 
+// gzip (the browser's own CompressionStream): Drive / Dropbox backups are about 4x smaller as .json.gz
+export const gzipBlob = (text, type = 'application/gzip') => new Response(new Blob([text]).stream().pipeThrough(new CompressionStream('gzip'))).blob().then(b => new Blob([b], { type }));
+// a backup file's text, plain .json or .json.gz (told apart by gzip's first two bytes, not the name)
+export async function backupText(file) {
+  const head = new Uint8Array(await file.slice(0, 2).arrayBuffer());
+  if (head[0] !== 0x1f || head[1] !== 0x8b) return file.text();
+  return new Response(file.stream().pipeThrough(new DecompressionStream('gzip'))).text();
+}
+
 export async function downloadBackup(btn) {
   btn.disabled = true;
   try {
@@ -31,7 +40,7 @@ export async function downloadBackup(btn) {
 
 async function restoreBackup(file) {
   let data;
-  try { data = JSON.parse(await file.text()); } catch { toast('That file is not a logbook backup'); return; }
+  try { data = JSON.parse(await backupText(file)); } catch { toast('That file is not a logbook backup'); return; }
   if (!data || data.format !== FORMAT || !Array.isArray(data.cases)) { toast('That file is not a logbook backup'); return; }
   const haveCases = new Set((S.cases || []).map(c => c.id));
   const haveRefl = new Set((S.reflections || []).map(r => r.id));
@@ -79,6 +88,6 @@ export function backupCard(...extra) {
     h('h2', {}, 'Backup'),
     extra.length ? h('h3', {}, 'Backup file') : null,
     h('p', { class: 'hint help' }, 'Keep your own copy of your cases, reflections, tag groups, settings and portfolio details as one file. Photos are not included. Restoring adds back anything missing and never deletes.'),
-    h('div', { class: 'bar', style: 'margin-bottom:0' }, btn, fileButton('Restore from backup…', '.json,application/json', restoreBackup)),
+    h('div', { class: 'bar', style: 'margin-bottom:0' }, btn, fileButton('Restore from backup…', '.json,.gz,application/json,application/gzip', restoreBackup)),
     ...extra);
 }

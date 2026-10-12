@@ -232,7 +232,12 @@ portfolio content.
   `resumeCloudSave` (from `onUser`) waits for the server's cases and reflections, then saves. The reflections
   listener needs `includeMetadataChanges` for that: without it an unchanged offline copy never reports `fromCache:
   false` (the first version waited 30 s and gave up on the owner's phone; demo e2e can't see it). States start `gdr-` /
-  `dbx-`; a mismatch saves nothing. e2e: `test/e2e/cloud-save.mjs` fakes both. Tokens in memory only. `settings.cloudBackup` { remind, md,
+  `dbx-`; a mismatch saves nothing. e2e: `test/e2e/cloud-save.mjs` fakes both. Tokens in memory only.
+  Uploads are `logbook-backup-<date>.json.gz` (CompressionStream, about 4x smaller; `gzipBlob` in `backup.js`);
+  Download backup stays plain `.json`; Restore reads both (`backupText`: gzip's 1f 8b bytes, not the name).
+  `cloudBackup.keepDays` 0 (default, keep all) / 90 / 30: after a save the app lists its folder and deletes its own
+  dated backups and notes zips older than that (`staleBackups`); Dropbox needs `files.metadata.read` for the list.
+  A failed tidy never undoes the save; the toast says so. `settings.cloudBackup` { remind, md,
   lastAt, lastTo } (never in the settings file). Reminder: one toast per visit with a Save button when due. The
   owner filled `GOOGLE_CLIENT_ID` and `DROPBOX_APP_KEY` (both public) in Oct 2026. Dropbox stays in development
   mode until the owner applies for production (its icons are 64 and 256 px from `icons/icon-512.png`).
