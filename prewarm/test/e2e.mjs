@@ -53,7 +53,10 @@ try {
   assert.equal(await page.$('.links a[href$="/form/satis"]'), null, 'no separate satisfaction screen');
   assert.match(await page.textContent('.tabs2 [aria-selected="true"]'), /Pre-warming/);
   assert.match(await page.textContent('.badge'), /10 min pre-warming/, 'group shows with the pre-warming temperatures');
+  // Gown on is still empty, so it asks first (a stray tap shouldn't log out of order)
+  let asked = ''; page.once('dialog', d => { asked = d.message(); d.accept(); });
   await page.click('[data-ev="pw_start"]');
+  assert.match(asked, /Gown on isn’t logged yet/);
   assert.match(await page.textContent('[data-ev="pw_start"] b'), /^\d\d:\d\d$/, 'tapping an empty time sets now');
   assert.match(await page.textContent('#due'), /due \d\d:\d\d/);
   // the 0-min reading is due right now: the due time shows its 'now' state
@@ -109,6 +112,7 @@ try {
   await shot('reading-next');
 
   // warming stopped: set temp becomes NA for later timepoints
+  page.once('dialog', d => d.accept()); // Gown on is still empty
   await page.click('[data-ev="ev_wstop"]');
   await page.click('[data-ev="ev_wstop"]');
   await page.fill('#evtime', '07:31');
