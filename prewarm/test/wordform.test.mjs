@@ -42,6 +42,11 @@ const done = fillForm(xml, { id: 'd', created: t, f: { ...f, sign_prewarm: undef
 assert.match(done, /Name: CD .*Date: 13 Oct 2026$/m);
 assert.doesNotMatch(done.split('PREOPERATIVE')[1].split('Subject ID')[0], /Name: CD/, 'not on the pre-op page');
 
+// "Vital Signs Data Collected" ticks itself once any BP / HR / BIS value is in
+const vit = fillForm(xml, { id: 'v', created: t, f: { haemo_base_sbp: { v: '120', t } } }).xml.replace(/<[^>]+>/g, '');
+assert.match(vit, /☒ Vital Signs Data Collected/);
+assert.match(text, /☐ Vital Signs Data Collected/, 'not ticked without vitals');
+
 // a long Subject ID: the five boxes become one
 const long = fillForm(xml, { id: 'y', created: t, f: { enrol_id: { v: 'NTF-0012', t } } }).xml;
 assert.match(long, /<w:gridSpan w:val="5"\/>/);

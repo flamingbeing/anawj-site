@@ -19,7 +19,7 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   Pre-warming / Intra-op switch (opens on Intra-op once the patient is in OT), then links to the other forms in the
   order they're filled in (BP/HR/BIS, intra-op details, PACU, satisfaction, form view).
 - **Patient comfort** (owner, 12 Oct 2026): pre-op question at the top of the main screen, post-op at the bottom (no
-  separate screen); one line once answered. "Spreadsheet view" (was Form view) is a text link under the other forms.
+  separate screen); one line once answered. "Sheet view" (was Spreadsheet view, earlier Form view) is a text link under the other forms.
 - **Join by code:** the hospital comes from the code's prefix (NTF-…), so nobody picks a hospital to join.
 - **Service worker:** the page reloads only when an update takes over, never on the first install (a reload wiped the
   initials typed on the join screen).
@@ -78,6 +78,12 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
 - **Due time warms up** (owner, 12 Oct 2026): the "due hh:mm" beside each timepoint is plain until 2 min before,
   then an amber pill with a slow pulse (soon), an orange-red pill with a stronger pulse from due to 5 min past (now),
   and a red pill with a fast pulse after that (late); plain once the reading is saved. Reduced motion: colours only.
+- **Other data** (owner, 12 Oct 2026): a small box beside Form view / Sheet view opens the remaining template pages
+  (pre-op, pre-op medication, pre-op investigations, day 1 and 2 chart review and analgesia, discharge), each a form of
+  every field in template order (`OTHER_PAGES`; no sign-off). The main screen stays the op-day bedside screen.
+- **Vital signs data collected** (paper form, intra-op readings page; no template column): ticked on the Word form
+  once any BP / HR / BIS value is in; the BP screen says so. The BP, HR, BIS box on the main screen warms up and
+  pulses like the due time for its next 15-min reading (misses older than 15 min are let go).
 - **Screen size** (Settings, this phone only): Smaller / Small / Normal / Large / Larger zooms the whole app
   (`--ui-zoom` on body). Normal by default.
 - **Form view** (owner, 12 Oct 2026): the study's real paper form (data collection form v3.2, .docx) with text put in:

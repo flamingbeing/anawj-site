@@ -71,7 +71,19 @@ a { color: var(--navy); }
 .danger:hover { border-color: var(--err); }
 .link { background: none; border: 0; color: var(--navy); text-decoration: underline; padding: 4px; cursor: pointer; font-size: inherit; }
 .textlinks { display: flex; gap: 16px; margin: 0; padding: 0 4px; }
+.textlinks { align-items: center; }
 .textlinks a { font-weight: 600; padding: 10px 0; }
+/* "Other data": a smaller box beside Form view and Sheet view */
+.textlinks a.minicard { display: grid; padding: 6px 10px; border: 1px solid var(--line); border-radius: var(--r); background: var(--card); text-decoration: none; color: var(--navy); line-height: 1.2; }
+.textlinks a.minicard small { font-weight: 400; font-size: 11px; color: var(--muted); }
+.links.one { grid-template-columns: 1fr; }
+/* the BP, HR, BIS box warms up like the due time */
+.links a[data-state="soon"] { background: var(--warn-soft); border-color: var(--warn); color: var(--warn); animation: duepulse 2s ease-in-out infinite; --pulse: rgba(138, 90, 0, .35); }
+.links a[data-state="now"] { background: #fde3d3; border-color: #9a3412; color: #9a3412; animation: duepulse 1.2s ease-in-out infinite; --pulse: rgba(229, 114, 0, .55); }
+.links a[data-state="late"] { background: var(--err); border-color: var(--err); color: #fff; animation: duepulse .7s ease-in-out infinite; --pulse: rgba(180, 35, 24, .6); }
+.links a[data-state="soon"] small, .links a[data-state="now"] small { color: inherit; }
+.links a[data-state="late"] small { color: #fff; }
+@media (prefers-reduced-motion: reduce) { .links a[data-state] { animation: none; } }
 
 /* home list */
 .list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }

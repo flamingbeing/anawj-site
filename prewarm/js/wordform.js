@@ -126,6 +126,9 @@ export function fillForm(xml, rec) {
     for (const [col, k] of HD) g.set(rowLabel(pt), col, v(`haemo_${pt.key}_${k}`));
   }
 
+  // "Vital Signs Data Collected": ticked once any BP / HR / BIS value is in
+  if (Object.keys(rec.f).some(k => /^haemo_/.test(k) && v(k) != null)) F.tickParagraph('Vital Signs Data Collected');
+
   // ---- POSTOPERATIVE (PACU)
   F.row('Time of PACU arrival').time(v('pacu_in'));
   F.row('Temperature on PACU arrival').line(v('pacu_temp'));

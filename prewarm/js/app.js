@@ -495,11 +495,11 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     const done = pg => val(p, 'sign_' + pg) ? ' ✓' : '';
     const haemo = pointsFor(p, 'haemo').filter(x => savedAt(p, 'haemo', x.key)).length;
     return `<nav class="links" aria-label="Other forms">
-      <a href="#/p/${id}/haemo">BP, HR, BIS${done('haemo')}<small>${haemo ? haemo + ' saved' : 'Baseline in OT'}</small></a>
+      <a href="#/p/${id}/haemo" id="haemolink" data-state="${haemoState(p)}">BP, HR, BIS${done('haemo')}<small>${haemo ? haemo + ' saved' : 'Baseline in OT'}</small></a>
       <a href="#/p/${id}/form/intraop">Intra-op details${done('intraop')}<small>Blood, products, tests</small></a>
       <a href="#/p/${id}/form/pacu">PACU${done('pacu')}<small>Temp, NuDESC, delay</small></a>
       </nav>
-      <p class="textlinks"><a href="#/p/${id}/form">Form view</a><a href="#/p/${id}/sheet">Spreadsheet view</a></p>`;
+      <div class="textlinks"><a class="minicard" href="#/p/${id}/data">Other data<small>Pre-op, day 1–2, discharge</small></a><a href="#/p/${id}/form">Form view</a><a href="#/p/${id}/sheet">Sheet view</a></div>`;
   }
   // previous / next timepoint: big buttons either side of the tabs and the timepoint strip
   function navHtml() {
@@ -522,6 +522,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
       ${isSaved ? `<p class="muted small tight">Saved ${esc(savedAt(p, s, pt.key))}${p.f['at_' + s + '_' + pt.key]?.by ? ' by ' + esc(p.f['at_' + s + '_' + pt.key].by) : ''}. Changes save when you tap Save.</p>` : ''}
       <div class="board">${cols.map(card).join('')}</div>
       <button class="save big" id="save">${isSaved ? 'Save changes' : `Save ${pt.label} reading`}</button>
+      ${s === 'haemo' && vitalsCollected(p) ? '<p class="okline small">✓ Vital signs data collected: ticked on the paper form</p>' : ''}
       ${s === 'haemo' && settings.hide.haemo15 ? `<p class="muted small">Only baseline is entered here; the 15-min rows come from the monitor download. Turn them on in Settings.</p>` : ''}
       ${main ? comfortHtml('sat_post', 'Comfortable after surgery?') + linksHtml() + doneHtml(p) : signoffHtml(p, s)}`);
     refreshBar();
@@ -618,6 +619,9 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     el.textContent = 'due ' + fromMin(Math.round(d)) + (left > 0 ? ` · in ${Math.floor(left)}:${String(Math.floor((left % 1) * 60)).padStart(2, '0')}` : left > -5 ? ' · now' : ' · late');
     el.dataset.state = isSaved ? 'saved' : left > 2 ? 'later' : left > 0 ? 'soon' : left > -5 ? 'now' : 'late';
   });
+  // the BP, HR, BIS box warms up the same way for its next 15-min reading
+  const hl = setInterval(() => { const a = $('#haemolink'); if (a) a.dataset.state = haemoState(p); }, 1000);
+  cleanup.push(() => clearInterval(hl));
 });
 
 // ---------- due alerts (only while the app is open)
@@ -669,6 +673,28 @@ function signoffClick(p, pg, t) {
   } else if (t.closest('[data-unsign]')) { set(p, 'sign_' + pg, null); render(); }
 }
 
+// BP / HR / BIS: the next 15-min reading's state, like the due time (readings missed by over 15 min are let go)
+function haemoState(p) {
+  const now = nowMin();
+  const lefts = pointsFor(p, 'haemo').filter(x => x.min != null && !savedAt(p, 'haemo', x.key))
+    .map(x => dueOf(p, 'haemo', x)).filter(d => d != null).map(d => d - now).filter(l => l > -15);
+  if (!lefts.length) return 'later';
+  const left = Math.min(...lefts);
+  return left > 2 ? 'later' : left > 0 ? 'soon' : left > -5 ? 'now' : 'late';
+}
+// the paper form's "Vital Signs Data Collected": ticked once any BP / HR / BIS value is saved
+const vitalsCollected = p => Object.keys(p.f).some(k => /^haemo_/.test(k) && val(p, k) != null);
+
+// ---------- other data: the study's remaining pages (pre-op, day 1 and 2 chart review, discharge)
+route(/^\/p\/(\w+)\/data$/, id => {
+  const p = patients[id]; if (!p) return go('#/');
+  header(sid(p) + ' · Other data', '#/p/' + id);
+  topBar(p, defaultSeries(p));
+  const filled = pg => FORM[pg].filter(([k]) => val(p, k) != null).length;
+  paint(`<p class="muted small">Usually from Epic or the chart, after the day of surgery. Fill in what you have; the rest stays blank.</p>
+    <nav class="links one" aria-label="Other data">${OTHER_PAGES.map(pg => `<a href="#/p/${id}/form/${pg}">${esc(PAGES.find(x => x.id === pg).title)}<small>${filled(pg) ? filled(pg) + ' of ' + FORM[pg].length + ' filled' : 'Not started'}</small></a>`).join('')}</nav>`);
+});
+
 // ---------- forms (intra-op details, PACU, satisfaction)
 const FORM = {
   intraop: [['io_tech'], ['io_ebl'], ['h', 'Transfusion'], ['tx'], ['io_cs', 'io_cs_vol', 'io_cs_ret'], ['io_pcc', 'io_pcc_dose'],
@@ -677,9 +703,14 @@ const FORM = {
     ['nd_dis', 'nd_beh', 'nd_com', 'nd_ill', 'nd_psy', 'pacu_nudesc'], ['pacu_delay', 'pacu_delay1h', 'pacu_delay_why']],
   satis: [['sat_pre'], ['sat_post']],
 };
-route(/^\/p\/(\w+)\/form\/(intraop|pacu|satis)$/, (id, pg) => {
+// the rest of the study's data (owner, 12 Oct 2026): every field of these pages, in template order
+const OTHER_PAGES = ['preop', 'meds', 'bloods', 'pod1', 'pod1an', 'pod2', 'pod2an', 'dc'];
+for (const pg of OTHER_PAGES) FORM[pg] = PAGES.find(x => x.id === pg).fields.filter(f => f.id !== 'enrol_id').map(f => [f.id]);
+route(/^\/p\/(\w+)\/form\/(\w+)$/, (id, pg) => {
   const p = patients[id]; if (!p) return go('#/');
-  header(sid(p) + ' · ' + PAGES.find(x => x.id === pg).title, '#/p/' + id);
+  if (!FORM[pg]) return go('#/p/' + id);
+  const other = OTHER_PAGES.includes(pg);
+  header(sid(p) + ' · ' + PAGES.find(x => x.id === pg).title, other ? `#/p/${id}/data` : '#/p/' + id);
   topBar(p, defaultSeries(p));
   const get = k => val(p, k);
   const draw = () => {
@@ -689,7 +720,7 @@ route(/^\/p\/(\w+)\/form\/(intraop|pacu|satis)$/, (id, pg) => {
       if (group[0] === 'tx') return txTable(p);
       if (group[0] === 'ix') return ixTable(p);
       return group.map(k => fieldHtml(field(k), get)).join('');
-    }).join('')}${signoffHtml(p, pg)}</div>`);
+    }).join('')}${other ? '' : signoffHtml(p, pg)}</div>`);
     window.scrollTo(0, y);
   };
   draw();
@@ -732,8 +763,9 @@ function fieldHtml(f, get) {
       `<button class="chip" data-f="${f.id}" data-v="${ov}" aria-pressed="${String(v) === String(ov)}">${esc(ol)}</button>`).join('')}</div></div>`;
   }
   const mode = f.type === 'text' ? 'text' : f.type === 'int' ? 'numeric' : 'decimal';
+  const type = f.type === 'date' ? 'date' : f.type === 'time' ? 'time' : 'text';
   return `<div class="fld"><label class="lab" for="${idA}">${esc(f.label)}${f.unit ? ` <small>${esc(f.unit)}</small>` : ''}</label>${hint}
-    <input id="${idA}" data-f="${f.id}" inputmode="${mode}" value="${esc(v ?? '')}" autocomplete="off"></div>`;
+    <input id="${idA}" data-f="${f.id}" type="${type}" ${type === 'text' ? `inputmode="${mode}"` : ''} value="${esc(v ?? '')}" autocomplete="off"></div>`;
 }
 function txTable(p) {
   const rows = [['rbc', 'RBC'], ['plt', 'Platelets'], ['ffp', 'FFP'], ['cryo', 'Cryo']];
@@ -753,7 +785,7 @@ function ixTable(p) {
 // ---------- form view: readings laid out like the paper form
 route(/^\/p\/(\w+)\/sheet$/, id => {
   const p = patients[id]; if (!p) return go('#/');
-  header(sid(p) + ' · Spreadsheet view', '#/p/' + id);
+  header(sid(p) + ' · Sheet view', '#/p/' + id);
   const cell = (s, pt, c) => { const v = val(p, `${s}_${pt.key}_${c.key}`); return `<td><a href="#/p/${id}/${s}/${pt.key}" aria-label="${esc(pt.label + ' ' + c.label + ': ' + (v ?? 'empty'))}">${v == null ? '' : esc(c.key === 'ts' && v > 0 ? '+' + v : v)}</a></td>`; };
   const pw = SERIES.prewarm, it = SERIES.iotemp, hd = SERIES.haemo;
   paint(`

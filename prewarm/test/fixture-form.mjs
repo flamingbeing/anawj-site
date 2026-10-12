@@ -30,7 +30,7 @@ export function fixtureXml() {
     tr([tc(p(box(), run(' 30-minute prewarming     '), box(), run(' 10-minute prewarming     '), box(), run(' No prewarming')))]),
     row('Time that gown was put on', p(run('__ _'), run('_  :'), run('  __ __  (24 hour clock)  '))),
   ]);
-  const body = [head(), p(run('PREOPERATIVE')), pre, sign(), page(), head(), intervention, p(run('Temperature every 5 minutes')), grid, sign()].join('');
+  const body = [head(), p(run('PREOPERATIVE')), pre, sign(), page(), head(), intervention, p(run('Temperature every 5 minutes')), grid, p(box(), run(' Vital Signs Data Collected ')), sign()].join('');
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<w:document ${W}><w:body>${body}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1000" w:right="1000" w:bottom="1000" w:left="1000"/></w:sectPr></w:body></w:document>`;
 }
 

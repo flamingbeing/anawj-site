@@ -117,6 +117,13 @@ export class WordForm {
     this.at = this.rows.indexOf(rows[rows.length - 1]);
     return new Grid(this, tbl, rows);
   }
+  // tick the first box in the paragraph containing `phrase` (one outside the tables, e.g. "☐ Vital Signs Data Collected")
+  tickParagraph(phrase) {
+    const P = all(this.root, 'w:p').map(para).find(x => norm(x.text).includes(norm(phrase)));
+    const k = P ? P.text.search(/[☐☒]/) : -1;
+    if (k < 0) { this.missed.push('paragraph: ' + phrase); return; }
+    tickAt(P, k);
+  }
   // Every paragraph with "Name: … Signature: … Date:", in order
   signLines() { return all(this.root, 'w:p').map(para).filter(P => /Name:/.test(P.text) && /Signature:/.test(P.text) && /Date:/.test(P.text)); }
   cell(tc, v) { if (v != null && v !== '') cellText(tc, String(v)); }

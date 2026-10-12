@@ -149,7 +149,17 @@ try {
   assert.doesNotMatch(await got.file('docProps/core.xml').async('string'), /Test Author/, 'file details removed');
   await page.goBack();
 
-  // spreadsheet view
+  // other data: the rest of the study's pages, from the small box beside Form view / Sheet view
+  await page.click('.textlinks a.minicard');
+  await page.waitForSelector('.links.one a');
+  assert.equal(await page.$$eval('.links.one a', x => x.length), 8, 'pre-op, meds, bloods, day 1 x2, day 2 x2, discharge');
+  await page.click('.links.one a >> nth=0');
+  await page.fill('#f-age', '67'); await page.dispatchEvent('#f-age', 'change');
+  await page.goBack(); await page.waitForSelector('.links.one a');
+  assert.match(await page.textContent('.links.one a >> nth=0'), /1 of \d+ filled/);
+  await page.goBack();
+
+  // sheet view
   await page.click('.textlinks a[href$="/sheet"]');
   await page.waitForSelector('.sheet');
   assert.match(await page.textContent('.sheet'), /36\.6/);
