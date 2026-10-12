@@ -304,18 +304,31 @@ function nextEvent(p) {
 }
 // app-bar button that logs the next event as now
 const logBtnHtml = p => { const nx = nextEvent(p); return nx ? `<b>Log</b><small>${esc(nx.label)}</small>` : ''; };
+// The patient screens' top bar (main screen, BP / HR / BIS, intra-op details, PACU): running timer, next event and
+// its Log button. Returns a function that redraws it; it also ticks every second while the screen is open.
+function topBar(p, s, onLog) {
+  $('#extra').innerHTML = `<div class="clock" id="clock">${clockHtml(p, s)}</div><button class="logbtn" id="lognext" ${nextEvent(p) ? '' : 'hidden'}>${logBtnHtml(p)}</button>`;
+  const refresh = () => {
+    const ck = $('#clock'); if (ck) ck.innerHTML = clockHtml(p, s);
+    const lb = $('#lognext'); if (lb) { const h = logBtnHtml(p); if (lb.innerHTML !== h) lb.innerHTML = h; lb.hidden = !h; }
+  };
+  $('#lognext').onclick = () => {
+    const nx = nextEvent(p); if (!nx) return;
+    const t = nowHM();
+    set(p, nx.id, t); toast(`${nx.label} ${t}. Tap its box to change.`); refresh(); onLog?.();
+  };
+  const iv = setInterval(refresh, 1000);
+  cleanup.push(() => clearInterval(iv));
+  return refresh;
+}
 const defaultSeries = p => noWarming(p) || val(p, 'ev_ot') || val(p, 'io_knife') ? 'iotemp' : 'prewarm';
 route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s, key) => {
   const p = patients[id]; if (!p) return go('#/');
   if (!s || (s === 'prewarm' && noWarming(p))) s = defaultSeries(p);
   const main = s !== 'haemo';
   const def = SERIES[s], pts = pointsFor(p, s);
-  header(main ? sid(p) : sid(p) + ' · BP, HR, BIS', main ? '#/' : '#/p/' + id, main ? `<div class="clock" id="clock">${clockHtml(p, s)}</div><button class="logbtn" id="lognext" ${nextEvent(p) ? '' : 'hidden'}>${logBtnHtml(p)}</button>` : '');
-  if (main) $('#lognext').onclick = () => {
-    const nx = nextEvent(p); if (!nx) return;
-    const t = nowHM();
-    set(p, nx.id, t); toast(`${nx.label} ${t}. Tap its box to change.`); draw();
-  };
+  header(main ? sid(p) : sid(p) + ' · BP, HR, BIS', main ? '#/' : '#/p/' + id);
+  const refreshBar = topBar(p, main ? s : 'iotemp', () => draw());
   let editing = null; // event whose time is being changed
   // default timepoint: the unsaved one nearest its due time, else the first unsaved
   if (!key) {
@@ -414,8 +427,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
       <button class="save big" id="save">${isSaved ? 'Save changes' : `Save ${pt.label} reading`}</button>
       ${s === 'haemo' && settings.hide.haemo15 ? `<p class="muted small">Only baseline is entered here; the 15-min rows come from the monitor download. Turn them on in Settings.</p>` : ''}
       ${main ? comfortHtml('sat_post', 'Comfortable after surgery?') + linksHtml() + doneHtml(p) : signoffHtml(p, s)}`);
-    const ck = $('#clock'); if (ck) ck.innerHTML = clockHtml(p, s);
-    const lb = $('#lognext'); if (lb) { const h = logBtnHtml(p); if (lb.innerHTML !== h) lb.innerHTML = h; lb.hidden = !h; }
+    refreshBar();
     if (editing) { const i = $('#evtime'); i?.focus(); }
     const st = view.querySelector('.strip'), on = st?.querySelector('.on');
     if (on) st.scrollLeft = on.offsetLeft - st.offsetLeft - (st.clientWidth - on.offsetWidth) / 2;
@@ -500,7 +512,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
   };
   view.onfocusout = e => { if (e.target.id === 'evtime') setTimeout(() => { if (editing && !view.contains(document.activeElement)) { editing = null; draw(); } }, 0); };
   cleanup.push(() => { view.onchange = view.onfocusout = null; });
-  startAlerts(p, s, () => { const ck = $('#clock'); if (ck) ck.innerHTML = clockHtml(p, s); const el = $('#due'); if (el) { const d = dueOf(p, s, pt); if (d != null) { const left = d - nowMin(); el.textContent = 'due ' + fromMin(Math.round(d)) + (left > 0 ? ` · in ${Math.floor(left)}:${String(Math.floor((left % 1) * 60)).padStart(2, '0')}` : left > -5 ? ' · now' : ' · late'); } } });
+  startAlerts(p, s, () => { const el = $('#due'); if (el) { const d = dueOf(p, s, pt); if (d != null) { const left = d - nowMin(); el.textContent = 'due ' + fromMin(Math.round(d)) + (left > 0 ? ` · in ${Math.floor(left)}:${String(Math.floor((left % 1) * 60)).padStart(2, '0')}` : left > -5 ? ' · now' : ' · late'); } } });
 });
 
 // ---------- due alerts (only while the app is open)
@@ -563,6 +575,7 @@ const FORM = {
 route(/^\/p\/(\w+)\/form\/(intraop|pacu|satis)$/, (id, pg) => {
   const p = patients[id]; if (!p) return go('#/');
   header(sid(p) + ' · ' + PAGES.find(x => x.id === pg).title, '#/p/' + id);
+  topBar(p, defaultSeries(p));
   const get = k => val(p, k);
   const draw = () => {
     const y = window.scrollY;
@@ -959,7 +972,7 @@ route(/^\/admin$/, async () => {
     ${SITES.map(x => {
       const who = people.filter(m => m.site === x);
       return `<div class="fld"><b>${x}</b>
-        <div class="coderow"><span class="mono">${codes[x] ? esc(codes[x].code) : '<span class="muted">no code yet</span>'}</span><button class="secondary" data-newcode="${x}">${codes[x] ? 'New code' : 'Make code'}</button></div>
+        <div class="coderow">${codes[x] ? `<button class="codebig" data-copy="${esc(codes[x].code)}" aria-label="Copy the ${x} join code">${esc(codes[x].code)}<small>tap to copy</small></button>` : '<span class="muted">no code yet</span>'}<button class="${codes[x] ? 'link' : 'secondary'}" data-newcode="${x}">${codes[x] ? 'New code' : 'Make code'}</button></div>
         ${codes[x] ? `<div class="sharerow"><button class="primary" data-share="${x}">Share join link</button><button class="secondary" data-qr="${x}">QR code</button></div><div class="qr" id="qr-${x}" hidden></div>` : ''}
         ${who.length ? `<ul class="plain">${who.map(m => `<li>${esc(m.initials || '—')} <small class="muted">joined ${new Date(m.joinedAt).toLocaleDateString()}</small> <button class="link" data-rm="${m.uid}">Remove</button></li>`).join('')}</ul>` : '<small class="muted">No phones yet</small>'}</div>`;
     }).join('')}</div>`);
@@ -988,7 +1001,13 @@ route(/^\/admin$/, async () => {
       else { box.hidden = true; qb.textContent = 'QR code'; }
       return;
     }
+    const cp = e.target.closest('[data-copy]');
+    if (cp) {
+      try { await navigator.clipboard.writeText(cp.dataset.copy); toast('Code copied'); } catch { prompt('Copy this join code', cp.dataset.copy); }
+      return;
+    }
     const nc = e.target.closest('[data-newcode]');
+    if (nc && codes[nc.dataset.newcode] && !confirm(`Make a new join code for ${nc.dataset.newcode}?\n\nThe current code, its join link and QR code stop working: phones that haven’t joined yet need the new link.\n\nPhones already in the ${nc.dataset.newcode} team stay in. To take a phone out, use Remove under the members.`)) return;
     if (nc) {
       const abc = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789', b = crypto.getRandomValues(new Uint8Array(8));
       const code = nc.dataset.newcode + '-' + Array.from(b, x => abc[x % abc.length]).join('');

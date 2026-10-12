@@ -164,6 +164,9 @@ try {
 
   // PACU: NuDESC total
   await page.click('.links a[href$="/form/pacu"]');
+  // sub-screens keep the running timer and the Log button in the top bar
+  assert.ok(await page.$('#clock'), 'timer on the PACU screen');
+  assert.ok(await page.$('#lognext'), 'Log button on the PACU screen');
   await page.click('.chip[data-f="nd_dis"][data-v="1"]');
   await page.click('.chip[data-f="nd_psy"][data-v="2"]');
   assert.equal(await page.inputValue('#f-pacu_nudesc'), '3');

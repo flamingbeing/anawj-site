@@ -95,6 +95,17 @@ try {
   assert.match(await ad.textContent('main'), /AA/, 'members listed');
   await ad.click('[data-newcode="WH"]');
   await ad.waitForFunction(() => /WH-[A-Z2-9]{8}/.test(document.querySelector('main').textContent), null, { timeout: 15000 });
+  // a new code for a team that has one warns first (cancelled here: the code stays)
+  let warned = '';
+  ad.once('dialog', d => { warned = d.message(); d.dismiss(); });
+  await ad.click('[data-newcode="NUH"]');
+  assert.match(warned, /stop working[\s\S]*Phones already in the NUH team stay in/);
+  assert.match(await ad.textContent('main'), /NUH-TEST-CODE/);
+  // tapping the code copies it
+  await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: new URL(BASE).origin });
+  await ad.click('[data-copy="NUH-TEST-CODE"]');
+  await toastSays(ad, /Code copied/);
+  assert.equal(await ad.evaluate(() => navigator.clipboard.readText()), 'NUH-TEST-CODE');
   // the admin uploads the blank Word form (made-up fixture; it isn't the whole form, so they confirm)
   ad.once('dialog', d => d.accept());
   const zip = new JSZip(); for (const [k, v] of Object.entries(fixtureFiles())) zip.file(k, v);
