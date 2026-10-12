@@ -294,3 +294,13 @@ Case creation, individual edits/Undo and reflection editor saves first commit im
 Case and reflection drafts use separate document slots, including when session storage is cloned into a duplicated tab. Case input writes synchronously and flushes on pagehide/hidden; draft status reports storage failures. Recovering a draft preserves the currently open draft in its previous slot.
 
 Run `logbook/test/e2e/recovery.mjs` beside the full E2E suite for rejected writes, immediate reload, two-tab drafts, offline reconnect, conflicts, failed reflection Close and denied storage. It accepts `PLAYWRIGHT_PATH`/`CHROMIUM_PATH` for cloud-runtime paths and uses fake demo records only.
+
+### Back, search and everyday logging (Codex usability review)
+
+Dialogs and reflection editors/pickers/heading choices use finite, opaque history entries. Browser Back dismisses the top view before leaving its screen; manual closes consume the same entry. Dialogs restore focus/caret. Back-dismissed reflection and case-edit drafts remain in More → Recent changes / Recover drafts, including learning-point-only and legacy drafts. Sign-out clears pending toast actions and drops transient callbacks before cleanup; direct account changes clear the old screen immediately. Undo waits for its durable delete and preserves text entered while it is finishing.
+
+Natural-language date search protects quoted phrases, field operands and exclusions before recognizing dates; literal whitespace is preserved. Category-name revisions invalidate search haystacks alongside personal tag changes. List and Pills use a multiselect listbox, roving option focus and a labelled combobox; empty-query ArrowDown+Enter works. The collapsed list reports its actual expanded state.
+
+Logging keeps Claude’s everyday/Advanced split. Everyday controls are grouped by task with device/account scope, defaults, a live fake example and a reset limited to this page. Optional device `compactTags` shows six common recent tags, with the full picker expandable/searchable; settings-file import/export carries the preference. Additional-Enter confirmation names suggested tags in a persistent inline hint. Age previews use words (6m/6M = six years male; 6mo = six months; 3m = three years male; 3mo = three months) without changing the saved input. Unambiguous months+weeks compounds retain their meaning.
+
+Run `logbook/test/e2e/usability.mjs` beside recovery and the full E2E suite. Both focused runners accept cloud-specific Playwright/Chromium paths and fail nonzero on assertion failure. Fake data only.

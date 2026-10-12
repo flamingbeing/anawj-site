@@ -1809,7 +1809,7 @@ async function run(label, ctxOpts) {
     assert(await summary.inputValue() === 'IJ hernia', 'switching field lost the draft');
     await tab('logging'); await first.selectOption('initials'); await tab('log');
     assert(await initials.inputValue() === 'IJ' && await summary.inputValue() === 'hernia', 'explicit initials became procedure text');
-    for (const [unit, preview, band] of [['6m', '6M', '20iii'], ['6M', '6M', '20iii'], ['6mo', '6 months', '20ii'], ['3m', '3M', '20ii'], ['3mo', '3 months', '20i']]) {
+    for (const [unit, preview, band] of [['6m', '6 years · male', '20iii'], ['6M', '6 years · male', '20iii'], ['6mo', '6 months', '20ii'], ['3m', '3 years · male', '20ii'], ['3mo', '3 months', '20i']]) {
       await summary.fill(unit + ' hernia'); await debounced();
       assert((await p.locator('.parsed').innerText()).includes(preview), unit + ' preview');
       assert(await p.locator(`.sugg-row [data-code="${band}"]`).count() === 1, unit + ' paeds band');

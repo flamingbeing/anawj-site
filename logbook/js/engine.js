@@ -240,7 +240,12 @@ export const weekLead = (d, ws = 1) => (d.getDay() - weekStart(ws) + 7) % 7;
 // day names from the first day of the week: ['Mon', …, 'Sun']
 export const weekdayNames = (ws = 1) => Array.from({ length: 7 }, (_, i) => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][(weekStart(ws) + i) % 7]);
 export function dateWindow(q, now = new Date(), ws = 1) {
-  let s = ' ' + String(q || '').replace(/\s+/g, ' ') + ' ';   // the rest keeps its capitals (OR, AND, case-sensitive search)
+  // Quoted phrases, field operands and exclusions are literal search text.
+  // Mask them before recognizing unquoted natural-language date filters.
+  const literals = [];
+  let s = String(q || '');
+  s = s.replace(/-?(?:[A-Za-z]+:)?"[^"]*"?|-?[A-Za-z]+:\S+|-\S+/g, text => '\uE000' + (literals.push(text) - 1) + '\uE001');
+  s = ' ' + s.replace(/\s+/g, ' ') + ' ';
   const day = (n = 0) => { const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + n); return todayISO(d); };
   const monday = (weeksBack = 0) => day(-weekLead(now, ws) - 7 * weeksBack);   // the week's first day
   let win = null;
@@ -260,7 +265,7 @@ export function dateWindow(q, now = new Date(), ws = 1) {
     if (m[1] && back === 0) back = 7;   // "last tuesday" on a Tuesday is a week ago
     return { from: day(-back), to: day(-back) };
   });
-  return win ? { ...win, rest: s.trim() } : null;
+  return win ? { ...win, rest: s.trim().replace(/\uE000(\d+)\uE001/g, (_, i) => literals[Number(i)]) } : null;
 }
 
 // 5 -> '5th', 22 -> '22nd'
@@ -270,8 +275,20 @@ export const nth = d => `${d}${(d % 100 >= 11 && d % 100 <= 13) ? 'th' : ({ 1: '
 const AGE_SEX = /^\s*(\d{1,3}\s?(?:(?:yo|y\/o|yrs?|years?|y|\/12|\/52|m\/o|mo|d\/o)\s?[MF]?|[MF]))(?![A-Za-z])[\s,;:\-]*/i;
 export function splitAge(details) {
   const s = String(details || '');
-  const m = s.match(AGE_SEX);
+  const compound = s.match(/^\s*(\d{1,3}m\d{1,2}w[MF]?)(?![A-Za-z])[\s,;:\-]*/i);
+  const m = compound || s.match(AGE_SEX);
   return m ? { age: m[1].replace(/\s+/g, ''), rest: s.slice(m[0].length).trim() } : { age: '', rest: s.trim() };
+}
+
+// Human-readable preview only; the original shorthand stays in the case text.
+export function humanAge(age) {
+  const compound = String(age || '').match(/^(\d{1,3})m(\d{1,2})w([mf])?$/i);
+  if (compound) return Number(compound[1]) + ' month' + (Number(compound[1]) === 1 ? '' : 's') + ' ' + Number(compound[2]) + ' week' + (Number(compound[2]) === 1 ? '' : 's') + (compound[3] ? ' · ' + (compound[3].toLowerCase() === 'm' ? 'male' : 'female') : '');
+  const m = String(age || '').match(/^(\d{1,3})(mo|m\/o|\/12|\/52|d\/o|yo|y\/o|yrs?|years?|y)?([mf])?$/i);
+  if (!m) return String(age || '');
+  const n = Number(m[1]), unit = (m[2] || '').toLowerCase();
+  const name = ['mo', 'm/o', '/12'].includes(unit) ? 'month' : unit === '/52' ? 'week' : unit === 'd/o' ? 'day' : 'year';
+  return n + ' ' + name + (n === 1 ? '' : 's') + (m[3] ? ' · ' + (m[3].toLowerCase() === 'm' ? 'male' : 'female') : '');
 }
 
 // Initials + details as one line of text: the Excel "Case details" column, search, duplicates.

@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import { createTransients } from '../js/transients.js';
+const callbacks=new Map(),events={addEventListener:(k,fn)=>callbacks.set(k,fn)};
+const location={pathname:'/logbook/',search:'?demo',hash:'#logbook'};
+const stack=[{state:{logbookNav:{tab:'logbook'}},url:'#logbook'}];let i=0,backs=0;
+const history={get state(){return stack[i].state;},pushState(state,_,url){stack.splice(++i);stack.push({state,url});},replaceState(state){stack[i].state=state;},back(){assert(i>0);backs++;i--;queueMicrotask(()=>callbacks.get('popstate')());}};
+const views=createTransients({history,location,events});const closed=[];
+const parent=views.open(()=>closed.push('parent')),child=views.open(()=>closed.push('child'));
+assert.equal(stack.length,3);assert.equal(history.state.logbookNav.tab,'logbook');
+await child.close();assert.deepEqual(closed,['child']);assert.equal(parent.active,true);
+await views.dismissAll();assert.deepEqual(closed,['child','parent']);assert.equal(i,0);assert.equal(backs,2);
+const next=views.open(()=>closed.push('next'));history.back();await Promise.resolve();assert.equal(next.active,false);assert.equal(closed.at(-1),'next');
+const signedOut=views.open(()=>{throw Error('Old account callback must not run');});views.reset();assert.equal(signedOut.active,false);assert.deepEqual(history.state.logbookTransient.ids,[]);
+console.log('transient history tests passed');

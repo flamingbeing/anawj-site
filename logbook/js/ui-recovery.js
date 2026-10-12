@@ -1,8 +1,9 @@
 // Recovery is device-only: cloud records keep their existing schema/permissions.
 import { S, h, hooks, writes, toast, cloud, confirmBox, setCases } from './ui-core.js';
-import { recoverableCaseDrafts, recoverCaseDraft } from './ui-log.js';
+import { recoverableCaseDrafts, recoverCaseDraft, editCaseDialog } from './ui-log.js';
+import { hasContent } from './ui-reflect.js';
 import { listDrafts } from './drafts.js';
-const summary = r => r?._deleted ? 'Deleted record' : [r?.initials, r?.title || r?.details || r?.summary || r?.diagnosis].filter(Boolean).join(' ').slice(0, 160);
+const summary = r => r?._deleted ? 'Deleted record' : [r?.initials, r?.title || r?.details || r?.summary || r?.diagnosis || r?.points?.find(p => p.heading || p.text)?.text || r?.points?.find(p => p.heading)?.heading || Object.values(r?.sections || {}).find(Boolean) || r?.references?.find(Boolean) || (r?.figures?.length ? 'Reflection with images' : '')].filter(Boolean).join(' ').slice(0, 160);
 async function restore(job, record) {
   const owner = S.user?.email;
   if (job.owner !== owner) return;
@@ -23,17 +24,21 @@ async function restore(job, record) {
 export function renderRecovery() {
   const email = S.user?.email;
   const drafts = recoverableCaseDrafts();
-  let reflections = [];
-  try { reflections = listDrafts('apmes-logbook-reflection-draft', (cloud.demo ? 'demo:' : '') + email).filter(x => x.value.restore); } catch { /* unavailable */ }
+  let reflections = [], edits = [];
+  try { reflections = listDrafts('apmes-logbook-reflection-draft', (cloud.demo ? 'demo:' : '') + email).filter(x => hasContent(x.value)); } catch { /* unavailable */ }
+  try { edits = listDrafts('logbook-edit-draft', (cloud.demo ? 'demo:' : '') + email); } catch { /* unavailable */ }
   const run = async fn => { if (S.user?.email !== email) return; try { await fn(); } catch (err) { toast(err.message); } hooks.render(); };
   return h('div', {},
     h('section', { class: 'card' }, h('h2', {}, 'Recent changes / Recover drafts'),
       h('p', { class: 'hint' }, 'Private to this browser and account. Keeps the last 100 saved versions and every pending, failed or conflicting change. Signing out clears these recovery copies. This is recovery history, not a backup.'),
       writes.error() ? h('p', { role: 'alert' }, writes.error()) : null),
     h('section', { class: 'card' }, h('h2', {}, 'Recover drafts'),
-      !drafts.length && !reflections.length ? h('p', { class: 'muted' }, 'No unfinished drafts on this device.') : null,
+      !drafts.length && !reflections.length && !edits.length ? h('p', { class: 'muted' }, 'No unfinished drafts on this device.') : null,
       drafts.map(x => h('div', { class: 'card' }, h('p', {}, summary(x.value) || x.value.bulk?.slice(0, 160)),
         h('button', { onclick: () => { if (S.user?.email === email) recoverCaseDraft(x.value); } }, 'Open case draft'),
+        h('button', { onclick: () => run(() => localStorage.removeItem(x.key)) }, 'Discard copy'))),
+      edits.map(x => h('div', { class: 'card' }, h('p', {}, 'Edit case draft: ', summary(x.value.record)),
+        h('button', { onclick: () => { if (S.user?.email === email) editCaseDialog(x.value.base, { draft: x.value.record, onCreated: x.value.isNew && !x.value.base.id ? () => {} : undefined }); } }, 'Open edit draft'),
         h('button', { onclick: () => run(() => localStorage.removeItem(x.key)) }, 'Discard copy'))),
       reflections.map(x => h('div', { class: 'card' }, h('p', {}, summary(x.value)),
         h('button', { onclick: () => { if (S.user?.email === email) hooks.recoverReflection?.(x.value); } }, 'Open reflection draft'),

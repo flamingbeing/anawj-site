@@ -2,11 +2,11 @@
 // Also the reusable category picker and the edit-case dialog (used by the Logbook screen).
 
 import { BY_CODE, TIPS } from './categories.js';
-import { withParents, parseBulk, parseDate, fmtDate, sortCodes, uid, caseParts, caseText, cleanInitials, splitInitials, splitAge, nth, weekLead } from './engine.js';
+import { withParents, parseBulk, parseDate, fmtDate, sortCodes, uid, caseParts, caseText, cleanInitials, splitInitials, splitAge, humanAge, nth, weekLead } from './engine.js';
 import { suggest as suggestCodes } from './suggest.js';
 import { apmesShorthand, shorthandTags } from './tags.js';
 import {
-  S, h, toast, debounce, modal, confirmBox, cat, catName, catShort, catFull, catChip, countText, logTags, tagLinks, tagChip, tagSet, keepTags, PROGRESS_BY_CODE,
+  S, h, toast, debounce, modal, confirmBox, cat, catName, catShort, catFull, catChip, countText, logTags, tagLinks, tagName, tagChip, tagSet, keepTags, PROGRESS_BY_CODE,
   createCase, updateCase, removeCase, restoreCase, saveMany, deleteMany, subcatChips, subcatsOf, settings, todayISO, hooks, fill, add, cloud, writes, okNoIds, patchLogbook, catPills } from './ui-core.js';
 import { display, templateDialog } from './ui-settings.js';
 import { moveToBin } from './bin.js';
@@ -88,7 +88,7 @@ export function clearDrafts() {
   suggestedSave = null;
   saveDraft.cancel();
   draft = EMPTY(); draftOwner = null; draftSlot = null; bulkRows = null; ui = null;
-  try { for (const k of Object.keys(localStorage)) if (k.startsWith('logbook-draft-')) localStorage.removeItem(k); } catch { /* ignore */ }
+  try { for (const k of Object.keys(localStorage)) if (k.startsWith('logbook-draft-') || k.startsWith('logbook-edit-draft:')) localStorage.removeItem(k); } catch { /* ignore */ }
 }
 
 // ---------- selection helpers ----------
@@ -142,18 +142,19 @@ const refocus = () => { if (ui.textarea && matchMedia('(pointer: fine)').matches
 // The list follows your tag set (Settings → Tag editor): section headers, categories and your own tags,
 // indented under what they sit in; hidden ones only turn up in a search. getTags / toggleTag handle your
 // tags (left out: categories only).
-export function catPicker({ get, toggle, getTags = null, toggleTag = null, placeholder = 'Search tags' }) {
-  let q = '', hl = 0, items = [];
-  const list = h('ul', { role: 'listbox' });
+export function catPicker({ get, toggle, getTags = null, toggleTag = null, placeholder = 'Search tags', collapsed = false }) {
+  let q = '', hl = -1, items = [], showAll = !collapsed;
+  const listId = 'tags-' + uid();
+  const list = h('ul', { id: listId, role: 'listbox', 'aria-label': 'Tags', 'aria-multiselectable': 'true' });
   const input = h('input', {
-    type: 'search', placeholder, autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false', enterkeyhint: 'done',
-    oninput: e => { q = e.target.value; hl = 0; refresh(); },
+    type: 'search', role: 'combobox', 'aria-label': placeholder, 'aria-controls': listId, 'aria-expanded': 'true', 'aria-autocomplete': 'list', placeholder, autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false', enterkeyhint: 'done',
+    oninput: e => { q = e.target.value; hl = q.trim() ? 0 : -1; refresh(); },
     onkeydown: e => {
       if (e.key === 'ArrowDown') { hl = Math.min(items.length - 1, hl + 1); paintHl(); e.preventDefault(); }
       else if (e.key === 'ArrowUp') { hl = Math.max(0, hl - 1); paintHl(); e.preventDefault(); }
-      else if (e.key === 'Enter' && q.trim()) {
+      else if (e.key === 'Enter' && (q.trim() || hl >= 0)) {
         e.preventDefault();
-        if (items[hl]) { pick(items[hl]); q = ''; input.value = ''; hl = 0; refresh(); }
+        if (items[hl]) { pick(items[hl]); q = ''; input.value = ''; hl = -1; refresh(); }
       } else if (e.key === 'Escape') { q = ''; input.value = ''; refresh(); }
     },
   });
@@ -165,11 +166,31 @@ export function catPicker({ get, toggle, getTags = null, toggleTag = null, place
     return words.every(w => (/^\d/.test(w) ? c.code.startsWith(w.padStart(2, '0')) || c.code.startsWith(w) : hay.includes(w)));
   }
   const pick = n => (n.kind === 'cat' ? toggle(n.code) : n.kind === 'tag' && toggleTag ? toggleTag(n.e.k) : null);
+  const options = () => [...list.querySelectorAll('[role=option]')];
   function paintHl() {
-    [...list.children].forEach((li, i) => li.classList.toggle('hl', i === hl && !!q.trim()));
-    list.children[hl]?.scrollIntoView({ block: 'nearest' });
+    const nodes = options();
+    if (hl >= 0) list.hidden = false;
+    nodes.forEach((li, i) => { li.id = listId + '-' + i; li.tabIndex = i === Math.max(0, hl) ? 0 : -1; li.classList.toggle('hl', i === hl); });
+    if (nodes[hl]) { input.setAttribute('aria-activedescendant', nodes[hl].id); nodes[hl].scrollIntoView({ block: 'nearest' }); }
+    else input.removeAttribute('aria-activedescendant');
+    input.setAttribute('aria-expanded', String(!list.hidden));
   }
+  // A roving tab stop supports both List and Pills without hundreds of tab stops.
+  list.addEventListener('keydown', ev => {
+    const nodes = options(), index = nodes.indexOf(ev.target.closest('[role=option]'));
+    if (index < 0) return;
+    let next;
+    if (ev.key === 'ArrowDown') next = Math.min(nodes.length - 1, index + 1);
+    else if (ev.key === 'ArrowUp') next = Math.max(0, index - 1);
+    else if (ev.key === 'Home') next = 0;
+    else if (ev.key === 'End') next = nodes.length - 1;
+    else if (ev.key === 'Enter' || ev.key === ' ') {
+      ev.preventDefault(); ev.stopPropagation(); hl = index; pick(items[index]); refresh(); options()[index]?.focus({ preventScroll: true }); return;
+    } else if (ev.key === 'Escape') { ev.preventDefault(); input.focus(); return; }
+    if (next != null) { ev.preventDefault(); hl = next; paintHl(); nodes[next]?.focus({ preventScroll: true }); }
+  });
   function refresh() {
+    list.hidden = !showAll && !q.trim() && hl < 0;
     const sel = new Set(get());
     const prog = PROGRESS_BY_CODE();
     const words = q.toLowerCase().split(/\s+/).filter(Boolean);
@@ -192,7 +213,7 @@ export function catPicker({ get, toggle, getTags = null, toggleTag = null, place
         const on = n.kind === 'cat' ? sel.has(n.code) : tagsOn.has(n.e.k);
         add(cur, h('span', { class: `chip ${on ? 'on' : ''} ${n.kind === 'tag' ? 'tag' : ''} ${n.depth ? 'subp' : ''}`, role: 'option', tabindex: '0', 'aria-selected': String(on),
           ...(n.kind === 'cat' ? { 'data-code': n.code, title: catName(n.code) } : { 'data-tag': n.e.k, title: n.e.l || n.e.n }),
-          onclick: () => keepPlace(list, () => { pick(n); refresh(); }), onkeydown: ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); pick(n); refresh(); } } },
+          onclick: () => keepPlace(list, () => { pick(n); refresh(); }) },
           h('span', { class: 'nm' }, n.kind === 'cat' ? catShort(n.code) : n.e.n)));
       }
       fill(list, ...rows);
@@ -223,7 +244,8 @@ export function catPicker({ get, toggle, getTags = null, toggleTag = null, place
     paintHl();
   }
   refresh();
-  const el = h('div', { class: 'picker' }, input, list);
+  const expand = collapsed ? h('button', { type: 'button', class: 'small', 'aria-expanded': String(showAll), onclick: () => { showAll = !showAll; hl = -1; expand.textContent = showAll ? 'Hide full tag list' : 'Show all tags'; expand.setAttribute('aria-expanded', String(showAll)); refresh(); } }, 'Show all tags') : null;
+  const el = h('div', { class: 'picker' }, input, expand, list);
   return { el, refresh, focus: opts => input.focus(opts), input };
 }
 
@@ -310,6 +332,7 @@ function curDate() {
 // calendar for any other day, and the Case | List switch. A chosen day that doesn't fit shows on the
 // calendar chip instead.
 function paintDate() {
+  paintEnterHint();
   const d = curDate(), t = todayISO();
   const dateInput = h('input', {
     type: 'date', value: d, 'aria-label': 'Case date',
@@ -437,12 +460,25 @@ function renderOne(card) {
   const tip = h('div');
   const templates = h('div', { class: 'chips quick-rest' });
   const picker = catPicker({
+    collapsed: !!display().compactTags,
     get: () => draft.cats,
     // the list stays put under your finger while the rows above it change
     toggle: code => keepPlace(picker.el, () => { draft.cats = toggleCat(draft.cats, code); saveDraft(); paintSel(); }),
     getTags: () => draft.tags || [],
     toggleTag: key => keepPlace(picker.el, () => { Object.assign(draft, toggleTagIn(draft.cats, draft.tags, key)); saveDraft(); paintSel(); }),
   });
+  const common = display().compactTags ? h('div', { class: 'chips common-tags', 'aria-label': 'Common tags' }) : null;
+  const paintCommon = () => {
+    if (!common) return;
+    const counts = new Map();
+    for (const c of S.cases.slice(0, 100)) for (const k of [...(c.cats || []).map(code => 'c:' + code), ...(c.tags || [])]) counts.set(k, (counts.get(k) || 0) + 1);
+    const choices = logTags().filter(n => n.kind !== 'head' && !n.e.hide && counts.has(n.e.k)).sort((a,b) => counts.get(b.e.k) - counts.get(a.e.k)).slice(0, 6);
+    fill(common, choices.length ? choices.map(n => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(n.kind === 'cat' ? draft.cats.includes(n.code) : (draft.tags || []).includes(n.e.k)), onclick: () => {
+      if (n.kind === 'cat') draft.cats = toggleCat(draft.cats, n.code); else Object.assign(draft, toggleTagIn(draft.cats, draft.tags, n.e.k));
+      saveDraft(); paintSel(); paintCommon();
+    } }, n.kind === 'cat' ? catShort(n.code) : n.e.n)) : h('span', { class: 'muted' }, 'Your common tags appear as you log cases.'));
+  };
+  paintCommon();
   // "Interesting": a star on the case (reflectTag), to find it again; the Reflections tab offers these first
   const tagBox = h('label', { class: 'check reflect-tag' }, h('input', { type: 'checkbox', checked: !!draft.reflectTag, onchange: e => { draft.reflectTag = e.target.checked; saveDraft(); } }), '☆ Interesting');
   ui.tagBox = tagBox;
@@ -452,6 +488,7 @@ function renderOne(card) {
   const offSync = writes.onChange(() => { if (syncNote.isConnected) paintSync(); else offSync(); });
   paintSync();
   const tagRow = h('div', { class: 'tag-row' }, tagBox, draftNote, syncNote);
+  const enterHint = h('p', { class: 'hint enter-suggestion-hint', 'aria-live': 'polite', hidden: true });
   const actions = h('div', { class: 'actions' },
     h('button', { class: 'big', title: 'Save and keep this date for the next case', onclick: () => save({ another: true }) }, 'Save, keep date'),
     h('button', { class: 'primary big', onclick: () => save({}) }, 'Save', h('span', { class: 'kbd', title: 'Ctrl+Enter (Cmd+Enter on a Mac)' }, ' Ctrl+⏎')));
@@ -463,7 +500,7 @@ function renderOne(card) {
   const selExtra = h('div', { class: 'sel-extra' });
   // "Save as tag group" sits under the tag list, not in the pinned bar (keeps the bar slim)
   const groupSave = h('div', { class: 'group-save' });
-  const savebar = h('div', { class: 'savebar' }, selected, selExtra, tip, actions);
+  const savebar = h('div', { class: 'savebar' }, selected, selExtra, tip, enterHint, actions);
   // Two panes on wide screens (style.css .log-card.panes): the case, quick picks and Save on the left,
   // all tags on the right, scrolling on their own. On phones the wrappers vanish (display: contents).
   card.classList.add('panes');
@@ -477,7 +514,7 @@ function renderOne(card) {
     h('div', { class: 'bar cat-head' }, h('div', { class: 'chiplabel grow' }, 'All tags'),
       h('span', { class: 'seg cat-view', role: 'group', 'aria-label': 'Show tags as' },
         ['list', 'pills'].map(v => h('button', { class: 'small', 'aria-pressed': String((settings().catView || 'list') === v), onclick: () => { if ((settings().catView || 'list') === v) return; patchLogbook({ settings: { catView: v } }); hooks.render(); } }, v === 'list' ? 'List' : 'Pills')))),
-    picker.el,
+    common, picker.el,
     groupSave),
     caseHidden('still') ? null : stillNeeded(),
     savebar);
@@ -491,7 +528,7 @@ function renderOne(card) {
     if (t.closest('input:not([type=checkbox]), textarea, select, .datepick, .box-wrap')) return;
     if (t.closest('.chip, .picker li, label.check, [role=button], button, a.btn')) e.preventDefault();
   });
-  Object.assign(ui, { initials: initialsInput, draftNote, textarea, parsed, sugg, selected, selExtra, groupSave, tip, templates, picker });
+  Object.assign(ui, { initials: initialsInput, draftNote, textarea, parsed, sugg, selected, selExtra, groupSave, tip, enterHint, templates, picker, paintCommon });
   paintSuggest(); paintSel(); paintQuick(); paintParsed(false);
   requestAnimationFrame(() => alignPlaceholder(textarea));
   // autofocus attribute is ignored on re-render; focus after insertion (not on phones' first paint
@@ -506,12 +543,13 @@ const suggestSoon = debounce(() => paintSuggest(), 120);
 function paintParsed(typed) {
   if (!ui || !ui.parsed) return;
   const text = draftText();
+  paintEnterHint();
   if (ui.draftNote) ui.draftNote.textContent = draftError || (text ? 'Draft saved on this device' : '');
   if (!text) { fill(ui.parsed); return; }
   const { initials, details } = draftParts();
   const { age, rest } = settings().detectAgeSex !== false ? splitAge(details) : { age: '', rest: details };
   const bits = [initials ? h('span', { class: 'pi' }, h('small', {}, 'Initials '), h('b', {}, initials)) : h('span', { class: 'pi none' }, 'No initials found'),
-    age ? h('span', { class: 'pi' }, h('small', {}, 'Age/sex '), h('b', {}, (/^\d+mo$/i.test(age) ? parseFloat(age) + ' months' : age.replace(/[mf]$/, c => c.toUpperCase())))) : null,
+    age ? h('span', { class: 'pi' }, h('small', {}, 'Age/sex '), h('b', {}, humanAge(age))) : null,
     rest ? h('span', { class: 'pi grow' }, rest.split('\n')[0].slice(0, 60)) : null];
   fill(ui.parsed, ...bits.filter(Boolean));
 }
@@ -541,7 +579,9 @@ function paintSuggest() {
 
 function paintSel() {
   suggestedSave = null;
+  paintEnterHint();
   if (!ui || !ui.selected) return;
+  ui.paintCommon?.();
   fill(ui.selected, ...(draft.cats.length
     ? draft.cats.map(code => catChip(code, { on: true, removable: true, cls: 'add', title: 'Remove ' + catFull(code),
       onclick: () => { draft.cats = dropCat(draft.cats, code); saveDraft(); paintSel(); } }))
@@ -621,9 +661,15 @@ function paintQuick() {
 
 // The failed no-tag save is the first step; only a subsequent Enter accepts these
 // suggestions. Editing, selecting tags or leaving this screen cancels the offer.
+function paintEnterHint() {
+  if (!ui?.enterHint) return;
+  const offer = suggestedSave;
+  ui.enterHint.hidden = !offer || offer.key !== suggestionKey() || !!draft.cats.length;
+  ui.enterHint.textContent = ui.enterHint.hidden ? '' : 'Press Enter again to apply ' + [...offer.cats.map(catShort), ...offer.tags.map(tagName)].join(', ') + ' and save.';
+}
 function applySuggestedSave() {
   const offer = suggestedSave;
-  suggestedSave = null;
+  suggestedSave = null; paintEnterHint();
   if (!offer || saving || settings().suggestions === false || draft.cats.length || offer.key !== suggestionKey()) return false;
   draft.cats = offer.cats;
   draft.tags = [...new Set([...(draft.tags || []), ...offer.tags])];
@@ -645,6 +691,7 @@ async function saveCase({ another }) {
     const codes = settings().suggestions !== false && details ? suggest(draft.details.trim(), { limit: 8 }).map(s => s.code) : [];
     const cats = sortCodes(withParents([...codes, ...tags.flatMap(tagLinks)]));
     suggestedSave = cats.length ? { key: suggestionKey(), cats, tags } : null;
+    paintEnterHint();
     // categories are counted towards credentialling, so they must be picked on purpose
     // point at the suggestions (no keyboard popping up); with none, the search box
     const target = ui.sugg && !ui.sugg.hidden && !caseHidden('quick') && ui.sugg.querySelector('.chip') ? ui.sugg : null;
@@ -680,7 +727,7 @@ async function saveCase({ another }) {
   saveDraft();
   if (ui.textarea) ui.textarea.value = '';
   if (ui.initials) ui.initials.value = '';
-  paintDate(); paintSel(); paintQuick();
+  paintDate(); paintSel(); paintQuick(); paintEnterHint();
   if (next === 'logbook') { hooks.showDay?.(c.date); location.hash = '#logbook'; }
   else if (next === 'closed') document.activeElement?.blur();
   else focusLog();
@@ -690,11 +737,15 @@ async function saveCase({ another }) {
   const counted = withTarget ? ` · ${catName(withTarget.code)} now ${withTarget.count}/${withTarget.next.n}` : ` · ${catPills(c.cats)}`;
   toast(`Saved ${fmtDate(c.date)}${counted}`, {
     action: 'Undo',
-    onaction: () => {
+    onaction: async () => {
+      if (S.user?.email !== owner) return;
+      const beforeUndo = JSON.stringify(draft);
       // put the case back in the box, unless the next one is already being typed: then it goes to the recycle bin
       // (tags kept for the next case by After Save don't count as the next one)
       if (draftText() || (draft.cats.length && JSON.stringify(draft.cats) !== JSON.stringify(c.cats))) { moveToBin('case', c).then(() => toast('Removed: it is in the Recycle bin (Settings). Your new case stays in the box'), err => toast('Could not delete: ' + err.message)); return; }
-      removeCase(c.id);
+      try { await removeCase(c.id); } catch (err) { toast('Could not undo: ' + err.message); return; }
+      if (S.user?.email !== owner) return;
+      if (JSON.stringify(draft) !== beforeUndo) { toast('Case removed. Your new input stays in the box.'); return; }
       draft = { ...draft, initials: firstField() === 'initials' ? caseParts(c).initials : '', initialsHint: caseParts(c).initials, details: firstField() === 'initials' ? caseParts(c).details : caseText(c), cats: c.cats, tags: c.tags || [], reflectTag: !!c.reflectTag, date: c.date === todayISO() ? null : c.date };
       saveDraft();
       if (S.tab === 'log' && ui.textarea) { ui.textarea.value = draft.details; if (ui.initials) ui.initials.value = draft.initials; if (ui.tagBox) ui.tagBox.querySelector('input').checked = draft.reflectTag; paintDate(); paintSel(); paintQuick(); paintParsed(false); }
@@ -704,6 +755,7 @@ async function saveCase({ another }) {
 
 // Case list changed (live listener): refresh counts and quick picks without touching the textarea.
 export function logCasesChanged() {
+  ui?.paintCommon?.();
   if (!ui || !ui.card.isConnected) return;
   if (ui.picker) { ui.picker.refresh(); paintQuick(); }
 }
@@ -868,7 +920,7 @@ export function pickDialog(initial, done) {
   paint();
   const m = modal('Tags', [sel, h('div', { style: 'height:8px' }), picker.el,
     h('div', { class: 'bar', style: 'margin-top:12px' }, h('span', { class: 'grow' }), h('button', { class: 'primary', onclick: () => m.close() }, 'Done'))],
-  { onclose: () => done(sortCodes(cats)) });
+  { onclose: state => { if (!state?.accountChanged) done(sortCodes(cats)); } });
   picker.focus();
 }
 
@@ -878,9 +930,19 @@ export function editCaseDialog(c, opts = {}) {
   const isNew = !c.id && typeof opts.onCreated === 'function';
   // older cases keep the initials at the front of the details: split them now, saved apart on Save
   let base = JSON.parse(JSON.stringify(c)), created = false;
-  const e = { ...c, ...caseParts(c), cats: [...(c.cats || [])] };
+  const e = { ...c, ...caseParts(c), ...(opts.draft || {}), cats: [...(opts.draft?.cats || c.cats || [])] };
+  const initial = JSON.stringify(e), ownerKey = (cloud.demo ? 'demo:' : '') + S.user.email;
+  const editDraft = createDraftSlot('logbook-edit-draft', ownerKey + ':' + uid());
+  const draftStatus = h('p', { class: 'hint', 'aria-live': 'polite' });
+  const saveEditDraft = () => {
+    if ((cloud.demo ? 'demo:' : '') + (S.user?.email || '') !== ownerKey) return;
+    if (JSON.stringify(e) === initial) return;
+    try { editDraft.save({ record: e, base, isNew, savedAt: Date.now() }); draftStatus.textContent = 'Edit draft saved on this device · Recover drafts'; }
+    catch { draftStatus.textContent = 'Edit draft not saved · storage unavailable'; }
+  };
   const sel = h('div', { class: 'chips selected' });
   const paint = () => {
+    saveEditDraft();
     fill(sel, ...(e.cats.length ? e.cats.map(code => catChip(code, { on: true, removable: true, onclick: () => { e.cats = dropCat(e.cats, code); paint(); picker.refresh(); } })) : [h('span', { class: 'none' }, 'No tags')]),
       ...looseTags(e.cats, e.tags).map(k => tagChip(k, { onclick: () => { e.tags = e.tags.filter(t => t !== k); paint(); picker.refresh(); } })),
       subcatChips(e.cats, e.tags || [], tags => { e.tags = tags; paint(); }));
@@ -898,15 +960,16 @@ export function editCaseDialog(c, opts = {}) {
   // at least 6 lines, growing with the text
   const grow = ta => { ta.style.height = 'auto'; ta.style.height = Math.max(ta.scrollHeight + 2, 0) + 'px'; };
   const detailsBox = h('textarea', { rows: '6', class: 'grow-box', value: e.details, placeholder: isNew ? 'e.g. 72M lap chole GA ETT, difficult airway' : '',
-    oninput: ev => { e.details = ev.target.value; grow(ev.target); } });
+    oninput: ev => { e.details = ev.target.value; saveEditDraft(); grow(ev.target); } });
   requestAnimationFrame(() => grow(detailsBox));
   const m = modal(isNew ? 'New case' : 'Edit case', [
     c.dateText && !c.date ? h('p', { class: 'tip' }, `Imported date “${c.dateText}” could not be read — please set the date.`) : null,
-    h('label', { class: 'field' }, 'Date', h('input', { type: 'date', value: e.date || '', onchange: ev => { e.date = parseDate(ev.target.value); } })),
-    h('label', { class: 'field' }, 'Patient initials', h('input', { value: e.initials, placeholder: 'e.g. AB', maxlength: '20', autocapitalize: 'characters', autocomplete: 'off', spellcheck: 'false', oninput: ev => { e.initials = ev.target.value; } })),
+    h('label', { class: 'field' }, 'Date', h('input', { type: 'date', value: e.date || '', onchange: ev => { e.date = parseDate(ev.target.value); saveEditDraft(); } })),
+    h('label', { class: 'field' }, 'Patient initials', h('input', { value: e.initials, placeholder: 'e.g. AB', maxlength: '20', autocapitalize: 'characters', autocomplete: 'off', spellcheck: 'false', oninput: ev => { e.initials = ev.target.value; saveEditDraft(); } })),
     h('label', { class: 'field' }, 'Case summary', detailsBox),
     h('div', { class: 'chiplabel' }, 'Tags'), sel, addBtn, pickWrap,
-    h('label', { class: 'check reflect-tag', style: 'margin-top:8px' }, h('input', { type: 'checkbox', checked: !!e.reflectTag, onchange: ev => { e.reflectTag = ev.target.checked; } }), '☆ Interesting'),
+    h('label', { class: 'check reflect-tag', style: 'margin-top:8px' }, h('input', { type: 'checkbox', checked: !!e.reflectTag, onchange: ev => { e.reflectTag = ev.target.checked; saveEditDraft(); } }), '☆ Interesting'),
+    draftStatus,
     // Delete / Cancel / Save stay pinned to the bottom while the form scrolls
     h('div', { class: 'bar dlg-actions' },
       isNew ? null : h('button', { class: 'danger', onclick: async () => {
@@ -926,9 +989,9 @@ export function editCaseDialog(c, opts = {}) {
           e.id ||= uid(); e.createdAt ||= Date.now();
           const inputAtSave = JSON.stringify(e);
           const made = await createCase({ id: e.id, createdAt: e.createdAt, date: e.date || todayISO(), initials: e.initials, details: e.details, cats: e.cats, reflectTag: !!e.reflectTag, tags: e.tags || [] });
-          base = made; created = true;
+          base = made; created = true; saveEditDraft();
           if (S.user?.email !== owner || JSON.stringify(e) !== inputAtSave) return toast('Case saved. Newer edits remain open.');
-          m.close(); toast('Case logged');
+          editDraft.clear(); await m.close(); if (S.user?.email !== owner) return; toast('Case logged');
           return opts.onCreated(made);
         }
         const next = { ...e, initials: cleanInitials(e.initials), details: e.details.trim() };
@@ -938,11 +1001,12 @@ export function editCaseDialog(c, opts = {}) {
         if (!next.tags.length) delete next.tags;
         const inputAtSave = JSON.stringify(e);
         const saved = await updateCase(next, { base });
-        base = saved;
+        base = saved; saveEditDraft();
         if (S.user?.email !== owner || JSON.stringify(e) !== inputAtSave) return toast('Case saved. Newer edits remain open.');
-        m.close();
+        editDraft.clear(); await m.close();
+        if (S.user?.email !== owner) return;
         if (isNew) { toast('Case logged'); return opts.onCreated(saved); }
-        toast('Case updated', { action: 'Undo', onaction: () => restoreCase(c, saved).catch(err => toast(err.message)) });
+        toast('Case updated', { action: 'Undo', onaction: () => { if (S.user?.email === owner) return restoreCase(c, saved).catch(err => toast(err.message)); } });
         } catch (err) { toast('Could not save: ' + err.message); } finally { button.disabled = false; }
       } }, 'Save')),
   ], { cls: 'full', sticky: true });

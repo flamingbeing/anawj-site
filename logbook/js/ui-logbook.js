@@ -9,7 +9,7 @@ import { inExport } from './reflections.js';
 import { parseQuery, matchQuery, OPERATOR_HELP, insertOperator } from './search-ops.js';
 import { parseCsv } from './tags.js';
 import {
-  S, h, toast, debounce, modal, cat, catName, catShort, tagName, catFull, catChip, PICKER_ORDER, settings, patchLogbook, needExcel, download, fileButton, catPills,
+  S, h, toast, debounce, modal, cat, categoryNamesRevision, catName, catShort, tagName, catFull, catChip, PICKER_ORDER, settings, patchLogbook, needExcel, download, fileButton, catPills,
   updateCase, saveMany, deleteMany, displayName, rYear, todayISO, fill, add, resetters, tagSet, tagLinks, confirmBox, keepTags, hooks } from './ui-core.js';
 import { flatTree, tagTree } from './tags.js';
 import { editCaseDialog, logOnDate } from './ui-log.js';
@@ -37,7 +37,7 @@ function tagChoices() {
 }
 // The text a case is searched by, worked out once per version of the case (logbooks run to thousands)
 // (and again when your tags change: renamed tags are searched by their new names)
-let hayCache = new WeakMap(), hayFor = null;
+let hayCache = new WeakMap(), hayFor = null, hayNames = -1;
 const MODES = [['calendar', 'Calendar'], ['list', 'List'], ['grid', 'Grid']];
 // "2026-10-06" -> "Tue"
 const weekday = iso => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); return m ? new Date(+m[1], +m[2] - 1, +m[3]).toLocaleDateString('en-GB', { weekday: 'short' }) : ''; };
@@ -64,7 +64,7 @@ export function renderLogbook() {
     const low = t => (cs ? t : t.toLowerCase());
     const words = low(win ? win.rest : view.q).split(/\s+/).filter(Boolean);
     const ops = opsOn() && words.length ? parseQuery(win ? win.rest : view.q, { keepCase: cs }) : null;
-    if (hayFor !== settings().tagSet) { hayCache = new WeakMap(); hayFor = settings().tagSet; }
+    if (hayFor !== settings().tagSet || hayNames !== categoryNamesRevision) { hayCache = new WeakMap(); hayFor = settings().tagSet; hayNames = categoryNamesRevision; }
     const hayOf = c => {
       let m = hayCache.get(c);
       if (!m) { m = {}; hayCache.set(c, m); }
@@ -277,7 +277,7 @@ function bulkTag(rows) {
           }
           return out;
         });
-        m.close();
+        await m.close();
         if (!next.length) return toast(add ? 'They all have it already' : 'None of them have it');
         if (!(await confirmBox('Change cases?', `${add ? 'Add' : 'Remove'} “${keyName(k)}” ${add ? 'to' : 'from'} ${next.length} case${next.length === 1 ? '' : 's'}?`, add ? 'Add' : 'Remove', !add))) return;
         try { await saveMany(next); toast(`${next.length} case${next.length === 1 ? '' : 's'} updated`); } catch (err) { toast('Could not save: ' + err.message); }
@@ -469,9 +469,9 @@ export function opsHelp(box, onchange, list = OPERATOR_HELP, example = 'tag:lscs
   const caret = box.selectionStart ?? box.value.length;
   const m = modal('Search operators', [
     h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'Tap one to add it to the search box.'),
-    h('div', { class: 'ops-pick' }, list.map(([op, what, insert, at]) => h('button', { type: 'button', class: 'ops-row', onclick: () => {
+    h('div', { class: 'ops-pick' }, list.map(([op, what, insert, at]) => h('button', { type: 'button', class: 'ops-row', onclick: async () => {
       const r = insertOperator(box.value, caret, insert, at);
-      m.close();
+      await m.close();
       box.value = r.text; onchange(r.text);
       box.focus(); box.setSelectionRange(r.caret, r.caret);
     } }, h('code', {}, op), h('span', {}, what)))),
@@ -607,12 +607,12 @@ function mapColumns(fileName, grid) {
       ok ? null : h('p', { class: 'tip' }, 'Choose at least the Date or the Case summary column.'));
     reviewBtn.disabled = !ok;
   };
-  const reviewBtn = h('button', { class: 'primary', onclick: () => {
+  const reviewBtn = h('button', { class: 'primary', onclick: async () => {
     const rows = rowsFromGrid(rowsOf(), st.map, { headerRow: st.headerRow, monthFirst: st.monthFirst });
     // remember the column names for next time
     const head = st.headerRow ? rowsOf()[0] || [] : [];
     if (st.headerRow) patchLogbook({ settings: { importMap: Object.fromEntries(IMPORT_FIELDS.map(f => [f.k, st.map[f.k] >= 0 ? String(head[st.map[f.k]] ?? '') : ''])) } });
-    m.close();
+    await m.close();
     const d = diffRows(S.cases, rows);
     // a file limited to some dates: cases outside them were never in it, so never delete those
     const rg = grid.range || {};

@@ -2,7 +2,7 @@
 // "You" and sign-out cards (youCard, signOutCard), used by ui-account.js.
 
 import { YEAR_NAMES, DEFAULT_NAMES, BY_CODE } from './categories.js';
-import { sortCodes, uid, academicYear, withParents, weekStart } from './engine.js';
+import { sortCodes, uid, academicYear, withParents, weekStart, humanAge } from './engine.js';
 import { S, h, toast, modal, confirmBox, cloud, writes, catChip, catName, catShort, PICKER_ORDER, pickerOrder, settings, patchLogbook, displayName, hooks, rYear, myYearName, fill, categoryNames, setCategoryNames, catPills, tagSet, download, fileButton, todayISO, saveMany, UNDO_SECS } from './ui-core.js';
 import { MAX_TAGS, tagLinks as tagLinksIn, learnShorthand, cleanShorthand, shorthandOf, DEFAULT_SHORTHAND, cleanTagSet, defaultTagSet, tagTree, flatTree, moveTag, reparentTag, removeTag, newKey, tagSetToCsv, tagSetFromCsv, dropTag, canPlace } from './tags.js';
 import { pickDialog, CASE_PARTS, AFTER_SAVE } from './ui-log.js';
@@ -97,7 +97,7 @@ export function residencyCard() {
 // the light / dark choice. The first time a device opens the app it starts from what the account had (these used to
 // follow the account), so nobody's look changes. Kept at sign-out: they are the device's, and nothing private.
 const DISPLAY_KEY = 'apmes-logbook-display';
-export const DISPLAY_KEYS = ['compact', 'textSize', 'zoom', 'accent', 'startTab', 'fontUi', 'fontUiName', 'fontLog', 'fontLogName', 'lineWidth', 'lineHeight', 'contrast', 'motion', 'tabIcons', 'tabBar', 'hideHeader', 'caseInverted', 'colourful', 'customCss', 'customCssOn', 'autoFocus', 'appTitle', 'boxCaps', 'boxCorrect', 'boxSpell', 'reflSpell', 'pinBox', 'pinSearch', 'firstField', 'borders'];
+export const DISPLAY_KEYS = ['compact', 'textSize', 'zoom', 'accent', 'startTab', 'fontUi', 'fontUiName', 'fontLog', 'fontLogName', 'lineWidth', 'lineHeight', 'contrast', 'motion', 'tabIcons', 'tabBar', 'hideHeader', 'caseInverted', 'colourful', 'customCss', 'customCssOn', 'autoFocus', 'appTitle', 'boxCaps', 'boxCorrect', 'boxSpell', 'reflSpell', 'pinBox', 'pinSearch', 'firstField', 'compactTags', 'borders'];
 export function deviceDisplay() {
   try { const d = JSON.parse(localStorage.getItem(DISPLAY_KEY) || 'null'); return d && typeof d === 'object' && !Array.isArray(d) ? d : null; } catch { return null; }
 }
@@ -431,32 +431,48 @@ export function renderMarkdownSettings() {
 
 export function renderLogging() {
   const st = settings();
+  const preview = h('div', { class: 'logging-preview', 'aria-live': 'polite' });
+  const paintPreview = () => {
+    const current = settings(), first = display().firstField || 'details';
+    fill(preview, h('b', {}, 'Example of your logging style'),
+      h('p', {}, 'First field: ' + ({ details: 'Case summary', initials: 'Initials', date: 'Date' }[first]) + '. ' + (current.detectAgeSex !== false ? 'AB 6m lap chole → AB · ' + humanAge('6m') + ' · lap chole' : 'AB lap chole → initials and case details; age and gender detection off.')),
+      h('p', {}, 'Enter: ' + ({ newline: 'new line', single: 'save', double: 'save on an empty line (double Enter)' }[current.enterMode || (current.enterSaves ? 'single' : 'newline')]) + '. After Save: ' + (AFTER_SAVE.find(([v]) => v === (current.afterSave || 'next'))?.[1] || 'Next case') + '.'));
+  };
+  paintPreview();
   return h('div', {},
     h('section', { class: 'card' },
       h('h2', {}, 'Logging'),
-      h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: st.suggestions !== false, onchange: e => patchLogbook({ settings: { suggestions: e.target.checked } }) }),
+      h('h3', {}, 'Recognise details'), h('p', { class: 'hint' }, 'Account settings · on by default; follows you between devices.'),
+      h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: st.suggestions !== false, onchange: e => patchLogbook({ settings: { suggestions: e.target.checked } }).then(paintPreview) }),
         'Suggest tags as I type'),
       h('label', { class: 'check' }, h('input', { type: 'checkbox', 'aria-label': 'Autodetect age and gender', checked: st.detectAgeSex !== false,
-        onchange: e => patchLogbook({ settings: { detectAgeSex: e.target.checked } }) }), 'Autodetect age and gender'),
+        onchange: e => patchLogbook({ settings: { detectAgeSex: e.target.checked } }).then(paintPreview) }), 'Autodetect age and gender'),
       h('p', { class: 'hint' }, 'Age and gender are optional for APMES. Turning this off stops age-based Paediatrics and Geriatric suggestions. Choose those tags yourself when needed; explicit words can still suggest them.'),
+      h('h3', {}, 'Start a case'), h('p', { class: 'hint' }, 'Device settings · summary first by default; other devices keep their own style.'),
       h('label', { class: 'field' }, 'First field for a new case',
-        h('select', { 'aria-label': 'First field for a new case', onchange: e => { setDisplay({ firstField: e.target.value }); toast('Saved on this device'); } },
+        h('select', { 'aria-label': 'First field for a new case', onchange: e => { setDisplay({ firstField: e.target.value }); toast('Saved on this device'); paintPreview(); } },
           [['details', 'Case summary (default)'], ['initials', 'Initials'], ['date', 'Date']].map(([v, l]) =>
             h('option', { value: v, selected: (display().firstField || 'details') === v }, l)))),
       h('p', { class: 'hint help' }, 'Starts here when you open the Case tab or save a case. This device only. Enter in Initials moves to the case summary.'),
+      h('label', { class: 'check' }, h('input', { type: 'checkbox', 'aria-label': 'Show common tags first', checked: !!display().compactTags, onchange: e => { setDisplay({ compactTags: e.target.checked }); paintPreview(); } }), 'Show common tags first'),
+      h('p', { class: 'hint' }, 'Off by default. A compact shortlist from your recent cases; all tags stay searchable and can be expanded.'),
+      h('h3', {}, 'Save and continue'), h('p', { class: 'hint' }, 'Account settings · defaults: Enter adds a line, Today, next case.'),
       h('label', { class: 'field', style: 'margin-top:8px' }, 'Enter key in the case box',
-        h('select', { onchange: e => patchLogbook({ settings: { enterMode: e.target.value, enterSaves: null } }).then(() => toast('Saved')) },
+        h('select', { onchange: e => patchLogbook({ settings: { enterMode: e.target.value, enterSaves: null } }).then(() => { toast('Saved'); paintPreview(); }) },
           [['newline', 'New line (default)'], ['double', 'Press Enter twice to save'], ['single', 'Enter saves (Shift+Enter for a new line)']].map(([v, l]) =>
             h('option', { value: v, selected: (st.enterMode || (st.enterSaves ? 'single' : 'newline')) === v }, l)))),
       h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'Twice: Enter on an empty line saves, so a case can still take several lines. Ctrl+Enter (Cmd+Enter on a Mac) always saves.'),
       h('label', { class: 'field', style: 'margin-top:8px' }, 'Date for a new case',
-        h('select', { onchange: e => patchLogbook({ settings: { defaultDate: e.target.value } }) },
+        h('select', { onchange: e => patchLogbook({ settings: { defaultDate: e.target.value } }).then(paintPreview) },
           h('option', { value: 'today', selected: st.defaultDate !== 'last' }, 'Today'),
           h('option', { value: 'last', selected: st.defaultDate === 'last' }, 'The date I used last'))),
       h('label', { class: 'field', style: 'margin-top:8px' }, 'After Save',
-        h('select', { onchange: e => patchLogbook({ settings: { afterSave: e.target.value === 'next' ? null : e.target.value } }).then(() => toast('Saved')) },
+        h('select', { onchange: e => patchLogbook({ settings: { afterSave: e.target.value === 'next' ? null : e.target.value } }).then(() => { toast('Saved'); paintPreview(); }) },
           AFTER_SAVE.map(([v, l]) => h('option', { value: v, selected: (st.afterSave || 'next') === v }, l)))),
       h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'Keeping the tags helps with a run of the same kind of case. “Save, keep date” keeps the date either way.')),
+    h('section', { class: 'card' }, preview, h('button', { onclick: async () => {
+      try { await patchLogbook({ settings: { suggestions: true, detectAgeSex: true, enterMode: 'newline', enterSaves: null, defaultDate: 'today', afterSave: null } }); setDisplay({ firstField: null, compactTags: null }); hooks.render(); toast('Everyday logging defaults restored'); } catch (err) { toast(err.message); }
+    } }, 'Reset these logging defaults'), h('p', { class: 'hint' }, 'Resets only the choices on this page. Advanced logging settings keep their current values.')),
     advancedLink('loggingadv', 'Advanced logging settings', 'The keyboard, case box height, parts of the Case tab, undo, the week, tips, advanced search'));
 }
 
@@ -889,7 +905,7 @@ function editTag(n, kind = n ? n.kind : 'tag') {
     kind !== 'head' ? h('label', { class: 'check', style: 'margin-top:8px' }, hide, 'Hide from the Case tab (still found by search)') : null,
     h('div', { class: 'bar', style: 'margin-top:12px' },
       n && kind !== 'cat' ? h('button', { class: 'danger', onclick: async () => { m.close(); await saveTags(removeTag(set, e.k)); toast('Removed (cases keep the tag)'); } }, 'Remove') : null,
-      n && kind === 'tag' ? h('button', { onclick: () => { m.close(); mergeTag(n); } }, 'Merge…') : null,
+      n && kind === 'tag' ? h('button', { onclick: async () => { await m.close(); mergeTag(n); } }, 'Merge…') : null,
       h('span', { class: 'grow' }),
       h('button', { onclick: () => m.close() }, 'Cancel'),
       h('button', { class: 'primary', onclick: async () => {
