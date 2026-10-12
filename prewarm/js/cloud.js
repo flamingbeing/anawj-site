@@ -171,6 +171,24 @@ export async function members() {
   const s = await F.getDocs(F.collection(db, 'members'));
   return s.docs.map(d => ({ uid: d.id, ...d.data() }));
 }
+// study admins (owner, 12 Oct 2026): any admin adds or removes others by email; nobody removes themselves
+export async function admins() {
+  const { db, F } = await sdk();
+  const s = await F.getDocs(F.collection(db, 'admins'));
+  return s.docs.map(d => ({ email: d.id, ...d.data() }));
+}
+export async function addAdmin(email) {
+  const { auth, db, F } = await sdk();
+  await F.setDoc(F.doc(db, 'admins', email.trim().toLowerCase()), { addedBy: auth.currentUser.email.toLowerCase(), addedAt: Date.now() });
+}
+export async function removeAdmin(email) {
+  const { db, F } = await sdk();
+  await F.deleteDoc(F.doc(db, 'admins', email));
+}
+export async function myEmail() {
+  const { auth } = await sdk();
+  return auth.currentUser?.email?.toLowerCase() || '';
+}
 export async function removeMember(uid) {
   const { db, F } = await sdk();
   await F.deleteDoc(F.doc(db, 'members', uid));

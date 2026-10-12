@@ -263,6 +263,7 @@ body.ro main .k, body.ro main .num, body.ro main .chip, body.ro main .tchip, bod
 .coderow .link { flex: none; font-size: 13px; }
 .mono { font-weight: 600; letter-spacing: .04em; font-variant-numeric: tabular-nums; }
 .plain { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.addrow { display: flex; gap: 6px; } .addrow input { flex: 1; min-width: 0; }
 .sharerow { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .qr { display: grid; justify-items: center; gap: 6px; padding: 8px 0; }
 .qr svg { width: min(240px, 70vw); height: auto; }

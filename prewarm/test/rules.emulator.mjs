@@ -91,7 +91,25 @@ await t('member writes again once unlocked', assertSucceeds(setDoc(doc(a, 'patie
 await t('admin writes any hospital', assertSucceeds(setDoc(doc(adm, 'patients', 'sgh1'), { f: { x: { v: 1, t: 1, by: 'L' } } }, { merge: true })));
 await t('admin removes a member', assertSucceeds(deleteDoc(doc(adm, 'members', 'phoneC'))));
 await t('removed member loses access', assertFails(getDoc(doc(c, 'patients', 'sgh1'))));
-await t('admin adds an admin', assertSucceeds(setDoc(doc(adm, 'admins', 'second@example.com'), { name: 'Second' })));
+// managing admins: any admin adds (lower-case email, addedBy themselves) or removes another; nobody removes themselves
+const add = (db, em, by = ADMIN, extra = {}) => setDoc(doc(db, 'admins', em), { addedBy: by, addedAt: 1, ...extra });
+await t('admin adds an admin', assertSucceeds(add(adm, 'second@example.com')));
+await t('admin lists admins', assertSucceeds(getDocs(collection(adm, 'admins'))));
+await t('admin add: not an email', assertFails(add(adm, 'not-an-email')));
+await t('admin add: upper-case id', assertFails(add(adm, 'Third@example.com')));
+await t('admin add: addedBy someone else', assertFails(add(adm, 'third@example.com', 'second@example.com')));
+await t('admin add: extra fields', assertFails(add(adm, 'third@example.com', ADMIN, { role: 'owner' })));
+await t('admin cannot change an admin entry', assertFails(add(adm, 'second@example.com')));
+await t('member cannot add an admin', assertFails(add(a, 'phone@example.com', 'phone@example.com')));
+await t('unverified email cannot add an admin', assertFails(add(unv, 'x@example.com')));
+const second = google('second@example.com');
+await t('new admin is an admin', assertSucceeds(getDocs(collection(second, 'admins'))));
+await t('admin cannot remove themselves', assertFails(deleteDoc(doc(adm, 'admins', ADMIN))));
+await t('second admin removes the first', assertSucceeds(deleteDoc(doc(second, 'admins', ADMIN))));
+await t('removed admin loses access', assertFails(getDocs(collection(adm, 'admins'))));
+await t('removed admin cannot re-add self', assertFails(add(adm, ADMIN)));
+await t('second admin re-adds the first', assertSucceeds(add(second, ADMIN, 'second@example.com')));
+await t('stranger cannot remove an admin', assertFails(deleteDoc(doc(stranger, 'admins', ADMIN))));
 // a code change keeps existing members in, and the old code stops working for new phones
 // the blank paper form
 const form = (extra = {}) => ({ b64: 'UEsDBA==', name: 'form.docx', size: 6, setAt: 5, setBy: ADMIN, ...extra });

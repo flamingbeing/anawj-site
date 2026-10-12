@@ -5,7 +5,9 @@ rules_version = '2';
 //
 // Who:
 //   members/{uid}   a phone that joined with its hospital's code (anonymous sign-in): { site, initials, code, joinedAt }
-//   admins/{email}  owner and investigators, signed in by email link (the owner adds the first one in the console)
+//   admins/{email}  owner and investigators, signed in by email link (the owner added the first one in the console):
+//                   { addedBy, addedAt }. Any admin adds another (lower-case email as the id) or removes one; nobody
+//                   removes themselves, so there is always at least one.
 //   codes/{site}    each hospital's join code: { code, setAt, setBy }; only admins read or change it
 // Data:
 //   patients/{id}   { site, created, deleted?, lock?, f: { fieldId: { v, t, by, auto? } } }
@@ -32,7 +34,12 @@ service cloud.firestore {
     match /admins/{adminEmail} {
       // a signed-in user may check whether their email is an admin; admins manage the list
       allow get: if signedIn() && request.auth.token.get('email', '') != '' && adminEmail == email();
-      allow read, write: if admin();
+      allow read: if admin();
+      allow create: if admin() && adminEmail == adminEmail.lower() && adminEmail.matches('^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$')
+        && adminEmail.size() <= 120
+        && request.resource.data.keys().hasOnly(['addedBy', 'addedAt'])
+        && request.resource.data.addedBy == email() && request.resource.data.addedAt is number;
+      allow delete: if admin() && adminEmail != email();
     }
 
     match /codes/{site} {
