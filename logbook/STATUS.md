@@ -16,9 +16,8 @@ Last updated: 2026-10-12 by Claude Code, Logbook 2 (log2).
 - **Claude Code, Logbook 3 (log3)** (branch `ccr-2994049c-4e5tlt`): idle, nothing half-done. Still signed in to the
   Firebase CLI (usage counts only; each use needs the owner's OK). Owns the axe check, PR previews and the Codex /
   Firebase plugin setup.
-- **Claude Code, Logbook 2 (log2)** (branch `ccr-afac5e7a-99esax`): profiles follow-up (Basic the default, items
-  can be turned back on, no settings hidden, page renamed) after #214. Next for log2: the Admin profile (Next, item 1). Codex plugin and Firebase CLI
-  signed in for this session, both unused (each use needs the owner's OK).
+- **Claude Code, Logbook 2 (log2)** (branch `ccr-afac5e7a-99esax`): Faculty / PCs profile PR (rules: active faculty
+  read summaries). Codex plugin and Firebase CLI signed in, both unused (each use needs the owner's OK).
 - **Codex**: no open logbook task (handed its remaining batch to Claude on #163).
 
 ## Waiting on the owner
@@ -38,24 +37,21 @@ Last updated: 2026-10-12 by Claude Code, Logbook 2 (log2).
 
 ## Next (agreed queue)
 
-1. **Admin profile** (log2; next after the Profiles PR): for admins, PDs and the PCs (programme coordinators, the
-   admin staff), layout not access (the rules stay the gatekeeper): opens on programme analytics built from
-   `summaries/` (per residency year: tags on track / due / behind, reflection headings met, who's behind, spread
-   strips) and easy-to-read compiled case logs. Open questions for the owner: PDs get it too?; what PCs need to see
-   first. Generic profile dropped (owner, 12 Oct).
-2. **PR B, usability and clearer design** (log1; from the owner's Bear comparison, 12 Oct; the owner wants
+1. **PR B, usability and clearer design** (log1; from the owner's Bear comparison, 12 Oct; the owner wants
    usability and clearer design, not a new look; waiting on the owner's pick): one tap on a case opens it, smaller
    case rows (Copy / Reflect lighter), no repeated date in the day view, today vs the picked day clearly different on
    the calendar, a tidy one-line status under the case box, one main button per screen. Not the Reflections list or
    page width (log2's area).
-3. Later, low priority: lazy-load rarely used modules (admin, portfolio, importer, xlsxio, backup, progress) to cut
+2. Later, low priority: lazy-load rarely used modules (admin, portfolio, importer, xlsxio, backup, progress) to cut
    first-visit time (now 3.5–4.2 s on a slow phone; repeat visits 0.6–0.8 s). Measure before and after.
-4. Parked ideas, only if asked:
+3. Parked ideas, only if asked:
    - Changed-records-only sync for cases (`syncAt` + delete tombstones; plan in chat on 12 Oct). Firestore usage
      12 Oct: busiest day 23.6k reads / 16.7k writes (bulk work), normal day ~4k reads; free tier 50k/20k a day.
 
 ## Recently done
 
+- #217 Basic the default profile; hidden items can be turned back on; no settings hidden; Profiles or hide items; soft
+  shadows by default; the Display preview marked clearly.
 - #214 Profiles: Advanced, Basic, Basic: logbook only (replaces Basic mode), at the top of Show or hide.
 - #210 Tab bar: up to seven tabs; any More page (Account, Settings, Recover drafts, Export / Import, Admin
   portal) can be a tab; an eighth asks which tab it replaces; Add Notes to the tab bar on the Notes page.
@@ -77,6 +73,9 @@ Last updated: 2026-10-12 by Claude Code, Logbook 2 (log2).
 ## Decisions log
 
 - 2026-10-12: Tab bar holds up to 7 tabs (More included); every More page can be a tab (owner).
+- 2026-10-12: Faculty / PCs profile (was "Admin profile") for faculty, PDs and admins; their default. PCs are added
+  as admins (no PC role). Case logs = counts per tag per resident (no case details); active faculty may read the
+  counts summaries (rules). Generic profile dropped.
 - 2026-10-12: Soft shadows around cards are the default (lines are the option). The Display preview is marked
   clearly as a preview.
 - 2026-10-12: Basic is the default profile for everyone (existing accounts too, unless they pick Advanced). Profiles

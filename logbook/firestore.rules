@@ -255,8 +255,10 @@ service cloud.firestore {
         && d.counts is map && d.counts.size() <= 100;
     }
 
+    // the counts summaries (counts per tag, reflections per heading, never case details): admins, PDs, programme
+    // residents and active faculty (the Faculty / PCs profile's Case logs; owner, Oct 2026: counts are no secret)
     match /summaries/{rid} {
-      allow read: if isAdmin() || isPD() || isMember();
+      allow read: if isAdmin() || isPD() || isMember() || isActiveFaculty(me());
       allow create, update: if validSummary(rid, request.resource.data)
         && (isAdmin() || (isResident(rid) && ownSummary(rid, request.resource.data)));
       allow delete: if isAdmin();

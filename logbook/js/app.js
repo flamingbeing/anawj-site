@@ -2,13 +2,14 @@
 // shared state and helpers are in ui-core.js. Case data comes from cloud.js (Firestore, or the
 // in-browser demo backend with ?demo).
 
-import { S, hooks, h, toast, basicMode, logbookOnly, clearToast, cloud, writes, transients, setCases, scheduleSummary, fill, resetCaches, patchLogbook, confirmBox, fileButton, modal, download, todayISO, settings, setCategoryNames, categoryNames as categoryNamesNow } from './ui-core.js';
+import { S, hooks, h, toast, basicMode, logbookOnly, facultyMode, facultyRole, clearToast, cloud, writes, transients, setCases, scheduleSummary, fill, resetCaches, patchLogbook, confirmBox, fileButton, modal, download, todayISO, settings, setCategoryNames, categoryNames as categoryNamesNow } from './ui-core.js';
 import { renderLog, focusLog, logCasesChanged, clearDrafts, SHARED_KEY } from './ui-log.js';
 import { renderRecovery } from './ui-recovery.js';
 import { renderLogbook } from './ui-logbook.js';
 import { renderProgress, renderTotals } from './ui-progress.js';
 import { applyCompact, cachedCompact, applyTheme, cachedTheme, applyTextSize, cachedTextSize, applyZoom, cachedZoom, stepZoom, applyAccent, adoptDisplay, applyDisplay, applyCustomCss, display, setDisplay, resetDisplay, DISPLAY_KEYS, renderTagEditor, renderDisplay, renderDisplayAdvanced, renderLogging, renderLoggingAdvanced, renderReflectionSettings, renderMarkdownSettings, renderShowHide, START_TABS, arrangeTabs, privacyCard, creditsCard, signOutCard } from './ui-settings.js';
 import { renderAccount, flush as flushProfile } from './ui-account.js';
+import { renderCaseLogs, renderCaseLog, renderProgramme } from './ui-caselogs.js';
 import { renderAdmin, renderAdminResidents, renderAdminAdvanced, leaveAdmin } from './ui-admin.js';
 import { renderReflect, watchMyReflections, renderExportPage, renderChoosePage } from './ui-reflect.js';
 import { downloadExcel, uploadExcel } from './ui-logbook.js';
@@ -22,6 +23,8 @@ import { purgeExpired, openBin } from './bin.js';
 
 // Tab icons: tiny inline SVG paths (24x24, stroked), so they look the same on every phone.
 const ICONS = {
+  caselogs: 'M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 21a7 7 0 0 1 14 0M16 3.5a4 4 0 0 1 0 7M18 14a6 6 0 0 1 4 7',   // people
+  caselog: 'M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 21a7 7 0 0 1 14 0',
   log: 'M12 5v14M5 12h14',
   logbook: 'M4 5h16M4 10h16M4 15h16M4 20h10',
   progress: 'M5 20V12M10 20V6M15 20v-9M20 20V9',
@@ -52,14 +55,18 @@ const icon = id => {
 };
 
 const TABS = [
+  // Faculty / PCs profile (faculty, PDs and admins): residents' compiled case logs, from the counts summaries
+  { id: 'caselogs', label: 'Case logs', render: () => renderCaseLogs(), faculty: true, desc: 'Residents’ case logs: counts per tag against the targets' },
   { id: 'log', label: 'Case', render: renderLog },
   { id: 'logbook', label: 'Logbook', render: renderLogbook },
   { id: 'reflect', label: 'Reflections', render: renderReflect, desc: 'Your reflections' },
-  { id: 'progress', label: 'Analytics', render: renderProgress, desc: 'Your progress against the APMES targets' },
+  // Faculty / PCs: programme analytics instead of your own
+  { id: 'progress', label: 'Analytics', render: () => (facultyMode() ? renderProgramme() : renderProgress()), desc: 'Your progress against the APMES targets' },
   // a personal notepad: on the bar only if chosen (Arrange tabs); otherwise first in More
   { id: 'notes', label: 'Notes', render: renderNotes, desc: 'Your own notes: private, never in your portfolio' },
   // five tabs on the bar; the rest live under More (still reachable by #totals, #account, #settings)
   { id: 'more', label: 'More', render: () => renderMore() },
+  { id: 'caselog', label: 'Case log', render: () => renderCaseLog(), faculty: true, hidden: true, under: 'caselogs', unlisted: true },
   // under Analytics: how your counts compare with your intake
   { id: 'totals', label: 'Totals', render: renderTotals, hidden: true, under: 'progress', unlisted: true },
   { id: 'account', bar: true, label: 'Account', render: renderAccount, hidden: true, under: 'more', desc: 'Your name and portfolio details (Section 1); delete account' },
@@ -95,7 +102,9 @@ const menuItem = (id, label, desc, onclick) => h('li', {}, h('a', { href: '#' + 
 function renderMore() {
   const items = visibleTabs().filter(t => t.under === 'more' && !t.unlisted);
   // tabs hidden from the bar (Advanced display) come first, so they are one tap away
-  const hidden = arrangeTabs(barCandidates(), display()).hidden.filter(id => !TABS.find(t => t.id === id).hidden);
+  // (Case logs, for faculty, PDs and admins outside their own profile, after the person's own tabs)
+  const hidden = arrangeTabs(barCandidates(), display()).hidden.filter(id => !TABS.find(t => t.id === id).hidden)
+    .sort((a, b) => (a === 'caselogs') - (b === 'caselogs'));
   return h('div', {},
     h('section', { class: 'card more-list' }, h('h2', {}, 'More'),
       h('ul', {}, hidden.map(id => TABS.find(t => t.id === id)).map(t => menuItem(t.id, t.label, t.desc || 'Hidden from the tab bar')), items.map(t => menuItem(t.id, t.label, t.desc)))),
@@ -293,7 +302,7 @@ const banner = document.getElementById('banner');
 // ---------- tabs and routing (#log, #logbook, ...) ----------
 
 // Totals (names and counts of programme residents) is for the programme only; the rules agree.
-const visibleTabs = () => TABS.filter(t => (!t.admin || S.admin) && (t.id !== 'totals' || S.admin || S.pd || S.resident));
+const visibleTabs = () => TABS.filter(t => (!t.admin || S.admin) && (!t.faculty || facultyRole()) && (t.id !== 'totals' || S.admin || S.pd || S.resident));
 // the tabs that can sit on the bar: the main ones, and the pages in the More list (bar: true), when put there
 const barCandidates = () => visibleTabs().filter(t => !t.hidden || t.bar).map(t => t.id);
 const TAB_ALIASES = { reflections: 'reflect' };
@@ -386,6 +395,7 @@ function render() {
   document.body.classList.toggle('no-help', !!(S.logbook && S.logbook.settings && S.logbook.settings.hideTips));
   document.body.classList.toggle('basic', basicMode());
   document.body.classList.toggle('logbook-only', logbookOnly());
+  document.body.classList.toggle('faculty-profile', facultyMode());
   paintTabs();
   const tab = visibleTabs().find(t => t.id === S.tab) || TABS[0];
   S.tab = tab.id;
@@ -640,8 +650,8 @@ function refreshWho(user, who, firstLogbook) {
   who().then(async w => {
     if (S.user !== user) return;
     saveWho(user.email, w);
-    const before = JSON.stringify([S.admin, S.owner, S.pd, S.resident, S.sharedTemplates, categoryNamesNow()]);
-    Object.assign(S, { admin: !!w.admin, owner: !!w.owner, pd: !!w.pd, resident: w.resident || null, sharedTemplates: w.sharedTemplates || [] });
+    const before = JSON.stringify([S.admin, S.owner, S.pd, S.faculty, S.resident, S.sharedTemplates, categoryNamesNow()]);
+    Object.assign(S, { admin: !!w.admin, owner: !!w.owner, pd: !!w.pd, faculty: !!w.faculty, resident: w.resident || null, sharedTemplates: w.sharedTemplates || [] });
     setCategoryNames(w.names || {});
     // the logbook (templates, settings) from the server, unless it was changed here meanwhile
     const lb = await cloud.loadLogbook(user.email).catch(() => null);
@@ -652,7 +662,7 @@ function refreshWho(user, who, firstLogbook) {
       applyDisplay(adoptDisplay(lb.settings, { fresh: true }));   // a first look made from a stale offline copy is corrected
     }
     if (lb && adoptShared()) lbChanged = true;   // never from a cached copy alone
-    if (!lbChanged && before === JSON.stringify([S.admin, S.owner, S.pd, S.resident, S.sharedTemplates, categoryNamesNow()])) return;
+    if (!lbChanged && before === JSON.stringify([S.admin, S.owner, S.pd, S.faculty, S.resident, S.sharedTemplates, categoryNamesNow()])) return;
     const typing = document.activeElement && /^(TEXTAREA|INPUT|SELECT)$/.test(document.activeElement.tagName);
     if (!typing && !document.querySelector('dialog[open]')) render(); else paintTabs();
   }).catch(err => console.warn('Refresh failed', err));
@@ -678,7 +688,7 @@ async function onUser(user) {
     if (S.user !== user) return;
   }
   if (!user) {
-    Object.assign(S, { admin: false, owner: false, pd: false, resident: null, logbook: null, cases: [], reflections: [], counts: {}, casesLoaded: false, casesSynced: false, sharedTemplates: [] });
+    Object.assign(S, { admin: false, owner: false, pd: false, faculty: false, resident: null, logbook: null, cases: [], reflections: [], counts: {}, casesLoaded: false, casesSynced: false, sharedTemplates: [] });
     const cleanup = signedInOnce ? writes.forget() : Promise.resolve();
     if (signedInOnce) { clearDrafts(); resetCaches(); forgetWho(); }
     transients.reset();
@@ -703,13 +713,14 @@ async function onUser(user) {
     cloud.isPD(user.email).catch(() => false),
     cloud.loadCategoryNames().catch(() => ({})),
     cloud.isAppOwner(user.email).catch(() => false),
-  ]).then(([admin, resident, shared, pd, names, owner]) => ({ admin, resident, sharedTemplates: shared || [], pd, names: names || {}, owner }));
+    cloud.isFaculty(user.email).catch(() => false),
+  ]).then(([admin, resident, shared, pd, names, owner, faculty]) => ({ admin, resident, sharedTemplates: shared || [], pd, names: names || {}, owner, faculty }));
   try {
     const known = readWho(user.email);
     const [logbook, w] = await Promise.all([cloud.loadLogbook(user.email, { cached: true }), known ? Promise.resolve(known) : who()]);
     if (S.user !== user) return; // signed out meanwhile
     reloadFlag('');
-    Object.assign(S, { admin: !!w.admin, owner: !!w.owner, pd: !!w.pd, resident: w.resident || null, logbook, sharedTemplates: w.sharedTemplates || [] });
+    Object.assign(S, { admin: !!w.admin, owner: !!w.owner, pd: !!w.pd, faculty: !!w.faculty, resident: w.resident || null, logbook, sharedTemplates: w.sharedTemplates || [] });
     setCategoryNames(w.names || {});
     if (!known) saveWho(user.email, w);
     // the server's logbook replaces the cached one there, and only then are the programme's tag groups

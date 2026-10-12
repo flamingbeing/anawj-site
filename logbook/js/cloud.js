@@ -217,6 +217,14 @@ export async function isPD(email) {
   catch (e) { if (e?.code !== 'permission-denied') console.warn('PD check failed', e); return false; }
 }
 
+// Active faculty (faculty/{email}, managed with the evals app) can read the counts summaries (Faculty / PCs profile).
+export async function isFaculty(email) {
+  if (demo) return false;
+  const { db, F } = await sdk();
+  try { const s = await F.getDoc(F.doc(db, 'faculty', lc(email))); return s.exists() && s.data().status === 'ACTIVE'; }
+  catch (e) { if (e?.code !== 'permission-denied') console.warn('Faculty check failed', e); return false; }
+}
+
 export async function myResident(email) {
   if (demo) return D.myResident(email);
   const { db, F } = await sdk();

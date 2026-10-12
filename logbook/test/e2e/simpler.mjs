@@ -130,6 +130,34 @@ try { for (const width of [390, 1280]) {
   assert.deepEqual(new Set(await tabsNow()), new Set(tabsAdvanced));
   await p.evaluate(async () => { const { patchLogbook } = await import('./js/ui-core.js'); await patchLogbook({ settings: { caseHide: null } }); });
 
+  // Faculty / PCs (faculty, PDs and admins; the demo user is an admin): Case logs, Analytics (the programme's), More
+  await pickProfile('faculty');
+  await p.waitForFunction(() => document.body.classList.contains('faculty-profile'));
+  assert.deepEqual(await tabsNow(), ['caselogs', 'progress', 'more']);
+  await p.locator('[role=tab][data-tab=caselogs]').click();
+  await p.locator('.caselog-list li').filter({ hasText: 'Resident A' }).waitFor();
+  assert.match(await p.locator('.caselog-list li').filter({ hasText: 'Resident A' }).innerText(), /\d+ cases/);
+  await p.getByLabel('Find a resident').fill('resident b');
+  assert.equal(await p.locator('.caselog-list li').count(), 1);
+  await p.locator('.caselog-list a').first().click();
+  await p.getByRole('heading', { name: 'Resident B' }).waitFor();
+  await p.locator('table.totals td.n').first().waitFor();
+  await p.getByRole('heading', { name: /^Reflections · \d+ of \d+ headings met$/ }).waitFor();
+  assert.equal(await p.locator('[role=tab][data-tab=caselogs]').getAttribute('aria-selected'), 'true', 'a case log sits under Case logs');
+  const logDl = p.waitForEvent('download'); await p.getByRole('button', { name: 'Download Excel' }).click();
+  assert.match((await logDl).suggestedFilename(), /^case-log-Resident-B-\d{4}-\d{2}-\d{2}\.xlsx$/);
+  await p.locator('[role=tab][data-tab=progress]').click();
+  await p.getByRole('heading', { name: 'Programme analytics' }).waitFor();
+  await p.getByRole('heading', { name: 'Programme totals' }).waitFor();
+  // their own Case, Logbook and Reflections are first in More
+  await p.locator('[role=tab][data-tab=more]').click();
+  assert.deepEqual((await p.locator('.more-list li a').evaluateAll(as => as.map(a => a.dataset.go))).slice(0, 3), ['log', 'logbook', 'reflect']);
+  await pickProfile('advanced');
+  await p.waitForFunction(() => !document.body.classList.contains('faculty-profile'));
+  assert.deepEqual(new Set(await tabsNow()), new Set(tabsAdvanced));
+  // residents never see the profile
+  assert.equal(await p.evaluate(async () => { const { S, facultyRole } = await import('./js/ui-core.js'); const was = [S.admin, S.pd, S.faculty]; Object.assign(S, { admin: false, pd: false, faculty: false }); const out = facultyRole(); [S.admin, S.pd, S.faculty] = was; return out; }), false);
+
   // reflection formatting buttons: off by default, on from Show or hide; they write Markdown the Word export formats
   await p.evaluate(async () => { const { reflectOnCase } = await import('./js/ui-reflect.js'); await reflectOnCase({ id: 'fake-fmt', date: '2026-10-10', initials: 'ZZ', details: 'Fake formatting case', cats: ['13'] }); });
   await p.waitForSelector('.refl-editor');

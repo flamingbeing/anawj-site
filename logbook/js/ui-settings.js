@@ -3,7 +3,7 @@
 
 import { YEAR_NAMES, DEFAULT_NAMES, BY_CODE } from './categories.js';
 import { sortCodes, uid, academicYear, withParents, weekStart, humanAge } from './engine.js';
-import { S, h, toast, modal, confirmBox, cloud, writes, catChip, catName, catShort, PICKER_ORDER, pickerOrder, settings, patchLogbook, displayName, hooks, rYear, myYearName, fill, PROFILES, profile, basicMode, BASIC_ITEMS, basicHides, setBasicOn, caseShown, setCaseShown, categoryNames, setCategoryNames, catPills, tagSet, resetters, download, fileButton, todayISO, saveMany, UNDO_SECS, rowIcon } from './ui-core.js';
+import { S, h, toast, modal, confirmBox, cloud, writes, catChip, catName, catShort, PICKER_ORDER, pickerOrder, settings, patchLogbook, displayName, hooks, rYear, myYearName, fill, PROFILES, profile, basicMode, facultyRole, BASIC_ITEMS, basicHides, setBasicOn, caseShown, setCaseShown, categoryNames, setCategoryNames, catPills, tagSet, resetters, download, fileButton, todayISO, saveMany, UNDO_SECS, rowIcon } from './ui-core.js';
 import { MAX_TAGS, tagLinks as tagLinksIn, learnShorthand, cleanShorthand, shorthandOf, DEFAULT_SHORTHAND, cleanTagSet, defaultTagSet, tagTree, flatTree, moveTag, reparentTag, removeTag, newKey, tagSetToCsv, tagSetFromCsv, dropTag, canPlace, placeNewTag } from './tags.js';
 import { pickDialog, CASE_PARTS, AFTER_SAVE } from './ui-log.js';
 import { OPERATOR_HELP } from './search-ops.js';
@@ -191,13 +191,15 @@ export const roundLevel = d => (Number.isInteger(d.round) && d.round >= 0 && d.r
 // The tab bar (Advanced display, per device): the order of its tabs and which are hidden. More always stays
 // (Settings live there), at least two and at most seven (MAX_BAR, More included) stay on the bar; hidden main tabs
 // are listed first on the More page. Every page in the More list can go on the bar too (Admin portal: admins only).
-export const BAR_TABS = [['log', 'Case'], ['logbook', 'Logbook'], ['reflect', 'Reflections'], ['progress', 'Analytics'], ['notes', 'Notes'],
+export const BAR_TABS = [['caselogs', 'Case logs'], ['log', 'Case'], ['logbook', 'Logbook'], ['reflect', 'Reflections'], ['progress', 'Analytics'], ['notes', 'Notes'],
   ['account', 'Account'], ['settings', 'Settings'], ['recovery', 'Recover drafts'], ['data', 'Export / Import'], ['admin', 'Admin portal'], ['more', 'More']];
-export const barTabs = () => BAR_TABS.filter(([id]) => id !== 'admin' || S.admin);
+export const barTabs = () => BAR_TABS.filter(([id]) => (id !== 'admin' || S.admin) && (id !== 'caselogs' || facultyRole()));
 // tabs off the bar until someone puts them there (they live in More by default); the Basic profiles keep Analytics
-// in More too, and Basic: logbook only Reflections
-const OFF_BAR = ['notes', 'account', 'settings', 'recovery', 'data', 'admin'];
-const offBar = mode => (mode === 'advanced' ? OFF_BAR : mode === 'logbook' ? [...OFF_BAR, 'progress', 'reflect'] : [...OFF_BAR, 'progress']);
+// in More too, and Basic: logbook only Reflections. Case logs is on the bar only in Faculty / PCs, which keeps the
+// person's own Case, Logbook and Reflections in More instead.
+const OFF_BAR = ['caselogs', 'notes', 'account', 'settings', 'recovery', 'data', 'admin'];
+const PROFILE_OFF = { advanced: [], basic: ['progress'], logbook: ['progress', 'reflect'], faculty: ['log', 'logbook', 'reflect'] };
+const offBar = mode => [...OFF_BAR.filter(id => mode !== 'faculty' || id !== 'caselogs'), ...(PROFILE_OFF[mode] || [])];
 export const MAX_BAR = 7;
 export function arrangeTabs(ids, d = {}, mode = profile()) {
   const order = Array.isArray(d.tabOrder) ? d.tabOrder : [];
@@ -651,12 +653,16 @@ export function profileCard() {
   const pick = async mode => {
     const was = profile();
     if (mode === was) return;
-    await patchLogbook({ settings: { mode: mode === 'basic' ? null : mode, basic: null, basicOn: null } });
+    // saved even for Basic: with nothing saved, faculty, PDs and admins get Faculty / PCs
+    await patchLogbook({ settings: { mode, basic: null, basicOn: null } });
     const d = display();
     if (Array.isArray(d.tabHidden)) {
+      // this device's saved tabs: the old profile's hidden tabs back, the new one's away
       const hid = new Set(d.tabHidden);
-      if (mode === 'advanced') hid.delete('progress'); else hid.add('progress');
-      if (mode === 'logbook') hid.add('reflect'); else if (was === 'logbook') hid.delete('reflect');
+      for (const id of PROFILE_OFF[was] || []) hid.delete(id);
+      if (was === 'faculty') hid.add('caselogs');
+      for (const id of PROFILE_OFF[mode] || []) hid.add(id);
+      if (mode === 'faculty') hid.delete('caselogs');
       applyDisplay(setDisplay({ tabHidden: [...hid] }));
     }
     hooks.paintTabs?.(); hooks.render(); toast(`Profile: ${PROFILES.find(([k]) => k === mode)[1]}`);
@@ -664,7 +670,7 @@ export function profileCard() {
   const items = BASIC_ITEMS.filter(([, , only]) => !only || only === cur);
   return h('section', { class: 'card profile-card' },
     h('h2', {}, 'Profile'),
-    h('div', { role: 'radiogroup', 'aria-label': 'Profile' }, PROFILES.map(([k, label, hint]) => h('label', { class: 'check profile-opt' },
+    h('div', { role: 'radiogroup', 'aria-label': 'Profile' }, PROFILES.filter(([k]) => k !== 'faculty' || facultyRole() || k === cur).map(([k, label, hint]) => h('label', { class: 'check profile-opt' },
       h('input', { type: 'radio', name: 'profile', value: k, checked: k === cur, onchange: () => pick(k) }),
       h('span', {}, h('b', {}, label), h('small', { class: 'hint' }, hint))))),
     basicMode() ? h('div', { class: 'profile-items' },

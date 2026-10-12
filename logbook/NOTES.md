@@ -297,7 +297,16 @@ portfolio content.
   - **Basic: logbook only**: Basic without reflections, for residents allowed to submit reflections separately (the
     PCs still need compiled case logs): Reflections off the bar (in More, for ones already written), no Reflect
     buttons or row-menu item, no ☆ Interesting (edit dialog, Logbook filter), no reflection headings card.
-  - **Advanced**: hides nothing. Admin profile planned next (owner: no Generic).
+  - **Advanced**: hides nothing.
+  - **Faculty / PCs** (`facultyMode()`; offered only to `facultyRole()`: admins, PDs and active faculty; their
+    default when nothing is saved, outside the demo; owner, 12 Oct 2026: PCs are added as admins, no PC role; no
+    Generic profile): tab bar **Case logs** (`#caselogs`, `ui-caselogs.js`: residents by year with total cases, tags
+    behind / due, reflections; tap → `#caselog`, that resident's counts per tag against the targets (`totalsTable`
+    with one column), reflection headings met, Excel download), then **Analytics** as programme analytics
+    (`renderProgramme`: who's behind, the tags most residents are behind on, then Programme totals), then More (their own
+    Case, Logbook, Reflections first). All from the counts summaries, never case details. The rules let active
+    faculty read `summaries/` (counts are no secret, owner); they still can't read the residents list, cases,
+    reflections or notes. Case logs is listed in More for them in other profiles.
   - Display preview (`displayPreview`): dashed accent edge, faint stripes and a "Preview only: not a real case" pill,
     so it never reads as a real case (owner).
   e2e: `simpler.mjs`.
@@ -356,8 +365,10 @@ portfolio content.
 
 - **App owner:** `owners/{email}`, set by hand in the Firebase console. May read logbooks and cases and import
   cases, but never reflections, images or the bin. Hand over by swapping the entry.
-- **Admins** can't read logbooks or cases. They read `summaries/` (counts per category, completed reflections per
-  heading) and portfolios marked ready (`submissions/`). Reflections stay private to the resident, the owner included.
+- **Admins** (the programme coordinators, PCs, are admins) can't read logbooks or cases. They read `summaries/`
+  (counts per category, completed reflections per heading) and portfolios marked ready (`submissions/`). PDs,
+  programme residents and **active faculty** read `summaries/` too (faculty since Oct 2026, for the Faculty / PCs
+  profile). Reflections stay private to the resident, the owner included.
 - **Photos:** adding one needs `isMember()` (on the residents list). 800–1000 px JPEG, a 20 MB budget per resident
   (`PHOTO_BUDGET_KB`; figures record `kb`). They stay in Firestore: at 150 residents that is about 3 GB, around
   US$0.40/month on Blaze, and photos still work offline. Moving to Firebase Storage needs a console bucket
