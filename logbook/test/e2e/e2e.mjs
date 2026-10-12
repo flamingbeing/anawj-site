@@ -1008,7 +1008,11 @@ async function run(label, ctxOpts) {
     assert(nToday === todayCases && nToday > 0, `"today" shows ${nToday}, expected ${todayCases}`);
     await p.locator('input[type=search]').fill('');
     await debounced();
-    // Copy on each row (not Share, not in the edit dialog); the day copies as [[date]] then 1. AB case, no tags
+    // Copy on each row is off by default (owner, 13 Oct 2026); switched on it shows (not Share, not in the edit
+    // dialog); the day copies as [[date]] then 1. AB case, no tags
+    assert(await items.first().locator('button', { hasText: /^Copy$/ }).count() === 0, 'Copy on the row by default');
+    await p.evaluate(async () => { const m = await import('/logbook/js/ui-settings.js'); m.applyDisplay(m.setDisplay({ rowCopy: true })); (await import('/logbook/js/ui-core.js')).hooks.render(); });
+    await items.first().waitFor();
     assert(await items.first().locator('button', { hasText: /^Copy$/ }).count() === 1, 'no Copy on the row');
     assert(await items.first().locator('button', { hasText: /^Share$/ }).count() === 0, 'Share still on the row');
     await items.first().locator('.t').click();

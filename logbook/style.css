@@ -1284,7 +1284,7 @@ details:not(.quick-actions) > summary::after { transition: transform var(--dur) 
 .empty-state > .btn, .empty-state > button { margin-top: 8px; }
 /* the case box: Paste (empty) or Clear (typed) is a small round icon in its top corner, clear of the words */
 .box-wrap textarea.details { padding-right: 48px; }
-.box-wrap .paste-btn.icon-only, .box-wrap .clear-btn { top: 6px; bottom: auto; right: 6px; width: 36px; min-height: 36px; height: 36px; padding: 0; border-radius: 50%; opacity: .75; font-size: calc(15px * var(--fs, 1)); }
+.box-wrap .paste-btn.icon-only, .box-wrap .clear-btn { top: 6px; bottom: auto; right: 4px; width: 40px; min-height: 40px; height: 40px; padding: 0; border-radius: 50%; opacity: .75; font-size: calc(15px * var(--fs, 1)); }
 .box-wrap .paste-btn.icon-only:hover, .box-wrap .clear-btn:hover { opacity: 1; }
 /* one quiet line under the box: the star left, "Draft saved · Recover" right; no empty gap when nothing is typed */
 .parsed:empty { display: none; }
@@ -1300,6 +1300,6 @@ details:not(.quick-actions) > summary::after { transition: transform var(--dur) 
 .actions .keep-date { flex: none; background: none; border-color: transparent; color: var(--accent); font-weight: 600; padding-inline: 6px; font-size: calc(14px * var(--fs, 1)); white-space: nowrap; }
 .actions .primary { flex: 1 1 auto; }
 /* the date row: smaller chips, a calendar icon instead of the emoji */
-.datebar .chip, .datebar .mode-seg button { min-height: 36px; padding: 2px 11px; font-size: calc(14px * var(--fs, 1)); }
+.datebar .chip, .datebar .mode-seg button { min-height: 40px; padding: 2px 11px; font-size: calc(14px * var(--fs, 1)); }
 .datebar .datepick .ico.i + span:not(:empty) { margin-inline-start: 4px; }
 .monthhead .jump { display: inline-flex; align-items: center; gap: 4px; }
