@@ -328,5 +328,8 @@ export function isShown(f, get, depth = 0) {
 // the answer back brings it back)
 export function shownValue(id, get) {
   const f = BY_ID[id] || EXTRA_BY_ID[id];
-  return f && !isShown(f, get) ? null : get(id);
+  if (f && !isShown(f, get)) return null;
+  // no pre-warming group (e.g. corrected to it later): its pre-warming readings and warming times aren't the study's
+  if (String(get('arm')) === '3' && (/^prewarm_/.test(id) || id === 'pw_start' || id === 'ev_wstop')) return null;
+  return get(id);
 }

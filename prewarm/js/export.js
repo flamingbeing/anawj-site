@@ -14,7 +14,8 @@ export function cellFor(f, v) {
     const n = typeof v === 'number' ? v : Number(String(v).trim());
     return String(v).trim() !== '' && Number.isFinite(n) ? n : String(v);
   }
-  return String(v);
+  // Excel holds at most 32,767 characters in a cell (a longer one makes the file need repair)
+  return String(v).slice(0, 32000);
 }
 
 const sortKey = r => String(val(r, 'enrol_id') || val(r, 'screen_id') || '~' + r.created);

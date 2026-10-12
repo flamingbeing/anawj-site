@@ -186,6 +186,7 @@ span.pn { color: var(--line); }
 .pm { display: grid; grid-template-columns: var(--tap) minmax(0, 1fr) var(--tap); gap: 4px; align-items: center; }
 .num { font: 600 1.6rem/1.1 var(--num); font-variant-numeric: tabular-nums; text-align: center; background: none; border: 0; color: var(--ink); width: 100%; min-width: 0; min-height: var(--tap); padding: 0; cursor: text; }
 .num .muted { font-size: 1rem; font-weight: 400; }
+.pm .num { white-space: nowrap; overflow: hidden; }
 input.num { border: 2px solid var(--navy); border-radius: var(--r); background: var(--card); }
 .card.typed input.num { border: 1px solid var(--line-input); }
 .card.typed input.num:focus { border: 2px solid var(--navy); }
