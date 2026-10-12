@@ -20,7 +20,7 @@ try { for (const width of [390, 1280]) {
   assert.equal(await p.locator('[role=tab][data-tab=notes]').count(), 0);
   await p.locator('[role=tab][data-tab=more]').click();
   const moreLink = p.locator('.more-list a[data-go=notes]');
-  assert.match(await moreLink.innerText(), /Notes[\s\S]*private, never in your portfolio/);
+  assert.match(await moreLink.innerText(), /Notes \(beta\)[\s\S]*private, never in your portfolio/);
   await moreLink.click();
   await p.getByRole('heading', { name: 'Notes', exact: true }).waitFor();
   assert.match(await p.locator('.notes-page').innerText(), /No notes yet[\s\S]*Use Reflect instead/);

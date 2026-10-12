@@ -64,7 +64,7 @@ const TABS = [
   // Faculty / PCs: programme analytics instead of your own
   { id: 'progress', label: 'Analytics', render: () => (facultyMode() ? renderProgramme() : renderProgress()), desc: 'Your progress against the APMES targets' },
   // a personal notepad: on the bar only if chosen (Arrange tabs); otherwise first in More
-  { id: 'notes', label: 'Notes', render: renderNotes, desc: 'Your own notes: private, never in your portfolio' },
+  { id: 'notes', label: 'Notes', moreLabel: 'Notes (beta)', render: renderNotes, desc: 'Your own notes: private, never in your portfolio' },
   // five tabs on the bar; the rest live under More (still reachable by #totals, #account, #settings)
   { id: 'more', label: 'More', render: () => renderMore() },
   { id: 'caselog', label: 'Case log', render: () => renderCaseLog(), faculty: true, hidden: true, under: 'caselogs', unlisted: true },
@@ -109,7 +109,7 @@ function renderMore() {
     .sort((a, b) => (a === 'caselogs') - (b === 'caselogs'));
   return h('div', {},
     h('section', { class: 'card more-list' }, h('h2', {}, 'More'),
-      h('ul', {}, hidden.map(id => TABS.find(t => t.id === id)).map(t => menuItem(t.id, t.label, t.desc || 'Hidden from the tab bar')), items.map(t => menuItem(t.id, t.label, t.desc)))),
+      h('ul', {}, hidden.map(id => TABS.find(t => t.id === id)).map(t => menuItem(t.id, t.moreLabel || t.label, t.desc || 'Hidden from the tab bar')), items.map(t => menuItem(t.id, t.moreLabel || t.label, t.desc)))),
     privacyCard(),
     creditsCard(),
     installCard(),
