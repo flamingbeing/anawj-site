@@ -13,8 +13,6 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 - Upload the blank paper form (.docx) on the admin screen, then check a patient's Form view on a phone (Download
   Word file, Save as PDF / Print).
 - Send each hospital team its join link (admin screen → Share join link), privately; test with a second phone.
-- Cloudflare previews: builds for #199 failed instantly with no log and were filed under "production/builds", not
-  branch previews. Check the anawj-preview Worker's build settings in the Cloudflare dashboard.
 
 ## Next
 
@@ -33,6 +31,9 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 
 ## Decisions
 
+- 12 Oct 2026: completed patients warn before opening; Export Excel moves to Settings.
+- 12 Oct 2026: Cloudflare PR previews fixed by the owner (build settings); main copy at
+  anawj-preview.kohwenjun.workers.dev.
 - 12 Oct 2026: "Mark data collection as complete" (one per patient) replaces the main screen's section mark; shown at the
   top of the main screen and in the patient list.
 - 12 Oct 2026: delete participants only from Settings → Delete participants; every reading entered live by default.
