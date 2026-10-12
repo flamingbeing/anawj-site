@@ -27,7 +27,9 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   - Phones join with their hospital's code (anonymous sign-in); the rules accept a `members/{uid}` entry only with that
     hospital's current code. Members read and write only their hospital's patients. A new code stops new joins with
     the old one; phones already in stay in until an admin removes them.
-  - Admins sign in with Google; `admins/{email}` (lower-case email) lists them. The first admin is added by hand in the
+  - Admins sign in with an emailed link (Firebase "Email link" sign-in), not Google: phone browsers block the
+    Google pop-up's helper page on `prewarm-study.firebaseapp.com` ("missing initial state"), and the self-hosted
+    helper at `anawj.com/__/auth` belongs to the logbook's project. `admins/{email}` (lower-case email) lists them. The first admin is added by hand in the
     Firebase console; after that admins can add others there. Admins see every hospital, make codes, remove phones.
   - Each patient is one document; each field is merged on its own (`f.<id>: {v, t, by}`), newest edit wins when
     copies meet. localStorage stays the phone's working copy; Firestore keeps its own offline cache and sends when
@@ -35,6 +37,8 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   - Membership is checked on the server, not the local cache (a refused join briefly shows in the cache).
   - Remote changes redraw the list, patient and form-view screens; on reading and form screens a bar offers to show
     them, so a half-entered reading is never lost.
+- **Deploys:** a merge that changes `.github/workflows/deploy-firestore-rules.yml` and a rules file together may not
+  start a run (it happened with #196); check Actions, and touch the rules file in a later PR if it didn't run.
 - **Testing sharing:** `tools/test-rules.sh` (rules, 52 checks) and `tools/test-prewarm-sync.sh` (two phones in a
   browser against the local Firestore and Auth emulators, `?emulator` on localhost only). Never the live project.
 - Changing any file in `sw.js` SHELL means bumping `VERSION`.

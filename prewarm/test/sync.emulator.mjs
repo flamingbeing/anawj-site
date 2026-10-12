@@ -13,6 +13,9 @@ const FS = 'http://127.0.0.1:8085/v1/projects/demo-prewarm/databases/(default)/d
 const put = await fetch(`${FS}/codes/NUH`, { method: 'PATCH', headers: { Authorization: 'Bearer owner', 'Content-Type': 'application/json' },
   body: JSON.stringify({ fields: { code: { stringValue: 'NUH-TEST-CODE' }, setAt: { integerValue: '1' }, setBy: { stringValue: 'lead@example.com' } } }) });
 assert.ok(put.ok, 'seed code: ' + put.status);
+const adm = await fetch(`${FS}/admins/lead@example.com`, { method: 'PATCH', headers: { Authorization: 'Bearer owner', 'Content-Type': 'application/json' },
+  body: JSON.stringify({ fields: { name: { stringValue: 'Lead' } } }) });
+assert.ok(adm.ok, 'seed admin: ' + adm.status);
 
 const b = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH, args: ['--no-sandbox'] } : {});
 const errors = [];
@@ -67,8 +70,34 @@ try {
   await a.click('.list a'); await a.click('.links a[href$="/sheet"]');
   await a.waitForFunction(() => /36\.7/.test(document.querySelector('.sheet')?.textContent || ''), null, { timeout: 15000 });
 
+  // an admin signs in with an emailed link and makes a join code
+  const ctx = await b.newContext({ viewport: { width: 390, height: 844 } });
+  const ad = await ctx.newPage();
+  ad.on('pageerror', e => errors.push('admin: ' + e.message));
+  await ad.goto(BASE + '#/settings');
+  await ad.waitForSelector('body[data-cloud=ready]');
+  await ad.click('#adminin');
+  await ad.fill('#adminemail', 'Lead@Example.com');
+  await ad.click('#adminsend');
+  await ad.waitForFunction(() => /Sign-in link sent/.test(document.querySelector('main').textContent), null, { timeout: 15000 });
+  const oob = await (await fetch('http://127.0.0.1:9099/emulator/v1/projects/demo-prewarm/oobCodes')).json();
+  const link = oob.oobCodes.filter(c => c.requestType === 'EMAIL_SIGNIN').pop();
+  assert.equal(link.email, 'lead@example.com');
+  await ad.goto(BASE + '&adminlink&mode=signIn&lang=en&apiKey=fake-api-key&oobCode=' + encodeURIComponent(link.oobCode));
+  await ad.waitForFunction(() => /NUH-TEST-CODE/.test(document.querySelector('main')?.textContent || '') && location.hash === '#/admin', null, { timeout: 20000 })
+    .catch(async () => { throw new Error('admin page: ' + ad.url() + ' | ' + (await ad.textContent('main')).replace(/\s+/g, ' ').slice(0, 300) + ' | toast: ' + await ad.textContent('#toast')); });
+  assert.doesNotMatch(ad.url(), /oobCode/, 'the one-time code leaves the address bar');
+  assert.match(await ad.textContent('main'), /NUH-TEST-CODE/);
+  assert.match(await ad.textContent('main'), /AA/, 'members listed');
+  await ad.click('[data-newcode="WH"]');
+  await ad.waitForFunction(() => /WH-[A-Z2-9]{8}/.test(document.querySelector('main').textContent), null, { timeout: 15000 });
+  if (SHOTS) await ad.screenshot({ path: SHOTS + '/admin.png', fullPage: true });
+  // the admin sees the NUH patient
+  await ad.goto(BASE + '#/');
+  await ad.waitForFunction(() => /SYNC-01/.test(document.querySelector('.list')?.textContent || ''), null, { timeout: 15000 });
+
   assert.deepEqual(errors, []);
-  console.log('prewarm sync: ok (two phones, join code, readings both ways)');
+  console.log('prewarm sync: ok (two phones, join code, readings both ways, admin email-link sign-in and codes)');
 } finally {
   await b.close();
 }

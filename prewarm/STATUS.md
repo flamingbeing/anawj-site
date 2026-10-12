@@ -6,17 +6,19 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 
 ## Now
 
-- **Claude Code, Prewarming Webapp** (branch `ccr-13264f37-d28edu`): main screen reorganised by when data are entered
-  (times + all temperatures, links to the rest); tests pass.
+- **Claude Code, Prewarming Webapp** (branch `ccr-13264f37-d28edu`): admin sign-in moved from Google pop-up (failed on
+  phones: "missing initial state") to an emailed link; emulator test covers it.
 
 ## Waiting on the owner
 
-- Add yourself as the first admin: Firebase console → Firestore → collection `admins`, document ID = your Google
-  email in lower case (any field, e.g. `name`). Then in the app: Settings → "Study admin? Sign in with Google" →
-  "Join codes and members" → make a code for each hospital and give it to that team.
-- Try it on a phone: `anawj.com/prewarm/` (real) or `?demo` (fake patient, no sharing).
+- Firebase console (`prewarm-study`) → Authentication → Sign-in method → Email/Password: turn it on and tick
+  "Email link (passwordless sign-in)". Then in the app: Settings → "Study admin? Sign in by email" → open the email
+  on the same phone → "Join codes and members" → make each hospital's code.
+- Try it on a phone: `anawj.com/prewarm/` (real) or `?demo` (fake patients, no sharing).
 
 ## Recently done
+
+- #197: main screen = times + all temperatures + links; rules first deployed to `prewarm-study` (run #19).
 
 - #196: sharing (join code per hospital, Firestore sync, rules, admin screen).
 
@@ -30,6 +32,8 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 1. PR 3: export across hospitals for admins, a members' view of who entered what, polish after phone testing.
 
 ## Decisions
+
+- 12 Oct 2026: admins sign in by email link, not Google (phone browsers broke the Google pop-up).
 
 - 12 Oct 2026: main screen = event times (compact) + all temperatures, links to other forms in fill-in order; empty
   temperature taps to 36.5, empty time taps to now.
