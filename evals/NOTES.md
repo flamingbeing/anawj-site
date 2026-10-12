@@ -24,10 +24,9 @@ This file collects what was learnt while building `/evals` (October 2026), so th
 | Repo | Public. **No names, patient data or real evaluation data** in the repo. Programme originals stay with the programme. |
 | Merging | "automerge": evals PRs are squash-merged once tests pass. **Firestore rules auto-deploy on merge to main**, so never ask the owner to paste rules. |
 | Platform | Static web app (PWA) on GitHub Pages. Electron might come later; nothing in the app blocks that. |
-| Theme | **Light by default.** More → Settings → Theme is a Light / Dark / Auto toggle, saved **per device** (the logbook's theme is per device too). |
-| Keyboard | The bottom nav **stays visible above the phone keyboard** (evals and logbook). |
+| Theme | **Light by default.** More → Settings → Theme is a Light / Dark / Auto toggle, saved **per device**. |
+| Keyboard | The bottom nav **stays visible above the phone keyboard**. |
 | More screen | The "Guide and forms" card is removed for now (the reference files stay in the repo). |
-| Logbook privacy | **Cases and logbook record: the resident and the app owner only.** Admins see counts, not cases. Reflections stay private to the resident (the owner included). Only residents on the programme list can add photos; 20 MB of photos each. |
 
 ## 2. MedHub, as it works today (from the official Android app 1.4.8 and the resident guide)
 
@@ -209,17 +208,10 @@ A quick contrast check for both themes is worth running after any colour change:
   - Before editing logbook files, check it isn't mid-change: `get_session` status, and its open PRs.
   - Keep logbook edits small, merge them, then tell it with `send_message` (what changed, files, the sw VERSION) so it merges main before its next change.
   - Twice it shipped the same feature first (logbook theme, keyboard nav); check main before building.
-- **Logbook data and roles** (`logbook/firestore.rules`):
-  - `owners/{email}`, set by hand in the console, is the app owner. They may read logbooks and cases and import cases, but never reflections, images or the bin. Hand over by swapping the entry.
-  - Admins can't read logbooks or cases; they read `summaries/` (counts per category, completed reflections per heading) and portfolios marked ready (`submissions/`).
-  - Photo writes need `isMember()` (on the residents list).
-  - Photos are 800–1000 px JPEG with a 20 MB budget per resident (`PHOTO_BUDGET_KB`, figures record `kb`). They stay in Firestore: at 150 residents that is about 3 GB, around US$0.40/month on Blaze, and photos still work offline. Moving to Firebase Storage needs the console bucket (asia-southeast1), loses offline adds, and isn't worth it yet.
-- **Owner-set IDs:**
-  - The Google Drive web client ID and the Dropbox app key are in `logbook/js/backup-targets.js`; both are public.
-  - The Claude connector's Desktop client (`logbook/mcp/config.mjs`) needs the owner to paste its ID and secret via a GitHub web edit. The agent's safety check refuses to commit a `client_secret`, even for a non-confidential desktop client and even with the owner's go-ahead.
-  - Dropbox stays in development mode until the owner applies for production (icons are 64 and 256 px from `logbook/icons/icon-512.png`).
+- **Logbook roles, photos and its Drive / Dropbox / Claude connector setup** are in `logbook/NOTES.md` ("Data, roles and photos", and the Backup bullets).
 - **Privacy policy:** `privacy/index.html`, live at https://anawj.com/privacy/. Keep it in step with the rules when roles change.
 - **What this cloud agent can't do:**
+  - Commit a `client_secret`, even a non-confidential desktop one and even with the owner's go-ahead: the owner pastes it via a GitHub web edit.
   - Write production Firestore.
   - Edit its own permission settings.
   - Delete remote branches.
@@ -235,7 +227,6 @@ A quick contrast check for both themes is worth running after any colour change:
 - Flagging requests abandoned for more than 3 days, and the 24-hour / end-of-rotation deadlines in the PD overview.
 - Electron wrapper, if ever needed.
 - Firestore scheduled backups (switch on in the console; the project is on Blaze).
-- The Claude connector's Desktop client secret (owner's GitHub web edit), then a live `node server.mjs login` test.
 - **Ease-of-use backlog** (from a review of other assessment apps and a phone test; the owner hasn't picked yet):
   - **Consultant:**
     - a dictation hint on comment boxes;

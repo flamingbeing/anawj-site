@@ -226,14 +226,17 @@ portfolio content.
   same-day file replaced; Dropbox = PKCE in a popup (opened from the tap, its address set after the challenge), the
   popup's return is caught in `index.html` (`window.__dbxReturn`, postMessage to the opener, app not started there),
   App folder access, uploads to `/APMES Logbook/`. Tokens in memory only. `settings.cloudBackup` { remind, md,
-  lastAt, lastTo } (never in the settings file). Reminder: one toast per visit with a Save button when due. Both
-  stay disabled until the owner fills `GOOGLE_CLIENT_ID` / `DROPBOX_APP_KEY` (README Firebase setup step 6); the
-  real sign-ins are untested until then.
+  lastAt, lastTo } (never in the settings file). Reminder: one toast per visit with a Save button when due. The
+  owner filled `GOOGLE_CLIENT_ID` and `DROPBOX_APP_KEY` (both public) in Oct 2026. Dropbox stays in development
+  mode until the owner applies for production (its icons are 64 and 256 px from `icons/icon-512.png`).
 - **Connect Claude** (`mcp/`, Settings → Connect Claude (advanced) links its README on GitHub): a read-only MCP
   server residents run locally; Google "Desktop app" OAuth (loopback, PKCE) → Firebase `signInWithIdp` → Firestore
   REST as the user, so the rules apply; only `logbooks/{own email}` and the user's own `residents` entry. Owner
   setup (the Desktop client ID and its non-confidential secret in `mcp/config.mjs`) is in `mcp/README.md`; until
-  then sign-in can't work. Tests: `logbook/mcp/test/*.test.mjs` (tools test needs `npm install` there).
+  then sign-in can't work. The Desktop client ID is
+  `474134277199-7ma8hij2lirbhk18d9l0i5033c2soc5c.apps.googleusercontent.com`; the agent's safety check refuses to
+  commit the `client_secret` (even with the owner's go-ahead), so the owner pastes it via a GitHub web edit, then
+  test `node server.mjs login` live. Tests: `logbook/mcp/test/*.test.mjs` (tools test needs `npm install` there).
 - **Download for notes apps** (More → Export / Import → Backup; `ui-notes.js`): a zip made on the phone (JSZip):
   `Cases/` notes, `Reflections/…` one note each (linked both ways), `Progress.md` (counts vs targets, reflections vs
   minimums), optional figures in `images/` (fetched one by one from `images/`). A privacy line is always shown.
@@ -241,6 +244,18 @@ portfolio content.
   a bar or highlight shows the drop spot, a label at the top says "Before/After/Under …", vibration on Android), search, case counts, edit
   dialog (name, long name, sits under, counts towards, shorthand with built-in defaults and words
   learned from your cases, hide, merge), Tag groups card, then a "Tag list file" card at the bottom (CSV download / load, Reset). The last tag or header tapped (list or pills) is marked; a new one goes right after it (`tev.last`); a new tag group goes after the last one edited.
+
+## Data, roles and photos (`firestore.rules`)
+
+- **App owner:** `owners/{email}`, set by hand in the Firebase console. May read logbooks and cases and import
+  cases, but never reflections, images or the bin. Hand over by swapping the entry.
+- **Admins** can't read logbooks or cases. They read `summaries/` (counts per category, completed reflections per
+  heading) and portfolios marked ready (`submissions/`). Reflections stay private to the resident, the owner included.
+- **Photos:** adding one needs `isMember()` (on the residents list). 800–1000 px JPEG, a 20 MB budget per resident
+  (`PHOTO_BUDGET_KB`; figures record `kb`). They stay in Firestore: at 150 residents that is about 3 GB, around
+  US$0.40/month on Blaze, and photos still work offline. Moving to Firebase Storage needs a console bucket
+  (asia-southeast1), loses offline adds, and isn't worth it yet.
+- **Privacy policy:** `privacy/index.html` (anawj.com/privacy/) shows who sees what. Keep it in step when roles change.
 
 ## Tags and suggestions (`tags.js`, `suggest.js`)
 
