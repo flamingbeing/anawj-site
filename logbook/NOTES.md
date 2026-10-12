@@ -364,6 +364,8 @@ portfolio content.
 - Pull-down-to-refresh is off (`overscroll-behavior-y: none` on html, body).
 - Any change to a file in `sw.js` SHELL: bump `VERSION` (`logbook-v20…`). New JS files go in SHELL. Check the bump
   really landed (`grep VERSION logbook/sw.js`): a sed run from the wrong folder once left it stale for ten commits.
+  After merging main into your branch, compare with main's VERSION: two sessions once both bumped to `v25t`, so
+  phones that had one change would never fetch the other. Bump past main's.
 - Rules: `logbook/firestore.rules` deploys on merge. Emulator: copy rules and
   `logbook/test/rules.emulator.mjs` + `evals/test/rules.emulator.mjs` into a folder with firebase-tools, then
   `firebase emulators:exec --only firestore --project demo-logbook "node logbook/test/rules.emulator.mjs; node evals/test/rules.emulator.mjs"`.
