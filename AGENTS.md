@@ -8,6 +8,7 @@ Static site on GitHub Pages (public repo: no names, patient data or real evaluat
 - `evals/`: APMES workplace-based assessments. Start with `evals/NOTES.md` (decisions, MedHub, forms, operations), then `evals/README.md`.
 - `logbook/`: APMES case logbook. Start with `logbook/NOTES.md` (principles, words, screens, tags, demo, how to test), then `logbook/README.md`.
 - `nuh-roster/`: NUH anaesthesia daily roster (own Firebase project `nuh-roster`). Start with `nuh-roster/NOTES.md`: its department section (grades, postings, roster sheet, notation, HMS monthly rosters, short names) applies to any app dealing with NUH anaesthesia staff.
+- `prewarm/`: prewarming study op-day data collection (temperatures every 5 min, export to the study's Excel template). Start with `prewarm/NOTES.md`, then `prewarm/PLAN.md`.
 - `apmes/`: APMES programme documents (not secret): the EPA Guidebook v8 and requirements transcribed (the evals
   data is built from them), and the blank portfolio template the logbook tests use. See `apmes/README.md`.
   Before adding a programme file, check its cover/contributor pages and file details (author, embedded files) for
@@ -17,7 +18,7 @@ Static site on GitHub Pages (public repo: no names, patient data or real evaluat
 Rules that bite:
 
 - `logbook/firestore.rules` is the one rules file for both logbook and evals (Firebase project `apmes-logbook`). It deploys automatically on merge to main; never ask the owner to paste rules.
-- `nuh-roster/firestore.rules` (Firebase project `nuh-roster`) deploys the same way.
+- `nuh-roster/firestore.rules` (Firebase project `nuh-roster`) and `prewarm/firestore.rules` (project `prewarm-study`) deploy the same way.
   How: `.github/workflows/deploy-firestore-rules.yml` deploys a changed file to its project on merge to main
   (check the "Deploy Firestore rules" run in Actions). It compiles the rules first, so a syntax error fails the run
   and leaves the live rules as they were. It signs in with the `FIREBASE_SERVICE_ACCOUNT` secret (service account
@@ -32,14 +33,15 @@ Before merging, run:
 
 ```
 node tools/check.mjs
-for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mjs; do node "$f"; done
+for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mjs prewarm/test/*.test.mjs; do node "$f"; done
 ```
 
 - Logbook changes: `tools/test-logbook.sh` runs all of the above plus the full e2e and every focused browser test
   (about 10 min; `quick` skips the full e2e). Its portfolio-template steps use `apmes/templates/portfolio-template-blank.docx`. After UI changes also run `node logbook/test/e2e/a11y.mjs` (accessibility).
-- Rules changes (`logbook/firestore.rules`): `tools/test-rules.sh` runs the logbook and evals rules suites in the
+- Rules changes (`logbook/firestore.rules`, `prewarm/firestore.rules`): `tools/test-rules.sh` runs the logbook, evals and prewarm rules suites in the
   local emulator (fake accounts, demo project; no sign-in, never the live projects).
 - Evals UI changes: also run the e2e test (see `evals/README.md`).
+- Prewarming UI changes: also run `node prewarm/test/e2e.mjs` (see `prewarm/README.md`).
 
 ## Working with the owner
 
