@@ -368,3 +368,12 @@ dialog.ask p { margin: 0 0 6px; }
 /* the phone couldn't store a change: stays until a write works again */
 .storefull { position: sticky; top: 0; z-index: 9; padding: 10px 12px; background: var(--err); color: #fff; font-weight: 700; text-align: center; }
 .twinline { display: block; font-size: 12px; font-weight: 600; color: var(--warn); }
+
+/* the patient screen's three parts (owner, 12 Oct 2026): key times, the tab's readings, the shared bottom part */
+.third { display: grid; gap: 4px; border: 1px solid var(--line); border-radius: var(--r-card); padding: 4px 6px; }
+.third.top { background: #e9eef6; border-color: #c5d0e2; }
+.third.mid { background: var(--bg); border-color: var(--line); }
+.third.bot { background: #f3f0e8; border-color: #ddd6c4; }
+.third.bot .links.two { margin-top: 0; }
+.resetline { margin: 4px 0 0; text-align: center; }
+.resetline .link { font-size: 12px; color: var(--muted); }

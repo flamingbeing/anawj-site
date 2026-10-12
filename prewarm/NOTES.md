@@ -86,6 +86,12 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   Still to fill, Mark complete) is the same on both tabs. The no-pre-warming group keeps a Pre-warming tab that says
   "No pre-warming". Intra-op time 0 is induction (`io_knife`, labelled Induction; the paper form's row reads
   "Knife-to-skin start time (Induction)").
+- **Three parts, reset, PACU view** (owner, 12 Oct 2026): the patient screen has three bordered parts with their
+  own backgrounds (key times blue-grey; tab bar and readings; shared bottom part beige). Swipe changes tab only in
+  the middle part (a touch starting on a −/+ button is its hold-to-repeat, not a swipe). The second tab is named
+  "BP, HR, BIS". "Reset this subject" (small, bottom part) asks twice, then clears every entry except the Subject
+  ID, group and hospital, on every phone. "PACU view" on the home list: tapping a participant opens only their
+  PACU page (to hand the phone to the PACU nurse); back returns to that list.
 - **Never send an empty `f`** (lesson, 12 Oct 2026): `setDoc(…, { f: {} }, { merge: true })` replaces the server's
   `f` with an empty map (an empty map is a leaf in the merge). Lock / unlock / delete sent one and wiped the server
   copy's readings; push now omits an empty `f`, lock sends the full record, and each phone resends all its patients

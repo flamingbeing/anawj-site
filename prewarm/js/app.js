@@ -472,6 +472,7 @@ function home() {
       if (locked) return `<li><a href="${canLock() ? '#/p/' + p.id : '#/'}" class="locked"${canLock() ? '' : ' data-locked="1"'}>${body}</a></li>`;
       return `<li><a href="#/p/${p.id}"${val(p, 'done') ? ` data-done="${esc(val(p, 'done'))}"` : ''}>${body}</a></li>`;
     }).join('')}</ul>` : `<p class="muted">No patients yet. Tap <b>New patient</b> on the morning of surgery.</p>`}
+    ${list.length ? '<p class="small"><a href="#/pacu">PACU view</a> <span class="muted">(hand the phone to the PACU nurse: tapping a participant opens only their PACU page)</span></p>' : ''}
     <p class="muted small">${sharing() ? `Shared with the ${esc(shared.admin ? 'whole study (admin)' : shared.member.site + ' team')}. Readings sync when there is signal. <b class="syncline">${esc(syncText())}</b>` : `Data stays on this phone. <a href="#/settings">Join your hospital’s team</a> to share patients.`} Study IDs only: no names or hospital numbers.</p>`);
   $('#new').onclick = () => go('#/new');
   // what each patient being charted needs now (a reading or Prewarm off due within 2 min, or late)
@@ -635,11 +636,11 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
   // and pulses as its next reading falls due
   // key times fill the top of the screen on both tabs; the tab bar sits under them (owner, 12 Oct 2026)
   const ptabsHtml = () => `<nav class="ptabs" role="tablist" aria-label="Readings"><a role="tab" id="templink" href="#/p/${id}" aria-selected="${main}" data-state="${haemoState(p, defaultSeries(p))}">Temperatures</a>`
-    + `<a role="tab" id="haemolink" href="#/p/${id}/haemo" aria-selected="${!main}" data-state="${haemoState(p)}">Others</a></nav>`;
+    + `<a role="tab" id="haemolink" href="#/p/${id}/haemo" aria-selected="${!main}" data-state="${haemoState(p)}">BP, HR, BIS</a></nav>`;
   const refreshBar = topBar(p, s, () => draw());
   // swipe left / right to change tab (owner, 12 Oct 2026); not from the timepoint strip or a box being typed in
   let sw = null;
-  const swStart = e => { const t = e.touches[0]; sw = e.touches.length === 1 && !e.target.closest('.strip, input, .tchip.edit') ? { x: t.clientX, y: t.clientY, at: Date.now() } : null; };
+  const swStart = e => { const t = e.touches[0]; sw = e.touches.length === 1 && e.target.closest('.third.mid') && !e.target.closest('.strip, input, .tchip.edit') ? { x: t.clientX, y: t.clientY, at: Date.now() } : null; };
   const swEnd = e => {
     if (!sw) return;
     const t = e.changedTouches[0], dx = t.clientX - sw.x, dy = t.clientY - sw.y, quick = Date.now() - sw.at < 700;
@@ -854,10 +855,15 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
       ${isSaved ? `<p class="muted small tight">Taken ${esc(savedAt(p, s, pt.key))}${p.f['at_' + s + '_' + pt.key]?.by ? ' (saved by ' + esc(p.f['at_' + s + '_' + pt.key].by) + ')' : ''} <button class="link" data-attime>Change time</button>. Changes save when you tap Save.</p>` : ''}
       <div class="board">${cols.map(card).join('')}</div>
       <button class="save big" id="save">${isSaved ? 'Save changes' : `Save ${pt.label} reading`}</button>`;
-    paint(`${val(p, 'done') ? `<p class="ok-box donetop">✓ Data collection complete <small>${esc(val(p, 'done'))}</small></p>` : ''}${timesHtml()}${ptabsHtml()}${main ? comfortHtml('sat_pre', 'Comfortable before surgery?') : ''}${reading}
+    // three parts (owner, 12 Oct 2026): key times; the tab bar and its readings (swipe changes tab here only);
+    // the other forms, Still to fill and Mark complete, the same on both tabs
+    paint(`<section class="third top" aria-label="Key times">${val(p, 'done') ? `<p class="ok-box donetop">✓ Data collection complete <small>${esc(val(p, 'done'))}</small></p>` : ''}${timesHtml()}</section>
+      <section class="third mid">${ptabsHtml()}${main ? comfortHtml('sat_pre', 'Comfortable before surgery?') : ''}${reading}
       ${s === 'haemo' && vitalsCollected(p) ? '<p class="okline small">✓ Vital signs data collected: ticked on the paper form</p>' : ''}
       ${s === 'haemo' && settings.hide.haemo15 ? `<p class="muted small">Only baseline is entered here; the 15-min rows come from the monitor download. Turn them on in Settings.</p>` : ''}
-      ${main ? comfortHtml('sat_post', 'Comfortable after surgery?') + linksHtml() + gapsHtml(p) + doneHtml(p) : signoffHtml(p, s) + linksHtml() + gapsHtml(p) + doneHtml(p)}`);
+      ${main ? comfortHtml('sat_post', 'Comfortable after surgery?') : signoffHtml(p, s)}</section>
+      <section class="third bot" aria-label="Other forms and checks">${linksHtml()}${gapsHtml(p)}${doneHtml(p)}
+      <p class="resetline"><button class="link" id="resetsub">Reset this subject</button></p></section>`);
     refreshBar();
     fitNums();
     if (editing) { const i = $('#evtime'); i?.focus(); }
@@ -958,6 +964,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
       toast('Data collection marked complete'); draw(); window.scrollTo(0, 0); return;
     }
     if (t.closest('[data-undone]')) { set(p, 'done', null); draw(); return; }
+    if (t.closest('#resetsub')) { resetSubject(p); return; }
     signoffClick(p, s, t);
   };
   view.onchange = e => {
@@ -1270,11 +1277,34 @@ const FORM = {
 // the rest of the study's data (owner, 12 Oct 2026): every field of these pages, in template order
 const OTHER_PAGES = ['preop', 'meds', 'bloods', 'pod1', 'pod1an', 'pod2', 'pod2an', 'dc'];
 for (const pg of OTHER_PAGES) FORM[pg] = PAGES.find(x => x.id === pg).fields.filter(f => f.id !== 'enrol_id').map(f => [f.id]);
-route(/^\/p\/(\w+)\/form\/(\w+)$/, (id, pg) => {
+// Reset a subject: clears every time, reading and answer, keeping the Subject ID, group and hospital (asks twice)
+const KEEP_ON_RESET = new Set(['enrol_id', 'arm', 'site', 'restored']);
+function resetSubject(p) {
+  if (p.lock?.on) return toast('Locked: read only. Unlock it on the home page to change it.');
+  if (!confirm(`Reset ${sid(p)}?\n\nThis clears every time, reading and answer entered for this subject. The Subject ID and group stay.`)) return;
+  if (!confirm(`Are you sure? Everything entered for ${sid(p)} will be cleared, on every phone sharing it. This can't be undone.`)) return;
+  const ids = Object.keys(p.f).filter(k => !KEEP_ON_RESET.has(k) && val(p, k) != null && setVal(p, k, null, settings.me));
+  try { Object.keys(localStorage).filter(k => k.startsWith(NS + 'unsaved:' + p.id + ':')).forEach(k => localStorage.removeItem(k)); } catch { /* fine */ }
+  saveAll(); if (ids.length) sync(p, ids);
+  leaveGuard = null; toast(sid(p) + ' reset');
+  if (location.hash === '#/p/' + p.id) render(); else go('#/p/' + p.id);
+}
+
+// PACU view (owner, 12 Oct 2026): a list where tapping a participant opens only their PACU page, to hand the phone
+// to the PACU nurses
+route(/^\/pacu$/, () => {
+  header('PACU view', '#/');
+  const list = Object.values(patients).filter(p => !isGone(p) && !p.lock?.on).sort((a, b) => (lastEdit(b)?.t || b.created) - (lastEdit(a)?.t || a.created));
+  paint(`<p class="muted small">Tap a participant to open their PACU page.</p>
+    ${list.length ? `<ul class="list">${list.map(p => `<li><a href="#/pacu/${p.id}"><b>${esc(sid(p))}</b><span>${esc(status(p))}</span></a></li>`).join('')}</ul>` : '<p class="muted">No patients yet.</p>'}`);
+});
+route(/^\/pacu\/(\w+)$/, id => formPage(id, 'pacu', '#/pacu'));
+route(/^\/p\/(\w+)\/form\/(\w+)$/, (id, pg) => formPage(id, pg, `#/p/${id}/haemo`));
+function formPage(id, pg, back) {
   const p = patients[id]; if (!p) return go('#/');
   if (OTHER_PAGES.includes(pg)) return go(`#/p/${id}/data`);
   if (!FORM[pg]) return go('#/p/' + id);
-  header(sid(p) + ' · ' + (SECTION[pg] || PAGES.find(x => x.id === pg).title), `#/p/${id}/haemo`);
+  header(sid(p) + ' · ' + (SECTION[pg] || PAGES.find(x => x.id === pg).title), back);
   topBar(p, defaultSeries(p));
   const get = k => val(p, k);
   const draw = () => {
@@ -1311,7 +1341,7 @@ route(/^\/p\/(\w+)\/form\/(\w+)$/, (id, pg) => {
     if (REDRAW.has(f.id)) { recalc(p); draw(); }
   };
   cleanup.push(() => { view.onclick = view.onchange = null; });
-});
+}
 const REDRAW = new Set(['io_txa_bolus', 'io_txa_inf', ...Object.values(BY_ID).filter(f => f.show).map(f => f.show.f)]);
 // totals worked out from other fields fill in when empty or when they still hold the old worked-out value
 function recalc(p) {

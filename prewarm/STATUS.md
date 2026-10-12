@@ -25,6 +25,7 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 
 ## Recently done
 
+- Three bordered parts, swipe in the middle only, tab "BP, HR, BIS", Reset this subject (asks twice), PACU view.
 - Layout: key times on top, tab bar under them, same bottom part on both tabs; no-pre-warming Pre-warming tab.
 - #285: unsaved readings come back after the phone closes the app; toasts no longer block taps on Log / tabs.
 - #283, #284: two patients at once: home list shows each one's due reading; alerts cover patients opened on this phone.
