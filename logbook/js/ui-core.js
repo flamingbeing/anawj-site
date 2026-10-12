@@ -44,8 +44,9 @@ export const settings = () => ({ suggestions: true, rYear: 1, ...(S.logbook && S
 // residents' case logs first (Case logs: counts per tag from the summaries, never case details), then programme
 // analytics, then More; their own Case, Logbook, Reflections and Notes tabs start in More.
 export const PROFILES = [
-  ['basic', 'Basic', 'A simpler app (the default): the same tabs and buttons without the extras. Analytics is in More.'],
+  // simplest first: logbook only hides the most
   ['logbook', 'Basic: logbook only', 'Basic without reflections, if you submit your reflections separately. Reflections you already wrote stay in More.'],
+  ['basic', 'Basic', 'A simpler app (the default): the same tabs and buttons without the extras. Analytics is in More.'],
   ['advanced', 'Advanced', 'Everything: quick picks, the Logbook grid, Analytics trends and forecasts, reflection figures and references.'],
   ['faculty', 'Faculty / PCs', 'For faculty, PDs and programme coordinators: residents’ case logs first, then programme analytics, then More.'],
 ];
