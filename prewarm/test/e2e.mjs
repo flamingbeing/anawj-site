@@ -147,7 +147,7 @@ try {
   await page.click('.textlinks a[href$="/sheet"]');
   await page.waitForSelector('.sheet');
   assert.match(await page.textContent('.sheet'), /36\.6/);
-  assert.ok(await page.$('#del'), 'delete is on the spreadsheet view');
+  assert.equal(await page.$('#del'), null, 'no delete on the spreadsheet view');
   await axe('form view'); await shot('form-view');
   await page.goBack();
 
@@ -182,6 +182,16 @@ try {
   assert.equal(await page.getAttribute('[data-zoom="1.25"]', 'aria-pressed'), 'true');
   assert.equal(await page.evaluate(() => getComputedStyle(document.body).zoom), '1.25');
   await page.click('[data-zoom="1"]');
+  // every reading live by default; deleting participants only from Settings
+  assert.equal(await page.isChecked('[data-k="haemo15"]'), true, 'BP, HR and BIS every 15 min on by default');
+  await page.click('a[href="#/delete"]');
+  await page.waitForSelector('.dellist');
+  await axe('delete participants'); await shot('delete');
+  const delBtn = page.locator('.dellist li', { hasText: 'TEST-02' }).locator('[data-del]');
+  await delBtn.click(); await delBtn.click();
+  await page.waitForFunction(() => !/TEST-02/.test(document.querySelector('main').textContent));
+  await page.goto(BASE + '?demo#/');
+  assert.doesNotMatch(await page.textContent('.list'), /TEST-02/, 'deleted from the list');
   await page.goto(BASE + '?demo#/export');
   const [dl] = await Promise.all([page.waitForEvent('download'), page.click('#xl')]);
   const file = await dl.path();

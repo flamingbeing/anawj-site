@@ -33,6 +33,7 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 
 ## Decisions
 
+- 12 Oct 2026: delete participants only from Settings → Delete participants; every reading entered live by default.
 - 12 Oct 2026: Log button (next event), ‹ › timepoints, squarer time boxes, Mark section complete at the bottom, tap an
   empty temperature card for 36.5, running timer and next event in the app bar.
 - 12 Oct 2026: NUHS app theme (design system artifact, kr-app); main screen fits one phone screen; Delete moves to the
