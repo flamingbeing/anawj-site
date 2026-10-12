@@ -2,7 +2,7 @@
 // 1. Each app's sw.js deletes only caches with its own prefix (apps share the anawj.com origin).
 // 2. Every file in an app's SHELL list exists.
 // 3. If a SHELL file changed against origin/main, that app's sw.js VERSION changed too.
-// 4. evals/js/catalogue.js and forms.js match a fresh build from evals/reference/.
+// 4. evals/js/catalogue.js and forms.js match a fresh build from apmes/.
 // Exits 1 on any failure.
 
 import fs from 'node:fs';

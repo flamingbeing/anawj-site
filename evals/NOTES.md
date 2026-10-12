@@ -1,6 +1,6 @@
 # What we have learnt: MedHub, APMES evaluations and this project
 
-This file collects what was learnt while building `/evals` (October 2026), so the next person or agent doesn't have to rediscover it. It sits alongside [`README.md`](README.md) (how to run the app and the data model), [`SPEC.md`](SPEC.md) (module contracts), [`PLAN.md`](PLAN.md) (the original UX plan) and [`reference/`](reference/) (programme documents, transcribed). If this file disagrees with the code, the code wins; if it disagrees with the EPA Guidebook v8, the guidebook wins.
+This file collects what was learnt while building `/evals` (October 2026), so the next person or agent doesn't have to rediscover it. It sits alongside [`README.md`](README.md) (how to run the app and the data model), [`SPEC.md`](SPEC.md) (module contracts), [`PLAN.md`](PLAN.md) (the original UX plan) and [`/apmes/`](../apmes/) at the repo root (programme documents, transcribed, and the blank portfolio template). If this file disagrees with the code, the code wins; if it disagrees with the EPA Guidebook v8, the guidebook wins.
 
 ## 1. The owner's decisions (don't re-litigate)
 
@@ -26,7 +26,7 @@ This file collects what was learnt while building `/evals` (October 2026), so th
 | Platform | Static web app (PWA) on GitHub Pages. Electron might come later; nothing in the app blocks that. |
 | Theme | **Light by default.** More → Settings → Theme is a Light / Dark / Auto toggle, saved **per device**. |
 | Keyboard | The bottom nav **stays visible above the phone keyboard**. |
-| More screen | The "Guide and forms" card is removed for now (the reference files stay in the repo). |
+| More screen | The "Guide and forms" card is removed for now (the APMES files stay in `/apmes/`). |
 
 ## 2. MedHub, as it works today (from the official Android app 1.4.8 and the resident guide)
 
@@ -101,7 +101,7 @@ Pickers are full-screen **Recent | All | Write-In** lists, with recents remember
 - **Entrustment rule:** level 3 needs an overall score ≥5, and level 4 needs ≥7.
 - **Catalogue:** 14 EPAs (1–12, 7a, 7b), 67 items (DOPS 17, Mini-CEX 12, EBD 38) and 46 counting groups. Every item has entrustment questions.
   - `EBD-7a-06` has only a vignette in the guidebook table, so its questions come from the embedded EBD_EPA7A_SR document.
-- **Where the guidebook and the template disagree:** central venous catheter insertion is a **DOPS under EPA 10** in the guidebook but a Mini-CEX in the template. Follow the guidebook. The other disagreements are in `reference/apmes-epas.json` → `notes`.
+- **Where the guidebook and the template disagree:** central venous catheter insertion is a **DOPS under EPA 10** in the guidebook but a Mini-CEX in the template. Follow the guidebook. The other disagreements are in `apmes/data/apmes-epas.json` → `notes`.
 - **Guidebook rules not yet enforced:**
   - fill within 24 h,
   - complete by the end of each rotation,
@@ -122,7 +122,7 @@ Pickers are full-screen **Recent | All | Write-In** lists, with recents remember
 - **Collections:** `evaluations/{id}` (with `private/assessor`), `faculty/{email}`, `applications/{uid}`, `residents/{rid}`, `pds/{email}`, `admins/{email}`, `members/{email}`. The fields and transitions are in `SPEC.md`.
   - Rules let an assessor edit an assessment for **15 minutes after submitting**.
   - A resident can only set `seenAt` on a submitted evaluation.
-- **Generated data:** `node evals/tools/build-data.mjs` writes `js/catalogue.js` and `js/forms.js` from `reference/`. **Change wording there, not in the generated files.** The build applies these overrides:
+- **Generated data:** `node evals/tools/build-data.mjs` writes `js/catalogue.js` and `js/forms.js` from `/apmes/` (repo root). **Change wording there, not in the generated files.** The build applies these overrides:
   - the short entrustment label (the official label is kept as `officialLabel`),
   - no comment minimum (`feedback: true`),
   - `ATTACHMENT_ENTRUST` for EPA 7a SR.

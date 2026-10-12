@@ -399,9 +399,11 @@ function tickBox(tc, n) {
   let k = -1, at = -1;
   const re = /<w:t(?:\s[^>]*)?>([^<]*)<\/w:t>/g;
   let m;
-  while ((m = re.exec(tc))) {
-    const j = m[1].indexOf('☐');
-    if (j >= 0 && ++k === n) { at = m.index + m[0].indexOf('>') + 1 + j; break; }
+  // both boxes can sit in one run ("☐  Male    ☐  Female"), so count every ☐, not one per run
+  while (at < 0 && (m = re.exec(tc))) {
+    for (let j = m[1].indexOf('☐'); j >= 0; j = m[1].indexOf('☐', j + 1)) {
+      if (++k === n) { at = m.index + m[0].indexOf('>') + 1 + j; break; }
+    }
   }
   if (at < 0) return tc;
   let out = tc.slice(0, at) + '☒' + tc.slice(at + 1);

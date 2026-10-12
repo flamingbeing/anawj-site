@@ -1,6 +1,6 @@
 // Run with: node logbook/test/reflect-import.test.mjs  (made-up reflections only)
 // Round trip: reflections -> exportPortfolio (.docx) -> parseDocx -> the same fields back.
-// Optional: PORTFOLIO_TEMPLATE=blank.docx also round-trips through a real blank portfolio template.
+// Also round-trips through the real blank portfolio template (apmes/templates/; PORTFOLIO_TEMPLATE=other.docx to try another).
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { readFileSync, existsSync } from 'node:fs';
@@ -87,7 +87,7 @@ const a = plain.items.find(x => x.initials === 'AB');
 assert.equal(a.figures[0].point, 0, 'figure follows its learning point');
 assert.ok(plain.images[a.figures[0].rid].data.length > 10, 'figure picture extracted');
 
-const tplPath = process.env.PORTFOLIO_TEMPLATE || '/tmp/claude-0/-home-user-anawj-site/aef7b023-a326-5f96-82d2-2f768144ab6f/scratchpad/orig/original-blank.docx';
+const tplPath = process.env.PORTFOLIO_TEMPLATE || new URL('../../apmes/templates/portfolio-template-blank.docx', import.meta.url);
 if (existsSync(tplPath)) {
   const tb = await exportPortfolio(refl, { name: 'Test Resident', JSZip, images, templateB64: readFileSync(tplPath).toString('base64') });
   assert.ok(tb.usedTemplate, 'template used');

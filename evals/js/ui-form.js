@@ -758,7 +758,7 @@ let mdP = null;
 async function dopsExpectations(itemId, n) {
   const key = DOPS_PROC[itemId];
   if (!key) return null;
-  mdP = mdP || fetch('reference/guidebook/dops-expectations.md').then(r => (r.ok ? r.text() : Promise.reject(new Error(r.status))));
+  mdP = mdP || fetch('../apmes/guidebook/dops-expectations.md').then(r => (r.ok ? r.text() : Promise.reject(new Error(r.status))));
   let md;
   try { md = await mdP; } catch (e) { mdP = null; throw e; }
   const parts = md.split(/\n## /).slice(1);
