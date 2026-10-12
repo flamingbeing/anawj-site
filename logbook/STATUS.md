@@ -9,12 +9,10 @@ Last updated: 2026-10-13 by Claude Code, Logbook 1 (log1).
 
 ## Now
 
-- **Claude Code, Logbook 1 (log1)** (branch `claude/clever-gates-pm6sas`): polish batch from the owner's Apple-apps
-  review (Next, item 1): PRs 1–4 merged (#250, #254, #268, #272), JR count / word counts merged (#264); PR 5 open
-  (note editor); PR 6 next (seven settings, regroup the Advanced pages, switches and checkmark lists). Settings controls (switches, checkmark lists,
-  one-line help) moved from PR 2 to PR 6, with the regrouping of the Advanced pages. Owner's picks are in the artifact
-  https://claude.ai/artifact/8Kfho8SPgupTbqe6t2g5bi (store `picks/owner`). Also doing the Reflections rows (log2's
-  area, owner's OK 13 Oct: log2 has stopped).
+- **Claude Code, Logbook 1 (log1)** (branch `claude/clever-gates-pm6sas`, no open PR): polish batch (Next, item 1):
+  PRs 1–5 merged (#250, #254, #268, #272, #274), JR count / word counts merged (#264). Next: PR 6a then 6b (layout
+  approved 13 Oct, "agree and merge": build, test, merge each without asking). Nothing half-done. Owner's picks are in
+  the artifact https://claude.ai/artifact/8Kfho8SPgupTbqe6t2g5bi (store `picks/owner`).
 - **Claude Code, Logbook 3 (log3)** (branch `ccr-2994049c-4e5tlt`): idle, nothing half-done. Still signed in to the
   Firebase CLI (usage counts only; each use needs the owner's OK). Owns the axe check, PR previews and the Codex /
   Firebase plugin setup.
@@ -53,11 +51,21 @@ Last updated: 2026-10-13 by Claude Code, Logbook 1 (log1).
       headings); each Analytics card shows one number and one bar, the detail inside.
    4. Recognised words highlighted inside the case box (replaces the read-back line under it).
    5. Note editor: no boxes, one grey info line (date, linked case), Delete and Preview in a ⋯ menu.
-   6. Seven separate settings, all off by default, in Advanced display / logging (regrouped and reordered then):
-      flat look (a new end of the Borders slider that also drops page cards), page titles in the header,
-      filled / tinted / plain buttons, calendar as plain numbers with counts, shorter case rows, press and hold a row
-      for its menu (no swipe: swipe changes tabs), icons instead of words on common buttons. With it: settings use
-      switches and checkmark lists, help cut to one line plus ⓘ.
+   6. Settings (layout approved by the owner 13 Oct; merge each after the checks, no need to ask):
+      - **6a, regroup only (nothing new):** every settings page uses switches for on/off, tap-to-pick lists with a
+        ✓ for 2–5 choices (Light or dark, Colourful, Tab bar, Line spacing, Page width, Enter key, Undo window, First
+        day of the week, Contrast, Motion), help cut to one line with ⓘ for the rest. Display → Advanced under
+        headings: Look · Header and tab bar (name, hide header, tab bar position, icons only, order) · Logbook rows
+        (⋯ menu, Copy button) · Text (fonts, line spacing, page width) · Case tab layout (upside down, pin box, pin
+        search) · Custom CSS last. Logging → Advanced: Case tab (parts, box height, separate initials, keyboard
+        opens) · Keyboard in the case box (capitals, autocorrect, spelling) · Search · Dates and Undo · Help (tips,
+        last week's summary). Settings search and each page's reset keep working.
+      - **6b, seven new options, all off by default, per device:** Borders slider gets a "Flat" end (no lines and no
+        page cards); Button style (Outlined today / Filled, tinted and plain); Icons instead of words on common
+        buttons (Copy, Share day, Filter, Edit…); Calendar (tiles today / plain numbers with counts, today an accent
+        circle, the picked day a dark circle); Page titles in the header ("Logbook"… instead of the app name);
+        Shorter Logbook rows (one bold line with initials and case, tags as one grey line, short date right, no
+        buttons); Press and hold a row for its menu (no swipe: swipe changes tabs).
    Skipped by the owner: the selected tab's look, text styles, dark mode default (stays Light), segmented switches.
 2. Later, low priority: lazy-load rarely used modules (admin, portfolio, importer, xlsxio, backup, progress) to cut
    first-visit time (now 3.5–4.2 s on a slow phone; repeat visits 0.6–0.8 s). Measure before and after.
@@ -67,6 +75,7 @@ Last updated: 2026-10-13 by Claude Code, Logbook 1 (log1).
 
 ## Recently done
 
+- #274 Polish 5: the note editor reads like a page (‹ Notes, ⋯ menu with Preview and Delete, Done; no boxes; one info line).
 - #272 Polish 4: the initials and age/sex marked inside the case box; the line under it says only what the age means.
 - #268 Polish 3: initials over the date on case rows, one-line tags, thin month headers, calmer Analytics cards.
 - #264 Reflections list: "JR 0/1" beside each heading's count (the JR rule left the note); word counts can be hidden.
@@ -75,25 +84,13 @@ Last updated: 2026-10-13 by Claude Code, Logbook 1 (log1).
 - #217 Basic the default profile; hidden items can be turned back on; no settings hidden; Profiles or hide items; soft
   shadows by default; the Display preview marked clearly.
 - #214 Profiles: Advanced, Basic, Basic: logbook only (replaces Basic mode), at the top of Show or hide.
-- #210 Tab bar: up to seven tabs; any More page (Account, Settings, Recover drafts, Export / Import, Admin
-  portal) can be a tab; an eighth asks which tab it replaces; Add Notes to the tab bar on the Notes page.
-- #200 Advanced display / logging links were hidden by ad blockers (EasyList `##.adv-link`, owner's Firefox): class
-  renamed; Basic mode now says it hides them, with a way to turn it off.
-- #191 Swipe between tabs like cards (next page follows the finger, steady tab bar, also on the background); Notes:
-  Enter in the title moves on, Formatting fold; shorter Logbook search hint; Interesting on one line.
-- #189 Analytics (Advanced only): pace forecast and Off pace, Gone quiet, Reflection to-dos, tags and month bars
-  open their cases.
-- #184 Page width (Full), header can hide in the demo, Leave / Reset demo by Sign out, swipe on by default and
-  following the finger.
-- #180 Reflections tab: topics as headings, one-line header, pinned search with sticky topics.
-- #186 EPA Guidebook v8 PDF in `apmes/originals/` (cover with names replaced, file details removed).
-- #183 APMES documents in `/apmes/`; blank portfolio template in the repo; Word export ticks Female (was never ticked).
-- #181 Notes review fixes: note index moved to owner-only `meta/noteIndex` (rules deployed), bin restore keeps the
-  100-note limit, notes listener metadata, 34 new rules tests; previews no longer break on reload (service workers
-  key the page by `'./'`).
 
 ## Decisions log
 
+- 2026-10-13: Polish PR 6 layout approved as proposed (Display basics unchanged but Borders gains a Flat end;
+  Advanced display and logging regrouped under headings; switches, ✓ lists, one-line help); built as 6a (regroup)
+  then 6b (seven new options, off by default). Owner: "agree and merge". Also: the age read-back under the case box
+  stays (only the age meaning) as the 6m/6mo check; JR rule shown as a "JR 0/1" pill; word counts can be hidden.
 - 2026-10-13: Polish batch from the Apple-apps review (Next, item 1). Seven new looks are separate settings, off by
   default, not one "Clean" switch. Initials beside the date for everyone. Edge swipe back only in the iPhone
   home-screen app (Android's own Back gesture uses the edges). Copy on each Logbook row is off by default. log1 may
