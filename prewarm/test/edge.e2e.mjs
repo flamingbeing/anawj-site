@@ -677,6 +677,23 @@ jobs.push(() => tryit(async () => {
   log(!(await pg.evaluate(() => caches.keys())).includes('prewarm-v1'), 'update helper clears the saved copy and opens the app');
   await ctx.close();
 }));
+// AH. a section marked complete is read only: timepoints with no data are hidden, nothing is offered for logging
+jobs.push(() => tryit(async () => {
+  const { ctx, pg } = await fresh();
+  await pg.evaluate(() => localStorage.setItem('prewarm-demo:settings', JSON.stringify({ me: 'ZZ', v: 3 })));
+  await pg.reload(); await pg.waitForTimeout(600);
+  await open(pg, 1);
+  const id = (await pg.evaluate(() => location.hash)).split('/')[2];
+  const strip = () => pg.$$eval('.strip a', as => as.map(a => a.textContent.trim()).join('|'));
+  await pg.evaluate(h => { location.hash = h; }, `#/p/${id}/prewarm`); await pg.waitForSelector('[data-sign="prewarm"]');
+  const before = await strip();
+  await pg.click('[data-sign="prewarm"]'); await pg.waitForSelector('.sealnote');
+  const after = await strip();
+  log(/15 min/.test(before) && !/15 min/.test(after) && /10 min/.test(after), 'complete: pre-warming points with no data are hidden: ' + before + ' -> ' + after);
+  await pg.evaluate(h => { location.hash = h; }, `#/p/${id}/prewarm/20`); await pg.waitForSelector('.strip');
+  log(!/20 min/.test(await strip()) && await pg.$('.sealnote') !== null, 'opening a hidden point goes to one that has data');
+  await ctx.close();
+}));
 await runJobs();
 await b.close();
 if (fails.length) { console.error('prewarm edge: FAIL\n- ' + fails.join('\n- ')); process.exit(1); }

@@ -308,3 +308,7 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   deletes the `prewarm-*` caches, then opens `/prewarm/` again. Patients and readings (localStorage, IndexedDB) are
   never touched. Also linked from Settings under Refresh now. Tell the owner to open it by typing the address when a
   phone is stuck on an old version.
+- **Read only hides empty timepoints** (owner, 13 Oct 2026): once a section is marked complete (or data collection is),
+  `pointsFor` shows only the timepoints that have a time or a reading (all, if none has), so no time is offered for
+  logging and the strip has no empty tabs; opening a hidden one goes to the default point. The bottom of Settings and
+  home shows the app version (the saved copy's name) to spot a phone stuck on an old one.
