@@ -138,7 +138,7 @@ Pickers are full-screen **Recent | All | Write-In** lists, with recents remember
   - Autosave uses `updateEvaluation(id, patch, { wait: false, onError })`: a rejection that arrives before the 3 s ack wait is reported (before, the form said "Saved").
   - `restoreLocal()` keeps the device copy when it only adds to the server's answers, not just when it is newer (a resident's nudge bumps `updatedAt`).
   - Unsent text is flushed on `visibilitychange`/`pagehide`. Sign-out removes `evals-draft-*`.
-- **State changes** (`stampPatch` in `demo-backend.js`, used by both backends): reopen, reassign and assessor change restart `requestedAt`; reopen clears `seenAt`; a new assessor drops the old `metrics` (rules let the resident remove `metrics`, never set it).
+- **State changes** (`stampPatch` in `schema.js`, used by both backends): reopen, reassign and assessor change restart `requestedAt`; reopen clears `seenAt`; a new assessor drops the old `metrics` (rules let the resident remove `metrics`, never set it).
 - **Navigation:**
   - The phone's Back closes open sheets and the full-screen QR (`popstate` listener in `ui-core.js`).
   - The request flow survives a reload (`sessionStorage` `evals-request-flow`, 2 h).

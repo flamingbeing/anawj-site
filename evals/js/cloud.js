@@ -8,11 +8,11 @@
 //   residents/{rid}                        { rid, name, email, status, intake, rYear, smo? }   admins or PDs write
 //   faculty/{email}                        { email, name, status: ACTIVE|INACTIVE, updatedAt }   admins or PDs write
 //   applications/{uid}                     { uid, email, name, role, note, status, createdAt, decidedAt?, decidedBy? }
-//   evaluations/{id}                       see EVAL_FIELDS in demo-backend.js
+//   evaluations/{id}                       see EVAL_FIELDS in schema.js
 
 import { FIREBASE_CONFIG } from './firebase-config.js';
 import * as D from './demo-backend.js';
-import { plain, lc, cleanEval, cleanPatch, stampPatch, cleanFaculty, cleanResident, cleanApplication, newRid } from './demo-backend.js';
+import { plain, lc, cleanEval, cleanPatch, stampPatch, cleanFaculty, cleanResident, cleanApplication, newRid } from './schema.js';
 
 const SDK = 'https://www.gstatic.com/firebasejs/10.12.2/';
 export const demo = (() => {
