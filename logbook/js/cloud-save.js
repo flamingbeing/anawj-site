@@ -37,7 +37,7 @@ async function saved(to, n, prune) {
 // ---- leaving for the sign-in, and coming back ----
 
 const PENDING = 'apmes-logbook-cloud-pending', RETURN = 'apmes-logbook-cloud-return', PENDING_MS = 15 * 60e3;
-const redirectUri = () => location.origin + location.pathname;   // https://anawj.com/logbook/ (registered with Google and Dropbox)
+const redirectUri = () => location.origin + location.pathname;   // https://apmes.anawj.com/logbook/ (registered with Google and Dropbox)
 const randomState = prefix => prefix + crypto.getRandomValues(new Uint32Array(2)).join('');
 async function leaveToSignIn(to) {
   const state = randomState(to === 'drive' ? 'gdr-' : 'dbx-');

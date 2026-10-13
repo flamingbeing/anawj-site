@@ -39,13 +39,10 @@ its own file), so sessions never edit the same lines. Read them all before start
 1. Subdomains (`SUBDOMAINS.md`, plan from the homepage session, agreed with the owner 13 Oct): step 1 (hosting) is
    done; log1 does step 5 (apmes.anawj.com for logbook and evals, with the MedHub Evaluations session) last, when the
    homepage session says so.
-2. Learning points in case summaries (owner's daily habit; secondary goal: logbook usable for non-APMES logging).
-   Part 1, agreed in outline: a line starting `Learning:` (or `Learning points:`; maybe `Pearl:`) in the case summary
-   is the learning points (not "LP": lumbar puncture). Shown as its own line on case rows, searchable, labelled in the
-   Markdown / Excel / Copy exports, and copied into a new reflection's free-text learning points (a copy, no live
-   link). Reflections already have the Numbered | Free text switch, so they stay as they are. Owner has not said "go"
-   yet. Part 2, later: an option (off by default) for a non-APMES logbook: own tag list, APMES categories, targets
-   and progress hidden, counts and Analytics by own tags.
+2. **On hold** (owner, 13 Oct: "lets move domains first"): labelled parts in the case summary (`LP:` learning points,
+   `DT:` case details, `LP1:`, `LP2:` …), behind one account switch, off by default. Full plan, consequences and the three
+   open questions: `logbook/PLAN-labelled-parts.md`. Later, part 2: an option for a non-APMES logbook (own tag list,
+   APMES categories, targets and progress hidden).
 3. (Polish batch done 13 Oct: #250, #254, #268, #272, #274, #264, #289, #295. Owner to try the new looks on a phone.)
 4. Later, low priority: lazy-load rarely used modules (admin, portfolio, importer, xlsxio, backup, progress) to cut
    first-visit time (now 3.5–4.2 s on a slow phone; repeat visits 0.6–0.8 s). Measure before and after.

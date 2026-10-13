@@ -15,6 +15,20 @@
 <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <script>
+  // The logbook now lives at apmes.anawj.com (SUBDOMAINS.md). The same folder is still served at anawj.com/logbook/, so send
+  // visitors on from there (path, query and # kept). Only for the top page, and a no-op on apmes.anawj.com, the PR previews,
+  // localhost and the /edit/ iframe (no loop). A browser with logbook settings saved at the old address stays for a moment,
+  // because what a browser saves belongs to its address: the page offers to download it first (window.LOGBOOK_MOVED_TO, js/moved.js).
+  if (top === self && /^(www\.)?anawj\.com$/.test(location.hostname)) (function () {
+    var to = 'https://apmes.anawj.com' + location.pathname + location.search + location.hash, saved = false;
+    try {
+      for (var i = 0; i < localStorage.length && !saved; i++) { var k = localStorage.key(i); saved = /^(apmes-)?logbook-/.test(k) && !/^apmes-logbook-(demo|moved|install|cloud)/.test(k); }
+      if (localStorage.getItem('apmes-logbook-moved')) saved = false;
+    } catch (e) { /* no storage */ }
+    if (saved && !/[?&]demo\b/.test(location.search)) window.LOGBOOK_MOVED_TO = to; else location.replace(to);
+  })();
+</script>
+<script>
   // back from Google or Dropbox after a Save to Drive / Dropbox sign-in (cloud-save.js): keep the answer for the
   // app (it finishes the save after sign-in) and tidy the address back to the Backup page
   try { var cq = new URLSearchParams(location.search), cf = new URLSearchParams(location.hash.slice(1)); if (/^dbx-/.test(cq.get('state') || '') || /^gdr-/.test(cf.get('state') || '')) { sessionStorage.setItem('apmes-logbook-cloud-return', JSON.stringify({ search: location.search, hash: location.hash })); var cp = JSON.parse(localStorage.getItem('apmes-logbook-cloud-pending') || '{}') || {}; history.replaceState(null, '', location.pathname + (cp.demo ? '?demo' : '') + '#data'); } } catch (e) {}
