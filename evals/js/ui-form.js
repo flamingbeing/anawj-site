@@ -2,7 +2,7 @@
 // autosave (this device at once, the server for choices at once and text after 3 s idle), a sticky
 // "n of N required" bar, submit, decline, and a read-only view for anyone else or once submitted.
 
-import { S, hooks, h, fill, add, toast, cloud, icon, go, modal, debounce, fmtDate, fmtAgo, toMs, avatar, toolLabel, empty, draftKey, EDIT_MS, errText } from './ui-core.js';
+import { S, hooks, h, fill, add, toast, cloud, icon, go, modal, debounce, fmtDate, fmtAgo, toMs, avatar, toolLabel, empty, draftKey, EDIT_MS, errText, linkAccount, wrongAccountCard, switchAccount } from './ui-core.js';
 import { FORMS, SCALES, ENTRUSTMENT_TEXT_KEY } from './forms.js';
 import { itemById } from './catalogue.js';
 import { validate, visibleQuestions, nextGap, identifierWarning } from './engine.js';
@@ -43,8 +43,12 @@ export async function renderForm(id) {
     try { ev = await cloud.getEvaluation(id); } catch (err) { console.warn(err); }
   }
   if (!ev) {
-    return empty('Evaluation not found', navigator.onLine ? 'It may have been withdrawn, or it was sent to a different account.' : 'Opens when you have signal.',
-      h('a', { class: 'n-btn', href: '#pending' }, 'Evaluations'));
+    if (!navigator.onLine) return empty('Evaluation not found', 'Opens when you have signal.', h('a', { class: 'n-btn', href: '#pending' }, 'Evaluations'));
+    const as = linkAccount();
+    if (as && as !== S.user?.email) return h('div', { class: 'e-stack' }, wrongAccountCard());
+    return empty('Evaluation not found', ['It may have been withdrawn, or it was sent to a different account. You’re signed in as ', h('b', {}, S.user?.email || ''), '.'],
+      h('div', { class: 'e-actions' }, h('a', { class: 'n-btn n-btn--outline e-btn-quiet', href: '#pending' }, 'Evaluations'),
+        cloud.demo ? null : h('button', { class: 'n-btn', type: 'button', onclick: switchAccount }, 'Switch account')));
   }
   if (ev.residentEmail === S.user?.email && ev.assessorEmail !== S.user?.email) {
     history.replaceState(null, '', location.pathname + location.search + '#r/' + encodeURIComponent(ev.id));
