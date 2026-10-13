@@ -27,6 +27,7 @@ Last updated: 2026-10-13 by Claude Code, hand assessment session.
 
 ## Recently done
 
+- Firefox: checked the update fix and 3D in Firefox; no-WebGL phones get the GIFs instead of blank boxes.
 - Page edits #302: no update bar; online visits always get the current page (network first, cache offline).
 - #260: updates switch on by themselves; the update bar only reloads (tap did nothing on the owner's phone).
 - #258: 3D animations (three.js) for cascade, FDP, FDS, nerve map; new FPL, EDC, EIP/EDM, EPL, Elson; kinder wording.
@@ -39,6 +40,7 @@ Last updated: 2026-10-13 by Claude Code, hand assessment session.
 
 ## Decisions
 
+- 2026-10-13: owner uses Firefox; test there too. No WebGL: show the figure's GIF.
 - 2026-10-13: no update bar; the worker is network first (3 s fallback to cache), so updates need no tap or reload.
 - 2026-10-12: new versions activate themselves; the bar only reloads (owner's tap did nothing).
 - 2026-10-12: 3D animations (three.js r160, vendored) for tendon tests, cascade and nerve map; 2D kept for the
