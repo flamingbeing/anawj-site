@@ -242,6 +242,9 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
 - Fix names (13 Oct): names an import couldn't match (draft, rotation file, red names on a monthly roster) get a card
   with a picker per name (closest names first, by `sameNameScore`); saving keeps the spelling as that person's short
   name (in the staff log) and reads the draft or rotation file again (`lastDraft`, `lastRotFile`).
+- Key and help (footer, and a link under the roster's one-line hint): what each mark means (`SYMBOLS`: &, (C), C-,
+  L-, (L), postings, (AOH), colours, ☾ and •, AOCC/AIC/AH OT…) and "How do I…?" answers (`HOW`), one open at a time.
+  Entries describe only what the roster does; don't add expansions of abbreviations nobody has confirmed.
 - Keep building elements with `h()` and `textContent`; there is no `innerHTML` anywhere, so imported text can't inject.
 
 ## Code map

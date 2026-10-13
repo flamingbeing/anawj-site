@@ -1432,6 +1432,49 @@ function redo() {
 // Keyboard shortcuts (Cmd instead of Ctrl on a Mac), when not typing in a box. ? lists them.
 const SHORTCUTS = [['Ctrl+Z', 'Undo'], ['Ctrl+Y or Ctrl+Shift+Z', 'Redo'], ['Ctrl+S', 'Save the roster for the team (or download it)'],
   ['Alt+1 … Alt+4', 'Monthly, Cases, Roster, Premeds'], ['[ and ]', 'Previous and next day'], ['/', 'Filter names'], ['Esc', 'Close a box, or cancel Move or swap'], ['?', 'This list']];
+// The key: what the roster's marks and words mean, then short answers to "How do I…?", one open at a time.
+const SYMBOLS = [
+  ['&', 'Double covering: this senior has two rooms (a dark & on the Roster tab). Drag the & to give them another room.'],
+  ['Name (C)', 'Ad hoc cover: a junior from a nearby room covers this one (shown in red). Drag the C on a junior to add one.'],
+  ['C-OT13', 'Covers OT 13 when its person leaves early.'],
+  ['L-4pm', 'Leaves at 4pm (L-4-5pm: away 4 to 5pm).'],
+  ['(L)', 'Liver standby: kept off complex lists. On a junior with a Liver posting it is their posting.'],
+  ['(RA) (P) (SR)…', `A junior's posting this week: ${POSTINGS.filter(([k]) => k).map(([k, l]) => `${k} ${l}`).join(', ')}.`],
+  ['(AOH)', 'On the AOH list that day (AOH Monthly).'],
+  ['-mtg 3pm', 'A comment, also listed in the comments box.'],
+  ['Green name', 'Baby MO: a new MOPEX who is never left alone, so their senior doesn\'t double cover.'],
+  ['Purple name', 'Locum.'],
+  ['Red room', 'A remote case (outside the OT complexes).'],
+  ['Red name (Monthly)', 'Not matched to the staff list: use Fix names.'],
+  ['☾ and •', 'On a monthly roster: ☾ an overnight duty (post call the next day); • fills the calls and clinics on Today.'],
+  ['Subspec', 'A senior\'s subspecialty (Paeds, Cardiac, Neuro…). Some lists need one.'],
+  ['AOCC', 'One senior and two juniors, taken after the OT lists.'],
+  ['AIC', 'One consultant (SC or C), else a senior resident.'],
+  ['AH OT', 'Filled by hand.'],
+  ['MOT / SICU', 'The call teams at the top of the sheet (Calls and clinics).'],
+  ['Premed', 'A junior who wasn\'t around yesterday needs a premed cover (Premeds tab).'],
+];
+const HOW = [
+  ['make tomorrow\'s roster?', 'Cases › "Do it all" with the admin draft. It reads the rooms and leave, makes the roster and opens its problems. Fix those, then Download or Save for the team.'],
+  ['fix a problem?', 'Each problem on the Roster tab has a button: Take off, Fill empty gaps, Swap for someone suitable. Show finds the room.'],
+  ['move or swap two people?', 'Tap a name, then Move or swap, then tap the other name or an empty cell. With a mouse you can drag names.'],
+  ['say someone leaves early?', 'Tap their name: Leaving (L-), e.g. 4pm. If someone covers, put the room in their Covering (C-).'],
+  ['put someone on leave for several days?', 'Monthly › Today, tap them, pick Leave (or Admin) and set "Same until". Leave from the HMS leave roster comes in by itself.'],
+  ['take back a change?', 'Undo at the bottom, or Ctrl+Z. Everything can be undone until you change the date.'],
+  ['send it on WhatsApp?', 'Download › Image for WhatsApp (or Image in 2 parts, easier to read on a phone). After changes, "Send image with the changes" lists what moved.'],
+  ['see only my own day?', 'My day (footer): pick your name once. It shows your room, partner, cases, calls, and your week.'],
+  ['practise without touching the real roster?', 'Practice (top right) has made-up staff, a tour and a "Fix 3 problems" exercise.'],
+];
+function showKey() {
+  const dlg = h('dialog', { class: 'changes key' }, h('h2', {}, 'Key and help'),
+    h('table', { class: 'key-table' }, h('tbody', {}, SYMBOLS.map(([k, what]) => h('tr', {}, h('th', { scope: 'row' }, k), h('td', {}, what))))),
+    h('h3', {}, 'How do I…'),
+    h('div', { class: 'how' }, HOW.map(([q, a]) => h('details', { ontoggle: e => { if (e.target.open) dlg.querySelectorAll('.how details[open]').forEach(d => { if (d !== e.target) d.open = false; }); } },
+      h('summary', {}, '…' + q), h('p', {}, a)))),
+    h('div', { class: 'bar' }, h('button', { class: 'primary', onclick: () => { dlg.close(); dlg.remove(); } }, 'Close')));
+  dlg.addEventListener('close', () => dlg.remove());
+  document.body.append(dlg); dlg.showModal();
+}
 function showShortcuts() {
   const dlg = h('dialog', { class: 'changes' }, h('h2', {}, 'Keyboard shortcuts'),
     h('table', {}, h('tbody', {}, SHORTCUTS.map(([k, what]) => h('tr', {}, h('td', {}, h('kbd', {}, k)), h('td', {}, what))))),
@@ -3422,7 +3465,8 @@ function renderRoster() {
   }
   return h('div', {},
     h('section', { class: 'card' }, h('h2', {}, 'OT roster'), actions,
-      h('p', { class: 'hint', style: 'margin:0' }, 'Drag a name onto another name to swap them, or onto an empty part of a cell to move it there. Drag the C on a junior to add them to another room as an ad hoc cover, or the & on a senior to have them double cover another room (a dark & means they already are). × takes a name off. Click a name to see where they are and change its tags ((L), (RA), L-4pm, C-OT13…). + adds someone from the staff list. Click the case notes to edit them. Premed cover is on the Premeds tab.')),
+      h('p', { class: 'hint', style: 'margin:0' }, `${TOUCH ? 'Tap' : 'Click'} a name for its details and to move or swap it${TOUCH ? '' : ' (or drag it)'}; + adds someone, × takes them off. `,
+        h('button', { class: 'link', onclick: showKey }, 'What do &, C, (L) and the colours mean? How do I…?'))),
     h('div', { class: 'cols' },
       h('section', { class: 'card scroll' },
         h('table', { class: 'sheet roster-edit' },
@@ -4159,6 +4203,7 @@ document.getElementById('tourBtn')?.addEventListener('click', () => startTour())
 document.getElementById('allBtn')?.addEventListener('click', downloadEverything);
 addEventListener('hashchange', () => { if (location.hash === '#myday' && state.tab !== 'myday') { closeTagEditor(); state.tab = 'myday'; window.scrollTo(0, 0); render(); } });
 document.getElementById('keysBtn')?.addEventListener('click', showShortcuts);
+document.getElementById('keyBtn')?.addEventListener('click', showKey);
 // Phones: keep the bottom-sheet person box above the on-screen keyboard, and the field being typed in visible.
 if (window.visualViewport) {
   const fit = () => {

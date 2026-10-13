@@ -469,3 +469,9 @@ table.monthly td.gap input { border-style: dashed; border-color: var(--warn); ba
 .task-list li.ok { color: var(--ok); }
 .fix-names { border-top: 4px solid var(--warn, #8a5a00); }
 .fix-names td { padding: 4px 8px 4px 0; }
+.key-table th { text-align: left; white-space: nowrap; padding: 4px 12px 4px 0; vertical-align: top; color: var(--navy); }
+.key-table td { padding: 4px 0; }
+dialog.key { max-width: 640px; }
+.how details { border-bottom: 1px solid var(--line); padding: 6px 0; }
+.how summary { cursor: pointer; font-weight: 600; color: var(--navy); }
+.how p { margin: 6px 0 2px; }

@@ -126,6 +126,11 @@ ok(await cells() === 0, 'cleared');
 await page.click('#toast button:has-text("Undo")'); await page.waitForTimeout(400);
 ok(await cells() === full, 'Undo brings the month back');
 
+// Key and help: the marks and "How do I…?" answers
+await page.click('#keyBtn'); await page.waitForTimeout(200);
+ok((await page.$$('dialog .key-table tr')).length >= 15 && (await page.$$('dialog .how details')).length >= 8, 'key and help');
+await page.keyboard.press('Escape'); await page.waitForTimeout(150);
+
 // axe on every tab
 if (fs.existsSync(AXE)) {
   await page.addScriptTag({ path: AXE });
