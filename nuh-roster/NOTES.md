@@ -160,6 +160,10 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
   latest copy when they come back to the page (after a minute away) or press Check again, and lines that changed since
   they last looked are marked (what each person saw per date is kept in `nuh-roster-seen`, last 60).
 - Opening the app on a past date (not today) moves the roster to tomorrow, with a toast to go back.
+- My day also has: Add to calendar (an .ics file made in the browser, `js/ics.js`; no feed URL, nothing sent), My
+  week (the next 7 days: saved rosters, else leave and calls from the monthly rosters; viewers load the team's copies
+  only when they open it) with "Add the week to my calendar", and Copy for logbook on each room (date, room,
+  supervisor, case notes, to paste into the logbook's case summary; the apps stay separate).
 - **Phones:** the Roster tab shows one card per room (Senior, Junior, case notes) instead of the wide table, and the person box slides up from the bottom.
 - **Sending it out:** Download offers .xlsx, PDF, an image for WhatsApp (`js/pngout.js`, drawn from the same layout; shared through the phone's share sheet where it can be, else downloaded) and Print. Printing shrinks the sheet to fit one A4 page.
   A send counts only once it happened (a closed share sheet or a PDF that couldn't load doesn't). What went out is kept

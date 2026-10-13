@@ -9,6 +9,7 @@ import { buildLayout, COL_WIDTHS, shortName, doubleCovered, isDouble, TEAM_ROWS,
 import * as cloud from './cloud.js';
 import { buildRosterPdf } from './pdfout.js';
 import { buildRosterCanvas } from './pngout.js';
+import { buildIcs } from './ics.js';
 import { emptyRotations, postingOn, weekPosting, mondayOf, weeksOfYear, setWeeks, readRotationSheet, buildRotationWorkbook, POSTING_FILL } from './rotations.js';
 import { makeDemo, demoNotes, demoAdmin } from './demo.js';
 import { MONTHLY, monthlyDef, LEAVE_TYPES, NIGHT_DUTIES, monthIssues, cleanCell, daysIn, weekday, monthName, addDays, readMonthlyPdf, readMonthlyXlsx, buildMonthlyWorkbook, dutiesOn, generalFromMonthly, leaveOn } from './monthly.js';
@@ -2567,7 +2568,8 @@ function dayLines(p) {
       const cover = isCoverPart(part);
       const other = cellParts(row, key === 'senior' ? 'junior' : 'senior').filter(x => !isCoverPart(x)).map(x => shortOf(x)).join(' / ');
       const parsed = parseNamePart(part);
-      out.push([`${room}${cover ? ' (ad hoc cover)' : ''}`, [role, other ? `with ${other}` : '', row.notes ? `· ${row.notes}` : '', parsed.leave ? `· leaving ${parsed.leave}` : '', parsed.cover ? `· also covers ${parsed.cover}` : ''].filter(Boolean).join(' ')]);
+      out.push([`${room}${cover ? ' (ad hoc cover)' : ''}`, [role, other ? `with ${other}` : '', row.notes ? `· ${row.notes}` : '', parsed.leave ? `· leaving ${parsed.leave}` : '', parsed.cover ? `· also covers ${parsed.cover}` : ''].filter(Boolean).join(' '),
+        { room, role, with: other, notes: row.notes || '', senior: key === 'junior' ? other : '' }]);
     }
     for (const part of cellParts(row, 'premed')) if (personOfPart(part) === p) out.push([`Premed for ${room}`, row.notes || '']);
   }
@@ -2578,6 +2580,55 @@ function dayLines(p) {
   }
   if (d.comment) out.push(['Note', d.comment]);
   return out;
+}
+// What the roster says about p on another date: that date's saved day (this browser's, or the team's for a viewer),
+// else what the monthly rosters say (leave, calls, clinics). rec: { day, roster } or null.
+function linesOn(p, date, rec) {
+  const keep = [state.day, state.roster];
+  try {
+    state.day = rec?.day ? { ...rec.day, date } : { date, rooms: [], staff: {} };
+    state.roster = rec?.roster ? { ...rec.roster, date } : null;
+    if (!rec?.day) { const r = derivedFor(date).get(p.id); if (r?.status) state.day.staff[p.id] = { status: r.status, auto: r.why }; }
+    return dayLines(p);
+  } finally { [state.day, state.roster] = keep; }
+}
+const weekDates = from => Array.from({ length: 7 }, (_, i) => addDays(from, i));
+let weekOpen = false, weekRecs = {}; // date -> { day, roster } or null (viewers: from the cloud, loaded on asking)
+async function loadWeek() {
+  const dates = weekDates(realToday());
+  if (isViewer()) {
+    const got = await Promise.all(dates.map(d => weekRecs[d] !== undefined ? weekRecs[d] : cloud.loadRoster(d).catch(() => null)));
+    dates.forEach((d, i) => { weekRecs[d] = got[i]?.roster ? { day: got[i].day, roster: got[i].roster } : null; });
+  } else for (const d of dates) weekRecs[d] = d === state.day.date ? { day: state.day, roster: state.roster } : state.days?.[d] || null;
+  render();
+}
+// A day's lines as one calendar event: the room (or leave, a call) as the title, everything as the details.
+const eventOf = (p, date, lines) => lines.length ? { date, uid: `${date}-${p.id}@nuhroster.anawj.com`,
+  title: lines.map(l => l[0]).slice(0, 2).join(' + '), details: lines.map(l => l[1] ? `${l[0]}: ${l[1]}` : l[0]).join('\n') } : null;
+function downloadIcs(p, events, name) {
+  const list = events.filter(Boolean);
+  if (!list.length) return toast('Nothing on the roster to add yet.');
+  download(name, new Blob([buildIcs(list)], { type: 'text/calendar' }));
+  toast(`Calendar file downloaded (${list.length} day${list.length === 1 ? '' : 's'}). Open it to add to your calendar.`);
+}
+// For the logbook's case summary: the facts of one list, to paste (nothing is sent to the logbook).
+async function copyForLogbook(date, meta) {
+  const text = [`Date: ${longDate(date)}`, `Room: ${meta.room}`, meta.senior ? `Supervisor: ${meta.senior}` : meta.with ? `With: ${meta.with}` : '', meta.notes ? `Cases: ${meta.notes}` : ''].filter(Boolean).join('\n');
+  try { await navigator.clipboard.writeText(text); toast('Copied for the logbook: paste it into the case summary.'); }
+  catch { prompt('Copy this for the logbook:', text.replace(/\n/g, ' · ')); }
+}
+function weekCard(p) {
+  if (!weekOpen) return null;
+  const dates = weekDates(realToday());
+  if (!dates.every(d => d in weekRecs)) return h('p', { class: 'seen' }, 'Loading the week…');
+  const days = dates.map(d => ({ d, lines: linesOn(p, d, weekRecs[d]), out: !!weekRecs[d]?.roster }));
+  return h('div', { class: 'myweek' },
+    h('h3', {}, 'My week'),
+    h('ul', { class: 'myweek-list' }, days.map(x => h('li', {},
+      h('button', { class: 'link', onclick: () => switchDate(x.d) }, new Date(x.d + 'T12:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })),
+      ' ', x.lines.length ? x.lines.map(l => l[0]).join(' · ') : h('span', { class: 'seen' }, x.out ? 'not on the roster' : 'roster not out yet'),
+      !x.out && x.lines.length ? h('span', { class: 'seen' }, ' (from the monthly rosters)') : null))),
+    h('button', { class: 'small', onclick: () => downloadIcs(p, days.map(x => eventOf(p, x.d, x.lines)), `My week from ${realToday()}.ics`) }, 'Add the week to my calendar'));
 }
 function renderMyDay() {
   const p = myPerson();
@@ -2606,9 +2657,14 @@ function renderMyDay() {
       !p ? h('p', { class: 'hint' }, 'Pick your name once; this browser remembers it.')
         : !state.staff.length ? h('p', { class: 'hint' }, 'Loading the staff list…')
         : !r && !lines.length ? h('p', { class: 'empty' }, isViewer() && viewerFound === null ? 'Loading…' : `The roster for ${longDate(date)} isn't out yet.`)
-        : lines.length ? h('ul', { class: 'myday-list' }, lines.map(l => h('li', { class: changed.has(key(l)) ? 'changed' : null }, h('b', {}, l[0]), l[1] ? h('span', {}, ' ', l[1]) : null, changed.has(key(l)) ? h('span', { class: 'new-tag' }, ' changed') : null)))
+        : lines.length ? h('ul', { class: 'myday-list' }, lines.map(l => h('li', { class: changed.has(key(l)) ? 'changed' : null }, h('b', {}, l[0]), l[1] ? h('span', {}, ' ', l[1]) : null, changed.has(key(l)) ? h('span', { class: 'new-tag' }, ' changed') : null,
+          l[2]?.room ? h('button', { class: 'small logbook-copy', title: 'Date, room, supervisor and case notes, to paste into the logbook', onclick: () => copyForLogbook(date, l[2]) }, 'Copy for logbook') : null)))
         : h('p', { class: 'empty' }, `You're not on the roster for ${longDate(date)}.`),
       changed.size || gone.length ? h('p', { class: 'warn-note', role: 'status' }, `Changed since you last looked${gone.length ? ` (no longer: ${gone.join('; ')})` : ''}.`) : null,
+      p ? h('div', { class: 'bar myday-actions' },
+        lines.length ? h('button', { class: 'small', onclick: () => downloadIcs(p, [eventOf(p, date, lines)], `My day ${date}.ics`) }, 'Add to calendar') : null,
+        h('button', { class: 'small', 'aria-expanded': String(weekOpen), onclick: () => { weekOpen = !weekOpen; if (weekOpen) { weekRecs = {}; loadWeek(); } else render(); } }, weekOpen ? 'Hide my week' : 'My week')) : null,
+      p ? weekCard(p) : null,
       meta?.updatedAt && viewerFound ? h('p', { class: 'seen' }, `Saved by ${meta.updatedBy?.name || 'the rosterer'} at ${hhmm(meta.updatedAt)}${new Date(meta.updatedAt).toDateString() !== new Date().toDateString() ? `, ${longDate(isoDate(new Date(meta.updatedAt)))}` : ''}. `,
         h('button', { class: 'link', onclick: () => viewerLoad(date) }, 'Check again')) : null,
       p && r && postingOf(p) && p.role === 'junior' ? h('p', { class: 'seen' }, `Posting this week: ${postingName(postingOf(p))}`) : null,
