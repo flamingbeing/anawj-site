@@ -232,7 +232,7 @@ function pacuLinkHtml(p) {
 
 // Refresh now (owner, 13 Oct 2026): fetch the team's latest data again and look for a new app version
 let swReg = null, offerUpdate = null;
-const refreshHtml = () => `<div class="refreshbox"><button class="secondary" id="refreshnow">Refresh now</button><small class="muted">Gets the team’s latest data again, sends anything waiting, and checks for a new app version.</small><a class="link" href="../prewarm-update/">App still won’t update? Get the latest version</a></div>`;
+const refreshHtml = () => `<div class="refreshbox"><button class="secondary" id="refreshnow">Refresh now</button><small class="muted">Gets the team’s latest data again, sends anything waiting, and checks for a new app version. <span id="appver"></span></small><a class="link" href="../prewarm-update/">App still won’t update? Get the latest version</a></div>`;
 async function refreshNow(btn) {
   btn.disabled = true; const was = btn.textContent; btn.textContent = 'Refreshing…';
   let msg = 'Up to date.';
@@ -253,7 +253,11 @@ async function refreshNow(btn) {
   btn.disabled = false; btn.textContent = was; toast(msg);
   if (/^#\/(settings)?$/.test(location.hash) || !location.hash) render();
 }
-const wireRefresh = () => $('#refreshnow')?.addEventListener('click', e => refreshNow(e.target));
+// which app version this phone is running (the saved copy's name), so a phone stuck on an old one can be spotted
+const wireRefresh = () => {
+  $('#refreshnow')?.addEventListener('click', e => refreshNow(e.target));
+  const el = $('#appver'); if (el && window.caches) caches.keys().then(ks => { const k = ks.find(x => x.startsWith('prewarm-')); if (k && $('#appver')) $('#appver').textContent = 'App version ' + k.replace('prewarm-', ''); }).catch(() => {});
+};
 async function watch() {
   shared.unwatch?.(); shared.unwatch = null;
   for (const u of pacuSubs.values()) u?.(); pacuSubs.clear();
@@ -377,8 +381,13 @@ function colsFor(s, pt) {
     return true;
   });
 }
+// a timepoint with a time or a reading saved
+const hasData = (p, s, x) => Object.keys(p.f).some(k => (k === `at_${s}_${x.key}` || k.startsWith(`${s}_${x.key}_`)) && val(p, k) != null);
 function pointsFor(p, s) {
-  const pts = SERIES[s].points;
+  let pts = SERIES[s].points;
+  // read only (the section is marked complete, or data collection is): timepoints with no data are hidden, so no time is offered
+  // for logging (owner, 13 Oct 2026); a series with no data at all keeps its list
+  if (sealedBy(p, s)) { const seen = pts.filter(x => hasData(p, s, x)); if (seen.length) pts = seen; }
   if (s === 'haemo' && settings.hide.haemo15) return pts.filter(x => x.key === 'base' || p.f['at_haemo_' + x.key]);
   // once pre-warming is complete (ticked, or its last reading saved), the later 5-min points (past the 10 / 30 min of warming) aren't taken (owner, 13 Oct 2026)
   if (s === 'prewarm' && WARM_MIN[val(p, 'arm')] && (val(p, 'sign_prewarm') || p.f['at_prewarm_' + WARM_MIN[val(p, 'arm')]])) return pts.filter(x => x.min == null || x.min <= WARM_MIN[val(p, 'arm')] || p.f['at_prewarm_' + x.key]);
@@ -786,6 +795,8 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     const pick = cur && !savedAt(p, s, cur.x.key) ? cur.x : timed.find(t => t.d > now && !savedAt(p, s, t.x.key))?.x;
     key = (pick || open[0] || pts[pts.length - 1]).key;
   }
+  // a timepoint hidden because the section is read only and it has no data: open the default one instead
+  if (!pts.some(x => x.key === key)) key = (pts.find(x => !savedAt(p, s, x.key)) || pts[pts.length - 1]).key;
   const pt = def.points.find(x => x.key === key) || pts[0];
   const idx = def.points.indexOf(pt);
   const cols = colsFor(s, pt);
