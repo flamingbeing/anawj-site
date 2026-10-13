@@ -3,7 +3,7 @@
 // firestore.rules to people listed in the "members" collection.
 //
 // Data:
-//   members/{email}            { role: 'admin' | 'rosterer' | 'viewer', name } (viewers only read)
+//   members/{email}            { role: 'admin' | 'rosterer' | 'viewer', name, staffId? } (viewers only read)
 //   team/main                  { settings, staff, roomTemplate, updatedAt, updatedBy }
 //   rosters/{date}             { date, day, roster, updatedAt, updatedBy }
 //   rosters/{date}/versions/*  { day, roster, savedAt, savedBy }   (never changed once written)
@@ -203,9 +203,10 @@ export async function listMembers() {
   return snap.docs.map(d => ({ email: d.id, ...d.data() })).sort((a, b) => a.email.localeCompare(b.email));
 }
 
-export async function setMember(email, role, name = '') {
+// staffId: who this account is on the staff list (set by an admin), so My day doesn't have to guess from the name.
+export async function setMember(email, role, name = '', staffId = '') {
   const { db, F } = await sdk();
-  await F.setDoc(F.doc(db, 'members', email.trim().toLowerCase()), { role, name });
+  await F.setDoc(F.doc(db, 'members', email.trim().toLowerCase()), { role, name, ...(staffId ? { staffId } : {}) });
 }
 
 export async function removeMember(email) {

@@ -2710,10 +2710,19 @@ async function viewerLoad(date) {
   } catch (e) { cloudError(e); }
   render();
 }
+// Who "my" is: the staff record an admin linked to this account, else the name picked in this browser, else a guess
+// from the member's name (myPersonGuessed says so, so My day can ask to confirm).
+let myPersonGuessed = false;
 function myPerson() {
+  myPersonGuessed = false;
   let id = '';
   try { id = localStorage.getItem(ME_KEY) || ''; } catch { /* no storage */ }
-  return person(id) || (cs.member?.name ? matchName(cs.member.name, state.staff).person : null) || null;
+  const linked = cs.member?.staffId && person(cs.member.staffId);
+  if (linked) return linked;
+  if (person(id)) return person(id);
+  const guess = cs.member?.name ? matchName(cs.member.name, state.staff).person : null;
+  myPersonGuessed = !!guess;
+  return guess || null;
 }
 // Everything the roster says about p on the day on screen: [what, detail] lines.
 function dayLines(p) {
@@ -2794,8 +2803,10 @@ function weekCard(p) {
 function renderMyDay() {
   const p = myPerson();
   const date = state.day.date;
-  const pick = select(p?.id || '', [['', 'Pick your name…'], ...state.staff.slice().sort((a, b) => a.name.localeCompare(b.name)).map(x => [x.id, x.name])],
-    v => { try { localStorage.setItem(ME_KEY, v); } catch { /* no storage */ } render(); });
+  const linked = !!(cs.member?.staffId && person(cs.member.staffId));
+  const pick = linked ? h('span', { class: 'seen', title: 'An admin linked your account to this name (Settings › Team members)' }, 'your account')
+    : select(p?.id || '', [['', 'Pick your name…'], ...state.staff.slice().sort((a, b) => a.name.localeCompare(b.name)).map(x => [x.id, x.name])],
+      v => { try { localStorage.setItem(ME_KEY, v); } catch { /* no storage */ } render(); });
   const r = state.roster && state.roster.date === date ? state.roster : null;
   const lines = p ? dayLines(p) : [];
   const when = date === today() ? 'Tomorrow' : date === realToday() ? 'Today' : longDate(date);
@@ -2815,6 +2826,7 @@ function renderMyDay() {
     h('section', { class: 'card myday' },
       h('div', { class: 'section-head' }, h('h2', { style: 'margin:0' }, p ? `${when} for ${shortName(p) || p.name}` : 'My day'), h('span', { class: 'grow' }),
         pick),
+      p && myPersonGuessed ? h('p', { class: 'warn-note' }, `Matched to ${p.name} from your account's name. Not you? Pick your name above.`) : null,
       !p ? h('p', { class: 'hint' }, 'Pick your name once; this browser remembers it.')
         : !state.staff.length ? h('p', { class: 'hint' }, 'Loading the staff list…')
         : !r && !lines.length ? h('p', { class: 'empty' }, isViewer() && viewerFound === null ? 'Loading…' : `The roster for ${longDate(date)} isn't out yet.`)
@@ -4222,11 +4234,14 @@ function membersCard() {
     h('h2', {}, 'Team members'),
     h('p', { class: 'hint' }, 'Only these Google accounts can sign in and see the shared staff list and rosters. Admins can also manage this list.'),
     h('table', {},
-      h('thead', {}, h('tr', {}, ['Google email', 'Name', 'Role', ''].map(t => h('th', {}, t)))),
+      h('thead', {}, h('tr', {}, ['Google email', 'Name', 'On the staff list as', 'Role', ''].map(t => h('th', {}, t)))),
       h('tbody', {},
         list.map(m => h('tr', {},
           h('td', {}, m.email), h('td', {}, m.name || ''),
-          h('td', {}, select(m.role, ROLES, v => cloud.setMember(m.email, v, m.name || '').then(refresh, cloudError))),
+          // who they are on the staff list: My day uses this instead of guessing from the name
+          h('td', {}, select(m.staffId || '', [['', m.name && matchName(m.name, state.staff).person ? `(by name: ${matchName(m.name, state.staff).person.name})` : '—'], ...state.staff.slice().sort((a, b) => a.name.localeCompare(b.name)).map(p => [p.id, p.name])],
+            v => cloud.setMember(m.email, m.role, m.name || '', v).then(refresh, cloudError))),
+          h('td', {}, select(m.role, ROLES, v => cloud.setMember(m.email, v, m.name || '', m.staffId || '').then(refresh, cloudError))),
           h('td', {}, m.email === cs.user.email.toLowerCase() ? '' : h('button', { class: 'small', onclick: () => { if (confirm(`Remove ${m.email}?`)) cloud.removeMember(m.email).then(refresh, cloudError); } }, '✕')))),
         h('tr', {},
           h('td', {}, h('input', { type: 'email', placeholder: 'name@gmail.com', value: newMember.email, oninput: e => { newMember.email = e.target.value; } })),

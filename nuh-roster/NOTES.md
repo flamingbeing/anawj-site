@@ -159,6 +159,9 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
   It opens on today before 2pm and on tomorrow after (`MYDAY_SWITCH_HOUR`). Viewers see "Saved by … at …", get the
   latest copy when they come back to the page (after a minute away) or press Check again, and lines that changed since
   they last looked are marked (what each person saw per date is kept in `nuh-roster-seen`, last 60).
+- Who "me" is on My day: the staff record an admin links to the account (Settings › Team members › "On the staff list
+  as", saved as `members/{email}.staffId`), else the name picked in this browser, else a guess from the member's name,
+  which My day flags ("Matched to … Not you? Pick your name").
 - Opening the app on a past date (not today) moves the roster to tomorrow, with a toast to go back.
 - My day also has: Add to calendar (an .ics file made in the browser, `js/ics.js`; no feed URL, nothing sent), My
   week (the next 7 days: saved rosters, else leave and calls from the monthly rosters; viewers load the team's copies
