@@ -655,6 +655,7 @@ jobs.push(() => tryit(async () => {
   const seenD = []; pg.on('dialog', d => { seenD.push(d.message().slice(0, 60)); d.accept(d.type() === 'prompt' ? d.defaultValue() : undefined); });
   await pg.waitForTimeout(900); await pg.click('#save'); await pg.waitForTimeout(500);
   log(/prewarm\/10$/.test(await pg.evaluate(() => location.hash)) && !await sealed(), 'the 5 min save moves to 10 min and does not complete pre-warming: ' + JSON.stringify(seenD) + await pg.textContent('#toast').catch(() => '') + await pg.evaluate(() => location.hash));
+  log(await pg.$('.card.dflt [data-type="core"]') !== null, 'a value carried over from the last reading shows as a light grey default');
   await pg.click('.num[data-type="core"]'); await pg.waitForSelector('dialog.kp[open]'); await pg.click('.kp [data-k="3"]'); await pg.click('.kp [data-k="6"]'); await pg.click('.kp [data-k="6"]'); await pg.waitForTimeout(300);
   await pg.waitForTimeout(900); await pg.click('#save'); await pg.waitForTimeout(600);
   log(/\/iotemp/.test(await pg.evaluate(() => location.hash)) && await sealed(), 'the 10 min save marks pre-warming complete and opens the intra-op temps: ' + await pg.evaluate(() => location.hash));
