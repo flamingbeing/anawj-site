@@ -384,3 +384,19 @@ dialog.ask p { margin: 0 0 6px; }
 /* a section marked complete: read only until its tick is undone */
 .sealed .card, .sealed .fld, .sealed .tchip, .sealed table, .sealed .ixrow, .sealed #addix { opacity: .6; }
 .sealnote { margin: 4px 0; padding: 8px 12px; border-radius: var(--r); background: #e3f1e6; color: var(--ok); font-weight: 600; font-size: 14px; }
+
+/* quick-entry pad: a number pad / time pad popup (owner, 13 Oct 2026) */
+dialog.kp { border: 0; border-radius: var(--r-card); padding: 12px; width: min(360px, calc(100vw - 20px)); background: var(--card); color: var(--ink); box-shadow: 0 8px 30px rgba(0, 0, 0, .3); margin: auto auto 10px; }
+dialog.kp::backdrop { background: rgba(0, 0, 0, .4); }
+.kphead { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+.kphead small { color: var(--muted); }
+.kpin { width: 100%; box-sizing: border-box; text-align: center; font-size: 34px; font-weight: 700; min-height: 60px; border: 2px solid var(--navy); border-radius: var(--r); background: var(--card); color: var(--ink); }
+.kpin.bad { border-color: var(--err); background: #fde8e6; }
+.kpnow { display: flex; justify-content: center; gap: 10px; width: 100%; min-height: 52px; margin-bottom: 8px; border: 1px solid var(--navy); border-radius: var(--r); background: #e9eef6; color: var(--navy); font-size: 18px; font-weight: 600; align-items: center; cursor: pointer; }
+.kpgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 8px 0; }
+.kpgrid button { min-height: 58px; font-size: 26px; font-weight: 600; border: 1px solid var(--line-input); border-radius: var(--r); background: var(--card); color: var(--ink); cursor: pointer; touch-action: manipulation; }
+.kpgrid button:active { background: #e9eef6; }
+.kpbtns { display: flex; gap: 6px; }
+.kpbtns button { flex: 1; min-height: 50px; font-size: 16px; }
+.kpbtns .save { flex: 1.4; }
+.clock .next[role="button"] { cursor: pointer; }

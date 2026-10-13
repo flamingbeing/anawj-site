@@ -1,6 +1,7 @@
 // Prewarming study: op-day screens. Data stays on this phone for now (localStorage); sharing comes with Firebase.
 import { PAGES, SERIES, BY_ID, EXTRA_BY_ID, IX_COLS, SITES, calc, normaliseTemp, isShown } from './schema.js';
 import { newRecord, setVal, val, lastEdit, mergeRecord, isGone } from './store.js';
+import { openKeypad, closeKeypad } from './keypad.js';
 import { workbook } from './export.js';
 import * as cloud from './cloud.js';
 import { qrcode } from './vendor/qrcode.js';
@@ -328,6 +329,7 @@ let cleanup = [];
 // once answered: the phone's back button never walks out of the app past an unsaved reading.
 let leaveGuard = null, shown = location.hash, at = history.state?.i ?? 0, restoring = false;
 function render() {
+  closeKeypad();
   if (restoring && location.hash === shown) { restoring = false; return; }
   restoring = false;
   // a box still being typed in (swipe, phone back): let it commit first, so the leave check sees it and a form's
@@ -415,12 +417,12 @@ function askLeave(g, proceed) {
   d.querySelector('[data-a="save"]').focus();
 }
 $('#fresh').onclick = () => render();
-$('#banner').onclick = () => { $('#banner').hidden = true; };
+$('#banner').onclick = () => { $('#banner').hidden = true; const t = bannerTarget; bannerTarget = null; if (t) openTarget(t); };
 // the due banner floats over the top of the page, just under the bar: nothing moves under a finger as it appears
 // (it used to push the page down, so a tap meant for Save landed on another box); a tap on it only hides it
-let bannerTimer;
-function showBanner(text, ms) {
-  const b = $('#banner');
+let bannerTimer, bannerTarget = null;
+function showBanner(text, ms, target = null) {
+  const b = $('#banner'); bannerTarget = target;
   b.style.top = Math.max(0, $('header.bar').getBoundingClientRect().bottom) + 'px';
   b.textContent = text; b.hidden = false;
   clearTimeout(bannerTimer); bannerTimer = setTimeout(() => { b.hidden = true; }, ms);
@@ -549,7 +551,9 @@ const WARM_EVENTS = new Set(['pw_gown', 'pw_start', 'ev_wstop', 'io_under_start'
 const EVENT_FULL = { pw_gown: 'Gown on', ev_ot: 'In OT', pacu_in: 'PACU arrival', io_flip: 'Flipped prone', pw_start: 'Active warming started', ev_wstop: 'Active warming stopped', io_knife: 'Induction', io_under_start: 'Underbody Bair Hugger on',
   io_gown_start: 'Gown Bair Hugger on', io_done: 'Surgery completed (post-extubation)', pacu_out: 'Transfer to ward' };
 // Running timer and the next event to note, in the app bar of the patient screen
-const ESSENTIAL = ['pw_gown', 'pw_start', 'ev_wstop', 'ev_ot', 'io_knife', 'io_done', 'pacu_in', 'pacu_out'];
+// PACU in / To ward are logged on the PACU page (owner, 13 Oct 2026), so they are not in the key-times row or the Log button
+const ESSENTIAL = ['pw_gown', 'pw_start', 'ev_wstop', 'ev_ot', 'io_knife', 'io_done'];
+const PACU_TIMES = ['pacu_in', 'pacu_out'];
 const WARM_MIN = { 1: 30, 2: 10 };
 const mmss = m => { const sec = Math.max(0, Math.floor(m * 60)), h = Math.floor(sec / 3600), mm = Math.floor(sec / 60) % 60, ss = String(sec % 60).padStart(2, '0');
   return h ? `${h}:${String(mm).padStart(2, '0')}:${ss}` : `${mm}:${ss}`; };
@@ -560,7 +564,7 @@ function clockHtml(p, s) {
   let next = '';
   if (n) {
     const left = n.left, st = left > 2 ? 'later' : left > 0 ? 'soon' : left > -5 ? 'now' : 'late';
-    next = `<div class="next" data-state="${st}"><small>${esc(n.label)}</small><b>${left > 0 ? 'in ' + mmss(left) : left > -5 ? 'now' : 'late ' + mmss(-left)}</b></div>`;
+    next = `<div class="next" role="button" tabindex="0" aria-label="${esc(n.label)}: open it" data-state="${st}"><small>${esc(n.label)}</small><b>${left > 0 ? 'in ' + mmss(left) : left > -5 ? 'now' : 'late ' + mmss(-left)}</b></div>`;
   }
   return `${next}<div class="now"><small>Time now</small><b>${fromMin(Math.floor(nowMin()))}</b></div>`;
 }
@@ -571,7 +575,7 @@ function nextDue(p, s) {
   const other = duePick(p, s === 'haemo' ? defaultSeries(p) : 'haemo');
   if (other && other.left <= 0 && !(mine?.left <= 0)) all.push(other);
   const nx = nextEvent(p);
-  if (nx?.due != null) all.push({ label: nx.label, left: nx.due - nowFor(p, 'prewarm') });
+  if (nx?.due != null) all.push({ label: nx.label, left: nx.due - nowFor(p, 'prewarm'), target: { pid: p.id, ev: nx.id } });
   return all.sort((a, b) => a.left - b.left)[0] || null;
 }
 // the reading due most recently (until the next one is due), else the next one coming up
@@ -581,7 +585,7 @@ function duePick(p, s) {
   const timed = pointsFor(p, s).map(x => ({ x, due: dueOf(p, s, x) })).filter(t => t.due != null && expected(p, s, t.due)).sort((a, b) => a.due - b.due);
   const cur = timed.filter(t => t.due <= now).pop(), up = timed.find(t => t.due > now && !savedAt(p, s, t.x.key));
   const pick = cur && !savedAt(p, s, cur.x.key) ? cur : up;
-  return pick ? { label: (s === 'haemo' ? 'BP ' : 'Temp ') + pick.x.label, left: pick.due - now } : null;
+  return pick ? { label: (s === 'haemo' ? 'BP ' : 'Temp ') + pick.x.label, left: pick.due - now, target: { pid: p.id, s, key: pick.x.key } } : null;
 }
 // the next event to note: the first unset one after the last one set (warming off: when it is expected)
 function nextEvent(p) {
@@ -610,6 +614,10 @@ function topBar(p, s, onLog) {
     const ck = $('#clock'); if (ck) ck.innerHTML = clockHtml(p, s);
     const lb = $('#lognext'); if (lb) { const h = logBtnHtml(p); if (lb.innerHTML !== h) lb.innerHTML = h; lb.hidden = !h; }
   };
+  // the countdown opens what it counts down to: that reading's first box, or the key time's pad
+  const ckGo = () => { const n = nextDue(p, s); if (n?.target) openTarget(n.target); };
+  $('#clock').onclick = e => { if (e.target.closest('.next')) ckGo(); };
+  $('#clock').onkeydown = e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.closest('.next')) { e.preventDefault(); ckGo(); } };
   $('#lognext').onclick = () => {
     const nx = nextEvent(p); if (!nx) return;
     if (val(p, 'done')) return toast(sealedMsg(p, null));
@@ -623,6 +631,14 @@ function topBar(p, s, onLog) {
   write('opened', Object.fromEntries([...Object.entries(read('opened', {})).filter(([, t]) => Date.now() - t < 864e5), [p.id, Date.now()]]));
   startAlerts(p);
   return refresh;
+}
+let pendingOpen = null, openHere = null;
+// go to a reading (or a key time) and open its pad: the screen is reached first, then the pad opens on it
+function openTarget(t) {
+  const hash = t.ev || !t.s ? `#/p/${t.pid}` : `#/p/${t.pid}/${t.s}/${t.key}`;
+  if (openHere?.(t) === true) return;
+  pendingOpen = { ...t, at: Date.now() };
+  if (location.hash === hash) render(); else go(hash);
 }
 const defaultSeries = p => noWarming(p) || val(p, 'ev_ot') || val(p, 'io_knife') ? 'iotemp' : 'prewarm';
 route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s, key) => {
@@ -654,7 +670,6 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
   view.addEventListener('touchstart', swStart, { passive: true });
   view.addEventListener('touchend', swEnd, { passive: true });
   cleanup.push(() => { view.removeEventListener('touchstart', swStart); view.removeEventListener('touchend', swEnd); });
-  let editing = null; // event whose time is being changed
   let alive = true; cleanup.push(() => { alive = false; });
   let typing = null; // the BP / HR / BIS box with the keyboard up
   // default timepoint: the one due most recently while unsaved (until the next is due), else the next one coming up,
@@ -789,7 +804,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     if (s === 'haemo') {
       const last = c === cols[cols.length - 1];
       return `<div class="card typed ${changed ? 'changed' : ''}" data-k="${c.key}"><div class="clab"><span>${c.label}</span><small>${hint}</small></div>
-        <input class="num" id="in-${c.key}" data-in="${c.key}" inputmode="numeric" enterkeyhint="${last ? 'done' : 'next'}" autocomplete="off" aria-label="${c.label}" value="${esc(v ?? '')}"></div>`;
+        <input class="num" id="in-${c.key}" data-in="${c.key}" inputmode="none" enterkeyhint="${last ? 'done' : 'next'}" autocomplete="off" aria-label="${c.label}" value="${esc(v ?? '')}"></div>`;
     }
     // an empty temperature: the whole card is one big target that puts in 36.5
     const fill = (c.temp || c.key === 'room') && v == null;
@@ -798,9 +813,8 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
   }
   function timesHtml() {
     // numbered in the order they happen (owner, 12 Oct 2026)
-    return `<div class="times${val(p, 'done') ? ' sealed' : ''}">${EVENTS.filter(([, , pw]) => !(pw && noWarming(p))).map(([f, l], i) => {
+    return `<div class="times${val(p, 'done') ? ' sealed' : ''}">${EVENTS.filter(([f, , pw]) => !(pw && noWarming(p)) && !PACU_TIMES.includes(f)).map(([f, l], i) => {
       const v = val(p, f), full = EVENT_FULL[f] || l, n = `<i class="tn" aria-hidden="true">${i + 1}</i>`;
-      if (editing === f) return `<div class="tchip edit"><span>${i + 1}. ${l}</span><input type="time" id="evtime" value="${v === 'NA' ? '' : esc(v || '')}" aria-label="${full}"><button class="link" data-evclear="${f}">Clear</button></div>`;
       return `<button class="tchip ${v ? 'set' : ''}${WARM_EVENTS.has(f) ? ' warm' : ''}" data-ev="${f}" aria-label="${i + 1}, ${full}: ${v ? v + ', tap to change' : 'tap to set now'}">${n}<span>${l}</span><b>${v ? esc(v) : 'tap'}</b></button>`;
     }).join('')}</div>`;
   }
@@ -875,12 +889,50 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     refreshBar();
     disableSealed();
     fitNums();
-    if (editing) { const i = $('#evtime'); i?.focus(); }
     if (typing) { const i = view.querySelector(`[data-in="${typing}"]`); i?.focus(); }
     const st = view.querySelector('.strip'), on = st?.querySelector('.on');
     if (on) st.scrollLeft = on.offsetLeft - st.offsetLeft - (st.clientWidth - on.offsetWidth) / 2;
   }
+  // the quick-entry pads (owner, 13 Oct 2026): a number pad for a box, a time pad for a key time
+  function openCell(k) {
+    const c = cols.find(x => x.key === k); if (!c) return;
+    const i = cols.indexOf(c), nxt = s === 'haemo' ? cols[i + 1] : null;
+    openKeypad({ title: c.label + (c.unit ? ' ' + c.unit : ''), mode: s === 'haemo' ? 'int' : c.temp ? 'temp' : 'dec', value: draft[k] ?? '',
+      hint: was[k] != null ? 'was ' + was[k] : '',
+      onDone: v => { draft[k] = v === '' ? null : v; draw(); lockTaps(); },
+      onClear: () => { draft[k] = null; draw(); },
+      onNext: nxt ? v => { draft[k] = v === '' ? null : v; draw(); openCell(nxt.key); } : null, nextLabel: 'Next' });
+  }
+  function editTime(f) {
+    const had = !!val(p, f), label = EVENT_FULL[f] || evLabel(f);
+    openKeypad({ title: label, mode: 'time', value: had && val(p, f) !== 'NA' ? val(p, f) : '', nowValue: nowHM(), hint: had ? 'logged ' + val(p, f) : '',
+      onDone: v => {
+        if (v === '') return;
+        // logging one while an earlier key time is still empty asks first: a stray tap on Surgery end would otherwise
+        // stop the intra-op readings counting as due
+        if (!had) {
+          const skipped = skippedBefore(p, f);
+          if (skipped.length && !confirm(`${skipped.join(', ')} ${skipped.length === 1 ? 'isn’t' : 'aren’t'} logged yet.\n\nLog ${evLabel(f)} at ${v}?`)) return;
+        }
+        set(p, f, v); lockTaps(); draw();
+      },
+      onClear: () => {
+        if (!had) return;
+        if (!confirm(`Clear the ${evLabel(f)} time (${val(p, f)})?`)) return;
+        set(p, f, null); draw();
+      } });
+  }
+  // an alarm or the top-bar countdown opens its reading's first box straight away (owner, 13 Oct 2026)
+  // returns true when the target is on this screen (so no navigation, which would ask about an unsaved reading)
+  openHere = t => {
+    if (t.pid !== id) return false;
+    if (t.ev) { editTime(t.ev); return true; }
+    if (t.s === s && t.key === pt.key) { if (cols[0]) openCell(cols[0].key); return true; }
+    return false;
+  };
+  cleanup.push(() => { openHere = null; });
   draw();
+  if (pendingOpen && pendingOpen.pid === id && Date.now() - pendingOpen.at < 8000) { const t = pendingOpen; pendingOpen = null; setTimeout(() => openHere?.(t), 0); }
   if (restored) toast(`Unsaved ${pt.label} reading brought back. Check it, then Save.`);
   const step = { core: 0.1, chest: 0.1, arm: 0.1, thigh: 0.1, calf: 0.1, room: 0.5, sbp: 1, dbp: 1, map: 1, hr: 1, bis: 1 };
   // an empty box starts here with + / − or a tap on its card; skin temperature starts at 31 (owner, 13 Oct 2026)
@@ -921,42 +973,11 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     const se = t.closest('[data-satedit]');
     if (se) { satEdit = se.dataset.satedit; draw(); return; }
     const ev = t.closest('[data-ev]');
-    if (ev) {
-      // tap an empty time: now; tap a set one: change it. Logging one while an earlier key time is still empty
-      // asks first: a stray tap on Surgery end would otherwise stop the intra-op readings counting as due
-      if (!val(p, ev.dataset.ev)) {
-        const skipped = skippedBefore(p, ev.dataset.ev);
-        if (skipped.length && !confirm(`${skipped.join(', ')} ${skipped.length === 1 ? 'isn’t' : 'aren’t'} logged yet.\n\nLog ${evLabel(ev.dataset.ev)} now (${nowHM()})?`)) return;
-        set(p, ev.dataset.ev, nowHM()); lockTaps();
-      } else editing = ev.dataset.ev;
-      draw(); return;
-    }
-    const clr = t.closest('[data-evclear]');
-    if (clr) {
-      const id = clr.dataset.evclear;
-      if (val(p, id) && !confirm(`Clear the ${evLabel(id)} time (${val(p, id)})?`)) return;
-      set(p, id, null); editing = null; draw(); return;
-    }
+    if (ev) { editTime(ev.dataset.ev); return; }
     const n = t.closest('.num[data-type]');
-    if (n) {
-      const k = n.dataset.type, c = cols.find(x => x.key === k);
-      // one tap opens the box for typing, empty or not (owner, 13 Oct 2026: typing is used more than the arrows)
-      const inp = document.createElement('input');
-      inp.className = 'num'; inp.dataset.k = k; inp.inputMode = 'decimal'; inp.value = draft[k] ?? ''; inp.setAttribute('aria-label', c.label);
-      n.replaceWith(inp); inp.focus(); inp.select();
-      let ended = false; // removing the box on redraw fires blur again
-      const done = () => {
-        if (ended) return; ended = true;
-        const v = c.temp ? normaliseTemp(inp.value) : inp.value.trim(); draft[k] = v === '' ? null : v;
-        // the number goes back in place now and the screen redraws a moment later: redrawing at once swapped the
-        // buttons under a finger already on its way to Save, + or ›, and that first tap was lost
-        const b = document.createElement('button'); b.className = 'num'; b.dataset.type = k; b.textContent = draft[k] ?? 'tap';
-        if (inp.isConnected) { inp.replaceWith(b); fitNums(); }
-        setTimeout(() => { if (alive) draw(); }, 400);
-      };
-      inp.onblur = done; inp.onkeydown = ev => { if (ev.key === 'Enter') inp.blur(); };
-      return;
-    }
+    if (n) { openCell(n.dataset.type); return; }
+    const tc = t.closest('.card.typed');
+    if (tc) { openCell(tc.dataset.k); return; }
     if (t.closest('[data-attime]')) {
       const v = askTime(`What time was the ${pt.label} reading taken?`, savedAt(p, s, pt.key));
       if (v) { set(p, `at_${s}_${pt.key}`, v); draw(); }
@@ -994,14 +1015,6 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     if (t.closest('#resetsub')) { resetSubject(p); return; }
     signoffClick(p, s, t);
   };
-  view.onchange = e => {
-    if (e.target.id !== 'evtime' || !editing) return;
-    // an emptied picker doesn't clear the time (that's the Clear button, which asks) and keeps the editor open
-    // (typing a time on a keyboard fires change with an empty value at the first digit)
-    if (!e.target.value) return;
-    set(p, editing, e.target.value);
-    editing = null; draw();
-  };
   // typed boxes (BP, HR, BIS): no redraw while typing, so moving to the next box keeps the keyboard up
   view.onfocusin = e => { if (e.target.dataset.in) typing = e.target.dataset.in; };
   view.oninput = e => {
@@ -1021,8 +1034,8 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
   };
   view.onfocusout = e => {
     if (e.target.dataset.in) setTimeout(() => { if (!view.querySelector('[data-in]:focus')) typing = null; }, 0);
-    if (e.target.id === 'evtime') setTimeout(() => { if (editing && !view.contains(document.activeElement)) { editing = null; draw(); } }, 0); };
-  cleanup.push(() => { view.onchange = view.onfocusout = view.onfocusin = view.oninput = view.onkeydown = null; });
+  };
+  cleanup.push(() => { view.onfocusout = view.onfocusin = view.oninput = view.onkeydown = null; });
   // the due time warms up as it nears the clock: soon (2 min), now (to 5 min past), late; plain once saved
   const dueTick = () => {
     const el = $('#due'); if (!el) return;
@@ -1060,18 +1073,18 @@ function startAlerts(p) {
   document.addEventListener('visibilitychange', awake);
   const iv = setInterval(() => {
     // everything falling due this second goes in one banner, with one buzz / beep
-    const due = [];
+    const due = []; let target = null;
     // other patients only if opened on this phone today (not a teammate's patient in another theatre)
     const opened = read('opened', {});
     const others = Object.values(patients).filter(q => q.id !== p?.id && charting(q) && Date.now() - (opened[q.id] || 0) < 12 * 3600e3);
     for (const q of p ? [p, ...others] : others) {
       const pre = q === p ? '' : sid(q) + ': ';
-      const hit = (tag, msg) => { if (alerted.has(tag)) return; alerted.add(tag); due.push(pre + msg); };
+      const hit = (tag, msg, to) => { if (alerted.has(tag)) return; alerted.add(tag); due.push(pre + msg); target ||= to; };
       // stopping the warming on time matters as much as a reading: Prewarm off due alerts too
       const nx = nextEvent(q);
       if (nx?.id === 'ev_wstop' && nx.due != null) {
         const now = nowFor(q, 'prewarm');
-        if (now >= nx.due && now <= nx.due + 5) hit(q.id + 'ev_wstop' + val(q, 'pw_start'), `Prewarm off due now (${WARM_MIN[val(q, 'arm')]} min of warming): tap Log`);
+        if (now >= nx.due && now <= nx.due + 5) hit(q.id + 'ev_wstop' + val(q, 'pw_start'), `Prewarm off due now (${WARM_MIN[val(q, 'arm')]} min of warming): tap Log`, { pid: q.id, ev: 'ev_wstop' });
       }
       // BP, HR, BIS alarm only when switched on in Settings (owner, 13 Oct 2026; off by default): their due time
       // still shows in the top bar and on the tab
@@ -1081,13 +1094,13 @@ function startAlerts(p) {
         for (const x of pointsFor(q, s)) {
           const d = dueOf(q, s, x), tag = q.id + s + x.key + (val(q, SERIES[s].ref[0]) || '');
           if (d == null || !expected(q, s, d) || savedAt(q, s, x.key) || now < d || now > d + 5) continue;
-          hit(tag, `${s === 'haemo' ? 'BP, HR, BIS' : 'Temperature'} ${x.label} reading due now`);
+          hit(tag, `${s === 'haemo' ? 'BP, HR, BIS' : 'Temperature'} ${x.label} reading due now`, { pid: q.id, s, key: x.key });
         }
       }
     }
     if (!due.length) return;
     write('alerted', [...alerted].slice(-200));
-    if (settings.remind.banner) showBanner(due.join(' · ') + ' (tap to hide)', 15000);
+    if (settings.remind.banner) showBanner(due.join(' · ') + ' (tap to open)', 15000, target);
     if (settings.remind.vibrate && navigator.vibrate) navigator.vibrate([300, 150, 300]);
     if (settings.remind.beep) beep();
   }, 1000);
@@ -1151,6 +1164,8 @@ function gaps(p) {
   const last = evs.reduce((i, id, j) => get(id) ? j : i, -1);
   const label = id => EVENTS.find(([f]) => f === id)[1].replace('\u00ad', '');
   add('Times not logged', evs.slice(0, last).filter(id => !get(id)).map(label), '#/p/' + p.id);
+  // PACU in / To ward are logged on the PACU page once surgery has ended
+  if (get('io_done')) add('PACU times not logged', PACU_TIMES.filter(id => !get(id)).map(label), `#/p/${p.id}/form/pacu`);
   // key times going backwards (more than a few minutes; past midnight counts forward): usually a mistyped time
   const logged = evs.filter(id => toMin(get(id)) != null);
   add('Times out of order', logged.slice(1).map((id, k) => [logged[k], id]).filter(([a, b]) => {
@@ -1379,15 +1394,15 @@ function formPage(id, pg, back) {
     if (e.target.closest('.sealed') && e.target.closest('button')) return toast(sealedMsg(p, pg));
     const pe = e.target.closest('[data-pev]');
     if (pe) {
-      const f = pe.dataset.pev, label = f === 'pacu_in' ? 'PACU in' : 'To ward';
-      if (!get(f)) {
-        if (f === 'pacu_out' && !get('pacu_in') && !confirm('PACU in isn’t logged yet. Log To ward now anyway?')) return;
-        set(p, f, nowHM()); toast(`${label} ${get(f)}. Tap it to change.`); lockTaps();
-      } else {
-        const v = askTime(`${label} time`, get(f));
-        if (v) set(p, f, v);
-      }
-      draw(); return;
+      const f = pe.dataset.pev, label = f === 'pacu_in' ? 'PACU in' : 'To ward', had = !!get(f);
+      openKeypad({ title: label, mode: 'time', value: get(f) || '', nowValue: nowHM(), hint: had ? 'logged ' + get(f) : '',
+        onDone: v => {
+          if (v === '') return;
+          if (f === 'pacu_out' && !get('pacu_in') && !had && !confirm('PACU in isn’t logged yet. Log To ward anyway?')) return;
+          set(p, f, v); lockTaps(); draw();
+        },
+        onClear: () => { if (!had || !confirm(`Clear the ${label} time (${get(f)})?`)) return; set(p, f, null); draw(); } });
+      return;
     }
     const rm = e.target.closest('[data-rmix]');
     if (rm && !confirm('Remove this investigation result?')) return;

@@ -26,7 +26,9 @@ await Promise.all(['1', '2', '3'].map(async ARM => {
   const pid = pg.url().match(/#\/p\/(\w+)/)[1];
   const adv = async m => { await pg.clock.fastForward(m * 60000); await pg.waitForTimeout(80); };
   const log = async () => { await pg.goto(`${BASE}?demo#/p/${pid}`); await pg.waitForSelector('#lognext'); const t = (await pg.textContent('#lognext')).trim(); await pg.click('#lognext'); await pg.waitForTimeout(100); return t; };
-  const tapEv = async id => { await pg.goto(`${BASE}?demo#/p/${pid}`); await pg.waitForSelector('.times'); await pg.click(`[data-ev="${id}"]`); await pg.waitForTimeout(100); };
+  const tapEv = async id => { await pg.goto(`${BASE}?demo#/p/${pid}`); await pg.waitForSelector('.times'); await pg.click(`[data-ev="${id}"]`); await pg.click('.kp [data-now]'); await pg.waitForTimeout(100); };
+  // PACU in / To ward are logged on the PACU page (owner, 13 Oct 2026)
+  const pacuTime = async (id, label) => { await pg.goto(`${BASE}?demo#/p/${pid}/form/pacu`); await pg.waitForSelector('#f-pacu_temp'); await pg.click(`[data-pev="${id}"]`); await pg.click('.kp [data-now]'); await pg.waitForTimeout(800); return label; }; // the tap guard ignores taps near the last one for 0.7 s
   async function temps(series, key) {
     await pg.goto(`${BASE}?demo#/p/${pid}/${series}/${key}`); await pg.waitForSelector('#save');
     for (const c of ['core', 'chest', 'arm', 'thigh', 'calf', 'room']) if (await pg.$(`.card[data-fill="${c}"]`)) await pg.click(`.card[data-fill="${c}"] .clab`);
@@ -68,7 +70,7 @@ await Promise.all(['1', '2', '3'].map(async ARM => {
   await pg.fill('#f-io_ebl', '200'); await pg.keyboard.press('Tab');
   for (const f of ['io_cs', 'io_pcc', 'io_txa', 'io_fib']) await pg.click(`.chip[data-f="${f}"][data-v="0"]`);
   for (const k of ['rbc', 'plt', 'ffp', 'cryo']) { await pg.fill(`input[data-f="io_${k}"]`, '0'); await pg.keyboard.press('Tab'); }
-  await adv(10); steps.push(await log()); // PACU in
+  await adv(10); steps.push(await pacuTime('pacu_in', 'PACU in'));
   await pg.goto(`${BASE}?demo#/p/${pid}/form/pacu`); await pg.waitForSelector('#f-pacu_temp');
   await pg.fill('#f-pacu_temp', '36.4'); await pg.keyboard.press('Tab');
   for (const f of ['pacu_shiver', 'pacu_ponv', 'pacu_hypot', 'pacu_tx', 'pacu_delay']) await pg.click(`.chip[data-f="${f}"][data-v="0"]`);
@@ -77,7 +79,7 @@ await Promise.all(['1', '2', '3'].map(async ARM => {
   await pg.goto(`${BASE}?demo#/p/${pid}`); await pg.waitForSelector('.times');
   await pg.click('.chip[data-sat="sat_pre"][data-v="1"]'); await pg.waitForTimeout(100);
   await pg.click('.chip[data-sat="sat_post"][data-v="1"]'); await pg.waitForTimeout(100);
-  await adv(60); steps.push(await log()); // to ward
+  await adv(60); steps.push(await pacuTime('pacu_out', 'To ward'));
   await pg.goto(`${BASE}?demo#/p/${pid}`); await pg.waitForSelector('.times'); await pg.waitForTimeout(1500);
 
   await pg.goto(`${BASE}?demo#/p/${pid}`); await pg.waitForSelector('.times'); await pg.waitForTimeout(1500);
