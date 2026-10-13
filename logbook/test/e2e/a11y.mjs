@@ -82,6 +82,7 @@ const SCREENS = [
   ['Note settings', hash('notesset'), false],
   ['Daily note on the Logbook', async p => {
     await hash('logbook')(p);
+    await p.locator('main .seg button', { hasText: /^Calendar$/ }).first().click();   // an earlier screen left the list on
     await p.locator('.lb-calbar').getByRole('button', { name: 'Today', exact: true }).click();
     await p.getByRole('button', { name: '+ Daily note' }).click();
     await p.getByLabel('Note text').fill('Fake day\n- [ ] fake to-do\n*fake italic*');
