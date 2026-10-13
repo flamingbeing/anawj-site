@@ -85,6 +85,7 @@ code{font-size:13px;background:var(--inset);padding:2px 4px;word-break:break-all
     <button id="mBrowse" aria-pressed="false">Browse</button><button id="mEdit" aria-pressed="true">Edit</button>
   </div>
   <button id="review"><span class="wide">Changes </span>(<span id="count">0</span>)</button>
+  <button id="share" aria-label="Share this page for comments">Share</button>
   <button id="send" class="primary">Send</button>
 </div>
 <div class="hint" id="hint" role="status"></div>
@@ -117,6 +118,14 @@ code{font-size:13px;background:var(--inset);padding:2px 4px;word-break:break-all
   <p class="muted">Saved in this browser until you send them. Changes on every page are sent together.</p>
   <div class="list" id="list"></div>
   <div class="row"><button id="clearAll">Clear all</button><button id="listClose" class="primary">Close</button></div>
+</dialog>
+
+<dialog id="shareDlg">
+  <h2>Share this page for comments</h2>
+  <p class="muted">Colleagues scan this to open the editor on this page and suggest changes from their own phones.</p>
+  <div id="qr" style="width:min(240px,70vw);margin:8px auto"></div>
+  <p style="text-align:center;overflow-wrap:anywhere"><code id="shareLink"></code></p>
+  <div class="row"><button id="shareCopy">Copy link</button><button id="shareClose" class="primary">Close</button></div>
 </dialog>
 
 <dialog id="sendDlg">
@@ -251,6 +260,17 @@ code{font-size:13px;background:var(--inset);padding:2px 4px;word-break:break-all
     $('live').innerHTML = 'This page lives at its own address too: <a target="_blank" rel="noopener"></a> opens it with a feedback button, for commenting on the real thing.';
     $('live').querySelector('a').href = url; $('live').querySelector('a').textContent = new URL(url).host + new URL(url).pathname;
   }
+
+  // ---- sharing: a QR code of the short address (edit.anawj.com/<page> opens this editor on that page)
+  $('share').onclick = async () => {
+    const link = 'https://edit.anawj.com' + (pageOf() || '/') + viewOf();
+    $('shareLink').textContent = link; $('qr').textContent = ''; $('shareCopy').textContent = 'Copy link';
+    $('shareDlg').showModal();
+    try { const { qrSvg } = await import('/feedback/qr.js'); $('qr').appendChild(qrSvg(link, 'QR code of the link to this page in the editor')); }
+    catch (e) { $('qr').textContent = 'QR code unavailable: use Copy link.'; }
+    $('shareCopy').onclick = () => { try { navigator.clipboard.writeText(link).catch(() => {}); } catch (e) {} $('shareCopy').textContent = 'Copied'; };
+  };
+  $('shareClose').onclick = () => $('shareDlg').close();
 
   // ---- choosing what was tapped
   const BLOCK = 'h1,h2,h3,h4,h5,h6,p,li,dt,dd,td,th,caption,figcaption,blockquote,summary,label,button,a,img,svg,figure,video,canvas,pre';

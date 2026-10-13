@@ -99,6 +99,7 @@
     </div>
     <div class="row" id="cmp" hidden><a id="cmpNow" target="_blank" rel="noopener">How it is now</a><a id="cmpPr" target="_blank" rel="noopener">What this PR changes</a></div>
     <div class="row"><button id="mBug">Something’s wrong</button></div>
+    <div class="row"><button id="mShare">Share this page</button></div>
     <div class="row"><button id="mList">Comments (<span id="count">0</span>)</button><button id="mSend">Send</button></div>
     <div class="row"><button id="mSide">Move button</button><button id="mOff">Turn off</button><button id="mClose">Close</button></div>
   </div>
@@ -111,6 +112,13 @@
     <label class="check"><input type="checkbox" id="optOptions"> <span>Show me 2–3 versions to choose from</span></label>
     <label class="check"><input type="checkbox" id="optEverywhere"> <span>Change this everywhere it appears</span></label>
     <div class="row"><button id="noteCancel">Cancel</button><button class="primary" id="noteSave">Save</button></div>
+  </div>
+  <div class="sheet" id="share" hidden role="dialog" aria-label="Share this page">
+    <h2>Share this page</h2>
+    <p class="muted" id="shareHow"></p>
+    <div id="qr" style="width:min(240px,70vw);margin:8px auto"></div>
+    <p class="muted" id="shareLink" style="overflow-wrap:anywhere;text-align:center"></p>
+    <div class="row"><button id="shareCopy">Copy link</button><button id="shareClose" class="primary">Close</button></div>
   </div>
   <div class="sheet" id="list" hidden role="dialog" aria-label="Comments">
     <h2>Comments waiting to be sent</h2>
@@ -131,7 +139,7 @@
     <div class="row"><button id="sent">I’ve sent them: clear my list</button><button id="sendClose">Close</button></div>
   </div>`;
   const $ = id => root.getElementById(id);
-  const sheets = ['menu', 'note', 'list', 'send'];
+  const sheets = ['menu', 'note', 'list', 'send', 'share'];
   const show = id => sheets.forEach(s => { $(s).hidden = s !== id; });
   (document.body || document.documentElement).appendChild(hostEl);
 
@@ -362,6 +370,20 @@
     document.cookie = 'anawj-feedback=; Path=/; Max-Age=0; Secure; SameSite=Lax';
     hostEl.remove();
   };
+  // a QR code of this page (with the button on), for colleagues to look and comment on their own phones
+  $('mShare').onclick = async () => {
+    const u = new URL(location.href);
+    if (!PREVIEW) u.searchParams.set('feedback', '1');
+    u.searchParams.delete('variant');
+    const link = u.href;
+    $('shareHow').textContent = PREVIEW ? 'Colleagues scan this to see this preview and comment on it with the 💬 button.' : 'Colleagues scan this to open this page with the 💬 button switched on.';
+    $('shareLink').textContent = link; $('qr').textContent = '';
+    show('share');
+    try { const { qrSvg } = await import('/feedback/qr.js'); $('qr').appendChild(qrSvg(link, 'QR code of the link to this page')); }
+    catch (e) { $('qr').textContent = 'QR code unavailable here: use Copy link.'; }
+    $('shareCopy').onclick = () => { try { navigator.clipboard.writeText(link).catch(() => {}); } catch (e) {} $('shareCopy').textContent = 'Copied'; };
+  };
+  $('shareClose').onclick = () => show(null);
   $('mList').onclick = () => {
     const box = $('items'); box.innerHTML = '';
     if (!items.length) box.innerHTML = '<p class="muted">No comments yet.</p>';

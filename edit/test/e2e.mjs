@@ -27,6 +27,12 @@ try {
   const frame = page.frameLocator('#frame');
   await frame.locator('p').first().waitFor();
   assert.ok(await page.isHidden('#live'), 'no subdomain link for a page on anawj.com');
+  // Share: a QR code of the short address that opens the editor on this page
+  await page.click('#share');
+  await page.locator('#qr svg path').waitFor();
+  assert.equal(await page.textContent('#shareLink'), 'https://edit.anawj.com/privacy/');
+  if (process.env.SHOTS) await page.screenshot({ path: path.join(process.env.SHOTS, 'edit-share.png') });
+  await page.click('#shareClose');
   // the comment dialog offers speaking (where the browser can) and the two options
   await frame.locator('p').first().click();
   await page.click('#aComment');
