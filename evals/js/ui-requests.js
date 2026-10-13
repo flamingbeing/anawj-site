@@ -160,7 +160,7 @@ export function renderRequestDetail(ev) {
   const nudge = () => act(async () => {
     const next = await save({ chasedAt: Date.now() });
     Object.assign(ev, next);
-    await shareEval(ev);
+    await shareEval(ev, { reminder: true });
     return next;
   });
 

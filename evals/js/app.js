@@ -72,6 +72,11 @@ function paintTabs() {
       h('span', { class: 'e-tab__label' }, t.label));
   }));
   tabsEl.hidden = !S.user || !hasRole() || tabs.length < 2;
+  // the home-screen icon's badge (installed app, where supported): what needs you, as on the tabs
+  try {
+    const total = tabs.reduce((n, t) => n + (t.badge ? t.badge() : 0), 0);
+    if (navigator.setAppBadge) (total ? navigator.setAppBadge(total) : navigator.clearAppBadge()).catch(() => {});
+  } catch {}
   document.body.classList.toggle('e-nonav', tabsEl.hidden || !!(ROUTES[S.route] && ROUTES[S.route].bare));
 }
 

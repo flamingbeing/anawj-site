@@ -188,13 +188,16 @@ async function copyText(text) {
 }
 
 // Share via the phone's share sheet (form type, item and link only: no patient details).
-export async function shareEval(ev) {
+// { reminder: true } words it as a gentle reminder (Remind assessor).
+export const reminderShareText = ev => `Gentle reminder: could you complete this ${toolLabel(ev.tool)} for me when you have a moment? ${ev.itemText || ''}`.trim();
+export async function shareEval(ev, { reminder = false } = {}) {
   const url = evalLink(ev.id, ev.assessorEmail);
+  const text = reminder ? reminderShareText(ev) : shareText(ev);
   if (navigator.share) {
-    try { await navigator.share({ title: `${toolLabel(ev.tool)} request`, text: shareText(ev), url }); return true; }
+    try { await navigator.share({ title: `${toolLabel(ev.tool)} ${reminder ? 'reminder' : 'request'}`, text, url }); return true; }
     catch (err) { if (err && err.name === 'AbortError') return false; }
   }
-  await copyText(shareText(ev) + '\n' + url);
+  await copyText(text + '\n' + url);
   return true;
 }
 

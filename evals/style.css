@@ -599,3 +599,4 @@ body { background: var(--e-bg-group); }
 /* sign-in help: in-app browsers, wrong account */
 .e-inapp, .e-wrongacct { border-left: 4px solid var(--e-warn); text-align: left; }
 .e-inapp .e-actions, .e-wrongacct .e-actions { justify-content: flex-start; }
+.e-remind { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }

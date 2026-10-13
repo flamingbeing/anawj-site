@@ -138,8 +138,8 @@ function overdueByAssessor(overdue, now) {
     h('span', { class: 'e-row__body' },
       h('span', { class: 'e-row__title' }, facName(g.email)),
       h('span', { class: 'e-row__meta' }, `${g.evs.length} waiting · oldest ${fmtAgo(sentAt(g.evs[0]), now)}`),
-      h('span', { class: 'e-row__meta' }, g.evs.map(nameOf).filter((v, i, a) => a.indexOf(v) === i).join(', '))),
-    h('button', { class: 'n-btn n-btn--outline e-btn-quiet e-btn-small', type: 'button', onclick: () => copyReminder(facName(g.email), g.evs, now) }, 'Copy reminder')))));
+      h('span', { class: 'e-row__meta' }, g.evs.map(nameOf).filter((v, i, a) => a.indexOf(v) === i).join(', ')),
+      reminderButtons(g.email, facName(g.email), g.evs, now))))));
   return card;
 }
 
@@ -148,8 +148,20 @@ export function reminderText(name, evs, now = Date.now(), url = location.origin 
   return `Dear ${name},\n\nYou have ${evs.length} evaluation${evs.length === 1 ? '' : 's'} waiting in APMES Evals:\n${lines.join('\n')}\n\n`
     + `Please complete them, or tap “I can’t assess this”, here: ${url}\n\nThank you.`;
 }
-async function copyReminder(name, evs, now) {
-  const text = reminderText(name, evs, now);
+// Send a reminder the way people actually read them: email (to the address on file) or WhatsApp
+// (pick the contact), or copy it. The link names the account (?as=) so sign-in suggests it.
+const pendingLink = email => location.origin + location.pathname + (email && email !== '?' ? '?as=' + encodeURIComponent(email) : '') + '#pending';
+function reminderButtons(email, name, evs, now) {
+  const text = () => reminderText(name, evs, now, pendingLink(email));
+  const subject = `APMES Evals: ${evs.length} evaluation${evs.length === 1 ? '' : 's'} waiting`;
+  const btn = 'n-btn n-btn--outline e-btn-quiet e-btn-small';
+  return h('span', { class: 'e-remind' },
+    email && email !== '?' ? h('a', { class: btn, href: `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(text())}` }, 'Email') : null,
+    h('a', { class: btn, href: 'https://wa.me/?text=' + encodeURIComponent(text()), target: '_blank', rel: 'noopener' }, 'WhatsApp'),
+    h('button', { class: btn, type: 'button', onclick: () => copyReminder(name, evs, now, pendingLink(email)) }, 'Copy'));
+}
+async function copyReminder(name, evs, now, url) {
+  const text = reminderText(name, evs, now, url);
   try { await navigator.clipboard.writeText(text); toast('Reminder copied'); }
   catch {
     // no clipboard permission: show it to copy by hand
