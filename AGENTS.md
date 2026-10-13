@@ -31,7 +31,12 @@ Rules that bite:
   A new Firestore-backed app needs a matrix entry and paths filter in the workflow, and the owner grants that
   service account Firebase Rules Admin on the new project.
 - `evals/js/catalogue.js` and `evals/js/forms.js` are generated. Edit `apmes/` (the transcribed APMES documents) or `evals/tools/build-data.mjs`, then run `node evals/tools/build-data.mjs`.
-- Changing any file in an app's `sw.js` SHELL list means bumping that app's `VERSION`.
+- Don't bump an app's `sw.js` `VERSION` by hand: the deploy stamps it with a hash of the app's files
+  (`tools/stamp-versions.mjs`, run by `.github/workflows/pages.yml`), so PRs leave `sw.js` alone unless its code
+  changes. Change the base (`logbook-v40`) only when the service worker's own logic changes.
+- One repo, one PR number sequence for every app: start PR titles with the app ("Logbook: …", "Prewarm: …"); a
+  workflow labels each PR by the folders it touches (`.github/labeler.yml`), so filter the PR list by label. Outside
+  an app's own files, write PRs as `#295 (logbook)`.
 
 Before merging, run:
 
@@ -73,7 +78,7 @@ now, what waits on the owner, the agreed next steps, recently merged PRs and a d
 - Read the app's `STATUS.md` (then `NOTES.md`) before starting work, and after any context compaction.
 - Update it when a task finishes, a decision is made, before compacting and before a session ends: the
   [save-state skill](.agents/skills/save-state/SKILL.md) (`/save-state` in Claude Code, `$save-state` in Codex).
-- Edit only your own session's line under "Now". Lasting rules and lessons go in `NOTES.md` (or here, if they apply
+- Edit only your own session's file under "Now" (`<app>/status/<session>.md`). Lasting rules and lessons go in `NOTES.md` (or here, if they apply
   to the whole repo).
 
 ## PR previews

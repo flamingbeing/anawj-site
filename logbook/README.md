@@ -92,7 +92,7 @@ The old data is the Google Form responses workbook (tabs **Case** and **AY20xx T
 - `js/cloud.js`: sign-in and Firestore (Firebase JS SDK 10.12.2 from gstatic, offline cache on). Writes return once queued locally, so saving works without signal; a write the server later rejects is reported through `onSyncError`.
 - `js/demo-backend.js`: the `?demo` stand-in for `cloud.js` (localStorage, fake admin `demo@example.com`).
 - `js/app.js`: boot, sign-in, tabs, service worker. Each screen is in `js/ui-*.js` (`ui-core.js` holds shared state and helpers).
-- `sw.js`: offline app shell (cache-first). **Bump `VERSION` in `sw.js` whenever any file changes**, otherwise installed phones keep the old copy; with a new version the app shows "Update available — Reload".
+- `sw.js`: offline app shell (cache-first). Its `VERSION` is stamped at deploy with a hash of the SHELL files (`tools/stamp-versions.mjs`), so installed phones get the new copy; with a new version the app shows "Update available — Reload".
 - `firestore.rules`: access rules for the whole project, logbook and evaluations (deployed automatically on merge to `main`).
 
 ## Tests

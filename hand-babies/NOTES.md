@@ -19,7 +19,7 @@ Lasting decisions for `hand-babies/`. Status and next steps: `STATUS.md`.
 
 Network first: online, every visit gets the current files; the cache is only used offline or when the network takes
 over 3 s. No "Update available" bar (owner, 13 Oct 2026: "why is this still here"). A new version still activates
-itself (`skipWaiting` in install); never go back to waiting for a tap (on a phone the tap did nothing, 12 Oct 2026). Bump `VERSION` in `sw.js` whenever a SHELL file changes.
+itself (`skipWaiting` in install); never go back to waiting for a tap (on a phone the tap did nothing, 12 Oct 2026). No hand bump of `VERSION`: the deploy stamps it with a hash of the SHELL files (`tools/stamp-versions.mjs`; AGENTS.md).
 
 ## Content rules
 

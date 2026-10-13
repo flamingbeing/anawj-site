@@ -1,22 +1,17 @@
 # Logbook status
 
 Short and current: what is happening now, what waits on the owner, what is next, and the decisions made along the way.
-Lasting rules and lessons go in `NOTES.md`; finished work leaves "Recently done" after a few PRs (git history keeps it).
-Each session edits only its own line under **Now**. Update this file when a task finishes, a decision is made, or
+Lasting rules and lessons go in `NOTES.md`. "Recently done" is updated at save-state only, not in every PR (the PR
+list, filtered by the app's label, has the rest).
+Each session edits only its own file under `status/` (see **Now**). Update this file when a task finishes, a decision is made, or
 before compacting (`/save-state` in Claude Code, `$save-state` in Codex).
 
 Last updated: 2026-10-13 by Claude Code, Logbook 1 (log1).
 
 ## Now
 
-- **Claude Code, Logbook 1 (log1)** (branch `claude/clever-gates-pm6sas`, no open PR): idle, nothing half-done. The
-  polish batch is finished (PRs 1–5, #264, 6a #289, 6b #295; full suite and a11y green on main).
-- **Claude Code, Logbook 3 (log3)** (branch `ccr-2994049c-4e5tlt`): idle, nothing half-done. Still signed in to the
-  Firebase CLI (usage counts only; each use needs the owner's OK). Owns the axe check, PR previews and the Codex /
-  Firebase plugin setup.
-- **Claude Code, Logbook 2 (log2)** (branch `ccr-afac5e7a-99esax`): Faculty / PCs profile PR (rules: active faculty
-  read summaries). Codex plugin and Firebase CLI signed in, both unused (each use needs the owner's OK).
-- **Codex**: no open logbook task (handed its remaining batch to Claude on #163).
+Each session keeps its own line in `status/<session>.md` (`log1.md`, `log2.md`, `log3.md`, `codex.md`; a new session adds
+its own file), so sessions never edit the same lines. Read them all before starting; edit only yours.
 
 ## Waiting on the owner
 

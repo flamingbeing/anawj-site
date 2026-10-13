@@ -247,4 +247,4 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   start a run (it happened with #196); check Actions, and touch the rules file in a later PR if it didn't run.
 - **Testing sharing:** `tools/test-rules.sh` (rules, 52 checks) and `tools/test-prewarm-sync.sh` (two phones in a
   browser against the local Firestore and Auth emulators, `?emulator` on localhost only). Never the live project.
-- Changing any file in `sw.js` SHELL means bumping `VERSION`.
+- No hand bump of `VERSION`: the deploy stamps it with a hash of the SHELL files (`tools/stamp-versions.mjs`; AGENTS.md).

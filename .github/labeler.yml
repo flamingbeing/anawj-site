@@ -1,0 +1,20 @@
+# Labels each PR with the app(s) it touches (.github/workflows/label-prs.yml), so the shared PR numbers can be
+# filtered by app. "site" is everything shared: the home page, the editor, design tokens, tools, instructions.
+logbook:
+  - changed-files:
+      - any-glob-to-any-file: 'logbook/**'
+evals:
+  - changed-files:
+      - any-glob-to-any-file: ['evals/**', 'apmes/**']
+nuh-roster:
+  - changed-files:
+      - any-glob-to-any-file: 'nuh-roster/**'
+prewarm:
+  - changed-files:
+      - any-glob-to-any-file: 'prewarm/**'
+hand-babies:
+  - changed-files:
+      - any-glob-to-any-file: ['hand-babies/**', 'hand/**']
+site:
+  - changed-files:
+      - any-glob-to-any-file: ['*', 'edit/**', 'design/**', 'tools/**', 'privacy/**', 'cmcj/**', '.github/**', '.agents/**', '.claude/**']
