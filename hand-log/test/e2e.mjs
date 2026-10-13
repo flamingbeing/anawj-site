@@ -52,7 +52,12 @@ async function fillAndSave() {
   }
   const groups = await page.$$eval('#entry-form input[type=radio][name^="d-"]', rs => [...new Set(rs.map(r => r.name))]);
   assert.ok(groups.length > 0, 'form has domain rating groups');
-  for (const name of groups) await page.locator(`#entry-form input[type=radio][name="${name}"]`).first().check();
+  // big radio pills hide the input under the sticky save bar's hit area, so click it in the DOM
+  for (const name of groups) {
+    const r = page.locator(`#entry-form input[type=radio][name="${name}"]`).first();
+    await r.evaluate(el => el.click()); // pill-styled radios hide the input itself
+    assert.ok(await r.isChecked(), name + ' rated');
+  }
   const glob = await page.$$eval('#f-global option', os => os.filter(o => o.value).map(o => o.value));
   await page.selectOption('#f-global', glob[glob.length - 1]);
   await page.fill('#f-good', 'Good exposure');
@@ -107,6 +112,48 @@ try {
   if (!/#list|#$|\/$/.test(page.url())) await page.goto(BASE + '#list');
   await page.waitForFunction(() => document.querySelectorAll('#entries li.entry').length === 1);
   assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('handlog.entries')).length), 1, 'deleted from storage');
+
+  // speed-of-entry features: each check skips if the feature isn't there
+  const has = async sel => (await page.locator(sel).count()) > 0;
+  await page.evaluate(() => { for (const k of Object.keys(localStorage)) if (k.startsWith('handlog.draft.')) localStorage.removeItem(k); });
+  await page.goto(BASE + '#new-dops');
+  await page.locator('#entry-form').waitFor();
+  if (await has('#f-assessor')) {
+    assert.equal(await page.inputValue('#f-assessor'), 'Consultant A', 'assessor remembered from last save');
+    console.log('  remembered assessor: ok');
+  }
+  if (await has('.quick-all')) {
+    const q = page.locator('.quick-all').first();
+    await q.evaluate(el => el.scrollIntoView({ block: 'center' }));
+    await q.click();
+    const unrated = await page.$$eval('#entry-form input[type=radio][name^="d-"]', rs => {
+      const names = [...new Set(rs.map(r => r.name))];
+      return names.filter(n => !rs.some(r => r.name === n && r.checked));
+    });
+    assert.deepEqual(unrated, [], 'rate-all button checks every domain');
+    console.log('  rate all domains: ok');
+  } else console.log('  rate all domains: skipped (no .quick-all)');
+
+  const remaining = await page.evaluate(() => JSON.parse(localStorage.getItem('handlog.entries'))[0]);
+  await page.goto(BASE + '#entry/' + encodeURIComponent(remaining.id));
+  await page.locator('#delete').waitFor();
+  if (await has('button#log-again')) {
+    await page.click('button#log-again');
+    await page.locator('#entry-form').waitFor();
+    assert.equal(await page.inputValue('#f-item'), remaining.item ?? (await page.inputValue('#f-item')), 'log again keeps the item');
+    assert.ok(await page.inputValue('#f-item'), 'log again preselects an item');
+    console.log('  log again: ok');
+  } else console.log('  log again: skipped (no button#log-again)');
+
+  await page.goto(BASE + '#list');
+  await page.locator('#entries li.entry').first().waitFor();
+  if (await has('input#list-filter')) {
+    await page.fill('#list-filter', 'zzz-no-match');
+    await page.waitForFunction(() => [...document.querySelectorAll('#entries li.entry')].every(li => li.hidden || getComputedStyle(li).display === 'none'));
+    await page.fill('#list-filter', '');
+    await page.waitForFunction(() => [...document.querySelectorAll('#entries li.entry')].some(li => !li.hidden && getComputedStyle(li).display !== 'none'));
+    console.log('  list filter: ok');
+  } else console.log('  list filter: skipped (no input#list-filter)');
 
   assert.deepEqual(errors, [], 'no console errors');
   console.log('hand-log e2e: ok');

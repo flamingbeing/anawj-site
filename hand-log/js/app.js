@@ -37,8 +37,34 @@ const itemName = (e) => {
 };
 const domainsOf = (type) => (FORMS[type] && FORMS[type].domains) || [];
 
+// Tappable phrase chips under each feedback box (speed of entry); added once.
+const PHRASES = {
+  'f-good': ['Safe tissue handling', 'Good knowledge of anatomy', 'Clear consent', 'Efficient', 'Good exposure'],
+  'f-improve': ['Tourniquet time awareness', 'Knot tying', 'Plan before incision', 'Documentation', 'Haemostasis'],
+  'f-action': ['Repeat with supervision', 'Read on zone II anatomy', 'Practise on sawbones', 'Re-assess in 1 month'],
+};
+function addPhraseChips() {
+  for (const [id, list] of Object.entries(PHRASES)) {
+    const ta = $(id);
+    if (!ta || (ta.nextElementSibling && ta.nextElementSibling.classList.contains('chips'))) continue;
+    const row = el('div', { class: 'chips' });
+    for (const p of list) {
+      const b = el('button', { type: 'button', class: 'chip', textContent: p });
+      b.addEventListener('click', () => {
+        const v = ta.value.trim();
+        ta.value = v ? v + '; ' + p : p;
+        ta.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+      row.append(b);
+    }
+    ta.after(row);
+  }
+}
+
 // ---------- form ----------
 let formType = 'dops';
+const LAST_KEY = 'handlog.last';
+let prefill = null;
 function buildForm(type) {
   formType = type;
   const form = $('entry-form');
@@ -46,11 +72,30 @@ function buildForm(type) {
   $('form-error').textContent = '';
   $('form-title').textContent = 'New ' + ((FORMS[type] && FORMS[type].title) || TYPE_LABEL[type]);
   $('f-date').value = today();
+  // Prefill assessor, setting and complexity from the last saved entry (speed of entry).
+  try {
+    const last = JSON.parse(localStorage.getItem(LAST_KEY) || 'null');
+    if (last && typeof last === 'object') {
+      if (typeof last.assessor === 'string') $('f-assessor').value = last.assessor;
+      for (const k of ['setting', 'complexity']) {
+        const s = $('f-' + k);
+        if (typeof last[k] === 'string' && [...s.options].some((o) => o.value === last[k])) s.value = last[k];
+      }
+    }
+  } catch { /* ignore */ }
   $('f-item-label').textContent = type === 'dops' ? 'Procedure' : 'Clinical presentation';
 
   const item = $('f-item');
   item.replaceChildren(el('option', { value: '', textContent: 'Choose…' }));
   const src = type === 'dops' ? PROCEDURES : CASES;
+  // "Recent": up to 5 distinct items of this form type, most recently logged first.
+  const recent = [];
+  for (const e of load().filter((x) => x && x.type === type).sort((a, b) => (b.created || '').localeCompare(a.created || ''))) {
+    const p = src.find((x) => x.id === e.item);
+    if (p && !recent.includes(p)) recent.push(p);
+    if (recent.length >= 5) break;
+  }
+  if (recent.length) item.append(el('optgroup', { label: 'Recent' }, ...recent.map((p) => el('option', { value: p.id, textContent: p.name }))));
   const groups = new Map();
   for (const p of src) {
     const opt = el('option', { value: p.id, textContent: p.name });
@@ -62,9 +107,47 @@ function buildForm(type) {
 
   const g = $('f-global');
   g.replaceChildren(el('option', { value: '', textContent: 'Choose…' }), ...RATING.map((r) => el('option', { value: String(r.value), textContent: `${r.value} ${r.label}` })));
+  // Suggest the global rating from the domain ratings until the user picks one themselves.
+  g.dataset.manual = '';
+  let gHint = $('f-global-hint');
+  if (!gHint) { gHint = el('p', { id: 'f-global-hint', class: 'small hint' }); g.insertAdjacentElement('afterend', gHint); }
+  gHint.textContent = '';
+  gHint.hidden = true;
+  if (!form.dataset.globalSuggest) {
+    form.dataset.globalSuggest = '1';
+    form.addEventListener('change', (ev) => {
+      const t = ev.target;
+      const gs = $('f-global');
+      const h = $('f-global-hint');
+      if (t === gs) { gs.dataset.manual = '1'; if (h) h.hidden = true; return; }
+      if (!t || !t.name || !t.name.startsWith('d-') || gs.dataset.manual) return;
+      const nums = [...form.querySelectorAll('input[type="radio"][name^="d-"]:checked')]
+        .map((i) => Number(i.value)).filter((n) => Number.isFinite(n)).sort((a, b) => a - b);
+      if (!nums.length) return;
+      const m = nums.length >> 1;
+      const median = nums.length % 2 ? nums[m] : (nums[m - 1] + nums[m]) / 2;
+      gs.value = String(Math.round(median));
+      if (h && gs.value) { h.textContent = 'Suggested from domain ratings; change if needed.'; h.hidden = false; }
+    });
+  }
 
   const box = $('domains');
   box.replaceChildren();
+  const quick = el('div', { class: 'quick-all-row' }, el('span', { class: 'small', textContent: 'Rate all domains:' }));
+  for (const r of RATING) {
+    const b = el('button', { type: 'button', class: 'quick-all', title: r.label, textContent: String(r.value) });
+    b.addEventListener('click', () => {
+      for (const dd of domainsOf(type)) {
+        const inp = box.querySelector(`input[name="d-${dd.id}"][value="${String(r.value)}"]`);
+        if (inp) inp.checked = true;
+      }
+      // fire from a radio so the global-rating suggestion and draft autosave see it
+      const any = box.querySelector(`input[name^="d-"][value="${String(r.value)}"]`);
+      if (any) any.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    quick.append(b);
+  }
+  box.append(quick);
   for (const d of domainsOf(type)) {
     const name = 'd-' + d.id;
     const fs = el('fieldset', {}, el('legend', { textContent: d.label }));
@@ -77,7 +160,51 @@ function buildForm(type) {
     fs.append(scale);
     box.append(fs);
   }
+  addPhraseChips();
+  // "Log another like this": preselect item, setting, complexity once, then clear.
+  if (prefill && prefill.type === type) {
+    $('f-item').value = prefill.item || '';
+    $('f-setting').value = prefill.setting || '';
+    $('f-complexity').value = prefill.complexity || '';
+  }
+  prefill = null;
+  restoreDraft(type);
 }
+
+// ---------- draft autosave (keeps a half-filled form if the phone locks) ----------
+const draftKey = (type) => 'handlog.draft.' + type;
+let draftTimer = null;
+function readDraft(type) {
+  try { const d = JSON.parse(localStorage.getItem(draftKey(type)) || 'null'); return d && typeof d === 'object' ? d : null; } catch { return null; }
+}
+function clearDraft(type) {
+  clearTimeout(draftTimer); draftTimer = null;
+  try { localStorage.removeItem(draftKey(type)); } catch { /* storage blocked */ }
+}
+function saveDraft() {
+  const form = $('entry-form');
+  const data = {};
+  for (const f of form.querySelectorAll('input[id^="f-"], select[id^="f-"], textarea[id^="f-"]')) data[f.id] = f.value;
+  for (const r of form.querySelectorAll('input[type="radio"][name^="d-"]:checked')) data[r.name] = r.value;
+  try { localStorage.setItem(draftKey(formType), JSON.stringify(data)); } catch { /* storage full or blocked */ }
+}
+function restoreDraft(type) {
+  const form = $('entry-form');
+  const old = document.getElementById('draft-note');
+  if (old) old.remove();
+  const d = readDraft(type);
+  if (!d) return;
+  for (const [k, v] of Object.entries(d)) {
+    if (typeof v !== 'string') continue;
+    if (k.startsWith('f-')) { const f = document.getElementById(k); if (f && form.contains(f) && 'value' in f) f.value = v; }
+    else if (k.startsWith('d-')) { const r = [...form.querySelectorAll('input[type="radio"]')].find((x) => x.name === k && x.value === v); if (r) r.checked = true; }
+  }
+  const btn = el('button', { type: 'button', class: 'secondary', textContent: 'Discard draft' });
+  btn.addEventListener('click', () => { clearDraft(type); buildForm(type); });
+  form.prepend(el('p', { id: 'draft-note', class: 'small hint' }, 'Draft restored ', btn));
+}
+$('entry-form').addEventListener('input', () => { clearTimeout(draftTimer); draftTimer = setTimeout(saveDraft, 300); });
+$('entry-form').addEventListener('change', () => { clearTimeout(draftTimer); draftTimer = setTimeout(saveDraft, 300); });
 
 $('entry-form').addEventListener('submit', (ev) => {
   ev.preventDefault();
@@ -100,6 +227,8 @@ $('entry-form').addEventListener('submit', (ev) => {
   };
   const list = load(); list.push(entry);
   if (!save(list)) { err.textContent = 'Could not save on this device (storage full or blocked).'; return; }
+  clearDraft(formType);
+  try { localStorage.setItem(LAST_KEY, JSON.stringify({ assessor: entry.assessor, setting: entry.setting, complexity: entry.complexity })); } catch { /* ignore */ }
   location.hash = '#list';
 });
 
@@ -113,7 +242,13 @@ function renderList() {
       el('span', { class: 'item', textContent: itemName(e) }),
       el('span', { class: 'meta', textContent: `${e.date} · ${TYPE_LABEL[e.type] || e.type}` }),
       el('span', { class: 'rating', textContent: e.global !== '' && e.global != null ? 'Global ' + e.global : '' })))));
+  applyListFilter();
 }
+function applyListFilter() {
+  const q = ($('list-filter')?.value || '').trim().toLowerCase();
+  for (const li of $('entries').querySelectorAll('li.entry')) li.hidden = !!q && !li.textContent.toLowerCase().includes(q);
+}
+$('list-filter')?.addEventListener('input', applyListFilter);
 
 // ---------- detail ----------
 let current = null;
@@ -127,6 +262,16 @@ function renderEntry(id) {
   for (const d of domainsOf(e.type)) rows.push([d.label, e.domains?.[d.id] === 'n/a' ? 'n/a' : ratingLabel(e.domains?.[d.id])]);
   rows.push(['Global rating', ratingLabel(e.global)], ['What went well', e.good], ['To improve', e.improve], ['Agreed action', e.action]);
   dl.replaceChildren(...rows.flatMap(([k, v]) => [el('dt', { textContent: k }), el('dd', { textContent: v || '—' })]));
+  let again = $('log-again');
+  if (!again) {
+    again = el('button', { type: 'button', id: 'log-again', class: 'btn', textContent: 'Log another like this' });
+    $('export-one').before(again);
+    again.addEventListener('click', () => {
+      if (!current) return;
+      prefill = { type: current.type, item: current.item, setting: current.setting, complexity: current.complexity };
+      location.hash = current.type === 'minicex' ? '#new-minicex' : '#new-dops';
+    });
+  }
 }
 $('delete').addEventListener('click', () => {
   if (!current || !confirm('Delete this entry? This cannot be undone.')) return;

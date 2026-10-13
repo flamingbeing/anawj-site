@@ -15,6 +15,16 @@ Evaluation Exercise) assessments on their phone. Static app: no sign-in, no serv
 - Phone first (390 px), NUHS-style top band and tokens from `../nuhsdesign/tokens.css`, `noindex` meta, offline via
   `sw.js` (network first; VERSION is stamped on deploy, don't bump it by hand).
 
+## Speed of entry (13 Oct 2026)
+
+- Remembers last assessor, setting and complexity (`handlog.last`); recent procedures in a "Recent" optgroup.
+- "Rate all domains" buttons (`.quick-all`), auto-suggested global rating, big radio pills, sticky Save bar.
+- Draft autosave per form (`handlog.draft.<type>`) with "Discard draft".
+- "Log another like this" (`#log-again`) on an entry; big add buttons and a filter box (`#list-filter`) on the list.
+- Feedback phrase chips (`.chip`) under each feedback box.
+- Test note: the pill styling hides the radio input where the sticky bar takes the click, so `test/e2e.mjs` clicks
+  radios in the DOM; each feature check skips if its element is missing.
+
 ## Files
 
 `index.html`, `style.css`, `js/app.js` (hash routes `#list`, `#new-dops`, `#new-minicex`, `#entry/<id>`, `#summary`),

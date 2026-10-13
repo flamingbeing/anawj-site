@@ -47,3 +47,33 @@ fieldset .hint { margin: 0 0 6px; }
 .detail dt { font-weight: 600; color: var(--navy); margin-top: 8px; }
 .detail dd { margin: 0; white-space: pre-wrap; }
 .counts { padding-left: 20px; }
+.quick-all-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 12px; }
+.quick-all { min-height: 44px; min-width: 44px; padding: 0 16px; border: 1px solid var(--navy, #002f6c); border-radius: 999px; background: transparent; color: var(--navy, #002f6c); font: inherit; font-weight: 600; cursor: pointer; }
+.quick-all:focus-visible { outline: 3px solid var(--navy, #002f6c); outline-offset: 2px; }
+
+/* Phrase chips under feedback boxes */
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.chip { min-height: 36px; padding: 6px 12px; border-radius: 18px; border: 1px solid #c9d3e3; background: #eef3fa; color: #002f6c; font: inherit; font-size: 0.9rem; cursor: pointer; }
+.chip:hover { background: #dfe8f5; }
+.chip:focus-visible { outline: 2px solid #002f6c; outline-offset: 2px; }
+
+/* Phone usability (390px): tappable rating pills, sticky Save, no iOS zoom */
+input, select, textarea { font-size: 16px; }
+.scale { gap: 8px; }
+.scale label { position: relative; min-height: 44px; padding: 8px 14px; border: 1px solid #8a8f96; background: #fff; color: var(--ink); font-size: 1rem; user-select: none; -webkit-tap-highlight-color: transparent; }
+.scale label input { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; pointer-events: none; }
+.scale label:hover { border-color: var(--navy); }
+.scale label:has(input:checked) { background: var(--navy); border-color: var(--navy); color: #fff; }
+.scale input:checked + span { color: #fff; font-weight: 700; }
+.scale label:has(input:focus-visible) { outline: 3px solid var(--navy); outline-offset: 2px; }
+#entry-form > button[type=submit] { position: sticky; bottom: 0; z-index: 5; display: block; width: 100%; min-height: 52px; margin: 8px 0 0; border-radius: 6px; padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px)); box-shadow: 0 -6px 12px rgba(255,255,255,.9); }
+#entry-form > button[type=submit]:focus-visible { outline: 3px solid var(--navy); outline-offset: 2px; box-shadow: 0 0 0 2px #fff, 0 -6px 12px rgba(255,255,255,.9); }
+
+/* List screen: big add buttons and search */
+.big-add-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 8px 0 12px; }
+.big-add { display: flex; align-items: center; justify-content: center; min-height: 56px; border-radius: 10px; color: #fff; font-weight: 700; font-size: 1.2rem; text-decoration: none; }
+.big-add:first-child { background: #002f6c; }
+.big-add:last-child { background: #178fd7; }
+.big-add:focus-visible { outline: 3px solid #002f6c; outline-offset: 2px; }
+#list-filter { width: 100%; min-height: 44px; margin-bottom: 10px; font: inherit; box-sizing: border-box; }
+.visually-hidden { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
