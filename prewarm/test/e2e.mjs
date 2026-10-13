@@ -69,9 +69,11 @@ try {
   // the 0-min reading is due now: the banner floats over the top of the page (nothing moves) and hides on a tap
   await page.waitForSelector('#banner:not([hidden])');
   assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('#banner')).position), 'fixed');
-  // a tap on the alarm opens its reading's first box (owner, 13 Oct 2026); Back closes the pad without a change
-  await page.click('#banner'); await page.waitForSelector('dialog.kp[open]');
-  assert.match(await page.textContent('.kp .kphead'), /Core/, 'tapping the alarm opens the first box of the reading');
+  // a tap on the alarm goes to the reading's screen but does not open a pad (owner, 13 Oct 2026); the countdown does
+  await page.click('#banner'); await page.waitForTimeout(400);
+  assert.equal(await page.$('dialog.kp[open]'), null, 'tapping the alarm opens no pad');
+  await page.click('#clock .next'); await page.waitForSelector('dialog.kp[open]');
+  assert.match(await page.textContent('.kp .kphead'), /Core/, 'tapping the countdown opens the first box of the reading');
   await axe('keypad'); await shot('keypad');
   await page.click('.kp [data-a="back"]'); await page.waitForTimeout(300);
   // the app bar's Log button sets the next event to now (then cleared again from its box)
