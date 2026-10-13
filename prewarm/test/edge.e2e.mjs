@@ -6,6 +6,8 @@ const b = await chromium.launch();
 const fails = [];
 const tryit = async f => { try { await f(); } catch (e) { fails.push('error: ' + e.message.split('\n')[0] + ' @ ' + (e.stack.match(/edge.e2e.mjs:(\d+)/)?.[1] || '?')); } };
 const log = (ok, msg) => { if (!ok) fails.push(msg); };
+// a key time: tap its box, then Now on the time pad (the pad also takes typed digits and has Clear and Back)
+const tapNow = async (pg, id) => { await pg.click(`[data-ev="${id}"]`); await pg.click('.kp [data-now]'); };
 // each block below starts from its own fresh browser context, so they run a few at a time (JOBS, default 4)
 const jobs = [];
 async function runJobs(n = +(process.env.JOBS || 4)) {
@@ -41,7 +43,7 @@ jobs.push(() => tryit(async () => {
 jobs.push(() => tryit(async () => {
   const { ctx, pg } = await fresh();
   await open(pg, 1);
-  await pg.click('[data-ev="io_done"]'); await pg.waitForTimeout(300);
+  await tapNow(pg, 'io_done'); await pg.waitForTimeout(300);
   const end = await pg.textContent('[data-ev="io_done"] b');
   log(!!end.match(/\d\d:\d\d/), 'surgery end set');
   log(!/late \d+:\d\d:\d\d/.test(await pg.textContent('#clock')), 'top bar sane after surgery end');
@@ -120,7 +122,7 @@ jobs.push(() => tryit(async () => {
 jobs.push(() => tryit(async () => {
   const { ctx, pg } = await fresh();
   await open(pg, 0);
-  await pg.click('#haemolink'); await pg.click('a.widebox'); await pg.waitForSelector('details.sect');
+  await pg.click('#haemolink'); await pg.click('.links.three a:has-text("Pre-op")'); await pg.waitForSelector('details.sect');
   const last = pg.locator('details.sect').last().locator('.fld').last().locator('input, .chip').first();
   await last.focus(); await pg.keyboard.press('Enter');
   log(!await pg.$('dialog.ask[open]'), 'Enter on the last question: no error, no prompt');
@@ -133,7 +135,7 @@ jobs.push(() => tryit(async () => {
   await pg.evaluate(() => { const k = 'prewarm-demo:settings'; const s = JSON.parse(localStorage.getItem(k) || '{}'); s.me = 'AB'; localStorage.setItem(k, JSON.stringify(s)); });
   await pg.reload(); await pg.waitForTimeout(600);
   await open(pg, 1);
-  await pg.click('[data-ev="io_done"]'); await pg.waitForTimeout(300);
+  await tapNow(pg, 'io_done'); await pg.waitForTimeout(300);
   log(/End of surgery/.test(await pg.textContent('#clock .next')), 'after Surgery end the top bar asks for the End reading');
   await pg.clock.fastForward('00:06:00'); await pg.waitForTimeout(1500);
   const g = await pg.textContent('#gaps');
@@ -180,12 +182,12 @@ jobs.push(() => tryit(async () => {
   const { ctx, pg } = await fresh();
   await open(pg, 0);
   let msg = ''; pg.once('dialog', d => { msg = d.message(); d.dismiss(); });
-  await pg.click('[data-ev="io_done"]'); await pg.waitForTimeout(300);
+  await tapNow(pg, 'io_done'); await pg.waitForTimeout(300);
   log(/In OT, Induction aren’t logged yet/.test(msg) && (await pg.textContent('[data-ev="io_done"] b')) === 'tap', 'stray Surgery end asks first; Cancel leaves it empty: ' + msg);
-  pg.once('dialog', d => d.accept()); await pg.click('[data-ev="ev_ot"]'); await pg.waitForTimeout(200);
-  pg.once('dialog', d => d.accept()); await pg.click('[data-ev="io_knife"]'); await pg.waitForTimeout(200);
+  pg.once('dialog', d => d.accept()); await tapNow(pg, 'ev_ot'); await pg.waitForTimeout(200);
+  pg.once('dialog', d => d.accept()); await tapNow(pg, 'io_knife'); await pg.waitForTimeout(200);
   const ot = await pg.textContent('[data-ev="ev_ot"] b'), [h, m] = ot.split(':').map(Number), early = `${String((h + 23) % 24).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-  await pg.waitForTimeout(700); await pg.click('[data-ev="io_knife"]'); await pg.fill('#evtime', early); await pg.keyboard.press('Tab'); await pg.waitForTimeout(1500);
+  await pg.waitForTimeout(700); await pg.click('[data-ev="io_knife"]'); await pg.fill('#evtime', early); await pg.waitForTimeout(1500);
   log(/Times out of order: Induction \d\d:\d\d is before In OT/.test(await pg.textContent('#gaps')), 'Induction an hour before In OT is listed');
   await ctx.close();
 }));
@@ -194,7 +196,7 @@ jobs.push(() => tryit(async () => {
 jobs.push(() => tryit(async () => {
   const { ctx, pg } = await fresh();
   await open(pg, 0);
-  await pg.click('#haemolink'); await pg.click('a.widebox'); await pg.waitForSelector('#f-enrol_id');
+  await pg.click('#haemolink'); await pg.click('.links.three a:has-text("Pre-op")'); await pg.waitForSelector('#f-enrol_id');
   await pg.fill('#f-enrol_id', 'DEMO-02'); await pg.keyboard.press('Tab'); await pg.waitForTimeout(200);
   log(/already used/.test(await pg.textContent('#toast')) && await pg.inputValue('#f-enrol_id') === 'DEMO-01', 'duplicate Subject ID refused');
   await pg.fill('#f-enrol_id', 'DEMO-01A'); await pg.keyboard.press('Tab'); await pg.waitForTimeout(200);
@@ -212,17 +214,19 @@ jobs.push(() => tryit(async () => {
   log(!await pg.$('#f-ihd_mi_years') && !await pg.$('.chip[data-f="ihd_mi"]'), 'IHD No hides both follow-ups');
   await ctx.close();
 }));
-// L. an all-blank reading isn't saved; a part-blank one asks, then shows in Still to fill; columns hidden in Settings show too
+// L. Save with every box blank removes the reading; a part-blank one asks, then shows in Still to fill; columns hidden in Settings show too
 jobs.push(() => tryit(async () => {
   const { ctx, pg } = await fresh();
   await open(pg, 0);
   await pg.click('#haemolink'); await pg.waitForSelector('input[data-in="sbp"]');
   await pg.click('.strip a:has-text("60")'); await pg.waitForSelector('input[data-in="sbp"]');
   for (const k of ['sbp', 'dbp', 'map', 'hr', 'bis']) await pg.fill(`input[data-in="${k}"]`, '');
-  await pg.click('#save'); await pg.waitForTimeout(300);
-  log(/Nothing entered for 60 min/.test(await pg.textContent('#toast')), 'blank reading not saved');
+  await pg.click('#save'); await pg.waitForTimeout(400);
+  log(/removed/.test(await pg.textContent('#toast')) && !await pg.$('.strip a.done:has-text("60")'), 'Save with nothing entered removes the reading (nothing saved)');
+  await pg.click('.strip a:has-text("60")'); await pg.waitForSelector('input[data-in="sbp"]');
   await pg.fill('input[data-in="sbp"]', '118');
-  pg.once('dialog', d => d.accept()); await pg.click('#save'); await pg.waitForTimeout(400);
+  const accept = d => d.accept(d.type() === 'prompt' ? d.defaultValue() : undefined); // also the "what time was it taken?" question, when the demo clock is late
+  pg.on('dialog', accept); await pg.click('#save'); await pg.waitForTimeout(400); pg.off('dialog', accept);
   await pg.waitForFunction(() => !!document.querySelector('#gaps'), null, { timeout: 4000 });
   log(/BP, HR, BIS saved with blanks: .*60 min \(Diastolic BP, Mean BP, Heart rate, BIS\)/.test(await pg.textContent('#gaps')), 'part-blank reading listed: ' + (await pg.textContent('#gaps')).replace(/\s+/g, ' ').slice(0, 300));
   await pg.evaluate(() => { const k = 'prewarm-demo:settings'; const s = JSON.parse(localStorage.getItem(k) || '{}'); s.hide = { ...(s.hide || {}), ts: true }; localStorage.setItem(k, JSON.stringify(s)); });
@@ -339,7 +343,7 @@ jobs.push(() => tryit(async () => {
   const { ctx, pg } = await fresh();
   await open(pg, 1);
   const st = await pg.textContent('[data-ev="io_gown_start"] b');
-  if (!/\d\d:\d\d/.test(st)) { await pg.click('[data-ev="io_gown_start"]'); await pg.waitForTimeout(200); }
+  if (!/\d\d:\d\d/.test(st)) { await tapNow(pg, 'io_gown_start'); await pg.waitForTimeout(200); }
   const t = await pg.textContent('[data-ev="io_gown_start"] b');
   await pg.click('.strip a:has-text("55")'); await pg.waitForSelector('#save');
   const due = (await pg.textContent('#due')).match(/\d\d:\d\d/)?.[0];
@@ -379,8 +383,8 @@ jobs.push(() => tryit(async () => {
   pg.off('dialog', ok);
   // typing a temperature, then swiping to Others: the typed value counts, so leaving asks
   await pg.goto(pg.url().replace(/(#\/p\/\w+).*$/, '$1')); await pg.waitForSelector('.num[data-type="core"]');
-  await pg.click('.num[data-type="core"]'); await pg.waitForSelector('input.num');
-  await pg.keyboard.type('372');
+  await pg.click('.num[data-type="core"]'); await pg.waitForSelector('dialog.kp input.num');
+  await pg.keyboard.type('372'); await pg.keyboard.press('Enter'); await pg.waitForTimeout(300); // the pad's OK
   const ty = await pg.evaluate(() => { const r = document.querySelector('.tp').getBoundingClientRect(); return r.top + r.height / 2; });
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 320, y: ty }] });
   for (let i = 1; i <= 5; i++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: 320 - 48 * i, y: ty }] });
@@ -389,7 +393,7 @@ jobs.push(() => tryit(async () => {
   if (await pg.$('dialog.ask[open]')) await pg.click('dialog.ask [data-a="stay"]');
   log(/37\.2/.test(await pg.textContent('.num[data-type="core"]')), 'and the typed 37.2 is kept: ' + await pg.textContent('.num[data-type="core"]'));
   // typing then the phone's back button
-  await pg.click('.num[data-type="core"]'); await pg.waitForSelector('input.num'); await pg.keyboard.press('Control+A'); await pg.keyboard.type('368');
+  await pg.click('.num[data-type="core"]'); await pg.waitForSelector('dialog.kp input.num'); await pg.keyboard.type('368'); await pg.keyboard.press('Enter'); await pg.waitForTimeout(300);
   await pg.goBack(); await pg.waitForTimeout(400);
   log(!!await pg.$('dialog.ask[open]'), 'typed temperature then back: asks to save');
   await ctx.close();
@@ -438,10 +442,8 @@ jobs.push(() => tryit(async () => {
   // a temperature being typed (keyboard still up) when the app closes
   await pg.click('#templink'); await pg.waitForSelector('dialog.ask[open]'); await pg.click('dialog.ask [data-a="drop"]');
   await pg.waitForSelector('.num[data-type="core"]'); await pg.waitForTimeout(800);
-  await pg.click('.num[data-type="core"]'); await pg.waitForTimeout(800);
-  if (!await pg.$('input.num')) await pg.click('.num[data-type="core"]');
-  await pg.waitForSelector('input.num');
-  await pg.keyboard.press('Control+A'); await pg.keyboard.type('372');
+  await pg.click('.num[data-type="core"]'); await pg.waitForSelector('dialog.kp input.num');
+  await pg.keyboard.type('372'); await pg.keyboard.press('Enter'); await pg.waitForTimeout(300);
   await pg.reload(); await pg.waitForSelector('.num[data-type="core"]');
   log((await pg.textContent('.num[data-type="core"]')).trim() === '37.2', 'temperature being typed back after the app closed: ' + await pg.textContent('.num[data-type="core"]'));
   // Don't save: gone when reopened
@@ -496,7 +498,7 @@ jobs.push(() => tryit(async () => {
   await pg.click('a[href="#/pacu"]'); await pg.click('a[href^="#/pacu/"] >> nth=0'); await pg.waitForTimeout(500);
   log(/· PACU$/.test(await pg.textContent('#title')) && /#\/pacu\/\w+$/.test(pg.url()), 'PACU view opens the PACU page: ' + await pg.textContent('#title'));
   // PACU in / To ward on the PACU page: a tap logs now
-  await pg.click('[data-pev="pacu_in"]'); await pg.waitForTimeout(300);
+  await pg.click('[data-pev="pacu_in"]'); await pg.click('.kp [data-now]'); await pg.waitForTimeout(300);
   log(/^\d\d:\d\d$/.test(await pg.textContent('[data-pev="pacu_in"] b')), 'PACU in logged from the PACU page');
   await pg.click('#back'); await pg.waitForTimeout(300);
   log(pg.url().endsWith('#/pacu'), 'and back returns to the PACU list');
@@ -526,7 +528,147 @@ jobs.push(() => tryit(async () => {
   log(await pg.textContent('[data-pev="pacu_in"] b') === before && await pg.$eval('.sealed input', i => i.disabled), 'PACU complete: times and answers locked');
   await ctx.close();
 }));
+// AA. temperature layout, carry-over from pre-warming, labels, Clear (owner, 13 Oct 2026)
+jobs.push(() => tryit(async () => {
+  const { ctx, pg } = await fresh();
+  await open(pg, 0);
+  const id = pg.url().match(/#\/p\/(\w+)/)[1];
+  await pg.evaluate(id => { const k = 'prewarm-demo:patients', all = JSON.parse(localStorage.getItem(k)), t = Date.now();
+    for (const [a, b] of [['prewarm_20_core', '36.8'], ['prewarm_20_chest', '33.5'], ['at_prewarm_20', '08:00']]) all[id].f[a] = { v: b, t, by: 'T' };
+    localStorage.setItem(k, JSON.stringify(all)); }, id);
+  await pg.goto(`http://localhost:8080/prewarm/?demo#/p/${id}/iotemp/base`); await pg.reload(); await pg.waitForSelector('.num[data-type="core"]');
+  const txt = k => pg.textContent(`.num[data-type="${k}"]`).then(t => t.trim());
+  log(await txt('core') === '36.8' && await txt('chest') === '33.5', 'first intra-op reading starts from the last pre-warming one: ' + await txt('core') + ' ' + await txt('chest'));
+  const box = k => pg.locator(`.card:has(.num[data-type="${k}"])`).boundingBox();
+  const [c, ch, a, th, ca] = [await box('core'), await box('chest'), await box('arm'), await box('thigh'), await box('calf')];
+  log(c.width > ch.width * 1.8 && Math.abs(ch.y - a.y) < 2 && Math.abs(th.y - ca.y) < 2 && a.y < th.y && c.y < ch.y, 'core spans two columns; chest + arm, then thigh + calf');
+  log((await pg.textContent('.card:has(.num[data-type="core"]) .clab')).includes('Core (spot on)'), 'core is labelled Core (spot on)');
+  const strip = await pg.$$eval('.strip a', as => as.map(x => x.textContent.trim()).slice(0, 4));
+  log(strip.join('|') === 'Arrival|Induction|5 min|10 min', 'strip labels: ' + strip.join('|'));
+  // an empty skin box starts at 31 from its card; one tap on a number opens the box for typing
+  await pg.click('#clearall'); await pg.waitForTimeout(200);
+  log(await txt('core') === 'tap' && await txt('chest') === 'tap', 'Clear empties every box');
+  await pg.click('.card[data-fill="thigh"] .clab');
+  log(await txt('thigh') === '31.0', 'skin starts at 31.0');
+  await pg.waitForTimeout(800); await pg.click('.num[data-type="core"]');
+  log(!!await pg.$('input.num'), 'one tap opens the box for typing');
+  await ctx.close();
+}));
+// AB. BP, HR, BIS alarm is off by default and comes on with its Settings toggle
+jobs.push(() => tryit(async () => {
+  const { ctx, pg } = await fresh('2026-10-13T10:00:00');
+  await pg.goto('http://localhost:8080/prewarm/?demo#/settings'); await pg.waitForSelector('[data-g="remind"][data-k="haemo"]');
+  log(!await pg.isChecked('[data-g="remind"][data-k="haemo"]'), 'BP, HR, BIS alarm toggle is off by default');
+  await pg.check('[data-g="remind"][data-k="haemo"]'); await pg.waitForTimeout(200);
+  await pg.goto('http://localhost:8080/prewarm/?demo#/'); await open(pg, 1);
+  await pg.click('#haemolink'); await pg.click('a[href$="/form/intraop"]'); await pg.waitForSelector('#f-io_ebl');
+  const seen = [];
+  for (let i = 0; i < 16; i++) {
+    await pg.clock.fastForward('01:00'); await pg.waitForTimeout(150);
+    const t = await pg.evaluate(() => { const b = document.querySelector('#banner'); return b && !b.hidden ? b.textContent : ''; });
+    if (t && !seen.includes(t)) seen.push(t);
+  }
+  log(seen.some(t => /BP, HR, BIS .* reading due now/.test(t)), 'with the toggle on, BP, HR, BIS alarms: ' + JSON.stringify(seen));
+  await ctx.close();
+}));
+// AC. the quick-entry pads: time pad (typed digits, 3-digit times, bad times, Back, Clear), number pad (keys replace the
+// old value, three digits save a temperature, Next moves on), the countdown opens its reading, no PACU times in the top row
+jobs.push(() => tryit(async () => {
+  const { ctx, pg } = await fresh();
+  await open(pg, 0);
+  pg.on('dialog', d => d.accept());
+  log(!await pg.$('[data-ev="pacu_in"]') && !await pg.$('[data-ev="pacu_out"]'), 'no PACU in / To ward in the key times row');
+  // time pad
+  await pg.click('[data-ev="ev_ot"]'); await pg.waitForSelector('dialog.kp[open]');
+  await pg.keyboard.type('2575'); await pg.waitForTimeout(200);
+  log(await pg.$('dialog.kp[open]') !== null && !(await pg.textContent('[data-ev="ev_ot"] b')).includes(':'), 'a bad time (25:75) is not saved');
+  await pg.fill('#evtime', ''); await pg.keyboard.type('731');
+  await pg.click('.kp [data-a="ok"]'); await pg.waitForTimeout(300);
+  log((await pg.textContent('[data-ev="ev_ot"] b')) === '07:31', '731 and OK save 07:31: ' + await pg.textContent('[data-ev="ev_ot"] b'));
+  await pg.waitForTimeout(800); await pg.click('[data-ev="ev_ot"]'); await pg.waitForSelector('dialog.kp[open]');
+  await pg.click('.kp [data-k="0"]'); await pg.click('.kp [data-k="9"]'); await pg.click('.kp [data-k="1"]'); await pg.click('.kp [data-k="5"]'); await pg.waitForTimeout(300);
+  log((await pg.textContent('[data-ev="ev_ot"] b')) === '09:15', 'keys 0 9 1 5 save 09:15 (the fourth digit saves): ' + await pg.textContent('[data-ev="ev_ot"] b'));
+  await pg.waitForTimeout(800); await pg.click('[data-ev="ev_ot"]'); await pg.waitForSelector('dialog.kp[open]');
+  await pg.click('.kp [data-a="back"]'); await pg.waitForTimeout(200);
+  log((await pg.textContent('[data-ev="ev_ot"] b')) === '09:15' && !await pg.$('dialog.kp[open]'), 'Back closes the pad without a change');
+  await pg.waitForTimeout(800); await pg.click('[data-ev="ev_ot"]'); await pg.waitForSelector('dialog.kp[open]');
+  await pg.click('.kp [data-a="clear"]'); await pg.waitForTimeout(300);
+  log((await pg.textContent('[data-ev="ev_ot"] b')) === 'tap', 'Clear (after asking) empties the time');
+  // number pad: skin box
+  await pg.waitForTimeout(800);
+  await pg.click('.num[data-type="chest"]'); await pg.waitForSelector('dialog.kp[open]');
+  await pg.click('.kp [data-k="3"]'); await pg.click('.kp [data-k="2"]'); await pg.click('.kp [data-k="5"]'); await pg.waitForTimeout(300);
+  log((await pg.textContent('.num[data-type="chest"]')).trim() === '32.5', 'keys 3 2 5 save 32.5: ' + await pg.textContent('.num[data-type="chest"]'));
+  await pg.waitForTimeout(800); await pg.click('.num[data-type="chest"]'); await pg.waitForSelector('dialog.kp[open]');
+  await pg.click('.kp [data-k="3"]');
+  log(await pg.inputValue('dialog.kp input') === '3', 'the first key replaces the old value');
+  await pg.click('.kp [data-a="back"]');
+  // the countdown opens its reading's first box
+  await pg.waitForTimeout(800); await pg.click('#clock .next'); await pg.waitForSelector('dialog.kp[open]');
+  log(/Core/.test(await pg.textContent('.kp .kphead')), 'tapping the countdown opens the due reading\'s first box');
+  await pg.click('.kp [data-a="back"]');
+  // BP pad: Next moves to the next box
+  await pg.click('#haemolink'); await pg.waitForSelector('dialog.ask[open]'); await pg.click('dialog.ask [data-a="drop"]'); // the unsaved chest value
+  await pg.waitForSelector('[data-in="sbp"]'); await pg.waitForTimeout(800);
+  await pg.click('[data-in="sbp"]'); await pg.waitForSelector('dialog.kp[open]');
+  await pg.click('.kp [data-k="1"]'); await pg.click('.kp [data-k="2"]'); await pg.click('.kp [data-k="0"]'); await pg.click('.kp [data-a="next"]'); await pg.waitForTimeout(300);
+  log(/Diastolic/.test(await pg.textContent('.kp .kphead')) && await pg.inputValue('[data-in="sbp"]') === '120', 'Next saves 120 and opens Diastolic BP');
+  await ctx.close();
+}));
+// AD. progress ticks on the patient list (read only); Perioperative data has its own complete tick that locks its page, and
+// "data collection complete" doesn't lock it
+jobs.push(() => tryit(async () => {
+  const { ctx, pg } = await fresh();
+  await pg.evaluate(() => localStorage.setItem('prewarm-demo:settings', JSON.stringify({ me: 'ZZ' })));
+  await pg.reload(); await pg.waitForTimeout(600);
+  await open(pg, 1);
+  const id = (await pg.evaluate(() => location.hash)).split('/')[2];
+  const prog = async () => { await pg.evaluate(() => { location.hash = '#/'; }); await pg.waitForSelector('.list .progress'); return pg.$$eval(`.list a[href$="/${id}"] .progress > span`, as => as.map(a => (a.classList.contains('on') ? '+' : '-') + a.textContent.trim()).join('|')); };
+  const back = async (h = '') => { await pg.evaluate(x => { location.hash = x; }, `#/p/${id}${h}`); await pg.waitForTimeout(500); };
+  log((await prog()).split('|').length === 8 && !(await prog()).includes('+'), 'list shows eight sections, none complete yet: ' + await prog());
+  await back(); log(await pg.$('.progress') === null, 'no extra tick boxes on the patient page');
+  await pg.click('[data-sign="iotemp"]'); await pg.waitForTimeout(300);
+  log(/\+✓Intra-op temps/.test(await prog()), 'a section marked complete shows its tick on the list');
+  await back('/data'); await pg.waitForSelector('#f-enrol_id');
+  const d0 = await pg.$eval('#f-enrol_id', i => i.disabled);
+  await pg.click('[data-sign="periop"]'); await pg.waitForSelector('.sealnote');
+  log(!d0 && await pg.$eval('#f-enrol_id', i => i.disabled), 'Perioperative data complete: its boxes lock');
+  pg.once('dialog', d => d.accept());
+  await pg.click('[data-unsign="periop"]'); await pg.waitForSelector('[data-sign="periop"]');
+  log(!await pg.$eval('#f-enrol_id', i => i.disabled), 'undone: editable again');
+  // data collection complete does not close Perioperative data
+  await back(); await pg.waitForSelector('[data-done]'); pg.once('dialog', d => d.accept()); await pg.click('[data-done]'); await pg.waitForTimeout(300);
+  await back('/data'); await pg.waitForSelector('#f-enrol_id');
+  log(!await pg.$eval('#f-enrol_id', i => i.disabled), 'data collection complete leaves Perioperative data open');
+  await ctx.close();
+}));
+// AE. the last warming reading (10 min for arm 2, 30 min for arm 1) marks pre-warming complete and goes to the intra-op temps
+jobs.push(() => tryit(async () => {
+  const { ctx, pg } = await fresh();
+  await pg.evaluate(() => localStorage.setItem('prewarm-demo:settings', JSON.stringify({ me: 'ZZ' })));
+  await pg.reload(); await pg.waitForTimeout(600);
+  await open(pg, 1); // DEMO-02: 10 min of warming
+  const id = (await pg.evaluate(() => location.hash)).split('/')[2];
+  const sealed = () => pg.evaluate(i => { const a = JSON.parse(localStorage.getItem('prewarm-demo:patients')); return !!a[i].f.sign_prewarm; }, id);
+  await pg.evaluate(h => { location.hash = h; }, `#/p/${id}/prewarm/5`); await pg.waitForSelector('.num[data-type="core"]');
+  await pg.click('.num[data-type="core"]'); await pg.waitForSelector('dialog.kp[open]'); await pg.click('.kp [data-k="3"]'); await pg.click('.kp [data-k="6"]'); await pg.click('.kp [data-k="5"]'); await pg.waitForTimeout(300);
+  const seenD = []; pg.on('dialog', d => { seenD.push(d.message().slice(0, 60)); d.accept(d.type() === 'prompt' ? d.defaultValue() : undefined); });
+  await pg.waitForTimeout(900); await pg.click('#save'); await pg.waitForTimeout(500);
+  log(/prewarm\/10$/.test(await pg.evaluate(() => location.hash)) && !await sealed(), 'the 5 min save moves to 10 min and does not complete pre-warming: ' + JSON.stringify(seenD) + await pg.textContent('#toast').catch(() => '') + await pg.evaluate(() => location.hash));
+  log(await pg.$('.card.dflt [data-type="core"]') !== null, 'a value carried over from the last reading shows as a light grey default');
+  await pg.click('.num[data-type="core"]'); await pg.waitForSelector('dialog.kp[open]'); await pg.click('.kp [data-k="3"]'); await pg.click('.kp [data-k="6"]'); await pg.click('.kp [data-k="6"]'); await pg.waitForTimeout(300);
+  await pg.waitForTimeout(900); await pg.click('#save'); await pg.waitForTimeout(600);
+  log(/\/iotemp/.test(await pg.evaluate(() => location.hash)) && await sealed(), 'the 10 min save marks pre-warming complete and opens the intra-op temps: ' + await pg.evaluate(() => location.hash));
+  await ctx.close();
+}));
+// AF. Refresh now at the bottom of the home page (and in Settings): never loses anything, says so
+jobs.push(() => tryit(async () => {
+  const { ctx, pg } = await fresh();
+  await pg.click('#refreshnow'); await pg.waitForTimeout(500);
+  log(/Up to date/.test(await pg.textContent('#toast')) && await pg.$('.list a') !== null, 'Refresh now keeps the patient list and says it is up to date');
+  await ctx.close();
+}));
 await runJobs();
 await b.close();
 if (fails.length) { console.error('prewarm edge: FAIL\n- ' + fails.join('\n- ')); process.exit(1); }
-console.log('prewarm edge: ok (midnight, surgery end, double-tap Save, BP checks, back button, Log, Enter, still to fill, swipe, stray taps, time order, corrections, BMI, follow-ups, blanks, typed answers, alerts everywhere, duplicates, storage full, lock warning, late readings, delete and restore, prewarm off alert, warming yes / no, touch double taps, typing then leaving, other tab due, two patients, app closed mid-reading, layout, reset, PACU view, sections closed once complete)');
+console.log('prewarm edge: ok (midnight, surgery end, double-tap Save, BP checks, back button, Log, Enter, still to fill, swipe, stray taps, time order, corrections, BMI, follow-ups, blanks, typed answers, alerts everywhere, duplicates, storage full, lock warning, late readings, delete and restore, prewarm off alert, warming yes / no, touch double taps, typing then leaving, other tab due, two patients, app closed mid-reading, layout, reset, PACU view, sections closed once complete, layout and carry-over, haemo alarm toggle, keypad popups, progress ticks on the list and perioperative tick, last warming reading completes pre-warming)');

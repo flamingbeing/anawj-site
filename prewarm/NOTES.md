@@ -106,6 +106,33 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   (memory climbs to gigabytes): if a test run is killed, look for a failed assertion comparing an element handle.
 - **No BP, HR, BIS alarm** (owner, 13 Oct 2026): only temperatures and Prewarm off beep, buzz and show the banner.
   BP, HR, BIS due times still show in the top bar countdown and on the tab.
+- **Temperature page** (owner, 13 Oct 2026): "Core (spot on)" spans both columns, then chest + arm, then thigh + calf.
+  One tap on a number opens its box for typing; tapping elsewhere on an empty card fills the starting value (core
+  36.5, skin 31.0, room 20.0). The first intra-op reading starts from the last pre-warming one. "Clear all boxes"
+  empties the draft (on a saved reading it removes the reading after asking). The strip reads Arrival, then
+  "Prewarm on" / "Induction" for 0, then "5 min"…; "Clear" beside a comfort answer. BP, HR, BIS due alarm is a
+  Settings toggle, off by default (`settings.remind.haemo`).
+- **Quick-entry pads** (owner, 13 Oct 2026; `js/keypad.js`): tapping a temperature, BP, HR or BIS box opens a number pad
+  (Back, Clear, OK; BP, HR, BIS also Next); tapping a key time opens a time pad (Now, digits: the fourth digit saves,
+  731 = 07:31; Back, Clear asks first). The display is a real input (`inputmode="none"`), so a computer keyboard
+  works (Enter = OK, Esc = Back) and Playwright `fill()` still works: tests fill `input.num` / `#evtime` and press
+  Enter. Tapping an alarm banner goes to that reading's screen only (owner, 13 Oct: no pad); the top-bar countdown also opens
+  its first box (or the key time's pad). PACU in / To ward are on the PACU page only (not in the key-times row or the Log button); Still to fill
+  lists them once surgery has ended. The tap guard (`lockTaps`) also runs after a pad saves, so tests wait 0.8 s.
+- **Progress and Perioperative data tick** (owner, 13 Oct 2026; moved 13 Oct: first built as tick boxes on the patient screen, wrongly): the patient list shows a
+  list of ticks on each patient in the patient list (read only; they mirror the existing complete ticks, no new boxes: pre-warming temps, intra-op temps, BP HR BIS, Intra-op details, PACU,
+  Perioperative data). Perioperative data has its own tick (`sign_periop`, exported as
+  "Complete: Perioperative data") that locks only that page; "data collection complete" does not lock it.
+- **PACU nurse link** (owner, 13 Oct 2026): on a participant's PACU page a member (or admin) makes a link and QR code
+  (`#/nurse/<token>`, 24 random characters = the secret). Firestore `pacu/{token}` holds a copy of that participant's
+  PACU answers (`PACU_KEYS` in `js/schema.js`; the rules allow exactly that list, checked by a unit test): anyone
+  signed in (the nurse's phone signs in anonymously, joins nothing) who has the token reads it and writes only those
+  fields; nobody can list tokens except admins; members of the hospital make and stop (delete) it. The nurse's page
+  shows only that participant's PACU in / To ward, answers and complete tick (the Subject ID in its title), with
+  initials. Team phones subscribe to the `pacu_token` of their patients and merge newer fields (and push their own
+  PACU edits to the link copy), so both directions settle on the newest write. `pacu_token` is a field on the patient.
+  Anyone holding the link can edit those PACU answers until the link is stopped. Tests: `rules.emulator.mjs` (24
+  checks), `sync.emulator.mjs` (a third phone opens the link). Rules deploy on merge to main.
 - **Never send an empty `f`** (lesson, 12 Oct 2026): `setDoc(…, { f: {} }, { merge: true })` replaces the server's
   `f` with an empty map (an empty map is a leaf in the merge). Lock / unlock / delete sent one and wiped the server
   copy's readings; push now omits an empty `f`, lock sends the full record, and each phone resends all its patients
@@ -248,3 +275,30 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
 - **Testing sharing:** `tools/test-rules.sh` (rules, 52 checks) and `tools/test-prewarm-sync.sh` (two phones in a
   browser against the local Firestore and Auth emulators, `?emulator` on localhost only). Never the live project.
 - No hand bump of `VERSION`: the deploy stamps it with a hash of the SHELL files (`tools/stamp-versions.mjs`; AGENTS.md).
+- **Update check** (owner, 13 Oct 2026: "Update available" didn't appear until the app was closed and reopened): browsers
+  look for a new service worker only when the page is opened, and the phones keep the app open for hours. The page now
+  calls `reg.update()` when it comes back to the front, when signal returns and every 10 min (not tested in the browser
+  suite: the worker isn't registered in demo mode).
+- **Last warming reading** (owner, 13 Oct 2026): Save on the 10 min reading (arm 2) or the 30 min one (arm 1) marks
+  Pre-warming temps complete (`sign_prewarm`, needs initials) and opens the intra-op temps. Undo the tick to edit.
+  Once complete, `pointsFor` drops the later 5-min points (past 10 / 30 min) unless already saved, so they aren't
+  asked for or listed in Still to fill; their export cells stay blank.
+- **Perioperative data split in three** (owner, 13 Oct 2026): one row of three buttons on the patient screen: Pre-op
+  (`#/p/<id>/data`: Subject ID and group, pre-op, meds, bloods; tick `sign_periop`, label "Pre-op and patient
+  details"), Day 1 (`/data/day1`: chart review, analgesia; `sign_pod1`) and Day 2 (`/data/day2`: chart review,
+  analgesia, discharge; `sign_pod2`). Questions and order unchanged (`DATA_PARTS` in app.js). Each tick locks only
+  its page; "data collection complete" closes none of them. Progress ticks on the list and the export's "Complete: …"
+  columns (Extra sheet) have the three.
+- **Defaults in light grey** (owner, 13 Oct 2026): a temperature or choice that is only carried over from the last reading
+  (or filled by a rule: gown set NA, underbody / gown Yes) and not yet saved for this timepoint has the `dflt` class
+  (grey text, grey pressed chip). Saving makes it normal. The later warming points (past 10 / 30 min) are also dropped
+  once that last warming reading is saved, even without initials (`pointsFor`).
+- **Admin password sign-in** (owner, 13 Oct 2026; Google stays off, see above): Settings has email + password boxes
+  with Sign in, "Email me a sign-in link" and "Forgot password? Email me a reset link". A password exists only on an
+  account that signed in once by emailed link (that proves the email, which the rules need): once signed in, Settings →
+  Password → Save password (8+ characters). Rules unchanged (admins list + verified email). Needs Email/Password on
+  in the Firebase console (it is, for email links). Covered by the two-phone sync test.
+- **Refresh now** (owner, 13 Oct 2026): a button at the bottom of the home page and in Settings (when sharing is on).
+  It re-checks who the phone is (fresh token, member / admin list, so a newly added admin entry counts without
+  logging out), re-subscribes to the team's patients, sends anything waiting, and checks for a new app version (shows
+  "Update available" if one is ready). It never deletes anything on the phone.

@@ -53,7 +53,7 @@ try {
   await a.goto(BASE + '#/new');
   await a.fill('#sid', 'SYNC-01'); await a.click('.seg .chip[data-v="1"]'); await a.click('button[type=submit]');
   await a.waitForSelector('.times');
-  await a.click('.num[data-type="core"]'); await a.click('.num[data-type="core"]'); await a.fill('input.num', '366'); await a.keyboard.press('Enter');
+  await a.click('.num[data-type="core"]'); await a.fill('input.num', '366'); await a.keyboard.press('Enter');
   a.once('dialog', d => d.accept()); // only core entered: Save asks about the blank boxes
   await a.click('#save');
   await toastSays(a, /0 min saved/);
@@ -77,6 +77,46 @@ try {
   await a.click('.list a'); await a.click('.textlinks a[href$="/sheet"]');
   await a.waitForFunction(() => /36\.7/.test(document.querySelector('.sheet')?.textContent || ''), null, { timeout: 15000 });
 
+  // the PACU nurse link: phone A makes it on the PACU page; a phone that joined nothing opens it, fills in PACU, and the
+  // team's phones get it (and the other way); the nurse's phone has nothing else; stopping the link ends access
+  await a.goto(BASE + '#/');
+  await a.click('.list a');
+  await a.click('.links a[href$="/form/pacu"]');
+  await a.waitForSelector('[data-pacu-make]');
+  await a.click('[data-pacu-make]');
+  await a.waitForSelector('.pacuurl', { timeout: 20000 });
+  const nurseLink = await a.inputValue('.pacuurl');
+  assert.match(nurseLink, /#\/nurse\/[a-z2-9]{24}$/, 'a long random token in the link');
+  assert.ok(await a.$('.paculink svg'), 'and a QR code');
+  if (SHOTS) { await a.evaluate(() => document.querySelector('.paculink').scrollIntoView()); await a.screenshot({ path: SHOTS + '/pacu-link.png' }); }
+  const nctx = await b.newContext({ viewport: { width: 390, height: 844 } });
+  const nu = await nctx.newPage();
+  nu.on('pageerror', e => errors.push('nurse: ' + e.message));
+  await nu.goto(nurseLink);
+  await nu.waitForSelector('[data-pev="pacu_in"]', { timeout: 25000 });
+  assert.match(await nu.textContent('#title'), /PACU · SYNC-01/);
+  if (SHOTS) await nu.screenshot({ path: SHOTS + '/pacu-nurse.png', fullPage: true });
+  await nu.fill('#ninit', 'NN'); await nu.dispatchEvent('#ninit', 'change');
+  await nu.click('[data-pev="pacu_in"]'); await nu.click('.kp [data-now]');
+  await nu.click('.chip[data-f="pacu_shiver"][data-v="0"]');
+  await nu.waitForFunction(() => /Saved to the team/.test(document.querySelector('#nstat')?.textContent || ''), null, { timeout: 20000 });
+  await a.waitForFunction(() => /\d\d:\d\d/.test(document.querySelector('[data-pev="pacu_in"] b')?.textContent || '') && document.querySelector('.chip[data-f="pacu_shiver"][data-v="0"]')?.getAttribute('aria-pressed') === 'true', null, { timeout: 25000 });
+  await bb.goto(BASE + '#/'); await bb.click('.list a'); await bb.click('.links a[href$="/form/pacu"]');
+  await bb.waitForFunction(() => /\d\d:\d\d/.test(document.querySelector('[data-pev="pacu_in"] b')?.textContent || ''), null, { timeout: 25000 });
+  // the other way: phone A answers a PACU question, the nurse's page gets it
+  await a.fill('#f-pacu_temp', '36.2'); await a.keyboard.press('Tab');
+  await nu.waitForFunction(() => document.querySelector('#f-pacu_temp')?.value === '36.2', null, { timeout: 25000 });
+  // the nurse's phone has no patients and no other screens' data
+  await nu.goto(BASE + '#/');
+  assert.equal(await nu.$('.list a'), null, 'the nurse phone has no patient list');
+  // stopping the link ends access
+  a.once('dialog', d => d.accept());
+  await a.click('[data-pacu-stop]');
+  await a.waitForSelector('[data-pacu-make]', { timeout: 20000 });
+  await nu.goto(nurseLink);
+  await nu.waitForFunction(() => /was stopped/.test(document.body.textContent), null, { timeout: 25000 });
+  await nctx.close();
+
   // an admin signs in with an emailed link and makes a join code
   const ctx = await b.newContext({ viewport: { width: 390, height: 844 } });
   const ad = await ctx.newPage();
@@ -96,6 +136,28 @@ try {
   assert.doesNotMatch(ad.url(), /oobCode/, 'the one-time code leaves the address bar');
   assert.match(await ad.textContent('main'), /NUH-TEST-CODE/);
   assert.match(await ad.textContent('main'), /AA/, 'members listed');
+  // the admin sets a password, logs out, and signs in with email and password (owner, 13 Oct 2026)
+  await ad.evaluate(() => { location.hash = '#/settings'; });
+  await ad.waitForSelector('details.sect summary');
+  await ad.click('details.sect summary'); await ad.waitForSelector('#setpw'); await ad.fill('#newpw', 'short'); await ad.click('#setpw');
+  await toastSays(ad, /at least 8/);
+  await ad.fill('#newpw', 'correct horse 42'); await ad.click('#setpw');
+  await toastSays(ad, /Password saved/);
+  ad.once('dialog', d => d.accept());
+  await ad.click('#leave');
+  await ad.waitForURL(/#\/$/, { timeout: 20000 }); await ad.waitForTimeout(1500);
+  await ad.goto(BASE + '#/settings'); await ad.waitForSelector('body[data-cloud=ready]'); await ad.waitForSelector('#adminin', { timeout: 20000 });
+  await ad.click('#adminin'); await ad.fill('#adminemail', 'lead@example.com');
+  await ad.fill('#adminpw', 'wrong password'); await ad.click('#adminpwin');
+  await toastSays(ad, /Wrong email or password/);
+  await ad.fill('#adminpw', 'correct horse 42'); await ad.click('#adminpwin');
+  await ad.waitForFunction(() => /Signed in as study admin/.test(document.querySelector('main')?.textContent || ''), null, { timeout: 20000 });
+  await ad.evaluate(() => { location.hash = '#/settings'; });
+  await ad.waitForSelector('#refreshnow'); await ad.click('#refreshnow');
+  await toastSays(ad, /Up to date|still waiting/);
+  assert.match(await ad.textContent('main'), /Signed in as study admin/, 'Refresh now keeps the admin signed in');
+  await ad.evaluate(() => { location.hash = '#/admin'; });
+  await ad.waitForFunction(() => /NUH-TEST-CODE/.test(document.querySelector('main')?.textContent || ''), null, { timeout: 20000 });
   await ad.click('[data-newcode="WH"]');
   await ad.waitForFunction(() => /WH-[A-Z2-9]{8}/.test(document.querySelector('main').textContent), null, { timeout: 15000 });
   // a new code for a team that has one warns first (cancelled here: the code stays)
@@ -187,7 +249,7 @@ try {
     return doc?.fields.f.mapValue.fields.age?.mapValue.fields.v?.stringValue;
   };
   const localAge = pg => pg.evaluate(() => Object.values(JSON.parse(localStorage.getItem('prewarm:patients'))).find(r => JSON.stringify(r).includes('SYNC-01'))?.f.age?.v);
-  for (const pg of [a, bb]) { await pg.goto(BASE + '#/'); await pg.click('.list a'); await pg.click('#haemolink'); await pg.click('a.widebox'); await pg.waitForSelector('#f-age'); }
+  for (const pg of [a, bb]) { await pg.goto(BASE + '#/'); await pg.click('.list a'); await pg.click('#haemolink'); await pg.click('.links.three a:has-text("Pre-op")'); await pg.waitForSelector('#f-age'); }
   await a.context().setOffline(true);
   await a.fill('#f-age', '60'); await a.keyboard.press('Tab'); await a.waitForTimeout(300);
   await bb.fill('#f-age', '70'); await bb.keyboard.press('Tab');
@@ -214,7 +276,7 @@ try {
   await a.waitForFunction(() => /BB/.test(document.querySelector('main').textContent), null, { timeout: 5000 });
 
   // a phone reloaded while offline with an unsent change: when signal comes back, the change still reaches the server
-  for (const pg of [a]) { await pg.goto(BASE + '#/'); await pg.click('.list a'); await pg.click('#haemolink'); await pg.click('a.widebox'); await pg.waitForSelector('#f-age'); }
+  for (const pg of [a]) { await pg.goto(BASE + '#/'); await pg.click('.list a'); await pg.click('#haemolink'); await pg.click('.links.three a:has-text("Pre-op")'); await pg.waitForSelector('#f-age'); }
   await a.context().setOffline(true);
   await a.fill('#f-age', '55'); await a.keyboard.press('Tab'); await a.waitForTimeout(300);
   await a.reload(); await a.waitForSelector('#f-age', { timeout: 20000 });
@@ -244,7 +306,7 @@ try {
   await a.goto(BASE + '#/');
   await a.click('.list a'); await a.waitForSelector('.board');
   await a.context().setOffline(true);
-  await a.click('[data-ev="pw_gown"]');
+  await a.click('[data-ev="pw_gown"]'); await a.click('.kp [data-now]');
   const said = [];
   a.on('dialog', d => { said.push(d.message()); said.length === 1 ? d.accept() : d.dismiss(); });
   await a.goto(BASE + '#/settings');
@@ -266,7 +328,7 @@ try {
   await bb.waitForSelector('#code', { timeout: 15000 });
 
   assert.deepEqual(errors, []);
-  console.log('prewarm sync: ok (two phones, join code, readings both ways, admin email-link sign-in, managing admins, codes, join link and QR, blank Word form upload and Form view, lock, offline edits heal, open reading asks, reload offline, same reading on both, log out)');
+  console.log('prewarm sync: ok (two phones, PACU nurse link, join code, readings both ways, admin email-link and password sign-in, managing admins, codes, join link and QR, blank Word form upload and Form view, lock, offline edits heal, open reading asks, reload offline, same reading on both, log out)');
 } finally {
   await b.close();
 }

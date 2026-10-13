@@ -127,6 +127,35 @@ await t('old code refused', assertFails(join(b, 'phoneB', 'NUH', 'NUH-CODE-1')))
 await t('new code works', assertSucceeds(join(b, 'phoneB', 'NUH', 'NUH-CODE-2')));
 await t('member leaves', assertSucceeds(deleteDoc(doc(b, 'members', 'phoneB'))));
 
+// the PACU nurse's link: pacu/{token} (owner, 13 Oct 2026)
+const nurse = anonUser('nurse1');
+const TK = 'k3m9x7q2w5r8t4y6u2p5n3d7', TK2 = 'z9y8x7w6v5u4t3s2r1q2p3m4';
+const pacuDoc = (extra = {}) => ({ site: 'NUH', pid: 'p1', sid: 'S-01', created: 1, f: {}, ...extra });
+await t('member makes a PACU link for own hospital', assertSucceeds(setDoc(doc(a, 'pacu', TK), pacuDoc({ f: { pacu_in: { v: '09:10', t: 1, by: 'AB' } } }))));
+await t('member cannot make one for another hospital', assertFails(setDoc(doc(a, 'pacu', TK2), pacuDoc({ site: 'SGH' }))));
+await t('a short token is refused', assertFails(setDoc(doc(a, 'pacu', 'short'), pacuDoc())));
+await t('extra fields are refused', assertFails(setDoc(doc(a, 'pacu', TK2), pacuDoc({ note: 'x' }))));
+await t('a non-PACU field is refused', assertFails(setDoc(doc(a, 'pacu', TK2), pacuDoc({ f: { prewarm_0_core: { v: '36', t: 1, by: 'AB' } } }))));
+await t('a stranger cannot make a link', assertFails(setDoc(doc(nurse, 'pacu', TK2), pacuDoc())));
+await t('the nurse (anonymous, not a member) opens the link', assertSucceeds(getDoc(doc(nurse, 'pacu', TK))));
+await t('signed out cannot open it', assertFails(getDoc(doc(nobody, 'pacu', TK))));
+await t('nobody lists links', assertFails(getDocs(collection(nurse, 'pacu'))));
+await t('a member cannot list links either', assertFails(getDocs(collection(a, 'pacu'))));
+await t('admin lists links', assertSucceeds(getDocs(collection(adm, 'pacu'))));
+await t('the nurse fills a PACU field', assertSucceeds(setDoc(doc(nurse, 'pacu', TK), { f: { pacu_temp: { v: '36.4', t: 2, by: 'NN', auto: false } } }, { merge: true })));
+await t('the nurse ticks PACU complete', assertSucceeds(setDoc(doc(nurse, 'pacu', TK), { f: { sign_pacu: { v: 'NN 13 Oct 2026 09:40', t: 3, by: 'NN' } } }, { merge: true })));
+await t('the nurse cannot write a non-PACU field', assertFails(setDoc(doc(nurse, 'pacu', TK), { f: { prewarm_0_core: { v: '36', t: 4, by: 'NN' } } }, { merge: true })));
+await t('the nurse cannot move the link to another participant', assertFails(setDoc(doc(nurse, 'pacu', TK), { pid: 'p2' }, { merge: true })));
+await t('the nurse cannot change the hospital', assertFails(setDoc(doc(nurse, 'pacu', TK), { site: 'SGH' }, { merge: true })));
+await t('the nurse cannot change the Subject ID', assertFails(setDoc(doc(nurse, 'pacu', TK), { sid: 'S-99' }, { merge: true })));
+await t('the nurse cannot add other fields', assertFails(setDoc(doc(nurse, 'pacu', TK), { admin: true }, { merge: true })));
+await t('the nurse cannot make a new link', assertFails(setDoc(doc(nurse, 'pacu', TK2), pacuDoc())));
+await t('the nurse cannot delete the link', assertFails(deleteDoc(doc(nurse, 'pacu', TK))));
+await t('a member corrects the Subject ID shown', assertSucceeds(setDoc(doc(a, 'pacu', TK), { sid: 'S-01b' }, { merge: true })));
+await t('another hospital cannot delete the link', assertFails(deleteDoc(doc(c, 'pacu', TK))));
+await t('the member stops the link', assertSucceeds(deleteDoc(doc(a, 'pacu', TK))));
+await t('a stopped link is gone', assertSucceeds(getDoc(doc(nurse, 'pacu', TK)).then(s => { if (s.exists()) throw new Error('still there'); })));
+
 await env.cleanup();
 console.log(`prewarm rules: ${n - fail}/${n} checks passed`);
 process.exit(fail ? 1 : 0);

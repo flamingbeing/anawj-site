@@ -6,10 +6,8 @@ Last updated: 2026-10-13 by Claude Code, Prewarming Webapp.
 
 ## Now
 
-- **Claude Code, Prewarming Webapp** (branch `ccr-13264f37-d28edu`): idle, nothing half-done. Last work 13 Oct 2026
-  (#290 to #300): layout, PACU view, reset, complete-means-locked, no BP alarms, fast tests. Real patients start
-  13 Oct 2026. Advise: don't lock patients during the study day; phones' clocks on automatic; check +/− and the
-  iOS time wheel on a real phone.
+Each session keeps its own line in `status/<session>.md` (`webapp.md`; a new session adds its own file), so sessions never
+edit the same lines. Read them all before starting; edit only yours.
 
 ## Waiting on the owner
 
@@ -25,6 +23,10 @@ Last updated: 2026-10-13 by Claude Code, Prewarming Webapp.
 
 ## Recently done
 
+- #317: PACU nurse link (QR code + link; `pacu/{token}` rules, 24 rules tests, two-phone sync test).
+- #316: progress ticks on the main page; Perioperative data complete tick.
+- #315: number and time pads; alarm / countdown tap opens the reading; PACU in / To ward on the PACU page only.
+- #314: Core (spot on) wide, one-tap typing, skin default 31, Clear, carry-over from pre-warming, Arrival / Induction labels, BP alarm toggle (off).
 - #300: AGENTS: merge by the PR number returned at creation (a guessed number merged another session's #295 early;
   logbook tests on main pass afterwards).
 - #298: no BP, HR, BIS alarm (banner, beep, buzz); temperatures and Prewarm off still alarm.
@@ -37,6 +39,8 @@ Last updated: 2026-10-13 by Claude Code, Prewarming Webapp.
 
 ## Decisions
 
+- 13 Oct 2026: PACU nurse link = a secret link (no sign-in); anyone with it can edit only that participant's PACU answers until it is stopped (owner chose this over joined-phones-only).
+- 13 Oct 2026: timepoint labels read Arrival, Prewarm on / Induction, then "5 min" (owner); skin temperature starts at 31; one tap on a number opens the pad; BP, HR, BIS alarm is a Settings toggle, off by default.
 - 13 Oct 2026: a section marked complete is closed for everyone until its tick is undone; data collection complete closes the op-day screens, not Perioperative data (owner).
 - 13 Oct 2026: no alarm for BP, HR, BIS; their due times still show in the top bar and tab (owner).
 - 12 Oct 2026: PACU view for the PACU nurse; PACU in / To ward on the PACU page; Reset this subject asks twice (owner).

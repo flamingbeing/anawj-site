@@ -87,6 +87,7 @@ a { color: var(--navy); }
 .textlinks a.minicard small { font-weight: 400; font-size: 11px; color: var(--muted); }
 .links.one { grid-template-columns: 1fr; }
 .links.two { grid-template-columns: 1fr 1fr; margin-top: 12px; }
+.links.three { margin-top: 6px; }
 /* Perioperative data: the full width under Intra-op details and PACU */
 a.widebox { display: grid; align-content: center; min-height: 52px; margin-top: 6px; padding: 6px 12px; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-card); color: var(--navy); font-weight: 600; text-decoration: none; }
 details.sect { margin-top: 12px; }
@@ -384,3 +385,37 @@ dialog.ask p { margin: 0 0 6px; }
 /* a section marked complete: read only until its tick is undone */
 .sealed .card, .sealed .fld, .sealed .tchip, .sealed table, .sealed .ixrow, .sealed #addix { opacity: .6; }
 .sealnote { margin: 4px 0; padding: 8px 12px; border-radius: var(--r); background: #e3f1e6; color: var(--ok); font-weight: 600; font-size: 14px; }
+
+/* quick-entry pad: a number pad / time pad popup (owner, 13 Oct 2026) */
+dialog.kp { border: 0; border-radius: var(--r-card); padding: 12px; width: min(360px, calc(100vw - 20px)); background: var(--card); color: var(--ink); box-shadow: 0 8px 30px rgba(0, 0, 0, .3); margin: auto auto 10px; }
+dialog.kp::backdrop { background: rgba(0, 0, 0, .4); }
+.kphead { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+.kphead small { color: var(--muted); }
+.kpin { width: 100%; box-sizing: border-box; text-align: center; font-size: 34px; font-weight: 700; min-height: 60px; border: 2px solid var(--navy); border-radius: var(--r); background: var(--card); color: var(--ink); }
+.kpin.bad { border-color: var(--err); background: #fde8e6; }
+.kpnow { display: flex; justify-content: center; gap: 10px; width: 100%; min-height: 52px; margin-bottom: 8px; border: 1px solid var(--navy); border-radius: var(--r); background: #e9eef6; color: var(--navy); font-size: 18px; font-weight: 600; align-items: center; cursor: pointer; }
+.kpgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 8px 0; }
+.kpgrid button { min-height: 58px; font-size: 26px; font-weight: 600; border: 1px solid var(--line-input); border-radius: var(--r); background: var(--card); color: var(--ink); cursor: pointer; touch-action: manipulation; }
+.kpgrid button:active { background: #e9eef6; }
+.kpbtns { display: flex; gap: 6px; }
+.kpbtns button { flex: 1; min-height: 50px; font-size: 16px; }
+.kpbtns .save { flex: 1.4; }
+.clock .next[role="button"] { cursor: pointer; }
+
+/* progress: which sections are marked complete (owner, 13 Oct 2026) */
+.progress { display: flex; flex-wrap: wrap; gap: 3px 10px; margin: 2px 0; }
+.progress > span { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); }
+.progress > span.on { color: var(--ok); font-weight: 600; }
+.progress .tick { display: inline-grid; place-items: center; flex: none; width: 14px; height: 14px; border: 1.5px solid var(--line-input); border-radius: 4px; font-size: 10px; line-height: 1; }
+.progress > span.on .tick { background: var(--ok); border-color: var(--ok); color: #fff; }
+
+/* PACU nurse link (owner, 13 Oct 2026) */
+.paculink { display: grid; gap: 6px; margin-top: 12px; padding: 10px; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); }
+.paculink h2 { margin: 0; font-size: 16px; }
+.pacuurl { width: 100%; box-sizing: border-box; font-size: 12px; padding: 6px; border: 1px solid var(--line-input); border-radius: var(--r); background: var(--bg); color: var(--ink); }
+.pacutimes .tchip { min-height: 64px; font-size: 16px; }
+
+/* values only carried over, not yet saved for this timepoint: light grey (owner, 13 Oct 2026) */
+.card.dflt .num { color: #767676; font-weight: 400; }
+.card.dflt .chip[aria-pressed="true"] { background: var(--line); border-color: var(--line-input); color: #4d545b; }
+.refreshbox { display: grid; gap: 4px; margin-top: 12px; }

@@ -2,12 +2,11 @@
 
 Short and current. Lasting rules go in `NOTES.md`. Update with `/save-state`.
 
-Last updated: 2026-10-13 by Claude Code, hand assessment session.
+Last updated: 2026-10-13 by Claude Code, hand assessment session (save-state).
 
 ## Now
 
-- **Claude Code, hand assessment** (branch `claude/amazing-goodall-erq636`, no open PR): nothing half-done. Applied
-  page-edit issue #302 (update bar removed; page now loads network first).
+Each session keeps its own line in `status/<session>.md` (`hand.md`). Read them before starting; edit only yours.
 
 ## Waiting on the owner
 
@@ -26,20 +25,19 @@ Last updated: 2026-10-13 by Claude Code, hand assessment session.
 
 ## Recently done
 
-- Elson figure: finger rests on the table, middle joint over the edge (no clipping); see-through table.
-- Firefox: checked the update fix and 3D in Firefox; no-WebGL phones get the GIFs instead of blank boxes.
-- Page edits #302: no update bar; online visits always get the current page (network first, cache offline).
-- #260: updates switch on by themselves; the update bar only reloads (tap did nothing on the owner's phone).
+- #312: tendon tests checked; EDC now all fingers then press each; EIP and EDM one at a time against resistance.
+- #309: Elson figure: finger rests on the table, middle joint over the edge (no clipping); see-through table.
+- #306: no-WebGL phones (Firefox) get the GIFs instead of blank boxes; checked in Firefox.
+- #305: no update bar; online visits always get the current page (network first, cache offline); page edit #302.
+- #260: updates switch on by themselves (tap did nothing on the owner's phone).
 - #258: 3D animations (three.js) for cascade, FDP, FDS, nerve map; new FPL, EDC, EIP/EDM, EPL, Elson; kinder wording.
 - #253: removed the 10 rules and the emoji.
-- #247: page editor (`edit.html`, sends GitHub issues).
-- #245: page cut to about half, plainer local wording; quiz, Words, privacy and template removed.
-- #243: moved from `/hand/` to `/hand-babies/` (redirect + cache cleanup at `/hand/`).
-- #242: animated figures with Play/Pause, GIF copies in `gifs/`.
-- #207: first version.
+- #247: page editor (now the site-wide `/edit/`, #301).
 
 ## Decisions
 
+- 2026-10-13: no Z-Anatomy / MakeHuman models (owner: too much effort); keep the primitive 3D hand.
+- 2026-10-13: EDC tested with all fingers straight, pressing each in turn (ring can't straighten alone); EIP and EDM tested separately.
 - 2026-10-13: owner uses Firefox; test there too. No WebGL: show the figure's GIF.
 - 2026-10-13: no update bar; the worker is network first (3 s fallback to cache), so updates need no tap or reload.
 - 2026-10-12: new versions activate themselves; the bar only reloads (owner's tap did nothing).
