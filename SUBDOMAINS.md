@@ -101,7 +101,10 @@ each one's step makes it a redirect), and `hand.anawj.com/logbook/` is a 404.
 
 - [x] Plan written (homepage session)
 - [x] 1. Hosting (log1): Worker merged (#352, #354); the four custom domains were added by the owner and checked 13 Oct (each address answers with its app, noindex, stamped versions; other apps' folders are 404s)
-- [ ] 2. hand.anawj.com (CMC trainer, then hand assessment)
+- [x] 2. hand.anawj.com (CMC trainer, hand assessment; run side by side): #357 (`cmcj/`) and #356 (`hand-babies/` to
+  `/babies/`, `hand/` removed), checked live 13 Oct; old addresses forward with path, query and `#` kept (a top-level-only
+  host check in each `index.html`, no Worker change)
+- [ ] Shared design folder: `design/` moves to `nuhsdesign/` (NUHS-style Design), served on every subdomain (log1)
 - [ ] 3. prewarmstudy.anawj.com (Prewarming Webapp)
 - [ ] 4. nuhroster.anawj.com (NUH Roster)
 - [ ] 5. apmes.anawj.com (log1, with MedHub Evaluations)
