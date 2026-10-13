@@ -722,8 +722,11 @@ function howTo() {
 // phone ("Saved on this phone") and the heading turns to Sent once the server has it.
 function sentScreen(ev, edited, unsent = false) {
   const me = S.user?.email;
+  // the same resident's other forms first (often several items from one case), then the oldest
   const next = (S.assigned || []).filter(e => e.status === 'requested' && e.id !== ev.id && e.residentEmail !== me)
-    .sort((a, b) => (a.requestedAt || a.createdAt || 0) - (b.requestedAt || b.createdAt || 0));
+    .sort((a, b) => (b.residentEmail === ev.residentEmail) - (a.residentEmail === ev.residentEmail)
+      || (a.requestedAt || a.createdAt || 0) - (b.requestedAt || b.createdAt || 0));
+  const sameRes = next.filter(e => e.residentEmail === ev.residentEmail).length;
   const link = resultLink(ev.id);
   const msg = `${toolLabel(ev.tool)} done: ${ev.itemText || ''}`.trim();
   const tell = async () => {
@@ -747,7 +750,8 @@ function sentScreen(ev, edited, unsent = false) {
       h('p', { class: 'e-small' }, ev.itemText || ''),
       h('p', { class: 'e-small' }, 'You can change your answers for 15 minutes from Evaluations › History.')),
     h('button', { class: 'n-btn e-btn-big', onclick: tell }, icon('share'), ' Tell resident'),
-    next.length ? h('a', { class: 'n-btn n-btn--secondary e-btn-big', href: '#e/' + encodeURIComponent(next[0].id) }, `Next pending (${next.length})`) : null,
+    next.length ? h('a', { class: 'n-btn n-btn--secondary e-btn-big', href: '#e/' + encodeURIComponent(next[0].id) },
+      sameRes ? `Next for ${ev.residentName || 'this resident'} (${sameRes} left)` : `Next pending (${next.length})`) : null,
     h('a', { class: 'n-btn n-btn--outline e-btn-quiet e-btn-big', href: '#pending' }, 'Back to Evaluations'));
 }
 

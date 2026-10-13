@@ -2,7 +2,7 @@
 // have submitted or declined. Rows open the form (#e/{id}).
 
 import { S, h, go, avatar, icon, empty, segment, fmtAgo, fmtDate, toolLabel, statusChip } from './ui-core.js';
-import { FORMS } from './forms.js';
+import { FORMS, questionsOf } from './forms.js';
 import { validate, nextGap, OVERDUE_HOURS } from './engine.js';
 
 const sentAt = ev => ev.requestedAt || ev.createdAt || 0;
@@ -62,7 +62,7 @@ function pendingRow(ev) {
     h('span', { class: 'e-row__meta', style: ITEM_STYLE }, ev.itemText || ev.itemId),
     h('span', { class: 'e-row__meta' }, h('span', { class: 'e-tag e-tag--tool' }, toolLabel(ev.tool)), ' ',
       h('span', { style: late ? 'color: var(--n-alert-ink); font-weight: 600' : null }, fmtAgo(sentAt(ev))),
-      gap ? ` · Resume at Q${gap}` : ''),
+      gap ? ` · Resume at Q${gap}` : FORMS[ev.formId] ? ` · ${questionsOf(FORMS[ev.formId]).length} questions` : ''),
   ], gap ? h('span', { class: 'e-dot', title: 'Partly complete' }) : null, null);
 }
 
