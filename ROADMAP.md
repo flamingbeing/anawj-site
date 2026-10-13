@@ -35,8 +35,8 @@ Everything else is an experiment or a demo for now.
 
 ## Ways of working to try
 
-- **The always-on home computer** (13 Oct 2026): connected to Remote Control through the Claude desktop app, so the
-  phone can drive a session on that computer. The desktop app runs sessions sandboxed, which limits what they can
-  do there. To try: `claude remote-control` from a terminal in the folder to work in (the command-line Claude Code,
-  whose permissions and sandbox are set in its own settings), for jobs the cloud can't do: the owner's signed-in
-  browser, files on that computer, long jobs. Ordinary repo work stays in the cloud.
+- **The always-on home computer** (13 Oct 2026): runs `claude remote-control` (command-line Claude Code) from the
+  owner's projects folder, which holds every Claude project, so the phone can drive a session there (first run 13 Oct;
+  the desktop app's Remote Control is sandboxed, so the command line is used instead). Started hidden by a small
+  PowerShell script, at sign-in through Task Scheduler, logging to a file in the user folder. For jobs the cloud can't
+  do: the owner's signed-in browser, files on that computer, long jobs. Ordinary repo work stays in the cloud.
