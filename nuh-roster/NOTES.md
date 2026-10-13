@@ -256,7 +256,7 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
 - Fix names (13 Oct): names an import couldn't match (draft, rotation file, red names on a monthly roster) get a card
   with a picker per name (closest names first, by `sameNameScore`); saving keeps the spelling as that person's short
   name (in the staff log) and reads the draft or rotation file again (`lastDraft`, `lastRotFile`).
-- Key and help (footer, and a link under the roster's one-line hint): what each mark means (`SYMBOLS`: &, (C), C-,
+- Key and help (footer, and a link under the roster's one-line hint; texts in `js/help.js`): what each mark means (`SYMBOLS`: &, (C), C-,
   L-, (L), postings, (AOH), colours, ☾ and •, AOCC/AIC/AH OT…) and "How do I…?" answers (`HOW`), one open at a time.
   Entries describe only what the roster does; don't add expansions of abbreviations nobody has confirmed. A printable
   one-page guide (`guide.html`: the morning steps, changing things, the marks) is linked from it and from the tour's
@@ -272,7 +272,7 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
   reasons); keep that rule in any new free-text field that is sent out or saved for the team.
 - Phones: a "Next step" bar at the bottom (`#nextbar`, from the same steps as the strip): the first step not done, with
   Go / Show / "Make it" (on Roster with no roster). Hidden on desktop, Staff, Settings, for viewers and in print.
-- What's new (`WHATS_NEW` in app.js): a dated list in plain words, offered once per device after an update (a toast
+- What's new (`WHATS_NEW` in `js/help.js`): a dated list in plain words, offered once per device after an update (a toast
   with "What's new", waiting for any message already on screen; not on a first visit or in Practice) and always from
   Key and help. Add a line when a change is something rosterers or viewers would notice; start a new date at the top.
 - Keep building elements with `h()` and `textContent`; there is no `innerHTML` anywhere, so imported text can't inject.
@@ -286,6 +286,9 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
 | `js/xlsxio.js` | Reading drafts, staff sheets and the contact list; writing the roster workbook. |
 | `js/store.js` | Loading saved data over a blank state (`mergeSaved`) and bringing old saved data up to date (`migrateRooms` v1→v4). Pure, tested. |
 | `js/ics.js` | Calendar files (.ics) for My day and My week. |
+| `js/help.js` | The app's own explanations: the key to the marks (`SYMBOLS`), "How do I…?" (`HOW`), What's new (`WHATS_NEW`). A test checks every mark in `guide.html` is also in the key. |
+| `guide.html` | The printable one-page quick guide. |
+| `sw.js`, `manifest.webmanifest`, `icons/` | Installable app and offline shell (VERSION stamped at deploy). |
 | `js/rotations.js` | Junior rotations: weeks (by Monday), a junior's posting on a date, reading and writing the year's rotation as Excel. |
 | `js/monthly.js` | The HMS monthly rosters: column definitions, PDF/Excel reading, Excel writing, what each roster means for a date. |
 | `js/pdfout.js` | The roster PDF from the layout. |
