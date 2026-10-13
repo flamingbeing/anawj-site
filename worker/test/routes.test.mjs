@@ -32,8 +32,8 @@ assert.deepEqual(resolve('prewarmstudy.anawj.com', '/js/app.js'), { file: 'prewa
 assert.deepEqual(resolve('prewarmstudy.anawj.com', '/prewarm/'), { file: 'prewarm/' });
 assert.deepEqual(resolve('prewarmstudy.anawj.com', '/prewarm/sw.js'), { file: 'prewarm/sw.js' });
 assert.deepEqual(resolve('prewarmstudy.anawj.com', '/prewarm'), { redirect: '/prewarm/' });
-assert.deepEqual(resolve('roster.anawj.com', '/'), { file: 'nuh-roster/' });
-assert.deepEqual(resolve('ROSTER.anawj.com:443', '/x.js'), { file: 'nuh-roster/x.js' });
+assert.deepEqual(resolve('nuhroster.anawj.com', '/'), { file: 'nuh-roster/' });
+assert.deepEqual(resolve('NUHROSTER.anawj.com:443', '/x.js'), { file: 'nuh-roster/x.js' });
 // ... and never another app's files (only folders under the app's own folder are reachable)
 assert.deepEqual(resolve('prewarmstudy.anawj.com', '/logbook/js/app.js'), { file: 'prewarm/logbook/js/app.js' });   // that file doesn't exist there: 404
 
@@ -49,7 +49,7 @@ assert.deepEqual(resolve('x.workers.dev', '/_sites/hand.anawj.com/logbook/'), { 
 assert.deepEqual(resolve('x.workers.dev', '/_sites/hand.anawj.com'), { redirect: '/_sites/hand.anawj.com/' });
 assert.deepEqual(resolve('x.workers.dev', '/_sites/nothing.anawj.com/x'), { file: '_sites/nothing.anawj.com/x' });   // unknown host: not a site
 // the real hosts don't take the /_sites/ route
-assert.deepEqual(resolve('hand.anawj.com', '/_sites/roster.anawj.com/'), { notFound: true });
+assert.deepEqual(resolve('hand.anawj.com', '/_sites/nuhroster.anawj.com/'), { notFound: true });
 
 // the table lists only folders that exist in the repo
 import fs from 'node:fs';

@@ -33,7 +33,7 @@ r = await get('https://apmes.anawj.com/logbook'); assert.equal(r.status, 301); a
 // a subdomain never serves another app's files, the repo's notes or the root
 for (const [h, p] of [['hand.anawj.com', '/logbook/index.html'], ['hand.anawj.com', '/'], ['hand.anawj.com', '/AGENTS.md'], ['hand.anawj.com', '/hand-babies/'],
   ['apmes.anawj.com', '/prewarm/index.html'], ['apmes.anawj.com', '/nuh-roster/'], ['prewarmstudy.anawj.com', '/logbook/index.html'], ['prewarmstudy.anawj.com', '/AGENTS.md'],
-  ['roster.anawj.com', '/prewarm/'], ['roster.anawj.com', '/logbook/js/app.js'], ['hand.anawj.com', '/cmcj/..%2flogbook/index.html'], ['hand.anawj.com', '/cmcj/%2e%2e/logbook/index.html']]) {
+  ['nuhroster.anawj.com', '/prewarm/'], ['nuhroster.anawj.com', '/logbook/js/app.js'], ['hand.anawj.com', '/cmcj/..%2flogbook/index.html'], ['hand.anawj.com', '/cmcj/%2e%2e/logbook/index.html']]) {
   r = await get(`https://${h}${p}`);
   assert.equal(r.status, 404, `${h}${p} -> ${r.status}`);
 }
@@ -42,10 +42,10 @@ r = await get('https://prewarmstudy.anawj.com/'); assert.equal(r.status, 200);
 r = await get('https://prewarmstudy.anawj.com/sw.js'); assert.equal(r.status, 200);
 r = await get('https://prewarmstudy.anawj.com/prewarm/sw.js'); assert.equal(r.status, 200);
 r = await get('https://prewarmstudy.anawj.com/prewarm'); assert.equal(r.status, 301);
-r = await get('https://roster.anawj.com/'); assert.equal(r.status, 200);
+r = await get('https://nuhroster.anawj.com/'); assert.equal(r.status, 200);
 // only GET and HEAD
-r = await get('https://roster.anawj.com/', 'POST'); assert.equal(r.status, 405);
-r = await get('https://roster.anawj.com/', 'HEAD'); assert.equal(r.status, 200);
+r = await get('https://nuhroster.anawj.com/', 'POST'); assert.equal(r.status, 405);
+r = await get('https://nuhroster.anawj.com/', 'HEAD'); assert.equal(r.status, 200);
 
 // the previews and the copy of main: the whole repo as before, index pages included
 r = await get('https://anawj-preview.example.workers.dev/logbook/'); assert.equal(r.status, 200);
