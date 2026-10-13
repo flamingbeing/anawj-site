@@ -816,10 +816,11 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     if (nan.length) { toast('Check ' + nan.map(c => c.label).join(', ') + ': numbers only.'); return false; }
     const odd = typed.filter(c => +draft[c.key] < SANE[c.key][0] || +draft[c.key] > SANE[c.key][1]);
     if (odd.length && !confirm(odd.map(c => `${c.label} ${draft[c.key]}`).join(', ') + ' looks unusual. Save anyway?')) return false;
-    // a blank reading isn't saved (it would stop the timepoint counting as missed); a part-blank one asks first
+    // a blank or part-blank reading asks first (owner, 13 Oct 2026: an empty one can be saved, e.g. pre-warming that
+    // ran only 10 min); saving it marks the timepoint done, so it stops counting as missed
     const blank = cols.filter(c => draft[c.key] == null || draft[c.key] === '');
-    if (blank.length === cols.length) { toast('Nothing entered for ' + pt.label + ' yet.'); return false; }
-    if (blank.length && !confirm(`${blank.map(c => c.label).join(', ')} ${blank.length === 1 ? 'is' : 'are'} blank.\n\nSave the ${pt.label} reading without ${blank.length === 1 ? 'it' : 'them'}?`)) return false;
+    if (blank.length === cols.length) { if (!confirm(`Nothing entered for ${pt.label}.\n\nSave it with no readings (it is then not counted as missed)?`)) return false; }
+    else if (blank.length && !confirm(`${blank.map(c => c.label).join(', ')} ${blank.length === 1 ? 'is' : 'are'} blank.\n\nSave the ${pt.label} reading without ${blank.length === 1 ? 'it' : 'them'}?`)) return false;
     // the other phone saved this reading while it was open here: ask before writing over it (Cancel shows theirs)
     const theirs = cols.filter(c => (p.f[`${s}_${pt.key}_${c.key}`]?.t || 0) !== openT[c.key]);
     if (theirs.length) {
