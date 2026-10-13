@@ -1,0 +1,39 @@
+# Weekly proof-read of every page and document (tools/proofread.mjs: missing noindex, titles, alt text, links to files
+# that don't exist, live addresses not answering). Keeps one open issue titled "Proof-read: …" up to date, and closes
+# it once a run finds nothing. No AI and no secrets: it only reads the repo and the live pages.
+name: Proof-read
+
+on:
+  schedule:
+    - cron: '47 0 * * 1'   # Mondays 08:47 Singapore
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  proofread:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Proof-read
+        id: run
+        run: |
+          if node tools/proofread.mjs --live --md > report.md; then echo "found=false" >> "$GITHUB_OUTPUT"; else echo "found=true" >> "$GITHUB_OUTPUT"; fi
+          cat report.md
+      - name: Open, update or close the issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FOUND: ${{ steps.run.outputs.found }}
+        run: |
+          open=$(gh issue list --state open --search 'in:title "Proof-read:"' --json number,title -q '[.[] | select(.title | startswith("Proof-read:"))][0].number')
+          if [ "$FOUND" = "true" ]; then
+            if [ -n "$open" ]; then gh issue edit "$open" --body-file report.md
+            else gh issue create --title "Proof-read: $(date -u +%F)" --body-file report.md; fi
+          elif [ -n "$open" ]; then
+            gh issue close "$open" --comment "This week's proof-read found nothing: all fixed."
+          fi
