@@ -884,7 +884,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
       ${s === 'haemo' && vitalsCollected(p) ? '<p class="okline small">✓ Vital signs data collected: ticked on the paper form</p>' : ''}
       ${s === 'haemo' && settings.hide.haemo15 ? `<p class="muted small">Only baseline is entered here; the 15-min rows come from the monitor download. Turn them on in Settings.</p>` : ''}
       ${main ? (noPw ? '' : signoffHtml(p, s)) + comfortHtml('sat_post', 'Comfortable after surgery?') : signoffHtml(p, s)}</section>
-      <section class="third bot" aria-label="Other forms and checks">${linksHtml()}${gapsHtml(p)}${doneHtml(p)}
+      <section class="third bot" aria-label="Other forms and checks">${progressHtml(p)}${linksHtml()}${gapsHtml(p)}${doneHtml(p)}
       <p class="resetline"><button class="link" id="resetsub">Reset this subject</button></p></section>`);
     refreshBar();
     disableSealed();
@@ -1198,7 +1198,8 @@ function gapsHtml(p) {
 // a section marked complete is read only until its tick is undone; "data collection complete" closes every op-day
 // screen (owner, 12 Oct 2026). The Perioperative data page (filled in later from the chart) stays open.
 function sealedBy(p, pg) {
-  if (val(p, 'done')) return 'Data collection';
+  // Perioperative data is filled in later from the chart, so "data collection complete" doesn't close it: only its own tick
+  if (val(p, 'done') && pg !== 'periop') return 'Data collection';
   if (!pg || !val(p, 'sign_' + pg)) return null;
   const n = SECTION[pg] || PAGES.find(x => x.id === pg)?.title || 'This section';
   return n[0].toUpperCase() + n.slice(1);
@@ -1207,13 +1208,22 @@ const sealedMsg = (p, pg) => `${sealedBy(p, pg)} is marked complete. Undo its ti
 const sealNote = (p, pg) => `<p class="sealnote">✓ ${esc(sealedMsg(p, pg))}</p>`;
 // boxes in a closed section can't be typed in
 const disableSealed = () => view.querySelectorAll('.sealed input, .sealed select, .sealed textarea').forEach(i => { i.disabled = true; });
+// which sections are marked complete (owner, 13 Oct 2026): each links to its screen
+function progressHtml(p) {
+  const id = p.id;
+  const rows = [['prewarm', 'Pre-warming temps', `#/p/${id}/prewarm`], ['iotemp', 'Intra-op temps', `#/p/${id}/iotemp`], ['haemo', 'BP, HR, BIS', `#/p/${id}/haemo`],
+    ['intraop', 'Intra-op details', `#/p/${id}/form/intraop`], ['pacu', 'PACU', `#/p/${id}/form/pacu`], ['periop', 'Perioperative data', `#/p/${id}/data`]]
+    .filter(([k]) => !(k === 'prewarm' && noWarming(p)));
+  return `<nav class="progress" aria-label="Progress">${rows.map(([k, l, h]) => { const on = !!val(p, 'sign_' + k);
+    return `<a href="${h}" class="${on ? 'on' : ''}" aria-label="${l}: ${on ? 'complete' : 'not marked complete'}"><span class="tick" aria-hidden="true">${on ? '✓' : ''}</span>${l}</a>`; }).join('')}</nav>`;
+}
 function doneHtml(p) {
   return tickHtml(!!val(p, 'done'), 'data collection', val(p, 'done') || '', 'data-undone', 'data-done').replace('Mark data collection complete', 'Mark data collection as complete').replace('<b>data collection complete', '<b>Data collection complete');
 }
 
 // ---------- section sign-off (replaces the paper form's Name / Signature / Date)
 // each sign-off names its section, and shows a ticked box once marked (owner, 12 Oct 2026)
-const SECTION = { prewarm: 'pre-warming temps', iotemp: 'intra-op temps', haemo: 'BP, HR, BIS', intraop: 'Intra-op details', pacu: 'PACU', satis: 'Patient comfort' };
+const SECTION = { periop: 'perioperative data', prewarm: 'pre-warming temps', iotemp: 'intra-op temps', haemo: 'BP, HR, BIS', intraop: 'Intra-op details', pacu: 'PACU', satis: 'Patient comfort' };
 const tickHtml = (on, label, who, undo, mark) => on
   ? `<div class="sign on"><span class="tick" aria-hidden="true">✓</span><span><b>${esc(label)} complete</b><small>${esc(who)}</small></span><button class="link" ${undo}>Undo</button></div>`
   : `<div class="sign"><button class="tickbtn" ${mark}><span class="tick" aria-hidden="true"></span>Mark ${esc(label)} complete</button></div>`;
@@ -1258,12 +1268,15 @@ route(/^\/p\/(\w+)\/data$/, id => {
   const filled = pg => FORM[pg].filter(([k]) => val(p, k) != null).length;
   const draw = () => {
     const y = window.scrollY;
+    const sl = sealedBy(p, 'periop');
     paint(`<p class="muted small">Usually from Epic or the chart, after the day of surgery. Fill in what you have; the rest stays blank.</p>
-      <details class="sect" data-pg="study" ${closed.has('study') ? '' : 'open'}><summary><span>Subject ID and group</span><small>to correct a mistake</small></summary>
+      <div class="${sl ? 'sealed' : ''}"><details class="sect" data-pg="study" ${closed.has('study') ? '' : 'open'}><summary><span>Subject ID and group</span><small>to correct a mistake</small></summary>
         <div class="stack">${fieldHtml(field('enrol_id'), get)}${fieldHtml(field('arm'), get)}</div></details>
       ${OTHER_PAGES.map(pg => `<details class="sect" data-pg="${pg}" ${closed.has(pg) ? '' : 'open'}><summary><span>${esc(PAGES.find(x => x.id === pg).title)}</span>
         <small>${filled(pg) ? filled(pg) + ' of ' + FORM[pg].length + ' filled' : 'Not started'}</small></summary>
-        <div class="stack">${FORM[pg].map(([k]) => fieldHtml(field(k), get)).join('')}</div></details>`).join('')}`);
+        <div class="stack">${FORM[pg].map(([k]) => fieldHtml(field(k), get)).join('')}</div></details>`).join('')}</div>
+      ${sl ? sealNote(p, 'periop') : ''}${signoffHtml(p, 'periop')}`);
+    disableSealed();
     window.scrollTo(0, y);
   };
   draw();
@@ -1283,9 +1296,15 @@ route(/^\/p\/(\w+)\/data$/, id => {
     }
     set(p, f.id, String(get(f.id)) === String(v) ? null : v); draw();
   };
-  view.onclick = e => { const b = e.target.closest('.chip[data-f]'); if (b) pick(b); };
+  view.onclick = e => {
+    if (e.target.closest('[data-sign], [data-unsign]')) return signoffClick(p, 'periop', e.target);
+    const b = e.target.closest('.chip[data-f]');
+    if (b && sealedBy(p, 'periop')) return toast(sealedMsg(p, 'periop'));
+    if (b) pick(b);
+  };
   view.onchange = e => {
     const i = e.target; if (!i.dataset.f) return;
+    if (sealedBy(p, 'periop')) return;
     const f = field(i.dataset.f);
     // Subject ID: never blank, never the same as another patient's here
     if (f.id === 'enrol_id') {

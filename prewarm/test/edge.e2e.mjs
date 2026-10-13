@@ -613,7 +613,31 @@ jobs.push(() => tryit(async () => {
   log(/Diastolic/.test(await pg.textContent('.kp .kphead')) && await pg.inputValue('[data-in="sbp"]') === '120', 'Next saves 120 and opens Diastolic BP');
   await ctx.close();
 }));
+// AD. progress ticks on the main page; Perioperative data has its own complete tick that locks its page, and
+// "data collection complete" doesn't lock it
+jobs.push(() => tryit(async () => {
+  const { ctx, pg } = await fresh();
+  await pg.evaluate(() => localStorage.setItem('prewarm-demo:settings', JSON.stringify({ me: 'ZZ' })));
+  await pg.reload(); await pg.waitForTimeout(600);
+  await open(pg, 1);
+  const prog = () => pg.$$eval('.progress a', as => as.map(a => (a.classList.contains('on') ? '+' : '-') + a.textContent.trim()).join('|'));
+  log((await prog()).split('|').length === 6 && !(await prog()).includes('+'), 'progress lists six sections, none complete yet: ' + await prog());
+  await pg.click('[data-sign="iotemp"]'); await pg.waitForTimeout(300);
+  log(/\+✓Intra-op temps/.test(await prog()), 'a section marked complete shows its tick on the main page');
+  await pg.click('.progress a[href$="/data"]'); await pg.waitForSelector('#f-enrol_id');
+  const d0 = await pg.$eval('#f-enrol_id', i => i.disabled);
+  await pg.click('[data-sign="periop"]'); await pg.waitForSelector('.sealnote');
+  log(!d0 && await pg.$eval('#f-enrol_id', i => i.disabled), 'Perioperative data complete: its boxes lock');
+  pg.once('dialog', d => d.accept());
+  await pg.click('[data-unsign="periop"]'); await pg.waitForSelector('[data-sign="periop"]');
+  log(!await pg.$eval('#f-enrol_id', i => i.disabled), 'undone: editable again');
+  // data collection complete does not close Perioperative data
+  await pg.goBack(); await pg.waitForSelector('[data-done]'); pg.once('dialog', d => d.accept()); await pg.click('[data-done]'); await pg.waitForTimeout(300);
+  await pg.click('.progress a[href$="/data"]'); await pg.waitForSelector('#f-enrol_id');
+  log(!await pg.$eval('#f-enrol_id', i => i.disabled), 'data collection complete leaves Perioperative data open');
+  await ctx.close();
+}));
 await runJobs();
 await b.close();
 if (fails.length) { console.error('prewarm edge: FAIL\n- ' + fails.join('\n- ')); process.exit(1); }
-console.log('prewarm edge: ok (midnight, surgery end, double-tap Save, BP checks, back button, Log, Enter, still to fill, swipe, stray taps, time order, corrections, BMI, follow-ups, blanks, typed answers, alerts everywhere, duplicates, storage full, lock warning, late readings, delete and restore, prewarm off alert, warming yes / no, touch double taps, typing then leaving, other tab due, two patients, app closed mid-reading, layout, reset, PACU view, sections closed once complete, layout and carry-over, haemo alarm toggle, keypad popups)');
+console.log('prewarm edge: ok (midnight, surgery end, double-tap Save, BP checks, back button, Log, Enter, still to fill, swipe, stray taps, time order, corrections, BMI, follow-ups, blanks, typed answers, alerts everywhere, duplicates, storage full, lock warning, late readings, delete and restore, prewarm off alert, warming yes / no, touch double taps, typing then leaving, other tab due, two patients, app closed mid-reading, layout, reset, PACU view, sections closed once complete, layout and carry-over, haemo alarm toggle, keypad popups, progress and perioperative tick)');
