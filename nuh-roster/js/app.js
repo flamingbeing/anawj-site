@@ -397,7 +397,14 @@ const TOUR = [
   { tab: 'roster', sel: '.split', title: 'Send it out', text: 'Download the sheet as Excel or PDF, or save it for the team. Undo (Ctrl+Z) takes back anything.' },
 ];
 let tourStep = -1;
-function startTour() { tourStep = 0; showTourStep(); }
+function startTour() {
+  // the tour points at a roster; an empty real app has none, so offer Practice (which has one) instead
+  if (!DEMO && (!state.staff.length || !state.roster)) {
+    toast('The tour shows a made-up roster in Practice, so it doesn\'t touch yours.', { label: 'Open Practice', run: () => window.open(demoLink(), '_blank', 'noopener') });
+    return;
+  }
+  tourStep = 0; showTourStep();
+}
 function endTour() {
   tourStep = -1;
   document.getElementById('tour')?.remove();
@@ -685,6 +692,22 @@ function renderStaff(role) {
   );
 }
 
+// The first time the real app opens (no staff yet): three ways in, instead of an empty staff page.
+function welcomeCard() {
+  if (state.staff.length || DEMO || isViewer()) return null;
+  const signIn = cloud.enabled && !cs.user;
+  return h('section', { class: 'card welcome' },
+    h('h2', {}, 'Welcome to the NUH roster'),
+    h('p', {}, 'Each day goes: monthly rosters → cases → generate the roster → fix the problems it lists → send it out. To start, the app needs the staff list.'),
+    h('ol', { class: 'welcome-steps' },
+      h('li', {}, h('b', {}, 'New here? '), 'Practise first on a made-up department, with a short tour. Nothing you do there touches the real roster. ',
+        h('a', { class: 'btn primary', href: demoLink(), target: '_blank', rel: 'noopener' }, 'Try Practice')),
+      cloud.enabled ? h('li', {}, h('b', {}, 'On the team? '), signIn ? 'Sign in with your Google account: the team\'s staff list loads by itself. ' : cs.member ? 'The team\'s staff list loads when someone has saved it (Staff › Save for the team). ' : 'Ask an admin to add you, then sign in again. ',
+        signIn ? h('button', { onclick: () => cloud.signIn().catch(e => { if (e?.code !== 'auth/popup-closed-by-user') cloudError(e); }) }, 'Sign in with Google') : null) : null,
+      h('li', {}, h('b', {}, 'Setting it up? '), 'Import the master staff sheet or the contact list (Excel). You check the list before anything is kept. ',
+        fileButton('Import staff sheet', '.xlsx,.csv', false, async files => { if (!staffEditing()) startStaffEdit(); await importStaffSheet(files); }))));
+}
+
 function renderStaffView(role) {
   const subs = state.settings.subspecs;
   const senior = role === 'senior';
@@ -704,6 +727,7 @@ function renderStaffView(role) {
     senior && h('td', {}, (p.avoid || []).join(', ')),
   );
   return h('div', {},
+    welcomeCard(),
     h('section', { class: 'card' },
       h('h2', {}, senior ? 'Seniors' : 'Juniors'),
       h('p', { class: 'hint' }, senior
@@ -3445,9 +3469,18 @@ const me = () => ({ email: cs.user.email, displayName: cs.user.displayName, rost
 const when = ms => new Date(ms).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 const byName = b => b?.name || b?.email || 'someone';
 
+// Cloud errors in words someone can act on; the technical message goes to the console.
 function cloudError(e) {
   console.error(e);
-  toast(e?.code === 'permission-denied' ? "You don't have access to that. Ask an admin to add you to the team." : `Couldn't reach the shared storage: ${e?.message || e}`);
+  const code = String(e?.code || '').replace(/^firestore\//, ''), msg = String(e?.message || e || '');
+  const kept = ' Your work is still kept in this browser.';
+  const words =
+    code === 'permission-denied' ? "You don't have access to that. Ask an admin to add you to the team (or give you the rosterer role)."
+    : code === 'unauthenticated' ? 'You\'ve been signed out. Sign in again, then try once more.' + kept
+    : code === 'unavailable' || !navigator.onLine || /network|fetch|offline|dynamically imported module/i.test(msg) ? "Can't reach the team's storage (offline, or the hospital network blocks it). Try again when connected." + kept
+    : code === 'deadline-exceeded' || code === 'resource-exhausted' ? 'The team\'s storage is slow or busy right now. Try again in a minute.' + kept
+    : `Something went wrong talking to the team's storage (${code || 'error'}). Try again.` + kept;
+  toast(words);
 }
 
 function renderCloudBar() {
