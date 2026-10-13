@@ -6,7 +6,7 @@ list, filtered by the app's label, has the rest).
 Each session edits only its own file under `status/` (see **Now**). Update this file when a task finishes, a decision is made, or
 before compacting (`/save-state` in Claude Code, `$save-state` in Codex).
 
-Last updated: 2026-10-13 by Claude Code, Logbook 1 (log1).
+Last updated: 2026-10-13 (evening) by Claude Code, Logbook 1 (log1), during the 6-hour build.
 
 ## Now
 
@@ -54,6 +54,9 @@ its own file), so sessions never edit the same lines. Read them all before start
 
 ## Recently done
 
+- #474 Wave 1 of the 6-hour build: cheap-read sync engine (local store + filtered listeners, deletes from the bin, `tools/test-reads.sh`), faster logging (Save takes the suggested tags, Case-tab 'quick' split into suggestions / Same as last, optional auto-tick), Sync to Drive / Dropbox / GitHub (one Markdown file per day, managed block, three-way merge), profiles as presets of visible switches with a new Personal profile and APMES switches, daily note (+ Today's note, paste cleaner, receive shares on Android).
+- #402 Send to… (Obsidian, WhatsApp, UpNote or any link).
+
 - #204 The top band's third quarter is the NUHS site's blue `#178fd7`, not cyan; Reflections' NUH tab colour too (`logbook-v26`).
 - #396, #395 Personal-log plan: written (#395), then made public-safe with the personal version moved to the private repo `flamingbeing/life` and a rule in `AGENTS.md` (#396).
 - #392 (site) The old `/design/` path retired; `/nuhsdesign/` is the one shared folder every subdomain serves.
@@ -65,6 +68,11 @@ its own file), so sessions never edit the same lines. Read them all before start
 - #289 Polish 6a: settings pages use switches, ✓ lists and one-line help (ⓘ for more); Advanced pages under headings.
 
 ## Decisions log
+
+- 2026-10-13: The owner's own main profile is the new generic Personal profile; residents keep Basic / Advanced. Every
+  difference between profiles is a visible switch; picking a profile only applies a preset (owner). Storage: Firestore stays
+  the main store with a local copy and filtered listeners for cheap reads (no rules change). Daily note = a note with id
+  `day-YYYY-MM-DD`. Notes cap 2,000 (app-side).
 
 - 2026-10-13: A private GitHub repo `flamingbeing/life` holds the owner's personal notes (daily log, knowledge notes, plans with
   personal details); cloud sessions may attach it only when he asks. Split rule (`AGENTS.md`): personal material goes
