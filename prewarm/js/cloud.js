@@ -50,6 +50,14 @@ export async function onUser(cb) {
   A.onAuthStateChanged(auth, cb);
 }
 
+// the signed-in user with a fresh token (after the owner changed the admin list or the rules)
+export async function whoAmI() {
+  const { auth } = await sdk();
+  const u = auth.currentUser;
+  try { await u?.getIdToken(true); } catch { /* offline: keep what we have */ }
+  return u;
+}
+
 export async function member() {
   const { auth, db, F } = await sdk();
   if (!auth.currentUser) return null;

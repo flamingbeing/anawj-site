@@ -298,3 +298,7 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   account that signed in once by emailed link (that proves the email, which the rules need): once signed in, Settings →
   Password → Save password (8+ characters). Rules unchanged (admins list + verified email). Needs Email/Password on
   in the Firebase console (it is, for email links). Covered by the two-phone sync test.
+- **Refresh now** (owner, 13 Oct 2026): a button at the bottom of the home page and in Settings (when sharing is on).
+  It re-checks who the phone is (fresh token, member / admin list, so a newly added admin entry counts without
+  logging out), re-subscribes to the team's patients, sends anything waiting, and checks for a new app version (shows
+  "Update available" if one is ready). It never deletes anything on the phone.

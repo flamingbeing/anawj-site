@@ -228,6 +228,30 @@ function pacuLinkHtml(p) {
     <p class="muted small">Opens only ${esc(sid(p))}’s PACU page. Show the QR code to the PACU nurse or send the link. Stopping it ends access.</p></div>`;
 }
 
+// Refresh now (owner, 13 Oct 2026): fetch the team's latest data again and look for a new app version
+let swReg = null, offerUpdate = null;
+const refreshHtml = () => `<div class="refreshbox"><button class="secondary" id="refreshnow">Refresh now</button><small class="muted">Gets the team’s latest data again, sends anything waiting, and checks for a new app version.</small></div>`;
+async function refreshNow(btn) {
+  btn.disabled = true; const was = btn.textContent; btn.textContent = 'Refreshing…';
+  let msg = 'Up to date.';
+  try {
+    if (cloud.enabled) {
+      // who this phone is: a new admin-list entry or team membership counts without logging out
+      const u = await cloud.whoAmI();
+      if (u) { shared.member = await cloud.member(); shared.admin = !u.isAnonymous ? await cloud.isAdmin() : false; shared.email = u.email || ''; }
+    }
+    if (cloud.enabled && sharing()) { uploadLocal(); await watch(); if (!(await cloud.flushed(5000))) msg = 'Refreshed, but some changes are still waiting for signal.'; }
+    if (swReg) {
+      await swReg.update().catch(() => {});
+      const w = swReg.installing;
+      if (w && w.state !== 'installed') await new Promise(ok => { const t = setTimeout(ok, 8000); w.addEventListener('statechange', () => { if (w.state === 'installed' || w.state === 'redundant') { clearTimeout(t); ok(); } }); });
+      if (swReg.waiting && navigator.serviceWorker.controller) { offerUpdate?.(swReg.waiting); msg = 'A new app version is ready: tap “Update available” at the top.'; }
+    }
+  } catch { msg = 'Couldn’t refresh. Check your signal and try again.'; }
+  btn.disabled = false; btn.textContent = was; toast(msg);
+  if (/^#\/(settings)?$/.test(location.hash) || !location.hash) render();
+}
+const wireRefresh = () => $('#refreshnow')?.addEventListener('click', e => refreshNow(e.target));
 async function watch() {
   shared.unwatch?.(); shared.unwatch = null;
   for (const u of pacuSubs.values()) u?.(); pacuSubs.clear();
@@ -549,7 +573,8 @@ function home() {
       if (locked) return `<li><a href="${canLock() ? '#/p/' + p.id : '#/'}" class="locked"${canLock() ? '' : ' data-locked="1"'}>${body}</a></li>`;
       return `<li><a href="#/p/${p.id}"${val(p, 'done') ? ` data-done="${esc(val(p, 'done'))}"` : ''}>${body}</a></li>`;
     }).join('')}</ul>` : `<p class="muted">No patients yet. Tap <b>New patient</b> on the morning of surgery.</p>`}
-    <p class="muted small">${sharing() ? `Shared with the ${esc(shared.admin ? 'whole study (admin)' : shared.member.site + ' team')}. Readings sync when there is signal. <b class="syncline">${esc(syncText())}</b>` : `Data stays on this phone. <a href="#/settings">Join your hospital’s team</a> to share patients.`} Study IDs only: no names or hospital numbers.</p>`);
+    <p class="muted small">${sharing() ? `Shared with the ${esc(shared.admin ? 'whole study (admin)' : shared.member.site + ' team')}. Readings sync when there is signal. <b class="syncline">${esc(syncText())}</b>` : `Data stays on this phone. <a href="#/settings">Join your hospital’s team</a> to share patients.`} Study IDs only: no names or hospital numbers.</p>${refreshHtml()}`);
+  wireRefresh();
   $('#new').onclick = () => go('#/new');
   // what each patient being charted needs now (a reading or Prewarm off due within 2 min, or late)
   const dues = () => view.querySelectorAll('[data-due]').forEach(el => {
@@ -1878,6 +1903,7 @@ route(/^\/settings$/, () => {
     <small class="muted">Makes text and buttons bigger or smaller on this phone.</small>
     <h2>Hospital and sharing</h2>
     ${sharingHtml()}
+    ${cloud.enabled ? refreshHtml() : ''}
     <h2>Readings to enter live</h2>
     <p class="muted small">Untick what you’ll fill in later from the Fortuna monitor or Epic. Core temperature is always on.</p>
     ${tog('hide', 'skin', 'Skin temps: chest, arm, thigh, calf')}${tog('hide', 'set', 'Gown set temp (pre-warming)')}${tog('hide', 'ts', 'Thermal sensation (pre-warming)')}
@@ -1892,6 +1918,7 @@ route(/^\/settings$/, () => {
     <a class="secondary" href="#/export">Export Excel</a>
     <h2>Participants</h2>
     <a class="secondary" href="#/delete">Delete participants</a></div>`);
+  wireRefresh();
   view.querySelectorAll('[data-zoom]').forEach(b => b.onclick = () => {
     settings.zoom = b.dataset.zoom; saveSettings(); applySize(settings.zoom);
     view.querySelectorAll('[data-zoom]').forEach(x => x.setAttribute('aria-pressed', x === b));
@@ -2150,7 +2177,8 @@ route(/^\/export$/, () => {
 if ('serviceWorker' in navigator && !DEMO) {
   navigator.serviceWorker.register('sw.js').then(reg => {
     // updating reloads the app: an unsaved reading on screen is asked about first
-    const offer = w => { const b = $('#update'); b.hidden = false; b.onclick = () => afterAsking(() => w.postMessage('skipWaiting')); };
+    const offer = offerUpdate = w => { const b = $('#update'); b.hidden = false; b.onclick = () => afterAsking(() => w.postMessage('skipWaiting')); };
+    swReg = reg;
     if (reg.waiting) offer(reg.waiting);
     reg.addEventListener('updatefound', () => { const w = reg.installing; w?.addEventListener('statechange', () => { if (w.state === 'installed' && navigator.serviceWorker.controller) offer(w); }); });
     // a phone keeps the app open for hours, and the browser only looks for a new version when the page is opened:

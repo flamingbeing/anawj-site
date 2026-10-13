@@ -661,6 +661,13 @@ jobs.push(() => tryit(async () => {
   log(/\/iotemp/.test(await pg.evaluate(() => location.hash)) && await sealed(), 'the 10 min save marks pre-warming complete and opens the intra-op temps: ' + await pg.evaluate(() => location.hash));
   await ctx.close();
 }));
+// AF. Refresh now at the bottom of the home page (and in Settings): never loses anything, says so
+jobs.push(() => tryit(async () => {
+  const { ctx, pg } = await fresh();
+  await pg.click('#refreshnow'); await pg.waitForTimeout(500);
+  log(/Up to date/.test(await pg.textContent('#toast')) && await pg.$('.list a') !== null, 'Refresh now keeps the patient list and says it is up to date');
+  await ctx.close();
+}));
 await runJobs();
 await b.close();
 if (fails.length) { console.error('prewarm edge: FAIL\n- ' + fails.join('\n- ')); process.exit(1); }
