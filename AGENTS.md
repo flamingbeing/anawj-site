@@ -49,7 +49,8 @@ for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mj
 
 ## Working with the owner
 
-- **Merging:** merge your own PRs once the checks above pass, then report (with the PR link). Exceptions: Claude
+- **Merging:** merge your own PRs once the checks above pass, then report (with the PR link). Merge by the number the
+  PR's creation returned, never a guessed next number (13 Oct 2026: a guess merged another session's PR early). Exceptions: Claude
   Code–Codex handover PRs wait for the owner's explicit approval; the owner may say "auto-merge" for a batch, or
   "no e2e yet" (then unit tests and quick browser checks).
 - **Planning:** for multi-part work, say the plan first and wait when asked; the owner plans in batches, then it's
