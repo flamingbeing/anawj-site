@@ -179,7 +179,7 @@ try { for (const width of [390, 1280]) {
   assert.equal(await p.evaluate(() => location.hash), '#log');
 
   assert.deepEqual(errors, []);
-  console.log(`daily note ${width}: ok`);
+  console.log(`PASS daily note ${width < 600 ? 'phone' : 'desktop'}`);
   await ctx.close();
 }
 
@@ -206,7 +206,6 @@ try { for (const width of [390, 1280]) {
   assert.equal(res.kept.title, 'Fake title');
   assert.deepEqual(res.kept.files.map(f => f.name), ['fake.md']);   // only files the app can read
   await ctx.close();
-  console.log('daily note service worker: ok');
+  console.log('PASS daily note service worker (POST share)');
 }
 } finally { await b.close(); }
-console.log('daily-note tests passed');
