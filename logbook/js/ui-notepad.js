@@ -8,16 +8,24 @@
 // The note index (which days and cases have notes; its own owner-only doc, meta/noteIndex) lets the Logbook mark
 // them without reading any note. It used to live in settings.noteIndex, which the app owner can read; it moves on the
 // first sync and the old copy is cleared.
+// Daily notes: one note a day ("day-YYYY-MM-DD", notepad.js), opened from the Logbook's day, "Today's note" here, the
+// app's "Today's note" shortcut (#today), and (Settings → Notes, off by default) a small box on the Case tab. They
+// don't count towards the 100 notes.
 
 import { S, h, toast, fill, hooks, writes, cloud, transients, settings, patchLogbook, resetters, todayISO, modal, emptyState, download } from './ui-core.js';
 import { uid, fmtDate, caseParts } from './engine.js';
-import { barTabs, arrangeTabs, display, setTabOnBar } from './ui-settings.js';
-import { MAX_NOTES, LIMITS, sortNotes, filterNotes, noteTitle, noteIndex, cleanNoteIndex, sameIndex, parseNote, toggleCheck, plainLines, noteFiles } from './notepad.js';
+import { barTabs, arrangeTabs, display, setDisplay, setTabOnBar, toggle, help, resetLink } from './ui-settings.js';
+import { MAX_NOTES, LIMITS, sortNotes, filterNotes, noteTitle, noteIndex, cleanNoteIndex, sameIndex, parseNote, toggleCheck, plainLines, noteFiles, dayNoteId, dayNoteOf, isDayNote, cappedNotes } from './notepad.js';
+import { fmtBar, replaceRange } from './fmt-bar.js';
+import { htmlToMarkdown, tidyMarkdown } from './paste-clean.js';
 
 const SAVE_MS = 3000;
 const mine = () => S.user && S.user.email;
-// q: search; day / caseId: what the list is narrowed to; editing: the note open in the editor; preview: its view mode
-export const nv = { q: '', day: '', caseId: '', editing: null, preview: false, autoNew: false };
+// q: search; day / caseId / kind ('day': daily notes only): what the list is narrowed to; editing: the note open in the
+// editor; preview: its view mode; back: the tab the editor goes back to (a daily note opened from the Logbook);
+// initBody: text a new note starts with (shared to the app)
+const NV0 = () => ({ q: '', day: '', caseId: '', kind: '', editing: null, preview: false, autoNew: false, back: '', initBody: '' });
+export const nv = NV0();
 
 // ---------- loading (lazy) ----------
 
@@ -44,7 +52,7 @@ export function ensureNotes() {
   return ready;
 }
 function stopNotes() { if (stop) stop(); stop = null; owner = null; raw = []; ready = null; readyResolve = null; S.notes = null; }
-resetters.push(() => { stopNotes(); Object.assign(nv, { q: '', day: '', caseId: '', editing: null, preview: false, autoNew: false }); });
+resetters.push(() => { stopNotes(); Object.assign(nv, NV0()); inline = null; });
 writes.onChange(() => { if (owner) { apply(); if (synced) syncIndex(); } });
 
 // the index doc, read the first time the Logbook asks (one small read), then kept live for the visit
@@ -79,10 +87,11 @@ export const notesIndex = () => { watchIndex(); return cleanNoteIndex(S.noteInde
 export const dayHasNotes = date => !!date && notesIndex().days.includes(date);
 export const caseHasNotes = id => !!id && notesIndex().cases.includes(id);
 
-// open Notes on a day's notes, or a case's (from the Logbook); create: start a new note there (linked to the case)
-export function openNotes({ day = '', caseId = '', create = false } = {}) {
+// open Notes on a day's notes, or a case's (from the Logbook); create: start a new note there (linked to the case),
+// with body as its text
+export function openNotes({ day = '', caseId = '', create = false, body = '' } = {}) {
   leaveNotes();   // a note open in the editor is saved first
-  Object.assign(nv, { day, caseId, q: '', editing: null, preview: false, autoNew: create });
+  Object.assign(nv, { day, caseId, kind: '', q: '', editing: null, preview: false, autoNew: create, back: '', initBody: create ? body : '' });
   if (S.tab === 'notes') return hooks.render();
   hooks.navigate ? hooks.navigate('notes') : (location.hash = '#notes');
 }
@@ -111,7 +120,7 @@ async function persist(n) {
   }, err => { s.dirty = true; s.status?.('Not saved: ' + err.message); return false; }).finally(() => { s.saving = null; });
   return s.saving;
 }
-const flushOpen = () => { if (nv.editing) persist(nv.editing); };
+const flushOpen = () => { if (nv.editing) persist(nv.editing); if (inline) persist(inline.note); };
 if (typeof window !== 'undefined') {
   window.addEventListener('pagehide', flushOpen);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushOpen(); });
@@ -137,7 +146,7 @@ export function renderNotes() {
   ensureNotes();
   const loading = !Array.isArray(S.notes);
   const list = loading ? [] : S.notes;
-  const full = list.length >= MAX_NOTES;
+  const counted = cappedNotes(list).length, full = counted >= MAX_NOTES;   // daily notes don't count
   if (nv.autoNew && !loading) { nv.autoNew = false; queueMicrotask(() => (full ? toast(`You have ${MAX_NOTES} notes, the most allowed. Delete or export some to make room.`) : newNote())); }
   const search = h('input', { type: 'search', class: 'grow', placeholder: 'Search notes', 'aria-label': 'Search notes', value: nv.q,
     oninput: e => { nv.q = e.target.value; paintList(); } });
@@ -149,11 +158,12 @@ export function renderNotes() {
       : !rows.length ? emptyState('search', 'No notes match')
       : h('ul', { class: 'notes-rows' }, rows.map(noteRow)));
   };
-  const narrowed = nv.day || nv.caseId;
+  const narrowed = nv.day || nv.caseId || nv.kind;
+  const hasDaily = list.some(isDayNote);
   // Notes lives in More until it's put on the tab bar: offer it here (a full bar asks which tab it replaces)
   const offBar = !arrangeTabs(barTabs().map(([id]) => id), display()).shown.includes('notes');
   fill(el,
-    h('div', { class: 'notes-head' }, h('h2', { style: 'margin:0' }, 'Notes'), h('span', { class: 'muted notes-count' }, loading ? '' : `${list.length} of ${MAX_NOTES}`)),
+    h('div', { class: 'notes-head' }, h('h2', { style: 'margin:0' }, 'Notes'), h('span', { class: 'muted notes-count', title: 'Daily notes don’t count' }, loading ? '' : `${counted} of ${MAX_NOTES}`)),
     h('p', { class: 'hint help' }, 'Your own notes: private, never in your portfolio.'),
     offBar ? h('p', { class: 'notes-onbar' }, h('button', { class: 'small', onclick: () => setTabOnBar('notes', true, () => hooks.render()) }, 'Add Notes to the tab bar')) : null,
     h('details', { class: 'fold help note-format' }, h('summary', {}, 'Formatting'),
@@ -164,8 +174,12 @@ export function renderNotes() {
         if (full) return toast(`You have ${MAX_NOTES} notes, the most allowed. Delete or export some to make room.`);
         newNote();
       } }, '+ New note')),
-    narrowed ? h('p', { class: 'notes-filter' }, h('span', {}, nv.day ? `Notes on ${fmtDate(nv.day)}` : `Notes on the case ${caseOf(nv.caseId) ? caseLabel(caseOf(nv.caseId)) : ''}`),
-      ' ', h('button', { class: 'small', onclick: () => { nv.day = ''; nv.caseId = ''; hooks.render(); } }, 'Show all')) : null,
+    // one note a day: today's (made the first time it's opened), and a chip for only the daily notes once there are some
+    h('div', { class: 'bar notes-daily' },
+      h('button', { class: 'small', disabled: loading, onclick: () => openDayNote(todayISO()) }, 'Today’s note'),
+      hasDaily || nv.kind ? h('button', { class: 'small chip-toggle', 'aria-pressed': String(nv.kind === 'day'), onclick: () => { nv.kind = nv.kind === 'day' ? '' : 'day'; hooks.render(); } }, 'Daily notes') : null),
+    narrowed ? h('p', { class: 'notes-filter' }, h('span', {}, nv.day ? `Notes on ${fmtDate(nv.day)}` : nv.caseId ? `Notes on the case ${caseOf(nv.caseId) ? caseLabel(caseOf(nv.caseId)) : ''}` : 'Daily notes'),
+      ' ', h('button', { class: 'small', onclick: () => { nv.day = ''; nv.caseId = ''; nv.kind = ''; hooks.render(); } }, 'Show all')) : null,
     full ? h('p', { class: 'tip' }, `You have ${MAX_NOTES} notes, the most allowed. Delete old ones (they stay in the recycle bin for 30 days) or keep them in a Markdown export.`) : null,
     listEl,
     list.length ? h('p', { class: 'notes-download' }, h('button', { class: 'small', onclick: downloadNoteFiles }, 'Download notes as files (zip)')) : null);
@@ -184,28 +198,138 @@ function noteRow(n) {
 }
 
 function newNote() {
-  const n = { id: uid(), date: nv.day || todayISO(), title: '', body: '', createdAt: Date.now() };
+  const n = { id: uid(), date: nv.day || todayISO(), title: '', body: nv.initBody || '', createdAt: Date.now() };
+  nv.initBody = '';
   if (nv.caseId) { n.caseId = nv.caseId; const c = caseOf(nv.caseId); if (c && c.date && !nv.day) n.date = c.date; }
   openEditor(n, true);
+  // text shared to the app is saved at once (a new note is otherwise saved only once something is typed)
+  if (n.body) touchOpen();
 }
 
 let editorTransient = null;
-function openEditor(n, fresh = false) {
+// edit: open straight in Edit (a daily note), not Preview; back: the tab Done goes back to
+function openEditor(n, fresh = false, { edit = false, back = '' } = {}) {
   const copy = JSON.parse(JSON.stringify(n));
   sessions.set(copy, { base: fresh ? null : JSON.parse(JSON.stringify(n)), owner: mine(), dirty: false, timer: null, saving: null });
-  nv.editing = copy; nv.preview = !fresh && !!String(copy.body || '').trim();
+  nv.editing = copy; nv.preview = !edit && !fresh && !!String(copy.body || '').trim(); nv.back = back;
   if (!editorTransient?.active) editorTransient = transients.open(() => {
     if (nv.editing) { persist(nv.editing); nv.editing = null; }
+    nv.back = '';
     hooks.render();
   });
   hooks.render();
   window.scrollTo(0, 0);
 }
-function closeEditor() {
-  const n = nv.editing;
+const touchOpen = () => { const s = nv.editing && sessions.get(nv.editing); if (s) { s.dirty = true; persist(nv.editing); } };
+async function closeEditor() {
+  const n = nv.editing, back = nv.back;
   if (n) persist(n);
-  nv.editing = null;
-  if (editorTransient?.active) editorTransient.close(); else hooks.render();
+  nv.editing = null; nv.back = '';
+  if (editorTransient?.active) await editorTransient.close(); else hooks.render();
+  // a daily note opened from the Logbook goes back there (the Notes page was only passed through)
+  if (back && S.tab === 'notes') history.back();
+}
+
+// ---------- daily notes ----------
+
+const BACK_LABEL = { logbook: 'Logbook', log: 'Case' };
+const joinText = (body, add) => (String(body || '').trim() ? String(body).trimEnd() + '\n\n' : '') + String(add || '').trim();
+// open a day's note in the editor (today's by default), made the first time; append: text to add at its end (shared to
+// the app). It waits for the notes, so an existing daily note is always opened (never a second copy with the same id).
+export async function openDayNote(iso = todayISO(), { append = '' } = {}) {
+  if (!mine()) return;
+  leaveNotes();
+  const from = S.tab !== 'notes' && BACK_LABEL[S.tab] ? S.tab : '';
+  Object.assign(nv, { day: '', caseId: '', kind: '', q: '', editing: null, preview: false, autoNew: false, initBody: '' });
+  if (S.tab !== 'notes') { if (hooks.navigate) await hooks.navigate('notes'); else location.hash = '#notes'; } else hooks.render();
+  const list = await ensureNotes();
+  if (S.tab !== 'notes' || nv.editing) return;   // gone elsewhere meanwhile
+  const have = dayNoteOf(list, iso);
+  openEditor(have || { id: dayNoteId(iso), date: iso, title: '', body: '', createdAt: Date.now() }, !have, { edit: true, back: from });
+  if (append && nv.editing) {
+    const n = nv.editing, add = String(append).trim();
+    n.body = joinText(n.body, add).slice(0, LIMITS.body);
+    if (n.body.length < joinText('', add).length) toast('The note is full: some of the text didn’t fit');
+    touchOpen(); hooks.render();
+  }
+}
+
+// The Logbook's day: its daily note as a preview (tap it or Edit to open the editor), or "+ Daily note". Notes are only
+// read when the index says the day has some, as before; until they arrive the button shows (it opens the right note).
+export function dayNoteCard(iso) {
+  const n = Array.isArray(S.notes) ? dayNoteOf(S.notes, iso) : null;
+  const open = () => openDayNote(iso);
+  if (!n || !String(n.body || '').trim()) return h('p', { class: 'lb-daynote-add' }, h('button', { class: 'small linkish', type: 'button', onclick: open }, n ? 'Daily note (empty) ›' : '+ Daily note'));
+  const view = h('div', { class: 'note-view lb-daynote-view', title: 'Open the daily note', onclick: e => { if (!e.target.closest('a')) open(); } }, renderBody(n.body));
+  return h('div', { class: 'lb-daynote' },
+    h('div', { class: 'lb-daynote-head' }, h('h4', {}, 'Daily note'), h('button', { class: 'small', type: 'button', 'aria-label': 'Edit the daily note', onclick: open }, 'Edit')),
+    view);
+}
+
+// The Case tab's daily note box (Settings → Notes → Show the daily note on the Case tab; off by default): today's note
+// in a small box that folds away, saving as you type like the editor. Its own copy of the note lives here between
+// renders, so a re-render of the Case tab never loses what's being typed.
+let inline = null, inlineOpen = false;   // { owner, iso, note }
+export function dayNoteBox() {
+  const me = mine(), iso = todayISO();
+  if (!me) return null;
+  const status = h('span', { class: 'muted notes-status', 'aria-live': 'polite' });
+  const ta = h('textarea', { class: 'day-note-text', rows: '4', placeholder: 'Loading…', disabled: true, 'aria-label': 'Today’s note', maxlength: String(LIMITS.body), spellcheck: 'true' });
+  const box = h('details', { class: 'fold day-note-box', open: inlineOpen },
+    h('summary', {}, 'Today’s note'),
+    ta,
+    h('div', { class: 'bar day-note-bar' }, status, h('span', { class: 'grow' }),
+      h('button', { class: 'small linkish', type: 'button', onclick: () => { if (inline) persist(inline.note); openDayNote(iso); } }, 'Open in Notes')));
+  box.addEventListener('toggle', () => { inlineOpen = box.open; });
+  const ready = () => {
+    const have = dayNoteOf(S.notes, iso);
+    const fresh = () => {
+      if (inline) persist(inline.note);   // yesterday's box (open past midnight) is saved first
+      const note = JSON.parse(JSON.stringify(have || { id: dayNoteId(iso), date: iso, title: '', body: '', createdAt: Date.now() }));
+      inline = { owner: me, iso, note };
+      sessions.set(note, { base: have ? JSON.parse(JSON.stringify(have)) : null, owner: me, dirty: false, timer: null, saving: null });
+    };
+    if (!inline || inline.owner !== me || inline.iso !== iso) fresh();
+    else {
+      // saved elsewhere since (the editor, another device) and nothing typed here: take the newer copy
+      const s = sessions.get(inline.note);
+      if (have && !s.dirty && !s.saving && (!s.base || s.base.updatedAt !== have.updatedAt) && have.body !== inline.note.body) fresh();
+    }
+    const n = inline.note, s = sessions.get(n);
+    s.status = t => { status.textContent = t; };
+    status.textContent = s.dirty ? 'Not saved yet' : s.base ? 'Saved' : '';
+    ta.value = n.body || ''; ta.disabled = false; ta.placeholder = 'A line for today…';
+    ta.oninput = () => { n.body = ta.value; s.dirty = true; status.textContent = 'Not saved yet'; clearTimeout(s.timer); s.timer = setTimeout(() => persist(n), SAVE_MS); };
+    ta.onblur = () => persist(n);
+  };
+  if (Array.isArray(S.notes)) ready();
+  else ensureNotes().then(ready);
+  return box;
+}
+
+// Settings → Notes: the daily note on the Case tab, the paste cleaner, formatting buttons, and what shared text does
+export function renderNoteSettings() {
+  const st = settings(), d = display();
+  const save = (patch, note = 'Saved') => patchLogbook({ settings: patch }).then(() => note && toast(note));
+  return h('div', { class: 'set-page' },
+    h('section', { class: 'card' },
+      h('h2', {}, 'Notes'),
+      help('Your own notes (More → Notes): private, never in your portfolio.'),
+      h('h3', {}, 'Daily note'),
+      toggle('Show the daily note on the Case tab', st.dayNoteOnCase, v => save({ dayNoteOnCase: v || null }),
+        'A small box under the case box for today’s note, saving as you type.', 'Off by default. The notes are read when the Case tab opens, which adds a little to the app’s reads.'),
+      h('h3', {}, 'Writing notes'),
+      toggle('Clean rich text when pasting', st.pasteClean, v => save({ pasteClean: v || null }),
+        'Text copied from a web page, Word, OneNote or UpNote becomes plain Markdown: headings, bold, lists, links.', 'Off: pasting keeps the plain text as it came. Clean up in a note’s ⋯ menu tidies a note already pasted.'),
+      toggle(['Formatting buttons in notes (this device)', 'Formatting buttons in notes'], d.noteToolbar, v => { setDisplay({ noteToolbar: v || null }); toast('Saved on this device'); },
+        'Bold, italic, heading, lists, to-do, link and undo above the note; on phones they sit on the keyboard.'),
+      h('h3', {}, 'Shared to the app'),
+      toggle('Ask what to do with shared text', st.shareAsk, v => save({ shareAsk: v || null }),
+        'Text shared to the installed app asks: add as cases, add to today’s note, or a new note.', 'Off: shared text goes to the Case tab’s paste-a-list, as before. Shared files always ask.')),
+    resetLink('everything on this page (the Case tab box, pasting, the formatting buttons and shared text)', async () => {
+      await patchLogbook({ settings: { dayNoteOnCase: null, pasteClean: null, shareAsk: null } });
+      setDisplay({ noteToolbar: null });
+    }));
 }
 
 function editor(n) {
@@ -213,15 +337,23 @@ function editor(n) {
   if (!sessions.has(n)) sessions.set(n, s);
   const status = h('span', { class: 'muted notes-status', 'aria-live': 'polite' }, s.base ? 'Saved' : 'Not saved yet');
   s.status = t => { status.textContent = t; };
-  const touch = () => { s.dirty = true; status.textContent = 'Not saved yet'; clearTimeout(s.timer); s.timer = setTimeout(() => persist(n), SAVE_MS); };
+  // (through s.status: the editor may have been drawn again since, e.g. after a live update once the box lost focus)
+  const touch = () => { s.dirty = true; s.status('Not saved yet'); clearTimeout(s.timer); s.timer = setTimeout(() => persist(n), SAVE_MS); };
   const title = h('input', { class: 'note-title', placeholder: 'Title', 'aria-label': 'Note title', maxlength: String(LIMITS.title), value: n.title || '',
     oninput: e => { n.title = e.target.value; touch(); }, onblur: () => persist(n),
     // Enter in the one-line title moves on to the note itself (as in a notes app), never a lost line break
     onkeydown: e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); if (nv.preview) modeBtn.click(); body.focus(); body.setSelectionRange(0, 0); } } });
   const date = h('input', { type: 'date', 'aria-label': 'Note date', value: n.date || '', onchange: e => { n.date = e.target.value || null; touch(); paintMeta(); } });
   const body = h('textarea', { class: 'note-body', rows: '12', placeholder: 'Write your note… (- [ ] for a to-do)', 'aria-label': 'Note text', maxlength: String(LIMITS.body), spellcheck: 'true',
-    oninput: e => { n.body = e.target.value; touch(); }, onblur: () => persist(n) });
+    oninput: e => { n.body = e.target.value; touch(); }, onblur: () => persist(n), onpaste: e => pasteClean(e, body) });
   body.value = n.body || '';
+  // Settings → Notes → Formatting buttons (this device): above the note; on a phone they ride on the keyboard
+  const bar = display().noteToolbar ? fmtBar(body, { full: true }) : null;
+  if (bar) {
+    bar.classList.add('note-fmt');
+    body.addEventListener('focus', () => bar.classList.add('on'));
+    body.addEventListener('blur', () => bar.classList.remove('on'));
+  }
   // one grey line under the title (like Notes and Bear): the date (tap it to change; the date box sits invisibly over
   // it), No date, and the linked case or a way to link one
   const meta = h('div', { class: 'note-meta' });
@@ -247,6 +379,7 @@ function editor(n) {
     modeBtn.textContent = nv.preview ? 'Edit' : 'Preview';
     modeBtn.setAttribute('aria-pressed', String(nv.preview));
     body.hidden = nv.preview; view.hidden = !nv.preview;
+    if (bar) bar.hidden = nv.preview;
     if (nv.preview) paintView();
   };
   paint();
@@ -260,10 +393,25 @@ function editor(n) {
     catch (err) { return toast('Could not delete: ' + err.message); }
     nv.editing = null; if (editorTransient?.active) editorTransient.close(); else hooks.render();
   } }, 'Delete');
-  setTimeout(() => { if (!s.base && !nv.preview) title.focus(); }, 0);
-  // the top bar: ‹ Notes, whether it's saved, a ⋯ menu (Preview or Edit, Delete) and Done; no boxes below it
-  const menu = h('div', { class: 'note-menu', role: 'menu', hidden: true }, modeBtn, del);
-  [modeBtn, del].forEach(b => b.setAttribute('role', 'menuitem'));
+  // Clean up: tidy Markdown pasted earlier (stray \ escapes, double spaces, ** around nothing, broken bullets); Undo puts it back
+  const tidy = h('button', { type: 'button', onclick: () => {
+    closeMenu();
+    const before = n.body || '', after = tidyMarkdown(before);
+    if (after === before.trim() || after === before) return toast('Nothing to clean up');
+    n.body = after; body.value = after; touch(); if (nv.preview) paintView();
+    toast('Cleaned up', { action: 'Undo', onaction: () => {
+      if (nv.editing !== n) return;
+      n.body = before; touch();
+      const live = document.querySelector('.note-editor .note-body');   // the editor on screen now
+      if (live) live.value = before;
+      if (nv.preview) hooks.render();
+    } });
+  } }, 'Clean up');
+  const day = isDayNote(n);
+  setTimeout(() => { if (!s.base && !nv.preview) (day ? body : title).focus(); }, 0);
+  // the top bar: ‹ Notes, whether it's saved, a ⋯ menu (Preview or Edit, Clean up, Delete) and Done; no boxes below it
+  const menu = h('div', { class: 'note-menu', role: 'menu', hidden: true }, modeBtn, tidy, del);
+  [modeBtn, tidy, del].forEach(b => b.setAttribute('role', 'menuitem'));
   const closeMenu = () => { menu.hidden = true; more.setAttribute('aria-expanded', 'false'); };
   const more = h('button', { class: 'small icon-btn note-more', type: 'button', 'aria-label': 'More options', 'aria-haspopup': 'menu', 'aria-expanded': 'false', onclick: e => {
     e.stopPropagation();
@@ -271,21 +419,36 @@ function editor(n) {
     if (!menu.hidden) setTimeout(() => document.addEventListener('click', ev => { if (!menu.contains(ev.target)) closeMenu(); }, { once: true }), 0);
   } }, '⋯');
   return h('section', { class: 'card note-editor' },
-    h('div', { class: 'note-top' }, h('a', { class: 'back-link note-back', href: '#notes', onclick: e => { e.preventDefault(); closeEditor(); } }, h('span', { class: 'back-chev', 'aria-hidden': 'true' }, '‹'), 'Notes'),
+    h('div', { class: 'note-top' }, h('a', { class: 'back-link note-back', href: '#notes', onclick: e => { e.preventDefault(); closeEditor(); } }, h('span', { class: 'back-chev', 'aria-hidden': 'true' }, '‹'), BACK_LABEL[nv.back] || 'Notes'),
       h('span', { style: 'flex:1' }), status, h('span', { class: 'note-menu-wrap' }, more, menu), h('button', { class: 'small primary', type: 'button', onclick: closeEditor }, 'Done')),
-    title, meta, body, view);
+    title, meta, bar, body, view);
 }
 
-// the body as elements (never innerHTML): headings, paragraphs, lists and to-dos that tick
+// Settings → Notes → Clean rich text when pasting (off by default): a paste with HTML (a web page, Word, Docs,
+// OneNote, UpNote) goes in as light Markdown; plain text pastes as it is. Never more than the note can hold.
+function pasteClean(e, ta) {
+  if (!settings().pasteClean) return;
+  const html = e.clipboardData && e.clipboardData.getData('text/html');
+  if (!html) return;
+  const md = htmlToMarkdown(html);
+  if (!md) return;
+  e.preventDefault();
+  const room = LIMITS.body - (ta.value.length - (ta.selectionEnd - ta.selectionStart));
+  if (md.length > room) toast('The note is full: some of the pasted text didn’t fit');
+  replaceRange(ta, ta.selectionStart, ta.selectionEnd, md.slice(0, Math.max(0, room)));
+}
+
+// the body as elements (never innerHTML): headings, paragraphs, lists and to-dos that tick (with no onTick, a preview:
+// the boxes show but don't change)
 export function renderBody(text, onTick) {
   const blocks = parseNote(text);
   if (!blocks.length) return h('p', { class: 'muted' }, 'Nothing written yet.');
-  const inl = parts => parts.map(p => p.t === 'b' ? h('strong', {}, p.v) : p.t === 'a' ? h('a', { href: p.href, target: '_blank', rel: 'noopener noreferrer' }, p.v) : p.v)
+  const inl = parts => parts.map(p => p.t === 'b' ? h('strong', {}, p.v) : p.t === 'i' ? h('em', {}, p.v) : p.t === 'a' ? h('a', { href: p.href, target: '_blank', rel: 'noopener noreferrer' }, p.v) : p.v)
     .flatMap(x => (typeof x === 'string' ? x.split('\n').flatMap((t, i) => (i ? [h('br'), t] : [t])) : [x]));
   return blocks.map(b => b.t === 'h' ? h('h' + (b.level + 2), {}, inl(b.inl))
     : b.t === 'p' ? h('p', {}, inl(b.inl))
     : h(b.t, { class: b.items.some(i => i.check !== null) ? 'note-todos' : null }, b.items.map(i => h('li', {},
-      i.check === null ? inl(i.inl) : h('label', { class: 'check' + (i.check ? ' done' : '') }, h('input', { type: 'checkbox', checked: i.check, onchange: () => onTick && onTick(i.line) }), h('span', {}, inl(i.inl)))))));
+      i.check === null ? inl(i.inl) : h('label', { class: 'check' + (i.check ? ' done' : '') }, h('input', { type: 'checkbox', checked: i.check, disabled: !onTick, onchange: () => onTick && onTick(i.line) }), h('span', {}, inl(i.inl)))))));
 }
 
 // link a note to one of your cases: that day's cases first, then the last two weeks, searchable

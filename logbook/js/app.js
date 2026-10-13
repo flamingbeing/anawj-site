@@ -4,7 +4,7 @@
 
 import { S, hooks, h, toast, basicMode, logbookOnly, facultyMode, facultyRole, clearToast, cloud, writes, transients, setCases, scheduleSummary, fill, resetCaches, patchLogbook, confirmBox, fileButton, modal, download, todayISO, settings, setCategoryNames, categoryNames as categoryNamesNow } from './ui-core.js';
 import { renderSendSettings, destinationHosts } from './ui-send.js';
-import { renderLog, focusLog, logCasesChanged, clearDrafts, SHARED_KEY } from './ui-log.js';
+import { renderLog, focusLog, logCasesChanged, clearDrafts } from './ui-log.js';
 import { renderRecovery } from './ui-recovery.js';
 import { renderLogbook } from './ui-logbook.js';
 import { renderProgress, renderTotals } from './ui-progress.js';
@@ -18,7 +18,9 @@ import { downloadNotes } from './ui-notes.js';
 import { cloudSaveSection, remindBackup, resumeCloudSave } from './cloud-save.js';
 import { backupCard } from './backup.js';
 import { createNavigation } from './navigation.js';
-import { renderNotes, leaveNotes } from './ui-notepad.js';
+import { renderNotes, leaveNotes, openDayNote, renderNoteSettings } from './ui-notepad.js';
+import { fromQuery, keepShared, readInbox } from './share-in.js';
+import { renderShare } from './ui-share-in.js';
 import { settingsFile, readSettingsFile, readDeviceFile, isDeviceFile } from './settings-file.js';
 import { movedPage } from './moved.js';
 import { purgeExpired, openBin } from './bin.js';
@@ -87,6 +89,9 @@ const TABS = [
   { id: 'sharefmt', label: 'Markdown', render: renderMarkdownSettings, hidden: true, under: 'settings', unlisted: true, desc: 'How Copy, Share and the notes export read' },
   { id: 'showhide', label: 'Profiles or hide items', render: renderShowHide, hidden: true, under: 'settings', unlisted: true, desc: 'Your profile (Advanced, Basic, logbook only) and everything you can hide' },
   { id: 'logging', label: 'Logging', render: renderLogging, hidden: true, under: 'settings', unlisted: true, desc: 'Suggestions, the Enter key, dates, after Save; more under Advanced' },
+  { id: 'notesset', label: 'Notes', render: renderNoteSettings, hidden: true, under: 'settings', unlisted: true, desc: 'Daily note on the Case tab, pasting, formatting buttons, shared text' },
+  // something shared to the installed app: where it goes (ui-share-in.js); no back link, it's a step of its own
+  { id: 'share', label: 'Shared with the app', render: renderShare, hidden: true, unlisted: true },
   // from Reflections → More tools
   { id: 'reflset', label: 'Reflections', render: renderReflectionSettings, hidden: true, under: 'settings', unlisted: true, desc: 'New reflections in the export, photo sizes' },
   // opened from More → Export / Import (not in the More list)
@@ -154,7 +159,7 @@ function installCard() {
 // Search in Settings (owner): the options of every settings page and its Advanced page, read from the pages
 // themselves (each is drawn once, off screen, the first time someone types), so the index never goes stale.
 // A result opens its page and scrolls to the option, which flashes.
-const SEARCH_PAGES = ['display', 'displayadv', 'access', 'logging', 'loggingadv', 'reflset', 'sharefmt', 'sendto'];
+const SEARCH_PAGES = ['display', 'displayadv', 'access', 'logging', 'loggingadv', 'reflset', 'notesset', 'sharefmt', 'sendto'];
 let settingsIndex = null, findAfterRender = '';
 const optionText = n => {
   if (n.matches('label.field')) return [...n.childNodes].filter(c => c.nodeType === 3).map(c => c.textContent).join(' ').trim();
@@ -209,7 +214,7 @@ function settingsSearch() {
 
 // Settings: a short menu of its pages (residency year on top for people not on the programme list)
 function renderSettingsMenu() {
-  const order = ['display', 'access', 'logging', 'showhide', 'tags', 'reflset', 'sharefmt', 'sendto'];
+  const order = ['display', 'access', 'logging', 'showhide', 'tags', 'reflset', 'notesset', 'sharefmt', 'sendto'];
   const pages = TABS.filter(t => t.under === 'settings').sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
   settingsIndex = null;   // drawn again on the first search of this visit
   return h('div', {},
@@ -683,7 +688,8 @@ hooks.casesChanged = () => {
 function flushRender() {
   if (!pendingRender) return;
   const a = document.activeElement;
-  const editing = document.querySelector('dialog[open]') || (a && app.contains(a) && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName));
+  // (the note editor shows no case data: drawing it again would only close its ⋯ menu mid-tap)
+  const editing = document.querySelector('dialog[open]') || (a && app.contains(a) && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) || app.querySelector('.note-editor');
   if (editing) { setTimeout(flushRender, 1000); return; }
   pendingRender = false;
   render();
@@ -872,6 +878,9 @@ async function onUser(user) {
   const onBar = arrangeTabs(barCandidates(), display()).shown;
   S.tab = tabFromHash() || (START_TABS.some(([v]) => v === start) && onBar.includes(start) ? start : onBar.find(id => id !== 'more') || 'log');
   navigation.initialize(S.tab);
+  if (wantToday) { wantToday = false; setTimeout(() => { if (S.user === user) openDayNote(); }, 0); }
+  // a POST share: the chooser draws again once the service worker's copy is read
+  if (sharedIn && S.tab === 'share') sharedIn.then(() => { if (S.user === user && S.tab === 'share') render(); });
   // Settings → Backup: a one-tap reminder when the last Drive / Dropbox backup is over a week old (if asked for)
   setTimeout(() => { if (S.user === user) remindBackup(); }, 3000);
   // back from a Drive / Dropbox sign-in: finish that save
@@ -961,17 +970,20 @@ function registerSW() {
 
 if (cloud.onSyncError) cloud.onSyncError(err => toast('A change could not be synced: ' + (err.message || err)));
 
-// shared to the installed app (Android share sheet): keep the text for the Log page, tidy the address
-{
-  const q = new URLSearchParams(location.search);
-  const shared = [q.get('share_title'), q.get('share_text'), q.get('share_url')].filter(Boolean).join('\n').trim();
-  if (q.has('share_text') || q.has('share_title') || q.has('share_url')) {
-    try { if (shared) sessionStorage.setItem(SHARED_KEY, shared); } catch { /* ignore */ }
-    for (const k of ['share_title', 'share_text', 'share_url']) q.delete(k);
-    const rest = q.toString().replace(/=(&|$)/g, '$1');
-    history.replaceState(null, '', location.pathname + (rest ? '?' + rest : '') + '#log');
-  }
-}
+// shared to the installed app (Android share sheet; share-in.js): the old GET share keeps its text for the Case tab;
+// a POST share (text or files, received by sw.js) goes to the chooser once its text is read. Tidy the address.
+const sharedIn = (() => {
+  const { has, text, rest } = fromQuery(location.search);
+  const posted = new URLSearchParams(location.search).has('shared');
+  if (!has && !posted) return null;
+  if (has) keepShared(text);
+  history.replaceState(null, '', location.pathname + (rest ? '?' + rest : '') + (posted ? '#share' : '#log'));
+  return posted ? readInbox(location.href) : Promise.resolve(text);
+})();
+// "Today's note" (the app's shortcut, ./#today): open today's daily note once signed in
+let wantToday = location.hash === '#today';
+if (wantToday) history.replaceState(null, '', location.pathname + location.search + '#notes');
+addEventListener('hashchange', () => { if (location.hash === '#today' && S.user) { history.replaceState(history.state, '', location.pathname + location.search + '#notes'); openDayNote(); } });
 applyTheme(cachedTheme());   // this device's choice (Settings → Display → Theme)
 applyTextSize(cachedTextSize());
 applyZoom(cachedZoom());

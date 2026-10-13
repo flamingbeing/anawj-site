@@ -97,7 +97,7 @@ export function residencyCard() {
 // the light / dark choice. The first time a device opens the app it starts from what the account had (these used to
 // follow the account), so nobody's look changes. Kept at sign-out: they are the device's, and nothing private.
 const DISPLAY_KEY = 'apmes-logbook-display';
-export const DISPLAY_KEYS = ['compact', 'textSize', 'zoom', 'accent', 'startTab', 'fontUi', 'fontUiName', 'fontLog', 'fontLogName', 'lineWidth', 'lineHeight', 'contrast', 'motion', 'tabIcons', 'tabBar', 'hideHeader', 'caseInverted', 'colourful', 'customCss', 'customCssOn', 'autoFocus', 'appTitle', 'boxCaps', 'boxCorrect', 'boxSpell', 'reflSpell', 'pinBox', 'pinSearch', 'firstField', 'compactTags', 'borders', 'round', 'shadows', 'bigTaps', 'tabOrder', 'tabHidden', 'swipeTabs', 'rowMenu', 'rowCopy', 'reflToolbar', 'edgeBack', 'hideWords', 'flat', 'btnStyle', 'iconBtns', 'calPlain', 'pageTitles', 'rowShort', 'rowHold', 'dayCopy'];
+export const DISPLAY_KEYS = ['noteToolbar', 'compact', 'textSize', 'zoom', 'accent', 'startTab', 'fontUi', 'fontUiName', 'fontLog', 'fontLogName', 'lineWidth', 'lineHeight', 'contrast', 'motion', 'tabIcons', 'tabBar', 'hideHeader', 'caseInverted', 'colourful', 'customCss', 'customCssOn', 'autoFocus', 'appTitle', 'boxCaps', 'boxCorrect', 'boxSpell', 'reflSpell', 'pinBox', 'pinSearch', 'firstField', 'compactTags', 'borders', 'round', 'shadows', 'bigTaps', 'tabOrder', 'tabHidden', 'swipeTabs', 'rowMenu', 'rowCopy', 'reflToolbar', 'edgeBack', 'hideWords', 'flat', 'btnStyle', 'iconBtns', 'calPlain', 'pageTitles', 'rowShort', 'rowHold', 'dayCopy'];
 export function deviceDisplay() {
   try { const d = JSON.parse(localStorage.getItem(DISPLAY_KEY) || 'null'); return d && typeof d === 'object' && !Array.isArray(d) ? d : null; } catch { return null; }
 }
@@ -299,13 +299,13 @@ export const TAB_BARS = [['auto', 'Bottom on phones, top on bigger screens (defa
 
 // Settings rows (owner, 13 Oct 2026): a switch for on or off, a ✓ list for two to five choices, help in one line
 // with ⓘ for the rest. The pages carry class set-page (style.css, "settings rows").
-const help = (line, ...more) => {
+export const help = (line, ...more) => {
   if (!more.length) return h('p', { class: 'hint help' }, line);
   const [b, p] = info(...more);
   return [h('p', { class: 'hint help' }, line, '\u00a0', b), p];
 };
 // label: the words, or [words, a shorter name for screen readers and tests]
-const toggle = (label, on, set, line, ...more) => {
+export const toggle = (label, on, set, line, ...more) => {
   const [text, name] = Array.isArray(label) ? label : [label, label];
   return [h('label', { class: 'check' }, h('input', { type: 'checkbox', role: 'switch', 'aria-label': name, checked: !!on, onchange: e => set(e.target.checked) }), text),
     line ? help(line, ...more) : null];

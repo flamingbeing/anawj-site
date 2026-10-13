@@ -1,7 +1,7 @@
 // Notes (notepad.js): the stored shape, order, search, the day/case index, the light Markdown and the export.
 // Fake notes only.
 import assert from 'node:assert/strict';
-import { cleanNote, sortNotes, filterNotes, notesOn, noteTitle, plainLines, noteIndex, cleanNoteIndex, sameIndex, parseNote, inline, safeHref, toggleCheck, noteMd, notesMd, noteFiles, MAX_NOTES, LIMITS } from '../js/notepad.js';
+import { cleanNote, sortNotes, filterNotes, notesOn, noteTitle, plainLines, noteIndex, cleanNoteIndex, sameIndex, parseNote, inline, safeHref, toggleCheck, noteMd, notesMd, noteFiles, MAX_NOTES, LIMITS, dayNoteId, isDayNote, dayNoteOf, cappedNotes } from '../js/notepad.js';
 import { mdDay, exportNotes } from '../js/markdown.js';
 
 assert.equal(MAX_NOTES, 100);
@@ -78,7 +78,6 @@ assert.match(byPath['Cases/2026-10/2026-10-10.md'], /### Older day/);
 assert.match(byPath['Notes.md'], /^---\nnotes: "2"[\s\S]*# Notes\n\n### Undated new\n\n### Undated old\npump settings\n$/);
 assert.equal(exportNotes({ cases, notes, opts: { notes: false, progress: false } }).some(f => /Notes/.test(f.text) || f.path === 'Notes.md'), false);
 
-console.log('notepad tests passed');
 
 // one file per note: names, no clashes, .md or .txt
 {
@@ -96,3 +95,45 @@ console.log('notepad tests passed');
   assert.equal(txt[1].text, 'Fake: dose/plan?\n\nDate: 2026-10-12\n\none\ntwo\n');
   assert.deepEqual(noteFiles([], 'md'), []);
 }
+
+// daily notes: one per day, id day-YYYY-MM-DD; first in their day; not counted in the 100; called "Daily note"
+{
+  assert.equal(dayNoteId('2026-10-13'), 'day-2026-10-13');
+  assert.ok(isDayNote({ id: 'day-2026-10-13' }));
+  assert.ok(!isDayNote({ id: 'day-2026-10' }) && !isDayNote({ id: 'x-day-2026-10-13' }) && !isDayNote(null));
+  assert.equal(cleanNote({ id: 'day-2026-10-13', date: '2026-10-13', body: 'x' }).id, 'day-2026-10-13');
+  const list = [
+    { id: 'a', date: '2026-10-13', title: 'Fake first', body: '', createdAt: 1 },
+    { id: 'day-2026-10-13', date: '2026-10-13', title: '', body: 'Fake day: **busy** list', createdAt: 5 },
+    { id: 'day-2026-10-12', date: '2026-10-12', title: '', body: '', createdAt: 2 },
+    { id: 'b', date: null, title: 'Undated', body: '', createdAt: 3, updatedAt: 3 },
+  ];
+  assert.deepEqual(sortNotes(list).map(n => n.id), ['b', 'day-2026-10-13', 'a', 'day-2026-10-12']);
+  assert.deepEqual(filterNotes(list, { kind: 'day' }).map(n => n.id), ['day-2026-10-13', 'day-2026-10-12']);
+  assert.deepEqual(filterNotes(list, { kind: 'day', q: 'busy' }).map(n => n.id), ['day-2026-10-13']);
+  assert.equal(dayNoteOf(list, '2026-10-13').body, 'Fake day: **busy** list');
+  assert.equal(dayNoteOf(list, '2026-10-01'), null);
+  assert.deepEqual(cappedNotes(list).map(n => n.id), ['a', 'b']);
+  assert.equal(noteTitle(list[1]), 'Daily note');
+  assert.equal(noteTitle({ ...list[1], title: 'Fake theatre day' }), 'Fake theatre day');
+  // in a day's Copy / Markdown: the daily note first, with no heading of its own
+  assert.equal(notesMd(notesOn(list, '2026-10-13')), 'Fake day: **busy** list\n\n### Fake first');
+  assert.equal(noteFiles([list[1]])[0].path, '2026-10-13 Daily note.md');
+  // the index keeps the latest 100 days (the rules allow 100)
+  const many = Array.from({ length: 130 }, (_, i) => ({ id: dayNoteId(`2026-${String(Math.floor(i / 28) + 1).padStart(2, '0')}-${String((i % 28) + 1).padStart(2, '0')}`), date: `2026-${String(Math.floor(i / 28) + 1).padStart(2, '0')}-${String((i % 28) + 1).padStart(2, '0')}`, title: '', body: 'x' }));
+  const ix = noteIndex(many);
+  assert.equal(ix.days.length, 100);
+  assert.equal(ix.days[99], many[129].date);
+  assert.equal(ix.n, 130);
+  assert.equal(cleanNoteIndex({ days: many.map(n => n.date), cases: [], n: 130 }).days[0], many[30].date);
+}
+
+// *italic*: shown in italics; a lone star (2*3, a * b) stays as typed
+{
+  assert.deepEqual(inline('a *word* b'), [{ t: 'text', v: 'a ' }, { t: 'i', v: 'word' }, { t: 'text', v: ' b' }]);
+  assert.deepEqual(inline('2*3*4 and a * b *').map(p => p.t), ['text']);
+  assert.deepEqual(inline('**bold** *it*').map(p => p.t), ['b', 'text', 'i']);
+  assert.deepEqual(plainLines('- *Fake* plan'), ['Fake plan']);
+}
+
+console.log('notepad tests passed');

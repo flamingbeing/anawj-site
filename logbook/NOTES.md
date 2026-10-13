@@ -404,6 +404,26 @@ portfolio content.
   note first). The Notes page's "Download notes as files (zip)" makes one `.md` or `.txt` per note
   (`noteFiles` in `notepad.js`: "2026-10-12 Title.md", undated "No date Title.md"; title, Date line, text; the linked
   case isn't named); this is separate from the Markdown export, which puts notes inside the day's case note.
+- **Daily notes, pasting, formatting, shared to the app** (Oct 2026, 6-hour build track E; e2e `test/e2e/daily-note.mjs`):
+  - A daily note is an ordinary note with the id `day-YYYY-MM-DD` (date set, title empty → "Daily note"), so every device
+    finds the same one without a query and no rules change was needed. `openDayNote(iso)` waits for the notes and opens
+    the existing one (never a second copy with the same id), straight in Edit. Ways in: the Logbook day's "+ Daily
+    note" / preview card (`dayNoteCard`; Done goes back to the Logbook), Notes' "Today's note" button and "Daily notes"
+    chip, the manifest shortcut `./#today`, and the Case tab box (Settings → Notes, `settings.dayNoteOnCase`, off).
+    It sorts first in its day and has no heading in Copy / Share / Send and the Markdown export.
+  - Daily notes don't count towards the 100 (`cappedNotes`; backup restore and bin restore follow). The rules allow
+    100 days in `meta/noteIndex`, so `noteIndex()` keeps the latest 100 days; older days' notes are still in Notes.
+    Raising that cap needs a `firestore.rules` change (owner's approval).
+  - Paste cleaner (`paste-clean.js`, tested): `settings.pasteClean` (off) turns pasted HTML into light Markdown;
+    Clean up (editor ⋯ menu, always there, with Undo) runs `tidyMarkdown`. The preview now shows `*italic*`.
+  - Formatting bar (`fmt-bar.js`, shared with reflections): the note editor's full bar (bold, italic, heading, lists,
+    to-do, link, undo) is device setting `noteToolbar` (off); on phones it rides on the keyboard while typing. Edits go
+    through `execCommand('insertText')`, so Undo and Ctrl+Z work.
+  - Shared to the app: the manifest share_target is POST multipart (text, title, url, `.md`/`.txt` files) to
+    `./share-target`; `sw.js` keeps it in Cache Storage `share-inbox-logbook` and opens `./?shared=1#share`, the chooser
+    (`ui-share-in.js`: Add as case(s) / Add to today's note / New note). The old GET `?share_text=` still works and still
+    goes straight to paste-a-list unless Settings → Notes → Ask what to do with shared text (`settings.shareAsk`, off);
+    files always ask. `share-in.js` holds the plumbing (tested).
 - **Connect Claude** (`mcp/`, Settings → Connect Claude (advanced) links its README on GitHub): a read-only MCP
   server residents run locally; Google "Desktop app" OAuth (loopback, PKCE) → Firebase `signInWithIdp` → Firestore
   REST as the user, so the rules apply; only `logbooks/{own email}` and the user's own `residents` entry. Owner
@@ -502,7 +522,7 @@ portfolio content.
     their content (`justify-content: center`), which shifted calendar days.
   - Show only what helps: owner prefers a ✓ on rows over calendar badges, small text over cards for guidance.
   - All the logbook checks in one go: `tools/test-logbook.sh` (repo check, unit tests, full e2e, and the focused
-    runners recovery / usability / cloud-save / notepad / tag-editor / simpler; `quick` skips the full e2e). Add new
+    runners recovery / usability / cloud-save / notepad / daily-note / tag-editor / simpler; `quick` skips the full e2e). Add new
     focused runners to it. Rules: `tools/test-rules.sh` (emulator, fake accounts, both suites).
   - Accessibility: `test/e2e/a11y.mjs` (axe-core 4.13.0, pinned in `tools/vendor/axe.min.js`, MPL-2.0; WCAG 2.2 A/AA)
     is **not** one of those (owner: not on every e2e). Run it after UI changes or before a release, about 75 s:
