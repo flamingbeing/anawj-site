@@ -464,7 +464,10 @@ export function generate({ staff, day, settings = DEFAULT_SETTINGS, seed = 1 }) 
   }
 
   if (rowOf.aocc && !rowOf.aocc.seniors.length) {
-    const free = seniors.filter(p => !usedSeniors.has(p.id));
+    let free = seniors.filter(p => !usedSeniors.has(p.id));
+    // AIC needs a consultant (SC, C): when only one is left, AOCC takes someone else if it can
+    const consultants = free.filter(p => STRONG.includes(p.grade));
+    if (!fixed.aic && consultants.length === 1 && free.length > 1) free = free.filter(p => p !== consultants[0]);
     const p = free[Math.floor(rand() * free.length)];
     if (p) { rowOf.aocc.seniors.push(p.id); usedSeniors.add(p.id); }
     else warnings.push({ level: 'warn', text: 'AOCC: no senior left after the OT lists.' });

@@ -235,7 +235,8 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
 - Generator seniority (13 Oct): complex lists (−3/+3), double covers (−2/+2) and rooms with a Baby MO or MOPEX (+4
   otherwise) prefer SC and C (`STRONG`); subspecs and the hard rules still win (subspec matches unchanged over 80 demo
   runs). The spare senior who takes half a double cover is the best fit, not the first. Each generated row carries
-  `why` ({ personId: reason }), shown as "Why here:" when hovering a name.
+  `why` ({ personId: reason }), shown as "Why here:" when hovering a name. AOCC leaves the last free consultant for AIC
+  (it took them 12 times in 20 before).
 - Faster mornings (13 Oct): the person box has "Same until": the status and comment go on each day up to that date
   (`state.carry`, applied when a day is opened, `applyCarry`; a hand change on that day or a monthly leave/MC/post
   call wins). Cases has "Start from last <weekday>" (running rooms, sessions, fixed people from 7 days before, if this
