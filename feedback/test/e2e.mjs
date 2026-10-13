@@ -47,6 +47,24 @@ try {
   const errors = []; page.on('pageerror', e => errors.push(e.message));
   await page.goto(PREVIEW + '/hand-babies/');
   await fb(page).locator('#fab').waitFor();
+  // the first visit says what the button is for, once
+  assert.match(await fb(page).locator('#tip').textContent(), /preview of a change/);
+  // on a preview: links to the page as it is now and to the PR's changes
+  await fb(page).locator('#fab').click();
+  assert.ok(await fb(page).locator('#tip').isHidden());
+  await fb(page).locator('#cmpPr').waitFor();
+  assert.equal(await fb(page).locator('#cmpNow').getAttribute('href'), 'https://anawj-preview.kohwenjun.workers.dev/hand-babies/');
+  assert.equal(await fb(page).locator('#cmpPr').getAttribute('href'), 'https://github.com/flamingbeing/anawj-site/pull/412/files');
+  // the button's menu and comment box pass an accessibility check (axe, WCAG 2.2 AA), only our own parts counted
+  await page.addScriptTag({ path: new URL('../../tools/vendor/axe.min.js', import.meta.url).pathname });
+  const ours = async () => (await page.evaluate(() => window.axe.run(document, { runOnly: ['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'] })))
+    .violations.map(v => ({ id: v.id, nodes: v.nodes.filter(n => JSON.stringify(n.target).includes('anawj-feedback')).map(n => JSON.stringify(n.target)) })).filter(v => v.nodes.length);
+  assert.deepEqual(await ours(), [], 'menu');
+  await fb(page).locator('#mPage').click();
+  assert.deepEqual(await ours(), [], 'comment box');
+  await fb(page).locator('#noteCancel').click();
+  await page.reload(); await fb(page).locator('#fab').waitFor();
+  assert.ok(await fb(page).locator('#tip').isHidden(), 'the hint shows once');
   // while picking, the page's own taps are held back
   await page.evaluate(() => { window.__clicks = 0; document.addEventListener('click', () => window.__clicks++); });
   await fb(page).locator('#fab').click();

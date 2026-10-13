@@ -31,6 +31,8 @@ editor), then Send. No frame: it runs in the page itself, so it works on the sub
 - **PR previews (`*.workers.dev`): on for every page.** Send finds the preview's PR from its address (GitHub's public API) and
   offers **Comment on PR #N**: it copies the comments and opens the PR; the owner pastes them as a PR comment, and the session
   watching that PR revises the change. Or **Send as a GitHub issue** (a normal `Page edits:` issue).
+- On a preview the menu also links to **How it is now** (the same page on the copy of `main`) and **What this PR
+  changes** (the PR's files). The first time the button appears on a site it says what it's for, once.
 - **Real addresses: off unless that browser turns it on.** Open any page with `?feedback=1` (a cookie keeps it on for that
   subdomain for 30 days); **Turn off** in its menu, or `?feedback=0`, removes it. `anawj.com` itself (GitHub Pages) never
   gets it; use the editor there.

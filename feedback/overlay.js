@@ -58,6 +58,7 @@
     .sheet h2{font:600 18px/1.25 system-ui,sans-serif;color:#002f6c;margin:0 0 8px}
     .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
     .row button{flex:1 1 auto}
+    .row a{flex:1 1 auto;display:flex;align-items:center;justify-content:center;min-height:44px;padding:0 12px;border:1px solid #7a8592;color:#002f6c;font-weight:500;text-decoration:none}
     .muted{color:#555b63;font-size:14px}
     .on{background:#eef2f7;padding:8px 10px;font-size:14px;margin:0 0 8px;max-height:6em;overflow:auto;white-space:pre-wrap}
     textarea{width:100%;min-height:110px;padding:10px;border:1px solid #7a8592;font-size:16px;border-radius:0}
@@ -73,6 +74,8 @@
     .banner span{flex:1}
     .banner button{background:#fff;color:#002f6c;border-color:#fff}
     #speak[aria-pressed=true]{background:#e4002b;border-color:#e4002b;color:#fff}
+    .tip{position:fixed;z-index:2147483647;bottom:24px;max-width:220px;font:14px/1.35 system-ui,sans-serif;background:#222;color:#fff;padding:8px 10px;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+    .tip.left{left:70px}.tip.right{right:70px}
     .ver{position:fixed;z-index:2147483647;bottom:70px;font:600 13px/1 system-ui,sans-serif;background:#e57200;color:#fff;padding:6px 8px;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.25)}
     .ver.left{left:12px}.ver.right{right:12px}
     .vers button[aria-pressed=true]{background:#002f6c;border-color:#002f6c;color:#fff}
@@ -81,6 +84,7 @@
   </style>
   <button class="fab" id="fab" aria-label="Feedback">💬<b id="badge" hidden></b></button>
   <div class="ver" id="ver" hidden></div>
+  <div class="tip" id="tip" hidden role="status"></div>
   <canvas class="draw" id="draw" hidden></canvas>
   <div class="banner" id="drawBar" hidden role="status"><span>Circle it, or draw an arrow to where it should go</span><button id="drawUndo">Undo</button><button id="drawDone">Done</button><button id="drawCancel">Cancel</button></div>
   <div class="banner" id="banner" hidden role="status"><span>Tap what you want to comment on</span><button id="pickFlip" aria-label="Move this bar to the other end">⇅</button><button id="pickCancel">Cancel</button></div>
@@ -93,6 +97,7 @@
       <div class="row vers" id="vers" role="group" aria-label="Versions"></div>
       <div class="row"><button id="choose" class="primary"></button></div>
     </div>
+    <div class="row" id="cmp" hidden><a id="cmpNow" target="_blank" rel="noopener">How it is now</a><a id="cmpPr" target="_blank" rel="noopener">What this PR changes</a></div>
     <div class="row"><button id="mBug">Something’s wrong</button></div>
     <div class="row"><button id="mList">Comments (<span id="count">0</span>)</button><button id="mSend">Send</button></div>
     <div class="row"><button id="mSide">Move button</button><button id="mOff">Turn off</button><button id="mClose">Close</button></div>
@@ -159,6 +164,15 @@
       save(); show(null);
     };
   }
+  // the first time on a site, say what the button is for (a few seconds, once)
+  if (store.get('anawj-feedback-hinted', '') !== '1') {
+    store.set('anawj-feedback-hinted', '1');
+    $('tip').className = 'tip ' + side();
+    $('tip').textContent = PREVIEW ? 'This is a preview of a change. Tap 💬 to comment on it.' : 'Tap 💬 to comment on this page.';
+    $('tip').hidden = false;
+    setTimeout(() => { $('tip').hidden = true; }, 8000);
+  }
+
   $('where').textContent = (PREVIEW ? 'Preview of a proposed change. ' : '') + (LIVE_APP ? 'Live app: your comments never include the screen’s own text.' : 'Comments stay on this phone until you send them.');
 
   // ---- picking what to comment on (the page's own taps are held back while picking)
@@ -316,7 +330,18 @@
   };
 
   // ---- menu
-  $('fab').onclick = () => { $('menu').hidden ? show('menu') : show(null); };
+  $('fab').onclick = async () => {
+    $('tip').hidden = true;
+    if (!$('menu').hidden) { show(null); return; }
+    show('menu');
+    // on a preview: links to the same page as it is now (the copy of main) and to the PR's changes
+    if (PREVIEW && host.split('.')[0] !== 'anawj-preview') {
+      $('cmpNow').href = 'https://' + host.replace(/^[^.]+/, 'anawj-preview') + location.pathname + location.search.replace(/[?&]variant=[^&]*/, '') + location.hash;
+      $('cmp').hidden = false; $('cmpPr').hidden = true;
+      if (!pr) pr = await findPr();
+      if (pr) { $('cmpPr').href = pr.html_url + '/files'; $('cmpPr').hidden = false; }
+    }
+  };
   $('mClose').onclick = () => show(null);
   $('mPick').onclick = startPick;
   $('mDraw').onclick = startDraw;
