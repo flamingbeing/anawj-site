@@ -25,7 +25,8 @@ export const DUTIES = [
 // shortOf(namePart) -> the same part with the person's short name ("Koh YW (RA)").
 // general: the General tab's fields ({ 'mot.cons': '…', 'eot8.s': '…' }); box: the free text
 // in the comments box at the top right.
-export function buildLayout({ date, rows, lists = {}, general = {}, box = '', colourOf = () => '', shortOf = s => s }) {
+// stamp: a short note at the top right, e.g. "Updated 09:15" on a sheet sent again after changes.
+export function buildLayout({ date, rows, lists = {}, general = {}, box = '', colourOf = () => '', shortOf = s => s, stamp = '' }) {
   const cells = [];
   const heights = {};
   const put = (r, c1, c2, text, o = {}) => cells.push({ r, r2: o.r2 || r, c1, c2, text: text ?? '', runs: o.runs || null, edit: o.edit || null, sz: o.sz || 8, bold: !!o.bold, color: o.color || null, align: o.align || 'center', box: !!o.box, valign: o.valign || 'middle', underlineFirst: !!o.underlineFirst, fill: o.fill || null, pad: !!o.pad });
@@ -35,6 +36,7 @@ export function buildLayout({ date, rows, lists = {}, general = {}, box = '', co
   // the title band (A to K, in line with the OT rows) is shaded grey, as on the department's sheet
   put(2, 1, 11, 'DEPARTMENT OF ANAESTHESIA', { sz: 10, bold: true, fill: GREY });
   put(3, 1, 11, 'NATIONAL UNIVERSITY HEALTH SYSTEM', { sz: 10, bold: true, fill: GREY });
+  if (stamp) put(4, 9, 11, stamp, { align: 'right', bold: true, color: RED });
   label(5, 'Date', { bold: true });
   put(5, 3, 5, d ? d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '', { bold: true });
   put(5, 6, 7, d ? d.toLocaleDateString('en-GB', { weekday: 'long' }) : '', { bold: true });

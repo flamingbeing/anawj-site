@@ -340,3 +340,18 @@ console.log('engine tests passed');
   assert.deepEqual(res.unknown, ['Mystery']);
   console.log('rotation tests passed');
 }
+
+{
+  // what changed since the roster was sent
+  const { rosterChanges, changeText } = await import('../js/engine.js');
+  const { buildLayout } = await import('../js/layout.js');
+  const before = [{ label: 'MOR 1', senior: 'A', junior: 'B' }, { label: 'MOR 2', senior: 'C', junior: '' }, { label: 'MOR 3', senior: '', junior: '' }];
+  const after = [{ label: 'MOR 1', senior: 'A', junior: 'D' }, { label: 'MOR 2', senior: '', junior: '' }, { label: 'MOR 4', senior: 'E', junior: '', premed: 'F' }];
+  const c = rosterChanges(before, after).map(changeText);
+  assert.deepEqual(c, ['MOR 1 junior: B → D', 'MOR 2 senior: C → (none)', 'MOR 4 senior: (none) → E', 'MOR 4 premed: (none) → F']);
+  assert.deepEqual(rosterChanges(before, before), []);
+  const stamped = buildLayout({ date: '2026-10-14', rows: [], stamp: 'Updated 09:15' }).cells.find(x => x.text === 'Updated 09:15');
+  assert.ok(stamped && stamped.r === 4, 'the stamp sits above the date row');
+  assert.ok(!buildLayout({ date: '2026-10-14', rows: [] }).cells.some(x => x.r === 4), 'no stamp on a first send');
+  console.log('sent changes tests passed');
+}

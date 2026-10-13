@@ -162,6 +162,10 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
 - Opening the app on a past date (not today) moves the roster to tomorrow, with a toast to go back.
 - **Phones:** the Roster tab shows one card per room (Senior, Junior, case notes) instead of the wide table, and the person box slides up from the bottom.
 - **Sending it out:** Download offers .xlsx, PDF, an image for WhatsApp (`js/pngout.js`, drawn from the same layout; shared through the phone's share sheet where it can be, else downloaded) and Print. Printing shrinks the sheet to fit one A4 page.
+  A send counts only once it happened (a closed share sheet or a PDF that couldn't load doesn't). What went out is kept
+  per date for 30 days (`state.outSent`: rows, time, stamp); after changes the Roster tab lists them ("Changed since sent
+  at 07:42") with Send image with the changes (the list goes as the message, or is copied) and Copy, and a sheet sent
+  again says "Updated hh:mm" at the top right (`buildLayout({ stamp })`).
 - **Learning from hand changes:** taking a senior off a subspecialty list by hand on three different days offers to add it to their "doesn't do" list (`state.learned`; asked once per person and subspecialty).
 - **Practice mode** is the demo (`?demo`): a "Practice" button in the header opens it in a new tab, it opens with a 7-step tour once (`localStorage['nuh-roster-tour']`), and Tour in the footer replays it.
 - **Undo instead of "are you sure?"** for Generate new, Clear cases, Clear manpower, Reset to monthly rosters and restoring a saved version on the same date: the toast has an Undo button. Confirms stay only for what can't be undone.

@@ -143,8 +143,8 @@ function normGrade(g, seniorish) {
 }
 
 // Build the roster workbook in the department's layout.
-export function buildRosterWorkbook(ExcelJS, { date, rows, lists, general, box, colourOf, shortOf }) {
-  const layout = buildLayout({ date, rows, lists, general, box, colourOf, shortOf });
+export function buildRosterWorkbook(ExcelJS, { date, rows, lists, general, box, colourOf, shortOf, stamp }) {
+  const layout = buildLayout({ date, rows, lists, general, box, colourOf, shortOf, stamp });
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet(date || 'roster', { pageSetup: { orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 1 } });
   ws.columns = COL_WIDTHS.map(width => ({ width }));
