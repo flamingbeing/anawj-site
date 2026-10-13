@@ -26,6 +26,9 @@ Rules that bite:
 - Accounts, settings, costs, the pre-launch checklist and how to hand over: [OPERATIONS.md](OPERATIONS.md). Update
   it when an account, setting or cost changes.
 - A PR that changes any `firestore.rules` waits for the owner's approval before merging (it deploys live on merge).
+- **Blocked by the cloud environment?** (no Google Cloud sign-in, the owner's real documents, a long test run, a
+  secret): hand it to the owner's home-computer session instead of stopping. How and what to send: `OPERATIONS.md`,
+  "The home computer". It changes live projects only with the owner's OK.
 
 - The homepage (`index.html`) only shows whether the server is up or down (owner, Oct 2026). Apps stay unlisted:
   never link them from the homepage, and give each app page `<meta name="robots" content="noindex, nofollow">`
