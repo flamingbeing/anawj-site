@@ -77,20 +77,20 @@ function syncIndex() {
   // the old copy in the logbook doc (readable by the app owner) goes
   if (settings().noteIndex != null) patchLogbook({ settings: { noteIndex: null } });
 }
-// From the notes themselves once loaded (every day and case, past the index doc's cap); before that the index doc,
-// and until it has arrived, an older settings.noteIndex.
-let fromNotes = { list: null, days: new Set(), cases: new Set() };
+// { days, cases } (plus Sets for the per-day lookups): from the notes themselves once loaded (every day and case, past
+// the index doc's cap); before that the index doc, and until it has arrived, an older settings.noteIndex.
+const withSets = i => ({ ...i, daySet: new Set(i.days), caseSet: new Set(i.cases) });
+let fromNotes = { list: null, index: null };
 export function notesIndex() {
   if (Array.isArray(S.notes)) {
-    if (fromNotes.list !== S.notes) { const i = noteIndex(S.notes); fromNotes = { list: S.notes, days: new Set(i.days), cases: new Set(i.cases) }; }
-    return fromNotes;
+    if (fromNotes.list !== S.notes) fromNotes = { list: S.notes, index: withSets(noteIndex(S.notes)) };
+    return fromNotes.index;
   }
   watchIndex();
-  const i = cleanNoteIndex(S.noteIndex || settings().noteIndex);
-  return { days: new Set(i.days), cases: new Set(i.cases) };
+  return withSets(cleanNoteIndex(S.noteIndex || settings().noteIndex));
 }
-export const dayHasNotes = date => !!date && notesIndex().days.has(date);
-export const caseHasNotes = id => !!id && notesIndex().cases.has(id);
+export const dayHasNotes = date => !!date && notesIndex().daySet.has(date);
+export const caseHasNotes = id => !!id && notesIndex().caseSet.has(id);
 
 // open Notes on a day's notes, or a case's (from the Logbook); create: start a new note there (linked to the case)
 export function openNotes({ day = '', caseId = '', create = false } = {}) {

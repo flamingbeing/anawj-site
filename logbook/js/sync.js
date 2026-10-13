@@ -252,7 +252,9 @@ export function createSyncHub({ openStore, listen, fetchOne = null, now = Date.n
         timers.set(k, setTimeout(() => {
           timers.delete(k);
           if (e.size || engines.get(k) !== e) return;
-          engines.delete(k); stopping.set(k, e.stop()); idle(email);
+          engines.delete(k); idle(email);
+          const done = e.stop().finally(() => { if (stopping.get(k) === done) stopping.delete(k); });
+          stopping.set(k, done);
         }, grace));
       };
     },
