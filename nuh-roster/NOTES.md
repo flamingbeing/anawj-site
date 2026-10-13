@@ -235,7 +235,9 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
 - Faster mornings (13 Oct): the person box has "Same until": the status and comment go on each day up to that date
   (`state.carry`, applied when a day is opened, `applyCarry`; a hand change on that day or a monthly leave/MC/post
   call wins). Cases has "Start from last <weekday>" (running rooms, sessions, fixed people from 7 days before, if this
-  browser has that day; not case notes). Members get "Save for the team, then image" in the Download menu.
+  browser has that day; not case notes). With no roster yet, Roster offers "Start from <day>'s roster" (the last day
+  within a week this browser has one for): rows for today's running rooms in today's order, today's case notes, then
+  the live checks flag who is away now. Members get "Save for the team, then image" in the Download menu.
 - Practice (13 Oct): the bar has "Fix 3 problems" (makes the roster and plants someone on leave on a list, a room
   with no senior and a double cover with no junior; a checklist card on Roster ticks each off from the live checks)
   and "Reset this day" (with Undo). Cases has "Download a practice draft" (the admin team's format, cases in column L)
