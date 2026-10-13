@@ -186,6 +186,10 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
 - A comment that is only a time ("5pm") reads back as a leaving time, as in the older roster style "Name -5pm".
 - AOH and liver duties don't make anyone post call; only the duties listed in Settings do.
 - Undo is per date and is cleared when the header date changes.
+- Found by the 13 Oct review (`REVIEW-2026-10.md`), not fixed yet: a full localStorage stops saving silently and old
+  days are never pruned; team, monthly and rotation documents are overwritten by whoever saves last (rosters have a
+  conflict check and versions, they don't); double cover with no junior is only a generator note, not a live check.
+- Keep building elements with `h()` and `textContent`; there is no `innerHTML` anywhere, so imported text can't inject.
 
 ## Code map
 
