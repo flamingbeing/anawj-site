@@ -173,6 +173,48 @@ export function confirmBox(title, text, okLabel = 'OK', danger = false) {
   });
 }
 
+// The email an assessor link was sent to (?as=), or ''.
+export function linkAccount() {
+  try { return (new URLSearchParams(location.search).get('as') || '').trim().toLowerCase(); } catch { return ''; }
+}
+// Apps that open links in their own built-in browser, where Google refuses to sign in
+// ("disallowed_useragent"): WhatsApp, Facebook, Instagram, LINE, WeChat, Telegram, and Android web views.
+export const inAppBrowser = () => typeof navigator !== 'undefined'
+  && /FBAN|FBAV|Instagram|WhatsApp|Line\/|MicroMessenger|Telegram|; wv\)/i.test(navigator.userAgent || '');
+// A card telling people to open the page in Chrome or Safari, with a Copy link button (and, on
+// Android, a button that opens Chrome directly).
+export function openInBrowserCard() {
+  const url = location.href;
+  const android = /Android/i.test(navigator.userAgent || '');
+  const chrome = 'intent://' + url.replace(/^https?:\/\//, '') + '#Intent;scheme=https;package=com.android.chrome;end';
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(url); toast('Link copied: paste it into Chrome or Safari'); }
+    catch { toast(url, { ms: 9000 }); }
+  };
+  return h('section', { class: 'e-card e-inapp', role: 'alert' },
+    h('h2', { class: 'e-h3' }, 'Open this in Chrome or Safari'),
+    h('p', {}, 'Google doesn’t allow signing in inside WhatsApp’s (or Facebook’s, Instagram’s…) own browser. ',
+      android ? 'Tap Open in Chrome, or ' : 'Tap ⋯ or the share button and choose “Open in Safari”, or ', 'copy the link and paste it into your browser.'),
+    h('div', { class: 'e-actions' },
+      android ? h('a', { class: 'n-btn', href: chrome }, 'Open in Chrome') : null,
+      h('button', { class: 'n-btn n-btn--outline e-btn-quiet', type: 'button', onclick: copy }, 'Copy link')));
+}
+
+// Signed in with an account that isn't the one an assessor link was sent to (often a personal Gmail
+// instead of the hospital one): say so first, with Switch account, before offering to apply.
+export function wrongAccountCard() {
+  const as = linkAccount();
+  return h('section', { class: 'e-card e-wrongacct', role: 'alert' },
+    h('h2', { class: 'e-h3' }, 'This evaluation was sent to another account'),
+    h('p', {}, 'You’re signed in as ', h('b', {}, S.user?.email || ''), '.',
+      as ? [' The request went to ', h('b', {}, as), '.'] : ' Sign in with the account the resident chose.'),
+    h('div', { class: 'e-actions' }, h('button', { class: 'n-btn e-btn-big', type: 'button', onclick: switchAccount }, 'Switch account')));
+}
+export async function switchAccount() {
+  try { await cloud.signOut(); await cloud.signIn(linkAccount() || undefined); }
+  catch (err) { toast('Couldn’t switch account. ' + errText(err)); }
+}
+
 // Plain words for the errors people actually meet; the code stays in brackets for support.
 export function errText(e) {
   const code = String(e?.code || '').replace(/^firestore\//, '');

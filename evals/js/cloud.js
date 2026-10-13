@@ -108,11 +108,12 @@ export async function watchUser(cb) {
 
 // Popup first; redirect when popups are blocked or unsupported (e.g. some home-screen apps).
 const REDIRECT_CODES = ['auth/popup-blocked', 'auth/operation-not-supported-in-this-environment', 'auth/web-storage-unsupported', 'auth/cancelled-popup-request'];
-export async function signIn() {
+export async function signIn(hint) {
   if (demo) return D.signIn();
   const { auth, A } = await sdk();
   const provider = new A.GoogleAuthProvider();
-  provider.setCustomParameters({ prompt: 'select_account' });
+  // hint: the email an assessor link was sent to (?as=), so Google suggests that account first
+  provider.setCustomParameters(hint ? { prompt: 'select_account', login_hint: hint } : { prompt: 'select_account' });
   try {
     await A.signInWithPopup(auth, provider);
   } catch (e) {

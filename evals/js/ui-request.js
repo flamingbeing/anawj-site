@@ -133,10 +133,12 @@ export function itemRow(item, prog, onclick, extra) {
     icon('chevron', 'e-row__chev'));
 }
 
-// The assessor's link. In the demo it opens as the demo assessor.
-export function evalLink(id) {
+// The assessor's link. In the demo it opens as the demo assessor. Otherwise it names the account it
+// was sent to (?as=), so the sign-in page can suggest it and spot a wrong account.
+export function evalLink(id, email) {
   const base = location.origin + location.pathname;
-  return base + (cloud.demo ? '?demo=assessor' : '') + '#e/' + encodeURIComponent(id);
+  const q = cloud.demo ? '?demo=assessor' : email ? '?as=' + encodeURIComponent(email) : '';
+  return base + q + '#e/' + encodeURIComponent(id);
 }
 export const shareText = ev => `Please complete this ${toolLabel(ev.tool)} for me: ${ev.itemText || ''}`.trim();
 
@@ -187,7 +189,7 @@ async function copyText(text) {
 
 // Share via the phone's share sheet (form type, item and link only: no patient details).
 export async function shareEval(ev) {
-  const url = evalLink(ev.id);
+  const url = evalLink(ev.id, ev.assessorEmail);
   if (navigator.share) {
     try { await navigator.share({ title: `${toolLabel(ev.tool)} request`, text: shareText(ev), url }); return true; }
     catch (err) { if (err && err.name === 'AbortError') return false; }
@@ -198,7 +200,7 @@ export async function shareEval(ev) {
 
 // QR + Share + Copy link, as a block (share step) or inside a sheet (Nudge, re-share).
 export function sharePanel(ev) {
-  const url = evalLink(ev.id);
+  const url = evalLink(ev.id, ev.assessorEmail);
   const who = ev.assessorName || ev.assessorEmail;
   return h('div', { class: 'e-stack' },
     h('div', { class: 'e-qr' },

@@ -595,3 +595,7 @@ body { background: var(--e-bg-group); }
 /* filled buttons (nuhsdesign/tokens.css sets white text): dark text on the light accents */
 :where(:root[data-theme="dark"]) .n-btn:not(.n-btn--outline):not(:disabled),
 :where(:root[data-theme="dark"]) .n-btn:not(.n-btn--outline):not(:disabled):hover { color: var(--e-on-accent); }
+
+/* sign-in help: in-app browsers, wrong account */
+.e-inapp, .e-wrongacct { border-left: 4px solid var(--e-warn); text-align: left; }
+.e-inapp .e-actions, .e-wrongacct .e-actions { justify-content: flex-start; }
