@@ -526,6 +526,7 @@ async function run(label, ctxOpts) {
   }
 
   await step('log: Paste puts the clipboard in the box', async () => {
+    // (clipboard permissions are Chromium's; this test runs in Chromium)
     await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: new URL(BASE).origin });
     await p.evaluate(() => navigator.clipboard.writeText('PQ 50F\nlap chole GA'));
     await p.locator('textarea.details').fill('');
@@ -2082,7 +2083,11 @@ async function run(label, ctxOpts) {
     assert(!(await p.locator('.parsed').innerText()).includes('Age/sex'), 'disabled age preview');
     assert(await p.locator('.sugg-row [title*="from the age"]').count() === 0, 'disabled age suggestions');
     await p.reload(); await p.waitForSelector('textarea.details');
-    assert(await summary.evaluate(el => el === document.activeElement) && await p.getByLabel('Patient initials', { exact: true }).count() === 0, 'initials box setting not retained on reload');
+    // (a touch phone doesn't open the keyboard as the app opens: only on going to the Case tab, ui-log.js wantFocus)
+    const touch = await p.evaluate(() => matchMedia('(hover: none) and (pointer: coarse)').matches);
+    if (touch) assert(await summary.evaluate(el => el !== document.activeElement), 'the keyboard opened as the app started on a phone');
+    else assert(await summary.evaluate(el => el === document.activeElement), 'the case box not focused on reload');
+    assert(await p.getByLabel('Patient initials', { exact: true }).count() === 0, 'initials box setting not retained on reload');
     assert(!(await p.locator('.parsed').innerText()).includes('Age/sex'), 'disabled age detection not retained');
     await tab('loggingadv');
     const keyboard = p.getByLabel('Open the keyboard when the Case tab opens (this device)', { exact: true });

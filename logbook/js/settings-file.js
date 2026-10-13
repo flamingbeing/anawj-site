@@ -34,6 +34,8 @@ const OBJECTS = {
 const PLAIN = new Set(['dayNoteOnCase', 'pasteClean', 'shareAsk', 'noteToolbar', 'accent', 'boxLines', 'catView', 'compact', 'compactTags', 'defaultDate', 'detectAgeSex', 'firstField', 'enterMode', 'enterSaves', 'hideTips', 'lbCase', 'lbFuzzy', 'lbScope', 'logbookView',
   'reflExport', 'reflNotes', 'searchOps', 'startTab', 'suggestions', 'tagEditorView', 'textSize', 'zoom', 'fontUi', 'fontUiName', 'fontLog', 'fontLogName', 'lineWidth', 'lineHeight', 'contrast', 'motion', 'tabIcons', 'tabBar', 'hideHeader', 'caseInverted', 'colourful', 'autoFocus', 'appTitle', 'weeklyDigest',
   'basic', 'mode', 'weekStart', 'afterSave', 'undoSecs', 'boxCaps', 'boxCorrect', 'boxSpell', 'reflSpell', 'pinBox', 'pinSearch', 'borders', 'reflPoints', 'round', 'shadows', 'bigTaps', 'swipeTabs', 'rowMenu', 'reflToolbar']);
+// (Phone batch, 13 Oct 2026: the tab bar while typing on this device, and Request an evaluation)
+for (const k of ['hideTabsTyping', 'evalRequest']) PLAIN.add(k);
 const MAX_JSON = 400 * 1024;
 
 export function settingsFile(logbook, { theme } = {}) {

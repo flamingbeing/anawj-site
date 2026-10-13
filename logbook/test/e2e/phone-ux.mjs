@@ -1,0 +1,232 @@
+// Fake data only. The phone batch (13 Oct 2026): the note editor's ⋯ menu (opens and stays open, Escape, arrows,
+// outside taps), Done always draws the list (and live saves repaint it in place), the editor's top bar stays put and
+// long titles wrap, Hide the tab bar while typing, a tapped calendar day comes into view, case row tags wrap, 44px
+// tap targets on touch screens, no keyboard as the app opens on a phone (unless asked for), and Request an
+// evaluation (off by default) with only the date and initials in its link. Phone 390 (touch) and desk 1280.
+import assert from 'node:assert/strict';
+import { launch, engine, isChromium, phoneOpts, ignorable, until } from './browsers.mjs';
+const base = `http://localhost:${process.env.PORT || 8080}/logbook/`;
+const b = await launch();
+if (!b) { console.log(`SKIP phone-ux (${engine} is not installed here)`); process.exit(0); }
+const label = w => (w === 390 ? 'phone' : 'desktop') + (isChromium ? '' : ` (${engine})`);
+try { for (const width of [390, 1280]) {
+  const phone = width === 390;
+  const ctx = await b.newContext({ viewport: { width, height: 844 }, serviceWorkers: 'block', ...(phone ? phoneOpts() : {}) });
+  await ctx.addInitScript(() => localStorage.setItem('apmes-logbook-demo-small', '1'));
+  const p = await ctx.newPage(), errors = [];
+  p.on('pageerror', e => errors.push(e.message)); p.on('console', m => { if (m.type() === 'error' && !ignorable(m.text())) errors.push(m.text()); });
+  // links the app opens are caught here, not followed
+  await p.addInitScript(() => {
+    window.__opened = [];
+    document.addEventListener('click', e => { const a = e.target.closest && e.target.closest('a[href^="https://apmes.anawj.com/evals/"]'); if (a) { e.preventDefault(); window.__opened.push(a.getAttribute('href')); } }, true);
+  });
+  const tap = (loc, o) => (phone ? loc.tap(o) : loc.click(o));
+  const focusedTag = () => p.evaluate(() => document.activeElement && document.activeElement.getAttribute('aria-label'));
+
+  // ---- the case box and the keyboard: on a phone not as the app opens, only on going to the Case tab ----
+  await p.goto(base + '?demo=reset#log'); await p.waitForSelector('textarea.details');
+  await p.waitForTimeout(300);
+  if (phone) {
+    assert.notEqual(await focusedTag(), 'Case summary', 'the keyboard opened as the app started on a phone');
+    await tap(p.locator('[role=tab][data-tab=logbook]'));
+    await tap(p.locator('[role=tab][data-tab=log]'));
+    await p.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === 'Case summary');
+    // "Also when the app opens" brings it back as the app starts
+    await p.goto(base + '?demo#loggingadv');
+    const also = p.getByRole('switch', { name: 'Also when the app opens on a phone or tablet (this device)' });
+    assert.equal(await also.isChecked(), false);
+    await tap(also);
+    await p.goto(base + '?demo#log'); await p.waitForSelector('textarea.details');
+    await p.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === 'Case summary');
+    await p.evaluate(async () => { const m = await import('./js/ui-settings.js'); m.applyDisplay(m.setDisplay({ autoFocus: null })); });
+  } else {
+    await p.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === 'Case summary');   // computers as before
+  }
+  console.log(`PASS keyboard on opening ${label(width)}`);
+
+  // ---- tap targets: 44px on touch screens ----
+  if (phone) {
+    await tap(p.locator('[role=tab][data-tab=logbook]'));
+    const cal = p.locator('main .seg button').filter({ hasText: /^Calendar$/ }); if (await cal.count()) await tap(cal.first());
+    for (const name of ['Previous month', 'Next month']) {
+      const r = await p.getByRole('button', { name }).boundingBox();
+      assert.ok(r.width >= 44 && r.height >= 44, `${name} is ${r.width}x${r.height}`);
+    }
+    await tap(p.locator('[role=tab][data-tab=log]'));
+    for (const name of [/^Case$/, /^List$/]) {
+      const r = await p.locator('.datebar .mode-seg button').filter({ hasText: name }).first().boundingBox();
+      assert.ok(r.height >= 44, `the Case | List switch is ${r.height} high`);
+    }
+    await p.goto(base + '?demo#display'); await p.getByRole('heading', { name: 'Display', exact: true }).first().waitFor();
+    const back = await p.locator('.back-row .back-link').first().boundingBox();
+    assert.ok(back.height >= 44, `the back link is ${back.height} high`);
+    console.log(`PASS tap targets ${label(width)}`);
+  }
+
+  // ---- case rows: the tags wrap, nothing runs under the note button or the row's buttons ----
+  await p.evaluate(async () => {
+    const { S, updateCase } = await import('./js/ui-core.js');
+    const c = S.cases[0];
+    await updateCase(c.id, { tags: ['fake-tag-one', 'fake-tag-two', 'fake-tag-three'], cats: ['16', '28', '1', '2', '3'] });
+  });
+  await p.goto(base + '?demo#logbook');
+  const list = p.locator('main .seg button').filter({ hasText: /^List$/ }); await list.first().click();
+  await p.locator('ul.cases li[data-date] .c-tags').first().waitFor();
+  const rows = await p.locator('ul.cases li[data-date] .c-tags').evaluateAll(els => els.map(e => ({ wrap: getComputedStyle(e).flexWrap, over: e.scrollWidth - e.clientWidth })));
+  assert.ok(rows.length >= 1);
+  for (const r of rows) { assert.equal(r.wrap, 'wrap'); assert.ok(r.over <= 1, 'a tag row runs past its edge: ' + r.over); }
+  console.log(`PASS case row tags wrap ${label(width)}`);
+
+  // ---- the calendar: a tapped day's cases come into view above the tab bar ----
+  if (phone) {
+    await p.setViewportSize({ width, height: 560 });
+    const cal = p.locator('main .seg button').filter({ hasText: /^Calendar$/ }); await tap(cal.first());
+    await p.evaluate(() => window.scrollTo(0, 0));
+    const day = p.locator('button.lb-day:not(.blank)').filter({ has: p.locator('.lb-count:not(.none)') }).first();
+    await tap(day);
+    const head = p.locator('.lb-daydetail .lb-dayhead');
+    await head.waitFor();
+    await p.waitForFunction(() => {
+      const r = document.querySelector('.lb-daydetail .lb-dayhead').getBoundingClientRect(), bar = document.getElementById('tabs').getBoundingClientRect();
+      return r.bottom <= bar.top && r.top >= 0;
+    }, null, { timeout: 3000 }).catch(async e => {
+      console.log('calendar state', await p.evaluate(() => { const d = document.querySelector('.lb-daydetail'); const h = d && d.querySelector('.lb-dayhead'); return { y: scrollY, ih: innerHeight, det: d && Math.round(d.getBoundingClientRect().top), head: h && Math.round(h.getBoundingClientRect().bottom), bar: Math.round(document.getElementById('tabs').getBoundingClientRect().top), sel: Math.round(document.querySelector('.lb-day.sel')?.getBoundingClientRect().top ?? -1) }; }));
+      await p.screenshot({ path: (process.env.E2E_OUT || '/tmp') + '/phone-ux-calendar.png' });
+      throw e;
+    });
+    // and the day stays on screen
+    const sel = await p.locator('button.lb-day.sel').boundingBox();
+    assert.ok(sel.y >= 0, 'the tapped day went off the top');
+    await p.setViewportSize({ width, height: 844 });
+    console.log(`PASS calendar day into view ${label(width)}`);
+  }
+
+  // ---- the note editor ----
+  await p.goto(base + '?demo#notes'); await p.getByRole('button', { name: '+ New note' }).waitFor();
+  await p.getByRole('button', { name: '+ New note' }).click();
+  // a long title wraps onto more lines; a pasted line break becomes a space
+  const long = 'Fake long title about a teaching point that goes on and on well past one line of the phone';
+  await p.getByLabel('Note title').fill(long + '\nsecond');
+  assert.equal(await p.getByLabel('Note title').inputValue(), long + ' second');
+  const tb = await p.getByLabel('Note title').evaluate(e => ({ h: e.getBoundingClientRect().height, lh: parseFloat(getComputedStyle(e).lineHeight), tag: e.tagName }));
+  assert.equal(tb.tag, 'TEXTAREA');
+  if (phone) assert.ok(tb.h > tb.lh * 1.6, `the long title didn't wrap (${tb.h}px, line ${tb.lh}px)`);
+  await p.getByLabel('Note text').fill(Array.from({ length: 80 }, (_, i) => 'Fake line ' + i).join('\n'));
+  // the ⋯ menu opens and stays open (a tap on its own button can't close it again)
+  const more = p.getByRole('button', { name: 'More options' });
+  const menuHidden = () => p.locator('.note-menu').evaluate(m => m.hidden);
+  await tap(more);
+  await p.waitForTimeout(200);
+  assert.equal(await menuHidden(), false, 'the ⋯ menu closed at once');
+  assert.equal(await more.getAttribute('aria-expanded'), 'true');
+  // keyboard: focus in the menu, arrows move, Escape closes and goes back to ⋯
+  assert.equal(await p.evaluate(() => document.activeElement?.getAttribute('role')), 'menuitem');
+  await p.keyboard.press('ArrowDown');
+  assert.equal(await p.evaluate(() => document.activeElement?.textContent), 'Clean up');
+  await p.keyboard.press('ArrowUp'); await p.keyboard.press('ArrowUp');
+  assert.equal(await p.evaluate(() => document.activeElement?.textContent), 'Delete');
+  await p.keyboard.press('Escape');
+  assert.equal(await menuHidden(), true);
+  assert.equal(await focusedTag(), 'More options');
+  assert.equal(await more.getAttribute('aria-expanded'), 'false');
+  // a tap elsewhere closes it; ⋯ again closes it; opening again still works
+  await tap(more); assert.equal(await menuHidden(), false);
+  await tap(p.getByLabel('Note title'), { position: { x: 8, y: 8 } });
+  assert.equal(await menuHidden(), true);
+  await tap(more); await tap(more);
+  assert.equal(await menuHidden(), true);
+  await tap(more);
+  await p.getByRole('menuitem', { name: 'Preview' }).click();
+  assert.equal(await menuHidden(), true);
+  await p.locator('.note-view:not([hidden])').waitFor();
+  // the top bar stays at the top while the note scrolls
+  await p.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await p.waitForTimeout(100);
+  const top = await p.locator('.note-editor .note-top').boundingBox();
+  assert.ok(top.y >= -1 && top.y < 30, `the editor's top bar scrolled away (${top.y})`);
+  assert.ok(await p.getByRole('button', { name: 'Done' }).isVisible());
+  // Done: the list, at once; the save that follows repaints its rows in place (the page isn't drawn again under a tap)
+  await tap(p.getByRole('button', { name: 'Done' }));
+  await p.locator('ul.notes-rows li').first().waitFor({ timeout: 2000 });
+  await p.evaluate(() => { window.__page = document.querySelector('.notes-page'); });
+  await until(p, async () => { const { S } = await import('./js/ui-core.js'); return S.notes?.some(n => n.title?.startsWith('Fake long title') && n.updatedAt); }, null, { msg: 'the note saved' });
+  await p.waitForTimeout(300);
+  assert.equal(await p.evaluate(() => window.__page.isConnected), true, 'the Notes page was drawn again after Done');
+  assert.match(await p.locator('ul.notes-rows').innerText(), /Fake long title/);
+  // and again through Back, with a few in a row
+  for (let i = 0; i < 3; i++) {
+    await p.locator('ul.notes-rows li').first().click();
+    await p.locator('.note-editor').waitFor();
+    if (i % 2) await p.goBack(); else await tap(p.getByRole('button', { name: 'Done' }));
+    await p.locator('ul.notes-rows li').first().waitFor({ timeout: 2000 });
+  }
+  console.log(`PASS note editor ${label(width)}`);
+
+  // ---- Hide the tab bar while typing (Accessibility, this device; off by default) ----
+  if (phone) {
+    await p.goto(base + '?demo#log'); await p.waitForSelector('textarea.details');
+    // the keyboard coming up: a text box has focus and the visible area shrinks
+    const typeWithKeyboard = async () => {
+      await p.locator('textarea.details').focus();
+      await p.setViewportSize({ width, height: 480 });
+      await p.waitForFunction(() => document.body.classList.contains('typing'));
+    };
+    await typeWithKeyboard();
+    assert.equal(await p.locator('#tabs').isVisible(), true);
+    assert.equal(await p.evaluate(() => document.body.classList.contains('typing-nobar')), false);
+    await p.setViewportSize({ width, height: 844 });
+    await p.goto(base + '?demo#access');
+    const sw = p.getByRole('switch', { name: 'Hide the tab bar while typing' });
+    assert.equal(await sw.isChecked(), false);
+    await tap(sw);
+    assert.equal(await p.evaluate(async () => (await import('./js/ui-settings.js')).display().hideTabsTyping), true);
+    await p.goto(base + '?demo#log'); await p.waitForSelector('textarea.details');
+    await typeWithKeyboard();
+    await p.waitForFunction(() => document.body.classList.contains('typing-nobar'));
+    assert.equal(await p.locator('#tabs').isVisible(), false);
+    // Save sits at the bottom now, where the bar was
+    const save = await p.locator('.savebar').boundingBox();
+    assert.ok(save && save.y + save.height >= 480 - 2, 'the Save bar did not move down: ' + JSON.stringify(save));
+    await p.locator('textarea.details').blur();
+    await p.setViewportSize({ width, height: 844 });
+    await p.waitForFunction(() => !document.body.classList.contains('typing-nobar'));
+    assert.equal(await p.locator('#tabs').isVisible(), true);
+    await p.evaluate(async () => { const m = await import('./js/ui-settings.js'); m.applyDisplay(m.setDisplay({ hideTabsTyping: null })); });
+    console.log(`PASS hide the tab bar while typing ${label(width)}`);
+  }
+
+  // ---- Request an evaluation: off by default, then in the case's ⋯ menu and its edit page ----
+  await p.evaluate(async () => { const m = await import('./js/ui-settings.js'); m.applyDisplay(m.setDisplay({ rowMenu: true })); });
+  await p.goto(base + '?demo#logbook');
+  await p.locator('main .seg button').filter({ hasText: /^List$/ }).first().click();
+  const c0 = await p.evaluate(async () => { const { S } = await import('./js/ui-core.js'); const { caseParts } = await import('./js/engine.js'); const c = S.cases.find(x => caseParts(x).initials); return { id: c.id, date: c.date, initials: caseParts(c).initials, details: caseParts(c).details }; });
+  const row = p.locator(`ul.cases li[data-date="${c0.date}"]`).first();
+  await row.locator('.row-more').click();
+  await p.locator('dialog[open] .row-menu-list').waitFor();
+  assert.equal(await p.locator('dialog[open]').getByText('Request an evaluation').count(), 0);
+  await p.locator('dialog[open]').getByRole('button', { name: 'Cancel' }).click();
+  await p.goto(base + '?demo#showhide');
+  const evalSw = p.getByRole('switch', { name: 'Request an evaluation from a case' });
+  assert.equal(await evalSw.isChecked(), false);
+  await evalSw.check();
+  await until(p, async () => (await import('./js/ui-core.js')).settings().evalRequest === true, null, { msg: 'the setting saved' });
+  await p.goto(base + '?demo#logbook');
+  await p.locator('main .seg button').filter({ hasText: /^List$/ }).first().click();
+  await p.locator(`ul.cases li[data-date="${c0.date}"]`).first().locator('.row-more').click();
+  const link = p.locator('dialog[open]').getByRole('link', { name: 'Request an evaluation' });
+  const href = await link.getAttribute('href');
+  assert.equal(href, `https://apmes.anawj.com/evals/?demo&date=${c0.date}&initials=${c0.initials}#new`);
+  assert.equal(await link.getAttribute('target'), '_blank');
+  assert.ok(!href.includes(encodeURIComponent(c0.details.split(' ')[0])) || c0.details.split(' ')[0] === c0.initials, 'the case details went into the link');
+  await link.click();
+  await p.waitForFunction(() => window.__opened.length === 1);
+  assert.equal(await p.locator('dialog[open]').count(), 0, 'the menu stayed open');
+  // the edit page has it too
+  await p.locator(`ul.cases li[data-date="${c0.date}"]`).first().locator('.t').click();
+  await p.locator('dialog[open]').getByText('Edit case', { exact: true }).waitFor();
+  assert.equal(await p.locator('dialog[open] .case-links').getByRole('link', { name: 'Request an evaluation' }).getAttribute('href'), href);
+  await p.keyboard.press('Escape');
+  console.log(`PASS request an evaluation ${label(width)}`);
+
+  assert.deepEqual(errors, []); await ctx.close(); console.log(`PASS phone-ux ${label(width)}`);
+} } finally { await b.close(); }

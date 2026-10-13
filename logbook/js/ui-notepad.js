@@ -52,7 +52,7 @@ export function ensureNotes() {
     if (!meta.fromCache) { synced = true; syncIndex(); if (serverResolve) { serverResolve(); serverResolve = null; } }
     if (readyResolve) { readyResolve(S.notes); readyResolve = null; }
     takeServerDayNote();
-    if (S.tab === 'notes' && !nv.editing) queueMicrotask(() => { if (S.tab === 'notes' && !nv.editing && !document.activeElement?.closest?.('.notes-page input')) hooks.render(); });
+    if (S.tab === 'notes' && !nv.editing) queueMicrotask(refreshList);
   });
   return ready;
 }
@@ -179,13 +179,26 @@ async function openCase(id) {
 }
 const caseLabel = c => { const p = caseParts(c); return [c.date ? fmtDate(c.date) : '', p.initials, p.details].filter(Boolean).join(' · ').slice(0, 90); };
 
+// The list on screen (renderNotes), so a live update repaints its rows and count in place instead of drawing the
+// whole page again: a page drawn again under a tap loses the tap (Firefox: the list sometimes came back empty after
+// Done, while the saves that Done set off were arriving). The whole page is drawn again only when its shape changes.
+let page = null;   // { el, shape, repaint(list) }
+const listShape = (list, loading) => JSON.stringify([loading, cappedNotes(list).length >= MAX_NOTES, list.some(isDayNote), !!list.length]);
+export const notesChanged = () => refreshList();
+function refreshList() {
+  if (S.tab !== 'notes' || nv.editing) return;
+  const list = Array.isArray(S.notes) ? S.notes : [];
+  if (page && page.el.isConnected && page.shape === listShape(list, !Array.isArray(S.notes))) return page.repaint(list);
+  if (document.activeElement?.closest?.('.notes-page input')) return;   // never under someone typing a search
+  hooks.render();
+}
+
 export function renderNotes() {
-  if (nv.editing) return editor(nv.editing);
+  if (nv.editing) { page = null; return editor(nv.editing); }
   const el = h('section', { class: 'card notes-page' });
   ensureNotes();
   const loading = !Array.isArray(S.notes);
-  const list = loading ? [] : S.notes;
-  const counted = cappedNotes(list).length, full = counted >= MAX_NOTES;   // daily notes don't count
+  const counted = cappedNotes(loading ? [] : S.notes).length, full = counted >= MAX_NOTES;   // daily notes don't count
   if (nv.autoNew && !loading) {
     nv.autoNew = false;
     queueMicrotask(() => {
@@ -198,6 +211,7 @@ export function renderNotes() {
   const search = h('input', { type: 'search', class: 'grow', placeholder: 'Search notes', 'aria-label': 'Search notes', value: nv.q,
     oninput: e => { nv.q = e.target.value; paintList(); } });
   const listEl = h('div', { class: 'notes-list' });
+  let list = loading ? [] : S.notes;   // (a live update swaps in the newer list: page.repaint)
   const paintList = () => {
     const rows = filterNotes(list, nv);
     fill(listEl, loading ? h('p', { class: 'empty' }, 'Loading…')
@@ -231,6 +245,12 @@ export function renderNotes() {
     listEl,
     list.length ? h('p', { class: 'notes-download' }, h('button', { class: 'small', onclick: downloadNoteFiles }, 'Download notes as files (zip)')) : null);
   paintList();
+  page = { el, shape: listShape(list, loading), repaint: next => {
+    list = next;
+    const count = el.querySelector('.notes-count');
+    if (count) count.textContent = `${cappedNotes(list).length} of ${MAX_NOTES}`;
+    paintList();
+  } };
   return el;
 }
 
@@ -262,10 +282,13 @@ function openEditor(n, fresh = false, { edit = false, back = '', own = false } =
   const copy = own && sessions.has(n) ? n : JSON.parse(JSON.stringify(n));
   if (copy !== n || !sessions.has(copy)) sessions.set(copy, { base: fresh ? null : JSON.parse(JSON.stringify(n)), owner: mine(), dirty: false, timer: null, saving: null });
   nv.editing = copy; nv.preview = !edit && !fresh && !!String(copy.body || '').trim(); nv.back = back;
+  // Back (the phone's, the browser's) closes the editor; when Done already closed it and drew the list, nothing is
+  // drawn again here (a second drawing a moment later could swallow the next tap)
   if (!editorTransient?.active) editorTransient = transients.open(() => {
-    if (nv.editing) { persist(nv.editing); nv.editing = null; }
+    const open = !!nv.editing;
+    if (open) { persist(nv.editing); nv.editing = null; }
     nv.back = '';
-    hooks.render();
+    if (open || !(page && page.el.isConnected)) hooks.render();
   });
   hooks.render();
   window.scrollTo(0, 0);
@@ -275,7 +298,11 @@ async function closeEditor() {
   const n = nv.editing, back = nv.back;
   if (n) persist(n);
   nv.editing = null; nv.back = '';
-  if (editorTransient?.active) await editorTransient.close(); else hooks.render();
+  // the list is drawn now, not when the browser gets round to the history step (Firefox's came late, and a live
+  // update in between could leave the page half drawn); going back to the Logbook draws that instead
+  const drawn = !back && S.tab === 'notes';
+  if (drawn) hooks.render();
+  if (editorTransient?.active) await editorTransient.close(); else if (!drawn) hooks.render();
   // a daily note opened from the Logbook goes back there (the Notes page was only passed through)
   if (back && S.tab === 'notes') history.back();
 }
@@ -415,10 +442,18 @@ function editor(n) {
   s.status = t => { status.textContent = t; };
   // (through s.status: the editor may have been drawn again since, e.g. after a live update once the box lost focus)
   const touch = () => { s.dirty = true; s.status('Not saved yet'); clearTimeout(s.timer); s.timer = setTimeout(() => persist(n), SAVE_MS); };
-  const title = h('input', { class: 'note-title', placeholder: 'Title', 'aria-label': 'Note title', maxlength: String(LIMITS.title), value: n.title || '',
-    oninput: e => { n.title = e.target.value; touch(); }, onblur: () => persist(n),
-    // Enter in the one-line title moves on to the note itself (as in a notes app), never a lost line break
+  // the title wraps onto more lines when it's long (a one-row box that grows), but stays one line of text: Enter moves
+  // on to the note itself (as in a notes app), and a pasted line break becomes a space
+  const fitTitle = () => { title.style.height = 'auto'; if (title.scrollHeight) title.style.height = title.scrollHeight + 'px'; };
+  const title = h('textarea', { class: 'note-title', rows: '1', placeholder: 'Title', 'aria-label': 'Note title', maxlength: String(LIMITS.title),
+    oninput: e => {
+      const v = e.target.value;
+      if (/[\r\n]/.test(v)) { const at = e.target.selectionStart; e.target.value = v.replace(/\r?\n|\r/g, ' '); e.target.setSelectionRange(at, at); }
+      n.title = e.target.value; touch(); fitTitle();
+    }, onblur: () => persist(n),
     onkeydown: e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); if (nv.preview) modeBtn.click(); body.focus(); body.setSelectionRange(0, 0); } } });
+  title.value = n.title || '';
+  requestAnimationFrame(fitTitle);
   const date = h('input', { type: 'date', 'aria-label': 'Note date', value: n.date || '', onchange: e => { n.date = e.target.value || null; touch(); paintMeta(); } });
   const body = h('textarea', { class: 'note-body', rows: '12', placeholder: 'Write your note… (- [ ] for a to-do)', 'aria-label': 'Note text', maxlength: String(LIMITS.body), spellcheck: 'true',
     oninput: e => { n.body = e.target.value; touch(); }, onblur: () => persist(n), onpaste: e => pasteClean(e, body) });
@@ -454,15 +489,15 @@ function editor(n) {
   s.onMerge = () => {
     if (nv.editing !== n) return;
     if (!(document.activeElement === body && body.value === n.body)) body.value = n.body || '';
-    if (document.activeElement !== title) title.value = n.title || '';
+    if (document.activeElement !== title) { title.value = n.title || ''; fitTitle(); }
     paintMeta(); if (nv.preview) paintView();
   };
   const view = h('div', { class: 'note-view' });
   const paintView = () => fill(view, renderBody(n.body, line => { n.body = toggleCheck(n.body, line); body.value = n.body; touch(); persist(n); paintView(); }));
-  const modeBtn = h('button', { type: 'button', 'aria-pressed': String(nv.preview), onclick: () => { closeMenu(); nv.preview = !nv.preview; paint(); if (!nv.preview) body.focus(); } });
+  // (a menu item names what it does, Preview or Edit: aria-pressed isn't allowed on one)
+  const modeBtn = h('button', { type: 'button', onclick: () => { closeMenu(); nv.preview = !nv.preview; paint(); if (!nv.preview) body.focus(); } });
   const paint = () => {
     modeBtn.textContent = nv.preview ? 'Edit' : 'Preview';
-    modeBtn.setAttribute('aria-pressed', String(nv.preview));
     body.hidden = nv.preview; view.hidden = !nv.preview;
     if (bar) bar.hidden = nv.preview;
     if (nv.preview) paintView();
@@ -497,16 +532,47 @@ function editor(n) {
   // the top bar: ‹ Notes, whether it's saved, a ⋯ menu (Preview or Edit, Clean up, Delete) and Done; no boxes below it
   const menu = h('div', { class: 'note-menu', role: 'menu', hidden: true }, modeBtn, tidy, del);
   [modeBtn, tidy, del].forEach(b => b.setAttribute('role', 'menuitem'));
-  const closeMenu = () => { menu.hidden = true; more.setAttribute('aria-expanded', 'false'); };
-  const more = h('button', { class: 'small icon-btn note-more', type: 'button', 'aria-label': 'More options', 'aria-haspopup': 'menu', 'aria-expanded': 'false', onclick: e => {
-    e.stopPropagation();
-    menu.hidden = !menu.hidden; more.setAttribute('aria-expanded', String(!menu.hidden));
-    if (!menu.hidden) setTimeout(() => document.addEventListener('click', ev => { if (!menu.contains(ev.target)) closeMenu(); }, { once: true }), 0);
-  } }, '⋯');
+  const more = h('button', { class: 'small icon-btn note-more', type: 'button', 'aria-label': 'More options', 'aria-haspopup': 'menu', 'aria-expanded': 'false' }, '⋯');
+  const { close: closeMenu } = popMenu(more, menu);
   return h('section', { class: 'card note-editor' },
     h('div', { class: 'note-top' }, h('a', { class: 'back-link note-back', href: '#notes', onclick: e => { e.preventDefault(); closeEditor(); } }, h('span', { class: 'back-chev', 'aria-hidden': 'true' }, '‹'), BACK_LABEL[nv.back] || 'Notes'),
       h('span', { style: 'flex:1' }), status, h('span', { class: 'note-menu-wrap' }, more, menu), h('button', { class: 'small primary', type: 'button', onclick: closeEditor }, 'Done')),
     title, meta, bar, body, view);
+}
+
+// The ⋯ menu: opens and closes with its button; a tap or click anywhere else closes it, as do Escape (focus back on the
+// button), Tab and leaving the page. One listener on the document while it's open (it ignores the button itself, so the
+// tap that opened it can't close it again, whatever order a browser delivers it in: WebKit closed it at once with a
+// one-off listener added after the tap), removed when it closes. Arrow keys move between the items.
+function popMenu(btn, menu) {
+  const items = () => [...menu.querySelectorAll('[role=menuitem]')];
+  const away = e => { if (!menu.isConnected || (!menu.contains(e.target) && !btn.contains(e.target))) close(); };
+  const keys = e => {
+    if (!menu.isConnected) return close();
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(true); return; }
+    if (e.key === 'Tab') return close();
+    if (!menu.contains(document.activeElement)) return;
+    const list = items(), i = list.indexOf(document.activeElement);
+    const to = e.key === 'ArrowDown' ? i + 1 : e.key === 'ArrowUp' ? i - 1 : e.key === 'Home' ? 0 : e.key === 'End' ? list.length - 1 : null;
+    if (to === null) return;
+    e.preventDefault();
+    list[(to + list.length) % list.length]?.focus();
+  };
+  function close(refocus = false) {
+    document.removeEventListener('click', away, true);
+    document.removeEventListener('keydown', keys, true);
+    if (menu.hidden) return;
+    menu.hidden = true; btn.setAttribute('aria-expanded', 'false');
+    if (refocus && btn.isConnected) btn.focus();
+  }
+  function open() {
+    menu.hidden = false; btn.setAttribute('aria-expanded', 'true');
+    document.addEventListener('click', away, true);
+    document.addEventListener('keydown', keys, true);
+    items()[0]?.focus({ preventScroll: true });
+  }
+  btn.addEventListener('click', e => { e.stopPropagation(); if (menu.hidden) open(); else close(); });
+  return { open, close };
 }
 
 // Settings → Notes → Clean rich text when pasting (off by default): a paste with HTML (a web page, Word, Docs,

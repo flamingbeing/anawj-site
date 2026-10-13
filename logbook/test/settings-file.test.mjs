@@ -73,3 +73,11 @@ assert.equal(readSettingsFile(JSON.stringify(settingsFile({settings:{compactTags
   assert.throws(() => readDeviceFile(JSON.stringify({ kind: 'apmes-logbook-settings', items: {} })), /isn’t a device file/);
   assert.throws(() => readDeviceFile(JSON.stringify({ kind: DEVICE_KIND, items: [] })), /isn’t a device file/);
 }
+
+// the phone batch's options travel in the file too
+{
+  const f2 = settingsFile({ settings: { hideTabsTyping: true, evalRequest: true } });
+  const got = readSettingsFile(JSON.stringify(f2)).settings;
+  assert.equal(got.hideTabsTyping, true);
+  assert.equal(got.evalRequest, true);
+}

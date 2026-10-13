@@ -13,6 +13,7 @@ import { moveToBin } from './bin.js';
 import { caseHasNotes, openNotes, dayNoteBox } from './ui-notepad.js';
 import { createDraftSlot, listDrafts } from './drafts.js';
 import { SHARED_KEY, peekShared, popShared, sharedFiles, shareState } from './share-in.js';
+import { evalRequestUrl } from './eval-link.js';
 
 const DRAFT_KEY = 'logbook-draft-v2';
 const KEEP_MS = 12 * 3600e3; // a date kept by "Save, keep date" lasts this long
@@ -35,6 +36,17 @@ const draftParts = () => {
 };
 // Settings → Advanced logging → Separate initials box (device firstField 'initials'; an older 'date' counts as off)
 const firstField = () => (display().firstField === 'initials' ? 'initials' : 'details');
+// The Case tab opening the keyboard by itself (Logging → Advanced: "Open the keyboard when the Case tab opens"). On a
+// touch screen only right after a tap or key (going to the Case tab), never as the app opens or when a live update
+// draws the page again (the keyboard would cover it before anything was tapped), unless set to "Also when the app
+// opens" (autoFocus true). Computers keep focusing it as before.
+let gestureAt = 0;
+if (typeof window !== 'undefined') for (const ev of ['pointerup', 'keydown']) window.addEventListener(ev, () => { gestureAt = Date.now(); }, { capture: true, passive: true });
+const touchOnly = () => typeof matchMedia === 'function' && matchMedia('(hover: none) and (pointer: coarse)').matches;
+export const wantFocus = () => {
+  const a = display().autoFocus;
+  return a !== false && !document.documentElement.classList.contains('no-autofocus') && (a === true || !touchOnly() || Date.now() - gestureAt < 1500);
+};
 export const focusLog = () => (draft.mode === 'bulk' ? ui?.textarea : firstField() === 'initials' ? ui.initials : ui.textarea)?.focus({ preventScroll: true });
 const suggestionKey = () => JSON.stringify([draftText(), curDate(), settings().detectAgeSex !== false]);
 const draftKey = () => `${DRAFT_KEY}:${cloud.demo ? 'demo:' : ''}${(S.user && S.user.email) || ''}`;
@@ -425,7 +437,7 @@ function renderOne(card) {
     oninput: e => { suggestedSave = null; draft.initials = cleanInitials(e.target.value); draft.initialsHint = ''; saveDraft(); paintParsed(true); suggestSoon(); },
     onkeydown: e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); ui.textarea.focus(); } } }) : null;
   const textarea = h('textarea', {
-    class: 'details', rows: String(boxLines()), style: `min-height:calc(${boxLines()} * 1.4em + 22px)`, autofocus: firstField() === 'details' && !document.documentElement.classList.contains('no-autofocus'), enterkeyhint: enterMode() === 'single' ? 'done' : 'enter', 'aria-label': 'Case summary',
+    class: 'details', rows: String(boxLines()), style: `min-height:calc(${boxLines()} * 1.4em + 22px)`, autofocus: firstField() === 'details' && wantFocus(), enterkeyhint: enterMode() === 'single' ? 'done' : 'enter', 'aria-label': 'Case summary',
     // Settings → Logging (this device): capitals, autocorrect, spelling underlines (html classes, applyLook)
     autocapitalize: htmlHas('box-caps-off') ? 'off' : 'sentences', autocorrect: htmlHas('box-correct') ? 'on' : 'off', spellcheck: htmlHas('box-spell-off') ? 'false' : 'true',
     placeholder: placeholderRows().map(([a, b]) => `${a}  ← ${b}`).join('\n'),
@@ -548,7 +560,7 @@ function renderOne(card) {
   requestAnimationFrame(() => alignPlaceholder(textarea));
   // autofocus attribute is ignored on re-render; focus after insertion (not on phones' first paint
   // when that would pop the keyboard over a fresh landing — it's what the user came to do, so do it)
-  requestAnimationFrame(() => { if (!document.documentElement.classList.contains('no-autofocus') && (document.activeElement === document.body || !document.activeElement || document.activeElement.closest('#tabs'))) focusLog(); });   // the tapped tab button keeps focus now the bar isn't rebuilt
+  requestAnimationFrame(() => { if (wantFocus() && (document.activeElement === document.body || !document.activeElement || document.activeElement.closest('#tabs'))) focusLog(); });   // the tapped tab button keeps focus now the bar isn't rebuilt
 }
 
 const suggestSoon = debounce(() => paintSuggest(), 120);
@@ -1008,7 +1020,9 @@ export function editCaseDialog(c, opts = {}) {
         basicHides('reflect') ? null : h('button', { type: 'button', class: 'small', onclick: async () => { await m.close(); (await import('./ui-reflect.js')).reflectOnCase(c); } },
           refl ? 'Open the reflection' : 'Write a reflection'),
         h('button', { type: 'button', class: 'small', onclick: async () => { await m.close(); openNotes({ caseId: c.id, create: !notes }); } },
-          notes ? 'Open the notes' : 'Write a note')));
+          notes ? 'Open the notes' : 'Write a note'),
+        // APMES → Request an evaluation (off by default): the case as saved (its date and initials only)
+        settings().evalRequest ? h('a', { class: 'btn small eval-req', href: evalRequestUrl({ date: c.date, initials: caseParts(c).initials }, { today: todayISO(), demo: cloud.demo }), target: '_blank', rel: 'noopener' }, 'Request an evaluation') : null));
   };
   const m = modal(isNew ? 'New case' : 'Edit case', [
     c.dateText && !c.date ? h('p', { class: 'tip' }, `Imported date “${c.dateText}” could not be read — please set the date.`) : null,

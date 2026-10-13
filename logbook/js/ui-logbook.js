@@ -18,6 +18,8 @@ import { reflectOnCase } from './ui-reflect.js';
 import { moveToBin } from './bin.js';
 import { destinations, openSend } from './ui-send.js';
 import { shareText, copyText, caseText as shareCaseText, dayTextWithNotes } from './share.js';
+import { cloud } from './ui-core.js';
+import { evalRequestUrl } from './eval-link.js';
 
 // has: tags a case must all have; not: tags it must have none of ('c:16' or a personal tag key); from/to: dates
 const FRESH = () => ({ q: '', has: [], not: [], from: '', to: '', flag: '', mode: null, limit: 150, month: null, day: null });
@@ -332,6 +334,8 @@ function openRowMenu(c) {
     h('button', { onclick: () => { m.close(); copyText(shareCaseText(c), 'Case copied: paste it into your notes'); } }, rowIcon('copy'), ' Copy'),
     destinations().length ? h('button', { onclick: () => { m.close(); openSend({ text: shareCaseText(c), title: c.date || 'Case' }); } }, rowIcon('copy'), ' Send to…') : null,
     basicHides('reflect') ? null : h('button', { class: has ? 'has-refl' : '', onclick: () => { m.close(); reflectOnCase(c); } }, rowIcon(has ? 'done' : 'reflect'), has ? ' Open the reflection' : ' Write a reflection'),
+    // APMES → Request an evaluation (off by default): the evaluations app, with this case's date and initials
+    settings().evalRequest ? h('a', { class: 'btn eval-req', href: evalRequestUrl({ date: c.date, initials: caseParts(c).initials }, { today: todayISO(), demo: cloud.demo }), target: '_blank', rel: 'noopener', onclick: () => m.close() }, rowIcon('reflect'), ' Request an evaluation') : null,
     h('button', { onclick: () => { m.close(); editCaseDialog(c); } }, ' Edit the case'),
     h('button', { class: 'linkish', onclick: () => m.close() }, 'Cancel')));
 }
@@ -444,7 +448,7 @@ function calendarView(rows, flagsOf, repaint) {
     add(grid, h('button', {
       class: `lb-day t${tint} ${iso === today ? 'today' : ''} ${iso === view.day ? 'sel' : ''}`,
       'aria-label': `${d} ${MONTHS[m - 1]}: ${cs.length} case${cs.length === 1 ? '' : 's'}${dayHasNotes(iso) ? ', has notes' : ''}`, 'aria-pressed': String(iso === view.day),
-      onclick: () => { view.day = view.day === iso ? null : iso; repaint(); },
+      onclick: () => { view.day = view.day === iso ? null : iso; repaint(); if (view.day) showDay(); },
     }, h('span', { class: 'n' }, d), h('span', { class: 'lb-count' + (cs.length ? '' : ' none'), 'aria-hidden': cs.length ? null : 'true' }, cs.length || ''), flagged ? h('i', { class: 'lb-dot', title: 'Has a flagged case' }) : null,
       dayHasNotes(iso) ? h('i', { class: 'lb-note', title: 'Has notes' }) : null));
   }
@@ -464,7 +468,7 @@ function calendarView(rows, flagsOf, repaint) {
       h('button', { class: 'small icon-btn', 'aria-label': 'Next month', onclick: () => shift(1) }, '›'),
       h('button', { class: 'small', onclick: () => { view.month = today.slice(0, 7); view.day = today; repaint(); } }, 'Today')),
     grid,
-    view.day ? h('div', { style: 'margin-top:12px' },
+    view.day ? h('div', { class: 'lb-daydetail', style: 'margin-top:12px' },
       // the day, then its buttons together on one row (none left alone on a line of its own)
       h('div', { class: 'lb-dayhead' },
         h('h3', { style: 'margin:0' }, `${fmtDate(view.day)} (${dayCases.length})`),
@@ -483,6 +487,40 @@ function calendarView(rows, flagsOf, repaint) {
     undated.length ? h('details', { style: 'margin-top:12px' },
       h('summary', {}, `No date (${undated.length})`),
       h('ul', { class: 'cases' }, undated.map(c => caseRow(c, flagsOf)))) : null);
+}
+
+// A tapped day's cases come into view when they'd start below the screen (or under the tab bar): enough of them to
+// see the day's heading and first cases, never so far that the calendar's own row goes off the top. Smoothly, unless
+// Reduce motion is on.
+function showDay() {
+  requestAnimationFrame(() => {
+    const el = document.querySelector('.lb-daydetail');
+    if (!el) return;
+    // the day's button was drawn again: keep the keyboard's place on it
+    const sel0 = document.querySelector('.lb-day.sel');
+    if (sel0 && (!document.activeElement || document.activeElement === document.body)) sel0.focus({ preventScroll: true });
+    const r = el.getBoundingClientRect();
+    const bar = document.getElementById('tabs'), br = bar && !bar.hidden ? bar.getBoundingClientRect() : null;
+    const bottom = Math.min(window.visualViewport ? window.visualViewport.height : window.innerHeight, br && br.top > window.innerHeight / 2 ? br.top : Infinity) - 8;
+    const want = r.top + Math.min(r.height, 220);   // the heading and about two cases
+    if (want <= bottom) return;
+    const sel = document.querySelector('.lb-day.sel'), top = sel ? sel.getBoundingClientRect().top - 8 : r.top - 8;
+    const by = Math.min(want - bottom, Math.max(0, top));
+    if (by <= 0) return;
+    const c = document.documentElement.classList;
+    const still = c.contains('rm') || (c.contains('rm-auto') && matchMedia('(prefers-reduced-motion: reduce)').matches);
+    const to = window.scrollY + by, behavior = still ? 'auto' : 'smooth';
+    window.scrollTo({ top: to, behavior });
+    // a page drawn again meanwhile (the day's notes arriving) puts the scroll back where it was: finish the move,
+    // unless the finger has moved the page since
+    let moved = false;
+    const mark = () => { moved = true; };
+    for (const ev of ['touchstart', 'wheel', 'keydown']) window.addEventListener(ev, mark, { once: true, passive: true });
+    setTimeout(() => {
+      for (const ev of ['touchstart', 'wheel', 'keydown']) window.removeEventListener(ev, mark);
+      if (!moved && S.tab === 'logbook' && document.querySelector('.lb-daydetail') && Math.abs(window.scrollY - to) > 4) window.scrollTo({ top: to, behavior });
+    }, still ? 50 : 500);
+  });
 }
 
 // ---------- grid ----------
