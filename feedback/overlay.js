@@ -23,6 +23,21 @@
   try { items = JSON.parse(store.get(KEY, '[]')); if (!Array.isArray(items)) items = []; } catch (e) { items = []; }
   const save = () => { store.set(KEY, JSON.stringify(items)); render(); };
 
+  // ---- what happened recently, for "Something's wrong": errors and the screens and things tapped (by kind and
+  // position on the page, never their text), kept only in memory, last 30
+  const recent = [], t0 = Date.now();
+  const note = what => { recent.push(`${((Date.now() - t0) / 1000).toFixed(1)}s ${what}`); if (recent.length > 30) recent.shift(); };
+  const errors = [];
+  const err = what => { errors.push(what.slice(0, 300)); if (errors.length > 10) errors.shift(); note('error'); };
+  addEventListener('error', e => { if (e.message) err(`${e.message} (${(e.filename || '').split('/').pop()}:${e.lineno || '?'})`); });
+  addEventListener('unhandledrejection', e => err('unhandled: ' + (e.reason?.message || String(e.reason))));
+  const origError = console.error;
+  console.error = function (...a) { try { err('console: ' + a.map(x => x?.message || (typeof x === 'string' ? x : JSON.stringify(x))).join(' ')); } catch (e) {} return origError.apply(this, a); };
+  // only the screen's name (the first part of #…): later parts can be record ids
+  const screen = () => (location.hash.split(/[\/?&=]/)[0] || '(start)');
+  addEventListener('hashchange', () => note('screen ' + screen()));
+  addEventListener('offline', () => note('went offline')); addEventListener('online', () => note('back online'));
+
   // ---- the overlay's own UI lives in a shadow root, so the page's styles and ours never mix
   const hostEl = document.createElement('anawj-feedback');
   hostEl.style.cssText = 'all:initial';
@@ -66,6 +81,7 @@
     <h2>Feedback on this page</h2>
     <p class="muted" id="where"></p>
     <div class="row"><button class="primary" id="mPick">Comment on something</button><button id="mPage">Comment on this screen</button></div>
+    <div class="row"><button id="mBug">Something’s wrong</button></div>
     <div class="row"><button id="mList">Comments (<span id="count">0</span>)</button><button id="mSend">Send</button></div>
     <div class="row"><button id="mSide">Move button</button><button id="mOff">Turn off</button><button id="mClose">Close</button></div>
   </div>
@@ -145,7 +161,8 @@
       parts.unshift(el.tagName.toLowerCase() + ':nth-of-type(' + i + ')');
       el = el.parentElement;
     }
-    return parts.join(' > ');
+    // on a live app an id with digits in it may be a record's id: keep only that there was one
+    return LIVE_APP ? parts.join(' > ').replace(/#[^ >]*\d[^ >]*/g, '#…') : parts.join(' > ');
   }
   function heading(el) {
     let found = '';
@@ -156,6 +173,13 @@
   }
   const KIND = { p: 'paragraph', li: 'list item', td: 'table cell', th: 'table heading', a: 'link', button: 'button', img: 'image', svg: 'diagram', figure: 'figure', video: 'video', canvas: 'drawing', input: 'input', select: 'choice', textarea: 'text box', label: 'label' };
   const kindOf = el => /^h[1-6]$/i.test(el.tagName) ? 'heading' : KIND[el.tagName.toLowerCase()] || 'part of the screen';
+
+  document.addEventListener('click', e => {
+    if (picking || inside(e)) return;
+    const el = e.target.nodeType === 1 ? e.target : e.target.parentElement;
+    const t = el && (el.closest(BLOCK) || el);
+    if (t && t !== page.body) note(`tap ${kindOf(t)} ${cssPath(t)}`.slice(0, 160));
+  }, { capture: true, passive: true });
 
   let pending = null;
   function choose(el) {
@@ -168,7 +192,7 @@
     openNote();
   }
   function openNote() {
-    $('noteText').value = ''; $('optOptions').checked = $('optEverywhere').checked = false;
+    $('noteText').value = ''; $('noteText').placeholder = 'What should change?'; $('optOptions').checked = $('optEverywhere').checked = false;
     show('note'); $('noteText').focus();
   }
   function closeNote() {
@@ -212,6 +236,13 @@
   $('pickCancel').onclick = stopPick;
   // the bar covers one end of the screen: flip it to reach what's underneath
   $('pickFlip').onclick = () => $('banner').classList.toggle('top');
+  $('mBug').onclick = () => {
+    pending = { kind: 'problem', heading: '', locator: '', before: '', problem: {
+      screen: screen(), size: `${innerWidth}×${innerHeight}`, browser: navigator.userAgent.replace(/^Mozilla\/5\.0 /, '').slice(0, 160),
+      online: navigator.onLine, steps: recent.slice(-15), errors: errors.slice() } };
+    $('onText').textContent = 'Problem report: say what you did and what went wrong. The last few screens and taps, and any errors, are added (no text from the screen).';
+    openNote(); $('noteText').placeholder = 'e.g. I tapped Save and nothing happened';
+  };
   $('mPage').onclick = () => { pending = { kind: 'whole screen', heading: '', locator: '', before: '' }; $('onText').textContent = 'On: this whole screen'; openNote(); };
   $('mSide').onclick = () => { store.set(SIDE, side() === 'left' ? 'right' : 'left'); render(); };
   $('mOff').onclick = () => {
@@ -243,6 +274,14 @@
     for (const u of urls) {
       out += `\n## Page: ${u}\n`;
       items.filter(c => c.url === u).forEach((c, i) => {
+        if (c.problem) {
+          const p = c.problem;
+          out += `\n### ${i + 1}. Something's wrong (screen ${p.screen}${c.view ? ', view ' + c.view : ''})\nWhat happened:\n${quote(c.text)}\n`;
+          out += `Device: ${p.size}, ${p.online ? 'online' : 'offline'}, ${p.browser}\n`;
+          out += `Recent steps (oldest first):\n${p.steps.length ? p.steps.map(x => '- ' + x).join('\n') : '- (none recorded)'}\n`;
+          out += `Errors:\n${p.errors.length ? p.errors.map(x => '- ' + x).join('\n') : '- none'}\n`;
+          return;
+        }
         out += `\n### ${i + 1}. Comment (${c.kind}${c.heading ? ', under “' + c.heading + '”' : ''}${c.view ? ', view ' + c.view : ''})\n`;
         if (c.before) out += `On:\n${quote(c.before)}\n`;
         out += `Comment:\n${quote(c.text)}\n`;
@@ -263,7 +302,7 @@
   ];
   function refresh() {
     $('report').value = report(); $('sendNote').hidden = true;
-    const typed = items.map(c => c.text).join('\n');
+    const typed = items.map(c => c.text + (c.problem ? '\n' + c.problem.errors.join('\n') : '')).join('\n');
     const flags = PRIVATE.filter(([re]) => re.test(typed)).map(([, w]) => w);
     $('privacy').hidden = $('privacyOk').hidden = !flags.length;
     if (flags.length) $('privacy').textContent = `Check before sending: your comments contain ${flags.length > 1 ? flags.slice(0, -1).join(', ') + ' and ' + flags.at(-1) : flags[0]}. This will be public; remove anything that could identify a patient.`;

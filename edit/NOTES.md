@@ -37,6 +37,10 @@ editor), then Send. No frame: it runs in the page itself, so it works on the sub
   same privacy check as the editor.
 - **Apps with an offline copy** (logbook, evals, prewarm, hand) show their saved page first, which was saved without the
   button: if it doesn't appear after `?feedback=1`, it will once the app updates; on previews it always appears.
+- **Something's wrong** (problem report): the sender says what happened, and the report adds the screen (the first part of
+  the `#` address), screen size, browser, online or not, the last 15 taps and screen changes (element kind and CSS locator,
+  never their text; ids with digits are hidden on live apps) and the last errors on the page. Kept only in memory until
+  the report is saved.
 - Comments stay in that browser (per subdomain) until sent. "Move button" puts it in the other corner; while picking, ⇅ moves
   the bar to the other end of the screen.
 - Test: `node feedback/test/e2e.mjs` (serves this checkout through the real Worker at phone size); the Worker's side is in
@@ -58,6 +62,9 @@ editor), then Send. No frame: it runs in the page itself, so it works on the sub
 - Comments from the feedback button name a full address (a subdomain or a PR preview): map it to the repo folder with
   `SITES` in `worker/routes.js` (`prewarmstudy.anawj.com/` is `prewarm/`). On a live app there's no "On:" text, only the
   element and locator; open the app in `?demo` to see it. Comments pasted on a PR are for the session working on that PR.
+- **Something's wrong** reports and comments about behaviour ("Export should stay off until 3 readings"): reproduce it in
+  `?demo` from the steps and errors, then for `prewarm/` and `logbook/` (vital apps) first add a browser test that fails,
+  fix it, and show it passing plus before-and-after 390 px screenshots in the PR, so the owner approves evidence, not code.
 - Find each change by searching for the old text in the page's source (the locator is a hint). App text lives in the
   app's JavaScript; follow that app's NOTES.md (hand-babies: figure text is in `app.js`, regenerate `gifs/`).
 - Close each issue with a link to the PR that applied it.

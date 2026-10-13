@@ -93,6 +93,29 @@ try {
   assert.equal(issue.searchParams.get('title'), 'Page edits: claude-try-feedback-anawj-preview.kohwenjun.workers.dev/hand-babies/ (Test sender)');
   assert.deepEqual(errors, []);
 
+  // ---- "Something's wrong": the last taps and screens and any errors go with the report, never the screen's text
+  const bug = await ctx.newPage();
+  await bug.goto(PREVIEW + '/hand-babies/');
+  await fb(bug).locator('#fab').waitFor();
+  await bug.locator('nav a, [role=tab], button').filter({ visible: true }).nth(1).click();
+  await bug.evaluate(() => { setTimeout(() => { throw new Error('boom in test'); }); });
+  await bug.waitForTimeout(100);
+  await fb(bug).locator('#fab').click();
+  await fb(bug).locator('#mBug').click();
+  assert.match(await fb(bug).locator('#onText').textContent(), /^Problem report/);
+  await fb(bug).locator('#noteText').fill('I tapped a tab and the page jumped');
+  await fb(bug).locator('#noteSave').click();
+  await fb(bug).locator('#fab').click();
+  await fb(bug).locator('#mSend').click();
+  await fb(bug).locator('#who').fill('Test sender');
+  const bugRep = await fb(bug).locator('#report').inputValue();
+  assert.match(bugRep, /### \d+\. Something's wrong \(screen /);
+  assert.match(bugRep, /What happened:\n> I tapped a tab and the page jumped/);
+  assert.match(bugRep, /Device: 390×844, online, /);
+  assert.match(bugRep, /\ds tap [a-z ]+ /, 'the tap is in the steps');
+  assert.match(bugRep, /Errors:\n- .*boom in test/);
+  if (SHOTS) await bug.screenshot({ path: path.join(SHOTS, 'feedback-bug.png') });
+
   // ---- a real address: off unless turned on
   const live = await ctx.newPage();
   await live.goto('https://hand.anawj.com/babies/');
