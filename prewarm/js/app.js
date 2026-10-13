@@ -49,7 +49,7 @@ window.addEventListener('storage', e => {
   if (changed) { shared.stale = true; const b = document.getElementById('fresh'); if (b) b.hidden = false; }
 });
 const settings = Object.assign({ me: '', site: '', hide: { skin: false, set: false, ts: false, warm: false, room: false, haemo15: false, bis: false },
-  remind: { vibrate: true, beep: true, banner: true, awake: true } }, read('settings', {}));
+  remind: { vibrate: true, beep: true, banner: true, awake: true, haemo: false } }, read('settings', {}));
 const saveAll = () => write('patients', patients);
 const saveSettings = () => write('settings', settings);
 // settings v2 (owner, 12 Oct 2026): every reading is entered live by default, BP / HR / BIS every 15 min included
@@ -673,9 +673,11 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
   // draft: this timepoint's saved values, else carried over from the last saved timepoint
   const prev = def.points.slice(0, idx).reverse().find(x => savedAt(p, s, x.key));
   const draft = {}, was = {};
+  // the first intra-op reading starts from the last pre-warming one (owner, 13 Oct 2026)
+  const prevPw = !prev && s === 'iotemp' ? [...SERIES.prewarm.points].reverse().find(x => savedAt(p, 'prewarm', x.key)) : null;
   for (const c of cols) {
     const mine = val(p, `${s}_${pt.key}_${c.key}`);
-    was[c.key] = prev ? val(p, `${s}_${prev.key}_${c.key}`) : null;
+    was[c.key] = prev ? val(p, `${s}_${prev.key}_${c.key}`) : prevPw && c.temp ? val(p, `prewarm_${prevPw.key}_${c.key}`) : null;
     draft[c.key] = mine ?? was[c.key];
   }
   let setTouched = false; // gown set temp follows "warming off" until someone picks a value
@@ -757,11 +759,13 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     return true;
   }
 
+  // timepoint labels (owner, 13 Oct 2026): Arrival, the zero point named for what it is, then "5 min"
+  const pointShort = (ser, x) => x.key === 'base' ? 'Arrival' : x.key === 'end' ? 'End' : x.min === 0 ? (ser === 'prewarm' ? 'Prewarm on' : 'Induction') : x.min + ' min';
   function strip() {
     const now = nowFor(p, s);
     return `<div class="strip" role="list">${pts.map(x => {
       const done = savedAt(p, s, x.key), due = dueOf(p, s, x), missed = !done && due != null && now > due + 5 && expected(p, s, due);
-      return `<a role="listitem" href="#/p/${id}/${s}/${x.key}" class="${x.key === pt.key ? 'on' : ''} ${done ? 'done' : missed ? 'missed' : ''}">${x.key === 'base' ? 'Base' : x.key === 'end' ? 'End' : x.min}</a>`;
+      return `<a role="listitem" href="#/p/${id}/${s}/${x.key}" class="${x.key === pt.key ? 'on' : ''} ${done ? 'done' : missed ? 'missed' : ''}">${pointShort(s, x)}</a>`;
     }).join('')}</div>`;
   }
   function isChanged(k) { const v = draft[k]; return v != null && was[k] != null && String(v) !== String(was[k]); }
@@ -789,7 +793,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     }
     // an empty temperature: the whole card is one big target that puts in 36.5
     const fill = (c.temp || c.key === 'room') && v == null;
-    return `<div class="card ${changed ? 'changed' : ''}${fill ? ' fill' : ''}" ${fill ? `data-fill="${c.key}"` : ''}><div class="clab">${c.label}<small>${hint}</small></div>
+    return `<div class="card ${changed ? 'changed' : ''}${fill ? ' fill' : ''}${c.key === 'core' ? ' wide core' : ''}" ${fill ? `data-fill="${c.key}"` : ''}><div class="clab">${c.label}<small>${hint}</small></div>
       <div class="pm"><button class="k" data-step="-1" data-c="${c.key}" aria-label="${c.label} down">−</button><button class="num" data-type="${c.key}">${v ?? '<span class="muted">tap</span>'}</button><button class="k" data-step="1" data-c="${c.key}" aria-label="${c.label} up">+</button></div></div>`;
   }
   function timesHtml() {
@@ -806,7 +810,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
   function comfortHtml(id, label) {
     const v = val(p, id);
     if (v != null && satEdit !== id) {
-      return `<div class="comfort done"><span>${label}: <b>${esc(COMFORT.find(o => String(o[0]) === String(v))?.[1] || v)}</b></span><button class="link" data-satedit="${id}">Change</button></div>`;
+      return `<div class="comfort done"><span>${label}: <b>${esc(COMFORT.find(o => String(o[0]) === String(v))?.[1] || v)}</b></span><button class="link" data-satedit="${id}">Change</button><button class="link" data-satclear="${id}">Clear</button></div>`;
     }
     return `<div class="comfort"><span class="lab">${label}<small>ask the patient</small></span>
       <div class="seg comfort5">${COMFORT.map(([ov, ol]) => `<button class="chip" data-sat="${id}" data-v="${ov}" aria-pressed="${String(v) === String(ov)}">${ol.replace('omfortable', 'omfort&shy;able')}</button>`).join('')}</div></div>`;
@@ -857,7 +861,8 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
       <div class="tp"><div><b>${pt.label}</b> ${grp}</div><div class="due" id="due">${due != null ? 'due ' + fromMin(Math.round(due)) : pt.key === 'base' ? (s === 'prewarm' ? '' : 'on arrival in OT') : pt.min != null ? `<span class="hint">Log ${s === 'prewarm' ? 'Prewarm on' : 'Induction'} first</span>` : ''}</div></div>
       <div class="${sealed() ? 'sealed' : ''}">${isSaved ? `<p class="muted small tight">Taken ${esc(savedAt(p, s, pt.key))}${p.f['at_' + s + '_' + pt.key]?.by ? ' (saved by ' + esc(p.f['at_' + s + '_' + pt.key].by) + ')' : ''} <button class="link" data-attime>Change time</button>. Changes save when you tap Save.</p>` : ''}
       <div class="board">${cols.map(card).join('')}</div>
-      ${sealed() ? sealNote(p, s) : `<button class="save big" id="save">${isSaved ? 'Save changes' : `Save ${pt.label} reading`}</button>`}</div>`;
+      ${sealed() ? sealNote(p, s) : `<button class="save big" id="save">${isSaved ? 'Save changes' : `Save ${pt.label} reading`}</button>
+      <p class="resetline"><button class="link" id="clearall">Clear ${isSaved ? 'this saved reading' : 'all boxes'}</button></p>`}</div>`;
     // three parts (owner, 12 Oct 2026): key times; the tab bar and its readings (swipe changes tab here only);
     // the other forms, Still to fill and Mark complete, the same on both tabs
     paint(`<section class="third top" aria-label="Key times">${val(p, 'done') ? `<p class="ok-box donetop">✓ Data collection complete <small>${esc(val(p, 'done'))}</small></p>` : ''}${timesHtml()}</section>
@@ -878,7 +883,8 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
   draw();
   if (restored) toast(`Unsaved ${pt.label} reading brought back. Check it, then Save.`);
   const step = { core: 0.1, chest: 0.1, arm: 0.1, thigh: 0.1, calf: 0.1, room: 0.5, sbp: 1, dbp: 1, map: 1, hr: 1, bis: 1 };
-  const start = { core: 36.5, chest: 36.5, arm: 36.5, thigh: 36.5, calf: 36.5, room: 20, sbp: 120, dbp: 70, map: 85, hr: 75, bis: 50 };
+  // an empty box starts here with + / − or a tap on its card; skin temperature starts at 31 (owner, 13 Oct 2026)
+  const start = { core: 36.5, chest: 31, arm: 31, thigh: 31, calf: 31, room: 20, sbp: 120, dbp: 70, map: 85, hr: 75, bis: 50 };
   function bump(k, dir) {
     const cur = parseFloat(draft[k]);
     const n = Number.isFinite(cur) ? cur + dir * step[k] : start[k];
@@ -904,12 +910,14 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     const chip = t.closest('.chip[data-c]');
     if (chip) { if (chip.dataset.c === 'set') setTouched = true; warmTouched.add(chip.dataset.c); draft[chip.dataset.c] = draft[chip.dataset.c] === chip.dataset.v ? null : chip.dataset.v; draw(); return; }
     const fl = t.closest('.card[data-fill]');
-    if (fl && !t.closest('[data-step]')) { draft[fl.dataset.fill] = fl.dataset.fill === 'room' ? '20.0' : '36.5'; draw(); return; }
+    if (fl && !t.closest('[data-step], .num')) { draft[fl.dataset.fill] = start[fl.dataset.fill].toFixed(1); draw(); return; }
     const m = t.closest('[data-map]');
     if (m) { draft.map = m.dataset.map; draw(); return; }
     const sat = t.closest('[data-sat]');
     // an answer can be changed, not cleared by tapping it again; the row collapses, so taps pause a moment
     if (sat) { set(p, sat.dataset.sat, +sat.dataset.v); satEdit = null; draw(); lockTaps(); return; }
+    const sc = t.closest('[data-satclear]');
+    if (sc) { if (confirm('Clear this comfort answer?')) { set(p, sc.dataset.satclear, null); satEdit = null; draw(); } return; }
     const se = t.closest('[data-satedit]');
     if (se) { satEdit = se.dataset.satedit; draw(); return; }
     const ev = t.closest('[data-ev]');
@@ -932,8 +940,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     const n = t.closest('.num[data-type]');
     if (n) {
       const k = n.dataset.type, c = cols.find(x => x.key === k);
-      // an empty temperature starts at 36.5; tap again to type
-      if ((c.temp || k === 'room') && draft[k] == null) { draft[k] = k === 'room' ? '20.0' : '36.5'; draw(); return; }
+      // one tap opens the box for typing, empty or not (owner, 13 Oct 2026: typing is used more than the arrows)
       const inp = document.createElement('input');
       inp.className = 'num'; inp.dataset.k = k; inp.inputMode = 'decimal'; inp.value = draft[k] ?? ''; inp.setAttribute('aria-label', c.label);
       n.replaceWith(inp); inp.focus(); inp.select();
@@ -954,6 +961,17 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
       const v = askTime(`What time was the ${pt.label} reading taken?`, savedAt(p, s, pt.key));
       if (v) { set(p, `at_${s}_${pt.key}`, v); draw(); }
       return;
+    }
+    if (t.closest('#clearall')) {
+      if (isSaved) {
+        if (!confirm(`Remove the saved ${pt.label} reading (${cols.filter(c => val(p, `${s}_${pt.key}_${c.key}`) != null).map(c => c.label + ' ' + val(p, `${s}_${pt.key}_${c.key}`)).join(', ')})?\n\nIt goes back to not taken.`)) return;
+        const ids = [...cols.map(c => `${s}_${pt.key}_${c.key}`), `at_${s}_${pt.key}`].filter(id => val(p, id) != null && setVal(p, id, null, settings.me));
+        saveAll(); if (ids.length) sync(p, ids);
+        dropDraft(); leaveGuard = null; toast(pt.label + ' reading removed'); render(); return;
+      }
+      for (const c of cols) draft[c.key] = null;
+      setTouched = true; for (const k of ['under', 'gown']) warmTouched.add(k);
+      draw(); return;
     }
     if (t.closest('#save')) {
       if (!commit()) return;
@@ -1055,14 +1073,15 @@ function startAlerts(p) {
         const now = nowFor(q, 'prewarm');
         if (now >= nx.due && now <= nx.due + 5) hit(q.id + 'ev_wstop' + val(q, 'pw_start'), `Prewarm off due now (${WARM_MIN[val(q, 'arm')]} min of warming): tap Log`);
       }
-      // no alarm for BP, HR, BIS (owner, 13 Oct 2026): their due time still shows in the top bar and on the tab
-      for (const s of ['prewarm', 'iotemp']) {
+      // BP, HR, BIS alarm only when switched on in Settings (owner, 13 Oct 2026; off by default): their due time
+      // still shows in the top bar and on the tab
+      for (const s of settings.remind.haemo ? ['prewarm', 'iotemp', 'haemo'] : ['prewarm', 'iotemp']) {
         if ((s === 'prewarm' && noWarming(q)) || sealedBy(q, s)) continue;
         const now = nowFor(q, s);
         for (const x of pointsFor(q, s)) {
           const d = dueOf(q, s, x), tag = q.id + s + x.key + (val(q, SERIES[s].ref[0]) || '');
           if (d == null || !expected(q, s, d) || savedAt(q, s, x.key) || now < d || now > d + 5) continue;
-          hit(tag, `Temperature ${x.label} reading due now`);
+          hit(tag, `${s === 'haemo' ? 'BP, HR, BIS' : 'Temperature'} ${x.label} reading due now`);
         }
       }
     }
@@ -1631,6 +1650,7 @@ route(/^\/settings$/, () => {
     ${tog('hide', 'haemo15', 'BP, HR and BIS every 15 min', 'Off: baseline only')}${tog('hide', 'bis', 'BIS')}
     <h2>When a reading is due</h2>
     <p class="muted small">Works while the app is open on screen.</p>
+    ${tog('remind', 'haemo', 'BP, HR, BIS due alarm', 'Off by default: the countdown still shows')}
     ${tog('remind', 'banner', 'Banner')}${tog('remind', 'vibrate', 'Vibrate', 'Android only')}${tog('remind', 'beep', 'Short beep')}${tog('remind', 'awake', 'Keep the screen on during readings')}
     <button class="secondary" id="test">Test the alert</button>
     <h2>Export</h2>

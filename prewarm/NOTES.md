@@ -106,6 +106,12 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   (memory climbs to gigabytes): if a test run is killed, look for a failed assertion comparing an element handle.
 - **No BP, HR, BIS alarm** (owner, 13 Oct 2026): only temperatures and Prewarm off beep, buzz and show the banner.
   BP, HR, BIS due times still show in the top bar countdown and on the tab.
+- **Temperature page** (owner, 13 Oct 2026): "Core (spot on)" spans both columns, then chest + arm, then thigh + calf.
+  One tap on a number opens its box for typing; tapping elsewhere on an empty card fills the starting value (core
+  36.5, skin 31.0, room 20.0). The first intra-op reading starts from the last pre-warming one. "Clear all boxes"
+  empties the draft (on a saved reading it removes the reading after asking). The strip reads Arrival, then
+  "Prewarm on" / "Induction" for 0, then "5 min"…; "Clear" beside a comfort answer. BP, HR, BIS due alarm is a
+  Settings toggle, off by default (`settings.remind.haemo`).
 - **Never send an empty `f`** (lesson, 12 Oct 2026): `setDoc(…, { f: {} }, { merge: true })` replaces the server's
   `f` with an empty map (an empty map is a leaf in the merge). Lock / unlock / delete sent one and wiped the server
   copy's readings; push now omits an empty `f`, lock sends the full record, and each phone resends all its patients

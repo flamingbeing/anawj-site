@@ -526,7 +526,50 @@ jobs.push(() => tryit(async () => {
   log(await pg.textContent('[data-pev="pacu_in"] b') === before && await pg.$eval('.sealed input', i => i.disabled), 'PACU complete: times and answers locked');
   await ctx.close();
 }));
+// AA. temperature layout, carry-over from pre-warming, labels, Clear (owner, 13 Oct 2026)
+jobs.push(() => tryit(async () => {
+  const { ctx, pg } = await fresh();
+  await open(pg, 0);
+  const id = pg.url().match(/#\/p\/(\w+)/)[1];
+  await pg.evaluate(id => { const k = 'prewarm-demo:patients', all = JSON.parse(localStorage.getItem(k)), t = Date.now();
+    for (const [a, b] of [['prewarm_20_core', '36.8'], ['prewarm_20_chest', '33.5'], ['at_prewarm_20', '08:00']]) all[id].f[a] = { v: b, t, by: 'T' };
+    localStorage.setItem(k, JSON.stringify(all)); }, id);
+  await pg.goto(`http://localhost:8080/prewarm/?demo#/p/${id}/iotemp/base`); await pg.reload(); await pg.waitForSelector('.num[data-type="core"]');
+  const txt = k => pg.textContent(`.num[data-type="${k}"]`).then(t => t.trim());
+  log(await txt('core') === '36.8' && await txt('chest') === '33.5', 'first intra-op reading starts from the last pre-warming one: ' + await txt('core') + ' ' + await txt('chest'));
+  const box = k => pg.locator(`.card:has(.num[data-type="${k}"])`).boundingBox();
+  const [c, ch, a, th, ca] = [await box('core'), await box('chest'), await box('arm'), await box('thigh'), await box('calf')];
+  log(c.width > ch.width * 1.8 && Math.abs(ch.y - a.y) < 2 && Math.abs(th.y - ca.y) < 2 && a.y < th.y && c.y < ch.y, 'core spans two columns; chest + arm, then thigh + calf');
+  log((await pg.textContent('.card:has(.num[data-type="core"]) .clab')).includes('Core (spot on)'), 'core is labelled Core (spot on)');
+  const strip = await pg.$$eval('.strip a', as => as.map(x => x.textContent.trim()).slice(0, 4));
+  log(strip.join('|') === 'Arrival|Induction|5 min|10 min', 'strip labels: ' + strip.join('|'));
+  // an empty skin box starts at 31 from its card; one tap on a number opens the box for typing
+  await pg.click('#clearall'); await pg.waitForTimeout(200);
+  log(await txt('core') === 'tap' && await txt('chest') === 'tap', 'Clear empties every box');
+  await pg.click('.card[data-fill="thigh"] .clab');
+  log(await txt('thigh') === '31.0', 'skin starts at 31.0');
+  await pg.waitForTimeout(800); await pg.click('.num[data-type="core"]');
+  log(!!await pg.$('input.num'), 'one tap opens the box for typing');
+  await ctx.close();
+}));
+// AB. BP, HR, BIS alarm is off by default and comes on with its Settings toggle
+jobs.push(() => tryit(async () => {
+  const { ctx, pg } = await fresh('2026-10-13T10:00:00');
+  await pg.goto('http://localhost:8080/prewarm/?demo#/settings'); await pg.waitForSelector('[data-g="remind"][data-k="haemo"]');
+  log(!await pg.isChecked('[data-g="remind"][data-k="haemo"]'), 'BP, HR, BIS alarm toggle is off by default');
+  await pg.check('[data-g="remind"][data-k="haemo"]'); await pg.waitForTimeout(200);
+  await pg.goto('http://localhost:8080/prewarm/?demo#/'); await open(pg, 1);
+  await pg.click('#haemolink'); await pg.click('a[href$="/form/intraop"]'); await pg.waitForSelector('#f-io_ebl');
+  const seen = [];
+  for (let i = 0; i < 16; i++) {
+    await pg.clock.fastForward('01:00'); await pg.waitForTimeout(150);
+    const t = await pg.evaluate(() => { const b = document.querySelector('#banner'); return b && !b.hidden ? b.textContent : ''; });
+    if (t && !seen.includes(t)) seen.push(t);
+  }
+  log(seen.some(t => /BP, HR, BIS .* reading due now/.test(t)), 'with the toggle on, BP, HR, BIS alarms: ' + JSON.stringify(seen));
+  await ctx.close();
+}));
 await runJobs();
 await b.close();
 if (fails.length) { console.error('prewarm edge: FAIL\n- ' + fails.join('\n- ')); process.exit(1); }
-console.log('prewarm edge: ok (midnight, surgery end, double-tap Save, BP checks, back button, Log, Enter, still to fill, swipe, stray taps, time order, corrections, BMI, follow-ups, blanks, typed answers, alerts everywhere, duplicates, storage full, lock warning, late readings, delete and restore, prewarm off alert, warming yes / no, touch double taps, typing then leaving, other tab due, two patients, app closed mid-reading, layout, reset, PACU view, sections closed once complete)');
+console.log('prewarm edge: ok (midnight, surgery end, double-tap Save, BP checks, back button, Log, Enter, still to fill, swipe, stray taps, time order, corrections, BMI, follow-ups, blanks, typed answers, alerts everywhere, duplicates, storage full, lock warning, late readings, delete and restore, prewarm off alert, warming yes / no, touch double taps, typing then leaving, other tab due, two patients, app closed mid-reading, layout, reset, PACU view, sections closed once complete, layout and carry-over, haemo alarm toggle)');

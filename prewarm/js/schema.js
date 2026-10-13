@@ -45,7 +45,7 @@ const tp = (from, to, step) => { const a = []; for (let m = from; m <= to; m += 
 const BASELINE = { key: 'base', label: 'Baseline', min: null };
 const END = { key: 'end', label: 'End of surgery', min: null };
 
-const TEMPS = [['core', 'Core'], ['chest', 'Chest'], ['arm', 'Arm'], ['thigh', 'Thigh'], ['calf', 'Calf']]
+const TEMPS = [['core', 'Core (spot on)'], ['chest', 'Chest'], ['arm', 'Arm'], ['thigh', 'Thigh'], ['calf', 'Calf']]
   .map(([k, l]) => ({ key: k, label: l, type: 'num', unit: '°C', temp: true }));
 
 const SERIES = {

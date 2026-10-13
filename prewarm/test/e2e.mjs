@@ -83,7 +83,8 @@ try {
   await page.waitForSelector('#evtime');
   await axe('patient'); await shot('patient');
   // two hours ago (a fixed clock time would read as tomorrow's when the test runs more than 12 h later)
-  const ago = new Date(Date.now() - 2 * 3600e3), PW = String(ago.getHours()).padStart(2, '0') + ':' + String(ago.getMinutes()).padStart(2, '0');
+  const hm = d => String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  const ago = new Date(Date.now() - 2 * 3600e3), PW = hm(ago), PW1 = hm(new Date(+ago + 60e3));
   await page.fill('#evtime', PW);
   assert.equal(await page.textContent('[data-ev="pw_start"] b'), PW);
 
@@ -95,19 +96,20 @@ try {
   assert.ok(await page.$('span.pn.prev'), 'no previous before the first timepoint');
   await page.click('.pn.next'); await page.waitForFunction(b => document.querySelector('.strip a.on')?.textContent !== b, before);
   await page.click('.pn.prev'); await page.waitForFunction(b => document.querySelector('.strip a.on')?.textContent === b, before);
+  // one tap on a temperature opens its box for typing (owner, 13 Oct 2026); 325 is read as 32.5
   await page.click('.num[data-type="chest"]');
-  assert.equal((await page.textContent('.num[data-type="chest"]')).trim(), '36.5', 'an empty temperature starts at 36.5');
-  // anywhere on an empty temperature's card does the same
+  await page.fill('input.num', '325'); await page.keyboard.press('Enter'); await page.waitForTimeout(500);
+  assert.equal((await page.textContent('.num[data-type="chest"]')).trim(), '32.5', 'one tap opens the box; 325 is read as 32.5');
+  // anywhere on an empty temperature's card (not its number) fills the starting value: skin 31
   await page.click('.card[data-fill="arm"] .clab');
-  assert.equal((await page.textContent('.num[data-type="arm"]')).trim(), '36.5', 'tapping the card label fills 36.5');
+  assert.equal((await page.textContent('.num[data-type="arm"]')).trim(), '31.0', 'tapping the card label fills 31.0 for skin');
   assert.equal(await page.$('.card[data-fill="arm"]'), null, 'a filled card is no longer one big target');
   await page.click('.num[data-type="core"]');
-  await page.click('.num[data-type="core"]');
   await page.fill('input.num', '366');
-  await page.keyboard.press('Enter');
+  await page.keyboard.press('Enter'); await page.waitForTimeout(500);
   assert.equal((await page.textContent('.num[data-type="core"]')).trim(), '36.6', '366 is read as 36.6');
   await page.click('[data-step="-1"][data-c="chest"]');
-  assert.equal((await page.textContent('.num[data-type="chest"]')).trim(), '36.4');
+  assert.equal((await page.textContent('.num[data-type="chest"]')).trim(), '32.4');
   await page.click('.chip[data-c="ts"][data-v="1"]');
   await axe('reading'); await shot('reading');
   // thigh and calf are still blank: Save asks first (Cancel keeps the reading open)
@@ -133,7 +135,7 @@ try {
   await page.click('[data-ev="ev_wstop"]');
   await page.waitForTimeout(800); // a quick second tap in the same place is ignored (double-tap guard)
   await page.click('[data-ev="ev_wstop"]');
-  await page.fill('#evtime', '07:31');
+  await page.fill('#evtime', PW1); // one minute after Prewarm on: every later reading has the set temp NA
   // leaving a reading with unsaved changes asks first: Stay keeps them, Save saves and goes on
   await page.click('.strip a:has-text("10")');
   await page.waitForSelector('dialog.ask[open]');
@@ -247,7 +249,7 @@ try {
   page.once('dialog', d => d.accept()); // mean BP and BIS left blank
   await page.click('#save');
   await page.waitForFunction(() => /15/.test(document.querySelector('.tp')?.textContent || ''));
-  await page.click('.strip a:has-text("Base")');
+  await page.click('.strip a:has-text("Arrival")');
   await page.waitForSelector('input[data-in="sbp"]');
   assert.equal(await page.inputValue('input[data-in="hr"]'), '64', 'saved');
   await axe('bp hr bis'); await shot('haemo');
