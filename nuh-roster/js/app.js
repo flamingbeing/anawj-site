@@ -11,7 +11,7 @@ import { buildRosterPdf } from './pdfout.js';
 import { buildRosterCanvas } from './pngout.js';
 import { emptyRotations, postingOn, weekPosting, mondayOf, weeksOfYear, setWeeks, readRotationSheet, buildRotationWorkbook, POSTING_FILL } from './rotations.js';
 import { makeDemo, demoNotes, demoAdmin } from './demo.js';
-import { MONTHLY, monthlyDef, LEAVE_TYPES, NIGHT_DUTIES, cleanCell, daysIn, weekday, monthName, addDays, readMonthlyPdf, readMonthlyXlsx, buildMonthlyWorkbook, dutiesOn, generalFromMonthly, leaveOn } from './monthly.js';
+import { MONTHLY, monthlyDef, LEAVE_TYPES, NIGHT_DUTIES, monthIssues, cleanCell, daysIn, weekday, monthName, addDays, readMonthlyPdf, readMonthlyXlsx, buildMonthlyWorkbook, dutiesOn, generalFromMonthly, leaveOn } from './monthly.js';
 
 // ?demo: a made-up department, kept apart from real data in its own storage
 const DEMO = new URLSearchParams(location.search).has('demo');
@@ -58,7 +58,7 @@ migrateRooms();
 syncRooms();
 state.rotations ||= emptyRotations();
 // bumped when the demo data changes, so a demo already open in a browser picks it up
-const DEMO_VERSION = 5;
+const DEMO_VERSION = 6;
 if (DEMO && !state.staff.length) startDemo();
 else if (DEMO && state.demoVersion !== DEMO_VERSION) { state = blankState(); syncRooms(); startDemo(); } // the made-up department changed: start it again
 
@@ -2895,8 +2895,32 @@ async function exportMonthly(kind) {
   download(`${monthlyDef(kind).label} ${monthName(curMonth())}.xlsx`, new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
 }
 
+// The month's clashes (monthly.js monthIssues), worked out once per change of the monthly rosters or staff.
+let issuesCache = { key: '', list: [] };
+function issuesOf(month) {
+  const key = month + JSON.stringify([state.monthly?.[month], state.monthly?.[addDays(month + '-01', -1).slice(0, 7)], state.staff.length]);
+  if (issuesCache.key !== key) issuesCache = { key, list: monthIssues(state.monthly, month, personByText) };
+  return issuesCache.list;
+}
+// Which monthly rosters are in, for this month and the next: missing ones leave post call, calls or leave out.
+function loadedStrip() {
+  const m = curMonth(), next = addDays(m + '-28', 7).slice(0, 7);
+  const has = (month, def) => def.list ? state.monthly?.[month]?.[def.id]?.entries?.length : Object.keys(state.monthly?.[month]?.[def.id]?.rows || {}).length;
+  const line = month => h('div', { class: 'loaded-row' }, h('span', { class: 'seen' }, monthName(month) + ':'),
+    MONTHLY.map(def => { const ok = has(month, def); return h('span', { class: 'chip static' + (ok ? ' ok' : ' missing'), title: ok ? 'Loaded' : 'Not loaded yet' }, (ok ? '✓ ' : '– ') + def.label.replace(' Monthly', '')); }));
+  return h('div', { class: 'loaded' }, line(m), line(next));
+}
 function monthlyBar(kind) {
   const def = monthlyDef(kind);
+  const issues = def.list ? [] : issuesOf(curMonth()).filter(i => i.kind === kind);
+  const errs = issues.filter(i => i.level === 'error').length, gaps = issues.length - errs;
+  const nextIssue = () => {
+    const cells = [...app.querySelectorAll('table.monthly td.clash, table.monthly td.gap')];
+    if (!cells.length) return;
+    const at = cells.findIndex(c => c.contains(document.activeElement));
+    const c = cells[(at + 1) % cells.length];
+    c.scrollIntoView({ block: 'center', inline: 'center' }); c.querySelector('input')?.focus({ preventScroll: true });
+  };
   return h('section', { class: 'card' },
     h('div', { class: 'bar' },
       h('button', { title: 'Previous month', onclick: () => shiftMonth(-1) }, '‹'),
@@ -2912,7 +2936,12 @@ function monthlyBar(kind) {
       } }, 'Clear')),
     h('p', { class: 'hint', style: 'margin:0' }, kind === 'leave'
       ? 'Leave sets people on leave on those days (Medical Leave counts as MC). Import the HMS leave roster or add leave by hand.'
-      : `Import the HMS ${def.label.toLowerCase()} (PDF) or an Excel copy, or type names in. ${def.cols.some(c => c.to) ? 'Columns marked • fill the calls and clinics on Today. ' : ''}${def.cols.some(c => c.night) ? 'Overnight duties make people post call the next day. ' : ''}Names in red aren't matched to the staff list.`));
+      : `Import the HMS ${def.label.toLowerCase()} (PDF) or an Excel copy, or type names in. ${def.cols.some(c => c.to) ? 'Columns marked • fill the calls and clinics on Today. ' : ''}${def.cols.some(c => c.night) ? 'Overnight duties make people post call the next day. ' : ''}Names in red aren't matched to the staff list.`),
+    issues.length ? h('p', { class: 'month-issues', role: 'status' },
+      h('b', {}, [errs ? `${errs} clash${errs > 1 ? 'es' : ''}` : '', gaps ? `${gaps} empty overnight dut${gaps > 1 ? 'ies' : 'y'}` : ''].filter(Boolean).join(', ')),
+      ' this month (marked in the grid: on leave, a day duty after a night, two nights at once). ',
+      h('button', { class: 'small', onclick: nextIssue }, 'Next ›')) : null,
+    loadedStrip());
 }
 
 function renderMonthlyRoster(kind) {
@@ -2928,9 +2957,12 @@ function renderMonthlyRoster(kind) {
     render();
   };
   const today = +state.day.date.slice(8, 10);
+  const flagged = {};
+  for (const i of issuesOf(month)) if (i.kind === kind) (flagged[`${+i.date.slice(8, 10)}|${i.key}`] ||= []).push(i);
   const cell = (d, c) => {
     const v = data?.rows?.[d]?.[c.key] || '';
-    return h('td', {}, nameInput({ value: v, class: v && !personByText(v) ? 'unmatched' : '', title: v && !personByText(v) ? unmatchedTitle(v) : '',
+    const f = flagged[`${d}|${c.key}`];
+    return h('td', { class: f ? (f.some(i => i.level === 'error') ? 'clash' : 'gap') : null }, nameInput({ value: v, class: v && !personByText(v) ? 'unmatched' : '', title: v && !personByText(v) ? unmatchedTitle(v) : f ? f.map(i => i.text).join(' ') : '', 'aria-invalid': f?.some(i => i.level === 'error') ? 'true' : null,
       onchange: e => set(d, c.key, cleanCell(e.target.value)),
       onkeydown: e => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } } }));
   };
@@ -2969,9 +3001,27 @@ function renderLeaveRoster() {
         h('span', { class: 'stats' }, h('span', {}, h('b', {}, data?.entries?.length || 0), ' entries')),
         h('span', { class: 'grow' }),
         h('input', { placeholder: 'Filter names', value: leaveFilter, oninput: e => { leaveFilter = e.target.value; const pos = e.target.selectionStart; render(); const i = app.querySelector('.card.scroll input[placeholder="Filter names"]'); i.focus(); i.setSelectionRange(pos, pos); } })),
+      leavePerDay(month),
       entries.length
         ? h('table', {}, h('thead', {}, h('tr', {}, ['Name', 'From', 'To', 'Leave type', 'Remarks', ''].map(t => h('th', {}, t)))), h('tbody', {}, entries.map(row)))
         : h('p', { class: 'empty' }, `No leave for ${monthName(month)} yet.`)));
+}
+// How many are away each day of the month, seniors and juniors, so a heavy day shows before it's approved.
+function leavePerDay(month) {
+  const limit = state.settings.leaveLimit || 0;
+  const days = Array.from({ length: daysIn(month) }, (_, i) => i + 1);
+  const counts = days.map(d => {
+    const date = `${month}-${String(d).padStart(2, '0')}`;
+    const people = [...new Set(leaveOn(state.monthly, date).map(e => personByText(e.name)).filter(Boolean))];
+    return { d, date, s: people.filter(p => p.role === 'senior').length, j: people.filter(p => p.role !== 'senior').length };
+  });
+  if (!counts.some(c => c.s + c.j)) return null;
+  return h('div', { class: 'leave-days', role: 'img', 'aria-label': 'People on leave each day' },
+    counts.map(c => h('button', { class: 'leave-day' + (weekday(month, c.d) === 'Sat' || weekday(month, c.d) === 'Sun' ? ' weekend' : '') + (limit && c.s + c.j > limit ? ' over' : ''),
+      title: `${c.d} ${monthName(month)}: ${c.s} senior${c.s === 1 ? '' : 's'} and ${c.j} junior${c.j === 1 ? '' : 's'} away${limit && c.s + c.j > limit ? ` (more than ${limit})` : ''}. Go to the day.`,
+      onclick: () => switchDate(c.date) },
+      h('span', { class: 'n' }, c.d), h('span', { class: 'sj' }, c.s + c.j ? `${c.s}/${c.j}` : ''))),
+    h('span', { class: 'seen' }, ' seniors/juniors away' + (limit ? `; more than ${limit} is marked` : '')));
 }
 
 // ----- premed tab -----
@@ -3430,6 +3480,7 @@ function renderSettings() {
       h('div', { class: 'paste' },
         h('div', {}, h('label', {}, 'Paeds if patient is younger than (years)'), h('input', { type: 'number', min: 1, max: 18, value: st.paedsAgeYears, onchange: e => { st.paedsAgeYears = +e.target.value || 12; save(); } })),
         h('div', {}, h('label', {}, 'Max rooms per premed cover'), h('input', { type: 'number', min: 1, max: 6, value: st.premedCap, onchange: e => { st.premedCap = +e.target.value || 3; save(); } })),
+        h('div', {}, h('label', {}, 'Mark days with more people on leave than (0: off)'), h('input', { type: 'number', min: 0, max: 60, value: st.leaveLimit || 0, onchange: e => { st.leaveLimit = Math.max(0, +e.target.value || 0); save(); } })),
         h('div', {}, h('label', {}, 'Complex list keywords'), h('textarea', { value: st.complexKeywords.join(', '), onchange: e => { st.complexKeywords = splitNameList(e.target.value).map(x => x.toLowerCase()); save(); } })),
         h('div', {}, h('label', {}, 'Runs-late keywords'), h('textarea', { value: st.longKeywords.join(', '), onchange: e => { st.longKeywords = splitNameList(e.target.value).map(x => x.toLowerCase()); save(); } })),
       ),

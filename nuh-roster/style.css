@@ -443,3 +443,16 @@ body.viewer .date-warn, body.viewer .save-state { display: none !important; }
 .name:focus-visible, .pchip:focus-visible { outline: 3px solid var(--navy); outline-offset: 1px; }
 .tag-editor:focus { outline: none; }
 td.seen, td .seen, .add-flag { color: #595e65; } /* muted text on striped or faded rows, still 4.5:1 */
+/* monthly planning: clashes, loaded rosters, leave per day */
+table.monthly td.clash input { border-color: var(--red); background: #fdecee; }
+table.monthly td.gap input { border-style: dashed; border-color: var(--warn); background: var(--warn-bg); }
+.month-issues { margin: 8px 0 0; }
+.loaded { margin-top: 8px; display: grid; gap: 4px; }
+.loaded-row { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; font-size: 12px; }
+.chip.ok { background: #e6f2ea; border-color: #b9dcc4; }
+.chip.missing { background: var(--warn-bg); color: #5a4630; }
+.leave-days { display: flex; flex-wrap: wrap; gap: 2px; margin: 8px 0; align-items: center; }
+.leave-day { display: inline-flex; flex-direction: column; align-items: center; min-width: 30px; padding: 2px 3px; font-size: 11px; line-height: 1.2; border-radius: var(--radius-sm); }
+.leave-day.weekend { background: var(--chip); }
+.leave-day.over { border-color: var(--red); color: var(--red); font-weight: 700; }
+.leave-day .sj { min-height: 1.2em; }
