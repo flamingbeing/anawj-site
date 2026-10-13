@@ -131,6 +131,7 @@ assert.deepEqual(splitDetails('lscs'), { initials: '', diagnosis: 'lscs' });
   resetDemo({ seeded: false });
   const seen = [];
   const stop = cloud.watchReflections(DEMO_USER.email, l => seen.push(l));
+  await new Promise(r => setTimeout(r, 5));   // the sync engine opens this device's copy first
   await cloud.saveReflection(DEMO_USER.email, { id: 'r1', headingId: 'icu', initials: 'ZZ', sections: { description: 'x' } });
   assert.equal(seen.at(-1).length, 1);
   assert.equal(seen.at(-1)[0].headingId, 'icu');

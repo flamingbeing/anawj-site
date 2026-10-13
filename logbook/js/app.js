@@ -840,7 +840,8 @@ async function onUser(user) {
   const previousUser = S.user;
   S.user = user;
   if (previousUser && user && previousUser.email !== user.email) {
-    const cleanup = writes.forget();
+    // the new account's own store stays (another tab may already be using it)
+    const cleanup = Promise.all([writes.forget(), cloud.forgetLocal(() => true, user.email)]);
     Object.assign(S, { cases: [], reflections: [], counts: {}, casesLoaded: false, casesSynced: false, logbook: null });
     clearDrafts(); resetCaches(); forgetWho(); forgetSync(); clearToast(); transients.reset();
     document.querySelectorAll('dialog[open]').forEach(el => el.close());
@@ -850,7 +851,8 @@ async function onUser(user) {
   }
   if (!user) {
     Object.assign(S, { admin: false, owner: false, pd: false, faculty: false, resident: null, logbook: null, cases: [], reflections: [], counts: {}, casesLoaded: false, casesSynced: false, sharedTemplates: [] });
-    const cleanup = signedInOnce ? writes.forget() : Promise.resolve();
+    // this device's copies of the last account go (the local store always: a shared PC keeps nothing)
+    const cleanup = Promise.all([signedInOnce ? writes.forget() : null, cloud.forgetLocal(() => !S.user)]);
     if (signedInOnce) { clearDrafts(); resetCaches(); forgetWho(); forgetSync(); }
     transients.reset();
     document.querySelectorAll('dialog[open]').forEach(el => el.close());

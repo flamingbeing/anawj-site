@@ -71,15 +71,15 @@ try { for (const width of [390, 1280]) {
   assert.equal(await p.evaluate(async () => (await import('./js/ui-core.js')).writes.entries().filter(x => x.state === 'conflict').length), 0);
   await p.getByRole('button', { name: 'Done' }).click();
 
-  // Notes: Today's note, the Daily notes chip, and daily notes not counted in the 100
+  // Notes: Today's note, the Daily notes chip, and daily notes not counted in MAX_NOTES (2,000)
   await p.goto(base + '?demo#notes');
   await p.getByRole('button', { name: 'Today’s note' }).waitFor();
-  await p.waitForFunction(() => /0 of 100/.test(document.querySelector('.notes-count')?.textContent || ''));
+  await p.waitForFunction(() => /^0 of 2000$/.test(document.querySelector('.notes-count')?.textContent || ''));
   await p.getByRole('button', { name: '+ New note' }).click();
   await p.getByLabel('Note title').fill('Fake other note');
   await p.getByRole('button', { name: 'Done' }).click();
   await p.waitForFunction(() => document.querySelectorAll('ul.notes-rows li').length === 4);
-  assert.match(await p.locator('.notes-count').innerText(), /^1 of 100$/);
+  assert.match(await p.locator('.notes-count').innerText(), /^1 of 2000$/);
   await p.getByRole('button', { name: 'Daily notes' }).click();
   assert.equal(await p.locator('ul.notes-rows li').count(), 3);
   assert.match(await p.locator('ul.notes-rows li').first().innerText(), /Daily note/);
@@ -249,12 +249,12 @@ try { for (const width of [390, 1280]) {
   await p.waitForFunction(() => /CD 50F fake TKR/.test(document.querySelector('textarea.details')?.value || ''));
   assert.equal(await p.evaluate(() => location.hash), '#log');
 
-  // New note with 100 notes already: the shared text isn't lost, the chooser comes back with it
-  await p.evaluate(async () => { const cloud = await import('./js/demo-backend.js'); for (let i = 0; i < 100; i++) cloud.saveNote('demo@example.com', { id: 'fake' + i, date: '2025-02-01', title: 'Fake ' + i, body: '', createdAt: i }); });
+  // New note with MAX_NOTES (2,000) notes already: the shared text isn't lost, the chooser comes back with it
+  await p.evaluate(async () => { const cloud = await import('./js/demo-backend.js'), { MAX_NOTES } = await import('./js/notepad.js'); for (let i = 0; i < MAX_NOTES; i++) cloud.saveNote('demo@example.com', { id: 'fake' + i, date: '2025-02-01', title: 'Fake ' + i, body: '', createdAt: i }); });
   await p.goto(base + '?demo&share_text=Fake%20kept%20text');
   await p.getByRole('heading', { name: 'Shared with the app' }).waitFor();
   await p.getByRole('button', { name: 'New note' }).click();
-  await p.locator('#toast').getByText(/100 notes/).waitFor();
+  await p.locator('#toast').getByText(/2000 notes/).waitFor();
   await p.getByRole('heading', { name: 'Shared with the app' }).waitFor();
   assert.match(await p.locator('.share-preview').innerText(), /Fake kept text/);
 

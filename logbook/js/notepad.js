@@ -1,12 +1,15 @@
 // Notes (More → Notes): a resident's own notepad. Private, never in the portfolio. Pure helpers, no DOM
 // (tested in test/notepad.test.mjs).
 //   logbooks/{email}/notes/{id} = { id, date: 'YYYY-MM-DD' | null, title, body (Markdown), caseId?, createdAt, updatedAt }
-// The app keeps at most MAX_NOTES (daily notes don't count). meta/noteIndex { days, cases, n } says which days and cases
-// have notes, so the Logbook can mark them without reading every note.
+// The app keeps at most MAX_NOTES (daily notes don't count; the rules don't cap the count). The note index
+// (meta/noteIndex { days, cases, n }) says which days and cases have notes, so the Logbook can mark them before the
+// notes are loaded; the rules cap its lists at INDEX_CAP, so it holds the most recent ones, and once the notes are
+// loaded the marks come from them.
 // A daily note is one note per day with the id "day-YYYY-MM-DD" (its date set, its title usually empty), so every
 // device finds the same one without a query.
 
-export const MAX_NOTES = 100;
+export const MAX_NOTES = 2000;
+export const INDEX_CAP = 100;
 export const LIMITS = { title: 200, body: 20000 };
 export const NOTE_FIELDS = ['id', 'date', 'title', 'body', 'caseId', 'createdAt', 'updatedAt'];
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
@@ -82,28 +85,22 @@ export const plainLines = body => String(body || '').split('\n').map(l => l.repl
 // a daily note without a title is called "Daily note" (its date sits beside it everywhere)
 export const noteTitle = n => (n.title || '').trim() || (isDayNote(n) ? 'Daily note' : (plainLines(n.body)[0] || '').slice(0, 80)) || 'Untitled note';
 
-// what meta/noteIndex holds; sameIndex() says whether it needs writing again. The rules allow 100 days and 100 cases
-// (firestore.rules validNoteIndex): with daily notes there can be more. Ordinary notes (at most 100) always keep their
-// days and cases, as before daily notes; the room left goes to the newest daily notes. An older daily note is still
-// found once the notes are loaded (ui-notepad.js dayHasNotes) and in Notes.
-const INDEX_MAX = 100;
-function capped(ordinary, daily) {
-  const keep = new Set(ordinary);
-  for (const v of daily) { if (keep.size >= INDEX_MAX) break; keep.add(v); }
-  return [...keep].slice(0, INDEX_MAX).sort();
-}
-export function noteIndex(list) {
-  const all = list || [], ord = all.filter(n => !isDayNote(n));
-  const newest = sortNotes(all.filter(isDayNote));   // newest day first
-  const days = capped(new Set(ord.map(n => n.date).filter(Boolean)), newest.map(n => n.date).filter(Boolean));
-  const cases = capped(new Set(ord.map(n => n.caseId).filter(Boolean)), newest.map(n => n.caseId).filter(Boolean));
-  return { days, cases, n: all.length };
+// which days and cases have notes; with cap, only the latest days and the cases of the latest-changed notes (what the
+// index doc can hold). sameIndex() says whether it needs writing again.
+export function noteIndex(list, cap = Infinity) {
+  const notes = list || [];
+  const days = [...new Set(notes.map(n => n.date).filter(Boolean))].sort().slice(-cap);
+  const recent = [...notes].filter(n => n.caseId).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  const cases = [...new Set(recent.map(n => n.caseId))].slice(0, cap).sort();
+  return { days, cases, n: notes.length };
 }
 export function cleanNoteIndex(v) {
   const o = v && typeof v === 'object' ? v : {};
-  const list = (x, ok) => (Array.isArray(x) ? x.filter(ok).slice(-INDEX_MAX) : []);
+  const list = (x, ok) => (Array.isArray(x) ? x.filter(ok).slice(-INDEX_CAP) : []);
   return { days: list(o.days, d => ISO.test(d)), cases: list(o.cases, c => typeof c === 'string' && c.length <= 200), n: Number.isInteger(o.n) && o.n >= 0 ? o.n : 0 };
 }
+// a full index doc may leave out older days and cases: "not listed" then means "not known" (load the notes to tell)
+export const indexCapped = i => !!i && ((i.days || []).length >= INDEX_CAP || (i.cases || []).length >= INDEX_CAP);
 export const sameIndex = (a, b) => JSON.stringify(cleanNoteIndex(a)) === JSON.stringify(cleanNoteIndex(b));
 
 // ---- light Markdown: headings, **bold**, *italic*, bullet / numbered lists, [ ] checkboxes, links ----

@@ -1,6 +1,7 @@
 // Storage for the logbook: Google sign-in and Cloud Firestore (Firebase), with an offline cache
 // so logging works without signal and syncs later. With ?demo in the URL, everything goes to an
-// in-browser stand-in instead (demo-backend.js), signed in as a fake admin.
+// in-browser stand-in instead (demo-backend.js), signed in as a fake admin. Cases, reflections and
+// notes are read through the sync engine (sync.js): a copy on this device plus only what changed.
 // Who may read or write what is enforced by firestore.rules on Google's side, not by this file.
 //
 // Data (see README.md):
@@ -21,6 +22,8 @@ import { checkWrite } from './recovery-store.js';
 import * as D from './demo-backend.js';
 import { cleanProfile } from './profile.js';
 import { cleanNote } from './notepad.js';
+import { createSyncHub, eachSettled, SKEW } from './sync.js';
+import { openStore, wipeStores } from './store.js';
 import { plain, cleanCase, cleanSummary, cleanResident, cleanTemplate, importDocId, defaultLogbook, cleanReflection, cleanImage, cleanCategoryNames, cleanSubmission } from './demo-backend.js';
 export { cleanSubmission };
 
@@ -28,7 +31,18 @@ const SDK = 'https://www.gstatic.com/firebasejs/10.12.2/';
 export const demo = (() => {
   try { return typeof location !== 'undefined' && new URLSearchParams(location.search).has('demo'); } catch { return false; }
 })();
-export const enabled = demo || !!(FIREBASE_CONFIG && FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.projectId);
+// Tests only: ?emulator on localhost uses the local Firebase emulators (Firestore and Auth) with the demo project, never
+// the live one (tools/test-reads.sh). ?emulator=<firestore port>:<auth port>, default 8085:9099.
+const emulator = (() => {
+  try {
+    if (demo || typeof location === 'undefined' || !/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) return null;
+    const v = new URLSearchParams(location.search).get('emulator');
+    if (v === null) return null;
+    const [fs, auth] = v.split(':').map(Number);
+    return { fs: fs || 8085, auth: auth || 9099 };
+  } catch { return null; }
+})();
+export const enabled = demo || !!emulator || !!(FIREBASE_CONFIG && FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.projectId);
 
 const BATCH = 450;            // Firestore allows 500 writes per batch; keep a margin
 const ACK_WAIT = 3000;        // ms to wait for the server before treating a write as queued
@@ -48,8 +62,13 @@ function loadSdk() {
       import(SDK + 'firebase-auth.js'),
       import(SDK + 'firebase-firestore.js'),
     ]);
-    const a = app.initializeApp(FIREBASE_CONFIG);
-    return { app: a, auth: auth.getAuth(a), db: openDb(a, fs), A: auth, F: fs };
+    const a = app.initializeApp(emulator ? { projectId: 'demo-logbook', apiKey: 'fake-api-key', authDomain: 'localhost' } : FIREBASE_CONFIG);
+    const s = { app: a, auth: auth.getAuth(a), db: openDb(a, fs), A: auth, F: fs };
+    if (emulator) {
+      auth.connectAuthEmulator(s.auth, 'http://127.0.0.1:' + emulator.auth, { disableWarnings: true });
+      fs.connectFirestoreEmulator(s.db, '127.0.0.1', emulator.fs);
+    }
+    return s;
   })();
   fb.catch(() => { fb = null; });   // e.g. offline on first ever load: try again next time
   return fb;
@@ -75,10 +94,54 @@ const lc = e => String(e || '').trim().toLowerCase();
 // then return; a later failure (e.g. a rules rejection) is reported to onSyncError listeners.
 const syncErrorListeners = new Set();
 export function onSyncError(cb) { syncErrorListeners.add(cb); return () => syncErrorListeners.delete(cb); }
-function queued(p) {
+function queued(p, lateWrite = null) {
   let late = false;
   p.catch(e => { if (late) { console.error('Sync failed', e); for (const cb of syncErrorListeners) cb(e); } });
+  // listed at once (a page closed within ACK_WAIT still stamps it after the next start), crossed off when the server has it
+  if (lateWrite) { rememberLate(lateWrite); p.then(() => restampIfLate(lateWrite, true), () => forgetLate(lateWrite)); }
   return Promise.race([p, new Promise(r => setTimeout(() => { late = true; r(); }, ACK_WAIT))]);
+}
+
+// Writes that reach the server late (made offline) carry an updatedAt from when they were made, which other devices'
+// "changed since my last sync" queries (sync.js) would skip. Once the server has them they are stamped again (one
+// small write each, so a record deleted since doesn't stop the others). Every such write is listed in localStorage
+// (ids only) until the server has it; one still waiting when the page closes is stamped after the next start, once
+// Firestore has sent it.
+const LATE_KEY = 'apmes-logbook-late:';
+const late = (email, coll, ids, field = 'updatedAt') => ({ email: lc(email), coll, ids: ids.map(String), field, at: Date.now() });
+const lateList = email => { try { return JSON.parse(localStorage.getItem(LATE_KEY + email) || '[]'); } catch { return []; } };
+const lateSave = (email, l) => { try { if (l.length) localStorage.setItem(LATE_KEY + email, JSON.stringify(l.slice(-200))); else localStorage.removeItem(LATE_KEY + email); } catch { /* storage blocked */ } };
+const sameLate = (a, b) => a.coll === b.coll && a.at === b.at && a.ids.join() === b.ids.join();
+function rememberLate(w) { lateSave(w.email, [...lateList(w.email), w]); }
+function forgetLate(w) { lateSave(w.email, lateList(w.email).filter(x => !sameLate(x, w))); }
+async function restampIfLate(w, listed) {
+  if (listed) forgetLate(w);
+  if (Date.now() - w.at <= SKEW / 2) return;
+  const now = Date.now(), { db, F } = await sdk();
+  const done = await eachSettled(w.ids, id => F.updateDoc(F.doc(db, 'logbooks', w.email, w.coll, id), { [w.field]: now }));
+  if (done.length < w.ids.length) console.warn(`${w.ids.length - done.length} late write(s) not stamped again (deleted since?)`);
+}
+const settled = new Set();
+async function settleLate(email) {
+  if (demo || settled.has(email) || !lateList(email).length) return;
+  settled.add(email);
+  const { db, F } = await sdk();
+  await F.waitForPendingWrites(db);   // offline: resolves when signal returns and the server has them
+  for (const w of lateList(email)) await restampIfLate(w, true);
+}
+// Sign-out, account switch, Delete account: stop syncing and delete this device's copies (a shared PC keeps nothing).
+// proceed() is asked again once syncing has stopped: a tab that has seen a new sign-in by then leaves the stores alone.
+// keep: the account signed in now (an account switch), whose store stays, here and in other tabs; so does the store
+// of whoever is signed in by the time the wipe runs (a tab catching up on another tab's sign-out and sign-in).
+export async function forgetLocal(proceed = () => true, keep = null) {
+  await hub.stopAll();
+  if (!proceed()) return;
+  let now = null;
+  try { if (!demo && fb) now = (await fb).auth.currentUser?.email || null; } catch { /* not loaded */ }
+  await wipeStores([keep, now].filter(Boolean).map(lc));
+  // late-write ids and the bin's last purge time (bin.js) are per account too
+  try { for (const k of Object.keys(localStorage)) if (k.startsWith(LATE_KEY) || k.startsWith('apmes-logbook-purged:')) localStorage.removeItem(k); } catch { /* storage blocked */ }
+  settled.clear();
 }
 
 // ---- sign-in ----
@@ -96,6 +159,13 @@ export async function watchUser(cb) {
 
 // Popup first; redirect when popups are blocked or unsupported (e.g. some home-screen apps).
 const REDIRECT_CODES = ['auth/popup-blocked', 'auth/operation-not-supported-in-this-environment', 'auth/web-storage-unsupported', 'auth/cancelled-popup-request'];
+// Tests only (?emulator): sign in as a made-up Google account the Auth emulator accepts (email verified).
+export async function emulatorSignIn(email) {
+  if (!emulator) throw new Error('Only with ?emulator');
+  const { auth, A } = await sdk();
+  await A.signInWithCredential(auth, A.GoogleAuthProvider.credential(JSON.stringify({ sub: lc(email).replace(/\W/g, ''), email: lc(email), email_verified: true })));
+}
+
 export async function signIn() {
   if (demo) return D.signIn();
   const { auth, A } = await sdk();
@@ -164,6 +234,8 @@ export async function deleteAccount(email, onStep = () => {}) {
     }
     return snap.size;
   };
+  // stop the listeners first, so the deletions below don't each cost a check (the store goes at sign-out)
+  await hub.stopAll();
   try {
     for (const [sub, label] of [['cases', 'cases'], ['reflections', 'reflections'], ['images', 'photos'], ['notes', 'notes'], ['meta', 'notes index'], ['bin', 'recycle bin']]) {
       onStep(`Deleting ${label}…`);
@@ -266,27 +338,63 @@ export async function saveLogbook(email, patch) {
   return doc;
 }
 
-// Live list of the user's cases, newest first. Served from the offline cache when there is no
-// signal. cb(cases, { fromCache, hasPendingWrites }). Returns an unsubscribe function.
-const byNewest = (a, b) => (b.date || '').localeCompare(a.date || '') || (b.createdAt || 0) - (a.createdAt || 0);
-export function watchCases(email, cb) {
-  if (demo) return D.watchCases(email, cb);
-  let stop = null, stopped = false;
+// ---- the synced collections (sync.js): cases, reflections, notes, each with a copy on this device ----
+// Firestore's side of the engine: the collection (since null) or the documents changed since a time, live. With
+// ?emulator, window.__reads counts documents read: billed (each listen's first server result in full, at least
+// one, as Firestore charges a listener started cold, plus every change after) and served (changes only).
+const reads = emulator && typeof window !== 'undefined' ? (window.__reads = {}) : null;
+const count = (coll, k, n) => { const r = (reads[coll] ||= { billed: 0, served: 0, listens: 0 }); r[k] += n; };
+function listenFirestore(email, coll, { since = null, field = 'updatedAt' } = {}, onSnap, onError) {
+  let stop = null, stopped = false, first = true;
   sdk().then(({ db, F }) => {
     if (stopped) return;
-    stop = F.onSnapshot(F.collection(db, 'logbooks', lc(email), 'cases'), { includeMetadataChanges: true }, snap => {
-      const cases = snap.docs.map(d => ({ ...d.data(), id: d.id })).sort(byNewest);
-      cb(cases, { fromCache: snap.metadata.fromCache, hasPendingWrites: snap.metadata.hasPendingWrites });
-    }, e => { console.error('Case listener failed', e); for (const l of syncErrorListeners) l(e); });
-  });
+    const col = F.collection(db, 'logbooks', lc(email), coll);
+    if (reads) count(coll, 'listens', 1);
+    // with metadata changes, so the engine learns when the server has confirmed an unchanged offline copy
+    stop = F.onSnapshot(since === null ? col : F.query(col, F.where(field, '>', since)), { includeMetadataChanges: true }, snap => {
+      const server = !snap.metadata.fromCache, full = since === null && first && server;
+      // pending: this device's write is not on the server yet (if it is refused, the record leaves again: checked)
+      const changes = snap.docChanges().map(c => ({ type: c.type, id: c.doc.id, pending: c.doc.metadata.hasPendingWrites, doc: c.type === 'removed' ? null : { ...c.doc.data(), id: c.doc.id } }));
+      if (reads && server) {
+        const n = changes.filter(c => c.type !== 'removed').length;
+        count(coll, 'served', n);
+        count(coll, 'billed', first ? Math.max(1, snap.size) : n);
+      }
+      if (server) first = false;
+      onSnap({ changes, fromCache: !server, hasPendingWrites: snap.metadata.hasPendingWrites, ...(full ? { full: true, docs: snap.docs.map(d => ({ ...d.data(), id: d.id })) } : {}) });
+    }, onError);
+  }).catch(onError);
   return () => { stopped = true; if (stop) stop(); };
 }
+async function fetchFirestore(email, coll, id) {
+  const { db, F } = await sdk();
+  const snap = await F.getDocFromServer(F.doc(db, 'logbooks', lc(email), coll, String(id)));
+  if (reads) count(coll, 'billed', 1);
+  return snap.exists() ? { ...snap.data(), id: snap.id } : null;
+}
+const hub = createSyncHub({
+  openStore,
+  listen: demo ? D.listenSince : listenFirestore,
+  fetchOne: demo ? D.fetchOne : fetchFirestore,
+  onError: e => { console.error('Sync listener failed', e); for (const l of syncErrorListeners) l(e); },
+});
+const watchColl = (coll, sort) => (email, cb) => {
+  settleLate(lc(email)).catch(e => console.warn('Late writes not stamped', e));
+  return hub.watch(lc(email), coll, (list, meta) => cb(sort ? list.sort(sort) : list, meta));
+};
+// tests: wait until the engines' local writes are done
+export const syncFlush = () => hub.flush();
+
+// Live list of the user's cases, newest first, from this device's copy, then the server's changes.
+// cb(cases, { fromCache, hasPendingWrites }). Returns an unsubscribe function.
+const byNewest = (a, b) => (b.date || '').localeCompare(a.date || '') || (b.createdAt || 0) - (a.createdAt || 0);
+export const watchCases = watchColl('cases', byNewest);
 
 export async function saveCase(email, c) {
   if (demo) return D.saveCase(email, c);
   const { db, F } = await sdk();
   const doc = cleanCase(c);
-  await queued(F.setDoc(F.doc(db, 'logbooks', lc(email), 'cases', doc.id), doc));
+  await queued(F.setDoc(F.doc(db, 'logbooks', lc(email), 'cases', doc.id), doc), late(email, 'cases', [doc.id]));
   return doc;
 }
 
@@ -307,21 +415,26 @@ export async function commitRecord(email, kind, input, base) {
     const list = kind === 'case' ? await D.listCases(email) : kind === 'note' ? D.notesOf(lc(email)) : D.reflectionsOf(lc(email));
     const current = list.find(x => x.id === doc.id) || null;
     if (!compare(current)) return doc;
+    if (deleted) await hub.drop(lc(email), collection, [doc.id]);
     if (kind === 'note') return deleted ? (D.deleteNote(email, doc.id), doc) : D.saveNote(email, doc);
     if (deleted) { await (kind === 'case' ? D.deleteCase(email, doc.id) : D.deleteReflection(email, doc.id)); return doc; }
     return kind === 'case' ? D.saveCase(email, doc) : D.saveReflection(email, doc);
   }
   const { db, F } = await sdk();
   const ref = F.doc(db, 'logbooks', lc(email), collection, doc.id);
-  return F.runTransaction(db, async tx => {
+  const out = await F.runTransaction(db, async tx => {
     const snap = await tx.get(ref);
     const current = snap.exists() ? { ...snap.data(), id: snap.id } : null;
     if (!compare(current)) return doc;
     if (deleted) tx.delete(ref); else tx.set(ref, doc); return doc;
   });
+  // a delete for good: off this device's copy too (other devices: see sync.js, Limits)
+  if (deleted) await hub.drop(lc(email), collection, [doc.id]);
+  return out;
 }
 
 export async function deleteCase(email, id) {
+  await hub.drop(lc(email), 'cases', [String(id)]);
   if (demo) return D.deleteCase(email, id);
   const { db, F } = await sdk();
   await queued(F.deleteDoc(F.doc(db, 'logbooks', lc(email), 'cases', String(id))));
@@ -349,34 +462,11 @@ export async function deleteImage(email, id) {
   await queued(F.deleteDoc(F.doc(db, 'logbooks', lc(email), 'images', String(id))));
 }
 
-// Live list of the user's reflections (owner only). cb(list, meta). Returns an unsubscribe function.
-export function watchReflections(email, cb) {
-  if (demo) return D.watchReflections(email, cb);
-  let stop = null, stopped = false;
-  sdk().then(({ db, F }) => {
-    if (stopped) return;
-    // with metadata changes, so callers learn when the server has confirmed an unchanged offline copy
-    stop = F.onSnapshot(F.collection(db, 'logbooks', lc(email), 'reflections'), { includeMetadataChanges: true }, snap => {
-      const list = snap.docs.map(d => ({ ...d.data(), id: d.id })).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
-      cb(list, { fromCache: snap.metadata.fromCache });
-    }, e => { console.error('Reflection listener failed', e); for (const l of syncErrorListeners) l(e); });
-  });
-  return () => { stopped = true; if (stop) stop(); };
-}
+// Live list of the user's reflections (owner only), latest change first. cb(list, meta). Returns an unsubscribe function.
+export const watchReflections = watchColl('reflections', (a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
 
 // Live list of the user's notes (owner only). Started only when notes are needed (ui-notepad.js), never at sign-in.
-export function watchNotes(email, cb) {
-  if (demo) return D.watchNotes(email, cb);
-  let stop = null, stopped = false;
-  sdk().then(({ db, F }) => {
-    if (stopped) return;
-    // with metadata changes, so a cache that already matches the server still reports fromCache: false (ui-notepad.js)
-    stop = F.onSnapshot(F.collection(db, 'logbooks', lc(email), 'notes'), { includeMetadataChanges: true }, snap => {
-      cb(snap.docs.map(d => ({ ...d.data(), id: d.id })), { fromCache: snap.metadata.fromCache });
-    }, e => { console.error('Notes listener failed', e); for (const l of syncErrorListeners) l(e); });
-  });
-  return () => { stopped = true; if (stop) stop(); };
-}
+export const watchNotes = watchColl('notes');
 
 // Which days and cases have notes ({ days, cases, n }), so the Logbook can mark them without reading a note. Its own
 // owner-only doc (logbooks/{email}/meta/noteIndex), not the logbook doc, which the app owner can read. One small read
@@ -404,11 +494,12 @@ export async function saveReflection(email, r) {
   if (demo) return D.saveReflection(email, r);
   const { db, F } = await sdk();
   const doc = cleanReflection(r);
-  await queued(F.setDoc(F.doc(db, 'logbooks', lc(email), 'reflections', doc.id), doc));
+  await queued(F.setDoc(F.doc(db, 'logbooks', lc(email), 'reflections', doc.id), doc), late(email, 'reflections', [doc.id]));
   return doc;
 }
 
 export async function deleteReflection(email, id) {
+  await hub.drop(lc(email), 'reflections', [String(id)]);
   if (demo) return D.deleteReflection(email, id);
   const { db, F } = await sdk();
   await queued(F.deleteDoc(F.doc(db, 'logbooks', lc(email), 'reflections', String(id))));
@@ -428,11 +519,14 @@ export async function saveCases(email, cases) {
   if (demo) return D.saveCases(email, cases);
   email = lc(email);
   const docs = cases.map(c => cleanCase(c));
-  await inBatches(docs, (b, d, F, db) => b.set(F.doc(db, 'logbooks', email, 'cases', d.id), d));
+  await inBatches(docs, (b, d, F, db) => b.set(F.doc(db, 'logbooks', email, 'cases', d.id), d),
+    (b, part) => queued(b.commit(), late(email, 'cases', part.map(d => d.id))));
   return docs;
 }
 
+// for good (no bin entry): Undo of a plan's "done" or of a pasted list, and after the bin copy
 export async function deleteCases(email, ids) {
+  await hub.drop(lc(email), 'cases', ids.map(String));
   if (demo) return D.deleteCases(email, ids);
   email = lc(email);
   await inBatches(ids, (b, id, F, db) => b.delete(F.doc(db, 'logbooks', email, 'cases', String(id))));
@@ -704,7 +798,7 @@ export async function saveBinEntry(email, entry) {
   if (demo) return D.saveBinEntry(email, entry);
   const { db, F } = await sdk();
   const doc = cleanBinEntry(entry);
-  await queued(F.setDoc(F.doc(db, 'logbooks', lc(email), 'bin', doc.id), doc));
+  await queued(F.setDoc(F.doc(db, 'logbooks', lc(email), 'bin', doc.id), doc), late(email, 'bin', [doc.id], 'deletedAt'));
   return doc;
 }
 export async function deleteBinEntry(email, id) {

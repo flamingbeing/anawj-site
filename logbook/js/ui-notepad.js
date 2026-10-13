@@ -2,7 +2,8 @@
 // rules), never in the portfolio. Pure helpers in notepad.js.
 //
 // Firebase cost: notes are not read at sign-in. The listener starts the first time notes are needed (this page,
-// a day's notes in the Logbook, the Markdown export, a backup) and then stays for the visit. Typing saves after
+// a day's notes in the Logbook, the Markdown export, a backup) and then stays for the visit. It runs on the sync
+// engine (sync.js): this device's copy at once, then only the notes changed since the last visit. Typing saves after
 // 3 s of quiet, and at once when the note is left, the field loses focus or the page is hidden; every write goes
 // through the durable write queue (writes.js → cloud.commitRecord 'note'), so notes work offline too.
 // The note index (which days and cases have notes; its own owner-only doc, meta/noteIndex) lets the Logbook mark
@@ -15,13 +16,14 @@
 import { S, h, toast, fill, hooks, writes, cloud, transients, settings, patchLogbook, resetters, todayISO, modal, emptyState, download } from './ui-core.js';
 import { uid, fmtDate, caseParts } from './engine.js';
 import { barTabs, arrangeTabs, display, setDisplay, setTabOnBar, toggle, help, resetLink } from './ui-settings.js';
-import { MAX_NOTES, LIMITS, sortNotes, filterNotes, noteTitle, noteIndex, cleanNoteIndex, sameIndex, parseNote, toggleCheck, plainLines, noteFiles, dayNoteId, dayNoteOf, isDayNote, cappedNotes, mergeDayNote } from './notepad.js';
+import { MAX_NOTES, INDEX_CAP, LIMITS, indexCapped, sortNotes, filterNotes, noteTitle, noteIndex, cleanNoteIndex, sameIndex, parseNote, toggleCheck, plainLines, noteFiles, dayNoteId, dayNoteOf, isDayNote, cappedNotes, mergeDayNote } from './notepad.js';
 import { recordSignature } from './recovery-store.js';
 import { popShared } from './share-in.js';
 import { fmtBar, replaceRange } from './fmt-bar.js';
 import { htmlToMarkdown, tidyMarkdown } from './paste-clean.js';
 
 const SAVE_MS = 3000;
+const PAGE = 100;   // notes listed before "Show more"
 const mine = () => S.user && S.user.email;
 // q: search; day / caseId / kind ('day': daily notes only): what the list is narrowed to; editing: the note open in the
 // editor; preview: its view mode; back: the tab the editor goes back to (a daily note opened from the Logbook);
@@ -103,16 +105,37 @@ function syncIndex() {
   const me = mine();
   if (!Array.isArray(S.notes) || !S.logbook || !me) return;
   watchIndex();
-  const next = noteIndex(S.notes);
+  // the doc holds the latest INDEX_CAP days and cases (the rules' cap); the marks use all notes once they're loaded
+  const next = noteIndex(S.notes, INDEX_CAP);
   if (!sameIndex(next, S.noteIndex)) { S.noteIndex = next; cloud.saveNoteIndex(me, next).catch(e => console.error('Note index not saved', e)); }
   // the old copy in the logbook doc (readable by the app owner) goes
   if (settings().noteIndex != null) patchLogbook({ settings: { noteIndex: null } });
 }
-// until the index doc has arrived, an older settings.noteIndex still marks the days
-export const notesIndex = () => { watchIndex(); return cleanNoteIndex(S.noteIndex || settings().noteIndex); };
-// (once the notes are loaded they answer too: the index holds 100 days, and an old daily note's day may not be in it)
-export const dayHasNotes = date => !!date && (notesIndex().days.includes(date) || (Array.isArray(S.notes) && S.notes.some(n => n.date === date)));
-export const caseHasNotes = id => !!id && notesIndex().cases.includes(id);
+// { days, cases } (plus Sets for the per-day lookups): from the notes themselves once loaded (every day and case, past
+// the index doc's cap); before that the index doc, and until it has arrived, an older settings.noteIndex.
+const withSets = i => ({ ...i, daySet: new Set(i.days), caseSet: new Set(i.cases) });
+let fromNotes = { list: null, index: null };
+// A full index doc (the cap) can't say about older days and cases: the notes load then (this device's copy, so it is
+// cheap), and the Logbook repaints with the marks from them.
+let capLoad = null;
+export function notesIndex() {
+  if (Array.isArray(S.notes)) {
+    if (fromNotes.list !== S.notes) fromNotes = { list: S.notes, index: withSets(noteIndex(S.notes)) };
+    return fromNotes.index;
+  }
+  watchIndex();
+  const idx = cleanNoteIndex(S.noteIndex || settings().noteIndex);
+  if (indexCapped(idx) && capLoad !== mine()) {
+    capLoad = mine();
+    ensureNotes().then(() => { if (S.tab === 'logbook') hooks.render(); }, () => {});
+  }
+  return withSets(idx);
+}
+resetters.push(() => { capLoad = null; });
+export const dayHasNotes = date => !!date && notesIndex().daySet.has(date);
+export const caseHasNotes = id => !!id && notesIndex().caseSet.has(id);
+// true when the day may have notes the index can't show (load them to be sure)
+export const dayMayHaveNotes = date => !!date && (dayHasNotes(date) || (!Array.isArray(S.notes) && indexCapped(cleanNoteIndex(S.noteIndex || settings().noteIndex))));
 
 // open Notes on a day's notes, or a case's (from the Logbook); create: start a new note there (linked to the case),
 // with body as its text
@@ -205,14 +228,22 @@ export function renderNotes() {
     });
   }
   const search = h('input', { type: 'search', class: 'grow', placeholder: 'Search notes', 'aria-label': 'Search notes', value: nv.q,
-    oninput: e => { nv.q = e.target.value; paintList(); } });
+    oninput: e => { nv.q = e.target.value; shown = PAGE; paintList(); } });
   const listEl = h('div', { class: 'notes-list' });
+  // a page of rows at a time (up to 2,000 notes), more on request
+  let shown = PAGE;
   const paintList = () => {
     const rows = filterNotes(list, nv);
+    const more = rows.length - shown;
     fill(listEl, loading ? h('p', { class: 'empty' }, 'Loading…')
       : !list.length ? emptyState('notes', 'No notes yet', 'Writing about a case for your portfolio? Use Reflect instead.')
       : !rows.length ? emptyState('search', 'No notes match')
-      : h('ul', { class: 'notes-rows' }, rows.map(noteRow)));
+      : [h('ul', { class: 'notes-rows' }, rows.slice(0, shown).map(noteRow)),
+        more > 0 ? h('p', { class: 'notes-more' }, h('button', { class: 'small', onclick: () => {
+          // focus moves to the first row just shown (the button is replaced, which would drop focus to the page)
+          const from = shown; shown += PAGE; paintList();
+          listEl.querySelectorAll('.notes-rows > li')[from]?.focus();
+        } }, `Show ${Math.min(more, PAGE)} more (${more} not shown)`)) : null]);
   };
   const narrowed = nv.day || nv.caseId || nv.kind;
   const hasDaily = list.some(isDayNote);

@@ -438,8 +438,12 @@ portfolio content.
   a resident's own notepad: teaching points, doses, to-dos. Private (owner-only rules: no admin, PD or app-owner
   access), never in the portfolio. A bar tab that starts off the bar (`OFF_BAR` in `ui-settings.js`): first in More
   with "Your own notes: private, never in your portfolio"; Arrange tabs can put it on the bar (it stays off until
-  `tabOrder` holds it, so people who arranged tabs before Notes existed don't get it on their bar). At most 100
-  (`MAX_NOTES`, the app enforces it: the rules can't count). A new note takes today's date (or the filtered day /
+  `tabOrder` holds it, so people who arranged tabs before Notes existed don't get it on their bar). At most 2,000
+  (`MAX_NOTES`, raised from 100 on 13 Oct 2026 with the sync engine; the app enforces it: the rules can't count); the
+  list shows 100 at a time ("Show 100 more"). The index doc (`meta/noteIndex`, rules cap 100) keeps the latest 100
+  days and the cases of the latest-changed notes; once the notes are loaded the Logbook's marks come from them. A full
+  index (100 days or cases) can't say about older ones, so the Logbook then loads the notes (this device's copy:
+  cheap), and a day's Share loads them too (`dayMayHaveNotes`). A new note takes today's date (or the filtered day /
   linked case's day); "No date" makes it undated. Order: undated first (latest change first), then newest day first,
   then as written. Search over title and body. Optional `caseId` ("Link to a case…"). Body is Markdown text, shown
   through `parseNote` → elements (never innerHTML; the list page keeps the syntax in a small "Formatting" fold;
@@ -542,6 +546,50 @@ portfolio content.
 - Tag CSV: Type (APMES / Personal / Header), Name, Full name, Under, APMES tags, Shorthand, Hidden, ID.
   Import is forgiving (column names, title row, separators, codes or names, Under anywhere, IDs kept by
   name) and reports what didn't line up.
+
+## Sync: this device's copy and cheap reopening (`sync.js`, `store.js`; 13 Oct 2026)
+
+- Goal: opening the app many times a day costs about one Firestore read per collection when nothing changed
+  (Firestore's own cache only re-charges unchanged documents if a listener resumes within ~30 minutes).
+- Each synced collection (cases, reflections, notes) has a copy on the device: IndexedDB `apmes-logbook-store:<email>`
+  (demo: `…:demo:<email>`), one object store per collection plus a meta record `{ syncAt, fullAt, epoch?, gone }`.
+  On start the engine shows the stored list at once (only if it was confirmed before, so a new device waits for the
+  server as it did), then listens to `where('updatedAt', '>', syncAt - 10 min)` and merges what arrives. syncAt is
+  this device's clock when the server last confirmed the list (never past now). First open on a device and once a week
+  (`FULL_EVERY`): the whole collection instead, which picks up documents without updatedAt and heals anything missed.
+- One engine per account and collection (`createSyncHub`), shared by every caller (the one-shot reflections purge and
+  the Reflections screen share one listener); an engine nobody watches stops after 1.5 s.
+- Deletions: the recycle bin is a feed of tombstones (`deletedAt > syncAt - 10 min`): a binned record goes only if it
+  is still the version that was binned (the entry's `data.updatedAt`; restored or edited elsewhere since, it stays, so
+  a bin entry whose delete was refused as a conflict removes nothing). Deletes on this device (`commitRecord`
+  `_deleted`, `deleteCases`, `deleteReflection`) drop the record from the local copy and remember its id (`gone`,
+  8 days), so a stale copy arriving later is ignored. A removal the server confirms goes at once; one seen only in the
+  cache, or after this device's own pending write (a refused write), is checked with one read. Delete account stops
+  the listeners first.
+- **Limits** (healed by the weekly full read): a record deleted for good without a bin entry (Undo of a just-saved
+  case, plan "done" / pasted-list Undo, Recent changes restoring a deletion) while another device was closed stays on
+  that device until then, as does a write stamped by a clock more than 10 minutes slow. A bin-entry tombstone for
+  these was considered and not used: older app versions would show it in the recycle bin as an empty case to restore.
+- Late writes: direct writes (pasted lists, bulk tag, reflections saved outside the editor, bin entries) that reach the
+  server more than 5 minutes after they were made (offline) are stamped again once the server has them
+  (`restampIfLate` in `cloud.js`, one small write per record so one deleted since doesn't block the rest; ids listed in
+  `apmes-logbook-late:<email>` from the moment they're queued until the server has them, so a page closed first
+  stamps them after the next start), so other devices' "changed since" queries still see them. Queue writes (`writes.js`) are stamped when they commit, so they need nothing.
+- Firestore's persistent cache stays (offline direct writes depend on its pending-writes queue).
+- Sign-out, account switch and Delete account delete every store on the device (`cloud.forgetLocal`; other tabs close
+  theirs on `versionchange` and a BroadcastChannel message). A shared ward PC keeps nothing. The account signed in
+  now keeps its store (account switch, or a tab catching up on another tab's sign-out and sign-in). If a store is
+  still deleted under a running engine, the engine writes its whole list back and reads everything at the next start.
+- Costs: the 10-minute window means records changed in the 10 minutes before the last sync are read again on the
+  next open (log a case and close the app: one read next time). The recycle-bin purge reads the whole bin at most once
+  a day per device (`apmes-logbook-purged:<email>`).
+- Demo: `demo-backend.js` `listenSince` gives the same listener; a logbook's `epoch` changes when its data is replaced
+  wholesale (reset, sample logbook), which makes the device read it in full.
+- Tests: `test/sync.test.mjs` (engine against a fake server that counts reads), `test/e2e/sync-engine.mjs` (demo: stored
+  copy, reopen, two tabs, reset, sign-out wipe), `tools/test-reads.sh` → `test/e2e/reads.emulator.mjs` (the real app
+  with `?emulator` on localhost against the Firestore and Auth emulators and the real rules; `window.__reads`).
+  Measured 13 Oct: first open 50 cases → 50 reads; reopen with nothing changed → 1 read per collection; one case
+  edited, one added, one binned elsewhere → 2 case reads and 1 bin read. Before the engine every open read all 50+.
 
 ## Demo (`demo-backend.js`, `demo-seed.js`)
 
