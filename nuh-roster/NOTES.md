@@ -190,7 +190,10 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
   (more than 3 months old); saved data that can't be read is kept under `<key>-damaged-<time>` with a download.
   Days put away don't keep their checks (rebuilt on opening).
 - Found by the 13 Oct review (`REVIEW-2026-10.md`), not fixed yet: team, monthly and rotation documents are overwritten by whoever saves last (rosters have a
-  conflict check and versions, they don't); double cover with no junior is only a generator note, not a live check.
+  conflict check and versions, they don't).
+- Live checks (13 Oct) also catch: a double-covered room with no junior (error, Fill), a senior in 3+ rooms (error),
+  someone senior in one room and junior in another, and an admin-day or elsewhere person on a list (warnings). The
+  Baby MO, premed cap and complex-list problems now have fix or Show buttons.
 - Keep building elements with `h()` and `textContent`; there is no `innerHTML` anywhere, so imported text can't inject.
 
 ## Code map
