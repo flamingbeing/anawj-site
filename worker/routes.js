@@ -17,10 +17,10 @@ export const SITES = {
   'apmes.anawj.com': { prefixes: { '/logbook/': 'logbook/', '/evals/': 'evals/', '/apmes/guidebook/': 'apmes/guidebook/', '/__/auth/': '__/auth/', '/__/firebase/': 'apmes-auth/firebase/' } },
 };
 
-// Folders every host serves as they are: the shared design files (styles only, no data), so a subdomain's apps can
-// link ../design/tokens.css. `design/` is the current folder; `nuhsdesign/` is its new name (the design session moves it).
-// Keep both until nothing links /design/ any more. These are the only folders shared between subdomains.
-export const SHARED = ['/design/', '/nuhsdesign/'];
+// The one folder every host serves as it is: the shared design files (styles only, no data), so a subdomain's apps can
+// link ../nuhsdesign/tokens.css. (The old path /design/ was served too until 13 Oct 2026, when nothing linked it any more.)
+// This is the only folder shared between subdomains.
+export const SHARED = ['/nuhsdesign/'];
 
 // On any host not in SITES, /_sites/<host>/<path> serves <path> as that host would, so the mapping can be tried on a
 // PR preview before the real addresses exist: <preview>/_sites/hand.anawj.com/babies/

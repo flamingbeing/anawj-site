@@ -69,10 +69,10 @@ and builds a preview for every PR.
   kept). Every response carries `X-Robots-Tag: noindex, nofollow`.
 - One-app hosts (`prewarmstudy.`, `nuhroster.`) serve the app at the root, and its own folder name works too
   (`prewarmstudy.anawj.com/prewarm/…`) so an app can move before its absolute links are tidied.
-- **One shared folder:** every host also serves `/design/` (the NUHS-style design files, styles only, no data), so an
-  app on a subdomain can link `../design/tokens.css`. The design session is renaming that folder to `/nuhsdesign/`;
-  both are served until nothing links `/design/` any more (change `SHARED` in `worker/routes.js` then). These are the
-  only folders subdomains share; everything else stays per app.
+- **One shared folder:** every host also serves `/nuhsdesign/` (the NUHS-style design files, styles only, no data), so an
+  app on a subdomain can link `../nuhsdesign/tokens.css` (`SHARED` in `worker/routes.js`). It is the only folder subdomains
+  share; everything else stays per app. The old `/design/` path was served alongside it for phones still on an older copy,
+  and retired on 13 Oct 2026 (nothing linked it any more; the old folder held only a copy of `tokens.css`).
 - **Sign-in helper pages on `apmes.`:** `apmes.anawj.com/__/auth/` and `/__/firebase/` serve Firebase's sign-in helper
   pages (the same scripts as `anawj.com/__/auth/`; `apmes-auth/firebase/init.json` is `apmes.`'s own copy with
   `authDomain` `apmes.anawj.com`). Only that host serves them. `anawj.com/__/` stays as it is until nothing uses it.
@@ -120,8 +120,8 @@ editor's frame). So `edit.anawj.com/<old path>` keeps working for every page, su
   `/babies/`, `hand/` removed), checked live 13 Oct; old addresses forward with path, query and `#` kept (a top-level-only
   host check in each `index.html`, no Worker change)
 - [x] Shared design folder: every subdomain serves `/design/` and `/nuhsdesign/` (log1, #358); `design/` moved to
-  `nuhsdesign/` (NUHS-style Design, #363), checked live 13 Oct. `/design/` is still served for phones on an older copy:
-  drop it from the Worker once the study phones have updated
+  `nuhsdesign/` (NUHS-style Design, #363), checked live 13 Oct. The old `/design/` path was
+  retired on 13 Oct 2026 (log1): nothing links it, and `design/` is deleted
 - [x] 3. prewarmstudy.anawj.com (Prewarming Webapp): #364, #382, live 13 Oct after the day's case. A phone moves only
   when nothing is waiting on it. Checked on the owner's phones: an old nurse link lands on the new address, admin
   password sign-in works, a team phone moves and rejoins in one tap, readings sync between phones

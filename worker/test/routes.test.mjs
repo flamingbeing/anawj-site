@@ -51,16 +51,16 @@ assert.deepEqual(resolve('x.workers.dev', '/_sites/nothing.anawj.com/x'), { file
 // the real hosts don't take the /_sites/ route
 assert.deepEqual(resolve('hand.anawj.com', '/_sites/nuhroster.anawj.com/'), { notFound: true });
 
-// the shared design folders: served on every subdomain as they are, and nothing else is shared
+// the shared design folder: served on every subdomain as it is, and nothing else is shared; the old /design/ is gone
 for (const h of Object.keys(SITES)) {
-  assert.deepEqual(resolve(h, '/design/tokens.css'), { file: 'design/tokens.css' }, h);
   assert.deepEqual(resolve(h, '/nuhsdesign/tokens.css'), { file: 'nuhsdesign/tokens.css' }, h);
-  assert.deepEqual(resolve(h, '/design'), { redirect: '/design/' }, h);
-  assert.deepEqual(resolve(h, '/design/../logbook/index.html'), { notFound: true }, h);
-  assert.deepEqual(resolve(h, '/designs/x'), SITES[h].root ? { file: SITES[h].root + 'designs/x' } : { notFound: true }, h);
+  assert.deepEqual(resolve(h, '/nuhsdesign'), { redirect: '/nuhsdesign/' }, h);
+  assert.deepEqual(resolve(h, '/nuhsdesign/../logbook/index.html'), { notFound: true }, h);
+  // /design/ is not shared any more: a shared host 404s, a one-app host looks inside its own folder (also a 404)
+  assert.deepEqual(resolve(h, '/design/tokens.css'), SITES[h].root ? { file: SITES[h].root + 'design/tokens.css' } : { notFound: true }, h);
 }
-assert.deepEqual(resolve('x.workers.dev', '/_sites/prewarmstudy.anawj.com/design/tokens.css'), { file: 'design/tokens.css' });
-assert.deepEqual(resolve('x.workers.dev', '/design/tokens.css'), { file: 'design/tokens.css' });
+assert.deepEqual(resolve('x.workers.dev', '/_sites/prewarmstudy.anawj.com/nuhsdesign/tokens.css'), { file: 'nuhsdesign/tokens.css' });
+assert.deepEqual(resolve('x.workers.dev', '/nuhsdesign/tokens.css'), { file: 'nuhsdesign/tokens.css' });
 
 // apmes.anawj.com: Firebase's sign-in helper pages
 assert.deepEqual(resolve('apmes.anawj.com', '/__/auth/handler'), { file: '__/auth/handler' });
