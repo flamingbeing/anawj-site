@@ -152,6 +152,10 @@ try {
   await toastSays(ad, /Wrong email or password/);
   await ad.fill('#adminpw', 'correct horse 42'); await ad.click('#adminpwin');
   await ad.waitForFunction(() => /Signed in as study admin/.test(document.querySelector('main')?.textContent || ''), null, { timeout: 20000 });
+  await ad.evaluate(() => { location.hash = '#/settings'; });
+  await ad.waitForSelector('#refreshnow'); await ad.click('#refreshnow');
+  await toastSays(ad, /Up to date|still waiting/);
+  assert.match(await ad.textContent('main'), /Signed in as study admin/, 'Refresh now keeps the admin signed in');
   await ad.evaluate(() => { location.hash = '#/admin'; });
   await ad.waitForFunction(() => /NUH-TEST-CODE/.test(document.querySelector('main')?.textContent || ''), null, { timeout: 20000 });
   await ad.click('[data-newcode="WH"]');
