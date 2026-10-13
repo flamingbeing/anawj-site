@@ -251,6 +251,7 @@ function render() {
   renderCloudBar();
   renderDateBar();
   renderSteps();
+  renderSwapBar();
   renderDemoBar();
   window.scrollTo(0, y);
   if (state.tab === 'monthly' && state.monthlyView === 'rotations') placeRotGrid();
@@ -275,14 +276,70 @@ function switchDate(date) {
 }
 
 // The demo banner: what this is, and the way back out.
+// Practice mode is the demo: a made-up department in its own storage, opened next to the real
+// roster (a new tab), so people can try things without touching real data.
 function renderDemoBar() {
-  if (!DEMO || document.getElementById('demo-bar')) return;
+  if (!DEMO) {
+    const team = document.querySelector('.top .team');
+    if (team && !document.getElementById('practice-link')) team.prepend(h('a', { id: 'practice-link', class: 'btn small', href: demoLink(), target: '_blank', rel: 'noopener', title: 'Try the app on made-up data in a new tab. Your real roster isn\'t touched.' }, 'Practice'));
+    return;
+  }
+  if (document.getElementById('demo-bar')) return;
   document.body.prepend(h('div', { id: 'demo-bar', class: 'demo-bar' },
-    h('b', {}, 'Demo'), h('span', {}, ' · made-up staff and rosters, saved only in this browser, nothing is shared.'),
+    h('b', {}, 'Practice'), h('span', {}, ' · made-up staff and rosters, saved only in this browser. Try anything: nothing here touches the real roster.'),
     h('span', { class: 'grow' }),
-    h('button', { class: 'small', onclick: () => { if (confirm('Start the demo again from scratch?')) { try { localStorage.removeItem(KEY); } catch { /* no storage */ } location.reload(); } } }, 'Reset demo'),
-    h('a', { class: 'btn small', href: location.pathname }, 'Exit demo')));
+    h('button', { class: 'small', onclick: () => startTour() }, 'Tour'),
+    h('button', { class: 'small', onclick: () => { if (confirm('Start practice again from scratch?')) { try { localStorage.removeItem(KEY); localStorage.removeItem(TOUR_KEY); } catch { /* no storage */ } location.reload(); } } }, 'Start again'),
+    h('a', { class: 'btn small', href: location.pathname }, 'Back to the real roster')));
 }
+
+// ---- a short guided tour: a ring around each part of the screen and a note beside it ----
+const TOUR_KEY = 'nuh-roster-tour';
+const TOUR = [
+  { sel: '#date', title: 'The day you\'re rostering', text: 'Everything follows this date. ‹ › step a day ([ and ] on a keyboard), and it warns you when it isn\'t tomorrow.' },
+  { tab: 'monthly', sel: '#steps', title: 'Your morning, in five steps', text: 'Monthly rosters, cases, roster, check, then save or download. Each step turns green when it\'s done; tap one to go there.' },
+  { tab: 'monthly', sel: '.board', title: 'Who\'s working', text: 'Leave, MC and post call come from the monthly rosters. Tap a name to change their day; "Select several" moves many at once.' },
+  { tab: 'cases', sel: '#app label.btn.primary', title: 'Start from the admin draft', text: '"Do it all" reads the admin team\'s draft, makes the roster and shows what needs a look.' },
+  { tab: 'roster', sel: '#problems', title: 'What needs a look', text: 'Problems are listed here with a button that fixes each one, and Show to find the room.' },
+  { tab: 'roster', sel: 'table.sheet', title: 'The roster', text: 'Tap a name for its box: leaving time, (L), comments, Move or swap. On a computer you can drag names; + suggests the best fits first.' },
+  { tab: 'roster', sel: '.split', title: 'Send it out', text: 'Download the sheet as Excel or PDF, or save it for the team. Undo (Ctrl+Z) takes back anything.' },
+];
+let tourStep = -1;
+function startTour() { tourStep = 0; showTourStep(); }
+function endTour() {
+  tourStep = -1;
+  document.getElementById('tour')?.remove();
+  try { localStorage.setItem(TOUR_KEY, 'done'); } catch { /* no storage */ }
+}
+async function showTourStep() {
+  const step = TOUR[tourStep];
+  if (!step) return endTour();
+  if (step.tab && state.tab !== step.tab) { await goTab(step.tab); }
+  if (step.tab === 'roster' && !state.roster && DEMO && canGenerate()) runGenerate(false); // practice: make one to look at
+  rosterView = 'edit';
+  const el = document.querySelector(step.sel);
+  if (!el) { tourStep++; return showTourStep(); }
+  // a tall part (the board on a phone) shows from its top; the note sits below it or at the bottom
+  const tall = el.getBoundingClientRect().height > innerHeight * 0.5;
+  el.scrollIntoView({ block: tall ? 'start' : 'center' });
+  await new Promise(r => setTimeout(r, 120));
+  const r = el.getBoundingClientRect();
+  const top = Math.max(r.top, 4), bottom = Math.min(r.bottom, innerHeight - 4);
+  document.getElementById('tour')?.remove();
+  const ring = h('div', { class: 'tour-ring', style: `left:${Math.max(r.left - 6, 2)}px; top:${top - 6}px; width:${Math.min(r.width + 12, innerWidth - 4)}px; height:${bottom - top + 12}px` });
+  const below = !tall && bottom + 230 < innerHeight;
+  const card = h('div', { class: 'tour-card', role: 'dialog', 'aria-label': step.title, style: below ? `top:${bottom + 14}px` : tall || top < 240 ? 'bottom:16px' : `bottom:${innerHeight - top + 14}px` },
+    h('div', { class: 'seen' }, `${tourStep + 1} of ${TOUR.length}`),
+    h('h3', {}, step.title), h('p', {}, step.text),
+    h('div', { class: 'bar' },
+      h('button', { class: 'small', onclick: endTour }, 'Skip'),
+      h('span', { class: 'grow' }),
+      tourStep ? h('button', { class: 'small', onclick: () => { tourStep--; showTourStep(); } }, 'Back') : null,
+      h('button', { class: 'small primary', onclick: () => { tourStep++; showTourStep(); } }, tourStep === TOUR.length - 1 ? 'Done' : 'Next')));
+  document.body.append(h('div', { id: 'tour' }, ring, card));
+}
+addEventListener('resize', () => { if (tourStep >= 0) showTourStep(); });
+addEventListener('keydown', e => { if (tourStep >= 0 && e.key === 'Escape') endTour(); });
 
 // One date for the whole workspace, in the header: the date in words (the picker shows
 // mm/dd on some phones), steps a day either way, and whether this day is saved.
@@ -1108,12 +1165,33 @@ function redo() {
   undoStack.push(inverseOf(e));
   applyStep(e, 'Redo');
 }
-// Ctrl+Z / Ctrl+Y (Cmd on a Mac) when not typing in a box
+// Keyboard shortcuts (Cmd instead of Ctrl on a Mac), when not typing in a box. ? lists them.
+const SHORTCUTS = [['Ctrl+Z', 'Undo'], ['Ctrl+Y or Ctrl+Shift+Z', 'Redo'], ['Ctrl+S', 'Save the roster for the team (or download it)'],
+  ['Alt+1 … Alt+4', 'Monthly, Cases, Roster, Premeds'], ['[ and ]', 'Previous and next day'], ['/', 'Filter names'], ['Esc', 'Close a box, or cancel Move or swap'], ['?', 'This list']];
+function showShortcuts() {
+  const dlg = h('dialog', { class: 'changes' }, h('h2', {}, 'Keyboard shortcuts'),
+    h('table', {}, h('tbody', {}, SHORTCUTS.map(([k, what]) => h('tr', {}, h('td', {}, h('kbd', {}, k)), h('td', {}, what))))),
+    h('div', { class: 'bar' }, h('button', { class: 'primary', onclick: () => { dlg.close(); dlg.remove(); } }, 'Close')));
+  document.body.append(dlg); dlg.showModal();
+}
 document.addEventListener('keydown', e => {
-  if (!(e.ctrlKey || e.metaKey) || e.altKey || e.target.closest?.('input, textarea, select, [contenteditable]')) return;
-  const k = e.key.toLowerCase();
-  if (k === 'z' && !e.shiftKey && undoStack.length) { e.preventDefault(); undo(); }
-  else if ((k === 'y' || (k === 'z' && e.shiftKey)) && redoStack.length) { e.preventDefault(); redo(); }
+  if (e.target.closest?.('input, textarea, select, [contenteditable]') || document.querySelector('dialog[open]')) return;
+  const k = e.key.toLowerCase(), mod = e.ctrlKey || e.metaKey;
+  if (mod && !e.altKey) {
+    if (k === 'z' && !e.shiftKey && undoStack.length) { e.preventDefault(); undo(); }
+    else if ((k === 'y' || (k === 'z' && e.shiftKey)) && redoStack.length) { e.preventDefault(); redo(); }
+    else if (k === 's') {
+      e.preventDefault();
+      if (!state.roster || state.roster.date !== state.day.date) return toast('Make the roster first.');
+      if (cloud.enabled && isMember()) saveRosterToCloud(); else DOWNLOADS[0][2]();
+    }
+    return;
+  }
+  if (e.altKey && !mod && /^Digit[1-4]$/.test(e.code)) { e.preventDefault(); goTab(['monthly', 'cases', 'roster', 'premed'][+e.code.slice(5) - 1]); return; }
+  if (e.altKey || mod) return;
+  if (e.key === '?') { e.preventDefault(); showShortcuts(); }
+  else if (e.key === '[' || e.key === ']') { e.preventDefault(); switchDate(addDays(state.day.date, e.key === '[' ? -1 : 1)); }
+  else if (e.key === '/') { const f = app.querySelector('input[placeholder="Filter names"]'); if (f) { e.preventDefault(); f.focus(); } }
 });
 let lastRows = null; // rows as of the last logged change
 let editing = null; // "rowIndex:key" of the cell being typed in
@@ -1300,8 +1378,40 @@ function dropToPool(src) {
 // Touchscreens get no dragging, covering or deleting on the chips: tapping a name opens it.
 const TOUCH = matchMedia('(hover: none), (pointer: coarse)').matches;
 
+// Move or swap by tapping (works without dragging, e.g. on a phone): pick "Move or swap" in a
+// name's box, then tap where they go. The next tap on a name swaps, on a cell moves, on the
+// Admin / no list box takes them off.
+let swapSrc = null;
+function startSwap(src, p) {
+  closeTagEditor();
+  swapSrc = { ...src, who: shortName(p) || p.name };
+  document.body.classList.add('swapping');
+  render();
+}
+function endSwap() { swapSrc = null; document.body.classList.remove('swapping'); document.getElementById('swap-bar')?.remove(); }
+function renderSwapBar() {
+  document.getElementById('swap-bar')?.remove();
+  if (!swapSrc || state.tab !== 'roster') { if (swapSrc && state.tab !== 'roster') endSwap(); return; }
+  document.body.append(h('div', { id: 'swap-bar', class: 'swap-bar' },
+    h('span', {}, `Tap a name to swap with ${swapSrc.who}, an empty cell to move them there, or Admin / no list to take them off.`),
+    h('button', { class: 'small', onclick: () => { endSwap(); render(); } }, 'Cancel')));
+}
+document.addEventListener('click', e => {
+  if (!swapSrc) return;
+  const t = e.target.closest?.('#app [data-drop]');
+  if (!t || e.target.closest('#swap-bar')) return;
+  e.preventDefault(); e.stopPropagation();
+  clearTimeout(tagTimer);
+  const src = swapSrc;
+  endSwap();
+  if (t.dataset.pool != null) dropName(src, { pool: true });
+  else dropName(src, { row: +t.dataset.row, key: t.dataset.key, part: t.dataset.part != null ? +t.dataset.part : null });
+  render();
+}, true);
+document.addEventListener('keydown', e => { if (swapSrc && e.key === 'Escape') { endSwap(); render(); } });
+
 function startNameDrag(e, src) {
-  if (e.button !== 0) return;
+  if (e.button !== 0 || swapSrc) return;
   e.preventDefault();
   const chip = e.currentTarget.closest('.name') || e.currentTarget;
   const x0 = e.clientX, y0 = e.clientY;
@@ -1364,12 +1474,36 @@ async function resolvePerson(text, role) {
 }
 
 // A text box that suggests names from the staff list (optionally one role).
-function nameInput(attrs = {}, role = null) {
-  const id = 'names-' + (role || 'all');
+// A name box with the staff list as suggestions. rank(p) -> [group, note] puts the best people first
+// (lower group first) and shows the note beside each name.
+function nameInput(attrs = {}, role = null, rank = null) {
+  const id = 'names-' + (role || 'all') + (rank ? '-ranked' : '');
   if (!document.getElementById(id)) document.body.append(h('datalist', { id }));
-  document.getElementById(id).replaceChildren(...state.staff.filter(p => !role || p.role === role)
-    .sort(bySeniority).map(p => h('option', { value: p.name })));
+  const list = state.staff.filter(p => !role || p.role === role).map(p => [p, rank ? rank(p) : [0, '']]);
+  list.sort((a, b) => a[1][0] - b[1][0] || bySeniority(a[0], b[0]));
+  document.getElementById(id).replaceChildren(...list.map(([p, [, note]]) => h('option', { value: p.name, label: note || undefined })));
   return h('input', { list: id, autocomplete: 'off', spellcheck: 'false', ...attrs });
+}
+// For the + in a roster cell: free people who suit the room first, then free people, then people
+// already on a list, then people who aren't working.
+function rankForCell(row, key) {
+  const room = state.day.rooms.find(r => r.id === row.roomId);
+  const needs = (room?.flags?.subspecs || []).map(k => state.settings.subspecs.find(x => x.key === k)).filter(Boolean);
+  const free = new Set(noListPeople().map(p => p.id));
+  const off = { leave: 'on leave', mc: 'on MC', postcall: 'post call', admin: 'admin day' };
+  return p => {
+    const st = state.day.staff[p.id]?.status || 'avail';
+    if (off[st]) return [4, off[st]];
+    if (!free.has(p.id)) return [3, st === 'elsewhere' ? 'calls / clinics' : 'already on a list'];
+    if (key === 'senior') {
+      const hard = needs.filter(x => x.hard);
+      if (hard.length && !hard.every(x => (p.subspecs || []).includes(x.key))) return [2, `free · not ${hard.map(x => x.label).join('/')}`];
+      return [0, hard.length ? `free · ${hard.map(x => x.label).join('/')}` : 'free'];
+    }
+    const posting = postingOf(p);
+    if (posting && needs.some(x => x.posting === posting)) return [0, `free · ${postingName(posting)} posting`];
+    return [1, `free${posting ? ' · ' + postingName(posting) : ''}`];
+  };
 }
 
 // ---- tags on one name: "(L)", "(RA)", "(AOH 1)" and the part after a dash ("-5pm", "-C-OT 4") ----
@@ -1707,6 +1841,7 @@ function openPersonBox(anchor, p, ctx) {
       h('button', { class: 'primary save', onclick: apply }, 'Save'),
       h('button', { onclick: closeTagEditor }, 'Cancel'),
       h('span', { class: 'grow' }),
+      roster ? h('button', { title: 'Then tap another name to swap, or an empty cell or the Admin / no list box to move them there', onclick: () => startSwap(ctx.src, p) }, 'Move or swap') : null,
       ['roster', 'lock', 'premed', 'call'].includes(ctx.kind) ? h('button', { onclick: remove, title: ctx.kind === 'lock' ? 'Let the roster choose' : 'Take them off here' }, 'Remove') : null),
   );
   document.body.append(box);
@@ -1804,7 +1939,7 @@ function rosterCell(row, i, key, doubles) {
       onkeydown: e => { if (e.key === 'Escape') { editing = null; render(); } if (e.key === 'Enter') { e.preventDefault(); add(e.target.value); } },
       onchange: e => { if (state.staff.some(p => p.name === e.target.value)) add(e.target.value); },
       onblur: e => setTimeout(() => { if (editing === id && !e.target.value.trim()) { editing = null; render(); } }, 150),
-    }, key === 'senior' && row.roomId !== 'aic' ? 'senior' : key === 'senior' ? null : 'junior');
+    }, key === 'senior' && row.roomId !== 'aic' ? 'senior' : key === 'senior' ? null : 'junior', rankForCell(row, key));
     setTimeout(() => adder.focus());
   } else {
     adder = h('button', { class: 'add-name', title: 'Add a name', onclick: () => { clearTimeout(tagTimer); closeTagEditor(); editing = id; render(); } }, '+');
@@ -2247,14 +2382,25 @@ async function exportRotations() {
 const BOARD = [['working', 'Working'], ['leave', 'Leave'], ['mc', 'MC'], ['postcall', 'Post call'], ['admin', 'Admin']];
 const groupOf = st => ({ leave: 'leave', mc: 'mc', postcall: 'postcall', admin: 'admin' })[st || 'avail'] || 'working';
 let boardRole = 'all', boardFilter = '';
-function setStatus(p, group) {
+function setStatus(p, group, { quiet = false } = {}) {
   const s = dayOf(p.id);
   const was = groupOf(s.status);
   s.status = group === 'working' ? (s.status === 'elsewhere' ? 'elsewhere' : 'avail') : group;
   s.manual = true;
   delete s.auto;
   if (state.roster && was !== group) logRoster([`${p.name}: ${BOARD.find(b => b[0] === was)[1]} → ${BOARD.find(b => b[0] === group)[1]}`]);
+  if (!quiet) render();
+}
+// Today › Manpower: tick several people, then move them all at once
+let boardPick = null; // Set of staff ids while selecting, else null
+function moveMany(ids, group) {
+  const people = [...ids].map(person).filter(Boolean);
+  if (!people.length) return;
+  pushUndoAll(`moving ${people.length} to ${BOARD.find(b => b[0] === group)[1]}`, { day: true });
+  for (const p of people) setStatus(p, group, { quiet: true });
+  boardPick = null;
   render();
+  undoToast(`Moved ${people.length} ${people.length > 1 ? 'people' : 'person'} to ${BOARD.find(b => b[0] === group)[1]}.`);
 }
 function manpowerBoard() {
   const people = state.staff
@@ -2264,10 +2410,14 @@ function manpowerBoard() {
   const chip = p => {
     const s = state.day.staff[p.id] || {};
     return personChip(p, {
-      class: 'name pchip board-chip' + (s.manual ? ' manual' : '') + (p.role === 'senior' ? ' senior' : ''), draggable: TOUCH ? null : 'true',
+      class: 'name pchip board-chip' + (s.manual ? ' manual' : '') + (p.role === 'senior' ? ' senior' : '') + (boardPick?.has(p.id) ? ' picked' : ''), draggable: TOUCH || boardPick ? null : 'true',
       title: `${p.name} · ${p.grade}${s.manual ? ' · set by hand' : s.auto ? ` · ${s.auto}` : ''}${s.status === 'elsewhere' ? ' · elsewhere (calls/clinics)' : ''}`,
       ondragstart: e => { e.dataTransfer.setData('text/plain', p.id); e.dataTransfer.effectAllowed = 'move'; },
-      onclick: e => openPersonBox(e.currentTarget, p, { kind: 'today' }),
+      onclick: e => {
+        if (!boardPick) return openPersonBox(e.currentTarget, p, { kind: 'today' });
+        if (boardPick.has(p.id)) boardPick.delete(p.id); else boardPick.add(p.id);
+        render();
+      },
     });
   };
   const col = ([key, label]) => {
@@ -2275,7 +2425,7 @@ function manpowerBoard() {
     return h('div', { class: 'board-col', 'data-group': key,
       ondragover: e => { e.preventDefault(); e.currentTarget.classList.add('over'); },
       ondragleave: e => e.currentTarget.classList.remove('over'),
-      ondrop: e => { e.preventDefault(); e.currentTarget.classList.remove('over'); const p = person(e.dataTransfer.getData('text/plain')); if (p) setStatus(p, key); } },
+      ondrop: e => { e.preventDefault(); e.currentTarget.classList.remove('over'); const p = person(e.dataTransfer.getData('text/plain')); if (p && groupOf(state.day.staff[p.id]?.status) !== key) { pushUndoAll(`moving ${p.name}`, { day: true }); setStatus(p, key); } } },
       h('h3', {}, label, h('span', { class: 'seen' }, ` ${list.length}`)),
       h('div', { class: 'pool-names' }, list.map(chip)));
   };
@@ -2287,6 +2437,7 @@ function manpowerBoard() {
     h('div', { class: 'bar' },
       h('div', { class: 'seg', role: 'group', 'aria-label': 'Who' }, [['all', 'Everyone'], ['senior', 'Seniors'], ['junior', 'Juniors']].map(([k, l]) =>
         h('button', { 'aria-pressed': String(boardRole === k), onclick: () => { boardRole = k; render(); } }, l))),
+      h('button', { 'aria-pressed': String(!!boardPick), title: 'Tap several names, then pick where they all go', onclick: () => { boardPick = boardPick ? null : new Set(); render(); } }, boardPick ? 'Done selecting' : 'Select several'),
       manualCount && hasMonthly() ? h('button', { onclick: () => {
         pushUndoAll('the reset to monthly rosters', { day: true });
         for (const s of Object.values(state.day.staff)) {
@@ -2299,6 +2450,10 @@ function manpowerBoard() {
       } }, 'Reset to monthly rosters') : null,
       h('span', { class: 'grow' }),
       h('input', { placeholder: 'Filter names', value: boardFilter, oninput: e => { boardFilter = e.target.value; const pos = e.target.selectionStart; render(); const i = app.querySelector('.card input[placeholder="Filter names"]'); i.focus(); i.setSelectionRange(pos, pos); } })),
+    boardPick ? h('div', { class: 'pick-bar' },
+      h('span', {}, boardPick.size ? `${boardPick.size} selected. Move to:` : 'Tap names to select them.'),
+      BOARD.map(([k, label]) => h('button', { class: 'small', disabled: !boardPick.size, onclick: () => moveMany(boardPick, k) }, label)),
+      boardPick.size ? h('button', { class: 'small link', onclick: () => { boardPick.clear(); render(); } }, 'Clear') : null) : null,
     state.staff.length ? h('div', { class: 'board' }, BOARD.map(col)) : nextStep('Nobody here yet: add the staff list first.', 'Go to Staff', 'staff'));
 }
 
@@ -2884,11 +3039,11 @@ function renderSettings() {
     ),
     isAdmin() ? membersCard() : null,
     h('section', { class: 'card' },
-      h('h2', {}, 'Demo mode'),
-      h('p', { class: 'hint' }, 'Try the app with a made-up department: invented staff, monthly rosters and cases. The demo is kept apart from your real data and never signs in or shares anything. Send the link to anyone who wants to try it.'),
+      h('h2', {}, 'Practice mode'),
+      h('p', { class: 'hint' }, 'Try the app with a made-up department: invented staff, monthly rosters and cases, with a short tour. It is kept apart from your real data and never signs in or shares anything. Send the link to anyone who wants to learn it.'),
       h('div', { class: 'bar', style: 'margin:0' },
-        DEMO ? null : h('a', { class: 'btn', href: demoLink(), target: '_blank', rel: 'noopener' }, 'Open demo'),
-        h('button', { onclick: () => navigator.clipboard.writeText(demoLink()).then(() => toast('Demo link copied.'), () => prompt('Demo link', demoLink())) }, 'Copy demo link'),
+        DEMO ? null : h('a', { class: 'btn', href: demoLink(), target: '_blank', rel: 'noopener' }, 'Open practice'),
+        h('button', { onclick: () => navigator.clipboard.writeText(demoLink()).then(() => toast('Practice link copied.'), () => prompt('Practice link', demoLink())) }, 'Copy practice link'),
         h('code', { class: 'seen' }, demoLink()))),
     h('fieldset', { class: 'lock', disabled: !settingsEditing },
     h('section', { class: 'card' },
@@ -3218,3 +3373,7 @@ function membersCard() {
 lastRows = state.roster ? JSON.stringify(state.roster.rows) : null;
 state.tab = state.staff.length ? 'roster' : 'staff'; // the page opens on the roster
 render();
+// practice mode opens with the tour, once
+if (DEMO) { try { if (!localStorage.getItem(TOUR_KEY)) setTimeout(startTour, 700); } catch { /* no storage */ } }
+document.getElementById('tourBtn')?.addEventListener('click', () => startTour());
+document.getElementById('keysBtn')?.addEventListener('click', showShortcuts);
