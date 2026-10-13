@@ -4,7 +4,7 @@ import {
 } from './engine.js';
 // Seniors are always shown in black; juniors may be green (Baby MO) or purple (locum).
 const staffColour = p => (p && p.role !== 'senior' && p.colour) || '';
-import { readRosterRows, readStaffSheet, buildRosterWorkbook, cellText, isContactList, readContactList, cleanContactName } from './xlsxio.js';
+import { readRosterRows, dateFromText, readStaffSheet, buildRosterWorkbook, cellText, isContactList, readContactList, cleanContactName } from './xlsxio.js';
 import { buildLayout, COL_WIDTHS, shortName, doubleCovered, isDouble, TEAM_ROWS, DUTIES } from './layout.js';
 import * as cloud from './cloud.js';
 import { buildRosterPdf } from './pdfout.js';
@@ -1279,9 +1279,7 @@ async function loadDraft([file]) {
   const ws = wb.worksheets[0];
   const rows = readRosterRows(ws);
   const dateCell = cellText(ws.getCell('C5').value).trim();
-  const parsed = dateCell ? new Date(dateCell + ' 12:00') : null;
-  // a draft for another date goes to that date; the current one is put away first
-  const draftDate = parsed && !isNaN(parsed) ? `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}` : null;
+  const draftDate = dateFromText(dateCell);
   const moved = draftDate && draftDate !== state.day.date;
   if (moved) switchDate(draftDate);
   const d = state.day;
@@ -3515,20 +3513,25 @@ addEventListener('beforeprint', () => {
 addEventListener('afterprint', () => { const t = document.querySelector('table.xl'); if (t) t.style.zoom = ''; });
 
 // The sheet as an image: shared straight to WhatsApp (or any app) where the phone allows it, else downloaded.
-// Returns false when nothing went out (the share sheet was closed).
-async function exportImage(stamp = '', text = '') {
+// Returns false when nothing went out (the share sheet was closed). parts: 1 image, or 2 (calls and lists, then the
+// OT rooms, each with the title and date) that stay readable when WhatsApp shrinks a tall photo.
+async function exportImage(stamp = '', text = '', parts = 1) {
   colourCache.clear();
   const layout = buildLayout({ date: state.day.date, rows: state.roster.rows, lists: rosterLists(), general: effectiveGeneral(), box: commentsText(), colourOf, shortOf, stamp });
-  const blob = await new Promise(ok => buildRosterCanvas(layout).toBlob(ok, 'image/png'));
-  const name = `OT roster ${state.day.date}.png`;
-  const file = new File([blob], name, { type: 'image/png' });
-  if (navigator.canShare?.({ files: [file] })) {
-    try { await navigator.share({ files: [file], title: `OT roster ${longDate(state.day.date)}`, ...(text ? { text } : {}) }); return true; }
+  const spans = parts === 2 && layout.otFrom ? [[[2, layout.otFrom - 1]], [[2, 5], [layout.otFrom, layout.rows]]] : [[[2, layout.rows]]];
+  const files = [];
+  for (const [i, sp] of spans.entries()) {
+    const blob = await new Promise(ok => buildRosterCanvas(layout, 1400, sp).toBlob(ok, 'image/png'));
+    files.push(new File([blob], `OT roster ${state.day.date}${spans.length > 1 ? ` (${i + 1} of ${spans.length})` : ''}.png`, { type: 'image/png' }));
+  }
+  if (navigator.canShare?.({ files })) {
+    try { await navigator.share({ files, title: `OT roster ${longDate(state.day.date)}`, ...(text ? { text } : {}) }); return true; }
     catch (e) { if (e?.name === 'AbortError') return false; }
   }
-  download(name, blob);
+  for (const f of files) download(f.name, f);
   if (text) { try { await navigator.clipboard.writeText(text); } catch { /* no clipboard */ } }
-  toast(text ? 'Image downloaded and the changes copied: paste them under the image on WhatsApp.' : 'Image downloaded. Send it on WhatsApp as a photo or file.');
+  const what = files.length > 1 ? `${files.length} images downloaded` : 'Image downloaded';
+  toast(text ? `${what} and the changes copied: paste them under the image on WhatsApp.` : `${what}. Send ${files.length > 1 ? 'them' : 'it'} on WhatsApp as a photo or file.`);
   return true;
 }
 
@@ -3571,7 +3574,7 @@ function changesCard() {
       h('button', { class: 'small', onclick: async () => { try { await navigator.clipboard.writeText(text); toast('Changes copied.'); } catch { toast("Couldn't copy here."); } } }, 'Copy the changes')),
     h('p', { class: 'hint' }, 'The sheet you send now says "Updated" with the time, so it can be told apart from the first one.'));
 }
-const DOWNLOADS = [['xlsx', 'Download .xlsx', sentOut(exportXlsx)], ['pdf', 'Download PDF', sentOut(exportPdf)], ['png', 'Image for WhatsApp', sentOut(exportImage)], ['print', 'Print', sentOut(() => { rosterView = 'sheet'; render(); setTimeout(() => window.print(), 100); })]];
+const DOWNLOADS = [['xlsx', 'Download .xlsx', sentOut(exportXlsx)], ['pdf', 'Download PDF', sentOut(exportPdf)], ['png', 'Image for WhatsApp', sentOut(exportImage)], ['png2', 'Image in 2 parts (easier to read on a phone)', sentOut(stamp => exportImage(stamp, '', 2))], ['print', 'Print', sentOut(() => { rosterView = 'sheet'; render(); setTimeout(() => window.print(), 100); })]];
 let downloadMenu = false;
 function downloadButton() {
   let pick = 'xlsx';

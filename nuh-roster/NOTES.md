@@ -234,6 +234,11 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
   with no senior and a double cover with no junior; a checklist card on Roster ticks each off from the live checks)
   and "Reset this day" (with Undo). Cases has "Download a practice draft" (the admin team's format, cases in column L)
   so "Do it all" can be practised.
+- Download › "Image in 2 parts": the calls and lists, then the OT rooms (each with the title and date), so neither is
+  shrunk past reading when WhatsApp compresses a tall photo (`buildRosterCanvas(layout, width, spans)`, `layout.otFrom`).
+- The draft's date (C5) is read by `dateFromText` (ISO, day-first d/m/y, "14 Oct 2026"), not `new Date()`, which reads
+  these differently in Safari. `test/design.test.mjs` checks every `/* n-… */` copy in style.css still matches
+  `nuhsdesign/tokens.css`; highlight yellows are `--hl-bg` / `--hl-line`.
 - Keep building elements with `h()` and `textContent`; there is no `innerHTML` anywhere, so imported text can't inject.
 
 ## Code map
