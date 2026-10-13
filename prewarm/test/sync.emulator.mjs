@@ -227,7 +227,7 @@ try {
     return doc?.fields.f.mapValue.fields.age?.mapValue.fields.v?.stringValue;
   };
   const localAge = pg => pg.evaluate(() => Object.values(JSON.parse(localStorage.getItem('prewarm:patients'))).find(r => JSON.stringify(r).includes('SYNC-01'))?.f.age?.v);
-  for (const pg of [a, bb]) { await pg.goto(BASE + '#/'); await pg.click('.list a'); await pg.click('#haemolink'); await pg.click('a.widebox'); await pg.waitForSelector('#f-age'); }
+  for (const pg of [a, bb]) { await pg.goto(BASE + '#/'); await pg.click('.list a'); await pg.click('#haemolink'); await pg.click('.links.three a:has-text("Pre-op")'); await pg.waitForSelector('#f-age'); }
   await a.context().setOffline(true);
   await a.fill('#f-age', '60'); await a.keyboard.press('Tab'); await a.waitForTimeout(300);
   await bb.fill('#f-age', '70'); await bb.keyboard.press('Tab');
@@ -254,7 +254,7 @@ try {
   await a.waitForFunction(() => /BB/.test(document.querySelector('main').textContent), null, { timeout: 5000 });
 
   // a phone reloaded while offline with an unsent change: when signal comes back, the change still reaches the server
-  for (const pg of [a]) { await pg.goto(BASE + '#/'); await pg.click('.list a'); await pg.click('#haemolink'); await pg.click('a.widebox'); await pg.waitForSelector('#f-age'); }
+  for (const pg of [a]) { await pg.goto(BASE + '#/'); await pg.click('.list a'); await pg.click('#haemolink'); await pg.click('.links.three a:has-text("Pre-op")'); await pg.waitForSelector('#f-age'); }
   await a.context().setOffline(true);
   await a.fill('#f-age', '55'); await a.keyboard.press('Tab'); await a.waitForTimeout(300);
   await a.reload(); await a.waitForSelector('#f-age', { timeout: 20000 });
