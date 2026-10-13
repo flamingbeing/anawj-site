@@ -42,10 +42,18 @@ function blankState() {
 }
 
 let state = blankState();
+// storage trouble, shown as a bar: 'full' (a save failed) or { corrupt: key } (saved data couldn't be read)
+let storeProblem = null;
 try {
-  const saved = JSON.parse(localStorage.getItem(KEY) || 'null');
+  const raw = localStorage.getItem(KEY);
+  let saved = null;
+  try { saved = JSON.parse(raw || 'null'); } catch {
+    // damaged: keep a copy before the next save writes over it
+    const key = `${KEY}-damaged-${Date.now()}`;
+    try { localStorage.setItem(key, raw); storeProblem = { corrupt: key }; } catch { storeProblem = { corrupt: null, raw }; }
+  }
   if (saved) state = { ...state, ...saved, settings: { ...clone(DEFAULT_SETTINGS), ...saved.settings }, roomsVersion: saved.roomsVersion || 1 };
-} catch { /* private mode or corrupt data: start fresh */ }
+} catch { /* private mode: start fresh */ }
 migrateRooms();
 syncRooms();
 state.rotations ||= emptyRotations();
@@ -149,7 +157,14 @@ let saveTimer;
 function save() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
-    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch { /* storage unavailable */ }
+    const was = storeProblem === 'full';
+    try {
+      localStorage.setItem(KEY, JSON.stringify(state));
+      if (was) { storeProblem = null; renderStoreBar(); toast('Saving in this browser works again.'); }
+    } catch {
+      // usually the browser's storage is full: say so, rather than losing changes without a word
+      if (!storeProblem || was) { storeProblem = 'full'; renderStoreBar(); }
+    }
   }, 200);
 }
 
@@ -256,6 +271,7 @@ function render() {
   renderSwapBar();
   renderDemoBar();
   renderMovedBar();
+  if (storeProblem && !document.getElementById('store-bar')) renderStoreBar();
   window.scrollTo(0, y);
   if (state.tab === 'monthly' && state.monthlyView === 'rotations') placeRotGrid();
   save();
@@ -264,7 +280,7 @@ function render() {
 // the current day away and brings up the other one (empty if it's new).
 function switchDate(date) {
   if (!date || date === state.day.date) return;
-  (state.days ||= {})[state.day.date] = { day: state.day, roster: state.roster };
+  (state.days ||= {})[state.day.date] = { day: state.day, roster: state.roster && { ...state.roster, checks: undefined } };
   const rec = state.days[date];
   delete state.days[date];
   state.day = rec?.day || { date, rooms: [], staff: {} };
@@ -291,6 +307,40 @@ function renderMovedBar() {
     h('span', { class: 'grow' }),
     h('button', { class: 'small primary', onclick: downloadEverything }, 'Download everything'),
     h('button', { class: 'small', onclick: go }, 'Go to the new address')));
+}
+// A bar when this browser can't keep the roster: storage full, or saved data that couldn't be read.
+function renderStoreBar() {
+  document.getElementById('store-bar')?.remove();
+  if (!storeProblem) return;
+  const bar = h('div', { id: 'store-bar', class: 'demo-bar moved-bar', role: 'alert' });
+  if (storeProblem === 'full') {
+    const old = oldDays(90);
+    bar.append(h('b', {}, 'Changes are not being kept in this browser.'),
+      h('span', {}, ' Its storage is probably full. Download everything to keep a copy' + (old.length ? `, then remove days more than 3 months old (${old.length}).` : '.')),
+      h('span', { class: 'grow' }),
+      h('button', { class: 'small primary', onclick: downloadEverything }, 'Download everything'),
+      ...(old.length ? [h('button', { class: 'small', onclick: () => removeOldDays(old) }, 'Remove old days')] : []));
+  } else {
+    const { corrupt, raw } = storeProblem;
+    const copy = () => download(`NUH roster, damaged saved data ${realToday()}.txt`, new Blob([corrupt ? localStorage.getItem(corrupt) || '' : raw || ''], { type: 'text/plain' }));
+    bar.append(h('b', {}, 'The roster saved in this browser couldn\'t be read, so the app started empty.'),
+      h('span', {}, corrupt ? ' A copy of it is kept in this browser.' : ' It couldn\'t be copied, so download it now, before you change anything.'),
+      h('span', { class: 'grow' }),
+      h('button', { class: 'small primary', onclick: copy }, 'Download the damaged data'),
+      h('button', { class: 'small', onclick: () => { storeProblem = null; renderStoreBar(); } }, 'Hide'));
+  }
+  document.body.prepend(bar);
+}
+// Stored dates more than n days before today (the open date is never in state.days).
+function oldDays(n) {
+  const cut = addDays(realToday(), -n);
+  return Object.keys(state.days || {}).filter(d => d < cut).sort();
+}
+function removeOldDays(dates) {
+  if (!confirm(`Remove ${dates.length} days from ${dates[0]} to ${dates[dates.length - 1]} from this browser? Download everything first if you want to keep them (days saved for the team stay in the cloud).`)) return;
+  for (const d of dates) delete state.days[d];
+  save();
+  renderStoreBar();
 }
 // Everything this browser holds for the roster (staff, settings, every day's roster, monthly rosters, rotations).
 function downloadEverything() {
@@ -3225,10 +3275,20 @@ document.getElementById('loadTeam').addEventListener('change', async e => {
     const data = JSON.parse(await f.text());
     if (data.kind === 'ot-roster-all' && data.state) {
       // a whole browser's roster (from the old address): staff, days, monthly rosters, rotations, settings
+      const d = data.state;
+      if (!Array.isArray(d.staff) || (d.day && typeof d.day !== 'object') || (d.days && typeof d.days !== 'object')) { toast('That file is damaged: its staff list or days are missing. Nothing was changed.'); return; }
       if (state.staff.length && !confirm('Replace everything the roster has saved in this browser with this file?')) return;
-      state = { ...blankState(), ...data.state, settings: { ...clone(DEFAULT_SETTINGS), ...data.state.settings } };
-      state.rotations ||= emptyRotations();
-      cleanStaffNames(); migrateRooms(); syncRooms();
+      const before = state;
+      try {
+        state = { ...blankState(), ...d, settings: { ...clone(DEFAULT_SETTINGS), ...d.settings } };
+        state.day ||= blankState().day;
+        state.rotations ||= emptyRotations();
+        cleanStaffNames(); migrateRooms(); syncRooms();
+      } catch {
+        state = before; // keep what was here rather than a half-loaded file
+        toast('That file is damaged, so nothing was changed.');
+        return;
+      }
       nextId = 1 + state.staff.reduce((m, p) => Math.max(m, parseInt(String(p.id).replace(/\D/g, ''), 10) || 0), 0);
       clearUndo(); lastRows = state.roster ? JSON.stringify(state.roster.rows) : null;
       render();
@@ -3250,8 +3310,8 @@ document.getElementById('loadTeam').addEventListener('change', async e => {
     syncRooms();
     render();
     toast(`Team file loaded: ${state.staff.length} staff.`);
-  } catch {
-    toast("That file isn't an OT roster team file.");
+  } catch (err) {
+    toast(err instanceof SyntaxError ? "That file isn't a roster file (it can't be read as JSON)." : "That file isn't an OT roster team file or a Download everything file.");
   }
 });
 
@@ -3550,5 +3610,6 @@ render();
 // practice mode opens with the tour, once
 if (DEMO) { try { if (!localStorage.getItem(TOUR_KEY)) setTimeout(startTour, 700); } catch { /* no storage */ } }
 document.getElementById('tourBtn')?.addEventListener('click', () => startTour());
+document.getElementById('allBtn')?.addEventListener('click', downloadEverything);
 addEventListener('hashchange', () => { if (location.hash === '#myday' && state.tab !== 'myday') { state.tab = 'myday'; window.scrollTo(0, 0); render(); } });
 document.getElementById('keysBtn')?.addEventListener('click', showShortcuts);

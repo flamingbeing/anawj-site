@@ -70,6 +70,30 @@ const bad = [{ roomId: 'r1', label: 'MCOR 1', complex: 'MCOR', senior: 'Senior G
 const out = check({ rows: bad, staff, day: { ...day, staff: { s3: { status: 'leave' } } } }).map(w => w.text).join('\n');
 assert.match(out, /on leave/);
 assert.match(out, /Paeds list/);
+{
+  // live checks that used to exist only as generator notes, or not at all
+  const r = (roomId, label, senior, junior) => ({ roomId, label, complex: 'MCOR', senior, junior, premed: '', notes: '' });
+  const day2 = { rooms: day.rooms.map(x => ({ ...x, flags: { subspecs: [], complex: false, long: false } })), staff: {} };
+  const texts = rows => check({ rows, staff, day: day2 }).map(w => `${w.level}|${w.fix || ''}|${w.text}`);
+  // double cover with no junior in one of the rooms
+  let t = texts([r('r3', 'MCOR 2', 'Senior General', ''), r('r4', 'MCOR 3', 'Senior General', 'Junior Resident')]);
+  assert.ok(t.some(x => /^error\|fill\|MCOR 2: no junior, and the senior is double covering/.test(x)), t.join('\n'));
+  assert.ok(!t.some(x => /MCOR 3: no junior/.test(x)));
+  // a cover from another room counts as a junior
+  t = texts([r('r3', 'MCOR 2', 'Senior General', 'Junior Mopex C'), r('r4', 'MCOR 3', 'Senior General', 'Junior Resident')]);
+  assert.ok(!t.some(x => /no junior/.test(x)), t.join('\n'));
+  // one senior in three rooms
+  t = texts([r('r1', 'MCOR 1', 'Senior General', 'Junior Paeds'), r('r3', 'MCOR 2', 'Senior General', 'Junior Mopex'), r('r4', 'MCOR 3', 'Senior General', 'Junior Resident')]);
+  assert.ok(t.some(x => /^error\|reseat\|Senior General is the senior in 3 rooms/.test(x)), t.join('\n'));
+  // senior in one room and junior in another
+  t = texts([r('r1', 'MCOR 1', 'Senior Paeds', 'Junior Paeds'), r('r3', 'MCOR 2', 'Senior General', 'Senior Paeds')]);
+  assert.ok(t.some(x => /^warn\|reseat\|Senior Paeds is the senior in MCOR 1 and the junior in MCOR 2/.test(x)), t.join('\n'));
+  // admin day / elsewhere on a list
+  const t2 = check({ rows: [r('r4', 'MCOR 3', 'Senior General', 'Junior Resident')], staff, day: { ...day2, staff: { s3: { status: 'admin' }, j2: { status: 'elsewhere' } } } }).map(w => `${w.level}|${w.fix}|${w.text}`);
+  assert.ok(t2.some(x => /^warn\|takeOff\|Senior General is on an admin day/.test(x)), t2.join('\n'));
+  assert.ok(t2.some(x => /^warn\|takeOff\|Junior Resident is elsewhere today/.test(x)), t2.join('\n'));
+  console.log('live check tests passed');
+}
 assert.equal(suggestShortName('Koh Yi Wen'), 'Koh YW');
 assert.equal(suggestShortName('Lim Xinyi'), 'Xinyi');
 assert.equal(suggestShortName('Anjali Varma'), 'Anjali');

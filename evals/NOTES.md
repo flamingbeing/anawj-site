@@ -225,6 +225,8 @@ A quick contrast check for both themes is worth running after any colour change:
 
 ## 7. Open items
 
+The full ranked review (20 reviewers, 13 Oct 2026) is in [IMPROVEMENTS.md](IMPROVEMENTS.md); the list below is the older short list.
+
 - Linked emails / hospital-email sign-in (the project is on Blaze; code path present, off).
 - Nightly encrypted Firestore backup Action.
 - Linking an evaluation to a logbook case (MedHub triggers evaluations from the case log; we request them directly).

@@ -2,7 +2,7 @@
 // Request detail (#r/{id} while not submitted, via ui-result.js): status trail, share again,
 // Nudge, Change assessor, Cancel, and Send to another assessor after a decline.
 
-import { S, h, fill, toast, cloud, icon, go, toolLabel, fmtDate, fmtAgo, toMs, statusChip, row, empty, segment, modal, confirmBox, hooks, needsAction, ageHours, NUDGE_HOURS } from './ui-core.js';
+import { S, h, fill, toast, cloud, icon, go, toolLabel, fmtDate, fmtAgo, toMs, statusChip, row, empty, segment, modal, confirmBox, hooks, needsAction, ageHours, NUDGE_HOURS, errText } from './ui-core.js';
 import { statusOf, validate } from './engine.js';
 import { FORMS } from './forms.js';
 import { itemById } from './catalogue.js';
@@ -88,7 +88,7 @@ function trail(ev) {
   const steps = [];
   const at = v => (v ? fmtDate(v, { time: true }) : '');
   steps.push({ done: true, text: ev.status === 'draft' ? 'Draft saved' : 'Sent', when: at(ev.status === 'draft' ? ev.createdAt : ev.requestedAt || ev.createdAt) });
-  if (ev.chasedAt) steps.push({ done: true, text: 'Nudged', when: at(ev.chasedAt) });
+  if (ev.chasedAt) steps.push({ done: true, text: 'Reminder sent', when: at(ev.chasedAt) });
   if (ev.metrics?.openedAt > 1e12) steps.push({ done: true, text: 'Opened by assessor', when: at(ev.metrics.openedAt) });
   const a = ev.assessment && Object.keys(ev.assessment).length ? ev.assessment : null;
   if (a && FORMS[ev.formId] && ev.status === 'requested') {
@@ -131,7 +131,7 @@ export function renderRequestDetail(ev) {
     if (busy) return;
     busy = true;
     try { const next = await fn(); if (okMsg) toast(okMsg); if (next) { Object.assign(ev, next); } hooks.render(); }
-    catch (err) { toast('Not saved: ' + (err.message || err)); }
+    catch (err) { toast('Not saved. ' + errText(err)); }
     finally { busy = false; }
   };
   const save = patch => cloud.updateEvaluation(ev.id, patch);
@@ -180,7 +180,7 @@ export function renderRequestDetail(ev) {
   const delDraft = async () => {
     if (!(await confirmBox('Delete this draft?', 'The draft has not been sent. This can’t be undone.', 'Delete draft', true))) return;
     try { await cloud.deleteDraft(ev.id); toast('Draft deleted'); go('requests'); }
-    catch (err) { toast('Not deleted: ' + (err.message || err)); }
+    catch (err) { toast('Not deleted. ' + errText(err)); }
   };
 
   const now = Date.now();
@@ -190,7 +190,7 @@ export function renderRequestDetail(ev) {
   const actions = [];
   if (ev.status === 'requested') {
     actions.push(h('button', { class: 'n-btn e-btn-big', onclick: () => shareSheet(ev) }, icon('qr'), 'Show QR / share link'));
-    if (canNudge) actions.push(h('button', { class: 'n-btn n-btn--secondary e-btn-big', onclick: nudge }, icon('share'), 'Nudge (send the link again)'));
+    if (canNudge) actions.push(h('button', { class: 'n-btn n-btn--secondary e-btn-big', onclick: nudge }, icon('share'), 'Remind assessor'));
     if (!started) actions.push(h('button', { class: 'n-btn n-btn--outline e-btn-quiet e-btn-big', onclick: changeAssessor }, 'Change assessor'));
     actions.push(h('button', { class: 'n-btn n-btn--outline e-btn-quiet e-btn-big', onclick: cancel }, 'Cancel request'));
   } else if (ev.status === 'draft') {

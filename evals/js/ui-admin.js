@@ -3,7 +3,7 @@
 // Never deletes anyone: residents and faculty change status instead.
 
 import { S, h, fill, cloud, toast, modal, confirmBox, download, go, avatar, icon, empty, segment,
-  fmtDate, fmtAgo, toMs, toolLabel, statusChip, hooks } from './ui-core.js';
+  fmtDate, fmtAgo, toMs, toolLabel, statusChip, hooks, errText } from './ui-core.js';
 import { progress, statusOf, residentYear, todayISO, OVERDUE_HOURS } from './engine.js';
 import { EPAS, GROUPS, itemById } from './catalogue.js';
 import { FORMS, questionsOf } from './forms.js';
@@ -65,7 +65,7 @@ const OVERALL_KEY = { dops: 'q14', minicex: 'q12' };   // the 9-point "overall" 
 const DECLINE_LABEL = { 'not-observed': 'Did not observe', 'not-co-managed': 'Did not co-manage', conflict: 'Conflict of interest', 'wrong-item': 'Wrong item or form', other: 'Other' };
 const sentAt = ev => toMs(ev.requestedAt) || toMs(ev.createdAt) || 0;
 const nameOf = ev => ev.residentName || ev.residentEmail || ev.rid || '';
-const err = e => (e && e.message) || String(e);
+const err = e => errText(e);
 
 // residents are cached for the session; People refreshes the cache
 let residentsCache = null;
@@ -368,7 +368,7 @@ async function approve(a, res, reload) {
   if (a.role === 'faculty') {
     if (!await confirmBox('Approve as faculty?', `${a.name} (${a.email}) will be added to the faculty list and can assess residents.`, 'Approve')) return;
     try { await cloud.decideApplication(a.uid, { approve: true }); toast(`${a.name} added to faculty`); reload(); }
-    catch (e) { toast('Could not approve: ' + err(e)); }
+    catch (e) { toast('Couldn’t approve. ' + err(e)); }
     return;
   }
   const old = res.find(r => r.email === a.email);
@@ -399,7 +399,7 @@ async function approve(a, res, reload) {
 async function reject(a, reload) {
   if (!await confirmBox('Reject application?', `${a.name} (${a.email}) will see that their application was not approved.`, 'Reject', true)) return;
   try { await cloud.decideApplication(a.uid, { approve: false }); toast('Application rejected'); reload(); }
-  catch (e) { toast('Could not reject: ' + err(e)); }
+  catch (e) { toast('Couldn’t reject. ' + err(e)); }
 }
 
 // Paste parser: one person per line, fields split by comma or tab. Returns [{ line, rec, problem, dup }]
@@ -523,7 +523,7 @@ function editFaculty(f, fac, reload) {
     const bad = !nm ? 'Enter a name.' : !validEmail(em) ? 'Enter a valid email.' : !f && fac.some(x => x.email === em) ? `${em} is already on the list.` : null;
     if (bad) { msg.hidden = false; msg.textContent = bad; return; }
     try { await cloud.saveFaculty({ ...(f || {}), email: em, name: nm, status: status.value }); m.close(); toast(f ? 'Saved' : `${nm} added`); reload(); }
-    catch (e2) { msg.hidden = false; msg.textContent = 'Could not save: ' + err(e2); }
+    catch (e2) { msg.hidden = false; msg.textContent = 'Couldn’t save. ' + err(e2); }
   } },
     field('Name', name), field('Google account email', email), f ? null : h('p', { class: 'e-hint' }, 'The email they sign in with.'),
     field('Status', status), msg,
