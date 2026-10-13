@@ -27,7 +27,9 @@ sessions never edit the same lines. Read them all before starting; edit only you
 
 ## Next (agreed queue)
 
-Nothing agreed. Parked, only if asked:
+Nothing agreed. The 13 Oct review (`REVIEW-2026-10.md`) ranks about 60 ideas in batches A–I, safety first
+(silent save failure, live checks, a role allowlist in the rules with emulator tests, team-doc conflicts); the owner
+picks from it. Parked, only if asked:
 1. A read-only bridge to APMES (owner's question, 13 Oct): residents and supervisors as roster viewers, and APMES pages
    reading `rosters/{date}` (room, consultant, case notes for a logbook entry; who supervised whom for evaluations;
    the week's posting from `team/rotations`). Each app keeps its own Firebase project and rules.
@@ -55,3 +57,4 @@ Nothing agreed. Parked, only if asked:
 - 2026-10-11 Demo start day: 5 on leave and 2 seniors on an admin day.
 - 2026-10-13 The roster stays separate from APMES (own Firebase project and rules). Data flows later through a narrow read-only bridge, not a merge.
 - 2026-10-13 The roster moved to its own subdomain, `nuhroster.anawj.com` (owner: other rosters may get their own later).
+- 2026-10-13 Twenty read-only reviews ranked improvements into `REVIEW-2026-10.md`; recommended order: safety (Batch A) before new features.
