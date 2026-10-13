@@ -1511,14 +1511,16 @@ details.day-note-box > summary { cursor: pointer; color: var(--muted); font-weig
 body.typing-nobar { --tabbar-h: 0px; }
 body.typing-nobar .tabs { display: none; }
 /* the note editor: its top bar (‹ Notes, Saved, ⋯, Done) stays at the top while the note scrolls under the keyboard;
-   on iOS the visible area itself moves down the page when the keyboard is up (--vvt, app.js) */
-.note-editor .note-top { position: sticky; top: 0; z-index: 15; background: var(--panel); margin: -4px 0 0; padding: 4px 0; }
-body.typing .note-editor .note-top { top: var(--vvt, 0px); }
+   on iOS the visible area itself moves down the page when the keyboard is up (--vvt, app.js); it sits under a tab
+   bar that is stuck at the top (--pin-top) */
+.note-editor .note-top { position: sticky; top: var(--pin-top, 0px); z-index: 15; background: var(--panel); margin: -4px 0 0; padding: 4px 0; }
+body.typing .note-editor .note-top { top: calc(var(--vvt, 0px) + var(--pin-top, 0px)); }
 /* the title wraps onto more lines when it's long (a one-row box that grows with it) */
 .note-editor textarea.note-title { display: block; resize: none; overflow: hidden; min-height: 0; line-height: 1.3; font-family: inherit; overflow-wrap: anywhere; }
-/* case rows: tags wrap onto a second line rather than run under the note button and the row's buttons */
-ul.cases .c-tags { flex-wrap: wrap; overflow-x: visible; -webkit-mask-image: none; mask-image: none; padding-right: 0; row-gap: 4px; }
-ul.cases .c-tags > * { max-width: 100%; }
+/* case rows: tags wrap onto a second line rather than run under the note button and the row's buttons (Shorter
+   Logbook rows keep their one grey line, which scrolls sideways inside the row as before) */
+html:not(.rows-short) ul.cases .c-tags { flex-wrap: wrap; overflow-x: visible; -webkit-mask-image: none; mask-image: none; padding-right: 0; row-gap: 4px; }
+html:not(.rows-short) ul.cases .c-tags > * { max-width: 100%; }
 /* the row menu's links look like its buttons (Request an evaluation) */
 .row-menu-list a.btn { justify-content: flex-start; min-height: 48px; text-decoration: none; color: inherit; }
 .row-menu-list a.btn .ico { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }

@@ -429,7 +429,7 @@ export function renderAccessibility() {
       h('h3', {}, 'Keyboard'),
       // the device's own value, else the profile's default (device-presets.js: on in the Personal profile)
       toggle('Hide the tab bar while typing', deviceOn(st, profile(), 'hideTabsTyping'), v => { applyDisplay(setDisplay({ hideTabsTyping: v })); toast('Saved on this device'); },
-        'Phones: more room above the keyboard for the box you’re typing in and its Save button.', 'The tab bar comes back when the keyboard goes down. Off unless you switch it on (on in the Personal profile).'),
+        'Phones: more room above the keyboard for the box you’re typing in and its Save button.', 'The tab bar comes back when the keyboard goes down. Off unless you switch it on.'),
       h('p', { class: 'hint', style: 'margin:10px 0 0' }, 'Everything on this page is saved on this device only.')),
     resetLink('zoom, text size, bigger tap targets, swiping, contrast, motion, edge swipe, press and hold and the tab bar while typing on this device', () =>
       applyDisplay(setDisplay({ zoom: null, textSize: null, bigTaps: null, swipeTabs: null, contrast: null, motion: null, edgeBack: null, rowHold: null, hideTabsTyping: null }))));
@@ -735,8 +735,9 @@ export function profileCard() {
 
 // Settings → Profiles or hide items: the profile, then every switch that hides part of the app, grouped by area, each group with its own
 // reset. The same settings as on their own pages (Logging, Display, Reflections), gathered in one place.
-const groupReset = (what, run) => h('p', { class: 'reset-row' }, h('button', { class: 'small linkish', type: 'button', onclick: async () => {
-  if (!await confirmBox('Reset this group', `Show ${what} again?`, 'Reset')) return;
+// question: for a group whose reset turns something off (an opt-in extra), not "Show … again?"
+const groupReset = (what, run, question = `Show ${what} again?`) => h('p', { class: 'reset-row' }, h('button', { class: 'small linkish', type: 'button', onclick: async () => {
+  if (!await confirmBox('Reset this group', question, 'Reset')) return;
   await run(); hooks.render(); toast('Back to the defaults');
 } }, 'Reset this group'));
 const sw = (label, on, set, hint) => [h('label', { class: 'check' }, h('input', { type: 'checkbox', role: 'switch', 'aria-label': label, checked: !!on, onchange: e => set(e.target.checked) }), label), hint ? h('p', { class: 'hint help' }, hint) : null];
@@ -778,7 +779,7 @@ export function renderShowHide() {
       h('h3', { style: 'margin-top:0' }, 'APMES'),
       sw('Request an evaluation from a case', !!st.evalRequest, v => save({ evalRequest: v || null }),
         'In a case’s ⋯ menu and its edit page: opens a new evaluation request with the case’s date and initials (never its details).'),
-      groupReset('the APMES extras (Request an evaluation off)', () => save({ evalRequest: null }))),
+      groupReset('', () => save({ evalRequest: null }), 'Turn off Request an evaluation?')),
     h('section', { class: 'card', 'data-group': 'bar' },
       h('h3', { style: 'margin-top:0' }, 'Header and tabs (this device)'),
       sw('Show the header (the app’s name and your name)', !d.hideHeader, v => applyDisplay(setDisplay({ hideHeader: !v }))),

@@ -5,7 +5,7 @@
 // evaluation (off by default) with only the date and initials in its link. Phone 390 (touch) and desk 1280.
 import assert from 'node:assert/strict';
 import { launch, engine, isChromium, phoneOpts, ignorable, until } from './browsers.mjs';
-const base = `http://localhost:${process.env.PORT || 8080}/logbook/`;
+const origin = `http://localhost:${process.env.PORT || 8080}`, base = origin + '/logbook/';
 const b = await launch();
 if (!b) { console.log(`SKIP phone-ux (${engine} is not installed here)`); process.exit(0); }
 const label = w => (w === 390 ? 'phone' : 'desktop') + (isChromium ? '' : ` (${engine})`);
@@ -18,7 +18,7 @@ try { for (const width of [390, 1280]) {
   // links the app opens are caught here, not followed
   await p.addInitScript(() => {
     window.__opened = [];
-    document.addEventListener('click', e => { const a = e.target.closest && e.target.closest('a[href^="https://apmes.anawj.com/evals/"]'); if (a) { e.preventDefault(); window.__opened.push(a.getAttribute('href')); } }, true);
+    document.addEventListener('click', e => { const a = e.target.closest && e.target.closest('a.eval-req'); if (a) { e.preventDefault(); window.__opened.push(a.getAttribute('href')); } }, true);
   });
   const tap = (loc, o) => (phone ? loc.tap(o) : loc.click(o));
   const focusedTag = () => p.evaluate(() => document.activeElement && document.activeElement.getAttribute('aria-label'));
@@ -39,6 +39,13 @@ try { for (const width of [390, 1280]) {
     await p.goto(base + '?demo#log'); await p.waitForSelector('textarea.details');
     await p.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === 'Case summary');
     await p.evaluate(async () => { const m = await import('./js/ui-settings.js'); m.applyDisplay(m.setDisplay({ autoFocus: null })); });
+    // the app's "Log a case" shortcut (./#quicklog) asks for the keyboard as it opens, and the address becomes #log
+    await p.evaluate(() => history.replaceState(null, '', location.pathname + '?demo#quicklog')); await p.reload(); await p.waitForSelector('textarea.details');
+    await p.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === 'Case summary');
+    assert.equal(new URL(p.url()).hash, '#log');
+    // a plain open again: no keyboard
+    await p.reload(); await p.waitForSelector('textarea.details'); await p.waitForTimeout(300);
+    assert.notEqual(await focusedTag(), 'Case summary', 'the keyboard opened as the app started (after the shortcut)');
   } else {
     await p.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === 'Case summary');   // computers as before
   }
@@ -75,6 +82,19 @@ try { for (const width of [390, 1280]) {
   const rows = await p.locator('ul.cases li[data-date] .c-tags').evaluateAll(els => els.map(e => ({ wrap: getComputedStyle(e).flexWrap, over: e.scrollWidth - e.clientWidth })));
   assert.ok(rows.length >= 1);
   for (const r of rows) { assert.equal(r.wrap, 'wrap'); assert.ok(r.over <= 1, 'a tag row runs past its edge: ' + r.over); }
+  // Shorter Logbook rows keep one grey line of tags that scrolls inside the row: nothing spills past the page's edge
+  await p.evaluate(async () => {
+    const { S, updateCase } = await import('./js/ui-core.js');
+    await updateCase(S.cases[0].id, { cats: ['16', '28', '1', '2', '3', '4', '5', '6', '7', '8', '9'] });
+    const m = await import('./js/ui-settings.js'); m.applyDisplay(m.setDisplay({ rowShort: true }));
+  });
+  await p.goto(base + '?demo#logbook');
+  await p.locator('main .seg button').filter({ hasText: /^List$/ }).first().click();
+  await p.locator('ul.cases li[data-date] .c-tags').first().waitFor();
+  const short = await p.locator('ul.cases li[data-date] .c-tags').first().evaluate(e => ({ wrap: getComputedStyle(e).flexWrap, ox: getComputedStyle(e).overflowX }));
+  assert.equal(short.wrap, 'nowrap'); assert.equal(short.ox, 'auto');
+  assert.ok(await p.evaluate(() => document.documentElement.scrollWidth) <= width, 'the short rows\' tags made the page scroll sideways');
+  await p.evaluate(async () => { const m = await import('./js/ui-settings.js'); m.applyDisplay(m.setDisplay({ rowShort: null })); });
   console.log(`PASS case row tags wrap ${label(width)}`);
 
   // ---- the calendar: a tapped day's cases come into view above the tab bar ----
@@ -111,6 +131,12 @@ try { for (const width of [390, 1280]) {
   const tb = await p.getByLabel('Note title').evaluate(e => ({ h: e.getBoundingClientRect().height, lh: parseFloat(getComputedStyle(e).lineHeight), tag: e.tagName }));
   assert.equal(tb.tag, 'TEXTAREA');
   if (phone) assert.ok(tb.h > tb.lh * 1.6, `the long title didn't wrap (${tb.h}px, line ${tb.lh}px)`);
+  // a wider window, then narrower again (a phone turned): the title fits again, no line cut off
+  const titleFits = () => p.getByLabel('Note title').evaluate(e => e.scrollHeight <= e.clientHeight + 1);
+  await p.setViewportSize({ width: width === 390 ? 844 : 1600, height: 844 }); await p.waitForTimeout(150);
+  assert.ok(await titleFits(), 'the title was cut off when the window grew');
+  await p.setViewportSize({ width, height: 844 }); await p.waitForTimeout(150);
+  assert.ok(await titleFits(), 'the title was cut off when the window narrowed');
   await p.getByLabel('Note text').fill(Array.from({ length: 80 }, (_, i) => 'Fake line ' + i).join('\n'));
   // the ⋯ menu opens and stays open (a tap on its own button can't close it again)
   const more = p.getByRole('button', { name: 'More options' });
@@ -153,12 +179,33 @@ try { for (const width of [390, 1280]) {
   await p.waitForTimeout(300);
   assert.equal(await p.evaluate(() => window.__page.isConnected), true, 'the Notes page was drawn again after Done');
   assert.match(await p.locator('ul.notes-rows').innerText(), /Fake long title/);
+  // a tap on a row straight after Done (before the browser's step back lands) opens that note, and it stays open
+  await p.locator('ul.notes-rows li').first().click();
+  await p.locator('.note-editor').waitFor();
+  await p.evaluate(() => { [...document.querySelectorAll('.note-editor button')].find(b => b.textContent.trim() === 'Done').click(); document.querySelector('ul.notes-rows li').click(); });
+  await p.waitForTimeout(400);
+  assert.equal(await p.locator('.note-editor').count(), 1, 'the note opened right after Done closed by itself');
+  // and Back still closes it
+  await p.goBack();
+  await p.locator('ul.notes-rows li').first().waitFor({ timeout: 2000 });
   // and again through Back, with a few in a row
   for (let i = 0; i < 3; i++) {
     await p.locator('ul.notes-rows li').first().click();
     await p.locator('.note-editor').waitFor();
     if (i % 2) await p.goBack(); else await tap(p.getByRole('button', { name: 'Done' }));
     await p.locator('ul.notes-rows li').first().waitFor({ timeout: 2000 });
+  }
+  // with the tab bar at the top of a phone, the editor's top bar stays in view under it
+  if (phone) {
+    await p.evaluate(async () => { const m = await import('./js/ui-settings.js'); m.applyDisplay(m.setDisplay({ tabBar: 'top' })); });
+    await p.locator('ul.notes-rows li').first().click();
+    await p.locator('.note-view:not([hidden])').waitFor();
+    await p.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight)); await p.waitForTimeout(100);
+    const hit = await p.evaluate(() => { const r = document.querySelector('.note-editor .note-top').getBoundingClientRect(); const el = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return !!el?.closest('.note-top'); });
+    assert.ok(hit, 'the editor\'s top bar is hidden under the tab bar at the top');
+    await tap(p.getByRole('button', { name: 'Done' }));
+    await p.locator('ul.notes-rows li').first().waitFor({ timeout: 2000 });
+    await p.evaluate(async () => { const m = await import('./js/ui-settings.js'); m.applyDisplay(m.setDisplay({ tabBar: null })); });
   }
   console.log(`PASS note editor ${label(width)}`);
 
@@ -215,7 +262,7 @@ try { for (const width of [390, 1280]) {
   await p.locator(`ul.cases li[data-date="${c0.date}"]`).first().locator('.row-more').click();
   const link = p.locator('dialog[open]').getByRole('link', { name: 'Request an evaluation' });
   const href = await link.getAttribute('href');
-  assert.equal(href, `https://apmes.anawj.com/evals/?demo&date=${c0.date}&initials=${c0.initials}#new`);
+  assert.equal(href, `${origin}/evals/?demo&date=${c0.date}&initials=${c0.initials}#new`);   // this server's evals, not the live one
   assert.equal(await link.getAttribute('target'), '_blank');
   assert.ok(!href.includes(encodeURIComponent(c0.details.split(' ')[0])) || c0.details.split(' ')[0] === c0.initials, 'the case details went into the link');
   await link.click();
@@ -224,8 +271,20 @@ try { for (const width of [390, 1280]) {
   // the edit page has it too
   await p.locator(`ul.cases li[data-date="${c0.date}"]`).first().locator('.t').click();
   await p.locator('dialog[open]').getByText('Edit case', { exact: true }).waitFor();
-  assert.equal(await p.locator('dialog[open] .case-links').getByRole('link', { name: 'Request an evaluation' }).getAttribute('href'), href);
+  const editLink = p.locator('dialog[open] .case-links').getByRole('link', { name: 'Request an evaluation' });
+  assert.equal(await editLink.getAttribute('href'), href);
+  // a correction made in the dialog before Save goes with the link
+  await p.locator('dialog[open]').getByLabel('Patient initials').fill('XQ');
+  await editLink.click();
+  await p.waitForFunction(() => window.__opened.length === 2);
+  assert.equal(await p.evaluate(() => window.__opened[1]), `${origin}/evals/?demo&date=${c0.date}&initials=XQ#new`);
   await p.keyboard.press('Escape');
+  if (await p.locator('dialog[open]').count()) await p.keyboard.press('Escape');
+  // its group's reset says what it does
+  await p.goto(base + '?demo#showhide');
+  await p.locator('[data-group="apmes-extras"]').getByRole('button', { name: 'Reset this group' }).click();
+  await p.locator('dialog[open]').getByText('Turn off Request an evaluation?').waitFor();
+  await p.locator('dialog[open]').getByRole('button', { name: 'Cancel' }).click();
   console.log(`PASS request an evaluation ${label(width)}`);
 
   assert.deepEqual(errors, []); await ctx.close(); console.log(`PASS phone-ux ${label(width)}`);

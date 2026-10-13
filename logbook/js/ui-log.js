@@ -13,7 +13,7 @@ import { moveToBin } from './bin.js';
 import { caseHasNotes, openNotes, dayNoteBox } from './ui-notepad.js';
 import { createDraftSlot, listDrafts } from './drafts.js';
 import { SHARED_KEY, peekShared, popShared, sharedFiles, shareState } from './share-in.js';
-import { evalRequestUrl } from './eval-link.js';
+import { evalRequestUrl, evalsBase } from './eval-link.js';
 
 const DRAFT_KEY = 'logbook-draft-v2';
 const KEEP_MS = 12 * 3600e3; // a date kept by "Save, keep date" lasts this long
@@ -43,11 +43,28 @@ const firstField = () => (display().firstField === 'initials' ? 'initials' : 'de
 let gestureAt = 0;
 if (typeof window !== 'undefined') for (const ev of ['pointerup', 'keydown']) window.addEventListener(ev, () => { gestureAt = Date.now(); }, { capture: true, passive: true });
 const touchOnly = () => typeof matchMedia === 'function' && matchMedia('(hover: none) and (pointer: coarse)').matches;
+// The app's "Log a case" shortcut (./#quicklog, manifest.webmanifest) asks for the keyboard: it counts as the tap, once
+// (until the box gets focus or someone taps, at most 15 s while the app starts), and the address becomes #log
+let launchedAt = 0;
+const takeQuickLog = () => {
+  if (location.hash !== '#quicklog') return;
+  launchedAt = Date.now();
+  history.replaceState(history.state, '', location.pathname + location.search + '#log');
+};
+if (typeof window !== 'undefined') {
+  takeQuickLog();
+  window.addEventListener('hashchange', takeQuickLog, true);   // before app.js routes it (registered first)
+  for (const ev of ['pointerdown', 'keydown']) window.addEventListener(ev, () => { launchedAt = 0; }, { capture: true, passive: true });
+}
 export const wantFocus = () => {
   const a = display().autoFocus;
-  return a !== false && !document.documentElement.classList.contains('no-autofocus') && (a === true || !touchOnly() || Date.now() - gestureAt < 1500);
+  return a !== false && !document.documentElement.classList.contains('no-autofocus') && (a === true || !touchOnly() || Date.now() - gestureAt < 1500 || Date.now() - launchedAt < 15000);
 };
-export const focusLog = () => (draft.mode === 'bulk' ? ui?.textarea : firstField() === 'initials' ? ui.initials : ui.textarea)?.focus({ preventScroll: true });
+export const focusLog = () => {
+  const el = (draft.mode === 'bulk' ? ui?.textarea : firstField() === 'initials' ? ui.initials : ui.textarea);
+  el?.focus({ preventScroll: true });
+  if (el && document.activeElement === el) launchedAt = 0;
+};
 const suggestionKey = () => JSON.stringify([draftText(), curDate(), settings().detectAgeSex !== false]);
 const draftKey = () => `${DRAFT_KEY}:${cloud.demo ? 'demo:' : ''}${(S.user && S.user.email) || ''}`;
 function loadDraft() {
@@ -1013,6 +1030,8 @@ export function editCaseDialog(c, opts = {}) {
     oninput: ev => { e.details = ev.target.value; saveEditDraft(); grow(ev.target); } });
   requestAnimationFrame(() => grow(detailsBox));
   // links to what hangs off this case: its reflection and its notes (a draft of unsaved edits stays on this device)
+  const evalHref = () => evalRequestUrl({ date: e.date, initials: e.initials }, { today: todayISO(), demo: cloud.demo, base: evalsBase(location.href) });
+  const freshEval = ev => { ev.currentTarget.href = evalHref(); };
   const linksBlock = () => {
     const refl = (S.reflections || []).some(r => r.caseId === c.id), notes = caseHasNotes(c.id);
     return h('div', { class: 'case-links' }, h('div', { class: 'chiplabel' }, 'Linked'),
@@ -1021,8 +1040,9 @@ export function editCaseDialog(c, opts = {}) {
           refl ? 'Open the reflection' : 'Write a reflection'),
         h('button', { type: 'button', class: 'small', onclick: async () => { await m.close(); openNotes({ caseId: c.id, create: !notes }); } },
           notes ? 'Open the notes' : 'Write a note'),
-        // APMES → Request an evaluation (off by default): the case as saved (its date and initials only)
-        settings().evalRequest ? h('a', { class: 'btn small eval-req', href: evalRequestUrl({ date: c.date, initials: caseParts(c).initials }, { today: todayISO(), demo: cloud.demo }), target: '_blank', rel: 'noopener' }, 'Request an evaluation') : null));
+        // APMES → Request an evaluation (off by default): the date and initials as they stand in this dialog (only
+        // those), read again as the link is used, so a correction made before Save goes with it
+        settings().evalRequest ? h('a', { class: 'btn small eval-req', href: evalHref(), target: '_blank', rel: 'noopener', onpointerdown: freshEval, onfocus: freshEval, onclick: freshEval, oncontextmenu: freshEval }, 'Request an evaluation') : null));
   };
   const m = modal(isNew ? 'New case' : 'Edit case', [
     c.dateText && !c.date ? h('p', { class: 'tip' }, `Imported date “${c.dateText}” could not be read — please set the date.`) : null,

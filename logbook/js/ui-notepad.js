@@ -165,7 +165,7 @@ if (typeof window !== 'undefined') {
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushOpen(); });
 }
 // leaving the page (another tab, Back): save what is open
-export function leaveNotes() { if (nv.editing) { const n = nv.editing; persist(n); nv.editing = null; editorTransient?.close(); } }
+export function leaveNotes() { if (nv.editing) { const n = nv.editing; persist(n); nv.editing = null; dropEditorEntry(); } }
 
 // ---------- the page ----------
 
@@ -274,7 +274,23 @@ function newNote() {
   if (n.body) touchOpen();
 }
 
-let editorTransient = null;
+let editorTransient = null, editorClosing = null;
+function guardEditor() {
+  editorTransient = transients.open(() => {
+    // a step back that Done, Delete or leaving asked for: they saved and drew already, and a note opened since (a tap
+    // on the list before the browser took the step) stays open
+    const mid = !!editorClosing, open = !!nv.editing && !mid;
+    if (open) { persist(nv.editing); nv.editing = null; }
+    if (!nv.editing) nv.back = '';
+    if (open || (!nv.editing && !(page && page.el.isConnected))) hooks.render();
+  });
+}
+// take the editor's history entry away (Back's job done by the app); resolves once the browser has taken the step
+function dropEditorEntry() {
+  if (!editorTransient?.active) return Promise.resolve();
+  if (!editorClosing) editorClosing = editorTransient.close().finally(() => { editorClosing = null; });
+  return editorClosing;
+}
 // edit: open straight in Edit (a daily note), not Preview; back: the tab Done goes back to
 // own: n is already a live copy with its session (the Case tab's daily note box), edited as it is, so there's only ever
 // one copy of it open
@@ -284,12 +300,9 @@ function openEditor(n, fresh = false, { edit = false, back = '', own = false } =
   nv.editing = copy; nv.preview = !edit && !fresh && !!String(copy.body || '').trim(); nv.back = back;
   // Back (the phone's, the browser's) closes the editor; when Done already closed it and drew the list, nothing is
   // drawn again here (a second drawing a moment later could swallow the next tap)
-  if (!editorTransient?.active) editorTransient = transients.open(() => {
-    const open = !!nv.editing;
-    if (open) { persist(nv.editing); nv.editing = null; }
-    nv.back = '';
-    if (open || !(page && page.el.isConnected)) hooks.render();
-  });
+  // A note opened while Done's step back is still on its way gets its own entry once that step has landed
+  if (editorClosing) editorClosing.then(() => { if (nv.editing === copy && !editorTransient?.active) guardEditor(); });
+  else if (!editorTransient?.active) guardEditor();
   hooks.render();
   window.scrollTo(0, 0);
 }
@@ -302,7 +315,7 @@ async function closeEditor() {
   // update in between could leave the page half drawn); going back to the Logbook draws that instead
   const drawn = !back && S.tab === 'notes';
   if (drawn) hooks.render();
-  if (editorTransient?.active) await editorTransient.close(); else if (!drawn) hooks.render();
+  if (editorTransient?.active) await dropEditorEntry(); else if (!drawn) hooks.render();
   // a daily note opened from the Logbook goes back there (the Notes page was only passed through)
   if (back && S.tab === 'notes') history.back();
 }
@@ -454,6 +467,17 @@ function editor(n) {
     onkeydown: e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); if (nv.preview) modeBtn.click(); body.focus(); body.setSelectionRange(0, 0); } } });
   title.value = n.title || '';
   requestAnimationFrame(fitTitle);
+  // and again when its width changes (the phone turned, the window resized, a new text size), so no line is cut off;
+  // only on a width change, as fitting it changes its height
+  if (typeof ResizeObserver !== 'undefined') {
+    let w = 0;
+    const ro = new ResizeObserver(([e]) => {
+      if (!title.isConnected) return ro.disconnect();
+      const nw = Math.round(e.contentRect.width);
+      if (nw && nw !== w) { const first = !w; w = nw; if (!first) fitTitle(); }
+    });
+    ro.observe(title);
+  }
   const date = h('input', { type: 'date', 'aria-label': 'Note date', value: n.date || '', onchange: e => { n.date = e.target.value || null; touch(); paintMeta(); } });
   const body = h('textarea', { class: 'note-body', rows: '12', placeholder: 'Write your note… (- [ ] for a to-do)', 'aria-label': 'Note text', maxlength: String(LIMITS.body), spellcheck: 'true',
     oninput: e => { n.body = e.target.value; touch(); }, onblur: () => persist(n), onpaste: e => pasteClean(e, body) });
@@ -507,11 +531,11 @@ function editor(n) {
     closeMenu();
     const st = sessions.get(n);
     clearTimeout(st?.timer);
-    if (!st?.base) { nv.editing = null; editorTransient?.close(); hooks.render(); return; }   // never saved: nothing to bin
+    if (!st?.base) { nv.editing = null; dropEditorEntry(); hooks.render(); return; }   // never saved: nothing to bin
     await persist(n);
     try { const { moveToBin } = await import('./bin.js'); await moveToBin('note', { ...n }, { toast: true }); }
     catch (err) { return toast('Could not delete: ' + err.message); }
-    nv.editing = null; if (editorTransient?.active) editorTransient.close(); else hooks.render();
+    nv.editing = null; if (editorTransient?.active) dropEditorEntry(); else hooks.render();
   } }, 'Delete');
   // Clean up: tidy Markdown pasted earlier (stray \ escapes, double spaces, ** around nothing, broken bullets); Undo puts it back
   const tidy = h('button', { type: 'button', onclick: () => {

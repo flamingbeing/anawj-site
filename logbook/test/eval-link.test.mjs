@@ -1,6 +1,6 @@
 // Request an evaluation from a case (js/eval-link.js): only the date and initials go in the link, checked.
 import assert from 'node:assert/strict';
-import { evalRequestUrl, EVALS_URL } from '../js/eval-link.js';
+import { evalRequestUrl, evalsBase, EVALS_URL } from '../js/eval-link.js';
 
 const today = '2026-10-13';
 assert.equal(EVALS_URL, 'https://apmes.anawj.com/evals/');
@@ -25,5 +25,12 @@ assert.equal(u.hash, '#new');
 assert.equal(evalRequestUrl({ date: '2026-10-01', initials: 'AB' }, { today, demo: true }), EVALS_URL + '?demo&date=2026-10-01&initials=AB#new');
 // no today given: any real date
 assert.equal(evalRequestUrl({ date: '2030-01-01' }), EVALS_URL + '?date=2030-01-01#new');
+
+// the evals app beside this logbook: the live site, a PR preview, a local server; EVALS_URL with no address
+assert.equal(evalsBase('https://apmes.anawj.com/logbook/?demo#log'), 'https://apmes.anawj.com/evals/');
+assert.equal(evalsBase('https://pr-1.example.workers.dev/logbook/index.html'), 'https://pr-1.example.workers.dev/evals/');
+assert.equal(evalsBase('http://localhost:8212/logbook/'), 'http://localhost:8212/evals/');
+assert.equal(evalsBase(''), EVALS_URL);
+assert.equal(evalRequestUrl({ initials: 'AB' }, { base: evalsBase('http://localhost:8212/logbook/') }), 'http://localhost:8212/evals/?initials=AB#new');
 
 console.log('eval-link tests passed');

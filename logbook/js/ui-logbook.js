@@ -19,7 +19,7 @@ import { moveToBin } from './bin.js';
 import { destinations, openSend } from './ui-send.js';
 import { shareText, copyText, caseText as shareCaseText, dayTextWithNotes } from './share.js';
 import { cloud } from './ui-core.js';
-import { evalRequestUrl } from './eval-link.js';
+import { evalRequestUrl, evalsBase } from './eval-link.js';
 
 // has: tags a case must all have; not: tags it must have none of ('c:16' or a personal tag key); from/to: dates
 const FRESH = () => ({ q: '', has: [], not: [], from: '', to: '', flag: '', mode: null, limit: 150, month: null, day: null });
@@ -335,7 +335,7 @@ function openRowMenu(c) {
     destinations().length ? h('button', { onclick: () => { m.close(); openSend({ text: shareCaseText(c), title: c.date || 'Case' }); } }, rowIcon('copy'), ' Send to…') : null,
     basicHides('reflect') ? null : h('button', { class: has ? 'has-refl' : '', onclick: () => { m.close(); reflectOnCase(c); } }, rowIcon(has ? 'done' : 'reflect'), has ? ' Open the reflection' : ' Write a reflection'),
     // APMES → Request an evaluation (off by default): the evaluations app, with this case's date and initials
-    settings().evalRequest ? h('a', { class: 'btn eval-req', href: evalRequestUrl({ date: c.date, initials: caseParts(c).initials }, { today: todayISO(), demo: cloud.demo }), target: '_blank', rel: 'noopener', onclick: () => m.close() }, rowIcon('reflect'), ' Request an evaluation') : null,
+    settings().evalRequest ? h('a', { class: 'btn eval-req', href: evalRequestUrl({ date: c.date, initials: caseParts(c).initials }, { today: todayISO(), demo: cloud.demo, base: evalsBase(location.href) }), target: '_blank', rel: 'noopener', onclick: () => m.close() }, rowIcon('reflect'), ' Request an evaluation') : null,
     h('button', { onclick: () => { m.close(); editCaseDialog(c); } }, ' Edit the case'),
     h('button', { class: 'linkish', onclick: () => m.close() }, 'Cancel')));
 }
