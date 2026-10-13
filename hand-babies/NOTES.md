@@ -17,9 +17,9 @@ Lasting decisions for `hand-babies/`. Status and next steps: `STATUS.md`.
 
 ## Updates (offline worker)
 
-A new version activates itself once it has cached the page (`skipWaiting` in install); the page then shows "Update
-available: tap to reload", which only reloads. Don't go back to waiting for a tap to activate: on a phone the tap did
-nothing (12 Oct 2026). Bump `VERSION` in `sw.js` whenever a SHELL file changes.
+Network first: online, every visit gets the current files; the cache is only used offline or when the network takes
+over 3 s. No "Update available" bar (owner, 13 Oct 2026: "why is this still here"). A new version still activates
+itself (`skipWaiting` in install); never go back to waiting for a tap (on a phone the tap did nothing, 12 Oct 2026). Bump `VERSION` in `sw.js` whenever a SHELL file changes.
 
 ## Content rules
 
