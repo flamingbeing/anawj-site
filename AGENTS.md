@@ -71,6 +71,7 @@ for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mj
   (`prewarm/test/e2e.mjs`, `edge.e2e.mjs`, `fullcase.e2e.mjs`) side by side in about 1½ minutes (see `prewarm/README.md`).
 - Hand assessment changes: run `node hand-babies/test/e2e.mjs` (see `hand-babies/README.md`).
 - Page editor changes (`edit/`): run `node edit/test/e2e.mjs` and `node hand-babies/test/e2e.mjs` (it opens the editor).
+- Feedback button or Worker changes (`feedback/`, `worker/`): run `node feedback/test/e2e.mjs` (through the real Worker).
 
 ## Working with the owner
 
