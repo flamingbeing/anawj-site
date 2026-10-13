@@ -189,6 +189,8 @@ const ICON_PATHS = {
   logbook: 'M4 5h16M4 10h16M4 15h16M4 20h10',   // the tab bar's
   notes: 'M6 3h9l4 4v14H6zM14 3v5h5M9 12h7M9 16h5',
   search: 'M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM20 20l-4-4',
+  share: 'M12 3v12M8 7l4-4 4 4M5 11v9h14v-9',   // a box with an arrow out of it
+  filter: 'M4 6h16M7 12h10M10 18h4',
 };
 const svgIcon = (k, cls) => {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -198,6 +200,9 @@ const svgIcon = (k, cls) => {
 };
 export const rowIcon = k => svgIcon(k, 'ico');
 export const ic = k => svgIcon(k, 'ico i');
+// a common button's contents: its icon (shown only with Advanced display → Icons instead of words, html.icon-btns)
+// and its word (then kept for screen readers only); the button gets class ib and a title
+export const ib = (k, word) => [svgIcon(k, 'ico i ib-ico'), h('span', { class: 'ib-l' }, word)];
 // Show or hide a panel (Filter, its Dates / Tags / More folds) by growing or shrinking it, like a fold; with
 // Reduce motion (Accessibility) it just appears. el.hidden is set at once when showing, after the shrink when hiding.
 const motionOff = () => { const c = document.documentElement.classList; return c.contains('rm') || (c.contains('rm-auto') && matchMedia('(prefers-reduced-motion: reduce)').matches); };

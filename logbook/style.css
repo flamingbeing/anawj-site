@@ -1001,12 +1001,12 @@ details.refl-foot { margin: 4px 4px 12px; }
 /* ---------- colour: one accent (Settings → Display → Colour); colors.js writes the palettes into a
    <style id="accent-css"> (cached for the first paint). OLED black is data-oled on top of dark. ---------- */
 :root[data-theme="dark"][data-oled] section.card, :root[data-theme="dark"][data-oled] dialog, :root[data-theme="dark"][data-oled] .savebar { border: 1px solid var(--edge, var(--line)); }
-/* the colour picker: suggested swatches, then any colour */
-.accent-pick { display: flex; flex-wrap: wrap; gap: 10px; margin: 6px 0 4px; }
-.accent-pick .swatch { position: relative; width: 44px; height: 44px; min-height: 44px; padding: 0; border-radius: 50%; border: 2px solid var(--edge, var(--line)); background: var(--sw, var(--panel)); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
-.accent-pick .swatch[aria-pressed="true"], .accent-pick .swatch.on { box-shadow: 0 0 0 3px var(--panel), 0 0 0 5px var(--ink); border-color: transparent; }
-.accent-pick .swatch.custom { background: var(--sw, conic-gradient(#e4002b, #e57200, #d4a72c, #2da44e, #00a9e0, #6d4fc2, #c2417a, #e4002b)); color: #fff; font-size: calc(22px * var(--fs, 1)); font-weight: 700; text-shadow: 0 1px 2px rgba(0,0,0,.5); }
-.accent-pick .swatch.custom input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; border: 0; padding: 0; cursor: pointer; }
+/* the colour picker: the device's own, as a wide colour well */
+.accent-pick { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 6px 0 4px; }
+.accent-pick .accent-input { width: 120px; height: 44px; padding: 3px; border: 1px solid var(--edge, var(--line)); border-radius: calc(10px * var(--round, 1)); background: var(--panel); cursor: pointer; }
+.accent-pick .accent-input::-webkit-color-swatch-wrapper { padding: 0; }
+.accent-pick .accent-input::-webkit-color-swatch { border: 0; border-radius: calc(7px * var(--round, 1)); }
+.accent-pick .accent-input::-moz-color-swatch { border: 0; border-radius: calc(7px * var(--round, 1)); }
 .accent-pick .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 .install-steps { margin: 4px 0 8px; padding-left: 20px; line-height: calc(1.6 * var(--lh, 1)); }
 /* Analytics at a glance (folded Logbook / Reflections cards) */
@@ -1421,3 +1421,47 @@ ul.cases .c-tags { -webkit-mask-image: linear-gradient(to right, #000 calc(100% 
 .pick-opt:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }
 .pick-opt:active { background: color-mix(in srgb, var(--ink) 6%, transparent); }
 body.compact .pick-opt { min-height: 40px; padding: 4px 10px; }
+
+/* ---------- polish 6b: the seven Clean looks (each off by default, Advanced display / Accessibility) ---------- */
+/* Borders → Flat: no lines and no page cards; the page takes the cards' colour */
+html.flat body { background: var(--panel); }
+html.flat :is(section.card, details.card) { background: transparent; border-color: transparent; box-shadow: none; padding-inline: 4px; margin-bottom: 4px; }
+html.flat .tabs, html.flat header.top { box-shadow: none; }
+/* Button style: the buttons that aren't the main one */
+html:is(.btn-filled, .btn-tinted, .btn-plain) :is(main, dialog) :is(button, .btn):not(.primary):not(.link):not(.linkish):not(.chip):not(.search-x):not(.lb-day):not(.info-btn):not(.flag):not(.swatch):not(.demo-flag):not(.grid-cats):not(.danger) { border-color: transparent; }
+html.btn-filled :is(main, dialog) :is(button, .btn):not(.primary):not(.link):not(.linkish):not(.chip):not(.search-x):not(.lb-day):not(.info-btn):not(.flag):not(.swatch):not(.demo-flag):not(.grid-cats) { background: color-mix(in srgb, var(--ink) 8%, var(--panel)); }
+html.btn-tinted :is(main, dialog) :is(button, .btn):not(.primary):not(.link):not(.linkish):not(.chip):not(.search-x):not(.lb-day):not(.info-btn):not(.flag):not(.swatch):not(.demo-flag):not(.grid-cats) { background: var(--accent-soft); color: var(--accent); }
+html.btn-plain :is(main, dialog) :is(button, .btn):not(.primary):not(.link):not(.linkish):not(.chip):not(.search-x):not(.lb-day):not(.info-btn):not(.flag):not(.swatch):not(.demo-flag):not(.grid-cats) { background: transparent; color: var(--accent); }
+/* Icons instead of words: common buttons (class ib) show their icon and keep the word for screen readers */
+.ib .ib-ico, .ib .ib-n { display: none; }
+html.icon-btns .ib .ib-n { display: inline; font-weight: 700; }
+html.icon-btns .ib .ib-ico { display: inline-block; width: 18px; height: 18px; margin: 0; }
+html.icon-btns .ib .ib-l { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+html.icon-btns .ib:has(.ib-l) { position: relative; min-width: 40px; gap: 2px; }
+html.icon-btns .lb-daybtns > button.ib { flex: 0 0 auto; }
+/* Plain calendar: numbers, no tiles; today an accent circle, the picked day a dark one, the count under it */
+html.cal-plain .lb-cal { gap: 2px 0; }
+html.cal-plain .lb-day { border: 0; background: none; min-height: 52px; padding: 2px 0; }
+html.cal-plain .lb-day.sel { outline: 0; }
+html.cal-plain .lb-day .n { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 50%; font-size: calc(15px * var(--fs, 1)); line-height: 1; color: var(--ink); font-weight: 500; }
+html.cal-plain .lb-day.today .n { background: var(--accent); color: var(--accent-ink); font-weight: 700; }
+html.cal-plain .lb-day.sel .n { background: var(--ink); color: var(--panel); font-weight: 700; }
+html.cal-plain .lb-day.today.sel .n { box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--accent); }
+html.cal-plain .lb-day .lb-count, html.cal-plain .lb-day:is(.t2, .t3, .t4) .lb-count { background: none; color: var(--muted); font-weight: 600; padding: 0; min-width: 0; }
+html.cal-plain .lb-day:is(.t3, .t4) .lb-count { color: var(--accent); }
+html.cal-plain .lb-day:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+/* Shorter Logbook rows: initials and case in bold on one line, the short date at the right, tags one grey line, no buttons */
+html.rows-short ul.cases li:not(.monthhead):not(.refl-row) { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "ini t dt" "c c c"; gap: 2px 6px; align-items: baseline; padding-top: 8px; padding-bottom: 8px; }
+html.rows-short ul.cases li:not(.monthhead):not(.refl-row) .d { display: contents; }
+html.rows-short ul.cases li:not(.monthhead):not(.refl-row) .ini { grid-area: ini; display: inline; font-size: inherit; }
+html.rows-short ul.cases li:not(.monthhead):not(.refl-row) .dt { grid-area: dt; font-size: calc(13px * var(--fs, 1)); color: var(--muted); }
+html.rows-short ul.cases li:not(.monthhead):not(.refl-row) .dt .wd { display: none; }
+html.rows-short ul.cases li:not(.monthhead):not(.refl-row) .t { grid-area: t; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html.rows-short ul.cases li:not(.monthhead):not(.refl-row) .c { grid-area: c; grid-column: 1 / -1; }
+html.rows-short ul.cases li:not(.monthhead):not(.refl-row) .c-tags { padding-top: 0; gap: 0 6px; }
+html.rows-short ul.cases li:not(.monthhead):not(.refl-row) .acts { display: none; }
+html.rows-short ul.cases li:not(.monthhead):not(.refl-row) .lb-tags { gap: 0; flex-wrap: nowrap; }
+html.rows-short ul.cases li:not(.monthhead):not(.refl-row) .lb-tag { background: none; box-shadow: none; padding: 0; color: var(--muted); font-size: calc(13px * var(--fs, 1)); overflow: visible; }
+html.rows-short ul.cases li:not(.monthhead):not(.refl-row) .lb-tag + .lb-tag::before { content: '·'; margin: 0 5px; }
+/* Press and hold: no text selection or iOS callout on the rows */
+html.row-hold ul.cases li:not(.monthhead) { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
