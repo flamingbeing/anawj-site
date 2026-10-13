@@ -608,6 +608,16 @@ portfolio content.
 - New JS files go in `sw.js` SHELL. No hand bump of `VERSION` (13 Oct 2026): the deploy stamps it with a hash of the
   SHELL files (`tools/stamp-versions.mjs`), so installed phones update whenever those files change. Change the base
   (`logbook-v40`) only when the service worker's own logic changes.
+- Start-up speed (13 Oct 2026): only the Case tab's modules load with the app (`index.html` modulepreloads exactly
+  those); every other page's module loads the first time it opens, then the rest in idle moments (`app.js`, "pages
+  that load on first use": `MODS`, `page()`, `warmUp()`). So: the Case-tab modules (`ui-log.js`, `ui-notepad.js`,
+  `ui-core.js`, `cloud.js` and what they import) must not import a page module statically. Device display settings
+  live in `display.js`, the settings rows in `settings-rows.js` and More's cards in `more-cards.js` (ui-settings.js
+  re-exports them); sync's device wipe in `sync-forget.js` (sign-out works before the Sync code loads); the field
+  whitelists in `clean.js` (the demo backend loads only in `?demo`, the Firebase SDK only outside it). A new page:
+  `page(['mod'], m => m.mod.renderX())` in TABS. `#app[data-page]` names the page once drawn (tests wait on it).
+  `logbook/test/e2e/lazy-load.mjs` checks the Case tab's modules, every page, and every page offline with the
+  service worker.
 - Rules: `logbook/firestore.rules` deploys on merge. Emulator: copy rules and
   `logbook/test/rules.emulator.mjs` + `evals/test/rules.emulator.mjs` into a folder with firebase-tools, then
   `firebase emulators:exec --only firestore --project demo-logbook "node logbook/test/rules.emulator.mjs; node evals/test/rules.emulator.mjs"`.

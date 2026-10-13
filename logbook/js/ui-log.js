@@ -8,7 +8,7 @@ import { apmesShorthand, shorthandTags } from './tags.js';
 import {
   S, h, ic, toast, debounce, modal, confirmBox, cat, catName, catShort, catFull, catChip, countText, logTags, tagLinks, tagName, tagChip, tagSet, keepTags, PROGRESS_BY_CODE,
   createCase, updateCase, removeCase, restoreCase, saveMany, deleteMany, subcatChips, subcatsOf, settings, todayISO, hooks, fill, add, cloud, writes, okNoIds, patchLogbook, catPills, basicHides, basicMode, caseShown } from './ui-core.js';
-import { display, templateDialog } from './ui-settings.js';
+import { display } from './display.js';
 import { moveToBin } from './bin.js';
 import { caseHasNotes, openNotes, dayNoteBox } from './ui-notepad.js';
 import { createDraftSlot, listDrafts } from './drafts.js';
@@ -724,7 +724,7 @@ function paintSel() {
   fill(ui.groupSave,
     // a combination worth keeping: one tap to make it a template (no trip to Settings)
     draft.cats.length >= 2 && !((S.logbook && S.logbook.templates) || []).some(t => sortCodes(t.cats).join() === sortCodes(draft.cats).join())
-      ? h('button', { type: 'button', class: 'small linkish', onclick: () => templateDialog({ id: uid(), name: '', cats: [...draft.cats], details: '' }, async out => {
+      ? h('button', { type: 'button', class: 'small linkish', onclick: async () => (await import('./ui-settings.js')).templateDialog({ id: uid(), name: '', cats: [...draft.cats], details: '' }, async out => {
         await patchLogbook({ templates: [...((S.logbook && S.logbook.templates) || []), out] });
         toast(`Tag group “${out.name}” saved`); paintQuick(); paintSel();
       }, 'Save as tag group') }, 'Save these tags as a tag group') : null);

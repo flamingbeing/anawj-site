@@ -15,7 +15,8 @@ try { for (const width of [390, 1280]) {
   p.on('pageerror', e => errors.push(e.message)); p.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
   const st = () => p.evaluate(async () => (await import('./js/ui-core.js')).settings());
   const tabs = () => p.locator('[role=tab]').evaluateAll(t => t.map(x => x.dataset.tab));
-  const goHash = h => p.evaluate(x => { location.hash = '#' + x; }, h);
+  // (and wait until that page is drawn: most pages' code loads on first use)
+  const goHash = h => p.evaluate(x => { location.hash = '#' + x; }, h).then(() => p.waitForFunction(x => document.getElementById('app').dataset.page === x, h));
   const group = name => p.locator(`.showhide [data-group=${name}]`);
   const now = () => p.locator('.profile-now').innerText();
   await p.goto(base + '?demo#log'); await p.waitForSelector('textarea.details');

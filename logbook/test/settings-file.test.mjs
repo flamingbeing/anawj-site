@@ -77,7 +77,7 @@ assert.equal(readSettingsFile(JSON.stringify(settingsFile({settings:{compactTags
 // every device display key survives a settings file (custom CSS stays out on purpose: never in a file to share)
 {
   const { readFileSync } = await import('node:fs');
-  const src = readFileSync(new URL('../js/ui-settings.js', import.meta.url), 'utf8');
+  const src = readFileSync(new URL('../js/display.js', import.meta.url), 'utf8');
   const keys = JSON.parse(src.match(/export const DISPLAY_KEYS = (\[[^\]]*\])/)[1].replace(/'/g, '"')).filter(k => !/^customCss/.test(k));
   const sample = v => (['tabOrder', 'tabHidden'].includes(v) ? ['log'] : v === 'accent' ? '#123456' : true);
   const got = readSettingsFile(JSON.stringify({ kind: SETTINGS_KIND, settings: Object.fromEntries(keys.map(k => [k, sample(k)])) })).settings;

@@ -527,6 +527,21 @@ export const scheduleSummary = debounce(writeSummaryNow, 4000);
 // demo only: the e2e test writes the summary now instead of waiting the 4 s
 if (cloud.demo && typeof window !== 'undefined') window.__logbookTest = { flushSummary: () => { scheduleSummary.cancel(); return writeSummaryNow(); } };
 
+// Live reflections for the signed-in user (app.js calls this after sign-in). Here rather than in ui-reflect.js, so the
+// Reflections page's code loads only when opened; it says when it's busy editing (hooks.reflectBusy), not to redraw then.
+export function watchMyReflections(email) {
+  S.reflections = []; S.reflectionsSynced = false;
+  let raw = [];
+  const paint = () => {
+    if (S.user?.email !== email) return;
+    S.reflections = writes.overlay('reflection', email, raw);
+    scheduleSummary();
+    if ((S.tab === 'reflect' && !hooks.reflectBusy?.()) || S.tab === 'export' || S.tab === 'choose') hooks.render();
+  };
+  const offQueue = writes.onChange(paint);
+  const offCloud = cloud.watchReflections(email, (list, meta = {}) => { raw = list; if (!meta.fromCache) S.reflectionsSynced = true; paint(); });
+  return () => { offQueue(); offCloud(); };
+}
 // Sign-out: forget per-user caches held by the screens (each registers its own reset).
 export const resetters = [() => { lastSummary = ''; scheduleSummary.cancel(); }];
 export const resetCaches = () => resetters.forEach(f => f());

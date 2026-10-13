@@ -3,7 +3,7 @@
 // account or share a setup with a colleague. Never cases, reflections or portfolio details. Pure, tested.
 
 import { cleanTagSet } from './tags.js';
-import { cleanTemplate } from './demo-backend.js';
+import { cleanTemplate } from './clean.js';
 import { cleanFormat } from './share-format.js';
 import { storedMarkdown } from './markdown.js';
 import { cleanExportOpts } from './export-opts.js';
