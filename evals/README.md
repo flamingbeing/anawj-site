@@ -51,6 +51,8 @@ for f in evals/test/*.test.mjs; do node "$f"; done
 # end-to-end demo loop (Playwright + Chromium; a global install works)
 npx http-server . -p 8110 -s -c-1 &
 node evals/test/e2e.spec.mjs        # BASE, PW_PATH, CHROMIUM env vars override the defaults
+node evals/test/edge.e2e.mjs        # old-address forward, sign-out clears drafts, dark theme, assessor sign-in page
+node evals/test/a11y.mjs            # accessibility (axe, WCAG 2.2 AA), light and dark: run after UI changes
 ```
 
 The e2e script drives one browser context across roles: a resident requests a DOPS, the assessor

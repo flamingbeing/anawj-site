@@ -609,7 +609,7 @@ body { background: var(--e-bg-group); }
 .e-next__go .e-ico { width: 16px; height: 16px; }
 .e-cg-tools { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 8px; }
 .e-cg-tools > div { min-width: 140px; flex: 1; }
-.e-cg-last { white-space: nowrap; font-size: var(--n-text-sm); color: var(--n-muted); }
+.e-cg-last { white-space: nowrap; font-size: var(--n-text-sm); color: var(--n-ink); }
 .e-flaggroup { border-top: 1px solid var(--n-line); }
 .e-flaggroup > summary { padding: 12px 16px; cursor: pointer; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
 .e-flaggroup > summary .e-flag-why { flex-basis: 100%; }
