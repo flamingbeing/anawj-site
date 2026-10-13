@@ -205,6 +205,9 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
 - Live checks (13 Oct) also catch: a double-covered room with no junior (error, Fill), a senior in 3+ rooms (error),
   someone senior in one room and junior in another, and an admin-day or elsewhere person on a list (warnings). The
   Baby MO, premed cap and complex-list problems now have fix or Show buttons.
+- Monthly rosters: an Excel file is read from the first sheet that looks like a roster; an import says which expected
+  columns weren't found (a renamed heading) and goes on the Undo list, as does Clear (no "are you sure?"). A name that
+  matches several people says who it could be in its tooltip.
 - Keep building elements with `h()` and `textContent`; there is no `innerHTML` anywhere, so imported text can't inject.
 
 ## Code map
