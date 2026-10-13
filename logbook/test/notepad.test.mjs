@@ -178,6 +178,15 @@ assert.equal(exportNotes({ cases, notes, opts: { notes: false, progress: false }
   assert.equal(mergeDayNote({ ...base }, base, null).body, 'Fake start');
   // a short line added here is kept even when its letters appear in the other copy
   assert.equal(mergeDayNote({ ...base, body: 'Fake start\nok' }, base, { ...remote, body: 'Fake start book' }).body, 'Fake start book\n\nok');
+  // a ticked to-do here and a line added there: both (not the whole note twice)
+  const tb = { ...remote, body: 'Plan\n- [ ] call ICU' };
+  assert.equal(mergeDayNote({ ...tb, body: 'Plan\n- [x] call ICU' }, tb, { ...tb, body: 'Plan\n- [ ] call ICU\n- review bloods' }).body, 'Plan\n- [x] call ICU\n- review bloods');
+  // a line deleted here stays deleted
+  const db = { ...remote, body: 'A\nB\nC' };
+  assert.equal(mergeDayNote({ ...db, body: 'A\nC' }, db, { ...db, body: 'A\nB\nC\nD' }).body, 'A\nC\nD');
+  // a new line that matches an older line elsewhere is still new
+  const rb = { ...remote, body: 'List A\nDone\nList B' };
+  assert.equal(mergeDayNote({ ...rb, body: 'List A\nDone\nList B\nDone' }, rb, { ...rb, body: 'List A\nDone\nList B\nX' }).body, 'List A\nDone\nList B\nX\n\nDone');
 }
 
 // *italic*: shown in italics; a lone star (2*3, a * b) stays as typed

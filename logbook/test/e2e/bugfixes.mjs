@@ -103,6 +103,83 @@ try { for (const width of [390, 1280]) {
   await apmes.getByRole('switch', { name: 'Counts against the APMES targets' }).check();
   await p.waitForFunction(() => !document.querySelector('.showhide [data-group=apmes]').textContent.includes('Shows only with Counts'));
 
+  // ======== round 2 ========
+  // ---- a daily-note conflict that arrives after the note was closed is merged; later saves aren't stuck ----
+  await p.evaluate(async () => {
+    const { writes, cloud, S } = await import('./js/ui-core.js'), np = await import('./js/ui-notepad.js');
+    await np.ensureNotes();
+    const me = S.user.email, id = 'day-2025-01-05';
+    const first = await writes.save('note', me, { id, date: '2025-01-05', title: '', body: 'Phone line 1', createdAt: 1 }, null);
+    for (let i = 0; i < 60 && writes.status('note', id) !== 'synced'; i++) await new Promise(r => setTimeout(r, 50));
+    await cloud.commitRecord(me, 'note', { ...first, body: 'Phone line 1\n\nLaptop line' }, first);   // another device
+    // a slow connection: the save is accepted, and its conflict comes after the note was closed
+    writes.configure({ backend: async (...a) => { await new Promise(r => setTimeout(r, 600)); return cloud.commitRecord(...a); } });
+    await writes.save('note', me, { ...first, body: 'Phone line 1\nPhone line 2' }, first);
+    setTimeout(() => writes.configure({ backend: cloud.commitRecord }), 700);
+  });
+  const dayNote = () => p.evaluate(async () => {
+    const { S, writes } = await import('./js/ui-core.js');
+    return { body: (S.notes || []).find(n => n.id === 'day-2025-01-05')?.body || '', stuck: writes.entries().filter(x => x.record.id === 'day-2025-01-05' && (x.state === 'conflict' || x.state === 'pending')).length };
+  });
+  await poll(async () => { const d = await dayNote(); return /Laptop line/.test(d.body) && /Phone line 2/.test(d.body) && !d.stuck; }, 'the closed daily note merged: ' + JSON.stringify(await dayNote()));
+
+  // ---- shared text longer than a note: New note takes what fits, the rest waits in the inbox ----
+  await p.evaluate(async () => { (await import('./js/share-in.js')).keepShared(Array.from({ length: 3000 }, (_, i) => 'Fake shared line ' + i).join('\n'), 1); });
+  await goHash('share');
+  await p.getByRole('button', { name: 'New note', exact: true }).click();
+  await p.waitForSelector('textarea.note-body');
+  const noteBody = await p.locator('textarea.note-body').inputValue();
+  const leftOver = await p.evaluate(async () => (await import('./js/share-in.js')).peekShared());
+  assert.ok(noteBody.length <= 20000 && noteBody.length > 15000, 'the note holds what fits: ' + noteBody.length);
+  assert.ok(leftOver.startsWith('Fake shared line ') && (noteBody + '\n' + leftOver).endsWith('Fake shared line 2999'), 'the rest is kept');
+  assert.equal(noteBody.split('\n').length + leftOver.split('\n').length, 3000, 'no line lost');
+  await p.getByRole('button', { name: 'Done', exact: true }).click();
+  await p.evaluate(async () => { (await import('./js/share-in.js')).popShared(); });
+
+  // ---- paste a list: text added after Review is never saved with the old rows, nor wiped ----
+  await goHash('log'); await p.waitForSelector('textarea.details');
+  await p.locator('.datebar button[data-mode="bulk"]').click();
+  const bulkBox = p.locator('textarea.details');
+  await bulkBox.fill('AB 30F\nLSCS spinal');
+  await p.getByRole('button', { name: 'Review', exact: true }).click();
+  await p.waitForSelector('table.bulk');
+  await bulkBox.fill('AB 30F\nLSCS spinal\n\nZZ 40M\nlap chole GA ETT');
+  await p.getByText('The list has changed: tap Review again.').waitFor();
+  assert.equal(await p.locator('table.bulk').count(), 0, 'the stale rows are gone');
+  await p.getByRole('button', { name: 'Review', exact: true }).click();
+  await p.getByRole('button', { name: 'Save all 2' }).click();
+  const anyway = p.locator('dialog[open] button', { hasText: 'Save all' });
+  if (await anyway.count()) await anyway.click();
+  await poll(() => p.evaluate(async () => (await import('./js/ui-core.js')).S.cases.some(c => /^ZZ/i.test(c.initials || '') || /lap chole GA ETT/.test(c.details))), 'ZZ saved');
+  await p.locator('.datebar button[data-mode="one"]').click();
+
+  // ---- auto-ticked tags cleared and put back keep following the text ----
+  await p.evaluate(async () => { const { patchLogbook } = await import('./js/ui-core.js'); await patchLogbook({ settings: { autoTick: true } }); });
+  const caseBox = p.locator('textarea.details');
+  const picked = () => p.locator('.savebar .selected .chip[data-code], .selected .chip[data-code]').evaluateAll(els => [...new Set(els.map(e => e.dataset.code))]);
+  await caseBox.fill('AB 30F LSCS spinal');
+  await poll(async () => (await picked()).length >= 2, 'auto-ticked');
+  const auto = await picked();
+  await p.getByRole('button', { name: 'Clear all tags' }).click();
+  await p.getByRole('button', { name: 'Undo' }).last().click();
+  await poll(async () => (await picked()).length === auto.length, 'put back');
+  await caseBox.fill('AB 72M TKR adductor canal block');
+  await p.waitForTimeout(600);
+  assert.deepEqual((await picked()).filter(c => auto.includes(c)), [], 'the LSCS ticks followed the text away');
+  await caseBox.fill('');
+  await p.evaluate(async () => { const { patchLogbook } = await import('./js/ui-core.js'); await patchLogbook({ settings: { autoTick: null } }); });
+
+  // ---- Separate initials box, left empty: a first word stays in the details ----
+  await p.evaluate(async () => { const { setDisplay, applyDisplay } = await import('./js/ui-settings.js'); applyDisplay(setDisplay({ firstField: 'initials' })); });
+  await p.reload(); await p.waitForSelector('textarea.details');
+  await p.locator('textarea.details').fill('Mum declined epidural, LSCS GA');
+  await p.waitForTimeout(1200);
+  await p.reload(); await p.waitForSelector('textarea.details');
+  assert.equal(await p.getByLabel('Patient initials', { exact: true }).inputValue(), '');
+  assert.equal(await p.locator('textarea.details').inputValue(), 'Mum declined epidural, LSCS GA');
+  await p.locator('textarea.details').fill('');
+  await p.evaluate(async () => { const { setDisplay, applyDisplay } = await import('./js/ui-settings.js'); applyDisplay(setDisplay({ firstField: null })); });
+
   assert.deepEqual(errors, [], 'console errors');
   await ctx.close();
   console.log(`PASS bug fixes ${width < 600 ? 'phone' : 'desktop'}`);

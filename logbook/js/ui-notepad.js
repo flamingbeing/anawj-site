@@ -18,7 +18,7 @@ import { uid, fmtDate, caseParts } from './engine.js';
 import { barTabs, arrangeTabs, display, setDisplay, setTabOnBar, toggle, help, resetLink } from './ui-settings.js';
 import { MAX_NOTES, INDEX_CAP, LIMITS, indexCapped, sortNotes, filterNotes, noteTitle, noteIndex, cleanNoteIndex, sameIndex, parseNote, toggleCheck, plainLines, noteFiles, dayNoteId, dayNoteOf, isDayNote, cappedNotes, mergeDayNote, cleanNote } from './notepad.js';
 import { recordSignature } from './recovery-store.js';
-import { popShared } from './share-in.js';
+import { popShared, keepShared, sharedFiles } from './share-in.js';
 import { fmtBar, replaceRange } from './fmt-bar.js';
 import { htmlToMarkdown, tidyMarkdown } from './paste-clean.js';
 
@@ -67,15 +67,37 @@ const serverNotes = ms => Promise.race([serverIn || Promise.resolve(), new Promi
 function stopNotes() { if (stop) stop(); stop = null; owner = null; raw = []; ready = null; readyResolve = null; serverIn = null; serverResolve = null; S.notes = null; }
 resetters.push(() => { stopNotes(); Object.assign(nv, NV0()); inline = null; });
 writes.onChange(() => { if (owner) { apply(); if (synced) syncIndex(); } healDayNotes(); });
-// a conflict found after the save had already been accepted (a slow connection): merge it the same way
+// a conflict found after the save had already been accepted (a slow connection): merge it the same way, also when
+// the note is no longer open (typed, Done, then the answer came): otherwise the other copy shows, the lines typed
+// here are only in Recent changes, and every later save of that note waits behind the conflict
+const healing = new Set();
 function healDayNotes() {
   const me = mine();
+  const open = new Set();
   for (const n of [nv.editing, inline && inline.note]) {
     const s = n && isDayNote(n) && sessions.get(n);
-    if (!s || s.saving || s.merging || s.owner !== me || !dayConflict(n)) continue;
+    if (!s || s.owner !== me) continue;
+    open.add(n.id);
+    if (s.saving || s.merging || !dayConflict(n)) continue;
     s.saving = mergeDaySave(n, s, me).then(ok => { if (ok) s.status?.(s.dirty ? 'Not saved yet' : 'Saved'); return !!ok; },
       err => { s.dirty = true; s.status?.('Not saved: ' + err.message); return false; }).finally(() => { s.saving = null; });
   }
+  if (!me) return;
+  for (const job of writes.entries()) {
+    const id = job.record && job.record.id;
+    if (job.kind !== 'note' || job.state !== 'conflict' || job.owner !== me || !isDayNote(job.record) || open.has(id) || healing.has(id)) continue;
+    healing.add(id);
+    healClosed(job, me).catch(e => console.error('Daily note not merged', e)).finally(() => healing.delete(id));
+  }
+}
+async function healClosed(job, me) {
+  // this device's newest copy (saves made after the conflict wait behind it), merged against the base its first
+  // unsynced save started from
+  const group = writes.entries().filter(x => x.kind === 'note' && x.record.id === job.record.id && (x.state === 'pending' || x.state === 'conflict'));
+  const local = group[0] ? group[0].record : job.record, first = group.at(-1) || job;
+  const base = 'base' in first ? first.base : null;
+  await writes.archive(job.key);
+  await writes.save('note', me, mergeDayNote(local, base, job.remote), job.remote || null);
 }
 // the notes as the server has them (not a possibly stale offline copy), for anything that must not miss one (Sync)
 export async function notesFromServer(ms = 30e3) {
@@ -196,7 +218,7 @@ async function persist(n) {
   s.status?.('Saving…');
   s.saving = writes.save('note', me, payload, s.base).then(saved => { s.base = clone(saved); return true; })
     .catch(async err => { if (isDayNote(n) && await mergeDaySave(n, s, me)) return true; throw err; })
-    .then(() => { s.status?.(s.dirty ? 'Not saved yet' : 'Saved'); return true; },
+    .then(() => { s.status?.(s.dirty || dayConflict(n) ? 'Not saved yet' : 'Saved'); return true; },
       err => { s.dirty = true; s.status?.('Not saved: ' + err.message); return false; }).finally(() => { s.saving = null; });
   return s.saving;
 }
@@ -314,8 +336,20 @@ function noteRow(n) {
 }
 
 function newNote() {
-  const n = { id: uid(), date: nv.day || todayISO(), title: '', body: nv.initBody || '', createdAt: Date.now() };
-  if (nv.fromShare) popShared();   // the note has the shared text now
+  let body = nv.initBody || '', rest = '';
+  // more than a note holds (a shared file can be 100k): the note takes what fits, up to a line end, and the rest stays
+  // in the inbox for another note (counted as a file, so the chooser asks again instead of the Case tab taking it)
+  if (body.length > LIMITS.body) {
+    const cut = body.lastIndexOf('\n', LIMITS.body);
+    const at = cut > LIMITS.body / 2 ? cut : LIMITS.body;
+    rest = body.slice(at).trim(); body = body.slice(0, at);
+  }
+  const n = { id: uid(), date: nv.day || todayISO(), title: '', body, createdAt: Date.now() };
+  if (nv.fromShare) {
+    const files = sharedFiles();
+    popShared();   // the note has the shared text now
+    if (rest) { keepShared(rest, files || 1); toast('The note is full: the rest of the shared text is kept for another note'); }
+  }
   nv.initBody = ''; nv.fromShare = false;
   if (nv.caseId) { n.caseId = nv.caseId; const c = caseOf(nv.caseId); if (c && c.date && !nv.day) n.date = c.date; }
   openEditor(n, true);

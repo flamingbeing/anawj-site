@@ -14,7 +14,7 @@ const BAD_SCHEMES = /^(javascript|data|vbscript|file|blob|about|chrome|intent):/
 
 export const PRESETS = [
   { id: 'obsidian', name: 'Obsidian', uri: 'obsidian://new?vault=MyVault&file={file}&content={content}', fileName: 'Logbook/{date}', mode: 'replace',
-    hint: 'Change MyVault to your vault’s name. The note is made (or replaced) in the Logbook folder.' },
+    hint: 'Change MyVault to your vault’s name. The note is made in the Logbook folder.' },
   { id: 'whatsapp', name: 'WhatsApp', uri: 'https://wa.me/?text={content}', fileName: '{date}', mode: 'replace',
     hint: 'Opens WhatsApp to choose who gets it.' },
   { id: 'upnote', name: 'UpNote', uri: 'upnote://x-callback-url/note/new?text={content}', fileName: '{date}', mode: 'replace',
@@ -55,8 +55,12 @@ export function cleanDestinations(list) {
 
 // The link to open for this destination and text. { url, tooLong }: when the link would be too long for a phone
 // to open, the text must be copied and the link opens with no text in it.
-export function sendLink(dest, { content = '', title = '', date = '' } = {}) {
-  const file = fill(dest.fileName || '{date}', { date }).replace(/\n.*/s, '').trim() || date;
+// fileDate: the day a case belongs to, for its {file} and {date} (date is set only for a whole day, which the
+// ledger remembers). A file name with nothing after its folder ("Logbook/") gets the day, or the title.
+export function sendLink(dest, { content = '', title = '', date = '', fileDate = '' } = {}) {
+  date ||= fileDate;
+  let file = fill(dest.fileName || '{date}', { date }).replace(/\n.*/s, '').trim();
+  if (!file || file.endsWith('/')) file += date || String(title || '').replace(/[\\/:*?"<>|#^[\]]+/g, ' ').trim().slice(0, 80) || 'Logbook';
   const build = c => dest.uri.replace(/\{(content|title|file|date)\}/g, (m, k) => encodeURIComponent({ content: c, title, file, date }[k]));
   const url = build(content);
   return url.length > MAX_LINK ? { url: build(''), tooLong: true, file } : { url, tooLong: false, file };
@@ -70,18 +74,22 @@ export function fingerprint(text) {
   for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
   return h.toString(36) + '.' + s.length.toString(36);
 }
-export const cleanLedger = l => {
+// keep: the destination ids still set up (the rest are dropped)
+export const cleanLedger = (l, keep = null) => {
   const out = {};
   if (!l || typeof l !== 'object' || Array.isArray(l)) return out;
-  for (const [id, days] of Object.entries(l).slice(0, 40)) {
-    if (!days || typeof days !== 'object' || Array.isArray(days)) continue;
-    out[String(id).slice(0, 20)] = Object.fromEntries(Object.entries(days).filter(([d, v]) => /^\d{4}-\d{2}-\d{2}$/.test(d) && typeof v === 'string').slice(-800).map(([d, v]) => [d, v.slice(0, 20)]));
+  // (the latest places sent to, and each one's latest days: markSent moves a place to the end)
+  for (const [id, days] of Object.entries(l).slice(-40)) {
+    if (!days || typeof days !== 'object' || Array.isArray(days) || (keep && !keep.includes(id))) continue;
+    out[String(id).slice(0, 20)] = Object.fromEntries(Object.entries(days).filter(([d, v]) => /^\d{4}-\d{2}-\d{2}$/.test(d) && typeof v === 'string')
+      .sort(([x], [y]) => (x < y ? -1 : 1)).slice(-800).map(([d, v]) => [d, v.slice(0, 20)]));
   }
   return out;
 };
 export function markSent(ledger, destId, date, text) {
-  const l = cleanLedger(ledger);
-  l[destId] = { ...(l[destId] || {}), [date]: fingerprint(text) };
+  const l = cleanLedger(ledger), was = l[destId] || {};
+  delete l[destId];
+  l[destId] = { ...was, [date]: fingerprint(text) };
   return l;
 }
 // 'new' (never sent), 'same' (sent and unchanged) or 'changed' (sent, then edited)

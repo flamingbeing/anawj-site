@@ -8,6 +8,8 @@
 // A daily note is one note per day with the id "day-YYYY-MM-DD" (its date set, its title usually empty), so every
 // device finds the same one without a query.
 
+import { merge3 } from './merge3.js';
+
 export const MAX_NOTES = 2000;
 export const INDEX_CAP = 100;
 export const LIMITS = { title: 200, body: 20000 };
@@ -25,6 +27,12 @@ export const cappedNotes = list => (list || []).filter(n => !isDayNote(n));
 // Two copies of one daily note saved apart (two devices, or a stale offline copy opened as a new note): one note with
 // both. A field changed only here keeps the change; the body keeps the other copy's text and adds what was written
 // here (only the new part when this copy started from base). Pure; used when a save meets a newer copy.
+// (the lines of x not in y, each line of y used once: a line typed twice is new the second time)
+function extra(x, y) {
+  const left = new Map();
+  for (const v of y) left.set(v, (left.get(v) || 0) + 1);
+  return x.filter(v => { const n = left.get(v) || 0; if (n) left.set(v, n - 1); return !n; });
+}
 export function mergeDayNote(local, base, remote) {
   if (!remote) return { ...local };
   const out = { ...remote };
@@ -33,15 +41,27 @@ export function mergeDayNote(local, base, remote) {
     if (base ? mine !== was : mine != null && mine !== '') { if (mine == null) delete out[k]; else out[k] = mine; }
   }
   const r = String(remote.body || ''), l = String(local.body || ''), b = base ? String(base.body || '') : '';
-  let add = l;
-  if (base && l.startsWith(b)) add = l.slice(b.length);
-  add = add.trim();
-  // "there already": every line added here is a line of the other copy (not just a few letters somewhere in it)
-  const rLines = new Set(r.split('\n').map(x => x.trim())), lLines = new Set(l.split('\n').map(x => x.trim()));
+  const tidy = t => t.split('\n').map(x => x.trim()).filter(Boolean);
   let body;
-  if (!add || add.split('\n').every(x => !x.trim() || rLines.has(x.trim()))) body = r;   // nothing new here
-  else if (!base && r.split('\n').every(x => !x.trim() || lLines.has(x.trim()))) body = l;   // this copy holds the other's
-  else body = (r.trim() ? r.trimEnd() + '\n\n' : '') + add;
+  if (l === r || (base && l === b)) body = r;   // nothing new here
+  else if (base && r === b) body = l;         // only this copy changed
+  else if (base && l.startsWith(b) && r.startsWith(b)) {
+    // both only added at the end: the other copy's text, then what was added here (unless it added the same lines)
+    const add = l.slice(b.length).trim();
+    body = !add || !extra(tidy(add), tidy(r.slice(b.length))).length ? r : (r.trim() ? r.trimEnd() + '\n\n' : '') + add;
+  } else if (base) {
+    // edited, ticked or deleted lines: a line-by-line three-way merge (both sides' changes applied); where the two
+    // changed the same lines, the other copy's text, then the lines added here
+    const m = merge3(b, l, r);
+    if (!m.conflicts) body = m.text;
+    else { const add = extra(l.split('\n'), b.split('\n')).filter(x => x.trim()); body = (r.trim() ? r.trimEnd() + '\n\n' : '') + add.join('\n'); }
+  } else {
+    // no common start (a blank copy opened offline): every line here already in the other copy -> that copy; the
+    // other's lines all here -> this copy; else both
+    if (!extra(tidy(l), tidy(r)).length) body = r;
+    else if (!extra(tidy(r), tidy(l)).length) body = l;
+    else body = (r.trim() ? r.trimEnd() + '\n\n' : '') + l.trim();
+  }
   out.body = body.slice(0, LIMITS.body);
   return out;
 }

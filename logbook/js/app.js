@@ -27,7 +27,6 @@ import { settingsFile, readSettingsFile, readDeviceFile, isDeviceFile } from './
 import { movedPage } from './moved.js';
 import { purgeExpired, openBin } from './bin.js';
 import { renderPoints } from './ui-parts.js';
-import { profile } from './ui-core.js';
 import { deviceOn, barAtBottom } from './device-presets.js';
 import { notesChanged } from './ui-notepad.js';
 

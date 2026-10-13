@@ -10,7 +10,7 @@
 // renderBin() / openBin()        the bin view (element) / the same in a dialog
 
 import { S, h, toast, modal, confirmBox, cloud, writes, fill, removeCase, deleteMany, restoreCase, miniChips, resetters } from './ui-core.js';
-import { cleanNote, noteTitle, MAX_NOTES, isDayNote, cappedNotes } from './notepad.js';
+import { cleanNote, noteTitle, MAX_NOTES, isDayNote, cappedNotes, mergeDayNote } from './notepad.js';
 import { cleanCase } from './demo-backend.js';
 import { cleanReflection } from './reflections.js';
 import { REFLECTION_HEADINGS } from './categories.js';
@@ -145,10 +145,14 @@ export async function restoreFromBin(id) {
     // the notes may not be loaded yet (they load on first use): load them, so the limit and the id check hold
     const have = (await (await import('./ui-notepad.js')).ensureNotes().catch(() => null)) || S.notes || [];
     out = { ...e.data };
-    if (!isDayNote(out) && cappedNotes(have).length >= MAX_NOTES) throw new Error(`you already have ${MAX_NOTES} notes; delete one first`);
-    // a daily note whose day has a new one since comes back as an ordinary note of that day
-    if (have.some(n => n.id === out.id)) out.id = uid();
-    out = await writes.save('note', mine(), out, null);
+    const now = have.find(n => n.id === out.id);
+    // a daily note whose day has a new one since is merged into it (one note a day, and never past the limit)
+    if (now && isDayNote(out)) out = await writes.save('note', mine(), mergeDayNote(out, null, now), now);
+    else {
+      if (cappedNotes(have).length >= MAX_NOTES && !isDayNote(out)) throw new Error(`you already have ${MAX_NOTES} notes; delete one first`);
+      if (now) out.id = uid();
+      out = await writes.save('note', mine(), out, null);
+    }
   } else {
     out = { ...e.data };
     if ((S.reflections || []).some(r => r.id === out.id)) out.id = uid();
