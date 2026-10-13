@@ -112,7 +112,7 @@ Pickers are full-screen **Recent | All | Write-In** lists, with recents remember
 
 ## 4. How the app is built
 
-- **Stack:** vanilla ES modules, no build step, GitHub Pages (`CNAME` anawj.com). The PWA service worker is `evals/sw.js`; **bump `VERSION` on every shell change**. Each app deletes only its own cache prefix (`evals-*`, `logbook-*`), because the apps share one origin.
+- **Stack:** vanilla ES modules, no build step, GitHub Pages (`CNAME` anawj.com). The PWA service worker is `evals/sw.js`; its `VERSION` is stamped at deploy (`tools/stamp-versions.mjs`), no hand bump. Each app deletes only its own cache prefix (`evals-*`, `logbook-*`), because the apps share one origin.
 - **Firebase:**
   - Project `apmes-logbook`, **Blaze** (pay-as-you-go) plan, asia-southeast1. Usage is within the free quotas at this scale.
   - **Shared with the logbook.** Evals reuses the logbook's `residents` collection.
@@ -161,7 +161,7 @@ Pickers are full-screen **Recent | All | Write-In** lists, with recents remember
 ### Tests (run all before merging)
 
 ```
-node tools/check.mjs                                                          # cache prefixes, SHELL files, VERSION bump, generated files
+node tools/check.mjs                                                          # cache prefixes, SHELL files, plain VERSION, generated files
 for f in evals/test/*.test.mjs logbook/test/*.test.mjs; do node "$f"; done   # unit
 npx http-server . -p 8110 -s -c-1 &                                           # static server
 node evals/test/e2e.spec.mjs                                                  # 36 e2e checks

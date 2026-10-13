@@ -1,0 +1,19 @@
+# Adds an app label (logbook, evals, nuh-roster, prewarm, hand-babies, site) to each PR from the folders it changes
+# (.github/labeler.yml). Runs with the base branch's config and never checks out the PR's code.
+name: Label PRs by app
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  label:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/labeler@v5
+        with:
+          sync-labels: true

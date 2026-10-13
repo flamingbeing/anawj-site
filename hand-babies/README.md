@@ -11,7 +11,7 @@ senior can assess remotely. Lives at `anawj.com/hand-babies/`. No data, no sign-
 - `hand3d.js`: the 3D figures (tendon tests, cascade, nerve map) on a simple 3D hand, drawn with three.js r160
   (`vendor/three.module.min.js`, MIT); they plug into the same player (Play/Pause, still frame, drag to turn).
 - `gifs/`: GIF copy of each animation for sharing in chats. Made by `node hand-babies/tools/make-gifs.mjs` (server on 8080,
-  needs ffmpeg); rerun after changing a figure. `style.css`: layout. `sw.js`: offline cache (bump `VERSION` on any change).
+  needs ffmpeg); rerun after changing a figure. `style.css`: layout. `sw.js`: offline cache (its `VERSION` is stamped at deploy, no hand bump).
 - `edit.html`: page editor for suggesting changes (sends a GitHub issue); see NOTES.md "Edits sent from the page editor".
 - Decisions and content rules: `NOTES.md`. Status: `STATUS.md`.
 

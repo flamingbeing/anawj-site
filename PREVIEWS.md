@@ -57,3 +57,10 @@ To try signed-in features (sync, sharing, admin) before merging, use a separate 
 the real ones: create e.g. `apmes-logbook-staging`, add one fixed preview address (the `staging` branch's) to its
 authorised domains, and have the apps pick the test config on that host. That needs a small code change in each
 app's `firebase-config.js` and the rules deploy workflow; ask for it when wanted.
+
+## Service-worker versions in previews
+
+The live site stamps each app's `sw.js` `VERSION` at deploy (`tools/stamp-versions.mjs`). For previews to do the same,
+set **Build command** to `node tools/stamp-versions.mjs` in the Cloudflare dashboard (Workers → anawj-preview →
+Settings → Build); Workers Builds ignores a build step in `wrangler.jsonc`. Without it a preview keeps the plain
+version, so a phone that already opened that preview may need a hard refresh to see a newer commit. Optional.
