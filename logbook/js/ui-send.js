@@ -91,6 +91,7 @@ export function renderSendSettings() {
       h('p', { class: 'hint help', style: 'margin:0' }, 'Places you can send a day or a case: Obsidian, WhatsApp, UpNote, or any app that opens from a link. A Send button then appears on the Logbook tab. Nothing is sent until you tap.'),
       h('p', { class: 'hint' }, 'The text goes to the app the link opens. The case text holds your case details: keep it de-identified, and check hospital policy before sending it to cloud notes or chat apps.'),
       h('p', { class: 'hint' }, 'Only add a link you trust, and look at where it goes before using a link someone gave you. The layout of the text is under Settings → Markdown.'),
+      h('p', { class: 'hint' }, 'To keep a file per day in Google Drive, Dropbox or GitHub, updated when you tap Sync: ', h('a', { href: '#sync' }, 'Settings → Sync'), '.'),
       box,
       h('div', { class: 'bar', style: 'margin:10px 0 0' },
         h('label', { class: 'field', style: 'margin:0' }, 'Add',

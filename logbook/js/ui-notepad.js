@@ -71,6 +71,15 @@ function healDayNotes() {
       err => { s.dirty = true; s.status?.('Not saved: ' + err.message); return false; }).finally(() => { s.saving = null; });
   }
 }
+// the notes as the server has them (not a possibly stale offline copy), for anything that must not miss one (Sync)
+export async function notesFromServer(ms = 30e3) {
+  const me = mine();
+  if (!me) return [];
+  await ensureNotes();
+  for (const t0 = Date.now(); !(synced && owner === me); await new Promise(r => setTimeout(r, 250)))
+    if (Date.now() - t0 > ms || mine() !== me) throw new Error('your notes didn’t finish loading (no signal?). Tap Sync again.');
+  return S.notes || [];
+}
 
 // the index doc, read the first time the Logbook asks (one small read), then kept live for the visit
 let idxStop = null, idxOwner = null;
