@@ -1055,13 +1055,14 @@ function startAlerts(p) {
         const now = nowFor(q, 'prewarm');
         if (now >= nx.due && now <= nx.due + 5) hit(q.id + 'ev_wstop' + val(q, 'pw_start'), `Prewarm off due now (${WARM_MIN[val(q, 'arm')]} min of warming): tap Log`);
       }
-      for (const s of ['prewarm', 'iotemp', 'haemo']) {
+      // no alarm for BP, HR, BIS (owner, 13 Oct 2026): their due time still shows in the top bar and on the tab
+      for (const s of ['prewarm', 'iotemp']) {
         if ((s === 'prewarm' && noWarming(q)) || sealedBy(q, s)) continue;
         const now = nowFor(q, s);
         for (const x of pointsFor(q, s)) {
           const d = dueOf(q, s, x), tag = q.id + s + x.key + (val(q, SERIES[s].ref[0]) || '');
           if (d == null || !expected(q, s, d) || savedAt(q, s, x.key) || now < d || now > d + 5) continue;
-          hit(tag, `${s === 'haemo' ? 'BP, HR, BIS' : 'Temperature'} ${x.label} reading due now`);
+          hit(tag, `Temperature ${x.label} reading due now`);
         }
       }
     }
