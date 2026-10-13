@@ -542,7 +542,7 @@ function home() {
       // the same Subject ID on two records (e.g. made on two phones without signal): readings are split between them
       const twin = list.some(q => q !== p && String(val(q, 'enrol_id') || '').toLowerCase() === String(val(p, 'enrol_id') || '').toLowerCase() && (val(q, 'site') || '') === (val(p, 'site') || ''));
       const body = `<b>${esc(sid(p))}${val(p, 'site') ? ` <small>${esc(val(p, 'site'))}</small>` : ''}</b>${twin ? '<span class="twinline">Same Subject ID twice: readings may be split. Fill in one and correct the other’s ID (Perioperative data), or delete it in Settings.</span>' : ''}<span${locked ? ' class="lockline"' : val(p, 'done') ? ' class="okline"' : ''}>${locked ? `${LOCK_ICON} Locked by the study admin${canLock() ? ' · read only' : ''}` : esc(status(p))}</span>
-        <span class="dueline" data-due="${p.id}" hidden></span><small>${e ? 'Last entry ' + new Date(e.t).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) + (e.by ? ' by ' + esc(e.by) : '') : 'No entries yet'}</small>`;
+        <span class="dueline" data-due="${p.id}" hidden></span>${progressHtml(p)}<small>${e ? 'Last entry ' + new Date(e.t).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) + (e.by ? ' by ' + esc(e.by) : '') : 'No entries yet'}</small>`;
       if (selecting) return `<li><label class="selrow"><input type="checkbox" data-sel="${p.id}" ${selecting.has(p.id) ? 'checked' : ''}><span>${body}</span></label></li>`;
       if (locked) return `<li><a href="${canLock() ? '#/p/' + p.id : '#/'}" class="locked"${canLock() ? '' : ' data-locked="1"'}>${body}</a></li>`;
       return `<li><a href="#/p/${p.id}"${val(p, 'done') ? ` data-done="${esc(val(p, 'done'))}"` : ''}>${body}</a></li>`;
@@ -957,7 +957,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
       ${s === 'haemo' && vitalsCollected(p) ? '<p class="okline small">✓ Vital signs data collected: ticked on the paper form</p>' : ''}
       ${s === 'haemo' && settings.hide.haemo15 ? `<p class="muted small">Only baseline is entered here; the 15-min rows come from the monitor download. Turn them on in Settings.</p>` : ''}
       ${main ? (noPw ? '' : signoffHtml(p, s)) + comfortHtml('sat_post', 'Comfortable after surgery?') : signoffHtml(p, s)}</section>
-      <section class="third bot" aria-label="Other forms and checks">${progressHtml(p)}${linksHtml()}${gapsHtml(p)}${doneHtml(p)}
+      <section class="third bot" aria-label="Other forms and checks">${linksHtml()}${gapsHtml(p)}${doneHtml(p)}
       <p class="resetline"><button class="link" id="resetsub">Reset this subject</button></p></section>`);
     refreshBar();
     disableSealed();
@@ -1281,14 +1281,13 @@ const sealedMsg = (p, pg) => `${sealedBy(p, pg)} is marked complete. Undo its ti
 const sealNote = (p, pg) => `<p class="sealnote">✓ ${esc(sealedMsg(p, pg))}</p>`;
 // boxes in a closed section can't be typed in
 const disableSealed = () => view.querySelectorAll('.sealed input, .sealed select, .sealed textarea').forEach(i => { i.disabled = true; });
-// which sections are marked complete (owner, 13 Oct 2026): each links to its screen
+// which sections are marked complete, shown on the patient list (owner, 13 Oct 2026): read only, they just
+// mirror the existing complete ticks inside each section
 function progressHtml(p) {
-  const id = p.id;
-  const rows = [['prewarm', 'Pre-warming temps', `#/p/${id}/prewarm`], ['iotemp', 'Intra-op temps', `#/p/${id}/iotemp`], ['haemo', 'BP, HR, BIS', `#/p/${id}/haemo`],
-    ['intraop', 'Intra-op details', `#/p/${id}/form/intraop`], ['pacu', 'PACU', `#/p/${id}/form/pacu`], ['periop', 'Perioperative data', `#/p/${id}/data`]]
+  const rows = [['prewarm', 'Pre-warm'], ['iotemp', 'Intra-op temps'], ['haemo', 'BP, HR, BIS'], ['intraop', 'Intra-op details'], ['pacu', 'PACU'], ['periop', 'Perioperative']]
     .filter(([k]) => !(k === 'prewarm' && noWarming(p)));
-  return `<nav class="progress" aria-label="Progress">${rows.map(([k, l, h]) => { const on = !!val(p, 'sign_' + k);
-    return `<a href="${h}" class="${on ? 'on' : ''}" aria-label="${l}: ${on ? 'complete' : 'not marked complete'}"><span class="tick" aria-hidden="true">${on ? '✓' : ''}</span>${l}</a>`; }).join('')}</nav>`;
+  return `<span class="progress" role="list" aria-label="Sections marked complete">${rows.map(([k, l]) => { const on = !!val(p, 'sign_' + k);
+    return `<span role="listitem" class="${on ? 'on' : ''}" aria-label="${l}: ${on ? 'complete' : 'not marked complete'}"><span class="tick" aria-hidden="true">${on ? '✓' : ''}</span>${l}</span>`; }).join('')}</span>`;
 }
 function doneHtml(p) {
   return tickHtml(!!val(p, 'done'), 'data collection', val(p, 'done') || '', 'data-undone', 'data-done').replace('Mark data collection complete', 'Mark data collection as complete').replace('<b>data collection complete', '<b>Data collection complete');
