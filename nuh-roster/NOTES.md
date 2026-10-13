@@ -205,6 +205,9 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
   conflict check as rosters (`expectedUpdatedAt` = `state.teamSyncedAt`): if someone saved after this browser loaded,
   it asks before replacing theirs. On sign-in, a newer team list doesn't offer to replace a browser with unsaved team
   changes; a toast offers "Load theirs". Team documents still keep no version history (rosters do).
+- Two tabs: when another tab saves the roster (`storage` event), this tab stops saving and shows a bar with Reload.
+- Not signed in to the team: once a week a bar suggests Download everything (`state.backupAt`; "Later" waits a week,
+  per device in `nuh-roster-backup-nag`; quiet for the first week).
 - "Sign out and clear this computer" (for shared OT PCs) removes every `ot-roster*` / `nuh-roster*` key, then reloads.
 - Live checks (13 Oct) also catch: a double-covered room with no junior (error, Fill), a senior in 3+ rooms (error),
   someone senior in one room and junior in another, and an admin-day or elsewhere person on a list (warnings). The

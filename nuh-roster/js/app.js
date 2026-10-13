@@ -211,10 +211,11 @@ function migrateEct() {
   state.roomsVersion = 4;
 }
 
-let saveTimer, lastSaved = '', checkKey = '', clearedForGood = false;
+let saveTimer, lastSaved = '', checkKey = '', clearedForGood = false, otherTab = false;
 function save() {
   clearTimeout(saveTimer);
   if (clearedForGood) return; // signed out and cleared: write nothing back
+  if (otherTab) return; // another tab saved since: this one would overwrite it
   saveTimer = setTimeout(() => {
     const was = storeProblem === 'full';
     try {
@@ -373,6 +374,7 @@ function render() {
   renderDemoBar();
   renderMovedBar();
   if (storeProblem && !document.getElementById('store-bar')) renderStoreBar();
+  if (cs.ready && !document.getElementById('backup-bar')) renderBackupBar();
   window.scrollTo(0, y);
   if (state.tab === 'monthly' && state.monthlyView === 'rotations') placeRotGrid();
   labelTableFields(app);
@@ -411,6 +413,33 @@ function renderMovedBar() {
     h('button', { class: 'small primary', onclick: downloadEverything }, 'Download everything'),
     h('button', { class: 'small', onclick: go }, 'Go to the new address')));
 }
+// The same roster open in two tabs: each would quietly write over the other. When another tab saves, this one stops
+// saving and says so, with Reload to pick up the other tab's work.
+addEventListener('storage', e => {
+  if (e.key !== KEY || clearedForGood || otherTab) return;
+  otherTab = true; clearTimeout(saveTimer);
+  document.getElementById('tab-bar')?.remove();
+  document.body.prepend(h('div', { id: 'tab-bar', class: 'demo-bar moved-bar', role: 'alert' },
+    h('b', {}, 'The roster was changed in another tab.'), h('span', {}, ' This tab has stopped saving so it doesn\'t undo that. Reload to carry on here with the latest, or close this tab.'),
+    h('span', { class: 'grow' }), h('button', { class: 'small primary', onclick: () => location.reload() }, 'Reload')));
+});
+// Not signed in to the team: the roster lives only in this browser. Once a week, suggest a backup file.
+const BACKUP_KEY = 'nuh-roster-backup-nag';
+function renderBackupBar() {
+  document.getElementById('backup-bar')?.remove();
+  if (DEMO || isViewer() || isMember() || !state.staff.length) return;
+  let snooze = 0;
+  try { snooze = +localStorage.getItem(BACKUP_KEY) || 0; } catch { /* no storage */ }
+  const last = Math.max(state.backupAt || 0, snooze);
+  if (!last) { try { localStorage.setItem(BACKUP_KEY, String(Date.now())); } catch { /* no storage */ } return; } // first week: quiet
+  if (Date.now() - last < 7 * 864e5) return;
+  const later = () => { try { localStorage.setItem(BACKUP_KEY, String(Date.now())); } catch { /* no storage */ } renderBackupBar(); };
+  document.body.prepend(h('div', { id: 'backup-bar', class: 'demo-bar' },
+    h('b', {}, 'A backup?'), h('span', {}, ' The roster is kept only in this browser. Download everything once a week, or sign in to save it for the team.'),
+    h('span', { class: 'grow' }),
+    h('button', { class: 'small primary', onclick: () => { downloadEverything(); renderBackupBar(); } }, 'Download everything'),
+    h('button', { class: 'small', onclick: later }, 'Later')));
+}
 // A bar when this browser can't keep the roster: storage full, or saved data that couldn't be read.
 function renderStoreBar() {
   document.getElementById('store-bar')?.remove();
@@ -447,6 +476,7 @@ function removeOldDays(dates) {
 }
 // Everything this browser holds for the roster (staff, settings, every day's roster, monthly rosters, rotations).
 function downloadEverything() {
+  state.backupAt = Date.now(); save();
   const data = { kind: 'ot-roster-all', version: 1, savedAt: new Date().toISOString(), state };
   download(`NUH roster, everything in this browser ${realToday()}.json`, new Blob([JSON.stringify(data)], { type: 'application/json' }));
 }
