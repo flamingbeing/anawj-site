@@ -470,3 +470,17 @@ console.log('engine tests passed');
   assert.ok(dates.every(d => !isNaN(d)) && dates.every((d, i) => !i || d <= dates[i - 1]), "What's new is dated, newest first");
   console.log('help text tests passed');
 }
+
+{
+  // AOCC leaves the last free consultant for AIC
+  const room = (id, name) => ({ id, name, complex: 'MOR', running: true, notes: '', flags: suggestFlags(''), session: 'full' });
+  const st = [P('a', 'Senior Busy', 'senior', { grade: 'AC' }), P('b', 'Senior Assoc', 'senior', { grade: 'AC' }), P('c', 'Senior Cons', 'senior', { grade: 'C' })];
+  let ok = 0;
+  for (let seed = 1; seed <= 20; seed++) {
+    const g = generate({ staff: st, day: { rooms: [room('r1', 'MOR 1')], staff: {} }, seed });
+    const by = Object.fromEntries(g.rows.map(r => [r.label, r]));
+    if (/Senior Cons/.test(by.AIC.senior) && by.AOCC.senior && !/Senior Cons/.test(by.AOCC.senior)) ok++;
+  }
+  assert.ok(ok >= 15, `AIC keeps the consultant (${ok}/20)`);
+  console.log('AOCC/AIC tests passed');
+}
