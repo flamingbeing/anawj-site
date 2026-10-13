@@ -218,6 +218,10 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
   clash with being post call. Each bar has "Next ›" and shows which rosters are loaded for this month and the next.
   The Leave view has a strip of seniors/juniors away per day (Settings: mark days over a limit; 0 is off). The made-up
   rosters are tidied of clashes (`tidyMonthly` in `js/demo.js`; DEMO_VERSION 6).
+- Generator seniority (13 Oct): complex lists (−3/+3), double covers (−2/+2) and rooms with a Baby MO or MOPEX (+4
+  otherwise) prefer SC and C (`STRONG`); subspecs and the hard rules still win (subspec matches unchanged over 80 demo
+  runs). The spare senior who takes half a double cover is the best fit, not the first. Each generated row carries
+  `why` ({ personId: reason }), shown as "Why here:" when hovering a name.
 - Keep building elements with `h()` and `textContent`; there is no `innerHTML` anywhere, so imported text can't inject.
 
 ## Code map

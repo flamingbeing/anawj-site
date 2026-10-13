@@ -381,3 +381,33 @@ console.log('engine tests passed');
   assert.equal(monthIssues(d.monthly, '2026-03', n => byName.get(n) || null).filter(i => i.level === 'error').length, 0, 'demo month has no clashes');
   console.log('monthly clash tests passed');
 }
+
+{
+  // seniority: complex lists, double covers and Baby MO / MOPEX rooms prefer SC and C
+  const room = (id, name, notes, extra = {}) => ({ id, name, complex: 'MOR', running: true, notes, flags: suggestFlags(notes), session: 'full', ...extra });
+  const st = [
+    P('a', 'Senior Associate', 'senior', { grade: 'AC' }), P('b', 'Senior Consultant', 'senior', { grade: 'SC' }),
+    P('j', 'Junior Mopex', 'junior', { grade: 'MOPEX' }), P('k', 'Junior Resident', 'junior'),
+  ];
+  let complexToSC = 0, mopexWithSC = 0;
+  for (let seed = 1; seed <= 20; seed++) {
+    const g = generate({ staff: st, day: { rooms: [room('r1', 'MOR 1', 'laparotomy', { flags: { subspecs: [], complex: true, long: false } }), room('r2', 'MOR 2', 'hernia')], staff: {} }, seed });
+    const r1 = g.rows.find(r => r.label === 'MOR 1');
+    if (/Senior Consultant/.test(r1.senior)) complexToSC++;
+    // two plain lists: the MOPEX goes with the SC
+    const g2 = generate({ staff: st, day: { rooms: [room('r1', 'MOR 1', 'hernia'), room('r2', 'MOR 2', 'hernia')], staff: {} }, seed });
+    if (g2.rows.some(r => /Senior Consultant/.test(r.senior) && /Junior Mopex/.test(r.junior))) mopexWithSC++;
+  }
+  assert.equal(complexToSC, 20, 'the complex list goes to the SC every time');
+  assert.ok(mopexWithSC >= 15, `MOPEX mostly with the SC (${mopexWithSC}/20)`);
+  // one senior short: the double cover goes to the SC
+  const st2 = [P('a', 'Senior Associate', 'senior', { grade: 'AC' }), P('b', 'Senior Consultant', 'senior', { grade: 'SC' }), P('c', 'Senior Visiting', 'senior', { grade: 'VC' })];
+  let dblSC = 0;
+  for (let seed = 1; seed <= 20; seed++) {
+    const g = generate({ staff: st2, day: { rooms: [room('r1', 'MOR 1', ''), room('r2', 'MOR 2', ''), room('r3', 'MOR 3', ''), room('r4', 'MOR 4', '')], staff: {} }, seed });
+    const n = {}; g.rows.forEach(r => String(r.senior).split(/\s*\/\s*/).filter(Boolean).forEach(x => { n[x] = (n[x] || 0) + 1; }));
+    if (Object.entries(n).some(([k, v]) => v > 1 && /Consultant/.test(k))) dblSC++;
+  }
+  assert.ok(dblSC >= 15, `double cover mostly by the SC (${dblSC}/20)`);
+  console.log('seniority tests passed');
+}
