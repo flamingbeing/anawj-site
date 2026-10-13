@@ -99,6 +99,17 @@ Send it:
 - **Long or heavy jobs**: every app's tests and browser tests before a release, builds, data crunching.
 - **Secrets**: the owner pastes any secret there, never into a cloud session or this repo.
 
+Scheduled checks it runs (owner, 13 Oct 2026; read-only, alerts go to the owner's phone):
+
+- **Backups, daily 08:00:** a ready Firestore backup under 30 hours old for `prewarm-study`, `apmes-logbook` and
+  `nuh-roster`, and point-in-time recovery still on for `prewarm-study`. Alerts only when something is wrong, plus an
+  "all OK" on Mondays so silence means it's still running.
+- **Uptime, every minute:** the seven live addresses (`anawj.com`, `prewarmstudy.`, `apmes.` logbook and evals,
+  `nuhroster.`, `hand.` babies and cmcj); alerts after 2 failures in a row, and warns before a certificate expires. It
+  checks from the owner's home internet, so a home outage makes every site look down at once.
+- No weekly spend report (owner's choice): the budget emails at 50%, 90% and 100% instead.
+- To change or stop them, ask that session.
+
 Don't send it: hosting or anything that must stay up (it's a home computer on home internet, and goes offline
 until the owner signs in again after a restart).
 
