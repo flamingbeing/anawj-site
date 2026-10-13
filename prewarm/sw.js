@@ -2,7 +2,7 @@
 // changes: the new worker installs alongside the old one and the app offers "Update available".
 // Firebase (added with sharing) will always go to the network; its SDK files are cached here.
 
-const VERSION = 'prewarm-v74';
+const VERSION = 'prewarm-v75';
 const SDK = 'https://www.gstatic.com/firebasejs/10.12.2/';
 const SDK_FILES = ['firebase-app.js', 'firebase-auth.js', 'firebase-firestore.js'].map(f => SDK + f);
 const SHELL = [

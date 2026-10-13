@@ -132,7 +132,7 @@ assert.equal(cellFor(BY_ID.age, ''), null);
   const [, , rd, ex] = workbookSheets([p], []);
   assert.equal(rd.rows.length, 3, 'the 5-min pre-warming reading and the end-of-surgery room temp');
   assert.deepEqual(rd.rows[1].slice(0, 3), ['E2', 'Pre-warming', '5 min']);
-  assert.match(rd.rows[1][5], /Core 36.5/);
+  assert.match(rd.rows[1][5], /Core \(spot on\) 36.5/);
   assert.equal(ex.rows[0][0].s, 'Subject ID');
   assert.equal(ex.rows[0][1].s, 'Hospital');
   assert.deepEqual(SITES, ['NTF', 'NUH', 'SGH', 'CGH', 'TTSH', 'KTPH', 'WH']);
