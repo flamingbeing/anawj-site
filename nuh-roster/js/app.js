@@ -3481,10 +3481,36 @@ function boxCard() {
     fromNames.length ? h('div', { class: 'hint' }, 'Also shown, from comments on names:', h('ul', {}, fromNames.map(l => h('li', {}, l)))) : null);
 }
 
+// No roster yet: start from the last day this browser has one for (within a week), when the lists change little.
+// Rows go across for the rooms running today; the live checks then show who is on leave or post call now, and
+// "Fill empty gaps" fills what's missing. With Undo.
+function copyRosterButton() {
+  const from = Array.from({ length: 7 }, (_, i) => addDays(state.day.date, -(i + 1))).find(d => state.days?.[d]?.roster?.rows?.length);
+  if (!from) return null;
+  return h('button', { title: `Copy the roster of ${longDate(from)} into this day, then check it: people on leave or post call today are flagged`, onclick: () => {
+    const src = state.days[from].roster;
+    pushUndoAll(`starting from ${longDate(from)}`, { day: true });
+    // today's rooms in today's order: the AOCC/AIC/AH OT rows first, then each running room (empty if new)
+    const byLabel = new Map(clone(src.rows).map(x => [x.label, x]));
+    const rows = [...clone(src.rows).filter(isSpecialRow).map(x => ({ ...x, why: undefined })),
+      ...state.day.rooms.filter(x => x.running).map(room => {
+        const o = byLabel.get(room.name);
+        return { roomId: room.id, label: room.name, complex: room.complex, senior: o?.senior || '', junior: o?.junior || '', premed: '', notes: room.notes || '' };
+      })];
+    state.roster = { rows, warnings: [], date: state.day.date, seed: src.seed, log: [] };
+    logRoster([`Started from the roster of ${longDate(from)}`]);
+    lastRows = JSON.stringify(rows);
+    afterRosterEdit(true);
+    const n = (state.roster.checks || []).filter(w => w.level === 'error').length;
+    toast(`Copied ${longDate(from)}'s roster.${n ? ` ${n} problem${n > 1 ? 's' : ''} to fix (people away today, empty rooms).` : ''}`, { label: 'Fill empty gaps', run: fillGaps });
+  } }, `Start from ${new Date(from + 'T12:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}'s roster`);
+}
+
 function renderRoster() {
   const r = state.roster;
   const actions = h('div', { class: 'bar' },
     h('button', { class: 'primary', onclick: () => runGenerate(!!r) }, r ? 'Generate new' : 'Generate roster'),
+    !r ? copyRosterButton() : null,
     r && r.date === state.day.date && h('button', { onclick: fillGaps, title: 'Keep every name already on the roster and fill only the empty cells' }, 'Fill empty gaps'),
     r && h('button', { disabled: !undoStack.length, title: undoStack.length ? `Undo${typeof undoStack.at(-1) === 'object' ? ' ' + undoStack.at(-1).what : ' the last change'} (Ctrl+Z)` : 'Nothing to undo', onclick: undo }, 'Undo'),
     r && h('button', { disabled: !redoStack.length, title: redoStack.length ? 'Redo (Ctrl+Y)' : 'Nothing to redo', onclick: redo }, 'Redo'),
