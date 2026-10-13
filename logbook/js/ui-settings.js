@@ -16,10 +16,8 @@ import { SWITCHES, switchLabel, switchChanges, applyPatch, resetPatch, tabsAfter
 import { PHOTO_BUDGET_KB, PHOTO_NOTE, photoUsageKb, fmtMb } from './reflections.js';
 import { applyCompact, applyTheme, cachedTheme, TEXT_SIZES, ZOOMS, applyTextSize, applyZoom, applyAccent, display, setDisplay, applyDisplay, LINE_WIDTHS, LINE_HEIGHTS, CONTRASTS, MOTIONS, BUTTON_STYLES, defaultTitle, BORDERS, ROUNDS, roundLevel, BAR_TABS, barTabs, MAX_BAR, arrangeTabs, setTabOnBar, borderLevel, cleanTitle, IPHONE_APP, START_TABS } from './display.js';
 import { resetLink, help, toggle } from './settings-rows.js';
-// (still exported from here, for the modules that import them from this file)
+// (the display helpers are still exported from here: the e2e tests import them from this file)
 export * from './display.js';
-export { help, toggle, resetLink } from './settings-rows.js';
-export { privacyCard, creditsCard, signOutCard } from './more-cards.js';
 
 // Settings is a short menu (app.js) of these pages: Display, Logging, the Tag editor and the Recycle bin.
 // Residency year (for people not on the programme list) is on Account; reflection settings on the

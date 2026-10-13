@@ -724,7 +724,7 @@ function paintSel() {
   fill(ui.groupSave,
     // a combination worth keeping: one tap to make it a template (no trip to Settings)
     draft.cats.length >= 2 && !((S.logbook && S.logbook.templates) || []).some(t => sortCodes(t.cats).join() === sortCodes(draft.cats).join())
-      ? h('button', { type: 'button', class: 'small linkish', onclick: async () => (await import('./ui-settings.js')).templateDialog({ id: uid(), name: '', cats: [...draft.cats], details: '' }, async out => {
+      ? h('button', { type: 'button', class: 'small linkish', onclick: async () => (await import('./ui-settings.js').catch(() => { toast('That didn’t load. Check the connection, then reload.'); }))?.templateDialog({ id: uid(), name: '', cats: [...draft.cats], details: '' }, async out => {
         await patchLogbook({ templates: [...((S.logbook && S.logbook.templates) || []), out] });
         toast(`Tag group “${out.name}” saved`); paintQuick(); paintSel();
       }, 'Save as tag group') }, 'Save these tags as a tag group') : null);

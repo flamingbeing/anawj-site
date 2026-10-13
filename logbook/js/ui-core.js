@@ -543,7 +543,12 @@ export function watchMyReflections(email) {
   return () => { offQueue(); offCloud(); };
 }
 // Sign-out: forget per-user caches held by the screens (each registers its own reset).
-export const resetters = [() => { lastSummary = ''; scheduleSummary.cancel(); }];
+// Reflections' unsaved editor drafts (ui-reflect.js) are wiped here, not there: that page's code loads only when
+// opened, and sign-out must leave nothing of the last person's on the device even before it has.
+export const REFLECTION_DRAFT_KEY = 'apmes-logbook-reflection-draft';
+export const resetters = [() => { lastSummary = ''; scheduleSummary.cancel(); }, () => {
+  try { for (const k of Object.keys(localStorage)) if (k.startsWith(REFLECTION_DRAFT_KEY)) localStorage.removeItem(k); } catch { /* blocked */ }
+}];
 export const resetCaches = () => resetters.forEach(f => f());
 
 export { todayISO };

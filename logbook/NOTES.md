@@ -612,12 +612,19 @@ portfolio content.
   those); every other page's module loads the first time it opens, then the rest in idle moments (`app.js`, "pages
   that load on first use": `MODS`, `page()`, `warmUp()`). So: the Case-tab modules (`ui-log.js`, `ui-notepad.js`,
   `ui-core.js`, `cloud.js` and what they import) must not import a page module statically. Device display settings
-  live in `display.js`, the settings rows in `settings-rows.js` and More's cards in `more-cards.js` (ui-settings.js
-  re-exports them); sync's device wipe in `sync-forget.js` (sign-out works before the Sync code loads); the field
+  live in `display.js`, the settings rows in `settings-rows.js` and More's cards in `more-cards.js`; sync's device
+  wipe in `sync-forget.js` and the reflection drafts' wipe in `ui-core.js` (sign-out leaves nothing on the device
+  even before those pages' code loads: anything a lazy module keeps on the device needs an eager wipe); the field
   whitelists in `clean.js` (the demo backend loads only in `?demo`, the Firebase SDK only outside it). A new page:
   `page(['mod'], m => m.mod.renderX())` in TABS. `#app[data-page]` names the page once drawn (tests wait on it).
-  `logbook/test/e2e/lazy-load.mjs` checks the Case tab's modules, every page, and every page offline with the
-  service worker.
+  `logbook/test/e2e/lazy-load.mjs` checks the Case tab's modules, every page, every page offline with the
+  service worker, the sign-out wipe before warm-up and the reload after a failed load. A failed module import
+  stays failed until the page reloads (the browser keeps it), so the "didn’t load" card's button reloads, and the
+  warm-up stops at its first failure. Version skew (an old page loading a newer module after an update): the
+  existing `controllerchange` reload in `registerSW()` reloads every open page when a new worker takes over, so a
+  page never mixes versions for long; a skewed import that fails shows the same card. Measured (CPU 4x, cold): demo
+  case box ~780 -> ~660 ms; real-user time to the landing UI ~710 -> ~590 ms (first contentful paint itself is
+  unchanged: the gain is in time to a usable screen).
 - Rules: `logbook/firestore.rules` deploys on merge. Emulator: copy rules and
   `logbook/test/rules.emulator.mjs` + `evals/test/rules.emulator.mjs` into a folder with firebase-tools, then
   `firebase emulators:exec --only firestore --project demo-logbook "node logbook/test/rules.emulator.mjs; node evals/test/rules.emulator.mjs"`.

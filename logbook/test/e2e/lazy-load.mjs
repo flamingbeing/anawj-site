@@ -1,7 +1,8 @@
 // Fake data only. Lazy loading (app.js "pages that load on first use"): the Case tab opens with only its own modules
 // (no Settings, Reflections, Logbook or Analytics code, no Firebase SDK in the demo); every page then opens, from a
 // link or straight from the address; the Logbook's view hooks work before its code has loaded; and with the service
-// worker, the app still opens every page offline after a reload.
+// worker, the app still opens every page offline after a reload; sign-out wipes reflection drafts before that page's
+// code loads; a page that failed to load comes back with the card's Reload.
 import assert from 'node:assert/strict';
 const { chromium } = await import(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/node_modules/playwright/index.mjs');
 const base = `http://localhost:${process.env.PORT || 8080}/logbook/`;
@@ -59,6 +60,35 @@ try {
     await p.waitForFunction(() => performance.getEntriesByType('resource').some(e => /ui-admin\.js/.test(e.name)), null, { timeout: 15000 });
     assert.deepEqual(errors, []);
     console.log('PASS lazy load ' + (width < 600 ? 'phone' : 'desktop'));
+    await ctx.close();
+  }
+
+  // sign-out before Reflections' code has loaded still wipes the last person's unsaved reflection draft
+  {
+    const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
+    await ctx.addInitScript(() => { if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); localStorage.setItem('apmes-logbook-demo-small', '1'); localStorage.setItem('apmes-logbook-reflection-draft:demo:demo@example.com', JSON.stringify({ diagnosis: 'Fake draft' })); } });
+    const p = await ctx.newPage();
+    await p.goto(base + '?demo#more');
+    await p.getByRole('button', { name: 'Sign out', exact: true }).click();
+    await p.waitForFunction(() => !Object.keys(localStorage).some(k => k.startsWith('apmes-logbook-reflection-draft')), null, { timeout: 5000 });
+    assert.ok(!(await loaded(p)).map(name).includes('ui-reflect'), 'ui-reflect loaded before sign-out; the test proves nothing');
+    console.log('PASS sign-out wipes reflection drafts before ui-reflect loads');
+    await ctx.close();
+  }
+
+  // a page whose module failed to load: the card's button reloads, and the page then draws
+  {
+    const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
+    await ctx.addInitScript(() => localStorage.setItem('apmes-logbook-demo-small', '1'));
+    let fail = true;
+    await ctx.route(/\/js\/ui-progress\.js/, r => (fail ? (fail = false, r.abort()) : r.continue()));
+    const p = await ctx.newPage();
+    await p.goto(base + '?demo#progress');
+    await p.getByText('This page didn’t load').waitFor();
+    await p.getByRole('button', { name: 'Reload' }).click();
+    await p.waitForFunction(() => document.getElementById('app').dataset.page === 'progress', null, { timeout: 15000 });
+    assert.doesNotMatch(await p.locator('#app').innerText(), /didn’t load/);
+    console.log('PASS a failed page load recovers with Reload');
     await ctx.close();
   }
 

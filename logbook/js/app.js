@@ -40,14 +40,15 @@ const forgetSync = () => {
   wipeSyncDevice();
 };
 // a page drawn from modules: at once when they are loaded; else the loading outline, and the page draws again when
-// they arrive (if it is still the one on screen)
+// they arrive (if it is still the one on screen). If one fails, only a reload helps: the browser keeps a failed module
+// import for the life of the page, so importing it again fails at once without asking the network.
 const page = (names, draw) => () => {
   const missing = names.filter(n => !mod[n]);
   if (!missing.length) return draw(mod);
   const wait = h('div', { class: 'lazy-wait' });
   wait.innerHTML = SKELETON;
   Promise.all(missing.map(need)).then(() => { if (wait.isConnected) render(); },
-    err => { console.warn(err); if (wait.isConnected) fill(wait, h('section', { class: 'card' }, h('p', {}, 'This page didn’t load. Check the connection, then try again.'), h('div', { class: 'bar', style: 'margin-bottom:0' }, h('button', { onclick: () => render() }, 'Try again')))); });
+    err => { console.warn(err); if (wait.isConnected) fill(wait, h('section', { class: 'card' }, h('p', {}, 'This page didn’t load. Check the connection, then reload.'), h('div', { class: 'bar', style: 'margin-bottom:0' }, h('button', { onclick: () => location.reload() }, 'Reload')))); });
   return wait;
 };
 // the rest, one module at a time in idle moments once the Case tab is up, so changing tab stays instant
@@ -56,7 +57,8 @@ function warmUp() {
   if (warmed) return; warmed = true;
   const names = ['logbook', 'reflect', 'progress', 'settings', 'send', 'sync', 'settingsFile', 'recovery', 'account', 'caselogs', 'notesExport', 'cloudSave', 'backup', 'shareIn', 'admin'];
   const idle = fn => (typeof requestIdleCallback === 'function' ? requestIdleCallback(fn, { timeout: 3000 }) : setTimeout(fn, 200));
-  const next = () => { const n = names.shift(); if (n) need(n).catch(() => {}).then(() => idle(next)); };
+  // a failure stops the warm-up (the network is likely down); the page that failed says so when it is opened
+  const next = () => { const n = names.shift(); if (n) need(n).then(() => idle(next), err => console.warn(err)); };
   setTimeout(() => idle(next), 1500);
 }
 // The Logbook's and Analytics' links set the Logbook's view first (ui-logbook.js replaces these once it loads)
