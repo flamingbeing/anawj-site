@@ -1,4 +1,4 @@
-// Fake data only. Settings → Profiles or hide items (profiles; grouped switches, a reset per group), and the backup as one
+// Fake data only. Settings → Profile (profiles as presets; grouped switches, a reset per group), and the backup as one
 // spreadsheet (CSV download and restore).
 import assert from 'node:assert/strict';
 const { chromium } = await import(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/node_modules/playwright/index.mjs');
@@ -12,13 +12,13 @@ try { for (const width of [390, 1280]) {
   const st = () => p.evaluate(async () => { const { settings } = await import('./js/ui-core.js'); const { display } = await import('./js/ui-settings.js'); return { s: settings(), d: display() }; });
   const group = name => p.locator(`.showhide [data-group=${name}]`);
   await p.goto(base + '?demo#settings'); await p.locator('a[data-go=showhide]').click();
-  await p.getByRole('heading', { name: 'Hide items', exact: true }).waitFor();
+  await p.getByRole('heading', { name: 'Show or hide', exact: true }).waitFor();
 
   // switches change the same settings as their own pages
   await group('tips').getByLabel('Show tips and help text').uncheck();
   await p.waitForFunction(() => document.body.classList.contains('no-help'));
   await group('case').getByLabel('Plan for later').uncheck();
-  await group('case').getByLabel('Still needed').uncheck();
+  await group('apmes').getByLabel('Still needed (on the Case tab)').uncheck();
   await p.waitForFunction(async () => { const { settings } = await import('./js/ui-core.js'); return (settings().caseHide || []).length === 2; });
   await group('logbook').getByLabel('Copy and Reflect buttons on each case').uncheck();
   await group('bar').getByLabel('Notes on the tab bar').check();
@@ -29,6 +29,9 @@ try { for (const width of [390, 1280]) {
 
   // resetting one group leaves the others alone
   await group('case').getByRole('button', { name: 'Reset this group' }).click();
+  await p.locator('dialog[open]').getByRole('button', { name: 'Reset' }).click();
+  await p.waitForFunction(async () => { const { settings } = await import('./js/ui-core.js'); return (settings().caseHide || []).join() === 'still'; });
+  await group('apmes').getByRole('button', { name: 'Reset this group' }).click();
   await p.locator('dialog[open]').getByRole('button', { name: 'Reset' }).click();
   await p.waitForFunction(async () => { const { settings } = await import('./js/ui-core.js'); return !settings().caseHide; });
   let now = await st();
@@ -46,15 +49,14 @@ try { for (const width of [390, 1280]) {
   await p.locator('dialog[open]').getByRole('button', { name: 'Reset' }).click();
   await p.waitForFunction(async () => { const { display } = await import('./js/ui-settings.js'); return !display().rowMenu; });
 
-  // Profiles (top of Profiles or hide items, the only place). Basic is the default (these tests start in Advanced).
+  // Profiles (top of Settings → Profile, the only place). Basic is the default (these tests start in Advanced).
   // Basic keeps the tabs and buttons where they are without the extras, Analytics in More; it hides interface items
   // only (never settings), and each can be turned back on
   const tabsNow = () => p.locator('[role=tab]').evaluateAll(t => t.map(x => x.dataset.tab));
-  const pickProfile = async k => { await p.evaluate(() => { location.hash = '#showhide'; }); await p.locator(`.profile-card input[value=${k}]`).check(); };
-  const prof = () => p.locator('.profile-card');
+  const pickProfile = async k => { await p.evaluate(() => { location.hash = '#showhide'; }); await p.locator(`.profile-card input[value=${k}]`).check(); await p.locator('dialog[open]').getByRole('button', { name: 'Apply' }).click(); };
   assert.equal(await p.evaluate(async () => { const { S, profile } = await import('./js/ui-core.js'); const was = S.logbook.settings; S.logbook.settings = { ...was, mode: null }; const out = profile(); S.logbook.settings = was; return out; }), 'basic', 'Basic is the default');
   await p.evaluate(() => { location.hash = '#settings'; });
-  assert.equal(await p.locator('.profile-card, .basic-card').count(), 0, 'the profile is in Profiles or hide items only');
+  assert.equal(await p.locator('.profile-card, .basic-card').count(), 0, 'the profile is in Settings → Profile only');
   const tabsAdvanced = await tabsNow();
   await pickProfile('basic');
   await p.waitForFunction(() => document.body.classList.contains('basic'));
@@ -83,11 +85,14 @@ try { for (const width of [390, 1280]) {
   await p.goBack(); await p.waitForFunction(() => !document.querySelector('.refl-editor'));
   // ...and back on, one by one
   await p.evaluate(() => { location.hash = '#showhide'; });
-  assert.equal(await prof().getByRole('switch', { name: /^Reflect buttons/ }).count(), 0, 'the reflections item is for logbook only');
-  await prof().getByRole('switch', { name: 'The Logbook grid view' }).check();
-  await prof().getByRole('switch', { name: /^Analytics trends/ }).check();
-  await prof().getByRole('switch', { name: 'Figures and references in reflections' }).check();
+  assert.equal(await group('extras').getByRole('switch', { name: /^Reflect buttons/ }).isChecked(), true, 'Basic keeps the reflections');
+  await p.locator('.profile-now', { hasText: 'Now: Basic' }).waitFor();
+  await group('extras').getByRole('switch', { name: 'The Logbook grid view' }).check();
+  await p.locator('.profile-now', { hasText: 'Custom (based on Basic)' }).waitFor();
+  await group('extras').getByRole('switch', { name: /^Analytics trends/ }).check();
+  await group('extras').getByRole('switch', { name: 'Figures and references in reflections' }).check();
   await group('case').getByLabel(/Quick picks/).check();
+  await group('case').getByLabel('Suggested tags as you type').check();
   await group('bar').getByLabel('Analytics on the tab bar').check();
   await p.locator('[role=tab][data-tab=progress]').waitFor();
   await p.locator('[role=tab][data-tab=logbook]').click();
@@ -97,12 +102,12 @@ try { for (const width of [390, 1280]) {
   await p.evaluate(async () => { const { reflectOnCase } = await import('./js/ui-reflect.js'); await reflectOnCase({ id: 'fake-basic2', date: '2026-10-10', initials: 'ZZ', details: 'Fake basic case', cats: ['13'] }); });
   await p.locator('.refl-editor summary').filter({ hasText: /References/ }).waitFor();
   await p.goBack(); await p.waitForFunction(() => !document.querySelector('.refl-editor'));
-  assert.ok((await st()).s.basicOn.includes('case:quick'));
+  { const s = (await st()).s.show; assert.ok(s['case:recent'] === true && s['case:sugg'] === true); }
 
   // Basic: logbook only: Basic without reflections (picking a profile starts from its defaults)
   await pickProfile('logbook');
   await p.waitForFunction(() => document.body.classList.contains('logbook-only'));
-  assert.ok(!(await st()).s.basicOn, 'picking a profile starts from its defaults');
+  assert.ok(!(await st()).s.show, 'picking a profile starts from its defaults');
   assert.deepEqual(await tabsNow(), tabsAdvanced.filter(t => t !== 'progress' && t !== 'reflect'));
   await p.locator('[role=tab][data-tab=logbook]').click();
   await p.locator('main .seg button').filter({ hasText: /^List$/ }).click();
@@ -115,7 +120,8 @@ try { for (const width of [390, 1280]) {
   await p.locator('main h2').filter({ hasText: 'Reflections' }).first().waitFor();
   // everything back on, one by one, is Advanced again
   await p.evaluate(() => { location.hash = '#showhide'; });
-  for (const el of await prof().locator('input[role=switch]').all()) await el.check();
+  for (const el of await group('extras').locator('input[role=switch]').all()) await el.check();
+  await group('apmes').getByLabel('Still needed (on the Case tab)').check();
   for (const el of await group('case').locator('input[role=switch]').all()) await el.check();
   await group('bar').getByLabel('Reflections on the tab bar').check();
   await group('bar').getByLabel('Analytics on the tab bar').check();
@@ -127,7 +133,7 @@ try { for (const width of [390, 1280]) {
   await pickProfile('advanced');
   await p.waitForFunction(() => !document.body.classList.contains('basic') && !document.body.classList.contains('logbook-only'));
   assert.equal((await st()).s.mode, 'advanced');
-  assert.equal(await prof().locator('input[role=switch]').count(), 0, 'nothing hidden in Advanced');
+  await p.locator('.profile-now', { hasText: 'Now: Advanced' }).waitFor();
   assert.deepEqual(new Set(await tabsNow()), new Set(tabsAdvanced));
   await p.evaluate(async () => { const { patchLogbook } = await import('./js/ui-core.js'); await patchLogbook({ settings: { caseHide: null } }); });
 

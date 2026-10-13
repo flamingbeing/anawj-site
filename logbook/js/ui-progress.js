@@ -26,6 +26,9 @@ export const legend = () => h('div', { class: 'legend' },
 // ---------- Progress ----------
 
 export function renderProgress() {
+  // Profile → APMES: targets, the residency year and the programme totals each have a switch (off in Personal)
+  if (basicHides('targets')) return renderCounts();
+  const yearOn = !basicHides('year'), totalsOn = !basicHides('totals');
   const yr = rYear();
   const rows = progress(S.counts, yr);
   const tally = s => rows.filter(r => r.status === s).length;
@@ -34,15 +37,15 @@ export function renderProgress() {
   const [infoBtn, infoText] = info('Targets are cumulative: every case counts towards the R3 and SR2 numbers whenever it was done.');
   const head = h('section', { class: 'card' },
     h('div', { class: 'ry' },
-      yearCtl,
-      h('span', {}, S.resident && S.resident.status === 'SMO' ? 'SMO: cases count as R3' : yr <= 3 ? 'Junior residency (R1–R3)' : 'Senior residency (SR1–SR2)'),
+      yearOn ? yearCtl : null,
+      yearOn ? h('span', {}, S.resident && S.resident.status === 'SMO' ? 'SMO: cases count as R3' : yr <= 3 ? 'Junior residency (R1–R3)' : 'Senior residency (SR1–SR2)') : null,
       h('span', { class: 'muted' }, `${S.cases.length} cases logged`)),
     // the counts double as the legend: one line of coloured dots
     h('p', { class: 'legend tally', style: 'margin:8px 0 0' },
       [['late', 'behind'], ['due', 'due this year'], ['ontrack', 'on track'], ['done', 'done']].map(([k, t], i) => [h('span', { style: 'white-space:nowrap' }, h('i', { class: `dot ${k}` }), ` ${tally(k)} ${t}`, i < 3 ? '\u00a0·' : ''), i < 3 ? ' ' : '']).flat(),   // a wrap never starts a line with ·
       ' ', infoBtn),
     infoText,
-    S.resident ? null : h('p', { class: 'hint', style: 'margin:4px 0 0' }, 'Not on the programme list, so your year is set in ', h('a', { href: '#settings' }, 'Settings'), '.'));
+    S.resident || !yearOn ? null : h('p', { class: 'hint', style: 'margin:4px 0 0' }, 'Not on the programme list, so your year is set in ', h('a', { href: '#account' }, 'Account'), '.'));
   // Advanced: your pace over the last 6 months; tags on track whose next target won't be reached in time are "off pace"
   const fc = advanced() ? paceForecast(rows, S.cases, yr, todayISO()) : {};
   const offPace = r => r.status === 'ontrack' && fc[r.code] && fc[r.code].offPace;
@@ -66,7 +69,7 @@ export function renderProgress() {
   // at a glance (before the card is opened): the summary line and one bar by status with this year's goal; where
   // you sit in your year is inside the card (owner's Apple-apps review: one number and one bar, the detail inside)
   const lg = logbookGlance(rows);
-  const cohort = cohortNow();
+  const cohort = totalsOn ? cohortNow() : null;
   const logGlance = h('div', { class: 'glance' }, statusBar(lg));
   const targets = section('targets', 'Logbook', `${tally('done')} of ${withTarget.length} tags done · ${S.cases.length} cases`, logGlance,
     cohort ? h('div', { class: 'glance an-year' }, h('h3', {}, 'You and your year'),
@@ -78,7 +81,25 @@ export function renderProgress() {
     h('ul', {}, h('li', {}, h('a', { href: '#totals' },
       h('span', { class: 'mt' }, h('b', {}, 'Compare with your intake'), h('small', {}, 'Case counts per tag across residents in your year (Totals)')),
       h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')))));
-  return h('div', {}, head, urgentSec, quietSec, targets, basicHides('reflect') ? null : reflCard(), advanced() ? todoCard() : null, advanced() ? trendsCard() : null, compare);
+  return h('div', {}, head, urgentSec, quietSec, targets, reflectionsOn() ? reflCard() : null, advanced() ? todoCard() : null, advanced() ? trendsCard() : null, totalsOn ? compare : null);
+}
+const reflectionsOn = () => !basicHides('reflect') && !basicHides('reflHeadings');
+
+// Analytics without the targets (Profile → APMES off; the Personal profile): how many cases each tag has, your own
+// tags too, most first; then the trends
+function renderCounts() {
+  const n = new Map();
+  for (const c of S.cases) {
+    for (const k of c.cats || []) n.set('c:' + k, (n.get('c:' + k) || 0) + 1);
+    for (const k of c.tags || []) n.set(k, (n.get(k) || 0) + 1);
+  }
+  const rows = [...n].sort((a, b) => b[1] - a[1]);
+  const name = k => (k.startsWith('c:') ? catName(k.slice(2)) : tagName(k));
+  const head = h('section', { class: 'card' }, h('div', { class: 'ry' }, h('span', { class: 'big' }, String(S.cases.length)), h('span', {}, `case${S.cases.length === 1 ? '' : 's'} logged`)));
+  const counts = section('counts', 'Tags', `${rows.length} tag${rows.length === 1 ? '' : 's'} used · ${S.cases.length} cases`,
+    rows.length ? h('ul', { class: 'an-list' }, rows.map(([k, x]) => h('li', {}, casesLink(name(k), { tag: k }), h('small', { class: 'muted' }, ` · ${x} case${x === 1 ? '' : 's'}`))))
+      : h('p', { class: 'empty' }, 'No cases yet.'));
+  return h('div', {}, head, counts, reflectionsOn() ? reflCard() : null, advanced() ? todoCard() : null, advanced() ? trendsCard() : null);
 }
 
 // A folded card: the title and a one-line summary; tap to open the full section (kept open while you stay).

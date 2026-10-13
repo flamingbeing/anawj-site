@@ -39,9 +39,10 @@ async function saved(to, n, prune) {
 const PENDING = 'apmes-logbook-cloud-pending', RETURN = 'apmes-logbook-cloud-return', PENDING_MS = 15 * 60e3;
 const redirectUri = () => location.origin + location.pathname;   // https://apmes.anawj.com/logbook/ (registered with Google and Dropbox)
 const randomState = prefix => prefix + crypto.getRandomValues(new Uint32Array(2)).join('');
-async function leaveToSignIn(to) {
+// extra: { action: 'sync', back: 'sync', target } when Sync (ui-sync.js) needs the token, not a backup
+async function leaveToSignIn(to, extra = {}) {
   const state = randomState(to === 'drive' ? 'gdr-' : 'dbx-');
-  const pending = { to, state, demo: !!demo, at: Date.now() };
+  const pending = { to, state, demo: !!demo, at: Date.now(), ...extra };
   let url;
   if (to === 'drive') url = googleAuthUrl({ clientId: GOOGLE_CLIENT_ID, redirectUri: redirectUri(), state, loginHint: S.user && S.user.email });
   else {
@@ -54,32 +55,37 @@ async function leaveToSignIn(to) {
 }
 const take = (store, key) => { try { const v = JSON.parse(store.getItem(key) || 'null'); store.removeItem(key); return v; } catch { return null; } };
 
-// after sign-in on the page Google or Dropbox sent us back to: finish the save that was waiting
+// after sign-in on the page Google or Dropbox sent us back to: finish the save (or the sync) that was waiting
 export async function resumeCloudSave() {
   const back = take(sessionStorage, RETURN);
   const r = back && parseCloudReturn(back);
   if (!r) return;
   const p = take(localStorage, PENDING), pending = p && Date.now() - (p.at || 0) < PENDING_MS ? p : null;
   const where = r.to === 'drive' ? 'Google Drive' : 'Dropbox';
-  if (!pending || pending.to !== r.to || pending.state !== r.state) return toast(`Not saved to ${where}: the sign-in didn’t match. Tap Save again.`);
-  if (r.error) return toast(`Not saved to ${where}: ${/denied/i.test(r.error) ? 'sign-in was cancelled' : r.error}`);
-  toast(`Saving to ${where}…`);
+  const sync = !!(pending && pending.action === 'sync'), what = sync ? 'synced' : 'saved';
+  if (!pending || pending.to !== r.to || pending.state !== r.state) return toast(`Not ${what} to ${where}: the sign-in didn’t match. Tap ${sync ? 'Sync' : 'Save'} again.`);
+  if (r.error) return toast(`Not ${what} to ${where}: ${/denied/i.test(r.error) ? 'sign-in was cancelled' : r.error}`);
+  if (!sync) toast(`Saving to ${where}…`);
   try {
     // the backup must hold everything: wait for the server's copy of the cases and reflections
     for (const t0 = Date.now(); !(S.casesSynced && S.reflectionsSynced); await new Promise(res => setTimeout(res, 250)))
-      if (Date.now() - t0 > 30e3) throw new Error('your logbook didn’t finish loading (no signal?). Tap Save again.');
-    if (r.to === 'drive') {
-      driveToken = { token: r.token, exp: Date.now() + r.expiresIn * 1000 };
-      await uploadDrive(r.token);
-    } else {
+      if (Date.now() - t0 > 30e3) throw new Error(`your logbook didn’t finish loading (no signal?). Tap ${sync ? 'Sync' : 'Save'} again.`);
+    if (r.to === 'drive') driveToken = { token: r.token, exp: Date.now() + r.expiresIn * 1000 };
+    else {
       const res = await fetch('https://api.dropboxapi.com/oauth2/token', { method: 'POST', body: new URLSearchParams({ code: r.code, grant_type: 'authorization_code', client_id: DROPBOX_APP_KEY, redirect_uri: redirectUri(), code_verifier: pending.verifier || '' }) });
       const t = await res.json().catch(() => ({}));
       if (!res.ok || !t.access_token) throw new Error('Dropbox: ' + (t.error_description || t.error || res.status));
       dbxToken = { token: t.access_token, exp: Date.now() + (Number(t.expires_in) || 14400) * 1000 };
-      await uploadDropbox(dbxToken.token);
     }
-  } catch (err) { toast('Not saved: ' + err.message); }
+    if (sync) return (await import('./ui-sync.js')).resumeSync(pending);
+    if (r.to === 'drive') await uploadDrive(driveToken.token); else await uploadDropbox(dbxToken.token);
+  } catch (err) { toast(`Not ${what}: ` + err.message); }
 }
+
+// for Sync (ui-sync.js): this visit's token while it has a minute left, or null (then signInFor leaves to get one)
+export const cloudToken = to => { const t = to === 'drive' ? driveToken : dbxToken; return t && t.exp > Date.now() + 60e3 ? t.token : null; };
+export const forgetCloudToken = to => { if (to === 'drive') driveToken = null; else dbxToken = null; };
+export const signInFor = (to, extra) => leaveToSignIn(to, extra);
 
 // ---- Google Drive: OAuth token for drive.file (the app sees only the files it made) ----
 

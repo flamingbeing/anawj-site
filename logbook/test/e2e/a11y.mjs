@@ -33,7 +33,10 @@ const SCREENS = [
   ['Display', hash('display'), true],
   ['Advanced display', hash('displayadv'), false],
   ['Logging', hash('logging'), false],
-  ['Profiles or hide items', hash('showhide'), false],
+  ['Profile', hash('showhide'), false],
+  ['Profile dialog', async p => { await hash('showhide')(p); await p.locator('.profile-card input[value=personal]').check(); await p.waitForSelector('dialog[open]'); }, false],
+  // the targets switched off (in memory only: the demo store is shared by the next screens)
+  ['Analytics without targets', async p => { await hash('progress')(p); await p.evaluate(async () => { const { S, hooks } = await import('./js/ui-core.js'); S.logbook.settings = { ...S.logbook.settings, show: { targets: false, totals: false, year: false } }; hooks.render(); }); await p.locator('.an-sec summary', { hasText: 'Tags' }).waitFor(); }, false],
   ['Advanced logging', hash('loggingadv'), false],
   ['Tag editor', hash('tags'), false],
   ['Reflection settings', hash('reflset'), false],
@@ -50,6 +53,28 @@ const SCREENS = [
     await hash('logbook')(p);
     await p.evaluate(async () => { const { openSend } = await import('./js/ui-send.js'); openSend({ text: 'Fake day', date: '2026-10-10' }); });
     await p.waitForSelector('dialog[open]');
+  }, true],
+  ['Sync', async p => {
+    await hash('sync')(p);
+    await p.getByLabel('Add a place to sync to').selectOption('github');
+    await p.getByLabel('Add a place to sync to').selectOption('drive');
+  }, true],
+  ['Sync run', async p => {
+    await hash('logbook')(p);
+    await p.evaluate(async () => {
+      const { patchLogbook } = await import('./js/ui-core.js');
+      await patchLogbook({ settings: { sync: { targets: [{ id: 'gh1', kind: 'github', owner: 'fake-user', repo: 'fake-notes' }] } } });
+      localStorage.setItem('apmes-logbook-cloud-gh:demo:demo@example.com:gh1', 'FAKE');
+    });
+    // GitHub answers from here, no network: every day is new, every write accepted
+    await p.route('https://api.github.com/**', route => route.request().method() === 'OPTIONS'
+      ? route.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' } })
+      : route.request().method() === 'GET'
+      ? route.fulfill({ status: 404, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{}' })
+      : route.fulfill({ status: 201, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ content: { sha: 'fake' } }) }));
+    await hash('settings')(p); await hash('logbook')(p);
+    await p.locator('button.lb-sync').click();
+    await p.getByText(/^Synced \d+ of/).waitFor();
   }, true],
   ['Export / Import', hash('data'), false],
   ['Recover drafts', hash('recovery'), false],
@@ -79,6 +104,33 @@ const SCREENS = [
     await p.getByRole('menuitem', { name: 'Preview' }).click();
     await p.waitForSelector('.note-view:not([hidden])');
   }, false],
+  ['Note settings', hash('notesset'), false],
+  ['Daily note on the Logbook', async p => {
+    await hash('logbook')(p);
+    await p.locator('main .seg button', { hasText: /^Calendar$/ }).first().click();   // an earlier screen left the list on
+    await p.locator('.lb-calbar').getByRole('button', { name: 'Today', exact: true }).click();
+    await p.getByRole('button', { name: '+ Daily note' }).click();
+    await p.getByLabel('Note text').fill('Fake day\n- [ ] fake to-do\n*fake italic*');
+    await p.waitForFunction(async () => (await import('./js/ui-core.js')).S.notes?.some(n => n.id.startsWith('day-')), null, { timeout: 8000 });
+    await p.getByRole('button', { name: 'Done' }).click();
+    await p.locator('.lb-daynote').waitFor();
+  }, true],
+  ['Note editor with formatting buttons', async p => {
+    await p.evaluate(async () => { const m = await import('./js/ui-settings.js'); m.setDisplay({ noteToolbar: true }); });
+    await hash('notes')(p);
+    await p.getByRole('button', { name: '+ New note' }).click();
+    await p.getByRole('toolbar', { name: 'Formatting' }).waitFor();
+  }, false],
+  ['Case tab daily note', async p => {
+    await p.evaluate(async () => { const { patchLogbook, hooks } = await import('./js/ui-core.js'); await patchLogbook({ settings: { dayNoteOnCase: true } }); hooks.render(); });
+    await p.locator('.day-note-box summary').click();
+    await p.waitForSelector('.day-note-text:not([disabled])');
+  }, false],
+  ['Shared with the app', async p => {
+    await p.evaluate(() => sessionStorage.setItem('logbook-shared', 'AB 40M fake lap chole\nFake second line'));
+    await hash('share')(p);
+    await p.locator('.share-preview').waitFor();
+  }, true],
   ['Reflection editor', async p => {
     await hash('reflect')(p);
     await p.evaluate(async () => { const { reflectOnCase } = await import('./js/ui-reflect.js'); await reflectOnCase({ id: 'fake-a11y', date: '2026-10-10', initials: 'ZZ', details: 'Fake case for the accessibility check', cats: ['13'] }); });

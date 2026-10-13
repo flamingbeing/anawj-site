@@ -66,9 +66,29 @@ portfolio content.
 - **Logging preferences**: First field (Case summary by default, Initials or Date) is per device (`display.firstField`). Initials adds an optional input before the case box; Enter moves to the summary. Opening Case and saving focus the chosen field. `settings.detectAgeSex` is on by default: off hides the age/gender preview and stops age-based suggestions in Case and List review, while preserving text and manual/keyword tags. Case/List examples follow autodetection and the separate initials field without changing typed text. `M` and `m` both mean male in years (`6m` = six-year-old male, `3m` = three-year-old male); use `mo` for months (`3mo` = three months). Unambiguous compounds such as `2m2w` retain months + weeks.
 - **Enter key** (Settings → Logging, `settings.enterMode`): New line (default; Ctrl/Cmd+Enter saves), Press Enter twice
   (Enter on an empty line saves; also via beforeinput for phone keyboards), or Enter saves. Old `enterSaves` = single.
-  A no-tag save highlights suggestions; an additional Enter accepts the suggested tags and saves
-  (the third Enter in double-Enter mode). This requires suggestions to be on. Editing or manually
-  selecting tags cancels the offer; Shift+Enter remains a new line and holding Enter never accepts it.
+  A no-tag save highlights suggestions and offers the confident ones (score >= 0.5, `logging.js` `STRONG`, the same
+  line as "+ All" and a pasted list; weak guesses are never counted without a look); a second Save (the button, an
+  additional Enter in the box, the third Enter in double-Enter mode, or Enter in the empty tag search) accepts them
+  and saves. This requires suggestions to be on. Editing or manually selecting tags cancels the offer; Shift+Enter
+  remains a new line and holding Enter never accepts it (key repeats are ignored, also in the tag search). A Save tap
+  within 600 ms of a tap that made the offer is a double tap and is ignored, so the hint shows first. Enter in the empty tag search
+  saves the case only in Basic (which, with no suggestion row, sends the focus there) or while an offer is pending;
+  elsewhere it does nothing, as before.
+- **Case tab parts** (`settings.caseHide`, and Basic's `basicOn` `case:<part>`): `sugg` (the suggestion row) and
+  `recent` (Same as last, tag groups) used to be one part, `quick`; an older `quick` still means both and is
+  rewritten as the two on the next change (`logging.js` `expandParts`). Basic hides both unless turned back on.
+  The profile switches are `case:sugg` and `case:recent` (profiles.js reads an older `quick` in `caseHide`,
+  `basicOn` or `show['case:quick']` as both).
+- **Logging extras** (account, off / default as before): `settings.autoTick` ticks the confident suggestions as you
+  type; they follow the text, and one the user unticks stays off for that case (`draft.auto` / `draft.rejected`,
+  kept through Undo after Save and Undo after clearing the box).
+  `settings.recentCount` (1 default; 1, 2, 3 or 5, other values snap to the nearest: `logging.js` `recentCount`) Same as last chips. A date chip tap refocuses the box only when it
+  had the focus. A pasted list ticks your own tags from their shorthand, with what they count towards.
+- **Typing cost**: the draft is stored 300 ms after the keys pause (and at once on pagehide, hidden, hash change);
+  the box's marks copy its style only on resize (ResizeObserver) and redraw in the next frame; per key only changed
+  text is written; a tag tap updates the list in place (`picker.sync`); `PROGRESS_BY_CODE` is memoised on
+  `S.counts`; a write's state change that leaves the list as it was doesn't recount. Benchmark:
+  `PORT=8080 node logbook/test/e2e/bench-logging.mjs` (Chrome busy time; numbers in the 13 Oct 2026 PR).
 - **Two panes** on the Case tab at >= 840px wide and >= 500px tall (tablets, unfolded foldables, computers; not
   landscape phones): `.log-card.panes` grid, left = date, case box, quick picks, Still needed, Save; right = all tags
   (sticky, own scroll). On phones `.lp-left` / `.lp-right` are display: contents, so the order is unchanged.
@@ -219,7 +239,7 @@ portfolio content.
   After Save (`afterSave`: next (default) / keepTags / closed = keyboard down / logbook = `hooks.showDay` set by
   ui-logbook.js, then #logbook on that day; Undo then puts the case back, and kept tags don't count as a new case);
   Undo window (`undoSecs` 5 default / 10 / 20 / 30: any toast with a button stays at least that long, ui-core `toast`);
-  Case tab card: parts to hide (`caseHide`, CASE_PARTS in ui-log.js: interesting, parsed, quick, still, groupsave,
+  Case tab card: parts to hide (`caseHide`, CASE_PARTS in ui-log.js: interesting, parsed, sugg, recent, still, groupsave,
   plan; `.log-card.hide-*` in style.css; the case box, All tags and Save always stay). Device (`DISPLAY_KEYS`, html
   classes from applyLook): case box keyboard (`boxCaps` false → `box-caps-off`, `boxCorrect` true → `box-correct`,
   `boxSpell` false → `box-spell-off`; read in renderOne), reflection spelling (`reflSpell` false → `refl-spell-off`,
@@ -305,6 +325,29 @@ portfolio content.
   references). Default day: `[[YYYY-MM-DD]]`, then `1. AB` / case, a blank line between cases; no tags. An older
   `settings.shareFormat` (the Copy & share format) carries over until the Markdown page is saved; `share-format.js`
   is kept for that and its tests. Previews use the user's own latest day and reflection.
+- **Sync** (Settings → Sync, `#sync`; `ui-sync.js` page + run, `sync-remote.js` calls, `sync-md.js` pure and tested;
+  Oct 2026): one Markdown file per day (the day's cases + that day's notes via `mdDay`, the user's Markdown format) in
+  Google Drive (`APMES Logbook/Daily/`), Dropbox (app folder `/Daily/`) or a GitHub repo (owner/repo/branch/folder,
+  contents API). Name pattern `{date}.md` (also {year} {month} {day}; `/` makes folders). Only days whose text changed
+  since this device's last sync go, only on a tap: a "Sync (N)" button on the Logbook tab's count row once a place is
+  set up (none otherwise); optional reminder on open (off). The app owns only `<!-- logbook:start fp=… -->` … `<!--
+  logbook:end -->` in each file: text outside is kept; edits inside are merged (`merge3`: base = the app's text at the
+  last sync, kept in IndexedDB `apmes-logbook-sync`; clashes kept both ways with `<<<<<<< logbook` / `>>>>>>> your
+  edits` marks; lines both sides added at the end: the user's first). The start mark's `fp` is the fingerprint of the
+  app's text written there (never of a merged block), so a device with no ledger or base (second device, after
+  sign-out) replaces an untouched block, leaves alone a block already holding its text, and marks clashes only when
+  both really changed. Changing a place's repo/branch/folder/file name clears its ledger and bases (every day is
+  written there again). A run waits for the server's notes (`notesFromServer`); a run stops recording at once on
+  sign-out (`gen`); `forgetSync` also drops this visit's Drive/Dropbox tokens and Drive folder ids. GitHub writes
+  are paced (60 a minute) and a rate limit (403/429 "rate limit", Retry-After) stops that place with "try again in
+  N minutes"; "Try again" redoes only the place(s) of that run. Writes are conditional (Drive: md5 checked just before PATCH; Dropbox: upload `update` rev / `add`;
+  GitHub: PUT with sha) and a refused write is read again and merged (twice at most). `settings.sync` {targets,
+  remind} (no tokens; travels in the settings file); ledger in localStorage `apmes-logbook-cloud-sync:<account>`
+  {fp, rev per day}; GitHub token (fine-grained, one repo, Contents read/write) in `apmes-logbook-cloud-gh:<account>:<id>`
+  only; "cloud" keeps them out of the device-settings file. Sign-out / account switch / demo reset forget all of it
+  (`forgetSync`). Drive/Dropbox reuse the backup sign-in (`signInFor`, pending `action: 'sync'`, `back` page);
+  tokens stay memory-only, so a run resumed after one sign-in never leaves for a second (the other place waits for
+  the next tap). ID check once per run. e2e: `test/e2e/sync.mjs` fakes all three APIs.
 - **Save to Google Drive / Dropbox** (Backup card; `cloud-save.js`, ids and pure helpers in `backup-targets.js`,
   tested): sign-in leaves the page and comes back, no popups (Oct 2026: on the owner's phone popups lost their
   opener, so Drive stayed on a blank page and Dropbox did nothing). Drive = OAuth implicit grant (token in the
@@ -325,23 +368,42 @@ portfolio content.
   lastAt, lastTo } (never in the settings file). Reminder: one toast per visit with a Save button when due. The
   owner filled `GOOGLE_CLIENT_ID` and `DROPBOX_APP_KEY` (both public) in Oct 2026. Dropbox stays in development
   mode until the owner applies for production (its icons are 64 and 256 px from `icons/icon-512.png`).
-- **Profiles or hide items** (Settings → Profiles or hide items, was Show or hide; `#showhide`, `renderShowHide` in `ui-settings.js`; Oct 2026, from Codex's
-  list): every switch that hides part of the app, grouped Tips and help / Case tab / Logbook / Header and tabs, each
-  group with its own "Reset this group" (the other groups stay); a Reflections group too (formatting buttons,
-  heading notes). The same settings as on their own pages (hideTips, weeklyDigest, reflNotes, caseHide, reflToolbar; this device's rowMenu, hideHeader, tabHidden / tabOrder). e2e:
-  `test/e2e/simpler.mjs`.
-- **Profiles** (`settings.mode`, the whole account; `PROFILES`, `profile()`, `basicMode()`, `logbookOnly()`,
-  `BASIC_ITEMS`, `basicHides()` in `ui-core.js`; `profileCard` at the top of Settings → **Profiles or hide items**
-  (`#showhide`), the **only** place (owner, Oct 2026: two Basic switches confused); body classes `basic`,
-  `logbook-only`). Named so both Basic ones read as Basic (owner). **Basic is the default for everyone** (owner, 12
-  Oct 2026: nothing saved = Basic; Advanced is saved as `mode: 'advanced'`). The e2e demo account starts in Advanced
-  (`demoDoc` in demo-backend.js, when `apmes-logbook-demo-small` is set) since the tests check every feature.
-  - **Profiles hide interface items only, never settings** (owner): the advanced settings links, settings file and
-    Connect Claude cards always show. **Every hidden item can be turned back on**, so all on is Advanced again
-    (owner): `settings.basicOn` lists them (Case tab parts as `case:<part>` via `caseShown` / `setCaseShown`, used
-    by the Logging page and the Case tab group too; `grid`, `analytics`, `reflExtras`, `reflect` from the profile
-    card's "Hidden in this profile" switches); the tabs are the tab bar switches. Picking a profile starts from its
-    defaults (`basicOn` cleared) and moves this device's saved tabs.
+- **Settings menu** (`renderSettingsMenu`, `SETTINGS_GROUPS` in `app.js`; owner, 13 Oct 2026): every page kept, in
+  groups Profile / Look / Logging / Reflections / Notes and sharing / Data / Advanced (Advanced display and Advanced
+  logging also listed there). A Settings page (`under: 'settings'`) no group names still shows, under "Other"
+  (`settingsGroups`): give a new page its group. Settings search indexes every page, Profile and the Tag editor included (`SEARCH_PAGES`).
+- **Profile** page (Settings → Profile, was Profiles or hide items; `#showhide`, `renderShowHide` in `ui-settings.js`):
+  the profile card, then every switch that shows or hides part of the app, grouped Extras / APMES / Tips and help /
+  Case tab / Reflections / Logbook / Header and tabs, each group with its own "Reset this group" (back to the
+  profile's defaults; the other groups stay). The same settings as on their own pages. e2e: `simpler.mjs`, `profiles.mjs`.
+- **Profiles are presets of switches** (owner, 13 Oct 2026: "changing profiles simply toggles a bunch of switches";
+  `js/profiles.js`, pure, `test/profiles.test.mjs`). `settings.mode` (the whole account; `PROFILES`, `profile()`,
+  `shows(key)` / `basicHides(key)`, `setShown`, `caseShown` / `setCaseShown` in `ui-core.js`) is the base; each switch
+  (`SWITCHES`: extras `grid`, `analytics`, `reflExtras`, `reflect`; Case tab parts `case:<part>`; APMES `targets`,
+  `case:still`, `totals`, `portfolio`, `year`, `reflHeadings`, `saveToast`, `apmesTitle`) is its saved value in
+  `settings.show`, else the profile's default (`presetOn`). Older accounts' lists still count: `caseHide` (parts off,
+  kept in step on every save) and `basicOn` (items a Basic profile hid, turned back on). So an account with only `mode`
+  saved looks exactly as before. Picking a profile (`profileCard` → `confirmProfile`) lists what it turns on and off and
+  the tabs it moves on this device, then Apply clears the saved switches (`applyPatch`; an ungoverned hidden part such
+  as `parsed` stays) and moves this device's saved tabs, only those the old or new profile moves (`PROFILE_OFF` /
+  `PROFILE_ON`; `tabsAfter`; Notes put on the bar by hand stays there from Basic to Advanced; a device with no saved tabs
+  follows the profile's `offBar`). A switch changed after makes the card read "Custom (based on X)" with "Back to X"
+  (of the tabs, only the profile's own count). **Saving `show`:** the cloud merges the map key by key (`setDoc` with merge), so a patch sends
+  only the changed keys, and a reset sends its keys as `null` (left out, they'd stay); `mergeSettings` merges the same
+  way locally and in demo mode, and a settings file's `show` replaces the account's (`replaceShow`).
+  Body classes `basic`, `logbook-only`, `faculty-profile` stay. **Basic is the default for everyone** (owner, 12 Oct
+  2026: nothing saved = Basic). The e2e demo account starts in Advanced (`demoDoc` in demo-backend.js, when
+  `apmes-logbook-demo-small` is set) since the tests check every feature.
+  - **Profiles hide interface items only, never settings** (owner): every switch is visible on the Profile page and
+    works in any profile.
+  - **APMES switches** (account, on in every profile but Personal): targets (counts against targets in All tags,
+    Analytics targets; off: Analytics shows cases per tag, your own tags too, `renderCounts`), Still needed, programme
+    totals (Compare with your intake, You and your year), portfolio export and Section 1 (Export / Import cards,
+    Account card), residency year (Account card, Analytics year), reflection headings (Analytics card, "Which
+    heading?" step, Reflections list grouped by month), the "now 4/10" save toast, APMES in the default app name
+    (`defaultTitle`; a name typed in Advanced display still wins).
+  - **Personal** (generic logging outside APMES): the APMES switches off, the extras on, Notes on the tab bar
+    (`PROFILE_ON`), own tags kept (tags are never touched by a profile).
   - **Basic**: hides the optional Case tab parts but "what the box was read as" (quick picks, ☆, Still needed, tag
     group saving, Plan for later), the Logbook Grid, Analytics trends / forecasts / Gone quiet / to-dos / links,
     reflection Figures and References (shown anyway when a reflection has some); Analytics off the bar (in More).
@@ -378,8 +440,12 @@ portfolio content.
   a resident's own notepad: teaching points, doses, to-dos. Private (owner-only rules: no admin, PD or app-owner
   access), never in the portfolio. A bar tab that starts off the bar (`OFF_BAR` in `ui-settings.js`): first in More
   with "Your own notes: private, never in your portfolio"; Arrange tabs can put it on the bar (it stays off until
-  `tabOrder` holds it, so people who arranged tabs before Notes existed don't get it on their bar). At most 100
-  (`MAX_NOTES`, the app enforces it: the rules can't count). A new note takes today's date (or the filtered day /
+  `tabOrder` holds it, so people who arranged tabs before Notes existed don't get it on their bar). At most 2,000
+  (`MAX_NOTES`, raised from 100 on 13 Oct 2026 with the sync engine; the app enforces it: the rules can't count); the
+  list shows 100 at a time ("Show 100 more"). The index doc (`meta/noteIndex`, rules cap 100) keeps the latest 100
+  days and the cases of the latest-changed notes; once the notes are loaded the Logbook's marks come from them. A full
+  index (100 days or cases) can't say about older ones, so the Logbook then loads the notes (this device's copy:
+  cheap), and a day's Share loads them too (`dayMayHaveNotes`). A new note takes today's date (or the filtered day /
   linked case's day); "No date" makes it undated. Order: undated first (latest change first), then newest day first,
   then as written. Search over title and body. Optional `caseId` ("Link to a case…"). Body is Markdown text, shown
   through `parseNote` → elements (never innerHTML; the list page keeps the syntax in a small "Formatting" fold;
@@ -404,6 +470,38 @@ portfolio content.
   note first). The Notes page's "Download notes as files (zip)" makes one `.md` or `.txt` per note
   (`noteFiles` in `notepad.js`: "2026-10-12 Title.md", undated "No date Title.md"; title, Date line, text; the linked
   case isn't named); this is separate from the Markdown export, which puts notes inside the day's case note.
+- **Daily notes, pasting, formatting, shared to the app** (Oct 2026, 6-hour build track E; e2e `test/e2e/daily-note.mjs`):
+  - A daily note is an ordinary note with the id `day-YYYY-MM-DD` (date set, title empty → "Daily note"), so every device
+    finds the same one without a query and no rules change was needed. `openDayNote(iso)` waits for the notes and opens
+    the existing one (never a second copy with the same id), straight in Edit; when the offline cache hasn't got it,
+    it waits up to 3 s for the server's list, and a server copy arriving before anything is typed replaces the blank
+    one. Two copies saved apart (two devices) are merged (`mergeDayNote`: the other copy's text plus what was added
+    here) instead of a write conflict; ordinary notes keep the conflict. The Case tab box and the editor share one
+    copy. A daily note's date can't be changed (it's found by its day). Ways in: the Logbook day's "+ Daily
+    note" / preview card (`dayNoteCard`; Done goes back to the Logbook), Notes' "Today's note" button and "Daily notes"
+    chip, the manifest shortcut `./#today`, and the Case tab box (Settings → Notes, `settings.dayNoteOnCase`, off).
+    It sorts first in its day and has no heading in Copy / Share / Send and the Markdown export.
+  - Daily notes don't count towards `MAX_NOTES` (2,000; `cappedNotes`; backup restore and bin restore follow). The
+    rules allow 100 days in `meta/noteIndex`, so the doc holds the latest 100 days and the cases of the latest-changed
+    notes (`noteIndex(list, INDEX_CAP)`, from the sync engine); once the notes are loaded the marks come from all of
+    them, and a full index loads them (`indexCapped`, `dayMayHaveNotes`), so an older daily note still shows and goes
+    into Copy / Share / Send. The Logbook's day repaints when the notes change (ui-notepad.js `apply`). Raising that
+    cap needs a `firestore.rules` change (owner's approval).
+  - Paste cleaner (`paste-clean.js`, tested): `settings.pasteClean` (off) turns pasted HTML into light Markdown;
+    Clean up (editor ⋯ menu, always there, with Undo) runs `tidyMarkdown`. The preview now shows `*italic*`.
+  - Formatting bar (`fmt-bar.js`, shared with reflections): the note editor's full bar (bold, italic, heading, lists,
+    to-do, link, undo) is device setting `noteToolbar` (off); on phones it rides on the keyboard while typing. Edits go
+    through `execCommand('insertText')`, so Undo and Ctrl+Z work.
+  - Shared to the app: the manifest share_target is POST multipart (text, title, url, `.md`/`.txt` files) to
+    `./share-target`; `sw.js` keeps it in Cache Storage `share-inbox-logbook` and opens `./?shared=1#log`. Shared text
+    (POST or the old GET `?share_text=`, which still works) goes straight to paste-a-list, as before, unless Settings →
+    Notes → Ask what to do with shared text (`settings.shareAsk`, off); files always ask. The chooser
+    (`ui-share-in.js`: Add as case(s) / Add to today's note / New note) clears the text only once the note has it.
+    `share-in.js` holds the plumbing (tested).
+    The POST needs the service worker: with none active (site data cleared, shared before the first install finished,
+    or the old v40 worker still in charge while the new one waits for its reload and the phone already has the new manifest), the share reaches
+    GitHub Pages, which refuses POSTs (405), so a static fallback page can't help. The worker installs on the first
+    visit, so this only bites in that window.
 - **Connect Claude** (`mcp/`, Settings → Connect Claude (advanced) links its README on GitHub): a read-only MCP
   server residents run locally; Google "Desktop app" OAuth (loopback, PKCE) → Firebase `signInWithIdp` → Firestore
   REST as the user, so the rules apply; only `logbooks/{own email}` and the user's own `residents` entry. Owner
@@ -451,6 +549,50 @@ portfolio content.
 - Tag CSV: Type (APMES / Personal / Header), Name, Full name, Under, APMES tags, Shorthand, Hidden, ID.
   Import is forgiving (column names, title row, separators, codes or names, Under anywhere, IDs kept by
   name) and reports what didn't line up.
+
+## Sync: this device's copy and cheap reopening (`sync.js`, `store.js`; 13 Oct 2026)
+
+- Goal: opening the app many times a day costs about one Firestore read per collection when nothing changed
+  (Firestore's own cache only re-charges unchanged documents if a listener resumes within ~30 minutes).
+- Each synced collection (cases, reflections, notes) has a copy on the device: IndexedDB `apmes-logbook-store:<email>`
+  (demo: `…:demo:<email>`), one object store per collection plus a meta record `{ syncAt, fullAt, epoch?, gone }`.
+  On start the engine shows the stored list at once (only if it was confirmed before, so a new device waits for the
+  server as it did), then listens to `where('updatedAt', '>', syncAt - 10 min)` and merges what arrives. syncAt is
+  this device's clock when the server last confirmed the list (never past now). First open on a device and once a week
+  (`FULL_EVERY`): the whole collection instead, which picks up documents without updatedAt and heals anything missed.
+- One engine per account and collection (`createSyncHub`), shared by every caller (the one-shot reflections purge and
+  the Reflections screen share one listener); an engine nobody watches stops after 1.5 s.
+- Deletions: the recycle bin is a feed of tombstones (`deletedAt > syncAt - 10 min`): a binned record goes only if it
+  is still the version that was binned (the entry's `data.updatedAt`; restored or edited elsewhere since, it stays, so
+  a bin entry whose delete was refused as a conflict removes nothing). Deletes on this device (`commitRecord`
+  `_deleted`, `deleteCases`, `deleteReflection`) drop the record from the local copy and remember its id (`gone`,
+  8 days), so a stale copy arriving later is ignored. A removal the server confirms goes at once; one seen only in the
+  cache, or after this device's own pending write (a refused write), is checked with one read. Delete account stops
+  the listeners first.
+- **Limits** (healed by the weekly full read): a record deleted for good without a bin entry (Undo of a just-saved
+  case, plan "done" / pasted-list Undo, Recent changes restoring a deletion) while another device was closed stays on
+  that device until then, as does a write stamped by a clock more than 10 minutes slow. A bin-entry tombstone for
+  these was considered and not used: older app versions would show it in the recycle bin as an empty case to restore.
+- Late writes: direct writes (pasted lists, bulk tag, reflections saved outside the editor, bin entries) that reach the
+  server more than 5 minutes after they were made (offline) are stamped again once the server has them
+  (`restampIfLate` in `cloud.js`, one small write per record so one deleted since doesn't block the rest; ids listed in
+  `apmes-logbook-late:<email>` from the moment they're queued until the server has them, so a page closed first
+  stamps them after the next start), so other devices' "changed since" queries still see them. Queue writes (`writes.js`) are stamped when they commit, so they need nothing.
+- Firestore's persistent cache stays (offline direct writes depend on its pending-writes queue).
+- Sign-out, account switch and Delete account delete every store on the device (`cloud.forgetLocal`; other tabs close
+  theirs on `versionchange` and a BroadcastChannel message). A shared ward PC keeps nothing. The account signed in
+  now keeps its store (account switch, or a tab catching up on another tab's sign-out and sign-in). If a store is
+  still deleted under a running engine, the engine writes its whole list back and reads everything at the next start.
+- Costs: the 10-minute window means records changed in the 10 minutes before the last sync are read again on the
+  next open (log a case and close the app: one read next time). The recycle-bin purge reads the whole bin at most once
+  a day per device (`apmes-logbook-purged:<email>`).
+- Demo: `demo-backend.js` `listenSince` gives the same listener; a logbook's `epoch` changes when its data is replaced
+  wholesale (reset, sample logbook), which makes the device read it in full.
+- Tests: `test/sync.test.mjs` (engine against a fake server that counts reads), `test/e2e/sync-engine.mjs` (demo: stored
+  copy, reopen, two tabs, reset, sign-out wipe), `tools/test-reads.sh` → `test/e2e/reads.emulator.mjs` (the real app
+  with `?emulator` on localhost against the Firestore and Auth emulators and the real rules; `window.__reads`).
+  Measured 13 Oct: first open 50 cases → 50 reads; reopen with nothing changed → 1 read per collection; one case
+  edited, one added, one binned elsewhere → 2 case reads and 1 bin read. Before the engine every open read all 50+.
 
 ## Demo (`demo-backend.js`, `demo-seed.js`)
 
@@ -502,7 +644,7 @@ portfolio content.
     their content (`justify-content: center`), which shifted calendar days.
   - Show only what helps: owner prefers a ✓ on rows over calendar badges, small text over cards for guidance.
   - All the logbook checks in one go: `tools/test-logbook.sh` (repo check, unit tests, full e2e, and the focused
-    runners recovery / usability / cloud-save / notepad / tag-editor / simpler; `quick` skips the full e2e). Add new
+    runners recovery / usability / cloud-save / notepad / daily-note / tag-editor / simpler; `quick` skips the full e2e). Add new
     focused runners to it. Rules: `tools/test-rules.sh` (emulator, fake accounts, both suites).
   - Accessibility: `test/e2e/a11y.mjs` (axe-core 4.13.0, pinned in `tools/vendor/axe.min.js`, MPL-2.0; WCAG 2.2 A/AA)
     is **not** one of those (owner: not on every e2e). Run it after UI changes or before a release, about 75 s:

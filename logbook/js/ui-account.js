@@ -2,13 +2,14 @@
 // Section 1 of the exported portfolio), and Delete account (sign out is at the bottom of More). Settings are on their own tab (ui-settings.js).
 // Profile shape and cleaning: js/profile.js (cleanProfile, SECTIONS, parseSection1).
 
-import { S, h, toast, cloud, fill, debounce, modal, hooks } from './ui-core.js';
+import { S, h, toast, cloud, fill, debounce, modal, hooks, basicHides } from './ui-core.js';
 import { youCard, residencyCard } from './ui-settings.js';
 import { needZip } from './portfolio.js';
 import { SECTIONS, emptyProfile, cleanProfile, parseSection1 } from './profile.js';
 
 export function renderAccount() {
-  return h('div', {}, youCard(), residencyCard(), profileCard(), deleteCard());
+  // (Section 1 is the portfolio's: Profile → APMES)
+  return h('div', {}, youCard(), residencyCard(), basicHides('portfolio') ? null : profileCard(), deleteCard());
 }
 
 // Delete account: everything goes (cases, reflections, photos, bin, portfolio details, settings) and

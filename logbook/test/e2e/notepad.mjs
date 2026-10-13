@@ -1,5 +1,5 @@
 // Fake data only. Notes (More → Notes): lazy loading, the editor and autosave, search, to-dos, day and case links,
-// the day's Copy, Arrange tabs, the recycle bin, the 100-note limit and the backup.
+// the day's Copy, Arrange tabs, the recycle bin, the 2,000-note limit (a page of 100 at a time) and the backup.
 import assert from 'node:assert/strict';
 const { chromium } = await import(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/node_modules/playwright/index.mjs');
 const base = `http://localhost:${process.env.PORT || 8080}/logbook/`;
@@ -40,7 +40,7 @@ try { for (const width of [390, 1280]) {
   await p.waitForFunction(async () => { const { S } = await import('./js/ui-core.js'); return S.notes?.[0]?.body.includes('- [x] fake to-do'); });
   await p.getByRole('button', { name: 'Done' }).click();
   await p.locator('ul.notes-rows li').first().waitFor();
-  assert.match(await p.locator('.notes-count').innerText(), /^1 of 100$/);
+  assert.match(await p.locator('.notes-count').innerText(), /^1 of 2000$/);
   assert.match(await p.locator('ul.notes-rows').innerText(), /Fake teaching point/);
   assert.deepEqual((await S()).index, { days: [iso], cases: [], n: 1 });
   // the index lives in its own owner-only doc, never in the logbook doc the app owner can read
@@ -175,16 +175,35 @@ try { for (const width of [390, 1280]) {
     ['caselogs', 'log', 'logbook', 'reflect', 'progress', 'notes', 'more']);
   await p.evaluate(async () => { const { applyDisplay, setDisplay } = await import('./js/ui-settings.js'); applyDisplay(setDisplay({ tabHidden: null, tabOrder: null })); });
 
-  // at 100 notes, no more
+  // at 2,000 notes, no more; the list shows 100 at a time (fillers go into the demo store in one write, then one save
+  // tells the sync engine)
   await p.evaluate(async () => {
-    const D = await import('./js/demo-backend.js');
-    for (let i = 0; i < 98; i++) D.saveNote('demo@example.com', { id: 'fake-' + i, date: null, title: 'Fake filler ' + i, body: '' });
+    const k = 'apmes-logbook-demo-v1', st = JSON.parse(localStorage.getItem(k)), lb = st.logbooks['demo@example.com'], t = Date.now();
+    const have = Object.keys(lb.notes || {}).length;
+    // the first 150 on days of their own from 1 Jan 2025 (more days than the note index doc holds)
+    const day = i => new Date(Date.UTC(2025, 0, 1 + i)).toISOString().slice(0, 10);
+    for (let i = 0; i < 2000 - have - 1; i++) lb.notes['fake-' + i] = { id: 'fake-' + i, date: i < 150 ? day(i) : null, title: 'Fake filler ' + i, body: '', createdAt: t, updatedAt: t };
+    localStorage.setItem(k, JSON.stringify(st));
+    (await import('./js/demo-backend.js')).saveNote('demo@example.com', { id: 'fake-last', date: null, title: 'Fake filler last', body: '' });
   });
   await p.evaluate(() => { location.hash = '#notes'; });
-  await p.locator('.notes-count').filter({ hasText: '100 of 100' }).waitFor();
+  await p.locator('.notes-count').filter({ hasText: '2000 of 2000' }).waitFor({ timeout: 15000 });
+  assert.equal(await p.locator('ul.notes-rows li').count(), 100);
+  await p.getByRole('button', { name: /^Show 100 more/ }).focus();
+  await p.keyboard.press('Enter');
+  assert.equal(await p.locator('ul.notes-rows li').count(), 200);
+  assert.equal(await p.evaluate(() => [...document.querySelectorAll('ul.notes-rows > li')].indexOf(document.activeElement)), 100, 'focus on the first row just shown');
   await p.getByRole('button', { name: '+ New note' }).click();
-  await p.getByText(/You have 100 notes, the most allowed/).first().waitFor();
+  await p.getByText(/You have 2000 notes, the most allowed/).first().waitFor();
   assert.equal(await p.locator('.note-editor').count(), 0);
+
+  // the note index doc holds the latest 100 days; after a reload a full index makes the notes load, so an older day's
+  // notes still come with its shared text and its calendar mark
+  await p.waitForFunction(async () => ((await import('./js/ui-core.js')).S.noteIndex?.days?.length || 0) >= 100);
+  await p.goto(base + '?demo#logbook'); await p.locator('[role=tab][data-tab=logbook][aria-selected=true]').waitFor();
+  const shared = await p.evaluate(async () => (await import('./js/share.js')).dayTextWithNotes('2025-01-01', []));
+  assert.match(shared, /Fake filler 0\b/);
+  assert.equal(await p.evaluate(async () => (await import('./js/ui-notepad.js')).dayHasNotes('2025-01-01')), true);
 
   assert.deepEqual(errors, []); await ctx.close(); console.log(`PASS notes ${width === 390 ? 'phone' : 'desktop'}`);
 } } finally { await b.close(); }

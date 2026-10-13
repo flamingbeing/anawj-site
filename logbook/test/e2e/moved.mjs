@@ -14,8 +14,9 @@ try {
     await ctx.route(/^https:\/\/(www\.)?(apmes\.)?anawj\.com\//, async route => {
       const u = new URL(route.request().url());
       seen.push(u.href);
-      const res = await route.fetch({ url: `http://localhost:${port}${u.pathname}${u.search}` });
-      await route.fulfill({ response: res });
+      // a module still loading when the test closes its page is no failure (the race failed a loaded full run once)
+      try { await route.fulfill({ response: await route.fetch({ url: `http://localhost:${port}${u.pathname}${u.search}` }) }); }
+      catch (err) { if (!/closed/i.test(err.message)) throw err; }
     });
     const p = await ctx.newPage(), errors = [];
     p.on('pageerror', e => errors.push(e.message));
