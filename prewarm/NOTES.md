@@ -119,6 +119,10 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   Enter. Tapping an alarm banner or the top-bar countdown goes to that reading and opens its first box (or the key
   time's pad). PACU in / To ward are on the PACU page only (not in the key-times row or the Log button); Still to fill
   lists them once surgery has ended. The tap guard (`lockTaps`) also runs after a pad saves, so tests wait 0.8 s.
+- **Progress and Perioperative data tick** (owner, 13 Oct 2026): the bottom part of the patient screen starts with a
+  progress grid (a tick for each of pre-warming temps, intra-op temps, BP HR BIS, Intra-op details, PACU,
+  Perioperative data; each links to its screen). Perioperative data has its own tick (`sign_periop`, exported as
+  "Complete: Perioperative data") that locks only that page; "data collection complete" does not lock it.
 - **Never send an empty `f`** (lesson, 12 Oct 2026): `setDoc(…, { f: {} }, { merge: true })` replaces the server's
   `f` with an empty map (an empty map is a leaf in the merge). Lock / unlock / delete sent one and wiped the server
   copy's readings; push now omits an empty `f`, lock sends the full record, and each phone resends all its patients

@@ -57,10 +57,11 @@ export function workbookSheets(patients, screening) {
     readings.push([sid(p), s === 'prewarm' ? 'Pre-warming' : s === 'iotemp' ? 'Intra-op temperature' : 'Haemodynamics', pt.label,
       at?.v ? cellFor({ type: 'time' }, at.v) : null, at?.by || '', vals.map(([l, v]) => `${l} ${v}`).join('; ')]);
   }
-  const signs = PAGES.filter(pg => pg.signoff).map(pg => pg.id);
-  const extra = [['Subject ID', ...EXTRA.map(f => f.label), ...signs.map(s => 'Complete: ' + PAGES.find(p => p.id === s).title)]];
+  // the sections with a "complete" tick; Perioperative data has its own (sign_periop)
+  const signs = [...PAGES.filter(pg => pg.signoff).map(pg => [pg.id, pg.title]), ['periop', 'Perioperative data']];
+  const extra = [['Subject ID', ...EXTRA.map(f => f.label), ...signs.map(([, t]) => 'Complete: ' + t)]];
   for (const p of live) extra.push([sid(p), ...EXTRA.map(f => f.type === 'rows' ? ixText(val(p, f.id)) || null : cellFor(f, shownValue(f.id, k => val(p, k)))),
-    ...signs.map(s => val(p, 'sign_' + s))]);
+    ...signs.map(([id]) => val(p, 'sign_' + id))]);
   const head = r => r.map(h => ({ s: h, style: 'head' }));
   return [data, scr,
     { name: 'Readings', rows: [head(readings[0]), ...readings.slice(1)], widths: [12, 18, 14, 10, 10, 80], freeze: 1 },
