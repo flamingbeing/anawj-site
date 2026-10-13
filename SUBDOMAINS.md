@@ -128,5 +128,5 @@ editor's frame). So `edit.anawj.com/<old path>` keeps working for every page, su
   a full Google sign-in with a real account is still for the owner to try once
 - [x] 5. apmes.anawj.com (log1, with MedHub Evaluations): logbook #370, evals #367, helper pages and guidebook #368; live 13 Oct. The
   owner added `apmes.anawj.com` to the Firebase authorised domains and the Google sign-in client's redirect URIs and origin, and
-  a real Google sign-in works at the new address. Old `anawj.com/logbook/` and `/evals/` forward (path, query and `#` kept). Still
-  to confirm by the owner: Drive and Dropbox backups at the new address (their redirect URI is `https://apmes.anawj.com/logbook/`).
+  a real Google sign-in works at the new address. Old `anawj.com/logbook/` and `/evals/` forward (path, query and `#` kept). Drive and Dropbox backups also work at the new address (the owner added
+  `https://apmes.anawj.com/logbook/` as a redirect URI to the Google Web client and to the Dropbox app).
