@@ -293,3 +293,8 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   (or filled by a rule: gown set NA, underbody / gown Yes) and not yet saved for this timepoint has the `dflt` class
   (grey text, grey pressed chip). Saving makes it normal. The later warming points (past 10 / 30 min) are also dropped
   once that last warming reading is saved, even without initials (`pointsFor`).
+- **Admin password sign-in** (owner, 13 Oct 2026; Google stays off, see above): Settings has email + password boxes
+  with Sign in, "Email me a sign-in link" and "Forgot password? Email me a reset link". A password exists only on an
+  account that signed in once by emailed link (that proves the email, which the rules need): once signed in, Settings →
+  Password → Save password (8+ characters). Rules unchanged (admins list + verified email). Needs Email/Password on
+  in the Firebase console (it is, for email links). Covered by the two-phone sync test.

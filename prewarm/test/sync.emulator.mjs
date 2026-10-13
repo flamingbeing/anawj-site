@@ -136,6 +136,24 @@ try {
   assert.doesNotMatch(ad.url(), /oobCode/, 'the one-time code leaves the address bar');
   assert.match(await ad.textContent('main'), /NUH-TEST-CODE/);
   assert.match(await ad.textContent('main'), /AA/, 'members listed');
+  // the admin sets a password, logs out, and signs in with email and password (owner, 13 Oct 2026)
+  await ad.evaluate(() => { location.hash = '#/settings'; });
+  await ad.waitForSelector('details.sect summary');
+  await ad.click('details.sect summary'); await ad.waitForSelector('#setpw'); await ad.fill('#newpw', 'short'); await ad.click('#setpw');
+  await toastSays(ad, /at least 8/);
+  await ad.fill('#newpw', 'correct horse 42'); await ad.click('#setpw');
+  await toastSays(ad, /Password saved/);
+  ad.once('dialog', d => d.accept());
+  await ad.click('#leave');
+  await ad.waitForURL(/#\/$/, { timeout: 20000 }); await ad.waitForTimeout(1500);
+  await ad.goto(BASE + '#/settings'); await ad.waitForSelector('body[data-cloud=ready]'); await ad.waitForSelector('#adminin', { timeout: 20000 });
+  await ad.click('#adminin'); await ad.fill('#adminemail', 'lead@example.com');
+  await ad.fill('#adminpw', 'wrong password'); await ad.click('#adminpwin');
+  await toastSays(ad, /Wrong email or password/);
+  await ad.fill('#adminpw', 'correct horse 42'); await ad.click('#adminpwin');
+  await ad.waitForFunction(() => /Signed in as study admin/.test(document.querySelector('main')?.textContent || ''), null, { timeout: 20000 });
+  await ad.evaluate(() => { location.hash = '#/admin'; });
+  await ad.waitForFunction(() => /NUH-TEST-CODE/.test(document.querySelector('main')?.textContent || ''), null, { timeout: 20000 });
   await ad.click('[data-newcode="WH"]');
   await ad.waitForFunction(() => /WH-[A-Z2-9]{8}/.test(document.querySelector('main').textContent), null, { timeout: 15000 });
   // a new code for a team that has one warns first (cancelled here: the code stays)
@@ -306,7 +324,7 @@ try {
   await bb.waitForSelector('#code', { timeout: 15000 });
 
   assert.deepEqual(errors, []);
-  console.log('prewarm sync: ok (two phones, PACU nurse link, join code, readings both ways, admin email-link sign-in, managing admins, codes, join link and QR, blank Word form upload and Form view, lock, offline edits heal, open reading asks, reload offline, same reading on both, log out)');
+  console.log('prewarm sync: ok (two phones, PACU nurse link, join code, readings both ways, admin email-link and password sign-in, managing admins, codes, join link and QR, blank Word form upload and Form view, lock, offline edits heal, open reading asks, reload offline, same reading on both, log out)');
 } finally {
   await b.close();
 }

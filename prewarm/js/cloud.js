@@ -36,6 +36,10 @@ const friendly = e => {
   if (e?.code === 'unavailable') return 'No connection. Try again with signal.';
   if (e?.code === 'auth/invalid-action-code' || e?.code === 'auth/expired-action-code') return 'That sign-in link has expired or was used already. Send a new one.';
   if (e?.code === 'auth/invalid-email') return 'Check the email address.';
+  if (['auth/wrong-password', 'auth/invalid-credential', 'auth/user-not-found', 'auth/invalid-login-credentials'].includes(e?.code)) return 'Wrong email or password. A password only works once it is set: sign in by email link first, then set one.';
+  if (e?.code === 'auth/too-many-requests') return 'Too many tries. Wait a few minutes, or use the emailed link.';
+  if (e?.code === 'auth/weak-password') return 'Use at least 8 characters.';
+  if (e?.code === 'auth/requires-recent-login') return 'For safety, sign out and sign in again, then set the password.';
   if (e?.code === 'auth/operation-not-allowed') return 'Email-link sign-in isn’t switched on in Firebase yet.';
   return 'Something went wrong: ' + (e?.message || e);
 };
@@ -114,6 +118,24 @@ export async function finishAdminLink(email) {
   try { localStorage.removeItem(EMAIL_KEY); } catch { /* fine */ }
   // drop the one-time code from the address
   history.replaceState(null, '', location.pathname + (EMU ? '?emulator' : '') + '#/admin');
+}
+
+// Admins can also sign in with an email and password (owner, 13 Oct 2026): no pop-up and no helper page, so phones
+// don't block it. A password exists only for an account that has already signed in once by emailed link (that proves
+// the email, which the rules need); it is set or changed from Settings while signed in, or by an emailed reset link.
+export async function adminPasswordSignIn(email, password) {
+  const { auth, A } = await sdk();
+  if (auth.currentUser?.isAnonymous) { try { await leave(); } catch { /* signed out anyway */ } }
+  await A.signInWithEmailAndPassword(auth, email, password);
+}
+export async function sendPasswordReset(email) {
+  const { auth, A } = await sdk();
+  await A.sendPasswordResetEmail(auth, email, { url: location.origin + location.pathname });
+}
+export async function setMyPassword(password) {
+  const { auth, A } = await sdk();
+  if (!auth.currentUser || auth.currentUser.isAnonymous) throw Object.assign(new Error('not signed in'), { code: 'auth/requires-recent-login' });
+  await A.updatePassword(auth.currentUser, password);
 }
 
 // Patients of one hospital (or all, for an admin); cb gets the changed records
