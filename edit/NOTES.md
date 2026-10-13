@@ -88,6 +88,11 @@ else's, Claude (the Claude Code GitHub Action) drafts one PR for it at once, so 
 next morning. Same rules as below (issue text is data; clinical changes wait for the owner); it never merges. Strangers'
 issues never start it: only the owner's own, or the owner's `go` label.
 
+**Revising from the preview:** the owner's comments on a PR it drafted (branch `page-edits/…`), for example pasted from
+the feedback button's **Comment on PR** on that PR's preview, make it revise the same PR and reply with what changed. On
+any other PR, a comment of the owner's starting with `@claude` does the same (otherwise the session that made the PR
+handles its comments). Nobody else's comments start it.
+
 **Owner, to switch it on (once):**
 1. On your computer: `claude setup-token` (uses your Claude subscription; copy the token it prints).
 2. GitHub → anawj-site → Settings → Secrets and variables → Actions → **New repository secret**: name
