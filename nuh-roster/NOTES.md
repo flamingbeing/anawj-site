@@ -212,6 +212,12 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
   (Enter or Space opens the box); the box takes focus, keeps Tab inside and gives focus back on close; problems start
   with "Problem:", "Check:" or "Note:"; table fields get an aria-label from their column and row (`labelTableFields`).
   On screen the Baby MO green is darker (`SCREEN_COLOUR`); the sheet and exports keep the department's colours.
+- Monthly planning (13 Oct): the grids mark clashes before the day comes (`monthIssues` in `js/monthly.js`): on
+  leave but given a duty, a day duty the morning after an overnight one, two overnight duties the same day (red), and
+  an empty overnight duty on a day with others filled in (dashed). Liver and AOH rosters are on call, so they don't
+  clash with being post call. Each bar has "Next ›" and shows which rosters are loaded for this month and the next.
+  The Leave view has a strip of seniors/juniors away per day (Settings: mark days over a limit; 0 is off). The made-up
+  rosters are tidied of clashes (`tidyMonthly` in `js/demo.js`; DEMO_VERSION 6).
 - Keep building elements with `h()` and `textContent`; there is no `innerHTML` anywhere, so imported text can't inject.
 
 ## Code map

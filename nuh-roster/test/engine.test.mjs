@@ -355,3 +355,29 @@ console.log('engine tests passed');
   assert.ok(!buildLayout({ date: '2026-10-14', rows: [] }).cells.some(x => x.r === 4), 'no stamp on a first send');
   console.log('sent changes tests passed');
 }
+
+{
+  // clashes the monthly rosters show before the day
+  const { monthIssues } = await import('../js/monthly.js');
+  const people = { A: { id: 'a', name: 'A' }, B: { id: 'b', name: 'B' }, C: { id: 'c', name: 'C' } };
+  const personOf = t => people[t] || null;
+  const monthly = { '2026-10': {
+    junior: { rows: { 1: { r1: 'A', nf: 'A' }, 2: { df: 'A', r1: 'B' }, 3: { r1: 'C', r2: '' } } },
+    liver: { rows: { 2: { otj: 'B' } } },
+    pain: { rows: { 3: { 'acute.a': 'B' } } },
+    leave: { entries: [{ name: 'C', from: '2026-10-03', to: '2026-10-03', type: 'Annual Leave' }] },
+  } };
+  const t = monthIssues(monthly, '2026-10', personOf).map(i => `${i.date.slice(8)} ${i.level} ${i.text}`);
+  assert.ok(t.includes('01 error A has two overnight duties (R1 and Night Float).'), t.join('\n'));
+  assert.ok(t.some(x => /^02 error A has Day Float the morning after /.test(x)), t.join('\n'));
+  assert.ok(!t.some(x => /B has OT \(Junior\)/.test(x)), 'liver duties are on call, not a clash with a night before');
+  assert.ok(t.some(x => /^03 error B has Acute Pain \(Junior\) the morning after R1/.test(x)), t.join('\n'));
+  assert.ok(t.includes('03 error C is on leave but has R1.'), t.join('\n'));
+  assert.ok(t.some(x => /^03 warn R2 is empty/.test(x)), t.join('\n'));
+  // the made-up department starts (nearly) clean
+  const { makeDemo } = await import('../js/demo.js');
+  const d = makeDemo('2026-03-17');
+  const byName = new Map(d.staff.map(p => [p.name, p]));
+  assert.equal(monthIssues(d.monthly, '2026-03', n => byName.get(n) || null).filter(i => i.level === 'error').length, 0, 'demo month has no clashes');
+  console.log('monthly clash tests passed');
+}
