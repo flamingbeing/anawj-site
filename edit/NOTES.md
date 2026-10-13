@@ -37,6 +37,13 @@ request), runs every day at 8:58 am Singapore time in a fresh cloud session:
   GitHub, recreate it from claude.ai/code → Routines with the GitHub connector. Pause or edit it there too.
 - Sessions handling page edits by hand should check for an open routine PR first, so the same issue isn't done twice.
 
+## Where it runs (after the subdomain moves, 13 Oct 2026)
+
+The editor stays at `anawj.com/edit/`. It edits pages in a same-origin frame, and `anawj.com` still serves every app folder
+(forwarding only top-level visits: the forwards check `top === self`), so pages that now live on `hand.`, `apmes.`,
+`nuhroster.` or `prewarmstudy.` are still edited through their `anawj.com/<folder>/` copy, which is the same files. Details and
+what would break it: `SUBDOMAINS.md`, "The page editor".
+
 ## edit.anawj.com (Cloudflare; set up by the owner 13 Oct 2026, working)
 
 The anawj.com DNS is on Cloudflare. The Cloudflare plugin in sessions can't make DNS records or rules, so this is

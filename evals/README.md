@@ -1,6 +1,6 @@
 # APMES Evaluations
 
-A phone-first web app at `anawj.com/evals/` for workplace-based assessments: **DOPS, Mini-CEX and EBD**.
+A phone-first web app at `apmes.anawj.com/evals/` (with the logbook at `apmes.anawj.com/logbook/`; the old `anawj.com/evals/` forwards there, path, query and `#` kept) for workplace-based assessments: **DOPS, Mini-CEX and EBD**.
 The resident picks the item (from the EPA Guidebook v8 catalogue), names an assessor from the faculty
 list and sends a link or QR code. The assessor signs in with Google, fills the official form in a few
 taps (saved as they go) and submits or declines. The resident reads the result and sees progress
@@ -112,7 +112,7 @@ so **no composite indexes are needed**.
 ## Going live (Firebase console, project `apmes-logbook`)
 
 1. **Authentication → Sign-in method:** Google is already on for the logbook. Under Settings →
-   Authorised domains, check `anawj.com` is listed.
+   Authorised domains, check `apmes.anawj.com` is listed (and the Google sign-in client has `https://apmes.anawj.com/__/auth/handler`).
 2. **Firestore rules** deploy automatically: a merge to `main` that changes `logbook/firestore.rules`
    runs `.github/workflows/deploy-firestore-rules.yml`. Run the emulator tests before merging.
 3. **Admins and PDs:** add `admins/{email}` and `pds/{email}` documents `{ name }` by hand (lower-case

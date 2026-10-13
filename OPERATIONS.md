@@ -9,14 +9,19 @@ marked **owner** need the owner's own sign-in; no session can do them.
 Today the APMES apps are a demo: residents don't use them yet. These are cheapest to do now, with no real data to
 protect or move. (Prewarm already holds real study data, so its items come first.)
 
-1. **Backups (owner).** There are none today. In the Google Cloud console for each project → Firestore → Disaster
-   recovery: switch on scheduled backups (daily, keep 7+ days) or point-in-time recovery. **`prewarm-study` first**
-   (real study data), then `apmes-logbook`, then `nuh-roster`. Needs the pay-as-you-go plan (see Costs).
-2. **Budget alerts (owner).** Google Cloud console → Billing → Budgets & alerts: one budget per billing account
-   (e.g. US$10 a month, alerts at 50%, 90%, 100%) so a bug or abuse can't quietly run up a bill.
-3. **Check each project's plan (owner).** `apmes-logbook` is on Blaze (pay-as-you-go). Check `prewarm-study` and
-   `nuh-roster`: on the free Spark plan, going over a daily quota stops the app until the next day, which would
-   stop prewarm during a case.
+1. **Backups: done 13 Oct 2026** (owner approved each step; set up from the home computer with `gcloud`). Every
+   project's `(default)` Firestore database (asia-southeast1) has a **daily backup kept 7 days**. `prewarm-study` also
+   has **point-in-time recovery** (any moment in the last 7 days). Restore: Google Cloud console → Firestore →
+   Disaster recovery (backups restore into a new database, never over the live one). **Still to do: delete
+   protection** is off on all three databases; switching it on is free and stops a whole database being deleted by
+   mistake.
+2. **Budget alerts: done 13 Oct 2026.** One budget on the owner's billing account (it's in SGD): about S$13 (US$10) a
+   month, emailing at 50%, 90% and 100%. Budgets only alert; they never stop spending. (The Billing Budgets API was
+   switched on in `apmes-logbook` to set it from the command line. A S$5 budget Firebase made for `nuh-roster` is
+   still there.)
+3. **Plans: done 13 Oct 2026.** All three projects are on Blaze (pay-as-you-go) on the same billing account.
+   `prewarm-study` was on the free Spark plan until 13 Oct, so it had no backups and would have stopped for the day
+   on hitting a quota.
 4. **App Check (owner, then a session).** Free. Stops scripts using the public Firebase config to burn quota or fill
    storage (the rules already stop them reading data). Owner: Firebase console → App Check → register each web app
    with reCAPTCHA Enterprise and add the subdomains. A session then adds the App Check call to each app and, once it
@@ -40,12 +45,13 @@ All are the owner's personal accounts today.
 | **GitHub** `flamingbeing/anawj-site` (public) | All code, docs, PRs; GitHub Pages serves `anawj.com` | Pages source "GitHub Actions" (`.github/workflows/pages.yml`); secret `FIREBASE_SERVICE_ACCOUNT` (rules deploys); PR labeller; page-edit suggestions arrive as **public** issues (`edit/NOTES.md`) |
 | **Domain registrar** for `anawj.com` | The domain itself | **Owner: fill in which registrar and the renewal date.** If it lapses, every address stops |
 | **Cloudflare** | DNS for `anawj.com`; Worker `anawj-preview` | Worker serves PR previews and the subdomains (`SUBDOMAINS.md`, `PREVIEWS.md`); custom domains on the Worker; `edit.anawj.com` redirect rule (`edit/NOTES.md`). Free plan: 100,000 Worker requests a day |
-| **Firebase `apmes-logbook`** (Blaze, asia-southeast1) | Logbook and evals data | Google sign-in; sign-in domain `anawj.com` (moves to `apmes.anawj.com` in step 5); authorised domains; `owners/`, `admins/` entries set by hand in the console (`logbook/NOTES.md`, Roles) |
-| **Firebase `prewarm-study`** (asia-southeast1) | **Real study data** | Anonymous sign-in (join codes), email link and password for admins; `admins/` entries set by hand; authorised domains |
-| **Firebase `nuh-roster`** | Roster data (not approved for real names yet) | Google sign-in; authorised domains |
+| **Firebase `apmes-logbook`** (Blaze, asia-southeast1; daily backups) | Logbook and evals data | Google sign-in; sign-in domain `apmes.anawj.com` (moved from `anawj.com` in step 5; `anawj.com` stays in the authorised domains until the old address is retired); authorised domains (must list `apmes.anawj.com`); `owners/`, `admins/` entries set by hand in the console (`logbook/NOTES.md`, Roles) |
+| **Firebase `prewarm-study`** (Blaze since 13 Oct 2026, asia-southeast1; daily backups and point-in-time recovery) | **Real study data** | Anonymous sign-in (join codes), email link and password for admins; `admins/` entries set by hand; authorised domains |
+| **Firebase `nuh-roster`** (Blaze; daily backups) | Roster data (not approved for real names yet) | Google sign-in; authorised domains |
 | **Google Cloud OAuth clients** | Sign-in and backups | Each project's web sign-in client (allowed origins and redirect addresses); the logbook's Google Drive client (`GOOGLE_CLIENT_ID`); the "Connect Claude" Desktop client (`mcp/README.md`); consent screen points to `anawj.com/privacy/` |
 | **Service account** `firebase-rules-deployer@apmes-logbook` | Deploys rules on merge | Firebase Rules Admin on all three projects; its key is the GitHub secret above |
 | **Dropbox app** | Logbook backups to Dropbox | App key `DROPBOX_APP_KEY` (public); development mode; redirect addresses |
+| **Home computer** (always on) | An always-on Claude Code session (Remote Control) | `gcloud` signed in as the owner, used for backups and budgets; its own notes live on that computer, never in this repo (`ROADMAP.md`, Ways of working) |
 | **Claude (claude.ai)** | Sessions, the daily "Page edits check" routine | Routine runs 8:58 am Singapore, drafts one PR, never merges (`edit/NOTES.md`) |
 
 Public client IDs (Firebase config, OAuth client IDs, Dropbox app key) are in the repo on purpose: they identify the

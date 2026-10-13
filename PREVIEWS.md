@@ -12,7 +12,7 @@ projects with Workers".)
   everything in the browser.
 - **Signing in does not work on previews, on purpose.** Google sign-in only works from domains listed in each
   Firebase project, and the previews aren't listed, so preview code can never read or change real data. Saving
-  to Google Drive / Dropbox doesn't work there either (both are registered to anawj.com only).
+  to Google Drive / Dropbox doesn't work there either (both are registered to apmes.anawj.com only).
 - **Firestore rules** are not previewed: they deploy on merge to `main`. Test rule changes with the emulator
   (`logbook/NOTES.md`, "Working on it").
 - Previews are public if someone has the link, and are kept out of search engines (`_headers`). Fake data only,

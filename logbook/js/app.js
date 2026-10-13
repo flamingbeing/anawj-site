@@ -18,7 +18,8 @@ import { cloudSaveSection, remindBackup, resumeCloudSave } from './cloud-save.js
 import { backupCard } from './backup.js';
 import { createNavigation } from './navigation.js';
 import { renderNotes, leaveNotes } from './ui-notepad.js';
-import { settingsFile, readSettingsFile } from './settings-file.js';
+import { settingsFile, readSettingsFile, readDeviceFile, isDeviceFile } from './settings-file.js';
+import { movedPage } from './moved.js';
 import { purgeExpired, openBin } from './bin.js';
 
 // Tab icons: tiny inline SVG paths (24x24, stroked), so they look the same on every phone.
@@ -238,8 +239,19 @@ function settingsFileCard() {
     download(`logbook-settings-${todayISO()}.json`, new Blob([JSON.stringify(f, null, 2)], { type: 'application/json' }));
   };
   const importIt = async file => {
+    const text = await file.text();
+    // a file of this browser's choices from the old address (anawj.com/logbook): look, text size, tab layout, drafts
+    if (isDeviceFile(text)) {
+      let dev;
+      try { dev = readDeviceFile(text); } catch (err) { return toast(err.message); }
+      const n = Object.keys(dev.items).length;
+      if (!(await confirmBox('Load this device’s choices', `Put ${n} saved choice${n === 1 ? '' : 's'} from the old address back on this device? The page reloads.`, 'Load'))) return;
+      try { for (const [k, v] of Object.entries(dev.items)) localStorage.setItem(k, v); } catch (err) { return toast('Could not save on this device: ' + err.message); }
+      location.reload();
+      return;
+    }
     let d;
-    try { d = readSettingsFile(await file.text()); } catch (err) { return toast(err.message); }
+    try { d = readSettingsFile(text); } catch (err) { return toast(err.message); }
     const mine = (S.logbook && S.logbook.templates) || [];
     const same = (a, b) => a.name === b.name && [...a.cats].sort().join() === [...b.cats].sort().join();
     const newGroups = (d.templates || []).filter(t => !mine.some(m => m.id === t.id || same(m, t)));
@@ -990,6 +1002,7 @@ function demoMenu() {
       h('span', { class: 'grow' }),
       h('button', { onclick: () => m.close() }, 'Close'))]);
 }
-if (!cloud.enabled) renderLanding();
+if (window.LOGBOOK_MOVED_TO) { tabsEl.hidden = true; fill(app, movedPage(window.LOGBOOK_MOVED_TO)); }   // the old address with this browser's choices saved: offer them, don't sign in here
+else if (!cloud.enabled) renderLanding();
 else cloud.watchUser(onUser).catch(err => renderLanding('Could not start sign-in: ' + err.message));
 registerSW();
