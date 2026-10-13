@@ -13,6 +13,7 @@ try { for (const width of [390, 1280]) {
   const p = await ctx.newPage(), errors = [];
   p.on('pageerror', e => errors.push(e.message)); p.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
   await p.goto(base + '?demo=reset#log'); await p.waitForSelector('textarea.details');
+  await p.waitForFunction(() => Number(document.body.dataset.cases) > 0);   // (the demo's cases load after the first drawing)
   const ta = p.locator('textarea.details');
   const set = async patch => { await p.evaluate(async patch => { const { patchLogbook, hooks } = await import('./js/ui-core.js'); await patchLogbook({ settings: patch }); hooks.render(); }, patch); await p.waitForSelector('textarea.details'); };
   const st = () => p.evaluate(async () => (await import('./js/ui-core.js')).settings());

@@ -86,6 +86,7 @@ const SCREENS = [
   ['Case log', async p => { await hash('caselogs')(p); await p.locator('.caselog-list a').first().click(); await p.locator('table.totals').waitFor(); }, false],
   ['Edit case dialog', async p => {
     await hash('logbook')(p);
+    await p.waitForFunction(() => Number(document.body.dataset.cases) > 0);   // the demo's cases load after the first drawing
     await p.evaluate(async () => { const { S } = await import('./js/ui-core.js'); const { editCaseDialog } = await import('./js/ui-log.js'); editCaseDialog(S.cases[0]); });
     await p.waitForSelector('dialog[open]');
   }, true],

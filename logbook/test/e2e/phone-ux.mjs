@@ -71,6 +71,7 @@ try { for (const width of [390, 1280]) {
   }
 
   // ---- case rows: the tags wrap, nothing runs under the note button or the row's buttons ----
+  await p.waitForFunction(() => Number(document.body.dataset.cases) > 0);   // (the demo's cases load after the first drawing)
   await p.evaluate(async () => {
     const { S, updateCase } = await import('./js/ui-core.js');
     const c = S.cases[0];
@@ -89,6 +90,7 @@ try { for (const width of [390, 1280]) {
     const m = await import('./js/ui-settings.js'); m.applyDisplay(m.setDisplay({ rowShort: true }));
   });
   await p.goto(base + '?demo#logbook');
+  await p.waitForFunction(() => Number(document.body.dataset.cases) > 0);
   await p.locator('main .seg button').filter({ hasText: /^List$/ }).first().click();
   await p.locator('ul.cases li[data-date] .c-tags').first().waitFor();
   const short = await p.locator('ul.cases li[data-date] .c-tags').first().evaluate(e => ({ wrap: getComputedStyle(e).flexWrap, ox: getComputedStyle(e).overflowX }));

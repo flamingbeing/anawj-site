@@ -12,7 +12,8 @@ try { for (const width of [390, 1280]) {
   const ctx = await b.newContext({ viewport: { width, height: 844 }, serviceWorkers: 'block', permissions: ['clipboard-read', 'clipboard-write'] });
   await ctx.addInitScript(() => localStorage.setItem('apmes-logbook-demo-small', '1'));
   // the app's state for waitForFunction, which needs a plain (not async) test: an async one passes at once
-  await ctx.addInitScript(() => window.addEventListener('load', () => import('/logbook/js/ui-core.js').then(m => { window.__core = m; })));
+  // (top frame only: sandboxed frames have origin 'null', and WebKit wants a full address)
+  await ctx.addInitScript(() => { if (window !== top || location.origin === 'null') return; window.addEventListener('load', () => import(location.origin + '/logbook/js/ui-core.js').then(m => { window.__core = m; })); });
   const p = await ctx.newPage(), errors = [];
   p.on('pageerror', e => errors.push(e.message)); p.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
   const st = () => p.evaluate(async () => (await import('./js/ui-core.js')).settings());
@@ -30,6 +31,7 @@ try { for (const width of [390, 1280]) {
   // the Logbook's filter panel stays as it was left: open it only when closed
   const openFilter = async () => { const f = p.getByRole('button', { name: /^Filter/ }); if ((await f.getAttribute('aria-expanded')) !== 'true') await f.click(); };
   await p.goto(base + '?demo#log'); await p.waitForSelector('textarea.details');
+  await p.waitForFunction(() => window.__core?.S.cases.length > 0);   // the demo's cases load after the first drawing
   const n0 = (await cases()).length;
 
   // off by default: nothing reads labels, the Logbook has no learning points link
@@ -44,6 +46,9 @@ try { for (const width of [390, 1280]) {
   assert.match(await p.locator('.settings-menu a[data-go=loggingadv]').innerText(), /labelled parts/);
   await p.getByLabel('Search settings').fill('labelled parts');
   await p.locator('.settings-search a[data-go=loggingadv]').filter({ hasText: 'Labelled parts in the case summary' }).first().waitFor();
+  // the result opens Advanced logging at the switch (scrolled to, flashing), not at the page's top
+  await p.locator('.settings-search a[data-go=loggingadv]').filter({ hasText: 'Labelled parts in the case summary' }).first().click();
+  await p.waitForFunction(() => { const f = document.querySelector('label.flash'); if (!f || !/Labelled parts in the case summary/.test(f.textContent)) return false; const r = f.getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight; }, null, { timeout: 3000 });
 
   // Settings → Advanced logging: switch on, add Plan (hidden in lists) and ASA
   await p.goto(base + '?demo#loggingadv'); await p.getByRole('heading', { name: 'Advanced logging' }).waitFor();
@@ -78,6 +83,8 @@ try { for (const width of [390, 1280]) {
   await p.locator('.sugg-row .chip[data-code]').first().click();
   await p.getByRole('button', { name: /^Save/ }).last().click();
   await p.waitForFunction(n => window.__core?.S.cases.length === n + 1, n0);
+  // the emptied box keeps neither the marks nor the "Parts …" line (they used to stay until the box was touched)
+  await p.waitForFunction(() => !document.querySelector('.parsed .parts-read') && (document.querySelector('.box-marks')?.hidden ?? true), null, { timeout: 3000 });
   const saved = (await cases()).find(c => c.details.includes('check the cuff'));
   assert.equal(saved.details, '72M lap chole\nASA 2: HTN\nPlan: GA ETT\nlp: check the cuff before any craniotomy');   // stored as typed
 

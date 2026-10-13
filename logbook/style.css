@@ -1542,6 +1542,8 @@ body.typing-nobar .tabs { display: none; }
    on iOS the visible area itself moves down the page when the keyboard is up (--vvt, app.js); it sits under a tab
    bar that is stuck at the top (--pin-top) */
 .note-editor .note-top { position: sticky; top: var(--pin-top, 0px); z-index: 15; background: var(--panel); margin: -4px 0 0; padding: 4px 0; }
+/* typing in the note: the browser keeps the caret's line clear of the sticky bar above (about 52px) when it scrolls to it */
+html:has(.note-editor .note-top) { scroll-padding-top: calc(var(--pin-top, 0px) + 64px); }
 body.typing .note-editor .note-top { top: calc(var(--vvt, 0px) + var(--pin-top, 0px)); }
 /* the title wraps onto more lines when it's long (a one-row box that grows with it) */
 .note-editor textarea.note-title { display: block; resize: none; overflow: hidden; min-height: 0; line-height: 1.3; font-family: inherit; overflow-wrap: anywhere; }
