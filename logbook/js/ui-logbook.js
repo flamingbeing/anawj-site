@@ -6,7 +6,7 @@ import { flagCase } from './importer.js';
 import { exportWorkbook, readSheetGrid } from './xlsxio.js';
 import { cleanExportOpts, exportTables, rangeText, CASE_COLS, REFL_COLS } from './export-opts.js';
 import { inExport } from './reflections.js';
-import { parseQuery, matchQuery, OPERATOR_HELP, insertOperator } from './search-ops.js';
+import { parseQuery, matchQuery, OPERATOR_HELP, insertOperator, FIELDS, FIELDS_NO_HAS } from './search-ops.js';
 import { parseCsv } from './tags.js';
 import {
   S, h, toast, debounce, modal, cat, categoryNamesRevision, catName, catShort, tagName, catFull, catChip, PICKER_ORDER, settings, patchLogbook, needExcel, download, fileButton, catPills,
@@ -100,7 +100,7 @@ export function renderLogbook() {
     const has = labels && !opsOn() ? takeHas(q, labels) : null;
     if (has) q = has.rest;
     const words = low(q).split(/\s+/).filter(Boolean);
-    const ops = opsOn() && words.length ? parseQuery(q, { keepCase: cs }) : null;
+    const ops = opsOn() && words.length ? parseQuery(q, { keepCase: cs, fields: labels ? FIELDS : FIELDS_NO_HAS }) : null;
     const partHas = c => t => { const l = labels && findLabel(t, labels); return !!l && partInfo(c, labels).keys.has(l.k); };
     if (hayFor !== settings().tagSet || hayNames !== categoryNamesRevision) { hayCache = new WeakMap(); hayFor = settings().tagSet; hayNames = categoryNamesRevision; }
     const hayOf = c => {
@@ -265,9 +265,10 @@ export function renderLogbook() {
   function setBox(v) { searchBox.value = v; searchWrap.classList.toggle('has-text', !!v); paintOpsNote(); }
   const opsNote = h('p', { class: 'hint lb-opsnote', hidden: true });
   const paintOpsNote = () => {
-    const u = opsOn() && view.q ? parseQuery(view.q).unknown : [];
-    opsNote.hidden = !u.length;
-    opsNote.textContent = u.map(x => `“${x.op}” isn’t an operator (searched as text): did you mean ${x.suggest}?`).join(' ');
+    const on = !!labelsOn(settings()), u = opsOn() && view.q ? parseQuery(view.q, { fields: on ? FIELDS : FIELDS_NO_HAS }).unknown.filter(x => on || x.op.toLowerCase() !== 'has:') : [];
+    const needs = opsOn() && !on && /(^|\s)-?has:/i.test(view.q || '');
+    opsNote.hidden = !u.length && !needs;
+    opsNote.textContent = [...u.map(x => `“${x.op}” isn’t an operator (searched as text): did you mean ${x.suggest}?`), ...(needs ? ['has: needs Labelled parts (Settings → Advanced logging): searched as text.'] : [])].join(' ');
   };
   const helpBtn = opsOn() ? h('button', { type: 'button', class: 'small icon-btn', title: 'Search operators', 'aria-label': 'Search operators', onclick: () => opsHelp(searchBox, v => { view.q = v; searchWrap.classList.toggle('has-text', !!v); paintOpsNote(); refresh(); }) }, '?') : null;
   paintFilterBtn(); repaintFilters(); paintSaved(); paintOpsNote();

@@ -452,11 +452,18 @@ portfolio content.
   "Bold labels" (`markdown.boldLabels`: `**Learning point:** …` in `{{details}}`, via `mdCtx().labels`). Learning
   points never feed tag suggestions or shorthand (`suggestText`). The case template goes into an empty case box on
   focus (cursor after the first label, or on an empty first line), goes again on blur if untouched, and template lines
-  left as they were are dropped on save (`stripTemplate`), so a bare template saves nothing and isn't kept as a draft.
-- **Pasted lists** (Case → List): blank lines split cases as before; a bold first line (`**AB 72M lap chole**`, also
-  after a list mark) starts a case too and loses its stars; a bold label (`**Plan:**`) never does. With labelled parts
-  on, a block that starts with a labelled line after a blank line joins the case above, and `**Plan:**` is kept as
-  `Plan:` (the export adds the bold back when asked).
+  left as they were are dropped on save (`stripTemplate`), so a bare template saves nothing and isn't kept as a draft;
+  an untouched label line that heads lines typed under it (`Plan :` then `- spinal`) is kept, so those lines keep their
+  part. A box holding only the template counts as empty for tag groups (their text goes on the empty first line or
+  above) and Same as last (procedure on line 2, template lines kept). Same as last takes only the main text when
+  labels are on. "Bold labels" writes the word as typed (`**Learning:**` stays `Learning`; a bare key like `lp` shows
+  its name). A label's own word always beats another label's "also" word.
+- **Pasted lists** (Case → List): with labelled parts off, exactly as before (blank lines split cases). With it on: a
+  bold first line (`**AB 72M lap chole**`, also after a list mark) starts a case and loses its stars, but inside a case
+  only a wholly bold line does (a bold word for emphasis stays); a bold label (`**Plan:**`) never does and is kept as
+  `Plan:` (the export adds the bold back when asked); a block that starts with a labelled line after a blank line joins
+  the case above, unless the label is `dt` or the case above already has that label.
+- `has:` is a search operator only with labelled parts on; with it off it is plain text and the box says so.
 - **2000-character limit** (`details` in `firestore.rules`): a case, a pasted row or an edit over it is never cut off
   silently. The box and the review table say how far over; Save asks, then keeps the first part in the case (cut at a
   line break or space, `splitOverflow`) and puts the rest in a note linked to it ("Rest of the case · AB", Notes'

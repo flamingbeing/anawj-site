@@ -131,7 +131,7 @@ const FRESH_TICKS = () => ({ auto: [], rejected: [] });
 const labels = () => labelsOn(settings());
 const caseTemplate = () => { const t = settings().caseTplOn ? cleanCaseTemplate(settings().caseTpl) : ''; return t.trim() ? t : ''; };
 // the box holds only the template (nothing added): as good as empty
-const onlyTemplate = text => { const tpl = caseTemplate(); return !!tpl && !!String(text || '').trim() && !stripTemplate(text, tpl).trim(); };
+const onlyTemplate = text => { const tpl = caseTemplate(); return !!tpl && !!String(text || '').trim() && !stripTemplate(text, tpl, labels()).trim(); };
 // An empty case box gets the template when it takes the focus, the cursor after its first label; left as it was,
 // the template goes again when the box loses the focus (nothing to save, no draft kept)
 function putTemplate(ta) {
@@ -168,13 +168,20 @@ async function splitLong(rows) {
   over.forEach((r, i) => { r.details = cut[i].head; r.rest = cut[i].rest; });
   return true;
 }
-// the notes for split cases, once the cases are saved: [{ c (the saved case), rest }]
+// the notes for split cases, once the cases are saved: [{ c (the saved case), rest }] -> a promise of the notes made,
+// or null when there are none. No toast of its own (there is one toast, and it would hide the Saved toast's Undo):
+// the caller adds restSaid() to its toast, and its Undo calls binRest()
 function restNotes(list) {
   const todo = list.filter(x => x.rest);
-  if (!todo.length) return;
-  addNotes(todo.map(({ c, rest }) => ({ date: c.date || null, caseId: c.id, title: 'Rest of the case' + (c.initials ? ' · ' + c.initials : ''), body: rest })))
-    .then(() => toast(todo.length === 1 ? 'The rest of the case is in a note linked to it' : `The rest of ${todo.length} cases is in notes linked to them`))
-    .catch(err => toast('The rest of the case was not saved as a note: ' + err.message));
+  if (!todo.length) return null;
+  return addNotes(todo.map(({ c, rest }) => ({ date: c.date || null, caseId: c.id, title: 'Rest of the case' + (c.initials ? ' · ' + c.initials : ''), body: rest })))
+    .catch(err => { toast('The rest of the case was not saved as a note: ' + err.message); return []; });
+}
+const restSaid = list => { const n = list.filter(x => x.rest).length; return !n ? '' : n === 1 ? ' · the rest is in a linked note' : ` · the rest of ${n} cases is in linked notes`; };
+async function binRest(made) {
+  const notes = made ? await made : [];
+  if (!notes || !notes.length) return;
+  try { const { moveToBin } = await import('./bin.js'); await moveToBin('note', notes); } catch (err) { toast('Could not remove the linked note: ' + err.message); }
 }
 
 // ---------- category picker (search + grouped list) ----------
@@ -673,7 +680,7 @@ function paintParsed(typed) {
       names.length ? h('span', { class: 'pi parts-read' }, h('small', {}, 'Parts '), names.join(' · ')) : null);
   }
   if (ui.tooLong) {
-    const tpl = caseTemplate(), over = (tpl ? stripTemplate(details, tpl) : details).length - MAX_DETAILS;
+    const tpl = caseTemplate(), over = (tpl ? stripTemplate(details, tpl, labels()) : details).length - MAX_DETAILS;
     if (ui.tooLong.hidden !== !(over > 0)) ui.tooLong.hidden = !(over > 0);
     setText(ui.tooLong, over > 0 ? `${over} character${over === 1 ? '' : 's'} over the ${MAX_DETAILS} a case holds: Save offers to move the rest into a linked note.` : '');
   }
@@ -820,7 +827,13 @@ function paintSel() {
 
 function applyTemplate(t) {
   draft.cats = sortCodes(withParents([...draft.cats, ...t.cats]));
-  if (t.details && !draft.details.trim()) { draft.details = t.details + ' '; ui.textarea.value = draft.details; }
+  // a box holding only the case template counts as empty: the group's text goes on its empty first line, or above it
+  const tplOnly = onlyTemplate(draft.details);
+  if (t.details && (!draft.details.trim() || tplOnly)) {
+    if (tplOnly) { const lines = draft.details.split('\n'); if (!lines[0].trim()) lines[0] = t.details; else lines.unshift(t.details); draft.details = lines.join('\n'); }
+    else draft.details = t.details + ' ';
+    ui.textarea.value = draft.details;
+  }
   keepPlace(ui.templates, () => { saveDraft(); paintSel(); }); refocus();
 }
 
@@ -835,14 +848,19 @@ function paintQuick() {
   // recent cases: one tap fills the procedure (not the patient) and the categories; type the new
   // initials and age on the first line
   // how many (Settings → Advanced logging; one by default)
-  const procOf = c => splitAge(caseParts(c).details).rest.replace(/\s+/g, ' ').trim();
+  // with Labelled parts on, only the main text: the last patient's ASA, findings and learning points stay with them
+  const procOf = c => { const d = caseParts(c).details, L = labels(); return splitAge(L ? parseParts(d, L).main : d).rest.replace(/\s+/g, ' ').trim(); };
   const recent = recentCases(S.cases, recentCount(), c => procOf(c).toLowerCase() + '|' + sortCodes(c.cats).join()).map(c => ({ c, proc: procOf(c) }));
   recent.forEach(({ c, proc }, i) => chips.push(h('span', {
     class: 'chip tmpl recent', role: 'button', tabindex: '0', title: 'Same as last: ' + (proc || 'no details') + '\n' + c.cats.map(catFull).join('\n'), 'aria-label': 'Same as last: ' + (proc || 'no details'),
     onclick: () => {
       draft.cats = sortCodes(withParents(c.cats)); Object.assign(draft, FRESH_TICKS());
       // the procedure goes on line 2; a first line already typed (initials, age) stays
-      draft.details = (draft.details || '').split('\n')[0] + (proc ? '\n' + proc : '');
+      // the case template's untouched lines stay, under the procedure
+      const lines = (draft.details || '').split('\n'), tl = new Set(caseTemplate().split('\n').map(l => l.trim().toLowerCase()).filter(Boolean));
+      const isTpl = l => tl.has(l.trim().toLowerCase());
+      const first = isTpl(lines[0]) ? '' : lines[0], tail = lines.slice(isTpl(lines[0]) ? 0 : 1).filter(isTpl);
+      draft.details = [first, ...(proc ? [proc] : []), ...tail].join('\n');
       draft.tags = [];
       // its date too, but only when it was logged in this sitting (not yesterday evening's list)
       if (i === 0 && c.date && Date.now() - (c.createdAt || 0) < KEEP_MS / 3) { draft.date = c.date === todayISO() ? null : c.date; draft.dateAt = Date.now(); }
@@ -896,7 +914,7 @@ async function save(opts) {
 
 async function saveCase({ another, tap }) {
   // the case template's lines left as they were are dropped (a template with nothing added saves as no details)
-  const tpl = caseTemplate(), box = tpl ? stripTemplate(draft.details, tpl) : draft.details;
+  const tpl = caseTemplate(), box = tpl ? stripTemplate(draft.details, tpl, labels()) : draft.details;
   const details = [draft.initials, box].filter(Boolean).join(' ').trim();
   // a quick Save must not depend on the typing debounce (and nothing re-ticks while the save is under way)
   suggestSoon.cancel();
@@ -932,7 +950,7 @@ async function saveCase({ another, tap }) {
   const owner = S.user?.email, inputAtSave = JSON.stringify(draft);
   draft.caseId ||= uid(); draft.caseCreatedAt ||= Date.now(); saveDraft();
   const c = await createCase({ id: draft.caseId, createdAt: draft.caseCreatedAt, date: curDate(), initials: parts.initials, details: parts.details, cats: draft.cats, reflectTag: !!draft.reflectTag, tags: draft.tags || [] });
-  restNotes([{ c, rest: parts.rest }]);
+  const restList = [{ c, rest: parts.rest }], restMade = restNotes(restList);
   if (S.user?.email !== owner) return;
   const currentInput = { ...draft }; delete currentInput.caseId; delete currentInput.caseCreatedAt;
   const originalInput = JSON.parse(inputAtSave); delete originalInput.caseId; delete originalInput.caseCreatedAt;
@@ -956,10 +974,11 @@ async function saveCase({ another, tap }) {
   const prog = PROGRESS_BY_CODE();
   const withTarget = c.cats.map(code => prog[code]).find(p => p && p.next);
   const counted = withTarget ? ` · ${catName(withTarget.code)} now ${withTarget.count}/${withTarget.next.n}` : ` · ${catPills(c.cats)}`;
-  toast(`Saved ${fmtDate(c.date)}${counted}`, {
+  toast(`Saved ${fmtDate(c.date)}${counted}${restSaid(restList)}`, {
     action: 'Undo',
     onaction: async () => {
       if (S.user?.email !== owner) return;
+      binRest(restMade);   // the split-off rest goes too (the case comes back whole only as far as the box held it)
       const beforeUndo = JSON.stringify(draft);
       // put the case back in the box, unless the next one is already being typed: then it goes to the recycle bin
       // (tags kept for the next case by After Save don't count as the next one)
@@ -1145,9 +1164,9 @@ async function saveBulk(e) {
   bulkRows = null;
   try {
     await saveMany(cases);
-    restNotes(cases.map((c, i) => ({ c, rest: rows[i].rest })));
+    const restList = cases.map((c, i) => ({ c, rest: rows[i].rest })), restMade = restNotes(restList);
     draft.bulk = ''; saveDraft();
-    toast(`Saved ${cases.length} cases`, { action: 'Undo', onaction: () => deleteMany(cases.map(c => c.id)).catch(err => toast('Could not undo: ' + err.message)) });
+    toast(`Saved ${cases.length} cases${restSaid(restList)}`, { action: 'Undo', onaction: () => { binRest(restMade); return deleteMany(cases.map(c => c.id)).catch(err => toast('Could not undo: ' + err.message)); } });
   } catch (err) { bulkRows = keep; toast('Could not save: ' + err.message); }
   bulkBusy = false;
   hooks.render();
@@ -1246,10 +1265,11 @@ export function editCaseDialog(c, opts = {}) {
           e.id ||= uid(); e.createdAt ||= Date.now();
           const inputAtSave = JSON.stringify(e);
           const made = await createCase({ id: e.id, createdAt: e.createdAt, date: e.date || todayISO(), initials: e.initials, details: long.details, cats: e.cats, reflectTag: !!e.reflectTag, tags: e.tags || [] });
-          restNotes([{ c: made, rest: long.rest }]);
+          const restList = [{ c: made, rest: long.rest }];
+          restNotes(restList);
           base = made; created = true; saveEditDraft();
           if (S.user?.email !== owner || JSON.stringify(e) !== inputAtSave) return toast('Case saved. Newer edits remain open.');
-          editDraft.clear(); await m.close(); if (S.user?.email !== owner) return; toast('Case logged');
+          editDraft.clear(); await m.close(); if (S.user?.email !== owner) return; toast('Case logged' + restSaid(restList));
           return opts.onCreated(made);
         }
         const next = { ...e, initials: cleanInitials(e.initials), details: e.details.trim() };
@@ -1263,13 +1283,13 @@ export function editCaseDialog(c, opts = {}) {
         if (!next.tags.length) delete next.tags;
         const inputAtSave = JSON.stringify(e);
         const saved = await updateCase(next, { base });
-        restNotes([{ c: saved, rest: long.rest }]);
+        const restList = [{ c: saved, rest: long.rest }], restMade = restNotes(restList);
         base = saved; saveEditDraft();
         if (S.user?.email !== owner || JSON.stringify(e) !== inputAtSave) return toast('Case saved. Newer edits remain open.');
         editDraft.clear(); await m.close();
         if (S.user?.email !== owner) return;
-        if (isNew) { toast('Case logged'); return opts.onCreated(saved); }
-        toast('Case updated', { action: 'Undo', onaction: () => { if (S.user?.email === owner) return restoreCase(c, saved).catch(err => toast(err.message)); } });
+        if (isNew) { toast('Case logged' + restSaid(restList)); return opts.onCreated(saved); }
+        toast('Case updated' + restSaid(restList), { action: 'Undo', onaction: () => { if (S.user?.email === owner) { binRest(restMade); return restoreCase(c, saved).catch(err => toast(err.message)); } } });
         } catch (err) { toast('Could not save: ' + err.message); } finally { button.disabled = false; }
       } }, 'Save')),
   ], { cls: 'full', sticky: true });

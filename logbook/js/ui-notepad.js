@@ -340,5 +340,7 @@ export async function addNotes(list) {
   const me = mine();
   if (!me) throw new Error('Not signed in');
   await ensureNotes();
-  for (const n of list) await writes.save('note', me, cleanNote({ id: uid(), ...n }), null);
+  const made = [];
+  for (const n of list) { const note = cleanNote({ id: uid(), ...n }); await writes.save('note', me, note, null); made.push(note); }
+  return made;   // so an Undo can bin them again
 }

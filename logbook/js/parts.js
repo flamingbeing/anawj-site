@@ -26,20 +26,24 @@ const WORD = /^\p{L}(?:[\p{L}\p{N} &/.'-]{0,22}[\p{L}&/.'-])?$/u;
 const word = v => String(v ?? '').replace(/\s+/g, ' ').trim();
 export const labelWordOk = v => WORD.test(word(v));
 
-// A stored list, cleaned: a missing one is the defaults; bad words dropped; one entry per word
+// A stored list, cleaned: a missing one is the defaults; bad words dropped; one entry per word. Every label's own
+// word is reserved first, so another label's "also" word never pushes a label (and its name and hide) out
 export function cleanLabels(v) {
   if (!Array.isArray(v)) return DEFAULT_LABELS.map(x => ({ ...x, ...(x.also ? { also: [...x.also] } : {}) }));
-  const out = [], seen = new Set();
+  const keep = [], seen = new Set();
   for (const x of v) {
-    if (!x || typeof x !== 'object' || out.length >= MAX_LABELS) continue;
+    if (!x || typeof x !== 'object' || keep.length >= MAX_LABELS) continue;
     const k = word(x.k);
     if (!labelWordOk(k) || seen.has(k.toLowerCase())) continue;
-    const also = (Array.isArray(x.also) ? x.also : []).map(word).filter(a => labelWordOk(a) && a.toLowerCase() !== k.toLowerCase() && !seen.has(a.toLowerCase())).slice(0, 5);
-    for (const w of [k, ...also]) seen.add(w.toLowerCase());
-    const n = word(x.n).slice(0, 40);
-    out.push(strip({ k, n: n || k, also: also.length ? [...new Set(also)] : undefined, hide: x.hide === true || undefined }));
+    seen.add(k.toLowerCase());
+    keep.push([x, k]);
   }
-  return out;
+  return keep.map(([x, k]) => {
+    const also = [...new Set((Array.isArray(x.also) ? x.also : []).map(word).filter(a => labelWordOk(a) && !seen.has(a.toLowerCase())))].slice(0, 5);
+    for (const a of also) seen.add(a.toLowerCase());
+    const n = word(x.n).slice(0, 40);
+    return strip({ k, n: n || k, also: also.length ? also : undefined, hide: x.hide === true || undefined });
+  });
 }
 const strip = x => Object.fromEntries(Object.entries(x).filter(([, v]) => v !== undefined));
 
@@ -88,7 +92,7 @@ export function parseParts(text, labels) {
     if (hit) { parts.push(cur = { k: hit.label.k, name: hit.name, word: hit.word, num: hit.num, text: hit.rest, hide: !!hit.label.hide }); continue; }
     if (cur) cur.text += '\n' + line; else main.push(line);
   }
-  for (const p of parts) p.text = p.text.replace(/\s+$/, '');
+  for (const p of parts) p.text = p.text.replace(/^\s*\n/, '').replace(/\s+$/, '');   // a label alone on its line heads the lines below
   return { main: main.join('\n').replace(/\s+$/, ''), parts };
 }
 
@@ -103,7 +107,10 @@ export function boldLabels(text, labels) {
   if (!labels || !labels.length) return String(text ?? '');
   return String(text ?? '').split('\n').map(line => {
     const hit = labelOf(line, labels);
-    return hit ? `**${hit.name}:**${hit.rest ? ' ' + hit.rest : ''}` : line;
+    if (!hit) return line;
+    // the word as typed ("Learning:" stays "Learning", "ASA 2" stays "ASA 2"); a short key ("lp") shows its name
+    const head = hit.word.toLowerCase() === hit.label.k.toLowerCase() && hit.label.n !== hit.label.k ? hit.name : hit.word.replace(/\s+/g, ' ') + (hit.num ? ' ' + hit.num : '');
+    return `**${head}:**${hit.rest ? ' ' + hit.rest : ''}`;
   }).join('\n');
 }
 // A pasted "**Learning:** x" is kept as "Learning: x" (the export puts the bold back when asked)
@@ -150,11 +157,22 @@ export function templateCaret(tpl) {
   return m ? m.index + m[0].length : first.length;
 }
 // What is saved: the template's lines left as they were (nothing typed after "PE :") are dropped, so a template
-// with nothing added saves as nothing
-export function stripTemplate(text, tpl) {
-  const lines = new Set(String(tpl || '').split('\n').map(l => l.trim().toLowerCase()).filter(Boolean));
-  if (!lines.size) return String(text ?? '');
-  return String(text ?? '').split('\n').filter(l => !lines.has(l.trim().toLowerCase())).join('\n').replace(/^\s*\n/, '').replace(/\s+$/, '');
+// with nothing added saves as nothing. An untouched line that heads text typed on the lines below it ("Plan :" then
+// "- spinal") is kept: it is dropped only when the next line with text is another template line (filled or not), a
+// label or the end.
+export function stripTemplate(text, tpl, labels = null) {
+  const tl = new Set(String(tpl || '').split('\n').map(l => l.trim().toLowerCase()).filter(Boolean));
+  if (!tl.size) return String(text ?? '');
+  const lines = String(text ?? '').split('\n');
+  const isTpl = l => tl.has(l.trim().toLowerCase());
+  // the next line is another part: a label, or a template line with something typed after it ("Plan : GA")
+  const isLabel = l => !!(labels && labels.length && labelOf(l, labels)) || [...tl].some(t => l.trim().toLowerCase().startsWith(t));
+  const out = lines.filter((l, i) => {
+    if (!isTpl(l)) return true;
+    const next = lines.slice(i + 1).find(x => x.trim());
+    return !(next == null || isTpl(next) || isLabel(next));
+  });
+  return out.join('\n').replace(/^\s*\n/, '').replace(/\s+$/, '');
 }
 
 // ---------- the 2000-character limit ----------

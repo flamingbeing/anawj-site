@@ -144,6 +144,15 @@ try { for (const width of [390, 1280]) {
   await p.waitForFunction(n => window.__core?.S.cases.length === n + 2, n0);
   assert.equal((await cases()).find(c => c.initials === 'CD' && c.details.includes('hernia')).details, '40F hernia\nASA : 3\nPlan : spinal');   // "PE :" left empty: dropped
   await p.waitForFunction(() => document.querySelector('textarea.details').value === 'ASA :\nPE :\nPlan :');   // ready for the next one
+  // Same as last with only the template in the box: the procedure (main text only) on line 2, the template kept
+  await p.locator('.chip.recent').first().click();
+  assert.equal(await ta.inputValue(), '\nhernia\nASA :\nPE :\nPlan :');
+  // an untouched label heading lines typed under it is kept, so those lines stay in its part
+  await ta.fill('KL 50M hernia\nASA : 2\nPE :\nPlan :\n- spinal\n- TAP block');
+  await p.getByRole('button', { name: /^Save/ }).last().click();
+  await p.waitForFunction(n => window.__core?.S.cases.length === n + 3, n0);
+  assert.equal((await cases()).find(c => c.initials === 'KL').details, '50M hernia\nASA : 2\nPlan :\n- spinal\n- TAP block');
+  await p.waitForFunction(() => document.querySelector('textarea.details').value === 'ASA :\nPE :\nPlan :');
   await p.evaluate(() => document.activeElement.blur());
   await p.waitForFunction(() => document.querySelector('textarea.details').value === '');
 
@@ -169,13 +178,19 @@ try { for (const width of [390, 1280]) {
     if (/Longer than a case can hold/.test(h)) { await d.getByRole('button', { name: 'Move the rest to a note' }).click(); break; }
     await d.getByRole('button', { name: 'Save all' }).click();
   }
-  await p.waitForFunction(n => window.__core?.S.cases.length === n + 5, n0);
+  await p.waitForFunction(n => window.__core?.S.cases.length === n + 6, n0);
+  // one toast: the note is said in it and Undo stays
+  assert.match(await p.locator('#toast').innerText(), /Saved 3 cases · the rest is in a linked note/);
   const gh = (await cases()).find(c => c.initials === 'GH');
   assert.ok(gh.details.length <= 2000 && gh.details.length > 1000, String(gh.details.length));
   await p.waitForFunction(id => (window.__core?.S.notes || []).some(n => n.caseId === id), gh.id, { timeout: 8000 });
   const note = await p.evaluate(async id => { const { S } = await import('./js/ui-core.js'); return S.notes.find(n => n.caseId === id); }, gh.id);
   assert.equal(note.title, 'Rest of the case · GH');
   assert.equal(gh.details + '\n' + note.body, long.replace(/^GH /, ''));   // nothing lost
+  // Undo takes the cases away and bins the note with them (no note left linked to a missing case)
+  await p.locator('#toast').getByRole('button', { name: 'Undo' }).click();
+  await p.waitForFunction(n => window.__core?.S.cases.length === n + 3, n0);
+  await p.waitForFunction(id => !(window.__core?.S.notes || []).some(n => n.caseId === id), gh.id, { timeout: 8000 });
 
   // switched off: plain text again, nothing bold, the page says how to turn it on
   await p.goto(base + '?demo#loggingadv'); await p.getByRole('heading', { name: 'Advanced logging' }).waitFor();

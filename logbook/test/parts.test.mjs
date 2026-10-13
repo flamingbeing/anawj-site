@@ -21,6 +21,10 @@ const L = cleanLabels([...DEFAULT_LABELS, { k: 'ASA', n: '' }, { k: 'PE' }, { k:
   assert.deepEqual(c.map(l => l.k), ['lp', 'Learning', 'H&P', 'S/B']);
   assert.equal(c[1].also, undefined);
   assert.deepEqual(c[3].also, ['sb']);
+  // another label's word typed as an "also" word never pushes that label (its name, hide) out
+  const kept = cleanLabels([{ k: 'lp', also: ['dt', 'learning'] }, { k: 'dt', n: 'Case details', hide: true }]);
+  assert.deepEqual(kept, [{ k: 'lp', n: 'lp', also: ['learning'] }, { k: 'dt', n: 'Case details', hide: true }]);
+  assert.deepEqual(cleanLabels([{ k: 'lp', also: ['learning'] }, { k: 'Learning' }]).map(l => [l.k, l.also]), [['lp', undefined], ['Learning', undefined]]);
   assert.equal(cleanLabels(Array.from({ length: 30 }, (_, i) => ({ k: 'L' + 'abcdefghijklmnopqrstuvwxyzABCD'[i] }))).length, 20);
   assert.ok(labelWordOk('Learning points') && labelWordOk('Ix') && !labelWordOk('lp1') && !labelWordOk('') && !labelWordOk('a:b'));
 }
@@ -77,6 +81,11 @@ const L = cleanLabels([...DEFAULT_LABELS, { k: 'ASA', n: '' }, { k: 'PE' }, { k:
 {
   assert.equal(boldLabels('AB lap chole\nASA 2: HTN\nlp: cuff\nLP for headache\nPE:', L), 'AB lap chole\n**ASA 2:** HTN\n**Learning point:** cuff\nLP for headache\n**PE:**');
   assert.equal(boldLabels('lp: x', null), 'lp: x');
+  // the word as typed survives a round trip: "**Learning:** x" pasted, stored plain, exported bold again
+  const pasted = plainLabels('**Learning:** cuff\n**Plan 2:** GA', L);
+  assert.equal(pasted, 'Learning: cuff\nPlan 2: GA');
+  assert.equal(boldLabels(pasted, L), '**Learning:** cuff\n**Plan 2:** GA');
+  assert.equal(boldLabels('LP: x', L), '**Learning point:** x');   // the short key shows its name
   assert.equal(plainLabels('**Learning:** cuff\n**PE**: clear\nPlan: GA\n**not a label:** x', L), 'Learning: cuff\nPE: clear\nPlan: GA\n**not a label:** x');
   assert.equal(suggestText('lap chole\nPlan: spinal\nlp: never spinal again', L), 'lap chole\nspinal');
   assert.equal(suggestText('lp: x', null), 'lp: x');
@@ -104,6 +113,16 @@ const L = cleanLabels([...DEFAULT_LABELS, { k: 'ASA', n: '' }, { k: 'PE' }, { k:
   assert.equal(stripTemplate(' ASA :\n\nPE :  \nPlan :\n', tpl), '');
   assert.equal(stripTemplate('AB lap chole\nASA : 2\nPE :\nPlan : GA', tpl), 'AB lap chole\nASA : 2\nPlan : GA');
   assert.equal(stripTemplate('anything', ''), 'anything');
+  // an untouched label that heads lines typed under it stays, so they keep their part
+  const under = stripTemplate('AB 45F lap chole\nASA : 2\nPE :\nPlan :\nGA ETT\nextubate deep', tpl, L);
+  assert.equal(under, 'AB 45F lap chole\nASA : 2\nPlan :\nGA ETT\nextubate deep');
+  assert.deepEqual(parseParts(under, L).parts.map(p => [p.k, p.text]), [['ASA', '2'], ['Plan', 'GA ETT\nextubate deep']]);
+  const ht = '\nASA :\nPE :\nPlan :';
+  assert.equal(stripTemplate('CD 40F hernia\nASA : 3\nPE :\nPlan :\n- spinal\n- TAP block', ht, L), 'CD 40F hernia\nASA : 3\nPlan :\n- spinal\n- TAP block');
+  assert.equal(stripTemplate('lp:\n- one\n- two', 'lp:'), 'lp:\n- one\n- two');
+  // an untouched line before a label the user typed goes; so does a trailing run
+  assert.equal(stripTemplate('AB knee\nASA :\nlp: cuff\nPE :\nPlan :', tpl, L), 'AB knee\nlp: cuff');
+  assert.equal(stripTemplate(ht, ht, L), '');
   assert.equal(cleanCaseTemplate('a\r\nb'), 'a\nb');
   assert.equal(cleanCaseTemplate('x'.repeat(900)).length, MAX_TEMPLATE);
 }
@@ -133,24 +152,31 @@ const L = cleanLabels([...DEFAULT_LABELS, { k: 'ASA', n: '' }, { k: 'PE' }, { k:
   const now = new Date(2026, 2, 15);
   // the existing rules stay: blank lines split, a case keeps its lines
   assert.deepEqual(parseBulk('AB lap chole\nGA ETT\n\nCD LSCS', null, now).map(r => r.details), ['lap chole\nGA ETT', 'LSCS']);
-  // a bold first line starts a case without a blank line, and loses its stars
+  // with labels on, a bold first line starts a case without a blank line, and loses its stars
   const notes = '**AB 72M lap chole**\nASA 2: HTN\nPlan: GA ETT\n**CD 30F LSCS**\n**ASA 2:** obese\nlp: check the block';
-  const off = parseBulk(notes, null, now);
-  assert.equal(off.length, 2);
-  assert.deepEqual([off[0].initials, off[0].details], ['AB', '72M lap chole\nASA 2: HTN\nPlan: GA ETT']);
-  assert.equal(off[1].details, '30F LSCS\n**ASA 2:** obese\nlp: check the block');   // a bold label isn't a case
   const on = parseBulk(notes, null, now, { labels: L });
-  assert.equal(on[1].details, '30F LSCS\nASA 2: obese\nlp: check the block');        // kept plain with the setting on
+  assert.equal(on.length, 2);
+  assert.deepEqual([on[0].initials, on[0].details], ['AB', '72M lap chole\nASA 2: HTN\nPlan: GA ETT']);
+  assert.equal(on[1].details, '30F LSCS\nASA 2: obese\nlp: check the block');        // a bold label isn't a case; kept plain
+  // with labels off, pasting is exactly as before: one case, stars kept
+  const off = parseBulk(notes, null, now);
+  assert.equal(off.length, 1);
+  assert.ok(off[0].details.includes('**CD 30F LSCS**'));
+  assert.equal(parseBulk('AB 45F lap chole\n**Difficult airway** grade 3 view, VL used', null, now).length, 1);
   // with labels, a labelled block after a blank line belongs to the case above
   const gap = parseBulk('AB lap chole\n\nlp: cuff pressure\n\nCD LSCS', null, now, { labels: L });
   assert.deepEqual(gap.map(r => r.details), ['lap chole\nlp: cuff pressure', 'LSCS']);
   assert.equal(parseBulk('AB lap chole\n\nlp: cuff pressure', null, now).length, 2);  // off: as before
-  // a dated bold line, a numbered bold line, __bold__
-  const d = parseBulk('1. **12/3 EF hernia**\nTAP block\n__GH appendix__', null, now);
+  // ... but never a dt block (a list of "dt: …" cases), nor a label the case above already has
+  assert.equal(parseBulk('dt: AB 45F lap chole\n\ndt: CD 30M appendix\n\ndt: EF 60F TKR', null, now, { labels: L }).length, 3);
+  assert.equal(parseBulk('ASA 2: AB knee\n\nASA 3: CD hip', null, now, { labels: L }).length, 2);
+  // a dated bold line, a numbered bold line, __bold__ (labels on)
+  const d = parseBulk('1. **12/3 EF hernia**\nTAP block\n__GH appendix__', null, now, { labels: L });
   assert.deepEqual(d.map(r => [r.date, r.initials, r.details]), [['2026-03-12', 'EF', 'hernia\nTAP block'], [null, 'GH', 'appendix']]);
-  // a bold word that is only the start of a line still starts a case; "**Note:**" doesn't
-  assert.equal(parseBulk('AB knee\n**Note:** spinal', null, now).length, 1);
-  assert.equal(parseBulk('AB knee\n**CD** hip', null, now)[1].details, 'hip');
+  // inside a case only a wholly bold line starts the next: a bold word for emphasis stays; "**Note:**" too
+  assert.equal(parseBulk('AB knee\n**Note:** spinal', null, now, { labels: L }).length, 1);
+  assert.deepEqual(parseBulk('AB 72M lap chole\n**Difficult airway** grade 3 view\nGA', null, now, { labels: L }).map(r => r.details), ['72M lap chole\n**Difficult airway** grade 3 view\nGA']);
+  assert.equal(parseBulk('AB knee\n**CD hip**', null, now, { labels: L })[1].details, 'hip');
 }
 
 console.log('parts tests passed');

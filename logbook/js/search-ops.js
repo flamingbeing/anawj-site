@@ -13,6 +13,8 @@
 import { editDistance } from './engine.js';
 
 export const FIELDS = ['initials', 'title', 'case', 'tag', 'has'];
+// with Labelled parts off, has: is plain text again (as before the setting existed)
+export const FIELDS_NO_HAS = FIELDS.filter(f => f !== 'has');
 // Reflections search: its own fields (no tags; title: is the reflection's title)
 export const REFL_FIELDS = ['initials', 'heading', 'title', 'diagnosis', 'case'];
 export const REFL_OPERATOR_HELP = [
