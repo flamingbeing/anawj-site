@@ -35,6 +35,7 @@ page.on('console', m => { if (m.type() === 'error' && !/favicon|404/.test(m.text
 const axe = async label => {
   if (!fs.existsSync(AXE)) return;
   if (!(await page.evaluate(() => !!window.axe))) await page.addScriptTag({ path: AXE });
+  await page.waitForTimeout(300);   // let a toast finish fading in (0.2 s): half-faded text reads as low contrast
   const r = await page.evaluate(() => window.axe.run(document, { runOnly: ['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'] }));
   const bad = r.violations.filter(v => v.impact === 'serious' || v.impact === 'critical');
   assert.equal(bad.length, 0, `axe (${label}): ` + bad.map(v => v.id + ' ' + v.nodes[0]?.target).join('; '));
