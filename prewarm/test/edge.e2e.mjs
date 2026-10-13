@@ -109,13 +109,13 @@ jobs.push(() => tryit(async () => {
   log(pg.url().includes('/p/') && !pg.url().includes('haemo') && !await pg.$('dialog.ask[open]'), 'back from BP: temps, no prompt');
   await ctx.close();
 }));
-// F. Log Prewarm off on an unsaved timepoint: no prompt for the automatic NA
+// F. setting Prewarm off on an unsaved timepoint: no prompt for the automatic NA
 jobs.push(() => tryit(async () => {
   const { ctx, pg } = await fresh();
   await open(pg, 0);
-  await pg.click('#lognext'); await pg.waitForTimeout(300);
+  pg.once('dialog', d => d.accept()); await tapNow(pg, 'ev_wstop'); await pg.waitForTimeout(300);
   await pg.click('.pn.next'); await pg.waitForTimeout(300);
-  log(!await pg.$('dialog.ask[open]'), 'Log then next: no prompt when nothing typed');
+  log(!await pg.$('dialog.ask[open]'), 'Prewarm off then next: no prompt when nothing typed');
   await ctx.close();
 }));
 // G. Perioperative data: Enter on the last question, Shift+Enter back
@@ -226,6 +226,7 @@ jobs.push(() => tryit(async () => {
   await pg.click('.strip a:has-text("60")'); await pg.waitForSelector('input[data-in="sbp"]');
   await pg.fill('input[data-in="sbp"]', '118');
   const accept = d => d.accept(d.type() === 'prompt' ? d.defaultValue() : undefined); // also the "what time was it taken?" question, when the demo clock is late
+  await pg.waitForTimeout(900); // the tap guard after the first Save
   pg.on('dialog', accept); await pg.click('#save'); await pg.waitForTimeout(400); pg.off('dialog', accept);
   await pg.waitForFunction(() => !!document.querySelector('#gaps'), null, { timeout: 4000 });
   log(/BP, HR, BIS saved with blanks: .*60 min \(Diastolic BP, Mean BP, Heart rate, BIS\)/.test(await pg.textContent('#gaps')), 'part-blank reading listed: ' + (await pg.textContent('#gaps')).replace(/\s+/g, ' ').slice(0, 300));
@@ -326,8 +327,8 @@ jobs.push(() => tryit(async () => {
   const { ctx, pg } = await fresh('2026-10-13T10:00:00');
   await pg.evaluate(() => { localStorage.setItem('prewarm-demo:settings', JSON.stringify({ me: 'TT' })); });
   await pg.goto('http://localhost:8080/prewarm/?demo#/new'); await pg.reload(); await pg.waitForSelector('#sid');
-  await pg.fill('#sid', 'ALERT-1'); await pg.click('.seg .chip[data-v="2"]'); await pg.click('button[type=submit]'); await pg.waitForSelector('#lognext');
-  await pg.click('#lognext'); await pg.waitForTimeout(800); await pg.click('#lognext'); // Gown on, Prewarm on (not a double tap)
+  await pg.fill('#sid', 'ALERT-1'); await pg.click('.seg .chip[data-v="2"]'); await pg.click('button[type=submit]'); await pg.waitForSelector('#syncchip');
+  await tapNow(pg, 'pw_gown'); await pg.waitForTimeout(900); await tapNow(pg, 'pw_start'); // Gown on, Prewarm on (not a double tap)
   const seen = [];
   for (let i = 0; i < 12; i++) {
     await pg.clock.fastForward('01:00'); await pg.waitForTimeout(150);
@@ -374,11 +375,6 @@ jobs.push(() => tryit(async () => {
   await dbl('#save');
   const after = await pg.$$eval('.strip a.done', a => a.length);
   log(after === before + 1, `double-tap Save saves one timepoint (saved ${before} → ${after})`);
-  // Log
-  const setBefore = await pg.$$eval('.tchip.set', a => a.length);
-  await dbl('#lognext');
-  const setAfter = await pg.$$eval('.tchip.set', a => a.length);
-  log(setAfter === setBefore + 1, `double-tap Log logs one event (times set ${setBefore} → ${setAfter})`);
   pg.off('dialog', ok);
   // typing a temperature, then swiping to Others: the typed value counts, so leaving asks
   await pg.goto(pg.url().replace(/(#\/p\/\w+).*$/, '$1')); await pg.waitForSelector('.num[data-type="core"]');

@@ -25,7 +25,13 @@ await Promise.all(['1', '2', '3'].map(async ARM => {
   await pg.waitForSelector('.times');
   const pid = pg.url().match(/#\/p\/(\w+)/)[1];
   const adv = async m => { await pg.clock.fastForward(m * 60000); await pg.waitForTimeout(80); };
-  const log = async () => { await pg.goto(`${BASE}?demo#/p/${pid}`); await pg.waitForSelector('#lognext'); const t = (await pg.textContent('#lognext')).trim(); await pg.click('#lognext'); await pg.waitForTimeout(100); return t; };
+  // the next key time is set to now from its pad (the Log shortcut was replaced by the sync status, 13 Oct 2026)
+  const log = async () => {
+    await pg.goto(`${BASE}?demo#/p/${pid}`); await pg.waitForSelector('.times');
+    const id = await pg.evaluate(() => ['pw_gown', 'pw_start', 'ev_wstop', 'ev_ot', 'io_knife', 'io_done'].find(e => { const b = document.querySelector(`[data-ev="${e}"]`); return b && !b.classList.contains('set'); }));
+    const t = (await pg.textContent(`[data-ev="${id}"] span`)).trim();
+    await pg.click(`[data-ev="${id}"]`); await pg.click('.kp [data-now]'); await pg.waitForTimeout(100); return t;
+  };
   const tapEv = async id => { await pg.goto(`${BASE}?demo#/p/${pid}`); await pg.waitForSelector('.times'); await pg.click(`[data-ev="${id}"]`); await pg.click('.kp [data-now]'); await pg.waitForTimeout(100); };
   // PACU in / To ward are logged on the PACU page (owner, 13 Oct 2026)
   const pacuTime = async (id, label) => { await pg.goto(`${BASE}?demo#/p/${pid}/form/pacu`); await pg.waitForSelector('#f-pacu_temp'); await pg.click(`[data-pev="${id}"]`); await pg.click('.kp [data-now]'); await pg.waitForTimeout(800); return label; }; // the tap guard ignores taps near the last one for 0.7 s

@@ -320,3 +320,7 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
 - **"Subject ID:" label** (owner, 13 Oct 2026): patients are named "Subject ID: 85" in the patient list, PACU view and
   delete lists (`sidL`), and the app bar shows a small "Subject ID" above the ID (`setTitle`) so it doesn't crowd the
   countdown and Log. The PACU nurse's page keeps its own "PACU · ID" title.
+- **Sync status replaces Log in the bar** (owner, 13 Oct 2026): the top-right chip shows Synced / N waiting / Offline
+  (or Local when not sharing); a tap runs Refresh now. The one-tap Log shortcut is gone: key times are set from their
+  boxes in the key-times row (pad with a Now button). Tests set times that way (`tapNow`); logging one while an earlier
+  key time is empty asks first.

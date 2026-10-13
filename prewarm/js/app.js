@@ -127,8 +127,9 @@ function syncText() {
   return when ? `Synced ${when}.` : 'Not synced yet.';
 }
 // every "last synced" line on screen
-function showSync() { const t = syncText(); document.querySelectorAll('.syncline').forEach(el => { el.textContent = t; el.classList.toggle('late', /^Not/.test(t)); }); }
+function showSync() { paintSyncChip(); const t = syncText(); document.querySelectorAll('.syncline').forEach(el => { el.textContent = t; el.classList.toggle('late', /^Not/.test(t)); }); }
 setInterval(showSync, 20000);
+addEventListener('online', () => showSync()); addEventListener('offline', () => showSync());
 function sync(p, ids, withLock = false) {
   if (!sharing()) return;
   // PACU answers also go to the nurse's link copy, so the nurse's phone sees them (owner, 13 Oct 2026)
@@ -236,7 +237,8 @@ function pacuLinkHtml(p) {
 let swReg = null, offerUpdate = null;
 const refreshHtml = () => `<div class="refreshbox"><button class="secondary" id="refreshnow">Refresh now</button><small class="muted">Gets the team’s latest data again, sends anything waiting, and checks for a new app version. <span id="appver"></span></small><a class="link" href="../prewarm-update/">App still won’t update? Get the latest version</a></div>`;
 async function refreshNow(btn) {
-  btn.disabled = true; const was = btn.textContent; btn.textContent = 'Refreshing…';
+  const chip = btn.id === 'syncchip'; // the bar's chip keeps its own text
+  btn.disabled = true; const was = btn.textContent; if (!chip) btn.textContent = 'Refreshing…'; else btn.dataset.busy = '1';
   let msg = 'Up to date.';
   try {
     if (cloud.enabled) {
@@ -252,7 +254,7 @@ async function refreshNow(btn) {
       if (swReg.waiting && navigator.serviceWorker.controller) { offerUpdate?.(swReg.waiting); msg = 'A new app version is ready: tap “Update available” at the top.'; }
     }
   } catch { msg = 'Couldn’t refresh. Check your signal and try again.'; }
-  btn.disabled = false; btn.textContent = was; toast(msg);
+  btn.disabled = false; if (!chip) btn.textContent = was; else delete btn.dataset.busy; paintSyncChip(); toast(msg);
   if (/^#\/(settings)?$/.test(location.hash) || !location.hash) render();
 }
 // which app version this phone is running (the saved copy's name), so a phone stuck on an old one can be spotted
@@ -722,27 +724,34 @@ function skippedBefore(p, id) {
   const i = evs.indexOf(id);
   return i < 0 ? [] : evs.slice(0, i).filter(x => !val(p, x)).map(evLabel);
 }
-// app-bar button that logs the next event as now
-const logBtnHtml = p => { const nx = nextEvent(p); return nx ? `<b>Log</b><small>${esc(nx.label)}</small>` : ''; };
+// app-bar sync status (owner, 13 Oct 2026, instead of the Log shortcut): Synced / N waiting / Offline / Phone only; a tap runs Refresh now
+function syncChipState() {
+  if (!sharing()) return ['Local', 'this phone', 'local', 'Data stays on this phone: not shared with a team'];
+  const n = Object.keys(pending).map(id => patients[id]).filter(p => p && !isGone(p)).length;
+  if (n) return [`${n} waiting`, 'to send', 'wait', `${n} patient${n === 1 ? '' : 's'} not sent to the team yet`];
+  if (!navigator.onLine) return ['Offline', 'no signal', 'wait', 'No signal: changes send when it returns'];
+  return ['Synced', 'with team', 'ok', syncText()];
+}
+function paintSyncChip() {
+  const el = $('#syncchip'); if (!el) return;
+  const [t, sub, st, tip] = syncChipState(), h = `<b>${esc(t)}</b><small>${esc(sub)}</small>`;
+  if (el.innerHTML !== h) el.innerHTML = h;
+  el.dataset.state = st; el.title = tip; el.setAttribute('aria-label', `Sync status: ${t}, ${sub}. Tap to refresh.`);
+}
 // The patient screens' top bar (main screen, BP / HR / BIS, intra-op details, PACU): running timer, next event and
-// its Log button. Returns a function that redraws it; it also ticks every second while the screen is open.
+// its sync status chip. Returns a function that redraws it; it also ticks every second while the screen is open.
 function topBar(p, s, onLog) {
-  $('#extra').innerHTML = `<div class="clock" id="clock">${clockHtml(p, s)}</div><button class="logbtn" id="lognext" ${nextEvent(p) ? '' : 'hidden'}>${logBtnHtml(p)}</button>`;
+  $('#extra').innerHTML = `<div class="clock" id="clock">${clockHtml(p, s)}</div><button class="logbtn syncchip" id="syncchip"></button>`;
+  paintSyncChip();
   const refresh = () => {
     const ck = $('#clock'); if (ck) ck.innerHTML = clockHtml(p, s);
-    const lb = $('#lognext'); if (lb) { const h = logBtnHtml(p); if (lb.innerHTML !== h) lb.innerHTML = h; lb.hidden = !h; }
+    paintSyncChip();
   };
   // the countdown opens what it counts down to: that reading's first box, or the key time's pad
   const ckGo = () => { const n = nextDue(p, s); if (n?.target) openTarget(n.target); };
   $('#clock').onclick = e => { if (e.target.closest('.next')) ckGo(); };
   $('#clock').onkeydown = e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.closest('.next')) { e.preventDefault(); ckGo(); } };
-  $('#lognext').onclick = () => {
-    const nx = nextEvent(p); if (!nx) return;
-    if (val(p, 'done')) return toast(sealedMsg(p, null));
-    const t = nowHM();
-    set(p, nx.id, t); toast(`${nx.label} ${t}. Tap its box to change.`); refresh(); onLog?.();
-    lockTaps(); // the button relabels to the next event at once: a double tap mustn't log that one too
-  };
+  $('#syncchip').onclick = e => refreshNow(e.currentTarget);
   const iv = setInterval(refresh, 1000);
   cleanup.push(() => clearInterval(iv));
   // patients opened here today get due alerts on every screen (kept a day)

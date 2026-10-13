@@ -240,7 +240,7 @@ input:focus { border-color: var(--navy); }
 .ico { width: 1.1em; height: 1.1em; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.15em; }
 /* a locked patient opened by an admin: read only */
 body.ro main::before { content: "Locked: read only. Unlock it on the home page to change it."; display: block; padding: 8px 12px; border-radius: var(--r); background: var(--warn-soft); color: var(--warn); font-weight: 600; }
-body.ro #save, body.ro .logbtn, body.ro [data-done], body.ro [data-undone], body.ro [data-sign], body.ro [data-unsign], body.ro #addix, body.ro [data-rmix] { display: none !important; }
+body.ro #save, body.ro [data-done], body.ro [data-undone], body.ro [data-sign], body.ro [data-unsign], body.ro #addix, body.ro [data-rmix] { display: none !important; }
 body.ro main .k, body.ro main .num, body.ro main .chip, body.ro main .tchip, body.ro main input, body.ro main select, body.ro main textarea, body.ro main [data-use], body.ro main [data-map] { pointer-events: none; opacity: .65; }
 .list a.locked { background: var(--bg); border-style: dashed; color: var(--muted); }
 .listhead { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
@@ -423,3 +423,11 @@ dialog.kp::backdrop { background: rgba(0, 0, 0, .4); }
 .bar h1 { display: flex; flex-direction: column; line-height: 1.1; }
 .bar h1 .idlab { font-size: 11px; font-weight: 500; opacity: .8; }
 .bar h1 span { overflow: hidden; text-overflow: ellipsis; }
+
+/* the bar's sync status chip (owner, 13 Oct 2026): replaces the Log shortcut */
+.syncchip { background: var(--card); color: var(--ink); border: 1px solid var(--line); }
+.syncchip:active { background: var(--bg); }
+.syncchip[data-state="ok"] { color: var(--ok); border-color: var(--ok); }
+.syncchip[data-state="wait"] { background: var(--warn-soft); color: var(--warn); border-color: var(--warn); }
+.syncchip[data-state="local"] { color: var(--muted); }
+.syncchip[data-busy] { opacity: .6; }
