@@ -239,6 +239,9 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
 - The draft's date (C5) is read by `dateFromText` (ISO, day-first d/m/y, "14 Oct 2026"), not `new Date()`, which reads
   these differently in Safari. `test/design.test.mjs` checks every `/* n-… */` copy in style.css still matches
   `nuhsdesign/tokens.css`; highlight yellows are `--hl-bg` / `--hl-line`.
+- Fix names (13 Oct): names an import couldn't match (draft, rotation file, red names on a monthly roster) get a card
+  with a picker per name (closest names first, by `sameNameScore`); saving keeps the spelling as that person's short
+  name (in the staff log) and reads the draft or rotation file again (`lastDraft`, `lastRotFile`).
 - Keep building elements with `h()` and `textContent`; there is no `innerHTML` anywhere, so imported text can't inject.
 
 ## Code map
