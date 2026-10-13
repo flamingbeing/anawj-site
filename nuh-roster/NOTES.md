@@ -222,6 +222,10 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
   otherwise) prefer SC and C (`STRONG`); subspecs and the hard rules still win (subspec matches unchanged over 80 demo
   runs). The spare senior who takes half a double cover is the best fit, not the first. Each generated row carries
   `why` ({ personId: reason }), shown as "Why here:" when hovering a name.
+- Faster mornings (13 Oct): the person box has "Same until": the status and comment go on each day up to that date
+  (`state.carry`, applied when a day is opened, `applyCarry`; a hand change on that day or a monthly leave/MC/post
+  call wins). Cases has "Start from last <weekday>" (running rooms, sessions, fixed people from 7 days before, if this
+  browser has that day; not case notes). Members get "Save for the team, then image" in the Download menu.
 - Keep building elements with `h()` and `textContent`; there is no `innerHTML` anywhere, so imported text can't inject.
 
 ## Code map
