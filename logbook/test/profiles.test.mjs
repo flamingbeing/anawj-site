@@ -2,7 +2,7 @@
 // and the tabs a profile moves. Fake settings only.
 import assert from 'node:assert/strict';
 const P = await import('../js/profiles.js');
-const { SWITCH_KEYS, presetOn, shownIn, switchPatch, resetPatch, applyPatch, switchChanges, offBar, presetHidesTab, tabsAfter, mergeSettings, replaceShow, PROFILE_IDS } = P;
+const { SWITCH_KEYS, OPT_IN, presetOn, shownIn, switchPatch, resetPatch, applyPatch, switchChanges, offBar, presetHidesTab, tabsAfter, mergeSettings, replaceShow, PROFILE_IDS } = P;
 const PARTS = ['interesting', 'parsed', 'sugg', 'recent', 'still', 'groupsave', 'plan'];
 
 // the presets: Basic leaves out the extras (not Reflect), logbook only Reflect too, Personal the APMES parts
@@ -10,7 +10,13 @@ const PARTS = ['interesting', 'parsed', 'sugg', 'recent', 'still', 'groupsave', 
   for (const k of ['grid', 'analytics', 'reflExtras', 'case:sugg', 'case:recent', 'case:still', 'case:plan']) assert.equal(presetOn('basic', k), false, k);
   assert.equal(presetOn('basic', 'reflect'), true);
   assert.equal(presetOn('logbook', 'reflect'), false);
-  for (const k of SWITCH_KEYS) { assert.equal(presetOn('advanced', k), true, k); assert.equal(presetOn('faculty', k), true, k); }
+  for (const k of SWITCH_KEYS.filter(k => !OPT_IN.includes(k))) { assert.equal(presetOn('advanced', k), true, k); assert.equal(presetOn('faculty', k), true, k); }
+  // opt-in switches (Request an evaluation): off in every profile until switched on, and saved like any switch
+  assert.ok(OPT_IN.includes('evalRequest') && SWITCH_KEYS.includes('evalRequest'));
+  for (const m of PROFILE_IDS) assert.equal(presetOn(m, 'evalRequest'), false, m);
+  assert.equal(shownIn({ mode: 'advanced' }, 'advanced', 'evalRequest'), false);
+  assert.equal(shownIn({ mode: 'basic', show: { evalRequest: true } }, 'basic', 'evalRequest'), true);
+  assert.deepEqual(switchChanges({ mode: 'advanced', show: { evalRequest: true } }, 'advanced', 'personal').off, ['targets', 'case:still', 'totals', 'portfolio', 'year', 'reflHeadings', 'saveToast', 'apmesTitle', 'evalRequest']);
   for (const k of ['targets', 'case:still', 'totals', 'portfolio', 'year', 'reflHeadings', 'saveToast', 'apmesTitle']) {
     assert.equal(presetOn('personal', k), false, k);
     assert.equal(presetOn('basic', k), k === 'case:still' ? false : true, 'APMES parts stay on in Basic: ' + k);

@@ -39,6 +39,12 @@ try { for (const width of [390, 1280]) {
   assert.equal(await p.locator('.lb-points').count(), 0);
   assert.equal(await p.locator('select[aria-label="Filter by flag"] option[value^="part:"]').count(), 0);
 
+  // the grouped Settings menu: Advanced logging names labelled parts, and Search settings finds the switch there
+  await p.goto(base + '?demo#settings');
+  assert.match(await p.locator('.settings-menu a[data-go=loggingadv]').innerText(), /labelled parts/);
+  await p.getByLabel('Search settings').fill('labelled parts');
+  await p.locator('.settings-search a[data-go=loggingadv]').filter({ hasText: 'Labelled parts in the case summary' }).first().waitFor();
+
   // Settings → Advanced logging: switch on, add Plan (hidden in lists) and ASA
   await p.goto(base + '?demo#loggingadv'); await p.getByRole('heading', { name: 'Advanced logging' }).waitFor();
   assert.equal(await p.locator('.label-editor').isHidden(), true);

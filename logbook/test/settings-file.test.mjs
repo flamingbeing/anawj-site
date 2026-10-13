@@ -101,3 +101,10 @@ assert.equal(readSettingsFile(JSON.stringify(settingsFile({settings:{compactTags
   assert.deepEqual(got.show, { targets: false, grid: true, 'case:quick': false });
 }
 console.log('settings-file display keys and profile switches tests passed');
+// the phone batch's options travel in the file too (Request an evaluation is a profile switch, in `show`)
+{
+  const f2 = settingsFile({ settings: { hideTabsTyping: true, show: { evalRequest: true } } });
+  const got = readSettingsFile(JSON.stringify(f2)).settings;
+  assert.equal(got.hideTabsTyping, true);
+  assert.equal(got.show.evalRequest, true);
+}

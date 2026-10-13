@@ -16,6 +16,7 @@ import { SWITCHES, switchLabel, switchChanges, applyPatch, resetPatch, offBar, t
 import { PHOTO_BUDGET_KB, PHOTO_NOTE, photoUsageKb, fmtMb } from './reflections.js';
 import { partsSettings } from './ui-parts.js';
 import { labelsOn } from './parts.js';
+import { deviceOn, deviceChanges, deviceReset, DEVICE_SWITCHES } from './device-presets.js';
 
 // Compact mode (this device's display settings, below): body.compact (style.css, "compact mode" block). Cached in
 // localStorage so the first paint after a reload is already compact, before the logbook loads.
@@ -101,7 +102,7 @@ export function residencyCard() {
 // the light / dark choice. The first time a device opens the app it starts from what the account had (these used to
 // follow the account), so nobody's look changes. Kept at sign-out: they are the device's, and nothing private.
 const DISPLAY_KEY = 'apmes-logbook-display';
-export const DISPLAY_KEYS = ['noteToolbar', 'compact', 'textSize', 'zoom', 'accent', 'startTab', 'fontUi', 'fontUiName', 'fontLog', 'fontLogName', 'lineWidth', 'lineHeight', 'contrast', 'motion', 'tabIcons', 'tabBar', 'hideHeader', 'caseInverted', 'colourful', 'customCss', 'customCssOn', 'autoFocus', 'appTitle', 'boxCaps', 'boxCorrect', 'boxSpell', 'reflSpell', 'pinBox', 'pinSearch', 'firstField', 'compactTags', 'borders', 'round', 'shadows', 'bigTaps', 'tabOrder', 'tabHidden', 'swipeTabs', 'rowMenu', 'rowCopy', 'reflToolbar', 'edgeBack', 'hideWords', 'flat', 'btnStyle', 'iconBtns', 'calPlain', 'pageTitles', 'rowShort', 'rowHold', 'dayCopy'];
+export const DISPLAY_KEYS = ['noteToolbar', 'compact', 'textSize', 'zoom', 'accent', 'startTab', 'fontUi', 'fontUiName', 'fontLog', 'fontLogName', 'lineWidth', 'lineHeight', 'contrast', 'motion', 'tabIcons', 'tabBar', 'hideHeader', 'caseInverted', 'colourful', 'customCss', 'customCssOn', 'autoFocus', 'appTitle', 'boxCaps', 'boxCorrect', 'boxSpell', 'reflSpell', 'pinBox', 'pinSearch', 'firstField', 'compactTags', 'borders', 'round', 'shadows', 'bigTaps', 'tabOrder', 'tabHidden', 'swipeTabs', 'rowMenu', 'rowCopy', 'reflToolbar', 'edgeBack', 'hideWords', 'flat', 'btnStyle', 'iconBtns', 'calPlain', 'pageTitles', 'rowShort', 'rowHold', 'dayCopy', 'hideTabsTyping'];
 export function deviceDisplay() {
   try { const d = JSON.parse(localStorage.getItem(DISPLAY_KEY) || 'null'); return d && typeof d === 'object' && !Array.isArray(d) ? d : null; } catch { return null; }
 }
@@ -427,9 +428,13 @@ export function renderAccessibility() {
         IPHONE_APP() ? 'From a page under a tab, drag from the left edge.' : 'Only in the app added to an iPhone or iPad home screen.',
         IPHONE_APP() ? 'On unless you switch it off.' : 'Android phones use their own Back gesture from the edges.'),
       toggle('Press and hold a Logbook row for its menu', st.rowHold, v => applyDisplay(setDisplay({ rowHold: v || null })), 'Copy, Reflect and Edit, without the row’s buttons.', 'Hold for half a second without moving. A right-click does the same on a computer.'),
+      h('h3', {}, 'Keyboard'),
+      // the device's own value, else the profile's default (device-presets.js: on in the Personal profile)
+      toggle('Hide the tab bar while typing', deviceOn(st, profile(), 'hideTabsTyping'), v => { applyDisplay(setDisplay({ hideTabsTyping: v })); toast('Saved on this device'); },
+        'Phones: more room above the keyboard for the box you’re typing in and its Save button.', 'The tab bar comes back when the keyboard goes down. Off unless you switch it on (on in the Personal profile).'),
       h('p', { class: 'hint', style: 'margin:10px 0 0' }, 'Everything on this page is saved on this device only.')),
-    resetLink('zoom, text size, bigger tap targets, swiping, contrast, motion, edge swipe and press and hold on this device', () =>
-      applyDisplay(setDisplay({ zoom: null, textSize: null, bigTaps: null, swipeTabs: null, contrast: null, motion: null, edgeBack: null, rowHold: null }))));
+    resetLink('zoom, text size, bigger tap targets, swiping, contrast, motion, edge swipe, press and hold and the tab bar while typing on this device', () =>
+      applyDisplay(setDisplay({ zoom: null, textSize: null, bigTaps: null, swipeTabs: null, contrast: null, motion: null, edgeBack: null, rowHold: null, hideTabsTyping: null }))));
 }
 // Advanced display → the tab bar's order and hidden tabs (arrangeTabs): ↑ ↓ to move, a switch to show or hide
 function tabArranger() {
@@ -672,7 +677,11 @@ export function renderLoggingAdvanced() {
       // a separate Initials box above the case box, where the Case tab starts (device; was "First field for a new case")
       toggle(['Separate initials box (this device)', 'Separate initials box'], display().firstField === 'initials', v => { setDisplay({ firstField: v ? 'initials' : null }); toast('Saved on this device'); },
         'An Initials box above the case box.', 'The Case tab starts there and Enter moves on to the case. Off: type the initials at the start of the case, e.g. “AB 72M lap chole”.'),
-      toggle('Open the keyboard when the Case tab opens (this device)', display().autoFocus !== false, v => applyDisplay(setDisplay({ autoFocus: v ? null : false }))),
+      toggle('Open the keyboard when the Case tab opens (this device)', display().autoFocus !== false, v => { applyDisplay(setDisplay({ autoFocus: v ? null : false })); hooks.render(); }),
+      // phones and tablets: not when the app first opens (the keyboard would cover the page before anything was
+      // tapped), only on going to the Case tab, unless this asks for it (autoFocus true; ui-log.js wantFocus)
+      display().autoFocus === false ? null : toggle('Also when the app opens on a phone or tablet (this device)', display().autoFocus === true, v => applyDisplay(setDisplay({ autoFocus: v ? true : null })),
+        'Off by default: on a touch screen the keyboard opens once you go to the Case tab, not as the app starts.'),
       // lp: / dt: parts in the case summary, and a template for the case box (ui-parts.js; both off by default)
       partsSettings(),
       h('h3', {}, 'Keyboard in the case box (this device)'),
@@ -715,10 +724,13 @@ function tabMoves(to) {
   const after = new Set(arrangeTabs(ids, next ? { ...d, tabHidden: next } : d, to).hidden);
   return { bar: ids.filter(id => now.has(id) && !after.has(id)), more: ids.filter(id => !now.has(id) && after.has(id)) };
 }
-// what picking a profile changes, as [heading, names] lines (empty: nothing on screen changes)
+// what picking a profile changes, as [heading, names] lines (empty: nothing on screen changes); the device options a
+// profile governs (device-presets.js, like Hide the tab bar while typing in Personal) are listed for this device
+const deviceName = k => (DEVICE_SWITCHES.find(([x]) => x === k) || [k, k])[1];
 export function profileChanges(to) {
-  const { on, off } = switchChanges(settings(), profile(), to), t = tabMoves(to);
+  const { on, off } = switchChanges(settings(), profile(), to), t = tabMoves(to), dv = deviceChanges(display(), profile(), to);
   return [['Turns on', on.map(switchLabel)], ['Turns off', off.map(switchLabel)],
+    ['Turns on (this device)', dv.on.map(deviceName)], ['Turns off (this device)', dv.off.map(deviceName)],
     ['Onto the tab bar (this device)', t.bar.map(tabName)], ['Into More (this device)', t.more.map(tabName)]].filter(([, l]) => l.length);
 }
 const changeList = lines => h('ul', { class: 'profile-changes' }, lines.map(([what, names]) => h('li', {}, h('b', {}, what + ': '), names.join(', '))));
@@ -727,7 +739,8 @@ export async function applyProfile(mode) {
   const from = profile();
   await patchLogbook({ settings: applyPatch(settings(), mode) });
   const next = tabsAfter(display().tabHidden, from, mode);
-  if (next) applyDisplay(setDisplay({ tabHidden: next }));
+  // this device's options the profile governs follow it again (their saved values go)
+  applyDisplay(setDisplay({ ...deviceReset(), ...(next ? { tabHidden: next } : {}) }));
   hooks.paintTabs?.(); hooks.render(); toast(`Profile: ${profileName(mode)}`);
 }
 // the short list of what changes, then Apply (or Cancel: nothing changes)
@@ -759,8 +772,9 @@ export function profileCard() {
 
 // Settings → Profile: the profile, then every switch that shows or hides part of the app, grouped by area, each group
 // with its own reset. The same settings as on their own pages (Logging, Display, Reflections), gathered in one place.
-const groupReset = (what, run) => h('p', { class: 'reset-row' }, h('button', { class: 'small linkish', type: 'button', onclick: async () => {
-  if (!await confirmBox('Reset this group', `Put ${what} back to the profile’s defaults?`, 'Reset')) return;
+// question: for a group whose reset turns something off (an opt-in extra), not "back to the defaults?"
+const groupReset = (what, run, question = `Put ${what} back to the profile’s defaults?`) => h('p', { class: 'reset-row' }, h('button', { class: 'small linkish', type: 'button', onclick: async () => {
+  if (!await confirmBox('Reset this group', question, 'Reset')) return;
   await run(); hooks.render(); toast('Back to the defaults');
 } }, 'Reset this group'));
 const sw = (label, on, set, hint) => [h('label', { class: 'check' }, h('input', { type: 'checkbox', role: 'switch', 'aria-label': label, checked: !!on, onchange: e => set(e.target.checked) }), label), hint ? h('p', { class: 'hint help' }, hint) : null];
@@ -785,9 +799,11 @@ export function renderShowHide() {
       groupReset('the extras', () => save(resetPatch(settings(), switchGroup('extras').map(([k]) => k))))),
     h('section', { class: 'card', 'data-group': 'apmes' },
       h('h3', { style: 'margin-top:0' }, 'APMES'),
-      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'The programme’s parts. Off in the Personal profile, for logging outside APMES.'),
+      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'The programme’s parts. Off in the Personal profile, for logging outside APMES. Request an evaluation (in a case’s ⋯ menu and its edit page: a new evaluation request with the case’s date and initials, never its details) is off unless you switch it on.'),
       switchGroup('apmes').map(presetSwitch),
-      groupReset('the APMES parts', () => save(resetPatch(settings(), switchGroup('apmes').map(([k]) => k))))),
+      // (Request an evaluation is opt-in: the reset turns it off, and says so)
+      groupReset('the APMES parts', () => save(resetPatch(settings(), switchGroup('apmes').map(([k]) => k))),
+        'Put the APMES parts back to the profile’s defaults? This also turns off Request an evaluation.')),
     h('section', { class: 'card', 'data-group': 'tips' },
       h('h3', { style: 'margin-top:0' }, 'Tips and help'),
       sw('Show tips and help text', !st.hideTips, v => save({ hideTips: !v }).then(() => hooks.render()), 'Explanations around the app, the privacy and photo reminders, and the tips for the tags you pick.'),

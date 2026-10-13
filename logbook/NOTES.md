@@ -396,6 +396,13 @@ portfolio content.
   `apmes-logbook-demo-small` is set) since the tests check every feature.
   - **Profiles hide interface items only, never settings** (owner): every switch is visible on the Profile page and
     works in any profile.
+  - **Opt-in switches** (`OPT_IN` in profiles.js: new options, off in every profile unless `PRESET_ON` lists them):
+    `evalRequest` ("Request an evaluation from a case", APMES group; a case's ⋯ menu and edit page open the evals app's
+    new request with the date and initials only, `js/eval-link.js`). The APMES group's reset says it turns it off.
+  - **Device presets** (`js/device-presets.js`): device options a profile turns on, the device's own value first.
+    `hideTabsTyping` (Accessibility → Hide the tab bar while typing) is on in Personal only. The profile sheet lists them
+    as "Turns on / off (this device)", and Apply clears the device's own values for them (`deviceReset`), so the device
+    follows the new profile; one switched by hand after makes the profile "Custom".
   - **APMES switches** (account, on in every profile but Personal): targets (counts against targets in All tags,
     Analytics targets; off: Analytics shows cases per tag, your own tags too, `renderCounts`), Still needed, programme
     totals (Compare with your intake, You and your year), portfolio export and Section 1 (Export / Import cards,

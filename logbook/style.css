@@ -1533,3 +1533,36 @@ ul.points-list li.empty-li { cursor: default; }
 .label-card input[type="text"], .label-add input { width: 100%; box-sizing: border-box; }
 .label-add { margin: 6px 0 2px; }
 .tpl-field textarea { width: 100%; box-sizing: border-box; font-family: ui-monospace, Menlo, Consolas, monospace; }
+/* ---------- phone batch (13 Oct 2026): typing room, the note editor's top bar, case rows, tap targets ---------- */
+/* Accessibility → Hide the tab bar while typing (app.js sets body.typing-nobar only while the bar is at the bottom and
+   the keyboard is up): no bar, and everything that sat above it (Save bar, formatting bar, page padding) drops down */
+body.typing-nobar { --tabbar-h: 0px; }
+body.typing-nobar .tabs { display: none; }
+/* the note editor: its top bar (‹ Notes, Saved, ⋯, Done) stays at the top while the note scrolls under the keyboard;
+   on iOS the visible area itself moves down the page when the keyboard is up (--vvt, app.js); it sits under a tab
+   bar that is stuck at the top (--pin-top) */
+.note-editor .note-top { position: sticky; top: var(--pin-top, 0px); z-index: 15; background: var(--panel); margin: -4px 0 0; padding: 4px 0; }
+body.typing .note-editor .note-top { top: calc(var(--vvt, 0px) + var(--pin-top, 0px)); }
+/* the title wraps onto more lines when it's long (a one-row box that grows with it) */
+.note-editor textarea.note-title { display: block; resize: none; overflow: hidden; min-height: 0; line-height: 1.3; font-family: inherit; overflow-wrap: anywhere; }
+/* case rows: tags wrap onto a second line rather than run under the note button and the row's buttons (Shorter
+   Logbook rows keep their one grey line, which scrolls sideways inside the row as before) */
+html:not(.rows-short) ul.cases .c-tags { flex-wrap: wrap; overflow-x: visible; -webkit-mask-image: none; mask-image: none; padding-right: 0; row-gap: 4px; }
+html:not(.rows-short) ul.cases .c-tags > * { max-width: 100%; }
+/* the row menu's links look like its buttons (Request an evaluation) */
+.row-menu-list a.btn { justify-content: flex-start; min-height: 48px; text-decoration: none; color: inherit; }
+.row-menu-list a.btn .ico { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.case-links a.btn { text-decoration: none; }
+/* touch screens: the small targets reach 44px (the calendar's arrows, the view switches, the header's back link, the
+   demo chip, the Case tab's sync link), with padding rather than a new look; Compact mode keeps its tighter sizes */
+@media (pointer: coarse), (max-width: 600px) {
+  body:not(.compact) button.icon-btn { min-width: 44px; }
+  body:not(.compact) .back-row .back-link, body:not(.compact) .note-editor .note-back { min-height: 44px; }
+  body:not(.compact) button.demo-flag { min-height: 44px; min-width: 44px; }
+  body:not(.compact) a.sync.wait, body:not(.compact) a.draft-note { min-height: 44px; }
+  body:not(.compact) .tag-row { min-height: 44px; }
+  body:not(.compact) .lb-daynote-add .linkish, body:not(.compact) .note-meta .linkish, body:not(.compact) .note-meta .note-date { min-height: 44px; }
+  /* the view switches (Case | List, List | Pills) and the date chips beside them, so the row stays even */
+  body:not(.compact) .datebar .chip, body:not(.compact) .datebar .mode-seg button, body:not(.compact) .datebar input[type="date"], body:not(.compact) .cat-view button { min-height: 44px; }
+  body:not(.compact) .lb-monthpick input[type="month"] { min-height: 44px; }
+}
