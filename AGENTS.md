@@ -103,6 +103,9 @@ for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mj
 - **Writing for the owner:** plain words, short; say what changed for residents and what the owner needs to do.
 - **Keep the repo public-safe:** fake data only; never commit secrets, tokens or credentials (the owner commits
   any needed public client IDs themselves).
+  **Personal notes** (how the owner works through his own day, his own notes, thoughts, private plans) go in his private
+  repo `flamingbeing/life`, never here: write the personal version there first and keep only a plain product version in
+  this repo. Never copy anything from `life` into this repo.
 
 ## Status and decisions (before compacting)
 
