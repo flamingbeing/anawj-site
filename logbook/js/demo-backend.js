@@ -317,6 +317,11 @@ export function listenSince(email, coll, { since = null, epoch, field = 'updated
     for (const id of (w.prev || new Map()).keys()) if (!next.has(id)) changes.push({ type: 'removed', id, doc: null });
     const first = w.prev === null;
     w.prev = next;
+    // documents "read", counted like cloud.js does with ?emulator (the browser tests check reopening reads ~nothing)
+    if (typeof window !== 'undefined') {
+      const r = ((window.__reads ||= {})[coll] ||= { billed: 0, served: 0, listens: 0 }), n = changes.filter(c => c.type !== 'removed').length;
+      r.served += n; r.billed += first ? Math.max(1, docs.length) : n; if (first) r.listens++;
+    }
     if (first || full || changes.length) onSnap({ changes, fromCache: false, hasPendingWrites: false, epoch: ep, ...(full ? { full: true, docs } : {}) });
   };
   sinceWatchers.add(w);

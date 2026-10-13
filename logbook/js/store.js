@@ -36,14 +36,19 @@ function memoryStore(name) {
 }
 
 const req = r => new Promise((resolve, reject) => { r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error); });
-function openDb(name) {
+// version 1 has every object store; a database left without them (opened elsewhere without a version) is upgraded
+function openDb(name, version = 1) {
   return new Promise((resolve, reject) => {
-    const r = indexedDB.open(name, 1);
+    const r = indexedDB.open(name, version);
     r.onupgradeneeded = () => {
-      for (const c of COLLS) r.result.createObjectStore(c, { keyPath: 'id' });
-      r.result.createObjectStore('meta', { keyPath: 'coll' });
+      for (const c of [...COLLS, 'meta']) if (!r.result.objectStoreNames.contains(c)) r.result.createObjectStore(c, { keyPath: c === 'meta' ? 'coll' : 'id' });
     };
-    r.onsuccess = () => resolve(r.result);
+    r.onsuccess = () => {
+      const db = r.result;
+      if ([...COLLS, 'meta'].every(c => db.objectStoreNames.contains(c))) return resolve(db);
+      db.close();
+      openDb(name, db.version + 1).then(resolve, reject);
+    };
     r.onerror = () => reject(r.error);
     r.onblocked = () => reject(new Error('Local store blocked by another tab'));
   });

@@ -14,7 +14,7 @@ export const caseText = c => mdCase(c, mdFormat(), mdCtx());
 export const dayCases = date => (S.cases || []).filter(c => c.date === date).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
 // the day's cases, or the ones given (the Logbook's calendar passes what the filter shows)
 export const dayText = (date, cases = null) => mdDay(date, cases ? [...cases].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)) : dayCases(date), mdFormat(), mdCtx());
-// the same with that day's notes (More → Notes): they load first if the day has any (settings.noteIndex)
+// the same with that day's notes (More → Notes): they load first if the day has any (the note index)
 export async function dayTextWithNotes(date, cases = null) {
   const notes = dayHasNotes(date) ? notesOn(await ensureNotes().catch(() => []) || [], date) : [];
   return mdDay(date, cases ? [...cases].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)) : dayCases(date), mdFormat(), mdCtx(), notes);

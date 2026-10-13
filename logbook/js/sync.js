@@ -9,7 +9,7 @@
 // record was changed after it was binned (restored). A record removed while it was in view is checked once.
 //
 // lastSync is this device's clock when the server last confirmed the list; SKEW covers writers whose clocks are a
-// little behind. Writes that reach the server late (offline) are re-stamped by cloud.js (lateTouch), so they still
+// little behind. Writes that reach the server late (offline) are re-stamped by cloud.js (restampIfLate), so they still
 // land after everyone's lastSync. Limits (healed by the weekly full read): a record deleted for good without a bin
 // entry (Undo of a just-saved case, Recent changes restoring a deletion) while another device was closed stays on
 // that device until then; so does a write stamped by a clock more than SKEW behind.
@@ -197,9 +197,11 @@ export function createTombFeed({ email, store, listen, apply, now = Date.now, on
 
 // ---- all collections of the signed-in account(s) ----
 // One engine per account and collection, shared by every caller (two callers never cost two listeners); the bin
-// feed runs while any of them does.
-export function createSyncHub({ openStore, listen, fetchOne = null, now = Date.now, onError = () => {} }) {
-  const engines = new Map(), feeds = new Map(), stores = new Map();
+// feed runs while any of them does. An engine nobody watches stops after a short grace, so a caller that stops and
+// starts again (the app re-runs its start when the demo changes in another tab) keeps the same listener.
+export const GRACE = 1500;
+export function createSyncHub({ openStore, listen, fetchOne = null, now = Date.now, onError = () => {}, grace = GRACE }) {
+  const engines = new Map(), feeds = new Map(), stores = new Map(), timers = new Map(), stopping = new Map();
   const key = (email, coll) => email + '\n' + coll;
   async function storeFor(email) {
     let s = stores.get(email);
@@ -208,9 +210,10 @@ export function createSyncHub({ openStore, listen, fetchOne = null, now = Date.n
     stores.set(email, s);
     return s;
   }
-  // a store opened lazily behind the same interface, so callers needn't wait for it
+  // a store opened lazily behind the same interface, so callers needn't wait for it; a load waits for the local writes
+  // of an engine just stopped on the same collection
   const lazyStore = email => ({
-    load: async coll => (await storeFor(email)).load(coll),
+    load: async coll => { await stopping.get(key(email, coll)); return (await storeFor(email)).load(coll); },
     write: async (coll, op) => (await storeFor(email)).write(coll, op),
   });
   // tombstones for a collection that isn't running: straight into its stored copy
@@ -240,11 +243,17 @@ export function createSyncHub({ openStore, listen, fetchOne = null, now = Date.n
       let e = engines.get(k);
       if (!e) { e = createCollectionSync({ email, coll, store: lazyStore(email), listen, fetchOne, now, onError }); engines.set(k, e); }
       if (!feeds.has(email)) feeds.set(email, createTombFeed({ email, store: lazyStore(email), listen, apply: tombsFor(email), now, onError }));
+      clearTimeout(timers.get(k)); timers.delete(k);
       const off = e.subscribe(cb);
       return () => {
         off();
         if (e.size || engines.get(k) !== e) return;
-        e.stop(); engines.delete(k); idle(email);
+        clearTimeout(timers.get(k));
+        timers.set(k, setTimeout(() => {
+          timers.delete(k);
+          if (e.size || engines.get(k) !== e) return;
+          engines.delete(k); stopping.set(k, e.stop()); idle(email);
+        }, grace));
       };
     },
     // records deleted on this device (for good, or into the bin)
@@ -255,8 +264,9 @@ export function createSyncHub({ openStore, listen, fetchOne = null, now = Date.n
     },
     // stop everything and forget open stores (sign-out); resolves when pending local writes are done
     async stopAll() {
+      for (const t of timers.values()) clearTimeout(t);
       const waits = [...engines.values(), ...feeds.values()].map(x => x.stop());
-      engines.clear(); feeds.clear(); stores.clear();
+      engines.clear(); feeds.clear(); stores.clear(); timers.clear(); stopping.clear();
       await Promise.all(waits).catch(() => {});
     },
     // tests: wait for pending local writes

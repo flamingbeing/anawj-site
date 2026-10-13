@@ -819,7 +819,7 @@ async function onUser(user) {
   if (!user) {
     Object.assign(S, { admin: false, owner: false, pd: false, faculty: false, resident: null, logbook: null, cases: [], reflections: [], counts: {}, casesLoaded: false, casesSynced: false, sharedTemplates: [] });
     // this device's copies of the last account go (the local store always: a shared PC keeps nothing)
-    const cleanup = Promise.all([signedInOnce ? writes.forget() : null, cloud.forgetLocal()]);
+    const cleanup = Promise.all([signedInOnce ? writes.forget() : null, cloud.forgetLocal(() => !S.user)]);
     if (signedInOnce) { clearDrafts(); resetCaches(); forgetWho(); }
     transients.reset();
     document.querySelectorAll('dialog[open]').forEach(el => el.close());

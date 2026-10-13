@@ -162,26 +162,42 @@ const E = 'fake@example.com';
   srv.set('cases', { id: 'k1', details: 'Fake', updatedAt: T0 - DAY });
   srv.set('notes', { id: 'n1', body: 'Fake note', updatedAt: T0 - DAY });
   srv.set('notes', { id: 'n2', body: 'Fake note 2', updatedAt: T0 - DAY });
-  const hub = createSyncHub({ openStore, listen: srv.listen, fetchOne: srv.fetchOne, now: () => now });
+  const hub = createSyncHub({ openStore, listen: srv.listen, fetchOne: srv.fetchOne, now: () => now, grace: 0 });
   const a = [], b = [];
   const offA = hub.watch(E, 'cases', l => a.push(l.length)), offB = hub.watch(E, 'cases', l => b.push(l.length));
   await settle();
   assert.equal(srv.listens, 2, 'one listener for cases (shared) and one for the bin');
   assert.deepEqual([a, b], [[1], [1]]);
   // notes loaded once, then not running: a bin entry and a delete on this device still reach the stored copy
-  const offN = hub.watch(E, 'notes', () => {}); await settle(); offN(); await hub.flush();
+  const offN = hub.watch(E, 'notes', () => {}); await settle(); offN(); await settle();
   srv.set('bin', { id: 'n_n1_x', kind: 'note', data: { id: 'n1' }, deletedAt: now });
   await settle(); await hub.flush();
   await hub.drop(E, 'notes', ['n2']);
   assert.deepEqual((await (await openStore(E)).load('notes')).docs, []);
   // later, with the feed and notes engine stopped, the notes come back from the store without them
-  offA(); offB(); await hub.flush();
+  offA(); offB(); await settle();
   now += 3600e3; srv.reads = 0;
   let notes = null;
   const offN2 = hub.watch(E, 'notes', l => { notes = l; }); await settle();
   assert.deepEqual(notes, []); assert.equal(srv.reads, 2, 'notes and bin: one read each');
   offN2();
   await hub.stopAll(); await wipeStores();
+}
+
+// ---- stopping and starting again within the grace keeps the same listener ----
+{
+  const srv = fakeServer();
+  srv.set('cases', { id: 'g1', updatedAt: T0 });
+  const hub = createSyncHub({ openStore, listen: srv.listen, fetchOne: srv.fetchOne, now: () => T0, grace: 40 });
+  let off = hub.watch(E, 'cases', () => {}); await settle();
+  const listens = srv.listens;
+  off(); off = hub.watch(E, 'cases', () => {}); await new Promise(r => setTimeout(r, 60));
+  assert.equal(srv.listens, listens, 'no new listener');
+  off(); await new Promise(r => setTimeout(r, 60));
+  let got = null; off = hub.watch(E, 'cases', l => { got = l; }); await settle();
+  assert.equal(srv.listens, listens + 2, 'after the grace: a new one (cases and the bin feed)');
+  assert.deepEqual(got.map(d => d.id), ['g1']);
+  off(); await hub.stopAll(); await wipeStores();
 }
 
 // ---- store: names per account and mode; memory fallback in node ----

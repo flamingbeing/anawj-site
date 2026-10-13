@@ -1,6 +1,7 @@
 // Storage for the logbook: Google sign-in and Cloud Firestore (Firebase), with an offline cache
 // so logging works without signal and syncs later. With ?demo in the URL, everything goes to an
-// in-browser stand-in instead (demo-backend.js), signed in as a fake admin.
+// in-browser stand-in instead (demo-backend.js), signed in as a fake admin. Cases, reflections and
+// notes are read through the sync engine (sync.js): a copy on this device plus only what changed.
 // Who may read or write what is enforced by firestore.rules on Google's side, not by this file.
 //
 // Data (see README.md):
@@ -127,8 +128,10 @@ async function settleLate(email) {
   for (const w of lateList(email)) await restampIfLate(w, true);
 }
 // Sign-out, account switch, Delete account: stop syncing and delete this device's copies (a shared PC keeps nothing).
-export async function forgetLocal() {
+// proceed() is asked again once syncing has stopped: a tab that has seen a new sign-in by then leaves the stores alone.
+export async function forgetLocal(proceed = () => true) {
   await hub.stopAll();
+  if (!proceed()) return;
   await wipeStores();
   // late-write ids and the bin's last purge time (bin.js) are per account too
   try { for (const k of Object.keys(localStorage)) if (k.startsWith(LATE_KEY) || k.startsWith('apmes-logbook-purged:')) localStorage.removeItem(k); } catch { /* storage blocked */ }
