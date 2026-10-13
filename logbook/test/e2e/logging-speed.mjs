@@ -30,17 +30,31 @@ try { for (const width of [390, 1280]) {
   const strong = await strongCodes(), weak = await weakCodes();
   assert.ok(strong.length, 'no confident suggestions for the fixture');
   let n = await nCases();
-  await save.click();
-  assert.equal(await nCases(), n, 'the first Save saved with no tag');
+  // a double tap makes the offer but doesn't take it (the hint gets a moment to show)
+  await save.dblclick();
+  await p.waitForTimeout(150);
+  assert.equal(await nCases(), n, 'a double tap on Save saved with tags nobody looked at');
   assert.match(await p.locator('.enter-suggestion-hint').innerText(), /^Tap Save or press Enter again to add /);
   assert.match(await p.locator('#toast').innerText(), /Tap Save or press Enter again to add the suggested tags/);
   assert.notEqual(await p.evaluate(() => document.activeElement?.type), 'search', 'the search box took the focus');
+  await p.waitForTimeout(700);
   await save.click();
   await until(async () => await nCases() === n + 1, 'the second Save did not save');
   let c = await newest();
   assert.ok(strong.every(code => c.cats.includes(code)), 'confident tags missing: ' + c.cats);
   assert.ok(weak.length && weak.every(code => !c.cats.includes(code)), 'a weak guess was saved: ' + c.cats + ' weak ' + weak);
   await until(async () => (await ta.inputValue()) === '', 'box not cleared');
+  // Advanced, Enter = new line: Enter in the empty tag search does nothing, as before (a habit Enter after picking)
+  {
+    await ta.fill('AB 40M fake lap chole GA');
+    const search = p.getByRole('combobox', { name: 'Search tags' });
+    await search.fill('lscs'); await search.press('Enter');
+    n = await nCases();
+    await search.press('Enter');
+    await p.waitForTimeout(300);
+    assert.equal(await nCases(), n, 'Enter in the empty search saved in Advanced / new line');
+    await ta.fill(''); await p.locator('.savebar .clear-tags, .savebar .selected .chip[data-code]').first().click(); await settle();
+  }
 
   // 2. Basic: no suggestion row; Save points at the search, whose Enter (empty) saves with the offered tags
   await set({ mode: 'basic' });
@@ -64,6 +78,17 @@ try { for (const width of [390, 1280]) {
   n = await nCases();
   await search.press('Enter');
   await until(async () => await nCases() === n + 1, 'Enter in the empty search did not save the ticked case');
+  // holding Enter (Enter saves) never takes the offer: the refused save moves the focus to the search, where the
+  // key's repeats land
+  await set({ enterMode: 'single' });
+  await ta.fill('GH 80F hemiarthroplasty spinal'); await settle();
+  n = await nCases();
+  await ta.focus();
+  await p.keyboard.down('Enter'); await p.keyboard.down('Enter'); await p.keyboard.down('Enter');
+  await p.keyboard.up('Enter');
+  await p.waitForTimeout(300);
+  assert.equal(await nCases(), n, 'a held Enter saved with the offered tags');
+  await ta.fill(''); await set({ enterMode: null });
 
   // 3. Basic can keep the suggestions without Same as last; the switch writes the new part names
   await p.goto(base + '?demo#loggingadv'); await p.getByRole('heading', { name: 'Advanced logging' }).waitFor();
@@ -118,6 +143,20 @@ try { for (const width of [390, 1280]) {
   await until(async () => await nCases() === n + 1, 'not saved in one tap with automatic ticks');
   c = await newest();
   assert.ok(!c.cats.includes('21') && c.cats.length, 'saved tags ' + c.cats);
+  // Undo puts the case back with the untick kept
+  await p.locator('#toast button', { hasText: 'Undo' }).click();
+  await until(async () => (await ta.inputValue()) === 'IJ 75M LSCS spinal', 'Undo did not put the case back');
+  await settle();
+  assert.equal(await p.locator('.savebar .selected .chip[data-code="21"]').count(), 0, 'Undo brought back an unticked suggestion');
+  // clearing the box and Undo keeps it too
+  await p.locator('.clear-btn').click(); await settle();
+  await p.locator('#toast button', { hasText: 'Undo' }).click(); await settle();
+  assert.equal(await ta.inputValue(), 'IJ 75M LSCS spinal');
+  assert.equal(await p.locator('.savebar .selected .chip[data-code="21"]').count(), 0, 'clear-box Undo brought back an unticked suggestion');
+  n = await nCases();
+  await save.click();
+  await until(async () => await nCases() === n + 1, 'not saved again after Undo');
+  assert.ok(!(await newest()).cats.includes('21'));
   // the next case starts afresh: Geriatric is ticked again
   await ta.fill('KL 81F');
   await until(async () => await p.locator('.savebar .selected .chip[data-code="21"]').count() === 1, 'the untick carried over to the next case');
@@ -140,6 +179,14 @@ try { for (const width of [390, 1280]) {
   assert.equal(await before.evaluate(el => el.isConnected && !el.classList.contains('on')), true);
 
   // 8. The draft is written a moment after typing stops, and at once when the page goes
+  const stored = text => p.evaluate(t => Object.keys(localStorage).some(k => k.startsWith('logbook-draft-v2:') && !k.includes(':active:') && (localStorage.getItem(k) || '').includes(t)), text);
+  await ta.fill('MN 33F fake timer'); await p.waitForTimeout(600);
+  assert.equal(await stored('MN 33F fake timer'), true, 'the typing pause did not write the draft');
+  await ta.fill('MN 33F fake hash');
+  await p.evaluate(() => { location.hash = '#logbook'; });
+  await until(() => stored('MN 33F fake hash'), 'moving to another screen did not write the draft');
+  await p.evaluate(() => { location.hash = '#log'; }); await p.waitForSelector('textarea.details');
+  assert.equal(await ta.inputValue(), 'MN 33F fake hash', 'draft lost moving between screens');
   await ta.fill('MN 33F fake draft');
   await p.reload(); await p.waitForSelector('textarea.details');
   assert.equal(await ta.inputValue(), 'MN 33F fake draft', 'draft lost on reload');

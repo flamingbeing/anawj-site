@@ -2,14 +2,14 @@
 // automatically, the Case tab parts people hide, and the recent cases for "Same as last". Tested in
 // test/logging.test.mjs.
 
-import { withParents, sortCodes } from './engine.js';
+import { withParents, sortCodes, STRONG } from './engine.js';
 
 // A suggestion this sure is "confident": shown as a strong chip, counted in "+ All", ticked in a pasted
 // list, offered by Save with nothing picked, and ticked by "Tick confident suggestions automatically".
-export const STRONG = 0.5;
+export { STRONG };
 export const confident = list => (list || []).filter(s => s.score >= STRONG).map(s => s.code);
 
-// Settings → Advanced logging → Tick confident suggestions automatically (settings.autoTick). The ticks follow
+// Settings → Logging → Tick confident suggestions automatically (settings.autoTick). The ticks follow
 // the text: a code ticked automatically goes again when the text no longer suggests it, and one the user took
 // off (rejected) stays off for this case. Codes the user ticked are never touched.
 // draft { cats, auto, rejected }, want: the confident codes now -> { cats, auto } (unchanged arrays when
@@ -45,6 +45,15 @@ export function expandParts(list, prefix = '') {
 }
 // item: the part as stored ('sugg', or 'case:sugg' with prefix 'case:')
 export const hasPart = (list, item, prefix = '') => expandParts(list, prefix).includes(item);
+
+// Settings → Advanced logging → Same as last: how many recent cases (settings.recentCount). The picker offers
+// these; any other stored value (an imported settings file) snaps to the nearest, the lower on a tie.
+export const RECENT_CHOICES = [1, 2, 3, 5];
+export function recentCount(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n) || n < 1) return 1;
+  return RECENT_CHOICES.reduce((best, c) => (Math.abs(c - n) < Math.abs(best - n) ? c : best), RECENT_CHOICES[0]);
+}
 
 // "Same as last": the n most recent cases with tags (by when they were logged), one per procedure and tag set.
 // keyOf(c) -> the procedure key (costly, so only worked out for the newest few). One pass over the list

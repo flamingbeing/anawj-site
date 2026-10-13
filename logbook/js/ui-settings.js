@@ -6,6 +6,7 @@ import { sortCodes, uid, academicYear, withParents, weekStart, humanAge } from '
 import { S, h, info, toast, modal, confirmBox, cloud, writes, catChip, catName, catShort, PICKER_ORDER, pickerOrder, settings, patchLogbook, displayName, hooks, rYear, myYearName, fill, PROFILES, profile, basicMode, facultyRole, BASIC_ITEMS, basicHides, setBasicOn, caseShown, setCaseShown, categoryNames, setCategoryNames, catPills, tagSet, resetters, download, fileButton, todayISO, saveMany, UNDO_SECS, rowIcon } from './ui-core.js';
 import { MAX_TAGS, tagLinks as tagLinksIn, learnShorthand, cleanShorthand, shorthandOf, DEFAULT_SHORTHAND, cleanTagSet, defaultTagSet, tagTree, flatTree, moveTag, reparentTag, removeTag, newKey, tagSetToCsv, tagSetFromCsv, dropTag, canPlace, placeNewTag } from './tags.js';
 import { pickDialog, CASE_PARTS, AFTER_SAVE, RECENT_COUNTS } from './ui-log.js';
+import { recentCount as snapRecent } from './logging.js';
 import { OPERATOR_HELP } from './search-ops.js';
 import { DEFAULT_ACCENT, cleanAccent, schemeCss, lightPalette, tabSchemeCss, tabVarsCss } from './colors.js';
 import { cleanMarkdown, storedMarkdown, mdCase, mdDay, reflectionPath, reflectionNote, CASE_FILLINS, REFL_FILLINS, FM_FIELDS } from './markdown.js';
@@ -626,13 +627,13 @@ export function renderLogging() {
   return h('div', { class: 'set-page' },
     h('section', { class: 'card' },
       h('h2', {}, 'Logging'),
-      h('h3', {}, 'Recognise details'), h('p', { class: 'hint' }, 'Account settings · on by default; follows you between devices.'),
-      toggle('Suggest tags as I type', st.suggestions !== false, v => save({ suggestions: v })),
+      h('h3', {}, 'Recognise details'), h('p', { class: 'hint' }, 'Account settings · follow you between devices.'),
+      toggle('Suggest tags as I type', st.suggestions !== false, v => save({ suggestions: v }), 'On by default.'),
       // off by default: tags count towards targets, so by default each one is picked on purpose
       toggle('Tick confident suggestions automatically', !!st.autoTick, v => save({ autoTick: v || null }),
         'Off by default. Untick any you don’t want.', 'The surest suggestions are ticked as you type and follow your words. One you untick stays off for that case. Check the ticks before you save: they count towards your targets.'),
       toggle('Autodetect age and gender', st.detectAgeSex !== false, v => save({ detectAgeSex: v }),
-        'Optional for APMES.', 'Turning this off stops age-based Paediatrics and Geriatric suggestions. Choose those tags yourself when needed; explicit words can still suggest them.'),
+        'On by default. Optional for APMES.', 'Turning this off stops age-based Paediatrics and Geriatric suggestions. Choose those tags yourself when needed; explicit words can still suggest them.'),
       h('h3', {}, 'Start a case'), h('p', { class: 'hint' }, 'Device setting · other devices keep their own style.'),
       toggle('Show common tags first', display().compactTags, v => { setDisplay({ compactTags: v }); paintPreview(); },
         'A shortlist from your recent cases.', 'Off by default. All tags stay searchable and can be expanded.'),
@@ -659,7 +660,7 @@ export function renderLoggingAdvanced() {
       h('h3', {}, 'Case tab'),
       help('Switch off what you don’t use. The case box, All tags and Save always stay.'),
       CASE_PARTS.map(([part, label]) => toggle(label, caseShown(part), v => setCaseShown(part, v, CASE_PARTS.map(([p]) => p)))),
-      pick('Same as last: how many recent cases', RECENT_COUNTS, Math.min(5, Math.max(1, Number(st.recentCount) || 1)), n => save({ recentCount: n === 1 ? null : n }),
+      pick('Same as last: how many recent cases', RECENT_COUNTS, snapRecent(st.recentCount), n => save({ recentCount: n === 1 ? null : n }),
         'Chips under the case box that copy a recent case’s procedure and tags.'),
       h('label', { class: 'field', style: 'margin-top:8px' }, 'Case box height on the Case tab',
         h('select', { onchange: e => save({ boxLines: Number(e.target.value) }) },

@@ -70,14 +70,17 @@ portfolio content.
   line as "+ All" and a pasted list; weak guesses are never counted without a look); a second Save (the button, an
   additional Enter in the box, the third Enter in double-Enter mode, or Enter in the empty tag search) accepts them
   and saves. This requires suggestions to be on. Editing or manually selecting tags cancels the offer; Shift+Enter
-  remains a new line and holding Enter never accepts it. Enter in the empty tag search saves the case (Basic, with no
-  suggestion row, sends the focus there).
+  remains a new line and holding Enter never accepts it (key repeats are ignored, also in the tag search). A Save tap
+  within 600 ms of a tap that made the offer is a double tap and is ignored, so the hint shows first. Enter in the empty tag search
+  saves the case only in Basic (which, with no suggestion row, sends the focus there) or while an offer is pending;
+  elsewhere it does nothing, as before.
 - **Case tab parts** (`settings.caseHide`, and Basic's `basicOn` `case:<part>`): `sugg` (the suggestion row) and
   `recent` (Same as last, tag groups) used to be one part, `quick`; an older `quick` still means both and is
   rewritten as the two on the next change (`logging.js` `expandParts`). Basic hides both unless turned back on.
 - **Logging extras** (account, off / default as before): `settings.autoTick` ticks the confident suggestions as you
-  type; they follow the text, and one the user unticks stays off for that case (`draft.auto` / `draft.rejected`).
-  `settings.recentCount` (1 default, up to 5) Same as last chips. A date chip tap refocuses the box only when it
+  type; they follow the text, and one the user unticks stays off for that case (`draft.auto` / `draft.rejected`,
+  kept through Undo after Save and Undo after clearing the box).
+  `settings.recentCount` (1 default; 1, 2, 3 or 5, other values snap to the nearest: `logging.js` `recentCount`) Same as last chips. A date chip tap refocuses the box only when it
   had the focus. A pasted list ticks your own tags from their shorthand, with what they count towards.
 - **Typing cost**: the draft is stored 300 ms after the keys pause (and at once on pagehide, hidden, hash change);
   the box's marks copy its style only on resize (ResizeObserver) and redraw in the next frame; per key only changed

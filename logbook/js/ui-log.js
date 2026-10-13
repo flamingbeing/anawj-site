@@ -7,12 +7,12 @@ import { suggest as suggestCodes } from './suggest.js';
 import { apmesShorthand, shorthandTags } from './tags.js';
 import {
   S, h, ic, toast, debounce, modal, confirmBox, cat, catName, catShort, catFull, catChip, countText, logTags, tagLinks, tagName, tagChip, tagSet, keepTags, PROGRESS_BY_CODE,
-  createCase, updateCase, removeCase, restoreCase, saveMany, deleteMany, subcatChips, subcatsOf, settings, todayISO, hooks, fill, add, cloud, writes, okNoIds, patchLogbook, catPills, basicHides, caseShown } from './ui-core.js';
+  createCase, updateCase, removeCase, restoreCase, saveMany, deleteMany, subcatChips, subcatsOf, settings, todayISO, hooks, fill, add, cloud, writes, okNoIds, patchLogbook, catPills, basicHides, basicMode, caseShown } from './ui-core.js';
 import { display, templateDialog } from './ui-settings.js';
 import { moveToBin } from './bin.js';
 import { caseHasNotes, openNotes } from './ui-notepad.js';
 import { createDraftSlot, listDrafts } from './drafts.js';
-import { STRONG, confident, autoTick, rejectCodes, recentCases } from './logging.js';
+import { STRONG, confident, autoTick, rejectCodes, recentCases, recentCount as snapRecent } from './logging.js';
 
 const DRAFT_KEY = 'logbook-draft-v2';
 const KEEP_MS = 12 * 3600e3; // a date kept by "Save, keep date" lasts this long
@@ -175,7 +175,7 @@ export function catPicker({ get, toggle, getTags = null, toggleTag = null, place
       else if (e.key === 'Enter' && (q.trim() || hl >= 0)) {
         e.preventDefault();
         if (items[hl]) { pick(items[hl]); q = ''; input.value = ''; hl = -1; refresh(); }
-      } else if (e.key === 'Enter' && onEmptyEnter && !e.isComposing) { e.preventDefault(); onEmptyEnter(); }
+      } else if (e.key === 'Enter' && onEmptyEnter && !e.isComposing) { e.preventDefault(); if (!e.repeat) onEmptyEnter(); }   // holding Enter never saves
       else if (e.key === 'Escape') { q = ''; input.value = ''; refresh(); }
     },
   });
@@ -492,11 +492,11 @@ function renderOne(card) {
   const sugg = h('div', { class: 'chips sugg-row', 'aria-live': 'polite' });
   // empty the box in one tap (Undo puts it back); shown once there is text, where Paste was
   const clearBtn = h('button', { type: 'button', class: 'small clear-btn icon-only', title: 'Clear the case box', 'aria-label': 'Clear the case box', onclick: () => {
-    const was = draft.details;
+    const was = draft.details, rejected = [...(draft.rejected || [])];
     if (!was) return;
     draft.details = ''; textarea.value = ''; saveDraft(); paintSuggest(); paintParsed(false);
     textarea.focus({ preventScroll: true });
-    toast('Case box cleared', { action: 'Undo', onaction: () => { draft.details = was; if (ui.textarea) { ui.textarea.value = was; paintSuggest(); paintParsed(false); } saveDraft(); } });
+    toast('Case box cleared', { action: 'Undo', onaction: () => { draft.details = was; draft.rejected = [...new Set([...(draft.rejected || []), ...rejected])]; if (ui.textarea) { ui.textarea.value = was; paintSuggest(); paintParsed(false); } saveDraft(); } });
   } }, ic('clear'));
   const selected = h('div', { class: 'chips selected' });
   const tip = h('div');
@@ -508,8 +508,9 @@ function renderOne(card) {
     toggle: code => keepPlace(picker.el, () => { setCats(toggleCat(draft.cats, code)); saveDraft(); paintSel(); }),
     getTags: () => draft.tags || [],
     toggleTag: key => keepPlace(picker.el, () => { Object.assign(draft, toggleTagIn(draft.cats, draft.tags, key)); saveDraft(); paintSel(); }),
-    // Enter in the empty search saves, the same as Enter in the box (the hint and toast say so)
-    onEmptyEnter: () => save({}),
+    // Enter in the empty search saves in Basic (where the hint says so), and elsewhere only accepts a pending
+    // offer ("press Enter again"); in other profiles a stray Enter there does nothing, as before
+    onEmptyEnter: () => { if (basicMode() || offerPending()) save({}); },
   });
   const common = display().compactTags ? h('div', { class: 'chips common-tags', 'aria-label': 'Common tags' }) : null;
   const paintCommon = () => {
@@ -537,8 +538,8 @@ function renderOne(card) {
   const enterHint = h('p', { class: 'hint enter-suggestion-hint', 'aria-live': 'polite', hidden: true });
   // one wide Save; saving and keeping the date for the next case is the small text button beside it
   const actions = h('div', { class: 'actions' },
-    h('button', { class: 'linkish keep-date', title: 'Save and keep this date for the next case', onclick: () => save({ another: true }) }, 'Save, keep date'),
-    h('button', { class: 'primary big', onclick: () => save({}) }, 'Save', h('span', { class: 'kbd', title: 'Ctrl+Enter (Cmd+Enter on a Mac)' }, ' Ctrl+⏎')));
+    h('button', { class: 'linkish keep-date', title: 'Save and keep this date for the next case', onclick: () => save({ another: true, tap: true }) }, 'Save, keep date'),
+    h('button', { class: 'primary big', onclick: () => save({ tap: true }) }, 'Save', h('span', { class: 'kbd', title: 'Ctrl+Enter (Cmd+Enter on a Mac)' }, ' Ctrl+⏎')));
 
   // what the box was read as: the initials and the age/sex are marked inside the box itself (a copy of its text
   // behind it, transparent but for the marks; owner's Apple-apps review), and the line under it says only what the
@@ -687,7 +688,7 @@ function paintSuggest() {
   })) : [h('span', { class: 'muted help', style: 'font-size:calc(13px * var(--fs, 1))' }, text ? 'No suggestions: search below.' : 'Suggestions appear as you type.')]));
 }
 
-// Settings → Advanced logging → Tick confident suggestions automatically (off by default): the confident
+// Settings → Logging → Tick confident suggestions automatically (off by default): the confident
 // suggestions are ticked as you type and follow the text; one you take off stays off for this case.
 // true when the ticks changed
 function applyAutoTick(found, text) {
@@ -742,7 +743,7 @@ function applyTemplate(t) {
 
 // Same as last chips on the Case tab (settings.recentCount, 1 to 5)
 export const RECENT_COUNTS = [[1, '1 (default)'], [2, '2'], [3, '3'], [5, '5']];
-const recentCount = () => Math.min(5, Math.max(1, Math.round(Number(settings().recentCount) || 1)));
+const recentCount = () => snapRecent(settings().recentCount);
 const clip = (t, n) => (t.length > n ? t.slice(0, n - 1).trimEnd() + '…' : t);
 
 function paintQuick() {
@@ -787,6 +788,11 @@ function paintEnterHint() {
   if (ui.enterHint.hidden !== hidden) ui.enterHint.hidden = hidden;
   setText(ui.enterHint, hidden ? '' : 'Tap Save or press Enter again to add ' + [...offer.cats.map(catShort), ...offer.tags.map(tagName)].join(', ') + ' and save.');
 }
+const offerPending = () => !!suggestedSave && suggestedSave.key === suggestionKey() && !draft.cats.length;
+// a tap this soon after a tap made the offer is a double tap, not a look at the hint: it neither saves nor
+// accepts (an offer made by a key has no gap: at is 0)
+const OFFER_GAP_MS = 600;
+const offerTooNew = () => offerPending() && Date.now() - (suggestedSave.at || 0) < OFFER_GAP_MS;
 function applySuggestedSave() {
   const offer = suggestedSave;
   suggestedSave = null; paintEnterHint();
@@ -799,12 +805,13 @@ function applySuggestedSave() {
 
 async function save(opts) {
   if (saving) return;
+  if (opts.tap && offerTooNew()) return;
   applySuggestedSave();   // a second Save takes the offered tags, the same as a second Enter
   saving = true;
   try { await saveCase(opts); } catch (err) { toast('Could not save: ' + err.message); } finally { saving = false; }
 }
 
-async function saveCase({ another }) {
+async function saveCase({ another, tap }) {
   const details = draftText();
   // a quick Save must not depend on the typing debounce (and nothing re-ticks while the save is under way)
   suggestSoon.cancel();
@@ -815,7 +822,7 @@ async function saveCase({ another }) {
     // confident suggestions only (as "+ All" and a pasted list): a weak guess is never counted without a look
     const codes = settings().suggestions !== false && details ? confident(suggest(draft.details.trim(), { limit: 8 })) : [];
     const cats = sortCodes(withParents([...codes, ...tags.flatMap(tagLinks)]));
-    suggestedSave = cats.length ? { key: suggestionKey(), cats, tags } : null;
+    suggestedSave = cats.length ? { key: suggestionKey(), cats, tags, at: tap ? Date.now() : 0 } : null;
     paintEnterHint();
     // categories are counted towards credentialling, so they must be picked on purpose
     // point at the suggestions (the focus stays put, so no keyboard pops up); with none shown, the search box
@@ -846,6 +853,8 @@ async function saveCase({ another }) {
   const keep = sticky ? draft.date : null;
   const next = settings().afterSave;
   const keepTags = next === 'keepTags' ? { cats: draft.cats, tags: draft.tags || [] } : { cats: [], tags: [] };
+  // Undo puts the case back with the ticks the user took off still off (auto-tick)
+  const ticksAtSave = { auto: [...(draft.auto || [])], rejected: [...(draft.rejected || [])] };
   draft = { ...draft, details: '', initials: '', initialsHint: '', caseId: null, caseCreatedAt: null, ...keepTags, ...FRESH_TICKS(), date: keep, keepDate: sticky, keptAt: Date.now(), dateAt: Date.now(), reflectTag: false };
   if (ui.tagBox) ui.tagBox.querySelector('input').checked = false;
   saveDraft();
@@ -870,7 +879,7 @@ async function saveCase({ another }) {
       try { await removeCase(c.id); } catch (err) { toast('Could not undo: ' + err.message); return; }
       if (S.user?.email !== owner) return;
       if (JSON.stringify(draft) !== beforeUndo) { toast('Case removed. Your new input stays in the box.'); return; }
-      draft = { ...draft, initials: firstField() === 'initials' ? caseParts(c).initials : '', initialsHint: caseParts(c).initials, details: firstField() === 'initials' ? caseParts(c).details : caseText(c), cats: c.cats, tags: c.tags || [], ...FRESH_TICKS(), reflectTag: !!c.reflectTag, date: c.date === todayISO() ? null : c.date };
+      draft = { ...draft, initials: firstField() === 'initials' ? caseParts(c).initials : '', initialsHint: caseParts(c).initials, details: firstField() === 'initials' ? caseParts(c).details : caseText(c), cats: c.cats, tags: c.tags || [], ...ticksAtSave, reflectTag: !!c.reflectTag, date: c.date === todayISO() ? null : c.date };
       saveDraft();
       if (S.tab === 'log' && ui.textarea) { ui.textarea.value = draft.details; if (ui.initials) ui.initials.value = draft.initials; if (ui.tagBox) ui.tagBox.querySelector('input').checked = draft.reflectTag; paintDate(); paintSel(); paintQuick(); paintParsed(false); }
     },
@@ -940,7 +949,7 @@ function paintBulk(out) {
         (r.tags || []).map(k => tagChip(k, { onclick: () => { r.tags = r.tags.filter(t => t !== k); paintBulk(out); } })),
         h('button', { class: 'small icon-btn', 'aria-label': 'Add tags', onclick: () => pickDialog(r.cats, cats => { r.cats = cats; paintBulk(out); }) }, r.cats.length ? '+' : '+ Add')),
         same || sugg.length ? h('div', { class: 'chips', style: 'margin-top:4px' }, same,
-          sugg.map(s => catChip(s.code, { cls: `sugg ${s.score >= 0.5 ? 'strong' : ''}`, title: 'Suggested: ' + catFull(s.code), onclick: () => { r.cats = addCat(r.cats, s.code); paintBulk(out); } }))) : null),
+          sugg.map(s => catChip(s.code, { cls: `sugg ${s.score >= STRONG ? 'strong' : ''}`, title: 'Suggested: ' + catFull(s.code), onclick: () => { r.cats = addCat(r.cats, s.code); paintBulk(out); } }))) : null),
       h('td', {}, h('button', { class: 'small danger icon-btn', title: 'Drop this case', 'aria-label': 'Drop this case', onclick: () => { bulkRows.splice(i, 1); paintBulk(out); } }, '×')));
   }));
   fill(out, 

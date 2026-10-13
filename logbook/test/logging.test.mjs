@@ -82,4 +82,13 @@ const { suggest } = await import('../js/suggest.js');
   assert.deepEqual(recentCases(shuffled, 2, key).map(c => c.id), ['r0', 'old']);
 }
 
+// recentCount: the picker's choices; anything else (an imported settings file) snaps to the nearest
+{
+  const { recentCount, RECENT_CHOICES } = await import('../js/logging.js');
+  const engine = await import('../js/engine.js');
+  assert.equal(engine.STRONG, STRONG, 'parseBulk and the Case tab share one confident line');
+  assert.deepEqual(RECENT_CHOICES, [1, 2, 3, 5]);
+  for (const [v, want] of [[undefined, 1], [null, 1], ['x', 1], [0, 1], [-3, 1], [1, 1], [2, 2], [2.6, 3], [3, 3], [4, 3], [4.6, 5], [5, 5], [9, 5], ['2', 2]]) assert.equal(recentCount(v), want, String(v));
+}
+
 console.log('logging tests passed');
