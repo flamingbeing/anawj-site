@@ -8,6 +8,7 @@ import { readRosterRows, readStaffSheet, buildRosterWorkbook, cellText, isContac
 import { buildLayout, COL_WIDTHS, shortName, doubleCovered, isDouble, TEAM_ROWS, DUTIES } from './layout.js';
 import * as cloud from './cloud.js';
 import { buildRosterPdf } from './pdfout.js';
+import { buildRosterCanvas } from './pngout.js';
 import { emptyRotations, postingOn, weekPosting, mondayOf, weeksOfYear, setWeeks, readRotationSheet, buildRotationWorkbook, POSTING_FILL } from './rotations.js';
 import { makeDemo, demoNotes, demoAdmin } from './demo.js';
 import { MONTHLY, monthlyDef, LEAVE_TYPES, NIGHT_DUTIES, cleanCell, daysIn, weekday, monthName, addDays, readMonthlyPdf, readMonthlyXlsx, buildMonthlyWorkbook, dutiesOn, generalFromMonthly, leaveOn } from './monthly.js';
@@ -1263,6 +1264,7 @@ async function askCover(before) {
 function afterRosterEdit(undone, prompted) {
   const r = state.roster;
   const before = lastRows ? juniorPlaces(JSON.parse(lastRows)) : {};
+  if (lastRows && !undone && !prompted) learnFromEdit(JSON.parse(lastRows), r.rows);
   if (lastRows) {
     const changes = describeRowChanges(JSON.parse(lastRows), r.rows);
     logRoster(undone ? changes.map(c => 'Undo: ' + c) : changes);
@@ -1271,6 +1273,41 @@ function afterRosterEdit(undone, prompted) {
   r.checks = check({ rows: r.rows, staff: dayStaff(), day: state.day, settings: state.settings });
   render();
   if (!undone && !prompted) askCoverForDoubles(before);
+}
+
+// Learning from hand changes: when a senior is taken off a subspecialty list by hand on three
+// different days, offer to stop giving them that kind of list (it goes on their "doesn't do" list).
+function learnFromEdit(oldRows, newRows) {
+  const subs = state.settings.subspecs;
+  const seniorsIn = row => new Set(namesInCell(row?.senior || '').map(n => matchName(n, state.staff).person?.id).filter(Boolean));
+  const now = Object.fromEntries(newRows.map(x => [x.roomId, x]));
+  for (const old of oldRows) {
+    const room = state.day.rooms.find(x => x.id === old.roomId);
+    const kinds = (room?.flags?.subspecs || []).filter(k => subs.find(x => x.key === k)?.hard);
+    if (!kinds.length) continue;
+    const kept = seniorsIn(now[old.roomId]);
+    for (const id of seniorsIn(old)) {
+      if (kept.has(id)) continue;
+      const p = person(id);
+      if (!p || p.role !== 'senior') continue;
+      for (const k of kinds) {
+        if ((p.avoid || []).includes(k)) continue;
+        const rec = (((state.learned ||= {})[id] ||= {})[k] ||= { days: [] });
+        if (rec.asked || rec.days.includes(state.day.date)) continue;
+        rec.days.push(state.day.date);
+        if (rec.days.length < 3) continue;
+        rec.asked = true;
+        const label = subs.find(x => x.key === k).label;
+        setTimeout(() => toast(`You've taken ${shortName(p) || p.name} off ${label} lists on ${rec.days.length} days.`, { label: `Stop giving them ${label}`, run: () => {
+          p.avoid = [...new Set([...(p.avoid || []), k])];
+          (state.staffLog ||= []).unshift({ at: Date.now(), by: who(), changes: [`${p.name}: doesn't do + ${k} (learned from the roster)`] });
+          render();
+          toast(`${p.name} won't be given ${label} lists. Change it on the Staff tab.`);
+        } }), 400);
+        return;
+      }
+    }
+  }
 }
 
 function dropName(src, dst) {
@@ -2792,7 +2829,7 @@ function renderRoster() {
       h('p', { class: 'hint', style: 'margin:0' }, 'Drag a name onto another name to swap them, or onto an empty part of a cell to move it there. Drag the C on a junior to add them to another room as an ad hoc cover, or the & on a senior to have them double cover another room (a dark & means they already are). × takes a name off. Click a name to see where they are and change its tags ((L), (RA), L-4pm, C-OT13…). + adds someone from the staff list. Click the case notes to edit them. Premed cover is on the Premeds tab.')),
     h('div', { class: 'cols' },
       h('section', { class: 'card scroll' },
-        h('table', { class: 'sheet' },
+        h('table', { class: 'sheet roster-edit' },
           h('thead', {}, h('tr', {}, ['', 'Senior', 'Junior', 'Cases'].map(t => h('th', {}, t)))),
           h('tbody', {}, body))),
       h('div', {},
@@ -2917,10 +2954,37 @@ async function exportPdf() {
   download(`OT roster ${state.day.date}.pdf`, buildRosterPdf(jspdf, layout).output('blob'));
 }
 
+// Printing: the sheet shrinks to fit one A4 page (portrait, 10 mm margins), whatever its length.
+addEventListener('beforeprint', () => {
+  const t = document.querySelector('table.xl');
+  if (!t) return;
+  t.style.zoom = '';
+  const r = t.getBoundingClientRect();
+  const mm = 96 / 25.4, w = 190 * mm, hgt = 277 * mm;
+  const k = Math.min(1, w / r.width, hgt / r.height) * 0.98;
+  if (k < 1) t.style.zoom = String(k);
+});
+addEventListener('afterprint', () => { const t = document.querySelector('table.xl'); if (t) t.style.zoom = ''; });
+
+// The sheet as an image: shared straight to WhatsApp (or any app) where the phone allows it, else downloaded.
+async function exportImage() {
+  colourCache.clear();
+  const layout = buildLayout({ date: state.day.date, rows: state.roster.rows, lists: rosterLists(), general: effectiveGeneral(), box: commentsText(), colourOf, shortOf });
+  const blob = await new Promise(ok => buildRosterCanvas(layout).toBlob(ok, 'image/png'));
+  const name = `OT roster ${state.day.date}.png`;
+  const file = new File([blob], name, { type: 'image/png' });
+  if (navigator.canShare?.({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: `OT roster ${longDate(state.day.date)}` }); return; }
+    catch (e) { if (e?.name === 'AbortError') return; }
+  }
+  download(name, blob);
+  toast('Image downloaded. Send it on WhatsApp as a photo or file.');
+}
+
 // Download button: the format last picked (remembered in this browser), with a menu to change it.
 // a download or print counts as the day being sent out (the steps strip shows it until the roster changes)
 const sentOut = fn => async () => { (state.outHash ||= {})[state.day.date] = dayHash(); save(); await fn(); renderSteps(); };
-const DOWNLOADS = [['xlsx', 'Download .xlsx', sentOut(exportXlsx)], ['pdf', 'Download PDF', sentOut(exportPdf)], ['print', 'Print', sentOut(() => { rosterView = 'sheet'; render(); setTimeout(() => window.print(), 100); })]];
+const DOWNLOADS = [['xlsx', 'Download .xlsx', sentOut(exportXlsx)], ['pdf', 'Download PDF', sentOut(exportPdf)], ['png', 'Image for WhatsApp', sentOut(exportImage)], ['print', 'Print', sentOut(() => { rosterView = 'sheet'; render(); setTimeout(() => window.print(), 100); })]];
 let downloadMenu = false;
 function downloadButton() {
   let pick = 'xlsx';
