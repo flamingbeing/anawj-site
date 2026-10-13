@@ -23,6 +23,10 @@ Static site on GitHub Pages (public repo: no names, patient data or real evaluat
 
 Rules that bite:
 
+- Accounts, settings, costs, the pre-launch checklist and how to hand over: [OPERATIONS.md](OPERATIONS.md). Update
+  it when an account, setting or cost changes.
+- A PR that changes any `firestore.rules` waits for the owner's approval before merging (it deploys live on merge).
+
 - The homepage (`index.html`) only shows whether the server is up or down (owner, Oct 2026). Apps stay unlisted:
   never link them from the homepage, and give each app page `<meta name="robots" content="noindex, nofollow">`
   (GitHub Pages ignores `_headers`, so the meta tag is what keeps anawj.com out of search engines).
@@ -68,7 +72,7 @@ for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mj
 
 - **Merging:** merge your own PRs once the checks above pass, then report (with the PR link). Merge by the number the
   PR's creation returned, never a guessed next number (13 Oct 2026: a guess merged another session's PR early). Exceptions: Claude
-  Code–Codex handover PRs wait for the owner's explicit approval; the owner may say "auto-merge" for a batch, or
+  Code–Codex handover PRs and PRs changing a `firestore.rules` wait for the owner's explicit approval; the owner may say "auto-merge" for a batch, or
   "no e2e yet" (then unit tests and quick browser checks).
 - **Planning:** for multi-part work, say the plan first and wait when asked; the owner plans in batches, then it's
   built PR by PR, each merged before the next. When the owner asks "should we / can we", answer and propose.
