@@ -261,7 +261,7 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
     Google pop-up's helper page on `prewarm-study.firebaseapp.com` ("missing initial state"), and the self-hosted
     helper at `anawj.com/__/auth` belongs to the logbook's project. `admins/{email}` (lower-case email) lists them. The first admin is added by hand in the
     Firebase console; after that admins can add others there. Admins see every hospital, make codes, remove phones.
-  - **Join links** (owner, 12 Oct 2026): the admin screen shares `anawj.com/prewarm/#/join/{site}/{code}` or shows it as
+  - **Join links** (owner, 12 Oct 2026): the admin screen shares `prewarmstudy.anawj.com/#/join/{site}/{code}` (old links at `anawj.com/prewarm/#/join/…` move across and still work) or shows it as
     a QR code (vendored qrcode-generator, as in evals). The code sits after the `#`, so it never reaches a server, and
     the app drops it from the address bar once joined. Codes stay long (8 characters); a link means nobody types them.
   - Each patient is one document; each field is merged on its own (`f.<id>: {v, t, by}`), newest edit wins when
@@ -329,3 +329,22 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   "Export N to Excel" (the same file as Settings → Export, for just those). In the lock view the chips (dashed, "All
   but the latest" / "Select none") sit on their own row above Lock / Unlock. The "Study IDs only" line was removed.
   "Downloaded" (pre-op `pre_dl` and day 2 `d2_dl`) is no longer asked (`NOT_ASKED`); its template columns stay empty.
+- **Move to prewarmstudy.anawj.com** (owner, 13 Oct 2026; plan in `SUBDOMAINS.md`, step 3; done between cases only):
+  - Why: the browser keeps a phone's saved copy, unsent readings and sign-in per web address, so the study app has its own
+    address. The repo folder stays `prewarm/`; the host serves only it (plus the shared `/design/`).
+  - The old address (`anawj.com/prewarm/`, `www.`) runs `moveCheck()` once, 1.5 s after the app opens (never mid-entry,
+    top-level windows only). It moves the phone only when: no half-entered reading (`unsaved:` drafts), nothing waiting
+    (`pending` empty and `cloud.flushed()`), the phone is on a team (or has no patients), it is online and the new
+    address answers. Otherwise a bar says why, with Try again. Demo mode moves at once. It never moves a phone mid-case
+    unless the app was just opened or updated: a running phone only gets the new code by "Update available" or a reload.
+  - The redirect keeps path and query and the `#` part (nurse links, join links, admin sign-in links). A team member's
+    phone sends `#/join/{site}/{its code}/{initials}` (read from its own `members` record) so it rejoins on the new
+    address with one tap; admins sign in again there (email link or password). Nothing in Firestore or the rules changes;
+    the old address's saved copy is left as it was (no data deleted).
+  - New address: `update.html` in the app folder is the update helper (the SW lets it through to the network);
+    the old address keeps `anawj.com/prewarm-update/` (outside the old worker's scope; it clears the old copy and
+    reopens `/prewarm/`, which then moves on). The sign-in domain stays `prewarm-study.firebaseapp.com`;
+    `prewarmstudy.anawj.com` is an authorised domain (owner added it).
+  - Tests: edge block AJ (redirect keeps path, query, `#`; no loop; update helper), sync test (a half-entered reading
+    keeps the phone; then the join code and initials arrive on the new address and the team's patient shows). In tests
+    `?oldhost=<new address>` on localhost pretends to be the old address.
