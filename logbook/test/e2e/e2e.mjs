@@ -526,8 +526,8 @@ async function run(label, ctxOpts) {
   }
 
   await step('log: Paste puts the clipboard in the box', async () => {
-    // (clipboard permissions are Chromium's; this test runs in Chromium)
-    await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: new URL(BASE).origin });
+    // (clipboard permissions are Chromium's names only; Firefox and WebKit refuse them)
+    if (ctx.browser()?.browserType().name() === 'chromium') await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: new URL(BASE).origin });
     await p.evaluate(() => navigator.clipboard.writeText('PQ 50F\nlap chole GA'));
     await p.locator('textarea.details').fill('');
     await p.locator('.box-wrap .paste-btn').click(); await nap(300);

@@ -113,6 +113,7 @@ try { for (const width of [390, 1280]) {
   const p = await ctx.newPage(), errors = [];
   p.on('pageerror', e => errors.push(e.message)); p.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errors.push(m.text()); });
   await p.goto(base + '?demo#log'); await p.waitForSelector('textarea.details');
+  await p.waitForFunction(() => Number(document.body.dataset.cases) > 0);   // (from the device's store, a moment after the first paint)
   const days = await p.evaluate(async () => [...new Set((await import('./js/ui-core.js')).S.cases.map(c => c.date).filter(Boolean))].sort());
   assert.ok(days.length >= 2, 'the demo has dated cases');
   const iso = days[days.length - 1];
@@ -196,6 +197,11 @@ try { for (const width of [390, 1280]) {
   // Dropbox: Sync now leaves for its sign-in, comes back to Settings → Sync and syncs that place only
   await p.evaluate(() => { location.hash = '#sync'; }); await p.getByRole('heading', { name: 'Sync', exact: true }).waitFor();
   await p.getByLabel('Add a place to sync to').selectOption('dropbox');
+  // the case just saved doesn't draw this page again (it shows no cases): the place being added stays, unsaved
+  const dbxNow = await p.getByRole('button', { name: 'Sync now' }).nth(1).elementHandle();
+  await p.evaluate(() => document.activeElement?.blur());
+  await p.waitForTimeout(1500);
+  assert.equal(await dbxNow.evaluate(el => el.isConnected), true, 'the Sync page was drawn again');
   await p.getByRole('button', { name: 'Sync now' }).nth(1).click();
   assert.match(await runDone(), new RegExp(`^Synced ${days.length} of ${days.length} days`));
   assert.match(p.url(), /\?demo#sync$/);
@@ -274,4 +280,36 @@ try { for (const width of [390, 1280]) {
   assert.deepEqual(errors, []);
   await ctx.close();
   console.log(`ok ${width}`);
-} console.log('PASS sync'); } finally { await b.close(); }
+}
+// storage blocked (a locked-down browser, some private modes): reading window.localStorage itself throws. The app
+// still opens, Settings → Sync and Send to work, a token can't be kept (said so), and forgetting the sync is quiet.
+{
+  const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
+  await ctx.addInitScript(() => {
+    const deny = () => { throw new DOMException("Failed to read the 'localStorage' property from 'Window': Access is denied for this document.", 'SecurityError'); };
+    Object.defineProperty(window, 'localStorage', { configurable: true, get: deny });
+    Object.defineProperty(window, 'sessionStorage', { configurable: true, get: deny });
+  });
+  const p = await ctx.newPage(), errors = [];
+  p.on('pageerror', e => errors.push(e.message)); p.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errors.push(m.text()); });
+  await p.goto(base + '?demo#log'); await p.waitForSelector('textarea.details');
+  assert.equal(await p.evaluate(() => { try { localStorage; return 'readable'; } catch { return 'blocked'; } }), 'blocked');
+  await p.waitForFunction(() => Number(document.body.dataset.cases) > 0);
+  await p.locator('textarea.details').fill('ZZ fake case, storage blocked');
+  await p.evaluate(() => { location.hash = '#sync'; }); await p.getByRole('heading', { name: 'Sync', exact: true }).waitFor();
+  await p.getByLabel('Add a place to sync to').selectOption('github');
+  await p.getByLabel('Owner').fill('fake-user'); await p.getByLabel('Repository').fill('fake-notes'); await p.getByLabel('Token').fill('FAKE_GH_TOKEN');
+  await p.getByRole('button', { name: 'Save', exact: true }).click();
+  await p.getByText('Saved, but this browser won’t keep the token (private mode?)').waitFor();
+  await p.evaluate(() => { location.hash = '#logbook'; }); await p.locator('main .lb-top').waitFor();
+  await p.locator('button.lb-sync').click();
+  await p.getByText(/add a GitHub token on this device first/).waitFor();
+  await p.evaluate(() => { location.hash = '#sendto'; }); await p.getByRole('heading', { name: 'Send to', exact: true }).waitFor();
+  await p.evaluate(async () => { (await import('./js/ui-sync.js')).forgetSync(); await (await import('./js/cloud-save.js')).resumeCloudSave(); });
+  await p.evaluate(() => { location.hash = '#log'; }); await p.waitForSelector('textarea.details');
+  await p.waitForTimeout(300);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+  console.log('ok storage blocked');
+}
+console.log('PASS sync'); } finally { await b.close(); }

@@ -11,6 +11,9 @@ try { for (const width of [390, 1280]) {
   await ctx.addInitScript(() => localStorage.setItem('apmes-logbook-demo-small', '1'));
   const p = await ctx.newPage(), errors = [];
   p.on('pageerror', e => errors.push(e.message)); p.on('console', m => { if (m.type() === 'error' && !ignorable(m.text())) errors.push(m.text()); });
+  // the list draws after the notes arrive (from the device's store, a moment after the page): wait for the count
+  const rowsAre = n => p.waitForFunction(n => document.querySelectorAll('ul.notes-rows li').length === n, n, { timeout: 5000 })
+    .catch(async () => { throw new Error(`expected ${n} note rows, saw ${await p.locator('ul.notes-rows li').count()}`); });
   const S = () => p.evaluate(async () => { const { S } = await import('./js/ui-core.js'); return { notes: S.notes, index: S.noteIndex || null }; });
   const today = await p.evaluate(() => 0) || null;
   await p.goto(base + '?demo#log'); await p.waitForSelector('textarea.details');
@@ -25,7 +28,7 @@ try { for (const width of [390, 1280]) {
   assert.match(await moreLink.innerText(), /Notes \(beta\)[\s\S]*private, never in your portfolio/);
   await moreLink.click();
   await p.getByRole('heading', { name: 'Notes', exact: true }).waitFor();
-  assert.match(await p.locator('.notes-page').innerText(), /No notes yet[\s\S]*Use Reflect instead/);
+  await p.locator('.notes-page', { hasText: /No notes yet[\s\S]*Use Reflect instead/ }).waitFor();   // (after "Loading…")
   assert.equal(await p.locator('[role=tab][aria-selected=true]').getAttribute('data-tab'), 'more');
 
   // a new note: today's date, saved after a pause in typing, listed with its count
@@ -59,7 +62,7 @@ try { for (const width of [390, 1280]) {
 
   // search
   await p.getByLabel('Search notes').fill('dose');
-  assert.equal(await p.locator('ul.notes-rows li').count(), 1);
+  await rowsAre(1);
   await p.getByLabel('Search notes').fill('');
 
   // the Logbook marks today and Copy takes the day's notes too (the day's Copy is off unless switched on)
@@ -73,7 +76,7 @@ try { for (const width of [390, 1280]) {
   assert.match(await readClipboard(p), /## Notes\n\n### Fake teaching point\nFake dose reminder/);
   await p.getByRole('button', { name: 'Notes', exact: true }).click();
   await p.locator('.notes-filter').filter({ hasText: 'Notes on' }).waitFor();
-  assert.equal(await p.locator('ul.notes-rows li').count(), 1);
+  await rowsAre(1);
 
   // link a note to a case: the case row gets a note button that opens it
   await p.locator('ul.notes-rows li').first().click();
@@ -90,7 +93,7 @@ try { for (const width of [390, 1280]) {
   const list = p.locator('main .seg button').filter({ hasText: /^List$/ }); await list.first().click();
   await p.getByRole('button', { name: 'Open your notes on this case' }).first().click();
   await p.locator('.notes-filter').waitFor();
-  assert.equal(await p.locator('ul.notes-rows li').count(), 1);
+  await rowsAre(1);
   assert.equal((await S()).notes.find(n => n.caseId).caseId, caseId);
   await p.getByRole('button', { name: 'Show all' }).click();
 
@@ -102,7 +105,7 @@ try { for (const width of [390, 1280]) {
   assert.match(await linked.innerText(), /linked[\s\S]*reflection[\s\S]*Open the notes/i);
   await linked.getByRole('button', { name: 'Open the notes' }).click();
   await p.locator('.notes-filter').waitFor();
-  assert.equal(await p.locator('ul.notes-rows li').count(), 1);
+  await rowsAre(1);
   await p.getByRole('button', { name: 'Show all' }).click();
   // ... and so does the pill inside the note
   await p.locator('ul.notes-rows li').filter({ has: p.locator('.note-case') }).first().locator('b').click();
@@ -192,10 +195,10 @@ try { for (const width of [390, 1280]) {
   });
   await p.evaluate(() => { location.hash = '#notes'; });
   await p.locator('.notes-count').filter({ hasText: '2000 of 2000' }).waitFor({ timeout: 15000 });
-  assert.equal(await p.locator('ul.notes-rows li').count(), 100);
+  await rowsAre(100);
   await p.getByRole('button', { name: /^Show 100 more/ }).focus();
   await p.keyboard.press('Enter');
-  assert.equal(await p.locator('ul.notes-rows li').count(), 200);
+  await rowsAre(200);
   assert.equal(await p.evaluate(() => [...document.querySelectorAll('ul.notes-rows > li')].indexOf(document.activeElement)), 100, 'focus on the first row just shown');
   await p.getByRole('button', { name: '+ New note' }).click();
   await p.getByText(/You have 2000 notes, the most allowed/).first().waitFor();

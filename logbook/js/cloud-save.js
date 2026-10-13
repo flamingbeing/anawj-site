@@ -53,14 +53,15 @@ async function leaveToSignIn(to, extra = {}) {
   try { localStorage.setItem(PENDING, JSON.stringify(pending)); } catch { return toast('Not saved: this browser won’t keep the sign-in (private mode?)'); }
   location.assign(url);
 }
-const take = (store, key) => { try { const v = JSON.parse(store.getItem(key) || 'null'); store.removeItem(key); return v; } catch { return null; } };
+// (the store is named, not passed: reading window.localStorage itself throws where storage is blocked)
+const take = (store, key) => { try { const st = store === 'session' ? sessionStorage : localStorage; const v = JSON.parse(st.getItem(key) || 'null'); st.removeItem(key); return v; } catch { return null; } };
 
 // after sign-in on the page Google or Dropbox sent us back to: finish the save (or the sync) that was waiting
 export async function resumeCloudSave() {
-  const back = take(sessionStorage, RETURN);
+  const back = take('session', RETURN);
   const r = back && parseCloudReturn(back);
   if (!r) return;
-  const p = take(localStorage, PENDING), pending = p && Date.now() - (p.at || 0) < PENDING_MS ? p : null;
+  const p = take('local', PENDING), pending = p && Date.now() - (p.at || 0) < PENDING_MS ? p : null;
   const where = r.to === 'drive' ? 'Google Drive' : 'Dropbox';
   const sync = !!(pending && pending.action === 'sync'), what = sync ? 'synced' : 'saved';
   if (!pending || pending.to !== r.to || pending.state !== r.state) return toast(`Not ${what} to ${where}: the sign-in didn’t match. Tap ${sync ? 'Sync' : 'Save'} again.`);

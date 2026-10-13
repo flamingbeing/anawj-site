@@ -744,16 +744,27 @@ export async function applyProfile(mode) {
   hooks.paintTabs?.(); hooks.render(); toast(`Profile: ${profileName(mode)}`);
 }
 // the short list of what changes, then Apply (or Cancel: nothing changes)
+// Cancel: the radio goes back at once and keeps the focus. The dialog's own close waits for its history step (Back), which
+// some browsers (Safari) give a moment later, so the page isn't left showing the radio that was cancelled meanwhile.
+function radioBack() {
+  const cur = profile();
+  for (const r of document.querySelectorAll('input[name=profile]')) r.checked = r.value === cur;
+  document.querySelector('input[name=profile]:checked')?.focus({ preventScroll: true });
+}
 function confirmProfile(mode) {
   const lines = profileChanges(mode);
   let done = false;
+  const cancel = () => { m.close(); radioBack(); };
   const m = modal(mode === profile() ? `Back to ${profileName(mode)}` : `Use ${profileName(mode)}`, [
     lines.length ? changeList(lines) : h('p', {}, 'Nothing on screen changes: only the profile’s name.'),
     h('p', { class: 'hint' }, 'Your cases, reflections, notes, tags and other settings stay as they are. Any switch can be changed again after.'),
     h('div', { class: 'bar' }, h('span', { class: 'grow' }),
-      h('button', { onclick: () => m.close() }, 'Cancel'),
+      h('button', { onclick: cancel }, 'Cancel'),
       h('button', { class: 'primary', onclick: async () => { done = true; await m.close(); applyProfile(mode); } }, 'Apply')),
-  ], { onclose: () => { if (!done) { hooks.render(); document.querySelector('input[name=profile]:checked')?.focus(); } } });   // (Cancel: the radio goes back, and keeps the focus)
+  ], { onclose: () => { if (!done) { hooks.render(); radioBack(); } } });
+  // Escape and a tap outside close it too
+  m.el.addEventListener('cancel', () => { if (!done) setTimeout(radioBack, 0); });
+  m.el.addEventListener('click', e => { if (e.target === m.el && !done) setTimeout(radioBack, 0); });
 }
 export function profileCard() {
   const cur = profile();

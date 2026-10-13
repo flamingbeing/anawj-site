@@ -39,7 +39,8 @@ function readState(a = acct()) {
 }
 const writeState = (s, a = acct()) => { try { localStorage.setItem(LEDGER + a, JSON.stringify(s)); } catch { /* storage full or blocked: the next sync reads the files again */ } };
 export const ghToken = (id, a = acct()) => { try { return localStorage.getItem(`${TOKEN}${a}:${id}`) || ''; } catch { return ''; } };
-const setGhToken = (id, v) => { try { if (v) localStorage.setItem(`${TOKEN}${acct()}:${id}`, v); else localStorage.removeItem(`${TOKEN}${acct()}:${id}`); } catch { toast('This browser won’t keep the token (private mode?)'); } };
+// false: storage is blocked (said so, unless quiet: Save says it in its own message)
+const setGhToken = (id, v, quiet = false) => { try { if (v) localStorage.setItem(`${TOKEN}${acct()}:${id}`, v); else localStorage.removeItem(`${TOKEN}${acct()}:${id}`); return true; } catch { if (!quiet) toast('This browser won’t keep the token (private mode?)'); return false; } };
 
 // the base texts: IndexedDB (a day can be long and there may be years of them)
 const DB = 'apmes-logbook-sync';
@@ -326,14 +327,15 @@ export function renderSyncSettings() {
     for (const id of new Set([...Object.keys(s.ledger), ...Object.keys(s.at)])) if (!keep.has(id) || moved.includes(id)) { delete s.ledger[id]; delete s.at[id]; }
     writeState(s);
     for (const id of [...sv.targets.map(t => t.id).filter(id => !keep.has(id)), ...moved]) await dropBases(id);
-    for (const t of sv.targets) if (!keep.has(t.id)) setGhToken(t.id, '');
-    for (const [id, v] of tokens) if (v && keep.has(id)) setGhToken(id, v);
+    for (const t of sv.targets) if (!keep.has(t.id)) setGhToken(t.id, '', true);
+    let kept = true;
+    for (const [id, v] of tokens) if (v && keep.has(id)) kept = setGhToken(id, v, true) && kept;
     tokens.clear();
     await patchLogbook({ settings: { sync: clean.length || remind.checked ? { targets: clean, remind: remind.checked } : null } });
     sv.targets = clean;
     list = clean.map(t => ({ ...t }));
     draw();   // the token field now says it's kept
-    toast('Saved');
+    toast(kept ? 'Saved' : 'Saved, but this browser won’t keep the token (private mode?)');
     return true;
   }
   return h('div', {},
