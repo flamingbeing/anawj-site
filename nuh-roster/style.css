@@ -255,6 +255,7 @@ input.unmatched { border-color: var(--red); }
 table.monthly td { padding: 2px 4px; }
 table.monthly td input { min-width: 150px; }
 table.monthly tr.weekend td { background: #f3f5f8; }
+table.monthly button.link { color: var(--navy); } /* the link blue is under 4.5:1 on the striped, weekend and today rows */
 table.monthly tr.today td { background: var(--chip); }
 dialog.changes.wide { max-width: min(900px, calc(100vw - 32px)); }
 .import-review { max-height: 62vh; overflow: auto; margin-bottom: 12px; }
