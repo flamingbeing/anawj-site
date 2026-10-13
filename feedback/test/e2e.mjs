@@ -265,5 +265,34 @@ try {
   await live.goto('https://hand.anawj.com/handlog/?feedback=1');
   await fb(live).locator('#fab').waitFor();
   assert.match(await fb(live).locator('#where').textContent(), /Live app/);
+  // ---- a phone (touch, as an iPhone): tap to pick, draw with a finger
+  const { devices } = await import(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/node_modules/playwright/index.mjs');
+  const phone = await b.newContext({ ...devices['iPhone 13'], serviceWorkers: 'block' });
+  await phone.route(/^https:\/\/(?![a-z0-9-]+\.kohwenjun\.workers\.dev)/, route => route.abort());
+  for (const r of [/^https:\/\/([a-z0-9-]+\.kohwenjun\.workers\.dev)\//]) await phone.route(r, async route => {
+    const req = route.request();
+    const res = await worker.fetch(new Request(req.url(), { headers: req.headers(), redirect: 'manual' }), { ASSETS });
+    await route.fulfill({ status: res.status, headers: Object.fromEntries(res.headers), body: Buffer.from(await res.arrayBuffer()) });
+  });
+  const tp = await phone.newPage();
+  await tp.goto(PREVIEW + '/hand-babies/');
+  await fb(tp).locator('#fab').tap();
+  await fb(tp).locator('#mPick').tap();
+  const pb = await tp.locator('p').first().boundingBox();
+  await tp.touchscreen.tap(pb.x + 10, pb.y + pb.height / 2);
+  await fb(tp).locator('#note').waitFor();
+  assert.match(await fb(tp).locator('#onText').textContent(), /^On: paragraph/, 'a tap picks on a phone');
+  await fb(tp).locator('#noteCancel').tap();
+  await fb(tp).locator('#fab').tap();
+  await fb(tp).locator('#mDraw').tap();
+  const cdp = await phone.newCDPSession(tp);
+  const ring = [...Array(13)].map((_, k) => [pb.x + 60 + 50 * Math.cos(k / 12 * 2 * Math.PI), pb.y + pb.height / 2 + 25 * Math.sin(k / 12 * 2 * Math.PI)]);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: ring[0][0], y: ring[0][1] }] });
+  for (const [x, y] of ring.slice(1)) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y }] });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await fb(tp).locator('#drawDone').tap();
+  await fb(tp).locator('#note').waitFor();
+  assert.match(await fb(tp).locator('#onText').textContent(), /^You drew: circled paragraph/, 'a finger drawing marks the paragraph');
+  await phone.close();
   console.log('feedback e2e: ok');
 } finally { await b.close(); }
