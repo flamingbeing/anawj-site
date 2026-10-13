@@ -104,22 +104,29 @@ let channel = null;
 try {
   if (typeof BroadcastChannel === 'function') {
     channel = new BroadcastChannel('apmes-logbook-store');
-    channel.onmessage = e => { if (e.data && e.data.wipe) for (const h of [...handles]) h.close(); };
+    channel.onmessage = e => { if (e.data && e.data.wipe) closeAll(e.data.keep); };
     if (channel.unref) channel.unref();   // node (tests): don't keep the process alive
   }
 } catch { channel = null; }
 
+function closeAll(keep) {
+  const k = new Set(Array.isArray(keep) ? keep : []);
+  for (const h of [...handles]) if (!k.has(h.name)) h.close();
+}
+
 // Delete every account's store on this device (this mode only), in this tab and the others. Sign-out, account
-// switch and Delete account: a shared ward PC keeps nothing. Resolves when the deletes are done (or can't be).
-export async function wipeStores() {
-  for (const h of [...handles]) h.close();
-  for (const name of [...memory.keys()]) if (ours(name)) memory.delete(name);
-  try { channel && channel.postMessage({ wipe: true }); } catch { /* closed */ }
+// switch and Delete account: a shared ward PC keeps nothing. keep: emails whose stores stay (the account signed in
+// now, which another tab may be using). Resolves when the deletes are done (or can't be).
+export async function wipeStores(keep = []) {
+  const kept = (Array.isArray(keep) ? keep : [keep]).filter(Boolean).map(storeName);
+  closeAll(kept);
+  for (const name of [...memory.keys()]) if (ours(name) && !kept.includes(name)) memory.delete(name);
+  try { channel && channel.postMessage({ wipe: true, keep: kept }); } catch { /* closed */ }
   if (typeof indexedDB === 'undefined') return;
   const names = new Set();
   try { for (const n of JSON.parse(localStorage.getItem(REGISTRY) || '[]')) names.add(n); } catch { /* storage blocked */ }
   try { if (indexedDB.databases) for (const d of await indexedDB.databases()) if (d.name && d.name.startsWith(PREFIX)) names.add(d.name); } catch { /* not supported */ }
-  const mine = [...names].filter(ours);
+  const mine = [...names].filter(n => ours(n) && !kept.includes(n));
   await Promise.all(mine.map(n => new Promise(resolve => {
     try {
       const r = indexedDB.deleteDatabase(n);

@@ -34,7 +34,9 @@ export function binLabel(e, now = Date.now()) {
 }
 export function binEntry(kind, item, now = Date.now()) {
   if (kind !== 'case' && kind !== 'reflection' && kind !== 'note') throw new Error('Unknown bin kind: ' + kind);
-  const data = kind === 'case' ? cleanCase(item, item.updatedAt || now) : kind === 'note' ? cleanNote(item, item.updatedAt || now) : cleanReflection(item);
+  // data keeps the binned version's updatedAt: other devices remove their copy only if it is that version (sync.js)
+  const data = kind === 'case' ? cleanCase(item, item.updatedAt || now) : kind === 'note' ? cleanNote(item, item.updatedAt || now)
+    : { ...cleanReflection(item), updatedAt: Number(item.updatedAt) || now };
   return { id: binId(kind, data.id, now), kind, data, deletedAt: now };
 }
 

@@ -22,7 +22,7 @@ import { checkWrite } from './recovery-store.js';
 import * as D from './demo-backend.js';
 import { cleanProfile } from './profile.js';
 import { cleanNote } from './notepad.js';
-import { createSyncHub, SKEW } from './sync.js';
+import { createSyncHub, eachSettled, SKEW } from './sync.js';
 import { openStore, wipeStores } from './store.js';
 import { plain, cleanCase, cleanSummary, cleanResident, cleanTemplate, importDocId, defaultLogbook, cleanReflection, cleanImage, cleanCategoryNames, cleanSubmission } from './demo-backend.js';
 export { cleanSubmission };
@@ -97,14 +97,16 @@ export function onSyncError(cb) { syncErrorListeners.add(cb); return () => syncE
 function queued(p, lateWrite = null) {
   let late = false;
   p.catch(e => { if (late) { console.error('Sync failed', e); for (const cb of syncErrorListeners) cb(e); } });
-  if (lateWrite) p.then(() => restampIfLate(lateWrite, late), () => late && forgetLate(lateWrite));
-  return Promise.race([p, new Promise(r => setTimeout(() => { late = true; if (lateWrite) rememberLate(lateWrite); r(); }, ACK_WAIT))]);
+  // listed at once (a page closed within ACK_WAIT still stamps it after the next start), crossed off when the server has it
+  if (lateWrite) { rememberLate(lateWrite); p.then(() => restampIfLate(lateWrite, true), () => forgetLate(lateWrite)); }
+  return Promise.race([p, new Promise(r => setTimeout(() => { late = true; r(); }, ACK_WAIT))]);
 }
 
 // Writes that reach the server late (made offline) carry an updatedAt from when they were made, which other devices'
 // "changed since my last sync" queries (sync.js) would skip. Once the server has them they are stamped again (one
-// small write each). Writes still waiting when the page closes are listed in localStorage (ids only) and stamped
-// after the next start, once Firestore has sent them.
+// small write each, so a record deleted since doesn't stop the others). Every such write is listed in localStorage
+// (ids only) until the server has it; one still waiting when the page closes is stamped after the next start, once
+// Firestore has sent it.
 const LATE_KEY = 'apmes-logbook-late:';
 const late = (email, coll, ids, field = 'updatedAt') => ({ email: lc(email), coll, ids: ids.map(String), field, at: Date.now() });
 const lateList = email => { try { return JSON.parse(localStorage.getItem(LATE_KEY + email) || '[]'); } catch { return []; } };
@@ -115,9 +117,9 @@ function forgetLate(w) { lateSave(w.email, lateList(w.email).filter(x => !sameLa
 async function restampIfLate(w, listed) {
   if (listed) forgetLate(w);
   if (Date.now() - w.at <= SKEW / 2) return;
-  const now = Date.now();
-  await inBatches(w.ids, (b, id, F, db) => b.update(F.doc(db, 'logbooks', w.email, w.coll, id), { [w.field]: now }),
-    b => b.commit().catch(e => console.warn('Late write not stamped again (deleted since?)', e)));
+  const now = Date.now(), { db, F } = await sdk();
+  const done = await eachSettled(w.ids, id => F.updateDoc(F.doc(db, 'logbooks', w.email, w.coll, id), { [w.field]: now }));
+  if (done.length < w.ids.length) console.warn(`${w.ids.length - done.length} late write(s) not stamped again (deleted since?)`);
 }
 const settled = new Set();
 async function settleLate(email) {
@@ -129,10 +131,14 @@ async function settleLate(email) {
 }
 // Sign-out, account switch, Delete account: stop syncing and delete this device's copies (a shared PC keeps nothing).
 // proceed() is asked again once syncing has stopped: a tab that has seen a new sign-in by then leaves the stores alone.
-export async function forgetLocal(proceed = () => true) {
+// keep: the account signed in now (an account switch), whose store stays, here and in other tabs; so does the store
+// of whoever is signed in by the time the wipe runs (a tab catching up on another tab's sign-out and sign-in).
+export async function forgetLocal(proceed = () => true, keep = null) {
   await hub.stopAll();
   if (!proceed()) return;
-  await wipeStores();
+  let now = null;
+  try { if (!demo && fb) now = (await fb).auth.currentUser?.email || null; } catch { /* not loaded */ }
+  await wipeStores([keep, now].filter(Boolean).map(lc));
   // late-write ids and the bin's last purge time (bin.js) are per account too
   try { for (const k of Object.keys(localStorage)) if (k.startsWith(LATE_KEY) || k.startsWith('apmes-logbook-purged:')) localStorage.removeItem(k); } catch { /* storage blocked */ }
   settled.clear();
@@ -228,6 +234,8 @@ export async function deleteAccount(email, onStep = () => {}) {
     }
     return snap.size;
   };
+  // stop the listeners first, so the deletions below don't each cost a check (the store goes at sign-out)
+  await hub.stopAll();
   try {
     for (const [sub, label] of [['cases', 'cases'], ['reflections', 'reflections'], ['images', 'photos'], ['notes', 'notes'], ['meta', 'notes index'], ['bin', 'recycle bin']]) {
       onStep(`Deleting ${label}…`);
@@ -345,7 +353,8 @@ function listenFirestore(email, coll, { since = null, field = 'updatedAt' } = {}
     // with metadata changes, so the engine learns when the server has confirmed an unchanged offline copy
     stop = F.onSnapshot(since === null ? col : F.query(col, F.where(field, '>', since)), { includeMetadataChanges: true }, snap => {
       const server = !snap.metadata.fromCache, full = since === null && first && server;
-      const changes = snap.docChanges().map(c => ({ type: c.type, id: c.doc.id, doc: c.type === 'removed' ? null : { ...c.doc.data(), id: c.doc.id } }));
+      // pending: this device's write is not on the server yet (if it is refused, the record leaves again: checked)
+      const changes = snap.docChanges().map(c => ({ type: c.type, id: c.doc.id, pending: c.doc.metadata.hasPendingWrites, doc: c.type === 'removed' ? null : { ...c.doc.data(), id: c.doc.id } }));
       if (reads && server) {
         const n = changes.filter(c => c.type !== 'removed').length;
         count(coll, 'served', n);

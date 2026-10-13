@@ -13,7 +13,7 @@
 import { S, h, toast, fill, hooks, writes, cloud, transients, settings, patchLogbook, resetters, todayISO, modal, emptyState, download } from './ui-core.js';
 import { uid, fmtDate, caseParts } from './engine.js';
 import { barTabs, arrangeTabs, display, setTabOnBar } from './ui-settings.js';
-import { MAX_NOTES, INDEX_CAP, LIMITS, sortNotes, filterNotes, noteTitle, noteIndex, cleanNoteIndex, sameIndex, parseNote, toggleCheck, plainLines, noteFiles } from './notepad.js';
+import { MAX_NOTES, INDEX_CAP, LIMITS, indexCapped, sortNotes, filterNotes, noteTitle, noteIndex, cleanNoteIndex, sameIndex, parseNote, toggleCheck, plainLines, noteFiles } from './notepad.js';
 
 const SAVE_MS = 3000;
 const PAGE = 100;   // notes listed before "Show more"
@@ -81,16 +81,27 @@ function syncIndex() {
 // the index doc's cap); before that the index doc, and until it has arrived, an older settings.noteIndex.
 const withSets = i => ({ ...i, daySet: new Set(i.days), caseSet: new Set(i.cases) });
 let fromNotes = { list: null, index: null };
+// A full index doc (the cap) can't say about older days and cases: the notes load then (this device's copy, so it is
+// cheap), and the Logbook repaints with the marks from them.
+let capLoad = null;
 export function notesIndex() {
   if (Array.isArray(S.notes)) {
     if (fromNotes.list !== S.notes) fromNotes = { list: S.notes, index: withSets(noteIndex(S.notes)) };
     return fromNotes.index;
   }
   watchIndex();
-  return withSets(cleanNoteIndex(S.noteIndex || settings().noteIndex));
+  const idx = cleanNoteIndex(S.noteIndex || settings().noteIndex);
+  if (indexCapped(idx) && capLoad !== mine()) {
+    capLoad = mine();
+    ensureNotes().then(() => { if (S.tab === 'logbook') hooks.render(); }, () => {});
+  }
+  return withSets(idx);
 }
+resetters.push(() => { capLoad = null; });
 export const dayHasNotes = date => !!date && notesIndex().daySet.has(date);
 export const caseHasNotes = id => !!id && notesIndex().caseSet.has(id);
+// true when the day may have notes the index can't show (load them to be sure)
+export const dayMayHaveNotes = date => !!date && (dayHasNotes(date) || (!Array.isArray(S.notes) && indexCapped(cleanNoteIndex(S.noteIndex || settings().noteIndex))));
 
 // open Notes on a day's notes, or a case's (from the Logbook); create: start a new note there (linked to the case)
 export function openNotes({ day = '', caseId = '', create = false } = {}) {
@@ -164,7 +175,11 @@ export function renderNotes() {
       : !list.length ? emptyState('notes', 'No notes yet', 'Writing about a case for your portfolio? Use Reflect instead.')
       : !rows.length ? emptyState('search', 'No notes match')
       : [h('ul', { class: 'notes-rows' }, rows.slice(0, shown).map(noteRow)),
-        more > 0 ? h('p', { class: 'notes-more' }, h('button', { class: 'small', onclick: () => { shown += PAGE; paintList(); } }, `Show ${Math.min(more, PAGE)} more (${more} not shown)`)) : null]);
+        more > 0 ? h('p', { class: 'notes-more' }, h('button', { class: 'small', onclick: () => {
+          // focus moves to the first row just shown (the button is replaced, which would drop focus to the page)
+          const from = shown; shown += PAGE; paintList();
+          listEl.querySelectorAll('.notes-rows > li')[from]?.focus();
+        } }, `Show ${Math.min(more, PAGE)} more (${more} not shown)`)) : null]);
   };
   const narrowed = nv.day || nv.caseId;
   // Notes lives in More until it's put on the tab bar: offer it here (a full bar asks which tab it replaces)

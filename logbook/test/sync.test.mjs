@@ -3,7 +3,7 @@
 // memory in node). The same engine runs on Firestore in the app and on the demo backend in the browser tests; the
 // emulator test (test/e2e/reads.emulator.mjs) counts real Firestore reads.
 import assert from 'node:assert/strict';
-import { plan, applyChanges, replaceAll, applyTombs, pruneGone, binTombs, createCollectionSync, createSyncHub, SKEW, FULL_EVERY, GONE_KEEP } from '../js/sync.js';
+import { plan, applyChanges, replaceAll, applyTombs, pruneGone, binTombs, eachSettled, createCollectionSync, createSyncHub, SKEW, FULL_EVERY, GONE_KEEP } from '../js/sync.js';
 import { openStore, wipeStores, storeName } from '../js/store.js';
 
 const settle = () => new Promise(r => setTimeout(r, 5));
@@ -30,6 +30,8 @@ const DAY = 864e5, T0 = Date.parse('2026-10-13T08:00:00Z');
   assert.equal(docs.get('a').updatedAt, 5); assert.ok(!docs.has('d'));
   const r2 = applyChanges(docs, [{ type: 'removed', id: 'c' }, { type: 'added', id: 'd', doc: { id: 'd', updatedAt: 9 } }], { c: 2, d: 4 });
   assert.deepEqual(r2.del, ['c']); assert.deepEqual(r2.put.map(d => d.id), ['d'], 'restored after the deletion');
+  const r3 = applyChanges(new Map([['p', { id: 'p' }], ['q', { id: 'q' }]]), [{ type: 'removed', id: 'p' }, { type: 'removed', id: 'q' }], {}, id => id === 'p');
+  assert.deepEqual([r3.del, r3.verify], [['p'], ['q']], 'a removal the server confirmed goes at once; others are checked');
 
   const m = new Map([['a', { id: 'a', v: 1 }], ['b', { id: 'b', v: 1 }]]);
   const rr = replaceAll(m, [{ id: 'a', v: 1 }, { id: 'c', v: 1 }]);
@@ -42,6 +44,19 @@ const DAY = 864e5, T0 = Date.parse('2026-10-13T08:00:00Z');
   assert.deepEqual(pruneGone({ old: T0 - GONE_KEEP - 1, new: T0 - 1 }, T0), { new: T0 - 1 });
   assert.deepEqual(binTombs([{ kind: 'case', data: { id: 'c1' }, deletedAt: 7 }, { kind: 'note', data: { id: 'n1' }, deletedAt: 8 }, { kind: 'summary', data: { id: 's' } }, { kind: 'reflection', data: {} }]),
     { cases: [{ id: 'c1', deletedAt: 7 }], notes: [{ id: 'n1', deletedAt: 8 }] });
+  // the binned version's updatedAt (never after deletedAt) decides, not when it was binned
+  assert.deepEqual(binTombs([{ kind: 'case', data: { id: 'v', updatedAt: 3 }, deletedAt: 9 }, { kind: 'case', data: { id: 'w', updatedAt: 12 }, deletedAt: 9 }]).cases,
+    [{ id: 'v', deletedAt: 3 }, { id: 'w', deletedAt: 9 }]);
+  // binned on a phone with an old copy (version 3), but the delete was refused: the record changed elsewhere at 5
+  const refused = new Map([['x', { id: 'x', updatedAt: 5 }]]), g2 = {};
+  assert.deepEqual(applyTombs(refused, g2, binTombs([{ kind: 'case', data: { id: 'x', updatedAt: 3 }, deletedAt: 9 }]).cases), []);
+  assert.ok(refused.has('x'), 'a bin entry whose delete was refused removes nothing');
+  assert.equal(applyChanges(refused, [{ type: 'modified', id: 'x', doc: { id: 'x', updatedAt: 6 } }], g2).put.length, 1, 'later edits still arrive');
+
+  // stamping again one at a time: a deleted record doesn't stop the others
+  const tried = [];
+  const ok = await eachSettled(['a', 'b', 'gone', 'c'], async id => { tried.push(id); if (id === 'gone') throw new Error('NOT_FOUND'); }, 2);
+  assert.deepEqual([tried, ok], [['a', 'b', 'gone', 'c'], ['a', 'b', 'c']]);
 }
 
 // ---- a fake server: collections of docs, live queries, and a count of documents sent ----
@@ -108,13 +123,13 @@ const E = 'fake@example.com';
   assert.equal(last.length, 52); assert.equal(last.find(c => c.id === 'c7').details, 'Fake case 7 edited');
   last[0].details = 'mutated';   // callers get copies
 
-  // live while open: a change, a deletion seen in view (checked with one read), a deletion via the bin
+  // live while open: a change, a deletion the server confirms in view (no extra read), a deletion via the bin
   srv.reads = 0;
   srv.set('cases', { id: 'c1', details: 'Fake case 1 edited', updatedAt: now });
-  srv.del('cases', 'new');        // in view (changed recently): removed, then checked
+  srv.del('cases', 'new');        // in view (changed recently): the server's removal, applied at once
   await settle();
   assert.ok(!last.some(c => c.id === 'new')); assert.equal(last.find(c => c.id === 'c1').details, 'Fake case 1 edited');
-  assert.equal(srv.fetches, 1); assert.equal(srv.reads, 2);
+  assert.equal(srv.fetches, 0); assert.equal(srv.reads, 1);
   await s.tombs([{ id: 'c2', deletedAt: now }, { id: 'c1', deletedAt: now - 1 }]);
   assert.ok(!last.some(c => c.id === 'c2')); assert.ok(last.some(c => c.id === 'c1'), 'c1 changed after it was binned: kept');
   // deleted here for good: gone at once, and a stale copy from the server (still pending there) is ignored
@@ -144,7 +159,9 @@ const E = 'fake@example.com';
   const store = await openStore(E);
   const offline = () => { throw new Error('offline'); };
   let last = null;
-  const s = createCollectionSync({ email: E, coll: 'notes', store, listen: srv.listen, fetchOne: offline, now: () => T0 });
+  // the removal arrives from the cache only (as after this device's own write), so it is checked: offline, it can't be
+  const fromCache = (email, coll, opts, onSnap) => srv.listen(email, coll, opts, x => onSnap(x.full ? x : { ...x, fromCache: true }));
+  const s = createCollectionSync({ email: E, coll: 'notes', store, listen: fromCache, fetchOne: offline, now: () => T0 });
   s.subscribe(l => { last = l; });
   await settle();
   srv.del('notes', 'n1');
@@ -153,6 +170,66 @@ const E = 'fake@example.com';
   await s.stop();
   assert.equal((await store.load('notes')).meta.fullAt, 0, 'next start reads everything');
   await wipeStores();
+}
+
+// ---- a removal after this device's own pending write (a refused write) is checked with one read ----
+{
+  let snap = null, fetched = 0;
+  const store = await openStore(E);
+  const listen = (email, coll, opts, onSnap) => { snap = onSnap; onSnap({ full: true, docs: [{ id: 'p1', updatedAt: T0 }], changes: [], fromCache: false }); return () => {}; };
+  const fetchOne = (email, coll, id) => { fetched++; return id === 'p2' ? null : { id, updatedAt: T0 }; };
+  let last = null;
+  const s = createCollectionSync({ email: E, coll: 'cases', store, listen, fetchOne, now: () => T0 });
+  s.subscribe(l => { last = l; });
+  await settle();
+  snap({ changes: [{ type: 'added', id: 'p2', pending: true, doc: { id: 'p2', updatedAt: T0 + 1 } }], fromCache: false, hasPendingWrites: true });
+  snap({ changes: [{ type: 'removed', id: 'p2' }, { type: 'removed', id: 'p1' }], fromCache: false, hasPendingWrites: false });
+  await settle();
+  assert.equal(fetched, 1, 'only the record with a pending write is checked');
+  assert.deepEqual(last, []);
+  snap({ changes: [{ type: 'added', id: 'p3', doc: { id: 'p3', updatedAt: T0 } }], fromCache: false });
+  snap({ changes: [{ type: 'removed', id: 'p3' }], fromCache: true });
+  await settle();
+  assert.equal(fetched, 2, 'a removal seen only in the cache is checked');
+  assert.deepEqual(last.map(d => d.id), ['p3'], 'it still exists');
+  await s.stop(); await wipeStores();
+}
+
+// ---- the store deleted under a running engine (another tab): the next start reads everything ----
+{
+  const srv = fakeServer();
+  for (let i = 0; i < 50; i++) srv.set('cases', { id: 'w' + i, updatedAt: T0 - DAY });
+  let now = T0;
+  const hub = createSyncHub({ openStore, listen: srv.listen, fetchOne: srv.fetchOne, now: () => now, grace: 0 });
+  let last = null;
+  const off = hub.watch(E, 'cases', l => { last = l; }); await settle(); await hub.flush();
+  await wipeStores();               // as another tab would
+  now += 60e3;
+  srv.set('cases', { id: 'w50', updatedAt: now });
+  await settle(); await hub.flush(); await settle(); await hub.flush();
+  assert.equal(last.length, 51);
+  const stored = await (await openStore(E)).load('cases');
+  assert.equal(stored.docs.length, 51, 'the whole list written back');
+  assert.equal(stored.meta.fullAt, 0, 'and a full read next time');
+  off(); await hub.stopAll();
+  now += 3600e3; srv.reads = 0;
+  const hub2 = createSyncHub({ openStore, listen: srv.listen, fetchOne: srv.fetchOne, now: () => now, grace: 0 });
+  const got = [];
+  const off2 = hub2.watch(E, 'cases', (l, m) => got.push([l.length, m.fromCache])); await settle();
+  assert.deepEqual(got.at(-1), [51, false]);
+  assert.ok(srv.reads >= 51, 'a full read');
+  off2(); await hub2.stopAll(); await wipeStores();
+}
+
+// ---- a wipe can keep the account signed in now (an account switch; another tab may be using it) ----
+{
+  const a = await openStore('fake-a@example.com'), b = await openStore('fake-b@example.com');
+  await a.write('cases', { put: [{ id: 'a1' }] }); await b.write('cases', { put: [{ id: 'b1' }] });
+  await wipeStores(['FAKE-B@example.com']);
+  assert.equal(a.closed, true); assert.equal(b.closed, false);
+  assert.deepEqual((await b.load('cases')).docs, [{ id: 'b1' }]);
+  await wipeStores();
+  assert.equal(b.closed, true);
 }
 
 // ---- the hub: shared engines, the bin feed, drops for collections not running ----

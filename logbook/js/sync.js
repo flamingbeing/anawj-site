@@ -6,7 +6,9 @@
 // and merges what arrives. The first time on a device, and once a week after that, it reads the whole collection
 // instead (current behaviour), which also picks up documents without updatedAt and heals anything the deltas missed.
 // Deletions: the recycle bin's entries (deletedAt) arrive the same way and remove the binned record here, unless the
-// record was changed after it was binned (restored). A record removed while it was in view is checked once.
+// record was changed after the version that was binned (restored, or the delete was refused as a conflict). A record
+// the server removes while it is in view goes at once; one removed while this device's own write was pending (a
+// refused write) is checked with one read.
 //
 // lastSync is this device's clock when the server last confirmed the list; SKEW covers writers whose clocks are a
 // little behind. Writes that reach the server late (offline) are re-stamped by cloud.js (restampIfLate), so they still
@@ -39,14 +41,14 @@ export function plan(meta, now) {
 }
 
 // Apply a snapshot's changes to docs (a Map, changed in place). A copy older than a known deletion is stale and
-// skipped; a removal of an id not known to be deleted is returned in verify (it may be a deletion elsewhere, or a
-// rejected write leaving the query), to be checked with one read.
-export function applyChanges(docs, changes, gone = {}) {
+// skipped. A removal goes at once when the deletion is known or sure(id) says the server confirmed it; otherwise it
+// is returned in verify (e.g. this device's refused write leaving the query), to be checked with one read.
+export function applyChanges(docs, changes, gone = {}, sure = () => false) {
   const put = [], del = [], verify = [];
   for (const c of changes || []) {
     if (c.type === 'removed') {
       if (!docs.has(c.id)) continue;
-      if (gone[c.id] != null) { docs.delete(c.id); del.push(c.id); } else verify.push(c.id);
+      if (gone[c.id] != null || sure(c.id)) { docs.delete(c.id); del.push(c.id); } else verify.push(c.id);
       continue;
     }
     if (!c.doc || (gone[c.id] != null && stamp(c.doc) <= gone[c.id])) continue;
@@ -65,7 +67,8 @@ export function replaceAll(docs, list) {
   return { put, del };
 }
 
-// Tombstones [{ id, deletedAt }]: remove each record unless it changed after it was deleted; remember the ids.
+// Tombstones [{ id, deletedAt }]: remove each record unless it changed after that time; remember the ids. (From the
+// bin, the time is the binned version's updatedAt: binTombs.)
 export function applyTombs(docs, gone, tombs) {
   const del = [];
   for (const t of tombs || []) {
@@ -79,21 +82,37 @@ export function applyTombs(docs, gone, tombs) {
 
 export const pruneGone = (gone, now) => Object.fromEntries(Object.entries(gone || {}).filter(([, t]) => t > now - GONE_KEEP));
 
-// recycle bin entries -> tombstones per collection: { cases: [{ id, deletedAt }], ... }
+// recycle bin entries -> tombstones per collection: { cases: [{ id, deletedAt }], ... }. The time is the binned
+// version's updatedAt (never after deletedAt): a copy changed since then survives, so a bin entry whose delete was
+// refused (the record changed elsewhere) removes nothing. Older entries without one use deletedAt.
 export function binTombs(entries) {
   const out = {};
   for (const e of entries || []) {
     const coll = BIN_KIND[e && e.kind], id = e && e.data && e.data.id;
-    if (coll && id) (out[coll] ||= []).push({ id: String(id), deletedAt: Number(e.deletedAt) || 0 });
+    if (!coll || !id) continue;
+    const at = Number(e.deletedAt) || 0, version = Number(e.data.updatedAt) || 0;
+    (out[coll] ||= []).push({ id: String(id), deletedAt: version > 0 && (!at || version <= at) ? version : at });
   }
   return out;
+}
+
+// Stamp ids again one small write at a time (a batch fails whole when one of them was deleted since); a failed one
+// is skipped. write(id) -> Promise. Resolves to the ids stamped.
+export async function eachSettled(ids, write, size = 20) {
+  const done = [];
+  for (let i = 0; i < ids.length; i += size) {
+    const part = ids.slice(i, i + size);
+    const r = await Promise.allSettled(part.map(id => write(id)));
+    r.forEach((x, j) => { if (x.status === 'fulfilled') done.push(part[j]); });
+  }
+  return done;
 }
 
 // ---- one collection ----
 
 // subscribe(cb) -> unsubscribe; cb(list, { fromCache, hasPendingWrites }) with the whole merged list (a copy each time).
 export function createCollectionSync({ email, coll, store, listen, fetchOne = null, now = Date.now, onError = () => {} }) {
-  const subs = new Set();
+  const subs = new Set(), local = new Set();   // local: ids last seen with this device's write pending
   let docs = new Map(), meta = {}, flags = null, stopped = false, unlisten = null, chain = Promise.resolve();
   const persist = op => (chain = chain.then(() => store.write(coll, op)).catch(e => console.warn('Local store not saved', e)));
   const send = cb => { if (flags && subs.has(cb)) cb(copy([...docs.values()]), { ...flags }); };
@@ -121,7 +140,12 @@ export function createCollectionSync({ email, coll, store, listen, fetchOne = nu
       meta = { ...meta, syncAt: t, fullAt: t, gone: pruneGone(meta.gone, t), ...(s.epoch !== undefined ? { epoch: s.epoch } : {}) };
       persist({ ...r, meta });
     } else {
-      const r = applyChanges(docs, s.changes, meta.gone || {});
+      const unsure = new Set();
+      for (const c of s.changes || []) {
+        if (c.type === 'removed') { if (s.fromCache || local.has(c.id)) unsure.add(c.id); local.delete(c.id); }
+        else if (c.pending) local.add(c.id); else local.delete(c.id);
+      }
+      const r = applyChanges(docs, s.changes, meta.gone || {}, id => !unsure.has(id));
       changed = !!(r.put.length || r.del.length);
       if (!s.fromCache) meta = { ...meta, syncAt: t };
       if (changed || !s.fromCache) persist({ put: r.put, del: r.del, meta });
@@ -165,6 +189,13 @@ export function createCollectionSync({ email, coll, store, listen, fetchOne = nu
       await persist({ del, meta });
       if (del.length) emit();
     },
+    // the device's store was deleted under this engine (another tab signed out or switched account) and opened
+    // again empty: write the whole list back, and read everything at the next start, since the list may be partial
+    wiped() {
+      if (stopped) return chain;
+      meta = { ...meta, fullAt: 0 };
+      return persist({ replace: true, put: [...docs.values()], meta });
+    },
     stop() { stopped = true; subs.clear(); if (unlisten) unlisten(); return chain; },
     flush: () => chain,
   };
@@ -192,7 +223,13 @@ export function createTombFeed({ email, store, listen, apply, now = Date.now, on
     }, onError);
     if (stopped) unlisten();
   })().catch(onError);
-  return { ready, stop() { stopped = true; if (unlisten) unlisten(); return chain; }, flush: () => chain };
+  return {
+    ready,
+    // its store was deleted and opened again: tombstones may have been missed, so read the whole bin next time
+    wiped() { if (stopped) return chain; meta = { ...meta, fullAt: 0 }; return (chain = chain.then(() => store.write('bin', { meta })).catch(e => console.warn('Recycle bin sync failed', e))); },
+    stop() { stopped = true; if (unlisten) unlisten(); return chain; },
+    flush: () => chain,
+  };
 }
 
 // ---- all collections of the signed-in account(s) ----
@@ -206,8 +243,16 @@ export function createSyncHub({ openStore, listen, fetchOne = null, now = Date.n
   async function storeFor(email) {
     let s = stores.get(email);
     if (s) { const got = await s; if (!got.closed) return got; }
+    const p = stores.get(email);
+    if (p && p !== s) return storeFor(email);   // another caller is opening it again already
     s = openStore(email);
     stores.set(email, s);
+    // deleted under running engines (another tab): they write their whole lists back and read in full next time
+    if (p) s.then(() => {
+      if (stores.get(email) !== s) return;
+      for (const [k, e] of engines) if (k.startsWith(email + '\n')) e.wiped();
+      const f = feeds.get(email); if (f) f.wiped();
+    });
     return s;
   }
   // a store opened lazily behind the same interface, so callers needn't wait for it; a load waits for the local writes

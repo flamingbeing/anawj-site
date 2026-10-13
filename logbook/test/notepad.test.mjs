@@ -1,7 +1,7 @@
 // Notes (notepad.js): the stored shape, order, search, the day/case index, the light Markdown and the export.
 // Fake notes only.
 import assert from 'node:assert/strict';
-import { cleanNote, sortNotes, filterNotes, notesOn, noteTitle, plainLines, noteIndex, cleanNoteIndex, sameIndex, parseNote, inline, safeHref, toggleCheck, noteMd, notesMd, noteFiles, MAX_NOTES, INDEX_CAP, LIMITS } from '../js/notepad.js';
+import { cleanNote, sortNotes, filterNotes, notesOn, noteTitle, plainLines, noteIndex, cleanNoteIndex, sameIndex, indexCapped, parseNote, inline, safeHref, toggleCheck, noteMd, notesMd, noteFiles, MAX_NOTES, INDEX_CAP, LIMITS } from '../js/notepad.js';
 import { mdDay, exportNotes } from '../js/markdown.js';
 
 assert.equal(MAX_NOTES, 2000);
@@ -89,6 +89,14 @@ assert.match(byPath['Cases/2026-10/2026-10-10.md'], /### Older day/);
 assert.match(byPath['Notes.md'], /^---\nnotes: "2"[\s\S]*# Notes\n\n### Undated new\n\n### Undated old\npump settings\n$/);
 assert.equal(exportNotes({ cases, notes, opts: { notes: false, progress: false } }).some(f => /Notes/.test(f.text) || f.path === 'Notes.md'), false);
 
+// a full index doc can't say about older days: the app loads the notes then (ui-notepad.js dayMayHaveNotes)
+{
+  const days = Array.from({ length: INDEX_CAP }, (_, i) => `2025-${String(1 + Math.floor(i / 28)).padStart(2, '0')}-${String(1 + i % 28).padStart(2, '0')}`);
+  assert.equal(indexCapped({ days, cases: [] }), true);
+  assert.equal(indexCapped({ days: days.slice(1), cases: [] }), false);
+  assert.equal(indexCapped({ days: [], cases: Array.from({ length: INDEX_CAP }, (_, i) => 'c' + i) }), true);
+  assert.equal(indexCapped(null), false);
+}
 console.log('notepad tests passed');
 
 // one file per note: names, no clashes, .md or .txt

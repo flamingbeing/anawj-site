@@ -61,6 +61,8 @@ export function cleanNoteIndex(v) {
   const list = (x, ok) => (Array.isArray(x) ? x.filter(ok).slice(-INDEX_CAP) : []);
   return { days: list(o.days, d => ISO.test(d)), cases: list(o.cases, c => typeof c === 'string' && c.length <= 200), n: Number.isInteger(o.n) && o.n >= 0 ? o.n : 0 };
 }
+// a full index doc may leave out older days and cases: "not listed" then means "not known" (load the notes to tell)
+export const indexCapped = i => !!i && ((i.days || []).length >= INDEX_CAP || (i.cases || []).length >= INDEX_CAP);
 export const sameIndex = (a, b) => JSON.stringify(cleanNoteIndex(a)) === JSON.stringify(cleanNoteIndex(b));
 
 // ---- light Markdown: headings, **bold**, bullet / numbered lists, [ ] checkboxes, links ----

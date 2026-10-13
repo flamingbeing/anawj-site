@@ -808,7 +808,8 @@ async function onUser(user) {
   const previousUser = S.user;
   S.user = user;
   if (previousUser && user && previousUser.email !== user.email) {
-    const cleanup = Promise.all([writes.forget(), cloud.forgetLocal()]);
+    // the new account's own store stays (another tab may already be using it)
+    const cleanup = Promise.all([writes.forget(), cloud.forgetLocal(() => true, user.email)]);
     Object.assign(S, { cases: [], reflections: [], counts: {}, casesLoaded: false, casesSynced: false, logbook: null });
     clearDrafts(); resetCaches(); forgetWho(); clearToast(); transients.reset();
     document.querySelectorAll('dialog[open]').forEach(el => el.close());
