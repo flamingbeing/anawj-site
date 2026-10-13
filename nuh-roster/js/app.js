@@ -4100,7 +4100,7 @@ openOnTheRightDay();
 if (DEMO) { try { if (!localStorage.getItem(TOUR_KEY)) setTimeout(startTour, 700); } catch { /* no storage */ } }
 document.getElementById('tourBtn')?.addEventListener('click', () => startTour());
 document.getElementById('allBtn')?.addEventListener('click', downloadEverything);
-addEventListener('hashchange', () => { if (location.hash === '#myday' && state.tab !== 'myday') { state.tab = 'myday'; window.scrollTo(0, 0); render(); } });
+addEventListener('hashchange', () => { if (location.hash === '#myday' && state.tab !== 'myday') { closeTagEditor(); state.tab = 'myday'; window.scrollTo(0, 0); render(); } });
 document.getElementById('keysBtn')?.addEventListener('click', showShortcuts);
 // Phones: keep the bottom-sheet person box above the on-screen keyboard, and the field being typed in visible.
 if (window.visualViewport) {

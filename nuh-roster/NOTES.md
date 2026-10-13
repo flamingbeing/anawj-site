@@ -254,8 +254,11 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
 ## Testing
 
 - `node nuh-roster/test/engine.test.mjs`: engine, monthly, duplicates, import planning. Fake names only.
-- The UI is checked with Playwright scripts kept outside the repo. Chromium is at `/opt/pw-browsers`.
-  - Serve the repo with `python3 -m http.server`.
-  - Block `www.gstatic.com` so Firebase stays off, or use `?demo`.
-  - Exercise the flow and watch for page errors.
+- `node nuh-roster/test/e2e.mjs` (serve the repo on port 8080 first, `python3 -m http.server 8080`; `PORT=` to change,
+  `SHOTS=<dir>` for screenshots): Practice with Firebase blocked, desktop and phone. 41 checks: every tour target exists,
+  the live double-cover check and its fix, changes since sent and the "Updated" stamp, keyboard focus in the person
+  box, the Fix 3 problems exercise, the practice draft through Do it all, monthly clashes and Undo, axe on every tab,
+  phone sizes (16px fields, 30px targets, no sideways scroll), My day (copy for logbook, My week), the welcome card.
+  Runs in the Checks workflow. A signed-in flow can be tried by routing `js/cloud.js` to a fake module (see how the
+  13 Oct session tested viewers and team saves).
 - Real sample files (rosters, the contact list, HMS PDFs) must stay out of the repo.
