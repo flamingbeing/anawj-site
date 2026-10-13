@@ -104,6 +104,8 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   Edge blocks each start from a fresh browser context and run four at a time (`JOBS=1` for one at a time); the full
   case's three groups run side by side. A failing `assert` on a Playwright handle can hang Node building its diff
   (memory climbs to gigabytes): if a test run is killed, look for a failed assertion comparing an element handle.
+- **No BP, HR, BIS alarm** (owner, 13 Oct 2026): only temperatures and Prewarm off beep, buzz and show the banner.
+  BP, HR, BIS due times still show in the top bar countdown and on the tab.
 - **Never send an empty `f`** (lesson, 12 Oct 2026): `setDoc(…, { f: {} }, { merge: true })` replaces the server's
   `f` with an empty map (an empty map is a leaf in the merge). Lock / unlock / delete sent one and wiped the server
   copy's readings; push now omits an empty `f`, lock sends the full record, and each phone resends all its patients

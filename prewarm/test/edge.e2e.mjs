@@ -247,7 +247,7 @@ jobs.push(() => tryit(async () => {
   log(await pg.inputValue('#f-pacu_temp') === '36.6', 'PACU temp 366 read as 36.6');
   await ctx.close();
 }));
-// N. alerts fire on every patient screen for every series: a BP reading falling due while on Intra-op details
+// N. temperature alerts fire on every patient screen (here Intra-op details); BP, HR, BIS never alarm (owner, 13 Oct)
 jobs.push(() => tryit(async () => {
   const { ctx, pg } = await fresh('2026-10-13T10:00:00');
   await open(pg, 1);
@@ -258,7 +258,7 @@ jobs.push(() => tryit(async () => {
     const t = await pg.evaluate(() => { const b = document.querySelector('#banner'); return b && !b.hidden ? b.textContent : ''; });
     if (t && !seen.includes(t)) seen.push(t);
   }
-  log(seen.some(t => /BP, HR, BIS .* reading due now/.test(t)), 'BP due alert on the Intra-op details screen: ' + JSON.stringify(seen));
+  log(!seen.some(t => /BP, HR, BIS/.test(t)), 'no BP, HR, BIS alarm: ' + JSON.stringify(seen));
   log(seen.some(t => /Temperature .* reading due now/.test(t)), 'temperature due alert there too');
   await ctx.close();
 }));
