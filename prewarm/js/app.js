@@ -490,7 +490,7 @@ function askLeave(g, proceed) {
   d.querySelector('[data-a="save"]').focus();
 }
 $('#fresh').onclick = () => render();
-$('#banner').onclick = () => { $('#banner').hidden = true; const t = bannerTarget; bannerTarget = null; if (t) openTarget(t); };
+$('#banner').onclick = () => { $('#banner').hidden = true; const t = bannerTarget; bannerTarget = null; if (t) openTarget(t, false); };
 // the due banner floats over the top of the page, just under the bar: nothing moves under a finger as it appears
 // (it used to push the page down, so a tap meant for Save landed on another box); a tap on it only hides it
 let bannerTimer, bannerTarget = null;
@@ -707,8 +707,10 @@ function topBar(p, s, onLog) {
 }
 let pendingOpen = null, openHere = null;
 // go to a reading (or a key time) and open its pad: the screen is reached first, then the pad opens on it
-function openTarget(t) {
+// an alarm banner only goes to the screen (pad = false); the top-bar countdown also opens the pad
+function openTarget(t, pad = true) {
   const hash = t.ev || !t.s ? `#/p/${t.pid}` : `#/p/${t.pid}/${t.s}/${t.key}`;
+  if (!pad) { if (location.hash !== hash && !openHere?.(t, true)) go(hash); return; }
   if (openHere?.(t) === true) return;
   pendingOpen = { ...t, at: Date.now() };
   if (location.hash === hash) render(); else go(hash);
@@ -997,8 +999,9 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
   }
   // an alarm or the top-bar countdown opens its reading's first box straight away (owner, 13 Oct 2026)
   // returns true when the target is on this screen (so no navigation, which would ask about an unsaved reading)
-  openHere = t => {
+  openHere = (t, stay) => {
     if (t.pid !== id) return false;
+    if (stay) return t.ev || (t.s === s && t.key === pt.key);
     if (t.ev) { editTime(t.ev); return true; }
     if (t.s === s && t.key === pt.key) { if (cols[0]) openCell(cols[0].key); return true; }
     return false;
