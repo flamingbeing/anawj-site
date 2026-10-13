@@ -225,7 +225,8 @@ jobs.push(() => tryit(async () => {
   log(/removed/.test(await pg.textContent('#toast')) && !await pg.$('.strip a.done:has-text("60")'), 'Save with nothing entered removes the reading (nothing saved)');
   await pg.click('.strip a:has-text("60")'); await pg.waitForSelector('input[data-in="sbp"]');
   await pg.fill('input[data-in="sbp"]', '118');
-  pg.once('dialog', d => d.accept()); await pg.click('#save'); await pg.waitForTimeout(400);
+  const accept = d => d.accept(d.type() === 'prompt' ? d.defaultValue() : undefined); // also the "what time was it taken?" question, when the demo clock is late
+  pg.on('dialog', accept); await pg.click('#save'); await pg.waitForTimeout(400); pg.off('dialog', accept);
   await pg.waitForFunction(() => !!document.querySelector('#gaps'), null, { timeout: 4000 });
   log(/BP, HR, BIS saved with blanks: .*60 min \(Diastolic BP, Mean BP, Heart rate, BIS\)/.test(await pg.textContent('#gaps')), 'part-blank reading listed: ' + (await pg.textContent('#gaps')).replace(/\s+/g, ' ').slice(0, 300));
   await pg.evaluate(() => { const k = 'prewarm-demo:settings'; const s = JSON.parse(localStorage.getItem(k) || '{}'); s.hide = { ...(s.hide || {}), ts: true }; localStorage.setItem(k, JSON.stringify(s)); });
@@ -641,7 +642,25 @@ jobs.push(() => tryit(async () => {
   log(!await pg.$eval('#f-enrol_id', i => i.disabled), 'data collection complete leaves Perioperative data open');
   await ctx.close();
 }));
+// AE. the last warming reading (10 min for arm 2, 30 min for arm 1) marks pre-warming complete and goes to the intra-op temps
+jobs.push(() => tryit(async () => {
+  const { ctx, pg } = await fresh();
+  await pg.evaluate(() => localStorage.setItem('prewarm-demo:settings', JSON.stringify({ me: 'ZZ' })));
+  await pg.reload(); await pg.waitForTimeout(600);
+  await open(pg, 1); // DEMO-02: 10 min of warming
+  const id = (await pg.evaluate(() => location.hash)).split('/')[2];
+  const sealed = () => pg.evaluate(i => { const a = JSON.parse(localStorage.getItem('prewarm-demo:patients')); return !!a[i].f.sign_prewarm; }, id);
+  await pg.evaluate(h => { location.hash = h; }, `#/p/${id}/prewarm/5`); await pg.waitForSelector('.num[data-type="core"]');
+  await pg.click('.num[data-type="core"]'); await pg.waitForSelector('dialog.kp[open]'); await pg.click('.kp [data-k="3"]'); await pg.click('.kp [data-k="6"]'); await pg.click('.kp [data-k="5"]'); await pg.waitForTimeout(300);
+  const seenD = []; pg.on('dialog', d => { seenD.push(d.message().slice(0, 60)); d.accept(d.type() === 'prompt' ? d.defaultValue() : undefined); });
+  await pg.waitForTimeout(900); await pg.click('#save'); await pg.waitForTimeout(500);
+  log(/prewarm\/10$/.test(await pg.evaluate(() => location.hash)) && !await sealed(), 'the 5 min save moves to 10 min and does not complete pre-warming: ' + JSON.stringify(seenD) + await pg.textContent('#toast').catch(() => '') + await pg.evaluate(() => location.hash));
+  await pg.click('.num[data-type="core"]'); await pg.waitForSelector('dialog.kp[open]'); await pg.click('.kp [data-k="3"]'); await pg.click('.kp [data-k="6"]'); await pg.click('.kp [data-k="6"]'); await pg.waitForTimeout(300);
+  await pg.waitForTimeout(900); await pg.click('#save'); await pg.waitForTimeout(600);
+  log(/\/iotemp/.test(await pg.evaluate(() => location.hash)) && await sealed(), 'the 10 min save marks pre-warming complete and opens the intra-op temps: ' + await pg.evaluate(() => location.hash));
+  await ctx.close();
+}));
 await runJobs();
 await b.close();
 if (fails.length) { console.error('prewarm edge: FAIL\n- ' + fails.join('\n- ')); process.exit(1); }
-console.log('prewarm edge: ok (midnight, surgery end, double-tap Save, BP checks, back button, Log, Enter, still to fill, swipe, stray taps, time order, corrections, BMI, follow-ups, blanks, typed answers, alerts everywhere, duplicates, storage full, lock warning, late readings, delete and restore, prewarm off alert, warming yes / no, touch double taps, typing then leaving, other tab due, two patients, app closed mid-reading, layout, reset, PACU view, sections closed once complete, layout and carry-over, haemo alarm toggle, keypad popups, progress ticks on the list and perioperative tick)');
+console.log('prewarm edge: ok (midnight, surgery end, double-tap Save, BP checks, back button, Log, Enter, still to fill, swipe, stray taps, time order, corrections, BMI, follow-ups, blanks, typed answers, alerts everywhere, duplicates, storage full, lock warning, late readings, delete and restore, prewarm off alert, warming yes / no, touch double taps, typing then leaving, other tab due, two patients, app closed mid-reading, layout, reset, PACU view, sections closed once complete, layout and carry-over, haemo alarm toggle, keypad popups, progress ticks on the list and perioperative tick, last warming reading completes pre-warming)');

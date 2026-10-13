@@ -354,6 +354,8 @@ function colsFor(s, pt) {
 function pointsFor(p, s) {
   const pts = SERIES[s].points;
   if (s === 'haemo' && settings.hide.haemo15) return pts.filter(x => x.key === 'base' || p.f['at_haemo_' + x.key]);
+  // once pre-warming is complete, the later 5-min points (past the 10 / 30 min of warming) aren't taken (owner, 13 Oct 2026)
+  if (s === 'prewarm' && val(p, 'sign_prewarm') && WARM_MIN[val(p, 'arm')]) return pts.filter(x => x.min == null || x.min <= WARM_MIN[val(p, 'arm')] || p.f['at_prewarm_' + x.key]);
   return pts;
 }
 // due time (minutes after midnight) of a timepoint, from the reference event
@@ -1082,6 +1084,13 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     if (t.closest('#save')) {
       if (!commit()) return;
       lockTaps(); // a double tap on Save mustn't save the next timepoint too
+      // the last warming reading (10 min or 30 min by arm): pre-warming is complete, on to the intra-op temps (owner, 13 Oct 2026)
+      if (s === 'prewarm' && pt.min != null && pt.min === WARM_MIN[val(p, 'arm')]) {
+        if (settings.me && !val(p, 'sign_prewarm')) set(p, 'sign_prewarm', `${settings.me} ${new Date().toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' })} ${nowHM()}`);
+        toast(settings.me ? 'Pre-warming complete. Now the intra-op temps.' : 'Last pre-warming reading saved. Add your initials in Settings to mark it complete.');
+        go(`#/p/${id}/iotemp`);
+        return;
+      }
       const next = pts.slice(pts.indexOf(pt) + 1).find(x => !savedAt(p, s, x.key));
       go(`#/p/${id}/${s}/` + (next ? next.key : pt.key));
       return;

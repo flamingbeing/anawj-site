@@ -279,3 +279,7 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   look for a new service worker only when the page is opened, and the phones keep the app open for hours. The page now
   calls `reg.update()` when it comes back to the front, when signal returns and every 10 min (not tested in the browser
   suite: the worker isn't registered in demo mode).
+- **Last warming reading** (owner, 13 Oct 2026): Save on the 10 min reading (arm 2) or the 30 min one (arm 1) marks
+  Pre-warming temps complete (`sign_prewarm`, needs initials) and opens the intra-op temps. Undo the tick to edit.
+  Once complete, `pointsFor` drops the later 5-min points (past 10 / 30 min) unless already saved, so they aren't
+  asked for or listed in Still to fill; their export cells stay blank.

@@ -48,8 +48,10 @@ await Promise.all(['1', '2', '3'].map(async ARM => {
   if (ARM === '3') { await adv(44); }
   else {
   await adv(2); steps.push(await log()); // prewarm on 08:00
-  for (let m = 0; m <= 40; m += 5) { if (m) await adv(5); await temps('prewarm', String(m)); if (m === (ARM === '2' ? 10 : 30)) steps.push(await log()); }
-  await adv(2);
+  // the last warming reading (10 or 30 min) completes pre-warming; the later 5-min points aren't taken
+  const lastWarm = ARM === '2' ? 10 : 30;
+  for (let m = 0; m <= lastWarm; m += 5) { if (m) await adv(5); await temps('prewarm', String(m)); if (m === lastWarm) steps.push(await log()); }
+  await adv(42 - lastWarm);
   }
   steps.push(await log()); // In OT 08:42
   await temps('iotemp', 'base'); await bp('base');
@@ -83,7 +85,7 @@ await Promise.all(['1', '2', '3'].map(async ARM => {
   await pg.goto(`${BASE}?demo#/p/${pid}`); await pg.waitForSelector('.times'); await pg.waitForTimeout(1500);
 
   await pg.goto(`${BASE}?demo#/p/${pid}`); await pg.waitForSelector('.times'); await pg.waitForTimeout(1500);
-  assert.equal(await pg.$('#gaps'), null, `group ${ARM}: still to fill is empty: ` + await pg.textContent('#gaps').catch(() => ''));
+  { const g = await pg.$('#gaps'); if (g) throw new Error('still to fill: ' + await pg.textContent('#gaps')); }
   assert.deepEqual(dialogs, [], `group ${ARM}: no prompts on an in-order case`);
   assert.deepEqual(errs, [], `group ${ARM}: no page errors`);
   assert.deepEqual(steps.map(t => t.replace(/^Log\s*/, '').trim()), ARM === '3' ? ['Gown on', 'In OT', 'Induction', 'Surgery end', 'PACU in', 'To ward']
@@ -98,6 +100,7 @@ await Promise.all(['1', '2', '3'].map(async ARM => {
     const m = /^(prewarm|iotemp|haemo)_(\w+?)_/.exec(id);
     if (m && m[1] !== 'prewarm' && +m[2] > 90) return false; // after surgery end (90 min)
     if (m && m[1] === 'prewarm' && ARM === '3') return false;
+    if (m && m[1] === 'prewarm' && +m[2] > (ARM === '2' ? 10 : 30)) return false; // not taken after the last warming reading
     return true;
   });
   assert.deepEqual(wrong, [], `group ${ARM}: op-day cells left blank`);
