@@ -112,7 +112,7 @@ Pickers are full-screen **Recent | All | Write-In** lists, with recents remember
 
 ## 4. How the app is built
 
-- **Stack:** vanilla ES modules, no build step, GitHub Pages (`CNAME` anawj.com). The PWA service worker is `evals/sw.js`; its `VERSION` is stamped at deploy (`tools/stamp-versions.mjs`), no hand bump. Each app deletes only its own cache prefix (`evals-*`, `logbook-*`), because the apps share one origin.
+- **Stack:** vanilla ES modules, no build step, served at `apmes.anawj.com/evals/` by the `anawj-preview` Cloudflare Worker (`SUBDOMAINS.md`); `anawj.com/evals/` (GitHub Pages) forwards there from `index.html`, path, query and `#` kept. The PWA service worker is `evals/sw.js`; its `VERSION` is stamped at deploy (`tools/stamp-versions.mjs`), no hand bump. Each app deletes only its own cache prefix (`evals-*`, `logbook-*`), because the apps share one origin.
 - **Firebase:**
   - Project `apmes-logbook`, **Blaze** (pay-as-you-go) plan, asia-southeast1. Usage is within the free quotas at this scale.
   - **Shared with the logbook.** Evals reuses the logbook's `residents` collection.
@@ -197,12 +197,14 @@ A quick contrast check for both themes is worth running after any colour change:
   - Cloud Functions (automatic reminder emails),
   - scheduled backups.
   - Set a budget alert when upgrading.
-- **Changing the domain** (logbook, roster and evals all live on anawj.com). What to change:
+- **Changing the domain** (evals and the logbook moved to `apmes.anawj.com` in Oct 2026, `SUBDOMAINS.md` step 5; the roster to `nuhroster.anawj.com`). What to change:
   - `CNAME` and DNS.
   - Add the new domain to **Firebase Auth → Authorised domains** in both projects (`apmes-logbook`, `nuh-roster`). Otherwise sign-in fails.
   - Change `authDomain` in `logbook/js/firebase-config.js`, `evals/js/firebase-config.js` and `/__/firebase/init.json`, and add `https://<new domain>/__/auth/handler` to the OAuth Web client's redirect URIs (see logbook/README.md, sign-in).
   - The roster keeps data in localStorage, which is per origin, so users must export it before the move and import it after.
-  - Old share links and QR codes in chats break unless the old domain redirects.
+  - Old share links and QR codes in chats break unless the old domain redirects (evals: the forward at the top of `index.html`).
+  - The new host must serve `/__/` (sign-in helper) and `/apmes/` (the DOPS expectations in the sw SHELL), or sign-in or the service worker fails.
+  - What a browser keeps (theme, unsent local drafts) belongs to the old address and doesn't move; answers are already in the cloud.
   - Installed PWAs need reinstalling from the new domain.
 
 ## 6. Working alongside the logbook session, and limits of this environment
