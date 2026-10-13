@@ -68,6 +68,8 @@ export function buildRosterCanvas(layout, width = 1400, spans = [[2, layout.rows
       }
       return out;
     };
+    // a single line that runs past the sheet's edge (long free text in the last column) shrinks to fit
+    if (!wrap) { const room = Math.max(w, xAt(13) - x) - 2 * pad; while (size > 4 && Math.max(...String(c.text).split('\n').map(l => ctx.measureText(l).width)) > room) { size -= 0.25; font(c.bold, size); } }
     let lines = split(c.text, w - 2 * pad);
     while (wrap && size > 4 && lines.length * size * 1.15 > h - pad) { size -= 0.25; font(c.bold, size); lines = split(c.text, w - 2 * pad); }
     const lh = size * 1.15;

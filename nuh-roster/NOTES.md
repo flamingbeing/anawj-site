@@ -265,6 +265,9 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
   (week n copied to week n, only into empty weeks, with Undo) when the next year is still empty.
 - Phones: Cases shows each room as a card (run, room and session, then case notes, flags, fixed people; rooms not
   running show only their first line). Labels made into buttons (`label.btn.primary`, e.g. "Do it all") now look primary.
+- Unexpected errors (`error` / `unhandledrejection`) show one plain toast a minute at most ("your last change may not
+  have gone in… Undo, or reload"); the toast empties before each message so screen readers repeat it; long single-line
+  text in the image shrinks to the sheet's edge.
 - Keep building elements with `h()` and `textContent`; there is no `innerHTML` anywhere, so imported text can't inject.
 
 ## Code map

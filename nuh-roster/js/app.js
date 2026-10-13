@@ -250,6 +250,9 @@ function h(tag, attrs = {}, ...kids) {
 // A short message at the bottom. With an action (e.g. Undo) it stays longer and has a button.
 function toast(msg, action) {
   const t = document.getElementById('toast');
+  // a live region only speaks when its text changes: empty it first, so the same message is read out again
+  t.replaceChildren();
+  void t.offsetWidth;
   t.replaceChildren(msg, ...(action ? [' ', h('button', { class: 'small', title: action.title || null, onclick: () => { t.classList.remove('show'); action.run(); } }, action.label)] : []));
   t.classList.toggle('actionable', !!action);
   t.classList.add('show');
@@ -4300,6 +4303,17 @@ document.getElementById('tourBtn')?.addEventListener('click', () => startTour())
 document.getElementById('allBtn')?.addEventListener('click', downloadEverything);
 addEventListener('hashchange', () => { if (location.hash === '#myday' && state.tab !== 'myday') { closeTagEditor(); state.tab = 'myday'; window.scrollTo(0, 0); render(); } });
 document.getElementById('keysBtn')?.addEventListener('click', showShortcuts);
+// Something unexpected broke mid-change: say so in plain words (the screen may not have caught up), once a minute
+// at most; the details go to the console.
+let lastCrash = 0;
+function crashed(err) {
+  console.error(err);
+  if (Date.now() - lastCrash < 60e3) return;
+  lastCrash = Date.now();
+  toast('Something went wrong, so your last change may not have gone in. Check it, press Undo, or reload the page.', { label: 'Reload', run: () => location.reload() });
+}
+addEventListener('error', e => { if (e.error) crashed(e.error); });
+addEventListener('unhandledrejection', e => crashed(e.reason));
 // Offline app shell (sw.js): the app opens with poor signal. A new version installs alongside and is offered here.
 (function registerSW() {
   if (!('serviceWorker' in navigator) || location.protocol === 'file:' || window.ROSTER_MOVED_TO || /^(www\.)?anawj\.com$/.test(location.hostname)) return; // not at the old address (it redirects)
