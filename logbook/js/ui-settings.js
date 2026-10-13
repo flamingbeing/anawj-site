@@ -5,7 +5,7 @@ import { YEAR_NAMES, DEFAULT_NAMES, BY_CODE } from './categories.js';
 import { sortCodes, uid, academicYear, withParents, weekStart, humanAge } from './engine.js';
 import { S, h, info, toast, modal, confirmBox, cloud, writes, catChip, catName, catShort, PICKER_ORDER, pickerOrder, settings, patchLogbook, displayName, hooks, rYear, myYearName, fill, PROFILES, profile, basicMode, facultyRole, BASIC_ITEMS, basicHides, setBasicOn, caseShown, setCaseShown, categoryNames, setCategoryNames, catPills, tagSet, resetters, download, fileButton, todayISO, saveMany, UNDO_SECS, rowIcon } from './ui-core.js';
 import { MAX_TAGS, tagLinks as tagLinksIn, learnShorthand, cleanShorthand, shorthandOf, DEFAULT_SHORTHAND, cleanTagSet, defaultTagSet, tagTree, flatTree, moveTag, reparentTag, removeTag, newKey, tagSetToCsv, tagSetFromCsv, dropTag, canPlace, placeNewTag } from './tags.js';
-import { pickDialog, CASE_PARTS, AFTER_SAVE } from './ui-log.js';
+import { pickDialog, CASE_PARTS, AFTER_SAVE, RECENT_COUNTS } from './ui-log.js';
 import { OPERATOR_HELP } from './search-ops.js';
 import { DEFAULT_ACCENT, cleanAccent, schemeCss, lightPalette, tabSchemeCss, tabVarsCss } from './colors.js';
 import { cleanMarkdown, storedMarkdown, mdCase, mdDay, reflectionPath, reflectionNote, CASE_FILLINS, REFL_FILLINS, FM_FIELDS } from './markdown.js';
@@ -628,6 +628,9 @@ export function renderLogging() {
       h('h2', {}, 'Logging'),
       h('h3', {}, 'Recognise details'), h('p', { class: 'hint' }, 'Account settings · on by default; follows you between devices.'),
       toggle('Suggest tags as I type', st.suggestions !== false, v => save({ suggestions: v })),
+      // off by default: tags count towards targets, so by default each one is picked on purpose
+      toggle('Tick confident suggestions automatically', !!st.autoTick, v => save({ autoTick: v || null }),
+        'Off by default. Untick any you don’t want.', 'The surest suggestions are ticked as you type and follow your words. One you untick stays off for that case. Check the ticks before you save: they count towards your targets.'),
       toggle('Autodetect age and gender', st.detectAgeSex !== false, v => save({ detectAgeSex: v }),
         'Optional for APMES.', 'Turning this off stops age-based Paediatrics and Geriatric suggestions. Choose those tags yourself when needed; explicit words can still suggest them.'),
       h('h3', {}, 'Start a case'), h('p', { class: 'hint' }, 'Device setting · other devices keep their own style.'),
@@ -640,7 +643,7 @@ export function renderLogging() {
       pick('After Save', AFTER_SAVE, st.afterSave || 'next', v => save({ afterSave: v === 'next' ? null : v }, 'Saved'),
         '“Save, keep date” keeps the date either way.', 'Keeping the tags helps with a run of the same kind of case.')),
     h('section', { class: 'card' }, preview, h('button', { onclick: async () => {
-      try { await patchLogbook({ settings: { suggestions: true, detectAgeSex: true, enterMode: 'newline', enterSaves: null, defaultDate: 'today', afterSave: null } }); setDisplay({ compactTags: null }); hooks.render(); toast('Everyday logging defaults restored'); } catch (err) { toast(err.message); }
+      try { await patchLogbook({ settings: { suggestions: true, autoTick: null, detectAgeSex: true, enterMode: 'newline', enterSaves: null, defaultDate: 'today', afterSave: null } }); setDisplay({ compactTags: null }); hooks.render(); toast('Everyday logging defaults restored'); } catch (err) { toast(err.message); }
     } }, 'Reset these logging defaults'), h('p', { class: 'hint' }, 'Resets only the choices on this page. Advanced logging settings keep their current values.')),
     advancedLink('loggingadv', 'Advanced logging settings', 'The Case tab, the keyboard, search, dates and undo, tips'));
 }
@@ -656,6 +659,8 @@ export function renderLoggingAdvanced() {
       h('h3', {}, 'Case tab'),
       help('Switch off what you don’t use. The case box, All tags and Save always stay.'),
       CASE_PARTS.map(([part, label]) => toggle(label, caseShown(part), v => setCaseShown(part, v, CASE_PARTS.map(([p]) => p)))),
+      pick('Same as last: how many recent cases', RECENT_COUNTS, Math.min(5, Math.max(1, Number(st.recentCount) || 1)), n => save({ recentCount: n === 1 ? null : n }),
+        'Chips under the case box that copy a recent case’s procedure and tags.'),
       h('label', { class: 'field', style: 'margin-top:8px' }, 'Case box height on the Case tab',
         h('select', { onchange: e => save({ boxLines: Number(e.target.value) }) },
           Array.from({ length: 19 }, (_, i) => i + 2).map(n => h('option', { value: String(n), selected: n === (Math.min(20, Math.max(2, Number(st.boxLines) || 3))) }, `${n} lines${n === 3 ? ' (default)' : ''}`)))),
@@ -682,8 +687,8 @@ export function renderLoggingAdvanced() {
       toggle('Show tips and help text', !st.hideTips, v => save({ hideTips: !v }, null),
         'Off for experienced users.', 'Hides the explanations around the app (like the one at the top of the tag editor), the privacy and photo reminders, and the tips for the tags you pick.'),
       toggle('Show last week’s summary on the Case tab (once a week)', st.weeklyDigest, v => save({ weeklyDigest: v }, null))),
-    resetLink('everything on this page (the Case tab parts, box height, the initials box, keyboard, advanced search, the week, undo, tips and the weekly summary)', async () => {
-      await patchLogbook({ settings: { boxLines: null, undoSecs: null, weekStart: null, weeklyDigest: null, hideTips: null, searchOps: null, caseHide: null } });
+    resetLink('everything on this page (the Case tab parts, Same as last, box height, the initials box, keyboard, advanced search, the week, undo, tips and the weekly summary)', async () => {
+      await patchLogbook({ settings: { boxLines: null, undoSecs: null, weekStart: null, weeklyDigest: null, hideTips: null, searchOps: null, caseHide: null, recentCount: null } });
       applyDisplay(setDisplay({ autoFocus: null, firstField: null, boxCaps: null, boxCorrect: null, boxSpell: null }));
     }));
 }
