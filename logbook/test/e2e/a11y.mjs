@@ -51,6 +51,28 @@ const SCREENS = [
     await p.evaluate(async () => { const { openSend } = await import('./js/ui-send.js'); openSend({ text: 'Fake day', date: '2026-10-10' }); });
     await p.waitForSelector('dialog[open]');
   }, true],
+  ['Sync', async p => {
+    await hash('sync')(p);
+    await p.getByLabel('Add a place to sync to').selectOption('github');
+    await p.getByLabel('Add a place to sync to').selectOption('drive');
+  }, true],
+  ['Sync run', async p => {
+    await hash('logbook')(p);
+    await p.evaluate(async () => {
+      const { patchLogbook } = await import('./js/ui-core.js');
+      await patchLogbook({ settings: { sync: { targets: [{ id: 'gh1', kind: 'github', owner: 'fake-user', repo: 'fake-notes' }] } } });
+      localStorage.setItem('apmes-logbook-cloud-gh:demo:demo@example.com:gh1', 'FAKE');
+    });
+    // GitHub answers from here, no network: every day is new, every write accepted
+    await p.route('https://api.github.com/**', route => route.request().method() === 'OPTIONS'
+      ? route.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' } })
+      : route.request().method() === 'GET'
+      ? route.fulfill({ status: 404, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{}' })
+      : route.fulfill({ status: 201, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ content: { sha: 'fake' } }) }));
+    await hash('settings')(p); await hash('logbook')(p);
+    await p.locator('button.lb-sync').click();
+    await p.getByText(/^Synced \d+ of/).waitFor();
+  }, true],
   ['Export / Import', hash('data'), false],
   ['Recover drafts', hash('recovery'), false],
   ['Admin portal', hash('admin'), false],

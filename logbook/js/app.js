@@ -4,6 +4,7 @@
 
 import { S, hooks, h, toast, basicMode, logbookOnly, facultyMode, facultyRole, clearToast, cloud, writes, transients, setCases, scheduleSummary, fill, resetCaches, patchLogbook, confirmBox, fileButton, modal, download, todayISO, settings, setCategoryNames, categoryNames as categoryNamesNow } from './ui-core.js';
 import { renderSendSettings, destinationHosts } from './ui-send.js';
+import { renderSyncSettings, remindSync, forgetSync, syncPlaces } from './ui-sync.js';
 import { renderLog, focusLog, logCasesChanged, clearDrafts, SHARED_KEY } from './ui-log.js';
 import { renderRecovery } from './ui-recovery.js';
 import { renderLogbook } from './ui-logbook.js';
@@ -45,6 +46,7 @@ const ICONS = {
   reflset: 'M4 19.5V5a2 2 0 0 1 2-2h12v14H6a2 2 0 0 0-2 2.5zM6 21h12v-4',
   sharefmt: 'M9 9h10v12H9zM5 15V3h10',
   sendto: 'M4 12l16-8-6 16-3-7z',
+  sync: 'M20 11a8 8 0 0 0-14.9-3M4 4v4h4M4 13a8 8 0 0 0 14.9 3M20 20v-4h-4',
   bin: 'M4 7h16M10 11v6M14 11v6M5 7l1 13h12l1-13M9 7V4h6v3',
   notes: 'M6 3h9l4 4v14H6zM14 3v5h5M9 12h7M9 16h5',
   more: 'M5 12h.01M12 12h.01M19 12h.01M4 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0M11 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0M18 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0',
@@ -84,6 +86,7 @@ const TABS = [
   { id: 'displayadv', label: 'Advanced display', render: renderDisplayAdvanced, hidden: true, under: 'display', unlisted: true },
   { id: 'loggingadv', label: 'Advanced logging', render: renderLoggingAdvanced, hidden: true, under: 'logging', unlisted: true },
   { id: 'sendto', label: 'Send to', render: renderSendSettings, hidden: true, under: 'settings', unlisted: true, desc: 'Obsidian, WhatsApp, UpNote or any app with a link' },
+  { id: 'sync', label: 'Sync', render: renderSyncSettings, hidden: true, under: 'settings', unlisted: true, desc: 'One Markdown file per day in Google Drive, Dropbox or GitHub' },
   { id: 'sharefmt', label: 'Markdown', render: renderMarkdownSettings, hidden: true, under: 'settings', unlisted: true, desc: 'How Copy, Share and the notes export read' },
   { id: 'showhide', label: 'Profiles or hide items', render: renderShowHide, hidden: true, under: 'settings', unlisted: true, desc: 'Your profile (Advanced, Basic, logbook only) and everything you can hide' },
   { id: 'logging', label: 'Logging', render: renderLogging, hidden: true, under: 'settings', unlisted: true, desc: 'Suggestions, the Enter key, dates, after Save; more under Advanced' },
@@ -154,7 +157,7 @@ function installCard() {
 // Search in Settings (owner): the options of every settings page and its Advanced page, read from the pages
 // themselves (each is drawn once, off screen, the first time someone types), so the index never goes stale.
 // A result opens its page and scrolls to the option, which flashes.
-const SEARCH_PAGES = ['display', 'displayadv', 'access', 'logging', 'loggingadv', 'reflset', 'sharefmt', 'sendto'];
+const SEARCH_PAGES = ['display', 'displayadv', 'access', 'logging', 'loggingadv', 'reflset', 'sharefmt', 'sendto', 'sync'];
 let settingsIndex = null, findAfterRender = '';
 const optionText = n => {
   if (n.matches('label.field')) return [...n.childNodes].filter(c => c.nodeType === 3).map(c => c.textContent).join(' ').trim();
@@ -209,7 +212,7 @@ function settingsSearch() {
 
 // Settings: a short menu of its pages (residency year on top for people not on the programme list)
 function renderSettingsMenu() {
-  const order = ['display', 'access', 'logging', 'showhide', 'tags', 'reflset', 'sharefmt', 'sendto'];
+  const order = ['display', 'access', 'logging', 'showhide', 'tags', 'reflset', 'sharefmt', 'sendto', 'sync'];
   const pages = TABS.filter(t => t.under === 'settings').sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
   settingsIndex = null;   // drawn again on the first search of this visit
   return h('div', {},
@@ -259,7 +262,7 @@ function settingsFileCard() {
     const same = (a, b) => a.name === b.name && [...a.cats].sort().join() === [...b.cats].sort().join();
     const newGroups = (d.templates || []).filter(t => !mine.some(m => m.id === t.id || same(m, t)));
     const n = Object.keys(d.settings).length;
-    if (!(await confirmBox('Import settings', `Use the ${n} setting${n === 1 ? '' : 's'} in this file${newGroups.length ? ` and add ${newGroups.length} tag group${newGroups.length === 1 ? '' : 's'}` : ''}? Settings in the file replace yours (your tags and shorthand too, if the file has them); anything not in it stays. Cases, reflections and portfolio details are never touched.${(d.settings.destinations || []).length ? ` The file also sets places to send your cases to, and sending goes only when you tap: ${destinationHosts(d.settings.destinations).join('; ')}. Import only if you trust them.` : ''}`, 'Import'))) return;
+    if (!(await confirmBox('Import settings', `Use the ${n} setting${n === 1 ? '' : 's'} in this file${newGroups.length ? ` and add ${newGroups.length} tag group${newGroups.length === 1 ? '' : 's'}` : ''}? Settings in the file replace yours (your tags and shorthand too, if the file has them); anything not in it stays. Cases, reflections and portfolio details are never touched.${(d.settings.destinations || []).length ? ` The file also sets places to send your cases to, and sending goes only when you tap: ${destinationHosts(d.settings.destinations).join('; ')}. Import only if you trust them.` : ''}${syncPlaces(d.settings.sync).length ? ` It also sets places to sync your days to (only when you tap Sync): ${syncPlaces(d.settings.sync).join('; ')}.` : ''}`, 'Import'))) return;
     // display settings in the file go to this device, the rest to the account
     const fileDisplay = Object.fromEntries(DISPLAY_KEYS.filter(k => k in d.settings).map(k => [k, d.settings[k]]));
     const forAccount = Object.fromEntries(Object.entries(d.settings).filter(([k]) => !DISPLAY_KEYS.includes(k)));
@@ -810,7 +813,7 @@ async function onUser(user) {
   if (previousUser && user && previousUser.email !== user.email) {
     const cleanup = writes.forget();
     Object.assign(S, { cases: [], reflections: [], counts: {}, casesLoaded: false, casesSynced: false, logbook: null });
-    clearDrafts(); resetCaches(); forgetWho(); clearToast(); transients.reset();
+    clearDrafts(); resetCaches(); forgetWho(); forgetSync(); clearToast(); transients.reset();
     document.querySelectorAll('dialog[open]').forEach(el => el.close());
     app.innerHTML = SKELETON;
     try { await cleanup; } catch (err) { if (S.user === user) toast(err.message); }
@@ -819,7 +822,7 @@ async function onUser(user) {
   if (!user) {
     Object.assign(S, { admin: false, owner: false, pd: false, faculty: false, resident: null, logbook: null, cases: [], reflections: [], counts: {}, casesLoaded: false, casesSynced: false, sharedTemplates: [] });
     const cleanup = signedInOnce ? writes.forget() : Promise.resolve();
-    if (signedInOnce) { clearDrafts(); resetCaches(); forgetWho(); }
+    if (signedInOnce) { clearDrafts(); resetCaches(); forgetWho(); forgetSync(); }
     transients.reset();
     document.querySelectorAll('dialog[open]').forEach(el => el.close());
     clearToast(); paintWho(); renderLanding();
@@ -873,7 +876,7 @@ async function onUser(user) {
   S.tab = tabFromHash() || (START_TABS.some(([v]) => v === start) && onBar.includes(start) ? start : onBar.find(id => id !== 'more') || 'log');
   navigation.initialize(S.tab);
   // Settings → Backup: a one-tap reminder when the last Drive / Dropbox backup is over a week old (if asked for)
-  setTimeout(() => { if (S.user === user) remindBackup(); }, 3000);
+  setTimeout(() => { if (S.user === user) { remindBackup(); remindSync(); } }, 3000);
   // back from a Drive / Dropbox sign-in: finish that save
   resumeCloudSave();
   // recycle bin: drop entries older than 30 days, but only once the reflections are loaded, so an
@@ -991,7 +994,7 @@ paintWho();
 // Reset demo (the demo badge's menu, and the link by Sign out on More): asks first, then starts again
 async function resetDemo() {
   if (!(await confirmBox('Reset demo', 'Delete everything you added in the demo (cases, reflections, images, settings) and start again with the made-up data? The uploaded portfolio template is kept.', 'Reset', true))) return;
-  clearDrafts(); resetCaches(); forgetWho(); resetDisplay(); applyCompact(false); applyTextSize('1'); applyAccent(null);
+  clearDrafts(); resetCaches(); forgetWho(); forgetSync(); resetDisplay(); applyCompact(false); applyTextSize('1'); applyAccent(null);
   cloud.resetDemo();
   location.reload();
 }

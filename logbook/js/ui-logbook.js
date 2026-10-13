@@ -17,6 +17,7 @@ import { editCaseDialog, logOnDate } from './ui-log.js';
 import { reflectOnCase } from './ui-reflect.js';
 import { moveToBin } from './bin.js';
 import { destinations, openSend } from './ui-send.js';
+import { syncButton } from './ui-sync.js';
 import { shareText, copyText, caseText as shareCaseText, dayTextWithNotes } from './share.js';
 
 // has: tags a case must all have; not: tags it must have none of ('c:16' or a personal tag key); from/to: dates
@@ -244,7 +245,9 @@ export function renderLogbook() {
     savedRow,
     filters,
     h('div', { class: 'bar', style: 'margin-bottom:0' },
-      counter, h('span', { class: 'grow' }),
+      // Sync (Settings → Sync): only once a place to sync to is set up; it says how many days wait (and then the
+      // gap may shrink, so the view switch stays on this row on a phone)
+      ...(sb => [counter, h('span', { class: 'grow', style: sb ? 'min-width:0' : null }), sb])(syncButton()),
       h('div', { class: 'seg' }, modes().map(([m, l]) =>
         h('button', { 'aria-pressed': String(view.mode === m), onclick: () => setMode(m) }, l)))));
   // pinned (Settings → Display): the month headings in List stick just under it

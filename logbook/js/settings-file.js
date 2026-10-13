@@ -8,6 +8,7 @@ import { cleanFormat } from './share-format.js';
 import { storedMarkdown } from './markdown.js';
 import { cleanExportOpts } from './export-opts.js';
 import { cleanDestinations } from './destinations.js';
+import { cleanSync } from './sync-md.js';
 
 export const SETTINGS_KIND = 'apmes-logbook-settings';
 // account-specific bookkeeping that shouldn't travel with the file (your residency year is yours, not a colleague's)
@@ -22,6 +23,7 @@ const OBJECTS = {
   markdown: v => { try { return storedMarkdown(v); } catch { return null; } },
   excelExport: v => cleanExportOpts(v),
   destinations: v => cleanDestinations(v),
+  sync: v => cleanSync(v),   // where to sync (Settings → Sync); tokens are never in settings
   catOrder: strs,
   caseHide: v => strs(v).slice(0, 20),
   basicOn: v => strs(v).slice(0, 30),

@@ -131,7 +131,7 @@ dialog .bar .grow { min-width: 0; }   /* keep Cancel / Save on one row in dialog
 .row { display: flex; gap: 8px; align-items: center; }
 .empty { text-align: center; color: var(--muted); padding: 32px 16px; }
 
-input[type="text"], input[type="search"], input[type="email"], input:not([type]), input[type="date"], input[type="number"], select, textarea {
+input[type="text"], input[type="password"], input[type="search"], input[type="email"], input:not([type]), input[type="date"], input[type="number"], select, textarea {
   padding: 8px 10px; border: 1px solid var(--edge, var(--line)); border-radius: calc(10px * var(--round, 1)); background: var(--panel);
   font-size: max(16px, calc(16px * var(--fs, 1))); /* 16px+ stops iOS zooming on focus */ min-height: 40px; max-width: 100%;
 }
@@ -424,7 +424,7 @@ body.compact button.small, body.compact .btn.small, body.compact .seg button { m
 body.compact button.big { min-height: 40px; font-size: calc(15px * var(--fs, 1)); padding: 6px 14px; }
 body.compact button.link { min-height: 0; padding: 0; }
 body.compact .actions { padding: 6px 0 4px; margin-top: 4px; gap: 6px; }
-body.compact input[type="text"], body.compact input[type="search"], body.compact input[type="email"], body.compact input:not([type]),
+body.compact input[type="text"], body.compact input[type="password"], body.compact input[type="search"], body.compact input[type="email"], body.compact input:not([type]),
 body.compact input[type="date"], body.compact input[type="number"], body.compact select {
   font-size: max(16px, calc(16px * var(--fs, 1))); min-height: 34px; padding: 4px 8px;
 }
@@ -1153,7 +1153,7 @@ html.pin-search .refl-topics .refl-h.open > .refl-hrow { position: sticky; top: 
    element so it follows the --line in force there (themes, contrast, colours). Borderless and Faint give fields,
    buttons and chips a light fill so they can still be seen */
 html.edges * { --edge: color-mix(in srgb, var(--line) var(--edge-mix, 100%), transparent); }
-html.edges-fill :is(input[type="text"], input[type="search"], input[type="email"], input:not([type]), input[type="date"], input[type="number"], select, textarea),
+html.edges-fill :is(input[type="text"], input[type="password"], input[type="search"], input[type="email"], input:not([type]), input[type="date"], input[type="number"], select, textarea),
 html.edges-fill :is(button, .btn):not(.primary):not(.link):not(.linkish):not(.search-x),
 html.edges-fill .chip:not(.on) { background: color-mix(in srgb, var(--ink) 6%, var(--panel)); }
 input[type="range"] { accent-color: var(--accent); width: 100%; min-height: 32px; }
