@@ -1,5 +1,6 @@
 // Demo mode (?demo): a made-up department to try the app with. Every name here is invented.
 import { suggestShortName } from './engine.js';
+import { weeksOfYear } from './rotations.js';
 
 const GIVEN = ['Alex', 'Brenda', 'Calvin', 'Dora', 'Edwin', 'Fiona', 'Gavin', 'Hazel', 'Irwin', 'Janice', 'Kelvin', 'Lorna', 'Marcus', 'Nadia',
   'Oscar', 'Petra', 'Quentin', 'Rosa', 'Silas', 'Tessa', 'Ulric', 'Vera', 'Wilbur', 'Xena', 'Yusuf', 'Zelda'];
@@ -101,7 +102,20 @@ export function makeDemo(date) {
     leave.entries.push({ name: p.name, from: day(from), to: day(to), type: k % 7 === 2 ? 'Medical Leave' : k % 5 === 4 ? 'Off in Lieu' : 'Annual Leave', remarks: '' });
   }
   monthly[month].leave = leave;
-  return { staff, monthly, notes: demoNotes(date) };
+  // rotations for the year and the next: residents move every 4 to 12 weeks; MOPEX and locums don't rotate
+  const rotations = { weeks: {} };
+  const ROT = ['P', 'RA', 'Neu', 'SR', 'Cardiac', 'L', 'Amb', 'ENT', 'Vasc', 'HPB', 'Remote', 'PACU'];
+  const y = +date.slice(0, 4);
+  const allWeeks = [...weeksOfYear(y), ...weeksOfYear(y + 1)].filter((m, i, a) => a.indexOf(m) === i);
+  staff.filter(p => p.role === 'junior' && !['MOPEX', 'Locum'].includes(p.grade)).forEach((p, i) => {
+    let w = 0, k = i;
+    while (w < allWeeks.length) {
+      const len = 4 + Math.floor(rand() * 9);
+      for (const m of allWeeks.slice(w, w + len)) (rotations.weeks[m] ||= {})[p.id] = ROT[k % ROT.length];
+      w += len; k += 3;
+    }
+  });
+  return { staff, monthly, rotations, notes: demoNotes(date) };
 }
 
 // Two seniors on an admin day, different each day (and not anyone on leave that day).

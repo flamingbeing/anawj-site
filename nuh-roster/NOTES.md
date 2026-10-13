@@ -35,7 +35,7 @@ The repo is public: never commit real staff names, rosters, leave, contact lists
   | Liver Donor | HPB |
 
   - Postings rotate, so juniors who aren't on the staff list are skipped by default when importing the contact list.
-  - A posting roster upload is planned but not built.
+  - Postings change by the week (Monday to Sunday) and are planned for the year: Monthly › Rotations. A junior can be moved for a single day from their person box ("Posting today").
 - **Short names** are how the leave and post call lists write people:
   - surname first: "Koh Yi Wen" → "Koh YW"
   - one given name after the surname: "Lim Xinyi" → "Xinyi"
@@ -125,14 +125,15 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
   - The header date switches between them, and every tab follows that one date.
   - The monthly rosters are in `state.monthly['YYYY-MM']`.
 - **Team sharing:** Firebase Auth (Google) and Firestore, in its own Firebase project `nuh-roster`.
-  - `team/main` holds staff, rooms and settings; `team/monthly` holds the monthly rosters.
+  - `team/main` holds staff, rooms and settings; `team/monthly` holds the monthly rosters; `team/rotations` holds the junior rotations (`weeks: { monday: { staffId: posting } }`).
   - Each `rosters/{date}` doc has an immutable `versions` history, which is what Restore uses.
   - Access is the `members` list plus `accessRequests`, enforced by `firestore.rules`.
   - The rules deploy automatically on merge to main (`.github/workflows/deploy-firestore-rules.yml`): edit the file, never ask the owner to paste it.
   - The Firebase web config in `js/firebase-config.js` is public by design.
+- **Rotations:** a junior's posting on a date is that day's change (`day.staff[id].posting`), else the week's rotation, else their usual posting (`p.posting`). The roster engine and checks get the staff list with each junior's posting for the day on screen (`dayStaff()`), so posting matches and the "(RA)" tags follow the rotation. Rotation edits go through Undo. The Excel layout is names down the first column and each week's Monday across the top; the download is a blank to fill in.
 - **Per-day, per-person details** live in `day.staff[id]`:
   - `status`: avail / leave / mc / postcall / elsewhere / admin
-  - `leaveTime`, `liverStandby`, `aoh`, `comment`, `notAroundPrev`
+  - `leaveTime`, `liverStandby`, `aoh`, `comment`, `notAroundPrev`, `posting` (a junior's posting for that day only)
   - `manual*` / `auto*` flags: values from the monthly rosters are `auto`; anything set by hand is `manual` and wins.
 - **Roster cells are text,** exactly as on the sheet. Day details are written into every cell the person is physically in (`syncPersonCells`); covers and posting tags stay per cell.
 - **Edit protection:**
@@ -171,6 +172,7 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
 | `js/engine.js` | No DOM. Grades, postings, name matching (`matchName`, short names), case-note flags, `generate()` (Hungarian assignment, double cover, AOCC/AIC, covers, premeds), `check()`, contact merge, duplicates, import planning. |
 | `js/layout.js` | The sheet as cells; shared by the preview, the .xlsx and the PDF. |
 | `js/xlsxio.js` | Reading drafts, staff sheets and the contact list; writing the roster workbook. |
+| `js/rotations.js` | Junior rotations: weeks (by Monday), a junior's posting on a date, reading and writing the year's rotation as Excel. |
 | `js/monthly.js` | The HMS monthly rosters: column definitions, PDF/Excel reading, Excel writing, what each roster means for a date. |
 | `js/pdfout.js` | The roster PDF from the layout. |
 | `js/demo.js` | Demo data (invented names). |

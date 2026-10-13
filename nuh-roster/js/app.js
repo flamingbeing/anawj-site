@@ -8,6 +8,7 @@ import { readRosterRows, readStaffSheet, buildRosterWorkbook, cellText, isContac
 import { buildLayout, COL_WIDTHS, shortName, doubleCovered, isDouble, TEAM_ROWS, DUTIES } from './layout.js';
 import * as cloud from './cloud.js';
 import { buildRosterPdf } from './pdfout.js';
+import { emptyRotations, postingOn, weekPosting, mondayOf, weeksOfYear, setWeeks, readRotationSheet, buildRotationWorkbook, POSTING_FILL } from './rotations.js';
 import { makeDemo, demoNotes, demoAdmin } from './demo.js';
 import { MONTHLY, monthlyDef, LEAVE_TYPES, NIGHT_DUTIES, cleanCell, daysIn, weekday, monthName, addDays, readMonthlyPdf, readMonthlyXlsx, buildMonthlyWorkbook, dutiesOn, generalFromMonthly, leaveOn } from './monthly.js';
 
@@ -32,6 +33,7 @@ function blankState() {
     roster: null,
     days: {},     // other dates: { '2026-10-12': { day, roster } }
     monthly: {},  // monthly rosters by month: { '2022-10': { junior: { rows }, leave: { entries } } }
+    rotations: emptyRotations(), // junior postings by week { weeks: { monday: { id: code } } }; a day's change is day.staff[id].posting
     tab: 'staff',
     cloudBase: {},
     roomsVersion: 4,
@@ -45,8 +47,9 @@ try {
 } catch { /* private mode or corrupt data: start fresh */ }
 migrateRooms();
 syncRooms();
+state.rotations ||= emptyRotations();
 // bumped when the demo data changes, so a demo already open in a browser picks it up
-const DEMO_VERSION = 4;
+const DEMO_VERSION = 5;
 if (DEMO && !state.staff.length) startDemo();
 else if (DEMO && state.demoVersion !== DEMO_VERSION) { state = blankState(); syncRooms(); startDemo(); } // the made-up department changed: start it again
 
@@ -54,10 +57,18 @@ function startDemo() {
   const demo = makeDemo(state.day.date);
   state.staff = demo.staff;
   state.monthly = demo.monthly;
+  state.rotations = demo.rotations;
   state.demoVersion = DEMO_VERSION;
   fillDemoNotes(state.day);
   state.tab = 'monthly';
 }
+// The staff list as it is on the day on screen: each junior's posting from the rotation (or that day's change).
+function postingOf(p) { return postingOn(state.rotations, p, state.day.date, state.day.staff[p.id]?.posting); }
+// What the rotation (or usual posting) says, without the day's change.
+function plannedPosting(p) { return postingOn(state.rotations, p, state.day.date); }
+function withPosting(p) { return p?.role === 'junior' ? { ...p, posting: postingOf(p) } : p; }
+function dayStaff() { return state.staff.map(withPosting); }
+
 // a new demo day starts with that day's made-up case notes, and two seniors on an admin day
 function fillDemoNotes(day) {
   const notes = demoNotes(day.date);
@@ -235,13 +246,14 @@ function render() {
   syncMonthly();
   if (hashPending?.date === state.day.date) { markSaved(hashPending.date, hashPending.at); hashPending = null; }
   // checks follow every change, wherever it was made (a status on Today, a fix here)
-  if (state.roster?.rows && state.roster.date === state.day.date) state.roster.checks = check({ rows: state.roster.rows, staff: state.staff, day: state.day, settings: state.settings });
+  if (state.roster?.rows && state.roster.date === state.day.date) state.roster.checks = check({ rows: state.roster.rows, staff: dayStaff(), day: state.day, settings: state.settings });
   app.replaceChildren(({ monthly: renderMonthly, roster: renderRoster, premed: renderPremed, cases: () => renderDay('cases'), staff: renderStaffTab, settings: renderSettings })[state.tab]());
   renderCloudBar();
   renderDateBar();
   renderSteps();
   renderDemoBar();
   window.scrollTo(0, y);
+  if (state.tab === 'monthly' && state.monthlyView === 'rotations') placeRotGrid();
   save();
 }
 // Each date keeps its own manpower, calls, cases and roster. Switching the header date puts
@@ -437,37 +449,13 @@ function staffLogCard() {
 
 // The Staff tab: seniors or juniors, read-only until Edit.
 function renderStaffTab() {
-  const role = ['junior', 'postings'].includes(state.staffRole) ? state.staffRole : 'senior';
+  if (state.staffRole === 'postings') { state.staffRole = 'junior'; } // postings moved to Monthly › Rotations
+  const role = state.staffRole === 'junior' ? 'junior' : 'senior';
   const pick = (r, label) => h('button', { 'aria-pressed': String(role === r), onclick: () => { state.staffRole = r; staffFilter = ''; render(); } }, label);
   const n = r => state.staff.filter(p => p.role === r).length;
   return h('div', {}, h('div', { class: 'seg subtabs', role: 'group', 'aria-label': 'Staff' },
-    pick('senior', `Seniors (${n('senior')})`), pick('junior', `Juniors (${n('junior')})`), pick('postings', 'Postings')),
-    role === 'postings' ? renderPostings() : renderStaff(role));
-}
-
-// Junior postings: changed here (with the staff list's Edit), later from the posting roster.
-function renderPostings() {
-  const editing = staffEditing();
-  const list = state.staff.filter(p => p.role === 'junior')
-    .filter(p => !staffFilter || (p.name + ' ' + (p.aliases || []).join(' ')).toLowerCase().includes(staffFilter.toLowerCase()))
-    .sort((a, b) => (postingName(a.posting) || '~').localeCompare(postingName(b.posting) || '~') || bySeniority(a, b));
-  const counts = {};
-  for (const p of state.staff) if (p.role === 'junior') counts[p.posting || ''] = (counts[p.posting || ''] || 0) + 1;
-  return h('div', {},
-    h('section', { class: 'card' },
-      h('h2', {}, 'Postings'),
-      h('p', { class: 'hint' }, 'Each junior\'s current posting. It shows after their name on the roster, e.g. "(RA)", and matches them to lists that suit it. Uploading the posting roster will come later.'),
-      editing
-        ? h('div', { class: 'bar sync dirty' }, h('span', {}, 'Editing the staff list.'), h('button', { class: 'primary', onclick: finishStaffEdit }, 'Review & save changes'))
-        : h('div', { class: 'bar' }, h('button', { onclick: startStaffEdit }, 'Edit postings'), h('span', { class: 'grow' }),
-          h('input', { placeholder: 'Filter names', value: staffFilter, oninput: e => { staffFilter = e.target.value; const pos = e.target.selectionStart; render(); const i = app.querySelector('input[placeholder="Filter names"]'); i.focus(); i.setSelectionRange(pos, pos); } })),
-      h('div', { class: 'stats' }, POSTINGS.filter(([k]) => counts[k]).map(([k, label]) => h('span', {}, h('b', {}, counts[k]), ' ', k ? label : 'no posting')))),
-    h('section', { class: 'card scroll' }, h('table', {},
-      h('thead', {}, h('tr', {}, ['Name', 'Grade', 'Posting'].map(t => h('th', {}, t)))),
-      h('tbody', {}, list.map(p => h('tr', {},
-        h('td', {}, h('b', { style: colourStyle(p.name) }, p.name)),
-        h('td', { class: 'seen' }, p.grade),
-        h('td', {}, editing ? select(p.posting || '', POSTINGS, v => { p.posting = v; render(); }) : postingName(p.posting) || '—')))))));
+    pick('senior', `Seniors (${n('senior')})`), pick('junior', `Juniors (${n('junior')})`)),
+    renderStaff(role));
 }
 
 function renderStaff(role) {
@@ -507,7 +495,7 @@ function renderStaff(role) {
       h('h2', {}, senior ? 'Seniors' : 'Juniors'),
       h('p', { class: 'hint' }, senior
         ? 'Tick each senior\'s subspecs and the lists they don\'t do. "Move to" moves someone to the juniors.'
-        : 'Set each junior\'s grade and colour (postings are on the Postings tab). Green marks a Baby MO: never left alone, so their senior won\'t double cover. Purple marks locums. "Move to" moves someone to the seniors.'),
+        : 'Set each junior\'s grade and colour (postings are on Monthly › Rotations). Green marks a Baby MO: never left alone, so their senior won\'t double cover. Purple marks locums. "Move to" moves someone to the seniors.'),
       h('div', { class: 'bar sync dirty' },
         h('span', {}, `Editing the staff list. ${diffStaff(staffBackup, state.staff).length} change(s) so far; nothing is kept until you review and save.`),
         h('button', { class: 'primary', onclick: finishStaffEdit }, 'Review & save changes'),
@@ -571,7 +559,7 @@ function renderStaffView(role) {
       h('h2', {}, senior ? 'Seniors' : 'Juniors'),
       h('p', { class: 'hint' }, senior
         ? 'The seniors the roster is generated from, with their subspecs and the lists they don\'t do.'
-        : 'The juniors the roster is generated from, with their grade. Postings are on the Postings tab.'),
+        : 'The juniors the roster is generated from, with their grade. Postings are on Monthly › Rotations.'),
       teamSyncBar(),
       h('div', { class: 'bar' },
         h('button', { onclick: startStaffEdit }, `Edit ${senior ? 'seniors' : 'juniors'}`),
@@ -1095,9 +1083,11 @@ function pushUndoAll(what, { day = false } = {}) {
 }
 // The state an entry would replace, in the entry's own form, so the step can be reversed.
 const inverseOf = e => typeof e === 'string' ? JSON.stringify(state.roster?.rows || [])
+  : e.rot ? { rot: JSON.stringify(state.rotations), what: e.what }
   : { roster: JSON.stringify(state.roster), ...(e.day ? { day: JSON.stringify(state.day) } : {}), what: e.what };
 function applyStep(e, verb) {
   if (typeof e === 'string') { if (state.roster) { state.roster.rows = JSON.parse(e); afterRosterEdit(true); } return; }
+  if (e.rot) { state.rotations = JSON.parse(e.rot); render(); toast(`${verb === 'Undo' ? 'Undid' : 'Redid'} ${e.what}.`); return; }
   if (e.day) state.day = JSON.parse(e.day);
   state.roster = JSON.parse(e.roster);
   lastRows = state.roster ? JSON.stringify(state.roster.rows) : null;
@@ -1200,7 +1190,7 @@ function afterRosterEdit(undone, prompted) {
     logRoster(undone ? changes.map(c => 'Undo: ' + c) : changes);
   }
   lastRows = JSON.stringify(r.rows);
-  r.checks = check({ rows: r.rows, staff: state.staff, day: state.day, settings: state.settings });
+  r.checks = check({ rows: r.rows, staff: dayStaff(), day: state.day, settings: state.settings });
   render();
   if (!undone && !prompted) askCoverForDoubles(before);
 }
@@ -1249,7 +1239,7 @@ function dropFromPool(id, dst) {
   const admin = d.status === 'admin';
   if (admin) pushUndoAll(`putting ${p.name} in ${row.label}`, { day: true }); else pushUndo(JSON.stringify(state.roster.rows));
   if (admin) { d.status = 'avail'; d.manual = true; } // off their admin day and onto a list
-  const text = p.role === 'senior' ? fmtSenior(p, d) : fmtJunior(p, d);
+  const text = p.role === 'senior' ? fmtSenior(p, d) : fmtJunior(withPosting(p), d);
   const parts = cellParts(row, dst.key);
   if (dst.part != null && parts[dst.part] != null) parts[dst.part] = text; else parts.push(text);
   setCellParts(row, dst.key, parts);
@@ -1449,7 +1439,7 @@ function wherePerson(p) {
 function whereCard(p) {
   const at = wherePerson(p);
   return h('div', { class: 'where' },
-    h('b', {}, p.name), h('span', { class: 'seen' }, ` · ${p.grade}${p.posting ? ' · ' + postingName(p.posting) : ''}`),
+    h('b', {}, p.name), h('span', { class: 'seen' }, ` · ${p.grade}${postingOf(p) ? ' · ' + postingName(postingOf(p)) : ''}`),
     h('ul', {}, (at.length ? at : ['Not on any list today']).map(t => h('li', {}, t))));
 }
 
@@ -1571,7 +1561,7 @@ function syncPersonCells(p) {
     parts.forEach((part, k) => {
       if (isCoverPart(part) || personOfPart(part) !== p) return;
       const cur = parseNamePart(part);
-      const postingL = p.role === 'junior' && p.posting === 'L';
+      const postingL = p.role === 'junior' && postingOf(p) === 'L';
       const tags = cur.tags.filter(t => !isAohTag(t) && !(t === 'L' && !postingL));
       if (d.liverStandby && !tags.includes('L')) tags.unshift('L');
       if (d.aoh) tags.push(d.aoh);
@@ -1579,6 +1569,26 @@ function syncPersonCells(p) {
       if (next !== part) { parts[k] = next; changed = true; }
     });
     if (changed) setCellParts(row, key, parts);
+  }
+}
+
+// A junior's posting changed for the day: swap the posting tag in their roster cells ("(RA)" -> "(P)").
+function retagPosting(p, from, to) {
+  if (!state.roster || state.roster.date !== state.day.date) return;
+  const isPostingTag = t => POSTINGS.some(([code]) => code && code === t);
+  for (const row of state.roster.rows) {
+    const parts = cellParts(row, 'junior');
+    let changed = false;
+    parts.forEach((part, k) => {
+      if (isCoverPart(part) || personOfPart(part) !== p) return;
+      const cur = parseNamePart(part);
+      let tags = cur.tags.filter(t => !(t === from && from !== 'L') && !(from === 'L' && t === 'L' && !state.day.staff[p.id]?.liverStandby));
+      if (!from && tags.some(isPostingTag)) tags = tags.filter(t => !isPostingTag(t) || t === 'L');
+      if (to && !tags.includes(to)) tags.push(to);
+      const next = buildNamePart({ ...cur, tags });
+      if (next !== part) { parts[k] = next; changed = true; }
+    });
+    if (changed) setCellParts(row, 'junior', parts);
   }
 }
 
@@ -1615,6 +1625,8 @@ function openPersonBox(anchor, p, ctx) {
   const aoh = h('input', { value: d.aoh || seed.tags.find(isAohTag) || '', placeholder: 'e.g. AOH or AOH 1' });
   const comment = h('input', { value: d.comment ?? seed.dash, placeholder: 'e.g. mtg 3pm' });
   const away = h('input', { type: 'checkbox', checked: !!d.notAroundPrev });
+  // a junior's posting for this day only (the rotation is planned on Monthly › Rotations)
+  const postingPick = p.role === 'junior' ? select(postingOf(p), POSTINGS, () => {}) : null;
   let status = groupOf(d.status);
   const statusBtns = BOARD.map(([k, label]) => h('button', { class: 'small', 'aria-pressed': String(k === status), onclick: e => {
     status = k; e.currentTarget.parentNode.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b === e.currentTarget)));
@@ -1640,7 +1652,7 @@ function openPersonBox(anchor, p, ctx) {
       const juniorCell = ctx.src.key === 'junior';
       const coverText = coverTo.value.trim().replace(/^C-/i, '');
       // a Liver Transplant posting's (L) isn't one of the cell's tag chips; keep it
-      const postingL = p.role === 'junior' && p.posting === 'L' && cur.tags.includes('L');
+      const postingL = p.role === 'junior' && postingOf(p) === 'L' && cur.tags.includes('L');
       const tags = [...(postingL ? ['L'] : []), ...CELL_TAGS.filter(t => on.has(t)), ...splitNameList(other.value).map(cellSafe).filter(t => t && !/^C$/i.test(t)), ...(juniorCell && coveredBox.checked ? ['C'] : [])];
       parts[ctx.src.part] = buildNamePart({ name: cur.name, tags, leave: '', cover: coverText, dash: '' });
       setCellParts(rrow, ctx.src.key, parts);
@@ -1652,6 +1664,11 @@ function openPersonBox(anchor, p, ctx) {
     if (liver.checked !== !!s.liverStandby) { s.liverStandby = liver.checked; s.manualLiver = true; delete s.autoLiver; }
     put('aoh', cellSafe(aoh.value.trim().replace(/^\(|\)$/g, '')));
     put('comment', cellSafe(comment.value.trim().replace(/^-\s*/, '')));
+    if (postingPick) {
+      const was = postingOf(p), v = postingPick.value;
+      if (v === plannedPosting(p)) delete s.posting; else s.posting = v;
+      if (v !== was) retagPosting(p, was, v);
+    }
     if (p.role === 'junior' && away.checked !== !!s.notAroundPrev) { s.notAroundPrev = away.checked; s.manualAway = true; delete s.autoAway; }
     if (ctx.kind === 'today' && status !== groupOf(s.status)) { closeTagEditor(); setStatus(p, status); }
     if (ctx.kind === 'premed' && premedPick.value !== p.name) ctx.setCover(premedPick.value);
@@ -1672,7 +1689,7 @@ function openPersonBox(anchor, p, ctx) {
     onkeydown: e => { if (e.key === 'Escape') closeTagEditor(); if (e.key === 'Enter' && e.target.tagName === 'INPUT') { e.preventDefault(); apply(); } } },
     h('div', { class: 'where' },
       h('div', { class: 'bar', style: 'margin:0' },
-        h('div', { class: 'grow' }, h('b', { style: colourStyle(p.name) }, p.name), h('div', { class: 'seen' }, [shortName(p) !== p.name ? shortName(p) : '', p.grade, p.posting ? postingName(p.posting) : ''].filter(Boolean).join(' · '))),
+        h('div', { class: 'grow' }, h('b', { style: colourStyle(p.name) }, p.name), h('div', { class: 'seen' }, [shortName(p) !== p.name ? shortName(p) : '', p.grade, postingOf(p) ? postingName(postingOf(p)) : ''].filter(Boolean).join(' · '))),
         h('button', { class: 'small', title: 'Edit their name, short names, grade and so on on the Staff tab', onclick: () => goEditStaff(p) }, 'Edit')),
       h('ul', {}, (wherePerson(p).length ? wherePerson(p) : ['Not on any list today']).map(t => h('li', {}, t)))),
     ctx.kind === 'today' ? [h('label', {}, 'Today'), h('div', { class: 'seg status-pick' }, statusBtns)] : null,
@@ -1685,6 +1702,7 @@ function openPersonBox(anchor, p, ctx) {
     ...field('AOH tag', aoh, 'Shown as (AOH) after their name'),
     ...field('Comment (also shown in the comments box)', comment),
     p.role === 'junior' ? h('label', { class: 'check', title: 'Not around on the previous working day: needs premed cover' }, away, ' Away on the previous working day') : null,
+    postingPick ? field(`Posting today${d.posting != null ? ` (rotation: ${postingName(plannedPosting(p)) || 'none'})` : ''}`, postingPick, 'Changes their posting for this day only; the weekly rotation is on Monthly › Rotations') : null,
     h('div', { class: 'bar', style: 'margin:8px 0 0' },
       h('button', { class: 'primary save', onclick: apply }, 'Save'),
       h('button', { onclick: closeTagEditor }, 'Cancel'),
@@ -1724,7 +1742,7 @@ function editNotes(i, value) {
     if (!room.flagsManual) room.flags = suggestFlags(value, state.settings, room.name);
   }
   const before = JSON.stringify(state.roster.checks);
-  state.roster.checks = check({ rows: state.roster.rows, staff: state.staff, day: state.day, settings: state.settings });
+  state.roster.checks = check({ rows: state.roster.rows, staff: dayStaff(), day: state.day, settings: state.settings });
   save();
   if (JSON.stringify(state.roster.checks) !== before) render();
 }
@@ -1768,7 +1786,7 @@ async function addToCell(i, key, text) {
   const row = state.roster.rows[i];
   const d = state.day.staff[p.id] || {};
   pushUndo(JSON.stringify(state.roster.rows));
-  setCellParts(row, key, [...cellParts(row, key), p.role === 'senior' ? fmtSenior(p, d) : fmtJunior(p, d)]);
+  setCellParts(row, key, [...cellParts(row, key), p.role === 'senior' ? fmtSenior(p, d) : fmtJunior(withPosting(p), d)]);
   editing = null;
   afterRosterEdit();
   return true;
@@ -1842,12 +1860,12 @@ function canGenerate() {
 function runGenerate(newSeed) {
   if (!canGenerate()) return;
   const seed = newSeed ? Math.floor(Math.random() * 1e9) : (state.roster?.seed || 1);
-  const res = generate({ staff: state.staff, day: generatorDay(), settings: state.settings, seed });
+  const res = generate({ staff: dayStaff(), day: generatorDay(), settings: state.settings, seed });
   const log = state.roster?.date === state.day.date ? state.roster.log || [] : [];
   const replacing = state.roster?.rows?.length && state.roster.date === state.day.date;
   pushUndoAll('the new roster');
   editing = null;
-  state.roster = { ...res, seed, date: state.day.date, log, checks: check({ rows: res.rows, staff: state.staff, day: state.day, settings: state.settings }) };
+  state.roster = { ...res, seed, date: state.day.date, log, checks: check({ rows: res.rows, staff: dayStaff(), day: state.day, settings: state.settings }) };
   logRoster([log.length ? 'Generated a new roster' : 'Generated the roster']);
   lastRows = JSON.stringify(res.rows);
   render();
@@ -1885,7 +1903,7 @@ function fillGaps() {
   if (special('aic').senior) fixed.aic = special('aic').senior;
   if (special('aocc').senior || special('aocc').junior) { fixed['aocc.s'] = special('aocc').senior || ''; fixed['aocc.j'] = special('aocc').junior || ''; }
   genDay.fixed = fixed;
-  const res = generate({ staff: state.staff, day: genDay, settings: state.settings, seed: Math.floor(Math.random() * 1e9) });
+  const res = generate({ staff: dayStaff(), day: genDay, settings: state.settings, seed: Math.floor(Math.random() * 1e9) });
   const old = Object.fromEntries(r.rows.map(x => [x.roomId, x]));
   const filled = [];
   const rows = res.rows.map(g => {
@@ -2082,12 +2100,146 @@ function syncMonthly() {
   }
 }
 
-const MONTHLY_VIEWS = [['today', 'Today'], ['pain', 'Pain Monthly'], ['liver', 'Liver Monthly'], ['leave', 'Leave Monthly'], ['aoh', 'AOH Monthly'], ['junior', 'Junior Monthly'], ['senior', 'Senior Monthly']];
+const MONTHLY_VIEWS = [['today', 'Today'], ['pain', 'Pain Monthly'], ['liver', 'Liver Monthly'], ['leave', 'Leave Monthly'], ['aoh', 'AOH Monthly'], ['junior', 'Junior Monthly'], ['senior', 'Senior Monthly'], ['rotations', 'Rotations']];
 function renderMonthly() {
   const view = MONTHLY_VIEWS.some(v => v[0] === state.monthlyView) ? state.monthlyView : 'today';
   const tabs = h('div', { class: 'seg subtabs', role: 'group', 'aria-label': 'Monthly' }, MONTHLY_VIEWS.map(([k, label]) =>
     h('button', { 'aria-pressed': String(view === k), onclick: () => { state.monthlyView = k; render(); } }, label)));
-  return h('div', {}, tabs, view === 'today' ? renderToday() : renderMonthlyRoster(view));
+  return h('div', {}, tabs, view === 'today' ? renderToday() : view === 'rotations' ? renderRotations() : renderMonthlyRoster(view));
+}
+
+// ---- rotations: each junior's posting by week, planned for the year ----
+
+let rotYear = null; // the year on screen
+let rotSel = null;  // selected cells: { a: [row, col], b: [row, col] } (a rectangle)
+let rotNotes = [];  // what the last import couldn't place
+let rotScroll = null; // where the grid was scrolled to, kept across re-renders
+const ROT_SHORT = { Cardiac: 'Card', Remote: 'Rem' }; // to fit a week's cell
+const pushRotUndo = what => pushUndo({ rot: JSON.stringify(state.rotations), what });
+const fillOf = code => POSTING_FILL[code] ? '#' + POSTING_FILL[code].slice(2) : '';
+
+function renderRotations() {
+  const year = rotYear ||= +state.day.date.slice(0, 4);
+  const weeks = weeksOfYear(year);
+  const now = mondayOf(state.day.date);
+  const people = state.staff.filter(p => p.role === 'junior')
+    .filter(p => !staffFilter || (p.name + ' ' + (p.aliases || []).join(' ')).toLowerCase().includes(staffFilter.toLowerCase()))
+    .sort(bySeniority);
+  const rot = state.rotations;
+  const sel = rotSel && (() => {
+    const [r1, r2] = [rotSel.a[0], rotSel.b[0]].sort((x, y) => x - y), [c1, c2] = [rotSel.a[1], rotSel.b[1]].sort((x, y) => x - y);
+    return { r1, r2, c1, c2 };
+  })();
+  const inSel = (r, c) => sel && r >= sel.r1 && r <= sel.r2 && c >= sel.c1 && c <= sel.c2;
+  const apply = code => {
+    if (!sel) return;
+    pushRotUndo('the rotation change');
+    for (let r = sel.r1; r <= sel.r2; r++) setWeeks(rot, people[r].id, weeks.slice(sel.c1, sel.c2 + 1), code);
+    const n = (sel.r2 - sel.r1 + 1) * (sel.c2 - sel.c1 + 1);
+    rotSel = null; render();
+    undoToast(code == null ? `Cleared ${n} week${n > 1 ? 's' : ''} (back to the usual posting).` : `Set ${n} week${n > 1 ? 's' : ''} to ${postingName(code)}.`);
+  };
+  // select with a click, shift-click to extend, or drag across the grid
+  let dragging = false;
+  const cellDown = (e, r, c) => {
+    e.preventDefault();
+    rotSel = e.shiftKey && rotSel ? { a: rotSel.a, b: [r, c] } : { a: [r, c], b: [r, c] };
+    dragging = true;
+    const up = () => { dragging = false; window.removeEventListener('pointerup', up); render(); };
+    window.addEventListener('pointerup', up);
+    refreshSel();
+  };
+  const cellEnter = (r, c) => { if (dragging) { rotSel.b = [r, c]; refreshSel(); } };
+  function refreshSel() {
+    const [r1, r2] = [rotSel.a[0], rotSel.b[0]].sort((x, y) => x - y), [c1, c2] = [rotSel.a[1], rotSel.b[1]].sort((x, y) => x - y);
+    app.querySelectorAll('td.wk').forEach(td => { const r = +td.dataset.r, c = +td.dataset.c; td.classList.toggle('sel', r >= r1 && r <= r2 && c >= c1 && c <= c2); });
+  }
+
+  // the month labels over the weeks
+  const monthHead = [];
+  weeks.forEach((m, i) => {
+    const mo = +m.slice(5, 7), y = +m.slice(0, 4);
+    const last = monthHead.at(-1);
+    if (last && last.mo === mo && last.y === y) last.span++; else monthHead.push({ mo, y, span: 1 });
+  });
+  const counts = {};
+  for (const p of state.staff.filter(x => x.role === 'junior')) { const c = weekPosting(rot, p.id, now) ?? p.posting ?? ''; counts[c] = (counts[c] || 0) + 1; }
+  const selCount = sel ? (sel.r2 - sel.r1 + 1) * (sel.c2 - sel.c1 + 1) : 0;
+
+  return h('div', {},
+    h('section', { class: 'card' },
+      h('div', { class: 'section-head' },
+        h('button', { class: 'small', 'aria-label': 'Previous year', onclick: () => { rotYear--; rotSel = null; rotScroll = null; render(); } }, '‹'),
+        h('h2', { style: 'display:inline; margin:0 8px' }, `Rotations · ${year}`),
+        h('button', { class: 'small', 'aria-label': 'Next year', onclick: () => { rotYear++; rotSel = null; rotScroll = null; render(); } }, '›'),
+        h('span', { class: 'grow' }),
+        fileButton('Import rotation (Excel)', '.xlsx,.csv', false, importRotations),
+        h('button', { onclick: exportRotations }, 'Download .xlsx'),
+        h('button', { onclick: () => {
+          pushRotUndo(`clearing ${year}`);
+          for (const m of weeks) delete rot.weeks[m];
+          render(); undoToast(`Cleared the ${year} rotation.`);
+        } }, 'Clear year')),
+      h('p', { class: 'hint' }, 'Each column is a week (Monday to Sunday). Select weeks by clicking, shift-clicking or dragging (across people too), then pick the posting. Blank weeks use the usual posting. To change someone\'s posting for one day only, open them from Today or the roster and use "Posting today". The Excel file has names down the first column and each week\'s Monday across the top; Download gives you one to fill in.'),
+      rotNotes.length ? h('ul', { class: 'warnings' }, rotNotes.map(t => h('li', { class: 'warn' }, t)), h('li', { class: 'info' }, h('button', { class: 'link', onclick: () => { rotNotes = []; render(); } }, 'Dismiss'))) : null,
+      h('div', { class: 'stats' }, h('span', {}, `Week of ${longDate(now)}:`), POSTINGS.filter(([k]) => counts[k]).map(([k, label]) => h('span', {}, h('b', {}, counts[k]), ' ', k ? label : 'no posting'))),
+      h('div', { class: 'rot-palette' + (selCount ? '' : ' idle') },
+        h('span', { class: 'seen' }, selCount ? `${selCount} week${selCount > 1 ? 's' : ''} selected:` : 'Select weeks, then pick:'),
+        POSTINGS.filter(([k]) => k).map(([k, label]) => h('button', { class: 'small post', disabled: !selCount, style: `background:${fillOf(k)}`, title: label, onclick: () => apply(k) }, k)),
+        h('button', { class: 'small', disabled: !selCount, title: 'Back to the usual posting', onclick: () => apply(null) }, 'Usual'),
+        h('span', { class: 'grow' }),
+        h('input', { placeholder: 'Filter names', value: staffFilter, oninput: e => { staffFilter = e.target.value; rotSel = null; const pos = e.target.selectionStart; render(); const i = app.querySelector('.rot-palette input'); i.focus(); i.setSelectionRange(pos, pos); } }))),
+    h('section', { class: 'card scroll rot-wrap', onscroll: e => { rotScroll = e.target.scrollLeft; } },
+      people.length ? h('table', { class: 'rot' },
+        h('thead', {},
+          h('tr', {}, h('th', { class: 'who' }), h('th', { class: 'usual' }), monthHead.map(x => h('th', { class: 'mon', colspan: x.span }, `${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][x.mo - 1]}${x.y !== year ? ' ' + x.y : ''}`))),
+          h('tr', {}, h('th', { class: 'who' }, 'Name'), h('th', { class: 'usual' }, 'Usual'), weeks.map(m => h('th', { class: 'day' + (m === now ? ' now' : ''), title: `Week of ${longDate(m)}` }, +m.slice(8))))),
+        h('tbody', {}, people.map((p, r) => h('tr', {},
+          h('td', { class: 'who' }, personChip(p, { onclick: e => openPersonBox(e.currentTarget, p, { kind: 'view' }) })),
+          h('td', { class: 'usual' }, select(p.posting || '', POSTINGS.map(([k, l]) => [k, k || '—']), v => { p.posting = v; render(); })),
+          weeks.map((m, c) => {
+            const code = weekPosting(rot, p.id, m);
+            const shown = code ?? p.posting ?? '';
+            return h('td', { class: 'wk' + (code == null ? ' usual' : '') + (m === now ? ' now' : '') + (inSel(r, c) ? ' sel' : ''), 'data-r': r, 'data-c': c,
+              style: shown ? `background:${fillOf(shown)}` : '', title: `${p.name} · week of ${longDate(m)}: ${postingName(shown) || 'no posting'}${code == null ? ' (usual)' : ''}`,
+              onpointerdown: e => cellDown(e, r, c), onpointerenter: () => cellEnter(r, c) }, ROT_SHORT[shown] || shown);
+          }))))) : h('p', { class: 'empty' }, state.staff.length ? 'No juniors match.' : 'Add the staff list first.')));
+}
+
+// keep the grid where it was, or open it on the week on screen
+function placeRotGrid() {
+  const w = app.querySelector('.rot-wrap'), now = w?.querySelector('th.day.now');
+  if (!w) return;
+  w.scrollLeft = rotScroll ?? (now ? Math.max(0, now.offsetLeft - w.clientWidth / 2) : 0);
+}
+
+async function importRotations([file]) {
+  try {
+    const wb = await readWorkbook(file);
+    const year = rotYear || +state.day.date.slice(0, 4);
+    const person = name => { const p = personByText(name); return p?.role === 'junior' ? p : null; };
+    let res = null;
+    for (const ws of wb.worksheets) { const r = readRotationSheet(ws, cellText, person, year); if (!r.error) { res = r; break; } res ||= r; }
+    if (res.error) return toast(res.error);
+    pushRotUndo('the rotation import');
+    // the weeks and people in the file are set exactly as the file has them (blank = usual posting)
+    for (const m of res.mondays) for (const id of res.people) setWeeks(state.rotations, id, [m], res.weeks[m]?.[id] ?? null);
+    rotNotes = [
+      ...(res.unmatched.length ? [`Not on the junior list (skipped): ${res.unmatched.join(', ')}. Add them on the Staff tab, or add the spelling as a short name, then import again.`] : []),
+      ...(res.unknown.length ? [`Not a posting (left out): ${res.unknown.map(t => `"${t}"`).join(', ')}. Postings are ${POSTINGS.filter(([k]) => k).map(([k, l]) => l).join(', ')}.`] : []),
+    ];
+    const first = res.mondays.slice().sort()[0];
+    if (first) rotYear = +first.slice(0, 4);
+    render();
+    undoToast(`${file.name}: ${res.people.length} people over ${res.mondays.length} weeks.`);
+  } catch (e) { console.error(e); toast(`Couldn't read ${file.name}.`); }
+}
+
+async function exportRotations() {
+  const year = rotYear || +state.day.date.slice(0, 4);
+  const people = state.staff.filter(p => p.role === 'junior').sort(bySeniority);
+  const wb = buildRotationWorkbook(window.ExcelJS, { year, people, rot: state.rotations });
+  download(`Junior rotations ${year}.xlsx`, new Blob([await wb.xlsx.writeBuffer()], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
 }
 
 // ---- today: who is where, then the calls and clinics ----
@@ -2751,7 +2903,7 @@ function renderSettings() {
 // ---------- team file ----------
 
 document.getElementById('saveTeam').addEventListener('click', () => {
-  const data = { kind: 'ot-roster-team', version: 1, savedAt: new Date().toISOString(), settings: state.settings, staff: state.staff, roomTemplate: state.roomTemplate, roomsVersion: state.roomsVersion, staffLog: state.staffLog || [] };
+  const data = { kind: 'ot-roster-team', version: 1, savedAt: new Date().toISOString(), settings: state.settings, staff: state.staff, roomTemplate: state.roomTemplate, roomsVersion: state.roomsVersion, staffLog: state.staffLog || [], rotations: state.rotations };
   download(`OT roster team file ${new Date().toISOString().slice(0, 10)}.json`, new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' }));
 });
 document.getElementById('loadTeam').addEventListener('change', async e => {
@@ -2768,6 +2920,7 @@ document.getElementById('loadTeam').addEventListener('change', async e => {
     cleanStaffNames();
     state.roomTemplate = data.roomTemplate || clone(DEFAULT_ROOMS);
     state.roomsVersion = data.roomsVersion || 1;
+    if (data.rotations) state.rotations = { ...emptyRotations(), ...data.rotations };
     migrateRooms();
     nextId = 1 + state.staff.reduce((m, p) => Math.max(m, parseInt(String(p.id).replace(/\D/g, ''), 10) || 0), 0);
     syncRooms();
@@ -2861,7 +3014,7 @@ cloud.watchUser(async user => {
   if (cs.member) loadTeamFromCloud(false);
 }).catch(e => { cs.ready = true; cloudError(e); render(); });
 
-const teamHash = () => JSON.stringify([state.settings, state.staff, state.roomTemplate, state.staffLog || [], state.monthly || {}]);
+const teamHash = () => JSON.stringify([state.settings, state.staff, state.roomTemplate, state.staffLog || [], state.monthly || {}, state.rotations || {}]);
 
 // Shown on the staff and settings tabs: whether this browser's staff list, rooms and settings match the team's.
 function teamSyncBar() {
@@ -2879,6 +3032,7 @@ async function saveTeamToCloud() {
   try {
     const doc = await cloud.saveTeam({ settings: state.settings, staff: state.staff, roomTemplate: state.roomTemplate, roomsVersion: state.roomsVersion, staffLog: state.staffLog || [] }, me());
     await cloud.saveMonthly(state.monthly || {}, me());
+    await cloud.saveRotations(state.rotations || emptyRotations(), me());
     state.teamSyncedAt = doc.updatedAt;
     state.teamSyncedHash = teamHash();
     render();
@@ -2900,6 +3054,8 @@ async function loadTeamFromCloud(asked) {
     state.roomTemplate = t.roomTemplate || clone(DEFAULT_ROOMS);
     const m = await cloud.loadMonthly();
     if (m) state.monthly = m.months || {};
+    const rot = await cloud.loadRotations();
+    if (rot) state.rotations = { ...emptyRotations(), weeks: rot.weeks || {} };
     state.teamSyncedAt = t.updatedAt;
     state.roomsVersion = t.roomsVersion || 1;
     migrateRooms();

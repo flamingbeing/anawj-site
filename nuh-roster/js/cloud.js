@@ -83,6 +83,18 @@ export async function saveMonthly(months, user) {
   await F.setDoc(F.doc(db, 'team', 'monthly'), plain({ months, updatedAt: Date.now(), updatedBy: who(user) }));
 }
 
+// Junior rotations (postings by week) for every year, in their own document.
+export async function loadRotations() {
+  const { db, F } = await sdk();
+  const snap = await F.getDoc(F.doc(db, 'team', 'rotations'));
+  return snap.exists() ? snap.data() : null;
+}
+
+export async function saveRotations(rot, user) {
+  const { db, F } = await sdk();
+  await F.setDoc(F.doc(db, 'team', 'rotations'), plain({ weeks: rot.weeks || {}, updatedAt: Date.now(), updatedBy: who(user) }));
+}
+
 // ---- rosters ----
 
 export async function rosterMeta(date) {
