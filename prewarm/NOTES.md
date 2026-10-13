@@ -285,7 +285,7 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   asked for or listed in Still to fill; their export cells stay blank.
 - **Perioperative data split in three** (owner, 13 Oct 2026): one row of three buttons on the patient screen: Pre-op
   (`#/p/<id>/data`: Subject ID and group, pre-op, meds, bloods; tick `sign_periop`, label "Pre-op and patient
-  details"), Day 1 (`/data/day1`: chart review, analgesia; `sign_pod1`) and Day 2 (`/data/day2`: chart review,
+  details"), POD1 (`/data/day1`: chart review, analgesia; `sign_pod1`) and POD2 (`/data/day2`: chart review,
   analgesia, discharge; `sign_pod2`). Questions and order unchanged (`DATA_PARTS` in app.js). Each tick locks only
   its page; "data collection complete" closes none of them. Progress ticks on the list and the export's "Complete: …"
   columns (Extra sheet) have the three.
@@ -351,3 +351,8 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
 - **Admin hospital** (owner, 13 Oct 2026): signed-in admins had no way to set "their" hospital (the chips only showed in
   demo mode), so patients they started had no hospital and never synced. Settings now shows the hospital chips to admins
   (members' hospital stays fixed by their team). Workaround before this ships: open the team's join link while signed in.
+
+### Done looks done (owner, 13 Oct 2026)
+The bottom shortcuts on the patient screen turn solid green once their section is marked complete (no tick). The PACU
+Mark complete is a full-width navy button. Day 1 / Day 2 are called POD1 / POD2 everywhere (the Word template's own
+"Day 1" labels are unchanged).

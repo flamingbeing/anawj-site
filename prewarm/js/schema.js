@@ -186,7 +186,7 @@ export const PAGES = [
     yn('pacu_delay1h', 'Delay more than 1 hour?', ifYes('pacu_delay')),
     { id: 'pacu_delay_why', label: 'Why the delay', type: 'text', ...ifYes('pacu_delay1h') },
   ] },
-  { id: 'pod1', title: 'Day 1 chart review', section: 6, fields: [
+  { id: 'pod1', title: 'POD1 chart review', section: 6, fields: [
     { id: 'd1_drain', label: 'Drain blood loss (24 h)', type: 'int', unit: 'mL' },
     ...bloods('d1_'),
     { id: 'd1_trop', label: 'Troponin I', type: 'num', unit: 'ng/L', hint: 'DCF is ng/mL; EPIC is ng/L' },
@@ -195,12 +195,12 @@ export const PAGES = [
     { id: 'd1_tmax', label: 'Highest temperature', type: 'num', unit: '°C', temp: true },
     { id: 'd1_pain', label: 'Highest pain score (24 h)', type: 'code', opts: PAIN },
   ] },
-  { id: 'pod1an', title: 'Day 1 analgesia (24 h)', section: 7, fields: analgesia('d1_') },
+  { id: 'pod1an', title: 'POD1 analgesia (24 h)', section: 7, fields: analgesia('d1_') },
   { id: 'satis', title: 'Patient satisfaction', section: 8, opday: true, signoff: true, fields: [
     { id: 'sat_pre', label: 'Comfortable in the pre-operative period?', type: 'code', opts: COMFORT },
     { id: 'sat_post', label: 'Comfortable in the post-operative period?', type: 'code', opts: COMFORT },
   ] },
-  { id: 'pod2', title: 'Day 2 chart review', section: 9, fields: [
+  { id: 'pod2', title: 'POD2 chart review', section: 9, fields: [
     { id: 'd2_drain', label: 'Drain blood loss (24 h)', type: 'int', unit: 'mL' },
     ...bloods('d2_'),
     { id: 'd2_trop', label: 'Troponin I', type: 'num', unit: 'ng/L', hint: 'DCF is ng/mL; EPIC is ng/L' },
@@ -210,7 +210,7 @@ export const PAGES = [
     { id: 'd2_tmax', label: 'Highest temperature', type: 'num', unit: '°C', temp: true },
     { id: 'd2_pain', label: 'Highest pain score', type: 'code', opts: PAIN },
   ] },
-  { id: 'pod2an', title: 'Day 2 analgesia (24 h)', section: 10, fields: analgesia('d2_') },
+  { id: 'pod2an', title: 'POD2 analgesia (24 h)', section: 10, fields: analgesia('d2_') },
   { id: 'dc', title: 'Discharge', section: 11, fields: [
     yn('dc_hai', 'Hospital-acquired infection'),
     { id: 'dc_hai_type', label: 'Type of infection', type: 'code', opts: [[0, 'Surgical site'], [1, 'Others']], ...ifYes('dc_hai') },

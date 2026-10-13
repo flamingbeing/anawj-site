@@ -450,3 +450,11 @@ dialog.kp::backdrop { background: rgba(0, 0, 0, .4); }
 
 .moved { background: var(--info-soft); color: var(--navy); padding: 8px 12px; font-size: 13px; line-height: 1.35; }
 .moved .link { font-size: 13px; }
+
+/* bottom shortcuts: a finished one turns green (owner, 13 Oct 2026) */
+.links a.done { background: var(--ok); border-color: var(--ok); color: #fff; }
+.links a.done small { color: #fff; }
+/* PACU: Mark complete is a full-width button */
+.sign.big { border-top: 0; }
+.sign.big .tickbtn { width: 100%; justify-content: center; min-height: 56px; border-radius: var(--r-card); background: var(--navy); color: #fff; font-size: 17px; box-shadow: 0 2px 6px rgba(0, 47, 108, .35); }
+.sign.big .tickbtn .tick { border-color: #fff; background: transparent; }

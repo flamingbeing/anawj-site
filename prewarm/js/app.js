@@ -988,7 +988,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
   }
   // the other forms, Still to fill and Mark complete: the same on both tabs (owner, 12 Oct 2026)
   function linksHtml() {
-    const done = pg => val(p, 'sign_' + pg) ? ' ✓' : '';
+    const done = pg => val(p, 'sign_' + pg) ? ' class="done" aria-label="complete"' : '';
     // once their stage has come: how many questions are left
     const todo = (ids, from) => {
       if (!val(p, from)) return '';
@@ -996,10 +996,10 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
       return n ? `${n} to answer` : '';
     };
     return `<nav class="links two" aria-label="Other forms">
-      <a href="#/p/${id}/form/intraop">Intra-op details${done('intraop')}<small>${todo(INTRAOP_Q, 'io_done') || 'Blood, products, tests'}</small></a>
-      <a href="#/p/${id}/form/pacu">PACU${done('pacu')}<small>${todo(PACU_Q, 'pacu_in') || 'Temp, NuDESC, delay'}</small></a>
+      <a href="#/p/${id}/form/intraop"${done('intraop')}>Intra-op details<small>${todo(INTRAOP_Q, 'io_done') || 'Blood, products, tests'}</small></a>
+      <a href="#/p/${id}/form/pacu"${done('pacu')}>PACU<small>${todo(PACU_Q, 'pacu_in') || 'Temp, NuDESC, delay'}</small></a>
       </nav>
-      <nav class="links three" aria-label="Perioperative data">${DATA_PARTS.map(d => `<a href="#/p/${id}/${d.path}">${d.short}${done(d.sign)}</a>`).join('')}</nav>
+      <nav class="links three" aria-label="Perioperative data">${DATA_PARTS.map(d => `<a href="#/p/${id}/${d.path}"${done(d.sign)}>${d.short}</a>`).join('')}</nav>
       <div class="textlinks"><a href="#/p/${id}/form">Form view</a><a href="#/p/${id}/sheet">Sheet view</a></div>`;
   }
   // previous / next timepoint: big buttons either side of the tabs and the timepoint strip
@@ -1376,7 +1376,7 @@ const disableSealed = () => view.querySelectorAll('.sealed input, .sealed select
 // which sections are marked complete, shown on the patient list (owner, 13 Oct 2026): read only, they just
 // mirror the existing complete ticks inside each section
 function progressHtml(p) {
-  const rows = [['prewarm', 'Pre-warm'], ['iotemp', 'Intra-op temps'], ['haemo', 'BP, HR, BIS'], ['intraop', 'Intra-op details'], ['pacu', 'PACU'], ['periop', 'Pre-op'], ['pod1', 'Day 1'], ['pod2', 'Day 2']]
+  const rows = [['prewarm', 'Pre-warm'], ['iotemp', 'Intra-op temps'], ['haemo', 'BP, HR, BIS'], ['intraop', 'Intra-op details'], ['pacu', 'PACU'], ['periop', 'Pre-op'], ['pod1', 'POD1'], ['pod2', 'POD2']]
     .filter(([k]) => !(k === 'prewarm' && noWarming(p)));
   return `<span class="progress" role="list" aria-label="Sections marked complete">${rows.map(([k, l]) => { const on = !!val(p, 'sign_' + k);
     return `<span role="listitem" class="${on ? 'on' : ''}" aria-label="${l}: ${on ? 'complete' : 'not marked complete'}"><span class="tick" aria-hidden="true">${on ? '✓' : ''}</span>${l}</span>`; }).join('')}</span>`;
@@ -1387,10 +1387,10 @@ function doneHtml(p) {
 
 // ---------- section sign-off (replaces the paper form's Name / Signature / Date)
 // each sign-off names its section, and shows a ticked box once marked (owner, 12 Oct 2026)
-const SECTION = { periop: 'pre-op and patient details', pod1: 'day 1', pod2: 'day 2', prewarm: 'pre-warming temps', iotemp: 'intra-op temps', haemo: 'BP, HR, BIS', intraop: 'Intra-op details', pacu: 'PACU', satis: 'Patient comfort' };
+const SECTION = { periop: 'pre-op and patient details', pod1: 'POD1', pod2: 'POD2', prewarm: 'pre-warming temps', iotemp: 'intra-op temps', haemo: 'BP, HR, BIS', intraop: 'Intra-op details', pacu: 'PACU', satis: 'Patient comfort' };
 const tickHtml = (on, label, who, undo, mark) => on
   ? `<div class="sign on"><span class="tick" aria-hidden="true">✓</span><span><b>${esc(label)} complete</b><small>${esc(who)}</small></span><button class="link" ${undo}>Undo</button></div>`
-  : `<div class="sign"><button class="tickbtn" ${mark}><span class="tick" aria-hidden="true"></span>Mark ${esc(label)} complete</button></div>`;
+  : `<div class="sign${label === 'PACU' ? ' big' : ''}"><button class="tickbtn" ${mark}><span class="tick" aria-hidden="true"></span>Mark ${esc(label)} complete</button></div>`;
 function signoffHtml(p, pg) {
   const name = SECTION[pg] || PAGES.find(x => x.id === pg)?.title || 'section';
   return tickHtml(!!val(p, 'sign_' + pg), name, val(p, 'sign_' + pg) || '', `data-unsign="${pg}"`, `data-sign="${pg}"`);
@@ -1427,8 +1427,8 @@ const vitalsCollected = p => Object.keys(p.f).some(k => /^haemo_/.test(k) && val
 // complete tick; the questions are the same and in the same order as before.
 const DATA_PARTS = [
   { path: 'data', sign: 'periop', short: 'Pre-op', title: 'Pre-op and patient details', pages: ['preop', 'meds', 'bloods'], study: true },
-  { path: 'data/day1', sign: 'pod1', short: 'Day 1', title: 'Day 1', pages: ['pod1', 'pod1an'] },
-  { path: 'data/day2', sign: 'pod2', short: 'Day 2', title: 'Day 2 and discharge', pages: ['pod2', 'pod2an', 'dc'] },
+  { path: 'data/day1', sign: 'pod1', short: 'POD1', title: 'POD1', pages: ['pod1', 'pod1an'] },
+  { path: 'data/day2', sign: 'pod2', short: 'POD2', title: 'POD2 and discharge', pages: ['pod2', 'pod2an', 'dc'] },
 ];
 const DATA_SIGNS = new Set(DATA_PARTS.map(d => d.sign));
 route(/^\/p\/(\w+)\/data(?:\/(day1|day2))?$/, (id, day) => {
