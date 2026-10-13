@@ -39,11 +39,18 @@ editor), then Send. No frame: it runs in the page itself, so it works on the sub
 - **Real addresses: off unless that browser turns it on.** Open any page with `?feedback=1` (a cookie keeps it on for that
   subdomain for 30 days); **Turn off** in its menu, or `?feedback=0`, removes it. `anawj.com` itself (GitHub Pages) never
   gets it; use the editor there.
-- **Live apps never send screen text.** On `apmes.`, `prewarmstudy.` and `nuhroster.` (not in `?demo`), a comment records only
-  the kind of element and its CSS locator, never what the screen shows (patients, residents' notes). Comments go through the
+- **Live apps never send screen text.** On `apmes.`, `prewarmstudy.`, `nuhroster.` and `hand.anawj.com/handlog/` (not in
+  `?demo`), a comment records only the kind of element and its CSS locator, never what the screen shows (patients,
+  residents' notes, assessors' names); the address only as its path and the screen's name (no query, no record ids in
+  the `#` part, no ids with digits in locators); errors only as their messages, never other things the app logged. Comments go through the
   same privacy check as the editor.
-- **Apps with an offline copy** (logbook, evals, prewarm, hand) show their saved page first, which was saved without the
-  button: if it doesn't appear after `?feedback=1`, it will once the app updates; on previews it always appears.
+- **Apps with an offline copy** (logbook, evals, prewarm, hand) answer from their saved page, so `?feedback=1` never reaches
+  the Worker there: the button appears once the app next updates (its new copy is saved with the button, which then shows
+  only while the cookie is on). To turn it on at once, use a bookmark whose address is this one line, opened on the app's
+  page (tested on the live site; on a phone, edit any bookmark and paste it as the address):
+  `javascript:(()=>{document.cookie='anawj-feedback=1;path=/;max-age=2592000;secure;samesite=lax';var s=document.createElement('script');s.src='/feedback/overlay.js';document.body.appendChild(s)})()`
+  **Turn off** in the button's menu removes it (the cookie); `?feedback=0` can't reach those apps either. Changing the apps'
+  service workers to let `?feedback` through is possible but touches the vital apps: owner's call.
 - **Draw on it**: circle things or draw arrows over the screen ("move this up here", "too much space"); each circle becomes
   "circled <element>" and each arrow "from <element> to <element>", with their locators, plus the screen size and scroll
   position, so a layout comment points at exact parts of the page. (On live apps, without their text.)

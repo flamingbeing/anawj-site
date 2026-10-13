@@ -37,6 +37,7 @@ await ctx.route(/^https:\/\/([a-z0-9-]+\.kohwenjun\.workers\.dev|(hand|apmes|pre
 await ctx.route('https://api.github.com/repos/flamingbeing/anawj-site/pulls?state=open&per_page=100', route => route.fulfill({
   status: 200, contentType: 'application/json',
   body: JSON.stringify([{ number: 7, title: 'Something else', head: { ref: 'claude/other' }, html_url: 'https://github.com/flamingbeing/anawj-site/pull/7' },
+    { number: 9, title: 'A longer branch name', head: { ref: 'claude/try-feedback-2' }, html_url: 'https://github.com/flamingbeing/anawj-site/pull/9' },
     { number: 412, title: 'Try the feedback button', head: { ref: 'claude/try-feedback' }, html_url: 'https://github.com/flamingbeing/anawj-site/pull/412' }]) }));
 await ctx.route(/^https:\/\/(?!api\.github\.com|[a-z0-9-]+\.kohwenjun\.workers\.dev|(hand|apmes|prewarmstudy|nuhroster)\.anawj\.com)/, r => r.abort());
 
@@ -175,25 +176,42 @@ try {
 
   // ---- versions to choose from: flip between them on the preview, then choose one
   const ver = await ctx.newPage();
-  await ver.goto(PREVIEW + '/zz-variants/');
+  await ver.goto(PREVIEW + '/zz-variants/?keep=1');
   await fb(ver).locator('#fab').waitFor();
   assert.equal(await fb(ver).locator('#ver').textContent(), 'Version A');
   await fb(ver).locator('#fab').click();
   assert.equal(await fb(ver).locator('#vers button').count(), 3);
   await fb(ver).locator('#vers button', { hasText: 'B' }).click();
-  await ver.waitForURL(/variant=b/);
+  await ver.waitForURL(/\?keep=1&variant=b$/);
   await fb(ver).locator('#fab').waitFor();
   assert.equal(await ver.evaluate(() => document.documentElement.dataset.variant), 'b');
   assert.equal(await fb(ver).locator('#ver').textContent(), 'Version B');
   await fb(ver).locator('#fab').click();
   if (SHOTS) await ver.screenshot({ path: path.join(SHOTS, 'feedback-versions.png') });
+  assert.equal(new URL(await fb(ver).locator('#cmpNow').getAttribute('href')).search, '?keep=1', '"how it is now" drops only ?variant');
+  await fb(ver).locator('#choose').click();
+  // change of mind: choose A instead (the later choice replaces the earlier one)
+  await ver.goto(PREVIEW + '/zz-variants/?variant=a&keep=1');
+  await fb(ver).locator('#fab').click();
   await fb(ver).locator('#choose').click();
   await fb(ver).locator('#fab').click();
   await fb(ver).locator('#mSend').click();
   const verRep = await fb(ver).locator('#report').inputValue();
-  assert.match(verRep, /## Page: https:\/\/claude-try-feedback-anawj-preview\.kohwenjun\.workers\.dev\/zz-variants\/\n\n### 1\. Version chosen\nChoose version B \(of A, B, C\)\. Keep that one/);
+  assert.match(verRep, /## Page: https:\/\/claude-try-feedback-anawj-preview\.kohwenjun\.workers\.dev\/zz-variants\/\?keep=1\n\n### 1\. Version chosen\nChoose version A \(of A, B, C\)\. Keep that one/);
+  assert.doesNotMatch(verRep, /version B/, 'only the latest choice');
   // pages without versions don't show the chooser
   assert.ok(await bug.evaluate(() => document.querySelector('[data-anawj-feedback]').shadowRoot.getElementById('verBox').hidden));
+
+  // ---- two tabs of the same site: a comment from each is kept
+  const t1 = await ctx.newPage(), t2 = await ctx.newPage();
+  await t1.goto(PREVIEW + '/privacy/'); await t2.goto(PREVIEW + '/privacy/');
+  for (const [t, words] of [[t1, 'from tab one'], [t2, 'from tab two']]) {
+    await fb(t).locator('#fab').waitFor(); await fb(t).locator('#fab').click();
+    await fb(t).locator('#mPage').click(); await fb(t).locator('#noteText').fill(words); await fb(t).locator('#noteSave').click();
+  }
+  const kept = await t1.evaluate(() => JSON.parse(localStorage.getItem('anawj-feedback-v1')).map(c => c.text));
+  assert.ok(kept.includes('from tab one') && kept.includes('from tab two'), 'both tabs\' comments kept: ' + kept);
+  await t1.close(); await t2.close();
 
   // ---- a real address: off unless turned on
   const live = await ctx.newPage();
@@ -224,5 +242,25 @@ try {
   await live.locator('h1:visible, h2:visible, button:visible').first().click();
   assert.match(await fb(live).locator('#onText').textContent(), /^On: [a-z ]+$/, 'no screen text on a live app');
   if (SHOTS) await live.screenshot({ path: path.join(SHOTS, 'feedback-live-app.png') });
+  await fb(live).locator('#noteText').fill('Heading too big');
+  await fb(live).locator('#noteSave').click();
+  // the address's query and record ids, and things the app logs, never reach a report from a live app
+  await live.goto('https://prewarmstudy.anawj.com/?secretq=abc#patient/rec123');
+  await fb(live).locator('#fab').waitFor();
+  await live.evaluate(() => { location.hash = '#patient/rec123'; console.error({ initials: 'QZX' }, new Error('write failed')); });
+  await fb(live).locator('#fab').click();
+  await fb(live).locator('#mBug').click();
+  await fb(live).locator('#noteText').fill('Save did nothing');
+  await fb(live).locator('#noteSave').click();
+  await fb(live).locator('#fab').click();
+  await fb(live).locator('#mSend').click();
+  const liveRep = await fb(live).locator('#report').inputValue();
+  assert.match(liveRep, /## Page: https:\/\/prewarmstudy\.anawj\.com\/\n/);
+  assert.match(liveRep, /console: write failed/);
+  for (const secret of ['secretq', 'rec123', 'QZX', 'Prewarming study']) assert.ok(!liveRep.includes(secret), `live report leaks ${secret}`);
+  // hand-log keeps people's names on the phone: a live app too
+  await live.goto('https://hand.anawj.com/handlog/?feedback=1');
+  await fb(live).locator('#fab').waitFor();
+  assert.match(await fb(live).locator('#where').textContent(), /Live app/);
   console.log('feedback e2e: ok');
 } finally { await b.close(); }

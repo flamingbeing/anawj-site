@@ -407,7 +407,7 @@ code{font-size:13px;background:var(--inset);padding:2px 4px;word-break:break-all
   // ---- speaking a comment (the browser's own speech recognition, where there is one; the text is what's kept)
   const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
   let rec = null;
-  function stopSpeech() { if (rec) { try { rec.stop(); } catch (e) {} rec = null; } $('speakBtn').setAttribute('aria-pressed', 'false'); $('speakBtn').textContent = '🎤 Speak'; }
+  function stopSpeech() { if (rec) { try { rec.abort(); } catch (e) {} rec = null; } $('speakBtn').setAttribute('aria-pressed', 'false'); $('speakBtn').textContent = '🎤 Speak'; }
   if (Speech) {
     $('speakBtn').hidden = false;
     $('speakHint').textContent = 'Tap Speak and say what should change; check the words before saving (drug names and doses get misheard).';
@@ -415,8 +415,9 @@ code{font-size:13px;background:var(--inset);padding:2px 4px;word-break:break-all
       if (rec) { stopSpeech(); return; }
       const box = $('noteText'), start = box.value ? box.value.replace(/\s*$/, ' ') : '';
       try {
-        rec = new Speech(); rec.lang = navigator.language || 'en-GB'; rec.interimResults = true; rec.continuous = true;
-        rec.onresult = e => { let t = ''; for (const r of e.results) t += r[0].transcript; box.value = start + t.trim(); };
+        const me = rec = new Speech(); rec.lang = navigator.language || 'en-GB'; rec.interimResults = true; rec.continuous = true;
+        // (a recognizer stopped for an earlier comment can still deliver words: ignore it)
+        rec.onresult = e => { if (rec !== me) return; let t = ''; for (const r of e.results) t += r[0].transcript; box.value = start + t.trim(); };
         rec.onerror = e => { stopSpeech(); if (e.error === 'not-allowed' || e.error === 'service-not-allowed') $('speakHint').textContent = 'The microphone is blocked for this page. Use your keyboard’s microphone instead.'; };
         rec.onend = () => { if (rec) stopSpeech(); };
         rec.start();
