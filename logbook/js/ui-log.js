@@ -10,6 +10,7 @@ import {
   createCase, updateCase, removeCase, restoreCase, saveMany, deleteMany, subcatChips, subcatsOf, settings, todayISO, hooks, fill, add, cloud, writes, okNoIds, patchLogbook, catPills, basicHides, caseShown } from './ui-core.js';
 import { display, templateDialog } from './ui-settings.js';
 import { moveToBin } from './bin.js';
+import { caseHasNotes, openNotes } from './ui-notepad.js';
 import { createDraftSlot, listDrafts } from './drafts.js';
 
 const DRAFT_KEY = 'logbook-draft-v2';
@@ -994,12 +995,23 @@ export function editCaseDialog(c, opts = {}) {
   const detailsBox = h('textarea', { rows: '6', class: 'grow-box', value: e.details, placeholder: isNew ? 'e.g. 72M lap chole GA ETT, difficult airway' : '',
     oninput: ev => { e.details = ev.target.value; saveEditDraft(); grow(ev.target); } });
   requestAnimationFrame(() => grow(detailsBox));
+  // links to what hangs off this case: its reflection and its notes (a draft of unsaved edits stays on this device)
+  const linksBlock = () => {
+    const refl = (S.reflections || []).some(r => r.caseId === c.id), notes = caseHasNotes(c.id);
+    return h('div', { class: 'case-links' }, h('div', { class: 'chiplabel' }, 'Linked'),
+      h('div', { class: 'bar' },
+        basicHides('reflect') ? null : h('button', { type: 'button', class: 'small', onclick: async () => { await m.close(); (await import('./ui-reflect.js')).reflectOnCase(c); } },
+          refl ? 'Open the reflection' : 'Write a reflection'),
+        h('button', { type: 'button', class: 'small', onclick: async () => { await m.close(); openNotes({ caseId: c.id, create: !notes }); } },
+          notes ? 'Open the notes' : 'Write a note')));
+  };
   const m = modal(isNew ? 'New case' : 'Edit case', [
     c.dateText && !c.date ? h('p', { class: 'tip' }, `Imported date “${c.dateText}” could not be read — please set the date.`) : null,
     h('label', { class: 'field' }, 'Date', h('input', { type: 'date', value: e.date || '', onchange: ev => { e.date = parseDate(ev.target.value); saveEditDraft(); } })),
     h('label', { class: 'field' }, 'Patient initials', h('input', { value: e.initials, placeholder: 'e.g. AB', maxlength: '20', autocapitalize: 'characters', autocomplete: 'off', spellcheck: 'false', oninput: ev => { e.initials = ev.target.value; saveEditDraft(); } })),
     h('label', { class: 'field' }, 'Case summary', detailsBox),
     h('div', { class: 'chiplabel' }, 'Tags'), sel, addBtn, pickWrap,
+    isNew ? null : linksBlock(),
     basicHides('reflect') ? null : h('label', { class: 'check reflect-tag', style: 'margin-top:8px' }, h('input', { type: 'checkbox', checked: !!e.reflectTag, onchange: ev => { e.reflectTag = ev.target.checked; saveEditDraft(); } }), ic('star'), 'Interesting'),
     draftStatus,
     // Delete / Cancel / Save stay pinned to the bottom while the form scrolls

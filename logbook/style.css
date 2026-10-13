@@ -1465,3 +1465,11 @@ html.rows-short ul.cases li:not(.monthhead):not(.refl-row) .lb-tag { background:
 html.rows-short ul.cases li:not(.monthhead):not(.refl-row) .lb-tag + .lb-tag::before { content: '·'; margin: 0 5px; }
 /* Press and hold: no text selection or iOS callout on the rows */
 html.row-hold ul.cases li:not(.monthhead) { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+
+/* Notes: the linked-case pill opens the case; download link; the case edit page's Linked row */
+.notes-page .note-case[type="button"] { cursor: pointer; font: inherit; display: block; max-width: 100%; box-sizing: border-box; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
+.notes-page .note-main { min-width: 0; }
+.note-meta button.note-case { color: var(--accent); text-align: left; }
+.notes-download { margin: 12px 0 0; }
+.case-links { margin-top: 8px; }
+.case-links .bar { justify-content: flex-start; gap: 8px; flex-wrap: wrap; }

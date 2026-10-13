@@ -9,15 +9,15 @@
 // them without reading any note. It used to live in settings.noteIndex, which the app owner can read; it moves on the
 // first sync and the old copy is cleared.
 
-import { S, h, toast, fill, hooks, writes, cloud, transients, settings, patchLogbook, resetters, todayISO, modal, emptyState } from './ui-core.js';
+import { S, h, toast, fill, hooks, writes, cloud, transients, settings, patchLogbook, resetters, todayISO, modal, emptyState, download } from './ui-core.js';
 import { uid, fmtDate, caseParts } from './engine.js';
 import { barTabs, arrangeTabs, display, setTabOnBar } from './ui-settings.js';
-import { MAX_NOTES, LIMITS, sortNotes, filterNotes, noteTitle, noteIndex, cleanNoteIndex, sameIndex, parseNote, toggleCheck, plainLines } from './notepad.js';
+import { MAX_NOTES, LIMITS, sortNotes, filterNotes, noteTitle, noteIndex, cleanNoteIndex, sameIndex, parseNote, toggleCheck, plainLines, noteFiles } from './notepad.js';
 
 const SAVE_MS = 3000;
 const mine = () => S.user && S.user.email;
 // q: search; day / caseId: what the list is narrowed to; editing: the note open in the editor; preview: its view mode
-export const nv = { q: '', day: '', caseId: '', editing: null, preview: false };
+export const nv = { q: '', day: '', caseId: '', editing: null, preview: false, autoNew: false };
 
 // ---------- loading (lazy) ----------
 
@@ -44,7 +44,7 @@ export function ensureNotes() {
   return ready;
 }
 function stopNotes() { if (stop) stop(); stop = null; owner = null; raw = []; ready = null; readyResolve = null; S.notes = null; }
-resetters.push(() => { stopNotes(); Object.assign(nv, { q: '', day: '', caseId: '', editing: null, preview: false }); });
+resetters.push(() => { stopNotes(); Object.assign(nv, { q: '', day: '', caseId: '', editing: null, preview: false, autoNew: false }); });
 writes.onChange(() => { if (owner) { apply(); if (synced) syncIndex(); } });
 
 // the index doc, read the first time the Logbook asks (one small read), then kept live for the visit
@@ -79,9 +79,11 @@ export const notesIndex = () => { watchIndex(); return cleanNoteIndex(S.noteInde
 export const dayHasNotes = date => !!date && notesIndex().days.includes(date);
 export const caseHasNotes = id => !!id && notesIndex().cases.includes(id);
 
-// open Notes on a day's notes, or a case's (from the Logbook)
-export function openNotes({ day = '', caseId = '' } = {}) {
-  Object.assign(nv, { day, caseId, q: '', editing: null, preview: false });
+// open Notes on a day's notes, or a case's (from the Logbook); create: start a new note there (linked to the case)
+export function openNotes({ day = '', caseId = '', create = false } = {}) {
+  leaveNotes();   // a note open in the editor is saved first
+  Object.assign(nv, { day, caseId, q: '', editing: null, preview: false, autoNew: create });
+  if (S.tab === 'notes') return hooks.render();
   hooks.navigate ? hooks.navigate('notes') : (location.hash = '#notes');
 }
 
@@ -120,6 +122,13 @@ export function leaveNotes() { if (nv.editing) { const n = nv.editing; persist(n
 // ---------- the page ----------
 
 const caseOf = id => (S.cases || []).find(c => c.id === id) || null;
+// tapping a linked case's pill opens the case (its edit page) over the note
+async function openCase(id) {
+  const c = caseOf(id);
+  if (!c) return toast('That case is not in your logbook any more');
+  const { editCaseDialog } = await import('./ui-log.js');
+  editCaseDialog(c);
+}
 const caseLabel = c => { const p = caseParts(c); return [c.date ? fmtDate(c.date) : '', p.initials, p.details].filter(Boolean).join(' · ').slice(0, 90); };
 
 export function renderNotes() {
@@ -129,6 +138,7 @@ export function renderNotes() {
   const loading = !Array.isArray(S.notes);
   const list = loading ? [] : S.notes;
   const full = list.length >= MAX_NOTES;
+  if (nv.autoNew && !loading) { nv.autoNew = false; queueMicrotask(() => (full ? toast(`You have ${MAX_NOTES} notes, the most allowed. Delete or export some to make room.`) : newNote())); }
   const search = h('input', { type: 'search', class: 'grow', placeholder: 'Search notes', 'aria-label': 'Search notes', value: nv.q,
     oninput: e => { nv.q = e.target.value; paintList(); } });
   const listEl = h('div', { class: 'notes-list' });
@@ -157,7 +167,8 @@ export function renderNotes() {
     narrowed ? h('p', { class: 'notes-filter' }, h('span', {}, nv.day ? `Notes on ${fmtDate(nv.day)}` : `Notes on the case ${caseOf(nv.caseId) ? caseLabel(caseOf(nv.caseId)) : ''}`),
       ' ', h('button', { class: 'small', onclick: () => { nv.day = ''; nv.caseId = ''; hooks.render(); } }, 'Show all')) : null,
     full ? h('p', { class: 'tip' }, `You have ${MAX_NOTES} notes, the most allowed. Delete old ones (they stay in the recycle bin for 30 days) or keep them in a Markdown export.`) : null,
-    listEl);
+    listEl,
+    list.length ? h('p', { class: 'notes-download' }, h('button', { class: 'small', onclick: downloadNoteFiles }, 'Download notes as files (zip)')) : null);
   paintList();
   return el;
 }
@@ -168,7 +179,8 @@ function noteRow(n) {
   return h('li', { tabindex: '0', onclick: () => openEditor(n), onkeydown: e => { if (e.key === 'Enter' && e.target === e.currentTarget) openEditor(n); } },
     h('span', { class: 'd' }, n.date ? fmtDate(n.date) : 'No date'),
     h('span', { class: 'note-main' }, h('b', {}, noteTitle(n)), preview ? h('span', { class: 'muted note-preview' }, preview.slice(0, 160)) : null,
-      c ? h('span', { class: 'flag note-case', title: 'Linked case' }, '↗ ' + caseLabel(c)) : null));
+      c ? h('button', { class: 'flag note-case', type: 'button', title: 'Open the linked case', 'aria-label': 'Open the linked case: ' + caseLabel(c),
+        onclick: e => { e.stopPropagation(); openCase(n.caseId); } }, '↗ ' + caseLabel(c)) : null));
 }
 
 function newNote() {
@@ -221,7 +233,9 @@ function editor(n) {
       h('label', { class: 'note-date', title: 'Change the date' }, dateText, date),
       n.date ? h('button', { class: 'linkish', type: 'button', onclick: () => { n.date = null; date.value = ''; touch(); paintMeta(); } }, 'No date') : null,
       h('span', { class: 'note-dot', 'aria-hidden': 'true' }, '·'),
-      n.caseId ? h('span', { class: 'note-link' }, h('span', { class: 'note-case' }, '↗ ' + (c ? caseLabel(c) : 'a deleted case')),
+      n.caseId ? h('span', { class: 'note-link' }, c
+        ? h('button', { class: 'linkish note-case', type: 'button', title: 'Open the linked case', 'aria-label': 'Open the linked case: ' + caseLabel(c), onclick: () => openCase(n.caseId) }, '↗ ' + caseLabel(c))
+        : h('span', { class: 'note-case' }, '↗ a deleted case'),
         h('button', { class: 'linkish', type: 'button', onclick: () => { delete n.caseId; touch(); paintMeta(); } }, 'Unlink'))
         : h('button', { class: 'linkish', type: 'button', onclick: () => pickCase(n, () => { touch(); paintMeta(); }) }, 'Link to a case…'));
   };
@@ -289,4 +303,29 @@ async function pickCase(n, done) {
   const m = modal('Link to a case', [q, ul, h('div', { class: 'bar' }, h('span', { class: 'grow' }), h('button', { onclick: () => m.close() }, 'Cancel'))]);
   paint();
   q.focus();
+}
+
+// Download every note as its own .md or .txt file in a zip (the files hold only the notes: the linked case isn't named)
+export function downloadNoteFiles() {
+  const list = Array.isArray(S.notes) ? S.notes : [];
+  if (!list.length) return toast('No notes to download yet');
+  const o = { fmt: 'md' };
+  const radio = (v, label) => h('label', { class: 'check' }, h('input', { type: 'radio', name: 'notes-file-format', value: v, checked: v === o.fmt, onchange: () => { o.fmt = v; } }), label);
+  const btn = h('button', { class: 'primary', onclick: async () => {
+    btn.disabled = true; btn.textContent = 'Making the zip…';
+    try {
+      const { needZip } = await import('./portfolio.js');
+      const Z = await needZip(), zip = new Z();
+      const files = noteFiles(list, o.fmt);
+      for (const f of files) zip.file(f.path, f.text);
+      download(`apmes-notes-${todayISO()}.zip`, await zip.generateAsync({ type: 'blob' }));
+      m.close();
+      toast(`${files.length} note${files.length === 1 ? '' : 's'} downloaded`);
+    } catch (err) { toast('Could not make the zip: ' + err.message); btn.disabled = false; btn.textContent = 'Download'; }
+  } }, 'Download');
+  const m = modal('Download notes', [
+    h('p', { class: 'hint help', style: 'margin:0 0 8px' }, `${list.length} note${list.length === 1 ? '' : 's'}, one file each, named by day and title, in a zip.`),
+    radio('md', 'Markdown (.md)'), radio('txt', 'Plain text (.txt)'),
+    h('p', { class: 'tip', style: 'margin:8px 0 0' }, 'The files hold only your notes, not the linked cases. Keep them private.'),
+    h('div', { class: 'bar dlg-actions' }, h('span', { class: 'grow' }), h('button', { onclick: () => m.close() }, 'Cancel'), btn)]);
 }
