@@ -58,8 +58,8 @@ button, .btn {
   padding: 6px 12px; border-radius: var(--radius); border: 1px solid var(--line-input); background: var(--panel); color: var(--navy);
 }
 button:hover, .btn:hover { border-color: var(--navy); }
-button.primary { background: var(--navy); color: #fff; border-color: var(--navy); }
-button.primary:hover { background: var(--navy-hover); border-color: var(--navy-hover); }
+button.primary, .btn.primary { background: var(--navy); color: #fff; border-color: var(--navy); }
+button.primary:hover, .btn.primary:hover { background: var(--navy-hover); border-color: var(--navy-hover); }
 button:disabled, button:disabled:hover { background: var(--disabled-bg); color: var(--disabled-ink); border-color: var(--disabled-bg); cursor: default; }
 button.small { padding: 2px 8px; font-size: 12px; }
 button.link { border: 0; background: none; color: var(--link); padding: 0; }
@@ -486,4 +486,18 @@ table.rot tfoot td.none { color: var(--red); font-weight: 700; background: #fdec
   .demo-bar .demo-text { display: none; }
   .demo-tools[open] > summary { display: block; margin-bottom: 4px; }
   .demo-tools { order: 3; flex-basis: 100%; }
+}
+/* phones: each room on Cases is a card (run, room and session on one line; notes, flags and fixed people below) */
+@media (max-width: 600px) {
+  table.cases-table thead { display: none; }
+  table.cases-table, table.cases-table tbody { display: block; }
+  table.cases-table tr { display: grid; grid-template-columns: auto 1fr auto; gap: 6px 10px; align-items: center; padding: 10px 2px; border-bottom: 1px solid var(--line); }
+  table.cases-table td { display: block; border: 0; padding: 0; min-width: 0; }
+  table.cases-table td.room b { font-size: 16px; color: var(--navy); }
+  table.cases-table td.notes, table.cases-table td.flags { grid-column: 1 / -1; }
+  table.cases-table td.notes input { width: 100%; }
+  table.cases-table td.lock { grid-column: span 3; display: flex; gap: 8px; align-items: center; }
+  table.cases-table td[data-label]::before { content: attr(data-label); font-size: 12px; color: #595e65; display: block; margin-bottom: 2px; }
+  table.cases-table td.lock::before { display: inline; margin: 0; min-width: 90px; }
+  table.cases-table tr.off td.notes, table.cases-table tr.off td.flags, table.cases-table tr.off td.lock { display: none; }
 }

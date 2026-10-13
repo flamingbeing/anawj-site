@@ -1153,17 +1153,17 @@ function renderDay(part) {
 
   const roomRow = r => h('tr', { class: r.running ? '' : 'off' },
     h('td', {}, h('input', { type: 'checkbox', checked: r.running, 'aria-label': 'Running', onchange: e => { r.running = e.target.checked; if (r.running && !r.flagsManual) r.flags = suggestFlags(r.notes, state.settings, r.name); render(); } })),
-    h('td', {}, h('b', {}, r.name)),
-    h('td', {}, select(r.session || 'full', [['full', 'Full'], ['am', 'AM'], ['pm', 'PM']], v => { r.session = v; save(); })),
-    h('td', {}, h('input', { value: r.notes, placeholder: 'e.g. eye 5y', onchange: e => {
+    h('td', { class: 'room' }, h('b', {}, r.name)),
+    h('td', { class: 'session' }, select(r.session || 'full', [['full', 'Full'], ['am', 'AM'], ['pm', 'PM']], v => { r.session = v; save(); })),
+    h('td', { class: 'notes', 'data-label': 'Case notes' }, h('input', { value: r.notes, placeholder: 'e.g. eye 5y', onchange: e => {
       r.notes = e.target.value;
       if (e.target.value.trim()) r.running = true;
       if (!r.flagsManual) r.flags = suggestFlags(r.notes, state.settings, r.name);
       render();
     } })),
-    h('td', {}, flagCell(r)),
-    h('td', {}, lockInput(r, 'lockSenior')),
-    h('td', {}, lockInput(r, 'lockJunior')),
+    h('td', { class: 'flags', 'data-label': 'Flags' }, flagCell(r)),
+    h('td', { class: 'lock', 'data-label': 'Fixed senior' }, lockInput(r, 'lockSenior')),
+    h('td', { class: 'lock', 'data-label': 'Fixed junior' }, lockInput(r, 'lockJunior')),
   );
 
   const pasteBox = (key, label, hint) => h('div', {},
@@ -1196,7 +1196,7 @@ function renderDay(part) {
     cases && h('section', { class: 'card scroll' },
       h('h2', {}, 'OT lists'),
       h('p', { class: 'hint' }, 'Tick the rooms that are running and type the case notes as usual. Flags are suggested from the notes (ages under ' + state.settings.paedsAgeYears + 'y count as paeds); "+ flag" adds or removes one. Fix a senior or junior to lock them in; the rest is filled automatically.'),
-      h('table', {},
+      h('table', { class: 'cases-table' },
         h('thead', {}, h('tr', {}, ['Run', 'Room', 'Session', 'Case notes', 'Flags', 'Fixed senior', 'Fixed junior'].map(t => h('th', {}, t)))),
         h('tbody', {}, d.rooms.map(roomRow))),
     ),
