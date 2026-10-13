@@ -96,7 +96,7 @@ each one's step makes it a redirect), and `hand.anawj.com/logbook/` is a 404.
 ## Progress
 
 - [x] Plan written (homepage session)
-- [ ] 1. Hosting (log1)
+- [x] 1. Hosting (log1): Worker merged (#352, #354); the four custom domains were added by the owner and checked 13 Oct (each address answers with its app, noindex, stamped versions; other apps' folders are 404s)
 - [ ] 2. hand.anawj.com (CMC trainer, then hand assessment)
 - [ ] 3. prewarmstudy.anawj.com (Prewarming Webapp)
 - [ ] 4. nuhroster.anawj.com (NUH Roster)

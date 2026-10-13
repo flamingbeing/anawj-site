@@ -15,7 +15,6 @@ its own file), so sessions never edit the same lines. Read them all before start
 
 ## Waiting on the owner
 
-- Subdomain hosting (step 1): when log1's PR is ready, do the Cloudflare clicks listed in `SUBDOMAINS.md`.
 - Try the polish batch's new looks on a phone (Advanced display: Flat, button style, icons, plain calendar, page
   titles, shorter rows; Accessibility: press and hold) and the colour picker.
 - Try on a real phone: pins (now also the Reflections search, with sticky topic names), swipe between tabs (cards that
@@ -37,10 +36,9 @@ its own file), so sessions never edit the same lines. Read them all before start
 
 ## Next (agreed queue)
 
-1. Subdomains (`SUBDOMAINS.md`, plan from the homepage session, agreed with the owner 13 Oct): log1 does step 1
-   (hosting: a Cloudflare Worker serving `main` at the subdomains, nothing moves yet) now, and step 5
-   (apmes.anawj.com for logbook and evals, with the MedHub Evaluations session) last. Tell the homepage session
-   (`session_01F6SrdrEnHJKzjEAr5LcDy8`) when step 1 is done.
+1. Subdomains (`SUBDOMAINS.md`, plan from the homepage session, agreed with the owner 13 Oct): step 1 (hosting) is
+   done; log1 does step 5 (apmes.anawj.com for logbook and evals, with the MedHub Evaluations session) last, when the
+   homepage session says so.
 2. Learning points in case summaries (owner's daily habit; secondary goal: logbook usable for non-APMES logging).
    Part 1, agreed in outline: a line starting `Learning:` (or `Learning points:`; maybe `Pearl:`) in the case summary
    is the learning points (not "LP": lumbar puncture). Shown as its own line on case rows, searchable, labelled in the
@@ -58,6 +56,7 @@ its own file), so sessions never edit the same lines. Read them all before start
 ## Recently done
 
 - #204 The top band's third quarter is the NUHS site's blue `#178fd7`, not cyan; Reflections' NUH tab colour too (`logbook-v26`).
+- #352, #354 (site) Cloudflare Worker serves hand., prewarmstudy., nuhroster. and apmes.anawj.com (hosting, step 1 of `SUBDOMAINS.md`).
 - #347 Notes: Download notes as files (zip, one .md or .txt each), the linked-case pill opens the case, a Linked row on the case edit page (reflection, notes).
 - #325 (tools) context-nudge mod: a reminder to /save-state and /compact at 50% and 75% context (cloud sessions install it).
 - #295 Polish 6b: seven clean looks (off by default), calendar day Share / Copy (off) / + Add, back links off the bar, device colour picker.
