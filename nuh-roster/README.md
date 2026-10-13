@@ -1,6 +1,6 @@
 # NUH Roster
 
-Drafts the NUH anaesthesia department's daily roster and downloads it as `.xlsx` or PDF in the department's layout. Live at <https://anawj.com/nuh-roster/>. Try it with made-up data at <https://anawj.com/nuh-roster/?demo>.
+Drafts the NUH anaesthesia department's daily roster and downloads it as `.xlsx` or PDF in the department's layout. Live at <https://nuhroster.anawj.com/>. Try it with made-up data at <https://nuhroster.anawj.com/?demo>. The old address, `anawj.com/nuh-roster/`, sends people on to the new one.
 
 Background, department rules, file formats and the decisions behind the app are in [NOTES.md](NOTES.md). Read it before changing anything here.
 
@@ -38,7 +38,7 @@ The data (staff names, leave, case notes) is then stored in Google Cloud, outsid
 
 1. Go to <https://console.firebase.google.com>, **Add project** (e.g. `nuh-roster`). Google Analytics isn't needed.
 2. **Build → Authentication → Get started → Sign-in method → Google → Enable**, then Save.
-   Under **Authentication → Settings → Authorized domains**, add `anawj.com`.
+   Under **Authentication → Settings → Authorized domains**, add `nuhroster.anawj.com` (the app's address; `anawj.com` was the old one).
 3. **Build → Firestore Database → Create database**. Pick a Singapore location (`asia-southeast1`) and start in **production mode**.
    The rules in `nuh-roster/firestore.rules` deploy automatically on every merge to main (GitHub Actions); never paste them by hand.
 4. Add yourself as the first admin. In **Firestore → Data → Start collection**, use collection ID `members`, document ID = your Google email in lowercase (e.g. `you@gmail.com`), and fields `role` (string) = `admin` and `name` (string) = your name.

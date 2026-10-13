@@ -255,6 +255,7 @@ function render() {
   renderSteps();
   renderSwapBar();
   renderDemoBar();
+  renderMovedBar();
   window.scrollTo(0, y);
   if (state.tab === 'monthly' && state.monthlyView === 'rotations') placeRotGrid();
   save();
@@ -279,6 +280,24 @@ function switchDate(date) {
 }
 
 // The demo banner: what this is, and the way back out.
+// The old address (anawj.com/nuh-roster/) with a roster saved in this browser: say where the app is now and
+// offer this browser's data as a file first (Import JSON at the new address loads it).
+function renderMovedBar() {
+  const to = window.ROSTER_MOVED_TO;
+  if (!to || document.getElementById('moved-bar')) return;
+  const go = () => { try { localStorage.setItem('nuh-roster-moved', '1'); } catch { /* no storage */ } location.replace(to); };
+  document.body.prepend(h('div', { id: 'moved-bar', class: 'demo-bar moved-bar' },
+    h('b', {}, 'The roster has moved'), h('span', {}, ' to nuhroster.anawj.com. What this browser saved here stays at this old address: download it, then use Import JSON at the bottom of the new page.'),
+    h('span', { class: 'grow' }),
+    h('button', { class: 'small primary', onclick: downloadEverything }, 'Download everything'),
+    h('button', { class: 'small', onclick: go }, 'Go to the new address')));
+}
+// Everything this browser holds for the roster (staff, settings, every day's roster, monthly rosters, rotations).
+function downloadEverything() {
+  const data = { kind: 'ot-roster-all', version: 1, savedAt: new Date().toISOString(), state };
+  download(`NUH roster, everything in this browser ${realToday()}.json`, new Blob([JSON.stringify(data)], { type: 'application/json' }));
+}
+
 // Practice mode is the demo: a made-up department in its own storage, opened next to the real
 // roster (a new tab), so people can try things without touching real data.
 function renderDemoBar() {
@@ -3204,6 +3223,18 @@ document.getElementById('loadTeam').addEventListener('change', async e => {
   if (!f) return;
   try {
     const data = JSON.parse(await f.text());
+    if (data.kind === 'ot-roster-all' && data.state) {
+      // a whole browser's roster (from the old address): staff, days, monthly rosters, rotations, settings
+      if (state.staff.length && !confirm('Replace everything the roster has saved in this browser with this file?')) return;
+      state = { ...blankState(), ...data.state, settings: { ...clone(DEFAULT_SETTINGS), ...data.state.settings } };
+      state.rotations ||= emptyRotations();
+      cleanStaffNames(); migrateRooms(); syncRooms();
+      nextId = 1 + state.staff.reduce((m, p) => Math.max(m, parseInt(String(p.id).replace(/\D/g, ''), 10) || 0), 0);
+      clearUndo(); lastRows = state.roster ? JSON.stringify(state.roster.rows) : null;
+      render();
+      toast(`Loaded everything from the file: ${state.staff.length} staff, ${Object.keys(state.days || {}).length + 1} days.`);
+      return;
+    }
     if (data.kind !== 'ot-roster-team') throw new Error('not a team file');
     if (state.staff.length && !confirm('Replace the staff list, rooms and settings in this browser with the team file?')) return;
     state.settings = { ...clone(DEFAULT_SETTINGS), ...data.settings };

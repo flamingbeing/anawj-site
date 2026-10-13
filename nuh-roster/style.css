@@ -413,3 +413,5 @@ body.viewer .tabs, body.viewer #steps, body.viewer .foot, body.viewer #practice-
 .myday-list { list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 6px; font-size: 15px; }
 .myday-list li { padding: 8px 10px; border-left: 4px solid var(--navy); background: var(--chip); }
 .myday-list li b { color: var(--navy); }
+
+.moved-bar { background: var(--warn-bg); }
