@@ -39,6 +39,7 @@ The 13 Oct review (`REVIEW-2026-10.md`) is mostly built (its "Done" section list
 ## Recently done
 
 13 Oct: about 30 PRs from the review (#407–#473); the full list is in `REVIEW-2026-10.md` › Done on 13 Oct. The main ones:
+- #476 / #477 / #478 Twenty bugs from a last review of the day's work: AH OT read as double cover, a hand change lost to a carried status, Monthly too wide on phones, and smaller ones.
 - #473 / #446 Generate prefers SC/C for complex lists and double covers, says why, keeps a consultant for AIC.
 - #467 Installable on a phone's home screen; opens with poor signal.
 - #466 / #449 Start a day from the last roster; several-day statuses; save then send.
