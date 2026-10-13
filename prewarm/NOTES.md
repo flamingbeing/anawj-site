@@ -317,3 +317,6 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   It now asks the current waiting worker, hides the banner, and if nothing takes over in 3 s clears the app's saved
   copy (never the patients) and reloads. (2) A blank or cleared save leaves a bare `at_…` time with no readings; a point
   counts as having data only if it has a reading (`hasData`), and `p.f[...]` truthiness is never used (cleared records stay).
+- **"Subject ID:" label** (owner, 13 Oct 2026): patients are named "Subject ID: 85" in the patient list, PACU view and
+  delete lists (`sidL`), and the app bar shows a small "Subject ID" above the ID (`setTitle`) so it doesn't crowd the
+  countdown and Log. The PACU nurse's page keeps its own "PACU · ID" title.

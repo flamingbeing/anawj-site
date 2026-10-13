@@ -93,6 +93,8 @@ const toMin = hm => { const m = /^(\d{1,2}):(\d{2})$/.exec(hm || ''); return m ?
 const fromMin = m => `${String(Math.floor(((m % 1440) + 1440) % 1440 / 60)).padStart(2, '0')}:${String(((m % 60) + 60) % 60).padStart(2, '0')}`;
 const nowMin = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes() + d.getSeconds() / 60; };
 const sid = p => val(p, 'enrol_id') || 'New patient';
+// "Subject ID: 85" wherever a patient is named on screen (owner, 13 Oct 2026)
+const sidL = p => 'Subject ID: ' + sid(p);
 function set(p, id, v) {
   if (p.lock?.on) return toast('Locked: read only. Unlock it on the home page to change it.');
   if (setVal(p, id, v, settings.me)) { saveAll(); sync(p, [id]); }
@@ -537,9 +539,14 @@ function showBanner(text, ms, target = null) {
   b.textContent = text; b.hidden = false;
   clearTimeout(bannerTimer); bannerTimer = setTimeout(() => { b.hidden = true; }, ms);
 }
+// the bar shows a small "Subject ID" above the ID, so the long title doesn't crowd the countdown and Log
+function setTitle(title) {
+  const m = /^Subject ID: (.*)$/.exec(title), el = $('#title');
+  if (m) el.innerHTML = `<small class="idlab">Subject ID</small><span>${esc(m[1])}</span>`; else el.textContent = title;
+}
 function header(title, back, extra = '') {
   $('#ptabs').hidden = true; $('#ptabs').innerHTML = '';
-  $('#title').textContent = title;
+  setTitle(title);
   $('#back').hidden = !back; $('#back').onclick = () => go(back);
   $('#extra').innerHTML = extra;
 }
@@ -578,7 +585,7 @@ function home() {
       const e = lastEdit(p), locked = p.lock?.on;
       // the same Subject ID on two records (e.g. made on two phones without signal): readings are split between them
       const twin = list.some(q => q !== p && String(val(q, 'enrol_id') || '').toLowerCase() === String(val(p, 'enrol_id') || '').toLowerCase() && (val(q, 'site') || '') === (val(p, 'site') || ''));
-      const body = `<b>${esc(sid(p))}${val(p, 'site') ? ` <small>${esc(val(p, 'site'))}</small>` : ''}</b>${twin ? '<span class="twinline">Same Subject ID twice: readings may be split. Fill in one and correct the other’s ID (Pre-op and patient details), or delete it in Settings.</span>' : ''}<span${locked ? ' class="lockline"' : val(p, 'done') ? ' class="okline"' : ''}>${locked ? `${LOCK_ICON} Locked by the study admin${canLock() ? ' · read only' : ''}` : esc(status(p))}</span>
+      const body = `<b>${esc(sidL(p))}${val(p, 'site') ? ` <small>${esc(val(p, 'site'))}</small>` : ''}</b>${twin ? '<span class="twinline">Same Subject ID twice: readings may be split. Fill in one and correct the other’s ID (Pre-op and patient details), or delete it in Settings.</span>' : ''}<span${locked ? ' class="lockline"' : val(p, 'done') ? ' class="okline"' : ''}>${locked ? `${LOCK_ICON} Locked by the study admin${canLock() ? ' · read only' : ''}` : esc(status(p))}</span>
         <span class="dueline" data-due="${p.id}" hidden></span>${progressHtml(p)}<small>${e ? 'Last entry ' + new Date(e.t).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) + (e.by ? ' by ' + esc(e.by) : '') : 'No entries yet'}</small>`;
       if (selecting) return `<li><label class="selrow"><input type="checkbox" data-sel="${p.id}" ${selecting.has(p.id) ? 'checked' : ''}><span>${body}</span></label></li>`;
       if (locked) return `<li><a href="${canLock() ? '#/p/' + p.id : '#/'}" class="locked"${canLock() ? '' : ' data-locked="1"'}>${body}</a></li>`;
@@ -762,7 +769,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
   const sealed = () => sealedBy(p, noPw ? null : s);
   const main = s !== 'haemo';
   const def = SERIES[s], pts = pointsFor(p, s);
-  header(sid(p), '#/');
+  header(sidL(p), '#/');
   // two tabs under the bar (owner, 12 Oct 2026): temperatures, and BP / HR / BIS with the other forms; each warms up
   // and pulses as its next reading falls due
   // key times fill the top of the screen on both tabs; the tab bar sits under them (owner, 12 Oct 2026)
@@ -1404,7 +1411,7 @@ const DATA_SIGNS = new Set(DATA_PARTS.map(d => d.sign));
 route(/^\/p\/(\w+)\/data(?:\/(day1|day2))?$/, (id, day) => {
   const p = patients[id]; if (!p) return go('#/');
   const part = DATA_PARTS.find(d => d.path === (day ? 'data/' + day : 'data')), SIGN = part.sign;
-  header(sid(p) + ' · ' + part.title, `#/p/${id}/haemo`);
+  header(sidL(p) + ' · ' + part.title, `#/p/${id}/haemo`);
   topBar(p, defaultSeries(p));
   const get = k => val(p, k);
   const closed = new Set();
@@ -1454,7 +1461,7 @@ route(/^\/p\/(\w+)\/data(?:\/(day1|day2))?$/, (id, day) => {
       const v = i.value.trim();
       const clash = Object.values(patients).some(q => q !== p && !isGone(q) && String(val(q, 'enrol_id') || '').toLowerCase() === v.toLowerCase());
       if (!v || clash) { toast(v ? 'That Subject ID is already used by another patient.' : 'The Subject ID can’t be blank.'); i.value = get('enrol_id') ?? ''; return; }
-      set(p, 'enrol_id', v); $('#title').textContent = sid(p) + ' · ' + part.title; return;
+      set(p, 'enrol_id', v); setTitle(sidL(p) + ' · ' + part.title); return;
     }
     const tv = typedValue(f, i.value);
     if (tv == null) { i.value = val(p, f.id) ?? ''; return; }
@@ -1520,7 +1527,7 @@ route(/^\/pacu$/, () => {
   header('PACU view', '#/');
   const list = Object.values(patients).filter(p => !isGone(p) && !p.lock?.on).sort((a, b) => (lastEdit(b)?.t || b.created) - (lastEdit(a)?.t || a.created));
   paint(`<p class="muted small">Tap a participant to open their PACU page.</p>
-    ${list.length ? `<ul class="list">${list.map(p => `<li><a href="#/pacu/${p.id}"><b>${esc(sid(p))}</b><span>${esc(status(p))}</span></a></li>`).join('')}</ul>` : '<p class="muted">No patients yet.</p>'}`);
+    ${list.length ? `<ul class="list">${list.map(p => `<li><a href="#/pacu/${p.id}"><b>${esc(sidL(p))}</b><span>${esc(status(p))}</span></a></li>`).join('')}</ul>` : '<p class="muted">No patients yet.</p>'}`);
 });
 route(/^\/pacu\/(\w+)$/, id => formPage(id, 'pacu', '#/pacu'));
 route(/^\/p\/(\w+)\/form\/(\w+)$/, (id, pg) => formPage(id, pg, `#/p/${id}/haemo`));
@@ -1528,7 +1535,7 @@ function formPage(id, pg, back) {
   const p = patients[id]; if (!p) return go('#/');
   if (OTHER_PAGES.includes(pg)) return go(`#/p/${id}/${DATA_PARTS.find(d => d.pages.includes(pg)).path}`);
   if (!FORM[pg]) return go('#/p/' + id);
-  header(sid(p) + ' · ' + (SECTION[pg] || PAGES.find(x => x.id === pg).title), back);
+  header(sidL(p) + ' · ' + (SECTION[pg] || PAGES.find(x => x.id === pg).title), back);
   topBar(p, defaultSeries(p));
   const get = k => val(p, k);
   const draw = () => {
@@ -1729,7 +1736,7 @@ route(/^\/nurse\/(\w{20,64})$/, token => {
 
 route(/^\/p\/(\w+)\/sheet$/, id => {
   const p = patients[id]; if (!p) return go('#/');
-  header(sid(p) + ' · Sheet view', '#/p/' + id);
+  header(sidL(p) + ' · Sheet view', '#/p/' + id);
   const cell = (s, pt, c) => { const v = val(p, `${s}_${pt.key}_${c.key}`); return `<td><a href="#/p/${id}/${s}/${pt.key}" aria-label="${esc(pt.label + ' ' + c.label + ': ' + (v ?? 'empty'))}">${v == null ? '' : esc(c.key === 'ts' && v > 0 ? '+' + v : v)}</a></td>`; };
   const pw = SERIES.prewarm, it = SERIES.iotemp, hd = SERIES.haemo;
   paint(`
@@ -1751,11 +1758,11 @@ route(/^\/delete$/, () => {
   paint(`<p class="muted small">${sharing() ? `Deleting removes the participant from this phone and from your team’s phones.` : 'Deleting removes the participant from this phone.'} Tap Delete, then tap again to confirm.</p>
     ${list.length ? `<ul class="list dellist">${list.map(p => {
       const e = lastEdit(p);
-      return `<li><div><b>${esc(sid(p))}${val(p, 'site') ? ` <small>${esc(val(p, 'site'))}</small>` : ''}</b><small>${esc(status(p))} · ${e ? 'last entry ' + new Date(e.t).toLocaleDateString([], { day: 'numeric', month: 'short' }) : 'no entries'}</small></div>
+      return `<li><div><b>${esc(sidL(p))}${val(p, 'site') ? ` <small>${esc(val(p, 'site'))}</small>` : ''}</b><small>${esc(status(p))} · ${e ? 'last entry ' + new Date(e.t).toLocaleDateString([], { day: 'numeric', month: 'short' }) : 'no entries'}</small></div>
         ${p.lock?.on ? `<span class="muted small">${LOCK_ICON} Locked</span>` : `<button class="danger" data-del="${p.id}" aria-label="Delete ${esc(sid(p))}">Delete</button>`}</li>`;
     }).join('')}</ul>` : `<p class="muted">No participants on this phone.</p>`}
     ${gone.length ? `<h2>Deleted</h2><p class="muted small">Deleted by mistake? Restore brings it back${sharing() ? ' on every phone in the team' : ''}.</p>
-      <ul class="list dellist">${gone.map(p => `<li><div><b>${esc(sid(p))}</b><small>deleted ${new Date(p.deleted).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</small></div><button class="secondary" data-restore="${p.id}">Restore</button></li>`).join('')}</ul>` : ''}`);
+      <ul class="list dellist">${gone.map(p => `<li><div><b>${esc(sidL(p))}</b><small>deleted ${new Date(p.deleted).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</small></div><button class="secondary" data-restore="${p.id}">Restore</button></li>`).join('')}</ul>` : ''}`);
   view.onclick = e => {
     const r = e.target.closest('[data-restore]');
     if (r) { const p = patients[r.dataset.restore]; if (p) { set(p, 'restored', 1); toast(sid(p) + ' restored'); render(); } return; }
@@ -1787,7 +1794,7 @@ function noBlankNote() {
 }
 route(/^\/p\/(\w+)\/form$/, async id => {
   const p = patients[id]; if (!p) return go('#/');
-  header(sid(p) + ' · Form view', '#/p/' + id);
+  header(sidL(p) + ' · Form view', '#/p/' + id);
   const here = location.hash, still = () => location.hash === here;
   paint(`<p class="muted">Loading the form…</p>`);
   const b = await blankForm();

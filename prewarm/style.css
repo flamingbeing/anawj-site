@@ -419,3 +419,7 @@ dialog.kp::backdrop { background: rgba(0, 0, 0, .4); }
 .card.dflt .num { color: #767676; font-weight: 400; }
 .card.dflt .chip[aria-pressed="true"] { background: var(--line); border-color: var(--line-input); color: #4d545b; }
 .refreshbox { display: grid; gap: 4px; margin-top: 12px; }
+
+.bar h1 { display: flex; flex-direction: column; line-height: 1.1; }
+.bar h1 .idlab { font-size: 11px; font-weight: 500; opacity: .8; }
+.bar h1 span { overflow: hidden; text-overflow: ellipsis; }
