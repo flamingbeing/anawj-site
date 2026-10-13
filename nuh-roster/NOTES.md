@@ -268,6 +268,10 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
 - Unexpected errors (`error` / `unhandledrejection`) show one plain toast a minute at most ("your last change may not
   have gone in… Undo, or reload"); the toast empties before each message so screen readers repeat it; long single-line
   text in the image shrinks to the sheet's edge.
+- Comments go out on the sheet: the person box's Comment says so (no patient details, NRIC, phone numbers or medical
+  reasons); keep that rule in any new free-text field that is sent out or saved for the team.
+- Phones: a "Next step" bar at the bottom (`#nextbar`, from the same steps as the strip): the first step not done, with
+  Go / Show / "Make it" (on Roster with no roster). Hidden on desktop, Staff, Settings, for viewers and in print.
 - Keep building elements with `h()` and `textContent`; there is no `innerHTML` anywhere, so imported text can't inject.
 
 ## Code map
