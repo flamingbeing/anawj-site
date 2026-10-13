@@ -419,3 +419,5 @@ body.viewer .date-warn, body.viewer .save-state { display: none !important; }
 .warn-note { background: var(--warn-bg); padding: 6px 10px; margin: 6px 0; }
 
 .moved-bar { background: var(--warn-bg); }
+.changes-list { margin: 6px 0; padding-left: 18px; font-size: 13px; }
+.changes-list b { color: var(--navy); }

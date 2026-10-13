@@ -1,6 +1,6 @@
 import {
   DEFAULT_SETTINGS, DEFAULT_ROOMS, JUNIOR_GRADES, SENIOR_GRADES, DEFAULT_GRADE, OLD_GRADES, POSTINGS, postingName, bySeniority, STATUSES, COLOURS, COLOUR_ARGB, isBaby,
-  matchName, splitNameList, namesInCell, suggestFlags, generate, check, learnFromRosters, tickFromHistory, remoteRoom, suggestShortNames, mergeContacts, planImport, importUpdate, findDuplicates, mergeStaffRecords, pacuRoom, isPacu, fmtSenior, fmtJunior, SPECIAL_ROWS, isCoverPart, coverTarget,
+  matchName, splitNameList, namesInCell, sentRows, rosterChanges, changeText, suggestFlags, generate, check, learnFromRosters, tickFromHistory, remoteRoom, suggestShortNames, mergeContacts, planImport, importUpdate, findDuplicates, mergeStaffRecords, pacuRoom, isPacu, fmtSenior, fmtJunior, SPECIAL_ROWS, isCoverPart, coverTarget,
 } from './engine.js';
 // Seniors are always shown in black; juniors may be green (Baby MO) or purple (locum).
 const staffColour = p => (p && p.role !== 'senior' && p.colour) || '';
@@ -3029,6 +3029,7 @@ function renderRoster() {
           h('tbody', {}, body))),
       h('div', {},
         problemsCard(),
+        changesCard(),
         noListCard(),
         boxCard(),
         callsCard(),
@@ -3131,21 +3132,23 @@ function noListCard() {
     !people.length && !admin.length ? h('p', { class: 'hint' }, 'Everyone working has a list.') : null);
 }
 
-async function exportXlsx() {
+async function exportXlsx(stamp = '') {
   colourCache.clear();
-  const wb = buildRosterWorkbook(window.ExcelJS, { date: state.day.date, rows: state.roster.rows, lists: rosterLists(), general: effectiveGeneral(), box: commentsText(), colourOf, shortOf });
+  const wb = buildRosterWorkbook(window.ExcelJS, { date: state.day.date, rows: state.roster.rows, lists: rosterLists(), general: effectiveGeneral(), box: commentsText(), colourOf, shortOf, stamp });
   const buf = await wb.xlsx.writeBuffer();
   download(`OT roster ${state.day.date}.xlsx`, new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
 }
 
 let jspdf = null;
-async function exportPdf() {
+async function exportPdf(stamp = '') {
   if (!jspdf) {
-    await new Promise((ok, fail) => { const s = document.createElement('script'); s.src = 'vendor/jspdf.umd.min.js'; s.onload = ok; s.onerror = fail; document.head.append(s); });
+    try {
+      await new Promise((ok, fail) => { const s = document.createElement('script'); s.src = 'vendor/jspdf.umd.min.js'; s.onload = ok; s.onerror = fail; document.head.append(s); });
+    } catch { toast("Couldn't load the PDF maker (offline?). Try again, or download the .xlsx."); return false; }
     jspdf = window.jspdf.jsPDF;
   }
   colourCache.clear();
-  const layout = buildLayout({ date: state.day.date, rows: state.roster.rows, lists: rosterLists(), general: effectiveGeneral(), box: commentsText(), colourOf, shortOf });
+  const layout = buildLayout({ date: state.day.date, rows: state.roster.rows, lists: rosterLists(), general: effectiveGeneral(), box: commentsText(), colourOf, shortOf, stamp });
   download(`OT roster ${state.day.date}.pdf`, buildRosterPdf(jspdf, layout).output('blob'));
 }
 
@@ -3162,23 +3165,62 @@ addEventListener('beforeprint', () => {
 addEventListener('afterprint', () => { const t = document.querySelector('table.xl'); if (t) t.style.zoom = ''; });
 
 // The sheet as an image: shared straight to WhatsApp (or any app) where the phone allows it, else downloaded.
-async function exportImage() {
+// Returns false when nothing went out (the share sheet was closed).
+async function exportImage(stamp = '', text = '') {
   colourCache.clear();
-  const layout = buildLayout({ date: state.day.date, rows: state.roster.rows, lists: rosterLists(), general: effectiveGeneral(), box: commentsText(), colourOf, shortOf });
+  const layout = buildLayout({ date: state.day.date, rows: state.roster.rows, lists: rosterLists(), general: effectiveGeneral(), box: commentsText(), colourOf, shortOf, stamp });
   const blob = await new Promise(ok => buildRosterCanvas(layout).toBlob(ok, 'image/png'));
   const name = `OT roster ${state.day.date}.png`;
   const file = new File([blob], name, { type: 'image/png' });
   if (navigator.canShare?.({ files: [file] })) {
-    try { await navigator.share({ files: [file], title: `OT roster ${longDate(state.day.date)}` }); return; }
-    catch (e) { if (e?.name === 'AbortError') return; }
+    try { await navigator.share({ files: [file], title: `OT roster ${longDate(state.day.date)}`, ...(text ? { text } : {}) }); return true; }
+    catch (e) { if (e?.name === 'AbortError') return false; }
   }
   download(name, blob);
-  toast('Image downloaded. Send it on WhatsApp as a photo or file.');
+  if (text) { try { await navigator.clipboard.writeText(text); } catch { /* no clipboard */ } }
+  toast(text ? 'Image downloaded and the changes copied: paste them under the image on WhatsApp.' : 'Image downloaded. Send it on WhatsApp as a photo or file.');
+  return true;
 }
 
 // Download button: the format last picked (remembered in this browser), with a menu to change it.
 // a download or print counts as the day being sent out (the steps strip shows it until the roster changes)
-const sentOut = fn => async () => { (state.outHash ||= {})[state.day.date] = dayHash(); save(); await fn(); renderSteps(); };
+// A sheet sent again after changes says "Updated hh:mm" at the top; re-sending the same version keeps its stamp.
+function stampForSend() {
+  const s = state.outSent?.[state.day.date];
+  if (!s) return '';
+  return s.hash === dayHash() ? s.stamp || '' : `Updated ${hhmm(Date.now())}`;
+}
+// Record what went out (only once it did), so the roster can show what changed since.
+function markSent(stamp) {
+  const date = state.day.date;
+  (state.outHash ||= {})[date] = dayHash();
+  const sent = state.outSent ||= {};
+  sent[date] = { hash: dayHash(), at: Date.now(), stamp, rows: sentRows(state.roster.rows) };
+  const cut = addDays(realToday(), -30);
+  for (const d of Object.keys(sent)) if (d < cut) delete sent[d];
+  save(); renderSteps(); render();
+}
+const sentOut = fn => async () => {
+  const stamp = stampForSend();
+  let ok;
+  try { ok = await fn(stamp); } catch (e) { console.error(e); toast("Couldn't make the file. Try again."); return; }
+  if (ok !== false) markSent(stamp);
+};
+// The rooms that changed since the roster was last sent, with a way to send the changes.
+function changesCard() {
+  const r = state.roster, s = state.outSent?.[state.day.date];
+  if (!r || !s || s.hash === dayHash()) return null;
+  const list = rosterChanges(s.rows, r.rows);
+  if (!list.length) return null;
+  const text = `OT roster ${longDate(state.day.date)}, changes since ${hhmm(s.at)}:\n` + list.map(c => '• ' + changeText(c)).join('\n');
+  return h('section', { class: 'card changes', id: 'changes' },
+    h('h2', {}, `Changed since sent at ${hhmm(s.at)} (${list.length})`),
+    h('ul', { class: 'changes-list' }, list.map(c => h('li', {}, h('b', {}, `${c.label} ${c.what}: `), c.from || '(none)', ' → ', c.to || '(none)'))),
+    h('div', { class: 'bar' },
+      h('button', { class: 'small primary', onclick: async () => { const stamp = stampForSend(); if (await exportImage(stamp, text) !== false) markSent(stamp); } }, 'Send image with the changes'),
+      h('button', { class: 'small', onclick: async () => { try { await navigator.clipboard.writeText(text); toast('Changes copied.'); } catch { toast("Couldn't copy here."); } } }, 'Copy the changes')),
+    h('p', { class: 'hint' }, 'The sheet you send now says "Updated" with the time, so it can be told apart from the first one.'));
+}
 const DOWNLOADS = [['xlsx', 'Download .xlsx', sentOut(exportXlsx)], ['pdf', 'Download PDF', sentOut(exportPdf)], ['png', 'Image for WhatsApp', sentOut(exportImage)], ['print', 'Print', sentOut(() => { rosterView = 'sheet'; render(); setTimeout(() => window.print(), 100); })]];
 let downloadMenu = false;
 function downloadButton() {

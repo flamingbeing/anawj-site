@@ -1015,3 +1015,24 @@ export function suggestShortNames(staff) {
   return proposals.filter(x => x.short && key(x.short) !== key(x.name) && count[key(x.short)] === 1
     && (!taken.has(key(x.short)) || taken.get(key(x.short)) === x.id));
 }
+
+// ---------- what changed since the roster was sent ----------
+
+// The parts of the roster a reader cares about, small enough to keep for each date sent.
+export const sentRows = rows => rows.map(r => ({ label: r.label, senior: r.senior || '', junior: r.junior || '', premed: r.premed || '' }))
+  .filter(r => r.senior || r.junior || r.premed);
+// Room by room, what is different now: [{ label, what, from, to }] (what: senior, junior, premed; a room
+// added or closed shows as from '' or to '').
+export function rosterChanges(before, after) {
+  const by = rows => Object.fromEntries(sentRows(rows).map(r => [r.label, r]));
+  const a = by(before || []), b = by(after || []);
+  const out = [];
+  for (const label of [...new Set([...Object.keys(a), ...Object.keys(b)])]) {
+    for (const what of ['senior', 'junior', 'premed']) {
+      const from = (a[label]?.[what] || '').trim(), to = (b[label]?.[what] || '').trim();
+      if (from !== to) out.push({ label, what, from, to });
+    }
+  }
+  return out;
+}
+export const changeText = c => `${c.label} ${c.what}: ${c.from || '(none)'} → ${c.to || '(none)'}`;
