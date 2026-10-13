@@ -122,6 +122,32 @@ try {
   assert.match(bugRep, /Errors:\n- .*boom in test/);
   if (SHOTS) await bug.screenshot({ path: path.join(SHOTS, 'feedback-bug.png') });
 
+  // ---- drawing: a circle round a paragraph and an arrow from a heading to it become marks on those parts of the page
+  const dr = await ctx.newPage();
+  await dr.goto(PREVIEW + '/hand-babies/');
+  await fb(dr).locator('#fab').waitFor();
+  await fb(dr).locator('#fab').click();
+  await fb(dr).locator('#mDraw').click();
+  const box = await dr.locator('p').first().boundingBox();
+  const cx = box.x + Math.min(box.width, 200) / 2, cy = box.y + box.height / 2, rx = Math.min(box.width, 200) / 2 + 6, ry = box.height / 2 + 6;
+  await dr.mouse.move(cx + rx, cy); await dr.mouse.down();
+  for (let k = 1; k <= 24; k++) await dr.mouse.move(cx + rx * Math.cos(k / 24 * 2 * Math.PI), cy + ry * Math.sin(k / 24 * 2 * Math.PI));
+  await dr.mouse.up();
+  const hb = await dr.locator('h2').first().boundingBox();
+  await dr.mouse.move(hb.x + 20, hb.y + hb.height / 2); await dr.mouse.down();
+  await dr.mouse.move(hb.x + 20, (hb.y + cy) / 2, { steps: 5 }); await dr.mouse.move(cx, cy, { steps: 5 }); await dr.mouse.up();
+  if (SHOTS) await dr.screenshot({ path: path.join(SHOTS, 'feedback-draw.png') });
+  await fb(dr).locator('#drawDone').click();
+  const drew = await fb(dr).locator('#onText').textContent();
+  assert.match(drew, /^You drew: circled paragraph “Tap the one in front of you\.”; arrow from heading “By case” to paragraph “Tap the one/);
+  await fb(dr).locator('#noteText').fill('Put the heading closer to this');
+  await fb(dr).locator('#noteSave').click();
+  await fb(dr).locator('#fab').click();
+  await fb(dr).locator('#mSend').click();
+  const drRep = await fb(dr).locator('#report').inputValue();
+  assert.match(drRep, /### \d+\. Drawing \(390×844 screen, scrolled 0px\)\nMarks:\n- Circled paragraph “Tap the one in front of you\.” \(`#picture > p:nth-of-type\(1\)`\)\n- Arrow from heading/);
+  await fb(dr).locator('#sendClose').click();
+
   // ---- versions to choose from: flip between them on the preview, then choose one
   const ver = await ctx.newPage();
   await ver.goto(PREVIEW + '/zz-variants/');

@@ -26,6 +26,7 @@ try {
   await page.goto('https://anawj.com/edit/?page=/privacy/');
   const frame = page.frameLocator('#frame');
   await frame.locator('p').first().waitFor();
+  assert.ok(await page.isHidden('#live'), 'no subdomain link for a page on anawj.com');
   // the comment dialog offers speaking (where the browser can) and the two options
   await frame.locator('p').first().click();
   await page.click('#aComment');
@@ -68,6 +69,11 @@ try {
   assert.ok(!(await page.isVisible('#privacy')), 'no warning for a plain comment');
   assert.match(await page.inputValue('#preview'), /Everywhere: apply this wherever it occurs/);
   if (process.env.SHOTS) await page.screenshot({ path: path.join(process.env.SHOTS, 'edit-send.png') });
+  await page.click('#sendClose');
+  // a page that lives on a subdomain offers the feedback button there
+  await page.fill('#path', '/hand-babies/'); await page.press('#path', 'Enter');
+  await page.locator('#live a').waitFor();
+  assert.equal(await page.getAttribute('#live a', 'href'), 'https://hand.anawj.com/babies/?feedback=1');
   assert.deepEqual(errors, []);
   console.log('edit e2e: ok');
 } finally { await b.close(); }

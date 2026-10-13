@@ -76,15 +76,18 @@
     .ver{position:fixed;z-index:2147483647;bottom:70px;font:600 13px/1 system-ui,sans-serif;background:#e57200;color:#fff;padding:6px 8px;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.25)}
     .ver.left{left:12px}.ver.right{right:12px}
     .vers button[aria-pressed=true]{background:#002f6c;border-color:#002f6c;color:#fff}
+    canvas.draw{position:fixed;z-index:2147483646;inset:0;width:100vw;height:100vh;touch-action:none;cursor:crosshair;background:rgba(0,47,108,.04)}
     [hidden]{display:none!important}
   </style>
   <button class="fab" id="fab" aria-label="Feedback">💬<b id="badge" hidden></b></button>
   <div class="ver" id="ver" hidden></div>
+  <canvas class="draw" id="draw" hidden></canvas>
+  <div class="banner" id="drawBar" hidden role="status"><span>Circle it, or draw an arrow to where it should go</span><button id="drawUndo">Undo</button><button id="drawDone">Done</button><button id="drawCancel">Cancel</button></div>
   <div class="banner" id="banner" hidden role="status"><span>Tap what you want to comment on</span><button id="pickFlip" aria-label="Move this bar to the other end">⇅</button><button id="pickCancel">Cancel</button></div>
   <div class="sheet" id="menu" hidden role="dialog" aria-label="Feedback">
     <h2>Feedback on this page</h2>
     <p class="muted" id="where"></p>
-    <div class="row"><button class="primary" id="mPick">Comment on something</button><button id="mPage">Comment on this screen</button></div>
+    <div class="row"><button class="primary" id="mPick">Comment on something</button><button id="mDraw">Draw on it</button><button id="mPage">Comment on this screen</button></div>
     <div id="verBox" hidden>
       <p class="muted" style="margin:12px 0 0">This preview has versions to choose from. Look at each, then choose one.</p>
       <div class="row vers" id="vers" role="group" aria-label="Versions"></div>
@@ -260,10 +263,63 @@
     };
   }
 
+  // ---- drawing: circles and arrows over the screen, turned into which parts of the page they mark
+  const cv = $('draw'), g = cv.getContext('2d');
+  let strokes = [], cur = null;
+  function paint() {
+    g.clearRect(0, 0, cv.width, cv.height);
+    g.lineWidth = 4 * devicePixelRatio; g.lineCap = g.lineJoin = 'round'; g.strokeStyle = '#e4002b';
+    for (const st of [...strokes, ...(cur ? [cur] : [])]) {
+      g.beginPath(); st.forEach(([x, y], i) => i ? g.lineTo(x * devicePixelRatio, y * devicePixelRatio) : g.moveTo(x * devicePixelRatio, y * devicePixelRatio)); g.stroke();
+    }
+  }
+  function startDraw() {
+    show(null); strokes = []; cur = null;
+    cv.width = innerWidth * devicePixelRatio; cv.height = innerHeight * devicePixelRatio;
+    cv.hidden = false; $('drawBar').hidden = false; $('fab').hidden = true; paint();
+  }
+  function endDraw() { cv.hidden = true; $('drawBar').hidden = true; $('fab').hidden = false; }
+  cv.addEventListener('pointerdown', e => { e.preventDefault(); cv.setPointerCapture(e.pointerId); cur = [[e.clientX, e.clientY]]; });
+  cv.addEventListener('pointermove', e => { if (cur) { cur.push([e.clientX, e.clientY]); paint(); } });
+  const finish = () => { if (cur && cur.length > 2) strokes.push(cur); cur = null; paint(); };
+  cv.addEventListener('pointerup', finish); cv.addEventListener('pointercancel', finish);
+  $('drawUndo').onclick = () => { strokes.pop(); paint(); };
+  $('drawCancel').onclick = endDraw;
+  // the part of the page under a point (the drawing hidden for a moment so it isn't in the way)
+  function under(x, y) {
+    const el = page.elementFromPoint(Math.max(0, Math.min(innerWidth - 1, x)), Math.max(0, Math.min(innerHeight - 1, y)));
+    if (!el || el === hostEl || el === page.body || el === page.documentElement) return null;
+    const t = el.closest(BLOCK) || el;
+    return t.closest('svg') && t.tagName.toLowerCase() !== 'svg' ? t.closest('svg') : t;
+  }
+  const label = el => { if (!el) return 'empty space'; const t = LIVE_APP ? '' : textOf(el).replace(/\s+/g, ' ').slice(0, 60); return kindOf(el) + (t ? ` “${t}${t.length >= 60 ? '…' : ''}”` : ''); };
+  $('drawDone').onclick = () => {
+    if (!strokes.length) { endDraw(); return; }
+    hostEl.style.display = 'none';
+    const marks = strokes.map(st => {
+      const xs = st.map(p => p[0]), ys = st.map(p => p[1]);
+      const w = Math.max(...xs) - Math.min(...xs), h = Math.max(...ys) - Math.min(...ys);
+      const [sx, sy] = st[0], [ex, ey] = st.at(-1), gap = Math.hypot(ex - sx, ey - sy);
+      // a shape that comes back near where it started is a circle round something; anything else is an arrow
+      if (gap < 0.35 * Math.max(w, h, 1)) {
+        const el = under(xs.reduce((a, b) => a + b) / xs.length, ys.reduce((a, b) => a + b) / ys.length);
+        return { kind: 'circled', what: label(el), locator: el ? cssPath(el) : '' };
+      }
+      const a = under(sx, sy), b = under(ex, ey);
+      return { kind: 'arrow', what: `from ${label(a)} to ${label(b)}`, locator: [a ? cssPath(a) : '', b ? cssPath(b) : ''].join(' → ') };
+    });
+    hostEl.style.display = '';
+    endDraw();
+    pending = { kind: 'drawing', heading: '', locator: '', before: '', marks, size: `${innerWidth}×${innerHeight}`, scroll: Math.round(scrollY) };
+    $('onText').textContent = 'You drew: ' + marks.map(m => (m.kind === 'circled' ? 'circled ' : 'arrow ') + m.what).join('; ');
+    openNote(); $('noteText').placeholder = 'What should change? e.g. “move this up here”, “too much space”';
+  };
+
   // ---- menu
   $('fab').onclick = () => { $('menu').hidden ? show('menu') : show(null); };
   $('mClose').onclick = () => show(null);
   $('mPick').onclick = startPick;
+  $('mDraw').onclick = startDraw;
   $('pickCancel').onclick = stopPick;
   // the bar covers one end of the screen: flip it to reach what's underneath
   $('pickFlip').onclick = () => $('banner').classList.toggle('top');
@@ -306,6 +362,13 @@
       out += `\n## Page: ${u}\n`;
       items.filter(c => c.url === u).forEach((c, i) => {
         if (c.kind === 'choice') { out += `\n### ${i + 1}. Version chosen\n${c.text} Keep that one and remove the others before merging.\n`; return; }
+        if (c.marks) {
+          out += `\n### ${i + 1}. Drawing (${c.size} screen, scrolled ${c.scroll}px${c.view ? ', view ' + c.view : ''})\nMarks:\n`;
+          out += c.marks.map(m => `- ${m.kind === 'circled' ? 'Circled' : 'Arrow'} ${m.what}${m.locator ? ` (\`${m.locator}\`)` : ''}`).join('\n') + '\n';
+          out += `Comment:\n${quote(c.text)}\n`;
+          if (c.options) out += `Wants options: make 2–3 clearly different versions to choose from, each with its own preview link.\n`;
+          return;
+        }
         if (c.problem) {
           const p = c.problem;
           out += `\n### ${i + 1}. Something's wrong (screen ${p.screen}${c.view ? ', view ' + c.view : ''})\nWhat happened:\n${quote(c.text)}\n`;
@@ -392,5 +455,5 @@
   $('copy').onclick = () => { if (blocked()) return; copy(report()); $('copy').textContent = 'Copied'; };
   $('sent').onclick = () => { if (confirm('Clear your list? Only do this once your comments have been sent.')) { items = []; save(); show(null); } };
   $('sendClose').onclick = () => show(null);
-  addEventListener('keydown', e => { if (e.key === 'Escape') { if (picking) stopPick(); else if (!$('note').hidden) closeNote(); else show(null); } });
+  addEventListener('keydown', e => { if (e.key === 'Escape') { if (!cv.hidden) endDraw(); else if (picking) stopPick(); else if (!$('note').hidden) closeNote(); else show(null); } });
 })();
