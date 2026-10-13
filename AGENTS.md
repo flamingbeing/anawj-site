@@ -74,7 +74,9 @@ for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mj
   prompting AI (almost all of this repo came from Claude Code cloud sessions), mostly from a phone through the day,
   with a laptop at hand when needed. Not a trained programmer, but very happy to copy and paste code from AI (finds
   it convenient), so a ready-to-paste snippet with exactly where it goes is fine when that's the quickest route.
-  Explain why in clinical or everyday terms rather than code jargon.
+  Wants to learn coding (very interested, finds the learning curve steep): use the real technical terms, but
+  explain each one briefly the first time, with an everyday or clinical comparison where it helps, so explanations
+  double as small lessons.
 - **How the owner works:** instructions arrive from the phone now and then, and sessions carry on agentically in
   between; the owner doesn't need to be there while work runs. Interests come in short bursts on quick wins or deep
   dives into a passion project. So work through a request to the end without waiting to be watched, ask only when a
