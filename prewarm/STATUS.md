@@ -2,7 +2,7 @@
 
 Short and current. Lasting rules go in `NOTES.md`. Update with `/save-state`.
 
-Last updated: 2026-10-13 (evening) by Claude Code, Prewarming Webapp.
+Last updated: 2026-10-13 (night) by Claude Code, Prewarming Webapp.
 
 ## Now
 
@@ -16,6 +16,8 @@ edit the same lines. Read them all before starting; edit only yours.
 - Add `admins/kohwenjun@gmail.com` (lower case, any field) in the Firebase console for `prewarm-study` if it isn't there:
   the app said that email isn't on the admin list. Then tap Refresh now in Settings. Then set a password (Settings →
   Password, after one emailed-link sign-in).
+- MOVE MERGED (#364, 13 Oct night). Checked live by the session: old address moves a fresh phone and `?demo` links (keeping query and `#`); the new host serves the app, shared styles, offline copy and `update.html`. NOT yet checked (needs the owner's phones): an admin sign-in (email link / password) at `prewarmstudy.anawj.com`, an OLD nurse link end to end, a team phone moving and rejoining with one tap, a reading saved and synced there. Do these before the next case.
+- PACU link (13 Oct): the nurse's saves were refused ("Not allowed"); live rules = repo rules and an anonymous nurse update on the current record is ALLOWED by a rules simulation; the original record was deleted when the link was stopped, so the cause is unknown (stale link or her phone). Test the new link with someone else's phone; if "Not allowed" again, dig further.
 - Owner's checklist for the move to `prewarmstudy.anawj.com` (after the case ends and the PR is merged): tell team phones to tap Update available once between patients; each phone then moves itself when nothing is waiting and rejoins its team with one tap (initials are filled in); admins sign in again there. Check one phone of each team before the next case.
 - Firefox phone stuck on an old version: open `anawj.com/prewarm-update/` once and tap Get the latest version.
 - Say if the export should show "NA" in the later pre-warming cells (past 10 / 30 min) and the two empty Downloaded columns.
