@@ -12,7 +12,7 @@ const FAIL = new Set(['serious', 'critical']);
 // [name, role (?demo=…), hash]. The form screen opens the first evaluation waiting for the demo assessor.
 const SCREENS = [
   ['Home', 'resident', 'home'], ['Requests', 'resident', 'requests'], ['Progress', 'resident', 'progress'],
-  ['New request', 'resident', 'new'], ['More', 'resident', 'more'],
+  ['New request', 'resident', 'new'], ['More', 'resident', 'more'], ['How evals work', 'assessor', 'how'],
   ['Evaluations', 'assessor', 'pending'], ['Form', 'assessor', 'FORM'],
   ['Overview', 'admin', 'admin'], ['People', 'admin', 'people'],
 ];

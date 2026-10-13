@@ -28,6 +28,7 @@ const ROUTES = {
   overview: { mod: 'ui-admin', fn: 'renderOverview', title: 'Overview', ok: isStaff },
   people: { mod: 'ui-admin', fn: 'renderPeople', title: 'People', ok: isStaff },
   more: { mod: 'ui-more', fn: 'renderMore', title: 'More' },
+  how: { mod: 'ui-more', fn: 'renderHow', title: 'How evals work', back: true },
 };
 
 // Tabs = union of roles, fixed order. Requests/Evaluations carry a count badge.
