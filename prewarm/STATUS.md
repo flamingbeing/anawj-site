@@ -2,7 +2,7 @@
 
 Short and current. Lasting rules go in `NOTES.md`. Update with `/save-state`.
 
-Last updated: 2026-10-13 by Claude Code, Prewarming Webapp.
+Last updated: 2026-10-13 (evening) by Claude Code, Prewarming Webapp.
 
 ## Now
 
@@ -13,6 +13,11 @@ edit the same lines. Read them all before starting; edit only yours.
 
 - Blank Word form uploaded (12 Oct 2026). Still to do: check one patient's Form view on a phone (Download Word file,
   Save as PDF / Print).
+- Add `admins/kohwenjun@gmail.com` (lower case, any field) in the Firebase console for `prewarm-study` if it isn't there:
+  the app said that email isn't on the admin list. Then tap Refresh now in Settings. Then set a password (Settings →
+  Password, after one emailed-link sign-in).
+- Firefox phone stuck on an old version: open `anawj.com/prewarm-update/` once and tap Get the latest version.
+- Say if the export should show "NA" in the later pre-warming cells (past 10 / 30 min) and the two empty Downloaded columns.
 - Open the app once as admin with signal (resends every patient so older records get the `locked` flag) and take
   "Update available" on both phones.
 
@@ -23,6 +28,12 @@ edit the same lines. Read them all before starting; edit only yours.
 
 ## Recently done
 
+- #339: list tools: Form view icon per line (admin), Select to export, Select none apart from Lock; Downloaded dropped; "Study IDs only" line removed.
+- #336: sync status chip replaces the Log shortcut in the app bar (tap = Refresh now).
+- #335: "Subject ID:" label in lists and the header.
+- #334, #333, #332, #331: bare time no longer keeps an empty point; read-only sections hide empty times; update helper `prewarm-update/`; Refresh now; "Readings to enter live" removed.
+- #330, #329, #328, #327: admin password sign-in; carried-over values light grey; Perioperative data split into Pre-op / Day 1 / Day 2; last warming reading completes pre-warming.
+- #326, #324, #323, #322, #321: update check every 10 min; Save with all blank removes the reading; alarm tap goes to the screen only; list ticks read only.
 - #317: PACU nurse link (QR code + link; `pacu/{token}` rules, 24 rules tests, two-phone sync test).
 - #316: progress ticks on the main page; Perioperative data complete tick.
 - #315: number and time pads; alarm / countdown tap opens the reading; PACU in / To ward on the PACU page only.
@@ -39,6 +50,10 @@ edit the same lines. Read them all before starting; edit only yours.
 
 ## Decisions
 
+- 13 Oct 2026: no Log shortcut: the bar's top-right is a sync status chip; key times are set from their pads (owner).
+- 13 Oct 2026: Save with every box blank removes the reading; later warming points (past 10 / 30 min) are dropped once that last reading is saved; sections marked complete show only timepoints that have readings (owner).
+- 13 Oct 2026: admin sign-in by email + password as well as the emailed link; Google stays off (phone browsers block its helper page).
+- 13 Oct 2026: Perioperative data is three pages (Pre-op and patient details, Day 1, Day 2 with discharge), each with its own complete tick (owner).
 - 13 Oct 2026: PACU nurse link = a secret link (no sign-in); anyone with it can edit only that participant's PACU answers until it is stopped (owner chose this over joined-phones-only).
 - 13 Oct 2026: timepoint labels read Arrival, Prewarm on / Induction, then "5 min" (owner); skin temperature starts at 31; one tap on a number opens the pad; BP, HR, BIS alarm is a Settings toggle, off by default.
 - 13 Oct 2026: a section marked complete is closed for everyone until its tick is undone; data collection complete closes the op-day screens, not Perioperative data (owner).
