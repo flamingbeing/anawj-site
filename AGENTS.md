@@ -103,7 +103,7 @@ for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mj
 
 ## Status and decisions (before compacting)
 
-Each app keeps a short `STATUS.md` beside its `NOTES.md` (start: `logbook/STATUS.md`): what each session is doing
+Site-wide work (homepage, subdomains, operations, repo rules) is tracked in the root `STATUS.md`. Each app keeps a short `STATUS.md` beside its `NOTES.md` (start: `logbook/STATUS.md`): what each session is doing
 now, what waits on the owner, the agreed next steps, recently merged PRs and a dated decisions log.
 
 - Read the app's `STATUS.md` (then `NOTES.md`) before starting work, and after any context compaction.
