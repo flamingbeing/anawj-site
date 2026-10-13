@@ -166,6 +166,13 @@ try {
   assert.match(drRep, /### \d+\. Drawing \(390×844 screen, scrolled 0px\)\nMarks:\n- Circled paragraph “Tap the one in front of you\.” \(`#picture > p:nth-of-type\(1\)`\)\n- Arrow from heading/);
   await fb(dr).locator('#sendClose').click();
 
+  // ---- Share: a QR code of this page (on a real address, with the button switched on)
+  await fb(dr).locator('#fab').click();
+  await fb(dr).locator('#mShare').click();
+  await fb(dr).locator('#qr svg path').waitFor();
+  assert.equal(await fb(dr).locator('#shareLink').textContent(), PREVIEW + '/hand-babies/');
+  await fb(dr).locator('#shareClose').click();
+
   // ---- versions to choose from: flip between them on the preview, then choose one
   const ver = await ctx.newPage();
   await ver.goto(PREVIEW + '/zz-variants/');
@@ -197,6 +204,11 @@ try {
   await fb(live).locator('#fab').waitFor();
   await live.goto('https://hand.anawj.com/cmcj/');           // the cookie keeps it on for the whole host
   await fb(live).locator('#fab').waitFor();
+  await fb(live).locator('#fab').click();
+  await fb(live).locator('#mShare').click();
+  await fb(live).locator('#qr svg path').waitFor();
+  assert.match(await fb(live).locator('#shareLink').textContent(), /^https:\/\/hand\.anawj\.com\/cmcj\/\?feedback=1(#\w+)?$/);
+  await fb(live).locator('#shareClose').click();
   await fb(live).locator('#fab').click();
   await fb(live).locator('#mOff').click();                  // "Turn off" clears it
   await live.goto('https://hand.anawj.com/babies/');

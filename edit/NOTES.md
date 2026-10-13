@@ -11,6 +11,9 @@ to edit it in place, comment, add below or delete. Ported from NTF-Anaesthesia/a
   `edit.anawj.com` only redirects.
 - The apps (`/logbook/`, `/evals/`, `/nuh-roster/`, `/prewarm/`) open in their demo (`?demo`, fake data): sign-in
   can't happen inside the editor. Their text is mostly drawn by the app, so comments fit better than edits there.
+- **Share** shows a QR code (and Copy link) of `edit.anawj.com/<page>`, so colleagues can open the editor on the same page
+  from their own phones. The feedback button has the same (**Share this page**: the page with `?feedback=1`, or the preview).
+  The QR generator is `feedback/vendor/qrcode.js` (MIT), loaded through `feedback/qr.js` only when Share is pressed.
 - Pages that now live on a subdomain (the apps, the hand pages) show a link to their real address with `?feedback=1`, so
   they can be commented on where they live (the feedback button, below).
 - `hand-babies/edit.html` forwards here (old links), and its waiting changes move into this editor's list once.
