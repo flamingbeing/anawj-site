@@ -7,7 +7,7 @@ import { renderLog, focusLog, logCasesChanged, clearDrafts, SHARED_KEY } from '.
 import { renderRecovery } from './ui-recovery.js';
 import { renderLogbook } from './ui-logbook.js';
 import { renderProgress, renderTotals } from './ui-progress.js';
-import { applyCompact, cachedCompact, applyTheme, cachedTheme, applyTextSize, cachedTextSize, applyZoom, cachedZoom, stepZoom, applyAccent, adoptDisplay, applyDisplay, applyCustomCss, display, setDisplay, resetDisplay, DISPLAY_KEYS, renderTagEditor, renderDisplay, renderDisplayAdvanced, renderAccessibility, IPHONE_APP, renderLogging, renderLoggingAdvanced, renderReflectionSettings, renderMarkdownSettings, renderShowHide, START_TABS, arrangeTabs, privacyCard, creditsCard, signOutCard } from './ui-settings.js';
+import { applyCompact, cachedCompact, applyTheme, cachedTheme, applyTextSize, cachedTextSize, applyZoom, cachedZoom, stepZoom, applyAccent, adoptDisplay, applyDisplay, applyCustomCss, display, setDisplay, resetDisplay, DISPLAY_KEYS, renderTagEditor, renderDisplay, renderDisplayAdvanced, renderAccessibility, IPHONE_APP, setPageLabel, renderLogging, renderLoggingAdvanced, renderReflectionSettings, renderMarkdownSettings, renderShowHide, START_TABS, arrangeTabs, privacyCard, creditsCard, signOutCard } from './ui-settings.js';
 import { renderAccount, flush as flushProfile } from './ui-account.js';
 import { renderCaseLogs, renderCaseLog, renderProgramme } from './ui-caselogs.js';
 import { renderAdmin, renderAdminResidents, renderAdminAdvanced, leaveAdmin } from './ui-admin.js';
@@ -416,6 +416,8 @@ function render() {
   const inHeader = back && brand && !document.documentElement.classList.contains('no-header');
   if (inHeader) brand.prepend(back);
   document.body.classList.toggle('header-back', !!inHeader);
+  // Advanced display → Page titles in the header: the page's name ("Logbook") instead of the app's
+  setPageLabel(tab.label);
   const dir = slideDirection(lastRendered, tab.id);
   fill(app, inHeader ? null : back, tab.render());
   if (tab.id !== 'log') window.scrollTo(0, y);

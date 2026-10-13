@@ -72,7 +72,7 @@ function takeShared() {
   setTimeout(() => toast('Shared text added: check it, then Review'), 300);
 }
 
-// Open the Log page with this day picked (from the Logbook calendar's "+ Log a case").
+// Open the Log page with this day picked (from the Logbook calendar's "+ Add").
 export function logOnDate(iso) {
   loadDraft();
   // a fresh case for that day; a case already being typed stays, and only its date changes

@@ -60,7 +60,9 @@ try { for (const width of [390, 1280]) {
   assert.equal(await p.locator('ul.notes-rows li').count(), 1);
   await p.getByLabel('Search notes').fill('');
 
-  // the Logbook marks today and Copy takes the day's notes too
+  // the Logbook marks today and Copy takes the day's notes too (the day's Copy is off unless switched on)
+  assert.equal(await p.getByRole('button', { name: 'Copy this day' }).count(), 0);
+  await p.evaluate(async () => { const m = await import('./js/ui-settings.js'); m.applyDisplay(m.setDisplay({ dayCopy: true })); });
   await p.locator('[role=tab][data-tab=logbook]').click();
   const cal = p.locator('main .seg button').filter({ hasText: /^Calendar$/ }); if (await cal.count()) await cal.first().click();
   await p.locator('.lb-day.today .lb-note').waitFor();

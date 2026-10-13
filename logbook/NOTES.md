@@ -50,7 +50,7 @@ portfolio content.
   text with a "did you mean" note. No raw regex (owner's choice). Reflections search has its own
   operators (REFL_FIELDS: initials: heading: title: diagnosis: case:). Logbook More also has "Case sensitive"
   (`settings.lbCase`, off by default; tag: always ignores case).
-- Future dates are allowed (Log date picker, calendar "+ Log a case"); they show as "upcoming".
+- Future dates are allowed (Log date picker, calendar "+ Add"); they show as "upcoming".
 
 ## Where things are (screens)
 
@@ -74,7 +74,7 @@ portfolio content.
   (sticky, own scroll). On phones `.lp-left` / `.lp-right` are display: contents, so the order is unchanged.
 - **Logbook** (`ui-logbook.js`): Calendar (default; opens on today, "No cases yet today" when empty) | List | Grid.
   Calendar days all share one layout (number on top, a reserved spot for the count) so nothing shifts. Calendar day:
-  + Log a case (opens Log on that date), Share day, Copy. Rows: slim tag pills (short names, full name on hover) on the
+  + Add (opens Log on that date), Share, Copy (off unless switched on: Advanced display → Copy button for each day). Rows: slim tag pills (short names, full name on hover) on the
   left, Copy and Reflect on the right at one fixed size (icons only at ≤ 600 px; labels on bigger screens); Reflect is
   filled with a ✓ once the case has a reflection (opens it). No swipe actions. Filter (Show, Search in; then Dates | Tags | More toggles, each open while in use; More = fuzzy, case sensitive, Save search, Tag N cases; saved searches one slim scrolling row): has all of / has none of
   tags, dates, flag, search scope, fuzzy; Reset (everything); × in the search box clears just the text; saved searches (text, filters, "Search in"; not fuzzy); Tag N cases (bulk add/remove). Search text
@@ -154,6 +154,14 @@ portfolio content.
   help to one short line; longer text goes behind ⓘ. Bigger choices (zoom, box height, fonts) stay dropdowns.
   Advanced display and Advanced logging are grouped under headings. Settings search also reads the ✓ lists (their
   name and choices, so "oled" finds Light or dark).
+- **Clean looks** (polish 6b; each its own device setting, off by default): Borders → Flat (`flat`: no lines, no
+  page cards; its own key so saved border levels keep their meaning), Button style (`btnStyle`: outlined / filled /
+  tinted / plain, for every button but the main one), Icons instead of words (`iconBtns`: buttons built with `ib(icon,
+  word)` from ui-core.js, class `ib`; the word stays for screen readers), Plain calendar (`calPlain`), Page titles in
+  the header (`pageTitles`; `setPageLabel` from render()), Shorter Logbook rows (`rowShort`, CSS only), Press and hold
+  a row for its menu (`rowHold`, Accessibility; the click from lifting the finger is swallowed so it can't press the
+  sheet's button now under it). The calendar day's buttons read Share, Copy and + Add; Copy for a day is off unless
+  switched on (`dayCopy`, owner 13 Oct 2026). e2e: `nap()` is capped, so a long press needs `p.waitForTimeout`.
 - **Reflections list JR count** (owner, 13 Oct 2026): a heading's JR rule ("One / Two from JR") shows as a small
   "JR 0/1" pill beside its count, green when met, and leaves the note under the heading (`listNote`; a qualifier stays:
   "JR: with neuromonitoring"). The editor still shows the full note. Word counts on the list can be hidden
@@ -531,7 +539,7 @@ portfolio content.
 - Search date words keep the rest of the query as typed (OR / AND, case-sensitive); a bare SAT/MON/SUN is a
   search word (initials), only full day names or "last sat" are dates.
 - Case tab: Shift+Enter never saves; Undo of a save restores ☆ Interesting; a picked day survives a reload
-  (12 h); "+ Log a case" keeps a case being typed; Same as last keeps line 1 (initials, age).
+  (12 h); "+ Add" (calendar) keeps a case being typed; Same as last keeps line 1 (initials, age).
 - Settings file: only known keys, each cleaned to the shape the app reads (a bad savedSearches broke the
   Logbook tab on every device); rYear / rYearAY / importMap / sharedSeen never travel.
 - Programme tag groups are adopted only from the server logbook, never a cached copy (it overwrote groups

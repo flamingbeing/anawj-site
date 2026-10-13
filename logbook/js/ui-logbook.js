@@ -10,7 +10,7 @@ import { parseQuery, matchQuery, OPERATOR_HELP, insertOperator } from './search-
 import { parseCsv } from './tags.js';
 import {
   S, h, toast, debounce, modal, cat, categoryNamesRevision, catName, catShort, tagName, catFull, catChip, PICKER_ORDER, settings, patchLogbook, needExcel, download, fileButton, catPills,
-  updateCase, saveMany, deleteMany, displayName, rYear, todayISO, fill, add, resetters, tagSet, tagLinks, confirmBox, keepTags, hooks, rowIcon, ic, emptyState, reveal, basicHides } from './ui-core.js';
+  updateCase, saveMany, deleteMany, displayName, rYear, todayISO, fill, add, resetters, tagSet, tagLinks, confirmBox, keepTags, hooks, rowIcon, ic, ib, emptyState, reveal, basicHides } from './ui-core.js';
 import { dayHasNotes, caseHasNotes, openNotes, ensureNotes } from './ui-notepad.js';
 import { flatTree, tagTree } from './tags.js';
 import { editCaseDialog, logOnDate } from './ui-log.js';
@@ -212,12 +212,13 @@ export function renderLogbook() {
   }
   function refresh() { flagSel.value = view.flag; paintFilterBtn(); repaintFilters(); view.limit = 150; paint(); }
   function active() { return !!(view.has.length || view.not.length || view.from || view.to || view.flag || (settings().lbScope || 'all') !== 'all' || settings().lbFuzzy || settings().lbCase); }
-  const filterBtn = h('button', { class: 'small', 'aria-expanded': String(!filters.hidden), onclick: () => {
+  const filterBtn = h('button', { class: 'small ib', title: 'Filter', 'aria-expanded': String(!filters.hidden), onclick: () => {
     const open = filters.hidden; view.showFilters = open; reveal(filters, open); filterBtn.setAttribute('aria-expanded', String(open));
   } });
   const paintFilterBtn = () => {
     const n = view.has.length + view.not.length + (view.from || view.to ? 1 : 0) + (view.flag ? 1 : 0) + ((settings().lbScope || 'all') !== 'all' ? 1 : 0) + (settings().lbFuzzy ? 1 : 0) + (settings().lbCase ? 1 : 0);
-    filterBtn.textContent = n ? `Filter (${n})` : 'Filter'; filterBtn.classList.toggle('primary', !!n);
+    // the count in the word (screen readers), and as a small number beside the icon when icons replace words
+    fill(filterBtn, ...ib('filter', n ? `Filter (${n})` : 'Filter'), n ? h('span', { class: 'ib-n', 'aria-hidden': 'true' }, String(n)) : null); filterBtn.classList.toggle('primary', !!n);
   };
   // the search box, with its own × that empties just the box (filters stay)
   const searchBox = h('input', { type: 'search', placeholder: 'Search, or “last Tuesday”', value: view.q, 'aria-label': 'Search cases',
@@ -323,16 +324,18 @@ function listView(rows, flagsOf, repaint) {
 
 // One case: date, details, procedure tags, flags. Tap to edit. Shared by the list and the calendar.
 // Advanced display → Fewer buttons on Logbook rows: one ⋯ that opens Copy / Reflect / Edit; a ✓ marks a reflection
+// the ⋯ menu's sheet; also opened by pressing and holding a row (Accessibility → Press and hold, html.row-hold)
+function openRowMenu(c) {
+  const has = (S.reflections || []).some(r => r.caseId === c.id);
+  const m = modal(caseText(c).slice(0, 60) || 'Case', h('div', { class: 'row-menu-list' },
+    h('button', { onclick: () => { m.close(); copyText(shareCaseText(c), 'Case copied: paste it into your notes'); } }, rowIcon('copy'), ' Copy'),
+    basicHides('reflect') ? null : h('button', { class: has ? 'has-refl' : '', onclick: () => { m.close(); reflectOnCase(c); } }, rowIcon(has ? 'done' : 'reflect'), has ? ' Open the reflection' : ' Write a reflection'),
+    h('button', { onclick: () => { m.close(); editCaseDialog(c); } }, ' Edit the case'),
+    h('button', { class: 'linkish', onclick: () => m.close() }, 'Cancel')));
+}
 function rowMenu(c) {
   const has = (S.reflections || []).some(r => r.caseId === c.id);
-  const open = e => {
-    e.stopPropagation();
-    const m = modal(caseText(c).slice(0, 60) || 'Case', h('div', { class: 'row-menu-list' },
-      h('button', { onclick: () => { m.close(); copyText(shareCaseText(c), 'Case copied: paste it into your notes'); } }, rowIcon('copy'), ' Copy'),
-      basicHides('reflect') ? null : h('button', { class: has ? 'has-refl' : '', onclick: () => { m.close(); reflectOnCase(c); } }, rowIcon(has ? 'done' : 'reflect'), has ? ' Open the reflection' : ' Write a reflection'),
-      h('button', { onclick: () => { m.close(); editCaseDialog(c); } }, ' Edit the case'),
-      h('button', { class: 'linkish', onclick: () => m.close() }, 'Cancel')));
-  };
+  const open = e => { e.stopPropagation(); openRowMenu(c); };
   return h('span', { class: 'acts' },
     has && !basicHides('reflect') ? h('span', { class: 'refl-done', title: 'Has a reflection', 'aria-label': 'Has a reflection' }, rowIcon('done')) : null,
     basicHides('reflect') ? h('button', { class: 'small row-btn row-more', title: 'Copy or edit', 'aria-label': 'Copy or edit this case', onclick: open }, '⋯')
@@ -346,10 +349,35 @@ function tagRow(el) {
   return el;
 }
 
+// Press and hold a row for its menu (Accessibility, off by default; owner, 13 Oct 2026): half a second without moving
+// opens the ⋯ sheet. The click that comes with lifting the finger is swallowed, so it neither opens the case nor
+// presses the sheet's button that is now under the finger. A sideways swipe still changes tabs.
+const HOLD_MS = 500;
+function swallowNextClick() {
+  const eat = e => { e.stopPropagation(); e.preventDefault(); window.removeEventListener('click', eat, true); };
+  window.addEventListener('click', eat, true);
+  const off = () => setTimeout(() => window.removeEventListener('click', eat, true), 350);
+  window.addEventListener('pointerup', off, { capture: true, once: true });
+  window.addEventListener('pointercancel', off, { capture: true, once: true });
+}
+function holdToMenu(li, c) {
+  let t = 0, x = 0, y = 0;
+  const stop = () => { clearTimeout(t); t = 0; };
+  li.addEventListener('pointerdown', e => {
+    if (e.button !== 0 || e.target.closest('button, a, input')) return;
+    x = e.clientX; y = e.clientY; stop();
+    t = setTimeout(() => { t = 0; swallowNextClick(); try { navigator.vibrate?.(10); } catch { /* not allowed */ } openRowMenu(c); }, HOLD_MS);
+  });
+  li.addEventListener('pointermove', e => { if (t && Math.hypot(e.clientX - x, e.clientY - y) > 10) stop(); });
+  for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) li.addEventListener(ev, stop);
+  // Android's long press and a right-click: the same menu instead of the browser's (unless the hold already opened it)
+  li.addEventListener('contextmenu', e => { e.preventDefault(); if (document.querySelector('dialog[open] .row-menu-list')) return; stop(); openRowMenu(c); });
+}
+
 function caseRow(c, flagsOf) {
   const flags = flagsOf(c);
   const p = caseParts(c);
-  return h('li', { 'data-date': c.date || '', onclick: () => editCaseDialog(c), tabindex: '0', onkeydown: e => { if (e.key === 'Enter' && e.target === e.currentTarget) editCaseDialog(c); } },
+  const li = h('li', { 'data-date': c.date || '', onclick: () => editCaseDialog(c), tabindex: '0', onkeydown: e => { if (e.key === 'Enter' && e.target === e.currentTarget) editCaseDialog(c); } },
       // the left column: the initials on top, the date on one line under them (like Reflections; owner, 13 Oct 2026)
       h('span', { class: 'd' }, p.initials ? h('b', { class: 'ini' }, p.initials) : null,
         h('span', { class: 'dt' }, c.date ? [h('span', { class: 'wd' }, weekday(c.date)), ' ', fmtDate(c.date).replace(/ \d{4}$/, '')] : (c.dateText || '—'))),
@@ -371,6 +399,8 @@ function caseRow(c, flagsOf) {
           basicHides('reflect') ? null : (S.reflections || []).some(r => r.caseId === c.id)
             ? h('button', { class: 'small row-btn has-refl', title: 'Open the reflection on this case', 'aria-label': 'Open the reflection on this case', onclick: e => { e.stopPropagation(); reflectOnCase(c); } }, rowIcon('done'), h('span', { class: 'lbl' }, 'Reflect'))
             : h('button', { class: 'small row-btn', title: 'Write a reflection on this case', 'aria-label': 'Write a reflection on this case', onclick: e => { e.stopPropagation(); reflectOnCase(c); } }, rowIcon('reflect'), h('span', { class: 'lbl' }, 'Reflect')))));
+  if (document.documentElement.classList.contains('row-hold')) holdToMenu(li, c);
+  return li;
 }
 
 // ---------- calendar ----------
@@ -383,7 +413,7 @@ const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 
 function calendarView(rows, flagsOf, repaint) {
   if (!S.cases.length) return emptyState('logbook', 'No cases yet', 'Cases you log show here on their day.', h('a', { class: 'btn primary', href: '#log' }, 'Log your first case'));
   const today = todayISO();
-  // opens on today (owner): the day's cases, or "No cases yet today" with + Log a case
+  // opens on today (owner): the day's cases, or "No cases yet today" with + Add
   if (!view.month) { view.month = today.slice(0, 7); if (!view.day) view.day = today; }
   const [y, m] = view.month.split('-').map(Number);
   const byDay = new Map();
@@ -435,11 +465,12 @@ function calendarView(rows, flagsOf, repaint) {
       h('div', { class: 'lb-dayhead' },
         h('h3', { style: 'margin:0' }, `${fmtDate(view.day)} (${dayCases.length})`),
         h('div', { class: 'lb-daybtns' },
-          dayCases.length || dayNotes ? h('button', { class: 'small', onclick: async () => shareText(await dayTextWithNotes(view.day, dayCases)) }, 'Share day') : null,
-          dayCases.length || dayNotes ? h('button', { class: 'small', title: 'Copy this day (format in Settings → Markdown)', 'aria-label': 'Copy this day', onclick: async () => copyText(await dayTextWithNotes(view.day, dayCases), 'Day copied: paste it into your notes') }, 'Copy') : null,
-          dayNotes ? h('button', { class: 'small', onclick: () => openNotes({ day: view.day }) }, ic('note'), 'Notes') : null,
+          dayCases.length || dayNotes ? h('button', { class: 'small ib', title: 'Share this day', 'aria-label': 'Share this day', onclick: async () => shareText(await dayTextWithNotes(view.day, dayCases)) }, ...ib('share', 'Share')) : null,
+          // Copy for the day: off unless switched on (Advanced display → Logbook rows; owner, 13 Oct 2026)
+          (dayCases.length || dayNotes) && document.documentElement.classList.contains('day-copy') ? h('button', { class: 'small ib', title: 'Copy this day (format in Settings → Markdown)', 'aria-label': 'Copy this day', onclick: async () => copyText(await dayTextWithNotes(view.day, dayCases), 'Day copied: paste it into your notes') }, ...ib('copy', 'Copy')) : null,
+          dayNotes ? h('button', { class: 'small ib', title: 'Notes', onclick: () => openNotes({ day: view.day }) }, ic('note'), h('span', { class: 'ib-l' }, 'Notes')) : null,
           // log on this day (the Log page opens with the date already picked): last, at the right like a main action
-          h('button', { class: 'small primary', onclick: () => logOnDate(view.day) }, '+ Log a case'))),
+          h('button', { class: 'small primary', title: 'Log a case on this day', 'aria-label': 'Log a case on this day', onclick: () => logOnDate(view.day) }, '+ Add'))),
       dayCases.length ? h('ul', { class: 'cases' }, dayCases.map(c => caseRow(c, flagsOf))) : emptyState('calendar', view.day === today ? 'No cases yet today' : 'No cases on this day'))
       : h('p', { class: 'hint help', style: 'margin-top:10px' }, 'Tap a day to see its cases.'),
     undated.length ? h('details', { style: 'margin-top:12px' },

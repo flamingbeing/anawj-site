@@ -100,7 +100,7 @@ async function run(label, ctxOpts) {
     if (ONLY && stepNo++ > ONLY_LAST) return;   // E2E_ONLY: nothing after the last matching step
     const e0 = errs.length, t0 = Date.now();
     try { const note = await fn(); results.push({ step: name, ms: Date.now() - t0, ok: errs.length === e0, note: errs.length > e0 ? errs.slice(e0).join(' | ') : (note || '') }); }
-    catch (e) { results.push({ step: name, ms: Date.now() - t0, ok: false, note: e.message.split('\n')[0] }); if (process.env.E2E_FAILFAST) console.log('FAIL ' + name + ': ' + e.message.split('\n')[0]); await shot('FAIL-' + name.replace(/\W+/g, '_')).catch(() => {}); for (let i = 0; i < 3 && await p.locator('dialog[open]').count().catch(() => 0); i++) await p.keyboard.press('Escape').catch(() => {}); }
+    catch (e) { results.push({ step: name, ms: Date.now() - t0, ok: false, note: e.message.split('\n').slice(0, process.env.E2E_LONG ? 12 : 1).join(' ') }); if (process.env.E2E_FAILFAST) console.log('FAIL ' + name + ': ' + e.message.split('\n')[0]); await shot('FAIL-' + name.replace(/\W+/g, '_')).catch(() => {}); for (let i = 0; i < 3 && await p.locator('dialog[open]').count().catch(() => 0); i++) await p.keyboard.press('Escape').catch(() => {}); }
   }
   const assert = (c, m) => { if (!c) throw new Error(m); };
 
@@ -1832,6 +1832,51 @@ async function run(label, ctxOpts) {
       }
     }
     assert(!bad.length, bad.join(' || '));
+  });
+
+  await step('clean looks: Flat, button style, icons, plain calendar, page titles, shorter rows, press and hold', async () => {
+    const eq = (x, y, m) => assert(x === y, `${m}: ${x}`);
+    const cls = k => p.evaluate(k => document.documentElement.classList.contains(k), k);
+    await tab('display');
+    await p.locator('input[type=range][aria-label="Borders"]').fill('0'); await nap(150);
+    assert(await cls('flat') && await cls('edges-fill'), 'Flat not applied');
+    await tab('displayadv');
+    await choose('Button style', 'tinted');
+    const sw = l => p.getByLabel(l, { exact: true });
+    for (const l of ['Icons instead of words on common buttons', 'Plain calendar', 'Page titles in the header', 'Shorter Logbook rows']) await sw(l).check();
+    await tab('access');
+    await sw('Press and hold a Logbook row for its menu').check();
+    try {
+      for (const k of ['btn-tinted', 'icon-btns', 'cal-plain', 'page-titles', 'rows-short', 'row-hold']) assert(await cls(k), k + ' not applied');
+      await tab('logbook');
+      eq(await p.locator('.top h1').innerText(), 'Logbook', 'page title not in the header');
+      // icons only, with the word kept for screen readers
+      const fb = p.locator('.lb-top button.ib').first();
+      assert(await fb.locator('.ib-ico').isVisible(), 'filter icon hidden');
+      eq(await fb.locator('.ib-l').evaluate(el => el.getBoundingClientRect().width <= 1), true, 'filter word still shown');
+      eq(await p.getByRole('button', { name: /^Filter/ }).count() >= 1, true, 'filter lost its name');
+      // shorter rows: no buttons; press and hold opens the menu, a tap still opens the case
+      const list = p.locator('main .seg button', { hasText: /^List$/ }); if (await list.count()) { await list.first().click(); await nap(300); }
+      const row = p.locator('ul.cases li:not(.monthhead)').first();
+      eq(await row.locator('.acts').isVisible(), false, 'row buttons still shown');
+      await row.scrollIntoViewIfNeeded(); await p.evaluate(() => window.scrollBy(0, -120)); await nap(150);
+      const bx = await row.boundingBox();
+      await p.mouse.move(bx.x + bx.width / 2, bx.y + 12); await p.mouse.down(); await p.waitForTimeout(700); await p.mouse.up(); await p.waitForTimeout(400);   // a real wait: nap() is capped await nap(250);
+      await p.locator('dialog[open] .row-menu-list').waitFor();
+      await p.locator('dialog[open]').getByRole('button', { name: 'Cancel' }).click(); await nap(250);
+      await row.click(); await nap(300);
+      eq(await p.locator('dialog[open] .row-menu-list').count(), 0, 'a tap opened the menu');
+      eq(await p.locator('dialog[open]').count(), 1, 'a tap did not open the case');
+      await p.keyboard.press('Escape'); await nap(250);
+      await shot3('logbook-clean');
+    } finally {
+      for (let i = 0; i < 3 && await p.locator('dialog[open]').count(); i++) { await p.keyboard.press('Escape'); await nap(200); }
+      await tab('access'); await p.getByRole('button', { name: 'Reset this page' }).click(); await p.locator('dialog[open]').getByRole('button', { name: 'Reset' }).click(); await nap(200);
+      await tab('displayadv'); await p.getByRole('button', { name: 'Reset this page' }).click(); await p.locator('dialog[open]').getByRole('button', { name: 'Reset' }).click(); await nap(200);
+      await tab('display'); await p.locator('input[type=range][aria-label="Borders"]').fill('5'); await nap(150);
+    }
+    for (const k of ['flat', 'btn-tinted', 'icon-btns', 'cal-plain', 'page-titles', 'rows-short', 'row-hold']) assert(!(await cls(k)), k + ' not reset');
+    eq(await p.locator('.top h1').innerText(), 'APMES Logbook', 'app name not back');
   });
 
   await step('theme: light by default; dark and auto in Settings → Display', async () => {

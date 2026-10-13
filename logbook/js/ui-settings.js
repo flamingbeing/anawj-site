@@ -97,7 +97,7 @@ export function residencyCard() {
 // the light / dark choice. The first time a device opens the app it starts from what the account had (these used to
 // follow the account), so nobody's look changes. Kept at sign-out: they are the device's, and nothing private.
 const DISPLAY_KEY = 'apmes-logbook-display';
-export const DISPLAY_KEYS = ['compact', 'textSize', 'zoom', 'accent', 'startTab', 'fontUi', 'fontUiName', 'fontLog', 'fontLogName', 'lineWidth', 'lineHeight', 'contrast', 'motion', 'tabIcons', 'tabBar', 'hideHeader', 'caseInverted', 'colourful', 'customCss', 'customCssOn', 'autoFocus', 'appTitle', 'boxCaps', 'boxCorrect', 'boxSpell', 'reflSpell', 'pinBox', 'pinSearch', 'firstField', 'compactTags', 'borders', 'round', 'shadows', 'bigTaps', 'tabOrder', 'tabHidden', 'swipeTabs', 'rowMenu', 'rowCopy', 'reflToolbar', 'edgeBack', 'hideWords'];
+export const DISPLAY_KEYS = ['compact', 'textSize', 'zoom', 'accent', 'startTab', 'fontUi', 'fontUiName', 'fontLog', 'fontLogName', 'lineWidth', 'lineHeight', 'contrast', 'motion', 'tabIcons', 'tabBar', 'hideHeader', 'caseInverted', 'colourful', 'customCss', 'customCssOn', 'autoFocus', 'appTitle', 'boxCaps', 'boxCorrect', 'boxSpell', 'reflSpell', 'pinBox', 'pinSearch', 'firstField', 'compactTags', 'borders', 'round', 'shadows', 'bigTaps', 'tabOrder', 'tabHidden', 'swipeTabs', 'rowMenu', 'rowCopy', 'reflToolbar', 'edgeBack', 'hideWords', 'flat', 'btnStyle', 'iconBtns', 'calPlain', 'pageTitles', 'rowShort', 'rowHold', 'dayCopy'];
 export function deviceDisplay() {
   try { const d = JSON.parse(localStorage.getItem(DISPLAY_KEY) || 'null'); return d && typeof d === 'object' && !Array.isArray(d) ? d : null; } catch { return null; }
 }
@@ -160,7 +160,9 @@ export function applyLook(d = {}) {
   // pinned while scrolling: the case box (Case tab) and the search card (Logbook)
   c.toggle('pin-box', !!d.pinBox); c.toggle('pin-search', !!d.pinSearch);
   // Borders: softer lines (--edge, style.css); at Borderless / Faint fields, buttons and chips get a light fill instead
-  const bl = borderLevel(d), soft = bl < BORDERS.length - 1;
+  // Flat (the slider's far end, owner 13 Oct 2026): borderless, and the page cards melt into the page
+  const bl = d.flat ? 0 : borderLevel(d), soft = bl < BORDERS.length - 1;
+  c.toggle('flat', !!d.flat);
   c.toggle('edges', soft); c.toggle('edges-fill', bl <= 1);
   if (soft) document.documentElement.style.setProperty('--edge-mix', BORDER_MIX[bl] + '%'); else document.documentElement.style.removeProperty('--edge-mix');
   // corners, card shadows instead of lines, bigger tap targets on the Case tab
@@ -171,15 +173,30 @@ export function applyLook(d = {}) {
   // swipe between the bar's tabs (app.js; on unless switched off: swipeTabs false); one ⋯ menu on Logbook rows
   // instead of Copy and Reflect (ui-logbook.js)
   c.toggle('swipe-tabs', d.swipeTabs !== false); c.toggle('row-menu', !!d.rowMenu); c.toggle('refl-toolbar', !!d.reflToolbar);
-  // Copy on each Logbook row: off by default (owner, 13 Oct 2026); the ⋯ menu, Copy day and the case itself still copy
+  // Copy on each Logbook row: off by default (owner, 13 Oct 2026); the ⋯ menu, Share for a day and the case itself still copy
   c.toggle('row-copy', !!d.rowCopy);
+  // Copy beside Share for a day in the Logbook calendar: off by default too (owner, 13 Oct 2026)
+  c.toggle('day-copy', !!d.dayCopy);
   // word counts on the Reflections list: on unless switched off (Settings → Reflections; owner, 13 Oct 2026)
   c.toggle('no-wc', !!d.hideWords);
+  // the seven Clean looks (owner, 13 Oct 2026; Advanced display and Accessibility, all off by default): button style,
+  // icons instead of words, the plain calendar, page titles in the header, shorter Logbook rows, press and hold
+  for (const b of BUTTON_STYLES.slice(1)) c.toggle('btn-' + b[0], d.btnStyle === b[0]);
+  c.toggle('icon-btns', !!d.iconBtns); c.toggle('cal-plain', !!d.calPlain); c.toggle('page-titles', !!d.pageTitles);
+  c.toggle('rows-short', !!d.rowShort); c.toggle('row-hold', !!d.rowHold);
   // the name in the header and the browser tab (plain text, at most 40 characters)
   const title = cleanTitle(d.appTitle) || APP_TITLE;
-  const h1 = document.querySelector('.top h1'); if (h1 && h1.textContent !== title) h1.textContent = title;
+  paintTitle(d);
   if (document.title !== title) document.title = title;   // ui-log.js: don't open the keyboard on the Case tab
   applyCustomCss(d);
+}
+export const BUTTON_STYLES = [['outlined', 'Outlined (default)'], ['filled', 'Filled'], ['tinted', 'Tinted'], ['plain', 'Plain']];
+// the header's words: the app's name, or with Page titles the page's ("Logbook"); render() in app.js says which page
+let pageLabel = '';
+export function setPageLabel(l) { pageLabel = l || ''; paintTitle(); }
+function paintTitle(d = display()) {
+  const t = (d.pageTitles && pageLabel) || cleanTitle(d.appTitle) || APP_TITLE;
+  const h1 = document.querySelector('.top h1'); if (h1 && h1.textContent !== t) h1.textContent = t;
 }
 // one colour per tab (Colourful); style.css has the same shades for the tabs-and-headings version
 export const TAB_COLOURS = { log: '#c2410c', logbook: '#0e7490', reflect: '#be123c', progress: '#1d4ed8', more: '#6d28d9' };
@@ -325,14 +342,16 @@ export function renderDisplay() {
       pick('Colourful', COLOURFUL, st.colourful === true ? 'tabs' : st.colourful || 'off', v => applyDisplay(setDisplay({ colourful: v === 'off' ? null : v })),
         'A colour for each tab.', 'With the default colour, the tabs follow the NUH stripe at the top: Case orange, Logbook red, Reflections cyan, Analytics navy. With another colour: orange, teal, red, blue, purple. “Everything” also colours the buttons, chips and links on that tab’s pages, in shades that stay easy to read.'),
       toggle('Compact mode', st.compact, v => { applyCompact(v); setDisplay({ compact: v }); }, 'Smaller chips, rows and spacing, so more tags fit.'),
-      slider('Borders', BORDERS, borderLevel(st), BORDERS.length - 1, n => applyDisplay(setDisplay({ borders: n }))),
+      // Flat first: no lines and no page cards (its own key, so the saved border levels keep their meaning)
+      slider('Borders', ['Flat (no lines, no cards)', ...BORDERS], st.flat ? 0 : borderLevel(st) + 1, BORDERS.length,
+        n => applyDisplay(setDisplay(n === 0 ? { flat: true, borders: 0 } : { flat: null, borders: n === null ? null : n - 1 }))),
       slider('Corners', ROUNDS.map(([n]) => n), roundLevel(st), 2, n => applyDisplay(setDisplay({ round: n }))),
       toggle('Soft shadows instead of lines around cards (default)', st.shadows !== false, v => applyDisplay(setDisplay({ shadows: v ? null : false }))),
       // the tab the app opens on (a link or shortcut to a tab still opens that tab)
       pick('Open the app on', START_TABS, st.startTab || 'log', v => { setDisplay({ startTab: v }); toast('Saved'); }),
       DEVICE_NOTE()),
     resetLink('light or dark, colour, Colourful, compact, borders, corners, shadows and the start tab on this device', () => {
-      applyTheme('light'); applyDisplay(setDisplay({ accent: null, colourful: null, compact: null, borders: null, round: null, shadows: null, startTab: null }));
+      applyTheme('light'); applyDisplay(setDisplay({ accent: null, colourful: null, compact: null, borders: null, flat: null, round: null, shadows: null, startTab: null }));
     }),
     advancedLink('displayadv', 'Advanced display settings', 'The header and tab bar, Logbook rows, fonts and spacing, the Case tab layout, custom CSS'));
 }
@@ -345,11 +364,16 @@ export function renderDisplayAdvanced() {
     displayPreview(),
     h('section', { class: 'card' },
       h('h2', {}, 'Advanced display'),
+      h('h3', {}, 'Look'),
+      lookPick('btnStyle', 'Button style', BUTTON_STYLES, 'outlined', 'The buttons that aren’t the main one on a screen.'),
+      toggle('Icons instead of words on common buttons', st.iconBtns, set('iconBtns'), 'Share, Copy, Notes and Filter.', 'Each still says its name to screen readers, and on a computer when you point at it.'),
+      toggle('Plain calendar', st.calPlain, set('calPlain'), 'Numbers with the count under them, no tiles.', 'Today in a coloured circle, the day you picked in a dark one.'),
       h('h3', {}, 'Header and tab bar'),
       h('label', { class: 'field' }, 'Name in the header',
         h('input', { type: 'text', value: st.appTitle || '', placeholder: APP_TITLE, maxlength: '40', 'aria-label': 'Name in the header',
           onchange: e => { const t = cleanTitle(e.target.value); e.target.value = t; applyDisplay(setDisplay({ appTitle: t && t !== APP_TITLE ? t : null })); } })),
       help('Also the name in the browser tab. Empty: APMES Logbook.'),
+      toggle('Page titles in the header', st.pageTitles, set('pageTitles'), '“Logbook”, “Reflections”… instead of the app’s name.'),
       toggle('Hide the header (the app name bar)', st.hideHeader, v => applyDisplay(setDisplay({ hideHeader: v })),
         'It comes back when something needs you.', 'It comes back by itself when something isn’t synced yet, when there’s no signal, and in the demo.'),
       lookPick('tabBar', 'Tab bar', TAB_BARS, 'auto'),
@@ -357,7 +381,9 @@ export function renderDisplayAdvanced() {
       tabArranger(),
       h('h3', {}, 'Logbook rows'),
       toggle('Fewer buttons on Logbook rows (a ⋯ menu)', st.rowMenu, set('rowMenu'), 'Copy and Reflect move into one ⋯ button.', 'A ✓ still shows cases with a reflection.'),
-      toggle('Copy button on each Logbook row', st.rowCopy, set('rowCopy'), 'Copy day still copies the whole day.', 'Off unless you switch it on. The ⋯ menu, if you use it, still copies one case.'),
+      toggle('Shorter Logbook rows', st.rowShort, set('rowShort'), 'One line for the case, one grey line of tags, no buttons.', 'The initials and case in bold, the short date at the right. Tap a row to open it; press and hold (Accessibility) for Copy and Reflect.'),
+      toggle('Copy button on each Logbook row', st.rowCopy, set('rowCopy'), 'Off unless you switch it on.', 'The ⋯ menu, if you use it, still copies one case.'),
+      toggle('Copy button for each day', st.dayCopy, set('dayCopy'), 'Beside Share when you pick a day in the calendar.', 'Off unless you switch it on. Share already sends the whole day (or copies it, where sharing isn’t possible).'),
       h('h3', {}, 'Text'),
       fontPicker('ui'),
       fontPicker('log'),
@@ -370,8 +396,8 @@ export function renderDisplayAdvanced() {
       toggle('Pin the search box at the top of the Logbook and Reflections', st.pinSearch, set('pinSearch'), 'They stay in view while the list scrolls under them.'),
       DEVICE_NOTE()),
     customCssCard(),
-    resetLink('the name in the header, fonts, line spacing and width, the tab bar (order and hidden tabs) and header options, the Logbook row buttons, upside down, pinning and custom CSS (switched off; your CSS is kept) on this device', () =>
-      applyDisplay(setDisplay({ appTitle: null, fontUi: null, fontUiName: null, fontLog: null, fontLogName: null, lineWidth: null, lineHeight: null, tabBar: null, tabIcons: null, hideHeader: null, caseInverted: null, pinBox: null, pinSearch: null, customCssOn: null, tabOrder: null, tabHidden: null, rowMenu: null, rowCopy: null }))));
+    resetLink('the name in the header, fonts, line spacing and width, the tab bar (order and hidden tabs) and header options, the Logbook row buttons, upside down, pinning and custom CSS (switched off; your CSS is kept), and the button style, icons, plain calendar, page titles and shorter rows on this device', () =>
+      applyDisplay(setDisplay({ appTitle: null, fontUi: null, fontUiName: null, fontLog: null, fontLogName: null, lineWidth: null, lineHeight: null, tabBar: null, tabIcons: null, hideHeader: null, caseInverted: null, pinBox: null, pinSearch: null, customCssOn: null, tabOrder: null, tabHidden: null, rowMenu: null, rowCopy: null, dayCopy: null, btnStyle: null, iconBtns: null, calPlain: null, pageTitles: null, rowShort: null }))));
 }
 // Settings → Accessibility (#access; owner, 13 Oct 2026): size, contrast, motion and the gestures, gathered from
 // Display and Advanced display. All this device's.
@@ -398,9 +424,10 @@ export function renderAccessibility() {
       toggle('Swipe from the left edge to go back (iPhone app)', st.edgeBack !== false, v => applyDisplay(setDisplay({ edgeBack: v ? null : false })),
         IPHONE_APP() ? 'From a page under a tab, drag from the left edge.' : 'Only in the app added to an iPhone or iPad home screen.',
         IPHONE_APP() ? 'On unless you switch it off.' : 'Android phones use their own Back gesture from the edges.'),
+      toggle('Press and hold a Logbook row for its menu', st.rowHold, v => applyDisplay(setDisplay({ rowHold: v || null })), 'Copy, Reflect and Edit, without the row’s buttons.', 'Hold for half a second without moving. A right-click does the same on a computer.'),
       h('p', { class: 'hint', style: 'margin:10px 0 0' }, 'Everything on this page is saved on this device only.')),
-    resetLink('zoom, text size, bigger tap targets, swiping, contrast, motion and edge swipe on this device', () =>
-      applyDisplay(setDisplay({ zoom: null, textSize: null, bigTaps: null, swipeTabs: null, contrast: null, motion: null, edgeBack: null }))));
+    resetLink('zoom, text size, bigger tap targets, swiping, contrast, motion, edge swipe and press and hold on this device', () =>
+      applyDisplay(setDisplay({ zoom: null, textSize: null, bigTaps: null, swipeTabs: null, contrast: null, motion: null, edgeBack: null, rowHold: null }))));
 }
 // Advanced display → the tab bar's order and hidden tabs (arrangeTabs): ↑ ↓ to move, a switch to show or hide
 function tabArranger() {
@@ -735,8 +762,9 @@ export function renderShowHide() {
     h('section', { class: 'card', 'data-group': 'logbook' },
       h('h3', { style: 'margin-top:0' }, 'Logbook (this device)'),
       sw('Copy and Reflect buttons on each case', !d.rowMenu, v => applyDisplay(setDisplay({ rowMenu: v ? null : true })), 'Off: one ⋯ button on each row instead.'),
-      sw('Copy button on each case', !!d.rowCopy, v => applyDisplay(setDisplay({ rowCopy: v || null })), 'Off by default: Copy day still copies the whole day.'),
-      groupReset('the row buttons', () => applyDisplay(setDisplay({ rowMenu: null, rowCopy: null })))),
+      sw('Copy button on each case', !!d.rowCopy, v => applyDisplay(setDisplay({ rowCopy: v || null })), 'Off by default.'),
+      sw('Copy button for each day', !!d.dayCopy, v => applyDisplay(setDisplay({ dayCopy: v || null })), 'Off by default: Share sends the whole day.'),
+      groupReset('the row and day buttons', () => applyDisplay(setDisplay({ rowMenu: null, rowCopy: null, dayCopy: null })))),
     h('section', { class: 'card', 'data-group': 'bar' },
       h('h3', { style: 'margin-top:0' }, 'Header and tabs (this device)'),
       sw('Show the header (the app’s name and your name)', !d.hideHeader, v => applyDisplay(setDisplay({ hideHeader: !v }))),

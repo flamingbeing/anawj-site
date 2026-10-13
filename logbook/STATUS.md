@@ -9,9 +9,9 @@ Last updated: 2026-10-13 by Claude Code, Logbook 1 (log1).
 
 ## Now
 
-- **Claude Code, Logbook 1 (log1)** (branch `claude/clever-gates-pm6sas`): polish batch (Next, item 1): PRs 1–5
-  and #264 merged; PR 6a (settings regroup) in #289, merging after the checks. Then 6b (layout approved 13 Oct,
-  "agree and merge": build, test, merge without asking). Owner's picks: artifact
+- **Claude Code, Logbook 1 (log1)** (branch `claude/clever-gates-pm6sas`): polish batch (Next, item 1): PRs 1–5,
+  #264 and 6a (#289) merged; 6b (seven Clean looks, plus the calendar day's Share / Copy / + Add with Copy off by
+  default) in its PR, merging after the checks. After that the polish batch is done. Owner's picks: artifact
   https://claude.ai/artifact/8Kfho8SPgupTbqe6t2g5bi (store `picks/owner`).
 - **Claude Code, Logbook 3 (log3)** (branch `ccr-2994049c-4e5tlt`): idle, nothing half-done. Still signed in to the
   Firebase CLI (usage counts only; each use needs the owner's OK). Owns the axe check, PR previews and the Codex /
@@ -87,6 +87,8 @@ Last updated: 2026-10-13 by Claude Code, Logbook 1 (log1).
 
 ## Decisions log
 
+- 2026-10-13: The Logbook calendar day's buttons read Share, Copy and + Add; Copy for a day is off by default
+  (Advanced display → Copy button for each day). The More list calls Notes "Notes (beta)". Owner's requests.
 - 2026-10-13: Polish PR 6 layout approved as proposed (Display basics unchanged but Borders gains a Flat end;
   Advanced display and logging regrouped under headings; switches, ✓ lists, one-line help); built as 6a (regroup)
   then 6b (seven new options, off by default). Owner: "agree and merge". Also: the age read-back under the case box
