@@ -9,7 +9,8 @@
   const host = location.hostname;
   const PREVIEW = /\.workers\.dev$/.test(host);
   // The apps on their live addresses hold real data: there, the overlay never copies the page's text into a comment.
-  const LIVE_APP = /^(apmes|prewarmstudy|nuhroster)\.anawj\.com$/.test(host) && !new URLSearchParams(location.search).has('demo');
+  const LIVE_APP = (/^(apmes|prewarmstudy|nuhroster)\.anawj\.com$/.test(host) || (host === 'hand.anawj.com' && location.pathname.startsWith('/handlog/')))
+    && !new URLSearchParams(location.search).has('demo');
   // the Worker only adds the script when it's on, but an app's offline copy may keep it: check again
   if (!PREVIEW && !/(?:^|;\s*)anawj-feedback=1(?:;|$)/.test(document.cookie)) return;
 
@@ -17,11 +18,15 @@
   const KEY = 'anawj-feedback-v1', WHO = 'anawj-editor-name', SIDE = 'anawj-feedback-side';
   const store = {
     get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : v; } catch (e) { return d; } },
-    set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
+    set(k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } },
   };
-  let items = [];
-  try { items = JSON.parse(store.get(KEY, '[]')); if (!Array.isArray(items)) items = []; } catch (e) { items = []; }
-  const save = () => { store.set(KEY, JSON.stringify(items)); render(); };
+  let items = [], saveFailed = false;
+  // the list as stored now (another tab of the same site may have changed it)
+  const load = () => { try { const v = JSON.parse(store.get(KEY, '[]')); items = Array.isArray(v) ? v : []; } catch (e) { items = []; } };
+  load();
+  const save = () => { saveFailed = !store.set(KEY, JSON.stringify(items)); render(); };
+  // every change: re-read, change, save
+  const change = fn => { load(); fn(); save(); };
 
   // ---- what happened recently, for "Something's wrong": errors and the screens and things tapped (by kind and
   // position on the page, never their text), kept only in memory, last 30
@@ -32,7 +37,9 @@
   addEventListener('error', e => { if (e.message) err(`${e.message} (${(e.filename || '').split('/').pop()}:${e.lineno || '?'})`); });
   addEventListener('unhandledrejection', e => err('unhandled: ' + (e.reason?.message || String(e.reason))));
   const origError = console.error;
-  console.error = function (...a) { try { err('console: ' + a.map(x => x?.message || (typeof x === 'string' ? x : JSON.stringify(x))).join(' ')); } catch (e) {} return origError.apply(this, a); };
+  // on a live app only error messages and codes, never other things logged (they can be records)
+  const said = x => x?.message ? (x.code ? x.code + ': ' : '') + x.message : typeof x === 'string' ? (LIVE_APP ? '' : x) : LIVE_APP ? '' : JSON.stringify(x);
+  console.error = function (...a) { try { const t = a.map(said).filter(Boolean).join(' '); if (t) err('console: ' + t); } catch (e) {} return origError.apply(this, a); };
   // only the screen's name (the first part of #…): later parts can be record ids
   const screen = () => (location.hash.split(/[\/?&=]/)[0] || '(start)');
   addEventListener('hashchange', () => note('screen ' + screen()));
@@ -40,7 +47,7 @@
 
   // ---- the overlay's own UI lives in a shadow root, so the page's styles and ours never mix
   const hostEl = document.createElement('anawj-feedback');
-  hostEl.style.cssText = 'all:initial';
+  hostEl.style.cssText = 'all:initial;position:fixed;top:0;left:0;width:0;height:0;z-index:2147483647';
   hostEl.setAttribute('data-anawj-feedback', '');
   const root = hostEl.attachShadow({ mode: 'open' });
   root.innerHTML = `<style>
@@ -167,9 +174,14 @@
     }
     $('choose').textContent = `Choose version ${current().toUpperCase()}`;
     $('choose').onclick = () => {
-      items.push({ id: Date.now().toString(36), url: location.href.split('#')[0].replace(/[?&]variant=[^&]*/, '').replace(/\?$/, ''), view: location.hash, title: document.title,
-        kind: 'choice', heading: '', locator: '', before: '', text: `Choose version ${current().toUpperCase()} (of ${VARIANTS.map(v => v.toUpperCase()).join(', ')}).`, at: new Date().toISOString() });
-      save(); show(null);
+      // 10: a later choice for the same page replaces the earlier one
+      change(() => {
+        const at = here().url;
+        items = items.filter(c => !(c.kind === 'choice' && c.url === at));
+        items.push({ id: Date.now().toString(36), ...here(), title: document.title,
+          kind: 'choice', heading: '', locator: '', before: '', text: `Choose version ${current().toUpperCase()} (of ${VARIANTS.map(v => v.toUpperCase()).join(', ')}).`, at: new Date().toISOString() });
+      });
+      show(null);
     };
   }
   // the first time on a site, say what the button is for (a few seconds, once)
@@ -186,7 +198,8 @@
   // ---- picking what to comment on (the page's own taps are held back while picking)
   const page = document;
   const mark = page.createElement('style');
-  mark.textContent = '[data-anawj-fb]{outline:3px solid #e4002b!important;outline-offset:2px!important}';
+  // (cursor:pointer while picking: iOS Safari only sends a tap's click on plain text when it looks tappable)
+  mark.textContent = '[data-anawj-fb]{outline:3px solid #e4002b!important;outline-offset:2px!important}html.anawj-fb-picking,html.anawj-fb-picking *{cursor:pointer!important}';
   (page.head || page.documentElement).appendChild(mark);
   let picking = false, target = null;
   const BLOCK = 'h1,h2,h3,h4,h5,h6,p,li,dt,dd,td,th,caption,figcaption,blockquote,summary,label,button,a,img,svg,figure,video,canvas,pre,input,select,textarea,[role=button],[role=tab]';
@@ -203,8 +216,8 @@
   }
   // (touches are left alone, so the page can still be scrolled while picking)
   ['click', 'pointerdown', 'pointerup', 'mousedown', 'mouseup', 'submit', 'dblclick'].forEach(ev => page.addEventListener(ev, hold, { capture: true, passive: false }));
-  function startPick() { show(null); picking = true; $('banner').hidden = false; $('fab').hidden = true; }
-  function stopPick() { picking = false; $('banner').hidden = true; $('fab').hidden = false; }
+  function startPick() { show(null); picking = true; page.documentElement.classList.add('anawj-fb-picking'); $('banner').hidden = false; $('fab').hidden = true; }
+  function stopPick() { picking = false; page.documentElement.classList.remove('anawj-fb-picking'); $('banner').hidden = true; $('fab').hidden = false; }
 
   const clean = s => (s || '').replace(/ /g, ' ').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
   const textOf = el => clean(el.innerText || el.textContent || el.getAttribute?.('alt') || el.getAttribute?.('aria-label') || '');
@@ -237,6 +250,14 @@
     if (t && t !== page.body) note(`tap ${kindOf(t)} ${cssPath(t)}`.slice(0, 160));
   }, { capture: true, passive: true });
 
+  // the page's address as recorded in a comment: on a live app only the path and the screen's name (the query and the
+  // rest of the # part can hold record ids); elsewhere the whole address, without ?variant (that's the version shown)
+  function here() {
+    const u = new URL(location.href);
+    u.searchParams.delete('variant'); u.hash = '';
+    return LIVE_APP ? { url: u.origin + u.pathname, view: screen() === '(start)' ? '' : screen() } : { url: u.href, view: location.hash };
+  }
+
   let pending = null;
   function choose(el) {
     target = el; el.setAttribute('data-anawj-fb', '');
@@ -260,15 +281,17 @@
   $('noteSave').onclick = () => {
     const v = $('noteText').value.trim();
     if (!v) { $('noteText').focus(); return; }
-    items.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 5), url: location.href.split('#')[0], view: location.hash,
-      title: document.title, ...pending, text: v, options: $('optOptions').checked || undefined, everywhere: $('optEverywhere').checked || undefined, at: new Date().toISOString() });
-    save(); closeNote();
+    const item = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 5), ...here(),
+      title: document.title, ...pending, text: v, options: $('optOptions').checked || undefined, everywhere: $('optEverywhere').checked || undefined, at: new Date().toISOString() };
+    change(() => items.push(item));
+    closeNote();
+    if (saveFailed) alert('This browser couldn’t keep your comment (storage full or blocked): send your comments now, before leaving the page.');
   };
 
   // ---- speaking (the browser's speech recognition where there is one; only the text is kept)
   const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
   let rec = null;
-  function stopSpeech() { if (rec) { try { rec.stop(); } catch (e) {} rec = null; } $('speak').setAttribute('aria-pressed', 'false'); $('speak').textContent = '🎤 Speak'; }
+  function stopSpeech() { if (rec) { try { rec.abort(); } catch (e) {} rec = null; } $('speak').setAttribute('aria-pressed', 'false'); $('speak').textContent = '🎤 Speak'; }
   if (Speech) {
     $('speak').hidden = false;
     $('speakHint').textContent = 'Check the words before saving: drug names and doses get misheard.';
@@ -276,8 +299,8 @@
       if (rec) { stopSpeech(); return; }
       const box = $('noteText'), start = box.value ? box.value.replace(/\s*$/, ' ') : '';
       try {
-        rec = new Speech(); rec.lang = navigator.language || 'en-GB'; rec.interimResults = true; rec.continuous = true;
-        rec.onresult = e => { let t = ''; for (const r of e.results) t += r[0].transcript; box.value = start + t.trim(); };
+        const me = rec = new Speech(); rec.lang = navigator.language || 'en-GB'; rec.interimResults = true; rec.continuous = true;
+        rec.onresult = e => { if (rec !== me) return; let t = ''; for (const r of e.results) t += r[0].transcript; box.value = start + t.trim(); };
         rec.onerror = () => stopSpeech();
         rec.onend = () => { if (rec) stopSpeech(); };
         rec.start(); $('speak').setAttribute('aria-pressed', 'true'); $('speak').textContent = '■ Stop';
@@ -344,7 +367,8 @@
     show('menu');
     // on a preview: links to the same page as it is now (the copy of main) and to the PR's changes
     if (PREVIEW && host.split('.')[0] !== 'anawj-preview') {
-      $('cmpNow').href = 'https://' + host.replace(/^[^.]+/, 'anawj-preview') + location.pathname + location.search.replace(/[?&]variant=[^&]*/, '') + location.hash;
+      const now = new URL(location.href); now.host = host.replace(/^[^.]+/, 'anawj-preview'); now.searchParams.delete('variant');
+      $('cmpNow').href = now.href;
       $('cmp').hidden = false; $('cmpPr').hidden = true;
       if (!pr) pr = await findPr();
       if (pr) { $('cmpPr').href = pr.html_url + '/files'; $('cmpPr').hidden = false; }
@@ -385,6 +409,7 @@
   };
   $('shareClose').onclick = () => show(null);
   $('mList').onclick = () => {
+    load(); render();
     const box = $('items'); box.innerHTML = '';
     if (!items.length) box.innerHTML = '<p class="muted">No comments yet.</p>';
     items.forEach(c => {
@@ -392,7 +417,7 @@
       const t = document.createElement('div');
       t.textContent = `${new URL(c.url).pathname}${c.view || ''} · ${c.kind}${c.before ? ' “' + c.before.slice(0, 80) + '”' : ''} → ${c.text}`;
       const rm = document.createElement('button'); rm.textContent = 'Remove';
-      rm.onclick = () => { items = items.filter(x => x.id !== c.id); save(); $('mList').onclick(); };
+      rm.onclick = () => { change(() => { items = items.filter(x => x.id !== c.id); }); $('mList').onclick(); };
       d.append(t, rm); box.appendChild(d);
     });
     show('list');
@@ -472,10 +497,12 @@
       const res = await fetch(`https://api.github.com/repos/${REPO}/pulls?state=open&per_page=100`, { headers: { Accept: 'application/vnd.github+json' } });
       if (!res.ok) return null;
       const list = await res.json();
-      return list.find(p => slug(p.head.ref) === label || (label.length >= 20 && slug(p.head.ref).startsWith(label))) || null;
+      // an exact match first; a prefix only when Cloudflare may have shortened a long branch name
+      return list.find(p => slug(p.head.ref) === label) || (label.length >= 40 && list.find(p => slug(p.head.ref).startsWith(label))) || null;
     } catch (e) { return null; }
   }
   $('mSend').onclick = async () => {
+    load(); render();
     if (!items.length) { show('menu'); $('where').textContent = 'No comments yet: use Comment on something first.'; return; }
     $('privacyTick').checked = false;
     refresh(); show('send');
@@ -500,7 +527,7 @@
     window.open(url, '_blank', 'noopener');
   };
   $('copy').onclick = () => { if (blocked()) return; copy(report()); $('copy').textContent = 'Copied'; };
-  $('sent').onclick = () => { if (confirm('Clear your list? Only do this once your comments have been sent.')) { items = []; save(); show(null); } };
+  $('sent').onclick = () => { if (confirm('Clear your list? Only do this once your comments have been sent.')) { change(() => { items = []; }); show(null); } };
   $('sendClose').onclick = () => show(null);
   addEventListener('keydown', e => { if (e.key === 'Escape') { if (!cv.hidden) endDraw(); else if (picking) stopPick(); else if (!$('note').hidden) closeNote(); else show(null); } });
 })();
