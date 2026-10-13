@@ -58,7 +58,7 @@ adminCSS();
 const EMAIL_RE = /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/;
 export const cleanEmail = e => String(e || '').trim().replace(/^<|>$/g, '').toLowerCase();
 export const validEmail = e => EMAIL_RE.test(cleanEmail(e));
-const RES_STATUSES = ['ACTIVE', 'ON LEAVE', 'SMO', 'GRADUATED', 'ATTRITED'];
+export const RES_STATUSES = ['ACTIVE', 'ON LEAVE', 'SMO', 'GRADUATED', 'ATTRITED'];
 const SUPERVISION_KEY = { dops: 'q16', minicex: 'q18', ebd: 'q9' };
 const COMMENTS_KEY = { dops: 'q17', minicex: 'q19', ebd: 'q10' };
 const OVERALL_KEY = { dops: 'q14', minicex: 'q12' };   // the 9-point "overall" question (EBD has none)
@@ -69,18 +69,19 @@ const err = e => errText(e);
 
 // residents are cached for the session; People refreshes the cache
 let residentsCache = null;
+export const clearResidentsCache = () => { residentsCache = null; };
 async function residents(force = false) {
   if (!residentsCache || force) residentsCache = await cloud.listResidents();
   return residentsCache;
 }
 
-function field(label, input, cls = '') {
+export function field(label, input, cls = '') {
   const id = input.id || ('f-' + Math.random().toString(36).slice(2, 8));
   input.id = id;
   return h('div', { class: cls }, h('label', { class: 'e-label', for: id }, label), input);
 }
-const input = (attrs = {}) => h('input', { class: 'e-input', autocomplete: 'off', ...attrs });
-const select = (opts, cur) => h('select', { class: 'e-select' }, opts.map(o => {
+export const input = (attrs = {}) => h('input', { class: 'e-input', autocomplete: 'off', ...attrs });
+export const select = (opts, cur) => h('select', { class: 'e-select' }, opts.map(o => {
   const [v, l] = Array.isArray(o) ? o : [o, o];
   const op = h('option', { value: v }, l);
   if (String(v) === String(cur ?? '')) op.selected = true;
@@ -437,6 +438,8 @@ export async function renderPeople(sub) {
     { id: 'residents', label: `Residents` },
   ], tab, id => go(id === 'applications' ? 'people' : 'people/' + id)));
   const ctx = { apps, fac, res, reload: () => hooks.render() };
+  root.append(h('p', {}, 'Adding a yearly intake? ', h('a', { href: '../people/' + (cloud.demo ? '?demo=admin' : '') + '#intake', style: 'color:var(--n-navy);font-weight:var(--n-semibold)' }, 'Open APMES People'),
+    ': the same lists with a new-intake paste, a year check and PDs.'));
   root.append(tab === 'faculty' ? facultyPane(ctx) : tab === 'residents' ? residentsPane(ctx) : applicationsPane(ctx));
   return root;
 }
@@ -459,7 +462,7 @@ export function nextRid(res) {
   return rid;
 }
 
-function applicationsPane({ apps, fac, res, reload }) {
+export function applicationsPane({ apps, fac, res, reload }) {
   const wrap = h('div', { class: 'e-stack' });
   if (!apps.length) { wrap.append(empty('No applications', 'People who sign in and aren’t on a list can apply here as faculty or a resident.')); return wrap; }
   const pending = apps.filter(a => a.status === 'pending');
@@ -569,7 +572,7 @@ export function parseResidentLines(text, existing = []) {
   }).filter(Boolean);
 }
 
-function pasteDialog({ title, help, placeholder, parse, save, done }) {
+export function pasteDialog({ title, help, placeholder, parse, save, done }) {
   const ta = h('textarea', { class: 'e-textarea', rows: 6, placeholder, spellcheck: 'false', autocapitalize: 'off' });
   const out = h('ul', { class: 'e-paste-res', 'aria-live': 'polite' });
   const btn = h('button', { class: 'n-btn e-go', type: 'button', disabled: true }, 'Add');
@@ -602,7 +605,7 @@ function pasteDialog({ title, help, placeholder, parse, save, done }) {
 const searchBox = (ph, onq) => h('input', { class: 'e-input', type: 'search', placeholder: ph, 'aria-label': ph, oninput: e => onq(e.target.value) });
 const matches = (q, ...vals) => !q || vals.some(v => String(v || '').toLowerCase().includes(q.toLowerCase()));
 
-function facultyPane({ fac, reload }) {
+export function facultyPane({ fac, reload }) {
   const list = h('div', { class: 'e-list' });
   let q = '';
   const paint = () => {
@@ -652,7 +655,7 @@ function editFaculty(f, fac, reload) {
 }
 
 let resStatusFilter = 'current';
-function residentsPane({ res, reload }) {
+export function residentsPane({ res, reload }) {
   const list = h('div', { class: 'e-list' });
   let q = '';
   const chipCls = { ACTIVE: 'e-chip--submitted', 'ON LEAVE': 'e-chip--info', GRADUATED: 'e-chip--draft', ATTRITED: 'e-chip--cancelled' };

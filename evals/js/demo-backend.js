@@ -330,6 +330,25 @@ export async function saveResident(r) {
   s.residents[d.rid] = d; save(s); return plain(d);
 }
 
+// programme directors (pds/{email} → { name }): admins and PDs read the list; only admins change it
+export async function listPDs() {
+  const s = load();
+  if (!isAdmin(s) && !isPD(s)) throw denied('admins and PDs only');
+  return Object.entries(s.pds).map(([email, d]) => ({ email, name: d?.name || '' })).sort((a, b) => String(a.name || a.email).localeCompare(String(b.name || b.email)));
+}
+export async function savePD({ email, name } = {}) {
+  const s = load();
+  if (!isAdmin(s)) throw denied('admins only');
+  const e = lc(email);
+  if (!e.includes('@')) throw new Error('email missing');
+  s.pds[e] = { name: String(name ?? '').slice(0, 200) }; save(s); return { email: e, name: s.pds[e].name };
+}
+export async function removePD(email) {
+  const s = load();
+  if (!isAdmin(s)) throw denied('admins only');
+  delete s.pds[lc(email)]; save(s);
+}
+
 export async function applyForRole({ role, name, note } = {}) {
   const u = currentUser();
   if (!u) throw denied('signed out');

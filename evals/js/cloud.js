@@ -202,6 +202,26 @@ export async function saveResident(r) {
 
 // ---- applications to join as faculty or resident ----
 
+// programme directors (pds/{email} → { name }): admins and PDs read the list; only admins change it (rules)
+export async function listPDs() {
+  if (demo) return D.listPDs();
+  const { db, F } = await sdk();
+  return (await F.getDocs(F.collection(db, 'pds'))).docs.map(d => ({ email: d.id, name: d.data().name || '' }))
+    .sort((a, b) => String(a.name || a.email).localeCompare(String(b.name || b.email)));
+}
+export async function savePD({ email, name } = {}) {
+  if (demo) return D.savePD({ email, name });
+  const { db, F } = await sdk();
+  const e = lc(email);
+  await queued(F.setDoc(F.doc(db, 'pds', e), { name: String(name ?? '').slice(0, 200) }));
+  return { email: e, name };
+}
+export async function removePD(email) {
+  if (demo) return D.removePD(email);
+  const { db, F } = await sdk();
+  await queued(F.deleteDoc(F.doc(db, 'pds', lc(email))));
+}
+
 export async function applyForRole({ role, name, note } = {}) {
   if (demo) return D.applyForRole({ role, name, note });
   const { db, F, auth } = await sdk();

@@ -15,6 +15,9 @@ prewarm:
 hand-babies:
   - changed-files:
       - any-glob-to-any-file: ['hand-babies/**', 'hand/**']
+people:
+  - changed-files:
+      - any-glob-to-any-file: 'people/**'
 hand-log:
   - changed-files:
       - any-glob-to-any-file: 'hand-log/**'
