@@ -19,7 +19,8 @@ try { for (const width of [390, 1280]) {
   });
   const opened = () => p.evaluate(() => window.__opened);
   await p.goto(base + '?demo#log'); await p.waitForSelector('textarea.details');
-  // the demo's day with two cases
+  // the demo's day with two cases (the cases arrive from the device's store a moment after the first paint)
+  await p.waitForFunction(() => Number(document.body.dataset.cases) > 0);
   const iso = await p.evaluate(async () => (await import('./js/ui-core.js')).S.cases[0].date);
   const dayCell = () => p.locator('button.lb-day[aria-label$=": 2 cases"]').first();
 

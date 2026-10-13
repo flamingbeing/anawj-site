@@ -1,6 +1,11 @@
+// where storage is blocked, reading window.localStorage itself throws: then reads find nothing and saves throw (the
+// caller says the draft isn't saved)
+const NONE = Object.freeze({ getItem: () => null, setItem() { throw new Error('storage unavailable'); }, removeItem() {} });
+const local = () => { try { return globalThis.localStorage || NONE; } catch { return NONE; } };
+const sessionStore = () => { try { return globalThis.sessionStorage || NONE; } catch { return NONE; } };
 // Each browser document owns its slot. Reload restores that slot; other tabs
 // retain independent drafts, including duplicated tabs inheriting sessionStorage.
-export function createDraftSlot(prefix, owner, storage = localStorage, session = sessionStorage) {
+export function createDraftSlot(prefix, owner, storage = local(), session = sessionStore()) {
   const pointer = prefix + ':active:' + owner;
   let previous = null;
   try { previous = session.getItem(pointer); } catch { /* storage may be denied */ }
@@ -17,7 +22,7 @@ export function createDraftSlot(prefix, owner, storage = localStorage, session =
     clear() { storage.removeItem(key); },
   };
 }
-export function listDrafts(prefix, owner, storage = localStorage) {
+export function listDrafts(prefix, owner, storage = local()) {
   return Object.keys(storage).filter(k => k.startsWith(prefix + ':' + owner + ':'))
     .map(key => { try { return { key, value: JSON.parse(storage.getItem(key)) }; } catch { return null; } }).filter(Boolean);
 }
