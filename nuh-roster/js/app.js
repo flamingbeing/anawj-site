@@ -2355,15 +2355,51 @@ function renderMonthly() {
 
 // ---- My day: where one person is on the day on screen (viewers' page; anyone at #myday) ----
 
+// My day opens on today until early afternoon (people check it in the morning), then on tomorrow.
+const MYDAY_SWITCH_HOUR = 14;
+const myDayDate = () => new Date().getHours() < MYDAY_SWITCH_HOUR ? realToday() : today();
+// On opening: My day goes to myDayDate(); the roster leaves a past date for tomorrow (the day being made),
+// with a way back. Today is left alone, for morning changes.
+function openOnTheRightDay() {
+  const was = state.day.date;
+  if (state.tab === 'myday') { if (myDayDate() !== was) switchDate(myDayDate()); return; }
+  if (isViewer() || !state.staff.length || !was || was >= realToday()) return;
+  switchDate(today());
+  toast(`Opened tomorrow, ${longDate(today())}.`, { label: `Back to ${longDate(was)}`, run: () => switchDate(was) });
+}
+// What this person saw last time on each date, to mark what changed since: { date: { at, lines } }
+const SEEN_KEY = 'nuh-roster-seen';
+function seenBefore(date, pid) {
+  try { return JSON.parse(localStorage.getItem(SEEN_KEY) || '{}')[date + '|' + pid] || null; } catch { return null; }
+}
+function markSeen(date, pid, at, lines) {
+  try {
+    const all = JSON.parse(localStorage.getItem(SEEN_KEY) || '{}');
+    all[date + '|' + pid] = { at, lines };
+    const keys = Object.keys(all).sort(); // keep the last 60 entries
+    for (const k of keys.slice(0, Math.max(0, keys.length - 60))) delete all[k];
+    localStorage.setItem(SEEN_KEY, JSON.stringify(all));
+  } catch { /* no storage */ }
+}
+let seenCache = { id: '', prev: null };
+const hhmm = t => t ? new Date(t).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '';
+// a viewer coming back to the page after a while gets the latest saved roster
+let viewerLoadedAt = 0;
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && isViewer() && state.tab === 'myday' && Date.now() - viewerLoadedAt > 60e3) viewerLoad(state.day.date);
+});
+
 const ME_KEY = 'nuh-roster-me';
 let viewerDate = null, viewerFound = null;
 // A viewer sees the roster saved for the team, never a local draft.
+let viewerMeta = null; // { updatedAt, updatedBy } of the roster on screen
 async function viewerLoad(date) {
-  viewerDate = date; viewerFound = null;
+  viewerDate = date; viewerFound = null; viewerLoadedAt = Date.now();
   try {
     const snap = await cloud.loadRoster(date);
     if (viewerDate !== date) return;
     viewerFound = !!snap?.roster;
+    viewerMeta = snap ? { updatedAt: snap.updatedAt, updatedBy: snap.updatedBy } : null;
     state.day = snap?.day ? { ...clone(snap.day), date } : { date, rooms: [], staff: {} };
     state.roster = snap?.roster ? clone(snap.roster) : null;
     syncRooms();
@@ -2409,14 +2445,30 @@ function renderMyDay() {
   const r = state.roster && state.roster.date === date ? state.roster : null;
   const lines = p ? dayLines(p) : [];
   const when = date === today() ? 'Tomorrow' : date === realToday() ? 'Today' : longDate(date);
+  // what changed for this person since they last looked (viewers, from the saved roster's time)
+  const meta = isViewer() ? viewerMeta : null;
+  const key = l => l.join(' ');
+  // what they saw before this version, read once per version (later renders keep the marks)
+  const seenId = p && meta?.updatedAt && viewerFound ? `${date}|${p.id}|${meta.updatedAt}` : '';
+  if (seenId && seenCache.id !== seenId) {
+    seenCache = { id: seenId, prev: seenBefore(date, p.id) };
+    markSeen(date, p.id, meta.updatedAt, lines.map(key));
+  }
+  const seen = seenId && seenCache.prev?.at !== meta.updatedAt ? seenCache.prev : null;
+  const changed = seen ? new Set(lines.map(key).filter(k => !seen.lines.includes(k))) : new Set();
+  const gone = seen ? seen.lines.filter(k => !lines.some(l => key(l) === k)) : [];
   return h('div', {},
     h('section', { class: 'card myday' },
-      h('div', { class: 'section-head' }, h('h2', { style: 'margin:0' }, p ? `${when} for ${shortName(p) || p.name}` : 'My day'), h('span', { class: 'grow' }), pick),
+      h('div', { class: 'section-head' }, h('h2', { style: 'margin:0' }, p ? `${when} for ${shortName(p) || p.name}` : 'My day'), h('span', { class: 'grow' }),
+        pick),
       !p ? h('p', { class: 'hint' }, 'Pick your name once; this browser remembers it.')
         : !state.staff.length ? h('p', { class: 'hint' }, 'Loading the staff list…')
         : !r && !lines.length ? h('p', { class: 'empty' }, isViewer() && viewerFound === null ? 'Loading…' : `The roster for ${longDate(date)} isn't out yet.`)
-        : lines.length ? h('ul', { class: 'myday-list' }, lines.map(([what, detail]) => h('li', {}, h('b', {}, what), detail ? h('span', {}, ' ', detail) : null)))
+        : lines.length ? h('ul', { class: 'myday-list' }, lines.map(l => h('li', { class: changed.has(key(l)) ? 'changed' : null }, h('b', {}, l[0]), l[1] ? h('span', {}, ' ', l[1]) : null, changed.has(key(l)) ? h('span', { class: 'new-tag' }, ' changed') : null)))
         : h('p', { class: 'empty' }, `You're not on the roster for ${longDate(date)}.`),
+      changed.size || gone.length ? h('p', { class: 'warn-note', role: 'status' }, `Changed since you last looked${gone.length ? ` (no longer: ${gone.join('; ')})` : ''}.`) : null,
+      meta?.updatedAt && viewerFound ? h('p', { class: 'seen' }, `Saved by ${meta.updatedBy?.name || 'the rosterer'} at ${hhmm(meta.updatedAt)}${new Date(meta.updatedAt).toDateString() !== new Date().toDateString() ? `, ${longDate(isoDate(new Date(meta.updatedAt)))}` : ''}. `,
+        h('button', { class: 'link', onclick: () => viewerLoad(date) }, 'Check again')) : null,
       p && r && postingOf(p) && p.role === 'junior' ? h('p', { class: 'seen' }, `Posting this week: ${postingName(postingOf(p))}`) : null,
       h('p', { class: 'hint' }, 'Bookmark this page to come straight here: ', h('code', {}, location.origin + location.pathname + '#myday'),
         isViewer() ? null : [' · ', h('button', { class: 'link', onclick: () => { history.replaceState(null, '', location.pathname); goTab('roster'); } }, 'Back to the roster')])),
@@ -3399,7 +3451,7 @@ cloud.watchUser(async user => {
   if (isViewer()) { state.tab = 'myday'; document.body.classList.add('viewer'); }
   render();
   if (cs.member) await loadTeamFromCloud(false);
-  if (isViewer()) viewerLoad(state.day.date);
+  if (isViewer()) { const d = myDayDate(); if (d !== state.day.date) switchDate(d); else viewerLoad(d); }
 }).catch(e => { cs.ready = true; cloudError(e); render(); });
 
 const teamHash = () => JSON.stringify([state.settings, state.staff, state.roomTemplate, state.staffLog || [], state.monthly || {}, state.rotations || {}]);
@@ -3607,6 +3659,7 @@ function membersCard() {
 lastRows = state.roster ? JSON.stringify(state.roster.rows) : null;
 state.tab = location.hash === '#myday' ? 'myday' : state.staff.length ? 'roster' : 'staff'; // the page opens on the roster
 render();
+openOnTheRightDay();
 // practice mode opens with the tour, once
 if (DEMO) { try { if (!localStorage.getItem(TOUR_KEY)) setTimeout(startTour, 700); } catch { /* no storage */ } }
 document.getElementById('tourBtn')?.addEventListener('click', () => startTour());

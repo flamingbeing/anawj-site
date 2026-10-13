@@ -413,5 +413,9 @@ body.viewer .tabs, body.viewer #steps, body.viewer .foot, body.viewer #practice-
 .myday-list { list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 6px; font-size: 15px; }
 .myday-list li { padding: 8px 10px; border-left: 4px solid var(--navy); background: var(--chip); }
 .myday-list li b { color: var(--navy); }
+.myday-list li.changed { border-left-color: var(--red, #e4002b); }
+.myday-list .new-tag { font-size: 12px; font-weight: 700; color: var(--red, #e4002b); }
+body.viewer .date-warn, body.viewer .save-state { display: none !important; }
+.warn-note { background: var(--warn-bg); padding: 6px 10px; margin: 6px 0; }
 
 .moved-bar { background: var(--warn-bg); }
