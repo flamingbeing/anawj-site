@@ -12,7 +12,7 @@
 import { S, h, toast, fill, hooks, writes, cloud, transients, settings, patchLogbook, resetters, todayISO, modal, emptyState, download } from './ui-core.js';
 import { uid, fmtDate, caseParts } from './engine.js';
 import { barTabs, arrangeTabs, display, setTabOnBar } from './ui-settings.js';
-import { MAX_NOTES, LIMITS, sortNotes, filterNotes, noteTitle, noteIndex, cleanNoteIndex, sameIndex, parseNote, toggleCheck, plainLines, noteFiles } from './notepad.js';
+import { MAX_NOTES, LIMITS, sortNotes, filterNotes, noteTitle, noteIndex, cleanNoteIndex, sameIndex, parseNote, toggleCheck, plainLines, noteFiles, cleanNote } from './notepad.js';
 
 const SAVE_MS = 3000;
 const mine = () => S.user && S.user.email;
@@ -328,4 +328,17 @@ export function downloadNoteFiles() {
     radio('md', 'Markdown (.md)'), radio('txt', 'Plain text (.txt)'),
     h('p', { class: 'tip', style: 'margin:8px 0 0' }, 'The files hold only your notes, not the linked cases. Keep them private.'),
     h('div', { class: 'bar dlg-actions' }, h('span', { class: 'grow' }), h('button', { onclick: () => m.close() }, 'Cancel'), btn)]);
+}
+
+// ---------- notes made for a case (the rest of a case over the 2000-character limit) ----------
+
+// Room for n more notes? (loads the notes first: the limit counts them all)
+export async function notesRoom() { const list = await ensureNotes(); return MAX_NOTES - (list || []).length; }
+// Write new notes linked to their cases: [{ date, caseId, title, body }]. Through the durable write queue, like
+// any note; the caller checks the room first (notesRoom).
+export async function addNotes(list) {
+  const me = mine();
+  if (!me) throw new Error('Not signed in');
+  await ensureNotes();
+  for (const n of list) await writes.save('note', me, cleanNote({ id: uid(), ...n }), null);
 }

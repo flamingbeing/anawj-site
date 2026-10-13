@@ -13,6 +13,8 @@ import { cleanMarkdown, storedMarkdown, mdCase, mdDay, reflectionPath, reflectio
 import { checkCss } from './custom-css.js';
 import { FONTS, applyFonts, fontStack, fontAvailable, cleanFontName, logChoice, saveUserFont, getUserFont, deleteUserFont } from './fonts.js';
 import { PHOTO_BUDGET_KB, PHOTO_NOTE, photoUsageKb, fmtMb } from './reflections.js';
+import { partsSettings } from './ui-parts.js';
+import { labelsOn } from './parts.js';
 
 // Compact mode (this device's display settings, below): body.compact (style.css, "compact mode" block). Cached in
 // localStorage so the first paint after a reload is already compact, before the logbook loads.
@@ -552,7 +554,7 @@ export function renderMarkdownSettings() {
   const latest = [...(S.cases || [])].filter(c => c.date).sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt || 0) - (a.createdAt || 0))[0];
   const dayList = latest ? S.cases.filter(c => c.date === latest.date).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)) : SAMPLE;
   const refl = [...(S.reflections || [])].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))[0] || SAMPLE_REFL;
-  const ctx = { catName, catShort };
+  const ctx = { catName, catShort, labels: labelsOn(settings()) };
   const paint = () => {
     const f = cleanMarkdown(m);
     dayOut.textContent = mdDay(dayList[0].date, dayList, f, ctx);
@@ -589,7 +591,10 @@ export function renderMarkdownSettings() {
       h('h3', { style: 'margin:14px 0 0' }, 'Dates, tags and links'),
       pick('dateFormat', 'Dates ({{date}})', [['iso', '2026-10-10'], ['long', '10 Oct 2026'], ['dmy', '10/10/2026']]),
       pick('cats', 'Tags ({{categories}})', [['names', 'Names (Lower Segment Caesarean Section)'], ['codes', 'Codes (16)'], ['tags', '#tags (#LSCS)']]),
-      pick('links', 'Links between notes', [['wiki', 'Wiki links [[note]] (Obsidian)'], ['md', 'Markdown links [note](note.md)']])),
+      pick('links', 'Links between notes', [['wiki', 'Wiki links [[note]] (Obsidian)'], ['md', 'Markdown links [note](note.md)']]),
+      // labelled parts (Settings → Advanced logging): "Plan: GA" written as "**Plan:** GA" in {{details}}; off by default
+      h('label', { class: 'check', style: 'margin-top:10px' }, h('input', { type: 'checkbox', checked: m.boldLabels, onchange: e => { m.boldLabels = e.target.checked; paint(); } }), 'Bold labels (**Plan:** GA)'),
+      h('p', { class: 'hint help', style: 'margin:0' }, settings().labelParts ? 'Labelled parts in your cases (lp:, Plan: …) come out as **Label:** text.' : 'For labelled parts (Settings → Advanced logging), which are off.')),
     h('section', { class: 'card' },
       h('h2', {}, 'Markdown export'),
       h('p', { class: 'hint help', style: 'margin:0' }, 'How the Markdown export lays out the zip: case notes (with each day’s notes), one note per reflection, Notes.md for undated notes, Progress.md and the figures in images/.'),
@@ -669,6 +674,8 @@ export function renderLoggingAdvanced() {
       toggle(['Separate initials box (this device)', 'Separate initials box'], display().firstField === 'initials', v => { setDisplay({ firstField: v ? 'initials' : null }); toast('Saved on this device'); },
         'An Initials box above the case box.', 'The Case tab starts there and Enter moves on to the case. Off: type the initials at the start of the case, e.g. “AB 72M lap chole”.'),
       toggle('Open the keyboard when the Case tab opens (this device)', display().autoFocus !== false, v => applyDisplay(setDisplay({ autoFocus: v ? null : false }))),
+      // lp: / dt: parts in the case summary, and a template for the case box (ui-parts.js; both off by default)
+      partsSettings(),
       h('h3', {}, 'Keyboard in the case box (this device)'),
       toggle('Capital letter at the start', display().boxCaps !== false, v => applyDisplay(setDisplay({ boxCaps: v ? null : false }))),
       toggle('Autocorrect', display().boxCorrect === true, v => applyDisplay(setDisplay({ boxCorrect: v ? true : null })), 'Off by default, so initials and drug names stay as typed.'),
@@ -688,8 +695,8 @@ export function renderLoggingAdvanced() {
       toggle('Show tips and help text', !st.hideTips, v => save({ hideTips: !v }, null),
         'Off for experienced users.', 'Hides the explanations around the app (like the one at the top of the tag editor), the privacy and photo reminders, and the tips for the tags you pick.'),
       toggle('Show last week’s summary on the Case tab (once a week)', st.weeklyDigest, v => save({ weeklyDigest: v }, null))),
-    resetLink('everything on this page (the Case tab parts, Same as last, box height, the initials box, keyboard, advanced search, the week, undo, tips and the weekly summary)', async () => {
-      await patchLogbook({ settings: { boxLines: null, undoSecs: null, weekStart: null, weeklyDigest: null, hideTips: null, searchOps: null, caseHide: null, recentCount: null } });
+    resetLink('everything on this page (the Case tab parts, Same as last, box height, the initials box, labelled parts and the template (switched off; your labels and template are kept), keyboard, advanced search, the week, undo, tips and the weekly summary)', async () => {
+      await patchLogbook({ settings: { boxLines: null, undoSecs: null, weekStart: null, weeklyDigest: null, hideTips: null, searchOps: null, caseHide: null, recentCount: null, labelParts: null, caseTplOn: null } });
       applyDisplay(setDisplay({ autoFocus: null, firstField: null, boxCaps: null, boxCorrect: null, boxSpell: null }));
     }));
 }

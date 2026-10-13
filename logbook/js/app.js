@@ -22,6 +22,7 @@ import { renderNotes, leaveNotes } from './ui-notepad.js';
 import { settingsFile, readSettingsFile, readDeviceFile, isDeviceFile } from './settings-file.js';
 import { movedPage } from './moved.js';
 import { purgeExpired, openBin } from './bin.js';
+import { renderPoints } from './ui-parts.js';
 
 // Tab icons: tiny inline SVG paths (24x24, stroked), so they look the same on every phone.
 const ICONS = {
@@ -73,6 +74,8 @@ const TABS = [
   { id: 'caselog', label: 'Case log', render: () => renderCaseLog(), faculty: true, hidden: true, under: 'caselogs', unlisted: true },
   // under Analytics: how your counts compare with your intake
   { id: 'totals', label: 'Totals', render: renderTotals, hidden: true, under: 'progress', unlisted: true },
+  // under the Logbook: every learning point (or other labelled part), from Filter (Labelled parts on)
+  { id: 'points', label: 'Learning points', render: renderPoints, hidden: true, under: 'logbook', unlisted: true },
   { id: 'account', bar: true, label: 'Account', render: renderAccount, hidden: true, under: 'more', desc: 'Your name and portfolio details (Section 1); delete account' },
   { id: 'settings', bar: true, label: 'Settings', render: () => renderSettingsMenu(), hidden: true, under: 'more', desc: 'Profile, display, logging, tag editor, Markdown, recycle bin' },
   { id: 'recovery', bar: true, short: 'Recover', label: 'Recent changes / Recover drafts', render: renderRecovery, hidden: true, under: 'more', desc: 'Retry sync, recover unfinished drafts and restore recent versions on this device' },

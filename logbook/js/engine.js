@@ -3,6 +3,7 @@
 
 import { CATEGORIES, BY_CODE, R_YEARS, codeOf, DEFAULT_NAMES } from './categories.js';
 import { KEYWORDS, STOP } from './keywords.js';
+import { labelOf, plainLabels } from './parts.js';
 const STOP_WORDS = new Set(STOP);
 
 // ---------- ids and dates ----------
@@ -345,28 +346,44 @@ function leadingDate(line, now) {
 export const STRONG = 0.5;
 
 // Cases are separated by blank lines (one or more empty or whitespace-only lines), so a case can span
-// several lines (kept in its details), e.g. "AB 45F" on one line and the procedure on the next.
+// several lines (kept in its details), e.g. "AB 45F" on one line and the procedure on the next. A bold first line
+// ("**AB 45F lap chole**", as notes apps write a heading) also starts the next case, blank line or not; its stars go.
 // List markers ("1.", "-", "•") are dropped.
 // An optional date at the start of a case's first line sets its date.
 // Leading patient initials are split off as in splitInitials. suggestFn(text) -> [{ code, score }];
 // confident codes (STRONG) are kept.
-export function parseBulk(text, suggestFn, now = new Date()) {
+// opts.labels (Labelled parts on, parts.js): a block that starts with a labelled line ("Plan: …") after a blank line
+// belongs to the case above, and a bold label ("**Plan:** …") is kept plain ("Plan: …").
+export function parseBulk(text, suggestFn, now = new Date(), { labels = null } = {}) {
   const blocks = [];
-  let cur = null;
+  let cur = null, gap = true;
   for (const raw of String(text || '').split(/\r?\n/)) {
-    const line = raw.replace(/\t+/g, ' ').trim().replace(/^(?:\d{1,2}[.)]|[-•*·])\s+/, '');
-    if (!line) { cur = null; continue; }
+    let line = raw.replace(/\t+/g, ' ').trim().replace(/^(?:\d{1,2}[.)]|[-•*·])\s+/, '');
+    if (!line) { cur = null; gap = true; continue; }
+    const lab = labels && labels.length ? labelOf(line, labels) : null;
+    const bold = lab ? null : boldHead(line);
+    if (bold != null) { cur = null; line = bold; }
+    else if (!cur && gap && lab && blocks.length) cur = blocks[blocks.length - 1];
     if (!cur) blocks.push(cur = []);
     cur.push(line);
+    gap = false;
   }
   return blocks.map(([first, ...more]) => {
     const ld = leadingDate(first, now);
-    const whole = [(ld ? ld.rest : first).trim(), ...more].filter(Boolean).join('\n');
+    let whole = [(ld ? ld.rest : first).trim(), ...more].filter(Boolean).join('\n');
+    if (labels && labels.length) whole = plainLabels(whole, labels);
     const { initials, details } = splitInitials(whole);
     const sugg = typeof suggestFn === 'function' && details ? suggestFn(details) || [] : [];
     const cats = withParents(sugg.filter(s => s.score >= STRONG).map(s => s.code));
     return { date: ld ? ld.date : null, initials, details, cats };
   });
+}
+// "**AB 45F lap chole**" (or __…__), with anything after it -> the line without the stars; null when the line
+// doesn't start bold, or the bold is a label ("**Plan:** …", "**Plan**: …")
+function boldHead(line) {
+  const m = /^(\*\*|__)(.+?)\1(.*)$/.exec(line);
+  if (!m || /:\s*$/.test(m[2]) || /^\s*:/.test(m[3])) return null;
+  return (m[2].trim() + (m[3].trim() ? ' ' + m[3].trim() : '')).trim();
 }
 
 // ---------- search helpers (Logbook) ----------

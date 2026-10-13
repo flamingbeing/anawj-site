@@ -79,6 +79,23 @@ const SCREENS = [
     await p.getByRole('menuitem', { name: 'Preview' }).click();
     await p.waitForSelector('.note-view:not([hidden])');
   }, false],
+  // Labelled parts on (Settings → Advanced logging): the label editor and case template, bold labels on Logbook rows,
+  // the Learning points page
+  ['Advanced logging, labelled parts', async p => {
+    await p.evaluate(async () => { const { patchLogbook } = await import('./js/ui-core.js'); await patchLogbook({ settings: { labelParts: true, caseTplOn: true, caseTpl: 'ASA :\nPlan :' } }); });
+    await hash('loggingadv')(p);
+    await p.locator('.label-editor:not([hidden])').waitFor();
+  }, false],
+  ['Logbook list, labelled parts', async p => {
+    await p.evaluate(async () => { const { patchLogbook, createCase, todayISO } = await import('./js/ui-core.js'); await patchLogbook({ settings: { labelParts: true } }); await createCase({ date: todayISO(), details: 'Fake a11y case\nPlan: GA\nlp: fake learning point', cats: ['13'] }); });
+    await hash('logbook')(p); await p.locator('main .seg button', { hasText: /^List$/ }).first().click();
+    await p.locator('ul.cases .part-l').first().waitFor();
+  }, true],
+  ['Learning points', async p => {
+    await p.evaluate(async () => { const { patchLogbook, createCase, todayISO } = await import('./js/ui-core.js'); await patchLogbook({ settings: { labelParts: true } }); await createCase({ date: todayISO(), details: 'Fake a11y case\nlp: fake learning point', cats: ['13'] }); });
+    await hash('points')(p);
+    await p.locator('.point-row').first().waitFor();
+  }, true],
   ['Reflection editor', async p => {
     await hash('reflect')(p);
     await p.evaluate(async () => { const { reflectOnCase } = await import('./js/ui-reflect.js'); await reflectOnCase({ id: 'fake-a11y', date: '2026-10-10', initials: 'ZZ', details: 'Fake case for the accessibility check', cats: ['13'] }); });
