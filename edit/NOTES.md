@@ -37,16 +37,16 @@ request), runs every day at 8:58 am Singapore time in a fresh cloud session:
   GitHub, recreate it from claude.ai/code → Routines with the GitHub connector. Pause or edit it there too.
 - Sessions handling page edits by hand should check for an open routine PR first, so the same issue isn't done twice.
 
-## edit.anawj.com (Cloudflare, set up by the owner)
+## edit.anawj.com (Cloudflare; set up by the owner 13 Oct 2026, working)
 
 The anawj.com DNS is on Cloudflare. The Cloudflare plugin in sessions can't make DNS records or rules, so this is
 two steps in the dashboard (anawj.com zone):
 
 1. **DNS → Records → Add record**: Type `AAAA`, Name `edit`, IPv6 `100::`, Proxy status **Proxied** (orange cloud).
    (A placeholder address: the redirect rule answers before anything is fetched.)
-2. **Rules → Redirect Rules → Create rule**: "Custom filter expression", Hostname equals `edit.anawj.com`; then
-   URL redirect: Type **Dynamic**, expression
-   `concat("https://anawj.com/edit/?page=", http.request.uri.path)`, status **302**, Preserve query string **off**.
+2. **Rules → Redirect Rules → "Redirect to a different domain" template**: request URL `*://edit.anawj.com/*` →
+   `https://anawj.com/edit/?page=/${2}`, status **302**, Preserve query string **off** (the wildcard already carries
+   the query, e.g. `?demo`). A dynamic rule (`concat("https://anawj.com/edit/?page=", http.request.uri.path)`) works too.
 
 Check: `edit.anawj.com/hand-babies/` opens the editor on the hand assessment page; `edit.anawj.com` opens it on the
 home page.

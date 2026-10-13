@@ -15,6 +15,8 @@ its own file), so sessions never edit the same lines. Read them all before start
 
 ## Waiting on the owner
 
+- Try the polish batch's new looks on a phone (Advanced display: Flat, button style, icons, plain calendar, page
+  titles, shorter rows; Accessibility: press and hold) and the colour picker.
 - Try on a real phone: pins (now also the Reflections search, with sticky topic names), swipe between tabs (cards that
   slide in with the finger, also on the background; #191), keyboard behaviour; Notes; Basic mode; formatting buttons; the new Analytics parts.
 - Admin → Advanced → "Fix initials in older cases" (one-off).

@@ -15,7 +15,6 @@ Last updated: 2026-10-13 by Claude Code, hand assessment session.
 - Clinical read-through by the owner / a hand surgeon (2PD cut-offs, index/little FDS caveats, Elson wording,
   local preferences for splinting and antibiotics).
 - Suggested edits arrive as GitHub issues titled `Page edits:`; say "apply the page edits" to have them made.
-- edit.anawj.com: add the Cloudflare DNS record and redirect rule (steps in `edit/NOTES.md`).
 
 ## Next (ideas, not agreed)
 
