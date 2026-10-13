@@ -173,11 +173,16 @@ function qrSvgNow(qrcode, text) {
 
 // Full-screen QR for the assessor to scan; tap or Esc closes.
 export function fullQR(link, caption) {
-  const el = h('div', { class: 'e-qr e-qr--full', role: 'dialog', 'aria-label': 'QR code', tabindex: '-1' },
-    qrSvg(link), h('p', { class: 'e-qr__caption' }, caption || 'Scan to open the form'),
-    h('button', { type: 'button', class: 'n-btn n-btn--outline e-btn-quiet' }, 'Close'));
-  const close = () => { el.remove(); document.removeEventListener('keydown', esc); };
-  const esc = e => { if (e.key === 'Escape') close(); };
+  const back = document.activeElement;
+  const closeBtn = h('button', { type: 'button', class: 'n-btn n-btn--outline e-btn-quiet' }, 'Close');
+  const el = h('div', { class: 'e-qr e-qr--full', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'QR code', tabindex: '-1' },
+    qrSvg(link), h('p', { class: 'e-qr__caption' }, caption || 'Scan to open the form'), closeBtn);
+  // modal: Tab stays on Close, and focus goes back to the button that opened it
+  const close = () => { el.remove(); document.removeEventListener('keydown', esc); if (back && back.focus) back.focus(); };
+  const esc = e => {
+    if (e.key === 'Escape') close();
+    else if (e.key === 'Tab') { e.preventDefault(); closeBtn.focus(); }
+  };
   el.addEventListener('click', close);
   document.addEventListener('keydown', esc);
   document.body.append(el);

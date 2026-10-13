@@ -266,7 +266,16 @@ class FormScreen {
       const msg = this.tried ? bad.get(q.n) : null;
       el.classList.toggle('is-error', !!msg);
       const box = el.querySelector(':scope > .e-q__error');
-      if (box) { box.textContent = msg || ''; box.hidden = !msg; }
+      if (box) {
+        box.textContent = msg || ''; box.hidden = !msg;
+        // screen readers hear "Required" (or the rule) on the question and its text box
+        box.id = box.id || `${el.id || 'q' + q.n}-err`;
+        if (msg) el.setAttribute('aria-describedby', box.id); else el.removeAttribute('aria-describedby');
+        for (const i of el.querySelectorAll('textarea, input[type="text"], input[type="number"], input:not([type])')) {
+          if (msg) { i.setAttribute('aria-invalid', 'true'); i.setAttribute('aria-describedby', box.id); }
+          else { i.removeAttribute('aria-invalid'); i.removeAttribute('aria-describedby'); }
+        }
+      }
     }
     return r;
   }

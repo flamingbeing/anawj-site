@@ -103,6 +103,6 @@ export function renderProgress() {
 
 function bar(done, min, state) {
   const pct = min ? Math.min(100, Math.round(done / min * 100)) : 0;
-  return h('div', { class: 'e-progress', role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': String(min), 'aria-valuenow': String(done) },
+  return h('div', { class: 'e-progress', role: 'progressbar', 'aria-label': `${done} of ${min} done`, 'aria-valuemin': '0', 'aria-valuemax': String(min), 'aria-valuenow': String(done) },
     h('div', { class: `e-progress__bar e-progress__bar--${state}`, style: `width:${Math.max(pct, done ? 4 : 0)}%` }));
 }

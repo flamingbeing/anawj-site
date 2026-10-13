@@ -84,6 +84,8 @@ function paintTabs() {
 
 function paintHeader(title) {
   titleEl.textContent = title || 'APMES Evals';
+  // the browser tab / app switcher / screen reader name the screen too (WCAG 2.4.2)
+  document.title = title && title !== 'APMES Evals' ? `${title} · APMES Evals` : 'APMES Evals';
   const bits = [];
   if (cloud.demo) bits.push('Demo');
   if (!navigator.onLine) bits.push('Offline');
