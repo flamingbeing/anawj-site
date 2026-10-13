@@ -112,6 +112,13 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   empties the draft (on a saved reading it removes the reading after asking). The strip reads Arrival, then
   "Prewarm on" / "Induction" for 0, then "5 min"…; "Clear" beside a comfort answer. BP, HR, BIS due alarm is a
   Settings toggle, off by default (`settings.remind.haemo`).
+- **Quick-entry pads** (owner, 13 Oct 2026; `js/keypad.js`): tapping a temperature, BP, HR or BIS box opens a number pad
+  (Back, Clear, OK; BP, HR, BIS also Next); tapping a key time opens a time pad (Now, digits: the fourth digit saves,
+  731 = 07:31; Back, Clear asks first). The display is a real input (`inputmode="none"`), so a computer keyboard
+  works (Enter = OK, Esc = Back) and Playwright `fill()` still works: tests fill `input.num` / `#evtime` and press
+  Enter. Tapping an alarm banner or the top-bar countdown goes to that reading and opens its first box (or the key
+  time's pad). PACU in / To ward are on the PACU page only (not in the key-times row or the Log button); Still to fill
+  lists them once surgery has ended. The tap guard (`lockTaps`) also runs after a pad saves, so tests wait 0.8 s.
 - **Never send an empty `f`** (lesson, 12 Oct 2026): `setDoc(…, { f: {} }, { merge: true })` replaces the server's
   `f` with an empty map (an empty map is a leaf in the merge). Lock / unlock / delete sent one and wiped the server
   copy's readings; push now omits an empty `f`, lock sends the full record, and each phone resends all its patients

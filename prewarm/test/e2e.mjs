@@ -55,9 +55,10 @@ try {
   assert.match(await page.textContent('.badge'), /10 min pre-warming/, 'group shows with the pre-warming temperatures');
   // Gown on is still empty, so it asks first (a stray tap shouldn't log out of order)
   let asked = ''; page.once('dialog', d => { asked = d.message(); d.accept(); });
-  await page.click('[data-ev="pw_start"]');
+  await page.click('[data-ev="pw_start"]'); await page.click('.kp [data-now]'); // the time pad: Now logs the current time
+  await page.waitForTimeout(200);
   assert.match(asked, /Gown on isn’t logged yet/);
-  assert.match(await page.textContent('[data-ev="pw_start"] b'), /^\d\d:\d\d$/, 'tapping an empty time sets now');
+  assert.match(await page.textContent('[data-ev="pw_start"] b'), /^\d\d:\d\d$/, 'tapping an empty time and Now sets now');
   assert.match(await page.textContent('#due'), /due \d\d:\d\d/);
   // the 0-min reading is due right now: the due time shows its 'now' state
   await page.waitForFunction(() => document.querySelector('#due')?.dataset.state === 'now', null, { timeout: 5000 });
@@ -68,14 +69,18 @@ try {
   // the 0-min reading is due now: the banner floats over the top of the page (nothing moves) and hides on a tap
   await page.waitForSelector('#banner:not([hidden])');
   assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('#banner')).position), 'fixed');
-  await page.click('#banner');
+  // a tap on the alarm opens its reading's first box (owner, 13 Oct 2026); Back closes the pad without a change
+  await page.click('#banner'); await page.waitForSelector('dialog.kp[open]');
+  assert.match(await page.textContent('.kp .kphead'), /Core/, 'tapping the alarm opens the first box of the reading');
+  await axe('keypad'); await shot('keypad');
+  await page.click('.kp [data-a="back"]'); await page.waitForTimeout(300);
   // the app bar's Log button sets the next event to now (then cleared again from its box)
   assert.match(await page.textContent('#lognext'), /Log\s*Prewarm off/);
   await page.click('#lognext');
   assert.match(await page.textContent('[data-ev="ev_wstop"] b'), /^\d\d:\d\d$/, 'Log sets warming off to now');
   await page.click('[data-ev="ev_wstop"]');
   let cleared = ''; page.once('dialog', d => { cleared = d.message(); d.accept(); });
-  await page.click('[data-evclear="ev_wstop"]');
+  await page.click('.kp [data-a="clear"]'); await page.waitForTimeout(200);
   assert.match(cleared, /Clear the Prewarm off time/, 'Clear asks first');
   assert.equal(await page.textContent('[data-ev="ev_wstop"] b'), 'tap');
   // changing a set time
@@ -132,8 +137,6 @@ try {
 
   // warming stopped: set temp becomes NA for later timepoints
   page.once('dialog', d => d.accept()); // Gown on is still empty
-  await page.click('[data-ev="ev_wstop"]');
-  await page.waitForTimeout(800); // a quick second tap in the same place is ignored (double-tap guard)
   await page.click('[data-ev="ev_wstop"]');
   await page.fill('#evtime', PW1); // one minute after Prewarm on: every later reading has the set temp NA
   // leaving a reading with unsaved changes asks first: Stay keeps them, Save saves and goes on
@@ -244,7 +247,7 @@ try {
   assert.equal(await page.evaluate(() => document.activeElement.dataset.in), 'dbp', 'Enter moves to diastolic');
   await page.keyboard.type('70');
   assert.ok(await hd.evaluate(el => el.isConnected), 'the same box: no redraw while typing');
-  await page.click('input[data-in="hr"]'); await page.keyboard.type('64');
+  await page.focus('input[data-in="hr"]'); await page.keyboard.type('64'); // a computer keyboard types straight into the box
   assert.equal(await page.inputValue('input[data-in="dbp"]'), '70');
   page.once('dialog', d => d.accept()); // mean BP and BIS left blank
   await page.click('#save');

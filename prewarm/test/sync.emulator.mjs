@@ -53,7 +53,7 @@ try {
   await a.goto(BASE + '#/new');
   await a.fill('#sid', 'SYNC-01'); await a.click('.seg .chip[data-v="1"]'); await a.click('button[type=submit]');
   await a.waitForSelector('.times');
-  await a.click('.num[data-type="core"]'); await a.click('.num[data-type="core"]'); await a.fill('input.num', '366'); await a.keyboard.press('Enter');
+  await a.click('.num[data-type="core"]'); await a.fill('input.num', '366'); await a.keyboard.press('Enter');
   a.once('dialog', d => d.accept()); // only core entered: Save asks about the blank boxes
   await a.click('#save');
   await toastSays(a, /0 min saved/);
@@ -244,7 +244,7 @@ try {
   await a.goto(BASE + '#/');
   await a.click('.list a'); await a.waitForSelector('.board');
   await a.context().setOffline(true);
-  await a.click('[data-ev="pw_gown"]');
+  await a.click('[data-ev="pw_gown"]'); await a.click('.kp [data-now]');
   const said = [];
   a.on('dialog', d => { said.push(d.message()); said.length === 1 ? d.accept() : d.dismiss(); });
   await a.goto(BASE + '#/settings');
