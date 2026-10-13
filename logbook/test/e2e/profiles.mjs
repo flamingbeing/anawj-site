@@ -29,6 +29,16 @@ try { for (const width of [390, 1280]) {
   // search finds the profile page's switches and the tag editor now
   await p.getByLabel('Search settings').fill('residency year');
   await p.locator('.settings-search li', { hasText: 'Residency year' }).filter({ hasText: 'Profile' }).waitFor();
+  // the menu drawn again while typing (the logbook arriving late, as in Safari): the text, results, focus and caret stay
+  await p.getByLabel('Search settings').press('ArrowLeft');
+  await p.evaluate(async () => (await import('./js/ui-core.js')).hooks.render());
+  assert.deepEqual(await p.evaluate(() => { const a = document.activeElement; return [a.getAttribute('aria-label'), a.value, a.selectionStart]; }), ['Search settings', 'residency year', 13]);
+  await p.locator('.settings-search li', { hasText: 'Residency year' }).filter({ hasText: 'Profile' }).waitFor({ timeout: 1000 });
+  // ...and a change to the cases meanwhile doesn't draw it again at all
+  const box = await p.getByLabel('Search settings').elementHandle();
+  await p.evaluate(async () => (await import('./js/ui-core.js')).hooks.casesChanged());
+  await p.waitForTimeout(400);
+  assert.equal(await box.evaluate(el => el.isConnected), true);
   await p.getByLabel('Search settings').fill('tag list file');
   await p.locator('.settings-search li', { hasText: 'Tag editor' }).waitFor();
 
@@ -41,11 +51,18 @@ try { for (const width of [390, 1280]) {
   const lines = await dlg.locator('.profile-changes li').allInnerTexts();
   assert.ok(lines.some(l => /^Turns off: Counts against the APMES targets, Still needed/.test(l)), lines.join(' | '));
   assert.ok(lines.some(l => /^Onto the tab bar \(this device\): Notes$/.test(l)), lines.join(' | '));
+  // (the dialog's history step comes back late, as in Safari: the radio must go back at once anyway)
+  await p.evaluate(() => { const back = history.back.bind(history); history.back = () => setTimeout(back, 600); });
   await dlg.getByRole('button', { name: 'Cancel' }).click();
   await p.waitForFunction(() => !document.querySelector('dialog[open]'));
   assert.equal(await p.locator('.profile-card input[value=advanced]').isChecked(), true, 'the radio goes back');
+  assert.equal(await p.locator('.profile-card input[value=personal]').isChecked(), false);
   assert.equal(await p.evaluate(() => document.activeElement && document.activeElement.value), 'advanced', 'and keeps the focus');
   assert.equal((await st()).mode, 'advanced');
+  await p.waitForTimeout(700);   // the late step back has come and gone: still Advanced, still focused
+  assert.equal(await p.locator('.profile-card input[value=advanced]').isChecked(), true);
+  assert.equal(await p.evaluate(() => document.activeElement && document.activeElement.value), 'advanced');
+  await p.evaluate(() => { delete history.back; });
   // ...then Apply
   await p.locator('.profile-card input[value=personal]').check();
   await dlg.getByRole('button', { name: 'Apply' }).click();

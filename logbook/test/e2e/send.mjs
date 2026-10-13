@@ -6,7 +6,8 @@ const { chromium } = await import(process.env.PLAYWRIGHT_PATH || '/opt/node22/li
 const base = `http://localhost:${process.env.PORT || 8080}/logbook/`;
 const b = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH, args: ['--no-sandbox'] } : {});
 try { for (const width of [390, 1280]) {
-  const ctx = await b.newContext({ viewport: { width, height: 844 }, serviceWorkers: 'block', permissions: ['clipboard-read', 'clipboard-write'] });
+  // (clipboard permissions are Chromium's names; Firefox and WebKit refuse them, and allow a page's own copy and read)
+  const ctx = await b.newContext({ viewport: { width, height: 844 }, serviceWorkers: 'block', ...(b.browserType().name() === 'chromium' ? { permissions: ['clipboard-read', 'clipboard-write'] } : {}) });
   await ctx.addInitScript(() => localStorage.setItem('apmes-logbook-demo-small', '1'));
   const p = await ctx.newPage(), errors = [];
   p.on('pageerror', e => errors.push(e.message)); p.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
@@ -17,7 +18,8 @@ try { for (const width of [390, 1280]) {
   });
   const opened = () => p.evaluate(() => window.__opened);
   await p.goto(base + '?demo#log'); await p.waitForSelector('textarea.details');
-  // the demo's day with two cases
+  // the demo's day with two cases (the cases arrive from the device's store a moment after the first paint)
+  await p.waitForFunction(() => Number(document.body.dataset.cases) > 0);
   const iso = await p.evaluate(async () => (await import('./js/ui-core.js')).S.cases[0].date);
   const dayCell = () => p.locator('button.lb-day[aria-label$=": 2 cases"]').first();
 
@@ -73,7 +75,7 @@ try { for (const width of [390, 1280]) {
   await p.getByRole('button', { name: /Fake Obsidian/ }).click();
   await p.waitForFunction(() => window.__opened.length === 3);
   assert.match((await opened())[2], /content=$/);
-  assert.ok((await p.evaluate(() => navigator.clipboard.readText())).includes('fake long case'));
+  assert.ok((await p.evaluate(() => navigator.clipboard.readText())).replace(/\r\n?/g, '\n').includes('fake long case'));
 
   // an ID number is asked about before anything leaves
   await p.evaluate(async () => { const { S } = await import('./js/ui-core.js'); S.cases[0].details = 'fake case S1234567A'; });

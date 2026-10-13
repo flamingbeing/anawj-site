@@ -5,10 +5,15 @@ const { chromium } = await import(process.env.PLAYWRIGHT_PATH || '/opt/node22/li
 const base = `http://localhost:${process.env.PORT || 8080}/logbook/`;
 const b = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH, args: ['--no-sandbox'] } : {});
 try { for (const width of [390, 1280]) {
-  const ctx = await b.newContext({ viewport: { width, height: 844 }, serviceWorkers: 'block', permissions: ['clipboard-read', 'clipboard-write'] });
+  // (clipboard permissions are Chromium's names; Firefox and WebKit refuse them, and allow a page's own copy and read)
+  const ctx = await b.newContext({ viewport: { width, height: 844 }, serviceWorkers: 'block', ...(b.browserType().name() === 'chromium' ? { permissions: ['clipboard-read', 'clipboard-write'] } : {}) });
   await ctx.addInitScript(() => localStorage.setItem('apmes-logbook-demo-small', '1'));
   const p = await ctx.newPage(), errors = [];
   p.on('pageerror', e => errors.push(e.message)); p.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
+  // the list draws after the notes arrive (from the device's store, a moment after the page): wait for the count
+  const rowsAre = n => p.waitForFunction(n => document.querySelectorAll('ul.notes-rows li').length === n, n, { timeout: 5000 })
+    .catch(async () => { throw new Error(`expected ${n} note rows, saw ${await p.locator('ul.notes-rows li').count()}`); });
+  const clip = async () => (await p.evaluate(() => navigator.clipboard.readText())).replace(/\r\n?/g, '\n');   // (Windows: CRLF)
   const S = () => p.evaluate(async () => { const { S } = await import('./js/ui-core.js'); return { notes: S.notes, index: S.noteIndex || null }; });
   const today = await p.evaluate(() => 0) || null;
   await p.goto(base + '?demo#log'); await p.waitForSelector('textarea.details');
@@ -23,7 +28,7 @@ try { for (const width of [390, 1280]) {
   assert.match(await moreLink.innerText(), /Notes \(beta\)[\s\S]*private, never in your portfolio/);
   await moreLink.click();
   await p.getByRole('heading', { name: 'Notes', exact: true }).waitFor();
-  assert.match(await p.locator('.notes-page').innerText(), /No notes yet[\s\S]*Use Reflect instead/);
+  await p.locator('.notes-page', { hasText: /No notes yet[\s\S]*Use Reflect instead/ }).waitFor();   // (after "Loading…")
   assert.equal(await p.locator('[role=tab][aria-selected=true]').getAttribute('data-tab'), 'more');
 
   // a new note: today's date, saved after a pause in typing, listed with its count
@@ -57,7 +62,7 @@ try { for (const width of [390, 1280]) {
 
   // search
   await p.getByLabel('Search notes').fill('dose');
-  assert.equal(await p.locator('ul.notes-rows li').count(), 1);
+  await rowsAre(1);
   await p.getByLabel('Search notes').fill('');
 
   // the Logbook marks today and Copy takes the day's notes too (the day's Copy is off unless switched on)
@@ -68,10 +73,10 @@ try { for (const width of [390, 1280]) {
   await p.locator('.lb-day.today .lb-note').waitFor();
   await p.getByRole('button', { name: 'Copy this day' }).click();
   await p.waitForTimeout(300);
-  assert.match(await p.evaluate(() => navigator.clipboard.readText()), /## Notes\n\n### Fake teaching point\nFake dose reminder/);
+  assert.match(await clip(), /## Notes\n\n### Fake teaching point\nFake dose reminder/);
   await p.getByRole('button', { name: 'Notes', exact: true }).click();
   await p.locator('.notes-filter').filter({ hasText: 'Notes on' }).waitFor();
-  assert.equal(await p.locator('ul.notes-rows li').count(), 1);
+  await rowsAre(1);
 
   // link a note to a case: the case row gets a note button that opens it
   await p.locator('ul.notes-rows li').first().click();
@@ -86,7 +91,7 @@ try { for (const width of [390, 1280]) {
   const list = p.locator('main .seg button').filter({ hasText: /^List$/ }); await list.first().click();
   await p.getByRole('button', { name: 'Open your notes on this case' }).first().click();
   await p.locator('.notes-filter').waitFor();
-  assert.equal(await p.locator('ul.notes-rows li').count(), 1);
+  await rowsAre(1);
   assert.equal((await S()).notes.find(n => n.caseId).caseId, caseId);
   await p.getByRole('button', { name: 'Show all' }).click();
 
@@ -98,7 +103,7 @@ try { for (const width of [390, 1280]) {
   assert.match(await linked.innerText(), /linked[\s\S]*reflection[\s\S]*Open the notes/i);
   await linked.getByRole('button', { name: 'Open the notes' }).click();
   await p.locator('.notes-filter').waitFor();
-  assert.equal(await p.locator('ul.notes-rows li').count(), 1);
+  await rowsAre(1);
   await p.getByRole('button', { name: 'Show all' }).click();
   // ... and so does the pill inside the note
   await p.locator('ul.notes-rows li').filter({ has: p.locator('.note-case') }).first().locator('b').click();
@@ -116,7 +121,7 @@ try { for (const width of [390, 1280]) {
   await p.locator('dialog[open]').getByLabel('Plain text (.txt)').check();
   await p.locator('dialog[open]').getByRole('button', { name: 'Download', exact: true }).click();
   const zipPath = await (await dl).path();
-  const names = (await import('node:child_process')).execFileSync('python3', ['-c', 'import sys,zipfile; print("\\n".join(zipfile.ZipFile(sys.argv[1]).namelist()))', zipPath]).toString().trim().split('\n');
+  const names = (await import('node:child_process')).execFileSync('python3', ['-c', 'import sys,zipfile; print("\\n".join(zipfile.ZipFile(sys.argv[1]).namelist()))', zipPath]).toString().replace(/\r\n?/g, '\n').trim().split('\n');
   assert.equal(names.length, 2); assert.ok(names.every(n => n.endsWith('.txt')), names.join('|'));
   assert.ok(names.some(n => /^\d{4}-\d{2}-\d{2} Fake teaching point\.txt$/.test(n)), names.join('|'));
 
@@ -188,10 +193,10 @@ try { for (const width of [390, 1280]) {
   });
   await p.evaluate(() => { location.hash = '#notes'; });
   await p.locator('.notes-count').filter({ hasText: '2000 of 2000' }).waitFor({ timeout: 15000 });
-  assert.equal(await p.locator('ul.notes-rows li').count(), 100);
+  await rowsAre(100);
   await p.getByRole('button', { name: /^Show 100 more/ }).focus();
   await p.keyboard.press('Enter');
-  assert.equal(await p.locator('ul.notes-rows li').count(), 200);
+  await rowsAre(200);
   assert.equal(await p.evaluate(() => [...document.querySelectorAll('ul.notes-rows > li')].indexOf(document.activeElement)), 100, 'focus on the first row just shown');
   await p.getByRole('button', { name: '+ New note' }).click();
   await p.getByText(/You have 2000 notes, the most allowed/).first().waitFor();
