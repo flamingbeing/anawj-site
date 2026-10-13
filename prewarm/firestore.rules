@@ -15,6 +15,10 @@ rules_version = '2';
 //                   lock { on, t, by }: only admins set it; while on, the patient is read only for everyone
 //                   (an admin can only unlock it) and hidden from members altogether. locked (bool) mirrors
 //                   lock.on so members can query `site == X && locked == false` (rules aren't filters).
+//   pacu/{token}    the PACU nurse's link: { site, pid, sid, created, f: { fieldId: { v, t, by, auto? } } }. The document id is a
+//                   long random token and is the secret. A member (own hospital) or admin makes and stops it; anyone
+//                   signed in (an anonymous sign-in on the nurse's phone) who knows the token reads it and writes ONLY
+//                   the PACU fields listed below. Nobody lists tokens (admins aside).
 //   forms/blank     the blank paper data collection form (.docx, base64), uploaded by an admin:
 //                   { b64, name, size, setAt, setBy }; members and admins read it (the Form view fills it in).
 service cloud.firestore {
@@ -72,6 +76,28 @@ service cloud.firestore {
         && request.resource.data.b64 is string && request.resource.data.b64.size() < 1000000
         && request.resource.data.name is string && request.resource.data.name.size() <= 200;
       allow delete: if admin();
+    }
+
+    match /pacu/{token} {
+      // the PACU page's fields and its complete tick (kept in step with PACU_KEYS in js/schema.js by a unit test)
+      function pacuKeys() {
+        return ['pacu_in', 'pacu_out', 'pacu_temp', 'pacu_shiver', 'pacu_ponv', 'pacu_hypot', 'pacu_tx', 'pacu_pain',
+          'nd_dis', 'nd_beh', 'nd_com', 'nd_ill', 'nd_psy', 'pacu_nudesc', 'pacu_delay', 'pacu_delay1h', 'pacu_delay_why', 'sign_pacu'];
+      }
+      function pshape(d) {
+        return d.keys().hasOnly(['site', 'pid', 'sid', 'created', 'f'])
+          && d.site in sites() && d.pid is string && d.pid.size() <= 40 && d.sid is string && d.sid.size() <= 60
+          && d.created is number && d.f is map && d.f.keys().hasOnly(pacuKeys());
+      }
+      allow get: if signedIn();
+      allow list: if admin();
+      allow create: if canUse(request.resource.data.site) && token.size() >= 20 && token.size() <= 64 && pshape(request.resource.data);
+      // the nurse (or anyone with the link) changes only f; the team may also correct the Subject ID shown
+      allow update: if signedIn() && pshape(request.resource.data)
+        && request.resource.data.site == resource.data.site && request.resource.data.pid == resource.data.pid
+        && request.resource.data.created == resource.data.created
+        && (request.resource.data.sid == resource.data.sid || canUse(resource.data.site));
+      allow delete: if canUse(resource.data.site);
     }
 
     match /patients/{pid} {

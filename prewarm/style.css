@@ -407,3 +407,9 @@ dialog.kp::backdrop { background: rgba(0, 0, 0, .4); }
 .progress a.on { border-color: var(--ok); color: var(--ok); font-weight: 600; }
 .progress .tick { display: inline-grid; place-items: center; flex: none; width: 22px; height: 22px; border: 2px solid var(--line-input); border-radius: 6px; font-size: 14px; line-height: 1; }
 .progress a.on .tick { background: var(--ok); border-color: var(--ok); color: #fff; }
+
+/* PACU nurse link (owner, 13 Oct 2026) */
+.paculink { display: grid; gap: 6px; margin-top: 12px; padding: 10px; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); }
+.paculink h2 { margin: 0; font-size: 16px; }
+.pacuurl { width: 100%; box-sizing: border-box; font-size: 12px; padding: 6px; border: 1px solid var(--line-input); border-radius: var(--r); background: var(--bg); color: var(--ink); }
+.pacutimes .tchip { min-height: 64px; font-size: 16px; }
