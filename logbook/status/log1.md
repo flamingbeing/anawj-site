@@ -17,5 +17,11 @@ Queue (update as each merges):
 8. GitHub destination + three-way merge.
 9. Logging speed and friction pass; lazy-load rare modules.
 10. Bug hunt and stress tests; code tidy.
+Progress: maps of the code in the session scratchpad (sync, settings, notes, export, logging, tests). Wave 1 running as
+a workflow: five tracks in parallel git worktrees (`/home/user/wt/<name>`, branches `wt/<name>`, not pushed): A sync engine,
+B logging speed, C file sync (Drive/Dropbox/GitHub), D profiles as presets + Personal, E daily note + paste cleaner + shares.
+Each is built, reviewed by three lenses, fixed and tested, then merged here one PR at a time. Wave 2: labelled parts / case
+templates / pasted-list parser, lazy loading, cross-browser bugs (firetop found: WebKit ⋯ menu closes at once in the note
+editor; Firefox notes list sometimes blank after Done), bug hunt.
 Design notes: no `firestore.rules` change needed for 1–10 (deletes come from `bin/`, daily note = a note with id `day-<date>`,
 caps are app-side). Read this file first after a compaction.
