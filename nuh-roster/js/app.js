@@ -334,6 +334,7 @@ function switchDate(date) {
   if (isViewer()) viewerLoad(date);
   if (DEMO && !state.monthly?.[date.slice(0, 7)]?.junior) for (const [m, v] of Object.entries(makeDemo(date).monthly)) (state.monthly ||= {})[m] ||= v; // months further out
   if (DEMO && !rec) fillDemoNotes(state.day);
+  applyCarry(state.day);
   clearUndo(); editing = null;
   lastRows = state.roster ? JSON.stringify(state.roster.rows) : null;
   render();
@@ -959,6 +960,28 @@ async function doItAll(files) {
 const goTab = async t => { if (staffEditing() && t !== 'staff' && !(await finishStaffEdit())) return; state.tab = t; window.scrollTo(0, 0); render(); };
 const nextStep = (text, label, tab) => h('div', { class: 'next-step' }, h('span', {}, text), h('button', { class: 'primary', onclick: () => goTab(tab) }, label + ' →'));
 let flagsOpen = null; // the room whose full set of flags is showing on Cases
+// The same weekday last week, if this browser has it: copy which rooms run, their sessions and fixed people
+// (lists repeat by weekday), not the case notes.
+function lastWeekButton() {
+  const prev = addDays(state.day.date, -7), rec = state.days?.[prev];
+  if (!rec?.day?.rooms?.length) return null;
+  const wd = new Date(prev + 'T12:00').toLocaleDateString('en-GB', { weekday: 'long' });
+  return h('button', { title: `Which rooms run, their sessions and fixed seniors and juniors, from ${longDate(prev)}. Case notes aren't copied.`, onclick: () => {
+    pushUndoAll(`copying rooms from last ${wd}`, { day: true });
+    const by = Object.fromEntries(rec.day.rooms.map(r => [r.name, r]));
+    let n = 0;
+    for (const r of state.day.rooms) {
+      const o = by[r.name];
+      if (!o) continue;
+      const lockS = o.lockSenior && person(o.lockSenior) ? o.lockSenior : '', lockJ = o.lockJunior && person(o.lockJunior) ? o.lockJunior : '';
+      if (r.running !== !!o.running || r.session !== o.session || r.lockSenior !== lockS || r.lockJunior !== lockJ) n++;
+      Object.assign(r, { running: !!o.running, session: o.session || 'full', lockSenior: lockS, lockJunior: lockJ });
+    }
+    render();
+    undoToast(n ? `Copied rooms, sessions and fixed people from last ${wd} (${n} room${n === 1 ? '' : 's'} changed).` : `Already the same as last ${wd}.`);
+  } }, `Start from last ${wd}`);
+}
+
 function renderDay(part) {
   const cases = part === 'cases';
   const d = state.day;
@@ -1035,6 +1058,7 @@ function renderDay(part) {
         h('label', { class: 'btn primary', title: 'Load the admin draft, make the roster from it, and show what needs a look' }, 'Do it all: load draft and make roster',
           h('input', { type: 'file', accept: '.xlsx', hidden: true, onchange: async e => { const f = [...e.target.files]; e.target.value = ''; if (f.length) await doItAll(f); } })),
         fileButton('Load draft only', '.xlsx', false, loadDraft),
+        cases ? lastWeekButton() : null,
         cases
           ? h('button', { onclick: () => { pushUndoAll('clearing the cases', { day: true }); d.rooms = []; syncRooms(); render(); undoToast('Cleared the cases. Rooms are back to running by default.'); } }, 'Clear cases')
           : h('button', { onclick: () => { pushUndoAll('clearing the manpower', { day: true }); d.staff = {}; d.lists = {}; render(); undoToast('Cleared leave, post call and other statuses.'); } }, 'Clear manpower'),
@@ -1964,6 +1988,9 @@ function openPersonBox(anchor, p, ctx) {
   const aoh = h('input', { value: d.aoh || seed.tags.find(isAohTag) || '', placeholder: 'e.g. AOH or AOH 1' });
   const comment = h('input', { value: d.comment ?? seed.dash, placeholder: 'e.g. mtg 3pm' });
   const away = h('input', { type: 'checkbox', checked: !!d.notAroundPrev });
+  // a status or comment that runs for several days (a course, an admin week): carried into those days
+  const carried = (state.carry || []).find(c => c.pid === p.id && c.from <= state.day.date && state.day.date <= c.until);
+  const until = h('input', { type: 'date', value: carried?.until || '', min: addDays(state.day.date, 1), title: 'The status and comment also go on each day up to this date' });
   // a junior's posting for this day only (the rotation is planned on Monthly › Rotations)
   const postingPick = p.role === 'junior' ? select(postingOf(p), POSTINGS, () => {}) : null;
   let status = groupOf(d.status);
@@ -2009,7 +2036,8 @@ function openPersonBox(anchor, p, ctx) {
       if (v !== was) retagPosting(p, was, v);
     }
     if (p.role === 'junior' && away.checked !== !!s.notAroundPrev) { s.notAroundPrev = away.checked; s.manualAway = true; delete s.autoAway; }
-    if (ctx.kind === 'today' && status !== groupOf(s.status)) { closeTagEditor(); setStatus(p, status); }
+    if (ctx.kind === 'today' && status !== groupOf(s.status)) { closeTagEditor(); setStatus(p, status, { quiet: true }); }
+    setCarry(p, until.value, ctx.kind === 'today' ? status : groupOf(s.status), s.comment || '');
     if (ctx.kind === 'premed' && premedPick.value !== p.name) ctx.setCover(premedPick.value);
     syncPersonCells(p);
     closeTagEditor();
@@ -2040,6 +2068,8 @@ function openPersonBox(anchor, p, ctx) {
     h('label', { class: 'check' }, liver, ' Liver standby (L): no complex lists'),
     ...field('AOH tag', aoh, 'Shown as (AOH) after their name'),
     ...field('Comment (also shown in the comments box)', comment),
+    ...field('Same until (optional)', until, 'For something that runs several days: the status and comment go on each day up to this date'),
+    carried ? h('div', { class: 'seen' }, `Carried from ${longDate(carried.from)} to ${longDate(carried.until)}. Clear the date to stop it.`) : null,
     p.role === 'junior' ? h('label', { class: 'check', title: 'Not around on the previous working day: needs premed cover' }, away, ' Away on the previous working day') : null,
     postingPick ? field(`Posting today${d.posting != null ? ` (rotation: ${postingName(plannedPosting(p)) || 'none'})` : ''}`, postingPick, 'Changes their posting for this day only; the weekly rotation is on Monthly › Rotations') : null,
     h('div', { class: 'bar', style: 'margin:8px 0 0' },
@@ -2726,6 +2756,32 @@ async function exportRotations() {
 const BOARD = [['working', 'Working'], ['leave', 'Leave'], ['mc', 'MC'], ['postcall', 'Post call'], ['admin', 'Admin']];
 const groupOf = st => ({ leave: 'leave', mc: 'mc', postcall: 'postcall', admin: 'admin' })[st || 'avail'] || 'working';
 let boardRole = 'all', boardFilter = '';
+// Several days at once: { pid, from, until, status, comment } in state.carry. Saving with "Same until" keeps
+// one entry per person starting today; clearing the date ends it today. New days pick them up (applyCarry).
+function setCarry(p, untilDate, group, comment) {
+  const date = state.day.date;
+  const list = state.carry ||= [];
+  const i = list.findIndex(c => c.pid === p.id && c.from <= date && date <= c.until);
+  if (!untilDate || untilDate <= date) {
+    if (i >= 0) { if (list[i].from < date) list[i].until = addDays(date, -1); else list.splice(i, 1); }
+    return;
+  }
+  const entry = { pid: p.id, from: i >= 0 ? list[i].from : date, until: untilDate, status: group === 'working' ? '' : group, comment };
+  if (i >= 0) list[i] = entry; else list.push(entry);
+  // keep only what still matters
+  state.carry = list.filter(c => c.until >= addDays(realToday(), -1));
+}
+// On a day being opened: anything carried over it goes in, unless that day was changed by hand for the person
+// or a monthly roster already says leave, MC or post call.
+function applyCarry(day) {
+  for (const c of state.carry || []) {
+    if (!(c.from < day.date && day.date <= c.until)) continue;
+    const d = (day.staff[c.pid] ||= {});
+    if (d.manual && !d.carried) continue;
+    if (c.status && (!d.status || d.status === 'avail' || d.carried)) { d.status = c.status; d.carried = true; }
+    if (c.comment && !d.comment) { d.comment = c.comment; d.carried = true; }
+  }
+}
 function setStatus(p, group, { quiet = false } = {}) {
   const s = dayOf(p.id);
   const was = groupOf(s.status);
@@ -3403,11 +3459,16 @@ let downloadMenu = false;
 function downloadButton() {
   let pick = 'xlsx';
   try { pick = localStorage.getItem('nuh-roster-download') || 'xlsx'; } catch { /* no storage */ }
-  const cur = DOWNLOADS.find(d => d[0] === pick) || DOWNLOADS[0];
+  // members: one step to save the roster for the team and then send the image
+  const all = cloud.enabled && isMember() ? [...DOWNLOADS, ['saveimage', 'Save for the team, then image', async () => {
+    await saveRosterToCloud();
+    if (state.cloudHash?.[state.day.date]?.hash === dayHash()) await sentOut(exportImage)();
+  }]] : DOWNLOADS;
+  const cur = all.find(d => d[0] === pick) || all[0];
   return h('div', { class: 'split' },
     h('button', { onclick: () => cur[2]() }, cur[1]),
     h('button', { class: 'caret', 'aria-label': 'Other formats', 'aria-expanded': String(downloadMenu), onclick: () => { downloadMenu = !downloadMenu; render(); } }, '▾'),
-    downloadMenu ? h('div', { class: 'menu' }, DOWNLOADS.map(([k, label, fn]) => h('button', { class: k === cur[0] ? 'on' : '', onclick: () => {
+    downloadMenu ? h('div', { class: 'menu' }, all.map(([k, label, fn]) => h('button', { class: k === cur[0] ? 'on' : '', onclick: () => {
       if (k !== 'print') { try { localStorage.setItem('nuh-roster-download', k); } catch { /* no storage */ } }
       downloadMenu = false; render(); fn();
     } }, label))) : null);
