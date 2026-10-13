@@ -82,6 +82,26 @@ near zero (the APMES apps are a demo). Rough projections, not measurements:
   (Singapore, asia-southeast1), who can access it, PDPA and institutional policy, and who is accountable if the owner
   is unavailable. They may ask for institutional ownership and billing. Raise it before the data grows.
 
+## The home computer ("firetop" helper)
+
+The owner's always-on Claude Code session at home (Remote Control): session `session_01F92cPiysiT5WAFPXMga7f4`,
+"firetop-partitioned-rose". Cloud sessions hand it work with `send_message`; it does each change to a live
+project only with the owner's explicit OK, and reports back by message or through the owner. Its own notes stay on
+that computer, never in this repo.
+
+Send it:
+
+- **Production operations** on the Google Cloud projects (it has `gcloud` signed in as the owner): Firestore backups,
+  restores and restore drills, point-in-time recovery, budget and billing checks, indexes, quotas, logs. Cloud
+  sessions can't do these.
+- **The owner's real documents** (study forms, the eCRF template and anything that must not enter this public
+  repo): it reads them locally and answers; they never leave the owner's own storage.
+- **Long or heavy jobs**: every app's tests and browser tests before a release, builds, data crunching.
+- **Secrets**: the owner pastes any secret there, never into a cloud session or this repo.
+
+Don't send it: hosting or anything that must stay up (it's a home computer on home internet, and goes offline
+until the owner signs in again after a restart).
+
 ## Handing over
 
 The apps are documented for a successor already: `AGENTS.md`, each app's `NOTES.md`, `STATUS.md` and `README.md`.
