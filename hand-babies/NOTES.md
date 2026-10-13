@@ -48,6 +48,16 @@ The owner uses Firefox (Gecko) on their phone: check changes in Firefox as well 
 under `xvfb-run` with `LIBGL_ALWAYS_SOFTWARE=1` to see the 3D figures. Where WebGL is blocked, hand3d.js shows each
 3D figure's GIF instead (no Play button), so keep `gifs/` current (`tools/make-gifs.mjs`).
 
+## Figures: lessons
+
+- Tendon tests follow standard technique (checked 13 Oct 2026): FDP hold middle phalanx; FDS hold the other fingers
+  straight; FPL hold the thumb proximal phalanx; EPL lift off a flat palm; EDC all fingers straight then press each
+  (the ring can't straighten alone); EIP and EDM separately from a fist; Elson with the PIP over the table edge.
+  Change a figure and its page text together.
+- `tools/make-gifs.mjs edc elson` remakes just those GIFs. After splicing code in `hand3d.js`, check for duplicate
+  figure keys (a later one silently wins). Render frames at several camera turns before merging.
+- No Z-Anatomy / MakeHuman models (owner: too much effort); the hand stays primitives.
+
 ## Edits sent from the page editor
 
 The page editor is now site-wide: `/edit/` (`edit/NOTES.md`, which also says how to apply `Page edits:` issues). The

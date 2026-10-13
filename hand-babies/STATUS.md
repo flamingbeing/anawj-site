@@ -2,12 +2,11 @@
 
 Short and current. Lasting rules go in `NOTES.md`. Update with `/save-state`.
 
-Last updated: 2026-10-13 by Claude Code, hand assessment session.
+Last updated: 2026-10-13 by Claude Code, hand assessment session (save-state).
 
 ## Now
 
-- **Claude Code, hand assessment** (branch `claude/amazing-goodall-erq636`, no open PR): nothing half-done. Checked
-  every tendon test against standard technique; EDC and EIP/EDM corrected.
+Each session keeps its own line in `status/<session>.md` (`hand.md`). Read them before starting; edit only yours.
 
 ## Waiting on the owner
 
@@ -26,18 +25,14 @@ Last updated: 2026-10-13 by Claude Code, hand assessment session.
 
 ## Recently done
 
-- Tendon tests checked: FDP, FDS, FPL, EPL, Elson correct; EDC now all fingers then press each; EIP and EDM one at a time against resistance.
-- Elson figure: finger rests on the table, middle joint over the edge (no clipping); see-through table.
-- Firefox: checked the update fix and 3D in Firefox; no-WebGL phones get the GIFs instead of blank boxes.
-- Page edits #302: no update bar; online visits always get the current page (network first, cache offline).
-- #260: updates switch on by themselves; the update bar only reloads (tap did nothing on the owner's phone).
+- #312: tendon tests checked; EDC now all fingers then press each; EIP and EDM one at a time against resistance.
+- #309: Elson figure: finger rests on the table, middle joint over the edge (no clipping); see-through table.
+- #306: no-WebGL phones (Firefox) get the GIFs instead of blank boxes; checked in Firefox.
+- #305: no update bar; online visits always get the current page (network first, cache offline); page edit #302.
+- #260: updates switch on by themselves (tap did nothing on the owner's phone).
 - #258: 3D animations (three.js) for cascade, FDP, FDS, nerve map; new FPL, EDC, EIP/EDM, EPL, Elson; kinder wording.
 - #253: removed the 10 rules and the emoji.
-- #247: page editor (`edit.html`, sends GitHub issues).
-- #245: page cut to about half, plainer local wording; quiz, Words, privacy and template removed.
-- #243: moved from `/hand/` to `/hand-babies/` (redirect + cache cleanup at `/hand/`).
-- #242: animated figures with Play/Pause, GIF copies in `gifs/`.
-- #207: first version.
+- #247: page editor (now the site-wide `/edit/`, #301).
 
 ## Decisions
 
