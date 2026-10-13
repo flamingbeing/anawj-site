@@ -14,11 +14,11 @@ import { cleanSync, cleanTarget, targetReady, targetPath, planDay, fingerprint, 
 import { mdDay } from './markdown.js';
 import { mdFormat, mdCtx } from './share.js';
 import { notesOn } from './notepad.js';
-import { ensureNotes, notesIndex } from './ui-notepad.js';
+import { ensureNotes, notesIndex, notesFromServer } from './ui-notepad.js';
 import { demo } from './cloud.js';
 import { FOLDER } from './backup-targets.js';
-import { driveReady, dropboxReady, cloudToken, signInFor } from './cloud-save.js';
-import { driveRemote, dropboxRemote, githubRemote } from './sync-remote.js';
+import { driveReady, dropboxReady, cloudToken, signInFor, forgetCloudToken } from './cloud-save.js';
+import { driveRemote, dropboxRemote, githubRemote, resetSyncRemote } from './sync-remote.js';
 
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
 export const syncSettings = () => cleanSync(settings().sync);
@@ -29,15 +29,16 @@ export const syncPlaces = v => cleanSync(v).targets.map(t => (t.kind === 'github
 
 // ---- this device's bookkeeping, per account ----
 
+// a run passes the account it started with (a), so nothing it records lands under the next person's name
 const acct = () => (demo ? 'demo:' : '') + String((S.user && S.user.email) || (S.logbook && S.logbook.email) || 'local').toLowerCase();
 // "cloud" in the names keeps them out of the device-settings file (settings-file.js) like the sign-in state
 const LEDGER = 'apmes-logbook-cloud-sync:', TOKEN = 'apmes-logbook-cloud-gh:';
-function readState() {
-  try { const s = JSON.parse(localStorage.getItem(LEDGER + acct()) || '{}') || {}; return { ledger: cleanSyncLedger(s.ledger), at: s.at && typeof s.at === 'object' ? s.at : {} }; }
+function readState(a = acct()) {
+  try { const s = JSON.parse(localStorage.getItem(LEDGER + a) || '{}') || {}; return { ledger: cleanSyncLedger(s.ledger), at: s.at && typeof s.at === 'object' ? s.at : {} }; }
   catch { return { ledger: {}, at: {} }; }
 }
-const writeState = s => { try { localStorage.setItem(LEDGER + acct(), JSON.stringify(s)); } catch { /* storage full or blocked: the next sync reads the files again */ } };
-export const ghToken = id => { try { return localStorage.getItem(`${TOKEN}${acct()}:${id}`) || ''; } catch { return ''; } };
+const writeState = (s, a = acct()) => { try { localStorage.setItem(LEDGER + a, JSON.stringify(s)); } catch { /* storage full or blocked: the next sync reads the files again */ } };
+export const ghToken = (id, a = acct()) => { try { return localStorage.getItem(`${TOKEN}${a}:${id}`) || ''; } catch { return ''; } };
 const setGhToken = (id, v) => { try { if (v) localStorage.setItem(`${TOKEN}${acct()}:${id}`, v); else localStorage.removeItem(`${TOKEN}${acct()}:${id}`); } catch { toast('This browser won’t keep the token (private mode?)'); } };
 
 // the base texts: IndexedDB (a day can be long and there may be years of them)
@@ -54,21 +55,33 @@ function db() {
   }).catch(err => { opened = null; throw err; });
   return opened;
 }
-const baseKey = (id, date) => `${acct()}|${id}|${date}`;
-async function getBase(id, date) {
+const baseKey = (a, id, date) => `${a}|${id}|${date}`;
+async function getBase(a, id, date) {
   try {
     const d = await db();
-    return await new Promise(res => { const q = d.transaction('base').objectStore('base').get(baseKey(id, date)); q.onsuccess = () => res(q.result ? q.result.text : null); q.onerror = () => res(null); });
+    return await new Promise(res => { const q = d.transaction('base').objectStore('base').get(baseKey(a, id, date)); q.onsuccess = () => res(q.result ? q.result.text : null); q.onerror = () => res(null); });
   } catch { return null; }   // no base: a day edited inside its block keeps both versions, marked
 }
-async function putBase(id, date, text) {
+async function putBase(a, id, date, text) {
   try {
     const d = await db();
-    await new Promise(res => { const tx = d.transaction('base', 'readwrite'); tx.objectStore('base').put({ key: baseKey(id, date), text }); tx.oncomplete = tx.onerror = tx.onabort = res; });
+    await new Promise(res => { const tx = d.transaction('base', 'readwrite'); tx.objectStore('base').put({ key: baseKey(a, id, date), text }); tx.oncomplete = tx.onerror = tx.onabort = res; });
   } catch { /* as above */ }
 }
-// sign-out, account switch, demo reset: a shared device keeps nothing of the last person's sync
+// every base of one place (it was removed, or now writes somewhere else)
+async function dropBases(id, a = acct()) {
+  try {
+    const d = await db(), from = baseKey(a, id, '');
+    await new Promise(res => { const tx = d.transaction('base', 'readwrite'); tx.objectStore('base').delete(IDBKeyRange.bound(from, from + '\uffff')); tx.oncomplete = tx.onerror = tx.onabort = res; });
+  } catch { /* as above */ }
+}
+// sign-out, account switch, demo reset: a shared device keeps nothing of the last person's sync, and a run still
+// going stops (gen) before it records anything more
+let gen = 0;
 export function forgetSync() {
+  gen++;
+  // this visit's Drive and Dropbox sign-ins were the last person's (the page doesn't reload on a switch)
+  forgetCloudToken('drive'); forgetCloudToken('dropbox'); resetSyncRemote();
   try { for (const k of Object.keys(localStorage)) if (k.startsWith(LEDGER) || k.startsWith(TOKEN)) localStorage.removeItem(k); } catch { /* blocked */ }
   try {
     const close = opened; opened = null;
@@ -80,13 +93,14 @@ export function forgetSync() {
 
 const tidy = t => String(t).replace(/\r\n?/g, '\n').replace(/\n+$/, '');
 // the days each place needs: for every day with cases or notes (and every day synced before, which may now be
-// empty), its text now against the ledger
-async function work(targets) {
+// empty), its text now against the ledger. A run (full) always waits for the server's notes: a day sent without
+// its notes would overwrite them in the file. The button's count reads notes only when there are some to read.
+async function work(targets, { full = false, a = acct() } = {}) {
   const days = new Map();
   for (const c of S.cases || []) if (ISO.test(c.date || '')) (days.get(c.date) || days.set(c.date, []).get(c.date)).push(c);
-  const notes = notesIndex().days.length || S.notes ? (await ensureNotes().catch(() => [])) || [] : [];
+  const notes = full ? await notesFromServer() : notesIndex().days.length || S.notes ? (await ensureNotes().catch(() => [])) || [] : [];
   for (const n of notes) if (ISO.test(n.date || '') && !days.has(n.date)) days.set(n.date, []);
-  const { ledger } = readState();
+  const { ledger } = readState(a);
   const fmt = mdFormat(), ctx = mdCtx(), texts = new Map();
   const text = date => {
     if (!texts.has(date)) texts.set(date, tidy(mdDay(date, [...(days.get(date) || [])].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)), fmt, ctx, notesOn(notes, date))));
@@ -114,16 +128,18 @@ export async function daysToSync() {
 // ---- the run ----
 
 let running = false;
-const remoteFor = t => (t.kind === 'drive' ? driveRemote(cloudToken('drive')) : t.kind === 'dropbox' ? dropboxRemote(cloudToken('dropbox')) : githubRemote(t, ghToken(t.id)));
+const remoteFor = (t, a) => (t.kind === 'drive' ? driveRemote(cloudToken('drive')) : t.kind === 'dropbox' ? dropboxRemote(cloudToken('dropbox')) : githubRemote(t, ghToken(t.id, a)));
+const stopped = () => Object.assign(new Error('stopped: signed out'), { auth: true });
 const where = t => (t.kind === 'github' ? `${t.owner}/${t.repo}` : KIND_NAMES[t.kind]);
 
 // one day: read the file, work out the text, write it only if it changed and only over the version read
 // (someone else's write meanwhile: read again and merge, twice at most)
-async function syncDay(t, remote, date, inner) {
+async function syncDay(t, remote, date, inner, a, g) {
   const path = targetPath(t, date);
-  const was = readState().ledger[t.id]?.[date];
-  const last = was ? { fp: was.fp, base: await getBase(t.id, date) } : null;
+  const was = readState(a).ledger[t.id]?.[date];
+  const last = was ? { fp: was.fp, base: await getBase(a, t.id, date) } : null;
   for (let tries = 0; ; tries++) {
+    if (g !== gen) throw stopped();
     const cur = await remote.read(path);
     const p = planDay({ remoteText: cur ? cur.text : null, inner, last });
     let rev = cur ? cur.rev : '';
@@ -131,9 +147,10 @@ async function syncDay(t, remote, date, inner) {
       try { rev = (await remote.write(path, p.text, cur)).rev; }
       catch (err) { if (err.conflict && tries < 2) continue; throw err; }
     }
-    await putBase(t.id, date, inner);
-    const s = readState();
-    writeState({ ...s, ledger: markSynced(s.ledger, t.id, date, fingerprint(inner), rev) });
+    if (g !== gen) throw stopped();   // written, but the device has forgotten this person's sync: keep nothing
+    await putBase(a, t.id, date, inner);
+    const s = readState(a);
+    writeState({ ...s, ledger: markSynced(s.ledger, t.id, date, fingerprint(inner), rev) }, a);
     return p;
   }
 }
@@ -145,15 +162,17 @@ async function syncDay(t, remote, date, inner) {
 export async function runSync({ only = '', resumed = false } = {}) {
   if (running) return toast('Sync is already running');
   const targets = syncTargets().filter(t => !only || t.id === only);
+  const a = acct(), g = gen;
   if (!targets.length) return toast('No place to sync to yet', { action: 'Set up', onaction: () => { location.hash = '#sync'; } });
   for (const t of targets) {
-    if (t.kind === 'github' && !ghToken(t.id)) return toast(`${t.name}: add a GitHub token on this device first`, { action: 'Set up', onaction: () => { location.hash = '#sync'; } });
+    if (t.kind === 'github' && !ghToken(t.id, a)) return toast(`${t.name}: add a GitHub token on this device first`, { action: 'Set up', onaction: () => { location.hash = '#sync'; } });
     if ((t.kind === 'drive' && !driveReady()) || (t.kind === 'dropbox' && !dropboxReady())) return toast(`${KIND_NAMES[t.kind]} isn’t set up for this app yet`);
   }
   running = true;
   try {
     await waitLoaded();
-    const { plan, text } = await work(targets);
+    const { plan, text } = await work(targets, { full: true, a });
+    if (g !== gen) return;
     const unsigned = plan.filter(x => x.days.length && x.target.kind !== 'github' && !cloudToken(x.target.kind));
     if (unsigned.length && !resumed) {
       running = false;
@@ -163,8 +182,8 @@ export async function runSync({ only = '', resumed = false } = {}) {
     const later = unsigned.map(x => x.target.name);
     if (!jobs.length) { toast(later.length ? `${later.join(' and ')}: tap Sync again to sign in` : 'Everything is synced'); return; }
     // asked once for the whole run, not per day
-    if (!(await okNoIds(...new Set(jobs.map(j => text(j.date)))))) return;
-    await showRun(jobs, text, later);
+    if (!(await okNoIds(...new Set(jobs.map(j => text(j.date))))) || g !== gen) return;
+    await showRun(jobs, text, { later, only, a, g });
   } catch (err) { toast('Not synced: ' + err.message); }
   finally { running = false; paintButtons(); }
 }
@@ -173,25 +192,28 @@ export async function resumeSync(pending) {
   await runSync({ only: pending && typeof pending.only === 'string' ? pending.only : '', resumed: true });
 }
 
-async function showRun(jobs, text, later = []) {
+async function showRun(jobs, text, { later = [], only = '', a = acct(), g = gen } = {}) {
   const status = h('p', { role: 'status', 'aria-live': 'polite', style: 'margin:0 0 8px' }, `Syncing ${jobs.length} day${jobs.length === 1 ? '' : 's'}…`);
   const bar = h('progress', { max: String(jobs.length), value: '0', 'aria-label': 'Sync progress', style: 'width:100%' });
   const errs = h('ul', { class: 'sync-errors', style: 'margin:8px 0 0;padding-left:18px' });
-  const retry = h('button', { hidden: true, onclick: () => { m.close(); runSync(); } }, 'Try again');
+  const retry = h('button', { hidden: true, onclick: async () => { await m.close(); runSync({ only }); } }, 'Try again');   // after the dialog's history step is undone
   const close = h('button', { class: 'primary', onclick: () => m.close() }, 'Hide');
   const m = modal('Sync', [status, bar, errs, h('div', { class: 'bar', style: 'margin:12px 0 0' }, h('span', { class: 'grow' }), retry, close)]);
   let done = 0, failed = 0, merged = 0, clashes = 0;
   const dead = new Map();   // a place whose sign-in or token failed: its other days aren't tried
   const now = Date.now();
   for (const { t, date } of jobs) {
-    const remote = dead.has(t.id) ? null : remoteFor(t);
+    if (g !== gen) break;   // signed out meanwhile: stop at once
+    const remote = dead.has(t.id) ? null : remoteFor(t, a);
     try {
       if (!remote) throw dead.get(t.id);
-      const p = await syncDay(t, remote, date, text(date));
+      const p = await syncDay(t, remote, date, text(date), a, g);
       if (p.merged) merged++;
       clashes += p.conflicts;
     } catch (err) {
       failed++;
+      // a refused sign-in or token, or a rate limit: that place's other days aren't tried, and it's said once
+      if (err.auth && dead.has(t.id)) { done++; bar.value = done; continue; }
       if (err.auth) dead.set(t.id, err);
       errs.append(h('li', {}, `${fmtDate(date)} (${t.name}): ${err.message}`));
     }
@@ -199,9 +221,10 @@ async function showRun(jobs, text, later = []) {
     bar.value = done;
     status.textContent = `Syncing: ${done} of ${jobs.length} days${failed ? `, ${failed} not synced` : ''}`;
   }
-  const s = readState();
+  if (g !== gen) { m.close(); return; }
+  const s = readState(a);
   for (const t of new Set(jobs.map(j => j.t))) if (!dead.has(t.id)) s.at[t.id] = now;
-  writeState(s);
+  writeState(s, a);
   status.textContent = `Synced ${done - failed} of ${jobs.length} day${jobs.length === 1 ? '' : 's'}` + (failed ? `; ${failed} not synced (below)` : '')
     + (merged ? `. Your edits kept in ${merged} file${merged === 1 ? '' : 's'}` : '') + (clashes ? `; ${clashes} place${clashes === 1 ? '' : 's'} where both changed are marked <<<<<<< in the file${clashes === 1 ? '' : 's'}` : '') + '.';
   if (later.length) status.textContent += ` ${later.join(' and ')}: tap Sync again to sign in.`;
@@ -294,10 +317,15 @@ export function renderSyncSettings() {
     const bad = list.find(t => t.kind === 'github' && !targetReady(cleanTarget(t)));
     if (bad) { toast('GitHub needs an owner and a repository (letters, digits, - . _)'); return false; }
     const clean = list.map(cleanTarget).filter(Boolean);
-    // places removed: their ledger and token go too
+    // places removed: their ledger and token go too. A place that now writes somewhere else (another repository,
+    // branch, folder or file name) starts again: every day is new there, and the old files' bases don't apply
     const keep = new Set(clean.map(t => t.id)), s = readState();
-    for (const id of Object.keys(s.ledger)) if (!keep.has(id)) { delete s.ledger[id]; delete s.at[id]; }
+    const place = t => JSON.stringify(['kind', 'owner', 'repo', 'branch', 'folder', 'fileName'].map(k => t[k] || ''));
+    const was = new Map(sv.targets.map(t => [t.id, place(t)]));
+    const moved = clean.filter(t => was.has(t.id) && was.get(t.id) !== place(t)).map(t => t.id);
+    for (const id of new Set([...Object.keys(s.ledger), ...Object.keys(s.at)])) if (!keep.has(id) || moved.includes(id)) { delete s.ledger[id]; delete s.at[id]; }
     writeState(s);
+    for (const id of [...sv.targets.map(t => t.id).filter(id => !keep.has(id)), ...moved]) await dropBases(id);
     for (const t of sv.targets) if (!keep.has(t.id)) setGhToken(t.id, '');
     for (const [id, v] of tokens) if (v && keep.has(id)) setGhToken(id, v);
     tokens.clear();
@@ -312,7 +340,7 @@ export function renderSyncSettings() {
     h('section', { class: 'card' },
       h('h2', {}, 'Sync'),
       h('p', { class: 'hint help', style: 'margin:0' }, 'Keeps one Markdown file per day (that day’s cases and notes, in your Markdown format) in your own Google Drive, Dropbox or GitHub repository, for Obsidian or any notes app. Only days that changed since the last sync are sent, and only when you tap Sync (on the Logbook tab).'),
-      h('p', { class: 'hint' }, 'The logbook writes between two marks in each file (<!-- logbook:start --> and <!-- logbook:end -->). Write above or below them and it’s kept. Edit between them and your edits are merged in; where yours and the logbook’s change the same line, both are kept, marked <<<<<<<.'),
+      h('p', { class: 'hint' }, 'The logbook writes between two marks in each file (<!-- logbook:start … --> and <!-- logbook:end -->). Write above or below them and it’s kept. Edit between them and your edits are merged in; where yours and the logbook’s change the same line, both are kept, marked <<<<<<<.'),
       h('p', { class: 'hint' }, 'Google Drive and Dropbox let the app see only the files it made. Editing those files is fine; a file another app makes in their place can’t be seen, and a fresh copy is written beside it.'),
       h('p', { class: 'hint' }, 'The files hold your case details: keep them de-identified, and check hospital policy before keeping cases in a cloud drive or on GitHub.'),
       box,

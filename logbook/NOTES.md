@@ -310,10 +310,17 @@ portfolio content.
   Google Drive (`APMES Logbook/Daily/`), Dropbox (app folder `/Daily/`) or a GitHub repo (owner/repo/branch/folder,
   contents API). Name pattern `{date}.md` (also {year} {month} {day}; `/` makes folders). Only days whose text changed
   since this device's last sync go, only on a tap: a "Sync (N)" button on the Logbook tab's count row once a place is
-  set up (none otherwise); optional reminder on open (off). The app owns only `<!-- logbook:start -->` … `<!--
+  set up (none otherwise); optional reminder on open (off). The app owns only `<!-- logbook:start fp=… -->` … `<!--
   logbook:end -->` in each file: text outside is kept; edits inside are merged (`merge3`: base = the app's text at the
   last sync, kept in IndexedDB `apmes-logbook-sync`; clashes kept both ways with `<<<<<<< logbook` / `>>>>>>> your
-  edits` marks). Writes are conditional (Drive: md5 checked just before PATCH; Dropbox: upload `update` rev / `add`;
+  edits` marks; lines both sides added at the end: the user's first). The start mark's `fp` is the fingerprint of the
+  app's text written there (never of a merged block), so a device with no ledger or base (second device, after
+  sign-out) replaces an untouched block, leaves alone a block already holding its text, and marks clashes only when
+  both really changed. Changing a place's repo/branch/folder/file name clears its ledger and bases (every day is
+  written there again). A run waits for the server's notes (`notesFromServer`); a run stops recording at once on
+  sign-out (`gen`); `forgetSync` also drops this visit's Drive/Dropbox tokens and Drive folder ids. GitHub writes
+  are paced (60 a minute) and a rate limit (403/429 "rate limit", Retry-After) stops that place with "try again in
+  N minutes"; "Try again" redoes only the place(s) of that run. Writes are conditional (Drive: md5 checked just before PATCH; Dropbox: upload `update` rev / `add`;
   GitHub: PUT with sha) and a refused write is read again and merged (twice at most). `settings.sync` {targets,
   remind} (no tokens; travels in the settings file); ledger in localStorage `apmes-logbook-cloud-sync:<account>`
   {fp, rev per day}; GitHub token (fine-grained, one repo, Contents read/write) in `apmes-logbook-cloud-gh:<account>:<id>`

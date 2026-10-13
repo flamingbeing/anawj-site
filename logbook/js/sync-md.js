@@ -9,6 +9,9 @@ import { fingerprint } from './destinations.js';
 
 export { fingerprint };
 export const START = '<!-- logbook:start -->';
+// the start mark carries the fingerprint of the app's text written there (<!-- logbook:start fp=… -->), so any
+// device, even one that never synced this day, can tell an untouched block from one the user edited
+const START_RE = /<!-- logbook:start(?: fp=([\w.]{1,40}))? -->/;
 export const END = '<!-- logbook:end -->';
 export const KINDS = ['drive', 'dropbox', 'github'];
 export const KIND_NAMES = { drive: 'Google Drive', dropbox: 'Dropbox', github: 'GitHub' };
@@ -23,19 +26,20 @@ const str = (v, n) => (typeof v === 'string' ? v.replace(/[\u0000-\u001f\u007f]/
 
 // ---- the app's block in a file ----
 
-export const wrapBlock = text => `${START}\n${lf(text).replace(/\n+$/, '')}\n${END}`;
+export const wrapBlock = (text, fp = '') => `${fp ? START.replace(' -->', ` fp=${fp} -->`) : START}\n${lf(text).replace(/\n+$/, '')}\n${END}`;
 
-// { before, inner, after } around the first block, or null when the file has none. A start mark whose end mark
+// { before, inner, after, fp } around the first block, or null when the file has none. A start mark whose end mark
 // was deleted runs to the end of the file (so what follows is merged as the user's, never dropped).
 export function extractBlock(fileText) {
   const t = String(fileText ?? '');
-  const s = t.indexOf(START);
-  if (s < 0) return null;
-  let from = s + START.length;
+  const sm = START_RE.exec(t);
+  if (!sm) return null;
+  const s = sm.index;
+  let from = s + sm[0].length;
   if (t.startsWith('\r\n', from)) from += 2; else if (t[from] === '\n') from += 1;
   const e = t.indexOf(END, from);
   const to = e < 0 ? t.length : e;
-  return { before: t.slice(0, s), inner: lf(t.slice(from, to)).replace(/\n$/, ''), after: e < 0 ? '' : t.slice(e + END.length) };
+  return { before: t.slice(0, s), inner: lf(t.slice(from, to)).replace(/\n$/, ''), after: e < 0 ? '' : t.slice(e + END.length), fp: sm[1] || '' };
 }
 
 // the file with its block replaced by newBlock (added at the end when it has none); the user's text outside the
@@ -79,11 +83,12 @@ const startsWith = (x, y) => y.length <= x.length && y.every((l, i) => l === x[i
 const endsWith = (x, y) => y.length <= x.length && y.every((l, i) => l === x[x.length - y.length + i]);
 // one changed stretch: the side that changed wins; when both changed, lines one side only added before or after
 // the old ones go round the other side's edit (the app adds a case under the line the user annotated); lines both
-// added at the very end are both kept, the app's first. null = a real clash.
+// added at the very end are both kept, the user's first (they follow the line they were written under; the app's
+// are new cases). null = a real clash.
 function resolve(co, ca, cb, atEnd) {
   if (same(ca, co)) return cb;
   if (same(cb, co) || same(ca, cb)) return ca;
-  if (!co.length) return atEnd ? [...ca, ...cb] : null;
+  if (!co.length) return atEnd ? [...cb, ...ca] : null;
   if (startsWith(ca, co)) return [...cb, ...ca.slice(co.length)];
   if (endsWith(ca, co)) return [...ca.slice(0, ca.length - co.length), ...cb];
   if (startsWith(cb, co)) return [...ca, ...cb.slice(co.length)];
@@ -120,28 +125,61 @@ export function merge3(base, mine, theirs) {
   return { text: out.join('\n'), conflicts };
 }
 
+// every line of x, in order, is in y (y only adds lines to x)
+function within(x, y) {
+  let j = 0;
+  for (const l of y) if (j < x.length && x[j] === l) j++;
+  return j === x.length;
+}
+
 // What to write for one day. remoteText: the file as it is now (null = no file); inner: the day's text from the
-// app; last: { fp, base } from the last sync of this day (fp of the app's text then; base = that text, kept on
-// this device, may be missing). -> { text, write, conflicts, merged }
+// app; last: { fp, base } from this device's last sync of this day (fp of the app's text then; base = that text,
+// kept on this device, may be missing). -> { text, write, conflicts, merged }
 export function planDay({ remoteText = null, inner, last = null }) {
-  const block = wrapBlock(inner);
+  const mine = lf(inner).replace(/\n+$/, ''), fp = fingerprint(mine);
+  const block = wrapBlock(mine, fp);
   if (remoteText == null) return { text: block + '\n', write: true, conflicts: 0, merged: false };
   const ext = extractBlock(remoteText);
+  const keep = { text: remoteText, write: false, conflicts: 0, merged: false };
+  if (ext && ext.inner === mine) return keep;
+  // the file already holds this very text of the app's, with the user's edits merged in (another device wrote it,
+  // or this one before its ledger was cleared): nothing to add
+  if (ext && ext.fp === fp) return keep;
   let text, conflicts = 0, merged = false;
-  if (ext && ext.inner === lf(inner).replace(/\n+$/, '')) return { text: remoteText, write: false, conflicts: 0, merged: false };
   if (!ext) text = replaceBlock(remoteText, block);
-  else if (last && last.fp === fingerprint(ext.inner)) text = replaceBlock(remoteText, block);   // untouched since the app wrote it
+  // untouched since the app wrote it (the mark's fingerprint, or this device's ledger, matches what's there)
+  else if ((ext.fp && ext.fp === fingerprint(ext.inner)) || (last && last.fp === fingerprint(ext.inner))) text = replaceBlock(remoteText, block);
   else {
-    // edited inside the block: apply the app's changes since last time onto the user's version
-    // (with no base kept on this device, nothing can say which lines are whose: both versions are kept, marked)
-    const mine = lf(inner).replace(/\n+$/, '');
+    // edited inside the block: apply the app's changes since last time onto the user's version. With no base on
+    // this device: if the app's text has every line of the file's block (the user only deleted, or nothing was
+    // edited at all), the app's text goes in; otherwise both versions are kept, marked.
     const m = last && typeof last.base === 'string' ? merge3(last.base, mine, ext.inner)
-      : !ext.inner.trim() ? { text: mine, conflicts: 0 }
+      : !ext.inner.trim() || within(lines(ext.inner), lines(mine)) ? { text: mine, conflicts: 0 }
       : { text: [MINE_MARK, mine, SPLIT_MARK, ext.inner, THEIRS_MARK].join('\n'), conflicts: 1 };
-    text = replaceBlock(remoteText, wrapBlock(m.text));
-    conflicts = m.conflicts; merged = true;
+    // the mark keeps the app's fingerprint, never the merged text's: so the block reads as edited by the user
+    text = replaceBlock(remoteText, wrapBlock(m.text, fp));
+    conflicts = m.conflicts; merged = m.text !== mine;
   }
   return { text, write: text !== remoteText, conflicts, merged };
+}
+
+// ---- GitHub's limits on writes ----
+// GitHub refuses bursts of content writes (a "secondary rate limit", about 80 a minute) with 403 or 429. The run
+// keeps under it (paceWait), and stops for that place when it is hit anyway (rateLimitWait).
+export const GH_PER_MIN = 60;
+// ms to wait before the next write, given the times of recent writes
+export function paceWait(times, now, perMin = GH_PER_MIN) {
+  const recent = times.filter(t => now - t < 60e3).sort((a, b) => a - b);
+  return recent.length < perMin ? 0 : recent[recent.length - perMin] + 60e3 - now;
+}
+// a refused request that is a rate limit -> minutes to wait (at least 1); null when it is something else
+export function rateLimitWait(status, header, body, now = Date.now()) {
+  const get = k => (typeof header === 'function' ? header(k) : null);
+  if (status !== 429 && status !== 403) return null;
+  const after = Number(get('retry-after')), reset = Number(get('x-ratelimit-reset'));
+  if (status === 403 && !/rate limit/i.test(String(body || '')) && get('x-ratelimit-remaining') !== '0' && !(after > 0)) return null;
+  const ms = after > 0 ? after * 1000 : reset > 0 ? reset * 1000 - now : 60e3;
+  return Math.max(1, Math.ceil(ms / 60e3));
 }
 
 // ---- file names ----

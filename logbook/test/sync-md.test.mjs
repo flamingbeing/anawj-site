@@ -1,7 +1,7 @@
 // Sync (one Markdown file per day): the app's block, the three-way merge, file names, settings and the ledger.
 import assert from 'node:assert/strict';
 const { START, END, wrapBlock, extractBlock, replaceBlock, merge3, planDay, dayFileName, cleanTarget, cleanSync, targetReady, targetPath,
-  cleanSyncLedger, markSynced, changedDays, fingerprint, toBase64, fromBase64, MINE_MARK, SPLIT_MARK, THEIRS_MARK } = await import('../js/sync-md.js');
+  cleanSyncLedger, markSynced, changedDays, fingerprint, toBase64, fromBase64, paceWait, rateLimitWait, MINE_MARK, SPLIT_MARK, THEIRS_MARK } = await import('../js/sync-md.js');
 
 // ---- blocks ----
 {
@@ -10,13 +10,13 @@ const { START, END, wrapBlock, extractBlock, replaceBlock, merge3, planDay, dayF
   assert.equal(extractBlock('no block here'), null);
   assert.equal(extractBlock(''), null);
   const file = `# My day\n\nmine above\n${START}\nAB lscs\nCD lap chole\n${END}\nmine below\n`;
-  assert.deepEqual(extractBlock(file), { before: '# My day\n\nmine above\n', inner: 'AB lscs\nCD lap chole', after: '\nmine below\n' });
+  assert.deepEqual(extractBlock(file), { before: '# My day\n\nmine above\n', inner: 'AB lscs\nCD lap chole', after: '\nmine below\n', fp: '' });
   // CRLF file: inner comes out with \n
   assert.equal(extractBlock(file.replace(/\n/g, '\r\n')).inner, 'AB lscs\nCD lap chole');
   // an empty block
   assert.equal(extractBlock(`${START}\n\n${END}`).inner, '');
   // the end mark deleted: the block runs to the end of the file
-  assert.deepEqual(extractBlock(`top\n${START}\nAB\nuser line\n`), { before: 'top\n', inner: 'AB\nuser line', after: '' });
+  assert.deepEqual(extractBlock(`top\n${START}\nAB\nuser line\n`), { before: 'top\n', inner: 'AB\nuser line', after: '', fp: '' });
 }
 {
   const nb = wrapBlock('NEW');
@@ -56,9 +56,12 @@ const { START, END, wrapBlock, extractBlock, replaceBlock, merge3, planDay, dayF
   assert.equal(c.text, ['a', MINE_MARK, 'APP', SPLIT_MARK, 'USER', THEIRS_MARK, 'c'].join('\n'));
   // empty base: both sides' text is new; the same text once, different text both kept (added at the end)
   assert.deepEqual(merge3('', 'x\ny', 'x\ny'), { text: 'x\ny', conflicts: 0 });
-  assert.deepEqual(merge3('', 'x', 'y'), { text: 'x\ny', conflicts: 0 });
-  // both add at the end (a new case, the user's note): both kept, the app's first
-  assert.deepEqual(merge3('a', 'a\nAPP', 'a\nUSER'), { text: 'a\nAPP\nUSER', conflicts: 0 });
+  assert.deepEqual(merge3('', 'x', 'y'), { text: 'y\nx', conflicts: 0 });
+  // both add at the end (a new case, the user's note): both kept, the user's first (under the line it is about)
+  assert.deepEqual(merge3('a', 'a\nAPP', 'a\nUSER'), { text: 'a\nUSER\nAPP', conflicts: 0 });
+  // the user's reflection on the day's last case stays under that case when the app adds the next one
+  assert.deepEqual(merge3('[[2026-10-13]]\n1. AB lap chole', '[[2026-10-13]]\n1. AB lap chole\n\n2. CD hernia', '[[2026-10-13]]\n1. AB lap chole\n   - learnt: X'),
+    { text: '[[2026-10-13]]\n1. AB lap chole\n   - learnt: X\n\n2. CD hernia', conflicts: 0 });
   // both add different lines at the same place in the middle: a clash
   assert.equal(merge3('a\nb', 'a\nX\nb', 'a\nY\nb').conflicts, 1);
   // the user deletes a line the app changed: a clash (kept both ways)
@@ -84,15 +87,19 @@ const { START, END, wrapBlock, extractBlock, replaceBlock, merge3, planDay, dayF
 // ---- planDay: what to write for a day ----
 {
   // no file yet
-  assert.deepEqual(planDay({ remoteText: null, inner: 'AB lscs' }), { text: wrapBlock('AB lscs') + '\n', write: true, conflicts: 0, merged: false });
+  assert.deepEqual(planDay({ remoteText: null, inner: 'AB lscs' }), { text: wrapBlock('AB lscs', fingerprint('AB lscs')) + '\n', write: true, conflicts: 0, merged: false });
+  // the start mark carries the fingerprint of the app's text
+  assert.equal(wrapBlock('AB', 'k1.2'), `<!-- logbook:start fp=k1.2 -->\nAB\n${END}`);
+  assert.deepEqual(extractBlock(`top\n${wrapBlock('AB', 'k1.2')}\n`), { before: 'top\n', inner: 'AB', after: '\n', fp: 'k1.2' });
+  assert.equal(extractBlock(wrapBlock('AB')).fp, '');
   // a file the user made, without our block: the block is added, their text kept
   const p1 = planDay({ remoteText: '# Thoughts\nbusy list\n', inner: 'AB lscs' });
-  assert.equal(p1.text, `# Thoughts\nbusy list\n\n${wrapBlock('AB lscs')}\n`); assert.equal(p1.write, true);
+  assert.equal(p1.text, `# Thoughts\nbusy list\n\n${wrapBlock('AB lscs', fingerprint('AB lscs'))}\n`); assert.equal(p1.write, true);
   // unchanged inside since last time (fp matches): replaced; the user's text outside kept
   const sent = 'AB lscs';
   const remote = `my top\n${wrapBlock(sent)}\nmy bottom\n`;
   const p2 = planDay({ remoteText: remote, inner: 'AB lscs\nCD hip', last: { fp: fingerprint(sent), base: sent } });
-  assert.equal(p2.text, `my top\n${wrapBlock('AB lscs\nCD hip')}\nmy bottom\n`); assert.equal(p2.merged, false);
+  assert.equal(p2.text, `my top\n${wrapBlock('AB lscs\nCD hip', fingerprint('AB lscs\nCD hip'))}\nmy bottom\n`); assert.equal(p2.merged, false);
   // nothing new: no write
   assert.equal(planDay({ remoteText: remote, inner: sent, last: { fp: fingerprint(sent), base: sent } }).write, false);
   // edited inside: merged with the last sent text as the base
@@ -115,7 +122,44 @@ const { START, END, wrapBlock, extractBlock, replaceBlock, merge3, planDay, dayF
   assert.equal(extractBlock(planDay({ remoteText: wrapBlock(''), inner: 'AB' }).text).inner, 'AB');
   // CRLF file stays CRLF
   const p7 = planDay({ remoteText: `top\r\n${wrapBlock(sent).replace(/\n/g, '\r\n')}\r\n`, inner: 'AB lscs\nCD hip', last: { fp: fingerprint(sent), base: sent } });
-  assert.equal(p7.text, `top\r\n${wrapBlock('AB lscs\nCD hip').replace(/\n/g, '\r\n')}\r\n`);
+  assert.equal(p7.text, `top\r\n${wrapBlock('AB lscs\nCD hip', fingerprint('AB lscs\nCD hip')).replace(/\n/g, '\r\n')}\r\n`);
+
+  // a second device (or this one after sign-out cleared its ledger): no ledger, no base
+  const phone = planDay({ remoteText: null, inner: '- AB lap chole' }).text;
+  // the app added a case and nobody touched the file: replaced, no marks
+  const d1 = planDay({ remoteText: `mine above\n${phone}`, inner: '- AB lap chole\n- CD TKR' });
+  assert.equal(d1.conflicts, 0); assert.equal(d1.merged, false);
+  assert.equal(extractBlock(d1.text).inner, '- AB lap chole\n- CD TKR'); assert.ok(d1.text.startsWith('mine above\n'));
+  // the user annotated inside the block and the app's text is the same as when it was written: left alone
+  const ann = phone.replace('chole', 'chole\n   - learnt X');
+  assert.equal(planDay({ remoteText: ann, inner: '- AB lap chole' }).write, false);
+  // a merged block written by the other device holds the same app text: left alone too
+  const p8 = planDay({ remoteText: ann, inner: '- AB lap chole\n- CD TKR', last: { fp: fingerprint('- AB lap chole'), base: '- AB lap chole' } });
+  assert.equal(extractBlock(p8.text).inner, '- AB lap chole\n   - learnt X\n- CD TKR'); assert.equal(p8.merged, true);
+  assert.equal(extractBlock(p8.text).fp, fingerprint('- AB lap chole\n- CD TKR'));   // the app's text, not the merged one
+  assert.equal(planDay({ remoteText: p8.text, inner: '- AB lap chole\n- CD TKR' }).write, false);
+  // edited, no base, but the app's text has every line of the file's block (an old file without a fingerprint)
+  const p9 = planDay({ remoteText: wrapBlock('- AB lap chole'), inner: '- AB lap chole\n- CD TKR' });
+  assert.equal(p9.conflicts, 0); assert.equal(extractBlock(p9.text).inner, '- AB lap chole\n- CD TKR');
+  // edited and the app changed too, no base: both kept, marked (never drops the user's lines)
+  const p10 = planDay({ remoteText: ann, inner: '- AB lap chole, edited' });
+  assert.equal(p10.conflicts, 1); assert.match(p10.text, /learnt X/); assert.match(p10.text, /edited/);
+}
+
+// ---- GitHub's write limits ----
+{
+  assert.equal(paceWait([], 1000), 0);
+  const t = Array.from({ length: 60 }, (_, i) => 100000 + i * 100);
+  assert.equal(paceWait(t.slice(0, 59), 106000), 0);
+  assert.equal(paceWait(t, 106000), 100000 + 60e3 - 106000);   // the 60th write in a minute waits for the oldest
+  assert.equal(paceWait(t, 200000), 0);
+  const hdr = o => k => (k in o ? String(o[k]) : null);
+  assert.equal(rateLimitWait(403, hdr({}), 'Resource not accessible by personal access token'), null);
+  assert.equal(rateLimitWait(404, hdr({}), 'rate limit'), null);
+  assert.equal(rateLimitWait(403, hdr({}), 'You have exceeded a secondary rate limit'), 1);
+  assert.equal(rateLimitWait(403, hdr({ 'retry-after': 300 }), ''), 5);
+  assert.equal(rateLimitWait(429, hdr({}), ''), 1);
+  assert.equal(rateLimitWait(403, hdr({ 'x-ratelimit-remaining': 0, 'x-ratelimit-reset': 1000 + 600 }), '', 1000 * 1000), 10);
 }
 
 // ---- file names and paths ----

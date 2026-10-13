@@ -43,6 +43,15 @@ export function ensureNotes() {
   });
   return ready;
 }
+// the notes as the server has them (not a possibly stale offline copy), for anything that must not miss one (Sync)
+export async function notesFromServer(ms = 30e3) {
+  const me = mine();
+  if (!me) return [];
+  await ensureNotes();
+  for (const t0 = Date.now(); !(synced && owner === me); await new Promise(r => setTimeout(r, 250)))
+    if (Date.now() - t0 > ms || mine() !== me) throw new Error('your notes didn’t finish loading (no signal?). Tap Sync again.');
+  return S.notes || [];
+}
 function stopNotes() { if (stop) stop(); stop = null; owner = null; raw = []; ready = null; readyResolve = null; S.notes = null; }
 resetters.push(() => { stopNotes(); Object.assign(nv, { q: '', day: '', caseId: '', editing: null, preview: false, autoNew: false }); });
 writes.onChange(() => { if (owner) { apply(); if (synced) syncIndex(); } });

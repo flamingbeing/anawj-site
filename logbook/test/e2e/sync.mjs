@@ -10,7 +10,7 @@ const b = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: pr
 const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*', 'access-control-expose-headers': 'Dropbox-API-Result' };
 const json = (route, body, status = 200, headers = {}) => route.fulfill({ status, contentType: 'application/json', headers: { ...CORS, ...headers }, body: JSON.stringify(body) });
 const preflight = route => route.request().method() === 'OPTIONS' && (route.fulfill({ status: 204, headers: CORS }), true);
-const START = '<!-- logbook:start -->', END = '<!-- logbook:end -->';
+const START_RE = /<!-- logbook:start fp=[\w.]+ -->/, END = '<!-- logbook:end -->';
 const md5 = t => createHash('md5').update(t).digest('hex');
 
 try { for (const width of [390, 1280]) {
@@ -19,7 +19,7 @@ try { for (const width of [390, 1280]) {
 
   // ---- fake GitHub: files by path, a sha per version; an old sha is refused (409) ----
   const gh = new Map(), ghLog = [];
-  let ghN = 0, ghRace = '';   // ghRace: a path someone else writes to just before our next PUT to it
+  let ghN = 0, ghRace = '', ghLimit = false;   // ghLimit: GitHub refuses writes as over its secondary rate limit   // ghRace: a path someone else writes to just before our next PUT to it
   await ctx.route('https://api.github.com/**', async route => {
     if (preflight(route)) return;
     const req = route.request(), u = new URL(req.url());
@@ -33,6 +33,7 @@ try { for (const width of [390, 1280]) {
       if (!f) return json(route, { message: 'Not Found' }, 404);
       return json(route, { type: 'file', encoding: 'base64', sha: f.sha, content: Buffer.from(f.text).toString('base64').replace(/.{60}/g, '$&\n') });
     }
+    if (ghLimit) return json(route, { message: 'You have exceeded a secondary rate limit. Please wait a few minutes before you try again.' }, 403);
     const body = JSON.parse(req.postData());
     ghLog.push({ path, sha: body.sha || null });
     assert.equal(body.branch, 'main');
@@ -123,7 +124,10 @@ try { for (const width of [390, 1280]) {
     await cloud.saveCase('demo@example.com', { id: 'fake-sync-1', date: d, initials: 'ZZ', details, cats: ['01'], createdAt: Date.now() + 1e9, updatedAt: Date.now(), source: 'app' });
     for (let i = 0; i < 40 && !S.cases.some(c => c.id === 'fake-sync-1' && c.details === details); i++) await new Promise(r => setTimeout(r, 50));
   }, [iso, details]);
-  const blockOf = text => text.slice(text.indexOf(START) + START.length + 1, text.indexOf(END) - 1);
+  const blockOf = text => { const m = START_RE.exec(text); return text.slice(m.index + m[0].length + 1, text.indexOf(END) - 1); };
+
+  // a note on another day, saved where the Logbook's note marks haven't seen it: Sync must still send it
+  await p.evaluate(async d => (await import('./js/demo-backend.js')).saveNote('demo@example.com', { id: 'fake-sync-note', date: d, title: 'Fake note', body: 'Fake note body for sync', createdAt: Date.now(), updatedAt: Date.now() }), days[0]);
 
   // nothing set up: no Sync button anywhere
   await toLogbook();
@@ -153,7 +157,9 @@ try { for (const width of [390, 1280]) {
   assert.match(await runDone(), new RegExp(`^Synced ${days.length} of ${days.length} days`));
   assert.deepEqual([...gh.keys()].sort(), days.map(d => `Daily/${d}.md`));
   const first = gh.get(`Daily/${iso}.md`).text;
-  assert.ok(first.startsWith(START + '\n') && first.endsWith(END + '\n'), first);
+  assert.match(gh.get(`Daily/${days[0]}.md`).text, /Fake note body for sync/);
+  assert.ok(new RegExp('^' + START_RE.source + '\n').test(first) && first.endsWith(END + '\n'), first);
+  const startLine = START_RE.exec(first)[0];
   await p.waitForFunction(() => document.querySelector('button.lb-sync')?.textContent === 'Synced');
   // nothing changed: nothing sent
   const puts = ghLog.length;
@@ -163,7 +169,7 @@ try { for (const width of [390, 1280]) {
   // the user writes around the block and edits a line in it; the logbook then gets a new case that day
   const path = `Daily/${iso}.md`, mine = blockOf(first).split('\n');
   const edited = mine.map((l, i) => (i === mine.length - 1 ? l + ' (my note)' : l)).join('\n');
-  gh.set(path, { text: `# My own heading\n\n${START}\n${edited}\n${END}\n\nMy thoughts below.\n`, sha: 'g' + ++ghN });
+  gh.set(path, { text: `# My own heading\n\n${startLine}\n${edited}\n${END}\n\nMy thoughts below.\n`, sha: 'g' + ++ghN });
   await setCase('Fake synced case');
   await toLogbook();
   await p.waitForFunction(() => document.querySelector('button.lb-sync')?.title === '1 day to sync');
@@ -171,7 +177,7 @@ try { for (const width of [390, 1280]) {
   await syncBtn.click();
   assert.match(await runDone(), /^Synced 1 of 1 day\. Your edits kept in 1 file\.$/);
   const now = gh.get(path).text;
-  assert.ok(now.startsWith('# My own heading\n\n' + START), now);
+  assert.ok(now.startsWith('# My own heading\n\n<!-- logbook:start fp='), now);
   assert.ok(now.endsWith('My thoughts below.\na line from another device\n'), now);
   assert.match(now, /\(my note\)/); assert.match(now, /Fake synced case/); assert.doesNotMatch(now, /<<<<<<<|>>>>>>>/);
   assert.deepEqual(ghLog.slice(-2).map(x => x.path), [path, path]);   // the refused write, then the merged one
@@ -221,7 +227,7 @@ try { for (const width of [390, 1280]) {
   await p.getByRole('button', { name: 'Sync now' }).nth(2).click();
   assert.match(await runDone(), /^Synced 1 of 1 day/);
   assert.equal(driveLog.at(-1), `update ${iso}.md`);
-  assert.ok(df.text.startsWith('Top line by me\n' + START) && /Fake synced case, third/.test(df.text), df.text);
+  assert.ok(df.text.startsWith('Top line by me\n<!-- logbook:start fp=') &&  /Fake synced case, third/.test(df.text), df.text);
 
   // one Sync from the Logbook does every place that has days waiting (here GitHub and Dropbox)
   await toLogbook();
@@ -229,6 +235,27 @@ try { for (const width of [390, 1280]) {
   await syncBtn.click();
   assert.match(await runDone(), /^Synced 2 of 2 days/);
   assert.match(gh.get(path).text, /Fake synced case, third/); assert.match(gh.get(path).text, /\(my note\)/);
+
+  // the GitHub place moves to another folder: every day is written there again (not "Everything is synced")
+  await p.evaluate(() => { location.hash = '#sync'; }); await p.getByRole('heading', { name: 'Sync', exact: true }).waitFor();
+  await p.getByLabel('Folder').fill('Logbook/Daily');
+  await p.getByRole('button', { name: 'Sync now' }).first().click();
+  assert.match(await runDone(), new RegExp(`^Synced ${days.length} of ${days.length} days`));
+  for (const d of days) assert.match(gh.get(`Logbook/Daily/${d}.md`)?.text || '', START_RE, d);
+
+  // GitHub limits requests: that place stops, says so once (not as a token problem); Try again redoes that place only
+  await p.getByLabel('Folder').fill('Limited');
+  ghLimit = true;
+  const dbxBefore = dbxLog.length, driveBefore = driveLog.length;
+  await p.getByRole('button', { name: 'Sync now' }).first().click();
+  await p.getByText(new RegExp(`^Synced 0 of ${days.length} days?; ${days.length} not synced`)).waitFor();
+  const errs = await p.locator('dialog[open] .sync-errors li').allInnerTexts();
+  assert.equal(errs.length, 1, errs.join('\n')); assert.match(errs[0], /GitHub is limiting requests: try again in about 1 minute/); assert.doesNotMatch(errs[0], /token/);
+  ghLimit = false;
+  await p.getByRole('button', { name: 'Try again' }).click();
+  assert.match(await runDone(), new RegExp(`^Synced ${days.length} of ${days.length} days`));
+  assert.ok(gh.has(`Limited/${iso}.md`));
+  assert.equal(dbxLog.length, dbxBefore); assert.equal(driveLog.length, driveBefore);
 
   // the settings file carries where to sync, never the token
   const file = await p.evaluate(async () => { const { settingsFile } = await import('./js/settings-file.js'); return JSON.stringify(settingsFile((await import('./js/ui-core.js')).S.logbook)); });
@@ -241,6 +268,8 @@ try { for (const width of [390, 1280]) {
   assert.equal(await p.evaluate(() => Object.keys(localStorage).filter(k => k.startsWith('apmes-logbook-cloud-sync:')).length), 1);
   await p.evaluate(async () => (await import('./js/ui-sync.js')).forgetSync());
   await p.waitForFunction(async () => !Object.keys(localStorage).some(k => k.startsWith('apmes-logbook-cloud-')) && !(await indexedDB.databases()).some(d => d.name === 'apmes-logbook-sync'));
+  // and this visit's Drive / Dropbox sign-ins are forgotten (the next person on the device can't use them)
+  assert.deepEqual(await p.evaluate(async () => { const c = await import('./js/cloud-save.js'); return [c.cloudToken('drive'), c.cloudToken('dropbox')]; }), [null, null]);
 
   assert.deepEqual(errors, []);
   await ctx.close();

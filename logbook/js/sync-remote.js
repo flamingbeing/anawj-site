@@ -10,7 +10,7 @@
 
 import { FOLDER, driveQuery, dropboxArg } from './backup-targets.js';
 import { forgetCloudToken } from './cloud-save.js';
-import { toBase64, fromBase64 } from './sync-md.js';
+import { toBase64, fromBase64, paceWait, rateLimitWait } from './sync-md.js';
 
 const fail = (msg, extra = {}) => Object.assign(new Error(msg), extra);
 const conflict = () => fail('changed elsewhere meanwhile', { conflict: true });
@@ -21,7 +21,9 @@ const detail = async res => { const t = await res.text().catch(() => ''); try { 
 
 const DRIVE = 'https://www.googleapis.com/drive/v3/files', DRIVE_UP = 'https://www.googleapis.com/upload/drive/v3/files';
 const FILE_FIELDS = 'id,name,md5Checksum,headRevisionId,trashed';
-const folderIds = new Map();   // "APMES Logbook/Daily" -> id, for this visit
+const folderIds = new Map();   // "APMES Logbook/Daily" -> id, for this visit and this account
+// sign-out and account switch (ui-sync.js forgetSync): the next person's Drive has other folders
+export function resetSyncRemote() { folderIds.clear(); ghPuts.length = 0; }
 
 export function driveRemote(token) {
   const call = async (url, init = {}) => {
@@ -134,12 +136,18 @@ export function dropboxRemote(token) {
 
 // ---- GitHub (contents API: the file's sha is its version; a PUT with an old sha is refused) ----
 
+const ghPuts = [];   // when this visit's recent writes went (all GitHub places: the limit is per user)
 export function githubRemote(target, token) {
   const url = path => `https://api.github.com/repos/${encodeURIComponent(target.owner)}/${encodeURIComponent(target.repo)}/contents/${path.split('/').map(encodeURIComponent).join('/')}`;
   const headers = { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' };
   const check = async res => {
     if (res.status === 401) throw fail('GitHub: the token was refused (expired or wrong). Enter a new one in Settings → Sync.', { auth: true });
-    if (res.status === 403) throw fail(`GitHub: not allowed (${(await detail(res)).slice(0, 120)}). The token needs Contents: read and write on ${target.owner}/${target.repo}.`);
+    if (res.status === 403 || res.status === 429) {
+      const d = await detail(res), wait = rateLimitWait(res.status, k => res.headers.get(k), d);
+      // a limit, not the token: this place stops for the run (the days done are kept), and says when to try again
+      if (wait) throw fail(`GitHub is limiting requests: try again in about ${wait} minute${wait === 1 ? '' : 's'}. The days already synced are kept.`, { auth: true, limited: true });
+      throw fail(`GitHub: not allowed (${d.slice(0, 120)}). The token needs Contents: read and write on ${target.owner}/${target.repo}.`);
+    }
     if (res.status === 404) throw fail(`GitHub: ${target.owner}/${target.repo} (branch ${target.branch}) not found, or the token can’t see it.`);
     if (!res.ok) throw fail(`GitHub: ${res.status} ${(await detail(res)).slice(0, 160)}`);
     return res.json();
@@ -155,6 +163,10 @@ export function githubRemote(target, token) {
       return { text: fromBase64(j.content), rev: j.sha };
     },
     async write(path, text, prev) {
+      // keep under GitHub's limit on bursts of writes (a first sync of a year is hundreds of commits)
+      for (let ms; (ms = paceWait(ghPuts, Date.now())) > 0;) await new Promise(r => setTimeout(r, ms));
+      ghPuts.push(Date.now());
+      if (ghPuts.length > 200) ghPuts.splice(0, ghPuts.length - 200);
       const res = await fetch(url(path), { method: 'PUT', headers: { ...headers, 'Content-Type': 'application/json' }, cache: 'no-store',
         body: JSON.stringify({ message: `Logbook: ${path.split('/').pop()}`, content: toBase64(text), branch: target.branch, ...(prev ? { sha: prev.rev } : {}) }) });
       // 409: the sha is old; 422 "sha wasn't supplied": a file appeared meanwhile
