@@ -7,9 +7,7 @@ Last updated: 2026-10-13 by Claude Code, design session (branch `claude/inspirin
 
 ## Now
 
-- Design session: PR moving `design/` to `nuhsdesign/` (branch `claude/inspiring-dijkstra-pctmrf`). **Held unmerged**
-  while a prewarming study case is being collected: merging changes what the study phones load. Merge only when the
-  owner says the case is over; rebase on main first (prewarm is busy) and rerun `tools/test-prewarm.sh`.
+- No session is working on `nuhsdesign/`. The design session is idle.
 - `design/tokens.css` stays as a byte-identical copy for pages and service workers still on the old path. Delete it
   (and tell log1 to drop `/design/` from `SHARED` in `worker/routes.js`) once every app has updated.
 
@@ -25,6 +23,8 @@ Last updated: 2026-10-13 by Claude Code, design session (branch `claude/inspirin
 - Nothing queued.
 
 ## Recently done
+
+- #363 `design/` moved to `nuhsdesign/` (every subdomain serves it); evals, prewarm and prewarm-update link it.
 
 - #204 The brand stripe is four equal quarters (orange, red, blue `#178fd7`, navy) in `design/`, logbook, evals,
   roster and privacy; new `--n-stripe-blue`.
