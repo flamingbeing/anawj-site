@@ -4,11 +4,17 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
+<script>
+// The page now lives at hand.anawj.com/babies/. The same folder is still served at anawj.com/hand-babies/, so send
+// visitors on from there (path, query and # kept). Only when it is the top page: the page editor on anawj.com still
+// opens the old copy in a frame to edit its text. A no-op on hand.anawj.com, previews and localhost (no loop).
+if (top === self && /^(www\.)?anawj\.com$/.test(location.hostname))
+  location.replace('https://hand.anawj.com/babies/' + location.pathname.replace(/^\/hand-babies\/?/, '') + location.search + location.hash);
+</script>
 <meta name="theme-color" content="#002f6c">
 <title>Hand assessment</title>
 <meta name="description" content="Crash course for new hand surgery MOs: accurate sensation, 2-point discrimination, individual tendon testing, Kanavel's signs and photos for remote review.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23002f6c'/%3E%3Ctext x='16' y='23' font-size='18' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='700'%3EH%3C/text%3E%3C/svg%3E">
-<link rel="stylesheet" href="../design/tokens.css">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -324,7 +330,7 @@
 
 <footer>
   <p>Teaching aid for new hand MOs. Follow your department's protocols and your senior. Works offline once opened.</p>
-  <p><a href="/edit/?page=%2Fhand-babies%2F">Spotted something wrong? Suggest an edit</a></p>
+  <p><a href="https://anawj.com/edit/?page=%2Fhand-babies%2F">Spotted something wrong? Suggest an edit</a></p>
 </footer>
 </main>
 <script src="app.js"></script>
