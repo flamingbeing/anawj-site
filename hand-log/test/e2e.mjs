@@ -8,7 +8,7 @@ import path from 'node:path';
 
 const AXE = new URL('../../tools/vendor/axe.min.js', import.meta.url).pathname;
 const root = new URL('../../', import.meta.url).pathname;
-const BASE = 'https://anawj.com/hand-log/';
+const BASE = 'https://hand.anawj.com/handlog/';
 const SHOTS = process.env.SHOTS;
 const MIME = { html: 'text/html', js: 'text/javascript', css: 'text/css', svg: 'image/svg+xml', json: 'application/json', png: 'image/png', webmanifest: 'application/manifest+json' };
 
@@ -16,9 +16,14 @@ const exe = process.env.CHROMIUM_PATH || (fs.existsSync('/opt/pw-browsers/chromi
 const b = await chromium.launch(exe ? { executablePath: exe, args: ['--no-sandbox'] } : {});
 // service workers blocked: routed files can't feed a worker, and the test is about the app, not offline
 const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, serviceWorkers: 'block', acceptDownloads: true });
-await ctx.route(/^https:\/\/(www\.)?anawj\.com\//, async route => {
+// anawj.com serves the whole repo (GitHub Pages); hand.anawj.com as the Worker maps it (/handlog/ -> hand-log/)
+await ctx.route(/^https:\/\/((www\.)?anawj\.com|hand\.anawj\.com)\//, async route => {
   const u = new URL(route.request().url());
   let rel = decodeURIComponent(u.pathname).replace(/^\//, '');
+  if (u.hostname === 'hand.anawj.com') {
+    if (rel.startsWith('handlog/')) rel = 'hand-log/' + rel.slice(8);
+    else if (!rel.startsWith('nuhsdesign/')) return route.fulfill({ status: 404, body: 'not found' });
+  }
   if (rel === '' || rel.endsWith('/')) rel += 'index.html';
   const f = path.join(root, rel);
   if (!f.startsWith(root) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) return route.fulfill({ status: 404, body: 'not found' });
@@ -67,6 +72,9 @@ async function fillAndSave() {
 }
 
 try {
+  // the old address sends you on to hand.anawj.com/handlog/, keeping the #
+  await page.goto('https://anawj.com/hand-log/#summary');
+  await page.waitForURL(BASE + '#summary');
   await page.goto(BASE + '#list');
   await page.evaluate(() => localStorage.clear());
   await page.reload();

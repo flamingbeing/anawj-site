@@ -8,7 +8,7 @@
 // host -> { prefixes: { '/cmcj/': 'cmcj/' } }  (several apps share the host, one path each)
 //      or { root: 'prewarm/' }                 (one app at the root; its own folder name works too)
 export const SITES = {
-  'hand.anawj.com': { prefixes: { '/cmcj/': 'cmcj/', '/babies/': 'hand-babies/' } },
+  'hand.anawj.com': { prefixes: { '/cmcj/': 'cmcj/', '/babies/': 'hand-babies/', '/handlog/': 'hand-log/' } },
   'prewarmstudy.anawj.com': { root: 'prewarm/' },
   'nuhroster.anawj.com': { root: 'nuh-roster/' },
   // /apmes/guidebook/ is the programme guidebook text the evals app reads (just that folder of apmes/).

@@ -10,7 +10,7 @@ From the repo root:
 python3 -m http.server 8080
 ```
 
-then open http://localhost:8080/hand-log/ (at phone width in the browser's device mode).
+then open http://localhost:8080/hand-log/ (live: https://hand.anawj.com/handlog/) (at phone width in the browser's device mode).
 
 ## Test
 

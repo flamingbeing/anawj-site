@@ -10,7 +10,7 @@ Static site on GitHub Pages (public repo: no names, patient data or real evaluat
 - `nuh-roster/`: NUH anaesthesia daily roster (own Firebase project `nuh-roster`), at `nuhroster.anawj.com` (the old `anawj.com/nuh-roster/` redirects). Start with `nuh-roster/NOTES.md`: its department section (grades, postings, roster sheet, notation, HMS monthly rosters, short names) applies to any app dealing with NUH anaesthesia staff.
 - `prewarm/`: prewarming study op-day data collection (temperatures every 5 min, export to the study's Excel template); served at `prewarmstudy.anawj.com`. Start with `prewarm/NOTES.md`, then `prewarm/PLAN.md`.
 - `hand-babies/`: hand surgery exam crash course for new MOs (one static page, no data), at `hand.anawj.com/babies/`. Start with `hand-babies/NOTES.md`.
-- `hand-log/`: hand surgery DOPS and Mini-CEX log (data on the device only, CSV/JSON export). Start with `hand-log/NOTES.md`.
+- `hand-log/`: hand surgery DOPS and Mini-CEX log (data on the device only, CSV/JSON export), at `hand.anawj.com/handlog/`. Start with `hand-log/NOTES.md`.
 - `edit/`: the page editor for any page on the site (`edit.anawj.com/<path>` redirects to it). Suggested edits arrive as
   GitHub issues titled `Page edits:`; how to apply them: `edit/NOTES.md`. A daily routine ("Page edits check", 8:58 am
   Singapore) drafts one PR for new ones and never merges: the owner approves page edits.

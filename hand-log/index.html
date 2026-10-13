@@ -4,6 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
+<script>
+// The app lives at hand.anawj.com/handlog/. The same folder is also served at anawj.com/hand-log/; send visitors on
+// from there (saved entries are per address, so everyone should use one). A no-op on hand.anawj.com, previews and
+// localhost.
+if (top === self && /^(www\.)?anawj\.com$/.test(location.hostname))
+  location.replace('https://hand.anawj.com/handlog/' + location.pathname.replace(/^\/hand-log\/?/, '') + location.search + location.hash);
+</script>
 <meta name="theme-color" content="#002f6c">
 <title>Hand log</title>
 <meta name="description" content="Log hand surgery DOPS and Mini-CEX workplace-based assessments on your phone.">
