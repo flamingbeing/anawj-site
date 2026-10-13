@@ -2,7 +2,7 @@
 
 Short and current. Lasting rules go in `NOTES.md`. Update with `/save-state`.
 
-Last updated: 2026-10-13 (night) by Claude Code, Prewarming Webapp.
+Last updated: 2026-10-13 (late night) by Claude Code, Prewarming Webapp.
 
 ## Now
 
@@ -16,8 +16,8 @@ edit the same lines. Read them all before starting; edit only yours.
 - Add `admins/kohwenjun@gmail.com` (lower case, any field) in the Firebase console for `prewarm-study` if it isn't there:
   the app said that email isn't on the admin list. Then tap Refresh now in Settings. Then set a password (Settings →
   Password, after one emailed-link sign-in).
-- MOVE MERGED (#364, 13 Oct night). Checked live by the session: old address moves a fresh phone and `?demo` links (keeping query and `#`); the new host serves the app, shared styles, offline copy and `update.html`. NOT yet checked (needs the owner's phones): an admin sign-in (email link / password) at `prewarmstudy.anawj.com`, an OLD nurse link end to end, a team phone moving and rejoining with one tap, a reading saved and synced there. Do these before the next case.
-- PACU link (13 Oct): the nurse's saves were refused ("Not allowed"); live rules = repo rules and an anonymous nurse update on the current record is ALLOWED by a rules simulation; the original record was deleted when the link was stopped, so the cause is unknown (stale link or her phone). Test the new link with someone else's phone; if "Not allowed" again, dig further.
+- MOVE MERGED (#364, #382, 13 Oct night). Checked live by the session: old address moves a fresh phone and `?demo` links (keeping query and `#`); the new host serves the app, shared styles, offline copy and `update.html`. NOT yet checked (needs the owner's phones): an admin sign-in (email link / password) at `prewarmstudy.anawj.com`, an OLD nurse link end to end, a team phone moving and rejoining with one tap, a reading saved and synced there. Do these before the next case.
+- PACU link (13 Oct): the nurse's saves were refused ("Not allowed") on the old link; live rules = repo rules (read with the owner's OK) and the original record was deleted when the link was stopped, so the cause is unknown (stale link or her phone). The NEW link was tested by the owner in incognito (a fresh visitor): reads and saves ("Saved to the team ✓"). Practice: make a fresh link per patient and test it once on a phone that isn't on the team. Do these still, with the owner's phones, before the next case: an OLD nurse link (`anawj.com/prewarm/#/nurse/…`) moves and shows the form; admin password sign-in at the new address; a team phone moves and rejoins with one tap; a reading saved and synced there. Then message the homepage session.
 - Owner's checklist for the move to `prewarmstudy.anawj.com` (after the case ends and the PR is merged): tell team phones to tap Update available once between patients; each phone then moves itself when nothing is waiting and rejoins its team with one tap (initials are filled in); admins sign in again there. Check one phone of each team before the next case.
 - Firefox phone stuck on an old version: open `anawj.com/prewarm-update/` once and tap Get the latest version.
 - Say if the export should show "NA" in the later pre-warming cells (past 10 / 30 min) and the two empty Downloaded columns.
@@ -31,6 +31,7 @@ edit the same lines. Read them all before starting; edit only yours.
 
 ## Recently done
 
+- #382, #381, #364: move to prewarmstudy.anawj.com (old address moves a phone only when nothing is waiting; join code and initials carried; `update.html`); admins can pick their hospital; update.html on nuhsdesign.
 - #339: list tools: Form view icon per line (admin), Select to export, Select none apart from Lock; Downloaded dropped; "Study IDs only" line removed.
 - #336: sync status chip replaces the Log shortcut in the app bar (tap = Refresh now).
 - #335: "Subject ID:" label in lists and the header.
@@ -53,6 +54,7 @@ edit the same lines. Read them all before starting; edit only yours.
 
 ## Decisions
 
+- 13 Oct 2026: prewarm is served at prewarmstudy.anawj.com; moves happen between cases only and only for a phone with nothing waiting (owner); the PACU nurse link is tested once per patient by a non-team phone.
 - 13 Oct 2026: no Log shortcut: the bar's top-right is a sync status chip; key times are set from their pads (owner).
 - 13 Oct 2026: Save with every box blank removes the reading; later warming points (past 10 / 30 min) are dropped once that last reading is saved; sections marked complete show only timepoints that have readings (owner).
 - 13 Oct 2026: admin sign-in by email + password as well as the emailed link; Google stays off (phone browsers block its helper page).
