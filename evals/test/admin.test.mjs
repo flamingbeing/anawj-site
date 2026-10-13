@@ -1,6 +1,6 @@
 // Plain node checks for the pure helpers in ui-admin.js (paste parsing, rid suggestion, CSV, flags, cohort cells).
 import assert from 'node:assert/strict';
-import { parseFacultyLines, parseResidentLines, nextRid, toCSV, CSV_COLUMNS, flagsOf, cohortRow, validEmail, cleanEmail, reminderText } from '../js/ui-admin.js';
+import { parseFacultyLines, parseResidentLines, nextRid, toCSV, CSV_COLUMNS, flagsOf, cohortRow, validEmail, cleanEmail, reminderText, committeeCSV, COMMITTEE_COLUMNS, stuckOf, flagsByResident } from '../js/ui-admin.js';
 
 let n = 0;
 const t = (name, fn) => { fn(); n++; };
@@ -75,3 +75,31 @@ console.log(`admin: ${n} checks passed`);
   assert.match(parseResidentLines('Sam Two, sam2@x.com')[0].problem, /resident ID/);
   console.log('paste formats ok');
 }
+
+t('committee summary and stuck requests', () => {
+  const res = [{ rid: 'R1', name: 'Res One', email: 'one@x.com', status: 'ACTIVE', rYear: 2 }, { rid: 'R9', name: 'Gone', email: 'g@x.com', status: 'GRADUATED', rYear: 5 }];
+  const sub = (itemId, epa) => ({ id: itemId + Math.random(), status: 'submitted', itemId, epa, residentEmail: 'one@x.com', submittedAt: Date.UTC(2026, 8, 1), assessment: {} });
+  const csv = committeeCSV(res, [sub('DOPS-2-01', '2'), sub('DOPS-2-02', '2')], '2026-10-01');
+  const lines = csv.replace(/^\ufeff/, '').trim().split('\r\n');
+  assert.equal(lines[0], COMMITTEE_COLUMNS.join(','));
+  assert.ok(lines.slice(1).every(l => l.startsWith('R1,')), 'graduated residents are left out');
+  const epa2 = lines.find(l => l.split(',')[5] === '2').split(',');
+  const col = c => epa2[COMMITTEE_COLUMNS.indexOf(c)];
+  assert.equal(col('year'), 'R2');
+  assert.ok(Number(col('doneByNow')) >= 2 && Number(col('requiredByNow')) >= Number(col('doneByNow')));
+  assert.equal(col('lastSubmitted'), '2026-09-01');
+  const now = Date.UTC(2026, 9, 20), day = 864e5;
+  const st = stuckOf([
+    { id: 'a', status: 'draft', updatedAt: now - 10 * day },
+    { id: 'b', status: 'draft', updatedAt: now - 2 * day },
+    { id: 'c', status: 'declined', declinedAt: now - 8 * day },
+    { id: 'd', status: 'requested', requestedAt: now - 30 * day },
+  ], now);
+  assert.deepEqual(st.map(e => e.id), ['a', 'c']);
+  const g = flagsByResident([{ ev: { residentEmail: 'a@x', residentName: 'A' }, why: ['Overall 3/9', 'Not receptive to feedback'] },
+    { ev: { residentEmail: 'a@x', residentName: 'A' }, why: ['Overall 4/9 on a level 3 item'] }, { ev: { residentEmail: 'b@x', residentName: 'B' }, why: ['Declined: Other'] }]);
+  assert.equal(g[0].name, 'A');
+  assert.equal(g[0].items.length, 2);
+  assert.equal(g[0].reasons['Low overall score'], 2);
+  console.log('committee summary ok');
+});
