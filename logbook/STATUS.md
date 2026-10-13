@@ -58,6 +58,7 @@ its own file), so sessions never edit the same lines. Read them all before start
 
 ## Recently done
 
+- #485 Bug hunt: 35 confirmed bugs fixed (sync engine data safety, settings merges, daily-note merges, paste cleaner, sync files, logging).
 - #484 Late dialog "back" no longer pulls you off a page opened meanwhile (Safari); settings search scrolls to the option; phone polish.
 - #483 Rarely used screens load on demand: case box ~35% sooner on a phone connection.
 - #482 Cross-browser fixes: settings search keeps typed text, profile Cancel, Sync page redraws, blocked storage.
@@ -76,6 +77,10 @@ its own file), so sessions never edit the same lines. Read them all before start
 - #289 Polish 6a: settings pages use switches, ✓ lists and one-line help (ⓘ for more); Advanced pages under headings.
 
 ## Decisions log
+
+- 2026-10-13: 6-hour build process that worked: map the code with parallel readers, build independent tracks in separate git
+  worktrees, review each with independent lenses, fix, integrate with a merge agent, then a find → double-verify → fix bug
+  hunt; real devices / other browsers via the home-computer session (firetop). Full suite on main after: ALL PASSED.
 
 - 2026-10-13: The owner's own main profile is the new generic Personal profile; residents keep Basic / Advanced. Every
   difference between profiles is a visible switch; picking a profile only applies a preset (owner). Storage: Firestore stays
