@@ -1,6 +1,6 @@
 rules_version = '2';
 
-// Paste into Firebase console → Firestore Database → Rules, then Publish.
+// Deployed by .github/workflows/deploy-firestore-rules.yml on merge to main. Tests: tools/test-rules.sh.
 // Only signed-in Google accounts listed in /members can read or write anything.
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -16,16 +16,29 @@ service cloud.firestore {
     function admin() {
       return member() && get(/databases/$(database)/documents/members/$(email())).data.role == 'admin';
     }
-    // viewers read the rosters (their own day, the saved sheet) but change nothing
+    // only admins and rosterers change anything; viewers (and a missing or mistyped role) only read
     function editor() {
-      return member() && get(/databases/$(database)/documents/members/$(email())).data.get('role', '') != 'viewer';
+      return member() && get(/databases/$(database)/documents/members/$(email())).data.get('role', '') in ['admin', 'rosterer'];
+    }
+    // the person a write is stamped with is the one signed in
+    function stampedBy(field) {
+      return request.resource.data.get(field, {}).get('email', '') == email();
+    }
+    function validMember() {
+      return request.resource.data.keys().hasOnly(['role', 'name', 'staffId'])
+        && request.resource.data.role in ['admin', 'rosterer', 'viewer']
+        && request.resource.data.get('name', '') is string && request.resource.data.get('name', '').size() <= 100
+        && request.resource.data.get('staffId', '') is string && request.resource.data.get('staffId', '').size() <= 40;
     }
 
     match /members/{memberEmail} {
       // anyone signed in may check their own entry; members see the list; admins manage it
       allow get: if signedIn() && memberEmail == email();
       allow list, get: if member();
-      allow write: if admin();
+      allow create: if admin() && validMember() && memberEmail == memberEmail.lower();
+      // an admin can't demote or remove themselves, so the team always keeps one
+      allow update: if admin() && validMember() && (memberEmail != email() || request.resource.data.role == 'admin');
+      allow delete: if admin() && memberEmail != email();
     }
 
     // people asking to join: they can file and see their own request; admins see and clear them
@@ -39,20 +52,30 @@ service cloud.firestore {
       allow delete: if signedIn() && requestEmail == email();
     }
 
+    // team/main (staff, rooms, settings), team/monthly, team/rotations
     match /team/{doc} {
       allow read: if member();
-      allow write: if editor();
+      allow create, update: if editor() && doc in ['main', 'monthly', 'rotations'] && stampedBy('updatedBy');
+      allow delete: if admin();
+
+      // each save of the staff list keeps a copy, like the rosters' history: permanent
+      match /versions/{version} {
+        allow read: if member();
+        allow create: if editor() && doc == 'main' && stampedBy('savedBy');
+        allow update, delete: if false;
+      }
     }
 
     match /rosters/{date} {
       allow read: if member();
-      allow create, update: if editor();
+      allow create, update: if editor() && date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && request.resource.data.date == date && stampedBy('updatedBy');
       allow delete: if admin();
 
       // history entries are permanent
       match /versions/{version} {
         allow read: if member();
-        allow create: if editor();
+        allow create: if editor() && stampedBy('savedBy');
         allow update, delete: if false;
       }
     }
