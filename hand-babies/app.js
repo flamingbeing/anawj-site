@@ -211,13 +211,28 @@ const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const figs = [];
 let raf = 0, last = 0, vis = null;
 function setup(el, f) {
-  el.innerHTML = `<div class="fig-art"></div><div class="fig-bar"><button type="button" class="fig-btn" aria-label="Play animation">Play</button><a class="fig-gif" href="gifs/${el.dataset.fig}.gif" download>Save GIF to share</a></div>`;
+  el.innerHTML = `<div class="fig-art"></div><div class="fig-bar"><button type="button" class="fig-btn" aria-label="Play animation">Play</button><a class="fig-gif" href="gifs/${el.dataset.fig}.gif" download>Share GIF</a></div>`;
   // the picture keeps the text description; the buttons beside it stay reachable
   const art = el.querySelector('.fig-art');
   for (const a of ['role', 'aria-label']) if (el.hasAttribute(a)) { art.setAttribute(a, el.getAttribute(a)); el.removeAttribute(a); }
   const st = { el, f, art, view: f.mount(art), btn: el.querySelector('.fig-btn'), playing: false, visible: !vis, start: 0, at: 0 };
   st.view.draw(stillAt(f));
   figs.push(st);
+  // Share GIF: the phone's share sheet where it can send files; otherwise the link downloads the GIF as before
+  const gifLink = el.querySelector('.fig-gif');
+  gifLink.addEventListener('click', async e => {
+    if (!navigator.canShare || !navigator.share) return;
+    e.preventDefault();
+    try {
+      const blob = await (await fetch(gifLink.href)).blob();
+      const file = new File([blob], `${el.dataset.fig}.gif`, { type: 'image/gif' });
+      if (!navigator.canShare({ files: [file] })) throw new Error('no file sharing');
+      await navigator.share({ files: [file], title: 'Hand assessment' });
+    } catch (err) {
+      if (err.name === 'AbortError') return; // closed the share sheet
+      const a = document.createElement('a'); a.href = gifLink.href; a.download = ''; a.click(); // fall back to the download
+    }
+  });
   const toggle = () => setPlaying(st, !st.playing);
   st.btn.addEventListener('click', e => { e.stopPropagation(); toggle(); });
   art.addEventListener('click', toggle);
