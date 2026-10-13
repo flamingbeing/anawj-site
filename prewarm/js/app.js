@@ -354,8 +354,8 @@ function colsFor(s, pt) {
 function pointsFor(p, s) {
   const pts = SERIES[s].points;
   if (s === 'haemo' && settings.hide.haemo15) return pts.filter(x => x.key === 'base' || p.f['at_haemo_' + x.key]);
-  // once pre-warming is complete, the later 5-min points (past the 10 / 30 min of warming) aren't taken (owner, 13 Oct 2026)
-  if (s === 'prewarm' && val(p, 'sign_prewarm') && WARM_MIN[val(p, 'arm')]) return pts.filter(x => x.min == null || x.min <= WARM_MIN[val(p, 'arm')] || p.f['at_prewarm_' + x.key]);
+  // once pre-warming is complete (ticked, or its last reading saved), the later 5-min points (past the 10 / 30 min of warming) aren't taken (owner, 13 Oct 2026)
+  if (s === 'prewarm' && WARM_MIN[val(p, 'arm')] && (val(p, 'sign_prewarm') || p.f['at_prewarm_' + WARM_MIN[val(p, 'arm')]])) return pts.filter(x => x.min == null || x.min <= WARM_MIN[val(p, 'arm')] || p.f['at_prewarm_' + x.key]);
   return pts;
 }
 // due time (minutes after midnight) of a timepoint, from the reference event
@@ -869,6 +869,9 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
       return `<a role="listitem" href="#/p/${id}/${s}/${x.key}" class="${x.key === pt.key ? 'on' : ''} ${done ? 'done' : missed ? 'missed' : ''}">${pointShort(s, x)}</a>`;
     }).join('')}</div>`;
   }
+  // a value only carried over (or filled in by a rule) and not yet saved for this timepoint shows light grey (owner, 13 Oct 2026)
+  const isDefault = k => val(p, `${s}_${pt.key}_${k}`) == null && draft[k] != null
+    && (String(draft[k]) === String(was[k]) || (k === 'set' && !setTouched) || ((k === 'under' || k === 'gown') && !warmTouched.has(k)));
   function isChanged(k) { const v = draft[k]; return v != null && was[k] != null && String(v) !== String(was[k]); }
   function hintOf(c) {
     const v = draft[c.key];
@@ -878,23 +881,23 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
   function card(c) {
     const v = draft[c.key];
     if (c.type === 'code') {
-      return `<div class="card ${c.opts.length > 2 ? 'wide inline' : ''}" ${c.key === 'ts' ? 'title="−3 cold … +3 hot" aria-label="Thermal sensation, −3 cold to +3 hot" role="group"' : ''}><div class="clab">${c.label}</div>
+      return `<div class="card ${c.opts.length > 2 ? 'wide inline' : ''}${isDefault(c.key) ? ' dflt' : ''}" ${c.key === 'ts' ? 'title="−3 cold … +3 hot" aria-label="Thermal sensation, −3 cold to +3 hot" role="group"' : ''}><div class="clab">${c.label}</div>
         <div class="seg ${c.opts.length > 2 ? 'seven' : 'two'}">${c.opts.map(([ov, ol]) => `<button class="chip" aria-pressed="${String(v) === String(ov)}" data-c="${c.key}" data-v="${ov}">${c.key === 'ts' ? ol.split(' ')[0] : ol}</button>`).join('')}</div></div>`;
     }
     if (c.key === 'set') {
-      return `<div class="card wide inline"><div class="clab">Gown set <small>°C</small></div>
+      return `<div class="card wide inline${isDefault('set') ? ' dflt' : ''}"><div class="clab">Gown set <small>°C</small></div>
         <div class="seg seven">${['38', '39', '40', '41', '42', '43', 'NA'].map(o => `<button class="chip" aria-pressed="${String(v) === o}" data-c="set" data-v="${o}">${o}</button>`).join('')}</div></div>`;
     }
     const changed = isChanged(c.key), hint = hintOf(c);
     // BP, HR, BIS: plain boxes that stay boxes, so the keyboard stays up from one to the next (owner, 12 Oct 2026)
     if (s === 'haemo') {
       const last = c === cols[cols.length - 1];
-      return `<div class="card typed ${changed ? 'changed' : ''}" data-k="${c.key}"><div class="clab"><span>${c.label}</span><small>${hint}</small></div>
+      return `<div class="card typed ${changed ? 'changed' : ''}${isDefault(c.key) ? ' dflt' : ''}" data-k="${c.key}"><div class="clab"><span>${c.label}</span><small>${hint}</small></div>
         <input class="num" id="in-${c.key}" data-in="${c.key}" inputmode="none" enterkeyhint="${last ? 'done' : 'next'}" autocomplete="off" aria-label="${c.label}" value="${esc(v ?? '')}"></div>`;
     }
     // an empty temperature: the whole card is one big target that puts in 36.5
     const fill = (c.temp || c.key === 'room') && v == null;
-    return `<div class="card ${changed ? 'changed' : ''}${fill ? ' fill' : ''}${c.key === 'core' ? ' wide core' : ''}" ${fill ? `data-fill="${c.key}"` : ''}><div class="clab">${c.label}<small>${hint}</small></div>
+    return `<div class="card ${changed ? 'changed' : ''}${isDefault(c.key) ? ' dflt' : ''}${fill ? ' fill' : ''}${c.key === 'core' ? ' wide core' : ''}" ${fill ? `data-fill="${c.key}"` : ''}><div class="clab">${c.label}<small>${hint}</small></div>
       <div class="pm"><button class="k" data-step="-1" data-c="${c.key}" aria-label="${c.label} down">−</button><button class="num" data-type="${c.key}">${v ?? '<span class="muted">tap</span>'}</button><button class="k" data-step="1" data-c="${c.key}" aria-label="${c.label} up">+</button></div></div>`;
   }
   function timesHtml() {

@@ -289,3 +289,7 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   analgesia, discharge; `sign_pod2`). Questions and order unchanged (`DATA_PARTS` in app.js). Each tick locks only
   its page; "data collection complete" closes none of them. Progress ticks on the list and the export's "Complete: …"
   columns (Extra sheet) have the three.
+- **Defaults in light grey** (owner, 13 Oct 2026): a temperature or choice that is only carried over from the last reading
+  (or filled by a rule: gown set NA, underbody / gown Yes) and not yet saved for this timepoint has the `dflt` class
+  (grey text, grey pressed chip). Saving makes it normal. The later warming points (past 10 / 30 min) are also dropped
+  once that last warming reading is saved, even without initials (`pointsFor`).

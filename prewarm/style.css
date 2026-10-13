@@ -414,3 +414,7 @@ dialog.kp::backdrop { background: rgba(0, 0, 0, .4); }
 .paculink h2 { margin: 0; font-size: 16px; }
 .pacuurl { width: 100%; box-sizing: border-box; font-size: 12px; padding: 6px; border: 1px solid var(--line-input); border-radius: var(--r); background: var(--bg); color: var(--ink); }
 .pacutimes .tchip { min-height: 64px; font-size: 16px; }
+
+/* values only carried over, not yet saved for this timepoint: light grey (owner, 13 Oct 2026) */
+.card.dflt .num { color: #767676; font-weight: 400; }
+.card.dflt .chip[aria-pressed="true"] { background: var(--line); border-color: var(--line-input); color: #4d545b; }
