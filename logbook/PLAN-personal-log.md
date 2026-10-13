@@ -13,8 +13,25 @@ notes today) is kept in his private notes, not here.
   app. The Firebase project is on pay-as-you-go, so there is no hard wall; the only true limit is 1 MB per document.
   Caps can be relaxed for a personal profile (the case summary cap is in `firestore.rules`: a rules change needs the
   owner's approval).
-- The export to notes apps stays one-way (a zip of Markdown files; Dropbox / Drive can hold loose files): other apps can't
-  write into a notes app's own sync.
+- The export to notes apps stays one-way (a zip of Markdown files): other apps can't write into a notes app's own sync.
+  Storage and cost are settled below.
+
+## Storage and cost (decided 13 Oct 2026, pending "go")
+
+- **Firestore stays the main store.** A web app's on-device storage can be wiped (Safari clears idle sites, clearing browser
+  data, a reset), so it is never the only copy. Notes are safe if a phone is lost.
+- **Writes and storage are cheap**: 100 residents writing a note a day is about 100 writes a day (free allowance about
+  20,000), a year of notes is about 200 MB (free 1 GB). **Reads are the only real cost**, and the app is opened many times
+  a day.
+- **Incremental sync, written by us** (not Firestore's built-in cache, which re-charges the whole result when the app was
+  closed more than about 30 minutes): the phone keeps a local copy; each open shows it at once, then asks "what changed
+  since my last check?" (notes stamped with a server update time) and downloads only those. An open with no changes costs
+  about one read. Deleted notes leave a "deleted" marker so other devices learn of them. Updates arrive on open or
+  pull-to-refresh, not live.
+- **Required test**: an emulator test that counts reads, proving 100 opens with no changes cost about 100 reads, not
+  thousands. Also a budget alert on the Google Cloud project (owner) so a bug cannot run up a bill.
+- **Caps** (100 notes, 20 KB) are our own and get relaxed; the case summary cap is in `firestore.rules` (owner's approval).
+- **Backup** to the user's own Google Drive / Dropbox stays as an extra copy (already built).
 
 ## Direction (proposed, in stages; each its own small PR)
 
@@ -23,7 +40,7 @@ notes today) is kept in his private notes, not here.
   one big note per day.
 - **Labelled parts** in the case summary (`lp:` learning points, `dt:` case details; details in `PLAN-labelled-parts.md`).
 - A **personal / generic profile** (off by default): own tags and counts; APMES categories, targets and progress hidden.
-- Higher caps for it (more and bigger notes).
+- Higher caps for it (more and bigger notes), with the incremental sync above (build and test it first).
 
 **Stage 2: getting value back out.**
 - Search across cases, learning points and notes; tags.
