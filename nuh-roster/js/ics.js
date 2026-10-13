@@ -3,8 +3,18 @@
 const esc = s => String(s ?? '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
 const ymd = date => date.replace(/-/g, '');
 const next = date => { const d = new Date(date + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + 1); return d.toISOString().slice(0, 10); };
-// lines over 75 octets are folded (RFC 5545); simple and safe for the ASCII-heavy text here
-const fold = line => { const out = []; for (let i = 0; i < line.length; i += 73) out.push((i ? ' ' : '') + line.slice(i, i + 73)); return out.join('\r\n'); };
+// lines over 75 octets are folded (RFC 5545): counted in UTF-8 bytes, never splitting a character
+const enc = new TextEncoder();
+const fold = line => {
+  const out = []; let cur = '', bytes = 0;
+  for (const ch of line) {
+    const n = enc.encode(ch).length;
+    if (bytes + n > (out.length ? 74 : 75)) { out.push(cur); cur = ''; bytes = 0; }
+    cur += ch; bytes += n;
+  }
+  out.push(cur);
+  return out.map((l, i) => (i ? ' ' : '') + l).join('\r\n');
+};
 
 export function buildIcs(events, { now = new Date() } = {}) {
   const stamp = now.toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
