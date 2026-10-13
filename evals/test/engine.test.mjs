@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { FORMS, questionsOf } from '../js/forms.js';
 import { GROUPS } from '../js/catalogue.js';
-import { validate, visibleQuestions, nextGap, progress, dueItems, statusOf, OVERDUE_HOURS, caseKey, sameCaseCount,
+import { monthsIntoYear, validate, visibleQuestions, nextGap, progress, dueItems, statusOf, OVERDUE_HOURS, caseKey, sameCaseCount,
   identifierWarning, newId, todayISO, residentYear } from '../js/engine.js';
 
 const LONG = 'Good airway assessment; next time plan for failure.'; // > 30 chars
@@ -274,6 +274,18 @@ const { dops, minicex, ebd } = FORMS;
   assert.equal(residentYear({ intake: 2015 }, '2026-10-10'), 5, 'capped');
   assert.equal(residentYear({ intake: 2027 }, '2026-10-10'), 1, 'floored');
   assert.equal(residentYear({ intake: 2025, rYear: null }, new Date(Date.parse('2026-06-30T20:00:00Z'))), 2, 'Date in SG time (1 July)');
+}
+
+// first 2 months of R1 (EPA2 DOPS-A: mask and intubation): overdue in R1 from September, only when today is given
+{
+  const g = (list, yr, today) => progress(list, yr, today).find(p => p.group.id === 'EPA2-DOPS-A');
+  assert.equal(monthsIntoYear('2026-07-15'), 0);
+  assert.equal(monthsIntoYear('2027-06-30'), 11);
+  assert.equal(g([], 1, '2026-08-20').state, 'due-soon', 'August: still in the first 2 months');
+  assert.equal(g([], 1, '2026-09-01').state, 'overdue', 'September: past the first 2 months');
+  assert.equal(g([], 1).state, 'due-soon', 'no date: by year only');
+  assert.equal(g([], 2, '2026-08-01').state, 'overdue', 'R2: overdue anyway');
+  assert.ok(dueItems([], 1, '2026-10-01').slice(0, 3).every(i => i.group === 'EPA2-DOPS-A'), 'early items lead the due list');
 }
 
 console.log('engine tests passed');

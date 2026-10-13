@@ -175,7 +175,7 @@ async function copyReminder(name, evs, now, url) {
 export function cohortRow(evals, rYear) {
   const yr = Number(rYear) || 1;
   const cells = {};
-  for (const p of progress(evals, yr)) {
+  for (const p of progress(evals, yr, todayISO())) {
     const e = p.group.epa;
     const c = cells[e] || (cells[e] = { done: 0, req: 0, all: 0 });
     c.all += Math.min(p.done, p.min);
