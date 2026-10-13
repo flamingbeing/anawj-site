@@ -144,7 +144,7 @@ function startPracticeTask() {
   const onLeave = state.staff.find(p => p.role === 'senior' && ['leave', 'mc'].includes(dayOf(p.id).status));
   const [a, b] = [rows[1], rows[4]];
   const items = [];
-  if (a && onLeave) { a.senior = fmtSenior(onLeave, dayOf(onLeave.id)); items.push({ label: `Someone on leave is on a list`, match: `${onLeave.name} is on` }); }
+  if (a && onLeave) { a.senior = fmtSenior(onLeave, dayOf(onLeave.id)); items.push({ label: `Someone on leave is on a list`, match: `${onLeave.name} is on`, person: onLeave.id, fix: 'takeOff' }); }
   if (b) { b.senior = ''; items.push({ label: `${b.label} has no senior`, match: `${b.label}: no senior` }); }
   // a double cover with no junior, inside one complex (as the generator would pair rooms)
   const host = rows.find(x => x !== a && x !== b && rows.some(y => y !== x && y !== a && y !== b && y.complex === x.complex));
@@ -155,13 +155,15 @@ function startPracticeTask() {
   lastRows = JSON.stringify(r.rows);
   afterRosterEdit(true);
   goTab('roster');
-  toast('Three problems are planted in this roster. Fix them from the Problems card (or by hand); the checklist ticks them off.');
+  const n = ['No problems', 'One problem', 'Two problems', 'Three problems'][items.length];
+  toast(`${n} ${items.length === 1 ? 'is' : 'are'} planted in this roster. Fix ${items.length === 1 ? 'it' : 'them'} from the Problems card (or by hand); the checklist ticks them off.`);
 }
 function practiceTaskCard() {
   const t = state.practiceTask;
   if (!DEMO || !t || t.date !== state.day.date || !state.roster) return null;
-  const texts = (state.roster.checks || []).map(w => w.text);
-  const done = t.items.map(i => !texts.some(x => x.includes(i.match)));
+  const checks = state.roster.checks || [];
+  // matched by person where there is one, so a name that starts another name can't keep an item open
+  const done = t.items.map(i => !checks.some(w => i.person ? w.person === i.person && w.fix === i.fix : w.text.includes(i.match)));
   const all = done.every(Boolean);
   return h('section', { class: 'card practice-task' + (all ? ' done' : '') },
     h('h2', {}, all ? 'Well done: all fixed' : `Practice: fix ${t.items.length} problems (${done.filter(Boolean).length} of ${t.items.length})`),
@@ -267,11 +269,12 @@ function toast(msg, action) {
 }
 const undoToast = msg => toast(msg, { label: 'Undo', run: undo, title: 'Undo (Ctrl+Z)' });
 
-const select = (value, options, onchange) => h('select', { onchange: e => onchange(e.target.value) },
+const select = (value, options, onchange) => { let found = false; return h('select', { onchange: e => onchange(e.target.value) },
   options.map(o => {
     const [v, label] = Array.isArray(o) ? o : [o, o || '—'];
-    return h('option', { value: v, selected: v === value }, label);
-  }));
+    const on = !found && v === value; if (on) found = true; // only the first ("Choose…", not a separator line)
+    return h('option', { value: v, selected: on }, label);
+  })); };
 
 const fileButton = (label, accept, multiple, onfiles) => h('label', { class: 'btn' }, label,
   h('input', { type: 'file', accept, multiple, hidden: true, onchange: async e => { const f = [...e.target.files]; e.target.value = ''; if (f.length) await onfiles(f); } }));
@@ -489,7 +492,7 @@ function renderDemoBar() {
     h('details', { class: 'demo-tools', open: innerWidth > 600 }, h('summary', {}, 'Practice tools'), h('span', { class: 'demo-actions' },
     h('button', { class: 'small', onclick: () => startTour() }, 'Tour'),
     h('button', { class: 'small', title: 'A roster with three problems planted in it, to find and fix', onclick: startPracticeTask }, 'Fix 3 problems'),
-    (() => { const sel = select('', [['', 'Try a morning…'], ...SCENARIOS.map(([k, label]) => [k, label])], v => { if (v) applyScenario(v); }); sel.setAttribute('aria-label', 'Practice a harder morning'); return sel; })(),
+    (() => { const sel = select('', [['', 'Try a morning…'], ...SCENARIOS.map(([k, label]) => [k, label])], v => { if (v) { applyScenario(v); sel.value = ''; } }); sel.setAttribute('aria-label', 'Practice a harder morning'); return sel; })(),
     h('button', { class: 'small', title: 'This day back to how Practice made it (Undo brings your version back)', onclick: resetPracticeDay }, 'Reset this day'),
     h('button', { class: 'small', onclick: () => { if (confirm('Start practice again from scratch?')) { try { localStorage.removeItem(KEY); localStorage.removeItem(TOUR_KEY); } catch { /* no storage */ } location.reload(); } } }, 'Start again'),
     )),
@@ -1512,6 +1515,7 @@ function showShortcuts() {
   const dlg = h('dialog', { class: 'changes' }, h('h2', {}, 'Keyboard shortcuts'),
     h('table', {}, h('tbody', {}, SHORTCUTS.map(([k, what]) => h('tr', {}, h('td', {}, h('kbd', {}, k)), h('td', {}, what))))),
     h('div', { class: 'bar' }, h('button', { class: 'primary', onclick: () => { dlg.close(); dlg.remove(); } }, 'Close')));
+  dlg.addEventListener('close', () => dlg.remove()); // Esc too
   document.body.append(dlg); dlg.showModal();
 }
 document.addEventListener('keydown', e => {
@@ -3369,7 +3373,7 @@ function leavePerDay(month) {
     return { d, date, s: people.filter(p => p.role === 'senior').length, j: people.filter(p => p.role !== 'senior').length };
   });
   if (!counts.some(c => c.s + c.j)) return null;
-  return h('div', { class: 'leave-days', role: 'img', 'aria-label': 'People on leave each day' },
+  return h('div', { class: 'leave-days', role: 'group', 'aria-label': 'People on leave each day' },
     counts.map(c => h('button', { class: 'leave-day' + (weekday(month, c.d) === 'Sat' || weekday(month, c.d) === 'Sun' ? ' weekend' : '') + (limit && c.s + c.j > limit ? ' over' : ''),
       title: `${c.d} ${monthName(month)}: ${c.s} senior${c.s === 1 ? '' : 's'} and ${c.j} junior${c.j === 1 ? '' : 's'} away${limit && c.s + c.j > limit ? ` (more than ${limit})` : ''}. Go to the day.`,
       onclick: () => switchDate(c.date) },
@@ -4343,14 +4347,14 @@ addEventListener('unhandledrejection', e => crashed(e.reason));
 // Offline app shell (sw.js): the app opens with poor signal. A new version installs alongside and is offered here.
 (function registerSW() {
   if (!('serviceWorker' in navigator) || location.protocol === 'file:' || window.ROSTER_MOVED_TO || /^(www\.)?anawj\.com$/.test(location.hostname)) return; // not at the old address (it redirects)
-  let reloading = false;
+  let reloading = false, wantReload = false;
   const hadController = !!navigator.serviceWorker.controller; // the first install takes control quietly
-  navigator.serviceWorker.addEventListener('controllerchange', () => { if (reloading || !hadController) return; reloading = true; location.reload(); });
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (reloading || !(hadController || wantReload)) return; reloading = true; location.reload(); });
   navigator.serviceWorker.register('sw.js').then(reg => {
     const offer = w => {
       if (document.getElementById('update-bar')) return;
       document.body.prepend(h('div', { id: 'update-bar', class: 'demo-bar', role: 'status' }, h('b', {}, 'Update available'), h('span', { class: 'grow' }),
-        h('button', { class: 'small primary', onclick: () => { document.getElementById('update-bar')?.remove(); w.postMessage('skipWaiting'); } }, 'Reload')));
+        h('button', { class: 'small primary', onclick: () => { document.getElementById('update-bar')?.remove(); wantReload = true; w.postMessage('skipWaiting'); } }, 'Reload')));
     };
     if (reg.waiting && navigator.serviceWorker.controller) offer(reg.waiting);
     reg.addEventListener('updatefound', () => { const w = reg.installing; w?.addEventListener('statechange', () => { if (w.state === 'installed' && navigator.serviceWorker.controller) offer(w); }); });
