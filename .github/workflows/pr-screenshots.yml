@@ -26,6 +26,7 @@ jobs:
       PR: ${{ github.event.pull_request.number }}
       SHA: ${{ github.event.pull_request.head.sha }}
       BASE: ${{ github.event.pull_request.base.ref }}
+      HEAD_REF: ${{ github.event.pull_request.head.ref }}
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
@@ -96,7 +97,9 @@ jobs:
       - name: Post or update the comment
         if: steps.pages.outputs.pages != '[]'
         run: |
-          node head/tools/shots.mjs comment out "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/pr-screenshots/$PR/${SHA:0:7}" "$SHA" > comment.md
+          # the PR's preview address (Cloudflare Workers Builds: the branch name, lowercased, other characters as "-")
+          slug=$(printf '%s' "$HEAD_REF" | tr 'A-Z' 'a-z' | sed -E 's/[^a-z0-9]+/-/g; s/^-|-$//g')
+          node head/tools/shots.mjs comment out "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/pr-screenshots/$PR/${SHA:0:7}" "$SHA" "https://$slug-anawj-preview.kohwenjun.workers.dev" > comment.md
           id=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" --paginate -q '.[] | select(.body | startswith("<!-- pr-screenshots -->")) | .id' | head -1)
           if [ -n "$id" ]; then gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$id" -F body=@comment.md >/dev/null
           else gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body-file comment.md; fi

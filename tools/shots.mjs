@@ -58,19 +58,21 @@ if (mode === 'pages') {
   console.log(`${name}: ${results.map(r => `${r.path} ${r.status}`).join(', ')}`);
 } else if (mode === 'comment') {
   // the PR comment: before and after side by side for each page (unchanged ones listed, not shown)
-  const [dir, imgBase, sha] = args;
+  const [dir, imgBase, sha, preview] = args;
   const read = n => { try { return JSON.parse(fs.readFileSync(path.join(dir, `${n}.json`), 'utf8')); } catch (e) { return []; } };
   const before = read('before'), after = read('after');
   const img = f => fs.existsSync(path.join(dir, f)) ? fs.readFileSync(path.join(dir, f)) : null;
   let out = `<!-- pr-screenshots -->\n### Phone screenshots (390 px): before → after\n\nCommit \`${sha.slice(0, 7)}\`, pages in demo mode (fake data). `
-    + 'The pages come from the folders this PR changes; add others with a line like `Screens: /logbook/?demo#notes` in the PR description.\n';
+    + 'The pages come from the folders this PR changes; add others with a line like `Screens: /logbook/?demo#notes` in the PR description.'
+    + (preview ? ' On the preview, the 💬 button comments on the change (Comment on PR).' : '') + '\n';
   const same = [];
   after.forEach((a, i) => {
     const b = before[i] || { status: 0 }, bi = img(`before-${i}.jpg`), ai = img(`after-${i}.jpg`);
     if (bi && ai && bi.equals(ai)) { same.push(a.path); return; }
     const cell = (ok, f, st) => ok ? `<img src="${imgBase}/${f}" width="260" alt="">` : st === 404 ? '(no such page)' : '(could not load)';
     const left = !bi && b.status === 404 && ai ? '(new page)' : cell(bi, `before-${i}.jpg`, b.status);
-    out += `\n**\`${a.path}\`**\n\n| Before (main) | After (this PR) |\n|---|---|\n| ${left} | ${cell(ai, `after-${i}.jpg`, a.status)} |\n`;
+    const open = preview ? ` · [open on the preview](${preview}${a.path})` : '';
+    out += `\n**\`${a.path}\`**${open}\n\n| Before (main) | After (this PR) |\n|---|---|\n| ${left} | ${cell(ai, `after-${i}.jpg`, a.status)} |\n`;
   });
   if (same.length) out += `\nNo visible change on the first screen of: ${same.map(p => '`' + p + '`').join(', ')}.\n`;
   if (!after.length) out += '\nNo pages to show for the files this PR changes.\n';
