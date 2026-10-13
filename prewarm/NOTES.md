@@ -119,9 +119,9 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   Enter. Tapping an alarm banner or the top-bar countdown goes to that reading and opens its first box (or the key
   time's pad). PACU in / To ward are on the PACU page only (not in the key-times row or the Log button); Still to fill
   lists them once surgery has ended. The tap guard (`lockTaps`) also runs after a pad saves, so tests wait 0.8 s.
-- **Progress and Perioperative data tick** (owner, 13 Oct 2026): the bottom part of the patient screen starts with a
-  progress grid (a tick for each of pre-warming temps, intra-op temps, BP HR BIS, Intra-op details, PACU,
-  Perioperative data; each links to its screen). Perioperative data has its own tick (`sign_periop`, exported as
+- **Progress and Perioperative data tick** (owner, 13 Oct 2026; moved 13 Oct: first built as tick boxes on the patient screen, wrongly): the patient list shows a
+  list of ticks on each patient in the patient list (read only; they mirror the existing complete ticks, no new boxes: pre-warming temps, intra-op temps, BP HR BIS, Intra-op details, PACU,
+  Perioperative data). Perioperative data has its own tick (`sign_periop`, exported as
   "Complete: Perioperative data") that locks only that page; "data collection complete" does not lock it.
 - **PACU nurse link** (owner, 13 Oct 2026): on a participant's PACU page a member (or admin) makes a link and QR code
   (`#/nurse/<token>`, 24 random characters = the secret). Firestore `pacu/{token}` holds a copy of that participant's
