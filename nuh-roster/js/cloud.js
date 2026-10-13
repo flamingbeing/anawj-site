@@ -3,7 +3,7 @@
 // firestore.rules to people listed in the "members" collection.
 //
 // Data:
-//   members/{email}            { role: 'admin' | 'rosterer', name }
+//   members/{email}            { role: 'admin' | 'rosterer' | 'viewer', name } (viewers only read)
 //   team/main                  { settings, staff, roomTemplate, updatedAt, updatedBy }
 //   rosters/{date}             { date, day, roster, updatedAt, updatedBy }
 //   rosters/{date}/versions/*  { day, roster, savedAt, savedBy }   (never changed once written)

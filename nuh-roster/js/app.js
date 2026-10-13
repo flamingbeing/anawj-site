@@ -242,13 +242,14 @@ function render() {
   colourCache.clear();
   if (state.tab === 'seniors' || state.tab === 'juniors') { state.staffRole = state.tab === 'juniors' ? 'junior' : 'senior'; state.tab = 'staff'; }
   if (state.tab === 'general' || state.tab === 'manpower') { state.monthlyView = state.tab === 'manpower' ? 'today' : state.monthlyView; state.tab = 'monthly'; }
-  if (!['monthly', 'roster', 'premed', 'cases', 'staff', 'settings'].includes(state.tab)) state.tab = 'staff';
+  if (isViewer()) state.tab = 'myday';
+  if (!['monthly', 'roster', 'premed', 'cases', 'staff', 'settings', 'myday'].includes(state.tab)) state.tab = 'staff';
   personCache.clear();
   syncMonthly();
   if (hashPending?.date === state.day.date) { markSaved(hashPending.date, hashPending.at); hashPending = null; }
   // checks follow every change, wherever it was made (a status on Today, a fix here)
   if (state.roster?.rows && state.roster.date === state.day.date) state.roster.checks = check({ rows: state.roster.rows, staff: dayStaff(), day: state.day, settings: state.settings });
-  app.replaceChildren(({ monthly: renderMonthly, roster: renderRoster, premed: renderPremed, cases: () => renderDay('cases'), staff: renderStaffTab, settings: renderSettings })[state.tab]());
+  app.replaceChildren(({ monthly: renderMonthly, roster: renderRoster, premed: renderPremed, cases: () => renderDay('cases'), staff: renderStaffTab, settings: renderSettings, myday: renderMyDay })[state.tab]());
   renderCloudBar();
   renderDateBar();
   renderSteps();
@@ -269,6 +270,7 @@ function switchDate(date) {
   state.day.date = date;
   state.roster = rec?.roster || null;
   syncRooms();
+  if (isViewer()) viewerLoad(date);
   if (DEMO && !state.monthly?.[date.slice(0, 7)]?.junior) for (const [m, v] of Object.entries(makeDemo(date).monthly)) (state.monthly ||= {})[m] ||= v; // months further out
   if (DEMO && !rec) fillDemoNotes(state.day);
   clearUndo(); editing = null;
@@ -2176,12 +2178,14 @@ function generalField(key, role) {
 }
 
 // The calls and clinics on the Roster tab, as a compact list (the same fields as Monthly › Today).
+// Every Calls/clinics field: [label, key, role].
+const generalFields = () => [
+  ...TEAM_ROWS.map(([k, label], i) => [`MOT ${i < 2 ? label.replace(':', '') : 'MO' + (i - 1)}`, 'mot.' + k, i < 2 ? 'senior' : 'junior']),
+  ...TEAM_ROWS.slice(0, 3).map(([k, label], i) => [`SICU ${i < 2 ? label.replace(':', '') : 'MO1'}`, 'sicu.' + k, i < 2 ? 'senior' : 'junior']),
+  ...DUTIES.flatMap(d => d.fields.map(([f, label]) => [`${d.label} · ${label}`, `${d.key}.${f}`, f === 's' ? 'senior' : 'junior'])),
+];
 function callsCard() {
-  const rows = [
-    ...TEAM_ROWS.map(([k, label], i) => [`MOT ${i < 2 ? label.replace(':', '') : 'MO' + (i - 1)}`, 'mot.' + k, i < 2 ? 'senior' : 'junior']),
-    ...TEAM_ROWS.slice(0, 3).map(([k, label], i) => [`SICU ${i < 2 ? label.replace(':', '') : 'MO1'}`, 'sicu.' + k, i < 2 ? 'senior' : 'junior']),
-    ...DUTIES.flatMap(d => d.fields.map(([f, label]) => [`${d.label} · ${label}`, `${d.key}.${f}`, f === 's' ? 'senior' : 'junior'])),
-  ];
+  const rows = generalFields();
   const filled = rows.filter(([, k]) => effectiveGeneral()[k]).length;
   return h('section', { class: 'card' }, h('details', { open: true },
     h('summary', {}, h('h2', { style: 'display:inline' }, 'Calls and clinics'), h('span', { class: 'seen' }, ` ${filled} of ${rows.length} filled`)),
@@ -2278,6 +2282,76 @@ function renderMonthly() {
   const tabs = h('div', { class: 'seg subtabs', role: 'group', 'aria-label': 'Monthly' }, MONTHLY_VIEWS.map(([k, label]) =>
     h('button', { 'aria-pressed': String(view === k), onclick: () => { state.monthlyView = k; render(); } }, label)));
   return h('div', {}, tabs, view === 'today' ? renderToday() : view === 'rotations' ? renderRotations() : renderMonthlyRoster(view));
+}
+
+// ---- My day: where one person is on the day on screen (viewers' page; anyone at #myday) ----
+
+const ME_KEY = 'nuh-roster-me';
+let viewerDate = null, viewerFound = null;
+// A viewer sees the roster saved for the team, never a local draft.
+async function viewerLoad(date) {
+  viewerDate = date; viewerFound = null;
+  try {
+    const snap = await cloud.loadRoster(date);
+    if (viewerDate !== date) return;
+    viewerFound = !!snap?.roster;
+    state.day = snap?.day ? { ...clone(snap.day), date } : { date, rooms: [], staff: {} };
+    state.roster = snap?.roster ? clone(snap.roster) : null;
+    syncRooms();
+  } catch (e) { cloudError(e); }
+  render();
+}
+function myPerson() {
+  let id = '';
+  try { id = localStorage.getItem(ME_KEY) || ''; } catch { /* no storage */ }
+  return person(id) || (cs.member?.name ? matchName(cs.member.name, state.staff).person : null) || null;
+}
+// Everything the roster says about p on the day on screen: [what, detail] lines.
+function dayLines(p) {
+  const out = [];
+  const d = state.day.staff[p.id] || {};
+  const off = { leave: 'On leave', mc: 'On MC', postcall: 'Post call', admin: 'Admin day (no list)' }[d.status || 'avail'];
+  if (off) out.push([off, d.auto || '']);
+  const r = state.roster && state.roster.date === state.day.date ? state.roster : null;
+  if (r) for (const row of r.rows) {
+    const room = row.label;
+    for (const [key, role] of [['senior', 'Senior'], ['junior', 'Junior']]) for (const part of cellParts(row, key)) {
+      if (personOfPart(part) !== p) continue;
+      const cover = isCoverPart(part);
+      const other = cellParts(row, key === 'senior' ? 'junior' : 'senior').filter(x => !isCoverPart(x)).map(x => shortOf(x)).join(' / ');
+      const parsed = parseNamePart(part);
+      out.push([`${room}${cover ? ' (ad hoc cover)' : ''}`, [role, other ? `with ${other}` : '', row.notes ? `· ${row.notes}` : '', parsed.leave ? `· leaving ${parsed.leave}` : '', parsed.cover ? `· also covers ${parsed.cover}` : ''].filter(Boolean).join(' ')]);
+    }
+    for (const part of cellParts(row, 'premed')) if (personOfPart(part) === p) out.push([`Premed for ${room}`, row.notes || '']);
+  }
+  const g = effectiveGeneral();
+  for (const [label, key] of generalFields()) {
+    const names = String(g[key] || '').split('/').flatMap(namesInCell);
+    if (names.some(n => matchName(n, state.staff).person === p)) out.push([label.replace(' · ', ': '), '']);
+  }
+  if (d.comment) out.push(['Note', d.comment]);
+  return out;
+}
+function renderMyDay() {
+  const p = myPerson();
+  const date = state.day.date;
+  const pick = select(p?.id || '', [['', 'Pick your name…'], ...state.staff.slice().sort((a, b) => a.name.localeCompare(b.name)).map(x => [x.id, x.name])],
+    v => { try { localStorage.setItem(ME_KEY, v); } catch { /* no storage */ } render(); });
+  const r = state.roster && state.roster.date === date ? state.roster : null;
+  const lines = p ? dayLines(p) : [];
+  const when = date === today() ? 'Tomorrow' : date === realToday() ? 'Today' : longDate(date);
+  return h('div', {},
+    h('section', { class: 'card myday' },
+      h('div', { class: 'section-head' }, h('h2', { style: 'margin:0' }, p ? `${when} for ${shortName(p) || p.name}` : 'My day'), h('span', { class: 'grow' }), pick),
+      !p ? h('p', { class: 'hint' }, 'Pick your name once; this browser remembers it.')
+        : !state.staff.length ? h('p', { class: 'hint' }, 'Loading the staff list…')
+        : !r && !lines.length ? h('p', { class: 'empty' }, isViewer() && viewerFound === null ? 'Loading…' : `The roster for ${longDate(date)} isn't out yet.`)
+        : lines.length ? h('ul', { class: 'myday-list' }, lines.map(([what, detail]) => h('li', {}, h('b', {}, what), detail ? h('span', {}, ' ', detail) : null)))
+        : h('p', { class: 'empty' }, `You're not on the roster for ${longDate(date)}.`),
+      p && r && postingOf(p) && p.role === 'junior' ? h('p', { class: 'seen' }, `Posting this week: ${postingName(postingOf(p))}`) : null,
+      h('p', { class: 'hint' }, 'Bookmark this page to come straight here: ', h('code', {}, location.origin + location.pathname + '#myday'),
+        isViewer() ? null : [' · ', h('button', { class: 'link', onclick: () => { history.replaceState(null, '', location.pathname); goTab('roster'); } }, 'Back to the roster')])),
+    r ? renderSheet() : null);
 }
 
 // ---- rotations: each junior's posting by week, planned for the year ----
@@ -3160,6 +3234,8 @@ state.cloudBase ||= {}; // date -> updatedAt of the cloud copy this browser last
 
 const isMember = () => !!cs.member;
 const isAdmin = () => cs.member?.role === 'admin';
+const isViewer = () => cs.member?.role === 'viewer'; // reads the saved rosters and My day; changes nothing
+const ROLES = [['rosterer', 'Rosterer'], ['admin', 'Admin'], ['viewer', 'Viewer (sees rosters, changes nothing)']];
 const me = () => ({ email: cs.user.email, displayName: cs.user.displayName, rostererName: rostererName.trim() });
 const when = ms => new Date(ms).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 const byName = b => b?.name || b?.email || 'someone';
@@ -3229,8 +3305,10 @@ cloud.watchUser(async user => {
     if (cs.member?.role === 'admin') { try { cs.requests = await cloud.listRequests(); } catch (e) { console.error(e); cs.requests = []; } }
   }
   cs.ready = true;
+  if (isViewer()) { state.tab = 'myday'; document.body.classList.add('viewer'); }
   render();
-  if (cs.member) loadTeamFromCloud(false);
+  if (cs.member) await loadTeamFromCloud(false);
+  if (isViewer()) viewerLoad(state.day.date);
 }).catch(e => { cs.ready = true; cloudError(e); render(); });
 
 const teamHash = () => JSON.stringify([state.settings, state.staff, state.roomTemplate, state.staffLog || [], state.monthly || {}, state.rotations || {}]);
@@ -3264,7 +3342,7 @@ async function loadTeamFromCloud(asked) {
     const t = await cloud.loadTeam();
     if (!t) { if (asked) toast('Nobody has saved a team staff list yet.'); return; }
     if (!asked && t.updatedAt === state.teamSyncedAt) return;
-    if (state.staff.length && !confirm(`Load the team's staff list (${t.staff?.length || 0} people, saved by ${byName(t.updatedBy)} ${when(t.updatedAt)})? It replaces the staff list, rooms and settings in this browser.`)) return;
+    if (state.staff.length && !isViewer() && !confirm(`Load the team's staff list (${t.staff?.length || 0} people, saved by ${byName(t.updatedBy)} ${when(t.updatedAt)})? It replaces the staff list, rooms and settings in this browser.`)) return;
     state.settings = { ...clone(DEFAULT_SETTINGS), ...t.settings };
     state.staff = t.staff || [];
     state.staffLog = t.staffLog || [];
@@ -3411,7 +3489,8 @@ function membersCard() {
         h('tbody', {}, requests.map(q => h('tr', {},
           h('td', {}, q.email), h('td', {}, q.name || ''), h('td', { class: 'seen' }, when(q.requestedAt)),
           h('td', {},
-            h('button', { class: 'small primary', onclick: () => cloud.setMember(q.email, 'rosterer', q.name || '').then(() => cloud.deleteRequest(q.email)).then(() => { toast(`Approved ${q.email}.`); refresh(); }, cloudError) }, 'Approve'), ' ',
+            h('button', { class: 'small primary', onclick: () => cloud.setMember(q.email, 'rosterer', q.name || '').then(() => cloud.deleteRequest(q.email)).then(() => { toast(`Approved ${q.email} as a rosterer.`); refresh(); }, cloudError) }, 'Approve'), ' ',
+            h('button', { class: 'small', title: 'Can see the saved rosters and their own day, but change nothing', onclick: () => cloud.setMember(q.email, 'viewer', q.name || '').then(() => cloud.deleteRequest(q.email)).then(() => { toast(`Approved ${q.email} as a viewer.`); refresh(); }, cloudError) }, 'Approve as viewer'), ' ',
             h('button', { class: 'small', onclick: () => { if (confirm(`Decline ${q.email}?`)) cloud.deleteRequest(q.email).then(refresh, cloudError); } }, 'Decline'))))))) : null,
     h('h2', {}, 'Team members'),
     h('p', { class: 'hint' }, 'Only these Google accounts can sign in and see the shared staff list and rosters. Admins can also manage this list.'),
@@ -3420,12 +3499,12 @@ function membersCard() {
       h('tbody', {},
         list.map(m => h('tr', {},
           h('td', {}, m.email), h('td', {}, m.name || ''),
-          h('td', {}, select(m.role, [['rosterer', 'Rosterer'], ['admin', 'Admin']], v => cloud.setMember(m.email, v, m.name || '').then(refresh, cloudError))),
+          h('td', {}, select(m.role, ROLES, v => cloud.setMember(m.email, v, m.name || '').then(refresh, cloudError))),
           h('td', {}, m.email === cs.user.email.toLowerCase() ? '' : h('button', { class: 'small', onclick: () => { if (confirm(`Remove ${m.email}?`)) cloud.removeMember(m.email).then(refresh, cloudError); } }, '✕')))),
         h('tr', {},
           h('td', {}, h('input', { type: 'email', placeholder: 'name@gmail.com', value: newMember.email, oninput: e => { newMember.email = e.target.value; } })),
           h('td', {}, h('input', { placeholder: 'Name', value: newMember.name, oninput: e => { newMember.name = e.target.value; } })),
-          h('td', {}, select(newMember.role, [['rosterer', 'Rosterer'], ['admin', 'Admin']], v => { newMember.role = v; })),
+          h('td', {}, select(newMember.role, ROLES, v => { newMember.role = v; })),
           h('td', {}, h('button', { class: 'small', onclick: () => {
             const e = newMember.email.trim().toLowerCase();
             if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) return toast('Enter a Google email address.');
@@ -3435,9 +3514,10 @@ function membersCard() {
 }
 
 lastRows = state.roster ? JSON.stringify(state.roster.rows) : null;
-state.tab = state.staff.length ? 'roster' : 'staff'; // the page opens on the roster
+state.tab = location.hash === '#myday' ? 'myday' : state.staff.length ? 'roster' : 'staff'; // the page opens on the roster
 render();
 // practice mode opens with the tour, once
 if (DEMO) { try { if (!localStorage.getItem(TOUR_KEY)) setTimeout(startTour, 700); } catch { /* no storage */ } }
 document.getElementById('tourBtn')?.addEventListener('click', () => startTour());
+addEventListener('hashchange', () => { if (location.hash === '#myday' && state.tab !== 'myday') { state.tab = 'myday'; window.scrollTo(0, 0); render(); } });
 document.getElementById('keysBtn')?.addEventListener('click', showShortcuts);

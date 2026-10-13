@@ -128,6 +128,7 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
   - `team/main` holds staff, rooms and settings; `team/monthly` holds the monthly rosters; `team/rotations` holds the junior rotations (`weeks: { monday: { staffId: posting } }`).
   - Each `rosters/{date}` doc has an immutable `versions` history, which is what Restore uses.
   - Access is the `members` list plus `accessRequests`, enforced by `firestore.rules`.
+  - Member roles: `admin`, `rosterer` and `viewer`. Viewers read everything but write nothing (`editor()` in the rules); the app shows them only My day and the roster saved for the team for the date on screen.
   - The rules deploy automatically on merge to main (`.github/workflows/deploy-firestore-rules.yml`): edit the file, never ask the owner to paste it.
   - The Firebase web config in `js/firebase-config.js` is public by design.
 - **Rotations:** a junior's posting on a date is that day's change (`day.staff[id].posting`), else the week's rotation, else their usual posting (`p.posting`). The roster engine and checks get the staff list with each junior's posting for the day on screen (`dayStaff()`), so posting matches and the "(RA)" tags follow the rotation. Rotation edits go through Undo. The Excel layout is names down the first column and each week's Monday across the top; the download is a blank to fill in.
@@ -153,6 +154,7 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
 - **The + picker ranks people** for that room: free and suitable first (subspec for seniors, posting match for juniors), then free, then already on a list, then not working, each with a note.
 - **Select several** on Today › Manpower moves many people to one group in one step (with Undo); dragging one also has Undo now.
 - **Keyboard shortcuts** (? lists them): Ctrl+Z/Y, Ctrl+S save or download, Alt+1–4 tabs, [ and ] previous/next day, / filter.
+- **My day** (`#myday`, bookmarkable; a viewer's only page): pick your name once (remembered in this browser, or matched from the member's name) and see where you are on the date on screen: rooms with your partner and case notes, premeds, calls/clinics, leave or admin, notes; then the whole sheet.
 - **Phones:** the Roster tab shows one card per room (Senior, Junior, case notes) instead of the wide table, and the person box slides up from the bottom.
 - **Sending it out:** Download offers .xlsx, PDF, an image for WhatsApp (`js/pngout.js`, drawn from the same layout; shared through the phone's share sheet where it can be, else downloaded) and Print. Printing shrinks the sheet to fit one A4 page.
 - **Learning from hand changes:** taking a senior off a subspecialty list by hand on three different days offers to add it to their "doesn't do" list (`state.learned`; asked once per person and subspecialty).

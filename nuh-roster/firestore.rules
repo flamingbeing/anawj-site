@@ -16,6 +16,10 @@ service cloud.firestore {
     function admin() {
       return member() && get(/databases/$(database)/documents/members/$(email())).data.role == 'admin';
     }
+    // viewers read the rosters (their own day, the saved sheet) but change nothing
+    function editor() {
+      return member() && get(/databases/$(database)/documents/members/$(email())).data.get('role', '') != 'viewer';
+    }
 
     match /members/{memberEmail} {
       // anyone signed in may check their own entry; members see the list; admins manage it
@@ -36,16 +40,19 @@ service cloud.firestore {
     }
 
     match /team/{doc} {
-      allow read, write: if member();
+      allow read: if member();
+      allow write: if editor();
     }
 
     match /rosters/{date} {
-      allow read, create, update: if member();
+      allow read: if member();
+      allow create, update: if editor();
       allow delete: if admin();
 
       // history entries are permanent
       match /versions/{version} {
-        allow read, create: if member();
+        allow read: if member();
+        allow create: if editor();
         allow update, delete: if false;
       }
     }
