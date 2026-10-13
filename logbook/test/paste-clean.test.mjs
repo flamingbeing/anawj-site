@@ -41,11 +41,27 @@ assert.equal(blocks[1].items[0].check, false);
 
 // tidying Markdown already pasted (UpNote / OneNote leftovers)
 assert.equal(tidyMarkdown('1\\. one\n\n2\\. two\n**  **\n• bullet\nword  word **bold **x\n- []  box\n☐ todo\n☑ done\n\n\n\nend  '),
-  '1. one\n2. two\n- bullet\nword word **bold** x\n- [ ] box\n- [ ] todo\n- [x] done\n\nend');
+  '1. one\n2. two\n\n- bullet\nword word **bold** x\n- [ ] box\n- [ ] todo\n- [x] done\n\nend');
 assert.equal(tidyMarkdown('**a** b **c**'), '**a** b **c**');                 // nothing to change
 assert.equal(tidyMarkdown('**  lead** and **trail  **'), '**lead** and **trail**');
 assert.equal(tidyMarkdown('  - nested  item'), '  - nested item');            // the indent of a nested list stays
 assert.equal(tidyMarkdown('para one\n\n  \n\npara two'), 'para one\n\npara two');
 assert.equal(tidyMarkdown('a\r\nb\\_c'), 'a\nb_c');
+
+// only what is clearly a leftover: two lists of different kinds stay apart, ☒ stays, real backslashes and code stay
+assert.equal(tidyMarkdown('- a\n- b\n\n1. one\n2. two'), '- a\n- b\n\n1. one\n2. two');
+assert.equal(tidyMarkdown('- a\n\n- b\n\n\n1. one\n\n2. two'), '- a\n- b\n\n1. one\n2. two');
+assert.equal(tidyMarkdown('☒ no allergy'), '☒ no allergy');
+assert.equal(tidyMarkdown('\\\\server\\share and C:\\temp'), '\\\\server\\share and C:\\temp');
+assert.equal(tidyMarkdown('a `x\\*y` \\*b'), 'a `x\\*y` *b');
+assert.equal(tidyMarkdown('```\ndef f():\n    return  1\n\n\n\\*\n```\nafter  x'), '```\ndef f():\n    return  1\n\n\n\\*\n```\nafter x');
+assert.equal(htmlToMarkdown('<pre>def f():\n    return  1</pre><p>next</p>'), '```\ndef f():\n    return  1\n```\n\nnext');
+
+// Word lists: the marker sits in <![if !supportLists]> (or the same in comments); bullets, numbers, a second level
+const wordItem = (marker, text, level = 1, cmt = false) => `<p class=MsoListParagraphCxSpMiddle style='text-indent:-18.0pt;mso-list:l0 level${level} lfo1'>${cmt ? '<!--[if !supportLists]-->' : '<![if !supportLists]>'}<span style='font-family:Symbol'><span style='mso-list:Ignore'>${marker}<span style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span></span></span>${cmt ? '<!--[endif]-->' : '<![endif]>'}${text}<o:p></o:p></p>`;
+assert.equal(htmlToMarkdown(wordItem('·', 'First item') + wordItem('·', 'Second item')), '- First item\n- Second item');
+assert.equal(htmlToMarkdown(wordItem('1.', 'Alpha') + wordItem('2.', 'Beta') + wordItem('o', 'Sub', 2)), '1. Alpha\n2. Beta\n  - Sub');
+assert.equal(htmlToMarkdown(wordItem('a)', 'One', 1, true) + wordItem('b)', 'Two', 1, true)), '1. One\n2. Two');
+assert.equal(htmlToMarkdown('<p class=MsoNormal>Plain <b>para</b></p>' + wordItem('§', 'Wingdings bullet')), 'Plain **para**\n\n- Wingdings bullet');
 
 console.log('paste-clean tests passed');

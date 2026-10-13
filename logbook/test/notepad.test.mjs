@@ -1,7 +1,7 @@
 // Notes (notepad.js): the stored shape, order, search, the day/case index, the light Markdown and the export.
 // Fake notes only.
 import assert from 'node:assert/strict';
-import { cleanNote, sortNotes, filterNotes, notesOn, noteTitle, plainLines, noteIndex, cleanNoteIndex, sameIndex, parseNote, inline, safeHref, toggleCheck, noteMd, notesMd, noteFiles, MAX_NOTES, LIMITS, dayNoteId, isDayNote, dayNoteOf, cappedNotes } from '../js/notepad.js';
+import { cleanNote, sortNotes, filterNotes, notesOn, noteTitle, plainLines, noteIndex, cleanNoteIndex, sameIndex, parseNote, inline, safeHref, toggleCheck, noteMd, notesMd, noteFiles, MAX_NOTES, LIMITS, dayNoteId, isDayNote, dayNoteOf, cappedNotes, mergeDayNote } from '../js/notepad.js';
 import { mdDay, exportNotes } from '../js/markdown.js';
 
 assert.equal(MAX_NOTES, 100);
@@ -126,6 +126,37 @@ assert.equal(exportNotes({ cases, notes, opts: { notes: false, progress: false }
   assert.equal(ix.days[99], many[129].date);
   assert.equal(ix.n, 130);
   assert.equal(cleanNoteIndex({ days: many.map(n => n.date), cases: [], n: 130 }).days[0], many[30].date);
+  // an ordinary note's day and case always stay in the index, however many daily notes there are
+  const withOld = [...many, { id: 'o1', date: '2025-06-01', title: 'Fake old', body: '', caseId: 'c-old' }];
+  const ix2 = noteIndex(withOld);
+  assert.equal(ix2.days.length, 100);
+  assert.equal(ix2.days[0], '2025-06-01');
+  assert.equal(ix2.days[99], many[129].date);
+  assert.deepEqual(ix2.cases, ['c-old']);
+  // a day's note is found only under its own day
+  assert.equal(dayNoteOf([{ id: 'day-2026-10-13', date: '2026-10-01' }], '2026-10-13'), null);
+}
+
+// two copies of a daily note saved apart are merged, never a conflict
+{
+  const remote = { id: 'day-2026-10-13', date: '2026-10-13', title: '', body: 'Fake laptop line', createdAt: 1, updatedAt: 9 };
+  // a blank copy opened as new (stale offline cache), with a line typed: both lines
+  assert.equal(mergeDayNote({ id: remote.id, date: remote.date, title: '', body: 'Fake phone line', createdAt: 5 }, null, remote).body, 'Fake laptop line\n\nFake phone line');
+  assert.equal(mergeDayNote({ id: remote.id, date: remote.date, title: '', body: 'Fake phone line' }, null, remote).createdAt, 1);
+  // from an older copy: only what was added here goes after the other copy's text; its own changes win
+  const base = { ...remote, body: 'Fake start', title: '' };
+  const m = mergeDayNote({ ...base, body: 'Fake start\nphone adds', title: 'Fake title' }, base, { ...remote, body: 'Fake start\nlaptop adds' });
+  assert.equal(m.body, 'Fake start\nlaptop adds\n\nphone adds');
+  assert.equal(m.title, 'Fake title');
+  // nothing new here, or this copy already has it: the other copy as it is
+  assert.equal(mergeDayNote({ ...base }, base, remote).body, 'Fake laptop line');
+  assert.equal(mergeDayNote({ ...remote, body: 'Fake laptop line' }, null, remote).body, 'Fake laptop line');
+  assert.equal(mergeDayNote({ ...remote, body: 'Fake laptop line\nmore' }, null, remote).body, 'Fake laptop line\nmore');
+  // a field changed only on the other copy is kept (the case linked elsewhere)
+  assert.equal(mergeDayNote({ ...base, body: 'Fake start x' }, base, { ...remote, caseId: 'c1' }).caseId, 'c1');
+  assert.equal(mergeDayNote({ ...base }, base, null).body, 'Fake start');
+  // a short line added here is kept even when its letters appear in the other copy
+  assert.equal(mergeDayNote({ ...base, body: 'Fake start\nok' }, base, { ...remote, body: 'Fake start book' }).body, 'Fake start book\n\nok');
 }
 
 // *italic*: shown in italics; a lone star (2*3, a * b) stays as typed

@@ -52,7 +52,7 @@ async function receiveShare(req) {
     const cache = await caches.open(SHARE_CACHE);
     await cache.put(new URL(SHARE_FILE, self.registration.scope).href, new Response(JSON.stringify(data), { headers: { 'content-type': 'application/json' } }));
   } catch (err) { console.warn('Share not kept', err); }
-  return Response.redirect(new URL('./?shared=1#share', self.registration.scope).href, 303);
+  return Response.redirect(new URL('./?shared=1#log', self.registration.scope).href, 303);
 }
 
 self.addEventListener('fetch', e => {

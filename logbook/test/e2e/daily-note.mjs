@@ -21,12 +21,13 @@ try { for (const width of [390, 1280]) {
   await p.locator('.lb-calbar').getByRole('button', { name: 'Today', exact: true }).click();
   await p.getByRole('button', { name: '+ Daily note' }).click();
   await p.locator('.note-editor').waitFor();
-  assert.equal(await p.getByLabel('Note date').inputValue(), iso);
+  assert.equal(await p.locator('.note-meta .note-date').innerText(), await p.evaluate(async iso => (await import('./js/engine.js')).fmtDate(iso), iso));
   assert.match(await p.locator('.note-back').innerText(), /‹\s*Logbook/);
   await p.waitForFunction(() => document.activeElement?.classList.contains('note-body'));
   await p.getByLabel('Note text').fill('Fake day: **busy** list\n- [ ] read about TIVA');
   await saved(p);
   assert.equal((await dayNote(p, iso)).title, '');
+  assert.equal((await dayNote(p, iso)).date, iso);
   // Done goes back to the Logbook's day, now with the note's preview and Edit
   await p.getByRole('button', { name: 'Done' }).click();
   await p.locator('.lb-daynote').waitFor();
@@ -42,6 +43,34 @@ try { for (const width of [390, 1280]) {
   await p.getByRole('button', { name: 'Done' }).click();
   await p.locator('.lb-daynote').waitFor();
 
+  // a daily note keeps its day: no date box, no "No date"
+  await p.getByRole('button', { name: 'Edit the daily note' }).click();
+  await p.locator('.note-editor').waitFor();
+  assert.equal(await p.locator('.note-editor input[type=date]').count(), 0);
+  assert.equal(await p.locator('.note-meta').getByRole('button', { name: 'No date' }).count(), 0);
+  await p.getByRole('button', { name: 'Done' }).click();
+  await p.locator('.lb-daynote').waitFor();
+
+  // another device's copy: a blank daily note opened before the server's copy came gets the server's copy in its
+  // place; one already typed in is merged with it on saving (never a write conflict)
+  const remote = (id, body) => p.evaluate(async ([id, body]) => { const demo = await import('./js/demo-backend.js'); demo.saveNote('demo@example.com', { id: 'day-' + id, date: id, title: '', body, createdAt: 1 }); }, [id, body]);
+  const openDay = d => p.evaluate(async d => (await import('./js/ui-notepad.js')).openDayNote(d), d);
+  await openDay('2025-01-06');
+  await p.locator('.note-editor').waitFor();
+  assert.equal(await p.getByLabel('Note text').inputValue(), '');
+  await remote('2025-01-06', 'Fake laptop note');
+  await p.waitForFunction(() => document.querySelector('.note-body')?.value === 'Fake laptop note');
+  await p.getByRole('button', { name: 'Done' }).click();
+  await openDay('2025-01-05');
+  await p.locator('.note-editor').waitFor();
+  await p.getByLabel('Note text').fill('Fake phone line');
+  await remote('2025-01-05', 'Fake laptop line');
+  await saved(p);
+  assert.equal((await dayNote(p, '2025-01-05')).body, 'Fake laptop line\n\nFake phone line');
+  assert.equal(await p.getByLabel('Note text').inputValue(), 'Fake laptop line\n\nFake phone line');
+  assert.equal(await p.evaluate(async () => (await import('./js/ui-core.js')).writes.entries().filter(x => x.state === 'conflict').length), 0);
+  await p.getByRole('button', { name: 'Done' }).click();
+
   // Notes: Today's note, the Daily notes chip, and daily notes not counted in the 100
   await p.goto(base + '?demo#notes');
   await p.getByRole('button', { name: 'Today’s note' }).waitFor();
@@ -49,14 +78,14 @@ try { for (const width of [390, 1280]) {
   await p.getByRole('button', { name: '+ New note' }).click();
   await p.getByLabel('Note title').fill('Fake other note');
   await p.getByRole('button', { name: 'Done' }).click();
-  await p.waitForFunction(() => document.querySelectorAll('ul.notes-rows li').length === 2);
+  await p.waitForFunction(() => document.querySelectorAll('ul.notes-rows li').length === 4);
   assert.match(await p.locator('.notes-count').innerText(), /^1 of 100$/);
   await p.getByRole('button', { name: 'Daily notes' }).click();
-  assert.equal(await p.locator('ul.notes-rows li').count(), 1);
-  assert.match(await p.locator('ul.notes-rows li').innerText(), /Daily note/);
+  assert.equal(await p.locator('ul.notes-rows li').count(), 3);
+  assert.match(await p.locator('ul.notes-rows li').first().innerText(), /Daily note/);
   assert.match(await p.locator('.notes-filter').innerText(), /Daily notes/);
   await p.getByRole('button', { name: 'Show all' }).click();
-  assert.equal(await p.locator('ul.notes-rows li').count(), 2);
+  assert.equal(await p.locator('ul.notes-rows li').count(), 4);
   await p.getByRole('button', { name: 'Today’s note' }).click();
   await p.locator('.note-editor').waitFor();
   assert.match(await p.getByLabel('Note text').inputValue(), /^Fake day/);
@@ -138,11 +167,53 @@ try { for (const width of [390, 1280]) {
   await p.evaluate(async () => (await import('./js/ui-core.js')).hooks.render());
   assert.equal(await p.locator('.day-note-box').getAttribute('open'), '');
   assert.equal(await box.inputValue(), 'Fake day: case tab\nmore from the Case tab');
+  // Open in Notes straight after typing: the editor has what was typed, and goes on saving the same note
+  await box.fill('Fake day: case tab\nmore from the Case tab\ntyped in box');
+  await p.getByRole('button', { name: 'Open in Notes' }).click();
+  await p.locator('.note-editor').waitFor();
+  assert.equal(await p.getByLabel('Note text').inputValue(), 'Fake day: case tab\nmore from the Case tab\ntyped in box');
+  await p.getByLabel('Note text').fill('Fake day: case tab\nmore from the Case tab\ntyped in box\ntyped in editor');
+  // a title added in the editor: the box takes the new copy, so its next line saves (no conflict)
+  await p.getByLabel('Note title').fill('Fake title');
+  await saved(p);
+  await p.getByRole('button', { name: 'Done' }).click();
+  await p.locator('.day-note-box').waitFor();
+  assert.equal(await p.evaluate(() => location.hash), '#log');
+  await p.waitForFunction(() => !document.querySelector('.day-note-text')?.disabled);
+  await box.fill(await box.inputValue() + '\nsecond box line');
+  await box.blur();
+  await p.waitForFunction(() => document.querySelector('.day-note-box .notes-status')?.textContent === 'Saved', null, { timeout: 8000 });
+  const both = await dayNote(p, iso);
+  assert.equal(both.title, 'Fake title');
+  assert.equal(both.body, 'Fake day: case tab\nmore from the Case tab\ntyped in box\ntyped in editor\nsecond box line');
+  // only the title changed on another device: the box takes that copy too (not only when the text differs)
+  await p.evaluate(async iso => {
+    const { S, hooks } = await import('./js/ui-core.js'); const cloud = await import('./js/demo-backend.js');
+    const n = S.notes.find(x => x.id === 'day-' + iso);
+    cloud.saveNote('demo@example.com', { ...n, title: 'Fake title 2' });
+    hooks.render();
+  }, iso);
+  await p.waitForFunction(() => !document.querySelector('.day-note-text')?.disabled);
+  await box.fill(await box.inputValue() + '\nthird');
+  await box.blur();
+  await p.waitForFunction(() => document.querySelector('.day-note-box .notes-status')?.textContent === 'Saved', null, { timeout: 8000 });
+  assert.equal((await dayNote(p, iso)).title, 'Fake title 2');
+  assert.match((await dayNote(p, iso)).body, /second box line\nthird$/);
+  assert.equal(await p.evaluate(async () => (await import('./js/ui-core.js')).writes.entries().filter(x => x.state === 'conflict').length), 0);
 
   // shared to the app, the old GET way, with the chooser off: straight into paste-a-list, as before
   await p.goto(base + '?demo&share_text=AB%2040M%20fake%20lap%20chole');
   await p.waitForFunction(() => /AB 40M fake lap chole/.test(document.querySelector('textarea.details')?.value || ''));
   assert.equal(await p.evaluate(() => location.search + location.hash), '?demo#log');
+  // a POST share of text only (what sw.js keeps), with the chooser off: also straight into paste-a-list, no chooser
+  await p.evaluate(async () => {
+    const c = await caches.open('share-inbox-logbook');
+    await c.put(new URL('share-inbox.json', location.href).href, new Response(JSON.stringify({ title: '', text: 'EF 30M fake appendix', url: '', files: [] })));
+  });
+  await p.goto(base + '?demo&shared=1#log');
+  await p.waitForFunction(() => /EF 30M fake appendix/.test(document.querySelector('textarea.details')?.value || ''));
+  assert.equal(await p.evaluate(() => location.search + location.hash), '?demo#log');
+  assert.equal(await p.getByRole('heading', { name: 'Shared with the app' }).count(), 0);
   // with Ask on: the chooser; "Add to today's note" appends it to the daily note
   await setting(p, { shareAsk: true });
   await p.goto(base + '?demo&share_text=Fake%20shared%20line');
@@ -151,7 +222,7 @@ try { for (const width of [390, 1280]) {
   assert.match(await p.locator('.share-preview').innerText(), /Fake shared line/);
   await p.getByRole('button', { name: 'Add to today’s note' }).click();
   await p.locator('.note-editor').waitFor();
-  assert.match(await p.getByLabel('Note text').inputValue(), /more from the Case tab\n\nFake shared line$/);
+  assert.match(await p.getByLabel('Note text').inputValue(), /second box line\nthird\n\nFake shared line$/);
   await saved(p);
   assert.match((await dayNote(p, iso)).body, /Fake shared line$/);
   await p.getByRole('button', { name: 'Done' }).click();
@@ -161,7 +232,7 @@ try { for (const width of [390, 1280]) {
     const c = await caches.open('share-inbox-logbook');
     await c.put(new URL('share-inbox.json', location.href).href, new Response(JSON.stringify({ title: '', text: '', url: '', files: [{ name: 'fake.md', type: 'text/markdown', text: '# Fake file\nline' }] })));
   });
-  await p.goto(base + '?demo&shared=1#share');
+  await p.goto(base + '?demo&shared=1#log');
   await p.getByRole('heading', { name: 'Shared with the app' }).waitFor();
   await p.waitForFunction(() => /Fake file/.test(document.querySelector('.share-preview')?.textContent || ''));
   assert.match(await p.locator('.share-in').innerText(), /from 1 file/);
@@ -177,6 +248,15 @@ try { for (const width of [390, 1280]) {
   await p.getByRole('button', { name: 'Add as case(s)' }).click();
   await p.waitForFunction(() => /CD 50F fake TKR/.test(document.querySelector('textarea.details')?.value || ''));
   assert.equal(await p.evaluate(() => location.hash), '#log');
+
+  // New note with 100 notes already: the shared text isn't lost, the chooser comes back with it
+  await p.evaluate(async () => { const cloud = await import('./js/demo-backend.js'); for (let i = 0; i < 100; i++) cloud.saveNote('demo@example.com', { id: 'fake' + i, date: '2025-02-01', title: 'Fake ' + i, body: '', createdAt: i }); });
+  await p.goto(base + '?demo&share_text=Fake%20kept%20text');
+  await p.getByRole('heading', { name: 'Shared with the app' }).waitFor();
+  await p.getByRole('button', { name: 'New note' }).click();
+  await p.locator('#toast').getByText(/100 notes/).waitFor();
+  await p.getByRole('heading', { name: 'Shared with the app' }).waitFor();
+  assert.match(await p.locator('.share-preview').innerText(), /Fake kept text/);
 
   assert.deepEqual(errors, []);
   console.log(`PASS daily note ${width < 600 ? 'phone' : 'desktop'}`);

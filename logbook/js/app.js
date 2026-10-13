@@ -880,8 +880,8 @@ async function onUser(user) {
   S.tab = tabFromHash() || (START_TABS.some(([v]) => v === start) && onBar.includes(start) ? start : onBar.find(id => id !== 'more') || 'log');
   navigation.initialize(S.tab);
   if (wantToday) { wantToday = false; setTimeout(() => { if (S.user === user) openDayNote(); }, 0); }
-  // a POST share: the chooser draws again once the service worker's copy is read
-  if (sharedIn && S.tab === 'share') sharedIn.then(() => { if (S.user === user && S.tab === 'share') render(); });
+  // a POST share: the Case tab (or the chooser it forwards to) draws again once the service worker's copy is read
+  if (sharedIn) sharedIn.then(() => { if (S.user === user && (S.tab === 'log' || S.tab === 'share')) render(); });
   // Settings → Backup: a one-tap reminder when the last Drive / Dropbox backup is over a week old (if asked for)
   setTimeout(() => { if (S.user === user) remindBackup(); }, 3000);
   // back from a Drive / Dropbox sign-in: finish that save
@@ -971,14 +971,16 @@ function registerSW() {
 
 if (cloud.onSyncError) cloud.onSyncError(err => toast('A change could not be synced: ' + (err.message || err)));
 
-// shared to the installed app (Android share sheet; share-in.js): the old GET share keeps its text for the Case tab;
-// a POST share (text or files, received by sw.js) goes to the chooser once its text is read. Tidy the address.
+// shared to the installed app (Android share sheet; share-in.js): the text waits for the Case tab, as it always did
+// (its paste-a-list), whether it came the old GET way or as a POST (text or files, received by sw.js). The Case tab
+// sends it on to the chooser only when Settings → Notes → Ask is on or files came (ui-log.js takeShared). Tidy the
+// address.
 const sharedIn = (() => {
   const { has, text, rest } = fromQuery(location.search);
   const posted = new URLSearchParams(location.search).has('shared');
   if (!has && !posted) return null;
   if (has) keepShared(text);
-  history.replaceState(null, '', location.pathname + (rest ? '?' + rest : '') + (posted ? '#share' : '#log'));
+  history.replaceState(null, '', location.pathname + (rest ? '?' + rest : '') + '#log');
   return posted ? readInbox(location.href) : Promise.resolve(text);
 })();
 // "Today's note" (the app's shortcut, ./#today): open today's daily note once signed in

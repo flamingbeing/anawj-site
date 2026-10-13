@@ -407,23 +407,34 @@ portfolio content.
 - **Daily notes, pasting, formatting, shared to the app** (Oct 2026, 6-hour build track E; e2e `test/e2e/daily-note.mjs`):
   - A daily note is an ordinary note with the id `day-YYYY-MM-DD` (date set, title empty → "Daily note"), so every device
     finds the same one without a query and no rules change was needed. `openDayNote(iso)` waits for the notes and opens
-    the existing one (never a second copy with the same id), straight in Edit. Ways in: the Logbook day's "+ Daily
+    the existing one (never a second copy with the same id), straight in Edit; when the offline cache hasn't got it,
+    it waits up to 3 s for the server's list, and a server copy arriving before anything is typed replaces the blank
+    one. Two copies saved apart (two devices) are merged (`mergeDayNote`: the other copy's text plus what was added
+    here) instead of a write conflict; ordinary notes keep the conflict. The Case tab box and the editor share one
+    copy. A daily note's date can't be changed (it's found by its day). Ways in: the Logbook day's "+ Daily
     note" / preview card (`dayNoteCard`; Done goes back to the Logbook), Notes' "Today's note" button and "Daily notes"
     chip, the manifest shortcut `./#today`, and the Case tab box (Settings → Notes, `settings.dayNoteOnCase`, off).
     It sorts first in its day and has no heading in Copy / Share / Send and the Markdown export.
   - Daily notes don't count towards the 100 (`cappedNotes`; backup restore and bin restore follow). The rules allow
-    100 days in `meta/noteIndex`, so `noteIndex()` keeps the latest 100 days; older days' notes are still in Notes.
-    Raising that cap needs a `firestore.rules` change (owner's approval).
+    100 days in `meta/noteIndex`, so `noteIndex()` keeps every ordinary note's day (at most 100, as before) and fills
+    the rest with the newest daily notes. Once the notes are loaded, `dayHasNotes` reads them too, so an older daily
+    note still shows and goes into Copy / Share / Send. Raising that cap needs a `firestore.rules` change (owner's
+    approval).
   - Paste cleaner (`paste-clean.js`, tested): `settings.pasteClean` (off) turns pasted HTML into light Markdown;
     Clean up (editor ⋯ menu, always there, with Undo) runs `tidyMarkdown`. The preview now shows `*italic*`.
   - Formatting bar (`fmt-bar.js`, shared with reflections): the note editor's full bar (bold, italic, heading, lists,
     to-do, link, undo) is device setting `noteToolbar` (off); on phones it rides on the keyboard while typing. Edits go
     through `execCommand('insertText')`, so Undo and Ctrl+Z work.
   - Shared to the app: the manifest share_target is POST multipart (text, title, url, `.md`/`.txt` files) to
-    `./share-target`; `sw.js` keeps it in Cache Storage `share-inbox-logbook` and opens `./?shared=1#share`, the chooser
-    (`ui-share-in.js`: Add as case(s) / Add to today's note / New note). The old GET `?share_text=` still works and still
-    goes straight to paste-a-list unless Settings → Notes → Ask what to do with shared text (`settings.shareAsk`, off);
-    files always ask. `share-in.js` holds the plumbing (tested).
+    `./share-target`; `sw.js` keeps it in Cache Storage `share-inbox-logbook` and opens `./?shared=1#log`. Shared text
+    (POST or the old GET `?share_text=`, which still works) goes straight to paste-a-list, as before, unless Settings →
+    Notes → Ask what to do with shared text (`settings.shareAsk`, off); files always ask. The chooser
+    (`ui-share-in.js`: Add as case(s) / Add to today's note / New note) clears the text only once the note has it.
+    `share-in.js` holds the plumbing (tested).
+    The POST needs the service worker: with none active (site data cleared, shared before the first install finished,
+    or the old v40 worker still in charge while the new one waits for its reload and the phone already has the new manifest), the share reaches
+    GitHub Pages, which refuses POSTs (405), so a static fallback page can't help. The worker installs on the first
+    visit, so this only bites in that window.
 - **Connect Claude** (`mcp/`, Settings → Connect Claude (advanced) links its README on GitHub): a read-only MCP
   server residents run locally; Google "Desktop app" OAuth (loopback, PKCE) → Firebase `signInWithIdp` → Firestore
   REST as the user, so the rules apply; only `logbooks/{own email}` and the user's own `residents` entry. Owner

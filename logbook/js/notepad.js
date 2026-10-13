@@ -14,9 +14,34 @@ const ISO = /^\d{4}-\d{2}-\d{2}$/;
 // ---- daily notes ----
 export const dayNoteId = iso => 'day-' + iso;
 export const isDayNote = n => !!n && /^day-\d{4}-\d{2}-\d{2}$/.test(n.id || '');
-export const dayNoteOf = (list, iso) => (list || []).find(n => n.id === dayNoteId(iso)) || null;
+// (its date must match too: a day's note is never found under another day)
+export const dayNoteOf = (list, iso) => (list || []).find(n => n.id === dayNoteId(iso) && n.date === iso) || null;
 // the notes that count towards MAX_NOTES (one daily note a day would fill it in three months)
 export const cappedNotes = list => (list || []).filter(n => !isDayNote(n));
+
+// Two copies of one daily note saved apart (two devices, or a stale offline copy opened as a new note): one note with
+// both. A field changed only here keeps the change; the body keeps the other copy's text and adds what was written
+// here (only the new part when this copy started from base). Pure; used when a save meets a newer copy.
+export function mergeDayNote(local, base, remote) {
+  if (!remote) return { ...local };
+  const out = { ...remote };
+  for (const k of ['title', 'date', 'caseId']) {
+    const mine = local[k] ?? null, was = base ? base[k] ?? null : null;
+    if (base ? mine !== was : mine != null && mine !== '') { if (mine == null) delete out[k]; else out[k] = mine; }
+  }
+  const r = String(remote.body || ''), l = String(local.body || ''), b = base ? String(base.body || '') : '';
+  let add = l;
+  if (base && l.startsWith(b)) add = l.slice(b.length);
+  add = add.trim();
+  // "there already": every line added here is a line of the other copy (not just a few letters somewhere in it)
+  const rLines = new Set(r.split('\n').map(x => x.trim())), lLines = new Set(l.split('\n').map(x => x.trim()));
+  let body;
+  if (!add || add.split('\n').every(x => !x.trim() || rLines.has(x.trim()))) body = r;   // nothing new here
+  else if (!base && r.split('\n').every(x => !x.trim() || lLines.has(x.trim()))) body = l;   // this copy holds the other's
+  else body = (r.trim() ? r.trimEnd() + '\n\n' : '') + add;
+  out.body = body.slice(0, LIMITS.body);
+  return out;
+}
 
 const str = (v, n) => String(v ?? '').replace(/\r\n?/g, '\n').slice(0, n);
 export function cleanNote(n, now = Date.now()) {
@@ -58,13 +83,21 @@ export const plainLines = body => String(body || '').split('\n').map(l => l.repl
 export const noteTitle = n => (n.title || '').trim() || (isDayNote(n) ? 'Daily note' : (plainLines(n.body)[0] || '').slice(0, 80)) || 'Untitled note';
 
 // what meta/noteIndex holds; sameIndex() says whether it needs writing again. The rules allow 100 days and 100 cases
-// (firestore.rules validNoteIndex): with daily notes there can be more, so the index keeps the latest 100 days (the
-// ones the calendar is mostly looking at). An older day's notes are still found by opening Notes.
+// (firestore.rules validNoteIndex): with daily notes there can be more. Ordinary notes (at most 100) always keep their
+// days and cases, as before daily notes; the room left goes to the newest daily notes. An older daily note is still
+// found once the notes are loaded (ui-notepad.js dayHasNotes) and in Notes.
 const INDEX_MAX = 100;
+function capped(ordinary, daily) {
+  const keep = new Set(ordinary);
+  for (const v of daily) { if (keep.size >= INDEX_MAX) break; keep.add(v); }
+  return [...keep].slice(0, INDEX_MAX).sort();
+}
 export function noteIndex(list) {
-  const days = [...new Set((list || []).map(n => n.date).filter(Boolean))].sort().slice(-INDEX_MAX);
-  const cases = [...new Set((list || []).map(n => n.caseId).filter(Boolean))].sort().slice(-INDEX_MAX);
-  return { days, cases, n: (list || []).length };
+  const all = list || [], ord = all.filter(n => !isDayNote(n));
+  const newest = sortNotes(all.filter(isDayNote));   // newest day first
+  const days = capped(new Set(ord.map(n => n.date).filter(Boolean)), newest.map(n => n.date).filter(Boolean));
+  const cases = capped(new Set(ord.map(n => n.caseId).filter(Boolean)), newest.map(n => n.caseId).filter(Boolean));
+  return { days, cases, n: all.length };
 }
 export function cleanNoteIndex(v) {
   const o = v && typeof v === 'object' ? v : {};

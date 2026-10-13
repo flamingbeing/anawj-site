@@ -33,12 +33,27 @@ const attr = (attrs, name) => {
 };
 const safeLink = href => (/^(https?:|mailto:)/i.test(String(href || '').trim()) ? String(href).trim() : '');
 
+// Word writes a list item as <p style="mso-list:l0 level1 lfo1"> with its bullet or number inside
+// <![if !supportLists]>…<![endif]> (or the same as <!--[if …]--> comments). The marker becomes a token here (read at the
+// end): a number or letter followed by . or ) is a numbered item, anything else a bullet.
+const LI_TOKEN = /\u0002(\d+)\|([bo])\|(\d+)\u0003 */g;
+function wordLists(src) {
+  src = src.replace(/<!--\[if !supportLists\]-->/gi, '<![if !supportLists]>').replace(/<!--\[endif\]-->/gi, '<![endif]>');
+  return src.replace(/(<p\b[^>]*?mso-list:\s*l\d+\s+level(\d+)[^>]*>)((?:(?!<\/p>)[\s\S])*?)<!\[if !supportLists\]>([\s\S]*?)<!\[endif\]>/gi,
+    (all, open, level, before, marker) => {
+      const m = normaliseChars(decodeEntities(marker.replace(/<[^>]*>/g, ''))).trim();
+      const num = /^(\d+|[a-z])[.)]$/i.exec(m);
+      const n = !num ? 0 : /^\d+$/.test(num[1]) ? Number(num[1]) : num[1].toLowerCase().charCodeAt(0) - 96;
+      return open + before + `\u0002${Number(level) || 1}|${num ? 'o' : 'b'}|${n}\u0003`;
+    });
+}
+
 export function htmlToMarkdown(html) {
   let src = String(html || '');
   // what the clipboard wraps around the copied part (Windows), comments and everything that isn't text
   const frag = /<!--StartFragment-->([\s\S]*?)<!--EndFragment-->/i.exec(src);
   if (frag) src = frag[1];
-  src = src.replace(/<!--[\s\S]*?-->/g, '').replace(SKIP, '').replace(/<!\[if[\s\S]*?<!\[endif\]>/gi, '');
+  src = wordLists(src).replace(/<!--[\s\S]*?-->/g, '').replace(SKIP, '').replace(/<!\[if[\s\S]*?<!\[endif\]>/gi, '');
   let out = '';
   const marks = [];        // open bold / italic: { mark, opened }
   const lists = [];        // { ordered, n }
@@ -113,7 +128,7 @@ export function htmlToMarkdown(html) {
       } else if (tag === 'table') { brk(2); table = { rows: 0, cells: 0, cell: false, prev: table }; }
       else if (tag === 'tr' && table) { brk(1); out += '|'; table.cells = 0; }
       else if ((tag === 'td' || tag === 'th') && table) { out += ' '; table.cell = true; table.cells++; }
-      else if (tag === 'pre') { brk(2); pre++; }
+      else if (tag === 'pre') { brk(2); if (!pre) out += '```\n'; pre++; }
       else if (tag === 'blockquote') { brk(2); quote++; }
       else if (tag === 'hr') { brk(2); out += '---'; brk(2); }
       else if (BLOCK2.has(tag)) brk(2);
@@ -146,24 +161,31 @@ export function htmlToMarkdown(html) {
         if (table.rows === 1 && table.cells) out += '\n|' + ' --- |'.repeat(table.cells);
         brk(1);
       } else if (t === 'table' && table) { table = table.prev; brk(2); }
-      else if (t === 'pre') { pre = Math.max(0, pre - 1); brk(2); }
+      else if (t === 'pre') { pre = Math.max(0, pre - 1); if (!pre) { out = out.replace(/\n*$/, '') + '\n```'; } brk(2); }
       else if (t === 'blockquote') { quote = Math.max(0, quote - 1); brk(2); }
       else if (/^h[1-6]$/.test(t) || BLOCK2.has(t)) brk(2);
       else if (BLOCK1.has(t)) brk(1);
     }
   }
+  // Word's list items (wordLists): the bullet or number, indented by level
+  out = out.replace(LI_TOKEN, (all, level, kind, n) => '  '.repeat(Number(level) - 1) + (kind === 'o' ? `${Number(n) || 1}. ` : '- '));
   return tidyMarkdown(out);
 }
 
-// Tidy Markdown that is already in the note (or just converted). Changes only what is clearly a leftover.
+// Tidy Markdown that is already in the note (or just converted). Changes only what is clearly a leftover; code (```
+// fences) is left exactly as it is.
 export function tidyMarkdown(md) {
   let s = normaliseChars(String(md || '').replace(/\r\n?/g, '\n'));
+  let fence = false;
   s = s.split('\n').map(line => {
+    if (/^\s*```/.test(line)) { fence = !fence; return line.replace(/\s+$/, ''); }
+    if (fence) return line;
     let l = line.replace(/\s+$/, '');
-    // escapes some exports add (UpNote, Notion, OneNote via converters): 1\. \- \* \# \[ … become plain
-    l = l.replace(/\\([\\`*_{}[\]()#+\-.!|>~])/g, '$1');
-    // bullets typed or pasted as symbols, and to-do boxes as symbols
-    l = l.replace(/^(\s*)[☐□]\s*/, '$1- [ ] ').replace(/^(\s*)[☑☒✅✓✔]\s+/, '$1- [x] ')
+    // escapes some exports add (UpNote, Notion, OneNote via converters): 1\. \- \* \# \[ … become plain; a real
+    // backslash (\\server\share, C:\path) stays, and so does anything inside `code`
+    l = l.split(/(`[^`]*`)/).map((part, i) => (i % 2 ? part : part.replace(/(^|[^\\])\\([`*_{}[\]()#+\-.!|>~])/g, '$1$2'))).join('');
+    // bullets typed or pasted as symbols, and to-do boxes as symbols (☒ is left: it often means "no")
+    l = l.replace(/^(\s*)[☐□]\s*/, '$1- [ ] ').replace(/^(\s*)[☑✅✓✔]\s+/, '$1- [x] ')
       .replace(/^(\s*)[•·◦▪▫●○■➢►‣⁃]\s*/, '$1- ')
       .replace(/^(\s*)([-*+])\s*\[\s?\]\s*/, '$1$2 [ ] ').replace(/^(\s*)([-*+])\s*\[[xX]\]\s*/, '$1$2 [x] ');
     // ** or __ around nothing, and marks with the spaces inside them moved out
@@ -174,15 +196,23 @@ export function tidyMarkdown(md) {
     const indent = /^\s*/.exec(line.trimEnd())[0];
     return indent + l.trimStart().replace(/ {2,}/g, ' ');
   }).join('\n');
-  // a list broken up by blank lines (loose lists from some exports) becomes one list
-  const isItem = l => /^\s*(?:[-*+]|\d+[.)])\s+\S/.test(l);
+  // a list broken up by blank lines (loose lists from some exports) becomes one list; two lists of different kinds
+  // (bullets, then numbers) side by side stay apart
+  const kind = l => (/^\s*[-*+]\s+\S/.test(l) ? 'b' : /^\s*\d+[.)]\s+\S/.test(l) ? 'o' : '');
   const lines = s.split('\n'), keep = [];
+  fence = false;
   for (let i = 0; i < lines.length; i++) {
-    if (!lines[i].trim() && keep.length && isItem(keep[keep.length - 1])) {
+    if (/^\s*```/.test(lines[i])) fence = !fence;
+    // runs of blank lines become one (inside code too, they stay as they are)
+    if (!fence && !lines[i].trim() && (!keep.length || !keep[keep.length - 1].trim())) continue;
+    const last = keep.length ? kind(keep[keep.length - 1]) : '';
+    if (!fence && !lines[i].trim() && last) {
       let j = i; while (j < lines.length && !lines[j].trim()) j++;
-      if (j < lines.length && isItem(lines[j])) { i = j - 1; continue; }
+      const next = j < lines.length ? kind(lines[j]) : '';
+      // (a nested item, indented, belongs to the list above whatever its kind)
+      if (next && (next === last || /^\s+/.test(lines[j]))) { i = j - 1; continue; }
     }
     keep.push(lines[i]);
   }
-  return keep.join('\n').replace(/\n{3,}/g, '\n\n').replace(/^\n+|\s+$/g, '');
+  return keep.join('\n').replace(/\s+$/, '');
 }

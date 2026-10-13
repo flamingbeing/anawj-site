@@ -15,7 +15,9 @@
 import { S, h, toast, fill, hooks, writes, cloud, transients, settings, patchLogbook, resetters, todayISO, modal, emptyState, download } from './ui-core.js';
 import { uid, fmtDate, caseParts } from './engine.js';
 import { barTabs, arrangeTabs, display, setDisplay, setTabOnBar, toggle, help, resetLink } from './ui-settings.js';
-import { MAX_NOTES, LIMITS, sortNotes, filterNotes, noteTitle, noteIndex, cleanNoteIndex, sameIndex, parseNote, toggleCheck, plainLines, noteFiles, dayNoteId, dayNoteOf, isDayNote, cappedNotes } from './notepad.js';
+import { MAX_NOTES, LIMITS, sortNotes, filterNotes, noteTitle, noteIndex, cleanNoteIndex, sameIndex, parseNote, toggleCheck, plainLines, noteFiles, dayNoteId, dayNoteOf, isDayNote, cappedNotes, mergeDayNote } from './notepad.js';
+import { recordSignature } from './recovery-store.js';
+import { popShared } from './share-in.js';
 import { fmtBar, replaceRange } from './fmt-bar.js';
 import { htmlToMarkdown, tidyMarkdown } from './paste-clean.js';
 
@@ -24,12 +26,13 @@ const mine = () => S.user && S.user.email;
 // q: search; day / caseId / kind ('day': daily notes only): what the list is narrowed to; editing: the note open in the
 // editor; preview: its view mode; back: the tab the editor goes back to (a daily note opened from the Logbook);
 // initBody: text a new note starts with (shared to the app)
-const NV0 = () => ({ q: '', day: '', caseId: '', kind: '', editing: null, preview: false, autoNew: false, back: '', initBody: '' });
+// fromShare: initBody came from the share chooser (taken from the inbox only once the note has it)
+const NV0 = () => ({ q: '', day: '', caseId: '', kind: '', editing: null, preview: false, autoNew: false, back: '', initBody: '', fromShare: false });
 export const nv = NV0();
 
 // ---------- loading (lazy) ----------
 
-let stop = null, owner = null, raw = [], ready = null, readyResolve = null, synced = false;
+let stop = null, owner = null, raw = [], ready = null, readyResolve = null, synced = false, serverIn = null, serverResolve = null;
 function apply() {
   if (!owner || owner !== mine()) return;
   S.notes = sortNotes(writes.overlay('note', owner, raw));
@@ -42,18 +45,32 @@ export function ensureNotes() {
   stopNotes();
   owner = me; synced = false;
   ready = new Promise(r => { readyResolve = r; });
+  serverIn = new Promise(r => { serverResolve = r; });
   stop = cloud.watchNotes(me, (list, meta = {}) => {
     if (owner !== me) return;
     raw = list; apply();
-    if (!meta.fromCache) { synced = true; syncIndex(); }
+    if (!meta.fromCache) { synced = true; syncIndex(); if (serverResolve) { serverResolve(); serverResolve = null; } }
     if (readyResolve) { readyResolve(S.notes); readyResolve = null; }
+    takeServerDayNote();
     if (S.tab === 'notes' && !nv.editing) queueMicrotask(() => { if (S.tab === 'notes' && !nv.editing && !document.activeElement?.closest?.('.notes-page input')) hooks.render(); });
   });
   return ready;
 }
-function stopNotes() { if (stop) stop(); stop = null; owner = null; raw = []; ready = null; readyResolve = null; S.notes = null; }
+// the server's list (not the offline cache's), or after ms, whichever comes first
+const serverNotes = ms => Promise.race([serverIn || Promise.resolve(), new Promise(r => setTimeout(r, ms))]);
+function stopNotes() { if (stop) stop(); stop = null; owner = null; raw = []; ready = null; readyResolve = null; serverIn = null; serverResolve = null; S.notes = null; }
 resetters.push(() => { stopNotes(); Object.assign(nv, NV0()); inline = null; });
-writes.onChange(() => { if (owner) { apply(); if (synced) syncIndex(); } });
+writes.onChange(() => { if (owner) { apply(); if (synced) syncIndex(); } healDayNotes(); });
+// a conflict found after the save had already been accepted (a slow connection): merge it the same way
+function healDayNotes() {
+  const me = mine();
+  for (const n of [nv.editing, inline && inline.note]) {
+    const s = n && isDayNote(n) && sessions.get(n);
+    if (!s || s.saving || s.merging || s.owner !== me || !dayConflict(n)) continue;
+    s.saving = mergeDaySave(n, s, me).then(ok => { if (ok) s.status?.(s.dirty ? 'Not saved yet' : 'Saved'); return !!ok; },
+      err => { s.dirty = true; s.status?.('Not saved: ' + err.message); return false; }).finally(() => { s.saving = null; });
+  }
+}
 
 // the index doc, read the first time the Logbook asks (one small read), then kept live for the visit
 let idxStop = null, idxOwner = null;
@@ -84,22 +101,45 @@ function syncIndex() {
 }
 // until the index doc has arrived, an older settings.noteIndex still marks the days
 export const notesIndex = () => { watchIndex(); return cleanNoteIndex(S.noteIndex || settings().noteIndex); };
-export const dayHasNotes = date => !!date && notesIndex().days.includes(date);
+// (once the notes are loaded they answer too: the index holds 100 days, and an old daily note's day may not be in it)
+export const dayHasNotes = date => !!date && (notesIndex().days.includes(date) || (Array.isArray(S.notes) && S.notes.some(n => n.date === date)));
 export const caseHasNotes = id => !!id && notesIndex().cases.includes(id);
 
 // open Notes on a day's notes, or a case's (from the Logbook); create: start a new note there (linked to the case),
 // with body as its text
-export function openNotes({ day = '', caseId = '', create = false, body = '' } = {}) {
+export function openNotes({ day = '', caseId = '', create = false, body = '', fromShare = false } = {}) {
   leaveNotes();   // a note open in the editor is saved first
-  Object.assign(nv, { day, caseId, kind: '', q: '', editing: null, preview: false, autoNew: create, back: '', initBody: create ? body : '' });
+  Object.assign(nv, { day, caseId, kind: '', q: '', editing: null, preview: false, autoNew: create, back: '', initBody: create ? body : '', fromShare: create && fromShare });
   if (S.tab === 'notes') return hooks.render();
   hooks.navigate ? hooks.navigate('notes') : (location.hash = '#notes');
 }
 
 // ---------- saving ----------
 
-const sessions = new Map();   // note object → { base, timer, saving, dirty }
+const sessions = new Map();   // note object → { base, timer, saving, dirty, status?, onMerge? }
 const blank = n => !String(n.title || '').trim() && !String(n.body || '').trim();
+const clone = v => JSON.parse(JSON.stringify(v));
+// A daily note has a fixed id, so two devices (or a stale offline copy opened as a new note) can each write it. When a
+// save meets a newer copy, the two are merged (notepad.js mergeDayNote) and saved over it, instead of a conflict that
+// stops the note saving until it's sorted out in Recent changes. Ordinary notes keep the conflict, as before.
+const dayConflict = n => writes.entries().find(x => x.kind === 'note' && x.record.id === n.id && x.state === 'conflict');
+async function mergeDaySave(n, s, me) {
+  const job = dayConflict(n);
+  if (!job || s.merging) return null;
+  s.merging = true;
+  try { return await mergeOver(n, s, me, job); } finally { s.merging = false; }
+}
+async function mergeOver(n, s, me, job) {
+  await writes.archive(job.key);
+  const merged = mergeDayNote(n, s.base, job.remote);
+  for (const k of Object.keys(n)) if (!(k in merged)) delete n[k];
+  Object.assign(n, merged);
+  s.base = job.remote ? clone(job.remote) : null;
+  s.onMerge?.();
+  const saved = await writes.save('note', me, clone(n), s.base);
+  s.base = clone(saved);
+  return true;
+}
 async function persist(n) {
   const s = sessions.get(n);
   if (!s || !s.dirty) return true;
@@ -113,11 +153,10 @@ async function persist(n) {
   s.dirty = false;
   const payload = JSON.parse(JSON.stringify(n));
   s.status?.('Saving…');
-  s.saving = writes.save('note', me, payload, s.base).then(saved => {
-    s.base = JSON.parse(JSON.stringify(saved));
-    s.status?.(s.dirty ? 'Not saved yet' : 'Saved');
-    return true;
-  }, err => { s.dirty = true; s.status?.('Not saved: ' + err.message); return false; }).finally(() => { s.saving = null; });
+  s.saving = writes.save('note', me, payload, s.base).then(saved => { s.base = clone(saved); return true; })
+    .catch(async err => { if (isDayNote(n) && await mergeDaySave(n, s, me)) return true; throw err; })
+    .then(() => { s.status?.(s.dirty ? 'Not saved yet' : 'Saved'); return true; },
+      err => { s.dirty = true; s.status?.('Not saved: ' + err.message); return false; }).finally(() => { s.saving = null; });
   return s.saving;
 }
 const flushOpen = () => { if (nv.editing) persist(nv.editing); if (inline) persist(inline.note); };
@@ -147,7 +186,15 @@ export function renderNotes() {
   const loading = !Array.isArray(S.notes);
   const list = loading ? [] : S.notes;
   const counted = cappedNotes(list).length, full = counted >= MAX_NOTES;   // daily notes don't count
-  if (nv.autoNew && !loading) { nv.autoNew = false; queueMicrotask(() => (full ? toast(`You have ${MAX_NOTES} notes, the most allowed. Delete or export some to make room.`) : newNote())); }
+  if (nv.autoNew && !loading) {
+    nv.autoNew = false;
+    queueMicrotask(() => {
+      if (!full) return newNote();
+      toast(`You have ${MAX_NOTES} notes, the most allowed. Delete or export some to make room.`);
+      // shared text that has nowhere to go goes back to the chooser (never lost)
+      if (nv.fromShare) { nv.fromShare = false; nv.initBody = ''; hooks.navigate && hooks.navigate('share'); }
+    });
+  }
   const search = h('input', { type: 'search', class: 'grow', placeholder: 'Search notes', 'aria-label': 'Search notes', value: nv.q,
     oninput: e => { nv.q = e.target.value; paintList(); } });
   const listEl = h('div', { class: 'notes-list' });
@@ -199,7 +246,8 @@ function noteRow(n) {
 
 function newNote() {
   const n = { id: uid(), date: nv.day || todayISO(), title: '', body: nv.initBody || '', createdAt: Date.now() };
-  nv.initBody = '';
+  if (nv.fromShare) popShared();   // the note has the shared text now
+  nv.initBody = ''; nv.fromShare = false;
   if (nv.caseId) { n.caseId = nv.caseId; const c = caseOf(nv.caseId); if (c && c.date && !nv.day) n.date = c.date; }
   openEditor(n, true);
   // text shared to the app is saved at once (a new note is otherwise saved only once something is typed)
@@ -208,9 +256,11 @@ function newNote() {
 
 let editorTransient = null;
 // edit: open straight in Edit (a daily note), not Preview; back: the tab Done goes back to
-function openEditor(n, fresh = false, { edit = false, back = '' } = {}) {
-  const copy = JSON.parse(JSON.stringify(n));
-  sessions.set(copy, { base: fresh ? null : JSON.parse(JSON.stringify(n)), owner: mine(), dirty: false, timer: null, saving: null });
+// own: n is already a live copy with its session (the Case tab's daily note box), edited as it is, so there's only ever
+// one copy of it open
+function openEditor(n, fresh = false, { edit = false, back = '', own = false } = {}) {
+  const copy = own && sessions.has(n) ? n : JSON.parse(JSON.stringify(n));
+  if (copy !== n || !sessions.has(copy)) sessions.set(copy, { base: fresh ? null : JSON.parse(JSON.stringify(n)), owner: mine(), dirty: false, timer: null, saving: null });
   nv.editing = copy; nv.preview = !edit && !fresh && !!String(copy.body || '').trim(); nv.back = back;
   if (!editorTransient?.active) editorTransient = transients.open(() => {
     if (nv.editing) { persist(nv.editing); nv.editing = null; }
@@ -235,23 +285,46 @@ async function closeEditor() {
 const BACK_LABEL = { logbook: 'Logbook', log: 'Case' };
 const joinText = (body, add) => (String(body || '').trim() ? String(body).trimEnd() + '\n\n' : '') + String(add || '').trim();
 // open a day's note in the editor (today's by default), made the first time; append: text to add at its end (shared to
-// the app). It waits for the notes, so an existing daily note is always opened (never a second copy with the same id).
+// the app). It waits for the notes, so an existing daily note is always opened (never a second copy with the same id):
+// when the offline cache doesn't have it, it waits a moment for the server's list too. The Case tab box's copy, when
+// it's the same day, is the one opened. Resolves to whether the editor opened (false: gone elsewhere meanwhile).
 export async function openDayNote(iso = todayISO(), { append = '' } = {}) {
-  if (!mine()) return;
+  const me = mine();
+  if (!me) return false;
   leaveNotes();
   const from = S.tab !== 'notes' && BACK_LABEL[S.tab] ? S.tab : '';
-  Object.assign(nv, { day: '', caseId: '', kind: '', q: '', editing: null, preview: false, autoNew: false, initBody: '' });
+  Object.assign(nv, { day: '', caseId: '', kind: '', q: '', editing: null, preview: false, autoNew: false, initBody: '', fromShare: false });
   if (S.tab !== 'notes') { if (hooks.navigate) await hooks.navigate('notes'); else location.hash = '#notes'; } else hooks.render();
   const list = await ensureNotes();
-  if (S.tab !== 'notes' || nv.editing) return;   // gone elsewhere meanwhile
-  const have = dayNoteOf(list, iso);
-  openEditor(have || { id: dayNoteId(iso), date: iso, title: '', body: '', createdAt: Date.now() }, !have, { edit: true, back: from });
+  const away = () => S.tab !== 'notes' || nv.editing || mine() !== me;
+  if (away()) return false;
+  const live = inline && inline.owner === me && inline.iso === iso && sessions.has(inline.note) ? inline.note : null;
+  let have = dayNoteOf(list, iso);
+  if (!have && !live && !synced && !(typeof navigator !== 'undefined' && navigator.onLine === false)) {
+    await serverNotes(3000);
+    if (away()) return false;
+    have = dayNoteOf(S.notes, iso);
+  }
+  if (live) openEditor(live, false, { edit: true, back: from, own: true });
+  else openEditor(have || { id: dayNoteId(iso), date: iso, title: '', body: '', createdAt: Date.now() }, !have, { edit: true, back: from });
   if (append && nv.editing) {
     const n = nv.editing, add = String(append).trim();
     n.body = joinText(n.body, add).slice(0, LIMITS.body);
     if (n.body.length < joinText('', add).length) toast('The note is full: some of the text didn’t fit');
     touchOpen(); hooks.render();
   }
+  return !!nv.editing;
+}
+// A daily note opened as new (none in the offline cache) that the server's list turns out to have, with nothing
+// typed in it yet: the server's copy takes its place in the editor
+function takeServerDayNote() {
+  const e = nv.editing, s = e && isDayNote(e) && sessions.get(e);
+  if (!s || s.base || s.dirty || s.saving || s.owner !== mine()) return;
+  const have = dayNoteOf(S.notes, e.date);
+  if (!have || have.id !== e.id) return;
+  sessions.delete(e);
+  if (inline && inline.note === e) inline = null;
+  openEditor(have, false, { edit: true, back: nv.back });
 }
 
 // The Logbook's day: its daily note as a preview (tap it or Edit to open the editor), or "+ Daily note". Notes are only
@@ -279,7 +352,8 @@ export function dayNoteBox() {
     h('summary', {}, 'Today’s note'),
     ta,
     h('div', { class: 'bar day-note-bar' }, status, h('span', { class: 'grow' }),
-      h('button', { class: 'small linkish', type: 'button', onclick: () => { if (inline) persist(inline.note); openDayNote(iso); } }, 'Open in Notes')));
+      // the editor opens this box's own copy (openDayNote), so nothing typed here waits on a save first
+      h('button', { class: 'small linkish', type: 'button', onclick: () => openDayNote(iso) }, 'Open in Notes')));
   box.addEventListener('toggle', () => { inlineOpen = box.open; });
   const ready = () => {
     const have = dayNoteOf(S.notes, iso);
@@ -291,12 +365,14 @@ export function dayNoteBox() {
     };
     if (!inline || inline.owner !== me || inline.iso !== iso) fresh();
     else {
-      // saved elsewhere since (the editor, another device) and nothing typed here: take the newer copy
+      // saved elsewhere since (the editor, another device: any field, not only the text) and nothing typed here: take
+      // the newer copy
       const s = sessions.get(inline.note);
-      if (have && !s.dirty && !s.saving && (!s.base || s.base.updatedAt !== have.updatedAt) && have.body !== inline.note.body) fresh();
+      if (!s || (have && !s.dirty && !s.saving && !s.merging && recordSignature(have) !== recordSignature(s.base))) fresh();
     }
     const n = inline.note, s = sessions.get(n);
     s.status = t => { status.textContent = t; };
+    s.onMerge = () => { if (document.activeElement !== ta || ta.value !== n.body) ta.value = n.body || ''; };
     status.textContent = s.dirty ? 'Not saved yet' : s.base ? 'Saved' : '';
     ta.value = n.body || ''; ta.disabled = false; ta.placeholder = 'A line for today…';
     ta.oninput = () => { n.body = ta.value; s.dirty = true; status.textContent = 'Not saved yet'; clearTimeout(s.timer); s.timer = setTimeout(() => persist(n), SAVE_MS); };
@@ -362,8 +438,10 @@ function editor(n) {
     const c = n.caseId && caseOf(n.caseId);
     dateText.textContent = n.date ? fmtDate(n.date) : 'No date';
     fill(meta,
-      h('label', { class: 'note-date', title: 'Change the date' }, dateText, date),
-      n.date ? h('button', { class: 'linkish', type: 'button', onclick: () => { n.date = null; date.value = ''; touch(); paintMeta(); } }, 'No date') : null,
+      // a daily note belongs to its day (found by it everywhere): its date shows but doesn't change
+      isDayNote(n) ? h('span', { class: 'note-date', title: 'A daily note stays on its day' }, dateText)
+        : h('label', { class: 'note-date', title: 'Change the date' }, dateText, date),
+      n.date && !isDayNote(n) ? h('button', { class: 'linkish', type: 'button', onclick: () => { n.date = null; date.value = ''; touch(); paintMeta(); } }, 'No date') : null,
       h('span', { class: 'note-dot', 'aria-hidden': 'true' }, '·'),
       n.caseId ? h('span', { class: 'note-link' }, c
         ? h('button', { class: 'linkish note-case', type: 'button', title: 'Open the linked case', 'aria-label': 'Open the linked case: ' + caseLabel(c), onclick: () => openCase(n.caseId) }, '↗ ' + caseLabel(c))
@@ -372,6 +450,13 @@ function editor(n) {
         : h('button', { class: 'linkish', type: 'button', onclick: () => pickCase(n, () => { touch(); paintMeta(); }) }, 'Link to a case…'));
   };
   paintMeta();
+  // a daily note merged with a newer copy saved elsewhere (persist): show the merged text
+  s.onMerge = () => {
+    if (nv.editing !== n) return;
+    if (!(document.activeElement === body && body.value === n.body)) body.value = n.body || '';
+    if (document.activeElement !== title) title.value = n.title || '';
+    paintMeta(); if (nv.preview) paintView();
+  };
   const view = h('div', { class: 'note-view' });
   const paintView = () => fill(view, renderBody(n.body, line => { n.body = toggleCheck(n.body, line); body.value = n.body; touch(); persist(n); paintView(); }));
   const modeBtn = h('button', { type: 'button', 'aria-pressed': String(nv.preview), onclick: () => { closeMenu(); nv.preview = !nv.preview; paint(); if (!nv.preview) body.focus(); } });

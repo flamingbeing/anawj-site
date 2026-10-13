@@ -16,8 +16,9 @@ export function renderShare() {
   }
   const lines = text.split('\n').length;
   const asCases = () => { takeShared(true); hooks.navigate('log'); };
-  const toToday = () => { const t = popShared(); openDayNote(todayISO(), { append: t }); };
-  const asNote = () => { const t = popShared(); openNotes({ create: true, body: t }); };
+  // the text leaves the inbox only once the note has it (left elsewhere meanwhile, or no room: it's still here)
+  const toToday = () => openDayNote(todayISO(), { append: text }).then(ok => { if (ok) popShared(); });
+  const asNote = () => openNotes({ create: true, body: text, fromShare: true });
   const discard = () => { popShared(); toast('Shared text discarded'); hooks.navigate('log'); };
   return h('section', { class: 'card share-in' },
     h('h2', {}, 'Shared with the app'),
