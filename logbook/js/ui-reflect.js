@@ -15,6 +15,7 @@ import { renderExportButton, caseRYear, countsByYear } from './portfolio.js';
 import { parseQuery, matchQuery, REFL_FIELDS, REFL_OPERATOR_HELP } from './search-ops.js';
 import { opsHelp } from './ui-logbook.js';
 import { createDraftSlot } from './drafts.js';
+import { fmtBar } from './fmt-bar.js';
 
 const DRAFT_KEY = 'apmes-logbook-reflection-draft';
 const VIEW_KEY = 'apmes-logbook-reflection-view';
@@ -1147,27 +1148,9 @@ function editor() {
   return editor;
 }
 
-// The formatting buttons write a little Markdown into the box (**bold**, "- " bullets, "1. " numbers); the Word
-// export turns it into real bold and bullets (portfolio.js mdRuns), the Markdown export keeps it as it is.
-export function fmtBar(ta) {
-  const edit = fn => {
-    const { selectionStart: a, selectionEnd: b, value: v } = ta;
-    const ls = v.lastIndexOf('\n', a - 1) + 1, le = v.indexOf('\n', b) < 0 ? v.length : v.indexOf('\n', b);
-    const [text, sa, sb] = fn(v, a, b, ls, le);
-    ta.value = text; ta.focus(); ta.setSelectionRange(sa, sb);
-    ta.dispatchEvent(new Event('input', { bubbles: true }));
-  };
-  const bold = () => edit((v, a, b) => (a === b ? [v.slice(0, a) + '****' + v.slice(b), a + 2, a + 2] : [v.slice(0, a) + '**' + v.slice(a, b) + '**' + v.slice(b), a + 2, b + 2]));
-  const prefix = numbered => edit((v, a, b, ls, le) => {
-    const block = v.slice(ls, le).split('\n');
-    const done = block.every(l => (numbered ? /^\d+\.\s/ : /^[-*+]\s/).test(l));
-    const out = block.map((l, i) => (done ? l.replace(numbered ? /^\d+\.\s/ : /^[-*+]\s/, '') : (numbered ? `${i + 1}. ` : '- ') + l.replace(/^(\d+\.|[-*+])\s/, ''))).join('\n');
-    return [v.slice(0, ls) + out + v.slice(le), ls, ls + out.length];
-  });
-  const btn = (label, aria, fn) => h('button', { type: 'button', class: 'small', 'aria-label': aria, title: aria, onmousedown: e => e.preventDefault(), onclick: fn }, label);
-  return h('div', { class: 'fmt-bar', role: 'toolbar', 'aria-label': 'Formatting' },
-    btn(h('b', {}, 'B'), 'Bold', bold), btn('• List', 'Bullet list', () => prefix(false)), btn('1. List', 'Numbered list', () => prefix(true)));
-}
+// The formatting buttons (fmt-bar.js) write a little Markdown into the box (**bold**, "- " bullets, "1. " numbers); the
+// Word export turns it into real bold and bullets (portfolio.js mdRuns), the Markdown export keeps it as it is.
+export { fmtBar };
 // (and fields added later, like a new learning point, as they take the focus)
 if (typeof document !== 'undefined') document.addEventListener('focusin', e => {
   if (e.target.closest && e.target.closest('.refl-editor') && document.documentElement.classList.contains('refl-spell-off')) e.target.spellcheck = false;

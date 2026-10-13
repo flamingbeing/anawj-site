@@ -10,9 +10,10 @@ import {
   createCase, updateCase, removeCase, restoreCase, saveMany, deleteMany, subcatChips, subcatsOf, settings, todayISO, hooks, fill, add, cloud, writes, okNoIds, patchLogbook, catPills, basicHides, basicMode, caseShown } from './ui-core.js';
 import { display, templateDialog } from './ui-settings.js';
 import { moveToBin } from './bin.js';
-import { caseHasNotes, openNotes } from './ui-notepad.js';
+import { caseHasNotes, openNotes, dayNoteBox } from './ui-notepad.js';
 import { createDraftSlot, listDrafts } from './drafts.js';
 import { STRONG, confident, autoTick, rejectCodes, recentCases, recentCount as snapRecent } from './logging.js';
+import { SHARED_KEY, peekShared, popShared, sharedFiles, shareState } from './share-in.js';
 
 const DRAFT_KEY = 'logbook-draft-v2';
 const KEEP_MS = 12 * 3600e3; // a date kept by "Save, keep date" lasts this long
@@ -68,11 +69,13 @@ export function recoverableCaseDrafts() {
 }
 export function recoverCaseDraft(value) { loadDraft(); saveDraft(); draftSlot = createDraftSlot(DRAFT_KEY, draftOwner.slice(DRAFT_KEY.length + 1)); draft = { ...EMPTY(), ...value }; saveDraft(); location.hash = '#log'; hooks.render(); }
 // Text shared to the installed app (share sheet → Logbook; manifest share_target) arrives as
-// ?share_text=…; app.js keeps it for here: it opens in paste-a-list, so one case or a whole list works.
-export const SHARED_KEY = 'logbook-shared';
-function takeShared() {
-  let text = '';
-  try { text = sessionStorage.getItem(SHARED_KEY) || ''; sessionStorage.removeItem(SHARED_KEY); } catch { /* ignore */ }
+// ?share_text=… (or, from the service worker, ?shared=1: share-in.js); app.js keeps it for here: it opens in
+// paste-a-list, so one case or a whole list works. With Settings → Notes → Ask what to do with shared text, the
+// chooser (#share) asks first; it calls this for "Add as case(s)" (force).
+export { SHARED_KEY };
+export function takeShared(force = false) {
+  if (!force && !shareState.seen && (settings().shareAsk || sharedFiles()) && peekShared()) { queueMicrotask(() => hooks.navigate && hooks.navigate('share')); return; }
+  const text = popShared();
   if (!text.trim()) return;
   draft.bulk = draft.bulk && draft.bulk.trim() ? draft.bulk.trimEnd() + '\n\n' + text.trim() : text.trim();
   draft.mode = 'bulk'; bulkRows = null;
@@ -561,7 +564,9 @@ function renderOne(card) {
       initialsInput ? h('label', { class: 'field log-initials' }, 'Initials', initialsInput) : null,
       h('div', { class: 'box-wrap' }, boxMarks, textarea, pasteBtn(textarea), clearBtn), parsed, tagRow,
       // suggestions first, then the last case and your own templates
-      h('div', { class: 'chiplabel quick-label' }, 'Quick picks'), sugg, templates),
+      h('div', { class: 'chiplabel quick-label' }, 'Quick picks'), sugg, templates,
+      // Settings → Notes → Show the daily note on the Case tab (off by default)
+      settings().dayNoteOnCase ? dayNoteBox() : null),
     h('div', { class: 'lp-right' },
     h('div', { class: 'bar cat-head' }, h('div', { class: 'chiplabel grow' }, 'All tags'),
       h('span', { class: 'seg cat-view', role: 'group', 'aria-label': 'Show tags as' },

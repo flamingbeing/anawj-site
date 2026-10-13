@@ -1479,3 +1479,34 @@ html.row-hold ul.cases li:not(.monthhead) { -webkit-user-select: none; user-sele
 .notes-download { margin: 12px 0 0; }
 .case-links { margin-top: 8px; }
 .case-links .bar { justify-content: flex-start; gap: 8px; flex-wrap: wrap; }
+
+/* ---------- daily notes, formatting bar, shared to the app (ui-notepad.js, fmt-bar.js, ui-share-in.js) ---------- */
+.notes-daily { margin: 4px 0 0; gap: 8px; }
+button.chip-toggle[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); font-weight: 600; }
+/* the Logbook's day: its daily note under the heading, a preview that opens the editor */
+.lb-daynote { margin: 8px 0 4px; padding: 8px 10px; border: 1px solid var(--edge, var(--line)); border-radius: calc(10px * var(--round, 1)); }
+.lb-daynote-head { display: flex; align-items: center; gap: 8px; }
+.lb-daynote-head h4 { margin: 0; flex: 1; font-size: calc(14px * var(--fs, 1)); color: var(--muted); }
+.lb-daynote-view { min-height: 0; max-height: 14em; overflow: hidden; cursor: pointer; padding: 0;
+  -webkit-mask-image: linear-gradient(#000 calc(100% - 2em), transparent); mask-image: linear-gradient(#000 calc(100% - 2em), transparent); }
+.lb-daynote-view > :first-child { margin-top: 4px; }
+.lb-daynote-add { margin: 6px 0 2px; }
+.lb-daynote-add .linkish { background: none; border: 0; padding: 0 2px; min-height: 32px; color: var(--accent); font-weight: 600; }
+/* the Case tab's box for today's note (Settings → Notes) */
+details.day-note-box { margin: 10px 0 0; }
+details.day-note-box > summary { cursor: pointer; color: var(--muted); font-weight: 600; min-height: 32px; line-height: 32px; width: fit-content; }
+.day-note-box .day-note-text { width: 100%; font-family: var(--font-log, inherit); }
+.day-note-bar { margin: 2px 0 0; }
+.day-note-bar .linkish { background: none; border: 0; color: var(--accent); font-weight: 600; }
+/* the note editor's full formatting bar: one row, scrolls sideways if it must */
+.fmt-full { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; gap: 4px; padding: 2px 0; }
+.fmt-full::-webkit-scrollbar { display: none; }
+.fmt-full button { flex: 0 0 auto; min-width: 36px; padding-inline: 8px; }
+@media (max-width: 600px) {
+  /* typing in the note on a phone: the bar rides on the keyboard, just above the tab bar */
+  body.typing .note-fmt.on { position: fixed; left: 0; right: 0; bottom: calc((var(--kb, 0px) + var(--tabbar-h)) / var(--ui-zoom, 1)); z-index: 29; margin: 0; padding: 4px 8px; background: var(--panel); border-top: 1px solid var(--edge, var(--line)); }
+}
+/* shared to the app: what came, and where it goes */
+.share-preview { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 40vh; overflow: auto; margin: 0 0 10px; padding: 8px 10px; font: inherit; font-size: calc(14px * var(--fs, 1)); background: var(--row-alt); border-radius: calc(8px * var(--round, 1)); }
+.share-choices { display: flex; flex-direction: column; gap: 8px; }
+.share-choices button { width: 100%; }

@@ -10,7 +10,7 @@
 // renderBin() / openBin()        the bin view (element) / the same in a dialog
 
 import { S, h, toast, modal, confirmBox, cloud, writes, fill, removeCase, deleteMany, restoreCase, miniChips, resetters } from './ui-core.js';
-import { cleanNote, noteTitle, MAX_NOTES } from './notepad.js';
+import { cleanNote, noteTitle, MAX_NOTES, isDayNote, cappedNotes } from './notepad.js';
 import { cleanCase } from './demo-backend.js';
 import { cleanReflection } from './reflections.js';
 import { REFLECTION_HEADINGS } from './categories.js';
@@ -94,8 +94,9 @@ export async function restoreFromBin(id) {
   } else if (e.kind === 'note') {
     // the notes may not be loaded yet (they load on first use): load them, so the limit and the id check hold
     const have = (await (await import('./ui-notepad.js')).ensureNotes().catch(() => null)) || S.notes || [];
-    if (have.length >= MAX_NOTES) throw new Error(`you already have ${MAX_NOTES} notes; delete one first`);
     out = { ...e.data };
+    if (!isDayNote(out) && cappedNotes(have).length >= MAX_NOTES) throw new Error(`you already have ${MAX_NOTES} notes; delete one first`);
+    // a daily note whose day has a new one since comes back as an ordinary note of that day
     if (have.some(n => n.id === out.id)) out.id = uid();
     out = await writes.save('note', mine(), out, null);
   } else {

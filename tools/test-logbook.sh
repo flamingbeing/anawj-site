@@ -28,7 +28,7 @@ if [ "${1:-}" != quick ]; then
   grep -E '^== |^FAIL|console errors' "$OUT/e2e.txt"
 fi
 
-for t in recovery usability cloud-save notepad tag-editor simpler profiles moved send logging-speed; do
+for t in recovery usability cloud-save notepad daily-note tag-editor simpler profiles moved send logging-speed; do
   step "$t"
   timeout 300 node "logbook/test/e2e/$t.mjs" >"$OUT/$t.txt" 2>&1 && grep -E '^PASS' "$OUT/$t.txt" || { echo "FAIL $t"; tail -15 "$OUT/$t.txt"; fail=1; }
 done

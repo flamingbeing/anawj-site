@@ -11,7 +11,7 @@ import { parseCsv } from './tags.js';
 import {
   S, h, toast, debounce, modal, cat, categoryNamesRevision, catName, catShort, tagName, catFull, catChip, PICKER_ORDER, settings, patchLogbook, needExcel, download, fileButton, catPills,
   updateCase, saveMany, deleteMany, displayName, rYear, todayISO, fill, add, resetters, tagSet, tagLinks, confirmBox, keepTags, hooks, rowIcon, ic, ib, emptyState, reveal, basicHides } from './ui-core.js';
-import { dayHasNotes, caseHasNotes, openNotes, ensureNotes } from './ui-notepad.js';
+import { dayHasNotes, caseHasNotes, openNotes, ensureNotes, dayNoteCard } from './ui-notepad.js';
 import { flatTree, tagTree } from './tags.js';
 import { editCaseDialog, logOnDate } from './ui-log.js';
 import { reflectOnCase } from './ui-reflect.js';
@@ -450,7 +450,9 @@ function calendarView(rows, flagsOf, repaint) {
   }
   const dayCases = view.day ? (byDay.get(view.day) || []) : [];
   const dayNotes = dayHasNotes(view.day);
-  if (dayNotes) ensureNotes();   // the day's Copy includes its notes: have them ready before the tap
+  // the day's Copy includes its notes, and its daily note shows under the heading: have them ready (drawn again once
+  // they arrive)
+  if (dayNotes && !Array.isArray(S.notes)) ensureNotes().then(() => { if (S.tab === 'logbook') hooks.render(); });
   return h('div', {},
     h('div', { class: 'bar lb-calbar' },
       h('button', { class: 'small icon-btn', 'aria-label': 'Previous month', onclick: () => shift(-1) }, '‹'),
@@ -475,6 +477,7 @@ function calendarView(rows, flagsOf, repaint) {
           dayNotes ? h('button', { class: 'small ib', title: 'Notes', onclick: () => openNotes({ day: view.day }) }, ic('note'), h('span', { class: 'ib-l' }, 'Notes')) : null,
           // log on this day (the Log page opens with the date already picked): last, at the right like a main action
           h('button', { class: 'small primary', title: 'Log a case on this day', 'aria-label': 'Log a case on this day', onclick: () => logOnDate(view.day) }, '+ Add'))),
+      dayNoteCard(view.day),
       dayCases.length ? h('ul', { class: 'cases' }, dayCases.map(c => caseRow(c, flagsOf))) : emptyState('calendar', view.day === today ? 'No cases yet today' : 'No cases on this day'))
       : h('p', { class: 'hint help', style: 'margin-top:10px' }, 'Tap a day to see its cases.'),
     undated.length ? h('details', { style: 'margin-top:12px' },
