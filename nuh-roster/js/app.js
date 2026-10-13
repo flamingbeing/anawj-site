@@ -1508,6 +1508,40 @@ const HOW = [
   ['see only my own day?', 'My day (footer): pick your name once. It shows your room, partner, cases, calls, and your week.'],
   ['practise without touching the real roster?', 'Practice (top right) has made-up staff, a tour and a "Fix 3 problems" exercise.'],
 ];
+// What changed for the people using it, newest first. Shown once per device after an update (WHATS_NEW_KEY), and
+// always from Key and help. Add a line here when a change is something a rosterer or viewer would notice.
+const WHATS_NEW = [
+  ['13 Oct 2026', [
+    'My day opens on today in the morning, shows when the roster was saved and marks what changed since you looked; My week, Add to calendar and Copy for logbook.',
+    'The roster says when this browser stops saving, and keeps a copy of damaged data.',
+    'New live checks: a double-covered room with no junior, a senior in three rooms, an admin day on a list.',
+    'After a change, "Changed since sent" lists who moved; a sheet sent again says "Updated" with the time; the image can go in 2 parts.',
+    'The generator prefers SC/C for complex lists and double covers, and says why when you hover a name.',
+    'Monthly rosters mark clashes (leave, a day duty after a night) and show which rosters are loaded; leave per day; rotation counts.',
+    'Fix names after an import; "Same until" for several days; Start from last week or from the last roster.',
+    'Phones: bigger buttons, no zooming, Cases as cards, a Next step bar; installable on the home screen and works with poor signal.',
+    'Key and help, a printable guide, Practice exercises and scenarios.',
+  ]],
+];
+const WHATS_NEW_KEY = 'nuh-roster-whats-new';
+function showWhatsNew() {
+  const dlg = h('dialog', { class: 'changes key' }, h('h2', {}, 'What\'s new'),
+    WHATS_NEW.map(([when, items]) => [h('h3', {}, when), h('ul', {}, items.map(t => h('li', {}, t)))]),
+    h('div', { class: 'bar' }, h('button', { class: 'primary', onclick: () => dlg.close() }, 'Close'), h('button', { onclick: () => { dlg.close(); showKey(); } }, 'Key and help')));
+  dlg.addEventListener('close', () => dlg.remove());
+  document.body.append(dlg); dlg.showModal();
+  try { localStorage.setItem(WHATS_NEW_KEY, WHATS_NEW[0][0]); } catch { /* no storage */ }
+}
+// once per device, for people who have used it before (not on a first visit, Practice or for the tour)
+function maybeWhatsNew() {
+  let seen = null;
+  try { seen = localStorage.getItem(WHATS_NEW_KEY); } catch { return; }
+  if (seen === WHATS_NEW[0][0]) return;
+  if (DEMO || !state.staff.length) { try { localStorage.setItem(WHATS_NEW_KEY, WHATS_NEW[0][0]); } catch { /* no storage */ } return; }
+  if (document.getElementById('toast')?.classList.contains('show') || document.querySelector('dialog[open]')) { setTimeout(maybeWhatsNew, 5000); return; } // after the message on screen
+  toast('The roster has been updated.', { label: 'What\'s new', run: showWhatsNew });
+  try { localStorage.setItem(WHATS_NEW_KEY, WHATS_NEW[0][0]); } catch { /* no storage */ }
+}
 function showKey() {
   const dlg = h('dialog', { class: 'changes key' }, h('h2', {}, 'Key and help'),
     h('table', { class: 'key-table' }, h('tbody', {}, SYMBOLS.map(([k, what]) => h('tr', {}, h('th', { scope: 'row' }, k), h('td', {}, what))))),
@@ -1515,7 +1549,8 @@ function showKey() {
     h('div', { class: 'how' }, HOW.map(([q, a]) => h('details', { ontoggle: e => { if (e.target.open) dlg.querySelectorAll('.how details[open]').forEach(d => { if (d !== e.target) d.open = false; }); } },
       h('summary', {}, '…' + q), h('p', {}, a)))),
     h('div', { class: 'bar' }, h('button', { class: 'primary', onclick: () => { dlg.close(); dlg.remove(); } }, 'Close'),
-      h('a', { class: 'btn', href: 'guide.html', target: '_blank', rel: 'noopener' }, 'One-page guide to print')));
+      h('a', { class: 'btn', href: 'guide.html', target: '_blank', rel: 'noopener' }, 'One-page guide to print'),
+      h('button', { onclick: () => { dlg.close(); showWhatsNew(); } }, 'What\'s new')));
   dlg.addEventListener('close', () => dlg.remove());
   document.body.append(dlg); dlg.showModal();
 }
@@ -4308,6 +4343,7 @@ lastRows = state.roster ? JSON.stringify(state.roster.rows) : null;
 state.tab = location.hash === '#myday' ? 'myday' : state.staff.length ? 'roster' : 'staff'; // the page opens on the roster
 render();
 openOnTheRightDay();
+setTimeout(maybeWhatsNew, 1200);
 // a practice link with a scenario (?demo=short): set it up once per visit
 if (DEMO) {
   const sc = new URLSearchParams(location.search).get('demo');
