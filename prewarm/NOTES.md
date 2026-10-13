@@ -96,6 +96,10 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   (tap logs now, tap again to change) so the PACU nurse logs them there. The Temperatures tab has "Mark pre-warming
   temps complete" (not for the no-pre-warming group) and "Mark intra-op temps complete" (`sign_prewarm`,
   `sign_iotemp`, already in the export and the Word form).
+- **Complete means closed** (owner, 13 Oct 2026): a section marked complete (pre-warming / intra-op temps, BP HR BIS,
+  Intra-op details, PACU) is read only for everyone until its tick is undone (Undo asks first); its due alerts and
+  countdown stop. "Data collection complete" closes every op-day screen (key times, Log, readings, forms) but not
+  Perioperative data (filled in later from the chart). Each temps tick shows only on its own sub-tab.
 - **Never send an empty `f`** (lesson, 12 Oct 2026): `setDoc(…, { f: {} }, { merge: true })` replaces the server's
   `f` with an empty map (an empty map is a leaf in the merge). Lock / unlock / delete sent one and wiped the server
   copy's readings; push now omits an empty `f`, lock sends the full record, and each phone resends all its patients

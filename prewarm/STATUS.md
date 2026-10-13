@@ -25,6 +25,7 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 
 ## Recently done
 
+- Sections marked complete are read only until undone; temps ticks on their own sub-tab.
 - PACU in / To ward on the PACU page; pre-warming / intra-op temps complete ticks.
 - Three bordered parts, swipe in the middle only, tab "BP, HR, BIS", Reset this subject (asks twice), PACU view.
 - Layout: key times on top, tab bar under them, same bottom part on both tabs; no-pre-warming Pre-warming tab.
