@@ -11,7 +11,8 @@ Static site on GitHub Pages (public repo: no names, patient data or real evaluat
 - `prewarm/`: prewarming study op-day data collection (temperatures every 5 min, export to the study's Excel template). Start with `prewarm/NOTES.md`, then `prewarm/PLAN.md`.
 - `hand-babies/`: hand surgery exam crash course for new MOs (one static page, no data). Start with `hand-babies/NOTES.md`.
 - `edit/`: the page editor for any page on the site (`edit.anawj.com/<path>` redirects to it). Suggested edits arrive as
-  GitHub issues titled `Page edits:`; how to apply them: `edit/NOTES.md`.
+  GitHub issues titled `Page edits:`; how to apply them: `edit/NOTES.md`. A daily routine ("Page edits check", 8:58 am
+  Singapore) drafts one PR for new ones and never merges: the owner approves page edits.
 - `apmes/`: APMES programme documents (not secret): the EPA Guidebook v8 and requirements transcribed (the evals
   data is built from them), and the blank portfolio template the logbook tests use. See `apmes/README.md`.
   Before adding a programme file, check its cover/contributor pages and file details (author, embedded files) for
