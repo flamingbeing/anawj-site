@@ -27,6 +27,14 @@ if ! claude plugin list 2>/dev/null | grep -q 'firebase@firebase'; then
   claude plugin install firebase@firebase >/dev/null 2>&1 || echo "Firebase plugin: install failed" >&2
 fi
 
+# context-nudge: reminds the owner to /save-state and /compact at 50% and 75% context (tools/context-nudge).
+if ! claude plugin marketplace list 2>/dev/null | grep -q anawj-tools; then
+  claude plugin marketplace add "$PWD/tools/context-nudge" >/dev/null 2>&1 || echo "context-nudge: marketplace add failed" >&2
+fi
+if ! claude plugin list 2>/dev/null | grep -q 'context-nudge@anawj-tools'; then
+  claude plugin install context-nudge@anawj-tools >/dev/null 2>&1 || echo "context-nudge: install failed" >&2
+fi
+
 if ! command -v codex >/dev/null 2>&1; then
   npm install -g @openai/codex >/dev/null 2>&1 || echo "Codex CLI: npm install failed" >&2
 fi

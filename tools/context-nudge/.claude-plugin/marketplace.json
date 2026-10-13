@@ -1,0 +1,5 @@
+{
+  "name": "anawj-tools",
+  "owner": { "name": "anawj" },
+  "plugins": [{ "name": "context-nudge", "source": "./" }]
+}
