@@ -1,14 +1,16 @@
 // Fake data only. Notes (More → Notes): lazy loading, the editor and autosave, search, to-dos, day and case links,
 // the day's Copy, Arrange tabs, the recycle bin, the 2,000-note limit (a page of 100 at a time) and the backup.
 import assert from 'node:assert/strict';
-const { chromium } = await import(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/node_modules/playwright/index.mjs');
+import { launch, engine, isChromium, clipboardOpts, portableClipboard, readClipboard, lf, ignorable, until } from './browsers.mjs';
 const base = `http://localhost:${process.env.PORT || 8080}/logbook/`;
-const b = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH, args: ['--no-sandbox'] } : {});
+const b = await launch();
+if (!b) { console.log(`SKIP notes (${engine} is not installed here)`); process.exit(0); }
 try { for (const width of [390, 1280]) {
-  const ctx = await b.newContext({ viewport: { width, height: 844 }, serviceWorkers: 'block', permissions: ['clipboard-read', 'clipboard-write'] });
+  const ctx = await b.newContext({ viewport: { width, height: 844 }, serviceWorkers: 'block', ...clipboardOpts() });
+  await portableClipboard(ctx);
   await ctx.addInitScript(() => localStorage.setItem('apmes-logbook-demo-small', '1'));
   const p = await ctx.newPage(), errors = [];
-  p.on('pageerror', e => errors.push(e.message)); p.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
+  p.on('pageerror', e => errors.push(e.message)); p.on('console', m => { if (m.type() === 'error' && !ignorable(m.text())) errors.push(m.text()); });
   const S = () => p.evaluate(async () => { const { S } = await import('./js/ui-core.js'); return { notes: S.notes, index: S.noteIndex || null }; });
   const today = await p.evaluate(() => 0) || null;
   await p.goto(base + '?demo#log'); await p.waitForSelector('textarea.details');
@@ -37,7 +39,7 @@ try { for (const width of [390, 1280]) {
   await p.getByRole('button', { name: 'More options' }).click();
   await p.getByRole('menuitem', { name: 'Preview' }).click();
   await p.locator('.note-view input[type=checkbox]').first().check();
-  await p.waitForFunction(async () => { const { S } = await import('./js/ui-core.js'); return S.notes?.[0]?.body.includes('- [x] fake to-do'); });
+  await until(p, async () => { const { S } = await import('./js/ui-core.js'); return S.notes?.[0]?.body.includes('- [x] fake to-do'); }, null, { msg: 'the ticked to-do saved' });
   await p.getByRole('button', { name: 'Done' }).click();
   await p.locator('ul.notes-rows li').first().waitFor();
   assert.match(await p.locator('.notes-count').innerText(), /^1 of 2000$/);
@@ -68,7 +70,7 @@ try { for (const width of [390, 1280]) {
   await p.locator('.lb-day.today .lb-note').waitFor();
   await p.getByRole('button', { name: 'Copy this day' }).click();
   await p.waitForTimeout(300);
-  assert.match(await p.evaluate(() => navigator.clipboard.readText()), /## Notes\n\n### Fake teaching point\nFake dose reminder/);
+  assert.match(await readClipboard(p), /## Notes\n\n### Fake teaching point\nFake dose reminder/);
   await p.getByRole('button', { name: 'Notes', exact: true }).click();
   await p.locator('.notes-filter').filter({ hasText: 'Notes on' }).waitFor();
   assert.equal(await p.locator('ul.notes-rows li').count(), 1);
@@ -80,8 +82,10 @@ try { for (const width of [390, 1280]) {
   await p.locator('dialog[open] .pick-cases li').first().click();
   await p.locator('.note-link').waitFor();
   await p.getByRole('button', { name: 'Done' }).click();
-  await p.waitForFunction(async () => { const { S } = await import('./js/ui-core.js'); return (S.noteIndex?.cases || []).length === 1; });
-  const caseId = (await S()).index.cases[0];
+  // (polled here: an async check in waitForFunction counts as done at once, before the index has the case)
+  let caseId = null;
+  for (let i = 0; i < 100 && !caseId; i++) { const idx = (await S()).index; caseId = idx && idx.cases.length === 1 ? idx.cases[0] : null; if (!caseId) await p.waitForTimeout(100); }
+  assert.ok(caseId, 'the note index never got the case');
   await p.locator('[role=tab][data-tab=logbook]').click();
   const list = p.locator('main .seg button').filter({ hasText: /^List$/ }); await list.first().click();
   await p.getByRole('button', { name: 'Open your notes on this case' }).first().click();
@@ -116,7 +120,7 @@ try { for (const width of [390, 1280]) {
   await p.locator('dialog[open]').getByLabel('Plain text (.txt)').check();
   await p.locator('dialog[open]').getByRole('button', { name: 'Download', exact: true }).click();
   const zipPath = await (await dl).path();
-  const names = (await import('node:child_process')).execFileSync('python3', ['-c', 'import sys,zipfile; print("\\n".join(zipfile.ZipFile(sys.argv[1]).namelist()))', zipPath]).toString().trim().split('\n');
+  const names = lf((await import('node:child_process')).execFileSync('python3', ['-c', 'import sys,zipfile; print("\\n".join(zipfile.ZipFile(sys.argv[1]).namelist()))', zipPath]).toString()).trim().split('\n');
   assert.equal(names.length, 2); assert.ok(names.every(n => n.endsWith('.txt')), names.join('|'));
   assert.ok(names.some(n => /^\d{4}-\d{2}-\d{2} Fake teaching point\.txt$/.test(n)), names.join('|'));
 
@@ -205,5 +209,5 @@ try { for (const width of [390, 1280]) {
   assert.match(shared, /Fake filler 0\b/);
   assert.equal(await p.evaluate(async () => (await import('./js/ui-notepad.js')).dayHasNotes('2025-01-01')), true);
 
-  assert.deepEqual(errors, []); await ctx.close(); console.log(`PASS notes ${width === 390 ? 'phone' : 'desktop'}`);
+  assert.deepEqual(errors, []); await ctx.close(); console.log(`PASS notes ${width === 390 ? 'phone' : 'desktop'}${isChromium ? '' : ' (' + engine + ')'}`);
 } } finally { await b.close(); }

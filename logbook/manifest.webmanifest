@@ -31,7 +31,7 @@
     {
       "name": "Log a case",
       "short_name": "Log",
-      "url": "./#log",
+      "url": "./#quicklog",
       "icons": [
         {
           "src": "icons/icon-192.png",

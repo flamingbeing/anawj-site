@@ -5,13 +5,16 @@
 //   title:lscs    only the first line      tag:lscs      a tag, by name
 //   "lap chole"   an exact phrase          spinal AND ga  both (same as a space)
 //   -paeds        leave out                spinal OR epidural (or |)   either
+//   has:lp        a labelled part (Settings → Advanced logging → Labelled parts)
 //
 // Anything else is a plain word, searched as without operators. A misspelt operator ("initals:AB",
 // "tga:16") is searched as plain text and reported, so the box can say "did you mean initials:?".
 
 import { editDistance } from './engine.js';
 
-export const FIELDS = ['initials', 'title', 'case', 'tag'];
+export const FIELDS = ['initials', 'title', 'case', 'tag', 'has'];
+// with Labelled parts off, has: is plain text again (as before the setting existed)
+export const FIELDS_NO_HAS = FIELDS.filter(f => f !== 'has');
 // Reflections search: its own fields (no tags; title: is the reflection's title)
 export const REFL_FIELDS = ['initials', 'heading', 'title', 'diagnosis', 'case'];
 export const REFL_OPERATOR_HELP = [
@@ -32,6 +35,7 @@ export const OPERATOR_HELP = [
   ['title:lscs', 'only the first line of the case', 'title:', 6],
   ['case:hernia', 'only the case text (not initials, tags or dates)', 'case:', 5],
   ['tag:lscs', 'cases with that tag, by name (your own tags too)', 'tag:', 4],
+  ['has:lp', 'cases with that labelled part (with Labelled parts on)', 'has:', 4],
   ['"lap chole"', 'that exact phrase', '""', 1],
   ['-paeds', 'leave out cases with that word (works with the others: -tag:13)', '-', 1],
   ['spinal OR epidural', 'either one (spinal | epidural works too)', 'OR ', 3],
@@ -72,7 +76,7 @@ export function parseQuery(q, { fields = FIELDS, keepCase = false } = {}) {
       word = field + ':' + (phrase != null ? phrase : word || ''); phrase = undefined; f = null;
     }
     const raw = (phrase != null ? phrase : word || '').trim();
-    const text = keepCase && f !== 'tag' ? raw : raw.toLowerCase();
+    const text = keepCase && f !== 'tag' && f !== 'has' ? raw : raw.toLowerCase();
     if (!text) continue;
     tokens.push({ field: f, text, phrase: phrase != null, neg: !!neg });
   }
@@ -88,10 +92,11 @@ export function parseQuery(q, { fields = FIELDS, keepCase = false } = {}) {
 }
 
 // Does a case match? get: { all, initials, title, case } lower-cased texts of the case; tagHas(text) for tag:;
-// has(hay, word) the plain-word test (fuzzy aware).
-export function matchQuery(parsed, get, tagHas, has = (hay, w) => hay.includes(w)) {
+// has(hay, word) the plain-word test (fuzzy aware); partHas(text) for has: (no partHas: nothing has a part).
+export function matchQuery(parsed, get, tagHas, has = (hay, w) => hay.includes(w), partHas = null) {
   const one = t => {
-    const hit = t.field === 'tag' && tagHas ? tagHas(t.text)
+    const hit = t.field === 'has' ? !!(partHas && partHas(t.text))
+      : t.field === 'tag' && tagHas ? tagHas(t.text)
       : t.phrase ? get(t.field || 'all').includes(t.text)
       : has(get(t.field || 'all'), t.text, t.field);
     return t.neg ? !hit : hit;
@@ -100,4 +105,4 @@ export function matchQuery(parsed, get, tagHas, has = (hay, w) => hay.includes(w
 }
 
 // whether the query uses any operator (for the "?" note), cheap
-export const usesOperators = q => /(^|\s)(-\S|"|(initials|title|case|tag):)|\s(OR|AND|\||&)\s/i.test(String(q || ''));
+export const usesOperators = q => /(^|\s)(-\S|"|(initials|title|case|tag|has):)|\s(OR|AND|\||&)\s/i.test(String(q || ''));

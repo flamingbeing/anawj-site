@@ -29,10 +29,14 @@ if [ "${1:-}" != quick ]; then
   grep -E '^== |^FAIL|console errors' "$OUT/e2e.txt"
 fi
 
-for t in recovery usability cloud-save notepad daily-note tag-editor simpler profiles moved send logging-speed sync sync-engine; do
+for t in recovery usability cloud-save notepad daily-note tag-editor simpler profiles moved send logging-speed sync sync-engine parts phone-ux; do
   step "$t"
   timeout 300 node "logbook/test/e2e/$t.mjs" >"$OUT/$t.txt" 2>&1 && grep -E '^PASS' "$OUT/$t.txt" || { echo "FAIL $t"; tail -15 "$OUT/$t.txt"; fail=1; }
 done
+
+# Safari's engine: the notes editor in Playwright's WebKit, when it's installed here (skipped otherwise)
+step 'notepad (webkit)'
+BROWSER=webkit timeout 300 node logbook/test/e2e/notepad.mjs >"$OUT/notepad-webkit.txt" 2>&1 && grep -E '^(PASS|SKIP)' "$OUT/notepad-webkit.txt" || { echo "FAIL notepad (webkit)"; tail -15 "$OUT/notepad-webkit.txt"; fail=1; }
 
 printf '\n%s\n' "$([ $fail = 0 ] && echo 'ALL PASSED' || echo "SOMETHING FAILED (logs in $OUT)")"
 exit $fail

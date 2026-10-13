@@ -5,11 +5,13 @@
 import { S, toast, settings, catName, catShort, tagName } from './ui-core.js';
 import { cleanMarkdown, mdCase, mdDay } from './markdown.js';
 import { notesOn } from './notepad.js';
+import { labelsOn } from './parts.js';
 import { ensureNotes, dayMayHaveNotes } from './ui-notepad.js';
 
 // the user's Markdown format (an older Copy & share format carries over), and the names they see
 export const mdFormat = () => cleanMarkdown(settings().markdown, settings().shareFormat);
-export const mdCtx = () => ({ catName, catShort, tagName });
+// labels: the labelled parts in use (Settings → Advanced logging), for Bold labels in Settings → Markdown
+export const mdCtx = () => ({ catName, catShort, tagName, labels: labelsOn(settings()) });
 export const caseText = c => mdCase(c, mdFormat(), mdCtx());
 export const dayCases = date => (S.cases || []).filter(c => c.date === date).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
 // the day's cases, or the ones given (the Logbook's calendar passes what the filter shows)
