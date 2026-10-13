@@ -123,11 +123,21 @@ try {
   const issue = await ed.evaluate(() => window.__opened);
   assert.match(issue, /^https:\/\/github\.com\/flamingbeing\/anawj-site\/issues\/new\?title=Page%20edits%3A%20%2Fhand-babies%2F/);
   if (SHOTS) { await ed.click('#sendClose'); await fr.locator('#picture .lead').click(); await ed.screenshot({ path: `${SHOTS}/edit.png` }); }
-  // pages outside this app can't be opened in the editor
+  // the old address forwards to the one editor for the whole site (/edit/)
+  assert.equal(new URL(ed.url()).pathname, '/edit/');
+  // any page on the site opens; the apps open in their demo (sign-in can't happen inside the editor)
+  await ed.click('#sendClose');
   await ed.fill('#path', '/logbook/');
   await ed.press('#path', 'Enter');
+  await ed.waitForTimeout(800);
+  const inFrame = new URL(await fr.locator('body').evaluate(() => location.href));
+  assert.equal(inFrame.pathname, '/logbook/');
+  assert.equal(inFrame.searchParams.has('demo'), true, 'app not opened in its demo');
+  // never the editor inside itself
+  await ed.fill('#path', '/edit/');
+  await ed.press('#path', 'Enter');
   await ed.waitForTimeout(500);
-  assert.equal(new URL(await fr.locator('body').evaluate(() => location.href)).pathname, '/hand-babies/');
+  assert.equal(new URL(await fr.locator('body').evaluate(() => location.href)).pathname, '/');
   await ed.close();
 
   if (SHOTS) {

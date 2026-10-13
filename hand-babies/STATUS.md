@@ -15,6 +15,7 @@ Last updated: 2026-10-12 by Claude Code, hand assessment session.
 - Clinical read-through by the owner / a hand surgeon (2PD cut-offs, index/little FDS caveats, Elson wording,
   local preferences for splinting and antibiotics).
 - Suggested edits arrive as GitHub issues titled `Page edits:`; say "apply the page edits" to have them made.
+- edit.anawj.com: add the Cloudflare DNS record and redirect rule (steps in `edit/NOTES.md`).
 
 ## Next (ideas, not agreed)
 
@@ -22,8 +23,7 @@ Last updated: 2026-10-12 by Claude Code, hand assessment session.
    add back into the case cards if the owner wants.
 2. Real clinical photos (consented, de-identified) or short videos of each tendon test.
 3. 3D for the remaining flat diagrams (sensation finger, 2PD, zones) if the owner asks; ✓/✗ marks in figures kept.
-4. Optional `edit.` shortcut address like edit.anantf.com (needs a separate redirect site).
-5. Delete the `hand/` redirect stub once old links have passed through.
+4. Delete the `hand/` redirect stub once old links have passed through.
 
 ## Recently done
 
