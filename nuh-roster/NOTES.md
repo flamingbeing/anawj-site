@@ -153,6 +153,9 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
 - **The + picker ranks people** for that room: free and suitable first (subspec for seniors, posting match for juniors), then free, then already on a list, then not working, each with a note.
 - **Select several** on Today › Manpower moves many people to one group in one step (with Undo); dragging one also has Undo now.
 - **Keyboard shortcuts** (? lists them): Ctrl+Z/Y, Ctrl+S save or download, Alt+1–4 tabs, [ and ] previous/next day, / filter.
+- **Phones:** the Roster tab shows one card per room (Senior, Junior, case notes) instead of the wide table, and the person box slides up from the bottom.
+- **Sending it out:** Download offers .xlsx, PDF, an image for WhatsApp (`js/pngout.js`, drawn from the same layout; shared through the phone's share sheet where it can be, else downloaded) and Print. Printing shrinks the sheet to fit one A4 page.
+- **Learning from hand changes:** taking a senior off a subspecialty list by hand on three different days offers to add it to their "doesn't do" list (`state.learned`; asked once per person and subspecialty).
 - **Practice mode** is the demo (`?demo`): a "Practice" button in the header opens it in a new tab, it opens with a 7-step tour once (`localStorage['nuh-roster-tour']`), and Tour in the footer replays it.
 - **Undo instead of "are you sure?"** for Generate new, Clear cases, Clear manpower, Reset to monthly rosters and restoring a saved version on the same date: the toast has an Undo button. Confirms stay only for what can't be undone.
 - **Person chip and box:** the same chip and box on Today, Cases, Roster, Premeds and Calls/clinics. On Calls/clinics a dashed chip comes from the monthly rosters (or the MOT call team for EOT 8 and 9); × on the only one stores `-` (nobody), and "↺ monthly" goes back to the monthly roster. The name and grade are read-only there; Edit opens the Staff tab on that person.
@@ -181,6 +184,7 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
 | `js/rotations.js` | Junior rotations: weeks (by Monday), a junior's posting on a date, reading and writing the year's rotation as Excel. |
 | `js/monthly.js` | The HMS monthly rosters: column definitions, PDF/Excel reading, Excel writing, what each roster means for a date. |
 | `js/pdfout.js` | The roster PDF from the layout. |
+| `js/pngout.js` | The roster as an image (canvas) from the layout. |
 | `js/demo.js` | Demo data (invented names). |
 | `js/cloud.js` | Firebase wrapper. |
 | `js/app.js` | The UI. |
