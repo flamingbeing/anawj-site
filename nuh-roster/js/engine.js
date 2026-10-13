@@ -681,16 +681,25 @@ export function check({ rows, staff, day, settings = DEFAULT_SETTINGS }) {
     if (['leave', 'mc', 'postcall'].includes(st)) {
       const rooms = [...new Set(uses.map(u => u.row.label))];
       out.push({ level: 'error', fix: 'takeOff', person: p.id, rooms, text: `${p.name} is ${{ leave: 'on leave', mc: 'on MC', postcall: 'post call' }[st]} but rostered in ${rooms.join(', ')}.` });
+    } else if (st === 'admin' || st === 'elsewhere') {
+      const rooms = [...new Set(uses.filter(u => u.col !== 'premed').map(u => u.row.label))];
+      if (rooms.length) out.push({ level: 'warn', fix: 'takeOff', person: p.id, rooms, text: `${p.name} is ${st === 'admin' ? 'on an admin day (no list)' : 'elsewhere today'} but rostered in ${rooms.join(', ')}.` });
     }
     const asJunior = uses.filter(u => u.col === 'junior');
     if (asJunior.length > 1) out.push({ level: 'warn', fix: 'cover', person: p.id, rooms: asJunior.map(u => u.row.label), text: `${p.name} is the junior in ${asJunior.map(u => u.row.label).join(' and ')}.` });
     const asSenior = uses.filter(u => u.col === 'senior');
-    if (asSenior.length > 1) {
+    if (asSenior.length > 2) {
+      const extra = asSenior.slice(2).map(u => u.row.label);
+      out.push({ level: 'error', fix: 'reseat', col: 'senior', person: p.id, rooms: extra, text: `${p.name} is the senior in ${asSenior.length} rooms (${asSenior.map(u => u.row.label).join(', ')}); double cover is two at most.` });
+    } else if (asSenior.length > 1) {
       const complexes = new Set(asSenior.map(u => u.row.complex));
-      if (complexes.size > 1) out.push({ level: 'warn', text: `${p.name} covers rooms in different complexes (${asSenior.map(u => u.row.label).join(', ')}).` });
+      if (complexes.size > 1) out.push({ level: 'warn', rooms: asSenior.map(u => u.row.label), text: `${p.name} covers rooms in different complexes (${asSenior.map(u => u.row.label).join(', ')}).` });
+    }
+    if (asSenior.length && asJunior.length) {
+      out.push({ level: 'warn', fix: 'reseat', col: 'junior', person: p.id, rooms: asJunior.map(u => u.row.label), text: `${p.name} is the senior in ${asSenior.map(u => u.row.label).join(', ')} and the junior in ${asJunior.map(u => u.row.label).join(', ')}.` });
     }
     const asPremed = uses.filter(u => u.col === 'premed');
-    if (asPremed.length > settings.premedCap) out.push({ level: 'warn', text: `${p.name} has premeds for ${asPremed.length} rooms (cap ${settings.premedCap}).` });
+    if (asPremed.length > settings.premedCap) out.push({ level: 'warn', fix: 'premed', rooms: asPremed.map(u => u.row.label), text: `${p.name} has premeds for ${asPremed.length} rooms (cap ${settings.premedCap}).` });
   }
   for (const row of rows) {
     const room = roomById[row.roomId];
@@ -717,9 +726,14 @@ export function check({ rows, staff, day, settings = DEFAULT_SETTINGS }) {
     }
     const shared = sen.some(p => (where[p.id] || []).filter(u => u.col === 'senior').length > 1);
     if (shared && jun.some(isBaby)) {
-      out.push({ level: 'error', text: `${row.label}: Baby MO in a room whose senior is double covering.` });
+      out.push({ level: 'error', fix: 'reseat', col: 'junior', person: jun.find(isBaby).id, rooms: [row.label], text: `${row.label}: Baby MO in a room whose senior is double covering.` });
     }
-    if (shared && flags.complex) out.push({ level: 'warn', text: `${row.label}: complex list but senior is double covering.` });
+    if (shared && flags.complex) out.push({ level: 'warn', rooms: [row.label], text: `${row.label}: complex list but senior is double covering.` });
+    // a double-covered room needs its own junior (or a cover from another room) in it
+    const juniorParts = String(row.junior || '').split('/').map(x => x.trim()).filter(Boolean);
+    if (shared && !isPacu(row.label) && !juniorParts.length) {
+      out.push({ level: 'error', fix: 'fill', rooms: [row.label], text: `${row.label}: no junior, and the senior is double covering.` });
+    }
     const needPremed = jun.some(p => dayOf(day, p).notAroundPrev) && !jun.some(p => !dayOf(day, p).notAroundPrev && !isBaby(p));
     if (needPremed && !String(row.premed || '').trim()) out.push({ level: 'warn', fix: 'premed', rooms: [row.label], text: `${row.label}: junior wasn't around yesterday — needs premed cover.` });
   }
