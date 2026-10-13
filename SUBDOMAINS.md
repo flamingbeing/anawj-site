@@ -13,7 +13,7 @@ The rule for new apps is in `AGENTS.md`.
 | `hand.anawj.com/cmcj/` | `cmcj/` | Static, hand surgery. |
 | `hand.anawj.com/babies/` | `hand-babies/` | Static, hand surgery. The old `hand/` redirect goes. |
 | `prewarmstudy.anawj.com/` | `prewarm/` | **Real study data.** The name is a reminder that it holds sensitive data and stays isolated. |
-| `roster.anawj.com/` | `nuh-roster/` | Own Firebase project `nuh-roster`. |
+| `nuhroster.anawj.com/` | `nuh-roster/` | Own Firebase project `nuh-roster`. |
 | `apmes.anawj.com/logbook/` | `logbook/` | With evals: one Firebase project (`apmes-logbook`), one sign-in. |
 | `apmes.anawj.com/evals/` | `evals/` | |
 | `anawj.com/privacy/` | `privacy/` | Stays: the Google sign-in consent screen points here. |
@@ -25,6 +25,8 @@ renaming: the hosting maps each address to its folder.
 
 Every old `anawj.com/<folder>/` address becomes a redirect to the new one, keeping the path, query and `#` part.
 That matters most for prewarm's PACU nurse links and QR codes, and for the logbook's `?demo` links.
+
+The roster's address is `nuhroster.anawj.com` (owner, 13 Oct: he may manage other rosters later, each with its own subdomain).
 
 ## Who does what, in order
 
@@ -44,7 +46,7 @@ One step at a time; each is merged and checked before the next starts. Each sess
    stays `prewarm-study.firebaseapp.com`; the owner adds `prewarmstudy.anawj.com` to the project's authorised
    domains. Nurse links and QR codes keep working through the redirect. Phones on the old worker are moved on with
    `anawj.com/prewarm-update/`. Check the next case's phones before it starts.
-4. **roster.anawj.com** — the NUH Roster session. The owner adds the address to the `nuh-roster` Firebase project's
+4. **nuhroster.anawj.com** — the NUH Roster session. The owner adds the address to the `nuh-roster` Firebase project's
    authorised domains and the Google sign-in client.
 5. **apmes.anawj.com** — Logbook 1 (log1) leads, with the MedHub Evaluations session for `evals/`. Sign-in domain
    moves from `anawj.com` to `apmes.anawj.com` (copy the `__/auth/` helper files); the owner updates the
@@ -65,7 +67,7 @@ and builds a preview for every PR.
 - A subdomain serves **only** its own folders: `hand.anawj.com` can't reach `logbook/`, `prewarmstudy.anawj.com` can't
   reach anything but `prewarm/`, and so on; a path outside them is a 404 (an address with no slash gets one, query
   kept). Every response carries `X-Robots-Tag: noindex, nofollow`.
-- One-app hosts (`prewarmstudy.`, `roster.`) serve the app at the root, and its own folder name works too
+- One-app hosts (`prewarmstudy.`, `nuhroster.`) serve the app at the root, and its own folder name works too
   (`prewarmstudy.anawj.com/prewarm/…`) so an app can move before its absolute links are tidied.
 - Any other address (the previews on `workers.dev`, the copy of main) serves the whole repo as before.
 - **Trying a subdomain before it exists:** on a PR preview, `<preview>/_sites/hand.anawj.com/babies/` serves what
@@ -78,7 +80,7 @@ and builds a preview for every PR.
 ### The owner's Cloudflare clicks (after the step 1 PR is merged and its build has finished)
 
 Do these **after** the merge, not before: until then the Worker still serves the whole repo everywhere.
-For each of `hand.anawj.com`, `prewarmstudy.anawj.com`, `roster.anawj.com`, `apmes.anawj.com` (any order):
+For each of `hand.anawj.com`, `prewarmstudy.anawj.com`, `nuhroster.anawj.com`, `apmes.anawj.com` (any order):
 
 1. <https://dash.cloudflare.com> → **Workers & Pages** → the `anawj-preview` Worker → **Settings** → **Domains & Routes**.
 2. **Add** → **Custom domain** → type the address → **Add domain**. Cloudflare makes the DNS record and the certificate
@@ -87,7 +89,7 @@ For each of `hand.anawj.com`, `prewarmstudy.anawj.com`, `roster.anawj.com`, `apm
    app's own move in steps 3 to 5).
 
 Check: each address answers with its app (`hand.anawj.com/babies/` the hand assessment, `hand.anawj.com/cmcj/` the
-trainer, `apmes.anawj.com/logbook/?demo`, `apmes.anawj.com/evals/?demo`, `roster.anawj.com/?demo`,
+trainer, `apmes.anawj.com/logbook/?demo`, `apmes.anawj.com/evals/?demo`, `nuhroster.anawj.com/?demo`,
 `prewarmstudy.anawj.com/`); the same apps still work at their old `anawj.com/<folder>/` addresses (GitHub Pages, until
 each one's step makes it a redirect), and `hand.anawj.com/logbook/` is a 404.
 
@@ -97,5 +99,5 @@ each one's step makes it a redirect), and `hand.anawj.com/logbook/` is a 404.
 - [ ] 1. Hosting (log1)
 - [ ] 2. hand.anawj.com (CMC trainer, then hand assessment)
 - [ ] 3. prewarmstudy.anawj.com (Prewarming Webapp)
-- [ ] 4. roster.anawj.com (NUH Roster)
+- [ ] 4. nuhroster.anawj.com (NUH Roster)
 - [ ] 5. apmes.anawj.com (log1, with MedHub Evaluations)

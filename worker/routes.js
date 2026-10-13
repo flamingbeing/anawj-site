@@ -10,7 +10,7 @@
 export const SITES = {
   'hand.anawj.com': { prefixes: { '/cmcj/': 'cmcj/', '/babies/': 'hand-babies/' } },
   'prewarmstudy.anawj.com': { root: 'prewarm/' },
-  'roster.anawj.com': { root: 'nuh-roster/' },
+  'nuhroster.anawj.com': { root: 'nuh-roster/' },
   'apmes.anawj.com': { prefixes: { '/logbook/': 'logbook/', '/evals/': 'evals/' } },
 };
 
