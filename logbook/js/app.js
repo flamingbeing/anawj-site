@@ -249,14 +249,18 @@ const searchSettings = (index, q) => {
 };
 function showFound() {
   const want = findAfterRender; findAfterRender = '';
-  requestAnimationFrame(() => {
+  // two frames on: changeScreen puts the new page at its top in the next frame, which would undo the scroll
+  // and while the new page slides in it is pinned in place (position: fixed), so the scroll waits for the slide's end
+  requestAnimationFrame(() => requestAnimationFrame(function find() {
+    if (sliding) { afterSlide = find; return; }
     const n = [...app.querySelectorAll('h2, h3, label.field, label.check, legend, summary')].find(x => optionText(x).replace(/\s+/g, ' ').startsWith(want.slice(0, 60)));
     if (!n) return;
-    const target = n.closest('fieldset, label, details, section') || n;
+    // a heading inside a card (h3) is found itself, not the whole card from its top
+    const target = n.matches('h3') ? n : n.closest('fieldset, label, details, section') || n;
     if (target.matches('details')) target.open = true;
     target.scrollIntoView({ block: 'center' });
     target.classList.remove('flash'); void target.offsetWidth; target.classList.add('flash');
-  });
+  }));
 }
 // the query lives here, not only in the box: the menu can be drawn again while someone types (the logbook arriving
 // from the device's store a moment after the first paint), and the new box gets the text, the results, the focus and
@@ -575,13 +579,13 @@ function slideDirection(from, to) {
   const a = depthOf(from), b = depthOf(to);
   return b > a ? 1 : b < a ? -1 : 0;
 }
-let sliding = null;
+let sliding = null, afterSlide = null;   // afterSlide: Settings search scrolling to its find once the page stops sliding
 function slidePages(dir) {
   sliding?.();   // a slide still running ends now
   pin();
   const x = Math.round(innerWidth * 0.3) * dir;
   const a = app.animate([{ transform: `translateX(${x}px)`, opacity: 0 }, { transform: 'translateX(0)', opacity: 1 }], { duration: 280, easing: 'cubic-bezier(.2, .7, .2, 1)' });
-  const done = () => { if (sliding !== done) return; sliding = null; a.cancel(); unpin(); };
+  const done = () => { if (sliding !== done) return; sliding = null; a.cancel(); unpin(); const then = afterSlide; afterSlide = null; then?.(); };
   sliding = done;
   a.finished.then(done, done);
 }

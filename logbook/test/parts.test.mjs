@@ -44,6 +44,7 @@ const L = cleanLabels([...DEFAULT_LABELS, { k: 'ASA', n: '' }, { k: 'PE' }, { k:
 {
   assert.equal(labelOf('lp: tube size', L).label.k, 'lp');
   assert.equal(labelOf('LP: tube size', L).label.k, 'lp');        // case doesn't matter
+  assert.equal(labelOf('Lp: fake cuff check', L).label.k, 'lp');   // a phone's capital first letter
   assert.equal(labelOf('LP for headache', L), null);              // lumbar puncture: no colon, no label
   assert.equal(labelOf('LP', L), null);
   assert.equal(labelOf('lpx: no', L), null);
