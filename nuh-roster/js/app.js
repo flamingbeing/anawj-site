@@ -91,6 +91,37 @@ function fillDemoNotes(day) {
 }
 const demoLink = () => location.origin + location.pathname + '?demo';
 
+// Practice: harder mornings to try, also as links a trainer can send (?demo=short, ?demo=latemc, ?demo=weekend).
+const SCENARIOS = [['short', 'Short-staffed (seniors away, double covers)'], ['latemc', 'Late MC at 7am (after the roster is out)'], ['weekend', 'A weekend']];
+function applyScenario(kind) {
+  if (kind === 'weekend') {
+    const d = new Date(state.day.date + 'T12:00'); d.setDate(d.getDate() + ((6 - d.getDay() + 7) % 7 || 7));
+    switchDate(isoDate(d));
+    return toast('A weekend: only emergency lists and calls. Generate, then check who covers what.');
+  }
+  pushUndoAll(`the "${SCENARIOS.find(x => x[0] === kind)[1]}" practice`, { day: true });
+  if (kind === 'short') {
+    // enough away that the lists outnumber the seniors by three, so some rooms must be double covered
+    const avail = state.staff.filter(p => p.role === 'senior' && (dayOf(p.id).status || 'avail') === 'avail');
+    const rooms = state.day.rooms.filter(r => r.running && !isPacu(r.name)).length + 1; // + AOCC
+    const n = Math.max(4, avail.length - rooms + 3);
+    const away = avail.filter(p => !(p.subspecs || []).length).slice(0, n);
+    for (const p of away) Object.assign(dayOf(p.id), { status: 'leave', manual: true });
+    runGenerate(true);
+    goTab('roster');
+    return toast(`${away.length} more seniors are away: the roster double covers where it can (the & marks). Check the Problems card.`);
+  }
+  if (kind === 'latemc') {
+    if (!state.roster || state.roster.date !== state.day.date) runGenerate(true);
+    const on = role => state.staff.find(p => p.role === role && state.roster.rows.some(r => !isSpecialRow(r) && cellParts(r, role === 'senior' ? 'senior' : 'junior').some(x => personOfPart(x) === p)));
+    const sick = [on('senior'), on('junior')].filter(Boolean);
+    for (const p of sick) Object.assign(dayOf(p.id), { status: 'mc', manual: true });
+    afterRosterEdit(true);
+    goTab('roster');
+    return toast(`${sick.map(p => shortName(p) || p.name).join(' and ')} just called in sick. Take them off and fill the gaps, then send the changes.`);
+  }
+}
+
 // Practice: the day as Practice first made it.
 function resetPracticeDay() {
   pushUndoAll('resetting the day', { day: true });
@@ -447,12 +478,16 @@ function renderDemoBar() {
   }
   if (document.getElementById('demo-bar')) return;
   document.body.prepend(h('div', { id: 'demo-bar', class: 'demo-bar' },
-    h('b', {}, 'Practice'), h('span', {}, ' · made-up staff and rosters, saved only in this browser. Try anything: nothing here touches the real roster.'),
+    h('b', {}, 'Practice'), h('span', { class: 'demo-text' }, ' · made-up staff and rosters, saved only in this browser. Try anything: nothing here touches the real roster.'),
     h('span', { class: 'grow' }),
+    // on a phone the tools fold away, so the bar doesn't take a third of the screen
+    h('details', { class: 'demo-tools', open: innerWidth > 600 }, h('summary', {}, 'Practice tools'), h('span', { class: 'demo-actions' },
     h('button', { class: 'small', onclick: () => startTour() }, 'Tour'),
     h('button', { class: 'small', title: 'A roster with three problems planted in it, to find and fix', onclick: startPracticeTask }, 'Fix 3 problems'),
+    (() => { const sel = select('', [['', 'Try a morning…'], ...SCENARIOS.map(([k, label]) => [k, label])], v => { if (v) applyScenario(v); }); sel.setAttribute('aria-label', 'Practice a harder morning'); return sel; })(),
     h('button', { class: 'small', title: 'This day back to how Practice made it (Undo brings your version back)', onclick: resetPracticeDay }, 'Reset this day'),
     h('button', { class: 'small', onclick: () => { if (confirm('Start practice again from scratch?')) { try { localStorage.removeItem(KEY); localStorage.removeItem(TOUR_KEY); } catch { /* no storage */ } location.reload(); } } }, 'Start again'),
+    )),
     h('a', { class: 'btn small', href: location.pathname }, 'Back to the real roster')));
 }
 
@@ -4209,8 +4244,15 @@ lastRows = state.roster ? JSON.stringify(state.roster.rows) : null;
 state.tab = location.hash === '#myday' ? 'myday' : state.staff.length ? 'roster' : 'staff'; // the page opens on the roster
 render();
 openOnTheRightDay();
+// a practice link with a scenario (?demo=short): set it up once per visit
+if (DEMO) {
+  const sc = new URLSearchParams(location.search).get('demo');
+  let done = '';
+  try { done = sessionStorage.getItem('nuh-roster-scenario') || ''; } catch { /* no storage */ }
+  if (SCENARIOS.some(x => x[0] === sc) && done !== sc) { try { sessionStorage.setItem('nuh-roster-scenario', sc); } catch { /* no storage */ } setTimeout(() => applyScenario(sc), 300); }
+}
 // practice mode opens with the tour, once
-if (DEMO) { try { if (!localStorage.getItem(TOUR_KEY)) setTimeout(startTour, 700); } catch { /* no storage */ } }
+if (DEMO && !SCENARIOS.some(x => x[0] === new URLSearchParams(location.search).get('demo'))) { try { if (!localStorage.getItem(TOUR_KEY)) setTimeout(startTour, 700); } catch { /* no storage */ } }
 document.getElementById('tourBtn')?.addEventListener('click', () => startTour());
 document.getElementById('allBtn')?.addEventListener('click', downloadEverything);
 addEventListener('hashchange', () => { if (location.hash === '#myday' && state.tab !== 'myday') { closeTagEditor(); state.tab = 'myday'; window.scrollTo(0, 0); render(); } });
