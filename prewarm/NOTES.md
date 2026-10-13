@@ -24,7 +24,7 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
 - **Service worker:** the page reloads only when an update takes over, never on the first install (a reload wiped the
   initials typed on the join screen).
 - **Look:** the NUHS design system's app theme (the owner's "Kent Ridge Clinical" design system artifact, Mobile and
-  web app section; `design/tokens.css`, Open Sans): white app bar with the four-quarter band (orange / red / stripe
+  web app section; `nuhsdesign/tokens.css`, Open Sans): white app bar with the four-quarter band (orange / red / stripe
   blue #178fd7 / navy), grey #f3f3f3 ground, white cards with 14px corners and hairlines, 10px controls, navy as the
   only accent (Save, selected chips, active tab), bold navy titles, 44px tap targets, dark toast at the top.
   Links are navy (link blue is under 4.5:1 on the grey page).

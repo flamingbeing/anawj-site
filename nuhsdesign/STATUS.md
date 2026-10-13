@@ -7,7 +7,11 @@ Last updated: 2026-10-13 by Claude Code, design session (branch `claude/inspirin
 
 ## Now
 
-- No session is working on `design/`. The design session is idle, nothing half-done.
+- Design session: PR moving `design/` to `nuhsdesign/` (branch `claude/inspiring-dijkstra-pctmrf`). **Held unmerged**
+  while a prewarming study case is being collected: merging changes what the study phones load. Merge only when the
+  owner says the case is over; rebase on main first (prewarm is busy) and rerun `tools/test-prewarm.sh`.
+- `design/tokens.css` stays as a byte-identical copy for pages and service workers still on the old path. Delete it
+  (and tell log1 to drop `/design/` from `SHARED` in `worker/routes.js`) once every app has updated.
 
 ## Waiting on the owner
 

@@ -17,4 +17,4 @@ hand-babies:
       - any-glob-to-any-file: ['hand-babies/**', 'hand/**']
 site:
   - changed-files:
-      - any-glob-to-any-file: ['*', 'edit/**', 'design/**', 'tools/**', 'privacy/**', 'cmcj/**', '.github/**', '.agents/**', '.claude/**']
+      - any-glob-to-any-file: ['*', 'edit/**', 'design/**', 'nuhsdesign/**', 'tools/**', 'privacy/**', 'cmcj/**', '.github/**', '.agents/**', '.claude/**']

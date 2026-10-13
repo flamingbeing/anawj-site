@@ -2,7 +2,7 @@
   Prewarming study app. NUHS design system, app theme (Kent Ridge Clinical "kr-app"): grey ground, white rounded
   cards with hairlines, navy as the only accent, a white app bar with the four-quarter band (orange / red / stripe
   blue / navy), Open Sans (index.html), 44px tap targets. Light only, phone first (360 px). Tokens from
-  ../design/tokens.css (--n-*); app tokens below.
+  ../nuhsdesign/tokens.css (--n-*); app tokens below.
   The patient main screen is compact: everything for one timepoint fits a 390 x 844 phone without scrolling.
 */
 :root {

@@ -2,7 +2,7 @@
 
 A design guide modelled on [nuhs.edu.sg](https://www.nuhs.edu.sg/), so the NUH tools on this site (roster, logbook, evals) can look at home next to it.
 
-- `index.html`: the visual guide (colours, type, buttons, page patterns). Open it at `/design/`.
+- `index.html`: the visual guide (colours, type, buttons, page patterns). Open it at `/nuhsdesign/`.
 - `tokens.css`: CSS variables and `.n-*` component classes. Link it and use the variables, or add `class="n-page"` to `<body>` for the base styles.
 
 Unofficial. The values were read from the public site's stylesheet (`main.min.css`, Bootstrap 5) and screenshots in October 2026. It copies the look, not the identity: don't use the NUHS logo or name to make a tool look official.

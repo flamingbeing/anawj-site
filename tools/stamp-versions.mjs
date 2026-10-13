@@ -3,7 +3,7 @@
 // sessions working on the same app no longer collide on that line (owner, 13 Oct 2026).
 // 'logbook-v40' becomes 'logbook-v40-3f9a2c1d': a hash of every file the app can serve: its whole folder (the service
 // workers serve any same-origin file cache-first and keep it until VERSION changes, so SHELL alone isn't enough) plus
-// SHELL files outside it (../design/tokens.css). Tests, tools and notes are left out; extras only cost an update.
+// SHELL files outside it (../nuhsdesign/tokens.css). Tests, tools and notes are left out; extras only cost an update.
 // Run: node tools/stamp-versions.mjs [--check]   (--check prints the versions without writing)
 import fs from 'node:fs';
 import path from 'node:path';
