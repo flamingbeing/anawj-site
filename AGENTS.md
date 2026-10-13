@@ -66,7 +66,7 @@ for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mj
 
 - Logbook changes: `tools/test-logbook.sh` runs all of the above plus the full e2e and every focused browser test
   (about 10 min; `quick` skips the full e2e). Its portfolio-template steps use `apmes/templates/portfolio-template-blank.docx`. After UI changes also run `node logbook/test/e2e/a11y.mjs` (accessibility).
-- Rules changes (`logbook/firestore.rules`, `prewarm/firestore.rules`): `tools/test-rules.sh` runs the logbook, evals and prewarm rules suites in the
+- Rules changes (`logbook/firestore.rules`, `prewarm/firestore.rules`, `nuh-roster/firestore.rules`): `tools/test-rules.sh` runs the logbook, evals, prewarm and roster rules suites in the
   local emulator (fake accounts, demo project; no sign-in, never the live projects).
 - Evals UI changes: also run the e2e test (see `evals/README.md`).
 - Prewarming UI changes: `tools/test-prewarm.sh` runs the repo check, prewarm unit tests and the three browser tests

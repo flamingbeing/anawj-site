@@ -130,6 +130,12 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
   - Each `rosters/{date}` doc has an immutable `versions` history, which is what Restore uses.
   - Access is the `members` list plus `accessRequests`, enforced by `firestore.rules`.
   - Member roles: `admin`, `rosterer` and `viewer`. Viewers read everything but write nothing (`editor()` in the rules); the app shows them only My day and the roster saved for the team for the date on screen.
+  - The rules (once the 13 Oct rules PR is merged): only `admin` and `rosterer` write (an allowlist, so a missing or
+    mistyped role can't); member documents are `{ role, name, staffId? }` with a lower-case email id, and an admin can't
+    demote or remove themselves; every roster, version and team write must be stamped with the signed-in email
+    (`updatedBy` / `savedBy`); roster ids are dates and match `date`; team documents are only main, monthly, rotations;
+    each staff-list save adds a permanent `team/main/versions` copy. Tested in the emulator: `nuh-roster/test/rules.emulator.mjs`
+    (run by `tools/test-rules.sh`).
   - The rules deploy automatically on merge to main (`.github/workflows/deploy-firestore-rules.yml`): edit the file, never ask the owner to paste it.
   - The Firebase web config in `js/firebase-config.js` is public by design.
 - **Rotations:** a junior's posting on a date is that day's change (`day.staff[id].posting`), else the week's rotation, else their usual posting (`p.posting`). The roster engine and checks get the staff list with each junior's posting for the day on screen (`dayStaff()`), so posting matches and the "(RA)" tags follow the rotation. Rotation edits go through Undo. The Excel layout is names down the first column and each week's Monday across the top; the download is a blank to fill in.
