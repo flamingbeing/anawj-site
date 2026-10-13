@@ -41,7 +41,9 @@ its own file), so sessions never edit the same lines. Read them all before start
    homepage session says so.
 2. **On hold** (owner, 13 Oct: "lets move domains first"): labelled parts in the case summary (`LP:` learning points,
    `DT:` case details, `LP1:`, `LP2:` …), behind one account switch, off by default. Full plan, consequences and the three
-   open questions: `logbook/PLAN-labelled-parts.md`. Later, part 2: an option for a non-APMES logbook (own tag list,
+   open questions: `logbook/PLAN-labelled-parts.md`.
+   Wider direction (the owner's own log, daily note, knowledge-note review, personal profile): `logbook/PLAN-personal-log.md`;
+   it folds this in. Discussion stage, nothing built; Notes (beta) stays. Later, part 2: an option for a non-APMES logbook (own tag list,
    APMES categories, targets and progress hidden).
 3. (Polish batch done 13 Oct: #250, #254, #268, #272, #274, #264, #289, #295. Owner to try the new looks on a phone.)
 4. Later, low priority: lazy-load rarely used modules (admin, portfolio, importer, xlsxio, backup, progress) to cut
