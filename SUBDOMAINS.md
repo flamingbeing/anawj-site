@@ -104,7 +104,11 @@ each one's step makes it a redirect), and `hand.anawj.com/logbook/` is a 404.
 - [x] 2. hand.anawj.com (CMC trainer, hand assessment; run side by side): #357 (`cmcj/`) and #356 (`hand-babies/` to
   `/babies/`, `hand/` removed), checked live 13 Oct; old addresses forward with path, query and `#` kept (a top-level-only
   host check in each `index.html`, no Worker change)
-- [ ] Shared design folder: `design/` moves to `nuhsdesign/` (NUHS-style Design), served on every subdomain (log1)
-- [ ] 3. prewarmstudy.anawj.com (Prewarming Webapp)
-- [ ] 4. nuhroster.anawj.com (NUH Roster)
+- [ ] Shared design folder: every subdomain serves `/design/` and `/nuhsdesign/` (log1, #358). The `design/` →
+  `nuhsdesign/` move (NUHS-style Design) is **paused** with prewarm, since prewarm loads `design/tokens.css`
+- [ ] 3. prewarmstudy.anawj.com (Prewarming Webapp): **paused** 13 Oct while a case is being collected; authorised domain
+  added by the owner. Resumes only when the owner tells that session the case is over
+- [x] 4. nuhroster.anawj.com (NUH Roster): #361, live 13 Oct; old address forwards with path, query and `#` kept, and a
+  browser with a roster saved at the old address is offered a download first. Authorised domain added by the owner;
+  a full Google sign-in with a real account is still for the owner to try once
 - [ ] 5. apmes.anawj.com (log1, with MedHub Evaluations)
