@@ -10,8 +10,14 @@ import worker from '../../worker/sites.js';
 
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../..');
 const MIME = { html: 'text/html; charset=utf-8', js: 'text/javascript', css: 'text/css', json: 'application/json', svg: 'image/svg+xml', gif: 'image/gif', png: 'image/png', webmanifest: 'application/manifest+json' };
+// a page with versions to choose from, as a "show me versions" PR would add (edit/NOTES.md)
+const VARIANT_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+<meta name="anawj-variants" content="a,b,c"><title>Versions</title>
+<script>document.documentElement.dataset.variant = new URLSearchParams(location.search).get('variant') || 'a'</script>
+<style>[data-variant=b] h1{color:red}</style></head><body><h1>Heading</h1><p>Text</p></body></html>`;
 const ASSETS = { async fetch(req) {
   const p = decodeURIComponent(new URL(req.url).pathname).replace(/^\//, '');
+  if (p === 'zz-variants/index.html') return new Response(VARIANT_PAGE, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
   const f = path.join(root, p);
   if (!f.startsWith(root + path.sep) || !fs.existsSync(f) || !fs.statSync(f).isFile()) return new Response('nope', { status: 404 });
   return new Response(fs.readFileSync(f), { headers: { 'Content-Type': MIME[f.split('.').pop()] || 'application/octet-stream' } });
@@ -115,6 +121,28 @@ try {
   assert.match(bugRep, /\ds tap [a-z ]+ /, 'the tap is in the steps');
   assert.match(bugRep, /Errors:\n- .*boom in test/);
   if (SHOTS) await bug.screenshot({ path: path.join(SHOTS, 'feedback-bug.png') });
+
+  // ---- versions to choose from: flip between them on the preview, then choose one
+  const ver = await ctx.newPage();
+  await ver.goto(PREVIEW + '/zz-variants/');
+  await fb(ver).locator('#fab').waitFor();
+  assert.equal(await fb(ver).locator('#ver').textContent(), 'Version A');
+  await fb(ver).locator('#fab').click();
+  assert.equal(await fb(ver).locator('#vers button').count(), 3);
+  await fb(ver).locator('#vers button', { hasText: 'B' }).click();
+  await ver.waitForURL(/variant=b/);
+  await fb(ver).locator('#fab').waitFor();
+  assert.equal(await ver.evaluate(() => document.documentElement.dataset.variant), 'b');
+  assert.equal(await fb(ver).locator('#ver').textContent(), 'Version B');
+  await fb(ver).locator('#fab').click();
+  if (SHOTS) await ver.screenshot({ path: path.join(SHOTS, 'feedback-versions.png') });
+  await fb(ver).locator('#choose').click();
+  await fb(ver).locator('#fab').click();
+  await fb(ver).locator('#mSend').click();
+  const verRep = await fb(ver).locator('#report').inputValue();
+  assert.match(verRep, /## Page: https:\/\/claude-try-feedback-anawj-preview\.kohwenjun\.workers\.dev\/zz-variants\/\n\n### 1\. Version chosen\nChoose version B \(of A, B, C\)\. Keep that one/);
+  // pages without versions don't show the chooser
+  assert.ok(await bug.evaluate(() => document.querySelector('[data-anawj-feedback]').shadowRoot.getElementById('verBox').hidden));
 
   // ---- a real address: off unless turned on
   const live = await ctx.newPage();
