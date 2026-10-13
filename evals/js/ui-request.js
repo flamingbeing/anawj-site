@@ -8,7 +8,7 @@ import { progress, dueItems, caseKey, sameCaseCount, identifierWarning, todayISO
 
 export const AGE_BANDS = ['<16', '16-40', '41-64', '65-79', '80+'];
 export const GENDERS = [['F', 'Female'], ['M', 'Male']];
-const LOCATIONS = ['Operating theatre', 'Preop Clinic', 'ICU', 'Delivery suite', 'Ward', 'Recovery/PACU'];
+export const LOCATIONS = ['Operating theatre', 'Preop Clinic', 'ICU', 'Delivery suite', 'Ward', 'Recovery/PACU'];
 
 // ---------- styles for the resident screens (kept here so style.css stays the shell's) ----------
 
