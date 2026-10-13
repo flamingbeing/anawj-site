@@ -17,11 +17,11 @@ Queue (update as each merges):
 8. GitHub destination + three-way merge.
 9. Logging speed and friction pass; lazy-load rare modules.
 10. Bug hunt and stress tests; code tidy.
-Progress: maps of the code in the session scratchpad (sync, settings, notes, export, logging, tests). Wave 1 running as
-a workflow: five tracks in parallel git worktrees (`/home/user/wt/<name>`, branches `wt/<name>`, not pushed): A sync engine,
-B logging speed, C file sync (Drive/Dropbox/GitHub), D profiles as presets + Personal, E daily note + paste cleaner + shares.
-Each is built, reviewed by three lenses, fixed and tested, then merged here one PR at a time. Wave 2: labelled parts / case
-templates / pasted-list parser, lazy loading, cross-browser bugs (firetop found: WebKit ⋯ menu closes at once in the note
-editor; Firefox notes list sometimes blank after Done), bug hunt.
+Progress (20:10 UTC): wave 1 built, reviewed and tested on branches `wt/sync-engine`, `wt/logging-speed`, `wt/file-sync`,
+`wt/profiles`, `wt/daily-note` (local only). An integrator agent is merging them into `integ/wave1` (worktree
+`/home/user/wt/integ`) with a full test run; then it goes to main as one PR. Wave 2 running from wave-1 bases: F labelled
+parts / case templates / pasted lists (`wt/labelled-parts`), G phone UX + cross-browser bugs (`wt/phone-ux`); H lazy loading
+starts from `integ/wave1`. Specs, maps and the bug list are in the session scratchpad (lost if the container resets: the
+branches are the record; if the session dies, push the `wt/*` and `integ/*` branches and open PRs from them).
 Design notes: no `firestore.rules` change needed for 1–10 (deletes come from `bin/`, daily note = a note with id `day-<date>`,
 caps are app-side). Read this file first after a compaction.
