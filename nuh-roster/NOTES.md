@@ -252,7 +252,9 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
   name (in the staff log) and reads the draft or rotation file again (`lastDraft`, `lastRotFile`).
 - Key and help (footer, and a link under the roster's one-line hint): what each mark means (`SYMBOLS`: &, (C), C-,
   L-, (L), postings, (AOH), colours, ☾ and •, AOCC/AIC/AH OT…) and "How do I…?" answers (`HOW`), one open at a time.
-  Entries describe only what the roster does; don't add expansions of abbreviations nobody has confirmed.
+  Entries describe only what the roster does; don't add expansions of abbreviations nobody has confirmed. A printable
+  one-page guide (`guide.html`: the morning steps, changing things, the marks) is linked from it and from the tour's
+  last step; keep it to one A4 page.
 - Rotations: under the grid, a count per posting for every week (0 in red), and "Start <next year> from <year>"
   (week n copied to week n, only into empty weeks, with Undo) when the next year is still empty.
 - Phones: Cases shows each room as a card (run, room and session, then case notes, flags, fixed people; rooms not

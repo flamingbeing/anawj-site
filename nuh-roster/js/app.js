@@ -501,6 +501,7 @@ const TOUR = [
   { tab: 'roster', sel: '#problems', title: 'What needs a look', text: 'Problems are listed here with a button that fixes each one, and Show to find the room.' },
   { tab: 'roster', sel: 'table.sheet', title: 'The roster', text: 'Tap a name for its box: leaving time, (L), comments, Move or swap. On a computer you can drag names; + suggests the best fits first.' },
   { tab: 'roster', sel: '.split', title: 'Send it out', text: 'Download the sheet as Excel or PDF, or save it for the team. Undo (Ctrl+Z) takes back anything.' },
+  { sel: '#keyBtn', title: 'Stuck?', text: 'Key and help explains every mark (&, C, (L), the colours) and answers "How do I…?". It also has a one-page guide to print for the OT computer.' },
 ];
 let tourStep = -1;
 function startTour() {
@@ -1492,7 +1493,8 @@ function showKey() {
     h('h3', {}, 'How do I…'),
     h('div', { class: 'how' }, HOW.map(([q, a]) => h('details', { ontoggle: e => { if (e.target.open) dlg.querySelectorAll('.how details[open]').forEach(d => { if (d !== e.target) d.open = false; }); } },
       h('summary', {}, '…' + q), h('p', {}, a)))),
-    h('div', { class: 'bar' }, h('button', { class: 'primary', onclick: () => { dlg.close(); dlg.remove(); } }, 'Close')));
+    h('div', { class: 'bar' }, h('button', { class: 'primary', onclick: () => { dlg.close(); dlg.remove(); } }, 'Close'),
+      h('a', { class: 'btn', href: 'guide.html', target: '_blank', rel: 'noopener' }, 'One-page guide to print')));
   dlg.addEventListener('close', () => dlg.remove());
   document.body.append(dlg); dlg.showModal();
 }
