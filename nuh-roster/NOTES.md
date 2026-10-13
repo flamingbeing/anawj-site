@@ -156,6 +156,10 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
 - **Select several** on Today › Manpower moves many people to one group in one step (with Undo); dragging one also has Undo now.
 - **Keyboard shortcuts** (? lists them): Ctrl+Z/Y, Ctrl+S save or download, Alt+1–4 tabs, [ and ] previous/next day, / filter.
 - **My day** (`#myday`, bookmarkable; a viewer's only page): pick your name once (remembered in this browser, or matched from the member's name) and see where you are on the date on screen: rooms with your partner and case notes, premeds, calls/clinics, leave or admin, notes; then the whole sheet.
+  It opens on today before 2pm and on tomorrow after (`MYDAY_SWITCH_HOUR`). Viewers see "Saved by … at …", get the
+  latest copy when they come back to the page (after a minute away) or press Check again, and lines that changed since
+  they last looked are marked (what each person saw per date is kept in `nuh-roster-seen`, last 60).
+- Opening the app on a past date (not today) moves the roster to tomorrow, with a toast to go back.
 - **Phones:** the Roster tab shows one card per room (Senior, Junior, case notes) instead of the wide table, and the person box slides up from the bottom.
 - **Sending it out:** Download offers .xlsx, PDF, an image for WhatsApp (`js/pngout.js`, drawn from the same layout; shared through the phone's share sheet where it can be, else downloaded) and Print. Printing shrinks the sheet to fit one A4 page.
 - **Learning from hand changes:** taking a senior off a subspecialty list by hand on three different days offers to add it to their "doesn't do" list (`state.learned`; asked once per person and subspecialty).
