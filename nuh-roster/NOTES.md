@@ -208,6 +208,10 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
 - Monthly rosters: an Excel file is read from the first sheet that looks like a roster; an import says which expected
   columns weren't found (a renamed heading) and goes on the Undo list, as does Clear (no "are you sure?"). A name that
   matches several people says who it could be in its tooltip.
+- Accessibility (13 Oct): every tab passes axe (WCAG A/AA) in Practice. Roster names and person chips are focusable
+  (Enter or Space opens the box); the box takes focus, keeps Tab inside and gives focus back on close; problems start
+  with "Problem:", "Check:" or "Note:"; table fields get an aria-label from their column and row (`labelTableFields`).
+  On screen the Baby MO green is darker (`SCREEN_COLOUR`); the sheet and exports keep the department's colours.
 - Keep building elements with `h()` and `textContent`; there is no `innerHTML` anywhere, so imported text can't inject.
 
 ## Code map
