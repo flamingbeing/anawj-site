@@ -324,3 +324,8 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   (or Local when not sharing); a tap runs Refresh now. The one-tap Log shortcut is gone: key times are set from their
   boxes in the key-times row (pad with a Now button). Tests set times that way (`tapNow`); logging one while an earlier
   key time is empty asks first.
+- **Patient list tools** (owner, 13 Oct 2026): admins get a Form view icon on every line (`.formlink`, beside the
+  card). "Select to export" (everyone) beside "Select to lock" (admins): tick cases, "Select all" / "Select none" chips,
+  "Export N to Excel" (the same file as Settings → Export, for just those). In the lock view the chips (dashed, "All
+  but the latest" / "Select none") sit on their own row above Lock / Unlock. The "Study IDs only" line was removed.
+  "Downloaded" (pre-op `pre_dl` and day 2 `d2_dl`) is no longer asked (`NOT_ASKED`); its template columns stay empty.

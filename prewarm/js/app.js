@@ -559,7 +559,9 @@ route(/^\/$/, home);
 // them; nobody can open a locked patient, and the rules stop members changing it, until an admin unlocks it.
 const canLock = () => shared.admin || DEMO;
 const LOCK_ICON = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
-let selecting = null; // Set of patient ids while choosing which to lock / unlock
+const FORM_ICON = '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/><path d="M9 12h6M9 16h6"/></svg>';
+let selecting = null; // Set of patient ids while choosing which to lock / unlock, or to export
+let selMode = 'lock'; // what the selection is for: 'lock' or 'export'
 function setLock(ids, on) {
   const by = shared.email || settings.me || 'admin';
   for (const id of ids) {
@@ -574,15 +576,18 @@ let homeStop = null;
 function home() {
   header('Prewarming study' + (DEMO ? ' (demo)' : ''), null, `<a class="iconbtn" href="#/settings" aria-label="Settings">⚙</a>`);
   const list = Object.values(patients).filter(p => !isGone(p)).sort((a, b) => (lastEdit(b)?.t || b.created) - (lastEdit(a)?.t || a.created));
-  if (selecting && !canLock()) selecting = null;
+  if (selecting && selMode === 'lock' && !canLock()) selecting = null;
   const latest = list[0];
   paint(`
     ${settings.me && settings.site ? '' : `<div class="note">Add your ${settings.me ? '' : 'initials and '}hospital in <a href="#/settings">Settings</a>${settings.me ? '' : ' so each reading shows who entered it'}.</div>`}
     <div class="newrow"><button class="primary big" id="new">+ New patient</button><a class="secondary big" id="pacuview" href="#/pacu" title="Hand the phone to the PACU nurse: tapping a participant opens only their PACU page">PACU view</a></div>
-    <div class="listhead"><h2>Patients on this phone</h2>${canLock() && list.length && !selecting ? '<button class="link" id="select">Select to lock</button>' : ''}</div>
-    ${selecting ? `<div class="seltools"><span>${selecting.size} selected</span>
-      ${latest && list.length > 1 ? `<button class="secondary" id="selall">All but ${esc(sid(latest))} (latest)</button>` : ''}<button class="secondary" id="selnone">None</button>
-      <button class="primary" id="lock" ${selecting.size ? '' : 'disabled'}>${LOCK_ICON} Lock</button><button class="secondary" id="unlock" ${selecting.size ? '' : 'disabled'}>Unlock</button><button class="link" id="seldone">Done</button></div>` : ''}
+    <div class="listhead"><h2>Patients on this phone</h2>${list.length && !selecting ? `<span class="headlinks">${canLock() ? '<button class="link" id="select">Select to lock</button>' : ''}<button class="link" id="selexport">Select to export</button></span>` : ''}</div>
+    ${selecting ? `<div class="seltools"><span class="selcount">${selecting.size} selected${selMode === 'export' ? ' to export' : ''}</span>
+      <div class="selshort" role="group" aria-label="Quick selection"><button class="selchip" id="${selMode === 'export' ? 'selallx' : 'selall'}">${selMode === 'export' ? 'Select all' : latest && list.length > 1 ? `All but ${esc(sid(latest))} (latest)` : 'Select all'}</button><button class="selchip" id="selnone">Select none</button></div>
+      <div class="selacts">${selMode === 'export'
+        ? `<button class="primary" id="exportsel" ${selecting.size ? '' : 'disabled'}>Export ${selecting.size || ''} to Excel</button>`
+        : `<button class="primary" id="lock" ${selecting.size ? '' : 'disabled'}>${LOCK_ICON} Lock</button><button class="secondary" id="unlock" ${selecting.size ? '' : 'disabled'}>Unlock</button>`}</div>
+      <button class="link" id="seldone">Done</button></div>` : ''}
     ${list.length ? `<ul class="list">${list.map(p => {
       const e = lastEdit(p), locked = p.lock?.on;
       // the same Subject ID on two records (e.g. made on two phones without signal): readings are split between them
@@ -590,10 +595,12 @@ function home() {
       const body = `<b>${esc(sidL(p))}${val(p, 'site') ? ` <small>${esc(val(p, 'site'))}</small>` : ''}</b>${twin ? '<span class="twinline">Same Subject ID twice: readings may be split. Fill in one and correct the other’s ID (Pre-op and patient details), or delete it in Settings.</span>' : ''}<span${locked ? ' class="lockline"' : val(p, 'done') ? ' class="okline"' : ''}>${locked ? `${LOCK_ICON} Locked by the study admin${canLock() ? ' · read only' : ''}` : esc(status(p))}</span>
         <span class="dueline" data-due="${p.id}" hidden></span>${progressHtml(p)}<small>${e ? 'Last entry ' + new Date(e.t).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) + (e.by ? ' by ' + esc(e.by) : '') : 'No entries yet'}</small>`;
       if (selecting) return `<li><label class="selrow"><input type="checkbox" data-sel="${p.id}" ${selecting.has(p.id) ? 'checked' : ''}><span>${body}</span></label></li>`;
-      if (locked) return `<li><a href="${canLock() ? '#/p/' + p.id : '#/'}" class="locked"${canLock() ? '' : ' data-locked="1"'}>${body}</a></li>`;
-      return `<li><a href="#/p/${p.id}"${val(p, 'done') ? ` data-done="${esc(val(p, 'done'))}"` : ''}>${body}</a></li>`;
+      // admins also get a shortcut to the patient's Form view on every line (owner, 13 Oct 2026)
+      const formLink = canLock() ? `<a class="formlink" href="#/p/${p.id}/form" aria-label="Form view of ${esc(sidL(p))}" title="Form view">${FORM_ICON}</a>` : '';
+      if (locked) return `<li class="${formLink ? 'rowact' : ''}"><a href="${canLock() ? '#/p/' + p.id : '#/'}" class="locked"${canLock() ? '' : ' data-locked="1"'}>${body}</a>${formLink}</li>`;
+      return `<li class="${formLink ? 'rowact' : ''}"><a href="#/p/${p.id}"${val(p, 'done') ? ` data-done="${esc(val(p, 'done'))}"` : ''}>${body}</a>${formLink}</li>`;
     }).join('')}</ul>` : `<p class="muted">No patients yet. Tap <b>New patient</b> on the morning of surgery.</p>`}
-    <p class="muted small">${sharing() ? `Shared with the ${esc(shared.admin ? 'whole study (admin)' : shared.member.site + ' team')}. Readings sync when there is signal. <b class="syncline">${esc(syncText())}</b>` : `Data stays on this phone. <a href="#/settings">Join your hospital’s team</a> to share patients.`} Study IDs only: no names or hospital numbers.</p>${refreshHtml()}`);
+    <p class="muted small">${sharing() ? `Shared with the ${esc(shared.admin ? 'whole study (admin)' : shared.member.site + ' team')}. Readings sync when there is signal. <b class="syncline">${esc(syncText())}</b>` : `Data stays on this phone. <a href="#/settings">Join your hospital’s team</a> to share patients.`}</p>${refreshHtml()}`);
   wireRefresh();
   $('#new').onclick = () => go('#/new');
   // what each patient being charted needs now (a reading or Prewarm off due within 2 min, or late)
@@ -610,12 +617,16 @@ function home() {
   homeStop = () => { clearInterval(div); stopAlerts(); homeStop = null; };
   cleanup.push(homeStop);
   view.querySelectorAll('.list a[data-locked]').forEach(a => a.onclick = e => { e.preventDefault(); toast('Locked by the study admin'); });
-  if ($('#select')) $('#select').onclick = () => { selecting = new Set(); home(); };
+  if ($('#select')) $('#select').onclick = () => { selMode = 'lock'; selecting = new Set(); home(); };
+  if ($('#selexport')) $('#selexport').onclick = () => { selMode = 'export'; selecting = new Set(); home(); };
   if (selecting) {
     view.querySelectorAll('[data-sel]').forEach(c => c.onchange = () => { c.checked ? selecting.add(c.dataset.sel) : selecting.delete(c.dataset.sel); home(); });
     if ($('#selall')) $('#selall').onclick = () => { selecting = new Set(list.filter(p => p !== latest).map(p => p.id)); home(); };
+    if ($('#selallx')) $('#selallx').onclick = () => { selecting = new Set(list.map(p => p.id)); home(); };
     $('#selnone').onclick = () => { selecting = new Set(); home(); };
     $('#seldone').onclick = () => { selecting = null; home(); };
+    if ($('#exportsel')) $('#exportsel').onclick = () => downloadWorkbook([...selecting].map(id => patients[id]).filter(Boolean));
+    if (selMode === 'lock') {
     $('#lock').onclick = () => {
       const n = selecting.size;
       // a patient changed in the last 3 hours and not marked complete may still be charted on a team phone
@@ -624,6 +635,7 @@ function home() {
       setLock(selecting, true); toast(n + ' locked'); selecting = null; home();
     };
     $('#unlock').onclick = () => { const n = selecting.size; setLock(selecting, false); toast(n + ' unlocked'); selecting = null; home(); };
+    }
   }
   // a patient marked complete: warn on the first tap, open on the second
   view.querySelectorAll('.list a[data-done]').forEach(a => a.onclick = e => {
@@ -1516,7 +1528,9 @@ const FORM = {
 };
 // the rest of the study's data (owner, 12 Oct 2026): every field of these pages, in template order
 const OTHER_PAGES = ['preop', 'meds', 'bloods', 'pod1', 'pod1an', 'pod2', 'pod2an', 'dc'];
-for (const pg of OTHER_PAGES) FORM[pg] = PAGES.find(x => x.id === pg).fields.filter(f => f.id !== 'enrol_id').map(f => [f.id]);
+// "Downloaded" (pre-op and day 2) is no longer asked (owner, 13 Oct 2026); its template columns stay empty in the export
+const NOT_ASKED = new Set(['pre_dl', 'd2_dl']);
+for (const pg of OTHER_PAGES) FORM[pg] = PAGES.find(x => x.id === pg).fields.filter(f => f.id !== 'enrol_id' && !NOT_ASKED.has(f.id)).map(f => [f.id]);
 // Reset a subject: clears every time, reading and answer, keeping the Subject ID, group and hospital (asks twice)
 const KEEP_ON_RESET = new Set(['enrol_id', 'arm', 'site', 'restored']);
 function resetSubject(p) {
@@ -2186,16 +2200,17 @@ route(/^\/export$/, () => {
     <ul class="muted small"><li><b>Data Collection</b>: the template sheet</li><li><b>Readings</b>: every reading with the time it was saved and who saved it</li>
     <li><b>Extra</b>: items the template has no column for (transfusion volumes, investigation rows, PACU transfusion, NuDESC items, sign-offs)</li></ul>
     <button class="primary big" id="xl" ${n ? '' : 'disabled'}>Export ${n} patient${n === 1 ? '' : 's'}</button></div>`);
-  $('#xl').onclick = async () => {
-    const live = Object.values(patients);
-    const bytes = workbook(live, []);
-    const name = `prewarming-study-${new Date().toISOString().slice(0, 10)}${DEMO ? '-demo' : ''}.xlsx`;
-    const file = new File([bytes], name, { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    if (navigator.canShare?.({ files: [file] })) { try { await navigator.share({ files: [file], title: name }); return; } catch (e) { if (e.name === 'AbortError') return; } }
-    const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = name; a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
-  };
+  $('#xl').onclick = () => downloadWorkbook(Object.values(patients));
 });
+// the Excel file for the given patients: shared from the phone's share sheet when it can, else downloaded
+async function downloadWorkbook(live) {
+  const bytes = workbook(live, []);
+  const name = `prewarming-study-${new Date().toISOString().slice(0, 10)}${DEMO ? '-demo' : ''}.xlsx`;
+  const file = new File([bytes], name, { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  if (navigator.canShare?.({ files: [file] })) { try { await navigator.share({ files: [file], title: name }); return; } catch (e) { if (e.name === 'AbortError') return; } }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+}
 
 // ---------- offline shell and updates
 if ('serviceWorker' in navigator && !DEMO) {
