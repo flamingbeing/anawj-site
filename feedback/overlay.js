@@ -380,8 +380,11 @@
   $('pickCancel').onclick = stopPick;
   // the bar covers one end of the screen: flip it to reach what's underneath
   $('pickFlip').onclick = () => $('banner').classList.toggle('top');
-  $('mBug').onclick = () => {
-    pending = { kind: 'problem', heading: '', locator: '', before: '', problem: {
+  $('mBug').onclick = async () => {
+    // which deploy this phone runs: each app's offline copy is named <app>-<version> (sw.js, stamped at deploy)
+    let versions = [];
+    try { versions = (await caches.keys()).filter(k => /^[a-z-]+-v?\d/.test(k)).slice(0, 4); } catch (e) {}
+    pending = { kind: 'problem', heading: '', locator: '', before: '', problem: { versions,
       screen: screen(), size: `${innerWidth}×${innerHeight}`, browser: navigator.userAgent.replace(/^Mozilla\/5\.0 /, '').slice(0, 160),
       online: navigator.onLine, steps: recent.slice(-15), errors: errors.slice() } };
     $('onText').textContent = 'Problem report: say what you did and what went wrong. The last few screens and taps, and any errors, are added (no text from the screen).';
@@ -445,6 +448,7 @@
           const p = c.problem;
           out += `\n### ${i + 1}. Something's wrong (screen ${p.screen}${c.view ? ', view ' + c.view : ''})\nWhat happened:\n${quote(c.text)}\n`;
           out += `Device: ${p.size}, ${p.online ? 'online' : 'offline'}, ${p.browser}\n`;
+          if (p.versions?.length) out += `App version (offline copy): ${p.versions.join(', ')}\n`;
           out += `Recent steps (oldest first):\n${p.steps.length ? p.steps.map(x => '- ' + x).join('\n') : '- (none recorded)'}\n`;
           out += `Errors:\n${p.errors.length ? p.errors.map(x => '- ' + x).join('\n') : '- none'}\n`;
           return;

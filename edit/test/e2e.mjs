@@ -49,12 +49,19 @@ try {
   await page.click('#noteDlg button[value=cancel]');
   await page.click('#aCancel');
 
+  // the editor's own screens pass an accessibility check (axe, WCAG 2.2 AA; the page being edited is not counted)
+  await page.addScriptTag({ path: new URL('../../tools/vendor/axe.min.js', import.meta.url).pathname });
+  const axe = async () => (await page.evaluate(() => window.axe.run(document, { iframes: false, runOnly: ['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'] })))
+    .violations.map(v => `${v.id}: ${v.nodes.map(n => n.target.join(' ')).join(', ')}`);
+  assert.deepEqual(await axe(), [], 'editor bar');
+
   // Send: the privacy check flags the NRIC and the name, and blocks sending until ticked
   await page.click('#send');
   await page.fill('#who', 'Test sender');
   assert.ok(await page.isVisible('#privacy'), 'privacy warning shown');
   const warn = await page.textContent('#privacy');
   assert.match(warn, /NRIC/); assert.match(warn, /name/);
+  assert.deepEqual(await axe(), [], 'send dialog');
   await page.evaluate(() => { window.__opened = []; window.open = u => { window.__opened.push(u); return null; }; });
   await page.click('#openIssue');
   assert.equal((await page.evaluate(() => window.__opened)).length, 0, 'not sent before the tick');

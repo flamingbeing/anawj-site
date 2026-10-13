@@ -25,6 +25,13 @@ to edit it in place, comment, add below or delete. Ported from NTF-Anaesthesia/a
   sender must tick "these aren't patient details" before Copy or Send. It can't catch everything; issues are public.
 - Test: `node edit/test/e2e.mjs` (serves this checkout as anawj.com; no server needed).
 
+## Where feedback lands (links for the phone)
+
+- Waiting page edits and feedback: [open `Page edits:` issues](https://github.com/flamingbeing/anawj-site/issues?q=is%3Aissue+is%3Aopen+in%3Atitle+%22Page+edits%3A%22)
+- Their drafted changes: [open `Page edits:` PRs](https://github.com/flamingbeing/anawj-site/pulls?q=is%3Apr+is%3Aopen+in%3Atitle+%22Page+edits%3A%22)
+  (each has before-and-after screenshots and preview links in a comment)
+- This week's mechanical problems: [the open `Proof-read:` issue](https://github.com/flamingbeing/anawj-site/issues?q=is%3Aissue+is%3Aopen+in%3Atitle+%22Proof-read%3A%22)
+
 ## Feedback button (on PR previews and, when turned on, the real addresses)
 
 `feedback/overlay.js`, added to HTML pages by the Worker (`worker/sites.js`, `feedback()` in `worker/routes.js`). A round 💬
@@ -56,7 +63,8 @@ editor), then Send. No frame: it runs in the page itself, so it works on the sub
   position, so a layout comment points at exact parts of the page. (On live apps, without their text.)
 - **Versions to choose from**: on a preview whose page lists versions (a "show me versions" PR, below), the button shows
   which version is on screen, A/B/C to flip between them, and **Choose version X**.
-- **Something's wrong** (problem report): the sender says what happened, and the report adds the screen (the first part of
+- **Something's wrong** (problem report): the sender says what happened, and the report adds the app version (the name of
+  its offline copy, e.g. `logbook-v40-1a2b3c4d`), the screen (the first part of
   the `#` address), screen size, browser, online or not, the last 15 taps and screen changes (element kind and CSS locator,
   never their text; ids with digits are hidden on live apps) and the last errors on the page. Kept only in memory until
   the report is saved.
