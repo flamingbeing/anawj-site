@@ -44,7 +44,7 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   the bottom. In the patient list, tapping a completed patient warns first (amber row: who marked it and when); a
   second tap opens it. The Word form's sign-off lines use it on op-day pages with data that have no sign-off of their own. The
   per-section sign-offs stay on the BP / HR / BIS screen and the other forms.
-- **Readings to enter live:** all on by default, BP / HR / BIS every 15 min included (owner, 12 Oct 2026; settings v2
+- **Readings to enter live:** (the Settings section was removed 13 Oct 2026; settings v3 resets every hidden column, so all are always entered live) all on by default, BP / HR / BIS every 15 min included (owner, 12 Oct 2026; settings v2
   turned it on once for phones that had it off).
 - **Export Excel** is in Settings (owner, 12 Oct 2026), not on the home page.
 - **Log out** (owner, 12 Oct 2026; replaced "Stop sharing on this phone" and the admins' "Sign out"): warns first (how many
@@ -302,3 +302,9 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   It re-checks who the phone is (fresh token, member / admin list, so a newly added admin entry counts without
   logging out), re-subscribes to the team's patients, sends anything waiting, and checks for a new app version (shows
   "Update available" if one is ready). It never deletes anything on the phone.
+- **Update helper** (owner, 13 Oct 2026: Firefox on the phone kept the old version after closing and reopening):
+  `anawj.com/prewarm-update/` is a plain page outside the app's service-worker scope (`/prewarm/`), so the old worker
+  can't serve it. "Get the latest version" first checks the app is reachable, then unregisters the prewarm worker and
+  deletes the `prewarm-*` caches, then opens `/prewarm/` again. Patients and readings (localStorage, IndexedDB) are
+  never touched. Also linked from Settings under Refresh now. Tell the owner to open it by typing the address when a
+  phone is stuck on an old version.

@@ -302,7 +302,7 @@ try {
   assert.equal(await page.evaluate(() => getComputedStyle(document.body).zoom), '1.25');
   await page.click('[data-zoom="1"]');
   // every reading live by default; deleting participants only from Settings
-  assert.equal(await page.isChecked('[data-k="haemo15"]'), true, 'BP, HR and BIS every 15 min on by default');
+  assert.doesNotMatch(await page.textContent('main'), /Readings to enter live/, 'no Readings to enter live section; every reading is live');
   await page.click('a[href="#/delete"]');
   await page.waitForSelector('.dellist');
   await axe('delete participants'); await shot('delete');

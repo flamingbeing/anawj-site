@@ -55,6 +55,8 @@ const saveAll = () => write('patients', patients);
 const saveSettings = () => write('settings', settings);
 // settings v2 (owner, 12 Oct 2026): every reading is entered live by default, BP / HR / BIS every 15 min included
 if ((settings.v || 0) < 2) { settings.hide.haemo15 = false; settings.v = 2; saveSettings(); }
+// settings v3 (owner, 13 Oct 2026): the "Readings to enter live" section is gone, so nothing stays hidden from an old choice
+if (settings.v < 3) { for (const k of Object.keys(settings.hide)) settings.hide[k] = false; settings.v = 3; saveSettings(); }
 // Interface size (this phone only): zooms the whole screen. Normal is 100%.
 const SIZES = [['0.85', 'Smaller'], ['0.92', 'Small'], ['1', 'Normal'], ['1.1', 'Large'], ['1.25', 'Larger']];
 const applySize = z => document.documentElement.style.setProperty('--ui-zoom', SIZES.some(([k]) => k === String(z)) ? String(z) : '1');
@@ -230,7 +232,7 @@ function pacuLinkHtml(p) {
 
 // Refresh now (owner, 13 Oct 2026): fetch the team's latest data again and look for a new app version
 let swReg = null, offerUpdate = null;
-const refreshHtml = () => `<div class="refreshbox"><button class="secondary" id="refreshnow">Refresh now</button><small class="muted">Gets the team’s latest data again, sends anything waiting, and checks for a new app version.</small></div>`;
+const refreshHtml = () => `<div class="refreshbox"><button class="secondary" id="refreshnow">Refresh now</button><small class="muted">Gets the team’s latest data again, sends anything waiting, and checks for a new app version.</small><a class="link" href="../prewarm-update/">App still won’t update? Get the latest version</a></div>`;
 async function refreshNow(btn) {
   btn.disabled = true; const was = btn.textContent; btn.textContent = 'Refreshing…';
   let msg = 'Up to date.';
@@ -1904,11 +1906,6 @@ route(/^\/settings$/, () => {
     <h2>Hospital and sharing</h2>
     ${sharingHtml()}
     ${cloud.enabled ? refreshHtml() : ''}
-    <h2>Readings to enter live</h2>
-    <p class="muted small">Untick what you’ll fill in later from the Fortuna monitor or Epic. Core temperature is always on.</p>
-    ${tog('hide', 'skin', 'Skin temps: chest, arm, thigh, calf')}${tog('hide', 'set', 'Gown set temp (pre-warming)')}${tog('hide', 'ts', 'Thermal sensation (pre-warming)')}
-    ${tog('hide', 'warm', 'Underbody / gown warming on or off')}${tog('hide', 'room', 'Room temp')}
-    ${tog('hide', 'haemo15', 'BP, HR and BIS every 15 min', 'Off: baseline only')}${tog('hide', 'bis', 'BIS')}
     <h2>When a reading is due</h2>
     <p class="muted small">Works while the app is open on screen.</p>
     ${tog('remind', 'haemo', 'BP, HR, BIS due alarm', 'Off by default: the countdown still shows')}

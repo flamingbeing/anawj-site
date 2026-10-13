@@ -229,9 +229,8 @@ jobs.push(() => tryit(async () => {
   pg.on('dialog', accept); await pg.click('#save'); await pg.waitForTimeout(400); pg.off('dialog', accept);
   await pg.waitForFunction(() => !!document.querySelector('#gaps'), null, { timeout: 4000 });
   log(/BP, HR, BIS saved with blanks: .*60 min \(Diastolic BP, Mean BP, Heart rate, BIS\)/.test(await pg.textContent('#gaps')), 'part-blank reading listed: ' + (await pg.textContent('#gaps')).replace(/\s+/g, ' ').slice(0, 300));
-  await pg.evaluate(() => { const k = 'prewarm-demo:settings'; const s = JSON.parse(localStorage.getItem(k) || '{}'); s.hide = { ...(s.hide || {}), ts: true }; localStorage.setItem(k, JSON.stringify(s)); });
-  await pg.reload(); await pg.waitForSelector('#gaps');
-  log(/Hidden in Settings \(not being recorded\): thermal sensation/.test(await pg.textContent('#gaps')), 'hidden column listed');
+  await pg.evaluate(() => { location.hash = '#/settings'; }); await pg.waitForSelector('#me');
+  log(!/Readings to enter live/.test(await pg.textContent('main')) && /When a reading is due/.test(await pg.textContent('main')), 'Settings no longer has a Readings to enter live section');
   await ctx.close();
 }));
 // M. typed form answers: letters refused where a number is asked; an odd temperature asked about
@@ -666,6 +665,16 @@ jobs.push(() => tryit(async () => {
   const { ctx, pg } = await fresh();
   await pg.click('#refreshnow'); await pg.waitForTimeout(500);
   log(/Up to date/.test(await pg.textContent('#toast')) && await pg.$('.list a') !== null, 'Refresh now keeps the patient list and says it is up to date');
+  await ctx.close();
+}));
+// AG. the update helper page (outside the app's scope, for a phone that won't update): clears the app's saved code, keeps
+// patients, and opens the app again
+jobs.push(() => tryit(async () => {
+  const { ctx, pg } = await fresh();
+  await pg.evaluate(() => caches.open('prewarm-v1').then(c => c.put('/x', new Response('old'))));
+  await pg.goto('http://localhost:8080/prewarm-update/'); await pg.click('#go');
+  await pg.waitForURL(/\/prewarm\/$/, { timeout: 10000 });
+  log(!(await pg.evaluate(() => caches.keys())).includes('prewarm-v1'), 'update helper clears the saved copy and opens the app');
   await ctx.close();
 }));
 await runJobs();
