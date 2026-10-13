@@ -348,3 +348,6 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   - Tests: edge block AJ (redirect keeps path, query, `#`; no loop; update helper), sync test (a half-entered reading
     keeps the phone; then the join code and initials arrive on the new address and the team's patient shows). In tests
     `?oldhost=<new address>` on localhost pretends to be the old address.
+- **Admin hospital** (owner, 13 Oct 2026): signed-in admins had no way to set "their" hospital (the chips only showed in
+  demo mode), so patients they started had no hospital and never synced. Settings now shows the hospital chips to admins
+  (members' hospital stays fixed by their team). Workaround before this ships: open the team's join link while signed in.

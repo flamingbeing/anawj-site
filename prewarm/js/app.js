@@ -2026,7 +2026,9 @@ function sharingHtml() {
   const chips = `<div class="seg sites">${SITES.map(x => `<button type="button" class="chip" data-site="${x}" aria-pressed="${settings.site === x}" ${shared.member ? 'disabled' : ''}>${x}</button>`).join('')}</div>`;
   if (!cloud.enabled) return `${chips}<small class="muted">New patients on this phone are recorded at this hospital. Sharing is off in demo mode.</small>`;
   if (shared.email && !shared.admin) return `<p class="note">${esc(shared.email)} isn’t on the study’s admin list. Ask the owner to add it.</p><button class="secondary" id="leave">Log out</button>`;
+  // an admin picks the hospital new patients on this phone are recorded at (members' hospital is fixed by their team)
   if (shared.admin) return `<p class="ok-box">Signed in as study admin (${esc(shared.email)}). You see every hospital’s patients.<br><span class="syncline">${esc(syncText())}</span></p>
+    <label class="lab">Your hospital</label>${chips}<small class="muted">New patients you start on this phone are recorded at this hospital. Pick one before starting a patient.</small>
     <a class="secondary" href="#/admin">Join codes and members</a>
     <details class="sect"><summary><span>Password</span><small>sign in with it next time</small></summary><div class="stack">
       <label class="lab" for="newpw">New password <small>(8 or more characters)</small></label>
