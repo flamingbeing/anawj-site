@@ -2843,7 +2843,7 @@ function renderMyDay() {
       meta?.updatedAt && viewerFound ? h('p', { class: 'seen' }, `Saved by ${meta.updatedBy?.name || 'the rosterer'} at ${hhmm(meta.updatedAt)}${new Date(meta.updatedAt).toDateString() !== new Date().toDateString() ? `, ${longDate(isoDate(new Date(meta.updatedAt)))}` : ''}. `,
         h('button', { class: 'link', onclick: () => viewerLoad(date) }, 'Check again')) : null,
       p && r && postingOf(p) && p.role === 'junior' ? h('p', { class: 'seen' }, `Posting this week: ${postingName(postingOf(p))}`) : null,
-      h('p', { class: 'hint' }, 'Bookmark this page to come straight here: ', h('code', {}, location.origin + location.pathname + '#myday'),
+      h('p', { class: 'hint' }, 'Add it to your home screen (browser menu › Add to Home Screen): it opens here and works with poor signal. Or bookmark ', h('code', {}, location.origin + location.pathname + '#myday'),
         isViewer() ? null : [' · ', h('button', { class: 'link', onclick: () => { history.replaceState(null, '', location.pathname); goTab('roster'); } }, 'Back to the roster')])),
     r ? renderSheet() : null);
 }
@@ -4300,6 +4300,23 @@ document.getElementById('tourBtn')?.addEventListener('click', () => startTour())
 document.getElementById('allBtn')?.addEventListener('click', downloadEverything);
 addEventListener('hashchange', () => { if (location.hash === '#myday' && state.tab !== 'myday') { closeTagEditor(); state.tab = 'myday'; window.scrollTo(0, 0); render(); } });
 document.getElementById('keysBtn')?.addEventListener('click', showShortcuts);
+// Offline app shell (sw.js): the app opens with poor signal. A new version installs alongside and is offered here.
+(function registerSW() {
+  if (!('serviceWorker' in navigator) || location.protocol === 'file:' || window.ROSTER_MOVED_TO || /^(www\.)?anawj\.com$/.test(location.hostname)) return; // not at the old address (it redirects)
+  let reloading = false;
+  const hadController = !!navigator.serviceWorker.controller; // the first install takes control quietly
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (reloading || !hadController) return; reloading = true; location.reload(); });
+  navigator.serviceWorker.register('sw.js').then(reg => {
+    const offer = w => {
+      if (document.getElementById('update-bar')) return;
+      document.body.prepend(h('div', { id: 'update-bar', class: 'demo-bar', role: 'status' }, h('b', {}, 'Update available'), h('span', { class: 'grow' }),
+        h('button', { class: 'small primary', onclick: () => { document.getElementById('update-bar')?.remove(); w.postMessage('skipWaiting'); } }, 'Reload')));
+    };
+    if (reg.waiting && navigator.serviceWorker.controller) offer(reg.waiting);
+    reg.addEventListener('updatefound', () => { const w = reg.installing; w?.addEventListener('statechange', () => { if (w.state === 'installed' && navigator.serviceWorker.controller) offer(w); }); });
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reg.update().catch(() => {}); });
+  }).catch(err => console.warn('Service worker not registered', err));
+})();
 document.getElementById('keyBtn')?.addEventListener('click', showKey);
 // Phones: keep the bottom-sheet person box above the on-screen keyboard, and the field being typed in visible.
 if (window.visualViewport) {

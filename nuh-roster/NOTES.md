@@ -162,6 +162,10 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
 - Who "me" is on My day: the staff record an admin links to the account (Settings › Team members › "On the staff list
   as", saved as `members/{email}.staffId`), else the name picked in this browser, else a guess from the member's name,
   which My day flags ("Matched to … Not you? Pick your name").
+- Installable and offline (13 Oct): `manifest.webmanifest` (shortcut: My day), icons in `icons/`, and `sw.js` (the
+  logbook's pattern: shell cache-first, Firebase SDK cached, big vendor files cached on first use, "Update available:
+  Reload" bar). Its VERSION base is `nuh-roster-v1`; the deploy stamps it, so PRs leave it alone. Not registered at the
+  old anawj.com address. Offline, the app opens and My day shows the last roster this phone loaded.
 - Opening the app on a past date (not today) moves the roster to tomorrow, with a toast to go back.
 - My day also has: Add to calendar (an .ics file made in the browser, `js/ics.js`; no feed URL, nothing sent), My
   week (the next 7 days: saved rosters, else leave and calls from the monthly rosters; viewers load the team's copies
