@@ -73,14 +73,23 @@
     .banner span{flex:1}
     .banner button{background:#fff;color:#002f6c;border-color:#fff}
     #speak[aria-pressed=true]{background:#e4002b;border-color:#e4002b;color:#fff}
+    .ver{position:fixed;z-index:2147483647;bottom:70px;font:600 13px/1 system-ui,sans-serif;background:#e57200;color:#fff;padding:6px 8px;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+    .ver.left{left:12px}.ver.right{right:12px}
+    .vers button[aria-pressed=true]{background:#002f6c;border-color:#002f6c;color:#fff}
     [hidden]{display:none!important}
   </style>
   <button class="fab" id="fab" aria-label="Feedback">💬<b id="badge" hidden></b></button>
+  <div class="ver" id="ver" hidden></div>
   <div class="banner" id="banner" hidden role="status"><span>Tap what you want to comment on</span><button id="pickFlip" aria-label="Move this bar to the other end">⇅</button><button id="pickCancel">Cancel</button></div>
   <div class="sheet" id="menu" hidden role="dialog" aria-label="Feedback">
     <h2>Feedback on this page</h2>
     <p class="muted" id="where"></p>
     <div class="row"><button class="primary" id="mPick">Comment on something</button><button id="mPage">Comment on this screen</button></div>
+    <div id="verBox" hidden>
+      <p class="muted" style="margin:12px 0 0">This preview has versions to choose from. Look at each, then choose one.</p>
+      <div class="row vers" id="vers" role="group" aria-label="Versions"></div>
+      <div class="row"><button id="choose" class="primary"></button></div>
+    </div>
     <div class="row"><button id="mBug">Something’s wrong</button></div>
     <div class="row"><button id="mList">Comments (<span id="count">0</span>)</button><button id="mSend">Send</button></div>
     <div class="row"><button id="mSide">Move button</button><button id="mOff">Turn off</button><button id="mClose">Close</button></div>
@@ -125,6 +134,28 @@
     $('count').textContent = items.length;
   }
   render();
+
+  // ---- versions to choose from (a "show me versions" comment, built on a PR preview): the page lists them in
+  // <meta name="anawj-variants" content="a,b,c"> and shows the one named by ?variant= (edit/NOTES.md)
+  const VARIANTS = (document.querySelector('meta[name="anawj-variants"]')?.content || '').split(',').map(v => v.trim()).filter(Boolean);
+  const current = () => { const v = new URLSearchParams(location.search).get('variant'); return VARIANTS.includes(v) ? v : VARIANTS[0]; };
+  if (VARIANTS.length > 1) {
+    $('verBox').hidden = false; $('ver').hidden = false;
+    $('ver').textContent = 'Version ' + current().toUpperCase();
+    $('ver').className = 'ver ' + side();
+    for (const v of VARIANTS) {
+      const b = document.createElement('button'); b.textContent = v.toUpperCase();
+      b.setAttribute('aria-pressed', String(v === current())); b.setAttribute('aria-label', 'Version ' + v.toUpperCase());
+      b.onclick = () => { const u = new URL(location.href); u.searchParams.set('variant', v); location.href = u.href; };
+      $('vers').appendChild(b);
+    }
+    $('choose').textContent = `Choose version ${current().toUpperCase()}`;
+    $('choose').onclick = () => {
+      items.push({ id: Date.now().toString(36), url: location.href.split('#')[0].replace(/[?&]variant=[^&]*/, '').replace(/\?$/, ''), view: location.hash, title: document.title,
+        kind: 'choice', heading: '', locator: '', before: '', text: `Choose version ${current().toUpperCase()} (of ${VARIANTS.map(v => v.toUpperCase()).join(', ')}).`, at: new Date().toISOString() });
+      save(); show(null);
+    };
+  }
   $('where').textContent = (PREVIEW ? 'Preview of a proposed change. ' : '') + (LIVE_APP ? 'Live app: your comments never include the screen’s own text.' : 'Comments stay on this phone until you send them.');
 
   // ---- picking what to comment on (the page's own taps are held back while picking)
@@ -244,7 +275,7 @@
     openNote(); $('noteText').placeholder = 'e.g. I tapped Save and nothing happened';
   };
   $('mPage').onclick = () => { pending = { kind: 'whole screen', heading: '', locator: '', before: '' }; $('onText').textContent = 'On: this whole screen'; openNote(); };
-  $('mSide').onclick = () => { store.set(SIDE, side() === 'left' ? 'right' : 'left'); render(); };
+  $('mSide').onclick = () => { store.set(SIDE, side() === 'left' ? 'right' : 'left'); render(); $('ver').className = 'ver ' + side(); };
   $('mOff').onclick = () => {
     if (PREVIEW) { hostEl.remove(); return; } // previews: gone until the page is opened again
     document.cookie = 'anawj-feedback=; Path=/; Max-Age=0; Secure; SameSite=Lax';
@@ -274,6 +305,7 @@
     for (const u of urls) {
       out += `\n## Page: ${u}\n`;
       items.filter(c => c.url === u).forEach((c, i) => {
+        if (c.kind === 'choice') { out += `\n### ${i + 1}. Version chosen\n${c.text} Keep that one and remove the others before merging.\n`; return; }
         if (c.problem) {
           const p = c.problem;
           out += `\n### ${i + 1}. Something's wrong (screen ${p.screen}${c.view ? ', view ' + c.view : ''})\nWhat happened:\n${quote(c.text)}\n`;
