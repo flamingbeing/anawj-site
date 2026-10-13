@@ -51,11 +51,11 @@ test('duplicate tabs clone reload draft but own independent storage keys', () =>
 test('a reload takes the draft slot over instead of leaving a copy behind; a duplicated tab leaves it', () => {
   const m=new Map(),sm=new Map();const storage={getItem:k=>m.has(k)?m.get(k):null,setItem:(k,v)=>m.set(k,v),removeItem:k=>m.delete(k)},session={getItem:k=>sm.get(k)||null,setItem:(k,v)=>sm.set(k,v)};
   const drafts=()=>[...m.keys()].filter(k=>k.startsWith('draft:a:'));
-  let s=createDraftSlot('draft','a',storage,session);s.save({details:'QQ stale'});
-  for(let i=0;i<5;i++){s.release();s=createDraftSlot('draft','a',storage,session);}
+  let s=createDraftSlot('draft','a',storage,session,{move:true});s.save({details:'QQ stale'});
+  for(let i=0;i<5;i++){s.release();s=createDraftSlot('draft','a',storage,session,{move:true});}
   assert.equal(drafts().length,1);assert.equal(s.initial.details,'QQ stale');
   // not released (still open in another tab): the copy and the original both stay
-  const dup=createDraftSlot('draft','a',storage,session);assert.equal(dup.initial.details,'QQ stale');assert.equal(drafts().length,2);
+  const dup=createDraftSlot('draft','a',storage,session,{move:true});assert.equal(dup.initial.details,'QQ stale');assert.equal(drafts().length,2);
 });
 test('edits arriving during an in-flight write drain without an online event or manual flush', async () => {
   const f=fixture();let finish,started;const called=new Promise(r=>started=r),first={id:'1',details:'one'},second={...first,details:'two'};

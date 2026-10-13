@@ -77,7 +77,7 @@ const draftKey = () => `${DRAFT_KEY}:${cloud.demo ? 'demo:' : ''}${(S.user && S.
 function loadDraft() {
   if (draftOwner === draftKey()) return;
   draftOwner = draftKey(); draft = EMPTY(); bulkRows = null;
-  draftSlot = createDraftSlot(DRAFT_KEY, draftOwner.slice(DRAFT_KEY.length + 1));
+  draftSlot = createDraftSlot(DRAFT_KEY, draftOwner.slice(DRAFT_KEY.length + 1), undefined, undefined, { move: true });
   draft = { ...draft, ...(draftSlot.initial || {}) };
   saveDraft();
   // a kept date only lasts for one sitting, never into tomorrow's list
@@ -102,7 +102,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) saveD
 export function recoverableCaseDrafts() {
   try { return listDrafts(DRAFT_KEY, draftKey().slice(DRAFT_KEY.length + 1)).filter(x => (x.value.details && !onlyTemplate(x.value.details)) || x.value.initials || x.value.bulk); } catch { return []; }
 }
-export function recoverCaseDraft(value) { loadDraft(); saveDraft(); draftSlot = createDraftSlot(DRAFT_KEY, draftOwner.slice(DRAFT_KEY.length + 1)); draft = { ...EMPTY(), ...value }; saveDraft(); location.hash = '#log'; hooks.render(); }
+export function recoverCaseDraft(value) { loadDraft(); saveDraft(); draftSlot = createDraftSlot(DRAFT_KEY, draftOwner.slice(DRAFT_KEY.length + 1), undefined, undefined, { move: true }); draft = { ...EMPTY(), ...value }; saveDraft(); location.hash = '#log'; hooks.render(); }
 // Text shared to the installed app (share sheet → Logbook; manifest share_target) arrives as
 // ?share_text=… (or, from the service worker, ?shared=1: share-in.js); app.js keeps it for here: it opens in
 // paste-a-list, so one case or a whole list works. With Settings → Notes → Ask what to do with shared text, the

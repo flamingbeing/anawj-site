@@ -5,7 +5,9 @@ const local = () => { try { return globalThis.localStorage || NONE; } catch { re
 const sessionStore = () => { try { return globalThis.sessionStorage || NONE; } catch { return NONE; } };
 // Each browser document owns its slot. Reload restores that slot; other tabs
 // retain independent drafts, including duplicated tabs inheriting sessionStorage.
-export function createDraftSlot(prefix, owner, storage = local(), session = sessionStore()) {
+// move: the old slot is taken over, not copied (the case box: one draft at a time). Reflections keep the copy: a
+// new reflection reuses the slot, so the copy is how the earlier draft stays recoverable.
+export function createDraftSlot(prefix, owner, storage = local(), session = sessionStore(), { move = false } = {}) {
   const pointer = prefix + ':active:' + owner;
   let previous = null;
   try { previous = session.getItem(pointer); } catch { /* storage may be denied */ }
@@ -24,12 +26,12 @@ export function createDraftSlot(prefix, owner, storage = local(), session = sess
       // the old slot moves over rather than staying behind as a copy (a reload, or the phone unloading the app,
       // would otherwise leave one each time, listed later as an unfinished draft after the case was saved); a slot
       // another document still holds (a duplicated tab) stays
-      if (!previous || storage.getItem(released(from)) != null) { storage.removeItem(from); storage.removeItem(released(from)); }
+      if (move && (!previous || storage.getItem(released(from)) != null)) { storage.removeItem(from); storage.removeItem(released(from)); }
     } catch { /* keep the previous pointer until a successful write */ }
   }
   const release = () => { try { storage.setItem(released(key), '1'); } catch { /* as above */ } };
   const hold = () => { try { storage.removeItem(released(key)); } catch { /* as above */ } };
-  if (typeof document !== 'undefined' && typeof addEventListener === 'function') {
+  if (move && typeof document !== 'undefined' && typeof addEventListener === 'function') {
     addEventListener('pagehide', release);
     document.addEventListener('visibilitychange', () => (document.visibilityState === 'hidden' ? release() : hold()));
   }
