@@ -1909,6 +1909,31 @@ route(/^\/settings$/, () => {
   });
   $('#leave')?.addEventListener('click', e => logOut(e.target));
   $('#adminin')?.addEventListener('click', () => { $('#adminbox').hidden = false; $('#adminemail').focus(); });
+  $('#adminpwin')?.addEventListener('click', async e => {
+    const email = $('#adminemail').value.trim().toLowerCase(), pw = $('#adminpw').value;
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return toast('Enter your email address.');
+    if (!pw) return toast('Enter your password, or use the emailed link.');
+    e.target.disabled = true;
+    try { await cloud.adminPasswordSignIn(email, pw); toast('Signed in'); }
+    catch (err) { toast(cloud.friendly(err)); }
+    e.target.disabled = false;
+  });
+  $('#adminreset')?.addEventListener('click', async e => {
+    const email = $('#adminemail').value.trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return toast('Enter your email address first.');
+    e.target.disabled = true;
+    try { await cloud.sendPasswordReset(email); toast('If that email has an account, a reset link is on its way.'); }
+    catch (err) { toast(cloud.friendly(err)); }
+    e.target.disabled = false;
+  });
+  $('#setpw')?.addEventListener('click', async e => {
+    const pw = $('#newpw').value;
+    if (pw.length < 8) return toast('Use at least 8 characters.');
+    e.target.disabled = true;
+    try { await cloud.setMyPassword(pw); $('#newpw').value = ''; toast('Password saved. Next time, sign in with your email and password.'); }
+    catch (err) { toast(cloud.friendly(err)); }
+    e.target.disabled = false;
+  });
   $('#adminsend')?.addEventListener('click', async e => {
     const email = $('#adminemail').value.trim().toLowerCase();
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return toast('Enter your email address.');
@@ -1935,7 +1960,11 @@ function sharingHtml() {
   if (!cloud.enabled) return `${chips}<small class="muted">New patients on this phone are recorded at this hospital. Sharing is off in demo mode.</small>`;
   if (shared.email && !shared.admin) return `<p class="note">${esc(shared.email)} isn’t on the study’s admin list. Ask the owner to add it.</p><button class="secondary" id="leave">Log out</button>`;
   if (shared.admin) return `<p class="ok-box">Signed in as study admin (${esc(shared.email)}). You see every hospital’s patients.<br><span class="syncline">${esc(syncText())}</span></p>
-    <a class="secondary" href="#/admin">Join codes and members</a><button class="secondary" id="leave">Log out</button>`;
+    <a class="secondary" href="#/admin">Join codes and members</a>
+    <details class="sect"><summary><span>Password</span><small>sign in with it next time</small></summary><div class="stack">
+      <label class="lab" for="newpw">New password <small>(8 or more characters)</small></label>
+      <input id="newpw" type="password" autocomplete="new-password"><button class="secondary" id="setpw">Save password</button></div></details>
+    <button class="secondary" id="leave">Log out</button>`;
   if (shared.member) return `<p class="ok-box">Sharing with the ${esc(shared.member.site)} team. Readings sync when there is signal.<br><span class="syncline">${esc(syncText())}</span></p><button class="secondary" id="leave">Log out</button>
     <small class="muted">Logging out deletes every patient on this phone (it warns first, and again if something hasn’t synced).</small>`;
   return `<label class="lab" for="code">Join code</label><input id="code" autocomplete="off" autocapitalize="characters" placeholder="e.g. NTF-…">
@@ -1944,7 +1973,11 @@ function sharingHtml() {
     <button class="link" id="adminin">Study admin? Sign in by email</button>
     <div id="adminbox" class="stack" hidden><label class="lab" for="adminemail">Your admin email</label>
       <input id="adminemail" type="email" autocomplete="email" inputmode="email">
-      <button class="secondary" id="adminsend">Email me a sign-in link</button></div>`;
+      <label class="lab" for="adminpw">Password <small>(if you have set one)</small></label>
+      <input id="adminpw" type="password" autocomplete="current-password">
+      <button class="primary" id="adminpwin">Sign in</button>
+      <button class="secondary" id="adminsend">Email me a sign-in link</button>
+      <button class="link" id="adminreset">Forgot password? Email me a reset link</button></div>`;
 }
 
 // an admin's sign-in link opened in another browser: ask for the email again
