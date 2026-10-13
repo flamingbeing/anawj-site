@@ -12,12 +12,13 @@ Read them all before starting; edit only yours.
 
 ## Waiting on the owner
 
-- Pick from the ease-of-use backlog (`NOTES.md` §7), or say to leave it.
+- Pick a batch from `IMPROVEMENTS.md` (20-reviewer review, 13 Oct). Suggested order: Batch 1 (don't lose work,
+  don't lose assessors: offline sign-out loses unsent forms; WhatsApp's in-app browser can't sign in), then Batch 2.
 - Nightly Firestore backup: deferred by the owner until the app is finalised.
 
 ## Next (agreed queue)
 
-- Nothing queued until the owner picks from the backlog.
+- Nothing queued until the owner picks from `IMPROVEMENTS.md`.
 
 ## Recently done
 
@@ -31,6 +32,7 @@ Read them all before starting; edit only yours.
 
 ## Decisions log
 
+- 2026-10-13: Improvement ideas live in `IMPROVEMENTS.md` (ranked batches); `NOTES.md` §7 keeps only the short list.
 - 2026-10-13: Evals lives at `apmes.anawj.com/evals/` with the logbook (one sign-in, `SUBDOMAINS.md` step 5).
 - 2026-10-13: `evals/NOTES.md` stays evals-only; logbook roles, photos and integrations live in `logbook/NOTES.md`.
 - 2026-10-11: Evals theme is light by default with a per-device Light / Dark / Auto toggle; the Guide and forms card is off More for now.
