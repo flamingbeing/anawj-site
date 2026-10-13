@@ -7,11 +7,12 @@ import { suggest as suggestCodes } from './suggest.js';
 import { apmesShorthand, shorthandTags } from './tags.js';
 import {
   S, h, ic, toast, debounce, modal, confirmBox, cat, catName, catShort, catFull, catChip, countText, logTags, tagLinks, tagName, tagChip, tagSet, keepTags, PROGRESS_BY_CODE,
-  createCase, updateCase, removeCase, restoreCase, saveMany, deleteMany, subcatChips, subcatsOf, settings, todayISO, hooks, fill, add, cloud, writes, okNoIds, patchLogbook, catPills, basicHides, caseShown } from './ui-core.js';
+  createCase, updateCase, removeCase, restoreCase, saveMany, deleteMany, subcatChips, subcatsOf, settings, todayISO, hooks, fill, add, cloud, writes, okNoIds, patchLogbook, catPills, basicHides, basicMode, caseShown } from './ui-core.js';
 import { display, templateDialog } from './ui-settings.js';
 import { moveToBin } from './bin.js';
 import { caseHasNotes, openNotes } from './ui-notepad.js';
 import { createDraftSlot, listDrafts } from './drafts.js';
+import { STRONG, confident, autoTick, rejectCodes, recentCases, recentCount as snapRecent } from './logging.js';
 
 const DRAFT_KEY = 'logbook-draft-v2';
 const KEEP_MS = 12 * 3600e3; // a date kept by "Save, keep date" lasts this long
@@ -47,14 +48,20 @@ function loadDraft() {
   // a picked day survives a reload in the same sitting (phones unload the app when you switch away)
   if (!(Date.now() - Math.max(draft.keepDate ? draft.keptAt || 0 : 0, draft.dateAt || 0) < KEEP_MS)) draft.date = null;
 }
+let draftTimer = 0;
 function saveDraft() {
+  clearTimeout(draftTimer); draftTimer = 0;
   if (!draftSlot || draftOwner !== draftKey()) return;
   try { draftSlot.save({ ...draft, savedAt: Date.now() }); draftError = ''; }
   catch { draftError = 'Draft not saved: storage unavailable. Keep this page open.'; }
   if (ui?.draftNote) ui.draftNote.textContent = draftError || (draftText() || draft.bulk ? 'Draft saved' : '');
 }
-saveDraft.cancel = () => {};
+// Typing saves once the keys pause (one storage write, not one per key). Leaving the page, switching away or
+// moving to another screen (Recover drafts lists what is stored) saves at once.
+const saveDraftSoon = () => { clearTimeout(draftTimer); draftTimer = setTimeout(saveDraft, 300); };
+saveDraft.cancel = () => { clearTimeout(draftTimer); draftTimer = 0; };
 window.addEventListener('pagehide', saveDraft);
+window.addEventListener('hashchange', () => { if (draftTimer) saveDraft(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden) saveDraft(); });
 export function recoverableCaseDrafts() {
   try { return listDrafts(DRAFT_KEY, draftKey().slice(DRAFT_KEY.length + 1)).filter(x => x.value.details || x.value.initials || x.value.bulk); } catch { return []; }
@@ -79,7 +86,7 @@ export function logOnDate(iso) {
   // a fresh case for that day; a case already being typed stays, and only its date changes
   const typing = draftText() || (draft.cats || []).length;
   if (typing) setTimeout(() => toast('Date set. The case you were typing is still in the box'), 300);
-  else Object.assign(draft, { details: '', initials: '', initialsHint: '', cats: [], tags: [], reflectTag: false });
+  else Object.assign(draft, { details: '', initials: '', initialsHint: '', cats: [], tags: [], reflectTag: false, ...FRESH_TICKS() });
   draft.mode = 'one';
   draft.date = iso === todayISO() ? null : iso; draft.dateAt = Date.now(); bulkRows = null;
   saveDraft();
@@ -106,6 +113,15 @@ function toggleTagIn(cats, tags, key) {
 const looseTags = (cats, tags) => (tags || []).filter(k => !(cats || []).some(code => subcatsOf(code).some(e => e.k === k)));
 function dropCat(list, code) { return list.filter(c => c !== code && BY_CODE[c]?.parent !== code); }
 const toggleCat = (list, code) => (list.includes(code) ? dropCat(list, code) : addCat(list, code));
+// The user's own changes to the ticked categories on the Case tab go through here: what they take off is
+// remembered for this case, so "Tick confident suggestions automatically" leaves it off.
+function setCats(next) {
+  const gone = draft.cats.filter(c => !next.includes(c));
+  draft.cats = next;
+  if (gone.length) Object.assign(draft, rejectCodes(draft, gone));
+}
+// a new case starts with nothing ticked automatically and nothing turned down
+const FRESH_TICKS = () => ({ auto: [], rejected: [] });
 
 // ---------- category picker (search + grouped list) ----------
 
@@ -145,7 +161,8 @@ const refocus = () => { if (ui.textarea && matchMedia('(pointer: fine)').matches
 // The list follows your tag set (Settings → Tag editor): section headers, categories and your own tags,
 // indented under what they sit in; hidden ones only turn up in a search. getTags / toggleTag handle your
 // tags (left out: categories only).
-export function catPicker({ get, toggle, getTags = null, toggleTag = null, placeholder = 'Search tags', collapsed = false }) {
+// onEmptyEnter: Enter in the empty search box (the Case tab saves the case).
+export function catPicker({ get, toggle, getTags = null, toggleTag = null, placeholder = 'Search tags', collapsed = false, onEmptyEnter = null }) {
   let q = '', hl = -1, items = [], showAll = !collapsed;
   const listId = 'tags-' + uid();
   const list = h('ul', { id: listId, role: 'listbox', 'aria-label': 'Tags', 'aria-multiselectable': 'true' });
@@ -158,7 +175,8 @@ export function catPicker({ get, toggle, getTags = null, toggleTag = null, place
       else if (e.key === 'Enter' && (q.trim() || hl >= 0)) {
         e.preventDefault();
         if (items[hl]) { pick(items[hl]); q = ''; input.value = ''; hl = -1; refresh(); }
-      } else if (e.key === 'Escape') { q = ''; input.value = ''; refresh(); }
+      } else if (e.key === 'Enter' && onEmptyEnter && !e.isComposing) { e.preventDefault(); if (!e.repeat) onEmptyEnter(); }   // holding Enter never saves
+      else if (e.key === 'Escape') { q = ''; input.value = ''; refresh(); }
     },
   });
   function matches(n, words) {
@@ -188,7 +206,7 @@ export function catPicker({ get, toggle, getTags = null, toggleTag = null, place
     else if (ev.key === 'Home') next = 0;
     else if (ev.key === 'End') next = nodes.length - 1;
     else if (ev.key === 'Enter' || ev.key === ' ') {
-      ev.preventDefault(); ev.stopPropagation(); hl = index; pick(items[index]); refresh(); options()[index]?.focus({ preventScroll: true }); return;
+      ev.preventDefault(); ev.stopPropagation(); hl = index; pick(items[index]); sync(); options()[index]?.focus({ preventScroll: true }); return;
     } else if (ev.key === 'Escape') { ev.preventDefault(); input.focus(); return; }
     if (next != null) { ev.preventDefault(); hl = next; paintHl(); nodes[next]?.focus({ preventScroll: true }); }
   });
@@ -216,7 +234,7 @@ export function catPicker({ get, toggle, getTags = null, toggleTag = null, place
         const on = n.kind === 'cat' ? sel.has(n.code) : tagsOn.has(n.e.k);
         add(cur, h('span', { class: `chip ${on ? 'on' : ''} ${n.kind === 'tag' ? 'tag' : ''} ${n.depth ? 'subp' : ''}`, role: 'option', tabindex: '0', 'aria-selected': String(on),
           ...(n.kind === 'cat' ? { 'data-code': n.code, title: catName(n.code) } : { 'data-tag': n.e.k, title: n.e.l || n.e.n }),
-          onclick: () => keepPlace(list, () => { pick(n); refresh(); }) },
+          onclick: () => keepPlace(list, () => { pick(n); sync(); }) },
           h('span', { class: 'nm' }, n.kind === 'cat' ? catShort(n.code) : n.e.n)));
       }
       fill(list, ...rows);
@@ -231,13 +249,13 @@ export function catPicker({ get, toggle, getTags = null, toggleTag = null, place
       if (n.kind === 'tag') {
         const on = tagsOn.has(n.e.k);
         return h('li', { role: 'option', 'data-tag': n.e.k, 'aria-selected': String(on), class: `tag ${n.depth ? 'sub' : ''} ${on ? 'on' : ''}`, style: pad, title: n.e.l || n.e.n,
-          onclick: () => keepPlace(list, () => { pick(n); refresh(); }) },
+          onclick: () => keepPlace(list, () => { pick(n); sync(); }) },
           h('span', { class: 'tick' }, on ? '✓' : ''), h('span', { class: 'nm' }, n.e.n, n.e.l ? h('small', { class: 'muted' }, ' ' + n.e.l) : null), h('span', { class: 'ct' }, ''));
       }
       const c = BY_CODE[n.code], p = prog[c.code];
       return h('li', {
         role: 'option', 'data-code': c.code, 'aria-selected': String(sel.has(c.code)), class: `${n.depth ? 'sub' : ''} ${sel.has(c.code) ? 'on' : ''}`, style: pad, title: c.full || c.name,
-        onclick: () => keepPlace(list, () => { pick(n); refresh(); }),
+        onclick: () => keepPlace(list, () => { pick(n); sync(); }),
       },
       h('span', { class: 'tick' }, sel.has(c.code) ? '✓' : ''),
       h('span', { class: 'nm' }, catName(c.code)),
@@ -246,10 +264,22 @@ export function catPicker({ get, toggle, getTags = null, toggleTag = null, place
     if (words.length && !items.length) add(list, h('li', { class: 'muted' }, 'Nothing matches “' + q + '”'));
     paintHl();
   }
+  // A tap only changes what is ticked: update the ticks in place instead of rebuilding the list (keeps the
+  // focus, the scroll and the work small). refresh() rebuilds, for a search, the counts or the tag set.
+  function sync() {
+    const sel = new Set(get()), tagsOn = new Set(getTags ? getTags() : []);
+    for (const el of options()) {
+      const on = el.dataset.code ? sel.has(el.dataset.code) : tagsOn.has(el.dataset.tag);
+      if (el.classList.contains('on') === on) continue;
+      el.classList.toggle('on', on); el.setAttribute('aria-selected', String(on));
+      const tick = el.querySelector(':scope > .tick');
+      if (tick) tick.textContent = on ? '✓' : '';
+    }
+  }
   refresh();
   const expand = collapsed ? h('button', { type: 'button', class: 'small', 'aria-expanded': String(showAll), onclick: () => { showAll = !showAll; hl = -1; expand.textContent = showAll ? 'Hide full tag list' : 'Show all tags'; expand.setAttribute('aria-expanded', String(showAll)); refresh(); } }, 'Show all tags') : null;
   const el = h('div', { class: 'picker' }, input, expand, list);
-  return { el, refresh, focus: opts => input.focus(opts), input };
+  return { el, refresh, sync, focus: opts => input.focus(opts), input };
 }
 
 // ---------- the Log screen ----------
@@ -258,7 +288,8 @@ export function catPicker({ get, toggle, getTags = null, toggleTag = null, place
 export const CASE_PARTS = [
   ['interesting', 'Interesting'],
   ['parsed', 'What the box was read as (initials · details)'],
-  ['quick', 'Quick picks (suggestions, Same as last, tag groups)'],
+  ['sugg', 'Suggested tags as you type'],
+  ['recent', 'Quick picks (Same as last, tag groups)'],
   ['still', 'Still needed'],
   ['groupsave', 'Save these tags as a tag group'],
   ['plan', 'Plan for later'],
@@ -331,6 +362,12 @@ function curDate() {
   return draft.date || todayISO();
 }
 
+// "Sat 10th" (toLocaleDateString is slow, and the date bar is redrawn after every save)
+const WD = new Map();
+const weekdayLabel = iso => {
+  if (!WD.has(iso)) { const [Y, M, D] = iso.split('-').map(Number); WD.set(iso, new Date(Y, M - 1, D).toLocaleDateString('en-GB', { weekday: 'short' }) + ' ' + nth(D)); }
+  return WD.get(iso);
+};
 // One line, never wrapping: Today, then as many recent weekdays as fit ("Sat 10th", newest first), a
 // calendar for any other day, and the Case | List switch. A chosen day that doesn't fit shows on the
 // calendar chip instead.
@@ -342,10 +379,12 @@ function paintDate() {
     onkeydown: e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); ui.textarea?.focus(); } },
     onchange: e => { draft.date = parseDate(e.target.value) || null; draft.dateAt = Date.now(); saveDraft(); paintDate(); },
   });
-  const pick = iso => () => { draft.date = iso === t ? null : iso; draft.dateAt = Date.now(); saveDraft(); paintDate(); ui.textarea?.focus(); };
+  // the box keeps the focus it had (a tap while typing doesn't drop the keyboard); a tap from elsewhere doesn't
+  // pop the keyboard up on a phone
+  const pick = iso => () => { const had = document.activeElement === ui.textarea; draft.date = iso === t ? null : iso; draft.dateAt = Date.now(); saveDraft(); paintDate(); if (had) ui.textarea?.focus(); };
   const week = [];
   for (let k = 1; k <= 6; k++) { const x = new Date(); x.setDate(x.getDate() - k); week.push(todayISO(x)); }
-  const wd = iso => { const [Y, M, D] = iso.split('-').map(Number); const x = new Date(Y, M - 1, D); return x.toLocaleDateString('en-GB', { weekday: 'short' }) + ' ' + nth(D); };
+  const wd = iso => weekdayLabel(iso);
   const calText = h('span', {});
   // the date input sits invisibly over the chip
   const picker = h('label', { class: 'chip datepick', title: 'Pick a date', 'aria-label': 'Pick a date' }, ic('calendar'), calText, dateInput);
@@ -419,7 +458,7 @@ function renderOne(card) {
   } else if (!separateInitials && draft.initials) { draft.initialsHint = draft.initials; draft.details = draftText(); draft.initials = ''; }
   saveDraft();
   const initialsInput = separateInitials ? h('input', { 'aria-label': 'Patient initials', placeholder: 'AB (initials, optional)', maxlength: '20', enterkeyhint: 'next', autocomplete: 'off', autocapitalize: 'characters', value: draft.initials || '',
-    oninput: e => { suggestedSave = null; draft.initials = cleanInitials(e.target.value); draft.initialsHint = ''; saveDraft(); paintParsed(true); suggestSoon(); },
+    oninput: e => { suggestedSave = null; draft.initials = cleanInitials(e.target.value); draft.initialsHint = ''; saveDraftSoon(); paintParsed(true); suggestSoon(); },
     onkeydown: e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); ui.textarea.focus(); } } }) : null;
   const textarea = h('textarea', {
     class: 'details', rows: String(boxLines()), style: `min-height:calc(${boxLines()} * 1.4em + 22px)`, autofocus: firstField() === 'details' && !document.documentElement.classList.contains('no-autofocus'), enterkeyhint: enterMode() === 'single' ? 'done' : 'enter', 'aria-label': 'Case summary',
@@ -427,7 +466,7 @@ function renderOne(card) {
     autocapitalize: htmlHas('box-caps-off') ? 'off' : 'sentences', autocorrect: htmlHas('box-correct') ? 'on' : 'off', spellcheck: htmlHas('box-spell-off') ? 'false' : 'true',
     placeholder: placeholderRows().map(([a, b]) => `${a}  ← ${b}`).join('\n'),
     value: draft.details,
-    oninput: e => { suggestedSave = null; draft.details = e.target.value; saveDraft(); suggestSoon(); paintParsed(true); },
+    oninput: e => { suggestedSave = null; draft.details = e.target.value; saveDraftSoon(); suggestSoon(); paintParsed(true); },
     // Settings → Logging → Enter key: 'newline' (default; Ctrl/Cmd+Enter saves), 'double' (Enter on an empty
     // line saves, so a case can still take several lines) or 'single' (Enter saves; Shift+Enter a new line)
     onkeydown: e => {
@@ -453,11 +492,11 @@ function renderOne(card) {
   const sugg = h('div', { class: 'chips sugg-row', 'aria-live': 'polite' });
   // empty the box in one tap (Undo puts it back); shown once there is text, where Paste was
   const clearBtn = h('button', { type: 'button', class: 'small clear-btn icon-only', title: 'Clear the case box', 'aria-label': 'Clear the case box', onclick: () => {
-    const was = draft.details;
+    const was = draft.details, rejected = [...(draft.rejected || [])];
     if (!was) return;
     draft.details = ''; textarea.value = ''; saveDraft(); paintSuggest(); paintParsed(false);
     textarea.focus({ preventScroll: true });
-    toast('Case box cleared', { action: 'Undo', onaction: () => { draft.details = was; if (ui.textarea) { ui.textarea.value = was; paintSuggest(); paintParsed(false); } saveDraft(); } });
+    toast('Case box cleared', { action: 'Undo', onaction: () => { draft.details = was; draft.rejected = [...new Set([...(draft.rejected || []), ...rejected])]; if (ui.textarea) { ui.textarea.value = was; paintSuggest(); paintParsed(false); } saveDraft(); } });
   } }, ic('clear'));
   const selected = h('div', { class: 'chips selected' });
   const tip = h('div');
@@ -466,9 +505,12 @@ function renderOne(card) {
     collapsed: !!display().compactTags,
     get: () => draft.cats,
     // the list stays put under your finger while the rows above it change
-    toggle: code => keepPlace(picker.el, () => { draft.cats = toggleCat(draft.cats, code); saveDraft(); paintSel(); }),
+    toggle: code => keepPlace(picker.el, () => { setCats(toggleCat(draft.cats, code)); saveDraft(); paintSel(); }),
     getTags: () => draft.tags || [],
     toggleTag: key => keepPlace(picker.el, () => { Object.assign(draft, toggleTagIn(draft.cats, draft.tags, key)); saveDraft(); paintSel(); }),
+    // Enter in the empty search saves in Basic (where the hint says so), and elsewhere only accepts a pending
+    // offer ("press Enter again"); in other profiles a stray Enter there does nothing, as before
+    onEmptyEnter: () => { if (basicMode() || offerPending()) save({}); },
   });
   const common = display().compactTags ? h('div', { class: 'chips common-tags', 'aria-label': 'Common tags' }) : null;
   const paintCommon = () => {
@@ -477,7 +519,7 @@ function renderOne(card) {
     for (const c of S.cases.slice(0, 100)) for (const k of [...(c.cats || []).map(code => 'c:' + code), ...(c.tags || [])]) counts.set(k, (counts.get(k) || 0) + 1);
     const choices = logTags().filter(n => n.kind !== 'head' && !n.e.hide && counts.has(n.e.k)).sort((a,b) => counts.get(b.e.k) - counts.get(a.e.k)).slice(0, 6);
     fill(common, choices.length ? choices.map(n => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(n.kind === 'cat' ? draft.cats.includes(n.code) : (draft.tags || []).includes(n.e.k)), onclick: () => {
-      if (n.kind === 'cat') draft.cats = toggleCat(draft.cats, n.code); else Object.assign(draft, toggleTagIn(draft.cats, draft.tags, n.e.k));
+      if (n.kind === 'cat') setCats(toggleCat(draft.cats, n.code)); else Object.assign(draft, toggleTagIn(draft.cats, draft.tags, n.e.k));
       saveDraft(); paintSel(); paintCommon();
     } }, n.kind === 'cat' ? catShort(n.code) : n.e.n)) : h('span', { class: 'muted' }, 'Your common tags appear as you log cases.'));
   };
@@ -496,8 +538,8 @@ function renderOne(card) {
   const enterHint = h('p', { class: 'hint enter-suggestion-hint', 'aria-live': 'polite', hidden: true });
   // one wide Save; saving and keeping the date for the next case is the small text button beside it
   const actions = h('div', { class: 'actions' },
-    h('button', { class: 'linkish keep-date', title: 'Save and keep this date for the next case', onclick: () => save({ another: true }) }, 'Save, keep date'),
-    h('button', { class: 'primary big', onclick: () => save({}) }, 'Save', h('span', { class: 'kbd', title: 'Ctrl+Enter (Cmd+Enter on a Mac)' }, ' Ctrl+⏎')));
+    h('button', { class: 'linkish keep-date', title: 'Save and keep this date for the next case', onclick: () => save({ another: true, tap: true }) }, 'Save, keep date'),
+    h('button', { class: 'primary big', onclick: () => save({ tap: true }) }, 'Save', h('span', { class: 'kbd', title: 'Ctrl+Enter (Cmd+Enter on a Mac)' }, ' Ctrl+⏎')));
 
   // what the box was read as: the initials and the age/sex are marked inside the box itself (a copy of its text
   // behind it, transparent but for the marks; owner's Apple-apps review), and the line under it says only what the
@@ -540,25 +582,31 @@ function renderOne(card) {
   });
   Object.assign(ui, { initials: initialsInput, draftNote, textarea, parsed, boxMarks, sugg, selected, selExtra, groupSave, tip, enterHint, templates, picker, paintCommon });
   paintSuggest(); paintSel(); paintQuick(); paintParsed(false);
+  watchMarks(textarea);
   requestAnimationFrame(() => alignPlaceholder(textarea));
   // autofocus attribute is ignored on re-render; focus after insertion (not on phones' first paint
   // when that would pop the keyboard over a fresh landing — it's what the user came to do, so do it)
   requestAnimationFrame(() => { if (!document.documentElement.classList.contains('no-autofocus') && (document.activeElement === document.body || !document.activeElement || document.activeElement.closest('#tabs'))) focusLog(); });   // the tapped tab button keeps focus now the bar isn't rebuilt
 }
 
-const suggestSoon = debounce(() => paintSuggest(), 120);
+const suggestSoon = debounce(() => { if (!saving) paintSuggest(); }, 120);
 
 // "AB · 72M · lap chole, GA ETT" under the box; "Draft saved" (once typing pauses) sits at the end of
 // the Interesting line
+// Per key, only what changed is touched: rewriting the same words still makes the browser restyle the page.
+const setText = (el, text) => { if (el && el.textContent !== text) el.textContent = text; };
 function paintParsed(typed) {
   if (!ui || !ui.parsed) return;
   const text = draftText();
   paintEnterHint();
-  if (ui.draftNote) ui.draftNote.textContent = draftError || (text ? 'Draft saved' : '');
-  if (!text) { fill(ui.parsed); paintMarks([]); return; }
+  setText(ui.draftNote, draftError || (text ? 'Draft saved' : ''));
+  if (!text) { if (ui.parsed.firstChild) fill(ui.parsed); ui.parsed.dataset.age = ''; marksSoon([]); return; }
   const { initials, details } = draftParts();
   const { age } = settings().detectAgeSex !== false ? splitAge(details) : { age: '' };
-  fill(ui.parsed, age ? h('span', { class: 'pi' }, h('b', {}, age), ` = ${humanAge(age)}`) : null);
+  if (ui.parsed.dataset.age !== age || (!age && ui.parsed.firstChild)) {
+    ui.parsed.dataset.age = age;
+    fill(ui.parsed, age ? h('span', { class: 'pi' }, h('b', {}, age), ` = ${humanAge(age)}`) : null);
+  }
   // where they are in the box's own text (the initials only when they're in the box, not in their own field)
   const v = ui.textarea ? ui.textarea.value : '', lead = v.length - v.trimStart().length, marks = [];
   let at = lead;
@@ -568,22 +616,50 @@ function paintParsed(typed) {
     const m = v.slice(from).match(/^[^\s,;:]+(?:\s?[mf](?![a-z]))?/i);
     if (m && m[0].replace(/\s+/g, '').toLowerCase() === age.toLowerCase()) marks.push(['age', from, from + m[0].length]);
   }
-  paintMarks(marks);
+  marksSoon(marks);
+}
+// The marks are drawn just before the next frame: one paint for a burst of keys, and the box never shows
+// out of step with its text.
+let marksFrame = 0, marksNext = [];
+function marksSoon(marks) {
+  marksNext = marks;
+  if (!marksFrame) marksFrame = requestAnimationFrame(() => { marksFrame = 0; paintMarks(marksNext); });
+}
+// Match the box exactly (it may be pinned, compact, bigger text, another font): copy what decides where text
+// wraps. Reading the box's style forces a layout, so it is done when the box is drawn or changes size, not per key.
+let marksRO = null;
+function fitMarks() {
+  const ta = ui && ui.textarea, el = ui && ui.boxMarks;
+  if (!ta || !el || !ta.isConnected) return;
+  const cs = getComputedStyle(ta);
+  for (const k of ['fontFamily', 'fontSize', 'fontWeight', 'lineHeight', 'letterSpacing', 'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'borderTopWidth', 'borderRightWidth', 'borderBottomWidth', 'borderLeftWidth', 'tabSize']) el.style[k] = cs[k];
+  Object.assign(el.style, { top: ta.offsetTop + 'px', left: ta.offsetLeft + 'px', width: ta.offsetWidth + 'px', height: ta.offsetHeight + 'px' });
+  if (marksRO) el.dataset.fit = '1';   // without ResizeObserver, fitted on every paint as before
+}
+function watchMarks(ta) {
+  if (!('ResizeObserver' in window)) return;
+  marksRO ||= new ResizeObserver(() => fitMarks());
+  marksRO.disconnect(); marksRO.observe(ta);
 }
 // the copy of the box's text behind it, with the marks; same font, padding and wrapping as the box
 function paintMarks(marks) {
   const ta = ui && ui.textarea, el = ui && ui.boxMarks;
   if (!ta || !el) return;
-  // match the box exactly (it may be pinned, compact, bigger text, another font): copy what decides where text wraps
-  const cs = getComputedStyle(ta);
-  for (const k of ['fontFamily', 'fontSize', 'fontWeight', 'lineHeight', 'letterSpacing', 'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'borderTopWidth', 'borderRightWidth', 'borderBottomWidth', 'borderLeftWidth', 'tabSize']) el.style[k] = cs[k];
-  Object.assign(el.style, { top: ta.offsetTop + 'px', left: ta.offsetLeft + 'px', width: ta.offsetWidth + 'px', height: ta.offsetHeight + 'px' });
+  // no marks before or now: the hidden copy needn't follow the text
+  if (!marks.length && el.hidden) return;
+  if (!el.dataset.fit) fitMarks();
   el.hidden = !marks.length;
-  const v = ta.value, parts = [];
-  let i = 0;
-  for (const [k, a, b] of marks) { parts.push(v.slice(i, a), h('mark', { class: 'm-' + k }, v.slice(a, b))); i = b; }
-  parts.push(v.slice(i), '\n');
-  fill(el, ...parts);
+  const v = ta.value, end = marks.length ? marks[marks.length - 1][2] : 0;
+  // the same marks over the same text (typing goes on after them): only the text after them changes
+  const key = JSON.stringify(marks) + v.slice(0, end);
+  if (el._key === key && el._tail && el._tail.isConnected) el._tail.data = v.slice(end);
+  else {
+    const parts = [];
+    let i = 0;
+    for (const [k, a, b] of marks) { parts.push(document.createTextNode(v.slice(i, a)), h('mark', { class: 'm-' + k }, v.slice(a, b))); i = b; }
+    el._tail = document.createTextNode(v.slice(i)); el._key = key;
+    fill(el, ...parts, el._tail, '\n');
+  }
   el.scrollTop = ta.scrollTop;
 }
 
@@ -596,18 +672,32 @@ function paintSuggest() {
   ui.sugg.hidden = !on;
   if (!on) return;
   const text = draft.details.trim();
-  const list = text ? suggest(text, { limit: 8 }).filter(s => !draft.cats.includes(s.code)) : [];
+  const found = text ? suggest(text, { limit: 8 }) : [];
+  if (settings().autoTick && applyAutoTick(found, text)) return paintSel();   // paintSel paints these again
+  const list = found.filter(s => !draft.cats.includes(s.code));
   // your own tags whose shorthand you typed (choosing one ticks what it counts towards)
   const mine = text ? shorthandTags(tagSet(), text).filter(k => !(draft.tags || []).includes(k)) : [];
   const mineChips = mine.map(k => tagChip(k, { on: false, onclick: () => { keepPlace(ui.sugg, () => { Object.assign(draft, toggleTagIn(draft.cats, draft.tags, k)); saveDraft(); paintSel(); }); refocus(); } }));
-  const strong = list.filter(s => s.score >= 0.5).map(s => s.code);
+  const strong = confident(list);
   const all = strong.length > 1 ? h('span', { class: 'chip sugg strong all', role: 'button', tabindex: '0', title: 'Add all the confident suggestions',
     onclick: () => { keepPlace(ui.sugg, () => { draft.cats = sortCodes(withParents([...draft.cats, ...strong])); saveDraft(); paintSel(); }); refocus(); } }, '+ All ' + strong.length) : null;
   fill(ui.sugg, ...mineChips, all, ...(list.length || mine.length ? list.map(s => catChip(s.code, {
-    cls: `sugg ${s.score >= 0.5 ? 'strong' : ''}`,
+    cls: `sugg ${s.score >= STRONG ? 'strong' : ''}`,
     title: `${catFull(s.code)} — ${s.why === 'age' ? 'from the age' : s.why === 'bmi' ? 'from the BMI' : s.why === 'shorthand' ? 'from shorthand (Tag editor)' : 'from your words'}`,
     onclick: () => { keepPlace(ui.sugg, () => { draft.cats = addCat(draft.cats, s.code); saveDraft(); paintSel(); }); refocus(); },
   })) : [h('span', { class: 'muted help', style: 'font-size:calc(13px * var(--fs, 1))' }, text ? 'No suggestions: search below.' : 'Suggestions appear as you type.')]));
+}
+
+// Settings → Logging → Tick confident suggestions automatically (off by default): the confident
+// suggestions are ticked as you type and follow the text; one you take off stays off for this case.
+// true when the ticks changed
+function applyAutoTick(found, text) {
+  if (!text && (draft.rejected || []).length) draft.rejected = [];
+  const next = autoTick({ cats: draft.cats, auto: draft.auto || [], rejected: draft.rejected || [] }, confident(found));
+  if (next.cats === draft.cats) return false;
+  Object.assign(draft, next);
+  saveDraft();
+  return true;
 }
 
 function paintSel() {
@@ -617,13 +707,13 @@ function paintSel() {
   ui.paintCommon?.();
   fill(ui.selected, ...(draft.cats.length
     ? draft.cats.map(code => catChip(code, { on: true, removable: true, cls: 'add', title: 'Remove ' + catFull(code),
-      onclick: () => { draft.cats = dropCat(draft.cats, code); saveDraft(); paintSel(); } }))
+      onclick: () => { setCats(dropCat(draft.cats, code)); saveDraft(); paintSel(); } }))
     : [h('span', { class: 'none' }, 'No tag yet: pick one above')]),
     ...looseTags(draft.cats, draft.tags).map(k => tagChip(k, { onclick: () => { draft.tags = draft.tags.filter(t => t !== k); saveDraft(); paintSel(); } })),
     // all the tags off in one tap (Undo puts them back)
     draft.cats.length + (draft.tags || []).length > 1 ? h('button', { type: 'button', class: 'small clear-tags', title: 'Clear all tags', 'aria-label': 'Clear all tags', onclick: () => {
       const was = { cats: draft.cats, tags: draft.tags || [] };
-      draft.cats = []; draft.tags = []; saveDraft(); paintSel();
+      setCats([]); draft.tags = []; saveDraft(); paintSel();
       toast('Tags cleared', { action: 'Undo', onaction: () => { draft.cats = was.cats; draft.tags = was.tags; saveDraft(); paintSel(); } });
     } }, '× Clear') : null);
   fill(ui.groupSave,
@@ -640,7 +730,7 @@ function paintSel() {
   const tips = settings().hideTips ? [] : draft.cats.filter(c => TIPS[c]).map(c => TIPS[c]);
   fill(ui.tip, ...tips.map(t => h('p', { class: 'tip' }, t)));
   paintSuggest();
-  ui.picker.refresh();
+  ui.picker.sync();
 }
 
 
@@ -651,6 +741,9 @@ function applyTemplate(t) {
   keepPlace(ui.templates, () => { saveDraft(); paintSel(); }); refocus();
 }
 
+// Same as last chips on the Case tab (settings.recentCount, 1 to 5)
+export const RECENT_COUNTS = [[1, '1 (default)'], [2, '2'], [3, '3'], [5, '5']];
+const recentCount = () => snapRecent(settings().recentCount);
 const clip = (t, n) => (t.length > n ? t.slice(0, n - 1).trimEnd() + '…' : t);
 
 function paintQuick() {
@@ -658,19 +751,13 @@ function paintQuick() {
   const chips = [];
   // recent cases: one tap fills the procedure (not the patient) and the categories; type the new
   // initials and age on the first line
-  const recent = [], keys = new Set();
-  for (const c of [...(S.cases || [])].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))) {
-    if (!c.cats || !c.cats.length) continue;
-    const proc = splitAge(caseParts(c).details).rest.replace(/\s+/g, ' ').trim();
-    const key = proc.toLowerCase() + '|' + sortCodes(c.cats).join();
-    if (keys.has(key)) continue;
-    keys.add(key); recent.push({ c, proc });
-    if (recent.length >= 1) break;
-  }
+  // how many (Settings → Advanced logging; one by default)
+  const procOf = c => splitAge(caseParts(c).details).rest.replace(/\s+/g, ' ').trim();
+  const recent = recentCases(S.cases, recentCount(), c => procOf(c).toLowerCase() + '|' + sortCodes(c.cats).join()).map(c => ({ c, proc: procOf(c) }));
   recent.forEach(({ c, proc }, i) => chips.push(h('span', {
     class: 'chip tmpl recent', role: 'button', tabindex: '0', title: 'Same as last: ' + (proc || 'no details') + '\n' + c.cats.map(catFull).join('\n'), 'aria-label': 'Same as last: ' + (proc || 'no details'),
     onclick: () => {
-      draft.cats = sortCodes(withParents(c.cats));
+      draft.cats = sortCodes(withParents(c.cats)); Object.assign(draft, FRESH_TICKS());
       // the procedure goes on line 2; a first line already typed (initials, age) stays
       draft.details = (draft.details || '').split('\n')[0] + (proc ? '\n' + proc : '');
       draft.tags = [];
@@ -692,14 +779,20 @@ function paintQuick() {
   fill(ui.templates, ...chips.filter(Boolean));
 }
 
-// The failed no-tag save is the first step; only a subsequent Enter accepts these
-// suggestions. Editing, selecting tags or leaving this screen cancels the offer.
+// The failed no-tag save is the first step; a second Save (the button, Enter in the box or Enter in the empty
+// tag search) accepts these suggestions. Editing, selecting tags or leaving this screen cancels the offer.
 function paintEnterHint() {
   if (!ui?.enterHint) return;
   const offer = suggestedSave;
-  ui.enterHint.hidden = !offer || offer.key !== suggestionKey() || !!draft.cats.length;
-  ui.enterHint.textContent = ui.enterHint.hidden ? '' : 'Press Enter again to apply ' + [...offer.cats.map(catShort), ...offer.tags.map(tagName)].join(', ') + ' and save.';
+  const hidden = !offer || offer.key !== suggestionKey() || !!draft.cats.length;
+  if (ui.enterHint.hidden !== hidden) ui.enterHint.hidden = hidden;
+  setText(ui.enterHint, hidden ? '' : 'Tap Save or press Enter again to add ' + [...offer.cats.map(catShort), ...offer.tags.map(tagName)].join(', ') + ' and save.');
 }
+const offerPending = () => !!suggestedSave && suggestedSave.key === suggestionKey() && !draft.cats.length;
+// a tap this soon after a tap made the offer is a double tap, not a look at the hint: it neither saves nor
+// accepts (an offer made by a key has no gap: at is 0)
+const OFFER_GAP_MS = 600;
+const offerTooNew = () => offerPending() && Date.now() - (suggestedSave.at || 0) < OFFER_GAP_MS;
 function applySuggestedSave() {
   const offer = suggestedSave;
   suggestedSave = null; paintEnterHint();
@@ -712,28 +805,33 @@ function applySuggestedSave() {
 
 async function save(opts) {
   if (saving) return;
+  if (opts.tap && offerTooNew()) return;
+  applySuggestedSave();   // a second Save takes the offered tags, the same as a second Enter
   saving = true;
   try { await saveCase(opts); } catch (err) { toast('Could not save: ' + err.message); } finally { saving = false; }
 }
 
-async function saveCase({ another }) {
+async function saveCase({ another, tap }) {
   const details = draftText();
+  // a quick Save must not depend on the typing debounce (and nothing re-ticks while the save is under way)
+  suggestSoon.cancel();
+  if (settings().autoTick) paintSuggest();
   if (!draft.cats.length) {
-    paintSuggest();   // a quick Enter must not depend on the typing debounce
+    paintSuggest();
     const tags = settings().suggestions !== false && details ? shorthandTags(tagSet(), details).filter(k => !(draft.tags || []).includes(k)) : [];
-    const codes = settings().suggestions !== false && details ? suggest(draft.details.trim(), { limit: 8 }).map(s => s.code) : [];
+    // confident suggestions only (as "+ All" and a pasted list): a weak guess is never counted without a look
+    const codes = settings().suggestions !== false && details ? confident(suggest(draft.details.trim(), { limit: 8 })) : [];
     const cats = sortCodes(withParents([...codes, ...tags.flatMap(tagLinks)]));
-    suggestedSave = cats.length ? { key: suggestionKey(), cats, tags } : null;
+    suggestedSave = cats.length ? { key: suggestionKey(), cats, tags, at: tap ? Date.now() : 0 } : null;
     paintEnterHint();
     // categories are counted towards credentialling, so they must be picked on purpose
-    // point at the suggestions (no keyboard popping up); with none, the search box
-    const target = ui.sugg && !ui.sugg.hidden && !caseHidden('quick') && ui.sugg.querySelector('.chip') ? ui.sugg : null;
+    // point at the suggestions (the focus stays put, so no keyboard pops up); with none shown, the search box
+    const target = ui.sugg && !ui.sugg.hidden && !caseHidden('sugg') && ui.sugg.querySelector('.chip') ? ui.sugg : null;
     if (target) {
-      toast(suggestedSave ? 'Press Enter again to apply suggested tags and save, or tap a tag' : 'Tap at least one tag: suggestions are highlighted');
-      if (suggestedSave) ui.textarea.focus();
+      toast(suggestedSave ? 'Tap Save or press Enter again to add the suggested tags, or tap a tag' : 'Tap at least one tag: suggestions are highlighted');
       target.scrollIntoView({ behavior: 'smooth', block: 'center' });
       target.classList.remove('flash'); void target.offsetWidth; target.classList.add('flash');
-    } else { toast('Pick at least one tag: search below'); ui.picker.focus(); }
+    } else { toast(suggestedSave ? 'Tap Save or press Enter again to add the suggested tags, or search below' : 'Pick at least one tag: search below'); ui.picker.focus(); }
     return;
   }
   suggestedSave = null;
@@ -755,7 +853,9 @@ async function saveCase({ another }) {
   const keep = sticky ? draft.date : null;
   const next = settings().afterSave;
   const keepTags = next === 'keepTags' ? { cats: draft.cats, tags: draft.tags || [] } : { cats: [], tags: [] };
-  draft = { ...draft, details: '', initials: '', initialsHint: '', caseId: null, caseCreatedAt: null, ...keepTags, date: keep, keepDate: sticky, keptAt: Date.now(), dateAt: Date.now(), reflectTag: false };
+  // Undo puts the case back with the ticks the user took off still off (auto-tick)
+  const ticksAtSave = { auto: [...(draft.auto || [])], rejected: [...(draft.rejected || [])] };
+  draft = { ...draft, details: '', initials: '', initialsHint: '', caseId: null, caseCreatedAt: null, ...keepTags, ...FRESH_TICKS(), date: keep, keepDate: sticky, keptAt: Date.now(), dateAt: Date.now(), reflectTag: false };
   if (ui.tagBox) ui.tagBox.querySelector('input').checked = false;
   saveDraft();
   if (ui.textarea) ui.textarea.value = '';
@@ -779,7 +879,7 @@ async function saveCase({ another }) {
       try { await removeCase(c.id); } catch (err) { toast('Could not undo: ' + err.message); return; }
       if (S.user?.email !== owner) return;
       if (JSON.stringify(draft) !== beforeUndo) { toast('Case removed. Your new input stays in the box.'); return; }
-      draft = { ...draft, initials: firstField() === 'initials' ? caseParts(c).initials : '', initialsHint: caseParts(c).initials, details: firstField() === 'initials' ? caseParts(c).details : caseText(c), cats: c.cats, tags: c.tags || [], reflectTag: !!c.reflectTag, date: c.date === todayISO() ? null : c.date };
+      draft = { ...draft, initials: firstField() === 'initials' ? caseParts(c).initials : '', initialsHint: caseParts(c).initials, details: firstField() === 'initials' ? caseParts(c).details : caseText(c), cats: c.cats, tags: c.tags || [], ...ticksAtSave, reflectTag: !!c.reflectTag, date: c.date === todayISO() ? null : c.date };
       saveDraft();
       if (S.tab === 'log' && ui.textarea) { ui.textarea.value = draft.details; if (ui.initials) ui.initials.value = draft.initials; if (ui.tagBox) ui.tagBox.querySelector('input').checked = draft.reflectTag; paintDate(); paintSel(); paintQuick(); paintParsed(false); }
     },
@@ -801,7 +901,7 @@ function renderBulk(card) {
   const ta = h('textarea', {
     class: 'details', rows: '8', value: draft.bulk || '',
     placeholder: settings().detectAgeSex !== false ? 'Leave an empty line between cases. An optional date at the start, e.g.\n12/3 AB 5yo\ncircumcision, caudal\n\n13/3 CD 30F\nLSCS spinal\n\nEF 80F\nhemiarthroplasty' : 'Leave an empty line between cases. An optional date at the start, e.g.\n12/3 AB\ncircumcision, caudal\n\n13/3 CD\nLSCS spinal\n\nEF\nhemiarthroplasty',
-    oninput: e => { draft.bulk = e.target.value; saveDraft(); },
+    oninput: e => { draft.bulk = e.target.value; saveDraftSoon(); },
   });
   ui.textarea = ta;
   const out = h('div');
@@ -809,11 +909,21 @@ function renderBulk(card) {
     h('p', { class: 'hint help' }, 'Paste your notes or OT list with an empty line between cases (a case can take several lines). Tags are guessed for each case. Cases without a date at the start get ', h('b', {}, fmtDate(curDate())), ' (change it above).'),
     ta,
     h('div', { class: 'bar', style: 'margin-top:8px' },
-      h('button', { class: 'primary', onclick: () => { bulkRows = parseBulk(ta.value, settings().suggestions !== false ? t => suggest(t) : null); paintBulk(out); } }, 'Review'),
+      h('button', { class: 'primary', onclick: () => { bulkRows = reviewRows(ta.value); paintBulk(out); } }, 'Review'),
       pasteBtn(ta, 'Paste from clipboard'),
       h('button', { onclick: () => { ta.value = ''; draft.bulk = ''; bulkRows = null; saveDraft(); fill(out); } }, 'Clear')),
     out);
   if (bulkRows) paintBulk(out);
+}
+
+// A pasted list read into rows: the confident suggestions ticked, and your own tags whose shorthand a row uses
+// (Tag editor) with what they count towards, as a single case would offer them.
+function reviewRows(text) {
+  const on = settings().suggestions !== false;
+  return parseBulk(text, on ? t => suggest(t) : null).map(r => {
+    const tags = on && r.details ? shorthandTags(tagSet(), r.details) : [];
+    return { ...r, tags, cats: tags.length ? sortCodes(withParents([...r.cats, ...tags.flatMap(tagLinks)])) : r.cats };
+  });
 }
 
 function paintBulk(out) {
@@ -836,9 +946,10 @@ function paintBulk(out) {
         h('textarea', { rows: String(Math.min(6, Math.max(2, r.details.split('\n').length))), value: r.details, 'aria-label': 'Case summary', oninput: e => { r.details = e.target.value; } })),
       h('td', {}, h('div', { class: 'chips' },
         r.cats.map(code => catChip(code, { on: true, removable: true, onclick: () => { r.cats = dropCat(r.cats, code); paintBulk(out); } })),
+        (r.tags || []).map(k => tagChip(k, { onclick: () => { r.tags = r.tags.filter(t => t !== k); paintBulk(out); } })),
         h('button', { class: 'small icon-btn', 'aria-label': 'Add tags', onclick: () => pickDialog(r.cats, cats => { r.cats = cats; paintBulk(out); }) }, r.cats.length ? '+' : '+ Add')),
         same || sugg.length ? h('div', { class: 'chips', style: 'margin-top:4px' }, same,
-          sugg.map(s => catChip(s.code, { cls: `sugg ${s.score >= 0.5 ? 'strong' : ''}`, title: 'Suggested: ' + catFull(s.code), onclick: () => { r.cats = addCat(r.cats, s.code); paintBulk(out); } }))) : null),
+          sugg.map(s => catChip(s.code, { cls: `sugg ${s.score >= STRONG ? 'strong' : ''}`, title: 'Suggested: ' + catFull(s.code), onclick: () => { r.cats = addCat(r.cats, s.code); paintBulk(out); } }))) : null),
       h('td', {}, h('button', { class: 'small danger icon-btn', title: 'Drop this case', 'aria-label': 'Drop this case', onclick: () => { bulkRows.splice(i, 1); paintBulk(out); } }, '×')));
   }));
   fill(out, 
@@ -850,6 +961,8 @@ function paintBulk(out) {
 }
 
 let bulkBusy = false;
+// your tags on a pasted row or planned case, as a case keeps them (none: no tags field at all)
+const withTags = r => { const tags = keepTags(r.tags, r.cats); return tags.length ? { tags } : {}; };
 
 // ---------- planned cases (logbook.plan): paste tomorrow's list now, confirm each case after ----------
 
@@ -864,7 +977,7 @@ async function planBulk() {
   const rows = bulkRows.filter(r => r.details.trim() || String(r.initials || '').trim() || r.cats.length);
   if (!(await okNoIds(...rows.map(r => r.details)))) return;
   const put = async date => {
-    const items = rows.map(r => ({ id: uid(), date, initials: cleanInitials(r.initials), details: r.details.trim(), cats: sortCodes(r.cats) }));
+    const items = rows.map(r => ({ id: uid(), date, initials: cleanInitials(r.initials), details: r.details.trim(), cats: sortCodes(r.cats), ...withTags(r) }));
     await savePlan([...plan(), ...items].slice(-100));
     bulkRows = null; draft.bulk = ''; saveDraft();
     toast(`Planned ${items.length} case${items.length === 1 ? '' : 's'} for ${fmtDate(date)}: confirm them on the Case tab that day`);
@@ -890,7 +1003,7 @@ function planCard() {
   if (!due.length && !later.length) return null;
   const done = async (items, opts = {}) => {
     const now = Date.now();
-    const cases = items.map((p, i) => ({ id: uid(), date: p.date, initials: p.initials || '', details: p.details || '', cats: sortCodes(p.cats || []), createdAt: now + i, updatedAt: now + i, source: 'paste' }));
+    const cases = items.map((p, i) => ({ id: uid(), date: p.date, initials: p.initials || '', details: p.details || '', cats: sortCodes(p.cats || []), ...withTags(p), createdAt: now + i, updatedAt: now + i, source: 'paste' }));
     if (cases.some(c => !c.cats.length) && !opts.quiet && !(await confirmBox('No tag', 'Some of these have no tag yet. Log them anyway?', 'Log'))) return;
     await saveMany(cases);
     const gone = new Set(items.map(p => p.id));
@@ -901,7 +1014,7 @@ function planCard() {
   const edit = async p => {
     // don't throw away a case being typed
     if ((draftText() || draft.cats.length) && !(await confirmBox('Replace what you’re typing?', 'The case in the box is replaced by the planned one.', 'Replace', true))) return;
-    draft = { ...draft, mode: 'one', initials: '', initialsHint: p.initials || '', details: [p.initials, p.details].filter(Boolean).join(' '), cats: [...(p.cats || [])], tags: [], reflectTag: false, date: p.date === today ? null : p.date, dateAt: Date.now() };
+    draft = { ...draft, mode: 'one', initials: '', initialsHint: p.initials || '', details: [p.initials, p.details].filter(Boolean).join(' '), cats: [...(p.cats || [])], tags: [...(p.tags || [])], ...FRESH_TICKS(), reflectTag: false, date: p.date === today ? null : p.date, dateAt: Date.now() };
     saveDraft();
     await savePlan(plan().filter(x => x.id !== p.id));
     hooks.render();
@@ -927,7 +1040,7 @@ async function saveBulk(e) {
   if (!(await okNoIds(...rows.map(r => r.details)))) return;
   if (rows.some(r => !r.cats.length) && !(await confirmBox('Some cases have no tag', 'Save them anyway? They will not count towards any target until you add one.', 'Save all'))) return;
   const now = Date.now();
-  const cases = rows.map((r, i) => ({ id: uid(), date: r.date || def, initials: cleanInitials(r.initials), details: r.details.trim(), cats: sortCodes(r.cats), createdAt: now + i, updatedAt: now + i, source: 'paste' }));
+  const cases = rows.map((r, i) => ({ id: uid(), date: r.date || def, initials: cleanInitials(r.initials), details: r.details.trim(), cats: sortCodes(r.cats), ...withTags(r), createdAt: now + i, updatedAt: now + i, source: 'paste' }));
   // clear the list first: offline the save can take a few seconds, and a second tap must not repeat it
   bulkBusy = true;
   if (btn) btn.disabled = true;
@@ -948,7 +1061,7 @@ async function saveBulk(e) {
 export function pickDialog(initial, done) {
   let cats = [...initial];
   const sel = h('div', { class: 'chips selected' });
-  const paint = () => fill(sel, ...(cats.length ? cats.map(code => catChip(code, { on: true, removable: true, onclick: () => { cats = dropCat(cats, code); paint(); picker.refresh(); } })) : [h('span', { class: 'none' }, 'None selected')]));
+  const paint = () => fill(sel, ...(cats.length ? cats.map(code => catChip(code, { on: true, removable: true, onclick: () => { cats = dropCat(cats, code); paint(); picker.sync(); } })) : [h('span', { class: 'none' }, 'None selected')]));
   const picker = catPicker({ get: () => cats, toggle: code => { cats = toggleCat(cats, code); paint(); } });
   paint();
   const m = modal('Tags', [sel, h('div', { style: 'height:8px' }), picker.el,
@@ -976,8 +1089,8 @@ export function editCaseDialog(c, opts = {}) {
   const sel = h('div', { class: 'chips selected' });
   const paint = () => {
     saveEditDraft();
-    fill(sel, ...(e.cats.length ? e.cats.map(code => catChip(code, { on: true, removable: true, onclick: () => { e.cats = dropCat(e.cats, code); paint(); picker.refresh(); } })) : [h('span', { class: 'none' }, 'No tags')]),
-      ...looseTags(e.cats, e.tags).map(k => tagChip(k, { onclick: () => { e.tags = e.tags.filter(t => t !== k); paint(); picker.refresh(); } })),
+    fill(sel, ...(e.cats.length ? e.cats.map(code => catChip(code, { on: true, removable: true, onclick: () => { e.cats = dropCat(e.cats, code); paint(); picker.sync(); } })) : [h('span', { class: 'none' }, 'No tags')]),
+      ...looseTags(e.cats, e.tags).map(k => tagChip(k, { onclick: () => { e.tags = e.tags.filter(t => t !== k); paint(); picker.sync(); } })),
       subcatChips(e.cats, e.tags || [], tags => { e.tags = tags; paint(); }));
   };
   const picker = catPicker({ get: () => e.cats, toggle: code => { e.cats = toggleCat(e.cats, code); paint(); },

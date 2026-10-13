@@ -88,6 +88,7 @@ try { for (const width of [390, 1280]) {
   await prof().getByRole('switch', { name: /^Analytics trends/ }).check();
   await prof().getByRole('switch', { name: 'Figures and references in reflections' }).check();
   await group('case').getByLabel(/Quick picks/).check();
+  await group('case').getByLabel('Suggested tags as you type').check();
   await group('bar').getByLabel('Analytics on the tab bar').check();
   await p.locator('[role=tab][data-tab=progress]').waitFor();
   await p.locator('[role=tab][data-tab=logbook]').click();
@@ -97,7 +98,7 @@ try { for (const width of [390, 1280]) {
   await p.evaluate(async () => { const { reflectOnCase } = await import('./js/ui-reflect.js'); await reflectOnCase({ id: 'fake-basic2', date: '2026-10-10', initials: 'ZZ', details: 'Fake basic case', cats: ['13'] }); });
   await p.locator('.refl-editor summary').filter({ hasText: /References/ }).waitFor();
   await p.goBack(); await p.waitForFunction(() => !document.querySelector('.refl-editor'));
-  assert.ok((await st()).s.basicOn.includes('case:quick'));
+  assert.ok((await st()).s.basicOn.includes('case:recent') && (await st()).s.basicOn.includes('case:sugg'));
 
   // Basic: logbook only: Basic without reflections (picking a profile starts from its defaults)
   await pickProfile('logbook');

@@ -340,12 +340,16 @@ function leadingDate(line, now) {
   return { date, rest };
 }
 
+// A suggestion this sure is "confident" (logging.js re-exports it; it lives here so parseBulk can use it
+// without an import cycle).
+export const STRONG = 0.5;
+
 // Cases are separated by blank lines (one or more empty or whitespace-only lines), so a case can span
 // several lines (kept in its details), e.g. "AB 45F" on one line and the procedure on the next.
 // List markers ("1.", "-", "•") are dropped.
 // An optional date at the start of a case's first line sets its date.
 // Leading patient initials are split off as in splitInitials. suggestFn(text) -> [{ code, score }];
-// codes scoring 0.5+ are kept.
+// confident codes (STRONG) are kept.
 export function parseBulk(text, suggestFn, now = new Date()) {
   const blocks = [];
   let cur = null;
@@ -360,7 +364,7 @@ export function parseBulk(text, suggestFn, now = new Date()) {
     const whole = [(ld ? ld.rest : first).trim(), ...more].filter(Boolean).join('\n');
     const { initials, details } = splitInitials(whole);
     const sugg = typeof suggestFn === 'function' && details ? suggestFn(details) || [] : [];
-    const cats = withParents(sugg.filter(s => s.score >= 0.5).map(s => s.code));
+    const cats = withParents(sugg.filter(s => s.score >= STRONG).map(s => s.code));
     return { date: ld ? ld.date : null, initials, details, cats };
   });
 }

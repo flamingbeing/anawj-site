@@ -1135,7 +1135,7 @@ html.colourful body[data-bar="progress"] { --heading: var(--t-progress); }
 html.colourful body[data-bar="more"] { --heading: var(--t-more); }
 /* parts of the Case tab people hide (Settings → Logging → Case tab; ui-log.js CASE_PARTS) */
 .log-card.hide-interesting .reflect-tag, .log-card.hide-parsed .parsed, .log-card.hide-groupsave .group-save,
-.log-card.hide-quick .quick-label, .log-card.hide-quick .sugg-row, .log-card.hide-quick .quick-rest { display: none; }
+.log-card.hide-sugg .sugg-row, .log-card.hide-recent .quick-rest, .log-card.hide-sugg.hide-recent .quick-label { display: none; }
 /* pinned while scrolling (Settings → Display, per device): the case box on the Case tab, the search card on the
    Logbook. --pin-top = what is already stuck at the top (the tab bar when it sits at the top of a phone) */
 :root { --pin-top: 0px; }

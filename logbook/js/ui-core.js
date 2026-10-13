@@ -2,6 +2,7 @@
 
 import { BY_CODE, CATEGORIES, DEFAULT_NAMES, yearName, appYear } from './categories.js';
 import { tagSetOf, tagTree, flatTree, userCatNames, tagName as tagNameIn, tagLinks as tagLinksIn } from './tags.js';
+import { expandParts, hasPart } from './logging.js';
 import { countCases, uid, todayISO, sortCodes, progress, rYearDefault, academicYear, splitInitials, cleanInitials } from './engine.js';
 import * as cloud from './cloud.js';
 import { reflectionCounts } from './reflections.js';
@@ -74,12 +75,13 @@ export const BASIC_ITEMS = [
 export const basicHides = item => {
   const p = profile();
   if ((p !== 'basic' && p !== 'logbook') || (item === 'reflect' && p !== 'logbook') || item === 'case:parsed') return false;
-  return !(settings().basicOn || []).includes(item);
+  return !hasPart(settings().basicOn, item, 'case:');
 };
-// the Case tab parts (Logging and Profiles or hide items; settings.caseHide, and the profile's)
-export const caseShown = part => !(settings().caseHide || []).includes(part) && !basicHides('case:' + part);
+// the Case tab parts (Logging and Profiles or hide items; settings.caseHide, and the profile's). An older 'quick'
+// stands for both 'sugg' and 'recent' (logging.js expandParts) and is written as the two on the next change.
+export const caseShown = part => !hasPart(settings().caseHide, part) && !basicHides('case:' + part);
 export function setCaseShown(part, show, parts) {
-  const hide = new Set(settings().caseHide || []), on = new Set(settings().basicOn || []);
+  const hide = new Set(expandParts(settings().caseHide)), on = new Set(expandParts(settings().basicOn, 'case:'));
   if (show) { hide.delete(part); if (basicHides('case:' + part)) on.add('case:' + part); } else hide.add(part);
   return patchLogbook({ settings: { caseHide: hide.size ? parts.filter(p => hide.has(p)) : null, basicOn: on.size ? [...on] : null } });
 }
@@ -129,17 +131,23 @@ export const rYear = () => residentYear(S.resident) || settingsYear();
 export const myYearName = () => (S.resident && S.resident.status === 'SMO' ? 'SMO' : yearName(rYear()));
 export const displayName = () => (S.logbook && S.logbook.name) || (S.resident && S.resident.name) || (S.user && S.user.name) || '';
 
+// -> false when the list came out exactly as it was (same cases in the same order): the counts are kept, so
+// nothing that depends on them is worked out again
 export function setCases(cases) {
   rawCases = cases;
-  S.cases = writes.overlay('case', S.user?.email, cases).sort(byNewest);
-  S.counts = countCases(S.cases);
+  const next = writes.overlay('case', S.user?.email, cases).sort(byNewest), was = S.cases;
   S.casesLoaded = true;
+  if (was && was.length === next.length && next.every((c, i) => c === was[i])) return false;
+  S.cases = next;
+  S.counts = countCases(S.cases);
+  return true;
 }
 let rawCases = [];
 writes.configure({ backend: cloud.commitRecord, normalize: cloud.cleanWrite, getOwner: () => S.user?.email || null });
 writes.onChange(() => {
   if (!S.user) return;
-  if (S.casesLoaded) { setCases(rawCases); hooks.casesChanged?.(); }
+  // a save's sync state changing (pending, accepted, done) seldom changes the list: repaint only when it does
+  if (S.casesLoaded && setCases(rawCases)) hooks.casesChanged?.();
   hooks.writesChanged?.();
 });
 export const byNewest = (a, b) => (b.date || '0').localeCompare(a.date || '0') || (b.createdAt || 0) - (a.createdAt || 0);
@@ -351,7 +359,13 @@ export const catName = code => (myNames()[code] && myNames()[code].l) || (NAMES[
 export const catShort = code => (myNames()[code] && myNames()[code].n) || (NAMES[code] && NAMES[code].short) || (DEFAULT_NAMES[code] && DEFAULT_NAMES[code][1]) || catName(code);
 // Readable procedure name for tags and tooltips: no code, no targets.
 export const catFull = code => cat(code).full || cat(code).name;
-export const PROGRESS_BY_CODE = () => Object.fromEntries(progress(S.counts, rYear()).map(p => [p.code, p]));
+// worked out again only when the counts (a new object on every case change) or the residency year change
+let progMemo = { counts: null, year: null, by: null };
+export const PROGRESS_BY_CODE = () => {
+  const year = rYear();
+  if (progMemo.counts !== S.counts || progMemo.year !== year) progMemo = { counts: S.counts, year, by: Object.fromEntries(progress(S.counts, year).map(p => [p.code, p])) };
+  return progMemo.by;
+};
 
 // "count / next target" for a category, e.g. "7 / 10 by R3" or "12 ✓".
 export function countText(code, prog) {
