@@ -54,6 +54,43 @@ One step at a time; each is merged and checked before the next starts. Each sess
 After each move: tests pass against the new address, previews still work, the app's `NOTES.md`/`README.md` show the
 new address, and every page keeps `<meta name="robots" content="noindex, nofollow">`.
 
+## How the hosting works (step 1, log1)
+
+One Cloudflare Worker, `anawj-preview` (the one that already serves the PR previews), now also serves the subdomains.
+Its code is `worker/sites.js`; the address-to-folder table is `SITES` in `worker/routes.js` (same as the table above;
+change both together). It serves the repo's files as they are on `main`: Workers Builds deploys it on every merge to
+`main` (build command `node tools/stamp-versions.mjs`, so service-worker versions are stamped, as for GitHub Pages),
+and builds a preview for every PR.
+
+- A subdomain serves **only** its own folders: `hand.anawj.com` can't reach `logbook/`, `prewarmstudy.anawj.com` can't
+  reach anything but `prewarm/`, and so on; a path outside them is a 404 (an address with no slash gets one, query
+  kept). Every response carries `X-Robots-Tag: noindex, nofollow`.
+- One-app hosts (`prewarmstudy.`, `roster.`) serve the app at the root, and its own folder name works too
+  (`prewarmstudy.anawj.com/prewarm/…`) so an app can move before its absolute links are tidied.
+- Any other address (the previews on `workers.dev`, the copy of main) serves the whole repo as before.
+- **Trying a subdomain before it exists:** on a PR preview, `<preview>/_sites/hand.anawj.com/babies/` serves what
+  `hand.anawj.com/babies/` will. (Real hosts don't take that route.)
+- No data, no secrets, no storage in the Worker: it only serves files. Workers' free plan allows 100,000 requests a
+  day; every request goes through the Worker (a page load without a cached service worker is a few dozen). If that is
+  ever not enough, Workers Paid is $5 a month.
+- Tests: `node worker/test/routes.test.mjs` and `node worker/test/sites.test.mjs` (in the merge checklist in `AGENTS.md`).
+
+### The owner's Cloudflare clicks (after the step 1 PR is merged and its build has finished)
+
+Do these **after** the merge, not before: until then the Worker still serves the whole repo everywhere.
+For each of `hand.anawj.com`, `prewarmstudy.anawj.com`, `roster.anawj.com`, `apmes.anawj.com` (any order):
+
+1. <https://dash.cloudflare.com> → **Workers & Pages** → the `anawj-preview` Worker → **Settings** → **Domains & Routes**.
+2. **Add** → **Custom domain** → type the address → **Add domain**. Cloudflare makes the DNS record and the certificate
+   itself (anawj.com's DNS is already on Cloudflare); it can take a few minutes.
+3. Nothing else (no DNS record by hand, no redirect rule, nothing in Firebase yet: sign-in domains come with each
+   app's own move in steps 3 to 5).
+
+Check: each address answers with its app (`hand.anawj.com/babies/` the hand assessment, `hand.anawj.com/cmcj/` the
+trainer, `apmes.anawj.com/logbook/?demo`, `apmes.anawj.com/evals/?demo`, `roster.anawj.com/?demo`,
+`prewarmstudy.anawj.com/`); the same apps still work at their old `anawj.com/<folder>/` addresses (GitHub Pages, until
+each one's step makes it a redirect), and `hand.anawj.com/logbook/` is a 404.
+
 ## Progress
 
 - [x] Plan written (homepage session)

@@ -1,9 +1,19 @@
-// Cloudflare Workers config for the PR previews only (see PREVIEWS.md). anawj.com itself is GitHub Pages and
-// ignores this file. A static-assets-only Worker: no server code, the repo root served as it is.
+// Cloudflare Workers config: the PR previews (PREVIEWS.md) and the subdomains (SUBDOMAINS.md). anawj.com itself is
+// GitHub Pages and ignores this file. The Worker (worker/sites.js) serves the repo root's files and decides which
+// folder each address may see (worker/routes.js). No data, no secrets.
 {
   "name": "anawj-preview",
+  "main": "worker/sites.js",
   "compatibility_date": "2026-10-01",
-  "assets": { "directory": "." },
+  "assets": {
+    "directory": ".",
+    "binding": "ASSETS",
+    // every request goes through the Worker first (it picks the folder by address); it does the folder-index and
+    // trailing-slash handling itself, so Cloudflare's own are off
+    "run_worker_first": true,
+    "html_handling": "none",
+    "not_found_handling": "none"
+  },
   // a preview link per branch and per build, posted on the PR by Workers Builds
   "preview_urls": true,
   // required by `wrangler preview` (Worker Previews), even when empty: previews use the same settings
