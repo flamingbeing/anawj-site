@@ -381,3 +381,6 @@ dialog.ask p { margin: 0 0 6px; }
 /* home: New patient and PACU view side by side */
 .newrow { display: grid; grid-template-columns: 2fr 1fr; gap: 8px; }
 #pacuview { font-weight: 600; color: var(--navy); border-color: var(--navy); }
+/* a section marked complete: read only until its tick is undone */
+.sealed .card, .sealed .fld, .sealed .tchip, .sealed table, .sealed .ixrow, .sealed #addix { opacity: .6; }
+.sealnote { margin: 4px 0; padding: 8px 12px; border-radius: var(--r); background: #e3f1e6; color: var(--ok); font-weight: 600; font-size: 14px; }

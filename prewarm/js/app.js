@@ -576,6 +576,7 @@ function nextDue(p, s) {
 }
 // the reading due most recently (until the next one is due), else the next one coming up
 function duePick(p, s) {
+  if (sealedBy(p, s)) return null; // marked complete: nothing more is asked for
   const now = nowFor(p, s);
   const timed = pointsFor(p, s).map(x => ({ x, due: dueOf(p, s, x) })).filter(t => t.due != null && expected(p, s, t.due)).sort((a, b) => a.due - b.due);
   const cur = timed.filter(t => t.due <= now).pop(), up = timed.find(t => t.due > now && !savedAt(p, s, t.x.key));
@@ -611,6 +612,7 @@ function topBar(p, s, onLog) {
   };
   $('#lognext').onclick = () => {
     const nx = nextEvent(p); if (!nx) return;
+    if (val(p, 'done')) return toast(sealedMsg(p, null));
     const t = nowHM();
     set(p, nx.id, t); toast(`${nx.label} ${t}. Tap its box to change.`); refresh(); onLog?.();
     lockTaps(); // the button relabels to the next event at once: a double tap mustn't log that one too
@@ -628,6 +630,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
   // the no-pre-warming group keeps the Pre-warming tab, which just says so (owner, 12 Oct 2026)
   if (!s) s = defaultSeries(p);
   const noPw = s === 'prewarm' && noWarming(p);
+  const sealed = () => sealedBy(p, noPw ? null : s);
   const main = s !== 'haemo';
   const def = SERIES[s], pts = pointsFor(p, s);
   header(sid(p), '#/');
@@ -711,6 +714,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
   cleanup.push(() => { document.removeEventListener('visibilitychange', hide); window.removeEventListener('pagehide', keep); });
   leaveGuard = () => !p.lock?.on && base != null && snap() !== base ? { what: pt.label + ' reading', save: commit, drop: dropDraft } : null;
   function commit() {
+    if (sealed()) { toast(sealedMsg(p, s)); return false; }
     if (p.lock?.on) { toast('Locked: read only. Unlock it on the home page to change it.'); return false; }
     const bad = cols.filter(c => c.temp && draft[c.key] != null && (+draft[c.key] < 25 || +draft[c.key] > 45 || Number.isNaN(+draft[c.key])));
     if (bad.length) { toast('Check ' + bad.map(c => c.label).join(', ') + ': temperatures should be 25–45 °C.'); return false; }
@@ -790,7 +794,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
   }
   function timesHtml() {
     // numbered in the order they happen (owner, 12 Oct 2026)
-    return `<div class="times">${EVENTS.filter(([, , pw]) => !(pw && noWarming(p))).map(([f, l], i) => {
+    return `<div class="times${val(p, 'done') ? ' sealed' : ''}">${EVENTS.filter(([, , pw]) => !(pw && noWarming(p))).map(([f, l], i) => {
       const v = val(p, f), full = EVENT_FULL[f] || l, n = `<i class="tn" aria-hidden="true">${i + 1}</i>`;
       if (editing === f) return `<div class="tchip edit"><span>${i + 1}. ${l}</span><input type="time" id="evtime" value="${v === 'NA' ? '' : esc(v || '')}" aria-label="${full}"><button class="link" data-evclear="${f}">Clear</button></div>`;
       return `<button class="tchip ${v ? 'set' : ''}${WARM_EVENTS.has(f) ? ' warm' : ''}" data-ev="${f}" aria-label="${i + 1}, ${full}: ${v ? v + ', tap to change' : 'tap to set now'}">${n}<span>${l}</span><b>${v ? esc(v) : 'tap'}</b></button>`;
@@ -851,19 +855,20 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     const reading = noPw ? `<div class="nav2"><span></span><div class="mid">${tabsHtml()}</div><span></span></div>
       <p class="note nopw">No pre-warming: this patient is in the no pre-warming group. Intra-op temperatures are on the Intra-op tab.</p>` : `${navHtml()}
       <div class="tp"><div><b>${pt.label}</b> ${grp}</div><div class="due" id="due">${due != null ? 'due ' + fromMin(Math.round(due)) : pt.key === 'base' ? (s === 'prewarm' ? '' : 'on arrival in OT') : pt.min != null ? `<span class="hint">Log ${s === 'prewarm' ? 'Prewarm on' : 'Induction'} first</span>` : ''}</div></div>
-      ${isSaved ? `<p class="muted small tight">Taken ${esc(savedAt(p, s, pt.key))}${p.f['at_' + s + '_' + pt.key]?.by ? ' (saved by ' + esc(p.f['at_' + s + '_' + pt.key].by) + ')' : ''} <button class="link" data-attime>Change time</button>. Changes save when you tap Save.</p>` : ''}
+      <div class="${sealed() ? 'sealed' : ''}">${isSaved ? `<p class="muted small tight">Taken ${esc(savedAt(p, s, pt.key))}${p.f['at_' + s + '_' + pt.key]?.by ? ' (saved by ' + esc(p.f['at_' + s + '_' + pt.key].by) + ')' : ''} <button class="link" data-attime>Change time</button>. Changes save when you tap Save.</p>` : ''}
       <div class="board">${cols.map(card).join('')}</div>
-      <button class="save big" id="save">${isSaved ? 'Save changes' : `Save ${pt.label} reading`}</button>`;
+      ${sealed() ? sealNote(p, s) : `<button class="save big" id="save">${isSaved ? 'Save changes' : `Save ${pt.label} reading`}</button>`}</div>`;
     // three parts (owner, 12 Oct 2026): key times; the tab bar and its readings (swipe changes tab here only);
     // the other forms, Still to fill and Mark complete, the same on both tabs
     paint(`<section class="third top" aria-label="Key times">${val(p, 'done') ? `<p class="ok-box donetop">✓ Data collection complete <small>${esc(val(p, 'done'))}</small></p>` : ''}${timesHtml()}</section>
       <section class="third mid">${ptabsHtml()}${main ? comfortHtml('sat_pre', 'Comfortable before surgery?') : ''}${reading}
       ${s === 'haemo' && vitalsCollected(p) ? '<p class="okline small">✓ Vital signs data collected: ticked on the paper form</p>' : ''}
       ${s === 'haemo' && settings.hide.haemo15 ? `<p class="muted small">Only baseline is entered here; the 15-min rows come from the monitor download. Turn them on in Settings.</p>` : ''}
-      ${main ? (noWarming(p) ? '' : signoffHtml(p, 'prewarm')) + signoffHtml(p, 'iotemp') + comfortHtml('sat_post', 'Comfortable after surgery?') : signoffHtml(p, s)}</section>
+      ${main ? (noPw ? '' : signoffHtml(p, s)) + comfortHtml('sat_post', 'Comfortable after surgery?') : signoffHtml(p, s)}</section>
       <section class="third bot" aria-label="Other forms and checks">${linksHtml()}${gapsHtml(p)}${doneHtml(p)}
       <p class="resetline"><button class="link" id="resetsub">Reset this subject</button></p></section>`);
     refreshBar();
+    disableSealed();
     fitNums();
     if (editing) { const i = $('#evtime'); i?.focus(); }
     if (typing) { const i = view.querySelector(`[data-in="${typing}"]`); i?.focus(); }
@@ -884,6 +889,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
   view.onpointerdown = e => {
     const b = e.target.closest('[data-step]'); if (!b) return;
     e.preventDefault();
+    if (b.closest('.sealed')) return toast(sealedMsg(p, s));
     const k = b.dataset.c, dir = +b.dataset.step;
     bump(k, dir); draw();
     hold = setTimeout(() => { hold = setInterval(() => { bump(k, dir); draw(); }, 120); }, 450);
@@ -892,6 +898,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
   cleanup.push(stopHold, () => { view.onpointerdown = view.onpointerup = view.onpointercancel = view.onpointerleave = view.onclick = null; });
   view.onclick = e => {
     const t = e.target;
+    if (t.closest('.sealed') && t.closest('button, .card, .chip, [data-ev], [data-attime]')) return toast(sealedMsg(p, t.closest('.times') ? null : s));
     const st = t.closest('[data-step]');
     if (st && e.detail === 0) { bump(st.dataset.c, +st.dataset.step); draw(); return; } // keyboard
     const chip = t.closest('.chip[data-c]');
@@ -962,7 +969,10 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
       set(p, 'done', `${settings.me} ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} ${nowHM()}`);
       toast('Data collection marked complete'); draw(); window.scrollTo(0, 0); return;
     }
-    if (t.closest('[data-undone]')) { set(p, 'done', null); draw(); return; }
+    if (t.closest('[data-undone]')) {
+      if (!confirm(`Undo "Data collection complete" (${val(p, 'done')})?\n\nThe day's screens can then be changed again.`)) return;
+      set(p, 'done', null); draw(); return;
+    }
     if (t.closest('#resetsub')) { resetSubject(p); return; }
     signoffClick(p, s, t);
   };
@@ -1046,7 +1056,7 @@ function startAlerts(p) {
         if (now >= nx.due && now <= nx.due + 5) hit(q.id + 'ev_wstop' + val(q, 'pw_start'), `Prewarm off due now (${WARM_MIN[val(q, 'arm')]} min of warming): tap Log`);
       }
       for (const s of ['prewarm', 'iotemp', 'haemo']) {
-        if (s === 'prewarm' && noWarming(q)) continue;
+        if ((s === 'prewarm' && noWarming(q)) || sealedBy(q, s)) continue;
         const now = nowFor(q, s);
         for (const x of pointsFor(q, s)) {
           const d = dueOf(q, s, x), tag = q.id + s + x.key + (val(q, SERIES[s].ref[0]) || '');
@@ -1150,6 +1160,18 @@ function gapsHtml(p) {
   if (!g.length) return '';
   return `<div class="gaps" id="gaps"><b>Still to fill</b><ul>${g.map(x => `<li><a href="${x.href}">${esc(x.what)}</a>: ${x.items.map(esc).join(', ')}</li>`).join('')}</ul></div>`;
 }
+// a section marked complete is read only until its tick is undone; "data collection complete" closes every op-day
+// screen (owner, 12 Oct 2026). The Perioperative data page (filled in later from the chart) stays open.
+function sealedBy(p, pg) {
+  if (val(p, 'done')) return 'Data collection';
+  if (!pg || !val(p, 'sign_' + pg)) return null;
+  const n = SECTION[pg] || PAGES.find(x => x.id === pg)?.title || 'This section';
+  return n[0].toUpperCase() + n.slice(1);
+}
+const sealedMsg = (p, pg) => `${sealedBy(p, pg)} is marked complete. Undo its tick to change this.`;
+const sealNote = (p, pg) => `<p class="sealnote">✓ ${esc(sealedMsg(p, pg))}</p>`;
+// boxes in a closed section can't be typed in
+const disableSealed = () => view.querySelectorAll('.sealed input, .sealed select, .sealed textarea').forEach(i => { i.disabled = true; });
 function doneHtml(p) {
   return tickHtml(!!val(p, 'done'), 'data collection', val(p, 'done') || '', 'data-undone', 'data-done').replace('Mark data collection complete', 'Mark data collection as complete').replace('<b>data collection complete', '<b>Data collection complete');
 }
@@ -1170,11 +1192,15 @@ function signoffClick(p, pg, t) {
   if (t.closest('[data-sign]')) {
     if (!settings.me) return toast('Add your initials in Settings first.');
     set(p, 'sign_' + pg, `${settings.me} ${new Date().toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' })} ${nowHM()}`); render();
-  } else if (t.closest('[data-unsign]')) { set(p, 'sign_' + pg, null); render(); }
+  } else if (t.closest('[data-unsign]')) {
+    if (!confirm(`Undo "${sealedBy(p, pg) || pg} complete" (${val(p, 'sign_' + pg)})?\n\nIt can then be changed again.`)) return;
+    set(p, 'sign_' + pg, null); render();
+  }
 }
 
 // BP / HR / BIS: the next 15-min reading's state, like the due time (readings missed by over 15 min are let go)
 function haemoState(p, s = 'haemo') {
+  if (sealedBy(p, s)) return 'later';
   const now = nowFor(p, s);
   const lefts = pointsFor(p, s).filter(x => !savedAt(p, s, x.key))
     .map(x => dueOf(p, s, x)).filter(d => d != null && expected(p, s, d)).map(d => d - now).filter(l => l > (s === 'haemo' ? -15 : -5));
@@ -1313,12 +1339,14 @@ function formPage(id, pg, back) {
     // PACU in / To ward on the PACU page, so the PACU nurse logs them there (owner, 12 Oct 2026)
     const pt = pg === 'pacu' ? `<div class="times pacutimes">${[['pacu_in', 'PACU in'], ['pacu_out', 'To ward']].map(([f, l]) =>
       `<button class="tchip ${get(f) ? 'set' : ''}" data-pev="${f}" aria-label="${EVENT_FULL[f] || l}: ${get(f) ? get(f) + ', tap to change' : 'tap to set now'}"><span>${l}</span><b>${get(f) ? esc(get(f)) : 'tap'}</b></button>`).join('')}</div>` : '';
-    paint(`${pt}<div class="stack">${FORM[pg].map(group => {
+    const sl = sealedBy(p, pg);
+    paint(`<div class="${sl ? 'sealed' : ''}">${pt}<div class="stack">${FORM[pg].map(group => {
       if (group[0] === 'h') return `<h2>${group[1]}</h2>`;
       if (group[0] === 'tx') return txTable(p);
       if (group[0] === 'ix') return ixTable(p);
       return group.map(k => fieldHtml(field(k), get)).join('');
-    }).join('')}${signoffHtml(p, pg)}</div>`);
+    }).join('')}</div></div>${sl ? sealNote(p, pg) : ''}${signoffHtml(p, pg)}`);
+    disableSealed();
     window.scrollTo(0, y);
   };
   draw();
@@ -1328,6 +1356,7 @@ function formPage(id, pg, back) {
     const u = e.target.closest('[data-use]');
     if (u) { set(p, u.dataset.use, u.dataset.v); draw(); return; }
     if (e.target.closest('#addix')) { const rows = ixRows(p); rows.push({ time: nowHM() }); set(p, 'io_ix_rows', JSON.stringify(rows)); draw(); return; }
+    if (e.target.closest('.sealed') && e.target.closest('button')) return toast(sealedMsg(p, pg));
     const pe = e.target.closest('[data-pev]');
     if (pe) {
       const f = pe.dataset.pev, label = f === 'pacu_in' ? 'PACU in' : 'To ward';

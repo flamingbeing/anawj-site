@@ -485,7 +485,7 @@ await tryit(async () => {
   for (let k = 1; k <= 5; k++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: 320 - 48 * k, y }] });
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); await pg.waitForTimeout(500);
   log(!pg.url().endsWith('/haemo'), 'a swipe on the key times doesn\'t change tab');
-  log(!!await pg.$('[data-sign="prewarm"]') && !!await pg.$('[data-sign="iotemp"]'), 'pre-warming and intra-op temps complete ticks on the Temperatures tab');
+  log((await pg.$$('[data-sign="iotemp"], [data-sign="prewarm"]')).length === 1, 'one temps complete tick: the open sub-tab\'s');
   await pg.goto('http://localhost:8080/prewarm/?demo#/'); await pg.waitForTimeout(400);
   await pg.click('a[href="#/pacu"]'); await pg.click('a[href^="#/pacu/"] >> nth=0'); await pg.waitForTimeout(500);
   log(/· PACU$/.test(await pg.textContent('#title')) && /#\/pacu\/\w+$/.test(pg.url()), 'PACU view opens the PACU page: ' + await pg.textContent('#title'));
@@ -496,6 +496,30 @@ await tryit(async () => {
   log(pg.url().endsWith('#/pacu'), 'and back returns to the PACU list');
   await ctx.close();
 });
+// Z. a section marked complete is read only until its tick is undone (which asks); each temps tick on its own sub-tab
+await tryit(async () => {
+  const { ctx, pg } = await fresh();
+  await pg.evaluate(() => localStorage.setItem('prewarm-demo:settings', JSON.stringify({ me: 'ZZ' })));
+  await pg.reload(); await pg.waitForTimeout(600);
+  await open(pg, 1);
+  log(!!await pg.$('[data-sign="iotemp"]') && !await pg.$('[data-sign="prewarm"]'), 'Intra-op sub-tab shows only the intra-op temps tick');
+  await pg.click('#haemolink'); await pg.waitForSelector('[data-in="sbp"]');
+  await pg.click('[data-sign="haemo"]'); await pg.waitForSelector('.sealnote');
+  log(!await pg.$('#save') && await pg.$eval('[data-in="sbp"]', i => i.disabled), 'BP, HR, BIS complete: no Save, boxes locked');
+  let asked = ''; pg.once('dialog', d => { asked = d.message(); d.dismiss(); });
+  await pg.click('[data-unsign="haemo"]'); await pg.waitForTimeout(300);
+  log(/Undo/.test(asked) && !!await pg.$('.sealnote'), 'undo asks; Cancel keeps it complete');
+  pg.once('dialog', d => d.accept());
+  await pg.click('[data-unsign="haemo"]'); await pg.waitForSelector('#save');
+  log(!await pg.$eval('[data-in="sbp"]', i => i.disabled), 'undone: editable again');
+  // PACU marked complete: its page is read only, including PACU in / To ward
+  await pg.click('a[href$="/form/pacu"]'); await pg.waitForSelector('[data-pev]');
+  await pg.click('[data-sign="pacu"]'); await pg.waitForSelector('.sealnote');
+  const before = await pg.textContent('[data-pev="pacu_in"] b');
+  await pg.click('[data-pev="pacu_in"]'); await pg.waitForTimeout(300);
+  log(await pg.textContent('[data-pev="pacu_in"] b') === before && await pg.$eval('.sealed input', i => i.disabled), 'PACU complete: times and answers locked');
+  await ctx.close();
+});
 await b.close();
 if (fails.length) { console.error('prewarm edge: FAIL\n- ' + fails.join('\n- ')); process.exit(1); }
-console.log('prewarm edge: ok (midnight, surgery end, double-tap Save, BP checks, back button, Log, Enter, still to fill, swipe, stray taps, time order, corrections, BMI, follow-ups, blanks, typed answers, alerts everywhere, duplicates, storage full, lock warning, late readings, delete and restore, prewarm off alert, warming yes / no, touch double taps, typing then leaving, other tab due, two patients, app closed mid-reading, layout, reset, PACU view)');
+console.log('prewarm edge: ok (midnight, surgery end, double-tap Save, BP checks, back button, Log, Enter, still to fill, swipe, stray taps, time order, corrections, BMI, follow-ups, blanks, typed answers, alerts everywhere, duplicates, storage full, lock warning, late readings, delete and restore, prewarm off alert, warming yes / no, touch double taps, typing then leaving, other tab due, two patients, app closed mid-reading, layout, reset, PACU view, sections closed once complete)');
