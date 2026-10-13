@@ -2,14 +2,14 @@
 
 Short and current. Lasting rules go in `NOTES.md`. Update with `/save-state`.
 
-Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
+Last updated: 2026-10-13 by Claude Code, Prewarming Webapp.
 
 ## Now
 
-- **Claude Code, Prewarming Webapp** (branch `ccr-13264f37-d28edu`): bug hunt 17:53 to 20:45 UTC 12 Oct 2026 done
-  (#257 to #285). Nothing half-done. Owner answered: intra-op time 0 is induction; no pre-op
-  temperatures for no pre-warming (tab kept, says so). Advise: don't lock patients during the study day;
-  set both phones' clocks to automatic; check +/− and the iOS time wheel on a real phone. Real patients start 13 Oct 2026.
+- **Claude Code, Prewarming Webapp** (branch `ccr-13264f37-d28edu`): idle, nothing half-done. Last work 13 Oct 2026
+  (#290 to #300): layout, PACU view, reset, complete-means-locked, no BP alarms, fast tests. Real patients start
+  13 Oct 2026. Advise: don't lock patients during the study day; phones' clocks on automatic; check +/− and the
+  iOS time wheel on a real phone.
 
 ## Waiting on the owner
 
@@ -25,23 +25,21 @@ Last updated: 2026-10-12 by Claude Code, Prewarming Webapp.
 
 ## Recently done
 
-- #296: prewarm tests in parallel, `tools/test-prewarm.sh` (~1½ min).
-- No BP, HR, BIS alarms (banner, beep, buzz); temperatures and Prewarm off still alarm.
-- Sections marked complete are read only until undone; temps ticks on their own sub-tab.
-- PACU in / To ward on the PACU page; pre-warming / intra-op temps complete ticks.
-- Three bordered parts, swipe in the middle only, tab "BP, HR, BIS", Reset this subject (asks twice), PACU view.
-- Layout: key times on top, tab bar under them, same bottom part on both tabs; no-pre-warming Pre-warming tab.
-- #285: unsaved readings come back after the phone closes the app; toasts no longer block taps on Log / tabs.
-- #283, #284: two patients at once: home list shows each one's due reading; alerts cover patients opened on this phone.
-- #282: a reading due now on the other tab shows in the top bar too.
-- #281: reading opens on the latest due unsaved timepoint; early saves ask; numbers shrink to fit; arm 3 pre-warming hidden in exports.
-- #280: double taps locked out; typed temperature kept when the screen redraws; banner floats under the bar.
-- #276: warming yes / no follows its logged start time; saved No after the start flagged.
-- #275: Prewarm off due alerts; alerts due together share one banner; AF specify as New onset / Existing.
-- #273: deleted patients can be restored; a deleted patient can't be charted into.
+- #300: AGENTS: merge by the PR number returned at creation (a guessed number merged another session's #295 early;
+  logbook tests on main pass afterwards).
+- #298: no BP, HR, BIS alarm (banner, beep, buzz); temperatures and Prewarm off still alarm.
+- #296: prewarm tests in parallel; `tools/test-prewarm.sh` (~1½ min, was 5).
+- #294: sections marked complete are read only until undone (asks); temps ticks on their own sub-tab.
+- #292, #293: PACU in / To ward on the PACU page; temps complete ticks; PACU view button beside New patient.
+- #291: three bordered parts, swipe in the middle only, tab "BP, HR, BIS", Reset this subject (asks twice), PACU view.
+- #290: key times on top, tab bar under them, same bottom part on both tabs; no-pre-warming Pre-warming tab.
+- #285: unsaved readings come back after the phone closes the app; toasts no longer block taps.
 
 ## Decisions
 
+- 13 Oct 2026: a section marked complete is closed for everyone until its tick is undone; data collection complete closes the op-day screens, not Perioperative data (owner).
+- 13 Oct 2026: no alarm for BP, HR, BIS; their due times still show in the top bar and tab (owner).
+- 12 Oct 2026: PACU view for the PACU nurse; PACU in / To ward on the PACU page; Reset this subject asks twice (owner).
 - 12 Oct 2026: intra-op time 0 is induction; no-pre-warming group keeps a Pre-warming tab saying so; times on top, tab bar below, shared bottom part (owner).
 - 12 Oct 2026: amber, orange and red are kept for timing alarms (warming boxes lavender); Still to fill stays amber (owner).
 - 12 Oct 2026: top-bar clock reads "Time now".
