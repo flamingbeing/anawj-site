@@ -454,8 +454,12 @@ function parentOf(tab) {
   return tab.under || null;
 }
 
+// a live update waiting to draw the page again (hooks.casesChanged, below); any full draw satisfies it, so one left
+// over from another tab (held back while the note editor was open) never draws the Notes list again after Done
+let pendingRender = false;
 function render() {
   if (!S.user) return;
+  pendingRender = false;
   // Settings → Logging → Show tips and help text: off hides every .help explanation (an experienced-user mode)
   document.body.classList.toggle('no-help', !!(S.logbook && S.logbook.settings && S.logbook.settings.hideTips));
   document.body.classList.toggle('basic', basicMode());
@@ -708,8 +712,7 @@ document.addEventListener('touchend', async e => {
 }, { passive: true });
 
 // A live case update shouldn't yank the screen from under someone typing: the Log screen refreshes
-// its counts in place; other screens re-render when nothing is being edited.
-let pendingRender = false;
+// its counts in place; other screens re-render when nothing is being edited (pendingRender: declared above render()).
 hooks.casesChanged = () => {
   paintWho();
   if (S.tab === 'log') return logCasesChanged();

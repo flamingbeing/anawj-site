@@ -280,8 +280,11 @@ try { for (const width of [390, 1280]) {
   assert.equal(await p.evaluate(() => window.__opened[1]), `${origin}/evals/?demo&date=${c0.date}&initials=XQ#new`);
   await p.keyboard.press('Escape');
   if (await p.locator('dialog[open]').count()) await p.keyboard.press('Escape');
+  // the dialogs' history steps are done (a step back still on its way would undo the next page's hash)
+  await until(p, () => !document.querySelector('dialog[open]') && location.hash === '#logbook', null, { msg: 'the dialogs closed' });
   // its group's reset says what it does
   await p.goto(base + '?demo#showhide');
+  await p.locator('[data-group="apmes"]').waitFor();
   await p.locator('[data-group="apmes"]').getByRole('button', { name: 'Reset this group' }).click();
   await p.locator('dialog[open]').getByText(/This also turns off Request an evaluation/).waitFor();
   await p.locator('dialog[open]').getByRole('button', { name: 'Cancel' }).click();
