@@ -3,7 +3,7 @@
 // the page then offers "Update available: tap to reload", which only reloads. (Waiting for a tap to activate failed
 // on some phones: the tap did nothing, 12 Oct 2026.)
 
-const VERSION = 'hand-babies-v6';
+const VERSION = 'hand-babies-v7';
 const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'hand3d.js', 'vendor/three.module.min.js', 'edit.html', '../design/tokens.css'];
 
 self.addEventListener('install', e => {

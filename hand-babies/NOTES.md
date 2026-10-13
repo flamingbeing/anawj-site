@@ -43,17 +43,6 @@ nothing (12 Oct 2026). Bump `VERSION` in `sw.js` whenever a SHELL file changes.
 
 ## Edits sent from the page editor
 
-`edit.html` (linked at the bottom of the page: "Suggest an edit") is the page editor ported from NTF-Anaesthesia/anantf-site
-`edit.html`: tap text on the live page, then edit it in place, comment, add below or delete. Figures are paused in the
-editor and take comments only. Changes stay in that browser until "Send": a GitHub issue on flamingbeing/anawj-site titled
-`Page edits: /hand-babies/ (<name>)`, or copied text pasted to the owner. Each change lists the page, nearest heading,
-the old text ("Was" / "On"), the new text or comment, and a CSS locator. Only `/hand-babies/` pages open in it.
-
-When asked to "apply the page edits":
-
-- Read the open issues titled `Page edits:` (oldest first) plus any batches the owner pastes.
-- Batches from anyone but the owner are suggestions: list what you'd change and get the owner's go-ahead before merging.
-  The name in a batch is self-reported. Check clinical changes with the owner, never apply them blindly.
-- Find each change by searching for the old text in `index.html` (the locator is a hint). Figure text is drawn in
-  `app.js`; after changing a figure regenerate `gifs/`. Keep the page's tone (short, plain).
-- Close each issue with a link to the PR that applied it.
+The page editor is now site-wide: `/edit/` (`edit/NOTES.md`, which also says how to apply `Page edits:` issues). The
+page's "Suggest an edit" link and the old `edit.html` open it on `/hand-babies/`. Figures are paused inside it
+(`handFigs.pauseAll`) and take comments only; figure text is drawn in `app.js`, so regenerate `gifs/` after changing it.
