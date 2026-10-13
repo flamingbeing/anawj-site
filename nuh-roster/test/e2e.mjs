@@ -131,6 +131,9 @@ if (fs.existsSync(AXE)) {
   await page.addScriptTag({ path: AXE });
   for (const t of ['Monthly', 'Cases', 'Roster', 'Premeds', 'Staff', 'Settings']) {
     await tab(page, t);
+    // a toast fading in or out is measured mid-fade: let it go first
+    await page.evaluate(() => document.getElementById('toast').classList.remove('show'));
+    await page.waitForTimeout(300);
     const v = await page.evaluate(async () => (await window.axe.run(document, { runOnly: ['wcag2a', 'wcag2aa'] })).violations.map(x => `${x.id} ${x.nodes[0]?.target}`));
     ok(!v.length, `axe on ${t}: ${v.join('; ')}`);
   }
