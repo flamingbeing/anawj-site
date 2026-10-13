@@ -303,7 +303,7 @@ function weeklyDigest() {
       h('b', {}, `Last week: ${n} case${n === 1 ? '' : 's'} logged`), h('span', { class: 'grow' }),
       h('button', { class: 'small', 'aria-label': 'Dismiss until next week', onclick: () => { try { localStorage.setItem(key, from); } catch { /* ignore */ } card.remove(); } }, 'OK')),
     h('p', { class: 'hint', style: 'margin:4px 0 8px' }, n ? 'Nice work.' : 'Nothing logged last week: catch up with the weekday chips or Paste list.'),
-    h('a', { class: 'btn small', href: '#progress' }, 'See what is still needed'));
+    basicHides('targets') ? null : h('a', { class: 'btn small', href: '#progress' }, 'See what is still needed'));
   return card;
 }
 
@@ -765,7 +765,7 @@ async function saveCase({ another }) {
   else if (next === 'closed') document.activeElement?.blur();
   else focusLog();
   // say where it went and what it counted towards: "Saved Sat 10 Oct · 16 LSCS now 4/10"
-  const prog = PROGRESS_BY_CODE();
+  const prog = basicHides('saveToast') ? {} : PROGRESS_BY_CODE();   // (Profile → APMES)
   const withTarget = c.cats.map(code => prog[code]).find(p => p && p.next);
   const counted = withTarget ? ` · ${catName(withTarget.code)} now ${withTarget.count}/${withTarget.next.n}` : ` · ${catPills(c.cats)}`;
   toast(`Saved ${fmtDate(c.date)}${counted}`, {

@@ -325,23 +325,37 @@ portfolio content.
   lastAt, lastTo } (never in the settings file). Reminder: one toast per visit with a Save button when due. The
   owner filled `GOOGLE_CLIENT_ID` and `DROPBOX_APP_KEY` (both public) in Oct 2026. Dropbox stays in development
   mode until the owner applies for production (its icons are 64 and 256 px from `icons/icon-512.png`).
-- **Profiles or hide items** (Settings → Profiles or hide items, was Show or hide; `#showhide`, `renderShowHide` in `ui-settings.js`; Oct 2026, from Codex's
-  list): every switch that hides part of the app, grouped Tips and help / Case tab / Logbook / Header and tabs, each
-  group with its own "Reset this group" (the other groups stay); a Reflections group too (formatting buttons,
-  heading notes). The same settings as on their own pages (hideTips, weeklyDigest, reflNotes, caseHide, reflToolbar; this device's rowMenu, hideHeader, tabHidden / tabOrder). e2e:
-  `test/e2e/simpler.mjs`.
-- **Profiles** (`settings.mode`, the whole account; `PROFILES`, `profile()`, `basicMode()`, `logbookOnly()`,
-  `BASIC_ITEMS`, `basicHides()` in `ui-core.js`; `profileCard` at the top of Settings → **Profiles or hide items**
-  (`#showhide`), the **only** place (owner, Oct 2026: two Basic switches confused); body classes `basic`,
-  `logbook-only`). Named so both Basic ones read as Basic (owner). **Basic is the default for everyone** (owner, 12
-  Oct 2026: nothing saved = Basic; Advanced is saved as `mode: 'advanced'`). The e2e demo account starts in Advanced
-  (`demoDoc` in demo-backend.js, when `apmes-logbook-demo-small` is set) since the tests check every feature.
-  - **Profiles hide interface items only, never settings** (owner): the advanced settings links, settings file and
-    Connect Claude cards always show. **Every hidden item can be turned back on**, so all on is Advanced again
-    (owner): `settings.basicOn` lists them (Case tab parts as `case:<part>` via `caseShown` / `setCaseShown`, used
-    by the Logging page and the Case tab group too; `grid`, `analytics`, `reflExtras`, `reflect` from the profile
-    card's "Hidden in this profile" switches); the tabs are the tab bar switches. Picking a profile starts from its
-    defaults (`basicOn` cleared) and moves this device's saved tabs.
+- **Settings menu** (`renderSettingsMenu`, `SETTINGS_GROUPS` in `app.js`; owner, 13 Oct 2026): every page kept, in
+  groups Profile / Look / Logging / Reflections / Notes and sharing / Data / Advanced (Advanced display and Advanced
+  logging also listed there). Settings search indexes every page, Profile and the Tag editor included (`SEARCH_PAGES`).
+- **Profile** page (Settings → Profile, was Profiles or hide items; `#showhide`, `renderShowHide` in `ui-settings.js`):
+  the profile card, then every switch that shows or hides part of the app, grouped Extras / APMES / Tips and help /
+  Case tab / Reflections / Logbook / Header and tabs, each group with its own "Reset this group" (back to the
+  profile's defaults; the other groups stay). The same settings as on their own pages. e2e: `simpler.mjs`, `profiles.mjs`.
+- **Profiles are presets of switches** (owner, 13 Oct 2026: "changing profiles simply toggles a bunch of switches";
+  `js/profiles.js`, pure, `test/profiles.test.mjs`). `settings.mode` (the whole account; `PROFILES`, `profile()`,
+  `shows(key)` / `basicHides(key)`, `setShown`, `caseShown` / `setCaseShown` in `ui-core.js`) is the base; each switch
+  (`SWITCHES`: extras `grid`, `analytics`, `reflExtras`, `reflect`; Case tab parts `case:<part>`; APMES `targets`,
+  `case:still`, `totals`, `portfolio`, `year`, `reflHeadings`, `saveToast`, `apmesTitle`) is its saved value in
+  `settings.show`, else the profile's default (`presetOn`). Older accounts' lists still count: `caseHide` (parts off,
+  kept in step on every save) and `basicOn` (items a Basic profile hid, turned back on). So an account with only `mode`
+  saved looks exactly as before. Picking a profile (`profileCard` → `confirmProfile`) lists what it turns on and off and
+  the tabs it moves on this device, then Apply clears the saved switches (`applyPatch`; an ungoverned hidden part such
+  as `parsed` stays) and moves this device's saved tabs (`tabsAfter`; a device with no saved tabs follows the
+  profile's `offBar`). A switch changed after makes the card read "Custom (based on X)" with "Back to X".
+  Body classes `basic`, `logbook-only`, `faculty-profile` stay. **Basic is the default for everyone** (owner, 12 Oct
+  2026: nothing saved = Basic). The e2e demo account starts in Advanced (`demoDoc` in demo-backend.js, when
+  `apmes-logbook-demo-small` is set) since the tests check every feature.
+  - **Profiles hide interface items only, never settings** (owner): every switch is visible on the Profile page and
+    works in any profile.
+  - **APMES switches** (account, on in every profile but Personal): targets (counts against targets in All tags,
+    Analytics targets; off: Analytics shows cases per tag, your own tags too, `renderCounts`), Still needed, programme
+    totals (Compare with your intake, You and your year), portfolio export and Section 1 (Export / Import cards,
+    Account card), residency year (Account card, Analytics year), reflection headings (Analytics card, "Which
+    heading?" step, Reflections list grouped by month), the "now 4/10" save toast, APMES in the default app name
+    (`defaultTitle`; a name typed in Advanced display still wins).
+  - **Personal** (generic logging outside APMES): the APMES switches off, the extras on, Notes on the tab bar
+    (`PROFILE_ON`), own tags kept (tags are never touched by a profile).
   - **Basic**: hides the optional Case tab parts but "what the box was read as" (quick picks, ☆, Still needed, tag
     group saving, Plan for later), the Logbook Grid, Analytics trends / forecasts / Gone quiet / to-dos / links,
     reflection Figures and References (shown anyway when a reflection has some); Analytics off the bar (in More).

@@ -33,7 +33,10 @@ const SCREENS = [
   ['Display', hash('display'), true],
   ['Advanced display', hash('displayadv'), false],
   ['Logging', hash('logging'), false],
-  ['Profiles or hide items', hash('showhide'), false],
+  ['Profile', hash('showhide'), false],
+  ['Profile dialog', async p => { await hash('showhide')(p); await p.locator('.profile-card input[value=personal]').check(); await p.waitForSelector('dialog[open]'); }, false],
+  // the targets switched off (in memory only: the demo store is shared by the next screens)
+  ['Analytics without targets', async p => { await hash('progress')(p); await p.evaluate(async () => { const { S, hooks } = await import('./js/ui-core.js'); S.logbook.settings = { ...S.logbook.settings, show: { targets: false, totals: false, year: false } }; hooks.render(); }); await p.locator('.an-sec summary', { hasText: 'Tags' }).waitFor(); }, false],
   ['Advanced logging', hash('loggingadv'), false],
   ['Tag editor', hash('tags'), false],
   ['Reflection settings', hash('reflset'), false],

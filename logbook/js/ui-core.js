@@ -7,6 +7,7 @@ import * as cloud from './cloud.js';
 import { reflectionCounts } from './reflections.js';
 import { writes } from './writes.js';
 import { transients } from './transients.js';
+import { shownIn, switchPatch } from './profiles.js';
 
 export { cloud, writes, transients };
 
@@ -34,60 +35,44 @@ export const S = {
 export const hooks = { render() {}, casesChanged() {} };
 
 export const settings = () => ({ suggestions: true, rYear: 1, ...(S.logbook && S.logbook.settings) });
-// Profiles (settings.mode, the whole account; at the top of Settings → Profiles or hide items). Basic is the default
-// for everyone (owner, 12 Oct 2026): a simpler app, the same tabs and buttons in the same places without the extras
-// (the optional Case tab parts, the Logbook grid, Analytics trends and forecasts, reflection figures and references),
-// and Analytics in More. Basic: logbook only is Basic without reflections, for residents who submit theirs separately
-// (Reflections in More, for ones already written; no Reflect buttons or ☆ Interesting). Advanced hides nothing.
-// Profiles hide interface items only, never settings, and each item can be turned back on (BASIC_ITEMS).
-// Faculty / PCs (faculty, PDs and admins, who include the programme coordinators; their default, outside the demo):
-// residents' case logs first (Case logs: counts per tag from the summaries, never case details), then programme
-// analytics, then More; their own Case, Logbook, Reflections and Notes tabs start in More.
+// Profiles (settings.mode, the whole account; at the top of Settings → Profile). Each is a preset of switches
+// (profiles.js): picking one shows what it turns on and off, then sets them; any switch can be changed after, and the
+// profile then reads "Custom (based on …)". Basic is the default for everyone (owner, 12 Oct 2026): a simpler app, the
+// same tabs and buttons in the same places without the extras (the optional Case tab parts, the Logbook grid,
+// Analytics trends and forecasts, reflection figures and references), and Analytics in More. Basic: logbook only is
+// Basic without reflections, for residents who submit theirs separately (Reflections in More, for ones already
+// written; no Reflect buttons or ☆ Interesting). Advanced hides nothing. Personal is for logging outside APMES: the
+// APMES parts (targets, Still needed, totals, portfolio, residency year, reflection headings) off, the extras on and
+// Notes on the tab bar. Faculty / PCs (faculty, PDs and admins, who include the programme coordinators; their
+// default, outside the demo): residents' case logs first (Case logs: counts per tag from the summaries, never case
+// details), then programme analytics, then More; their own Case, Logbook, Reflections and Notes tabs start in More.
 export const PROFILES = [
   // simplest first: logbook only hides the most
   ['logbook', 'Basic: logbook only', 'Basic without reflections, if you submit your reflections separately. Reflections you already wrote stay in More.'],
   ['basic', 'Basic', 'A simpler app (the default): the same tabs and buttons without the extras. Analytics is in More.'],
   ['advanced', 'Advanced', 'Everything: quick picks, the Logbook grid, Analytics trends and forecasts, reflection figures and references.'],
+  ['personal', 'Personal', 'For logging outside APMES: no targets, totals or portfolio; the Advanced extras, your own tags and Notes on the tab bar.'],
   ['faculty', 'Faculty / PCs', 'For faculty, PDs and programme coordinators: residents’ case logs first, then programme analytics, then More.'],
 ];
 // may use Faculty / PCs: admins (PCs), PDs and active faculty (the rules let them read the counts summaries)
 export const facultyRole = () => !!(S.admin || S.pd || S.faculty);
 export const profile = () => {
   const m = settings().mode;
-  if (m === 'advanced' || m === 'logbook' || m === 'basic') return m;
+  if (m === 'advanced' || m === 'logbook' || m === 'basic' || m === 'personal') return m;
   if (m === 'faculty') return facultyRole() ? 'faculty' : 'basic';
   return facultyRole() && !cloud.demo ? 'faculty' : 'basic';
 };
 export const facultyMode = () => profile() === 'faculty';
 export const basicMode = () => profile() === 'basic' || profile() === 'logbook';
 export const logbookOnly = () => profile() === 'logbook';
-// What a Basic profile hides is interface only (never a setting), and each can be turned back on (Profiles or hide
-// items; settings.basicOn lists them), so all on is Advanced again. Case tab parts are 'case:<part>'. 'reflect'
-// (Reflect buttons, ☆ Interesting, the reflection headings card) only in Basic: logbook only. The tabs (Analytics,
-// Reflections) are tab bar switches instead.
-export const BASIC_ITEMS = [
-  ['grid', 'The Logbook grid view'],
-  ['analytics', 'Analytics trends, forecasts, Gone quiet, reflection to-dos and links to cases'],
-  ['reflExtras', 'Figures and references in reflections'],
-  ['reflect', 'Reflect buttons, ☆ Interesting and reflection headings in Analytics', 'logbook'],
-];
-export const basicHides = item => {
-  const p = profile();
-  if ((p !== 'basic' && p !== 'logbook') || (item === 'reflect' && p !== 'logbook') || item === 'case:parsed') return false;
-  return !(settings().basicOn || []).includes(item);
-};
-// the Case tab parts (Logging and Profiles or hide items; settings.caseHide, and the profile's)
-export const caseShown = part => !(settings().caseHide || []).includes(part) && !basicHides('case:' + part);
-export function setCaseShown(part, show, parts) {
-  const hide = new Set(settings().caseHide || []), on = new Set(settings().basicOn || []);
-  if (show) { hide.delete(part); if (basicHides('case:' + part)) on.add('case:' + part); } else hide.add(part);
-  return patchLogbook({ settings: { caseHide: hide.size ? parts.filter(p => hide.has(p)) : null, basicOn: on.size ? [...on] : null } });
-}
-export function setBasicOn(item, on) {
-  const now = new Set(settings().basicOn || []);
-  if (on) now.add(item); else now.delete(item);
-  return patchLogbook({ settings: { basicOn: now.size ? [...now] : null } });
-}
+// Each switch (profiles.js SWITCHES; Case tab parts are 'case:<part>'): its saved value, else the profile's default.
+// They hide interface only, never a setting.
+export const shows = key => shownIn(settings(), profile(), key);
+export const basicHides = key => !shows(key);
+export const setShown = (key, on, parts = []) => patchLogbook({ settings: switchPatch(settings(), key, on, parts) });
+// the Case tab parts (Advanced logging and Profile; their own switches, and the profile's defaults)
+export const caseShown = part => shows('case:' + part);
+export const setCaseShown = (part, show, parts) => setShown('case:' + part, show, parts);
 // The intake on the list, or the year the rid starts with.
 export function baseIntake(r) {
   if (!r) return null;
@@ -351,7 +336,8 @@ export const catName = code => (myNames()[code] && myNames()[code].l) || (NAMES[
 export const catShort = code => (myNames()[code] && myNames()[code].n) || (NAMES[code] && NAMES[code].short) || (DEFAULT_NAMES[code] && DEFAULT_NAMES[code][1]) || catName(code);
 // Readable procedure name for tags and tooltips: no code, no targets.
 export const catFull = code => cat(code).full || cat(code).name;
-export const PROGRESS_BY_CODE = () => Object.fromEntries(progress(S.counts, rYear()).map(p => [p.code, p]));
+// (empty with the targets switched off: counts then show without them)
+export const PROGRESS_BY_CODE = () => (!shows('targets') ? {} : Object.fromEntries(progress(S.counts, rYear()).map(p => [p.code, p])));
 
 // "count / next target" for a category, e.g. "7 / 10 by R3" or "12 ✓".
 export function countText(code, prog) {

@@ -194,7 +194,7 @@ async function pickCase(c) {
   }
   if (other || p.preset) return reflectOnCase(c, p.preset);
   // general "+ New reflection": offer heading suggestions before opening the editor
-  if (!suggestHeadings(c, S.reflections || []).length) return reflectOnCase(c);
+  if (basicHides('reflHeadings') || !suggestHeadings(c, S.reflections || []).length) return reflectOnCase(c);
   p.chosen = c; hooks.render();
 }
 
@@ -341,6 +341,9 @@ function list() {
   const ex = exportSummary(all);
   const exBy = Object.fromEntries(ex.headings.map(x => [x.id, x]));
   const em = rv.editMode;
+  // without the APMES headings (Profile → APMES; the Personal profile) the list starts grouped by month
+  const headingsOn = !basicHides('reflHeadings');
+  const grp = !headingsOn && rv.group === 'heading' ? 'month' : rv.group;
   for (const id of [...rv.sel]) if (!all.some(r => r.id === id)) rv.sel.delete(id);
 
   // search and filter: headings with no match are hidden, the rest open
@@ -359,7 +362,7 @@ function list() {
     || (ops ? matchQuery(ops, k => fieldOf(r, k), null) : words.every(w => hayOf(r).includes(w))));
   const narrowed = !!words.length || rv.filter !== 'all';
   // the filter / group / sort panel folds behind one button; it says how many differ from the defaults
-  const changedN = (rv.filter !== 'all') + (rv.group !== 'heading') + (rv.sort !== 'newest');
+  const changedN = (rv.filter !== 'all') + (grp !== (headingsOn ? 'heading' : 'month')) + (rv.sort !== 'newest');
   const viewOpen = rv.viewOpen ?? false;
   // sort within each group
   const SORTS = {
@@ -374,7 +377,7 @@ function list() {
     h('select', { 'aria-label': label, onchange: e => { rv[key] = e.target.value; saveView(); hooks.render(); } },
       opts.map(([v, t]) => h('option', { value: v, selected: rv[key] === v }, t))));
   const viewBar = h('div', { class: 'bar refl-viewbar', style: 'flex-wrap:wrap;gap:6px 12px;margin:6px 0 0' },
-    viewSel('Group by', 'group', [['heading', 'Heading'], ['month', 'Month'], ['year', 'Residency year'], ['status', 'Status'], ['none', 'None']]),
+    viewSel('Group by', 'group', [...(headingsOn ? [['heading', 'Heading']] : []), ['month', 'Month'], ['year', 'Residency year'], ['status', 'Status'], ['none', 'None']]),
     viewSel('Sort', 'sort', [['newest', 'Newest first'], ['oldest', 'Oldest first'], ['longest', 'Longest'], ['shortest', 'Shortest'], ['az', 'A–Z']]));
 
   const search = h('input', { type: 'search', value: rv.q, placeholder: 'Search reflections', 'aria-label': 'Search reflections', style: 'font-size:calc(16px * var(--fs, 1));flex:1;min-width:0',
@@ -424,7 +427,7 @@ function list() {
     const pts = (r.points || []).map(pt => (pt && pt.heading || '').trim()).filter(Boolean);
     const open = () => { if (em) { if (cb) { cb.checked = !cb.checked; cb.dispatchEvent(new Event('change')); } } else openEditor(r); };
     const li = h('li', { tabindex: '0', class: em ? 'refl-row edit' : 'refl-row', onclick: open, onkeydown: e => { if (e.key === 'Enter') open(); } },
-      h('span', { class: 'd' }, em ? h('span', { class: 'refl-tools' }, rv.group === 'heading' ? h('span', { class: 'refl-handle', title: 'Drag to another heading', 'aria-label': 'Drag to another heading', onpointerdown: e => startDrag(e, r, li), onclick: e => e.stopPropagation() }, '⠿') : null, cb) : null,
+      h('span', { class: 'd' }, em ? h('span', { class: 'refl-tools' }, grp === 'heading' ? h('span', { class: 'refl-handle', title: 'Drag to another heading', 'aria-label': 'Drag to another heading', onpointerdown: e => startDrag(e, r, li), onclick: e => e.stopPropagation() }, '⠿') : null, cb) : null,
         // the patient's initials sit on top in the left column, the date (and JR) under them
         h('b', { class: 'refl-ini' }, r.initials || '??', r.jr ? h('small', { class: 'refl-jr' }, 'JR') : null), h('span', { class: 'refl-date' }, r.date ? shortDate(r.date) : '—')),
       h('span', { class: 't' }, h('span', { class: draft ? 'refl-proc draft' : 'refl-proc' }, r.diagnosis || h('i', { class: 'muted' }, 'no diagnosis yet')), draft ? h('span', { class: 'flag err' }, 'draft') : null,
@@ -441,7 +444,7 @@ function list() {
 
   // at the bottom, small and without a card: the rules (export and Word upload are under More →
   // Export / Import; the bin and photo sizes under Settings)
-  const notesSwitch = em || rv.group !== 'heading' ? null : h('label', { class: 'check refl-notes-switch' },
+  const notesSwitch = em || grp !== 'heading' ? null : h('label', { class: 'check refl-notes-switch' },
     h('input', { type: 'checkbox', role: 'switch', checked: notesOn(), onchange: e => { patchLogbook({ settings: { reflNotes: e.target.checked } }); hooks.render(); } }), 'Show notes under each heading');
   const foot = em ? null : h('details', { class: 'refl-rules refl-foot' }, h('summary', {}, 'Rules for reflections'),
     h('ul', { class: 'hint' },
@@ -451,7 +454,7 @@ function list() {
       h('li', {}, 'Generative AI use must follow the NUS guidelines on the use of AI tools in academic work.')));
   const body = h('section', { class: 'card' });
   let shown = 0;
-  if (rv.group !== 'heading') {
+  if (grp !== 'heading') {
     // other groupings: plain sections of rows (no + Add, counts or dragging between headings)
     const hits = sorted(narrowed ? all.filter(match) : all);
     const intake = effectiveIntake(), smo = residentSmo(S.resident);
@@ -461,17 +464,17 @@ function list() {
       year: r => { const y = r.date && intake ? caseRYear(r.date, intake, smo) : null; return y ? String(y) : ''; },
       status: r => r.status !== 'complete' ? '1' : !HEADING_BY_ID[r.headingId] ? '3' : '2',
       none: () => 'all',
-    }[rv.group] || (() => 'all');
+    }[grp] || (() => 'all');
     const nameOf = {
       month: k => k ? `${MONTHS[Number(k.slice(5)) - 1]} ${k.slice(0, 4)}` : 'No date',
       year: k => k ? yearName(Number(k)) : 'Year unknown',
       status: k => ({ 1: 'Drafts', 2: 'Complete', 3: 'Uncategorised (complete)' })[k],
       none: () => 'All reflections',
-    }[rv.group] || (() => 'All reflections');
+    }[grp] || (() => 'All reflections');
     const groups = new Map();
     for (const r of hits) { const k = keyOf(r); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(r); }
     // months and years: newest first (oldest first with that sort); the unknown group last
-    const order = [...groups.keys()].sort((a, b) => (a === '') - (b === '') || (rv.group === 'status' ? a.localeCompare(b)
+    const order = [...groups.keys()].sort((a, b) => (a === '') - (b === '') || (grp === 'status' ? a.localeCompare(b)
       : rv.sort === 'oldest' ? a.localeCompare(b) : b.localeCompare(a)));
     for (const k of order) {
       const rs = groups.get(k);
