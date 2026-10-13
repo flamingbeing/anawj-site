@@ -45,6 +45,7 @@ its own file), so sessions never edit the same lines. Read them all before start
 
 ## Recently done
 
+- #204 The top band's third quarter is the NUHS site's blue `#178fd7`, not cyan; Reflections' NUH tab colour too (`logbook-v26`).
 - #295 Polish 6b: seven clean looks (off by default), calendar day Share / Copy (off) / + Add, back links off the bar, device colour picker.
 - #289 Polish 6a: settings pages use switches, ✓ lists and one-line help (ⓘ for more); Advanced pages under headings.
 - #274 Polish 5: the note editor reads like a page (‹ Notes, ⋯ menu with Preview and Delete, Done; no boxes; one info line).
@@ -52,7 +53,6 @@ its own file), so sessions never edit the same lines. Read them all before start
 - #268 Polish 3: initials over the date on case rows, one-line tags, thin month headers, calmer Analytics cards.
 - #264 Reflections list: "JR 0/1" beside each heading's count (the JR rule left the note); word counts can be hidden.
 - #254 Polish 2: "‹ Settings" in the header, pages slide in, iPhone edge swipe back, Settings → Accessibility, month picker.
-- #250 Polish 1: tap feedback, smooth folds, line icons instead of emoji, tidier Case screen, empty screens, row Copy off by default.
 
 ## Decisions log
 

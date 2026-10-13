@@ -19,9 +19,11 @@ Last updated: 2026-10-12 by Claude Code, Logbook 1 (log1).
 
 ## Recently done
 
+- #204 The app bar's top band: third quarter is the NUHS site's blue `#178fd7`, not cyan (`evals-v18`).
 - #183 The APMES reference files moved from `evals/reference/` to `/apmes/` at the repo root; `tools/build-data.mjs`
   and the DOPS checklist read them from there (`evals-v17`). Generated data unchanged.
 
 ## Decisions log
 
+- 2026-10-12: The top band is four equal quarters, orange, red, blue `#178fd7`, navy (as on nuhs.edu.sg), in every app.
 - 2026-10-12: APMES programme documents live in `/apmes/` (shared by evals and logbook), not under `evals/`.

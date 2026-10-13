@@ -153,7 +153,8 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
 - **Touch screens:** no dragging, no C / & / × icons. Tapping opens the box.
 - **Design:** "Kent Ridge Clinical" (NUHS website style):
   - navy and white, Open Sans
-  - the four-colour band (orange, red, cyan, navy) along the top of the header, as on the logbook
+  - the four-colour band along the top of the header, as on the logbook: equal quarters of orange `#e57200`, red
+    `#e4002b`, blue `#178fd7` (not cyan) and navy `#002f6c`
   - square panels, with only controls rounded
 - **Demo mode** (`?demo`): an invented department about the real size (39 seniors, 50 juniors); on the start day 5 are on leave and 2 seniors on an admin day (every weekday gets 2 senior admins); every monthly roster filled for the chosen month and the months either side (more are made as the date moves on), and made-up case notes for each new day (fewer at weekends). It uses separate storage and never signs in. Bump `DEMO_VERSION` in `js/app.js` when the demo data changes, so open demos start again.
 
