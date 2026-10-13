@@ -51,6 +51,17 @@ assert.deepEqual(resolve('x.workers.dev', '/_sites/nothing.anawj.com/x'), { file
 // the real hosts don't take the /_sites/ route
 assert.deepEqual(resolve('hand.anawj.com', '/_sites/nuhroster.anawj.com/'), { notFound: true });
 
+// the shared design folders: served on every subdomain as they are, and nothing else is shared
+for (const h of Object.keys(SITES)) {
+  assert.deepEqual(resolve(h, '/design/tokens.css'), { file: 'design/tokens.css' }, h);
+  assert.deepEqual(resolve(h, '/nuhsdesign/tokens.css'), { file: 'nuhsdesign/tokens.css' }, h);
+  assert.deepEqual(resolve(h, '/design'), { redirect: '/design/' }, h);
+  assert.deepEqual(resolve(h, '/design/../logbook/index.html'), { notFound: true }, h);
+  assert.deepEqual(resolve(h, '/designs/x'), SITES[h].root ? { file: SITES[h].root + 'designs/x' } : { notFound: true }, h);
+}
+assert.deepEqual(resolve('x.workers.dev', '/_sites/prewarmstudy.anawj.com/design/tokens.css'), { file: 'design/tokens.css' });
+assert.deepEqual(resolve('x.workers.dev', '/design/tokens.css'), { file: 'design/tokens.css' });
+
 // the table lists only folders that exist in the repo
 import fs from 'node:fs';
 import path from 'node:path';

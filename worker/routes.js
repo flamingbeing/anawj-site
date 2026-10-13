@@ -14,6 +14,11 @@ export const SITES = {
   'apmes.anawj.com': { prefixes: { '/logbook/': 'logbook/', '/evals/': 'evals/' } },
 };
 
+// Folders every host serves as they are: the shared design files (styles only, no data), so a subdomain's apps can
+// link ../design/tokens.css. `design/` is the current folder; `nuhsdesign/` is its new name (the design session moves it).
+// Keep both until nothing links /design/ any more. These are the only folders shared between subdomains.
+export const SHARED = ['/design/', '/nuhsdesign/'];
+
 // On any host not in SITES, /_sites/<host>/<path> serves <path> as that host would, so the mapping can be tried on a
 // PR preview before the real addresses exist: <preview>/_sites/hand.anawj.com/babies/
 const TRY = '/_sites/';
@@ -41,6 +46,10 @@ function route(host, pathname) {
     }
   }
   if (!site) return { file: p.replace(/^\//, '') };   // every other host: the repo as it is
+  for (const dir of SHARED) {
+    if (p === dir.slice(0, -1)) return { redirect: dir };
+    if (p.startsWith(dir)) return { file: p.slice(1) };
+  }
   if (site.root) {
     const own = '/' + site.root;
     if (p === own.slice(0, -1)) return { redirect: own };

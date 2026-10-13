@@ -69,6 +69,10 @@ and builds a preview for every PR.
   kept). Every response carries `X-Robots-Tag: noindex, nofollow`.
 - One-app hosts (`prewarmstudy.`, `nuhroster.`) serve the app at the root, and its own folder name works too
   (`prewarmstudy.anawj.com/prewarm/…`) so an app can move before its absolute links are tidied.
+- **One shared folder:** every host also serves `/design/` (the NUHS-style design files, styles only, no data), so an
+  app on a subdomain can link `../design/tokens.css`. The design session is renaming that folder to `/nuhsdesign/`;
+  both are served until nothing links `/design/` any more (change `SHARED` in `worker/routes.js` then). These are the
+  only folders subdomains share; everything else stays per app.
 - Any other address (the previews on `workers.dev`, the copy of main) serves the whole repo as before.
 - **Trying a subdomain before it exists:** on a PR preview, `<preview>/_sites/hand.anawj.com/babies/` serves what
   `hand.anawj.com/babies/` will. (Real hosts don't take that route.)
