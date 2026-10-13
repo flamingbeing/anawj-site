@@ -11,7 +11,7 @@
 
 import { S, h, toast, modal, confirmBox, cloud, writes, fill, removeCase, deleteMany, restoreCase, miniChips, resetters } from './ui-core.js';
 import { cleanNote, noteTitle, MAX_NOTES, isDayNote, cappedNotes } from './notepad.js';
-import { cleanCase } from './demo-backend.js';
+import { cleanCase } from './clean.js';
 import { cleanReflection } from './reflections.js';
 import { REFLECTION_HEADINGS } from './categories.js';
 import { uid, fmtDate, caseText } from './engine.js';
