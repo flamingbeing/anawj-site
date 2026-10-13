@@ -121,13 +121,14 @@ try {
   // ---- "Something's wrong": the last taps and screens and any errors go with the report, never the screen's text
   const bug = await ctx.newPage();
   await bug.goto(PREVIEW + '/hand-babies/');
+  await bug.evaluate(() => caches.open('hand-babies-v9-abcdef12'));   // as the app's service worker names its copy
   await fb(bug).locator('#fab').waitFor();
   await bug.locator('nav a, [role=tab], button').filter({ visible: true }).nth(1).click();
   await bug.evaluate(() => { setTimeout(() => { throw new Error('boom in test'); }); });
   await bug.waitForTimeout(100);
   await fb(bug).locator('#fab').click();
   await fb(bug).locator('#mBug').click();
-  assert.match(await fb(bug).locator('#onText').textContent(), /^Problem report/);
+  await fb(bug).locator('#onText', { hasText: /^Problem report/ }).waitFor();
   await fb(bug).locator('#noteText').fill('I tapped a tab and the page jumped');
   await fb(bug).locator('#noteSave').click();
   await fb(bug).locator('#fab').click();
@@ -137,6 +138,7 @@ try {
   assert.match(bugRep, /### \d+\. Something's wrong \(screen /);
   assert.match(bugRep, /What happened:\n> I tapped a tab and the page jumped/);
   assert.match(bugRep, /Device: 390×844, online, /);
+  assert.match(bugRep, /App version \(offline copy\): hand-babies-/, 'the app version is in the report');
   assert.match(bugRep, /\ds tap [a-z ]+ /, 'the tap is in the steps');
   assert.match(bugRep, /Errors:\n- .*boom in test/);
   if (SHOTS) await bug.screenshot({ path: path.join(SHOTS, 'feedback-bug.png') });
@@ -250,6 +252,7 @@ try {
   await live.evaluate(() => { location.hash = '#patient/rec123'; console.error({ initials: 'QZX' }, new Error('write failed')); });
   await fb(live).locator('#fab').click();
   await fb(live).locator('#mBug').click();
+  await fb(live).locator('#onText', { hasText: /^Problem report/ }).waitFor();
   await fb(live).locator('#noteText').fill('Save did nothing');
   await fb(live).locator('#noteSave').click();
   await fb(live).locator('#fab').click();
