@@ -115,6 +115,7 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
 
 ## The app's decisions
 
+- **Address:** `https://nuhroster.anawj.com/` (its own subdomain since 13 Oct 2026, so its saved data and sign-in are kept apart from the other apps; see `SUBDOMAINS.md`). The repo folder is still `nuh-roster/`. The old `anawj.com/nuh-roster/` redirects (path, query and `#` kept) from a script at the top of `index.html`; a browser with a roster saved at the old address first gets a bar with "Download everything" (a `kind: 'ot-roster-all'` file that Import JSON at the new address loads), because saved data belongs to its address. Sign-in needs `nuhroster.anawj.com` in the `nuh-roster` project's authorised domains.
 - **Static page, no build step:** vanilla ES modules. The vendored libraries load only when needed:
   - ExcelJS 4.4.0
   - pdf.js 3.11.174 (reading HMS PDFs)

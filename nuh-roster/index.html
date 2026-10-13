@@ -4,6 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
+<script>
+// The roster now lives at nuhroster.anawj.com. The same folder is still served at anawj.com/nuh-roster/, so send
+// visitors on from there (path, query and # kept). Only when it is the top page, and a no-op on nuhroster.anawj.com,
+// previews and localhost (no loop). A browser with a roster saved at the old address stays for a moment: what is
+// saved in a browser belongs to its address, so the page offers to download it first (window.ROSTER_MOVED_TO).
+if (top === self && /^(www\.)?anawj\.com$/.test(location.hostname)) (function () {
+  var to = 'https://nuhroster.anawj.com/' + location.pathname.replace(/^\/nuh-roster\/?/, '') + location.search + location.hash;
+  var saved = false;
+  try { saved = !!localStorage.getItem('ot-roster-v1') && !localStorage.getItem('nuh-roster-moved'); } catch (e) { /* no storage */ }
+  if (saved && !/[?&]demo\b/.test(location.search)) window.ROSTER_MOVED_TO = to;
+  else location.replace(to);
+})();
+</script>
 <title>NUH Roster</title>
 <meta name="description" content="Draft the daily anaesthesia OT roster and export it as an Excel file. Runs entirely in your browser.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
