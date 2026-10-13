@@ -6,6 +6,12 @@ const b = await chromium.launch();
 const fails = [];
 const tryit = async f => { try { await f(); } catch (e) { fails.push('error: ' + e.message.split('\n')[0] + ' @ ' + (e.stack.match(/edge.e2e.mjs:(\d+)/)?.[1] || '?')); } };
 const log = (ok, msg) => { if (!ok) fails.push(msg); };
+// each block below starts from its own fresh browser context, so they run a few at a time (JOBS, default 4)
+const jobs = [];
+async function runJobs(n = +(process.env.JOBS || 4)) {
+  let next = 0;
+  await Promise.all(Array.from({ length: n }, async () => { while (next < jobs.length) await jobs[next++](); }));
+}
 async function fresh(time) {
   const ctx = await b.newContext({ viewport: { width: 390, height: 844 } });
   const pg = await ctx.newPage();
@@ -18,7 +24,7 @@ async function fresh(time) {
 const open = async (pg, i) => { await pg.locator('a[href*="#/p/"]', { hasText: i ? 'DEMO-02' : 'DEMO-01' }).first().click(); await pg.waitForSelector('#clock'); };
 
 // A. midnight: intra-op patient, clock crosses midnight
-await tryit(async () => {
+jobs.push(() => tryit(async () => {
   const { ctx, pg } = await fresh('2026-10-13T23:40:00');
   await open(pg, 1);
   const before = await pg.textContent('#clock');
@@ -30,9 +36,9 @@ await tryit(async () => {
   const missed = await pg.$$eval('.strip a.missed', a => a.length);
   log(missed < 12, 'midnight: strip missed count ' + missed);
   await ctx.close();
-});
+}));
 // B. surgery end: later intra-op points stop nagging
-await tryit(async () => {
+jobs.push(() => tryit(async () => {
   const { ctx, pg } = await fresh();
   await open(pg, 1);
   await pg.click('[data-ev="io_done"]'); await pg.waitForTimeout(300);
@@ -40,9 +46,9 @@ await tryit(async () => {
   log(!!end.match(/\d\d:\d\d/), 'surgery end set');
   log(!/late \d+:\d\d:\d\d/.test(await pg.textContent('#clock')), 'top bar sane after surgery end');
   await ctx.close();
-});
+}));
 // C. double tap Save: must not save the next timepoint
-await tryit(async () => {
+jobs.push(() => tryit(async () => {
   const { ctx, pg } = await fresh();
   await open(pg, 0);
   const tp = (await pg.textContent('.tp b')).trim();
@@ -51,9 +57,9 @@ await tryit(async () => {
   const saved = await pg.$$eval('.strip a.done', a => a.map(x => x.textContent.trim()));
   log(next !== tp && !saved.includes(next.replace(' min', '')), `double-tap Save on ${tp} must not save ${next} too (saved: ${saved.join(',')})`);
   await ctx.close();
-});
+}));
 // D. BP: letters refused, unusual asked
-await tryit(async () => {
+jobs.push(() => tryit(async () => {
   const { ctx, pg } = await fresh();
   await open(pg, 0);
   await pg.click('#haemolink'); await pg.waitForSelector('input[data-in="sbp"]');
@@ -69,9 +75,9 @@ await tryit(async () => {
   pg.off('dialog', ok);
   log(/saved/.test(await pg.textContent('#toast')), 'BP 320 saved after OK');
   await ctx.close();
-});
+}));
 // E. back button with unsaved change, app opened at home: back never leaves the app while there's something to save
-await tryit(async () => {
+jobs.push(() => tryit(async () => {
   const { ctx, pg } = await fresh();
   await open(pg, 0);
   const url = pg.url();
@@ -100,18 +106,18 @@ await tryit(async () => {
   await pg.goBack(); await pg.waitForTimeout(400);
   log(pg.url().includes('/p/') && !pg.url().includes('haemo') && !await pg.$('dialog.ask[open]'), 'back from BP: temps, no prompt');
   await ctx.close();
-});
+}));
 // F. Log Prewarm off on an unsaved timepoint: no prompt for the automatic NA
-await tryit(async () => {
+jobs.push(() => tryit(async () => {
   const { ctx, pg } = await fresh();
   await open(pg, 0);
   await pg.click('#lognext'); await pg.waitForTimeout(300);
   await pg.click('.pn.next'); await pg.waitForTimeout(300);
   log(!await pg.$('dialog.ask[open]'), 'Log then next: no prompt when nothing typed');
   await ctx.close();
-});
+}));
 // G. Perioperative data: Enter on the last question, Shift+Enter back
-await tryit(async () => {
+jobs.push(() => tryit(async () => {
   const { ctx, pg } = await fresh();
   await open(pg, 0);
   await pg.click('#haemolink'); await pg.click('a.widebox'); await pg.waitForSelector('details.sect');
@@ -119,10 +125,10 @@ await tryit(async () => {
   await last.focus(); await pg.keyboard.press('Enter');
   log(!await pg.$('dialog.ask[open]'), 'Enter on the last question: no error, no prompt');
   await ctx.close();
-});
+}));
 // H. intra-op: after Surgery end the End readings fall due; once missed they and the unanswered details are listed,
 // and Mark data collection as complete lists them first
-await tryit(async () => {
+jobs.push(() => tryit(async () => {
   const { ctx, pg } = await fresh('2026-10-13T10:00:00');
   await pg.evaluate(() => { const k = 'prewarm-demo:settings'; const s = JSON.parse(localStorage.getItem(k) || '{}'); s.me = 'AB'; localStorage.setItem(k, JSON.stringify(s)); });
   await pg.reload(); await pg.waitForTimeout(600);
@@ -143,9 +149,9 @@ await tryit(async () => {
   log(/\d+ to answer/.test(await pg.textContent('.links a[href$="/form/intraop"]')), 'Intra-op details (BP, HR, BIS tab) shows how many are left');
   log(!!await pg.$('#gaps'), 'still to fill on the BP, HR, BIS tab too');
   await ctx.close();
-});
+}));
 // I. swipe left / right changes tab; no pull-to-refresh; the BP, HR, BIS tick sits above Intra-op details
-await tryit(async () => {
+jobs.push(() => tryit(async () => {
   const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
   const pg = await ctx.newPage();
   pg.on('pageerror', e => fails.push('page error: ' + e.message));
@@ -168,9 +174,9 @@ await tryit(async () => {
   log(/#\/p\/\w+$/.test(pg.url()), 'swipe right back to Temperatures: ' + pg.url());
   log(await pg.evaluate(() => getComputedStyle(document.body).overscrollBehaviorY) === 'none', 'pull-to-refresh off');
   await ctx.close();
-});
+}));
 // J. a stray tap on a key time with earlier ones empty asks first; times out of order are listed
-await tryit(async () => {
+jobs.push(() => tryit(async () => {
   const { ctx, pg } = await fresh();
   await open(pg, 0);
   let msg = ''; pg.once('dialog', d => { msg = d.message(); d.dismiss(); });
@@ -182,10 +188,10 @@ await tryit(async () => {
   await pg.waitForTimeout(700); await pg.click('[data-ev="io_knife"]'); await pg.fill('#evtime', early); await pg.keyboard.press('Tab'); await pg.waitForTimeout(1500);
   log(/Times out of order: Induction \d\d:\d\d is before In OT/.test(await pg.textContent('#gaps')), 'Induction an hour before In OT is listed');
   await ctx.close();
-});
+}));
 // K. Perioperative data: Subject ID and group can be corrected (never blank, never a duplicate; group asks first);
 // BMI is worked out from weight and height; a follow-up of a follow-up hides when the first answer goes to No
-await tryit(async () => {
+jobs.push(() => tryit(async () => {
   const { ctx, pg } = await fresh();
   await open(pg, 0);
   await pg.click('#haemolink'); await pg.click('a.widebox'); await pg.waitForSelector('#f-enrol_id');
@@ -205,9 +211,9 @@ await tryit(async () => {
   await pg.click('.chip[data-f="ihd"][data-v="0"]'); await pg.waitForTimeout(200);
   log(!await pg.$('#f-ihd_mi_years') && !await pg.$('.chip[data-f="ihd_mi"]'), 'IHD No hides both follow-ups');
   await ctx.close();
-});
+}));
 // L. an all-blank reading isn't saved; a part-blank one asks, then shows in Still to fill; columns hidden in Settings show too
-await tryit(async () => {
+jobs.push(() => tryit(async () => {
   const { ctx, pg } = await fresh();
   await open(pg, 0);
   await pg.click('#haemolink'); await pg.waitForSelector('input[data-in="sbp"]');
@@ -223,9 +229,9 @@ await tryit(async () => {
   await pg.reload(); await pg.waitForSelector('#gaps');
   log(/Hidden in Settings \(not being recorded\): thermal sensation/.test(await pg.textContent('#gaps')), 'hidden column listed');
   await ctx.close();
-});
+}));
 // M. typed form answers: letters refused where a number is asked; an odd temperature asked about
-await tryit(async () => {
+jobs.push(() => tryit(async () => {
   const { ctx, pg } = await fresh();
   await open(pg, 0);
   await pg.click('#haemolink'); await pg.click('a[href$="/form/intraop"]'); await pg.waitForSelector('#f-io_ebl');
@@ -240,9 +246,9 @@ await tryit(async () => {
   await pg.goBack(); await pg.click('a[href$="/form/pacu"]'); await pg.waitForSelector('#f-pacu_temp');
   log(await pg.inputValue('#f-pacu_temp') === '36.6', 'PACU temp 366 read as 36.6');
   await ctx.close();
-});
+}));
 // N. alerts fire on every patient screen for every series: a BP reading falling due while on Intra-op details
-await tryit(async () => {
+jobs.push(() => tryit(async () => {
   const { ctx, pg } = await fresh('2026-10-13T10:00:00');
   await open(pg, 1);
   await pg.click('#haemolink'); await pg.click('a[href$="/form/intraop"]'); await pg.waitForSelector('#f-io_ebl');
@@ -255,10 +261,10 @@ await tryit(async () => {
   log(seen.some(t => /BP, HR, BIS .* reading due now/.test(t)), 'BP due alert on the Intra-op details screen: ' + JSON.stringify(seen));
   log(seen.some(t => /Temperature .* reading due now/.test(t)), 'temperature due alert there too');
   await ctx.close();
-});
+}));
 // O. same Subject ID twice is flagged on the list; storage full stays on screen; locking a patient still being
 // charted says so
-await tryit(async () => {
+jobs.push(() => tryit(async () => {
   const { ctx, pg } = await fresh();
   await pg.evaluate(() => {
     const k = 'prewarm-demo:patients', all = JSON.parse(localStorage.getItem(k));
@@ -276,9 +282,9 @@ await tryit(async () => {
   await pg.click('.chip[data-sat="sat_pre"][data-v="1"]'); await pg.waitForTimeout(300);
   log(/couldn’t store the last change/.test(await pg.textContent('#storefull').catch(() => '')), 'storage full stays on screen');
   await ctx.close();
-});
+}));
 // P. a reading saved late asks when it was taken (that time is what the forms show); Change time fixes it later
-await tryit(async () => {
+jobs.push(() => tryit(async () => {
   const { ctx, pg } = await fresh('2026-10-13T10:00:00');
   await open(pg, 1);
   await pg.click('#haemolink'); await pg.waitForSelector('input[data-in="sbp"]');
@@ -295,9 +301,9 @@ await tryit(async () => {
   await pg.click('[data-attime]'); await pg.waitForTimeout(300);
   log(/Taken 09:59/.test(await pg.textContent('main')), 'Change time (9.59 read as 09:59)');
   await ctx.close();
-});
+}));
 // Q. a deleted patient can be restored (Settings › Delete participants), and can't be charted into while deleted
-await tryit(async () => {
+jobs.push(() => tryit(async () => {
   const { ctx, pg } = await fresh();
   await open(pg, 0);
   const pid = pg.url().match(/#\/p\/(\w+)/)[1];
@@ -311,9 +317,9 @@ await tryit(async () => {
   await pg.goto('http://localhost:8080/prewarm/?demo#/'); await pg.waitForSelector('.list');
   log(/DEMO-01/.test(await pg.textContent('.list')), 'restored patient back on the list');
   await ctx.close();
-});
+}));
 // R. Prewarm off due alerts like a reading (10-min group: 10 min after Prewarm on)
-await tryit(async () => {
+jobs.push(() => tryit(async () => {
   const { ctx, pg } = await fresh('2026-10-13T10:00:00');
   await pg.evaluate(() => { localStorage.setItem('prewarm-demo:settings', JSON.stringify({ me: 'TT' })); });
   await pg.goto('http://localhost:8080/prewarm/?demo#/new'); await pg.reload(); await pg.waitForSelector('#sid');
@@ -327,9 +333,9 @@ await tryit(async () => {
   }
   log(seen.some(t => /Prewarm off due now \(10 min of warming\)/.test(t)), 'Prewarm off alert: ' + JSON.stringify(seen));
   await ctx.close();
-});
+}));
 // S. a reading due after Underbody warm / Gown warm was logged defaults to Yes for it; saved No after it is listed
-await tryit(async () => {
+jobs.push(() => tryit(async () => {
   const { ctx, pg } = await fresh();
   await open(pg, 1);
   const st = await pg.textContent('[data-ev="io_gown_start"] b');
@@ -346,9 +352,9 @@ await tryit(async () => {
     log(/Gown warming says No after its start time: .*55 min/.test(await pg.textContent('#gaps')), 'saved No after the start listed');
   } else log(false, `test setup: 55 min due ${due} is before gown start ${t}`);
   await ctx.close();
-});
+}));
 // T. real touch double taps (100 ms apart) on Save and Log; typing a temperature then swiping / pressing back
-await tryit(async () => {
+jobs.push(() => tryit(async () => {
   const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
   const pg = await ctx.newPage();
   pg.on('pageerror', e => fails.push('page error: ' + e.message));
@@ -387,9 +393,9 @@ await tryit(async () => {
   await pg.goBack(); await pg.waitForTimeout(400);
   log(!!await pg.$('dialog.ask[open]'), 'typed temperature then back: asks to save');
   await ctx.close();
-});
+}));
 // U. a temperature due now also shows in the Others tab's top bar (BP isn't due before In OT)
-await tryit(async () => {
+jobs.push(() => tryit(async () => {
   const { ctx, pg } = await fresh();
   await open(pg, 0);
   const main = await pg.textContent('#clock .next'), st = await pg.getAttribute('#clock .next', 'data-state');
@@ -397,10 +403,10 @@ await tryit(async () => {
   await pg.click('#haemolink'); await pg.waitForSelector('#haemolink[aria-selected="true"], .haemo, #clock'); await pg.waitForTimeout(400);
   log((await pg.textContent('#clock .next')) === main, 'Others tab top bar shows the temperature due: ' + await pg.textContent('#clock .next'));
   await ctx.close();
-});
+}));
 // V. two patients at once (the next pre-warms while the last is in surgery): the home list shows what each needs now,
 // and the open patient's screen alerts for the other one too (once opened on this phone)
-await tryit(async () => {
+jobs.push(() => tryit(async () => {
   const { ctx, pg } = await fresh();
   await pg.waitForTimeout(1200);
   const lines = await pg.$$eval('.dueline:not([hidden])', els => els.map(e => e.textContent));
@@ -418,9 +424,9 @@ await tryit(async () => {
   bn = await pg.evaluate(() => document.querySelector('.banner')?.textContent || '');
   log(/DEMO-01: Temperature \d+ min reading due now/.test(bn), 'other patient\'s due reading alerts on this screen: ' + bn);
   await ctx.close();
-});
+}));
 // W. the phone closes the app with a reading half typed: it comes back when reopened; Don't save forgets it
-await tryit(async () => {
+jobs.push(() => tryit(async () => {
   const { ctx, pg } = await fresh();
   pg.on('dialog', d => d.accept());
   await open(pg, 1);
@@ -444,10 +450,10 @@ await tryit(async () => {
   await pg.click('#templink'); await pg.waitForSelector('.num[data-type="core"]');
   log((await pg.textContent('.num[data-type="core"]')).trim() !== '37.2', 'Don\'t save forgets it: ' + await pg.textContent('.num[data-type="core"]'));
   await ctx.close();
-});
+}));
 // X. layout: key times on top, the Temperatures / Others tab bar under them on both tabs, Save on screen;
 // the no-pre-warming group keeps a Pre-warming tab that just says so
-await tryit(async () => {
+jobs.push(() => tryit(async () => {
   const { ctx, pg } = await fresh();
   await open(pg, 1);
   const below = () => pg.evaluate(() => !!(document.querySelector('.times')?.compareDocumentPosition(document.querySelector('main .ptabs')) & Node.DOCUMENT_POSITION_FOLLOWING));
@@ -467,10 +473,10 @@ await tryit(async () => {
   await pg.click('.tabs2 a:first-child'); await pg.waitForSelector('.nopw');
   log(/No pre-warming/.test(await pg.textContent('.nopw')) && !await pg.$('#save'), 'Pre-warming tab says no pre-warming, nothing to save');
   await ctx.close();
-});
+}));
 // Y. Reset this subject asks twice (Cancel on the second keeps everything); PACU view opens only the PACU page;
 // swiping on the key times doesn't change tab
-await tryit(async () => {
+jobs.push(() => tryit(async () => {
   const { ctx, pg } = await fresh();
   await open(pg, 1);
   let n = 0; const one = d => { n++; n === 2 ? d.dismiss() : d.accept(); }; pg.on('dialog', one);
@@ -495,9 +501,9 @@ await tryit(async () => {
   await pg.click('#back'); await pg.waitForTimeout(300);
   log(pg.url().endsWith('#/pacu'), 'and back returns to the PACU list');
   await ctx.close();
-});
+}));
 // Z. a section marked complete is read only until its tick is undone (which asks); each temps tick on its own sub-tab
-await tryit(async () => {
+jobs.push(() => tryit(async () => {
   const { ctx, pg } = await fresh();
   await pg.evaluate(() => localStorage.setItem('prewarm-demo:settings', JSON.stringify({ me: 'ZZ' })));
   await pg.reload(); await pg.waitForTimeout(600);
@@ -519,7 +525,8 @@ await tryit(async () => {
   await pg.click('[data-pev="pacu_in"]'); await pg.waitForTimeout(300);
   log(await pg.textContent('[data-pev="pacu_in"] b') === before && await pg.$eval('.sealed input', i => i.disabled), 'PACU complete: times and answers locked');
   await ctx.close();
-});
+}));
+await runJobs();
 await b.close();
 if (fails.length) { console.error('prewarm edge: FAIL\n- ' + fails.join('\n- ')); process.exit(1); }
 console.log('prewarm edge: ok (midnight, surgery end, double-tap Save, BP checks, back button, Log, Enter, still to fill, swipe, stray taps, time order, corrections, BMI, follow-ups, blanks, typed answers, alerts everywhere, duplicates, storage full, lock warning, late readings, delete and restore, prewarm off alert, warming yes / no, touch double taps, typing then leaving, other tab due, two patients, app closed mid-reading, layout, reset, PACU view, sections closed once complete)');

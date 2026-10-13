@@ -2,7 +2,7 @@
 // reading saved when due, Intra-op details, PACU and comfort filled in. Then: no unexpected prompts or errors, Still to
 // fill empty, and the exported template row has every op-day cell filled except the ones that should be blank
 // (timepoints after surgery end, follow-ups of No, not turned prone, no investigations; pre-warming for no
-// pre-warming). Needs the site served on :8080 (python3 -m http.server 8080). About 3 minutes.
+// pre-warming). Needs the site served on :8080 (python3 -m http.server 8080). About 1 minute.
 const { chromium } = await import(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/node_modules/playwright/index.mjs');
 import assert from 'node:assert/strict';
 import { workbookSheets } from '../js/export.js';
@@ -11,7 +11,8 @@ import { SECTIONS } from '../js/headers.js';
 const BASE = `http://localhost:${process.env.PORT || 8080}/prewarm/`;
 const b = await chromium.launch();
 const ALLOWED = new Set(['io_flip', 'io_cs_vol', 'io_cs_ret', 'io_pcc_dose', 'io_txa_bolus', 'io_txa_inf', 'io_txa_total', 'io_fib_dose', 'io_ix', 'pacu_delay1h', 'pacu_delay_why']);
-for (const ARM of ['1', '2', '3']) {
+// the three groups run side by side, each in its own browser context with its own fake clock
+await Promise.all(['1', '2', '3'].map(async ARM => {
   const ctx = await b.newContext({ viewport: { width: 390, height: 844 } });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', e => errs.push(e.message));
@@ -100,6 +101,6 @@ for (const ARM of ['1', '2', '3']) {
   assert.deepEqual(wrong, [], `group ${ARM}: op-day cells left blank`);
   assert.equal(row[FIELDS.findIndex(f => f.id === 'pw_start')], ARM === '3' ? 'NA' : row[FIELDS.findIndex(f => f.id === 'pw_start')]);
   await ctx.close();
-}
+}));
 await b.close();
 console.log('prewarm full case: ok (30 min, 10 min, no pre-warming: in order, nothing left to fill, every op-day cell exported)');

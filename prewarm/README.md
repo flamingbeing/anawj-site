@@ -17,11 +17,12 @@ store with a fake patient.
 Tests (fake data only):
 
 ```
+tools/test-prewarm.sh            # all of the below except rules and sync, browser tests side by side (~1½ min)
 node prewarm/test/prewarm.test.mjs
 node prewarm/test/wordform.test.mjs   # filling the Word form (made-up fixture-form.mjs)
 python3 -m http.server 8080 &   # from the repo root
 node prewarm/test/e2e.mjs        # phone-size browser test with an axe check; SHOTS=<dir> saves screenshots
-node prewarm/test/edge.e2e.mjs   # edge cases: past midnight, surgery end, double-tap Save, BP checks, back button
+node prewarm/test/edge.e2e.mjs   # edge cases (4 at a time; JOBS=1 for one at a time): past midnight, double-tap Save, BP checks, back button
 node prewarm/test/fullcase.e2e.mjs  # a whole case per group with a fake clock: nothing left to fill, every op-day cell exported
 tools/test-rules.sh              # Firestore rules in the local emulator
 tools/test-prewarm-sync.sh       # two phones sharing a patient through the local emulators
