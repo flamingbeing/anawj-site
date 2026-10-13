@@ -43,6 +43,15 @@ r = await get('https://prewarmstudy.anawj.com/sw.js'); assert.equal(r.status, 20
 r = await get('https://prewarmstudy.anawj.com/prewarm/sw.js'); assert.equal(r.status, 200);
 r = await get('https://prewarmstudy.anawj.com/prewarm'); assert.equal(r.status, 301);
 r = await get('https://nuhroster.anawj.com/'); assert.equal(r.status, 200);
+// the shared design file is served on every subdomain (apps link ../design/tokens.css), the design folder's other
+// neighbours are not
+for (const h of ['hand.anawj.com', 'apmes.anawj.com', 'prewarmstudy.anawj.com', 'nuhroster.anawj.com']) {
+  r = await get(`https://${h}/design/tokens.css`); assert.equal(r.status, 200, h);
+  r = await get(`https://${h}/design`); assert.equal(r.status, 301, h);
+  assert.equal(r.headers.get('Location'), `https://${h}/design/`);
+  r = await get(`https://${h}/design/..%2flogbook/index.html`); assert.equal(r.status, 404, h);
+}
+r = await get('https://apmes.anawj.com/nuhsdesign/tokens.css'); assert.equal(r.status, 404);   // until the folder exists
 // only GET and HEAD
 r = await get('https://nuhroster.anawj.com/', 'POST'); assert.equal(r.status, 405);
 r = await get('https://nuhroster.anawj.com/', 'HEAD'); assert.equal(r.status, 200);
