@@ -11,6 +11,8 @@ to edit it in place, comment, add below or delete. Ported from NTF-Anaesthesia/a
   `edit.anawj.com` only redirects.
 - The apps (`/logbook/`, `/evals/`, `/nuh-roster/`, `/prewarm/`) open in their demo (`?demo`, fake data): sign-in
   can't happen inside the editor. Their text is mostly drawn by the app, so comments fit better than edits there.
+- Pages that now live on a subdomain (the apps, the hand pages) show a link to their real address with `?feedback=1`, so
+  they can be commented on where they live (the feedback button, below).
 - `hand-babies/edit.html` forwards here (old links), and its waiting changes move into this editor's list once.
 - **Comments** can be spoken (🎤 Speak, the browser's own speech recognition; only the text is kept, and the keyboard's
   microphone works everywhere) and carry two options: **show me versions** (the report says "Wants options") and
@@ -37,6 +39,9 @@ editor), then Send. No frame: it runs in the page itself, so it works on the sub
   same privacy check as the editor.
 - **Apps with an offline copy** (logbook, evals, prewarm, hand) show their saved page first, which was saved without the
   button: if it doesn't appear after `?feedback=1`, it will once the app updates; on previews it always appears.
+- **Draw on it**: circle things or draw arrows over the screen ("move this up here", "too much space"); each circle becomes
+  "circled <element>" and each arrow "from <element> to <element>", with their locators, plus the screen size and scroll
+  position, so a layout comment points at exact parts of the page. (On live apps, without their text.)
 - **Versions to choose from**: on a preview whose page lists versions (a "show me versions" PR, below), the button shows
   which version is on screen, A/B/C to flip between them, and **Choose version X**.
 - **Something's wrong** (problem report): the sender says what happened, and the report adds the screen (the first part of
