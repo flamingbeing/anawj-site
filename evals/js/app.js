@@ -23,6 +23,7 @@ const ROUTES = {
   requests: { mod: 'ui-requests', fn: 'renderRequests', title: 'Requests', ok: isResident },
   r: { mod: 'ui-result', fn: 'renderResult', title: 'Evaluation', back: true },
   progress: { mod: 'ui-progress', fn: 'renderProgress', title: 'Progress', ok: isResident },
+  summary: { mod: 'ui-progress', fn: 'renderSummary', title: 'My record', back: true, ok: isResident },
   pending: { mod: 'ui-pending', fn: 'renderPending', title: 'Evaluations', ok: () => isFaculty() || S.assigned.length > 0 },
   e: { mod: 'ui-form', fn: 'renderForm', title: 'Evaluation', back: true, bare: true },
   overview: { mod: 'ui-admin', fn: 'renderOverview', title: 'Overview', ok: isStaff },
@@ -62,7 +63,7 @@ function parseHash() {
 // ---------- tabs ----------
 
 function paintTabs() {
-  const sel = S.route === 'new' ? 'home' : S.route === 'r' ? (isResident() ? 'requests' : 'pending') : S.route === 'e' ? 'pending' : S.route;
+  const sel = S.route === 'new' ? 'home' : S.route === 'summary' ? 'progress' : S.route === 'r' ? (isResident() ? 'requests' : 'pending') : S.route === 'e' ? 'pending' : S.route;
   const tabs = visibleTabs();
   fill(tabsEl, tabs.map(t => {
     const n = t.badge ? t.badge() : 0;

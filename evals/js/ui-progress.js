@@ -1,7 +1,7 @@
 // Progress (#progress, resident): each EPA (collapsible) with its guidebook groups, done/min and a
 // state colour for my year (done, on track, due this year, overdue, later). Tap an item → Request this.
 
-import { S, h, icon, go, toolLabel, toMs, modal, hooks } from './ui-core.js';
+import { S, h, icon, go, toolLabel, toMs, modal, hooks, fmtDate, download, toast } from './ui-core.js';
 import { progress, dueItems, todayISO } from './engine.js';
 import { EPAS } from './catalogue.js';
 import { residentCSS, itemTags, myYear } from './ui-request.js';
@@ -98,11 +98,60 @@ export function renderProgress() {
       h('button', { type: 'button', class: 'e-chip-btn', 'aria-pressed': String(view === id), onclick: () => { view = id; hooks.render(); } }, label))),
     h('div', { class: 'e-rq-legend', 'aria-hidden': 'true' }, Object.entries(STATE).map(([, [l, c]]) => h('span', { style: `--c:${c}` }, l))),
     epaBlocks.some(Boolean) ? h('div', { class: 'e-list' }, epaBlocks)
-      : h('p', { class: 'e-small e-center' }, view === 'overdue' ? 'Nothing overdue.' : 'Nothing due this year.'));
+      : h('p', { class: 'e-small e-center' }, view === 'overdue' ? 'Nothing overdue.' : 'Nothing due this year.'),
+    h('a', { class: 'n-btn n-btn--outline e-btn-quiet e-btn-big', href: '#summary' }, 'My record: print or download'));
 }
 
 function bar(done, min, state) {
   const pct = min ? Math.min(100, Math.round(done / min * 100)) : 0;
   return h('div', { class: 'e-progress', role: 'progressbar', 'aria-label': `${done} of ${min} done`, 'aria-valuemin': '0', 'aria-valuemax': String(min), 'aria-valuenow': String(done) },
     h('div', { class: `e-progress__bar e-progress__bar--${state}`, style: `width:${Math.max(pct, done ? 4 : 0)}%` }));
+}
+
+// ---------- My record (#summary): one printable page, and a CSV ----------
+// Progress against each EPA's groups, and every submitted evaluation (for a portfolio or a review).
+
+export function renderSummary() {
+  const yr = myYear();
+  const rows = progress(S.mine, yr, todayISO());
+  const res = S.roles.resident || {};
+  const subs = S.mine.filter(ev => ev.status === 'submitted')
+    .sort((a, b) => String(a.request?.date || a.date || '').localeCompare(String(b.request?.date || b.date || '')) || (toMs(a.submittedAt) || 0) - (toMs(b.submittedAt) || 0));
+  const csv = async () => {
+    const { toCSV } = await import('./ui-admin.js');
+    download(`apmes-my-evaluations-${todayISO()}.csv`, new Blob([toCSV(subs, res.rid ? [res] : [])], { type: 'text/csv;charset=utf-8' }));
+    toast(`Downloaded ${subs.length} evaluations`);
+  };
+  const epaTables = EPAS.map(e => {
+    const groups = rows.filter(p => p.group.epa === e.epa);
+    if (!groups.length) return null;
+    return h('section', { class: 'e-sum-epa' },
+      h('h3', { class: 'e-h3' }, `EPA ${e.epa}: ${e.title}`),
+      h('table', { class: 'e-table e-sum-table' },
+        h('thead', {}, h('tr', {}, h('th', { scope: 'col' }, 'Requirement'), h('th', { scope: 'col' }, 'By'), h('th', { scope: 'col', class: 'e-num' }, 'Done'), h('th', { scope: 'col' }, 'Status'))),
+        h('tbody', {}, groups.sort((a, b) => a.group.byYear - b.group.byYear).map(p => h('tr', {},
+          h('td', {}, p.group.label.includes(toolLabel(p.group.tool)) ? p.group.label : `${toolLabel(p.group.tool)} · ${p.group.label}`),
+          h('td', {}, p.group.completeBy || 'R' + p.group.byYear),
+          h('td', { class: 'e-num' }, `${p.done}/${p.min}`),
+          h('td', {}, STATE[p.state][0]))))));
+  });
+  return h('div', { class: 'e-stack e-summary' },
+    h('div', { class: 'e-actions e-noprint' },
+      h('button', { class: 'n-btn', type: 'button', onclick: () => window.print() }, 'Print or save as PDF'),
+      h('button', { class: 'n-btn n-btn--outline e-btn-quiet', type: 'button', onclick: csv }, 'Download CSV')),
+    h('section', { class: 'e-card' },
+      h('h2', { class: 'e-h2', style: 'margin:0' }, res.name || S.user?.name || ''),
+      h('p', { class: 'e-small', style: 'margin:4px 0 0' }, [res.rid, 'R' + yr, `${rows.filter(p => p.state === 'done').length} of ${rows.length} requirements done`, `printed ${fmtDate(todayISO())}`].filter(Boolean).join(' · ')),
+      h('p', { class: 'e-small e-muted', style: 'margin:4px 0 0' }, 'APMES workplace-based assessments: submitted evaluations counted against the EPA requirements. Unofficial; it does not replace the official record.')),
+    h('section', { class: 'e-card' }, epaTables),
+    h('section', { class: 'e-card' },
+      h('h3', { class: 'e-h3' }, `Submitted evaluations (${subs.length})`),
+      subs.length ? h('table', { class: 'e-table e-sum-table' },
+        h('thead', {}, h('tr', {}, h('th', { scope: 'col' }, 'Case date'), h('th', { scope: 'col' }, 'Form'), h('th', { scope: 'col' }, 'EPA'), h('th', { scope: 'col' }, 'Item'), h('th', { scope: 'col' }, 'Assessor'))),
+        h('tbody', {}, subs.map(ev => h('tr', {},
+          h('td', {}, fmtDate(ev.request?.date || ev.date || ev.submittedAt)),
+          h('td', {}, toolLabel(ev.tool)),
+          h('td', {}, ev.epa || ''),
+          h('td', {}, ev.itemText || ev.itemId),
+          h('td', {}, ev.assessorName || ev.assessorEmail))))) : h('p', { class: 'e-small' }, 'None yet.')));
 }

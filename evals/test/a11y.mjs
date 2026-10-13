@@ -13,7 +13,7 @@ const FAIL = new Set(['serious', 'critical']);
 const SCREENS = [
   ['Home', 'resident', 'home'], ['Requests', 'resident', 'requests'], ['Progress', 'resident', 'progress'],
   ['New request', 'resident', 'new'], ['More', 'resident', 'more'], ['How evals work', 'assessor', 'how'],
-  ['Evaluations', 'assessor', 'pending'], ['Form', 'assessor', 'FORM'],
+  ['My record', 'resident', 'summary'], ['Evaluations', 'assessor', 'pending'], ['Form', 'assessor', 'FORM'],
   ['Overview', 'admin', 'admin'], ['People', 'admin', 'people'],
 ];
 

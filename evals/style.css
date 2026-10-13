@@ -620,3 +620,12 @@ body { background: var(--e-bg-group); }
 .e-how__step { display: flex; gap: 12px; align-items: flex-start; }
 .e-how__step p { margin: 2px 0 0; }
 .e-how__n { flex: none; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--e-accent-soft, #e6eef8); color: var(--n-navy); font-weight: var(--n-bold); }
+
+/* My record (#summary): screen and print */
+.e-sum-epa + .e-sum-epa { margin-top: 16px; }
+.e-sum-table { width: 100%; font-size: var(--n-text-sm); }
+.e-sum-table td, .e-sum-table th { vertical-align: top; }
+@media print {
+  .e-summary .e-card { border: 0; box-shadow: none; padding: 0; margin: 0 0 12px; }
+  .e-sum-epa { break-inside: avoid; }
+}
