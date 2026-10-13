@@ -52,6 +52,17 @@ for (const h of ['hand.anawj.com', 'apmes.anawj.com', 'prewarmstudy.anawj.com', 
   r = await get(`https://${h}/design/..%2flogbook/index.html`); assert.equal(r.status, 404, h);
 }
 r = await get('https://apmes.anawj.com/nuhsdesign/tokens.css'); assert.equal(r.status, 404);   // until the folder exists
+// apmes.anawj.com also serves Firebase's sign-in helper pages at /__/auth/ (handler is handler.html, as on GitHub Pages)
+r = await get('https://apmes.anawj.com/__/auth/handler?apiKey=x&mode=y'); assert.equal(r.status, 200);
+r = await get('https://apmes.anawj.com/__/auth/handler.js'); assert.equal(r.status, 200);
+r = await get('https://apmes.anawj.com/__/auth/iframe?apiKey=x'); assert.equal(r.status, 200);
+r = await get('https://apmes.anawj.com/__/firebase/init.json'); assert.equal(r.status, 200);
+assert.equal(JSON.parse(await r.text()).authDomain, 'apmes.anawj.com');
+assert.equal((await get('https://apmes.anawj.com/__/auth/handler.html')).status, 200);
+// ... and only there, only those two folders
+for (const u of ['https://hand.anawj.com/__/auth/handler', 'https://prewarmstudy.anawj.com/__/firebase/init.json', 'https://nuhroster.anawj.com/__/auth/handler', 'https://apmes.anawj.com/__/', 'https://apmes.anawj.com/apmes-auth/firebase/init.json']) {
+  assert.equal((await get(u)).status, 404, u);
+}
 // only GET and HEAD
 r = await get('https://nuhroster.anawj.com/', 'POST'); assert.equal(r.status, 405);
 r = await get('https://nuhroster.anawj.com/', 'HEAD'); assert.equal(r.status, 200);

@@ -62,11 +62,20 @@ for (const h of Object.keys(SITES)) {
 assert.deepEqual(resolve('x.workers.dev', '/_sites/prewarmstudy.anawj.com/design/tokens.css'), { file: 'design/tokens.css' });
 assert.deepEqual(resolve('x.workers.dev', '/design/tokens.css'), { file: 'design/tokens.css' });
 
+// apmes.anawj.com: Firebase's sign-in helper pages
+assert.deepEqual(resolve('apmes.anawj.com', '/__/auth/handler'), { file: '__/auth/handler' });
+assert.deepEqual(resolve('apmes.anawj.com', '/__/firebase/init.json'), { file: 'apmes-auth/firebase/init.json' });
+assert.deepEqual(resolve('apmes.anawj.com', '/__/other'), { notFound: true });
+assert.deepEqual(resolve('hand.anawj.com', '/__/auth/handler'), { notFound: true });
+
 // the table lists only folders that exist in the repo
 import fs from 'node:fs';
 import path from 'node:path';
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../..');
 for (const [h, s] of Object.entries(SITES)) {
-  for (const f of s.root ? [s.root] : Object.values(s.prefixes)) assert.ok(fs.existsSync(path.join(root, f, 'index.html')), `${h}: ${f}index.html is missing`);
+  for (const [pre, f] of s.root ? [['/', s.root]] : Object.entries(s.prefixes)) {
+    // an app folder has an index.html; the sign-in helper folders have their own files
+    assert.ok(fs.existsSync(path.join(root, f, pre.startsWith('/__/') ? (pre === '/__/auth/' ? 'handler.html' : 'init.json') : 'index.html')), `${h}: ${f} is missing its page`);
+  }
 }
 console.log('worker routes tests passed');
