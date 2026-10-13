@@ -449,4 +449,5 @@ if (cloud.demo) {
 paintHeader('APMES Evals');
 if (!cloud.enabled) renderLanding();
 else Promise.resolve(cloud.watchUser(onUser)).catch(err => renderLanding('Couldn’t start sign-in. ' + errText(err)));
-registerSW();
+// after the first screen has loaded, so the offline download doesn't compete with it
+if (document.readyState === 'complete') registerSW(); else window.addEventListener('load', registerSW, { once: true });

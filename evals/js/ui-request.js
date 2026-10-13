@@ -5,7 +5,6 @@
 import { S, hooks, h, fill, toast, cloud, icon, go, toolLabel, fmtDate, modal, debounce, avatar, errText } from './ui-core.js';
 import { EPAS, ITEMS, itemById, searchItems, CATALOGUE_VERSION } from './catalogue.js';
 import { progress, dueItems, caseKey, sameCaseCount, identifierWarning, todayISO, residentYear } from './engine.js';
-import qrcode from './vendor/qrcode.js';
 
 export const AGE_BANDS = ['<16', '16-40', '41-64', '65-79', '80+'];
 export const GENDERS = [['F', 'Female'], ['M', 'Male']];
@@ -142,8 +141,16 @@ export function evalLink(id, email) {
 }
 export const shareText = ev => `Please complete this ${toolLabel(ev.tool)} for me: ${ev.itemText || ''}`.trim();
 
-// QR code as an SVG (generated on the phone, so it works offline).
+// QR code as an SVG (generated on the phone, so it works offline). The generator (12 KB) loads on
+// first use, so assessors opening a link don't download it; the shell keeps it for offline.
+let qrLib = null;
+const loadQR = () => (qrLib = qrLib || import('./vendor/qrcode.js').then(m => m.default));
 export function qrSvg(text) {
+  const box = h('span', { class: 'e-qrbox', role: 'img', 'aria-label': 'QR code of the link to the form' });
+  loadQR().then(qrcode => box.replaceWith(qrSvgNow(qrcode, text))).catch(e => { console.warn('QR', e); box.textContent = 'QR code unavailable offline: use Copy link.'; });
+  return box;
+}
+function qrSvgNow(qrcode, text) {
   const qr = qrcode(0, 'M');
   qr.addData(text);
   qr.make();

@@ -613,3 +613,4 @@ body { background: var(--e-bg-group); }
 .e-flaggroup { border-top: 1px solid var(--n-line); }
 .e-flaggroup > summary { padding: 12px 16px; cursor: pointer; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
 .e-flaggroup > summary .e-flag-why { flex-basis: 100%; }
+.e-qrbox { display: block; width: min(280px, 80vw); aspect-ratio: 1; background: #fff; }
