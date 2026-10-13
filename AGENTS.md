@@ -73,18 +73,12 @@ for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mj
 
 ## Working with the owner
 
-- **Who the owner is** (13 Oct 2026): a consultant anaesthetist, interested in resident education. Builds by
-  prompting AI (almost all of this repo came from Claude Code cloud sessions), mostly from a phone through the day,
-  with a laptop at hand when needed. Not a trained programmer, but very happy to copy and paste code from AI (finds
-  it convenient), so a ready-to-paste snippet with exactly where it goes is fine when that's the quickest route.
-  Wants to learn coding (very interested, finds the learning curve steep): use the real technical terms, but
-  explain each one briefly the first time, with an everyday or clinical comparison where it helps, so explanations
-  double as small lessons.
-- **How the owner works:** instructions arrive from the phone now and then, and sessions carry on agentically in
-  between; the owner doesn't need to be there while work runs. Interests come in short bursts on quick wins or deep
-  dives into a passion project. So work through a request to the end without waiting to be watched, ask only when a
-  decision is genuinely the owner's, keep each PR small and finished on its own, and keep `STATUS.md` current so the
-  next session (or the owner, days later) can pick up from the files alone.
+- **Working with the owner day to day:** instructions mostly arrive from a phone, and sessions carry on agentically
+  in between, so work through a request to the end without waiting to be watched, ask only when a decision is
+  genuinely the owner's, keep each PR small and finished on its own, and keep `STATUS.md` current so the next session
+  can pick up from the files alone. A ready-to-paste snippet, with exactly where it goes, is fine when that's the
+  quickest route. Use the real technical terms, and explain each briefly the first time (an everyday or clinical
+  comparison helps), so explanations double as small lessons.
 - **Speed vs care:** the owner favours speed and merges to main freely while exploring what AI coding can do. That
   holds for most apps. **Vital apps get more care:** `prewarm/` (live study data) and `logbook/` (live soon): full
   tests before merging, preview links for the owner, and nothing merged into them while a prewarm case is being
