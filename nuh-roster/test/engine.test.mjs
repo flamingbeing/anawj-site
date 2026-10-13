@@ -411,3 +411,14 @@ console.log('engine tests passed');
   assert.ok(dblSC >= 15, `double cover mostly by the SC (${dblSC}/20)`);
   console.log('seniority tests passed');
 }
+
+{
+  const { buildIcs } = await import('../js/ics.js');
+  const t = buildIcs([{ date: '2026-10-31', title: 'MOR 4, Senior', details: 'with A; cases: lap chole\nleaving 4pm', uid: '2026-10-31-p1@nuhroster' }], { now: new Date('2026-10-13T10:00:00Z') });
+  assert.match(t, /^BEGIN:VCALENDAR\r\n/);
+  assert.match(t, /DTSTART;VALUE=DATE:20261031\r\nDTEND;VALUE=DATE:20261101\r\n/, 'all-day event ending the next day, across a month end');
+  assert.match(t, /SUMMARY:MOR 4\\, Senior/);
+  assert.match(t.replace(/\r\n /g, ''), /DESCRIPTION:with A\\; cases: lap chole\\nleaving 4pm/);
+  assert.ok(t.split('\r\n').every(l => l.length <= 75), 'lines folded');
+  console.log('calendar tests passed');
+}
