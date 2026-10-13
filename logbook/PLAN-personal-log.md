@@ -1,6 +1,6 @@
 # Plan: a personal log mode for the logbook
 
-Status: **discussion, nothing built** (13 Oct 2026). Folds in `PLAN-labelled-parts.md` (learning points, `dt:`). Nobody uses
+Status: **plan agreed, build order below; nothing built yet** (13 Oct 2026). Folds in `PLAN-labelled-parts.md` (learning points, `dt:`). Nobody uses
 the logbook yet, so there is room to change its shape. The owner wants to use it as his own log, outside APMES too (a
 generic profile), and let residents follow if they see fit. The personal side of this discussion (how he uses his own
 notes today) is kept in his private notes, not here.
@@ -33,7 +33,7 @@ notes today) is kept in his private notes, not here.
 - **Caps** (100 notes, 20 KB) are our own and get relaxed; the case summary cap is in `firestore.rules` (owner's approval).
 - **Backup** to the user's own Google Drive / Dropbox stays as an extra copy (already built).
 
-## Direction (proposed, in stages; each its own small PR)
+## Direction (proposed; the agreed build order is below)
 
 **Stage 1: a day-centred personal log.**
 - A **day page**: that day's cases plus a free-text daily note in a proper Markdown editor (the Notes editor, better),
@@ -53,6 +53,76 @@ notes today) is kept in his private notes, not here.
   read-only "Connect Claude" connector could gain a write side, or a Claude session works on exported notes). Nothing in a
   static app can hold an AI key.
 - Possibly spaced review of vetted notes.
+
+## Send and Sync (destinations): decided 13 Oct 2026
+
+What exists: Copy / Share (`share.js`: share sheet or clipboard, text from the Markdown format in Settings), backup to Google
+Drive / Dropbox (optional Markdown copy, weekly reminder), and the settings file. This extends them in three layers.
+
+1. **Format**: what the text looks like. The Markdown settings gain a file-name template (`Logbook/{date}.md`), optional
+   frontmatter (`date`, `tags`, `source`), templates for day, case, note and reflection, and named formats.
+2. **Destination**: where it goes. Each is a small saved definition (kept in settings, so it travels in the settings
+   file): share sheet, clipboard, zip, **link (URI) destinations** with an editable template where `{content}`, `{title}`,
+   `{file}`, `{date}` are filled in and URL-encoded, and **file destinations** (Drive, Dropbox, GitHub). Presets: Obsidian
+   (`obsidian://new?vault=…&file={file}&content={content}`), WhatsApp (`https://wa.me/?text={content}`), UpNote
+   (`upnote://x-callback-url/note/new?text={content}`), Tasker (custom). Each preset's exact format must be checked
+   against that app before it ships. A tech-savvy user can add any app that has a link.
+3. **Ledger**: what has been sent. Per destination and day, a fingerprint of the text last sent. The sync button reads
+   "3 days changed since last send" and sends only those; an edited day shows as changed, and one file per day means no
+   duplicates. Pressed whenever the user remembers (the existing reminder idea).
+
+**Edits after sending** (no duplication, no lost edits):
+- A **managed block** (`<!-- logbook -->` … `<!-- /logbook -->`) in each daily file: the app replaces only that block.
+- Destinations the app can read back (Drive, Dropbox, GitHub): if the remote file differs from the last sent version, a
+  **three-way merge** (last sent, remote, mine); clean merges apply, real clashes keep both with markers.
+- Link destinations cannot be read back: replace the day, or append a revision (a per-destination choice).
+
+**GitHub destination**: a personal access token limited to one repo (contents write), kept on the device only, never in
+the settings file or Firestore; the screen says plainly what a leaked token could do. A Worker holding the token
+instead is possible for one owner, not for residents.
+
+**Safety**: importing a destination from a colleague shows its exact host and asks first; nothing is ever sent without a
+tap; the patient-ID check runs before any send. New options are off by default; destinations are per device unless
+they belong to the account.
+
+## Receiving shares
+
+The installed app already takes shared text (manifest `share_target`, GET `?share_text=`; it opens in paste-a-list). To
+extend: a chooser for what the share becomes (a case, today's note, a new note); a POST target so shared `.md` / `.txt`
+files arrive too (the service worker reads the form data). Limits: Web Share Target works for the installed app on
+Android (Chrome); iPhone Safari does not support it, so there the paste cleaner and Copy are the route.
+
+## Reconfigure the storage: cache, daily note, case notes, reflections
+
+Today `cloud.js` keeps a live Firestore listener on cases, reflections and notes with Firestore's offline cache. That cache
+only charges changed documents if the listener resumes within about 30 minutes; a longer gap re-reads the whole
+collection, and a busy day means many opens. So:
+
+- **Measure first**: an emulator test that counts reads for N opens with no changes, on today's code (baseline).
+- **Incremental sync** (ours): a local copy per collection; on open show it, then query `updatedAt > lastSync` (server
+  time stamp) and apply only changes; deletions leave a marker (`deleted: true`; cases already use a bin). No live
+  updates between devices: refresh on open or pull-to-refresh. A gate in the test: 100 opens with no changes cost about
+  100 reads.
+- **Daily note**: one document per day (Markdown), the day page showing that day's cases beside it; **case notes**: any
+  number linked to a case; **reflections** stay individual documents. All three use the same incremental sync.
+- **Caps** raised (100 notes / 20 KB → much higher; the 1 MB document limit stays): the notes caps and the case summary
+  cap are in `firestore.rules`: that change waits for the owner's approval. A budget alert on the Google Cloud project is
+  the owner's to set.
+- **Risk**: cases and reflections are the vital data. Keep the current listeners until the new path passes the emulator
+  and browser tests; offline writes, sign-out wipe (a shared PC keeps nothing) and multi-tab behaviour are re-tested.
+
+## Build order (agreed 13 Oct 2026: small PRs, each merged before the next, previews and 390 px screenshots)
+
+1. **Send, part 1**: destination model, formats, ledger (pure code, unit-tested), then the Send UI with the Obsidian,
+   WhatsApp, UpNote and custom link presets, the host confirmation and the ID check. Try it on existing day text.
+2. **Receive shares**: the chooser and file shares.
+3. **Read-count baseline test** for today's listeners.
+4. **Notes on incremental sync + the daily note and day page** (rules change: owner's approval first).
+5. **Sync to Drive / Dropbox** with the ledger, one file per day and the managed block.
+6. **GitHub destination**, then the three-way merge for read-back destinations.
+7. **Reflections, then cases on incremental sync** (vital data: full tests, owner reviews the preview first).
+Later: images and files; searching an external vault from the logbook; getting value back out (search, "this day in
+earlier years"); the labelled parts (`PLAN-labelled-parts.md`, on hold).
 
 ## Things to keep in mind
 
