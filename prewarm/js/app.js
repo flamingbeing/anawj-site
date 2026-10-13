@@ -816,11 +816,19 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     if (nan.length) { toast('Check ' + nan.map(c => c.label).join(', ') + ': numbers only.'); return false; }
     const odd = typed.filter(c => +draft[c.key] < SANE[c.key][0] || +draft[c.key] > SANE[c.key][1]);
     if (odd.length && !confirm(odd.map(c => `${c.label} ${draft[c.key]}`).join(', ') + ' looks unusual. Save anyway?')) return false;
-    // a blank or part-blank reading asks first (owner, 13 Oct 2026: an empty one can be saved, e.g. pre-warming that
-    // ran only 10 min); saving it marks the timepoint done, so it stops counting as missed
+    // saving with every box blank removes the reading (owner, 13 Oct 2026): the timepoint is left as if never taken,
+    // e.g. readings that make no sense once pre-warming stopped early
     const blank = cols.filter(c => draft[c.key] == null || draft[c.key] === '');
-    if (blank.length === cols.length) { if (!confirm(`Nothing entered for ${pt.label}.\n\nSave it with no readings (it is then not counted as missed)?`)) return false; }
-    else if (blank.length && !confirm(`${blank.map(c => c.label).join(', ')} ${blank.length === 1 ? 'is' : 'are'} blank.\n\nSave the ${pt.label} reading without ${blank.length === 1 ? 'it' : 'them'}?`)) return false;
+    if (blank.length === cols.length) {
+      if (savedAt(p, s, pt.key) && !confirm(`Remove the ${pt.label} reading?\n\nIts saved values are deleted.`)) return false;
+      const ids = [...cols.map(c => `${s}_${pt.key}_${c.key}`), `at_${s}_${pt.key}`];
+      const sent = ids.filter(id => setVal(p, id, null, settings.me));
+      saveAll(); if (sent.length) sync(p, sent);
+      toast(`${pt.label} reading removed`); dropDraft(); base = snap();
+      for (const c of cols) openT[c.key] = p.f[`${s}_${pt.key}_${c.key}`]?.t || 0;
+      return true;
+    }
+    if (blank.length && !confirm(`${blank.map(c => c.label).join(', ')} ${blank.length === 1 ? 'is' : 'are'} blank.\n\nSave the ${pt.label} reading without ${blank.length === 1 ? 'it' : 'them'}?`)) return false;
     // the other phone saved this reading while it was open here: ask before writing over it (Cancel shows theirs)
     const theirs = cols.filter(c => (p.f[`${s}_${pt.key}_${c.key}`]?.t || 0) !== openT[c.key]);
     if (theirs.length) {

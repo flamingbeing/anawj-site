@@ -214,17 +214,15 @@ jobs.push(() => tryit(async () => {
   log(!await pg.$('#f-ihd_mi_years') && !await pg.$('.chip[data-f="ihd_mi"]'), 'IHD No hides both follow-ups');
   await ctx.close();
 }));
-// L. an all-blank reading asks, then can be saved; a part-blank one asks, then shows in Still to fill; columns hidden in Settings show too
+// L. Save with every box blank removes the reading; a part-blank one asks, then shows in Still to fill; columns hidden in Settings show too
 jobs.push(() => tryit(async () => {
   const { ctx, pg } = await fresh();
   await open(pg, 0);
   await pg.click('#haemolink'); await pg.waitForSelector('input[data-in="sbp"]');
   await pg.click('.strip a:has-text("60")'); await pg.waitForSelector('input[data-in="sbp"]');
   for (const k of ['sbp', 'dbp', 'map', 'hr', 'bis']) await pg.fill(`input[data-in="${k}"]`, '');
-  let ask = ''; pg.once('dialog', d => { ask = d.message(); d.dismiss(); }); await pg.click('#save'); await pg.waitForTimeout(300);
-  log(/Nothing entered for 60 min/.test(ask) && !await pg.$('.strip a.done:has-text("60")'), 'blank reading asks; Cancel does not save it');
-  pg.once('dialog', d => d.accept()); await pg.click('#save'); await pg.waitForTimeout(400);
-  log(!!await pg.$('.strip a.done:has-text("60")'), 'OK saves a reading with nothing entered (counts as done)');
+  await pg.click('#save'); await pg.waitForTimeout(400);
+  log(/removed/.test(await pg.textContent('#toast')) && !await pg.$('.strip a.done:has-text("60")'), 'Save with nothing entered removes the reading (nothing saved)');
   await pg.click('.strip a:has-text("60")'); await pg.waitForSelector('input[data-in="sbp"]');
   await pg.fill('input[data-in="sbp"]', '118');
   pg.once('dialog', d => d.accept()); await pg.click('#save'); await pg.waitForTimeout(400);
