@@ -6,7 +6,7 @@ list, filtered by the app's label, has the rest).
 Each session edits only its own file under `status/` (see **Now**). Update this file when a task finishes, a decision is made, or
 before compacting (`/save-state` in Claude Code, `$save-state` in Codex).
 
-Last updated: 2026-10-13 by Claude Code, Logbook 1 (log1).
+Last updated: 2026-10-13 by Claude Code, Logbook 2 (log2).
 
 ## Now
 
@@ -20,6 +20,10 @@ its own file), so sessions never edit the same lines. Read them all before start
 - Try on a real phone: pins (now also the Reflections search, with sticky topic names), swipe between tabs (cards that
   slide in with the finger, also on the background; #191), keyboard behaviour; Notes; Basic mode; formatting buttons; the new Analytics parts.
 - Admin → Advanced → "Fix initials in older cases" (one-off).
+- Add the programme coordinators (PCs) as admins in the Firebase console (`admins/{email}`); they then get the
+  Faculty / PCs profile with the Admin tab. Your own account opens in Faculty / PCs unless you pick a profile.
+- Try the profiles on a phone (Settings → Profiles or hide items): Basic (now the default), Basic: logbook only,
+  Advanced, Faculty / PCs (Case logs, Analytics, Admin).
 - Dropbox developer console: tick `files.metadata.read` so "Keep backups for…" can remove old Dropbox files.
 - Dropbox: apply for production approval when ready (only listed accounts can use it until then).
 - MCP connector: test `node server.mjs login` on a computer.
@@ -52,6 +56,11 @@ its own file), so sessions never edit the same lines. Read them all before start
 
 ## Decisions log
 
+- 2026-10-12: Faculty / PCs shows the Admin portal on the tab bar, left of More, for admins only (PDs and faculty
+  never see it). A tab missing from a saved tab order goes just before More. The profile list runs from the most
+  hidden: Basic: logbook only, Basic, Advanced, Faculty / PCs (owner).
+- 2026-10-12: Admins are the owner and the admin staff (PCs) only, added by the owner in the console; removing
+  yourself from admins keeps only the app-owner reads (logbooks and cases), not the Admin portal.
 - 2026-10-13: Site deploys through GitHub Actions (Pages source switched by the owner); service-worker VERSION is
   stamped at deploy, PRs are labelled by app, each session's Now line lives in `status/<session>.md` (#307). The owner
   declined CI tests on PRs and branch protection: sessions' own e2e runs are the check, as before.

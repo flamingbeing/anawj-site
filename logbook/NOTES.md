@@ -417,7 +417,8 @@ portfolio content.
 ## Data, roles and photos (`firestore.rules`)
 
 - **App owner:** `owners/{email}`, set by hand in the Firebase console. May read logbooks and cases and import
-  cases, but never reflections, images or the bin. Hand over by swapping the entry.
+  cases, but never reflections, images or the bin. Hand over by swapping the entry. Owner and admin are separate: without an
+  `admins/` entry the owner has no Admin portal (where the import and initials fix live).
 - **Admins** (the programme coordinators, PCs, are admins) can't read logbooks or cases. They read `summaries/`
   (counts per category, completed reflections per heading) and portfolios marked ready (`submissions/`). PDs,
   programme residents and **active faculty** read `summaries/` too (faculty since Oct 2026, for the Faculty / PCs
