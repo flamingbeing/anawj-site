@@ -70,13 +70,16 @@ for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mj
 
 ## Working with the owner
 
-- **Who the owner is** (13 Oct 2026): a consultant anaesthetist, interested in resident education. No coding
-  background; builds by prompting AI (almost all of this repo came from Claude Code cloud sessions), mostly from a
-  phone through the day, with a laptop at hand when needed. Explain in clinical or everyday terms, not code; never
-  ask the owner to edit code or run commands unless there's no other way, and then give exact steps.
-- **How the owner works:** short bursts on quick wins, or deep dives into a passion project. Work may stop
-  mid-task at any time, so keep each PR small and finished on its own, and keep `STATUS.md` current so the next
-  session (or the owner, days later) can pick up from the files alone.
+- **Who the owner is** (13 Oct 2026): a consultant anaesthetist, interested in resident education. Builds by
+  prompting AI (almost all of this repo came from Claude Code cloud sessions), mostly from a phone through the day,
+  with a laptop at hand when needed. Not a trained programmer, but very happy to copy and paste code from AI (finds
+  it convenient), so a ready-to-paste snippet with exactly where it goes is fine when that's the quickest route.
+  Explain why in clinical or everyday terms rather than code jargon.
+- **How the owner works:** instructions arrive from the phone now and then, and sessions carry on agentically in
+  between; the owner doesn't need to be there while work runs. Interests come in short bursts on quick wins or deep
+  dives into a passion project. So work through a request to the end without waiting to be watched, ask only when a
+  decision is genuinely the owner's, keep each PR small and finished on its own, and keep `STATUS.md` current so the
+  next session (or the owner, days later) can pick up from the files alone.
 - **Speed vs care:** the owner favours speed and merges to main freely while exploring what AI coding can do. That
   holds for most apps. **Vital apps get more care:** `prewarm/` (live study data) and `logbook/` (live soon): full
   tests before merging, preview links for the owner, and nothing merged into them while a prewarm case is being
