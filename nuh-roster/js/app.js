@@ -1,6 +1,6 @@
 import {
   DEFAULT_SETTINGS, DEFAULT_ROOMS, JUNIOR_GRADES, SENIOR_GRADES, DEFAULT_GRADE, OLD_GRADES, POSTINGS, postingName, bySeniority, STATUSES, COLOURS, COLOUR_ARGB, isBaby,
-  matchName, splitNameList, namesInCell, sentRows, rosterChanges, changeText, suggestFlags, generate, check, learnFromRosters, tickFromHistory, remoteRoom, suggestShortNames, mergeContacts, planImport, importUpdate, findDuplicates, mergeStaffRecords, pacuRoom, isPacu, fmtSenior, fmtJunior, SPECIAL_ROWS, isCoverPart, coverTarget,
+  matchName, splitNameList, namesInCell, sentRows, rosterChanges, changeText, suggestFlags, generate, check, learnFromRosters, tickFromHistory, remoteRoom, suggestShortNames, mergeContacts, planImport, importUpdate, findDuplicates, mergeStaffRecords, pacuRoom, isPacu, fmtSenior, fmtJunior, SPECIAL_ROWS, isSpecialRow, isCoverPart, coverTarget,
 } from './engine.js';
 // Seniors are always shown in black; juniors may be green (Baby MO) or purple (locum).
 const staffColour = p => (p && p.role !== 'senior' && p.colour) || '';
@@ -89,6 +89,63 @@ function fillDemoNotes(day) {
   for (const id of demoAdmin(day.date, state.staff, onLeave)) day.staff[id] = { ...(day.staff[id] || {}), status: 'admin', manual: true };
 }
 const demoLink = () => location.origin + location.pathname + '?demo';
+
+// Practice: the day as Practice first made it.
+function resetPracticeDay() {
+  pushUndoAll('resetting the day', { day: true });
+  state.day = { date: state.day.date, rooms: [], staff: {} };
+  state.roster = null; state.practiceTask = null;
+  syncRooms(); fillDemoNotes(state.day); syncMonthly();
+  lastRows = null;
+  render();
+  undoToast('This day is back to how Practice made it.');
+}
+// Practice: make the roster, then plant three mistakes a rosterer meets most mornings; the card on the Roster
+// tab ticks each one off when the live checks no longer find it.
+function startPracticeTask() {
+  if (!state.roster || state.roster.date !== state.day.date) runGenerate(true);
+  const r = state.roster;
+  if (!r) return;
+  pushUndoAll('the practice task', { day: true });
+  const rows = r.rows.filter(x => !isSpecialRow(x) && !isPacu(x.label) && x.senior && x.junior);
+  const onLeave = state.staff.find(p => p.role === 'senior' && ['leave', 'mc'].includes(dayOf(p.id).status));
+  const [a, b] = [rows[1], rows[4]];
+  const items = [];
+  if (a && onLeave) { a.senior = fmtSenior(onLeave, dayOf(onLeave.id)); items.push({ label: `Someone on leave is on a list`, match: `${onLeave.name} is on` }); }
+  if (b) { b.senior = ''; items.push({ label: `${b.label} has no senior`, match: `${b.label}: no senior` }); }
+  // a double cover with no junior, inside one complex (as the generator would pair rooms)
+  const host = rows.find(x => x !== a && x !== b && rows.some(y => y !== x && y !== a && y !== b && y.complex === x.complex));
+  const dbl = host && rows.find(y => y !== host && y !== a && y !== b && y.complex === host.complex);
+  const s0 = host && cellParts(host, 'senior')[0];
+  if (dbl && s0) { dbl.senior = s0; dbl.junior = ''; items.push({ label: `${dbl.label}: a double cover with no junior`, match: `${dbl.label}: no junior` }); }
+  state.practiceTask = { date: state.day.date, items };
+  lastRows = JSON.stringify(r.rows);
+  afterRosterEdit(true);
+  goTab('roster');
+  toast('Three problems are planted in this roster. Fix them from the Problems card (or by hand); the checklist ticks them off.');
+}
+function practiceTaskCard() {
+  const t = state.practiceTask;
+  if (!DEMO || !t || t.date !== state.day.date || !state.roster) return null;
+  const texts = (state.roster.checks || []).map(w => w.text);
+  const done = t.items.map(i => !texts.some(x => x.includes(i.match)));
+  const all = done.every(Boolean);
+  return h('section', { class: 'card practice-task' + (all ? ' done' : '') },
+    h('h2', {}, all ? 'Well done: all fixed' : `Practice: fix ${t.items.length} problems (${done.filter(Boolean).length} of ${t.items.length})`),
+    h('ul', { class: 'task-list' }, t.items.map((i, k) => h('li', { class: done[k] ? 'ok' : '' }, done[k] ? '✓ ' : '○ ', i.label))),
+    all ? h('div', { class: 'bar' }, h('button', { class: 'small', onclick: startPracticeTask }, 'Another one'), h('button', { class: 'small', onclick: () => { state.practiceTask = null; render(); } }, 'Close'))
+      : h('p', { class: 'hint' }, 'Try the fix buttons in the Problems card first: Take off, Fill empty gaps, Swap.'));
+}
+// Practice: a draft in the admin team's format, so "Do it all" can be tried as on a real morning.
+async function downloadPracticeDraft() {
+  const rows = state.day.rooms.filter(r => r.running && !isPacu(r.name)).map(r => ({ roomId: r.id, label: r.name, complex: r.complex, senior: '', junior: '', premed: '', notes: r.notes || '' }));
+  const wb = buildRosterWorkbook(await excel(), { date: state.day.date, rows, lists: rosterLists(), general: effectiveGeneral(), box: '', colourOf, shortOf });
+  // the admin team's draft has each room's cases in column L (the sent-out sheet doesn't)
+  const notes = Object.fromEntries(rows.map(r => [r.label, r.notes]));
+  wb.worksheets[0].eachRow(row => { const label = cellText(row.getCell(1).value).replace(/:\s*$/, '').trim(); if (notes[label]) row.getCell(12).value = notes[label]; });
+  download(`Practice draft ${state.day.date}.xlsx`, new Blob([await wb.xlsx.writeBuffer()], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+  toast('Practice draft downloaded. Now press "Do it all" and pick it.');
+}
 
 // Room list changes since the first version: Remote Case -> Remote 1 + Remote 2, add KROR 1 and MCOR 9.
 // Names imported before titles were stripped ("Dr Brandon Ong", "A/Prof ..."): clean them and
@@ -407,6 +464,8 @@ function renderDemoBar() {
     h('b', {}, 'Practice'), h('span', {}, ' · made-up staff and rosters, saved only in this browser. Try anything: nothing here touches the real roster.'),
     h('span', { class: 'grow' }),
     h('button', { class: 'small', onclick: () => startTour() }, 'Tour'),
+    h('button', { class: 'small', title: 'A roster with three problems planted in it, to find and fix', onclick: startPracticeTask }, 'Fix 3 problems'),
+    h('button', { class: 'small', title: 'This day back to how Practice made it (Undo brings your version back)', onclick: resetPracticeDay }, 'Reset this day'),
     h('button', { class: 'small', onclick: () => { if (confirm('Start practice again from scratch?')) { try { localStorage.removeItem(KEY); localStorage.removeItem(TOUR_KEY); } catch { /* no storage */ } location.reload(); } } }, 'Start again'),
     h('a', { class: 'btn small', href: location.pathname }, 'Back to the real roster')));
 }
@@ -417,7 +476,7 @@ const TOUR = [
   { sel: '#date', title: 'The day you\'re rostering', text: 'Everything follows this date. ‹ › step a day ([ and ] on a keyboard), and it warns you when it isn\'t tomorrow.' },
   { tab: 'monthly', sel: '#steps', title: 'Your morning, in five steps', text: 'Monthly rosters, cases, roster, check, then save or download. Each step turns green when it\'s done; tap one to go there.' },
   { tab: 'monthly', sel: '.board', title: 'Who\'s working', text: 'Leave, MC and post call come from the monthly rosters. Tap a name to change their day; "Select several" moves many at once.' },
-  { tab: 'cases', sel: '#app label.btn.primary', title: 'Start from the admin draft', text: '"Do it all" reads the admin team\'s draft, makes the roster and shows what needs a look.' },
+  { tab: 'cases', sel: '#app label.btn.primary', title: 'Start from the admin draft', text: '"Do it all" reads the admin team\'s draft, makes the roster and shows what needs a look. In Practice, "Download a practice draft" gives you one to try.' },
   { tab: 'roster', sel: '#problems', title: 'What needs a look', text: 'Problems are listed here with a button that fixes each one, and Show to find the room.' },
   { tab: 'roster', sel: 'table.sheet', title: 'The roster', text: 'Tap a name for its box: leaving time, (L), comments, Move or swap. On a computer you can drag names; + suggests the best fits first.' },
   { tab: 'roster', sel: '.split', title: 'Send it out', text: 'Download the sheet as Excel or PDF, or save it for the team. Undo (Ctrl+Z) takes back anything.' },
@@ -1059,6 +1118,7 @@ function renderDay(part) {
         h('label', { class: 'btn primary', title: 'Load the admin draft, make the roster from it, and show what needs a look' }, 'Do it all: load draft and make roster',
           h('input', { type: 'file', accept: '.xlsx', hidden: true, onchange: async e => { const f = [...e.target.files]; e.target.value = ''; if (f.length) await doItAll(f); } })),
         fileButton('Load draft only', '.xlsx', false, loadDraft),
+        DEMO ? h('button', { title: 'A draft in the admin team\'s usual format, made from this practice day', onclick: downloadPracticeDraft }, 'Download a practice draft') : null,
         cases ? lastWeekButton() : null,
         cases
           ? h('button', { onclick: () => { pushUndoAll('clearing the cases', { day: true }); d.rooms = []; syncRooms(); render(); undoToast('Cleared the cases. Rooms are back to running by default.'); } }, 'Clear cases')
@@ -3317,6 +3377,7 @@ function renderRoster() {
           h('thead', {}, h('tr', {}, ['', 'Senior', 'Junior', 'Cases'].map(t => h('th', {}, t)))),
           h('tbody', {}, body))),
       h('div', {},
+        practiceTaskCard(),
         problemsCard(),
         changesCard(),
         noListCard(),
