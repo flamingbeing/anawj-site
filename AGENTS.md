@@ -56,7 +56,8 @@ Rules that bite:
   workflow labels each PR by the folders it touches (`.github/labeler.yml`), so filter the PR list by label. Outside
   an app's own files, write PRs as `#295 (logbook)`.
 
-Before merging, run:
+Before merging, run (GitHub runs these too on every PR, plus the editor, feedback-button and hand browser tests: the
+"Checks" workflow; a red check means don't merge):
 
 ```
 node tools/check.mjs
