@@ -2161,7 +2161,8 @@ function rosterCell(row, i, key, doubles) {
     const src = { row: i, key, part: k };
     const icon = (cls, title, text, o) => h('span', { class: 'icon ' + cls, title, onpointerdown: e => { e.stopPropagation(); o.down?.(e); }, onclick: e => { e.stopPropagation(); o.click?.(); } }, text);
     const pid = personOfPart(p)?.id;
-    const el = h('span', { class: 'name', 'data-drop': '', 'data-row': i, 'data-key': key, 'data-part': k, 'data-pid': pid || '', style: colourStyle(p), title: p,
+    const why = pid ? row.why?.[pid] : ''; // from the generator; stale after a hand move, so only for who is still here
+    const el = h('span', { class: 'name', 'data-drop': '', 'data-row': i, 'data-key': key, 'data-part': k, 'data-pid': pid || '', style: colourStyle(p), title: why ? `${p}\nWhy here: ${why}` : p,
       onpointerenter: TOUCH || !pid ? null : () => highlightPerson(pid), onpointerleave: TOUCH || !pid ? null : () => highlightPerson(null),
       onpointerdown: TOUCH ? null : e => startNameDrag(e, src),
       onclick: TOUCH ? () => openTagEditor(el, src) : null,
