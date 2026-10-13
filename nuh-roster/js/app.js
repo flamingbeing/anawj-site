@@ -1,6 +1,6 @@
 import {
   DEFAULT_SETTINGS, DEFAULT_ROOMS, JUNIOR_GRADES, SENIOR_GRADES, DEFAULT_GRADE, OLD_GRADES, POSTINGS, postingName, bySeniority, STATUSES, COLOURS, COLOUR_ARGB, isBaby,
-  matchName, splitNameList, namesInCell, sentRows, rosterChanges, changeText, suggestFlags, generate, check, learnFromRosters, tickFromHistory, remoteRoom, suggestShortNames, mergeContacts, planImport, importUpdate, findDuplicates, mergeStaffRecords, pacuRoom, isPacu, fmtSenior, fmtJunior, SPECIAL_ROWS, isSpecialRow, isCoverPart, coverTarget,
+  matchName, sameNameScore, splitNameList, namesInCell, sentRows, rosterChanges, changeText, suggestFlags, generate, check, learnFromRosters, tickFromHistory, remoteRoom, suggestShortNames, mergeContacts, planImport, importUpdate, findDuplicates, mergeStaffRecords, pacuRoom, isPacu, fmtSenior, fmtJunior, SPECIAL_ROWS, isSpecialRow, isCoverPart, coverTarget,
 } from './engine.js';
 // Seniors are always shown in black; juniors may be green (Baby MO) or purple (locum).
 const staffColour = p => (p && p.role !== 'senior' && p.colour) || '';
@@ -1002,6 +1002,46 @@ async function learnFiles(files) {
 
 const pasteText = { leave: '', postcall: '', elsewhere: '', admin: '', notAround: '' };
 let unmatched = [];
+let lastDraft = null, lastRotFile = null; // to read again after names are fixed
+
+// Names an import couldn't match: pick who each one is (closest names first). The spelling is kept as that person's
+// short name, so the next import matches it, then rerun() reads the file again. role: 'senior' | 'junior' | null.
+let fixPick = {};
+function fixNamesCard(names, { role = null, rerun, dismiss, what = 'the file' }) {
+  const list = [...new Set(names.map(n => String(n).trim()).filter(Boolean))];
+  if (!list.length) return null;
+  const pool = state.staff.filter(p => !role || p.role === role);
+  const options = n => {
+    const m = matchName(n, pool);
+    const ranked = pool.map(p => [p, (m.ambiguous || []).includes(p) ? 4 : sameNameScore({ name: n }, p)]).filter(([, sc]) => sc > 0).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([p]) => p);
+    const rest = pool.filter(p => !ranked.includes(p)).sort((a, b) => a.name.localeCompare(b.name));
+    return [['', 'Choose…'], ['skip', 'Skip (not on the staff list)'],
+      ...(ranked.length ? [['', '── closest names ──'], ...ranked.map(p => [p.id, p.name])] : []),
+      ['', '── everyone ──'], ...rest.map(p => [p.id, p.name])];
+  };
+  const save = () => {
+    const changes = [];
+    for (const n of list) {
+      const p = person(fixPick[n]);
+      if (!p) continue;
+      if (![p.name, ...(p.aliases || [])].some(a => a.toLowerCase() === n.toLowerCase())) { (p.aliases ||= []).push(n); changes.push(`${p.name}: short name + ${n}`); }
+    }
+    fixPick = {};
+    if (changes.length) (state.staffLog ||= []).unshift({ at: Date.now(), by: who(), changes }), state.staffLog.splice(300);
+    personCache.clear();
+    toast(changes.length ? `Kept ${changes.length} spelling${changes.length > 1 ? 's' : ''} as short names. Reading ${what} again…` : 'Nothing picked.');
+    if (changes.length && rerun) rerun(); else render();
+  };
+  return h('section', { class: 'card fix-names' },
+    h('h2', {}, `${list.length} name${list.length > 1 ? 's' : ''} not matched`),
+    h('p', { class: 'hint' }, `Pick who each one is. The spelling is kept as their short name, so ${what} matches next time.`),
+    h('table', {}, h('tbody', {}, list.map(n => h('tr', {},
+      h('td', {}, h('b', {}, n)),
+      h('td', {}, select(fixPick[n] || '', options(n), v => { fixPick[n] = v; })))))),
+    h('div', { class: 'bar' },
+      h('button', { class: 'primary', onclick: save }, 'Save and read again'),
+      h('button', { onclick: () => { fixPick = {}; dismiss(); } }, 'Dismiss')));
+}
 let lockEditing = null;
 let settingsEditing = false; // "roomId:lockSenior" while picking a fixed person on the Cases tab
 
@@ -1125,9 +1165,7 @@ function renderDay(part) {
           : h('button', { onclick: () => { pushUndoAll('clearing the manpower', { day: true }); d.staff = {}; d.lists = {}; render(); undoToast('Cleared leave, post call and other statuses.'); } }, 'Clear manpower'),
       ),
       h('p', { class: 'hint' }, "Both read the admin team's draft in the usual format: running rooms, case notes, leave, post call and upper-half duties. \"Do it all\" then makes the roster and opens its problems."),
-      unmatched.length ? h('ul', { class: 'warnings', style: 'margin-bottom:12px' }, h('li', { class: 'warn' },
-        `Names not matched to the staff list: ${unmatched.join(', ')}. Add them on the Staff tab, or add the short name to the right person, then load or apply again. `,
-        h('button', { class: 'link', onclick: () => { unmatched = []; render(); } }, 'Dismiss'))) : null,
+      fixNamesCard(unmatched, { what: lastDraft ? 'the draft' : 'the names', rerun: lastDraft ? () => loadDraft([lastDraft]) : null, dismiss: () => { unmatched = []; render(); } }),
       h('div', { class: 'stats' },
         h('span', {}, h('b', {}, running.length), ' rooms running'),
         h('span', {}, h('b', {}, avail('senior')), ' seniors available'),
@@ -1275,6 +1313,7 @@ function readUpperHalf(ws, d) {
 }
 
 async function loadDraft([file]) {
+  lastDraft = file;
   const wb = await readWorkbook(file);
   const ws = wb.worksheets[0];
   const rows = readRosterRows(ws);
@@ -2736,6 +2775,7 @@ function renderMyDay() {
 let rotYear = null; // the year on screen
 let rotSel = null;  // selected cells: { a: [row, col], b: [row, col] } (a rectangle)
 let rotNotes = [];  // what the last import couldn't place
+let rotUnmatched = []; // names in the last import not on the junior list
 let rotScroll = null; // where the grid was scrolled to, kept across re-renders
 const ROT_SHORT = { Cardiac: 'Card', Remote: 'Rem' }; // to fit a week's cell
 const pushRotUndo = what => pushUndo({ rot: JSON.stringify(state.rotations), what });
@@ -2804,6 +2844,7 @@ function renderRotations() {
           render(); undoToast(`Cleared the ${year} rotation.`);
         } }, 'Clear year')),
       h('p', { class: 'hint' }, 'Each column is a week (Monday to Sunday). Select weeks by clicking, shift-clicking or dragging (across people too), then pick the posting. Blank weeks use the usual posting. To change someone\'s posting for one day only, open them from Today or the roster and use "Posting today". The Excel file has names down the first column and each week\'s Monday across the top; Download gives you one to fill in.'),
+      fixNamesCard(rotUnmatched, { role: 'junior', what: 'the rotation file', rerun: lastRotFile ? () => importRotations([lastRotFile]) : null, dismiss: () => { rotUnmatched = []; render(); } }),
       rotNotes.length ? h('ul', { class: 'warnings' }, rotNotes.map(t => h('li', { class: 'warn' }, t)), h('li', { class: 'info' }, h('button', { class: 'link', onclick: () => { rotNotes = []; render(); } }, 'Dismiss'))) : null,
       h('div', { class: 'stats' }, h('span', {}, `Week of ${longDate(now)}:`), POSTINGS.filter(([k]) => counts[k]).map(([k, label]) => h('span', {}, h('b', {}, counts[k]), ' ', k ? label : 'no posting'))),
       h('div', { class: 'rot-palette' + (selCount ? '' : ' idle') },
@@ -2837,6 +2878,7 @@ function placeRotGrid() {
 }
 
 async function importRotations([file]) {
+  lastRotFile = file;
   try {
     const wb = await readWorkbook(file);
     const year = rotYear || +state.day.date.slice(0, 4);
@@ -2847,8 +2889,8 @@ async function importRotations([file]) {
     pushRotUndo('the rotation import');
     // the weeks and people in the file are set exactly as the file has them (blank = usual posting)
     for (const m of res.mondays) for (const id of res.people) setWeeks(state.rotations, id, [m], res.weeks[m]?.[id] ?? null);
+    rotUnmatched = res.unmatched;
     rotNotes = [
-      ...(res.unmatched.length ? [`Not on the junior list (skipped): ${res.unmatched.join(', ')}. Add them on the Staff tab, or add the spelling as a short name, then import again.`] : []),
       ...(res.unknown.length ? [`Not a posting (left out): ${res.unknown.map(t => `"${t}"`).join(', ')}. Postings are ${POSTINGS.filter(([k]) => k).map(([k, l]) => l).join(', ')}.`] : []),
     ];
     const first = res.mondays.slice().sort()[0];
@@ -3081,6 +3123,17 @@ function loadedStrip() {
     MONTHLY.map(def => { const ok = has(month, def); return h('span', { class: 'chip static' + (ok ? ' ok' : ' missing'), title: ok ? 'Loaded' : 'Not loaded yet' }, (ok ? '✓ ' : '– ') + def.label.replace(' Monthly', '')); }));
   return h('div', { class: 'loaded' }, line(m), line(next));
 }
+// The names in red on a monthly roster, to fix in one go (the alias makes them match at once; nothing to re-read).
+let monthlyFixOpen = false;
+function monthlyFixNames(kind) {
+  const d = monthData(kind);
+  if (!d) return null;
+  const names = d.entries ? d.entries.map(e => e.name) : Object.values(d.rows || {}).flatMap(Object.values);
+  const missing = [...new Set(names.map(cleanCell).filter(n => n && !personByText(n)))];
+  if (!missing.length) return null;
+  if (!monthlyFixOpen) return h('p', { class: 'hint' }, `${missing.length} name${missing.length > 1 ? 's in red aren\'t' : ' in red isn\'t'} matched to the staff list. `, h('button', { class: 'small', onclick: () => { monthlyFixOpen = true; render(); } }, 'Fix names'));
+  return fixNamesCard(missing, { what: 'this roster', rerun: () => { monthlyFixOpen = false; render(); }, dismiss: () => { monthlyFixOpen = false; render(); } });
+}
 function monthlyBar(kind) {
   const def = monthlyDef(kind);
   const issues = def.list ? [] : issuesOf(curMonth()).filter(i => i.kind === kind);
@@ -3112,7 +3165,8 @@ function monthlyBar(kind) {
       h('b', {}, [errs ? `${errs} clash${errs > 1 ? 'es' : ''}` : '', gaps ? `${gaps} empty overnight dut${gaps > 1 ? 'ies' : 'y'}` : ''].filter(Boolean).join(', ')),
       ' this month (marked in the grid: on leave, a day duty after a night, two nights at once). ',
       h('button', { class: 'small', onclick: nextIssue }, 'Next ›')) : null,
-    loadedStrip());
+    loadedStrip(),
+    monthlyFixNames(kind));
 }
 
 function renderMonthlyRoster(kind) {

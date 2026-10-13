@@ -467,3 +467,5 @@ table.monthly td.gap input { border-style: dashed; border-color: var(--warn); ba
 .practice-task.done { border-top-color: var(--ok); }
 .task-list { list-style: none; padding: 0; margin: 6px 0; display: grid; gap: 4px; }
 .task-list li.ok { color: var(--ok); }
+.fix-names { border-top: 4px solid var(--warn, #8a5a00); }
+.fix-names td { padding: 4px 8px 4px 0; }
