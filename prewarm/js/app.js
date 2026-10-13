@@ -381,16 +381,16 @@ function colsFor(s, pt) {
     return true;
   });
 }
-// a timepoint with a time or a reading saved
-const hasData = (p, s, x) => Object.keys(p.f).some(k => (k === `at_${s}_${x.key}` || k.startsWith(`${s}_${x.key}_`)) && val(p, k) != null);
+// a timepoint with a reading saved (a bare time doesn't count: a cleared or blank reading leaves one behind)
+const hasData = (p, s, x) => Object.keys(p.f).some(k => k.startsWith(`${s}_${x.key}_`) && val(p, k) != null);
 function pointsFor(p, s) {
   let pts = SERIES[s].points;
   // read only (the section is marked complete, or data collection is): timepoints with no data are hidden, so no time is offered
   // for logging (owner, 13 Oct 2026); a series with no data at all keeps its list
   if (sealedBy(p, s)) { const seen = pts.filter(x => hasData(p, s, x)); if (seen.length) pts = seen; }
-  if (s === 'haemo' && settings.hide.haemo15) return pts.filter(x => x.key === 'base' || p.f['at_haemo_' + x.key]);
+  if (s === 'haemo' && settings.hide.haemo15) return pts.filter(x => x.key === 'base' || val(p, 'at_haemo_' + x.key));
   // once pre-warming is complete (ticked, or its last reading saved), the later 5-min points (past the 10 / 30 min of warming) aren't taken (owner, 13 Oct 2026)
-  if (s === 'prewarm' && WARM_MIN[val(p, 'arm')] && (val(p, 'sign_prewarm') || p.f['at_prewarm_' + WARM_MIN[val(p, 'arm')]])) return pts.filter(x => x.min == null || x.min <= WARM_MIN[val(p, 'arm')] || p.f['at_prewarm_' + x.key]);
+  if (s === 'prewarm' && WARM_MIN[val(p, 'arm')] && (val(p, 'sign_prewarm') || val(p, 'at_prewarm_' + WARM_MIN[val(p, 'arm')]))) return pts.filter(x => x.min == null || x.min <= WARM_MIN[val(p, 'arm')] || hasData(p, s, x));
   return pts;
 }
 // due time (minutes after midnight) of a timepoint, from the reference event
@@ -2185,7 +2185,17 @@ route(/^\/export$/, () => {
 if ('serviceWorker' in navigator && !DEMO) {
   navigator.serviceWorker.register('sw.js').then(reg => {
     // updating reloads the app: an unsaved reading on screen is asked about first
-    const offer = offerUpdate = w => { const b = $('#update'); b.hidden = false; b.onclick = () => afterAsking(() => w.postMessage('skipWaiting')); };
+    // the waiting worker may have been replaced by a newer one since the banner showed (several updates in a row), so ask the
+    // current one; if nothing takes over in 3 s (Firefox did not), clear the saved copy of the app (never the patients) and reload
+    const offer = offerUpdate = w => { const b = $('#update'); b.hidden = false; b.onclick = () => afterAsking(() => {
+      b.hidden = true;
+      (reg.waiting || w).postMessage('skipWaiting');
+      setTimeout(async () => {
+        if (reloaded || !navigator.onLine) return;
+        try { for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister(); for (const k of await caches.keys()) if (k.startsWith('prewarm-')) await caches.delete(k); } catch { /* reload anyway */ }
+        location.reload();
+      }, 3000);
+    }); };
     swReg = reg;
     if (reg.waiting) offer(reg.waiting);
     reg.addEventListener('updatefound', () => { const w = reg.installing; w?.addEventListener('statechange', () => { if (w.state === 'installed' && navigator.serviceWorker.controller) offer(w); }); });
