@@ -721,6 +721,19 @@ jobs.push(() => tryit(async () => {
   log(!(await pg.textContent('main')).includes('Downloaded'), 'Pre-op no longer asks Downloaded');
   await ctx.close();
 }));
+// AJ. the old address moves a phone to the new one (owner, 13 Oct 2026): demo phones go straight away, keeping the path, query and #
+jobs.push(() => tryit(async () => {
+  const { ctx, pg } = await fresh();
+  const NEW = 'http://127.0.0.1:' + (process.env.PORT || 8080) + '/prewarm/';
+  await pg.goto('http://localhost:8080/prewarm/?demo&oldhost=' + encodeURIComponent(NEW) + '#/nurse/abcdefghijklmnopqrstuv');
+  await pg.waitForURL(/^http:\/\/127\.0\.0\.1:/, { timeout: 12000 });
+  log(/\/prewarm\/\?demo#\/nurse\/abcdefghijklmnopqrstuv$/.test(pg.url()), 'the redirect keeps the path, query and # part (nurse link): ' + pg.url());
+  await pg.waitForTimeout(2500);
+  log(/^http:\/\/127\.0\.0\.1:/.test(pg.url()) && !/oldhost/.test(pg.url()), 'no redirect loop on the new address');
+  const upd = await pg.goto('http://127.0.0.1:8080/prewarm/update.html'); await pg.waitForSelector('#go');
+  log(upd.ok() && /Get the latest version/.test(await pg.textContent('#go')), 'update helper page inside the app folder');
+  await ctx.close();
+}));
 await runJobs();
 await b.close();
 if (fails.length) { console.error('prewarm edge: FAIL\n- ' + fails.join('\n- ')); process.exit(1); }

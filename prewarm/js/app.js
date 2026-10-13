@@ -235,7 +235,7 @@ function pacuLinkHtml(p) {
 
 // Refresh now (owner, 13 Oct 2026): fetch the team's latest data again and look for a new app version
 let swReg = null, offerUpdate = null;
-const refreshHtml = () => `<div class="refreshbox"><button class="secondary" id="refreshnow">Refresh now</button><small class="muted">Gets the team’s latest data again, sends anything waiting, and checks for a new app version. <span id="appver"></span></small><a class="link" href="../prewarm-update/">App still won’t update? Get the latest version</a></div>`;
+const refreshHtml = () => `<div class="refreshbox"><button class="secondary" id="refreshnow">Refresh now</button><small class="muted">Gets the team’s latest data again, sends anything waiting, and checks for a new app version. <span id="appver"></span></small><a class="link" href="${UPDATE_HELPER}">App still won’t update? Get the latest version</a></div>`;
 async function refreshNow(btn) {
   const chip = btn.id === 'syncchip'; // the bar's chip keeps its own text
   btn.disabled = true; const was = btn.textContent; if (!chip) btn.textContent = 'Refreshing…'; else btn.dataset.busy = '1';
@@ -559,6 +559,8 @@ route(/^\/$/, home);
 // them; nobody can open a locked patient, and the rules stop members changing it, until an admin unlocks it.
 const canLock = () => shared.admin || DEMO;
 const LOCK_ICON = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
+// the update helper page: out of the app's service-worker scope on the old address, inside the app's folder on the new one
+const UPDATE_HELPER = location.hostname === 'prewarmstudy.anawj.com' ? 'update.html' : '../prewarm-update/';
 const FORM_ICON = '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/><path d="M9 12h6M9 16h6"/></svg>';
 let selecting = null; // Set of patient ids while choosing which to lock / unlock, or to export
 let selMode = 'lock'; // what the selection is for: 'lock' or 'export'
@@ -2024,7 +2026,9 @@ function sharingHtml() {
   const chips = `<div class="seg sites">${SITES.map(x => `<button type="button" class="chip" data-site="${x}" aria-pressed="${settings.site === x}" ${shared.member ? 'disabled' : ''}>${x}</button>`).join('')}</div>`;
   if (!cloud.enabled) return `${chips}<small class="muted">New patients on this phone are recorded at this hospital. Sharing is off in demo mode.</small>`;
   if (shared.email && !shared.admin) return `<p class="note">${esc(shared.email)} isn’t on the study’s admin list. Ask the owner to add it.</p><button class="secondary" id="leave">Log out</button>`;
+  // an admin picks the hospital new patients on this phone are recorded at (members' hospital is fixed by their team)
   if (shared.admin) return `<p class="ok-box">Signed in as study admin (${esc(shared.email)}). You see every hospital’s patients.<br><span class="syncline">${esc(syncText())}</span></p>
+    <label class="lab">Your hospital</label>${chips}<small class="muted">New patients you start on this phone are recorded at this hospital. Pick one before starting a patient.</small>
     <a class="secondary" href="#/admin">Join codes and members</a>
     <details class="sect"><summary><span>Password</span><small>sign in with it next time</small></summary><div class="stack">
       <label class="lab" for="newpw">New password <small>(8 or more characters)</small></label>
@@ -2074,7 +2078,7 @@ async function joinTeam(site, code, btn) {
 
 // ---------- join link: #/join/{site}/{code} (after the #, so the code never reaches a server)
 const joinLink = (site, code) => location.origin + location.pathname + (/emulator/.test(location.search) ? '?emulator' : '') + `#/join/${site}/${encodeURIComponent(code)}`;
-route(/^\/join\/([A-Z]+)\/([^/]+)$/, (site, enc) => {
+route(/^\/join\/([A-Z]+)\/([^/]+)(?:\/(\w{1,6}))?$/, (site, enc, carriedMe) => {
   const code = decodeURIComponent(enc);
   // the code shouldn't stay in the history or a bookmark
   const forget = () => history.replaceState(null, '', location.pathname + location.search + '#/');
@@ -2084,7 +2088,7 @@ route(/^\/join\/([A-Z]+)\/([^/]+)$/, (site, enc) => {
   paint(`<div class="stack">
     <p>Join the <b>${site}</b> prewarming study team on this phone. You’ll see and enter ${site}’s patients, and they sync when there is signal.</p>
     ${shared.member ? `<p class="note">This phone is in the ${esc(shared.member.site)} team now; joining moves it to ${site}.</p>` : ''}
-    <label class="lab" for="me">Your initials</label><input id="me" value="${esc(settings.me)}" maxlength="6" autocapitalize="characters" autocomplete="off">
+    <label class="lab" for="me">Your initials</label><input id="me" value="${esc(settings.me || (carriedMe || '').toUpperCase())}" maxlength="6" autocapitalize="characters" autocomplete="off">
     <small class="muted">Saved with each reading as “entered by”.</small>
     <button class="primary big" id="joinlink">Join ${site}</button></div>`);
   $('#joinlink').onclick = async e => {
@@ -2211,6 +2215,51 @@ async function downloadWorkbook(live) {
   const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = name; a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 10000);
 }
+
+// ---------- moving to prewarmstudy.anawj.com (owner, 13 Oct 2026)
+// Phones keep their saved copy, unsent readings and sign-in per web address, so the old address (anawj.com/prewarm/) moves a
+// phone to the new one only when nothing on it is waiting: every reading sent to the team, no half-entered reading, the new
+// address reachable. Otherwise the app carries on as before and a bar says why it hasn't moved. It runs once when the app opens
+// (never while someone is entering a reading), and a team phone carries its join code and initials in the address's `#` part,
+// which never reaches a server, so it rejoins its team on the new address without anyone typing the code.
+const NEW_HOME = 'https://prewarmstudy.anawj.com/';
+const MOVE_TEST = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? new URLSearchParams(location.search).get('oldhost') : null; // tests: pretend to be the old address
+const ON_OLD_ADDRESS = window.top === window && (!!MOVE_TEST || ['anawj.com', 'www.anawj.com'].includes(location.hostname));
+function moveBar(text, canTry) {
+  const el = $('#moved'); if (!el) return;
+  el.hidden = false;
+  el.innerHTML = `<b>The study app has a new address: prewarmstudy.anawj.com.</b> ${esc(text)} ${canTry ? '<button class="link" id="movenow">Try again</button>' : ''}`;
+  $('#movenow')?.addEventListener('click', () => moveCheck());
+}
+// why this phone can't move yet ('' when it can)
+async function notReadyToMove() {
+  if (DEMO) return '';
+  const t0 = Date.now();
+  while (cloud.enabled && document.body.dataset.cloud !== 'ready' && Date.now() - t0 < 10000) await new Promise(r => setTimeout(r, 200));
+  if (cloud.enabled && document.body.dataset.cloud !== 'ready') return 'It is still checking this phone’s team and readings.';
+  if (Object.keys(localStorage).some(k => k.startsWith(NS + 'unsaved:'))) return 'A reading on this phone is half entered: save it, then it moves.';
+  if (Object.keys(pending).length) return 'Some readings are still waiting to reach the team: it moves once they have.';
+  if (!sharing() && Object.values(patients).some(p => !isGone(p))) return 'This phone holds patients that are not shared with a team, so it stays here. Export them first (Settings → Export).';
+  if (cloud.enabled && !(await cloud.flushed(6000))) return 'Waiting for signal to send the last readings: it moves once they have gone.';
+  if (!navigator.onLine) return 'No signal: it moves when the new address can be reached.';
+  try { await fetch(new URL('sw.js', MOVE_TEST || NEW_HOME).href + '?' + Date.now(), { mode: 'no-cors', cache: 'no-store' }); } catch { return 'The new address can’t be reached from here yet.'; }
+  return '';
+}
+async function moveCheck() {
+  if (!ON_OLD_ADDRESS) return;
+  let why = await notReadyToMove();
+  if (why) return moveBar(why, true);
+  // a team phone rejoins on the new address with its code (read from its own membership record) and initials
+  let hash = location.hash, member = null;
+  if (cloud.enabled && !DEMO && shared.member && !shared.admin) { try { member = await cloud.member(); } catch { member = null; } }
+  if (member?.code && member.site) hash = `#/join/${member.site}/${encodeURIComponent(member.code)}${settings.me ? '/' + encodeURIComponent(settings.me) : ''}`;
+  else if (shared.member && !shared.admin) return moveBar('It couldn’t read this phone’s team details yet.', true);
+  const rest = location.pathname.replace(/^\/prewarm\/?/, '').replace(/^index\.html$/, '');
+  const search = location.search.replace(/([?&])oldhost=[^&]*(&|$)/, (m, p1, p2) => (p2 ? p1 : '')).replace(/[?&]$/, ''); // the original query, untouched
+  const base = MOVE_TEST ? new URL(MOVE_TEST, location.href) : new URL(NEW_HOME);
+  location.replace(base.origin + (MOVE_TEST ? base.pathname : '/') + rest + search + hash);
+}
+if (ON_OLD_ADDRESS) setTimeout(moveCheck, 1500);
 
 // ---------- offline shell and updates
 if ('serviceWorker' in navigator && !DEMO) {

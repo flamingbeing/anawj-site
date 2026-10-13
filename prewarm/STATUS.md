@@ -16,6 +16,7 @@ edit the same lines. Read them all before starting; edit only yours.
 - Add `admins/kohwenjun@gmail.com` (lower case, any field) in the Firebase console for `prewarm-study` if it isn't there:
   the app said that email isn't on the admin list. Then tap Refresh now in Settings. Then set a password (Settings →
   Password, after one emailed-link sign-in).
+- Owner's checklist for the move to `prewarmstudy.anawj.com` (after the case ends and the PR is merged): tell team phones to tap Update available once between patients; each phone then moves itself when nothing is waiting and rejoins its team with one tap (initials are filled in); admins sign in again there. Check one phone of each team before the next case.
 - Firefox phone stuck on an old version: open `anawj.com/prewarm-update/` once and tap Get the latest version.
 - Say if the export should show "NA" in the later pre-warming cells (past 10 / 30 min) and the two empty Downloaded columns.
 - Open the app once as admin with signal (resends every patient so older records get the `locked` flag) and take

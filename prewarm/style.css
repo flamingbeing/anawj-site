@@ -447,3 +447,6 @@ dialog.kp::backdrop { background: rgba(0, 0, 0, .4); }
 .listhead { flex-wrap: wrap; }
 .headlinks { margin-left: auto; white-space: nowrap; }
 .headlinks .link { white-space: nowrap; }
+
+.moved { background: var(--info-soft); color: var(--navy); padding: 8px 12px; font-size: 13px; line-height: 1.35; }
+.moved .link { font-size: 13px; }
