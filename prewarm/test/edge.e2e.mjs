@@ -4,7 +4,7 @@
 const { chromium } = await import(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/node_modules/playwright/index.mjs');
 const b = await chromium.launch();
 const fails = [];
-const tryit = async f => { try { await f(); } catch (e) { fails.push('error: ' + e.message.split('\n')[0] + ' @ ' + (e.stack.match(/edge.e2e.mjs:(\d+)/)?.[1] || '?')); } };
+const tryit = async f => { try { await f(); } catch (e) { fails.push('error: ' + e.message.split('\n')[0] + ' @ ' + [...e.stack.matchAll(/edge.e2e.mjs:(\d+)/g)].map(m => m[1]).join(',')); } };
 const log = (ok, msg) => { if (!ok) fails.push(msg); };
 // a key time: tap its box, then Now on the time pad (the pad also takes typed digits and has Clear and Back)
 const tapNow = async (pg, id) => { await pg.click(`[data-ev="${id}"]`); await pg.click('.kp [data-now]'); };
@@ -691,6 +691,34 @@ jobs.push(() => tryit(async () => {
   log(/15 min/.test(before) && !/15 min/.test(after) && /10 min/.test(after), 'complete: pre-warming points with no data are hidden: ' + before + ' -> ' + after);
   await pg.evaluate(h => { location.hash = h; }, `#/p/${id}/prewarm/20`); await pg.waitForSelector('.strip');
   log(!/20 min/.test(await strip()) && await pg.$('.sealnote') !== null, 'opening a hidden point goes to one that has data');
+  await ctx.close();
+}));
+// AI. admin list shortcuts: Form view icon per line, Select to export with All / None, Select none apart from Lock / Unlock;
+// "Downloaded" no longer asked; the "Study IDs only" line is gone
+jobs.push(() => tryit(async () => {
+  const { ctx, pg } = await fresh();
+  log(await pg.$$eval('.list li a.formlink', a => a.length) === 2 && /\/form$/.test(await pg.getAttribute('.list li a.formlink', 'href')), 'each patient line has a Form view shortcut (admin)');
+  log(!/Study IDs only/.test(await pg.textContent('main')), 'the Study IDs only line is gone');
+  await pg.click('#selexport'); await pg.waitForSelector('.seltools');
+  log(/0 selected to export/.test(await pg.textContent('.selcount')) && await pg.isDisabled('#exportsel'), 'Select to export starts with none and Export disabled');
+  await pg.click('#selallx');
+  log(/2 selected/.test(await pg.textContent('.selcount')) && !await pg.isDisabled('#exportsel'), 'Select all picks every patient');
+  await pg.click('#selnone');
+  log(/0 selected/.test(await pg.textContent('.selcount')), 'Select none clears');
+  await pg.click('[data-sel]');
+  const dl = pg.waitForEvent('download', { timeout: 15000 }).catch(() => null);
+  await pg.click('#exportsel');
+  const d = await dl;
+  log(!!d && /\.xlsx$/.test(d.suggestedFilename()), 'Export downloads an Excel file for the selected case: ' + (d && d.suggestedFilename()));
+  await pg.click('#seldone'); await pg.click('#select'); await pg.waitForSelector('#lock');
+  const y = id => pg.$eval(id, e => Math.round(e.getBoundingClientRect().y));
+  log(await y('#selnone') !== await y('#lock') && await y('#selnone') < await y('#lock'), 'Select none is on its own line, above Lock / Unlock');
+  log(await pg.$eval('#selnone', e => e.className) !== await pg.$eval('#unlock', e => e.className), 'Select none looks different from Lock / Unlock');
+  await pg.click('#seldone');
+  await pg.click('.list li:first-child a.formlink'); await pg.waitForSelector('.fhead');
+  log(/Subject ID:/.test(await pg.textContent('.fhead')), 'the shortcut opens the Form view');
+  await pg.evaluate(() => { location.hash = '#/p/' + location.hash.split('/')[2] + '/data'; }); await pg.waitForSelector('details.sect');
+  log(!(await pg.textContent('main')).includes('Downloaded'), 'Pre-op no longer asks Downloaded');
   await ctx.close();
 }));
 await runJobs();
