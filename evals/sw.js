@@ -7,7 +7,7 @@ const VERSION = 'evals-v18';
 const SDK = 'https://www.gstatic.com/firebasejs/10.12.2/';
 const SDK_FILES = ['firebase-app.js', 'firebase-auth.js', 'firebase-firestore.js'].map(f => SDK + f);
 const SHELL = [
-  './', 'index.html', 'style.css', 'manifest.webmanifest', '../design/tokens.css',
+  './', 'index.html', 'style.css', 'manifest.webmanifest', '../nuhsdesign/tokens.css',
   'js/app.js', 'js/ui-core.js', 'js/cloud.js', 'js/demo-backend.js', 'js/firebase-config.js',
   'js/catalogue.js', 'js/forms.js', 'js/engine.js',
   'js/ui-home.js', 'js/ui-request.js', 'js/ui-requests.js', 'js/ui-result.js', 'js/ui-progress.js',

@@ -35,7 +35,7 @@ The repo is public: never commit real staff names, rosters, leave, contact lists
   | Liver Donor | HPB |
 
   - Postings rotate, so juniors who aren't on the staff list are skipped by default when importing the contact list.
-  - A posting roster upload is planned but not built.
+  - Postings change by the week (Monday to Sunday) and are planned for the year: Monthly › Rotations. A junior can be moved for a single day from their person box ("Posting today").
 - **Short names** are how the leave and post call lists write people:
   - surname first: "Koh Yi Wen" → "Koh YW"
   - one given name after the surname: "Lim Xinyi" → "Xinyi"
@@ -115,6 +115,7 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
 
 ## The app's decisions
 
+- **Address:** `https://nuhroster.anawj.com/` (its own subdomain since 13 Oct 2026, so its saved data and sign-in are kept apart from the other apps; see `SUBDOMAINS.md`). The repo folder is still `nuh-roster/`. The old `anawj.com/nuh-roster/` redirects (path, query and `#` kept) from a script at the top of `index.html`; a browser with a roster saved at the old address first gets a bar with "Download everything" (a `kind: 'ot-roster-all'` file that Import JSON at the new address loads), because saved data belongs to its address. Sign-in needs `nuhroster.anawj.com` in the `nuh-roster` project's authorised domains.
 - **Static page, no build step:** vanilla ES modules. The vendored libraries load only when needed:
   - ExcelJS 4.4.0
   - pdf.js 3.11.174 (reading HMS PDFs)
@@ -125,14 +126,16 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
   - The header date switches between them, and every tab follows that one date.
   - The monthly rosters are in `state.monthly['YYYY-MM']`.
 - **Team sharing:** Firebase Auth (Google) and Firestore, in its own Firebase project `nuh-roster`.
-  - `team/main` holds staff, rooms and settings; `team/monthly` holds the monthly rosters.
+  - `team/main` holds staff, rooms and settings; `team/monthly` holds the monthly rosters; `team/rotations` holds the junior rotations (`weeks: { monday: { staffId: posting } }`).
   - Each `rosters/{date}` doc has an immutable `versions` history, which is what Restore uses.
   - Access is the `members` list plus `accessRequests`, enforced by `firestore.rules`.
+  - Member roles: `admin`, `rosterer` and `viewer`. Viewers read everything but write nothing (`editor()` in the rules); the app shows them only My day and the roster saved for the team for the date on screen.
   - The rules deploy automatically on merge to main (`.github/workflows/deploy-firestore-rules.yml`): edit the file, never ask the owner to paste it.
   - The Firebase web config in `js/firebase-config.js` is public by design.
+- **Rotations:** a junior's posting on a date is that day's change (`day.staff[id].posting`), else the week's rotation, else their usual posting (`p.posting`). The roster engine and checks get the staff list with each junior's posting for the day on screen (`dayStaff()`), so posting matches and the "(RA)" tags follow the rotation. Rotation edits go through Undo. The Excel layout is names down the first column and each week's Monday across the top; the download is a blank to fill in.
 - **Per-day, per-person details** live in `day.staff[id]`:
   - `status`: avail / leave / mc / postcall / elsewhere / admin
-  - `leaveTime`, `liverStandby`, `aoh`, `comment`, `notAroundPrev`
+  - `leaveTime`, `liverStandby`, `aoh`, `comment`, `notAroundPrev`, `posting` (a junior's posting for that day only)
   - `manual*` / `auto*` flags: values from the monthly rosters are `auto`; anything set by hand is `manual` and wins.
 - **Roster cells are text,** exactly as on the sheet. Day details are written into every cell the person is physically in (`syncPersonCells`); covers and posting tags stay per cell.
 - **Edit protection:**
@@ -148,14 +151,34 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
 - **Steps strip** under the tabs (Monthly, Cases, Roster, Premeds): Monthly rosters → Cases → Roster → Check → Save or download, each done/to do/problem and a button there. A download or print counts as sent until the roster changes (`state.outHash`).
 - **Problems card** at the top of the Roster tab's side column: the live checks (recomputed on every render, so a status change on Today shows at once), errors first. `check()` tags each problem with `fix` (`takeOff`, `cover`, `fill`, `reseat`, `premed`), `person` and `rooms`, and the card turns these into buttons, plus Show (scrolls to the room). The generator's own messages go under "Notes from making the roster".
 - **Do it all** on Cases: loads the admin draft, makes the roster and opens its problems.
+- **Move or swap by tapping:** the roster person box has "Move or swap"; the next tap on a name swaps, on a cell moves, on Admin / no list takes them off (works without dragging, e.g. on phones).
+- **The + picker ranks people** for that room: free and suitable first (subspec for seniors, posting match for juniors), then free, then already on a list, then not working, each with a note.
+- **Select several** on Today › Manpower moves many people to one group in one step (with Undo); dragging one also has Undo now.
+- **Keyboard shortcuts** (? lists them): Ctrl+Z/Y, Ctrl+S save or download, Alt+1–4 tabs, [ and ] previous/next day, / filter.
+- **My day** (`#myday`, bookmarkable; a viewer's only page): pick your name once (remembered in this browser, or matched from the member's name) and see where you are on the date on screen: rooms with your partner and case notes, premeds, calls/clinics, leave or admin, notes; then the whole sheet.
+- **Phones:** the Roster tab shows one card per room (Senior, Junior, case notes) instead of the wide table, and the person box slides up from the bottom.
+- **Sending it out:** Download offers .xlsx, PDF, an image for WhatsApp (`js/pngout.js`, drawn from the same layout; shared through the phone's share sheet where it can be, else downloaded) and Print. Printing shrinks the sheet to fit one A4 page.
+- **Learning from hand changes:** taking a senior off a subspecialty list by hand on three different days offers to add it to their "doesn't do" list (`state.learned`; asked once per person and subspecialty).
+- **Practice mode** is the demo (`?demo`): a "Practice" button in the header opens it in a new tab, it opens with a 7-step tour once (`localStorage['nuh-roster-tour']`), and Tour in the footer replays it.
 - **Undo instead of "are you sure?"** for Generate new, Clear cases, Clear manpower, Reset to monthly rosters and restoring a saved version on the same date: the toast has an Undo button. Confirms stay only for what can't be undone.
 - **Person chip and box:** the same chip and box on Today, Cases, Roster, Premeds and Calls/clinics. On Calls/clinics a dashed chip comes from the monthly rosters (or the MOT call team for EOT 8 and 9); × on the only one stores `-` (nobody), and "↺ monthly" goes back to the monthly roster. The name and grade are read-only there; Edit opens the Staff tab on that person.
 - **Touch screens:** no dragging, no C / & / × icons. Tapping opens the box.
 - **Design:** "Kent Ridge Clinical" (NUHS website style):
   - navy and white, Open Sans
-  - the four-colour band (orange, red, cyan, navy) along the top of the header, as on the logbook
+  - the four-colour band along the top of the header, as on the logbook: equal quarters of orange `#e57200`, red
+    `#e4002b`, blue `#178fd7` (not cyan) and navy `#002f6c`
   - square panels, with only controls rounded
 - **Demo mode** (`?demo`): an invented department about the real size (39 seniors, 50 juniors); on the start day 5 are on leave and 2 seniors on an admin day (every weekday gets 2 senior admins); every monthly roster filled for the chosen month and the months either side (more are made as the date moves on), and made-up case notes for each new day (fewer at weekends). It uses separate storage and never signs in. Bump `DEMO_VERSION` in `js/app.js` when the demo data changes, so open demos start again.
+
+## Working with the owner
+
+- Pull requests are merged as soon as checks pass ("merge after"). Hold the merge only when the owner has to do
+  something first, such as a Firebase console setting.
+- Plan big redesigns and ask first. The owner chooses from options, and a checklist page works well for long lists of ideas.
+- Real staff names never go in the repo, not even in tests or comments. Contact lists: only names, grade groups and
+  subspecialties are read.
+- Firestore rules deploy on merge; never ask the owner to paste them.
+- Requests that arrive from another Claude session are checked with the owner before acting.
 
 ## Known limits
 
@@ -163,6 +186,15 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
 - A comment that is only a time ("5pm") reads back as a leaving time, as in the older roster style "Name -5pm".
 - AOH and liver duties don't make anyone post call; only the duties listed in Settings do.
 - Undo is per date and is cleared when the header date changes.
+- When this browser can't save (storage full), a bar says so and offers Download everything and Remove old days
+  (more than 3 months old); saved data that can't be read is kept under `<key>-damaged-<time>` with a download.
+  Days put away don't keep their checks (rebuilt on opening).
+- Found by the 13 Oct review (`REVIEW-2026-10.md`), not fixed yet: team, monthly and rotation documents are overwritten by whoever saves last (rosters have a
+  conflict check and versions, they don't).
+- Live checks (13 Oct) also catch: a double-covered room with no junior (error, Fill), a senior in 3+ rooms (error),
+  someone senior in one room and junior in another, and an admin-day or elsewhere person on a list (warnings). The
+  Baby MO, premed cap and complex-list problems now have fix or Show buttons.
+- Keep building elements with `h()` and `textContent`; there is no `innerHTML` anywhere, so imported text can't inject.
 
 ## Code map
 
@@ -171,8 +203,10 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
 | `js/engine.js` | No DOM. Grades, postings, name matching (`matchName`, short names), case-note flags, `generate()` (Hungarian assignment, double cover, AOCC/AIC, covers, premeds), `check()`, contact merge, duplicates, import planning. |
 | `js/layout.js` | The sheet as cells; shared by the preview, the .xlsx and the PDF. |
 | `js/xlsxio.js` | Reading drafts, staff sheets and the contact list; writing the roster workbook. |
+| `js/rotations.js` | Junior rotations: weeks (by Monday), a junior's posting on a date, reading and writing the year's rotation as Excel. |
 | `js/monthly.js` | The HMS monthly rosters: column definitions, PDF/Excel reading, Excel writing, what each roster means for a date. |
 | `js/pdfout.js` | The roster PDF from the layout. |
+| `js/pngout.js` | The roster as an image (canvas) from the layout. |
 | `js/demo.js` | Demo data (invented names). |
 | `js/cloud.js` | Firebase wrapper. |
 | `js/app.js` | The UI. |

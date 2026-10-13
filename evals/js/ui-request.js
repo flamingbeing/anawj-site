@@ -2,7 +2,7 @@
 // Also exports the pieces the other resident screens reuse: the assessor picker, the share sheet,
 // the QR code, item rows and the resident styles.
 
-import { S, hooks, h, fill, toast, cloud, icon, go, toolLabel, fmtDate, modal, debounce, avatar } from './ui-core.js';
+import { S, hooks, h, fill, toast, cloud, icon, go, toolLabel, fmtDate, modal, debounce, avatar, errText } from './ui-core.js';
 import { EPAS, ITEMS, itemById, searchItems, CATALOGUE_VERSION } from './catalogue.js';
 import { progress, dueItems, caseKey, sameCaseCount, identifierWarning, todayISO, residentYear } from './engine.js';
 import qrcode from './vendor/qrcode.js';
@@ -114,7 +114,7 @@ const facultyByEmail = email => (S.faculty || []).find(f => f.email === email) |
 // Group progress (done/min) for every item, from my submitted evaluations.
 export function itemProgress() {
   const map = new Map();
-  for (const p of progress(S.mine, myYear())) for (const { item } of p.items) map.set(item.id, p);
+  for (const p of progress(S.mine, myYear(), todayISO())) for (const { item } of p.items) map.set(item.id, p);
   return map;
 }
 
@@ -133,10 +133,12 @@ export function itemRow(item, prog, onclick, extra) {
     icon('chevron', 'e-row__chev'));
 }
 
-// The assessor's link. In the demo it opens as the demo assessor.
-export function evalLink(id) {
+// The assessor's link. In the demo it opens as the demo assessor. Otherwise it names the account it
+// was sent to (?as=), so the sign-in page can suggest it and spot a wrong account.
+export function evalLink(id, email) {
   const base = location.origin + location.pathname;
-  return base + (cloud.demo ? '?demo=assessor' : '') + '#e/' + encodeURIComponent(id);
+  const q = cloud.demo ? '?demo=assessor' : email ? '?as=' + encodeURIComponent(email) : '';
+  return base + q + '#e/' + encodeURIComponent(id);
 }
 export const shareText = ev => `Please complete this ${toolLabel(ev.tool)} for me: ${ev.itemText || ''}`.trim();
 
@@ -180,25 +182,28 @@ async function copyText(text) {
   catch {
     const t = h('textarea', { style: 'position:fixed;opacity:0' }, text);
     document.body.append(t); t.select();
-    try { document.execCommand('copy'); toast('Link copied'); } catch { toast('Copy failed: press and hold the link'); }
+    try { document.execCommand('copy'); toast('Link copied'); } catch { toast('Couldn’t copy. Press and hold the link to copy it.'); }
     t.remove();
   }
 }
 
 // Share via the phone's share sheet (form type, item and link only: no patient details).
-export async function shareEval(ev) {
-  const url = evalLink(ev.id);
+// { reminder: true } words it as a gentle reminder (Remind assessor).
+export const reminderShareText = ev => `Gentle reminder: could you complete this ${toolLabel(ev.tool)} for me when you have a moment? ${ev.itemText || ''}`.trim();
+export async function shareEval(ev, { reminder = false } = {}) {
+  const url = evalLink(ev.id, ev.assessorEmail);
+  const text = reminder ? reminderShareText(ev) : shareText(ev);
   if (navigator.share) {
-    try { await navigator.share({ title: `${toolLabel(ev.tool)} request`, text: shareText(ev), url }); return true; }
+    try { await navigator.share({ title: `${toolLabel(ev.tool)} ${reminder ? 'reminder' : 'request'}`, text, url }); return true; }
     catch (err) { if (err && err.name === 'AbortError') return false; }
   }
-  await copyText(shareText(ev) + '\n' + url);
+  await copyText(text + '\n' + url);
   return true;
 }
 
 // QR + Share + Copy link, as a block (share step) or inside a sheet (Nudge, re-share).
 export function sharePanel(ev) {
-  const url = evalLink(ev.id);
+  const url = evalLink(ev.id, ev.assessorEmail);
   const who = ev.assessorName || ev.assessorEmail;
   return h('div', { class: 'e-stack' },
     h('div', { class: 'e-qr' },
@@ -401,7 +406,7 @@ function stepItem() {
         : h('p', { class: 'e-rq-hint' }, 'Nothing matches. Try another word, or browse by EPA below.'));
   }
   const last = lastRequest();
-  const due = [...new Set(dueItems(S.mine, myYear()).map(i => i.id))].slice(0, 5).map(itemById);
+  const due = [...new Set(dueItems(S.mine, myYear(), todayISO()).map(i => i.id))].slice(0, 5).map(itemById);
   const recentIds = [...new Set([...S.mine].sort(byNew).map(ev => ev.itemId).filter(id => itemById(id)))].slice(0, 5);
   const repeat = last && !F.assessor ? h('button', { type: 'button', class: 'e-row', onclick: () => {
     F.itemId = last.itemId;
@@ -578,7 +583,7 @@ function stepCase() {
       F.sending = false;
       F.error = e?.code === 'permission-denied'
         ? `Not sent: ${F.assessor?.name || 'this assessor'} is not on the active faculty list. Choose another assessor, or ask the PD to add them.`
-        : 'Not sent: ' + (e.message || e) + '. Check your signal and try again.';
+        : 'Not sent. ' + errText(e);
       paint();
     }
   }
@@ -593,7 +598,7 @@ function stepShare() {
   return [
     h('div', { class: 'e-card' },
       h('div', { class: 'e-rq-done-head' }, icon('check'),
-        h('div', {}, h('h2', { class: 'e-h3', style: 'margin:0' }, F.offline ? 'Saved: sends when online' : 'Request sent'),
+        h('div', {}, h('h2', { class: 'e-h3', style: 'margin:0' }, F.offline ? 'Saved. It sends when you’re back online' : 'Request sent'),
           h('p', { class: 'e-small e-muted', style: 'margin:0' }, `${toolLabel(ev.tool)} · ${ev.assessorName}`)))),
     sharePanel(ev),
     h('div', { class: 'e-stack' },

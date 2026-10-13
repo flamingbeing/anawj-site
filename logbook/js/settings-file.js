@@ -7,6 +7,7 @@ import { cleanTemplate } from './demo-backend.js';
 import { cleanFormat } from './share-format.js';
 import { storedMarkdown } from './markdown.js';
 import { cleanExportOpts } from './export-opts.js';
+import { cleanDestinations } from './destinations.js';
 
 export const SETTINGS_KIND = 'apmes-logbook-settings';
 // account-specific bookkeeping that shouldn't travel with the file (your residency year is yours, not a colleague's)
@@ -20,6 +21,7 @@ const OBJECTS = {
   shareFormat: v => cleanFormat(v),
   markdown: v => { try { return storedMarkdown(v); } catch { return null; } },
   excelExport: v => cleanExportOpts(v),
+  destinations: v => cleanDestinations(v),
   catOrder: strs,
   caseHide: v => strs(v).slice(0, 20),
   basicOn: v => strs(v).slice(0, 30),
@@ -57,3 +59,28 @@ export function readSettingsFile(text) {
   const theme = ['light', 'dark', 'oled', 'auto'].includes(d.theme) ? d.theme : null;
   return { settings, templates, theme };
 }
+
+// ---- this browser's own saved choices as a file (look, text size, tab layout, unsent case drafts) ----
+// Used when the logbook moves address: what a browser saves belongs to its address, so the old address offers this file and
+// Settings -> Settings file at the new one loads it. Never cases from the account; no demo data, no Google / Dropbox sign-in state.
+export const DEVICE_KIND = 'apmes-logbook-device';
+const DEVICE_KEY = /^(apmes-)?logbook-/;
+const NOT_DEVICE = /^apmes-logbook-(demo|moved|cloud)/;
+export const isDeviceKey = k => DEVICE_KEY.test(String(k)) && !NOT_DEVICE.test(String(k));
+// entries: [[key, value]] from localStorage -> the file's contents
+export function deviceFile(entries) {
+  const items = {};
+  for (const [k, v] of entries || []) if (isDeviceKey(k) && typeof v === 'string' && v.length <= 100 * 1024) items[k] = v;
+  return { kind: DEVICE_KIND, version: 1, exportedAt: new Date().toISOString(), items };
+}
+// a file's text -> { items } to write into localStorage, or throws a message for the user
+export function readDeviceFile(text) {
+  if (String(text || '').length > MAX_JSON * 2) throw new Error('That file is too big to be a device file');
+  let d;
+  try { d = JSON.parse(text); } catch { throw new Error('That isn’t a device file (not JSON)'); }
+  if (!d || d.kind !== DEVICE_KIND || !d.items || typeof d.items !== 'object' || Array.isArray(d.items)) throw new Error('That isn’t a device file from this app');
+  const items = {};
+  for (const [k, v] of Object.entries(d.items).slice(0, 200)) if (isDeviceKey(k) && typeof v === 'string' && v.length <= 100 * 1024) items[k] = v;
+  return { items };
+}
+export const isDeviceFile = text => { try { return JSON.parse(text)?.kind === DEVICE_KIND; } catch { return false; } };

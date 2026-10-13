@@ -3,11 +3,18 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<script>
+// The page now lives at hand.anawj.com/babies/. The same folder is still served at anawj.com/hand-babies/, so send
+// visitors on from there (path, query and # kept). Only when it is the top page: the page editor on anawj.com still
+// opens the old copy in a frame to edit its text. A no-op on hand.anawj.com, previews and localhost (no loop).
+if (top === self && /^(www\.)?anawj\.com$/.test(location.hostname))
+  location.replace('https://hand.anawj.com/babies/' + location.pathname.replace(/^\/hand-babies\/?/, '') + location.search + location.hash);
+</script>
 <meta name="theme-color" content="#002f6c">
 <title>Hand assessment</title>
 <meta name="description" content="Crash course for new hand surgery MOs: accurate sensation, 2-point discrimination, individual tendon testing, Kanavel's signs and photos for remote review.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23002f6c'/%3E%3Ctext x='16' y='23' font-size='18' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='700'%3EH%3C/text%3E%3C/svg%3E">
-<link rel="stylesheet" href="../design/tokens.css">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -19,7 +26,7 @@
     <a href="#tendons">Tendons</a>
     <a href="#infection">Infection</a>
     <a href="#photos">Photos</a>
-    <a href="#call">Call</a>
+    <a href="#call">Handover</a>
   </nav>
 </header>
 
@@ -44,7 +51,7 @@
         </ul></div>
       <div><h4>Photos</h4>
         <ul class="photo"><li>Zoomed out + zoomed in.</li><li>Side view of the hand relaxed, palm up (posture).</li><li>Short video of each FDP and FDS test.</li></ul>
-        <h4 class="red">Call now if</h4>
+        <h4 class="red">Escalate now if</h4>
         <ul><li>Finger pale or cold.</li><li>Still bleeding after 10 min of pressure and elevation.</li><li>Wrist cut with several things cut.</li></ul>
         <p class="miss"><b>Easy to miss:</b> sensation for a finger cut needs to be tested on the finger itself, beyond the cut. Also, if the patient was gripping the knife or glass, so the tendon cut may sit <a href="#t-partial">further along</a> than the skin cut.</p>
       </div>
@@ -64,7 +71,7 @@
         </ul></div>
       <div><h4>Photos</h4>
         <ul class="photo"><li>Both hands side by side, palm up (swelling only shows when compared).</li><li>Close-up of the finger, front and side.</li><li>Back of the hand.</li><li>After the pen marking.</li></ul>
-        <h4 class="red">Call now if</h4>
+        <h4 class="red">Escalate now if</h4>
         <ul><li>Any Kanavel sign, or the whole finger is swollen.</li><li>Pain out of proportion, spreading fast, dusky skin, blisters, unwell: think <b>nec fasc</b>.</li></ul>
       </div>
     </div>
@@ -83,7 +90,7 @@
         </ul></div>
       <div><h4>Photos</h4>
         <ul class="photo"><li>Back of hand, zoomed out.</li><li>Close-up, fingers straight <b>and</b> fist clenched.</li></ul>
-        <h4 class="red">Call now</h4>
+        <h4 class="red">Escalate now</h4>
         <ul><li>Every fight bite. Most need a washout in OT.</li></ul>
       </div>
     </div>
@@ -102,7 +109,7 @@
         </ul></div>
       <div><h4>Photos</h4>
         <ul class="photo"><li>Zoomed out, fingers straight.</li><li>Loose fist (rotation).</li><li>Fingertips end-on.</li><li>X-rays: straight-on photo of the screen, every view.</li></ul>
-        <h4 class="red">Call now if</h4>
+        <h4 class="red">Escalate now if</h4>
         <ul><li>Dislocation not reduced, open fracture, pale finger, tense swollen hand.</li></ul>
       </div>
     </div>
@@ -120,7 +127,7 @@
         </ul></div>
       <div><h4>Photos</h4>
         <ul class="photo"><li>Whole hand, palm and back.</li><li>Stump from the front, side and end-on.</li><li>Amputated part, both sides, with a ruler.</li><li>X-ray the hand and the part.</li></ul>
-        <h4 class="red">Call now if</h4>
+        <h4 class="red">Escalate now if</h4>
         <ul><li>Amputation above the nail fold, thumb, several fingers, or a child: may be for replant.</li></ul>
       </div>
     </div>
@@ -135,7 +142,7 @@
           <li>What substance, when. Swelling spreading up the finger/palm, colour, sensation.</li>
           <li>X-ray. Elevate. <b>No digital block</b> (adds pressure).</li>
         </ul></div>
-      <div><h4>Call now</h4><ul><li><b>Always.</b> Needs early debridement.</li></ul></div>
+      <div><h4>Escalate now</h4><ul><li><b>Always.</b> Needs early debridement.</li></ul></div>
     </div>
   </details>
 
@@ -149,7 +156,7 @@
           <li>Temperature. Doppler both sides if you have one. One working artery can keep a finger pink, so pink doesn't mean both are fine.</li>
         </ul></div>
       <div><h4>Photos</h4><ul class="photo"><li>Whole hand in normal light, no flash (flash changes the colour).</li></ul>
-        <h4 class="red">Call now</h4><ul><li><b>Always.</b> Time matters.</li></ul></div>
+        <h4 class="red">Escalate now</h4><ul><li><b>Always.</b> Time matters.</li></ul></div>
     </div>
   </details>
 </section>
@@ -206,7 +213,7 @@
   <h3 id="t-look">Look first</h3>
   <p>With the hand relaxed and palm up, the fingers rest <b>a little more bent from index to little</b>. A finger lying straighter than its neighbours usually means its flexors are cut. This works even in a child or a patient who can't cooperate.</p>
   <div class="fig" data-fig="cascade" role="img" aria-label="3D hand, palm up, seen from the side. The fingers relax so each one is a little more bent from index to little. Then the middle finger straightens, which is what a finger with cut flexor tendons looks like."></div>
-  <p>You can also gently bend the wrist back: the fingers should curl. A side-view photo of the resting hand is often the most useful picture for your senior.</p>
+  <p>You can also gently bend the wrist back: the fingers should curl. A side-view photo of the resting hand is a useful record of the resting cascade.</p>
 
   <h3 id="t-flex">Flexors</h3>
   <div class="cols">
@@ -266,7 +273,7 @@
   </div>
   <p><b>Mallet finger:</b> the fingertip droops and can't be straightened actively, though you can straighten it passively. X-ray for a bony fragment.</p>
 
-  <h3 id="t-zones">Zones (tell your senior the zone)</h3>
+  <h3 id="t-zones">Zones (document the zone)</h3>
   <div class="fig" data-fig="zones" role="img" aria-label="Flexor tendon zones on the palm side. Zone 1: distal to the FDS insertion on the middle phalanx. Zone 2: from the distal palmar crease (A1 pulley) to the FDS insertion, both tendons inside the sheath. Zone 3: palm. Zone 4: carpal tunnel. Zone 5: wrist and forearm. Thumb zones T1 to T3."></div>
   <p class="example">How to write it: "R middle: FDP bends tip fully, no pain. FDS bends with floppy tip but painful and weak compared with L. Middle lies straighter than ring at rest. Video sent."</p>
 </section>
@@ -281,7 +288,7 @@
       <li><b>Tender along the palm side</b> of the finger, over the tendon.</li>
       <li><b>Pain when you gently straighten it</b> (often the earliest sign).</li>
     </ol>
-    <p>Early on, not all 4 show. <b>Even 1 or 2 with a swollen finger: call your senior.</b> It can destroy the tendon within a day and usually needs OT.</p>
+    <p>Early on, not all 4 show. <b>Even 1 or 2 with a swollen finger: escalate now.</b> It can destroy the tendon within a day and usually needs OT.</p>
   </div>
   <table class="t">
     <tr><th>Not the sheath?</th><th>Clue</th></tr>
@@ -295,8 +302,8 @@
 </section>
 
 <section id="photos">
-  <h2>Photos your senior can use</h2>
-  <p class="lead">A close-up on its own is hard to interpret. Your senior needs to know <b>which hand, which finger, which side and how bad</b>.</p>
+  <h2>Photos: part of the record</h2>
+  <p class="lead">Clinical photos are part of the record, taken with the patient's consent. A close-up on its own does not show <b>which hand, which finger, which side and how bad</b>.</p>
   <div class="fig" data-fig="photo" role="img" aria-label="Three examples. Close-up only: you cannot tell which hand, finger or side. Far away only: you cannot see the wound. Correct: send both, one wide view of the whole hand and wrist and one close-up of the wound."></div>
   <div class="callout must">
     <b>Always 2 photos:</b>
@@ -317,13 +324,14 @@
 </section>
 
 <section id="call">
-  <h2>Calling your senior</h2>
+  <h2>Documenting and handing over</h2>
+  <p class="lead">Write the findings the same way every time: it is the record, and it is what the next doctor reads. Example:</p>
   <p class="example">"35M, right-handed chef. Cut L index on broken glass 2 h ago, was gripping it. Lac 1.5 cm, palm side, radial side over the proximal phalanx (zone II). Pink, CRT 2 s. 2PD radial 12 mm, ulnar 4 mm (R 4/4), before LA. FDP full but painful against resistance, FDS OK. X-ray no glass. Photos + videos sent. ?Digital nerve ± partial FDP, for explore when?"</p>
 </section>
 
 <footer>
   <p>Teaching aid for new hand MOs. Follow your department's protocols and your senior. Works offline once opened.</p>
-  <p><a href="/edit/?page=%2Fhand-babies%2F">Spotted something wrong? Suggest an edit</a></p>
+  <p><a href="https://anawj.com/edit/?page=%2Fhand-babies%2F">Spotted something wrong? Suggest an edit</a></p>
 </footer>
 </main>
 <script src="app.js"></script>

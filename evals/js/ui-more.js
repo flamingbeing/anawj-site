@@ -1,6 +1,6 @@
 // More (#more): account, apply for a role, demo role switch, settings, privacy, sign out.
 
-import { S, h, fill, cloud, toast, hooks, avatar, isResident, isFaculty, isStaff, confirmBox, segment, THEMES, themePref, setTheme } from './ui-core.js';
+import { S, h, fill, cloud, toast, hooks, avatar, isResident, isFaculty, isStaff, confirmBox, signOutSafely, segment, THEMES, themePref, setTheme, errText } from './ui-core.js';
 import { residentYear } from './engine.js';
 
 const AUTOSCROLL_KEY = 'evals-autoscroll';   // 'off' turns auto-advance off (ui-form.js reads it)
@@ -55,7 +55,7 @@ function applyCard() {
     card.append(h('p', { class: 'e-note' }, `Application to join as ${label(appl.role)} sent. An admin or programme director will approve it.`),
       h('div', { class: 'e-actions' },
         h('button', { class: 'n-btn n-btn--outline e-btn-quiet e-btn-small', type: 'button', onclick: () => fill(card, h('h2', { class: 'e-h3' }, 'Change application'), applyForm(appl, wantRes, wantFac)) }, 'Change'),
-        h('button', { class: 'n-btn e-btn-small', type: 'button', onclick: async () => { await hooks.refreshRoles(); toast(S.roles.application?.status === 'pending' ? 'Still waiting' : 'Updated'); } }, 'Check again')));
+        h('button', { class: 'n-btn e-btn-small', type: 'button', onclick: async () => { await hooks.refreshRoles(); toast(S.roles.application?.status === 'pending' ? 'Not approved yet. You’ll see it here once it is.' : 'Updated'); } }, 'Check again')));
     return card;
   }
   if (appl && appl.status !== 'pending') {
@@ -83,7 +83,7 @@ function applyForm(prev, wantRes, wantFac) {
       await cloud.applyForRole({ role, name: name.value.trim(), note: note.value.trim() });
       toast('Application sent');
       await hooks.refreshRoles();
-    } catch (err) { msg.hidden = false; msg.textContent = 'Could not apply: ' + (err.message || err); btn.disabled = false; }
+    } catch (err) { msg.hidden = false; msg.textContent = 'Couldn’t send your application. ' + errText(err); btn.disabled = false; }
   } },
     roles.length > 1 ? h('div', { class: 'e-radios', role: 'radiogroup', 'aria-label': 'Role' }, roles.map(([v, l, d]) =>
       h('label', { class: 'e-radio' }, h('input', { type: 'radio', name: 'more-apply-role', value: v, checked: v === role, onchange: () => { role = v; } }),
@@ -138,7 +138,4 @@ function privacyCard() {
     h('p', { class: 'e-small' }, 'Evaluations are seen by the resident, the assessor and the programme’s admins and directors.'));
 }
 
-async function signOut() {
-  try { await cloud.signOut(); }
-  catch (err) { toast('Could not sign out: ' + (err.message || err)); }
-}
+const signOut = () => signOutSafely();

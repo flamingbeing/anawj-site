@@ -2,7 +2,7 @@
   Prewarming study app. NUHS design system, app theme (Kent Ridge Clinical "kr-app"): grey ground, white rounded
   cards with hairlines, navy as the only accent, a white app bar with the four-quarter band (orange / red / stripe
   blue / navy), Open Sans (index.html), 44px tap targets. Light only, phone first (360 px). Tokens from
-  ../design/tokens.css (--n-*); app tokens below.
+  ../nuhsdesign/tokens.css (--n-*); app tokens below.
   The patient main screen is compact: everything for one timepoint fits a 390 x 844 phone without scrolling.
 */
 :root {
@@ -240,7 +240,7 @@ input:focus { border-color: var(--navy); }
 .ico { width: 1.1em; height: 1.1em; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.15em; }
 /* a locked patient opened by an admin: read only */
 body.ro main::before { content: "Locked: read only. Unlock it on the home page to change it."; display: block; padding: 8px 12px; border-radius: var(--r); background: var(--warn-soft); color: var(--warn); font-weight: 600; }
-body.ro #save, body.ro .logbtn, body.ro [data-done], body.ro [data-undone], body.ro [data-sign], body.ro [data-unsign], body.ro #addix, body.ro [data-rmix] { display: none !important; }
+body.ro #save, body.ro [data-done], body.ro [data-undone], body.ro [data-sign], body.ro [data-unsign], body.ro #addix, body.ro [data-rmix] { display: none !important; }
 body.ro main .k, body.ro main .num, body.ro main .chip, body.ro main .tchip, body.ro main input, body.ro main select, body.ro main textarea, body.ro main [data-use], body.ro main [data-map] { pointer-events: none; opacity: .65; }
 .list a.locked { background: var(--bg); border-style: dashed; color: var(--muted); }
 .listhead { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
@@ -419,3 +419,42 @@ dialog.kp::backdrop { background: rgba(0, 0, 0, .4); }
 .card.dflt .num { color: #767676; font-weight: 400; }
 .card.dflt .chip[aria-pressed="true"] { background: var(--line); border-color: var(--line-input); color: #4d545b; }
 .refreshbox { display: grid; gap: 4px; margin-top: 12px; }
+
+.bar h1 { display: flex; flex-direction: column; line-height: 1.1; }
+.bar h1 .idlab { font-size: 11px; font-weight: 500; opacity: .8; }
+.bar h1 span { overflow: hidden; text-overflow: ellipsis; }
+
+/* the bar's sync status chip (owner, 13 Oct 2026): replaces the Log shortcut */
+.syncchip { background: var(--card); color: var(--ink); border: 1px solid var(--line); }
+.syncchip:active { background: var(--bg); }
+.syncchip[data-state="ok"] { color: var(--ok); border-color: var(--ok); }
+.syncchip[data-state="wait"] { background: var(--warn-soft); color: var(--warn); border-color: var(--warn); }
+.syncchip[data-state="local"] { color: var(--muted); }
+.syncchip[data-busy] { opacity: .6; }
+
+/* patient list: admin Form view shortcut on each line; select to lock / export (owner, 13 Oct 2026) */
+.list li.rowact { display: flex; gap: 6px; align-items: stretch; }
+.list li.rowact > a:first-child { flex: 1 1 auto; min-width: 0; }
+.list a.formlink { display: grid; place-items: center; flex: none; width: 52px; padding: 0; color: var(--navy); }
+.headlinks { display: inline-flex; gap: 14px; }
+.seltools { display: grid; gap: 8px; }
+.seltools .selcount { flex: none; }
+.selshort { display: flex; flex-wrap: wrap; gap: 6px; }
+.selchip { font: inherit; font-size: 14px; min-height: 40px; padding: 4px 12px; border-radius: 20px; background: transparent; color: var(--navy); border: 1px dashed var(--navy); }
+.selacts { display: flex; gap: 6px; }
+.selacts .primary, .selacts .secondary { flex: 1 1 0; }
+.seltools .link { justify-self: start; }
+.listhead { flex-wrap: wrap; }
+.headlinks { margin-left: auto; white-space: nowrap; }
+.headlinks .link { white-space: nowrap; }
+
+.moved { background: var(--info-soft); color: var(--navy); padding: 8px 12px; font-size: 13px; line-height: 1.35; }
+.moved .link { font-size: 13px; }
+
+/* bottom shortcuts: a finished one turns green (owner, 13 Oct 2026) */
+.links a.done { background: var(--ok); border-color: var(--ok); color: #fff; }
+.links a.done small { color: #fff; }
+/* PACU: Mark complete is a full-width button */
+.sign.big { border-top: 0; }
+.sign.big .tickbtn { width: 100%; justify-content: center; min-height: 56px; border-radius: var(--r-card); background: var(--navy); color: #fff; font-size: 17px; box-shadow: 0 2px 6px rgba(0, 47, 108, .35); }
+.sign.big .tickbtn .tick { border-color: #fff; background: transparent; }

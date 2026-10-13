@@ -309,8 +309,8 @@ portfolio content.
   tested): sign-in leaves the page and comes back, no popups (Oct 2026: on the owner's phone popups lost their
   opener, so Drive stayed on a blank page and Dropbox did nothing). Drive = OAuth implicit grant (token in the
   `#fragment`), scope `drive.file`, folder "APMES Logbook" found or made, same-day file replaced; Dropbox = PKCE,
-  code in `?query`, App folder access, uploads to `/APMES Logbook/`. Both redirect to `https://anawj.com/logbook/`
-  (registered with both). localStorage `apmes-logbook-cloud-pending` {to, state, verifier, demo, at} before leaving
+  code in `?query`, App folder access, uploads to `/APMES Logbook/`. Both redirect to `https://apmes.anawj.com/logbook/`
+  (registered with both; moved from anawj.com on 13 Oct 2026). localStorage `apmes-logbook-cloud-pending` {to, state, verifier, demo, at} before leaving
   (not sessionStorage: a home-screen app may finish sign-in in a browser tab; 15 min limit);
   `index.html` stores the answer in `apmes-logbook-cloud-return` and tidies the address to `#data` (`?demo` kept);
   `resumeCloudSave` (from `onUser`) waits for the server's cases and reflections, then saves. The reflections
@@ -398,6 +398,12 @@ portfolio content.
   and its text); `{{notes}}` in the day heading places them there instead; no notes, no heading. The Markdown export
   (renamed from "Notes apps") puts dated notes in their day's case note (a notes-only day gets one) and undated ones
   in `Notes.md`. The backup file holds notes; restore adds missing ones up to the limit. e2e: `test/e2e/notepad.mjs`.
+  A note's linked-case pill (in the list and in the editor) opens that case's edit page over the note
+  (`openCase` → `editCaseDialog`). The edit page has a "Linked" row (not for a new case): Open / Write a
+  reflection (`reflectOnCase`) and Open the notes / Write a note (`openNotes({ caseId, create })`; it saves an open
+  note first). The Notes page's "Download notes as files (zip)" makes one `.md` or `.txt` per note
+  (`noteFiles` in `notepad.js`: "2026-10-12 Title.md", undated "No date Title.md"; title, Date line, text; the linked
+  case isn't named); this is separate from the Markdown export, which puts notes inside the day's case note.
 - **Connect Claude** (`mcp/`, Settings → Connect Claude (advanced) links its README on GitHub): a read-only MCP
   server residents run locally; Google "Desktop app" OAuth (loopback, PKCE) → Firebase `signInWithIdp` → Firestore
   REST as the user, so the rules apply; only `logbooks/{own email}` and the user's own `residents` entry. Owner
@@ -427,6 +433,7 @@ portfolio content.
   (`PHOTO_BUDGET_KB`; figures record `kb`). They stay in Firestore: at 150 residents that is about 3 GB, around
   US$0.40/month on Blaze, and photos still work offline. Moving to Firebase Storage needs a console bucket
   (asia-southeast1), loses offline adds, and isn't worth it yet.
+- **Address (13 Oct 2026, SUBDOMAINS.md step 5):** the logbook lives at `apmes.anawj.com/logbook/` (evals beside it). `anawj.com/logbook/` still serves the same folder, but a top-level visit forwards (path, query, # kept; `index.html` head script; no-op on the new host, previews, localhost and frames). A browser with choices saved at the old address first gets a page (`js/moved.js`, `window.LOGBOOK_MOVED_TO`) offering them as a file (`deviceFile` in `settings-file.js`, kind `apmes-logbook-device`: `apmes-logbook-*` and `logbook-*` keys except demo, moved and Google / Dropbox sign-in state); Settings → Settings file at the new address loads it. e2e: `test/e2e/moved.mjs`. `authDomain` is `apmes.anawj.com` (helper pages and `init.json` served by the Worker, `apmes-auth/`).
 - **Privacy policy:** `privacy/index.html` (anawj.com/privacy/) shows who sees what. Keep it in step when roles change.
 
 ## Tags and suggestions (`tags.js`, `suggest.js`)

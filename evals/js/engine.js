@@ -94,7 +94,14 @@ export function nextGap(result) {
 // group minimum; in an 'each' group every item needs at least 1 first, so done is capped at
 // min - (items with none). State: done; else by the resident's year against the group's due year:
 // overdue (past), due-soon (this year), on-track (next year, or started early), later.
-export function progress(evaluations, rYear) {
+// A group due in the "first N months of R1" (mask, intubation) is overdue in R1 once N months of the
+// academic year (from 1 July) have passed; pass today (YYYY-MM-DD) to apply that, as the screens do.
+export function monthsIntoYear(today) {
+  const m = Number(String(today || '').split('-')[1]);
+  return m >= 1 && m <= 12 ? (m + 5) % 12 : null;   // July = 0 … June = 11
+}
+export function progress(evaluations, rYear, today = null) {
+  const into = monthsIntoYear(today);
   const yr = Number(rYear) || 1;
   const counts = {};
   for (const ev of evaluations || []) {
@@ -106,8 +113,10 @@ export function progress(evaluations, rYear) {
     const total = items.reduce((n, i) => n + i.done, 0);
     const uncovered = g.each ? items.filter(i => !i.done).length : 0;
     const done = Math.max(0, Math.min(total, g.min - uncovered));
+    const early = /first\s+(\d+)\s+months?/i.exec(g.completeBy || '');
     const state = done >= g.min ? 'done'
       : yr > g.byYear ? 'overdue'
+      : early && into != null && yr === g.byYear && into >= Number(early[1]) ? 'overdue'
       : yr === g.byYear ? 'due-soon'
       : yr === g.byYear - 1 || done > 0 ? 'on-track' : 'later';
     return { group: g, done, min: g.min, state, items };
@@ -197,9 +206,9 @@ export function residentYear(residentDoc, today = todayISO()) {
 
 // Items due by the resident's year that their group still needs (for "Due for you"), overdue first.
 // In an 'each' group the items not yet done come first; once all are covered any item counts.
-export function dueItems(evaluations, rYear) {
+export function dueItems(evaluations, rYear, today = null) {
   const out = [];
-  const rows = progress(evaluations, rYear).filter(p => p.state === 'overdue' || p.state === 'due-soon');
+  const rows = progress(evaluations, rYear, today).filter(p => p.state === 'overdue' || p.state === 'due-soon');
   rows.sort((a, b) => (a.state === 'overdue' ? 0 : 1) - (b.state === 'overdue' ? 0 : 1));
   for (const p of rows) {
     const open = p.group.each ? p.items.filter(i => !i.done) : [];

@@ -3,7 +3,7 @@
   Taken from the public stylesheet of https://www.nuhs.edu.sg/ (October 2026).
   Unofficial: this mirrors the look, it is not an NUHS brand asset. Don't use the NUHS logo with it.
 
-  Use: <link rel="stylesheet" href="/design/tokens.css"> then the .n-* classes, or just the variables.
+  Use: <link rel="stylesheet" href="/nuhsdesign/tokens.css"> then the .n-* classes, or just the variables.
   Light theme only, like the source site.
 */
 

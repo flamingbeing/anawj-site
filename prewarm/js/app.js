@@ -55,6 +55,8 @@ const saveAll = () => write('patients', patients);
 const saveSettings = () => write('settings', settings);
 // settings v2 (owner, 12 Oct 2026): every reading is entered live by default, BP / HR / BIS every 15 min included
 if ((settings.v || 0) < 2) { settings.hide.haemo15 = false; settings.v = 2; saveSettings(); }
+// settings v3 (owner, 13 Oct 2026): the "Readings to enter live" section is gone, so nothing stays hidden from an old choice
+if (settings.v < 3) { for (const k of Object.keys(settings.hide)) settings.hide[k] = false; settings.v = 3; saveSettings(); }
 // Interface size (this phone only): zooms the whole screen. Normal is 100%.
 const SIZES = [['0.85', 'Smaller'], ['0.92', 'Small'], ['1', 'Normal'], ['1.1', 'Large'], ['1.25', 'Larger']];
 const applySize = z => document.documentElement.style.setProperty('--ui-zoom', SIZES.some(([k]) => k === String(z)) ? String(z) : '1');
@@ -91,6 +93,8 @@ const toMin = hm => { const m = /^(\d{1,2}):(\d{2})$/.exec(hm || ''); return m ?
 const fromMin = m => `${String(Math.floor(((m % 1440) + 1440) % 1440 / 60)).padStart(2, '0')}:${String(((m % 60) + 60) % 60).padStart(2, '0')}`;
 const nowMin = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes() + d.getSeconds() / 60; };
 const sid = p => val(p, 'enrol_id') || 'New patient';
+// "Subject ID: 85" wherever a patient is named on screen (owner, 13 Oct 2026)
+const sidL = p => 'Subject ID: ' + sid(p);
 function set(p, id, v) {
   if (p.lock?.on) return toast('Locked: read only. Unlock it on the home page to change it.');
   if (setVal(p, id, v, settings.me)) { saveAll(); sync(p, [id]); }
@@ -123,8 +127,9 @@ function syncText() {
   return when ? `Synced ${when}.` : 'Not synced yet.';
 }
 // every "last synced" line on screen
-function showSync() { const t = syncText(); document.querySelectorAll('.syncline').forEach(el => { el.textContent = t; el.classList.toggle('late', /^Not/.test(t)); }); }
+function showSync() { paintSyncChip(); const t = syncText(); document.querySelectorAll('.syncline').forEach(el => { el.textContent = t; el.classList.toggle('late', /^Not/.test(t)); }); }
 setInterval(showSync, 20000);
+addEventListener('online', () => showSync()); addEventListener('offline', () => showSync());
 function sync(p, ids, withLock = false) {
   if (!sharing()) return;
   // PACU answers also go to the nurse's link copy, so the nurse's phone sees them (owner, 13 Oct 2026)
@@ -230,9 +235,10 @@ function pacuLinkHtml(p) {
 
 // Refresh now (owner, 13 Oct 2026): fetch the team's latest data again and look for a new app version
 let swReg = null, offerUpdate = null;
-const refreshHtml = () => `<div class="refreshbox"><button class="secondary" id="refreshnow">Refresh now</button><small class="muted">Gets the team’s latest data again, sends anything waiting, and checks for a new app version.</small></div>`;
+const refreshHtml = () => `<div class="refreshbox"><button class="secondary" id="refreshnow">Refresh now</button><small class="muted">Gets the team’s latest data again, sends anything waiting, and checks for a new app version. <span id="appver"></span></small><a class="link" href="${UPDATE_HELPER}">App still won’t update? Get the latest version</a></div>`;
 async function refreshNow(btn) {
-  btn.disabled = true; const was = btn.textContent; btn.textContent = 'Refreshing…';
+  const chip = btn.id === 'syncchip'; // the bar's chip keeps its own text
+  btn.disabled = true; const was = btn.textContent; if (!chip) btn.textContent = 'Refreshing…'; else btn.dataset.busy = '1';
   let msg = 'Up to date.';
   try {
     if (cloud.enabled) {
@@ -248,10 +254,14 @@ async function refreshNow(btn) {
       if (swReg.waiting && navigator.serviceWorker.controller) { offerUpdate?.(swReg.waiting); msg = 'A new app version is ready: tap “Update available” at the top.'; }
     }
   } catch { msg = 'Couldn’t refresh. Check your signal and try again.'; }
-  btn.disabled = false; btn.textContent = was; toast(msg);
+  btn.disabled = false; if (!chip) btn.textContent = was; else delete btn.dataset.busy; paintSyncChip(); toast(msg);
   if (/^#\/(settings)?$/.test(location.hash) || !location.hash) render();
 }
-const wireRefresh = () => $('#refreshnow')?.addEventListener('click', e => refreshNow(e.target));
+// which app version this phone is running (the saved copy's name), so a phone stuck on an old one can be spotted
+const wireRefresh = () => {
+  $('#refreshnow')?.addEventListener('click', e => refreshNow(e.target));
+  const el = $('#appver'); if (el && window.caches) caches.keys().then(ks => { const k = ks.find(x => x.startsWith('prewarm-')); if (k && $('#appver')) $('#appver').textContent = 'App version ' + k.replace('prewarm-', ''); }).catch(() => {});
+};
 async function watch() {
   shared.unwatch?.(); shared.unwatch = null;
   for (const u of pacuSubs.values()) u?.(); pacuSubs.clear();
@@ -375,11 +385,16 @@ function colsFor(s, pt) {
     return true;
   });
 }
+// a timepoint with a reading saved (a bare time doesn't count: a cleared or blank reading leaves one behind)
+const hasData = (p, s, x) => Object.keys(p.f).some(k => k.startsWith(`${s}_${x.key}_`) && val(p, k) != null);
 function pointsFor(p, s) {
-  const pts = SERIES[s].points;
-  if (s === 'haemo' && settings.hide.haemo15) return pts.filter(x => x.key === 'base' || p.f['at_haemo_' + x.key]);
+  let pts = SERIES[s].points;
+  // read only (the section is marked complete, or data collection is): timepoints with no data are hidden, so no time is offered
+  // for logging (owner, 13 Oct 2026); a series with no data at all keeps its list
+  if (sealedBy(p, s)) { const seen = pts.filter(x => hasData(p, s, x)); if (seen.length) pts = seen; }
+  if (s === 'haemo' && settings.hide.haemo15) return pts.filter(x => x.key === 'base' || val(p, 'at_haemo_' + x.key));
   // once pre-warming is complete (ticked, or its last reading saved), the later 5-min points (past the 10 / 30 min of warming) aren't taken (owner, 13 Oct 2026)
-  if (s === 'prewarm' && WARM_MIN[val(p, 'arm')] && (val(p, 'sign_prewarm') || p.f['at_prewarm_' + WARM_MIN[val(p, 'arm')]])) return pts.filter(x => x.min == null || x.min <= WARM_MIN[val(p, 'arm')] || p.f['at_prewarm_' + x.key]);
+  if (s === 'prewarm' && WARM_MIN[val(p, 'arm')] && (val(p, 'sign_prewarm') || val(p, 'at_prewarm_' + WARM_MIN[val(p, 'arm')]))) return pts.filter(x => x.min == null || x.min <= WARM_MIN[val(p, 'arm')] || hasData(p, s, x));
   return pts;
 }
 // due time (minutes after midnight) of a timepoint, from the reference event
@@ -526,9 +541,14 @@ function showBanner(text, ms, target = null) {
   b.textContent = text; b.hidden = false;
   clearTimeout(bannerTimer); bannerTimer = setTimeout(() => { b.hidden = true; }, ms);
 }
+// the bar shows a small "Subject ID" above the ID, so the long title doesn't crowd the countdown and Log
+function setTitle(title) {
+  const m = /^Subject ID: (.*)$/.exec(title), el = $('#title');
+  if (m) el.innerHTML = `<small class="idlab">Subject ID</small><span>${esc(m[1])}</span>`; else el.textContent = title;
+}
 function header(title, back, extra = '') {
   $('#ptabs').hidden = true; $('#ptabs').innerHTML = '';
-  $('#title').textContent = title;
+  setTitle(title);
   $('#back').hidden = !back; $('#back').onclick = () => go(back);
   $('#extra').innerHTML = extra;
 }
@@ -539,7 +559,11 @@ route(/^\/$/, home);
 // them; nobody can open a locked patient, and the rules stop members changing it, until an admin unlocks it.
 const canLock = () => shared.admin || DEMO;
 const LOCK_ICON = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
-let selecting = null; // Set of patient ids while choosing which to lock / unlock
+// the update helper page: out of the app's service-worker scope on the old address, inside the app's folder on the new one
+const UPDATE_HELPER = location.hostname === 'prewarmstudy.anawj.com' ? 'update.html' : '../prewarm-update/';
+const FORM_ICON = '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/><path d="M9 12h6M9 16h6"/></svg>';
+let selecting = null; // Set of patient ids while choosing which to lock / unlock, or to export
+let selMode = 'lock'; // what the selection is for: 'lock' or 'export'
 function setLock(ids, on) {
   const by = shared.email || settings.me || 'admin';
   for (const id of ids) {
@@ -554,26 +578,31 @@ let homeStop = null;
 function home() {
   header('Prewarming study' + (DEMO ? ' (demo)' : ''), null, `<a class="iconbtn" href="#/settings" aria-label="Settings">⚙</a>`);
   const list = Object.values(patients).filter(p => !isGone(p)).sort((a, b) => (lastEdit(b)?.t || b.created) - (lastEdit(a)?.t || a.created));
-  if (selecting && !canLock()) selecting = null;
+  if (selecting && selMode === 'lock' && !canLock()) selecting = null;
   const latest = list[0];
   paint(`
     ${settings.me && settings.site ? '' : `<div class="note">Add your ${settings.me ? '' : 'initials and '}hospital in <a href="#/settings">Settings</a>${settings.me ? '' : ' so each reading shows who entered it'}.</div>`}
     <div class="newrow"><button class="primary big" id="new">+ New patient</button><a class="secondary big" id="pacuview" href="#/pacu" title="Hand the phone to the PACU nurse: tapping a participant opens only their PACU page">PACU view</a></div>
-    <div class="listhead"><h2>Patients on this phone</h2>${canLock() && list.length && !selecting ? '<button class="link" id="select">Select to lock</button>' : ''}</div>
-    ${selecting ? `<div class="seltools"><span>${selecting.size} selected</span>
-      ${latest && list.length > 1 ? `<button class="secondary" id="selall">All but ${esc(sid(latest))} (latest)</button>` : ''}<button class="secondary" id="selnone">None</button>
-      <button class="primary" id="lock" ${selecting.size ? '' : 'disabled'}>${LOCK_ICON} Lock</button><button class="secondary" id="unlock" ${selecting.size ? '' : 'disabled'}>Unlock</button><button class="link" id="seldone">Done</button></div>` : ''}
+    <div class="listhead"><h2>Patients on this phone</h2>${list.length && !selecting ? `<span class="headlinks">${canLock() ? '<button class="link" id="select">Select to lock</button>' : ''}<button class="link" id="selexport">Select to export</button></span>` : ''}</div>
+    ${selecting ? `<div class="seltools"><span class="selcount">${selecting.size} selected${selMode === 'export' ? ' to export' : ''}</span>
+      <div class="selshort" role="group" aria-label="Quick selection"><button class="selchip" id="${selMode === 'export' ? 'selallx' : 'selall'}">${selMode === 'export' ? 'Select all' : latest && list.length > 1 ? `All but ${esc(sid(latest))} (latest)` : 'Select all'}</button><button class="selchip" id="selnone">Select none</button></div>
+      <div class="selacts">${selMode === 'export'
+        ? `<button class="primary" id="exportsel" ${selecting.size ? '' : 'disabled'}>Export ${selecting.size || ''} to Excel</button>`
+        : `<button class="primary" id="lock" ${selecting.size ? '' : 'disabled'}>${LOCK_ICON} Lock</button><button class="secondary" id="unlock" ${selecting.size ? '' : 'disabled'}>Unlock</button>`}</div>
+      <button class="link" id="seldone">Done</button></div>` : ''}
     ${list.length ? `<ul class="list">${list.map(p => {
       const e = lastEdit(p), locked = p.lock?.on;
       // the same Subject ID on two records (e.g. made on two phones without signal): readings are split between them
       const twin = list.some(q => q !== p && String(val(q, 'enrol_id') || '').toLowerCase() === String(val(p, 'enrol_id') || '').toLowerCase() && (val(q, 'site') || '') === (val(p, 'site') || ''));
-      const body = `<b>${esc(sid(p))}${val(p, 'site') ? ` <small>${esc(val(p, 'site'))}</small>` : ''}</b>${twin ? '<span class="twinline">Same Subject ID twice: readings may be split. Fill in one and correct the other’s ID (Pre-op and patient details), or delete it in Settings.</span>' : ''}<span${locked ? ' class="lockline"' : val(p, 'done') ? ' class="okline"' : ''}>${locked ? `${LOCK_ICON} Locked by the study admin${canLock() ? ' · read only' : ''}` : esc(status(p))}</span>
+      const body = `<b>${esc(sidL(p))}${val(p, 'site') ? ` <small>${esc(val(p, 'site'))}</small>` : ''}</b>${twin ? '<span class="twinline">Same Subject ID twice: readings may be split. Fill in one and correct the other’s ID (Pre-op and patient details), or delete it in Settings.</span>' : ''}<span${locked ? ' class="lockline"' : val(p, 'done') ? ' class="okline"' : ''}>${locked ? `${LOCK_ICON} Locked by the study admin${canLock() ? ' · read only' : ''}` : esc(status(p))}</span>
         <span class="dueline" data-due="${p.id}" hidden></span>${progressHtml(p)}<small>${e ? 'Last entry ' + new Date(e.t).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) + (e.by ? ' by ' + esc(e.by) : '') : 'No entries yet'}</small>`;
       if (selecting) return `<li><label class="selrow"><input type="checkbox" data-sel="${p.id}" ${selecting.has(p.id) ? 'checked' : ''}><span>${body}</span></label></li>`;
-      if (locked) return `<li><a href="${canLock() ? '#/p/' + p.id : '#/'}" class="locked"${canLock() ? '' : ' data-locked="1"'}>${body}</a></li>`;
-      return `<li><a href="#/p/${p.id}"${val(p, 'done') ? ` data-done="${esc(val(p, 'done'))}"` : ''}>${body}</a></li>`;
+      // admins also get a shortcut to the patient's Form view on every line (owner, 13 Oct 2026)
+      const formLink = canLock() ? `<a class="formlink" href="#/p/${p.id}/form" aria-label="Form view of ${esc(sidL(p))}" title="Form view">${FORM_ICON}</a>` : '';
+      if (locked) return `<li class="${formLink ? 'rowact' : ''}"><a href="${canLock() ? '#/p/' + p.id : '#/'}" class="locked"${canLock() ? '' : ' data-locked="1"'}>${body}</a>${formLink}</li>`;
+      return `<li class="${formLink ? 'rowact' : ''}"><a href="#/p/${p.id}"${val(p, 'done') ? ` data-done="${esc(val(p, 'done'))}"` : ''}>${body}</a>${formLink}</li>`;
     }).join('')}</ul>` : `<p class="muted">No patients yet. Tap <b>New patient</b> on the morning of surgery.</p>`}
-    <p class="muted small">${sharing() ? `Shared with the ${esc(shared.admin ? 'whole study (admin)' : shared.member.site + ' team')}. Readings sync when there is signal. <b class="syncline">${esc(syncText())}</b>` : `Data stays on this phone. <a href="#/settings">Join your hospital’s team</a> to share patients.`} Study IDs only: no names or hospital numbers.</p>${refreshHtml()}`);
+    <p class="muted small">${sharing() ? `Shared with the ${esc(shared.admin ? 'whole study (admin)' : shared.member.site + ' team')}. Readings sync when there is signal. <b class="syncline">${esc(syncText())}</b>` : `Data stays on this phone. <a href="#/settings">Join your hospital’s team</a> to share patients.`}</p>${refreshHtml()}`);
   wireRefresh();
   $('#new').onclick = () => go('#/new');
   // what each patient being charted needs now (a reading or Prewarm off due within 2 min, or late)
@@ -590,12 +619,16 @@ function home() {
   homeStop = () => { clearInterval(div); stopAlerts(); homeStop = null; };
   cleanup.push(homeStop);
   view.querySelectorAll('.list a[data-locked]').forEach(a => a.onclick = e => { e.preventDefault(); toast('Locked by the study admin'); });
-  if ($('#select')) $('#select').onclick = () => { selecting = new Set(); home(); };
+  if ($('#select')) $('#select').onclick = () => { selMode = 'lock'; selecting = new Set(); home(); };
+  if ($('#selexport')) $('#selexport').onclick = () => { selMode = 'export'; selecting = new Set(); home(); };
   if (selecting) {
     view.querySelectorAll('[data-sel]').forEach(c => c.onchange = () => { c.checked ? selecting.add(c.dataset.sel) : selecting.delete(c.dataset.sel); home(); });
     if ($('#selall')) $('#selall').onclick = () => { selecting = new Set(list.filter(p => p !== latest).map(p => p.id)); home(); };
+    if ($('#selallx')) $('#selallx').onclick = () => { selecting = new Set(list.map(p => p.id)); home(); };
     $('#selnone').onclick = () => { selecting = new Set(); home(); };
     $('#seldone').onclick = () => { selecting = null; home(); };
+    if ($('#exportsel')) $('#exportsel').onclick = () => downloadWorkbook([...selecting].map(id => patients[id]).filter(Boolean));
+    if (selMode === 'lock') {
     $('#lock').onclick = () => {
       const n = selecting.size;
       // a patient changed in the last 3 hours and not marked complete may still be charted on a team phone
@@ -604,6 +637,7 @@ function home() {
       setLock(selecting, true); toast(n + ' locked'); selecting = null; home();
     };
     $('#unlock').onclick = () => { const n = selecting.size; setLock(selecting, false); toast(n + ' unlocked'); selecting = null; home(); };
+    }
   }
   // a patient marked complete: warn on the first tap, open on the second
   view.querySelectorAll('.list a[data-done]').forEach(a => a.onclick = e => {
@@ -704,27 +738,34 @@ function skippedBefore(p, id) {
   const i = evs.indexOf(id);
   return i < 0 ? [] : evs.slice(0, i).filter(x => !val(p, x)).map(evLabel);
 }
-// app-bar button that logs the next event as now
-const logBtnHtml = p => { const nx = nextEvent(p); return nx ? `<b>Log</b><small>${esc(nx.label)}</small>` : ''; };
+// app-bar sync status (owner, 13 Oct 2026, instead of the Log shortcut): Synced / N waiting / Offline / Phone only; a tap runs Refresh now
+function syncChipState() {
+  if (!sharing()) return ['Local', 'this phone', 'local', 'Data stays on this phone: not shared with a team'];
+  const n = Object.keys(pending).map(id => patients[id]).filter(p => p && !isGone(p)).length;
+  if (n) return [`${n} waiting`, 'to send', 'wait', `${n} patient${n === 1 ? '' : 's'} not sent to the team yet`];
+  if (!navigator.onLine) return ['Offline', 'no signal', 'wait', 'No signal: changes send when it returns'];
+  return ['Synced', 'with team', 'ok', syncText()];
+}
+function paintSyncChip() {
+  const el = $('#syncchip'); if (!el) return;
+  const [t, sub, st, tip] = syncChipState(), h = `<b>${esc(t)}</b><small>${esc(sub)}</small>`;
+  if (el.innerHTML !== h) el.innerHTML = h;
+  el.dataset.state = st; el.title = tip; el.setAttribute('aria-label', `Sync status: ${t}, ${sub}. Tap to refresh.`);
+}
 // The patient screens' top bar (main screen, BP / HR / BIS, intra-op details, PACU): running timer, next event and
-// its Log button. Returns a function that redraws it; it also ticks every second while the screen is open.
+// its sync status chip. Returns a function that redraws it; it also ticks every second while the screen is open.
 function topBar(p, s, onLog) {
-  $('#extra').innerHTML = `<div class="clock" id="clock">${clockHtml(p, s)}</div><button class="logbtn" id="lognext" ${nextEvent(p) ? '' : 'hidden'}>${logBtnHtml(p)}</button>`;
+  $('#extra').innerHTML = `<div class="clock" id="clock">${clockHtml(p, s)}</div><button class="logbtn syncchip" id="syncchip"></button>`;
+  paintSyncChip();
   const refresh = () => {
     const ck = $('#clock'); if (ck) ck.innerHTML = clockHtml(p, s);
-    const lb = $('#lognext'); if (lb) { const h = logBtnHtml(p); if (lb.innerHTML !== h) lb.innerHTML = h; lb.hidden = !h; }
+    paintSyncChip();
   };
   // the countdown opens what it counts down to: that reading's first box, or the key time's pad
   const ckGo = () => { const n = nextDue(p, s); if (n?.target) openTarget(n.target); };
   $('#clock').onclick = e => { if (e.target.closest('.next')) ckGo(); };
   $('#clock').onkeydown = e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.closest('.next')) { e.preventDefault(); ckGo(); } };
-  $('#lognext').onclick = () => {
-    const nx = nextEvent(p); if (!nx) return;
-    if (val(p, 'done')) return toast(sealedMsg(p, null));
-    const t = nowHM();
-    set(p, nx.id, t); toast(`${nx.label} ${t}. Tap its box to change.`); refresh(); onLog?.();
-    lockTaps(); // the button relabels to the next event at once: a double tap mustn't log that one too
-  };
+  $('#syncchip').onclick = e => refreshNow(e.currentTarget);
   const iv = setInterval(refresh, 1000);
   cleanup.push(() => clearInterval(iv));
   // patients opened here today get due alerts on every screen (kept a day)
@@ -751,7 +792,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
   const sealed = () => sealedBy(p, noPw ? null : s);
   const main = s !== 'haemo';
   const def = SERIES[s], pts = pointsFor(p, s);
-  header(sid(p), '#/');
+  header(sidL(p), '#/');
   // two tabs under the bar (owner, 12 Oct 2026): temperatures, and BP / HR / BIS with the other forms; each warms up
   // and pulses as its next reading falls due
   // key times fill the top of the screen on both tabs; the tab bar sits under them (owner, 12 Oct 2026)
@@ -784,6 +825,8 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     const pick = cur && !savedAt(p, s, cur.x.key) ? cur.x : timed.find(t => t.d > now && !savedAt(p, s, t.x.key))?.x;
     key = (pick || open[0] || pts[pts.length - 1]).key;
   }
+  // a timepoint hidden because the section is read only and it has no data: open the default one instead
+  if (!pts.some(x => x.key === key)) key = (pts.find(x => !savedAt(p, s, x.key)) || pts[pts.length - 1]).key;
   const pt = def.points.find(x => x.key === key) || pts[0];
   const idx = def.points.indexOf(pt);
   const cols = colsFor(s, pt);
@@ -945,7 +988,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
   }
   // the other forms, Still to fill and Mark complete: the same on both tabs (owner, 12 Oct 2026)
   function linksHtml() {
-    const done = pg => val(p, 'sign_' + pg) ? ' ✓' : '';
+    const done = pg => val(p, 'sign_' + pg) ? ' class="done" aria-label="complete"' : '';
     // once their stage has come: how many questions are left
     const todo = (ids, from) => {
       if (!val(p, from)) return '';
@@ -953,10 +996,10 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
       return n ? `${n} to answer` : '';
     };
     return `<nav class="links two" aria-label="Other forms">
-      <a href="#/p/${id}/form/intraop">Intra-op details${done('intraop')}<small>${todo(INTRAOP_Q, 'io_done') || 'Blood, products, tests'}</small></a>
-      <a href="#/p/${id}/form/pacu">PACU${done('pacu')}<small>${todo(PACU_Q, 'pacu_in') || 'Temp, NuDESC, delay'}</small></a>
+      <a href="#/p/${id}/form/intraop"${done('intraop')}>Intra-op details<small>${todo(INTRAOP_Q, 'io_done') || 'Blood, products, tests'}</small></a>
+      <a href="#/p/${id}/form/pacu"${done('pacu')}>PACU<small>${todo(PACU_Q, 'pacu_in') || 'Temp, NuDESC, delay'}</small></a>
       </nav>
-      <nav class="links three" aria-label="Perioperative data">${DATA_PARTS.map(d => `<a href="#/p/${id}/${d.path}">${d.short}${done(d.sign)}</a>`).join('')}</nav>
+      <nav class="links three" aria-label="Perioperative data">${DATA_PARTS.map(d => `<a href="#/p/${id}/${d.path}"${done(d.sign)}>${d.short}</a>`).join('')}</nav>
       <div class="textlinks"><a href="#/p/${id}/form">Form view</a><a href="#/p/${id}/sheet">Sheet view</a></div>`;
   }
   // previous / next timepoint: big buttons either side of the tabs and the timepoint strip
@@ -1333,7 +1376,7 @@ const disableSealed = () => view.querySelectorAll('.sealed input, .sealed select
 // which sections are marked complete, shown on the patient list (owner, 13 Oct 2026): read only, they just
 // mirror the existing complete ticks inside each section
 function progressHtml(p) {
-  const rows = [['prewarm', 'Pre-warm'], ['iotemp', 'Intra-op temps'], ['haemo', 'BP, HR, BIS'], ['intraop', 'Intra-op details'], ['pacu', 'PACU'], ['periop', 'Pre-op'], ['pod1', 'Day 1'], ['pod2', 'Day 2']]
+  const rows = [['prewarm', 'Pre-warm'], ['iotemp', 'Intra-op temps'], ['haemo', 'BP, HR, BIS'], ['intraop', 'Intra-op details'], ['pacu', 'PACU'], ['periop', 'Pre-op'], ['pod1', 'POD1'], ['pod2', 'POD2']]
     .filter(([k]) => !(k === 'prewarm' && noWarming(p)));
   return `<span class="progress" role="list" aria-label="Sections marked complete">${rows.map(([k, l]) => { const on = !!val(p, 'sign_' + k);
     return `<span role="listitem" class="${on ? 'on' : ''}" aria-label="${l}: ${on ? 'complete' : 'not marked complete'}"><span class="tick" aria-hidden="true">${on ? '✓' : ''}</span>${l}</span>`; }).join('')}</span>`;
@@ -1344,10 +1387,10 @@ function doneHtml(p) {
 
 // ---------- section sign-off (replaces the paper form's Name / Signature / Date)
 // each sign-off names its section, and shows a ticked box once marked (owner, 12 Oct 2026)
-const SECTION = { periop: 'pre-op and patient details', pod1: 'day 1', pod2: 'day 2', prewarm: 'pre-warming temps', iotemp: 'intra-op temps', haemo: 'BP, HR, BIS', intraop: 'Intra-op details', pacu: 'PACU', satis: 'Patient comfort' };
+const SECTION = { periop: 'pre-op and patient details', pod1: 'POD1', pod2: 'POD2', prewarm: 'pre-warming temps', iotemp: 'intra-op temps', haemo: 'BP, HR, BIS', intraop: 'Intra-op details', pacu: 'PACU', satis: 'Patient comfort' };
 const tickHtml = (on, label, who, undo, mark) => on
   ? `<div class="sign on"><span class="tick" aria-hidden="true">✓</span><span><b>${esc(label)} complete</b><small>${esc(who)}</small></span><button class="link" ${undo}>Undo</button></div>`
-  : `<div class="sign"><button class="tickbtn" ${mark}><span class="tick" aria-hidden="true"></span>Mark ${esc(label)} complete</button></div>`;
+  : `<div class="sign${label === 'PACU' ? ' big' : ''}"><button class="tickbtn" ${mark}><span class="tick" aria-hidden="true"></span>Mark ${esc(label)} complete</button></div>`;
 function signoffHtml(p, pg) {
   const name = SECTION[pg] || PAGES.find(x => x.id === pg)?.title || 'section';
   return tickHtml(!!val(p, 'sign_' + pg), name, val(p, 'sign_' + pg) || '', `data-unsign="${pg}"`, `data-sign="${pg}"`);
@@ -1384,14 +1427,14 @@ const vitalsCollected = p => Object.keys(p.f).some(k => /^haemo_/.test(k) && val
 // complete tick; the questions are the same and in the same order as before.
 const DATA_PARTS = [
   { path: 'data', sign: 'periop', short: 'Pre-op', title: 'Pre-op and patient details', pages: ['preop', 'meds', 'bloods'], study: true },
-  { path: 'data/day1', sign: 'pod1', short: 'Day 1', title: 'Day 1', pages: ['pod1', 'pod1an'] },
-  { path: 'data/day2', sign: 'pod2', short: 'Day 2', title: 'Day 2 and discharge', pages: ['pod2', 'pod2an', 'dc'] },
+  { path: 'data/day1', sign: 'pod1', short: 'POD1', title: 'POD1', pages: ['pod1', 'pod1an'] },
+  { path: 'data/day2', sign: 'pod2', short: 'POD2', title: 'POD2 and discharge', pages: ['pod2', 'pod2an', 'dc'] },
 ];
 const DATA_SIGNS = new Set(DATA_PARTS.map(d => d.sign));
 route(/^\/p\/(\w+)\/data(?:\/(day1|day2))?$/, (id, day) => {
   const p = patients[id]; if (!p) return go('#/');
   const part = DATA_PARTS.find(d => d.path === (day ? 'data/' + day : 'data')), SIGN = part.sign;
-  header(sid(p) + ' · ' + part.title, `#/p/${id}/haemo`);
+  header(sidL(p) + ' · ' + part.title, `#/p/${id}/haemo`);
   topBar(p, defaultSeries(p));
   const get = k => val(p, k);
   const closed = new Set();
@@ -1441,7 +1484,7 @@ route(/^\/p\/(\w+)\/data(?:\/(day1|day2))?$/, (id, day) => {
       const v = i.value.trim();
       const clash = Object.values(patients).some(q => q !== p && !isGone(q) && String(val(q, 'enrol_id') || '').toLowerCase() === v.toLowerCase());
       if (!v || clash) { toast(v ? 'That Subject ID is already used by another patient.' : 'The Subject ID can’t be blank.'); i.value = get('enrol_id') ?? ''; return; }
-      set(p, 'enrol_id', v); $('#title').textContent = sid(p) + ' · ' + part.title; return;
+      set(p, 'enrol_id', v); setTitle(sidL(p) + ' · ' + part.title); return;
     }
     const tv = typedValue(f, i.value);
     if (tv == null) { i.value = val(p, f.id) ?? ''; return; }
@@ -1487,7 +1530,9 @@ const FORM = {
 };
 // the rest of the study's data (owner, 12 Oct 2026): every field of these pages, in template order
 const OTHER_PAGES = ['preop', 'meds', 'bloods', 'pod1', 'pod1an', 'pod2', 'pod2an', 'dc'];
-for (const pg of OTHER_PAGES) FORM[pg] = PAGES.find(x => x.id === pg).fields.filter(f => f.id !== 'enrol_id').map(f => [f.id]);
+// "Downloaded" (pre-op and day 2) is no longer asked (owner, 13 Oct 2026); its template columns stay empty in the export
+const NOT_ASKED = new Set(['pre_dl', 'd2_dl']);
+for (const pg of OTHER_PAGES) FORM[pg] = PAGES.find(x => x.id === pg).fields.filter(f => f.id !== 'enrol_id' && !NOT_ASKED.has(f.id)).map(f => [f.id]);
 // Reset a subject: clears every time, reading and answer, keeping the Subject ID, group and hospital (asks twice)
 const KEEP_ON_RESET = new Set(['enrol_id', 'arm', 'site', 'restored']);
 function resetSubject(p) {
@@ -1507,7 +1552,7 @@ route(/^\/pacu$/, () => {
   header('PACU view', '#/');
   const list = Object.values(patients).filter(p => !isGone(p) && !p.lock?.on).sort((a, b) => (lastEdit(b)?.t || b.created) - (lastEdit(a)?.t || a.created));
   paint(`<p class="muted small">Tap a participant to open their PACU page.</p>
-    ${list.length ? `<ul class="list">${list.map(p => `<li><a href="#/pacu/${p.id}"><b>${esc(sid(p))}</b><span>${esc(status(p))}</span></a></li>`).join('')}</ul>` : '<p class="muted">No patients yet.</p>'}`);
+    ${list.length ? `<ul class="list">${list.map(p => `<li><a href="#/pacu/${p.id}"><b>${esc(sidL(p))}</b><span>${esc(status(p))}</span></a></li>`).join('')}</ul>` : '<p class="muted">No patients yet.</p>'}`);
 });
 route(/^\/pacu\/(\w+)$/, id => formPage(id, 'pacu', '#/pacu'));
 route(/^\/p\/(\w+)\/form\/(\w+)$/, (id, pg) => formPage(id, pg, `#/p/${id}/haemo`));
@@ -1515,7 +1560,7 @@ function formPage(id, pg, back) {
   const p = patients[id]; if (!p) return go('#/');
   if (OTHER_PAGES.includes(pg)) return go(`#/p/${id}/${DATA_PARTS.find(d => d.pages.includes(pg)).path}`);
   if (!FORM[pg]) return go('#/p/' + id);
-  header(sid(p) + ' · ' + (SECTION[pg] || PAGES.find(x => x.id === pg).title), back);
+  header(sidL(p) + ' · ' + (SECTION[pg] || PAGES.find(x => x.id === pg).title), back);
   topBar(p, defaultSeries(p));
   const get = k => val(p, k);
   const draw = () => {
@@ -1716,7 +1761,7 @@ route(/^\/nurse\/(\w{20,64})$/, token => {
 
 route(/^\/p\/(\w+)\/sheet$/, id => {
   const p = patients[id]; if (!p) return go('#/');
-  header(sid(p) + ' · Sheet view', '#/p/' + id);
+  header(sidL(p) + ' · Sheet view', '#/p/' + id);
   const cell = (s, pt, c) => { const v = val(p, `${s}_${pt.key}_${c.key}`); return `<td><a href="#/p/${id}/${s}/${pt.key}" aria-label="${esc(pt.label + ' ' + c.label + ': ' + (v ?? 'empty'))}">${v == null ? '' : esc(c.key === 'ts' && v > 0 ? '+' + v : v)}</a></td>`; };
   const pw = SERIES.prewarm, it = SERIES.iotemp, hd = SERIES.haemo;
   paint(`
@@ -1738,11 +1783,11 @@ route(/^\/delete$/, () => {
   paint(`<p class="muted small">${sharing() ? `Deleting removes the participant from this phone and from your team’s phones.` : 'Deleting removes the participant from this phone.'} Tap Delete, then tap again to confirm.</p>
     ${list.length ? `<ul class="list dellist">${list.map(p => {
       const e = lastEdit(p);
-      return `<li><div><b>${esc(sid(p))}${val(p, 'site') ? ` <small>${esc(val(p, 'site'))}</small>` : ''}</b><small>${esc(status(p))} · ${e ? 'last entry ' + new Date(e.t).toLocaleDateString([], { day: 'numeric', month: 'short' }) : 'no entries'}</small></div>
+      return `<li><div><b>${esc(sidL(p))}${val(p, 'site') ? ` <small>${esc(val(p, 'site'))}</small>` : ''}</b><small>${esc(status(p))} · ${e ? 'last entry ' + new Date(e.t).toLocaleDateString([], { day: 'numeric', month: 'short' }) : 'no entries'}</small></div>
         ${p.lock?.on ? `<span class="muted small">${LOCK_ICON} Locked</span>` : `<button class="danger" data-del="${p.id}" aria-label="Delete ${esc(sid(p))}">Delete</button>`}</li>`;
     }).join('')}</ul>` : `<p class="muted">No participants on this phone.</p>`}
     ${gone.length ? `<h2>Deleted</h2><p class="muted small">Deleted by mistake? Restore brings it back${sharing() ? ' on every phone in the team' : ''}.</p>
-      <ul class="list dellist">${gone.map(p => `<li><div><b>${esc(sid(p))}</b><small>deleted ${new Date(p.deleted).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</small></div><button class="secondary" data-restore="${p.id}">Restore</button></li>`).join('')}</ul>` : ''}`);
+      <ul class="list dellist">${gone.map(p => `<li><div><b>${esc(sidL(p))}</b><small>deleted ${new Date(p.deleted).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</small></div><button class="secondary" data-restore="${p.id}">Restore</button></li>`).join('')}</ul>` : ''}`);
   view.onclick = e => {
     const r = e.target.closest('[data-restore]');
     if (r) { const p = patients[r.dataset.restore]; if (p) { set(p, 'restored', 1); toast(sid(p) + ' restored'); render(); } return; }
@@ -1774,7 +1819,7 @@ function noBlankNote() {
 }
 route(/^\/p\/(\w+)\/form$/, async id => {
   const p = patients[id]; if (!p) return go('#/');
-  header(sid(p) + ' · Form view', '#/p/' + id);
+  header(sidL(p) + ' · Form view', '#/p/' + id);
   const here = location.hash, still = () => location.hash === here;
   paint(`<p class="muted">Loading the form…</p>`);
   const b = await blankForm();
@@ -1904,11 +1949,6 @@ route(/^\/settings$/, () => {
     <h2>Hospital and sharing</h2>
     ${sharingHtml()}
     ${cloud.enabled ? refreshHtml() : ''}
-    <h2>Readings to enter live</h2>
-    <p class="muted small">Untick what you’ll fill in later from the Fortuna monitor or Epic. Core temperature is always on.</p>
-    ${tog('hide', 'skin', 'Skin temps: chest, arm, thigh, calf')}${tog('hide', 'set', 'Gown set temp (pre-warming)')}${tog('hide', 'ts', 'Thermal sensation (pre-warming)')}
-    ${tog('hide', 'warm', 'Underbody / gown warming on or off')}${tog('hide', 'room', 'Room temp')}
-    ${tog('hide', 'haemo15', 'BP, HR and BIS every 15 min', 'Off: baseline only')}${tog('hide', 'bis', 'BIS')}
     <h2>When a reading is due</h2>
     <p class="muted small">Works while the app is open on screen.</p>
     ${tog('remind', 'haemo', 'BP, HR, BIS due alarm', 'Off by default: the countdown still shows')}
@@ -1986,7 +2026,9 @@ function sharingHtml() {
   const chips = `<div class="seg sites">${SITES.map(x => `<button type="button" class="chip" data-site="${x}" aria-pressed="${settings.site === x}" ${shared.member ? 'disabled' : ''}>${x}</button>`).join('')}</div>`;
   if (!cloud.enabled) return `${chips}<small class="muted">New patients on this phone are recorded at this hospital. Sharing is off in demo mode.</small>`;
   if (shared.email && !shared.admin) return `<p class="note">${esc(shared.email)} isn’t on the study’s admin list. Ask the owner to add it.</p><button class="secondary" id="leave">Log out</button>`;
+  // an admin picks the hospital new patients on this phone are recorded at (members' hospital is fixed by their team)
   if (shared.admin) return `<p class="ok-box">Signed in as study admin (${esc(shared.email)}). You see every hospital’s patients.<br><span class="syncline">${esc(syncText())}</span></p>
+    <label class="lab">Your hospital</label>${chips}<small class="muted">New patients you start on this phone are recorded at this hospital. Pick one before starting a patient.</small>
     <a class="secondary" href="#/admin">Join codes and members</a>
     <details class="sect"><summary><span>Password</span><small>sign in with it next time</small></summary><div class="stack">
       <label class="lab" for="newpw">New password <small>(8 or more characters)</small></label>
@@ -2036,7 +2078,7 @@ async function joinTeam(site, code, btn) {
 
 // ---------- join link: #/join/{site}/{code} (after the #, so the code never reaches a server)
 const joinLink = (site, code) => location.origin + location.pathname + (/emulator/.test(location.search) ? '?emulator' : '') + `#/join/${site}/${encodeURIComponent(code)}`;
-route(/^\/join\/([A-Z]+)\/([^/]+)$/, (site, enc) => {
+route(/^\/join\/([A-Z]+)\/([^/]+)(?:\/(\w{1,6}))?$/, (site, enc, carriedMe) => {
   const code = decodeURIComponent(enc);
   // the code shouldn't stay in the history or a bookmark
   const forget = () => history.replaceState(null, '', location.pathname + location.search + '#/');
@@ -2046,7 +2088,7 @@ route(/^\/join\/([A-Z]+)\/([^/]+)$/, (site, enc) => {
   paint(`<div class="stack">
     <p>Join the <b>${site}</b> prewarming study team on this phone. You’ll see and enter ${site}’s patients, and they sync when there is signal.</p>
     ${shared.member ? `<p class="note">This phone is in the ${esc(shared.member.site)} team now; joining moves it to ${site}.</p>` : ''}
-    <label class="lab" for="me">Your initials</label><input id="me" value="${esc(settings.me)}" maxlength="6" autocapitalize="characters" autocomplete="off">
+    <label class="lab" for="me">Your initials</label><input id="me" value="${esc(settings.me || (carriedMe || '').toUpperCase())}" maxlength="6" autocapitalize="characters" autocomplete="off">
     <small class="muted">Saved with each reading as “entered by”.</small>
     <button class="primary big" id="joinlink">Join ${site}</button></div>`);
   $('#joinlink').onclick = async e => {
@@ -2162,22 +2204,78 @@ route(/^\/export$/, () => {
     <ul class="muted small"><li><b>Data Collection</b>: the template sheet</li><li><b>Readings</b>: every reading with the time it was saved and who saved it</li>
     <li><b>Extra</b>: items the template has no column for (transfusion volumes, investigation rows, PACU transfusion, NuDESC items, sign-offs)</li></ul>
     <button class="primary big" id="xl" ${n ? '' : 'disabled'}>Export ${n} patient${n === 1 ? '' : 's'}</button></div>`);
-  $('#xl').onclick = async () => {
-    const live = Object.values(patients);
-    const bytes = workbook(live, []);
-    const name = `prewarming-study-${new Date().toISOString().slice(0, 10)}${DEMO ? '-demo' : ''}.xlsx`;
-    const file = new File([bytes], name, { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    if (navigator.canShare?.({ files: [file] })) { try { await navigator.share({ files: [file], title: name }); return; } catch (e) { if (e.name === 'AbortError') return; } }
-    const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = name; a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
-  };
+  $('#xl').onclick = () => downloadWorkbook(Object.values(patients));
 });
+// the Excel file for the given patients: shared from the phone's share sheet when it can, else downloaded
+async function downloadWorkbook(live) {
+  const bytes = workbook(live, []);
+  const name = `prewarming-study-${new Date().toISOString().slice(0, 10)}${DEMO ? '-demo' : ''}.xlsx`;
+  const file = new File([bytes], name, { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  if (navigator.canShare?.({ files: [file] })) { try { await navigator.share({ files: [file], title: name }); return; } catch (e) { if (e.name === 'AbortError') return; } }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+}
+
+// ---------- moving to prewarmstudy.anawj.com (owner, 13 Oct 2026)
+// Phones keep their saved copy, unsent readings and sign-in per web address, so the old address (anawj.com/prewarm/) moves a
+// phone to the new one only when nothing on it is waiting: every reading sent to the team, no half-entered reading, the new
+// address reachable. Otherwise the app carries on as before and a bar says why it hasn't moved. It runs once when the app opens
+// (never while someone is entering a reading), and a team phone carries its join code and initials in the address's `#` part,
+// which never reaches a server, so it rejoins its team on the new address without anyone typing the code.
+const NEW_HOME = 'https://prewarmstudy.anawj.com/';
+const MOVE_TEST = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? new URLSearchParams(location.search).get('oldhost') : null; // tests: pretend to be the old address
+const ON_OLD_ADDRESS = window.top === window && (!!MOVE_TEST || ['anawj.com', 'www.anawj.com'].includes(location.hostname));
+function moveBar(text, canTry) {
+  const el = $('#moved'); if (!el) return;
+  el.hidden = false;
+  el.innerHTML = `<b>The study app has a new address: prewarmstudy.anawj.com.</b> ${esc(text)} ${canTry ? '<button class="link" id="movenow">Try again</button>' : ''}`;
+  $('#movenow')?.addEventListener('click', () => moveCheck());
+}
+// why this phone can't move yet ('' when it can)
+async function notReadyToMove() {
+  if (DEMO) return '';
+  const t0 = Date.now();
+  while (cloud.enabled && document.body.dataset.cloud !== 'ready' && Date.now() - t0 < 10000) await new Promise(r => setTimeout(r, 200));
+  if (cloud.enabled && document.body.dataset.cloud !== 'ready') return 'It is still checking this phone’s team and readings.';
+  if (Object.keys(localStorage).some(k => k.startsWith(NS + 'unsaved:'))) return 'A reading on this phone is half entered: save it, then it moves.';
+  if (Object.keys(pending).length) return 'Some readings are still waiting to reach the team: it moves once they have.';
+  if (!sharing() && Object.values(patients).some(p => !isGone(p))) return 'This phone holds patients that are not shared with a team, so it stays here. Export them first (Settings → Export).';
+  if (cloud.enabled && !(await cloud.flushed(6000))) return 'Waiting for signal to send the last readings: it moves once they have gone.';
+  if (!navigator.onLine) return 'No signal: it moves when the new address can be reached.';
+  try { await fetch(new URL('sw.js', MOVE_TEST || NEW_HOME).href + '?' + Date.now(), { mode: 'no-cors', cache: 'no-store' }); } catch { return 'The new address can’t be reached from here yet.'; }
+  return '';
+}
+async function moveCheck() {
+  if (!ON_OLD_ADDRESS) return;
+  let why = await notReadyToMove();
+  if (why) return moveBar(why, true);
+  // a team phone rejoins on the new address with its code (read from its own membership record) and initials
+  let hash = location.hash, member = null;
+  if (cloud.enabled && !DEMO && shared.member && !shared.admin) { try { member = await cloud.member(); } catch { member = null; } }
+  if (member?.code && member.site) hash = `#/join/${member.site}/${encodeURIComponent(member.code)}${settings.me ? '/' + encodeURIComponent(settings.me) : ''}`;
+  else if (shared.member && !shared.admin) return moveBar('It couldn’t read this phone’s team details yet.', true);
+  const rest = location.pathname.replace(/^\/prewarm\/?/, '').replace(/^index\.html$/, '');
+  const search = location.search.replace(/([?&])oldhost=[^&]*(&|$)/, (m, p1, p2) => (p2 ? p1 : '')).replace(/[?&]$/, ''); // the original query, untouched
+  const base = MOVE_TEST ? new URL(MOVE_TEST, location.href) : new URL(NEW_HOME);
+  location.replace(base.origin + (MOVE_TEST ? base.pathname : '/') + rest + search + hash);
+}
+if (ON_OLD_ADDRESS) setTimeout(moveCheck, 1500);
 
 // ---------- offline shell and updates
 if ('serviceWorker' in navigator && !DEMO) {
   navigator.serviceWorker.register('sw.js').then(reg => {
     // updating reloads the app: an unsaved reading on screen is asked about first
-    const offer = offerUpdate = w => { const b = $('#update'); b.hidden = false; b.onclick = () => afterAsking(() => w.postMessage('skipWaiting')); };
+    // the waiting worker may have been replaced by a newer one since the banner showed (several updates in a row), so ask the
+    // current one; if nothing takes over in 3 s (Firefox did not), clear the saved copy of the app (never the patients) and reload
+    const offer = offerUpdate = w => { const b = $('#update'); b.hidden = false; b.onclick = () => afterAsking(() => {
+      b.hidden = true;
+      (reg.waiting || w).postMessage('skipWaiting');
+      setTimeout(async () => {
+        if (reloaded || !navigator.onLine) return;
+        try { for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister(); for (const k of await caches.keys()) if (k.startsWith('prewarm-')) await caches.delete(k); } catch { /* reload anyway */ }
+        location.reload();
+      }, 3000);
+    }); };
     swReg = reg;
     if (reg.waiting) offer(reg.waiting);
     reg.addEventListener('updatefound', () => { const w = reg.installing; w?.addEventListener('statechange', () => { if (w.state === 'installed' && navigator.serviceWorker.controller) offer(w); }); });

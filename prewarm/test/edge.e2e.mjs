@@ -4,7 +4,7 @@
 const { chromium } = await import(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/node_modules/playwright/index.mjs');
 const b = await chromium.launch();
 const fails = [];
-const tryit = async f => { try { await f(); } catch (e) { fails.push('error: ' + e.message.split('\n')[0] + ' @ ' + (e.stack.match(/edge.e2e.mjs:(\d+)/)?.[1] || '?')); } };
+const tryit = async f => { try { await f(); } catch (e) { fails.push('error: ' + e.message.split('\n')[0] + ' @ ' + [...e.stack.matchAll(/edge.e2e.mjs:(\d+)/g)].map(m => m[1]).join(',')); } };
 const log = (ok, msg) => { if (!ok) fails.push(msg); };
 // a key time: tap its box, then Now on the time pad (the pad also takes typed digits and has Clear and Back)
 const tapNow = async (pg, id) => { await pg.click(`[data-ev="${id}"]`); await pg.click('.kp [data-now]'); };
@@ -109,13 +109,13 @@ jobs.push(() => tryit(async () => {
   log(pg.url().includes('/p/') && !pg.url().includes('haemo') && !await pg.$('dialog.ask[open]'), 'back from BP: temps, no prompt');
   await ctx.close();
 }));
-// F. Log Prewarm off on an unsaved timepoint: no prompt for the automatic NA
+// F. setting Prewarm off on an unsaved timepoint: no prompt for the automatic NA
 jobs.push(() => tryit(async () => {
   const { ctx, pg } = await fresh();
   await open(pg, 0);
-  await pg.click('#lognext'); await pg.waitForTimeout(300);
+  pg.once('dialog', d => d.accept()); await tapNow(pg, 'ev_wstop'); await pg.waitForTimeout(300);
   await pg.click('.pn.next'); await pg.waitForTimeout(300);
-  log(!await pg.$('dialog.ask[open]'), 'Log then next: no prompt when nothing typed');
+  log(!await pg.$('dialog.ask[open]'), 'Prewarm off then next: no prompt when nothing typed');
   await ctx.close();
 }));
 // G. Perioperative data: Enter on the last question, Shift+Enter back
@@ -226,12 +226,12 @@ jobs.push(() => tryit(async () => {
   await pg.click('.strip a:has-text("60")'); await pg.waitForSelector('input[data-in="sbp"]');
   await pg.fill('input[data-in="sbp"]', '118');
   const accept = d => d.accept(d.type() === 'prompt' ? d.defaultValue() : undefined); // also the "what time was it taken?" question, when the demo clock is late
+  await pg.waitForTimeout(900); // the tap guard after the first Save
   pg.on('dialog', accept); await pg.click('#save'); await pg.waitForTimeout(400); pg.off('dialog', accept);
   await pg.waitForFunction(() => !!document.querySelector('#gaps'), null, { timeout: 4000 });
   log(/BP, HR, BIS saved with blanks: .*60 min \(Diastolic BP, Mean BP, Heart rate, BIS\)/.test(await pg.textContent('#gaps')), 'part-blank reading listed: ' + (await pg.textContent('#gaps')).replace(/\s+/g, ' ').slice(0, 300));
-  await pg.evaluate(() => { const k = 'prewarm-demo:settings'; const s = JSON.parse(localStorage.getItem(k) || '{}'); s.hide = { ...(s.hide || {}), ts: true }; localStorage.setItem(k, JSON.stringify(s)); });
-  await pg.reload(); await pg.waitForSelector('#gaps');
-  log(/Hidden in Settings \(not being recorded\): thermal sensation/.test(await pg.textContent('#gaps')), 'hidden column listed');
+  await pg.evaluate(() => { location.hash = '#/settings'; }); await pg.waitForSelector('#me');
+  log(!/Readings to enter live/.test(await pg.textContent('main')) && /When a reading is due/.test(await pg.textContent('main')), 'Settings no longer has a Readings to enter live section');
   await ctx.close();
 }));
 // M. typed form answers: letters refused where a number is asked; an odd temperature asked about
@@ -327,8 +327,8 @@ jobs.push(() => tryit(async () => {
   const { ctx, pg } = await fresh('2026-10-13T10:00:00');
   await pg.evaluate(() => { localStorage.setItem('prewarm-demo:settings', JSON.stringify({ me: 'TT' })); });
   await pg.goto('http://localhost:8080/prewarm/?demo#/new'); await pg.reload(); await pg.waitForSelector('#sid');
-  await pg.fill('#sid', 'ALERT-1'); await pg.click('.seg .chip[data-v="2"]'); await pg.click('button[type=submit]'); await pg.waitForSelector('#lognext');
-  await pg.click('#lognext'); await pg.waitForTimeout(800); await pg.click('#lognext'); // Gown on, Prewarm on (not a double tap)
+  await pg.fill('#sid', 'ALERT-1'); await pg.click('.seg .chip[data-v="2"]'); await pg.click('button[type=submit]'); await pg.waitForSelector('#syncchip');
+  await tapNow(pg, 'pw_gown'); await pg.waitForTimeout(900); await tapNow(pg, 'pw_start'); // Gown on, Prewarm on (not a double tap)
   const seen = [];
   for (let i = 0; i < 12; i++) {
     await pg.clock.fastForward('01:00'); await pg.waitForTimeout(150);
@@ -375,11 +375,6 @@ jobs.push(() => tryit(async () => {
   await dbl('#save');
   const after = await pg.$$eval('.strip a.done', a => a.length);
   log(after === before + 1, `double-tap Save saves one timepoint (saved ${before} → ${after})`);
-  // Log
-  const setBefore = await pg.$$eval('.tchip.set', a => a.length);
-  await dbl('#lognext');
-  const setAfter = await pg.$$eval('.tchip.set', a => a.length);
-  log(setAfter === setBefore + 1, `double-tap Log logs one event (times set ${setBefore} → ${setAfter})`);
   pg.off('dialog', ok);
   // typing a temperature, then swiping to Others: the typed value counts, so leaving asks
   await pg.goto(pg.url().replace(/(#\/p\/\w+).*$/, '$1')); await pg.waitForSelector('.num[data-type="core"]');
@@ -666,6 +661,77 @@ jobs.push(() => tryit(async () => {
   const { ctx, pg } = await fresh();
   await pg.click('#refreshnow'); await pg.waitForTimeout(500);
   log(/Up to date/.test(await pg.textContent('#toast')) && await pg.$('.list a') !== null, 'Refresh now keeps the patient list and says it is up to date');
+  await ctx.close();
+}));
+// AG. the update helper page (outside the app's scope, for a phone that won't update): clears the app's saved code, keeps
+// patients, and opens the app again
+jobs.push(() => tryit(async () => {
+  const { ctx, pg } = await fresh();
+  await pg.evaluate(() => caches.open('prewarm-v1').then(c => c.put('/x', new Response('old'))));
+  await pg.goto('http://localhost:8080/prewarm-update/'); await pg.click('#go');
+  await pg.waitForURL(/\/prewarm\/$/, { timeout: 10000 });
+  log(!(await pg.evaluate(() => caches.keys())).includes('prewarm-v1'), 'update helper clears the saved copy and opens the app');
+  await ctx.close();
+}));
+// AH. a section marked complete is read only: timepoints with no data are hidden, nothing is offered for logging
+jobs.push(() => tryit(async () => {
+  const { ctx, pg } = await fresh();
+  await pg.evaluate(() => localStorage.setItem('prewarm-demo:settings', JSON.stringify({ me: 'ZZ', v: 3 })));
+  await pg.reload(); await pg.waitForTimeout(600);
+  await open(pg, 1);
+  const id = (await pg.evaluate(() => location.hash)).split('/')[2];
+  const strip = () => pg.$$eval('.strip a', as => as.map(a => a.textContent.trim()).join('|'));
+  // a bare time left behind by a blank save (no readings) doesn't keep a point visible
+  await pg.evaluate(i => { const k = 'prewarm-demo:patients', all = JSON.parse(localStorage.getItem(k)); all[i].f.at_prewarm_15 = { v: '08:50', t: Date.now(), by: 'T' }; localStorage.setItem(k, JSON.stringify(all)); }, id);
+  await pg.reload(); await pg.waitForTimeout(600);
+  await pg.evaluate(h => { location.hash = h; }, `#/p/${id}/prewarm`); await pg.waitForSelector('[data-sign="prewarm"]');
+  const before = await strip();
+  await pg.click('[data-sign="prewarm"]'); await pg.waitForSelector('.sealnote');
+  const after = await strip();
+  log(/15 min/.test(before) && !/15 min/.test(after) && /10 min/.test(after), 'complete: pre-warming points with no data are hidden: ' + before + ' -> ' + after);
+  await pg.evaluate(h => { location.hash = h; }, `#/p/${id}/prewarm/20`); await pg.waitForSelector('.strip');
+  log(!/20 min/.test(await strip()) && await pg.$('.sealnote') !== null, 'opening a hidden point goes to one that has data');
+  await ctx.close();
+}));
+// AI. admin list shortcuts: Form view icon per line, Select to export with All / None, Select none apart from Lock / Unlock;
+// "Downloaded" no longer asked; the "Study IDs only" line is gone
+jobs.push(() => tryit(async () => {
+  const { ctx, pg } = await fresh();
+  log(await pg.$$eval('.list li a.formlink', a => a.length) === 2 && /\/form$/.test(await pg.getAttribute('.list li a.formlink', 'href')), 'each patient line has a Form view shortcut (admin)');
+  log(!/Study IDs only/.test(await pg.textContent('main')), 'the Study IDs only line is gone');
+  await pg.click('#selexport'); await pg.waitForSelector('.seltools');
+  log(/0 selected to export/.test(await pg.textContent('.selcount')) && await pg.isDisabled('#exportsel'), 'Select to export starts with none and Export disabled');
+  await pg.click('#selallx');
+  log(/2 selected/.test(await pg.textContent('.selcount')) && !await pg.isDisabled('#exportsel'), 'Select all picks every patient');
+  await pg.click('#selnone');
+  log(/0 selected/.test(await pg.textContent('.selcount')), 'Select none clears');
+  await pg.click('[data-sel]');
+  const dl = pg.waitForEvent('download', { timeout: 15000 }).catch(() => null);
+  await pg.click('#exportsel');
+  const d = await dl;
+  log(!!d && /\.xlsx$/.test(d.suggestedFilename()), 'Export downloads an Excel file for the selected case: ' + (d && d.suggestedFilename()));
+  await pg.click('#seldone'); await pg.click('#select'); await pg.waitForSelector('#lock');
+  const y = id => pg.$eval(id, e => Math.round(e.getBoundingClientRect().y));
+  log(await y('#selnone') !== await y('#lock') && await y('#selnone') < await y('#lock'), 'Select none is on its own line, above Lock / Unlock');
+  log(await pg.$eval('#selnone', e => e.className) !== await pg.$eval('#unlock', e => e.className), 'Select none looks different from Lock / Unlock');
+  await pg.click('#seldone');
+  await pg.click('.list li:first-child a.formlink'); await pg.waitForSelector('.fhead');
+  log(/Subject ID:/.test(await pg.textContent('.fhead')), 'the shortcut opens the Form view');
+  await pg.evaluate(() => { location.hash = '#/p/' + location.hash.split('/')[2] + '/data'; }); await pg.waitForSelector('details.sect');
+  log(!(await pg.textContent('main')).includes('Downloaded'), 'Pre-op no longer asks Downloaded');
+  await ctx.close();
+}));
+// AJ. the old address moves a phone to the new one (owner, 13 Oct 2026): demo phones go straight away, keeping the path, query and #
+jobs.push(() => tryit(async () => {
+  const { ctx, pg } = await fresh();
+  const NEW = 'http://127.0.0.1:' + (process.env.PORT || 8080) + '/prewarm/';
+  await pg.goto('http://localhost:8080/prewarm/?demo&oldhost=' + encodeURIComponent(NEW) + '#/nurse/abcdefghijklmnopqrstuv');
+  await pg.waitForURL(/^http:\/\/127\.0\.0\.1:/, { timeout: 12000 });
+  log(/\/prewarm\/\?demo#\/nurse\/abcdefghijklmnopqrstuv$/.test(pg.url()), 'the redirect keeps the path, query and # part (nurse link): ' + pg.url());
+  await pg.waitForTimeout(2500);
+  log(/^http:\/\/127\.0\.0\.1:/.test(pg.url()) && !/oldhost/.test(pg.url()), 'no redirect loop on the new address');
+  const upd = await pg.goto('http://127.0.0.1:8080/prewarm/update.html'); await pg.waitForSelector('#go');
+  log(upd.ok() && /Get the latest version/.test(await pg.textContent('#go')), 'update helper page inside the app folder');
   await ctx.close();
 }));
 await runJobs();

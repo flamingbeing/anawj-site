@@ -1,6 +1,6 @@
 // Settings export / import (js/settings-file.js).
 import assert from 'node:assert/strict';
-import { settingsFile, readSettingsFile, SETTINGS_KIND } from '../js/settings-file.js';
+import { settingsFile, readSettingsFile, SETTINGS_KIND, deviceFile, readDeviceFile, isDeviceFile, isDeviceKey, DEVICE_KIND } from '../js/settings-file.js';
 
 const lb = { email: 'x@y', name: 'N', profile: { familyName: 'Secret' }, settings: { compact: true, searchOps: true, sharedSeen: ['a'], tagSet: [{ k: 'c:16', t: 'apmes' }], shareFormat: { dayHead: '{day}' } },
   templates: [{ id: 't1', name: 'LSCS spinal', cats: ['16', '28'] }] };
@@ -19,6 +19,12 @@ assert.equal(back.settings.shareFormat.dayHead, '{day}');   // cleaned: the othe
 assert.ok(Array.isArray(back.settings.tagSet));
 assert.equal(back.templates.length, 1);
 assert.equal(back.theme, 'dark');
+
+// places to send to travel in the file, cleaned: a script-like link never gets through
+const dst = settingsFile({ settings: { destinations: [{ id: 'a', name: 'Obs', uri: 'obsidian://new?content={content}' }] } });
+assert.equal(readSettingsFile(JSON.stringify(dst)).settings.destinations[0].uri, 'obsidian://new?content={content}');
+const evil = { kind: SETTINGS_KIND, version: 1, settings: { destinations: [{ id: 'b', name: 'Bad', uri: 'javascript:alert({content})' }, { id: 'c', name: 'Ok', uri: 'https://x.test/?t={content}' }] } };
+assert.deepEqual(readSettingsFile(JSON.stringify(evil)).settings.destinations.map(d => d.id), ['c']);
 
 // junk and the wrong files
 assert.throws(() => readSettingsFile('nope'), /not JSON/);
@@ -48,3 +54,22 @@ assert.deepEqual(readSettingsFile(JSON.stringify({ kind: SETTINGS_KIND, settings
 console.log('settings file tests passed');
 
 assert.equal(readSettingsFile(JSON.stringify(settingsFile({settings:{compactTags:true,firstField:'date'}}))).settings.compactTags,true);
+
+// this browser's own choices as a file (the move to apmes.anawj.com)
+{
+  const entries = [['apmes-logbook-display', '{"flat":true}'], ['apmes-logbook-theme', 'dark'], ['logbook-draft-x', '{"details":"fake"}'], ['logbook-edit-draft:y', 'z'],
+    ['apmes-logbook-demo-small', '1'], ['apmes-logbook-moved', '1'], ['apmes-logbook-cloud-pending', '{}'], ['ot-roster-v1', '{}'], ['other', 'x'], ['apmes-logbook-big', 'x'.repeat(100 * 1024 + 1)]];
+  const f = deviceFile(entries);
+  assert.equal(f.kind, DEVICE_KIND);
+  assert.deepEqual(Object.keys(f.items).sort(), ['apmes-logbook-display', 'apmes-logbook-theme', 'logbook-draft-x', 'logbook-edit-draft:y']);
+  const back = readDeviceFile(JSON.stringify(f));
+  assert.deepEqual(back.items, f.items);
+  assert.ok(isDeviceFile(JSON.stringify(f)) && !isDeviceFile('nope') && !isDeviceFile('{"kind":"apmes-logbook-settings"}'));
+  assert.ok(isDeviceKey('apmes-logbook-theme') && !isDeviceKey('apmes-logbook-demo-small') && !isDeviceKey('ot-roster-v1'));
+  // a file can only write this app's own keys, never anything else
+  const evil = readDeviceFile(JSON.stringify({ kind: DEVICE_KIND, items: { 'apmes-logbook-theme': 'dark', 'ot-roster-v1': 'x', 'apmes-logbook-cloud-pending': 'x', __proto__: 'x', n: 5 } }));
+  assert.deepEqual(Object.keys(evil.items), ['apmes-logbook-theme']);
+  assert.throws(() => readDeviceFile('not json'), /not JSON/);
+  assert.throws(() => readDeviceFile(JSON.stringify({ kind: 'apmes-logbook-settings', items: {} })), /isn’t a device file/);
+  assert.throws(() => readDeviceFile(JSON.stringify({ kind: DEVICE_KIND, items: [] })), /isn’t a device file/);
+}

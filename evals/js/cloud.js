@@ -76,6 +76,23 @@ const soft = p => p.catch(e => {
   return null;
 });
 
+// True when this phone holds writes the server hasn't confirmed yet (e.g. a form submitted without
+// signal). Signing out would delete them with the offline cache, so the UI asks first.
+export async function hasUnsentWrites(ms = 1500) {
+  if (demo || !fb) return false;
+  const { db, F } = await sdk();
+  let done = false;
+  const settle = () => { done = true; };
+  await Promise.race([F.waitForPendingWrites(db).then(settle, settle), new Promise(r => setTimeout(r, ms))]);
+  return !done;
+}
+// Resolves once every write made so far has reached the server.
+export async function whenSynced() {
+  if (demo) return;
+  const { db, F } = await sdk();
+  await F.waitForPendingWrites(db);
+}
+
 // ---- sign-in ----
 
 const asUser = u => (u ? { email: lc(u.email), name: u.displayName || u.email, uid: u.uid } : null);
@@ -91,11 +108,12 @@ export async function watchUser(cb) {
 
 // Popup first; redirect when popups are blocked or unsupported (e.g. some home-screen apps).
 const REDIRECT_CODES = ['auth/popup-blocked', 'auth/operation-not-supported-in-this-environment', 'auth/web-storage-unsupported', 'auth/cancelled-popup-request'];
-export async function signIn() {
+export async function signIn(hint) {
   if (demo) return D.signIn();
   const { auth, A } = await sdk();
   const provider = new A.GoogleAuthProvider();
-  provider.setCustomParameters({ prompt: 'select_account' });
+  // hint: the email an assessor link was sent to (?as=), so Google suggests that account first
+  provider.setCustomParameters(hint ? { prompt: 'select_account', login_hint: hint } : { prompt: 'select_account' });
   try {
     await A.signInWithPopup(auth, provider);
   } catch (e) {

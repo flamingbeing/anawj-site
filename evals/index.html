@@ -18,10 +18,16 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600;700&display=swap">
 <script>
+  // Evals now lives at apmes.anawj.com/evals/ (with the logbook: one sign-in). The same folder is still served at
+  // anawj.com/evals/, so send visitors on from there, path, query and # kept, so assessor links and "Assess me"
+  // QR codes keep working. Only when it is the top page, and a no-op on apmes.anawj.com, previews and localhost.
+  if (top === self && /^(www\.)?anawj\.com$/.test(location.hostname)) location.replace('https://apmes.anawj.com' + location.pathname + location.search + location.hash);
+</script>
+<script>
   // theme before the first paint (More → Settings → Theme; light unless chosen)
   try { var t = localStorage.getItem('evals-theme'); if (t === 'auto') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; document.documentElement.dataset.theme = t === 'dark' ? 'dark' : 'light'; } catch (e) {}
 </script>
-<link rel="stylesheet" href="../design/tokens.css">
+<link rel="stylesheet" href="../nuhsdesign/tokens.css">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>

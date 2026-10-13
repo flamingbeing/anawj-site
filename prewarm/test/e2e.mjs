@@ -76,10 +76,12 @@ try {
   assert.match(await page.textContent('.kp .kphead'), /Core/, 'tapping the countdown opens the first box of the reading');
   await axe('keypad'); await shot('keypad');
   await page.click('.kp [data-a="back"]'); await page.waitForTimeout(300);
-  // the app bar's Log button sets the next event to now (then cleared again from its box)
-  assert.match(await page.textContent('#lognext'), /Log\s*Prewarm off/);
-  await page.click('#lognext');
-  assert.match(await page.textContent('[data-ev="ev_wstop"] b'), /^\d\d:\d\d$/, 'Log sets warming off to now');
+  // the app bar shows the sync status, not a Log button (owner, 13 Oct 2026); a time is set to now from its pad, then cleared
+  assert.match(await page.textContent('#syncchip'), /Local/, 'sync status chip in the bar');
+  assert.equal(await page.$('#lognext'), null, 'no Log button');
+  await page.waitForTimeout(900); await page.click('[data-ev="ev_wstop"]'); page.once('dialog', d => d.accept()); // earlier times aren't logged yet: asks first
+  await page.waitForSelector('.kp [data-now]'); await page.click('.kp [data-now]'); await page.waitForTimeout(900);
+  assert.match(await page.textContent('[data-ev="ev_wstop"] b'), /^\d\d:\d\d$/, 'Now sets warming off to now');
   await page.click('[data-ev="ev_wstop"]');
   let cleared = ''; page.once('dialog', d => { cleared = d.message(); d.accept(); });
   await page.click('.kp [data-a="clear"]'); await page.waitForTimeout(200);
@@ -209,7 +211,7 @@ try {
   assert.ok(await page.$('[data-done]'), 'Mark data collection as complete on this tab too');
   // other data: the rest of the study's pages on one page, under headers open by default, from the small box on the
   // BP, HR, BIS tab; Enter and the arrow keys move between questions
-  assert.deepEqual((await page.$$eval('.links.three a', as => as.map(a => a.textContent.replace(/\s*✓/, '').trim()))), ['Pre-op', 'Day 1', 'Day 2'], 'Perioperative data is three buttons on one line');
+  assert.deepEqual((await page.$$eval('.links.three a', as => as.map(a => a.textContent.replace(/\s*✓/, '').trim()))), ['Pre-op', 'POD1', 'POD2'], 'Perioperative data is three buttons on one line');
   const ys = await page.$$eval('.links.three a', as => as.map(a => Math.round(a.getBoundingClientRect().y)));
   assert.ok(ys.every(y => y === ys[0]), 'the three buttons share one line');
   assert.equal((await page.textContent('#haemolink')).trim(), 'BP, HR, BIS', 'second tab is BP, HR, BIS');
@@ -218,9 +220,9 @@ try {
   assert.equal(await page.$$eval('details.sect[open]', x => x.length), 4, 'Pre-op page: Subject ID and group, pre-op, meds, bloods, all open');
   const pid3 = (await page.evaluate(() => location.hash)).split('/')[2];
   await page.evaluate(h => { location.replace(h); }, `#/p/${pid3}/data/day1`); await page.waitForSelector('details.sect');
-  assert.equal(await page.$$eval('details.sect[open]', x => x.length), 2, 'Day 1 page: chart review and analgesia');
+  assert.equal(await page.$$eval('details.sect[open]', x => x.length), 2, 'POD1 page: chart review and analgesia');
   await page.evaluate(h => { location.replace(h); }, `#/p/${pid3}/data/day2`); await page.waitForSelector('details.sect');
-  assert.equal(await page.$$eval('details.sect[open]', x => x.length), 3, 'Day 2 page: chart review, analgesia, discharge');
+  assert.equal(await page.$$eval('details.sect[open]', x => x.length), 3, 'POD2 page: chart review, analgesia, discharge');
   await page.evaluate(h => { location.replace(h); }, `#/p/${pid3}/data`); await page.waitForSelector('details.sect');
   await page.fill('#f-age', '67'); await page.keyboard.press('Enter');
   assert.match(await page.textContent('details.sect[data-pg="preop"] summary'), /1 of \d+ filled/, 'Enter saves the answer');
@@ -280,9 +282,9 @@ try {
 
   // PACU: NuDESC total
   await page.click('.links a[href$="/form/pacu"]');
-  // sub-screens keep the running timer and the Log button in the top bar
+  // sub-screens keep the running timer and the sync status in the top bar
   assert.ok(await page.$('#clock'), 'timer on the PACU screen');
-  assert.ok(await page.$('#lognext'), 'Log button on the PACU screen');
+  assert.ok(await page.$('#syncchip'), 'sync status on the PACU screen');
   await page.click('.chip[data-f="nd_dis"][data-v="1"]');
   await page.click('.chip[data-f="nd_psy"][data-v="2"]');
   assert.equal(await page.inputValue('#f-pacu_nudesc'), '3');
@@ -302,7 +304,7 @@ try {
   assert.equal(await page.evaluate(() => getComputedStyle(document.body).zoom), '1.25');
   await page.click('[data-zoom="1"]');
   // every reading live by default; deleting participants only from Settings
-  assert.equal(await page.isChecked('[data-k="haemo15"]'), true, 'BP, HR and BIS every 15 min on by default');
+  assert.doesNotMatch(await page.textContent('main'), /Readings to enter live/, 'no Readings to enter live section; every reading is live');
   await page.click('a[href="#/delete"]');
   await page.waitForSelector('.dellist');
   await axe('delete participants'); await shot('delete');
@@ -343,7 +345,7 @@ try {
   await page.waitForSelector('.board');
   assert.ok(await page.evaluate(() => document.body.classList.contains('ro')), 'read only');
   assert.equal(await page.isVisible('#save'), false, 'no Save');
-  assert.equal(await page.isVisible('#lognext'), false, 'no Log');
+  assert.equal(await page.isVisible('#syncchip'), true, 'sync status still shows when read only');
   await shot('locked-readonly');
   await page.goto(BASE + '?demo#/');
   assert.equal(await page.evaluate(() => document.body.classList.contains('ro')), false);

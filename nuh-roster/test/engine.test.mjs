@@ -70,6 +70,30 @@ const bad = [{ roomId: 'r1', label: 'MCOR 1', complex: 'MCOR', senior: 'Senior G
 const out = check({ rows: bad, staff, day: { ...day, staff: { s3: { status: 'leave' } } } }).map(w => w.text).join('\n');
 assert.match(out, /on leave/);
 assert.match(out, /Paeds list/);
+{
+  // live checks that used to exist only as generator notes, or not at all
+  const r = (roomId, label, senior, junior) => ({ roomId, label, complex: 'MCOR', senior, junior, premed: '', notes: '' });
+  const day2 = { rooms: day.rooms.map(x => ({ ...x, flags: { subspecs: [], complex: false, long: false } })), staff: {} };
+  const texts = rows => check({ rows, staff, day: day2 }).map(w => `${w.level}|${w.fix || ''}|${w.text}`);
+  // double cover with no junior in one of the rooms
+  let t = texts([r('r3', 'MCOR 2', 'Senior General', ''), r('r4', 'MCOR 3', 'Senior General', 'Junior Resident')]);
+  assert.ok(t.some(x => /^error\|fill\|MCOR 2: no junior, and the senior is double covering/.test(x)), t.join('\n'));
+  assert.ok(!t.some(x => /MCOR 3: no junior/.test(x)));
+  // a cover from another room counts as a junior
+  t = texts([r('r3', 'MCOR 2', 'Senior General', 'Junior Mopex C'), r('r4', 'MCOR 3', 'Senior General', 'Junior Resident')]);
+  assert.ok(!t.some(x => /no junior/.test(x)), t.join('\n'));
+  // one senior in three rooms
+  t = texts([r('r1', 'MCOR 1', 'Senior General', 'Junior Paeds'), r('r3', 'MCOR 2', 'Senior General', 'Junior Mopex'), r('r4', 'MCOR 3', 'Senior General', 'Junior Resident')]);
+  assert.ok(t.some(x => /^error\|reseat\|Senior General is the senior in 3 rooms/.test(x)), t.join('\n'));
+  // senior in one room and junior in another
+  t = texts([r('r1', 'MCOR 1', 'Senior Paeds', 'Junior Paeds'), r('r3', 'MCOR 2', 'Senior General', 'Senior Paeds')]);
+  assert.ok(t.some(x => /^warn\|reseat\|Senior Paeds is the senior in MCOR 1 and the junior in MCOR 2/.test(x)), t.join('\n'));
+  // admin day / elsewhere on a list
+  const t2 = check({ rows: [r('r4', 'MCOR 3', 'Senior General', 'Junior Resident')], staff, day: { ...day2, staff: { s3: { status: 'admin' }, j2: { status: 'elsewhere' } } } }).map(w => `${w.level}|${w.fix}|${w.text}`);
+  assert.ok(t2.some(x => /^warn\|takeOff\|Senior General is on an admin day/.test(x)), t2.join('\n'));
+  assert.ok(t2.some(x => /^warn\|takeOff\|Junior Resident is elsewhere today/.test(x)), t2.join('\n'));
+  console.log('live check tests passed');
+}
 assert.equal(suggestShortName('Koh Yi Wen'), 'Koh YW');
 assert.equal(suggestShortName('Lim Xinyi'), 'Xinyi');
 assert.equal(suggestShortName('Anjali Varma'), 'Anjali');
@@ -281,4 +305,38 @@ console.log('engine tests passed');
   assert.equal(res.data.rows[2].aoh, 'Charlie Delta', 'a name wrapped onto two lines');
   assert.equal(res.data.rows[3].aoh, 'Foxtrot', 'a page without headers');
   console.log('review fix tests passed');
+}
+
+// rotations: weeks, postings on a date, reading a sheet (fake names only)
+{
+  const R = await import('../js/rotations.js');
+  assert.equal(R.mondayOf('2026-10-18'), '2026-10-12');
+  assert.equal(R.weeksOfYear(2026)[0], '2025-12-29');
+  assert.equal(R.postingCode('Paeds'), 'P');
+  assert.equal(R.postingCode('liver'), 'L');
+  assert.equal(R.postingCode('banana'), null);
+  assert.equal(R.headerDate('14/10/2026', 2026), '2026-10-12');
+  assert.equal(R.headerDate('12 Oct', 2026), '2026-10-12');
+  const rot = R.emptyRotations();
+  const j = { id: 'j1', role: 'junior', posting: 'RA' };
+  R.setWeeks(rot, 'j1', ['2026-10-12'], 'P');
+  assert.equal(R.postingOn(rot, j, '2026-10-15'), 'P');
+  assert.equal(R.postingOn(rot, j, '2026-10-20'), 'RA', 'the usual posting outside the rotation');
+  assert.equal(R.postingOn(rot, j, '2026-10-15', 'Neu'), 'Neu', "the day's change wins");
+  assert.equal(R.postingOn(rot, { id: 's', role: 'senior', posting: '' }, '2026-10-15'), '');
+  // a sheet: a title row, then names and Mondays
+  const grid = [['Rotations 2026'], ['Name', 'Usual', new Date(Date.UTC(2026, 9, 12)), '19 Oct', '26/10/2026'],
+    ['Alpha Junior', 'RA', 'Paeds', 'Paeds', 'Neuro'], ['Nobody Known', '', 'P'], ['Bravo Junior', '', '', 'Cardiac', 'Mystery']];
+  const ws = { eachRow: (_, fn) => grid.forEach((vals, i) => fn({ eachCell: (_o, f) => vals.forEach((v, c) => f({ value: v }, c + 1)) }, i + 1)) };
+  const cellText = v => v instanceof Date ? v.toISOString().slice(0, 10) : String(v ?? '');
+  const staffR = [{ id: 'a', name: 'Alpha Junior' }, { id: 'b', name: 'Bravo Junior' }];
+  const res = R.readRotationSheet(ws, cellText, n => staffR.find(p => p.name === n) || null, 2026);
+  assert.deepEqual(res.mondays, ['2026-10-12', '2026-10-19', '2026-10-26']);
+  assert.deepEqual(res.people, ['a', 'b']);
+  assert.equal(res.weeks['2026-10-12'].a, 'P');
+  assert.equal(res.weeks['2026-10-26'].a, 'Neu');
+  assert.equal(res.weeks['2026-10-19'].b, 'Cardiac');
+  assert.deepEqual(res.unmatched, ['Nobody Known']);
+  assert.deepEqual(res.unknown, ['Mystery']);
+  console.log('rotation tests passed');
 }

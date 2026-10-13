@@ -1,8 +1,8 @@
 // Progress (#progress, resident): each EPA (collapsible) with its guidebook groups, done/min and a
 // state colour for my year (done, on track, due this year, overdue, later). Tap an item → Request this.
 
-import { S, h, icon, go, toolLabel, toMs, modal } from './ui-core.js';
-import { progress } from './engine.js';
+import { S, h, icon, go, toolLabel, toMs, modal, hooks } from './ui-core.js';
+import { progress, dueItems, todayISO } from './engine.js';
 import { EPAS } from './catalogue.js';
 import { residentCSS, itemTags, myYear } from './ui-request.js';
 
@@ -18,6 +18,22 @@ const STATE = {
 const RANK = { overdue: 0, 'due-soon': 1, 'on-track': 2, later: 3, done: 4 };
 const YEAR_MS = 365 * 864e5;
 const open = new Set();   // EPAs the resident opened (kept across repaints)
+let view = 'all';         // filter: all | year (overdue + due this year) | overdue
+const VIEWS = [['all', 'All'], ['year', 'This year'], ['overdue', 'Overdue']];
+const shown = st => view === 'all' || (view === 'overdue' ? st === 'overdue' : st === 'overdue' || st === 'due-soon');
+
+// The next items to ask for: due by now (overdue first), not already requested; one tap to request.
+function nextCard(yr, pending) {
+  const items = [...new Map(dueItems(S.mine, yr, todayISO()).filter(i => !pending.has(i.id)).map(i => [i.id, i])).values()].slice(0, 3);
+  if (!items.length) return null;
+  return h('section', { class: 'e-card e-next' },
+    h('h2', { class: 'e-h3', style: 'margin:0 0 8px' }, 'Ask for next'),
+    h('div', { class: 'e-list' }, items.map(item => h('a', { class: 'e-row', href: '#new/' + encodeURIComponent(item.id) },
+      h('span', { class: 'e-row__body' },
+        h('span', { class: 'e-row__title' }, item.text),
+        h('span', { class: 'e-row__meta' }, itemTags(item), item.completeBy ? ` · by ${item.completeBy}` : '')),
+      h('span', { class: 'e-next__go' }, icon('plus'), 'Request')))));
+}
 
 function itemSheet(item, p) {
   const m = modal(item.text, h('div', { class: 'e-stack' },
@@ -33,14 +49,14 @@ function itemSheet(item, p) {
 
 export function renderProgress() {
   const yr = myYear();
-  const rows = progress(S.mine, yr);
+  const rows = progress(S.mine, yr, todayISO());
   const count = st => rows.filter(p => p.state === st).length;
   const lastByEpa = {};
   for (const ev of S.mine) if (ev.status === 'submitted' && ev.epa) lastByEpa[ev.epa] = Math.max(lastByEpa[ev.epa] || 0, toMs(ev.submittedAt) || 0);
   const pending = new Set(S.mine.filter(ev => ['requested', 'draft'].includes(ev.status)).map(ev => ev.itemId));
 
   const epaBlocks = EPAS.map(e => {
-    const groups = rows.filter(p => p.group.epa === e.epa);
+    const groups = rows.filter(p => p.group.epa === e.epa && shown(p.state));
     if (!groups.length) return null;
     const done = groups.reduce((n, p) => n + p.done, 0), min = groups.reduce((n, p) => n + p.min, 0);
     const worst = groups.reduce((w, p) => (RANK[p.state] < RANK[w] ? p.state : w), 'done');
@@ -77,8 +93,12 @@ export function renderProgress() {
         h('span', { class: 'e-chip e-chip--submitted' }, `${count('done')} done`)),
       bar(count('done'), rows.length, count('overdue') ? 'overdue' : 'on-track'),
       h('p', { class: 'e-small e-muted', style: 'margin:8px 0 0' }, 'Counts submitted evaluations. Repeats of an item count towards its group.')),
+    nextCard(yr, pending),
+    h('div', { class: 'e-chips e-progress-filter', role: 'group', 'aria-label': 'Show' }, VIEWS.map(([id, label]) =>
+      h('button', { type: 'button', class: 'e-chip-btn', 'aria-pressed': String(view === id), onclick: () => { view = id; hooks.render(); } }, label))),
     h('div', { class: 'e-rq-legend', 'aria-hidden': 'true' }, Object.entries(STATE).map(([, [l, c]]) => h('span', { style: `--c:${c}` }, l))),
-    h('div', { class: 'e-list' }, epaBlocks));
+    epaBlocks.some(Boolean) ? h('div', { class: 'e-list' }, epaBlocks)
+      : h('p', { class: 'e-small e-center' }, view === 'overdue' ? 'Nothing overdue.' : 'Nothing due this year.'));
 }
 
 function bar(done, min, state) {

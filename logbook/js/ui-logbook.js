@@ -16,6 +16,7 @@ import { flatTree, tagTree } from './tags.js';
 import { editCaseDialog, logOnDate } from './ui-log.js';
 import { reflectOnCase } from './ui-reflect.js';
 import { moveToBin } from './bin.js';
+import { destinations, openSend } from './ui-send.js';
 import { shareText, copyText, caseText as shareCaseText, dayTextWithNotes } from './share.js';
 
 // has: tags a case must all have; not: tags it must have none of ('c:16' or a personal tag key); from/to: dates
@@ -329,6 +330,7 @@ function openRowMenu(c) {
   const has = (S.reflections || []).some(r => r.caseId === c.id);
   const m = modal(caseText(c).slice(0, 60) || 'Case', h('div', { class: 'row-menu-list' },
     h('button', { onclick: () => { m.close(); copyText(shareCaseText(c), 'Case copied: paste it into your notes'); } }, rowIcon('copy'), ' Copy'),
+    destinations().length ? h('button', { onclick: () => { m.close(); openSend({ text: shareCaseText(c), title: c.date || 'Case' }); } }, rowIcon('copy'), ' Send to…') : null,
     basicHides('reflect') ? null : h('button', { class: has ? 'has-refl' : '', onclick: () => { m.close(); reflectOnCase(c); } }, rowIcon(has ? 'done' : 'reflect'), has ? ' Open the reflection' : ' Write a reflection'),
     h('button', { onclick: () => { m.close(); editCaseDialog(c); } }, ' Edit the case'),
     h('button', { class: 'linkish', onclick: () => m.close() }, 'Cancel')));
@@ -466,6 +468,8 @@ function calendarView(rows, flagsOf, repaint) {
         h('h3', { style: 'margin:0' }, `${fmtDate(view.day)} (${dayCases.length})`),
         h('div', { class: 'lb-daybtns' },
           dayCases.length || dayNotes ? h('button', { class: 'small ib', title: 'Share this day', 'aria-label': 'Share this day', onclick: async () => shareText(await dayTextWithNotes(view.day, dayCases)) }, ...ib('share', 'Share')) : null,
+          // Send to…: only once a place to send to is set up (Settings → Send to)
+          (dayCases.length || dayNotes) && destinations().length ? h('button', { class: 'small ib', title: 'Send this day to another app', 'aria-label': 'Send this day', onclick: async () => openSend({ text: await dayTextWithNotes(view.day, dayCases), title: view.day, date: view.day }) }, ...ib('share', 'Send')) : null,
           // Copy for the day: off unless switched on (Advanced display → Logbook rows; owner, 13 Oct 2026)
           (dayCases.length || dayNotes) && document.documentElement.classList.contains('day-copy') ? h('button', { class: 'small ib', title: 'Copy this day (format in Settings → Markdown)', 'aria-label': 'Copy this day', onclick: async () => copyText(await dayTextWithNotes(view.day, dayCases), 'Day copied: paste it into your notes') }, ...ib('copy', 'Copy')) : null,
           dayNotes ? h('button', { class: 'small ib', title: 'Notes', onclick: () => openNotes({ day: view.day }) }, ic('note'), h('span', { class: 'ib-l' }, 'Notes')) : null,

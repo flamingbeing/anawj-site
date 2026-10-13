@@ -8,18 +8,18 @@ projects with Workers".)
 - Each branch gets a steady preview address, `https://<branch>-anawj-preview.kohwenjun.workers.dev/`, and each
   build a one-off one. Cloudflare posts the links on the PR (a comment and a Workers Builds check) and updates
   them on every push. The copy of `main` is at <https://anawj-preview.kohwenjun.workers.dev/>.
-- **Open the apps in demo mode:** `…/logbook/?demo`, `…/evals/?demo`, `…/nuh-roster/?demo`. Demo mode keeps
+- **Open the apps in demo mode:** `…/logbook/?demo`, `…/evals/?demo`, `…/nuh-roster/?demo` (the roster as it will be at its own address: `…/_sites/nuhroster.anawj.com/?demo`). Demo mode keeps
   everything in the browser.
 - **Signing in does not work on previews, on purpose.** Google sign-in only works from domains listed in each
   Firebase project, and the previews aren't listed, so preview code can never read or change real data. Saving
-  to Google Drive / Dropbox doesn't work there either (both are registered to anawj.com only).
+  to Google Drive / Dropbox doesn't work there either (both are registered to apmes.anawj.com only).
 - **Firestore rules** are not previewed: they deploy on merge to `main`. Test rule changes with the emulator
   (`logbook/NOTES.md`, "Working on it").
 - Previews are public if someone has the link, and are kept out of search engines (`_headers`). Fake data only,
   as everywhere in this repo.
 
 How it is set up in the repo: `wrangler.jsonc` describes a Worker named `anawj-preview` that only serves files
-(no server code), with `preview_urls` on. `.assetsignore` keeps `.git`, `.github`, `.claude`, `.agents` and the
+(`worker/sites.js`: no data, no secrets; it also serves the subdomains, see `SUBDOMAINS.md`), with `preview_urls` on. `.assetsignore` keeps `.git`, `.github`, `.claude`, `.agents` and the
 config out of the upload. `_headers` adds `X-Robots-Tag: noindex`. GitHub Pages ignores all three. Check a change
 to them with `npx wrangler deploy --dry-run` (no account needed; it lists files before the ignore list applies).
 

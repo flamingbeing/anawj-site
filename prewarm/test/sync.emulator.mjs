@@ -68,6 +68,28 @@ try {
   await bb.click('.textlinks a[href$="/sheet"]');
   await bb.waitForFunction(() => /36\.6/.test(document.querySelector('.sheet')?.textContent || ''), null, { timeout: 15000 });
 
+  // moving to the new address (owner, 13 Oct 2026): the old address moves a synced team phone and carries its join code and
+  // initials in the # part; a half-entered reading keeps it where it is, with a bar saying why
+  const NEWHOST = 'http://127.0.0.1:' + (process.env.PORT || 8080) + '/prewarm/';
+  const mv = await a.context().newPage();
+  mv.on('pageerror', e => errors.push('mover: ' + e.message));
+  await a.evaluate(() => localStorage.setItem('prewarm:unsaved:test:prewarm:5', '{"x":1}'));
+  await mv.goto(BASE + '&oldhost=' + encodeURIComponent(NEWHOST));
+  await mv.waitForFunction(() => /half entered/.test(document.querySelector('#moved')?.textContent || ''), null, { timeout: 25000 });
+  assert.match(mv.url(), /^http:\/\/localhost:/, 'a half-entered reading keeps the phone on the old address');
+  await a.evaluate(() => localStorage.removeItem('prewarm:unsaved:test:prewarm:5'));
+  await mv.click('#movenow');
+  await mv.waitForURL(/^http:\/\/127\.0\.0\.1:/, { timeout: 25000 });
+  assert.match(mv.url(), /\?emulator#\/join\/NUH\/NUH-TEST-CODE\/AA$/, 'the new address gets the join code and initials in the # part: ' + mv.url());
+  assert.doesNotMatch(mv.url(), /oldhost/);
+  await mv.waitForSelector('#joinlink');
+  assert.equal(await mv.inputValue('#me'), 'AA', 'initials carried over');
+  await mv.click('#joinlink');
+  await toastSays(mv, /Joined the NUH team/);
+  await mv.goto(NEWHOST + '?emulator#/');
+  await mv.waitForFunction(() => /SYNC-01/.test(document.querySelector('.list')?.textContent || ''), null, { timeout: 15000 });
+  await mv.close();
+
   // phone B adds the 5-min reading; phone A gets it
   await bb.goto(bb.url().replace('/sheet', '/prewarm/5'));
   await bb.click('[data-step="1"][data-c="core"]');
@@ -153,6 +175,9 @@ try {
   await ad.fill('#adminpw', 'correct horse 42'); await ad.click('#adminpwin');
   await ad.waitForFunction(() => /Signed in as study admin/.test(document.querySelector('main')?.textContent || ''), null, { timeout: 20000 });
   await ad.evaluate(() => { location.hash = '#/settings'; });
+  // an admin picks the hospital for patients started on this phone (it was missing: they couldn't be set at all)
+  await ad.click('[data-site="NUH"]');
+  assert.equal(await ad.getAttribute('[data-site="NUH"]', 'aria-pressed'), 'true', 'an admin can set the hospital in Settings');
   await ad.waitForSelector('#refreshnow'); await ad.click('#refreshnow');
   await toastSays(ad, /Up to date|still waiting/);
   assert.match(await ad.textContent('main'), /Signed in as study admin/, 'Refresh now keeps the admin signed in');

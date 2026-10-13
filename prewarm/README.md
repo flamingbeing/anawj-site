@@ -1,7 +1,7 @@
 # Prewarming study app
 
 Phone app for the op-day bedside data of the prewarming RCT: temperatures every 5 minutes (pre-warming and intra-op),
-event times, intra-op details, PACU and satisfaction. Lives at `anawj.com/prewarm/`; `?demo` opens a separate demo
+event times, intra-op details, PACU and satisfaction. Lives at `prewarmstudy.anawj.com` (it moved from `anawj.com/prewarm/`, which now moves phones across once they have nothing waiting); `?demo` opens a separate demo
 store with a fake patient.
 
 - Plan and decisions: `PLAN.md`. Status: `STATUS.md`. Lasting rules: `NOTES.md`.

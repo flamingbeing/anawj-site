@@ -6,14 +6,20 @@ Lasting decisions for `hand-babies/`. Status and next steps: `STATUS.md`.
 
 - Readers: MOs who were house officers last month, first week in hand surgery, often on a phone in ED.
 - Aim: accurate bedside exam (sensation distal to the wound, 2PD done properly, each tendon isolated, Kanavel's
-  signs) and photos a senior can decide from (always wide + close-up). Practical content over looks.
+  signs) and a clinical record to the standard of care, with photos (always wide + close-up). Frame it as standard of care, not "what the senior wants" (owner, 13 Oct 2026). Practical content over looks.
 - Owner's emphasis (12 Oct 2026): 2PD, sensation, individual tendon tests, "no point testing proximal to the cut",
   2 photo views (zoomed in + zoomed out), Kanavel's signs, depends on the clinical picture.
 
 ## Address
 
-- Lives at `anawj.com/hand-babies/` (moved from `/hand/`, 12 Oct 2026). `hand/` holds only a redirect and a worker
-  that clears the old `hand-*` caches; its cache cleanup must never touch `hand-babies-*` (same prefix start).
+- Lives at `hand.anawj.com/babies/` (moved from `anawj.com/hand-babies/`, 13 Oct 2026, SUBDOMAINS.md step 2). The repo
+  folder stays `hand-babies/`; the Worker maps the address (`worker/routes.js`). Never use absolute `/hand-babies/…`,
+  `/design/…` or `/edit/…` paths in the page: the subdomain serves only this folder (`/design/` and `/edit/` are 404s there).
+- The old `anawj.com/hand-babies/` is the same folder on GitHub Pages: a script at the top of `index.html` sends a
+  top-level visit to the new address (path, query, `#` kept). It skips frames, so the page editor (`/edit/`, on
+  anawj.com until SUBDOMAINS.md step 5) can still open the old copy to edit its text. The old `/hand/` redirect folder
+  is gone (nobody used it).
+- The "Suggest an edit" link and `edit.html` go to `https://anawj.com/edit/?page=%2Fhand-babies%2F` (editor on anawj.com).
 
 ## Updates (offline worker)
 
@@ -26,7 +32,7 @@ itself (`skipWaiting` in install); never go back to waiting for a tap (on a phon
 - No emoji, no "10 rules" box (owner, 12 Oct 2026). One long page, sticky section chips; scenarios are `<details>` cards (open from a link like `#pic-infect`).
 - Short, plain, practical (owner, 12 Oct 2026): not textbook; good English the way Singapore doctors talk (MO,
   ED, OT, TW, ATT, nec fasc). No quiz, no privacy guide, no referral template: one short example message only.
-- Plain words, short. Each scenario: Examine / Photos / Call now if / Common miss.
+- Plain words, short. Each scenario: Examine / Photos / Escalate now if / Common miss.
 - Generic to any hospital: "per unit protocol" for drugs and splints; no hospital-specific numbers or names.
 - Figures are drawn in `app.js` from one hand geometry (`FINGERS`, `shapes()`); the hand is a LEFT hand palm side so
   radial is on the left. Label radial/ulnar on any new figure.

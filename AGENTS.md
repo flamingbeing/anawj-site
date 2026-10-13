@@ -7,9 +7,10 @@ Static site on GitHub Pages (public repo: no names, patient data or real evaluat
 
 - `evals/`: APMES workplace-based assessments. Start with `evals/NOTES.md` (decisions, MedHub, forms, operations), then `evals/README.md`.
 - `logbook/`: APMES case logbook. Start with `logbook/NOTES.md` (principles, words, screens, tags, demo, how to test), then `logbook/README.md`.
-- `nuh-roster/`: NUH anaesthesia daily roster (own Firebase project `nuh-roster`). Start with `nuh-roster/NOTES.md`: its department section (grades, postings, roster sheet, notation, HMS monthly rosters, short names) applies to any app dealing with NUH anaesthesia staff.
-- `prewarm/`: prewarming study op-day data collection (temperatures every 5 min, export to the study's Excel template). Start with `prewarm/NOTES.md`, then `prewarm/PLAN.md`.
-- `hand-babies/`: hand surgery exam crash course for new MOs (one static page, no data). Start with `hand-babies/NOTES.md`.
+- `nuh-roster/`: NUH anaesthesia daily roster (own Firebase project `nuh-roster`), at `nuhroster.anawj.com` (the old `anawj.com/nuh-roster/` redirects). Start with `nuh-roster/NOTES.md`: its department section (grades, postings, roster sheet, notation, HMS monthly rosters, short names) applies to any app dealing with NUH anaesthesia staff.
+- `prewarm/`: prewarming study op-day data collection (temperatures every 5 min, export to the study's Excel template); served at `prewarmstudy.anawj.com`. Start with `prewarm/NOTES.md`, then `prewarm/PLAN.md`.
+- `hand-babies/`: hand surgery exam crash course for new MOs (one static page, no data), at `hand.anawj.com/babies/`. Start with `hand-babies/NOTES.md`.
+- `hand-log/`: hand surgery DOPS and Mini-CEX log (data on the device only, CSV/JSON export), at `hand.anawj.com/handlog/`. Start with `hand-log/NOTES.md`.
 - `edit/`: the page editor for any page on the site (`edit.anawj.com/<path>` redirects to it). Suggested edits arrive as
   GitHub issues titled `Page edits:`; how to apply them: `edit/NOTES.md`. A daily routine ("Page edits check", 8:58 am
   Singapore) drafts one PR for new ones and never merges: the owner approves page edits.
@@ -17,9 +18,26 @@ Static site on GitHub Pages (public repo: no names, patient data or real evaluat
   data is built from them), and the blank portfolio template the logbook tests use. See `apmes/README.md`.
   Before adding a programme file, check its cover/contributor pages and file details (author, embedded files) for
   names; add a cleaned copy.
-- `design/tokens.css`: shared design tokens.
+- `nuhsdesign/tokens.css`: shared design tokens; `nuhsdesign/README.md` is the NUHS-style guide (`nuhsdesign/STATUS.md`
+  for its status). Every subdomain serves `/nuhsdesign/` (the old `/design/` path was retired 13 Oct 2026; link `../nuhsdesign/tokens.css`). Every app's top band is four equal quarters: orange `#e57200`, red `#e4002b`, blue `#178fd7` (not cyan),
+  navy `#002f6c`. Focus rings are navy on light grounds (cyan on white is only 2.7:1).
 
 Rules that bite:
+
+- Accounts, settings, costs, the pre-launch checklist and how to hand over: [OPERATIONS.md](OPERATIONS.md). Update
+  it when an account, setting or cost changes.
+- A PR that changes any `firestore.rules` waits for the owner's approval before merging (it deploys live on merge).
+- **Blocked by the cloud environment?** (no Google Cloud sign-in, the owner's real documents, a long test run, a
+  secret): hand it to the owner's home-computer session instead of stopping. How and what to send: `OPERATIONS.md`,
+  "The home computer". It changes live projects only with the owner's OK.
+
+- The homepage (`index.html`) only shows whether the server is up or down (owner, Oct 2026). Apps stay unlisted:
+  never link them from the homepage, and give each app page `<meta name="robots" content="noindex, nofollow">`
+  (GitHub Pages ignores `_headers`, so the meta tag is what keeps anawj.com out of search engines).
+- Subdomains (owner, 13 Oct 2026; plan and progress in [SUBDOMAINS.md](SUBDOMAINS.md)): an app that saves data or
+  signs people in gets its own subdomain (apps sharing data or sign-in share one, like `apmes.` for logbook and
+  evals); static pages share a subdomain by topic (`hand.`). Never put a data app on a subdomain with apps it doesn't
+  need to share with. Name subdomains for what they're for, once.
 
 - `logbook/firestore.rules` is the one rules file for both logbook and evals (Firebase project `apmes-logbook`). It deploys automatically on merge to main; never ask the owner to paste rules.
 - `nuh-roster/firestore.rules` (Firebase project `nuh-roster`) and `prewarm/firestore.rules` (project `prewarm-study`) deploy the same way.
@@ -42,7 +60,7 @@ Before merging, run:
 
 ```
 node tools/check.mjs
-for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mjs prewarm/test/*.test.mjs; do node "$f"; done
+for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mjs prewarm/test/*.test.mjs worker/test/*.test.mjs; do node "$f"; done
 ```
 
 - Logbook changes: `tools/test-logbook.sh` runs all of the above plus the full e2e and every focused browser test
@@ -53,12 +71,25 @@ for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mj
 - Prewarming UI changes: `tools/test-prewarm.sh` runs the repo check, prewarm unit tests and the three browser tests
   (`prewarm/test/e2e.mjs`, `edge.e2e.mjs`, `fullcase.e2e.mjs`) side by side in about 1½ minutes (see `prewarm/README.md`).
 - Hand assessment changes: run `node hand-babies/test/e2e.mjs` (see `hand-babies/README.md`).
+- Hand log changes: run `node hand-log/test/e2e.mjs`.
+- Page editor changes (`edit/`): run `node edit/test/e2e.mjs` and `node hand-babies/test/e2e.mjs` (it opens the editor).
 
 ## Working with the owner
 
+- **Working with the owner day to day:** instructions mostly arrive from a phone, and sessions carry on agentically
+  in between, so work through a request to the end without waiting to be watched, ask only when a decision is
+  genuinely the owner's, keep each PR small and finished on its own, and keep `STATUS.md` current so the next session
+  can pick up from the files alone. A ready-to-paste snippet, with exactly where it goes, is fine when that's the
+  quickest route. Use the real technical terms, and explain each briefly the first time (an everyday or clinical
+  comparison helps), so explanations double as small lessons.
+- **Speed vs care:** the owner favours speed and merges to main freely while exploring what AI coding can do. That
+  holds for most apps. **Vital apps get more care:** `prewarm/` (live study data) and `logbook/` (live soon): full
+  tests before merging, preview links for the owner, and nothing merged into them while a prewarm case is being
+  collected if the owner has said one is running.
+- **Goal now:** find diverse use cases. Ideas and the longer-term direction are in [ROADMAP.md](ROADMAP.md).
 - **Merging:** merge your own PRs once the checks above pass, then report (with the PR link). Merge by the number the
   PR's creation returned, never a guessed next number (13 Oct 2026: a guess merged another session's PR early). Exceptions: Claude
-  Code–Codex handover PRs wait for the owner's explicit approval; the owner may say "auto-merge" for a batch, or
+  Code–Codex handover PRs and PRs changing a `firestore.rules` wait for the owner's explicit approval; the owner may say "auto-merge" for a batch, or
   "no e2e yet" (then unit tests and quick browser checks).
 - **Planning:** for multi-part work, say the plan first and wait when asked; the owner plans in batches, then it's
   built PR by PR, each merged before the next. When the owner asks "should we / can we", answer and propose.
@@ -69,10 +100,13 @@ for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mj
 - **Writing for the owner:** plain words, short; say what changed for residents and what the owner needs to do.
 - **Keep the repo public-safe:** fake data only; never commit secrets, tokens or credentials (the owner commits
   any needed public client IDs themselves).
+  **Personal notes** (how the owner works through his own day, his own notes, thoughts, private plans) go in his private
+  repo `flamingbeing/life`, never here: write the personal version there first and keep only a plain product version in
+  this repo. Never copy anything from `life` into this repo.
 
 ## Status and decisions (before compacting)
 
-Each app keeps a short `STATUS.md` beside its `NOTES.md` (start: `logbook/STATUS.md`): what each session is doing
+Site-wide work (homepage, subdomains, operations, repo rules) is tracked in the root `STATUS.md`. Each app keeps a short `STATUS.md` beside its `NOTES.md` (start: `logbook/STATUS.md`): what each session is doing
 now, what waits on the owner, the agreed next steps, recently merged PRs and a dated decisions log.
 
 - Read the app's `STATUS.md` (then `NOTES.md`) before starting work, and after any context compaction.

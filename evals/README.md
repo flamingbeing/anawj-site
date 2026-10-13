@@ -1,6 +1,6 @@
 # APMES Evaluations
 
-A phone-first web app at `anawj.com/evals/` for workplace-based assessments: **DOPS, Mini-CEX and EBD**.
+A phone-first web app at `apmes.anawj.com/evals/` (with the logbook at `apmes.anawj.com/logbook/`; the old `anawj.com/evals/` forwards there, path, query and `#` kept) for workplace-based assessments: **DOPS, Mini-CEX and EBD**.
 The resident picks the item (from the EPA Guidebook v8 catalogue), names an assessor from the faculty
 list and sends a link or QR code. The assessor signs in with Google, fills the official form in a few
 taps (saved as they go) and submits or declines. The resident reads the result and sees progress
@@ -32,7 +32,7 @@ one tab. The demo never loads Firebase.
 
 | File | What |
 |---|---|
-| `index.html`, `style.css`, `manifest.webmanifest`, `icons/`, `sw.js` | Shell, styles (NUHS tokens from `../design/tokens.css`), PWA and offline cache (`evals-*` caches only). |
+| `index.html`, `style.css`, `manifest.webmanifest`, `icons/`, `sw.js` | Shell, styles (NUHS tokens from `../nuhsdesign/tokens.css`), PWA and offline cache (`evals-*` caches only). |
 | `js/app.js`, `js/ui-core.js` | Boot, sign-in, roles, tabs, hash routes, shared helpers and state. |
 | `js/catalogue.js`, `js/forms.js` | **Generated** by `node tools/build-data.mjs` from `apmes/data/*.json` and `apmes/guidebook/*.md` (repo root). 14 EPAs, 67 items (DOPS 17, Mini-CEX 12, EBD 38), 46 counting groups; the three forms. Entrustment questions for EPA 1–12 come from `apmes/guidebook/epa-01-06.md` and `epa-07-12.md`; all 67 items have them. The EPA 7a SR EBD (`EBD-7a-06`) has only a case vignette in the guidebook's table, so its questions come from the embedded EBD_EPA7A_SR document (`epa-07-attachments.md`). |
 | `js/engine.js` | Pure logic: validation, visible questions, progress, status, case key, identifier warning. |
@@ -112,7 +112,7 @@ so **no composite indexes are needed**.
 ## Going live (Firebase console, project `apmes-logbook`)
 
 1. **Authentication → Sign-in method:** Google is already on for the logbook. Under Settings →
-   Authorised domains, check `anawj.com` is listed.
+   Authorised domains, check `apmes.anawj.com` is listed (and the Google sign-in client has `https://apmes.anawj.com/__/auth/handler`).
 2. **Firestore rules** deploy automatically: a merge to `main` that changes `logbook/firestore.rules`
    runs `.github/workflows/deploy-firestore-rules.yml`. Run the emulator tests before merging.
 3. **Admins and PDs:** add `admins/{email}` and `pds/{email}` documents `{ name }` by hand (lower-case

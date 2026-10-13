@@ -56,6 +56,11 @@ code{font-size:13px;background:var(--inset);padding:2px 4px;word-break:break-all
 .field input{min-height:44px;padding:0 10px;border:1px solid var(--control);background:#fff;font-size:16px}
 #preview{min-height:160px;max-height:30vh;font:14px/1.5 ui-monospace,Menlo,monospace}
 .warn{background:#f6e7c8;border:1px solid #b07a2a;padding:8px 10px;margin:0 0 10px}
+.check{display:flex;gap:8px;align-items:flex-start;margin:0 0 10px;font-size:14px}
+.check input{width:22px;height:22px;margin:1px 0 0;flex:none}
+.speak{display:flex;gap:8px;align-items:center;margin:8px 0 0;flex-wrap:wrap}
+.speak .muted{font-size:14px}
+#speakBtn[aria-pressed=true]{background:#e4002b;border-color:#e4002b;color:#fff}
 @media (max-width:640px){
   .bar{gap:6px;padding:6px 8px}
   .bar h1{display:none}
@@ -98,6 +103,11 @@ code{font-size:13px;background:var(--inset);padding:2px 4px;word-break:break-all
   <h2 id="noteTitle">Comment</h2>
   <p class="muted" id="noteHelp"></p>
   <textarea id="noteText" required></textarea>
+  <div class="speak" id="speakRow"><button type="button" id="speakBtn" aria-pressed="false" hidden>🎤 Speak</button><span class="muted" id="speakHint">Or tap the microphone on your keyboard to talk instead of typing.</span></div>
+  <div id="extras">
+    <label class="check"><input type="checkbox" id="optOptions"> <span>Show me 2–3 versions to choose from (for “feels cluttered”, “make this clearer” and other changes that are hard to describe)</span></label>
+    <label class="check"><input type="checkbox" id="optEverywhere"> <span>Change this everywhere it appears, not only here (wording rules like “say MO, not HO”)</span></label>
+  </div>
   <div class="row"><button value="cancel" formnovalidate>Cancel</button><button value="ok" class="primary">Save</button></div>
 </form></dialog>
 
@@ -112,6 +122,9 @@ code{font-size:13px;background:var(--inset);padding:2px 4px;word-break:break-all
   <h2>Send your changes</h2>
   <label class="field">Your name (so we know who suggested them)<input id="who" autocomplete="name" placeholder="e.g. Dr Tan, MO"></label>
   <p class="warn" id="sendNote" hidden></p>
+  <p class="warn" id="privacy" hidden></p>
+  <label class="check" id="privacyOk" hidden><input type="checkbox" id="privacyTick"> <span>I’ve checked: these aren’t patient details (names, NRIC, hospital numbers, dates of birth, phone numbers).</span></label>
+  <p class="muted">What you send is <b>public</b>. Never put patient details in a change or comment.</p>
   <p><b>Send on GitHub</b> opens a GitHub page with your changes filled in. Sign in if asked, then press <b>Create</b>.</p>
   <p class="muted">Can’t use GitHub? Press <b>Copy</b> and paste your changes into a message to whoever sent you this page.</p>
   <textarea id="preview" readonly aria-label="What will be sent"></textarea>
@@ -341,15 +354,42 @@ code{font-size:13px;background:var(--inset);padding:2px 4px;word-break:break-all
       ? 'Write the new text, or describe what should go here (a new paragraph, a table, a picture…). It will be formatted to match the page.'
       : 'Say what should change. For example: “not how we do it here”, “make this shorter”, “this diagram is wrong: …”.';
     $('noteText').value = '';
+    $('extras').hidden = type !== 'comment';
+    $('optOptions').checked = $('optEverywhere').checked = false;
     $('noteDlg').showModal();
   }
   $('aComment').onclick = () => note('comment');
   $('aAdd').onclick = () => note('add');
   $('noteDlg').addEventListener('close', () => {
     const v = $('noteText').value.trim();
-    if ($('noteDlg').returnValue === 'ok' && v && noteFor) { record(noteFor.type, noteFor.el, v); deselect(); }
+    stopSpeech();
+    if ($('noteDlg').returnValue === 'ok' && v && noteFor) {
+      const extra = noteFor.type === 'comment' ? { options: $('optOptions').checked || undefined, everywhere: $('optEverywhere').checked || undefined } : {};
+      record(noteFor.type, noteFor.el, v, extra); deselect();
+    }
     noteFor = null;
   });
+
+  // ---- speaking a comment (the browser's own speech recognition, where there is one; the text is what's kept)
+  const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let rec = null;
+  function stopSpeech() { if (rec) { try { rec.stop(); } catch (e) {} rec = null; } $('speakBtn').setAttribute('aria-pressed', 'false'); $('speakBtn').textContent = '🎤 Speak'; }
+  if (Speech) {
+    $('speakBtn').hidden = false;
+    $('speakHint').textContent = 'Tap Speak and say what should change; check the words before saving (drug names and doses get misheard).';
+    $('speakBtn').onclick = () => {
+      if (rec) { stopSpeech(); return; }
+      const box = $('noteText'), start = box.value ? box.value.replace(/\s*$/, ' ') : '';
+      try {
+        rec = new Speech(); rec.lang = navigator.language || 'en-GB'; rec.interimResults = true; rec.continuous = true;
+        rec.onresult = e => { let t = ''; for (const r of e.results) t += r[0].transcript; box.value = start + t.trim(); };
+        rec.onerror = e => { stopSpeech(); if (e.error === 'not-allowed' || e.error === 'service-not-allowed') $('speakHint').textContent = 'The microphone is blocked for this page. Use your keyboard’s microphone instead.'; };
+        rec.onend = () => { if (rec) stopSpeech(); };
+        rec.start();
+        $('speakBtn').setAttribute('aria-pressed', 'true'); $('speakBtn').textContent = '■ Stop';
+      } catch (e) { stopSpeech(); }
+    };
+  }
 
   // ---- marks for changes already made on this page
   function restoreMarks() {
@@ -394,7 +434,7 @@ code{font-size:13px;background:var(--inset);padding:2px 4px;word-break:break-all
       info.querySelector('b').textContent = LABEL[c.type];
       info.querySelector('.meta').textContent = `${c.page}${c.view || ''}${c.heading ? ' · under “' + c.heading + '”' : ''}`;
       info.querySelector('.b').textContent = (c.type === 'edit' ? 'Was: ' : 'On: ') + c.before.slice(0, 200) + (c.before.length > 200 ? '…' : '');
-      info.querySelector('.t').textContent = c.text ? (c.type === 'edit' ? 'Now: ' : '→ ') + c.text.slice(0, 300) : '';
+      info.querySelector('.t').textContent = c.text ? (c.type === 'edit' ? 'Now: ' : '→ ') + c.text.slice(0, 300) + (c.options ? ' (show me versions)' : '') + (c.everywhere ? ' (everywhere)' : '') : '';
       const rm = document.createElement('button'); rm.textContent = 'Remove';
       rm.onclick = () => { changes = changes.filter(x => x.id !== c.id); save(); renderList(); if (doc) frame.contentWindow.location.reload(); };
       d.append(info, rm); box.appendChild(d);
@@ -417,7 +457,11 @@ code{font-size:13px;background:var(--inset);padding:2px 4px;word-break:break-all
         out += `\n### ${i + 1}. ${LABEL[c.type]} (${c.element}${c.heading ? ', under “' + c.heading + '”' : ''}${c.view ? ', view ' + c.view : ''})\n`;
         out += `${c.type === 'edit' ? 'Was' : 'On'}:\n${quote(c.before || '(no text)')}\n`;
         if (c.type === 'edit') out += `Now:\n${quote(c.text)}\n`;
-        else if (c.type === 'comment') out += `Comment:\n${quote(c.text)}\n`;
+        else if (c.type === 'comment') {
+          out += `Comment:\n${quote(c.text)}\n`;
+          if (c.options) out += `Wants options: make 2–3 clearly different versions to choose from, each with its own preview link.\n`;
+          if (c.everywhere) out += `Everywhere: apply this wherever it occurs on the site, and list every place changed.\n`;
+        }
         else if (c.type === 'add') out += `Add below it:\n${quote(c.text)}\n`;
         else out += `Delete this.\n`;
         out += `Locator: \`${c.locator}\`\n`;
@@ -426,12 +470,36 @@ code{font-size:13px;background:var(--inset);padding:2px 4px;word-break:break-all
     return out;
   }
   const title = () => ('Page edits: ' + [...new Set(changes.map(pageKey))].join(', ')).slice(0, 140) + (who() ? ' (' + who() + ')' : '');
-  const refresh = () => { $('preview').value = report(); $('sendNote').hidden = true; };
+  // What the sender typed (not the page's own text, which is public already) is checked for things shaped like patient
+  // details. It can't catch everything, so the sender confirms.
+  const PRIVATE = [
+    [/\b[STFGM]\d{7}[A-Z]\b/i, 'an NRIC or FIN'],
+    [/\b\d{7,}\b/, 'a long number (a hospital or case number?)'],
+    [/\b\d{1,2}[\/.-]\d{1,2}[\/.-](19|20)?\d{2}\b/, 'a date (a date of birth?)'],
+    [/(?<![\d.])[689]\d{3}[ -]?\d{4}(?![\d.])/, 'a phone number'],
+    [/[\w.+-]+@[\w-]+\.[\w.]+/, 'an email address'],
+    [/\b(?:[Mm]rs?|[Mm]s|[Mm]dm|[Mm]adam|[Pp]atient|[Pp]t)\.?\s+[A-Z][a-z]+/, 'what looks like a patient’s name'],
+  ];
+  function privacyFlags() {
+    const typed = changes.map(c => c.text || '').join('\n');
+    return PRIVATE.filter(([re]) => re.test(typed)).map(([, what]) => what);
+  }
+  function refresh() {
+    $('preview').value = report(); $('sendNote').hidden = true;
+    const flags = privacyFlags();
+    $('privacy').hidden = $('privacyOk').hidden = !flags.length;
+    if (flags.length) $('privacy').textContent = `Check before sending: your changes contain ${flags.length > 1 ? flags.slice(0, -1).join(', ') + ' and ' + flags.at(-1) : flags[0]}. This will be public; remove anything that could identify a patient.`;
+  }
+  const privacyBlocked = () => {
+    if ($('privacyOk').hidden || $('privacyTick').checked) return false;
+    $('privacyTick').focus(); return true;
+  };
   $('who').addEventListener('input', () => { try { localStorage.setItem(WHO, $('who').value.trim()); } catch (e) {} refresh(); });
   $('send').onclick = () => {
     if (editing) { alert('Save or cancel the change you’re typing first.'); return; }
     if (!changes.length) { alert('No changes to send yet. Switch to Edit and tap some text.'); return; }
     ['copyTxt'].forEach(id => $(id).textContent = 'Copy');
+    $('privacyTick').checked = false;
     refresh(); $('sendDlg').showModal();
   };
   // Copy synchronously where possible so phones keep the tap as permission for the popup that follows.
@@ -441,9 +509,9 @@ code{font-size:13px;background:var(--inset);padding:2px 4px;word-break:break-all
     try { ta.focus(); ta.select(); ta.setSelectionRange(0, s.length); document.execCommand('copy'); } catch (e) {}
   }
   const needName = () => { if (who()) return false; $('who').focus(); $('sendNote').textContent = 'Add your name first.'; $('sendNote').hidden = false; return true; };
-  $('copyTxt').onclick = () => { if (needName()) return; copy(report()); $('copyTxt').textContent = 'Copied'; };
+  $('copyTxt').onclick = () => { if (needName() || privacyBlocked()) return; copy(report()); $('copyTxt').textContent = 'Copied'; };
   $('openIssue').onclick = () => {
-    if (needName()) return;
+    if (needName() || privacyBlocked()) return;
     const body = report();
     let url = REPO + '?title=' + encodeURIComponent(title()) + '&body=' + encodeURIComponent(body);
     if (url.length > 7500) {

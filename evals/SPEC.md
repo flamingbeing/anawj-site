@@ -13,7 +13,7 @@ Read with `evals/PLAN.md` (the why and the UX detail). This file fixes **names, 
 ## Files (all under evals/)
 | File | Owner | Purpose |
 |---|---|---|
-| `index.html` | shell | Links `../design/tokens.css` then `style.css`; `<header class="e-appbar">`, `<main id="app">`, `<nav id="tabs" class="e-bottomnav">`, `<div id="toast">`, `<div id="banner">`. Viewport `width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content`. |
+| `index.html` | shell | Links `../nuhsdesign/tokens.css` then `style.css`; `<header class="e-appbar">`, `<main id="app">`, `<nav id="tabs" class="e-bottomnav">`, `<div id="toast">`, `<div id="banner">`. Viewport `width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content`. |
 | `style.css` | shell | All app CSS, `e-` prefixed classes, NUHS `--n-*` variables + `--e-*` additions (PLAN §3, incl. contrast fixes). Light only. Mobile first (360px), max content width 720px, desktop OK. |
 | `manifest.webmanifest`, `icons/` | shell | PWA (generate simple navy square icons with "E" via a script; no NUHS/MedHub artwork). |
 | `sw.js` | shell | Copy of logbook/sw.js pattern, `VERSION = 'evals-v2'`, SHELL lists every evals file. |

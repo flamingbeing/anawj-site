@@ -24,7 +24,7 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
 - **Service worker:** the page reloads only when an update takes over, never on the first install (a reload wiped the
   initials typed on the join screen).
 - **Look:** the NUHS design system's app theme (the owner's "Kent Ridge Clinical" design system artifact, Mobile and
-  web app section; `design/tokens.css`, Open Sans): white app bar with the four-quarter band (orange / red / stripe
+  web app section; `nuhsdesign/tokens.css`, Open Sans): white app bar with the four-quarter band (orange / red / stripe
   blue #178fd7 / navy), grey #f3f3f3 ground, white cards with 14px corners and hairlines, 10px controls, navy as the
   only accent (Save, selected chips, active tab), bold navy titles, 44px tap targets, dark toast at the top.
   Links are navy (link blue is under 4.5:1 on the grey page).
@@ -44,7 +44,7 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   the bottom. In the patient list, tapping a completed patient warns first (amber row: who marked it and when); a
   second tap opens it. The Word form's sign-off lines use it on op-day pages with data that have no sign-off of their own. The
   per-section sign-offs stay on the BP / HR / BIS screen and the other forms.
-- **Readings to enter live:** all on by default, BP / HR / BIS every 15 min included (owner, 12 Oct 2026; settings v2
+- **Readings to enter live:** (the Settings section was removed 13 Oct 2026; settings v3 resets every hidden column, so all are always entered live) all on by default, BP / HR / BIS every 15 min included (owner, 12 Oct 2026; settings v2
   turned it on once for phones that had it off).
 - **Export Excel** is in Settings (owner, 12 Oct 2026), not on the home page.
 - **Log out** (owner, 12 Oct 2026; replaced "Stop sharing on this phone" and the admins' "Sign out"): warns first (how many
@@ -261,7 +261,7 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
     Google pop-up's helper page on `prewarm-study.firebaseapp.com` ("missing initial state"), and the self-hosted
     helper at `anawj.com/__/auth` belongs to the logbook's project. `admins/{email}` (lower-case email) lists them. The first admin is added by hand in the
     Firebase console; after that admins can add others there. Admins see every hospital, make codes, remove phones.
-  - **Join links** (owner, 12 Oct 2026): the admin screen shares `anawj.com/prewarm/#/join/{site}/{code}` or shows it as
+  - **Join links** (owner, 12 Oct 2026): the admin screen shares `prewarmstudy.anawj.com/#/join/{site}/{code}` (old links at `anawj.com/prewarm/#/join/…` move across and still work) or shows it as
     a QR code (vendored qrcode-generator, as in evals). The code sits after the `#`, so it never reaches a server, and
     the app drops it from the address bar once joined. Codes stay long (8 characters); a link means nobody types them.
   - Each patient is one document; each field is merged on its own (`f.<id>: {v, t, by}`), newest edit wins when
@@ -285,7 +285,7 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   asked for or listed in Still to fill; their export cells stay blank.
 - **Perioperative data split in three** (owner, 13 Oct 2026): one row of three buttons on the patient screen: Pre-op
   (`#/p/<id>/data`: Subject ID and group, pre-op, meds, bloods; tick `sign_periop`, label "Pre-op and patient
-  details"), Day 1 (`/data/day1`: chart review, analgesia; `sign_pod1`) and Day 2 (`/data/day2`: chart review,
+  details"), POD1 (`/data/day1`: chart review, analgesia; `sign_pod1`) and POD2 (`/data/day2`: chart review,
   analgesia, discharge; `sign_pod2`). Questions and order unchanged (`DATA_PARTS` in app.js). Each tick locks only
   its page; "data collection complete" closes none of them. Progress ticks on the list and the export's "Complete: …"
   columns (Extra sheet) have the three.
@@ -302,3 +302,57 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   It re-checks who the phone is (fresh token, member / admin list, so a newly added admin entry counts without
   logging out), re-subscribes to the team's patients, sends anything waiting, and checks for a new app version (shows
   "Update available" if one is ready). It never deletes anything on the phone.
+- **Update helper** (owner, 13 Oct 2026: Firefox on the phone kept the old version after closing and reopening):
+  `anawj.com/prewarm-update/` is a plain page outside the app's service-worker scope (`/prewarm/`), so the old worker
+  can't serve it. "Get the latest version" first checks the app is reachable, then unregisters the prewarm worker and
+  deletes the `prewarm-*` caches, then opens `/prewarm/` again. Patients and readings (localStorage, IndexedDB) are
+  never touched. Also linked from Settings under Refresh now. Tell the owner to open it by typing the address when a
+  phone is stuck on an old version.
+- **Read only hides empty timepoints** (owner, 13 Oct 2026): once a section is marked complete (or data collection is),
+  `pointsFor` shows only the timepoints that have a time or a reading (all, if none has), so no time is offered for
+  logging and the strip has no empty tabs; opening a hidden one goes to the default point. The bottom of Settings and
+  home shows the app version (the saved copy's name) to spot a phone stuck on an old one.
+- **Stale banner and bare times** (owner, 13 Oct 2026): (1) "Update available" posted `skipWaiting` to the worker it had
+  captured, which can be replaced by a newer one when several updates ship in a row, so on Firefox the tap did nothing.
+  It now asks the current waiting worker, hides the banner, and if nothing takes over in 3 s clears the app's saved
+  copy (never the patients) and reloads. (2) A blank or cleared save leaves a bare `at_…` time with no readings; a point
+  counts as having data only if it has a reading (`hasData`), and `p.f[...]` truthiness is never used (cleared records stay).
+- **"Subject ID:" label** (owner, 13 Oct 2026): patients are named "Subject ID: 85" in the patient list, PACU view and
+  delete lists (`sidL`), and the app bar shows a small "Subject ID" above the ID (`setTitle`) so it doesn't crowd the
+  countdown and Log. The PACU nurse's page keeps its own "PACU · ID" title.
+- **Sync status replaces Log in the bar** (owner, 13 Oct 2026): the top-right chip shows Synced / N waiting / Offline
+  (or Local when not sharing); a tap runs Refresh now. The one-tap Log shortcut is gone: key times are set from their
+  boxes in the key-times row (pad with a Now button). Tests set times that way (`tapNow`); logging one while an earlier
+  key time is empty asks first.
+- **Patient list tools** (owner, 13 Oct 2026): admins get a Form view icon on every line (`.formlink`, beside the
+  card). "Select to export" (everyone) beside "Select to lock" (admins): tick cases, "Select all" / "Select none" chips,
+  "Export N to Excel" (the same file as Settings → Export, for just those). In the lock view the chips (dashed, "All
+  but the latest" / "Select none") sit on their own row above Lock / Unlock. The "Study IDs only" line was removed.
+  "Downloaded" (pre-op `pre_dl` and day 2 `d2_dl`) is no longer asked (`NOT_ASKED`); its template columns stay empty.
+- **Move to prewarmstudy.anawj.com** (owner, 13 Oct 2026; plan in `SUBDOMAINS.md`, step 3; done between cases only):
+  - Why: the browser keeps a phone's saved copy, unsent readings and sign-in per web address, so the study app has its own
+    address. The repo folder stays `prewarm/`; the host serves only it (plus the shared `/nuhsdesign/`).
+  - The old address (`anawj.com/prewarm/`, `www.`) runs `moveCheck()` once, 1.5 s after the app opens (never mid-entry,
+    top-level windows only). It moves the phone only when: no half-entered reading (`unsaved:` drafts), nothing waiting
+    (`pending` empty and `cloud.flushed()`), the phone is on a team (or has no patients), it is online and the new
+    address answers. Otherwise a bar says why, with Try again. Demo mode moves at once. It never moves a phone mid-case
+    unless the app was just opened or updated: a running phone only gets the new code by "Update available" or a reload.
+  - The redirect keeps path and query and the `#` part (nurse links, join links, admin sign-in links). A team member's
+    phone sends `#/join/{site}/{its code}/{initials}` (read from its own `members` record) so it rejoins on the new
+    address with one tap; admins sign in again there (email link or password). Nothing in Firestore or the rules changes;
+    the old address's saved copy is left as it was (no data deleted).
+  - New address: `update.html` in the app folder is the update helper (the SW lets it through to the network);
+    the old address keeps `anawj.com/prewarm-update/` (outside the old worker's scope; it clears the old copy and
+    reopens `/prewarm/`, which then moves on). The sign-in domain stays `prewarm-study.firebaseapp.com`;
+    `prewarmstudy.anawj.com` is an authorised domain (owner added it).
+  - Tests: edge block AJ (redirect keeps path, query, `#`; no loop; update helper), sync test (a half-entered reading
+    keeps the phone; then the join code and initials arrive on the new address and the team's patient shows). In tests
+    `?oldhost=<new address>` on localhost pretends to be the old address.
+- **Admin hospital** (owner, 13 Oct 2026): signed-in admins had no way to set "their" hospital (the chips only showed in
+  demo mode), so patients they started had no hospital and never synced. Settings now shows the hospital chips to admins
+  (members' hospital stays fixed by their team). Workaround before this ships: open the team's join link while signed in.
+
+### Done looks done (owner, 13 Oct 2026)
+The bottom shortcuts on the patient screen turn solid green once their section is marked complete (no tick). The PACU
+Mark complete is a full-width navy button. Day 1 / Day 2 are called POD1 / POD2 everywhere (the Word template's own
+"Day 1" labels are unchanged).

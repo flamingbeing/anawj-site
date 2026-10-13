@@ -3,7 +3,7 @@
 // firestore.rules to people listed in the "members" collection.
 //
 // Data:
-//   members/{email}            { role: 'admin' | 'rosterer', name }
+//   members/{email}            { role: 'admin' | 'rosterer' | 'viewer', name } (viewers only read)
 //   team/main                  { settings, staff, roomTemplate, updatedAt, updatedBy }
 //   rosters/{date}             { date, day, roster, updatedAt, updatedBy }
 //   rosters/{date}/versions/*  { day, roster, savedAt, savedBy }   (never changed once written)
@@ -81,6 +81,18 @@ export async function loadMonthly() {
 export async function saveMonthly(months, user) {
   const { db, F } = await sdk();
   await F.setDoc(F.doc(db, 'team', 'monthly'), plain({ months, updatedAt: Date.now(), updatedBy: who(user) }));
+}
+
+// Junior rotations (postings by week) for every year, in their own document.
+export async function loadRotations() {
+  const { db, F } = await sdk();
+  const snap = await F.getDoc(F.doc(db, 'team', 'rotations'));
+  return snap.exists() ? snap.data() : null;
+}
+
+export async function saveRotations(rot, user) {
+  const { db, F } = await sdk();
+  await F.setDoc(F.doc(db, 'team', 'rotations'), plain({ weeks: rot.weeks || {}, updatedAt: Date.now(), updatedBy: who(user) }));
 }
 
 // ---- rosters ----

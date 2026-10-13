@@ -188,7 +188,7 @@ table.xl td.spill { overflow: visible; white-space: nowrap; }
 .sheet-wrap { padding-right: 120px; }
 @media print {
   body { background: #fff; }
-  .top, .tabs, .no-print, #toast { display: none !important; }
+  .top, .tabs, .no-print, #toast, #demo-bar, .foot { display: none !important; }
   main { padding: 0; max-width: none; }
   section.card { border: 0; padding: 0; margin: 0; }
   @page { size: A4 portrait; margin: 10mm; }
@@ -349,3 +349,69 @@ tr.flash td { animation: flash-row 2s ease-out; }
 .steps .off { opacity: .55; }
 @media (max-width: 560px) { .steps { padding: 8px; } .steps .step { min-width: 0; padding: 4px 8px; } .steps .what small { display: none; } }
 @media print { .steps { display: none !important; } }
+
+/* rotations: a year of weeks per junior */
+.rot-palette { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-top: 10px; position: sticky; top: 0; background: var(--panel); padding: 6px 0; z-index: 3; }
+.rot-palette .post { min-width: 40px; font-weight: 600; border-color: var(--line); color: var(--ink); }
+.rot-palette.idle .post { opacity: .55; }
+.rot-wrap { padding-top: 8px; }
+table.rot { border-collapse: separate; border-spacing: 0; font-size: 11px; user-select: none; }
+table.rot th, table.rot td { padding: 0; border-bottom: 1px solid var(--line); }
+table.rot th.mon { text-align: left; padding: 2px 4px; border-left: 1px solid var(--line); font-size: 12px; }
+table.rot th.day { width: 36px; min-width: 36px; text-align: center; font-weight: 400; color: var(--muted); }
+table.rot th.day.now { color: var(--navy); font-weight: 700; }
+table.rot .who { position: sticky; left: 0; z-index: 2; background: var(--panel); padding: 2px 6px 2px 0; min-width: 150px; text-align: left; box-shadow: -24px 0 0 var(--panel), 1px 0 0 var(--line); }
+table.rot .usual { padding: 2px 6px; }
+table.rot .usual select { font-size: 11px; padding: 1px 2px; }
+table.rot td.wk { width: 36px; min-width: 36px; height: 26px; font-size: 10.5px; white-space: nowrap; text-align: center; cursor: cell; border-left: 1px solid #fff; }
+table.rot td.wk.usual { color: var(--muted); opacity: .55; }
+table.rot td.wk.now { box-shadow: inset 2px 0 0 var(--cyan), inset -2px 0 0 var(--cyan); }
+table.rot td.wk.sel { outline: 2px solid var(--navy); outline-offset: -2px; opacity: 1; }
+table.rot td.wk:hover { outline: 1px solid var(--navy); outline-offset: -1px; }
+
+/* move or swap by tapping */
+.swap-bar { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 40; display: flex; gap: 10px; align-items: center; background: var(--navy); color: #fff; padding: 8px 14px; max-width: calc(100vw - 32px); box-shadow: var(--shadow-card); }
+.swap-bar button { background: transparent; color: #fff; border-color: #fff; }
+body.swapping #app td.cell, body.swapping #app .card.pool { cursor: crosshair; }
+body.swapping #app td.cell:hover, body.swapping #app .card.pool:hover { box-shadow: inset 0 0 0 2px var(--cyan); }
+/* select several on the manpower board */
+.pick-bar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 8px 10px; margin: 8px 0; background: var(--chip); }
+.pchip.picked { background: var(--navy); color: #fff; border-color: var(--navy); }
+/* keyboard shortcuts */
+kbd { font-family: var(--font-sans); font-size: 12px; border: 1px solid var(--line); border-bottom-width: 2px; padding: 1px 6px; background: var(--panel); white-space: nowrap; }
+.foot .grow { flex: 1; }
+/* the tour */
+.tour-ring { position: fixed; z-index: 60; border: 3px solid var(--cyan); box-shadow: 0 0 0 9999px rgba(10, 25, 60, .45); pointer-events: none; transition: all .2s; }
+.tour-card { position: fixed; z-index: 61; left: 50%; transform: translateX(-50%); width: min(380px, calc(100vw - 32px)); background: var(--panel); border-top: 4px solid var(--navy); padding: 12px 14px; box-shadow: var(--shadow-card); }
+.tour-card h3 { margin: 2px 0 4px; color: var(--navy); }
+.tour-card p { margin: 0 0 8px; }
+.tour-card .bar { margin: 0; }
+@media (prefers-reduced-motion: reduce) { .tour-ring { transition: none; } }
+@media print { .swap-bar, #tour { display: none !important; } }
+
+/* phones: the roster as one card per room, and the person box as a sheet from the bottom */
+@media (max-width: 600px) {
+  table.roster-edit, table.roster-edit tbody { display: block; width: 100%; }
+  table.roster-edit thead { display: none; }
+  table.roster-edit tr { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 8px; padding: 8px 4px 10px; border-bottom: 1px solid var(--line); }
+  table.roster-edit tr.gap { display: none; }
+  table.roster-edit td { display: block; border: 0; padding: 0; min-width: 0; }
+  table.roster-edit td.room { grid-column: 1 / -1; position: static; text-align: left; font-size: 15px; color: var(--navy); background: none; }
+  table.roster-edit td.cell { min-width: 0; }
+  table.roster-edit td.cell::before { display: block; font-size: 11px; color: var(--muted); text-align: left; margin-bottom: 2px; }
+  table.roster-edit td.cell[data-key=senior]::before { content: 'Senior'; }
+  table.roster-edit td.cell[data-key=junior]::before { content: 'Junior'; }
+  table.roster-edit td.notes { grid-column: 1 / -1; font-style: italic; }
+  table.roster-edit td.notes:empty, table.roster-edit td:empty { display: none; }
+  .tag-editor { left: 0 !important; right: 0; top: auto !important; bottom: 0; width: 100% !important; max-width: 100%; max-height: 85vh; overflow: auto; border-radius: 12px 12px 0 0; padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); box-shadow: 0 -8px 24px rgba(0, 0, 0, .25); animation: sheet-up .18s ease-out; }
+}
+@keyframes sheet-up { from { transform: translateY(40%); opacity: .4; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .tag-editor { animation: none; } }
+
+/* viewers: My day and the saved roster only */
+body.viewer .tabs, body.viewer #steps, body.viewer .foot, body.viewer #practice-link { display: none !important; }
+.myday-list { list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 6px; font-size: 15px; }
+.myday-list li { padding: 8px 10px; border-left: 4px solid var(--navy); background: var(--chip); }
+.myday-list li b { color: var(--navy); }
+
+.moved-bar { background: var(--warn-bg); }
