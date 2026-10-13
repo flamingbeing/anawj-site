@@ -584,7 +584,12 @@ function renderDateBar() {
 function renderSteps() {
   const el = document.getElementById('steps');
   if (!el) return;
-  if (!['monthly', 'cases', 'roster', 'premed'].includes(state.tab) || !state.staff.length) { el.hidden = true; return; }
+  if (!['monthly', 'cases', 'roster', 'premed'].includes(state.tab) || !state.staff.length) {
+    el.hidden = true;
+    const nb = document.getElementById('nextbar'); if (nb) nb.hidden = true;
+    document.body.classList.remove('has-nextbar');
+    return;
+  }
   el.hidden = false;
   const date = state.day.date, month = date?.slice(0, 7);
   const mon = state.monthly?.[month] || {};
@@ -608,6 +613,19 @@ function renderSteps() {
   const mark = { ok: '✓', bad: '!', todo: '', off: '' };
   el.replaceChildren(...steps.map(([k, label, st, note], i) => h('button', { class: `step ${st}` + (state.tab === k ? ' here' : ''), onclick: () => go(k) },
     h('span', { class: 'dot' }, mark[st] || String(i + 1)), h('span', { class: 'what' }, h('b', {}, label), h('small', {}, note)))));
+  // phones: the next step to do, in reach of a thumb at the bottom of the screen (CSS shows it only on phones)
+  let bar = document.getElementById('nextbar');
+  if (!bar) { bar = h('nav', { id: 'nextbar', 'aria-label': 'Next step' }); document.body.append(bar); }
+  const next = steps.find(([, , st]) => st === 'bad' || st === 'todo');
+  bar.hidden = !next;
+  document.body.classList.toggle('has-nextbar', !!next);
+  if (next) {
+    const [k, label, st, note] = next, i = steps.indexOf(next);
+    // on the Roster tab with no roster, the button makes it; otherwise it goes to the step
+    const make = k === 'roster' && state.tab === 'roster';
+    bar.replaceChildren(h('span', { class: 'what' }, h('small', {}, `Step ${i + 1} of ${steps.length}`), h('b', {}, `${label}: ${note}`)),
+      h('button', { class: 'primary' + (st === 'bad' ? ' bad' : ''), onclick: () => make ? runGenerate(false) : go(k) }, make ? 'Make it' : st === 'bad' ? 'Show' : 'Go'));
+  }
 }
 
 // Whether the day on screen is saved where the team can see it.
@@ -2234,7 +2252,7 @@ function openPersonBox(anchor, p, ctx) {
     ...field('Leaving (L-)', leave),
     h('label', { class: 'check' }, liver, ' Liver standby (L): no complex lists'),
     ...field('AOH tag', aoh, 'Shown as (AOH) after their name'),
-    ...field('Comment (also shown in the comments box)', comment),
+    ...field('Comment (also shown in the comments box)', comment, 'Shown on the sent-out sheet: meetings, times, where they are. No patient details, NRIC, phone numbers or medical reasons.'),
     ...field('Same until (optional)', until, 'For something that runs several days: the status and comment go on each day up to this date'),
     carried ? h('div', { class: 'seen' }, `Carried from ${longDate(carried.from)} to ${longDate(carried.until)}. Clear the date to stop it.`) : null,
     p.role === 'junior' ? h('label', { class: 'check', title: 'Not around on the previous working day: needs premed cover' }, away, ' Away on the previous working day') : null,
