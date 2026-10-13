@@ -7,6 +7,8 @@ is made, or before compacting (`/save-state` in Claude Code, `$save-state` in Co
 
 Last updated: 2026-10-13 by Claude Code, CMC trainer 1 (cmcj1).
 
+Live at `https://hand.anawj.com/cmcj/`; the old `anawj.com/cmcj/` redirects there.
+
 ## Now
 
 Each session keeps its own line in `status/<session>.md` (`cmcj1.md`; a new session adds its own file). Read them all
@@ -38,6 +40,9 @@ before starting; edit only yours.
 - #1–#4 The trainer: anatomy, osteoarthritis and arthroscopy modes, phone touch controls, WebGL diagnostics.
 
 ## Decisions log
+
+- 2026-10-13: Moved to `hand.anawj.com/cmcj/` (SUBDOMAINS.md step 2). The old address redirects from an inline
+  script in `index.html` (host check + top-level only), no Worker change; hand-babies uses the same approach.
 
 - 2026-10-10: Exam teaching lives in an "Exam viva" card (all modes) rather than a fourth tab; questions are plain
   data in `content.js` so clinicians can edit them. Missed questions come back within three questions.
