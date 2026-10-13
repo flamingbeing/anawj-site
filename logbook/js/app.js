@@ -2,7 +2,7 @@
 // shared state and helpers are in ui-core.js. Case data comes from cloud.js (Firestore, or the
 // in-browser demo backend with ?demo).
 
-import { replaceShow } from './profiles.js';
+import { replaceShow, legacyShow, tabsAfter } from './profiles.js';
 import { S, hooks, h, toast, basicHides, basicMode, logbookOnly, facultyMode, facultyRole, clearToast, cloud, writes, transients, setCases, scheduleSummary, fill, resetCaches, patchLogbook, confirmBox, fileButton, modal, download, todayISO, settings, setCategoryNames, categoryNames as categoryNamesNow, watchMyReflections } from './ui-core.js';
 import { renderLog, focusLog, logCasesChanged, clearDrafts } from './ui-log.js';
 import { applyCompact, cachedCompact, applyTheme, cachedTheme, applyTextSize, cachedTextSize, applyZoom, cachedZoom, stepZoom, applyAccent, adoptDisplay, applyDisplay, applyCustomCss, display, setDisplay, resetDisplay, DISPLAY_KEYS, IPHONE_APP, setPageLabel, START_TABS, arrangeTabs } from './display.js';
@@ -210,7 +210,8 @@ function installCard() {
 // Search in Settings (owner): the options of every settings page and its Advanced page, read from the pages
 // themselves (each is drawn once, off screen, the first time someone types), so the index never goes stale.
 // A result opens its page and scrolls to the option, which flashes.
-const SEARCH_PAGES = ['showhide', 'display', 'displayadv', 'access', 'logging', 'loggingadv', 'tags', 'reflset', 'notesset', 'sharefmt', 'sendto', 'sync'];
+const SEARCH_PAGES = ['showhide', 'display', 'displayadv', 'access', 'logging', 'loggingadv', 'tags', 'reflset', 'notesset', 'sharefmt', 'sendto', 'sync', 'account'];
+const SEARCH_MODS = ['settings', 'send', 'sync', 'account'];   // the modules those pages are drawn from
 let settingsIndex = null, findAfterRender = '';
 const optionText = n => {
   if (n.matches('label.field')) return [...n.childNodes].filter(c => c.nodeType === 3).map(c => c.textContent).join(' ').trim();
@@ -233,6 +234,12 @@ function buildSettingsIndex() {
       out.push({ id, page: t.label, text, hint: hint.replace(/ⓘ/g, '').trim().slice(0, 160) });
     }
   }
+  // the Settings page's own cards (Settings file, Connect Claude: their buttons too) and its Recycle bin
+  for (const card of [settingsFileCard(), connectClaudeCard()]) {
+    const text = card.querySelector('h2').textContent.trim();
+    out.push({ id: 'settings', page: 'Settings', text, hint: [...card.querySelectorAll('button, a, label'), ...card.querySelectorAll('p')].map(x => x.textContent.trim()).join(' · ').slice(0, 160) });
+  }
+  out.push({ id: 'bin', page: 'Settings', text: 'Recycle bin', hint: 'Deleted cases, reflections and notes, kept for 30 days', open: openBin });
   return out;
 }
 const searchSettings = (index, q) => {
@@ -267,9 +274,13 @@ function settingsSearch() {
     value: settingsQuery, oninput: () => search() });
   const search = () => {
     settingsQuery = box.value;
-    settingsIndex ||= buildSettingsIndex();
+    // the pages are read from their own code, which loads on first use: until all of it has, the index isn't kept,
+    // and the results come again once it has
+    const missing = SEARCH_MODS.filter(n => !mod[n]);
+    if (missing.length) Promise.all(missing.map(need)).then(() => { settingsIndex = null; if (box.isConnected && box.value === settingsQuery) search(); }, () => {});
+    if (!settingsIndex || missing.length) settingsIndex = buildSettingsIndex();
     const found = searchSettings(settingsIndex, box.value);
-    fill(results, ...found.map(x => h('li', {}, h('a', { href: '#' + x.id, 'data-go': x.id, onclick: e => { e.preventDefault(); findAfterRender = x.text; go(x.id); } },
+    fill(results, ...found.map(x => h('li', {}, h('a', { href: '#' + x.id, 'data-go': x.id, onclick: e => { e.preventDefault(); if (x.open) return x.open(); findAfterRender = x.text; if (S.tab === x.id) showFound(); else go(x.id); } },
       h('span', { class: 'mt' }, h('b', {}, x.text), h('small', {}, x.page)), h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')))),
       box.value.trim() && !found.length ? h('li', { class: 'hint', style: 'padding:10px 4px' }, 'No setting matches. Try another word.') : null);
   };
@@ -350,12 +361,18 @@ function settingsFileCard() {
     // display settings in the file go to this device, the rest to the account
     const fileDisplay = Object.fromEntries(DISPLAY_KEYS.filter(k => k in d.settings).map(k => [k, d.settings[k]]));
     const forAccount = Object.fromEntries(Object.entries(d.settings).filter(([k]) => !DISPLAY_KEYS.includes(k)));
+    // a file from before the `show` map: its basicOn / caseHide become the switches they set
+    const from = profile();
+    const old = legacyShow(forAccount, ['advanced', 'logbook', 'basic', 'personal'].includes(forAccount.mode) ? forAccount.mode : from);
+    if (old) forAccount.show = old;
     // the file's switches replace the account's (the cloud merges `show` key by key, so the ones it lacks go as null)
     if (forAccount.show) forAccount.show = replaceShow(settings().show, forAccount.show);
     await patchLogbook({ settings: forAccount, ...(newGroups.length ? { templates: [...mine, ...newGroups].slice(0, 100) } : {}) });
     if (d.theme) applyTheme(d.theme);
-    applyDisplay(setDisplay(Object.fromEntries(DISPLAY_KEYS.filter(k => k in fileDisplay).map(k => [k, fileDisplay[k]]))));
-    toast('Settings imported'); render();
+    // a new profile moves its tabs on this device too, as picking it does (applyProfile), unless the file arranges them
+    const tabs = !('tabHidden' in fileDisplay) && profile() !== from ? tabsAfter(display().tabHidden, from, profile()) : null;
+    applyDisplay(setDisplay({ ...Object.fromEntries(DISPLAY_KEYS.filter(k => k in fileDisplay).map(k => [k, fileDisplay[k]])), ...(tabs ? { tabHidden: tabs } : {}) }));
+    hooks.paintTabs?.(); toast('Settings imported'); render();
   };
   return h('section', { class: 'card' },
     h('h2', {}, 'Settings file'),

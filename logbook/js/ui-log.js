@@ -32,8 +32,10 @@ const draftText = () => [draft.initials, draft.details].filter(Boolean).join(' '
 const typedText = () => !!(String(draft.initials || '').trim() || (draft.details.trim() && !onlyTemplate(draft.details)));
 // Keep deliberately entered initials when switching back to the combined box,
 // even if those letters also name a procedure (IJ, TKR). Editing the prefix can replace them.
+// With the Separate initials box on (draft.sep: the box the draft was last shown with), the Initials field is
+// taken as typed, even empty: a first word like "Mum" stays in the details.
 const draftParts = (box = draft.details) => {
-  if (draft.initials) return { initials: draft.initials, details: box.trim() };
+  if (draft.initials || (draft.sep === 'initials' && firstField() === 'initials')) return { initials: draft.initials, details: box.trim() };
   const text = box.trim(), hint = draft.initialsHint;
   if (hint && text.slice(0, hint.length).toUpperCase() === hint && (!text.slice(hint.length) || /^\s/.test(text.slice(hint.length))))
     return { initials: hint, details: text.slice(hint.length).trim() };
@@ -75,7 +77,7 @@ const draftKey = () => `${DRAFT_KEY}:${cloud.demo ? 'demo:' : ''}${(S.user && S.
 function loadDraft() {
   if (draftOwner === draftKey()) return;
   draftOwner = draftKey(); draft = EMPTY(); bulkRows = null;
-  draftSlot = createDraftSlot(DRAFT_KEY, draftOwner.slice(DRAFT_KEY.length + 1));
+  draftSlot = createDraftSlot(DRAFT_KEY, draftOwner.slice(DRAFT_KEY.length + 1), undefined, undefined, { move: true });
   draft = { ...draft, ...(draftSlot.initial || {}) };
   saveDraft();
   // a kept date only lasts for one sitting, never into tomorrow's list
@@ -100,7 +102,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) saveD
 export function recoverableCaseDrafts() {
   try { return listDrafts(DRAFT_KEY, draftKey().slice(DRAFT_KEY.length + 1)).filter(x => (x.value.details && !onlyTemplate(x.value.details)) || x.value.initials || x.value.bulk); } catch { return []; }
 }
-export function recoverCaseDraft(value) { loadDraft(); saveDraft(); draftSlot = createDraftSlot(DRAFT_KEY, draftOwner.slice(DRAFT_KEY.length + 1)); draft = { ...EMPTY(), ...value }; saveDraft(); location.hash = '#log'; hooks.render(); }
+export function recoverCaseDraft(value) { loadDraft(); saveDraft(); draftSlot = createDraftSlot(DRAFT_KEY, draftOwner.slice(DRAFT_KEY.length + 1), undefined, undefined, { move: true }); draft = { ...EMPTY(), ...value }; saveDraft(); location.hash = '#log'; hooks.render(); }
 // Text shared to the installed app (share sheet → Logbook; manifest share_target) arrives as
 // ?share_text=… (or, from the service worker, ?shared=1: share-in.js); app.js keeps it for here: it opens in
 // paste-a-list, so one case or a whole list works. With Settings → Notes → Ask what to do with shared text, the
@@ -547,9 +549,11 @@ function renderOne(card) {
   suggestedSave = null;
   if (onlyTemplate(draft.details)) draft.details = '';   // the template comes back when the box takes the focus
   const separateInitials = firstField() === 'initials';
-  if (separateInitials && !draft.initials) {
+  // (split only when coming from the combined box, not on every render of the separate one)
+  if (separateInitials && !draft.initials && draft.sep !== 'initials') {
     const parts = draftParts(); draft.initials = parts.initials; draft.details = parts.details;
   } else if (!separateInitials && draft.initials) { draft.initialsHint = draft.initials; draft.details = draftText(); draft.initials = ''; }
+  draft.sep = firstField();
   saveDraft();
   const initialsInput = separateInitials ? h('input', { 'aria-label': 'Patient initials', placeholder: 'AB (initials, optional)', maxlength: '20', enterkeyhint: 'next', autocomplete: 'off', autocapitalize: 'characters', value: draft.initials || '',
     oninput: e => { suggestedSave = null; draft.initials = cleanInitials(e.target.value); draft.initialsHint = ''; saveDraftSoon(); paintParsed(true); suggestSoon(); },
@@ -836,9 +840,10 @@ function paintSel() {
     ...looseTags(draft.cats, draft.tags).map(k => tagChip(k, { onclick: () => { draft.tags = draft.tags.filter(t => t !== k); saveDraft(); paintSel(); } })),
     // all the tags off in one tap (Undo puts them back)
     draft.cats.length + (draft.tags || []).length > 1 ? h('button', { type: 'button', class: 'small clear-tags', title: 'Clear all tags', 'aria-label': 'Clear all tags', onclick: () => {
-      const was = { cats: draft.cats, tags: draft.tags || [] };
+      // (which were ticked automatically, and which turned down, come back too: auto-ticked ones keep following the text)
+      const was = { cats: draft.cats, tags: draft.tags || [], auto: draft.auto, rejected: draft.rejected };
       setCats([]); draft.tags = []; saveDraft(); paintSel();
-      toast('Tags cleared', { action: 'Undo', onaction: () => { draft.cats = was.cats; draft.tags = was.tags; saveDraft(); paintSel(); } });
+      toast('Tags cleared', { action: 'Undo', onaction: () => { Object.assign(draft, was); saveDraft(); paintSel(); } });
     } }, '× Clear') : null);
   fill(ui.groupSave,
     // a combination worth keeping: one tap to make it a template (no trip to Settings)
@@ -1037,13 +1042,17 @@ export function logCasesChanged() {
 
 // ---------- paste a list ----------
 
-let bulkRows = null;
+let bulkRows = null, bulkText = null;   // the rows of the last Review, and the text they were read from
 
 function renderBulk(card) {
   const ta = h('textarea', {
     class: 'details', rows: '8', value: draft.bulk || '',
     placeholder: settings().detectAgeSex !== false ? 'Leave an empty line between cases. An optional date at the start, e.g.\n12/3 AB 5yo\ncircumcision, caudal\n\n13/3 CD 30F\nLSCS spinal\n\nEF 80F\nhemiarthroplasty' : 'Leave an empty line between cases. An optional date at the start, e.g.\n12/3 AB\ncircumcision, caudal\n\n13/3 CD\nLSCS spinal\n\nEF\nhemiarthroplasty',
-    oninput: e => { draft.bulk = e.target.value; saveDraftSoon(); },
+    oninput: e => {
+      draft.bulk = e.target.value; saveDraftSoon();
+      // the list changed after Review: the rows on screen no longer match it, so they can't be saved as they are
+      if (bulkRows && e.target.value !== bulkText) { bulkRows = null; fill(out, h('p', { class: 'tip' }, 'The list has changed: tap Review again.')); }
+    },
   });
   ui.textarea = ta;
   const out = h('div');
@@ -1051,7 +1060,7 @@ function renderBulk(card) {
     h('p', { class: 'hint help' }, 'Paste your notes or OT list with an empty line between cases (a case can take several lines; a bold first line, **like this**, starts a case too). Tags are guessed for each case. Cases without a date at the start get ', h('b', {}, fmtDate(curDate())), ' (change it above).'),
     ta,
     h('div', { class: 'bar', style: 'margin-top:8px' },
-      h('button', { class: 'primary', onclick: () => { bulkRows = reviewRows(ta.value); paintBulk(out); } }, 'Review'),
+      h('button', { class: 'primary', onclick: () => { bulkRows = reviewRows(ta.value); bulkText = ta.value; paintBulk(out); } }, 'Review'),
       pasteBtn(ta, 'Paste from clipboard'),
       h('button', { onclick: () => { ta.value = ''; draft.bulk = ''; bulkRows = null; saveDraft(); fill(out); } }, 'Clear')),
     out);
@@ -1086,7 +1095,7 @@ function paintBulk(out) {
     const paintLong = () => { const over = r.details.trim().length - MAX_DETAILS; long.hidden = over <= 0; long.textContent = over > 0 ? `${over} character${over === 1 ? '' : 's'} over the ${MAX_DETAILS} a case holds: the rest goes into a linked note when you save.` : ''; };
     paintLong();
     return h('tr', {},
-      h('td', {}, h('input', { type: 'date', value: r.date || def, onchange: e => { r.date = parseDate(e.target.value); } })),
+      h('td', {}, h('input', { type: 'date', value: r.date || def, 'aria-label': 'Case date', onchange: e => { r.date = parseDate(e.target.value); } })),
       h('td', { class: 'details' },
         h('input', { value: r.initials || '', placeholder: 'Initials', 'aria-label': 'Patient initials', autocapitalize: 'characters', maxlength: '20', oninput: e => { r.initials = e.target.value; } }),
         h('textarea', { rows: String(Math.min(6, Math.max(2, r.details.split('\n').length))), value: r.details, 'aria-label': 'Case summary', oninput: e => { r.details = e.target.value; paintLong(); } }),
@@ -1128,7 +1137,7 @@ async function planBulk() {
   const put = async date => {
     const items = rows.map(r => ({ id: uid(), date, initials: cleanInitials(r.initials), details: r.details.trim(), cats: sortCodes(r.cats), ...withTags(r) }));
     await savePlan([...plan(), ...items].slice(-100));
-    bulkRows = null; draft.bulk = ''; saveDraft();
+    bulkRows = null; if (draft.bulk === bulkText) draft.bulk = ''; saveDraft();
     toast(`Planned ${items.length} case${items.length === 1 ? '' : 's'} for ${fmtDate(date)}: confirm them on the Case tab that day`);
     m.close(); hooks.render();
   };
@@ -1163,7 +1172,7 @@ function planCard() {
   const edit = async p => {
     // don't throw away a case being typed
     if ((typedText() || draft.cats.length) && !(await confirmBox('Replace what you’re typing?', 'The case in the box is replaced by the planned one.', 'Replace', true))) return;
-    draft = { ...draft, mode: 'one', initials: '', initialsHint: p.initials || '', details: [p.initials, p.details].filter(Boolean).join(' '), cats: [...(p.cats || [])], tags: [...(p.tags || [])], ...FRESH_TICKS(), reflectTag: false, date: p.date === today ? null : p.date, dateAt: Date.now() };
+    draft = { ...draft, mode: 'one', sep: '', initials: '', initialsHint: p.initials || '', details: [p.initials, p.details].filter(Boolean).join(' '), cats: [...(p.cats || [])], tags: [...(p.tags || [])], ...FRESH_TICKS(), reflectTag: false, date: p.date === today ? null : p.date, dateAt: Date.now() };
     saveDraft();
     await savePlan(plan().filter(x => x.id !== p.id));
     hooks.render();
@@ -1200,7 +1209,7 @@ async function saveBulk(e) {
   try {
     await saveMany(cases);
     const restList = cases.map((c, i) => ({ c, rest: rows[i].rest })), restMade = restNotes(restList);
-    draft.bulk = ''; saveDraft();
+    if (draft.bulk === bulkText) draft.bulk = ''; saveDraft();   // (text added since Review stays in the box)
     toast(`Saved ${cases.length} cases${restSaid(restList)}`, { action: 'Undo', onaction: () => { binRest(restMade); return deleteMany(cases.map(c => c.id)).catch(err => toast('Could not undo: ' + err.message)); } });
   } catch (err) { bulkRows = keep; toast('Could not save: ' + err.message); }
   bulkBusy = false;

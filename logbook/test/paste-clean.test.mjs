@@ -64,4 +64,17 @@ assert.equal(htmlToMarkdown(wordItem('1.', 'Alpha') + wordItem('2.', 'Beta') + w
 assert.equal(htmlToMarkdown(wordItem('a)', 'One', 1, true) + wordItem('b)', 'Two', 1, true)), '1. One\n2. Two');
 assert.equal(htmlToMarkdown('<p class=MsoNormal>Plain <b>para</b></p>' + wordItem('§', 'Wingdings bullet')), 'Plain **para**\n\n- Wingdings bullet');
 
+// bold right after bold-and-punctuation: each ** pair kept as it was (not "sepsis,** Plan**")
+assert.equal(tidyMarkdown('**Dx**: sepsis, **Plan**: abx'), '**Dx**: sepsis, **Plan**: abx');
+assert.equal(tidyMarkdown('**Bold**, then **more**'), '**Bold**, then **more**');
+assert.equal(htmlToMarkdown('<p><b>Dx</b>: sepsis, <b>Plan</b>: abx</p>'), '**Dx**: sepsis, **Plan**: abx');
+assert.equal(tidyMarkdown('a ** b** c'), 'a **b** c');
+// a bold run starting with a link; a $ in a link's text
+assert.equal(htmlToMarkdown('<p><b><a href="https://x.com">Guideline</a> for sepsis</b></p>'), '**[Guideline](https://x.com) for sepsis**');
+assert.equal(htmlToMarkdown('<p><a href="https://x.com">Cost $& more</a></p>'), '[Cost $& more](https://x.com)');
+// inline code keeps its backslashes and spaces; Clean up leaves a regex's escapes
+assert.equal(htmlToMarkdown('<p>Pattern <code>^\\d+\\.\\s(\\w+)</code></p>'), 'Pattern `^\\d+\\.\\s(\\w+)`');
+assert.equal(htmlToMarkdown('<p><code>x  y</code></p>'), '`x  y`');
+assert.equal(tidyMarkdown('Regex ^\\d+\\.\\s and \\(x\\)'), 'Regex ^\\d+\\.\\s and \\(x\\)');
+assert.equal(tidyMarkdown('1\\. one\n\\- two'), '1. one\n- two');
 console.log('paste-clean tests passed');

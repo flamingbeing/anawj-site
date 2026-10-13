@@ -72,12 +72,22 @@ export function shownIn(st, mode, key) {
   return presetOn(mode, key);
 }
 
-// One switch saved: the settings patch. `show` carries only the changed key: Firestore merges the map key by key
-// (setDoc with merge), so another device's newer switches are never written over, and mergeSettings does the same
-// here and in demo mode. caseHide (Case tab parts off) and basicOn (Basic's items turned on) are kept in step, so an
-// older copy of the app on another device agrees until it updates. parts: every Case tab part in order (caseHide's order).
+// One switch saved: the settings patch. `show` carries only the changed key: the cloud merges the map key by key
+// (saveLogbook writes each show key on its own, mergeFields), so another device's newer switches are never written over,
+// and mergeSettings does the same here and in demo mode. caseHide (Case tab parts off) and basicOn (Basic's items
+// turned on) are kept in step, so an older copy of the app on another device shows the same until it updates. Only that
+// way round: once a switch is in `show`, an older copy changing only caseHide or basicOn is not seen here (shownIn
+// reads `show` first) until the switch is set again or a profile is picked. A known limit, healed when it updates.
+// parts: every Case tab part in order (caseHide's order).
 export function switchPatch(st, key, on, parts = []) {
   const patch = { show: { [key]: !!on } };
+  // the old combined part ('case:quick', both of these): the other of the two keeps its value, and 'quick' goes
+  const old = OLD_PART[key], cur = (st && st.show) || {};
+  if (old && typeof cur[old] === 'boolean') {
+    const other = Object.keys(OLD_PART).find(k => k !== key && OLD_PART[k] === old);
+    if (typeof cur[other] !== 'boolean') patch.show[other] = cur[old];
+    patch.show[old] = null;
+  }
   const was = (st && st.basicOn) || [];
   const legacyOn = onList(st).filter(k => k !== key);
   if (on && BASIC_ITEMS.includes(key)) legacyOn.push(key);
@@ -95,6 +105,15 @@ export function switchPatch(st, key, on, parts = []) {
 // sent as null (not left out of `show`): Firestore's merge keeps any key a patch leaves out.
 export function resetPatch(st, keys) {
   const show = Object.fromEntries(keys.map(k => [k, null]));
+  // the old combined part ('case:quick') goes with either half; a half not being reset keeps its value
+  const cur = (st && st.show) || {};
+  for (const k of keys) {
+    const old = OLD_PART[k];
+    if (!old || typeof cur[old] !== 'boolean') continue;
+    show[old] = null;
+    const other = Object.keys(OLD_PART).find(x => x !== k && OLD_PART[x] === old);
+    if (!keys.includes(other) && typeof cur[other] !== 'boolean') show[other] = cur[old];
+  }
   const parts = keys.filter(k => k.startsWith('case:')).map(k => k.slice(5));
   const hide = hideList(st).filter(p => !parts.includes(p));
   const on = onList(st).filter(k => !keys.includes(k));
@@ -104,8 +123,33 @@ export function resetPatch(st, keys) {
 // A settings file's `show` replaces the account's: the keys the account has and the file doesn't go (as null)
 export const replaceShow = (cur, next) => ({ ...Object.fromEntries(Object.keys(cur || {}).map(k => [k, null])), ...(next || {}) });
 
-// Settings after a patch, as Firestore's merge leaves them: top-level keys replaced, `show` merged key by key (null
-// clears the whole map). Used for the local copy (patchLogbook) and the demo backend, so both match the cloud.
+// A settings file from before the `show` map (mode, basicOn, caseHide only): the switches those lists set, as a `show`
+// map holding what differs from the mode's defaults, so they win over the account's own `show` (shownIn reads it
+// first). null when the file has neither list.
+export function legacyShow(fileSettings, mode) {
+  const f = fileSettings || {};
+  if (f.show || (!Array.isArray(f.basicOn) && !Array.isArray(f.caseHide))) return null;
+  const st = { basicOn: f.basicOn, caseHide: f.caseHide };
+  return Object.fromEntries(SWITCH_KEYS.map(k => [k, shownIn(st, mode, k)]).filter(([k, on]) => on !== presetOn(mode, k)));
+}
+
+// The field paths saveLogbook writes (Firestore setDoc mergeFields), so the cloud stores a patch as mergeSettings does:
+// each top-level key and each settings key replaced whole (a map like settings.markdown too: with a plain merge,
+// Firestore would merge it key by key and keep keys the new value leaves out), `show` key by key. Arrays of segments.
+export function mergePaths(doc) {
+  const out = [];
+  for (const [k, v] of Object.entries(doc || {})) {
+    if (k !== 'settings' || !v || typeof v !== 'object' || Array.isArray(v)) { out.push([k]); continue; }
+    for (const [sk, sv] of Object.entries(v)) {
+      if (sk === 'show' && sv && typeof sv === 'object' && !Array.isArray(sv)) for (const key of Object.keys(sv)) out.push(['settings', 'show', key]);
+      else out.push(['settings', sk]);
+    }
+  }
+  return out;
+}
+
+// Settings after a patch, as the cloud stores it (saveLogbook, mergePaths): settings keys replaced whole, `show` merged
+// key by key (null clears the whole map). Used for the local copy (patchLogbook) and the demo backend, so both match.
 export function mergeSettings(cur, patch) {
   const out = { ...(cur || {}), ...(patch || {}) };
   const a = cur && cur.show, b = patch && patch.show;

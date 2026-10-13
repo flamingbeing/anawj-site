@@ -1,7 +1,7 @@
 // Sync (one Markdown file per day): the app's block, the three-way merge, file names, settings and the ledger.
 import assert from 'node:assert/strict';
 const { START, END, wrapBlock, extractBlock, replaceBlock, merge3, planDay, dayFileName, cleanTarget, cleanSync, targetReady, targetPath,
-  cleanSyncLedger, markSynced, changedDays, fingerprint, toBase64, fromBase64, paceWait, rateLimitWait, MINE_MARK, SPLIT_MARK, THEIRS_MARK } = await import('../js/sync-md.js');
+  cleanSyncLedger, markSynced, changedDays, fingerprint, toBase64, fromBase64, paceWait, rateLimitWait, reconcileSyncState, placeOf, MINE_MARK, SPLIT_MARK, THEIRS_MARK } = await import('../js/sync-md.js');
 
 // ---- blocks ----
 {
@@ -220,4 +220,33 @@ const { START, END, wrapBlock, extractBlock, replaceBlock, merge3, planDay, dayF
   assert.equal(fromBase64(toBase64('x'.repeat(100000))).length, 100000);
 }
 
+// another device rewrote the block since this device's last sync (its fp mark differs): this device's base is not
+// used, so the cases both have are not doubled
+{
+  const c1 = '- AB lap chole GA', c12 = c1 + '\n- CD TKR spinal', c123 = c12 + '\n- EF LSCS spinal';
+  const file = wrapBlock(c12 + '\nhard spinal, 3 attempts', fingerprint(c12)) + '\n';
+  const p = planDay({ remoteText: file, inner: c123, last: { fp: fingerprint(c1), base: c1 } });
+  // (no silent merge: both versions, marked, for the user to sort out)
+  assert.equal(p.conflicts, 1);
+  assert.match(p.text, /hard spinal/); assert.match(p.text, /EF LSCS/);
+}
+// a secondary rate limit with the hourly window not used up: a minute, not the hourly reset
+{
+  const hdr = o => k => (k in o ? String(o[k]) : null);
+  assert.equal(rateLimitWait(403, hdr({ 'x-ratelimit-remaining': 4321, 'x-ratelimit-reset': 1000 + 3000 }), 'You have exceeded a secondary rate limit', 1000 * 1000), 1);
+  // at most GH_PER_HOUR writes in an hour
+  const hour = Array.from({ length: 450 }, (_, i) => i * 1000);
+  assert.ok(paceWait(hour, 460000) > 0);
+  assert.equal(paceWait(hour, 3600e3 + 1000), 0);
+}
+// the ledger follows the place, not only the target id: pointed elsewhere (another device, a settings file) or
+// removed, its ledger goes; an old ledger with no place recorded is kept and takes the place it has now
+{
+  const t = { id: 't1', kind: 'github', owner: 'me', repo: 'notes-a', branch: 'main', folder: '', fileName: '{date}.md' };
+  const first = reconcileSyncState({ ledger: { t1: { '2026-10-13': { fp: 'x' } }, gone: { '2026-10-01': { fp: 'y' } } }, at: { gone: 1 } }, [t]);
+  assert.deepEqual(first.drop, ['gone']); assert.ok(first.state.ledger.t1); assert.equal(first.state.places.t1, placeOf(t));
+  const moved = reconcileSyncState(first.state, [{ ...t, repo: 'vault-b' }]);
+  assert.deepEqual(moved.drop, ['t1']); assert.equal(moved.state.ledger.t1, undefined);
+  assert.deepEqual(reconcileSyncState(first.state, [t]).drop, []);
+}
 console.log('sync-md tests passed');

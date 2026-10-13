@@ -6,6 +6,7 @@
 
 import { fill } from './markdown.js';
 import { fingerprint } from './destinations.js';
+import { merge3, MINE_MARK, SPLIT_MARK, THEIRS_MARK } from './merge3.js';
 
 export { fingerprint };
 export const START = '<!-- logbook:start -->';
@@ -54,76 +55,10 @@ export function replaceBlock(fileText, newBlock) {
   return t.replace(/(\r?\n)*$/, '') + nl + nl + block + nl;
 }
 
-// ---- three-way merge, line by line ----
+// ---- three-way merge, line by line (merge3.js; daily notes use it too) ----
 
+export { merge3, MINE_MARK, SPLIT_MARK, THEIRS_MARK };
 const lines = s => (s === '' ? [] : lf(s).split('\n'));
-// longest common subsequence of two line lists: for each line of a, the matching line of b (or -1)
-function lcs(a, b) {
-  const n = a.length, m = b.length, match = new Array(n).fill(-1);
-  // trim the common start and end first (most edits are small), so the table stays small
-  let lo = 0;
-  while (lo < n && lo < m && a[lo] === b[lo]) { match[lo] = lo; lo++; }
-  let hiA = n, hiB = m;
-  while (hiA > lo && hiB > lo && a[hiA - 1] === b[hiB - 1]) { hiA--; hiB--; match[hiA] = hiB; }
-  const rows = hiA - lo, cols = hiB - lo;
-  if (!rows || !cols) return match;
-  if (rows * cols > 4e6) return match;   // a huge rewrite: no middle matches (it merges as one change)
-  const w = cols + 1, t = new Uint32Array((rows + 1) * w);
-  for (let i = rows - 1; i >= 0; i--)
-    for (let j = cols - 1; j >= 0; j--)
-      t[i * w + j] = a[lo + i] === b[lo + j] ? t[(i + 1) * w + j + 1] + 1 : Math.max(t[(i + 1) * w + j], t[i * w + j + 1]);
-  for (let i = 0, j = 0; i < rows && j < cols;) {
-    if (a[lo + i] === b[lo + j]) { match[lo + i] = lo + j; i++; j++; }
-    else if (t[(i + 1) * w + j] >= t[i * w + j + 1]) i++; else j++;
-  }
-  return match;
-}
-const same = (x, y) => x.length === y.length && x.every((l, i) => l === y[i]);
-const startsWith = (x, y) => y.length <= x.length && y.every((l, i) => l === x[i]);
-const endsWith = (x, y) => y.length <= x.length && y.every((l, i) => l === x[x.length - y.length + i]);
-// one changed stretch: the side that changed wins; when both changed, lines one side only added before or after
-// the old ones go round the other side's edit (the app adds a case under the line the user annotated); lines both
-// added at the very end are both kept, the user's first (they follow the line they were written under; the app's
-// are new cases). null = a real clash.
-function resolve(co, ca, cb, atEnd) {
-  if (same(ca, co)) return cb;
-  if (same(cb, co) || same(ca, cb)) return ca;
-  if (!co.length) return atEnd ? [...cb, ...ca] : null;
-  if (startsWith(ca, co)) return [...cb, ...ca.slice(co.length)];
-  if (endsWith(ca, co)) return [...ca.slice(0, ca.length - co.length), ...cb];
-  if (startsWith(cb, co)) return [...ca, ...cb.slice(co.length)];
-  if (endsWith(cb, co)) return [...cb.slice(0, cb.length - co.length), ...ca];
-  return null;
-}
-
-export const MINE_MARK = '<<<<<<< logbook';
-export const SPLIT_MARK = '=======';
-export const THEIRS_MARK = '>>>>>>> your edits';
-
-// merge3(base, mine, theirs) -> { text, conflicts }: changes made on either side since base are both applied;
-// where the two changed the same lines differently, both are kept between git-style marks (mine first).
-// Line endings come out as \n.
-export function merge3(base, mine, theirs) {
-  const o = lines(base), a = lines(mine), b = lines(theirs);
-  const ma = lcs(o, a), mb = lcs(o, b);
-  const out = [];
-  let conflicts = 0, i = 0, ia = 0, ib = 0;
-  for (;;) {
-    // the next base line that both sides kept
-    let j = i;
-    while (j < o.length && (ma[j] < 0 || mb[j] < 0)) j++;
-    const end = j >= o.length;
-    const ja = end ? a.length : ma[j], jb = end ? b.length : mb[j];
-    const co = o.slice(i, j), ca = a.slice(ia, ja), cb = b.slice(ib, jb);
-    const r = resolve(co, ca, cb, end);
-    if (r) out.push(...r);
-    else { conflicts++; out.push(MINE_MARK, ...ca, SPLIT_MARK, ...cb, THEIRS_MARK); }
-    if (end) break;
-    out.push(o[j]);
-    i = j + 1; ia = ja + 1; ib = jb + 1;
-  }
-  return { text: out.join('\n'), conflicts };
-}
 
 // every line of x, in order, is in y (y only adds lines to x)
 function within(x, y) {
@@ -153,7 +88,10 @@ export function planDay({ remoteText = null, inner, last = null }) {
     // edited inside the block: apply the app's changes since last time onto the user's version. With no base on
     // this device: if the app's text has every line of the file's block (the user only deleted, or nothing was
     // edited at all), the app's text goes in; otherwise both versions are kept, marked.
-    const m = last && typeof last.base === 'string' ? merge3(last.base, mine, ext.inner)
+    // (this device's base only while the block's mark still has this device's last text: once another device has
+    // written the block, the base would count that device's cases as the user's edits, and duplicate them)
+    const own = last && typeof last.base === 'string' && (!ext.fp || ext.fp === last.fp);
+    const m = own ? merge3(last.base, mine, ext.inner)
       : !ext.inner.trim() || within(lines(ext.inner), lines(mine)) ? { text: mine, conflicts: 0 }
       : { text: [MINE_MARK, mine, SPLIT_MARK, ext.inner, THEIRS_MARK].join('\n'), conflicts: 1 };
     // the mark keeps the app's fingerprint, never the merged text's: so the block reads as edited by the user
@@ -167,10 +105,14 @@ export function planDay({ remoteText = null, inner, last = null }) {
 // GitHub refuses bursts of content writes (a "secondary rate limit", about 80 a minute) with 403 or 429. The run
 // keeps under it (paceWait), and stops for that place when it is hit anyway (rateLimitWait).
 export const GH_PER_MIN = 60;
-// ms to wait before the next write, given the times of recent writes
-export function paceWait(times, now, perMin = GH_PER_MIN) {
-  const recent = times.filter(t => now - t < 60e3).sort((a, b) => a - b);
-  return recent.length < perMin ? 0 : recent[recent.length - perMin] + 60e3 - now;
+export const GH_PER_HOUR = 450;   // (GitHub allows 500 content-creating requests an hour)
+// ms to wait before the next write, given the times of recent writes (the last hour's)
+export function paceWait(times, now, perMin = GH_PER_MIN, perHour = GH_PER_HOUR) {
+  const wait = (span, max) => {
+    const recent = times.filter(t => now - t < span).sort((a, b) => a - b);
+    return recent.length < max ? 0 : recent[recent.length - max] + span - now;
+  };
+  return Math.max(wait(60e3, perMin), wait(3600e3, perHour));
 }
 // a refused request that is a rate limit -> minutes to wait (at least 1); null when it is something else
 export function rateLimitWait(status, header, body, now = Date.now()) {
@@ -178,7 +120,8 @@ export function rateLimitWait(status, header, body, now = Date.now()) {
   if (status !== 429 && status !== 403) return null;
   const after = Number(get('retry-after')), reset = Number(get('x-ratelimit-reset'));
   if (status === 403 && !/rate limit/i.test(String(body || '')) && get('x-ratelimit-remaining') !== '0' && !(after > 0)) return null;
-  const ms = after > 0 ? after * 1000 : reset > 0 ? reset * 1000 - now : 60e3;
+  // (the reset time is the hourly window's: only when that is used up; a secondary limit says retry-after, or a minute)
+  const ms = after > 0 ? after * 1000 : reset > 0 && String(get('x-ratelimit-remaining')) === '0' ? reset * 1000 - now : 60e3;
   return Math.max(1, Math.ceil(ms / 60e3));
 }
 
@@ -251,6 +194,19 @@ export function markSynced(ledger, id, date, fp, rev = '') {
   const l = cleanSyncLedger(ledger);
   l[id] = { ...(l[id] || {}), [date]: { fp, ...(rev ? { rev } : {}) } };
   return l;
+}
+// Which place a target id's ledger was written for. This device's ledger and bases follow a target id, but the
+// target can be pointed somewhere else from another device (account settings) or a settings file: the old ledger
+// would then say every day is synced there. state = { ledger, at, places }; targets = every place set up now.
+// -> { state, drop }: ids whose ledger (and bases) no longer apply (removed, or now another place) are dropped.
+export const placeOf = t => JSON.stringify(['kind', 'owner', 'repo', 'branch', 'folder', 'fileName'].map(k => (t && t[k]) || ''));
+export function reconcileSyncState(s, targets) {
+  const now = new Map((targets || []).map(t => [t.id, placeOf(t)]));
+  const ledger = { ...(s && s.ledger) }, at = { ...(s && s.at) }, places = { ...(s && s.places) }, drop = [];
+  for (const id of new Set([...Object.keys(ledger), ...Object.keys(at), ...Object.keys(places)]))
+    if (!now.has(id) || (places[id] && places[id] !== now.get(id))) { drop.push(id); delete ledger[id]; delete at[id]; delete places[id]; }
+  for (const [id, p] of now) places[id] = p;
+  return { state: { ...s, ledger, at, places }, drop };
 }
 // the days to sync for one destination: fps = { date: fingerprint of the day's text now }; a day the ledger
 // has but fps doesn't (all its cases deleted) is the caller's to include, with its now-empty text

@@ -11,10 +11,11 @@
 // refused write) is checked with one read.
 //
 // lastSync is this device's clock when the server last confirmed the list; SKEW covers writers whose clocks are a
-// little behind. Writes that reach the server late (offline) are re-stamped by cloud.js (restampIfLate), so they still
-// land after everyone's lastSync. Limits (healed by the weekly full read): a record deleted for good without a bin
-// entry (Undo of a just-saved case, Recent changes restoring a deletion) while another device was closed stays on
-// that device until then; so does a write stamped by a clock more than SKEW behind.
+// little behind. Documents stamped after the newest one held here are read too (a reader whose clock ran ahead at its
+// last sync would otherwise skip what others wrote since). Writes that reach the server late (offline) are re-stamped
+// by cloud.js (restampIfLate), so they still land after everyone's lastSync. Limits (healed by the weekly full read):
+// a record deleted for good without a bin entry (Undo of a just-saved case, Recent changes restoring a deletion) while
+// another device was closed stays on that device until then; so does a write stamped by a clock more than SKEW behind.
 //
 // listen(email, coll, { since, epoch, field }, onSnap, onError) -> unsubscribe   (cloud.js: Firestore; demo-backend.js)
 //   since: null = the whole collection. onSnap({ changes: [{ type: 'added'|'modified'|'removed', id, doc }],
@@ -33,11 +34,12 @@ const stamp = d => Number(d && d.updatedAt) || 0;
 // ---- pure helpers (test/sync.test.mjs) ----
 
 // What to read now: the whole collection (first time, a week since the last full read, a clock gone back), or only
-// what changed since the last confirmed sync.
-export function plan(meta, now) {
+// what changed since the last confirmed sync. newest: the highest updatedAt in the stored copy (0: none): anything
+// written after it is read too, so the time read from is anchored to the writers' stamps, not only to this clock.
+export function plan(meta, now, newest = 0) {
   const m = meta || {};
   const full = !(m.fullAt > 0) || !(m.syncAt > 0) || now - m.fullAt > FULL_EVERY || m.fullAt > now + SKEW;
-  return { full, since: full ? null : Math.min(m.syncAt, now) - SKEW };
+  return { full, since: full ? null : Math.min(Math.min(m.syncAt, now) - SKEW, newest > 0 ? newest : Infinity) };
 }
 
 // Apply a snapshot's changes to docs (a Map, changed in place). A copy older than a known deletion is stale and
@@ -80,18 +82,22 @@ export function applyTombs(docs, gone, tombs) {
   return del;
 }
 
+// records deleted on this device -> tombstones: each at the deleted version's stamp; at (now) only for one not held here
+export const dropTombs = (docs, ids, at) => ids.map(id => ({ id: String(id), deletedAt: stamp(docs.get(String(id))) || at }));
+
 export const pruneGone = (gone, now) => Object.fromEntries(Object.entries(gone || {}).filter(([, t]) => t > now - GONE_KEEP));
 
 // recycle bin entries -> tombstones per collection: { cases: [{ id, deletedAt }], ... }. The time is the binned
-// version's updatedAt (never after deletedAt): a copy changed since then survives, so a bin entry whose delete was
-// refused (the record changed elsewhere) removes nothing. Older entries without one use deletedAt.
+// version's updatedAt, even when a fast clock stamped it after deletedAt (a copy of that version must still go): a copy
+// changed since then survives, so a bin entry whose delete was refused (the record changed elsewhere) removes nothing.
+// Older entries without one use deletedAt.
 export function binTombs(entries) {
   const out = {};
   for (const e of entries || []) {
     const coll = BIN_KIND[e && e.kind], id = e && e.data && e.data.id;
     if (!coll || !id) continue;
     const at = Number(e.deletedAt) || 0, version = Number(e.data.updatedAt) || 0;
-    (out[coll] ||= []).push({ id: String(id), deletedAt: version > 0 && (!at || version <= at) ? version : at });
+    (out[coll] ||= []).push({ id: String(id), deletedAt: version > 0 ? version : at });
   }
   return out;
 }
@@ -114,7 +120,14 @@ export async function eachSettled(ids, write, size = 20) {
 export function createCollectionSync({ email, coll, store, listen, fetchOne = null, now = Date.now, onError = () => {} }) {
   const subs = new Set(), local = new Set();   // local: ids last seen with this device's write pending
   let docs = new Map(), meta = {}, flags = null, stopped = false, unlisten = null, chain = Promise.resolve();
-  const persist = op => (chain = chain.then(() => store.write(coll, op)).catch(e => console.warn('Local store not saved', e)));
+  // A write that fails (storage full) leaves the device's copy short of what meta claims: until a later write puts the
+  // whole list back (replace), nothing else is written, and the next start reads everything (fullAt 0).
+  let dirty = false;
+  const persist = op => (chain = chain.then(async () => {
+    const heal = dirty;
+    await store.write(coll, heal ? { replace: true, put: [...docs.values()], meta } : op);
+    if (heal) dirty = false;
+  }).catch(e => { dirty = true; meta = { ...meta, fullAt: 0 }; console.warn('Local store not saved', e); }));
   const send = cb => { if (flags && subs.has(cb)) cb(copy([...docs.values()]), { ...flags }); };
   const emit = () => { for (const cb of subs) send(cb); };
 
@@ -125,7 +138,7 @@ export function createCollectionSync({ email, coll, store, listen, fetchOne = nu
     meta = got.meta || {};
     // a list confirmed before shows at once; a device that never synced waits for the listener (as Firestore did)
     if (meta.syncAt) { flags = { fromCache: true, hasPendingWrites: false }; emit(); }
-    const p = plan(meta, now());
+    const p = plan(meta, now(), got.docs.reduce((n, d) => Math.max(n, stamp(d)), 0));
     unlisten = listen(email, coll, { since: p.since, epoch: meta.epoch }, onSnap, onError);
     if (stopped) unlisten();
   })().catch(onError);
@@ -176,10 +189,11 @@ export function createCollectionSync({ email, coll, store, listen, fetchOne = nu
     subscribe(cb) { subs.add(cb); if (flags) queueMicrotask(() => send(cb)); return () => subs.delete(cb); },
     get size() { return subs.size; },
     ready,
-    // deleted here (for good, or into the bin): gone at once, and older copies arriving later are ignored
+    // deleted here (for good, or into the bin): gone at once, and copies of that version (or older) arriving later are
+    // ignored; the tombstone is the deleted version's stamp (not this clock), so a restore stamped after it shows
     async drop(ids, at = now()) {
       await ready;
-      const del = applyTombs(docs, meta.gone ||= {}, ids.map(id => ({ id: String(id), deletedAt: Math.max(at, stamp(docs.get(String(id)))) })));
+      const del = applyTombs(docs, meta.gone ||= {}, dropTombs(docs, ids, at));
       await persist({ del, meta });
       if (del.length) emit();
     },
@@ -265,8 +279,7 @@ export function createSyncHub({ openStore, listen, fetchOne = null, now = Date.n
   async function storeTombs(email, coll, list, drop = false) {
     const st = lazyStore(email), got = await st.load(coll);
     const docs = new Map(got.docs.map(d => [d.id, d])), meta = got.meta || {};
-    const at = now();
-    const del = applyTombs(docs, meta.gone ||= {}, drop ? list.map(id => ({ id: String(id), deletedAt: Math.max(at, stamp(docs.get(String(id)))) })) : list);
+    const del = applyTombs(docs, meta.gone ||= {}, drop ? dropTombs(docs, list, now()) : list);
     await st.write(coll, { del, meta });
   }
   function tombsFor(email) {

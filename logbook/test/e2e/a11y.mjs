@@ -23,6 +23,12 @@ const hash = id => async p => { await p.evaluate(h => { location.hash = '#' + h;
 const SCREENS = [
   ['Case', hash('log'), true],
   ['Logbook calendar', hash('logbook'), true],
+  ['Paste a list review', async p => {
+    await p.locator('.datebar button[data-mode="bulk"]').click();
+    await p.locator('textarea.details').fill('AB 30F\nLSCS spinal\n\nCD 40M\nlap chole GA');
+    await p.getByRole('button', { name: 'Review', exact: true }).click();
+    await p.waitForSelector('table.bulk');
+  }, false],
   ['Logbook list', async p => { await hash('logbook')(p); await p.locator('main .seg button', { hasText: /^List$/ }).first().click(); }, false],
   ['Reflections', hash('reflect'), true],
   ['Analytics', hash('progress'), true],

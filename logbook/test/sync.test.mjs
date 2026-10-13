@@ -17,6 +17,10 @@ const DAY = 864e5, T0 = Date.parse('2026-10-13T08:00:00Z');
   assert.equal(plan({ syncAt: T0, fullAt: T0 - FULL_EVERY - 1 }, T0).full, true, 'weekly full read');
   assert.equal(plan({ syncAt: T0 + DAY, fullAt: T0 + DAY }, T0).full, true, 'clock went back a day');
   assert.equal(plan({ syncAt: T0 + 60e3, fullAt: T0 - DAY }, T0).since, T0 - SKEW, 'never past now');
+  // a reader whose clock was 2 h ahead at its last sync (real 08:00, syncAt 10:00), opened at 12:00 with the clock put
+  // right: anchored to the newest stamp it holds (others' edits up to 08:00), not 09:50 (bug: 08:00–09:50 never came)
+  assert.equal(plan({ syncAt: T0 + 2 * 3600e3, fullAt: T0 - DAY }, T0 + 4 * 3600e3, T0 - 60e3).since, T0 - 60e3);
+  assert.equal(plan({ syncAt: T0, fullAt: T0 - DAY }, T0 + 60e3, T0 + DAY).since, T0 - SKEW, 'a future stamp never moves it later');
 
   const docs = new Map([['a', { id: 'a', updatedAt: 1 }], ['b', { id: 'b', updatedAt: 1 }], ['c', { id: 'c', updatedAt: 1 }]]);
   const r = applyChanges(docs, [
@@ -44,9 +48,12 @@ const DAY = 864e5, T0 = Date.parse('2026-10-13T08:00:00Z');
   assert.deepEqual(pruneGone({ old: T0 - GONE_KEEP - 1, new: T0 - 1 }, T0), { new: T0 - 1 });
   assert.deepEqual(binTombs([{ kind: 'case', data: { id: 'c1' }, deletedAt: 7 }, { kind: 'note', data: { id: 'n1' }, deletedAt: 8 }, { kind: 'summary', data: { id: 's' } }, { kind: 'reflection', data: {} }]),
     { cases: [{ id: 'c1', deletedAt: 7 }], notes: [{ id: 'n1', deletedAt: 8 }] });
-  // the binned version's updatedAt (never after deletedAt) decides, not when it was binned
+  // the binned version's updatedAt decides, not when it was binned; even one stamped after deletedAt by a clock
+  // running ahead: the copies of that version must go (bug: they stayed on every other device)
   assert.deepEqual(binTombs([{ kind: 'case', data: { id: 'v', updatedAt: 3 }, deletedAt: 9 }, { kind: 'case', data: { id: 'w', updatedAt: 12 }, deletedAt: 9 }]).cases,
-    [{ id: 'v', deletedAt: 3 }, { id: 'w', deletedAt: 9 }]);
+    [{ id: 'v', deletedAt: 3 }, { id: 'w', deletedAt: 12 }]);
+  const fast = new Map([['x', { id: 'x', updatedAt: 1000 + 20 * 60e3 }]]);
+  assert.deepEqual(applyTombs(fast, {}, binTombs([{ kind: 'case', deletedAt: 1000, data: { id: 'x', updatedAt: 1000 + 20 * 60e3 } }]).cases), ['x']);
   // binned on a phone with an old copy (version 3), but the delete was refused: the record changed elsewhere at 5
   const refused = new Map([['x', { id: 'x', updatedAt: 5 }]]), g2 = {};
   assert.deepEqual(applyTombs(refused, g2, binTombs([{ kind: 'case', data: { id: 'x', updatedAt: 3 }, deletedAt: 9 }]).cases), []);
@@ -291,6 +298,102 @@ const E = 'fake@example.com';
   assert.equal(st.closed, true);
   await st.write('cases', { put: [{ id: 'z' }] });   // an old handle never brings a wiped store back
   assert.deepEqual((await (await openStore(E)).load('cases')).docs, []);
+}
+
+// ---- a local write that fails (storage full) never leaves meta claiming documents the device doesn't hold ----
+{
+  const srv = fakeServer();
+  for (let i = 0; i < 5; i++) srv.set('cases', { id: 'q' + i, updatedAt: T0 - DAY });
+  const mem = await openStore(E);
+  let full = true;   // writes of 3 or more documents fail, as QuotaExceededError on a phone low on storage
+  const store = { load: c => mem.load(c), write: async (c, op) => { if (full && (op.put || []).length >= 3) throw new Error('QuotaExceededError'); return mem.write(c, op); } };
+  let now = T0, last = null, snap = null;
+  const listen = (email, coll, opts, onSnap) => { snap = onSnap; return srv.listen(email, coll, opts, onSnap); };
+  const warn = console.warn; console.warn = () => {};
+  let s = createCollectionSync({ email: E, coll: 'cases', store, listen, now: () => now });
+  s.subscribe(l => { last = l; });
+  await settle(); await s.flush();
+  assert.equal(last.length, 5, 'shown from memory');
+  now += 60e3;
+  snap({ changes: [], fromCache: false, hasPendingWrites: false });   // a metadata-only server snapshot: its write is small
+  await s.flush();
+  let stored = await mem.load('cases');
+  assert.ok(!(stored.docs.length < 5 && stored.meta.syncAt && stored.meta.fullAt), 'meta never claims a sync the documents lack');
+  await s.stop();
+  // the next start reads everything (not just changes since), so the missing cases come back
+  now += 3600e3; srv.reads = 0; full = false;
+  s = createCollectionSync({ email: E, coll: 'cases', store, listen, now: () => now });
+  s.subscribe(l => { last = l; });
+  await settle(); await s.flush();
+  assert.equal(last.length, 5); assert.equal(srv.reads, 5, 'a full read');
+  stored = await mem.load('cases');
+  assert.equal(stored.docs.length, 5, 'healed');
+  // a write failing later (once): the next write puts the whole list back
+  let fails = 1;
+  const failing = { load: c => mem.load(c), write: async (c, op) => { if (fails && op.put && op.put.some(d => d.id === 'q20')) { fails--; throw new Error('UnknownError'); } return mem.write(c, op); } };
+  await s.stop();
+  s = createCollectionSync({ email: E, coll: 'cases', store: failing, listen, now: () => now });
+  s.subscribe(l => { last = l; }); await settle(); await s.flush();
+  srv.set('cases', { id: 'q20', updatedAt: now + 1 }); await settle(); await s.flush();
+  srv.set('cases', { id: 'q21', updatedAt: now + 2 }); await settle(); await s.flush();
+  stored = await mem.load('cases');
+  assert.ok(stored.docs.some(d => d.id === 'q20') && stored.docs.some(d => d.id === 'q21'), 'the failed put is written with the next one');
+  assert.equal(stored.meta.fullAt, 0, 'and the next start reads everything');
+  await s.stop(); console.warn = warn; await wipeStores();
+}
+
+// ---- deleted here: the tombstone is the deleted version, so a restore (stamped after it) shows ----
+{
+  let snap = null;
+  const store = await openStore(E);
+  const listen = (email, coll, opts, onSnap) => { snap = onSnap; onSnap({ full: true, docs: [], changes: [], fromCache: false }); return () => {}; };
+  let last = null;
+  const s = createCollectionSync({ email: E, coll: 'cases', store, listen, now: () => T0 });
+  s.subscribe(l => { last = l; }); await settle();
+  // edited on a PC whose clock is 20 min fast, then moved to the bin here and restored a minute later
+  const v = { id: 'x', details: 'Fake', updatedAt: T0 + 20 * 60e3 };
+  snap({ changes: [{ type: 'added', id: 'x', doc: v }], fromCache: false });
+  await s.drop(['x']);
+  assert.deepEqual(last, []);
+  snap({ changes: [{ type: 'added', id: 'x', doc: v }], fromCache: false });
+  assert.deepEqual(last, [], 'the deleted version arriving again stays deleted');
+  const { cleanCase } = await import('../js/demo-backend.js');
+  const restored = cleanCase(v);   // the restore's write: stamped after the version it brings back
+  assert.ok(restored.updatedAt > v.updatedAt);
+  snap({ changes: [{ type: 'modified', id: 'x', doc: restored }], fromCache: false });
+  assert.deepEqual(last.map(d => d.id), ['x'], 'the restored case shows');
+  await s.stop(); await wipeStores();
+}
+
+// ---- store: an open that never settles falls back to memory ----
+{
+  const had = globalThis.indexedDB, warn = console.warn;
+  globalThis.indexedDB = { open: () => ({}) };   // never calls back
+  console.warn = () => {};
+  try {
+    const st = await openStore('fake-hang@example.com', 30);
+    assert.equal(st.kind, 'memory');
+  } finally { if (had === undefined) delete globalThis.indexedDB; else globalThis.indexedDB = had; console.warn = warn; }
+  await wipeStores();
+}
+
+// ---- store: a demo tab's sign-out never closes the real account's store in another tab ----
+{
+  const had = globalThis.indexedDB;
+  // a minimal IndexedDB: opens at once, with every object store
+  globalThis.indexedDB = { open: () => { const r = {}; setTimeout(() => { r.result = { objectStoreNames: { contains: () => true }, close() {}, version: 1 }; r.onsuccess(); }, 0); return r; } };
+  try {
+    const real = await openStore('fake-real@example.com');
+    assert.equal(real.kind, 'idb');
+    const other = new BroadcastChannel('apmes-logbook-store');
+    other.postMessage({ wipe: true, realm: 'demo:', keep: [] });
+    await new Promise(r => setTimeout(r, 30));
+    assert.equal(real.closed, false, 'the demo’s wipe leaves it open');
+    other.postMessage({ wipe: true, realm: '', keep: [] });
+    await new Promise(r => setTimeout(r, 30));
+    assert.equal(real.closed, true, 'a real sign-out closes it');
+    other.close();
+  } finally { if (had === undefined) delete globalThis.indexedDB; else globalThis.indexedDB = had; }
 }
 
 console.log('sync tests passed');

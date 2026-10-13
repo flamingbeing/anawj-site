@@ -10,7 +10,7 @@
 
 import { S, h, toast, modal, settings, patchLogbook, okNoIds } from './ui-core.js';
 import { fmtDate } from './engine.js';
-import { cleanSync, cleanTarget, targetReady, targetPath, planDay, fingerprint, changedDays, cleanSyncLedger, markSynced, KIND_NAMES, MAX_TARGETS, DEFAULT_FILE, DRIVE_DIR, DROPBOX_DIR } from './sync-md.js';
+import { cleanSync, cleanTarget, targetReady, targetPath, planDay, fingerprint, changedDays, cleanSyncLedger, markSynced, reconcileSyncState, KIND_NAMES, MAX_TARGETS, DEFAULT_FILE, DRIVE_DIR, DROPBOX_DIR } from './sync-md.js';
 import { mdDay } from './markdown.js';
 import { mdFormat, mdCtx } from './share.js';
 import { notesOn } from './notepad.js';
@@ -34,8 +34,10 @@ export const syncPlaces = v => cleanSync(v).targets.map(t => (t.kind === 'github
 const acct = () => (demo ? 'demo:' : '') + String((S.user && S.user.email) || (S.logbook && S.logbook.email) || 'local').toLowerCase();
 // "cloud" in the names keeps them out of the device-settings file (settings-file.js) like the sign-in state
 function readState(a = acct()) {
-  try { const s = JSON.parse(localStorage.getItem(LEDGER + a) || '{}') || {}; return { ledger: cleanSyncLedger(s.ledger), at: s.at && typeof s.at === 'object' ? s.at : {} }; }
-  catch { return { ledger: {}, at: {} }; }
+  try {
+    const s = JSON.parse(localStorage.getItem(LEDGER + a) || '{}') || {}, obj = v => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
+    return { ledger: cleanSyncLedger(s.ledger), at: obj(s.at), places: obj(s.places) };
+  } catch { return { ledger: {}, at: {}, places: {} }; }
 }
 const writeState = (s, a = acct()) => { try { localStorage.setItem(LEDGER + a, JSON.stringify(s)); } catch { /* storage full or blocked: the next sync reads the files again */ } };
 export const ghToken = (id, a = acct()) => { try { return localStorage.getItem(`${TOKEN}${a}:${id}`) || ''; } catch { return ''; } };
@@ -97,7 +99,10 @@ async function work(targets, { full = false, a = acct() } = {}) {
   for (const c of S.cases || []) if (ISO.test(c.date || '')) (days.get(c.date) || days.set(c.date, []).get(c.date)).push(c);
   const notes = full ? await notesFromServer() : notesIndex().days.length || S.notes ? (await ensureNotes().catch(() => [])) || [] : [];
   for (const n of notes) if (ISO.test(n.date || '') && !days.has(n.date)) days.set(n.date, []);
-  const { ledger } = readState(a);
+  // a place pointed somewhere else meanwhile (another device, a settings file), or removed: its ledger goes
+  const { state, drop } = reconcileSyncState(readState(a), syncSettings().targets);
+  if (drop.length || JSON.stringify(state.places) !== JSON.stringify(readState(a).places)) { writeState(state, a); for (const id of drop) await dropBases(id, a); }
+  const { ledger } = state;
   const fmt = mdFormat(), ctx = mdCtx(), texts = new Map();
   const text = date => {
     if (!texts.has(date)) texts.set(date, tidy(mdDay(date, [...(days.get(date) || [])].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)), fmt, ctx, notesOn(notes, date))));

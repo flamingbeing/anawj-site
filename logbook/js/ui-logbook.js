@@ -372,7 +372,7 @@ function openRowMenu(c) {
   const has = (S.reflections || []).some(r => r.caseId === c.id);
   const m = modal(caseText(c).slice(0, 60) || 'Case', h('div', { class: 'row-menu-list' },
     h('button', { onclick: () => { m.close(); copyText(shareCaseText(c), 'Case copied: paste it into your notes'); } }, rowIcon('copy'), ' Copy'),
-    destinations().length ? h('button', { onclick: () => { m.close(); openSend({ text: shareCaseText(c), title: c.date || 'Case' }); } }, rowIcon('copy'), ' Send to…') : null,
+    destinations().length ? h('button', { onclick: () => { m.close(); openSend({ text: shareCaseText(c), title: c.date || 'Case', fileDate: c.date || '' }); } }, rowIcon('copy'), ' Send to…') : null,
     basicHides('reflect') ? null : h('button', { class: has ? 'has-refl' : '', onclick: () => { m.close(); reflectOnCase(c); } }, rowIcon(has ? 'done' : 'reflect'), has ? ' Open the reflection' : ' Write a reflection'),
     // APMES → Request an evaluation (off by default): the evaluations app, with this case's date and initials
     shows('evalRequest') ? h('a', { class: 'btn eval-req', href: evalRequestUrl({ date: c.date, initials: caseParts(c).initials }, { today: todayISO(), demo: cloud.demo, base: evalsBase(location.href) }), target: '_blank', rel: 'noopener', onclick: () => m.close() }, rowIcon('reflect'), ' Request an evaluation') : null,

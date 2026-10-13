@@ -15,6 +15,10 @@ its own file), so sessions never edit the same lines. Read them all before start
 
 ## Waiting on the owner
 
+- **Try the 6-hour build** (13–14 Oct): Settings → Profile → Personal; Logbook day → + Daily note; Settings → Advanced
+  logging → Labelled parts; Settings → Sync (GitHub / Drive / Dropbox); Send to. Everything new is off until switched on.
+  Notes with text open in Preview (⋯ → Edit to type): say if they should open ready to type instead.
+
 - Answer the questions in `logbook/PLAN-personal-log.md` and `logbook/PLAN-labelled-parts.md` (13 Oct), then say go.
 - Get the Obsidian vault into the private repo `flamingbeing/life` (Obsidian Git plugin or GitHub Desktop; steps on request).
 - Dropbox production form: website `https://apmes.anawj.com/logbook/` (13 Oct; text was given in chat).
@@ -54,6 +58,10 @@ its own file), so sessions never edit the same lines. Read them all before start
 
 ## Recently done
 
+- #484 Late dialog "back" no longer pulls you off a page opened meanwhile (Safari); settings search scrolls to the option; phone polish.
+- #483 Rarely used screens load on demand: case box ~35% sooner on a phone connection.
+- #482 Cross-browser fixes: settings search keeps typed text, profile Cancel, Sync page redraws, blocked storage.
+- #481 Labelled parts (`lp:` etc., off), case templates, pasted case lists, phone fixes (keyboard, tap targets, Safari menu), Request an evaluation (off), Hide the tab bar while typing (Personal).
 - #474 Wave 1 of the 6-hour build: cheap-read sync engine (local store + filtered listeners, deletes from the bin, `tools/test-reads.sh`), faster logging (Save takes the suggested tags, Case-tab 'quick' split into suggestions / Same as last, optional auto-tick), Sync to Drive / Dropbox / GitHub (one Markdown file per day, managed block, three-way merge), profiles as presets of visible switches with a new Personal profile and APMES switches, daily note (+ Today's note, paste cleaner, receive shares on Android).
 - #402 Send to… (Obsidian, WhatsApp, UpNote or any link).
 

@@ -57,12 +57,21 @@ function remember(name) {
   try { const l = JSON.parse(localStorage.getItem(REGISTRY) || '[]'); if (!l.includes(name)) localStorage.setItem(REGISTRY, JSON.stringify([...l, name])); } catch { /* storage blocked */ }
 }
 
-// The store for one account. Never throws: a store that can't open is a memory store.
-export async function openStore(email) {
+// an open that never settles (some WebKit builds; an open queued behind a delete another tab blocks) gives up after this
+export const OPEN_WAIT = 4000;
+// The store for one account. Never throws: a store that can't open (or doesn't open in time) is a memory store.
+export async function openStore(email, wait = OPEN_WAIT) {
   const name = storeName(email);
   if (typeof indexedDB === 'undefined') return memoryStore(name);
-  let db;
-  try { db = await openDb(name); } catch (e) { console.warn('Local store unavailable; using memory', e); return memoryStore(name); }
+  let db, timer;
+  const opening = openDb(name);
+  try {
+    db = await Promise.race([opening, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Local store took too long to open')), wait); })]);
+  } catch (e) {
+    console.warn('Local store unavailable; using memory', e);
+    opening.then(late => late.close(), () => {});   // (opened after all: let it go, this page uses memory now)
+    return memoryStore(name);
+  } finally { clearTimeout(timer); }
   remember(name);
   let dead = false;   // deleted (sign-out in another tab): forget everything, never recreate the database
   const handle = {
@@ -104,14 +113,15 @@ let channel = null;
 try {
   if (typeof BroadcastChannel === 'function') {
     channel = new BroadcastChannel('apmes-logbook-store');
-    channel.onmessage = e => { if (e.data && e.data.wipe) closeAll(e.data.keep); };
+    // (one channel for both modes: a message names its mode, and a demo tab's sign-out never closes real stores)
+    channel.onmessage = e => { if (e.data && e.data.wipe && (e.data.realm || '') === realm) closeAll(e.data.keep); };
     if (channel.unref) channel.unref();   // node (tests): don't keep the process alive
   }
 } catch { channel = null; }
 
 function closeAll(keep) {
   const k = new Set(Array.isArray(keep) ? keep : []);
-  for (const h of [...handles]) if (!k.has(h.name)) h.close();
+  for (const h of [...handles]) if (ours(h.name) && !k.has(h.name)) h.close();
 }
 
 // Delete every account's store on this device (this mode only), in this tab and the others. Sign-out, account
@@ -121,7 +131,7 @@ export async function wipeStores(keep = []) {
   const kept = (Array.isArray(keep) ? keep : [keep]).filter(Boolean).map(storeName);
   closeAll(kept);
   for (const name of [...memory.keys()]) if (ours(name) && !kept.includes(name)) memory.delete(name);
-  try { channel && channel.postMessage({ wipe: true, keep: kept }); } catch { /* closed */ }
+  try { channel && channel.postMessage({ wipe: true, realm, keep: kept }); } catch { /* closed */ }
   if (typeof indexedDB === 'undefined') return;
   const names = new Set();
   try { for (const n of JSON.parse(localStorage.getItem(REGISTRY) || '[]')) names.add(n); } catch { /* storage blocked */ }
