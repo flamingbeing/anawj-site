@@ -18,13 +18,11 @@ Last updated: 2026-10-13 by Claude Code, design session (branch `claude/inspirin
 
 ## Next (agreed queue)
 
-- Retire the old path: `design/tokens.css` is a byte-identical copy kept for pages and service workers still on
-  `../design/tokens.css`. Once nothing links it (`git grep -n "design/tokens"`; prewarm #364 adds
-  `prewarm/update.html`, which must link `../nuhsdesign/`) and the apps have updated, delete it and drop `/design/`
-  from `SHARED` in `worker/routes.js` and its tests in `worker/test/` (or ask the hosting session to).
+- Nothing queued.
 
 ## Recently done
 
+- #392 (log1) The old `design/` folder and `/design/` path are retired; every subdomain serves only `/nuhsdesign/`.
 - #363 `design/` moved to `nuhsdesign/` (every subdomain serves it); evals, prewarm and prewarm-update link it. Checked live: tokens load on
   `prewarmstudy.`, `apmes.` and `anawj.com`; the prewarm and evals service workers install and cache them.
 - #204 The brand stripe is four equal quarters (orange, red, blue `#178fd7`, navy) in `design/`, logbook, evals,
