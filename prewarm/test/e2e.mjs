@@ -211,7 +211,7 @@ try {
   assert.ok(await page.$('[data-done]'), 'Mark data collection as complete on this tab too');
   // other data: the rest of the study's pages on one page, under headers open by default, from the small box on the
   // BP, HR, BIS tab; Enter and the arrow keys move between questions
-  assert.deepEqual((await page.$$eval('.links.three a', as => as.map(a => a.textContent.replace(/\s*✓/, '').trim()))), ['Pre-op', 'Day 1', 'Day 2'], 'Perioperative data is three buttons on one line');
+  assert.deepEqual((await page.$$eval('.links.three a', as => as.map(a => a.textContent.replace(/\s*✓/, '').trim()))), ['Pre-op', 'POD1', 'POD2'], 'Perioperative data is three buttons on one line');
   const ys = await page.$$eval('.links.three a', as => as.map(a => Math.round(a.getBoundingClientRect().y)));
   assert.ok(ys.every(y => y === ys[0]), 'the three buttons share one line');
   assert.equal((await page.textContent('#haemolink')).trim(), 'BP, HR, BIS', 'second tab is BP, HR, BIS');
@@ -220,9 +220,9 @@ try {
   assert.equal(await page.$$eval('details.sect[open]', x => x.length), 4, 'Pre-op page: Subject ID and group, pre-op, meds, bloods, all open');
   const pid3 = (await page.evaluate(() => location.hash)).split('/')[2];
   await page.evaluate(h => { location.replace(h); }, `#/p/${pid3}/data/day1`); await page.waitForSelector('details.sect');
-  assert.equal(await page.$$eval('details.sect[open]', x => x.length), 2, 'Day 1 page: chart review and analgesia');
+  assert.equal(await page.$$eval('details.sect[open]', x => x.length), 2, 'POD1 page: chart review and analgesia');
   await page.evaluate(h => { location.replace(h); }, `#/p/${pid3}/data/day2`); await page.waitForSelector('details.sect');
-  assert.equal(await page.$$eval('details.sect[open]', x => x.length), 3, 'Day 2 page: chart review, analgesia, discharge');
+  assert.equal(await page.$$eval('details.sect[open]', x => x.length), 3, 'POD2 page: chart review, analgesia, discharge');
   await page.evaluate(h => { location.replace(h); }, `#/p/${pid3}/data`); await page.waitForSelector('details.sect');
   await page.fill('#f-age', '67'); await page.keyboard.press('Enter');
   assert.match(await page.textContent('details.sect[data-pg="preop"] summary'), /1 of \d+ filled/, 'Enter saves the answer');

@@ -58,7 +58,7 @@ export function workbookSheets(patients, screening) {
       at?.v ? cellFor({ type: 'time' }, at.v) : null, at?.by || '', vals.map(([l, v]) => `${l} ${v}`).join('; ')]);
   }
   // the sections with a "complete" tick; the perioperative pages have their own (sign_periop = pre-op and patient details, sign_pod1, sign_pod2)
-  const signs = [...PAGES.filter(pg => pg.signoff).map(pg => [pg.id, pg.title]), ['periop', 'Pre-op and patient details'], ['pod1', 'Day 1'], ['pod2', 'Day 2 and discharge']];
+  const signs = [...PAGES.filter(pg => pg.signoff).map(pg => [pg.id, pg.title]), ['periop', 'Pre-op and patient details'], ['pod1', 'POD1'], ['pod2', 'POD2 and discharge']];
   const extra = [['Subject ID', ...EXTRA.map(f => f.label), ...signs.map(([, t]) => 'Complete: ' + t)]];
   for (const p of live) extra.push([sid(p), ...EXTRA.map(f => f.type === 'rows' ? ixText(val(p, f.id)) || null : cellFor(f, shownValue(f.id, k => val(p, k)))),
     ...signs.map(([id]) => val(p, 'sign_' + id))]);
