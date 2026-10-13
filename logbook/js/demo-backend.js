@@ -6,7 +6,7 @@
 //   ?demo=empty  blank store (nothing seeded)
 //   ?demo=reset  wipe the demo store, then seed as for ?demo
 //
-// The field whitelists below are shared with cloud.js so both backends store the same shapes
+// The field whitelists are in clean.js, shared with cloud.js so both backends store the same shapes
 // (and so cloud writes never trip the field checks in firestore.rules).
 
 export const DEMO_USER = { email: 'demo@example.com', name: 'Demo User', uid: 'demo-uid' };
@@ -16,79 +16,13 @@ import { cleanNote } from './notepad.js';
 import { progress } from './engine.js';
 import { cleanProfile } from './profile.js';
 import { mergeSettings } from './profiles.js';
-export { cleanReflection, cleanImage };
+import { plain, cleanCase, cleanSummary, cleanResident, cleanTemplate, importDocId, defaultLogbook, cleanCategoryNames, cleanSubmission } from './clean.js';
+export { cleanReflection, cleanImage, plain, cleanCase, cleanSummary, cleanResident, cleanTemplate, importDocId, defaultLogbook, cleanCategoryNames, cleanSubmission } from './clean.js';
 
 const KEY = 'apmes-logbook-demo-v1';
 
-// ---- shared field whitelists ----
+// ---- shared field whitelists: clean.js (cloud.js uses them without loading this file) ----
 
-const CASE_FIELDS = ['id', 'date', 'dateText', 'initials', 'details', 'cats', 'createdAt', 'updatedAt', 'source', 'importKey', 'reflectionId', 'reflectTag', 'tags'];
-const SUMMARY_FIELDS = ['rid', 'name', 'intake', 'rYear', 'smo', 'counts', 'total', 'reflections', 'reflectionsTotal', 'updatedAt'];
-const RESIDENT_FIELDS = ['rid', 'name', 'email', 'status', 'intake', 'rYear', 'smo'];
-const TEMPLATE_FIELDS = ['id', 'name', 'cats', 'details'];
-
-const pick = (o, keys) => Object.fromEntries(keys.filter(k => o[k] !== undefined).map(k => [k, o[k]]));
-// Firestore rejects undefined values; a JSON round trip drops them (and deep-copies).
-export const plain = o => JSON.parse(JSON.stringify(o));
-
-// (a write is stamped after the version it replaces, so it wins even over a copy stamped by a clock running ahead)
-export function cleanCase(c, now = Math.max(Date.now(), (Number(c && c.updatedAt) || 0) + 1)) {
-  const out = pick(c, CASE_FIELDS);
-  out.id = out.id ? String(out.id) : Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
-  out.date = out.date || null;
-  out.details = String(out.details ?? '').slice(0, 2000);
-  out.cats = [...new Set((out.cats || []).map(String))].slice(0, 40);
-  if (out.dateText != null) out.dateText = String(out.dateText).slice(0, 200);
-  if (out.initials != null) out.initials = String(out.initials).slice(0, 20);
-  // marked interesting; personal subcategory tags ("16:elective")
-  if (out.reflectTag) out.reflectTag = true; else delete out.reflectTag;
-  if (Array.isArray(out.tags) && out.tags.length) out.tags = [...new Set(out.tags.map(t => String(t).slice(0, 60)))].slice(0, 20); else delete out.tags;
-  out.createdAt = Number(out.createdAt) || now;
-  out.updatedAt = now;
-  out.source = out.source || 'app';
-  return plain(out);
-}
-
-export function cleanSummary(rid, s, now = Date.now()) {
-  const out = pick(s, SUMMARY_FIELDS);
-  out.rid = String(rid);
-  out.counts = out.counts || {};
-  out.total = Number(out.total) || 0;
-  if (out.smo !== true) delete out.smo;
-  out.updatedAt = now;
-  return plain(out);
-}
-
-export function cleanResident(r) {
-  const out = pick(r, RESIDENT_FIELDS);
-  out.rid = String(out.rid);
-  out.name = String(out.name ?? '').slice(0, 200);
-  out.email = String(out.email ?? '').trim().toLowerCase();
-  out.status = out.status || 'ACTIVE';
-  out.intake = out.intake == null || out.intake === '' ? null : Number(out.intake);
-  out.rYear = out.rYear == null || out.rYear === '' ? null : Number(out.rYear);
-  // years spent as an SMO (logbook: they count as R3); left out when none
-  const smo = Math.floor(Number(out.smo) || 0);
-  if (smo > 0) out.smo = Math.min(10, smo); else delete out.smo;
-  return plain(out);
-}
-
-export function cleanTemplate(t) {
-  const out = pick(t, TEMPLATE_FIELDS);
-  out.name = String(out.name ?? '').slice(0, 100);
-  out.cats = [...new Set((out.cats || []).map(String))].slice(0, 40);
-  if (out.details != null) out.details = String(out.details).slice(0, 2000);
-  return plain(out);
-}
-
-// Firestore document ids may not contain '/', and some other characters are awkward.
-// Map an importKey to a safe, reversible-enough id: keep [A-Za-z0-9_-], escape the rest as ~xxxx.
-export const importDocId = key =>
-  'imp_' + String(key).replace(/[^A-Za-z0-9_-]/g, ch => '~' + ch.charCodeAt(0).toString(16).padStart(4, '0'));
-
-export function defaultLogbook(email, name = '') {
-  return { email, name, rid: null, settings: {}, templates: [], updatedAt: Date.now() };
-}
 // the demo's own logbook. The e2e tests (apmes-logbook-demo-small) check every feature, so theirs starts in Advanced;
 // everyone else starts in Basic, the default profile
 function demoDoc(email, name) {
@@ -458,14 +392,6 @@ export async function deleteImage(email, id) {
 const SUB_KEY = KEY + '-submissions';
 const subs = () => { try { return JSON.parse(localStorage.getItem(SUB_KEY) || '{}'); } catch { return {}; } };
 const subsSave = m => { try { localStorage.setItem(SUB_KEY, JSON.stringify(m)); } catch (e) { console.warn('Demo submissions not saved', e); } };
-export const cleanSubmission = (email, m) => plain({
-  email: lc(email), rid: m.rid ? String(m.rid).slice(0, 40) : null, name: String(m.name || '').slice(0, 200),
-  intake: Number(m.intake) || null, rYear: Number(m.rYear) || null, smo: Math.max(0, Math.floor(Number(m.smo) || 0)),
-  readyAt: Number(m.readyAt) || Date.now(), updatedAt: Date.now(), fp: String(m.fp || '').slice(0, 100),
-  count: Math.max(0, Math.floor(Number(m.count) || 0)), profile: m.profile && typeof m.profile === 'object' ? m.profile : null,
-  counts: m.counts && typeof m.counts === 'object' ? m.counts : {},
-  imageIds: [...new Set((Array.isArray(m.imageIds) ? m.imageIds : []).map(String))].slice(0, 1000),
-});
 export async function submitPortfolio(email, meta, reflections) {
   const m = subs();
   const doc = cleanSubmission(email, meta);
@@ -548,16 +474,6 @@ export async function importCases(email, rid, cases, onProgress) {
 
 // ---- portfolio template (word-export) ----
 // Kept under its own key: it is ~1.4 MB of base64 and must not slow every load()/save() of the demo state.
-// Category display names set by admins: { code: { name?, short? } } (display only; exports keep the official names)
-export function cleanCategoryNames(m) {
-  const out = {};
-  for (const [code, v] of Object.entries(m && typeof m === 'object' ? m : {})) {
-    if (!/^\d{2}[ivx]*$/.test(code) || !v || typeof v !== 'object') continue;
-    const name = String(v.name || '').trim().slice(0, 80), short = String(v.short || '').trim().slice(0, 30);
-    if (name || short) out[code] = { ...(name ? { name } : {}), ...(short ? { short } : {}) };
-  }
-  return out;
-}
 const NAMES_KEY = KEY + '-category-names';
 const HIDDEN_KEY = 'apmes-logbook-demo-hidden';
 export async function loadTotalsHidden() { try { return JSON.parse(localStorage.getItem(HIDDEN_KEY) || '[]'); } catch { return []; } }

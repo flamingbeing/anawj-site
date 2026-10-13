@@ -17,11 +17,10 @@ Queue (update as each merges):
 8. GitHub destination + three-way merge.
 9. Logging speed and friction pass; lazy-load rare modules.
 10. Bug hunt and stress tests; code tidy.
-Progress (20:10 UTC): wave 1 built, reviewed and tested on branches `wt/sync-engine`, `wt/logging-speed`, `wt/file-sync`,
-`wt/profiles`, `wt/daily-note` (local only). An integrator agent is merging them into `integ/wave1` (worktree
-`/home/user/wt/integ`) with a full test run; then it goes to main as one PR. Wave 2 running from wave-1 bases: F labelled
-parts / case templates / pasted lists (`wt/labelled-parts`), G phone UX + cross-browser bugs (`wt/phone-ux`); H lazy loading
-starts from `integ/wave1`. Specs, maps and the bug list are in the session scratchpad (lost if the container resets: the
-branches are the record; if the session dies, push the `wt/*` and `integ/*` branches and open PRs from them).
+Progress (22:05 UTC): merged #474 (wave 1), #481 (labelled parts, phone fixes), #482 (cross-browser fixes). In flight
+(local branches): `wt/bugfix` (bug hunt: 35 confirmed bugs, 16 fixed in round 1 incl. sync data-loss and daily-note
+blocker; round 2 fixing the other 19), `integ/lazy` (lazy loading onto main), `wt/xb2` (Firefox/WebKit test hooks + a
+dialog-close vs navigation race). Then one last PR, save-state and the owner's summary. If this session dies before
+they merge: those branches hold tested work; a new session can push them and open PRs.
 Design notes: no `firestore.rules` change needed for 1–10 (deletes come from `bin/`, daily note = a note with id `day-<date>`,
 caps are app-side). Read this file first after a compaction.

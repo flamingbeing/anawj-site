@@ -19,6 +19,7 @@ import { demo } from './cloud.js';
 import { FOLDER } from './backup-targets.js';
 import { driveReady, dropboxReady, cloudToken, signInFor, forgetCloudToken } from './cloud-save.js';
 import { driveRemote, dropboxRemote, githubRemote, resetSyncRemote } from './sync-remote.js';
+import { LEDGER, TOKEN, DB, wipeSyncDevice } from './sync-forget.js';
 
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
 export const syncSettings = () => cleanSync(settings().sync);
@@ -32,7 +33,6 @@ export const syncPlaces = v => cleanSync(v).targets.map(t => (t.kind === 'github
 // a run passes the account it started with (a), so nothing it records lands under the next person's name
 const acct = () => (demo ? 'demo:' : '') + String((S.user && S.user.email) || (S.logbook && S.logbook.email) || 'local').toLowerCase();
 // "cloud" in the names keeps them out of the device-settings file (settings-file.js) like the sign-in state
-const LEDGER = 'apmes-logbook-cloud-sync:', TOKEN = 'apmes-logbook-cloud-gh:';
 function readState(a = acct()) {
   try {
     const s = JSON.parse(localStorage.getItem(LEDGER + a) || '{}') || {}, obj = v => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
@@ -45,7 +45,6 @@ export const ghToken = (id, a = acct()) => { try { return localStorage.getItem(`
 const setGhToken = (id, v, quiet = false) => { try { if (v) localStorage.setItem(`${TOKEN}${acct()}:${id}`, v); else localStorage.removeItem(`${TOKEN}${acct()}:${id}`); return true; } catch { if (!quiet) toast('This browser won’t keep the token (private mode?)'); return false; } };
 
 // the base texts: IndexedDB (a day can be long and there may be years of them)
-const DB = 'apmes-logbook-sync';
 let opened = null;
 function db() {
   if (typeof indexedDB === 'undefined') return Promise.reject(new Error('no IndexedDB'));
@@ -85,11 +84,8 @@ export function forgetSync() {
   gen++;
   // this visit's Drive and Dropbox sign-ins were the last person's (the page doesn't reload on a switch)
   forgetCloudToken('drive'); forgetCloudToken('dropbox'); resetSyncRemote();
-  try { for (const k of Object.keys(localStorage)) if (k.startsWith(LEDGER) || k.startsWith(TOKEN)) localStorage.removeItem(k); } catch { /* blocked */ }
-  try {
-    const close = opened; opened = null;
-    Promise.resolve(close).then(d => d && d.close()).catch(() => {}).finally(() => { try { indexedDB.deleteDatabase(DB); } catch { /* none */ } });
-  } catch { /* none */ }
+  const close = opened; opened = null;
+  wipeSyncDevice(close);
 }
 
 // ---- which days to sync ----

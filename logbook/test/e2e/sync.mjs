@@ -124,6 +124,9 @@ try { for (const width of [390, 1280]) {
   const setCase = details => p.evaluate(async ([d, details]) => { const cloud = await import('./js/cloud.js'); const { S } = await import('./js/ui-core.js');
     await cloud.saveCase('demo@example.com', { id: 'fake-sync-1', date: d, initials: 'ZZ', details, cats: ['01'], createdAt: Date.now() + 1e9, updatedAt: Date.now(), source: 'app' });
     for (let i = 0; i < 40 && !S.cases.some(c => c.id === 'fake-sync-1' && c.details === details); i++) await new Promise(r => setTimeout(r, 50));
+    // other pages draw again 250 ms after a live case change (app.js flushRender): let that land before the next step
+    // fills in a form there (Settings → Sync's new place would be drawn away)
+    await new Promise(r => setTimeout(r, 400));
   }, [iso, details]);
   const blockOf = text => { const m = START_RE.exec(text); return text.slice(m.index + m[0].length + 1, text.indexOf(END) - 1); };
 

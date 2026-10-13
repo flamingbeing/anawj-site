@@ -3,32 +3,71 @@
 // in-browser demo backend with ?demo).
 
 import { replaceShow, legacyShow, tabsAfter } from './profiles.js';
-import { S, hooks, h, toast, profile, basicHides, basicMode, logbookOnly, facultyMode, facultyRole, clearToast, cloud, writes, transients, setCases, scheduleSummary, fill, resetCaches, patchLogbook, confirmBox, fileButton, modal, download, todayISO, settings, setCategoryNames, categoryNames as categoryNamesNow } from './ui-core.js';
-import { renderSendSettings, destinationHosts } from './ui-send.js';
-import { renderSyncSettings, remindSync, forgetSync, syncPlaces } from './ui-sync.js';
+import { S, hooks, h, toast, basicHides, basicMode, logbookOnly, facultyMode, facultyRole, clearToast, cloud, writes, transients, setCases, scheduleSummary, fill, resetCaches, patchLogbook, confirmBox, fileButton, modal, download, todayISO, settings, setCategoryNames, categoryNames as categoryNamesNow, watchMyReflections } from './ui-core.js';
 import { renderLog, focusLog, logCasesChanged, clearDrafts } from './ui-log.js';
-import { renderRecovery } from './ui-recovery.js';
-import { renderLogbook } from './ui-logbook.js';
-import { renderProgress, renderTotals } from './ui-progress.js';
-import { applyCompact, cachedCompact, applyTheme, cachedTheme, applyTextSize, cachedTextSize, applyZoom, cachedZoom, stepZoom, applyAccent, adoptDisplay, applyDisplay, applyCustomCss, display, setDisplay, resetDisplay, DISPLAY_KEYS, renderTagEditor, renderDisplay, renderDisplayAdvanced, renderAccessibility, IPHONE_APP, setPageLabel, renderLogging, renderLoggingAdvanced, renderReflectionSettings, renderMarkdownSettings, renderShowHide, START_TABS, arrangeTabs, privacyCard, creditsCard, signOutCard } from './ui-settings.js';
-import { renderAccount, flush as flushProfile } from './ui-account.js';
-import { renderCaseLogs, renderCaseLog, renderProgramme } from './ui-caselogs.js';
-import { renderAdmin, renderAdminResidents, renderAdminAdvanced, leaveAdmin } from './ui-admin.js';
-import { renderReflect, watchMyReflections, renderExportPage, renderChoosePage } from './ui-reflect.js';
-import { downloadExcel, uploadExcel } from './ui-logbook.js';
-import { downloadNotes } from './ui-notes.js';
-import { cloudSaveSection, remindBackup, resumeCloudSave } from './cloud-save.js';
-import { backupCard } from './backup.js';
+import { applyCompact, cachedCompact, applyTheme, cachedTheme, applyTextSize, cachedTextSize, applyZoom, cachedZoom, stepZoom, applyAccent, adoptDisplay, applyDisplay, applyCustomCss, display, setDisplay, resetDisplay, DISPLAY_KEYS, IPHONE_APP, setPageLabel, START_TABS, arrangeTabs } from './display.js';
 import { createNavigation } from './navigation.js';
 import { renderNotes, leaveNotes, openDayNote, renderNoteSettings } from './ui-notepad.js';
 import { fromQuery, keepShared, readInbox } from './share-in.js';
-import { renderShare } from './ui-share-in.js';
-import { settingsFile, readSettingsFile, readDeviceFile, isDeviceFile } from './settings-file.js';
-import { movedPage } from './moved.js';
 import { purgeExpired, openBin } from './bin.js';
-import { renderPoints } from './ui-parts.js';
+import { profile } from './ui-core.js';
 import { deviceOn, barAtBottom } from './device-presets.js';
 import { notesChanged } from './ui-notepad.js';
+import { privacyCard, creditsCard, signOutCard } from './more-cards.js';
+import { wipeSyncDevice } from './sync-forget.js';
+
+// ---------- pages that load on first use ----------
+
+// Only the Case tab's code loads with the app (index.html preloads it); every other page's module loads the first
+// time it is opened, or in idle time soon after the first paint (warmUp), so a phone shows the case box sooner. The
+// service worker keeps them all (sw.js SHELL), so this works offline too.
+const MODS = {
+  logbook: () => import('./ui-logbook.js'), reflect: () => import('./ui-reflect.js'), progress: () => import('./ui-progress.js'),
+  caselogs: () => import('./ui-caselogs.js'), settings: () => import('./ui-settings.js'), send: () => import('./ui-send.js'),
+  sync: () => import('./ui-sync.js'), settingsFile: () => import('./settings-file.js'), account: () => import('./ui-account.js'),
+  admin: () => import('./ui-admin.js'), recovery: () => import('./ui-recovery.js'), notesExport: () => import('./ui-notes.js'),
+  cloudSave: () => import('./cloud-save.js'), backup: () => import('./backup.js'), shareIn: () => import('./ui-share-in.js'),
+  parts: () => import('./ui-parts.js'),
+};
+const mod = {}, loading = {};   // name → the module once loaded; → its promise while loading
+function need(name) {
+  if (mod[name]) return Promise.resolve(mod[name]);
+  return (loading[name] ||= MODS[name]().then(m => (mod[name] = m), err => { delete loading[name]; throw err; }));
+}
+// call a loaded module now (so the order of things stays as it was), or once it has loaded
+const withMod = (name, fn) => (mod[name] ? Promise.resolve(fn(mod[name])) : need(name).then(fn));
+// sign-out, an account switch, a demo reset: sync's run and sign-ins stop (when its code is loaded) and what it keeps
+// on the device goes, at once either way
+const forgetSync = () => {
+  if (mod.sync) return mod.sync.forgetSync();
+  mod.cloudSave?.forgetCloudToken('drive'); mod.cloudSave?.forgetCloudToken('dropbox');   // (Save to Drive / Dropbox's sign-ins)
+  wipeSyncDevice();
+};
+// a page drawn from modules: at once when they are loaded; else the loading outline, and the page draws again when
+// they arrive (if it is still the one on screen). If one fails, only a reload helps: the browser keeps a failed module
+// import for the life of the page, so importing it again fails at once without asking the network.
+const page = (names, draw) => () => {
+  const missing = names.filter(n => !mod[n]);
+  if (!missing.length) return draw(mod);
+  const wait = h('div', { class: 'lazy-wait' });
+  wait.innerHTML = SKELETON;
+  Promise.all(missing.map(need)).then(() => { if (wait.isConnected) render(); },
+    err => { console.warn(err); if (wait.isConnected) fill(wait, h('section', { class: 'card' }, h('p', {}, 'This page didn’t load. Check the connection, then reload.'), h('div', { class: 'bar', style: 'margin-bottom:0' }, h('button', { onclick: () => location.reload() }, 'Reload')))); });
+  return wait;
+};
+// the rest, one module at a time in idle moments once the Case tab is up, so changing tab stays instant
+let warmed = false;
+function warmUp() {
+  if (warmed) return; warmed = true;
+  const names = ['logbook', 'reflect', 'progress', 'settings', 'send', 'sync', 'settingsFile', 'recovery', 'account', 'caselogs', 'notesExport', 'cloudSave', 'backup', 'shareIn', 'parts', 'admin'];
+  const idle = fn => (typeof requestIdleCallback === 'function' ? requestIdleCallback(fn, { timeout: 3000 }) : setTimeout(fn, 200));
+  // a failure stops the warm-up (the network is likely down); the page that failed says so when it is opened
+  const next = () => { const n = names.shift(); if (n) need(n).then(() => idle(next), err => console.warn(err)); };
+  setTimeout(() => idle(next), 1500);
+}
+// The Logbook's and Analytics' links set the Logbook's view first (ui-logbook.js replaces these once it loads)
+hooks.showDay = iso => { need('logbook').then(() => hooks.showDay(iso)).catch(() => {}); };
+hooks.showCases = opts => { need('logbook').then(() => hooks.showCases(opts)).catch(() => {}); };
 
 // Tab icons: tiny inline SVG paths (24x24, stroked), so they look the same on every phone.
 const ICONS = {
@@ -71,51 +110,51 @@ const icon = id => {
 
 const TABS = [
   // Faculty / PCs profile (faculty, PDs and admins): residents' compiled case logs, from the counts summaries
-  { id: 'caselogs', label: 'Case logs', render: () => renderCaseLogs(), faculty: true, desc: 'Residents’ case logs: counts per tag against the targets' },
+  { id: 'caselogs', label: 'Case logs', render: page(['caselogs'], m => m.caselogs.renderCaseLogs()), faculty: true, desc: 'Residents’ case logs: counts per tag against the targets' },
   { id: 'log', label: 'Case', render: renderLog },
-  { id: 'logbook', label: 'Logbook', render: renderLogbook },
-  { id: 'reflect', label: 'Reflections', render: renderReflect, desc: 'Your reflections' },
+  { id: 'logbook', label: 'Logbook', render: page(['logbook'], m => m.logbook.renderLogbook()) },
+  { id: 'reflect', label: 'Reflections', render: page(['reflect'], m => m.reflect.renderReflect()), desc: 'Your reflections' },
   // Faculty / PCs: programme analytics instead of your own
-  { id: 'progress', label: 'Analytics', render: () => (facultyMode() ? renderProgramme() : renderProgress()), desc: 'Your progress against the APMES targets' },
+  { id: 'progress', label: 'Analytics', render: page(['progress', 'caselogs'], m => (facultyMode() ? m.caselogs.renderProgramme() : m.progress.renderProgress())), desc: 'Your progress against the APMES targets' },
   // a personal notepad: on the bar only if chosen (Arrange tabs); otherwise first in More
   { id: 'notes', label: 'Notes', moreLabel: 'Notes (beta)', render: renderNotes, desc: 'Your own notes: private, never in your portfolio' },
   // five tabs on the bar; the rest live under More (still reachable by #totals, #account, #settings)
   { id: 'more', label: 'More', render: () => renderMore() },
-  { id: 'caselog', label: 'Case log', render: () => renderCaseLog(), faculty: true, hidden: true, under: 'caselogs', unlisted: true },
+  { id: 'caselog', label: 'Case log', render: page(['caselogs'], m => m.caselogs.renderCaseLog()), faculty: true, hidden: true, under: 'caselogs', unlisted: true },
   // under Analytics: how your counts compare with your intake
-  { id: 'totals', label: 'Totals', render: renderTotals, hidden: true, under: 'progress', unlisted: true },
+  { id: 'totals', label: 'Totals', render: page(['progress'], m => m.progress.renderTotals()), hidden: true, under: 'progress', unlisted: true },
   // under the Logbook: every learning point (or other labelled part), from Filter (Labelled parts on)
-  { id: 'points', label: 'Learning points', render: renderPoints, hidden: true, under: 'logbook', unlisted: true },
-  { id: 'account', bar: true, label: 'Account', render: renderAccount, hidden: true, under: 'more', desc: 'Your name and portfolio details (Section 1); delete account' },
-  { id: 'settings', bar: true, label: 'Settings', render: () => renderSettingsMenu(), hidden: true, under: 'more', desc: 'Profile, look, logging, reflections, notes and sharing, data' },
-  { id: 'recovery', bar: true, short: 'Recover', label: 'Recent changes / Recover drafts', render: renderRecovery, hidden: true, under: 'more', desc: 'Retry sync, recover unfinished drafts and restore recent versions on this device' },
-  { id: 'data', bar: true, short: 'Export', label: 'Export / Import', render: () => renderDataPage(), hidden: true, under: 'more', desc: 'Export the portfolio (Word); import reflections from Word; backup file, Excel and Markdown export' },
+  { id: 'points', label: 'Learning points', render: page(['parts'], m => m.parts.renderPoints()), hidden: true, under: 'logbook', unlisted: true },
+  { id: 'account', bar: true, label: 'Account', render: page(['account', 'settings'], m => m.account.renderAccount()), hidden: true, under: 'more', desc: 'Your name and portfolio details (Section 1); delete account' },
+  { id: 'settings', bar: true, label: 'Settings', render: page(['settings', 'send', 'sync', 'settingsFile'], () => renderSettingsMenu()), hidden: true, under: 'more', desc: 'Profile, look, logging, reflections, notes and sharing, data' },
+  { id: 'recovery', bar: true, short: 'Recover', label: 'Recent changes / Recover drafts', render: page(['recovery'], m => m.recovery.renderRecovery()), hidden: true, under: 'more', desc: 'Retry sync, recover unfinished drafts and restore recent versions on this device' },
+  { id: 'data', bar: true, short: 'Export', label: 'Export / Import', render: page(['logbook', 'notesExport', 'cloudSave', 'backup'], () => renderDataPage()), hidden: true, under: 'more', desc: 'Export the portfolio (Word); import reflections from Word; backup file, Excel and Markdown export' },
   { id: 'reflimport', label: 'Import reflections from Word', render: () => renderReflImport(), hidden: true, under: 'data', unlisted: true },
   // Settings' own pages (not in the More list)
-  { id: 'display', label: 'Display', render: renderDisplay, hidden: true, under: 'settings', unlisted: true, desc: 'Light or dark, colour, compact, borders; fonts and more under Advanced' },
-  { id: 'access', label: 'Accessibility', render: renderAccessibility, hidden: true, under: 'settings', unlisted: true, desc: 'Zoom, text size, bigger taps, contrast, motion, swipe gestures' },
-  { id: 'displayadv', label: 'Advanced display', render: renderDisplayAdvanced, hidden: true, under: 'display', unlisted: true, desc: 'The header and tab bar, Logbook rows, fonts, custom CSS' },
-  { id: 'loggingadv', label: 'Advanced logging', render: renderLoggingAdvanced, hidden: true, under: 'logging', unlisted: true, desc: 'Case tab parts, labelled parts and a case template, the keyboard, search, the week, undo, tips' },
-  { id: 'sendto', label: 'Send to', render: renderSendSettings, hidden: true, under: 'settings', unlisted: true, desc: 'Obsidian, WhatsApp, UpNote or any app with a link' },
-  { id: 'sync', label: 'Sync', render: renderSyncSettings, hidden: true, under: 'settings', unlisted: true, desc: 'One Markdown file per day in Google Drive, Dropbox or GitHub' },
-  { id: 'sharefmt', label: 'Markdown', render: renderMarkdownSettings, hidden: true, under: 'settings', unlisted: true, desc: 'How Copy, Share and the notes export read' },
-  { id: 'showhide', label: 'Profile', render: renderShowHide, hidden: true, under: 'settings', unlisted: true, desc: 'Basic, Advanced, Personal…, and everything you can show or hide' },
-  { id: 'logging', label: 'Logging', render: renderLogging, hidden: true, under: 'settings', unlisted: true, desc: 'Suggestions, the Enter key, dates, after Save; more under Advanced' },
+  { id: 'display', label: 'Display', render: page(['settings'], m => m.settings.renderDisplay()), hidden: true, under: 'settings', unlisted: true, desc: 'Light or dark, colour, compact, borders; fonts and more under Advanced' },
+  { id: 'access', label: 'Accessibility', render: page(['settings'], m => m.settings.renderAccessibility()), hidden: true, under: 'settings', unlisted: true, desc: 'Zoom, text size, bigger taps, contrast, motion, swipe gestures' },
+  { id: 'displayadv', label: 'Advanced display', render: page(['settings'], m => m.settings.renderDisplayAdvanced()), hidden: true, under: 'display', unlisted: true, desc: 'The header and tab bar, Logbook rows, fonts, custom CSS' },
+  { id: 'loggingadv', label: 'Advanced logging', render: page(['settings'], m => m.settings.renderLoggingAdvanced()), hidden: true, under: 'logging', unlisted: true, desc: 'Case tab parts, labelled parts and a case template, the keyboard, search, the week, undo, tips' },
+  { id: 'sendto', label: 'Send to', render: page(['send'], m => m.send.renderSendSettings()), hidden: true, under: 'settings', unlisted: true, desc: 'Obsidian, WhatsApp, UpNote or any app with a link' },
+  { id: 'sync', label: 'Sync', render: page(['sync'], m => m.sync.renderSyncSettings()), hidden: true, under: 'settings', unlisted: true, desc: 'One Markdown file per day in Google Drive, Dropbox or GitHub' },
+  { id: 'sharefmt', label: 'Markdown', render: page(['settings'], m => m.settings.renderMarkdownSettings()), hidden: true, under: 'settings', unlisted: true, desc: 'How Copy, Share and the notes export read' },
+  { id: 'showhide', label: 'Profile', render: page(['settings'], m => m.settings.renderShowHide()), hidden: true, under: 'settings', unlisted: true, desc: 'Basic, Advanced, Personal…, and everything you can show or hide' },
+  { id: 'logging', label: 'Logging', render: page(['settings'], m => m.settings.renderLogging()), hidden: true, under: 'settings', unlisted: true, desc: 'Suggestions, the Enter key, dates, after Save; more under Advanced' },
   { id: 'notesset', label: 'Notes', render: renderNoteSettings, hidden: true, under: 'settings', unlisted: true, desc: 'Daily note on the Case tab, pasting, formatting buttons, shared text' },
   // something shared to the installed app: where it goes (ui-share-in.js); no back link, it's a step of its own
-  { id: 'share', label: 'Shared with the app', render: renderShare, hidden: true, unlisted: true },
+  { id: 'share', label: 'Shared with the app', render: page(['shareIn'], m => m.shareIn.renderShare()), hidden: true, unlisted: true },
   // from Reflections → More tools
-  { id: 'reflset', label: 'Reflections', render: renderReflectionSettings, hidden: true, under: 'settings', unlisted: true, desc: 'The export, learning points, formatting, spelling, photo sizes' },
+  { id: 'reflset', label: 'Reflections', render: page(['settings'], m => m.settings.renderReflectionSettings()), hidden: true, under: 'settings', unlisted: true, desc: 'The export, learning points, formatting, spelling, photo sizes' },
   // opened from More → Export / Import (not in the More list)
-  { id: 'export', label: 'Export portfolio', render: () => renderExportPage(), hidden: true, under: 'data', unlisted: true },
-  { id: 'choose', label: 'Export portfolio', render: renderChoosePage, hidden: true, under: 'export', unlisted: true },
+  { id: 'export', label: 'Export portfolio', render: page(['reflect'], m => m.reflect.renderExportPage()), hidden: true, under: 'data', unlisted: true },
+  { id: 'choose', label: 'Export portfolio', render: page(['reflect'], m => m.reflect.renderChoosePage()), hidden: true, under: 'export', unlisted: true },
   // admins open it from More
-  { id: 'admin', bar: true, short: 'Admin', label: 'Admin portal', render: renderAdmin, admin: true, hidden: true, under: 'more', desc: 'Admins only: ready portfolios, programme totals, residents, settings' },
-  { id: 'admintotals', label: 'Programme totals', render: renderTotals, admin: true, hidden: true, under: 'admin', unlisted: true },
-  { id: 'adminresidents', label: 'Residents', render: renderAdminResidents, admin: true, hidden: true, under: 'admin', unlisted: true },
-  { id: 'adminadv', label: 'Advanced admin settings', render: renderAdminAdvanced, admin: true, hidden: true, under: 'admin', unlisted: true },
+  { id: 'admin', bar: true, short: 'Admin', label: 'Admin portal', render: page(['admin'], m => m.admin.renderAdmin()), admin: true, hidden: true, under: 'more', desc: 'Admins only: ready portfolios, programme totals, residents, settings' },
+  { id: 'admintotals', label: 'Programme totals', render: page(['progress'], m => m.progress.renderTotals()), admin: true, hidden: true, under: 'admin', unlisted: true },
+  { id: 'adminresidents', label: 'Residents', render: page(['admin'], m => m.admin.renderAdminResidents()), admin: true, hidden: true, under: 'admin', unlisted: true },
+  { id: 'adminadv', label: 'Advanced admin settings', render: page(['admin'], m => m.admin.renderAdminAdvanced()), admin: true, hidden: true, under: 'admin', unlisted: true },
   // opened from Settings
-  { id: 'tags', label: 'Tag editor', render: renderTagEditor, hidden: true, under: 'settings', unlisted: true, desc: 'APMES and personal tags, shorthand, tag groups' },
+  { id: 'tags', label: 'Tag editor', render: page(['settings'], m => m.settings.renderTagEditor()), hidden: true, under: 'settings', unlisted: true, desc: 'APMES and personal tags, shorthand, tag groups' },
 ];
 
 // A list of pages, like the More list: icon, name, one line, ›.
@@ -288,15 +327,15 @@ function settingsFileCard() {
     // this device's display settings travel in the file (in place of any old ones in the account)
     const dev = Object.fromEntries(DISPLAY_KEYS.filter(k => !/^customCss/.test(k)).map(k => [k, display()[k]]).filter(([, v]) => v != null));   // custom CSS never goes in a file to share
     const plain = Object.fromEntries(Object.entries((S.logbook && S.logbook.settings) || {}).filter(([k]) => !DISPLAY_KEYS.includes(k)));
-    const f = settingsFile({ ...S.logbook, settings: { ...plain, ...dev } }, { theme: cachedTheme() });
+    const f = mod.settingsFile.settingsFile({ ...S.logbook, settings: { ...plain, ...dev } }, { theme: cachedTheme() });
     download(`logbook-settings-${todayISO()}.json`, new Blob([JSON.stringify(f, null, 2)], { type: 'application/json' }));
   };
   const importIt = async file => {
     const text = await file.text();
     // a file of this browser's choices from the old address (anawj.com/logbook): look, text size, tab layout, drafts
-    if (isDeviceFile(text)) {
+    if (mod.settingsFile.isDeviceFile(text)) {
       let dev;
-      try { dev = readDeviceFile(text); } catch (err) { return toast(err.message); }
+      try { dev = mod.settingsFile.readDeviceFile(text); } catch (err) { return toast(err.message); }
       const n = Object.keys(dev.items).length;
       if (!(await confirmBox('Load this device’s choices', `Put ${n} saved choice${n === 1 ? '' : 's'} from the old address back on this device? The page reloads.`, 'Load'))) return;
       try { for (const [k, v] of Object.entries(dev.items)) localStorage.setItem(k, v); } catch (err) { return toast('Could not save on this device: ' + err.message); }
@@ -304,12 +343,12 @@ function settingsFileCard() {
       return;
     }
     let d;
-    try { d = readSettingsFile(text); } catch (err) { return toast(err.message); }
+    try { d = mod.settingsFile.readSettingsFile(text); } catch (err) { return toast(err.message); }
     const mine = (S.logbook && S.logbook.templates) || [];
     const same = (a, b) => a.name === b.name && [...a.cats].sort().join() === [...b.cats].sort().join();
     const newGroups = (d.templates || []).filter(t => !mine.some(m => m.id === t.id || same(m, t)));
     const n = Object.keys(d.settings).length;
-    if (!(await confirmBox('Import settings', `Use the ${n} setting${n === 1 ? '' : 's'} in this file${newGroups.length ? ` and add ${newGroups.length} tag group${newGroups.length === 1 ? '' : 's'}` : ''}? Settings in the file replace yours (your tags and shorthand too, if the file has them); anything not in it stays. Cases, reflections and portfolio details are never touched.${(d.settings.destinations || []).length ? ` The file also sets places to send your cases to, and sending goes only when you tap: ${destinationHosts(d.settings.destinations).join('; ')}. Import only if you trust them.` : ''}${syncPlaces(d.settings.sync).length ? ` It also sets places to sync your days to (only when you tap Sync): ${syncPlaces(d.settings.sync).join('; ')}.` : ''}`, 'Import'))) return;
+    if (!(await confirmBox('Import settings', `Use the ${n} setting${n === 1 ? '' : 's'} in this file${newGroups.length ? ` and add ${newGroups.length} tag group${newGroups.length === 1 ? '' : 's'}` : ''}? Settings in the file replace yours (your tags and shorthand too, if the file has them); anything not in it stays. Cases, reflections and portfolio details are never touched.${(d.settings.destinations || []).length ? ` The file also sets places to send your cases to, and sending goes only when you tap: ${mod.send.destinationHosts(d.settings.destinations).join('; ')}. Import only if you trust them.` : ''}${mod.sync.syncPlaces(d.settings.sync).length ? ` It also sets places to sync your days to (only when you tap Sync): ${mod.sync.syncPlaces(d.settings.sync).join('; ')}.` : ''}`, 'Import'))) return;
     // display settings in the file go to this device, the rest to the account
     const fileDisplay = Object.fromEntries(DISPLAY_KEYS.filter(k => k in d.settings).map(k => [k, d.settings[k]]));
     const forAccount = Object.fromEntries(Object.entries(d.settings).filter(([k]) => !DISPLAY_KEYS.includes(k)));
@@ -360,16 +399,16 @@ function renderDataPage() {
         h('div', { class: 'bar', style: 'margin-bottom:0' }, h('a', { class: 'btn', href: '#reflimport' }, 'Upload from Word ›'))],
       h('h3', { style: portfolio ? 'margin-top:16px' : '' }, 'Logbook from Excel or CSV'),
       h('p', { class: 'hint help' }, 'Edit your cases in a spreadsheet (Download Excel under Backup), then upload it back; or bring in a list from elsewhere. You match the columns and see every change before anything is saved.'),
-      h('div', { class: 'bar', style: 'margin-bottom:0' }, fileButton('Upload Excel/CSV…', '.xlsx,.csv,text/csv', uploadExcel))),
-    backupCard(
+      h('div', { class: 'bar', style: 'margin-bottom:0' }, fileButton('Upload Excel/CSV…', '.xlsx,.csv,text/csv', mod.logbook.uploadExcel))),
+    mod.backup.backupCard(
       h('h3', { style: 'margin-top:16px' }, 'Spreadsheet (Excel)'),
       h('p', { class: 'hint help' }, 'Your cases, your reflections or both as a spreadsheet: choose the dates and the columns. To edit cases and upload them back, use Import above.'),
-      h('div', { class: 'bar', style: 'margin-bottom:0' }, h('button', { onclick: downloadExcel }, 'Download Excel…')),
+      h('div', { class: 'bar', style: 'margin-bottom:0' }, h('button', { onclick: mod.logbook.downloadExcel }, 'Download Excel…')),
       h('h3', { style: 'margin-top:16px' }, 'Markdown export (Obsidian and notes apps)'),
       h('p', { class: 'hint help' }, 'Your cases, reflections and notes as Markdown files for Obsidian and other notes apps, with Progress.md and, if you like, the figures. Laid out as you set in Settings → Markdown.'),
       h('p', { class: 'hint' }, 'The files hold your case details: keep them private, and check hospital policy before putting them into cloud notes or AI tools.'),
-      h('div', { class: 'bar', style: 'margin-bottom:0' }, h('button', { onclick: downloadNotes }, 'Download Markdown export…')),
-      ...cloudSaveSection()));
+      h('div', { class: 'bar', style: 'margin-bottom:0' }, h('button', { onclick: mod.notesExport.downloadNotes }, 'Download Markdown export…')),
+      ...mod.cloudSave.cloudSaveSection()));
 }
 
 const app = document.getElementById('app');
@@ -419,9 +458,9 @@ function paintTabs() {
 
 function changeScreen(id, scroll = 0) {
   snapPage();   // for swiping back to it (a still copy)
-  if (S.tab === 'account') flushProfile();
+  if (S.tab === 'account') mod.account?.flush();
   if (S.tab === 'notes' && id !== 'notes') leaveNotes();
-  if (/^admin/.test(S.tab || '') && !/^admin/.test(id)) leaveAdmin();
+  if (/^admin/.test(S.tab || '') && !/^admin/.test(id)) mod.admin?.leaveAdmin();
   S.tab = id;
   window.scrollTo(0, 0);
   render();
@@ -509,7 +548,10 @@ function render() {
   const dir = slideDirection(lastRendered, tab.id);
   fill(app, inHeader ? null : back, tab.render());
   if (tab.id !== 'log') window.scrollTo(0, y);
-  if (findAfterRender) showFound();
+  // the page on screen, once drawn (not while its code loads); read by tests
+  const drawn = !app.querySelector('.lazy-wait');
+  if (drawn) app.dataset.page = tab.id; else delete app.dataset.page;
+  if (findAfterRender) { if (drawn) showFound(); }   // (kept until the page is drawn)
   // the inverted Case tab (Settings → Display, phones) opens at the bottom, where the case box is
   else if (lastRendered !== 'log' && invertedCase()) requestAnimationFrame(() => window.scrollTo(0, document.documentElement.scrollHeight));
   lastRendered = tab.id;
@@ -951,9 +993,15 @@ async function onUser(user) {
   // a POST share: the Case tab (or the chooser it forwards to) draws again once the service worker's copy is read
   if (sharedIn) sharedIn.then(() => { if (S.user === user && (S.tab === 'log' || S.tab === 'share')) render(); });
   // Settings → Backup: a one-tap reminder when the last Drive / Dropbox backup is over a week old (if asked for)
-  setTimeout(() => { if (S.user === user) { remindBackup(); remindSync(); } }, 3000);
+  // (their code loads only when one is asked for)
+  setTimeout(() => {
+    if (S.user !== user) return;
+    if (settings().cloudBackup?.remind) withMod('cloudSave', m => m.remindBackup()).catch(() => {});
+    if (settings().sync?.remind) withMod('sync', m => m.remindSync()).catch(() => {});
+  }, 3000);
   // back from a Drive / Dropbox sign-in: finish that save
-  resumeCloudSave();
+  // (index.html keeps the sign-in's answer in sessionStorage; cloud-save.js loads only when there is one)
+  if ((() => { try { return sessionStorage.getItem('apmes-logbook-cloud-return'); } catch { return null; } })()) withMod('cloudSave', m => m.resumeCloudSave()).catch(err => console.warn(err));
   // recycle bin: drop entries older than 30 days, but only once the reflections are loaded, so an
   // image still used by a live (e.g. restored) reflection is never deleted with an old bin entry
   { let done = false, stop = null;
@@ -983,6 +1031,7 @@ async function onUser(user) {
     scheduleSummary();
   });
   render();
+  warmUp();
 }
 
 // Phones: while the keyboard is up (a text box has focus and the visible area has shrunk), the bottom
@@ -1097,7 +1146,7 @@ function demoMenu() {
       h('span', { class: 'grow' }),
       h('button', { onclick: () => m.close() }, 'Close'))]);
 }
-if (window.LOGBOOK_MOVED_TO) { tabsEl.hidden = true; fill(app, movedPage(window.LOGBOOK_MOVED_TO)); }   // the old address with this browser's choices saved: offer them, don't sign in here
+if (window.LOGBOOK_MOVED_TO) { tabsEl.hidden = true; import('./moved.js').then(m => fill(app, m.movedPage(window.LOGBOOK_MOVED_TO))); }   // the old address with this browser's choices saved: offer them, don't sign in here
 else if (!cloud.enabled) renderLanding();
 else cloud.watchUser(onUser).catch(err => renderLanding('Could not start sign-in: ' + err.message));
 registerSW();
