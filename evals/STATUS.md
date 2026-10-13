@@ -21,6 +21,7 @@ Read them all before starting; edit only yours.
 
 ## Recently done
 
+- #367 Evals moved to `apmes.anawj.com/evals/` (sign-in domain, forward from `anawj.com/evals/` with path, query and `#` kept); sign-in checked by the owner.
 - #157 Logbook learnings moved from `evals/NOTES.md` to `logbook/NOTES.md`; evals notes keep a pointer.
 - #156 `evals/NOTES.md`: theme, keyboard, More screen decisions, app internals, working alongside the logbook session, backlog.
 - #155 Privacy policy page at anawj.com/privacy/ (who sees what, Drive/Dropbox/Claude connector).
@@ -30,6 +31,7 @@ Read them all before starting; edit only yours.
 
 ## Decisions log
 
+- 2026-10-13: Evals lives at `apmes.anawj.com/evals/` with the logbook (one sign-in, `SUBDOMAINS.md` step 5).
 - 2026-10-13: `evals/NOTES.md` stays evals-only; logbook roles, photos and integrations live in `logbook/NOTES.md`.
 - 2026-10-11: Evals theme is light by default with a per-device Light / Dark / Auto toggle; the Guide and forms card is off More for now.
 - 2026-10-12: The top band is four equal quarters, orange, red, blue `#178fd7`, navy (as on nuhs.edu.sg), in every app.

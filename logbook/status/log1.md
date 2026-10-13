@@ -1,10 +1,10 @@
 # Now: Claude Code, Logbook 1 (log1)
 
-**Claude Code, Logbook 1 (log1)** (branch `claude/clever-gates-pm6sas`, no open PR): subdomain **step 1, hosting, is done**
-(#352, #354; the owner added the four custom domains and all answer, 13 Oct) and ticked in `SUBDOMAINS.md`; the
-homepage session (`session_01F6SrdrEnHJKzjEAr5LcDy8`) was told. Waiting for the other steps (2 to 4, other sessions);
-step 5 (apmes.anawj.com, with MedHub Evaluations) is log1's later. Next for log1 meanwhile: learning points in case
-summaries (`Learning:` line; see Next in `STATUS.md`), once the owner says go.
+**Claude Code, Logbook 1 (log1)** (branch `claude/clever-gates-pm6sas`, no open PR): subdomain **step 5 is done** (logbook #370,
+evals #367 by the MedHub Evaluations session, helper pages and guidebook #368; live 13 Oct; real Google sign-in works at
+apmes.anawj.com). The page editor stays at anawj.com (`SUBDOMAINS.md`, "The page editor"). Drive and Dropbox backups work at the new address (owner confirmed 13 Oct). The owner is filling in the Dropbox production form
+(website `https://apmes.anawj.com/logbook/`). Next for log1: labelled parts in the case summary (on hold until the owner answers the three questions in
+`logbook/PLAN-labelled-parts.md`). Prewarm case limits from the homepage session still apply until the owner says the case is over.
 Done 13 Oct: polish batch; site-wide page editor `/edit/` and edit.anawj.com (#301); daily Page edits routine (#303);
-deploy-time VERSION stamping, PR labels, per-session status files (#307); the context-nudge mod (#325); Notes: files
-zip, case pill, Linked row (#347); subdomain hosting Worker (#352, #354).
+deploy-time VERSION stamping, PR labels, per-session status files (#307); the context-nudge mod (#325); Notes: files zip, case
+pill, Linked row (#347); subdomain hosting Worker (#352, #354, #358, #368); logbook move (#370).
