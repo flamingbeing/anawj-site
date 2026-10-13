@@ -3,6 +3,7 @@
 //
 //   members/{uid}  { site, initials, code, joinedAt }       codes/{site}  { code, setAt, setBy }   (admins only)
 //   admins/{email} {}                                       patients/{id} { site, created, deleted?, lock?, f: { id: {v,t,by} } }
+//   pacu/{token}   { site, pid, sid, created, f }      (the PACU nurse's link: the token is the secret; see firestore.rules)
 //   forms/blank    { b64, name, size, setAt, setBy }        (the blank paper form, .docx; admins upload, members read)
 
 import { FIREBASE_CONFIG } from './firebase-config.js';
@@ -193,4 +194,32 @@ export async function myEmail() {
 export async function removeMember(uid) {
   const { db, F } = await sdk();
   await F.deleteDoc(F.doc(db, 'members', uid));
+}
+
+// ---- PACU nurse link (owner, 13 Oct 2026)
+// An anonymous sign-in is enough for the nurse's phone: knowing the token is what opens the document.
+export async function ensureSignedIn() {
+  const { auth, A } = await sdk();
+  if (!auth.currentUser) await A.signInAnonymously(auth);
+}
+export async function pacuCreate(token, data) {
+  const { db, F } = await sdk();
+  await F.setDoc(F.doc(db, 'pacu', token), plain(data));
+}
+export async function pacuPush(token, f) {
+  const { db, F } = await sdk();
+  const out = {};
+  for (const [k, x] of Object.entries(f)) out[k] = { ...x, auto: !!x.auto };
+  if (!Object.keys(out).length) return;
+  await F.setDoc(F.doc(db, 'pacu', token), plain({ f: out }), { merge: true });
+}
+// cb(data | null (no such link), { server, pending })
+export async function pacuWatch(token, cb, onError) {
+  const { db, F } = await sdk();
+  return F.onSnapshot(F.doc(db, 'pacu', token), { includeMetadataChanges: true },
+    snap => cb(snap.exists() ? snap.data() : null, { server: !snap.metadata.fromCache && !snap.metadata.hasPendingWrites, pending: snap.metadata.hasPendingWrites }), onError);
+}
+export async function pacuStop(token) {
+  const { db, F } = await sdk();
+  await F.deleteDoc(F.doc(db, 'pacu', token));
 }

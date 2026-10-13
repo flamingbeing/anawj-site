@@ -2,7 +2,8 @@
 import assert from 'node:assert/strict';
 import { inflateRawSync } from 'node:zlib';
 import { HEADERS, SECTIONS, SCREENING_HEADERS } from '../js/headers.js';
-import { FIELDS, BY_ID, PAGES, SCREENING, SITES, EXTRA, colLetter, colIndex, calc, normaliseTemp, isShown, shownValue } from '../js/schema.js';
+import { FIELDS, BY_ID, PAGES, SCREENING, SITES, EXTRA, EXTRA_BY_ID, PACU_KEYS, colLetter, colIndex, calc, normaliseTemp, isShown, shownValue } from '../js/schema.js';
+import fs from 'node:fs';
 import { newRecord, setVal, val, mergeRecord, mergeInto, packFile, readFile, isGone } from '../js/store.js';
 import { workbook, workbookSheets, cellFor, ixText } from '../js/export.js';
 import { dateSerial, timeSerial } from '../js/xlsx.js';
@@ -196,4 +197,16 @@ function unzip(bytes) {
   assert.equal(mergeRecord(b, a).rec.lock.on, false, 'an older lock does not win');
   assert.equal(mergeRecord({ id: 'L', created: 1, f: {} }, a).rec.lock.on, true);
 }
+// the PACU nurse's link may write only the PACU page's fields: PACU_KEYS and the rules' list match, and every key is real
+{
+  const rules = fs.readFileSync(new URL('../firestore.rules', import.meta.url), 'utf8');
+  const m = /function pacuKeys\(\) \{\s*return \[([^\]]*)\]/.exec(rules);
+  const listed = [...m[1].matchAll(/'(\w+)'/g)].map(x => x[1]);
+  assert.deepEqual([...listed].sort(), [...PACU_KEYS].sort(), 'the rules allow exactly PACU_KEYS');
+  for (const k of PACU_KEYS) assert.ok(k === 'sign_pacu' || BY_ID[k] || EXTRA_BY_ID[k], 'a real field: ' + k);
+  const page = PAGES.find(x => x.id === 'pacu').fields.map(f => f.id);
+  for (const k of page) assert.ok(PACU_KEYS.includes(k), 'every PACU page field can be written from the link: ' + k);
+  assert.ok(!PACU_KEYS.some(k => /^(prewarm|iotemp|haemo|io_|pw_|arm|enrol)/.test(k)), 'nothing from the other pages');
+}
+
 console.log('prewarm: ok');

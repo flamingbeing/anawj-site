@@ -123,6 +123,16 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   progress grid (a tick for each of pre-warming temps, intra-op temps, BP HR BIS, Intra-op details, PACU,
   Perioperative data; each links to its screen). Perioperative data has its own tick (`sign_periop`, exported as
   "Complete: Perioperative data") that locks only that page; "data collection complete" does not lock it.
+- **PACU nurse link** (owner, 13 Oct 2026): on a participant's PACU page a member (or admin) makes a link and QR code
+  (`#/nurse/<token>`, 24 random characters = the secret). Firestore `pacu/{token}` holds a copy of that participant's
+  PACU answers (`PACU_KEYS` in `js/schema.js`; the rules allow exactly that list, checked by a unit test): anyone
+  signed in (the nurse's phone signs in anonymously, joins nothing) who has the token reads it and writes only those
+  fields; nobody can list tokens except admins; members of the hospital make and stop (delete) it. The nurse's page
+  shows only that participant's PACU in / To ward, answers and complete tick (the Subject ID in its title), with
+  initials. Team phones subscribe to the `pacu_token` of their patients and merge newer fields (and push their own
+  PACU edits to the link copy), so both directions settle on the newest write. `pacu_token` is a field on the patient.
+  Anyone holding the link can edit those PACU answers until the link is stopped. Tests: `rules.emulator.mjs` (24
+  checks), `sync.emulator.mjs` (a third phone opens the link). Rules deploy on merge to main.
 - **Never send an empty `f`** (lesson, 12 Oct 2026): `setDoc(…, { f: {} }, { merge: true })` replaces the server's
   `f` with an empty map (an empty map is a leaf in the merge). Lock / unlock / delete sent one and wiped the server
   copy's readings; push now omits an empty `f`, lock sends the full record, and each phone resends all its patients

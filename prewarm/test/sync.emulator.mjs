@@ -77,6 +77,46 @@ try {
   await a.click('.list a'); await a.click('.textlinks a[href$="/sheet"]');
   await a.waitForFunction(() => /36\.7/.test(document.querySelector('.sheet')?.textContent || ''), null, { timeout: 15000 });
 
+  // the PACU nurse link: phone A makes it on the PACU page; a phone that joined nothing opens it, fills in PACU, and the
+  // team's phones get it (and the other way); the nurse's phone has nothing else; stopping the link ends access
+  await a.goto(BASE + '#/');
+  await a.click('.list a');
+  await a.click('.links a[href$="/form/pacu"]');
+  await a.waitForSelector('[data-pacu-make]');
+  await a.click('[data-pacu-make]');
+  await a.waitForSelector('.pacuurl', { timeout: 20000 });
+  const nurseLink = await a.inputValue('.pacuurl');
+  assert.match(nurseLink, /#\/nurse\/[a-z2-9]{24}$/, 'a long random token in the link');
+  assert.ok(await a.$('.paculink svg'), 'and a QR code');
+  if (SHOTS) { await a.evaluate(() => document.querySelector('.paculink').scrollIntoView()); await a.screenshot({ path: SHOTS + '/pacu-link.png' }); }
+  const nctx = await b.newContext({ viewport: { width: 390, height: 844 } });
+  const nu = await nctx.newPage();
+  nu.on('pageerror', e => errors.push('nurse: ' + e.message));
+  await nu.goto(nurseLink);
+  await nu.waitForSelector('[data-pev="pacu_in"]', { timeout: 25000 });
+  assert.match(await nu.textContent('#title'), /PACU · SYNC-01/);
+  if (SHOTS) await nu.screenshot({ path: SHOTS + '/pacu-nurse.png', fullPage: true });
+  await nu.fill('#ninit', 'NN'); await nu.dispatchEvent('#ninit', 'change');
+  await nu.click('[data-pev="pacu_in"]'); await nu.click('.kp [data-now]');
+  await nu.click('.chip[data-f="pacu_shiver"][data-v="0"]');
+  await nu.waitForFunction(() => /Saved to the team/.test(document.querySelector('#nstat')?.textContent || ''), null, { timeout: 20000 });
+  await a.waitForFunction(() => /\d\d:\d\d/.test(document.querySelector('[data-pev="pacu_in"] b')?.textContent || '') && document.querySelector('.chip[data-f="pacu_shiver"][data-v="0"]')?.getAttribute('aria-pressed') === 'true', null, { timeout: 25000 });
+  await bb.goto(BASE + '#/'); await bb.click('.list a'); await bb.click('.links a[href$="/form/pacu"]');
+  await bb.waitForFunction(() => /\d\d:\d\d/.test(document.querySelector('[data-pev="pacu_in"] b')?.textContent || ''), null, { timeout: 25000 });
+  // the other way: phone A answers a PACU question, the nurse's page gets it
+  await a.fill('#f-pacu_temp', '36.2'); await a.keyboard.press('Tab');
+  await nu.waitForFunction(() => document.querySelector('#f-pacu_temp')?.value === '36.2', null, { timeout: 25000 });
+  // the nurse's phone has no patients and no other screens' data
+  await nu.goto(BASE + '#/');
+  assert.equal(await nu.$('.list a'), null, 'the nurse phone has no patient list');
+  // stopping the link ends access
+  a.once('dialog', d => d.accept());
+  await a.click('[data-pacu-stop]');
+  await a.waitForSelector('[data-pacu-make]', { timeout: 20000 });
+  await nu.goto(nurseLink);
+  await nu.waitForFunction(() => /was stopped/.test(document.body.textContent), null, { timeout: 25000 });
+  await nctx.close();
+
   // an admin signs in with an emailed link and makes a join code
   const ctx = await b.newContext({ viewport: { width: 390, height: 844 } });
   const ad = await ctx.newPage();
@@ -266,7 +306,7 @@ try {
   await bb.waitForSelector('#code', { timeout: 15000 });
 
   assert.deepEqual(errors, []);
-  console.log('prewarm sync: ok (two phones, join code, readings both ways, admin email-link sign-in, managing admins, codes, join link and QR, blank Word form upload and Form view, lock, offline edits heal, open reading asks, reload offline, same reading on both, log out)');
+  console.log('prewarm sync: ok (two phones, PACU nurse link, join code, readings both ways, admin email-link sign-in, managing admins, codes, join link and QR, blank Word form upload and Form view, lock, offline edits heal, open reading asks, reload offline, same reading on both, log out)');
 } finally {
   await b.close();
 }

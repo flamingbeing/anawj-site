@@ -25,6 +25,7 @@ Last updated: 2026-10-13 by Claude Code, Prewarming Webapp.
 
 ## Recently done
 
+- PACU nurse link: QR code and link on the PACU page opening only that participant's PACU page for the PACU nurse (rules + emulator tests).
 - Progress ticks on the main page; Perioperative data complete tick (locks that page only).
 - Quick-entry pads for numbers and times; alarm / countdown tap opens the reading; PACU times only on the PACU page.
 - Temperature page: Core (spot on) wide, skin default 31, one-tap typing, Clear, carry-over from pre-warming, Arrival / Induction labels, BP alarm toggle (off).

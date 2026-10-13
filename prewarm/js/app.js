@@ -1,5 +1,5 @@
 // Prewarming study: op-day screens. Data stays on this phone for now (localStorage); sharing comes with Firebase.
-import { PAGES, SERIES, BY_ID, EXTRA_BY_ID, IX_COLS, SITES, calc, normaliseTemp, isShown } from './schema.js';
+import { PAGES, SERIES, BY_ID, EXTRA_BY_ID, IX_COLS, SITES, PACU_KEYS, calc, normaliseTemp, isShown } from './schema.js';
 import { newRecord, setVal, val, lastEdit, mergeRecord, isGone } from './store.js';
 import { openKeypad, closeKeypad } from './keypad.js';
 import { workbook } from './export.js';
@@ -127,6 +127,9 @@ function showSync() { const t = syncText(); document.querySelectorAll('.syncline
 setInterval(showSync, 20000);
 function sync(p, ids, withLock = false) {
   if (!sharing()) return;
+  // PACU answers also go to the nurse's link copy, so the nurse's phone sees them (owner, 13 Oct 2026)
+  const ptok = pacuToken(p), pk = ptok && !p.lock?.on ? ids.filter(k => PACU_KEYS.includes(k)) : [];
+  if (pk.length) cloud.pacuPush(ptok, pacuFields(p, pk)).catch(() => { /* retried by the heal below */ });
   p.site ||= val(p, 'site') || shared.member?.site || settings.site;
   if (!p.site) return;
   const tok = Date.now() + Math.random();
@@ -157,8 +160,77 @@ async function logOut(btn) {
   location.replace(location.pathname + location.search + '#/');
   location.reload();
 }
+// ---------- PACU nurse link (owner, 13 Oct 2026)
+// pacu/{token} holds a copy of one participant's PACU answers. A member makes it (the token is the secret: a link and QR
+// code on the PACU page); the nurse's phone opens #/nurse/<token> and can write only those answers; members' phones
+// merge what the nurse writes into the patient (newest field wins, like everywhere else).
+const pacuToken = p => p.f.pacu_token?.v || null;
+const pacuFields = (p, keys = PACU_KEYS) => Object.fromEntries(keys.filter(k => p.f[k]).map(k => [k, p.f[k]]));
+const pacuUrl = token => `${location.origin}${location.pathname}${/[?&]emulator/.test(location.search) ? '?emulator' : ''}#/nurse/${token}`;
+const pacuSubs = new Map(); // token -> unsubscribe
+// a value from the link only if it is a plain short answer for a PACU field
+const pacuClean = (k, x) => PACU_KEYS.includes(k) && x && typeof x === 'object' && typeof x.t === 'number'
+  && (x.v == null || (typeof x.v === 'string' && x.v.length <= 200) || typeof x.v === 'number');
+function watchPacu() {
+  if (!sharing()) return;
+  for (const p of Object.values(patients)) {
+    const token = pacuToken(p);
+    if (!token || pacuSubs.has(token) || isGone(p)) continue;
+    pacuSubs.set(token, null);
+    cloud.pacuWatch(token, data => {
+      const cur = patients[p.id];
+      if (!data || !cur || cur.lock?.on) return;
+      const ch = [];
+      for (const [k, x] of Object.entries(data.f || {})) {
+        if (!pacuClean(k, x) || (cur.f[k]?.t || 0) >= x.t) continue;
+        cur.f[k] = { v: x.v ?? null, t: x.t, by: String(x.by || '').slice(0, 20), ...(x.auto ? { auto: true } : {}) };
+        ch.push(k);
+      }
+      if (!ch.length) return;
+      saveAll(); sync(cur, ch);
+      const h = location.hash.slice(1) || '/', typing = view.contains(document.activeElement) && document.activeElement.matches('input, textarea, select');
+      if (new RegExp(`^/(pacu/${p.id}|p/${p.id}(/form/pacu)?)$|^/$|^/pacu$`).test(h) && !typing && !leaveGuard?.() && !document.querySelector('dialog[open]')) render();
+      else { shared.stale = true; const b = $('#fresh'); if (b) b.hidden = false; }
+    }, () => { /* the link was stopped, or no signal: the patient's own PACU page still works */ })
+      .then(u => { if (pacuSubs.has(token)) pacuSubs.set(token, u); else u?.(); }).catch(() => pacuSubs.delete(token));
+  }
+}
+async function makePacuLink(p) {
+  if (!sharing()) return toast('Join your hospital’s team in Settings first.');
+  const site = p.site || val(p, 'site') || shared.member?.site || settings.site;
+  if (!site) return toast('Set your hospital in Settings first.');
+  const abc = 'abcdefghijkmnpqrstuvwxyz23456789', b = crypto.getRandomValues(new Uint8Array(24));
+  const token = Array.from(b, x => abc[x % 32]).join(''); // 24 characters of 5 bits: not guessable
+  try {
+    await Promise.race([cloud.pacuCreate(token, { site, pid: p.id, sid: sid(p), created: Date.now(), f: pacuFields(p) }),
+      new Promise((_, no) => setTimeout(() => no({ code: 'unavailable' }), 8000))]);
+  } catch (e) { return toast(cloud.friendly(e)); }
+  p.site ||= site;
+  set(p, 'pacu_token', token); watchPacu();
+}
+async function stopPacuLink(p) {
+  const token = pacuToken(p); if (!token) return;
+  try { await Promise.race([cloud.pacuStop(token), new Promise((_, no) => setTimeout(() => no({ code: 'unavailable' }), 8000))]); }
+  catch (e) { return toast(cloud.friendly(e)); }
+  pacuSubs.get(token)?.(); pacuSubs.delete(token);
+  set(p, 'pacu_token', null);
+}
+function pacuLinkHtml(p) {
+  const head = '<h2>PACU nurse link</h2>', tk = pacuToken(p);
+  if (!cloud.enabled) return `<div class="paculink">${head}<p class="muted small">Not available in demo mode.</p></div>`;
+  if (!sharing()) return `<div class="paculink">${head}<p class="muted small">Join your hospital’s team (Settings) to make a link for the PACU nurse.</p></div>`;
+  if (!tk) return `<div class="paculink">${head}<p class="muted small">A link and QR code that open only this participant’s PACU page, so the PACU nurse can fill it in on their own phone. Anyone with the link can edit just those answers.</p>
+    <button class="secondary" data-pacu-make>Make a link for the PACU nurse</button></div>`;
+  const url = pacuUrl(tk);
+  return `<div class="paculink">${head}<div class="qr">${qrSvg(url, 'QR code of the PACU nurse link')}</div>
+    <input class="pacuurl" readonly value="${esc(url)}" aria-label="PACU nurse link">
+    <div class="sharerow"><button class="secondary" data-pacu-copy>Copy link</button><button class="secondary" data-pacu-stop>Stop this link</button></div>
+    <p class="muted small">Opens only ${esc(sid(p))}’s PACU page. Show the QR code to the PACU nurse or send the link. Stopping it ends access.</p></div>`;
+}
+
 async function watch() {
   shared.unwatch?.(); shared.unwatch = null;
+  for (const u of pacuSubs.values()) u?.(); pacuSubs.clear();
   if (!sharing()) return;
   const seen = new Set();
   let healedAll = false;
@@ -200,6 +272,7 @@ async function watch() {
       write('pending', pending);
     }
     if (meta.server) { synced(); resyncOnce(); }
+    watchPacu();
     if (!changed) return;
     saveAll();
     const h = location.hash.slice(1) || '/';
@@ -1399,7 +1472,7 @@ function formPage(id, pg, back) {
       if (group[0] === 'tx') return txTable(p);
       if (group[0] === 'ix') return ixTable(p);
       return group.map(k => fieldHtml(field(k), get)).join('');
-    }).join('')}</div></div>${sl ? sealNote(p, pg) : ''}${signoffHtml(p, pg)}`);
+    }).join('')}</div></div>${sl ? sealNote(p, pg) : ''}${signoffHtml(p, pg)}${pg === 'pacu' ? pacuLinkHtml(p) : ''}`);
     disableSealed();
     window.scrollTo(0, y);
   };
@@ -1410,6 +1483,16 @@ function formPage(id, pg, back) {
     const u = e.target.closest('[data-use]');
     if (u) { set(p, u.dataset.use, u.dataset.v); draw(); return; }
     if (e.target.closest('#addix')) { const rows = ixRows(p); rows.push({ time: nowHM() }); set(p, 'io_ix_rows', JSON.stringify(rows)); draw(); return; }
+    if (e.target.closest('[data-pacu-make]')) return void makePacuLink(p).then(draw);
+    if (e.target.closest('[data-pacu-stop]')) {
+      if (confirm('Stop the PACU nurse link?\n\nThe link and its QR code stop working. A new one can be made.')) stopPacuLink(p).then(draw);
+      return;
+    }
+    if (e.target.closest('[data-pacu-copy]')) {
+      const u = pacuUrl(pacuToken(p));
+      (navigator.clipboard?.writeText(u) || Promise.reject()).then(() => toast('Link copied'), () => { view.querySelector('.pacuurl')?.select(); toast('Select the link and copy it'); });
+      return;
+    }
     if (e.target.closest('.sealed') && e.target.closest('button')) return toast(sealedMsg(p, pg));
     const pe = e.target.closest('[data-pev]');
     if (pe) {
@@ -1488,6 +1571,92 @@ function ixTable(p) {
 }
 
 // ---------- form view: readings laid out like the paper form
+// The PACU nurse's page (owner, 13 Oct 2026): opened from the link or QR code on the PACU page, it shows only this
+// participant's PACU answers; what is entered goes to pacu/{token} and into the patient on the team's phones.
+route(/^\/nurse\/(\w{20,64})$/, token => {
+  header('PACU', null);
+  if (!cloud.enabled) { paint('<p class="note">The PACU nurse link needs the team connection, which isn’t available in demo mode.</p>'); return; }
+  const rec = { id: token, f: {} };
+  let info = null, status = 'Connecting…', gone = false, unsub = null, alive = true;
+  cleanup.push(() => { alive = false; unsub?.(); });
+  const get = k => val(rec, k);
+  const locked = () => !!get('sign_pacu');
+  const typing = () => view.contains(document.activeElement) && document.activeElement.matches('input, textarea, select');
+  const setStatus = () => { const el = $('#nstat'); if (el) el.textContent = status; };
+  const draw = () => {
+    if (gone) { paint('<p class="note">This PACU link was stopped. Ask the study team for a new one.</p>'); return; }
+    if (!info) { paint(`<p class="muted">${esc(status)}</p>`); return; }
+    $('#title').textContent = 'PACU · ' + (info.sid || '');
+    const tchip = (f, l) => `<button class="tchip ${get(f) ? 'set' : ''}" data-pev="${f}" aria-label="${l}: ${get(f) ? get(f) + ', tap to change' : 'tap to set'}"><span>${l}</span><b>${get(f) ? esc(get(f)) : 'tap'}</b></button>`;
+    paint(`<p class="note">You can fill in only this participant’s PACU details here. Changes reach the study team as you go.</p>
+      <div class="fld"><label class="lab" for="ninit">Your initials</label><input id="ninit" value="${esc(settings.me)}" maxlength="6" autocomplete="off" autocapitalize="characters"></div>
+      <div class="${locked() ? 'sealed' : ''}"><div class="times pacutimes">${tchip('pacu_in', 'PACU in')}${tchip('pacu_out', 'To ward')}</div>
+      <div class="stack">${FORM.pacu.map(group => group[0] === 'h' ? `<h2>${group[1]}</h2>` : group.map(k => fieldHtml(field(k), get)).join('')).join('')}</div></div>
+      ${locked() ? sealNote({ f: rec.f }, 'pacu') : ''}${tickHtml(locked(), 'PACU', get('sign_pacu') || '', 'data-unsign', 'data-sign')}
+      <p class="muted small" id="nstat" role="status">${esc(status)}</p>`);
+    disableSealed();
+  };
+  const push = k => { status = 'Saving…'; cloud.pacuPush(token, { [k]: rec.f[k] }).catch(e => { status = cloud.friendly(e); setStatus(); }); };
+  function nset(k, v, auto = false) {
+    if (!setVal(rec, k, v, settings.me)) return false;
+    if (auto && rec.f[k]) rec.f[k].auto = true;
+    push(k); return true;
+  }
+  const renudesc = () => {
+    const c = calc('nudesc', get);
+    if (c != null && (get('pacu_nudesc') == null || rec.f.pacu_nudesc?.auto)) nset('pacu_nudesc', String(c), true);
+  };
+  (async () => {
+    try { await cloud.ensureSignedIn(); } catch (e) { status = cloud.friendly(e); draw(); return; }
+    if (!alive) return;
+    const u = await cloud.pacuWatch(token, (data, m) => {
+      if (!alive) return;
+      if (!data) { if (m.server) { gone = true; draw(); } return; }
+      info = { sid: String(data.sid || '').slice(0, 60) };
+      for (const [k, x] of Object.entries(data.f || {})) {
+        if (pacuClean(k, x) && (rec.f[k]?.t || 0) < x.t) rec.f[k] = { v: x.v ?? null, t: x.t, by: String(x.by || '').slice(0, 20), ...(x.auto ? { auto: true } : {}) };
+      }
+      status = m.pending ? 'Saving…' : m.server ? 'Saved to the team ✓' : 'No signal: kept on this phone, sent when there is signal';
+      if (typing() || document.querySelector('dialog[open]')) setStatus(); else draw();
+    }, e => { status = cloud.friendly(e); if (!info) draw(); else setStatus(); });
+    if (alive) unsub = u; else u?.();
+  })();
+  draw();
+  view.onclick = e => {
+    const t = e.target;
+    if (t.closest('.sealed') && t.closest('button')) return toast('PACU is marked complete. Undo its tick to change this.');
+    const chip = t.closest('.chip[data-f]');
+    if (chip) {
+      const f = field(chip.dataset.f), v = f.type === 'code' ? +chip.dataset.v : chip.dataset.v;
+      nset(f.id, String(get(f.id)) === String(v) ? null : v);
+      if (f.id.startsWith('nd_')) renudesc();
+      draw(); return;
+    }
+    const pe = t.closest('[data-pev]');
+    if (pe) {
+      const f = pe.dataset.pev, label = f === 'pacu_in' ? 'PACU in' : 'To ward', had = !!get(f);
+      openKeypad({ title: label, mode: 'time', value: get(f) || '', nowValue: nowHM(), hint: had ? 'logged ' + get(f) : '',
+        onDone: v => { if (v === '') return; nset(f, v); lockTaps(); draw(); },
+        onClear: () => { if (!had || !confirm(`Clear the ${label} time (${get(f)})?`)) return; nset(f, null); draw(); } });
+      return;
+    }
+    if (t.closest('[data-sign]')) {
+      if (!settings.me) return toast('Add your initials first.');
+      nset('sign_pacu', `${settings.me} ${new Date().toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' })} ${nowHM()}`); draw(); return;
+    }
+    if (t.closest('[data-unsign]') && confirm('Undo "PACU complete"? It can then be changed again.')) { nset('sign_pacu', null); draw(); }
+  };
+  view.onchange = e => {
+    const i = e.target;
+    if (i.id === 'ninit') { settings.me = i.value.trim().toUpperCase().slice(0, 6); saveSettings(); return; }
+    if (!i.dataset.f) return;
+    const f = field(i.dataset.f), tv = typedValue(f, i.value);
+    if (tv == null) { i.value = get(f.id) ?? ''; return; }
+    nset(f.id, tv === '' ? null : tv); setStatus();
+  };
+  cleanup.push(() => { view.onclick = view.onchange = null; });
+});
+
 route(/^\/p\/(\w+)\/sheet$/, id => {
   const p = patients[id]; if (!p) return go('#/');
   header(sid(p) + ' · Sheet view', '#/p/' + id);
@@ -1797,13 +1966,13 @@ route(/^\/join\/([A-Z]+)\/([^/]+)$/, (site, enc) => {
   };
 });
 
-function qrSvg(text) {
+function qrSvg(text, label = 'QR code of the join link') {
   const qr = qrcode(0, 'M');
   qr.addData(text); qr.make();
   const n = qr.getModuleCount(), q = 4;
   let d = '';
   for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (qr.isDark(r, c)) d += `M${c + q},${r + q}h1v1h-1z`;
-  return `<svg viewBox="0 0 ${n + 2 * q} ${n + 2 * q}" shape-rendering="crispEdges" role="img" aria-label="QR code of the join link"><rect width="100%" height="100%" fill="#fff"/><path d="${d}" fill="#000"/></svg>`;
+  return `<svg viewBox="0 0 ${n + 2 * q} ${n + 2 * q}" shape-rendering="crispEdges" role="img" aria-label="${label}"><rect width="100%" height="100%" fill="#fff"/><path d="${d}" fill="#000"/></svg>`;
 }
 
 // ---------- admin: join codes and members
