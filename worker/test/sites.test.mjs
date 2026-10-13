@@ -84,3 +84,28 @@ assert.equal(r.headers.get('Location'), 'https://anawj-preview.example.workers.d
 r = await get('https://anawj-preview.example.workers.dev/_sites/hand.anawj.com/logbook/'); assert.equal(r.status, 404);
 r = await get('https://anawj-preview.example.workers.dev/_sites/prewarmstudy.anawj.com/'); assert.equal(r.status, 200);
 console.log('worker tests passed');
+
+// the feedback button (edit/NOTES.md): every page of a PR preview gets the script; the real addresses only when
+// that browser turned it on (?feedback=1 sets a cookie, ?feedback=0 clears it); never on non-HTML files
+{
+  const TAG = '<script src="/feedback/overlay.js" defer></script>';
+  const prev = 'https://claude-x-anawj-preview.kohwenjun.workers.dev';
+  r = await get(prev + '/hand-babies/'); assert.ok((await text(r)).includes(TAG + '</body>'), 'preview page has the button');
+  assert.equal(r.headers.get('Set-Cookie'), null);
+  r = await get(prev + '/hand-babies/app.js'); assert.ok(!(await text(r)).includes(TAG), 'not in scripts');
+  r = await get('https://hand.anawj.com/babies/'); assert.ok(!(await text(r)).includes(TAG), 'off by default on the real address');
+  assert.equal(r.headers.get('Set-Cookie'), null);
+  r = await get('https://hand.anawj.com/babies/?feedback=1'); assert.ok((await text(r)).includes(TAG), 'on with ?feedback=1');
+  assert.match(r.headers.get('Set-Cookie'), /^anawj-feedback=1; Max-Age=2592000; Path=\/; Secure; SameSite=Lax$/);
+  assert.equal(r.headers.get('X-Robots-Tag'), 'noindex, nofollow');
+  const withCookie = (url, cookie) => worker.fetch(new Request(url, { headers: { Cookie: cookie } }), { ASSETS });
+  r = await withCookie('https://prewarmstudy.anawj.com/', 'a=b; anawj-feedback=1'); assert.ok((await text(r)).includes(TAG), 'on with the cookie');
+  r = await withCookie('https://prewarmstudy.anawj.com/?feedback=0', 'anawj-feedback=1'); assert.ok(!(await text(r)).includes(TAG), 'off with ?feedback=0');
+  assert.match(r.headers.get('Set-Cookie'), /^anawj-feedback=; Max-Age=0;/);
+  r = await withCookie('https://prewarmstudy.anawj.com/', 'anawj-feedback=0'); assert.ok(!(await text(r)).includes(TAG));
+  // the script itself is served on every subdomain (a shared folder, like the design files)
+  for (const h of ['hand.anawj.com', 'apmes.anawj.com', 'prewarmstudy.anawj.com', 'nuhroster.anawj.com']) {
+    r = await get(`https://${h}/feedback/overlay.js`); assert.equal(r.status, 200, h);
+  }
+}
+console.log('feedback button: ok');

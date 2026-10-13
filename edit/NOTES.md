@@ -20,6 +20,28 @@ to edit it in place, comment, add below or delete. Ported from NTF-Anaesthesia/a
   sender must tick "these aren't patient details" before Copy or Send. It can't catch everything; issues are public.
 - Test: `node edit/test/e2e.mjs` (serves this checkout as anawj.com; no server needed).
 
+## Feedback button (on PR previews and, when turned on, the real addresses)
+
+`feedback/overlay.js`, added to HTML pages by the Worker (`worker/sites.js`, `feedback()` in `worker/routes.js`). A round 💬
+button in a corner; "Comment on something", tap any part of the screen, write or speak a comment (same two options as the
+editor), then Send. No frame: it runs in the page itself, so it works on the subdomains and on the real apps' screens.
+
+- **PR previews (`*.workers.dev`): on for every page.** Send finds the preview's PR from its address (GitHub's public API) and
+  offers **Comment on PR #N**: it copies the comments and opens the PR; the owner pastes them as a PR comment, and the session
+  watching that PR revises the change. Or **Send as a GitHub issue** (a normal `Page edits:` issue).
+- **Real addresses: off unless that browser turns it on.** Open any page with `?feedback=1` (a cookie keeps it on for that
+  subdomain for 30 days); **Turn off** in its menu, or `?feedback=0`, removes it. `anawj.com` itself (GitHub Pages) never
+  gets it; use the editor there.
+- **Live apps never send screen text.** On `apmes.`, `prewarmstudy.` and `nuhroster.` (not in `?demo`), a comment records only
+  the kind of element and its CSS locator, never what the screen shows (patients, residents' notes). Comments go through the
+  same privacy check as the editor.
+- **Apps with an offline copy** (logbook, evals, prewarm, hand) show their saved page first, which was saved without the
+  button: if it doesn't appear after `?feedback=1`, it will once the app updates; on previews it always appears.
+- Comments stay in that browser (per subdomain) until sent. "Move button" puts it in the other corner; while picking, ⇅ moves
+  the bar to the other end of the screen.
+- Test: `node feedback/test/e2e.mjs` (serves this checkout through the real Worker at phone size); the Worker's side is in
+  `node worker/test/sites.test.mjs`.
+
 ## Applying the edits ("apply the page edits")
 
 - Read the open issues titled `Page edits:` (oldest first) plus any batches the owner pastes.
@@ -33,6 +55,9 @@ to edit it in place, comment, add below or delete. Ported from NTF-Anaesthesia/a
   a preview link and a 390 px screenshot of each; the owner picks one, then the others are removed before merging.
 - **Everywhere**: search the whole site, change every match the comment covers, and list each place changed in the PR
   (pages, files, before and after) so the owner can check them.
+- Comments from the feedback button name a full address (a subdomain or a PR preview): map it to the repo folder with
+  `SITES` in `worker/routes.js` (`prewarmstudy.anawj.com/` is `prewarm/`). On a live app there's no "On:" text, only the
+  element and locator; open the app in `?demo` to see it. Comments pasted on a PR are for the session working on that PR.
 - Find each change by searching for the old text in the page's source (the locator is a hint). App text lives in the
   app's JavaScript; follow that app's NOTES.md (hand-babies: figure text is in `app.js`, regenerate `gifs/`).
 - Close each issue with a link to the PR that applied it.
