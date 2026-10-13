@@ -71,6 +71,26 @@ export async function saveTeam(data, user) {
   return doc;
 }
 
+// Save the staff list (team/main), the monthly rosters and the rotations together, in one transaction, so they stay
+// in step. expectedUpdatedAt is team/main's time when this browser last loaded or saved it: if someone else has
+// saved since, a Conflict is thrown unless force is set (as for rosters).
+export async function saveTeamAll({ team, months, rotations }, user, { expectedUpdatedAt = null, force = false } = {}) {
+  const { db, F } = await sdk();
+  const by = who(user), now = Date.now();
+  const main = F.doc(db, 'team', 'main');
+  const doc = plain({ ...team, updatedAt: now, updatedBy: by });
+  await F.runTransaction(db, async tx => {
+    const cur = await tx.get(main);
+    if (!force && cur.exists() && cur.data().updatedAt !== expectedUpdatedAt) {
+      throw new Conflict({ updatedAt: cur.data().updatedAt, updatedBy: cur.data().updatedBy });
+    }
+    tx.set(main, doc);
+    tx.set(F.doc(db, 'team', 'monthly'), plain({ months, updatedAt: now, updatedBy: by }));
+    tx.set(F.doc(db, 'team', 'rotations'), plain({ weeks: rotations.weeks || {}, updatedAt: now, updatedBy: by }));
+  });
+  return doc;
+}
+
 // The monthly rosters live in their own document, so the staff list stays small.
 export async function loadMonthly() {
   const { db, F } = await sdk();

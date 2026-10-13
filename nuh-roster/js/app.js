@@ -153,9 +153,10 @@ function migrateEct() {
   state.roomsVersion = 4;
 }
 
-let saveTimer, lastSaved = '', checkKey = '';
+let saveTimer, lastSaved = '', checkKey = '', clearedForGood = false;
 function save() {
   clearTimeout(saveTimer);
+  if (clearedForGood) return; // signed out and cleared: write nothing back
   saveTimer = setTimeout(() => {
     const was = storeProblem === 'full';
     try {
@@ -3464,7 +3465,9 @@ function renderCloudBar() {
     el.replaceChildren(h('button', { class: 'primary', onclick: () => cloud.signIn().catch(e => { if (e?.code !== 'auth/popup-closed-by-user') cloudError(e); }) }, 'Sign in with Google'));
     return;
   }
-  const out = h('button', { onclick: () => cloud.signOut() }, 'Sign out');
+  const out = h('span', { class: 'signout' },
+    h('button', { onclick: () => cloud.signOut() }, 'Sign out'),
+    h('button', { class: 'small', title: 'For a shared computer: also removes the roster, staff list and your name from this browser', onclick: signOutAndClear }, 'Sign out and clear this computer'));
   if (!cs.member) {
     if (!cs.memberError) {
       el.replaceChildren(...[
@@ -3525,15 +3528,37 @@ function teamSyncBar() {
     h('span', {}, dirty
       ? 'You have changes to staff, rooms, settings or monthly rosters that the team doesn\'t have yet.'
       : `Shared with the team${state.teamSyncedAt ? `, last saved ${when(state.teamSyncedAt)}` : ''}.`),
-    h('button', { class: dirty ? 'primary' : '', onclick: saveTeamToCloud }, 'Save for the team'),
+    h('button', { class: dirty ? 'primary' : '', onclick: () => saveTeamToCloud() }, 'Save for the team'),
     h('button', { onclick: () => loadTeamFromCloud(true) }, 'Load team version'));
 }
 
-async function saveTeamToCloud() {
+// A shared OT computer: sign out and leave nothing of the roster behind in this browser.
+async function signOutAndClear() {
+  const unsaved = state.teamSyncedHash !== teamHash() || (state.roster && state.cloudHash?.[state.day.date]?.hash !== dayHash());
+  if (!confirm(`Sign out and remove the roster, staff list and your name from this browser?${unsaved ? '\n\nSome changes here are not saved for the team: press Cancel and save them (or Download everything) first.' : ''}`)) return;
   try {
-    const doc = await cloud.saveTeam({ settings: state.settings, staff: state.staff, roomTemplate: state.roomTemplate, roomsVersion: state.roomsVersion, staffLog: state.staffLog || [] }, me());
-    await cloud.saveMonthly(state.monthly || {}, me());
-    await cloud.saveRotations(state.rotations || emptyRotations(), me());
+    for (const k of Object.keys(localStorage)) if (/^(ot-roster|nuh-roster)/.test(k)) localStorage.removeItem(k);
+  } catch { /* no storage */ }
+  clearTimeout(saveTimer); clearedForGood = true;
+  window.onbeforeunload = null;
+  try { await cloud.signOut(); } catch { /* signed out anyway */ }
+  location.reload();
+}
+
+async function saveTeamToCloud(force = false) {
+  try {
+    const team = { settings: state.settings, staff: state.staff, roomTemplate: state.roomTemplate, roomsVersion: state.roomsVersion, staffLog: state.staffLog || [] };
+    let doc;
+    try {
+      doc = await cloud.saveTeamAll({ team, months: state.monthly || {}, rotations: state.rotations || emptyRotations() }, me(), { expectedUpdatedAt: state.teamSyncedAt ?? null, force });
+    } catch (e) {
+      if (!(e instanceof cloud.Conflict)) throw e;
+      // someone saved the team list after this browser last loaded it: don't overwrite their work unasked
+      const c = e.current;
+      if (confirm(`${byName(c.updatedBy)} saved the team's staff list, rooms and monthly rosters ${when(c.updatedAt)}, after this browser last loaded them.\n\nOK: replace theirs with this browser's version.\nCancel: keep theirs (you can then load it, or download yours first).`)) return saveTeamToCloud(true);
+      toast('Not saved. The team version is newer.', { label: 'Load team version', run: () => loadTeamFromCloud(true) });
+      return;
+    }
     state.teamSyncedAt = doc.updatedAt;
     state.teamSyncedHash = teamHash();
     render();
@@ -3546,6 +3571,11 @@ async function loadTeamFromCloud(asked) {
     const t = await cloud.loadTeam();
     if (!t) { if (asked) toast('Nobody has saved a team staff list yet.'); return; }
     if (!asked && t.updatedAt === state.teamSyncedAt) return;
+    // this browser has its own unsaved changes: say the team's is newer instead of offering to replace them
+    if (!asked && state.staff.length && !isViewer() && state.teamSyncedHash && state.teamSyncedHash !== teamHash()) {
+      toast(`The team's staff list was saved by ${byName(t.updatedBy)} ${when(t.updatedAt)}; this browser has changes not saved for the team.`, { label: 'Load theirs', run: () => loadTeamFromCloud(true) });
+      return;
+    }
     if (state.staff.length && !isViewer() && !confirm(`Load the team's staff list (${t.staff?.length || 0} people, saved by ${byName(t.updatedBy)} ${when(t.updatedAt)})? It replaces the staff list, rooms and settings in this browser.`)) return;
     state.settings = { ...clone(DEFAULT_SETTINGS), ...t.settings };
     state.staff = t.staff || [];
