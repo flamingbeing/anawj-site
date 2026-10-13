@@ -3,7 +3,7 @@
 // left out (they are for the Word portfolio only); older backups that have them still restore them.
 
 import { S, h, toast, modal, cloud, writes, download, fileButton, saveMany, patchLogbook, todayISO, displayName, catName } from './ui-core.js';
-import { cleanCase } from './demo-backend.js';
+import { cleanCase } from './clean.js';
 import { cleanReflection } from './reflections.js';
 import { cleanNote, MAX_NOTES, isDayNote, cappedNotes } from './notepad.js';
 import { backupToCsv, csvToBackup, looksLikeBackupCsv } from './backup-csv.js';

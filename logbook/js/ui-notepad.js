@@ -15,7 +15,8 @@
 
 import { S, h, toast, fill, hooks, writes, cloud, transients, settings, patchLogbook, resetters, todayISO, modal, emptyState, download } from './ui-core.js';
 import { uid, fmtDate, caseParts } from './engine.js';
-import { barTabs, arrangeTabs, display, setDisplay, setTabOnBar, toggle, help, resetLink } from './ui-settings.js';
+import { barTabs, arrangeTabs, display, setDisplay, setTabOnBar } from './display.js';
+import { toggle, help, resetLink } from './settings-rows.js';
 import { MAX_NOTES, INDEX_CAP, LIMITS, indexCapped, sortNotes, filterNotes, noteTitle, noteIndex, cleanNoteIndex, sameIndex, parseNote, toggleCheck, plainLines, noteFiles, dayNoteId, dayNoteOf, isDayNote, cappedNotes, mergeDayNote, cleanNote } from './notepad.js';
 import { recordSignature } from './recovery-store.js';
 import { popShared } from './share-in.js';
