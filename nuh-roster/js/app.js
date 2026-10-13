@@ -2915,7 +2915,9 @@ function renderRotations() {
           pushRotUndo(`clearing ${year}`);
           for (const m of weeks) delete rot.weeks[m];
           render(); undoToast(`Cleared the ${year} rotation.`);
-        } }, 'Clear year')),
+        } }, 'Clear year'),
+        weeksOfYear(year).some(m => state.rotations.weeks[m]) && !weeksOfYear(year + 1).slice(1).some(m => state.rotations.weeks[m])
+          ? h('button', { title: `Copy ${year}'s rotation into ${year + 1}, week by week, as a start`, onclick: () => fillNextYear(year) }, `Start ${year + 1} from ${year}`) : null),
       h('p', { class: 'hint' }, 'Each column is a week (Monday to Sunday). Select weeks by clicking, shift-clicking or dragging (across people too), then pick the posting. Blank weeks use the usual posting. To change someone\'s posting for one day only, open them from Today or the roster and use "Posting today". The Excel file has names down the first column and each week\'s Monday across the top; Download gives you one to fill in.'),
       fixNamesCard(rotUnmatched, { role: 'junior', what: 'the rotation file', rerun: lastRotFile ? () => importRotations([lastRotFile]) : null, dismiss: () => { rotUnmatched = []; render(); } }),
       rotNotes.length ? h('ul', { class: 'warnings' }, rotNotes.map(t => h('li', { class: 'warn' }, t)), h('li', { class: 'info' }, h('button', { class: 'link', onclick: () => { rotNotes = []; render(); } }, 'Dismiss'))) : null,
@@ -2940,7 +2942,31 @@ function renderRotations() {
             return h('td', { class: 'wk' + (code == null ? ' usual' : '') + (m === now ? ' now' : '') + (inSel(r, c) ? ' sel' : ''), 'data-r': r, 'data-c': c,
               style: shown ? `background:${fillOf(shown)}` : '', title: `${p.name} · week of ${longDate(m)}: ${postingName(shown) || 'no posting'}${code == null ? ' (usual)' : ''}`,
               onpointerdown: e => cellDown(e, r, c), onpointerenter: () => cellEnter(r, c) }, ROT_SHORT[shown] || shown);
-          }))))) : h('p', { class: 'empty' }, state.staff.length ? 'No juniors match.' : 'Add the staff list first.')));
+          })))),
+        rotCountsFoot(weeks, people, rot, now)) : h('p', { class: 'empty' }, state.staff.length ? 'No juniors match.' : 'Add the staff list first.')));
+}
+// Under the grid: how many juniors are on each posting, week by week, so a week with nobody on a posting shows up.
+function rotCountsFoot(weeks, people, rot, now) {
+  const on = (p, m) => weekPosting(rot, p.id, m) ?? p.posting ?? '';
+  const used = POSTINGS.filter(([k]) => k && people.some(p => weeks.some(m => on(p, m) === k)));
+  if (!used.length) return null;
+  return h('tfoot', {}, used.map(([k, label]) => h('tr', { class: 'rot-count' },
+    h('th', { class: 'who', scope: 'row' }, label), h('th', { class: 'usual' }, k),
+    weeks.map(m => { const n = people.filter(p => on(p, m) === k).length; return h('td', { class: 'wk' + (n ? '' : ' none') + (m === now ? ' now' : ''), title: `Week of ${longDate(m)}: ${n} on ${label}` }, n || '0'); }))));
+}
+// A new year starts empty: copy this year's pattern across, week by week (week 1 to week 1…), with Undo.
+function fillNextYear(year) {
+  const from = weeksOfYear(year), to = weeksOfYear(year + 1);
+  pushRotUndo(`starting ${year + 1} from ${year}`);
+  let n = 0;
+  to.forEach((m, i) => {
+    const src = state.rotations.weeks[from[Math.min(i, from.length - 1)]];
+    if (!src || from[Math.min(i, from.length - 1)] === m) return; // the shared boundary week stays
+    for (const [id, code] of Object.entries(src)) if (weekPosting(state.rotations, id, m) == null) { setWeeks(state.rotations, id, [m], code); n++; }
+  });
+  rotYear = year + 1; rotScroll = 0;
+  render();
+  undoToast(`Started ${year + 1} from ${year}'s pattern (${n} weeks set). Change what differs, or Undo.`);
 }
 
 // keep the grid where it was, or open it on the week on screen
