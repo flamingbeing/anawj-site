@@ -464,7 +464,10 @@ export function generate({ staff, day, settings = DEFAULT_SETTINGS, seed = 1 }) 
   }
 
   if (rowOf.aocc && !rowOf.aocc.seniors.length) {
-    const free = seniors.filter(p => !usedSeniors.has(p.id));
+    let free = seniors.filter(p => !usedSeniors.has(p.id));
+    // AIC needs a consultant (SC, C): when only one is left, AOCC takes someone else if it can
+    const consultants = free.filter(p => STRONG.includes(p.grade));
+    if (!fixed.aic && consultants.length === 1 && free.length > 1) free = free.filter(p => p !== consultants[0]);
     const p = free[Math.floor(rand() * free.length)];
     if (p) { rowOf.aocc.seniors.push(p.id); usedSeniors.add(p.id); }
     else warnings.push({ level: 'warn', text: 'AOCC: no senior left after the OT lists.' });
@@ -713,7 +716,8 @@ export function check({ rows, staff, day, settings = DEFAULT_SETTINGS }) {
 
   const seniorsOf = {}, juniorsOf = {};
   for (const row of rows) {
-    seniorsOf[row.roomId] = resolve(row.senior, 'senior', row);
+    // AH OT (after hours) is a separate job, not a second room: it never counts as double cover
+    seniorsOf[row.roomId] = resolve(row.senior, row.roomId === 'ahot' ? 'ahot' : 'senior', row);
     const parts = String(row.junior || '').split('/');
     juniorsOf[row.roomId] = resolve(parts.filter(x => !isCoverPart(x)).join('/'), 'junior', row);
     resolve(parts.filter(isCoverPart).join('/'), 'cover', row);
@@ -769,7 +773,7 @@ export function check({ rows, staff, day, settings = DEFAULT_SETTINGS }) {
     for (const p of jun) {
       if (dayOf(day, p).liverStandby && flags.complex) out.push({ level: 'warn', fix: 'reseat', col: 'junior', person: p.id, rooms: [row.label], text: `${row.label}: ${p.name} is liver standby but has a complex list.` });
     }
-    const shared = sen.some(p => (where[p.id] || []).filter(u => u.col === 'senior').length > 1);
+    const shared = row.roomId !== 'ahot' && sen.some(p => (where[p.id] || []).filter(u => u.col === 'senior').length > 1);
     if (shared && jun.some(isBaby)) {
       out.push({ level: 'error', fix: 'reseat', col: 'junior', person: jun.find(isBaby).id, rooms: [row.label], text: `${row.label}: Baby MO in a room whose senior is double covering.` });
     }

@@ -78,6 +78,9 @@ assert.match(out, /Paeds list/);
   // double cover with no junior in one of the rooms
   let t = texts([r('r3', 'MCOR 2', 'Senior General', ''), r('r4', 'MCOR 3', 'Senior General', 'Junior Resident')]);
   assert.ok(t.some(x => /^error\|fill\|MCOR 2: no junior, and the senior is double covering/.test(x)), t.join('\n'));
+  // AH OT is its own job, not a second room: a senior on AH OT and one room isn't double covering
+  t = texts([{ roomId: 'ahot', label: 'AH OT', complex: 'Clinic', senior: 'Senior General', junior: '', premed: '', notes: '' }, r('r3', 'MCOR 2', 'Senior General', '')]);
+  assert.ok(!t.some(x => /double covering|rooms \(/.test(x)), t.join('\n'));
   assert.ok(!t.some(x => /MCOR 3: no junior/.test(x)));
   // a cover from another room counts as a junior
   t = texts([r('r3', 'MCOR 2', 'Senior General', 'Junior Mopex C'), r('r4', 'MCOR 3', 'Senior General', 'Junior Resident')]);
@@ -420,6 +423,12 @@ console.log('engine tests passed');
   assert.match(t, /SUMMARY:MOR 4\\, Senior/);
   assert.match(t.replace(/\r\n /g, ''), /DESCRIPTION:with A\\; cases: lap chole\\nleaving 4pm/);
   assert.ok(t.split('\r\n').every(l => l.length <= 75), 'lines folded');
+  // folded by UTF-8 bytes, never splitting a character (· and emoji are several bytes)
+  const u = buildIcs([{ date: '2026-10-31', title: 'MOR 4', details: 'with A · B → C 🙂 '.repeat(12), uid: 'x' }]);
+  const enc = new TextEncoder();
+  assert.ok(u.split('\r\n').every(l => enc.encode(l).length <= 75), 'lines at most 75 octets');
+  assert.ok(!/[\ud800-\udfff]/.test(u.replace(/\p{Extended_Pictographic}/gu, '')), 'no split emoji');
+  assert.ok(u.replace(/\r\n /g, '').includes('with A · B → C 🙂 with A'), 'unfolds to the same text');
   console.log('calendar tests passed');
 }
 
@@ -430,6 +439,9 @@ console.log('engine tests passed');
   assert.equal(dateFromText('1.2.26'), '2026-02-01');
   assert.equal(dateFromText('14 Oct 2026'), '2026-10-14');
   assert.equal(dateFromText('Wednesday, 14 October 2026'), '2026-10-14');
+  assert.equal(dateFromText('WEDNESDAY, 14 OCTOBER 2026'), '2026-10-14', 'capitals');
+  const { cellText } = await import('../js/xlsxio.js');
+  assert.equal(cellText({ formula: 'TODAY()+1', result: new Date('2026-10-14T00:00:00Z') }), '2026-10-14', 'a formula date');
   assert.equal(dateFromText('31/02/2026'), null, 'no 31 February');
   assert.equal(dateFromText(''), null);
   console.log('draft date tests passed');
@@ -469,4 +481,18 @@ console.log('engine tests passed');
   const dates = WHATS_NEW.map(([d]) => new Date(d));
   assert.ok(dates.every(d => !isNaN(d)) && dates.every((d, i) => !i || d <= dates[i - 1]), "What's new is dated, newest first");
   console.log('help text tests passed');
+}
+
+{
+  // AOCC leaves the last free consultant for AIC
+  const room = (id, name) => ({ id, name, complex: 'MOR', running: true, notes: '', flags: suggestFlags(''), session: 'full' });
+  const st = [P('a', 'Senior Busy', 'senior', { grade: 'AC' }), P('b', 'Senior Assoc', 'senior', { grade: 'AC' }), P('c', 'Senior Cons', 'senior', { grade: 'C' })];
+  let ok = 0;
+  for (let seed = 1; seed <= 20; seed++) {
+    const g = generate({ staff: st, day: { rooms: [room('r1', 'MOR 1')], staff: {} }, seed });
+    const by = Object.fromEntries(g.rows.map(r => [r.label, r]));
+    if (/Senior Cons/.test(by.AIC.senior) && by.AOCC.senior && !/Senior Cons/.test(by.AOCC.senior)) ok++;
+  }
+  assert.ok(ok >= 15, `AIC keeps the consultant (${ok}/20)`);
+  console.log('AOCC/AIC tests passed');
 }

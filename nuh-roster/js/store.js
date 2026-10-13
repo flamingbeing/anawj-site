@@ -13,7 +13,7 @@ export function migrateRooms(state) {
   if ((state.roomsVersion || 1) >= 2) return migratePacu(state);
   const rename = (from, to) => {
     t.forEach(r => { if (r.name === from) r.name = to; });
-    (state.day.rooms || []).forEach(r => { if (r.name === from) r.name = to; });
+    (state.day?.rooms || []).forEach(r => { if (r.name === from) r.name = to; });
     (state.roster?.rows || []).forEach(r => { if (r.label === from) r.label = to; });
   };
   rename('Remote Case', 'Remote 1');

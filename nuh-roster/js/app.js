@@ -61,7 +61,7 @@ migrateRooms();
 syncRooms();
 state.rotations ||= emptyRotations();
 // bumped when the demo data changes, so a demo already open in a browser picks it up
-const DEMO_VERSION = 6;
+const DEMO_VERSION = 7;
 if (DEMO && !state.staff.length) startDemo();
 else if (DEMO && state.demoVersion !== DEMO_VERSION) { state = blankState(); syncRooms(); startDemo(); } // the made-up department changed: start it again
 
@@ -144,7 +144,7 @@ function startPracticeTask() {
   const onLeave = state.staff.find(p => p.role === 'senior' && ['leave', 'mc'].includes(dayOf(p.id).status));
   const [a, b] = [rows[1], rows[4]];
   const items = [];
-  if (a && onLeave) { a.senior = fmtSenior(onLeave, dayOf(onLeave.id)); items.push({ label: `Someone on leave is on a list`, match: `${onLeave.name} is on` }); }
+  if (a && onLeave) { a.senior = fmtSenior(onLeave, dayOf(onLeave.id)); items.push({ label: `Someone on leave is on a list`, match: `${onLeave.name} is on`, person: onLeave.id, fix: 'takeOff' }); }
   if (b) { b.senior = ''; items.push({ label: `${b.label} has no senior`, match: `${b.label}: no senior` }); }
   // a double cover with no junior, inside one complex (as the generator would pair rooms)
   const host = rows.find(x => x !== a && x !== b && rows.some(y => y !== x && y !== a && y !== b && y.complex === x.complex));
@@ -155,13 +155,15 @@ function startPracticeTask() {
   lastRows = JSON.stringify(r.rows);
   afterRosterEdit(true);
   goTab('roster');
-  toast('Three problems are planted in this roster. Fix them from the Problems card (or by hand); the checklist ticks them off.');
+  const n = ['No problems', 'One problem', 'Two problems', 'Three problems'][items.length];
+  toast(`${n} ${items.length === 1 ? 'is' : 'are'} planted in this roster. Fix ${items.length === 1 ? 'it' : 'them'} from the Problems card (or by hand); the checklist ticks them off.`);
 }
 function practiceTaskCard() {
   const t = state.practiceTask;
   if (!DEMO || !t || t.date !== state.day.date || !state.roster) return null;
-  const texts = (state.roster.checks || []).map(w => w.text);
-  const done = t.items.map(i => !texts.some(x => x.includes(i.match)));
+  const checks = state.roster.checks || [];
+  // matched by person where there is one, so a name that starts another name can't keep an item open
+  const done = t.items.map(i => !checks.some(w => i.person ? w.person === i.person && w.fix === i.fix : w.text.includes(i.match)));
   const all = done.every(Boolean);
   return h('section', { class: 'card practice-task' + (all ? ' done' : '') },
     h('h2', {}, all ? 'Well done: all fixed' : `Practice: fix ${t.items.length} problems (${done.filter(Boolean).length} of ${t.items.length})`),
@@ -204,6 +206,7 @@ function save() {
   clearTimeout(saveTimer);
   if (clearedForGood) return; // signed out and cleared: write nothing back
   if (otherTab) return; // another tab saved since: this one would overwrite it
+  if (storeProblem?.corrupt === null && !storeProblem.downloaded) return; // the damaged data is still only in storage
   saveTimer = setTimeout(() => {
     const was = storeProblem === 'full';
     try {
@@ -266,11 +269,12 @@ function toast(msg, action) {
 }
 const undoToast = msg => toast(msg, { label: 'Undo', run: undo, title: 'Undo (Ctrl+Z)' });
 
-const select = (value, options, onchange) => h('select', { onchange: e => onchange(e.target.value) },
+const select = (value, options, onchange) => { let found = false; return h('select', { onchange: e => onchange(e.target.value) },
   options.map(o => {
     const [v, label] = Array.isArray(o) ? o : [o, o || '—'];
-    return h('option', { value: v, selected: v === value }, label);
-  }));
+    const on = !found && v === value; if (on) found = true; // only the first ("Choose…", not a separator line)
+    return h('option', { value: v, selected: on }, label);
+  })); };
 
 const fileButton = (label, accept, multiple, onfiles) => h('label', { class: 'btn' }, label,
   h('input', { type: 'file', accept, multiple, hidden: true, onchange: async e => { const f = [...e.target.files]; e.target.value = ''; if (f.length) await onfiles(f); } }));
@@ -365,7 +369,7 @@ function render() {
   renderDemoBar();
   renderMovedBar();
   if (storeProblem && !document.getElementById('store-bar')) renderStoreBar();
-  if (cs.ready && !document.getElementById('backup-bar')) renderBackupBar();
+  if (cs.ready && (!document.getElementById('backup-bar') || isMember() || isViewer())) renderBackupBar();
   window.scrollTo(0, y);
   if (state.tab === 'monthly' && state.monthlyView === 'rotations') placeRotGrid();
   labelTableFields(app);
@@ -418,7 +422,7 @@ addEventListener('storage', e => {
 const BACKUP_KEY = 'nuh-roster-backup-nag';
 function renderBackupBar() {
   document.getElementById('backup-bar')?.remove();
-  if (DEMO || isViewer() || isMember() || !state.staff.length) return;
+  if (clearedForGood || DEMO || isViewer() || isMember() || !state.staff.length) return;
   let snooze = 0;
   try { snooze = +localStorage.getItem(BACKUP_KEY) || 0; } catch { /* no storage */ }
   const last = Math.max(state.backupAt || 0, snooze);
@@ -445,12 +449,12 @@ function renderStoreBar() {
       ...(old.length ? [h('button', { class: 'small', onclick: () => removeOldDays(old) }, 'Remove old days')] : []));
   } else {
     const { corrupt, raw } = storeProblem;
-    const copy = () => download(`NUH roster, damaged saved data ${realToday()}.txt`, new Blob([corrupt ? localStorage.getItem(corrupt) || '' : raw || ''], { type: 'text/plain' }));
+    const copy = () => { download(`NUH roster, damaged saved data ${realToday()}.txt`, new Blob([corrupt ? localStorage.getItem(corrupt) || '' : raw || ''], { type: 'text/plain' })); storeProblem.downloaded = true; save(); };
     bar.append(h('b', {}, 'The roster saved in this browser couldn\'t be read, so the app started empty.'),
       h('span', {}, corrupt ? ' A copy of it is kept in this browser.' : ' It couldn\'t be copied, so download it now, before you change anything.'),
       h('span', { class: 'grow' }),
       h('button', { class: 'small primary', onclick: copy }, 'Download the damaged data'),
-      h('button', { class: 'small', onclick: () => { storeProblem = null; renderStoreBar(); } }, 'Hide'));
+      h('button', { class: 'small', onclick: () => { storeProblem = null; renderStoreBar(); save(); } }, 'Hide'));
   }
   document.body.prepend(bar);
 }
@@ -488,7 +492,7 @@ function renderDemoBar() {
     h('details', { class: 'demo-tools', open: innerWidth > 600 }, h('summary', {}, 'Practice tools'), h('span', { class: 'demo-actions' },
     h('button', { class: 'small', onclick: () => startTour() }, 'Tour'),
     h('button', { class: 'small', title: 'A roster with three problems planted in it, to find and fix', onclick: startPracticeTask }, 'Fix 3 problems'),
-    (() => { const sel = select('', [['', 'Try a morning…'], ...SCENARIOS.map(([k, label]) => [k, label])], v => { if (v) applyScenario(v); }); sel.setAttribute('aria-label', 'Practice a harder morning'); return sel; })(),
+    (() => { const sel = select('', [['', 'Try a morning…'], ...SCENARIOS.map(([k, label]) => [k, label])], v => { if (v) { applyScenario(v); sel.value = ''; } }); sel.setAttribute('aria-label', 'Practice a harder morning'); return sel; })(),
     h('button', { class: 'small', title: 'This day back to how Practice made it (Undo brings your version back)', onclick: resetPracticeDay }, 'Reset this day'),
     h('button', { class: 'small', onclick: () => { if (confirm('Start practice again from scratch?')) { try { localStorage.removeItem(KEY); localStorage.removeItem(TOUR_KEY); } catch { /* no storage */ } location.reload(); } } }, 'Start again'),
     )),
@@ -631,7 +635,7 @@ function renderSteps() {
 
 // Whether the day on screen is saved where the team can see it.
 const hashOf = o => { let x = 5381; const t = JSON.stringify(o); for (let i = 0; i < t.length; i++) x = (x * 33 ^ t.charCodeAt(i)) >>> 0; return x.toString(36); };
-const dayHash = () => hashOf({ day: state.day, roster: state.roster && { ...state.roster, checks: undefined } });
+const dayHash = (day = state.day, roster = state.roster) => hashOf({ day, roster: roster && { ...roster, checks: undefined } });
 let hashPending = null; // a date whose saved copy was just opened; its hash is taken after the next sync
 function saveState() {
   const date = state.day.date;
@@ -641,7 +645,7 @@ function saveState() {
   if (saved.hash === dayHash()) return [h('span', { class: 'saved' }, `✓ Saved to the team ${when(saved.at)}`)];
   return [h('span', { class: 'unsaved' }, 'Changes not saved to the team'), ' ', h('button', { class: 'small', onclick: saveRosterToCloud }, 'Save')];
 }
-function markSaved(date, at) { (state.cloudHash ||= {})[date] = { hash: dayHash(), at }; }
+function markSaved(date, at, hash = dayHash()) { (state.cloudHash ||= {})[date] = { hash, at }; }
 
 document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', async () => {
   const t = b.dataset.tab;
@@ -1511,6 +1515,7 @@ function showShortcuts() {
   const dlg = h('dialog', { class: 'changes' }, h('h2', {}, 'Keyboard shortcuts'),
     h('table', {}, h('tbody', {}, SHORTCUTS.map(([k, what]) => h('tr', {}, h('td', {}, h('kbd', {}, k)), h('td', {}, what))))),
     h('div', { class: 'bar' }, h('button', { class: 'primary', onclick: () => { dlg.close(); dlg.remove(); } }, 'Close')));
+  dlg.addEventListener('close', () => dlg.remove()); // Esc too
   document.body.append(dlg); dlg.showModal();
 }
 document.addEventListener('keydown', e => {
@@ -2203,6 +2208,7 @@ function openPersonBox(anchor, p, ctx) {
     if (liver.checked !== !!s.liverStandby) { s.liverStandby = liver.checked; s.manualLiver = true; delete s.autoLiver; }
     put('aoh', cellSafe(aoh.value.trim().replace(/^\(|\)$/g, '')));
     put('comment', cellSafe(comment.value.trim().replace(/^-\s*/, '')));
+    if (s.carried?.comment && s.comment !== s.carried.comment) { delete s.carried.comment; if (!s.carried.status) delete s.carried; } // edited by hand
     if (postingPick) {
       const was = postingOf(p), v = postingPick.value;
       if (v === plannedPosting(p)) delete s.posting; else s.posting = v;
@@ -2718,7 +2724,7 @@ async function viewerLoad(date) {
     state.day = snap?.day ? { ...clone(snap.day), date } : { date, rooms: [], staff: {} };
     state.roster = snap?.roster ? clone(snap.roster) : null;
     syncRooms();
-  } catch (e) { cloudError(e); }
+  } catch (e) { if (viewerDate === date) viewerFound = 'failed'; cloudError(e); }
   render();
 }
 // Who "my" is: the staff record an admin linked to this account, else the name picked in this browser, else a guess
@@ -2825,7 +2831,7 @@ function renderMyDay() {
   const meta = isViewer() ? viewerMeta : null;
   const key = l => l.join(' ');
   // what they saw before this version, read once per version (later renders keep the marks)
-  const seenId = p && meta?.updatedAt && viewerFound ? `${date}|${p.id}|${meta.updatedAt}` : '';
+  const seenId = p && meta?.updatedAt && viewerFound === true ? `${date}|${p.id}|${meta.updatedAt}` : '';
   if (seenId && seenCache.id !== seenId) {
     seenCache = { id: seenId, prev: seenBefore(date, p.id) };
     markSeen(date, p.id, meta.updatedAt, lines.map(key));
@@ -2840,7 +2846,7 @@ function renderMyDay() {
       p && myPersonGuessed ? h('p', { class: 'warn-note' }, `Matched to ${p.name} from your account's name. Not you? Pick your name above.`) : null,
       !p ? h('p', { class: 'hint' }, 'Pick your name once; this browser remembers it.')
         : !state.staff.length ? h('p', { class: 'hint' }, 'Loading the staff list…')
-        : !r && !lines.length ? h('p', { class: 'empty' }, isViewer() && viewerFound === null ? 'Loading…' : `The roster for ${longDate(date)} isn't out yet.`)
+        : !r && !lines.length ? h('p', { class: 'empty' }, isViewer() && viewerFound === 'failed' ? 'Couldn\'t load the roster. Check your signal, then open My day again.' : isViewer() && viewerFound === null ? 'Loading…' : `The roster for ${longDate(date)} isn't out yet.`)
         : lines.length ? h('ul', { class: 'myday-list' }, lines.map(l => h('li', { class: changed.has(key(l)) ? 'changed' : null }, h('b', {}, l[0]), l[1] ? h('span', {}, ' ', l[1]) : null, changed.has(key(l)) ? h('span', { class: 'new-tag' }, ' changed') : null,
           l[2]?.room ? h('button', { class: 'small logbook-copy', title: 'Date, room, supervisor and case notes, to paste into the logbook', onclick: () => copyForLogbook(date, l[2]) }, 'Copy for logbook') : null)))
         : h('p', { class: 'empty' }, `You're not on the roster for ${longDate(date)}.`),
@@ -2849,7 +2855,7 @@ function renderMyDay() {
         lines.length ? h('button', { class: 'small', onclick: () => downloadIcs(p, [eventOf(p, date, lines)], `My day ${date}.ics`) }, 'Add to calendar') : null,
         h('button', { class: 'small', 'aria-expanded': String(weekOpen), onclick: () => { weekOpen = !weekOpen; if (weekOpen) { weekRecs = {}; loadWeek(); } else render(); } }, weekOpen ? 'Hide my week' : 'My week')) : null,
       p ? weekCard(p) : null,
-      meta?.updatedAt && viewerFound ? h('p', { class: 'seen' }, `Saved by ${meta.updatedBy?.name || 'the rosterer'} at ${hhmm(meta.updatedAt)}${new Date(meta.updatedAt).toDateString() !== new Date().toDateString() ? `, ${longDate(isoDate(new Date(meta.updatedAt)))}` : ''}. `,
+      meta?.updatedAt && viewerFound === true ? h('p', { class: 'seen' }, `Saved by ${meta.updatedBy?.name || 'the rosterer'} at ${hhmm(meta.updatedAt)}${new Date(meta.updatedAt).toDateString() !== new Date().toDateString() ? `, ${longDate(isoDate(new Date(meta.updatedAt)))}` : ''}. `,
         h('button', { class: 'link', onclick: () => viewerLoad(date) }, 'Check again')) : null,
       p && r && postingOf(p) && p.role === 'junior' ? h('p', { class: 'seen' }, `Posting this week: ${postingName(postingOf(p))}`) : null,
       h('p', { class: 'hint' }, 'Add it to your home screen (browser menu › Add to Home Screen): it opens here and works with poor signal. Or bookmark ', h('code', {}, location.origin + location.pathname + '#myday'),
@@ -3041,14 +3047,26 @@ function setCarry(p, untilDate, group, comment) {
   state.carry = list.filter(c => c.until >= addDays(realToday(), -1));
 }
 // On a day being opened: anything carried over it goes in, unless that day was changed by hand for the person
-// or a monthly roster already says leave, MC or post call.
+// or a monthly roster already says leave, MC or post call. d.carried records what was put in, so a carry that is
+// ended, shortened or changed takes it back out again.
 function applyCarry(day) {
+  const covering = pid => (state.carry || []).find(c => c.pid === pid && c.from < day.date && day.date <= c.until);
+  for (const [pid, d] of Object.entries(day.staff || {})) {
+    if (!d.carried) continue;
+    const was = d.carried === true ? { status: d.status } : d.carried, c = covering(pid);
+    if (c && (c.status || '') === (was.status || '') && (c.comment || '') === (was.comment || '')) continue;
+    if (was.status && d.status === was.status) d.status = 'avail';
+    if (was.comment && d.comment === was.comment) delete d.comment;
+    delete d.carried;
+  }
   for (const c of state.carry || []) {
     if (!(c.from < day.date && day.date <= c.until)) continue;
     const d = (day.staff[c.pid] ||= {});
-    if (d.manual && !d.carried) continue;
-    if (c.status && (!d.status || d.status === 'avail' || d.carried)) { d.status = c.status; d.carried = true; }
-    if (c.comment && !d.comment) { d.comment = c.comment; d.carried = true; }
+    if (d.carried || d.manual) continue;
+    const put = {};
+    if (c.status && (!d.status || d.status === 'avail')) { d.status = c.status; put.status = c.status; }
+    if (c.comment && !d.comment) { d.comment = c.comment; put.comment = c.comment; }
+    if (put.status || put.comment) d.carried = put;
   }
 }
 function setStatus(p, group, { quiet = false } = {}) {
@@ -3057,6 +3075,7 @@ function setStatus(p, group, { quiet = false } = {}) {
   s.status = group === 'working' ? (s.status === 'elsewhere' ? 'elsewhere' : 'avail') : group;
   s.manual = true;
   delete s.auto;
+  delete s.carried; // a hand change wins over a status carried from another day
   if (state.roster && was !== group) logRoster([`${p.name}: ${BOARD.find(b => b[0] === was)[1]} → ${BOARD.find(b => b[0] === group)[1]}`]);
   if (!quiet) render();
 }
@@ -3354,7 +3373,7 @@ function leavePerDay(month) {
     return { d, date, s: people.filter(p => p.role === 'senior').length, j: people.filter(p => p.role !== 'senior').length };
   });
   if (!counts.some(c => c.s + c.j)) return null;
-  return h('div', { class: 'leave-days', role: 'img', 'aria-label': 'People on leave each day' },
+  return h('div', { class: 'leave-days', role: 'group', 'aria-label': 'People on leave each day' },
     counts.map(c => h('button', { class: 'leave-day' + (weekday(month, c.d) === 'Sat' || weekday(month, c.d) === 'Sun' ? ' weekend' : '') + (limit && c.s + c.j > limit ? ' over' : ''),
       title: `${c.d} ${monthName(month)}: ${c.s} senior${c.s === 1 ? '' : 's'} and ${c.j} junior${c.j === 1 ? '' : 's'} away${limit && c.s + c.j > limit ? ` (more than ${limit})` : ''}. Go to the day.`,
       onclick: () => switchDate(c.date) },
@@ -3927,7 +3946,7 @@ document.getElementById('loadTeam').addEventListener('change', async e => {
       if (state.staff.length && !confirm('Replace everything the roster has saved in this browser with this file?')) return;
       const before = state;
       try {
-        state = { ...blankState(), ...d, settings: { ...clone(DEFAULT_SETTINGS), ...d.settings } };
+        state = { ...blankState(), ...d, roomsVersion: d.roomsVersion || 1, settings: { ...clone(DEFAULT_SETTINGS), ...d.settings } };
         state.day ||= blankState().day;
         state.rotations ||= emptyRotations();
         cleanStaffNames(); migrateRooms(); syncRooms();
@@ -4076,7 +4095,9 @@ function teamSyncBar() {
 
 // A shared OT computer: sign out and leave nothing of the roster behind in this browser.
 async function signOutAndClear() {
-  const unsaved = state.teamSyncedHash !== teamHash() || (state.roster && state.cloudHash?.[state.day.date]?.hash !== dayHash());
+  const unsavedDay = (date, day, roster) => roster && state.cloudHash?.[date]?.hash !== dayHash(day, roster);
+  const unsaved = state.teamSyncedHash !== teamHash() || unsavedDay(state.day.date, state.day, state.roster)
+    || Object.entries(state.days || {}).some(([d, rec]) => unsavedDay(d, rec.day, rec.roster));
   if (!confirm(`Sign out and remove the roster, staff list and your name from this browser?${unsaved ? '\n\nSome changes here are not saved for the team: press Cancel and save them (or Download everything) first.' : ''}`)) return;
   try {
     for (const k of Object.keys(localStorage)) if (/^(ot-roster|nuh-roster)/.test(k)) localStorage.removeItem(k);
@@ -4090,6 +4111,7 @@ async function signOutAndClear() {
 async function saveTeamToCloud(force = false) {
   try {
     const team = { settings: state.settings, staff: state.staff, roomTemplate: state.roomTemplate, roomsVersion: state.roomsVersion, staffLog: state.staffLog || [] };
+    const hash = teamHash(); // what is being sent
     let doc;
     try {
       doc = await cloud.saveTeamAll({ team, months: state.monthly || {}, rotations: state.rotations || emptyRotations() }, me(), { expectedUpdatedAt: state.teamSyncedAt ?? null, force });
@@ -4102,7 +4124,7 @@ async function saveTeamToCloud(force = false) {
       return;
     }
     state.teamSyncedAt = doc.updatedAt;
-    state.teamSyncedHash = teamHash();
+    state.teamSyncedHash = hash;
     render();
     toast(`Saved for the team: ${state.staff.length} staff, ${state.roomTemplate.length} rooms and settings.`);
   } catch (e) { cloudError(e); }
@@ -4150,6 +4172,7 @@ async function saveRosterToCloud() {
     storeName(n.trim());
   }
   const data = { day: state.day, roster: state.roster };
+  const hash = dayHash(); // what is being sent: edits made during the save stay "not saved"
   try {
     let ts;
     try {
@@ -4161,7 +4184,7 @@ async function saveRosterToCloud() {
       ts = await cloud.saveRoster(date, data, me(), { force: true });
     }
     state.cloudBase[date] = ts;
-    markSaved(date, ts);
+    markSaved(date, ts, hash);
     delete cs.meta[date]; delete cs.versions[date]; cs.recent = null;
     render();
     toast(`Saved the ${date} roster.`);
@@ -4324,14 +4347,14 @@ addEventListener('unhandledrejection', e => crashed(e.reason));
 // Offline app shell (sw.js): the app opens with poor signal. A new version installs alongside and is offered here.
 (function registerSW() {
   if (!('serviceWorker' in navigator) || location.protocol === 'file:' || window.ROSTER_MOVED_TO || /^(www\.)?anawj\.com$/.test(location.hostname)) return; // not at the old address (it redirects)
-  let reloading = false;
+  let reloading = false, wantReload = false;
   const hadController = !!navigator.serviceWorker.controller; // the first install takes control quietly
-  navigator.serviceWorker.addEventListener('controllerchange', () => { if (reloading || !hadController) return; reloading = true; location.reload(); });
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (reloading || !(hadController || wantReload)) return; reloading = true; location.reload(); });
   navigator.serviceWorker.register('sw.js').then(reg => {
     const offer = w => {
       if (document.getElementById('update-bar')) return;
       document.body.prepend(h('div', { id: 'update-bar', class: 'demo-bar', role: 'status' }, h('b', {}, 'Update available'), h('span', { class: 'grow' }),
-        h('button', { class: 'small primary', onclick: () => { document.getElementById('update-bar')?.remove(); w.postMessage('skipWaiting'); } }, 'Reload')));
+        h('button', { class: 'small primary', onclick: () => { document.getElementById('update-bar')?.remove(); wantReload = true; w.postMessage('skipWaiting'); } }, 'Reload')));
     };
     if (reg.waiting && navigator.serviceWorker.controller) offer(reg.waiting);
     reg.addEventListener('updatefound', () => { const w = reg.installing; w?.addEventListener('statechange', () => { if (w.state === 'installed' && navigator.serviceWorker.controller) offer(w); }); });

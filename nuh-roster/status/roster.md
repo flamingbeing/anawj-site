@@ -1,10 +1,10 @@
 # roster (Claude Code, NUH Roster session)
 
-Last updated: 2026-10-13.
+Last updated: 2026-10-13 (evening).
 
-Nothing in progress. 13 Oct: twenty read-only reviews saved as `../REVIEW-2026-10.md` (nothing built from it yet). All five UX batches (#101–#349) and the move to `nuhroster.anawj.com` (#361) are merged and
-checked; the owner confirmed Google sign-in at the new address. Branch `claude/clever-bohr-mycx7o` has no unmerged
-work: reset it to `origin/main` before the next task.
+13 Oct: built most of `../REVIEW-2026-10.md` (#407–#473, see its "Done on 13 Oct"). A last bug review's 20 findings are fixed
+(#476–#478). The rules PR is open (role allowlist, member shape, stamped writes, date ids,
+staff-list versions; 56 emulator checks), waiting for the owner's approval. It is not merged by a session.
 
-To pick up: read `../STATUS.md` (Waiting on the owner, Next) and `../NOTES.md`. Browser checks are Playwright scripts
-kept outside the repo; `NOTES.md` › Testing says how to run them (serve the repo, `?demo`, block Firebase).
+To pick up: read `../STATUS.md` (Waiting on the owner, Next) and `../NOTES.md`. The browser test is
+`node nuh-roster/test/e2e.mjs` (also in CI); rules tests are `tools/test-rules.sh`.

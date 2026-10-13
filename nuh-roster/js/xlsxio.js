@@ -7,6 +7,7 @@ export function cellText(v) {
   if (typeof v === 'object') {
     if (v.richText) return v.richText.map(t => t.text).join('');
     if (v.text != null) return String(v.text);
+    if (v.result instanceof Date) return v.result.toISOString().slice(0, 10); // a formula whose result is a date
     if (v.result != null) return String(v.result);
     if (v instanceof Date) return v.toISOString().slice(0, 10);
     return '';
@@ -25,7 +26,7 @@ export function dateFromText(text) {
   if (m) return ok(+m[1], +m[2], +m[3]);
   m = t.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})$/);
   if (m) return ok(+m[3] < 100 ? 2000 + +m[3] : +m[3], +m[2], +m[1]);
-  m = t.match(/(\d{1,2})(?:st|nd|rd|th)?[\s-]+([A-Za-z]{3})[a-z]*\.?[\s,-]+(\d{4})/);
+  m = t.match(/(\d{1,2})(?:st|nd|rd|th)?[\s-]+([A-Za-z]{3})[a-z]*\.?[\s,-]+(\d{4})/i);
   if (m && MON.includes(m[2].toLowerCase())) return ok(+m[3], MON.indexOf(m[2].toLowerCase()) + 1, +m[1]);
   return null;
 }
