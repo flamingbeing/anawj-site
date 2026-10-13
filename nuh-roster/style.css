@@ -435,3 +435,7 @@ body.viewer .date-warn, body.viewer .save-state { display: none !important; }
   .chips { gap: 8px; }
   .tabs button { padding: 12px 14px; }
 }
+.welcome { border-top: 4px solid var(--navy); }
+.welcome-steps { padding-left: 20px; display: grid; gap: 12px; }
+.welcome-steps li { line-height: 1.5; }
+.welcome-steps .btn, .welcome-steps button { margin-left: 4px; }
