@@ -70,6 +70,18 @@ for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mj
 
 ## Working with the owner
 
+- **Who the owner is** (13 Oct 2026): a consultant anaesthetist, interested in resident education. No coding
+  background; builds by prompting AI (almost all of this repo came from Claude Code cloud sessions), mostly from a
+  phone through the day, with a laptop at hand when needed. Explain in clinical or everyday terms, not code; never
+  ask the owner to edit code or run commands unless there's no other way, and then give exact steps.
+- **How the owner works:** short bursts on quick wins, or deep dives into a passion project. Work may stop
+  mid-task at any time, so keep each PR small and finished on its own, and keep `STATUS.md` current so the next
+  session (or the owner, days later) can pick up from the files alone.
+- **Speed vs care:** the owner favours speed and merges to main freely while exploring what AI coding can do. That
+  holds for most apps. **Vital apps get more care:** `prewarm/` (live study data) and `logbook/` (live soon): full
+  tests before merging, preview links for the owner, and nothing merged into them while a prewarm case is being
+  collected if the owner has said one is running.
+- **Goal now:** find diverse use cases. Ideas and the longer-term direction are in [ROADMAP.md](ROADMAP.md).
 - **Merging:** merge your own PRs once the checks above pass, then report (with the PR link). Merge by the number the
   PR's creation returned, never a guessed next number (13 Oct 2026: a guess merged another session's PR early). Exceptions: Claude
   Code–Codex handover PRs and PRs changing a `firestore.rules` wait for the owner's explicit approval; the owner may say "auto-merge" for a batch, or
