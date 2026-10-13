@@ -1257,10 +1257,12 @@ function pushUndoAll(what, { day = false } = {}) {
 // The state an entry would replace, in the entry's own form, so the step can be reversed.
 const inverseOf = e => typeof e === 'string' ? JSON.stringify(state.roster?.rows || [])
   : e.rot ? { rot: JSON.stringify(state.rotations), what: e.what }
+  : e.mon ? { mon: JSON.stringify(state.monthly || {}), what: e.what }
   : { roster: JSON.stringify(state.roster), ...(e.day ? { day: JSON.stringify(state.day) } : {}), what: e.what };
 function applyStep(e, verb) {
   if (typeof e === 'string') { if (state.roster) { state.roster.rows = JSON.parse(e); afterRosterEdit(true); } return; }
   if (e.rot) { state.rotations = JSON.parse(e.rot); render(); toast(`${verb === 'Undo' ? 'Undid' : 'Redid'} ${e.what}.`); return; }
+  if (e.mon) { state.monthly = JSON.parse(e.mon); personCache.clear(); syncMonthly(); render(); toast(`${verb === 'Undo' ? 'Undid' : 'Redid'} ${e.what}.`); return; }
   if (e.day) state.day = JSON.parse(e.day);
   state.roster = JSON.parse(e.roster);
   lastRows = state.roster ? JSON.stringify(state.roster.rows) : null;
@@ -2335,6 +2337,14 @@ function renderGeneral() {
 
 // A name as written on a monthly roster ("Quah Zi Hui, Bernice", "LOKE BENJAMIN") -> person
 const personCache = new Map();
+// A monthly roster name that matches more than one person: their names, else null.
+function ambiguousText(text) {
+  const t = cleanCell(text);
+  if (!t || personByText(t)) return null;
+  const m = matchName(t, state.staff);
+  return m.ambiguous?.length ? m.ambiguous.map(p => p.name) : null;
+}
+const unmatchedTitle = v => { const a = ambiguousText(v); return a ? `Could be ${a.join(' or ')}: type more of the name` : 'Not matched to the staff list'; };
 function personByText(text) {
   const t = cleanCell(text);
   if (!t) return null;
@@ -2745,7 +2755,7 @@ function monthlyDayCard() {
   if (!items.length) return null;
   return h('section', { class: 'card' }, h('details', {},
     h('summary', {}, `From the monthly rosters today (${items.length})`),
-    h('table', {}, h('tbody', {}, items.map(([r, c, v]) => h('tr', {}, h('td', { class: 'seen' }, r), h('td', {}, c), h('td', { class: personByText(v) ? '' : 'unmatched', title: personByText(v) ? '' : 'Not matched to the staff list' }, v)))))));
+    h('table', {}, h('tbody', {}, items.map(([r, c, v]) => h('tr', {}, h('td', { class: 'seen' }, r), h('td', {}, c), h('td', { class: personByText(v) ? '' : 'unmatched', title: personByText(v) ? '' : unmatchedTitle(v) }, v)))))));
 }
 
 function renderToday() {
@@ -2787,29 +2797,40 @@ async function readMonthlyFile(file) {
     return readMonthlyPdf(pages);
   }
   const wb = await readWorkbook(file);
-  return readMonthlyXlsx(wb.worksheets[0], cellText);
+  // the roster may not be on the first sheet: take the first sheet that reads as one
+  let first = null;
+  for (const ws of wb.worksheets) {
+    const res = readMonthlyXlsx(ws, cellText);
+    if (!res.error) return res;
+    first ||= res;
+  }
+  return first || { error: `${file.name} has no sheets.` };
 }
 async function importMonthly(files) {
-  const done = [];
+  const done = [], gaps = [];
+  const before = JSON.stringify(state.monthly || {});
   for (const file of files) {
     let res;
     try { res = await readMonthlyFile(file); } catch (e) { res = { error: `Couldn't read ${file.name}: ${e.message}` }; }
     if (res.error) { toast(res.error); continue; }
     const def = monthlyDef(res.kind);
-    const old = state.monthly?.[res.month]?.[res.kind];
-    if (old && !confirm(`Replace the ${def.label} for ${monthName(res.month)} with ${file.name}?`)) continue;
+    // a renamed heading leaves its column empty: say so rather than import half a roster quietly
+    const missingCols = res.cols ? def.cols.filter(c => !res.cols.includes(c.key)).map(c => c.label) : [];
+    if (missingCols.length) gaps.push(`${def.label}: no ${missingCols.join(', ')} column`);
     ((state.monthly ||= {})[res.month] ||= {})[res.kind] = res.data;
     done.push(res);
   }
   if (!done.length) return;
+  pushUndo({ mon: before, what: `importing ${done.length === 1 ? 'the ' + monthlyDef(done[0].kind).label : done.length + ' monthly rosters'}` });
   personCache.clear();
   const names = done.flatMap(r => r.data.entries ? r.data.entries.map(e => e.name) : Object.values(r.data.rows).flatMap(Object.values));
   const missing = [...new Set(names.filter(n => !personByText(n)))];
   const last = done.at(-1);
   state.monthlyView = last.kind;
-  toast(`Imported ${done.map(r => `${monthlyDef(r.kind).label} (${monthName(r.month)})`).join(', ')}.${missing.length ? ` ${missing.length} name(s) aren't on the staff list.` : ''}`);
-  if (last.month !== curMonth() && confirm(`Go to ${monthName(last.month)} to see it?`)) return switchDate(last.month + '-01');
+  const msg = `Imported ${done.map(r => `${monthlyDef(r.kind).label} (${monthName(r.month)})`).join(', ')}.${missing.length ? ` ${missing.length} name(s) aren't on the staff list (in red).` : ''}${gaps.length ? ` Check: ${gaps.join('; ')}.` : ''}`;
   render();
+  if (last.month !== curMonth()) toast(msg, { label: `Show ${monthName(last.month)}`, run: () => switchDate(last.month + '-01') });
+  else undoToast(msg);
 }
 async function exportMonthly(kind) {
   const wb = buildMonthlyWorkbook(await excel(), kind, curMonth(), monthData(kind) || {});
@@ -2827,7 +2848,11 @@ function monthlyBar(kind) {
       h('span', { class: 'grow' }),
       fileButton('Import roster (PDF or Excel)', '.pdf,.xlsx', true, importMonthly),
       h('button', { onclick: () => exportMonthly(kind) }, 'Download .xlsx'),
-      monthData(kind) && h('button', { onclick: () => { if (confirm(`Clear the ${def.label} for ${monthName(curMonth())}?`)) { delete state.monthly[curMonth()][kind]; render(); } } }, 'Clear')),
+      monthData(kind) && h('button', { onclick: () => {
+        pushUndo({ mon: JSON.stringify(state.monthly || {}), what: `clearing the ${def.label}` });
+        delete state.monthly[curMonth()][kind]; personCache.clear(); render();
+        undoToast(`Cleared the ${def.label} for ${monthName(curMonth())}.`);
+      } }, 'Clear')),
     h('p', { class: 'hint', style: 'margin:0' }, kind === 'leave'
       ? 'Leave sets people on leave on those days (Medical Leave counts as MC). Import the HMS leave roster or add leave by hand.'
       : `Import the HMS ${def.label.toLowerCase()} (PDF) or an Excel copy, or type names in. ${def.cols.some(c => c.to) ? 'Columns marked • fill the calls and clinics on Today. ' : ''}${def.cols.some(c => c.night) ? 'Overnight duties make people post call the next day. ' : ''}Names in red aren't matched to the staff list.`));
@@ -2848,7 +2873,7 @@ function renderMonthlyRoster(kind) {
   const today = +state.day.date.slice(8, 10);
   const cell = (d, c) => {
     const v = data?.rows?.[d]?.[c.key] || '';
-    return h('td', {}, nameInput({ value: v, class: v && !personByText(v) ? 'unmatched' : '', title: v && !personByText(v) ? 'Not matched to the staff list' : '',
+    return h('td', {}, nameInput({ value: v, class: v && !personByText(v) ? 'unmatched' : '', title: v && !personByText(v) ? unmatchedTitle(v) : '',
       onchange: e => set(d, c.key, cleanCell(e.target.value)),
       onkeydown: e => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } } }));
   };
@@ -2874,7 +2899,7 @@ function renderLeaveRoster() {
     .sort((a, b) => a.name.localeCompare(b.name) || a.from.localeCompare(b.from));
   const change = () => { personCache.clear(); render(); };
   const row = e => h('tr', {},
-    h('td', {}, nameInput({ value: e.name, class: personByText(e.name) ? '' : 'unmatched', title: personByText(e.name) ? '' : 'Not matched to the staff list', onchange: ev => { e.name = cleanCell(ev.target.value); change(); } })),
+    h('td', {}, nameInput({ value: e.name, class: personByText(e.name) ? '' : 'unmatched', title: personByText(e.name) ? '' : unmatchedTitle(e.name), onchange: ev => { e.name = cleanCell(ev.target.value); change(); } })),
     h('td', {}, h('input', { type: 'date', value: e.from, onchange: ev => { e.from = ev.target.value; if (e.to < e.from) e.to = e.from; change(); } })),
     h('td', {}, h('input', { type: 'date', value: e.to, onchange: ev => { e.to = ev.target.value < e.from ? e.from : ev.target.value; change(); } })),
     h('td', {}, select(e.type, LEAVE_TYPES.includes(e.type) || !e.type ? LEAVE_TYPES : [e.type, ...LEAVE_TYPES], v => { e.type = v; change(); })),
