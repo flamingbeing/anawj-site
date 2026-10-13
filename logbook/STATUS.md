@@ -6,7 +6,7 @@ list, filtered by the app's label, has the rest).
 Each session edits only its own file under `status/` (see **Now**). Update this file when a task finishes, a decision is made, or
 before compacting (`/save-state` in Claude Code, `$save-state` in Codex).
 
-Last updated: 2026-10-13 by Claude Code, Logbook 2 (log2).
+Last updated: 2026-10-13 by Claude Code, Logbook 1 (log1).
 
 ## Now
 
@@ -15,6 +15,7 @@ its own file), so sessions never edit the same lines. Read them all before start
 
 ## Waiting on the owner
 
+- Subdomain hosting (step 1): when log1's PR is ready, do the Cloudflare clicks listed in `SUBDOMAINS.md`.
 - Try the polish batch's new looks on a phone (Advanced display: Flat, button style, icons, plain calendar, page
   titles, shorter rows; Accessibility: press and hold) and the colour picker.
 - Try on a real phone: pins (now also the Reflections search, with sticky topic names), swipe between tabs (cards that
@@ -36,16 +37,29 @@ its own file), so sessions never edit the same lines. Read them all before start
 
 ## Next (agreed queue)
 
-1. (Polish batch done 13 Oct: #250, #254, #268, #272, #274, #264, #289, #295. Owner to try the new looks on a phone.)
-2. Later, low priority: lazy-load rarely used modules (admin, portfolio, importer, xlsxio, backup, progress) to cut
+1. Subdomains (`SUBDOMAINS.md`, plan from the homepage session, agreed with the owner 13 Oct): log1 does step 1
+   (hosting: a Cloudflare Worker serving `main` at the subdomains, nothing moves yet) now, and step 5
+   (apmes.anawj.com for logbook and evals, with the MedHub Evaluations session) last. Tell the homepage session
+   (`session_01F6SrdrEnHJKzjEAr5LcDy8`) when step 1 is done.
+2. Learning points in case summaries (owner's daily habit; secondary goal: logbook usable for non-APMES logging).
+   Part 1, agreed in outline: a line starting `Learning:` (or `Learning points:`; maybe `Pearl:`) in the case summary
+   is the learning points (not "LP": lumbar puncture). Shown as its own line on case rows, searchable, labelled in the
+   Markdown / Excel / Copy exports, and copied into a new reflection's free-text learning points (a copy, no live
+   link). Reflections already have the Numbered | Free text switch, so they stay as they are. Owner has not said "go"
+   yet. Part 2, later: an option (off by default) for a non-APMES logbook: own tag list, APMES categories, targets
+   and progress hidden, counts and Analytics by own tags.
+3. (Polish batch done 13 Oct: #250, #254, #268, #272, #274, #264, #289, #295. Owner to try the new looks on a phone.)
+4. Later, low priority: lazy-load rarely used modules (admin, portfolio, importer, xlsxio, backup, progress) to cut
    first-visit time (now 3.5–4.2 s on a slow phone; repeat visits 0.6–0.8 s). Measure before and after.
-3. Parked ideas, only if asked:
+5. Parked ideas, only if asked:
    - Changed-records-only sync for cases (`syncAt` + delete tombstones; plan in chat on 12 Oct). Firestore usage
      12 Oct: busiest day 23.6k reads / 16.7k writes (bulk work), normal day ~4k reads; free tier 50k/20k a day.
 
 ## Recently done
 
 - #204 The top band's third quarter is the NUHS site's blue `#178fd7`, not cyan; Reflections' NUH tab colour too (`logbook-v26`).
+- #347 Notes: Download notes as files (zip, one .md or .txt each), the linked-case pill opens the case, a Linked row on the case edit page (reflection, notes).
+- #325 (tools) context-nudge mod: a reminder to /save-state and /compact at 50% and 75% context (cloud sessions install it).
 - #295 Polish 6b: seven clean looks (off by default), calendar day Share / Copy (off) / + Add, back links off the bar, device colour picker.
 - #289 Polish 6a: settings pages use switches, ✓ lists and one-line help (ⓘ for more); Advanced pages under headings.
 - #274 Polish 5: the note editor reads like a page (‹ Notes, ⋯ menu with Preview and Delete, Done; no boxes; one info line).
@@ -56,6 +70,13 @@ its own file), so sessions never edit the same lines. Read them all before start
 
 ## Decisions log
 
+- 2026-10-13: Notes keep their 100-note limit (reads, index doc size and the list all assume it); raising it to ~1,000
+  would need a paged list and a bigger index cap. A note's linked-case pill opens the case; the case edit page has a
+  Linked row. Notes can be downloaded as one .md or .txt file each in a zip (owner's requests, #347).
+- 2026-10-13: Case learning points stay in the one summary field, marked by a `Learning:` line; reflections keep their
+  Numbered | Free text switch (owner: "fair to keep everything in 1 field").
+- 2026-10-13: Cloud sessions install the context-nudge mod (reminder at 50% / 75% context to /save-state then
+  /compact; it never compacts for the owner). Owner asked for it; messages sent to the other open sessions (#325).
 - 2026-10-12: Faculty / PCs shows the Admin portal on the tab bar, left of More, for admins only (PDs and faculty
   never see it). A tab missing from a saved tab order goes just before More. The profile list runs from the most
   hidden: Basic: logbook only, Basic, Advanced, Faculty / PCs (owner).
