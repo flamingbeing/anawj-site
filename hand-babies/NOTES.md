@@ -12,8 +12,14 @@ Lasting decisions for `hand-babies/`. Status and next steps: `STATUS.md`.
 
 ## Address
 
-- Lives at `anawj.com/hand-babies/` (moved from `/hand/`, 12 Oct 2026). `hand/` holds only a redirect and a worker
-  that clears the old `hand-*` caches; its cache cleanup must never touch `hand-babies-*` (same prefix start).
+- Lives at `hand.anawj.com/babies/` (moved from `anawj.com/hand-babies/`, 13 Oct 2026, SUBDOMAINS.md step 2). The repo
+  folder stays `hand-babies/`; the Worker maps the address (`worker/routes.js`). Never use absolute `/hand-babies/…`,
+  `/design/…` or `/edit/…` paths in the page: the subdomain serves only this folder (`/design/` and `/edit/` are 404s there).
+- The old `anawj.com/hand-babies/` is the same folder on GitHub Pages: a script at the top of `index.html` sends a
+  top-level visit to the new address (path, query, `#` kept). It skips frames, so the page editor (`/edit/`, on
+  anawj.com until SUBDOMAINS.md step 5) can still open the old copy to edit its text. The old `/hand/` redirect folder
+  is gone (nobody used it).
+- The "Suggest an edit" link and `edit.html` go to `https://anawj.com/edit/?page=%2Fhand-babies%2F` (editor on anawj.com).
 
 ## Updates (offline worker)
 

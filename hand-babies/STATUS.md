@@ -10,6 +10,7 @@ Each session keeps its own line in `status/<session>.md` (`hand.md`). Read them 
 
 ## Waiting on the owner
 
+- Open `hand.anawj.com/babies/` on your phone once (and the old `anawj.com/hand-babies/` to see it forward).
 - Check the 3D poses on a phone and say which, if any, look anatomically off.
 - Clinical read-through by the owner / a hand surgeon (2PD cut-offs, index/little FDS caveats, Elson wording,
   local preferences for splinting and antibiotics).
@@ -21,7 +22,6 @@ Each session keeps its own line in `status/<session>.md` (`hand.md`). Read them 
    add back into the case cards if the owner wants.
 2. Real clinical photos (consented, de-identified) or short videos of each tendon test.
 3. 3D for the remaining flat diagrams (sensation finger, 2PD, zones) if the owner asks; ✓/✗ marks in figures kept.
-4. Delete the `hand/` redirect stub once old links have passed through.
 
 ## Recently done
 
@@ -36,6 +36,7 @@ Each session keeps its own line in `status/<session>.md` (`hand.md`). Read them 
 
 ## Decisions
 
+- 2026-10-13: moved to `hand.anawj.com/babies/` (SUBDOMAINS.md step 2); old address redirects by a top-level-only host check; `hand/` folder deleted; tokens.css link dropped (not served there).
 - 2026-10-13: no Z-Anatomy / MakeHuman models (owner: too much effort); keep the primitive 3D hand.
 - 2026-10-13: EDC tested with all fingers straight, pressing each in turn (ring can't straighten alone); EIP and EDM tested separately.
 - 2026-10-13: owner uses Firefox; test there too. No WebGL: show the figure's GIF.

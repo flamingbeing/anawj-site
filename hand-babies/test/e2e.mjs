@@ -3,13 +3,30 @@
 //   node hand-babies/test/e2e.mjs            SHOTS=<dir> also saves phone screenshots of each section
 const { chromium } = await import(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/node_modules/playwright/index.mjs');
 import assert from 'node:assert/strict';
+
 import fs from 'node:fs';
+import path from 'node:path';
 const AXE = new URL('../../tools/vendor/axe.min.js', import.meta.url).pathname;
 const BASE = `http://localhost:${process.env.PORT || 8080}/hand-babies/`;
 const SHOTS = process.env.SHOTS;
 
 const b = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH, args: ['--no-sandbox'] } : {});
 const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+// The real addresses are served from this checkout: anawj.com (GitHub Pages) as the whole repo, hand.anawj.com as the
+// Worker maps it (/babies/ -> hand-babies/, nothing else), so the move and the page editor can be tested offline.
+const root = new URL('../../', import.meta.url).pathname;
+const MIME = { html: 'text/html', js: 'text/javascript', css: 'text/css', gif: 'image/gif', svg: 'image/svg+xml', json: 'application/json' };
+const serve = (map) => async route => {
+  const u = new URL(route.request().url());
+  let rel = map(decodeURIComponent(u.pathname));
+  if (rel == null) return route.fulfill({ status: 404, body: 'not found' });
+  if (rel.endsWith('/')) rel += 'index.html';
+  const f = path.join(root, rel);
+  if (!f.startsWith(root) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) return route.fulfill({ status: 404, body: 'not found' });
+  await route.fulfill({ status: 200, contentType: MIME[f.split('.').pop()] || 'application/octet-stream', body: fs.readFileSync(f) });
+};
+await ctx.route(/^https:\/\/(www\.)?anawj\.com\//, serve(p => p.replace(/^\//, '')));
+await ctx.route(/^https:\/\/hand\.anawj\.com\//, serve(p => p.startsWith('/babies/') ? 'hand-babies/' + p.slice(8) : null));
 const page = await ctx.newPage();
 const errors = [];
 page.on('pageerror', e => errors.push(e.message));
@@ -86,6 +103,18 @@ try {
   // a scenario link opens its card
   await page.goto(BASE + '#pic-infect');
   assert.ok(await page.$eval('#pic-infect', d => d.open), 'hash opens scenario');
+
+  // the old address moves on to hand.anawj.com/babies/ (path, query and # kept) and the page works there
+  const mv = await ctx.newPage();
+  const mvErrors = []; mv.on('pageerror', e => mvErrors.push(e.message)); mv.on('console', m => m.type() === 'error' && mvErrors.push(m.text()));
+  await mv.goto('https://anawj.com/hand-babies/?x=1#tendons');
+  await mv.waitForURL('https://hand.anawj.com/babies/?x=1#tendons');
+  await mv.waitForFunction(() => document.querySelectorAll('canvas.fig3d').length > 0);
+  assert.ok(await mv.evaluate(async () => { await navigator.serviceWorker.ready; return true; }), 'worker registers on the new host');
+  assert.deepEqual(mvErrors.filter(e => !/WebGL|GL Driver/.test(e)), [], 'errors on hand.anawj.com/babies/');
+  await mv.goto('https://anawj.com/hand-babies/gifs/fpl.gif'); // a file is not a page: no redirect script, still served
+  await mv.close();
+  // only the top page moves: the page editor still frames the old copy to edit its text (below)
 
   // page editor: tap a line, change it, see it in the message that would be sent as a GitHub issue
   const ed = await ctx.newPage();
