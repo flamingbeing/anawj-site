@@ -153,6 +153,9 @@ const g2 = await page.$('button:has-text("Generate roster")'); if (g2) { await g
 ok(!(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)), 'no sideways scroll on a phone');
 ok((await page.$$eval('input, select', es => [...new Set(es.map(e => getComputedStyle(e).fontSize))])).every(s => s === '16px'), 'fields are 16px (no iOS zoom)');
 ok(await page.$$eval('.name, .chip, .add-name, button.small', es => es.filter(e => e.offsetParent && e.getBoundingClientRect().height < 30).length) === 0, 'touch targets 30px+');
+await tab(page, 'Cases');
+ok(!(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)) && await page.$eval('table.cases-table', t => t.scrollWidth <= t.parentElement.clientWidth + 1), 'Cases fits a phone (room cards)');
+await tab(page, 'Roster');
 await page.locator('table.roster-edit .name').first().tap(); await page.waitForTimeout(300);
 ok(await page.$('.tag-editor .bar button.save'), 'person box opens with its Save bar');
 await shot(page, 'phone-box');

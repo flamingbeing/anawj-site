@@ -252,6 +252,8 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
   Entries describe only what the roster does; don't add expansions of abbreviations nobody has confirmed.
 - Rotations: under the grid, a count per posting for every week (0 in red), and "Start <next year> from <year>"
   (week n copied to week n, only into empty weeks, with Undo) when the next year is still empty.
+- Phones: Cases shows each room as a card (run, room and session, then case notes, flags, fixed people; rooms not
+  running show only their first line). Labels made into buttons (`label.btn.primary`, e.g. "Do it all") now look primary.
 - Keep building elements with `h()` and `textContent`; there is no `innerHTML` anywhere, so imported text can't inject.
 
 ## Code map
