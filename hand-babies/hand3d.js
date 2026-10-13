@@ -26,6 +26,7 @@ function gl() {
 const mat = (color, o = {}) => new THREE.MeshStandardMaterial({ color, roughness: .62, metalness: 0, ...o });
 const SKIN = mat(0xefc3a4), NAIL = mat(0xf8e0d6, { roughness: .3 }), GLOVE = mat(0x6d9fd8, { roughness: .45 });
 const TABLE = mat(0xe8ecf1, { roughness: .9 });
+const TABLE_GLASS = mat(0xdfe5ec, { roughness: .9, transparent: true, opacity: .62, depthWrite: false });
 const TENDON = {
   fdp: mat(0xe07b00, { emissive: 0xe07b00, emissiveIntensity: .35 }),
   fds: mat(0x8a4fc4, { emissive: 0x8a4fc4, emissiveIntensity: .35 }),
@@ -128,7 +129,8 @@ function makeScene({ tableY = 0, edgeZ = null } = {}) {
   if (edgeZ == null) {
     const t = mesh(new THREE.PlaneGeometry(80, 80), TABLE); t.rotation.x = -Math.PI / 2; t.position.y = tableY; t.castShadow = false; scene.add(t);
   } else { // a table that ends at z = edgeZ (fingers hang over the edge)
-    const t = mesh(new THREE.BoxGeometry(60, 4, 40), TABLE); t.position.set(0, tableY - 2, edgeZ + 20); t.castShadow = false; scene.add(t);
+    // see-through, so the fingers stay visible when the view is turned to look past the edge
+    const t = mesh(new THREE.BoxGeometry(60, 4, 40), TABLE_GLASS); t.position.set(0, tableY - 2, edgeZ + 20); t.castShadow = false; scene.add(t);
   }
   return scene;
 }
@@ -334,17 +336,20 @@ const FIGS3D = {
     },
   },
 
-  // Elson test for the central slip: middle joint bent 90° over the table edge, straighten against resistance
+  // Elson test for the central slip: the finger lies on the table with the middle joint just past the edge, bent 90°
+  // so the middle bone hangs down; they straighten it against resistance. The other fingers rest flat on the table.
   elson: {
-    dur: 9, cam: { target: [0, -2.5, -3], dist: 28, yaw: -118, pitch: 16 }, scene: { edgeZ: 0 },
+    dur: 9, cam: { target: [0, -2, -2], dist: 28, yaw: -118, pitch: 16 }, scene: { edgeZ: 0 },
     build(scene) {
-      const H = makeHand(); H.root.rotation.z = Math.PI; H.root.position.set(0, 2.05, 9.1 - .3); scene.add(H.root);
+      // palm down (hand turned over); middle finger's PIP (9.1 + 4.7 from the wrist) sits 0.9 past the edge;
+      // lifted .3 so the forearm doesn't dip into the table
+      const H = makeHand(); H.root.rotation.z = Math.PI; H.root.position.set(0, 2.35, 9.1 + 4.7 - .9); scene.add(H.root);
       H.press = pad(H.fingers.middle.segs[1], -1, .55, 2.2);
       return H;
     },
     pose(H, s) {
       const cut = ph(s, 4.6, 5.1);
-      for (const n of ['index', 'ring', 'little']) H.fingers[n].set(95, 100, 70);
+      for (const n of ['index', 'ring', 'little']) H.fingers[n].set(0, 0, 0);
       const floppy = 28 + 14 * Math.sin(s * 2 * Math.PI / .9);
       H.fingers.middle.set(0, 90, (1 - cut) * floppy + cut * -4);
       H.thumb.set(15, 25, 25);

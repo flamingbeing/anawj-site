@@ -1,6 +1,6 @@
 // Makes hand-babies/gifs/<figure>.gif from the page's animated figures, for sharing in chats.
 // Run from the repo root with a static server on port 8080 (python3 -m http.server 8080):
-//   node hand-babies/tools/make-gifs.mjs            needs ffmpeg; rerun after changing a figure in hand-babies/app.js or hand3d.js
+//   node hand-babies/tools/make-gifs.mjs [names]    needs ffmpeg; names limit it to those figures; rerun after changing a figure in hand-babies/app.js or hand3d.js
 const { chromium } = await import(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/node_modules/playwright/index.mjs');
 import fs from 'node:fs';
 import os from 'node:os';
@@ -15,7 +15,8 @@ const page = await (await b.newContext({ viewport: { width: WIDTH + 40, height: 
 await page.addInitScript(() => { window.HAND_GIF = true; });
 await page.goto(`http://localhost:${process.env.PORT || 8080}/hand-babies/`);
 await page.waitForFunction(() => [...document.querySelectorAll('[data-fig]')].every(e => e.querySelector('.fig-art svg, .fig-art canvas')));
-const names = await page.$$eval('[data-fig]', els => els.map(e => e.dataset.fig));
+const all = await page.$$eval('[data-fig]', els => els.map(e => e.dataset.fig));
+const names = process.argv.length > 2 ? all.filter(n => process.argv.includes(n)) : all; // e.g. make-gifs.mjs elson
 for (const name of names) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'handgif-'));
   const el = await page.$(`[data-fig="${name}"] .fig-art`);

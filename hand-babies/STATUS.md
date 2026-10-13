@@ -27,6 +27,7 @@ Last updated: 2026-10-13 by Claude Code, hand assessment session.
 
 ## Recently done
 
+- Elson figure: finger rests on the table, middle joint over the edge (no clipping); see-through table.
 - Firefox: checked the update fix and 3D in Firefox; no-WebGL phones get the GIFs instead of blank boxes.
 - Page edits #302: no update bar; online visits always get the current page (network first, cache offline).
 - #260: updates switch on by themselves; the update bar only reloads (tap did nothing on the owner's phone).
