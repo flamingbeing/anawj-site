@@ -90,6 +90,47 @@ try { for (const width of [390, 1280]) {
   assert.equal((await S()).notes.find(n => n.caseId).caseId, caseId);
   await p.getByRole('button', { name: 'Show all' }).click();
 
+  // the linked case's pill opens the case (its edit page), which links back to the notes and the reflection
+  await p.locator('ul.notes-rows li .note-case').first().click();
+  await p.locator('dialog[open]').getByText('Edit case', { exact: true }).waitFor();
+  assert.equal(await p.locator('.note-editor').count(), 0);
+  const linked = p.locator('dialog[open] .case-links');
+  assert.match(await linked.innerText(), /linked[\s\S]*reflection[\s\S]*Open the notes/i);
+  await linked.getByRole('button', { name: 'Open the notes' }).click();
+  await p.locator('.notes-filter').waitFor();
+  assert.equal(await p.locator('ul.notes-rows li').count(), 1);
+  await p.getByRole('button', { name: 'Show all' }).click();
+  // ... and so does the pill inside the note
+  await p.locator('ul.notes-rows li').filter({ has: p.locator('.note-case') }).first().locator('b').click();
+  if (await p.locator('.note-view:not([hidden])').count()) { await p.getByRole('button', { name: 'More options' }).click(); await p.getByRole('menuitem', { name: 'Edit' }).click(); }
+  await p.locator('.note-meta button.note-case').click();
+  await p.locator('dialog[open]').getByText('Edit case', { exact: true }).waitFor();
+  await p.locator('dialog[open] .case-links').getByRole('button', { name: 'Open the notes' }).click();
+  await p.locator('.notes-filter').waitFor();
+  assert.equal(await p.locator('.note-editor').count(), 0);
+  await p.getByRole('button', { name: 'Show all' }).click();
+
+  // every note as its own file in a zip, Markdown or plain text
+  const dl = p.waitForEvent('download');
+  await p.getByRole('button', { name: 'Download notes as files (zip)' }).click();
+  await p.locator('dialog[open]').getByLabel('Plain text (.txt)').check();
+  await p.locator('dialog[open]').getByRole('button', { name: 'Download', exact: true }).click();
+  const zipPath = await (await dl).path();
+  const names = (await import('node:child_process')).execFileSync('python3', ['-c', 'import sys,zipfile; print("\\n".join(zipfile.ZipFile(sys.argv[1]).namelist()))', zipPath]).toString().trim().split('\n');
+  assert.equal(names.length, 2); assert.ok(names.every(n => n.endsWith('.txt')), names.join('|'));
+  assert.ok(names.some(n => /^\d{4}-\d{2}-\d{2} Fake teaching point\.txt$/.test(n)), names.join('|'));
+
+  // from a case with no notes, "Write a note" starts a note linked to it
+  await p.locator('[role=tab][data-tab=logbook]').click();
+  await p.locator('main li[data-date]').filter({ hasNot: p.locator('.note-flag') }).first().click();
+  await p.locator('dialog[open] .case-links').getByRole('button', { name: 'Write a note' }).click();
+  await p.locator('.note-editor').waitFor();
+  await p.locator('.note-meta button.note-case').waitFor();
+  await p.getByRole('button', { name: 'Done' }).click();
+  await p.evaluate(() => { location.hash = '#notes'; });
+  await p.getByRole('heading', { name: 'Notes', exact: true }).waitFor();
+  await p.getByRole('button', { name: 'Show all' }).click();
+
   // delete goes to the recycle bin, and restores
   await p.locator('ul.notes-rows li').filter({ hasText: 'Fake undated scratch' }).click();
   await p.getByRole('button', { name: 'More options' }).click();

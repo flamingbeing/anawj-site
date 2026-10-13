@@ -116,3 +116,21 @@ export function noteMd(n) {
   return [title ? `### ${title}` : '', body].filter(Boolean).join('\n');
 }
 export const notesMd = list => sortNotes(list).map(noteMd).filter(Boolean).join('\n\n');
+
+// ---- one file per note, for a zip: "2026-10-12 Title.md" (undated: "No date Title.md"), .md or .txt ----
+// Markdown starts with "# Title"; plain text with the title on its own line. The date follows as "Date: …". The linked
+// case is not named (its details stay in the logbook).
+const fileSafe = s => String(s || '').replace(/[\\/:*?"<>|\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').replace(/^[.\s]+|[.\s]+$/g, '').slice(0, 60).trim();
+export function noteFiles(list, fmt = 'md') {
+  const ext = fmt === 'txt' ? 'txt' : 'md', used = new Set();
+  return sortNotes(list).map(n => {
+    const title = noteTitle(n), stem = `${n.date || 'No date'} ${fileSafe(title) || 'Untitled note'}`;
+    let name = stem, i = 1;
+    while (used.has(name.toLowerCase())) name = `${stem} ${++i}`;
+    used.add(name.toLowerCase());
+    const body = String(n.body || '').trim();
+    const head = ext === 'md' ? `# ${title}` : title;
+    const text = [head, n.date ? `Date: ${n.date}` : '', body].filter(Boolean).join('\n\n') + '\n';
+    return { path: `${name}.${ext}`, text };
+  });
+}

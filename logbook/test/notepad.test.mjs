@@ -1,7 +1,7 @@
 // Notes (notepad.js): the stored shape, order, search, the day/case index, the light Markdown and the export.
 // Fake notes only.
 import assert from 'node:assert/strict';
-import { cleanNote, sortNotes, filterNotes, notesOn, noteTitle, plainLines, noteIndex, cleanNoteIndex, sameIndex, parseNote, inline, safeHref, toggleCheck, noteMd, notesMd, MAX_NOTES, LIMITS } from '../js/notepad.js';
+import { cleanNote, sortNotes, filterNotes, notesOn, noteTitle, plainLines, noteIndex, cleanNoteIndex, sameIndex, parseNote, inline, safeHref, toggleCheck, noteMd, notesMd, noteFiles, MAX_NOTES, LIMITS } from '../js/notepad.js';
 import { mdDay, exportNotes } from '../js/markdown.js';
 
 assert.equal(MAX_NOTES, 100);
@@ -79,3 +79,20 @@ assert.match(byPath['Notes.md'], /^---\nnotes: "2"[\s\S]*# Notes\n\n### Undated 
 assert.equal(exportNotes({ cases, notes, opts: { notes: false, progress: false } }).some(f => /Notes/.test(f.text) || f.path === 'Notes.md'), false);
 
 console.log('notepad tests passed');
+
+// one file per note: names, no clashes, .md or .txt
+{
+  const list = [
+    { id: 'a', date: '2026-10-12', title: 'Fake: dose/plan?', body: 'one\ntwo', createdAt: 1 },
+    { id: 'b', date: '2026-10-12', title: 'Fake: dose/plan?', body: '', createdAt: 2 },
+    { id: 'c', date: null, title: '', body: '# Heading line\ntext', createdAt: 3, updatedAt: 3 },
+  ];
+  const md = noteFiles(list, 'md');
+  assert.deepEqual(md.map(f => f.path), ['No date Heading line.md', '2026-10-12 Fake dose plan.md', '2026-10-12 Fake dose plan 2.md']);
+  assert.equal(md[1].text, '# Fake: dose/plan?\n\nDate: 2026-10-12\n\none\ntwo\n');
+  assert.equal(md[0].text, '# Heading line\n\n# Heading line\ntext\n');
+  const txt = noteFiles(list, 'txt');
+  assert.equal(txt[1].path, '2026-10-12 Fake dose plan.txt');
+  assert.equal(txt[1].text, 'Fake: dose/plan?\n\nDate: 2026-10-12\n\none\ntwo\n');
+  assert.deepEqual(noteFiles([], 'md'), []);
+}

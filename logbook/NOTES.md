@@ -398,6 +398,12 @@ portfolio content.
   and its text); `{{notes}}` in the day heading places them there instead; no notes, no heading. The Markdown export
   (renamed from "Notes apps") puts dated notes in their day's case note (a notes-only day gets one) and undated ones
   in `Notes.md`. The backup file holds notes; restore adds missing ones up to the limit. e2e: `test/e2e/notepad.mjs`.
+  A note's linked-case pill (in the list and in the editor) opens that case's edit page over the note
+  (`openCase` → `editCaseDialog`). The edit page has a "Linked" row (not for a new case): Open / Write a
+  reflection (`reflectOnCase`) and Open the notes / Write a note (`openNotes({ caseId, create })`; it saves an open
+  note first). The Notes page's "Download notes as files (zip)" makes one `.md` or `.txt` per note
+  (`noteFiles` in `notepad.js`: "2026-10-12 Title.md", undated "No date Title.md"; title, Date line, text; the linked
+  case isn't named); this is separate from the Markdown export, which puts notes inside the day's case note.
 - **Connect Claude** (`mcp/`, Settings → Connect Claude (advanced) links its README on GitHub): a read-only MCP
   server residents run locally; Google "Desktop app" OAuth (loopback, PKCE) → Firebase `signInWithIdp` → Firestore
   REST as the user, so the rules apply; only `logbooks/{own email}` and the user's own `residents` entry. Owner
