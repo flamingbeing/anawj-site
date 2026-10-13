@@ -26,6 +26,10 @@ Rules that bite:
 - The homepage (`index.html`) only shows whether the server is up or down (owner, Oct 2026). Apps stay unlisted:
   never link them from the homepage, and give each app page `<meta name="robots" content="noindex, nofollow">`
   (GitHub Pages ignores `_headers`, so the meta tag is what keeps anawj.com out of search engines).
+- Subdomains (owner, 13 Oct 2026; plan and progress in [SUBDOMAINS.md](SUBDOMAINS.md)): an app that saves data or
+  signs people in gets its own subdomain (apps sharing data or sign-in share one, like `apmes.` for logbook and
+  evals); static pages share a subdomain by topic (`hand.`). Never put a data app on a subdomain with apps it doesn't
+  need to share with. Name subdomains for what they're for, once.
 
 - `logbook/firestore.rules` is the one rules file for both logbook and evals (Firebase project `apmes-logbook`). It deploys automatically on merge to main; never ask the owner to paste rules.
 - `nuh-roster/firestore.rules` (Firebase project `nuh-roster`) and `prewarm/firestore.rules` (project `prewarm-study`) deploy the same way.
