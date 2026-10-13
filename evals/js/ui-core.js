@@ -39,9 +39,31 @@ export const hasRole = () => isResident() || isFaculty() || isStaff()
 // (submitted, declined, cancelled) with no write of ours pending, so an offline submit that the
 // server later refuses loses nothing. app.js calls pruneDrafts from the assigned watcher.
 export const draftKey = id => `evals-draft-${id}`;
+// A draft saved after the server's last change (an edit in the 15-minute window that hasn't reached
+// the server, or that it refused) is kept; both times come from this phone's clock.
 export function pruneDrafts(list, meta) {
   if (meta && (meta.hasPendingWrites || meta.fromCache)) return;
-  for (const ev of list || []) if (ev.status !== 'requested') { try { localStorage.removeItem(draftKey(ev.id)); } catch {} }
+  for (const ev of list || []) {
+    if (ev.status === 'requested') continue;
+    try {
+      const d = JSON.parse(localStorage.getItem(draftKey(ev.id)) || 'null');
+      if (d && ev.status === 'submitted' && (d.at || 0) > (toMs(ev.updatedAt) || 0) && Date.now() - d.at < 7 * 864e5) continue;
+      localStorage.removeItem(draftKey(ev.id));
+    } catch {}
+  }
+}
+
+// Sign out, but first warn when answers on this phone haven't reached the server: signing out
+// deletes this device's offline copy, unsent forms included.
+export async function signOutSafely() {
+  if (await cloud.hasUnsentWrites()) {
+    const ok = await confirmBox('Not sent yet',
+      'Some answers on this phone haven’t reached the server yet (no signal?). Signing out now deletes them. Wait until you have signal, then sign out.',
+      'Sign out anyway', true);
+    if (!ok) return;
+  }
+  try { await cloud.signOut(); }
+  catch (err) { console.warn(err); toast('Couldn’t sign out. Check your signal and try again.'); }
 }
 
 // A request that needs the resident: declined, new feedback, or waiting 20 h or more (nudge).
@@ -149,6 +171,24 @@ export function confirmBox(title, text, okLabel = 'OK', danger = false) {
         h('button', { class: danger ? 'n-btn n-btn--alert' : 'n-btn', onclick: () => { ok = true; m.close(); } }, okLabel)),
     ], { onclose: () => resolve(ok) });
   });
+}
+
+// Plain words for the errors people actually meet; the code stays in brackets for support.
+export function errText(e) {
+  const code = String(e?.code || '').replace(/^firestore\//, '');
+  const msg = {
+    'permission-denied': 'You can’t change this any more (it may have been cancelled, reassigned or closed).',
+    'unavailable': 'No connection. Check your signal and try again.',
+    'auth/network-request-failed': 'No connection. Check your signal and try again.',
+    'auth/popup-closed-by-user': 'The sign-in window was closed before it finished. Try again.',
+    'auth/cancelled-popup-request': 'The sign-in window was closed before it finished. Try again.',
+    'auth/popup-blocked': 'Your browser blocked the sign-in window. Try again, or allow pop-ups for this site.',
+    'auth/unauthorized-domain': 'Sign-in doesn’t work from this address. Open apmes.anawj.com/evals/ instead.',
+    'auth/web-storage-unsupported': 'This browser blocks sign-in (private mode or blocked cookies). Open the link in Chrome or Safari.',
+  }[code];
+  if (msg) return msg;
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return 'No connection. Check your signal and try again.';
+  return `Something went wrong. Try again${code ? ` (${code})` : ''}.`;
 }
 
 // ---------- routing ----------

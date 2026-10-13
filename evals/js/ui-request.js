@@ -2,7 +2,7 @@
 // Also exports the pieces the other resident screens reuse: the assessor picker, the share sheet,
 // the QR code, item rows and the resident styles.
 
-import { S, hooks, h, fill, toast, cloud, icon, go, toolLabel, fmtDate, modal, debounce, avatar } from './ui-core.js';
+import { S, hooks, h, fill, toast, cloud, icon, go, toolLabel, fmtDate, modal, debounce, avatar, errText } from './ui-core.js';
 import { EPAS, ITEMS, itemById, searchItems, CATALOGUE_VERSION } from './catalogue.js';
 import { progress, dueItems, caseKey, sameCaseCount, identifierWarning, todayISO, residentYear } from './engine.js';
 import qrcode from './vendor/qrcode.js';
@@ -180,7 +180,7 @@ async function copyText(text) {
   catch {
     const t = h('textarea', { style: 'position:fixed;opacity:0' }, text);
     document.body.append(t); t.select();
-    try { document.execCommand('copy'); toast('Link copied'); } catch { toast('Copy failed: press and hold the link'); }
+    try { document.execCommand('copy'); toast('Link copied'); } catch { toast('Couldn’t copy. Press and hold the link to copy it.'); }
     t.remove();
   }
 }
@@ -578,7 +578,7 @@ function stepCase() {
       F.sending = false;
       F.error = e?.code === 'permission-denied'
         ? `Not sent: ${F.assessor?.name || 'this assessor'} is not on the active faculty list. Choose another assessor, or ask the PD to add them.`
-        : 'Not sent: ' + (e.message || e) + '. Check your signal and try again.';
+        : 'Not sent. ' + errText(e);
       paint();
     }
   }
@@ -593,7 +593,7 @@ function stepShare() {
   return [
     h('div', { class: 'e-card' },
       h('div', { class: 'e-rq-done-head' }, icon('check'),
-        h('div', {}, h('h2', { class: 'e-h3', style: 'margin:0' }, F.offline ? 'Saved: sends when online' : 'Request sent'),
+        h('div', {}, h('h2', { class: 'e-h3', style: 'margin:0' }, F.offline ? 'Saved. It sends when you’re back online' : 'Request sent'),
           h('p', { class: 'e-small e-muted', style: 'margin:0' }, `${toolLabel(ev.tool)} · ${ev.assessorName}`)))),
     sharePanel(ev),
     h('div', { class: 'e-stack' },

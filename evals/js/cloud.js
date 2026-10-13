@@ -76,6 +76,23 @@ const soft = p => p.catch(e => {
   return null;
 });
 
+// True when this phone holds writes the server hasn't confirmed yet (e.g. a form submitted without
+// signal). Signing out would delete them with the offline cache, so the UI asks first.
+export async function hasUnsentWrites(ms = 1500) {
+  if (demo || !fb) return false;
+  const { db, F } = await sdk();
+  let done = false;
+  const settle = () => { done = true; };
+  await Promise.race([F.waitForPendingWrites(db).then(settle, settle), new Promise(r => setTimeout(r, ms))]);
+  return !done;
+}
+// Resolves once every write made so far has reached the server.
+export async function whenSynced() {
+  if (demo) return;
+  const { db, F } = await sdk();
+  await F.waitForPendingWrites(db);
+}
+
 // ---- sign-in ----
 
 const asUser = u => (u ? { email: lc(u.email), name: u.displayName || u.email, uid: u.uid } : null);
