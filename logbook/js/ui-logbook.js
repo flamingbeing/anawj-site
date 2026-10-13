@@ -6,7 +6,7 @@ import { flagCase } from './importer.js';
 import { exportWorkbook, readSheetGrid } from './xlsxio.js';
 import { cleanExportOpts, exportTables, rangeText, CASE_COLS, REFL_COLS } from './export-opts.js';
 import { inExport } from './reflections.js';
-import { parseQuery, matchQuery, OPERATOR_HELP, insertOperator } from './search-ops.js';
+import { parseQuery, matchQuery, OPERATOR_HELP, insertOperator, FIELDS, FIELDS_NO_HAS } from './search-ops.js';
 import { parseCsv } from './tags.js';
 import {
   S, h, toast, debounce, modal, cat, categoryNamesRevision, catName, catShort, tagName, catFull, catChip, PICKER_ORDER, settings, patchLogbook, needExcel, download, fileButton, catPills,
@@ -19,6 +19,7 @@ import { moveToBin } from './bin.js';
 import { destinations, openSend } from './ui-send.js';
 import { syncButton } from './ui-sync.js';
 import { shareText, copyText, caseText as shareCaseText, dayTextWithNotes } from './share.js';
+import { labelsOn, parseParts, rowSegments, findLabel, takeHas } from './parts.js';
 
 // has: tags a case must all have; not: tags it must have none of ('c:16' or a personal tag key); from/to: dates
 const FRESH = () => ({ q: '', has: [], not: [], from: '', to: '', flag: '', mode: null, limit: 150, month: null, day: null });
@@ -42,6 +43,29 @@ function tagChoices() {
   for (const c of S.cases || []) for (const k of c.tags || []) if (!known.has(k)) gone.set(k, (gone.get(k) || 0) + 1);
   for (const [k, n] of gone) out.push({ k, depth: 0, label: `${tagName(k)} (${n} case${n === 1 ? '' : 's'})` });
   return out;
+}
+// Labelled parts (Settings → Advanced logging; off by default): which parts a case has and its row text, worked out
+// once per version of the case and list of labels
+let partMemo = new WeakMap(), partFor = null;
+function partInfo(c, labels) {
+  if (partFor !== labels) { partMemo = new WeakMap(); partFor = labels; }
+  let m = partMemo.get(c);
+  if (!m) {
+    const text = caseParts(c).details;
+    m = { keys: new Set(parseParts(text, labels).parts.filter(p => p.text.trim()).map(p => p.k)), segs: rowSegments(text, labels) };
+    partMemo.set(c, m);
+  }
+  return m;
+}
+// a row's text with each part's label in bold ("Plan: GA"), on lines of their own; parts hidden in lists left out
+function partsText(c, labels) {
+  const out = [];
+  for (const seg of partInfo(c, labels).segs) {
+    if (out.length) out.push('\n');
+    if (seg.label) out.push(h('b', { class: 'part-l' }, seg.label + ':'), seg.text ? ' ' + seg.text : '');
+    else out.push(seg.text);
+  }
+  return out.length ? out : null;
 }
 // The text a case is searched by, worked out once per version of the case (logbooks run to thousands)
 // (and again when your tags change: renamed tags are searched by their new names)
@@ -71,8 +95,14 @@ export function renderLogbook() {
     // case sensitive (off by default) keeps capitals apart ("GA" doesn't find "gastrectomy")
     const scope = settings().lbScope || 'all', fuzzy = !!settings().lbFuzzy, cs = !!settings().lbCase;
     const low = t => (cs ? t : t.toLowerCase());
-    const words = low(win ? win.rest : view.q).split(/\s+/).filter(Boolean);
-    const ops = opsOn() && words.length ? parseQuery(win ? win.rest : view.q, { keepCase: cs }) : null;
+    // has:lp (Labelled parts on): cases with that part; a plain search takes it here, Advanced search as an operator
+    const labels = labelsOn(settings());
+    let q = win ? win.rest : view.q;
+    const has = labels && !opsOn() ? takeHas(q, labels) : null;
+    if (has) q = has.rest;
+    const words = low(q).split(/\s+/).filter(Boolean);
+    const ops = opsOn() && words.length ? parseQuery(q, { keepCase: cs, fields: labels ? FIELDS : FIELDS_NO_HAS }) : null;
+    const partHas = c => t => { const l = labels && findLabel(t, labels); return !!l && partInfo(c, labels).keys.has(l.k); };
     if (hayFor !== settings().tagSet || hayNames !== categoryNamesRevision) { hayCache = new WeakMap(); hayFor = settings().tagSet; hayNames = categoryNamesRevision; }
     const hayOf = c => {
       let m = hayCache.get(c);
@@ -84,12 +114,13 @@ export function renderLogbook() {
       return m[key];
     };
     return S.cases.filter(c => {
-      if (view.flag && !(view.flag === 'interesting' ? c.reflectTag : flagsOf(c).includes(view.flag))) return false;
+      if (view.flag && !(view.flag === 'interesting' ? c.reflectTag : view.flag.startsWith('part:') ? !!labels && partInfo(c, labels).keys.has(view.flag.slice(5)) : flagsOf(c).includes(view.flag))) return false;
       if (view.has.length && !view.has.every(k => hasTag(c, k))) return false;
       if (view.not.length && view.not.some(k => hasTag(c, k))) return false;
       if ((view.from || view.to) && !(c.date && (!view.from || c.date >= view.from) && (!view.to || c.date <= view.to))) return false;
       if (win && !(c.date && c.date >= win.from && c.date <= win.to)) return false;
-      if (ops) return matchQuery(ops, k => (k === 'all' ? hayOf(c) : partsOf(c, cs)[k]), t => tagHas(c, t), (hay, w, f) => textHas(hay, w, fuzzy && f !== 'initials' && (f || scope !== 'initials')));
+      if (has && has.keys.length && !has.keys.every(k => k && partInfo(c, labels).keys.has(k))) return false;
+      if (ops) return matchQuery(ops, k => (k === 'all' ? hayOf(c) : partsOf(c, cs)[k]), t => tagHas(c, t), (hay, w, f) => textHas(hay, w, fuzzy && f !== 'initials' && (f || scope !== 'initials')), partHas(c));
       if (!words.length) return true;
       const hay = hayOf(c);
       return words.every(w => textHas(hay, w, fuzzy && scope !== 'initials'));
@@ -114,7 +145,11 @@ export function renderLogbook() {
   const paintSoon = debounce(() => { view.limit = 150; paint(); }, 150);
 
   const nFlag = f => S.cases.filter(c => flagsOf(c).includes(f)).length;
-  const flagOpts = [['', 'All cases'], ['needsDate', `Needs a date (${nFlag('needsDate')})`], ['duplicate', `Possible duplicates (${nFlag('duplicate')})`], ['future', `Upcoming (${nFlag('future')})`], ...(basicHides('reflect') ? [] : [['interesting', `Interesting (${S.cases.filter(c => c.reflectTag).length})`]])];
+  // with Labelled parts on, one more for each label: "Has learning point (12)"
+  const labelList = labelsOn(settings()) || [];
+  const flagOpts = [['', 'All cases'], ['needsDate', `Needs a date (${nFlag('needsDate')})`], ['duplicate', `Possible duplicates (${nFlag('duplicate')})`], ['future', `Upcoming (${nFlag('future')})`], ...(basicHides('reflect') ? [] : [['interesting', `Interesting (${S.cases.filter(c => c.reflectTag).length})`]]),
+    ...labelList.map(l => ['part:' + l.k, `Has ${l.n.toLowerCase()} (${S.cases.filter(c => partInfo(c, labelList).keys.has(l.k)).length})`])];
+  if (view.flag && !flagOpts.some(([v]) => v === view.flag)) view.flag = '';   // a label since taken off, or the setting off
   const counter = h('span', { class: 'muted', style: 'font-size:calc(13px * var(--fs, 1))' });
 
   // the two filters fold behind a Filter button (shown open while one is in use)
@@ -166,7 +201,8 @@ export function renderLogbook() {
   const filters = h('div', { class: 'lb-filters', hidden: !(view.showFilters || active()) },
     h('div', { class: 'lb-grid' }, cell('Show', flagSel), cell('Search in', searchIn)),
     h('div', { class: 'bar lb-folds' }, dateBtn, tagBtn, moreBtn, resetBtn),
-    datePanel, tagPanel, morePanel);
+    datePanel, tagPanel, morePanel,
+    labelList.length ? h('p', { class: 'lb-points' }, h('a', { href: '#points' }, 'All learning points ›')) : null);
   // everything back to how it starts: search text, tag and date filters, search options
   function resetLink() {
     return h('button', { class: 'small linkish', style: 'margin-left:auto', onclick: () => {
@@ -230,9 +266,10 @@ export function renderLogbook() {
   function setBox(v) { searchBox.value = v; searchWrap.classList.toggle('has-text', !!v); paintOpsNote(); }
   const opsNote = h('p', { class: 'hint lb-opsnote', hidden: true });
   const paintOpsNote = () => {
-    const u = opsOn() && view.q ? parseQuery(view.q).unknown : [];
-    opsNote.hidden = !u.length;
-    opsNote.textContent = u.map(x => `“${x.op}” isn’t an operator (searched as text): did you mean ${x.suggest}?`).join(' ');
+    const on = !!labelsOn(settings()), u = opsOn() && view.q ? parseQuery(view.q, { fields: on ? FIELDS : FIELDS_NO_HAS }).unknown.filter(x => on || x.op.toLowerCase() !== 'has:') : [];
+    const needs = opsOn() && !on && /(^|\s)-?has:/i.test(view.q || '');
+    opsNote.hidden = !u.length && !needs;
+    opsNote.textContent = [...u.map(x => `“${x.op}” isn’t an operator (searched as text): did you mean ${x.suggest}?`), ...(needs ? ['has: needs Labelled parts (Settings → Advanced logging): searched as text.'] : [])].join(' ');
   };
   const helpBtn = opsOn() ? h('button', { type: 'button', class: 'small icon-btn', title: 'Search operators', 'aria-label': 'Search operators', onclick: () => opsHelp(searchBox, v => { view.q = v; searchWrap.classList.toggle('has-text', !!v); paintOpsNote(); refresh(); }) }, '?') : null;
   paintFilterBtn(); repaintFilters(); paintSaved(); paintOpsNote();
@@ -386,7 +423,7 @@ function caseRow(c, flagsOf) {
       // the left column: the initials on top, the date on one line under them (like Reflections; owner, 13 Oct 2026)
       h('span', { class: 'd' }, p.initials ? h('b', { class: 'ini' }, p.initials) : null,
         h('span', { class: 'dt' }, c.date ? [h('span', { class: 'wd' }, weekday(c.date)), ' ', fmtDate(c.date).replace(/ \d{4}$/, '')] : (c.dateText || '—'))),
-      h('span', { class: 't' }, p.details || h('i', { class: 'muted' }, 'no details')),
+      h('span', { class: 't' }, (labelsOn(settings()) ? partsText(c, labelsOn(settings())) : p.details) || h('i', { class: 'muted' }, 'no details')),
       // tags on the left (wrapping), Copy and Reflect on the right, the same size whatever they say
       h('span', { class: 'c' }, tagRow(h('span', { class: 'c-tags' }, catTags(c.cats),
         flags.includes('needsDate') ? h('span', { class: 'flag err' }, 'needs date') : null,

@@ -10,10 +10,12 @@ import {
   createCase, updateCase, removeCase, restoreCase, saveMany, deleteMany, subcatChips, subcatsOf, settings, todayISO, hooks, fill, add, cloud, writes, okNoIds, patchLogbook, catPills, basicHides, basicMode, caseShown } from './ui-core.js';
 import { display, templateDialog } from './ui-settings.js';
 import { moveToBin } from './bin.js';
-import { caseHasNotes, openNotes, dayNoteBox } from './ui-notepad.js';
+import { caseHasNotes, openNotes, dayNoteBox, addNotes, notesRoom } from './ui-notepad.js';
 import { createDraftSlot, listDrafts } from './drafts.js';
 import { STRONG, confident, autoTick, rejectCodes, recentCases, recentCount as snapRecent } from './logging.js';
 import { SHARED_KEY, peekShared, popShared, sharedFiles, shareState } from './share-in.js';
+import { labelsOn, labelOf, parseParts, suggestText, cleanCaseTemplate, templateCaret, stripTemplate, splitOverflow, MAX_DETAILS } from './parts.js';
+import { LIMITS as NOTE_LIMITS } from './notepad.js';
 
 const DRAFT_KEY = 'logbook-draft-v2';
 const KEEP_MS = 12 * 3600e3; // a date kept by "Save, keep date" lasts this long
@@ -25,11 +27,13 @@ const EMPTY = () => ({ date: null, details: '', initials: '', initialsHint: '', 
 let draft = EMPTY(), draftOwner = null, draftSlot = null, draftError = '';
 let suggestedSave = null, saving = false;
 const draftText = () => [draft.initials, draft.details].filter(Boolean).join(' ').trim();
+// something typed (a case template with nothing added doesn't count)
+const typedText = () => !!(String(draft.initials || '').trim() || (draft.details.trim() && !onlyTemplate(draft.details)));
 // Keep deliberately entered initials when switching back to the combined box,
 // even if those letters also name a procedure (IJ, TKR). Editing the prefix can replace them.
-const draftParts = () => {
-  if (draft.initials) return { initials: draft.initials, details: draft.details.trim() };
-  const text = draft.details.trim(), hint = draft.initialsHint;
+const draftParts = (box = draft.details) => {
+  if (draft.initials) return { initials: draft.initials, details: box.trim() };
+  const text = box.trim(), hint = draft.initialsHint;
   if (hint && text.slice(0, hint.length).toUpperCase() === hint && (!text.slice(hint.length) || /^\s/.test(text.slice(hint.length))))
     return { initials: hint, details: text.slice(hint.length).trim() };
   return splitInitials(text);
@@ -65,7 +69,7 @@ window.addEventListener('pagehide', saveDraft);
 window.addEventListener('hashchange', () => { if (draftTimer) saveDraft(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden) saveDraft(); });
 export function recoverableCaseDrafts() {
-  try { return listDrafts(DRAFT_KEY, draftKey().slice(DRAFT_KEY.length + 1)).filter(x => x.value.details || x.value.initials || x.value.bulk); } catch { return []; }
+  try { return listDrafts(DRAFT_KEY, draftKey().slice(DRAFT_KEY.length + 1)).filter(x => (x.value.details && !onlyTemplate(x.value.details)) || x.value.initials || x.value.bulk); } catch { return []; }
 }
 export function recoverCaseDraft(value) { loadDraft(); saveDraft(); draftSlot = createDraftSlot(DRAFT_KEY, draftOwner.slice(DRAFT_KEY.length + 1)); draft = { ...EMPTY(), ...value }; saveDraft(); location.hash = '#log'; hooks.render(); }
 // Text shared to the installed app (share sheet → Logbook; manifest share_target) arrives as
@@ -87,7 +91,7 @@ export function takeShared(force = false) {
 export function logOnDate(iso) {
   loadDraft();
   // a fresh case for that day; a case already being typed stays, and only its date changes
-  const typing = draftText() || (draft.cats || []).length;
+  const typing = typedText() || (draft.cats || []).length;
   if (typing) setTimeout(() => toast('Date set. The case you were typing is still in the box'), 300);
   else Object.assign(draft, { details: '', initials: '', initialsHint: '', cats: [], tags: [], reflectTag: false, ...FRESH_TICKS() });
   draft.mode = 'one';
@@ -125,6 +129,63 @@ function setCats(next) {
 }
 // a new case starts with nothing ticked automatically and nothing turned down
 const FRESH_TICKS = () => ({ auto: [], rejected: [] });
+
+// Settings → Advanced logging → Labelled parts (null when off) and Case template ('' when off); parts.js
+const labels = () => labelsOn(settings());
+const caseTemplate = () => { const t = settings().caseTplOn ? cleanCaseTemplate(settings().caseTpl) : ''; return t.trim() ? t : ''; };
+// the box holds only the template (nothing added): as good as empty
+const onlyTemplate = text => { const tpl = caseTemplate(); return !!tpl && !!String(text || '').trim() && !stripTemplate(text, tpl, labels()).trim(); };
+// An empty case box gets the template when it takes the focus, the cursor after its first label; left as it was,
+// the template goes again when the box loses the focus (nothing to save, no draft kept)
+function putTemplate(ta) {
+  const tpl = caseTemplate();
+  if (!tpl || ta.value.trim() || draft.mode === 'bulk') return;
+  ta.value = tpl; draft.details = tpl;
+  // the tap that focused the box puts the cursor where it landed: put it back once that tap ends
+  const at = templateCaret(tpl), place = () => { if (document.activeElement === ta && ta.value === tpl) ta.setSelectionRange(at, at); };
+  place();
+  ta.addEventListener('click', place, { once: true });
+  setTimeout(() => ta.removeEventListener('click', place), 800);
+  saveDraftSoon(); paintParsed(false);
+}
+function dropTemplate(ta) {
+  if (!onlyTemplate(ta.value)) return;
+  ta.value = ''; draft.details = ''; saveDraft(); paintSuggest(); paintParsed(false);
+}
+// Tag suggestions and your shorthand read the case without its learning points (Labelled parts on)
+const forTags = text => suggestText(text, labels());
+
+// A case longer than the 2000 characters a case can hold (firestore.rules): with a yes, the first part stays in the
+// case and the rest goes into a note linked to it, never cut off silently. rows: [{ details }] (changed in place:
+// details shortened, rest added); false when cancelled or there's no room in Notes.
+async function splitLong(rows) {
+  const over = rows.filter(r => String(r.details || '').length > MAX_DETAILS);
+  if (!over.length) return true;
+  const cut = over.map(r => splitOverflow(r.details));
+  if (cut.some(x => x.rest.length > NOTE_LIMITS.body)) { toast('A case is too long even with a note: shorten it first'); return false; }
+  const one = over.length === 1;
+  if (!(await confirmBox('Longer than a case can hold', `${one ? 'This case is' : `${over.length} cases are`} over the ${MAX_DETAILS}-character limit. Keep the first part in the case and move the rest into a note linked to it?`, one ? 'Move the rest to a note' : 'Move the rest to notes'))) return false;
+  let room = 0;
+  try { room = await notesRoom(); } catch { /* counted as none */ }
+  if (room < over.length) { toast(`No room in Notes (100 at most) for ${one ? 'the rest' : over.length + ' notes'}: shorten ${one ? 'the case' : 'them'} or delete some notes`); return false; }
+  over.forEach((r, i) => { r.details = cut[i].head; r.rest = cut[i].rest; });
+  return true;
+}
+// the notes for split cases, once the cases are saved: [{ c (the saved case), rest }] -> a promise of the notes made,
+// or null when there are none. No toast of its own (there is one toast, and it would hide the Saved toast's Undo):
+// the caller adds restSaid() to its toast, and its Undo calls binRest()
+function restNotes(list) {
+  const todo = list.filter(x => x.rest);
+  if (!todo.length) return null;
+  return addNotes(todo.map(({ c, rest }) => ({ date: c.date || null, caseId: c.id, title: 'Rest of the case' + (c.initials ? ' · ' + c.initials : ''), body: rest })))
+    .catch(err => { toast('The rest of the case was not saved as a note: ' + err.message); return []; });
+}
+const restSaid = list => { const n = list.filter(x => x.rest).length; return !n ? '' : n === 1 ? ' · the rest is in a linked note' : ` · the rest of ${n} cases is in linked notes`; };
+async function binRest(made) {
+  const notes = made ? await made : [];
+  if (!notes || !notes.length) return;
+  try { const { moveToBin } = await import('./bin.js'); await moveToBin('note', notes); } catch (err) { toast('Could not remove the linked note: ' + err.message); }
+}
 
 // ---------- category picker (search + grouped list) ----------
 
@@ -455,6 +516,7 @@ function saveFromEmptyLine(ta, another) {
 
 function renderOne(card) {
   suggestedSave = null;
+  if (onlyTemplate(draft.details)) draft.details = '';   // the template comes back when the box takes the focus
   const separateInitials = firstField() === 'initials';
   if (separateInitials && !draft.initials) {
     const parts = draftParts(); draft.initials = parts.initials; draft.details = parts.details;
@@ -470,6 +532,8 @@ function renderOne(card) {
     placeholder: placeholderRows().map(([a, b]) => `${a}  ← ${b}`).join('\n'),
     value: draft.details,
     oninput: e => { suggestedSave = null; draft.details = e.target.value; saveDraftSoon(); suggestSoon(); paintParsed(true); },
+    // Settings → Advanced logging → Case template (off by default)
+    onfocus: e => putTemplate(e.target), onblur: e => dropTemplate(e.target),
     // Settings → Logging → Enter key: 'newline' (default; Ctrl/Cmd+Enter saves), 'double' (Enter on an empty
     // line saves, so a case can still take several lines) or 'single' (Enter saves; Shift+Enter a new line)
     onkeydown: e => {
@@ -499,6 +563,7 @@ function renderOne(card) {
     if (!was) return;
     draft.details = ''; textarea.value = ''; saveDraft(); paintSuggest(); paintParsed(false);
     textarea.focus({ preventScroll: true });
+    if (document.activeElement === textarea) putTemplate(textarea);
     toast('Case box cleared', { action: 'Undo', onaction: () => { draft.details = was; draft.rejected = [...new Set([...(draft.rejected || []), ...rejected])]; if (ui.textarea) { ui.textarea.value = was; paintSuggest(); paintParsed(false); } saveDraft(); } });
   } }, ic('clear'));
   const selected = h('div', { class: 'chips selected' });
@@ -548,6 +613,8 @@ function renderOne(card) {
   // behind it, transparent but for the marks; owner's Apple-apps review), and the line under it says only what the
   // age means ("6m = 6 years · male"), the one thing worth checking
   const parsed = h('div', { class: 'parsed', 'aria-live': 'polite' });
+  // over the 2000 characters a case holds: said under the box (Save offers to move the rest into a note)
+  const tooLong = h('p', { class: 'tip too-long', 'aria-live': 'polite', hidden: true });
   const boxMarks = h('div', { class: 'box-marks', 'aria-hidden': 'true' });
   textarea.addEventListener('scroll', () => { boxMarks.scrollTop = textarea.scrollTop; });
   // Only the selected categories and Save stay pinned: a slim bar at the end of the card that sticks
@@ -562,7 +629,7 @@ function renderOne(card) {
   add(card,
     h('div', { class: 'lp-left' },
       initialsInput ? h('label', { class: 'field log-initials' }, 'Initials', initialsInput) : null,
-      h('div', { class: 'box-wrap' }, boxMarks, textarea, pasteBtn(textarea), clearBtn), parsed, tagRow,
+      h('div', { class: 'box-wrap' }, boxMarks, textarea, pasteBtn(textarea), clearBtn), tooLong, parsed, tagRow,
       // suggestions first, then the last case and your own templates
       h('div', { class: 'chiplabel quick-label' }, 'Quick picks'), sugg, templates,
       // Settings → Notes → Show the daily note on the Case tab (off by default)
@@ -585,7 +652,7 @@ function renderOne(card) {
     if (t.closest('input:not([type=checkbox]), textarea, select, .datepick, .box-wrap')) return;
     if (t.closest('.chip, .picker li, label.check, [role=button], button, a.btn')) e.preventDefault();
   });
-  Object.assign(ui, { initials: initialsInput, draftNote, textarea, parsed, boxMarks, sugg, selected, selExtra, groupSave, tip, enterHint, templates, picker, paintCommon });
+  Object.assign(ui, { initials: initialsInput, draftNote, textarea, parsed, tooLong, boxMarks, sugg, selected, selExtra, groupSave, tip, enterHint, templates, picker, paintCommon });
   paintSuggest(); paintSel(); paintQuick(); paintParsed(false);
   watchMarks(textarea);
   requestAnimationFrame(() => alignPlaceholder(textarea));
@@ -605,12 +672,22 @@ function paintParsed(typed) {
   const text = draftText();
   paintEnterHint();
   setText(ui.draftNote, draftError || (text ? 'Draft saved' : ''));
-  if (!text) { if (ui.parsed.firstChild) fill(ui.parsed); ui.parsed.dataset.age = ''; marksSoon([]); return; }
+  if (!text) { if (ui.parsed.firstChild) fill(ui.parsed); ui.parsed.dataset.age = ''; ui.parsed.dataset.key = ''; if (ui.tooLong) ui.tooLong.hidden = true; marksSoon([]); return; }
   const { initials, details } = draftParts();
   const { age } = settings().detectAgeSex !== false ? splitAge(details) : { age: '' };
-  if (ui.parsed.dataset.age !== age || (!age && ui.parsed.firstChild)) {
-    ui.parsed.dataset.age = age;
-    fill(ui.parsed, age ? h('span', { class: 'pi' }, h('b', {}, age), ` = ${humanAge(age)}`) : null);
+  // Labelled parts on: which parts the box has ("Parts Learning point · Plan"), so you see a label was read
+  const lab = labels();
+  const names = lab ? [...new Set(parseParts(details, lab).parts.filter(p => p.text.trim()).map(p => p.name.replace(/ \d+$/, '')))] : [];
+  const key = age + '|' + names.join('|');
+  if (ui.parsed.dataset.key !== key) {
+    ui.parsed.dataset.key = key; ui.parsed.dataset.age = age;
+    fill(ui.parsed, age ? h('span', { class: 'pi' }, h('b', {}, age), ` = ${humanAge(age)}`) : null,
+      names.length ? h('span', { class: 'pi parts-read' }, h('small', {}, 'Parts '), names.join(' · ')) : null);
+  }
+  if (ui.tooLong) {
+    const tpl = caseTemplate(), over = (tpl ? stripTemplate(details, tpl, labels()) : details).length - MAX_DETAILS;
+    if (ui.tooLong.hidden !== !(over > 0)) ui.tooLong.hidden = !(over > 0);
+    setText(ui.tooLong, over > 0 ? `${over} character${over === 1 ? '' : 's'} over the ${MAX_DETAILS} a case holds: Save offers to move the rest into a linked note.` : '');
   }
   // where they are in the box's own text (the initials only when they're in the box, not in their own field)
   const v = ui.textarea ? ui.textarea.value : '', lead = v.length - v.trimStart().length, marks = [];
@@ -620,6 +697,18 @@ function paintParsed(typed) {
     const rem = v.slice(at), from = at + rem.length - rem.trimStart().length;
     const m = v.slice(from).match(/^[^\s,;:]+(?:\s?[mf](?![a-z]))?/i);
     if (m && m[0].replace(/\s+/g, '').toLowerCase() === age.toLowerCase()) marks.push(['age', from, from + m[0].length]);
+  }
+  // each label at the start of a line ("Plan:"), after the initials and age
+  if (lab) {
+    let i = 0;
+    for (const line of v.split('\n')) {
+      const hit = labelOf(line, lab);
+      if (hit) {
+        const head = line.slice(0, line.length - hit.rest.length), from = i + head.length - head.trimStart().length, to = i + head.trimEnd().length;
+        if (to > from && from >= (marks.length ? marks[marks.length - 1][2] : 0)) marks.push(['lab', from, to]);
+      }
+      i += line.length + 1;
+    }
   }
   marksSoon(marks);
 }
@@ -669,7 +758,8 @@ function paintMarks(marks) {
 }
 
 // Suggestions, with your own shorthand for APMES tags (Tag editor) mixed in
-const suggest = (text, opts = {}) => suggestCodes(text, { ...opts, detectAgeSex: settings().detectAgeSex !== false, extra: apmesShorthand(tagSet()) });
+// (learning points left out: forTags)
+const suggest = (text, opts = {}) => suggestCodes(forTags(text), { ...opts, detectAgeSex: settings().detectAgeSex !== false, extra: apmesShorthand(tagSet()) });
 
 function paintSuggest() {
   if (!ui || !ui.sugg) return;
@@ -681,7 +771,7 @@ function paintSuggest() {
   if (settings().autoTick && applyAutoTick(found, text)) return paintSel();   // paintSel paints these again
   const list = found.filter(s => !draft.cats.includes(s.code));
   // your own tags whose shorthand you typed (choosing one ticks what it counts towards)
-  const mine = text ? shorthandTags(tagSet(), text).filter(k => !(draft.tags || []).includes(k)) : [];
+  const mine = text ? shorthandTags(tagSet(), forTags(text)).filter(k => !(draft.tags || []).includes(k)) : [];
   const mineChips = mine.map(k => tagChip(k, { on: false, onclick: () => { keepPlace(ui.sugg, () => { Object.assign(draft, toggleTagIn(draft.cats, draft.tags, k)); saveDraft(); paintSel(); }); refocus(); } }));
   const strong = confident(list);
   const all = strong.length > 1 ? h('span', { class: 'chip sugg strong all', role: 'button', tabindex: '0', title: 'Add all the confident suggestions',
@@ -742,7 +832,13 @@ function paintSel() {
 
 function applyTemplate(t) {
   draft.cats = sortCodes(withParents([...draft.cats, ...t.cats]));
-  if (t.details && !draft.details.trim()) { draft.details = t.details + ' '; ui.textarea.value = draft.details; }
+  // a box holding only the case template counts as empty: the group's text goes on its empty first line, or above it
+  const tplOnly = onlyTemplate(draft.details);
+  if (t.details && (!draft.details.trim() || tplOnly)) {
+    if (tplOnly) { const lines = draft.details.split('\n'); if (!lines[0].trim()) lines[0] = t.details; else lines.unshift(t.details); draft.details = lines.join('\n'); }
+    else draft.details = t.details + ' ';
+    ui.textarea.value = draft.details;
+  }
   keepPlace(ui.templates, () => { saveDraft(); paintSel(); }); refocus();
 }
 
@@ -757,14 +853,19 @@ function paintQuick() {
   // recent cases: one tap fills the procedure (not the patient) and the categories; type the new
   // initials and age on the first line
   // how many (Settings → Advanced logging; one by default)
-  const procOf = c => splitAge(caseParts(c).details).rest.replace(/\s+/g, ' ').trim();
+  // with Labelled parts on, only the main text: the last patient's ASA, findings and learning points stay with them
+  const procOf = c => { const d = caseParts(c).details, L = labels(); return splitAge(L ? parseParts(d, L).main : d).rest.replace(/\s+/g, ' ').trim(); };
   const recent = recentCases(S.cases, recentCount(), c => procOf(c).toLowerCase() + '|' + sortCodes(c.cats).join()).map(c => ({ c, proc: procOf(c) }));
   recent.forEach(({ c, proc }, i) => chips.push(h('span', {
     class: 'chip tmpl recent', role: 'button', tabindex: '0', title: 'Same as last: ' + (proc || 'no details') + '\n' + c.cats.map(catFull).join('\n'), 'aria-label': 'Same as last: ' + (proc || 'no details'),
     onclick: () => {
       draft.cats = sortCodes(withParents(c.cats)); Object.assign(draft, FRESH_TICKS());
       // the procedure goes on line 2; a first line already typed (initials, age) stays
-      draft.details = (draft.details || '').split('\n')[0] + (proc ? '\n' + proc : '');
+      // the case template's untouched lines stay, under the procedure
+      const lines = (draft.details || '').split('\n'), tl = new Set(caseTemplate().split('\n').map(l => l.trim().toLowerCase()).filter(Boolean));
+      const isTpl = l => tl.has(l.trim().toLowerCase());
+      const first = isTpl(lines[0]) ? '' : lines[0], tail = lines.slice(isTpl(lines[0]) ? 0 : 1).filter(isTpl);
+      draft.details = [first, ...(proc ? [proc] : []), ...tail].join('\n');
       draft.tags = [];
       // its date too, but only when it was logged in this sitting (not yesterday evening's list)
       if (i === 0 && c.date && Date.now() - (c.createdAt || 0) < KEEP_MS / 3) { draft.date = c.date === todayISO() ? null : c.date; draft.dateAt = Date.now(); }
@@ -817,15 +918,17 @@ async function save(opts) {
 }
 
 async function saveCase({ another, tap }) {
-  const details = draftText();
+  // the case template's lines left as they were are dropped (a template with nothing added saves as no details)
+  const tpl = caseTemplate(), box = tpl ? stripTemplate(draft.details, tpl, labels()) : draft.details;
+  const details = [draft.initials, box].filter(Boolean).join(' ').trim();
   // a quick Save must not depend on the typing debounce (and nothing re-ticks while the save is under way)
   suggestSoon.cancel();
   if (settings().autoTick) paintSuggest();
   if (!draft.cats.length) {
     paintSuggest();
-    const tags = settings().suggestions !== false && details ? shorthandTags(tagSet(), details).filter(k => !(draft.tags || []).includes(k)) : [];
+    const tags = settings().suggestions !== false && details ? shorthandTags(tagSet(), forTags(details)).filter(k => !(draft.tags || []).includes(k)) : [];
     // confident suggestions only (as "+ All" and a pasted list): a weak guess is never counted without a look
-    const codes = settings().suggestions !== false && details ? confident(suggest(draft.details.trim(), { limit: 8 })) : [];
+    const codes = settings().suggestions !== false && details ? confident(suggest(box.trim(), { limit: 8 })) : [];
     const cats = sortCodes(withParents([...codes, ...tags.flatMap(tagLinks)]));
     suggestedSave = cats.length ? { key: suggestionKey(), cats, tags, at: tap ? Date.now() : 0 } : null;
     paintEnterHint();
@@ -846,10 +949,13 @@ async function saveCase({ another, tap }) {
   const norm = t => String(t || '').toLowerCase().replace(/\s+/g, ' ').trim();
   const twin = (S.cases || []).find(x => x.date === curDate() && norm(caseText(x)) === norm(details));
   if (twin && !(await confirmBox('Possible duplicate', `You already logged “${caseText(twin).slice(0, 60)}” on ${fmtDate(twin.date)}. Save another one?`, 'Save anyway'))) return;
-  const parts = firstField() === 'initials' || draft.initialsHint ? draftParts() : { details };
+  const parts = firstField() === 'initials' || draft.initialsHint ? draftParts(box) : splitInitials(details);
+  // over the 2000 characters a case holds: the rest into a linked note (asked first), never cut off silently
+  if (!(await splitLong([parts]))) return;
   const owner = S.user?.email, inputAtSave = JSON.stringify(draft);
   draft.caseId ||= uid(); draft.caseCreatedAt ||= Date.now(); saveDraft();
-  const c = await createCase({ id: draft.caseId, createdAt: draft.caseCreatedAt, date: curDate(), ...parts, cats: draft.cats, reflectTag: !!draft.reflectTag, tags: draft.tags || [] });
+  const c = await createCase({ id: draft.caseId, createdAt: draft.caseCreatedAt, date: curDate(), initials: parts.initials, details: parts.details, cats: draft.cats, reflectTag: !!draft.reflectTag, tags: draft.tags || [] });
+  const restList = [{ c, rest: parts.rest }], restMade = restNotes(restList);
   if (S.user?.email !== owner) return;
   const currentInput = { ...draft }; delete currentInput.caseId; delete currentInput.caseCreatedAt;
   const originalInput = JSON.parse(inputAtSave); delete originalInput.caseId; delete originalInput.caseCreatedAt;
@@ -868,19 +974,20 @@ async function saveCase({ another, tap }) {
   paintDate(); paintSel(); paintQuick(); paintEnterHint();
   if (next === 'logbook') { hooks.showDay?.(c.date); location.hash = '#logbook'; }
   else if (next === 'closed') document.activeElement?.blur();
-  else focusLog();
+  else { focusLog(); if (ui.textarea && document.activeElement === ui.textarea) putTemplate(ui.textarea); }
   // say where it went and what it counted towards: "Saved Sat 10 Oct · 16 LSCS now 4/10"
   const prog = basicHides('saveToast') ? {} : PROGRESS_BY_CODE();   // (Profile → APMES)
   const withTarget = c.cats.map(code => prog[code]).find(p => p && p.next);
   const counted = withTarget ? ` · ${catName(withTarget.code)} now ${withTarget.count}/${withTarget.next.n}` : ` · ${catPills(c.cats)}`;
-  toast(`Saved ${fmtDate(c.date)}${counted}`, {
+  toast(`Saved ${fmtDate(c.date)}${counted}${restSaid(restList)}`, {
     action: 'Undo',
     onaction: async () => {
       if (S.user?.email !== owner) return;
+      binRest(restMade);   // the split-off rest goes too (the case comes back whole only as far as the box held it)
       const beforeUndo = JSON.stringify(draft);
       // put the case back in the box, unless the next one is already being typed: then it goes to the recycle bin
       // (tags kept for the next case by After Save don't count as the next one)
-      if (draftText() || (draft.cats.length && JSON.stringify(draft.cats) !== JSON.stringify(c.cats))) { moveToBin('case', c).then(() => toast('Removed: it is in the Recycle bin (Settings). Your new case stays in the box'), err => toast('Could not delete: ' + err.message)); return; }
+      if (typedText() || (draft.cats.length && JSON.stringify(draft.cats) !== JSON.stringify(c.cats))) { moveToBin('case', c).then(() => toast('Removed: it is in the Recycle bin (Settings). Your new case stays in the box'), err => toast('Could not delete: ' + err.message)); return; }
       try { await removeCase(c.id); } catch (err) { toast('Could not undo: ' + err.message); return; }
       if (S.user?.email !== owner) return;
       if (JSON.stringify(draft) !== beforeUndo) { toast('Case removed. Your new input stays in the box.'); return; }
@@ -911,7 +1018,7 @@ function renderBulk(card) {
   ui.textarea = ta;
   const out = h('div');
   add(card, 
-    h('p', { class: 'hint help' }, 'Paste your notes or OT list with an empty line between cases (a case can take several lines). Tags are guessed for each case. Cases without a date at the start get ', h('b', {}, fmtDate(curDate())), ' (change it above).'),
+    h('p', { class: 'hint help' }, 'Paste your notes or OT list with an empty line between cases (a case can take several lines; a bold first line, **like this**, starts a case too). Tags are guessed for each case. Cases without a date at the start get ', h('b', {}, fmtDate(curDate())), ' (change it above).'),
     ta,
     h('div', { class: 'bar', style: 'margin-top:8px' },
       h('button', { class: 'primary', onclick: () => { bulkRows = reviewRows(ta.value); paintBulk(out); } }, 'Review'),
@@ -925,8 +1032,8 @@ function renderBulk(card) {
 // (Tag editor) with what they count towards, as a single case would offer them.
 function reviewRows(text) {
   const on = settings().suggestions !== false;
-  return parseBulk(text, on ? t => suggest(t) : null).map(r => {
-    const tags = on && r.details ? shorthandTags(tagSet(), r.details) : [];
+  return parseBulk(text, on ? t => suggest(t) : null, undefined, { labels: labels() }).map(r => {
+    const tags = on && r.details ? shorthandTags(tagSet(), forTags(r.details)) : [];
     return { ...r, tags, cats: tags.length ? sortCodes(withParents([...r.cats, ...tags.flatMap(tagLinks)])) : r.cats };
   });
 }
@@ -944,11 +1051,16 @@ function paintBulk(out) {
       onclick: () => { r.cats = sortCodes(withParents([...r.cats, ...above])); paintBulk(out); },
     }, 'Same as above: ', h('b', {}, catPills(above))) : null;
     const sugg = on && r.details.trim() ? suggest(r.details, { limit: 4 }).filter(s => !r.cats.includes(s.code)) : [];
+    // longer than a case holds: said here, and Save all offers to move the rest into a linked note
+    const long = h('p', { class: 'tip too-long', 'aria-live': 'polite' });
+    const paintLong = () => { const over = r.details.trim().length - MAX_DETAILS; long.hidden = over <= 0; long.textContent = over > 0 ? `${over} character${over === 1 ? '' : 's'} over the ${MAX_DETAILS} a case holds: the rest goes into a linked note when you save.` : ''; };
+    paintLong();
     return h('tr', {},
       h('td', {}, h('input', { type: 'date', value: r.date || def, onchange: e => { r.date = parseDate(e.target.value); } })),
       h('td', { class: 'details' },
         h('input', { value: r.initials || '', placeholder: 'Initials', 'aria-label': 'Patient initials', autocapitalize: 'characters', maxlength: '20', oninput: e => { r.initials = e.target.value; } }),
-        h('textarea', { rows: String(Math.min(6, Math.max(2, r.details.split('\n').length))), value: r.details, 'aria-label': 'Case summary', oninput: e => { r.details = e.target.value; } })),
+        h('textarea', { rows: String(Math.min(6, Math.max(2, r.details.split('\n').length))), value: r.details, 'aria-label': 'Case summary', oninput: e => { r.details = e.target.value; paintLong(); } }),
+        long),
       h('td', {}, h('div', { class: 'chips' },
         r.cats.map(code => catChip(code, { on: true, removable: true, onclick: () => { r.cats = dropCat(r.cats, code); paintBulk(out); } })),
         (r.tags || []).map(k => tagChip(k, { onclick: () => { r.tags = r.tags.filter(t => t !== k); paintBulk(out); } })),
@@ -980,6 +1092,8 @@ function nextWorkingDay() { for (let n = 1; n < 8; n++) { const d = new Date(); 
 async function planBulk() {
   if (!bulkRows || !bulkRows.length) return;
   const rows = bulkRows.filter(r => r.details.trim() || String(r.initials || '').trim() || r.cats.length);
+  // a planned case can't carry a note yet: the long ones are shortened first, or saved now
+  if (rows.some(r => r.details.trim().length > MAX_DETAILS)) return toast(`A case is over the ${MAX_DETAILS}-character limit: shorten it, or Save all now (the rest goes into a note)`);
   if (!(await okNoIds(...rows.map(r => r.details)))) return;
   const put = async date => {
     const items = rows.map(r => ({ id: uid(), date, initials: cleanInitials(r.initials), details: r.details.trim(), cats: sortCodes(r.cats), ...withTags(r) }));
@@ -1018,7 +1132,7 @@ function planCard() {
   };
   const edit = async p => {
     // don't throw away a case being typed
-    if ((draftText() || draft.cats.length) && !(await confirmBox('Replace what you’re typing?', 'The case in the box is replaced by the planned one.', 'Replace', true))) return;
+    if ((typedText() || draft.cats.length) && !(await confirmBox('Replace what you’re typing?', 'The case in the box is replaced by the planned one.', 'Replace', true))) return;
     draft = { ...draft, mode: 'one', initials: '', initialsHint: p.initials || '', details: [p.initials, p.details].filter(Boolean).join(' '), cats: [...(p.cats || [])], tags: [...(p.tags || [])], ...FRESH_TICKS(), reflectTag: false, date: p.date === today ? null : p.date, dateAt: Date.now() };
     saveDraft();
     await savePlan(plan().filter(x => x.id !== p.id));
@@ -1041,9 +1155,11 @@ async function saveBulk(e) {
   if (bulkBusy || !bulkRows) return;
   const btn = e && e.currentTarget;
   const def = curDate();
-  const rows = bulkRows.filter(r => r.details.trim() || String(r.initials || '').trim() || r.cats.length);
+  // copies: a long case is shortened for saving, and the list stays as it was if the save fails
+  const rows = bulkRows.filter(r => r.details.trim() || String(r.initials || '').trim() || r.cats.length).map(r => ({ ...r, details: r.details.trim() }));
   if (!(await okNoIds(...rows.map(r => r.details)))) return;
   if (rows.some(r => !r.cats.length) && !(await confirmBox('Some cases have no tag', 'Save them anyway? They will not count towards any target until you add one.', 'Save all'))) return;
+  if (!(await splitLong(rows)) || !bulkRows) return;
   const now = Date.now();
   const cases = rows.map((r, i) => ({ id: uid(), date: r.date || def, initials: cleanInitials(r.initials), details: r.details.trim(), cats: sortCodes(r.cats), ...withTags(r), createdAt: now + i, updatedAt: now + i, source: 'paste' }));
   // clear the list first: offline the save can take a few seconds, and a second tap must not repeat it
@@ -1053,8 +1169,9 @@ async function saveBulk(e) {
   bulkRows = null;
   try {
     await saveMany(cases);
+    const restList = cases.map((c, i) => ({ c, rest: rows[i].rest })), restMade = restNotes(restList);
     draft.bulk = ''; saveDraft();
-    toast(`Saved ${cases.length} cases`, { action: 'Undo', onaction: () => deleteMany(cases.map(c => c.id)).catch(err => toast('Could not undo: ' + err.message)) });
+    toast(`Saved ${cases.length} cases${restSaid(restList)}`, { action: 'Undo', onaction: () => { binRest(restMade); return deleteMany(cases.map(c => c.id)).catch(err => toast('Could not undo: ' + err.message)); } });
   } catch (err) { bulkRows = keep; toast('Could not save: ' + err.message); }
   bulkBusy = false;
   hooks.render();
@@ -1148,27 +1265,36 @@ export function editCaseDialog(c, opts = {}) {
         try {
         if (isNew && !created) {
           if (!e.details.trim() && !e.cats.length) return toast('Add a case summary or a tag');
+          const long = { details: String(e.details || '').trim() };
+          if (!(await splitLong([long]))) return;
           e.id ||= uid(); e.createdAt ||= Date.now();
           const inputAtSave = JSON.stringify(e);
-          const made = await createCase({ id: e.id, createdAt: e.createdAt, date: e.date || todayISO(), initials: e.initials, details: e.details, cats: e.cats, reflectTag: !!e.reflectTag, tags: e.tags || [] });
+          const made = await createCase({ id: e.id, createdAt: e.createdAt, date: e.date || todayISO(), initials: e.initials, details: long.details, cats: e.cats, reflectTag: !!e.reflectTag, tags: e.tags || [] });
+          const restList = [{ c: made, rest: long.rest }];
+          restNotes(restList);
           base = made; created = true; saveEditDraft();
           if (S.user?.email !== owner || JSON.stringify(e) !== inputAtSave) return toast('Case saved. Newer edits remain open.');
-          editDraft.clear(); await m.close(); if (S.user?.email !== owner) return; toast('Case logged');
+          editDraft.clear(); await m.close(); if (S.user?.email !== owner) return; toast('Case logged' + restSaid(restList));
           return opts.onCreated(made);
         }
         const next = { ...e, initials: cleanInitials(e.initials), details: e.details.trim() };
+        // over the 2000 characters a case holds: the rest into a linked note (asked first)
+        const long = { details: next.details };
+        if (!(await splitLong([long]))) return;
+        next.details = long.details;
         if (!next.reflectTag) delete next.reflectTag;
         // a tag that sits under a category goes when that category is taken off; other tags stay
         next.tags = keepTags(next.tags, next.cats);
         if (!next.tags.length) delete next.tags;
         const inputAtSave = JSON.stringify(e);
         const saved = await updateCase(next, { base });
+        const restList = [{ c: saved, rest: long.rest }], restMade = restNotes(restList);
         base = saved; saveEditDraft();
         if (S.user?.email !== owner || JSON.stringify(e) !== inputAtSave) return toast('Case saved. Newer edits remain open.');
         editDraft.clear(); await m.close();
         if (S.user?.email !== owner) return;
-        if (isNew) { toast('Case logged'); return opts.onCreated(saved); }
-        toast('Case updated', { action: 'Undo', onaction: () => { if (S.user?.email === owner) return restoreCase(c, saved).catch(err => toast(err.message)); } });
+        if (isNew) { toast('Case logged' + restSaid(restList)); return opts.onCreated(saved); }
+        toast('Case updated' + restSaid(restList), { action: 'Undo', onaction: () => { if (S.user?.email === owner) { binRest(restMade); return restoreCase(c, saved).catch(err => toast(err.message)); } } });
         } catch (err) { toast('Could not save: ' + err.message); } finally { button.disabled = false; }
       } }, 'Save')),
   ], { cls: 'full', sticky: true });

@@ -55,6 +55,17 @@ console.log('settings file tests passed');
 
 assert.equal(readSettingsFile(JSON.stringify(settingsFile({settings:{compactTags:true,firstField:'date'}}))).settings.compactTags,true);
 
+// labelled parts and the case template travel with the file, cleaned
+{
+  const r = readSettingsFile(JSON.stringify(settingsFile({ settings: { labelParts: true, caseTplOn: true, caseTpl: 'ASA :\r\nPE :' + 'x'.repeat(900), partLabels: [{ k: 'PE' }, { k: '1bad' }, { k: 'pe' }] } })));
+  assert.equal(r.settings.labelParts, true);
+  assert.equal(r.settings.caseTplOn, true);
+  assert.equal(r.settings.caseTpl.length, 500);
+  assert.ok(r.settings.caseTpl.startsWith('ASA :\nPE :'));
+  assert.deepEqual(r.settings.partLabels, [{ k: 'PE', n: 'PE' }]);
+  assert.equal(readSettingsFile(JSON.stringify(settingsFile({ settings: { partLabels: null } }))).settings.partLabels, null);
+}
+
 // this browser's own choices as a file (the move to apmes.anawj.com)
 {
   const entries = [['apmes-logbook-display', '{"flat":true}'], ['apmes-logbook-theme', 'dark'], ['logbook-draft-x', '{"details":"fake"}'], ['logbook-edit-draft:y', 'z'],

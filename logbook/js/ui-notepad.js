@@ -16,7 +16,7 @@
 import { S, h, toast, fill, hooks, writes, cloud, transients, settings, patchLogbook, resetters, todayISO, modal, emptyState, download } from './ui-core.js';
 import { uid, fmtDate, caseParts } from './engine.js';
 import { barTabs, arrangeTabs, display, setDisplay, setTabOnBar, toggle, help, resetLink } from './ui-settings.js';
-import { MAX_NOTES, INDEX_CAP, LIMITS, indexCapped, sortNotes, filterNotes, noteTitle, noteIndex, cleanNoteIndex, sameIndex, parseNote, toggleCheck, plainLines, noteFiles, dayNoteId, dayNoteOf, isDayNote, cappedNotes, mergeDayNote } from './notepad.js';
+import { MAX_NOTES, INDEX_CAP, LIMITS, indexCapped, sortNotes, filterNotes, noteTitle, noteIndex, cleanNoteIndex, sameIndex, parseNote, toggleCheck, plainLines, noteFiles, dayNoteId, dayNoteOf, isDayNote, cappedNotes, mergeDayNote, cleanNote } from './notepad.js';
 import { recordSignature } from './recovery-store.js';
 import { popShared } from './share-in.js';
 import { fmtBar, replaceRange } from './fmt-bar.js';
@@ -620,4 +620,19 @@ export function downloadNoteFiles() {
     radio('md', 'Markdown (.md)'), radio('txt', 'Plain text (.txt)'),
     h('p', { class: 'tip', style: 'margin:8px 0 0' }, 'The files hold only your notes, not the linked cases. Keep them private.'),
     h('div', { class: 'bar dlg-actions' }, h('span', { class: 'grow' }), h('button', { onclick: () => m.close() }, 'Cancel'), btn)]);
+}
+
+// ---------- notes made for a case (the rest of a case over the 2000-character limit) ----------
+
+// Room for n more notes? (loads the notes first: the limit counts them all)
+export async function notesRoom() { const list = await ensureNotes(); return MAX_NOTES - (list || []).length; }
+// Write new notes linked to their cases: [{ date, caseId, title, body }]. Through the durable write queue, like
+// any note; the caller checks the room first (notesRoom).
+export async function addNotes(list) {
+  const me = mine();
+  if (!me) throw new Error('Not signed in');
+  await ensureNotes();
+  const made = [];
+  for (const n of list) { const note = cleanNote({ id: uid(), ...n }); await writes.save('note', me, note, null); made.push(note); }
+  return made;   // so an Undo can bin them again
 }

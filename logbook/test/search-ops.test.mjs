@@ -42,6 +42,19 @@ assert.equal(M('title:spinal'), true);
 assert.equal(M('title:converted'), false);             // second line
 assert.equal(M('converted AND spinal'), true);
 
+// has: a labelled part (the caller says which parts a case has)
+{
+  assert.equal(P('has:LP -has:plan'), 'has:lp -has:plan');
+  assert.equal(parseQuery('has:LP', { keepCase: true }).groups[0][0].text, 'lp');   // a label never case sensitive
+  const parts = new Set(['lp']);
+  const H = q => matchQuery(parseQuery(q), () => 'lap chole', null, undefined, t => parts.has(t));
+  assert.equal(H('has:lp'), true);
+  assert.equal(H('has:plan'), false);
+  assert.equal(H('-has:lp'), false);
+  assert.equal(H('lap has:lp'), true);
+  assert.equal(matchQuery(parseQuery('has:lp'), () => 'x', null), false);              // no part test: nothing has one
+}
+
 // tapping an operator in the "?" list
 assert.deepEqual(insertOperator('', 0, 'tag:', 4), { text: 'tag:', caret: 4 });
 assert.deepEqual(insertOperator('spinal', 6, '""', 1), { text: 'spinal ""', caret: 8 });
