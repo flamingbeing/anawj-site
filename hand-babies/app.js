@@ -221,6 +221,7 @@ function setup(el, f) {
   const toggle = () => setPlaying(st, !st.playing);
   st.btn.addEventListener('click', e => { e.stopPropagation(); toggle(); });
   art.addEventListener('click', toggle);
+  if (f.gif) { st.btn.style.display = 'none'; return; } // a GIF stand-in plays by itself (see hand3d.js)
   vis?.observe(el);
   if (!reduce) setPlaying(st, true);
 }

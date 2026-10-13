@@ -2,7 +2,7 @@
 // Network first: online, every visit gets the current page (no update bar, owner 13 Oct 2026); the cache is only
 // for offline or a network slower than NET_WAIT. A new version switches itself on once it has cached the page.
 
-const VERSION = 'hand-babies-v8';
+const VERSION = 'hand-babies-v9';
 const NET_WAIT = 3000; // ms before falling back to the cached copy
 const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'hand3d.js', 'vendor/three.module.min.js', 'edit.html', '../design/tokens.css'];
 

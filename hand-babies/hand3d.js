@@ -442,5 +442,8 @@ function mount(def) {
     return { draw };
   };
 }
-for (const [name, def] of Object.entries(FIGS3D)) globalThis.window?.handFigs?.add(name, { dur: def.dur, still: def.still, mount: mount(def) });
+// No WebGL (blocked or no GPU, seen in Firefox): show the saved GIF of each figure instead of a blank box.
+const canGL = (() => { try { return !!gl(); } catch { return false; } })();
+const gifFig = name => ({ dur: 1, gif: true, mount: art => { art.innerHTML = `<img src="gifs/${name}.gif" alt="" style="display:block;width:100%">`; return { draw() {} }; } });
+for (const [name, def] of Object.entries(FIGS3D)) globalThis.window?.handFigs?.add(name, canGL ? { dur: def.dur, still: def.still, mount: mount(def) } : gifFig(name));
 export { makeHand, FIGS3D }; // for tests

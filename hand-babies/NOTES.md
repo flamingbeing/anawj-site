@@ -41,6 +41,13 @@ itself (`skipWaiting` in install); never go back to waiting for a tap (on a phon
 - Tone: instructive and kind, never scolding ("so a normal result there doesn't tell you…", not "is wrong").
 - Clinical content is a teaching aid, not a protocol; the footer says so.
 
+## Browsers
+
+The owner uses Firefox (Gecko) on their phone: check changes in Firefox as well as Chromium. Playwright's Firefox
+(`npx playwright install firefox` into a scratch `PLAYWRIGHT_BROWSERS_PATH`) has no WebGL headless; run it headed
+under `xvfb-run` with `LIBGL_ALWAYS_SOFTWARE=1` to see the 3D figures. Where WebGL is blocked, hand3d.js shows each
+3D figure's GIF instead (no Play button), so keep `gifs/` current (`tools/make-gifs.mjs`).
+
 ## Edits sent from the page editor
 
 The page editor is now site-wide: `/edit/` (`edit/NOTES.md`, which also says how to apply `Page edits:` issues). The
