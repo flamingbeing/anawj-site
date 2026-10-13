@@ -31,7 +31,8 @@ const pick = (o, keys) => Object.fromEntries(keys.filter(k => o[k] !== undefined
 // Firestore rejects undefined values; a JSON round trip drops them (and deep-copies).
 export const plain = o => JSON.parse(JSON.stringify(o));
 
-export function cleanCase(c, now = Date.now()) {
+// (a write is stamped after the version it replaces, so it wins even over a copy stamped by a clock running ahead)
+export function cleanCase(c, now = Math.max(Date.now(), (Number(c && c.updatedAt) || 0) + 1)) {
   const out = pick(c, CASE_FIELDS);
   out.id = out.id ? String(out.id) : Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
   out.date = out.date || null;

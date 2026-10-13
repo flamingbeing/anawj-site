@@ -166,8 +166,13 @@ async function mergeDaySave(n, s, me) {
   try { return await mergeOver(n, s, me, job); } finally { s.merging = false; }
 }
 async function mergeOver(n, s, me, job) {
+  // merged against the base the first unsynced save was written from (all of them are set aside together): s.base has
+  // moved on to the saved copy once a save was accepted (before the server answered), and against that the text typed
+  // since would look like nothing new
+  const first = writes.entries().filter(x => x.kind === 'note' && x.record.id === n.id && (x.state === 'pending' || x.state === 'conflict')).at(-1) || job;
+  const base = 'base' in first ? first.base : s.base;
   await writes.archive(job.key);
-  const merged = mergeDayNote(n, s.base, job.remote);
+  const merged = mergeDayNote(n, base, job.remote);
   for (const k of Object.keys(n)) if (!(k in merged)) delete n[k];
   Object.assign(n, merged);
   s.base = job.remote ? clone(job.remote) : null;

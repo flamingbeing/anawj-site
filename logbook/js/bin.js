@@ -55,19 +55,30 @@ export async function moveToBin(kind, item, extra = {}) {
   await Promise.all(entries.map(e => cloud.saveBinEntry(owner, e)));
   if (S.user?.email !== owner) throw new Error('Account changed; the original record has not been deleted');
   binCache = [...entries, ...binCache];
+  // if deleting an original fails it is still there: its copy leaves the bin again, or other devices would hide the
+  // record (their bin feed removes that version, sync.js) while it still exists
+  // record (their bin feed removes that version, sync.js) while it still exists. A delete through the write queue can
+  // also fail after it was accepted (a connection that only looks online): watched until it is synced.
+  const failed = async (ids, err) => { await rollBack(owner, kind, entries.filter(e => ids.includes(e.data.id))); throw err; };
   if (kind === 'case') {
-    if (entries.length === 1) await removeCase(entries[0].data.id);
-    else await deleteMany(entries.map(e => e.data.id));
+    const ids = entries.map(e => e.data.id);
+    try { if (ids.length === 1) await removeCase(ids[0]); else await deleteMany(ids); }
+    catch (err) { await failed(ids, err); }   // (deleteMany is one batch: all or nothing)
+    if (ids.length === 1) watchDeletes(owner, kind, entries);
   } else if (kind === 'note') {
     // through the write queue, so it works offline; the open notes list drops them at once
-    await Promise.all(entries.map(e => writes.save('note', owner, { id: e.data.id, _deleted: true }, items.find(x => x.id === e.data.id) || null)));
-    if (Array.isArray(S.notes)) { const gone = new Set(entries.map(e => e.data.id)); S.notes = S.notes.filter(n => !gone.has(n.id)); }
+    const r = await Promise.allSettled(entries.map(e => writes.save('note', owner, { id: e.data.id, _deleted: true }, items.find(x => x.id === e.data.id) || null)));
+    const ok = new Set(entries.filter((e, i) => r[i].status === 'fulfilled').map(e => e.data.id));
+    if (Array.isArray(S.notes)) S.notes = S.notes.filter(n => !ok.has(n.id));
+    watchDeletes(owner, kind, entries.filter(e => ok.has(e.data.id)));
+    const bad = r.find(x => x.status === 'rejected');
+    if (bad) await failed(entries.map(e => e.data.id).filter(id => !ok.has(id)), bad.reason);
   } else {
-    await Promise.all(entries.map(e => cloud.deleteReflection(mine(), e.data.id)));
-    if (Array.isArray(S.reflections)) {
-      const gone = new Set(entries.map(e => e.data.id));
-      S.reflections = S.reflections.filter(r => !gone.has(r.id));
-    }
+    const r = await Promise.allSettled(entries.map(e => cloud.deleteReflection(mine(), e.data.id)));
+    const ok = new Set(entries.filter((e, i) => r[i].status === 'fulfilled').map(e => e.data.id));
+    if (Array.isArray(S.reflections)) S.reflections = S.reflections.filter(x => !ok.has(x.id));
+    const bad = r.find(x => x.status === 'rejected');
+    if (bad) await failed(entries.map(e => e.data.id).filter(id => !ok.has(id)), bad.reason);
   }
   if (extra.toast) {
     const n = entries.length, what = kind === 'case' ? 'case' : kind === 'note' ? 'note' : 'reflection';
@@ -76,6 +87,43 @@ export async function moveToBin(kind, item, extra = {}) {
     });
   }
   return Array.isArray(item) ? entries : entries[0];
+}
+
+// the bin entries of originals whose delete failed come out again; a failed delete in the write queue is set aside
+// (archived), so a later Retry can't delete the record with no copy in the bin. The bin feed may already have hidden
+// the record (here and on other devices: its tombstone is that version), so it is saved again, stamped after that
+// version; not after a conflict (the record changed elsewhere: that newer copy already shows everywhere).
+async function rollBack(owner, kind, entries) {
+  if (S.user?.email !== owner) return;   // (signed out or switched: the old account's bin can't be reached)
+  for (const e of entries) {
+    try { await cloud.deleteBinEntry(owner, e.id); binCache = binCache.filter(x => x.id !== e.id); }
+    catch (err) { console.warn('Bin entry left after a failed delete', e.id, err); }
+    const job = kind !== 'reflection' && writes.entries().find(x => x.kind === kind && x.record.id === e.data.id && (x.state === 'failed' || x.state === 'conflict'));
+    if (job) await writes.archive(job.key).catch(() => {});
+    if (job && job.state === 'conflict') continue;
+    try {
+      if (kind === 'case') await restoreCase({ ...e.data }, e.data);
+      else if (kind === 'note') await writes.save('note', owner, { ...e.data }, e.data);
+      else await cloud.saveReflection(owner, { ...e.data });
+    } catch (err) { console.warn('Could not save the record again after a failed delete', e.data.id, err); }
+  }
+}
+
+function watchDeletes(owner, kind, entries) {
+  const left = new Map(entries.map(e => [e.data.id, e]));
+  if (!left.size) return;
+  let off = null;
+  const check = () => {
+    for (const [id, e] of [...left]) {
+      const st = writes.status(kind, id);
+      if (st === 'pending') continue;
+      left.delete(id);
+      if (st === 'failed' || st === 'conflict') rollBack(owner, kind, [e]).catch(err => console.warn('Bin entry left after a failed delete', err));
+    }
+    if (!left.size && off) { off(); off = null; }
+  };
+  off = writes.onChange(check);
+  check();
 }
 
 async function findEntry(id) {

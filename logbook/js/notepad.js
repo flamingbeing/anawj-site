@@ -47,7 +47,8 @@ export function mergeDayNote(local, base, remote) {
 }
 
 const str = (v, n) => String(v ?? '').replace(/\r\n?/g, '\n').slice(0, n);
-export function cleanNote(n, now = Date.now()) {
+// (stamped after the version it replaces, as cleanCase)
+export function cleanNote(n, now = Math.max(Date.now(), (Number(n && n.updatedAt) || 0) + 1)) {
   const src = n && typeof n === 'object' ? n : {};
   const out = {
     id: src.id ? String(src.id).slice(0, 100) : Date.now().toString(36) + Math.random().toString(36).slice(2, 10),

@@ -69,3 +69,11 @@ test('canonical offline versions do not conflict when the backend removes empty/
  assert.equal(first.tags,undefined);assert.equal(first.reflectTag,undefined);
  await q.save('case','a',{...first,details:'two'},first);f.online(true);assert.equal(await q.flush(),true);assert.equal(f.remote.get('normal').details,'two');
 });
+
+test('sign-out check sees another tab’s unsynced change in the shared store', async () => {
+  // two tabs (or the browser and the home-screen app) share the recovery store: tab B saves offline
+  const f=fixture();f.online(false);const A=createWriteQueue(f.config),B=createWriteQueue(f.config);
+  await A.activate('a');await B.save('case','a',{id:'tabB',details:'Fake case from tab B'});
+  assert.equal(await A.flush(50),false,'not synced yet: the sign-out prompt shows');
+  f.online(true);assert.equal(await B.flush(),true);assert.equal(await A.flush(50),true,'once B has synced it');
+});
