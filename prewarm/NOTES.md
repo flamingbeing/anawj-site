@@ -275,3 +275,7 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
 - **Testing sharing:** `tools/test-rules.sh` (rules, 52 checks) and `tools/test-prewarm-sync.sh` (two phones in a
   browser against the local Firestore and Auth emulators, `?emulator` on localhost only). Never the live project.
 - No hand bump of `VERSION`: the deploy stamps it with a hash of the SHELL files (`tools/stamp-versions.mjs`; AGENTS.md).
+- **Update check** (owner, 13 Oct 2026: "Update available" didn't appear until the app was closed and reopened): browsers
+  look for a new service worker only when the page is opened, and the phones keep the app open for hours. The page now
+  calls `reg.update()` when it comes back to the front, when signal returns and every 10 min (not tested in the browser
+  suite: the worker isn't registered in demo mode).

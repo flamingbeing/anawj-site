@@ -2099,6 +2099,13 @@ if ('serviceWorker' in navigator && !DEMO) {
     const offer = w => { const b = $('#update'); b.hidden = false; b.onclick = () => afterAsking(() => w.postMessage('skipWaiting')); };
     if (reg.waiting) offer(reg.waiting);
     reg.addEventListener('updatefound', () => { const w = reg.installing; w?.addEventListener('statechange', () => { if (w.state === 'installed' && navigator.serviceWorker.controller) offer(w); }); });
+    // a phone keeps the app open for hours, and the browser only looks for a new version when the page is opened:
+    // look again when the app comes back to the front, when signal returns, and every 10 minutes (owner, 13 Oct 2026)
+    const look = () => { if (document.visibilityState === 'hidden') return; reg.update().catch(() => {}); if (reg.waiting && navigator.serviceWorker.controller) offer(reg.waiting); };
+    document.addEventListener('visibilitychange', look);
+    addEventListener('online', look);
+    setInterval(look, 10 * 60e3);
+    look();
   }).catch(() => {});
   // reload only when an update takes over, not when the first install claims the page (that wiped a half-filled form)
   const hadController = !!navigator.serviceWorker.controller;
