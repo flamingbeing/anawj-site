@@ -7,6 +7,7 @@ import { cleanTemplate } from './demo-backend.js';
 import { cleanFormat } from './share-format.js';
 import { storedMarkdown } from './markdown.js';
 import { cleanExportOpts } from './export-opts.js';
+import { cleanDestinations } from './destinations.js';
 
 export const SETTINGS_KIND = 'apmes-logbook-settings';
 // account-specific bookkeeping that shouldn't travel with the file (your residency year is yours, not a colleague's)
@@ -20,6 +21,7 @@ const OBJECTS = {
   shareFormat: v => cleanFormat(v),
   markdown: v => { try { return storedMarkdown(v); } catch { return null; } },
   excelExport: v => cleanExportOpts(v),
+  destinations: v => cleanDestinations(v),
   catOrder: strs,
   caseHide: v => strs(v).slice(0, 20),
   basicOn: v => strs(v).slice(0, 30),

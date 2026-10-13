@@ -20,6 +20,12 @@ assert.ok(Array.isArray(back.settings.tagSet));
 assert.equal(back.templates.length, 1);
 assert.equal(back.theme, 'dark');
 
+// places to send to travel in the file, cleaned: a script-like link never gets through
+const dst = settingsFile({ settings: { destinations: [{ id: 'a', name: 'Obs', uri: 'obsidian://new?content={content}' }] } });
+assert.equal(readSettingsFile(JSON.stringify(dst)).settings.destinations[0].uri, 'obsidian://new?content={content}');
+const evil = { kind: SETTINGS_KIND, version: 1, settings: { destinations: [{ id: 'b', name: 'Bad', uri: 'javascript:alert({content})' }, { id: 'c', name: 'Ok', uri: 'https://x.test/?t={content}' }] } };
+assert.deepEqual(readSettingsFile(JSON.stringify(evil)).settings.destinations.map(d => d.id), ['c']);
+
 // junk and the wrong files
 assert.throws(() => readSettingsFile('nope'), /not JSON/);
 assert.throws(() => readSettingsFile('{"kind":"other"}'), /isn’t a settings file/);

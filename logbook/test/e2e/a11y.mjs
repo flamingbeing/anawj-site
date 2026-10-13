@@ -38,6 +38,19 @@ const SCREENS = [
   ['Tag editor', hash('tags'), false],
   ['Reflection settings', hash('reflset'), false],
   ['Markdown', hash('sharefmt'), false],
+  ['Send to', async p => {
+    await hash('sendto')(p);
+    await p.getByLabel('Add a place to send to').selectOption('obsidian');
+  }, true],
+  ['Send menu', async p => {
+    await hash('sendto')(p);
+    await p.getByLabel('Add a place to send to').selectOption('whatsapp');
+    await p.getByRole('button', { name: 'Save', exact: true }).click();
+    await p.waitForFunction(async () => ((await import('./js/ui-core.js')).S.logbook.settings.destinations || []).length === 1);
+    await hash('logbook')(p);
+    await p.evaluate(async () => { const { openSend } = await import('./js/ui-send.js'); openSend({ text: 'Fake day', date: '2026-10-10' }); });
+    await p.waitForSelector('dialog[open]');
+  }, true],
   ['Export / Import', hash('data'), false],
   ['Recover drafts', hash('recovery'), false],
   ['Admin portal', hash('admin'), false],
