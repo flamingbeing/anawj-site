@@ -1,10 +1,11 @@
 // Notes (notepad.js): the stored shape, order, search, the day/case index, the light Markdown and the export.
 // Fake notes only.
 import assert from 'node:assert/strict';
-import { cleanNote, sortNotes, filterNotes, notesOn, noteTitle, plainLines, noteIndex, cleanNoteIndex, sameIndex, parseNote, inline, safeHref, toggleCheck, noteMd, notesMd, noteFiles, MAX_NOTES, LIMITS } from '../js/notepad.js';
+import { cleanNote, sortNotes, filterNotes, notesOn, noteTitle, plainLines, noteIndex, cleanNoteIndex, sameIndex, parseNote, inline, safeHref, toggleCheck, noteMd, notesMd, noteFiles, MAX_NOTES, INDEX_CAP, LIMITS } from '../js/notepad.js';
 import { mdDay, exportNotes } from '../js/markdown.js';
 
-assert.equal(MAX_NOTES, 100);
+assert.equal(MAX_NOTES, 2000);
+assert.equal(INDEX_CAP, 100);   // firestore.rules validNoteIndex
 // cleaning: unknown fields dropped, bad dates cleared, long text cut, title on one line
 const c = cleanNote({ id: 'n1', date: '12/10/2026', title: 'A\nB', body: 'x'.repeat(LIMITS.body + 5), images: [1], createdAt: 5 }, 9);
 assert.deepEqual(Object.keys(c).sort(), ['body', 'createdAt', 'date', 'id', 'title', 'updatedAt']);
@@ -40,6 +41,16 @@ assert.deepEqual(idx, { days: ['2026-10-10', '2026-10-12'], cases: ['case1'], n:
 assert.ok(sameIndex(idx, JSON.parse(JSON.stringify(idx))));
 assert.ok(!sameIndex(idx, { days: [], cases: [], n: 0 }));
 assert.deepEqual(cleanNoteIndex({ days: ['bad', '2026-01-01'], cases: [5, 'x'], n: -1 }), { days: ['2026-01-01'], cases: ['x'], n: 0 });
+// past the doc's cap: the latest days, and the cases of the latest-changed notes
+{
+  const many = Array.from({ length: 150 }, (_, i) => ({ id: 'm' + i, date: new Date(Date.UTC(2026, 0, 1 + i)).toISOString().slice(0, 10), caseId: 'case' + String(i).padStart(3, '0'), body: '', updatedAt: 1000 - i }));
+  const all = noteIndex(many), capped = noteIndex(many, INDEX_CAP);
+  assert.equal(all.days.length, 150); assert.equal(all.n, 150);
+  assert.equal(capped.days.length, 100); assert.equal(capped.days[0], '2026-02-20'); assert.equal(capped.days.at(-1), '2026-05-30');
+  assert.equal(capped.cases.length, 100); assert.ok(capped.cases.includes('case000') && !capped.cases.includes('case100'));
+  assert.equal(capped.n, 150);
+  assert.ok(sameIndex(capped, JSON.parse(JSON.stringify(capped))));
+}
 
 // light Markdown: blocks and inline parts, never raw HTML
 const blocks = parseNote('# Plan\nline one\nline two\n\n- [ ] to-do\n- [x] done\n- plain\n1. first\n2) second\n<script>alert(1)</script>');

@@ -126,13 +126,18 @@ async function dropImages(entries) {
 }
 
 const purged = new Set();
-// Once per signed-in user per page load. Returns the number of entries purged.
+// It reads the whole bin, so at most once a day per account on this device (and once per page load); entries a day
+// past their 30 are hidden from the view anyway. Wiped at sign-out with the other device copies (cloud.forgetLocal).
+export const PURGED_KEY = 'apmes-logbook-purged:';
+const lastPurge = who => { try { return Number(localStorage.getItem(PURGED_KEY + who)) || 0; } catch { return 0; } };
+// Returns the number of entries purged.
 export async function purgeExpired({ now = Date.now(), force = false } = {}) {
   if (!S.user) return 0;
   const who = mine();
-  if (purged.has(who) && !force) return 0;
+  if ((purged.has(who) || Math.abs(now - lastPurge(who)) < DAY) && !force) return 0;
   purged.add(who);
   binCache = await cloud.listBin(who);
+  try { localStorage.setItem(PURGED_KEY + who, String(now)); } catch { /* storage blocked */ }
   const old = binCache.filter(e => isExpired(e, now));
   if (!old.length) return 0;
   for (const e of old) await cloud.deleteBinEntry(who, e.id);

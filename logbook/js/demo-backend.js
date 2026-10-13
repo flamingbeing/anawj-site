@@ -166,6 +166,7 @@ function seed(s) {
     })),
   };
   s.logbooks[DEMO_USER.email].doc.rid = 'DEMO01';
+  s.logbooks[DEMO_USER.email].epoch = newEpoch();
   // two years of cases and the sample reflections come from demo-seed.js, loaded after the page starts
   s.logbooks[DEMO_USER.email].extras = 'pending';
   // one complete reflection on the LSCS case, so the Reflections, Progress and Export pages have something in them
@@ -196,21 +197,21 @@ function seed(s) {
 }
 
 // ---- change notification (same tab and other tabs) ----
+// The synced collections (cases, reflections, notes, bin) are watched like Firestore queries (listenSince, used by
+// the sync engine in sync.js): each watcher gets the changes since what it last saw.
 
-const caseWatchers = new Set();   // { email, cb }
 const userWatchers = new Set();
-const reflWatchers = new Set();
-const noteWatchers = new Set();   // { email, cb }
+const sinceWatchers = new Set();   // { email, coll, run }
 
 function notifyAll() {
-  for (const w of caseWatchers) w.cb(casesOf(w.email));
   for (const cb of userWatchers) cb(currentUser());
-  for (const w of reflWatchers) w.cb(reflectionsOf(w.email));
-  for (const w of noteWatchers) w.cb(notesOf(w.email));
+  for (const w of [...sinceWatchers]) w.run();
 }
-function notifyCases(email) {
-  for (const w of caseWatchers) if (w.email === email) w.cb(casesOf(email));
-}
+function notifyColl(email, coll) { for (const w of [...sinceWatchers]) if (w.email === email && w.coll === coll) w.run(); }
+const notifyCases = email => notifyColl(email, 'cases');
+// a logbook's epoch changes when its data is replaced wholesale (reset, the sample logbook arriving), so a device's
+// stored copy is read again in full rather than patched
+const newEpoch = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 // ?demo=reset wipes and reseeds on page load (after the watcher sets above exist).
 // The address then says plain ?demo, so a reload keeps what was done since.
 // The bigger sample logbook (demo-seed.js: ~350 cases, 32 reflections) loads on demand, so real users
@@ -228,7 +229,7 @@ function loadExtras() {
     lb2.cases ||= {}; lb2.reflections ||= {};
     for (const c of cases) if (!lb2.cases[c.id]) lb2.cases[c.id] = cleanCase(c, c.updatedAt);
     for (const r of reflections) if (!lb2.reflections[r.id]) lb2.reflections[r.id] = cleanReflection(r);
-    lb2.extras = 'done';
+    lb2.extras = 'done'; lb2.epoch = newEpoch();
     save(s2); notifyAll();
   }).catch(err => console.warn('Demo sample data not loaded', err));
 }
@@ -243,7 +244,7 @@ if (typeof addEventListener === 'function') {
 }
 
 function book(s, email) {
-  if (!s.logbooks[email]) s.logbooks[email] = { doc: null, cases: {} };
+  if (!s.logbooks[email]) s.logbooks[email] = { doc: null, cases: {}, epoch: newEpoch() };
   return s.logbooks[email];
 }
 const byNewest = (a, b) => (b.date || '').localeCompare(a.date || '') || (b.createdAt || 0) - (a.createdAt || 0);
@@ -299,11 +300,32 @@ export async function saveLogbook(email, patch) {
   return plain(lb.doc);
 }
 
-export function watchCases(email, cb) {
-  const w = { email: lc(email), cb: cases => cb(cases, meta) };
-  caseWatchers.add(w);
-  w.cb(casesOf(w.email));
-  return () => caseWatchers.delete(w);
+// The sync engine's listener (sync.js): the collection's documents with field > since (all when since is null, or when
+// the logbook's epoch differs from the one the device last saw), then the changes as they happen.
+export function listenSince(email, coll, { since = null, epoch, field = 'updatedAt' } = {}, onSnap) {
+  const w = { email: lc(email), coll, prev: null, seen: epoch };
+  w.run = () => {
+    const lb = load().logbooks[w.email];
+    const ep = (lb && lb.epoch) || 'none';
+    const full = w.prev === null ? since === null || ep !== w.seen : ep !== w.seen;
+    if (full) since = null;   // from now on, the whole collection (as a full Firestore listener)
+    w.seen = ep;
+    const docs = Object.values((lb && lb[coll]) || {}).filter(d => since === null || (Number(d[field]) || 0) > since).map(plain);
+    const next = new Map(docs.map(d => [d.id, JSON.stringify(d)]));
+    const changes = [];
+    for (const d of docs) { const was = w.prev && w.prev.get(d.id); if (was !== next.get(d.id)) changes.push({ type: was ? 'modified' : 'added', id: d.id, doc: d }); }
+    for (const id of (w.prev || new Map()).keys()) if (!next.has(id)) changes.push({ type: 'removed', id, doc: null });
+    const first = w.prev === null;
+    w.prev = next;
+    if (first || full || changes.length) onSnap({ changes, fromCache: false, hasPendingWrites: false, epoch: ep, ...(full ? { full: true, docs } : {}) });
+  };
+  sinceWatchers.add(w);
+  w.run();
+  return () => sinceWatchers.delete(w);
+}
+export function fetchOne(email, coll, id) {
+  const lb = load().logbooks[lc(email)], d = lb && lb[coll] && lb[coll][id];
+  return d ? plain(d) : null;
 }
 
 export async function saveCase(email, c) {
@@ -344,15 +366,7 @@ export function reflectionsOf(email) {
   const lb = load().logbooks[email];
   return lb && lb.reflections ? Object.values(lb.reflections).map(plain).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)) : [];
 }
-function notifyReflections(email) {
-  for (const w of reflWatchers) if (w.email === email) w.cb(reflectionsOf(email));
-}
-export function watchReflections(email, cb) {
-  const w = { email: lc(email), cb: list => cb(list, meta) };
-  reflWatchers.add(w);
-  w.cb(reflectionsOf(w.email));
-  return () => reflWatchers.delete(w);
-}
+const notifyReflections = email => notifyColl(email, 'reflections');
 export async function saveReflection(email, r) {
   email = lc(email);
   const s = load();
@@ -377,13 +391,7 @@ export function notesOf(email) {
   const lb = load().logbooks[email];
   return lb && lb.notes ? Object.values(lb.notes).map(plain) : [];
 }
-function notifyNotes(email) { for (const w of noteWatchers) if (w.email === email) w.cb(notesOf(email)); }
-export function watchNotes(email, cb) {
-  const w = { email: lc(email), cb: list => cb(list, meta) };
-  noteWatchers.add(w);
-  w.cb(notesOf(w.email));
-  return () => noteWatchers.delete(w);
-}
+const notifyNotes = email => notifyColl(email, 'notes');
 export function saveNote(email, n) {
   email = lc(email);
   const s = load(), lb = book(s, email), doc = cleanNote(n);
@@ -569,7 +577,7 @@ function binOf(email) {
   const lb = load().logbooks[email];
   return lb && lb.bin ? Object.values(lb.bin).map(plain).sort((a, b) => (b.deletedAt || 0) - (a.deletedAt || 0)) : [];
 }
-function notifyBin(email) { for (const w of binWatchers) if (w.email === email) w.cb(binOf(email)); }
+function notifyBin(email) { for (const w of binWatchers) if (w.email === email) w.cb(binOf(email)); notifyColl(email, 'bin'); }
 export function watchBin(email, cb) {
   const w = { email: lc(email), cb: list => cb(list, meta) };
   binWatchers.add(w);

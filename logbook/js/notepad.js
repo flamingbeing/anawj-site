@@ -1,10 +1,12 @@
 // Notes (More → Notes): a resident's own notepad. Private, never in the portfolio. Pure helpers, no DOM
 // (tested in test/notepad.test.mjs).
 //   logbooks/{email}/notes/{id} = { id, date: 'YYYY-MM-DD' | null, title, body (Markdown), caseId?, createdAt, updatedAt }
-// The app keeps at most MAX_NOTES. settings.noteIndex { days, cases, n } says which days and cases have notes, so the
-// Logbook can mark them without reading every note.
+// The app keeps at most MAX_NOTES (the rules don't cap the count). The note index (meta/noteIndex { days, cases, n })
+// says which days and cases have notes, so the Logbook can mark them before the notes are loaded; the rules cap its
+// lists at INDEX_CAP, so it holds the most recent ones, and once the notes are loaded the marks come from them.
 
-export const MAX_NOTES = 100;
+export const MAX_NOTES = 2000;
+export const INDEX_CAP = 100;
 export const LIMITS = { title: 200, body: 20000 };
 export const NOTE_FIELDS = ['id', 'date', 'title', 'body', 'caseId', 'createdAt', 'updatedAt'];
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
@@ -45,15 +47,18 @@ export const notesOn = (list, date) => sortNotes((list || []).filter(n => n.date
 export const plainLines = body => String(body || '').split('\n').map(l => l.replace(/^\s*(#{1,6}\s+|[-*+]\s+(\[[ xX]\]\s+)?|\d+[.)]\s+)/, '').replace(/\*\*/g, '').replace(/\[([^\]]+)\]\([^)]*\)/g, '$1').trim()).filter(Boolean);
 export const noteTitle = n => (n.title || '').trim() || (plainLines(n.body)[0] || '').slice(0, 80) || 'Untitled note';
 
-// what settings.noteIndex holds; equal() says whether it needs writing again
-export function noteIndex(list) {
-  const days = [...new Set((list || []).map(n => n.date).filter(Boolean))].sort();
-  const cases = [...new Set((list || []).map(n => n.caseId).filter(Boolean))].sort();
-  return { days, cases, n: (list || []).length };
+// which days and cases have notes; with cap, only the latest days and the cases of the latest-changed notes (what the
+// index doc can hold). sameIndex() says whether it needs writing again.
+export function noteIndex(list, cap = Infinity) {
+  const notes = list || [];
+  const days = [...new Set(notes.map(n => n.date).filter(Boolean))].sort().slice(-cap);
+  const recent = [...notes].filter(n => n.caseId).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  const cases = [...new Set(recent.map(n => n.caseId))].slice(0, cap).sort();
+  return { days, cases, n: notes.length };
 }
 export function cleanNoteIndex(v) {
   const o = v && typeof v === 'object' ? v : {};
-  const list = (x, ok) => (Array.isArray(x) ? x.filter(ok).slice(0, MAX_NOTES) : []);
+  const list = (x, ok) => (Array.isArray(x) ? x.filter(ok).slice(-INDEX_CAP) : []);
   return { days: list(o.days, d => ISO.test(d)), cases: list(o.cases, c => typeof c === 'string' && c.length <= 200), n: Number.isInteger(o.n) && o.n >= 0 ? o.n : 0 };
 }
 export const sameIndex = (a, b) => JSON.stringify(cleanNoteIndex(a)) === JSON.stringify(cleanNoteIndex(b));

@@ -1,5 +1,5 @@
 // Fake data only. Notes (More → Notes): lazy loading, the editor and autosave, search, to-dos, day and case links,
-// the day's Copy, Arrange tabs, the recycle bin, the 100-note limit and the backup.
+// the day's Copy, Arrange tabs, the recycle bin, the 2,000-note limit (a page of 100 at a time) and the backup.
 import assert from 'node:assert/strict';
 const { chromium } = await import(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/node_modules/playwright/index.mjs');
 const base = `http://localhost:${process.env.PORT || 8080}/logbook/`;
@@ -40,7 +40,7 @@ try { for (const width of [390, 1280]) {
   await p.waitForFunction(async () => { const { S } = await import('./js/ui-core.js'); return S.notes?.[0]?.body.includes('- [x] fake to-do'); });
   await p.getByRole('button', { name: 'Done' }).click();
   await p.locator('ul.notes-rows li').first().waitFor();
-  assert.match(await p.locator('.notes-count').innerText(), /^1 of 100$/);
+  assert.match(await p.locator('.notes-count').innerText(), /^1 of 2000$/);
   assert.match(await p.locator('ul.notes-rows').innerText(), /Fake teaching point/);
   assert.deepEqual((await S()).index, { days: [iso], cases: [], n: 1 });
   // the index lives in its own owner-only doc, never in the logbook doc the app owner can read
@@ -175,15 +175,22 @@ try { for (const width of [390, 1280]) {
     ['caselogs', 'log', 'logbook', 'reflect', 'progress', 'notes', 'more']);
   await p.evaluate(async () => { const { applyDisplay, setDisplay } = await import('./js/ui-settings.js'); applyDisplay(setDisplay({ tabHidden: null, tabOrder: null })); });
 
-  // at 100 notes, no more
+  // at 2,000 notes, no more; the list shows 100 at a time (fillers go into the demo store in one write, then one save
+  // tells the sync engine)
   await p.evaluate(async () => {
-    const D = await import('./js/demo-backend.js');
-    for (let i = 0; i < 98; i++) D.saveNote('demo@example.com', { id: 'fake-' + i, date: null, title: 'Fake filler ' + i, body: '' });
+    const k = 'apmes-logbook-demo-v1', st = JSON.parse(localStorage.getItem(k)), lb = st.logbooks['demo@example.com'], t = Date.now();
+    const have = Object.keys(lb.notes || {}).length;
+    for (let i = 0; i < 2000 - have - 1; i++) lb.notes['fake-' + i] = { id: 'fake-' + i, date: null, title: 'Fake filler ' + i, body: '', createdAt: t, updatedAt: t };
+    localStorage.setItem(k, JSON.stringify(st));
+    (await import('./js/demo-backend.js')).saveNote('demo@example.com', { id: 'fake-last', date: null, title: 'Fake filler last', body: '' });
   });
   await p.evaluate(() => { location.hash = '#notes'; });
-  await p.locator('.notes-count').filter({ hasText: '100 of 100' }).waitFor();
+  await p.locator('.notes-count').filter({ hasText: '2000 of 2000' }).waitFor({ timeout: 15000 });
+  assert.equal(await p.locator('ul.notes-rows li').count(), 100);
+  await p.getByRole('button', { name: /^Show 100 more/ }).click();
+  assert.equal(await p.locator('ul.notes-rows li').count(), 200);
   await p.getByRole('button', { name: '+ New note' }).click();
-  await p.getByText(/You have 100 notes, the most allowed/).first().waitFor();
+  await p.getByText(/You have 2000 notes, the most allowed/).first().waitFor();
   assert.equal(await p.locator('.note-editor').count(), 0);
 
   assert.deepEqual(errors, []); await ctx.close(); console.log(`PASS notes ${width === 390 ? 'phone' : 'desktop'}`);

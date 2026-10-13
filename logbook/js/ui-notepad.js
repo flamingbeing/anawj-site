@@ -2,7 +2,8 @@
 // rules), never in the portfolio. Pure helpers in notepad.js.
 //
 // Firebase cost: notes are not read at sign-in. The listener starts the first time notes are needed (this page,
-// a day's notes in the Logbook, the Markdown export, a backup) and then stays for the visit. Typing saves after
+// a day's notes in the Logbook, the Markdown export, a backup) and then stays for the visit. It runs on the sync
+// engine (sync.js): this device's copy at once, then only the notes changed since the last visit. Typing saves after
 // 3 s of quiet, and at once when the note is left, the field loses focus or the page is hidden; every write goes
 // through the durable write queue (writes.js → cloud.commitRecord 'note'), so notes work offline too.
 // The note index (which days and cases have notes; its own owner-only doc, meta/noteIndex) lets the Logbook mark
@@ -12,9 +13,10 @@
 import { S, h, toast, fill, hooks, writes, cloud, transients, settings, patchLogbook, resetters, todayISO, modal, emptyState, download } from './ui-core.js';
 import { uid, fmtDate, caseParts } from './engine.js';
 import { barTabs, arrangeTabs, display, setTabOnBar } from './ui-settings.js';
-import { MAX_NOTES, LIMITS, sortNotes, filterNotes, noteTitle, noteIndex, cleanNoteIndex, sameIndex, parseNote, toggleCheck, plainLines, noteFiles } from './notepad.js';
+import { MAX_NOTES, INDEX_CAP, LIMITS, sortNotes, filterNotes, noteTitle, noteIndex, cleanNoteIndex, sameIndex, parseNote, toggleCheck, plainLines, noteFiles } from './notepad.js';
 
 const SAVE_MS = 3000;
+const PAGE = 100;   // notes listed before "Show more"
 const mine = () => S.user && S.user.email;
 // q: search; day / caseId: what the list is narrowed to; editing: the note open in the editor; preview: its view mode
 export const nv = { q: '', day: '', caseId: '', editing: null, preview: false, autoNew: false };
@@ -69,15 +71,26 @@ function syncIndex() {
   const me = mine();
   if (!Array.isArray(S.notes) || !S.logbook || !me) return;
   watchIndex();
-  const next = noteIndex(S.notes);
+  // the doc holds the latest INDEX_CAP days and cases (the rules' cap); the marks use all notes once they're loaded
+  const next = noteIndex(S.notes, INDEX_CAP);
   if (!sameIndex(next, S.noteIndex)) { S.noteIndex = next; cloud.saveNoteIndex(me, next).catch(e => console.error('Note index not saved', e)); }
   // the old copy in the logbook doc (readable by the app owner) goes
   if (settings().noteIndex != null) patchLogbook({ settings: { noteIndex: null } });
 }
-// until the index doc has arrived, an older settings.noteIndex still marks the days
-export const notesIndex = () => { watchIndex(); return cleanNoteIndex(S.noteIndex || settings().noteIndex); };
-export const dayHasNotes = date => !!date && notesIndex().days.includes(date);
-export const caseHasNotes = id => !!id && notesIndex().cases.includes(id);
+// From the notes themselves once loaded (every day and case, past the index doc's cap); before that the index doc,
+// and until it has arrived, an older settings.noteIndex.
+let fromNotes = { list: null, days: new Set(), cases: new Set() };
+export function notesIndex() {
+  if (Array.isArray(S.notes)) {
+    if (fromNotes.list !== S.notes) { const i = noteIndex(S.notes); fromNotes = { list: S.notes, days: new Set(i.days), cases: new Set(i.cases) }; }
+    return fromNotes;
+  }
+  watchIndex();
+  const i = cleanNoteIndex(S.noteIndex || settings().noteIndex);
+  return { days: new Set(i.days), cases: new Set(i.cases) };
+}
+export const dayHasNotes = date => !!date && notesIndex().days.has(date);
+export const caseHasNotes = id => !!id && notesIndex().cases.has(id);
 
 // open Notes on a day's notes, or a case's (from the Logbook); create: start a new note there (linked to the case)
 export function openNotes({ day = '', caseId = '', create = false } = {}) {
@@ -140,14 +153,18 @@ export function renderNotes() {
   const full = list.length >= MAX_NOTES;
   if (nv.autoNew && !loading) { nv.autoNew = false; queueMicrotask(() => (full ? toast(`You have ${MAX_NOTES} notes, the most allowed. Delete or export some to make room.`) : newNote())); }
   const search = h('input', { type: 'search', class: 'grow', placeholder: 'Search notes', 'aria-label': 'Search notes', value: nv.q,
-    oninput: e => { nv.q = e.target.value; paintList(); } });
+    oninput: e => { nv.q = e.target.value; shown = PAGE; paintList(); } });
   const listEl = h('div', { class: 'notes-list' });
+  // a page of rows at a time (up to 2,000 notes), more on request
+  let shown = PAGE;
   const paintList = () => {
     const rows = filterNotes(list, nv);
+    const more = rows.length - shown;
     fill(listEl, loading ? h('p', { class: 'empty' }, 'Loading…')
       : !list.length ? emptyState('notes', 'No notes yet', 'Writing about a case for your portfolio? Use Reflect instead.')
       : !rows.length ? emptyState('search', 'No notes match')
-      : h('ul', { class: 'notes-rows' }, rows.map(noteRow)));
+      : [h('ul', { class: 'notes-rows' }, rows.slice(0, shown).map(noteRow)),
+        more > 0 ? h('p', { class: 'notes-more' }, h('button', { class: 'small', onclick: () => { shown += PAGE; paintList(); } }, `Show ${Math.min(more, PAGE)} more (${more} not shown)`)) : null]);
   };
   const narrowed = nv.day || nv.caseId;
   // Notes lives in More until it's put on the tab bar: offer it here (a full bar asks which tab it replaces)
