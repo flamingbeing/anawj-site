@@ -2,12 +2,12 @@
 
 Short and current. Lasting rules go in `NOTES.md`. Update with `/save-state`.
 
-Last updated: 2026-10-12 by Claude Code, hand assessment session.
+Last updated: 2026-10-13 by Claude Code, hand assessment session.
 
 ## Now
 
-- **Claude Code, hand assessment** (branch `claude/amazing-goodall-erq636`, no open PR): nothing half-done. Owner
-  to check on their phone that the page reached the 3D version after #260 (close and reopen the tab).
+- **Claude Code, hand assessment** (branch `claude/amazing-goodall-erq636`, no open PR): nothing half-done. Applied
+  page-edit issue #302 (update bar removed; page now loads network first).
 
 ## Waiting on the owner
 
@@ -27,6 +27,7 @@ Last updated: 2026-10-12 by Claude Code, hand assessment session.
 
 ## Recently done
 
+- Page edits #302: no update bar; online visits always get the current page (network first, cache offline).
 - #260: updates switch on by themselves; the update bar only reloads (tap did nothing on the owner's phone).
 - #258: 3D animations (three.js) for cascade, FDP, FDS, nerve map; new FPL, EDC, EIP/EDM, EPL, Elson; kinder wording.
 - #253: removed the 10 rules and the emoji.
@@ -38,6 +39,7 @@ Last updated: 2026-10-12 by Claude Code, hand assessment session.
 
 ## Decisions
 
+- 2026-10-13: no update bar; the worker is network first (3 s fallback to cache), so updates need no tap or reload.
 - 2026-10-12: new versions activate themselves; the bar only reloads (owner's tap did nothing).
 - 2026-10-12: 3D animations (three.js r160, vendored) for tendon tests, cascade and nerve map; 2D kept for the
   sensation, 2PD, palm cut, zones and photo diagrams. Calling example is plain text. Tone instructive, not blunt.

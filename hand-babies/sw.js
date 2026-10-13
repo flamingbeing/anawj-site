@@ -1,9 +1,9 @@
-// Offline copy of the hand assessment page (pattern from prewarm/sw.js). Bump VERSION whenever any SHELL file
-// changes. A new version switches itself on as soon as it has cached the page (no data here, so nothing to lose);
-// the page then offers "Update available: tap to reload", which only reloads. (Waiting for a tap to activate failed
-// on some phones: the tap did nothing, 12 Oct 2026.)
+// Offline copy of the hand assessment page. Bump VERSION whenever any SHELL file changes.
+// Network first: online, every visit gets the current page (no update bar, owner 13 Oct 2026); the cache is only
+// for offline or a network slower than NET_WAIT. A new version switches itself on once it has cached the page.
 
-const VERSION = 'hand-babies-v7';
+const VERSION = 'hand-babies-v8';
+const NET_WAIT = 3000; // ms before falling back to the cached copy
 const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'hand3d.js', 'vendor/three.module.min.js', 'edit.html', '../design/tokens.css'];
 
 self.addEventListener('install', e => {
@@ -29,19 +29,23 @@ self.addEventListener('fetch', e => {
   if (url.origin !== self.location.origin) return;
   e.respondWith((async () => {
     const cache = await caches.open(VERSION);
-    // navigations: the cached page, keyed by the folder (see prewarm/sw.js for why not 'index.html')
+    // navigations: the page, cached under by the folder (see prewarm/sw.js for why not 'index.html')
     // (only the page itself: edit.html is a separate page and must not get the shell)
     const shell = req.mode === 'navigate' && /\/(index\.html)?$/.test(url.pathname);
     const key = shell ? './' : req;
-    const hit = await cache.match(key, { ignoreSearch: req.mode === 'navigate' });
-    if (hit) return hit;
-    try {
-      const res = await fetch(req);
+    const cached = () => cache.match(key, { ignoreSearch: req.mode === 'navigate' });
+    const net = fetch(req).then(res => {
       if (res.ok && res.type === 'basic') cache.put(key, res.clone());
       return res;
+    });
+    // slow network: show the cached copy rather than wait (the fetch still refreshes the cache for next time)
+    const slow = new Promise(r => setTimeout(r, NET_WAIT)).then(cached).then(hit => hit || net);
+    slow.catch(() => {}); // offline: handled below
+    try {
+      return await Promise.race([net, slow]);
     } catch (err) {
-      const page = shell && await cache.match('./');
-      if (page) return page;
+      const hit = await cached() || (shell && await cache.match('./'));
+      if (hit) return hit;
       throw err;
     }
   })());
