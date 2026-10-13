@@ -2,7 +2,7 @@
 // own ui-*.js file and is loaded on first use; shared state and helpers are in ui-core.js.
 // Data comes from cloud.js (Firestore, or the in-browser demo backend with ?demo).
 
-import { S, hooks, h, fill, toast, cloud, icon, initials, go, isResident, isFaculty, isStaff, hasRole, pruneDrafts, confirmBox, needsAction, applyTheme } from './ui-core.js';
+import { S, hooks, h, fill, toast, cloud, icon, initials, go, isResident, isFaculty, isStaff, hasRole, pruneDrafts, signOutSafely, confirmBox, needsAction, applyTheme, errText } from './ui-core.js';
 
 applyTheme();   // also keeps the browser's theme-color in step with the page
 
@@ -215,7 +215,7 @@ function googleMark() {
 
 async function signIn() {
   try { await cloud.signIn(); }
-  catch (err) { renderLanding('Sign-in failed: ' + (err && err.message || err)); }
+  catch (err) { renderLanding('Sign-in didn’t finish. ' + errText(err)); }
 }
 
 // ---------- signed in, no role: apply ----------
@@ -257,7 +257,7 @@ function applyForm(prev) {
       await cloud.applyForRole({ role, name: name.value.trim(), note: note.value.trim() });
       toast('Application sent');
       await refreshRoles();
-    } catch (err) { toast('Could not apply: ' + (err.message || err)); btn.disabled = false; }
+    } catch (err) { toast('Couldn’t send your application. ' + errText(err)); btn.disabled = false; }
   } },
   h('h2', { class: 'e-h3' }, 'Join APMES Evals'),
   h('p', {}, `${S.user.email} isn’t on the resident or faculty list yet. Apply below and an admin or programme director will approve you.`),
@@ -267,7 +267,7 @@ function applyForm(prev) {
   h('div', { class: 'e-actions' }, btn));
 }
 
-const signOutCard = () => h('p', { class: 'e-center' }, h('button', { class: 'n-btn n-btn--outline e-btn-quiet', onclick: () => cloud.signOut() }, 'Sign out'));
+const signOutCard = () => h('p', { class: 'e-center' }, h('button', { class: 'n-btn n-btn--outline e-btn-quiet', onclick: () => signOutSafely() }, 'Sign out'));
 
 // ---------- signed in ----------
 
@@ -280,7 +280,7 @@ async function refreshRoles() {
   let roles;
   try { roles = await cloud.getRoles(user.email); }
   catch (err) {
-    fill(app, h('div', { class: 'e-empty' }, h('p', { class: 'e-empty__title' }, 'Could not load your account'), h('p', {}, err.message || String(err)),
+    fill(app, h('div', { class: 'e-empty' }, h('p', { class: 'e-empty__title' }, 'Couldn’t load your account'), h('p', {}, errText(err)),
       h('button', { class: 'n-btn', onclick: () => refreshRoles() }, 'Try again')));
     return;
   }
@@ -411,7 +411,7 @@ export async function resetDemoData() {
 
 // ---------- boot ----------
 
-if (cloud.onSyncError) cloud.onSyncError(err => toast('A change could not be synced: ' + (err.message || err)));
+if (cloud.onSyncError) cloud.onSyncError(err => toast('A change didn’t reach the server. ' + errText(err)));
 
 if (cloud.demo) {
   S.demoRole = cloud.demoRole ? cloud.demoRole() : 'resident';
@@ -423,5 +423,5 @@ if (cloud.demo) {
 }
 paintHeader('APMES Evals');
 if (!cloud.enabled) renderLanding();
-else Promise.resolve(cloud.watchUser(onUser)).catch(err => renderLanding('Could not start sign-in: ' + (err.message || err)));
+else Promise.resolve(cloud.watchUser(onUser)).catch(err => renderLanding('Couldn’t start sign-in. ' + errText(err)));
 registerSW();
