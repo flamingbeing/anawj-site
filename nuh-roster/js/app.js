@@ -61,7 +61,7 @@ migrateRooms();
 syncRooms();
 state.rotations ||= emptyRotations();
 // bumped when the demo data changes, so a demo already open in a browser picks it up
-const DEMO_VERSION = 6;
+const DEMO_VERSION = 7;
 if (DEMO && !state.staff.length) startDemo();
 else if (DEMO && state.demoVersion !== DEMO_VERSION) { state = blankState(); syncRooms(); startDemo(); } // the made-up department changed: start it again
 
@@ -3927,7 +3927,7 @@ document.getElementById('loadTeam').addEventListener('change', async e => {
       if (state.staff.length && !confirm('Replace everything the roster has saved in this browser with this file?')) return;
       const before = state;
       try {
-        state = { ...blankState(), ...d, settings: { ...clone(DEFAULT_SETTINGS), ...d.settings } };
+        state = { ...blankState(), ...d, roomsVersion: d.roomsVersion || 1, settings: { ...clone(DEFAULT_SETTINGS), ...d.settings } };
         state.day ||= blankState().day;
         state.rotations ||= emptyRotations();
         cleanStaffNames(); migrateRooms(); syncRooms();

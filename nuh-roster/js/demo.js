@@ -156,6 +156,7 @@ function tidyMonthly(monthly, staff) {
         const cur = row && personOf(row[issue.key]);
         if (!cur) continue;
         // someone of the same role and grade group who has nothing that day or the night before, and isn't away
+        // liver and AOH are on-call standbys, so a night before doesn't rule anyone out for them
         // cardiac call and TEE need a cardiac senior, the liver donor an HPB one; anyone of the same role otherwise
         const need = issue.kind === 'senior' && ['c1', 'c2', 'tee'].includes(issue.key) ? 'cardiac' : issue.kind === 'liver' && issue.key === 'donor' ? 'hpb' : '';
         const busy = new Set([issue.date, addDays(issue.date, -1)].flatMap(date => Object.values(dutiesOn(monthly, date)).flatMap(Object.values)));
@@ -164,7 +165,7 @@ function tidyMonthly(monthly, staff) {
           && (!need || (p.subspecs || []).includes(need)));
         const sameDay = new Set(Object.values(dutiesOn(monthly, issue.date)).flatMap(Object.values));
         const nightBefore = new Set(Object.entries(dutiesOn(monthly, addDays(issue.date, -1))).flatMap(([kind, r]) => Object.entries(r).filter(([key]) => NIGHT_DUTIES.includes(`${kind}.${key}`)).map(([, v]) => v)));
-        const ok = (p, strict) => p.role === cur.role && p.id !== cur.id && (p.subspecs || []).includes(need) && !nightBefore.has(p.name) && !away.has(p.name) && (!strict || !sameDay.has(p.name));
+        const ok = (p, strict) => p.role === cur.role && p.id !== cur.id && (p.subspecs || []).includes(need) && (['liver', 'aoh'].includes(issue.kind) || !nightBefore.has(p.name)) && !away.has(p.name) && (!strict || !sameDay.has(p.name));
         const pickLoose = pick || (need && (staff.find(p => ok(p, true)) || staff.find(p => ok(p, false))));
         if (pickLoose) { row[issue.key] = pickLoose.name; fixed++; continue; }
         // no one suitable for the day duty (e.g. a cardiac list): move the night before instead
