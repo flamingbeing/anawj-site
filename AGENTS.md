@@ -17,8 +17,8 @@ Static site on GitHub Pages (public repo: no names, patient data or real evaluat
   data is built from them), and the blank portfolio template the logbook tests use. See `apmes/README.md`.
   Before adding a programme file, check its cover/contributor pages and file details (author, embedded files) for
   names; add a cleaned copy.
-- `design/tokens.css`: shared design tokens; `design/README.md` is the NUHS-style guide (`design/STATUS.md` for its
-  status). Every app's top band is four equal quarters: orange `#e57200`, red `#e4002b`, blue `#178fd7` (not cyan),
+- `nuhsdesign/tokens.css`: shared design tokens; `nuhsdesign/README.md` is the NUHS-style guide (`nuhsdesign/STATUS.md`
+  for its status). Every subdomain serves `/nuhsdesign/`; `design/tokens.css` is an old-path copy for cached pages. Every app's top band is four equal quarters: orange `#e57200`, red `#e4002b`, blue `#178fd7` (not cyan),
   navy `#002f6c`. Focus rings are navy on light grounds (cyan on white is only 2.7:1).
 
 Rules that bite:

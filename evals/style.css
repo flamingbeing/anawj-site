@@ -1,5 +1,5 @@
 /*
-  APMES Evals styles. Links after ../design/tokens.css (NUHS --n-* variables, .n-btn, .n-stripe).
+  APMES Evals styles. Links after ../nuhsdesign/tokens.css (NUHS --n-* variables, .n-btn, .n-stripe).
   Light only, mobile first (360px), content max 720px. All app classes are e- prefixed.
 
   Style guide (class names for the screens):
@@ -590,6 +590,6 @@ body { background: var(--e-bg-group); }
 :where(:root[data-theme="dark"]) img:not(.e-qr img) { opacity: .92; }
 :where(:root[data-theme="dark"]) dialog.e-dialog::backdrop { background: rgba(0, 0, 0, .6); }
 .e-more-theme .e-segment { padding: 0; border: 0; background: none; }
-/* filled buttons (design/tokens.css sets white text): dark text on the light accents */
+/* filled buttons (nuhsdesign/tokens.css sets white text): dark text on the light accents */
 :where(:root[data-theme="dark"]) .n-btn:not(.n-btn--outline):not(:disabled),
 :where(:root[data-theme="dark"]) .n-btn:not(.n-btn--outline):not(:disabled):hover { color: var(--e-on-accent); }
