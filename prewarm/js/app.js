@@ -543,7 +543,7 @@ function home() {
       const e = lastEdit(p), locked = p.lock?.on;
       // the same Subject ID on two records (e.g. made on two phones without signal): readings are split between them
       const twin = list.some(q => q !== p && String(val(q, 'enrol_id') || '').toLowerCase() === String(val(p, 'enrol_id') || '').toLowerCase() && (val(q, 'site') || '') === (val(p, 'site') || ''));
-      const body = `<b>${esc(sid(p))}${val(p, 'site') ? ` <small>${esc(val(p, 'site'))}</small>` : ''}</b>${twin ? '<span class="twinline">Same Subject ID twice: readings may be split. Fill in one and correct the other’s ID (Perioperative data), or delete it in Settings.</span>' : ''}<span${locked ? ' class="lockline"' : val(p, 'done') ? ' class="okline"' : ''}>${locked ? `${LOCK_ICON} Locked by the study admin${canLock() ? ' · read only' : ''}` : esc(status(p))}</span>
+      const body = `<b>${esc(sid(p))}${val(p, 'site') ? ` <small>${esc(val(p, 'site'))}</small>` : ''}</b>${twin ? '<span class="twinline">Same Subject ID twice: readings may be split. Fill in one and correct the other’s ID (Pre-op and patient details), or delete it in Settings.</span>' : ''}<span${locked ? ' class="lockline"' : val(p, 'done') ? ' class="okline"' : ''}>${locked ? `${LOCK_ICON} Locked by the study admin${canLock() ? ' · read only' : ''}` : esc(status(p))}</span>
         <span class="dueline" data-due="${p.id}" hidden></span>${progressHtml(p)}<small>${e ? 'Last entry ' + new Date(e.t).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) + (e.by ? ' by ' + esc(e.by) : '') : 'No entries yet'}</small>`;
       if (selecting) return `<li><label class="selrow"><input type="checkbox" data-sel="${p.id}" ${selecting.has(p.id) ? 'checked' : ''}><span>${body}</span></label></li>`;
       if (locked) return `<li><a href="${canLock() ? '#/p/' + p.id : '#/'}" class="locked"${canLock() ? '' : ' data-locked="1"'}>${body}</a></li>`;
@@ -928,7 +928,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
       <a href="#/p/${id}/form/intraop">Intra-op details${done('intraop')}<small>${todo(INTRAOP_Q, 'io_done') || 'Blood, products, tests'}</small></a>
       <a href="#/p/${id}/form/pacu">PACU${done('pacu')}<small>${todo(PACU_Q, 'pacu_in') || 'Temp, NuDESC, delay'}</small></a>
       </nav>
-      <a class="widebox" href="#/p/${id}/data">Perioperative data</a>
+      <nav class="links three" aria-label="Perioperative data">${DATA_PARTS.map(d => `<a href="#/p/${id}/${d.path}">${d.short}${done(d.sign)}</a>`).join('')}</nav>
       <div class="textlinks"><a href="#/p/${id}/form">Form view</a><a href="#/p/${id}/sheet">Sheet view</a></div>`;
   }
   // previous / next timepoint: big buttons either side of the tabs and the timepoint strip
@@ -1292,8 +1292,8 @@ function gapsHtml(p) {
 // a section marked complete is read only until its tick is undone; "data collection complete" closes every op-day
 // screen (owner, 12 Oct 2026). The Perioperative data page (filled in later from the chart) stays open.
 function sealedBy(p, pg) {
-  // Perioperative data is filled in later from the chart, so "data collection complete" doesn't close it: only its own tick
-  if (val(p, 'done') && pg !== 'periop') return 'Data collection';
+  // the perioperative pages are filled in later from the chart, so "data collection complete" doesn't close them: only their own ticks
+  if (val(p, 'done') && !DATA_SIGNS.has(pg)) return 'Data collection';
   if (!pg || !val(p, 'sign_' + pg)) return null;
   const n = SECTION[pg] || PAGES.find(x => x.id === pg)?.title || 'This section';
   return n[0].toUpperCase() + n.slice(1);
@@ -1305,7 +1305,7 @@ const disableSealed = () => view.querySelectorAll('.sealed input, .sealed select
 // which sections are marked complete, shown on the patient list (owner, 13 Oct 2026): read only, they just
 // mirror the existing complete ticks inside each section
 function progressHtml(p) {
-  const rows = [['prewarm', 'Pre-warm'], ['iotemp', 'Intra-op temps'], ['haemo', 'BP, HR, BIS'], ['intraop', 'Intra-op details'], ['pacu', 'PACU'], ['periop', 'Perioperative']]
+  const rows = [['prewarm', 'Pre-warm'], ['iotemp', 'Intra-op temps'], ['haemo', 'BP, HR, BIS'], ['intraop', 'Intra-op details'], ['pacu', 'PACU'], ['periop', 'Pre-op'], ['pod1', 'Day 1'], ['pod2', 'Day 2']]
     .filter(([k]) => !(k === 'prewarm' && noWarming(p)));
   return `<span class="progress" role="list" aria-label="Sections marked complete">${rows.map(([k, l]) => { const on = !!val(p, 'sign_' + k);
     return `<span role="listitem" class="${on ? 'on' : ''}" aria-label="${l}: ${on ? 'complete' : 'not marked complete'}"><span class="tick" aria-hidden="true">${on ? '✓' : ''}</span>${l}</span>`; }).join('')}</span>`;
@@ -1316,7 +1316,7 @@ function doneHtml(p) {
 
 // ---------- section sign-off (replaces the paper form's Name / Signature / Date)
 // each sign-off names its section, and shows a ticked box once marked (owner, 12 Oct 2026)
-const SECTION = { periop: 'perioperative data', prewarm: 'pre-warming temps', iotemp: 'intra-op temps', haemo: 'BP, HR, BIS', intraop: 'Intra-op details', pacu: 'PACU', satis: 'Patient comfort' };
+const SECTION = { periop: 'pre-op and patient details', pod1: 'day 1', pod2: 'day 2', prewarm: 'pre-warming temps', iotemp: 'intra-op temps', haemo: 'BP, HR, BIS', intraop: 'Intra-op details', pacu: 'PACU', satis: 'Patient comfort' };
 const tickHtml = (on, label, who, undo, mark) => on
   ? `<div class="sign on"><span class="tick" aria-hidden="true">✓</span><span><b>${esc(label)} complete</b><small>${esc(who)}</small></span><button class="link" ${undo}>Undo</button></div>`
   : `<div class="sign"><button class="tickbtn" ${mark}><span class="tick" aria-hidden="true"></span>Mark ${esc(label)} complete</button></div>`;
@@ -1352,23 +1352,32 @@ const vitalsCollected = p => Object.keys(p.f).some(k => /^haemo_/.test(k) && val
 // ---------- other data: the study's remaining pages (pre-op, day 1 and 2 chart review, discharge), all on one page under
 // headers that open by default (owner, 12 Oct 2026). Built for a computer keyboard too: Enter or ↓ goes to the next
 // question, ↑ to the one before; on a row of choices ← → move along it and Enter or Space picks one and moves on.
-route(/^\/p\/(\w+)\/data$/, id => {
+// The page is split in three (owner, 13 Oct 2026): pre-op and patient details, day 1, day 2 (with discharge). Each has its own
+// complete tick; the questions are the same and in the same order as before.
+const DATA_PARTS = [
+  { path: 'data', sign: 'periop', short: 'Pre-op', title: 'Pre-op and patient details', pages: ['preop', 'meds', 'bloods'], study: true },
+  { path: 'data/day1', sign: 'pod1', short: 'Day 1', title: 'Day 1', pages: ['pod1', 'pod1an'] },
+  { path: 'data/day2', sign: 'pod2', short: 'Day 2', title: 'Day 2 and discharge', pages: ['pod2', 'pod2an', 'dc'] },
+];
+const DATA_SIGNS = new Set(DATA_PARTS.map(d => d.sign));
+route(/^\/p\/(\w+)\/data(?:\/(day1|day2))?$/, (id, day) => {
   const p = patients[id]; if (!p) return go('#/');
-  header(sid(p) + ' · Perioperative data', `#/p/${id}/haemo`);
+  const part = DATA_PARTS.find(d => d.path === (day ? 'data/' + day : 'data')), SIGN = part.sign;
+  header(sid(p) + ' · ' + part.title, `#/p/${id}/haemo`);
   topBar(p, defaultSeries(p));
   const get = k => val(p, k);
   const closed = new Set();
   const filled = pg => FORM[pg].filter(([k]) => val(p, k) != null).length;
   const draw = () => {
     const y = window.scrollY;
-    const sl = sealedBy(p, 'periop');
+    const sl = sealedBy(p, SIGN);
     paint(`<p class="muted small">Usually from Epic or the chart, after the day of surgery. Fill in what you have; the rest stays blank.</p>
-      <div class="${sl ? 'sealed' : ''}"><details class="sect" data-pg="study" ${closed.has('study') ? '' : 'open'}><summary><span>Subject ID and group</span><small>to correct a mistake</small></summary>
-        <div class="stack">${fieldHtml(field('enrol_id'), get)}${fieldHtml(field('arm'), get)}</div></details>
-      ${OTHER_PAGES.map(pg => `<details class="sect" data-pg="${pg}" ${closed.has(pg) ? '' : 'open'}><summary><span>${esc(PAGES.find(x => x.id === pg).title)}</span>
+      <div class="${sl ? 'sealed' : ''}">${part.study ? `<details class="sect" data-pg="study" ${closed.has('study') ? '' : 'open'}><summary><span>Subject ID and group</span><small>to correct a mistake</small></summary>
+        <div class="stack">${fieldHtml(field('enrol_id'), get)}${fieldHtml(field('arm'), get)}</div></details>` : ''}
+      ${part.pages.map(pg => `<details class="sect" data-pg="${pg}" ${closed.has(pg) ? '' : 'open'}><summary><span>${esc(PAGES.find(x => x.id === pg).title)}</span>
         <small>${filled(pg) ? filled(pg) + ' of ' + FORM[pg].length + ' filled' : 'Not started'}</small></summary>
         <div class="stack">${FORM[pg].map(([k]) => fieldHtml(field(k), get)).join('')}</div></details>`).join('')}</div>
-      ${sl ? sealNote(p, 'periop') : ''}${signoffHtml(p, 'periop')}`);
+      ${sl ? sealNote(p, SIGN) : ''}${signoffHtml(p, SIGN)}`);
     disableSealed();
     window.scrollTo(0, y);
   };
@@ -1390,21 +1399,21 @@ route(/^\/p\/(\w+)\/data$/, id => {
     set(p, f.id, String(get(f.id)) === String(v) ? null : v); draw();
   };
   view.onclick = e => {
-    if (e.target.closest('[data-sign], [data-unsign]')) return signoffClick(p, 'periop', e.target);
+    if (e.target.closest('[data-sign], [data-unsign]')) return signoffClick(p, SIGN, e.target);
     const b = e.target.closest('.chip[data-f]');
-    if (b && sealedBy(p, 'periop')) return toast(sealedMsg(p, 'periop'));
+    if (b && sealedBy(p, SIGN)) return toast(sealedMsg(p, SIGN));
     if (b) pick(b);
   };
   view.onchange = e => {
     const i = e.target; if (!i.dataset.f) return;
-    if (sealedBy(p, 'periop')) return;
+    if (sealedBy(p, SIGN)) return;
     const f = field(i.dataset.f);
     // Subject ID: never blank, never the same as another patient's here
     if (f.id === 'enrol_id') {
       const v = i.value.trim();
       const clash = Object.values(patients).some(q => q !== p && !isGone(q) && String(val(q, 'enrol_id') || '').toLowerCase() === v.toLowerCase());
       if (!v || clash) { toast(v ? 'That Subject ID is already used by another patient.' : 'The Subject ID can’t be blank.'); i.value = get('enrol_id') ?? ''; return; }
-      set(p, 'enrol_id', v); $('#title').textContent = sid(p) + ' · Perioperative data'; return;
+      set(p, 'enrol_id', v); $('#title').textContent = sid(p) + ' · ' + part.title; return;
     }
     const tv = typedValue(f, i.value);
     if (tv == null) { i.value = val(p, f.id) ?? ''; return; }
@@ -1476,7 +1485,7 @@ route(/^\/pacu\/(\w+)$/, id => formPage(id, 'pacu', '#/pacu'));
 route(/^\/p\/(\w+)\/form\/(\w+)$/, (id, pg) => formPage(id, pg, `#/p/${id}/haemo`));
 function formPage(id, pg, back) {
   const p = patients[id]; if (!p) return go('#/');
-  if (OTHER_PAGES.includes(pg)) return go(`#/p/${id}/data`);
+  if (OTHER_PAGES.includes(pg)) return go(`#/p/${id}/${DATA_PARTS.find(d => d.pages.includes(pg)).path}`);
   if (!FORM[pg]) return go('#/p/' + id);
   header(sid(p) + ' · ' + (SECTION[pg] || PAGES.find(x => x.id === pg).title), back);
   topBar(p, defaultSeries(p));

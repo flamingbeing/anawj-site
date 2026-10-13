@@ -283,3 +283,9 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   Pre-warming temps complete (`sign_prewarm`, needs initials) and opens the intra-op temps. Undo the tick to edit.
   Once complete, `pointsFor` drops the later 5-min points (past 10 / 30 min) unless already saved, so they aren't
   asked for or listed in Still to fill; their export cells stay blank.
+- **Perioperative data split in three** (owner, 13 Oct 2026): one row of three buttons on the patient screen: Pre-op
+  (`#/p/<id>/data`: Subject ID and group, pre-op, meds, bloods; tick `sign_periop`, label "Pre-op and patient
+  details"), Day 1 (`/data/day1`: chart review, analgesia; `sign_pod1`) and Day 2 (`/data/day2`: chart review,
+  analgesia, discharge; `sign_pod2`). Questions and order unchanged (`DATA_PARTS` in app.js). Each tick locks only
+  its page; "data collection complete" closes none of them. Progress ticks on the list and the export's "Complete: …"
+  columns (Extra sheet) have the three.
