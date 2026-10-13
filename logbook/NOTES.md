@@ -127,6 +127,11 @@ portfolio content.
   buttons, `rowIcon` on Logbook rows), never emoji; empty lists use `emptyState(icon, title, hint, button)`; buttons,
   chips and rows show a pressed state; one speed for motion (`--dur`, `--ease` in style.css). New looks are separate
   settings, off by default (the plan is in STATUS, Next).
+- **Back links** (owner, 13 Oct 2026): every page without its own place on the tab bar has a back link to the page
+  before it (`parentOf` in app.js: none for a page on the bar, Settings or Notes too when put there; More for a bar
+  page kept off the bar; otherwise the page it sits under). The edge swipe follows the same rule.
+- **Colour** (owner, 13 Oct 2026): the device's own colour picker (one colour well, Default colour beside it), no
+  preset swatches; the light and dark palettes still adjust it to stay readable.
 - **Moving around** (polish 2): on a page under a tab, "‹ Settings" (the page it goes back to) replaces the app's name
   in the header (in the page instead when the header is hidden). Going into a page slides it in from the right as it
   fades in; going back, from the left. Only the new page moves: a still copy of the old page (tried first) put every

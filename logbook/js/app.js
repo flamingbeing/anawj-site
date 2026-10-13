@@ -394,6 +394,14 @@ const syncNavigation = () => { if (S.user) { const t = tabFromHash(); if (t) nav
 window.addEventListener('popstate', syncNavigation);
 window.addEventListener('hashchange', syncNavigation);
 
+// Where a page's back link goes: nowhere for a page on the tab bar (Settings or Notes too, when put there); More for a
+// bar page kept off the bar (Notes, Analytics…), where it's listed; otherwise the page it sits under
+function parentOf(tab) {
+  const cands = barCandidates();
+  if (cands.includes(tab.id)) return arrangeTabs(cands, display()).shown.includes(tab.id) ? null : 'more';
+  return tab.under || null;
+}
+
 function render() {
   if (!S.user) return;
   // Settings → Logging → Show tips and help text: off hides every .help explanation (an experienced-user mode)
@@ -406,11 +414,12 @@ function render() {
   S.tab = tab.id;
   applyCustomCss();   // never on the Display page, so a bad rule can always be fixed there
   const y = window.scrollY;
-  // pages under a tab get a way back: "‹ Settings" in the header, in place of the app's name (owner, 13 Oct 2026),
-  // or at the top of the page when the header is hidden (Advanced display)
-  const backTo = tab.under && navigation.backTarget(tab.under);
+  // every page without its own place on the tab bar gets a way back (owner, 13 Oct 2026): "‹ Settings" in the
+  // header, in place of the app's name, or at the top of the page when the header is hidden (Advanced display)
+  const parent = parentOf(tab);
+  const backTo = parent && navigation.backTarget(parent);
   const back = backTo ? h('p', { class: 'back-row' }, h('a', { class: 'back-link', href: '#' + backTo,
-    onclick: e => { e.preventDefault(); navigation.back(tab.under); } }, h('span', { class: 'back-chev', 'aria-hidden': 'true' }, '‹'), (TABS.find(t => t.id === backTo) || {}).label || 'Back')) : null;
+    onclick: e => { e.preventDefault(); navigation.back(parent); } }, h('span', { class: 'back-chev', 'aria-hidden': 'true' }, '‹'), (TABS.find(t => t.id === backTo) || {}).label || 'Back')) : null;
   const brand = document.querySelector('.top .brand');
   brand?.querySelector('.back-row')?.remove();
   const inHeader = back && brand && !document.documentElement.classList.contains('no-header');
@@ -459,8 +468,8 @@ document.addEventListener('touchstart', e => {
   edge = null;
   if (!S.user || display().edgeBack === false || !IPHONE_APP() || e.touches.length !== 1 || e.touches[0].clientX > 20) return;
   const tab = TABS.find(t => t.id === S.tab);
-  if (!tab || !tab.under || e.target.closest('dialog, #tabs')) return;
-  edge = { x: e.touches[0].clientX, y: e.touches[0].clientY, at: Date.now(), lock: false, dx: 0, under: tab.under };
+  if (!tab || !parentOf(tab) || e.target.closest('dialog, #tabs')) return;
+  edge = { x: e.touches[0].clientX, y: e.touches[0].clientY, at: Date.now(), lock: false, dx: 0, under: parentOf(tab) };
 }, { passive: true });
 document.addEventListener('touchmove', e => {
   const s = edge;

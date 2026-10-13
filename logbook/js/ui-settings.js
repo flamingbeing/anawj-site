@@ -7,7 +7,7 @@ import { S, h, info, toast, modal, confirmBox, cloud, writes, catChip, catName, 
 import { MAX_TAGS, tagLinks as tagLinksIn, learnShorthand, cleanShorthand, shorthandOf, DEFAULT_SHORTHAND, cleanTagSet, defaultTagSet, tagTree, flatTree, moveTag, reparentTag, removeTag, newKey, tagSetToCsv, tagSetFromCsv, dropTag, canPlace, placeNewTag } from './tags.js';
 import { pickDialog, CASE_PARTS, AFTER_SAVE } from './ui-log.js';
 import { OPERATOR_HELP } from './search-ops.js';
-import { PRESETS, DEFAULT_ACCENT, cleanAccent, schemeCss, lightPalette, tabSchemeCss, tabVarsCss } from './colors.js';
+import { DEFAULT_ACCENT, cleanAccent, schemeCss, lightPalette, tabSchemeCss, tabVarsCss } from './colors.js';
 import { cleanMarkdown, storedMarkdown, mdCase, mdDay, reflectionPath, reflectionNote, CASE_FILLINS, REFL_FILLINS, FM_FIELDS } from './markdown.js';
 import { checkCss } from './custom-css.js';
 import { FONTS, applyFonts, fontStack, fontAvailable, cleanFontName, logChoice, saveUserFont, getUserFont, deleteUserFont } from './fonts.js';
@@ -338,7 +338,7 @@ export function renderDisplay() {
       h('h2', {}, 'Display'),
       pick('Light or dark', THEMES, cachedTheme(), v => applyTheme(v)),
       h('div', { class: 'field', style: 'margin-top:10px' }, 'Colour', accentPicker()),
-      help('Light and dark versions stay easy to read.'),
+      help('Tap to pick any colour. Light and dark versions stay easy to read.'),
       pick('Colourful', COLOURFUL, st.colourful === true ? 'tabs' : st.colourful || 'off', v => applyDisplay(setDisplay({ colourful: v === 'off' ? null : v })),
         'A colour for each tab.', 'With the default colour, the tabs follow the NUH stripe at the top: Case orange, Logbook red, Reflections cyan, Analytics navy. With another colour: orange, teal, red, blue, purple. “Everything” also colours the buttons, chips and links on that tab’s pages, in shades that stay easy to read.'),
       toggle('Compact mode', st.compact, v => { applyCompact(v); setDisplay({ compact: v }); }, 'Smaller chips, rows and spacing, so more tags fit.'),
@@ -512,17 +512,17 @@ function customCssCard() {
       h('p', { class: 'hint help', style: 'margin:6px 0 0' }, 'It never applies on this page, so you can always come back and fix it. If something goes wrong elsewhere, open the app with ?nocss at the end of the address. Saved on this device only; app updates can change the class names it relies on.')));
 }
 
-// suggested colours, then any colour (a custom pick shows as the last swatch)
+// any colour, straight from the device's own colour picker (owner, 13 Oct 2026: no preset swatches); Default goes
+// back to the app's navy
 function accentPicker() {
   const cur = () => cleanAccent(display().accent) || DEFAULT_ACCENT;
-  const wrap = h('div', { class: 'accent-pick', role: 'group', 'aria-label': 'Colour' });
+  const wrap = h('div', { class: 'accent-pick' });
   const pick = c => { applyDisplay(setDisplay({ accent: c === DEFAULT_ACCENT ? null : c })); paint(); };   // (also redoes the Colourful shades)
   const paint = () => {
-    const c = cur(), custom = !PRESETS.some(([x]) => x === c);
-    const input = h('input', { type: 'color', value: c, 'aria-label': 'Any colour', oninput: e => applyAccent(e.target.value), onchange: e => pick(e.target.value) });
+    const c = cur();
     fill(wrap,
-      ...PRESETS.map(([x, name]) => h('button', { type: 'button', class: 'swatch', title: name, 'aria-label': name, 'aria-pressed': String(c === x), style: `--sw:${x}`, onclick: () => pick(x) }, h('span', { class: 'sr' }, name))),
-      h('label', { class: 'swatch custom' + (custom ? ' on' : ''), title: 'Any colour', style: custom ? `--sw:${c}` : '' }, h('span', { 'aria-hidden': 'true' }, custom ? '' : '+'), input));
+      h('input', { type: 'color', class: 'accent-input', value: c, 'aria-label': 'Colour', oninput: e => applyAccent(e.target.value), onchange: e => pick(e.target.value) }),
+      c === DEFAULT_ACCENT ? null : h('button', { type: 'button', class: 'small linkish', onclick: () => pick(DEFAULT_ACCENT) }, 'Default colour'));
   };
   paint();
   return wrap;
