@@ -100,6 +100,10 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   Intra-op details, PACU) is read only for everyone until its tick is undone (Undo asks first); its due alerts and
   countdown stop. "Data collection complete" closes every op-day screen (key times, Log, readings, forms) but not
   Perioperative data (filled in later from the chart). Each temps tick shows only on its own sub-tab.
+- **Fast tests** (13 Oct 2026): `tools/test-prewarm.sh` runs everything but sync and rules in about 1½ minutes.
+  Edge blocks each start from a fresh browser context and run four at a time (`JOBS=1` for one at a time); the full
+  case's three groups run side by side. A failing `assert` on a Playwright handle can hang Node building its diff
+  (memory climbs to gigabytes): if a test run is killed, look for a failed assertion comparing an element handle.
 - **Never send an empty `f`** (lesson, 12 Oct 2026): `setDoc(…, { f: {} }, { merge: true })` replaces the server's
   `f` with an empty map (an empty map is a leaf in the merge). Lock / unlock / delete sent one and wiped the server
   copy's readings; push now omits an empty `f`, lock sends the full record, and each phone resends all its patients

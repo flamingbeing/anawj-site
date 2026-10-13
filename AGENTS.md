@@ -43,7 +43,8 @@ for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mj
 - Rules changes (`logbook/firestore.rules`, `prewarm/firestore.rules`): `tools/test-rules.sh` runs the logbook, evals and prewarm rules suites in the
   local emulator (fake accounts, demo project; no sign-in, never the live projects).
 - Evals UI changes: also run the e2e test (see `evals/README.md`).
-- Prewarming UI changes: also run `node prewarm/test/e2e.mjs`, `node prewarm/test/edge.e2e.mjs` and `node prewarm/test/fullcase.e2e.mjs` (see `prewarm/README.md`).
+- Prewarming UI changes: `tools/test-prewarm.sh` runs the repo check, prewarm unit tests and the three browser tests
+  (`prewarm/test/e2e.mjs`, `edge.e2e.mjs`, `fullcase.e2e.mjs`) side by side in about 1½ minutes (see `prewarm/README.md`).
 - Hand assessment changes: run `node hand-babies/test/e2e.mjs` (see `hand-babies/README.md`).
 
 ## Working with the owner
