@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#002f6c">
+<title>Hand log</title>
+<meta name="description" content="Log hand surgery DOPS and Mini-CEX workplace-based assessments on your phone.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23002f6c'/%3E%3Ctext x='16' y='23' font-size='18' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='700'%3EL%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="../nuhsdesign/tokens.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="band" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+<header class="bar">
+  <div class="title"><b>Hand log</b> <span>DOPS and Mini-CEX</span></div>
+  <nav aria-label="Sections">
+    <a href="#list">Entries</a>
+    <a href="#new-dops">New DOPS</a>
+    <a href="#new-minicex">New Mini-CEX</a>
+    <a href="#summary">Summary</a>
+  </nav>
+</header>
+<main id="main" tabindex="-1">
+  <section id="view-list" class="view" hidden>
+    <h1>Entries</h1>
+    <p id="empty" class="empty" hidden>No entries yet. Start a <a href="#new-dops">DOPS</a> or a <a href="#new-minicex">Mini-CEX</a>.</p>
+    <ul id="entries" class="entries"></ul>
+  </section>
+
+  <section id="view-form" class="view" hidden>
+    <h1 id="form-title">New entry</h1>
+    <p class="small">Saved on this phone only. No patient names or identifiers, and no assessor full names.</p>
+    <form id="entry-form" novalidate>
+      <div class="field"><label for="f-date">Date</label><input id="f-date" name="date" type="date" required></div>
+      <div class="field"><label for="f-item" id="f-item-label">Procedure</label><select id="f-item" name="item" required></select></div>
+      <div class="field"><label for="f-assessor">Assessor (role or initials)</label>
+        <input id="f-assessor" name="assessor" type="text" autocomplete="off" placeholder="e.g. Consultant, AB (no full names)"></div>
+      <div class="field"><label for="f-setting">Setting</label>
+        <select id="f-setting" name="setting"><option>Clinic</option><option>OT</option><option>Ward</option><option>ED</option></select></div>
+      <div class="field"><label for="f-complexity">Complexity</label>
+        <select id="f-complexity" name="complexity"><option>Low</option><option selected>Medium</option><option>High</option></select></div>
+      <div id="domains"></div>
+      <div class="field"><label for="f-global">Global rating</label><select id="f-global" name="global" required></select></div>
+      <div class="field"><label for="f-good">What went well</label><textarea id="f-good" name="good" rows="3"></textarea></div>
+      <div class="field"><label for="f-improve">To improve</label><textarea id="f-improve" name="improve" rows="3"></textarea></div>
+      <div class="field"><label for="f-action">Agreed action</label><textarea id="f-action" name="action" rows="3"></textarea></div>
+      <p id="form-error" class="error" role="alert"></p>
+      <button type="submit" class="btn primary">Save</button>
+    </form>
+  </section>
+
+  <section id="view-entry" class="view" hidden>
+    <h1 id="entry-title">Entry</h1>
+    <dl id="entry-detail" class="detail"></dl>
+    <div class="actions">
+      <button type="button" id="export-one" class="btn">Export CSV</button>
+      <button type="button" id="delete" class="btn danger">Delete</button>
+    </div>
+    <p><a href="#list">Back to entries</a></p>
+  </section>
+
+  <section id="view-summary" class="view" hidden>
+    <h1>Summary</h1>
+    <h2>By type</h2>
+    <ul id="sum-type" class="counts"></ul>
+    <h2>By procedure or case</h2>
+    <ul id="sum-item" class="counts"></ul>
+    <h2>Export and backup</h2>
+    <div class="actions">
+      <button type="button" id="export-csv" class="btn primary">Export CSV</button>
+      <button type="button" id="export-json" class="btn">Back up (JSON)</button>
+    </div>
+    <div class="field"><label for="import-json">Restore from backup (JSON)</label><input id="import-json" type="file" accept="application/json,.json"></div>
+    <p id="import-msg" class="small" role="status"></p>
+  </section>
+</main>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
