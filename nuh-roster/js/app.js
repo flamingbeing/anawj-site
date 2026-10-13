@@ -3708,3 +3708,19 @@ document.getElementById('tourBtn')?.addEventListener('click', () => startTour())
 document.getElementById('allBtn')?.addEventListener('click', downloadEverything);
 addEventListener('hashchange', () => { if (location.hash === '#myday' && state.tab !== 'myday') { state.tab = 'myday'; window.scrollTo(0, 0); render(); } });
 document.getElementById('keysBtn')?.addEventListener('click', showShortcuts);
+// Phones: keep the bottom-sheet person box above the on-screen keyboard, and the field being typed in visible.
+if (window.visualViewport) {
+  const fit = () => {
+    const box = document.querySelector('.tag-editor');
+    if (!box || innerWidth > 600) return;
+    const vv = visualViewport, covered = Math.max(0, innerHeight - vv.height - vv.offsetTop);
+    box.style.bottom = covered + 'px';
+    box.style.maxHeight = Math.round(vv.height * 0.9) + 'px';
+  };
+  visualViewport.addEventListener('resize', fit);
+  visualViewport.addEventListener('scroll', fit);
+  document.addEventListener('focusin', e => {
+    if (innerWidth > 600 || !e.target.closest?.('.tag-editor')) return;
+    setTimeout(() => { fit(); e.target.scrollIntoView({ block: 'nearest' }); }, 250);
+  });
+}

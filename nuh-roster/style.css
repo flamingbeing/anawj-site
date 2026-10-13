@@ -161,7 +161,7 @@ tr.off td:first-child { opacity: 1; }
 
 .empty { text-align: center; color: var(--muted); padding: 32px 16px; }
 
-#toast { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 8px 14px; border-radius: var(--radius); opacity: 0; pointer-events: none; transition: opacity .2s; max-width: calc(100vw - 32px); }
+#toast { position: fixed; z-index: 30; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 8px 14px; border-radius: var(--radius); opacity: 0; pointer-events: none; transition: opacity .2s; max-width: calc(100vw - 32px); }
 #toast.show { opacity: 1; }
 #toast.actionable.show { pointer-events: auto; display: flex; align-items: center; gap: 10px; }
 #toast button { background: transparent; color: inherit; border-color: currentColor; font-weight: 600; }
@@ -403,7 +403,7 @@ kbd { font-family: var(--font-sans); font-size: 12px; border: 1px solid var(--li
   table.roster-edit td.cell[data-key=junior]::before { content: 'Junior'; }
   table.roster-edit td.notes { grid-column: 1 / -1; font-style: italic; }
   table.roster-edit td.notes:empty, table.roster-edit td:empty { display: none; }
-  .tag-editor { left: 0 !important; right: 0; top: auto !important; bottom: 0; width: 100% !important; max-width: 100%; max-height: 85vh; overflow: auto; border-radius: 12px 12px 0 0; padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); box-shadow: 0 -8px 24px rgba(0, 0, 0, .25); animation: sheet-up .18s ease-out; }
+  .tag-editor { left: 0 !important; right: 0; top: auto !important; bottom: 0; width: 100% !important; max-width: 100%; max-height: 85vh; overflow: auto; border-radius: 0; padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); box-shadow: 0 -8px 24px rgba(0, 0, 0, .25); animation: sheet-up .18s ease-out; }
 }
 @keyframes sheet-up { from { transform: translateY(40%); opacity: .4; } to { transform: none; opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .tag-editor { animation: none; } }
@@ -421,3 +421,17 @@ body.viewer .date-warn, body.viewer .save-state { display: none !important; }
 .moved-bar { background: var(--warn-bg); }
 .changes-list { margin: 6px 0; padding-left: 18px; font-size: 13px; }
 .changes-list b { color: var(--navy); }
+
+/* phones: iOS zooms into any field under 16px, then the page scrolls sideways */
+@media (max-width: 600px) {
+  input, select, textarea { font-size: 16px; }
+  .tag-editor .bar { position: sticky; bottom: calc(-16px - env(safe-area-inset-bottom, 0px)); background: var(--panel); padding: 8px 0; margin-bottom: -8px; }
+}
+/* touch: fingers need bigger targets than a mouse (about 36-44px) */
+@media (pointer: coarse) {
+  .name, .chip, .add-name { min-height: 34px; padding-top: 4px; padding-bottom: 4px; }
+  .add-name { opacity: .8; line-height: 24px; }
+  button.small { min-height: 36px; padding: 6px 10px; }
+  .chips { gap: 8px; }
+  .tabs button { padding: 12px 14px; }
+}
