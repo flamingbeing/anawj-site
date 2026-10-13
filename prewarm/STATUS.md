@@ -2,15 +2,12 @@
 
 Short and current. Lasting rules go in `NOTES.md`. Update with `/save-state`.
 
-Last updated: 2026-10-13 (04:10 UTC) by Claude Code, Prewarming Webapp.
+Last updated: 2026-10-13 by Claude Code, Prewarming Webapp.
 
 ## Now
 
-- **Claude Code, Prewarming Webapp** (branch `ccr-13264f37-d28edu`): idle, nothing half-done. 13 Oct 2026 batch merged
-  (#314 to #317): temperature layout and one-tap typing, number / time pads, alarm tap opens the reading, PACU times on
-  the PACU page, progress ticks, Perioperative tick, PACU nurse link (rules deploy on merge: check the "Deploy
-  Firestore rules" run). Real patients are being charted: update phones when idle. Not built yet: nothing from this
-  batch; ideas: stop-link by admin from the admin screen, nurse page in the PACU view.
+Each session keeps its own line in `status/<session>.md` (`webapp.md`; a new session adds its own file), so sessions never
+edit the same lines. Read them all before starting; edit only yours.
 
 ## Waiting on the owner
 
