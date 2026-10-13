@@ -19,18 +19,19 @@
 
 import { FIREBASE_CONFIG } from './firebase-config.js';
 import { checkWrite } from './recovery-store.js';
-import * as D from './demo-backend.js';
 import { cleanProfile } from './profile.js';
 import { cleanNote } from './notepad.js';
 import { createSyncHub, eachSettled, SKEW } from './sync.js';
 import { openStore, wipeStores } from './store.js';
-import { plain, cleanCase, cleanSummary, cleanResident, cleanTemplate, importDocId, defaultLogbook, cleanReflection, cleanImage, cleanCategoryNames, cleanSubmission } from './demo-backend.js';
+import { plain, cleanCase, cleanSummary, cleanResident, cleanTemplate, importDocId, defaultLogbook, cleanReflection, cleanImage, cleanCategoryNames, cleanSubmission } from './clean.js';
 export { cleanSubmission };
 
 const SDK = 'https://www.gstatic.com/firebasejs/10.12.2/';
 export const demo = (() => {
   try { return typeof location !== 'undefined' && new URLSearchParams(location.search).has('demo'); } catch { return false; }
 })();
+// the in-browser stand-in, loaded only in the demo (a real sign-in never fetches it)
+const D = demo ? await import('./demo-backend.js') : null;
 // Tests only: ?emulator on localhost uses the local Firebase emulators (Firestore and Auth) with the demo project, never
 // the live one (tools/test-reads.sh). ?emulator=<firestore port>:<auth port>, default 8085:9099.
 const emulator = (() => {

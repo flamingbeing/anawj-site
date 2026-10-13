@@ -10,14 +10,14 @@ import { REFLECTION_HEADINGS, REFLECTION_SECTIONS, yearName } from './categories
 import { reflectionProgress, reflectionCounts, HEADING_BY_ID, splitDetails, completeProblems, isLegacy, isFreeText, joinPoints, LIMITS, IMAGE_MAX_B64, IMAGE_MAX_SIDE, IMAGE_QUALITY, PHOTO_BUDGET_KB, PHOTO_NOTE, photoUsageKb, imageKb, fmtMb, wordCount, MIN_WORDS, suggestHeadings, moveToHeading, inExport, exportSummary, pickJustEnough } from './reflections.js';
 export { completeProblems };
 import { fmtDate, caseText, procedureText, caseParts } from './engine.js';
-import { S, h, ic, emptyState, toast, cloud, writes, transients, debounce, hooks, rYear, effectiveIntake, residentSmo, todayISO, confirmBox, add, resetters, scheduleSummary, displayName, byNewest, catName, updateCase, settings, patchLogbook, info, basicHides } from './ui-core.js';
+import { S, h, ic, emptyState, toast, cloud, writes, transients, debounce, hooks, rYear, effectiveIntake, residentSmo, todayISO, confirmBox, add, resetters, displayName, byNewest, catName, updateCase, settings, patchLogbook, info, basicHides, REFLECTION_DRAFT_KEY } from './ui-core.js';
 import { renderExportButton, caseRYear, countsByYear } from './portfolio.js';
 import { parseQuery, matchQuery, REFL_FIELDS, REFL_OPERATOR_HELP } from './search-ops.js';
 import { opsHelp } from './ui-logbook.js';
 import { createDraftSlot } from './drafts.js';
 import { fmtBar } from './fmt-bar.js';
 
-const DRAFT_KEY = 'apmes-logbook-reflection-draft';
+const DRAFT_KEY = REFLECTION_DRAFT_KEY;   // (sign-out wipes these in ui-core.js)
 const VIEW_KEY = 'apmes-logbook-reflection-view';
 const savedView = (() => { try { return JSON.parse(localStorage.getItem(VIEW_KEY) || '{}') || {}; } catch { return {}; } })();
 const pointsMode = new WeakMap();   // the reflection being edited -> 'numbered' | 'free', kept while it is open
@@ -43,15 +43,14 @@ let reflectionSlot, slotOwner;
 const slot = () => { if (slotOwner !== draftKey()) { slotOwner = draftKey(); reflectionSlot = createDraftSlot(DRAFT_KEY, slotOwner.slice(DRAFT_KEY.length + 1)); } return reflectionSlot; };
 const lsGet = () => slot().initial;
 const lsSet = r => { try { r ? slot().save(r) : slot().clear(); slot().initial = r; return true; } catch { return false; } };
-// sign-out: nothing of this person's is left for the next one (drafts, search, open headings, figure previews)
+// sign-out: nothing of this person's is left for the next one (search, open headings, figure previews; the saved
+// drafts go in ui-core.js)
 resetters.push(() => {
   Object.assign(rv, { editing: null, picking: null, editMode: false, view: null, q: '', filter: 'all', thumbs: {}, viewOpen: false, readyOpen: false, toolsOpen: false });
   reflectionSlot = null; slotOwner = null;
   rv.sel.clear(); rv.openH.clear(); rv.shutH.clear();
-  try { for (const k of Object.keys(localStorage)) if (k.startsWith(DRAFT_KEY)) localStorage.removeItem(k); } catch { /* blocked */ }
 });
 
-// Live reflections for the signed-in user (app.js calls this after sign-in).
 // A reflection's date on one line in the list's narrow left column: "11 Sep" this year, "11 Sep 25" before
 const shortDate = iso => { const f = fmtDate(iso), y = String(new Date().getFullYear()); return f.endsWith(' ' + y) ? f.slice(0, -5) : f.replace(/ (\d{2})(\d{2})$/, ' $2'); };
 // A heading's note in the Reflections list without its JR rule, which the JR count beside the name shows instead:
@@ -61,19 +60,10 @@ const listNote = note => String(note || '').split('\n').map(l => {
   return !m ? l : m[2] ? 'JR: ' + m[2].replace(/^\((.*)\)$/, '$1') : '';
 }).filter(Boolean).join('\n');
 
-export function watchMyReflections(email) {
-  S.reflections = []; S.reflectionsSynced = false;
-  let raw = [];
-  const paint = () => {
-    if (S.user?.email !== email) return;
-    S.reflections = writes.overlay('reflection', email, raw);
-    scheduleSummary();
-    if ((S.tab === 'reflect' && !rv.editing && !rv.picking && !rv.view && !drag) || S.tab === 'export' || S.tab === 'choose') hooks.render();
-  };
-  const offQueue = writes.onChange(paint);
-  const offCloud = cloud.watchReflections(email, (list, meta = {}) => { raw = list; if (!meta.fromCache) S.reflectionsSynced = true; paint(); });
-  return () => { offQueue(); offCloud(); };
-}
+// Live reflections for the signed-in user: the watch is in ui-core.js (it starts at sign-in, before this page's code
+// loads); it asks this page whether it's busy before drawing it again.
+hooks.reflectBusy = () => !!(rv.editing || rv.picking || rv.view || drag);
+export { watchMyReflections } from './ui-core.js';
 export const summaryReflections = () => reflectionCounts(S.reflections || []);
 
 const blank = (over = {}) => ({
