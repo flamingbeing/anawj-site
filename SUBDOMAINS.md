@@ -119,13 +119,15 @@ editor's frame). So `edit.anawj.com/<old path>` keeps working for every page, su
 - [x] 2. hand.anawj.com (CMC trainer, hand assessment; run side by side): #357 (`cmcj/`) and #356 (`hand-babies/` to
   `/babies/`, `hand/` removed), checked live 13 Oct; old addresses forward with path, query and `#` kept (a top-level-only
   host check in each `index.html`, no Worker change)
-- [ ] Shared design folder: every subdomain serves `/design/` and `/nuhsdesign/` (log1, #358). The `design/` →
-  `nuhsdesign/` move (NUHS-style Design) is **paused** with prewarm, since prewarm loads `design/tokens.css`
-- [ ] 3. prewarmstudy.anawj.com (Prewarming Webapp): **paused** 13 Oct while a case is being collected; authorised domain
-  added by the owner. Resumes only when the owner tells that session the case is over
+- [x] Shared design folder: every subdomain serves `/design/` and `/nuhsdesign/` (log1, #358); `design/` moved to
+  `nuhsdesign/` (NUHS-style Design, #363), checked live 13 Oct. `/design/` is still served for phones on an older copy:
+  drop it from the Worker once the study phones have updated
+- [x] 3. prewarmstudy.anawj.com (Prewarming Webapp): #364, #382, live 13 Oct after the day's case. A phone moves only
+  when nothing is waiting on it. Checked on the owner's phones: an old nurse link lands on the new address, admin
+  password sign-in works, a team phone moves and rejoins in one tap, readings sync between phones
 - [x] 4. nuhroster.anawj.com (NUH Roster): #361, live 13 Oct; old address forwards with path, query and `#` kept, and a
   browser with a roster saved at the old address is offered a download first. Authorised domain added by the owner;
-  a full Google sign-in with a real account is still for the owner to try once
+  a real Google sign-in works (owner, 13 Oct)
 - [x] 5. apmes.anawj.com (log1, with MedHub Evaluations): logbook #370, evals #367, helper pages and guidebook #368; live 13 Oct. The
   owner added `apmes.anawj.com` to the Firebase authorised domains and the Google sign-in client's redirect URIs and origin, and
   a real Google sign-in works at the new address. Old `anawj.com/logbook/` and `/evals/` forward (path, query and `#` kept). Drive and Dropbox backups also work at the new address (the owner added
