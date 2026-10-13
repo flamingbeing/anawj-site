@@ -7,9 +7,7 @@ Last updated: 2026-10-13 by Claude Code, design session (branch `claude/inspirin
 
 ## Now
 
-- No session is working on `nuhsdesign/`. The design session is idle.
-- `design/tokens.css` stays as a byte-identical copy for pages and service workers still on the old path. Delete it
-  (and tell log1 to drop `/design/` from `SHARED` in `worker/routes.js`) once every app has updated.
+- No session is working on `nuhsdesign/`. The design session is idle, nothing half-done.
 
 ## Waiting on the owner
 
@@ -20,12 +18,15 @@ Last updated: 2026-10-13 by Claude Code, design session (branch `claude/inspirin
 
 ## Next (agreed queue)
 
-- Nothing queued.
+- Retire the old path: `design/tokens.css` is a byte-identical copy kept for pages and service workers still on
+  `../design/tokens.css`. Once nothing links it (`git grep -n "design/tokens"`; prewarm #364 adds
+  `prewarm/update.html`, which must link `../nuhsdesign/`) and the apps have updated, delete it and drop `/design/`
+  from `SHARED` in `worker/routes.js` and its tests in `worker/test/` (or ask the hosting session to).
 
 ## Recently done
 
-- #363 `design/` moved to `nuhsdesign/` (every subdomain serves it); evals, prewarm and prewarm-update link it.
-
+- #363 `design/` moved to `nuhsdesign/` (every subdomain serves it); evals, prewarm and prewarm-update link it. Checked live: tokens load on
+  `prewarmstudy.`, `apmes.` and `anawj.com`; the prewarm and evals service workers install and cache them.
 - #204 The brand stripe is four equal quarters (orange, red, blue `#178fd7`, navy) in `design/`, logbook, evals,
   roster and privacy; new `--n-stripe-blue`.
 - #61 Navy focus ring (3px) in `design/` and the logbook; cyan only on navy panels.
@@ -33,6 +34,9 @@ Last updated: 2026-10-13 by Claude Code, design session (branch `claude/inspirin
 
 ## Decisions log
 
+- 2026-10-13: The design folder is `nuhsdesign/` (owner), so every subdomain can serve it. Changes to the design,
+  `prewarm/` or `prewarm-update/` wait while a prewarming study case is being collected (they change what the
+  phones load).
 - 2026-10-12: The top band is four equal quarters: orange `#e57200`, red `#e4002b`, blue `#178fd7`, navy `#002f6c`
   (measured across the whole nuhs.edu.sg stripe; the first guide sampled three points and missed the blue). Not cyan.
 - 2026-10-10: Focus rings are navy (`--n-focus`) on light grounds; cyan `#00a9e0` is 2.7:1 on white, under 3:1.
