@@ -909,6 +909,7 @@ function editor() {
   const restructure = () => { changed(); hooks.render(); };   // list changed: save and redraw
   const close = async () => { if (!current()) return; autosave.cancel(); if (hasContent(r) && !await persist() || !current()) return; await editorTransient.close(); if (S.user?.email !== owner) return; rv.editing = null; rv.thumbs = {}; lsSet(null); hooks.render(); };
 
+  const headingsOn = !basicHides('reflHeadings');   // (Settings → Profile: Reflection headings, the APMES list)
   const subWrap = h('div');
   const paintSubs = () => {
     const hd = HEADING_BY_ID[r.headingId];
@@ -946,13 +947,14 @@ function editor() {
   const fields = h('section', { class: 'card' },
     h('div', { class: 'bar', style: 'flex-wrap:nowrap' }, h('button', { onclick: close }, '← Reflections'), h('span', { style: 'flex:1;min-width:0' }), status, h('button', { onclick: persist }, 'Save / Retry')),
     linkBox,
-    !r.headingId ? suggestChips(lc, x => { r.headingId = x.headingId; r.subId = null; restructure(); }, r.jr) : null,
-    h('label', { class: 'field' }, 'Heading', headingSelect),
-    subWrap,
+    headingsOn && !r.headingId ? suggestChips(lc, x => { r.headingId = x.headingId; r.subId = null; restructure(); }, r.jr) : null,
+    // the APMES headings switch off (Personal): the heading folds away, still there and kept as saved
+    headingsOn ? [h('label', { class: 'field' }, 'Heading', headingSelect), subWrap]
+      : h('details', { class: 'refl-apmes-heading' }, h('summary', {}, 'APMES heading (optional)'), h('label', { class: 'field' }, 'Heading', headingSelect), subWrap),
     h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:8px' },
       h('label', { class: 'field' }, 'Patient initials', input('initials', { 'data-field': 'initials', maxlength: '20', autocapitalize: 'characters', style: 'font-size:calc(16px * var(--fs, 1));width:7em' })),
       h('label', { class: 'field' }, 'Date', h('input', { type: 'date', 'data-field': 'date', style: 'font-size:calc(16px * var(--fs, 1))', value: r.date || '', oninput: e => { r.date = e.target.value || null; if (r.source !== 'word') setJr(r); changed(); } }))),
-    h('p', { class: 'hint help' }, 'Dated in R1–R3: marked JR in the Word export. ', ...info('Some categories require one case reflection in Junior Residency (JR); when not indicated, at most one case reflection can be done at the JR level per category. A reflection dated in R1–R3 is marked JR in the Word export automatically.')),
+    !headingsOn ? null : h('p', { class: 'hint help' }, 'Dated in R1–R3: marked JR in the Word export. ', ...info('Some categories require one case reflection in Junior Residency (JR); when not indicated, at most one case reflection can be done at the JR level per category. A reflection dated in R1–R3 is marked JR in the Word export automatically.')),
     h('label', { class: 'field' }, 'Diagnosis / operation', input('diagnosis', { maxlength: '2000' })),
     h('p', { class: 'hint help' }, 'De-identified only: initials, no names or NRIC. Generative AI use must follow the NUS guidelines on the use of AI tools in academic work.'));
 
@@ -1137,7 +1139,7 @@ function editor() {
       rv.editing = null; rv.thumbs = {}; lsSet(null); hooks.render();
     } }, 'Delete') : null));
 
-  const editor = h('div', { class: 'refl-editor' }, fields, body, actions, legacy ? null : guide);   // the APMES notes last, small (owner)   // .refl-editor: the logging font (Settings → Display)
+  const editor = h('div', { class: 'refl-editor' }, fields, body, actions, legacy || !headingsOn ? null : guide);   // the APMES notes last, small (owner)   // .refl-editor: the logging font (Settings → Display)
   // Settings → Reflections: no spelling underlines on this device (html class from applyLook)
   if (document.documentElement.classList.contains('refl-spell-off')) editor.querySelectorAll('textarea, input:not([type]), input[type=text]').forEach(f => { f.spellcheck = false; });
   // Settings → Reflections → Formatting buttons (this device, off by default): Bold, bullets and numbers above each box

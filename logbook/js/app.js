@@ -2,6 +2,7 @@
 // shared state and helpers are in ui-core.js. Case data comes from cloud.js (Firestore, or the
 // in-browser demo backend with ?demo).
 
+import { replaceShow } from './profiles.js';
 import { S, hooks, h, toast, basicHides, basicMode, logbookOnly, facultyMode, facultyRole, clearToast, cloud, writes, transients, setCases, scheduleSummary, fill, resetCaches, patchLogbook, confirmBox, fileButton, modal, download, todayISO, settings, setCategoryNames, categoryNames as categoryNamesNow } from './ui-core.js';
 import { renderSendSettings, destinationHosts } from './ui-send.js';
 import { renderLog, focusLog, logCasesChanged, clearDrafts, SHARED_KEY } from './ui-log.js';
@@ -160,6 +161,7 @@ const SEARCH_PAGES = ['showhide', 'display', 'displayadv', 'access', 'logging', 
 let settingsIndex = null, findAfterRender = '';
 const optionText = n => {
   if (n.matches('label.field')) return [...n.childNodes].filter(c => c.nodeType === 3).map(c => c.textContent).join(' ').trim();
+  if (n.matches('label.profile-opt')) return n.querySelector('b').textContent.trim();   // (a profile: its name, not its hint run on)
   if (n.matches('label.check')) return n.textContent.trim();
   return n.textContent.trim();
 };
@@ -220,6 +222,12 @@ const SETTINGS_GROUPS = [
   ['Data', ['bin']],
   ['Advanced', ['displayadv', 'loggingadv']],
 ];
+// the groups, then any Settings page none of them names (so a new page is never left out of the menu)
+function settingsGroups() {
+  const named = new Set(SETTINGS_GROUPS.flatMap(([, ids]) => ids));
+  const rest = TABS.filter(t => t.under === 'settings' && !named.has(t.id)).map(t => t.id);
+  return rest.length ? [...SETTINGS_GROUPS, ['Other', rest]] : SETTINGS_GROUPS;
+}
 function renderSettingsMenu() {
   settingsIndex = null;   // drawn again on the first search of this visit
   const item = id => (id === 'bin' ? menuItem('bin', 'Recycle bin', 'Deleted cases and reflections, kept for 30 days', () => openBin())
@@ -227,7 +235,7 @@ function renderSettingsMenu() {
   return h('div', {},
     settingsSearch(),
     h('section', { class: 'card more-list settings-menu' }, h('h2', {}, 'Settings'),
-      SETTINGS_GROUPS.map(([name, ids]) => [h('h3', {}, name), h('ul', {}, ids.map(item))])),
+      settingsGroups().map(([name, ids]) => [h('h3', {}, name), h('ul', {}, ids.map(item))])),
     settingsFileCard(),
     connectClaudeCard());
 }
@@ -274,6 +282,8 @@ function settingsFileCard() {
     // display settings in the file go to this device, the rest to the account
     const fileDisplay = Object.fromEntries(DISPLAY_KEYS.filter(k => k in d.settings).map(k => [k, d.settings[k]]));
     const forAccount = Object.fromEntries(Object.entries(d.settings).filter(([k]) => !DISPLAY_KEYS.includes(k)));
+    // the file's switches replace the account's (the cloud merges `show` key by key, so the ones it lacks go as null)
+    if (forAccount.show) forAccount.show = replaceShow(settings().show, forAccount.show);
     await patchLogbook({ settings: forAccount, ...(newGroups.length ? { templates: [...mine, ...newGroups].slice(0, 100) } : {}) });
     if (d.theme) applyTheme(d.theme);
     applyDisplay(setDisplay(Object.fromEntries(DISPLAY_KEYS.filter(k => k in fileDisplay).map(k => [k, fileDisplay[k]]))));

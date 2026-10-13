@@ -30,6 +30,8 @@ export const SWITCH_KEYS = SWITCHES.map(([k]) => k);
 export const switchLabel = key => (SWITCHES.find(([k]) => k === key) || [key, key])[1];
 // (Basic leaves out every optional Case tab part, Still needed too)
 const EXTRAS = SWITCHES.filter(s => s[2] === 'extras' || s[0].startsWith('case:')).map(([k]) => k);
+// the items older copies of the app let a Basic profile turn back on (settings.basicOn)
+const BASIC_ITEMS = EXTRAS;
 const APMES = SWITCHES.filter(s => s[2] === 'apmes').map(([k]) => k);
 
 // what each profile turns off (everything else is on). Basic: the extras and the optional Case tab parts;
@@ -54,12 +56,16 @@ export function shownIn(st, mode, key) {
   return presetOn(mode, key);
 }
 
-// One switch saved: the settings patch (show map, and caseHide kept in step for the Case tab parts, so older copies
-// of the app on another device agree). parts: every Case tab part in order (for caseHide's order).
+// One switch saved: the settings patch. `show` carries only the changed key: Firestore merges the map key by key
+// (setDoc with merge), so another device's newer switches are never written over, and mergeSettings does the same
+// here and in demo mode. caseHide (Case tab parts off) and basicOn (Basic's items turned on) are kept in step, so an
+// older copy of the app on another device agrees until it updates. parts: every Case tab part in order (caseHide's order).
 export function switchPatch(st, key, on, parts = []) {
-  const patch = { show: { ...((st && st.show) || {}), [key]: !!on } };
-  const legacyOn = ((st && st.basicOn) || []).filter(k => k !== key);
-  if (legacyOn.length !== ((st && st.basicOn) || []).length) patch.basicOn = legacyOn.length ? legacyOn : null;
+  const patch = { show: { [key]: !!on } };
+  const was = (st && st.basicOn) || [];
+  const legacyOn = was.filter(k => k !== key);
+  if (on && BASIC_ITEMS.includes(key)) legacyOn.push(key);
+  if (legacyOn.length !== was.length || legacyOn.some((k, i) => k !== was[i])) patch.basicOn = legacyOn.length ? legacyOn : null;
   if (key.startsWith('case:')) {
     const part = key.slice(5), hide = new Set((st && st.caseHide) || []);
     if (on) hide.delete(part); else hide.add(part);
@@ -69,14 +75,26 @@ export function switchPatch(st, key, on, parts = []) {
   return patch;
 }
 
-// Back to the defaults for some switches (a group's "Reset"): their saved values go, in all three places
+// Back to the defaults for some switches (a group's "Reset"): their saved values go, in all three places. Each key is
+// sent as null (not left out of `show`): Firestore's merge keeps any key a patch leaves out.
 export function resetPatch(st, keys) {
-  const show = { ...((st && st.show) || {}) };
-  for (const k of keys) delete show[k];
+  const show = Object.fromEntries(keys.map(k => [k, null]));
   const parts = keys.filter(k => k.startsWith('case:')).map(k => k.slice(5));
   const hide = ((st && st.caseHide) || []).filter(p => !parts.includes(p));
   const on = ((st && st.basicOn) || []).filter(k => !keys.includes(k));
-  return { show: Object.keys(show).length ? show : null, caseHide: hide.length ? hide : null, basicOn: on.length ? on : null };
+  return { show, caseHide: hide.length ? hide : null, basicOn: on.length ? on : null };
+}
+
+// A settings file's `show` replaces the account's: the keys the account has and the file doesn't go (as null)
+export const replaceShow = (cur, next) => ({ ...Object.fromEntries(Object.keys(cur || {}).map(k => [k, null])), ...(next || {}) });
+
+// Settings after a patch, as Firestore's merge leaves them: top-level keys replaced, `show` merged key by key (null
+// clears the whole map). Used for the local copy (patchLogbook) and the demo backend, so both match the cloud.
+export function mergeSettings(cur, patch) {
+  const out = { ...(cur || {}), ...(patch || {}) };
+  const a = cur && cur.show, b = patch && patch.show;
+  if (b && typeof b === 'object' && a && typeof a === 'object') out.show = { ...a, ...b };
+  return out;
 }
 
 // Picking a profile: its mode, and every switch back to that profile's default (the Case tab parts no profile
@@ -109,17 +127,17 @@ export const PROFILE_OFF = { advanced: [], basic: ['progress'], logbook: ['progr
 // OFF_BAR tabs a profile puts on the bar: Case logs and the Admin portal (admins only) in Faculty / PCs, Notes in Personal
 export const PROFILE_ON = { faculty: ['caselogs', 'admin'], personal: ['notes'] };
 export const offBar = mode => [...OFF_BAR.filter(id => !(PROFILE_ON[mode] || []).includes(id)), ...(PROFILE_OFF[mode] || [])];
-// the tabs a profile has a say about (the ones it moves)
-export const PROFILE_TABS = [...new Set([...Object.values(PROFILE_OFF).flat(), ...Object.values(PROFILE_ON).flat()])];
 // a profile's default for one tab: off the bar?
 export const presetHidesTab = (mode, id) => offBar(mode).includes(id);
 
-// This device's saved hidden tabs after picking a profile: each tab a profile has a say about goes where that profile
-// puts it; the rest stay as arranged. Returns the new tabHidden list, or null when the device keeps the profile's
-// defaults (nothing saved: arrangeTabs then follows the profile by itself).
-export function tabsAfter(tabHidden, to) {
+// This device's saved hidden tabs after moving from one profile to another: only the tabs either profile moves
+// (its PROFILE_OFF / PROFILE_ON) go where the new profile puts them; the rest stay as arranged (Notes put on the bar
+// by hand stays there from Basic to Advanced). Returns the new tabHidden list, or null when the device keeps the
+// profile's defaults (nothing saved: arrangeTabs then follows the profile by itself).
+export const ownTabs = mode => [...(PROFILE_OFF[mode] || []), ...(PROFILE_ON[mode] || [])];
+export function tabsAfter(tabHidden, from, to) {
   if (!Array.isArray(tabHidden)) return null;
   const hid = new Set(tabHidden);
-  for (const id of PROFILE_TABS) if (presetHidesTab(to, id)) hid.add(id); else hid.delete(id);
+  for (const id of new Set([...ownTabs(from), ...ownTabs(to)])) if (presetHidesTab(to, id)) hid.add(id); else hid.delete(id);
   return [...hid];
 }

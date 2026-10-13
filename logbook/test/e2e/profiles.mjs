@@ -44,6 +44,7 @@ try { for (const width of [390, 1280]) {
   await dlg.getByRole('button', { name: 'Cancel' }).click();
   await p.waitForFunction(() => !document.querySelector('dialog[open]'));
   assert.equal(await p.locator('.profile-card input[value=advanced]').isChecked(), true, 'the radio goes back');
+  assert.equal(await p.evaluate(() => document.activeElement && document.activeElement.value), 'advanced', 'and keeps the focus');
   assert.equal((await st()).mode, 'advanced');
   // ...then Apply
   await p.locator('.profile-card input[value=personal]').check();
@@ -84,6 +85,15 @@ try { for (const width of [390, 1280]) {
   await goHash('reflect');
   await p.getByLabel('Search reflections').waitFor();
   assert.equal(await p.locator('select[aria-label="Group by"] option[value=heading]').count(), 0);
+  // the editor: the APMES heading folded away (kept as saved), no JR note or "What APMES wants covered"
+  if (await p.locator('li.refl-row').count()) {
+    await p.locator('li.refl-row').first().click();
+    await p.locator('.refl-editor details.refl-apmes-heading').waitFor();
+    assert.equal(await p.locator('.refl-editor details.refl-guide').count(), 0);
+    assert.equal(await p.getByText('marked JR in the Word export').count(), 0);
+    await p.getByRole('button', { name: '← Reflections' }).click();
+    await p.getByLabel('Search reflections').waitFor();
+  }
 
   // one switch back on: Custom (based on Personal); Back to Personal lists just that, and undoes it
   await goHash('showhide');
@@ -104,6 +114,21 @@ try { for (const width of [390, 1280]) {
   await group('extras').getByRole('button', { name: 'Reset this group' }).click();
   await dlg.getByRole('button', { name: 'Reset' }).click();
   await p.locator('.profile-now', { hasText: 'Now: Personal' }).waitFor();
+  // a Case tab switch, then another group's reset: the Case tab change stays (the reset reads the settings as they are)
+  await group('case').getByRole('switch', { name: /^Quick picks/ }).uncheck();
+  await p.locator('.profile-now', { hasText: 'Custom' }).waitFor();
+  await group('apmes').getByRole('switch', { name: 'Residency year' }).check();
+  await group('apmes').getByRole('button', { name: 'Reset this group' }).click();
+  await dlg.getByRole('button', { name: 'Reset' }).click();
+  await p.waitForFunction(() => !document.querySelector('dialog[open]'));
+  await group('apmes').getByRole('switch', { name: 'Residency year', checked: false }).waitFor();
+  assert.equal(await group('case').getByRole('switch', { name: /^Quick picks/ }).isChecked(), false);
+  const afterReset = await st();
+  assert.equal(afterReset.show['case:quick'], false); assert.deepEqual(afterReset.caseHide, ['quick']);
+  assert.notEqual(typeof afterReset.show.year, 'boolean', 'the reset key is cleared (sent as null, as the cloud merges)');
+  await group('case').getByRole('button', { name: 'Reset this group' }).click();
+  await dlg.getByRole('button', { name: 'Reset' }).click();
+  await p.locator('.profile-now', { hasText: 'Now: Personal' }).waitFor();
 
   // back to Basic: Analytics and Notes into More, the APMES parts back, the extras away
   await p.locator('.profile-card input[value=basic]').check();
@@ -114,6 +139,22 @@ try { for (const width of [390, 1280]) {
   await p.locator('.profile-now', { hasText: 'Now: Basic' }).waitFor();
   assert.deepEqual(await tabs(), tabsAdvanced.filter(t => t !== 'progress'));
   assert.equal(await p.title(), 'APMES Logbook');
+  // Notes put on the bar by hand: still plain Basic (tabs no profile moves aren't counted), and it stays on the bar
+  // going to Advanced
+  await p.evaluate(async () => (await import('./js/ui-settings.js')).setTabOnBar('notes', true));
+  await goHash('log'); await goHash('showhide');
+  assert.equal(await now(), 'Now: Basic');
+  assert.ok((await tabs()).includes('notes'));
+  await p.locator('.profile-card input[value=advanced]').check();
+  assert.equal(await dlg.getByText(/Into More/).count(), 0);
+  await dlg.getByRole('button', { name: 'Apply' }).click();
+  await p.locator('.profile-now', { hasText: 'Now: Advanced' }).waitFor();
+  const advTabs = await tabs();
+  assert.ok(advTabs.includes('notes') && advTabs.includes('progress'), advTabs.join());
+  // Settings search: a profile reads as its name
+  await goHash('settings');
+  await p.getByLabel('Search settings').fill('personal');
+  await p.locator('.settings-search li b', { hasText: /^Personal$/ }).first().waitFor();
 
   // an older account (mode and basicOn only, no switches saved) looks as it did, and reads as Custom
   await p.evaluate(async () => { const { patchLogbook } = await import('./js/ui-core.js'); await patchLogbook({ settings: { mode: 'basic', show: null, basicOn: ['grid', 'case:quick'], caseHide: ['plan'] } }); });

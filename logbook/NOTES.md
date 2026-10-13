@@ -327,7 +327,8 @@ portfolio content.
   mode until the owner applies for production (its icons are 64 and 256 px from `icons/icon-512.png`).
 - **Settings menu** (`renderSettingsMenu`, `SETTINGS_GROUPS` in `app.js`; owner, 13 Oct 2026): every page kept, in
   groups Profile / Look / Logging / Reflections / Notes and sharing / Data / Advanced (Advanced display and Advanced
-  logging also listed there). Settings search indexes every page, Profile and the Tag editor included (`SEARCH_PAGES`).
+  logging also listed there). A Settings page (`under: 'settings'`) no group names still shows, under "Other"
+  (`settingsGroups`): give a new page its group. Settings search indexes every page, Profile and the Tag editor included (`SEARCH_PAGES`).
 - **Profile** page (Settings → Profile, was Profiles or hide items; `#showhide`, `renderShowHide` in `ui-settings.js`):
   the profile card, then every switch that shows or hides part of the app, grouped Extras / APMES / Tips and help /
   Case tab / Reflections / Logbook / Header and tabs, each group with its own "Reset this group" (back to the
@@ -341,8 +342,12 @@ portfolio content.
   kept in step on every save) and `basicOn` (items a Basic profile hid, turned back on). So an account with only `mode`
   saved looks exactly as before. Picking a profile (`profileCard` → `confirmProfile`) lists what it turns on and off and
   the tabs it moves on this device, then Apply clears the saved switches (`applyPatch`; an ungoverned hidden part such
-  as `parsed` stays) and moves this device's saved tabs (`tabsAfter`; a device with no saved tabs follows the
-  profile's `offBar`). A switch changed after makes the card read "Custom (based on X)" with "Back to X".
+  as `parsed` stays) and moves this device's saved tabs, only those the old or new profile moves (`PROFILE_OFF` /
+  `PROFILE_ON`; `tabsAfter`; Notes put on the bar by hand stays there from Basic to Advanced; a device with no saved tabs
+  follows the profile's `offBar`). A switch changed after makes the card read "Custom (based on X)" with "Back to X"
+  (of the tabs, only the profile's own count). **Saving `show`:** the cloud merges the map key by key (`setDoc` with merge), so a patch sends
+  only the changed keys, and a reset sends its keys as `null` (left out, they'd stay); `mergeSettings` merges the same
+  way locally and in demo mode, and a settings file's `show` replaces the account's (`replaceShow`).
   Body classes `basic`, `logbook-only`, `faculty-profile` stay. **Basic is the default for everyone** (owner, 12 Oct
   2026: nothing saved = Basic). The e2e demo account starts in Advanced (`demoDoc` in demo-backend.js, when
   `apmes-logbook-demo-small` is set) since the tests check every feature.

@@ -698,7 +698,7 @@ const partIds = () => CASE_PARTS.map(([p]) => p);
 function tabMoves(to) {
   const ids = barTabs().map(([id]) => id), d = display();
   const now = new Set(arrangeTabs(ids, d).hidden);
-  const next = tabsAfter(d.tabHidden, to);
+  const next = tabsAfter(d.tabHidden, profile(), to);
   const after = new Set(arrangeTabs(ids, next ? { ...d, tabHidden: next } : d, to).hidden);
   return { bar: ids.filter(id => now.has(id) && !after.has(id)), more: ids.filter(id => !now.has(id) && after.has(id)) };
 }
@@ -711,8 +711,9 @@ export function profileChanges(to) {
 const changeList = lines => h('ul', { class: 'profile-changes' }, lines.map(([what, names]) => h('li', {}, h('b', {}, what + ': '), names.join(', '))));
 const profileName = k => (PROFILES.find(([x]) => x === k) || [k, k])[1];
 export async function applyProfile(mode) {
+  const from = profile();
   await patchLogbook({ settings: applyPatch(settings(), mode) });
-  const next = tabsAfter(display().tabHidden, mode);
+  const next = tabsAfter(display().tabHidden, from, mode);
   if (next) applyDisplay(setDisplay({ tabHidden: next }));
   hooks.paintTabs?.(); hooks.render(); toast(`Profile: ${profileName(mode)}`);
 }
@@ -726,7 +727,7 @@ function confirmProfile(mode) {
     h('div', { class: 'bar' }, h('span', { class: 'grow' }),
       h('button', { onclick: () => m.close() }, 'Cancel'),
       h('button', { class: 'primary', onclick: async () => { done = true; await m.close(); applyProfile(mode); } }, 'Apply')),
-  ], { onclose: () => { if (!done) hooks.render(); } });   // (Cancel: the radio goes back)
+  ], { onclose: () => { if (!done) { hooks.render(); document.querySelector('input[name=profile]:checked')?.focus(); } } });   // (Cancel: the radio goes back, and keeps the focus)
 }
 export function profileCard() {
   const cur = profile();
@@ -768,12 +769,12 @@ export function renderShowHide() {
       h('h3', { style: 'margin-top:0' }, 'Extras'),
       h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'Off in the Basic profiles, on in Advanced and Personal.'),
       switchGroup('extras').map(presetSwitch),
-      groupReset('the extras', () => save(resetPatch(st, switchGroup('extras').map(([k]) => k))))),
+      groupReset('the extras', () => save(resetPatch(settings(), switchGroup('extras').map(([k]) => k))))),
     h('section', { class: 'card', 'data-group': 'apmes' },
       h('h3', { style: 'margin-top:0' }, 'APMES'),
       h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'The programme’s parts. Off in the Personal profile, for logging outside APMES.'),
       switchGroup('apmes').map(presetSwitch),
-      groupReset('the APMES parts', () => save(resetPatch(st, switchGroup('apmes').map(([k]) => k))))),
+      groupReset('the APMES parts', () => save(resetPatch(settings(), switchGroup('apmes').map(([k]) => k))))),
     h('section', { class: 'card', 'data-group': 'tips' },
       h('h3', { style: 'margin-top:0' }, 'Tips and help'),
       sw('Show tips and help text', !st.hideTips, v => save({ hideTips: !v }).then(() => hooks.render()), 'Explanations around the app, the privacy and photo reminders, and the tips for the tags you pick.'),
@@ -782,8 +783,8 @@ export function renderShowHide() {
     h('section', { class: 'card', 'data-group': 'case' },
       h('h3', { style: 'margin-top:0' }, 'Case tab'),
       h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'The case box, All tags and Save always stay. Still needed is under APMES.'),
-      caseParts.map(([part, label]) => sw(label, caseShown(part), v => setCaseShown(part, v, partIds()))),
-      groupReset('every part of the Case tab', () => save(resetPatch(st, caseParts.map(([p]) => 'case:' + p))))),
+      caseParts.map(([part, label]) => sw(label, caseShown(part), v => setCaseShown(part, v, partIds()).then(() => hooks.render()))),
+      groupReset('every part of the Case tab', () => save(resetPatch(settings(), caseParts.map(([p]) => 'case:' + p))))),
     h('section', { class: 'card', 'data-group': 'reflections' },
       h('h3', { style: 'margin-top:0' }, 'Reflections'),
       sw('Formatting buttons (this device)', !!d.reflToolbar, v => applyDisplay(setDisplay({ reflToolbar: v || null })), 'Bold, bullet and numbered lists above each box.'),

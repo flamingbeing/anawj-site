@@ -7,7 +7,7 @@ import * as cloud from './cloud.js';
 import { reflectionCounts } from './reflections.js';
 import { writes } from './writes.js';
 import { transients } from './transients.js';
-import { shownIn, switchPatch } from './profiles.js';
+import { shownIn, switchPatch, mergeSettings } from './profiles.js';
 
 export { cloud, writes, transients };
 
@@ -475,7 +475,8 @@ export async function deleteMany(ids) {
 }
 
 export async function patchLogbook(patch) {
-  S.logbook = { ...S.logbook, ...patch, settings: { ...(S.logbook && S.logbook.settings), ...(patch.settings || {}) } };
+  // (settings merged as the cloud does: `show` key by key)
+  S.logbook = { ...S.logbook, ...patch, settings: mergeSettings(S.logbook && S.logbook.settings, patch.settings) };
   try { await cloud.saveLogbook(mine(), patch); } catch (err) { toast('Could not save settings: ' + err.message); }
 }
 
