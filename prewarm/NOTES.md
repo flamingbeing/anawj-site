@@ -331,7 +331,7 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   "Downloaded" (pre-op `pre_dl` and day 2 `d2_dl`) is no longer asked (`NOT_ASKED`); its template columns stay empty.
 - **Move to prewarmstudy.anawj.com** (owner, 13 Oct 2026; plan in `SUBDOMAINS.md`, step 3; done between cases only):
   - Why: the browser keeps a phone's saved copy, unsent readings and sign-in per web address, so the study app has its own
-    address. The repo folder stays `prewarm/`; the host serves only it (plus the shared `/design/`).
+    address. The repo folder stays `prewarm/`; the host serves only it (plus the shared `/nuhsdesign/`).
   - The old address (`anawj.com/prewarm/`, `www.`) runs `moveCheck()` once, 1.5 s after the app opens (never mid-entry,
     top-level windows only). It moves the phone only when: no half-entered reading (`unsaved:` drafts), nothing waiting
     (`pending` empty and `cloud.flushed()`), the phone is on a team (or has no patients), it is online and the new
