@@ -282,3 +282,37 @@ console.log('engine tests passed');
   assert.equal(res.data.rows[3].aoh, 'Foxtrot', 'a page without headers');
   console.log('review fix tests passed');
 }
+
+// rotations: weeks, postings on a date, reading a sheet (fake names only)
+{
+  const R = await import('../js/rotations.js');
+  assert.equal(R.mondayOf('2026-10-18'), '2026-10-12');
+  assert.equal(R.weeksOfYear(2026)[0], '2025-12-29');
+  assert.equal(R.postingCode('Paeds'), 'P');
+  assert.equal(R.postingCode('liver'), 'L');
+  assert.equal(R.postingCode('banana'), null);
+  assert.equal(R.headerDate('14/10/2026', 2026), '2026-10-12');
+  assert.equal(R.headerDate('12 Oct', 2026), '2026-10-12');
+  const rot = R.emptyRotations();
+  const j = { id: 'j1', role: 'junior', posting: 'RA' };
+  R.setWeeks(rot, 'j1', ['2026-10-12'], 'P');
+  assert.equal(R.postingOn(rot, j, '2026-10-15'), 'P');
+  assert.equal(R.postingOn(rot, j, '2026-10-20'), 'RA', 'the usual posting outside the rotation');
+  assert.equal(R.postingOn(rot, j, '2026-10-15', 'Neu'), 'Neu', "the day's change wins");
+  assert.equal(R.postingOn(rot, { id: 's', role: 'senior', posting: '' }, '2026-10-15'), '');
+  // a sheet: a title row, then names and Mondays
+  const grid = [['Rotations 2026'], ['Name', 'Usual', new Date(Date.UTC(2026, 9, 12)), '19 Oct', '26/10/2026'],
+    ['Alpha Junior', 'RA', 'Paeds', 'Paeds', 'Neuro'], ['Nobody Known', '', 'P'], ['Bravo Junior', '', '', 'Cardiac', 'Mystery']];
+  const ws = { eachRow: (_, fn) => grid.forEach((vals, i) => fn({ eachCell: (_o, f) => vals.forEach((v, c) => f({ value: v }, c + 1)) }, i + 1)) };
+  const cellText = v => v instanceof Date ? v.toISOString().slice(0, 10) : String(v ?? '');
+  const staffR = [{ id: 'a', name: 'Alpha Junior' }, { id: 'b', name: 'Bravo Junior' }];
+  const res = R.readRotationSheet(ws, cellText, n => staffR.find(p => p.name === n) || null, 2026);
+  assert.deepEqual(res.mondays, ['2026-10-12', '2026-10-19', '2026-10-26']);
+  assert.deepEqual(res.people, ['a', 'b']);
+  assert.equal(res.weeks['2026-10-12'].a, 'P');
+  assert.equal(res.weeks['2026-10-26'].a, 'Neu');
+  assert.equal(res.weeks['2026-10-19'].b, 'Cardiac');
+  assert.deepEqual(res.unmatched, ['Nobody Known']);
+  assert.deepEqual(res.unknown, ['Mystery']);
+  console.log('rotation tests passed');
+}
