@@ -1000,7 +1000,8 @@ async function saveCase({ another, tap }) {
   saveDraft();
   if (ui.textarea) ui.textarea.value = '';
   if (ui.initials) ui.initials.value = '';
-  paintDate(); paintSel(); paintQuick(); paintEnterHint();
+  // the emptied box loses the last case's marks and its "Parts …" line too (they stayed until the box was touched)
+  paintDate(); paintSel(); paintQuick(); paintParsed(false);
   if (next === 'logbook') { hooks.showDay?.(c.date); location.hash = '#logbook'; }
   else if (next === 'closed') document.activeElement?.blur();
   else { focusLog(); if (ui.textarea && document.activeElement === ui.textarea) putTemplate(ui.textarea); }

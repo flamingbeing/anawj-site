@@ -46,6 +46,9 @@ try { for (const width of [390, 1280]) {
   assert.match(await p.locator('.settings-menu a[data-go=loggingadv]').innerText(), /labelled parts/);
   await p.getByLabel('Search settings').fill('labelled parts');
   await p.locator('.settings-search a[data-go=loggingadv]').filter({ hasText: 'Labelled parts in the case summary' }).first().waitFor();
+  // the result opens Advanced logging at the switch (scrolled to, flashing), not at the page's top
+  await p.locator('.settings-search a[data-go=loggingadv]').filter({ hasText: 'Labelled parts in the case summary' }).first().click();
+  await p.waitForFunction(() => { const f = document.querySelector('label.flash'); if (!f || !/Labelled parts in the case summary/.test(f.textContent)) return false; const r = f.getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight; }, null, { timeout: 3000 });
 
   // Settings → Advanced logging: switch on, add Plan (hidden in lists) and ASA
   await p.goto(base + '?demo#loggingadv'); await p.getByRole('heading', { name: 'Advanced logging' }).waitFor();
@@ -80,6 +83,8 @@ try { for (const width of [390, 1280]) {
   await p.locator('.sugg-row .chip[data-code]').first().click();
   await p.getByRole('button', { name: /^Save/ }).last().click();
   await p.waitForFunction(n => window.__core?.S.cases.length === n + 1, n0);
+  // the emptied box keeps neither the marks nor the "Parts …" line (they used to stay until the box was touched)
+  await p.waitForFunction(() => !document.querySelector('.parsed .parts-read') && (document.querySelector('.box-marks')?.hidden ?? true), null, { timeout: 3000 });
   const saved = (await cases()).find(c => c.details.includes('check the cuff'));
   assert.equal(saved.details, '72M lap chole\nASA 2: HTN\nPlan: GA ETT\nlp: check the cuff before any craniotomy');   // stored as typed
 
