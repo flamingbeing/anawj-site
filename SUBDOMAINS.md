@@ -17,6 +17,7 @@ The rule for new apps is in `AGENTS.md`.
 | `nuhroster.anawj.com/` | `nuh-roster/` | Own Firebase project `nuh-roster`. |
 | `apmes.anawj.com/logbook/` | `logbook/` | With evals: one Firebase project (`apmes-logbook`), one sign-in. |
 | `apmes.anawj.com/evals/` | `evals/` | |
+| `apmes.anawj.com/people/` | `people/` | The people lists logbook and evals share (admins and PDs; 13 Oct 2026). |
 | `anawj.com/privacy/` | `privacy/` | Stays: the Google sign-in consent screen points here. |
 | `anawj.com/prewarm-update/` | `prewarm-update/` | Stays until no phone runs the old prewarm worker, then becomes a redirect. |
 | `anawj.com/edit/` (decided in step 5) | `edit/` | Stays on `anawj.com`: see "The page editor" below. |
