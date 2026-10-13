@@ -1,9 +1,9 @@
 # Prewarm: Claude Code, Prewarming Webapp (branch `ccr-13264f37-d28edu`)
 
-Idle, nothing half-done (13 Oct 2026, 04:20 UTC). The 13 Oct batch is merged (#314 to #317): temperature layout and
-one-tap typing, number / time pads, alarm tap opens the reading, PACU times on the PACU page only, progress ticks,
-Perioperative data tick, PACU nurse link (the rules deployed: "Deploy Firestore rules" run succeeded).
+Idle, nothing half-done (13 Oct 2026, evening). Everything asked so far is merged (last: #339). Real patients are being
+charted: phones update when someone taps "Update available" (it now also checks every 10 min); a phone stuck on an old
+version uses `anawj.com/prewarm-update/`. What waits on the owner is in `STATUS.md` (admin list entry for their email,
+export blanks, Firefox phone).
 
-Real patients are being charted: phones update only when someone taps "Update available", so changes reach them
-between patients. Ideas not built: stop a nurse link from the admin screen; the nurse page inside the PACU view.
-Delete this file when the session ends for good.
+Ideas not built: stop a nurse link from the admin screen; the nurse page inside the PACU view; Google sign-in (blocked
+on phones). Delete this file when the session ends for good.
