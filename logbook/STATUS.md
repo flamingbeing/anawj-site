@@ -9,10 +9,8 @@ Last updated: 2026-10-13 by Claude Code, Logbook 1 (log1).
 
 ## Now
 
-- **Claude Code, Logbook 1 (log1)** (branch `claude/clever-gates-pm6sas`): polish batch (Next, item 1): PRs 1–5,
-  #264 and 6a (#289) merged; 6b (seven Clean looks, plus the calendar day's Share / Copy / + Add with Copy off by
-  default; back links on every page off the bar; the device's colour picker) in #295, merging after the checks. After that the polish batch is done. Owner's picks: artifact
-  https://claude.ai/artifact/8Kfho8SPgupTbqe6t2g5bi (store `picks/owner`).
+- **Claude Code, Logbook 1 (log1)** (branch `claude/clever-gates-pm6sas`, no open PR): idle, nothing half-done. The
+  polish batch is finished (PRs 1–5, #264, 6a #289, 6b #295; full suite and a11y green on main).
 - **Claude Code, Logbook 3 (log3)** (branch `ccr-2994049c-4e5tlt`): idle, nothing half-done. Still signed in to the
   Firebase CLI (usage counts only; each use needs the owner's OK). Owns the axe check, PR previews and the Codex /
   Firebase plugin setup.
@@ -37,36 +35,7 @@ Last updated: 2026-10-13 by Claude Code, Logbook 1 (log1).
 
 ## Next (agreed queue)
 
-1. **Polish batch** (log1; owner's Apple-apps review and picks, 13 Oct; one PR each, merged before the next):
-   1. Small fixes for everyone: tap feedback, smooth folds, line icons instead of emoji, "pick one above", Paste /
-      Clear as a round icon in the case box's corner, one status line (star · Draft saved · Recover), one wide Save
-      with "Save, keep date" as small text, smaller date chips, + Log a case at the right, Copy on each row off by
-      default (Advanced display / Show or hide bring it back), empty screens with an icon and a hint.
-   2. Moving around: "‹ Settings" replaces the app name in the header on sub-pages; pages slide in and out; edge
-      swipe back only in the iPhone home-screen app (switchable); a new Accessibility page (text size, zoom,
-      contrast, motion, bigger taps, swipe between tabs, edge swipe back, press and hold); tap the month title to
-      pick a month; Filter opens smoothly, dropdowns styled to match.
-   3. Lists and Analytics: initials beside the date on every case row (like Reflections), for everyone; thin sticky
-      month headers you tap to jump; tags on one line that scrolls sideways; Reflection rows stop wrapping (dates,
-      headings); each Analytics card shows one number and one bar, the detail inside.
-   4. Recognised words highlighted inside the case box (replaces the read-back line under it).
-   5. Note editor: no boxes, one grey info line (date, linked case), Delete and Preview in a ⋯ menu.
-   6. Settings (layout approved by the owner 13 Oct; merge each after the checks, no need to ask):
-      - **6a, regroup only (nothing new):** every settings page uses switches for on/off, tap-to-pick lists with a
-        ✓ for 2–5 choices (Light or dark, Colourful, Tab bar, Line spacing, Page width, Enter key, Undo window, First
-        day of the week, Contrast, Motion), help cut to one line with ⓘ for the rest. Display → Advanced under
-        headings: Look · Header and tab bar (name, hide header, tab bar position, icons only, order) · Logbook rows
-        (⋯ menu, Copy button) · Text (fonts, line spacing, page width) · Case tab layout (upside down, pin box, pin
-        search) · Custom CSS last. Logging → Advanced: Case tab (parts, box height, separate initials, keyboard
-        opens) · Keyboard in the case box (capitals, autocorrect, spelling) · Search · Dates and Undo · Help (tips,
-        last week's summary). Settings search and each page's reset keep working.
-      - **6b, seven new options, all off by default, per device:** Borders slider gets a "Flat" end (no lines and no
-        page cards); Button style (Outlined today / Filled, tinted and plain); Icons instead of words on common
-        buttons (Copy, Share day, Filter, Edit…); Calendar (tiles today / plain numbers with counts, today an accent
-        circle, the picked day a dark circle); Page titles in the header ("Logbook"… instead of the app name);
-        Shorter Logbook rows (one bold line with initials and case, tags as one grey line, short date right, no
-        buttons); Press and hold a row for its menu (no swipe: swipe changes tabs).
-   Skipped by the owner: the selected tab's look, text styles, dark mode default (stays Light), segmented switches.
+1. (Polish batch done 13 Oct: #250, #254, #268, #272, #274, #264, #289, #295. Owner to try the new looks on a phone.)
 2. Later, low priority: lazy-load rarely used modules (admin, portfolio, importer, xlsxio, backup, progress) to cut
    first-visit time (now 3.5–4.2 s on a slow phone; repeat visits 0.6–0.8 s). Measure before and after.
 3. Parked ideas, only if asked:
