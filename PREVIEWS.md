@@ -19,7 +19,7 @@ projects with Workers".)
   as everywhere in this repo.
 
 How it is set up in the repo: `wrangler.jsonc` describes a Worker named `anawj-preview` that only serves files
-(no server code), with `preview_urls` on. `.assetsignore` keeps `.git`, `.github`, `.claude`, `.agents` and the
+(`worker/sites.js`: no data, no secrets; it also serves the subdomains, see `SUBDOMAINS.md`), with `preview_urls` on. `.assetsignore` keeps `.git`, `.github`, `.claude`, `.agents` and the
 config out of the upload. `_headers` adds `X-Robots-Tag: noindex`. GitHub Pages ignores all three. Check a change
 to them with `npx wrangler deploy --dry-run` (no account needed; it lists files before the ignore list applies).
 
