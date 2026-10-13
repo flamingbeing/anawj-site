@@ -15,6 +15,7 @@ import { cleanReflection, cleanImage } from './reflections.js';
 import { cleanNote } from './notepad.js';
 import { progress } from './engine.js';
 import { cleanProfile } from './profile.js';
+import { mergeSettings } from './profiles.js';
 export { cleanReflection, cleanImage };
 
 const KEY = 'apmes-logbook-demo-v1';
@@ -294,7 +295,7 @@ export async function saveLogbook(email, patch) {
   const cur = lb.doc || defaultLogbook(email);
   const p = plain(patch || {});
   if ('profile' in p) p.profile = cleanProfile(p.profile);
-  lb.doc = { ...cur, ...p, settings: { ...(cur.settings || {}), ...(p.settings || {}) }, email, updatedAt: Date.now() };
+  lb.doc = { ...cur, ...p, settings: mergeSettings(cur.settings, p.settings), email, updatedAt: Date.now() };
   save(s);
   return plain(lb.doc);
 }

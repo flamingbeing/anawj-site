@@ -103,7 +103,7 @@ try { for (const width of [390, 1280]) {
   // an older basicOn 'case:quick' still brings both back
   await set({ basicOn: ['case:quick'] });
   assert.equal(await p.locator('.quick-rest').evaluate(el => getComputedStyle(el).display !== 'none'), true, 'case:quick no longer means both');
-  await set({ mode: 'advanced', basicOn: null });
+  await set({ mode: 'advanced', basicOn: null, show: null });   // (the switch above saved show['case:sugg'], which wins over caseHide)
 
   // 4. An older caseHide 'quick' hides both; turning the suggestions back on keeps Same as last hidden
   await set({ caseHide: ['quick'] });

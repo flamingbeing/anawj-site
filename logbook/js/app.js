@@ -2,7 +2,8 @@
 // shared state and helpers are in ui-core.js. Case data comes from cloud.js (Firestore, or the
 // in-browser demo backend with ?demo).
 
-import { S, hooks, h, toast, basicMode, logbookOnly, facultyMode, facultyRole, clearToast, cloud, writes, transients, setCases, scheduleSummary, fill, resetCaches, patchLogbook, confirmBox, fileButton, modal, download, todayISO, settings, setCategoryNames, categoryNames as categoryNamesNow } from './ui-core.js';
+import { replaceShow } from './profiles.js';
+import { S, hooks, h, toast, basicHides, basicMode, logbookOnly, facultyMode, facultyRole, clearToast, cloud, writes, transients, setCases, scheduleSummary, fill, resetCaches, patchLogbook, confirmBox, fileButton, modal, download, todayISO, settings, setCategoryNames, categoryNames as categoryNamesNow } from './ui-core.js';
 import { renderSendSettings, destinationHosts } from './ui-send.js';
 import { renderLog, focusLog, logCasesChanged, clearDrafts, SHARED_KEY } from './ui-log.js';
 import { renderRecovery } from './ui-recovery.js';
@@ -49,6 +50,8 @@ const ICONS = {
   notes: 'M6 3h9l4 4v14H6zM14 3v5h5M9 12h7M9 16h5',
   more: 'M5 12h.01M12 12h.01M19 12h.01M4 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0M11 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0M18 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0',
 };
+// the Advanced pages (Settings menu) use their parent page's icon
+ICONS.displayadv = ICONS.display; ICONS.loggingadv = ICONS.logging;
 const icon = id => {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('class', 'ico'); svg.setAttribute('aria-hidden', 'true');
@@ -74,21 +77,21 @@ const TABS = [
   // under Analytics: how your counts compare with your intake
   { id: 'totals', label: 'Totals', render: renderTotals, hidden: true, under: 'progress', unlisted: true },
   { id: 'account', bar: true, label: 'Account', render: renderAccount, hidden: true, under: 'more', desc: 'Your name and portfolio details (Section 1); delete account' },
-  { id: 'settings', bar: true, label: 'Settings', render: () => renderSettingsMenu(), hidden: true, under: 'more', desc: 'Profile, display, logging, tag editor, Markdown, recycle bin' },
+  { id: 'settings', bar: true, label: 'Settings', render: () => renderSettingsMenu(), hidden: true, under: 'more', desc: 'Profile, look, logging, reflections, notes and sharing, data' },
   { id: 'recovery', bar: true, short: 'Recover', label: 'Recent changes / Recover drafts', render: renderRecovery, hidden: true, under: 'more', desc: 'Retry sync, recover unfinished drafts and restore recent versions on this device' },
   { id: 'data', bar: true, short: 'Export', label: 'Export / Import', render: () => renderDataPage(), hidden: true, under: 'more', desc: 'Export the portfolio (Word); import reflections from Word; backup file, Excel and Markdown export' },
   { id: 'reflimport', label: 'Import reflections from Word', render: () => renderReflImport(), hidden: true, under: 'data', unlisted: true },
   // Settings' own pages (not in the More list)
   { id: 'display', label: 'Display', render: renderDisplay, hidden: true, under: 'settings', unlisted: true, desc: 'Light or dark, colour, compact, borders; fonts and more under Advanced' },
   { id: 'access', label: 'Accessibility', render: renderAccessibility, hidden: true, under: 'settings', unlisted: true, desc: 'Zoom, text size, bigger taps, contrast, motion, swipe gestures' },
-  { id: 'displayadv', label: 'Advanced display', render: renderDisplayAdvanced, hidden: true, under: 'display', unlisted: true },
-  { id: 'loggingadv', label: 'Advanced logging', render: renderLoggingAdvanced, hidden: true, under: 'logging', unlisted: true },
+  { id: 'displayadv', label: 'Advanced display', render: renderDisplayAdvanced, hidden: true, under: 'display', unlisted: true, desc: 'The header and tab bar, Logbook rows, fonts, custom CSS' },
+  { id: 'loggingadv', label: 'Advanced logging', render: renderLoggingAdvanced, hidden: true, under: 'logging', unlisted: true, desc: 'Case tab parts, the keyboard, search, the week, undo, tips' },
   { id: 'sendto', label: 'Send to', render: renderSendSettings, hidden: true, under: 'settings', unlisted: true, desc: 'Obsidian, WhatsApp, UpNote or any app with a link' },
   { id: 'sharefmt', label: 'Markdown', render: renderMarkdownSettings, hidden: true, under: 'settings', unlisted: true, desc: 'How Copy, Share and the notes export read' },
-  { id: 'showhide', label: 'Profiles or hide items', render: renderShowHide, hidden: true, under: 'settings', unlisted: true, desc: 'Your profile (Advanced, Basic, logbook only) and everything you can hide' },
+  { id: 'showhide', label: 'Profile', render: renderShowHide, hidden: true, under: 'settings', unlisted: true, desc: 'Basic, Advanced, Personal…, and everything you can show or hide' },
   { id: 'logging', label: 'Logging', render: renderLogging, hidden: true, under: 'settings', unlisted: true, desc: 'Suggestions, the Enter key, dates, after Save; more under Advanced' },
   // from Reflections → More tools
-  { id: 'reflset', label: 'Reflections', render: renderReflectionSettings, hidden: true, under: 'settings', unlisted: true, desc: 'New reflections in the export, photo sizes' },
+  { id: 'reflset', label: 'Reflections', render: renderReflectionSettings, hidden: true, under: 'settings', unlisted: true, desc: 'The export, learning points, formatting, spelling, photo sizes' },
   // opened from More → Export / Import (not in the More list)
   { id: 'export', label: 'Export portfolio', render: () => renderExportPage(), hidden: true, under: 'data', unlisted: true },
   { id: 'choose', label: 'Export portfolio', render: renderChoosePage, hidden: true, under: 'export', unlisted: true },
@@ -154,10 +157,11 @@ function installCard() {
 // Search in Settings (owner): the options of every settings page and its Advanced page, read from the pages
 // themselves (each is drawn once, off screen, the first time someone types), so the index never goes stale.
 // A result opens its page and scrolls to the option, which flashes.
-const SEARCH_PAGES = ['display', 'displayadv', 'access', 'logging', 'loggingadv', 'reflset', 'sharefmt', 'sendto'];
+const SEARCH_PAGES = ['showhide', 'display', 'displayadv', 'access', 'logging', 'loggingadv', 'tags', 'reflset', 'sharefmt', 'sendto'];
 let settingsIndex = null, findAfterRender = '';
 const optionText = n => {
   if (n.matches('label.field')) return [...n.childNodes].filter(c => c.nodeType === 3).map(c => c.textContent).join(' ').trim();
+  if (n.matches('label.profile-opt')) return n.querySelector('b').textContent.trim();   // (a profile: its name, not its hint run on)
   if (n.matches('label.check')) return n.textContent.trim();
   return n.textContent.trim();
 };
@@ -207,16 +211,31 @@ function settingsSearch() {
   return h('section', { class: 'card more-list settings-search' }, box, results);
 }
 
-// Settings: a short menu of its pages (residency year on top for people not on the programme list)
+// Settings: its pages in groups (owner, 13 Oct 2026: every setting kept, grouped so each is easy to find): Profile, Look,
+// Logging, Reflections, Notes and sharing, Data, Advanced. Search finds any option on any page.
+const SETTINGS_GROUPS = [
+  ['Profile', ['showhide']],
+  ['Look', ['display', 'access']],
+  ['Logging', ['logging', 'tags']],
+  ['Reflections', ['reflset']],
+  ['Notes and sharing', ['sharefmt', 'sendto']],
+  ['Data', ['bin']],
+  ['Advanced', ['displayadv', 'loggingadv']],
+];
+// the groups, then any Settings page none of them names (so a new page is never left out of the menu)
+function settingsGroups() {
+  const named = new Set(SETTINGS_GROUPS.flatMap(([, ids]) => ids));
+  const rest = TABS.filter(t => t.under === 'settings' && !named.has(t.id)).map(t => t.id);
+  return rest.length ? [...SETTINGS_GROUPS, ['Other', rest]] : SETTINGS_GROUPS;
+}
 function renderSettingsMenu() {
-  const order = ['display', 'access', 'logging', 'showhide', 'tags', 'reflset', 'sharefmt', 'sendto'];
-  const pages = TABS.filter(t => t.under === 'settings').sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
   settingsIndex = null;   // drawn again on the first search of this visit
+  const item = id => (id === 'bin' ? menuItem('bin', 'Recycle bin', 'Deleted cases and reflections, kept for 30 days', () => openBin())
+    : (t => menuItem(t.id, t.label, t.desc))(TABS.find(t => t.id === id)));
   return h('div', {},
     settingsSearch(),
-    h('section', { class: 'card more-list' }, h('h2', {}, 'Settings'),
-      h('ul', {}, pages.map(t => menuItem(t.id, t.label, t.desc)),
-        menuItem('bin', 'Recycle bin', 'Deleted cases and reflections, kept for 30 days', () => openBin()))),
+    h('section', { class: 'card more-list settings-menu' }, h('h2', {}, 'Settings'),
+      settingsGroups().map(([name, ids]) => [h('h3', {}, name), h('ul', {}, ids.map(item))])),
     settingsFileCard(),
     connectClaudeCard());
 }
@@ -263,6 +282,8 @@ function settingsFileCard() {
     // display settings in the file go to this device, the rest to the account
     const fileDisplay = Object.fromEntries(DISPLAY_KEYS.filter(k => k in d.settings).map(k => [k, d.settings[k]]));
     const forAccount = Object.fromEntries(Object.entries(d.settings).filter(([k]) => !DISPLAY_KEYS.includes(k)));
+    // the file's switches replace the account's (the cloud merges `show` key by key, so the ones it lacks go as null)
+    if (forAccount.show) forAccount.show = replaceShow(settings().show, forAccount.show);
     await patchLogbook({ settings: forAccount, ...(newGroups.length ? { templates: [...mine, ...newGroups].slice(0, 100) } : {}) });
     if (d.theme) applyTheme(d.theme);
     applyDisplay(setDisplay(Object.fromEntries(DISPLAY_KEYS.filter(k => k in fileDisplay).map(k => [k, fileDisplay[k]]))));
@@ -289,17 +310,18 @@ function renderReflImport() {
 
 // Export / Import: the portfolio export, the Word upload for reflections, and backups
 function renderDataPage() {
+  const portfolio = !basicHides('portfolio');   // (Profile → APMES; off in Personal)
   return h('div', {},
     // Export is the portfolio only (it holds everything APMES needs); every other copy is a backup
-    h('section', { class: 'card export-sync' }, h('h2', {}, 'Export'),
+    !portfolio ? null : h('section', { class: 'card export-sync' }, h('h2', {}, 'Export'),
       h('h3', {}, 'Portfolio (Word)'),
       h('p', { class: 'hint help' }, 'The APMES portfolio: choose which complete reflections go in, then export it with Section 1 and the Section 4 case numbers filled in. This is what APMES needs.'),
       h('div', { class: 'bar', style: 'margin-bottom:0' }, h('a', { class: 'btn primary', href: '#export' }, 'Choose reflections and export ›'))),
     h('section', { class: 'card' }, h('h2', {}, 'Import'),
-      h('h3', {}, 'Reflections from Word'),
-      h('p', { class: 'hint help' }, 'Already wrote reflections in the APMES Word portfolio? Upload the .docx to add them here. You check each one before it is saved.'),
-      h('div', { class: 'bar', style: 'margin-bottom:0' }, h('a', { class: 'btn', href: '#reflimport' }, 'Upload from Word ›')),
-      h('h3', { style: 'margin-top:16px' }, 'Logbook from Excel or CSV'),
+      !portfolio ? null : [h('h3', {}, 'Reflections from Word'),
+        h('p', { class: 'hint help' }, 'Already wrote reflections in the APMES Word portfolio? Upload the .docx to add them here. You check each one before it is saved.'),
+        h('div', { class: 'bar', style: 'margin-bottom:0' }, h('a', { class: 'btn', href: '#reflimport' }, 'Upload from Word ›'))],
+      h('h3', { style: portfolio ? 'margin-top:16px' : '' }, 'Logbook from Excel or CSV'),
       h('p', { class: 'hint help' }, 'Edit your cases in a spreadsheet (Download Excel under Backup), then upload it back; or bring in a list from elsewhere. You match the columns and see every change before anything is saved.'),
       h('div', { class: 'bar', style: 'margin-bottom:0' }, fileButton('Upload Excel/CSV…', '.xlsx,.csv,text/csv', uploadExcel))),
     backupCard(
