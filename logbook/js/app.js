@@ -211,6 +211,7 @@ function installCard() {
 // themselves (each is drawn once, off screen, the first time someone types), so the index never goes stale.
 // A result opens its page and scrolls to the option, which flashes.
 const SEARCH_PAGES = ['showhide', 'display', 'displayadv', 'access', 'logging', 'loggingadv', 'tags', 'reflset', 'notesset', 'sharefmt', 'sendto', 'sync', 'account'];
+const SEARCH_MODS = ['settings', 'send', 'sync', 'account'];   // the modules those pages are drawn from
 let settingsIndex = null, findAfterRender = '';
 const optionText = n => {
   if (n.matches('label.field')) return [...n.childNodes].filter(c => c.nodeType === 3).map(c => c.textContent).join(' ').trim();
@@ -269,7 +270,11 @@ function settingsSearch() {
     value: settingsQuery, oninput: () => search() });
   const search = () => {
     settingsQuery = box.value;
-    settingsIndex ||= buildSettingsIndex();
+    // the pages are read from their own code, which loads on first use: until all of it has, the index isn't kept,
+    // and the results come again once it has
+    const missing = SEARCH_MODS.filter(n => !mod[n]);
+    if (missing.length) Promise.all(missing.map(need)).then(() => { settingsIndex = null; if (box.isConnected && box.value === settingsQuery) search(); }, () => {});
+    if (!settingsIndex || missing.length) settingsIndex = buildSettingsIndex();
     const found = searchSettings(settingsIndex, box.value);
     fill(results, ...found.map(x => h('li', {}, h('a', { href: '#' + x.id, 'data-go': x.id, onclick: e => { e.preventDefault(); if (x.open) return x.open(); findAfterRender = x.text; if (S.tab === x.id) showFound(); else go(x.id); } },
       h('span', { class: 'mt' }, h('b', {}, x.text), h('small', {}, x.page)), h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')))),
