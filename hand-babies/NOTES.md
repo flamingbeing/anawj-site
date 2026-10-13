@@ -6,7 +6,7 @@ Lasting decisions for `hand-babies/`. Status and next steps: `STATUS.md`.
 
 - Readers: MOs who were house officers last month, first week in hand surgery, often on a phone in ED.
 - Aim: accurate bedside exam (sensation distal to the wound, 2PD done properly, each tendon isolated, Kanavel's
-  signs) and photos a senior can decide from (always wide + close-up). Practical content over looks.
+  signs) and a clinical record to the standard of care, with photos (always wide + close-up). Frame it as standard of care, not "what the senior wants" (owner, 13 Oct 2026). Practical content over looks.
 - Owner's emphasis (12 Oct 2026): 2PD, sensation, individual tendon tests, "no point testing proximal to the cut",
   2 photo views (zoomed in + zoomed out), Kanavel's signs, depends on the clinical picture.
 
@@ -32,7 +32,7 @@ itself (`skipWaiting` in install); never go back to waiting for a tap (on a phon
 - No emoji, no "10 rules" box (owner, 12 Oct 2026). One long page, sticky section chips; scenarios are `<details>` cards (open from a link like `#pic-infect`).
 - Short, plain, practical (owner, 12 Oct 2026): not textbook; good English the way Singapore doctors talk (MO,
   ED, OT, TW, ATT, nec fasc). No quiz, no privacy guide, no referral template: one short example message only.
-- Plain words, short. Each scenario: Examine / Photos / Call now if / Common miss.
+- Plain words, short. Each scenario: Examine / Photos / Escalate now if / Common miss.
 - Generic to any hospital: "per unit protocol" for drugs and splints; no hospital-specific numbers or names.
 - Figures are drawn in `app.js` from one hand geometry (`FINGERS`, `shapes()`); the hand is a LEFT hand palm side so
   radial is on the left. Label radial/ulnar on any new figure.
