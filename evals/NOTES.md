@@ -207,6 +207,7 @@ A quick contrast check for both themes is worth running after any colour change:
 
 ## 6. Working alongside the logbook session, and limits of this environment
 
+- **Session status files:** keep this session's "Now" in `evals/status/<session>.md`; run `/save-state` before compacting.
 - **The logbook has its own Claude session** (branch `claude/clever-gates-pm6sas`, title "APMES Logbook"). It owns `logbook/`.
   - Before editing logbook files, check it isn't mid-change: `get_session` status, and its open PRs.
   - Keep logbook edits small, merge them, then tell it with `send_message` (what changed, files, the sw VERSION) so it merges main before its next change.
@@ -219,7 +220,6 @@ A quick contrast check for both themes is worth running after any colour change:
   - Edit its own permission settings.
   - Delete remote branches.
   - Push after a blocked credential attempt (the classifier stays wary for a while). Wait, or ask the owner.
-  - A stray branch `claude/privacy-page` was left by mistake; the owner can delete it.
 
 ## 7. Open items
 
