@@ -18,7 +18,7 @@ The rule for new apps is in `AGENTS.md`.
 | `apmes.anawj.com/evals/` | `evals/` | |
 | `anawj.com/privacy/` | `privacy/` | Stays: the Google sign-in consent screen points here. |
 | `anawj.com/prewarm-update/` | `prewarm-update/` | Stays until no phone runs the old prewarm worker, then becomes a redirect. |
-| (decided in step 5) | `edit/` | The page editor has to reach pages on several subdomains. |
+| `anawj.com/edit/` (decided in step 5) | `edit/` | Stays on `anawj.com`: see "The page editor" below. |
 
 Single-app subdomains serve the app at the root; shared ones keep a path per app. Folders in the repo don't need
 renaming: the hosting maps each address to its folder.
@@ -102,6 +102,16 @@ trainer, `apmes.anawj.com/logbook/?demo`, `apmes.anawj.com/evals/?demo`, `nuhros
 `prewarmstudy.anawj.com/`); the same apps still work at their old `anawj.com/<folder>/` addresses (GitHub Pages, until
 each one's step makes it a redirect), and `hand.anawj.com/logbook/` is a 404.
 
+## The page editor (decided in step 5)
+
+`anawj.com/edit/` and `edit.anawj.com` stay where they are. The editor shows the page in a same-origin frame and reads and
+marks its text, so it can only edit pages served from its own origin; and `anawj.com` still serves every app folder (the
+GitHub Pages copy), forwarding only top-level visits (the forwards check `top === self`, so they never fire inside the
+editor's frame). So `edit.anawj.com/<old path>` keeps working for every page, suggested edits still name repo paths, and the
+"Suggest an edit" link on the hand pages (`anawj.com/edit/?page=…`) is correct. Do not stop serving the old folders at
+`anawj.com` without moving the editor (it would need to be served on each subdomain, `/edit/` shared like `/design/`, with
+`edit.anawj.com` turned into a lookup from old path to new host).
+
 ## Progress
 
 - [x] Plan written (homepage session)
@@ -116,4 +126,7 @@ each one's step makes it a redirect), and `hand.anawj.com/logbook/` is a 404.
 - [x] 4. nuhroster.anawj.com (NUH Roster): #361, live 13 Oct; old address forwards with path, query and `#` kept, and a
   browser with a roster saved at the old address is offered a download first. Authorised domain added by the owner;
   a full Google sign-in with a real account is still for the owner to try once
-- [ ] 5. apmes.anawj.com (log1, with MedHub Evaluations)
+- [x] 5. apmes.anawj.com (log1, with MedHub Evaluations): logbook #370, evals #367, helper pages and guidebook #368; live 13 Oct. The
+  owner added `apmes.anawj.com` to the Firebase authorised domains and the Google sign-in client's redirect URIs and origin, and
+  a real Google sign-in works at the new address. Old `anawj.com/logbook/` and `/evals/` forward (path, query and `#` kept). Still
+  to confirm by the owner: Drive and Dropbox backups at the new address (their redirect URI is `https://apmes.anawj.com/logbook/`).
