@@ -250,6 +250,9 @@ function h(tag, attrs = {}, ...kids) {
 // A short message at the bottom. With an action (e.g. Undo) it stays longer and has a button.
 function toast(msg, action) {
   const t = document.getElementById('toast');
+  // a live region only speaks when its text changes: empty it first, so the same message is read out again
+  t.replaceChildren();
+  void t.offsetWidth;
   t.replaceChildren(msg, ...(action ? [' ', h('button', { class: 'small', title: action.title || null, onclick: () => { t.classList.remove('show'); action.run(); } }, action.label)] : []));
   t.classList.toggle('actionable', !!action);
   t.classList.add('show');
@@ -581,7 +584,12 @@ function renderDateBar() {
 function renderSteps() {
   const el = document.getElementById('steps');
   if (!el) return;
-  if (!['monthly', 'cases', 'roster', 'premed'].includes(state.tab) || !state.staff.length) { el.hidden = true; return; }
+  if (!['monthly', 'cases', 'roster', 'premed'].includes(state.tab) || !state.staff.length) {
+    el.hidden = true;
+    const nb = document.getElementById('nextbar'); if (nb) nb.hidden = true;
+    document.body.classList.remove('has-nextbar');
+    return;
+  }
   el.hidden = false;
   const date = state.day.date, month = date?.slice(0, 7);
   const mon = state.monthly?.[month] || {};
@@ -605,6 +613,19 @@ function renderSteps() {
   const mark = { ok: '✓', bad: '!', todo: '', off: '' };
   el.replaceChildren(...steps.map(([k, label, st, note], i) => h('button', { class: `step ${st}` + (state.tab === k ? ' here' : ''), onclick: () => go(k) },
     h('span', { class: 'dot' }, mark[st] || String(i + 1)), h('span', { class: 'what' }, h('b', {}, label), h('small', {}, note)))));
+  // phones: the next step to do, in reach of a thumb at the bottom of the screen (CSS shows it only on phones)
+  let bar = document.getElementById('nextbar');
+  if (!bar) { bar = h('nav', { id: 'nextbar', 'aria-label': 'Next step' }); document.body.append(bar); }
+  const next = steps.find(([, , st]) => st === 'bad' || st === 'todo');
+  bar.hidden = !next;
+  document.body.classList.toggle('has-nextbar', !!next);
+  if (next) {
+    const [k, label, st, note] = next, i = steps.indexOf(next);
+    // on the Roster tab with no roster, the button makes it; otherwise it goes to the step
+    const make = k === 'roster' && state.tab === 'roster';
+    bar.replaceChildren(h('span', { class: 'what' }, h('small', {}, `Step ${i + 1} of ${steps.length}`), h('b', {}, `${label}: ${note}`)),
+      h('button', { class: 'primary' + (st === 'bad' ? ' bad' : ''), onclick: () => make ? runGenerate(false) : go(k) }, make ? 'Make it' : st === 'bad' ? 'Show' : 'Go'));
+  }
 }
 
 // Whether the day on screen is saved where the team can see it.
@@ -1487,6 +1508,40 @@ const HOW = [
   ['see only my own day?', 'My day (footer): pick your name once. It shows your room, partner, cases, calls, and your week.'],
   ['practise without touching the real roster?', 'Practice (top right) has made-up staff, a tour and a "Fix 3 problems" exercise.'],
 ];
+// What changed for the people using it, newest first. Shown once per device after an update (WHATS_NEW_KEY), and
+// always from Key and help. Add a line here when a change is something a rosterer or viewer would notice.
+const WHATS_NEW = [
+  ['13 Oct 2026', [
+    'My day opens on today in the morning, shows when the roster was saved and marks what changed since you looked; My week, Add to calendar and Copy for logbook.',
+    'The roster says when this browser stops saving, and keeps a copy of damaged data.',
+    'New live checks: a double-covered room with no junior, a senior in three rooms, an admin day on a list.',
+    'After a change, "Changed since sent" lists who moved; a sheet sent again says "Updated" with the time; the image can go in 2 parts.',
+    'The generator prefers SC/C for complex lists and double covers, and says why when you hover a name.',
+    'Monthly rosters mark clashes (leave, a day duty after a night) and show which rosters are loaded; leave per day; rotation counts.',
+    'Fix names after an import; "Same until" for several days; Start from last week or from the last roster.',
+    'Phones: bigger buttons, no zooming, Cases as cards, a Next step bar; installable on the home screen and works with poor signal.',
+    'Key and help, a printable guide, Practice exercises and scenarios.',
+  ]],
+];
+const WHATS_NEW_KEY = 'nuh-roster-whats-new';
+function showWhatsNew() {
+  const dlg = h('dialog', { class: 'changes key' }, h('h2', {}, 'What\'s new'),
+    WHATS_NEW.map(([when, items]) => [h('h3', {}, when), h('ul', {}, items.map(t => h('li', {}, t)))]),
+    h('div', { class: 'bar' }, h('button', { class: 'primary', onclick: () => dlg.close() }, 'Close'), h('button', { onclick: () => { dlg.close(); showKey(); } }, 'Key and help')));
+  dlg.addEventListener('close', () => dlg.remove());
+  document.body.append(dlg); dlg.showModal();
+  try { localStorage.setItem(WHATS_NEW_KEY, WHATS_NEW[0][0]); } catch { /* no storage */ }
+}
+// once per device, for people who have used it before (not on a first visit, Practice or for the tour)
+function maybeWhatsNew() {
+  let seen = null;
+  try { seen = localStorage.getItem(WHATS_NEW_KEY); } catch { return; }
+  if (seen === WHATS_NEW[0][0]) return;
+  if (DEMO || !state.staff.length) { try { localStorage.setItem(WHATS_NEW_KEY, WHATS_NEW[0][0]); } catch { /* no storage */ } return; }
+  if (document.getElementById('toast')?.classList.contains('show') || document.querySelector('dialog[open]')) { setTimeout(maybeWhatsNew, 5000); return; } // after the message on screen
+  toast('The roster has been updated.', { label: 'What\'s new', run: showWhatsNew });
+  try { localStorage.setItem(WHATS_NEW_KEY, WHATS_NEW[0][0]); } catch { /* no storage */ }
+}
 function showKey() {
   const dlg = h('dialog', { class: 'changes key' }, h('h2', {}, 'Key and help'),
     h('table', { class: 'key-table' }, h('tbody', {}, SYMBOLS.map(([k, what]) => h('tr', {}, h('th', { scope: 'row' }, k), h('td', {}, what))))),
@@ -1494,7 +1549,8 @@ function showKey() {
     h('div', { class: 'how' }, HOW.map(([q, a]) => h('details', { ontoggle: e => { if (e.target.open) dlg.querySelectorAll('.how details[open]').forEach(d => { if (d !== e.target) d.open = false; }); } },
       h('summary', {}, '…' + q), h('p', {}, a)))),
     h('div', { class: 'bar' }, h('button', { class: 'primary', onclick: () => { dlg.close(); dlg.remove(); } }, 'Close'),
-      h('a', { class: 'btn', href: 'guide.html', target: '_blank', rel: 'noopener' }, 'One-page guide to print')));
+      h('a', { class: 'btn', href: 'guide.html', target: '_blank', rel: 'noopener' }, 'One-page guide to print'),
+      h('button', { onclick: () => { dlg.close(); showWhatsNew(); } }, 'What\'s new')));
   dlg.addEventListener('close', () => dlg.remove());
   document.body.append(dlg); dlg.showModal();
 }
@@ -2231,7 +2287,7 @@ function openPersonBox(anchor, p, ctx) {
     ...field('Leaving (L-)', leave),
     h('label', { class: 'check' }, liver, ' Liver standby (L): no complex lists'),
     ...field('AOH tag', aoh, 'Shown as (AOH) after their name'),
-    ...field('Comment (also shown in the comments box)', comment),
+    ...field('Comment (also shown in the comments box)', comment, 'Shown on the sent-out sheet: meetings, times, where they are. No patient details, NRIC, phone numbers or medical reasons.'),
     ...field('Same until (optional)', until, 'For something that runs several days: the status and comment go on each day up to this date'),
     carried ? h('div', { class: 'seen' }, `Carried from ${longDate(carried.from)} to ${longDate(carried.until)}. Clear the date to stop it.`) : null,
     p.role === 'junior' ? h('label', { class: 'check', title: 'Not around on the previous working day: needs premed cover' }, away, ' Away on the previous working day') : null,
@@ -2843,7 +2899,7 @@ function renderMyDay() {
       meta?.updatedAt && viewerFound ? h('p', { class: 'seen' }, `Saved by ${meta.updatedBy?.name || 'the rosterer'} at ${hhmm(meta.updatedAt)}${new Date(meta.updatedAt).toDateString() !== new Date().toDateString() ? `, ${longDate(isoDate(new Date(meta.updatedAt)))}` : ''}. `,
         h('button', { class: 'link', onclick: () => viewerLoad(date) }, 'Check again')) : null,
       p && r && postingOf(p) && p.role === 'junior' ? h('p', { class: 'seen' }, `Posting this week: ${postingName(postingOf(p))}`) : null,
-      h('p', { class: 'hint' }, 'Bookmark this page to come straight here: ', h('code', {}, location.origin + location.pathname + '#myday'),
+      h('p', { class: 'hint' }, 'Add it to your home screen (browser menu › Add to Home Screen): it opens here and works with poor signal. Or bookmark ', h('code', {}, location.origin + location.pathname + '#myday'),
         isViewer() ? null : [' · ', h('button', { class: 'link', onclick: () => { history.replaceState(null, '', location.pathname); goTab('roster'); } }, 'Back to the roster')])),
     r ? renderSheet() : null);
 }
@@ -4287,6 +4343,7 @@ lastRows = state.roster ? JSON.stringify(state.roster.rows) : null;
 state.tab = location.hash === '#myday' ? 'myday' : state.staff.length ? 'roster' : 'staff'; // the page opens on the roster
 render();
 openOnTheRightDay();
+setTimeout(maybeWhatsNew, 1200);
 // a practice link with a scenario (?demo=short): set it up once per visit
 if (DEMO) {
   const sc = new URLSearchParams(location.search).get('demo');
@@ -4300,6 +4357,34 @@ document.getElementById('tourBtn')?.addEventListener('click', () => startTour())
 document.getElementById('allBtn')?.addEventListener('click', downloadEverything);
 addEventListener('hashchange', () => { if (location.hash === '#myday' && state.tab !== 'myday') { closeTagEditor(); state.tab = 'myday'; window.scrollTo(0, 0); render(); } });
 document.getElementById('keysBtn')?.addEventListener('click', showShortcuts);
+// Something unexpected broke mid-change: say so in plain words (the screen may not have caught up), once a minute
+// at most; the details go to the console.
+let lastCrash = 0;
+function crashed(err) {
+  console.error(err);
+  if (Date.now() - lastCrash < 60e3) return;
+  lastCrash = Date.now();
+  toast('Something went wrong, so your last change may not have gone in. Check it, press Undo, or reload the page.', { label: 'Reload', run: () => location.reload() });
+}
+addEventListener('error', e => { if (e.error) crashed(e.error); });
+addEventListener('unhandledrejection', e => crashed(e.reason));
+// Offline app shell (sw.js): the app opens with poor signal. A new version installs alongside and is offered here.
+(function registerSW() {
+  if (!('serviceWorker' in navigator) || location.protocol === 'file:' || window.ROSTER_MOVED_TO || /^(www\.)?anawj\.com$/.test(location.hostname)) return; // not at the old address (it redirects)
+  let reloading = false;
+  const hadController = !!navigator.serviceWorker.controller; // the first install takes control quietly
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (reloading || !hadController) return; reloading = true; location.reload(); });
+  navigator.serviceWorker.register('sw.js').then(reg => {
+    const offer = w => {
+      if (document.getElementById('update-bar')) return;
+      document.body.prepend(h('div', { id: 'update-bar', class: 'demo-bar', role: 'status' }, h('b', {}, 'Update available'), h('span', { class: 'grow' }),
+        h('button', { class: 'small primary', onclick: () => { document.getElementById('update-bar')?.remove(); w.postMessage('skipWaiting'); } }, 'Reload')));
+    };
+    if (reg.waiting && navigator.serviceWorker.controller) offer(reg.waiting);
+    reg.addEventListener('updatefound', () => { const w = reg.installing; w?.addEventListener('statechange', () => { if (w.state === 'installed' && navigator.serviceWorker.controller) offer(w); }); });
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reg.update().catch(() => {}); });
+  }).catch(err => console.warn('Service worker not registered', err));
+})();
 document.getElementById('keyBtn')?.addEventListener('click', showKey);
 // Phones: keep the bottom-sheet person box above the on-screen keyboard, and the field being typed in visible.
 if (window.visualViewport) {

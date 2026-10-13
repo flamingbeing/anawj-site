@@ -162,6 +162,10 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
 - Who "me" is on My day: the staff record an admin links to the account (Settings › Team members › "On the staff list
   as", saved as `members/{email}.staffId`), else the name picked in this browser, else a guess from the member's name,
   which My day flags ("Matched to … Not you? Pick your name").
+- Installable and offline (13 Oct): `manifest.webmanifest` (shortcut: My day), icons in `icons/`, and `sw.js` (the
+  logbook's pattern: shell cache-first, Firebase SDK cached, big vendor files cached on first use, "Update available:
+  Reload" bar). Its VERSION base is `nuh-roster-v1`; the deploy stamps it, so PRs leave it alone. Not registered at the
+  old anawj.com address. Offline, the app opens and My day shows the last roster this phone loaded.
 - Opening the app on a past date (not today) moves the roster to tomorrow, with a toast to go back.
 - My day also has: Add to calendar (an .ics file made in the browser, `js/ics.js`; no feed URL, nothing sent), My
   week (the next 7 days: saved rosters, else leave and calls from the monthly rosters; viewers load the team's copies
@@ -261,6 +265,16 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
   (week n copied to week n, only into empty weeks, with Undo) when the next year is still empty.
 - Phones: Cases shows each room as a card (run, room and session, then case notes, flags, fixed people; rooms not
   running show only their first line). Labels made into buttons (`label.btn.primary`, e.g. "Do it all") now look primary.
+- Unexpected errors (`error` / `unhandledrejection`) show one plain toast a minute at most ("your last change may not
+  have gone in… Undo, or reload"); the toast empties before each message so screen readers repeat it; long single-line
+  text in the image shrinks to the sheet's edge.
+- Comments go out on the sheet: the person box's Comment says so (no patient details, NRIC, phone numbers or medical
+  reasons); keep that rule in any new free-text field that is sent out or saved for the team.
+- Phones: a "Next step" bar at the bottom (`#nextbar`, from the same steps as the strip): the first step not done, with
+  Go / Show / "Make it" (on Roster with no roster). Hidden on desktop, Staff, Settings, for viewers and in print.
+- What's new (`WHATS_NEW` in app.js): a dated list in plain words, offered once per device after an update (a toast
+  with "What's new", waiting for any message already on screen; not on a first visit or in Practice) and always from
+  Key and help. Add a line when a change is something rosterers or viewers would notice; start a new date at the top.
 - Keep building elements with `h()` and `textContent`; there is no `innerHTML` anywhere, so imported text can't inject.
 
 ## Code map

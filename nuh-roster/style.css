@@ -501,3 +501,18 @@ table.rot tfoot td.none { color: var(--red); font-weight: 700; background: #fdec
   table.cases-table td.lock::before { display: inline; margin: 0; min-width: 90px; }
   table.cases-table tr.off td.notes, table.cases-table tr.off td.flags, table.cases-table tr.off td.lock { display: none; }
 }
+/* phones: the next step at the bottom, one-handed */
+#nextbar { display: none; }
+@media (max-width: 600px) {
+  #nextbar:not([hidden]) { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 15; gap: 10px; align-items: center;
+    padding: 8px 16px calc(8px + env(safe-area-inset-bottom, 0px)); background: var(--panel); border-top: 1px solid var(--line); box-shadow: 0 -4px 12px rgba(0, 0, 0, .08); }
+  #nextbar .what { flex: 1; min-width: 0; display: grid; }
+  #nextbar .what small { color: #595e65; font-size: 12px; }
+  #nextbar .what b { color: var(--navy); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #nextbar button { min-height: 44px; padding: 8px 18px; }
+  #nextbar button.bad { background: var(--red); border-color: var(--red); }
+  body.has-nextbar { padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px)); }
+  body.has-nextbar #toast { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+}
+@media print { #nextbar { display: none !important; } }
+body.viewer #nextbar { display: none !important; }
