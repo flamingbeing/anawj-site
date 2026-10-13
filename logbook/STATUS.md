@@ -15,6 +15,9 @@ its own file), so sessions never edit the same lines. Read them all before start
 
 ## Waiting on the owner
 
+- Answer the questions in `logbook/PLAN-personal-log.md` and `logbook/PLAN-labelled-parts.md` (13 Oct), then say go.
+- Get the Obsidian vault into the private repo `flamingbeing/life` (Obsidian Git plugin or GitHub Desktop; steps on request).
+- Dropbox production form: website `https://apmes.anawj.com/logbook/` (13 Oct; text was given in chat).
 - Try the polish batch's new looks on a phone (Advanced display: Flat, button style, icons, plain calendar, page
   titles, shorter rows; Accessibility: press and hold) and the colour picker.
 - Try on a real phone: pins (now also the Reflections search, with sticky topic names), swipe between tabs (cards that
@@ -36,15 +39,12 @@ its own file), so sessions never edit the same lines. Read them all before start
 
 ## Next (agreed queue)
 
-1. Subdomains (`SUBDOMAINS.md`, plan from the homepage session, agreed with the owner 13 Oct): step 1 (hosting) is
-   done; log1 does step 5 (apmes.anawj.com for logbook and evals, with the MedHub Evaluations session) last, when the
-   homepage session says so.
-2. **On hold** (owner, 13 Oct: "lets move domains first"): labelled parts in the case summary (`LP:` learning points,
-   `DT:` case details, `LP1:`, `LP2:` …), behind one account switch, off by default. Full plan, consequences and the three
-   open questions: `logbook/PLAN-labelled-parts.md`.
-   Wider direction (the owner's own log, daily note, knowledge-note review, personal profile): `logbook/PLAN-personal-log.md`;
-   it folds this in. Discussion stage, nothing built; Notes (beta) stays. Later, part 2: an option for a non-APMES logbook (own tag list,
-   APMES categories, targets and progress hidden).
+1. Subdomains: **all steps done 13 Oct** (`SUBDOMAINS.md`); the logbook is at `apmes.anawj.com/logbook/`. Nothing queued here.
+2. **Waiting on the owner's answers** (13 Oct): the owner wants the logbook to also be his own log (daily note, learning points,
+   knowledge-note review, a generic profile; residents may follow). Plans, consequences and the open questions:
+   `logbook/PLAN-personal-log.md` (the public, personal-details-free version; the personal version is in his private
+   repo) and `logbook/PLAN-labelled-parts.md` (`LP:` / `DT:` / `LP1:` parts, one account switch, off by default).
+   Notes (beta) stays and becomes the base. Nothing built; start only when he says go.
 3. (Polish batch done 13 Oct: #250, #254, #268, #272, #274, #264, #289, #295. Owner to try the new looks on a phone.)
 4. Later, low priority: lazy-load rarely used modules (admin, portfolio, importer, xlsxio, backup, progress) to cut
    first-visit time (now 3.5–4.2 s on a slow phone; repeat visits 0.6–0.8 s). Measure before and after.
@@ -55,19 +55,27 @@ its own file), so sessions never edit the same lines. Read them all before start
 ## Recently done
 
 - #204 The top band's third quarter is the NUHS site's blue `#178fd7`, not cyan; Reflections' NUH tab colour too (`logbook-v26`).
+- #396, #395 Personal-log plan: written (#395), then made public-safe with the personal version moved to the private repo `flamingbeing/life` and a rule in `AGENTS.md` (#396).
+- #392 (site) The old `/design/` path retired; `/nuhsdesign/` is the one shared folder every subdomain serves.
+- #370, #371, #373, #368 The logbook (and evals, #367) moved to `apmes.anawj.com`: new sign-in domain, old address forwards, a download page for saved device choices, Drive and Dropbox backups confirmed.
 - #352, #354 (site) Cloudflare Worker serves hand., prewarmstudy., nuhroster. and apmes.anawj.com (hosting, step 1 of `SUBDOMAINS.md`).
 - #347 Notes: Download notes as files (zip, one .md or .txt each), the linked-case pill opens the case, a Linked row on the case edit page (reflection, notes).
 - #325 (tools) context-nudge mod: a reminder to /save-state and /compact at 50% and 75% context (cloud sessions install it).
 - #295 Polish 6b: seven clean looks (off by default), calendar day Share / Copy (off) / + Add, back links off the bar, device colour picker.
 - #289 Polish 6a: settings pages use switches, ✓ lists and one-line help (ⓘ for more); Advanced pages under headings.
-- #274 Polish 5: the note editor reads like a page (‹ Notes, ⋯ menu with Preview and Delete, Done; no boxes; one info line).
-- #272 Polish 4: the initials and age/sex marked inside the case box; the line under it says only what the age means.
-- #268 Polish 3: initials over the date on case rows, one-line tags, thin month headers, calmer Analytics cards.
-- #264 Reflections list: "JR 0/1" beside each heading's count (the JR rule left the note); word counts can be hidden.
-- #254 Polish 2: "‹ Settings" in the header, pages slide in, iPhone edge swipe back, Settings → Accessibility, month picker.
 
 ## Decisions log
 
+- 2026-10-13: A private GitHub repo `flamingbeing/life` holds the owner's personal notes (daily log, knowledge notes, plans with
+  personal details); cloud sessions may attach it only when he asks. Split rule (`AGENTS.md`): personal material goes
+  there first and only a plain product version stays in this public repo; nothing is ever copied from `life` into it.
+  The earlier version of `PLAN-personal-log.md` stays in this repo's git history (not scrubbed; owner can ask).
+- 2026-10-13: Direction: the logbook as the owner's own log too (daily note, learning points, knowledge notes with a review
+  status, generic profile), possibly adopted by residents. The Firebase limits he met are our own caps (pay-as-you-go
+  plan: no hard wall); Notes (beta) is kept as the base, not dropped or renamed. Obsidian Sync can't be written to by the
+  app, so the export stays one-way. Plans: `PLAN-personal-log.md`, `PLAN-labelled-parts.md`.
+- 2026-10-13: The page editor stays at `anawj.com/edit/`; `/design/` retired (`/nuhsdesign/` only); the logbook and evals are at
+  `apmes.anawj.com` (steps in `SUBDOMAINS.md`).
 - 2026-10-13: Notes keep their 100-note limit (reads, index doc size and the list all assume it); raising it to ~1,000
   would need a paged list and a bigger index cap. A note's linked-case pill opens the case; the case edit page has a
   Linked row. Notes can be downloaded as one .md or .txt file each in a zip (owner's requests, #347).
