@@ -10,6 +10,7 @@ import { cleanExportOpts } from './export-opts.js';
 import { cleanDestinations } from './destinations.js';
 import { SWITCH_KEYS } from './profiles.js';
 import { cleanSync } from './sync-md.js';
+import { cleanLabels, cleanCaseTemplate } from './parts.js';
 
 export const SETTINGS_KIND = 'apmes-logbook-settings';
 // account-specific bookkeeping that shouldn't travel with the file (your residency year is yours, not a colleague's)
@@ -25,6 +26,8 @@ const OBJECTS = {
   excelExport: v => cleanExportOpts(v),
   destinations: v => cleanDestinations(v),
   sync: v => cleanSync(v),   // where to sync (Settings → Sync); tokens are never in settings
+  partLabels: v => (v == null ? null : cleanLabels(v)),
+  caseTpl: v => (v == null ? null : cleanCaseTemplate(v)),
   catOrder: strs,
   caseHide: v => strs(v).slice(0, 20),
   basicOn: v => strs(v).slice(0, 30),
@@ -40,7 +43,8 @@ const PLAIN = new Set(['dayNoteOnCase', 'pasteClean', 'shareAsk', 'noteToolbar',
   'reflExport', 'reflNotes', 'searchOps', 'startTab', 'suggestions', 'tagEditorView', 'textSize', 'zoom', 'fontUi', 'fontUiName', 'fontLog', 'fontLogName', 'lineWidth', 'lineHeight', 'contrast', 'motion', 'tabIcons', 'tabBar', 'hideHeader', 'caseInverted', 'colourful', 'autoFocus', 'appTitle', 'weeklyDigest',
   'basic', 'mode', 'weekStart', 'afterSave', 'undoSecs', 'boxCaps', 'boxCorrect', 'boxSpell', 'reflSpell', 'pinBox', 'pinSearch', 'borders', 'reflPoints', 'round', 'shadows', 'bigTaps', 'swipeTabs', 'rowMenu', 'reflToolbar', 'autoTick', 'recentCount',
   // device keys added later (they were dropped on import until 13 Oct 2026; settings-file.test.mjs checks DISPLAY_KEYS)
-  'rowCopy', 'edgeBack', 'hideWords', 'flat', 'btnStyle', 'iconBtns', 'calPlain', 'pageTitles', 'rowShort', 'rowHold', 'dayCopy']);
+  'rowCopy', 'edgeBack', 'hideWords', 'flat', 'btnStyle', 'iconBtns', 'calPlain', 'pageTitles', 'rowShort', 'rowHold', 'dayCopy', 'hideTabsTyping',
+  'labelParts', 'caseTplOn']);
 const MAX_JSON = 400 * 1024;
 
 export function settingsFile(logbook, { theme } = {}) {

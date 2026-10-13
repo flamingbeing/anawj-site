@@ -26,6 +26,10 @@ import { renderShare } from './ui-share-in.js';
 import { settingsFile, readSettingsFile, readDeviceFile, isDeviceFile } from './settings-file.js';
 import { movedPage } from './moved.js';
 import { purgeExpired, openBin } from './bin.js';
+import { renderPoints } from './ui-parts.js';
+import { profile } from './ui-core.js';
+import { deviceOn, barAtBottom } from './device-presets.js';
+import { notesChanged } from './ui-notepad.js';
 
 // Tab icons: tiny inline SVG paths (24x24, stroked), so they look the same on every phone.
 const ICONS = {
@@ -81,6 +85,8 @@ const TABS = [
   { id: 'caselog', label: 'Case log', render: () => renderCaseLog(), faculty: true, hidden: true, under: 'caselogs', unlisted: true },
   // under Analytics: how your counts compare with your intake
   { id: 'totals', label: 'Totals', render: renderTotals, hidden: true, under: 'progress', unlisted: true },
+  // under the Logbook: every learning point (or other labelled part), from Filter (Labelled parts on)
+  { id: 'points', label: 'Learning points', render: renderPoints, hidden: true, under: 'logbook', unlisted: true },
   { id: 'account', bar: true, label: 'Account', render: renderAccount, hidden: true, under: 'more', desc: 'Your name and portfolio details (Section 1); delete account' },
   { id: 'settings', bar: true, label: 'Settings', render: () => renderSettingsMenu(), hidden: true, under: 'more', desc: 'Profile, look, logging, reflections, notes and sharing, data' },
   { id: 'recovery', bar: true, short: 'Recover', label: 'Recent changes / Recover drafts', render: renderRecovery, hidden: true, under: 'more', desc: 'Retry sync, recover unfinished drafts and restore recent versions on this device' },
@@ -90,7 +96,7 @@ const TABS = [
   { id: 'display', label: 'Display', render: renderDisplay, hidden: true, under: 'settings', unlisted: true, desc: 'Light or dark, colour, compact, borders; fonts and more under Advanced' },
   { id: 'access', label: 'Accessibility', render: renderAccessibility, hidden: true, under: 'settings', unlisted: true, desc: 'Zoom, text size, bigger taps, contrast, motion, swipe gestures' },
   { id: 'displayadv', label: 'Advanced display', render: renderDisplayAdvanced, hidden: true, under: 'display', unlisted: true, desc: 'The header and tab bar, Logbook rows, fonts, custom CSS' },
-  { id: 'loggingadv', label: 'Advanced logging', render: renderLoggingAdvanced, hidden: true, under: 'logging', unlisted: true, desc: 'Case tab parts, the keyboard, search, the week, undo, tips' },
+  { id: 'loggingadv', label: 'Advanced logging', render: renderLoggingAdvanced, hidden: true, under: 'logging', unlisted: true, desc: 'Case tab parts, labelled parts and a case template, the keyboard, search, the week, undo, tips' },
   { id: 'sendto', label: 'Send to', render: renderSendSettings, hidden: true, under: 'settings', unlisted: true, desc: 'Obsidian, WhatsApp, UpNote or any app with a link' },
   { id: 'sync', label: 'Sync', render: renderSyncSettings, hidden: true, under: 'settings', unlisted: true, desc: 'One Markdown file per day in Google Drive, Dropbox or GitHub' },
   { id: 'sharefmt', label: 'Markdown', render: renderMarkdownSettings, hidden: true, under: 'settings', unlisted: true, desc: 'How Copy, Share and the notes export read' },
@@ -448,8 +454,12 @@ function parentOf(tab) {
   return tab.under || null;
 }
 
+// a live update waiting to draw the page again (hooks.casesChanged, below); any full draw satisfies it, so one left
+// over from another tab (held back while the note editor was open) never draws the Notes list again after Done
+let pendingRender = false;
 function render() {
   if (!S.user) return;
+  pendingRender = false;
   // Settings → Logging → Show tips and help text: off hides every .help explanation (an experienced-user mode)
   document.body.classList.toggle('no-help', !!(S.logbook && S.logbook.settings && S.logbook.settings.hideTips));
   document.body.classList.toggle('basic', basicMode());
@@ -702,11 +712,13 @@ document.addEventListener('touchend', async e => {
 }, { passive: true });
 
 // A live case update shouldn't yank the screen from under someone typing: the Log screen refreshes
-// its counts in place; other screens re-render when nothing is being edited.
-let pendingRender = false;
+// its counts in place; other screens re-render when nothing is being edited (pendingRender: declared above render()).
 hooks.casesChanged = () => {
   paintWho();
   if (S.tab === 'log') return logCasesChanged();
+  // the Notes list repaints its rows in place (every note save comes through here too: drawing the page again 250 ms
+  // after Done could swallow the next tap, or leave the list undrawn in Firefox)
+  if (S.tab === 'notes') return notesChanged();
   if (S.tab === 'account' || /^admin/.test(S.tab || '') || S.tab === 'totals') return;
   pendingRender = true;
   setTimeout(flushRender, 250);
@@ -952,6 +964,9 @@ function keyboardCheck() {
   // a keyboard takes at least ~120px (also small and landscape keyboards, where 25% was too much to ask)
   const typing = !!typingEl(document.activeElement) && fullH - vh > 120;
   document.body.classList.toggle('typing', typing);
+  // Accessibility → Hide the tab bar while typing (this device; off unless switched on, on in the Personal profile):
+  // the bar at the bottom goes while the keyboard is up, so the box and its Save bar keep that room
+  document.body.classList.toggle('typing-nobar', typing && barAtBottom({ width: window.innerWidth, tabBar: display().tabBar }) && deviceOn(display(), S.logbook ? profile() : '', 'hideTabsTyping'));
   // how far the keyboard covers the bottom of the layout viewport (iOS also scrolls the visible area
   // inside it: offsetTop), and the visible area itself, for dialogs (style.css: --kb, --vvh, --vvt)
   const kb = typing && vv ? Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)) : 0;

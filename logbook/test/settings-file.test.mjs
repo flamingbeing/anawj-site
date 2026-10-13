@@ -55,6 +55,17 @@ console.log('settings file tests passed');
 
 assert.equal(readSettingsFile(JSON.stringify(settingsFile({settings:{compactTags:true,firstField:'date'}}))).settings.compactTags,true);
 
+// labelled parts and the case template travel with the file, cleaned
+{
+  const r = readSettingsFile(JSON.stringify(settingsFile({ settings: { labelParts: true, caseTplOn: true, caseTpl: 'ASA :\r\nPE :' + 'x'.repeat(900), partLabels: [{ k: 'PE' }, { k: '1bad' }, { k: 'pe' }] } })));
+  assert.equal(r.settings.labelParts, true);
+  assert.equal(r.settings.caseTplOn, true);
+  assert.equal(r.settings.caseTpl.length, 500);
+  assert.ok(r.settings.caseTpl.startsWith('ASA :\nPE :'));
+  assert.deepEqual(r.settings.partLabels, [{ k: 'PE', n: 'PE' }]);
+  assert.equal(readSettingsFile(JSON.stringify(settingsFile({ settings: { partLabels: null } }))).settings.partLabels, null);
+}
+
 // this browser's own choices as a file (the move to apmes.anawj.com)
 {
   const entries = [['apmes-logbook-display', '{"flat":true}'], ['apmes-logbook-theme', 'dark'], ['logbook-draft-x', '{"details":"fake"}'], ['logbook-edit-draft:y', 'z'],
@@ -90,3 +101,10 @@ assert.equal(readSettingsFile(JSON.stringify(settingsFile({settings:{compactTags
   assert.deepEqual(got.show, { targets: false, grid: true, 'case:quick': false });
 }
 console.log('settings-file display keys and profile switches tests passed');
+// the phone batch's options travel in the file too (Request an evaluation is a profile switch, in `show`)
+{
+  const f2 = settingsFile({ settings: { hideTabsTyping: true, show: { evalRequest: true } } });
+  const got = readSettingsFile(JSON.stringify(f2)).settings;
+  assert.equal(got.hideTabsTyping, true);
+  assert.equal(got.show.evalRequest, true);
+}

@@ -14,6 +14,7 @@ import { fmtDate, caseParts, sortCodes } from './engine.js';
 import { BY_CODE, DEFAULT_NAMES } from './categories.js';
 import { HEADING_BY_ID } from './reflections.js';
 import { notesMd, sortNotes } from './notepad.js';
+import { boldLabels } from './parts.js';
 
 export const DEFAULT_MARKDOWN = {
   // Copy / Share (the same as the Copy & share format's default before this page existed)
@@ -25,6 +26,7 @@ export const DEFAULT_MARKDOWN = {
   dateFormat: 'iso',            // 'iso' 2026-10-10 | 'long' 10 Oct 2026 | 'dmy' 10/10/2026
   cats: 'names',                // {{categories}}: 'names' | 'codes' | 'tags' (#LSCS)
   links: 'wiki',                // 'wiki' [[note]] | 'md' [note](note.md)
+  boldLabels: false,            // labelled parts (Settings → Advanced logging) as **Plan:** … in {{details}}
   // the notes export
   caseNotes: 'month',           // one note per 'month' or per 'day'
   folders: 'month',             // reflection notes: 'month' | 'heading' | 'flat'
@@ -58,6 +60,7 @@ export function cleanMarkdown(m, shareFormat = null) {
   }
   for (const [k, ok] of Object.entries(CHOICES)) if (ok.includes(src[k])) out[k] = src[k];
   if (typeof src.frontMatter === 'boolean') out.frontMatter = src.frontMatter;
+  if (typeof src.boldLabels === 'boolean') out.boldLabels = src.boldLabels;
   if (Array.isArray(src.fmFields)) out.fmFields = FM_FIELDS.filter(f => src.fmFields.includes(f));
   return out;
 }
@@ -114,11 +117,13 @@ export function noteLink(path, label, links = 'wiki', from = '') {
   return `[${String(label || p.split('/').pop()).replace(/[[\]]/g, '\\$&')}](${href})`;
 }
 
+// ctx.labels: the labelled parts in use (Settings → Advanced logging), or none
 function caseVals(c, n, count, f, ctx) {
   const p = caseParts(c);
+  const text = String(p.details || '').trim(), details = f.boldLabels && ctx.labels ? boldLabels(text, ctx.labels) : text;
   return {
     date: fmtMdDate(c.date, f.dateFormat) || c.dateText || '', iso: c.date || '', day: c.date ? fmtDate(c.date) : (c.dateText || ''), weekday: weekday(c.date),
-    n: n ?? '', count: count ?? '', initials: p.initials, details: String(p.details || '').trim(), case: String(p.details || '').trim(),
+    n: n ?? '', count: count ?? '', initials: p.initials, details, case: details,
     categories: catsText(c.cats, f.cats, ctx), categoryCodes: sortCodes(c.cats || []).join(', '),
     tags: (c.tags || []).map(k => (ctx.tagName ? ctx.tagName(k) : k)).filter(Boolean).join(', '),
     reflection: ctx.reflectionLink ? ctx.reflectionLink(c) || '' : '',

@@ -110,4 +110,18 @@ assert.equal(cleanMarkdown({ dayHead: 'x'.repeat(5000) }).dayHead.length, 1000);
 assert.throws(() => storedMarkdown(Object.fromEntries(['dayHead', 'dayCase', 'oneCase', 'fileName', 'reflTitle', 'reflSummary', 'reflPoint', 'reflFigure', 'reflRefs'].map(k => [k, 'y'.repeat(1000)]))), /too long/);
 assert.ok(MAX_JSON >= 8000);
 
+// Bold labels (labelled parts on: ctx.labels): "Plan: GA" -> "**Plan:** GA" in {{details}}; off by default
+{
+  const { cleanLabels } = await import('../js/parts.js');
+  const labels = cleanLabels([{ k: 'lp', n: 'Learning point' }, { k: 'Plan' }]);
+  const c = { date: '2026-10-10', initials: 'AB', details: 'lap chole\nPlan: GA ETT\nlp: cuff', cats: [] };
+  assert.equal(cleanMarkdown({}).boldLabels, false);
+  assert.equal(cleanMarkdown({ boldLabels: 'yes' }).boldLabels, false);
+  assert.deepEqual(storedMarkdown({ boldLabels: true }), { boldLabels: true });
+  assert.equal(mdCase(c, {}, { labels }), '[[2026-10-10]]\nAB\nlap chole\nPlan: GA ETT\nlp: cuff');              // as typed
+  assert.equal(mdCase(c, { boldLabels: true }, {}), '[[2026-10-10]]\nAB\nlap chole\nPlan: GA ETT\nlp: cuff');   // the setting off
+  assert.equal(mdCase(c, { boldLabels: true }, { labels }), '[[2026-10-10]]\nAB\nlap chole\n**Plan:** GA ETT\n**Learning point:** cuff');
+  assert.match(mdDay('2026-10-10', [c], { boldLabels: true }, { labels }), /\*\*Plan:\*\* GA ETT/);
+}
+
 console.log('markdown tests passed');
