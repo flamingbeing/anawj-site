@@ -14,9 +14,20 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://www.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600;700&display=swap">
+<script>
+  // Firebase starts downloading at once rather than after the app's own files (cloud.js imports these;
+  // keep the version in step). Not in the demo, which never loads Firebase.
+  if (!/[?&]demo\b/.test(location.search)) ['app', 'auth', 'firestore'].forEach(function (n) {
+    var l = document.createElement('link'); l.rel = 'modulepreload'; l.crossOrigin = 'anonymous';
+    l.href = 'https://www.gstatic.com/firebasejs/10.12.2/firebase-' + n + '.js'; document.head.appendChild(l);
+  });
+</script>
+<!-- the web font doesn't hold up the first paint (system font until it arrives) -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600;700&display=swap" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600;700&display=swap"></noscript>
 <script>
   // Evals now lives at apmes.anawj.com/evals/ (with the logbook: one sign-in). The same folder is still served at
   // anawj.com/evals/, so send visitors on from there, path, query and # kept, so assessor links and "Assess me"
