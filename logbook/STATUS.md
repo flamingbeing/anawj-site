@@ -50,6 +50,9 @@ its own file), so sessions never edit the same lines. Read them all before start
 
 ## Decisions log
 
+- 2026-10-13: Site deploys through GitHub Actions (Pages source switched by the owner); service-worker VERSION is
+  stamped at deploy, PRs are labelled by app, each session's Now line lives in `status/<session>.md` (#307). The owner
+  declined CI tests on PRs and branch protection: sessions' own e2e runs are the check, as before.
 - 2026-10-13: The Logbook calendar day's buttons read Share, Copy and + Add; Copy for a day is off by default
   (Advanced display → Copy button for each day). The More list calls Notes "Notes (beta)". Every page off the
   tab bar has a back link to the page before it. Colour: the device's own picker, no preset swatches. Owner's requests.
