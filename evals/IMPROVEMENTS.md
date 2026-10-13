@@ -5,6 +5,14 @@ Elentra, ANZCA) and at the medical-education evidence. Nothing here is built yet
 meant to be one small PR. Sizes are rough: S = an hour or two, M = half a day, L = more. Line numbers are as of
 commit `72e8d19` and will drift.
 
+**Done on 14 Oct 2026** (PRs #406–#441, see `STATUS.md`): all of Batch 1; Batch 2 items 4–5 (question counts, next
+form for the same resident); Batch 3 items 1 (Email/WhatsApp/Copy reminders, resident reminder wording) and the app badge;
+Batch 4 residents 1–3 and request-flow (offline banner, compact step 3, Today/Yesterday, edit case details) and all PD
+items except the one-page committee view per resident (the committee CSV covers it); Batch 5 items 1–2 in #428 (waiting for
+approval); Batch 6 speed (except the catalogue split), accessibility, tests, `schema.js`, settings switch; Later: How evals
+work, install card, empty Home button, My record (print, CSV), the case link for the logbook. Batch 2 items 1–3 and 6 are
+left out on purpose: they change the programme's forms (the PD's call).
+
 **Verified** means checked against the code by the main session. Every other item is the reviewer's reading and
 needs checking before it is built.
 
