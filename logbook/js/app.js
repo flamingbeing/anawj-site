@@ -26,6 +26,10 @@ import { renderShare } from './ui-share-in.js';
 import { settingsFile, readSettingsFile, readDeviceFile, isDeviceFile } from './settings-file.js';
 import { movedPage } from './moved.js';
 import { purgeExpired, openBin } from './bin.js';
+import { renderPoints } from './ui-parts.js';
+import { profile } from './ui-core.js';
+import { deviceOn, barAtBottom } from './device-presets.js';
+import { notesChanged } from './ui-notepad.js';
 
 // Tab icons: tiny inline SVG paths (24x24, stroked), so they look the same on every phone.
 const ICONS = {
@@ -81,6 +85,8 @@ const TABS = [
   { id: 'caselog', label: 'Case log', render: () => renderCaseLog(), faculty: true, hidden: true, under: 'caselogs', unlisted: true },
   // under Analytics: how your counts compare with your intake
   { id: 'totals', label: 'Totals', render: renderTotals, hidden: true, under: 'progress', unlisted: true },
+  // under the Logbook: every learning point (or other labelled part), from Filter (Labelled parts on)
+  { id: 'points', label: 'Learning points', render: renderPoints, hidden: true, under: 'logbook', unlisted: true },
   { id: 'account', bar: true, label: 'Account', render: renderAccount, hidden: true, under: 'more', desc: 'Your name and portfolio details (Section 1); delete account' },
   { id: 'settings', bar: true, label: 'Settings', render: () => renderSettingsMenu(), hidden: true, under: 'more', desc: 'Profile, look, logging, reflections, notes and sharing, data' },
   { id: 'recovery', bar: true, short: 'Recover', label: 'Recent changes / Recover drafts', render: renderRecovery, hidden: true, under: 'more', desc: 'Retry sync, recover unfinished drafts and restore recent versions on this device' },
@@ -90,7 +96,7 @@ const TABS = [
   { id: 'display', label: 'Display', render: renderDisplay, hidden: true, under: 'settings', unlisted: true, desc: 'Light or dark, colour, compact, borders; fonts and more under Advanced' },
   { id: 'access', label: 'Accessibility', render: renderAccessibility, hidden: true, under: 'settings', unlisted: true, desc: 'Zoom, text size, bigger taps, contrast, motion, swipe gestures' },
   { id: 'displayadv', label: 'Advanced display', render: renderDisplayAdvanced, hidden: true, under: 'display', unlisted: true, desc: 'The header and tab bar, Logbook rows, fonts, custom CSS' },
-  { id: 'loggingadv', label: 'Advanced logging', render: renderLoggingAdvanced, hidden: true, under: 'logging', unlisted: true, desc: 'Case tab parts, the keyboard, search, the week, undo, tips' },
+  { id: 'loggingadv', label: 'Advanced logging', render: renderLoggingAdvanced, hidden: true, under: 'logging', unlisted: true, desc: 'Case tab parts, labelled parts and a case template, the keyboard, search, the week, undo, tips' },
   { id: 'sendto', label: 'Send to', render: renderSendSettings, hidden: true, under: 'settings', unlisted: true, desc: 'Obsidian, WhatsApp, UpNote or any app with a link' },
   { id: 'sync', label: 'Sync', render: renderSyncSettings, hidden: true, under: 'settings', unlisted: true, desc: 'One Markdown file per day in Google Drive, Dropbox or GitHub' },
   { id: 'sharefmt', label: 'Markdown', render: renderMarkdownSettings, hidden: true, under: 'settings', unlisted: true, desc: 'How Copy, Share and the notes export read' },
@@ -213,16 +219,27 @@ function showFound() {
     target.classList.remove('flash'); void target.offsetWidth; target.classList.add('flash');
   });
 }
+// the query lives here, not only in the box: the menu can be drawn again while someone types (the logbook arriving
+// from the device's store a moment after the first paint), and the new box gets the text, the results, the focus and
+// the caret back. A visit to another page starts it empty again.
+let settingsQuery = '';
 function settingsSearch() {
   const results = h('ul', {});
+  const old = document.activeElement?.closest?.('.settings-search') ? document.activeElement : null;
+  const caret = old && typeof old.selectionStart === 'number' ? [old.selectionStart, old.selectionEnd] : null;
   const box = h('input', { type: 'search', placeholder: 'Search settings, e.g. font, undo, initials', 'aria-label': 'Search settings', autocomplete: 'off', enterkeyhint: 'search',
-    oninput: () => {
-      settingsIndex ||= buildSettingsIndex();
-      const found = searchSettings(settingsIndex, box.value);
-      fill(results, ...found.map(x => h('li', {}, h('a', { href: '#' + x.id, 'data-go': x.id, onclick: e => { e.preventDefault(); if (x.open) return x.open(); findAfterRender = x.text; if (S.tab === x.id) showFound(); else go(x.id); } },
-        h('span', { class: 'mt' }, h('b', {}, x.text), h('small', {}, x.page)), h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')))),
-        box.value.trim() && !found.length ? h('li', { class: 'hint', style: 'padding:10px 4px' }, 'No setting matches. Try another word.') : null);
-    } });
+    value: settingsQuery, oninput: () => search() });
+  const search = () => {
+    settingsQuery = box.value;
+    settingsIndex ||= buildSettingsIndex();
+    const found = searchSettings(settingsIndex, box.value);
+    fill(results, ...found.map(x => h('li', {}, h('a', { href: '#' + x.id, 'data-go': x.id, onclick: e => { e.preventDefault(); if (x.open) return x.open(); findAfterRender = x.text; if (S.tab === x.id) showFound(); else go(x.id); } },
+      h('span', { class: 'mt' }, h('b', {}, x.text), h('small', {}, x.page)), h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')))),
+      box.value.trim() && !found.length ? h('li', { class: 'hint', style: 'padding:10px 4px' }, 'No setting matches. Try another word.') : null);
+  };
+  if (settingsQuery) search();
+  // (after render() has put the new menu in place)
+  if (old) queueMicrotask(() => { if (!box.isConnected) return; box.focus({ preventScroll: true }); if (caret) box.setSelectionRange(...caret); });
   return h('section', { class: 'card more-list settings-search' }, box, results);
 }
 
@@ -244,7 +261,7 @@ function settingsGroups() {
   return rest.length ? [...SETTINGS_GROUPS, ['Other', rest]] : SETTINGS_GROUPS;
 }
 function renderSettingsMenu() {
-  settingsIndex = null;   // drawn again on the first search of this visit
+  if (lastRendered !== 'settings') { settingsIndex = null; settingsQuery = ''; }   // drawn again on the first search of this visit
   const item = id => (id === 'bin' ? menuItem('bin', 'Recycle bin', 'Deleted cases and reflections, kept for 30 days', () => openBin())
     : (t => menuItem(t.id, t.label, t.desc))(TABS.find(t => t.id === id)));
   return h('div', {},
@@ -460,8 +477,13 @@ function parentOf(tab) {
   return tab.under || null;
 }
 
+// a live update waiting to draw the page again (hooks.casesChanged, below). Any full draw satisfies it: a page drawn
+// since the change already shows it, so a postponed draw is dropped (one left over from another tab, held back while
+// the note editor was open, never draws the Notes list again after Done; nor wipes a form opened meanwhile)
+let pendingRender = false;
 function render() {
   if (!S.user) return;
+  pendingRender = false;
   // Settings → Logging → Show tips and help text: off hides every .help explanation (an experienced-user mode)
   document.body.classList.toggle('no-help', !!(S.logbook && S.logbook.settings && S.logbook.settings.hideTips));
   document.body.classList.toggle('basic', basicMode());
@@ -714,21 +736,29 @@ document.addEventListener('touchend', async e => {
 }, { passive: true });
 
 // A live case update shouldn't yank the screen from under someone typing: the Log screen refreshes
-// its counts in place; other screens re-render when nothing is being edited.
-let pendingRender = false;
+// its counts in place; other screens re-render when nothing is being edited (pendingRender: declared above render()).
+// Settings pages that show no case data: drawing them again would only throw away what is half filled in there (a
+// sync place being added, a search being typed)
+const CASE_FREE = new Set(['settings', 'showhide', 'display', 'displayadv', 'access', 'logging', 'loggingadv', 'reflset', 'sendto', 'sync']);
 hooks.casesChanged = () => {
   paintWho();
   if (S.tab === 'log') return logCasesChanged();
-  if (S.tab === 'account' || /^admin/.test(S.tab || '') || S.tab === 'totals') return;
+  // the Notes list repaints its rows in place (every note save comes through here too: drawing the page again 250 ms
+  // after Done could swallow the next tap, or leave the list undrawn in Firefox)
+  if (S.tab === 'notes') return notesChanged();
+  if (S.tab === 'account' || /^admin/.test(S.tab || '') || S.tab === 'totals' || CASE_FREE.has(S.tab)) return;
   pendingRender = true;
   setTimeout(flushRender, 250);
 };
+// someone is typing in the page or has a dialog open (the note editor shows no case data: drawing it again would only
+// close its ⋯ menu mid-tap)
+function editingNow() {
+  const a = document.activeElement;
+  return !!(document.querySelector('dialog[open]') || (a && app.contains(a) && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) || app.querySelector('.note-editor'));
+}
 function flushRender() {
   if (!pendingRender) return;
-  const a = document.activeElement;
-  // (the note editor shows no case data: drawing it again would only close its ⋯ menu mid-tap)
-  const editing = document.querySelector('dialog[open]') || (a && app.contains(a) && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) || app.querySelector('.note-editor');
-  if (editing) { setTimeout(flushRender, 1000); return; }
+  if (editingNow()) { setTimeout(flushRender, 1000); return; }
   pendingRender = false;
   render();
 }
@@ -945,7 +975,13 @@ async function onUser(user) {
     if (!first && next === sig) { scheduleSummary(); return; }
     sig = next;
     setCases(cases);
-    if (first) { paintWho(); render(); scheduleSummary(); } else { hooks.casesChanged(); scheduleSummary(); }
+    // the cases arrive a moment after the first paint (the device's store is read in the background): a page that shows
+    // none stays as it is, and one someone is already typing in or has a dialog open on waits like any later change
+    if (!first) hooks.casesChanged();
+    else if (CASE_FREE.has(S.tab)) paintWho();
+    else if (S.tab !== 'log' && editingNow()) { paintWho(); pendingRender = true; setTimeout(flushRender, 250); }
+    else { paintWho(); render(); }
+    scheduleSummary();
   });
   render();
 }
@@ -964,6 +1000,9 @@ function keyboardCheck() {
   // a keyboard takes at least ~120px (also small and landscape keyboards, where 25% was too much to ask)
   const typing = !!typingEl(document.activeElement) && fullH - vh > 120;
   document.body.classList.toggle('typing', typing);
+  // Accessibility → Hide the tab bar while typing (this device; off unless switched on, on in the Personal profile):
+  // the bar at the bottom goes while the keyboard is up, so the box and its Save bar keep that room
+  document.body.classList.toggle('typing-nobar', typing && barAtBottom({ width: window.innerWidth, tabBar: display().tabBar }) && deviceOn(display(), S.logbook ? profile() : '', 'hideTabsTyping'));
   // how far the keyboard covers the bottom of the layout viewport (iOS also scrolls the visible area
   // inside it: offsetTop), and the visible area itself, for dialogs (style.css: --kb, --vvh, --vvt)
   const kb = typing && vv ? Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)) : 0;

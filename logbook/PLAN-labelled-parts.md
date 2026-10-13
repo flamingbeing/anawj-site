@@ -1,7 +1,11 @@
 # Plan: labelled parts in the case summary (LP:, DT:)
 
-Status: **planned, on hold** (owner, 13 Oct 2026: "hold that thought... lets move domains first"). Not started. Owner's
-decisions still needed are at the end. Secondary goal behind it: the logbook should also suit non-APMES logging, and
+Status: **built on branch `wt/labelled-parts` (13–14 Oct 2026, wave 2 track F)**: parser, switch, editable labels, rows,
+read-back, the filter chip and `has:`, a Learning points page, Bold labels in Markdown, a case template and pasted
+lists split by bold first lines; all off by default. What it does now is in `NOTES.md` ("Labelled parts and case
+template"). Defaults chosen for the open questions: the cap stays 2000 (the rest of a long case goes into a linked
+note, asked first; no rules change); the filter chip is in; `lp:` plus `lp1:` count as separate points in order.
+Still to do from this plan: the reflection pre-fill (step 2) and the `{{main}}`/`{{lp}}` format tokens. Secondary goal behind it: the logbook should also suit non-APMES logging, and
 the owner's daily habit is writing learning points in the case summary.
 
 ## The idea

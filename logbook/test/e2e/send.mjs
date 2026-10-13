@@ -2,14 +2,16 @@
 // save it, see Send appear, send a day (the link opened, the text URL-encoded), "changed since sent" after an
 // edit, refused link kinds, ID numbers asked about, and a long day copied instead of put in the link.
 import assert from 'node:assert/strict';
-const { chromium } = await import(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/node_modules/playwright/index.mjs');
+import { launch, engine, clipboardOpts, portableClipboard, readClipboard, ignorable } from './browsers.mjs';
 const base = `http://localhost:${process.env.PORT || 8080}/logbook/`;
-const b = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH, args: ['--no-sandbox'] } : {});
+const b = await launch();
+if (!b) { console.log(`SKIP send (${engine} is not installed here)`); process.exit(0); }
 try { for (const width of [390, 1280]) {
-  const ctx = await b.newContext({ viewport: { width, height: 844 }, serviceWorkers: 'block', permissions: ['clipboard-read', 'clipboard-write'] });
+  const ctx = await b.newContext({ viewport: { width, height: 844 }, serviceWorkers: 'block', ...clipboardOpts() });
+  await portableClipboard(ctx);
   await ctx.addInitScript(() => localStorage.setItem('apmes-logbook-demo-small', '1'));
   const p = await ctx.newPage(), errors = [];
-  p.on('pageerror', e => errors.push(e.message)); p.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
+  p.on('pageerror', e => errors.push(e.message)); p.on('console', m => { if (m.type() === 'error' && !ignorable(m.text())) errors.push(m.text()); });
   // every link the app opens is caught here, not followed
   await p.addInitScript(() => {
     window.__opened = [];
@@ -17,7 +19,8 @@ try { for (const width of [390, 1280]) {
   });
   const opened = () => p.evaluate(() => window.__opened);
   await p.goto(base + '?demo#log'); await p.waitForSelector('textarea.details');
-  // the demo's day with two cases
+  // the demo's day with two cases (the cases arrive from the device's store a moment after the first paint)
+  await p.waitForFunction(() => Number(document.body.dataset.cases) > 0);
   const iso = await p.evaluate(async () => (await import('./js/ui-core.js')).S.cases[0].date);
   const dayCell = () => p.locator('button.lb-day[aria-label$=": 2 cases"]').first();
 
@@ -73,7 +76,7 @@ try { for (const width of [390, 1280]) {
   await p.getByRole('button', { name: /Fake Obsidian/ }).click();
   await p.waitForFunction(() => window.__opened.length === 3);
   assert.match((await opened())[2], /content=$/);
-  assert.ok((await p.evaluate(() => navigator.clipboard.readText())).includes('fake long case'));
+  assert.ok((await readClipboard(p)).includes('fake long case'));
 
   // an ID number is asked about before anything leaves
   await p.evaluate(async () => { const { S } = await import('./js/ui-core.js'); S.cases[0].details = 'fake case S1234567A'; });

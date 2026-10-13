@@ -438,7 +438,7 @@ const imagesMem = {};
 function imageStore() { try { return JSON.parse(localStorage.getItem(IMAGES_KEY) || '{}'); } catch { return { ...imagesMem }; } }
 function imageStoreSave(m) {
   Object.keys(imagesMem).forEach(k => delete imagesMem[k]); Object.assign(imagesMem, m);
-  if (typeof localStorage === 'undefined') return;
+  try { if (typeof localStorage === 'undefined') return; } catch { return; }   // (blocked storage throws even here)
   try { localStorage.setItem(IMAGES_KEY, JSON.stringify(m)); } catch (e) { console.warn('Demo images kept in memory only', e); }
 }
 export async function saveImage(email, img) {

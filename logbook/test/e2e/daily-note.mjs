@@ -61,6 +61,8 @@ try { for (const width of [390, 1280]) {
   await remote('2025-01-06', 'Fake laptop note');
   await p.waitForFunction(() => document.querySelector('.note-body')?.value === 'Fake laptop note');
   await p.getByRole('button', { name: 'Done' }).click();
+  // Done steps back twice (the editor, then the Notes page it passed through): let it reach the Logbook first
+  await p.waitForFunction(async () => !document.querySelector('.note-editor') && (await import('./js/ui-core.js')).S.tab === 'logbook' && location.hash === '#logbook');
   await openDay('2025-01-05');
   await p.locator('.note-editor').waitFor();
   await p.getByLabel('Note text').fill('Fake phone line');

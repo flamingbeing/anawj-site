@@ -28,6 +28,7 @@ export const SWITCHES = [
   ['reflHeadings', 'Reflection headings (the APMES list)', 'apmes'],
   ['saveToast', '“LSCS now 4/10” after Save', 'apmes'],
   ['apmesTitle', 'APMES in the app’s name', 'apmes'],
+  ['evalRequest', 'Request an evaluation from a case', 'apmes'],
 ];
 export const SWITCH_KEYS = SWITCHES.map(([k]) => k);
 export const switchLabel = key => (SWITCHES.find(([k]) => k === key) || [key, key])[1];
@@ -46,8 +47,12 @@ const PRESET_OFF = {
   personal: APMES,
   faculty: [],
 };
+// Opt-in switches (new options, off by default): off in every profile unless its PRESET_ON lists them. Request an
+// evaluation (phone batch, 13 Oct 2026) is off everywhere until switched on.
+export const OPT_IN = ['evalRequest'];
+const PRESET_ON = {};
 // a profile's default for a switch (true for anything it doesn't govern, like 'case:parsed')
-export const presetOn = (mode, key) => !(PRESET_OFF[mode] || []).includes(key);
+export const presetOn = (mode, key) => (OPT_IN.includes(key) ? (PRESET_ON[mode] || []).includes(key) : !(PRESET_OFF[mode] || []).includes(key));
 
 // The Case tab part 'quick' was split into 'sugg' and 'recent' (logging.js expandParts): an older 'quick' in
 // caseHide, basicOn or `show` stands for both.
