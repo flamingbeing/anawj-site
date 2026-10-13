@@ -1,12 +1,20 @@
 # Thumb CMC Trainer: working notes
 
-Conventions and lessons for `cmcj/`. What's happening now is in `STATUS.md`; architecture and files are in
+Conventions and lessons for `cmcj/`, served at `https://hand.anawj.com/cmcj/` (shared with `hand-babies/` at `/babies/`). What's happening now is in `STATUS.md`; architecture and files are in
 `README.md`. Public repo: no patient images or data.
 
 ## Owner preferences
 
 - Open PRs and squash-merge them directly; restart the session branch from main after each merge.
 - Tuning of simulation feel (burr speed, targets) is decided by the owner on a phone, not by headless tests.
+
+## Address and hosting
+
+- Live at `https://hand.anawj.com/cmcj/` (Cloudflare Worker, `worker/routes.js`). `hand.anawj.com` serves only `cmcj/`
+  and `hand-babies/`: no `/design/`, `/edit/` or other repo folders, so keep every path relative to `cmcj/`.
+- `anawj.com/cmcj/` (GitHub Pages) redirects with an inline script at the top of `index.html`: only on `anawj.com` /
+  `www.anawj.com` and only at the top level, so the new host, previews, localhost and the `/edit/` iframe don't loop.
+- Keep `<meta name="robots" content="noindex, nofollow">`. No service worker.
 
 ## Content
 

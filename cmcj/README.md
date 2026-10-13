@@ -1,7 +1,9 @@
 # Thumb CMC Trainer
 
 Static web app (no build step) for teaching thumb carpometacarpal (trapeziometacarpal) joint
-anatomy, osteoarthritis and CMC arthroscopy to hand-surgery trainees. Served at `/cmcj/`.
+anatomy, osteoarthritis and CMC arthroscopy to hand-surgery trainees. Served at `https://hand.anawj.com/cmcj/`
+(the Cloudflare Worker maps that address to this folder; see `SUBDOMAINS.md`). The old `anawj.com/cmcj/` address
+redirects there from a small script at the top of `index.html`, keeping the query and `#` part.
 
 ## Modes
 
@@ -37,4 +39,5 @@ python tools/export_cmcj_from_z_anatomy.py -- "Z-Anatomy/Z-Anatomy PC/Assets/Mod
 
 ## Running locally
 
-Any static server, e.g. `python3 -m http.server` from the repo root, then open `/cmcj/`.
+Any static server, e.g. `python3 -m http.server` from the repo root, then open `/cmcj/` (the redirect only fires on
+`anawj.com`). On a PR preview: `<preview>/_sites/hand.anawj.com/cmcj/`.
