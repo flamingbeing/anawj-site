@@ -76,10 +76,12 @@ try {
   assert.match(await page.textContent('.kp .kphead'), /Core/, 'tapping the countdown opens the first box of the reading');
   await axe('keypad'); await shot('keypad');
   await page.click('.kp [data-a="back"]'); await page.waitForTimeout(300);
-  // the app bar's Log button sets the next event to now (then cleared again from its box)
-  assert.match(await page.textContent('#lognext'), /Log\s*Prewarm off/);
-  await page.click('#lognext');
-  assert.match(await page.textContent('[data-ev="ev_wstop"] b'), /^\d\d:\d\d$/, 'Log sets warming off to now');
+  // the app bar shows the sync status, not a Log button (owner, 13 Oct 2026); a time is set to now from its pad, then cleared
+  assert.match(await page.textContent('#syncchip'), /Local/, 'sync status chip in the bar');
+  assert.equal(await page.$('#lognext'), null, 'no Log button');
+  await page.waitForTimeout(900); await page.click('[data-ev="ev_wstop"]'); page.once('dialog', d => d.accept()); // earlier times aren't logged yet: asks first
+  await page.waitForSelector('.kp [data-now]'); await page.click('.kp [data-now]'); await page.waitForTimeout(900);
+  assert.match(await page.textContent('[data-ev="ev_wstop"] b'), /^\d\d:\d\d$/, 'Now sets warming off to now');
   await page.click('[data-ev="ev_wstop"]');
   let cleared = ''; page.once('dialog', d => { cleared = d.message(); d.accept(); });
   await page.click('.kp [data-a="clear"]'); await page.waitForTimeout(200);
@@ -280,9 +282,9 @@ try {
 
   // PACU: NuDESC total
   await page.click('.links a[href$="/form/pacu"]');
-  // sub-screens keep the running timer and the Log button in the top bar
+  // sub-screens keep the running timer and the sync status in the top bar
   assert.ok(await page.$('#clock'), 'timer on the PACU screen');
-  assert.ok(await page.$('#lognext'), 'Log button on the PACU screen');
+  assert.ok(await page.$('#syncchip'), 'sync status on the PACU screen');
   await page.click('.chip[data-f="nd_dis"][data-v="1"]');
   await page.click('.chip[data-f="nd_psy"][data-v="2"]');
   assert.equal(await page.inputValue('#f-pacu_nudesc'), '3');
@@ -343,7 +345,7 @@ try {
   await page.waitForSelector('.board');
   assert.ok(await page.evaluate(() => document.body.classList.contains('ro')), 'read only');
   assert.equal(await page.isVisible('#save'), false, 'no Save');
-  assert.equal(await page.isVisible('#lognext'), false, 'no Log');
+  assert.equal(await page.isVisible('#syncchip'), true, 'sync status still shows when read only');
   await shot('locked-readonly');
   await page.goto(BASE + '?demo#/');
   assert.equal(await page.evaluate(() => document.body.classList.contains('ro')), false);
