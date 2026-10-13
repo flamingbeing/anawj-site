@@ -16,6 +16,9 @@ export function renderMore() {
   const apply = applyCard();
   if (apply) root.append(apply);
   if (cloud.demo) root.append(demoCard());
+  root.append(h('a', { class: 'n-btn n-btn--outline e-btn-quiet e-btn-big', href: '#how' }, 'How evals work'));
+  const inst = installCard();
+  if (inst) root.append(inst);
   root.append(settingsCard(), privacyCard(),
     h('button', { class: 'n-btn n-btn--outline e-btn-quiet e-btn-big', type: 'button', onclick: signOut }, cloud.demo ? 'Sign out of the demo' : 'Sign out'));
   return root;
@@ -139,3 +142,51 @@ function privacyCard() {
 }
 
 const signOut = () => signOutSafely();
+
+// ---------- How evals work (#how) ----------
+// Plain steps for each role. Only what the app and the APMES guidebook already say (24 h, the same
+// patient for at most 2 assessments, EBD by someone who co-managed, 15-minute corrections).
+
+export function renderHow() {
+  const step = (n, t, d) => h('li', { class: 'e-how__step' }, h('span', { class: 'e-how__n', 'aria-hidden': 'true' }, String(n)),
+    h('div', {}, h('b', {}, t), d ? h('p', { class: 'e-small' }, d) : null));
+  const forAssessors = h('section', { class: 'e-card' },
+    h('h2', { class: 'e-h3' }, 'If you assess residents'),
+    h('ol', { class: 'e-how' },
+      step(1, 'A resident sends you a link or shows a QR code', 'After a case you supervised. Open it on your phone.'),
+      step(2, 'Sign in with Google', 'Use the account the programme has for you (the link names it). If the link opened inside WhatsApp, open it in Chrome or Safari first: Google doesn’t allow signing in inside WhatsApp.'),
+      step(3, 'Fill in the official form', 'DOPS, Mini-CEX or EBD, as in the APMES guidebook. Answers save as you go: you can stop and finish later from Evaluations.'),
+      step(4, 'Submit within 24 hours', 'You can correct your answers for 15 minutes after submitting. The resident then sees your feedback.'),
+      step(5, 'Can’t assess it?', 'Tap “I can’t assess this” at the top of the form and say why (for example, you didn’t observe the case, or for an EBD you didn’t co-manage it). The resident can send it to someone else.')));
+  const forResidents = h('section', { class: 'e-card' },
+    h('h2', { class: 'e-h3' }, 'If you are a resident'),
+    h('ol', { class: 'e-how' },
+      step(1, 'Request evaluation', 'Pick the item (Progress shows what’s due), then the assessor.'),
+      step(2, 'Describe the case', 'Date, place, the patient’s initials, age band and gender only: no names or record numbers. The same patient can be used for at most 2 assessments. An EBD needs an assessor who co-managed the case.'),
+      step(3, 'Show the QR code or share the link', 'Best done straight after the case. Without signal, the link works once your phone is back online.'),
+      step(4, 'Follow up', 'Forms should be done within 24 hours. From Requests you can remind your assessor, or send a declined request to someone else.'),
+      step(5, 'Track your progress', 'Progress counts submitted forms against the APMES EPA requirements for your year.')));
+  const order = isResident() && !isFaculty() ? [forResidents, forAssessors] : [forAssessors, forResidents];
+  return h('div', { class: 'e-stack' }, ...order,
+    h('p', { class: 'e-small e-center' }, 'An unofficial tool for the APMES programme. It does not replace the official record.'));
+}
+
+// ---------- Install (home-screen app) ----------
+// Chrome/Android offer an install prompt (beforeinstallprompt); iPhones need Share → Add to Home Screen.
+let installEvent = null;
+if (typeof window !== 'undefined') window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvent = e; });
+const standalone = () => typeof window !== 'undefined' && (matchMedia('(display-mode: standalone)').matches || navigator.standalone === true);
+function installCard() {
+  if (standalone() || cloud.demo) return null;
+  const ios = /iPhone|iPad|iPod/i.test(navigator.userAgent || '');
+  if (!installEvent && !ios) return null;
+  return h('section', { class: 'e-card' },
+    h('h2', { class: 'e-h3' }, 'Add Evals to your home screen'),
+    h('p', { class: 'e-small' }, 'It opens like an app, works without signal, and shows a badge when something needs you.'),
+    installEvent ? h('button', { class: 'n-btn', type: 'button', onclick: async () => {
+      const ev = installEvent; installEvent = null;
+      ev.prompt();
+      try { const r = await ev.userChoice; if (r.outcome === 'accepted') toast('Added to your home screen'); } catch {}
+      hooks.render();
+    } }, 'Install') : h('p', { class: 'e-small' }, 'In Safari, tap the Share button, then “Add to Home Screen”.'));
+}
