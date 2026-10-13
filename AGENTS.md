@@ -96,7 +96,9 @@ for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mj
 - **Planning:** for multi-part work, say the plan first and wait when asked; the owner plans in batches, then it's
   built PR by PR, each merged before the next. When the owner asks "should we / can we", answer and propose.
   While another session or Codex works in an area, plan only and don't merge into it.
-- **Show it:** phone screenshots (390 px) of UI changes, plus preview links once a PR has one (see PR previews).
+- **Show it:** phone screenshots (390 px) of UI changes, plus preview links once a PR has one (see PR previews). Every
+  PR also gets an automatic before-and-after comment of the first screen of each app it changes
+  (`.github/workflows/pr-screenshots.yml`); for other screens add a line `Screens: /logbook/?demo#notes` to the PR body.
 - **New options:** optional settings, off by default, per device unless they belong to the account; existing
   defaults stay exactly as they look now.
 - **Writing for the owner:** plain words, short; say what changed for residents and what the owner needs to do.
