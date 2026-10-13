@@ -153,13 +153,16 @@ function migrateEct() {
   state.roomsVersion = 4;
 }
 
-let saveTimer;
+let saveTimer, lastSaved = '', checkKey = '';
 function save() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     const was = storeProblem === 'full';
     try {
-      localStorage.setItem(KEY, JSON.stringify(state));
+      const json = JSON.stringify(state);
+      if (json === lastSaved && storeProblem !== 'full') return; // nothing changed since the last write
+      localStorage.setItem(KEY, json);
+      lastSaved = json;
       if (was) { storeProblem = null; renderStoreBar(); toast('Saving in this browser works again.'); }
     } catch {
       // usually the browser's storage is full: say so, rather than losing changes without a word
@@ -217,8 +220,21 @@ const select = (value, options, onchange) => h('select', { onchange: e => onchan
 const fileButton = (label, accept, multiple, onfiles) => h('label', { class: 'btn' }, label,
   h('input', { type: 'file', accept, multiple, hidden: true, onchange: async e => { const f = [...e.target.files]; e.target.value = ''; if (f.length) await onfiles(f); } }));
 
+// Vendor scripts (ExcelJS, jsPDF, pdf.js) load the first time they're needed, so opening the app (and My day on
+// a phone) doesn't wait for them. Each loads once.
+const vendorLoads = {};
+function loadVendor(src) {
+  return vendorLoads[src] ||= new Promise((ok, fail) => {
+    const el = document.createElement('script');
+    el.src = src; el.onload = ok;
+    el.onerror = () => { delete vendorLoads[src]; fail(new Error(`Couldn't load ${src}`)); };
+    document.head.append(el);
+  });
+}
+const excel = async () => { await loadVendor('vendor/exceljs.min.js'); return window.ExcelJS; };
+
 async function readWorkbook(file) {
-  const wb = new window.ExcelJS.Workbook();
+  const wb = new (await excel()).Workbook();
   const buf = await file.arrayBuffer();
   if (/\.csv$/i.test(file.name)) {
     const ws = wb.addWorksheet('csv');
@@ -263,7 +279,10 @@ function render() {
   syncMonthly();
   if (hashPending?.date === state.day.date) { markSaved(hashPending.date, hashPending.at); hashPending = null; }
   // checks follow every change, wherever it was made (a status on Today, a fix here)
-  if (state.roster?.rows && state.roster.date === state.day.date) state.roster.checks = check({ rows: state.roster.rows, staff: dayStaff(), day: state.day, settings: state.settings });
+  if (state.roster?.rows && state.roster.date === state.day.date) {
+    const key = JSON.stringify([state.roster.rows, state.day, state.staff, state.settings, state.rotations]);
+    if (key !== checkKey || !state.roster.checks) { checkKey = key; state.roster.checks = check({ rows: state.roster.rows, staff: dayStaff(), day: state.day, settings: state.settings }); }
+  }
   app.replaceChildren(({ monthly: renderMonthly, roster: renderRoster, premed: renderPremed, cases: () => renderDay('cases'), staff: renderStaffTab, settings: renderSettings, myday: renderMyDay })[state.tab]());
   renderCloudBar();
   renderDateBar();
@@ -2605,7 +2624,7 @@ async function importRotations([file]) {
 async function exportRotations() {
   const year = rotYear || +state.day.date.slice(0, 4);
   const people = state.staff.filter(p => p.role === 'junior').sort(bySeniority);
-  const wb = buildRotationWorkbook(window.ExcelJS, { year, people, rot: state.rotations });
+  const wb = buildRotationWorkbook(await excel(), { year, people, rot: state.rotations });
   download(`Junior rotations ${year}.xlsx`, new Blob([await wb.xlsx.writeBuffer()], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
 }
 
@@ -2727,7 +2746,7 @@ function monthData(kind, month = curMonth(), create = false) {
 let pdfjs = null;
 async function loadPdfJs() {
   if (pdfjs) return pdfjs;
-  await new Promise((ok, fail) => { const s = document.createElement('script'); s.src = 'vendor/pdf.min.js'; s.onload = ok; s.onerror = fail; document.head.append(s); });
+  await loadVendor('vendor/pdf.min.js');
   window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'vendor/pdf.worker.min.js';
   return (pdfjs = window.pdfjsLib);
 }
@@ -2768,7 +2787,7 @@ async function importMonthly(files) {
   render();
 }
 async function exportMonthly(kind) {
-  const wb = buildMonthlyWorkbook(window.ExcelJS, kind, curMonth(), monthData(kind) || {});
+  const wb = buildMonthlyWorkbook(await excel(), kind, curMonth(), monthData(kind) || {});
   const buf = await wb.xlsx.writeBuffer();
   download(`${monthlyDef(kind).label} ${monthName(curMonth())}.xlsx`, new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
 }
@@ -3134,7 +3153,7 @@ function noListCard() {
 
 async function exportXlsx(stamp = '') {
   colourCache.clear();
-  const wb = buildRosterWorkbook(window.ExcelJS, { date: state.day.date, rows: state.roster.rows, lists: rosterLists(), general: effectiveGeneral(), box: commentsText(), colourOf, shortOf, stamp });
+  const wb = buildRosterWorkbook(await excel(), { date: state.day.date, rows: state.roster.rows, lists: rosterLists(), general: effectiveGeneral(), box: commentsText(), colourOf, shortOf, stamp });
   const buf = await wb.xlsx.writeBuffer();
   download(`OT roster ${state.day.date}.xlsx`, new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
 }
@@ -3143,7 +3162,7 @@ let jspdf = null;
 async function exportPdf(stamp = '') {
   if (!jspdf) {
     try {
-      await new Promise((ok, fail) => { const s = document.createElement('script'); s.src = 'vendor/jspdf.umd.min.js'; s.onload = ok; s.onerror = fail; document.head.append(s); });
+      await loadVendor('vendor/jspdf.umd.min.js');
     } catch { toast("Couldn't load the PDF maker (offline?). Try again, or download the .xlsx."); return false; }
     jspdf = window.jspdf.jsPDF;
   }
