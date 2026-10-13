@@ -32,10 +32,6 @@ protect or move. (Prewarm already holds real study data, so its items come first
 7. **Changed-records-only sync** for the logbook (planned in `logbook/STATUS.md`): needed before nationwide use, not
    before the first residents.
 
-Not doing: two-step sign-in (2FA) on the accounts below. The owner decided against it (13 Oct 2026, too irritating).
-The risk: anyone who gets one of these passwords controls the site and its data. A passkey on the Google account is
-the low-effort middle ground if that changes.
-
 ## Accounts and settings
 
 All are the owner's personal accounts today.
