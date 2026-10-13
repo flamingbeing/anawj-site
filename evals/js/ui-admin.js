@@ -3,7 +3,7 @@
 // Never deletes anyone: residents and faculty change status instead.
 
 import { S, h, fill, cloud, toast, modal, confirmBox, download, go, avatar, icon, empty, segment,
-  fmtDate, fmtAgo, toMs, toolLabel, statusChip, hooks } from './ui-core.js';
+  fmtDate, fmtAgo, toMs, toolLabel, statusChip, hooks, errText } from './ui-core.js';
 import { progress, statusOf, residentYear, todayISO, OVERDUE_HOURS } from './engine.js';
 import { EPAS, GROUPS, itemById } from './catalogue.js';
 import { FORMS, questionsOf } from './forms.js';
@@ -65,7 +65,7 @@ const OVERALL_KEY = { dops: 'q14', minicex: 'q12' };   // the 9-point "overall" 
 const DECLINE_LABEL = { 'not-observed': 'Did not observe', 'not-co-managed': 'Did not co-manage', conflict: 'Conflict of interest', 'wrong-item': 'Wrong item or form', other: 'Other' };
 const sentAt = ev => toMs(ev.requestedAt) || toMs(ev.createdAt) || 0;
 const nameOf = ev => ev.residentName || ev.residentEmail || ev.rid || '';
-const err = e => (e && e.message) || String(e);
+const err = e => errText(e);
 
 // residents are cached for the session; People refreshes the cache
 let residentsCache = null;
@@ -102,6 +102,7 @@ export async function renderOverview() {
   const overdue = open.filter(ev => statusOf(ev, now).key === 'overdue');
   const submittedMonth = all.filter(ev => ev.status === 'submitted' && monthOf(toMs(ev.submittedAt)) === thisMonth);
   const declined = all.filter(ev => ev.status === 'declined');
+  const stuck = stuckOf(all, now);
 
   const stat = (n, label, alert) => h('div', { class: `e-stat ${alert && n ? 'e-stat--alert' : ''}` }, h('b', {}, String(n)), h('span', {}, label));
   root.append(h('div', { class: 'e-stats' },
@@ -111,13 +112,17 @@ export async function renderOverview() {
     stat(declined.length, 'Declined', true)));
 
   root.append(overdueByAssessor(overdue, now));
+  if (stuck.length) root.append(stuckCard(stuck, now));
   root.append(cohortGrid(res, all));
   root.append(flagsCard(all, res));
   root.append(h('section', { class: 'e-card' },
     h('h2', { class: 'e-h3' }, 'Export'),
     h('p', { class: 'e-small' }, `All ${all.length} evaluations as a CSV file (opens in Excel). Private notes are not included.`),
     h('div', { class: 'e-actions e-actions--start' },
-      h('button', { class: 'n-btn', type: 'button', onclick: () => exportCSV(all, res) }, 'Download CSV'))));
+      h('button', { class: 'n-btn', type: 'button', onclick: () => exportCSV(all, res) }, 'Download CSV')),
+    h('p', { class: 'e-small', style: 'margin-top:12px' }, 'Committee summary: one row per resident and EPA (done and required by now, overdue groups, flags, last submitted).'),
+    h('div', { class: 'e-actions e-actions--start' },
+      h('button', { class: 'n-btn n-btn--outline e-btn-quiet', type: 'button', onclick: () => exportCommittee(res, all) }, 'Download committee summary'))));
   return root;
 }
 
@@ -138,8 +143,8 @@ function overdueByAssessor(overdue, now) {
     h('span', { class: 'e-row__body' },
       h('span', { class: 'e-row__title' }, facName(g.email)),
       h('span', { class: 'e-row__meta' }, `${g.evs.length} waiting · oldest ${fmtAgo(sentAt(g.evs[0]), now)}`),
-      h('span', { class: 'e-row__meta' }, g.evs.map(nameOf).filter((v, i, a) => a.indexOf(v) === i).join(', '))),
-    h('button', { class: 'n-btn n-btn--outline e-btn-quiet e-btn-small', type: 'button', onclick: () => copyReminder(facName(g.email), g.evs, now) }, 'Copy reminder')))));
+      h('span', { class: 'e-row__meta' }, g.evs.map(nameOf).filter((v, i, a) => a.indexOf(v) === i).join(', ')),
+      reminderButtons(g.email, facName(g.email), g.evs, now))))));
   return card;
 }
 
@@ -148,8 +153,20 @@ export function reminderText(name, evs, now = Date.now(), url = location.origin 
   return `Dear ${name},\n\nYou have ${evs.length} evaluation${evs.length === 1 ? '' : 's'} waiting in APMES Evals:\n${lines.join('\n')}\n\n`
     + `Please complete them, or tap “I can’t assess this”, here: ${url}\n\nThank you.`;
 }
-async function copyReminder(name, evs, now) {
-  const text = reminderText(name, evs, now);
+// Send a reminder the way people actually read them: email (to the address on file) or WhatsApp
+// (pick the contact), or copy it. The link names the account (?as=) so sign-in suggests it.
+const pendingLink = email => location.origin + location.pathname + (email && email !== '?' ? '?as=' + encodeURIComponent(email) : '') + '#pending';
+function reminderButtons(email, name, evs, now) {
+  const text = () => reminderText(name, evs, now, pendingLink(email));
+  const subject = `APMES Evals: ${evs.length} evaluation${evs.length === 1 ? '' : 's'} waiting`;
+  const btn = 'n-btn n-btn--outline e-btn-quiet e-btn-small';
+  return h('span', { class: 'e-remind' },
+    email && email !== '?' ? h('a', { class: btn, href: `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(text())}` }, 'Email') : null,
+    h('a', { class: btn, href: 'https://wa.me/?text=' + encodeURIComponent(text()), target: '_blank', rel: 'noopener' }, 'WhatsApp'),
+    h('button', { class: btn, type: 'button', onclick: () => copyReminder(name, evs, now, pendingLink(email)) }, 'Copy'));
+}
+async function copyReminder(name, evs, now, url) {
+  const text = reminderText(name, evs, now, url);
   try { await navigator.clipboard.writeText(text); toast('Reminder copied'); }
   catch {
     // no clipboard permission: show it to copy by hand
@@ -159,11 +176,66 @@ async function copyReminder(name, evs, now) {
   }
 }
 
+// Requests going nowhere for a week: drafts never sent, and declines never sent to someone else.
+const STUCK_DAYS = 7;
+export function stuckOf(all, now = Date.now()) {
+  const age = ev => now - (toMs(ev.declinedAt) || toMs(ev.updatedAt) || sentAt(ev));
+  return (all || []).filter(ev => (ev.status === 'draft' || ev.status === 'declined') && age(ev) > STUCK_DAYS * 864e5)
+    .sort((a, b) => age(b) - age(a));
+}
+function stuckCard(stuck, now) {
+  const card = h('section', { class: 'e-card e-card--flush' }, h('h2', { class: 'e-section' }, `Stuck for over ${STUCK_DAYS} days (${stuck.length})`));
+  card.append(h('p', { class: 'e-small', style: 'padding:12px 16px 0;margin:0' }, 'Drafts the resident never sent, and declined requests not sent to another assessor.'));
+  card.append(h('div', { class: 'e-list' }, stuck.slice(0, 50).map(ev => h('a', { class: 'e-row', href: '#r/' + encodeURIComponent(ev.id) },
+    avatar(nameOf(ev)),
+    h('span', { class: 'e-row__body' },
+      h('span', { class: 'e-row__title' }, nameOf(ev)),
+      h('span', { class: 'e-row__meta' }, `${ev.status === 'draft' ? 'Draft, not sent' : 'Declined, not re-sent'} · ${fmtAgo(toMs(ev.declinedAt) || toMs(ev.updatedAt) || sentAt(ev), now)}`),
+      h('span', { class: 'e-row__meta' }, `${toolLabel(ev.tool)} · ${ev.itemText || ev.itemId}`)),
+    statusChip(ev), icon('chevron', 'e-row__chev')))));
+  return card;
+}
+
+// Committee summary: one row per resident × EPA (residents on the list who are active or on leave).
+export const COMMITTEE_COLUMNS = ['rid', 'residentName', 'residentEmail', 'year', 'status', 'epa', 'epaTitle', 'doneByNow', 'requiredByNow',
+  'shortByNow', 'doneAll', 'overdueGroups', 'flags', 'lastSubmitted'];
+export function committeeCSV(res, all, today = todayISO()) {
+  const remails = new Set((res || []).filter(r => r.status === 'ACTIVE').map(r => r.email));
+  const rows = [];
+  for (const r of (res || []).filter(x => x.status === 'ACTIVE' || x.status === 'ON LEAVE')
+    .sort((a, b) => (residentYear(a) || 1) - (residentYear(b) || 1) || String(a.name).localeCompare(String(b.name)))) {
+    const yr = residentYear(r, today) || 1;
+    const evs = evalsOf(r, all || []);
+    const prog = progress(evs, yr, today);
+    for (const e of GRID_EPAS) {
+      const groups = prog.filter(p => p.group.epa === e.epa);
+      let done = 0, req = 0, doneAll = 0;
+      for (const p of groups) {
+        doneAll += Math.min(p.done, p.min);
+        if (p.group.byYear != null && p.group.byYear <= yr) { req += p.min; done += Math.min(p.done, p.min); }
+      }
+      const mine = evs.filter(ev => ev.epa === e.epa);
+      const last = Math.max(0, ...mine.filter(ev => ev.status === 'submitted').map(ev => toMs(ev.submittedAt) || 0));
+      const rec = { rid: r.rid, residentName: r.name, residentEmail: r.email, year: 'R' + yr, status: r.status, epa: e.epa, epaTitle: e.title,
+        doneByNow: done, requiredByNow: req, shortByNow: Math.max(0, req - done), doneAll,
+        overdueGroups: groups.filter(p => p.state === 'overdue').length,
+        flags: mine.reduce((n, ev) => n + flagsOf(ev, remails).length, 0),
+        lastSubmitted: last ? todayISO('Asia/Singapore', new Date(last)) : '' };
+      rows.push(COMMITTEE_COLUMNS.map(c => cell(rec[c])).join(','));
+    }
+  }
+  return '\ufeff' + [COMMITTEE_COLUMNS.join(','), ...rows].join('\r\n') + '\r\n';
+}
+function exportCommittee(res, all) {
+  download(`apmes-committee-summary-${todayISO()}.csv`, new Blob([committeeCSV(res, all)], { type: 'text/csv;charset=utf-8' }));
+  toast('Committee summary downloaded');
+}
+
 // Per resident and EPA: submitted toward groups due by now / required by now (groups due by their year).
 export function cohortRow(evals, rYear) {
   const yr = Number(rYear) || 1;
   const cells = {};
-  for (const p of progress(evals, yr)) {
+  for (const p of progress(evals, yr, todayISO())) {
     const e = p.group.epa;
     const c = cells[e] || (cells[e] = { done: 0, req: 0, all: 0 });
     c.all += Math.min(p.done, p.min);
@@ -175,27 +247,47 @@ const evalsOf = (r, all) => all.filter(ev => (ev.rid && ev.rid === r.rid) || (r.
 
 const GRID_EPAS = EPAS.filter(e => GROUPS.some(g => g.epa === e.epa));
 let showLeavers = false;
+let gridSort = 'year';   // year | short (furthest behind first) | quiet (longest since a submitted form)
+let gridYear = 0;        // 0 = all years
+const lastSubmitted = evs => Math.max(0, ...evs.filter(ev => ev.status === 'submitted').map(ev => toMs(ev.submittedAt) || 0));
 function cohortGrid(res, all) {
   const card = h('section', { class: 'e-card e-card--flush' }, h('h2', { class: 'e-section' }, 'Cohort'));
   const body = h('div', { style: 'padding:12px 16px' });
   card.append(body);
   const paint = () => {
+    const byName = (a, b) => String(a.r.name).localeCompare(String(b.r.name));
     const list = res.filter(r => showLeavers || r.status === 'ACTIVE' || r.status === 'ON LEAVE')
-      .map(r => ({ r, yr: residentYear(r) || 1 })).sort((a, b) => a.yr - b.yr || String(a.r.name).localeCompare(String(b.r.name)));
+      .map(r => {
+        const yr = residentYear(r) || 1, evs = evalsOf(r, all), cells = cohortRow(evs, yr);
+        const short = Object.values(cells).reduce((n, c) => n + Math.max(0, c.req - c.done), 0);
+        return { r, yr, evs, cells, short, last: lastSubmitted(evs) };
+      })
+      .filter(x => !gridYear || x.yr === gridYear)
+      .sort(gridSort === 'short' ? (a, b) => b.short - a.short || a.yr - b.yr || byName(a, b)
+        : gridSort === 'quiet' ? (a, b) => a.last - b.last || byName(a, b)
+        : (a, b) => a.yr - b.yr || byName(a, b));
+    const sortSel = select([['year', 'Year, then name'], ['short', 'Furthest behind first'], ['quiet', 'Longest since a submitted form']], gridSort);
+    sortSel.onchange = () => { gridSort = sortSel.value; paint(); };
+    const yearSel = select([[0, 'All years'], [1, 'R1'], [2, 'R2'], [3, 'R3'], [4, 'R4'], [5, 'R5']], gridYear);
+    yearSel.onchange = () => { gridYear = Number(yearSel.value); paint(); };
     const hidden = res.length - res.filter(r => r.status === 'ACTIVE' || r.status === 'ON LEAVE').length;
     fill(body,
       h('p', { class: 'e-small', style: 'margin:0 0 8px' }, 'Done / required by now for each EPA (submitted forms, requirements due by the resident’s year). Tap a name for their evaluations.'),
+      h('div', { class: 'e-toolbar e-cg-tools' }, field('Sort', sortSel), field('Year', yearSel)),
       hidden ? h('div', { class: 'e-toolbar' }, h('label', {}, h('input', { type: 'checkbox', checked: showLeavers, onchange: e => { showLeavers = e.target.checked; paint(); } }), `Show graduated and attrited (${hidden})`)) : null,
       !list.length ? empty('No residents', 'Add residents in People.', h('a', { class: 'n-btn', href: '#people/residents' }, 'People')) :
         h('div', { class: 'e-table-wrap' }, h('table', { class: 'e-table' },
-          h('thead', {}, h('tr', {}, h('th', { scope: 'col' }, 'Resident'), h('th', { scope: 'col' }, 'Year'), GRID_EPAS.map(e => h('th', { scope: 'col', title: e.title }, 'EPA ' + e.epa)))),
-          h('tbody', {}, list.map(({ r, yr }) => {
-            const evs = evalsOf(r, all);
-            const cells = cohortRow(evs, yr);
+          h('thead', {}, h('tr', {}, h('th', { scope: 'col' }, 'Resident'), h('th', { scope: 'col' }, 'Year'),
+            h('th', { scope: 'col', title: 'Forms still needed for requirements due by now' }, 'Short'),
+            h('th', { scope: 'col', title: 'Last submitted evaluation' }, 'Last'),
+            GRID_EPAS.map(e => h('th', { scope: 'col', title: e.title }, 'EPA ' + e.epa)))),
+          h('tbody', {}, list.map(({ r, yr, evs, cells, short, last }) => {
             return h('tr', {},
               h('td', {}, h('button', { class: 'e-cg-name', type: 'button', onclick: () => residentSheet(r, evs) }, r.name || r.email,
                 r.status !== 'ACTIVE' ? h('span', { class: 'e-tag' }, r.status) : null)),
               h('td', { class: 'e-num' }, 'R' + yr),
+              h('td', { class: 'e-num' }, short ? h('span', { class: 'e-cg-cell e-cg--short' }, String(short)) : h('span', { class: 'e-cg-cell e-cg--done' }, '0')),
+              h('td', { class: 'e-num e-cg-last' }, last ? fmtAgo(last) : '–'),
               GRID_EPAS.map(e => {
                 const c = cells[e.epa] || { done: 0, req: 0, all: 0 };
                 if (!c.req) return h('td', { class: 'e-num' }, h('span', { class: 'e-cg-cell e-cg--none', title: 'Nothing due yet' }, c.all ? `${c.all}` : '–'));
@@ -244,20 +336,47 @@ export function flagsOf(ev, residentEmails = new Set()) {
   return out;
 }
 
+// Flags grouped by resident (newest first within each), so repeated concerns about one person stand out.
+export function flagsByResident(flagged) {
+  const by = new Map();
+  for (const x of flagged) {
+    const k = x.ev.residentEmail || x.ev.rid || nameOf(x.ev);
+    if (!by.has(k)) by.set(k, { name: nameOf(x.ev), items: [], reasons: {} });
+    const g = by.get(k);
+    g.items.push(x);
+    for (const w of x.why) { const r = w.replace(/ \(.*\)$/, '').replace(/^Overall \d\/9.*/, 'Low overall score'); g.reasons[r] = (g.reasons[r] || 0) + 1; }
+  }
+  return [...by.values()].sort((a, b) => b.items.length - a.items.length || a.name.localeCompare(b.name));
+}
+let flagView = 'recent';   // recent | resident
 function flagsCard(all, res) {
   const remails = new Set(res.filter(r => r.status === 'ACTIVE').map(r => r.email));
   const flagged = all.map(ev => ({ ev, why: flagsOf(ev, remails) })).filter(x => x.why.length)
     .sort((a, b) => (toMs(b.ev.submittedAt) || toMs(b.ev.declinedAt) || sentAt(b.ev)) - (toMs(a.ev.submittedAt) || toMs(a.ev.declinedAt) || sentAt(a.ev)));
   const card = h('section', { class: 'e-card e-card--flush' }, h('h2', { class: 'e-section' }, `Flags (${flagged.length})`));
   if (!flagged.length) { card.append(h('p', { class: 'e-small', style: 'padding:12px 16px;margin:0' }, 'No flags.')); return card; }
-  card.append(h('div', { class: 'e-list' }, flagged.slice(0, 100).map(({ ev, why }) => h('a', { class: 'e-row', href: '#r/' + encodeURIComponent(ev.id) },
+  const body = h('div', {});
+  const paint = () => {
+    const tabs = h('div', { class: 'e-chips', style: 'padding:12px 16px 4px', role: 'group', 'aria-label': 'Show flags' },
+      [['recent', 'Newest first'], ['resident', 'By resident']].map(([id, label]) =>
+        h('button', { type: 'button', class: 'e-chip-btn', 'aria-pressed': String(flagView === id), onclick: () => { flagView = id; paint(); } }, label)));
+    fill(body, tabs, flagView === 'resident' ? flagsByResident(flagged).map(g => h('details', { class: 'e-flaggroup' },
+      h('summary', {}, h('b', {}, g.name), ` · ${g.items.length} flag${g.items.length === 1 ? '' : 's'}`,
+        h('span', { class: 'e-row__meta e-flag-why' }, Object.entries(g.reasons).map(([r, n]) => `${r}${n > 1 ? ' ×' + n : ''}`).join(' · '))),
+      flagRows(g.items))) : flagRows(flagged.slice(0, 100)));
+  };
+  paint();
+  card.append(body);
+  return card;
+}
+function flagRows(list) {
+  return h('div', { class: 'e-list' }, list.map(({ ev, why }) => h('a', { class: 'e-row', href: '#r/' + encodeURIComponent(ev.id) },
     avatar(nameOf(ev)),
     h('span', { class: 'e-row__body' },
       h('span', { class: 'e-row__title' }, nameOf(ev)),
       h('span', { class: 'e-row__meta e-flag-why' }, why.join(' · ')),
       h('span', { class: 'e-row__meta' }, `${toolLabel(ev.tool)} · ${ev.itemText || ev.itemId} · ${ev.assessorName || ev.assessorEmail}`)),
-    statusChip(ev), icon('chevron', 'e-row__chev')))));
-  return card;
+    statusChip(ev), icon('chevron', 'e-row__chev'))));
 }
 
 // ---------- CSV ----------
@@ -368,7 +487,7 @@ async function approve(a, res, reload) {
   if (a.role === 'faculty') {
     if (!await confirmBox('Approve as faculty?', `${a.name} (${a.email}) will be added to the faculty list and can assess residents.`, 'Approve')) return;
     try { await cloud.decideApplication(a.uid, { approve: true }); toast(`${a.name} added to faculty`); reload(); }
-    catch (e) { toast('Could not approve: ' + err(e)); }
+    catch (e) { toast('Couldn’t approve. ' + err(e)); }
     return;
   }
   const old = res.find(r => r.email === a.email);
@@ -399,7 +518,7 @@ async function approve(a, res, reload) {
 async function reject(a, reload) {
   if (!await confirmBox('Reject application?', `${a.name} (${a.email}) will see that their application was not approved.`, 'Reject', true)) return;
   try { await cloud.decideApplication(a.uid, { approve: false }); toast('Application rejected'); reload(); }
-  catch (e) { toast('Could not reject: ' + err(e)); }
+  catch (e) { toast('Couldn’t reject. ' + err(e)); }
 }
 
 // Paste parser: one person per line, fields split by comma or tab. Returns [{ line, rec, problem, dup }]
@@ -523,7 +642,7 @@ function editFaculty(f, fac, reload) {
     const bad = !nm ? 'Enter a name.' : !validEmail(em) ? 'Enter a valid email.' : !f && fac.some(x => x.email === em) ? `${em} is already on the list.` : null;
     if (bad) { msg.hidden = false; msg.textContent = bad; return; }
     try { await cloud.saveFaculty({ ...(f || {}), email: em, name: nm, status: status.value }); m.close(); toast(f ? 'Saved' : `${nm} added`); reload(); }
-    catch (e2) { msg.hidden = false; msg.textContent = 'Could not save: ' + err(e2); }
+    catch (e2) { msg.hidden = false; msg.textContent = 'Couldn’t save. ' + err(e2); }
   } },
     field('Name', name), field('Google account email', email), f ? null : h('p', { class: 'e-hint' }, 'The email they sign in with.'),
     field('Status', status), msg,

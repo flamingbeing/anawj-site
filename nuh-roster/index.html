@@ -51,14 +51,15 @@ if (top === self && /^(www\.)?anawj\.com$/.test(location.hostname)) (function ()
   <span>Staff list, rooms and settings as a file:</span>
   <button id="saveTeam" class="small" title="Download the staff list, rooms and settings as a JSON file">Export JSON</button>
   <label class="btn small" title="Replace the staff list, rooms and settings from a JSON file">Import JSON<input id="loadTeam" type="file" accept=".json,application/json" hidden></label>
+  <button id="allBtn" class="small" title="Everything this browser holds (staff, settings, every day's roster, monthly rosters, rotations) as one file, to keep or to move to another computer">Download everything</button>
   <span class="grow"></span>
   <a id="mydayLink" class="btn small" href="#myday" title="Where one person is on the day: bookmark it for your own day">My day</a>
   <button id="tourBtn" class="small" title="A short tour of the app">Tour</button>
+  <button id="keyBtn" class="small" title="What the marks and colours mean, and how to do common things">Key and help</button>
   <button id="keysBtn" class="small" title="Keyboard shortcuts (?)">Keyboard shortcuts</button>
 </footer>
 <div id="toast" role="status" aria-live="polite"></div>
 
-<script src="vendor/exceljs.min.js"></script>
 <script type="module" src="js/app.js"></script>
 </body>
 </html>

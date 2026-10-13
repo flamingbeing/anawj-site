@@ -70,6 +70,30 @@ const bad = [{ roomId: 'r1', label: 'MCOR 1', complex: 'MCOR', senior: 'Senior G
 const out = check({ rows: bad, staff, day: { ...day, staff: { s3: { status: 'leave' } } } }).map(w => w.text).join('\n');
 assert.match(out, /on leave/);
 assert.match(out, /Paeds list/);
+{
+  // live checks that used to exist only as generator notes, or not at all
+  const r = (roomId, label, senior, junior) => ({ roomId, label, complex: 'MCOR', senior, junior, premed: '', notes: '' });
+  const day2 = { rooms: day.rooms.map(x => ({ ...x, flags: { subspecs: [], complex: false, long: false } })), staff: {} };
+  const texts = rows => check({ rows, staff, day: day2 }).map(w => `${w.level}|${w.fix || ''}|${w.text}`);
+  // double cover with no junior in one of the rooms
+  let t = texts([r('r3', 'MCOR 2', 'Senior General', ''), r('r4', 'MCOR 3', 'Senior General', 'Junior Resident')]);
+  assert.ok(t.some(x => /^error\|fill\|MCOR 2: no junior, and the senior is double covering/.test(x)), t.join('\n'));
+  assert.ok(!t.some(x => /MCOR 3: no junior/.test(x)));
+  // a cover from another room counts as a junior
+  t = texts([r('r3', 'MCOR 2', 'Senior General', 'Junior Mopex C'), r('r4', 'MCOR 3', 'Senior General', 'Junior Resident')]);
+  assert.ok(!t.some(x => /no junior/.test(x)), t.join('\n'));
+  // one senior in three rooms
+  t = texts([r('r1', 'MCOR 1', 'Senior General', 'Junior Paeds'), r('r3', 'MCOR 2', 'Senior General', 'Junior Mopex'), r('r4', 'MCOR 3', 'Senior General', 'Junior Resident')]);
+  assert.ok(t.some(x => /^error\|reseat\|Senior General is the senior in 3 rooms/.test(x)), t.join('\n'));
+  // senior in one room and junior in another
+  t = texts([r('r1', 'MCOR 1', 'Senior Paeds', 'Junior Paeds'), r('r3', 'MCOR 2', 'Senior General', 'Senior Paeds')]);
+  assert.ok(t.some(x => /^warn\|reseat\|Senior Paeds is the senior in MCOR 1 and the junior in MCOR 2/.test(x)), t.join('\n'));
+  // admin day / elsewhere on a list
+  const t2 = check({ rows: [r('r4', 'MCOR 3', 'Senior General', 'Junior Resident')], staff, day: { ...day2, staff: { s3: { status: 'admin' }, j2: { status: 'elsewhere' } } } }).map(w => `${w.level}|${w.fix}|${w.text}`);
+  assert.ok(t2.some(x => /^warn\|takeOff\|Senior General is on an admin day/.test(x)), t2.join('\n'));
+  assert.ok(t2.some(x => /^warn\|takeOff\|Junior Resident is elsewhere today/.test(x)), t2.join('\n'));
+  console.log('live check tests passed');
+}
 assert.equal(suggestShortName('Koh Yi Wen'), 'Koh YW');
 assert.equal(suggestShortName('Lim Xinyi'), 'Xinyi');
 assert.equal(suggestShortName('Anjali Varma'), 'Anjali');
@@ -315,4 +339,120 @@ console.log('engine tests passed');
   assert.deepEqual(res.unmatched, ['Nobody Known']);
   assert.deepEqual(res.unknown, ['Mystery']);
   console.log('rotation tests passed');
+}
+
+{
+  // what changed since the roster was sent
+  const { rosterChanges, changeText } = await import('../js/engine.js');
+  const { buildLayout } = await import('../js/layout.js');
+  const before = [{ label: 'MOR 1', senior: 'A', junior: 'B' }, { label: 'MOR 2', senior: 'C', junior: '' }, { label: 'MOR 3', senior: '', junior: '' }];
+  const after = [{ label: 'MOR 1', senior: 'A', junior: 'D' }, { label: 'MOR 2', senior: '', junior: '' }, { label: 'MOR 4', senior: 'E', junior: '', premed: 'F' }];
+  const c = rosterChanges(before, after).map(changeText);
+  assert.deepEqual(c, ['MOR 1 junior: B → D', 'MOR 2 senior: C → (none)', 'MOR 4 senior: (none) → E', 'MOR 4 premed: (none) → F']);
+  assert.deepEqual(rosterChanges(before, before), []);
+  const stamped = buildLayout({ date: '2026-10-14', rows: [], stamp: 'Updated 09:15' }).cells.find(x => x.text === 'Updated 09:15');
+  assert.ok(stamped && stamped.r === 4, 'the stamp sits above the date row');
+  assert.ok(!buildLayout({ date: '2026-10-14', rows: [] }).cells.some(x => x.r === 4), 'no stamp on a first send');
+  console.log('sent changes tests passed');
+}
+
+{
+  // clashes the monthly rosters show before the day
+  const { monthIssues } = await import('../js/monthly.js');
+  const people = { A: { id: 'a', name: 'A' }, B: { id: 'b', name: 'B' }, C: { id: 'c', name: 'C' } };
+  const personOf = t => people[t] || null;
+  const monthly = { '2026-10': {
+    junior: { rows: { 1: { r1: 'A', nf: 'A' }, 2: { df: 'A', r1: 'B' }, 3: { r1: 'C', r2: '' } } },
+    liver: { rows: { 2: { otj: 'B' } } },
+    pain: { rows: { 3: { 'acute.a': 'B' } } },
+    leave: { entries: [{ name: 'C', from: '2026-10-03', to: '2026-10-03', type: 'Annual Leave' }] },
+  } };
+  const t = monthIssues(monthly, '2026-10', personOf).map(i => `${i.date.slice(8)} ${i.level} ${i.text}`);
+  assert.ok(t.includes('01 error A has two overnight duties (R1 and Night Float).'), t.join('\n'));
+  assert.ok(t.some(x => /^02 error A has Day Float the morning after /.test(x)), t.join('\n'));
+  assert.ok(!t.some(x => /B has OT \(Junior\)/.test(x)), 'liver duties are on call, not a clash with a night before');
+  assert.ok(t.some(x => /^03 error B has Acute Pain \(Junior\) the morning after R1/.test(x)), t.join('\n'));
+  assert.ok(t.includes('03 error C is on leave but has R1.'), t.join('\n'));
+  assert.ok(t.some(x => /^03 warn R2 is empty/.test(x)), t.join('\n'));
+  // the made-up department starts (nearly) clean
+  const { makeDemo } = await import('../js/demo.js');
+  const d = makeDemo('2026-03-17');
+  const byName = new Map(d.staff.map(p => [p.name, p]));
+  assert.equal(monthIssues(d.monthly, '2026-03', n => byName.get(n) || null).filter(i => i.level === 'error').length, 0, 'demo month has no clashes');
+  console.log('monthly clash tests passed');
+}
+
+{
+  // seniority: complex lists, double covers and Baby MO / MOPEX rooms prefer SC and C
+  const room = (id, name, notes, extra = {}) => ({ id, name, complex: 'MOR', running: true, notes, flags: suggestFlags(notes), session: 'full', ...extra });
+  const st = [
+    P('a', 'Senior Associate', 'senior', { grade: 'AC' }), P('b', 'Senior Consultant', 'senior', { grade: 'SC' }),
+    P('j', 'Junior Mopex', 'junior', { grade: 'MOPEX' }), P('k', 'Junior Resident', 'junior'),
+  ];
+  let complexToSC = 0, mopexWithSC = 0;
+  for (let seed = 1; seed <= 20; seed++) {
+    const g = generate({ staff: st, day: { rooms: [room('r1', 'MOR 1', 'laparotomy', { flags: { subspecs: [], complex: true, long: false } }), room('r2', 'MOR 2', 'hernia')], staff: {} }, seed });
+    const r1 = g.rows.find(r => r.label === 'MOR 1');
+    if (/Senior Consultant/.test(r1.senior)) complexToSC++;
+    // two plain lists: the MOPEX goes with the SC
+    const g2 = generate({ staff: st, day: { rooms: [room('r1', 'MOR 1', 'hernia'), room('r2', 'MOR 2', 'hernia')], staff: {} }, seed });
+    if (g2.rows.some(r => /Senior Consultant/.test(r.senior) && /Junior Mopex/.test(r.junior))) mopexWithSC++;
+  }
+  assert.equal(complexToSC, 20, 'the complex list goes to the SC every time');
+  assert.ok(mopexWithSC >= 15, `MOPEX mostly with the SC (${mopexWithSC}/20)`);
+  // one senior short: the double cover goes to the SC
+  const st2 = [P('a', 'Senior Associate', 'senior', { grade: 'AC' }), P('b', 'Senior Consultant', 'senior', { grade: 'SC' }), P('c', 'Senior Visiting', 'senior', { grade: 'VC' })];
+  let dblSC = 0;
+  for (let seed = 1; seed <= 20; seed++) {
+    const g = generate({ staff: st2, day: { rooms: [room('r1', 'MOR 1', ''), room('r2', 'MOR 2', ''), room('r3', 'MOR 3', ''), room('r4', 'MOR 4', '')], staff: {} }, seed });
+    const n = {}; g.rows.forEach(r => String(r.senior).split(/\s*\/\s*/).filter(Boolean).forEach(x => { n[x] = (n[x] || 0) + 1; }));
+    if (Object.entries(n).some(([k, v]) => v > 1 && /Consultant/.test(k))) dblSC++;
+  }
+  assert.ok(dblSC >= 15, `double cover mostly by the SC (${dblSC}/20)`);
+  console.log('seniority tests passed');
+}
+
+{
+  const { buildIcs } = await import('../js/ics.js');
+  const t = buildIcs([{ date: '2026-10-31', title: 'MOR 4, Senior', details: 'with A; cases: lap chole\nleaving 4pm', uid: '2026-10-31-p1@nuhroster' }], { now: new Date('2026-10-13T10:00:00Z') });
+  assert.match(t, /^BEGIN:VCALENDAR\r\n/);
+  assert.match(t, /DTSTART;VALUE=DATE:20261031\r\nDTEND;VALUE=DATE:20261101\r\n/, 'all-day event ending the next day, across a month end');
+  assert.match(t, /SUMMARY:MOR 4\\, Senior/);
+  assert.match(t.replace(/\r\n /g, ''), /DESCRIPTION:with A\\; cases: lap chole\\nleaving 4pm/);
+  assert.ok(t.split('\r\n').every(l => l.length <= 75), 'lines folded');
+  console.log('calendar tests passed');
+}
+
+{
+  const { dateFromText } = await import('../js/xlsxio.js');
+  assert.equal(dateFromText('2026-10-14'), '2026-10-14');
+  assert.equal(dateFromText('14/10/2026'), '2026-10-14');
+  assert.equal(dateFromText('1.2.26'), '2026-02-01');
+  assert.equal(dateFromText('14 Oct 2026'), '2026-10-14');
+  assert.equal(dateFromText('Wednesday, 14 October 2026'), '2026-10-14');
+  assert.equal(dateFromText('31/02/2026'), null, 'no 31 February');
+  assert.equal(dateFromText(''), null);
+  console.log('draft date tests passed');
+}
+
+{
+  // saved data from the first versions of the app comes up to date
+  const { mergeSaved, migrateRooms } = await import('../js/store.js');
+  const { DEFAULT_SETTINGS } = await import('../js/engine.js');
+  const v1 = { staff: [], settings: { premedCap: 2 }, roomTemplate: [{ complex: 'Other', name: 'Remote Case' }, { complex: 'KROR', name: 'KROR 2' }, { complex: 'MCOR', name: 'MCOR 8' }, { complex: 'MCOR', name: 'MCOR 10' }, { complex: 'MOR', name: 'MOR 1' }],
+    day: { rooms: [{ name: 'Remote Case' }] }, roster: { rows: [{ label: 'Remote Case' }] } };
+  const st = mergeSaved({ settings: {}, roomTemplate: [] }, JSON.parse(JSON.stringify(v1)), DEFAULT_SETTINGS);
+  assert.equal(st.roomsVersion, 1);
+  assert.equal(st.settings.premedCap, 2, 'saved settings kept');
+  assert.equal(st.settings.subspecs.length, DEFAULT_SETTINGS.subspecs.length, 'new settings get their defaults');
+  migrateRooms(st);
+  const names = st.roomTemplate.map(r => r.name);
+  assert.equal(st.roomsVersion, 4);
+  assert.deepEqual(names, ['Remote 1', 'Remote 2', 'KROR PACU', 'KROR 1', 'KROR 2', 'MCOR PACU', 'MCOR 8', 'MCOR 9', 'MCOR 10', 'ECT', 'MBOR PACU', 'MOR 1']);
+  assert.equal(st.day.rooms[0].name, 'Remote 1'); assert.equal(st.roster.rows[0].label, 'Remote 1');
+  assert.equal(st.roomTemplate.find(r => r.name === 'MOR 1').defaultOn, true);
+  assert.equal(st.roomTemplate.find(r => r.name === 'KROR 1').defaultOn, false);
+  const again = JSON.stringify(st); migrateRooms(st); assert.equal(JSON.stringify(st), again, 'running it twice changes nothing');
+  assert.equal(mergeSaved('blank', null, DEFAULT_SETTINGS), 'blank');
+  console.log('saved data migration tests passed');
 }

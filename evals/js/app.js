@@ -2,7 +2,7 @@
 // own ui-*.js file and is loaded on first use; shared state and helpers are in ui-core.js.
 // Data comes from cloud.js (Firestore, or the in-browser demo backend with ?demo).
 
-import { S, hooks, h, fill, toast, cloud, icon, initials, go, isResident, isFaculty, isStaff, hasRole, pruneDrafts, confirmBox, needsAction, applyTheme } from './ui-core.js';
+import { S, hooks, h, fill, toast, cloud, icon, initials, go, isResident, isFaculty, isStaff, hasRole, pruneDrafts, signOutSafely, confirmBox, needsAction, applyTheme, errText, linkAccount, inAppBrowser, openInBrowserCard, wrongAccountCard } from './ui-core.js';
 
 applyTheme();   // also keeps the browser's theme-color in step with the page
 
@@ -23,11 +23,13 @@ const ROUTES = {
   requests: { mod: 'ui-requests', fn: 'renderRequests', title: 'Requests', ok: isResident },
   r: { mod: 'ui-result', fn: 'renderResult', title: 'Evaluation', back: true },
   progress: { mod: 'ui-progress', fn: 'renderProgress', title: 'Progress', ok: isResident },
+  summary: { mod: 'ui-progress', fn: 'renderSummary', title: 'My record', back: true, ok: isResident },
   pending: { mod: 'ui-pending', fn: 'renderPending', title: 'Evaluations', ok: () => isFaculty() || S.assigned.length > 0 },
   e: { mod: 'ui-form', fn: 'renderForm', title: 'Evaluation', back: true, bare: true },
   overview: { mod: 'ui-admin', fn: 'renderOverview', title: 'Overview', ok: isStaff },
   people: { mod: 'ui-admin', fn: 'renderPeople', title: 'People', ok: isStaff },
   more: { mod: 'ui-more', fn: 'renderMore', title: 'More' },
+  how: { mod: 'ui-more', fn: 'renderHow', title: 'How evals work', back: true },
 };
 
 // Tabs = union of roles, fixed order. Requests/Evaluations carry a count badge.
@@ -61,7 +63,7 @@ function parseHash() {
 // ---------- tabs ----------
 
 function paintTabs() {
-  const sel = S.route === 'new' ? 'home' : S.route === 'r' ? (isResident() ? 'requests' : 'pending') : S.route === 'e' ? 'pending' : S.route;
+  const sel = S.route === 'new' ? 'home' : S.route === 'summary' ? 'progress' : S.route === 'r' ? (isResident() ? 'requests' : 'pending') : S.route === 'e' ? 'pending' : S.route;
   const tabs = visibleTabs();
   fill(tabsEl, tabs.map(t => {
     const n = t.badge ? t.badge() : 0;
@@ -72,6 +74,11 @@ function paintTabs() {
       h('span', { class: 'e-tab__label' }, t.label));
   }));
   tabsEl.hidden = !S.user || !hasRole() || tabs.length < 2;
+  // the home-screen icon's badge (installed app, where supported): what needs you, as on the tabs
+  try {
+    const total = tabs.reduce((n, t) => n + (t.badge ? t.badge() : 0), 0);
+    if (navigator.setAppBadge) (total ? navigator.setAppBadge(total) : navigator.clearAppBadge()).catch(() => {});
+  } catch {}
   document.body.classList.toggle('e-nonav', tabsEl.hidden || !!(ROUTES[S.route] && ROUTES[S.route].bare));
 }
 
@@ -79,6 +86,8 @@ function paintTabs() {
 
 function paintHeader(title) {
   titleEl.textContent = title || 'APMES Evals';
+  // the browser tab / app switcher / screen reader name the screen too (WCAG 2.4.2)
+  document.title = title && title !== 'APMES Evals' ? `${title} · APMES Evals` : 'APMES Evals';
   const bits = [];
   if (cloud.demo) bits.push('Demo');
   if (!navigator.onLine) bits.push('Offline');
@@ -187,9 +196,26 @@ function renderLanding(error) {
   document.body.classList.add('e-nonav');
   paintHeader('APMES Evals');
   const base = location.pathname;
+  const forAssessor = /^#e\//.test(location.hash) && !cloud.demo;
+  const as = linkAccount();
+  if (forAssessor) {
+    fill(app, h('div', { class: 'e-landing' },
+      h('img', { src: 'icons/icon-192.png', alt: '', class: 'e-landing__icon', width: 72, height: 72 }),
+      h('h1', { class: 'e-h1' }, 'A resident asked you for an evaluation'),
+      h('p', { class: 'e-lead' }, 'Sign in to open the form. It takes a few minutes and saves as you go.'),
+      inAppBrowser() ? openInBrowserCard() : null,
+      error ? h('p', { class: 'e-alert', role: 'alert' }, error) : null,
+      cloud.enabled ? h('button', { class: 'n-btn e-btn-big', onclick: signIn }, googleMark(), 'Sign in with Google')
+        : h('p', { class: 'e-alert' }, 'Sign-in is not configured.'),
+      h('p', { class: 'e-small e-center' }, as ? ['Use the Google account ', h('b', {}, as), ': the request was sent there.']
+        : 'Use the Google account your programme has on file for you.'),
+      h('p', { class: 'e-small e-center' }, 'Unofficial tool for the APMES programme. Please don’t enter patient identifiers.')));
+    return;
+  }
   fill(app, h('div', { class: 'e-landing' },
     h('img', { src: 'icons/icon-192.png', alt: '', class: 'e-landing__icon', width: 72, height: 72 }),
     h('h1', { class: 'e-h1' }, 'Workplace-based assessments'),
+    inAppBrowser() && !cloud.demo ? openInBrowserCard() : null,
     h('p', { class: 'e-lead' }, 'Request and complete DOPS, Mini-CEX and EBD evaluations on your phone.'),
     h('ul', { class: 'e-ticks' },
       h('li', {}, icon('check'), 'Residents pick the item, the assessor and send a link or QR code.'),
@@ -214,8 +240,8 @@ function googleMark() {
 }
 
 async function signIn() {
-  try { await cloud.signIn(); }
-  catch (err) { renderLanding('Sign-in failed: ' + (err && err.message || err)); }
+  try { await cloud.signIn(linkAccount() || undefined); }
+  catch (err) { renderLanding('Sign-in didn’t finish. ' + errText(err)); }
 }
 
 // ---------- signed in, no role: apply ----------
@@ -223,6 +249,7 @@ async function signIn() {
 function renderApply() {
   const appl = S.roles.application;
   const wrap = h('div', { class: 'e-stack' });
+  const fromLink = /^#e\//.test(location.hash) && !cloud.demo;
   if (appl && appl.status === 'pending') {
     fill(wrap,
       h('section', { class: 'e-card' },
@@ -236,6 +263,8 @@ function renderApply() {
     return wrap;
   }
   fill(wrap,
+    fromLink ? wrongAccountCard() : null,
+    fromLink ? h('p', { class: 'e-small' }, 'New to APMES Evals and this is your account? Apply below.') : null,
     appl && appl.status === 'rejected' ? h('p', { class: 'e-alert' }, 'Your last application was not approved. You can apply again, or contact the programme office.') : null,
     applyForm(appl), signOutCard());
   return wrap;
@@ -257,7 +286,7 @@ function applyForm(prev) {
       await cloud.applyForRole({ role, name: name.value.trim(), note: note.value.trim() });
       toast('Application sent');
       await refreshRoles();
-    } catch (err) { toast('Could not apply: ' + (err.message || err)); btn.disabled = false; }
+    } catch (err) { toast('Couldn’t send your application. ' + errText(err)); btn.disabled = false; }
   } },
   h('h2', { class: 'e-h3' }, 'Join APMES Evals'),
   h('p', {}, `${S.user.email} isn’t on the resident or faculty list yet. Apply below and an admin or programme director will approve you.`),
@@ -267,7 +296,7 @@ function applyForm(prev) {
   h('div', { class: 'e-actions' }, btn));
 }
 
-const signOutCard = () => h('p', { class: 'e-center' }, h('button', { class: 'n-btn n-btn--outline e-btn-quiet', onclick: () => cloud.signOut() }, 'Sign out'));
+const signOutCard = () => h('p', { class: 'e-center' }, h('button', { class: 'n-btn n-btn--outline e-btn-quiet', onclick: () => signOutSafely() }, 'Sign out'));
 
 // ---------- signed in ----------
 
@@ -280,7 +309,7 @@ async function refreshRoles() {
   let roles;
   try { roles = await cloud.getRoles(user.email); }
   catch (err) {
-    fill(app, h('div', { class: 'e-empty' }, h('p', { class: 'e-empty__title' }, 'Could not load your account'), h('p', {}, err.message || String(err)),
+    fill(app, h('div', { class: 'e-empty' }, h('p', { class: 'e-empty__title' }, 'Couldn’t load your account'), h('p', {}, errText(err)),
       h('button', { class: 'n-btn', onclick: () => refreshRoles() }, 'Try again')));
     return;
   }
@@ -411,7 +440,7 @@ export async function resetDemoData() {
 
 // ---------- boot ----------
 
-if (cloud.onSyncError) cloud.onSyncError(err => toast('A change could not be synced: ' + (err.message || err)));
+if (cloud.onSyncError) cloud.onSyncError(err => toast('A change didn’t reach the server. ' + errText(err)));
 
 if (cloud.demo) {
   S.demoRole = cloud.demoRole ? cloud.demoRole() : 'resident';
@@ -423,5 +452,6 @@ if (cloud.demo) {
 }
 paintHeader('APMES Evals');
 if (!cloud.enabled) renderLanding();
-else Promise.resolve(cloud.watchUser(onUser)).catch(err => renderLanding('Could not start sign-in: ' + (err.message || err)));
-registerSW();
+else Promise.resolve(cloud.watchUser(onUser)).catch(err => renderLanding('Couldn’t start sign-in. ' + errText(err)));
+// after the first screen has loaded, so the offline download doesn't compete with it
+if (document.readyState === 'complete') registerSW(); else window.addEventListener('load', registerSW, { once: true });

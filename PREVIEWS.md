@@ -58,6 +58,14 @@ the real ones: create e.g. `apmes-logbook-staging`, add one fixed preview addres
 authorised domains, and have the apps pick the test config on that host. That needs a small code change in each
 app's `firebase-config.js` and the rules deploy workflow; ask for it when wanted.
 
+## Before-and-after screenshots on PRs
+
+`.github/workflows/pr-screenshots.yml` (`tools/shots.mjs`): on every PR from this repo, the first screen (390 px, demo
+mode) of each app the PR changes, on `main` and on the PR, side by side in one PR comment that each push updates. More
+screens: a line `Screens: /logbook/?demo#notes, /evals/?demo` in the PR description (up to 6 pages). The pictures are
+kept on the branch `pr-screenshots`, rewritten on every run as one commit holding only open PRs' latest pictures (no
+history, so clones stay small). PRs opened by the Page edits workflow (GitHub's own token) don't trigger it.
+
 ## Service-worker versions in previews
 
 The live site stamps each app's `sw.js` `VERSION` at deploy (`tools/stamp-versions.mjs`). For previews to do the same,

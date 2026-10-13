@@ -3,7 +3,7 @@
 // firestore.rules to people listed in the "members" collection.
 //
 // Data:
-//   members/{email}            { role: 'admin' | 'rosterer' | 'viewer', name } (viewers only read)
+//   members/{email}            { role: 'admin' | 'rosterer' | 'viewer', name, staffId? } (viewers only read)
 //   team/main                  { settings, staff, roomTemplate, updatedAt, updatedBy }
 //   rosters/{date}             { date, day, roster, updatedAt, updatedBy }
 //   rosters/{date}/versions/*  { day, roster, savedAt, savedBy }   (never changed once written)
@@ -68,6 +68,26 @@ export async function saveTeam(data, user) {
   const { db, F } = await sdk();
   const doc = plain({ ...data, updatedAt: Date.now(), updatedBy: who(user) });
   await F.setDoc(F.doc(db, 'team', 'main'), doc);
+  return doc;
+}
+
+// Save the staff list (team/main), the monthly rosters and the rotations together, in one transaction, so they stay
+// in step. expectedUpdatedAt is team/main's time when this browser last loaded or saved it: if someone else has
+// saved since, a Conflict is thrown unless force is set (as for rosters).
+export async function saveTeamAll({ team, months, rotations }, user, { expectedUpdatedAt = null, force = false } = {}) {
+  const { db, F } = await sdk();
+  const by = who(user), now = Date.now();
+  const main = F.doc(db, 'team', 'main');
+  const doc = plain({ ...team, updatedAt: now, updatedBy: by });
+  await F.runTransaction(db, async tx => {
+    const cur = await tx.get(main);
+    if (!force && cur.exists() && cur.data().updatedAt !== expectedUpdatedAt) {
+      throw new Conflict({ updatedAt: cur.data().updatedAt, updatedBy: cur.data().updatedBy });
+    }
+    tx.set(main, doc);
+    tx.set(F.doc(db, 'team', 'monthly'), plain({ months, updatedAt: now, updatedBy: by }));
+    tx.set(F.doc(db, 'team', 'rotations'), plain({ weeks: rotations.weeks || {}, updatedAt: now, updatedBy: by }));
+  });
   return doc;
 }
 
@@ -183,9 +203,10 @@ export async function listMembers() {
   return snap.docs.map(d => ({ email: d.id, ...d.data() })).sort((a, b) => a.email.localeCompare(b.email));
 }
 
-export async function setMember(email, role, name = '') {
+// staffId: who this account is on the staff list (set by an admin), so My day doesn't have to guess from the name.
+export async function setMember(email, role, name = '', staffId = '') {
   const { db, F } = await sdk();
-  await F.setDoc(F.doc(db, 'members', email.trim().toLowerCase()), { role, name });
+  await F.setDoc(F.doc(db, 'members', email.trim().toLowerCase()), { role, name, ...(staffId ? { staffId } : {}) });
 }
 
 export async function removeMember(email) {

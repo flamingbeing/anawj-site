@@ -8,6 +8,8 @@ const cloud = await import('../js/cloud.js');
 const { resetDemo, cleanCase, cleanSummary, cleanResident, importDocId, DEMO_USER } = await import('../js/demo-backend.js');
 
 assert.equal(cloud.demo, true);
+// the sync engine (sync.js) opens this device's copy first (memory here, no IndexedDB in node): let it settle
+const settle = () => new Promise(r => setTimeout(r, 5));
 assert.equal(cloud.enabled, true);
 
 // whitelists
@@ -57,10 +59,11 @@ const E = DEMO_USER.email;
   assert.equal(lb2.templates.length, 1);
 }
 
-// cases: watchCases fires immediately and on every change, newest first
+// cases: watchCases fires once the list is known and on every change, newest first
 {
   const calls = [];
   const stop = cloud.watchCases(E, cases => calls.push(cases));
+  await settle();
   assert.equal(calls.length, 1);
   assert.deepEqual(calls[0], []);
   await cloud.saveCase(E, { id: 'a', date: '2026-01-01', details: 'AB 30F LSCS', cats: ['16'], createdAt: 1 });
@@ -95,7 +98,7 @@ const E = DEMO_USER.email;
   assert.deepEqual(prog.at(-1), [3, 3]);
   assert.deepEqual(await cloud.importCases('other@example.com', 'R1', [...rows, { ...rows[2], importKey: 'h3#0' }]), { written: 1, skipped: 3 });
   const got = [];
-  cloud.watchCases('other@example.com', cs => got.push(cs))();
+  const off = cloud.watchCases('other@example.com', cs => got.push(cs)); await settle(); off();
   assert.equal(got[0].length, 4);
   assert.ok(got[0].every(c => c.source === 'import' && c.id.startsWith('imp_')));
   // after an email fix the import record no longer applies: everything goes to the new address
@@ -130,7 +133,7 @@ const E = DEMO_USER.email;
   assert.equal((await cloud.myResident(E)).rid, 'DEMO01');
   assert.ok((await cloud.listSummaries()).length >= 3);
   let first = null;
-  cloud.watchCases(E, cs => { first ??= cs; })();
+  const off = cloud.watchCases(E, cs => { first ??= cs; }); await settle(); off();
   assert.ok(first.length > 0);
 }
 

@@ -14,6 +14,22 @@ export function cellText(v) {
   return String(v);
 }
 
+// A date written in a sheet cell, as YYYY-MM-DD, or null: "2026-10-14", "14/10/2026" (day first), "14 Oct 2026",
+// "Wednesday, 14 October 2026". Written out rather than left to new Date(), which reads these differently by browser.
+const MON = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+export function dateFromText(text) {
+  const t = String(text ?? '').trim();
+  const pad = n => String(n).padStart(2, '0');
+  const ok = (y, m, d) => { const x = new Date(Date.UTC(y, m - 1, d)); return x.getUTCMonth() === m - 1 && x.getUTCDate() === d ? `${y}-${pad(m)}-${pad(d)}` : null; };
+  let m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) return ok(+m[1], +m[2], +m[3]);
+  m = t.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})$/);
+  if (m) return ok(+m[3] < 100 ? 2000 + +m[3] : +m[3], +m[2], +m[1]);
+  m = t.match(/(\d{1,2})(?:st|nd|rd|th)?[\s-]+([A-Za-z]{3})[a-z]*\.?[\s,-]+(\d{4})/);
+  if (m && MON.includes(m[2].toLowerCase())) return ok(+m[3], MON.indexOf(m[2].toLowerCase()) + 1, +m[1]);
+  return null;
+}
+
 // Rows of a department roster sheet: label in A, senior in C, junior in F, premed in I, notes in L.
 export function readRosterRows(ws) {
   const rows = [];
@@ -143,8 +159,8 @@ function normGrade(g, seniorish) {
 }
 
 // Build the roster workbook in the department's layout.
-export function buildRosterWorkbook(ExcelJS, { date, rows, lists, general, box, colourOf, shortOf }) {
-  const layout = buildLayout({ date, rows, lists, general, box, colourOf, shortOf });
+export function buildRosterWorkbook(ExcelJS, { date, rows, lists, general, box, colourOf, shortOf, stamp }) {
+  const layout = buildLayout({ date, rows, lists, general, box, colourOf, shortOf, stamp });
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet(date || 'roster', { pageSetup: { orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 1 } });
   ws.columns = COL_WIDTHS.map(width => ({ width }));

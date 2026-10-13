@@ -1,17 +1,19 @@
 import {
   DEFAULT_SETTINGS, DEFAULT_ROOMS, JUNIOR_GRADES, SENIOR_GRADES, DEFAULT_GRADE, OLD_GRADES, POSTINGS, postingName, bySeniority, STATUSES, COLOURS, COLOUR_ARGB, isBaby,
-  matchName, splitNameList, namesInCell, suggestFlags, generate, check, learnFromRosters, tickFromHistory, remoteRoom, suggestShortNames, mergeContacts, planImport, importUpdate, findDuplicates, mergeStaffRecords, pacuRoom, isPacu, fmtSenior, fmtJunior, SPECIAL_ROWS, isCoverPart, coverTarget,
+  matchName, sameNameScore, splitNameList, namesInCell, sentRows, rosterChanges, changeText, suggestFlags, generate, check, learnFromRosters, tickFromHistory, remoteRoom, suggestShortNames, mergeContacts, planImport, importUpdate, findDuplicates, mergeStaffRecords, pacuRoom, isPacu, fmtSenior, fmtJunior, SPECIAL_ROWS, isSpecialRow, isCoverPart, coverTarget,
 } from './engine.js';
 // Seniors are always shown in black; juniors may be green (Baby MO) or purple (locum).
 const staffColour = p => (p && p.role !== 'senior' && p.colour) || '';
-import { readRosterRows, readStaffSheet, buildRosterWorkbook, cellText, isContactList, readContactList, cleanContactName } from './xlsxio.js';
+import { readRosterRows, dateFromText, readStaffSheet, buildRosterWorkbook, cellText, isContactList, readContactList, cleanContactName } from './xlsxio.js';
 import { buildLayout, COL_WIDTHS, shortName, doubleCovered, isDouble, TEAM_ROWS, DUTIES } from './layout.js';
 import * as cloud from './cloud.js';
 import { buildRosterPdf } from './pdfout.js';
 import { buildRosterCanvas } from './pngout.js';
+import { buildIcs } from './ics.js';
 import { emptyRotations, postingOn, weekPosting, mondayOf, weeksOfYear, setWeeks, readRotationSheet, buildRotationWorkbook, POSTING_FILL } from './rotations.js';
 import { makeDemo, demoNotes, demoAdmin } from './demo.js';
-import { MONTHLY, monthlyDef, LEAVE_TYPES, NIGHT_DUTIES, cleanCell, daysIn, weekday, monthName, addDays, readMonthlyPdf, readMonthlyXlsx, buildMonthlyWorkbook, dutiesOn, generalFromMonthly, leaveOn } from './monthly.js';
+import { mergeSaved, migrateRooms as migrateRoomsIn } from './store.js';
+import { MONTHLY, monthlyDef, LEAVE_TYPES, NIGHT_DUTIES, monthIssues, cleanCell, daysIn, weekday, monthName, addDays, readMonthlyPdf, readMonthlyXlsx, buildMonthlyWorkbook, dutiesOn, generalFromMonthly, leaveOn } from './monthly.js';
 
 // ?demo: a made-up department, kept apart from real data in its own storage
 const DEMO = new URLSearchParams(location.search).has('demo');
@@ -42,15 +44,23 @@ function blankState() {
 }
 
 let state = blankState();
+// storage trouble, shown as a bar: 'full' (a save failed) or { corrupt: key } (saved data couldn't be read)
+let storeProblem = null;
 try {
-  const saved = JSON.parse(localStorage.getItem(KEY) || 'null');
-  if (saved) state = { ...state, ...saved, settings: { ...clone(DEFAULT_SETTINGS), ...saved.settings }, roomsVersion: saved.roomsVersion || 1 };
-} catch { /* private mode or corrupt data: start fresh */ }
+  const raw = localStorage.getItem(KEY);
+  let saved = null;
+  try { saved = JSON.parse(raw || 'null'); } catch {
+    // damaged: keep a copy before the next save writes over it
+    const key = `${KEY}-damaged-${Date.now()}`;
+    try { localStorage.setItem(key, raw); storeProblem = { corrupt: key }; } catch { storeProblem = { corrupt: null, raw }; }
+  }
+  if (saved) state = mergeSaved(state, saved, DEFAULT_SETTINGS);
+} catch { /* private mode: start fresh */ }
 migrateRooms();
 syncRooms();
 state.rotations ||= emptyRotations();
 // bumped when the demo data changes, so a demo already open in a browser picks it up
-const DEMO_VERSION = 5;
+const DEMO_VERSION = 6;
 if (DEMO && !state.staff.length) startDemo();
 else if (DEMO && state.demoVersion !== DEMO_VERSION) { state = blankState(); syncRooms(); startDemo(); } // the made-up department changed: start it again
 
@@ -81,6 +91,94 @@ function fillDemoNotes(day) {
 }
 const demoLink = () => location.origin + location.pathname + '?demo';
 
+// Practice: harder mornings to try, also as links a trainer can send (?demo=short, ?demo=latemc, ?demo=weekend).
+const SCENARIOS = [['short', 'Short-staffed (seniors away, double covers)'], ['latemc', 'Late MC at 7am (after the roster is out)'], ['weekend', 'A weekend']];
+function applyScenario(kind) {
+  if (kind === 'weekend') {
+    const d = new Date(state.day.date + 'T12:00'); d.setDate(d.getDate() + ((6 - d.getDay() + 7) % 7 || 7));
+    switchDate(isoDate(d));
+    return toast('A weekend: only emergency lists and calls. Generate, then check who covers what.');
+  }
+  pushUndoAll(`the "${SCENARIOS.find(x => x[0] === kind)[1]}" practice`, { day: true });
+  if (kind === 'short') {
+    // enough away that the lists outnumber the seniors by three, so some rooms must be double covered
+    const avail = state.staff.filter(p => p.role === 'senior' && (dayOf(p.id).status || 'avail') === 'avail');
+    const rooms = state.day.rooms.filter(r => r.running && !isPacu(r.name)).length + 1; // + AOCC
+    const n = Math.max(4, avail.length - rooms + 3);
+    const away = avail.filter(p => !(p.subspecs || []).length).slice(0, n);
+    for (const p of away) Object.assign(dayOf(p.id), { status: 'leave', manual: true });
+    runGenerate(true);
+    goTab('roster');
+    return toast(`${away.length} more seniors are away: the roster double covers where it can (the & marks). Check the Problems card.`);
+  }
+  if (kind === 'latemc') {
+    if (!state.roster || state.roster.date !== state.day.date) runGenerate(true);
+    const on = role => state.staff.find(p => p.role === role && state.roster.rows.some(r => !isSpecialRow(r) && cellParts(r, role === 'senior' ? 'senior' : 'junior').some(x => personOfPart(x) === p)));
+    const sick = [on('senior'), on('junior')].filter(Boolean);
+    for (const p of sick) Object.assign(dayOf(p.id), { status: 'mc', manual: true });
+    afterRosterEdit(true);
+    goTab('roster');
+    return toast(`${sick.map(p => shortName(p) || p.name).join(' and ')} just called in sick. Take them off and fill the gaps, then send the changes.`);
+  }
+}
+
+// Practice: the day as Practice first made it.
+function resetPracticeDay() {
+  pushUndoAll('resetting the day', { day: true });
+  state.day = { date: state.day.date, rooms: [], staff: {} };
+  state.roster = null; state.practiceTask = null;
+  syncRooms(); fillDemoNotes(state.day); syncMonthly();
+  lastRows = null;
+  render();
+  undoToast('This day is back to how Practice made it.');
+}
+// Practice: make the roster, then plant three mistakes a rosterer meets most mornings; the card on the Roster
+// tab ticks each one off when the live checks no longer find it.
+function startPracticeTask() {
+  if (!state.roster || state.roster.date !== state.day.date) runGenerate(true);
+  const r = state.roster;
+  if (!r) return;
+  pushUndoAll('the practice task', { day: true });
+  const rows = r.rows.filter(x => !isSpecialRow(x) && !isPacu(x.label) && x.senior && x.junior);
+  const onLeave = state.staff.find(p => p.role === 'senior' && ['leave', 'mc'].includes(dayOf(p.id).status));
+  const [a, b] = [rows[1], rows[4]];
+  const items = [];
+  if (a && onLeave) { a.senior = fmtSenior(onLeave, dayOf(onLeave.id)); items.push({ label: `Someone on leave is on a list`, match: `${onLeave.name} is on` }); }
+  if (b) { b.senior = ''; items.push({ label: `${b.label} has no senior`, match: `${b.label}: no senior` }); }
+  // a double cover with no junior, inside one complex (as the generator would pair rooms)
+  const host = rows.find(x => x !== a && x !== b && rows.some(y => y !== x && y !== a && y !== b && y.complex === x.complex));
+  const dbl = host && rows.find(y => y !== host && y !== a && y !== b && y.complex === host.complex);
+  const s0 = host && cellParts(host, 'senior')[0];
+  if (dbl && s0) { dbl.senior = s0; dbl.junior = ''; items.push({ label: `${dbl.label}: a double cover with no junior`, match: `${dbl.label}: no junior` }); }
+  state.practiceTask = { date: state.day.date, items };
+  lastRows = JSON.stringify(r.rows);
+  afterRosterEdit(true);
+  goTab('roster');
+  toast('Three problems are planted in this roster. Fix them from the Problems card (or by hand); the checklist ticks them off.');
+}
+function practiceTaskCard() {
+  const t = state.practiceTask;
+  if (!DEMO || !t || t.date !== state.day.date || !state.roster) return null;
+  const texts = (state.roster.checks || []).map(w => w.text);
+  const done = t.items.map(i => !texts.some(x => x.includes(i.match)));
+  const all = done.every(Boolean);
+  return h('section', { class: 'card practice-task' + (all ? ' done' : '') },
+    h('h2', {}, all ? 'Well done: all fixed' : `Practice: fix ${t.items.length} problems (${done.filter(Boolean).length} of ${t.items.length})`),
+    h('ul', { class: 'task-list' }, t.items.map((i, k) => h('li', { class: done[k] ? 'ok' : '' }, done[k] ? '✓ ' : '○ ', i.label))),
+    all ? h('div', { class: 'bar' }, h('button', { class: 'small', onclick: startPracticeTask }, 'Another one'), h('button', { class: 'small', onclick: () => { state.practiceTask = null; render(); } }, 'Close'))
+      : h('p', { class: 'hint' }, 'Try the fix buttons in the Problems card first: Take off, Fill empty gaps, Swap.'));
+}
+// Practice: a draft in the admin team's format, so "Do it all" can be tried as on a real morning.
+async function downloadPracticeDraft() {
+  const rows = state.day.rooms.filter(r => r.running && !isPacu(r.name)).map(r => ({ roomId: r.id, label: r.name, complex: r.complex, senior: '', junior: '', premed: '', notes: r.notes || '' }));
+  const wb = buildRosterWorkbook(await excel(), { date: state.day.date, rows, lists: rosterLists(), general: effectiveGeneral(), box: '', colourOf, shortOf });
+  // the admin team's draft has each room's cases in column L (the sent-out sheet doesn't)
+  const notes = Object.fromEntries(rows.map(r => [r.label, r.notes]));
+  wb.worksheets[0].eachRow(row => { const label = cellText(row.getCell(1).value).replace(/:\s*$/, '').trim(); if (notes[label]) row.getCell(12).value = notes[label]; });
+  download(`Practice draft ${state.day.date}.xlsx`, new Blob([await wb.xlsx.writeBuffer()], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+  toast('Practice draft downloaded. Now press "Do it all" and pick it.');
+}
+
 // Room list changes since the first version: Remote Case -> Remote 1 + Remote 2, add KROR 1 and MCOR 9.
 // Names imported before titles were stripped ("Dr Brandon Ong", "A/Prof ..."): clean them and
 // remember they came from an import, so a contact list can correct their role.
@@ -98,58 +196,25 @@ function cleanStaffNames() {
 }
 cleanStaffNames();
 
-function migrateRooms() {
-  const t = state.roomTemplate;
-  if ((state.roomsVersion || 1) >= 2) return migratePacu();
-  const rename = (from, to) => {
-    t.forEach(r => { if (r.name === from) r.name = to; });
-    (state.day.rooms || []).forEach(r => { if (r.name === from) r.name = to; });
-    (state.roster?.rows || []).forEach(r => { if (r.label === from) r.label = to; });
-  };
-  rename('Remote Case', 'Remote 1');
-  const addAfter = (name, complex, after, before) => {
-    if (t.some(r => r.name === name)) return;
-    let i = t.findIndex(r => r.name === after);
-    if (i >= 0) i++; else i = Math.max(0, t.findIndex(r => r.name === before));
-    t.splice(i, 0, { complex, name, defaultOn: false });
-  };
-  addAfter('Remote 2', 'Other', 'Remote 1', 'KROR 2');
-  addAfter('KROR 1', 'KROR', null, 'KROR 2');
-  addAfter('MCOR 9', 'MCOR', 'MCOR 8', 'MCOR 10');
-  t.forEach(r => { if (r.defaultOn === undefined) r.defaultOn = true; });
-  state.roomsVersion = 2;
-  migratePacu();
-}
+function migrateRooms() { migrateRoomsIn(state); } // (a declaration, so it can run before this line)
 
-// v3: a PACU row above each complex
-function migratePacu() {
-  if ((state.roomsVersion || 1) >= 3) return migrateEct();
-  const t = state.roomTemplate;
-  for (const [complex, name] of [['KROR', 'KROR PACU'], ['MCOR', 'MCOR PACU'], ['MOR', 'MBOR PACU']]) {
-    if (t.some(r => r.name === name)) continue;
-    const i = t.findIndex(r => r.complex === complex);
-    t.splice(i < 0 ? t.length : i, 0, { complex, name, defaultOn: true });
-  }
-  state.roomsVersion = 3;
-  migrateEct();
-}
-
-// v4: ECT moves from the calls to the OT rows, just above MBOR PACU
-function migrateEct() {
-  if ((state.roomsVersion || 1) >= 4) return;
-  const t = state.roomTemplate;
-  if (!t.some(r => r.name === 'ECT')) {
-    const i = t.findIndex(r => r.name === 'MBOR PACU');
-    t.splice(i < 0 ? t.length : i, 0, { complex: 'ECT', name: 'ECT', defaultOn: true });
-  }
-  state.roomsVersion = 4;
-}
-
-let saveTimer;
+let saveTimer, lastSaved = '', checkKey = '', clearedForGood = false, otherTab = false;
 function save() {
   clearTimeout(saveTimer);
+  if (clearedForGood) return; // signed out and cleared: write nothing back
+  if (otherTab) return; // another tab saved since: this one would overwrite it
   saveTimer = setTimeout(() => {
-    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch { /* storage unavailable */ }
+    const was = storeProblem === 'full';
+    try {
+      const json = JSON.stringify(state);
+      if (json === lastSaved && storeProblem !== 'full') return; // nothing changed since the last write
+      localStorage.setItem(KEY, json);
+      lastSaved = json;
+      if (was) { storeProblem = null; renderStoreBar(); toast('Saving in this browser works again.'); }
+    } catch {
+      // usually the browser's storage is full: say so, rather than losing changes without a word
+      if (!storeProblem || was) { storeProblem = 'full'; renderStoreBar(); }
+    }
   }, 200);
 }
 
@@ -185,13 +250,17 @@ function h(tag, attrs = {}, ...kids) {
 // A short message at the bottom. With an action (e.g. Undo) it stays longer and has a button.
 function toast(msg, action) {
   const t = document.getElementById('toast');
-  t.replaceChildren(msg, ...(action ? [' ', h('button', { class: 'small', onclick: () => { t.classList.remove('show'); action.run(); } }, action.label)] : []));
+  t.replaceChildren(msg, ...(action ? [' ', h('button', { class: 'small', title: action.title || null, onclick: () => { t.classList.remove('show'); action.run(); } }, action.label)] : []));
   t.classList.toggle('actionable', !!action);
   t.classList.add('show');
   clearTimeout(toast.t);
-  toast.t = setTimeout(() => t.classList.remove('show'), action ? 8000 : 3500);
+  const ms = action ? 8000 : 3500;
+  toast.t = setTimeout(() => t.classList.remove('show'), ms);
+  // keep it while someone is reading or reaching for its button
+  t.onmouseenter = t.onfocusin = () => clearTimeout(toast.t);
+  t.onmouseleave = t.onfocusout = () => { clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 2500); };
 }
-const undoToast = msg => toast(msg, { label: 'Undo', run: undo });
+const undoToast = msg => toast(msg, { label: 'Undo', run: undo, title: 'Undo (Ctrl+Z)' });
 
 const select = (value, options, onchange) => h('select', { onchange: e => onchange(e.target.value) },
   options.map(o => {
@@ -202,8 +271,21 @@ const select = (value, options, onchange) => h('select', { onchange: e => onchan
 const fileButton = (label, accept, multiple, onfiles) => h('label', { class: 'btn' }, label,
   h('input', { type: 'file', accept, multiple, hidden: true, onchange: async e => { const f = [...e.target.files]; e.target.value = ''; if (f.length) await onfiles(f); } }));
 
+// Vendor scripts (ExcelJS, jsPDF, pdf.js) load the first time they're needed, so opening the app (and My day on
+// a phone) doesn't wait for them. Each loads once.
+const vendorLoads = {};
+function loadVendor(src) {
+  return vendorLoads[src] ||= new Promise((ok, fail) => {
+    const el = document.createElement('script');
+    el.src = src; el.onload = ok;
+    el.onerror = () => { delete vendorLoads[src]; fail(new Error(`Couldn't load ${src}`)); };
+    document.head.append(el);
+  });
+}
+const excel = async () => { await loadVendor('vendor/exceljs.min.js'); return window.ExcelJS; };
+
 async function readWorkbook(file) {
-  const wb = new window.ExcelJS.Workbook();
+  const wb = new (await excel()).Workbook();
   const buf = await file.arrayBuffer();
   if (/\.csv$/i.test(file.name)) {
     const ws = wb.addWorksheet('csv');
@@ -235,6 +317,25 @@ function download(name, blob) {
 // ---------- render ----------
 
 const app = document.getElementById('app');
+// Fields in table cells have no visible label of their own: name each from its column heading and row,
+// so a screen reader says "Session, MOR 4" rather than "combo box".
+function labelTableFields(root) {
+  for (const f of root.querySelectorAll('td input:not([aria-label]):not([type=hidden]), td select:not([aria-label]), td textarea:not([aria-label])')) {
+    if (f.labels?.length) continue;
+    const td = f.closest('td'), tr = td.parentElement, table = td.closest('table');
+    const col = [...tr.children].indexOf(td);
+    const head = table.querySelector('thead tr')?.children[col]?.textContent.trim();
+    const rowName = [...tr.children].find(c => c !== td && c.textContent.trim())?.textContent.trim()
+      || tr.querySelector('input')?.value || '';
+    const label = [head, rowName].filter(Boolean).join(', ') || f.placeholder || '';
+    if (label) f.setAttribute('aria-label', label.slice(0, 80));
+  }
+  // a <label> written just before its field (not wrapping it): tie the two together
+  for (const l of root.querySelectorAll('label:not([for])')) {
+    const f = l.nextElementSibling;
+    if (f && /^(INPUT|SELECT|TEXTAREA)$/.test(f.tagName) && !f.labels?.length && !f.getAttribute('aria-label') && !l.contains(f)) f.setAttribute('aria-label', l.textContent.trim().slice(0, 80));
+  }
+}
 function render() {
   document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === state.tab)));
   const y = window.scrollY;
@@ -248,7 +349,10 @@ function render() {
   syncMonthly();
   if (hashPending?.date === state.day.date) { markSaved(hashPending.date, hashPending.at); hashPending = null; }
   // checks follow every change, wherever it was made (a status on Today, a fix here)
-  if (state.roster?.rows && state.roster.date === state.day.date) state.roster.checks = check({ rows: state.roster.rows, staff: dayStaff(), day: state.day, settings: state.settings });
+  if (state.roster?.rows && state.roster.date === state.day.date) {
+    const key = JSON.stringify([state.roster.rows, state.day, state.staff, state.settings, state.rotations]);
+    if (key !== checkKey || !state.roster.checks) { checkKey = key; state.roster.checks = check({ rows: state.roster.rows, staff: dayStaff(), day: state.day, settings: state.settings }); }
+  }
   app.replaceChildren(({ monthly: renderMonthly, roster: renderRoster, premed: renderPremed, cases: () => renderDay('cases'), staff: renderStaffTab, settings: renderSettings, myday: renderMyDay })[state.tab]());
   renderCloudBar();
   renderDateBar();
@@ -256,15 +360,18 @@ function render() {
   renderSwapBar();
   renderDemoBar();
   renderMovedBar();
+  if (storeProblem && !document.getElementById('store-bar')) renderStoreBar();
+  if (cs.ready && !document.getElementById('backup-bar')) renderBackupBar();
   window.scrollTo(0, y);
   if (state.tab === 'monthly' && state.monthlyView === 'rotations') placeRotGrid();
+  labelTableFields(app);
   save();
 }
 // Each date keeps its own manpower, calls, cases and roster. Switching the header date puts
 // the current day away and brings up the other one (empty if it's new).
 function switchDate(date) {
   if (!date || date === state.day.date) return;
-  (state.days ||= {})[state.day.date] = { day: state.day, roster: state.roster };
+  (state.days ||= {})[state.day.date] = { day: state.day, roster: state.roster && { ...state.roster, checks: undefined } };
   const rec = state.days[date];
   delete state.days[date];
   state.day = rec?.day || { date, rooms: [], staff: {} };
@@ -274,6 +381,7 @@ function switchDate(date) {
   if (isViewer()) viewerLoad(date);
   if (DEMO && !state.monthly?.[date.slice(0, 7)]?.junior) for (const [m, v] of Object.entries(makeDemo(date).monthly)) (state.monthly ||= {})[m] ||= v; // months further out
   if (DEMO && !rec) fillDemoNotes(state.day);
+  applyCarry(state.day);
   clearUndo(); editing = null;
   lastRows = state.roster ? JSON.stringify(state.roster.rows) : null;
   render();
@@ -292,8 +400,70 @@ function renderMovedBar() {
     h('button', { class: 'small primary', onclick: downloadEverything }, 'Download everything'),
     h('button', { class: 'small', onclick: go }, 'Go to the new address')));
 }
+// The same roster open in two tabs: each would quietly write over the other. When another tab saves, this one stops
+// saving and says so, with Reload to pick up the other tab's work.
+addEventListener('storage', e => {
+  if (e.key !== KEY || clearedForGood || otherTab) return;
+  otherTab = true; clearTimeout(saveTimer);
+  document.getElementById('tab-bar')?.remove();
+  document.body.prepend(h('div', { id: 'tab-bar', class: 'demo-bar moved-bar', role: 'alert' },
+    h('b', {}, 'The roster was changed in another tab.'), h('span', {}, ' This tab has stopped saving so it doesn\'t undo that. Reload to carry on here with the latest, or close this tab.'),
+    h('span', { class: 'grow' }), h('button', { class: 'small primary', onclick: () => location.reload() }, 'Reload')));
+});
+// Not signed in to the team: the roster lives only in this browser. Once a week, suggest a backup file.
+const BACKUP_KEY = 'nuh-roster-backup-nag';
+function renderBackupBar() {
+  document.getElementById('backup-bar')?.remove();
+  if (DEMO || isViewer() || isMember() || !state.staff.length) return;
+  let snooze = 0;
+  try { snooze = +localStorage.getItem(BACKUP_KEY) || 0; } catch { /* no storage */ }
+  const last = Math.max(state.backupAt || 0, snooze);
+  if (!last) { try { localStorage.setItem(BACKUP_KEY, String(Date.now())); } catch { /* no storage */ } return; } // first week: quiet
+  if (Date.now() - last < 7 * 864e5) return;
+  const later = () => { try { localStorage.setItem(BACKUP_KEY, String(Date.now())); } catch { /* no storage */ } renderBackupBar(); };
+  document.body.prepend(h('div', { id: 'backup-bar', class: 'demo-bar' },
+    h('b', {}, 'A backup?'), h('span', {}, ' The roster is kept only in this browser. Download everything once a week, or sign in to save it for the team.'),
+    h('span', { class: 'grow' }),
+    h('button', { class: 'small primary', onclick: () => { downloadEverything(); renderBackupBar(); } }, 'Download everything'),
+    h('button', { class: 'small', onclick: later }, 'Later')));
+}
+// A bar when this browser can't keep the roster: storage full, or saved data that couldn't be read.
+function renderStoreBar() {
+  document.getElementById('store-bar')?.remove();
+  if (!storeProblem) return;
+  const bar = h('div', { id: 'store-bar', class: 'demo-bar moved-bar', role: 'alert' });
+  if (storeProblem === 'full') {
+    const old = oldDays(90);
+    bar.append(h('b', {}, 'Changes are not being kept in this browser.'),
+      h('span', {}, ' Its storage is probably full. Download everything to keep a copy' + (old.length ? `, then remove days more than 3 months old (${old.length}).` : '.')),
+      h('span', { class: 'grow' }),
+      h('button', { class: 'small primary', onclick: downloadEverything }, 'Download everything'),
+      ...(old.length ? [h('button', { class: 'small', onclick: () => removeOldDays(old) }, 'Remove old days')] : []));
+  } else {
+    const { corrupt, raw } = storeProblem;
+    const copy = () => download(`NUH roster, damaged saved data ${realToday()}.txt`, new Blob([corrupt ? localStorage.getItem(corrupt) || '' : raw || ''], { type: 'text/plain' }));
+    bar.append(h('b', {}, 'The roster saved in this browser couldn\'t be read, so the app started empty.'),
+      h('span', {}, corrupt ? ' A copy of it is kept in this browser.' : ' It couldn\'t be copied, so download it now, before you change anything.'),
+      h('span', { class: 'grow' }),
+      h('button', { class: 'small primary', onclick: copy }, 'Download the damaged data'),
+      h('button', { class: 'small', onclick: () => { storeProblem = null; renderStoreBar(); } }, 'Hide'));
+  }
+  document.body.prepend(bar);
+}
+// Stored dates more than n days before today (the open date is never in state.days).
+function oldDays(n) {
+  const cut = addDays(realToday(), -n);
+  return Object.keys(state.days || {}).filter(d => d < cut).sort();
+}
+function removeOldDays(dates) {
+  if (!confirm(`Remove ${dates.length} days from ${dates[0]} to ${dates[dates.length - 1]} from this browser? Download everything first if you want to keep them (days saved for the team stay in the cloud).`)) return;
+  for (const d of dates) delete state.days[d];
+  save();
+  renderStoreBar();
+}
 // Everything this browser holds for the roster (staff, settings, every day's roster, monthly rosters, rotations).
 function downloadEverything() {
+  state.backupAt = Date.now(); save();
   const data = { kind: 'ot-roster-all', version: 1, savedAt: new Date().toISOString(), state };
   download(`NUH roster, everything in this browser ${realToday()}.json`, new Blob([JSON.stringify(data)], { type: 'application/json' }));
 }
@@ -308,10 +478,16 @@ function renderDemoBar() {
   }
   if (document.getElementById('demo-bar')) return;
   document.body.prepend(h('div', { id: 'demo-bar', class: 'demo-bar' },
-    h('b', {}, 'Practice'), h('span', {}, ' · made-up staff and rosters, saved only in this browser. Try anything: nothing here touches the real roster.'),
+    h('b', {}, 'Practice'), h('span', { class: 'demo-text' }, ' · made-up staff and rosters, saved only in this browser. Try anything: nothing here touches the real roster.'),
     h('span', { class: 'grow' }),
+    // on a phone the tools fold away, so the bar doesn't take a third of the screen
+    h('details', { class: 'demo-tools', open: innerWidth > 600 }, h('summary', {}, 'Practice tools'), h('span', { class: 'demo-actions' },
     h('button', { class: 'small', onclick: () => startTour() }, 'Tour'),
+    h('button', { class: 'small', title: 'A roster with three problems planted in it, to find and fix', onclick: startPracticeTask }, 'Fix 3 problems'),
+    (() => { const sel = select('', [['', 'Try a morning…'], ...SCENARIOS.map(([k, label]) => [k, label])], v => { if (v) applyScenario(v); }); sel.setAttribute('aria-label', 'Practice a harder morning'); return sel; })(),
+    h('button', { class: 'small', title: 'This day back to how Practice made it (Undo brings your version back)', onclick: resetPracticeDay }, 'Reset this day'),
     h('button', { class: 'small', onclick: () => { if (confirm('Start practice again from scratch?')) { try { localStorage.removeItem(KEY); localStorage.removeItem(TOUR_KEY); } catch { /* no storage */ } location.reload(); } } }, 'Start again'),
+    )),
     h('a', { class: 'btn small', href: location.pathname }, 'Back to the real roster')));
 }
 
@@ -321,13 +497,21 @@ const TOUR = [
   { sel: '#date', title: 'The day you\'re rostering', text: 'Everything follows this date. ‹ › step a day ([ and ] on a keyboard), and it warns you when it isn\'t tomorrow.' },
   { tab: 'monthly', sel: '#steps', title: 'Your morning, in five steps', text: 'Monthly rosters, cases, roster, check, then save or download. Each step turns green when it\'s done; tap one to go there.' },
   { tab: 'monthly', sel: '.board', title: 'Who\'s working', text: 'Leave, MC and post call come from the monthly rosters. Tap a name to change their day; "Select several" moves many at once.' },
-  { tab: 'cases', sel: '#app label.btn.primary', title: 'Start from the admin draft', text: '"Do it all" reads the admin team\'s draft, makes the roster and shows what needs a look.' },
+  { tab: 'cases', sel: '#app label.btn.primary', title: 'Start from the admin draft', text: '"Do it all" reads the admin team\'s draft, makes the roster and shows what needs a look. In Practice, "Download a practice draft" gives you one to try.' },
   { tab: 'roster', sel: '#problems', title: 'What needs a look', text: 'Problems are listed here with a button that fixes each one, and Show to find the room.' },
   { tab: 'roster', sel: 'table.sheet', title: 'The roster', text: 'Tap a name for its box: leaving time, (L), comments, Move or swap. On a computer you can drag names; + suggests the best fits first.' },
   { tab: 'roster', sel: '.split', title: 'Send it out', text: 'Download the sheet as Excel or PDF, or save it for the team. Undo (Ctrl+Z) takes back anything.' },
+  { sel: '#keyBtn', title: 'Stuck?', text: 'Key and help explains every mark (&, C, (L), the colours) and answers "How do I…?". It also has a one-page guide to print for the OT computer.' },
 ];
 let tourStep = -1;
-function startTour() { tourStep = 0; showTourStep(); }
+function startTour() {
+  // the tour points at a roster; an empty real app has none, so offer Practice (which has one) instead
+  if (!DEMO && (!state.staff.length || !state.roster)) {
+    toast('The tour shows a made-up roster in Practice, so it doesn\'t touch yours.', { label: 'Open Practice', run: () => window.open(demoLink(), '_blank', 'noopener') });
+    return;
+  }
+  tourStep = 0; showTourStep();
+}
 function endTour() {
   tourStep = -1;
   document.getElementById('tour')?.remove();
@@ -615,6 +799,22 @@ function renderStaff(role) {
   );
 }
 
+// The first time the real app opens (no staff yet): three ways in, instead of an empty staff page.
+function welcomeCard() {
+  if (state.staff.length || DEMO || isViewer()) return null;
+  const signIn = cloud.enabled && !cs.user;
+  return h('section', { class: 'card welcome' },
+    h('h2', {}, 'Welcome to the NUH roster'),
+    h('p', {}, 'Each day goes: monthly rosters → cases → generate the roster → fix the problems it lists → send it out. To start, the app needs the staff list.'),
+    h('ol', { class: 'welcome-steps' },
+      h('li', {}, h('b', {}, 'New here? '), 'Practise first on a made-up department, with a short tour. Nothing you do there touches the real roster. ',
+        h('a', { class: 'btn primary', href: demoLink(), target: '_blank', rel: 'noopener' }, 'Try Practice')),
+      cloud.enabled ? h('li', {}, h('b', {}, 'On the team? '), signIn ? 'Sign in with your Google account: the team\'s staff list loads by itself. ' : cs.member ? 'The team\'s staff list loads when someone has saved it (Staff › Save for the team). ' : 'Ask an admin to add you, then sign in again. ',
+        signIn ? h('button', { onclick: () => cloud.signIn().catch(e => { if (e?.code !== 'auth/popup-closed-by-user') cloudError(e); }) }, 'Sign in with Google') : null) : null,
+      h('li', {}, h('b', {}, 'Setting it up? '), 'Import the master staff sheet or the contact list (Excel). You check the list before anything is kept. ',
+        fileButton('Import staff sheet', '.xlsx,.csv', false, async files => { if (!staffEditing()) startStaffEdit(); await importStaffSheet(files); }))));
+}
+
 function renderStaffView(role) {
   const subs = state.settings.subspecs;
   const senior = role === 'senior';
@@ -634,6 +834,7 @@ function renderStaffView(role) {
     senior && h('td', {}, (p.avoid || []).join(', ')),
   );
   return h('div', {},
+    welcomeCard(),
     h('section', { class: 'card' },
       h('h2', {}, senior ? 'Seniors' : 'Juniors'),
       h('p', { class: 'hint' }, senior
@@ -823,6 +1024,46 @@ async function learnFiles(files) {
 
 const pasteText = { leave: '', postcall: '', elsewhere: '', admin: '', notAround: '' };
 let unmatched = [];
+let lastDraft = null, lastRotFile = null; // to read again after names are fixed
+
+// Names an import couldn't match: pick who each one is (closest names first). The spelling is kept as that person's
+// short name, so the next import matches it, then rerun() reads the file again. role: 'senior' | 'junior' | null.
+let fixPick = {};
+function fixNamesCard(names, { role = null, rerun, dismiss, what = 'the file' }) {
+  const list = [...new Set(names.map(n => String(n).trim()).filter(Boolean))];
+  if (!list.length) return null;
+  const pool = state.staff.filter(p => !role || p.role === role);
+  const options = n => {
+    const m = matchName(n, pool);
+    const ranked = pool.map(p => [p, (m.ambiguous || []).includes(p) ? 4 : sameNameScore({ name: n }, p)]).filter(([, sc]) => sc > 0).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([p]) => p);
+    const rest = pool.filter(p => !ranked.includes(p)).sort((a, b) => a.name.localeCompare(b.name));
+    return [['', 'Choose…'], ['skip', 'Skip (not on the staff list)'],
+      ...(ranked.length ? [['', '── closest names ──'], ...ranked.map(p => [p.id, p.name])] : []),
+      ['', '── everyone ──'], ...rest.map(p => [p.id, p.name])];
+  };
+  const save = () => {
+    const changes = [];
+    for (const n of list) {
+      const p = person(fixPick[n]);
+      if (!p) continue;
+      if (![p.name, ...(p.aliases || [])].some(a => a.toLowerCase() === n.toLowerCase())) { (p.aliases ||= []).push(n); changes.push(`${p.name}: short name + ${n}`); }
+    }
+    fixPick = {};
+    if (changes.length) (state.staffLog ||= []).unshift({ at: Date.now(), by: who(), changes }), state.staffLog.splice(300);
+    personCache.clear();
+    toast(changes.length ? `Kept ${changes.length} spelling${changes.length > 1 ? 's' : ''} as short names. Reading ${what} again…` : 'Nothing picked.');
+    if (changes.length && rerun) rerun(); else render();
+  };
+  return h('section', { class: 'card fix-names' },
+    h('h2', {}, `${list.length} name${list.length > 1 ? 's' : ''} not matched`),
+    h('p', { class: 'hint' }, `Pick who each one is. The spelling is kept as their short name, so ${what} matches next time.`),
+    h('table', {}, h('tbody', {}, list.map(n => h('tr', {},
+      h('td', {}, h('b', {}, n)),
+      h('td', {}, select(fixPick[n] || '', options(n), v => { fixPick[n] = v; })))))),
+    h('div', { class: 'bar' },
+      h('button', { class: 'primary', onclick: save }, 'Save and read again'),
+      h('button', { onclick: () => { fixPick = {}; dismiss(); } }, 'Dismiss')));
+}
 let lockEditing = null;
 let settingsEditing = false; // "roomId:lockSenior" while picking a fixed person on the Cases tab
 
@@ -841,6 +1082,28 @@ async function doItAll(files) {
 const goTab = async t => { if (staffEditing() && t !== 'staff' && !(await finishStaffEdit())) return; state.tab = t; window.scrollTo(0, 0); render(); };
 const nextStep = (text, label, tab) => h('div', { class: 'next-step' }, h('span', {}, text), h('button', { class: 'primary', onclick: () => goTab(tab) }, label + ' →'));
 let flagsOpen = null; // the room whose full set of flags is showing on Cases
+// The same weekday last week, if this browser has it: copy which rooms run, their sessions and fixed people
+// (lists repeat by weekday), not the case notes.
+function lastWeekButton() {
+  const prev = addDays(state.day.date, -7), rec = state.days?.[prev];
+  if (!rec?.day?.rooms?.length) return null;
+  const wd = new Date(prev + 'T12:00').toLocaleDateString('en-GB', { weekday: 'long' });
+  return h('button', { title: `Which rooms run, their sessions and fixed seniors and juniors, from ${longDate(prev)}. Case notes aren't copied.`, onclick: () => {
+    pushUndoAll(`copying rooms from last ${wd}`, { day: true });
+    const by = Object.fromEntries(rec.day.rooms.map(r => [r.name, r]));
+    let n = 0;
+    for (const r of state.day.rooms) {
+      const o = by[r.name];
+      if (!o) continue;
+      const lockS = o.lockSenior && person(o.lockSenior) ? o.lockSenior : '', lockJ = o.lockJunior && person(o.lockJunior) ? o.lockJunior : '';
+      if (r.running !== !!o.running || r.session !== o.session || r.lockSenior !== lockS || r.lockJunior !== lockJ) n++;
+      Object.assign(r, { running: !!o.running, session: o.session || 'full', lockSenior: lockS, lockJunior: lockJ });
+    }
+    render();
+    undoToast(n ? `Copied rooms, sessions and fixed people from last ${wd} (${n} room${n === 1 ? '' : 's'} changed).` : `Already the same as last ${wd}.`);
+  } }, `Start from last ${wd}`);
+}
+
 function renderDay(part) {
   const cases = part === 'cases';
   const d = state.day;
@@ -891,17 +1154,17 @@ function renderDay(part) {
 
   const roomRow = r => h('tr', { class: r.running ? '' : 'off' },
     h('td', {}, h('input', { type: 'checkbox', checked: r.running, 'aria-label': 'Running', onchange: e => { r.running = e.target.checked; if (r.running && !r.flagsManual) r.flags = suggestFlags(r.notes, state.settings, r.name); render(); } })),
-    h('td', {}, h('b', {}, r.name)),
-    h('td', {}, select(r.session || 'full', [['full', 'Full'], ['am', 'AM'], ['pm', 'PM']], v => { r.session = v; save(); })),
-    h('td', {}, h('input', { value: r.notes, placeholder: 'e.g. eye 5y', onchange: e => {
+    h('td', { class: 'room' }, h('b', {}, r.name)),
+    h('td', { class: 'session' }, select(r.session || 'full', [['full', 'Full'], ['am', 'AM'], ['pm', 'PM']], v => { r.session = v; save(); })),
+    h('td', { class: 'notes', 'data-label': 'Case notes' }, h('input', { value: r.notes, placeholder: 'e.g. eye 5y', onchange: e => {
       r.notes = e.target.value;
       if (e.target.value.trim()) r.running = true;
       if (!r.flagsManual) r.flags = suggestFlags(r.notes, state.settings, r.name);
       render();
     } })),
-    h('td', {}, flagCell(r)),
-    h('td', {}, lockInput(r, 'lockSenior')),
-    h('td', {}, lockInput(r, 'lockJunior')),
+    h('td', { class: 'flags', 'data-label': 'Flags' }, flagCell(r)),
+    h('td', { class: 'lock', 'data-label': 'Fixed senior' }, lockInput(r, 'lockSenior')),
+    h('td', { class: 'lock', 'data-label': 'Fixed junior' }, lockInput(r, 'lockJunior')),
   );
 
   const pasteBox = (key, label, hint) => h('div', {},
@@ -917,14 +1180,14 @@ function renderDay(part) {
         h('label', { class: 'btn primary', title: 'Load the admin draft, make the roster from it, and show what needs a look' }, 'Do it all: load draft and make roster',
           h('input', { type: 'file', accept: '.xlsx', hidden: true, onchange: async e => { const f = [...e.target.files]; e.target.value = ''; if (f.length) await doItAll(f); } })),
         fileButton('Load draft only', '.xlsx', false, loadDraft),
+        DEMO ? h('button', { title: 'A draft in the admin team\'s usual format, made from this practice day', onclick: downloadPracticeDraft }, 'Download a practice draft') : null,
+        cases ? lastWeekButton() : null,
         cases
           ? h('button', { onclick: () => { pushUndoAll('clearing the cases', { day: true }); d.rooms = []; syncRooms(); render(); undoToast('Cleared the cases. Rooms are back to running by default.'); } }, 'Clear cases')
           : h('button', { onclick: () => { pushUndoAll('clearing the manpower', { day: true }); d.staff = {}; d.lists = {}; render(); undoToast('Cleared leave, post call and other statuses.'); } }, 'Clear manpower'),
       ),
       h('p', { class: 'hint' }, "Both read the admin team's draft in the usual format: running rooms, case notes, leave, post call and upper-half duties. \"Do it all\" then makes the roster and opens its problems."),
-      unmatched.length ? h('ul', { class: 'warnings', style: 'margin-bottom:12px' }, h('li', { class: 'warn' },
-        `Names not matched to the staff list: ${unmatched.join(', ')}. Add them on the Staff tab, or add the short name to the right person, then load or apply again. `,
-        h('button', { class: 'link', onclick: () => { unmatched = []; render(); } }, 'Dismiss'))) : null,
+      fixNamesCard(unmatched, { what: lastDraft ? 'the draft' : 'the names', rerun: lastDraft ? () => loadDraft([lastDraft]) : null, dismiss: () => { unmatched = []; render(); } }),
       h('div', { class: 'stats' },
         h('span', {}, h('b', {}, running.length), ' rooms running'),
         h('span', {}, h('b', {}, avail('senior')), ' seniors available'),
@@ -934,7 +1197,7 @@ function renderDay(part) {
     cases && h('section', { class: 'card scroll' },
       h('h2', {}, 'OT lists'),
       h('p', { class: 'hint' }, 'Tick the rooms that are running and type the case notes as usual. Flags are suggested from the notes (ages under ' + state.settings.paedsAgeYears + 'y count as paeds); "+ flag" adds or removes one. Fix a senior or junior to lock them in; the rest is filled automatically.'),
-      h('table', {},
+      h('table', { class: 'cases-table' },
         h('thead', {}, h('tr', {}, ['Run', 'Room', 'Session', 'Case notes', 'Flags', 'Fixed senior', 'Fixed junior'].map(t => h('th', {}, t)))),
         h('tbody', {}, d.rooms.map(roomRow))),
     ),
@@ -1072,13 +1335,12 @@ function readUpperHalf(ws, d) {
 }
 
 async function loadDraft([file]) {
+  lastDraft = file;
   const wb = await readWorkbook(file);
   const ws = wb.worksheets[0];
   const rows = readRosterRows(ws);
   const dateCell = cellText(ws.getCell('C5').value).trim();
-  const parsed = dateCell ? new Date(dateCell + ' 12:00') : null;
-  // a draft for another date goes to that date; the current one is put away first
-  const draftDate = parsed && !isNaN(parsed) ? `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}` : null;
+  const draftDate = dateFromText(dateCell);
   const moved = draftDate && draftDate !== state.day.date;
   if (moved) switchDate(draftDate);
   const d = state.day;
@@ -1163,10 +1425,12 @@ function pushUndoAll(what, { day = false } = {}) {
 // The state an entry would replace, in the entry's own form, so the step can be reversed.
 const inverseOf = e => typeof e === 'string' ? JSON.stringify(state.roster?.rows || [])
   : e.rot ? { rot: JSON.stringify(state.rotations), what: e.what }
+  : e.mon ? { mon: JSON.stringify(state.monthly || {}), what: e.what }
   : { roster: JSON.stringify(state.roster), ...(e.day ? { day: JSON.stringify(state.day) } : {}), what: e.what };
 function applyStep(e, verb) {
   if (typeof e === 'string') { if (state.roster) { state.roster.rows = JSON.parse(e); afterRosterEdit(true); } return; }
   if (e.rot) { state.rotations = JSON.parse(e.rot); render(); toast(`${verb === 'Undo' ? 'Undid' : 'Redid'} ${e.what}.`); return; }
+  if (e.mon) { state.monthly = JSON.parse(e.mon); personCache.clear(); syncMonthly(); render(); toast(`${verb === 'Undo' ? 'Undid' : 'Redid'} ${e.what}.`); return; }
   if (e.day) state.day = JSON.parse(e.day);
   state.roster = JSON.parse(e.roster);
   lastRows = state.roster ? JSON.stringify(state.roster.rows) : null;
@@ -1190,6 +1454,50 @@ function redo() {
 // Keyboard shortcuts (Cmd instead of Ctrl on a Mac), when not typing in a box. ? lists them.
 const SHORTCUTS = [['Ctrl+Z', 'Undo'], ['Ctrl+Y or Ctrl+Shift+Z', 'Redo'], ['Ctrl+S', 'Save the roster for the team (or download it)'],
   ['Alt+1 … Alt+4', 'Monthly, Cases, Roster, Premeds'], ['[ and ]', 'Previous and next day'], ['/', 'Filter names'], ['Esc', 'Close a box, or cancel Move or swap'], ['?', 'This list']];
+// The key: what the roster's marks and words mean, then short answers to "How do I…?", one open at a time.
+const SYMBOLS = [
+  ['&', 'Double covering: this senior has two rooms (a dark & on the Roster tab). Drag the & to give them another room.'],
+  ['Name (C)', 'Ad hoc cover: a junior from a nearby room covers this one (shown in red). Drag the C on a junior to add one.'],
+  ['C-OT13', 'Covers OT 13 when its person leaves early.'],
+  ['L-4pm', 'Leaves at 4pm (L-4-5pm: away 4 to 5pm).'],
+  ['(L)', 'Liver standby: kept off complex lists. On a junior with a Liver posting it is their posting.'],
+  ['(RA) (P) (SR)…', `A junior's posting this week: ${POSTINGS.filter(([k]) => k).map(([k, l]) => `${k} ${l}`).join(', ')}.`],
+  ['(AOH)', 'On the AOH list that day (AOH Monthly).'],
+  ['-mtg 3pm', 'A comment, also listed in the comments box.'],
+  ['Green name', 'Baby MO: a new MOPEX who is never left alone, so their senior doesn\'t double cover.'],
+  ['Purple name', 'Locum.'],
+  ['Red room', 'A remote case (outside the OT complexes).'],
+  ['Red name (Monthly)', 'Not matched to the staff list: use Fix names.'],
+  ['☾ and •', 'On a monthly roster: ☾ an overnight duty (post call the next day); • fills the calls and clinics on Today.'],
+  ['Subspec', 'A senior\'s subspecialty (Paeds, Cardiac, Neuro…). Some lists need one.'],
+  ['AOCC', 'One senior and two juniors, taken after the OT lists.'],
+  ['AIC', 'One consultant (SC or C), else a senior resident.'],
+  ['AH OT', 'Filled by hand.'],
+  ['MOT / SICU', 'The call teams at the top of the sheet (Calls and clinics).'],
+  ['Premed', 'A junior who wasn\'t around yesterday needs a premed cover (Premeds tab).'],
+];
+const HOW = [
+  ['make tomorrow\'s roster?', 'Cases › "Do it all" with the admin draft. It reads the rooms and leave, makes the roster and opens its problems. Fix those, then Download or Save for the team.'],
+  ['fix a problem?', 'Each problem on the Roster tab has a button: Take off, Fill empty gaps, Swap for someone suitable. Show finds the room.'],
+  ['move or swap two people?', 'Tap a name, then Move or swap, then tap the other name or an empty cell. With a mouse you can drag names.'],
+  ['say someone leaves early?', 'Tap their name: Leaving (L-), e.g. 4pm. If someone covers, put the room in their Covering (C-).'],
+  ['put someone on leave for several days?', 'Monthly › Today, tap them, pick Leave (or Admin) and set "Same until". Leave from the HMS leave roster comes in by itself.'],
+  ['take back a change?', 'Undo at the bottom, or Ctrl+Z. Everything can be undone until you change the date.'],
+  ['send it on WhatsApp?', 'Download › Image for WhatsApp (or Image in 2 parts, easier to read on a phone). After changes, "Send image with the changes" lists what moved.'],
+  ['see only my own day?', 'My day (footer): pick your name once. It shows your room, partner, cases, calls, and your week.'],
+  ['practise without touching the real roster?', 'Practice (top right) has made-up staff, a tour and a "Fix 3 problems" exercise.'],
+];
+function showKey() {
+  const dlg = h('dialog', { class: 'changes key' }, h('h2', {}, 'Key and help'),
+    h('table', { class: 'key-table' }, h('tbody', {}, SYMBOLS.map(([k, what]) => h('tr', {}, h('th', { scope: 'row' }, k), h('td', {}, what))))),
+    h('h3', {}, 'How do I…'),
+    h('div', { class: 'how' }, HOW.map(([q, a]) => h('details', { ontoggle: e => { if (e.target.open) dlg.querySelectorAll('.how details[open]').forEach(d => { if (d !== e.target) d.open = false; }); } },
+      h('summary', {}, '…' + q), h('p', {}, a)))),
+    h('div', { class: 'bar' }, h('button', { class: 'primary', onclick: () => { dlg.close(); dlg.remove(); } }, 'Close'),
+      h('a', { class: 'btn', href: 'guide.html', target: '_blank', rel: 'noopener' }, 'One-page guide to print')));
+  dlg.addEventListener('close', () => dlg.remove());
+  document.body.append(dlg); dlg.showModal();
+}
 function showShortcuts() {
   const dlg = h('dialog', { class: 'changes' }, h('h2', {}, 'Keyboard shortcuts'),
     h('table', {}, h('tbody', {}, SHORTCUTS.map(([k, what]) => h('tr', {}, h('td', {}, h('kbd', {}, k)), h('td', {}, what))))),
@@ -1539,7 +1847,9 @@ function nameInput(attrs = {}, role = null, rank = null) {
   if (!document.getElementById(id)) document.body.append(h('datalist', { id }));
   const list = state.staff.filter(p => !role || p.role === role).map(p => [p, rank ? rank(p) : [0, '']]);
   list.sort((a, b) => a[1][0] - b[1][0] || bySeniority(a[0], b[0]));
-  document.getElementById(id).replaceChildren(...list.map(([p, [, note]]) => h('option', { value: p.name, label: note || undefined })));
+  // a monthly grid calls this hundreds of times per render: rebuild the shared list only when it changes
+  const dl = document.getElementById(id), sig = list.map(([p, [, note]]) => p.name + '|' + (note || '')).join('\n');
+  if (dl.dataset.sig !== sig) { dl.dataset.sig = sig; dl.replaceChildren(...list.map(([p, [, note]]) => h('option', { value: p.name, label: note || undefined }))); }
   return h('input', { list: id, autocomplete: 'off', spellcheck: 'false', ...attrs });
 }
 // For the + in a roster cell: free people who suit the room first, then free people, then people
@@ -1635,7 +1945,31 @@ function whereCard(p) {
     h('ul', {}, (at.length ? at : ['Not on any list today']).map(t => h('li', {}, t))));
 }
 
-function closeTagEditor() { document.querySelector('.tag-editor')?.remove(); boxPerson = null; highlightPerson(null); }
+function closeTagEditor() {
+  const open = document.querySelector('.tag-editor');
+  open?.remove(); boxPerson = null; highlightPerson(null);
+  // keyboard and screen-reader users land back on the name they opened (or the same person after a re-render)
+  if (open && boxReturn) {
+    const back = boxReturn.el?.isConnected ? boxReturn.el : boxReturn.pid ? document.querySelector(`[data-pid="${boxReturn.pid}"][tabindex]`) : null;
+    boxReturn = null;
+    if (back && (!document.activeElement || document.activeElement === document.body)) back.focus({ preventScroll: true });
+  }
+}
+// A box just opened: take focus (the box itself, so phones don't pop the keyboard), keep Tab inside it.
+let boxReturn = null;
+function focusBox(box, anchor) {
+  boxReturn = { el: anchor, pid: anchor?.dataset?.pid || '' };
+  box.tabIndex = -1;
+  box.focus({ preventScroll: true });
+  box.addEventListener('keydown', e => {
+    if (e.key !== 'Tab') return;
+    const f = [...box.querySelectorAll('button, input, select, textarea, [tabindex="0"]')].filter(x => !x.disabled && x.offsetParent);
+    if (!f.length) return;
+    if (e.shiftKey && (document.activeElement === f[0] || document.activeElement === box)) { e.preventDefault(); f.at(-1).focus(); }
+    else if (!e.shiftKey && document.activeElement === f.at(-1)) { e.preventDefault(); f[0].focus(); }
+  });
+  box.addEventListener('keydown', e => { if (e.key === 'Escape' && e.target === box) closeTagEditor(); });
+}
 // Light up every chip of one person (hover, or while their box is open), so double bookings show.
 let boxPerson = null;
 function highlightPerson(id) {
@@ -1714,6 +2048,7 @@ function openRawEditor(chip, src) {
       h('button', { onclick: remove, title: 'Take this name out of the cell' }, 'Remove')),
   );
   document.body.append(box);
+  focusBox(box, chip);
   const rc = chip.getBoundingClientRect();
   const w = box.offsetWidth, hgt = box.offsetHeight;
   box.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, rc.left)) + 'px';
@@ -1739,7 +2074,7 @@ function dayMarks(p) {
 // The person chip for the daily tabs: short name in their colour, then the day's markers
 function personChip(p, attrs = {}, ...extra) {
   const marks = dayMarks(p);
-  return h('span', { class: 'name pchip', 'data-pid': p.id, style: colourStyle(p.name), title: `${p.name} · ${p.grade}`, ...attrs },
+  return h('span', { class: 'name pchip', 'data-pid': p.id, style: colourStyle(p.name), title: `${p.name} · ${p.grade}`, tabindex: 0, role: 'button', ...attrs },
     h('span', { class: 'label' }, shortName(p) || p.name), marks ? h('span', { class: 'marks' }, ' ' + marks) : null, ...extra);
 }
 
@@ -1817,6 +2152,9 @@ function openPersonBox(anchor, p, ctx) {
   const aoh = h('input', { value: d.aoh || seed.tags.find(isAohTag) || '', placeholder: 'e.g. AOH or AOH 1' });
   const comment = h('input', { value: d.comment ?? seed.dash, placeholder: 'e.g. mtg 3pm' });
   const away = h('input', { type: 'checkbox', checked: !!d.notAroundPrev });
+  // a status or comment that runs for several days (a course, an admin week): carried into those days
+  const carried = (state.carry || []).find(c => c.pid === p.id && c.from <= state.day.date && state.day.date <= c.until);
+  const until = h('input', { type: 'date', value: carried?.until || '', min: addDays(state.day.date, 1), title: 'The status and comment also go on each day up to this date' });
   // a junior's posting for this day only (the rotation is planned on Monthly › Rotations)
   const postingPick = p.role === 'junior' ? select(postingOf(p), POSTINGS, () => {}) : null;
   let status = groupOf(d.status);
@@ -1862,7 +2200,8 @@ function openPersonBox(anchor, p, ctx) {
       if (v !== was) retagPosting(p, was, v);
     }
     if (p.role === 'junior' && away.checked !== !!s.notAroundPrev) { s.notAroundPrev = away.checked; s.manualAway = true; delete s.autoAway; }
-    if (ctx.kind === 'today' && status !== groupOf(s.status)) { closeTagEditor(); setStatus(p, status); }
+    if (ctx.kind === 'today' && status !== groupOf(s.status)) { closeTagEditor(); setStatus(p, status, { quiet: true }); }
+    setCarry(p, until.value, ctx.kind === 'today' ? status : groupOf(s.status), s.comment || '');
     if (ctx.kind === 'premed' && premedPick.value !== p.name) ctx.setCover(premedPick.value);
     syncPersonCells(p);
     closeTagEditor();
@@ -1893,6 +2232,8 @@ function openPersonBox(anchor, p, ctx) {
     h('label', { class: 'check' }, liver, ' Liver standby (L): no complex lists'),
     ...field('AOH tag', aoh, 'Shown as (AOH) after their name'),
     ...field('Comment (also shown in the comments box)', comment),
+    ...field('Same until (optional)', until, 'For something that runs several days: the status and comment go on each day up to this date'),
+    carried ? h('div', { class: 'seen' }, `Carried from ${longDate(carried.from)} to ${longDate(carried.until)}. Clear the date to stop it.`) : null,
     p.role === 'junior' ? h('label', { class: 'check', title: 'Not around on the previous working day: needs premed cover' }, away, ' Away on the previous working day') : null,
     postingPick ? field(`Posting today${d.posting != null ? ` (rotation: ${postingName(plannedPosting(p)) || 'none'})` : ''}`, postingPick, 'Changes their posting for this day only; the weekly rotation is on Monthly › Rotations') : null,
     h('div', { class: 'bar', style: 'margin:8px 0 0' },
@@ -1903,6 +2244,7 @@ function openPersonBox(anchor, p, ctx) {
       ['roster', 'lock', 'premed', 'call'].includes(ctx.kind) ? h('button', { onclick: remove, title: ctx.kind === 'lock' ? 'Let the roster choose' : 'Take them off here' }, 'Remove') : null),
   );
   document.body.append(box);
+  focusBox(box, anchor);
   const rc = anchor.getBoundingClientRect();
   const w = box.offsetWidth, hgt = box.offsetHeight;
   box.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, rc.left)) + 'px';
@@ -1967,7 +2309,10 @@ function shortOf(part) {
   const at = part.indexOf(n);
   return s && at >= 0 ? part.slice(0, at) + s + part.slice(at + n.length) : part;
 }
-const colourStyle = part => { const c = COLOUR_ARGB[colourOf(part)]; return c ? `color:#${c.slice(2)}` : ''; };
+// On screen the sheet's bright green (Baby MO) is darkened so it reads on white (2.9:1 → 5:1); the sheet itself,
+// the .xlsx, PDF and image keep the department's colours.
+const SCREEN_COLOUR = { green: '#00803a' };
+const colourStyle = part => { const k = colourOf(part), c = COLOUR_ARGB[k]; return c ? `color:${SCREEN_COLOUR[k] || '#' + c.slice(2)}` : ''; };
 
 // Add a person to a cell from the staff list (unknown names offer to add them to the staff list).
 async function addToCell(i, key, text) {
@@ -2010,10 +2355,13 @@ function rosterCell(row, i, key, doubles) {
     const src = { row: i, key, part: k };
     const icon = (cls, title, text, o) => h('span', { class: 'icon ' + cls, title, onpointerdown: e => { e.stopPropagation(); o.down?.(e); }, onclick: e => { e.stopPropagation(); o.click?.(); } }, text);
     const pid = personOfPart(p)?.id;
-    const el = h('span', { class: 'name', 'data-drop': '', 'data-row': i, 'data-key': key, 'data-part': k, 'data-pid': pid || '', style: colourStyle(p), title: p,
+    const why = pid ? row.why?.[pid] : ''; // from the generator; stale after a hand move, so only for who is still here
+    const el = h('span', { class: 'name', 'data-drop': '', 'data-row': i, 'data-key': key, 'data-part': k, 'data-pid': pid || '', style: colourStyle(p), title: why ? `${p}\nWhy here: ${why}` : p,
       onpointerenter: TOUCH || !pid ? null : () => highlightPerson(pid), onpointerleave: TOUCH || !pid ? null : () => highlightPerson(null),
       onpointerdown: TOUCH ? null : e => startNameDrag(e, src),
-      onclick: TOUCH ? () => openTagEditor(el, src) : null },
+      onclick: TOUCH ? () => openTagEditor(el, src) : null,
+      tabindex: 0, role: 'button', 'aria-label': `${p} (${key}, ${row.label}): open`,
+      onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openTagEditor(el, src); } } },
       !TOUCH && key === 'junior' && !isCoverPart(p) ? icon('cover', 'Drag to another room to add them there as an ad hoc cover (C). They stay in this room.', 'C', { down: e => startNameDrag(e, { ...src, cover: true }) }) : null,
       key === 'senior' && (!TOUCH || isDouble(p, doubles)) ? icon('dbl' + (isDouble(p, doubles) ? ' on' : ''),
         (isDouble(p, doubles) ? 'Double covering. ' : '') + (TOUCH ? '' : 'Drag to another room to have them double cover it too.'), '&',
@@ -2241,6 +2589,14 @@ function renderGeneral() {
 
 // A name as written on a monthly roster ("Quah Zi Hui, Bernice", "LOKE BENJAMIN") -> person
 const personCache = new Map();
+// A monthly roster name that matches more than one person: their names, else null.
+function ambiguousText(text) {
+  const t = cleanCell(text);
+  if (!t || personByText(t)) return null;
+  const m = matchName(t, state.staff);
+  return m.ambiguous?.length ? m.ambiguous.map(p => p.name) : null;
+}
+const unmatchedTitle = v => { const a = ambiguousText(v); return a ? `Could be ${a.join(' or ')}: type more of the name` : 'Not matched to the staff list'; };
 function personByText(text) {
   const t = cleanCell(text);
   if (!t) return null;
@@ -2305,25 +2661,70 @@ function renderMonthly() {
 
 // ---- My day: where one person is on the day on screen (viewers' page; anyone at #myday) ----
 
+// My day opens on today until early afternoon (people check it in the morning), then on tomorrow.
+const MYDAY_SWITCH_HOUR = 14;
+const myDayDate = () => new Date().getHours() < MYDAY_SWITCH_HOUR ? realToday() : today();
+// On opening: My day goes to myDayDate(); the roster leaves a past date for tomorrow (the day being made),
+// with a way back. Today is left alone, for morning changes.
+function openOnTheRightDay() {
+  const was = state.day.date;
+  if (state.tab === 'myday') { if (myDayDate() !== was) switchDate(myDayDate()); return; }
+  if (isViewer() || !state.staff.length || !was || was >= realToday()) return;
+  switchDate(today());
+  toast(`Opened tomorrow, ${longDate(today())}.`, { label: `Back to ${longDate(was)}`, run: () => switchDate(was) });
+}
+// What this person saw last time on each date, to mark what changed since: { date: { at, lines } }
+const SEEN_KEY = 'nuh-roster-seen';
+function seenBefore(date, pid) {
+  try { return JSON.parse(localStorage.getItem(SEEN_KEY) || '{}')[date + '|' + pid] || null; } catch { return null; }
+}
+function markSeen(date, pid, at, lines) {
+  try {
+    const all = JSON.parse(localStorage.getItem(SEEN_KEY) || '{}');
+    all[date + '|' + pid] = { at, lines };
+    const keys = Object.keys(all).sort(); // keep the last 60 entries
+    for (const k of keys.slice(0, Math.max(0, keys.length - 60))) delete all[k];
+    localStorage.setItem(SEEN_KEY, JSON.stringify(all));
+  } catch { /* no storage */ }
+}
+let seenCache = { id: '', prev: null };
+const hhmm = t => t ? new Date(t).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '';
+// a viewer coming back to the page after a while gets the latest saved roster
+let viewerLoadedAt = 0;
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && isViewer() && state.tab === 'myday' && Date.now() - viewerLoadedAt > 60e3) viewerLoad(state.day.date);
+});
+
 const ME_KEY = 'nuh-roster-me';
 let viewerDate = null, viewerFound = null;
 // A viewer sees the roster saved for the team, never a local draft.
+let viewerMeta = null; // { updatedAt, updatedBy } of the roster on screen
 async function viewerLoad(date) {
-  viewerDate = date; viewerFound = null;
+  viewerDate = date; viewerFound = null; viewerLoadedAt = Date.now();
   try {
     const snap = await cloud.loadRoster(date);
     if (viewerDate !== date) return;
     viewerFound = !!snap?.roster;
+    viewerMeta = snap ? { updatedAt: snap.updatedAt, updatedBy: snap.updatedBy } : null;
     state.day = snap?.day ? { ...clone(snap.day), date } : { date, rooms: [], staff: {} };
     state.roster = snap?.roster ? clone(snap.roster) : null;
     syncRooms();
   } catch (e) { cloudError(e); }
   render();
 }
+// Who "my" is: the staff record an admin linked to this account, else the name picked in this browser, else a guess
+// from the member's name (myPersonGuessed says so, so My day can ask to confirm).
+let myPersonGuessed = false;
 function myPerson() {
+  myPersonGuessed = false;
   let id = '';
   try { id = localStorage.getItem(ME_KEY) || ''; } catch { /* no storage */ }
-  return person(id) || (cs.member?.name ? matchName(cs.member.name, state.staff).person : null) || null;
+  const linked = cs.member?.staffId && person(cs.member.staffId);
+  if (linked) return linked;
+  if (person(id)) return person(id);
+  const guess = cs.member?.name ? matchName(cs.member.name, state.staff).person : null;
+  myPersonGuessed = !!guess;
+  return guess || null;
 }
 // Everything the roster says about p on the day on screen: [what, detail] lines.
 function dayLines(p) {
@@ -2339,7 +2740,8 @@ function dayLines(p) {
       const cover = isCoverPart(part);
       const other = cellParts(row, key === 'senior' ? 'junior' : 'senior').filter(x => !isCoverPart(x)).map(x => shortOf(x)).join(' / ');
       const parsed = parseNamePart(part);
-      out.push([`${room}${cover ? ' (ad hoc cover)' : ''}`, [role, other ? `with ${other}` : '', row.notes ? `· ${row.notes}` : '', parsed.leave ? `· leaving ${parsed.leave}` : '', parsed.cover ? `· also covers ${parsed.cover}` : ''].filter(Boolean).join(' ')]);
+      out.push([`${room}${cover ? ' (ad hoc cover)' : ''}`, [role, other ? `with ${other}` : '', row.notes ? `· ${row.notes}` : '', parsed.leave ? `· leaving ${parsed.leave}` : '', parsed.cover ? `· also covers ${parsed.cover}` : ''].filter(Boolean).join(' '),
+        { room, role, with: other, notes: row.notes || '', senior: key === 'junior' ? other : '' }]);
     }
     for (const part of cellParts(row, 'premed')) if (personOfPart(part) === p) out.push([`Premed for ${room}`, row.notes || '']);
   }
@@ -2351,22 +2753,95 @@ function dayLines(p) {
   if (d.comment) out.push(['Note', d.comment]);
   return out;
 }
+// What the roster says about p on another date: that date's saved day (this browser's, or the team's for a viewer),
+// else what the monthly rosters say (leave, calls, clinics). rec: { day, roster } or null.
+function linesOn(p, date, rec) {
+  const keep = [state.day, state.roster];
+  try {
+    state.day = rec?.day ? { ...rec.day, date } : { date, rooms: [], staff: {} };
+    state.roster = rec?.roster ? { ...rec.roster, date } : null;
+    if (!rec?.day) { const r = derivedFor(date).get(p.id); if (r?.status) state.day.staff[p.id] = { status: r.status, auto: r.why }; }
+    return dayLines(p);
+  } finally { [state.day, state.roster] = keep; }
+}
+const weekDates = from => Array.from({ length: 7 }, (_, i) => addDays(from, i));
+let weekOpen = false, weekRecs = {}; // date -> { day, roster } or null (viewers: from the cloud, loaded on asking)
+async function loadWeek() {
+  const dates = weekDates(realToday());
+  if (isViewer()) {
+    const got = await Promise.all(dates.map(d => weekRecs[d] !== undefined ? weekRecs[d] : cloud.loadRoster(d).catch(() => null)));
+    dates.forEach((d, i) => { weekRecs[d] = got[i]?.roster ? { day: got[i].day, roster: got[i].roster } : null; });
+  } else for (const d of dates) weekRecs[d] = d === state.day.date ? { day: state.day, roster: state.roster } : state.days?.[d] || null;
+  render();
+}
+// A day's lines as one calendar event: the room (or leave, a call) as the title, everything as the details.
+const eventOf = (p, date, lines) => lines.length ? { date, uid: `${date}-${p.id}@nuhroster.anawj.com`,
+  title: lines.map(l => l[0]).slice(0, 2).join(' + '), details: lines.map(l => l[1] ? `${l[0]}: ${l[1]}` : l[0]).join('\n') } : null;
+function downloadIcs(p, events, name) {
+  const list = events.filter(Boolean);
+  if (!list.length) return toast('Nothing on the roster to add yet.');
+  download(name, new Blob([buildIcs(list)], { type: 'text/calendar' }));
+  toast(`Calendar file downloaded (${list.length} day${list.length === 1 ? '' : 's'}). Open it to add to your calendar.`);
+}
+// For the logbook's case summary: the facts of one list, to paste (nothing is sent to the logbook).
+async function copyForLogbook(date, meta) {
+  const text = [`Date: ${longDate(date)}`, `Room: ${meta.room}`, meta.senior ? `Supervisor: ${meta.senior}` : meta.with ? `With: ${meta.with}` : '', meta.notes ? `Cases: ${meta.notes}` : ''].filter(Boolean).join('\n');
+  try { await navigator.clipboard.writeText(text); toast('Copied for the logbook: paste it into the case summary.'); }
+  catch { prompt('Copy this for the logbook:', text.replace(/\n/g, ' · ')); }
+}
+function weekCard(p) {
+  if (!weekOpen) return null;
+  const dates = weekDates(realToday());
+  if (!dates.every(d => d in weekRecs)) return h('p', { class: 'seen' }, 'Loading the week…');
+  const days = dates.map(d => ({ d, lines: linesOn(p, d, weekRecs[d]), out: !!weekRecs[d]?.roster }));
+  return h('div', { class: 'myweek' },
+    h('h3', {}, 'My week'),
+    h('ul', { class: 'myweek-list' }, days.map(x => h('li', {},
+      h('button', { class: 'link', onclick: () => switchDate(x.d) }, new Date(x.d + 'T12:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })),
+      ' ', x.lines.length ? x.lines.map(l => l[0]).join(' · ') : h('span', { class: 'seen' }, x.out ? 'not on the roster' : 'roster not out yet'),
+      !x.out && x.lines.length ? h('span', { class: 'seen' }, ' (from the monthly rosters)') : null))),
+    h('button', { class: 'small', onclick: () => downloadIcs(p, days.map(x => eventOf(p, x.d, x.lines)), `My week from ${realToday()}.ics`) }, 'Add the week to my calendar'));
+}
 function renderMyDay() {
   const p = myPerson();
   const date = state.day.date;
-  const pick = select(p?.id || '', [['', 'Pick your name…'], ...state.staff.slice().sort((a, b) => a.name.localeCompare(b.name)).map(x => [x.id, x.name])],
-    v => { try { localStorage.setItem(ME_KEY, v); } catch { /* no storage */ } render(); });
+  const linked = !!(cs.member?.staffId && person(cs.member.staffId));
+  const pick = linked ? h('span', { class: 'seen', title: 'An admin linked your account to this name (Settings › Team members)' }, 'your account')
+    : select(p?.id || '', [['', 'Pick your name…'], ...state.staff.slice().sort((a, b) => a.name.localeCompare(b.name)).map(x => [x.id, x.name])],
+      v => { try { localStorage.setItem(ME_KEY, v); } catch { /* no storage */ } render(); });
   const r = state.roster && state.roster.date === date ? state.roster : null;
   const lines = p ? dayLines(p) : [];
   const when = date === today() ? 'Tomorrow' : date === realToday() ? 'Today' : longDate(date);
+  // what changed for this person since they last looked (viewers, from the saved roster's time)
+  const meta = isViewer() ? viewerMeta : null;
+  const key = l => l.join(' ');
+  // what they saw before this version, read once per version (later renders keep the marks)
+  const seenId = p && meta?.updatedAt && viewerFound ? `${date}|${p.id}|${meta.updatedAt}` : '';
+  if (seenId && seenCache.id !== seenId) {
+    seenCache = { id: seenId, prev: seenBefore(date, p.id) };
+    markSeen(date, p.id, meta.updatedAt, lines.map(key));
+  }
+  const seen = seenId && seenCache.prev?.at !== meta.updatedAt ? seenCache.prev : null;
+  const changed = seen ? new Set(lines.map(key).filter(k => !seen.lines.includes(k))) : new Set();
+  const gone = seen ? seen.lines.filter(k => !lines.some(l => key(l) === k)) : [];
   return h('div', {},
     h('section', { class: 'card myday' },
-      h('div', { class: 'section-head' }, h('h2', { style: 'margin:0' }, p ? `${when} for ${shortName(p) || p.name}` : 'My day'), h('span', { class: 'grow' }), pick),
+      h('div', { class: 'section-head' }, h('h2', { style: 'margin:0' }, p ? `${when} for ${shortName(p) || p.name}` : 'My day'), h('span', { class: 'grow' }),
+        pick),
+      p && myPersonGuessed ? h('p', { class: 'warn-note' }, `Matched to ${p.name} from your account's name. Not you? Pick your name above.`) : null,
       !p ? h('p', { class: 'hint' }, 'Pick your name once; this browser remembers it.')
         : !state.staff.length ? h('p', { class: 'hint' }, 'Loading the staff list…')
         : !r && !lines.length ? h('p', { class: 'empty' }, isViewer() && viewerFound === null ? 'Loading…' : `The roster for ${longDate(date)} isn't out yet.`)
-        : lines.length ? h('ul', { class: 'myday-list' }, lines.map(([what, detail]) => h('li', {}, h('b', {}, what), detail ? h('span', {}, ' ', detail) : null)))
+        : lines.length ? h('ul', { class: 'myday-list' }, lines.map(l => h('li', { class: changed.has(key(l)) ? 'changed' : null }, h('b', {}, l[0]), l[1] ? h('span', {}, ' ', l[1]) : null, changed.has(key(l)) ? h('span', { class: 'new-tag' }, ' changed') : null,
+          l[2]?.room ? h('button', { class: 'small logbook-copy', title: 'Date, room, supervisor and case notes, to paste into the logbook', onclick: () => copyForLogbook(date, l[2]) }, 'Copy for logbook') : null)))
         : h('p', { class: 'empty' }, `You're not on the roster for ${longDate(date)}.`),
+      changed.size || gone.length ? h('p', { class: 'warn-note', role: 'status' }, `Changed since you last looked${gone.length ? ` (no longer: ${gone.join('; ')})` : ''}.`) : null,
+      p ? h('div', { class: 'bar myday-actions' },
+        lines.length ? h('button', { class: 'small', onclick: () => downloadIcs(p, [eventOf(p, date, lines)], `My day ${date}.ics`) }, 'Add to calendar') : null,
+        h('button', { class: 'small', 'aria-expanded': String(weekOpen), onclick: () => { weekOpen = !weekOpen; if (weekOpen) { weekRecs = {}; loadWeek(); } else render(); } }, weekOpen ? 'Hide my week' : 'My week')) : null,
+      p ? weekCard(p) : null,
+      meta?.updatedAt && viewerFound ? h('p', { class: 'seen' }, `Saved by ${meta.updatedBy?.name || 'the rosterer'} at ${hhmm(meta.updatedAt)}${new Date(meta.updatedAt).toDateString() !== new Date().toDateString() ? `, ${longDate(isoDate(new Date(meta.updatedAt)))}` : ''}. `,
+        h('button', { class: 'link', onclick: () => viewerLoad(date) }, 'Check again')) : null,
       p && r && postingOf(p) && p.role === 'junior' ? h('p', { class: 'seen' }, `Posting this week: ${postingName(postingOf(p))}`) : null,
       h('p', { class: 'hint' }, 'Bookmark this page to come straight here: ', h('code', {}, location.origin + location.pathname + '#myday'),
         isViewer() ? null : [' · ', h('button', { class: 'link', onclick: () => { history.replaceState(null, '', location.pathname); goTab('roster'); } }, 'Back to the roster')])),
@@ -2378,6 +2853,7 @@ function renderMyDay() {
 let rotYear = null; // the year on screen
 let rotSel = null;  // selected cells: { a: [row, col], b: [row, col] } (a rectangle)
 let rotNotes = [];  // what the last import couldn't place
+let rotUnmatched = []; // names in the last import not on the junior list
 let rotScroll = null; // where the grid was scrolled to, kept across re-renders
 const ROT_SHORT = { Cardiac: 'Card', Remote: 'Rem' }; // to fit a week's cell
 const pushRotUndo = what => pushUndo({ rot: JSON.stringify(state.rotations), what });
@@ -2444,8 +2920,11 @@ function renderRotations() {
           pushRotUndo(`clearing ${year}`);
           for (const m of weeks) delete rot.weeks[m];
           render(); undoToast(`Cleared the ${year} rotation.`);
-        } }, 'Clear year')),
+        } }, 'Clear year'),
+        weeksOfYear(year).some(m => state.rotations.weeks[m]) && !weeksOfYear(year + 1).slice(1).some(m => state.rotations.weeks[m])
+          ? h('button', { title: `Copy ${year}'s rotation into ${year + 1}, week by week, as a start`, onclick: () => fillNextYear(year) }, `Start ${year + 1} from ${year}`) : null),
       h('p', { class: 'hint' }, 'Each column is a week (Monday to Sunday). Select weeks by clicking, shift-clicking or dragging (across people too), then pick the posting. Blank weeks use the usual posting. To change someone\'s posting for one day only, open them from Today or the roster and use "Posting today". The Excel file has names down the first column and each week\'s Monday across the top; Download gives you one to fill in.'),
+      fixNamesCard(rotUnmatched, { role: 'junior', what: 'the rotation file', rerun: lastRotFile ? () => importRotations([lastRotFile]) : null, dismiss: () => { rotUnmatched = []; render(); } }),
       rotNotes.length ? h('ul', { class: 'warnings' }, rotNotes.map(t => h('li', { class: 'warn' }, t)), h('li', { class: 'info' }, h('button', { class: 'link', onclick: () => { rotNotes = []; render(); } }, 'Dismiss'))) : null,
       h('div', { class: 'stats' }, h('span', {}, `Week of ${longDate(now)}:`), POSTINGS.filter(([k]) => counts[k]).map(([k, label]) => h('span', {}, h('b', {}, counts[k]), ' ', k ? label : 'no posting'))),
       h('div', { class: 'rot-palette' + (selCount ? '' : ' idle') },
@@ -2468,7 +2947,31 @@ function renderRotations() {
             return h('td', { class: 'wk' + (code == null ? ' usual' : '') + (m === now ? ' now' : '') + (inSel(r, c) ? ' sel' : ''), 'data-r': r, 'data-c': c,
               style: shown ? `background:${fillOf(shown)}` : '', title: `${p.name} · week of ${longDate(m)}: ${postingName(shown) || 'no posting'}${code == null ? ' (usual)' : ''}`,
               onpointerdown: e => cellDown(e, r, c), onpointerenter: () => cellEnter(r, c) }, ROT_SHORT[shown] || shown);
-          }))))) : h('p', { class: 'empty' }, state.staff.length ? 'No juniors match.' : 'Add the staff list first.')));
+          })))),
+        rotCountsFoot(weeks, people, rot, now)) : h('p', { class: 'empty' }, state.staff.length ? 'No juniors match.' : 'Add the staff list first.')));
+}
+// Under the grid: how many juniors are on each posting, week by week, so a week with nobody on a posting shows up.
+function rotCountsFoot(weeks, people, rot, now) {
+  const on = (p, m) => weekPosting(rot, p.id, m) ?? p.posting ?? '';
+  const used = POSTINGS.filter(([k]) => k && people.some(p => weeks.some(m => on(p, m) === k)));
+  if (!used.length) return null;
+  return h('tfoot', {}, used.map(([k, label]) => h('tr', { class: 'rot-count' },
+    h('th', { class: 'who', scope: 'row' }, label), h('th', { class: 'usual' }, k),
+    weeks.map(m => { const n = people.filter(p => on(p, m) === k).length; return h('td', { class: 'wk' + (n ? '' : ' none') + (m === now ? ' now' : ''), title: `Week of ${longDate(m)}: ${n} on ${label}` }, n || '0'); }))));
+}
+// A new year starts empty: copy this year's pattern across, week by week (week 1 to week 1…), with Undo.
+function fillNextYear(year) {
+  const from = weeksOfYear(year), to = weeksOfYear(year + 1);
+  pushRotUndo(`starting ${year + 1} from ${year}`);
+  let n = 0;
+  to.forEach((m, i) => {
+    const src = state.rotations.weeks[from[Math.min(i, from.length - 1)]];
+    if (!src || from[Math.min(i, from.length - 1)] === m) return; // the shared boundary week stays
+    for (const [id, code] of Object.entries(src)) if (weekPosting(state.rotations, id, m) == null) { setWeeks(state.rotations, id, [m], code); n++; }
+  });
+  rotYear = year + 1; rotScroll = 0;
+  render();
+  undoToast(`Started ${year + 1} from ${year}'s pattern (${n} weeks set). Change what differs, or Undo.`);
 }
 
 // keep the grid where it was, or open it on the week on screen
@@ -2479,6 +2982,7 @@ function placeRotGrid() {
 }
 
 async function importRotations([file]) {
+  lastRotFile = file;
   try {
     const wb = await readWorkbook(file);
     const year = rotYear || +state.day.date.slice(0, 4);
@@ -2489,8 +2993,8 @@ async function importRotations([file]) {
     pushRotUndo('the rotation import');
     // the weeks and people in the file are set exactly as the file has them (blank = usual posting)
     for (const m of res.mondays) for (const id of res.people) setWeeks(state.rotations, id, [m], res.weeks[m]?.[id] ?? null);
+    rotUnmatched = res.unmatched;
     rotNotes = [
-      ...(res.unmatched.length ? [`Not on the junior list (skipped): ${res.unmatched.join(', ')}. Add them on the Staff tab, or add the spelling as a short name, then import again.`] : []),
       ...(res.unknown.length ? [`Not a posting (left out): ${res.unknown.map(t => `"${t}"`).join(', ')}. Postings are ${POSTINGS.filter(([k]) => k).map(([k, l]) => l).join(', ')}.`] : []),
     ];
     const first = res.mondays.slice().sort()[0];
@@ -2503,7 +3007,7 @@ async function importRotations([file]) {
 async function exportRotations() {
   const year = rotYear || +state.day.date.slice(0, 4);
   const people = state.staff.filter(p => p.role === 'junior').sort(bySeniority);
-  const wb = buildRotationWorkbook(window.ExcelJS, { year, people, rot: state.rotations });
+  const wb = buildRotationWorkbook(await excel(), { year, people, rot: state.rotations });
   download(`Junior rotations ${year}.xlsx`, new Blob([await wb.xlsx.writeBuffer()], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
 }
 
@@ -2512,6 +3016,32 @@ async function exportRotations() {
 const BOARD = [['working', 'Working'], ['leave', 'Leave'], ['mc', 'MC'], ['postcall', 'Post call'], ['admin', 'Admin']];
 const groupOf = st => ({ leave: 'leave', mc: 'mc', postcall: 'postcall', admin: 'admin' })[st || 'avail'] || 'working';
 let boardRole = 'all', boardFilter = '';
+// Several days at once: { pid, from, until, status, comment } in state.carry. Saving with "Same until" keeps
+// one entry per person starting today; clearing the date ends it today. New days pick them up (applyCarry).
+function setCarry(p, untilDate, group, comment) {
+  const date = state.day.date;
+  const list = state.carry ||= [];
+  const i = list.findIndex(c => c.pid === p.id && c.from <= date && date <= c.until);
+  if (!untilDate || untilDate <= date) {
+    if (i >= 0) { if (list[i].from < date) list[i].until = addDays(date, -1); else list.splice(i, 1); }
+    return;
+  }
+  const entry = { pid: p.id, from: i >= 0 ? list[i].from : date, until: untilDate, status: group === 'working' ? '' : group, comment };
+  if (i >= 0) list[i] = entry; else list.push(entry);
+  // keep only what still matters
+  state.carry = list.filter(c => c.until >= addDays(realToday(), -1));
+}
+// On a day being opened: anything carried over it goes in, unless that day was changed by hand for the person
+// or a monthly roster already says leave, MC or post call.
+function applyCarry(day) {
+  for (const c of state.carry || []) {
+    if (!(c.from < day.date && day.date <= c.until)) continue;
+    const d = (day.staff[c.pid] ||= {});
+    if (d.manual && !d.carried) continue;
+    if (c.status && (!d.status || d.status === 'avail' || d.carried)) { d.status = c.status; d.carried = true; }
+    if (c.comment && !d.comment) { d.comment = c.comment; d.carried = true; }
+  }
+}
 function setStatus(p, group, { quiet = false } = {}) {
   const s = dayOf(p.id);
   const was = groupOf(s.status);
@@ -2599,7 +3129,7 @@ function monthlyDayCard() {
   if (!items.length) return null;
   return h('section', { class: 'card' }, h('details', {},
     h('summary', {}, `From the monthly rosters today (${items.length})`),
-    h('table', {}, h('tbody', {}, items.map(([r, c, v]) => h('tr', {}, h('td', { class: 'seen' }, r), h('td', {}, c), h('td', { class: personByText(v) ? '' : 'unmatched', title: personByText(v) ? '' : 'Not matched to the staff list' }, v)))))));
+    h('table', {}, h('tbody', {}, items.map(([r, c, v]) => h('tr', {}, h('td', { class: 'seen' }, r), h('td', {}, c), h('td', { class: personByText(v) ? '' : 'unmatched', title: personByText(v) ? '' : unmatchedTitle(v) }, v)))))));
 }
 
 function renderToday() {
@@ -2625,7 +3155,7 @@ function monthData(kind, month = curMonth(), create = false) {
 let pdfjs = null;
 async function loadPdfJs() {
   if (pdfjs) return pdfjs;
-  await new Promise((ok, fail) => { const s = document.createElement('script'); s.src = 'vendor/pdf.min.js'; s.onload = ok; s.onerror = fail; document.head.append(s); });
+  await loadVendor('vendor/pdf.min.js');
   window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'vendor/pdf.worker.min.js';
   return (pdfjs = window.pdfjsLib);
 }
@@ -2641,38 +3171,84 @@ async function readMonthlyFile(file) {
     return readMonthlyPdf(pages);
   }
   const wb = await readWorkbook(file);
-  return readMonthlyXlsx(wb.worksheets[0], cellText);
+  // the roster may not be on the first sheet: take the first sheet that reads as one
+  let first = null;
+  for (const ws of wb.worksheets) {
+    const res = readMonthlyXlsx(ws, cellText);
+    if (!res.error) return res;
+    first ||= res;
+  }
+  return first || { error: `${file.name} has no sheets.` };
 }
 async function importMonthly(files) {
-  const done = [];
+  const done = [], gaps = [];
+  const before = JSON.stringify(state.monthly || {});
   for (const file of files) {
     let res;
     try { res = await readMonthlyFile(file); } catch (e) { res = { error: `Couldn't read ${file.name}: ${e.message}` }; }
     if (res.error) { toast(res.error); continue; }
     const def = monthlyDef(res.kind);
-    const old = state.monthly?.[res.month]?.[res.kind];
-    if (old && !confirm(`Replace the ${def.label} for ${monthName(res.month)} with ${file.name}?`)) continue;
+    // a renamed heading leaves its column empty: say so rather than import half a roster quietly
+    const missingCols = res.cols ? def.cols.filter(c => !res.cols.includes(c.key)).map(c => c.label) : [];
+    if (missingCols.length) gaps.push(`${def.label}: no ${missingCols.join(', ')} column`);
     ((state.monthly ||= {})[res.month] ||= {})[res.kind] = res.data;
     done.push(res);
   }
   if (!done.length) return;
+  pushUndo({ mon: before, what: `importing ${done.length === 1 ? 'the ' + monthlyDef(done[0].kind).label : done.length + ' monthly rosters'}` });
   personCache.clear();
   const names = done.flatMap(r => r.data.entries ? r.data.entries.map(e => e.name) : Object.values(r.data.rows).flatMap(Object.values));
   const missing = [...new Set(names.filter(n => !personByText(n)))];
   const last = done.at(-1);
   state.monthlyView = last.kind;
-  toast(`Imported ${done.map(r => `${monthlyDef(r.kind).label} (${monthName(r.month)})`).join(', ')}.${missing.length ? ` ${missing.length} name(s) aren't on the staff list.` : ''}`);
-  if (last.month !== curMonth() && confirm(`Go to ${monthName(last.month)} to see it?`)) return switchDate(last.month + '-01');
+  const msg = `Imported ${done.map(r => `${monthlyDef(r.kind).label} (${monthName(r.month)})`).join(', ')}.${missing.length ? ` ${missing.length} name(s) aren't on the staff list (in red).` : ''}${gaps.length ? ` Check: ${gaps.join('; ')}.` : ''}`;
   render();
+  if (last.month !== curMonth()) toast(msg, { label: `Show ${monthName(last.month)}`, run: () => switchDate(last.month + '-01') });
+  else undoToast(msg);
 }
 async function exportMonthly(kind) {
-  const wb = buildMonthlyWorkbook(window.ExcelJS, kind, curMonth(), monthData(kind) || {});
+  const wb = buildMonthlyWorkbook(await excel(), kind, curMonth(), monthData(kind) || {});
   const buf = await wb.xlsx.writeBuffer();
   download(`${monthlyDef(kind).label} ${monthName(curMonth())}.xlsx`, new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
 }
 
+// The month's clashes (monthly.js monthIssues), worked out once per change of the monthly rosters or staff.
+let issuesCache = { key: '', list: [] };
+function issuesOf(month) {
+  const key = month + JSON.stringify([state.monthly?.[month], state.monthly?.[addDays(month + '-01', -1).slice(0, 7)], state.staff.length]);
+  if (issuesCache.key !== key) issuesCache = { key, list: monthIssues(state.monthly, month, personByText) };
+  return issuesCache.list;
+}
+// Which monthly rosters are in, for this month and the next: missing ones leave post call, calls or leave out.
+function loadedStrip() {
+  const m = curMonth(), next = addDays(m + '-28', 7).slice(0, 7);
+  const has = (month, def) => def.list ? state.monthly?.[month]?.[def.id]?.entries?.length : Object.keys(state.monthly?.[month]?.[def.id]?.rows || {}).length;
+  const line = month => h('div', { class: 'loaded-row' }, h('span', { class: 'seen' }, monthName(month) + ':'),
+    MONTHLY.map(def => { const ok = has(month, def); return h('span', { class: 'chip static' + (ok ? ' ok' : ' missing'), title: ok ? 'Loaded' : 'Not loaded yet' }, (ok ? '✓ ' : '– ') + def.label.replace(' Monthly', '')); }));
+  return h('div', { class: 'loaded' }, line(m), line(next));
+}
+// The names in red on a monthly roster, to fix in one go (the alias makes them match at once; nothing to re-read).
+let monthlyFixOpen = false;
+function monthlyFixNames(kind) {
+  const d = monthData(kind);
+  if (!d) return null;
+  const names = d.entries ? d.entries.map(e => e.name) : Object.values(d.rows || {}).flatMap(Object.values);
+  const missing = [...new Set(names.map(cleanCell).filter(n => n && !personByText(n)))];
+  if (!missing.length) return null;
+  if (!monthlyFixOpen) return h('p', { class: 'hint' }, `${missing.length} name${missing.length > 1 ? 's in red aren\'t' : ' in red isn\'t'} matched to the staff list. `, h('button', { class: 'small', onclick: () => { monthlyFixOpen = true; render(); } }, 'Fix names'));
+  return fixNamesCard(missing, { what: 'this roster', rerun: () => { monthlyFixOpen = false; render(); }, dismiss: () => { monthlyFixOpen = false; render(); } });
+}
 function monthlyBar(kind) {
   const def = monthlyDef(kind);
+  const issues = def.list ? [] : issuesOf(curMonth()).filter(i => i.kind === kind);
+  const errs = issues.filter(i => i.level === 'error').length, gaps = issues.length - errs;
+  const nextIssue = () => {
+    const cells = [...app.querySelectorAll('table.monthly td.clash, table.monthly td.gap')];
+    if (!cells.length) return;
+    const at = cells.findIndex(c => c.contains(document.activeElement));
+    const c = cells[(at + 1) % cells.length];
+    c.scrollIntoView({ block: 'center', inline: 'center' }); c.querySelector('input')?.focus({ preventScroll: true });
+  };
   return h('section', { class: 'card' },
     h('div', { class: 'bar' },
       h('button', { title: 'Previous month', onclick: () => shiftMonth(-1) }, '‹'),
@@ -2681,10 +3257,20 @@ function monthlyBar(kind) {
       h('span', { class: 'grow' }),
       fileButton('Import roster (PDF or Excel)', '.pdf,.xlsx', true, importMonthly),
       h('button', { onclick: () => exportMonthly(kind) }, 'Download .xlsx'),
-      monthData(kind) && h('button', { onclick: () => { if (confirm(`Clear the ${def.label} for ${monthName(curMonth())}?`)) { delete state.monthly[curMonth()][kind]; render(); } } }, 'Clear')),
+      monthData(kind) && h('button', { onclick: () => {
+        pushUndo({ mon: JSON.stringify(state.monthly || {}), what: `clearing the ${def.label}` });
+        delete state.monthly[curMonth()][kind]; personCache.clear(); render();
+        undoToast(`Cleared the ${def.label} for ${monthName(curMonth())}.`);
+      } }, 'Clear')),
     h('p', { class: 'hint', style: 'margin:0' }, kind === 'leave'
       ? 'Leave sets people on leave on those days (Medical Leave counts as MC). Import the HMS leave roster or add leave by hand.'
-      : `Import the HMS ${def.label.toLowerCase()} (PDF) or an Excel copy, or type names in. ${def.cols.some(c => c.to) ? 'Columns marked • fill the calls and clinics on Today. ' : ''}${def.cols.some(c => c.night) ? 'Overnight duties make people post call the next day. ' : ''}Names in red aren't matched to the staff list.`));
+      : `Import the HMS ${def.label.toLowerCase()} (PDF) or an Excel copy, or type names in. ${def.cols.some(c => c.to) ? 'Columns marked • fill the calls and clinics on Today. ' : ''}${def.cols.some(c => c.night) ? 'Overnight duties make people post call the next day. ' : ''}Names in red aren't matched to the staff list.`),
+    issues.length ? h('p', { class: 'month-issues', role: 'status' },
+      h('b', {}, [errs ? `${errs} clash${errs > 1 ? 'es' : ''}` : '', gaps ? `${gaps} empty overnight dut${gaps > 1 ? 'ies' : 'y'}` : ''].filter(Boolean).join(', ')),
+      ' this month (marked in the grid: on leave, a day duty after a night, two nights at once). ',
+      h('button', { class: 'small', onclick: nextIssue }, 'Next ›')) : null,
+    loadedStrip(),
+    monthlyFixNames(kind));
 }
 
 function renderMonthlyRoster(kind) {
@@ -2700,9 +3286,12 @@ function renderMonthlyRoster(kind) {
     render();
   };
   const today = +state.day.date.slice(8, 10);
+  const flagged = {};
+  for (const i of issuesOf(month)) if (i.kind === kind) (flagged[`${+i.date.slice(8, 10)}|${i.key}`] ||= []).push(i);
   const cell = (d, c) => {
     const v = data?.rows?.[d]?.[c.key] || '';
-    return h('td', {}, nameInput({ value: v, class: v && !personByText(v) ? 'unmatched' : '', title: v && !personByText(v) ? 'Not matched to the staff list' : '',
+    const f = flagged[`${d}|${c.key}`];
+    return h('td', { class: f ? (f.some(i => i.level === 'error') ? 'clash' : 'gap') : null }, nameInput({ value: v, class: v && !personByText(v) ? 'unmatched' : '', title: v && !personByText(v) ? unmatchedTitle(v) : f ? f.map(i => i.text).join(' ') : '', 'aria-invalid': f?.some(i => i.level === 'error') ? 'true' : null,
       onchange: e => set(d, c.key, cleanCell(e.target.value)),
       onkeydown: e => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } } }));
   };
@@ -2728,7 +3317,7 @@ function renderLeaveRoster() {
     .sort((a, b) => a.name.localeCompare(b.name) || a.from.localeCompare(b.from));
   const change = () => { personCache.clear(); render(); };
   const row = e => h('tr', {},
-    h('td', {}, nameInput({ value: e.name, class: personByText(e.name) ? '' : 'unmatched', title: personByText(e.name) ? '' : 'Not matched to the staff list', onchange: ev => { e.name = cleanCell(ev.target.value); change(); } })),
+    h('td', {}, nameInput({ value: e.name, class: personByText(e.name) ? '' : 'unmatched', title: personByText(e.name) ? '' : unmatchedTitle(e.name), onchange: ev => { e.name = cleanCell(ev.target.value); change(); } })),
     h('td', {}, h('input', { type: 'date', value: e.from, onchange: ev => { e.from = ev.target.value; if (e.to < e.from) e.to = e.from; change(); } })),
     h('td', {}, h('input', { type: 'date', value: e.to, onchange: ev => { e.to = ev.target.value < e.from ? e.from : ev.target.value; change(); } })),
     h('td', {}, select(e.type, LEAVE_TYPES.includes(e.type) || !e.type ? LEAVE_TYPES : [e.type, ...LEAVE_TYPES], v => { e.type = v; change(); })),
@@ -2741,9 +3330,27 @@ function renderLeaveRoster() {
         h('span', { class: 'stats' }, h('span', {}, h('b', {}, data?.entries?.length || 0), ' entries')),
         h('span', { class: 'grow' }),
         h('input', { placeholder: 'Filter names', value: leaveFilter, oninput: e => { leaveFilter = e.target.value; const pos = e.target.selectionStart; render(); const i = app.querySelector('.card.scroll input[placeholder="Filter names"]'); i.focus(); i.setSelectionRange(pos, pos); } })),
+      leavePerDay(month),
       entries.length
         ? h('table', {}, h('thead', {}, h('tr', {}, ['Name', 'From', 'To', 'Leave type', 'Remarks', ''].map(t => h('th', {}, t)))), h('tbody', {}, entries.map(row)))
         : h('p', { class: 'empty' }, `No leave for ${monthName(month)} yet.`)));
+}
+// How many are away each day of the month, seniors and juniors, so a heavy day shows before it's approved.
+function leavePerDay(month) {
+  const limit = state.settings.leaveLimit || 0;
+  const days = Array.from({ length: daysIn(month) }, (_, i) => i + 1);
+  const counts = days.map(d => {
+    const date = `${month}-${String(d).padStart(2, '0')}`;
+    const people = [...new Set(leaveOn(state.monthly, date).map(e => personByText(e.name)).filter(Boolean))];
+    return { d, date, s: people.filter(p => p.role === 'senior').length, j: people.filter(p => p.role !== 'senior').length };
+  });
+  if (!counts.some(c => c.s + c.j)) return null;
+  return h('div', { class: 'leave-days', role: 'img', 'aria-label': 'People on leave each day' },
+    counts.map(c => h('button', { class: 'leave-day' + (weekday(month, c.d) === 'Sat' || weekday(month, c.d) === 'Sun' ? ' weekend' : '') + (limit && c.s + c.j > limit ? ' over' : ''),
+      title: `${c.d} ${monthName(month)}: ${c.s} senior${c.s === 1 ? '' : 's'} and ${c.j} junior${c.j === 1 ? '' : 's'} away${limit && c.s + c.j > limit ? ` (more than ${limit})` : ''}. Go to the day.`,
+      onclick: () => switchDate(c.date) },
+      h('span', { class: 'n' }, c.d), h('span', { class: 'sj' }, c.s + c.j ? `${c.s}/${c.j}` : ''))),
+    h('span', { class: 'seen' }, ' seniors/juniors away' + (limit ? `; more than ${limit} is marked` : '')));
 }
 
 // ----- premed tab -----
@@ -2874,10 +3481,36 @@ function boxCard() {
     fromNames.length ? h('div', { class: 'hint' }, 'Also shown, from comments on names:', h('ul', {}, fromNames.map(l => h('li', {}, l)))) : null);
 }
 
+// No roster yet: start from the last day this browser has one for (within a week), when the lists change little.
+// Rows go across for the rooms running today; the live checks then show who is on leave or post call now, and
+// "Fill empty gaps" fills what's missing. With Undo.
+function copyRosterButton() {
+  const from = Array.from({ length: 7 }, (_, i) => addDays(state.day.date, -(i + 1))).find(d => state.days?.[d]?.roster?.rows?.length);
+  if (!from) return null;
+  return h('button', { title: `Copy the roster of ${longDate(from)} into this day, then check it: people on leave or post call today are flagged`, onclick: () => {
+    const src = state.days[from].roster;
+    pushUndoAll(`starting from ${longDate(from)}`, { day: true });
+    // today's rooms in today's order: the AOCC/AIC/AH OT rows first, then each running room (empty if new)
+    const byLabel = new Map(clone(src.rows).map(x => [x.label, x]));
+    const rows = [...clone(src.rows).filter(isSpecialRow).map(x => ({ ...x, why: undefined })),
+      ...state.day.rooms.filter(x => x.running).map(room => {
+        const o = byLabel.get(room.name);
+        return { roomId: room.id, label: room.name, complex: room.complex, senior: o?.senior || '', junior: o?.junior || '', premed: '', notes: room.notes || '' };
+      })];
+    state.roster = { rows, warnings: [], date: state.day.date, seed: src.seed, log: [] };
+    logRoster([`Started from the roster of ${longDate(from)}`]);
+    lastRows = JSON.stringify(rows);
+    afterRosterEdit(true);
+    const n = (state.roster.checks || []).filter(w => w.level === 'error').length;
+    toast(`Copied ${longDate(from)}'s roster.${n ? ` ${n} problem${n > 1 ? 's' : ''} to fix (people away today, empty rooms).` : ''}`, { label: 'Fill empty gaps', run: fillGaps });
+  } }, `Start from ${new Date(from + 'T12:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}'s roster`);
+}
+
 function renderRoster() {
   const r = state.roster;
   const actions = h('div', { class: 'bar' },
     h('button', { class: 'primary', onclick: () => runGenerate(!!r) }, r ? 'Generate new' : 'Generate roster'),
+    !r ? copyRosterButton() : null,
     r && r.date === state.day.date && h('button', { onclick: fillGaps, title: 'Keep every name already on the roster and fill only the empty cells' }, 'Fill empty gaps'),
     r && h('button', { disabled: !undoStack.length, title: undoStack.length ? `Undo${typeof undoStack.at(-1) === 'object' ? ' ' + undoStack.at(-1).what : ' the last change'} (Ctrl+Z)` : 'Nothing to undo', onclick: undo }, 'Undo'),
     r && h('button', { disabled: !redoStack.length, title: redoStack.length ? 'Redo (Ctrl+Y)' : 'Nothing to redo', onclick: redo }, 'Redo'),
@@ -2919,14 +3552,17 @@ function renderRoster() {
   }
   return h('div', {},
     h('section', { class: 'card' }, h('h2', {}, 'OT roster'), actions,
-      h('p', { class: 'hint', style: 'margin:0' }, 'Drag a name onto another name to swap them, or onto an empty part of a cell to move it there. Drag the C on a junior to add them to another room as an ad hoc cover, or the & on a senior to have them double cover another room (a dark & means they already are). × takes a name off. Click a name to see where they are and change its tags ((L), (RA), L-4pm, C-OT13…). + adds someone from the staff list. Click the case notes to edit them. Premed cover is on the Premeds tab.')),
+      h('p', { class: 'hint', style: 'margin:0' }, `${TOUCH ? 'Tap' : 'Click'} a name for its details and to move or swap it${TOUCH ? '' : ' (or drag it)'}; + adds someone, × takes them off. `,
+        h('button', { class: 'link', onclick: showKey }, 'What do &, C, (L) and the colours mean? How do I…?'))),
     h('div', { class: 'cols' },
       h('section', { class: 'card scroll' },
         h('table', { class: 'sheet roster-edit' },
           h('thead', {}, h('tr', {}, ['', 'Senior', 'Junior', 'Cases'].map(t => h('th', {}, t)))),
           h('tbody', {}, body))),
       h('div', {},
+        practiceTaskCard(),
         problemsCard(),
+        changesCard(),
         noListCard(),
         boxCard(),
         callsCard(),
@@ -3004,7 +3640,7 @@ function problemsCard() {
   return h('section', { class: 'card problems', id: 'problems' },
     h('h2', {}, list.length ? `Problems (${list.length})` : 'Problems'),
     list.length
-      ? h('ul', { class: 'warnings' }, list.map(w => h('li', { class: w.level }, h('span', {}, w.text), h('span', { class: 'fixes' }, problemFixes(w)))))
+      ? h('ul', { class: 'warnings' }, list.map(w => h('li', { class: w.level }, h('span', {}, h('b', { class: 'level' }, { error: 'Problem: ', warn: 'Check: ', info: 'Note: ' }[w.level] || ''), w.text), h('span', { class: 'fixes' }, problemFixes(w)))))
       : h('p', { class: 'ok-note' }, '✓ No problems found.'),
     errors ? null : list.length ? h('p', { class: 'hint' }, 'Only warnings left: worth a look, but nothing is wrong.') : null,
     notes.length ? h('details', {}, h('summary', { class: 'seen' }, `Notes from making the roster (${notes.length})`),
@@ -3029,21 +3665,23 @@ function noListCard() {
     !people.length && !admin.length ? h('p', { class: 'hint' }, 'Everyone working has a list.') : null);
 }
 
-async function exportXlsx() {
+async function exportXlsx(stamp = '') {
   colourCache.clear();
-  const wb = buildRosterWorkbook(window.ExcelJS, { date: state.day.date, rows: state.roster.rows, lists: rosterLists(), general: effectiveGeneral(), box: commentsText(), colourOf, shortOf });
+  const wb = buildRosterWorkbook(await excel(), { date: state.day.date, rows: state.roster.rows, lists: rosterLists(), general: effectiveGeneral(), box: commentsText(), colourOf, shortOf, stamp });
   const buf = await wb.xlsx.writeBuffer();
   download(`OT roster ${state.day.date}.xlsx`, new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
 }
 
 let jspdf = null;
-async function exportPdf() {
+async function exportPdf(stamp = '') {
   if (!jspdf) {
-    await new Promise((ok, fail) => { const s = document.createElement('script'); s.src = 'vendor/jspdf.umd.min.js'; s.onload = ok; s.onerror = fail; document.head.append(s); });
+    try {
+      await loadVendor('vendor/jspdf.umd.min.js');
+    } catch { toast("Couldn't load the PDF maker (offline?). Try again, or download the .xlsx."); return false; }
     jspdf = window.jspdf.jsPDF;
   }
   colourCache.clear();
-  const layout = buildLayout({ date: state.day.date, rows: state.roster.rows, lists: rosterLists(), general: effectiveGeneral(), box: commentsText(), colourOf, shortOf });
+  const layout = buildLayout({ date: state.day.date, rows: state.roster.rows, lists: rosterLists(), general: effectiveGeneral(), box: commentsText(), colourOf, shortOf, stamp });
   download(`OT roster ${state.day.date}.pdf`, buildRosterPdf(jspdf, layout).output('blob'));
 }
 
@@ -3060,33 +3698,82 @@ addEventListener('beforeprint', () => {
 addEventListener('afterprint', () => { const t = document.querySelector('table.xl'); if (t) t.style.zoom = ''; });
 
 // The sheet as an image: shared straight to WhatsApp (or any app) where the phone allows it, else downloaded.
-async function exportImage() {
+// Returns false when nothing went out (the share sheet was closed). parts: 1 image, or 2 (calls and lists, then the
+// OT rooms, each with the title and date) that stay readable when WhatsApp shrinks a tall photo.
+async function exportImage(stamp = '', text = '', parts = 1) {
   colourCache.clear();
-  const layout = buildLayout({ date: state.day.date, rows: state.roster.rows, lists: rosterLists(), general: effectiveGeneral(), box: commentsText(), colourOf, shortOf });
-  const blob = await new Promise(ok => buildRosterCanvas(layout).toBlob(ok, 'image/png'));
-  const name = `OT roster ${state.day.date}.png`;
-  const file = new File([blob], name, { type: 'image/png' });
-  if (navigator.canShare?.({ files: [file] })) {
-    try { await navigator.share({ files: [file], title: `OT roster ${longDate(state.day.date)}` }); return; }
-    catch (e) { if (e?.name === 'AbortError') return; }
+  const layout = buildLayout({ date: state.day.date, rows: state.roster.rows, lists: rosterLists(), general: effectiveGeneral(), box: commentsText(), colourOf, shortOf, stamp });
+  const spans = parts === 2 && layout.otFrom ? [[[2, layout.otFrom - 1]], [[2, 5], [layout.otFrom, layout.rows]]] : [[[2, layout.rows]]];
+  const files = [];
+  for (const [i, sp] of spans.entries()) {
+    const blob = await new Promise(ok => buildRosterCanvas(layout, 1400, sp).toBlob(ok, 'image/png'));
+    files.push(new File([blob], `OT roster ${state.day.date}${spans.length > 1 ? ` (${i + 1} of ${spans.length})` : ''}.png`, { type: 'image/png' }));
   }
-  download(name, blob);
-  toast('Image downloaded. Send it on WhatsApp as a photo or file.');
+  if (navigator.canShare?.({ files })) {
+    try { await navigator.share({ files, title: `OT roster ${longDate(state.day.date)}`, ...(text ? { text } : {}) }); return true; }
+    catch (e) { if (e?.name === 'AbortError') return false; }
+  }
+  for (const f of files) download(f.name, f);
+  if (text) { try { await navigator.clipboard.writeText(text); } catch { /* no clipboard */ } }
+  const what = files.length > 1 ? `${files.length} images downloaded` : 'Image downloaded';
+  toast(text ? `${what} and the changes copied: paste them under the image on WhatsApp.` : `${what}. Send ${files.length > 1 ? 'them' : 'it'} on WhatsApp as a photo or file.`);
+  return true;
 }
 
 // Download button: the format last picked (remembered in this browser), with a menu to change it.
 // a download or print counts as the day being sent out (the steps strip shows it until the roster changes)
-const sentOut = fn => async () => { (state.outHash ||= {})[state.day.date] = dayHash(); save(); await fn(); renderSteps(); };
-const DOWNLOADS = [['xlsx', 'Download .xlsx', sentOut(exportXlsx)], ['pdf', 'Download PDF', sentOut(exportPdf)], ['png', 'Image for WhatsApp', sentOut(exportImage)], ['print', 'Print', sentOut(() => { rosterView = 'sheet'; render(); setTimeout(() => window.print(), 100); })]];
+// A sheet sent again after changes says "Updated hh:mm" at the top; re-sending the same version keeps its stamp.
+function stampForSend() {
+  const s = state.outSent?.[state.day.date];
+  if (!s) return '';
+  return s.hash === dayHash() ? s.stamp || '' : `Updated ${hhmm(Date.now())}`;
+}
+// Record what went out (only once it did), so the roster can show what changed since.
+function markSent(stamp) {
+  const date = state.day.date;
+  (state.outHash ||= {})[date] = dayHash();
+  const sent = state.outSent ||= {};
+  sent[date] = { hash: dayHash(), at: Date.now(), stamp, rows: sentRows(state.roster.rows) };
+  const cut = addDays(realToday(), -30);
+  for (const d of Object.keys(sent)) if (d < cut) delete sent[d];
+  save(); renderSteps(); render();
+}
+const sentOut = fn => async () => {
+  const stamp = stampForSend();
+  let ok;
+  try { ok = await fn(stamp); } catch (e) { console.error(e); toast("Couldn't make the file. Try again."); return; }
+  if (ok !== false) markSent(stamp);
+};
+// The rooms that changed since the roster was last sent, with a way to send the changes.
+function changesCard() {
+  const r = state.roster, s = state.outSent?.[state.day.date];
+  if (!r || !s || s.hash === dayHash()) return null;
+  const list = rosterChanges(s.rows, r.rows);
+  if (!list.length) return null;
+  const text = `OT roster ${longDate(state.day.date)}, changes since ${hhmm(s.at)}:\n` + list.map(c => '• ' + changeText(c)).join('\n');
+  return h('section', { class: 'card changes', id: 'changes' },
+    h('h2', {}, `Changed since sent at ${hhmm(s.at)} (${list.length})`),
+    h('ul', { class: 'changes-list' }, list.map(c => h('li', {}, h('b', {}, `${c.label} ${c.what}: `), c.from || '(none)', ' → ', c.to || '(none)'))),
+    h('div', { class: 'bar' },
+      h('button', { class: 'small primary', onclick: async () => { const stamp = stampForSend(); if (await exportImage(stamp, text) !== false) markSent(stamp); } }, 'Send image with the changes'),
+      h('button', { class: 'small', onclick: async () => { try { await navigator.clipboard.writeText(text); toast('Changes copied.'); } catch { toast("Couldn't copy here."); } } }, 'Copy the changes')),
+    h('p', { class: 'hint' }, 'The sheet you send now says "Updated" with the time, so it can be told apart from the first one.'));
+}
+const DOWNLOADS = [['xlsx', 'Download .xlsx', sentOut(exportXlsx)], ['pdf', 'Download PDF', sentOut(exportPdf)], ['png', 'Image for WhatsApp', sentOut(exportImage)], ['png2', 'Image in 2 parts (easier to read on a phone)', sentOut(stamp => exportImage(stamp, '', 2))], ['print', 'Print', sentOut(() => { rosterView = 'sheet'; render(); setTimeout(() => window.print(), 100); })]];
 let downloadMenu = false;
 function downloadButton() {
   let pick = 'xlsx';
   try { pick = localStorage.getItem('nuh-roster-download') || 'xlsx'; } catch { /* no storage */ }
-  const cur = DOWNLOADS.find(d => d[0] === pick) || DOWNLOADS[0];
+  // members: one step to save the roster for the team and then send the image
+  const all = cloud.enabled && isMember() ? [...DOWNLOADS, ['saveimage', 'Save for the team, then image', async () => {
+    await saveRosterToCloud();
+    if (state.cloudHash?.[state.day.date]?.hash === dayHash()) await sentOut(exportImage)();
+  }]] : DOWNLOADS;
+  const cur = all.find(d => d[0] === pick) || all[0];
   return h('div', { class: 'split' },
     h('button', { onclick: () => cur[2]() }, cur[1]),
     h('button', { class: 'caret', 'aria-label': 'Other formats', 'aria-expanded': String(downloadMenu), onclick: () => { downloadMenu = !downloadMenu; render(); } }, '▾'),
-    downloadMenu ? h('div', { class: 'menu' }, DOWNLOADS.map(([k, label, fn]) => h('button', { class: k === cur[0] ? 'on' : '', onclick: () => {
+    downloadMenu ? h('div', { class: 'menu' }, all.map(([k, label, fn]) => h('button', { class: k === cur[0] ? 'on' : '', onclick: () => {
       if (k !== 'print') { try { localStorage.setItem('nuh-roster-download', k); } catch { /* no storage */ } }
       downloadMenu = false; render(); fn();
     } }, label))) : null);
@@ -3160,6 +3847,7 @@ function renderSettings() {
       h('div', { class: 'paste' },
         h('div', {}, h('label', {}, 'Paeds if patient is younger than (years)'), h('input', { type: 'number', min: 1, max: 18, value: st.paedsAgeYears, onchange: e => { st.paedsAgeYears = +e.target.value || 12; save(); } })),
         h('div', {}, h('label', {}, 'Max rooms per premed cover'), h('input', { type: 'number', min: 1, max: 6, value: st.premedCap, onchange: e => { st.premedCap = +e.target.value || 3; save(); } })),
+        h('div', {}, h('label', {}, 'Mark days with more people on leave than (0: off)'), h('input', { type: 'number', min: 0, max: 60, value: st.leaveLimit || 0, onchange: e => { st.leaveLimit = Math.max(0, +e.target.value || 0); save(); } })),
         h('div', {}, h('label', {}, 'Complex list keywords'), h('textarea', { value: st.complexKeywords.join(', '), onchange: e => { st.complexKeywords = splitNameList(e.target.value).map(x => x.toLowerCase()); save(); } })),
         h('div', {}, h('label', {}, 'Runs-late keywords'), h('textarea', { value: st.longKeywords.join(', '), onchange: e => { st.longKeywords = splitNameList(e.target.value).map(x => x.toLowerCase()); save(); } })),
       ),
@@ -3178,7 +3866,7 @@ function renderSettings() {
       h('p', { class: 'hint' }, 'The rooms on the roster, in order. "Running by default" rooms are ticked when you set up a new day (Clear day). Rooms in the same complex can share a senior when seniors are short. MOR 7–9 are emergency OTs, so they have no line.'),
       roomEditor(),
       h('p', { class: 'hint', style: 'margin-top:12px' }, 'Room defaults: subspecs a room always needs, one room per line, e.g. "MOR 12: cardiac". Use the keys ' + st.subspecs.map(x => x.key).join(', ') + '.'),
-      h('textarea', { rows: 3, value: Object.entries(st.roomDefaults || {}).map(([room, ks]) => `${room}: ${ks.join(', ')}`).join('\n'), onchange: e => {
+      h('textarea', { rows: 3, 'aria-label': 'Room defaults', value: Object.entries(st.roomDefaults || {}).map(([room, ks]) => `${room}: ${ks.join(', ')}`).join('\n'), onchange: e => {
         const keys = new Set(st.subspecs.map(x => x.key));
         const out = {}, bad = [];
         for (const line of e.target.value.split('\n')) {
@@ -3225,10 +3913,20 @@ document.getElementById('loadTeam').addEventListener('change', async e => {
     const data = JSON.parse(await f.text());
     if (data.kind === 'ot-roster-all' && data.state) {
       // a whole browser's roster (from the old address): staff, days, monthly rosters, rotations, settings
+      const d = data.state;
+      if (!Array.isArray(d.staff) || (d.day && typeof d.day !== 'object') || (d.days && typeof d.days !== 'object')) { toast('That file is damaged: its staff list or days are missing. Nothing was changed.'); return; }
       if (state.staff.length && !confirm('Replace everything the roster has saved in this browser with this file?')) return;
-      state = { ...blankState(), ...data.state, settings: { ...clone(DEFAULT_SETTINGS), ...data.state.settings } };
-      state.rotations ||= emptyRotations();
-      cleanStaffNames(); migrateRooms(); syncRooms();
+      const before = state;
+      try {
+        state = { ...blankState(), ...d, settings: { ...clone(DEFAULT_SETTINGS), ...d.settings } };
+        state.day ||= blankState().day;
+        state.rotations ||= emptyRotations();
+        cleanStaffNames(); migrateRooms(); syncRooms();
+      } catch {
+        state = before; // keep what was here rather than a half-loaded file
+        toast('That file is damaged, so nothing was changed.');
+        return;
+      }
       nextId = 1 + state.staff.reduce((m, p) => Math.max(m, parseInt(String(p.id).replace(/\D/g, ''), 10) || 0), 0);
       clearUndo(); lastRows = state.roster ? JSON.stringify(state.roster.rows) : null;
       render();
@@ -3250,8 +3948,8 @@ document.getElementById('loadTeam').addEventListener('change', async e => {
     syncRooms();
     render();
     toast(`Team file loaded: ${state.staff.length} staff.`);
-  } catch {
-    toast("That file isn't an OT roster team file.");
+  } catch (err) {
+    toast(err instanceof SyntaxError ? "That file isn't a roster file (it can't be read as JSON)." : "That file isn't an OT roster team file or a Download everything file.");
   }
 });
 
@@ -3271,9 +3969,18 @@ const me = () => ({ email: cs.user.email, displayName: cs.user.displayName, rost
 const when = ms => new Date(ms).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 const byName = b => b?.name || b?.email || 'someone';
 
+// Cloud errors in words someone can act on; the technical message goes to the console.
 function cloudError(e) {
   console.error(e);
-  toast(e?.code === 'permission-denied' ? "You don't have access to that. Ask an admin to add you to the team." : `Couldn't reach the shared storage: ${e?.message || e}`);
+  const code = String(e?.code || '').replace(/^firestore\//, ''), msg = String(e?.message || e || '');
+  const kept = ' Your work is still kept in this browser.';
+  const words =
+    code === 'permission-denied' ? "You don't have access to that. Ask an admin to add you to the team (or give you the rosterer role)."
+    : code === 'unauthenticated' ? 'You\'ve been signed out. Sign in again, then try once more.' + kept
+    : code === 'unavailable' || !navigator.onLine || /network|fetch|offline|dynamically imported module/i.test(msg) ? "Can't reach the team's storage (offline, or the hospital network blocks it). Try again when connected." + kept
+    : code === 'deadline-exceeded' || code === 'resource-exhausted' ? 'The team\'s storage is slow or busy right now. Try again in a minute.' + kept
+    : `Something went wrong talking to the team's storage (${code || 'error'}). Try again.` + kept;
+  toast(words);
 }
 
 function renderCloudBar() {
@@ -3291,7 +3998,9 @@ function renderCloudBar() {
     el.replaceChildren(h('button', { class: 'primary', onclick: () => cloud.signIn().catch(e => { if (e?.code !== 'auth/popup-closed-by-user') cloudError(e); }) }, 'Sign in with Google'));
     return;
   }
-  const out = h('button', { onclick: () => cloud.signOut() }, 'Sign out');
+  const out = h('span', { class: 'signout' },
+    h('button', { onclick: () => cloud.signOut() }, 'Sign out'),
+    h('button', { class: 'small', title: 'For a shared computer: also removes the roster, staff list and your name from this browser', onclick: signOutAndClear }, 'Sign out and clear this computer'));
   if (!cs.member) {
     if (!cs.memberError) {
       el.replaceChildren(...[
@@ -3339,7 +4048,7 @@ cloud.watchUser(async user => {
   if (isViewer()) { state.tab = 'myday'; document.body.classList.add('viewer'); }
   render();
   if (cs.member) await loadTeamFromCloud(false);
-  if (isViewer()) viewerLoad(state.day.date);
+  if (isViewer()) { const d = myDayDate(); if (d !== state.day.date) switchDate(d); else viewerLoad(d); }
 }).catch(e => { cs.ready = true; cloudError(e); render(); });
 
 const teamHash = () => JSON.stringify([state.settings, state.staff, state.roomTemplate, state.staffLog || [], state.monthly || {}, state.rotations || {}]);
@@ -3352,15 +4061,37 @@ function teamSyncBar() {
     h('span', {}, dirty
       ? 'You have changes to staff, rooms, settings or monthly rosters that the team doesn\'t have yet.'
       : `Shared with the team${state.teamSyncedAt ? `, last saved ${when(state.teamSyncedAt)}` : ''}.`),
-    h('button', { class: dirty ? 'primary' : '', onclick: saveTeamToCloud }, 'Save for the team'),
+    h('button', { class: dirty ? 'primary' : '', onclick: () => saveTeamToCloud() }, 'Save for the team'),
     h('button', { onclick: () => loadTeamFromCloud(true) }, 'Load team version'));
 }
 
-async function saveTeamToCloud() {
+// A shared OT computer: sign out and leave nothing of the roster behind in this browser.
+async function signOutAndClear() {
+  const unsaved = state.teamSyncedHash !== teamHash() || (state.roster && state.cloudHash?.[state.day.date]?.hash !== dayHash());
+  if (!confirm(`Sign out and remove the roster, staff list and your name from this browser?${unsaved ? '\n\nSome changes here are not saved for the team: press Cancel and save them (or Download everything) first.' : ''}`)) return;
   try {
-    const doc = await cloud.saveTeam({ settings: state.settings, staff: state.staff, roomTemplate: state.roomTemplate, roomsVersion: state.roomsVersion, staffLog: state.staffLog || [] }, me());
-    await cloud.saveMonthly(state.monthly || {}, me());
-    await cloud.saveRotations(state.rotations || emptyRotations(), me());
+    for (const k of Object.keys(localStorage)) if (/^(ot-roster|nuh-roster)/.test(k)) localStorage.removeItem(k);
+  } catch { /* no storage */ }
+  clearTimeout(saveTimer); clearedForGood = true;
+  window.onbeforeunload = null;
+  try { await cloud.signOut(); } catch { /* signed out anyway */ }
+  location.reload();
+}
+
+async function saveTeamToCloud(force = false) {
+  try {
+    const team = { settings: state.settings, staff: state.staff, roomTemplate: state.roomTemplate, roomsVersion: state.roomsVersion, staffLog: state.staffLog || [] };
+    let doc;
+    try {
+      doc = await cloud.saveTeamAll({ team, months: state.monthly || {}, rotations: state.rotations || emptyRotations() }, me(), { expectedUpdatedAt: state.teamSyncedAt ?? null, force });
+    } catch (e) {
+      if (!(e instanceof cloud.Conflict)) throw e;
+      // someone saved the team list after this browser last loaded it: don't overwrite their work unasked
+      const c = e.current;
+      if (confirm(`${byName(c.updatedBy)} saved the team's staff list, rooms and monthly rosters ${when(c.updatedAt)}, after this browser last loaded them.\n\nOK: replace theirs with this browser's version.\nCancel: keep theirs (you can then load it, or download yours first).`)) return saveTeamToCloud(true);
+      toast('Not saved. The team version is newer.', { label: 'Load team version', run: () => loadTeamFromCloud(true) });
+      return;
+    }
     state.teamSyncedAt = doc.updatedAt;
     state.teamSyncedHash = teamHash();
     render();
@@ -3373,6 +4104,11 @@ async function loadTeamFromCloud(asked) {
     const t = await cloud.loadTeam();
     if (!t) { if (asked) toast('Nobody has saved a team staff list yet.'); return; }
     if (!asked && t.updatedAt === state.teamSyncedAt) return;
+    // this browser has its own unsaved changes: say the team's is newer instead of offering to replace them
+    if (!asked && state.staff.length && !isViewer() && state.teamSyncedHash && state.teamSyncedHash !== teamHash()) {
+      toast(`The team's staff list was saved by ${byName(t.updatedBy)} ${when(t.updatedAt)}; this browser has changes not saved for the team.`, { label: 'Load theirs', run: () => loadTeamFromCloud(true) });
+      return;
+    }
     if (state.staff.length && !isViewer() && !confirm(`Load the team's staff list (${t.staff?.length || 0} people, saved by ${byName(t.updatedBy)} ${when(t.updatedAt)})? It replaces the staff list, rooms and settings in this browser.`)) return;
     state.settings = { ...clone(DEFAULT_SETTINGS), ...t.settings };
     state.staff = t.staff || [];
@@ -3526,11 +4262,14 @@ function membersCard() {
     h('h2', {}, 'Team members'),
     h('p', { class: 'hint' }, 'Only these Google accounts can sign in and see the shared staff list and rosters. Admins can also manage this list.'),
     h('table', {},
-      h('thead', {}, h('tr', {}, ['Google email', 'Name', 'Role', ''].map(t => h('th', {}, t)))),
+      h('thead', {}, h('tr', {}, ['Google email', 'Name', 'On the staff list as', 'Role', ''].map(t => h('th', {}, t)))),
       h('tbody', {},
         list.map(m => h('tr', {},
           h('td', {}, m.email), h('td', {}, m.name || ''),
-          h('td', {}, select(m.role, ROLES, v => cloud.setMember(m.email, v, m.name || '').then(refresh, cloudError))),
+          // who they are on the staff list: My day uses this instead of guessing from the name
+          h('td', {}, select(m.staffId || '', [['', m.name && matchName(m.name, state.staff).person ? `(by name: ${matchName(m.name, state.staff).person.name})` : '—'], ...state.staff.slice().sort((a, b) => a.name.localeCompare(b.name)).map(p => [p.id, p.name])],
+            v => cloud.setMember(m.email, m.role, m.name || '', v).then(refresh, cloudError))),
+          h('td', {}, select(m.role, ROLES, v => cloud.setMember(m.email, v, m.name || '', m.staffId || '').then(refresh, cloudError))),
           h('td', {}, m.email === cs.user.email.toLowerCase() ? '' : h('button', { class: 'small', onclick: () => { if (confirm(`Remove ${m.email}?`)) cloud.removeMember(m.email).then(refresh, cloudError); } }, '✕')))),
         h('tr', {},
           h('td', {}, h('input', { type: 'email', placeholder: 'name@gmail.com', value: newMember.email, oninput: e => { newMember.email = e.target.value; } })),
@@ -3547,8 +4286,34 @@ function membersCard() {
 lastRows = state.roster ? JSON.stringify(state.roster.rows) : null;
 state.tab = location.hash === '#myday' ? 'myday' : state.staff.length ? 'roster' : 'staff'; // the page opens on the roster
 render();
+openOnTheRightDay();
+// a practice link with a scenario (?demo=short): set it up once per visit
+if (DEMO) {
+  const sc = new URLSearchParams(location.search).get('demo');
+  let done = '';
+  try { done = sessionStorage.getItem('nuh-roster-scenario') || ''; } catch { /* no storage */ }
+  if (SCENARIOS.some(x => x[0] === sc) && done !== sc) { try { sessionStorage.setItem('nuh-roster-scenario', sc); } catch { /* no storage */ } setTimeout(() => applyScenario(sc), 300); }
+}
 // practice mode opens with the tour, once
-if (DEMO) { try { if (!localStorage.getItem(TOUR_KEY)) setTimeout(startTour, 700); } catch { /* no storage */ } }
+if (DEMO && !SCENARIOS.some(x => x[0] === new URLSearchParams(location.search).get('demo'))) { try { if (!localStorage.getItem(TOUR_KEY)) setTimeout(startTour, 700); } catch { /* no storage */ } }
 document.getElementById('tourBtn')?.addEventListener('click', () => startTour());
-addEventListener('hashchange', () => { if (location.hash === '#myday' && state.tab !== 'myday') { state.tab = 'myday'; window.scrollTo(0, 0); render(); } });
+document.getElementById('allBtn')?.addEventListener('click', downloadEverything);
+addEventListener('hashchange', () => { if (location.hash === '#myday' && state.tab !== 'myday') { closeTagEditor(); state.tab = 'myday'; window.scrollTo(0, 0); render(); } });
 document.getElementById('keysBtn')?.addEventListener('click', showShortcuts);
+document.getElementById('keyBtn')?.addEventListener('click', showKey);
+// Phones: keep the bottom-sheet person box above the on-screen keyboard, and the field being typed in visible.
+if (window.visualViewport) {
+  const fit = () => {
+    const box = document.querySelector('.tag-editor');
+    if (!box || innerWidth > 600) return;
+    const vv = visualViewport, covered = Math.max(0, innerHeight - vv.height - vv.offsetTop);
+    box.style.bottom = covered + 'px';
+    box.style.maxHeight = Math.round(vv.height * 0.9) + 'px';
+  };
+  visualViewport.addEventListener('resize', fit);
+  visualViewport.addEventListener('scroll', fit);
+  document.addEventListener('focusin', e => {
+    if (innerWidth > 600 || !e.target.closest?.('.tag-editor')) return;
+    setTimeout(() => { fit(); e.target.scrollIntoView({ block: 'nearest' }); }, 250);
+  });
+}

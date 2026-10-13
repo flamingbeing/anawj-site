@@ -2,7 +2,7 @@
 // autosave (this device at once, the server for choices at once and text after 3 s idle), a sticky
 // "n of N required" bar, submit, decline, and a read-only view for anyone else or once submitted.
 
-import { S, hooks, h, fill, add, toast, cloud, icon, go, modal, debounce, fmtDate, fmtAgo, toMs, avatar, toolLabel, empty, draftKey, EDIT_MS } from './ui-core.js';
+import { S, hooks, h, fill, add, toast, cloud, icon, go, modal, debounce, fmtDate, fmtAgo, toMs, avatar, toolLabel, empty, draftKey, EDIT_MS, errText, linkAccount, wrongAccountCard, switchAccount } from './ui-core.js';
 import { FORMS, SCALES, ENTRUSTMENT_TEXT_KEY } from './forms.js';
 import { itemById } from './catalogue.js';
 import { validate, visibleQuestions, nextGap, identifierWarning } from './engine.js';
@@ -43,8 +43,12 @@ export async function renderForm(id) {
     try { ev = await cloud.getEvaluation(id); } catch (err) { console.warn(err); }
   }
   if (!ev) {
-    return empty('Evaluation not found', navigator.onLine ? 'It may have been withdrawn, or it was sent to a different account.' : 'Opens when you have signal.',
-      h('a', { class: 'n-btn', href: '#pending' }, 'Evaluations'));
+    if (!navigator.onLine) return empty('Evaluation not found', 'Opens when you have signal.', h('a', { class: 'n-btn', href: '#pending' }, 'Evaluations'));
+    const as = linkAccount();
+    if (as && as !== S.user?.email) return h('div', { class: 'e-stack' }, wrongAccountCard());
+    return empty('Evaluation not found', ['It may have been withdrawn, or it was sent to a different account. You’re signed in as ', h('b', {}, S.user?.email || ''), '.'],
+      h('div', { class: 'e-actions' }, h('a', { class: 'n-btn n-btn--outline e-btn-quiet', href: '#pending' }, 'Evaluations'),
+        cloud.demo ? null : h('button', { class: 'n-btn', type: 'button', onclick: switchAccount }, 'Switch account')));
   }
   if (ev.residentEmail === S.user?.email && ev.assessorEmail !== S.user?.email) {
     history.replaceState(null, '', location.pathname + location.search + '#r/' + encodeURIComponent(ev.id));
@@ -52,7 +56,7 @@ export async function renderForm(id) {
     return h('p', { class: 'e-loading' }, 'Opening your request…');
   }
   const form = FORMS[ev.formId];
-  if (!form) return empty('Unknown form', `This evaluation uses a form this app doesn't know (${ev.formId}).`);
+  if (!form) return empty('Can’t open this form', `Refresh the app to get the latest forms (pull down, or close and reopen it). If that doesn’t work, ask the resident to send the request again. (${ev.formId})`);
   setTitle(toolLabel(ev.tool || form.tool));
   return new FormScreen(ev, form).render();
 }
@@ -149,9 +153,9 @@ class FormScreen {
         else if (this.sentAny) { patch.assessment = null; this.sentAny = false; }
         if (S.user?.name && this.ev.assessorName !== S.user.name) patch.assessorName = S.user.name;
         try {
-          await cloud.updateEvaluation(this.ev.id, patch, { wait: false, onError: err => { console.warn('Save failed', err); this.status('Saved on this device'); this.saveError(err); } });
-          this.status('Saved');
-        } catch (err) { console.warn('Save failed', err); this.status('Saved on this device'); this.saveError(err); this.again = false; }
+          await cloud.updateEvaluation(this.ev.id, patch, { wait: false, onError: err => { console.warn('Save failed', err); this.status('Not saved to the server: kept on this phone'); this.saveError(err); } });
+          this.status(navigator.onLine ? 'Saved' : 'Saved on this phone: sends when you have signal');
+        } catch (err) { console.warn('Save failed', err); this.status('Not saved to the server: kept on this phone'); this.saveError(err); this.again = false; }
       } while (this.again);
     };
     this.saving = run().finally(() => { this.saving = null; });
@@ -262,7 +266,16 @@ class FormScreen {
       const msg = this.tried ? bad.get(q.n) : null;
       el.classList.toggle('is-error', !!msg);
       const box = el.querySelector(':scope > .e-q__error');
-      if (box) { box.textContent = msg || ''; box.hidden = !msg; }
+      if (box) {
+        box.textContent = msg || ''; box.hidden = !msg;
+        // screen readers hear "Required" (or the rule) on the question and its text box
+        box.id = box.id || `${el.id || 'q' + q.n}-err`;
+        if (msg) el.setAttribute('aria-describedby', box.id); else el.removeAttribute('aria-describedby');
+        for (const i of el.querySelectorAll('textarea, input[type="text"], input[type="number"], input:not([type])')) {
+          if (msg) { i.setAttribute('aria-invalid', 'true'); i.setAttribute('aria-describedby', box.id); }
+          else { i.removeAttribute('aria-invalid'); i.removeAttribute('aria-describedby'); }
+        }
+      }
     }
     return r;
   }
@@ -293,7 +306,7 @@ class FormScreen {
     const assessment = this.cleanAnswers();
     const patch = this.mode === 'edit' ? { assessment }
       : { status: 'submitted', submittedAt: Date.now(), assessment, metrics: this.metrics, assessorName: S.user?.name || this.ev.assessorName };
-    if (!navigator.onLine) this.status('Sending when online: keep this page open until ✓');
+    if (!navigator.onLine) this.status('No signal: it will send by itself when you’re back online');
     try {
       // no waiting for autosaves: Firestore applies writes in order. The device copy stays until the
       // server has the submitted form (pruneDrafts), so a rejected offline submit loses nothing.
@@ -303,13 +316,14 @@ class FormScreen {
       const saved = await cloud.updateEvaluation(this.ev.id, patch);
       if (cloud.demo) ls.del(draftKey(this.ev.id));
       const ev = { ...this.ev, ...(saved || patch) };
-      this.root.replaceWith(sentScreen(ev, this.mode === 'edit'));
+      const unsent = await cloud.hasUnsentWrites(300);
+      this.root.replaceWith(sentScreen(ev, this.mode === 'edit', unsent));
       window.scrollTo(0, 0);
     } catch (err) {
       console.warn(err);
       btn.disabled = false;
       const m = modal('Not sent', [
-        h('p', {}, err.code === 'permission-denied' ? 'The request is no longer open, or the 15-minute edit window has passed.' : 'Could not send: ' + (err.message || err)),
+        h('p', {}, err.code === 'permission-denied' ? 'The request is no longer open, or the 15-minute edit window has passed.' : 'Couldn’t send. Check your signal and try again.'),
         h('p', { class: 'e-small' }, err.code === 'permission-denied' ? 'Copy your answers now if you want to keep them.' : 'Your answers are kept on this device.'),
         h('div', { class: 'e-actions' },
           h('button', { class: 'n-btn n-btn--outline e-btn-quiet', onclick: () => copyAnswers(this.form, this.cleanAnswers()) }, 'Copy my answers'),
@@ -344,7 +358,7 @@ class FormScreen {
         hooks.render();
       } catch (e) {
         ok.disabled = false;
-        err.textContent = 'Could not decline: ' + (e.message || e); err.hidden = false;
+        err.textContent = 'Couldn’t decline. ' + errText(e); err.hidden = false;
       }
     } }, 'Decline');
     const m = modal('I can’t assess this', [
@@ -704,11 +718,15 @@ function howTo() {
   return d;
 }
 
-// After submit: "Sent ✓", tell the resident, next pending.
-function sentScreen(ev, edited) {
+// After submit: "Sent ✓", tell the resident, next pending. Without signal the form waits on this
+// phone ("Saved on this phone") and the heading turns to Sent once the server has it.
+function sentScreen(ev, edited, unsent = false) {
   const me = S.user?.email;
+  // the same resident's other forms first (often several items from one case), then the oldest
   const next = (S.assigned || []).filter(e => e.status === 'requested' && e.id !== ev.id && e.residentEmail !== me)
-    .sort((a, b) => (a.requestedAt || a.createdAt || 0) - (b.requestedAt || b.createdAt || 0));
+    .sort((a, b) => (b.residentEmail === ev.residentEmail) - (a.residentEmail === ev.residentEmail)
+      || (a.requestedAt || a.createdAt || 0) - (b.requestedAt || b.createdAt || 0));
+  const sameRes = next.filter(e => e.residentEmail === ev.residentEmail).length;
   const link = resultLink(ev.id);
   const msg = `${toolLabel(ev.tool)} done: ${ev.itemText || ''}`.trim();
   const tell = async () => {
@@ -719,15 +737,21 @@ function sentScreen(ev, edited) {
     catch { toast(link, { ms: 9000 }); }
   };
   setTitle('Sent');
+  const done = edited ? 'Changes saved ✓' : 'Sent ✓';
+  const head = h('h1', { class: 'e-h2', role: 'status', 'aria-live': 'polite' }, unsent ? 'Saved on this phone' : done);
+  const unsentNote = unsent ? h('p', { class: 'e-small e-warn-text' }, 'No signal yet. It sends by itself when you’re back online; don’t sign out until then.') : null;
+  if (unsent) cloud.whenSynced().then(() => { head.textContent = done; unsentNote?.remove(); }).catch(() => {});
   return h('div', { class: 'e-stack e-form__sent' },
     h('div', { class: 'e-card e-center' },
       h('div', { class: 'e-form__senticon', 'aria-hidden': 'true' }, icon('check')),
-      h('h1', { class: 'e-h2', role: 'status', 'aria-live': 'polite' }, edited ? 'Changes saved ✓' : 'Sent ✓'),
+      head,
+      unsentNote,
       h('p', {}, `${toolLabel(ev.tool)} for ${ev.residentName || ev.residentEmail}`),
       h('p', { class: 'e-small' }, ev.itemText || ''),
       h('p', { class: 'e-small' }, 'You can change your answers for 15 minutes from Evaluations › History.')),
     h('button', { class: 'n-btn e-btn-big', onclick: tell }, icon('share'), ' Tell resident'),
-    next.length ? h('a', { class: 'n-btn n-btn--secondary e-btn-big', href: '#e/' + encodeURIComponent(next[0].id) }, `Next pending (${next.length})`) : null,
+    next.length ? h('a', { class: 'n-btn n-btn--secondary e-btn-big', href: '#e/' + encodeURIComponent(next[0].id) },
+      sameRes ? `Next for ${ev.residentName || 'this resident'} (${sameRes} left)` : `Next pending (${next.length})`) : null,
     h('a', { class: 'n-btn n-btn--outline e-btn-quiet e-btn-big', href: '#pending' }, 'Back to Evaluations'));
 }
 

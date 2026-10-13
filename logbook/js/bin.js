@@ -10,7 +10,7 @@
 // renderBin() / openBin()        the bin view (element) / the same in a dialog
 
 import { S, h, toast, modal, confirmBox, cloud, writes, fill, removeCase, deleteMany, restoreCase, miniChips, resetters } from './ui-core.js';
-import { cleanNote, noteTitle, MAX_NOTES } from './notepad.js';
+import { cleanNote, noteTitle, MAX_NOTES, isDayNote, cappedNotes } from './notepad.js';
 import { cleanCase } from './demo-backend.js';
 import { cleanReflection } from './reflections.js';
 import { REFLECTION_HEADINGS } from './categories.js';
@@ -34,7 +34,9 @@ export function binLabel(e, now = Date.now()) {
 }
 export function binEntry(kind, item, now = Date.now()) {
   if (kind !== 'case' && kind !== 'reflection' && kind !== 'note') throw new Error('Unknown bin kind: ' + kind);
-  const data = kind === 'case' ? cleanCase(item, item.updatedAt || now) : kind === 'note' ? cleanNote(item, item.updatedAt || now) : cleanReflection(item);
+  // data keeps the binned version's updatedAt: other devices remove their copy only if it is that version (sync.js)
+  const data = kind === 'case' ? cleanCase(item, item.updatedAt || now) : kind === 'note' ? cleanNote(item, item.updatedAt || now)
+    : { ...cleanReflection(item), updatedAt: Number(item.updatedAt) || now };
   return { id: binId(kind, data.id, now), kind, data, deletedAt: now };
 }
 
@@ -94,8 +96,9 @@ export async function restoreFromBin(id) {
   } else if (e.kind === 'note') {
     // the notes may not be loaded yet (they load on first use): load them, so the limit and the id check hold
     const have = (await (await import('./ui-notepad.js')).ensureNotes().catch(() => null)) || S.notes || [];
-    if (have.length >= MAX_NOTES) throw new Error(`you already have ${MAX_NOTES} notes; delete one first`);
     out = { ...e.data };
+    if (!isDayNote(out) && cappedNotes(have).length >= MAX_NOTES) throw new Error(`you already have ${MAX_NOTES} notes; delete one first`);
+    // a daily note whose day has a new one since comes back as an ordinary note of that day
     if (have.some(n => n.id === out.id)) out.id = uid();
     out = await writes.save('note', mine(), out, null);
   } else {
@@ -126,13 +129,18 @@ async function dropImages(entries) {
 }
 
 const purged = new Set();
-// Once per signed-in user per page load. Returns the number of entries purged.
+// It reads the whole bin, so at most once a day per account on this device (and once per page load); entries a day
+// past their 30 are hidden from the view anyway. Wiped at sign-out with the other device copies (cloud.forgetLocal).
+export const PURGED_KEY = 'apmes-logbook-purged:';
+const lastPurge = who => { try { return Number(localStorage.getItem(PURGED_KEY + who)) || 0; } catch { return 0; } };
+// Returns the number of entries purged.
 export async function purgeExpired({ now = Date.now(), force = false } = {}) {
   if (!S.user) return 0;
   const who = mine();
-  if (purged.has(who) && !force) return 0;
+  if ((purged.has(who) || Math.abs(now - lastPurge(who)) < DAY) && !force) return 0;
   purged.add(who);
   binCache = await cloud.listBin(who);
+  try { localStorage.setItem(PURGED_KEY + who, String(now)); } catch { /* storage blocked */ }
   const old = binCache.filter(e => isExpired(e, now));
   if (!old.length) return 0;
   for (const e of old) await cloud.deleteBinEntry(who, e.id);

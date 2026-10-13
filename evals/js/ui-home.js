@@ -1,7 +1,7 @@
 // Home (#home, resident): Request button (+ Repeat last), Needs action, Due for you, recent requests.
 
 import { S, h, icon, go, toolLabel, toMs, empty } from './ui-core.js';
-import { progress, dueItems } from './engine.js';
+import { progress, dueItems, todayISO } from './engine.js';
 import { itemById } from './catalogue.js';
 import { residentCSS, itemRow, itemProgress, lastRequest, repeatLast, myYear } from './ui-request.js';
 import { requestRow, needsAction } from './ui-requests.js';
@@ -11,9 +11,9 @@ residentCSS();
 // The next n items for my year: overdue and due groups first, then the next year's.
 export function nextItems(n = 3) {
   const yr = myYear();
-  const out = [...new Set(dueItems(S.mine, yr).map(i => i.id))];
+  const out = [...new Set(dueItems(S.mine, yr, todayISO()).map(i => i.id))];
   if (out.length < n) {
-    const later = progress(S.mine, yr).filter(p => p.state === 'on-track' || p.state === 'later')
+    const later = progress(S.mine, yr, todayISO()).filter(p => p.state === 'on-track' || p.state === 'later')
       .sort((a, b) => a.group.byYear - b.group.byYear);
     for (const p of later) for (const { item, done } of p.items) if (!done && !out.includes(item.id)) out.push(item.id);
   }
@@ -52,5 +52,8 @@ export function renderHome() {
     !S.loaded.mine ? h('p', { class: 'e-loading' }, 'Loading…')
       : recent.length ? h('div', { class: 'e-list' }, recent.map(ev => requestRow(ev, now)))
       : action.length ? h('p', { class: 'e-small' }, 'Nothing else yet.')
-      : h('div', { class: 'e-card' }, empty('No requests yet', 'Pick an item, choose your assessor and show them the QR code.')));
+      : h('div', { class: 'e-card' }, empty('No requests yet', 'Pick an item, choose your assessor and show them the QR code.',
+          h('div', { class: 'e-actions' },
+            h('button', { type: 'button', class: 'n-btn e-go', onclick: () => go('new') }, icon('plus'), 'Request your first evaluation'),
+            h('a', { class: 'n-btn n-btn--outline e-btn-quiet', href: '#how' }, 'How evals work')))));
 }

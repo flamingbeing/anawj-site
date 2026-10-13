@@ -2,9 +2,11 @@
 // shared state and helpers are in ui-core.js. Case data comes from cloud.js (Firestore, or the
 // in-browser demo backend with ?demo).
 
-import { S, hooks, h, toast, basicMode, logbookOnly, facultyMode, facultyRole, clearToast, cloud, writes, transients, setCases, scheduleSummary, fill, resetCaches, patchLogbook, confirmBox, fileButton, modal, download, todayISO, settings, setCategoryNames, categoryNames as categoryNamesNow } from './ui-core.js';
+import { replaceShow } from './profiles.js';
+import { S, hooks, h, toast, basicHides, basicMode, logbookOnly, facultyMode, facultyRole, clearToast, cloud, writes, transients, setCases, scheduleSummary, fill, resetCaches, patchLogbook, confirmBox, fileButton, modal, download, todayISO, settings, setCategoryNames, categoryNames as categoryNamesNow } from './ui-core.js';
 import { renderSendSettings, destinationHosts } from './ui-send.js';
-import { renderLog, focusLog, logCasesChanged, clearDrafts, SHARED_KEY } from './ui-log.js';
+import { renderSyncSettings, remindSync, forgetSync, syncPlaces } from './ui-sync.js';
+import { renderLog, focusLog, logCasesChanged, clearDrafts } from './ui-log.js';
 import { renderRecovery } from './ui-recovery.js';
 import { renderLogbook } from './ui-logbook.js';
 import { renderProgress, renderTotals } from './ui-progress.js';
@@ -18,7 +20,9 @@ import { downloadNotes } from './ui-notes.js';
 import { cloudSaveSection, remindBackup, resumeCloudSave } from './cloud-save.js';
 import { backupCard } from './backup.js';
 import { createNavigation } from './navigation.js';
-import { renderNotes, leaveNotes } from './ui-notepad.js';
+import { renderNotes, leaveNotes, openDayNote, renderNoteSettings } from './ui-notepad.js';
+import { fromQuery, keepShared, readInbox } from './share-in.js';
+import { renderShare } from './ui-share-in.js';
 import { settingsFile, readSettingsFile, readDeviceFile, isDeviceFile } from './settings-file.js';
 import { movedPage } from './moved.js';
 import { purgeExpired, openBin } from './bin.js';
@@ -45,10 +49,14 @@ const ICONS = {
   reflset: 'M4 19.5V5a2 2 0 0 1 2-2h12v14H6a2 2 0 0 0-2 2.5zM6 21h12v-4',
   sharefmt: 'M9 9h10v12H9zM5 15V3h10',
   sendto: 'M4 12l16-8-6 16-3-7z',
+  sync: 'M20 11a8 8 0 0 0-14.9-3M4 4v4h4M4 13a8 8 0 0 0 14.9 3M20 20v-4h-4',
   bin: 'M4 7h16M10 11v6M14 11v6M5 7l1 13h12l1-13M9 7V4h6v3',
   notes: 'M6 3h9l4 4v14H6zM14 3v5h5M9 12h7M9 16h5',
+  notesset: 'M6 3h9l4 4v14H6zM14 3v5h5M9 12h7M9 16h5',
   more: 'M5 12h.01M12 12h.01M19 12h.01M4 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0M11 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0M18 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0',
 };
+// the Advanced pages (Settings menu) use their parent page's icon
+ICONS.displayadv = ICONS.display; ICONS.loggingadv = ICONS.logging;
 const icon = id => {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('class', 'ico'); svg.setAttribute('aria-hidden', 'true');
@@ -74,21 +82,25 @@ const TABS = [
   // under Analytics: how your counts compare with your intake
   { id: 'totals', label: 'Totals', render: renderTotals, hidden: true, under: 'progress', unlisted: true },
   { id: 'account', bar: true, label: 'Account', render: renderAccount, hidden: true, under: 'more', desc: 'Your name and portfolio details (Section 1); delete account' },
-  { id: 'settings', bar: true, label: 'Settings', render: () => renderSettingsMenu(), hidden: true, under: 'more', desc: 'Profile, display, logging, tag editor, Markdown, recycle bin' },
+  { id: 'settings', bar: true, label: 'Settings', render: () => renderSettingsMenu(), hidden: true, under: 'more', desc: 'Profile, look, logging, reflections, notes and sharing, data' },
   { id: 'recovery', bar: true, short: 'Recover', label: 'Recent changes / Recover drafts', render: renderRecovery, hidden: true, under: 'more', desc: 'Retry sync, recover unfinished drafts and restore recent versions on this device' },
   { id: 'data', bar: true, short: 'Export', label: 'Export / Import', render: () => renderDataPage(), hidden: true, under: 'more', desc: 'Export the portfolio (Word); import reflections from Word; backup file, Excel and Markdown export' },
   { id: 'reflimport', label: 'Import reflections from Word', render: () => renderReflImport(), hidden: true, under: 'data', unlisted: true },
   // Settings' own pages (not in the More list)
   { id: 'display', label: 'Display', render: renderDisplay, hidden: true, under: 'settings', unlisted: true, desc: 'Light or dark, colour, compact, borders; fonts and more under Advanced' },
   { id: 'access', label: 'Accessibility', render: renderAccessibility, hidden: true, under: 'settings', unlisted: true, desc: 'Zoom, text size, bigger taps, contrast, motion, swipe gestures' },
-  { id: 'displayadv', label: 'Advanced display', render: renderDisplayAdvanced, hidden: true, under: 'display', unlisted: true },
-  { id: 'loggingadv', label: 'Advanced logging', render: renderLoggingAdvanced, hidden: true, under: 'logging', unlisted: true },
+  { id: 'displayadv', label: 'Advanced display', render: renderDisplayAdvanced, hidden: true, under: 'display', unlisted: true, desc: 'The header and tab bar, Logbook rows, fonts, custom CSS' },
+  { id: 'loggingadv', label: 'Advanced logging', render: renderLoggingAdvanced, hidden: true, under: 'logging', unlisted: true, desc: 'Case tab parts, the keyboard, search, the week, undo, tips' },
   { id: 'sendto', label: 'Send to', render: renderSendSettings, hidden: true, under: 'settings', unlisted: true, desc: 'Obsidian, WhatsApp, UpNote or any app with a link' },
+  { id: 'sync', label: 'Sync', render: renderSyncSettings, hidden: true, under: 'settings', unlisted: true, desc: 'One Markdown file per day in Google Drive, Dropbox or GitHub' },
   { id: 'sharefmt', label: 'Markdown', render: renderMarkdownSettings, hidden: true, under: 'settings', unlisted: true, desc: 'How Copy, Share and the notes export read' },
-  { id: 'showhide', label: 'Profiles or hide items', render: renderShowHide, hidden: true, under: 'settings', unlisted: true, desc: 'Your profile (Advanced, Basic, logbook only) and everything you can hide' },
+  { id: 'showhide', label: 'Profile', render: renderShowHide, hidden: true, under: 'settings', unlisted: true, desc: 'Basic, Advanced, Personal…, and everything you can show or hide' },
   { id: 'logging', label: 'Logging', render: renderLogging, hidden: true, under: 'settings', unlisted: true, desc: 'Suggestions, the Enter key, dates, after Save; more under Advanced' },
+  { id: 'notesset', label: 'Notes', render: renderNoteSettings, hidden: true, under: 'settings', unlisted: true, desc: 'Daily note on the Case tab, pasting, formatting buttons, shared text' },
+  // something shared to the installed app: where it goes (ui-share-in.js); no back link, it's a step of its own
+  { id: 'share', label: 'Shared with the app', render: renderShare, hidden: true, unlisted: true },
   // from Reflections → More tools
-  { id: 'reflset', label: 'Reflections', render: renderReflectionSettings, hidden: true, under: 'settings', unlisted: true, desc: 'New reflections in the export, photo sizes' },
+  { id: 'reflset', label: 'Reflections', render: renderReflectionSettings, hidden: true, under: 'settings', unlisted: true, desc: 'The export, learning points, formatting, spelling, photo sizes' },
   // opened from More → Export / Import (not in the More list)
   { id: 'export', label: 'Export portfolio', render: () => renderExportPage(), hidden: true, under: 'data', unlisted: true },
   { id: 'choose', label: 'Export portfolio', render: renderChoosePage, hidden: true, under: 'export', unlisted: true },
@@ -154,10 +166,11 @@ function installCard() {
 // Search in Settings (owner): the options of every settings page and its Advanced page, read from the pages
 // themselves (each is drawn once, off screen, the first time someone types), so the index never goes stale.
 // A result opens its page and scrolls to the option, which flashes.
-const SEARCH_PAGES = ['display', 'displayadv', 'access', 'logging', 'loggingadv', 'reflset', 'sharefmt', 'sendto'];
+const SEARCH_PAGES = ['showhide', 'display', 'displayadv', 'access', 'logging', 'loggingadv', 'tags', 'reflset', 'notesset', 'sharefmt', 'sendto', 'sync'];
 let settingsIndex = null, findAfterRender = '';
 const optionText = n => {
   if (n.matches('label.field')) return [...n.childNodes].filter(c => c.nodeType === 3).map(c => c.textContent).join(' ').trim();
+  if (n.matches('label.profile-opt')) return n.querySelector('b').textContent.trim();   // (a profile: its name, not its hint run on)
   if (n.matches('label.check')) return n.textContent.trim();
   return n.textContent.trim();
 };
@@ -207,16 +220,31 @@ function settingsSearch() {
   return h('section', { class: 'card more-list settings-search' }, box, results);
 }
 
-// Settings: a short menu of its pages (residency year on top for people not on the programme list)
+// Settings: its pages in groups (owner, 13 Oct 2026: every setting kept, grouped so each is easy to find): Profile, Look,
+// Logging, Reflections, Notes and sharing, Data, Advanced. Search finds any option on any page.
+const SETTINGS_GROUPS = [
+  ['Profile', ['showhide']],
+  ['Look', ['display', 'access']],
+  ['Logging', ['logging', 'tags']],
+  ['Reflections', ['reflset']],
+  ['Notes and sharing', ['notesset', 'sharefmt', 'sendto', 'sync']],
+  ['Data', ['bin']],
+  ['Advanced', ['displayadv', 'loggingadv']],
+];
+// the groups, then any Settings page none of them names (so a new page is never left out of the menu)
+function settingsGroups() {
+  const named = new Set(SETTINGS_GROUPS.flatMap(([, ids]) => ids));
+  const rest = TABS.filter(t => t.under === 'settings' && !named.has(t.id)).map(t => t.id);
+  return rest.length ? [...SETTINGS_GROUPS, ['Other', rest]] : SETTINGS_GROUPS;
+}
 function renderSettingsMenu() {
-  const order = ['display', 'access', 'logging', 'showhide', 'tags', 'reflset', 'sharefmt', 'sendto'];
-  const pages = TABS.filter(t => t.under === 'settings').sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
   settingsIndex = null;   // drawn again on the first search of this visit
+  const item = id => (id === 'bin' ? menuItem('bin', 'Recycle bin', 'Deleted cases and reflections, kept for 30 days', () => openBin())
+    : (t => menuItem(t.id, t.label, t.desc))(TABS.find(t => t.id === id)));
   return h('div', {},
     settingsSearch(),
-    h('section', { class: 'card more-list' }, h('h2', {}, 'Settings'),
-      h('ul', {}, pages.map(t => menuItem(t.id, t.label, t.desc)),
-        menuItem('bin', 'Recycle bin', 'Deleted cases and reflections, kept for 30 days', () => openBin()))),
+    h('section', { class: 'card more-list settings-menu' }, h('h2', {}, 'Settings'),
+      settingsGroups().map(([name, ids]) => [h('h3', {}, name), h('ul', {}, ids.map(item))])),
     settingsFileCard(),
     connectClaudeCard());
 }
@@ -259,10 +287,12 @@ function settingsFileCard() {
     const same = (a, b) => a.name === b.name && [...a.cats].sort().join() === [...b.cats].sort().join();
     const newGroups = (d.templates || []).filter(t => !mine.some(m => m.id === t.id || same(m, t)));
     const n = Object.keys(d.settings).length;
-    if (!(await confirmBox('Import settings', `Use the ${n} setting${n === 1 ? '' : 's'} in this file${newGroups.length ? ` and add ${newGroups.length} tag group${newGroups.length === 1 ? '' : 's'}` : ''}? Settings in the file replace yours (your tags and shorthand too, if the file has them); anything not in it stays. Cases, reflections and portfolio details are never touched.${(d.settings.destinations || []).length ? ` The file also sets places to send your cases to, and sending goes only when you tap: ${destinationHosts(d.settings.destinations).join('; ')}. Import only if you trust them.` : ''}`, 'Import'))) return;
+    if (!(await confirmBox('Import settings', `Use the ${n} setting${n === 1 ? '' : 's'} in this file${newGroups.length ? ` and add ${newGroups.length} tag group${newGroups.length === 1 ? '' : 's'}` : ''}? Settings in the file replace yours (your tags and shorthand too, if the file has them); anything not in it stays. Cases, reflections and portfolio details are never touched.${(d.settings.destinations || []).length ? ` The file also sets places to send your cases to, and sending goes only when you tap: ${destinationHosts(d.settings.destinations).join('; ')}. Import only if you trust them.` : ''}${syncPlaces(d.settings.sync).length ? ` It also sets places to sync your days to (only when you tap Sync): ${syncPlaces(d.settings.sync).join('; ')}.` : ''}`, 'Import'))) return;
     // display settings in the file go to this device, the rest to the account
     const fileDisplay = Object.fromEntries(DISPLAY_KEYS.filter(k => k in d.settings).map(k => [k, d.settings[k]]));
     const forAccount = Object.fromEntries(Object.entries(d.settings).filter(([k]) => !DISPLAY_KEYS.includes(k)));
+    // the file's switches replace the account's (the cloud merges `show` key by key, so the ones it lacks go as null)
+    if (forAccount.show) forAccount.show = replaceShow(settings().show, forAccount.show);
     await patchLogbook({ settings: forAccount, ...(newGroups.length ? { templates: [...mine, ...newGroups].slice(0, 100) } : {}) });
     if (d.theme) applyTheme(d.theme);
     applyDisplay(setDisplay(Object.fromEntries(DISPLAY_KEYS.filter(k => k in fileDisplay).map(k => [k, fileDisplay[k]]))));
@@ -289,17 +319,18 @@ function renderReflImport() {
 
 // Export / Import: the portfolio export, the Word upload for reflections, and backups
 function renderDataPage() {
+  const portfolio = !basicHides('portfolio');   // (Profile → APMES; off in Personal)
   return h('div', {},
     // Export is the portfolio only (it holds everything APMES needs); every other copy is a backup
-    h('section', { class: 'card export-sync' }, h('h2', {}, 'Export'),
+    !portfolio ? null : h('section', { class: 'card export-sync' }, h('h2', {}, 'Export'),
       h('h3', {}, 'Portfolio (Word)'),
       h('p', { class: 'hint help' }, 'The APMES portfolio: choose which complete reflections go in, then export it with Section 1 and the Section 4 case numbers filled in. This is what APMES needs.'),
       h('div', { class: 'bar', style: 'margin-bottom:0' }, h('a', { class: 'btn primary', href: '#export' }, 'Choose reflections and export ›'))),
     h('section', { class: 'card' }, h('h2', {}, 'Import'),
-      h('h3', {}, 'Reflections from Word'),
-      h('p', { class: 'hint help' }, 'Already wrote reflections in the APMES Word portfolio? Upload the .docx to add them here. You check each one before it is saved.'),
-      h('div', { class: 'bar', style: 'margin-bottom:0' }, h('a', { class: 'btn', href: '#reflimport' }, 'Upload from Word ›')),
-      h('h3', { style: 'margin-top:16px' }, 'Logbook from Excel or CSV'),
+      !portfolio ? null : [h('h3', {}, 'Reflections from Word'),
+        h('p', { class: 'hint help' }, 'Already wrote reflections in the APMES Word portfolio? Upload the .docx to add them here. You check each one before it is saved.'),
+        h('div', { class: 'bar', style: 'margin-bottom:0' }, h('a', { class: 'btn', href: '#reflimport' }, 'Upload from Word ›'))],
+      h('h3', { style: portfolio ? 'margin-top:16px' : '' }, 'Logbook from Excel or CSV'),
       h('p', { class: 'hint help' }, 'Edit your cases in a spreadsheet (Download Excel under Backup), then upload it back; or bring in a list from elsewhere. You match the columns and see every change before anything is saved.'),
       h('div', { class: 'bar', style: 'margin-bottom:0' }, fileButton('Upload Excel/CSV…', '.xlsx,.csv,text/csv', uploadExcel))),
     backupCard(
@@ -683,7 +714,8 @@ hooks.casesChanged = () => {
 function flushRender() {
   if (!pendingRender) return;
   const a = document.activeElement;
-  const editing = document.querySelector('dialog[open]') || (a && app.contains(a) && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName));
+  // (the note editor shows no case data: drawing it again would only close its ⋯ menu mid-tap)
+  const editing = document.querySelector('dialog[open]') || (a && app.contains(a) && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) || app.querySelector('.note-editor');
   if (editing) { setTimeout(flushRender, 1000); return; }
   pendingRender = false;
   render();
@@ -808,9 +840,10 @@ async function onUser(user) {
   const previousUser = S.user;
   S.user = user;
   if (previousUser && user && previousUser.email !== user.email) {
-    const cleanup = writes.forget();
+    // the new account's own store stays (another tab may already be using it)
+    const cleanup = Promise.all([writes.forget(), cloud.forgetLocal(() => true, user.email)]);
     Object.assign(S, { cases: [], reflections: [], counts: {}, casesLoaded: false, casesSynced: false, logbook: null });
-    clearDrafts(); resetCaches(); forgetWho(); clearToast(); transients.reset();
+    clearDrafts(); resetCaches(); forgetWho(); forgetSync(); clearToast(); transients.reset();
     document.querySelectorAll('dialog[open]').forEach(el => el.close());
     app.innerHTML = SKELETON;
     try { await cleanup; } catch (err) { if (S.user === user) toast(err.message); }
@@ -818,8 +851,9 @@ async function onUser(user) {
   }
   if (!user) {
     Object.assign(S, { admin: false, owner: false, pd: false, faculty: false, resident: null, logbook: null, cases: [], reflections: [], counts: {}, casesLoaded: false, casesSynced: false, sharedTemplates: [] });
-    const cleanup = signedInOnce ? writes.forget() : Promise.resolve();
-    if (signedInOnce) { clearDrafts(); resetCaches(); forgetWho(); }
+    // this device's copies of the last account go (the local store always: a shared PC keeps nothing)
+    const cleanup = Promise.all([signedInOnce ? writes.forget() : null, cloud.forgetLocal(() => !S.user)]);
+    if (signedInOnce) { clearDrafts(); resetCaches(); forgetWho(); forgetSync(); }
     transients.reset();
     document.querySelectorAll('dialog[open]').forEach(el => el.close());
     clearToast(); paintWho(); renderLanding();
@@ -872,8 +906,11 @@ async function onUser(user) {
   const onBar = arrangeTabs(barCandidates(), display()).shown;
   S.tab = tabFromHash() || (START_TABS.some(([v]) => v === start) && onBar.includes(start) ? start : onBar.find(id => id !== 'more') || 'log');
   navigation.initialize(S.tab);
+  if (wantToday) { wantToday = false; setTimeout(() => { if (S.user === user) openDayNote(); }, 0); }
+  // a POST share: the Case tab (or the chooser it forwards to) draws again once the service worker's copy is read
+  if (sharedIn) sharedIn.then(() => { if (S.user === user && (S.tab === 'log' || S.tab === 'share')) render(); });
   // Settings → Backup: a one-tap reminder when the last Drive / Dropbox backup is over a week old (if asked for)
-  setTimeout(() => { if (S.user === user) remindBackup(); }, 3000);
+  setTimeout(() => { if (S.user === user) { remindBackup(); remindSync(); } }, 3000);
   // back from a Drive / Dropbox sign-in: finish that save
   resumeCloudSave();
   // recycle bin: drop entries older than 30 days, but only once the reflections are loaded, so an
@@ -961,17 +998,22 @@ function registerSW() {
 
 if (cloud.onSyncError) cloud.onSyncError(err => toast('A change could not be synced: ' + (err.message || err)));
 
-// shared to the installed app (Android share sheet): keep the text for the Log page, tidy the address
-{
-  const q = new URLSearchParams(location.search);
-  const shared = [q.get('share_title'), q.get('share_text'), q.get('share_url')].filter(Boolean).join('\n').trim();
-  if (q.has('share_text') || q.has('share_title') || q.has('share_url')) {
-    try { if (shared) sessionStorage.setItem(SHARED_KEY, shared); } catch { /* ignore */ }
-    for (const k of ['share_title', 'share_text', 'share_url']) q.delete(k);
-    const rest = q.toString().replace(/=(&|$)/g, '$1');
-    history.replaceState(null, '', location.pathname + (rest ? '?' + rest : '') + '#log');
-  }
-}
+// shared to the installed app (Android share sheet; share-in.js): the text waits for the Case tab, as it always did
+// (its paste-a-list), whether it came the old GET way or as a POST (text or files, received by sw.js). The Case tab
+// sends it on to the chooser only when Settings → Notes → Ask is on or files came (ui-log.js takeShared). Tidy the
+// address.
+const sharedIn = (() => {
+  const { has, text, rest } = fromQuery(location.search);
+  const posted = new URLSearchParams(location.search).has('shared');
+  if (!has && !posted) return null;
+  if (has) keepShared(text);
+  history.replaceState(null, '', location.pathname + (rest ? '?' + rest : '') + '#log');
+  return posted ? readInbox(location.href) : Promise.resolve(text);
+})();
+// "Today's note" (the app's shortcut, ./#today): open today's daily note once signed in
+let wantToday = location.hash === '#today';
+if (wantToday) history.replaceState(null, '', location.pathname + location.search + '#notes');
+addEventListener('hashchange', () => { if (location.hash === '#today' && S.user) { history.replaceState(history.state, '', location.pathname + location.search + '#notes'); openDayNote(); } });
 applyTheme(cachedTheme());   // this device's choice (Settings → Display → Theme)
 applyTextSize(cachedTextSize());
 applyZoom(cachedZoom());
@@ -991,7 +1033,7 @@ paintWho();
 // Reset demo (the demo badge's menu, and the link by Sign out on More): asks first, then starts again
 async function resetDemo() {
   if (!(await confirmBox('Reset demo', 'Delete everything you added in the demo (cases, reflections, images, settings) and start again with the made-up data? The uploaded portfolio template is kept.', 'Reset', true))) return;
-  clearDrafts(); resetCaches(); forgetWho(); resetDisplay(); applyCompact(false); applyTextSize('1'); applyAccent(null);
+  clearDrafts(); resetCaches(); forgetWho(); forgetSync(); resetDisplay(); applyCompact(false); applyTextSize('1'); applyAccent(null);
   cloud.resetDemo();
   location.reload();
 }

@@ -2,11 +2,11 @@
 // Request detail (#r/{id} while not submitted, via ui-result.js): status trail, share again,
 // Nudge, Change assessor, Cancel, and Send to another assessor after a decline.
 
-import { S, h, fill, toast, cloud, icon, go, toolLabel, fmtDate, fmtAgo, toMs, statusChip, row, empty, segment, modal, confirmBox, hooks, needsAction, ageHours, NUDGE_HOURS } from './ui-core.js';
-import { statusOf, validate } from './engine.js';
+import { S, h, fill, toast, cloud, icon, go, toolLabel, fmtDate, fmtAgo, toMs, statusChip, row, empty, segment, modal, confirmBox, hooks, needsAction, ageHours, NUDGE_HOURS, errText } from './ui-core.js';
+import { statusOf, validate, caseKey, sameCaseCount, identifierWarning, todayISO } from './engine.js';
 import { FORMS } from './forms.js';
 import { itemById } from './catalogue.js';
-import { residentCSS, assessorPicker, shareSheet, shareEval, itemTags, tag, AGE_BANDS } from './ui-request.js';
+import { residentCSS, assessorPicker, shareSheet, shareEval, itemTags, tag, AGE_BANDS, GENDERS, LOCATIONS } from './ui-request.js';
 
 residentCSS();
 
@@ -88,7 +88,7 @@ function trail(ev) {
   const steps = [];
   const at = v => (v ? fmtDate(v, { time: true }) : '');
   steps.push({ done: true, text: ev.status === 'draft' ? 'Draft saved' : 'Sent', when: at(ev.status === 'draft' ? ev.createdAt : ev.requestedAt || ev.createdAt) });
-  if (ev.chasedAt) steps.push({ done: true, text: 'Nudged', when: at(ev.chasedAt) });
+  if (ev.chasedAt) steps.push({ done: true, text: 'Reminder sent', when: at(ev.chasedAt) });
   if (ev.metrics?.openedAt > 1e12) steps.push({ done: true, text: 'Opened by assessor', when: at(ev.metrics.openedAt) });
   const a = ev.assessment && Object.keys(ev.assessment).length ? ev.assessment : null;
   if (a && FORMS[ev.formId] && ev.status === 'requested') {
@@ -131,7 +131,7 @@ export function renderRequestDetail(ev) {
     if (busy) return;
     busy = true;
     try { const next = await fn(); if (okMsg) toast(okMsg); if (next) { Object.assign(ev, next); } hooks.render(); }
-    catch (err) { toast('Not saved: ' + (err.message || err)); }
+    catch (err) { toast('Not saved. ' + errText(err)); }
     finally { busy = false; }
   };
   const save = patch => cloud.updateEvaluation(ev.id, patch);
@@ -160,9 +160,54 @@ export function renderRequestDetail(ev) {
   const nudge = () => act(async () => {
     const next = await save({ chasedAt: Date.now() });
     Object.assign(ev, next);
-    await shareEval(ev);
+    await shareEval(ev, { reminder: true });
     return next;
   });
+
+  // Fix the case card (a typo in the initials, the wrong date) while the assessor hasn't started:
+  // same fields and checks as when requesting; the rules lock it once an assessment has begun.
+  const editCase = () => {
+    const r = { ...(ev.request || {}) };
+    const err = h('p', { class: 'e-rq-err', role: 'alert', hidden: true });
+    const date = h('input', { class: 'e-input', type: 'date', id: 'ec-date', value: r.date || ev.date || '', max: todayISO() });
+    const loc = h('input', { class: 'e-input', id: 'ec-loc', value: r.location || '', maxlength: 80, list: 'ec-locs' });
+    const ini = h('input', { class: 'e-input e-rq-initials', id: 'ec-ini', value: r.initials || '', maxlength: 3, autocapitalize: 'characters', autocomplete: 'off',
+      oninput: () => { ini.value = ini.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3); } });
+    const sel = (id, opts, cur) => h('select', { class: 'e-select', id }, opts.map(o => {
+      const [v, l] = Array.isArray(o) ? o : [o, o];
+      return h('option', { value: v, selected: v === cur ? true : null }, l);
+    }));
+    const age = sel('ec-age', AGE_BANDS, r.ageBand), gender = sel('ec-gender', GENDERS, r.gender);
+    const notes = h('textarea', { class: 'e-textarea', id: 'ec-notes', rows: 2, maxlength: 300 }, r.notes || '');
+    const field = (label, id, el) => h('div', { class: 'e-rq-field' }, h('label', { class: 'e-label', for: id }, label), el);
+    const save = async () => {
+      const next = { ...r, date: date.value, location: loc.value.trim(), initials: ini.value, ageBand: age.value, gender: gender.value };
+      const note = notes.value.trim();
+      if (note) next.notes = note; else delete next.notes;
+      const problem = !/^\d{4}-\d{2}-\d{2}$/.test(next.date) ? 'Choose the date'
+        : next.date > todayISO() ? 'The date can’t be in the future'
+        : !next.location ? 'Enter a location' : !next.initials ? 'Enter the patient’s initials'
+        : identifierWarning(note) || null;
+      if (!problem && sameCaseCount(S.mine.filter(x => x.id !== ev.id), next.date, next.initials) >= 2) {
+        if (!(await confirmBox('Same patient again?', `${next.initials} on ${fmtDate(next.date)} is already on 2 of your requests. A patient can be used for at most 2 assessments.`, 'Save anyway'))) return;
+      }
+      if (problem) { err.textContent = problem; err.hidden = false; return; }
+      m.close();
+      act(() => save2({ request: next, date: next.date, caseKey: caseKey(next.date, next.initials) }), 'Case details saved');
+    };
+    const save2 = patch => cloud.updateEvaluation(ev.id, patch);
+    const m = modal('Edit case details', h('div', { class: 'e-stack' },
+      h('p', { class: 'e-small', style: 'margin:0' }, 'Initials, age band and gender only: no names or record numbers.'),
+      field('Date of case', 'ec-date', date),
+      field('Location', 'ec-loc', loc), h('datalist', { id: 'ec-locs' }, LOCATIONS.map(l => h('option', { value: l }))),
+      field('Patient initials', 'ec-ini', ini),
+      field('Age', 'ec-age', age), field('Gender', 'ec-gender', gender),
+      field('Note to assessor (optional)', 'ec-notes', notes),
+      err,
+      h('div', { class: 'e-actions' },
+        h('button', { class: 'n-btn n-btn--outline e-btn-quiet', type: 'button', onclick: () => m.close() }, 'Cancel'),
+        h('button', { class: 'n-btn', type: 'button', onclick: save }, 'Save'))), { cls: 'e-sheet' });
+  };
 
   const cancel = async () => {
     const started = ev.assessment && Object.keys(ev.assessment).length;
@@ -180,7 +225,7 @@ export function renderRequestDetail(ev) {
   const delDraft = async () => {
     if (!(await confirmBox('Delete this draft?', 'The draft has not been sent. This can’t be undone.', 'Delete draft', true))) return;
     try { await cloud.deleteDraft(ev.id); toast('Draft deleted'); go('requests'); }
-    catch (err) { toast('Not deleted: ' + (err.message || err)); }
+    catch (err) { toast('Not deleted. ' + errText(err)); }
   };
 
   const now = Date.now();
@@ -190,8 +235,9 @@ export function renderRequestDetail(ev) {
   const actions = [];
   if (ev.status === 'requested') {
     actions.push(h('button', { class: 'n-btn e-btn-big', onclick: () => shareSheet(ev) }, icon('qr'), 'Show QR / share link'));
-    if (canNudge) actions.push(h('button', { class: 'n-btn n-btn--secondary e-btn-big', onclick: nudge }, icon('share'), 'Nudge (send the link again)'));
+    if (canNudge) actions.push(h('button', { class: 'n-btn n-btn--secondary e-btn-big', onclick: nudge }, icon('share'), 'Remind assessor'));
     if (!started) actions.push(h('button', { class: 'n-btn n-btn--outline e-btn-quiet e-btn-big', onclick: changeAssessor }, 'Change assessor'));
+    if (!started) actions.push(h('button', { class: 'n-btn n-btn--outline e-btn-quiet e-btn-big', onclick: editCase }, 'Edit case details'));
     actions.push(h('button', { class: 'n-btn n-btn--outline e-btn-quiet e-btn-big', onclick: cancel }, 'Cancel request'));
   } else if (ev.status === 'draft') {
     actions.push(h('button', { class: 'n-btn e-go e-btn-big', onclick: sendDraft }, `Send to ${ev.assessorName || ev.assessorEmail}`));

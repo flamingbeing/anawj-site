@@ -12,6 +12,7 @@ The rule for new apps is in `AGENTS.md`.
 | `anawj.com/` | `index.html` | Status page only. Stays on GitHub Pages. |
 | `hand.anawj.com/cmcj/` | `cmcj/` | Static, hand surgery. |
 | `hand.anawj.com/babies/` | `hand-babies/` | Static, hand surgery. The old `hand/` redirect goes. |
+| `hand.anawj.com/handlog/` | `hand-log/` | Hand DOPS/Mini-CEX log; data on the phone only, no sign-in (owner, 13 Oct 2026). |
 | `prewarmstudy.anawj.com/` | `prewarm/` | **Real study data.** The name is a reminder that it holds sensitive data and stays isolated. |
 | `nuhroster.anawj.com/` | `nuh-roster/` | Own Firebase project `nuh-roster`. |
 | `apmes.anawj.com/logbook/` | `logbook/` | With evals: one Firebase project (`apmes-logbook`), one sign-in. |
@@ -69,8 +70,9 @@ and builds a preview for every PR.
   kept). Every response carries `X-Robots-Tag: noindex, nofollow`.
 - One-app hosts (`prewarmstudy.`, `nuhroster.`) serve the app at the root, and its own folder name works too
   (`prewarmstudy.anawj.com/prewarm/…`) so an app can move before its absolute links are tidied.
-- **One shared folder:** every host also serves `/nuhsdesign/` (the NUHS-style design files, styles only, no data), so an
-  app on a subdomain can link `../nuhsdesign/tokens.css` (`SHARED` in `worker/routes.js`). It is the only folder subdomains
+- **Shared folders:** every host also serves `/nuhsdesign/` (the NUHS-style design files, styles only, no data), so an
+  app on a subdomain can link `../nuhsdesign/tokens.css` (`SHARED` in `worker/routes.js`), and `/feedback/` (the feedback
+  button's script, no data; `edit/NOTES.md`, "Feedback button"). They are the only folders subdomains
   share; everything else stays per app. The old `/design/` path was served alongside it for phones still on an older copy,
   and retired on 13 Oct 2026 (nothing linked it any more; the old folder held only a copy of `tokens.css`).
 - **Sign-in helper pages on `apmes.`:** `apmes.anawj.com/__/auth/` and `/__/firebase/` serve Firebase's sign-in helper

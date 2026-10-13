@@ -1,6 +1,6 @@
 // More (#more): account, apply for a role, demo role switch, settings, privacy, sign out.
 
-import { S, h, fill, cloud, toast, hooks, avatar, isResident, isFaculty, isStaff, confirmBox, segment, THEMES, themePref, setTheme } from './ui-core.js';
+import { S, h, fill, cloud, toast, hooks, avatar, isResident, isFaculty, isStaff, confirmBox, signOutSafely, segment, THEMES, themePref, setTheme, errText } from './ui-core.js';
 import { residentYear } from './engine.js';
 
 const AUTOSCROLL_KEY = 'evals-autoscroll';   // 'off' turns auto-advance off (ui-form.js reads it)
@@ -16,6 +16,9 @@ export function renderMore() {
   const apply = applyCard();
   if (apply) root.append(apply);
   if (cloud.demo) root.append(demoCard());
+  root.append(h('a', { class: 'n-btn n-btn--outline e-btn-quiet e-btn-big', href: '#how' }, 'How evals work'));
+  const inst = installCard();
+  if (inst) root.append(inst);
   root.append(settingsCard(), privacyCard(),
     h('button', { class: 'n-btn n-btn--outline e-btn-quiet e-btn-big', type: 'button', onclick: signOut }, cloud.demo ? 'Sign out of the demo' : 'Sign out'));
   return root;
@@ -55,7 +58,7 @@ function applyCard() {
     card.append(h('p', { class: 'e-note' }, `Application to join as ${label(appl.role)} sent. An admin or programme director will approve it.`),
       h('div', { class: 'e-actions' },
         h('button', { class: 'n-btn n-btn--outline e-btn-quiet e-btn-small', type: 'button', onclick: () => fill(card, h('h2', { class: 'e-h3' }, 'Change application'), applyForm(appl, wantRes, wantFac)) }, 'Change'),
-        h('button', { class: 'n-btn e-btn-small', type: 'button', onclick: async () => { await hooks.refreshRoles(); toast(S.roles.application?.status === 'pending' ? 'Still waiting' : 'Updated'); } }, 'Check again')));
+        h('button', { class: 'n-btn e-btn-small', type: 'button', onclick: async () => { await hooks.refreshRoles(); toast(S.roles.application?.status === 'pending' ? 'Not approved yet. You’ll see it here once it is.' : 'Updated'); } }, 'Check again')));
     return card;
   }
   if (appl && appl.status !== 'pending') {
@@ -83,7 +86,7 @@ function applyForm(prev, wantRes, wantFac) {
       await cloud.applyForRole({ role, name: name.value.trim(), note: note.value.trim() });
       toast('Application sent');
       await hooks.refreshRoles();
-    } catch (err) { msg.hidden = false; msg.textContent = 'Could not apply: ' + (err.message || err); btn.disabled = false; }
+    } catch (err) { msg.hidden = false; msg.textContent = 'Couldn’t send your application. ' + errText(err); btn.disabled = false; }
   } },
     roles.length > 1 ? h('div', { class: 'e-radios', role: 'radiogroup', 'aria-label': 'Role' }, roles.map(([v, l, d]) =>
       h('label', { class: 'e-radio' }, h('input', { type: 'radio', name: 'more-apply-role', value: v, checked: v === role, onchange: () => { role = v; } }),
@@ -114,7 +117,7 @@ function demoCard() {
 
 function settingsCard() {
   const on = store.get(AUTOSCROLL_KEY) !== 'off';
-  const box = h('input', { type: 'checkbox', id: 'more-autoscroll', checked: on, onchange: e => {
+  const box = h('input', { type: 'checkbox', role: 'switch', id: 'more-autoscroll', checked: on, onchange: e => {
     store.set(AUTOSCROLL_KEY, e.target.checked ? null : 'off');
     toast(e.target.checked ? 'Auto-scroll on' : 'Auto-scroll off');
   } });
@@ -123,7 +126,7 @@ function settingsCard() {
   paintTheme();
   return h('section', { class: 'e-card' },
     h('h2', { class: 'e-h3' }, 'Settings'),
-    h('label', { class: 'e-check', for: 'more-autoscroll' }, box,
+    h('label', { class: 'e-check e-switch', for: 'more-autoscroll' }, box,
       h('span', {}, h('b', {}, 'Scroll to the next question'), h('br'), h('span', { class: 'e-small' }, 'After you answer a question on a form. Saved on this device.'))),
     h('p', { style: 'margin:16px 0 4px' }, h('b', {}, 'Theme')),
     h('div', { class: 'e-more-theme' }, theme),
@@ -138,7 +141,52 @@ function privacyCard() {
     h('p', { class: 'e-small' }, 'Evaluations are seen by the resident, the assessor and the programme’s admins and directors.'));
 }
 
-async function signOut() {
-  try { await cloud.signOut(); }
-  catch (err) { toast('Could not sign out: ' + (err.message || err)); }
+const signOut = () => signOutSafely();
+
+// ---------- How evals work (#how) ----------
+// Plain steps for each role. Only what the app and the APMES guidebook already say (24 h, the same
+// patient for at most 2 assessments, EBD by someone who co-managed, 15-minute corrections).
+
+export function renderHow() {
+  const step = (n, t, d) => h('li', { class: 'e-how__step' }, h('span', { class: 'e-how__n', 'aria-hidden': 'true' }, String(n)),
+    h('div', {}, h('b', {}, t), d ? h('p', { class: 'e-small' }, d) : null));
+  const forAssessors = h('section', { class: 'e-card' },
+    h('h2', { class: 'e-h3' }, 'If you assess residents'),
+    h('ol', { class: 'e-how' },
+      step(1, 'A resident sends you a link or shows a QR code', 'After a case you supervised. Open it on your phone.'),
+      step(2, 'Sign in with Google', 'Use the account the programme has for you (the link names it). If the link opened inside WhatsApp, open it in Chrome or Safari first: Google doesn’t allow signing in inside WhatsApp.'),
+      step(3, 'Fill in the official form', 'DOPS, Mini-CEX or EBD, as in the APMES guidebook. Answers save as you go: you can stop and finish later from Evaluations.'),
+      step(4, 'Submit within 24 hours', 'You can correct your answers for 15 minutes after submitting. The resident then sees your feedback.'),
+      step(5, 'Can’t assess it?', 'Tap “I can’t assess this” at the top of the form and say why (for example, you didn’t observe the case, or for an EBD you didn’t co-manage it). The resident can send it to someone else.')));
+  const forResidents = h('section', { class: 'e-card' },
+    h('h2', { class: 'e-h3' }, 'If you are a resident'),
+    h('ol', { class: 'e-how' },
+      step(1, 'Request evaluation', 'Pick the item (Progress shows what’s due), then the assessor.'),
+      step(2, 'Describe the case', 'Date, place, the patient’s initials, age band and gender only: no names or record numbers. The same patient can be used for at most 2 assessments. An EBD needs an assessor who co-managed the case.'),
+      step(3, 'Show the QR code or share the link', 'Best done straight after the case. Without signal, the link works once your phone is back online.'),
+      step(4, 'Follow up', 'Forms should be done within 24 hours. From Requests you can remind your assessor, or send a declined request to someone else.'),
+      step(5, 'Track your progress', 'Progress counts submitted forms against the APMES EPA requirements for your year.')));
+  const order = isResident() && !isFaculty() ? [forResidents, forAssessors] : [forAssessors, forResidents];
+  return h('div', { class: 'e-stack' }, ...order,
+    h('p', { class: 'e-small e-center' }, 'An unofficial tool for the APMES programme. It does not replace the official record.'));
+}
+
+// ---------- Install (home-screen app) ----------
+// Chrome/Android offer an install prompt (beforeinstallprompt); iPhones need Share → Add to Home Screen.
+let installEvent = null;
+if (typeof window !== 'undefined') window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvent = e; });
+const standalone = () => typeof window !== 'undefined' && (matchMedia('(display-mode: standalone)').matches || navigator.standalone === true);
+function installCard() {
+  if (standalone() || cloud.demo) return null;
+  const ios = /iPhone|iPad|iPod/i.test(navigator.userAgent || '');
+  if (!installEvent && !ios) return null;
+  return h('section', { class: 'e-card' },
+    h('h2', { class: 'e-h3' }, 'Add Evals to your home screen'),
+    h('p', { class: 'e-small' }, 'It opens like an app, works without signal, and shows a badge when something needs you.'),
+    installEvent ? h('button', { class: 'n-btn', type: 'button', onclick: async () => {
+      const ev = installEvent; installEvent = null;
+      ev.prompt();
+      try { const r = await ev.userChoice; if (r.outcome === 'accepted') toast('Added to your home screen'); } catch {}
+      hooks.render();
+    } }, 'Install') : h('p', { class: 'e-small' }, 'In Safari, tap the Share button, then “Add to Home Screen”.'));
 }

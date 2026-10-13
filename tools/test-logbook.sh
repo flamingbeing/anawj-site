@@ -4,7 +4,8 @@
 #   tools/test-logbook.sh quick      repo check, unit tests and the focused browser tests (no full e2e)
 # It starts a static server on port 8080 if none is running (and stops it after). The portfolio template steps
 # use apmes/templates/portfolio-template-blank.docx.
-# Accessibility (logbook/test/e2e/a11y.mjs) and the rules emulator (tools/test-rules.sh) are run on their own.
+# Accessibility (logbook/test/e2e/a11y.mjs), the rules emulator (tools/test-rules.sh) and the read counts
+# (tools/test-reads.sh, emulator) are run on their own.
 set -u
 cd "$(dirname "$0")/.."
 OUT="${E2E_OUT:-${TMPDIR:-/tmp}/logbook-tests}"; mkdir -p "$OUT"
@@ -28,7 +29,7 @@ if [ "${1:-}" != quick ]; then
   grep -E '^== |^FAIL|console errors' "$OUT/e2e.txt"
 fi
 
-for t in recovery usability cloud-save notepad tag-editor simpler moved send; do
+for t in recovery usability cloud-save notepad daily-note tag-editor simpler profiles moved send logging-speed sync sync-engine; do
   step "$t"
   timeout 300 node "logbook/test/e2e/$t.mjs" >"$OUT/$t.txt" 2>&1 && grep -E '^PASS' "$OUT/$t.txt" || { echo "FAIL $t"; tail -15 "$OUT/$t.txt"; fail=1; }
 done

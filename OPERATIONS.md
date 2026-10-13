@@ -38,7 +38,7 @@ All are the owner's personal accounts today.
 
 | Account | What it holds | Settings that matter |
 |---|---|---|
-| **GitHub** `flamingbeing/anawj-site` (public) | All code, docs, PRs; GitHub Pages serves `anawj.com` | Pages source "GitHub Actions" (`.github/workflows/pages.yml`); secret `FIREBASE_SERVICE_ACCOUNT` (rules deploys); PR labeller; page-edit suggestions arrive as **public** issues (`edit/NOTES.md`) |
+| **GitHub** `flamingbeing/anawj-site` (public) | All code, docs, PRs; GitHub Pages serves `anawj.com` | Pages source "GitHub Actions" (`.github/workflows/pages.yml`); secret `FIREBASE_SERVICE_ACCOUNT` (rules deploys); secret `CLAUDE_CODE_OAUTH_TOKEN` (instant page edits, **owner: not set yet**; with "Allow GitHub Actions to create and approve pull requests"); PR labeller; weekly proof-read issue; page-edit suggestions arrive as **public** issues (`edit/NOTES.md`) |
 | **GitHub** `flamingbeing/life` (**private**) | The owner's personal notes: daily log, knowledge notes, plans with personal details | Private. Cloud sessions attach it only when he asks; never copy anything from it into the public repo (rule in `AGENTS.md`); its own `CLAUDE.md` holds the rules for sessions; no patient-identifiable details even there |
 | **Domain registrar** for `anawj.com` | The domain itself | **Owner: fill in which registrar and the renewal date.** If it lapses, every address stops |
 | **Cloudflare** | DNS for `anawj.com`; Worker `anawj-preview` | Worker serves PR previews and the subdomains (`SUBDOMAINS.md`, `PREVIEWS.md`); custom domains on the Worker; `edit.anawj.com` redirect rule (`edit/NOTES.md`). Free plan: 100,000 Worker requests a day |

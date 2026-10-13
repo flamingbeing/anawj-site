@@ -2,7 +2,7 @@
 // then every answer read-only with its descriptor on tap; "Got it" sets seenAt; prints cleanly).
 // A request that isn't submitted yet shows the request detail (ui-requests.js) to its resident.
 
-import { S, h, fill, toast, cloud, icon, go, toolLabel, fmtDate, hooks, modal } from './ui-core.js';
+import { S, h, fill, toast, cloud, icon, go, toolLabel, fmtDate, hooks, modal, errText } from './ui-core.js';
 import { FORMS, SCALES, ENTRUSTMENT_TEXT_KEY } from './forms.js';
 import { visibleQuestions } from './engine.js';
 import { residentCSS, assessorPicker } from './ui-request.js';
@@ -11,8 +11,8 @@ import { renderRequestDetail, itemCard, caseKV } from './ui-requests.js';
 residentCSS();
 
 const notAvailable = () => h('div', { class: 'e-empty' }, icon('info', 'e-empty__icon'),
-  h('p', { class: 'e-empty__title' }, 'Not available yet'),
-  h('p', {}, 'It may still be syncing, or it was sent to a different address.'),
+  h('p', { class: 'e-empty__title' }, 'Can’t find this evaluation'),
+  h('p', {}, 'It may still be syncing. If it keeps happening, check you’re signed in with the email it was sent to.'),
   h('button', { class: 'n-btn', onclick: () => hooks.render() }, 'Try again'));
 
 async function find(id) {
@@ -45,7 +45,7 @@ function adminActions(ev) {
   if (!S.roles.admin) return null;
   const run = async (patch, done) => {
     try { await cloud.updateEvaluation(ev.id, patch); toast(done); hooks.render(); }
-    catch (err) { toast('Not changed: ' + (err.message || err)); }
+    catch (err) { toast('Not changed. ' + errText(err)); }
   };
   const open = ['draft', 'requested', 'declined'].includes(ev.status);
   const reassign = () => {
@@ -63,7 +63,7 @@ function adminActions(ev) {
   const btns = [
     open ? h('button', { class: 'n-btn n-btn--outline e-btn-quiet', onclick: reassign }, 'Reassign') : null,
     open ? h('button', { class: 'n-btn n-btn--outline e-btn-quiet', onclick: () => confirmDo('Cancel this request?', 'The resident sees it as cancelled. Nothing is deleted.', 'Cancel request', { status: 'cancelled' }, 'Cancelled') }, 'Cancel request') : null,
-    ev.status === 'submitted' || ev.status === 'cancelled' ? h('button', { class: 'n-btn n-btn--outline e-btn-quiet', onclick: () => confirmDo('Reopen?', `It goes back to ${ev.assessorName || ev.assessorEmail} as a request; their answers are kept.`, 'Reopen', { status: 'requested', submittedAt: null }, 'Reopened') }, 'Reopen') : null,
+    ev.status === 'submitted' || ev.status === 'cancelled' ? h('button', { class: 'n-btn n-btn--outline e-btn-quiet', onclick: () => confirmDo('Reopen this evaluation?', `It goes back to ${ev.assessorName || ev.assessorEmail} as a request; their answers are kept.`, 'Reopen', { status: 'requested', submittedAt: null }, 'Reopened') }, 'Reopen') : null,
   ].filter(Boolean);
   if (!btns.length) return null;
   return h('section', { class: 'e-card e-noprint' }, h('h2', { class: 'e-h3' }, 'Admin'), h('div', { class: 'e-actions' }, btns));
@@ -133,7 +133,7 @@ function resultView(ev) {
   const gotIt = h('button', { class: 'n-btn e-go e-btn-big', onclick: async () => {
     gotIt.disabled = true;
     try { const next = await cloud.updateEvaluation(ev.id, { seenAt: Date.now() }); Object.assign(ev, next); toast('Marked as seen'); go('requests'); }
-    catch (err) { gotIt.disabled = false; toast('Not saved: ' + (err.message || err)); }
+    catch (err) { gotIt.disabled = false; toast('Not saved. ' + errText(err)); }
   } }, icon('check'), 'Got it');
 
   const sections = form.sections.map(sec => {

@@ -138,7 +138,7 @@ Pickers are full-screen **Recent | All | Write-In** lists, with recents remember
   - Autosave uses `updateEvaluation(id, patch, { wait: false, onError })`: a rejection that arrives before the 3 s ack wait is reported (before, the form said "Saved").
   - `restoreLocal()` keeps the device copy when it only adds to the server's answers, not just when it is newer (a resident's nudge bumps `updatedAt`).
   - Unsent text is flushed on `visibilitychange`/`pagehide`. Sign-out removes `evals-draft-*`.
-- **State changes** (`stampPatch` in `demo-backend.js`, used by both backends): reopen, reassign and assessor change restart `requestedAt`; reopen clears `seenAt`; a new assessor drops the old `metrics` (rules let the resident remove `metrics`, never set it).
+- **State changes** (`stampPatch` in `schema.js`, used by both backends): reopen, reassign and assessor change restart `requestedAt`; reopen clears `seenAt`; a new assessor drops the old `metrics` (rules let the resident remove `metrics`, never set it).
 - **Navigation:**
   - The phone's Back closes open sheets and the full-screen QR (`popstate` listener in `ui-core.js`).
   - The request flow survives a reload (`sessionStorage` `evals-request-flow`, 2 h).
@@ -158,6 +158,24 @@ Pickers are full-screen **Recent | All | Write-In** lists, with recents remember
   - The demo never loads Firebase.
   - `resetDemoData()` is exported from `app.js` for the banner button.
 
+### Added in the 14 Oct improvement run (worth not regressing)
+
+- **Unsent work:** `cloud.hasUnsentWrites()` / `whenSynced()` (Firestore `waitForPendingWrites`). `signOutSafely()` (ui-core) asks before
+  signing out with unsent writes, because sign-out clears the offline cache and its write queue. The Sent screen says "Saved on this phone"
+  until synced; so does the request share step. `pruneDrafts` keeps a draft newer than the server's `updatedAt` (edits in the 15-min window).
+- **Errors:** `errText(err)` (ui-core) maps Firebase codes to plain words; never show raw `err.message`.
+- **Assessor links:** `evalLink(id, email)` adds `?as=<assessor email>`; `linkAccount()` reads it; sign-in passes it as `login_hint`. An `#e/`
+  link signed out shows the assessor landing; `inAppBrowser()` + `openInBrowserCard()` handle WhatsApp/Facebook/Instagram web views (Google
+  blocks sign-in there). `wrongAccountCard()` / `switchAccount()` when the signed-in account has no role or isn't the `?as=` one.
+- **Case link:** `?date=YYYY-MM-DD&initials=AB#new[/itemId]` prefills the case card (`caseFromLink`), then drops those two params only.
+- **Requirements:** `progress(evals, rYear, today)` / `dueItems(…, today)`: with `today`, a "first N months of R1" group is overdue in R1 once
+  N months from 1 July have passed (`monthsIntoYear`). Screens pass `todayISO()`; tests without a date keep the by-year rule.
+- **Data rules:** field whitelists and `clean*()`/`stampPatch` live in `js/schema.js` (production code; demo-backend re-exports them).
+- **Speed:** Firebase SDK `modulepreload` from an inline script in `index.html` (not in the demo; keep the version in step with `cloud.js`
+  and `sw.js`); web font non-blocking; service worker registers on `load`; `qrSvg()` loads `vendor/qrcode.js` on first use.
+- **Not changed on purpose:** form questions, their order, required answers and scales are the programme's (APMES guidebook). Ideas that
+  would change them (pre-ticking, resident-filled context, moving the feedback box) are in `IMPROVEMENTS.md` for the PD to decide.
+
 ### Tests (run all before merging)
 
 ```
@@ -165,9 +183,11 @@ node tools/check.mjs                                                          # 
 for f in evals/test/*.test.mjs logbook/test/*.test.mjs; do node "$f"; done   # unit
 npx http-server . -p 8110 -s -c-1 &                                           # static server
 node evals/test/e2e.spec.mjs                                                  # 36 e2e checks
+node evals/test/edge.e2e.mjs                                                  # 13 edge checks (forward, sign-out, dark, assessor landing)
+node evals/test/a11y.mjs                                                      # axe WCAG 2.2 AA, 12 screens, light and dark
 ```
 
-- **Rules:** the emulator suites (`logbook/test/rules.emulator.mjs` and `evals/test/rules.emulator.mjs`) run under `firebase emulators:exec --only firestore --project demo-logbook`. At the last run, logbook passed 154/154 and evals 191/191 (the logbook session has since added more).
+- **Rules:** `tools/test-rules.sh` (installs the emulator tools once into `~/.cache/anawj-rules`, about a minute). On 14 Oct: evals 201/201, logbook 227/227, prewarm 116/116.
 - **Playwright** is installed globally. Use executable `/opt/pw-browsers/chromium` in the cloud container.
 - **e2e failing with `ERR_CONNECTION_REFUSED`** means the static server isn't running on port 8110.
 
@@ -224,6 +244,8 @@ A quick contrast check for both themes is worth running after any colour change:
   - Push after a blocked credential attempt (the classifier stays wary for a while). Wait, or ask the owner.
 
 ## 7. Open items
+
+The full ranked review (20 reviewers, 13 Oct 2026) is in [IMPROVEMENTS.md](IMPROVEMENTS.md); the list below is the older short list.
 
 - Linked emails / hospital-email sign-in (the project is on Blaze; code path present, off).
 - Nightly encrypted Firestore backup Action.

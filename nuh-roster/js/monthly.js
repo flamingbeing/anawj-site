@@ -309,3 +309,54 @@ export function leaveOn(monthly, date) {
   for (const m of Object.values(monthly || {})) for (const e of m.leave?.entries || []) if (e.from <= date && date <= e.to) out.push(e);
   return out;
 }
+
+// ---- planning problems across a month ----
+
+// Clashes the monthly rosters already show before the day comes. personOf(text) -> { id, name } or null.
+// Returns [{ date, kind, key, level: 'error' | 'warn', text }], one per cell that needs a look:
+//   on leave that day; a day duty the morning after an overnight one; two overnight duties the same day
+//   (errors); an overnight duty left empty on a day the roster has others filled in (warning).
+// Liver and AOH duties are on-call standbys, not a day's work, so they don't clash with being post call
+// (as NOTES says, they don't make anyone post call either).
+const ON_CALL_ROSTERS = ['liver', 'aoh'];
+export function monthIssues(monthly, month, personOf) {
+  const out = [];
+  const pad = d => `${month}-${String(d).padStart(2, '0')}`;
+  const nightOf = (kind, key) => NIGHT_DUTIES.includes(`${kind}.${key}`);
+  const cellsOn = date => {
+    const duty = dutiesOn(monthly, date), cells = [];
+    for (const def of MONTHLY) if (!def.list) for (const c of def.cols) {
+      const v = cleanCell(duty[def.id]?.[c.key]);
+      for (const name of v.split(/\s*\/\s*/).filter(Boolean)) {
+        const p = personOf(name);
+        if (p) cells.push({ kind: def.id, key: c.key, label: c.label, p, night: nightOf(def.id, c.key) });
+      }
+    }
+    return cells;
+  };
+  let prev = cellsOn(addDays(pad(1), -1));
+  for (let d = 1; d <= daysIn(month); d++) {
+    const date = pad(d), cells = cellsOn(date);
+    const away = new Set(leaveOn(monthly, date).map(e => personOf(e.name)?.id).filter(Boolean));
+    const lastNight = new Map(prev.filter(c => c.night).map(c => [c.p.id, c]));
+    const nights = {};
+    for (const c of cells) {
+      if (away.has(c.p.id)) out.push({ date, kind: c.kind, key: c.key, level: 'error', text: `${c.p.name} is on leave but has ${c.label}.` });
+      const n = lastNight.get(c.p.id);
+      if (n && !c.night && !ON_CALL_ROSTERS.includes(c.kind)) out.push({ date, kind: c.kind, key: c.key, level: 'error', text: `${c.p.name} has ${c.label} the morning after ${n.label} (post call).`, after: { date: addDays(date, -1), kind: n.kind, key: n.key } });
+      if (c.night) (nights[c.p.id] ||= []).push(c);
+    }
+    for (const list of Object.values(nights)) if (list.length > 1) for (const c of list.slice(1)) {
+      out.push({ date, kind: c.kind, key: c.key, level: 'error', text: `${c.p.name} has two overnight duties (${list.map(x => x.label).join(' and ')}).` });
+    }
+    // empty overnight duties, on days the roster has something filled in
+    const m = monthly?.[month] || {};
+    for (const def of MONTHLY) {
+      const row = m[def.id]?.rows?.[d];
+      if (def.list || !row || !Object.values(row).some(v => cleanCell(v))) continue;
+      for (const c of def.cols) if (c.night && !cleanCell(row[c.key])) out.push({ date, kind: def.id, key: c.key, level: 'warn', text: `${c.label} is empty.` });
+    }
+    prev = cells;
+  }
+  return out;
+}

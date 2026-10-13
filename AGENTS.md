@@ -10,6 +10,7 @@ Static site on GitHub Pages (public repo: no names, patient data or real evaluat
 - `nuh-roster/`: NUH anaesthesia daily roster (own Firebase project `nuh-roster`), at `nuhroster.anawj.com` (the old `anawj.com/nuh-roster/` redirects). Start with `nuh-roster/NOTES.md`: its department section (grades, postings, roster sheet, notation, HMS monthly rosters, short names) applies to any app dealing with NUH anaesthesia staff.
 - `prewarm/`: prewarming study op-day data collection (temperatures every 5 min, export to the study's Excel template); served at `prewarmstudy.anawj.com`. Start with `prewarm/NOTES.md`, then `prewarm/PLAN.md`.
 - `hand-babies/`: hand surgery exam crash course for new MOs (one static page, no data), at `hand.anawj.com/babies/`. Start with `hand-babies/NOTES.md`.
+- `hand-log/`: hand surgery DOPS and Mini-CEX log (data on the device only, CSV/JSON export), at `hand.anawj.com/handlog/`. Start with `hand-log/NOTES.md`.
 - `edit/`: the page editor for any page on the site (`edit.anawj.com/<path>` redirects to it). Suggested edits arrive as
   GitHub issues titled `Page edits:`; how to apply them: `edit/NOTES.md`. A daily routine ("Page edits check", 8:58 am
   Singapore) drafts one PR for new ones and never merges: the owner approves page edits.
@@ -55,11 +56,12 @@ Rules that bite:
   workflow labels each PR by the folders it touches (`.github/labeler.yml`), so filter the PR list by label. Outside
   an app's own files, write PRs as `#295 (logbook)`.
 
-Before merging, run:
+Before merging, run (GitHub runs these too on every PR, plus the editor, feedback-button and hand browser tests: the
+"Checks" workflow; a red check means don't merge):
 
 ```
 node tools/check.mjs
-for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mjs prewarm/test/*.test.mjs worker/test/*.test.mjs; do node "$f"; done
+for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mjs prewarm/test/*.test.mjs worker/test/*.test.mjs feedback/test/*.test.mjs; do node "$f"; done
 ```
 
 - Logbook changes: `tools/test-logbook.sh` runs all of the above plus the full e2e and every focused browser test
@@ -70,6 +72,12 @@ for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mj
 - Prewarming UI changes: `tools/test-prewarm.sh` runs the repo check, prewarm unit tests and the three browser tests
   (`prewarm/test/e2e.mjs`, `edge.e2e.mjs`, `fullcase.e2e.mjs`) side by side in about 1½ minutes (see `prewarm/README.md`).
 - Hand assessment changes: run `node hand-babies/test/e2e.mjs` (see `hand-babies/README.md`).
+- NUH roster changes: run `node nuh-roster/test/e2e.mjs` (Practice in a browser, desktop and phone, axe on every tab;
+  under a minute; also in the Checks workflow).
+- Hand log changes: run `node hand-log/test/e2e.mjs`.
+- Page editor changes (`edit/`): run `node edit/test/e2e.mjs` and `node hand-babies/test/e2e.mjs` (it opens the editor).
+- Feedback button or Worker changes (`feedback/`, `worker/`): run `node feedback/test/e2e.mjs` (through the real Worker).
+- New or moved pages and documents: `node tools/proofread.mjs` (broken links, missing `noindex`, titles, alt text; also weekly).
 
 ## Working with the owner
 
@@ -91,7 +99,9 @@ for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mj
 - **Planning:** for multi-part work, say the plan first and wait when asked; the owner plans in batches, then it's
   built PR by PR, each merged before the next. When the owner asks "should we / can we", answer and propose.
   While another session or Codex works in an area, plan only and don't merge into it.
-- **Show it:** phone screenshots (390 px) of UI changes, plus preview links once a PR has one (see PR previews).
+- **Show it:** phone screenshots (390 px) of UI changes, plus preview links once a PR has one (see PR previews). Every
+  PR also gets an automatic before-and-after comment of the first screen of each app it changes
+  (`.github/workflows/pr-screenshots.yml`); for other screens add a line `Screens: /logbook/?demo#notes` to the PR body.
 - **New options:** optional settings, off by default, per device unless they belong to the account; existing
   defaults stay exactly as they look now.
 - **Writing for the owner:** plain words, short; say what changed for residents and what the owner needs to do.

@@ -39,9 +39,31 @@ export const hasRole = () => isResident() || isFaculty() || isStaff()
 // (submitted, declined, cancelled) with no write of ours pending, so an offline submit that the
 // server later refuses loses nothing. app.js calls pruneDrafts from the assigned watcher.
 export const draftKey = id => `evals-draft-${id}`;
+// A draft saved after the server's last change (an edit in the 15-minute window that hasn't reached
+// the server, or that it refused) is kept; both times come from this phone's clock.
 export function pruneDrafts(list, meta) {
   if (meta && (meta.hasPendingWrites || meta.fromCache)) return;
-  for (const ev of list || []) if (ev.status !== 'requested') { try { localStorage.removeItem(draftKey(ev.id)); } catch {} }
+  for (const ev of list || []) {
+    if (ev.status === 'requested') continue;
+    try {
+      const d = JSON.parse(localStorage.getItem(draftKey(ev.id)) || 'null');
+      if (d && ev.status === 'submitted' && (d.at || 0) > (toMs(ev.updatedAt) || 0) && Date.now() - d.at < 7 * 864e5) continue;
+      localStorage.removeItem(draftKey(ev.id));
+    } catch {}
+  }
+}
+
+// Sign out, but first warn when answers on this phone haven't reached the server: signing out
+// deletes this device's offline copy, unsent forms included.
+export async function signOutSafely() {
+  if (await cloud.hasUnsentWrites()) {
+    const ok = await confirmBox('Not sent yet',
+      'Some answers on this phone haven’t reached the server yet (no signal?). Signing out now deletes them. Wait until you have signal, then sign out.',
+      'Sign out anyway', true);
+    if (!ok) return;
+  }
+  try { await cloud.signOut(); }
+  catch (err) { console.warn(err); toast('Couldn’t sign out. Check your signal and try again.'); }
 }
 
 // A request that needs the resident: declined, new feedback, or waiting 20 h or more (nudge).
@@ -149,6 +171,66 @@ export function confirmBox(title, text, okLabel = 'OK', danger = false) {
         h('button', { class: danger ? 'n-btn n-btn--alert' : 'n-btn', onclick: () => { ok = true; m.close(); } }, okLabel)),
     ], { onclose: () => resolve(ok) });
   });
+}
+
+// The email an assessor link was sent to (?as=), or ''.
+export function linkAccount() {
+  try { return (new URLSearchParams(location.search).get('as') || '').trim().toLowerCase(); } catch { return ''; }
+}
+// Apps that open links in their own built-in browser, where Google refuses to sign in
+// ("disallowed_useragent"): WhatsApp, Facebook, Instagram, LINE, WeChat, Telegram, and Android web views.
+export const inAppBrowser = () => typeof navigator !== 'undefined'
+  && /FBAN|FBAV|Instagram|WhatsApp|Line\/|MicroMessenger|Telegram|; wv\)/i.test(navigator.userAgent || '');
+// A card telling people to open the page in Chrome or Safari, with a Copy link button (and, on
+// Android, a button that opens Chrome directly).
+export function openInBrowserCard() {
+  const url = location.href;
+  const android = /Android/i.test(navigator.userAgent || '');
+  const chrome = 'intent://' + url.replace(/^https?:\/\//, '') + '#Intent;scheme=https;package=com.android.chrome;end';
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(url); toast('Link copied: paste it into Chrome or Safari'); }
+    catch { toast(url, { ms: 9000 }); }
+  };
+  return h('section', { class: 'e-card e-inapp', role: 'alert' },
+    h('h2', { class: 'e-h3' }, 'Open this in Chrome or Safari'),
+    h('p', {}, 'Google doesn’t allow signing in inside WhatsApp’s (or Facebook’s, Instagram’s…) own browser. ',
+      android ? 'Tap Open in Chrome, or ' : 'Tap ⋯ or the share button and choose “Open in Safari”, or ', 'copy the link and paste it into your browser.'),
+    h('div', { class: 'e-actions' },
+      android ? h('a', { class: 'n-btn', href: chrome }, 'Open in Chrome') : null,
+      h('button', { class: 'n-btn n-btn--outline e-btn-quiet', type: 'button', onclick: copy }, 'Copy link')));
+}
+
+// Signed in with an account that isn't the one an assessor link was sent to (often a personal Gmail
+// instead of the hospital one): say so first, with Switch account, before offering to apply.
+export function wrongAccountCard() {
+  const as = linkAccount();
+  return h('section', { class: 'e-card e-wrongacct', role: 'alert' },
+    h('h2', { class: 'e-h3' }, 'This evaluation was sent to another account'),
+    h('p', {}, 'You’re signed in as ', h('b', {}, S.user?.email || ''), '.',
+      as ? [' The request went to ', h('b', {}, as), '.'] : ' Sign in with the account the resident chose.'),
+    h('div', { class: 'e-actions' }, h('button', { class: 'n-btn e-btn-big', type: 'button', onclick: switchAccount }, 'Switch account')));
+}
+export async function switchAccount() {
+  try { await cloud.signOut(); await cloud.signIn(linkAccount() || undefined); }
+  catch (err) { toast('Couldn’t switch account. ' + errText(err)); }
+}
+
+// Plain words for the errors people actually meet; the code stays in brackets for support.
+export function errText(e) {
+  const code = String(e?.code || '').replace(/^firestore\//, '');
+  const msg = {
+    'permission-denied': 'You can’t change this any more (it may have been cancelled, reassigned or closed).',
+    'unavailable': 'No connection. Check your signal and try again.',
+    'auth/network-request-failed': 'No connection. Check your signal and try again.',
+    'auth/popup-closed-by-user': 'The sign-in window was closed before it finished. Try again.',
+    'auth/cancelled-popup-request': 'The sign-in window was closed before it finished. Try again.',
+    'auth/popup-blocked': 'Your browser blocked the sign-in window. Try again, or allow pop-ups for this site.',
+    'auth/unauthorized-domain': 'Sign-in doesn’t work from this address. Open apmes.anawj.com/evals/ instead.',
+    'auth/web-storage-unsupported': 'This browser blocks sign-in (private mode or blocked cookies). Open the link in Chrome or Safari.',
+  }[code];
+  if (msg) return msg;
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return 'No connection. Check your signal and try again.';
+  return `Something went wrong. Try again${code ? ` (${code})` : ''}.`;
 }
 
 // ---------- routing ----------
