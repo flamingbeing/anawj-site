@@ -262,55 +262,70 @@ const FIGS3D = {
     },
   },
 
-  // finger extensors: from a fist, each finger straightens at the knuckle in turn, then all together
+  // EIP and EDM: from a fist, point the index alone (EIP), then the little finger alone (EDM), each against resistance
+  eipedm: {
+    dur: 8, cam: { target: [0, 5, -11], dist: 36, yaw: 200, pitch: 28 },
+    build(scene) {
+      const H = makeHand(); H.root.rotation.z = Math.PI; H.root.position.y = 6.5; scene.add(H.root);
+      H.lines = {}; H.press = {};
+      for (const n of ['index', 'little']) {
+        H.lines[n] = [...H.fingers[n].segs.map(sg => tendon(sg, -1, TENDON.ext)),
+          stick(H.hand, [FING[n].x, -.2, FING[n].z], [FING[n].x * .45, -.2, -.5], .17, TENDON.ext)];
+        H.press[n] = pad(H.fingers[n].segs[0], -1, .6, 1.8);
+      }
+      return H;
+    },
+    pose(H, s) {
+      const fist = [85, 95, 55];
+      const x = { index: win(s, .6, 3.6, .6), little: win(s, 4.2, 7.2, .6) };   // finger points out
+      const p = { index: win(s, 1.5, 3.2, .3), little: win(s, 5.1, 6.8, .3) }; // your finger resists
+      for (const n of ['middle', 'ring']) H.fingers[n].set(...fist);
+      for (const n of ['index', 'little']) {
+        H.fingers[n].set(...fist.map(a => a * (1 - x[n])));
+        H.lines[n].forEach(l => { l.visible = x[n] > .2; });
+        H.press[n].scale.setScalar(Math.max(.01, p[n]));
+      }
+      H.thumb.set(10, 30, 30);
+      const n = s < 3.9 ? 'index' : 'little';
+      return {
+        title: n === 'index' ? 'EIP: index points on its own' : 'EDM: little finger points on its own',
+        sub: 'From a fist, point one finger and hold it up against your finger', hint: true,
+        tags: [{ obj: H.fingers[n].segs[2].end, text: n === 'index' ? 'EIP (index)' : 'EDM (little)', color: '#1f5fa8', k: x[n], dx: n === 'index' ? -30 : 30, dy: 30 },
+          { obj: H.press[n], text: 'resist here', color: '#1f5fa8', k: p[n], dx: n === 'index' ? -30 : 30, dy: -40 }],
+        caption: { text: 'Points and holds against you = ' + (n === 'index' ? 'EIP' : 'EDM') + ' working', k: Math.max(p.index, p.little) },
+      };
+    },
+  },
+  // EDC: from a fist, straighten all the fingers at the knuckles, then press on the back of each first bone in turn
   edc: {
     dur: 9, cam: { target: [0, 5, -11], dist: 36, yaw: -96, pitch: 10 },
     build(scene) {
       const H = makeHand(); H.root.rotation.z = Math.PI; H.root.position.y = 6.5; scene.add(H.root);
-      H.lines = {};
-      for (const [n, f] of Object.entries(H.fingers)) H.lines[n] = [...f.segs.map(sg => tendon(sg, -1, TENDON.ext)),
-        stick(H.hand, [FING[n].x, -.2, FING[n].z], [FING[n].x * .35, -.2, -.5], .17, TENDON.ext)];
+      H.lines = {}; H.press = {};
+      for (const [n, f] of Object.entries(H.fingers)) {
+        H.lines[n] = [...f.segs.map(sg => tendon(sg, -1, TENDON.ext)),
+          stick(H.hand, [FING[n].x, -.2, FING[n].z], [FING[n].x * .35, -.2, -.5], .17, TENDON.ext)];
+        H.press[n] = pad(f.segs[0], -1, .55, 1.6);
+      }
       return H;
     },
     pose(H, s) {
       const order = ['index', 'middle', 'ring', 'little'];
+      const x = ph(s, .6, 1.6) * (1 - ph(s, 8.2, 8.8));
       let active = null;
       for (const [i, n] of order.entries()) {
-        const t0 = .6 + i * 1.4, e = win(s, t0, t0 + 1.2, .35), all = ph(s, 6.4, 7);
-        const x = Math.max(e, all);
         H.fingers[n].set(85 * (1 - x), 95 * (1 - x), 55 * (1 - x));
         H.lines[n].forEach(l => { l.visible = x > .15; });
-        if (e > .5) active = n;
+        const t0 = 2 + i * 1.5, p = win(s, t0, t0 + 1.3, .3);
+        H.press[n].scale.setScalar(Math.max(.01, p));
+        if (p > .5) active = n;
       }
       H.thumb.set(10, 30, 30);
-      const f = active ? H.fingers[active] : H.fingers.middle;
       return {
-        title: 'Finger extensors (EDC)', sub: 'From a fist, straighten one finger at a time', hint: true,
-        tags: [{ obj: f.base, text: 'watch the knuckle (MCP)', color: '#1f5fa8', k: active || s > 6.4 ? 1 : 0, dx: -30, dy: -34 }],
-        caption: { text: 'Knuckle straightens = extensor working', k: ph(s, 1.2, 1.6) },
-      };
-    },
-  },
-
-  // EIP and EDM: index and little have their own extra extensor
-  eipedm: {
-    dur: 6, cam: { target: [0, 5, -11], dist: 36, yaw: 200, pitch: 28 },
-    build(scene) {
-      const H = makeHand(); H.root.rotation.z = Math.PI; H.root.position.y = 6.5; scene.add(H.root);
-      H.lines = ['index', 'little'].map(n => [...H.fingers[n].segs.map(sg => tendon(sg, -1, TENDON.ext)),
-        stick(H.hand, [FING[n].x, -.2, FING[n].z], [FING[n].x * .45, -.2, -.5], .17, TENDON.ext)]).flat();
-      return H;
-    },
-    pose(H, s) {
-      const x = ph(s, .8, 1.6) - ph(s, 3, 3.5) + ph(s, 4, 4.8);
-      for (const n of ['middle', 'ring']) H.fingers[n].set(85, 95, 55);
-      for (const n of ['index', 'little']) H.fingers[n].set(85 * (1 - x), 95 * (1 - x), 55 * (1 - x));
-      H.thumb.set(10, 30, 30); H.lines.forEach(l => { l.visible = x > .2; });
-      return {
-        title: 'EIP and EDM', sub: 'Make a fist, then point the index and little fingers', hint: true,
-        tags: [{ obj: H.fingers.index.segs[2].end, text: 'EIP (index)', color: '#1f5fa8', k: x, dx: -30, dy: -20 },
-          { obj: H.fingers.little.segs[2].end, text: 'EDM (little)', color: '#1f5fa8', k: x, dx: 30, dy: -20 }],
-        caption: { text: 'Both straighten = EIP and EDM working', k: ph(s, 1.4, 1.8) },
+        title: 'Finger extensors (EDC)', sub: 'From a fist, straighten all the fingers; press on each one in turn', hint: true,
+        tags: [{ obj: H.fingers.index.base, text: 'watch the knuckles (MCP)', color: '#1f5fa8', k: ph(s, .8, 1.2) * (1 - ph(s, 1.8, 2)), dx: -30, dy: -34 },
+          { obj: H.press[active || 'index'], text: 'press here', color: '#1f5fa8', k: active ? 1 : 0, dx: -24, dy: -34 }],
+        caption: { text: 'Each knuckle straightens and holds = extensor working', k: ph(s, 2.2, 2.6) },
       };
     },
   },

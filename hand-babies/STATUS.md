@@ -6,8 +6,8 @@ Last updated: 2026-10-13 by Claude Code, hand assessment session.
 
 ## Now
 
-- **Claude Code, hand assessment** (branch `claude/amazing-goodall-erq636`, no open PR): nothing half-done. Applied
-  page-edit issue #302 (update bar removed; page now loads network first).
+- **Claude Code, hand assessment** (branch `claude/amazing-goodall-erq636`, no open PR): nothing half-done. Checked
+  every tendon test against standard technique; EDC and EIP/EDM corrected.
 
 ## Waiting on the owner
 
@@ -26,6 +26,7 @@ Last updated: 2026-10-13 by Claude Code, hand assessment session.
 
 ## Recently done
 
+- Tendon tests checked: FDP, FDS, FPL, EPL, Elson correct; EDC now all fingers then press each; EIP and EDM one at a time against resistance.
 - Elson figure: finger rests on the table, middle joint over the edge (no clipping); see-through table.
 - Firefox: checked the update fix and 3D in Firefox; no-WebGL phones get the GIFs instead of blank boxes.
 - Page edits #302: no update bar; online visits always get the current page (network first, cache offline).
@@ -40,6 +41,8 @@ Last updated: 2026-10-13 by Claude Code, hand assessment session.
 
 ## Decisions
 
+- 2026-10-13: no Z-Anatomy / MakeHuman models (owner: too much effort); keep the primitive 3D hand.
+- 2026-10-13: EDC tested with all fingers straight, pressing each in turn (ring can't straighten alone); EIP and EDM tested separately.
 - 2026-10-13: owner uses Firefox; test there too. No WebGL: show the figure's GIF.
 - 2026-10-13: no update bar; the worker is network first (3 s fallback to cache), so updates need no tap or reload.
 - 2026-10-12: new versions activate themselves; the bar only reloads (owner's tap did nothing).
