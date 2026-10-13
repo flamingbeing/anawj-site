@@ -422,3 +422,15 @@ console.log('engine tests passed');
   assert.ok(t.split('\r\n').every(l => l.length <= 75), 'lines folded');
   console.log('calendar tests passed');
 }
+
+{
+  const { dateFromText } = await import('../js/xlsxio.js');
+  assert.equal(dateFromText('2026-10-14'), '2026-10-14');
+  assert.equal(dateFromText('14/10/2026'), '2026-10-14');
+  assert.equal(dateFromText('1.2.26'), '2026-02-01');
+  assert.equal(dateFromText('14 Oct 2026'), '2026-10-14');
+  assert.equal(dateFromText('Wednesday, 14 October 2026'), '2026-10-14');
+  assert.equal(dateFromText('31/02/2026'), null, 'no 31 February');
+  assert.equal(dateFromText(''), null);
+  console.log('draft date tests passed');
+}

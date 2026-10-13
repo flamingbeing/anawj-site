@@ -21,6 +21,8 @@
   --chip-on: var(--navy);
   --err: #5c0c1b;           /* n-alert-ink */
   --err-bg: #ffebeb;        /* n-alert-bg */
+  --hl-bg: #fff3c4;         /* highlight: a person's chips, a row just jumped to (not an NUHS token) */
+  --hl-line: #c99a06;
   --err-line: #ffdadf;      /* n-alert-line */
   --warn: #333333;
   --warn-bg: #e6dbce;       /* n-bg-beige */
@@ -285,7 +287,7 @@ a.btn { text-decoration: none; }
 .pchip .marks { font-size: 11px; color: var(--muted); }
 .person-box { width: 320px; }
 .person-box .btn-group button { margin: 0; }
-tr.highlight td { background: #fff4c2 !important; transition: background 1s; }
+tr.highlight td { background: var(--hl-bg) !important; transition: background 1s; }
 .status-pick { flex-wrap: wrap; } .status-pick button[aria-pressed=true] { background: var(--navy); color: #fff; border-color: var(--navy); }
 
 .add-flag { padding: 0 8px; font-size: 12px; line-height: 20px; border-style: dashed; color: var(--muted); background: none; }
@@ -297,7 +299,7 @@ tr.highlight td { background: #fff4c2 !important; transition: background 1s; }
 @media (hover: none), (pointer: coarse) { .sheet .cell .add-name { opacity: .35; } .sheet .cell:not(:has(.name)) .add-name { opacity: 1; } }
 .name .icon { opacity: 0; }
 .name:hover .icon, .name:focus-within .icon, .name .icon.dbl.on { opacity: 1; }
-.name.hl, .pchip.hl { background: #fff3c4; border-color: #c99a06; box-shadow: 0 0 0 1px #c99a06; }
+.name.hl, .pchip.hl { background: var(--hl-bg); border-color: var(--hl-line); box-shadow: 0 0 0 1px var(--hl-line); }
 
 /* tabs: the daily ones in work order, the set-up ones (Staff, Settings) to the right */
 .tabs button.setup { display: inline-flex; align-items: center; gap: 6px; }
@@ -332,7 +334,7 @@ tr.highlight td { background: #fff4c2 !important; transition: background 1s; }
 .problems .warnings li > span:first-child { flex: 1 1 200px; }
 .problems .fixes { display: flex; gap: 6px; flex-wrap: wrap; }
 .ok-note { color: var(--ok); font-weight: 600; margin: 4px 0; }
-@keyframes flash-row { from { background: #fff3c4; } to { background: transparent; } }
+@keyframes flash-row { from { background: var(--hl-bg); } to { background: transparent; } }
 tr.flash td { animation: flash-row 2s ease-out; }
 
 /* the day's steps, under the tabs */
