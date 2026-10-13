@@ -12,6 +12,7 @@ import { buildRosterCanvas } from './pngout.js';
 import { buildIcs } from './ics.js';
 import { emptyRotations, postingOn, weekPosting, mondayOf, weeksOfYear, setWeeks, readRotationSheet, buildRotationWorkbook, POSTING_FILL } from './rotations.js';
 import { makeDemo, demoNotes, demoAdmin } from './demo.js';
+import { mergeSaved, migrateRooms as migrateRoomsIn } from './store.js';
 import { MONTHLY, monthlyDef, LEAVE_TYPES, NIGHT_DUTIES, monthIssues, cleanCell, daysIn, weekday, monthName, addDays, readMonthlyPdf, readMonthlyXlsx, buildMonthlyWorkbook, dutiesOn, generalFromMonthly, leaveOn } from './monthly.js';
 
 // ?demo: a made-up department, kept apart from real data in its own storage
@@ -53,7 +54,7 @@ try {
     const key = `${KEY}-damaged-${Date.now()}`;
     try { localStorage.setItem(key, raw); storeProblem = { corrupt: key }; } catch { storeProblem = { corrupt: null, raw }; }
   }
-  if (saved) state = { ...state, ...saved, settings: { ...clone(DEFAULT_SETTINGS), ...saved.settings }, roomsVersion: saved.roomsVersion || 1 };
+  if (saved) state = mergeSaved(state, saved, DEFAULT_SETTINGS);
 } catch { /* private mode: start fresh */ }
 migrateRooms();
 syncRooms();
@@ -164,52 +165,7 @@ function cleanStaffNames() {
 }
 cleanStaffNames();
 
-function migrateRooms() {
-  const t = state.roomTemplate;
-  if ((state.roomsVersion || 1) >= 2) return migratePacu();
-  const rename = (from, to) => {
-    t.forEach(r => { if (r.name === from) r.name = to; });
-    (state.day.rooms || []).forEach(r => { if (r.name === from) r.name = to; });
-    (state.roster?.rows || []).forEach(r => { if (r.label === from) r.label = to; });
-  };
-  rename('Remote Case', 'Remote 1');
-  const addAfter = (name, complex, after, before) => {
-    if (t.some(r => r.name === name)) return;
-    let i = t.findIndex(r => r.name === after);
-    if (i >= 0) i++; else i = Math.max(0, t.findIndex(r => r.name === before));
-    t.splice(i, 0, { complex, name, defaultOn: false });
-  };
-  addAfter('Remote 2', 'Other', 'Remote 1', 'KROR 2');
-  addAfter('KROR 1', 'KROR', null, 'KROR 2');
-  addAfter('MCOR 9', 'MCOR', 'MCOR 8', 'MCOR 10');
-  t.forEach(r => { if (r.defaultOn === undefined) r.defaultOn = true; });
-  state.roomsVersion = 2;
-  migratePacu();
-}
-
-// v3: a PACU row above each complex
-function migratePacu() {
-  if ((state.roomsVersion || 1) >= 3) return migrateEct();
-  const t = state.roomTemplate;
-  for (const [complex, name] of [['KROR', 'KROR PACU'], ['MCOR', 'MCOR PACU'], ['MOR', 'MBOR PACU']]) {
-    if (t.some(r => r.name === name)) continue;
-    const i = t.findIndex(r => r.complex === complex);
-    t.splice(i < 0 ? t.length : i, 0, { complex, name, defaultOn: true });
-  }
-  state.roomsVersion = 3;
-  migrateEct();
-}
-
-// v4: ECT moves from the calls to the OT rows, just above MBOR PACU
-function migrateEct() {
-  if ((state.roomsVersion || 1) >= 4) return;
-  const t = state.roomTemplate;
-  if (!t.some(r => r.name === 'ECT')) {
-    const i = t.findIndex(r => r.name === 'MBOR PACU');
-    t.splice(i < 0 ? t.length : i, 0, { complex: 'ECT', name: 'ECT', defaultOn: true });
-  }
-  state.roomsVersion = 4;
-}
+function migrateRooms() { migrateRoomsIn(state); } // (a declaration, so it can run before this line)
 
 let saveTimer, lastSaved = '', checkKey = '', clearedForGood = false, otherTab = false;
 function save() {

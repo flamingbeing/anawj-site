@@ -259,6 +259,8 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
 | `js/engine.js` | No DOM. Grades, postings, name matching (`matchName`, short names), case-note flags, `generate()` (Hungarian assignment, double cover, AOCC/AIC, covers, premeds), `check()`, contact merge, duplicates, import planning. |
 | `js/layout.js` | The sheet as cells; shared by the preview, the .xlsx and the PDF. |
 | `js/xlsxio.js` | Reading drafts, staff sheets and the contact list; writing the roster workbook. |
+| `js/store.js` | Loading saved data over a blank state (`mergeSaved`) and bringing old saved data up to date (`migrateRooms` v1→v4). Pure, tested. |
+| `js/ics.js` | Calendar files (.ics) for My day and My week. |
 | `js/rotations.js` | Junior rotations: weeks (by Monday), a junior's posting on a date, reading and writing the year's rotation as Excel. |
 | `js/monthly.js` | The HMS monthly rosters: column definitions, PDF/Excel reading, Excel writing, what each roster means for a date. |
 | `js/pdfout.js` | The roster PDF from the layout. |

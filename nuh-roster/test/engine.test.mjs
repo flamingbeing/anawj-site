@@ -434,3 +434,25 @@ console.log('engine tests passed');
   assert.equal(dateFromText(''), null);
   console.log('draft date tests passed');
 }
+
+{
+  // saved data from the first versions of the app comes up to date
+  const { mergeSaved, migrateRooms } = await import('../js/store.js');
+  const { DEFAULT_SETTINGS } = await import('../js/engine.js');
+  const v1 = { staff: [], settings: { premedCap: 2 }, roomTemplate: [{ complex: 'Other', name: 'Remote Case' }, { complex: 'KROR', name: 'KROR 2' }, { complex: 'MCOR', name: 'MCOR 8' }, { complex: 'MCOR', name: 'MCOR 10' }, { complex: 'MOR', name: 'MOR 1' }],
+    day: { rooms: [{ name: 'Remote Case' }] }, roster: { rows: [{ label: 'Remote Case' }] } };
+  const st = mergeSaved({ settings: {}, roomTemplate: [] }, JSON.parse(JSON.stringify(v1)), DEFAULT_SETTINGS);
+  assert.equal(st.roomsVersion, 1);
+  assert.equal(st.settings.premedCap, 2, 'saved settings kept');
+  assert.equal(st.settings.subspecs.length, DEFAULT_SETTINGS.subspecs.length, 'new settings get their defaults');
+  migrateRooms(st);
+  const names = st.roomTemplate.map(r => r.name);
+  assert.equal(st.roomsVersion, 4);
+  assert.deepEqual(names, ['Remote 1', 'Remote 2', 'KROR PACU', 'KROR 1', 'KROR 2', 'MCOR PACU', 'MCOR 8', 'MCOR 9', 'MCOR 10', 'ECT', 'MBOR PACU', 'MOR 1']);
+  assert.equal(st.day.rooms[0].name, 'Remote 1'); assert.equal(st.roster.rows[0].label, 'Remote 1');
+  assert.equal(st.roomTemplate.find(r => r.name === 'MOR 1').defaultOn, true);
+  assert.equal(st.roomTemplate.find(r => r.name === 'KROR 1').defaultOn, false);
+  const again = JSON.stringify(st); migrateRooms(st); assert.equal(JSON.stringify(st), again, 'running it twice changes nothing');
+  assert.equal(mergeSaved('blank', null, DEFAULT_SETTINGS), 'blank');
+  console.log('saved data migration tests passed');
+}
