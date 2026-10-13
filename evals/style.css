@@ -600,3 +600,10 @@ body { background: var(--e-bg-group); }
 .e-inapp, .e-wrongacct { border-left: 4px solid var(--e-warn); text-align: left; }
 .e-inapp .e-actions, .e-wrongacct .e-actions { justify-content: flex-start; }
 .e-remind { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+
+/* Progress: filter chips and "Ask for next" */
+.e-chip-btn { min-height: 40px; padding: 0 14px; border: 1px solid var(--n-line-input); border-radius: 999px; background: var(--e-surface); color: var(--n-ink); font: inherit; font-size: var(--n-text-sm); cursor: pointer; }
+.e-chip-btn[aria-pressed="true"] { background: var(--e-select); border-color: var(--e-select); color: var(--e-on-accent); font-weight: var(--n-bold); }
+.e-next .e-list { margin: 0 -16px -12px; }
+.e-next__go { display: inline-flex; align-items: center; gap: 4px; color: var(--e-go); font-weight: var(--n-bold); font-size: var(--n-text-sm); white-space: nowrap; }
+.e-next__go .e-ico { width: 16px; height: 16px; }

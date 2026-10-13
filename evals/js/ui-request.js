@@ -114,7 +114,7 @@ const facultyByEmail = email => (S.faculty || []).find(f => f.email === email) |
 // Group progress (done/min) for every item, from my submitted evaluations.
 export function itemProgress() {
   const map = new Map();
-  for (const p of progress(S.mine, myYear())) for (const { item } of p.items) map.set(item.id, p);
+  for (const p of progress(S.mine, myYear(), todayISO())) for (const { item } of p.items) map.set(item.id, p);
   return map;
 }
 
@@ -406,7 +406,7 @@ function stepItem() {
         : h('p', { class: 'e-rq-hint' }, 'Nothing matches. Try another word, or browse by EPA below.'));
   }
   const last = lastRequest();
-  const due = [...new Set(dueItems(S.mine, myYear()).map(i => i.id))].slice(0, 5).map(itemById);
+  const due = [...new Set(dueItems(S.mine, myYear(), todayISO()).map(i => i.id))].slice(0, 5).map(itemById);
   const recentIds = [...new Set([...S.mine].sort(byNew).map(ev => ev.itemId).filter(id => itemById(id)))].slice(0, 5);
   const repeat = last && !F.assessor ? h('button', { type: 'button', class: 'e-row', onclick: () => {
     F.itemId = last.itemId;
