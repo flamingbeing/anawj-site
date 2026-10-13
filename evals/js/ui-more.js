@@ -117,7 +117,7 @@ function demoCard() {
 
 function settingsCard() {
   const on = store.get(AUTOSCROLL_KEY) !== 'off';
-  const box = h('input', { type: 'checkbox', id: 'more-autoscroll', checked: on, onchange: e => {
+  const box = h('input', { type: 'checkbox', role: 'switch', id: 'more-autoscroll', checked: on, onchange: e => {
     store.set(AUTOSCROLL_KEY, e.target.checked ? null : 'off');
     toast(e.target.checked ? 'Auto-scroll on' : 'Auto-scroll off');
   } });
@@ -126,7 +126,7 @@ function settingsCard() {
   paintTheme();
   return h('section', { class: 'e-card' },
     h('h2', { class: 'e-h3' }, 'Settings'),
-    h('label', { class: 'e-check', for: 'more-autoscroll' }, box,
+    h('label', { class: 'e-check e-switch', for: 'more-autoscroll' }, box,
       h('span', {}, h('b', {}, 'Scroll to the next question'), h('br'), h('span', { class: 'e-small' }, 'After you answer a question on a form. Saved on this device.'))),
     h('p', { style: 'margin:16px 0 4px' }, h('b', {}, 'Theme')),
     h('div', { class: 'e-more-theme' }, theme),
