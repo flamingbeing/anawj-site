@@ -475,3 +475,6 @@ dialog.key { max-width: 640px; }
 .how details { border-bottom: 1px solid var(--line); padding: 6px 0; }
 .how summary { cursor: pointer; font-weight: 600; color: var(--navy); }
 .how p { margin: 6px 0 2px; }
+table.rot tfoot th, table.rot tfoot td { font-size: 11px; color: #595e65; text-align: center; border-top: 1px solid var(--line); }
+table.rot tfoot th.who { text-align: left; }
+table.rot tfoot td.none { color: var(--red); font-weight: 700; background: #fdecee; }
