@@ -23,6 +23,10 @@ Static site on GitHub Pages (public repo: no names, patient data or real evaluat
 
 Rules that bite:
 
+- The homepage (`index.html`) only shows whether the server is up or down (owner, Oct 2026). Apps stay unlisted:
+  never link them from the homepage, and give each app page `<meta name="robots" content="noindex, nofollow">`
+  (GitHub Pages ignores `_headers`, so the meta tag is what keeps anawj.com out of search engines).
+
 - `logbook/firestore.rules` is the one rules file for both logbook and evals (Firebase project `apmes-logbook`). It deploys automatically on merge to main; never ask the owner to paste rules.
 - `nuh-roster/firestore.rules` (Firebase project `nuh-roster`) and `prewarm/firestore.rules` (project `prewarm-study`) deploy the same way.
   How: `.github/workflows/deploy-firestore-rules.yml` deploys a changed file to its project on merge to main
