@@ -312,3 +312,8 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   `pointsFor` shows only the timepoints that have a time or a reading (all, if none has), so no time is offered for
   logging and the strip has no empty tabs; opening a hidden one goes to the default point. The bottom of Settings and
   home shows the app version (the saved copy's name) to spot a phone stuck on an old one.
+- **Stale banner and bare times** (owner, 13 Oct 2026): (1) "Update available" posted `skipWaiting` to the worker it had
+  captured, which can be replaced by a newer one when several updates ship in a row, so on Firefox the tap did nothing.
+  It now asks the current waiting worker, hides the banner, and if nothing takes over in 3 s clears the app's saved
+  copy (never the patients) and reloads. (2) A blank or cleared save leaves a bare `at_…` time with no readings; a point
+  counts as having data only if it has a reading (`hasData`), and `p.f[...]` truthiness is never used (cleared records stay).

@@ -685,6 +685,9 @@ jobs.push(() => tryit(async () => {
   await open(pg, 1);
   const id = (await pg.evaluate(() => location.hash)).split('/')[2];
   const strip = () => pg.$$eval('.strip a', as => as.map(a => a.textContent.trim()).join('|'));
+  // a bare time left behind by a blank save (no readings) doesn't keep a point visible
+  await pg.evaluate(i => { const k = 'prewarm-demo:patients', all = JSON.parse(localStorage.getItem(k)); all[i].f.at_prewarm_15 = { v: '08:50', t: Date.now(), by: 'T' }; localStorage.setItem(k, JSON.stringify(all)); }, id);
+  await pg.reload(); await pg.waitForTimeout(600);
   await pg.evaluate(h => { location.hash = h; }, `#/p/${id}/prewarm`); await pg.waitForSelector('[data-sign="prewarm"]');
   const before = await strip();
   await pg.click('[data-sign="prewarm"]'); await pg.waitForSelector('.sealnote');
