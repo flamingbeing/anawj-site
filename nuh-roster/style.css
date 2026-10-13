@@ -478,3 +478,12 @@ dialog.key { max-width: 640px; }
 table.rot tfoot th, table.rot tfoot td { font-size: 11px; color: #595e65; text-align: center; border-top: 1px solid var(--line); }
 table.rot tfoot th.who { text-align: left; }
 table.rot tfoot td.none { color: var(--red); font-weight: 700; background: #fdecee; }
+.demo-tools > summary { cursor: pointer; font-size: 13px; color: var(--navy); }
+.demo-tools[open] > summary { display: none; }
+.demo-actions { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+@media (max-width: 600px) {
+  .demo-bar { flex-wrap: wrap; }
+  .demo-bar .demo-text { display: none; }
+  .demo-tools[open] > summary { display: block; margin-bottom: 4px; }
+  .demo-tools { order: 3; flex-basis: 100%; }
+}

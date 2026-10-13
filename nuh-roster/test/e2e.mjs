@@ -167,6 +167,12 @@ ok((await page.$$('.myweek-list li')).length === 7, 'My week has 7 days');
 await shot(page, 'myday');
 await page.context().close();
 
+// ---- a practice link with a scenario: the late MCs show as problems to fix ----
+page = await newPage({ width: 1300, height: 900 });
+await page.goto(BASE + '?demo=latemc'); await page.waitForTimeout(1200);
+ok((await problems(page)).filter(t => /is on MC but rostered/.test(t)).length === 2, 'late MC scenario');
+await page.context().close();
+
 // ---- the real app, empty: welcome card, tour points to Practice ----
 page = await newPage({ width: 390, height: 844 });
 await page.goto(BASE); await page.waitForTimeout(700);

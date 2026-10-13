@@ -236,7 +236,9 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
 - Practice (13 Oct): the bar has "Fix 3 problems" (makes the roster and plants someone on leave on a list, a room
   with no senior and a double cover with no junior; a checklist card on Roster ticks each off from the live checks)
   and "Reset this day" (with Undo). Cases has "Download a practice draft" (the admin team's format, cases in column L)
-  so "Do it all" can be practised.
+  so "Do it all" can be practised. "Try a morning…" (Practice bar) sets up Short-staffed (seniors away until some rooms
+  are double covered), Late MC at 7am (a senior and a junior on the roster go MC) or A weekend; the same as links for a
+  trainer to send: `?demo=short`, `?demo=latemc`, `?demo=weekend` (once per visit; no tour on those links).
 - Download › "Image in 2 parts": the calls and lists, then the OT rooms (each with the title and date), so neither is
   shrunk past reading when WhatsApp compresses a tall photo (`buildRosterCanvas(layout, width, spans)`, `layout.otFrom`).
 - The draft's date (C5) is read by `dateFromText` (ISO, day-first d/m/y, "14 Oct 2026"), not `new Date()`, which reads
