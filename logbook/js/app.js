@@ -49,6 +49,7 @@ const ICONS = {
   sendto: 'M4 12l16-8-6 16-3-7z',
   bin: 'M4 7h16M10 11v6M14 11v6M5 7l1 13h12l1-13M9 7V4h6v3',
   notes: 'M6 3h9l4 4v14H6zM14 3v5h5M9 12h7M9 16h5',
+  notesset: 'M6 3h9l4 4v14H6zM14 3v5h5M9 12h7M9 16h5',
   more: 'M5 12h.01M12 12h.01M19 12h.01M4 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0M11 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0M18 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0',
 };
 const icon = id => {
