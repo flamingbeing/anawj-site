@@ -135,4 +135,45 @@ const PARTS = ['interesting', 'parsed', 'sugg', 'recent', 'still', 'groupsave', 
   assert.ok(tabsAfter(['account'], 'basic', 'logbook').includes('progress'));
 }
 
+// the cloud's write paths: settings keys whole (a map like markdown too), `show` key by key (bug: Firestore's plain
+// merge kept markdown keys a new value left out, so a format set back to its default stayed custom)
+{
+  assert.deepEqual(P.mergePaths({ settings: { markdown: { links: 'md' }, show: { grid: false, 'case:plan': null }, mode: 'basic' }, email: 'e', updatedAt: 1 }),
+    [['settings', 'markdown'], ['settings', 'show', 'grid'], ['settings', 'show', 'case:plan'], ['settings', 'mode'], ['email'], ['updatedAt']]);
+  assert.deepEqual(P.mergePaths({ settings: { show: null } }), [['settings', 'show']], 'null clears the whole map');
+  assert.deepEqual(P.mergePaths({ profile: { a: 1 }, settings: null }), [['profile'], ['settings']]);
+  // and the local copy / demo agree: markdown replaced, show merged
+  assert.deepEqual(mergeSettings({ markdown: { dateFormat: 'long' }, show: { grid: false } }, { markdown: { links: 'md' }, show: { analytics: false } }),
+    { markdown: { links: 'md' }, show: { grid: false, analytics: false } });
+}
+
+// a settings file from before `show` (mode, basicOn, caseHide): its lists become the switches, winning over the
+// account's own (bug: the account's show.grid=false kept the grid hidden though the file turned it on)
+{
+  const old = P.legacyShow({ mode: 'basic', basicOn: ['grid', 'case:plan'], caseHide: [] }, 'basic');
+  assert.deepEqual(old, { grid: true, 'case:plan': true });
+  const show = replaceShow({ grid: false, 'case:plan': false, analytics: true }, old);
+  assert.equal(shownIn({ basicOn: ['grid', 'case:plan'], show }, 'basic', 'grid'), true);
+  assert.equal(shownIn({ show }, 'basic', 'case:plan'), true);
+  assert.equal(shownIn({ show }, 'basic', 'analytics'), false, 'the account’s other switches go back to the profile');
+  assert.deepEqual(P.legacyShow({ mode: 'advanced', caseHide: ['quick', 'plan'] }, 'advanced'), { 'case:sugg': false, 'case:recent': false, 'case:plan': false });
+  assert.equal(P.legacyShow({ show: { grid: true }, basicOn: ['grid'] }, 'basic'), null, 'a file with show uses its show');
+  assert.equal(P.legacyShow({ weekStart: 0 }, 'basic'), null);
+}
+
+// the old combined part 'case:quick': a reset of either half clears it (bug: Reset this group left both hidden)
+{
+  const st = { show: { 'case:quick': false } };
+  const all = mergeSettings(st, resetPatch(st, ['case:interesting', 'case:sugg', 'case:recent', 'case:groupsave', 'case:plan']));
+  assert.equal(shownIn(all, 'advanced', 'case:sugg'), true); assert.equal(shownIn(all, 'advanced', 'case:recent'), true);
+  assert.deepEqual(switchChanges(all, 'advanced'), { on: [], off: [] }, 'not Custom any more');
+  // one half reset: the other keeps the old value
+  const one = mergeSettings(st, resetPatch(st, ['case:sugg']));
+  assert.equal(shownIn(one, 'advanced', 'case:sugg'), true); assert.equal(shownIn(one, 'advanced', 'case:recent'), false);
+  // one half switched: the other keeps the old value, and 'quick' goes
+  const sw = mergeSettings(st, switchPatch(st, 'case:sugg', true, PARTS));
+  assert.equal(shownIn(sw, 'advanced', 'case:sugg'), true); assert.equal(shownIn(sw, 'advanced', 'case:recent'), false);
+  assert.equal(sw.show['case:quick'], null);
+}
+
 console.log('profiles tests passed');

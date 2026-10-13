@@ -37,7 +37,8 @@ const IMG_ID = /^[A-Za-z0-9_-]{1,100}$/;
 // Whitelist and cap a reflection before it is stored (Firestore rules check the same).
 // Shape: title, summary, points [{ heading, text }], figures [{ id, caption, point }], references [string];
 // legacy reflections carry sections { description, thoughts, ... } instead, which are kept.
-export function cleanReflection(r, now = Date.now()) {
+// (stamped after the version it replaces, as cleanCase)
+export function cleanReflection(r, now = Math.max(Date.now(), (Number(r && r.updatedAt) || 0) + 1)) {
   const L = LIMITS;
   const id = r.id ? String(r.id).slice(0, 100) : now.toString(36) + Math.random().toString(36).slice(2, 10);
   const h = HEADING_BY_ID[r.headingId];

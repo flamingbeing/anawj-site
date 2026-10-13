@@ -72,6 +72,24 @@ try { for (const width of [390, 1280]) {
   assert.equal(await p.getByLabel('Note text').inputValue(), 'Fake laptop line\n\nFake phone line');
   assert.equal(await p.evaluate(async () => (await import('./js/ui-core.js')).writes.entries().filter(x => x.state === 'conflict').length), 0);
   await p.getByRole('button', { name: 'Done' }).click();
+  // on a slow connection the save is accepted (180 ms) before the server answers: the conflict found later is still
+  // merged with what was typed (bug: it was merged against the just-accepted copy, and the new line was lost)
+  await p.evaluate(async () => { const { writes, cloud } = await import('./js/ui-core.js'); writes.configure({ backend: async (...a) => { await new Promise(r => setTimeout(r, 600)); return cloud.commitRecord(...a); } }); });
+  await openDay('2025-01-07');
+  await p.locator('.note-editor').waitFor();
+  await p.getByLabel('Note text').fill('Fake phone A');
+  await saved(p);
+  const jobState = () => p.evaluate(async () => (await import('./js/ui-core.js')).writes.entries().find(x => x.record.id === 'day-2025-01-07')?.state);
+  for (let i = 0; i < 50 && await jobState() !== 'synced'; i++) await p.waitForTimeout(100);
+  assert.equal(await jobState(), 'synced');
+  await p.getByLabel('Note text').fill('Fake phone A\nFake phone C');
+  await remote('2025-01-07', 'Fake phone A\n\nFake laptop B');
+  for (let i = 0; i < 100 && !/Fake laptop B[\s\S]*Fake phone C/.test((await dayNote(p, '2025-01-07'))?.body || ''); i++) await p.waitForTimeout(100);
+  await saved(p);
+  assert.equal((await dayNote(p, '2025-01-07')).body, 'Fake phone A\n\nFake laptop B\n\nFake phone C');
+  assert.equal(await p.getByLabel('Note text').inputValue(), 'Fake phone A\n\nFake laptop B\n\nFake phone C');
+  await p.evaluate(async () => { const { writes, cloud } = await import('./js/ui-core.js'); writes.configure({ backend: cloud.commitRecord }); });
+  await p.getByRole('button', { name: 'Done' }).click();
 
   // Notes: Today's note, the Daily notes chip, and daily notes not counted in MAX_NOTES (2,000)
   await p.goto(base + '?demo#notes');
@@ -80,14 +98,14 @@ try { for (const width of [390, 1280]) {
   await p.getByRole('button', { name: '+ New note' }).click();
   await p.getByLabel('Note title').fill('Fake other note');
   await p.getByRole('button', { name: 'Done' }).click();
-  await p.waitForFunction(() => document.querySelectorAll('ul.notes-rows li').length === 4);
+  await p.waitForFunction(() => document.querySelectorAll('ul.notes-rows li').length === 5);
   assert.match(await p.locator('.notes-count').innerText(), /^1 of 2000$/);
   await p.getByRole('button', { name: 'Daily notes' }).click();
-  assert.equal(await p.locator('ul.notes-rows li').count(), 3);
+  assert.equal(await p.locator('ul.notes-rows li').count(), 4);
   assert.match(await p.locator('ul.notes-rows li').first().innerText(), /Daily note/);
   assert.match(await p.locator('.notes-filter').innerText(), /Daily notes/);
   await p.getByRole('button', { name: 'Show all' }).click();
-  assert.equal(await p.locator('ul.notes-rows li').count(), 4);
+  assert.equal(await p.locator('ul.notes-rows li').count(), 5);
   await p.getByRole('button', { name: 'Today’s note' }).click();
   await p.locator('.note-editor').waitFor();
   assert.match(await p.getByLabel('Note text').inputValue(), /^Fake day/);

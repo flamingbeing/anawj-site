@@ -48,6 +48,7 @@ function wordLists(src) {
     });
 }
 
+const CODE = new Set(['code', 'kbd', 'samp', 'tt']);
 export function htmlToMarkdown(html) {
   let src = String(html || '');
   // what the clipboard wraps around the copied part (Windows), comments and everything that isn't text
@@ -58,7 +59,7 @@ export function htmlToMarkdown(html) {
   const marks = [];        // open bold / italic: { mark, opened }
   const lists = [];        // { ordered, n }
   const links = [];        // { at, href }
-  let pre = 0, table = null, quote = 0;
+  let pre = 0, table = null, quote = 0, code = 0;
   const tail = () => /\n*$/.exec(out)[0].length;
   const brk = n => {
     if (table && table.cell) { if (!/ $/.test(out)) out += ' '; return; }
@@ -74,6 +75,8 @@ export function htmlToMarkdown(html) {
   // spaces, so there is never "** **" or "**word **"
   const openPending = () => { for (const m of marks) if (!m.opened) { out += m.mark; m.opened = true; } };
   const text = t => {
+    // inline code keeps its spaces (only line breaks become spaces), as pre keeps everything
+    if (code && !pre) { t = t.replace(/\r?\n/g, ' ').replace(/`/g, "'"); if (t) { openPending(); out += t; } return; }
     if (!pre) t = t.replace(/[\s\u00a0]+/g, ' ');
     if (!t) return;
     if (!pre && lineStart()) t = t.replace(/^ +/, '');
@@ -133,6 +136,8 @@ export function htmlToMarkdown(html) {
       else if (tag === 'hr') { brk(2); out += '---'; brk(2); }
       else if (BLOCK2.has(tag)) brk(2);
       else if (BLOCK1.has(tag)) brk(1);
+      // inline code (not inside a code block): between backticks, so nothing in it is tidied
+      if (CODE.has(tag) && !pre && !selfClose) { if (!code) { openPending(); out += '`'; } code++; }
       if (tag === 'a') links.push({ at: out.length, href: safeLink(attr(attrs, 'href')), marks: marks.length });
       const opened = styleMarks(tag, attrs);
       for (const mk of opened) marks.push({ mark: mk, opened: false });
@@ -147,11 +152,17 @@ export function htmlToMarkdown(html) {
     for (const el of closing.reverse()) {
       for (const mk of [...el.opened].reverse()) closeMark(mk);
       const t = el.tag;
+      if (CODE.has(t) && code && !pre) { code--; if (!code) out = /`$/.test(out) ? out.slice(0, -1) : out + '`'; }
       if (t === 'a') {
         const l = links.pop();
         if (l) {
-          const inner = out.slice(l.at), label = inner.trim();
-          if (l.href && label && label !== l.href && !/\n/.test(label)) out = out.slice(0, l.at) + inner.replace(label, `[${label.replace(/[[\]*]/g, '')}](${l.href})`);
+          // a bold or italic run that starts with the link opened its mark inside it: the mark goes in front of the [
+          let inner = out.slice(l.at), lead = '';
+          const mk = /^(\s*)(\*{1,3})(?=\S)/.exec(inner);
+          if (mk && !inner.trimEnd().endsWith(mk[2])) { lead = mk[0]; inner = inner.slice(lead.length); }
+          const label = inner.trim();
+          // (a function, so a $ in the label is never read as a replacement pattern)
+          if (l.href && label && label !== l.href && !/\n/.test(label)) out = out.slice(0, l.at) + lead + inner.replace(label, () => `[${label.replace(/[[\]*]/g, '')}](${l.href})`);
           else if (l.href && !label) out += l.href;
         }
       } else if (t === 'ul' || t === 'ol') { lists.pop(); brk(lists.length ? 1 : 2); }
@@ -172,6 +183,24 @@ export function htmlToMarkdown(html) {
   return tidyMarkdown(out);
 }
 
+// ** pairs in one line, left to right: ** around nothing go, and spaces just inside a pair move out of it
+function boldSpaces(l) {
+  const parts = l.split('**');
+  if (parts.length < 3) return l;
+  let out = parts[0];
+  for (let i = 1; i < parts.length; i += 2) {
+    const inner = parts[i], after = parts[i + 1];
+    if (after === undefined) { out += '**' + inner; break; }   // a lone ** (2**3) stays
+    if (!inner.trim()) out += inner + after;
+    else if (inner.includes('*')) out += '**' + inner + '**' + after;
+    else {
+      const lead = /^\s*/.exec(inner)[0], trail = /\s*$/.exec(inner)[0];
+      out += lead + '**' + inner.trim() + '**' + trail + after;
+    }
+  }
+  return out;
+}
+
 // Tidy Markdown that is already in the note (or just converted). Changes only what is clearly a leftover; code (```
 // fences) is left exactly as it is.
 export function tidyMarkdown(md) {
@@ -183,18 +212,20 @@ export function tidyMarkdown(md) {
     let l = line.replace(/\s+$/, '');
     // escapes some exports add (UpNote, Notion, OneNote via converters): 1\. \- \* \# \[ … become plain; a real
     // backslash (\\server\share, C:\path) stays, and so does anything inside `code`
-    l = l.split(/(`[^`]*`)/).map((part, i) => (i % 2 ? part : part.replace(/(^|[^\\])\\([`*_{}[\]()#+\-.!|>~])/g, '$1$2'))).join('');
+    // Only where an export puts them: \* \_ \[ \] \~ \` \# anywhere, and \- \+ \> \| 1\. at the start of a line, so a
+    // pasted regex or path (^\d+\.\s, \(x\)) keeps its backslashes
+    l = l.split(/(`[^`]*`)/).map((part, i) => (i % 2 ? part : part.replace(/(^|[^\\])\\([`*_[\]~#])/g, '$1$2'))).join('')
+      .replace(/^(\s*)\\([-+>|])/, '$1$2').replace(/^(\s*\d+)\\\./, '$1.');
     // bullets typed or pasted as symbols, and to-do boxes as symbols (☒ is left: it often means "no")
     l = l.replace(/^(\s*)[☐□]\s*/, '$1- [ ] ').replace(/^(\s*)[☑✅✓✔]\s+/, '$1- [x] ')
       .replace(/^(\s*)[•·◦▪▫●○■➢►‣⁃]\s*/, '$1- ')
       .replace(/^(\s*)([-*+])\s*\[\s?\]\s*/, '$1$2 [ ] ').replace(/^(\s*)([-*+])\s*\[[xX]\]\s*/, '$1$2 [x] ');
     // ** or __ around nothing, and marks with the spaces inside them moved out
-    l = l.replace(/\*\*(\s*)\*\*/g, '$1').replace(/__(\s*)__/g, '$1')
-      .replace(/\*\*(\s+)([^\s*](?:[^*\n]*[^\s*])?)\*\*/g, '$1**$2**')
-      .replace(/\*\*([^\s*](?:[^*\n]*[^\s*])?)(\s+)\*\*/g, '**$1**$2');
+    // (the ** are paired left to right first, so the end of one bold and the start of the next never pair up)
+    l = boldSpaces(l.replace(/__(\s*)__/g, '$1'));
     // double spaces inside the line; the indent of a nested list stays (spaces moved out of a mark don't make one)
     const indent = /^\s*/.exec(line.trimEnd())[0];
-    return indent + l.trimStart().replace(/ {2,}/g, ' ');
+    return indent + l.trimStart().split(/(`[^`]*`)/).map((part, i) => (i % 2 ? part : part.replace(/ {2,}/g, ' '))).join('');
   }).join('\n');
   // a list broken up by blank lines (loose lists from some exports) becomes one list; two lists of different kinds
   // (bullets, then numbers) side by side stay apart

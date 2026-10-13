@@ -93,7 +93,14 @@ export function driveRemote(token) {
         if (meta.trashed || rev(meta) !== prev.rev) throw conflict();
         return { rev: rev(await upload(`${DRIVE_UP}/${encodeURIComponent(prev.id)}`, 'PATCH', {}, text)) };
       }
-      const parent = await folder(dirs, true);
+      let parent = await folder(dirs, true);
+      // the folder remembered this visit may have been binned or deleted in Drive since (a file put there would be
+      // out of sight, and gone when the bin is emptied): checked, and looked up (or made) again if so
+      const there = await call(`${DRIVE}/${encodeURIComponent(parent)}?fields=trashed`);
+      if (there.status === 404 || (there.ok && (await there.json()).trashed)) {
+        for (const k of [...folderIds.keys()]) if (k === FOLDER || k.startsWith(FOLDER + '/')) folderIds.delete(k);
+        parent = await folder(dirs, true);
+      }
       if ((await findAll(driveQuery(name, { parent }))).length) throw conflict();   // made by another device meanwhile
       return { rev: rev(await upload(DRIVE_UP, 'POST', { name, parents: [parent], mimeType: 'text/markdown' }, text)) };
     },
@@ -146,9 +153,11 @@ export function githubRemote(target, token) {
       const d = await detail(res), wait = rateLimitWait(res.status, k => res.headers.get(k), d);
       // a limit, not the token: this place stops for the run (the days done are kept), and says when to try again
       if (wait) throw fail(`GitHub is limiting requests: try again in about ${wait} minute${wait === 1 ? '' : 's'}. The days already synced are kept.`, { auth: true, limited: true });
-      throw fail(`GitHub: not allowed (${d.slice(0, 120)}). The token needs Contents: read and write on ${target.owner}/${target.repo}.`);
+      // (the token's rights or the repository are wrong: every other day would fail the same way, so the place stops)
+      throw fail(`GitHub: not allowed (${d.slice(0, 120)}). The token needs Contents: read and write on ${target.owner}/${target.repo}.`, { auth: true });
     }
-    if (res.status === 404) throw fail(`GitHub: ${target.owner}/${target.repo} (branch ${target.branch}) not found, or the token can’t see it.`);
+    // (a read's 404 is "no file yet"; a write's means the repository or branch is missing, or hidden from the token)
+    if (res.status === 404) throw fail(`GitHub: ${target.owner}/${target.repo} (branch ${target.branch}) not found, or the token can’t see it.`, { auth: true });
     if (!res.ok) throw fail(`GitHub: ${res.status} ${(await detail(res)).slice(0, 160)}`);
     return res.json();
   };
@@ -166,7 +175,7 @@ export function githubRemote(target, token) {
       // keep under GitHub's limit on bursts of writes (a first sync of a year is hundreds of commits)
       for (let ms; (ms = paceWait(ghPuts, Date.now())) > 0;) await new Promise(r => setTimeout(r, ms));
       ghPuts.push(Date.now());
-      if (ghPuts.length > 200) ghPuts.splice(0, ghPuts.length - 200);
+      if (ghPuts.length > 600) ghPuts.splice(0, ghPuts.length - 600);   // (an hour's worth, for paceWait)
       const res = await fetch(url(path), { method: 'PUT', headers: { ...headers, 'Content-Type': 'application/json' }, cache: 'no-store',
         body: JSON.stringify({ message: `Logbook: ${path.split('/').pop()}`, content: toBase64(text), branch: target.branch, ...(prev ? { sha: prev.rev } : {}) }) });
       // 409: the sha is old; 422 "sha wasn't supplied": a file appeared meanwhile

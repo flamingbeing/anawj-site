@@ -10,7 +10,8 @@ export const destinations = () => cleanDestinations(settings().destinations);
 
 // the ledger of what was sent from this device, per signed-in account
 const ledgerKey = () => 'apmes-logbook-sent:' + String((S.user && S.user.email) || (S.logbook && S.logbook.email) || 'local').toLowerCase();
-const readLedger = () => { try { return cleanLedger(JSON.parse(localStorage.getItem(ledgerKey()) || '{}')); } catch { return {}; } };
+// (places removed since are dropped, so they never crowd out the ones in use)
+const readLedger = () => { try { return cleanLedger(JSON.parse(localStorage.getItem(ledgerKey()) || '{}'), destinations().map(d => d.id)); } catch { return {}; } };
 const writeLedger = l => { try { localStorage.setItem(ledgerKey(), JSON.stringify(l)); } catch { /* storage blocked: the app still works, it just forgets */ } };
 
 // open a link: a home-screen app opens another app by a plain navigation; web links open in a new tab
@@ -21,9 +22,9 @@ function openLink(url) {
   document.body.append(a); a.click(); a.remove();
 }
 
-async function sendTo(dest, { text, title, date }) {
+async function sendTo(dest, { text, title, date, fileDate }) {
   if (!(await okNoIds(text))) return false;
-  const { url, tooLong } = sendLink(dest, { content: text, title, date });
+  const { url, tooLong } = sendLink(dest, { content: text, title, date, fileDate });
   if (tooLong) {
     if (!(await copyText(text, 'Copied: paste it in the app'))) return false;
   }
@@ -33,7 +34,8 @@ async function sendTo(dest, { text, title, date }) {
 }
 
 // Send… for a day (date given: remembers what was sent) or a case. `text` is the Markdown to send.
-export function openSend({ text, title = 'Logbook', date = '' }) {
+// fileDate: a case's day, for the file name only
+export function openSend({ text, title = 'Logbook', date = '', fileDate = '' }) {
   const list = destinations();
   if (!list.length) {
     toast('No place to send to yet', { action: 'Set up', onaction: () => { location.hash = '#sendto'; } });
@@ -43,7 +45,7 @@ export function openSend({ text, title = 'Logbook', date = '' }) {
   const m = modal('Send to…', h('div', { class: 'row-menu-list' },
     list.map(d => {
       const st = date ? sentState(ledger, d.id, date, text) : 'new';
-      return h('button', { onclick: async () => { if (await sendTo(d, { text, title, date })) m.close(); } },
+      return h('button', { onclick: async () => { if (await sendTo(d, { text, title, date, fileDate })) m.close(); } },
         d.name, ' ', h('small', { class: 'hint' }, st === 'same' ? 'sent, unchanged' : st === 'changed' ? 'changed since sent' : linkHost(d.uri)));
     }),
     h('button', { class: 'linkish', onclick: () => { m.close(); location.hash = '#sendto'; } }, 'Set up places to send to'),

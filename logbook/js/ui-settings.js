@@ -529,8 +529,11 @@ const groupReset = (what, run, question = `Put ${what} back to the profile’s d
   await run(); hooks.render(); toast('Back to the defaults');
 } }, 'Reset this group'));
 const sw = (label, on, set, hint) => [h('label', { class: 'check' }, h('input', { type: 'checkbox', role: 'switch', 'aria-label': label, checked: !!on, onchange: e => set(e.target.checked) }), label), hint ? h('p', { class: 'hint help' }, hint) : null];
-// a profile switch (profiles.js), saved for the account
-const presetSwitch = ([k, label]) => sw(label, shows(k), v => setShown(k, v, partIds()).then(() => hooks.render()));
+// a profile switch (profiles.js), saved for the account. These show only with the targets' counts: while that is off,
+// one switched on says so (rather than seeming to do nothing)
+const NEEDS_TARGETS = ['case:still', 'totals', 'year', 'saveToast'];
+const presetSwitch = ([k, label]) => sw(label, shows(k), v => setShown(k, v, partIds()).then(() => hooks.render()),
+  NEEDS_TARGETS.includes(k) && shows(k) && !shows('targets') ? 'Shows only with Counts against the APMES targets on.' : undefined);
 const switchGroup = g => SWITCHES.filter(x => x[2] === g);
 export function renderShowHide() {
   const st = settings(), d = display();

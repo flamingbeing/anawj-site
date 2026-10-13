@@ -20,6 +20,7 @@
 import { FIREBASE_CONFIG } from './firebase-config.js';
 import { checkWrite } from './recovery-store.js';
 import { cleanProfile } from './profile.js';
+import { mergePaths } from './profiles.js';
 import { cleanNote } from './notepad.js';
 import { createSyncHub, eachSettled, SKEW } from './sync.js';
 import { openStore, wipeStores } from './store.js';
@@ -335,7 +336,9 @@ export async function saveLogbook(email, patch) {
   email = lc(email);
   const { db, F } = await sdk();
   const doc = plain({ ...patch, ...(patch && 'profile' in patch ? { profile: cleanProfile(patch.profile) } : {}), email, updatedAt: Date.now() });
-  await queued(F.setDoc(F.doc(db, 'logbooks', email), doc, { merge: true }));
+  // each settings key replaced whole, `show` key by key (profiles.js mergePaths; a plain merge would keep the keys a
+  // map like settings.markdown leaves out)
+  await queued(F.setDoc(F.doc(db, 'logbooks', email), doc, { mergeFields: mergePaths(doc).map(p => new F.FieldPath(...p)) }));
   return doc;
 }
 
