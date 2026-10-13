@@ -76,6 +76,8 @@ and builds a preview for every PR.
 - **Sign-in helper pages on `apmes.`:** `apmes.anawj.com/__/auth/` and `/__/firebase/` serve Firebase's sign-in helper
   pages (the same scripts as `anawj.com/__/auth/`; `apmes-auth/firebase/init.json` is `apmes.`'s own copy with
   `authDomain` `apmes.anawj.com`). Only that host serves them. `anawj.com/__/` stays as it is until nothing uses it.
+- **The guidebook on `apmes.`:** `apmes.anawj.com/apmes/guidebook/` serves just that folder of `apmes/` (the evals app reads
+  `../apmes/guidebook/dops-expectations.md`); the rest of `apmes/` is not served there.
 - Any other address (the previews on `workers.dev`, the copy of main) serves the whole repo as before.
 - **Trying a subdomain before it exists:** on a PR preview, `<preview>/_sites/hand.anawj.com/babies/` serves what
   `hand.anawj.com/babies/` will. (Real hosts don't take that route.)

@@ -67,6 +67,8 @@ assert.deepEqual(resolve('apmes.anawj.com', '/__/auth/handler'), { file: '__/aut
 assert.deepEqual(resolve('apmes.anawj.com', '/__/firebase/init.json'), { file: 'apmes-auth/firebase/init.json' });
 assert.deepEqual(resolve('apmes.anawj.com', '/__/other'), { notFound: true });
 assert.deepEqual(resolve('hand.anawj.com', '/__/auth/handler'), { notFound: true });
+assert.deepEqual(resolve('apmes.anawj.com', '/apmes/guidebook/dops-expectations.md'), { file: 'apmes/guidebook/dops-expectations.md' });
+assert.deepEqual(resolve('apmes.anawj.com', '/apmes/originals/x'), { notFound: true });
 
 // the table lists only folders that exist in the repo
 import fs from 'node:fs';
@@ -75,7 +77,7 @@ const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../.
 for (const [h, s] of Object.entries(SITES)) {
   for (const [pre, f] of s.root ? [['/', s.root]] : Object.entries(s.prefixes)) {
     // an app folder has an index.html; the sign-in helper folders have their own files
-    assert.ok(fs.existsSync(path.join(root, f, pre.startsWith('/__/') ? (pre === '/__/auth/' ? 'handler.html' : 'init.json') : 'index.html')), `${h}: ${f} is missing its page`);
+    assert.ok(fs.existsSync(path.join(root, f, pre.startsWith('/__/') ? (pre === '/__/auth/' ? 'handler.html' : 'init.json') : pre === '/apmes/guidebook/' ? 'dops-expectations.md' : 'index.html')), `${h}: ${f} is missing its page`);
   }
 }
 console.log('worker routes tests passed');

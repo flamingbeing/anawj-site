@@ -59,6 +59,10 @@ r = await get('https://apmes.anawj.com/__/auth/iframe?apiKey=x'); assert.equal(r
 r = await get('https://apmes.anawj.com/__/firebase/init.json'); assert.equal(r.status, 200);
 assert.equal(JSON.parse(await r.text()).authDomain, 'apmes.anawj.com');
 assert.equal((await get('https://apmes.anawj.com/__/auth/handler.html')).status, 200);
+r = await get('https://apmes.anawj.com/apmes/guidebook/dops-expectations.md'); assert.equal(r.status, 200);
+for (const u of ['https://apmes.anawj.com/apmes/', 'https://apmes.anawj.com/apmes/originals/x', 'https://apmes.anawj.com/apmes/README.md', 'https://hand.anawj.com/apmes/guidebook/dops-expectations.md', 'https://prewarmstudy.anawj.com/apmes/guidebook/dops-expectations.md']) {
+  assert.equal((await get(u)).status, 404, u);
+}
 // ... and only there, only those two folders
 for (const u of ['https://hand.anawj.com/__/auth/handler', 'https://prewarmstudy.anawj.com/__/firebase/init.json', 'https://nuhroster.anawj.com/__/auth/handler', 'https://apmes.anawj.com/__/', 'https://apmes.anawj.com/apmes-auth/firebase/init.json']) {
   assert.equal((await get(u)).status, 404, u);
