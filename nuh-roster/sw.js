@@ -10,7 +10,7 @@ const SDK_FILES = ['firebase-app.js', 'firebase-auth.js', 'firebase-firestore.js
 const SHELL = [
   './', 'index.html', 'style.css', 'manifest.webmanifest', 'guide.html',
   'js/app.js', 'js/engine.js', 'js/layout.js', 'js/xlsxio.js', 'js/monthly.js', 'js/rotations.js', 'js/cloud.js', 'js/firebase-config.js',
-  'js/demo.js', 'js/pdfout.js', 'js/pngout.js', 'js/ics.js', 'js/store.js',
+  'js/demo.js', 'js/pdfout.js', 'js/pngout.js', 'js/ics.js', 'js/store.js', 'js/help.js',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/maskable-512.png', 'icons/apple-touch-icon.png', 'icons/favicon-32.png',
 ];
 

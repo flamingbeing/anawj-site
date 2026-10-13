@@ -456,3 +456,17 @@ console.log('engine tests passed');
   assert.equal(mergeSaved('blank', null, DEFAULT_SETTINGS), 'blank');
   console.log('saved data migration tests passed');
 }
+
+{
+  // help texts: every mark the printable guide explains is in the in-app key too; What's new is dated, newest first
+  const { SYMBOLS, HOW, WHATS_NEW } = await import('../js/help.js');
+  const fs = await import('node:fs');
+  const guide = fs.readFileSync(new URL('../guide.html', import.meta.url), 'utf8');
+  const marks = [...guide.matchAll(/<th>([^<]+)<\/th>/g)].map(m => m[1].replace('&amp;', '&'));
+  const keyText = SYMBOLS.map(([k, v]) => k + ' ' + v).join(' | ');
+  for (const m of marks) assert.ok(keyText.includes(m.split(' ')[0].replace(/…$/, '')), `guide mark "${m}" is also in the in-app key`);
+  assert.ok(HOW.length >= 8 && HOW.every(([q, a]) => q.endsWith('?') && a.length > 20));
+  const dates = WHATS_NEW.map(([d]) => new Date(d));
+  assert.ok(dates.every(d => !isNaN(d)) && dates.every((d, i) => !i || d <= dates[i - 1]), "What's new is dated, newest first");
+  console.log('help text tests passed');
+}
