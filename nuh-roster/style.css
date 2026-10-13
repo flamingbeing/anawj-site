@@ -88,7 +88,7 @@ input[type="text"], input:not([type]), input[type="date"], input[type="number"],
   padding: 4px 8px; border: 1px solid var(--line-input); border-radius: var(--radius); background: var(--panel);
 }
 textarea { width: 100%; min-height: 56px; resize: vertical; }
-tr.off td { opacity: .45; }
+tr.off td { opacity: .7; }
 tr.off td:first-child { opacity: 1; }
 
 .chips { display: flex; flex-wrap: wrap; gap: 4px; }
@@ -110,7 +110,7 @@ tr.off td:first-child { opacity: 1; }
 .sheet .cell-input { width: 100%; text-align: center; font: inherit; }
 .names { display: flex; flex-direction: column; gap: 3px; align-items: stretch; }
 .names .name { border-color: var(--line); background: var(--panel); text-align: center; }
-.add-name { align-self: center; padding: 0 8px; font-size: 12px; line-height: 18px; border-style: dashed; color: var(--muted); opacity: .5; }
+.add-name { align-self: center; padding: 0 8px; font-size: 12px; line-height: 18px; border-style: dashed; color: var(--muted); opacity: .75; }
 .cell:hover .add-name { opacity: 1; }
 .name { padding: 1px 8px; border-radius: var(--radius); border: 1px solid transparent; user-select: none; display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
 .names .name .label { flex: 1; }
@@ -144,8 +144,8 @@ tr.off td:first-child { opacity: 1; }
 .name.dragging { opacity: .35; }
 .name.ghost { position: fixed; z-index: 10; pointer-events: none; background: var(--panel); border-color: var(--accent); box-shadow: var(--shadow-card); cursor: grabbing; font-family: var(--font-sans); font-size: 13px; }
 .names .sep { color: var(--muted); align-self: center; }
-.empty-cell { color: var(--muted); opacity: .5; }
-.sheet td.notes { color: var(--muted); min-width: 120px; }
+.empty-cell { color: var(--muted); }
+.sheet td.notes { color: #595e65; min-width: 120px; } /* a shade darker than --muted: 4.5:1 on the striped rows */
 .sheet tr.gap td { border: 0; height: 12px; background: var(--panel); }
 .sheet tr.flagged td.room { color: var(--err); }
 
@@ -346,7 +346,7 @@ tr.flash td { animation: flash-row 2s ease-out; }
 .steps .ok .dot { background: var(--ok); border-color: var(--ok); color: #fff; }
 .steps .bad .dot { background: var(--red); border-color: var(--red); color: #fff; }
 .steps .bad small { color: var(--red); font-weight: 600; }
-.steps .off { opacity: .55; }
+.steps .off { opacity: .8; } /* faded, but still 4.5:1 */
 @media (max-width: 560px) { .steps { padding: 8px; } .steps .step { min-width: 0; padding: 4px 8px; } .steps .what small { display: none; } }
 @media print { .steps { display: none !important; } }
 
@@ -439,3 +439,7 @@ body.viewer .date-warn, body.viewer .save-state { display: none !important; }
 .welcome-steps { padding-left: 20px; display: grid; gap: 12px; }
 .welcome-steps li { line-height: 1.5; }
 .welcome-steps .btn, .welcome-steps button { margin-left: 4px; }
+.warnings .level { font-weight: 700; }
+.name:focus-visible, .pchip:focus-visible { outline: 3px solid var(--navy); outline-offset: 1px; }
+.tag-editor:focus { outline: none; }
+td.seen, td .seen, .add-flag { color: #595e65; } /* muted text on striped or faded rows, still 4.5:1 */

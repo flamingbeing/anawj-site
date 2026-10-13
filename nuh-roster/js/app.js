@@ -204,13 +204,17 @@ function h(tag, attrs = {}, ...kids) {
 // A short message at the bottom. With an action (e.g. Undo) it stays longer and has a button.
 function toast(msg, action) {
   const t = document.getElementById('toast');
-  t.replaceChildren(msg, ...(action ? [' ', h('button', { class: 'small', onclick: () => { t.classList.remove('show'); action.run(); } }, action.label)] : []));
+  t.replaceChildren(msg, ...(action ? [' ', h('button', { class: 'small', title: action.title || null, onclick: () => { t.classList.remove('show'); action.run(); } }, action.label)] : []));
   t.classList.toggle('actionable', !!action);
   t.classList.add('show');
   clearTimeout(toast.t);
-  toast.t = setTimeout(() => t.classList.remove('show'), action ? 8000 : 3500);
+  const ms = action ? 8000 : 3500;
+  toast.t = setTimeout(() => t.classList.remove('show'), ms);
+  // keep it while someone is reading or reaching for its button
+  t.onmouseenter = t.onfocusin = () => clearTimeout(toast.t);
+  t.onmouseleave = t.onfocusout = () => { clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 2500); };
 }
-const undoToast = msg => toast(msg, { label: 'Undo', run: undo });
+const undoToast = msg => toast(msg, { label: 'Undo', run: undo, title: 'Undo (Ctrl+Z)' });
 
 const select = (value, options, onchange) => h('select', { onchange: e => onchange(e.target.value) },
   options.map(o => {
@@ -267,6 +271,25 @@ function download(name, blob) {
 // ---------- render ----------
 
 const app = document.getElementById('app');
+// Fields in table cells have no visible label of their own: name each from its column heading and row,
+// so a screen reader says "Session, MOR 4" rather than "combo box".
+function labelTableFields(root) {
+  for (const f of root.querySelectorAll('td input:not([aria-label]):not([type=hidden]), td select:not([aria-label]), td textarea:not([aria-label])')) {
+    if (f.labels?.length) continue;
+    const td = f.closest('td'), tr = td.parentElement, table = td.closest('table');
+    const col = [...tr.children].indexOf(td);
+    const head = table.querySelector('thead tr')?.children[col]?.textContent.trim();
+    const rowName = [...tr.children].find(c => c !== td && c.textContent.trim())?.textContent.trim()
+      || tr.querySelector('input')?.value || '';
+    const label = [head, rowName].filter(Boolean).join(', ') || f.placeholder || '';
+    if (label) f.setAttribute('aria-label', label.slice(0, 80));
+  }
+  // a <label> written just before its field (not wrapping it): tie the two together
+  for (const l of root.querySelectorAll('label:not([for])')) {
+    const f = l.nextElementSibling;
+    if (f && /^(INPUT|SELECT|TEXTAREA)$/.test(f.tagName) && !f.labels?.length && !f.getAttribute('aria-label') && !l.contains(f)) f.setAttribute('aria-label', l.textContent.trim().slice(0, 80));
+  }
+}
 function render() {
   document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === state.tab)));
   const y = window.scrollY;
@@ -294,6 +317,7 @@ function render() {
   if (storeProblem && !document.getElementById('store-bar')) renderStoreBar();
   window.scrollTo(0, y);
   if (state.tab === 'monthly' && state.monthlyView === 'rotations') placeRotGrid();
+  labelTableFields(app);
   save();
 }
 // Each date keeps its own manpower, calls, cases and roster. Switching the header date puts
@@ -1635,7 +1659,9 @@ function nameInput(attrs = {}, role = null, rank = null) {
   if (!document.getElementById(id)) document.body.append(h('datalist', { id }));
   const list = state.staff.filter(p => !role || p.role === role).map(p => [p, rank ? rank(p) : [0, '']]);
   list.sort((a, b) => a[1][0] - b[1][0] || bySeniority(a[0], b[0]));
-  document.getElementById(id).replaceChildren(...list.map(([p, [, note]]) => h('option', { value: p.name, label: note || undefined })));
+  // a monthly grid calls this hundreds of times per render: rebuild the shared list only when it changes
+  const dl = document.getElementById(id), sig = list.map(([p, [, note]]) => p.name + '|' + (note || '')).join('\n');
+  if (dl.dataset.sig !== sig) { dl.dataset.sig = sig; dl.replaceChildren(...list.map(([p, [, note]]) => h('option', { value: p.name, label: note || undefined }))); }
   return h('input', { list: id, autocomplete: 'off', spellcheck: 'false', ...attrs });
 }
 // For the + in a roster cell: free people who suit the room first, then free people, then people
@@ -1731,7 +1757,31 @@ function whereCard(p) {
     h('ul', {}, (at.length ? at : ['Not on any list today']).map(t => h('li', {}, t))));
 }
 
-function closeTagEditor() { document.querySelector('.tag-editor')?.remove(); boxPerson = null; highlightPerson(null); }
+function closeTagEditor() {
+  const open = document.querySelector('.tag-editor');
+  open?.remove(); boxPerson = null; highlightPerson(null);
+  // keyboard and screen-reader users land back on the name they opened (or the same person after a re-render)
+  if (open && boxReturn) {
+    const back = boxReturn.el?.isConnected ? boxReturn.el : boxReturn.pid ? document.querySelector(`[data-pid="${boxReturn.pid}"][tabindex]`) : null;
+    boxReturn = null;
+    if (back && (!document.activeElement || document.activeElement === document.body)) back.focus({ preventScroll: true });
+  }
+}
+// A box just opened: take focus (the box itself, so phones don't pop the keyboard), keep Tab inside it.
+let boxReturn = null;
+function focusBox(box, anchor) {
+  boxReturn = { el: anchor, pid: anchor?.dataset?.pid || '' };
+  box.tabIndex = -1;
+  box.focus({ preventScroll: true });
+  box.addEventListener('keydown', e => {
+    if (e.key !== 'Tab') return;
+    const f = [...box.querySelectorAll('button, input, select, textarea, [tabindex="0"]')].filter(x => !x.disabled && x.offsetParent);
+    if (!f.length) return;
+    if (e.shiftKey && (document.activeElement === f[0] || document.activeElement === box)) { e.preventDefault(); f.at(-1).focus(); }
+    else if (!e.shiftKey && document.activeElement === f.at(-1)) { e.preventDefault(); f[0].focus(); }
+  });
+  box.addEventListener('keydown', e => { if (e.key === 'Escape' && e.target === box) closeTagEditor(); });
+}
 // Light up every chip of one person (hover, or while their box is open), so double bookings show.
 let boxPerson = null;
 function highlightPerson(id) {
@@ -1810,6 +1860,7 @@ function openRawEditor(chip, src) {
       h('button', { onclick: remove, title: 'Take this name out of the cell' }, 'Remove')),
   );
   document.body.append(box);
+  focusBox(box, chip);
   const rc = chip.getBoundingClientRect();
   const w = box.offsetWidth, hgt = box.offsetHeight;
   box.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, rc.left)) + 'px';
@@ -1835,7 +1886,7 @@ function dayMarks(p) {
 // The person chip for the daily tabs: short name in their colour, then the day's markers
 function personChip(p, attrs = {}, ...extra) {
   const marks = dayMarks(p);
-  return h('span', { class: 'name pchip', 'data-pid': p.id, style: colourStyle(p.name), title: `${p.name} · ${p.grade}`, ...attrs },
+  return h('span', { class: 'name pchip', 'data-pid': p.id, style: colourStyle(p.name), title: `${p.name} · ${p.grade}`, tabindex: 0, role: 'button', ...attrs },
     h('span', { class: 'label' }, shortName(p) || p.name), marks ? h('span', { class: 'marks' }, ' ' + marks) : null, ...extra);
 }
 
@@ -1999,6 +2050,7 @@ function openPersonBox(anchor, p, ctx) {
       ['roster', 'lock', 'premed', 'call'].includes(ctx.kind) ? h('button', { onclick: remove, title: ctx.kind === 'lock' ? 'Let the roster choose' : 'Take them off here' }, 'Remove') : null),
   );
   document.body.append(box);
+  focusBox(box, anchor);
   const rc = anchor.getBoundingClientRect();
   const w = box.offsetWidth, hgt = box.offsetHeight;
   box.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, rc.left)) + 'px';
@@ -2063,7 +2115,10 @@ function shortOf(part) {
   const at = part.indexOf(n);
   return s && at >= 0 ? part.slice(0, at) + s + part.slice(at + n.length) : part;
 }
-const colourStyle = part => { const c = COLOUR_ARGB[colourOf(part)]; return c ? `color:#${c.slice(2)}` : ''; };
+// On screen the sheet's bright green (Baby MO) is darkened so it reads on white (2.9:1 → 5:1); the sheet itself,
+// the .xlsx, PDF and image keep the department's colours.
+const SCREEN_COLOUR = { green: '#00803a' };
+const colourStyle = part => { const k = colourOf(part), c = COLOUR_ARGB[k]; return c ? `color:${SCREEN_COLOUR[k] || '#' + c.slice(2)}` : ''; };
 
 // Add a person to a cell from the staff list (unknown names offer to add them to the staff list).
 async function addToCell(i, key, text) {
@@ -2109,7 +2164,9 @@ function rosterCell(row, i, key, doubles) {
     const el = h('span', { class: 'name', 'data-drop': '', 'data-row': i, 'data-key': key, 'data-part': k, 'data-pid': pid || '', style: colourStyle(p), title: p,
       onpointerenter: TOUCH || !pid ? null : () => highlightPerson(pid), onpointerleave: TOUCH || !pid ? null : () => highlightPerson(null),
       onpointerdown: TOUCH ? null : e => startNameDrag(e, src),
-      onclick: TOUCH ? () => openTagEditor(el, src) : null },
+      onclick: TOUCH ? () => openTagEditor(el, src) : null,
+      tabindex: 0, role: 'button', 'aria-label': `${p} (${key}, ${row.label}): open`,
+      onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openTagEditor(el, src); } } },
       !TOUCH && key === 'junior' && !isCoverPart(p) ? icon('cover', 'Drag to another room to add them there as an ad hoc cover (C). They stay in this room.', 'C', { down: e => startNameDrag(e, { ...src, cover: true }) }) : null,
       key === 'senior' && (!TOUCH || isDouble(p, doubles)) ? icon('dbl' + (isDouble(p, doubles) ? ' on' : ''),
         (isDouble(p, doubles) ? 'Double covering. ' : '') + (TOUCH ? '' : 'Drag to another room to have them double cover it too.'), '&',
@@ -3176,7 +3233,7 @@ function problemsCard() {
   return h('section', { class: 'card problems', id: 'problems' },
     h('h2', {}, list.length ? `Problems (${list.length})` : 'Problems'),
     list.length
-      ? h('ul', { class: 'warnings' }, list.map(w => h('li', { class: w.level }, h('span', {}, w.text), h('span', { class: 'fixes' }, problemFixes(w)))))
+      ? h('ul', { class: 'warnings' }, list.map(w => h('li', { class: w.level }, h('span', {}, h('b', { class: 'level' }, { error: 'Problem: ', warn: 'Check: ', info: 'Note: ' }[w.level] || ''), w.text), h('span', { class: 'fixes' }, problemFixes(w)))))
       : h('p', { class: 'ok-note' }, '✓ No problems found.'),
     errors ? null : list.length ? h('p', { class: 'hint' }, 'Only warnings left: worth a look, but nothing is wrong.') : null,
     notes.length ? h('details', {}, h('summary', { class: 'seen' }, `Notes from making the roster (${notes.length})`),
@@ -3391,7 +3448,7 @@ function renderSettings() {
       h('p', { class: 'hint' }, 'The rooms on the roster, in order. "Running by default" rooms are ticked when you set up a new day (Clear day). Rooms in the same complex can share a senior when seniors are short. MOR 7–9 are emergency OTs, so they have no line.'),
       roomEditor(),
       h('p', { class: 'hint', style: 'margin-top:12px' }, 'Room defaults: subspecs a room always needs, one room per line, e.g. "MOR 12: cardiac". Use the keys ' + st.subspecs.map(x => x.key).join(', ') + '.'),
-      h('textarea', { rows: 3, value: Object.entries(st.roomDefaults || {}).map(([room, ks]) => `${room}: ${ks.join(', ')}`).join('\n'), onchange: e => {
+      h('textarea', { rows: 3, 'aria-label': 'Room defaults', value: Object.entries(st.roomDefaults || {}).map(([room, ks]) => `${room}: ${ks.join(', ')}`).join('\n'), onchange: e => {
         const keys = new Set(st.subspecs.map(x => x.key));
         const out = {}, bad = [];
         for (const line of e.target.value.split('\n')) {
