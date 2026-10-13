@@ -77,6 +77,8 @@ portfolio content.
 - **Case tab parts** (`settings.caseHide`, and Basic's `basicOn` `case:<part>`): `sugg` (the suggestion row) and
   `recent` (Same as last, tag groups) used to be one part, `quick`; an older `quick` still means both and is
   rewritten as the two on the next change (`logging.js` `expandParts`). Basic hides both unless turned back on.
+  The profile switches are `case:sugg` and `case:recent` (profiles.js reads an older `quick` in `caseHide`,
+  `basicOn` or `show['case:quick']` as both).
 - **Logging extras** (account, off / default as before): `settings.autoTick` ticks the confident suggestions as you
   type; they follow the text, and one the user unticks stays off for that case (`draft.auto` / `draft.rejected`,
   kept through Undo after Save and Undo after clearing the box).
@@ -237,7 +239,7 @@ portfolio content.
   After Save (`afterSave`: next (default) / keepTags / closed = keyboard down / logbook = `hooks.showDay` set by
   ui-logbook.js, then #logbook on that day; Undo then puts the case back, and kept tags don't count as a new case);
   Undo window (`undoSecs` 5 default / 10 / 20 / 30: any toast with a button stays at least that long, ui-core `toast`);
-  Case tab card: parts to hide (`caseHide`, CASE_PARTS in ui-log.js: interesting, parsed, quick, still, groupsave,
+  Case tab card: parts to hide (`caseHide`, CASE_PARTS in ui-log.js: interesting, parsed, sugg, recent, still, groupsave,
   plan; `.log-card.hide-*` in style.css; the case box, All tags and Save always stay). Device (`DISPLAY_KEYS`, html
   classes from applyLook): case box keyboard (`boxCaps` false → `box-caps-off`, `boxCorrect` true → `box-correct`,
   `boxSpell` false → `box-spell-off`; read in renderOne), reflection spelling (`reflSpell` false → `refl-spell-off`,
@@ -479,11 +481,12 @@ portfolio content.
     note" / preview card (`dayNoteCard`; Done goes back to the Logbook), Notes' "Today's note" button and "Daily notes"
     chip, the manifest shortcut `./#today`, and the Case tab box (Settings → Notes, `settings.dayNoteOnCase`, off).
     It sorts first in its day and has no heading in Copy / Share / Send and the Markdown export.
-  - Daily notes don't count towards the 100 (`cappedNotes`; backup restore and bin restore follow). The rules allow
-    100 days in `meta/noteIndex`, so `noteIndex()` keeps every ordinary note's day (at most 100, as before) and fills
-    the rest with the newest daily notes. Once the notes are loaded, `dayHasNotes` reads them too, so an older daily
-    note still shows and goes into Copy / Share / Send. Raising that cap needs a `firestore.rules` change (owner's
-    approval).
+  - Daily notes don't count towards `MAX_NOTES` (2,000; `cappedNotes`; backup restore and bin restore follow). The
+    rules allow 100 days in `meta/noteIndex`, so the doc holds the latest 100 days and the cases of the latest-changed
+    notes (`noteIndex(list, INDEX_CAP)`, from the sync engine); once the notes are loaded the marks come from all of
+    them, and a full index loads them (`indexCapped`, `dayMayHaveNotes`), so an older daily note still shows and goes
+    into Copy / Share / Send. The Logbook's day repaints when the notes change (ui-notepad.js `apply`). Raising that
+    cap needs a `firestore.rules` change (owner's approval).
   - Paste cleaner (`paste-clean.js`, tested): `settings.pasteClean` (off) turns pasted HTML into light Markdown;
     Clean up (editor ⋯ menu, always there, with Undo) runs `tidyMarkdown`. The preview now shows `*italic*`.
   - Formatting bar (`fmt-bar.js`, shared with reflections): the note editor's full bar (bold, italic, heading, lists,

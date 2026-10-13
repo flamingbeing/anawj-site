@@ -37,7 +37,11 @@ export const nv = NV0();
 let stop = null, owner = null, raw = [], ready = null, readyResolve = null, synced = false, serverIn = null, serverResolve = null;
 function apply() {
   if (!owner || owner !== mine()) return;
+  const was = S.notes;
   S.notes = sortNotes(writes.overlay('note', owner, raw));
+  // the Logbook's day shows its daily note: draw it again when the notes change (a save no longer repaints it
+  // through the cases, which only repaint when the case list itself changes)
+  if (S.tab === 'logbook' && !(was && was.length === S.notes.length && S.notes.every((n, i) => n === was[i]))) hooks.casesChanged?.();
 }
 // resolves once the first list has arrived (from the offline cache or the server)
 export function ensureNotes() {
