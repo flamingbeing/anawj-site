@@ -71,6 +71,10 @@ def process_page(page_no, flat, tpl, fmap, fields, cells, reader):
         if loc['page'] != page_no:
             continue
         f = fields[fid]
+        top = min([r[1] for r in loc['options'].values()] + ([loc['rect'][1]] if loc.get('rect') else []))
+        if top < fmap.get('header_bottom', {}).get(str(page_no), 0):   # the page header: Subject ID and Date of Entry are identifiers, never cropped or sent
+            out[fid] = dict(kind='text', value=None, flags=['in the page header: not read'], crop=b'', reads=[])
+            continue
         if loc['options'] and (loc.get('written') or f.get('col') == 'ts'):   # Y/N columns and thermal sensation are written, not ticked
             rs = list(loc['options'].values())
             loc = dict(loc, options={}, rect=[min(r[0] for r in rs), min(r[1] for r in rs), max(r[2] for r in rs), max(r[3] for r in rs)])
@@ -79,10 +83,6 @@ def process_page(page_no, flat, tpl, fmap, fields, cells, reader):
             on = [o for o, r in res.items() if r['state'] == 'ticked']
             unsure = [o for o, r in res.items() if r['state'] == 'unsure']
             flags = [f'unsure tick: {o}' for o in unsure] + (['more than one ticked'] if len(on) > 1 else [])
-            # a slash that overshoots its box can put some ink on a neighbour's: one clearly strongest box wins, but is flagged
-            hot = sorted(((r['ink'], o) for o, r in res.items() if r['state'] != 'empty'), reverse=True)
-            if len(hot) > 1 and hot[0][0] >= ticks.CLEAR_TICK and hot[0][0] >= 2 * hot[1][0] + 0.3:
-                on, flags = [hot[0][1]], ['more than one box has ink: took the clearly strongest, check']
             r0 = next(iter(loc['options'].values()))
             (cx0, cy0, cx1, cy1), _ = crop_rect([min(r[0] for r in loc['options'].values()), r0[1], max(r[2] for r in loc['options'].values()), r0[3]], cells, flat.shape)
             out[fid] = dict(kind='tick', value=on[0] if len(on) == 1 else None, flags=flags, inks={o: r['ink'] for o, r in res.items()},
@@ -142,14 +142,26 @@ def series_checks(fields_out, fields):
                 pass
 
 
-def best_page(img, tpls, forced=None):
+def aligned(img, tpl, tables):
+    """Align the photo to the page, then pull each printed table onto the template's rows and columns; keep whichever
+    fits the printed lines better."""
+    flat, score = align.align_page(img, tpl)
+    if tables:
+        fine, n = align.refine_tables(flat, tpl, tables)
+        if n:
+            s2 = align.line_score(fine, tpl)
+            if s2 > score: return fine, s2
+    return flat, score
+
+
+def best_page(img, tpls, tables_of, forced=None):
     """Align the photo to its most likely pages and keep the best fit: page look-alikes (big tables) fool a quick guess."""
     if forced:
-        flat, score = align.align_page(img, tpls[forced - 1]); return forced - 1, flat, score
+        flat, score = aligned(img, tpls[forced - 1], tables_of(forced - 1)); return forced - 1, flat, score
     _, guess = align.guess_page(img, tpls)
     best = None
     for pg in sorted(range(len(tpls)), key=lambda i: -guess[i])[:3]:
-        flat, score = align.align_page(img, tpls[pg])
+        flat, score = aligned(img, tpls[pg], tables_of(pg))
         if best is None or score > best[2]: best = (pg, flat, score)
     return best
 
@@ -168,10 +180,12 @@ def main(argv=None, reader=None):
     forced = [int(x) for x in a.pages.split(',')] if a.pages else [None] * len(a.photos)
     if len(forced) != len(a.photos): ap.error('--pages needs one page number per photo')
     reader = reader or (readers.CropExporter(a.export_crops) if a.export_crops else readers.FileReader(a.readings) if a.readings else readers.AnthropicReader())
+    _tables = {}
+    tables_of = lambda pg: _tables.setdefault(pg, boxes.tables(f'{a.form_dir}/blank.pdf', pg))
     result, pages = {}, []
     for ph, fp in zip(a.photos, forced):
         img = cv2.imread(ph)
-        pg, flat, score = best_page(img, tpls, fp)
+        pg, flat, score = best_page(img, tpls, tables_of, fp)
         ok = score >= MIN_ALIGN
         pages.append(dict(photo=os.path.basename(ph), page=pg + 1, score=round(score, 3), accepted=ok, check_alignment=ok and score < CHECK_ALIGN))
         if not ok:
