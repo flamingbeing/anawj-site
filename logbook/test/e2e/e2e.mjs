@@ -526,7 +526,8 @@ async function run(label, ctxOpts) {
   }
 
   await step('log: Paste puts the clipboard in the box', async () => {
-    await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: new URL(BASE).origin });
+    // (clipboard permissions are Chromium's names only; Firefox and WebKit refuse them)
+    if (ctx.browser()?.browserType().name() === 'chromium') await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: new URL(BASE).origin });
     await p.evaluate(() => navigator.clipboard.writeText('PQ 50F\nlap chole GA'));
     await p.locator('textarea.details').fill('');
     await p.locator('.box-wrap .paste-btn').click(); await nap(300);
@@ -587,23 +588,23 @@ async function run(label, ctxOpts) {
     while (await p.locator('.selected .chip').count()) await p.locator('.selected .chip').first().click();
   });
 
-  await step('Save with nothing picked does not save; tap then save', async () => {
+  await step('Save with nothing picked does not save; a second Save takes the confident suggestions', async () => {
     const ta = p.locator('textarea.details');
     await ta.fill('UV 72M TKR ACB spinal');
     await nap(300);
+    const strong = await p.locator('.sugg-row .chip.strong[data-code]:not(.all)').evaluateAll(els => els.map(e => e.dataset.code));
     const n0 = await nCases();
     await ta.press('Control+Enter');
     await nap(300);
     assert(await nCases() === n0, 'saved with no category picked');
     const t0 = await toastText();
     assert(/Enter again.*suggested tags/.test(t0), 'toast ' + t0);
+    // the Save button accepts the offer the same as a second Enter (confident suggestions only)
     await p.locator('.actions .primary').click();
     await nap(300);
-    assert(await nCases() === n0, 'Save button saved with no category');
-    await p.locator('.chip.sugg').first().click();
-    await p.locator('.actions .primary').click();
-    await nap(300);
-    assert(await nCases() === n0 + 1, 'not saved after tapping a category');
+    assert(await nCases() === n0 + 1, 'the second Save did not take the suggested tags');
+    const savedCats = await p.evaluate(async () => (await import('./js/ui-core.js')).S.cases.find(c => c.details && c.details.includes('TKR ACB')).cats);
+    assert(strong.length && strong.every(code => savedCats.includes(code)), 'confident tags not saved: ' + savedCats);
     const t = await toastText();
     assert(/Saved/.test(t), 'toast ' + t);
     // the toast must not sit on the Save button
@@ -1928,7 +1929,7 @@ async function run(label, ctxOpts) {
     await tab('loggingadv');
     const check = l => p.locator('label.check', { hasText: l }).locator('input');
     await choose('First day of the week', '0'); await nap(300);
-    await check('Quick picks').uncheck(); await check('Autocorrect').check(); await nap(300);
+    await check('Suggested tags as you type').uncheck(); await check('Quick picks').uncheck(); await check('Autocorrect').check(); await nap(300);
     await tab('displayadv');
     await check('Pin the case box').check(); await check('Pin the search box').check(); await nap(200);
     // Borders all the way down: lines gone, fields filled
@@ -1957,7 +1958,7 @@ async function run(label, ctxOpts) {
     } finally {
       await tab('loggingadv');
       await choose('First day of the week', '1');
-      await check('Quick picks').check(); await check('Autocorrect').uncheck(); await nap(300);
+      await check('Suggested tags as you type').check(); await check('Quick picks').check(); await check('Autocorrect').uncheck(); await nap(300);
       await tab('displayadv');
       await check('Pin the case box').uncheck(); await check('Pin the search box').uncheck(); await nap(200);
       await tab('display');
@@ -1992,7 +1993,7 @@ async function run(label, ctxOpts) {
       const ta = p.locator('textarea.details');
       await ta.fill(`${initials} lap chole GA`);
       await debounced();
-      const expected = await p.locator('.sugg-row .chip[data-code]:not(.all)').evaluateAll(els => els.map(e => e.dataset.code));
+      const expected = await p.locator('.sugg-row .chip.strong[data-code]:not(.all)').evaluateAll(els => els.map(e => e.dataset.code));
       assert(expected.length > 0, 'no fixture suggestions');
       const n = await nCases();
       if (mode === 'newline') await p.locator('.savebar button.primary', { hasText: /^Save/ }).click();
@@ -2082,7 +2083,11 @@ async function run(label, ctxOpts) {
     assert(!(await p.locator('.parsed').innerText()).includes('Age/sex'), 'disabled age preview');
     assert(await p.locator('.sugg-row [title*="from the age"]').count() === 0, 'disabled age suggestions');
     await p.reload(); await p.waitForSelector('textarea.details');
-    assert(await summary.evaluate(el => el === document.activeElement) && await p.getByLabel('Patient initials', { exact: true }).count() === 0, 'initials box setting not retained on reload');
+    // (a touch phone doesn't open the keyboard as the app opens: only on going to the Case tab, ui-log.js wantFocus)
+    const touch = await p.evaluate(() => matchMedia('(hover: none) and (pointer: coarse)').matches);
+    if (touch) assert(await summary.evaluate(el => el !== document.activeElement), 'the keyboard opened as the app started on a phone');
+    else assert(await summary.evaluate(el => el === document.activeElement), 'the case box not focused on reload');
+    assert(await p.getByLabel('Patient initials', { exact: true }).count() === 0, 'initials box setting not retained on reload');
     assert(!(await p.locator('.parsed').innerText()).includes('Age/sex'), 'disabled age detection not retained');
     await tab('loggingadv');
     const keyboard = p.getByLabel('Open the keyboard when the Case tab opens (this device)', { exact: true });

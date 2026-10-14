@@ -37,6 +37,7 @@ one tab. The demo never loads Firebase.
 | `js/catalogue.js`, `js/forms.js` | **Generated** by `node tools/build-data.mjs` from `apmes/data/*.json` and `apmes/guidebook/*.md` (repo root). 14 EPAs, 67 items (DOPS 17, Mini-CEX 12, EBD 38), 46 counting groups; the three forms. Entrustment questions for EPA 1–12 come from `apmes/guidebook/epa-01-06.md` and `epa-07-12.md`; all 67 items have them. The EPA 7a SR EBD (`EBD-7a-06`) has only a case vignette in the guidebook's table, so its questions come from the embedded EBD_EPA7A_SR document (`epa-07-attachments.md`). |
 | `js/engine.js` | Pure logic: validation, visible questions, progress, status, case key, identifier warning. |
 | `js/cloud.js`, `js/demo-backend.js`, `js/firebase-config.js` | Firestore backend and the in-browser demo, same API. |
+| `js/schema.js` | Field whitelists and clean*() helpers for every write, shared by both backends; keep in step with `logbook/firestore.rules`. |
 | `js/ui-*.js` | Screens: home, request flow, requests, result, progress (resident); pending and form (assessor); overview and people (admin/PD); more. |
 | `js/vendor/qrcode.js` | qrcode-generator 1.4.4 (MIT), as an ES module. |
 
@@ -51,6 +52,8 @@ for f in evals/test/*.test.mjs; do node "$f"; done
 # end-to-end demo loop (Playwright + Chromium; a global install works)
 npx http-server . -p 8110 -s -c-1 &
 node evals/test/e2e.spec.mjs        # BASE, PW_PATH, CHROMIUM env vars override the defaults
+node evals/test/edge.e2e.mjs        # old-address forward, sign-out clears drafts, dark theme, assessor sign-in page
+node evals/test/a11y.mjs            # accessibility (axe, WCAG 2.2 AA), light and dark: run after UI changes
 ```
 
 The e2e script drives one browser context across roles: a resident requests a DOPS, the assessor

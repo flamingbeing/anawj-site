@@ -17,9 +17,11 @@ The rule for new apps is in `AGENTS.md`.
 | `nuhroster.anawj.com/` | `nuh-roster/` | Own Firebase project `nuh-roster`. |
 | `apmes.anawj.com/logbook/` | `logbook/` | With evals: one Firebase project (`apmes-logbook`), one sign-in. |
 | `apmes.anawj.com/evals/` | `evals/` | |
+| `apmes.anawj.com/people/` | `people/` | The people lists logbook and evals share (admins and PDs; 13 Oct 2026). |
 | `anawj.com/privacy/` | `privacy/` | Stays: the Google sign-in consent screen points here. |
 | `anawj.com/prewarm-update/` | `prewarm-update/` | Stays until no phone runs the old prewarm worker, then becomes a redirect. |
 | `anawj.com/edit/` (decided in step 5) | `edit/` | Stays on `anawj.com`: see "The page editor" below. |
+| `ask.anawj.com/` | `ask/` | Ask Claude, the owner's page; behind Cloudflare Access; its API `/api/ask` is `worker/ask.js` (`edit/NOTES.md`). |
 
 Single-app subdomains serve the app at the root; shared ones keep a path per app. Folders in the repo don't need
 renaming: the hosting maps each address to its folder.
@@ -70,8 +72,9 @@ and builds a preview for every PR.
   kept). Every response carries `X-Robots-Tag: noindex, nofollow`.
 - One-app hosts (`prewarmstudy.`, `nuhroster.`) serve the app at the root, and its own folder name works too
   (`prewarmstudy.anawj.com/prewarm/…`) so an app can move before its absolute links are tidied.
-- **One shared folder:** every host also serves `/nuhsdesign/` (the NUHS-style design files, styles only, no data), so an
-  app on a subdomain can link `../nuhsdesign/tokens.css` (`SHARED` in `worker/routes.js`). It is the only folder subdomains
+- **Shared folders:** every host also serves `/nuhsdesign/` (the NUHS-style design files, styles only, no data), so an
+  app on a subdomain can link `../nuhsdesign/tokens.css` (`SHARED` in `worker/routes.js`), and `/feedback/` (the feedback
+  button's script, no data; `edit/NOTES.md`, "Feedback button"). They are the only folders subdomains
   share; everything else stays per app. The old `/design/` path was served alongside it for phones still on an older copy,
   and retired on 13 Oct 2026 (nothing linked it any more; the old folder held only a copy of `tokens.css`).
 - **Sign-in helper pages on `apmes.`:** `apmes.anawj.com/__/auth/` and `/__/firebase/` serve Firebase's sign-in helper
@@ -82,7 +85,9 @@ and builds a preview for every PR.
 - Any other address (the previews on `workers.dev`, the copy of main) serves the whole repo as before.
 - **Trying a subdomain before it exists:** on a PR preview, `<preview>/_sites/hand.anawj.com/babies/` serves what
   `hand.anawj.com/babies/` will. (Real hosts don't take that route.)
-- No data, no secrets, no storage in the Worker: it only serves files. Workers' free plan allows 100,000 requests a
+- No data and no storage in the Worker: it serves files, plus one owner-only API on `ask.anawj.com` (`worker/ask.js`,
+  Ask Claude), the only part with secrets (a GitHub token for issues, the Access team and audience), kept in
+  Cloudflare, never in the repo. Previews never answer that API. Workers' free plan allows 100,000 requests a
   day; every request goes through the Worker (a page load without a cached service worker is a few dozen). If that is
   ever not enough, Workers Paid is $5 a month.
 - Tests: `node worker/test/routes.test.mjs` and `node worker/test/sites.test.mjs` (in the merge checklist in `AGENTS.md`).

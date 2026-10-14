@@ -5,11 +5,10 @@
 import { S, hooks, h, fill, toast, cloud, icon, go, toolLabel, fmtDate, modal, debounce, avatar, errText } from './ui-core.js';
 import { EPAS, ITEMS, itemById, searchItems, CATALOGUE_VERSION } from './catalogue.js';
 import { progress, dueItems, caseKey, sameCaseCount, identifierWarning, todayISO, residentYear } from './engine.js';
-import qrcode from './vendor/qrcode.js';
 
 export const AGE_BANDS = ['<16', '16-40', '41-64', '65-79', '80+'];
 export const GENDERS = [['F', 'Female'], ['M', 'Male']];
-const LOCATIONS = ['Operating theatre', 'Preop Clinic', 'ICU', 'Delivery suite', 'Ward', 'Recovery/PACU'];
+export const LOCATIONS = ['Operating theatre', 'Preop Clinic', 'ICU', 'Delivery suite', 'Ward', 'Recovery/PACU'];
 
 // ---------- styles for the resident screens (kept here so style.css stays the shell's) ----------
 
@@ -37,6 +36,8 @@ const CSS = `
 .e-rq-chosen__body { flex:1; min-width:0; }
 .e-rq-chosen__body p { margin:0; line-height:1.35; }
 .e-rq-chosen .e-btn-link { flex:none; min-height:40px; }
+.e-rq-chosen__btns { display:flex; flex-direction:column; align-items:flex-end; flex:none; }
+.e-rq-days { margin-bottom:8px; }
 .e-rq-field { margin:0 0 16px; }
 .e-rq-field > .e-label { display:block; margin:0 0 6px; }
 .e-rq-field .e-chips { margin-bottom:8px; }
@@ -142,8 +143,16 @@ export function evalLink(id, email) {
 }
 export const shareText = ev => `Please complete this ${toolLabel(ev.tool)} for me: ${ev.itemText || ''}`.trim();
 
-// QR code as an SVG (generated on the phone, so it works offline).
+// QR code as an SVG (generated on the phone, so it works offline). The generator (12 KB) loads on
+// first use, so assessors opening a link don't download it; the shell keeps it for offline.
+let qrLib = null;
+const loadQR = () => (qrLib = qrLib || import('./vendor/qrcode.js').then(m => m.default));
 export function qrSvg(text) {
+  const box = h('span', { class: 'e-qrbox', role: 'img', 'aria-label': 'QR code of the link to the form' });
+  loadQR().then(qrcode => box.replaceWith(qrSvgNow(qrcode, text))).catch(e => { console.warn('QR', e); box.textContent = 'QR code unavailable offline: use Copy link.'; });
+  return box;
+}
+function qrSvgNow(qrcode, text) {
   const qr = qrcode(0, 'M');
   qr.addData(text);
   qr.make();
@@ -166,11 +175,16 @@ export function qrSvg(text) {
 
 // Full-screen QR for the assessor to scan; tap or Esc closes.
 export function fullQR(link, caption) {
-  const el = h('div', { class: 'e-qr e-qr--full', role: 'dialog', 'aria-label': 'QR code', tabindex: '-1' },
-    qrSvg(link), h('p', { class: 'e-qr__caption' }, caption || 'Scan to open the form'),
-    h('button', { type: 'button', class: 'n-btn n-btn--outline e-btn-quiet' }, 'Close'));
-  const close = () => { el.remove(); document.removeEventListener('keydown', esc); };
-  const esc = e => { if (e.key === 'Escape') close(); };
+  const back = document.activeElement;
+  const closeBtn = h('button', { type: 'button', class: 'n-btn n-btn--outline e-btn-quiet' }, 'Close');
+  const el = h('div', { class: 'e-qr e-qr--full', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'QR code', tabindex: '-1' },
+    qrSvg(link), h('p', { class: 'e-qr__caption' }, caption || 'Scan to open the form'), closeBtn);
+  // modal: Tab stays on Close, and focus goes back to the button that opened it
+  const close = () => { el.remove(); document.removeEventListener('keydown', esc); if (back && back.focus) back.focus(); };
+  const esc = e => {
+    if (e.key === 'Escape') close();
+    else if (e.key === 'Tab') { e.preventDefault(); closeBtn.focus(); }
+  };
   el.addEventListener('click', close);
   document.addEventListener('keydown', esc);
   document.body.append(el);
@@ -299,11 +313,30 @@ function restoreFlow() {
   } catch { return null; }
 }
 
+// A link may carry the case (e.g. "Request an evaluation" from a logbook case): ?date=YYYY-MM-DD&initials=AB.
+// Only those two, checked; read once, then dropped from the address.
+export function caseFromLink(search = location.search, today = todayISO()) {
+  const q = new URLSearchParams(search || '');
+  const date = q.get('date') || '';
+  const initials = (q.get('initials') || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3);
+  return { date: /^\d{4}-\d{2}-\d{2}$/.test(date) && date <= today ? date : '', initials };
+}
+function takeCaseFromLink() {
+  const got = caseFromLink();
+  try {
+    // drop just those two, leaving ?demo and the rest exactly as they were
+    const q = location.search.replace(/([?&])(date|initials)=[^&]*/g, '$1').replace(/&{2,}/g, '&').replace(/\?&/, '?').replace(/[?&]$/, '');
+    if (q !== location.search) history.replaceState(history.state, '', location.pathname + q + location.hash);
+  } catch {}
+  return got;
+}
+
 function startFlow({ itemId = null, step = 1 } = {}) {
   const last = lastRequest();
+  const linked = takeCaseFromLink();
   F = {
     id: cloud.newEvaluationId(), step, firstStep: step, itemId, assessor: null, sending: false, sent: null, error: '',
-    card: { date: todayISO(), location: last?.request?.location || '', initials: '', ageBand: '', gender: '', coManaged: false, notes: '' },
+    card: { date: linked.date || todayISO(), location: last?.request?.location || '', initials: linked.initials, ageBand: '', gender: '', coManaged: false, notes: '' },
   };
 }
 
@@ -449,6 +482,19 @@ function chosenItem() {
     h('div', { class: 'e-rq-chosen__body' }, h('p', {}, h('b', {}, it.text)), h('p', { class: 'e-rq-tags' }, itemTags(it))),
     h('button', { type: 'button', class: 'e-btn-link', onclick: () => { F.firstStep = 1; setStep(1); }, 'aria-label': 'Change item' }, 'Change'));
 }
+// Step 3 shows the item and assessor as one short card, so the case fields start higher on a phone.
+function chosenSummary() {
+  const it = itemById(F.itemId), a = F.assessor;
+  if (!it || !a) return null;
+  return h('div', { class: 'e-rq-chosen e-rq-chosen--both' },
+    h('div', { class: 'e-rq-chosen__body' },
+      h('p', {}, h('b', {}, it.text)),
+      h('p', { class: 'e-rq-tags' }, itemTags(it)),
+      h('p', { class: 'e-small' }, 'Assessor: ', h('b', {}, a.name))),
+    h('div', { class: 'e-rq-chosen__btns' },
+      h('button', { type: 'button', class: 'e-btn-link', onclick: () => { F.firstStep = 1; setStep(1); } }, 'Change item'),
+      h('button', { type: 'button', class: 'e-btn-link', onclick: () => { F.firstStep = Math.min(F.firstStep, 2); setStep(2); } }, 'Change assessor')));
+}
 function chosenAssessor() {
   const a = F.assessor;
   return h('div', { class: 'e-rq-chosen' },
@@ -494,7 +540,12 @@ function stepCase() {
   })));
 
   const date = fields.date = h('input', { class: 'e-input', type: 'date', id: 'rq-date', value: c.date, max: todayISO(), required: true, 'aria-describedby': errId('date'),
-    onchange: () => { c.date = date.value; showErr('date', ''); checkWarnings(); } });
+    onchange: () => { c.date = date.value; syncDay(); showErr('date', ''); checkWarnings(); } });
+  // Today / Yesterday in one tap (last night's list), the date box for anything else
+  const yday = todayISO('Asia/Singapore', new Date(Date.now() - 864e5));
+  const dayBtns = [['Today', todayISO()], ['Yesterday', yday]].map(([l, v]) => h('button', { type: 'button', class: 'e-chip-btn', 'aria-pressed': String(c.date === v),
+    onclick: () => { c.date = v; date.value = v; syncDay(); showErr('date', ''); checkWarnings(); } }, l));
+  const syncDay = () => dayBtns.forEach((b, i) => b.setAttribute('aria-pressed', String(c.date === [todayISO(), yday][i])));
 
   const recentLocs = [...new Set([...S.mine].sort(byNew).map(ev => ev.request?.location).filter(Boolean))];
   const locs = [...new Set([...recentLocs.slice(0, 4), ...LOCATIONS])].slice(0, 6);
@@ -535,7 +586,7 @@ function stepCase() {
 
   const sendBtn = h('button', { type: 'submit', class: 'n-btn e-go e-btn-big', disabled: F.sending }, F.sending ? 'Sending…' : 'Send request');
   const form = h('form', { class: 'e-card', novalidate: true, onsubmit: e => { e.preventDefault(); send(); } },
-    h('div', { class: 'e-rq-field' }, h('label', { class: 'e-label', for: 'rq-date' }, 'Date of case'), date, err('date')),
+    h('div', { class: 'e-rq-field' }, h('label', { class: 'e-label', for: 'rq-date' }, 'Date of case'), h('div', { class: 'e-chips e-rq-days' }, dayBtns), date, err('date')),
     h('div', { class: 'e-rq-field' }, h('span', { class: 'e-label', id: 'rq-loc-l' }, 'Location'), locChips, locInput, err('location')),
     h('div', { class: 'e-rq-field' }, h('label', { class: 'e-label', for: 'rq-initials' }, 'Patient initials'), initials,
       h('p', { class: 'e-hint', id: 'rq-initials-hint' }, 'Initials only (max 3 letters). No names or record numbers.'), err('initials')),
@@ -589,16 +640,21 @@ function stepCase() {
   }
 
   setTimeout(checkWarnings, 0);
-  return [stepHead(3, 'The case'), chosenItem(), chosenAssessor(), form];
+  return [stepHead(3, 'The case'), chosenSummary(), form];
 }
 
 // Step 4: share (QR, share sheet, copy) and "another EPA on the same case".
 function stepShare() {
   const ev = F.sent;
+  const head = h('h2', { class: 'e-h3', style: 'margin:0' }, F.offline ? 'Saved. It sends when you’re back online' : 'Request sent');
+  // without signal the request isn't on the server yet, so the assessor's link would find nothing
+  const offlineNote = F.offline ? h('p', { class: 'e-warn-note', role: 'status' }, 'No signal: the link and QR work once this phone is back online and the request has gone. Keep the app open, or show the QR again later from Requests.') : null;
+  if (F.offline) cloud.whenSynced().then(() => { F.offline = false; head.textContent = 'Request sent'; offlineNote?.remove(); }).catch(() => {});
   return [
     h('div', { class: 'e-card' },
+      offlineNote,
       h('div', { class: 'e-rq-done-head' }, icon('check'),
-        h('div', {}, h('h2', { class: 'e-h3', style: 'margin:0' }, F.offline ? 'Saved. It sends when you’re back online' : 'Request sent'),
+        h('div', {}, head,
           h('p', { class: 'e-small e-muted', style: 'margin:0' }, `${toolLabel(ev.tool)} · ${ev.assessorName}`)))),
     sharePanel(ev),
     h('div', { class: 'e-stack' },

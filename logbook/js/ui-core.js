@@ -7,6 +7,7 @@ import * as cloud from './cloud.js';
 import { reflectionCounts } from './reflections.js';
 import { writes } from './writes.js';
 import { transients } from './transients.js';
+import { shownIn, switchPatch, mergeSettings } from './profiles.js';
 
 export { cloud, writes, transients };
 
@@ -28,66 +29,51 @@ export const S = {
   casesSynced: false,  // a snapshot has come from the server (not only the offline cache)
   sharedTemplates: [],
   tab: 'log',
+  lastScreen: null,    // the page before More (app.js); Send feedback names it, nothing else
 };
 
 // Set by app.js: re-render the current screen, or tell it the case list changed.
 export const hooks = { render() {}, casesChanged() {} };
 
 export const settings = () => ({ suggestions: true, rYear: 1, ...(S.logbook && S.logbook.settings) });
-// Profiles (settings.mode, the whole account; at the top of Settings → Profiles or hide items). Basic is the default
-// for everyone (owner, 12 Oct 2026): a simpler app, the same tabs and buttons in the same places without the extras
-// (the optional Case tab parts, the Logbook grid, Analytics trends and forecasts, reflection figures and references),
-// and Analytics in More. Basic: logbook only is Basic without reflections, for residents who submit theirs separately
-// (Reflections in More, for ones already written; no Reflect buttons or ☆ Interesting). Advanced hides nothing.
-// Profiles hide interface items only, never settings, and each item can be turned back on (BASIC_ITEMS).
-// Faculty / PCs (faculty, PDs and admins, who include the programme coordinators; their default, outside the demo):
-// residents' case logs first (Case logs: counts per tag from the summaries, never case details), then programme
-// analytics, then More; their own Case, Logbook, Reflections and Notes tabs start in More.
+// Profiles (settings.mode, the whole account; at the top of Settings → Profile). Each is a preset of switches
+// (profiles.js): picking one shows what it turns on and off, then sets them; any switch can be changed after, and the
+// profile then reads "Custom (based on …)". Basic is the default for everyone (owner, 12 Oct 2026): a simpler app, the
+// same tabs and buttons in the same places without the extras (the optional Case tab parts, the Logbook grid,
+// Analytics trends and forecasts, reflection figures and references), and Analytics in More. Basic: logbook only is
+// Basic without reflections, for residents who submit theirs separately (Reflections in More, for ones already
+// written; no Reflect buttons or ☆ Interesting). Advanced hides nothing. Personal is for logging outside APMES: the
+// APMES parts (targets, Still needed, totals, portfolio, residency year, reflection headings) off, the extras on and
+// Notes on the tab bar. Faculty / PCs (faculty, PDs and admins, who include the programme coordinators; their
+// default, outside the demo): residents' case logs first (Case logs: counts per tag from the summaries, never case
+// details), then programme analytics, then More; their own Case, Logbook, Reflections and Notes tabs start in More.
 export const PROFILES = [
   // simplest first: logbook only hides the most
   ['logbook', 'Basic: logbook only', 'Basic without reflections, if you submit your reflections separately. Reflections you already wrote stay in More.'],
   ['basic', 'Basic', 'A simpler app (the default): the same tabs and buttons without the extras. Analytics is in More.'],
   ['advanced', 'Advanced', 'Everything: quick picks, the Logbook grid, Analytics trends and forecasts, reflection figures and references.'],
+  ['personal', 'Personal', 'For logging outside APMES: no targets, totals or portfolio; the Advanced extras, your own tags and Notes on the tab bar.'],
   ['faculty', 'Faculty / PCs', 'For faculty, PDs and programme coordinators: residents’ case logs first, then programme analytics, then More.'],
 ];
 // may use Faculty / PCs: admins (PCs), PDs and active faculty (the rules let them read the counts summaries)
 export const facultyRole = () => !!(S.admin || S.pd || S.faculty);
 export const profile = () => {
   const m = settings().mode;
-  if (m === 'advanced' || m === 'logbook' || m === 'basic') return m;
+  if (m === 'advanced' || m === 'logbook' || m === 'basic' || m === 'personal') return m;
   if (m === 'faculty') return facultyRole() ? 'faculty' : 'basic';
   return facultyRole() && !cloud.demo ? 'faculty' : 'basic';
 };
 export const facultyMode = () => profile() === 'faculty';
 export const basicMode = () => profile() === 'basic' || profile() === 'logbook';
 export const logbookOnly = () => profile() === 'logbook';
-// What a Basic profile hides is interface only (never a setting), and each can be turned back on (Profiles or hide
-// items; settings.basicOn lists them), so all on is Advanced again. Case tab parts are 'case:<part>'. 'reflect'
-// (Reflect buttons, ☆ Interesting, the reflection headings card) only in Basic: logbook only. The tabs (Analytics,
-// Reflections) are tab bar switches instead.
-export const BASIC_ITEMS = [
-  ['grid', 'The Logbook grid view'],
-  ['analytics', 'Analytics trends, forecasts, Gone quiet, reflection to-dos and links to cases'],
-  ['reflExtras', 'Figures and references in reflections'],
-  ['reflect', 'Reflect buttons, ☆ Interesting and reflection headings in Analytics', 'logbook'],
-];
-export const basicHides = item => {
-  const p = profile();
-  if ((p !== 'basic' && p !== 'logbook') || (item === 'reflect' && p !== 'logbook') || item === 'case:parsed') return false;
-  return !(settings().basicOn || []).includes(item);
-};
-// the Case tab parts (Logging and Profiles or hide items; settings.caseHide, and the profile's)
-export const caseShown = part => !(settings().caseHide || []).includes(part) && !basicHides('case:' + part);
-export function setCaseShown(part, show, parts) {
-  const hide = new Set(settings().caseHide || []), on = new Set(settings().basicOn || []);
-  if (show) { hide.delete(part); if (basicHides('case:' + part)) on.add('case:' + part); } else hide.add(part);
-  return patchLogbook({ settings: { caseHide: hide.size ? parts.filter(p => hide.has(p)) : null, basicOn: on.size ? [...on] : null } });
-}
-export function setBasicOn(item, on) {
-  const now = new Set(settings().basicOn || []);
-  if (on) now.add(item); else now.delete(item);
-  return patchLogbook({ settings: { basicOn: now.size ? [...now] : null } });
-}
+// Each switch (profiles.js SWITCHES; Case tab parts are 'case:<part>'): its saved value, else the profile's default.
+// They hide interface only, never a setting.
+export const shows = key => shownIn(settings(), profile(), key);
+export const basicHides = key => !shows(key);
+export const setShown = (key, on, parts = []) => patchLogbook({ settings: switchPatch(settings(), key, on, parts) });
+// the Case tab parts (Advanced logging and Profile; their own switches, and the profile's defaults)
+export const caseShown = part => shows('case:' + part);
+export const setCaseShown = (part, show, parts) => setShown('case:' + part, show, parts);
 // The intake on the list, or the year the rid starts with.
 export function baseIntake(r) {
   if (!r) return null;
@@ -129,17 +115,23 @@ export const rYear = () => residentYear(S.resident) || settingsYear();
 export const myYearName = () => (S.resident && S.resident.status === 'SMO' ? 'SMO' : yearName(rYear()));
 export const displayName = () => (S.logbook && S.logbook.name) || (S.resident && S.resident.name) || (S.user && S.user.name) || '';
 
+// -> false when the list came out exactly as it was (same cases in the same order): the counts are kept, so
+// nothing that depends on them is worked out again
 export function setCases(cases) {
   rawCases = cases;
-  S.cases = writes.overlay('case', S.user?.email, cases).sort(byNewest);
-  S.counts = countCases(S.cases);
+  const next = writes.overlay('case', S.user?.email, cases).sort(byNewest), was = S.cases;
   S.casesLoaded = true;
+  if (was && was.length === next.length && next.every((c, i) => c === was[i])) return false;
+  S.cases = next;
+  S.counts = countCases(S.cases);
+  return true;
 }
 let rawCases = [];
 writes.configure({ backend: cloud.commitRecord, normalize: cloud.cleanWrite, getOwner: () => S.user?.email || null });
 writes.onChange(() => {
   if (!S.user) return;
-  if (S.casesLoaded) { setCases(rawCases); hooks.casesChanged?.(); }
+  // a save's sync state changing (pending, accepted, done) seldom changes the list: repaint only when it does
+  if (S.casesLoaded && setCases(rawCases)) hooks.casesChanged?.();
   hooks.writesChanged?.();
 });
 export const byNewest = (a, b) => (b.date || '0').localeCompare(a.date || '0') || (b.createdAt || 0) - (a.createdAt || 0);
@@ -351,7 +343,14 @@ export const catName = code => (myNames()[code] && myNames()[code].l) || (NAMES[
 export const catShort = code => (myNames()[code] && myNames()[code].n) || (NAMES[code] && NAMES[code].short) || (DEFAULT_NAMES[code] && DEFAULT_NAMES[code][1]) || catName(code);
 // Readable procedure name for tags and tooltips: no code, no targets.
 export const catFull = code => cat(code).full || cat(code).name;
-export const PROGRESS_BY_CODE = () => Object.fromEntries(progress(S.counts, rYear()).map(p => [p.code, p]));
+// worked out again only when the counts (a new object on every case change), the residency year or the targets
+// switch change (empty with the targets switched off: counts then show without them)
+let progMemo = { counts: null, year: null, on: null, by: null };
+export const PROGRESS_BY_CODE = () => {
+  const year = rYear(), on = shows('targets');
+  if (progMemo.counts !== S.counts || progMemo.year !== year || progMemo.on !== on) progMemo = { counts: S.counts, year, on, by: on ? Object.fromEntries(progress(S.counts, year).map(p => [p.code, p])) : {} };
+  return progMemo.by;
+};
 
 // "count / next target" for a category, e.g. "7 / 10 by R3" or "12 ✓".
 export function countText(code, prog) {
@@ -489,7 +488,8 @@ export async function deleteMany(ids) {
 }
 
 export async function patchLogbook(patch) {
-  S.logbook = { ...S.logbook, ...patch, settings: { ...(S.logbook && S.logbook.settings), ...(patch.settings || {}) } };
+  // (settings merged as the cloud does: `show` key by key)
+  S.logbook = { ...S.logbook, ...patch, settings: mergeSettings(S.logbook && S.logbook.settings, patch.settings) };
   try { await cloud.saveLogbook(mine(), patch); } catch (err) { toast('Could not save settings: ' + err.message); }
 }
 
@@ -528,8 +528,28 @@ export const scheduleSummary = debounce(writeSummaryNow, 4000);
 // demo only: the e2e test writes the summary now instead of waiting the 4 s
 if (cloud.demo && typeof window !== 'undefined') window.__logbookTest = { flushSummary: () => { scheduleSummary.cancel(); return writeSummaryNow(); } };
 
+// Live reflections for the signed-in user (app.js calls this after sign-in). Here rather than in ui-reflect.js, so the
+// Reflections page's code loads only when opened; it says when it's busy editing (hooks.reflectBusy), not to redraw then.
+export function watchMyReflections(email) {
+  S.reflections = []; S.reflectionsSynced = false;
+  let raw = [];
+  const paint = () => {
+    if (S.user?.email !== email) return;
+    S.reflections = writes.overlay('reflection', email, raw);
+    scheduleSummary();
+    if ((S.tab === 'reflect' && !hooks.reflectBusy?.()) || S.tab === 'export' || S.tab === 'choose') hooks.render();
+  };
+  const offQueue = writes.onChange(paint);
+  const offCloud = cloud.watchReflections(email, (list, meta = {}) => { raw = list; if (!meta.fromCache) S.reflectionsSynced = true; paint(); });
+  return () => { offQueue(); offCloud(); };
+}
 // Sign-out: forget per-user caches held by the screens (each registers its own reset).
-export const resetters = [() => { lastSummary = ''; scheduleSummary.cancel(); }];
+// Reflections' unsaved editor drafts (ui-reflect.js) are wiped here, not there: that page's code loads only when
+// opened, and sign-out must leave nothing of the last person's on the device even before it has.
+export const REFLECTION_DRAFT_KEY = 'apmes-logbook-reflection-draft';
+export const resetters = [() => { lastSummary = ''; scheduleSummary.cancel(); }, () => {
+  try { for (const k of Object.keys(localStorage)) if (k.startsWith(REFLECTION_DRAFT_KEY)) localStorage.removeItem(k); } catch { /* blocked */ }
+}];
 export const resetCaches = () => resetters.forEach(f => f());
 
 export { todayISO };

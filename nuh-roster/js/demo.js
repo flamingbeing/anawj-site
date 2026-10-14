@@ -1,6 +1,7 @@
 // Demo mode (?demo): a made-up department to try the app with. Every name here is invented.
 import { suggestShortName } from './engine.js';
 import { weeksOfYear } from './rotations.js';
+import { monthIssues, dutiesOn, leaveOn, addDays, NIGHT_DUTIES } from './monthly.js';
 
 const GIVEN = ['Alex', 'Brenda', 'Calvin', 'Dora', 'Edwin', 'Fiona', 'Gavin', 'Hazel', 'Irwin', 'Janice', 'Kelvin', 'Lorna', 'Marcus', 'Nadia',
   'Oscar', 'Petra', 'Quentin', 'Rosa', 'Silas', 'Tessa', 'Ulric', 'Vera', 'Wilbur', 'Xena', 'Yusuf', 'Zelda'];
@@ -102,6 +103,7 @@ export function makeDemo(date) {
     leave.entries.push({ name: p.name, from: day(from), to: day(to), type: k % 7 === 2 ? 'Medical Leave' : k % 5 === 4 ? 'Off in Lieu' : 'Annual Leave', remarks: '' });
   }
   monthly[month].leave = leave;
+  tidyMonthly(monthly, staff);
   // rotations for the year and the next: residents move every 4 to 12 weeks; MOPEX and locums don't rotate
   const rotations = { weeks: {} };
   const ROT = ['P', 'RA', 'Neu', 'SR', 'Cardiac', 'L', 'Amb', 'ENT', 'Vasc', 'HPB', 'Remote', 'PACU'];
@@ -138,4 +140,44 @@ export function demoNotes(date) {
   Object.entries(MORE).forEach(([room, note], i) => { if ((i + d) % 3) out[room] = note; });
   if (d % 2) delete out['MOR 4'];
   return out;
+}
+
+// Made-up rosters are built by counting round the staff list, so some days clash (a duty on someone's leave,
+// a day duty after a night). Swap those for someone free, as a real rota would, so Practice starts clean.
+function tidyMonthly(monthly, staff) {
+  const byName = new Map(staff.map(p => [p.name, p]));
+  const personOf = t => byName.get(t) || null;
+  for (let pass = 0; pass < 4; pass++) {
+    let fixed = 0;
+    for (const month of Object.keys(monthly).sort()) {
+      for (const issue of monthIssues(monthly, month, personOf)) {
+        if (issue.level !== 'error') continue;
+        const d = +issue.date.slice(8, 10), row = monthly[month][issue.kind]?.rows?.[d];
+        const cur = row && personOf(row[issue.key]);
+        if (!cur) continue;
+        // someone of the same role and grade group who has nothing that day or the night before, and isn't away
+        // liver and AOH are on-call standbys, so a night before doesn't rule anyone out for them
+        // cardiac call and TEE need a cardiac senior, the liver donor an HPB one; anyone of the same role otherwise
+        const need = issue.kind === 'senior' && ['c1', 'c2', 'tee'].includes(issue.key) ? 'cardiac' : issue.kind === 'liver' && issue.key === 'donor' ? 'hpb' : '';
+        const busy = new Set([issue.date, addDays(issue.date, -1)].flatMap(date => Object.values(dutiesOn(monthly, date)).flatMap(Object.values)));
+        const away = new Set(leaveOn(monthly, issue.date).map(e => e.name));
+        const pick = staff.find(p => p.role === cur.role && (p.grade === 'MOPEX') === (cur.grade === 'MOPEX') && p.id !== cur.id && !busy.has(p.name) && !away.has(p.name)
+          && (!need || (p.subspecs || []).includes(need)));
+        const sameDay = new Set(Object.values(dutiesOn(monthly, issue.date)).flatMap(Object.values));
+        const nightBefore = new Set(Object.entries(dutiesOn(monthly, addDays(issue.date, -1))).flatMap(([kind, r]) => Object.entries(r).filter(([key]) => NIGHT_DUTIES.includes(`${kind}.${key}`)).map(([, v]) => v)));
+        const ok = (p, strict) => p.role === cur.role && p.id !== cur.id && (p.subspecs || []).includes(need) && (['liver', 'aoh'].includes(issue.kind) || !nightBefore.has(p.name)) && !away.has(p.name) && (!strict || !sameDay.has(p.name));
+        const pickLoose = pick || (need && (staff.find(p => ok(p, true)) || staff.find(p => ok(p, false))));
+        if (pickLoose) { row[issue.key] = pickLoose.name; fixed++; continue; }
+        // no one suitable for the day duty (e.g. a cardiac list): move the night before instead
+        const a = issue.after, arow = a && monthly[a.date.slice(0, 7)]?.[a.kind]?.rows?.[+a.date.slice(8, 10)];
+        const night = arow && personOf(arow[a.key]);
+        if (!night) continue;
+        const busy2 = new Set([a.date, addDays(a.date, -1), issue.date].flatMap(date => Object.values(dutiesOn(monthly, date)).flatMap(Object.values)));
+        const away2 = new Set([...leaveOn(monthly, a.date), ...leaveOn(monthly, issue.date)].map(e => e.name));
+        const pick2 = staff.find(p => p.role === night.role && (p.grade === 'MOPEX') === (night.grade === 'MOPEX') && !busy2.has(p.name) && !away2.has(p.name));
+        if (pick2) { arow[a.key] = pick2.name; fixed++; }
+      }
+    }
+    if (!fixed) break;
+  }
 }

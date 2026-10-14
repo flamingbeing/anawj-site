@@ -11,16 +11,31 @@ export const SITES = {
   'hand.anawj.com': { prefixes: { '/cmcj/': 'cmcj/', '/babies/': 'hand-babies/', '/handlog/': 'hand-log/' } },
   'prewarmstudy.anawj.com': { root: 'prewarm/' },
   'nuhroster.anawj.com': { root: 'nuh-roster/' },
+  // /people/ is the shared people lists (residents, faculty, PDs) the logbook and evals both use.
   // /apmes/guidebook/ is the programme guidebook text the evals app reads (just that folder of apmes/).
   // /__/auth/ and /__/firebase/ are Firebase's sign-in helper pages (the auth domain of logbook and evals). The helper
   // scripts are the same files anawj.com serves; init.json is this host's own copy (authDomain apmes.anawj.com).
-  'apmes.anawj.com': { prefixes: { '/logbook/': 'logbook/', '/evals/': 'evals/', '/apmes/guidebook/': 'apmes/guidebook/', '/__/auth/': '__/auth/', '/__/firebase/': 'apmes-auth/firebase/' } },
+  // Ask Claude, the owner's page (behind Cloudflare Access; its API is worker/ask.js)
+  'ask.anawj.com': { root: 'ask/' },
+  'apmes.anawj.com': { prefixes: { '/logbook/': 'logbook/', '/evals/': 'evals/', '/people/': 'people/', '/apmes/guidebook/': 'apmes/guidebook/', '/__/auth/': '__/auth/', '/__/firebase/': 'apmes-auth/firebase/' } },
 };
 
 // The one folder every host serves as it is: the shared design files (styles only, no data), so a subdomain's apps can
 // link ../nuhsdesign/tokens.css. (The old path /design/ was served too until 13 Oct 2026, when nothing linked it any more.)
-// This is the only folder shared between subdomains.
-export const SHARED = ['/nuhsdesign/'];
+// /feedback/ is the feedback button's script (feedback/overlay.js; no data), which sites.js adds to pages when it's on.
+// These are the only folders shared between subdomains.
+export const SHARED = ['/nuhsdesign/', '/feedback/'];
+
+// The feedback button (edit/NOTES.md): on PR previews (any *.workers.dev host) it is on for every page; on the real
+// addresses only in a browser that turned it on with ?feedback=1 (a cookie; ?feedback=0 turns it off).
+export const FEEDBACK_COOKIE = 'anawj-feedback';
+export function feedback(host, search, cookie) {
+  host = String(host || '').toLowerCase().replace(/:\d+$/, '');
+  const q = new URLSearchParams(search || '').get('feedback');
+  const set = q === '1' ? true : q === '0' ? false : null;   // what the address asks for, if anything
+  const on = /\.workers\.dev$/.test(host) || (set ?? new RegExp(`(?:^|;\\s*)${FEEDBACK_COOKIE}=1(?:;|$)`).test(cookie || ''));
+  return { on, set: /\.workers\.dev$/.test(host) ? null : set };
+}
 
 // On any host not in SITES, /_sites/<host>/<path> serves <path> as that host would, so the mapping can be tried on a
 // PR preview before the real addresses exist: <preview>/_sites/hand.anawj.com/babies/

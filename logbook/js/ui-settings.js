@@ -1,90 +1,33 @@
 // Settings tab (#settings): the Admin entry (admins only), display, logging, templates, recycle bin, privacy. Also the Account tab's
-// "You" and sign-out cards (youCard, signOutCard), used by ui-account.js.
+// "You" card (youCard), used by ui-account.js; the More page's cards are in more-cards.js.
 
 import { YEAR_NAMES, DEFAULT_NAMES, BY_CODE } from './categories.js';
 import { sortCodes, uid, academicYear, withParents, weekStart, humanAge } from './engine.js';
-import { S, h, info, toast, modal, confirmBox, cloud, writes, catChip, catName, catShort, PICKER_ORDER, pickerOrder, settings, patchLogbook, displayName, hooks, rYear, myYearName, fill, PROFILES, profile, basicMode, facultyRole, BASIC_ITEMS, basicHides, setBasicOn, caseShown, setCaseShown, categoryNames, setCategoryNames, catPills, tagSet, resetters, download, fileButton, todayISO, saveMany, UNDO_SECS, rowIcon } from './ui-core.js';
+import { S, h, toast, modal, confirmBox, cloud, catChip, catName, catShort, PICKER_ORDER, settings, patchLogbook, displayName, hooks, rYear, myYearName, fill, PROFILES, profile, facultyRole, shows, setShown, caseShown, setCaseShown, categoryNames, setCategoryNames, catPills, tagSet, resetters, download, fileButton, todayISO, saveMany, UNDO_SECS, rowIcon } from './ui-core.js';
 import { MAX_TAGS, tagLinks as tagLinksIn, learnShorthand, cleanShorthand, shorthandOf, DEFAULT_SHORTHAND, cleanTagSet, defaultTagSet, tagTree, flatTree, moveTag, reparentTag, removeTag, newKey, tagSetToCsv, tagSetFromCsv, dropTag, canPlace, placeNewTag } from './tags.js';
-import { pickDialog, CASE_PARTS, AFTER_SAVE } from './ui-log.js';
+import { pickDialog, CASE_PARTS, AFTER_SAVE, RECENT_COUNTS } from './ui-log.js';
+import { recentCount as snapRecent } from './logging.js';
 import { OPERATOR_HELP } from './search-ops.js';
-import { DEFAULT_ACCENT, cleanAccent, schemeCss, lightPalette, tabSchemeCss, tabVarsCss } from './colors.js';
+import { DEFAULT_ACCENT, cleanAccent } from './colors.js';
 import { cleanMarkdown, storedMarkdown, mdCase, mdDay, reflectionPath, reflectionNote, CASE_FILLINS, REFL_FILLINS, FM_FIELDS } from './markdown.js';
 import { checkCss } from './custom-css.js';
-import { FONTS, applyFonts, fontStack, fontAvailable, cleanFontName, logChoice, saveUserFont, getUserFont, deleteUserFont } from './fonts.js';
+import { FONTS, fontStack, fontAvailable, cleanFontName, logChoice, saveUserFont, getUserFont, deleteUserFont } from './fonts.js';
+import { SWITCHES, switchLabel, switchChanges, applyPatch, resetPatch, tabsAfter } from './profiles.js';
 import { PHOTO_BUDGET_KB, PHOTO_NOTE, photoUsageKb, fmtMb } from './reflections.js';
-
-// Compact mode (this device's display settings, below): body.compact (style.css, "compact mode" block). Cached in
-// localStorage so the first paint after a reload is already compact, before the logbook loads.
-const COMPACT_KEY = 'apmes-logbook-compact';
-export function applyCompact(on) {
-  document.body.classList.toggle('compact', !!on);
-  try { on ? localStorage.setItem(COMPACT_KEY, '1') : localStorage.removeItem(COMPACT_KEY); } catch { /* storage blocked */ }
-}
-// Theme: 'light' (default), 'dark', or 'auto' (follows the phone) as <html data-theme>, styled at
-// the end of style.css. Saved on this device only (Auto is a device setting, and a ward PC can stay
-// light while a phone is dark); sign-out keeps it. index.html applies it before the first paint.
-const THEME_KEY = 'apmes-logbook-theme';
-// light | dark | oled (dark with pure black: data-oled) | auto (follows the phone)
-export function applyTheme(t) {
-  const theme = ['dark', 'oled', 'auto'].includes(t) ? t : 'light';
-  document.documentElement.dataset.theme = theme === 'oled' ? 'dark' : theme;
-  if (theme === 'oled') document.documentElement.dataset.oled = ''; else delete document.documentElement.dataset.oled;
-  try { theme === 'light' ? localStorage.removeItem(THEME_KEY) : localStorage.setItem(THEME_KEY, theme); } catch { /* storage blocked */ }
-}
-export function cachedTheme() {
-  try { return localStorage.getItem(THEME_KEY) || 'light'; } catch { return 'light'; }
-}
-// Text size (this device's display settings): the words only (style.css font sizes × --fs); the layout stays.
-// Interface zoom: everything, header and tab bar too (body zoom, --ui-zoom), like a notes app's zoom level;
-// Ctrl/Cmd + / − / 0 on a computer (app.js). Both cached on the device for the first paint (index.html).
-const SIZE_KEY = 'apmes-logbook-textsize', ZOOM_KEY = 'apmes-logbook-zoom';
-export const TEXT_SIZES = [['0.85', 'Smallest'], ['0.92', 'Smaller'], ['1', 'Normal'], ['1.1', 'Larger'], ['1.2', 'Largest']];
-export const ZOOMS = ['0.8', '0.9', '1', '1.1', '1.25', '1.5'];
-export function applyTextSize(z) {
-  const v = TEXT_SIZES.some(([k]) => k === String(z)) ? String(z) : '1';
-  document.documentElement.style.setProperty('--fs', v);
-  try { v === '1' ? localStorage.removeItem(SIZE_KEY) : localStorage.setItem(SIZE_KEY, v); } catch { /* storage blocked */ }
-}
-export function applyZoom(z) {
-  const v = ZOOMS.includes(String(z)) ? String(z) : '1';
-  document.documentElement.style.setProperty('--ui-zoom', v);
-  try { v === '1' ? localStorage.removeItem(ZOOM_KEY) : localStorage.setItem(ZOOM_KEY, v); } catch { /* storage blocked */ }
-}
-// one step in or out (or back to 100%), saved on this device
-export function stepZoom(dir) {
-  const i = ZOOMS.indexOf(String(display().zoom || '1'));
-  const v = dir === 0 ? '1' : ZOOMS[Math.max(0, Math.min(ZOOMS.length - 1, (i < 0 ? 2 : i) + dir))];
-  applyZoom(v); setDisplay({ zoom: v });
-  return v;
-}
-// Colour (this device's display settings): one accent colour; colors.js works out the
-// light, dark and OLED palettes. The CSS is cached on the device so the first paint has it (index.html).
-const ACCENT_CSS_KEY = 'apmes-logbook-accent-css';
-export function applyAccent(c) {
-  const accent = cleanAccent(c) || DEFAULT_ACCENT;
-  const css = schemeCss(accent);
-  let el = document.getElementById('accent-css');
-  if (!el) { el = document.createElement('style'); el.id = 'accent-css'; document.head.append(el); }
-  el.textContent = css;
-  const meta = document.querySelector('meta[name="theme-color"]'); if (meta) meta.setAttribute('content', lightPalette(accent).accent);
-  try { accent === DEFAULT_ACCENT ? localStorage.removeItem(ACCENT_CSS_KEY) : localStorage.setItem(ACCENT_CSS_KEY, css); } catch { /* storage blocked */ }
-}
-export function cachedTextSize() {
-  try { return localStorage.getItem(SIZE_KEY) || '1'; } catch { return '1'; }
-}
-export function cachedZoom() {
-  try { return localStorage.getItem(ZOOM_KEY) || '1'; } catch { return '1'; }
-}
-export function cachedCompact() {
-  try { return localStorage.getItem(COMPACT_KEY) === '1'; } catch { return false; }
-}
+import { partsSettings } from './ui-parts.js';
+import { labelsOn } from './parts.js';
+import { deviceOn, deviceChanges, deviceReset, DEVICE_SWITCHES } from './device-presets.js';
+import { applyCompact, applyTheme, cachedTheme, TEXT_SIZES, ZOOMS, applyTextSize, applyZoom, applyAccent, display, setDisplay, applyDisplay, LINE_WIDTHS, LINE_HEIGHTS, CONTRASTS, MOTIONS, BUTTON_STYLES, defaultTitle, BORDERS, ROUNDS, roundLevel, BAR_TABS, barTabs, MAX_BAR, arrangeTabs, setTabOnBar, borderLevel, cleanTitle, IPHONE_APP, START_TABS } from './display.js';
+import { resetLink, help, toggle } from './settings-rows.js';
+// (the display helpers are still exported from here: the e2e tests import them from this file)
+export * from './display.js';
 
 // Settings is a short menu (app.js) of these pages: Display, Logging, the Tag editor and the Recycle bin.
 // Residency year (for people not on the programme list) is on Account; reflection settings on the
 // Reflections tab (#reflset).
 export function residencyCard() {
   return (
-    S.resident ? null : h('section', { class: 'card' },
+    S.resident || !shows('year') ? null : h('section', { class: 'card' },
       h('h2', {}, 'Residency year'),
       h('label', { class: 'field' }, 'Year used for the targets on Analytics',
         h('select', { onchange: e => patchLogbook({ settings: { rYear: Number(e.target.value), rYearAY: academicYear() } }).then(() => toast('Saved')) },
@@ -92,174 +35,6 @@ export function residencyCard() {
       h('p', { class: 'hint', style: 'margin:4px 0 0' }, 'Programme residents get their year from the programme list automatically. If you are an APMES resident, ask the programme admins to add your email.')));
 }
 
-// Display settings belong to the device, not the account (owner: people use the logbook on different devices with
-// different needs): compact mode, text size, colour and the tab the app opens on, in localStorage DISPLAY_KEY, next to
-// the light / dark choice. The first time a device opens the app it starts from what the account had (these used to
-// follow the account), so nobody's look changes. Kept at sign-out: they are the device's, and nothing private.
-const DISPLAY_KEY = 'apmes-logbook-display';
-export const DISPLAY_KEYS = ['compact', 'textSize', 'zoom', 'accent', 'startTab', 'fontUi', 'fontUiName', 'fontLog', 'fontLogName', 'lineWidth', 'lineHeight', 'contrast', 'motion', 'tabIcons', 'tabBar', 'hideHeader', 'caseInverted', 'colourful', 'customCss', 'customCssOn', 'autoFocus', 'appTitle', 'boxCaps', 'boxCorrect', 'boxSpell', 'reflSpell', 'pinBox', 'pinSearch', 'firstField', 'compactTags', 'borders', 'round', 'shadows', 'bigTaps', 'tabOrder', 'tabHidden', 'swipeTabs', 'rowMenu', 'rowCopy', 'reflToolbar', 'edgeBack', 'hideWords', 'flat', 'btnStyle', 'iconBtns', 'calPlain', 'pageTitles', 'rowShort', 'rowHold', 'dayCopy'];
-export function deviceDisplay() {
-  try { const d = JSON.parse(localStorage.getItem(DISPLAY_KEY) || 'null'); return d && typeof d === 'object' && !Array.isArray(d) ? d : null; } catch { return null; }
-}
-export const display = () => migrateDisplay(deviceDisplay()) || {};
-// before Interface zoom, "Text size" zoomed the page content: carry it over as the zoom (closest step) once
-const OLD_SIZES = { '0.8': '0.8', '0.9': '0.9', '1.12': '1.1', '1.25': '1.25' };
-function migrateDisplay(d) {
-  if (!d || d.v === 2) return d;
-  const out = { ...d, v: 2 };
-  if (OLD_SIZES[String(d.textSize)] && !d.zoom) { out.zoom = OLD_SIZES[String(d.textSize)]; out.textSize = '1'; }
-  try { localStorage.setItem(DISPLAY_KEY, JSON.stringify(out)); } catch { /* storage blocked */ }
-  return out;
-}
-export function setDisplay(patch) {
-  const d = { ...display(), ...patch };
-  try { localStorage.setItem(DISPLAY_KEY, JSON.stringify(d)); } catch { /* storage blocked: this visit only */ }
-  return d;
-}
-let adoptedNow = false;
-// this device's display settings, made from the account's the first time (fresh: the server's copy replaces a
-// first guess made from a stale offline copy earlier in the same visit)
-export function adoptDisplay(accountSettings, { fresh = false } = {}) {
-  if (deviceDisplay() && !(fresh && adoptedNow)) return display();
-  adoptedNow = !fresh;
-  try { localStorage.setItem(DISPLAY_KEY, JSON.stringify(Object.fromEntries(DISPLAY_KEYS.map(k => [k, (accountSettings || {})[k] ?? null])))); } catch { /* storage blocked */ }
-  return display();   // (an old account text size becomes the zoom here too)
-}
-export function resetDisplay() { adoptedNow = false; try { localStorage.removeItem(DISPLAY_KEY); } catch { /* storage blocked */ } }
-export function applyDisplay(d = display()) { applyCompact(!!d.compact); applyTextSize(d.textSize || '1'); applyZoom(d.zoom || '1'); applyAccent(d.accent); applyFonts(d); applyLook(d); }
-// page width (lineWidth), line spacing, contrast, motion, icons-only tabs: classes on <html> and --lh (style.css, end); also set at
-// first paint from the same localStorage entry (index.html)
-export const LINE_WIDTHS = [['narrow', 'Narrow (easier to read on a big screen)'], ['normal', 'Normal (default)'], ['wide', 'Wide'], ['full', 'Full (no limit)']];
-export const LINE_HEIGHTS = [['0.9', 'Tight'], ['1', 'Normal (default)'], ['1.15', 'Relaxed'], ['1.3', 'Loose']];
-export const CONTRASTS = [['auto', 'Follow the device (default)'], ['normal', 'Normal'], ['high', 'Higher contrast']];
-export const MOTIONS = [['auto', 'Follow the device (default)'], ['full', 'Animations on'], ['reduce', 'Reduce motion']];
-export function applyLook(d = {}) {
-  const c = document.documentElement.classList;
-  c.toggle('lw-narrow', d.lineWidth === 'narrow'); c.toggle('lw-wide', d.lineWidth === 'wide'); c.toggle('lw-full', d.lineWidth === 'full');
-  document.documentElement.style.setProperty('--lh', LINE_HEIGHTS.some(([v]) => v === String(d.lineHeight)) ? String(d.lineHeight) : '1');
-  const ct = d.contrast || 'auto'; c.toggle('hc', ct === 'high'); c.toggle('hc-auto', ct === 'auto');
-  const mo = d.motion || 'auto'; c.toggle('rm', mo === 'reduce'); c.toggle('rm-auto', mo === 'auto');
-  c.toggle('tab-icons', !!d.tabIcons);
-  c.toggle('tabs-top', d.tabBar === 'top'); c.toggle('tabs-bottom', d.tabBar === 'bottom');
-  c.toggle('no-header', !!d.hideHeader);
-  c.toggle('case-inverted', !!d.caseInverted);
-  const col = d.colourful === true ? 'tabs' : d.colourful;   // (a plain on/off before "everything in the tab")
-  c.toggle('colourful', col === 'tabs' || col === 'all'); c.toggle('colour-all', col === 'all');
-  if (col === 'tabs' || col === 'all') {
-    // with the default colour the tabs follow the NUH stripe at the top; with another colour, the brighter set
-    const set = (cleanAccent(d.accent) || DEFAULT_ACCENT) === DEFAULT_ACCENT ? NUH_TAB_COLOURS : TAB_COLOURS;
-    const css = tabVarsCss(set) + '\n' + (col === 'all' ? Object.entries(set).map(([t, hex]) => tabSchemeCss(hex, `body[data-bar="${t}"]`)).join('\n') : '');
-    let el = document.getElementById('tab-colours');
-    if (!el) { el = document.createElement('style'); el.id = 'tab-colours'; document.head.append(el); }
-    if (el.textContent !== css) el.textContent = css;
-  }
-  c.toggle('no-autofocus', d.autoFocus === false);
-  // the case box's keyboard and the reflection editor's spelling (Logging / Reflections pages; read by ui-log.js, ui-reflect.js)
-  c.toggle('box-caps-off', d.boxCaps === false); c.toggle('box-correct', d.boxCorrect === true); c.toggle('box-spell-off', d.boxSpell === false);
-  c.toggle('refl-spell-off', d.reflSpell === false);
-  // pinned while scrolling: the case box (Case tab) and the search card (Logbook)
-  c.toggle('pin-box', !!d.pinBox); c.toggle('pin-search', !!d.pinSearch);
-  // Borders: softer lines (--edge, style.css); at Borderless / Faint fields, buttons and chips get a light fill instead
-  // Flat (the slider's far end, owner 13 Oct 2026): borderless, and the page cards melt into the page
-  const bl = d.flat ? 0 : borderLevel(d), soft = bl < BORDERS.length - 1;
-  c.toggle('flat', !!d.flat);
-  c.toggle('edges', soft); c.toggle('edges-fill', bl <= 1);
-  if (soft) document.documentElement.style.setProperty('--edge-mix', BORDER_MIX[bl] + '%'); else document.documentElement.style.removeProperty('--edge-mix');
-  // corners, card shadows instead of lines, bigger tap targets on the Case tab
-  const rl = roundLevel(d);
-  if (rl !== 2) document.documentElement.style.setProperty('--round', String(ROUNDS[rl][1])); else document.documentElement.style.removeProperty('--round');
-  c.toggle('shadows', d.shadows !== false);   // soft shadows by default (owner, 12 Oct 2026); false = lines
-  c.toggle('big-taps', !!d.bigTaps);
-  // swipe between the bar's tabs (app.js; on unless switched off: swipeTabs false); one ⋯ menu on Logbook rows
-  // instead of Copy and Reflect (ui-logbook.js)
-  c.toggle('swipe-tabs', d.swipeTabs !== false); c.toggle('row-menu', !!d.rowMenu); c.toggle('refl-toolbar', !!d.reflToolbar);
-  // Copy on each Logbook row: off by default (owner, 13 Oct 2026); the ⋯ menu, Share for a day and the case itself still copy
-  c.toggle('row-copy', !!d.rowCopy);
-  // Copy beside Share for a day in the Logbook calendar: off by default too (owner, 13 Oct 2026)
-  c.toggle('day-copy', !!d.dayCopy);
-  // word counts on the Reflections list: on unless switched off (Settings → Reflections; owner, 13 Oct 2026)
-  c.toggle('no-wc', !!d.hideWords);
-  // the seven Clean looks (owner, 13 Oct 2026; Advanced display and Accessibility, all off by default): button style,
-  // icons instead of words, the plain calendar, page titles in the header, shorter Logbook rows, press and hold
-  for (const b of BUTTON_STYLES.slice(1)) c.toggle('btn-' + b[0], d.btnStyle === b[0]);
-  c.toggle('icon-btns', !!d.iconBtns); c.toggle('cal-plain', !!d.calPlain); c.toggle('page-titles', !!d.pageTitles);
-  c.toggle('rows-short', !!d.rowShort); c.toggle('row-hold', !!d.rowHold);
-  // the name in the header and the browser tab (plain text, at most 40 characters)
-  const title = cleanTitle(d.appTitle) || APP_TITLE;
-  paintTitle(d);
-  if (document.title !== title) document.title = title;   // ui-log.js: don't open the keyboard on the Case tab
-  applyCustomCss(d);
-}
-export const BUTTON_STYLES = [['outlined', 'Outlined (default)'], ['filled', 'Filled'], ['tinted', 'Tinted'], ['plain', 'Plain']];
-// the header's words: the app's name, or with Page titles the page's ("Logbook"); render() in app.js says which page
-let pageLabel = '';
-export function setPageLabel(l) { pageLabel = l || ''; paintTitle(); }
-function paintTitle(d = display()) {
-  const t = (d.pageTitles && pageLabel) || cleanTitle(d.appTitle) || APP_TITLE;
-  const h1 = document.querySelector('.top h1'); if (h1 && h1.textContent !== t) h1.textContent = t;
-}
-// one colour per tab (Colourful); style.css has the same shades for the tabs-and-headings version
-export const TAB_COLOURS = { log: '#c2410c', logbook: '#0e7490', reflect: '#be123c', progress: '#1d4ed8', more: '#6d28d9' };
-// the NUH stripe (orange, red, blue, navy) for the default colour; More keeps the app's navy
-export const NUH_TAB_COLOURS = { log: '#e57200', logbook: '#e4002b', reflect: '#178fd7', progress: '#002f6c', more: '#002f6c' };
-export const APP_TITLE = 'APMES Logbook';
-// Borders (Display, per device): how strong the lines around cards, fields, buttons and chips are; the last is the default
-export const BORDERS = ['Borderless', 'Faint', 'Light', 'Soft', 'Normal (default)'];
-export const BORDER_MIX = [0, 25, 50, 75];
-// Corners (Display, per device): every border-radius in style.css is multiplied by --round; Normal is the default
-export const ROUNDS = [['Square', 0], ['Slightly rounded', 0.5], ['Normal (default)', 1], ['Very round', 1.7]];
-export const roundLevel = d => (Number.isInteger(d.round) && d.round >= 0 && d.round < ROUNDS.length ? d.round : 2);
-// The tab bar (Advanced display, per device): the order of its tabs and which are hidden. More always stays
-// (Settings live there), at least two and at most seven (MAX_BAR, More included) stay on the bar; hidden main tabs
-// are listed first on the More page. Every page in the More list can go on the bar too (Admin portal: admins only).
-export const BAR_TABS = [['caselogs', 'Case logs'], ['log', 'Case'], ['logbook', 'Logbook'], ['reflect', 'Reflections'], ['progress', 'Analytics'], ['notes', 'Notes'],
-  ['account', 'Account'], ['settings', 'Settings'], ['recovery', 'Recover drafts'], ['data', 'Export / Import'], ['admin', 'Admin portal'], ['more', 'More']];
-export const barTabs = () => BAR_TABS.filter(([id]) => (id !== 'admin' || S.admin) && (id !== 'caselogs' || facultyRole()));
-// tabs off the bar until someone puts them there (they live in More by default); the Basic profiles keep Analytics
-// in More too, and Basic: logbook only Reflections. Case logs is on the bar only in Faculty / PCs, which keeps the
-// person's own Case, Logbook and Reflections in More instead.
-const OFF_BAR = ['caselogs', 'notes', 'account', 'settings', 'recovery', 'data', 'admin'];
-const PROFILE_OFF = { advanced: [], basic: ['progress'], logbook: ['progress', 'reflect'], faculty: ['log', 'logbook', 'reflect'] };
-// (Faculty / PCs also puts the Admin portal on the bar, for admins: the tab is theirs only)
-const offBar = mode => [...OFF_BAR.filter(id => mode !== 'faculty' || (id !== 'caselogs' && id !== 'admin')), ...(PROFILE_OFF[mode] || [])];
-export const MAX_BAR = 7;
-export function arrangeTabs(ids, d = {}, mode = profile()) {
-  const order = Array.isArray(d.tabOrder) ? d.tabOrder : [];
-  // a tab not in the saved order goes just before More (More stays last unless moved)
-  const before = order.includes('more') ? order.indexOf('more') - 0.5 : order.length;
-  const at = id => (order.includes(id) ? order.indexOf(id) : id === 'more' ? order.length + 1e3 : before + ids.indexOf(id) / 1e3);
-  const sorted = [...ids].sort((a, b) => at(a) - at(b));
-  // an OFF_BAR tab stays off until someone shows it in Arrange tabs (which saves the order with it in)
-  const hidden = new Set([...(Array.isArray(d.tabHidden) ? d.tabHidden : []), ...offBar(mode).filter(id => !order.includes(id) || !Array.isArray(d.tabHidden))].filter(id => id !== 'more'));
-  // over the limit (saved by hand, or an old settings file): the last ones in the order go to More
-  for (const id of [...sorted].reverse()) if (sorted.filter(k => !hidden.has(k)).length > MAX_BAR && id !== 'more' && !hidden.has(id)) hidden.add(id);
-  const shown = sorted.filter(id => !hidden.has(id));
-  return shown.length >= 2 ? { sorted, shown, hidden: sorted.filter(id => hidden.has(id)) } : { sorted, shown: sorted, hidden: [] };
-}
-// Show or hide one tab on the bar (Arrange tabs, Show or hide, the Notes page); then() runs after a change.
-// Fewer than two tabs: a toast. More than seven: asks which tab it replaces (taking that tab's place).
-export function setTabOnBar(id, show, then = () => {}) {
-  const all = barTabs();
-  const { sorted, shown, hidden } = arrangeTabs(all.map(([k]) => k), display());
-  const next = new Set(hidden); if (show) next.delete(id); else next.add(id);
-  const n = all.length - next.size;
-  const label = k => BAR_TABS.find(([x]) => x === k)[1];
-  if (n < 2) { toast('Keep at least two tabs on the bar'); then(); return; }
-  if (n > MAX_BAR) {
-    const m = modal(`The tab bar holds ${MAX_BAR} tabs`, [
-      h('p', {}, `Put ${label(id)} in place of:`),
-      h('div', { class: 'bar' }, shown.filter(k => k !== 'more').map(k => h('button', { onclick: () => {
-        const order = sorted.filter(x => x !== id); order.splice(order.indexOf(k), 0, id);
-        applyDisplay(setDisplay({ tabHidden: [...next, k], tabOrder: order })); hooks.paintTabs?.(); m.close();
-      } }, label(k)))),
-      h('div', { class: 'bar' }, h('span', { class: 'grow' }), h('button', { onclick: () => m.close() }, 'Cancel')),
-    ], { onclose: () => then() });
-    return;
-  }
-  // an empty list (not null) means "everything on the bar", so Notes doesn't drop back into More
-  applyDisplay(setDisplay({ tabHidden: [...next], tabOrder: sorted })); hooks.paintTabs?.(); then();
-}
-export const borderLevel = d => (Number.isInteger(d.borders) && d.borders >= 0 && d.borders < BORDERS.length - 1 ? d.borders : BORDERS.length - 1);
 // Display preview (owner): a made-up case row, chips and buttons drawn with the app's own classes, so colour,
 // borders, fonts, text size and compact show at once; it stays in view while the page scrolls
 export const displayPreview = () => h('div', { class: 'display-preview', 'aria-hidden': 'true' },
@@ -272,44 +47,16 @@ export const displayPreview = () => h('div', { class: 'display-preview', 'aria-h
         h('button', { class: 'small row-btn has-refl', tabindex: '-1', type: 'button' }, rowIcon('done'), h('span', { class: 'lbl' }, 'Reflect')))))),
   h('div', { class: 'chips' }, h('span', { class: 'chip on' }, 'Spinal'), h('span', { class: 'chip' }, 'LSCS'), h('span', { class: 'chip' }, 'GA'),
     h('span', { class: 'grow' }), h('button', { class: 'small primary', tabindex: '-1', type: 'button' }, 'Save')));
-// "Reset this page" (owner): puts only this page's choices back to their defaults, after asking
-export const resetLink = (what, run) => h('p', { class: 'reset-row' }, h('button', { class: 'small linkish', type: 'button', onclick: async () => {
-  if (!await confirmBox('Reset this page', `Put ${what} back to the defaults?`, 'Reset')) return;
-  await run(); hooks.render(); toast('Back to the defaults');
-} }, 'Reset this page'));
 
 // a link to a settings page's own Advanced page, like a row of the More list (never hidden: profiles hide interface
 // items, not settings)
 export const advancedLink = (id, label, desc) => h('section', { class: 'card more-list more-settings' },
   h('ul', {}, h('li', {}, h('a', { href: '#' + id, 'data-go': id },
     h('span', { class: 'mt' }, h('b', {}, label), h('small', {}, desc)), h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')))));
-export const cleanTitle = s => String(s || '').replace(/[\u0000-\u001f]/g, '').replace(/\s+/g, ' ').trim().slice(0, 40);
 export const COLOURFUL = [['off', 'Off (default)'], ['tabs', 'One colour per tab: the tabs and headings'], ['all', 'One colour per tab: everything in the tab']];
-// Custom CSS (custom-css.js): only CSS that passes checkCss, never on the Display pages (basic and advanced), and off with ?nocss
-export function applyCustomCss(d = display()) {
-  if (typeof document === 'undefined') return;
-  let el = document.getElementById('user-css');
-  const res = checkCss(d.customCss);
-  const on = !!d.customCssOn && res.ok && !!res.css && !/[?&]nocss\b/.test(location.search) && S.tab !== 'display' && S.tab !== 'displayadv';
-  if (!on) { if (el) el.textContent = ''; return; }
-  if (!el) { el = document.createElement('style'); el.id = 'user-css'; document.head.append(el); }
-  if (el.textContent !== res.css) el.textContent = res.css;
-}
 export const TAB_BARS = [['auto', 'Bottom on phones, top on bigger screens (default)'], ['top', 'Always at the top'], ['bottom', 'Always at the bottom']];
 
-// Settings rows (owner, 13 Oct 2026): a switch for on or off, a ✓ list for two to five choices, help in one line
-// with ⓘ for the rest. The pages carry class set-page (style.css, "settings rows").
-const help = (line, ...more) => {
-  if (!more.length) return h('p', { class: 'hint help' }, line);
-  const [b, p] = info(...more);
-  return [h('p', { class: 'hint help' }, line, '\u00a0', b), p];
-};
-// label: the words, or [words, a shorter name for screen readers and tests]
-const toggle = (label, on, set, line, ...more) => {
-  const [text, name] = Array.isArray(label) ? label : [label, label];
-  return [h('label', { class: 'check' }, h('input', { type: 'checkbox', role: 'switch', 'aria-label': name, checked: !!on, onchange: e => set(e.target.checked) }), text),
-    line ? help(line, ...more) : null];
-};
+// a ✓ list for two to five choices (settings rows: settings-rows.js); the pages carry class set-page (style.css)
 function pick(label, opts, cur, set, line, ...more) {
   const name = 'pick-' + label.toLowerCase().replace(/[^a-z0-9]+/g, '-');
   return h('fieldset', { class: 'pick' }, h('legend', {}, label),
@@ -370,9 +117,9 @@ export function renderDisplayAdvanced() {
       toggle('Plain calendar', st.calPlain, set('calPlain'), 'Numbers with the count under them, no tiles.', 'Today in a coloured circle, the day you picked in a dark one.'),
       h('h3', {}, 'Header and tab bar'),
       h('label', { class: 'field' }, 'Name in the header',
-        h('input', { type: 'text', value: st.appTitle || '', placeholder: APP_TITLE, maxlength: '40', 'aria-label': 'Name in the header',
-          onchange: e => { const t = cleanTitle(e.target.value); e.target.value = t; applyDisplay(setDisplay({ appTitle: t && t !== APP_TITLE ? t : null })); } })),
-      help('Also the name in the browser tab. Empty: APMES Logbook.'),
+        h('input', { type: 'text', value: st.appTitle || '', placeholder: defaultTitle(), maxlength: '40', 'aria-label': 'Name in the header',
+          onchange: e => { const t = cleanTitle(e.target.value); e.target.value = t; applyDisplay(setDisplay({ appTitle: t && t !== defaultTitle() ? t : null })); } })),
+      help(`Also the name in the browser tab. Empty: ${defaultTitle()}.`),
       toggle('Page titles in the header', st.pageTitles, set('pageTitles'), '“Logbook”, “Reflections”… instead of the app’s name.'),
       toggle('Hide the header (the app name bar)', st.hideHeader, v => applyDisplay(setDisplay({ hideHeader: v })),
         'It comes back when something needs you.', 'It comes back by itself when something isn’t synced yet, when there’s no signal, and in the demo.'),
@@ -399,9 +146,6 @@ export function renderDisplayAdvanced() {
     resetLink('the name in the header, fonts, line spacing and width, the tab bar (order and hidden tabs) and header options, the Logbook row buttons, upside down, pinning and custom CSS (switched off; your CSS is kept), and the button style, icons, plain calendar, page titles and shorter rows on this device', () =>
       applyDisplay(setDisplay({ appTitle: null, fontUi: null, fontUiName: null, fontLog: null, fontLogName: null, lineWidth: null, lineHeight: null, tabBar: null, tabIcons: null, hideHeader: null, caseInverted: null, pinBox: null, pinSearch: null, customCssOn: null, tabOrder: null, tabHidden: null, rowMenu: null, rowCopy: null, dayCopy: null, btnStyle: null, iconBtns: null, calPlain: null, pageTitles: null, rowShort: null }))));
 }
-// Settings → Accessibility (#access; owner, 13 Oct 2026): size, contrast, motion and the gestures, gathered from
-// Display and Advanced display. All this device's.
-export const IPHONE_APP = () => (/iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1)) && (navigator.standalone === true || matchMedia('(display-mode: standalone)').matches);
 export function renderAccessibility() {
   const st = display();
   return h('div', { class: 'set-page' },
@@ -425,9 +169,13 @@ export function renderAccessibility() {
         IPHONE_APP() ? 'From a page under a tab, drag from the left edge.' : 'Only in the app added to an iPhone or iPad home screen.',
         IPHONE_APP() ? 'On unless you switch it off.' : 'Android phones use their own Back gesture from the edges.'),
       toggle('Press and hold a Logbook row for its menu', st.rowHold, v => applyDisplay(setDisplay({ rowHold: v || null })), 'Copy, Reflect and Edit, without the row’s buttons.', 'Hold for half a second without moving. A right-click does the same on a computer.'),
+      h('h3', {}, 'Keyboard'),
+      // the device's own value, else the profile's default (device-presets.js: on in the Personal profile)
+      toggle('Hide the tab bar while typing', deviceOn(st, profile(), 'hideTabsTyping'), v => { applyDisplay(setDisplay({ hideTabsTyping: v })); toast('Saved on this device'); },
+        'Phones: more room above the keyboard for the box you’re typing in and its Save button.', 'The tab bar comes back when the keyboard goes down. Off unless you switch it on (on in the Personal profile).'),
       h('p', { class: 'hint', style: 'margin:10px 0 0' }, 'Everything on this page is saved on this device only.')),
-    resetLink('zoom, text size, bigger tap targets, swiping, contrast, motion, edge swipe and press and hold on this device', () =>
-      applyDisplay(setDisplay({ zoom: null, textSize: null, bigTaps: null, swipeTabs: null, contrast: null, motion: null, edgeBack: null, rowHold: null }))));
+    resetLink('zoom, text size, bigger tap targets, swiping, contrast, motion, edge swipe, press and hold and the tab bar while typing on this device', () =>
+      applyDisplay(setDisplay({ zoom: null, textSize: null, bigTaps: null, swipeTabs: null, contrast: null, motion: null, edgeBack: null, rowHold: null, hideTabsTyping: null }))));
 }
 // Advanced display → the tab bar's order and hidden tabs (arrangeTabs): ↑ ↓ to move, a switch to show or hide
 function tabArranger() {
@@ -527,7 +275,6 @@ function accentPicker() {
   paint();
   return wrap;
 }
-export const START_TABS = [['log', 'Case'], ['logbook', 'Logbook'], ['reflect', 'Reflections'], ['progress', 'Analytics']];
 
 // ---------- Markdown (Logbook: Copy on a case or a day, Share day; the notes export) ----------
 
@@ -551,7 +298,7 @@ export function renderMarkdownSettings() {
   const latest = [...(S.cases || [])].filter(c => c.date).sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt || 0) - (a.createdAt || 0))[0];
   const dayList = latest ? S.cases.filter(c => c.date === latest.date).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)) : SAMPLE;
   const refl = [...(S.reflections || [])].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))[0] || SAMPLE_REFL;
-  const ctx = { catName, catShort };
+  const ctx = { catName, catShort, labels: labelsOn(settings()) };
   const paint = () => {
     const f = cleanMarkdown(m);
     dayOut.textContent = mdDay(dayList[0].date, dayList, f, ctx);
@@ -588,7 +335,10 @@ export function renderMarkdownSettings() {
       h('h3', { style: 'margin:14px 0 0' }, 'Dates, tags and links'),
       pick('dateFormat', 'Dates ({{date}})', [['iso', '2026-10-10'], ['long', '10 Oct 2026'], ['dmy', '10/10/2026']]),
       pick('cats', 'Tags ({{categories}})', [['names', 'Names (Lower Segment Caesarean Section)'], ['codes', 'Codes (16)'], ['tags', '#tags (#LSCS)']]),
-      pick('links', 'Links between notes', [['wiki', 'Wiki links [[note]] (Obsidian)'], ['md', 'Markdown links [note](note.md)']])),
+      pick('links', 'Links between notes', [['wiki', 'Wiki links [[note]] (Obsidian)'], ['md', 'Markdown links [note](note.md)']]),
+      // labelled parts (Settings → Advanced logging): "Plan: GA" written as "**Plan:** GA" in {{details}}; off by default
+      h('label', { class: 'check', style: 'margin-top:10px' }, h('input', { type: 'checkbox', checked: m.boldLabels, onchange: e => { m.boldLabels = e.target.checked; paint(); } }), 'Bold labels (**Plan:** GA)'),
+      h('p', { class: 'hint help', style: 'margin:0' }, settings().labelParts ? 'Labelled parts in your cases (lp:, Plan: …) come out as **Label:** text.' : 'For labelled parts (Settings → Advanced logging), which are off.')),
     h('section', { class: 'card' },
       h('h2', {}, 'Markdown export'),
       h('p', { class: 'hint help', style: 'margin:0' }, 'How the Markdown export lays out the zip: case notes (with each day’s notes), one note per reflection, Notes.md for undated notes, Progress.md and the figures in images/.'),
@@ -626,10 +376,13 @@ export function renderLogging() {
   return h('div', { class: 'set-page' },
     h('section', { class: 'card' },
       h('h2', {}, 'Logging'),
-      h('h3', {}, 'Recognise details'), h('p', { class: 'hint' }, 'Account settings · on by default; follows you between devices.'),
-      toggle('Suggest tags as I type', st.suggestions !== false, v => save({ suggestions: v })),
+      h('h3', {}, 'Recognise details'), h('p', { class: 'hint' }, 'Account settings · follow you between devices.'),
+      toggle('Suggest tags as I type', st.suggestions !== false, v => save({ suggestions: v }), 'On by default.'),
+      // off by default: tags count towards targets, so by default each one is picked on purpose
+      toggle('Tick confident suggestions automatically', !!st.autoTick, v => save({ autoTick: v || null }),
+        'Off by default. Untick any you don’t want.', 'The surest suggestions are ticked as you type and follow your words. One you untick stays off for that case. Check the ticks before you save: they count towards your targets.'),
       toggle('Autodetect age and gender', st.detectAgeSex !== false, v => save({ detectAgeSex: v }),
-        'Optional for APMES.', 'Turning this off stops age-based Paediatrics and Geriatric suggestions. Choose those tags yourself when needed; explicit words can still suggest them.'),
+        'On by default. Optional for APMES.', 'Turning this off stops age-based Paediatrics and Geriatric suggestions. Choose those tags yourself when needed; explicit words can still suggest them.'),
       h('h3', {}, 'Start a case'), h('p', { class: 'hint' }, 'Device setting · other devices keep their own style.'),
       toggle('Show common tags first', display().compactTags, v => { setDisplay({ compactTags: v }); paintPreview(); },
         'A shortlist from your recent cases.', 'Off by default. All tags stay searchable and can be expanded.'),
@@ -640,7 +393,7 @@ export function renderLogging() {
       pick('After Save', AFTER_SAVE, st.afterSave || 'next', v => save({ afterSave: v === 'next' ? null : v }, 'Saved'),
         '“Save, keep date” keeps the date either way.', 'Keeping the tags helps with a run of the same kind of case.')),
     h('section', { class: 'card' }, preview, h('button', { onclick: async () => {
-      try { await patchLogbook({ settings: { suggestions: true, detectAgeSex: true, enterMode: 'newline', enterSaves: null, defaultDate: 'today', afterSave: null } }); setDisplay({ compactTags: null }); hooks.render(); toast('Everyday logging defaults restored'); } catch (err) { toast(err.message); }
+      try { await patchLogbook({ settings: { suggestions: true, autoTick: null, detectAgeSex: true, enterMode: 'newline', enterSaves: null, defaultDate: 'today', afterSave: null } }); setDisplay({ compactTags: null }); hooks.render(); toast('Everyday logging defaults restored'); } catch (err) { toast(err.message); }
     } }, 'Reset these logging defaults'), h('p', { class: 'hint' }, 'Resets only the choices on this page. Advanced logging settings keep their current values.')),
     advancedLink('loggingadv', 'Advanced logging settings', 'The Case tab, the keyboard, search, dates and undo, tips'));
 }
@@ -655,14 +408,22 @@ export function renderLoggingAdvanced() {
       h('h2', {}, 'Advanced logging'),
       h('h3', {}, 'Case tab'),
       help('Switch off what you don’t use. The case box, All tags and Save always stay.'),
-      CASE_PARTS.map(([part, label]) => toggle(label, caseShown(part), v => setCaseShown(part, v, CASE_PARTS.map(([p]) => p)))),
+      CASE_PARTS.map(([part, label]) => toggle(label, caseShown(part), v => setCaseShown(part, v, partIds()))),
+      pick('Same as last: how many recent cases', RECENT_COUNTS, snapRecent(st.recentCount), n => save({ recentCount: n === 1 ? null : n }),
+        'Chips under the case box that copy a recent case’s procedure and tags.'),
       h('label', { class: 'field', style: 'margin-top:8px' }, 'Case box height on the Case tab',
         h('select', { onchange: e => save({ boxLines: Number(e.target.value) }) },
           Array.from({ length: 19 }, (_, i) => i + 2).map(n => h('option', { value: String(n), selected: n === (Math.min(20, Math.max(2, Number(st.boxLines) || 3))) }, `${n} lines${n === 3 ? ' (default)' : ''}`)))),
       // a separate Initials box above the case box, where the Case tab starts (device; was "First field for a new case")
       toggle(['Separate initials box (this device)', 'Separate initials box'], display().firstField === 'initials', v => { setDisplay({ firstField: v ? 'initials' : null }); toast('Saved on this device'); },
         'An Initials box above the case box.', 'The Case tab starts there and Enter moves on to the case. Off: type the initials at the start of the case, e.g. “AB 72M lap chole”.'),
-      toggle('Open the keyboard when the Case tab opens (this device)', display().autoFocus !== false, v => applyDisplay(setDisplay({ autoFocus: v ? null : false }))),
+      toggle('Open the keyboard when the Case tab opens (this device)', display().autoFocus !== false, v => { applyDisplay(setDisplay({ autoFocus: v ? null : false })); hooks.render(); }),
+      // phones and tablets: not when the app first opens (the keyboard would cover the page before anything was
+      // tapped), only on going to the Case tab, unless this asks for it (autoFocus true; ui-log.js wantFocus)
+      display().autoFocus === false ? null : toggle('Also when the app opens on a phone or tablet (this device)', display().autoFocus === true, v => applyDisplay(setDisplay({ autoFocus: v ? true : null })),
+        'Off by default: on a touch screen the keyboard opens once you go to the Case tab, not as the app starts.'),
+      // lp: / dt: parts in the case summary, and a template for the case box (ui-parts.js; both off by default)
+      partsSettings(),
       h('h3', {}, 'Keyboard in the case box (this device)'),
       toggle('Capital letter at the start', display().boxCaps !== false, v => applyDisplay(setDisplay({ boxCaps: v ? null : false }))),
       toggle('Autocorrect', display().boxCorrect === true, v => applyDisplay(setDisplay({ boxCorrect: v ? true : null })), 'Off by default, so initials and drug names stay as typed.'),
@@ -682,67 +443,121 @@ export function renderLoggingAdvanced() {
       toggle('Show tips and help text', !st.hideTips, v => save({ hideTips: !v }, null),
         'Off for experienced users.', 'Hides the explanations around the app (like the one at the top of the tag editor), the privacy and photo reminders, and the tips for the tags you pick.'),
       toggle('Show last week’s summary on the Case tab (once a week)', st.weeklyDigest, v => save({ weeklyDigest: v }, null))),
-    resetLink('everything on this page (the Case tab parts, box height, the initials box, keyboard, advanced search, the week, undo, tips and the weekly summary)', async () => {
-      await patchLogbook({ settings: { boxLines: null, undoSecs: null, weekStart: null, weeklyDigest: null, hideTips: null, searchOps: null, caseHide: null } });
+    resetLink('everything on this page (the Case tab parts, Same as last, box height, the initials box, labelled parts and the template (switched off; your labels and template are kept), keyboard, advanced search, the week, undo, tips and the weekly summary)', async () => {
+      await patchLogbook({ settings: { boxLines: null, undoSecs: null, weekStart: null, weeklyDigest: null, hideTips: null, searchOps: null, recentCount: null, labelParts: null, caseTplOn: null, ...resetPatch(settings(), partIds().map(p => 'case:' + p)) } });
       applyDisplay(setDisplay({ autoFocus: null, firstField: null, boxCaps: null, boxCorrect: null, boxSpell: null }));
     }));
 }
 
-// Profiles (settings.mode, the whole account; PROFILES in ui-core.js): one place only, at the top of Profiles or hide
-// items (owner, Oct 2026: two Basic mode switches confused). Picking one starts from its defaults (settings.basicOn
-// cleared) and moves this device's tabs (Analytics, and Reflections for logbook only, into More; back for Advanced);
-// other devices follow the profile's defaults. In a Basic profile every hidden item has a switch to bring it back.
+// Profiles (settings.mode, the whole account; PROFILES in ui-core.js, presets in profiles.js): one place only, at the
+// top of Settings → Profile (owner, Oct 2026: two Basic mode switches confused). A profile is a preset of switches: picking
+// one first lists what it turns on and off (and the tabs it moves on this device), then Apply sets them. Every switch
+// stays free after that (the cards below); the profile then reads "Custom (based on …)". Other devices follow the
+// profile's tab defaults unless their tabs were arranged by hand.
+const tabName = id => (BAR_TABS.find(([k]) => k === id) || [id, id])[1];
+const partIds = () => CASE_PARTS.map(([p]) => p);
+// the tabs that would move on this device: { bar: [...], more: [...] }
+function tabMoves(to) {
+  const ids = barTabs().map(([id]) => id), d = display();
+  const now = new Set(arrangeTabs(ids, d).hidden);
+  const next = tabsAfter(d.tabHidden, profile(), to);
+  const after = new Set(arrangeTabs(ids, next ? { ...d, tabHidden: next } : d, to).hidden);
+  return { bar: ids.filter(id => now.has(id) && !after.has(id)), more: ids.filter(id => !now.has(id) && after.has(id)) };
+}
+// what picking a profile changes, as [heading, names] lines (empty: nothing on screen changes); the device options a
+// profile governs (device-presets.js, like Hide the tab bar while typing in Personal) are listed for this device
+const deviceName = k => (DEVICE_SWITCHES.find(([x]) => x === k) || [k, k])[1];
+export function profileChanges(to) {
+  const { on, off } = switchChanges(settings(), profile(), to), t = tabMoves(to), dv = deviceChanges(display(), profile(), to);
+  return [['Turns on', on.map(switchLabel)], ['Turns off', off.map(switchLabel)],
+    ['Turns on (this device)', dv.on.map(deviceName)], ['Turns off (this device)', dv.off.map(deviceName)],
+    ['Onto the tab bar (this device)', t.bar.map(tabName)], ['Into More (this device)', t.more.map(tabName)]].filter(([, l]) => l.length);
+}
+const changeList = lines => h('ul', { class: 'profile-changes' }, lines.map(([what, names]) => h('li', {}, h('b', {}, what + ': '), names.join(', '))));
+const profileName = k => (PROFILES.find(([x]) => x === k) || [k, k])[1];
+export async function applyProfile(mode) {
+  const from = profile();
+  await patchLogbook({ settings: applyPatch(settings(), mode) });
+  const next = tabsAfter(display().tabHidden, from, mode);
+  // this device's options the profile governs follow it again (their saved values go)
+  applyDisplay(setDisplay({ ...deviceReset(), ...(next ? { tabHidden: next } : {}) }));
+  hooks.paintTabs?.(); hooks.render(); toast(`Profile: ${profileName(mode)}`);
+}
+// the short list of what changes, then Apply (or Cancel: nothing changes)
+// Cancel: the radio goes back at once and keeps the focus. The dialog's own close waits for its history step (Back), which
+// some browsers (Safari) give a moment later, so the page isn't left showing the radio that was cancelled meanwhile.
+function radioBack() {
+  const cur = profile();
+  for (const r of document.querySelectorAll('input[name=profile]')) r.checked = r.value === cur;
+  document.querySelector('input[name=profile]:checked')?.focus({ preventScroll: true });
+}
+function confirmProfile(mode) {
+  const lines = profileChanges(mode);
+  let done = false;
+  const cancel = () => { m.close(); radioBack(); };
+  const m = modal(mode === profile() ? `Back to ${profileName(mode)}` : `Use ${profileName(mode)}`, [
+    lines.length ? changeList(lines) : h('p', {}, 'Nothing on screen changes: only the profile’s name.'),
+    h('p', { class: 'hint' }, 'Your cases, reflections, notes, tags and other settings stay as they are. Any switch can be changed again after.'),
+    h('div', { class: 'bar' }, h('span', { class: 'grow' }),
+      h('button', { onclick: cancel }, 'Cancel'),
+      h('button', { class: 'primary', onclick: async () => { done = true; await m.close(); applyProfile(mode); } }, 'Apply')),
+  ], { onclose: () => { if (!done) { hooks.render(); radioBack(); } } });
+  // Escape and a tap outside close it too
+  m.el.addEventListener('cancel', () => { if (!done) setTimeout(radioBack, 0); });
+  m.el.addEventListener('click', e => { if (e.target === m.el && !done) setTimeout(radioBack, 0); });
+}
 export function profileCard() {
   const cur = profile();
-  const pick = async mode => {
-    const was = profile();
-    if (mode === was) return;
-    // saved even for Basic: with nothing saved, faculty, PDs and admins get Faculty / PCs
-    await patchLogbook({ settings: { mode, basic: null, basicOn: null } });
-    const d = display();
-    if (Array.isArray(d.tabHidden)) {
-      // this device's saved tabs: the old profile's hidden tabs back, the new one's away
-      const hid = new Set(d.tabHidden);
-      for (const id of PROFILE_OFF[was] || []) hid.delete(id);
-      if (was === 'faculty') { hid.add('caselogs'); hid.add('admin'); }
-      for (const id of PROFILE_OFF[mode] || []) hid.add(id);
-      if (mode === 'faculty') { hid.delete('caselogs'); hid.delete('admin'); }
-      applyDisplay(setDisplay({ tabHidden: [...hid] }));
-    }
-    hooks.paintTabs?.(); hooks.render(); toast(`Profile: ${PROFILES.find(([k]) => k === mode)[1]}`);
-  };
-  const items = BASIC_ITEMS.filter(([, , only]) => !only || only === cur);
+  const diffs = profileChanges(cur);
+  const now = diffs.length ? `Custom (based on ${profileName(cur)})` : profileName(cur);
   return h('section', { class: 'card profile-card' },
     h('h2', {}, 'Profile'),
+    h('p', { class: 'profile-now', style: 'margin:0 0 6px' }, 'Now: ', h('b', {}, now)),
+    diffs.length ? [h('p', { class: 'hint', style: 'margin:0' }, `Back to ${profileName(cur)}:`), changeList(diffs),
+      h('div', { class: 'bar', style: 'margin:4px 0 8px' }, h('button', { class: 'small', onclick: () => confirmProfile(cur) }, `Back to ${profileName(cur)}`))] : null,
     h('div', { role: 'radiogroup', 'aria-label': 'Profile' }, PROFILES.filter(([k]) => k !== 'faculty' || facultyRole() || k === cur).map(([k, label, hint]) => h('label', { class: 'check profile-opt' },
-      h('input', { type: 'radio', name: 'profile', value: k, checked: k === cur, onchange: () => pick(k) }),
+      h('input', { type: 'radio', name: 'profile', value: k, checked: k === cur, onchange: () => confirmProfile(k) }),
       h('span', {}, h('b', {}, label), h('small', { class: 'hint' }, hint))))),
-    basicMode() ? h('div', { class: 'profile-items' },
-      h('h3', {}, 'Hidden in this profile'),
-      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'Turn any back on. The Case tab parts and the tabs are below (Case tab, Header and tabs).'),
-      items.map(([k, label]) => sw(label, !basicHides(k), v => setBasicOn(k, v).then(() => hooks.render())))) : null,
-    h('p', { class: 'hint help', style: 'margin:6px 0 0' }, 'For your whole account. Profiles only show or hide parts of the screen: your settings, cases and reflections never change. Picking a profile starts from its defaults.'));
+    h('p', { class: 'hint help', style: 'margin:6px 0 0' }, 'For your whole account. A profile is a set of the switches below: picking one shows what it turns on and off first. Your cases, reflections and tags never change.'));
 }
 
-// Settings → Profiles or hide items: the profile, then every switch that hides part of the app, grouped by area, each group with its own
-// reset. The same settings as on their own pages (Logging, Display, Reflections), gathered in one place.
-const groupReset = (what, run) => h('p', { class: 'reset-row' }, h('button', { class: 'small linkish', type: 'button', onclick: async () => {
-  if (!await confirmBox('Reset this group', `Show ${what} again?`, 'Reset')) return;
+// Settings → Profile: the profile, then every switch that shows or hides part of the app, grouped by area, each group
+// with its own reset. The same settings as on their own pages (Logging, Display, Reflections), gathered in one place.
+// question: for a group whose reset turns something off (an opt-in extra), not "back to the defaults?"
+const groupReset = (what, run, question = `Put ${what} back to the profile’s defaults?`) => h('p', { class: 'reset-row' }, h('button', { class: 'small linkish', type: 'button', onclick: async () => {
+  if (!await confirmBox('Reset this group', question, 'Reset')) return;
   await run(); hooks.render(); toast('Back to the defaults');
 } }, 'Reset this group'));
 const sw = (label, on, set, hint) => [h('label', { class: 'check' }, h('input', { type: 'checkbox', role: 'switch', 'aria-label': label, checked: !!on, onchange: e => set(e.target.checked) }), label), hint ? h('p', { class: 'hint help' }, hint) : null];
+// a profile switch (profiles.js), saved for the account. These show only with the targets' counts: while that is off,
+// one switched on says so (rather than seeming to do nothing)
+const NEEDS_TARGETS = ['case:still', 'totals', 'year', 'saveToast'];
+const presetSwitch = ([k, label]) => sw(label, shows(k), v => setShown(k, v, partIds()).then(() => hooks.render()),
+  NEEDS_TARGETS.includes(k) && shows(k) && !shows('targets') ? 'Shows only with Counts against the APMES targets on.' : undefined);
+const switchGroup = g => SWITCHES.filter(x => x[2] === g);
 export function renderShowHide() {
   const st = settings(), d = display();
   const save = patch => patchLogbook({ settings: patch });
-  const caseOn = caseShown;
-  const setCase = (part, show) => setCaseShown(part, show, CASE_PARTS.map(([p]) => p));
+  const caseParts = CASE_PARTS.filter(([p]) => p !== 'still');   // (Still needed is with the APMES parts)
   const { hidden } = arrangeTabs(barTabs().map(([id]) => id), d);
   return h('div', { class: 'showhide set-page' },
     profileCard(),
     h('section', { class: 'card' },
-      h('h2', {}, 'Hide items'),
-      h('p', { class: 'hint help', style: 'margin:0' }, 'Everything you can hide, by area. Each group has its own reset, so you can bring one area back without touching the rest. The same switches are on their own pages too.'),
+      h('h2', {}, 'Show or hide'),
+      h('p', { class: 'hint help', style: 'margin:0' }, 'Everything you can show or hide, by area. Each group has its own reset, so you can bring one area back without touching the rest. The same switches are on their own pages too.'),
       ),
+    h('section', { class: 'card', 'data-group': 'extras' },
+      h('h3', { style: 'margin-top:0' }, 'Extras'),
+      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'Off in the Basic profiles, on in Advanced and Personal.'),
+      switchGroup('extras').map(presetSwitch),
+      groupReset('the extras', () => save(resetPatch(settings(), switchGroup('extras').map(([k]) => k))))),
+    h('section', { class: 'card', 'data-group': 'apmes' },
+      h('h3', { style: 'margin-top:0' }, 'APMES'),
+      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'The programme’s parts. Off in the Personal profile, for logging outside APMES. Request an evaluation (in a case’s ⋯ menu and its edit page: a new evaluation request with the case’s date and initials, never its details) is off unless you switch it on.'),
+      switchGroup('apmes').map(presetSwitch),
+      // (Request an evaluation is opt-in: the reset turns it off, and says so)
+      groupReset('the APMES parts', () => save(resetPatch(settings(), switchGroup('apmes').map(([k]) => k))),
+        'Put the APMES parts back to the profile’s defaults? This also turns off Request an evaluation.')),
     h('section', { class: 'card', 'data-group': 'tips' },
       h('h3', { style: 'margin-top:0' }, 'Tips and help'),
       sw('Show tips and help text', !st.hideTips, v => save({ hideTips: !v }).then(() => hooks.render()), 'Explanations around the app, the privacy and photo reminders, and the tips for the tags you pick.'),
@@ -750,9 +565,9 @@ export function renderShowHide() {
       groupReset('the tips and the weekly summary', () => save({ hideTips: null, weeklyDigest: null }))),
     h('section', { class: 'card', 'data-group': 'case' },
       h('h3', { style: 'margin-top:0' }, 'Case tab'),
-      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'The case box, All tags and Save always stay.'),
-      CASE_PARTS.map(([part, label]) => sw(label, caseOn(part), v => setCase(part, v))),
-      groupReset('every part of the Case tab', () => save({ caseHide: null }))),
+      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'The case box, All tags and Save always stay. Still needed is under APMES.'),
+      caseParts.map(([part, label]) => sw(label, caseShown(part), v => setCaseShown(part, v, partIds()).then(() => hooks.render()))),
+      groupReset('every part of the Case tab', () => save(resetPatch(settings(), caseParts.map(([p]) => 'case:' + p))))),
     h('section', { class: 'card', 'data-group': 'reflections' },
       h('h3', { style: 'margin-top:0' }, 'Reflections'),
       sw('Formatting buttons (this device)', !!d.reflToolbar, v => applyDisplay(setDisplay({ reflToolbar: v || null })), 'Bold, bullet and numbered lists above each box.'),
@@ -771,7 +586,7 @@ export function renderShowHide() {
       sw('Swipe left or right to change tab', d.swipeTabs !== false, v => applyDisplay(setDisplay({ swipeTabs: v ? null : false }))),
       barTabs().filter(([id]) => id !== 'more').map(([id, label]) => sw(`${label} on the tab bar`, !hidden.includes(id), v => setTabOnBar(id, v, () => hooks.render()))),
       h('p', { class: 'hint help', style: 'margin:0 0 6px' }, `Up to ${MAX_BAR} tabs fit, More included. Hidden tabs are first in More. The order is in Display → Advanced.`),
-      groupReset('the header, swiping and the usual tabs (Notes and the More pages go back into More)', () => { applyDisplay(setDisplay({ hideHeader: null, swipeTabs: null, tabHidden: null, tabOrder: null })); hooks.paintTabs?.(); })));
+      groupReset('the header, swiping and the profile’s tabs (Notes and the More pages go back into More, unless the profile puts them on the bar)', () => { applyDisplay(setDisplay({ hideHeader: null, swipeTabs: null, tabHidden: null, tabOrder: null })); hooks.paintTabs?.(); })));
 }
 
 export function renderReflectionSettings() {
@@ -797,19 +612,6 @@ export function renderReflectionSettings() {
 }
 
 // On the More page
-export const privacyCard = () => (
-    h('section', { class: 'card' },
-      h('h2', {}, 'Privacy'),
-      h('p', { class: 'hint', style: 'margin:0' },
-        'Your cases are stored in your own logbook in Google Cloud Firestore. Only you can read them (and the app owner, who runs the import from the old Google Form); programme admins cannot. ',
-        'Log patient initials only — no names, NRIC or hospital numbers. Programme residents share case counts per tag (Analytics → Compare with your intake); details are never shared. ',
-        'This device keeps an offline copy of your cases until you sign out — sign out on shared computers.')));
-export const creditsCard = () => (
-    h('section', { class: 'card credits' },
-      h('h2', {}, 'Credits'),
-      h('p', { style: 'margin:0' }, 'Code by ', h('b', {}, 'Abigail Sim')),
-      h('p', { style: 'margin:4px 0 0' }, 'Design and UX/UI by ', h('b', {}, 'Koh Wenjun'))));
-
 // ---------- Account-tab cards: who you are, sign out ----------
 
 export function youCard() {
@@ -824,22 +626,6 @@ export function youCard() {
       : h('p', { class: 'hint' }, 'Not on the programme resident list, so your logbook is private and not on Totals. If you are an APMES resident, ask the programme admins to add your email.'));
 }
 
-export function signOutCard() {
-  return h('section', { class: 'card' },
-    h('div', { class: 'bar', style: 'margin:0' },
-      h('button', { onclick: async e => {
-        const btn = e.currentTarget;
-        btn.disabled = true;
-        const ok = await writes.flush() && await cloud.synced();
-        btn.disabled = false;
-        if (!ok && !(await confirmBox('Not synced yet', 'Some cases or changes on this device have not reached the server yet (no signal?). Signing out now deletes them. Wait for signal and try again, or sign out anyway?', 'Sign out anyway', true))) return;
-        cloud.signOut();
-      } }, 'Sign out'),
-      // the demo: Leave demo beside Sign out (the header badge can be hidden now), Reset as a link that asks first
-      cloud.demo ? h('a', { href: location.pathname, class: 'btn' }, 'Leave demo') : null,
-      cloud.demo ? h('button', { type: 'button', class: 'link', style: 'margin-left:auto;padding:10px 4px;min-height:44px', onclick: () => hooks.resetDemo?.() }, 'Reset demo') : null),
-    cloud.demo ? h('p', { class: 'muted', style: 'margin:8px 0 0' }, 'Demo mode: data stays in this browser.') : null);
-}
 
 // ---------- tag groups (stored as logbook.templates) ----------
 

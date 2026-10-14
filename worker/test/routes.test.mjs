@@ -9,6 +9,7 @@ assert.deepEqual(resolve('hand.anawj.com', '/babies/'), { file: 'hand-babies/' }
 assert.deepEqual(resolve('hand.anawj.com', '/babies/img/x.png'), { file: 'hand-babies/img/x.png' });
 assert.deepEqual(resolve('apmes.anawj.com', '/logbook/js/app.js'), { file: 'logbook/js/app.js' });
 assert.deepEqual(resolve('apmes.anawj.com', '/evals/'), { file: 'evals/' });
+assert.deepEqual(resolve('apmes.anawj.com', '/people/js/app.js'), { file: 'people/js/app.js' });
 assert.deepEqual(resolve('hand.anawj.com', '/babies'), { redirect: '/babies/' });
 assert.deepEqual(resolve('hand.anawj.com', '/handlog/'), { file: 'hand-log/' });
 assert.deepEqual(resolve('hand.anawj.com', '/handlog/js/app.js'), { file: 'hand-log/js/app.js' });

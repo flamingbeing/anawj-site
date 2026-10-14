@@ -26,10 +26,30 @@ try {
   await page.goto('https://anawj.com/edit/?page=/privacy/');
   const frame = page.frameLocator('#frame');
   await frame.locator('p').first().waitFor();
+  assert.ok(await page.isHidden('#live'), 'no subdomain link for a page on anawj.com');
+  // Share: a QR code of the short address that opens the editor on this page
+  await page.click('#share');
+  await page.locator('#qr svg path').waitFor();
+  assert.equal(await page.textContent('#shareLink'), 'https://edit.anawj.com/privacy/');
+  if (process.env.SHOTS) await page.screenshot({ path: path.join(process.env.SHOTS, 'edit-share.png') });
+  await page.click('#shareClose');
   // the comment dialog offers speaking (where the browser can) and the two options
   await frame.locator('p').first().click();
   await page.click('#aComment');
   assert.ok(await page.isVisible('#optOptions') && await page.isVisible('#optEverywhere'), 'comment options shown');
+  // the owner's shortcut sends the comment straight to Ask Claude, prefilled, without keeping it in the list
+  await page.fill('#noteText', 'Make this shorter');
+  await page.evaluate(() => { window.__opened = []; window.open = u => { window.__opened.push(u); return null; }; });
+  await page.click('#askNow');
+  const askUrl = new URL((await page.evaluate(() => window.__opened))[0]);
+  assert.equal(askUrl.origin + askUrl.pathname, 'https://ask.anawj.com/');
+  assert.equal(askUrl.searchParams.get('page'), 'https://anawj.com/privacy/');
+  assert.equal(askUrl.searchParams.get('text'), 'Make this shorter');
+  assert.ok(askUrl.searchParams.get('kind'), 'the kind of element goes along');
+  assert.ok(askUrl.searchParams.get('locator'));
+  assert.equal(await page.textContent('#count'), '0', 'not kept in the list');
+  await frame.locator('p').first().click();
+  await page.click('#aComment');
   await page.fill('#noteText', 'Patient Tan said S1234567A was wrong');
   await page.check('#optOptions');
   await page.click('#noteDlg button[value=ok]');
@@ -42,12 +62,19 @@ try {
   await page.click('#noteDlg button[value=cancel]');
   await page.click('#aCancel');
 
+  // the editor's own screens pass an accessibility check (axe, WCAG 2.2 AA; the page being edited is not counted)
+  await page.addScriptTag({ path: new URL('../../tools/vendor/axe.min.js', import.meta.url).pathname });
+  const axe = async () => (await page.evaluate(() => window.axe.run(document, { iframes: false, runOnly: ['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'] })))
+    .violations.map(v => `${v.id}: ${v.nodes.map(n => n.target.join(' ')).join(', ')}`);
+  assert.deepEqual(await axe(), [], 'editor bar');
+
   // Send: the privacy check flags the NRIC and the name, and blocks sending until ticked
   await page.click('#send');
   await page.fill('#who', 'Test sender');
   assert.ok(await page.isVisible('#privacy'), 'privacy warning shown');
   const warn = await page.textContent('#privacy');
   assert.match(warn, /NRIC/); assert.match(warn, /name/);
+  assert.deepEqual(await axe(), [], 'send dialog');
   await page.evaluate(() => { window.__opened = []; window.open = u => { window.__opened.push(u); return null; }; });
   await page.click('#openIssue');
   assert.equal((await page.evaluate(() => window.__opened)).length, 0, 'not sent before the tick');
@@ -68,6 +95,11 @@ try {
   assert.ok(!(await page.isVisible('#privacy')), 'no warning for a plain comment');
   assert.match(await page.inputValue('#preview'), /Everywhere: apply this wherever it occurs/);
   if (process.env.SHOTS) await page.screenshot({ path: path.join(process.env.SHOTS, 'edit-send.png') });
+  await page.click('#sendClose');
+  // a page that lives on a subdomain offers the feedback button there
+  await page.fill('#path', '/hand-babies/'); await page.press('#path', 'Enter');
+  await page.locator('#live a').waitFor();
+  assert.equal(await page.getAttribute('#live a', 'href'), 'https://hand.anawj.com/babies/?feedback=1');
   assert.deepEqual(errors, []);
   console.log('edit e2e: ok');
 } finally { await b.close(); }

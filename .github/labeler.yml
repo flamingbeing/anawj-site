@@ -15,9 +15,12 @@ prewarm:
 hand-babies:
   - changed-files:
       - any-glob-to-any-file: ['hand-babies/**', 'hand/**']
+people:
+  - changed-files:
+      - any-glob-to-any-file: 'people/**'
 hand-log:
   - changed-files:
       - any-glob-to-any-file: 'hand-log/**'
 site:
   - changed-files:
-      - any-glob-to-any-file: ['*', 'edit/**', 'design/**', 'nuhsdesign/**', 'tools/**', 'privacy/**', 'cmcj/**', '.github/**', '.agents/**', '.claude/**']
+      - any-glob-to-any-file: ['*', 'edit/**', 'ask/**', 'feedback/**', 'worker/**', 'design/**', 'nuhsdesign/**', 'tools/**', 'privacy/**', 'cmcj/**', '.github/**', '.agents/**', '.claude/**']

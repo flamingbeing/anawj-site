@@ -6,7 +6,7 @@
 //   ?demo=empty  blank store (nothing seeded)
 //   ?demo=reset  wipe the demo store, then seed as for ?demo
 //
-// The field whitelists below are shared with cloud.js so both backends store the same shapes
+// The field whitelists are in clean.js, shared with cloud.js so both backends store the same shapes
 // (and so cloud writes never trip the field checks in firestore.rules).
 
 export const DEMO_USER = { email: 'demo@example.com', name: 'Demo User', uid: 'demo-uid' };
@@ -15,78 +15,14 @@ import { cleanReflection, cleanImage } from './reflections.js';
 import { cleanNote } from './notepad.js';
 import { progress } from './engine.js';
 import { cleanProfile } from './profile.js';
-export { cleanReflection, cleanImage };
+import { mergeSettings } from './profiles.js';
+import { plain, cleanCase, cleanSummary, cleanResident, cleanTemplate, importDocId, defaultLogbook, cleanCategoryNames, cleanSubmission } from './clean.js';
+export { cleanReflection, cleanImage, plain, cleanCase, cleanSummary, cleanResident, cleanTemplate, importDocId, defaultLogbook, cleanCategoryNames, cleanSubmission } from './clean.js';
 
 const KEY = 'apmes-logbook-demo-v1';
 
-// ---- shared field whitelists ----
+// ---- shared field whitelists: clean.js (cloud.js uses them without loading this file) ----
 
-const CASE_FIELDS = ['id', 'date', 'dateText', 'initials', 'details', 'cats', 'createdAt', 'updatedAt', 'source', 'importKey', 'reflectionId', 'reflectTag', 'tags'];
-const SUMMARY_FIELDS = ['rid', 'name', 'intake', 'rYear', 'smo', 'counts', 'total', 'reflections', 'reflectionsTotal', 'updatedAt'];
-const RESIDENT_FIELDS = ['rid', 'name', 'email', 'status', 'intake', 'rYear', 'smo'];
-const TEMPLATE_FIELDS = ['id', 'name', 'cats', 'details'];
-
-const pick = (o, keys) => Object.fromEntries(keys.filter(k => o[k] !== undefined).map(k => [k, o[k]]));
-// Firestore rejects undefined values; a JSON round trip drops them (and deep-copies).
-export const plain = o => JSON.parse(JSON.stringify(o));
-
-export function cleanCase(c, now = Date.now()) {
-  const out = pick(c, CASE_FIELDS);
-  out.id = out.id ? String(out.id) : Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
-  out.date = out.date || null;
-  out.details = String(out.details ?? '').slice(0, 2000);
-  out.cats = [...new Set((out.cats || []).map(String))].slice(0, 40);
-  if (out.dateText != null) out.dateText = String(out.dateText).slice(0, 200);
-  if (out.initials != null) out.initials = String(out.initials).slice(0, 20);
-  // marked interesting; personal subcategory tags ("16:elective")
-  if (out.reflectTag) out.reflectTag = true; else delete out.reflectTag;
-  if (Array.isArray(out.tags) && out.tags.length) out.tags = [...new Set(out.tags.map(t => String(t).slice(0, 60)))].slice(0, 20); else delete out.tags;
-  out.createdAt = Number(out.createdAt) || now;
-  out.updatedAt = now;
-  out.source = out.source || 'app';
-  return plain(out);
-}
-
-export function cleanSummary(rid, s, now = Date.now()) {
-  const out = pick(s, SUMMARY_FIELDS);
-  out.rid = String(rid);
-  out.counts = out.counts || {};
-  out.total = Number(out.total) || 0;
-  if (out.smo !== true) delete out.smo;
-  out.updatedAt = now;
-  return plain(out);
-}
-
-export function cleanResident(r) {
-  const out = pick(r, RESIDENT_FIELDS);
-  out.rid = String(out.rid);
-  out.name = String(out.name ?? '').slice(0, 200);
-  out.email = String(out.email ?? '').trim().toLowerCase();
-  out.status = out.status || 'ACTIVE';
-  out.intake = out.intake == null || out.intake === '' ? null : Number(out.intake);
-  out.rYear = out.rYear == null || out.rYear === '' ? null : Number(out.rYear);
-  // years spent as an SMO (logbook: they count as R3); left out when none
-  const smo = Math.floor(Number(out.smo) || 0);
-  if (smo > 0) out.smo = Math.min(10, smo); else delete out.smo;
-  return plain(out);
-}
-
-export function cleanTemplate(t) {
-  const out = pick(t, TEMPLATE_FIELDS);
-  out.name = String(out.name ?? '').slice(0, 100);
-  out.cats = [...new Set((out.cats || []).map(String))].slice(0, 40);
-  if (out.details != null) out.details = String(out.details).slice(0, 2000);
-  return plain(out);
-}
-
-// Firestore document ids may not contain '/', and some other characters are awkward.
-// Map an importKey to a safe, reversible-enough id: keep [A-Za-z0-9_-], escape the rest as ~xxxx.
-export const importDocId = key =>
-  'imp_' + String(key).replace(/[^A-Za-z0-9_-]/g, ch => '~' + ch.charCodeAt(0).toString(16).padStart(4, '0'));
-
-export function defaultLogbook(email, name = '') {
-  return { email, name, rid: null, settings: {}, templates: [], updatedAt: Date.now() };
-}
 // the demo's own logbook. The e2e tests (apmes-logbook-demo-small) check every feature, so theirs starts in Advanced;
 // everyone else starts in Basic, the default profile
 function demoDoc(email, name) {
@@ -166,6 +102,7 @@ function seed(s) {
     })),
   };
   s.logbooks[DEMO_USER.email].doc.rid = 'DEMO01';
+  s.logbooks[DEMO_USER.email].epoch = newEpoch();
   // two years of cases and the sample reflections come from demo-seed.js, loaded after the page starts
   s.logbooks[DEMO_USER.email].extras = 'pending';
   // one complete reflection on the LSCS case, so the Reflections, Progress and Export pages have something in them
@@ -196,21 +133,21 @@ function seed(s) {
 }
 
 // ---- change notification (same tab and other tabs) ----
+// The synced collections (cases, reflections, notes, bin) are watched like Firestore queries (listenSince, used by
+// the sync engine in sync.js): each watcher gets the changes since what it last saw.
 
-const caseWatchers = new Set();   // { email, cb }
 const userWatchers = new Set();
-const reflWatchers = new Set();
-const noteWatchers = new Set();   // { email, cb }
+const sinceWatchers = new Set();   // { email, coll, run }
 
 function notifyAll() {
-  for (const w of caseWatchers) w.cb(casesOf(w.email));
   for (const cb of userWatchers) cb(currentUser());
-  for (const w of reflWatchers) w.cb(reflectionsOf(w.email));
-  for (const w of noteWatchers) w.cb(notesOf(w.email));
+  for (const w of [...sinceWatchers]) w.run();
 }
-function notifyCases(email) {
-  for (const w of caseWatchers) if (w.email === email) w.cb(casesOf(email));
-}
+function notifyColl(email, coll) { for (const w of [...sinceWatchers]) if (w.email === email && w.coll === coll) w.run(); }
+const notifyCases = email => notifyColl(email, 'cases');
+// a logbook's epoch changes when its data is replaced wholesale (reset, the sample logbook arriving), so a device's
+// stored copy is read again in full rather than patched
+const newEpoch = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 // ?demo=reset wipes and reseeds on page load (after the watcher sets above exist).
 // The address then says plain ?demo, so a reload keeps what was done since.
 // The bigger sample logbook (demo-seed.js: ~350 cases, 32 reflections) loads on demand, so real users
@@ -228,7 +165,7 @@ function loadExtras() {
     lb2.cases ||= {}; lb2.reflections ||= {};
     for (const c of cases) if (!lb2.cases[c.id]) lb2.cases[c.id] = cleanCase(c, c.updatedAt);
     for (const r of reflections) if (!lb2.reflections[r.id]) lb2.reflections[r.id] = cleanReflection(r);
-    lb2.extras = 'done';
+    lb2.extras = 'done'; lb2.epoch = newEpoch();
     save(s2); notifyAll();
   }).catch(err => console.warn('Demo sample data not loaded', err));
 }
@@ -243,7 +180,7 @@ if (typeof addEventListener === 'function') {
 }
 
 function book(s, email) {
-  if (!s.logbooks[email]) s.logbooks[email] = { doc: null, cases: {} };
+  if (!s.logbooks[email]) s.logbooks[email] = { doc: null, cases: {}, epoch: newEpoch() };
   return s.logbooks[email];
 }
 const byNewest = (a, b) => (b.date || '').localeCompare(a.date || '') || (b.createdAt || 0) - (a.createdAt || 0);
@@ -274,6 +211,17 @@ export async function deleteAccount(email) {
 
 export async function isAdmin(email) { return !!load().admins[lc(email)]; }
 
+// private feedback: in the demo store (Reset demo wipes it); the demo admin plays the owner, so it reads them back
+export async function sendFeedback(rec) {
+  const s = load(); s.feedback ||= {};
+  const id = 'fb' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  s.feedback[id] = { ...plain(rec), id, createdAt: Date.now() }; save(s);
+  return true;
+}
+export async function listFeedback() { return Object.values(load().feedback || {}).map(plain).sort((a, b) => b.createdAt - a.createdAt); }
+export async function setFeedbackStatus(id, status) { const s = load(); if (s.feedback?.[id]) { s.feedback[id].status = status; save(s); } }
+export async function deleteFeedback(id) { const s = load(); if (s.feedback) { delete s.feedback[id]; save(s); } }
+
 export async function myResident(email) {
   const r = Object.values(load().residents).find(r => r.email === lc(email));
   return r ? plain(r) : null;
@@ -294,16 +242,42 @@ export async function saveLogbook(email, patch) {
   const cur = lb.doc || defaultLogbook(email);
   const p = plain(patch || {});
   if ('profile' in p) p.profile = cleanProfile(p.profile);
-  lb.doc = { ...cur, ...p, settings: { ...(cur.settings || {}), ...(p.settings || {}) }, email, updatedAt: Date.now() };
+  lb.doc = { ...cur, ...p, settings: mergeSettings(cur.settings, p.settings), email, updatedAt: Date.now() };
   save(s);
   return plain(lb.doc);
 }
 
-export function watchCases(email, cb) {
-  const w = { email: lc(email), cb: cases => cb(cases, meta) };
-  caseWatchers.add(w);
-  w.cb(casesOf(w.email));
-  return () => caseWatchers.delete(w);
+// The sync engine's listener (sync.js): the collection's documents with field > since (all when since is null, or when
+// the logbook's epoch differs from the one the device last saw), then the changes as they happen.
+export function listenSince(email, coll, { since = null, epoch, field = 'updatedAt' } = {}, onSnap) {
+  const w = { email: lc(email), coll, prev: null, seen: epoch };
+  w.run = () => {
+    const lb = load().logbooks[w.email];
+    const ep = (lb && lb.epoch) || 'none';
+    const full = w.prev === null ? since === null || ep !== w.seen : ep !== w.seen;
+    if (full) since = null;   // from now on, the whole collection (as a full Firestore listener)
+    w.seen = ep;
+    const docs = Object.values((lb && lb[coll]) || {}).filter(d => since === null || (Number(d[field]) || 0) > since).map(plain);
+    const next = new Map(docs.map(d => [d.id, JSON.stringify(d)]));
+    const changes = [];
+    for (const d of docs) { const was = w.prev && w.prev.get(d.id); if (was !== next.get(d.id)) changes.push({ type: was ? 'modified' : 'added', id: d.id, doc: d }); }
+    for (const id of (w.prev || new Map()).keys()) if (!next.has(id)) changes.push({ type: 'removed', id, doc: null });
+    const first = w.prev === null;
+    w.prev = next;
+    // documents "read", counted like cloud.js does with ?emulator (the browser tests check reopening reads ~nothing)
+    if (typeof window !== 'undefined') {
+      const r = ((window.__reads ||= {})[coll] ||= { billed: 0, served: 0, listens: 0 }), n = changes.filter(c => c.type !== 'removed').length;
+      r.served += n; r.billed += first ? Math.max(1, docs.length) : n; if (first) r.listens++;
+    }
+    if (first || full || changes.length) onSnap({ changes, fromCache: false, hasPendingWrites: false, epoch: ep, ...(full ? { full: true, docs } : {}) });
+  };
+  sinceWatchers.add(w);
+  w.run();
+  return () => sinceWatchers.delete(w);
+}
+export function fetchOne(email, coll, id) {
+  const lb = load().logbooks[lc(email)], d = lb && lb[coll] && lb[coll][id];
+  return d ? plain(d) : null;
 }
 
 export async function saveCase(email, c) {
@@ -344,15 +318,7 @@ export function reflectionsOf(email) {
   const lb = load().logbooks[email];
   return lb && lb.reflections ? Object.values(lb.reflections).map(plain).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)) : [];
 }
-function notifyReflections(email) {
-  for (const w of reflWatchers) if (w.email === email) w.cb(reflectionsOf(email));
-}
-export function watchReflections(email, cb) {
-  const w = { email: lc(email), cb: list => cb(list, meta) };
-  reflWatchers.add(w);
-  w.cb(reflectionsOf(w.email));
-  return () => reflWatchers.delete(w);
-}
+const notifyReflections = email => notifyColl(email, 'reflections');
 export async function saveReflection(email, r) {
   email = lc(email);
   const s = load();
@@ -377,13 +343,7 @@ export function notesOf(email) {
   const lb = load().logbooks[email];
   return lb && lb.notes ? Object.values(lb.notes).map(plain) : [];
 }
-function notifyNotes(email) { for (const w of noteWatchers) if (w.email === email) w.cb(notesOf(email)); }
-export function watchNotes(email, cb) {
-  const w = { email: lc(email), cb: list => cb(list, meta) };
-  noteWatchers.add(w);
-  w.cb(notesOf(w.email));
-  return () => noteWatchers.delete(w);
-}
+const notifyNotes = email => notifyColl(email, 'notes');
 export function saveNote(email, n) {
   email = lc(email);
   const s = load(), lb = book(s, email), doc = cleanNote(n);
@@ -423,7 +383,7 @@ const imagesMem = {};
 function imageStore() { try { return JSON.parse(localStorage.getItem(IMAGES_KEY) || '{}'); } catch { return { ...imagesMem }; } }
 function imageStoreSave(m) {
   Object.keys(imagesMem).forEach(k => delete imagesMem[k]); Object.assign(imagesMem, m);
-  if (typeof localStorage === 'undefined') return;
+  try { if (typeof localStorage === 'undefined') return; } catch { return; }   // (blocked storage throws even here)
   try { localStorage.setItem(IMAGES_KEY, JSON.stringify(m)); } catch (e) { console.warn('Demo images kept in memory only', e); }
 }
 export async function saveImage(email, img) {
@@ -443,14 +403,6 @@ export async function deleteImage(email, id) {
 const SUB_KEY = KEY + '-submissions';
 const subs = () => { try { return JSON.parse(localStorage.getItem(SUB_KEY) || '{}'); } catch { return {}; } };
 const subsSave = m => { try { localStorage.setItem(SUB_KEY, JSON.stringify(m)); } catch (e) { console.warn('Demo submissions not saved', e); } };
-export const cleanSubmission = (email, m) => plain({
-  email: lc(email), rid: m.rid ? String(m.rid).slice(0, 40) : null, name: String(m.name || '').slice(0, 200),
-  intake: Number(m.intake) || null, rYear: Number(m.rYear) || null, smo: Math.max(0, Math.floor(Number(m.smo) || 0)),
-  readyAt: Number(m.readyAt) || Date.now(), updatedAt: Date.now(), fp: String(m.fp || '').slice(0, 100),
-  count: Math.max(0, Math.floor(Number(m.count) || 0)), profile: m.profile && typeof m.profile === 'object' ? m.profile : null,
-  counts: m.counts && typeof m.counts === 'object' ? m.counts : {},
-  imageIds: [...new Set((Array.isArray(m.imageIds) ? m.imageIds : []).map(String))].slice(0, 1000),
-});
 export async function submitPortfolio(email, meta, reflections) {
   const m = subs();
   const doc = cleanSubmission(email, meta);
@@ -533,16 +485,6 @@ export async function importCases(email, rid, cases, onProgress) {
 
 // ---- portfolio template (word-export) ----
 // Kept under its own key: it is ~1.4 MB of base64 and must not slow every load()/save() of the demo state.
-// Category display names set by admins: { code: { name?, short? } } (display only; exports keep the official names)
-export function cleanCategoryNames(m) {
-  const out = {};
-  for (const [code, v] of Object.entries(m && typeof m === 'object' ? m : {})) {
-    if (!/^\d{2}[ivx]*$/.test(code) || !v || typeof v !== 'object') continue;
-    const name = String(v.name || '').trim().slice(0, 80), short = String(v.short || '').trim().slice(0, 30);
-    if (name || short) out[code] = { ...(name ? { name } : {}), ...(short ? { short } : {}) };
-  }
-  return out;
-}
 const NAMES_KEY = KEY + '-category-names';
 const HIDDEN_KEY = 'apmes-logbook-demo-hidden';
 export async function loadTotalsHidden() { try { return JSON.parse(localStorage.getItem(HIDDEN_KEY) || '[]'); } catch { return []; } }
@@ -569,7 +511,7 @@ function binOf(email) {
   const lb = load().logbooks[email];
   return lb && lb.bin ? Object.values(lb.bin).map(plain).sort((a, b) => (b.deletedAt || 0) - (a.deletedAt || 0)) : [];
 }
-function notifyBin(email) { for (const w of binWatchers) if (w.email === email) w.cb(binOf(email)); }
+function notifyBin(email) { for (const w of binWatchers) if (w.email === email) w.cb(binOf(email)); notifyColl(email, 'bin'); }
 export function watchBin(email, cb) {
   const w = { email: lc(email), cb: list => cb(list, meta) };
   binWatchers.add(w);

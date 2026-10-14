@@ -1,12 +1,16 @@
 // The Cloudflare Worker behind the subdomains (SUBDOMAINS.md) and the PR previews (PREVIEWS.md). It serves the repo's
 // files (the static assets, bound as ASSETS) and decides which folder an address may see (routes.js). No data, no
-// secrets, no storage: just files. wrangler.jsonc: "run_worker_first" sends every request here.
-import { resolve } from './routes.js';
+// storage: just files, plus one owner-only API on ask.anawj.com (ask.js), the only part with secrets.
+// wrangler.jsonc: "run_worker_first" sends every request here.
+import { resolve, feedback, FEEDBACK_COOKIE } from './routes.js';
+import { handleAsk, ASK_HOST } from './ask.js';
 
 const NOINDEX = 'noindex, nofollow';
 
 export default {
   async fetch(request, env) {
+    const u0 = new URL(request.url);
+    if (u0.hostname === ASK_HOST && u0.pathname === '/api/ask') return handleAsk(request, env);
     if (request.method !== 'GET' && request.method !== 'HEAD') return new Response('Method not allowed', { status: 405, headers: { Allow: 'GET, HEAD' } });
     const url = new URL(request.url);
     const r = resolve(url.hostname, url.pathname);
@@ -29,8 +33,19 @@ export default {
       }
     }
     if (res.status === 404) return notFound();
-    res = new Response(res.body, res);
+    const fb = /\.html$/.test(file) ? feedback(url.hostname, url.search, request.headers.get('Cookie')) : { on: false, set: null };
+    if (fb.on && request.method === 'GET' && res.status === 200) {
+      // the feedback button: one script tag before </body> (the page itself is unchanged otherwise)
+      const html = await res.text();
+      const tag = '<script src="/feedback/overlay.js" defer></script>';
+      const i = html.toLowerCase().lastIndexOf('</body>');
+      const headers = new Headers(res.headers);
+      // the page now differs by browser (the cookie): no length or ETag of the file as stored
+      headers.delete('Content-Length'); headers.delete('ETag');
+      res = new Response(i < 0 ? html + tag : html.slice(0, i) + tag + html.slice(i), { status: 200, headers });
+    } else res = new Response(res.body, res);
     res.headers.set('X-Robots-Tag', NOINDEX);
+    if (fb.set != null) res.headers.append('Set-Cookie', `${FEEDBACK_COOKIE}=${fb.set ? '1; Max-Age=2592000' : '; Max-Age=0'}; Path=/; Secure; SameSite=Lax`);
     return res;
   },
 };

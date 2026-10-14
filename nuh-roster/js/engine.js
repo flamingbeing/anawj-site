@@ -259,6 +259,8 @@ function subspecByKey(settings) {
   return Object.fromEntries(settings.subspecs.map(s => [s.key, s]));
 }
 
+// Senior consultants and consultants: preferred for complex lists, double covers and rooms with a Baby MO or MOPEX.
+const STRONG = ['SC', 'C'];
 function seniorRoomCost(p, d, room, settings, noise) {
   const sub = subspecByKey(settings);
   for (const k of room.flags.subspecs) {
@@ -273,6 +275,8 @@ function seniorRoomCost(p, d, room, settings, noise) {
   if (d.leaveTime && room.flags.long) c += 40;
   const mine = (p.subspecs || []).filter(k => room.flags.subspecs.includes(k)).length;
   c -= mine * 5;
+  // complex lists go to the most senior (SC, C) where they can; small, so subspecs and the hard rules still win
+  if (room.flags.complex) c += STRONG.includes(p.grade) ? -3 : 3;
   // keep subspecialists free for rooms that need them
   if ((p.subspecs || []).some(k => sub[k]?.hard) && !room.flags.subspecs.some(k => sub[k]?.hard)) c += 3;
   return c;
@@ -362,6 +366,8 @@ export function generate({ staff, day, settings = DEFAULT_SETTINGS, seed = 1 }) 
   const slotCost = slots => seniors.map((p, i) => slots.map(slot => {
     let c = 0;
     for (const r of slot) { const x = base[i][r.id]; if (x >= INF) return INF; c += x; }
+    // a double cover goes to a senior consultant or consultant where it can
+    if (slot.length > 1) c += STRONG.includes(p.grade) ? -2 : 2;
     return c;
   }));
   const evaluate = slots => {
@@ -429,7 +435,9 @@ export function generate({ staff, day, settings = DEFAULT_SETTINGS, seed = 1 }) 
   for (const slot of slots) {
     if (slot.length < 2 || !spare.length) continue;
     for (const r of slot.slice(1)) {
-      const k = spare.findIndex(p => seniorRoomCost(p, dayOf(day, p), r, settings, 0) < INF);
+      // the spare senior who suits the room best, not just the first who may
+      let k = -1, bestC = INF;
+      spare.forEach((p, n) => { const c = seniorRoomCost(p, dayOf(day, p), r, settings, 0); if (c < bestC) { bestC = c; k = n; } });
       if (k < 0) continue;
       const [p] = spare.splice(k, 1);
       rowOf[r.id].seniors = [p.id];
@@ -456,7 +464,10 @@ export function generate({ staff, day, settings = DEFAULT_SETTINGS, seed = 1 }) 
   }
 
   if (rowOf.aocc && !rowOf.aocc.seniors.length) {
-    const free = seniors.filter(p => !usedSeniors.has(p.id));
+    let free = seniors.filter(p => !usedSeniors.has(p.id));
+    // AIC needs a consultant (SC, C): when only one is left, AOCC takes someone else if it can
+    const consultants = free.filter(p => STRONG.includes(p.grade));
+    if (!fixed.aic && consultants.length === 1 && free.length > 1) free = free.filter(p => p !== consultants[0]);
     const p = free[Math.floor(rand() * free.length)];
     if (p) { rowOf.aocc.seniors.push(p.id); usedSeniors.add(p.id); }
     else warnings.push({ level: 'warn', text: 'AOCC: no senior left after the OT lists.' });
@@ -489,8 +500,10 @@ export function generate({ staff, day, settings = DEFAULT_SETTINGS, seed = 1 }) 
   let juniors = staff.filter(p => p.role === 'junior' && isAvail(day, p) && !lockedJuniors.has(p.id));
   // first pass: one junior per room; dummy "nobody" columns let rooms go without
   // a Baby MO never goes where there is no senior
+  // a Baby MO or MOPEX goes with a senior consultant or consultant where it can
+  const pairing = (p, r) => (isBaby(p) || p.grade === 'MOPEX') && rowOf[r.id].seniors.length && !rowOf[r.id].seniors.some(id => STRONG.includes(byId[id]?.grade)) ? 4 : 0;
   const jCost = juniors.map(p => jRooms.map(r => isBaby(p) && !rowOf[r.id].seniors.length ? INF
-    : juniorRoomCost(p, dayOf(day, p), r, settings, rand() * 2, doubled.has(r.id))));
+    : juniorRoomCost(p, dayOf(day, p), r, settings, rand() * 2, doubled.has(r.id)) + pairing(p, r)));
   const nobody = jRooms.map(r => doubled.has(r.id) ? 5000 : r.flags.complex ? 80 : 40);
   const rowsForNobody = Math.max(0, jRooms.length - juniors.length);
   const fullCost = [
@@ -590,6 +603,40 @@ export function generate({ staff, day, settings = DEFAULT_SETTINGS, seed = 1 }) 
     else warnings.push({ level: 'warn', fix: 'premed', rooms: [r.name], text: `${r.name}: needs premed cover but nobody is free.` });
   }
 
+  // Why each person was put where they are, in a few words (shown on the roster when hovering a name):
+  // { personId: 'Paeds subspec · SC/C for a complex list' }. Only the strongest reasons, not the arithmetic.
+  const sub = subspecByKey(settings);
+  const pairOf = id => slots.find(sl => sl.length > 1 && sl.some(x => x.id === id));
+  function whyHere(r0, row) {
+    const r = { ...r0, flags: { subspecs: [], complex: false, long: false, ...(r0.flags || {}) } };
+    const out = {};
+    for (const id of row.seniors) {
+      const p = byId[id], w = [];
+      if (r.lockSenior === id) w.push('fixed here');
+      const mine = (p.subspecs || []).filter(k => r.flags.subspecs.includes(k)).map(k => sub[k]?.label || k);
+      if (mine.length) w.push(`${mine.join(', ')} subspec`);
+      if (r.flags.complex && STRONG.includes(p.grade)) w.push(`${p.grade} for a complex list`);
+      const pr = pairOf(r.id);
+      if (pr && rowOf[pr.find(x => x.id !== r.id).id]?.seniors.includes(id)) w.push(`double covers with ${pr.find(x => x.id !== r.id).name} (short of seniors)`);
+      if (r.id === 'aocc') w.push('free after the OT lists');
+      out[id] = w.join(' · ') || 'free, and suits the list';
+    }
+    row.juniors.forEach((id, k) => {
+      const p = byId[id], w = [];
+      if (r.lockJunior === id) w.push('fixed here');
+      if (k > 0) w.push('second junior (more juniors than rooms)');
+      const postingMatch = p.posting && (r.flags.subspecs.some(x => sub[x]?.posting === p.posting) || (p.posting === 'SR' && r.flags.complex));
+      if (postingMatch) w.push(`${p.posting} posting`);
+      if (r.flags.complex && isResident(p)) w.push('resident for a complex list');
+      if (isBaby(p)) w.push('Baby MO: with a senior who isn\'t double covering');
+      else if (p.grade === 'MOPEX' && row.seniors.some(s => STRONG.includes(byId[s]?.grade))) w.push('MOPEX with a consultant');
+      if (r.id === 'aocc') w.push('free after the OT lists');
+      out[id] = w.join(' · ') || 'free, and suits the list';
+    });
+    for (const id of row.covers || []) out[id] = `ad hoc cover from ${homeOf[id]?.name || 'a nearby room'} (no junior free)`;
+    return out;
+  }
+
   const pacu = Object.fromEntries(allRooms.filter(r => isPacu(r.name)).map(r => [r.id, { roomId: r.id, label: r.name, complex: r.complex, senior: '', junior: '', premed: '', notes: r.notes || '' }]));
   const textRow = (r, senior, junior = '') => ({ roomId: r.id, label: r.name, complex: r.complex, senior, junior, premed: '', notes: '' });
   const rows = allRooms.map(r => {
@@ -602,6 +649,7 @@ export function generate({ staff, day, settings = DEFAULT_SETTINGS, seed = 1 }) 
       roomId: r.id,
       label: r.name,
       complex: r.complex,
+      why: whyHere(r, row),
       senior: row.seniors.map(id => fmtSenior(byId[id], dayOf(day, byId[id]))).join(' / '),
       junior: [...row.juniors.map(id => fmtJunior(byId[id], dayOf(day, byId[id]))), ...(row.covers || []).map(id => `${byId[id].name} (C)`)].join(' / '),
       premed: row.premed ? `${byId[row.premed].name} - Premed` : '',
@@ -668,7 +716,8 @@ export function check({ rows, staff, day, settings = DEFAULT_SETTINGS }) {
 
   const seniorsOf = {}, juniorsOf = {};
   for (const row of rows) {
-    seniorsOf[row.roomId] = resolve(row.senior, 'senior', row);
+    // AH OT (after hours) is a separate job, not a second room: it never counts as double cover
+    seniorsOf[row.roomId] = resolve(row.senior, row.roomId === 'ahot' ? 'ahot' : 'senior', row);
     const parts = String(row.junior || '').split('/');
     juniorsOf[row.roomId] = resolve(parts.filter(x => !isCoverPart(x)).join('/'), 'junior', row);
     resolve(parts.filter(isCoverPart).join('/'), 'cover', row);
@@ -724,7 +773,7 @@ export function check({ rows, staff, day, settings = DEFAULT_SETTINGS }) {
     for (const p of jun) {
       if (dayOf(day, p).liverStandby && flags.complex) out.push({ level: 'warn', fix: 'reseat', col: 'junior', person: p.id, rooms: [row.label], text: `${row.label}: ${p.name} is liver standby but has a complex list.` });
     }
-    const shared = sen.some(p => (where[p.id] || []).filter(u => u.col === 'senior').length > 1);
+    const shared = row.roomId !== 'ahot' && sen.some(p => (where[p.id] || []).filter(u => u.col === 'senior').length > 1);
     if (shared && jun.some(isBaby)) {
       out.push({ level: 'error', fix: 'reseat', col: 'junior', person: jun.find(isBaby).id, rooms: [row.label], text: `${row.label}: Baby MO in a room whose senior is double covering.` });
     }
@@ -1015,3 +1064,24 @@ export function suggestShortNames(staff) {
   return proposals.filter(x => x.short && key(x.short) !== key(x.name) && count[key(x.short)] === 1
     && (!taken.has(key(x.short)) || taken.get(key(x.short)) === x.id));
 }
+
+// ---------- what changed since the roster was sent ----------
+
+// The parts of the roster a reader cares about, small enough to keep for each date sent.
+export const sentRows = rows => rows.map(r => ({ label: r.label, senior: r.senior || '', junior: r.junior || '', premed: r.premed || '' }))
+  .filter(r => r.senior || r.junior || r.premed);
+// Room by room, what is different now: [{ label, what, from, to }] (what: senior, junior, premed; a room
+// added or closed shows as from '' or to '').
+export function rosterChanges(before, after) {
+  const by = rows => Object.fromEntries(sentRows(rows).map(r => [r.label, r]));
+  const a = by(before || []), b = by(after || []);
+  const out = [];
+  for (const label of [...new Set([...Object.keys(a), ...Object.keys(b)])]) {
+    for (const what of ['senior', 'junior', 'premed']) {
+      const from = (a[label]?.[what] || '').trim(), to = (b[label]?.[what] || '').trim();
+      if (from !== to) out.push({ label, what, from, to });
+    }
+  }
+  return out;
+}
+export const changeText = c => `${c.label} ${c.what}: ${c.from || '(none)'} → ${c.to || '(none)'}`;

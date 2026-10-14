@@ -1,4 +1,4 @@
-// Firebase web app config: a copy of logbook/js/firebase-config.js (evals shares the apmes-logbook project).
+// Firebase web app config: a copy of logbook/js/firebase-config.js (evals shares the apmes-logbook project). Keep the two in step.
 // These values are public by design: access is controlled by firestore.rules on Google's side.
 // Setup steps: see logbook/README.md.
 export const FIREBASE_CONFIG = {

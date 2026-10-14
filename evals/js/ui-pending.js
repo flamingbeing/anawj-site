@@ -2,7 +2,7 @@
 // have submitted or declined. Rows open the form (#e/{id}).
 
 import { S, h, go, avatar, icon, empty, segment, fmtAgo, fmtDate, toolLabel, statusChip } from './ui-core.js';
-import { FORMS } from './forms.js';
+import { FORMS, questionsOf } from './forms.js';
 import { validate, nextGap, OVERDUE_HOURS } from './engine.js';
 
 const sentAt = ev => ev.requestedAt || ev.createdAt || 0;
@@ -39,7 +39,9 @@ export function renderPending(sub) {
   if (tab === 'pending') {
     if (!pend.length) {
       root.append(empty('Nothing waiting', 'When a resident sends you a DOPS, Mini-CEX or EBD it appears here. Their link opens it too.',
-        hist.length ? h('a', { class: 'n-btn n-btn--outline e-btn-quiet', href: '#pending/history' }, 'See history') : null));
+        h('div', { class: 'e-actions' },
+          hist.length ? h('a', { class: 'n-btn n-btn--outline e-btn-quiet', href: '#pending/history' }, 'See history') : null,
+          h('a', { class: 'n-btn n-btn--outline e-btn-quiet', href: '#how' }, 'How evals work'))));
     } else {
       root.append(h('p', { class: 'e-listhead' }, h('span', {}, `${pend.length} to complete`), h('span', {}, 'oldest first')),
         h('div', { class: 'e-list' }, pend.map(pendingRow)));
@@ -60,7 +62,7 @@ function pendingRow(ev) {
     h('span', { class: 'e-row__meta', style: ITEM_STYLE }, ev.itemText || ev.itemId),
     h('span', { class: 'e-row__meta' }, h('span', { class: 'e-tag e-tag--tool' }, toolLabel(ev.tool)), ' ',
       h('span', { style: late ? 'color: var(--n-alert-ink); font-weight: 600' : null }, fmtAgo(sentAt(ev))),
-      gap ? ` · Resume at Q${gap}` : ''),
+      gap ? ` · Resume at Q${gap}` : FORMS[ev.formId] ? ` · ${questionsOf(FORMS[ev.formId]).length} questions` : ''),
   ], gap ? h('span', { class: 'e-dot', title: 'Partly complete' }) : null, null);
 }
 

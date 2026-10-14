@@ -38,10 +38,10 @@ All are the owner's personal accounts today.
 
 | Account | What it holds | Settings that matter |
 |---|---|---|
-| **GitHub** `flamingbeing/anawj-site` (public) | All code, docs, PRs; GitHub Pages serves `anawj.com` | Pages source "GitHub Actions" (`.github/workflows/pages.yml`); secret `FIREBASE_SERVICE_ACCOUNT` (rules deploys); PR labeller; page-edit suggestions arrive as **public** issues (`edit/NOTES.md`) |
+| **GitHub** `flamingbeing/anawj-site` (public) | All code, docs, PRs; GitHub Pages serves `anawj.com` | Pages source "GitHub Actions" (`.github/workflows/pages.yml`); secret `FIREBASE_SERVICE_ACCOUNT` (rules deploys); secret `CLAUDE_CODE_OAUTH_TOKEN` (instant page edits; set 14 Oct 2026 with the owner's own `claude setup-token`, plus "Allow GitHub Actions to create and approve pull requests"; default workflow permissions stay read; to stop it, delete the secret); PR labeller; weekly proof-read issue; page-edit suggestions arrive as **public** issues (`edit/NOTES.md`) |
 | **GitHub** `flamingbeing/life` (**private**) | The owner's personal notes: daily log, knowledge notes, plans with personal details | Private. Cloud sessions attach it only when he asks; never copy anything from it into the public repo (rule in `AGENTS.md`); its own `CLAUDE.md` holds the rules for sessions; no patient-identifiable details even there |
 | **Domain registrar** for `anawj.com` | The domain itself | **Owner: fill in which registrar and the renewal date.** If it lapses, every address stops |
-| **Cloudflare** | DNS for `anawj.com`; Worker `anawj-preview` | Worker serves PR previews and the subdomains (`SUBDOMAINS.md`, `PREVIEWS.md`); custom domains on the Worker; `edit.anawj.com` redirect rule (`edit/NOTES.md`). Free plan: 100,000 Worker requests a day |
+| **Cloudflare** | DNS for `anawj.com`; Worker `anawj-preview` | Worker serves PR previews and the subdomains (`SUBDOMAINS.md`, `PREVIEWS.md`); custom domains on the Worker; `edit.anawj.com` redirect rule (`edit/NOTES.md`); Ask Claude (`ask.anawj.com`): a Zero Trust Access application allowing only the owner's email, and three Worker secrets (`GITHUB_ISSUES_TOKEN`, a fine-grained GitHub token for this repo's issues; `ACCESS_TEAM`; `ACCESS_AUD`) (`edit/NOTES.md`, "Ask Claude"). Free plan: 100,000 Worker requests a day |
 | **Firebase `apmes-logbook`** (Blaze, asia-southeast1; daily backups) | Logbook and evals data | Google sign-in; sign-in domain `apmes.anawj.com` (moved from `anawj.com` in step 5; `anawj.com` stays in the authorised domains until the old address is retired); authorised domains (must list `apmes.anawj.com`); `owners/`, `admins/` entries set by hand in the console (`logbook/NOTES.md`, Roles) |
 | **Firebase `prewarm-study`** (Blaze since 13 Oct 2026, asia-southeast1; daily backups and point-in-time recovery) | **Real study data** | Anonymous sign-in (join codes), email link and password for admins; `admins/` entries set by hand; authorised domains |
 | **Firebase `nuh-roster`** (Blaze; daily backups) | Roster data (not approved for real names yet) | Google sign-in; authorised domains |
@@ -74,6 +74,9 @@ near zero (the APMES apps are a demo). Rough projections, not measurements:
   sign-in.
 - **Reflections and notes are private to each resident, the owner included.** Backups, exports and any handover must
   keep that.
+- **Logbook feedback is private, owner-only, never a GitHub issue.** Residents send it from More → Send feedback
+  (Firestore `feedback/`, only the app owner in `owners/` reads, marks done or deletes it; admins can't). The site's
+  page editor and 💬 button make public issues: never point residents at them.
 - **Public repo:** fake data only; no names, patient data or secrets, ever (`AGENTS.md`).
 - **Going nationwide** is mostly an approval question: expect the programme or MOHH to ask where data lives
   (Singapore, asia-southeast1), who can access it, PDPA and institutional policy, and who is accountable if the owner

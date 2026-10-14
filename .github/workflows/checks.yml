@@ -1,0 +1,56 @@
+# The merge checklist from AGENTS.md, run on every PR (and on main): the repo check, every unit test, the proof-read,
+# and the quick browser tests of the page editor, the feedback button, the hand pages and the NUH roster (Practice). The long browser suites
+# (logbook, prewarm, evals) stay with the session that changes those apps (AGENTS.md lists them).
+name: Checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Repo check
+        run: node tools/check.mjs
+      - name: Unit tests
+        run: for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mjs prewarm/test/*.test.mjs people/test/*.test.mjs worker/test/*.test.mjs feedback/test/*.test.mjs; do echo "== $f"; node "$f" || exit 1; done
+      - name: Proof-read (pages and documents)
+        run: node tools/proofread.mjs
+
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install a browser
+        run: |
+          npm install -g playwright@1.56.1
+          playwright install --with-deps chromium
+      - name: Page editor, feedback button, Ask Claude, hand pages, NUH roster, People
+        run: |
+          export PLAYWRIGHT_PATH="$(npm root -g)/playwright/index.mjs"
+          (python3 -m http.server 8080 >/dev/null 2>&1 &)
+          sleep 1
+          node edit/test/e2e.mjs
+          node feedback/test/e2e.mjs
+          node ask/test/e2e.mjs
+          node hand-babies/test/e2e.mjs
+          node nuh-roster/test/e2e.mjs
+          node people/test/e2e.mjs

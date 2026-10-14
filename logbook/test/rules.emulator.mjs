@@ -1,7 +1,8 @@
 // Firestore rules checks against the local emulator (fake accounts only). Not run by plain node:
 // needs firebase-tools, @firebase/rules-unit-testing and firebase; see logbook/README.md, "Tests".
 import { initializeTestEnvironment, assertSucceeds, assertFails } from '@firebase/rules-unit-testing';
-import { doc, getDoc, setDoc, deleteDoc, getDocs, collection, query, where, writeBatch } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc, getDocs, collection, query, where, writeBatch, FieldPath, serverTimestamp, updateDoc, addDoc, orderBy, limit } from 'firebase/firestore';
+import { mergePaths } from '../js/profiles.js';
 import fs from 'node:fs';
 const env = await initializeTestEnvironment({ projectId: 'demo-logbook', firestore: { rules: fs.readFileSync('firestore.rules', 'utf8'), host: '127.0.0.1', port: 8085 } });
 const as = (email, verified = true) => env.authenticatedContext(email, { email, email_verified: verified }).firestore();
@@ -22,6 +23,18 @@ const c = id => ({ id, date: '2026-01-02', details: 'AB 5yo tonsil', cats: ['10'
 const a = as(A), b = as(B), adm = as(ADMIN), own = as(OWNER), anon = env.unauthenticatedContext().firestore(), unv = as(A, false);
 const AU = as('Alice@Example.com');
 await t('own logbook create', assertSucceeds(setDoc(doc(a, 'logbooks', A), { email: A, name: 'A', rid: null, settings: {}, templates: [], updatedAt: 1 })));
+// the app's settings write (cloud.saveLogbook): a settings map replaced whole, `show` merged key by key
+{
+  const save = patch => { const d = { ...patch, email: A, updatedAt: Date.now() }; return setDoc(doc(a, 'logbooks', A), d, { mergeFields: mergePaths(d).map(p => new FieldPath(...p)) }); };
+  await t('settings write: markdown replaced, show merged', (async () => {
+    await save({ settings: { markdown: { dayTpl: 'CUSTOM', caseLine: 'X' }, show: { grid: false } } });
+    await save({ settings: { markdown: { caseLine: 'Y' }, show: { analytics: false } } });
+    const st = (await getDoc(doc(a, 'logbooks', A))).data().settings;
+    if (JSON.stringify(st.markdown) !== JSON.stringify({ caseLine: 'Y' })) throw new Error('markdown kept old keys: ' + JSON.stringify(st.markdown));
+    if (st.show.grid !== false || st.show.analytics !== false) throw new Error('show not merged: ' + JSON.stringify(st.show));
+    await save({ settings: { markdown: null, show: null } });
+  })());
+}
 await t('mixed-case token email ok', assertSucceeds(getDoc(doc(AU, 'logbooks', A))));
 await t('other logbook read', assertFails(getDoc(doc(b, 'logbooks', A))));
 await t('other logbook write', assertFails(setDoc(doc(b, 'logbooks', A), { email: A })));
@@ -269,6 +282,47 @@ await t('other config doc', assertFails(setDoc(doc(adm, 'config', 'other'), { da
 await t('random collection', assertFails(getDoc(doc(adm, 'other', 'x'))));
 await t('template admin delete', assertSucceeds(deleteDoc(doc(adm, 'config', 'portfolioTemplate'))));
 await t('template part admin delete', assertSucceeds(deleteDoc(doc(adm, 'config', 'portfolioTemplate_part0'))));
+// private feedback (More → Send feedback): anyone signed in sends as themselves; only the app owner reads, marks done, deletes
+{
+  // authenticatedContext(email) makes the uid the email
+  const fb = (uid, o = {}) => ({ uid, text: 'The Save button is slow', screen: 'log', version: 'logbook-v41-abcd1234', ua: 'Mozilla/5.0 (fake)', status: 'new', createdAt: serverTimestamp(), ...o });
+  await t('feedback: resident sends', assertSucceeds(setDoc(doc(a, 'feedback', 'f1'), fb(A))));
+  await t('feedback: auto id (addDoc)', assertSucceeds(addDoc(collection(b, 'feedback'), fb(B, { doing: 'Logging a case' }))));
+  await t('feedback: as someone else', assertFails(setDoc(doc(a, 'feedback', 'f2'), fb(B))));
+  await t('feedback: anon', assertFails(setDoc(doc(anon, 'feedback', 'f2'), fb('x'))));
+  await t('feedback: unverified', assertFails(setDoc(doc(unv, 'feedback', 'f2'), fb(A))));
+  await t('feedback: client time', assertFails(setDoc(doc(a, 'feedback', 'f2'), fb(A, { createdAt: Date.now() }))));
+  await t('feedback: no time', assertFails(setDoc(doc(a, 'feedback', 'f2'), (({ createdAt, ...r }) => r)(fb(A)))));
+  await t('feedback: born done', assertFails(setDoc(doc(a, 'feedback', 'f2'), fb(A, { status: 'done' }))));
+  await t('feedback: extra field (email)', assertFails(setDoc(doc(a, 'feedback', 'f2'), fb(A, { email: A }))));
+  await t('feedback: extra field (screen text)', assertFails(setDoc(doc(a, 'feedback', 'f2'), fb(A, { page: 'AB 5yo' }))));
+  await t('feedback: missing version', assertFails(setDoc(doc(a, 'feedback', 'f2'), (({ version, ...r }) => r)(fb(A)))));
+  await t('feedback: empty text', assertFails(setDoc(doc(a, 'feedback', 'f2'), fb(A, { text: '' }))));
+  await t('feedback: 2000 chars', assertSucceeds(setDoc(doc(a, 'feedback', 'f3'), fb(A, { text: 'x'.repeat(2000), doing: 'y'.repeat(300) }))));
+  await t('feedback: 2001 chars', assertFails(setDoc(doc(a, 'feedback', 'f2'), fb(A, { text: 'x'.repeat(2001) }))));
+  await t('feedback: doing 301', assertFails(setDoc(doc(a, 'feedback', 'f2'), fb(A, { doing: 'y'.repeat(301) }))));
+  await t('feedback: doing not text', assertFails(setDoc(doc(a, 'feedback', 'f2'), fb(A, { doing: 5 }))));
+  await t('feedback: long screen', assertFails(setDoc(doc(a, 'feedback', 'f2'), fb(A, { screen: 's'.repeat(41) }))));
+  await t('feedback: long ua', assertFails(setDoc(doc(a, 'feedback', 'f2'), fb(A, { ua: 'u'.repeat(201) }))));
+  await t('feedback: long id', assertFails(setDoc(doc(a, 'feedback', 'i'.repeat(41)), fb(A))));
+  await t('feedback: resident overwrites own', assertFails(setDoc(doc(a, 'feedback', 'f1'), fb(A, { text: 'changed' }))));
+  await t('feedback: resident reads own', assertFails(getDoc(doc(a, 'feedback', 'f1'))));
+  await t('feedback: resident lists', assertFails(getDocs(collection(a, 'feedback'))));
+  await t('feedback: resident marks done', assertFails(updateDoc(doc(a, 'feedback', 'f1'), { status: 'done' })));
+  await t('feedback: resident deletes own', assertFails(deleteDoc(doc(a, 'feedback', 'f1'))));
+  await t('feedback: admin (not owner) reads', assertFails(getDoc(doc(adm, 'feedback', 'f1'))));
+  await t('feedback: admin lists', assertFails(getDocs(collection(adm, 'feedback'))));
+  await t('feedback: admin deletes', assertFails(deleteDoc(doc(adm, 'feedback', 'f1'))));
+  await t('feedback: owner lists newest first', assertSucceeds(getDocs(query(collection(own, 'feedback'), orderBy('createdAt', 'desc'), limit(200)))));
+  await t('feedback: owner reads', assertSucceeds(getDoc(doc(own, 'feedback', 'f1'))));
+  await t('feedback: owner marks done', assertSucceeds(updateDoc(doc(own, 'feedback', 'f1'), { status: 'done' })));
+  await t('feedback: owner marks new again', assertSucceeds(updateDoc(doc(own, 'feedback', 'f1'), { status: 'new' })));
+  await t('feedback: owner other status', assertFails(updateDoc(doc(own, 'feedback', 'f1'), { status: 'wontfix' })));
+  await t('feedback: owner edits text', assertFails(updateDoc(doc(own, 'feedback', 'f1'), { text: 'edited' })));
+  await t('feedback: owner edits text with status', assertFails(updateDoc(doc(own, 'feedback', 'f1'), { status: 'done', text: 'edited' })));
+  await t('feedback: owner adds field', assertFails(updateDoc(doc(own, 'feedback', 'f1'), { note: 'x' })));
+  await t('feedback: owner deletes', assertSucceeds(deleteDoc(doc(own, 'feedback', 'f1'))));
+}
 console.log(`${n - fail}/${n} rule checks passed`);
 await env.cleanup();
 process.exit(fail ? 1 : 0);

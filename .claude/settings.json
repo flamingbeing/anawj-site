@@ -11,7 +11,7 @@
       "Bash(node nuh-roster/test/*)",
       "Bash(node prewarm/test/*)",
       "Bash(node worker/test/*)",
-      "Bash(node hand-babies/test/*)",
+      "Bash(node hand-babies/test/*)", "Bash(node feedback/test/*)", "Bash(node edit/test/*)", "Bash(node tools/proofread.mjs*)",
       "Bash(tools/test-*.sh*)",
       "Bash(bash tools/test-*.sh*)",
       "Bash(node evals/tools/build-data.mjs*)",
