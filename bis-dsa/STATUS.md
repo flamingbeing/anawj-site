@@ -18,7 +18,7 @@ Each session keeps its own line in `status/<session>.md`. Read them before start
 
 ## Recently done
 
-- Two-sided screens (BIS Advance style, SedLine style) with a right-hemisphere engine and a one-sided slowing control (14 Oct 2026). Queued: make the Menu functional.
+- Two-sided screens (BIS Advance style, SedLine style) with a right-hemisphere engine and a one-sided slowing control (14 Oct 2026). Menu made functional (on-screen list, alarm limits). Queued: photos of Advance and SedLine screens to tighten the layouts; DSA suppression and artefact marks for SedLine.
 
 - BIS VISTA-style screen as the default (owner's photos, 14 Oct 2026); the earlier layout stays as "Teaching layout". Queued: relaxant top-up with PTC/TOF readout, long vs short case emergence, machine switch.
 

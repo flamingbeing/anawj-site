@@ -254,3 +254,11 @@ Still to do for the machine switch (BIS Advance, SedLine): left/right engine, AS
   ARTF per side, ASYM, PSi trend with the 25–50 band. Layouts come from published descriptions, not photos: the owner can
   send photos to tighten them. Only two of SedLine's four channels are modelled; suppression and artefact marks on the DSA
   are not drawn.
+
+## The Menu is functional (owner, 14 Oct 2026)
+
+The MENU key (VISTA screen, and the Menu button under the two-sided screens) opens an on-screen list; tapping an item steps
+through its values: smoothing rate, EEG scale and sweep, trend window, bottom trend, DSA colour range (four presets), BIS
+alarm low (20–50) and high (50–80) that set the "BIS Out of Target Range" message (`mon.alo`, `mon.ahi`; the message
+also needs the teaching labels on), alarm audio, teaching labels, suppression timers (reset), sensor check, and the monitor
+(VISTA, Advance, SedLine). Escape or Close shuts it. The soft-key row is only shown in the Teaching layout now.

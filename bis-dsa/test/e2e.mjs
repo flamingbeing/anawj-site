@@ -34,15 +34,18 @@ try {
       const lit = await page.$eval('#' + id, c => { const x = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 0; i < x.length; i += 4) if (x[i] + x[i + 1] + x[i + 2] > 60) n++; return n / (x.length / 4); });
       assert.ok(lit > 0.02, `${id} is drawn (${lit})`);
     }
-    // soft keys: Menu opens the settings row, the trend key cycles 5, 15 and 60 min, Sensor check opens and closes
-    assert.equal(await page.$eval('#keySeg', e => e.hidden), true);
-    await page.click('#kMenu'); assert.equal(await page.$eval('#keySeg', e => e.hidden), false);
-    await page.click('#kTrend'); assert.equal(await page.textContent('#kTrend'), 'Trend 15 min');
-    await page.click('#kTrend'); assert.equal(await page.textContent('#kTrend'), 'Trend 60 min');
-    await page.click('#kTrend'); assert.equal(await page.textContent('#kTrend'), 'Trend 5 min');
+    // Menu: an on-screen list; tapping an item steps its value, and the setting really changes; Escape closes it
+    assert.equal(await page.$eval('#vMenu', e => e.hidden), true);
+    await page.click('#kMenu'); assert.equal(await page.$eval('#vMenu', e => e.hidden), false);
+    const item = name => page.locator('#vMenuList button', { hasText: name });
+    assert.match(await item('Trend window').textContent(), /5 min/);
+    await item('Trend window').click(); assert.match(await item('Trend window').textContent(), /15 min/);
+    await item('Trend window').click(); assert.match(await item('Trend window').textContent(), /60 min/);
+    await item('Trend window').click(); assert.match(await item('Trend window').textContent(), /5 min/);
+    for (const want of [45, 50, 20, 25, 30, 35, 40]) { await item('BIS alarm low').click(); assert.match(await item('BIS alarm low').textContent(), new RegExp(`${want}$`)); }
+    await page.keyboard.press('Escape'); assert.equal(await page.$eval('#vMenu', e => e.hidden), true);
     await page.click('#kSensor'); assert.equal(await page.$eval('#v2Sensor', e => e.hidden), false);
     await page.click('#v2Sensor'); assert.equal(await page.$eval('#v2Sensor', e => e.hidden), true);
-    await page.click('#kMenu');
     await page.addScriptTag({ path: AXE });
     { const r = await page.evaluate(() => axe.run(document.querySelector('#monitor'), { runOnly: ['wcag2a', 'wcag2aa'] })); assert.deepEqual(r.violations.map(v => `${v.id}: ${v.nodes.length}`), [], 'axe on the VISTA screen'); }
     // two-sided screens: BIS Advance style and SedLine style draw both hemispheres and read out both sides
@@ -54,6 +57,7 @@ try {
       assert.ok(lit > 0.05, `${sk} screen is drawn (${lit})`);
     }
     assert.match(await page.textContent('#bilSum'), /PSi \d+/);
+    await page.click('#bMenu'); assert.equal(await page.$eval('#vMenu', e => e.hidden), false); await page.keyboard.press('Escape'); assert.equal(await page.$eval('#vMenu', e => e.hidden), true);
     // the teaching layout is still there for the rest of the checks
     await page.click('#skinSeg [data-skin="classic"]');
     assert.equal(await page.$eval('#classicWrap', e => e.hidden), false);

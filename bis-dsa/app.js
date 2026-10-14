@@ -269,7 +269,7 @@ const stepR=n=>{swapCh();try{step(n);}finally{swapCh();}};
 const stimAll=kind=>{const k=kind??(Math.random()<0.1?'delta':'');eng.stimulus(k);R.eng.stimulus(k);};
 const snapAll=()=>{eng.snap();R.eng.snap();};
 // monitor settings: smoothing (s), EEG scale (± uV), teaching labels and target band, the info message
-const mon={smooth:15,scale:50,sweep:8,dbLo:DB_LO,dbHi:DB_HI,teach:true,info:'',infoUntil:0,skin:'vista',trend:5,bottom:'bis'};
+const mon={smooth:15,scale:50,sweep:8,dbLo:DB_LO,dbHi:DB_HI,teach:true,info:'',infoUntil:0,skin:'vista',trend:5,bottom:'bis',alo:40,ahi:60};
 function applyTarget(){eng.setTarget(drug,depth,mods);R.eng.setTarget(drug,depth,modsR);describe();if(typeof onTarget==='function')onTarget();}
 
 // effect-site depth 0-1 for the trend lane's thin trace (a mix: the hypnotic share)
@@ -307,7 +307,7 @@ function step(nSamples){
    isoN=art?isoN:f.supFrac>=1?isoN+1:0;
    // (GA-level propofol/sevo only, not sedation, dex or ketamine; once shown it clears only back inside 42-58)
    const blank=sqi<15,gaH=eng.drug==='mix'?0.155*(eng.de.propofol||0)+sevoDepth(eng.de.sevo||0):eng.drug==='propofol'||eng.drug==='sevo'?eng.de:0;
-   outN=!blank&&gaH>=0.44&&(bisS<40||bisS>60||outN>=10&&(bisS<42||bisS>58))?outN+1:0;
+   outN=!blank&&gaH>=0.44&&(bisS<mon.alo||bisS>mon.ahi||outN>=10&&(bisS<mon.alo+2||bisS>mon.ahi-2))?outN+1:0;
    if(!art&&!blank){if(bsr>=5)tim.sup++;if(bisS<40)tim.low++;}
    const col={n:Math.round(produced/FS),ce:ceNow(),db,sef:fresh?lastSef:null,mf:fresh?lastMf:null,bis:blank?null:bisS,bsr,emg,sqi,tp,art,
     bc:bcH.reduce((a,b)=>a+b,0)};COLS.push(col);if(COLS.length>COLMAX)COLS.shift();HIST.push(col);if(HIST.length>HISTMAX)HIST.shift();
@@ -709,15 +709,38 @@ $('kScale').onclick=()=>{const v=[25,50,100,250],n=v[(v.indexOf(mon.scale)+1)%4]
 function scaleUI(){$('kScale').textContent=`EEG ±${mon.scale} µV`;}
 function trendUI(){$('kTrend').textContent=`Trend ${mon.trend} min`;$('kBottom').textContent='Bottom: '+(mon.bottom==='emg'?'BIS + EMG':mon.bottom==='sr'?'BIS + SR':'BIS trend');
  txt('dsaRange',(mon.dbLo===DB_LO&&mon.dbHi===DB_HI?'':`${mon.dbLo}…${mon.dbHi} dB · `)+`last ${mon.trend} min`);}
-let menuOpen=false;
+let menuOpen=false; // the on-screen Menu (VISTA and two-sided screens)
 const BILAT=s=>s==='advance'||s==='sedline';
 function applySkin(s,reset,init){mon.skin=s;$('vistaWrap').hidden=s!=='vista';$('bilatWrap').hidden=!BILAT(s);$('classicWrap').hidden=s!=='classic';$('teachStrip').hidden=s==='classic';$('bilSum').hidden=!BILAT(s);
  document.querySelectorAll('#skinSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.skin===s));
- $('keySeg').hidden=s==='vista'?!menuOpen:false;$('kMenu').setAttribute('aria-expanded',menuOpen);
+ $('keySeg').hidden=s!=='classic';if(s==='classic')closeMenu(true);
  if(reset){mon.scale=s==='classic'?100:50;mon.sweep=s==='classic'?'auto':8;}
  scaleUI();dispUI(false);trendUI();if(!init){dirty=true;try{localStorage.setItem('bisdsa.skin',s);}catch(e){}if(reset)saveDisp();}}
 document.querySelectorAll('#skinSeg button').forEach(b=>b.onclick=()=>applySkin(b.dataset.skin,true));
-$('kMenu').onclick=()=>{menuOpen=!menuOpen;$('keySeg').hidden=!menuOpen;$('kMenu').setAttribute('aria-expanded',menuOpen);};
+// the Menu: tap an item to step through its values; settings are the same ones the soft keys and Display panel change
+const RANGES=[[-3,31],[0,25],[5,20],[-9,40]],SKINS=[['vista','BIS VISTA'],['advance','BIS Advance'],['sedline','SedLine']];
+const MENU=[
+ ['Smoothing rate',()=>mon.smooth+' s',()=>$('kSmooth').click()],
+ ['EEG scale',()=>`±${mon.scale} µV`,()=>$('kScale').click()],
+ ['EEG sweep',()=>(mon.sweep==='auto'?8:mon.sweep)+' s',()=>$('kSweep').click()],
+ ['Trend window',()=>mon.trend+' min',()=>$('kTrend').click()],
+ ['Bottom trend',()=>mon.bottom==='emg'?'BIS + EMG':mon.bottom==='sr'?'BIS + SR':'BIS',()=>$('kBottom').click()],
+ ['DSA colour range',()=>`${mon.dbLo} to ${mon.dbHi} dB`,()=>{let i=RANGES.findIndex(r=>r[0]===mon.dbLo&&r[1]===mon.dbHi);[mon.dbLo,mon.dbHi]=RANGES[(i+1)%RANGES.length];dispUI();saveDisp();}],
+ ['BIS alarm low',()=>String(mon.alo),()=>{mon.alo=mon.alo>=50?20:mon.alo+5;dirty=true;}],
+ ['BIS alarm high',()=>String(mon.ahi),()=>{mon.ahi=mon.ahi>=80?50:mon.ahi+5;dirty=true;}],
+ ['Alarm audio',()=>silenced?'Paused':'On',()=>$('kSilent').click()],
+ ['Teaching labels',()=>mon.teach?'On':'Off',()=>setTeach(!mon.teach)],
+ ['Suppression timers',()=>'Reset',()=>$('tReset').click()],
+ ['Sensor check',()=>'Start',()=>{closeMenu();$(BILAT(mon.skin)?'bSensor':'kSensor').click();}],
+ ['Monitor',()=>(SKINS.find(k=>k[0]===mon.skin)||SKINS[0])[1],()=>{const i=SKINS.findIndex(k=>k[0]===mon.skin);applySkin(SKINS[(i+1)%SKINS.length][0],true);}]];
+function menuRender(focusI){const ul=$('vMenuList');ul.innerHTML='';MENU.forEach(([l,v,fn],i)=>{const li=document.createElement('li'),b=document.createElement('button');b.type='button';
+  b.innerHTML=`<span>${l}</span><b>${v()}</b>`;b.onclick=()=>{fn();menuRender(i);};li.appendChild(b);ul.appendChild(li);});
+ if(focusI!=null)ul.children[focusI].firstChild.focus();}
+function closeMenu(quiet){if(!menuOpen)return;menuOpen=false;$('vMenu').hidden=true;document.querySelectorAll('.menukey').forEach(k=>k.setAttribute('aria-expanded','false'));if(!quiet)$(BILAT(mon.skin)?'bMenu':'kMenu').focus();}
+function toggleMenu(){if(menuOpen){closeMenu();return;}menuOpen=true;$('vMenu').hidden=false;document.querySelectorAll('.menukey').forEach(k=>k.setAttribute('aria-expanded','true'));menuRender(0);}
+document.querySelectorAll('.menukey').forEach(k=>k.onclick=toggleMenu);
+$('vMenuClose').onclick=()=>closeMenu();
+$('vMenu').addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();closeMenu();}});
 let silenced=false;
 $('kSilent').onclick=()=>{silenced=!silenced;$('kSilent').classList.toggle('on',silenced);$('kSilent').setAttribute('aria-pressed',silenced);$('v2Msg').style.animation=silenced?'none':'';
  mon.info=silenced?'Alarm audio paused':'Alarm audio on';mon.infoUntil=Date.now()+4000;dirty=true;setTimeout(()=>dirty=true,4100);};
@@ -725,6 +748,8 @@ let sensorT=0;
 $('kSensor').onclick=()=>{const ok=(COLS[COLS.length-1]||{sqi:100}).sqi>=50,els=[...document.querySelectorAll('#v2Sensor .vel i')];clearTimeout(sensorT);
  $('v2Sensor').hidden=false;els.forEach(e=>e.className='chk');txt('v2SensorT','Sensor check in progress');
  sensorT=setTimeout(()=>{els.forEach((e,i)=>e.className=ok||i!==2?'ok':'chk');txt('v2SensorT',ok?'Sensor check passed':'Check electrode 3');sensorT=setTimeout(()=>{$('v2Sensor').hidden=true;},2000);},1800);};
+$('bSilent').onclick=()=>$('kSilent').click();
+$('bSensor').onclick=()=>{const l=(COLS[COLS.length-1]||{sqi:100}).sqi,r=(R.COLS[R.COLS.length-1]||{sqi:100}).sqi;mon.info=`Sensor check: left ${l>=50?'OK':'check electrodes'}, right ${r>=50?'OK':'check electrodes'}`;mon.infoUntil=Date.now()+5000;dirty=true;setTimeout(()=>dirty=true,5100);};
 $('v2Sensor').onclick=()=>{clearTimeout(sensorT);$('v2Sensor').hidden=true;};
 $('v2Dismiss').onclick=()=>{vDismissed=$('v2MsgT').textContent;dirty=true;};
 $('kTrend').onclick=()=>{const v=[5,15,60];mon.trend=v[(v.indexOf(mon.trend)+1)%3];trendUI();dirty=true;};
