@@ -32,8 +32,20 @@ try {
     await page.waitForFunction(() => { const m = /≈ (\d+)/.exec(document.querySelector('#tgtBis').textContent); return m && +m[1] >= 35 && +m[1] <= 60; }, null, { timeout: 8000 });
     await page.waitForFunction(() => !document.querySelector('#zoneBand').hidden && document.querySelector('#zoneBand').getBoundingClientRect().width > 8, null, { timeout: 15000 });
     assert.match(await page.textContent('#zoneText'), /BIS 40–60/);
+    // EEG sweep key cycles the seconds across the lane; the DSA colour range sliders change the colours and are labelled
+    { const lbl = () => page.textContent('#eegLbl');
+      const want = async t => { await page.waitForFunction(t => document.querySelector('#eegLbl').textContent === t, t, { timeout: 4000 }); return t; };
+      const first = await lbl(); await page.click('#kSweep'); assert.equal(await want('EEG · 4 s'), 'EEG · 4 s');
+      await page.click('#kSweep'); await want('EEG · 8 s'); await page.click('#kSweep'); await want('EEG · 16 s');
+      await page.click('#kSweep'); await want(first);
+      const px = () => page.$eval('#cDsa', c => { const x = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let r = 0, b = 0; for (let i = 0; i < x.length; i += 4) { r += x[i]; b += x[i + 2]; } return r / (b + 1); });
+      const r0 = await px(); // red-to-blue ratio of the DSA
+      await page.$eval('#dbHi', e => { e.value = 14; e.dispatchEvent(new Event('input')); }); // lower ceiling: redder
+      await page.waitForTimeout(600); const r1 = await px(); assert.ok(r1 > r0, `lower ceiling makes the DSA redder (${r0} -> ${r1})`);
+      assert.match(await page.textContent('#dsaRange'), /14 dB/);
+      await page.click('#dbReset'); await page.waitForTimeout(300); assert.equal(await page.textContent('#dsaRange'), 'last 5 min'); }
     // dragging the depth slider pops up the target BIS over the thumb, which hides again a moment after release
-    { const box = await page.locator('#depth').boundingBox(); const y = box.y + box.height / 2;
+    { await page.locator('#depth').scrollIntoViewIfNeeded(); const box = await page.locator('#depth').boundingBox(); const y = box.y + box.height / 2;
       await page.mouse.move(box.x + box.width * 0.5, y); await page.mouse.down(); await page.mouse.move(box.x + box.width * 0.58, y, { steps: 4 });
       await page.waitForFunction(() => { const p = document.querySelector('#tgtPop'); const m = /≈ (\d+)/.exec(p.textContent); return !p.hidden && m && +m[1] >= 25 && +m[1] <= 80; }, null, { timeout: 8000 });
       await page.mouse.up();
@@ -112,12 +124,12 @@ try {
     // suppression timer: deep propofol brings burst suppression, the suppression time box counts up, Reset clears it
     await page.click('#speedSeg [data-speed="10"]');
     await page.click('#tReset');
-    await page.waitForFunction(() => document.querySelector('#vSupT').textContent === '0:00');
+    await page.waitForFunction(() => { const [m, x] = document.querySelector('#vSupT').textContent.split(':'); return +m * 60 + +x <= 3; }); // cleared (it may already tick on at 10x)
     await page.$eval('#depth', e => { e.value = 93; e.dispatchEvent(new Event('input')); });
     await page.waitForFunction(() => document.querySelector('#vSupT').textContent !== '0:00' && +document.querySelector('#vSr').textContent >= 5, null, { timeout: 60000 });
     await page.waitForFunction(() => document.querySelector('#vLowT').textContent !== '0:00', null, { timeout: 60000 }); // BIS under 40 counts too
     await page.click('#tReset');
-    await page.waitForFunction(() => document.querySelector('#vSupT').textContent === '0:00');
+    await page.waitForFunction(() => { const [m, x] = document.querySelector('#vSupT').textContent.split(':'); return +m * 60 + +x <= 3; }); // cleared (it may already tick on at 10x)
     await page.$eval('#depth', e => { e.value = 57; e.dispatchEvent(new Event('input')); });
     // emergence button: stops the drugs (slider to 0), the effect site falls slowly, the patient wakes and the relaxant is reversed
     await page.click('#wakeBtn');

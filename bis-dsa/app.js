@@ -210,7 +210,8 @@ function turbo(x){x=Math.max(0,Math.min(1,x));
  return [Math.max(0,Math.min(255,r*255))|0,Math.max(0,Math.min(255,g*255))|0,Math.max(0,Math.min(255,b*255))|0];}
 const DB_LO=-3, DB_HI=31, NB=60; // 60 bins of 0.5 Hz = 0-30 Hz
 const LUT=Array.from({length:256},(_,i)=>turbo(i/255));
-const dbToX=d=>Math.max(0,Math.min(1,(d-DB_LO)/(DB_HI-DB_LO)));
+const dbToXd=d=>Math.max(0,Math.min(1,(d-DB_LO)/(DB_HI-DB_LO))); // default scale: teaching strips, quiz and the explainer
+const dbToX=d=>Math.max(0,Math.min(1,(d-mon.dbLo)/(mon.dbHi-mon.dbLo))); // the monitor's DSA: the user's colour range
 const rgb=c=>`rgb(${c[0]},${c[1]},${c[2]})`;
 const MONO='600 12px "JetBrains Mono", ui-monospace, monospace';
 const SCR={bg:'#05080f',fg:'#d9e4f5',mute:'#7d8ca6',grid:'#1a2538',bis:'#ffffff',sef:'#ffffff'};
@@ -223,7 +224,7 @@ function fit(c,hLogical){const dpr=Math.min(2,window.devicePixelRatio||1);const 
 
 // ===== live simulation state =====
 const eng=new Engine();
-const SIG=[],EYE=[]; const SIGMAX=8*FS;
+const SIG=[],EYE=[]; const SIGMAX=16*FS; // the EEG lane can sweep 4, 8 or 16 s
 const COLS=[]; const COLMAX=300; // one column per second, 5 min
 const sup=[]; let bisS=null, lastSef=null, lastMf=null, produced=0, simT=0, speed=1, paused=false;
 let drug='propofol', depth=0; const mods={elderly:false,emg:false,diathermy:false,nmb:false,warmer:false,blink:false};
@@ -231,7 +232,7 @@ let drug='propofol', depth=0; const mods={elderly:false,emg:false,diathermy:fals
 const tim={sup:0,low:0};
 const artH=[],bcH=[],rawH=[],sefH=[],mfH=[];let prevSup=false,isoN=0,outN=0,sefAge=0;
 // monitor settings: smoothing (s), EEG scale (± uV), teaching labels and target band, the info message
-const mon={smooth:15,scale:100,teach:true,info:'',infoUntil:0};
+const mon={smooth:15,scale:100,sweep:'auto',dbLo:DB_LO,dbHi:DB_HI,teach:true,info:'',infoUntil:0};
 function applyTarget(){eng.setTarget(drug,depth,mods);describe();if(typeof onTarget==='function')onTarget();}
 
 const EYE_REJ=0.85;
@@ -299,7 +300,7 @@ const T0=Date.now()-300e3,clk=t=>{const d=new Date(T0+t*1000);return String(d.ge
 const AMBER='#ffb454',MFC='#b47cff',EMGC='#5fd08f';
 function txt(id,t){const el=$(id);if(el.textContent!==t)el.textContent=t;}
 function drawEeg(){if(view==='dsa')return;const {ctx,w,h}=fit(cEeg,laneH().eeg);ctx.fillStyle=SCR.bg;ctx.fillRect(0,0,w,h);
- const secs=w<500?5:8,N=secs*FS,s=mon.scale,sc=(h/2)/s; // about 5 s across a phone, 8 s on a desktop; ±scale full height
+ const secs=mon.sweep==='auto'?(w<500?5:8):mon.sweep,N=secs*FS,s=mon.scale,sc=(h/2)/s; // 'auto': about 5 s across a phone, 8 s on a desktop; ±scale full height
  ctx.strokeStyle=SCR.grid;ctx.lineWidth=1;for(let k=0;k<=secs;k++){const x=Math.round(w*k/secs)+.5;ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,h);ctx.stroke();}
  for(let j=-1;j<=1;j++){const y=Math.round(h/2+j*h/4)+.5;ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke();} // every scale/2 uV
  ctx.strokeStyle=SCR.mute;for(let k=1;k<secs;k++){const x=Math.round(w*k/secs)+.5;ctx.beginPath();ctx.moveTo(x,h-5);ctx.lineTo(x,h);ctx.stroke();}
@@ -506,6 +507,17 @@ document.querySelectorAll('#viewSeg button').forEach(b=>b.onclick=()=>setView(b.
 // soft keys: smoothing 10/15/30 s (info message for 5 s) and EEG scale ±25/50/100/250 uV
 $('kSmooth').onclick=()=>{const v=[10,15,30],n=v[(v.indexOf(mon.smooth)+1)%3];mon.smooth=n;$('kSmooth').textContent=`Smoothing ${n} s`;
  mon.info=`Smoothing Rate Changed to ${n} Seconds`;mon.infoUntil=Date.now()+5000;dirty=true;setTimeout(()=>dirty=true,5100);};
+// EEG sweep (seconds across the lane) and the DSA colour range, per device (localStorage, try/catch)
+function saveDisp(){try{localStorage.setItem('bisdsa.disp',JSON.stringify({sweep:mon.sweep,dbLo:mon.dbLo,dbHi:mon.dbHi}));}catch(e){}}
+function dispUI(mark=true){$('kSweep').textContent='EEG sweep '+(mon.sweep==='auto'?'auto':mon.sweep+' s');
+ $('dbLo').value=mon.dbLo;$('dbHi').value=mon.dbHi;$('oLo').textContent=mon.dbLo+' dB';$('oHi').textContent=mon.dbHi+' dB';
+ const def=mon.dbLo===DB_LO&&mon.dbHi===DB_HI;txt('dsaRange',def?'last 5 min':`last 5 min · ${mon.dbLo}…${mon.dbHi} dB`);if(mark)dirty=true;}
+$('kSweep').onclick=()=>{const v=['auto',4,8,16];mon.sweep=v[(v.indexOf(mon.sweep)+1)%4];dispUI();saveDisp();};
+$('dbLo').oninput=e=>{mon.dbLo=Math.min(+e.target.value,mon.dbHi-6);dispUI();saveDisp();};
+$('dbHi').oninput=e=>{mon.dbHi=Math.max(+e.target.value,mon.dbLo+6);dispUI();saveDisp();};
+$('dbReset').onclick=()=>{mon.dbLo=DB_LO;mon.dbHi=DB_HI;dispUI();saveDisp();};
+try{const d=JSON.parse(localStorage.getItem('bisdsa.disp')||'null');if(d){if(['auto',4,8,16].includes(d.sweep))mon.sweep=d.sweep;if(Number.isFinite(d.dbLo)&&Number.isFinite(d.dbHi)&&d.dbHi-d.dbLo>=6){mon.dbLo=d.dbLo;mon.dbHi=d.dbHi;}}}catch(e){}
+dispUI(false);
 $('kScale').onclick=()=>{const v=[25,50,100,250],n=v[(v.indexOf(mon.scale)+1)%4];mon.scale=n;$('kScale').textContent=`EEG ±${n} µV`;};
 // teaching labels (per device): zone pill, newest-2-s box, newest-column outline, colour key and the 40-60 target band
 function setTeach(on){mon.teach=on;$('mTeach').checked=on;$('vZone').hidden=!on;$('tgtCap').hidden=!on;dirty=true;try{localStorage.setItem('bisdsa.teach',on?'1':'0');}catch(e){}}
@@ -586,7 +598,7 @@ function drawEx(){const cw0=cEx.clientWidth||600;const L=layout(cw0);const scale
  if(exT>=T[1]){ex.comps.forEach(([lab,arr,col],i)=>{const a=Math.max(0,Math.min(1,p2*3-i));if(a<=0)return;ctx.globalAlpha=a;
    const y=B.y+rowH*(i+1);ctx.fillStyle=col;ctx.fillText((i===0?'= ':'+ ')+lab,B.x,y-2);trace(ctx,arr,B.x,y,B.w,rowH-14,sc,col,1.4);ctx.globalAlpha=1;});}
  // C: spectrum bars
- const C=L.C,bw=C.w/NB,hOf=d=>dbToX(d)*C.h;const p3=exT<T[2]?0:Math.min(1,(exT-T[2])/(T[3]-T[2]-0.4));const p4=prog(T[3],T[4]-0.3);const p5=prog(T[4],T[5]-0.2);
+ const C=L.C,bw=C.w/NB,hOf=d=>dbToXd(d)*C.h;const p3=exT<T[2]?0:Math.min(1,(exT-T[2])/(T[3]-T[2]-0.4));const p4=prog(T[3],T[4]-0.3);const p5=prog(T[4],T[5]-0.2);
  if(exT>=T[2]){ // axes
   ctx.globalAlpha=1-p4*0.6;ctx.strokeStyle=SCR.grid;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(C.x,C.y);ctx.lineTo(C.x,C.y+C.h);ctx.lineTo(C.x+C.w,C.y+C.h);ctx.stroke();
   ctx.fillStyle=SCR.mute;ctx.textAlign='center';for(const f of [0,10,20,30])ctx.fillText(f,C.x+f/30*C.w,C.y+C.h+16);ctx.fillText('frequency (Hz)',C.x+C.w/2,C.y+C.h+32);
@@ -599,7 +611,7 @@ function drawEx(){const cw0=cEx.clientWidth||600;const L=layout(cw0);const scale
  // E: mini DSA history (shifts left during step 5)
  const E=L.E,ncol=Math.floor(E.w/L.cw);const hist=ex.hist.slice(-(ncol-1));
  if(exT>=T[3]-0.2){ctx.save();ctx.beginPath();ctx.rect(E.x,E.y,E.w,E.h);ctx.clip();
-  const shift=p5*L.cw;hist.forEach((col,ci)=>{const x=E.x+E.w-L.cw*(hist.length-ci)-shift;for(let k=0;k<NB;k++){ctx.fillStyle=rgb(LUT[(dbToX(col[k])*255)|0]);ctx.fillRect(x,E.y+E.h-(k+1)*ch,L.cw+0.5,ch+0.5);}});
+  const shift=p5*L.cw;hist.forEach((col,ci)=>{const x=E.x+E.w-L.cw*(hist.length-ci)-shift;for(let k=0;k<NB;k++){ctx.fillStyle=rgb(LUT[(dbToXd(col[k])*255)|0]);ctx.fillRect(x,E.y+E.h-(k+1)*ch,L.cw+0.5,ch+0.5);}});
   ctx.restore();ctx.strokeStyle=SCR.grid;ctx.strokeRect(E.x-.5,E.y-.5,E.w+1,E.h+1);
   ctx.fillStyle=SCR.fg;ctx.fillText('DSA',E.x,E.y-8);ctx.fillStyle=SCR.mute;ctx.textAlign='right';ctx.fillText('now →',E.x+E.w,E.y+E.h+16);ctx.textAlign='left';
   ctx.textAlign='right';ctx.fillText('30',D.x-4,D.y+8);ctx.fillText('0 Hz',D.x-4,D.y+D.h);ctx.textAlign='left';}
@@ -610,7 +622,7 @@ function drawEx(){const cw0=cEx.clientWidth||600;const L=layout(cw0);const scale
    const colX=lerp(D.x,E.x+E.w-L.cw,p5),colW=lerp(D.w,L.cw,p5);
    const r1={x:colX,y:D.y+D.h-(k+1)*ch,w:colW,h:ch+0.5};
    const r={x:lerp(r0.x,r1.x,p4),y:lerp(r0.y,r1.y,p4),w:lerp(r0.w,r1.w,p4),h:lerp(r0.h,r1.h,p4)};
-   const cc=LUT[(dbToX(ex.db[k])*255)|0];const grey=[200,214,235];
+   const cc=LUT[(dbToXd(ex.db[k])*255)|0];const grey=[200,214,235];
    const mix=[0,1,2].map(j=>Math.round(lerp(grey[j],cc[j],Math.min(1,p4*1.6))));ctx.fillStyle=rgb(mix);ctx.fillRect(r.x,r.y,r.w,r.h);}
   if(p4>0.9&&p5<0.05){ctx.strokeStyle='#fff';ctx.lineWidth=1;ctx.strokeRect(D.x-1.5,D.y-1.5,D.w+3,D.h+3);}
  }
@@ -627,7 +639,7 @@ function simStrip(drug,d,m,seconds){const e=new Engine();e.setTarget(drug,d,m);e
  return cols;}
 function drawStrip(canvas,cols){const {ctx,w,h}=fit(canvas);ctx.fillStyle=SCR.bg;ctx.fillRect(0,0,w,h);const g={x:28,y:6,w:w-34,h:h-12};
  const o=document.createElement('canvas');o.width=cols.length;o.height=NB;const oc=o.getContext('2d');const im=oc.createImageData(cols.length,NB);
- cols.forEach((c,x)=>{for(let y=0;y<NB;y++){const i=(y*cols.length+x)*4,col=LUT[(dbToX(c.db[NB-1-y])*255)|0];im.data[i]=col[0];im.data[i+1]=col[1];im.data[i+2]=col[2];im.data[i+3]=255;}});
+ cols.forEach((c,x)=>{for(let y=0;y<NB;y++){const i=(y*cols.length+x)*4,col=LUT[(dbToXd(c.db[NB-1-y])*255)|0];im.data[i]=col[0];im.data[i+1]=col[1];im.data[i+2]=col[2];im.data[i+3]=255;}});
  oc.putImageData(im,0,0);ctx.imageSmoothingEnabled=true;ctx.drawImage(o,g.x,g.y,g.w,g.h);
  ctx.strokeStyle='rgba(255,255,255,.85)';ctx.lineWidth=1.2;ctx.beginPath();let pen=false;cols.forEach((c,i)=>{if(c.sef==null){pen=false;return;}const x=g.x+(i+.5)/cols.length*g.w,y=g.y+g.h*(1-c.sef/30);pen?ctx.lineTo(x,y):ctx.moveTo(x,y);pen=true;});ctx.stroke();
  ctx.fillStyle=SCR.mute;ctx.font='600 10px "JetBrains Mono", monospace';ctx.textAlign='right';ctx.fillText('30',g.x-4,g.y+9);ctx.fillText('15',g.x-4,g.y+g.h/2+4);ctx.fillText('0',g.x-4,g.y+g.h);}
