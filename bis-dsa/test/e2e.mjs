@@ -31,6 +31,24 @@ try {
     assert.ok(lit > 0.3, `DSA drawn (${lit})`);
     assert.ok(await page.$eval('#err', e => e.hidden), 'no display error');
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth), 0, 'no sideways scroll');
+    // screen order like a BIS monitor: trends, DSA above, EEG below; the view toggle shows one large
+    const order = await page.$$eval('.screen .lane', ls => ls.map(l => l.id));
+    assert.deepEqual(order, ['wTrend', 'wDsa', 'wEeg']);
+    await page.click('#viewSeg [data-view="dsa"]');
+    await page.waitForFunction(() => document.querySelector('#cDsa').clientHeight === 300);
+    assert.ok(await page.$eval('#wEeg', e => e.hidden), 'EEG hidden in DSA view');
+    await page.click('#viewSeg [data-view="eeg"]');
+    await page.waitForFunction(() => document.querySelector('#cEeg').clientHeight === 280);
+    assert.ok(await page.$eval('#wDsa', e => e.hidden), 'DSA hidden in EEG view');
+    await page.click('#viewSeg [data-view="both"]');
+    await page.waitForFunction(() => document.querySelector('#cEeg').clientHeight === 110 && document.querySelector('#cDsa').clientHeight === 190);
+    // facial EMG raises the EMG reading
+    const emg0 = await page.$eval('#vEmg', e => +e.textContent);
+    await page.click('#speedSeg [data-speed="10"]');
+    await page.check('#mEmg');
+    await page.waitForFunction(e0 => +document.querySelector('#vEmg').textContent >= e0 + 6, emg0, { timeout: 20000 });
+    await page.uncheck('#mEmg');
+    await page.click('#speedSeg [data-speed="1"]');
     // library strips and quiz drawn
     await page.waitForFunction(() => document.querySelectorAll('#lib canvas').length === 10 && document.querySelectorAll('#opts button').length === 4);
     await page.click('#opts button');

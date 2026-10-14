@@ -110,7 +110,7 @@ const LUT=Array.from({length:256},(_,i)=>turbo(i/255));
 const dbToX=d=>Math.max(0,Math.min(1,(d-DB_LO)/(DB_HI-DB_LO)));
 const rgb=c=>`rgb(${c[0]},${c[1]},${c[2]})`;
 const MONO='600 12px "JetBrains Mono", ui-monospace, monospace';
-const SCR={bg:'#05080f',fg:'#d9e4f5',mute:'#7d8ca6',grid:'#1a2538',bis:'#ffd166',sef:'#ffffff'};
+const SCR={bg:'#05080f',fg:'#d9e4f5',mute:'#7d8ca6',grid:'#1a2538',bis:'#ffffff',sef:'#ffffff'};
 const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 function fit(c,hLogical){const dpr=Math.min(2,window.devicePixelRatio||1);const w=c.clientWidth||300;// logical height read once: setting c.height below rewrites the attribute (it grew every frame on dpr>1 phones)
@@ -149,7 +149,8 @@ function paintOff(){const d=offImg.data;const start=COLMAX-COLS.length;
   if(!col){d[i]=5;d[i+1]=8;d[i+2]=15;d[i+3]=255;continue;}
   const c=LUT[(dbToX(col.db[NB-1-y])*255)|0];d[i]=c[0];d[i+1]=c[1];d[i+2]=c[2];d[i+3]=255;}}
  offCtx.putImageData(offImg,0,0);}
-function drawEeg(){const {ctx,w,h}=fit(cEeg);ctx.fillStyle=SCR.bg;ctx.fillRect(0,0,w,h);
+let view='both';
+function drawEeg(){if(view==='dsa')return;const {ctx,w,h}=fit(cEeg,view==='eeg'?280:110);ctx.fillStyle=SCR.bg;ctx.fillRect(0,0,w,h);
  ctx.strokeStyle=SCR.grid;ctx.lineWidth=1;for(let s=0;s<=8;s++){const x=Math.round(w*s/8)+.5;ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,h);ctx.stroke();}
  ctx.beginPath();ctx.moveTo(0,h/2+.5);ctx.lineTo(w,h/2+.5);ctx.stroke();
  // newest 2-s epoch
@@ -158,12 +159,16 @@ function drawEeg(){const {ctx,w,h}=fit(cEeg);ctx.fillStyle=SCR.bg;ctx.fillRect(0
  const n=SIG.length,off0=SIGMAX-n,sc=(h/2-4)/100;ctx.strokeStyle='#7ee0a1';ctx.lineWidth=1.3;ctx.beginPath();
  for(let i=0;i<n;i++){const x=(off0+i)/SIGMAX*w,y=h/2-SIG[i]*sc;i?ctx.lineTo(x,y):ctx.moveTo(x,y);}ctx.stroke();}
 function plotGeom(w,h){return {x:34,y:6,w:w-34-30,h:h-24};}
-function drawTrend(){const {ctx,w,h}=fit(cTrend);ctx.fillStyle=SCR.bg;ctx.fillRect(0,0,w,h);const g={x:34,y:6,w:w-64,h:h-12};
- const Y=v=>g.y+g.h*(1-v/100);ctx.fillStyle='rgba(255,209,102,.10)';ctx.fillRect(g.x,Y(60),g.w,Y(40)-Y(60));
- ctx.font=MONO;ctx.fillStyle=SCR.mute;ctx.textAlign='right';for(const v of [0,50,100]){ctx.fillText(v,g.x-6,Math.min(h-2,Math.max(10,Y(v)+4)));}
- ctx.strokeStyle=SCR.bis;ctx.lineWidth=2;ctx.beginPath();const start=COLMAX-COLS.length;
- COLS.forEach((c,i)=>{const x=g.x+(start+i+.5)/COLMAX*g.w,y=Y(c.bis);i?ctx.lineTo(x,y):ctx.moveTo(x,y);});ctx.stroke();}
-function drawDsa(){const {ctx,w,h}=fit(cDsa);ctx.fillStyle=SCR.bg;ctx.fillRect(0,0,w,h);const g=plotGeom(w,h);
+const emgShow=e=>e+16; // displayed EMG (dB), placed on a BIS-like 30-55 dB scale
+function drawTrend(){const {ctx,w,h}=fit(cTrend);ctx.fillStyle=SCR.bg;ctx.fillRect(0,0,w,h);
+ const g={x:34,y:6,w:w-64,h:h-38},e={y:h-26,h:20};const start=COLMAX-COLS.length;const X=i=>g.x+(start+i+.5)/COLMAX*g.w;
+ const Y=v=>g.y+g.h*(1-v/100);ctx.fillStyle='rgba(255,255,255,.07)';ctx.fillRect(g.x,Y(60),g.w,Y(40)-Y(60));
+ ctx.font=MONO;ctx.fillStyle=SCR.mute;ctx.textAlign='right';for(const v of [0,50,100]){ctx.fillText(v,g.x-6,Math.min(g.y+g.h,Math.max(10,Y(v)+4)));}
+ ctx.strokeStyle=SCR.bis;ctx.lineWidth=2;ctx.beginPath();COLS.forEach((c,i)=>{const y=Y(c.bis);i?ctx.lineTo(X(i),y):ctx.moveTo(X(i),y);});ctx.stroke();
+ // EMG lane: one bar per second, 25-55 dB
+ ctx.fillStyle=SCR.mute;ctx.fillText('EMG',g.x-6,e.y+e.h);ctx.strokeStyle=SCR.grid;ctx.strokeRect(g.x+.5,e.y+.5,g.w-1,e.h-1);
+ const bw=Math.max(1,g.w/COLMAX);COLS.forEach((c,i)=>{const v=Math.max(0,Math.min(1,(emgShow(c.emg)-25)/30));if(v<=0)return;ctx.fillStyle=v>0.55?'#ffb454':'#5fd08f';ctx.fillRect(X(i)-bw/2,e.y+e.h-v*e.h,bw,v*e.h);});}
+function drawDsa(){if(view==='eeg')return;const {ctx,w,h}=fit(cDsa,view==='dsa'?300:190);ctx.fillStyle=SCR.bg;ctx.fillRect(0,0,w,h);const g=plotGeom(w,h);
  ctx.imageSmoothingEnabled=true;ctx.drawImage(off,g.x,g.y,g.w,g.h);
  // SEF line
  const start=COLMAX-COLS.length;ctx.strokeStyle=SCR.sef;ctx.lineWidth=1.4;ctx.beginPath();let pen=false;
@@ -176,12 +181,12 @@ function drawDsa(){const {ctx,w,h}=fit(cDsa);ctx.fillStyle=SCR.bg;ctx.fillRect(0
  ctx.textAlign='left';ctx.fillText('−5 min',g.x,h-4);ctx.textAlign='center';ctx.fillText('−2½',g.x+g.w/2,h-4);ctx.textAlign='right';ctx.fillText('now',g.x+g.w,h-4);
  // colour scale
  const lx=w-20;for(let i=0;i<g.h;i++){ctx.fillStyle=rgb(LUT[((1-i/g.h)*255)|0]);ctx.fillRect(lx,g.y+i,10,1);}
- ctx.save();ctx.translate(lx-4,g.y+g.h/2);ctx.rotate(-Math.PI/2);ctx.textAlign='center';ctx.fillStyle=SCR.mute;ctx.font='600 10px "JetBrains Mono", monospace';ctx.fillText('power',0,0);ctx.restore();}
+ ctx.save();ctx.translate(lx-6,g.y+g.h/2);ctx.rotate(-Math.PI/2);ctx.textAlign='center';ctx.fillStyle=SCR.mute;ctx.font='600 10px "JetBrains Mono", monospace';ctx.fillText('power',0,0);ctx.restore();}
 const $=id=>document.getElementById(id);
 function zoneOf(b){return b>80?'Awake/light':b>60?'Sedation':b>=40?'GA range':b>=20?'Deep':'Very deep';}
 function readouts(){const c=COLS[COLS.length-1];if(!c)return;$('vBis').textContent=Math.round(c.bis);$('vZone').textContent=zoneOf(c.bis);
  $('vSr').textContent=Math.round(c.bsr);$('vSef').textContent=lastSef==null?'--':lastSef.toFixed(1);
- $('vEmg').textContent=Math.round(c.emg);$('vEmgBar').style.width=Math.max(0,Math.min(100,(c.emg+5)/35*100))+'%';}
+ $('vEmg').textContent=Math.round(emgShow(c.emg));$('vEmgBar').style.width=Math.max(0,Math.min(100,(emgShow(c.emg)-25)/30*100))+'%';}
 
 // ===== state descriptions =====
 function describe(){const d=depth;let n,t;
@@ -216,6 +221,8 @@ $('mElder').onchange=e=>{mods.elderly=e.target.checked;applyTarget();};
 $('mEmg').onchange=e=>{mods.emg=e.target.checked;applyTarget();};
 function setSpeed(s){speed=s;document.querySelectorAll('#speedSeg button[data-speed]').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.speed===s));}
 document.querySelectorAll('#speedSeg button[data-speed]').forEach(b=>b.onclick=()=>setSpeed(+b.dataset.speed));
+function setView(v){view=v;document.querySelectorAll('#viewSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.view===v));$('wDsa').hidden=v==='eeg';$('wEeg').hidden=v==='dsa';dirty=true;}
+document.querySelectorAll('#viewSeg button').forEach(b=>b.onclick=()=>setView(b.dataset.view));
 $('pause').onclick=()=>{paused=!paused;$('pause').setAttribute('aria-pressed',paused);$('pause').textContent=paused?'Resume':'Pause';};
 
 // ===== the case story =====

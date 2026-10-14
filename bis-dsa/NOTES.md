@@ -8,6 +8,9 @@ Lasting decisions for `bis-dsa/`. Status and next steps: `STATUS.md`.
   array (DSA), and how to read the DSA for propofol, sevoflurane, ketamine and dexmedetomidine (owner, 14 Oct 2026).
 - One static page, no data, no sign-in, no storage. Synthetic EEG only.
 - Always dark, like an anaesthetic monitor (owner, 14 Oct 2026); BIS big on the left, SR/SEF95/EMG stacked on the right.
+- Screen order like a BIS monitor (owner, 14 Oct 2026): BIS and EMG trends, then DSA above, raw EEG below; a view
+  toggle (DSA + EEG, DSA, EEG) shows one large. Displayed EMG is the 30–47 Hz power + 16 dB on a 25–55 dB bar
+  (`emgShow`); ketamine's gamma also lifts it, as real high-frequency power would.
 
 ## Address
 

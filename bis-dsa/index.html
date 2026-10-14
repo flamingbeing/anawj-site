@@ -73,6 +73,11 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .reading b{font-family:var(--f-display);font-size:17px}
 .reading p{font-size:15px}
 .story{display:grid;gap:8px}
+.lane{display:grid;gap:6px;min-width:0}
+.scrseg button{background:var(--scr-2);border-color:#2a3850;color:var(--scr-fg);padding:5px 10px;font-size:13px}
+.scrseg button[aria-pressed="true"]{background:var(--scr-fg);border-color:var(--scr-fg);color:#000}
+.key{display:inline-block;width:14px;height:3px;vertical-align:middle;margin-left:4px;border-radius:2px}
+.key.bis{background:#fff}.key.emg{background:#5fd08f;height:8px}
 .err{font-size:14px;color:var(--bad)}
 .caption{min-height:3.2em;font-size:15px;border-left:3px solid var(--q1);padding-left:10px}
 .caption:empty{display:none}
@@ -120,21 +125,24 @@ footer{font-size:13px;color:var(--muted);max-width:80ch;border-top:1px solid var
 
 <section id="monitor" aria-labelledby="h-mon">
   <div class="sec-head"><h2 id="h-mon">The monitor</h2>
-  <p>Raw EEG at the top, the BIS trend under it, then the DSA: time runs left to right, frequency goes up (0–30 Hz), and colour shows power. The white line is SEF95, the frequency below which 95% of the power sits.</p></div>
+  <p>Laid out like a BIS screen: the number and EMG at the top, then the BIS and EMG trends, the DSA, and the raw EEG at the bottom. Switch the view to see the DSA or the EEG large. On the DSA, time runs left to right, frequency goes up (0–30 Hz) and colour shows power; the white line is SEF95, the frequency below which 95% of the power sits.</p></div>
   <div class="sim">
     <div class="screen">
       <div class="readouts">
         <div class="ro bisbox"><span class="k">BIS</span><span class="v" id="vBis">--</span><span class="zone" id="vZone">--</span></div>
         <div class="ro"><span class="k">SR</span><span class="v" id="vSr">0</span><span class="u">% flat EEG, last 63 s</span></div>
         <div class="ro"><span class="k">SEF95</span><span class="v" id="vSef">--</span><span class="u">Hz</span></div>
-        <div class="ro"><span class="k">EMG</span><span class="v" id="vEmg">--</span><span class="u">dB, 30–47 Hz</span><div class="emgbar"><b id="vEmgBar"></b></div></div>
+        <div class="ro"><span class="k">EMG</span><span class="v" id="vEmg">--</span><span class="u">dB, high-frequency power</span><div class="emgbar"><b id="vEmgBar"></b></div></div>
       </div>
-      <div class="lbl"><span>EEG · 8 s</span><span style="text-transform:none">±100 µV</span></div>
-      <canvas id="cEeg" height="110" aria-label="Scrolling raw EEG trace"></canvas>
-      <div class="lbl"><span>BIS trend</span><span>40–60 band shaded</span></div>
-      <canvas id="cTrend" height="70" aria-label="BIS trend over the last five minutes"></canvas>
-      <div class="lbl"><span>DSA · 0–30 Hz</span><span>last 5 min</span></div>
-      <canvas id="cDsa" height="210" aria-label="Density spectral array over the last five minutes"></canvas>
+      <div class="seg scrseg" id="viewSeg" role="group" aria-label="Screen view">
+        <button data-view="both" aria-pressed="true">DSA + EEG</button><button data-view="dsa" aria-pressed="false">DSA</button><button data-view="eeg" aria-pressed="false">EEG</button>
+      </div>
+      <div class="lane" id="wTrend"><div class="lbl"><span>BIS trend <i class="key bis"></i> · EMG <i class="key emg"></i></span><span>5 min</span></div>
+      <canvas id="cTrend" height="96" aria-label="BIS and EMG trends over the last five minutes"></canvas></div>
+      <div class="lane" id="wDsa"><div class="lbl"><span>DSA · 0–30 Hz</span><span>last 5 min</span></div>
+      <canvas id="cDsa" height="190" aria-label="Density spectral array over the last five minutes"></canvas></div>
+      <div class="lane" id="wEeg"><div class="lbl"><span>EEG · 8 s</span><span style="text-transform:none">±100 µV</span></div>
+      <canvas id="cEeg" height="110" aria-label="Scrolling raw EEG trace"></canvas></div>
     </div>
     <div class="panel">
       <div class="ctl"><span class="t">Drug</span>
