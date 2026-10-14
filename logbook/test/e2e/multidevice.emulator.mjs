@@ -168,6 +168,15 @@ try {
       else record(x.r);
     }
   }
+  // an edit on a device just back online can be accepted (saved here) and only meet the change made elsewhere when it
+  // drains: a conflict, kept in Recent changes, as for an offline device (seed 419136196). On a device that was already
+  // up to date it would be a real fault.
+  async function conflictedOnline(d, r) {
+    const st = (await latest(d)).get(r.id);
+    if (!st || st[0] !== 'conflict') return;
+    if (d.stale) { conflicts++; ledger.delete(r.id); }
+    else errors.push(`round ${r.round}: device ${d.n} edit ${r.id} met a conflict on a device that was up to date`);
+  }
   // an online device's delete can be undone the same way, once it lands (a change made elsewhere reached the server first)
   async function undoneOnline(d, r) {
     const states = await latest(d);
@@ -202,11 +211,11 @@ try {
     }));
     const results = await Promise.all(devs.map((d, i) => act(d.p, plan[i])));
     results.forEach((r, i) => history.push([round, devs[i].n, devs[i].offline, r.kind, (r.ids || [r.id]).join('+'), r.ok, r.error || '']));
-    // a delete of several cases where one met a change made elsewhere: that one is kept (and the action says so), the
+    // a delete of several cases where one met a change made elsewhere (entries() lists the newest job first): that one is kept (and the action says so), the
     // others were deleted (moved to the bin) all the same (seed 76343995)
     const doneIds = await Promise.all(results.map((r, i) => !r.ok && r.kind === 'deleteMany' && /changed elsewhere/.test(r.error)
       ? devs[i].p.evaluate(async ids => { const w = (await import('./js/writes.js')).writes.entries();
-        return ids.filter(id => { const j = w.filter(x => x.record.id === id).at(-1); return j && j.record._deleted && j.state === 'synced'; }); }, r.ids).catch(() => [])
+        return ids.filter(id => { const j = w.find(x => x.record.id === id); return j && j.record._deleted && j.state === 'synced'; }); }, r.ids).catch(() => [])
       : []));
     results.forEach((r, i) => {
       const d = devs[i];
@@ -226,6 +235,7 @@ try {
     await Promise.all(online.map(d => d.p.evaluate(async () => (await import('./js/cloud.js')).syncFlush()).catch(() => {})));
     await Promise.all(online.map(d => d.p.evaluate(async () => (await import('./js/writes.js')).writes.flush(8000)).catch(() => {})));
     for (const [i, r] of results.entries()) if (r.ok && /^delete/.test(r.kind) && !devs[i].offline) await undoneOnline(devs[i], r);
+    for (const [i, r] of results.entries()) if (r.ok && r.kind === 'edit' && !devs[i].offline) await conflictedOnline(devs[i], { ...r, round });
     await new Promise(r => setTimeout(r, 2000));
     await Promise.all(online.map(async d => { await d.p.reload(); await synced(d.p); }));
     for (const d of back) d.held.clear();
