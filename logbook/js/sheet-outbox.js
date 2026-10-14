@@ -15,8 +15,9 @@ import { ID_RE } from './engine.js';
 // identifiers never leave the logbook: an NRIC/FIN or a long number is replaced (as form-inbox.js maskIds does)
 const maskIds = text => String(text || '').replace(new RegExp(ID_RE.source, 'gi'), '[ID removed]');
 
-// Off until the sheet script is live and tested on a copy of the sheet (owner, Oct 2026). Then one line turns it on.
-export const SHEET_OUTBOX_ON = false;
+// On since 14 Oct 2026, once the sheet script (form-script/Outbox.gs) was installed on the response sheet. Off switch: set
+// this to false (the app stops writing entries), or delete the sheet script's trigger.
+export const SHEET_OUTBOX_ON = true;
 let override = null;
 export const outboxOn = () => override == null ? SHEET_OUTBOX_ON : override;
 export function setOutboxOn(v) { override = v; }   // tests

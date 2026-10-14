@@ -299,7 +299,7 @@ const scenarios = {
       await ui.saveMany([{ id: 'sheetr1', date: '2026-10-14', initials: 'GH', details: 'fake restored', cats: ['08'], createdAt: now, updatedAt: now, source: 'app' }]); });
     await settle(A); await A.p.waitForTimeout(800);
     assert.ok(!(await outbox()).has('sheetr1'), 'a restore is not a new case');
-    await A.p.evaluate(async () => (await import('./js/sheet-outbox.js')).setOutboxOn(null));
+    await A.p.evaluate(async () => (await import('./js/sheet-outbox.js')).setOutboxOn(false));
     must(await act(A, { kind: 'create', id: 'sheet2', text: 'fake case while it is off' })); await settle(A); await A.p.waitForTimeout(800);
     assert.ok(!(await outbox()).has('sheet2'), 'off: nothing queued');
     return 'queued, masked, edit ignored, removed on delete, paste yes, restore no, off';

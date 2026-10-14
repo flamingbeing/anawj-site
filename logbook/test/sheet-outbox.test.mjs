@@ -34,8 +34,8 @@ assert.equal(outboxEntry(null, who), null);
   assert.equal(e.initials.length, 20); assert.equal(e.details.length, 2000); assert.ok(e.cats.length <= 40); assert.equal(new Set(e.cats).size, e.cats.length);
 }
 assert.equal(outboxEntries([c, { ...c, id: 'k2', source: 'form' }, { ...c, id: 'k3', source: 'paste' }], who).map(e => e.id).join(), 'k1,k3');
-// off until the sheet script is live
-assert.equal(SHEET_OUTBOX_ON, false);
-assert.equal(outboxOn(), false);
-setOutboxOn(true); assert.equal(outboxOn(), true); setOutboxOn(null); assert.equal(outboxOn(), false);
+// on once the sheet script is installed (14 Oct 2026); the tests can still switch it
+assert.equal(SHEET_OUTBOX_ON, true);
+assert.equal(outboxOn(), true);
+setOutboxOn(false); assert.equal(outboxOn(), false); setOutboxOn(null); assert.equal(outboxOn(), true);
 console.log('PASS sheet-outbox');

@@ -1,6 +1,6 @@
 # Plan: new app cases → the programme's response sheet (teething phase)
 
-Owner, 14 Oct 2026. Status: **owner said go (14 Oct 2026)**; the app side, rules and tests are built (PR 1, off by a constant until the sheet script is live); the sheet script is written and unit-tested (`form-script/Outbox.gs`, setup in `form-script/OUTBOX-README.md`) but not installed anywhere: next is a dry run on a **copy** of the sheet (owner's OK first). Product version only (no names or
+Owner, 14 Oct 2026. Status: **LIVE from 14 Oct 2026** (sheet script installed by the owner, `SHEET_OUTBOX_ON = true`); earlier: owner said go; the app side, rules and tests are built (PR 1, off by a constant until the sheet script is live); the sheet script is written and unit-tested (`form-script/Outbox.gs`, setup in `form-script/OUTBOX-README.md`) but not installed anywhere: next is a dry run on a **copy** of the sheet (owner's OK first). Product version only (no names or
 case data here).
 
 ## Why
@@ -95,3 +95,11 @@ email); it still can't read logbooks, cases or the Form inbox. A separate bot ac
   rebuilds kept in a Script property). A piece can still exceed 10 s: the real fix is `waitLock(10000)` → `waitLock(60000)` in the
   existing `onFormSubmit` (owner's call; it also helps two Form responses close together), or outbox runs at quiet hours only.
 - Not tested yet: the bot sign-in and outbox read from the sheet's project (needs the Script properties set in the editor).
+
+## Switched on (14 Oct 2026)
+
+The owner installed `Outbox.gs` in the response sheet's project (Script properties set, `logbookOutboxSetup` run: column J header
+"App marker", 5-minute trigger `logbookOutboxRun`) and raised the Form handler's lock wait to 60 s. `SHEET_OUTBOX_ON` is now true.
+Only cases made from then on go to the sheet (no back-fill). First check: a case logged by a programme resident shows in the
+Case tab within about 5 minutes, with `app:<caseId>` in column J, and in the Database tab. Off switch: set the constant false, or
+delete the trigger.
