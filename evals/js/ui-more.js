@@ -20,7 +20,8 @@ export function renderMore() {
   const inst = installCard();
   if (inst) root.append(inst);
   root.append(settingsCard(), privacyCard(),
-    h('button', { class: 'n-btn n-btn--outline e-btn-quiet e-btn-big', type: 'button', onclick: signOut }, cloud.demo ? 'Sign out of the demo' : 'Sign out'));
+    h('button', { class: 'n-btn n-btn--outline e-btn-quiet e-btn-big', type: 'button', onclick: signOut }, cloud.demo ? 'Sign out of the demo' : 'Sign out'),
+    versionLine());
   return root;
 }
 
@@ -142,6 +143,33 @@ function privacyCard() {
 }
 
 const signOut = () => signOutSafely();
+
+// App version and "Get the latest version" (owner, 14 Oct 2026, as in prewarm): small print at the bottom of More.
+// The version is the name of the saved copy of the app (sw.js VERSION, stamped at deploy), so a phone stuck on an old
+// one can be spotted. The button clears only this app's saved copy (never the logbook's) and reloads; answers not
+// sent yet stay in Firestore's own offline store, but it still asks first.
+function versionLine() {
+  const ver = h('span', {}, 'App version: checking…');
+  const line = h('p', { class: 'e-appver' }, ver, ' · ',
+    h('button', { class: 'e-linkbtn', type: 'button', onclick: getLatest }, 'Get the latest version'));
+  (window.caches ? caches.keys() : Promise.resolve([])).then(ks => {
+    const k = ks.find(x => x.startsWith('evals-'));
+    ver.textContent = k ? 'App version ' + k.replace(/^evals-/, '').replace(/-([0-9a-f]{8})$/, ' ($1)') : 'App version: not saved on this device';
+  }).catch(() => { ver.textContent = 'App version: unknown'; });
+  return line;
+}
+
+async function getLatest() {
+  try { if (!(await fetch('sw.js', { cache: 'no-store' })).ok) throw new Error(); }
+  catch { toast('No connection. Try again when you have signal.'); return; }
+  if (!cloud.demo && await cloud.hasUnsentWrites() && !(await confirmBox('Some answers aren’t sent yet',
+    'They stay saved on this phone and are sent once the app reopens with signal. Get the latest version now?', 'Get it'))) return;
+  try {
+    for (const r of await navigator.serviceWorker?.getRegistrations?.() || []) if (/\/evals\/$/.test(r.scope)) await r.unregister();
+    for (const k of await caches.keys()) if (k.startsWith('evals-')) await caches.delete(k);
+  } catch { /* reload anyway */ }
+  location.reload();
+}
 
 // ---------- How evals work (#how) ----------
 // Plain steps for each role. Only what the app and the APMES guidebook already say (24 h, the same
