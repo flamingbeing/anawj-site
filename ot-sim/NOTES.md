@@ -60,3 +60,17 @@ Lasting decisions for `ot-sim/`. Status and next steps: `STATUS.md`. The build b
 
 - 14 Oct 2026: folder `ot-sim/`, address `anaes.anawj.com/ot/`, plain ES modules with no build step, model separate
   from UI so Node tests can run it. Environment prepared (routes, labels, checks, test runner, build brief).
+
+## Permissions for unattended sessions (14 Oct 2026)
+
+`.claude/settings.json` allows what a milestone loop needs without a prompt: the test scripts (`tools/test-*.sh`,
+`node ot-sim/test/*` and other apps' tests), local static servers and `curl` to localhost, `git add/commit/checkout/
+merge origin/main/pull`, pushes to `claude/*` branches, reading sources (web search and fetch, PubMed tools), and the
+PR loop (open, update, read checks, merge your own PR). Sessions may edit `.claude/settings.json` to keep this list
+current (owner's OK, 14 Oct 2026); widen it only for what the work needs, and say what you added in the PR.
+It still **asks** for Codex, Firebase and anything that signs in to a live project (`CLAUDE.md`); never add allow rules
+for a `firestore.rules` merge, a force-push to `main`, secrets or live-project sign-in.
+The permission *mode* is set in the app, not in the repo: pick **Auto** from the mode dropdown when starting the build
+session. Settings are read from `main`, so they apply to new sessions once the PR is merged.
+Network (checked 14 Oct 2026): GitHub, npm, PubMed/NCBI, ANZCA and MHAUS are reachable. If a guideline site is denied,
+the owner adds the host under Allowed domains in the environment settings.
