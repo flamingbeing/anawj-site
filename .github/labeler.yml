@@ -15,6 +15,9 @@ prewarm:
 bis-dsa:
   - changed-files:
       - any-glob-to-any-file: 'bis-dsa/**'
+ot-sim:
+  - changed-files:
+      - any-glob-to-any-file: 'ot-sim/**'
 hand-babies:
   - changed-files:
       - any-glob-to-any-file: ['hand-babies/**', 'hand/**']

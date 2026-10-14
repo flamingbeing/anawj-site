@@ -9,7 +9,7 @@
 //      or { root: 'prewarm/' }                 (one app at the root; its own folder name works too)
 export const SITES = {
   // anaesthesia teaching pages (static, no data)
-  'anaes.anawj.com': { prefixes: { '/bis/': 'bis-dsa/' } },
+  'anaes.anawj.com': { prefixes: { '/bis/': 'bis-dsa/', '/ot/': 'ot-sim/' } },
   'hand.anawj.com': { prefixes: { '/cmcj/': 'cmcj/', '/babies/': 'hand-babies/', '/handlog/': 'hand-log/' } },
   'prewarmstudy.anawj.com': { root: 'prewarm/' },
   'nuhroster.anawj.com': { root: 'nuh-roster/' },

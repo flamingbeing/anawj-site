@@ -30,6 +30,8 @@ jobs:
         run: for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mjs prewarm/test/*.test.mjs people/test/*.test.mjs worker/test/*.test.mjs feedback/test/*.test.mjs; do echo "== $f"; node "$f" || exit 1; done
       - name: BIS to DSA engine tuning
         run: node bis-dsa/test/engine.check.mjs
+      - name: OT simulator model tests
+        run: for f in ot-sim/test/*.test.mjs; do echo "== $f"; node "$f" || exit 1; done
       - name: Proof-read (pages and documents)
         run: node tools/proofread.mjs
 
@@ -55,5 +57,6 @@ jobs:
           node ask/test/e2e.mjs
           node hand-babies/test/e2e.mjs
           node bis-dsa/test/e2e.mjs
+          node ot-sim/test/e2e.mjs
           node nuh-roster/test/e2e.mjs
           node people/test/e2e.mjs

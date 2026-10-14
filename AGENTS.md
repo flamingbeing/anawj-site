@@ -14,6 +14,9 @@ Static site on GitHub Pages (public repo: no names, patient data or real evaluat
 - `prewarm/`: prewarming study op-day data collection (temperatures every 5 min, export to the study's Excel template); served at `prewarmstudy.anawj.com`. Start with `prewarm/NOTES.md`, then `prewarm/PLAN.md`.
 - `bis-dsa/`: BIS to DSA teaching simulator for anaesthesia residents (one static page, synthetic EEG, no data), at
   `anaes.anawj.com/bis/`. Start with `bis-dsa/NOTES.md`.
+- `ot-sim/`: anaesthesia operating-theatre simulator for teaching (a general anaesthetic, the vitals monitor and
+  crisis scenarios; one static site, synthetic physiology, no data), at `anaes.anawj.com/ot/`. Start with
+  `ot-sim/NOTES.md`, then `ot-sim/PLAN.md` (the build brief for autonomous sessions).
 - `hand-babies/`: hand surgery exam crash course for new MOs (one static page, no data), at `hand.anawj.com/babies/`. Start with `hand-babies/NOTES.md`.
 - `hand-log/`: hand surgery DOPS and Mini-CEX log (data on the device only, CSV/JSON export), at `hand.anawj.com/handlog/`. Start with `hand-log/NOTES.md`.
 - `edit/`: the page editor for any page on the site (`edit.anawj.com/<path>` redirects to it). Suggested edits arrive as
@@ -33,7 +36,11 @@ Rules that bite:
 
 - Accounts, settings, costs, the pre-launch checklist and how to hand over: [OPERATIONS.md](OPERATIONS.md). Update
   it when an account, setting or cost changes.
-- A PR that changes any `firestore.rules` waits for the owner's approval before merging (it deploys live on merge).
+- A PR that changes any `firestore.rules` deploys live on merge. Sessions may merge it themselves (owner, 14 Oct 2026: rules
+  and data are his biggest headache; he does not want to intervene), carefully: run `tools/test-rules.sh` first, merge only
+  when the Checks are green, confirm the "Deploy Firestore rules" run succeeded, and say in the report which rules changed
+  and what they now allow or deny. Never loosen rules on real-data collections (logbook, evals, prewarm, roster) just to
+  make a test pass.
 - **Blocked by the cloud environment?** (no Google Cloud sign-in, the owner's real documents, a long test run, a
   secret): hand it to the owner's home-computer session instead of stopping. How and what to send: `OPERATIONS.md`,
   "The home computer". It changes live projects only with the owner's OK.
@@ -82,6 +89,7 @@ for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mj
 - NUH roster changes: run `node nuh-roster/test/e2e.mjs` (Practice in a browser, desktop and phone, axe on every tab;
   under a minute; also in the Checks workflow).
 - Hand log changes: run `node hand-log/test/e2e.mjs`.
+- OT simulator changes: run `tools/test-ot-sim.sh` (model tests, repo check, browser test; see `ot-sim/NOTES.md`).
 - BIS to DSA changes: run `node bis-dsa/test/e2e.mjs` and `node bis-dsa/test/engine.check.mjs` (engine tuning, no browser).
 - People changes, and evals changes to `cloud.js`, `ui-core.js` or the People panes in `ui-admin.js`: run `node people/test/e2e.mjs`.
 - Page editor changes (`edit/`): run `node edit/test/e2e.mjs` and `node hand-babies/test/e2e.mjs` (it opens the editor).
@@ -104,7 +112,7 @@ for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mj
 - **Goal now:** find diverse use cases. Ideas and the longer-term direction are in [ROADMAP.md](ROADMAP.md).
 - **Merging:** merge your own PRs once the checks above pass, then report (with the PR link). Merge by the number the
   PR's creation returned, never a guessed next number (13 Oct 2026: a guess merged another session's PR early). Exceptions: Claude
-  Code–Codex handover PRs and PRs changing a `firestore.rules` wait for the owner's explicit approval; the owner may say "auto-merge" for a batch, or
+  Code–Codex handover PRs wait for the owner's explicit approval (`firestore.rules` PRs do not any more: see Rules that bite); the owner may say "auto-merge" for a batch, or
   "no e2e yet" (then unit tests and quick browser checks).
 - **Planning:** for multi-part work, say the plan first and wait when asked; the owner plans in batches, then it's
   built PR by PR, each merged before the next. When the owner asks "should we / can we", answer and propose.

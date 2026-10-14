@@ -14,11 +14,14 @@ assert.deepEqual(resolve('hand.anawj.com', '/babies'), { redirect: '/babies/' })
 assert.deepEqual(resolve('anaes.anawj.com', '/bis/'), { file: 'bis-dsa/' });
 assert.deepEqual(resolve('anaes.anawj.com', '/bis/app.js'), { file: 'bis-dsa/app.js' });
 assert.deepEqual(resolve('anaes.anawj.com', '/bis'), { redirect: '/bis/' });
+assert.deepEqual(resolve('anaes.anawj.com', '/ot/'), { file: 'ot-sim/' });
+assert.deepEqual(resolve('anaes.anawj.com', '/ot/js/engine.js'), { file: 'ot-sim/js/engine.js' });
+assert.deepEqual(resolve('anaes.anawj.com', '/ot'), { redirect: '/ot/' });
 assert.deepEqual(resolve('hand.anawj.com', '/handlog/'), { file: 'hand-log/' });
 assert.deepEqual(resolve('hand.anawj.com', '/handlog/js/app.js'), { file: 'hand-log/js/app.js' });
 assert.deepEqual(resolve('hand.anawj.com', '/handlog'), { redirect: '/handlog/' });
 // a shared host serves nothing else: not its root, not other apps' folders, not the repo
-for (const [h, p] of [['hand.anawj.com', '/'], ['hand.anawj.com', '/logbook/'], ['hand.anawj.com', '/hand-babies/'], ['hand.anawj.com', '/hand-log/'], ['hand.anawj.com', '/AGENTS.md'], ['anaes.anawj.com', '/'], ['anaes.anawj.com', '/bis-dsa/'], ['anaes.anawj.com', '/hand-babies/'],
+for (const [h, p] of [['hand.anawj.com', '/'], ['hand.anawj.com', '/logbook/'], ['hand.anawj.com', '/hand-babies/'], ['hand.anawj.com', '/hand-log/'], ['hand.anawj.com', '/AGENTS.md'], ['anaes.anawj.com', '/'], ['anaes.anawj.com', '/bis-dsa/'], ['anaes.anawj.com', '/ot-sim/'], ['anaes.anawj.com', '/hand-babies/'],
   ['apmes.anawj.com', '/'], ['apmes.anawj.com', '/prewarm/'], ['apmes.anawj.com', '/nuh-roster/index.html'], ['apmes.anawj.com', '/logbooks/']]) {
   assert.deepEqual(resolve(h, p), { notFound: true }, h + p);
 }
