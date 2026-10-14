@@ -169,3 +169,61 @@ function fakeEnv({ entries = [], pending = { rids: [], ays: [] }, over = {}, ioO
   assert.deepEqual([...S.entryOf({ name: 'x/y/z', fields: { cats: { arrayValue: {} }, date: { nullValue: null } } }).cats], []);
 }
 console.log('PASS outbox script');
+
+// ---------- the nightly Totals check (counts only; fake residents) ----------
+{
+  const L1 = '01) Cardiac surgery with CPB (10 | 15)', L16 = S.labels['16'], L20 = S.labels['20'], L20iii = S.labels['20iii'], L26iv = S.labels['26iv'];
+  const caseRow = (rid, ...labels) => [`Fake ${rid} (${rid})`, labels.filter(l => !/^(20i|26i)/.test(l.slice(0, 3))).join(', '), '', '', labels.filter(l => /^26iv/.test(l)).join(', '), new Date('2026-10-01T00:00:00Z')];
+  // Case counts: one per label per row; rows without a resident id (WRONG ENTRY) are not counted
+  const cc = S.caseCounts([caseRow('202301', L1, L16), caseRow('202301', L1), ['WRONG ENTRY', L1, '', '', '', null], caseRow('202302', L26iv)]);
+  assert.deepEqual(plain(cc), { 202301: { [L1]: 2, [L16]: 1 }, 202302: { [L26iv]: 1 } });
+  assert.deepEqual(plain(S.dbCounts([['202301', L1], ['202301', L1], ['x', L1], ['202301', '']])), { 202301: { [L1]: 2 } });
+  const tab = (cols, rows) => [['Category', ...cols], ...rows, ['Grand Total', 0]];
+  const ok = { AY2023: tab(['Fake A (202301)'], [[L1, 2], [L16, 1], [L20, '']]) };
+  // everything agrees; the Totals tab has no row for 26iv: that is not a difference (it is reported as ignored)
+  const same = S.totalsDiff(cc, plain(cc), ok);
+  assert.deepEqual([same.db.length, same.ay.length, [...same.ignored]], [0, 0, [L26iv]]);
+  // a Database row added twice, a Case row missing from the Database, a stale Totals cell
+  const dbBad = { 202301: { [L1]: 3, [L16]: 1 }, 202302: {} };
+  const d1 = S.totalsDiff(cc, dbBad, { AY2023: tab(['Fake A (202301)'], [[L1, 2], [L16, 5]]) });
+  assert.deepEqual(plain(d1.db).map(x => [x.rid, x.label, x.caseCount, x.dbCount]), [['202301', L1, 2, 3], ['202302', L26iv, 1, 0]]);
+  assert.deepEqual(plain(d1.ay).map(x => [x.label, x.dbCount, x.tabCount]), [[L1, 3, 2], [L16, 1, 5]]);
+
+  // the cycle: fake sheet whose state is advanced by the rebuilds
+  const mk = ({ fixOn = true, ageMs = 3600e3, rows = 1200, fixable = true } = {}) => {
+    const st = { stale: true, log: [], now: 1e12 };
+    const base = []; for (let i = 0; i < rows; i++) base.push(caseRow('202301', L1));
+    const env = {
+      fixOn, now: () => st.now, log: t => st.log.push(t),
+      locked: fn => { st.log.push('lock'); fn(); st.log.push('unlock'); },
+      rebuildDatabase: () => { st.log.push('db'); st.dbDone = true; },
+      rebuildAy: () => { st.log.push('ay'); if (fixable) st.ayDone = true; },
+      read: () => ({
+        caseRows: base,
+        dbRows: Array.from({ length: rows + (st.dbDone ? 0 : 1) }, () => ['202301', L1]),
+        ayTabs: { AY2023: tab(['Fake A (202301)'], [[L1, st.ayDone ? rows : rows + 5]]) },
+        newestCaseMs: st.now - ageMs,
+      }),
+    };
+    return { env, st };
+  };
+  let m = mk({ fixOn: false }); let r = S.totalsCycle(m.env);
+  assert.deepEqual([r.status, r.before.database, r.before.totals, m.st.log.length], ['differs', 1, 1, 0], 'report only: nothing is run');
+  m = mk(); r = S.totalsCycle(m.env);
+  assert.equal(r.status, 'fixed'); assert.deepEqual([...r.ran], ['Rebuild Database', 'Rebuild AY Reports']);
+  assert.deepEqual(m.st.log, ['lock', 'db', 'unlock', 'lock', 'ay', 'unlock'], 'each rebuild in a lock hold of its own, Database first');
+  m = mk({ ageMs: 60e3 }); r = S.totalsCycle(m.env);
+  assert.deepEqual([r.status, m.st.log.length], ['skipped', 0], 'a case arrived a minute ago: wait for the next night');
+  m = mk({ rows: 300 }); r = S.totalsCycle(m.env);
+  assert.deepEqual([r.status, m.st.log.length], ['skipped', 0], 'too few rows read: change nothing');
+  m = mk({ fixable: false }); r = S.totalsCycle(m.env);
+  assert.equal(r.status, 'still differs', 'checked again after the rebuild, once');
+  assert.equal(m.st.log.filter(x => x === 'ay').length, 1, 'never rebuilds twice in one night');
+  // nothing differs: nothing runs
+  const clean = mk(); clean.st.dbDone = true; clean.st.ayDone = true; r = S.totalsCycle(clean.env);
+  assert.deepEqual([r.status, clean.st.log.length], ['ok', 0]);
+  // the menu commands end with an alert a trigger cannot show: that error is swallowed, others are not
+  S.noUi(() => { throw new Error('Cannot call SpreadsheetApp.getUi() from this context.'); });
+  assert.throws(() => S.noUi(() => { throw new Error('boom'); }), /boom/);
+}
+console.log('outbox script totals check ok');

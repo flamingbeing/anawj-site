@@ -363,4 +363,158 @@ function logbookOutboxTryOne(rid) {
   console.log(JSON.stringify({ result: r, holds: times }));
 }
 
-if (typeof module !== 'undefined') module.exports = { labels: LOGBOOK_OUTBOX_LABELS, categories: logbookOutboxCategories_, row: logbookOutboxRow_, add: logbookOutboxAdd_, cycle: logbookOutboxCycle_, chunk: LOGBOOK_OUTBOX_CHUNK, entryOf: logbookOutboxEntryOf_, date: logbookOutboxDate_ };
+// ---------- the Totals check (nightly) ----------
+// The sheet's Database tab is built one response at a time and the AY Totals tabs are built from the Database, so a
+// response whose update timed out, one added twice, or a Case row changed by hand leaves the Totals out of step with the
+// Case tab (Oct 2026: three residents' totals were 1-2 off). This compares, by counts only, Case tab -> Database -> AY
+// Totals tabs, and (only if the Script property LOGBOOK_TOTALS_FIX is 'on') runs the same two rebuilds the sheet's own menu
+// has ("Rebuild Database", "Rebuild AY Reports"), in the quiet of the night. It never touches the Case or Residents tabs,
+// a resident's own spreadsheet, or anything outside this sheet.
+
+var LOGBOOK_TOTALS_FIX_KEY = 'LOGBOOK_TOTALS_FIX';       // 'on' to let the nightly run rebuild; anything else only reports
+var LOGBOOK_TOTALS_LAST_KEY = 'LOGBOOK_TOTALS_LAST';     // the last run's result (text)
+var LOGBOOK_TOTALS_RECENT_MS = 10 * 60 * 1000;           // a Form response or app case this recent: wait for the next night
+var LOGBOOK_TOTALS_MIN_ROWS = 1000;                      // fewer Case rows than this: something is wrong with the read, change nothing
+
+// caseRows: [[A resident text, D, E, F, G (category cells), H timestamp]...] -> { 'rid': { 'label': n } } (one per label per row)
+function logbookOutboxCaseCounts_(caseRows) {
+  var out = {};
+  for (var i = 0; i < caseRows.length; i++) {
+    var m = /\((\d{6})\)\s*$/.exec(String(caseRows[i][0]));
+    if (!m) continue;   // WRONG ENTRY and rows without a resident id are not counted by the Database either
+    var rid = m[1], seen = {};
+    for (var c = 1; c <= 4; c++) {
+      String(caseRows[i][c] || '').split(',').forEach(function (s) {
+        var label = s.replace(/^\s+|\s+$/g, '');
+        if (!label || seen[label]) return;
+        seen[label] = true;
+        out[rid] = out[rid] || {}; out[rid][label] = (out[rid][label] || 0) + 1;
+      });
+    }
+  }
+  return out;
+}
+
+// dbRows: [[B resident id, I category label]...] -> the same shape
+function logbookOutboxDbCounts_(dbRows) {
+  var out = {};
+  for (var i = 0; i < dbRows.length; i++) {
+    var rid = String(dbRows[i][0]), label = String(dbRows[i][1] || '').replace(/^\s+|\s+$/g, '');
+    if (!/^\d{6}$/.test(rid) || !label) continue;
+    out[rid] = out[rid] || {}; out[rid][label] = (out[rid][label] || 0) + 1;
+  }
+  return out;
+}
+
+// ayTabs: { 'AY2023': [[ 'Category', 'Name (202301)', ... ], [ label, n, ... ], ..., [ 'Grand Total', ... ]] } (the tab's values)
+// -> { db: [{ rid, label, caseCount, dbCount }], ay: [{ ay, rid, label, dbCount, tabCount }], ignored: [labels the Totals tabs have no row for] }
+// Compared: Case vs Database for every resident; Database vs each Totals cell for the residents and labels a tab shows.
+function logbookOutboxTotalsDiff_(caseCounts, dbCounts, ayTabs) {
+  var db = [], ay = [], shown = {}, ignored = {}, rid, label;
+  var rids = logbookOutboxUnion_(Object.keys(caseCounts), Object.keys(dbCounts)).sort();
+  rids.forEach(function (r) {
+    logbookOutboxUnion_(Object.keys(caseCounts[r] || {}), Object.keys(dbCounts[r] || {})).sort().forEach(function (l) {
+      var a = (caseCounts[r] || {})[l] || 0, b = (dbCounts[r] || {})[l] || 0;
+      if (a !== b) db.push({ rid: r, label: l, caseCount: a, dbCount: b });
+    });
+  });
+  Object.keys(ayTabs).sort().forEach(function (name) {
+    var rows = ayTabs[name], head = rows[0] || [], cols = {};
+    head.forEach(function (h, i) { var m = /\((\d{6})\)\s*$/.exec(String(h)); if (m) cols[i] = m[1]; });
+    rows.slice(1).forEach(function (r) {
+      label = String(r[0]).replace(/^\s+|\s+$/g, '');
+      if (!label || label === 'Grand Total') return;
+      shown[label] = true;
+      Object.keys(cols).forEach(function (i) {
+        var tabCount = Number(r[i]) || 0, dbCount = ((dbCounts[cols[i]] || {})[label]) || 0;
+        if (tabCount !== dbCount) ay.push({ ay: name, rid: cols[i], label: label, dbCount: dbCount, tabCount: tabCount });
+      });
+    });
+  });
+  Object.keys(dbCounts).forEach(function (r) { Object.keys(dbCounts[r]).forEach(function (l) { if (!shown[l]) ignored[l] = true; }); });
+  return { db: db, ay: ay, ignored: Object.keys(ignored).sort() };
+}
+
+// One night's check, with its surroundings behind env (tested with fakes):
+//   env.read() -> { caseRows, dbRows, ayTabs, newestCaseMs }, env.fixOn (bool), env.now(), env.locked(fn),
+//   env.rebuildDatabase(), env.rebuildAy(), env.log(text)
+// -> { status: 'ok' | 'differs' | 'fixed' | 'still differs' | 'skipped', reason, before, after, ran: [] }
+function logbookOutboxTotalsCycle_(env) {
+  var data = env.read();
+  var diff = function (d) { return logbookOutboxTotalsDiff_(logbookOutboxCaseCounts_(d.caseRows), logbookOutboxDbCounts_(d.dbRows), d.ayTabs); };
+  var count = function (x) { return { database: x.db.length, totals: x.ay.length }; };
+  if (data.caseRows.length < LOGBOOK_TOTALS_MIN_ROWS) return { status: 'skipped', reason: 'only ' + data.caseRows.length + ' Case rows read; nothing changed', ran: [] };
+  var before = diff(data), b = count(before);
+  if (!b.database && !b.totals) return { status: 'ok', before: b, ran: [] };
+  var summary = { status: 'differs', before: b, detail: before, ran: [] };
+  if (!env.fixOn) return summary;
+  if (env.now() - data.newestCaseMs < LOGBOOK_TOTALS_RECENT_MS) { summary.reason = 'a case arrived in the last 10 minutes; left for the next run'; summary.status = 'skipped'; return summary; }
+  if (b.database) { env.locked(env.rebuildDatabase); summary.ran.push('Rebuild Database'); }
+  env.locked(env.rebuildAy); summary.ran.push('Rebuild AY Reports');
+  var after = diff(env.read()), a = count(after);
+  summary.after = a; summary.detail = after;
+  summary.status = (!a.database && !a.totals) ? 'fixed' : 'still differs';
+  return summary;
+}
+
+// The sheet's menu commands end with an alert, which a time trigger cannot show: the work is done by then
+function logbookOutboxNoUi_(fn) {
+  try { fn(); } catch (e) { if (!/getUi|Cannot call/i.test(String(e && e.message))) throw e; }
+}
+
+function logbookOutboxTotalsEnv_(fixOn) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  return {
+    fixOn: fixOn,
+    now: function () { return Date.now(); },
+    log: function (t) { console.log(t); },
+    locked: function (fn) { var lock = LockService.getDocumentLock(); lock.waitLock(60000); try { fn(); } finally { lock.releaseLock(); } },
+    rebuildDatabase: function () { logbookOutboxNoUi_(rebuildDatabase); },
+    rebuildAy: function () { logbookOutboxNoUi_(rebuildAYSummaryReports); },
+    read: function () {
+      var cs = ss.getSheetByName(LOGBOOK_OUTBOX_CASE_SHEET), ds = ss.getSheetByName('Database'), n = cs.getLastRow() - 1, m = ds.getLastRow() - 1;
+      var caseRows = n > 0 ? cs.getRange(2, 1, n, 8).getValues().map(function (r) { return [r[0], r[3], r[4], r[5], r[6], r[7]]; }) : [];
+      var newest = 0;
+      caseRows.forEach(function (r) { var t = r[5] instanceof Date ? r[5].getTime() : 0; if (t > newest) newest = t; });
+      var dbRows = m > 0 ? ds.getRange(2, 2, m, 8).getValues().map(function (r) { return [r[0], r[7]]; }) : [];
+      var ayTabs = {};
+      ss.getSheets().forEach(function (sh) { var mm = /^(AY\d{4}) Totals$/.exec(sh.getName()); if (mm) ayTabs[mm[1]] = sh.getDataRange().getValues(); });
+      return { caseRows: caseRows, dbRows: dbRows, ayTabs: ayTabs, newestCaseMs: newest };
+    },
+  };
+}
+
+function logbookOutboxTotalsSummaryText_(s) {
+  var t = s.status + (s.reason ? ' (' + s.reason + ')' : '') + '. Differing cells before: Database ' + (s.before ? s.before.database : 0) + ', Totals ' + (s.before ? s.before.totals : 0);
+  if (s.ran && s.ran.length) t += '; ran ' + s.ran.join(' + ') + '; after: Database ' + s.after.database + ', Totals ' + s.after.totals;
+  return t;
+}
+
+// The nightly trigger (logbookOutboxTotalsSetup adds it). Rebuilds only when LOGBOOK_TOTALS_FIX is 'on'.
+function logbookOutboxTotalsCheck() {
+  var props = PropertiesService.getScriptProperties();
+  var s = logbookOutboxTotalsCycle_(logbookOutboxTotalsEnv_(props.getProperty(LOGBOOK_TOTALS_FIX_KEY) === 'on'));
+  var text = Utilities.formatDate(new Date(), 'Asia/Singapore', 'dd/MM/yyyy HH:mm') + ': ' + logbookOutboxTotalsSummaryText_(s);
+  props.setProperty(LOGBOOK_TOTALS_LAST_KEY, text);
+  console.log(text);
+  if (s.detail) { s.detail.db.slice(0, 20).forEach(function (d) { console.log('Case vs Database: ' + d.rid + ' ' + d.label + ' case ' + d.caseCount + ' Database ' + d.dbCount); }); s.detail.ay.slice(0, 20).forEach(function (d) { console.log('Database vs ' + d.ay + ' Totals: ' + d.rid + ' ' + d.label + ' Database ' + d.dbCount + ' tab ' + d.tabCount); }); }
+  if (s.status === 'still differs') throw new Error('Totals still differ after the rebuild: ' + text);
+}
+
+// Run by hand any time: lists the differences, changes nothing.
+function logbookOutboxTotalsReport() {
+  var s = logbookOutboxTotalsCycle_(logbookOutboxTotalsEnv_(false));
+  console.log(logbookOutboxTotalsSummaryText_(s));
+  if (s.detail) { s.detail.db.slice(0, 50).forEach(function (d) { console.log('Case vs Database: ' + d.rid + ' ' + d.label + ' case ' + d.caseCount + ' Database ' + d.dbCount); }); s.detail.ay.slice(0, 50).forEach(function (d) { console.log('Database vs ' + d.ay + ' Totals: ' + d.rid + ' ' + d.label + ' Database ' + d.dbCount + ' tab ' + d.tabCount); }); if (s.detail.ignored.length) console.log('Totals tabs have no row for: ' + s.detail.ignored.join(' | ')); }
+}
+
+// Run once by hand: adds the nightly trigger at about 03:00 (the project's time zone). It only reports until you also set the
+// Script property LOGBOOK_TOTALS_FIX to on. Safe to run again.
+function logbookOutboxTotalsSetup() {
+  var has = ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === 'logbookOutboxTotalsCheck'; });
+  if (!has) ScriptApp.newTrigger('logbookOutboxTotalsCheck').timeBased().everyDays(1).atHour(3).create();
+  console.log(has ? 'Trigger already there.' : 'Trigger added: logbookOutboxTotalsCheck, daily at about 03:00. It only reports until the Script property ' + LOGBOOK_TOTALS_FIX_KEY + ' is set to on.');
+}
+
+if (typeof module !== 'undefined') module.exports = { labels: LOGBOOK_OUTBOX_LABELS, categories: logbookOutboxCategories_, row: logbookOutboxRow_, add: logbookOutboxAdd_, cycle: logbookOutboxCycle_, chunk: LOGBOOK_OUTBOX_CHUNK, entryOf: logbookOutboxEntryOf_, date: logbookOutboxDate_,
+  caseCounts: logbookOutboxCaseCounts_, dbCounts: logbookOutboxDbCounts_, totalsDiff: logbookOutboxTotalsDiff_, totalsCycle: logbookOutboxTotalsCycle_, noUi: logbookOutboxNoUi_ };
