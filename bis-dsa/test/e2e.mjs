@@ -43,7 +43,7 @@ try {
       const px = await page.$eval('#c2Dsa', (c, pts) => { const k = c.width / 552, g = c.getContext('2d'); return pts.map(([x, y]) => [...g.getImageData(Math.round((x - 88) * k), Math.round((y - 232) * k), 1, 1).data]); }, [[173, 262], [173, 258 + 118 * (1 - 6 / 30)]]);
       assert.ok(px[0][2] > 150 && px[0][0] < 160, `awake beta is cyan or green (${px[0]})`); assert.ok(px[1][0] > 200 && px[1][2] < 90, `awake 6 Hz is orange-red (${px[1]})`); }
     // start-up message with a Dismiss button, as on the real monitor
-    assert.match(await page.textContent('#v2MsgT'), /Factory settings restored/);
+    await page.waitForFunction(re => new RegExp(re).test(document.querySelector('#v2MsgT').textContent), String.raw`Factory settings restored`, { timeout: 4000 });
     await page.click('#v2Dismiss'); assert.equal(await page.$eval('#v2Msg', e => e.hidden), true);
     // Menu: pages of 3 x 3 tiles in the lower panel; MENU becomes HOME; tiles change the settings they name
     assert.equal(await page.$eval('#v2Menu', e => e.hidden), true);
@@ -88,14 +88,14 @@ try {
     assert.equal(await page.textContent('#v2Uv'), '25 µV / division'); await tile('EEG Channels').click(); await page.click('#kMenu');
     assert.equal(await page.textContent('#v2Uv'), '50 µV / division'); assert.equal(await page.evaluate(() => MT.channels), 2);
     await page.click('#kMenu'); await tile('Next').click(); await tile('Next').click(); await tile('EEG Channels').click(); assert.equal(await page.evaluate(() => MT.channels), 1);
-    await tile('Filters').click(); assert.equal(await page.evaluate(() => MT.filters), false); assert.match(await page.textContent('#v2MsgT'), /Filters Off/); await tile('Filters').click();
+    await tile('Filters').click(); assert.equal(await page.evaluate(() => MT.filters), false); await page.waitForFunction(re => new RegExp(re).test(document.querySelector('#v2MsgT').textContent), String.raw`Filters Off`, { timeout: 4000 }); await tile('Filters').click();
     await tile('Demo Case').click(); assert.equal(await page.evaluate(() => MT.caseId), 'DEMO');
     await page.click('#kSensor'); await page.waitForFunction(() => /Not available during Demo Case {2}\[ 511 \]/.test(document.querySelector('#v2MsgT').textContent), null, { timeout: 3000 });
     await page.click('#kMenu'); await tile('Next').click(); await tile('Next').click(); await tile('Demo Case').click(); assert.equal(await page.evaluate(() => MT.caseId), 'AH5F');
     // Escape closes the menu; Maintenance asks for a passkey; Diagnostics > Clear Trend Data empties the trend
     await page.click('#kMenu'); await page.keyboard.press('Escape'); assert.equal(await page.$eval('#v2Menu', e => e.hidden), true);
     await page.click('#kMenu'); await tile('Next').click(); await tile('Next').click(); await tile('Maintenance').click(); assert.ok(await tile('Enter Passkey').count() + (await page.locator('#v2Menu .mtl', { hasText: 'Enter Passkey' }).count()), 'passkey screen');
-    await page.click('#v2Menu button[data-k="d9"]'); await page.click('#v2Menu button[data-k="ok"]'); assert.match(await page.textContent('#v2MsgT'), /Invalid passkey/); assert.equal(await page.$eval('#v2Dismiss', e => e.hidden), true, 'information bars have no Dismiss');
+    await page.click('#v2Menu button[data-k="d9"]'); await page.click('#v2Menu button[data-k="ok"]'); await page.waitForFunction(re => new RegExp(re).test(document.querySelector('#v2MsgT').textContent), String.raw`Invalid passkey`, { timeout: 4000 }); assert.equal(await page.$eval('#v2Dismiss', e => e.hidden), true, 'information bars have no Dismiss');
     for (const d of '1234') await page.click(`#v2Menu button[data-k="d${d}"]`); await page.click('#v2Menu button[data-k="ok"]'); assert.ok(await tile('Audio Off').count(), 'Maintenance menu');
     await tile('Return').click(); await tile('Diagnostics').click(); await tile('Clear').click();
     assert.equal(await page.evaluate(() => HIST.length < 5), true, 'trend data cleared'); await page.waitForTimeout(200);
