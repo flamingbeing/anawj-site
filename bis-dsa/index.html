@@ -112,6 +112,8 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .tgtnote{font-size:13px;color:var(--muted);display:flex;gap:6px;align-items:center}
 .swatch{display:inline-block;width:18px;height:10px;border-radius:3px;background:color-mix(in srgb,var(--good) 38%,transparent);outline:1px solid color-mix(in srgb,var(--good) 70%,transparent)}
 .nmbrow{display:grid;gap:6px;font-size:15px}
+.rngbox{display:grid;gap:6px;margin-top:6px}.rngt{font-size:14px;color:var(--muted)}
+.rng{display:flex;justify-content:space-between;font-size:15px}.rng output{font:600 14px/1 var(--f-mono);color:var(--accent)}
 .chk{display:flex;gap:8px;align-items:flex-start;font-size:15px}
 .chk input{margin-top:4px;accent-color:var(--accent)}
 .reading{background:var(--accent-soft);border-radius:10px;padding:12px 14px;display:grid;gap:4px}
@@ -197,15 +199,15 @@ footer{font-size:13px;color:var(--muted);max-width:80ch;border-top:1px solid var
       </div>
       <div class="lane" id="wTrend"><div class="lbl"><span>BIS <i class="key bis"></i> · EMG <i class="key emg"></i></span><span id="tgtCap" style="text-transform:none">target 40–60 set by user</span></div>
       <canvas id="cTrend" height="88" aria-label="BIS and EMG trends over the last five minutes"></canvas></div>
-      <div class="lane" id="wDsa"><div class="lbl"><span>DSA · 0–30 Hz</span><span>last 5 min</span></div>
+      <div class="lane" id="wDsa"><div class="lbl"><span>DSA · 0–30 Hz</span><span id="dsaRange" style="text-transform:none">last 5 min</span></div>
       <canvas id="cDsa" height="190" aria-label="Density spectral array over the last five minutes"></canvas></div>
       <div class="lane" id="wEeg"><div class="lbl"><span id="eegLbl">EEG · 8 s</span><span id="eegDiv" style="text-transform:none">50 µV/div</span></div>
       <canvas id="cEeg" height="110" aria-label="Scrolling raw EEG trace"></canvas></div>
       <div class="softkeys" id="viewSeg" role="group" aria-label="Screen view">
         <button data-view="both" aria-pressed="true">DSA + EEG</button><button data-view="dsa" aria-pressed="false">DSA + BIS</button><button data-view="eeg" aria-pressed="false">EEG</button>
       </div>
-      <div class="softkeys two" id="keySeg" role="group" aria-label="Monitor settings">
-        <button id="kSmooth">Smoothing 15 s</button><button id="kScale">EEG ±100 µV</button>
+      <div class="softkeys" id="keySeg" role="group" aria-label="Monitor settings">
+        <button id="kSmooth">Smoothing 15 s</button><button id="kScale">EEG ±100 µV</button><button id="kSweep">EEG sweep auto</button>
       </div>
     </div></div>
     <div class="panel">
@@ -243,7 +245,13 @@ footer{font-size:13px;color:var(--muted);max-width:80ch;border-top:1px solid var
         <label class="chk"><input type="checkbox" id="mBlink"> Blinks and eye movement</label>
         <div class="row"><button class="btn" id="stimBtn" aria-pressed="false">Surgical stimulus</button></div></div>
       <div class="ctl"><span class="t">Display</span>
-        <label class="chk"><input type="checkbox" id="mTeach" checked> Teaching labels (zone, newest epoch, colour key, target band)</label></div>
+        <label class="chk"><input type="checkbox" id="mTeach" checked> Teaching labels (zone, newest epoch, colour key, target band)</label>
+        <div class="rngbox"><span class="rngt">DSA colour range (power → blue … red)</span>
+          <label class="rng" for="dbLo"><span>Floor (blue)</span><output id="oLo" for="dbLo">-3 dB</output></label><input type="range" id="dbLo" min="-30" max="20" step="1" value="-3">
+          <label class="rng" for="dbHi"><span>Ceiling (red)</span><output id="oHi" for="dbHi">31 dB</output></label><input type="range" id="dbHi" min="0" max="50" step="1" value="31">
+          <p class="tgtnote">Raise the floor and the DSA turns bluer, lower the ceiling and it turns redder. Teaching strips keep the default scale.</p>
+          <div class="row"><button class="btn" id="dbReset">Default range</button></div></div>
+</div>
       <div class="ctl"><span class="t">Speed</span>
         <div class="seg" id="speedSeg" role="group" aria-label="Simulation speed">
           <button data-speed="1" aria-pressed="true">1×</button><button data-speed="4" aria-pressed="false">4×</button><button data-speed="10" aria-pressed="false">10×</button>
