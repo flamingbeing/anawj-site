@@ -245,7 +245,7 @@ footer{font-size:13px;color:var(--muted);max-width:80ch;border-top:1px solid var
   <h1 class="apptitle" id="h-mon">BIS to DSA <span>simulator</span></h1>
   <div class="sim">
     <div class="screens">
-    <div class="screen vwrap" id="vistaWrap"><div class="vista" id="vista" role="group" aria-label="Monitor screen in the style of a Covidien BIS VISTA">
+    <div class="screen vwrap" id="vistaWrap"><div class="vista" id="vista" role="group" aria-label="Monitor screen in the style of the owner's Medtronic BIS monitor">
       <div class="vbox vbis"><span class="vlbl">BIS</span><span class="vsqi" id="v2Sqi" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span class="vnum" id="v2Bis">--</span></div>
       <div class="vbox vemg"><span class="vemglbl">EMG</span><span class="vemgbar" id="v2Emg" aria-hidden="true"><i></i><i></i><i></i><i></i></span></div>
       <div class="vbox vst"><span class="vtag st">ST</span><span class="vval st" id="v2St">0:00:00</span></div>
@@ -340,7 +340,7 @@ footer{font-size:13px;color:var(--muted);max-width:80ch;border-top:1px solid var
         <label class="chk"><input type="checkbox" id="mBlink"> Blinks and eye movement</label>
         <div class="row"><button class="btn" id="stimBtn" aria-pressed="false">Surgical stimulus</button></div></div>
       <div class="ctl"><span class="t">Display</span>
-        <div class="seg" id="skinSeg" role="group" aria-label="Screen layout"><button data-skin="vista" aria-pressed="true">BIS VISTA</button><button data-skin="advance" aria-pressed="false">BIS Advance (two-sided)</button><button data-skin="sedline" aria-pressed="false">Masimo SedLine</button><button data-skin="classic" aria-pressed="false">Teaching layout</button></div>
+        <div class="seg" id="skinSeg" role="group" aria-label="Screen layout"><button data-skin="vista" aria-pressed="true">Medtronic BIS</button><button data-skin="advance" aria-pressed="false">BIS Advance (two-sided)</button><button data-skin="sedline" aria-pressed="false">Masimo SedLine</button><button data-skin="classic" aria-pressed="false">Teaching layout</button></div>
         <label class="chk"><input type="checkbox" id="mTeach" checked> Teaching labels (zone, newest epoch, colour key, target band)</label>
         <div class="rngbox"><span class="rngt">DSA colour range (power → blue … red)</span>
           <label class="rng" for="dbLo"><span>Floor (blue)</span><output id="oLo" for="dbLo">-3 dB</output></label><input type="range" id="dbLo" min="-30" max="20" step="1" value="-3">

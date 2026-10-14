@@ -725,7 +725,7 @@ function applySkin(s,reset,init){mon.skin=s;$('vistaWrap').hidden=s!=='vista';$(
  scaleUI();dispUI(false);trendUI();if(!init){dirty=true;try{localStorage.setItem('bisdsa.skin',s);}catch(e){}if(reset)saveDisp();}}
 document.querySelectorAll('#skinSeg button').forEach(b=>b.onclick=()=>applySkin(b.dataset.skin,true));
 // the Menu: tap an item to step through its values; settings are the same ones the soft keys and Display panel change
-const RANGES=[[-3,31],[0,25],[5,20],[-9,40]],SKINS=[['vista','BIS VISTA'],['advance','BIS Advance'],['sedline','SedLine']];
+const RANGES=[[-3,31],[0,25],[5,20],[-9,40]],SKINS=[['vista','Medtronic BIS'],['advance','BIS Advance'],['sedline','SedLine']];
 const MENU=[
  ['Smoothing rate',()=>mon.smooth+' s',()=>$('kSmooth').click()],
  ['EEG scale',()=>`±${mon.scale} µV`,()=>$('kScale').click()],

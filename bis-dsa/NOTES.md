@@ -202,10 +202,11 @@ falls under 50 after about a minute of diathermy) → emergence with blinks → 
   seconds only); Reset clears them and the case story starts them at 0. Not on the real monitor: a teaching aid for
   cumulative burst-suppression time (linked to postoperative delirium in observational data; trials are mixed).
 
-## BIS VISTA screen is the default (owner, 14 Oct 2026)
+## Medtronic BIS screen is the default (owner, 14 Oct 2026)
 
-The owner's own monitor is a Covidien (now Medtronic) BIS VISTA-family 2-channel monitor (photos; the model and software
-version are not shown in them: ask for Menu > About or the back label). The page opens on a copy of that screen: BIS box
+The owner's own monitor is a Medtronic (formerly Covidien) BIS monitor (photos; the owner says it is NOT a VISTA, so the
+screen is labelled "Medtronic BIS"; the exact model and software version are not shown in the photos: ask for Menu > About
+or the back label). The internal ids still say `vista`. The page opens on a copy of that screen: BIS box
 with SQI bars, EMG bar, ST (suppression time, h:mm:ss) and SR boxes, the EEG window (25 mm/sec, 25 µV/division),
 message bar with Dismiss, SILENT / MENU / SENSOR CHECK keys, and the DSA with dotted lines at 4/8/13 Hz, white SEF and
 purple MF lines, band names, H-L colour bar and the BIS trend under it. Layout is absolute in container units (`cqw`),
