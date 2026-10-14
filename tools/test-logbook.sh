@@ -29,7 +29,7 @@ if [ "${1:-}" != quick ]; then
   grep -E '^== |^FAIL|console errors' "$OUT/e2e.txt"
 fi
 
-for t in recovery usability cloud-save notepad daily-note tag-editor simpler profiles moved send logging-speed sync sync-engine parts phone-ux lazy-load late-back bugfixes feedback; do
+for t in recovery usability cloud-save notepad daily-note tag-editor simpler profiles moved send logging-speed sync sync-engine parts phone-ux lazy-load late-back bugfixes feedback app-version; do
   step "$t"
   timeout 300 node "logbook/test/e2e/$t.mjs" >"$OUT/$t.txt" 2>&1 && grep -E '^PASS' "$OUT/$t.txt" || { echo "FAIL $t"; tail -15 "$OUT/$t.txt"; fail=1; }
 done

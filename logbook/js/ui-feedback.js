@@ -5,12 +5,9 @@
 
 import { S, h, toast, fill, cloud, okNoIds, confirmBox, emptyState, hooks } from './ui-core.js';
 import { copyText } from './share.js';
+import { appVersion } from './app-version.js';
 import { feedbackRecord, sendProblem, taskText, byNewestFeedback, screenOf, TEXT_MAX, DOING_MAX } from './feedback.js';
 
-// the service worker's cache name is the app version ('logbook-v41-3f9a2c1d', stamped at deploy)
-async function appVersion() {
-  try { return (await caches.keys()).filter(k => k.startsWith('logbook-')).sort().pop() || 'no-sw'; } catch { return 'no-sw'; }
-}
 
 let sentNote = false;   // after a send, the page says so until it is left
 const rerender = () => hooks.render();

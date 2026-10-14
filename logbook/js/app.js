@@ -3,6 +3,7 @@
 // in-browser demo backend with ?demo).
 
 import { replaceShow, legacyShow, tabsAfter } from './profiles.js';
+import { appVersion, versionLabel, freshCopy } from './app-version.js';
 import { S, hooks, h, toast, basicHides, basicMode, logbookOnly, facultyMode, facultyRole, clearToast, cloud, writes, transients, setCases, scheduleSummary, fill, resetCaches, patchLogbook, confirmBox, fileButton, modal, download, todayISO, settings, setCategoryNames, categoryNames as categoryNamesNow, watchMyReflections } from './ui-core.js';
 import { renderLog, focusLog, logCasesChanged, clearDrafts } from './ui-log.js';
 import { applyCompact, cachedCompact, applyTheme, cachedTheme, applyTextSize, cachedTextSize, applyZoom, cachedZoom, stepZoom, applyAccent, adoptDisplay, applyDisplay, applyCustomCss, display, setDisplay, resetDisplay, DISPLAY_KEYS, IPHONE_APP, setPageLabel, START_TABS, arrangeTabs } from './display.js';
@@ -321,7 +322,22 @@ function renderSettingsMenu() {
     h('section', { class: 'card more-list settings-menu' }, h('h2', {}, 'Settings'),
       settingsGroups().map(([name, ids]) => [h('h3', {}, name), h('ul', {}, ids.map(item))])),
     settingsFileCard(),
-    connectClaudeCard());
+    connectClaudeCard(),
+    versionLine());
+}
+
+// at the very bottom: which app version this device runs, and a way to fetch the latest when it seems stuck on an old
+// one (the "Update available" banner is the usual way)
+function versionLine() {
+  const ver = h('span', {}, 'App version …');
+  appVersion().then(v => { ver.textContent = 'App version ' + versionLabel(v); });
+  const latest = async () => {
+    // a change still on its way could be lost with the reload: wait for it
+    if (S.pending) return toast('Some changes are still sending: try again once it says Synced');
+    if (!(await confirmBox('Get the latest version', 'Download the app again and reload? Your logbook, drafts and settings stay.', 'Get it'))) return;
+    if (!(await freshCopy())) toast('Can’t reach the server: try again with a signal');
+  };
+  return h('p', { class: 'hint app-ver' }, ver, ' · ', h('button', { type: 'button', class: 'linkish', onclick: latest }, 'Get the latest version'));
 }
 
 // Connect Claude (advanced): the read-only MCP server residents run on their own computer (logbook/mcp/README.md)
