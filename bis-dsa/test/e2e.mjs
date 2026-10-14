@@ -22,10 +22,22 @@ try {
     assert.ok(awake >= 80, `awake BIS ${awake}`);
     assert.equal(await page.textContent('#rName'), 'Awake');
     assert.equal(await page.$eval('#depth', e => e.value), '0');
-    // give propofol to GA depth: BIS falls into 35-60 and the two bands are described
-    await page.click('#speedSeg [data-speed="10"]');
+    // the relaxant is on by default, given at induction: the awake patient is not paralysed (BIS stays in the 90s)
+    assert.equal(await page.$eval('#nmbSeg [data-nmb="auto"]', e => e.getAttribute('aria-pressed')), 'true');
+    // move the depth target to GA at 1x: the effect site follows slowly, so the screen still shows an awake patient, and the
+    // slider shows the BIS the dose will settle on
     await page.$eval('#depth', e => { e.value = 57; e.dispatchEvent(new Event('input')); });
-    assert.equal(await page.textContent('#rName'), 'General anaesthesia');
+    assert.match(await page.textContent('#tgtSub'), /settling/);
+    assert.equal(await page.textContent('#rName'), 'Awake');
+    await page.waitForFunction(() => { const m = /≈ (\d+)/.exec(document.querySelector('#tgtBis').textContent); return m && +m[1] >= 35 && +m[1] <= 60; }, null, { timeout: 8000 });
+    await page.waitForFunction(() => !document.querySelector('#zoneBand').hidden && document.querySelector('#zoneBand').getBoundingClientRect().width > 8, null, { timeout: 15000 });
+    assert.match(await page.textContent('#zoneText'), /BIS 40–60/);
+    // the effect-site marker is still left of the slider thumb, then catches up; BIS falls into 35-60 and the bands are described
+    assert.ok(await page.$eval('#effMark', m => parseFloat(m.style.left.replace(/[^0-9.]/g, '')) >= 0), 'marker placed');
+    await page.click('#speedSeg [data-speed="10"]');
+    await page.waitForFunction(() => document.querySelector('#rName').textContent === 'General anaesthesia', null, { timeout: 40000 });
+    assert.match(await page.textContent('#rText'), /relaxant on board/);
+    await page.waitForFunction(() => /at target/.test(document.querySelector('#tgtSub').textContent), null, { timeout: 40000 });
     await page.waitForFunction(() => +document.querySelector('#vBis').textContent <= 60, null, { timeout: 40000 });
     await page.waitForTimeout(3000);
     const ga = await bis(page);
@@ -55,20 +67,20 @@ try {
     await page.waitForFunction(([d, e]) => document.querySelector('#cEeg').clientHeight === e && document.querySelector('#cDsa').clientHeight === d, [dsa0, eeg0]);
     // monitor first: on a phone the monitor and the drug and depth controls are near the top
     if (viewport.width === 390) assert.ok(await page.$eval('#monitor .screen', e => e.getBoundingClientRect().top + scrollY) < 80, 'monitor at the top');
-    // facial EMG raises the EMG reading
+    // facial EMG raises the EMG reading (no relaxant on board)
+    await page.click('#nmbSeg [data-nmb="off"]');
     const emg0 = await page.$eval('#vEmg', e => +e.textContent);
     await page.click('#speedSeg [data-speed="10"]');
     await page.check('#mEmg');
     await page.waitForFunction(e0 => +document.querySelector('#vEmg').textContent >= e0 + 6, emg0, { timeout: 20000 });
     // a muscle relaxant takes the EMG away again
     const emgHi = await page.$eval('#vEmg', e => +e.textContent);
-    await page.check('#mNmb');
+    await page.click('#nmbSeg [data-nmb="auto"]');
     await page.waitForFunction(e1 => +document.querySelector('#vEmg').textContent <= e1 - 6, emgHi, { timeout: 20000 });
     assert.match(await page.textContent('#rText'), /Muscle relaxant/);
-    await page.uncheck('#mNmb');
     await page.uncheck('#mEmg');
     // forced-air warmer: high-frequency pickup raises the EMG reading; blinks and the surgical stimulus are described
-    await page.waitForFunction(() => +document.querySelector('#vEmg').textContent < 40, null, { timeout: 20000 });
+    await page.waitForFunction(() => +document.querySelector('#vEmg').textContent <= 32, null, { timeout: 20000 });
     const emgW = await page.$eval('#vEmg', e => +e.textContent);
     await page.check('#mWarm');
     await page.waitForFunction(e0 => +document.querySelector('#vEmg').textContent >= e0 + 6, emgW, { timeout: 20000 });
@@ -91,6 +103,16 @@ try {
     await page.waitForFunction(() => document.querySelectorAll('#lib canvas').length === 13 && document.querySelectorAll('#opts button').length === 4);
     await page.click('#opts button');
     assert.ok((await page.textContent('#fb')).length > 10, 'quiz feedback');
+    // suppression timer: deep propofol brings burst suppression, the suppression time box counts up, Reset clears it
+    await page.click('#speedSeg [data-speed="10"]');
+    await page.click('#tReset');
+    await page.waitForFunction(() => document.querySelector('#vSupT').textContent === '0:00');
+    await page.$eval('#depth', e => { e.value = 93; e.dispatchEvent(new Event('input')); });
+    await page.waitForFunction(() => document.querySelector('#vSupT').textContent !== '0:00' && +document.querySelector('#vSr').textContent >= 5, null, { timeout: 60000 });
+    assert.notEqual(await page.textContent('#vLowT'), '0:00', 'BIS under 40 time counts too');
+    await page.click('#tReset');
+    await page.waitForFunction(() => document.querySelector('#vSupT').textContent === '0:00');
+    await page.$eval('#depth', e => { e.value = 57; e.dispatchEvent(new Event('input')); });
     // mix mode: propofol + ketamine reads higher than propofol alone; back to one drug restores the single controls
     await page.click('#speedSeg [data-speed="10"]');
     await page.click('#modeSeg [data-mode="mix"]');
@@ -98,6 +120,7 @@ try {
     await page.click('#presetSeg [data-preset="propket"]');
     assert.equal(await page.$eval('#o-ketamine', e => e.textContent), '40');
     assert.match(await page.textContent('#rName'), /propofol \+ ketamine/);
+    await page.waitForFunction(() => /≈ \d+/.test(document.querySelector('#tgtMix').textContent), null, { timeout: 8000 });
     await page.waitForFunction(g => +document.querySelector('#vBis').textContent > g + 8, ga, { timeout: 30000 });
     await page.click('#modeSeg [data-mode="single"]');
     assert.ok(!(await page.$eval('#depthCtl', e => e.hidden)), 'single controls back');

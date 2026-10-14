@@ -48,6 +48,7 @@ function baseTarget(drug,d){
 // add into one hypnotic depth; remifentanil (ng/ml), dexmedetomidine and N2O deepen it a little; then ketamine,
 // dexmedetomidine, remifentanil and N2O each add their own EEG signature on top.
 const MIX0={propofol:0,sevo:0,ketamine:0,dex:0,remi:0,n2o:0};
+const MIXMAX={propofol:8,sevo:2,remi:8,ketamine:1,dex:1,n2o:0.7}; // slider ranges
 const MAC=[[0,0],[0.3,0.3],[0.5,0.44],[1,0.6],[1.5,0.76],[2,0.88]]; // sevoflurane MAC -> depth
 function sevoDepth(mac){let i=0;while(i<MAC.length-2&&mac>MAC[i+1][0])i++;const [x0,y0]=MAC[i],[x1,y1]=MAC[i+1];return y0+(y1-y0)*cl((mac-x0)/(x1-x0));}
 function mixTarget(m,bsShift){
@@ -90,27 +91,51 @@ function profile(p,f,spEnv,spF,kg,ks,wa){
    +p.spindle*spEnv*g(spF,1.0)+kg*(p.beta*g(p.betaF,p.betaW)+p.gamma*g(34,5))+p.emg*(f>18?Math.min(1,(f-18)/15):0);
  return P;
 }
+// Effect site: the dose the brain 'feels' follows the target dose with a first-order lag, so moving the slider changes the
+// EEG over a minute or two (the DSA 'unzips' from one pattern to the next) instead of at once. Real propofol and sevoflurane
+// effect-site half-times are about 2-3 min; 45 s here keeps a transition watchable. Speed 4x or 10x shortens it too.
+const EFFECT_TAU=45;
+const cloneD=d=>typeof d==='number'?d:Object.assign({},MIX0,d);
+// is the patient 'induced' (asleep enough that a relaxant would be given)? Hysteresis: given at 0.30, reversed under 0.25.
+// propofol/sevo depth; ketamine 0.45 anaesthetic dose; mix: hypnotic depth or ketamine; dex alone never.
+function inducedDepth(drug,d){
+ if(drug==='propofol'||drug==='sevo')return d;
+ if(drug==='ketamine')return d/1.5;
+ if(drug==='mix')return Math.max(0.155*d.propofol+sevoDepth(d.sevo),d.ketamine/1.5);
+ return 0;}
 class Engine{
  constructor(){this.ph=OSC_F.map(()=>Math.random()*6.283);this.m=OSC_F.map(()=>1);this.p=target('propofol',0);
   this.t=0;this.spT=1;this.spOn=false;this.spD=1;this.spF=12;this.kT=3;this.kPh=0;this.kg=1;this.ks=1;this.bsState=0;this.bsTimer=1;this.gate=1;this.drug='propofol';this.d=0;this.mods={};this.diT=0;this.diOn=false;this.nmbT=0;this.nmbS=0;this.tone=1;this.diAcc=0;this.artAcc=0;this.tail=0;this.tailV=0;
-  this.wa=0;this.stT=0;this.stK='';this.blT=2;this.blA=0;this.blP=1;this.dr=0;this.eye=0;}
- setTarget(drug,d,mods){this.drug=drug;this.d=d;this.mods=mods||{};}
- snap(){this.p=target(this.drug,this.d,this.mods);this.wa=this.mods.warmer?1:0;} // jump instantly
+  this.wa=0;this.stT=0;this.stK='';this.blT=2;this.blA=0;this.blP=1;this.dr=0;this.eye=0;this.de=0;this.nmbOn=false;}
+ setTarget(drug,d,mods){if(drug!==this.drug||typeof d!==typeof this.d||this.de===0&&!this.deSet)this.de=cloneD(d);this.deSet=true;this.drug=drug;this.d=d;this.mods=mods||{};}
+ snap(){this.de=cloneD(this.d);this.updNmb();this.p=target(this.drug,this.de,this.mods);this.wa=this.mods.warmer?1:0;} // jump instantly
+ // muscle relaxant given at induction (nmbMode 'auto'), always ('on') or never ('off'); sets mods.nmb, which target() reads.
+ // Only when the page set a mode: the Node checks drive mods.nmb directly.
+ updNmb(){const m=this.mods;if(!m.nmbMode)return;
+  if(m.nmbMode==='on')this.nmbOn=true;else if(m.nmbMode==='off')this.nmbOn=false;
+  else{const v=inducedDepth(this.drug,this.de);if(v>=0.3)this.nmbOn=true;else if(v<0.25)this.nmbOn=false;}
+  m.nmb=this.nmbOn;}
+ // how far the effect site still is from the target, 0-1 (each drug as a share of its slider range)
+ gap(){const d=this.d,e=this.de;if(typeof d==='number')return Math.abs(d-e);
+  let g=0;for(const k in MIX0)g=Math.max(g,Math.abs((d[k]||0)-(e[k]||0))/(MIXMAX[k]||1));return g;}
  // surgical stimulus: a 100-s arousal; kind 'delta' (paradoxical delta arousal) or '' (beta when light, alpha dip when deeper)
  stimulus(kind){this.stT=100;this.stK=kind??(Math.random()<0.1?'delta':'');}
  sample(){ // one sample at FS
   const dt=1/FS; this.t+=dt;
-  const tg=target(this.drug,this.d,this.mods),m=this.mods; const k=dt/8; // ~8 s time constant
+  const m=this.mods,de=this.de,a=dt/EFFECT_TAU;
+  if(typeof de==='number')this.de+=(this.d-de)*a;else for(const q in MIX0)de[q]+=((this.d[q]||0)-de[q])*a;
+  this.updNmb();
+  const tg=target(this.drug,this.de,m); const k=dt/8; // ~8 s time constant: the spectrum glides to the effect-site state
   // surgical stimulus (García 2021, Hight 2019), blunted by remifentanil b = remi/4 (mix only): light (dH < 0.5) beta at
   // 18 Hz and facial EMG; deeper the alpha band dips 3.5 dB, or 1 in 10 a paradoxical delta arousal (BIS falls)
-  if(this.stT>0){this.stT-=dt;const u=1-(this.drug==='mix'?cl((this.d.remi||0)/4):0),dh=tg.dH??this.d;
+  if(this.stT>0){this.stT-=dt;const u=1-(this.drug==='mix'?cl((this.de.remi||0)/4):0),dh=tg.dH??this.de;
    if(dh<0.5){tg.ar+=8*u;if(!m.nmb)tg.emg=Math.max(tg.emg,6*u);}else if(this.stK==='delta'){tg.delta*=1+u;tg.beta*=1-0.5*u;}else tg.alpha*=10**(-0.35*u);}
   for(const key of KEYS)this.p[key]+=(tg[key]-this.p[key])*k;
   // relaxant stage 2: starts 60 s after the relaxant, only while the hypnotic is light; τ 120 s on, 30 s off
-  if(m.nmb){this.nmbT+=dt;if(this.nmbT>60&&(tg.dH??this.d)<0.3)this.nmbS+=(1-this.nmbS)*dt/120;}else{this.nmbT=0;this.nmbS-=this.nmbS*dt/30;}
+  if(m.nmb){this.nmbT+=dt;if(this.nmbT>60&&(tg.dH??this.de)<0.3)this.nmbS+=(1-this.nmbS)*dt/120;}else{this.nmbT=0;this.nmbS-=this.nmbS*dt/30;}
   m._nmbSlow=this.nmbS;
   // facial muscle tone for the EMG readout: full while awake (dH < 0.3), a little under GA, none when paralysed
-  const tT=m.nmb?0.05:0.12+0.88*cl((0.5-(tg.dH??this.d))/0.2);this.tone+=(tT-this.tone)*dt/5;
+  const tT=m.nmb?0.05:0.12+0.88*cl((0.5-(tg.dH??this.de))/0.2);this.tone+=(tT-this.tone)*dt/5;
   // forced-air warmer pickup: on within seconds; once off its amplitude fades with τ 60 s (power τ 30 s), so the true
   // BIS is back in 2-3 min
   this.wa+=m.warmer?(1-this.wa)*dt/3:-this.wa*dt/60;
@@ -201,10 +226,12 @@ const SIG=[],EYE=[]; const SIGMAX=8*FS;
 const COLS=[]; const COLMAX=300; // one column per second, 5 min
 const sup=[]; let bisS=null, lastSef=null, lastMf=null, produced=0, simT=0, speed=1, paused=false;
 let drug='propofol', depth=0; const mods={elderly:false,emg:false,diathermy:false,nmb:false,warmer:false,blink:false};
+// cumulative times this case (s): the shown SR at 5% or more (suppression present) and the shown BIS under 40; a clean second only
+const tim={sup:0,low:0};
 const artH=[],bcH=[],rawH=[],sefH=[],mfH=[];let prevSup=false,isoN=0,outN=0,sefAge=0;
 // monitor settings: smoothing (s), EEG scale (± uV), teaching labels and target band, the info message
 const mon={smooth:15,scale:100,teach:true,info:'',infoUntil:0};
-function applyTarget(){eng.setTarget(drug,depth,mods);describe();}
+function applyTarget(){eng.setTarget(drug,depth,mods);describe();if(typeof onTarget==='function')onTarget();}
 
 const EYE_REJ=0.85;
 function step(nSamples){
@@ -238,8 +265,9 @@ function step(nSamples){
    // isoelectric: every second flat for 60 s; out of target: shown BIS outside 40-60 for 10 s while a hypnotic is on
    isoN=art?isoN:f.supFrac>=1?isoN+1:0;
    // (GA-level propofol/sevo only, not sedation, dex or ketamine; once shown it clears only back inside 42-58)
-   const blank=sqi<15,gaH=eng.drug==='mix'?0.155*(eng.d.propofol||0)+sevoDepth(eng.d.sevo||0):eng.drug==='propofol'||eng.drug==='sevo'?eng.d:0;
+   const blank=sqi<15,gaH=eng.drug==='mix'?0.155*(eng.de.propofol||0)+sevoDepth(eng.de.sevo||0):eng.drug==='propofol'||eng.drug==='sevo'?eng.de:0;
    outN=!blank&&gaH>=0.44&&(bisS<40||bisS>60||outN>=10&&(bisS<42||bisS>58))?outN+1:0;
+   if(!art&&!blank){if(bsr>=5)tim.sup++;if(bisS<40)tim.low++;}
    COLS.push({db,sef:fresh?lastSef:null,mf:fresh?lastMf:null,bis:blank?null:bisS,bsr,emg,sqi,tp,art,
     bc:bcH.reduce((a,b)=>a+b,0)});if(COLS.length>COLMAX)COLS.shift();
    onColumn&&onColumn();
@@ -323,6 +351,7 @@ function drawDsa(){if(view==='eeg')return;const {ctx,w,h}=fit(cDsa,laneH().dsa);
 const $=id=>document.getElementById(id);
 function zoneOf(b){return b>90?'Awake':b>80?'Light/moderate sedation':b>60?'Sedation':b>=40?'General anaesthesia':b>=20?'Deep hypnotic state':'Burst suppression / flat';}
 function segs(id,n,color){const el=$(id);el.style.setProperty('--seg',color);[...el.children].forEach((x,i)=>x.classList.toggle('on',i<n));}
+const mmss=n=>Math.floor(n/60)+':'+String(n%60).padStart(2,'0');
 function readouts(){const c=COLS[COLS.length-1];if(!c)return;
  // like the monitor: SQI under 50 shows BIS hollow; under 15 no BIS, SEF, SR, TP or BC at all
  const bl=c.sqi<15,b=$('vBis');b.textContent=bl||c.bis==null?'--':Math.round(c.bis);b.classList.toggle('hollow',!bl&&c.sqi<50);
@@ -330,6 +359,7 @@ function readouts(){const c=COLS[COLS.length-1];if(!c)return;
  // SQI: 5 bars of 20; EMG: 4 bars, empty under 30 dB, then 30-38, 39-47, 48-55, over 55
  $('vSqi').textContent=c.sqi;segs('sqiSegs',Math.ceil(c.sqi/20),c.sqi<15?'#ff6b6b':c.sqi<50?AMBER:'#5fd08f');
  const e=c.emg;$('vEmg').textContent=Math.round(e);segs('emgSegs',e<30?0:e<39?1:e<48?2:e<56?3:4,e>=48?AMBER:'#5fd08f');
+ $('vSupT').textContent=mmss(tim.sup);$('vLowT').textContent=mmss(tim.low);
  $('vSr').textContent=bl?'--':sr;$('vSef').textContent=bl||lastSef==null?'--':lastSef.toFixed(1);
  $('vTp').textContent=bl?'--':Math.round(c.tp);$('vBc').textContent=c.bsr<5||c.sqi<50?'--':c.bc;
  txt('vClock',clk(simT));
@@ -337,8 +367,8 @@ function readouts(){const c=COLS[COLS.length-1];if(!c)return;
  const m=monMsg(),mt=m?m[1]:'',el=$('vMsg');if(el.textContent!==mt){el.textContent=mt;el.className='msg'+(m?' '+m[0]:'');}}
 
 // ===== state descriptions =====
-function describe(){const d=depth;let n,t;
- if(drug==='mix'){[n,t]=describeMix(depth);}
+function describe(){const d=typeof eng.de==='number'?eng.de:0;let n,t;
+ if(drug==='mix'){[n,t]=describeMix(eng.de,depth);}
  else if(drug==='propofol'||drug==='sevo'){const s=drug==='sevo';
   if(d<0.08){n='Awake';t='Low-amplitude, mixed fast activity. Power is spread thinly across the DSA with no strong band. SEF95 is high (above 25 Hz), so BIS reads 90 or more.';}
   else if(d<0.24){n='Paradoxical excitation';t='Early '+(s?'sevoflurane':'propofol')+' boosts beta (13–25 Hz) power. The DSA brightens high up and BIS may stay high or even rise, although the patient is drifting off.';}
@@ -359,24 +389,25 @@ function describe(){const d=depth;let n,t;
  }
  if(mods.elderly&&drug!=='ketamine')t+=' Older patient: EEG power is 2–3 times smaller in amplitude, alpha weakest and about 1 Hz slower, so the DSA is dim. For the same brain state BIS tends to read higher (at loss of consciousness, median 70 vs 58 in the young), although older patients need less drug. Chasing 40–60 can push them into burst suppression.';
  if(mods.diathermy)t+=' Diathermy: bursts of electrical interference swamp the EEG. SQI drops, those seconds are left out of BIS (the number holds, shows hollow under SQI 50 and disappears under 15), and the DSA shows bright full-height stripes.';
- if(mods.nmb)t+=' Muscle relaxant: no facial EMG, so any BIS rise from muscle goes. Paralysis also takes away the muscle share of the awake fast activity. In awake volunteers given a relaxant, BIS fell at once to about 80, then minutes later to the mid-40s (Schuller 2015; an older-monitor study saw 33, once 9). A low BIS under relaxant does not prove unconsciousness.';
+ if(mods.nmb&&inducedDepth(drug,eng.de)>=0.3)t+=' Muscle relaxant on board (given at induction): facial EMG is gone, so a rise in BIS now is not muscle. A paralysed patient cannot move to show light anaesthesia, which is why the EEG matters with a relaxant.';
+ else if(mods.nmb)t+=' Muscle relaxant: no facial EMG, so any BIS rise from muscle goes. Paralysis also takes away the muscle share of the awake fast activity. In awake volunteers given a relaxant, BIS fell at once to about 80, then minutes later to the mid-40s (Schuller 2015; an older-monitor study saw 33, once 9). A low BIS under relaxant does not prove unconsciousness.';
  else if(mods.emg)t+=' Muscle activity: broad high-frequency power raises the EMG bar and pushes BIS up. It is artefact, not lighter anaesthesia.';
  if(mods.warmer)t+=' Forced-air warmer: the blower adds broadband noise above 30 Hz, so BIS climbs (often into the 70s) and the EMG bar rises, while the alpha and slow bands on the DSA don’t change. Switch it off or move the hose: the true value is back in 2–3 minutes (Hemmerling 2002).';
  if(mods.blink)t+=' Blinks and eye movement: slow one-sided swings on the raw EEG and brighter power at 0.5–2 Hz along the bottom of the DSA. The monitor rejects most of it, but BIS can read a few points low; the biggest blinks are flagged as artefact.';
- if(eng.stT>0){const dh=drug==='mix'?mixTarget(Object.assign({},MIX0,depth)).dH:depth,bl=drug==='mix'&&depth.remi>=4;
+ if(eng.stT>0){const dh=drug==='mix'?mixTarget(Object.assign({},MIX0,eng.de)).dH:eng.de,bl=drug==='mix'&&eng.de.remi>=4;
   t+=' Surgical stimulus: '+(bl?'remifentanil blunts the response, so the EEG barely changes.':dh<0.5?'in a light patient, beta (around 18 Hz) and facial EMG rise and BIS jumps 10–20 points. An opioid blunts this.':eng.stK==='delta'?'a paradoxical delta arousal: slow power rises and BIS falls, but this is arousal, not deeper anaesthesia. Treat the stimulus with analgesia rather than more hypnotic.':'the alpha band dips by about 3 dB for a minute or two (an alpha dropout), a sign of nociceptive arousal. Give analgesia first; if the alpha band and slow waves keep fading, the hypnotic may also be light (Hight 2019).');}
- $('rName').textContent=n;$('rText').textContent=t;}
+ if($('rName').textContent!==n)$('rName').textContent=n;if($('rText').textContent!==t)$('rText').textContent=t;}
 
-function describeMix(m){const hyp=0.155*m.propofol+sevoDepth(m.sevo),parts=[];let n;
+function describeMix(m,tg){tg=tg||m;const hyp=0.155*m.propofol+sevoDepth(m.sevo),parts=[];let n;
  n=hyp<0.08?(m.ketamine>0.45?'Ketamine anaesthesia':m.dex>0.2?'Dexmedetomidine sedation':'Light or no hypnotic'):hyp<0.44?'Sedation':hyp<0.68?'General anaesthesia':hyp<0.85?'Deep anaesthesia':'Burst suppression';
- const on=[m.propofol&&'propofol',m.sevo&&'sevoflurane',m.remi&&'remifentanil',m.ketamine&&'ketamine',m.dex&&'dexmedetomidine',m.n2o&&'N₂O'].filter(Boolean);
+ const on=[tg.propofol&&'propofol',tg.sevo&&'sevoflurane',tg.remi&&'remifentanil',tg.ketamine&&'ketamine',tg.dex&&'dexmedetomidine',tg.n2o&&'N₂O'].filter(Boolean);
  if(on.length)n+=' · '+on.join(' + ');
- if(m.propofol&&m.sevo)parts.push('Propofol and sevoflurane add together into one hypnotic depth.');
+ if(tg.propofol&&tg.sevo)parts.push('Propofol and sevoflurane add together into one hypnotic depth.');
  if(hyp>=0.44&&hyp<0.68&&!m.ketamine)parts.push('The hypnotic gives the usual alpha (8–12 Hz) and slow bands.');
- if(m.remi)parts.push('Remifentanil barely changes BIS in a quiet patient (Guignard 2000), but it blunts the BIS and EMG rise from surgery or intubation: tick facial muscle activity or press Surgical stimulus to see it.');
- if(m.ketamine)parts.push('Ketamine adds gamma (about 27–40 Hz), weakens the alpha band and thins the slow band, so BIS reads higher even though the patient is deeper (0.5 mg/kg on propofol raised BIS from about 40 to 63). Don\u2019t chase the number with more propofol.');
- if(m.dex)parts.push('Dexmedetomidine adds spindles and slow waves and lowers the hypnotic dose needed.');
- if(m.n2o)parts.push('N₂O adds anaesthesia (60% is about 0.6 MAC) but barely moves BIS, so the number underestimates the depth.');
+ if(tg.remi)parts.push('Remifentanil barely changes BIS in a quiet patient (Guignard 2000), but it blunts the BIS and EMG rise from surgery or intubation: tick facial muscle activity or press Surgical stimulus to see it.');
+ if(tg.ketamine)parts.push('Ketamine adds gamma (about 27–40 Hz), weakens the alpha band and thins the slow band, so BIS reads higher even though the patient is deeper (0.5 mg/kg on propofol raised BIS from about 40 to 63). Don\u2019t chase the number with more propofol.');
+ if(tg.dex)parts.push('Dexmedetomidine adds spindles and slow waves and lowers the hypnotic dose needed.');
+ if(tg.n2o)parts.push('N₂O adds anaesthesia (60% is about 0.6 MAC) but barely moves BIS, so the number underestimates the depth.');
  if(!on.length)parts.push('Pick a combination or move the sliders.');
  return [n,parts.join(' ')];}
 
@@ -401,10 +432,47 @@ document.querySelectorAll('#drugSeg button').forEach(b=>b.onclick=()=>{stopStory
 $('depth').oninput=e=>{stopStory();depth=e.target.value/100;applyTarget();};
 $('mElder').onchange=e=>{mods.elderly=e.target.checked;applyTarget();};
 $('mEmg').onchange=e=>{mods.emg=e.target.checked;applyTarget();};
-$('mNmb').onchange=e=>{mods.nmb=e.target.checked;applyTarget();};
+// muscle relaxant (owner, 14 Oct 2026: on by default): 'auto' gives it at induction and reverses it at emergence, so the
+// awake patient still reads 90s; 'on' paralyses an awake patient now (the awake-paralysis pitfall); 'off' for the EMG teaching
+mods.nmbMode='auto';
+function setNmb(m){mods.nmbMode=m;document.querySelectorAll('#nmbSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.nmb===m));applyTarget();}
+document.querySelectorAll('#nmbSeg button').forEach(b=>b.onclick=()=>setNmb(b.dataset.nmb));
+$('tReset').onclick=()=>{tim.sup=tim.low=0;dirty=true;};
 $('mDia').onchange=e=>{mods.diathermy=e.target.checked;applyTarget();};
 $('mWarm').onchange=e=>{mods.warmer=e.target.checked;applyTarget();};
 $('mBlink').onchange=e=>{mods.blink=e.target.checked;applyTarget();};
+// ===== target BIS: what the monitor will settle on for the dose set =====
+// A throwaway engine is started at the target and run 36 sim-s; BIS comes from the same features and formula as the
+// live monitor. Computed 180 ms after the last change (cheap: ~15 ms) so dragging stays smooth.
+function forecastBis(dr,d,m,secs){
+ const e=new Engine(),fm={elderly:!!m.elderly,emg:!!m.emg,nmbMode:m.nmbMode};e.setTarget(dr,cloneD(d),fm);e.snap();
+ if(e.nmbOn&&inducedDepth(dr,e.de)<0.3)e.nmbS=1; // relaxant long since given in a light patient (stage 2 developed)
+ // suppression runs last up to 30 s, so a short run can't measure SR: use the gate's long-run share instead (mean flat run
+ // 2*10^(2*(bs-0.5)) s, mean burst 1.75 s, 1/bs bursts per cycle) and run longer to average the spectra
+ const bs=e.p.bs,srSS=bs>0.97?100:bs>0.02?(L=>100*L/(L+1.75/bs))(2*10**(2*Math.max(0,bs-0.5))):null;
+ const buf=[],sp=[],raw=[];secs=srSS==null?secs||36:90;
+ for(let n=0;n<secs*FS;n++){buf.push(e.sample());if(buf.length>NWIN)buf.shift();
+  if(buf.length===NWIN&&n%HOP===0){const f=features(spectrum(buf).P,buf);sp.push(f.supFrac);if(sp.length>63)sp.shift();
+   if(n>=14*FS)raw.push(bisRaw(f,srSS??100*sp.reduce((a,b)=>a+b,0)/sp.length));}}
+ return raw.reduce((a,b)=>a+b,0)/raw.length;}
+const fc={bis:null};let fcT=0,fcRun=0,zoneKey='',zoneRun=0;
+var onTarget=()=>{slideUI();clearTimeout(fcT);const run=++fcRun;fcT=setTimeout(()=>{if(run!==fcRun)return;
+ fc.bis=forecastBis(drug,drug==='mix'?mix:depth,mods);fcUI();
+ if(drug!=='mix'){const key=drug+'|'+(+mods.elderly)+(+mods.emg)+mods.nmbMode;if(key!==zoneKey){zoneKey=key;const zr=++zoneRun;zoneChunk(zr,0,[]);}}},180);};
+// the depth range that gives BIS 40-60, from 17 short forecasts at depths 0-0.8 (BIS 40 is crossed before suppression starts;
+// one forecast per timeout so the live monitor keeps drawing)
+function zoneChunk(zr,i,pts){if(zr!==zoneRun)return;pts.push(forecastBis(drug,i/20,mods,24));
+ if(i<16){setTimeout(()=>zoneChunk(zr,i+1,pts),40);return;}
+ const cross=v=>{for(let j=0;j<=16;j++)if(pts[j]<=v)return j?(j-1+(pts[j-1]-v)/(pts[j-1]-pts[j]))/20:0;return null;};
+ const lo=cross(60),hi=cross(40),h=hi==null?1:hi,band=$('zoneBand');
+ const ok=lo!=null&&h>lo;band.hidden=!ok;$('zoneNote').hidden=false;
+ if(ok){band.style.left=`calc(8px + ${lo} * (100% - 16px))`;band.style.width=`calc(${h-lo} * (100% - 16px))`;}
+ $('zoneText').textContent=ok?'Green band: depths that settle at BIS 40–60 (steady state)':'No depth of this drug alone settles at BIS 40–60';}
+function fcUI(){const b=fc.bis==null?'--':Math.round(fc.bis),el=drug==='mix'?['tgtMix','tgtMixSub']:['tgtBis','tgtSub'];
+ const g=eng.gap(),sub=g>0.03?(drug==='mix'?' · drugs settling at the effect site':' · effect site '+Math.round(eng.de*100)+' → '+Math.round(depth*100)+', settling'):' · effect site at target';
+ const bt=$(el[0]).firstChild,st=$(el[1]);const tx='Target BIS ≈ '+b;if(bt.textContent!==tx)bt.textContent=tx;if(st.textContent!==sub)st.textContent=sub;}
+function slideUI(){if(drug==='mix'){fcUI();return;}$('effMark').style.left=`calc(8px + ${cl(eng.de)} * (100% - 16px))`;fcUI();}
+
 // surgical stimulus: 100 sim-s of arousal; the button shows pressed while it lasts
 let stimOn=false;function stimUI(){const on=eng.stT>0;if(on!==stimOn){stimOn=on;$('stimBtn').setAttribute('aria-pressed',on);$('stimBtn').textContent=on?'Stimulus running…':'Surgical stimulus';describe();}}
 $('stimBtn').onclick=()=>{eng.stimulus();stimUI();};
@@ -424,28 +492,28 @@ $('pause').onclick=()=>{paused=!paused;$('pause').setAttribute('aria-pressed',pa
 
 // ===== the case story =====
 const STORY=[
- {at:0,drug:'propofol',d:0,mods:{blink:true},cap:'Pre-induction. Awake EEG: small, fast, disorganised. Thin power across the DSA and BIS in the 90s. Blinks put slow swings on the raw EEG and a little brightness along the bottom of the DSA.'},
+ {at:0,drug:'propofol',d:0,snap:true,mods:{blink:true},cap:'Pre-induction. Awake EEG: small, fast, disorganised. Thin power across the DSA and BIS in the 90s. Blinks put slow swings on the raw EEG and a little brightness along the bottom of the DSA.'},
  {at:25,d:0.17,cap:'Propofol bolus. Beta power rises first (paradoxical excitation), so BIS barely moves even though the patient is drifting off.'},
- {at:50,d:0.57,mods:{},cap:'Loss of consciousness. Power moves into two bands: alpha 8–12 Hz and slow-delta under 4 Hz. SEF95 drops and BIS settles at 40–60.'},
+ {at:50,d:0.57,mods:{},cap:'Loss of consciousness, and the relaxant is given. The effect site takes a minute or two to catch up, so the DSA unzips gradually: beta fades while two bands grow, alpha 8–12 Hz and slow-delta under 4 Hz. SEF95 drops and BIS settles at 40–60 a little after the DSA does.'},
  {at:130,d:0.93,cap:'Infusion left high and the blood pressure falls. Alpha fades, slow waves dominate, then dark vertical stripes appear: burst suppression. SR climbs; BIS falls into the 30s and then, once SR passes 40%, below 30.'},
  {at:220,d:0.57,cap:'Infusion reduced. The alpha band comes back within a minute or two. Notice the DSA recovers before the smoothed BIS number does.'},
- {at:280,d:0.5,mods:{emg:true},stim:'alpha',cap:'Incision with no opioid on board: the alpha band dips and EMG and BIS rise, though the hypnotic dose has not changed.'},
- {at:330,d:0.5,mods:{},cap:'Analgesia topped up (relaxant only if surgery needs it). EMG falls and the alpha band recovers with no change in propofol, so more hypnotic was not needed. Check the patient isn’t lightening before you paralyse.'},
+ {at:280,d:0.5,mods:{emg:true,nmb:false},stim:'alpha',cap:'Incision with no opioid and no relaxant on board: the alpha band dips and EMG and BIS rise, though the hypnotic dose has not changed.'},
+ {at:330,d:0.5,mods:{},cap:'Analgesia topped up and the relaxant on board again. EMG falls and the alpha band recovers with no change in propofol, so more hypnotic was not needed. Check the patient isn’t lightening before you paralyse.'},
  {at:400,d:0.5,mods:{diathermy:true},cap:'Diathermy. Interference swamps the EEG: SQI falls, BIS shows hollow (and -- once SQI is under 15), and the artefact bar marks the trend. Don’t act on the number until the signal is clean.'},
  {at:460,d:0.5,mods:{},cap:'Diathermy stops. SQI climbs back over the next minute (it looks back 63 s) and BIS returns to where it was.'},
  {at:500,d:0.12,mods:{blink:true},cap:'Infusion stopped at the end (any relaxant reversed). Alpha dims, slow waves fade, beta returns, blinks come back and BIS rises towards 80–90 as the patient wakes.'},
  {at:570,end:true,cap:'End of case. Scroll the DSA back in your head: two bands for propofol GA, stripes for too deep, a dipping alpha band and high fast power for stimulus without analgesia, stripes of interference for diathermy.'}];
-let story=null;const SMODS=[['emg','mEmg'],['nmb','mNmb'],['diathermy','mDia'],['warmer','mWarm'],['blink','mBlink']];
+let story=null;const SMODS=[['emg','mEmg'],['diathermy','mDia'],['warmer','mWarm'],['blink','mBlink']];
 function stopStory(){if(!story)return;story=null;$('storyBtn').textContent='Play a case: induction to emergence';}
 $('storyBtn').onclick=()=>{if(story){stopStory();$('storyCap').textContent='';return;}
- story={t0:simT,i:-1};mods.elderly=false;$('mElder').checked=false;for(const [k,id] of SMODS){mods[k]=false;$(id).checked=false;}eng.stT=0;setSpeed(10);
+ story={t0:simT,i:-1};mods.elderly=false;$('mElder').checked=false;for(const [k,id] of SMODS){mods[k]=false;$(id).checked=false;}setNmb('auto');eng.stT=0;tim.sup=tim.low=0;setSpeed(10);
  if(paused)$('pause').click();$('storyBtn').textContent='Stop the case';};
 function runStory(){if(!story)return;const t=simT-story.t0;
  while(story.i+1<STORY.length&&t>=STORY[story.i+1].at){story.i++;const s=STORY[story.i];
   if(s.drug)setDrug(s.drug);if(s.d!=null){depth=s.d;$('depth').value=Math.round(s.d*100);}
-  if(s.mods)for(const [k,id] of SMODS){mods[k]=!!s.mods[k];$(id).checked=mods[k];}
+  if(s.mods){for(const [k,id] of SMODS){mods[k]=!!s.mods[k];$(id).checked=mods[k];}setNmb(s.mods.nmb===false?'off':s.mods.nmb===true?'on':'auto');}
   if(s.stim)eng.stimulus(s.stim);else if(s.mods)eng.stT=0;
-  applyTarget();$('storyCap').textContent=`${story.i+1}/${STORY.length} · ${s.cap}`;
+  applyTarget();if(s.snap)eng.snap();$('storyCap').textContent=`${story.i+1}/${STORY.length} · ${s.cap}`;
   if(s.end){story=null;$('storyBtn').textContent='Play the case again';setSpeed(1);return;}}}
 
 // ===== explainer animation =====
@@ -568,7 +636,7 @@ function newQ(){const QZ=LIB.filter(x=>x.quiz!==false),ans=QZ[Math.floor(Math.ra
 $('qNext').onclick=newQ;
 
 // ===== main loop =====
-let last=performance.now(),dirty=true,colsSinceSnap=0;
+let lastUI=0;let last=performance.now(),dirty=true,colsSinceSnap=0;
 var onColumn=()=>{dirty=true;};
 function frame(now){requestAnimationFrame(frame);try{frameBody(now);}catch(e){const el=$('err');if(el&&el.hidden){el.hidden=false;el.textContent='Display error: '+e.message;}}}
 function frameBody(now){const dt=Math.min(0.1,(now-last)/1000);last=now;
@@ -577,7 +645,8 @@ function frameBody(now){const dt=Math.min(0.1,(now-last)/1000);last=now;
  drawEeg();
  if(exPlaying){exT+=dt;if(exT>=T[6]){exT=0;snapshotEx();}}
  if(!ex)snapshotEx();
- drawEx();exUI();}
+ drawEx();exUI();
+ if(now-lastUI>250){lastUI=now;slideUI();describe();}}
 // warm start: the patient is awake (owner, 14 Oct 2026); 5 min of awake EEG so the screen opens full
 setDrug('propofol');eng.snap();step(300*FS);simT=300;snapshotEx();
 if(reduced){exT=T[5]-0.01;}

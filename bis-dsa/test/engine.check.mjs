@@ -151,6 +151,16 @@ chk('Propofol 0.57', 'MF (SEF50) Hz', p57.mf, 2, 8);
   rows.push(['Smoothing 10 s vs 30 s', `seconds to within 5 of final (10 s: ${r10}, 30 s: ${r30})`, String(r30 - r10), '5..', r30 - r10 >= 5 ? 'ok' : 'FAIL']); if (r30 - r10 < 5) fails++;
 }
 
+// effect site and the relaxant mode: a step in the target takes minutes to show; 'auto' gives the relaxant at induction
+{ seed = BASE; const S = load(), ms = S.mods; ms.nmbMode = 'auto'; S.eng.setTarget('propofol', 0, ms); S.eng.snap(); S.step(120 * FS_);
+  chk('Relaxant auto, awake 120 s', 'BIS (not paralysed)', S.COLS[S.COLS.length - 1].bis, 85, 100); chk('Relaxant auto, awake 120 s', 'relaxant on (0/1)', +ms.nmb, 0, 0);
+  S.eng.setTarget('propofol', 0.57, ms); S.step(20 * FS_);
+  chk('Step to 0.57, 20 s', 'share of target reached (effect site)', S.eng.de / 0.57, 0.28, 0.42); chk('Step to 0.57, 20 s', 'BIS still awake-range', S.COLS[S.COLS.length - 1].bis, 70, 100);
+  S.step(25 * FS_); chk('Step to 0.57, 45 s', 'share of target reached (tau 45 s)', S.eng.de / 0.57, 0.58, 0.68); chk('Step to 0.57, 45 s', 'relaxant given at induction (0/1)', +ms.nmb, 1, 1);
+  S.step(300 * FS_); chk('Step to 0.57, 6 min', 'share of target reached', S.eng.de / 0.57, 0.97, 1.01); chk('Step to 0.57, 6 min', 'BIS', S.COLS[S.COLS.length - 1].bis, 38, 56);
+  S.eng.setTarget('propofol', 0.1, ms); S.step(100 * FS_); chk('Back to 0.1, 100 s', 'relaxant reversed (0/1)', +ms.nmb, 0, 0);
+  ms.nmbMode = 'on'; S.eng.setTarget('propofol', 0.1, ms); S.step(5 * FS_); chk('Relaxant On now', 'on (0/1)', +ms.nmb, 1, 1); ms.nmbMode = 'off'; ms.nmb = false; }
+
 // WS5: forced-air warmer, blinks, surgical stimulus
 const pw = run('propofol', 0.57, { warmer: true }, 120, null, 4);
 chk('Propofol 0.57 + warmer', 'BIS', pw.bis, 68, 82); chk('Propofol 0.57 + warmer', 'EMG dB minus no warmer', pw.emg - p57.emg, 10, 99);
