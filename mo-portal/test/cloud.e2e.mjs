@@ -255,7 +255,7 @@ try {
     const q = await getD('questions', ids.active); assert.equal(q.stem.startsWith('Tab A mine'), true); assert.equal(q.rev, 5);
     assert.equal((await docs(`questions/${ids.active}/history`)).length, 5, "B's version is kept in the history");
     // and the other way: choose "load theirs"
-    await B.reload(); await stemIs(B, 'Tab A mine');
+    await B.goto(URL_EMU + '#/faculty/q/' + ids.active); await stemIs(B, 'Tab A mine');
     await A.goto(URL_EMU + '#/faculty/q/' + ids.active); await stemIs(A, 'Tab A mine');
     await B.fill('#stem', 'Tab B again: which is the antidote to heparin?'); await B.evaluate(() => { document.querySelector('#toast').textContent = ''; }); await B.click('#qf button[type=submit]'); await toastText(B, /Saved/);
     await A.fill('#stem', 'Tab A loses: which is the antidote to heparin?'); await A.click('#qf button[type=submit]');
