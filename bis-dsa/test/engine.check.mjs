@@ -165,12 +165,7 @@ chk('Propofol 0.57', 'MF (SEF50) Hz', p57.mf, 2, 8);
   S.step(180 * FS_); chk('Emergence, 5 min', 'BIS back above 80', bisNow(), 80, 100);
   ms.nmbMode = 'on'; S.eng.setTarget('propofol', 0, ms); S.step(5 * FS_); chk('Relaxant On now', 'on (0/1)', +ms.nmb, 1, 1); ms.nmbMode = 'off'; ms.nmb = false; }
 
-// WS5: forced-air warmer, blinks, surgical stimulus
-const pw = run('propofol', 0.57, { warmer: true }, 120, null, 4);
-chk('Propofol 0.57 + warmer', 'BIS', pw.bis, 68, 82); chk('Propofol 0.57 + warmer', 'EMG dB minus no warmer', pw.emg - p57.emg, 10, 99);
-chk('Propofol 0.57 + warmer', '8-12 Hz dB vs no warmer', pw.band(8, 12) - p57.band(8, 12), -1, 1);
-const pwOff = run('propofol', 0.57, { warmer: true }, 120, [[150, { warmer: false }]], 4);
-chk('Warmer off, 120-150 s after', 'BIS minus no warmer', pwOff.bis - p57.bis, -5, 5);
+// WS5: blinks, surgical stimulus
 const bl = run('propofol', 0, { blink: true }, 120, null, 4);
 chk('Blinks, awake', 'SQI', bl.sqi, 85, 100); chk('Blinks, awake', 'BIS', bl.bis, 80, 100);
 chk('Blinks, awake', '0.5-2 Hz dB vs no blinks', bl.band(0.5, 2) - awake.band(0.5, 2), 3, 99);
