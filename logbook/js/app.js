@@ -1028,11 +1028,13 @@ async function onUser(user) {
       S.reflections = list; purgeExpired().catch(err => console.warn('Recycle bin purge failed', err));
     }); if (done && stop) stop(); }
   unwatchRefl = watchMyReflections(user.email);
-  let sig = '';
+  let sig = '', formChecked = false;
   unwatch = cloud.watchCases(user.email, (cases, meta = {}) => {
     const first = !S.casesLoaded;
     const wasSynced = S.casesSynced;
     if (!meta.fromCache) S.casesSynced = true;
+    // the Google Form inbox, once the server's cases are in (so a case already made from a response is known)
+    if (!meta.fromCache && !formChecked) { formChecked = true; setTimeout(() => pickUpForm(user).catch(err => console.warn('Google Form pick-up failed', err)), 0); }
     if (S.pending !== !!meta.hasPendingWrites || wasSynced !== S.casesSynced) { S.pending = !!meta.hasPendingWrites; paintWho(); }
     // metadata-only updates (write acknowledged, cache -> server) need no re-render
     const next = cases.map(c => c.id + ':' + (c.updatedAt || 0)).join();
@@ -1049,6 +1051,19 @@ async function onUser(user) {
   });
   render();
   warmUp();
+}
+
+// Responses from the old Google Form (its Apps Script puts them in formInbox; form-inbox.js) become cases here, then
+// leave the inbox. Quiet when there are none.
+async function pickUpForm(user) {
+  const entries = await cloud.listFormEntries(user.email);
+  if (!entries.length || S.user !== user) return;
+  const { mergeFormEntries, pickupMessage } = await import('./form-inbox.js');
+  const r = mergeFormEntries(entries, new Map((S.cases || []).map(c => [c.id, c])), Date.now());
+  if (r.save.length) await cloud.saveCases(user.email, r.save);
+  await cloud.deleteFormEntries(r.done);
+  const msg = pickupMessage(r);
+  if (msg && S.user === user) toast(msg);
 }
 
 // Phones: while the keyboard is up (a text box has focus and the visible area has shrunk), the bottom

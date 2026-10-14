@@ -15,6 +15,8 @@
 //   logbooks/{email}/bin/{id}         { id, kind: case | reflection | note, data, deletedAt }  recycle bin (30 days), owner only
 //   summaries/{rid}                       counts only, readable by everyone signed in
 //   imports/{rid}                         { email, keys: [importKey], updatedAt }  (which old-form rows are in)
+//   formInbox/{responseId}                { id, email, date, dateText, details, labels, submittedAt }  Google Form responses
+//                                         waiting to be picked up (form-inbox.js); formBots/{uid} lists the bot that writes them
 //   sharedTemplates/{id}                  { id, name, cats, details? }
 //   feedback/{id}                         { uid, text, doing?, screen, version, ua, status, createdAt }  private feedback, app owner reads
 
@@ -633,6 +635,20 @@ export async function listCases(email) {
   if (demo) return D.listCases(email);
   const { db, F } = await sdk();
   return (await F.getDocs(F.collection(db, 'logbooks', lc(email), 'cases'))).docs.map(d => ({ ...d.data(), id: d.id }));
+}
+
+// ---- the Google Form inbox: formInbox/{responseId}, written by the Form's Apps Script (form-inbox.js) ----
+// The resident's own entries (the rules let each person read and delete only entries with their email). Read from
+// the server, never the offline cache, so an entry already picked up on another device isn't added twice.
+export async function listFormEntries(email) {
+  if (demo) return D.listFormEntries ? D.listFormEntries(email) : [];
+  const { db, F } = await sdk();
+  const snap = await F.getDocsFromServer(F.query(F.collection(db, 'formInbox'), F.where('email', '==', lc(email))));
+  return snap.docs.map(d => ({ ...d.data(), id: d.id }));
+}
+export async function deleteFormEntries(ids) {
+  if (demo) return D.deleteFormEntries ? D.deleteFormEntries(ids) : undefined;
+  await inBatches(ids, (b, id, F, db) => b.delete(F.doc(db, 'formInbox', String(id))));
 }
 
 // The one-off initials fix (the app owner): every logbook's email, then the fixed cases written back.

@@ -1,6 +1,7 @@
 # Now: Claude Code, Logbook 2 (log2)
 
-**Claude Code, Logbook 2 (log2)** (branch `ccr-afac5e7a-99esax`): idle; nothing half-done. Last: a 30-lens
-brainstorm, saved as `logbook/ideas/brainstorm-2026-10-13.md` (361 ideas, themes and a top-10 shortlist; nothing
-agreed, the owner picks). Earlier log2 work: profiles (#214, #217, #230 Faculty / PCs, #232 Admin tab, #236) and the
-tab bar up to 7 (#210). Codex plugin and Firebase CLI unused (each use needs the owner's OK).
+**Claude Code, Logbook 2 (log2)** (branch `ccr-afac5e7a-99esax`): Google Form inbox, PR 1 of 2 (14 Oct 2026; owner:
+keep the old Google Form open as a simple way in, no end date, synced one way into the logbook). PR 1 = app side
+(`js/form-inbox.js`, `formInbox/` + `formBots/` rules, pick-up on open); it changes `firestore.rules`, so it waits for
+the owner's approval before merging. PR 2 = the Apps Script for the Form's response sheet plus setup steps; needs the
+Form's question titles from the owner (no responses). Earlier: 30-lens brainstorm (`logbook/ideas/`), profiles, tab bar.

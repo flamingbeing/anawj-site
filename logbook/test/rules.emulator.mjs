@@ -323,6 +323,45 @@ await t('template part admin delete', assertSucceeds(deleteDoc(doc(adm, 'config'
   await t('feedback: owner adds field', assertFails(updateDoc(doc(own, 'feedback', 'f1'), { note: 'x' })));
   await t('feedback: owner deletes', assertSucceeds(deleteDoc(doc(own, 'feedback', 'f1'))));
 }
+// the Google Form inbox: only the listed bot adds entries; each resident reads and deletes only their own
+{
+  await env.withSecurityRulesDisabled(async ctx => { await setDoc(doc(ctx.firestore(), 'formBots', 'formbot-uid'), { note: 'Form script' }); });
+  const bot = env.authenticatedContext('formbot-uid', { email: 'formbot@example.com', email_verified: false }).firestore();
+  const fake = env.authenticatedContext('other-uid', { email: 'formbot@example.com', email_verified: false }).firestore();
+  const e = (id, email, extra = {}) => ({ id, email, date: '2026-03-04', details: 'AB 34F LSCS spinal', labels: ['16) GA'], submittedAt: 1, ...extra });
+  await t('form: bot adds an entry', assertSucceeds(setDoc(doc(bot, 'formInbox', 'r1'), e('r1', A))));
+  await t('form: bot replaces it (edited response)', assertSucceeds(setDoc(doc(bot, 'formInbox', 'r1'), e('r1', A, { submittedAt: 2 }))));
+  await t('form: bot adds one for B', assertSucceeds(setDoc(doc(bot, 'formInbox', 'r2'), e('r2', B))));
+  await t('form: bot, no date', assertSucceeds(setDoc(doc(bot, 'formInbox', 'r3'), e('r3', A, { date: null, dateText: 'last Tue' }))));
+  await t('form: bot reads', assertFails(getDoc(doc(bot, 'formInbox', 'r1'))));
+  await t('form: bot lists', assertFails(getDocs(collection(bot, 'formInbox'))));
+  await t('form: bot deletes', assertFails(deleteDoc(doc(bot, 'formInbox', 'r1'))));
+  await t('form: bot writes a case', assertFails(setDoc(doc(bot, 'logbooks', A, 'cases', 'x'), c('x'))));
+  await t('form: bot reads a logbook', assertFails(getDoc(doc(bot, 'logbooks', A))));
+  await t('form: bot lists itself as a bot', assertFails(setDoc(doc(bot, 'formBots', 'other-uid'), {})));
+  await t('form: unlisted account adds', assertFails(setDoc(doc(fake, 'formInbox', 'r9'), e('r9', A))));
+  await t('form: resident adds an entry', assertFails(setDoc(doc(a, 'formInbox', 'r9'), e('r9', A))));
+  await t('form: bot, extra field', assertFails(setDoc(doc(bot, 'formInbox', 'r9'), e('r9', A, { name: 'x' }))));
+  await t('form: bot, id mismatch', assertFails(setDoc(doc(bot, 'formInbox', 'r9'), e('r8', A))));
+  await t('form: bot, odd id', assertFails(setDoc(doc(bot, 'formInbox', 'r 9'), e('r 9', A))));
+  await t('form: bot, capital email', assertFails(setDoc(doc(bot, 'formInbox', 'r9'), e('r9', 'Alice@example.com'))));
+  await t('form: bot, bad date', assertFails(setDoc(doc(bot, 'formInbox', 'r9'), e('r9', A, { date: '4/3/2026' }))));
+  await t('form: bot, long details', assertFails(setDoc(doc(bot, 'formInbox', 'r9'), e('r9', A, { details: 'x'.repeat(2001) }))));
+  await t('form: bot, too many labels', assertFails(setDoc(doc(bot, 'formInbox', 'r9'), e('r9', A, { labels: Array(41).fill('16) GA') }))));
+  await t('form: resident lists own', (async () => {
+    const got = await assertSucceeds(getDocs(query(collection(a, 'formInbox'), where('email', '==', A))));
+    if (got.size !== 2) throw new Error('expected 2, got ' + got.size);
+  })());
+  await t('form: resident lists all', assertFails(getDocs(collection(a, 'formInbox'))));
+  await t('form: resident reads other', assertFails(getDoc(doc(a, 'formInbox', 'r2'))));
+  await t('form: resident deletes other', assertFails(deleteDoc(doc(a, 'formInbox', 'r2'))));
+  await t('form: unverified reads own', assertFails(getDocs(query(collection(unv, 'formInbox'), where('email', '==', A)))));
+  await t('form: resident edits own entry', assertFails(setDoc(doc(a, 'formInbox', 'r1'), e('r1', A, { details: 'changed' }))));
+  await t('form: admin reads', assertFails(getDoc(doc(adm, 'formInbox', 'r1'))));
+  await t('form: anyone reads bots', assertFails(getDoc(doc(own, 'formBots', 'formbot-uid'))));
+  await t('form: resident deletes own', assertSucceeds(deleteDoc(doc(a, 'formInbox', 'r1'))));
+  await t('form: case from the Form', assertSucceeds(setDoc(doc(a, 'logbooks', A, 'cases', 'imp_form~003ar3'), { ...c('imp_form~003ar3'), source: 'form', importKey: 'form:r3@1700000000000' })));
+}
 console.log(`${n - fail}/${n} rule checks passed`);
 await env.cleanup();
 process.exit(fail ? 1 : 0);
