@@ -1,0 +1,72 @@
+/* Masimo SedLine screen (the 'sedline' skin). Every size is in design pixels of the real 800 x 1280 Root screen times --u, so the screen
+   scales as a unit. Built from Masimo's manuals and screen figures; see NOTES.md, "Masimo SedLine". */
+@font-face{font-family:"Source Sans 3";font-style:normal;font-weight:300 700;font-display:swap;src:url(fonts/SourceSans3-latin-var.woff2) format("woff2")}
+@font-face{font-family:"Source Sans 3";font-style:italic;font-weight:300 700;font-display:swap;src:url(fonts/SourceSans3-Italic-latin-var.woff2) format("woff2")}
+.sedwrap{display:block;min-width:0}
+.sedwrap[hidden]{display:none}
+.sedcase{max-width:min(100%,540px);margin:0 auto}
+.sedbezel{container-type:inline-size;position:relative;background:linear-gradient(#17171a,#08080a);border-radius:14px;padding:26px 14px 30px;box-shadow:inset 0 0 0 1px #2c2c30,0 10px 30px -18px rgba(0,0,0,.8)}
+.sedlogo{position:absolute;right:16px;top:7px;font:600 15px/1 "Source Sans 3",system-ui,sans-serif;color:#e8e8e8;letter-spacing:.04em;display:flex;align-items:center;gap:5px}
+.sedlogo i{width:9px;height:9px;border-radius:50%;background:#e4002b;display:block}
+.sedroot{position:absolute;right:18px;bottom:8px;font:400 14px/1 "Source Sans 3",system-ui,sans-serif;color:#8a8a90}
+.seds{--u:calc(100cqw / 800);position:relative;aspect-ratio:5/8;background:#100f0d;overflow:hidden;border-radius:calc(4*var(--u));color:#fff;font-family:"Source Sans 3","Source Sans Pro","Segoe UI",system-ui,sans-serif;user-select:none;-webkit-user-select:none}
+@media (max-width:640px){.sedbezel{padding:14px 6px 18px;border-radius:10px}.sedlogo{top:3px;font-size:11px}.sedroot{font-size:11px;bottom:3px}}
+.seds *{box-sizing:border-box}
+.seds button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;cursor:pointer;text-align:inherit}
+.seds [hidden]{display:none!important}
+.seds .a{position:absolute;left:calc(var(--x)*var(--u));top:calc(var(--y)*var(--u));width:calc(var(--w,0)*var(--u));height:calc(var(--h,0)*var(--u));display:block}
+.seds .hit{position:absolute;background:transparent}
+.seds .hit:focus-visible,.seds :focus-visible{outline:calc(3*var(--u)) solid #178fd7;outline-offset:calc(-3*var(--u));z-index:40}
+/* the view options and number menus (dark rounded panels like the action menu) */
+.seds .spop{position:absolute;z-index:12;background:linear-gradient(#4f4f52,#2b2b2b);border:1px solid #1a1a1a;border-radius:calc(8*var(--u));box-shadow:0 calc(4*var(--u)) calc(14*var(--u)) rgba(0,0,0,.7)}
+.seds .spop.act{display:flex;gap:calc(5*var(--u));padding:calc(5*var(--u))}
+.seds .spop.act button{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:calc(3*var(--u));background:#2b2b2b;border-radius:calc(5*var(--u));color:#c9c9c9;font-size:calc(13*var(--u));letter-spacing:.03em}
+.seds .spop.act button svg{width:calc(30*var(--u));height:calc(22*var(--u));display:block}
+.seds .spop.act button.on{background:linear-gradient(#3f95d8,#3486ca);color:#fff}
+.seds .spopclose{position:absolute;z-index:13}
+.seds .spop.num{display:flex;flex-direction:column;gap:calc(4*var(--u));padding:calc(8*var(--u));min-width:calc(190*var(--u))}
+.seds .spop.num b{font-size:calc(18*var(--u));color:#f4c609;padding:0 calc(6*var(--u)) calc(3*var(--u));font-weight:600}
+.seds .spop.num button{background:#2b2b2b;border-radius:calc(5*var(--u));padding:calc(11*var(--u)) calc(14*var(--u));font-size:calc(22*var(--u));color:#f0f0f0}
+.seds .spop.num button.x{background:transparent;color:#9a9a9a;font-size:calc(17*var(--u))}
+.sstandby{position:absolute;inset:0;background:#000;z-index:60;display:flex;align-items:center;justify-content:center}
+.sstandby button{width:100%;height:100%;color:#9a9a9a;font-size:calc(28*var(--u))!important;text-align:center!important}
+/* Root's dialog style: a black page, a thin lowercase title, a round back arrow, Cancel (silver) and OK (white) */
+.seds #sedDlg{position:absolute;inset:0;z-index:30;background:radial-gradient(120% 80% at 50% 0,#1a1917,#0d0c0b 60%);}
+.seds .sdp{position:absolute;inset:0;display:flex;flex-direction:column}
+.seds .sdback{position:absolute;left:calc(20*var(--u));top:calc(12*var(--u));width:calc(48*var(--u));height:calc(48*var(--u));z-index:2}
+.seds .sdback svg{display:block;width:100%;height:100%}
+.seds .sdp h2{margin:0;text-align:center;font:300 calc(46*var(--u))/calc(60*var(--u)) "Source Sans 3","Segoe UI",system-ui,sans-serif;padding-top:calc(62*var(--u));height:calc(150*var(--u));color:#fff;letter-spacing:.01em}
+.seds .sdbody{flex:1;overflow:auto;padding:0 calc(22*var(--u)) calc(20*var(--u));position:relative}
+.seds .sdrow{position:relative;display:flex;align-items:center;min-height:calc(97*var(--u))}
+.seds .sdrow label{width:calc(300*var(--u));padding-right:calc(22*var(--u));text-align:right;font-size:calc(27*var(--u));line-height:1.15;color:#e8e8e8;font-weight:300}
+.seds .sdrow .sdbar,.seds .sdrow .sdinfo{flex:1;max-width:calc(432*var(--u));height:calc(42*var(--u));display:flex;align-items:center;justify-content:center;color:#fff;font-size:calc(25*var(--u));font-weight:500;background:linear-gradient(#262626,#0e0e0e);border:1px solid #2a2a2a;border-radius:calc(2*var(--u));box-shadow:inset 0 1px 0 #3a3a3a}
+.seds .sdrow .sdinfo{background:none;border:0;box-shadow:none;justify-content:flex-start;color:#cfcfcf}
+.seds .sdrow.nav{justify-content:center}.seds .sdrow.nav .sdbar{max-width:calc(620*var(--u));height:calc(54*var(--u));font-size:calc(28*var(--u))}
+.seds .sdbar[aria-expanded="true"]{border-color:#3486ca!important}
+.seds .sdsave{width:calc(180*var(--u));height:calc(42*var(--u));background:linear-gradient(#2c2c2c,#161616);border:1px solid #2a2a2a;border-radius:calc(2*var(--u));color:#bcbcbc;font-size:calc(24*var(--u))!important;text-align:center!important}
+.seds .sdtog{width:calc(118*var(--u));height:calc(44*var(--u));border-radius:calc(22*var(--u));position:relative;background:linear-gradient(#0d0d0d,#262626);border:1px solid #333;display:flex;align-items:center}
+.seds .sdtog b{font-size:calc(19*var(--u));font-weight:500;color:#e8e8e8;position:absolute;right:calc(14*var(--u))}
+.seds .sdtog i{position:absolute;left:calc(4*var(--u));top:calc(3*var(--u));width:calc(36*var(--u));height:calc(36*var(--u));border-radius:50%;background:radial-gradient(circle at 40% 35%,#fff,#9a9a9a 60%,#c8c8c8)}
+.seds .sdtog.on{background:linear-gradient(#1b5f9f,#2b8fe0);border-color:#4aa3ea}
+.seds .sdtog.on b{right:auto;left:calc(14*var(--u))}.seds .sdtog.on i{left:auto;right:calc(4*var(--u))}
+.seds .sdlist{position:absolute;left:calc(300*var(--u));top:calc(70*var(--u));width:calc(432*var(--u));max-height:calc(440*var(--u));overflow:auto;z-index:5;background:#171717;border:1px solid #3486ca;box-shadow:0 calc(8*var(--u)) calc(20*var(--u)) rgba(0,0,0,.8)}
+.seds .sdlist button{display:block;width:100%;padding:calc(10*var(--u)) calc(14*var(--u));font-size:calc(24*var(--u));color:#f0f0f0;border-bottom:1px solid #262626}
+.seds .sdlist button.on{background:#2a6fb0}
+.seds .sdtxt{margin:calc(14*var(--u)) calc(36*var(--u));font-size:calc(26*var(--u));line-height:1.35;color:#e6e6e6;font-weight:300}
+.seds .sderr{margin:calc(10*var(--u)) calc(36*var(--u));font-size:calc(23*var(--u));color:#ff6a6a}.seds .sdmsg{margin:calc(10*var(--u)) calc(36*var(--u));font-size:calc(23*var(--u));color:#9ad07a}
+.seds .sdfoot{height:calc(70*var(--u));border-top:1px solid #1d1d1d;display:flex;justify-content:center;align-items:center;gap:calc(56*var(--u));background:#0d0c0b}
+.seds .sdfoot button{width:calc(150*var(--u));height:calc(46*var(--u));border-radius:calc(3*var(--u));font-size:calc(27*var(--u));color:#111;text-align:center}
+.seds .sdcancel{background:linear-gradient(#e0e0e0,#a8a8a8)}.seds .sdok{background:linear-gradient(#fff,#e2e2e2)}
+.seds .sdtiles{display:grid;grid-template-columns:repeat(3,1fr);gap:calc(18*var(--u));padding:calc(12*var(--u)) calc(30*var(--u))}
+.seds .sdtile{height:calc(220*var(--u));display:flex;flex-direction:column;align-items:center;justify-content:center;gap:calc(16*var(--u));background:linear-gradient(#262626,#101010);border:1px solid #2c2c2c;border-radius:calc(6*var(--u));color:#e8e8e8;font-size:calc(24*var(--u));text-align:center!important;line-height:1.1}
+.seds .sdtile svg{width:calc(78*var(--u));height:calc(78*var(--u));color:#f4c609;display:block}
+.seds .sdlay{padding:calc(20*var(--u)) calc(60*var(--u));text-align:center}
+.seds .sdlt{height:calc(300*var(--u));background:#f9ca07;border-radius:calc(6*var(--u));display:flex;align-items:center;justify-content:center;font-size:calc(34*var(--u));color:#fff;border:calc(4*var(--u)) solid #3486ca}
+.seds .sdlay p{font-size:calc(22*var(--u));color:#aaa;font-weight:300}
+.sedsim{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin:10px 0 0;font:13px/1.2 system-ui,-apple-system,"Segoe UI",sans-serif;color:#9aa3b2}
+.sedsim .sl{margin-left:6px}
+.sedsim button{font:inherit;color:#c9d1de;background:transparent;border:1px solid #3a4352;border-radius:15px;padding:5px 12px;cursor:pointer}
+.sedsim button[aria-pressed="true"]{background:#2d4f7c;border-color:#3f8fd6;color:#fff}
+.sedsim button:focus-visible{outline:2px solid #178fd7;outline-offset:2px}
+.sedwrap .bilkeys{max-width:min(100%,540px);margin:8px auto 0}
+.sedwrap .sedsim{max-width:min(100%,540px);margin:10px auto 0}

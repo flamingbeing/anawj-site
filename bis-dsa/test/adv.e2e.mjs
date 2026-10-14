@@ -25,7 +25,7 @@ try {
     await page.waitForFunction(() => ADV.sensor && document.querySelector('#advOv .th'), null, { timeout: 6000 }); // the sensor check opens by itself
     await page.click('#advSkip'); assert.equal(await page.evaluate(() => ADV.boot), null); assert.equal(await page.$eval('#advBoot', e => e.hidden), true);
     assert.ok(await page.evaluate(() => ADV.t0 < simT - 1800 && ADV.pre.L.length >= 400 && ADV.pre.R.length >= 400), 'the case starts with 35 minutes of earlier trend');
-    assert.equal(await page.$eval('#advWrap', e => e.hidden), false); assert.equal(await page.$eval('#vistaWrap', e => e.hidden), true); assert.equal(await page.$eval('#bilatWrap', e => e.hidden), true);
+    assert.equal(await page.$eval('#advWrap', e => e.hidden), false); assert.equal(await page.$eval('#vistaWrap', e => e.hidden), true); assert.equal(await page.$eval('#sedWrap', e => e.hidden), true);
     // the screen is 16:10 and scales as a unit
     { const r = await page.$eval('#advS', e => { const q = e.getBoundingClientRect(); return q.width / q.height; }); assert.ok(Math.abs(r - 1.6) < 0.02, `16:10 screen (${r})`); }
     assert.ok(await page.evaluate(() => document.fonts.check('16px Selawik')), 'bundled Selawik font loads');

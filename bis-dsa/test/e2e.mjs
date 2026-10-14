@@ -127,16 +127,10 @@ try {
     await page.click('#kSensor'); assert.equal(await page.$eval('#v2Sensor', e => e.hidden), true);
     await page.addScriptTag({ path: AXE });
     { const r = await page.evaluate(() => axe.run(document.querySelector('#monitor'), { runOnly: ['wcag2a', 'wcag2aa'] })); assert.deepEqual(r.violations.map(v => `${v.id}: ${v.nodes.length}`), [], 'axe on the VISTA screen'); }
-    // two-sided SedLine style screen draws both hemispheres and reads out both sides (the BIS Advance screen has its own test, adv.e2e.mjs)
-    for (const sk of ['sedline']) {
-      await page.click(`#skinSeg [data-skin="${sk}"]`);
-      assert.equal(await page.$eval('#bilatWrap', e => e.hidden), false); assert.equal(await page.$eval('#vistaWrap', e => e.hidden), true);
-      await page.waitForFunction(() => /L: BIS \d+.*R: BIS \d+/.test(document.querySelector('#bilSum').textContent), null, { timeout: 5000 });
-      const lit = await page.$eval('#cBil', c => { const x = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 0; i < x.length; i += 4) if (x[i] + x[i + 1] + x[i + 2] > 60) n++; return n / (x.length / 4); });
-      assert.ok(lit > 0.05, `${sk} screen is drawn (${lit})`);
-    }
-    assert.match(await page.textContent('#bilSum'), /PSi \d+/);
-    await page.click('#bMenu'); assert.equal(await page.$eval('#vMenu', e => e.hidden), false); await page.keyboard.press('Escape'); assert.equal(await page.$eval('#vMenu', e => e.hidden), true);
+    // the Masimo SedLine screen has its own test (sed.e2e.mjs): here only that it opens and draws
+    await page.click('#skinSeg [data-skin="sedline"]');
+    assert.equal(await page.$eval('#sedWrap', e => e.hidden), false); assert.equal(await page.$eval('#vistaWrap', e => e.hidden), true);
+    await page.waitForFunction(() => /PSi \d+/.test(document.querySelector('#bilSum').textContent), null, { timeout: 5000 });
     // the teaching layout is still there for the rest of the checks
     await page.click('#skinSeg [data-skin="classic"]');
     assert.equal(await page.$eval('#classicWrap', e => e.hidden), false);

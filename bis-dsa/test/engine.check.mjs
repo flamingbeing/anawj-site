@@ -198,6 +198,20 @@ chk('Stimulus at 0.57, delta arousal', 'BIS change (falls)', sd.bis - q57.bis, -
   chk('Sugammadex 2 mg/kg on profound block', 'T1 % rises but not fully', r2.t1 - r0.t1, -1, 20); chk('Sugammadex 2 mg/kg on profound block', 'TOF count', r2.tofc, 0, 1);
   S.nmSug(16); for (let t = 0; t < 30; t++) S.nmStep(1); chk('Sugammadex 18 mg/kg total', 'TOFr', S.nmRead().tofr ?? 1, 0.9, 1); }
 
+
+// the SedLine screen's pure parts (sed-draw.js, sed-screen.js, app.js): the PSi stand-in, the spectrogram colour scale, signed ASYM, the 2 h history
+{ const src = fs.readFileSync(new URL('../sed-draw.js', import.meta.url), 'utf8'), cut = src.indexOf('function sT('), head = src.slice(src.indexOf('const SC='), cut);
+  const psiLine = SRC.split('\n').find(l => l.startsWith('const psiOf=')), histMax = +/const HISTMAX=(\d+)/.exec(SRC)[1];
+  const F = new Function(`${psiLine};${head};const sedAsym=${/const sedAsym=([^\n]+);\n/.exec(src)[1]};return {psiOf,SED_LUT,sedAsym};`)();
+  chk('SedLine PSi stand-in', 'BIS 40 maps to PSi 25 (lower limit)', F.psiOf(40), 25, 25); chk('SedLine PSi stand-in', 'BIS 60 maps to PSi 50 (upper limit)', F.psiOf(60), 50, 50);
+  chk('SedLine PSi stand-in', 'clamped at 0 (BIS 5)', F.psiOf(5), 0, 0); chk('SedLine PSi stand-in', 'clamped at 100 (BIS 120)', F.psiOf(120), 100, 100); chk('SedLine PSi stand-in', 'no BIS: no PSi', F.psiOf(null) === null ? 1 : 0, 1, 1);
+  chk('SedLine DSA colours', 'quantised to 51 steps', F.SED_LUT.length, 51, 51);
+  chk('SedLine DSA colours', 'strongest step is red (#ed1c24)', F.SED_LUT[50].join() === '237,28,36' ? 1 : 0, 1, 1);
+  chk('SedLine DSA colours', 'weakest step is deep indigo (#3349a5)', F.SED_LUT[0].join() === '51,73,165' ? 1 : 0, 1, 1);
+  chk('SedLine ASYM', 'left stronger: positive', F.sedAsym(70, 60), 1, 100); chk('SedLine ASYM', 'right stronger: negative', F.sedAsym(60, 70), -100, -1); chk('SedLine ASYM', 'equal: zero', Math.abs(F.sedAsym(65, 65)), 0, 0.001);
+  chk('SedLine ASYM', 'range within +-100', Math.abs(F.sedAsym(90, 20)), 0, 100);
+  chk('SedLine history', 'columns kept (the monitor shows up to 2 h)', histMax, 7200, 999999); }
+
 const wid = rows[0].map((_, i) => Math.max(...rows.map(r => r[i].length)));
 for (const r of rows) console.log(r.map((c, i) => c.padEnd(wid[i])).join('  '));
 if (fails) { console.error(`bis-dsa engine: ${fails} check(s) failed`); process.exit(1); }

@@ -305,6 +305,7 @@ footer{font-size:13px;color:var(--muted);max-width:80ch;border-top:1px solid var
 .teachstrip .zone{color:var(--fg)}
 </style>
 <link rel="stylesheet" href="adv.css">
+<link rel="stylesheet" href="sed.css">
 </head>
 <body>
 <div class="band" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
@@ -336,8 +337,7 @@ footer{font-size:13px;color:var(--muted);max-width:80ch;border-top:1px solid var
       <svg class="v2bat" id="v2Bat" viewBox="0 0 16 28" aria-hidden="true" hidden></svg>
     </div></div>
     <div class="advwrap" id="advWrap" hidden></div>
-    <div class="screen vwrap" id="bilatWrap" hidden><div class="vista" id="bilat" role="group" aria-label="Two-sided monitor screen: left and right EEG, DSA and trend"><canvas id="cBil" class="bilc" aria-label="Left and right EEG, density spectral arrays and trend"></canvas></div>
-      <div class="bilkeys"><button type="button" id="bSilent">Silent</button><button type="button" class="menukey" id="bMenu" aria-expanded="false">Menu</button><button type="button" id="bSensor">Sensor check</button></div></div>
+    <div class="sedwrap" id="sedWrap" hidden></div>
     <div class="vmenu" id="vMenu" role="dialog" aria-label="Monitor menu" hidden><div class="vmenuh"><b>Menu</b><button type="button" id="vMenuClose">Close</button></div><ul id="vMenuList"></ul></div>
     <div class="screen mon" id="classicWrap" hidden><div class="glass">
       <div class="statusbar"><span><b>BIS</b> · Case AH5F</span><div id="vMsg" class="msg" role="status" aria-live="polite"></div><span id="vClock">--:--</span></div>
@@ -521,6 +521,9 @@ footer{font-size:13px;color:var(--muted);max-width:80ch;border-top:1px solid var
 <script src="adv-live.js"></script>
 <script src="adv-menu.js"></script>
 <script src="adv-seed.js"></script>
+<script src="sed-screen.js"></script>
+<script src="sed-draw.js"></script>
+<script src="sed-menu.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
