@@ -230,7 +230,7 @@ function fit(c,hLogical){const dpr=Math.min(2,window.devicePixelRatio||1);const 
 
 // ===== live simulation state =====
 let eng=new Engine();
-let SIG=[],EYE=[]; const SIGMAX=16*FS; // the EEG lane can sweep 4, 8 or 16 s
+let SIG=[],EYE=[]; const SIGMAX=20*FS; // the EEG lane can sweep 4, 8 or 16 s
 let COLS=[]; const COLMAX=300; // one column per second, 5 min
 let HIST=[]; const HISTMAX=14400; // the same columns for the BIS VISTA screen's 5, 15 and 60 min trend windows and a 4 h case to review
 let sup=[]; let bisS=null, lastSef=null, lastMf=null, produced=0, simT=0, speed=1, paused=false;
@@ -670,7 +670,7 @@ function trendUI(){$('kTrend').textContent=`Trend ${mon.trend} min`;$('kBottom')
  txt('dsaRange',(mon.dbLo===DB_LO&&mon.dbHi===DB_HI?'':`${mon.dbLo}…${mon.dbHi} dB · `)+`last ${mon.trend} min`);}
 let menuOpen=false; // the on-screen Menu (VISTA and two-sided screens)
 const BILAT=s=>s==='advance'||s==='sedline';
-function applySkin(s,reset,init){mon.skin=s;mtApply();$('vistaWrap').hidden=s!=='vista';$('bilatWrap').hidden=!BILAT(s);$('classicWrap').hidden=s!=='classic';$('teachStrip').hidden=s==='classic';$('bilSum').hidden=!BILAT(s);
+function applySkin(s,reset,init){mon.skin=s;mtApply();$('vistaWrap').hidden=s!=='vista';$('bilatWrap').hidden=s!=='sedline';$('advWrap').hidden=s!=='advance';if(s==='advance')advApply();$('classicWrap').hidden=s!=='classic';$('teachStrip').hidden=s==='classic';$('bilSum').hidden=!BILAT(s);
  document.querySelectorAll('#skinSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.skin===s));
  $('keySeg').hidden=s!=='classic';if(s==='classic')closeMenu(true);
  if(reset){mon.scale=s==='classic'?100:50;mon.sweep=s==='classic'?'auto':8;}
@@ -863,8 +863,9 @@ var onColumn=()=>{dirty=true;};
 function frame(now){requestAnimationFrame(frame);try{frameBody(now);}catch(e){const el=$('err');if(el&&el.hidden){el.hidden=false;el.textContent='Display error: '+e.message;}}}
 function frameBody(now){const dt=Math.min(0.1,(now-last)/1000);last=now;
  if(!paused){const target=simT+dt*speed;const need=Math.floor(target*FS)-Math.floor(simT*FS);simT=target;nmStep(dt*speed);step(need);stepR(need);runStory();}
- if(dirty){paintOff();drawTrend();drawDsa();if(mon.skin==='vista'){paintV();drawVDsa();}if(BILAT(mon.skin)){paintDsa('bl',HIST);paintDsa('br',R.HIST);}readouts();stimUI();dirty=false;}
- drawEeg();if(mon.skin==='vista')drawVEeg();if(BILAT(mon.skin))drawBil();
+ if(mon.skin==='advance')advTick(dirty);
+ if(dirty){paintOff();drawTrend();drawDsa();if(mon.skin==='vista'){paintV();drawVDsa();}if(mon.skin==='sedline'){paintDsa('bl',HIST);paintDsa('br',R.HIST);}readouts();stimUI();dirty=false;}
+ drawEeg();if(mon.skin==='vista')drawVEeg();if(mon.skin==='sedline')drawBil();
  if(exPlaying){exT+=dt;if(exT>=T[6]){exT=0;snapshotEx();}}
  if(!ex)snapshotEx();
  drawEx();exUI();

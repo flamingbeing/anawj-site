@@ -127,8 +127,8 @@ try {
     await page.click('#kSensor'); assert.equal(await page.$eval('#v2Sensor', e => e.hidden), true);
     await page.addScriptTag({ path: AXE });
     { const r = await page.evaluate(() => axe.run(document.querySelector('#monitor'), { runOnly: ['wcag2a', 'wcag2aa'] })); assert.deepEqual(r.violations.map(v => `${v.id}: ${v.nodes.length}`), [], 'axe on the VISTA screen'); }
-    // two-sided screens: BIS Advance style and SedLine style draw both hemispheres and read out both sides
-    for (const sk of ['advance', 'sedline']) {
+    // two-sided SedLine style screen draws both hemispheres and reads out both sides (the BIS Advance screen has its own test, adv.e2e.mjs)
+    for (const sk of ['sedline']) {
       await page.click(`#skinSeg [data-skin="${sk}"]`);
       assert.equal(await page.$eval('#bilatWrap', e => e.hidden), false); assert.equal(await page.$eval('#vistaWrap', e => e.hidden), true);
       await page.waitForFunction(() => /L: BIS \d+.*R: BIS \d+/.test(document.querySelector('#bilSum').textContent), null, { timeout: 5000 });
@@ -292,5 +292,6 @@ try {
     await page.close();
   }
   assert.deepEqual(errors, [], 'page errors');
+  await import('./adv.e2e.mjs'); // the BIS Advance screen
   console.log('bis-dsa e2e: ok');
 } finally { await b.close(); }

@@ -304,6 +304,7 @@ footer{font-size:13px;color:var(--muted);max-width:80ch;border-top:1px solid var
 .teachstrip b{color:var(--fg);font-weight:600}
 .teachstrip .zone{color:var(--fg)}
 </style>
+<link rel="stylesheet" href="adv.css">
 </head>
 <body>
 <div class="band" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
@@ -334,6 +335,7 @@ footer{font-size:13px;color:var(--muted);max-width:80ch;border-top:1px solid var
       <svg class="v2usb" id="v2Usb" viewBox="0 0 30 22" aria-label="USB export in progress" role="img" hidden><path d="M2 11h22M18 6l6 5-6 5" stroke="#fff" stroke-width="2.2" fill="none"/><circle cx="6" cy="11" r="3" fill="#fff"/><path d="M12 11l4-5h4" stroke="#fff" stroke-width="1.6" fill="none"/><rect x="25" y="7" width="4" height="8" fill="#fff"/></svg>
       <svg class="v2bat" id="v2Bat" viewBox="0 0 16 28" aria-hidden="true" hidden></svg>
     </div></div>
+    <div class="advwrap" id="advWrap" hidden></div>
     <div class="screen vwrap" id="bilatWrap" hidden><div class="vista" id="bilat" role="group" aria-label="Two-sided monitor screen: left and right EEG, DSA and trend"><canvas id="cBil" class="bilc" aria-label="Left and right EEG, density spectral arrays and trend"></canvas></div>
       <div class="bilkeys"><button type="button" id="bSilent">Silent</button><button type="button" class="menukey" id="bMenu" aria-expanded="false">Menu</button><button type="button" id="bSensor">Sensor check</button></div></div>
     <div class="vmenu" id="vMenu" role="dialog" aria-label="Monitor menu" hidden><div class="vmenuh"><b>Menu</b><button type="button" id="vMenuClose">Close</button></div><ul id="vMenuList"></ul></div>
@@ -416,7 +418,7 @@ footer{font-size:13px;color:var(--muted);max-width:80ch;border-top:1px solid var
         <label class="chk"><input type="checkbox" id="mBlink"> Blinks and eye movement</label>
         <div class="row"><button class="btn" id="stimBtn" aria-pressed="false">Surgical stimulus</button></div></div>
       <div class="ctl"><span class="t">Display</span>
-        <div class="seg" id="skinSeg" role="group" aria-label="Screen layout"><button data-skin="vista" aria-pressed="true">Medtronic BIS</button><button data-skin="advance" aria-pressed="false">BIS Advance (two-sided)</button><button data-skin="sedline" aria-pressed="false">Masimo SedLine</button><button data-skin="classic" aria-pressed="false">Teaching layout</button></div>
+        <div class="seg" id="skinSeg" role="group" aria-label="Screen layout"><button data-skin="vista" aria-pressed="true">Medtronic BIS</button><button data-skin="advance" aria-pressed="false">BIS Advance</button><button data-skin="sedline" aria-pressed="false">Masimo SedLine</button><button data-skin="classic" aria-pressed="false">Teaching layout</button></div>
         <label class="chk"><input type="checkbox" id="mTeach" checked> Teaching labels (zone, newest epoch, colour key, target band)</label>
         <div class="rngbox"><span class="rngt">DSA colour range (power → blue … red)</span>
           <label class="rng" for="dbLo"><span>Floor (blue)</span><output id="oLo" for="dbLo">-3 dB</output></label><input type="range" id="dbLo" min="-30" max="20" step="1" value="-3">
@@ -514,6 +516,10 @@ footer{font-size:13px;color:var(--muted);max-width:80ch;border-top:1px solid var
 <footer>A teaching simulation. The EEG is synthetic and the BIS value comes from a simple model of spectral features (edge frequency, fast and slow power, suppression ratio) tuned to typical published ranges. It is not the proprietary BIS algorithm and must not guide patient care.</footer>
 </div>
 <script src="mt-screen.js"></script>
+<script src="adv-screen.js"></script>
+<script src="adv-draw.js"></script>
+<script src="adv-live.js"></script>
+<script src="adv-menu.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
