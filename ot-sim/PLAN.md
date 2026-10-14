@@ -1,9 +1,12 @@
 # OT simulator build brief
 
 For an autonomous session (or several in turn). Read `AGENTS.md`, `ot-sim/NOTES.md` and `ot-sim/STATUS.md` first, and
-`bis-dsa/NOTES.md` for the monitor look. Work milestone by milestone: one PR each, tests green, merged by you
-(per `AGENTS.md`; `ot-sim/` is not a "vital app"), then the next. Update `STATUS.md` at each merge. Ask the owner only
-for clinical decisions you cannot resolve from sources; otherwise choose, record the choice in the decisions log, go on.
+`bis-dsa/NOTES.md` for the monitor look. The technical plan is `DESIGN.md` (architecture, screens, tests, the PR-by-PR
+order), `MODEL.md` (every model number with its source and the calibration targets) and `SCENARIOS.md` (the crises);
+`research/` holds the sourced notes behind them (14 Oct 2026). Work milestone by milestone, split into the PRs listed in
+`DESIGN.md`: tests green, merged by you (per `AGENTS.md`; `ot-sim/` is not a "vital app"), then the next. Update
+`STATUS.md` at each merge. Ask the owner only for clinical decisions you cannot resolve from sources; otherwise choose,
+record the choice in the decisions log, go on.
 
 ## Definition of done for every milestone
 
@@ -20,12 +23,14 @@ for clinical decisions you cannot resolve from sources; otherwise choose, record
 BP, SpO2, RR, EtCO2, temperature as plain numbers; monitor page with ECG, pleth, capnogram and numerics drawn on canvas;
 speed control (1x, 5x, 20x, pause); model test proving same seed gives identical run at 1x and 20x.
 
-**M1 - Pharmacology.** Compartmental PK with effect-site (Ce) for propofol (Marsh and Schnider), remifentanil (Minto),
+**M1 - Pharmacology.** (`DESIGN.md` moves volatile uptake, the haemodynamic effects and breathing to M2, where the
+circulation and lungs exist; its PR table rules.) Compartmental PK with effect-site (Ce) for propofol (Marsh and Schnider), remifentanil (Minto),
 fentanyl, rocuronium and suxamethonium (simple), plus volatile uptake (sevoflurane, desflurane; FA/FI approach with
 age-adjusted MAC). Hill-curve PD for hypnosis (BIS-like index, reuse the idea from `bis-dsa/app.js`), analgesia, MAP/HR
 effect, respiratory depression, neuromuscular block (TOF count). Controls: boluses, infusions, TCI-style target,
-vaporiser dial, fresh gas flow. Tests against published values (for example, Marsh 70 kg propofol 2 mg/kg bolus gives
-Ce rising to roughly 3-4 mcg/mL at about 1-2 min; record the numbers you check and their sources).
+vaporiser dial, fresh gas flow. Tests against published values (for example, Marsh 70 kg propofol
+2 mg/kg bolus: Ce peaks at about 3.2 mcg/mL at 3.9 min with the original ke0 0.26/min, or about 5.7 mcg/mL at 1.6 min
+with the modified ke0 1.2/min; the targets are in `MODEL.md`; record the numbers you check and their sources).
 
 **M2 - Cardiorespiratory model.** Haemodynamics (preload, contractility, SVR, HR with baroreflex; fluid and blood loss;
 vasopressor and inotrope effects: phenylephrine, ephedrine, noradrenaline, adrenaline, atropine, glycopyrrolate).
@@ -58,7 +63,7 @@ performance on a mid-range phone (no dropped frames at 20x), offline use if the 
 - Teaching only, said on the page. Dosing in the app is for the synthetic patient.
 - Cite the source for each drug model, algorithm and threshold. Prefer open guidelines (DAS, ANZCA, AAGBI, ASRA LAST
   checklist, MHAUS, ERC/AHA). Never paste copyrighted text; paraphrase and cite.
-- Where models are simplified, say so in `NOTES.md` ("what is not modelled") and on the debrief page.
+- Where models are simplified, say so in `MODEL.md` ("What is not modelled") and on the debrief page.
 - Flag uncertain numbers in the PR for the owner; never describe content as clinically reviewed.
 
 ## Autonomy rules
@@ -66,6 +71,10 @@ performance on a mid-range phone (no dropped frames at 20x), offline use if the 
 - Branch per milestone from latest `main`; PR title starts "OT sim: …"; merge your own once checks are green and
   report with the PR link. Do not touch other apps' files except the registration lines (routes, labeler, checks).
 - If a milestone is large, split it, but keep each PR small enough to review on a phone.
-- If blocked (cloud limits, a long test run, a secret), hand to the home computer per `OPERATIONS.md`; do not stop.
+- If blocked (cloud limits, a long test run, a secret), hand to the home computer ("firetop", the owner's always-on
+  Claude Code session with his own credentials) per `OPERATIONS.md`, "The home computer"; do not stop. For this app it
+  is useful for: soak runs of the model (hours of simulated time at 20x), Safari/WebKit and real-phone checks, and
+  anything needing a sign-in. `ot-sim/` has no live project, so firetop needs no sign-in for it. Send it the branch,
+  what to run, and what to report back; it changes live projects only with the owner's OK.
 - Never add the page to the homepage or other apps. Keep `noindex`.
 - Save state (`/save-state`) before compacting and when ending.

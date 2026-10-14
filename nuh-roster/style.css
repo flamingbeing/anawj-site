@@ -74,6 +74,8 @@ main { padding: 16px; max-width: 1400px; margin: 0 auto; }
 section.card { background: var(--panel); border: 1px solid var(--line); border-radius: 0; padding: 16px; margin-bottom: 16px; }
 section.card h2 { margin: 0 0 6px; font-size: 1.125rem; font-weight: 600; color: var(--navy); }
 .hint { color: var(--muted); margin: 0 0 12px; font-size: 13px; }
+.appver { margin: 4px 2px 16px; }
+.appver button.link { font-size: inherit; text-decoration: underline; }
 .bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
 .bar .grow { flex: 1; }
 .stats { display: flex; flex-wrap: wrap; gap: 16px; color: var(--muted); font-size: 13px; }

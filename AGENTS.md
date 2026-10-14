@@ -65,7 +65,16 @@ Rules that bite:
 - `evals/js/catalogue.js` and `evals/js/forms.js` are generated. Edit `apmes/` (the transcribed APMES documents) or `evals/tools/build-data.mjs`, then run `node evals/tools/build-data.mjs`.
 - Don't bump an app's `sw.js` `VERSION` by hand: the deploy stamps it with a hash of the app's files
   (`tools/stamp-versions.mjs`, run by `.github/workflows/pages.yml`), so PRs leave `sw.js` alone unless its code
-  changes. Change the base (`logbook-v40`) only when the service worker's own logic changes.
+  changes. Change the base (`logbook-v40`) only when the service worker's own logic changes. The deployed name is
+  `<app>-<date>-<hash>` (`logbook-2026-10-14-3f9a2c1d`: the day the app's files last changed, then the hash).
+- **App version and "Get the latest version"** (owner, 14 Oct 2026; prewarm's settings are the model): every app with a
+  service worker ends its settings screen (or, with no settings screen, its page footer) with two lines of small muted
+  text. First, `App version 2026-10-14 (3f9a2c1d)`, read from the app's cache name (`caches.keys()`, the one starting
+  `<app>-`; show the rest as it is if it isn't dated; show nothing without one). Second, a link-styled button
+  `Not updating? Get the latest version`: it fetches the app's `sw.js` with `cache: 'no-store'` first (no signal: say so and
+  change nothing), then unregisters only this app's service worker, deletes only caches starting `<app>-` and reloads.
+  It never touches saved data (localStorage, IndexedDB, sign-in). A browser test checks both lines. The same goes for
+  apps in other repos (anantf.com's `babymo/`).
 - One repo, one PR number sequence for every app: start PR titles with the app ("Logbook: …", "Prewarm: …"); a
   workflow labels each PR by the folders it touches (`.github/labeler.yml`), so filter the PR list by label. Outside
   an app's own files, write PRs as `#295 (logbook)`.

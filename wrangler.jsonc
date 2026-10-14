@@ -16,6 +16,8 @@
   },
   // a preview link per branch and per build, posted on the PR by Workers Builds
   "preview_urls": true,
+  // variables set in the Cloudflare dashboard survive each deploy (Ask Claude's settings; edit/NOTES.md). Secrets always do.
+  "keep_vars": true,
   // required by `wrangler preview` (Worker Previews), even when empty: previews use the same settings
   "previews": {}
 }

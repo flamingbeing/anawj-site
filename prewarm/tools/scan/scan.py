@@ -115,6 +115,9 @@ def process_page(page_no, flat, tpl, fmap, fields, cells, reader, header_bottom=
             e['flags'].append('type this in (not sent anywhere)')
         elif not filled and f['type'] != 'text' and arrow_shaft(cink):   # a long vertical stroke and nothing else: an arrow
             e['flags'].append('arrow or ditto: same as the reading above?')
+        elif filled and getattr(reader, 'reads_nothing', False):
+            read_cell(reader, f, crop)       # the exporter keeps the crop; a no-read run keeps nothing
+            e['flags'].append('type this in (not read)')
         elif filled:
             reads = read_cell(reader, f, crop)
             e['reads'] = [r['text'] for r in reads]
@@ -221,7 +224,10 @@ def main(argv=None, reader=None):
     ap.add_argument('--pages', help='page number of each photo, in order, e.g. 7,9,1 (otherwise worked out from the photo)')
     ap.add_argument('--export-crops', metavar='DIR', help='no reading: write the handwritten crops to DIR for someone to read')
     ap.add_argument('--readings', metavar='FILE', help='use readings made from the exported crops, as {field id: text}, instead of the API')
+    ap.add_argument('--readings2', metavar='FILE', help='a second, independent reading of the same crops: the two are compared and any disagreement is flagged')
+    ap.add_argument('--no-read', action='store_true', help='nobody reads the handwriting: ticks are read, every written value is typed in the review screen')
     ap.add_argument('--min-align', type=float, default=MIN_ALIGN, help=f'lowest page alignment score to accept (default {MIN_ALIGN}); lower it only to test a page, and check its crops')
+    ap.add_argument('--key-file', metavar='FILE', help='file holding the Anthropic API key, read by this process only (instead of the ANTHROPIC_API_KEY environment variable)')
     ap.add_argument('photos', nargs='+')
     a = ap.parse_args(argv)
     fmap = json.load(open(f'{a.form_dir}/fieldmap.json', encoding='utf-8'))
@@ -229,7 +235,9 @@ def main(argv=None, reader=None):
     tpls = templates(a.form_dir)
     forced = [int(x) for x in a.pages.split(',')] if a.pages else [None] * len(a.photos)
     if len(forced) != len(a.photos): ap.error('--pages needs one page number per photo')
-    reader = reader or (readers.CropExporter(a.export_crops) if a.export_crops else readers.FileReader(a.readings) if a.readings else readers.AnthropicReader())
+    if a.readings2 and not a.readings: ap.error('--readings2 needs --readings')
+    reader = reader or (readers.CropExporter(a.export_crops) if a.export_crops else readers.NoReader() if a.no_read
+                        else readers.FileReader(a.readings, a.readings2) if a.readings else readers.AnthropicReader(key_file=a.key_file))
     _tables = {}
     tables_of = lambda pg: _tables.setdefault(pg, boxes.tables(f'{a.form_dir}/blank.pdf', pg))
     result, pages = {}, []
@@ -253,6 +261,11 @@ def main(argv=None, reader=None):
         result.update(process_page(pg, flat, tpls[pg], fmap, fields, boxes.cells(f'{a.form_dir}/blank.pdf', pg), reader, boxes.header_bottom(f'{a.form_dir}/blank.pdf', pg)))
     series_checks(result, fields)
     arrow_gaps(result, fields)
+    if hasattr(reader, 'finish'):
+        reader.finish()
+        print(f'{len(reader.items)} handwritten crops, contact sheets a-NN.png and b-NN.png and manifest.json in {a.export_crops}')
+    if getattr(reader, 'missing', None):
+        print(f'{len(reader.missing)} written cells had no reading in the readings file(s): they are flagged "hard to read"', file=sys.stderr)
     for fid, e in result.items():
         e['label'] = fields[fid]['label']; e['type'] = fields[fid]['type']
         e['opts'] = fields[fid].get('opts'); e['unit'] = fields[fid].get('unit')

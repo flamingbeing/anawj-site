@@ -356,9 +356,9 @@ const FIGS3D = {
   elson: {
     dur: 9, cam: { target: [0, -2, -2], dist: 28, yaw: -118, pitch: 16 }, scene: { edgeZ: 0 },
     build(scene) {
-      // palm down (hand turned over); middle finger's PIP (9.1 + 4.7 from the wrist) sits 0.9 past the edge;
-      // lifted .3 so the forearm doesn't dip into the table
-      const H = makeHand(); H.root.rotation.z = Math.PI; H.root.position.set(0, 2.35, 9.1 + 4.7 - .9); scene.add(H.root);
+      // palm down (hand turned over); middle finger's PIP (9.1 + 4.7 from the wrist) sits 2 past the edge, so the
+      // bent finger clears the table; lifted .3 so the forearm doesn't dip into the table
+      const H = makeHand(); H.root.rotation.z = Math.PI; H.root.position.set(0, 2.35, 9.1 + 4.7 - 2); scene.add(H.root);
       H.press = pad(H.fingers.middle.segs[1], -1, .55, 2.2);
       return H;
     },

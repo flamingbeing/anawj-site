@@ -4,7 +4,7 @@ Site-wide work that belongs to no single app: the homepage, subdomains and hosti
 rules, the roadmap. Each app keeps its own `STATUS.md`. Short and current; lasting rules go in `AGENTS.md`.
 "Recently done" is updated at save-state only.
 
-Last updated: 2026-10-14 by Claude Code, homepage session.
+Last updated: 2026-10-14 by Claude Code, homepage session (with the home computer's report).
 
 ## Now
 
@@ -12,11 +12,8 @@ Each session keeps its own line in `status/<session>.md` (`homepage.md`; a new s
 
 ## Waiting on the owner
 
-- Revoke the two Claude tokens that were shown by mistake while setting up instant page edits (claude.ai settings); the
-  one stored as the GitHub secret is a later one.
-- Decide on the next feedback ideas in `ROADMAP.md` ("Editing and commenting"): a Telegram bot or an "Ask Claude" box (both
-  need a secret in the Worker), a weekly AI proof-reading routine, a private feedback queue for residents, and whether
-  logbook/evals/prewarm's service workers should let `?feedback=1` through (today a bookmark does it; `edit/NOTES.md`).
+- Whether `?feedback=1` should get through logbook/evals/prewarm's service workers (today a bookmark does it;
+  `edit/NOTES.md`). A Telegram bot is still an idea in `ROADMAP.md`.
 - Optional: make **Checks** a required check (GitHub → Settings → Branches → protection rule for `main`).
 - Fill in the domain registrar and renewal date in `OPERATIONS.md` (accounts table).
 - Optional, from the pre-launch checklist in `OPERATIONS.md`: Firestore delete protection on the three databases
@@ -28,6 +25,9 @@ Nothing agreed. Ideas for later are in `ROADMAP.md`; nothing there is a task unt
 
 ## Recently done
 
+- #489, #555, #557, #558: **Ask Claude** at `ask.anawj.com` (owner only, behind Cloudflare Access; a request becomes a
+  `Page edits:` issue that the instant workflow drafts); weekly AI proof-read routine; the page-edits workflow says on
+  the issue or PR when it fails. Home computer (14 Oct): NAS uptime check of all 11 addresses, Monday drift check.
 - #435–#454: feedback follow-ups: Share with a QR code (editor and button), compare a preview with how it is now,
   fixes from a review (live-app privacy, iPhone picking, PR match), app version in problem reports; **Checks** on every
   PR (repo check, unit tests, proof-read, quick browser tests, `.github/workflows/checks.yml`) and **before-and-after
@@ -50,6 +50,12 @@ Nothing agreed. Ideas for later are in `ROADMAP.md`; nothing there is a task unt
 
 ## Decisions log
 
+- 2026-10-14: the owner approved retiring the seven old uptime monitors (paused by the home computer, reversible) and dropped the
+  token-revoking to-do.
+- 2026-10-14: instant page edits work end to end: the renewed token drafted PR #561 from an Ask Claude request (merged).
+- 2026-10-14: uptime is one NAS check of every address in `SITES`, alerting on Telegram (home computer, with the owner).
+- 2026-10-14: the owner chose Ask Claude, the weekly AI proof-read and a private resident feedback queue; Ask Claude
+  secrets live in the Worker's runtime Variables and Secrets, not the Build settings.
 - 2026-10-14: instant page edits switched on (secret `CLAUDE_CODE_OAUTH_TOKEN` and the Actions setting, done from the
   home computer with the owner); the owner's next real page edit is the test. Checks stays optional: PRs opened by that
   workflow (GitHub's own token) don't trigger Checks, so a required check would block them.

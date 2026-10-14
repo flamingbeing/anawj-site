@@ -1877,7 +1877,7 @@ async function run(label, ctxOpts) {
       await tab('display'); await p.locator('input[type=range][aria-label="Borders"]').fill('5'); await nap(150);
     }
     for (const k of ['flat', 'btn-tinted', 'icon-btns', 'cal-plain', 'page-titles', 'rows-short', 'row-hold']) assert(!(await cls(k)), k + ' not reset');
-    eq(await p.locator('.top h1').innerText(), 'APMES Logbook', 'app name not back');
+    eq(await p.locator('.top h1').textContent(), 'APMES Logbook', 'app name not back');
   });
 
   await step('theme: light by default; dark and auto in Settings → Display', async () => {

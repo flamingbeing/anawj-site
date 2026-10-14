@@ -147,10 +147,12 @@ Anyone else gets Cloudflare's sign-in page and can't pass it.
    Save, then copy the application's **Audience (AUD) tag**.
 3. GitHub → Settings → Developer settings → Fine-grained tokens → Generate: repository access **only anawj-site**;
    permissions **Issues: Read and write**, **Pull requests: Read-only**; expiry a year.
-4. Cloudflare → `anawj-preview` → Settings → Variables and Secrets → add three **Secrets**: `GITHUB_ISSUES_TOKEN` (step 3),
+4. Cloudflare → `anawj-preview` → Settings → **Variables and Secrets** (the runtime table with "+ Add", **not** the
+   "Variables and secrets" box inside Settings → Build, which only the build sees) → add three **Secrets**, then Deploy: `GITHUB_ISSUES_TOKEN` (step 3),
    `ACCESS_TEAM` (your Zero Trust team name, the part before `.cloudflareaccess.com`), `ACCESS_AUD` (step 2).
 Check: open `ask.anawj.com` on your phone, enter the PIN emailed to you, and send a small ask; until step 4 the page
-answers "Ask Claude is not set up yet".
+answers "Ask Claude is not set up yet: the Worker has no …" (naming what's missing). **Set up and working 14 Oct 2026**
+(Access team `red-sun-ceba`; the first try put the secrets in the Build box by mistake).
 
 ## Weekly proof-read
 

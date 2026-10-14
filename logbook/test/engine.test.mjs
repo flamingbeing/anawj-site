@@ -677,3 +677,13 @@ console.log('engine tests passed');
  assert.equal(tagTotal({}),0);
  assert.equal(tagTotal(Object.fromEntries(Object.keys(BY_CODE).map(k=>[k,9999])),"min"),MINIMUM_TOTAL);   // everything met = the whole minimum
 }
+
+// Settings' app version line
+{
+ const {versionLabel}=await import('../js/app-version.js');
+ assert.equal(versionLabel('logbook-2026-10-14-3f9a2c1d'),'2026-10-14 (3f9a2c1d)');
+ assert.equal(versionLabel('logbook-v41-3f9a2c1d'),'v41-3f9a2c1d');   // the older style, as it is
+ assert.equal(versionLabel('logbook-v41'),'v41');                     // a local copy (not stamped)
+ assert.equal(versionLabel('no-sw'),'no-sw');
+ assert.equal(versionLabel(''),'unknown');
+}

@@ -1,6 +1,6 @@
 # Now: Claude Code, Logbook 2 (log2)
 
-**Claude Code, Logbook 2 (log2)** (branch `ccr-afac5e7a-99esax`; docs PR #547 open until merged): the app → response-sheet sync is **live**
+**Claude Code, Logbook 2 (log2)** (branch `ccr-afac5e7a-99esax`): the app → response-sheet sync is **live**
 (#527, #532, #546 merged; plan `logbook/PLAN-app-to-sheet.md`). The owner installed `form-script/Outbox.gs` on the real sheet,
 ran `logbookOutboxSetup` (column J header, 5-minute trigger `logbookOutboxRun`) and raised the Form handler's lock wait to 60 s.
 
@@ -16,3 +16,10 @@ The go-live bug hunt is parked at the owner's request: remaining items and Firet
 `logbook/PLAN-go-live-bugfix.md` ("Parked findings"). Firetop (`session_01F92cPiysiT5WAFPXMga7f4`) has no pending job from log2.
 Note: messages from here that ask Firetop to change a LIVE system (e.g. edit the real sheet's script) are blocked by the
 permission classifier; the owner does those steps themselves or adds a permission rule.
+
+**Drift tooling (14 Oct):** `/drift-check` (asks Firetop to run `bash Projects/jobs/drift-check/drift-check.sh`, read-only, counts
+and names in chat only), weekly on Firetop Mondays 08:30 SGT with a phone message, private dashboard "Logbook Sync Check"
+(Claude artifact `TFa1Dvn9b4uA4oAedz5111`; refresh from the run's rids-only counts via `ArtifactData`, datasets `run` and
+`residents` are uploaded JSON files). Sheet script has the nightly Totals check (owner installs it). Next if asked: app edits and
+deletes to the sheet (the `app:` marker finds the row), then sheet edits to the app. A message to Firetop that asks for a LIVE
+change is blocked by the permission classifier: give the owner paste-ready wording.

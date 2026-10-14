@@ -786,6 +786,11 @@ portfolio content.
 - Programme tag groups are adopted only from the server logbook, never a cached copy (it overwrote groups
   changed on another device). Delete account re-authenticates before deleting anything.
 - Totals: your own column is live (summaryOf), not the copy loaded when Analytics opened.
+- **App version (owner, 14 Oct 2026, as in the prewarming app):** the bottom of Settings shows "App version
+  2026-10-14 (3f9a2c1d)" (the service worker's cache name, stamped at deploy by
+  `tools/stamp-versions.mjs`; the date is the day that version went live) and "Get the latest version": it unregisters this app's service worker and deletes the
+  `logbook-` caches, then reloads (`js/app-version.js`). Never data, drafts, settings or other apps' caches; refused
+  offline (the saved copy is what opens the app) and while changes are still sending. e2e: `test/e2e/app-version.mjs`.
 - Totals counts (owner, 14 Oct 2026): by default every tag on every case, all years (cumulative), plus a **Total tags**
   row like the old Google Sheet's Grand Total (one per tag per case; "Total cases" counts cases, so it is smaller). A
   per-device switch (`display().totalsCount = 'min'`) shows only what counts towards the minimums (each tag up to its

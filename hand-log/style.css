@@ -23,6 +23,7 @@ h1 { color: var(--navy); font-size: 1.4rem; margin: 12px 0 8px; }
 h2 { color: var(--navy); font-size: 1.1rem; margin: 18px 0 6px; }
 a { color: #1a5fa0; }
 .small { font-size: .88rem; color: var(--muted); }
+.linkbtn { font: inherit; color: inherit; background: none; border: 0; padding: 0; min-height: 24px; text-decoration: underline; cursor: pointer; }
 .empty { padding: 16px; background: var(--blue-bg); border-radius: 6px; }
 .field { margin: 0 0 14px; }
 .field label { display: block; font-weight: 600; margin-bottom: 4px; }

@@ -69,3 +69,17 @@ def clean(f, text):
                 break
         return (int(n) if kind == 'int' or f['id'].endswith('_ts') else n), probs
     return text, []
+
+
+def allowed(f):
+    """A short plain statement of what a reading of this field can be (for whoever reads the crops)."""
+    if f.get('opts'):
+        return 'one of: ' + ', '.join(str(o[1] if isinstance(o, (list, tuple)) else o) for o in f['opts']) + ' (usually just the letter or number)'
+    if f['type'] == 'time':
+        return 'a 24-hour clock time, like 07:05'
+    if f['type'] in ('num', 'int', 'code'):
+        for pat, lo, hi in RANGES:
+            if re.search(pat, f['id']):
+                return f'a number from {lo} to {hi}' + (' (whole)' if f['type'] == 'int' else '')
+        return 'a number'
+    return 'text'

@@ -36,6 +36,9 @@ const ask = { page: 'https://hand.anawj.com/babies/', text: 'Make this a table',
 // not set up: 503, nothing sent
 let r = await handleAsk(req('POST', ask, { 'Cf-Access-Jwt-Assertion': good }), {}, fake);
 assert.equal(r.status, 503);
+assert.match((await r.json()).error, /no GITHUB_ISSUES_TOKEN, ACCESS_TEAM, ACCESS_AUD/);
+r = await handleAsk(req('POST', ask, { 'Cf-Access-Jwt-Assertion': good }), { ...env, ACCESS_AUD: '' }, fake);
+assert.match((await r.json()).error, /has no ACCESS_AUD \(/, 'names only the missing one');
 // the Access token is checked: missing, wrong audience, expired, wrong signer, unknown key
 for (const t of [null, await token({ aud: ['other'], exp: later }), await token({ aud: ['aud1'], exp: 1 }),
   await token({ aud: ['aud1'], exp: later }, 'k1', (await crypto.subtle.generateKey({ name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' }, true, ['sign'])).privateKey),
