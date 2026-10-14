@@ -1,0 +1,1 @@
+- bis-dsa (14 Oct 2026): first version added from the artifact; waiting on the owner's domain click.

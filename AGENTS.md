@@ -12,6 +12,8 @@ Static site on GitHub Pages (public repo: no names, patient data or real evaluat
   with `people/NOTES.md`.
 - `nuh-roster/`: NUH anaesthesia daily roster (own Firebase project `nuh-roster`), at `nuhroster.anawj.com` (the old `anawj.com/nuh-roster/` redirects). Start with `nuh-roster/NOTES.md`: its department section (grades, postings, roster sheet, notation, HMS monthly rosters, short names) applies to any app dealing with NUH anaesthesia staff.
 - `prewarm/`: prewarming study op-day data collection (temperatures every 5 min, export to the study's Excel template); served at `prewarmstudy.anawj.com`. Start with `prewarm/NOTES.md`, then `prewarm/PLAN.md`.
+- `bis-dsa/`: BIS to DSA teaching simulator for anaesthesia residents (one static page, synthetic EEG, no data), at
+  `anaes.anawj.com/bis/`. Start with `bis-dsa/NOTES.md`.
 - `hand-babies/`: hand surgery exam crash course for new MOs (one static page, no data), at `hand.anawj.com/babies/`. Start with `hand-babies/NOTES.md`.
 - `hand-log/`: hand surgery DOPS and Mini-CEX log (data on the device only, CSV/JSON export), at `hand.anawj.com/handlog/`. Start with `hand-log/NOTES.md`.
 - `edit/`: the page editor for any page on the site (`edit.anawj.com/<path>` redirects to it). Suggested edits arrive as
@@ -80,6 +82,7 @@ for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mj
 - NUH roster changes: run `node nuh-roster/test/e2e.mjs` (Practice in a browser, desktop and phone, axe on every tab;
   under a minute; also in the Checks workflow).
 - Hand log changes: run `node hand-log/test/e2e.mjs`.
+- BIS to DSA changes: run `node bis-dsa/test/e2e.mjs`.
 - People changes, and evals changes to `cloud.js`, `ui-core.js` or the People panes in `ui-admin.js`: run `node people/test/e2e.mjs`.
 - Page editor changes (`edit/`): run `node edit/test/e2e.mjs` and `node hand-babies/test/e2e.mjs` (it opens the editor).
 - Feedback button or Worker changes (`feedback/`, `worker/`): run `node feedback/test/e2e.mjs` (through the real Worker).

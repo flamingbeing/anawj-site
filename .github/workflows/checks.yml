@@ -52,5 +52,6 @@ jobs:
           node feedback/test/e2e.mjs
           node ask/test/e2e.mjs
           node hand-babies/test/e2e.mjs
+          node bis-dsa/test/e2e.mjs
           node nuh-roster/test/e2e.mjs
           node people/test/e2e.mjs

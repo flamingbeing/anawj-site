@@ -10,6 +10,7 @@ The rule for new apps is in `AGENTS.md`.
 | Address | Folder now | Notes |
 |---|---|---|
 | `anawj.com/` | `index.html` | Status page only. Stays on GitHub Pages. |
+| `anaes.anawj.com/bis/` | `bis-dsa/` | Static, anaesthesia teaching: BIS to DSA simulator (14 Oct 2026). Needs its custom domain (below). |
 | `hand.anawj.com/cmcj/` | `cmcj/` | Static, hand surgery. |
 | `hand.anawj.com/babies/` | `hand-babies/` | Static, hand surgery. The old `hand/` redirect goes. |
 | `hand.anawj.com/handlog/` | `hand-log/` | Hand DOPS/Mini-CEX log; data on the phone only, no sign-in (owner, 13 Oct 2026). |
@@ -107,6 +108,9 @@ Check: each address answers with its app (`hand.anawj.com/babies/` the hand asse
 trainer, `apmes.anawj.com/logbook/?demo`, `apmes.anawj.com/evals/?demo`, `nuhroster.anawj.com/?demo`,
 `prewarmstudy.anawj.com/`); the same apps still work at their old `anawj.com/<folder>/` addresses (GitHub Pages, until
 each one's step makes it a redirect), and `hand.anawj.com/logbook/` is a 404.
+
+Later addresses take the same two clicks once their PR is merged: `anaes.anawj.com` (BIS to DSA, 14 Oct 2026; check
+`anaes.anawj.com/bis/`).
 
 ## The page editor (decided in step 5)
 
