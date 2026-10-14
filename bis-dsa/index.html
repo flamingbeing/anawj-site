@@ -105,6 +105,9 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .track input[type=range]{position:absolute;inset:0 0 auto 0;height:22px;margin:0;width:100%;background:transparent}
 .zoneband{position:absolute;top:2px;height:18px;border-radius:4px;background:color-mix(in srgb,var(--good) 38%,transparent);outline:1px solid color-mix(in srgb,var(--good) 70%,transparent);pointer-events:none}
 .effmark{position:absolute;bottom:0;width:0;height:0;margin-left:-6px;border:6px solid transparent;border-bottom:9px solid var(--fg);border-top:0;transition:left .25s linear;pointer-events:none}
+.pop{position:absolute;bottom:calc(100% + 8px);transform:translateX(-50%);background:var(--fg);color:var(--bg);font:600 14px/1 var(--f-mono);padding:6px 9px;border-radius:7px;white-space:nowrap;pointer-events:none;z-index:3;box-shadow:0 2px 8px rgba(0,0,0,.45)}
+.pop::after{content:"";position:absolute;left:50%;top:100%;margin-left:-5px;border:5px solid transparent;border-top-color:var(--fg);border-bottom:0}
+.pop.in{background:var(--good);color:#04130a}.pop.in::after{border-top-color:var(--good)}
 .tgt{font-size:15px}.tgt b{font-family:var(--f-mono);font-weight:600}.tgt span{color:var(--muted)}
 .tgtnote{font-size:13px;color:var(--muted);display:flex;gap:6px;align-items:center}
 .swatch{display:inline-block;width:18px;height:10px;border-radius:3px;background:color-mix(in srgb,var(--good) 38%,transparent);outline:1px solid color-mix(in srgb,var(--good) 70%,transparent)}
@@ -217,7 +220,7 @@ footer{font-size:13px;color:var(--muted);max-width:80ch;border-top:1px solid var
         </div>
         <div class="mixrows" id="mixRows"></div></div>
       <div class="ctl" id="depthCtl"><label class="t" for="depth">Depth target</label>
-        <div class="track"><i class="zoneband" id="zoneBand" hidden></i><input type="range" id="depth" min="0" max="100" value="0" aria-describedby="tgtBis"><i class="effmark" id="effMark" aria-hidden="true"></i></div>
+        <div class="track"><i class="zoneband" id="zoneBand" hidden></i><input type="range" id="depth" min="0" max="100" value="0" aria-describedby="tgtBis"><i class="effmark" id="effMark" aria-hidden="true"></i><output class="pop" id="tgtPop" aria-hidden="true" hidden></output></div>
         <div class="ticks" id="ticks"><span>Awake</span><span>Sedated</span><span>GA</span><span>Deep</span><span>Flat</span></div>
         <p class="tgt" id="tgtBis"><b>Target BIS --</b> <span id="tgtSub"></span></p>
         <p class="tgtnote" id="zoneNote" hidden><i class="swatch"></i> <span id="zoneText"></span></p></div>
