@@ -15,6 +15,9 @@ Static site on GitHub Pages (public repo: no names, patient data or real evaluat
 - `bis-dsa/`: BIS to DSA teaching simulator for anaesthesia residents (one static page, synthetic EEG, no data), at
   `anaes.anawj.com/bis/`. Start with `bis-dsa/NOTES.md`.
 - `hand-babies/`: hand surgery exam crash course for new MOs (one static page, no data), at `hand.anawj.com/babies/`. Start with `hand-babies/NOTES.md`.
+- `mo-portal/`: Baby MO Portal: the MCQ test for new MOs (rotating every few months) and, later, their CBD discussions and
+  feedback; faculty edit the questions in the app; own Firebase project `nuh-mo-portal` (not created yet); at `mo.anawj.com`.
+  Start with `mo-portal/NOTES.md`. The real question bank is not in this repo.
 - `hand-log/`: hand surgery DOPS and Mini-CEX log (data on the device only, CSV/JSON export), at `hand.anawj.com/handlog/`. Start with `hand-log/NOTES.md`.
 - `edit/`: the page editor for any page on the site (`edit.anawj.com/<path>` redirects to it). Suggested edits arrive as
   GitHub issues titled `Page edits:`; how to apply them: `edit/NOTES.md`. A daily routine ("Page edits check", 8:58 am
@@ -68,7 +71,7 @@ Before merging, run (GitHub runs these too on every PR, plus the editor, feedbac
 
 ```
 node tools/check.mjs
-for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mjs prewarm/test/*.test.mjs people/test/*.test.mjs worker/test/*.test.mjs feedback/test/*.test.mjs; do node "$f"; done
+for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mjs prewarm/test/*.test.mjs people/test/*.test.mjs mo-portal/test/*.test.mjs worker/test/*.test.mjs feedback/test/*.test.mjs; do node "$f"; done
 ```
 
 - Logbook changes: `tools/test-logbook.sh` runs all of the above plus the full e2e and every focused browser test
@@ -82,6 +85,7 @@ for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mj
 - NUH roster changes: run `node nuh-roster/test/e2e.mjs` (Practice in a browser, desktop and phone, axe on every tab;
   under a minute; also in the Checks workflow).
 - Hand log changes: run `node hand-log/test/e2e.mjs`.
+- Baby MO Portal changes: run `node mo-portal/test/logic.test.mjs` and `node mo-portal/test/e2e.mjs`; rules changes also `tools/test-rules.sh`.
 - BIS to DSA changes: run `node bis-dsa/test/e2e.mjs`.
 - People changes, and evals changes to `cloud.js`, `ui-core.js` or the People panes in `ui-admin.js`: run `node people/test/e2e.mjs`.
 - Page editor changes (`edit/`): run `node edit/test/e2e.mjs` and `node hand-babies/test/e2e.mjs` (it opens the editor).

@@ -13,6 +13,8 @@ export const SITES = {
   'hand.anawj.com': { prefixes: { '/cmcj/': 'cmcj/', '/babies/': 'hand-babies/', '/handlog/': 'hand-log/' } },
   'prewarmstudy.anawj.com': { root: 'prewarm/' },
   'nuhroster.anawj.com': { root: 'nuh-roster/' },
+  // Baby MO Portal (the Baby MO test now; CBD discussions and feedback later). Own subdomain: it saves data and signs people in.
+  'mo.anawj.com': { root: 'mo-portal/' },
   // /people/ is the shared people lists (residents, faculty, PDs) the logbook and evals both use.
   // /apmes/guidebook/ is the programme guidebook text the evals app reads (just that folder of apmes/).
   // /__/auth/ and /__/firebase/ are Firebase's sign-in helper pages (the auth domain of logbook and evals). The helper

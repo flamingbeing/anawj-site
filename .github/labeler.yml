@@ -21,6 +21,9 @@ hand-babies:
 people:
   - changed-files:
       - any-glob-to-any-file: 'people/**'
+mo-portal:
+  - changed-files:
+      - any-glob-to-any-file: 'mo-portal/**'
 hand-log:
   - changed-files:
       - any-glob-to-any-file: 'hand-log/**'

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Firestore rules tests for logbook/firestore.rules (logbook and evals suites), prewarm/firestore.rules and nuh-roster/firestore.rules in the local emulator, with fake
+# Firestore rules tests for logbook/firestore.rules (logbook and evals suites), prewarm/firestore.rules, nuh-roster/firestore.rules and mo-portal/firestore.rules in the local emulator, with fake
 # accounts and the demo project "demo-logbook": nothing reaches the live Firebase projects and no sign-in is needed.
 # Needs Java and, once per machine, the test tools (the cloud environment's setup script installs them there):
 #   npm install --prefix ~/.cache/anawj-rules firebase-tools@13 @firebase/rules-unit-testing firebase
@@ -27,8 +27,14 @@ cfg3="$(mktemp -d)/firebase.json"
 echo '{ "firestore": { "rules": "nuh-roster/firestore.rules" }, "emulators": { "firestore": { "port": 8085, "host": "127.0.0.1" }, "ui": { "enabled": false } } }' > "$cfg3"
 "$TOOLS/node_modules/.bin/firebase" emulators:exec --config "$cfg3" --only firestore --project demo-roster \
   "cd nuh-roster && node test/rules.emulator.mjs" 2>&1 | grep -E 'checks passed|checks failed|^FAIL|^Error:' ; rc3=${PIPESTATUS[0]}
+# MO portal rules: own rules file and demo project
+cfg4="$(mktemp -d)/firebase.json"
+echo '{ "firestore": { "rules": "mo-portal/firestore.rules" }, "emulators": { "firestore": { "port": 8085, "host": "127.0.0.1" }, "ui": { "enabled": false } } }' > "$cfg4"
+"$TOOLS/node_modules/.bin/firebase" emulators:exec --config "$cfg4" --only firestore --project demo-moportal \
+  "cd mo-portal && node test/rules.emulator.mjs" 2>&1 | grep -E 'checks passed|checks failed|^FAIL|^Error:' ; rc4=${PIPESTATUS[0]}
 [ $rc = 0 ] && rc=$rc2
 [ $rc = 0 ] && rc=$rc3
+[ $rc = 0 ] && rc=$rc4
 [ $made_link = 1 ] && rm -f node_modules
-rm -f firebase-debug.log firestore-debug.log logbook/firestore-debug.log prewarm/firestore-debug.log nuh-roster/firestore-debug.log
+rm -f firebase-debug.log firestore-debug.log logbook/firestore-debug.log prewarm/firestore-debug.log nuh-roster/firestore-debug.log mo-portal/firestore-debug.log
 exit $rc

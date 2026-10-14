@@ -22,6 +22,7 @@ The rule for new apps is in `AGENTS.md`.
 | `anawj.com/privacy/` | `privacy/` | Stays: the Google sign-in consent screen points here. |
 | `anawj.com/prewarm-update/` | `prewarm-update/` | Stays until no phone runs the old prewarm worker, then becomes a redirect. |
 | `anawj.com/edit/` (decided in step 5) | `edit/` | Stays on `anawj.com`: see "The page editor" below. |
+| `mo.anawj.com/` | `mo-portal/` | Baby MO Portal (14 Oct 2026): saves data and signs people in, so its own subdomain. Own Firebase project `nuh-mo-portal`. Needs its custom domain (below) and the project's authorised domains. |
 | `ask.anawj.com/` | `ask/` | Ask Claude, the owner's page; behind Cloudflare Access; its API `/api/ask` is `worker/ask.js` (`edit/NOTES.md`). |
 
 Single-app subdomains serve the app at the root; shared ones keep a path per app. Folders in the repo don't need
@@ -110,7 +111,7 @@ trainer, `apmes.anawj.com/logbook/?demo`, `apmes.anawj.com/evals/?demo`, `nuhros
 each one's step makes it a redirect), and `hand.anawj.com/logbook/` is a 404.
 
 Later addresses take the same two clicks once their PR is merged: `anaes.anawj.com` (BIS to DSA, 14 Oct 2026; check
-`anaes.anawj.com/bis/`).
+`anaes.anawj.com/bis/`), and `mo.anawj.com` (Baby MO Portal, 14 Oct 2026; shows the demo at `mo.anawj.com/?demo`).
 
 ## The page editor (decided in step 5)
 
