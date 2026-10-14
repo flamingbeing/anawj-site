@@ -218,7 +218,7 @@ function mtSeries(m,W,fn){const out=new Array(W).fill(null),per=m.win/W;
 function mtLine(ctx,ser,X0,Yf,col,lw,outline){const go=()=>{ctx.beginPath();let pen=false;ser.forEach((v,x)=>{if(v==null){pen=false;return;}const X=X0+x+.5,Y=Yf(v);pen?ctx.lineTo(X,Y):ctx.moveTo(X,Y);pen=true;});ctx.stroke();};
  if(outline){ctx.strokeStyle='#000';ctx.lineWidth=lw+2.5;go();}ctx.strokeStyle=col;ctx.lineWidth=lw;go();}
 const MT_OFF=document.createElement('canvas');MT_OFF.width=323;MT_OFF.height=60;let MT_IMG=null;
-function mtPaintDsa(m){const W=323,H=60,per=m.win/W,lo=mon.dbLo-1,hi=mon.dbHi-9; // the monitor's map sits a little lower than the teaching one: awake beta cyan, anaesthetic alpha red
+function mtPaintDsa(m){const W=323,H=60,per=m.win/W,lo=mon.dbLo-2,hi=mon.dbHi-9; // the monitor's map sits a little lower than the teaching one: awake beta cyan, anaesthetic alpha red
  if(!MT_IMG)MT_IMG=MT_OFF.getContext('2d').createImageData(W,H);const d=MT_IMG.data;
  for(let x=0;x<W;x++){const i0=Math.floor(x*per),i1=Math.max(i0+1,Math.floor((x+1)*per));
   for(let y=0;y<H;y++){const p=(y*W+x)*4;

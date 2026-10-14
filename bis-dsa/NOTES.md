@@ -228,7 +228,7 @@ sheet (screens are 640 x 480), as a clone to look at and use. Code: `mt-screen.j
   artefact strip (orange SQI under 50, yellow blanked), black gap lines (sensor check passed, Clear Trend Data) and the
   H-L colour bar. Colours were sampled from the photos: pale blue frames (white on the manufacturer's own screenshots).
 - **Colour map:** a saturated red-orange-yellow-green-cyan-blue table (`MT_LUT`), no dark ends. The simulator's dB range maps
-  to it one dB-range lower than the teaching skins (`mon.dbLo - 1` to `mon.dbHi - 9`) so awake beta is cyan and
+  to it one dB-range lower than the teaching skins (`mon.dbLo - 2` to `mon.dbHi - 9`) so awake beta is cyan and
   anaesthetic alpha is red, as on the photos. A light 3 x 3 smoothing is applied (the raw one-second columns are noisier
   than the real display).
 - **Display** (Menu > Display): BIS (trend view: yellow 2.5 px line with black outline, ST in magenta on the right axis,
