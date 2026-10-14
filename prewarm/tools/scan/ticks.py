@@ -17,5 +17,9 @@ def read_ticks(ink, boxes, pad=0):
         patch = ink[max(0, y0 - pad):y1 + pad, max(0, x0 - pad):x1 + pad]
         score = float(patch.sum()) / side if patch.size else 0.0
         state = 'ticked' if score >= CLEAR_TICK else 'empty' if score <= CLEAR_EMPTY else 'unsure'
-        res.append(dict(b, ink=round(score, 2), state=state))
+        # the middle of the box: a slash through the box crosses it, a neighbour's overshoot tail does not
+        qx, qy = (x1 - x0) // 4, (y1 - y0) // 4
+        mid = ink[y0 + qy:y1 - qy, x0 + qx:x1 - qx]
+        center = float(mid.sum()) / (0.5 * side) if mid.size else 0.0
+        res.append(dict(b, ink=round(score, 2), center=round(center, 2), state=state))
     return res

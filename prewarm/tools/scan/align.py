@@ -38,8 +38,12 @@ def flatten_illumination(gray):
     return cv2.divide(gray, bg, scale=255)
 
 
-def line_score(aligned_gray, template_gray):
-    """Share of the template's printed ink (thickened a little) that has dark pixels under it in the photo."""
+def line_score(aligned_gray, template_gray, box=None):
+    """Share of the template's printed ink (thickened a little) that has dark pixels under it in the photo (inside box
+    = (x0, y0, x1, y1) if given: used to judge one table on its own)."""
+    if box is not None:
+        x0, y0, x1, y1 = box
+        aligned_gray, template_gray = aligned_gray[y0:y1, x0:x1], template_gray[y0:y1, x0:x1]
     t = (template_gray < 140).astype(np.uint8)
     a = (flatten_illumination(aligned_gray) < 150).astype(np.uint8)
     hit = cv2.dilate(a, np.ones((5, 5), np.uint8))

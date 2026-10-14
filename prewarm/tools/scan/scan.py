@@ -11,6 +11,7 @@ import align, boxes, ticks, readers, plausible
 NEVER_SEND = {'text', 'date', 'word'}      # IDs, dates, names and free text are typed in the review screen, never sent anywhere
 MIN_ALIGN = 0.80                            # below this, the photo is rejected: retake it
 LEAK_WARN = 8.0                             # printed-ink leakage per 1000 px outside the fields (to be tuned on real pages)
+TABLE_OK, TABLE_PAGE_MIN = 0.85, 0.70       # a page under MIN_ALIGN is still accepted if every refined table fits this well on its own
 CHECK_ALIGN = 0.90                          # between the two, the page is read but flagged 'check the crops line up'
 JUMP = {'core': 1.0, 'chest': 6.0, 'arm': 6.0, 'thigh': 6.0, 'calf': 6.0}   # °C between neighbouring readings
 
@@ -64,7 +65,7 @@ def read_cell(reader, f, crop_gray):
     return [a, b]
 
 
-def process_page(page_no, flat, tpl, fmap, fields, cells, reader):
+def process_page(page_no, flat, tpl, fmap, fields, cells, reader, header_bottom=0):
     ink = align.ink_layer(flat, tpl)
     out = {}
     for fid, loc in fmap['fields'].items():
@@ -72,7 +73,7 @@ def process_page(page_no, flat, tpl, fmap, fields, cells, reader):
             continue
         f = fields[fid]
         top = min([r[1] for r in loc['options'].values()] + ([loc['rect'][1]] if loc.get('rect') else []))
-        if top < fmap.get('header_bottom', {}).get(str(page_no), 0):   # the page header: Subject ID and Date of Entry are identifiers, never cropped or sent
+        if top < max(header_bottom, fmap.get('header_bottom', {}).get(str(page_no), 0)):   # the page header: Subject ID and Date of Entry are identifiers, never cropped or sent
             out[fid] = dict(kind='text', value=None, flags=['in the page header: not read'], crop=b'', reads=[])
             continue
         if loc['options'] and (loc.get('written') or f.get('col') == 'ts'):   # Y/N columns and thermal sensation are written, not ticked
@@ -83,9 +84,13 @@ def process_page(page_no, flat, tpl, fmap, fields, cells, reader):
             on = [o for o, r in res.items() if r['state'] == 'ticked']
             unsure = [o for o, r in res.items() if r['state'] == 'unsure']
             flags = [f'unsure tick: {o}' for o in unsure] + (['more than one ticked'] if len(on) > 1 else [])
+            # two boxes with some ink (a slash running past its box): the one the slash crosses the MIDDLE of wins, flagged
+            crossed = [o for o, r in res.items() if r['center'] >= 0.6]
+            if len(on) + len(unsure) > 1 and len(crossed) == 1 and all(r['center'] <= 0.15 for o, r in res.items() if o != crossed[0]):
+                on, flags = [crossed[0]], ['more than one box has ink: took the one the slash crosses the middle of, check']
             r0 = next(iter(loc['options'].values()))
             (cx0, cy0, cx1, cy1), _ = crop_rect([min(r[0] for r in loc['options'].values()), r0[1], max(r[2] for r in loc['options'].values()), r0[3]], cells, flat.shape)
-            out[fid] = dict(kind='tick', value=on[0] if len(on) == 1 else None, flags=flags, inks={o: r['ink'] for o, r in res.items()},
+            out[fid] = dict(kind='tick', value=on[0] if len(on) == 1 else None, flags=flags, inks={o: r['ink'] for o, r in res.items()}, centers={o: r['center'] for o, r in res.items()},
                             crop=png(flat[cy0:cy1, cx0:cx1]))
             continue
         (x0, y0, x1, y1), (ix0, iy0, ix1, iy1) = crop_rect(loc['rect'], cells, flat.shape)
@@ -144,25 +149,26 @@ def series_checks(fields_out, fields):
 
 def aligned(img, tpl, tables):
     """Align the photo to the page, then pull each printed table onto the template's rows and columns; keep whichever
-    fits the printed lines better."""
+    fits the printed lines better. Also returns how well each refined table fits on its own."""
     flat, score = align.align_page(img, tpl)
     if tables:
         fine, n = align.refine_tables(flat, tpl, tables)
         if n:
             s2 = align.line_score(fine, tpl)
-            if s2 > score: return fine, s2
-    return flat, score
+            if s2 > score:
+                return fine, s2, [align.line_score(fine, tpl, tb['bbox']) for tb in tables]
+    return flat, score, []
 
 
 def best_page(img, tpls, tables_of, forced=None):
     """Align the photo to its most likely pages and keep the best fit: page look-alikes (big tables) fool a quick guess."""
     if forced:
-        flat, score = aligned(img, tpls[forced - 1], tables_of(forced - 1)); return forced - 1, flat, score
+        pg = forced - 1; flat, score, ts = aligned(img, tpls[pg], tables_of(pg)); return pg, flat, score, ts
     _, guess = align.guess_page(img, tpls)
     best = None
     for pg in sorted(range(len(tpls)), key=lambda i: -guess[i])[:3]:
-        flat, score = aligned(img, tpls[pg], tables_of(pg))
-        if best is None or score > best[2]: best = (pg, flat, score)
+        flat, score, ts = aligned(img, tpls[pg], tables_of(pg))
+        if best is None or score > best[2]: best = (pg, flat, score, ts)
     return best
 
 
@@ -172,6 +178,7 @@ def main(argv=None, reader=None):
     ap.add_argument('--pages', help='page number of each photo, in order, e.g. 7,9,1 (otherwise worked out from the photo)')
     ap.add_argument('--export-crops', metavar='DIR', help='no reading: write the handwritten crops to DIR for someone to read')
     ap.add_argument('--readings', metavar='FILE', help='use readings made from the exported crops, as {field id: text}, instead of the API')
+    ap.add_argument('--min-align', type=float, default=MIN_ALIGN, help=f'lowest page alignment score to accept (default {MIN_ALIGN}); lower it only to test a page, and check its crops')
     ap.add_argument('photos', nargs='+')
     a = ap.parse_args(argv)
     fmap = json.load(open(f'{a.form_dir}/fieldmap.json', encoding='utf-8'))
@@ -185,19 +192,22 @@ def main(argv=None, reader=None):
     result, pages = {}, []
     for ph, fp in zip(a.photos, forced):
         img = cv2.imread(ph)
-        pg, flat, score = best_page(img, tpls, tables_of, fp)
-        ok = score >= MIN_ALIGN
-        pages.append(dict(photo=os.path.basename(ph), page=pg + 1, score=round(score, 3), accepted=ok, check_alignment=ok and score < CHECK_ALIGN))
+        pg, flat, score, tscores = best_page(img, tpls, tables_of, fp)
+        # a page can fall just short overall while its refined tables sit right on the printed lines: accept that, but say so
+        by_tables = bool(tscores) and min(tscores) >= TABLE_OK and score >= TABLE_PAGE_MIN
+        ok = score >= a.min_align or by_tables
+        pages.append(dict(photo=os.path.basename(ph), page=pg + 1, score=round(score, 3), accepted=ok, table_scores=[round(t, 3) for t in tscores],
+                          check_alignment=ok and (score < CHECK_ALIGN or score < a.min_align)))
         if not ok:
             print(f'{ph}: best fit is page {pg + 1} but it did not line up (score {score:.2f}): retake the photo, or say which page it is with --pages', file=sys.stderr); continue
-        if score < CHECK_ALIGN:
+        if score < CHECK_ALIGN or score < a.min_align:
             print(f'{ph}: page {pg + 1} lined up only moderately (score {score:.2f}): check the crops in the review screen', file=sys.stderr)
         leak = leak_ratio(align.ink_layer(flat, tpls[pg]), fmap, pg)
         pages[-1]['leak'] = round(leak, 1)
         if leak > LEAK_WARN:
             pages[-1]['template_mismatch'] = True
             print(f'{ph}: page {pg + 1}: printed text is leaking into the ink layer ({leak:.0f}); the template does not match the paper layout (fonts / row heights): ticks on this page are less reliable', file=sys.stderr)
-        result.update(process_page(pg, flat, tpls[pg], fmap, fields, boxes.cells(f'{a.form_dir}/blank.pdf', pg), reader))
+        result.update(process_page(pg, flat, tpls[pg], fmap, fields, boxes.cells(f'{a.form_dir}/blank.pdf', pg), reader, boxes.header_bottom(f'{a.form_dir}/blank.pdf', pg)))
     series_checks(result, fields)
     for fid, e in result.items():
         e['label'] = fields[fid]['label']; e['type'] = fields[fid]['type']

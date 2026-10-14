@@ -9,7 +9,6 @@ from pathlib import Path
 import pdfplumber
 
 PT = 200 / 72
-HEADER_MARGIN = 12   # px below the header digits that still count as header
 TICKS = set('☒☑✓✔✗✘')     # ballot-box X, ballot-box check, check marks, crosses
 JOBS = int(os.environ.get('LOCATE_JOBS') or os.cpu_count() or 2)
 d = sys.argv[1]
@@ -22,11 +21,19 @@ def convert_chunk(files):
 
 
 def convert():
-    if os.environ.get('RENDERER') == 'word':   # Microsoft Word itself (pip install docx2pdf; Windows or Mac): the layout of the printed paper
-        from docx2pdf import convert as word_convert   # Word converts the whole folder in one session
-        word_convert(d)
+    # only what has no PDF yet, or whose PDF is older than its .docx (Word and LibreOffice are both slow)
+    todo = [f for f in sorted(glob.glob(f'{d}/*.docx'))
+            if not os.path.exists(f[:-5] + '.pdf') or os.path.getmtime(f[:-5] + '.pdf') < os.path.getmtime(f)]
+    if not todo:
         return
-    todo = [f for f in sorted(glob.glob(f'{d}/*.docx')) if not os.path.exists(f[:-5] + '.pdf')]
+    if os.environ.get('RENDERER') == 'word':   # Microsoft Word itself (pip install docx2pdf; Windows or Mac): the layout of the printed paper
+        from docx2pdf import convert as word_convert   # Word converts a whole folder in one session
+        import shutil
+        tmp = tempfile.mkdtemp()
+        for f in todo: shutil.copy(f, tmp)
+        word_convert(tmp)
+        for f in todo: shutil.move(os.path.join(tmp, os.path.basename(f)[:-5] + '.pdf'), f[:-5] + '.pdf')
+        return
     chunks = [todo[i::JOBS] for i in range(JOBS) if todo[i::JOBS]]
     with cf.ThreadPoolExecutor(len(chunks) or 1) as ex:
         list(ex.map(convert_chunk, chunks))
@@ -73,16 +80,14 @@ if __name__ == '__main__':
         for pi in {m[0] for m in marks}: on_page[pi] = on_page.get(pi, 0) + 1
         for k in {m[:4] for m in marks}: freq[k] = freq.get(k, 0) + 1
     common = {k for k, n in freq.items() if on_page[k[0]] >= 4 and n > 0.25 * on_page[k[0]]}
-    # the header (Subject ID / Date of Entry) is the page furniture near the top: where it ends, per page
+    # the header (Subject ID / Date of Entry): where it ends on each page, read from the blank form itself
     header_bottom = {}
-    tops = {}
-    for v, marks in found:
-        for m in marks:
-            if m[:4] in common and m[2] * PT < 700:
-                tops.setdefault(m[0], {})[m[:4]] = (round(m[2] * PT), round(m[5] * PT))
-    for pi, marks in tops.items():            # the topmost line of such marks (not a tick lower down the page)
-        first = min(t for t, _ in marks.values())
-        header_bottom[pi] = max(b for t, b in marks.values() if t <= first + 60) + HEADER_MARGIN
+    if os.path.exists(f'{d}/blank.pdf'):
+        import boxes
+        with pdfplumber.open(f'{d}/blank.pdf') as pdf:
+            for pi in range(len(pdf.pages)):
+                hb = boxes.header_bottom(f'{d}/blank.pdf', pi)
+                if hb: header_bottom[pi] = hb
     fmap, ticked = {}, {}
     for v, marks in found:
         key = v['field'] + (':' + v['option'] if v.get('option') is not None else '')
@@ -92,6 +97,8 @@ if __name__ == '__main__':
             continue
         page = own[0][0]
         ms = [m for m in own if m[0] == page]
+        boxes_only = [m for m in ms if m[3] in TICKS]   # a ticked option: just the box (its label text can shift and would overlap the next option)
+        ms = boxes_only or ms
         rect = [round(min(m[1] for m in ms) * PT), round(min(m[2] for m in ms) * PT), round(max(m[4] for m in ms) * PT), round(max(m[5] for m in ms) * PT)]
         if rect[1] < header_bottom.get(page, 0):   # Subject ID / Date of Entry live up here: never a field to read or send
             unplaced.append(dict(key=key, why='lands in the page header band (Subject ID / Date of Entry)'))
