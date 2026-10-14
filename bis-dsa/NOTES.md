@@ -9,12 +9,39 @@ Lasting decisions for `bis-dsa/`. Status and next steps: `STATUS.md`.
 - One static page, no data, no sign-in, no storage. Synthetic EEG only.
 - Always dark, like an anaesthetic monitor (owner, 14 Oct 2026); BIS big on the left, SR/SEF95/EMG stacked on the right.
 - Screen order like a BIS monitor (owner, 14 Oct 2026): BIS and EMG trends, then DSA above, raw EEG below; a view
-  toggle (DSA + EEG, DSA, EEG) shows one large. Displayed EMG is the 30–47 Hz power + 16 dB on a 25–55 dB bar
-  (`emgShow`); ketamine's gamma also lifts it, as real high-frequency power would.
-- Monitor look (owner, 14 Oct 2026): bezel, status line, BIS with SQI and EMG segment bars, SR/SEF/TP/BC row, soft keys
-  for the view. SQI = 98 − 160 × share of artefact seconds (any sample over 300 µV) in the last 30 s; artefact seconds
-  are left out of BIS, SR, EMG and TP. As on the monitor, BIS shows hollow under SQI 50 and `--` under 15. The
-  Diathermy toggle injects interference bursts to show this.
+  toggle (DSA + EEG, DSA + BIS, EEG) shows one large.
+- Monitor look (owner, 14 Oct 2026; made closer to a BIS Complete/VISTA, Oct 2026): bezel, status line ("BIS · Case
+  AH5F", message region, clock), BIS with SQI and EMG segment bars, SR/SEF/TP/BC row, soft keys.
+- **SQI** = 98 − 160 × share of artefact seconds in the last 63 s; 5 bars of 20 (green ≥ 50, amber 15–49, red < 15).
+  An artefact second has any sample over 300 µV, or a diathermy burst or its 1-s settling tail. Artefact seconds are
+  left out of BIS, SR, SEF and TP (TP holds). BIS shows hollow under SQI 50; under 15 BIS, SEF, SR, TP and BC show `--`
+  and the BIS trend line breaks. 15 is the conventional blanking threshold; it is not stated in the Covidien manual.
+- **EMG** (dB re 0.0001 µV², shown like the monitor's 70–110 Hz band): a parametric muscle term,
+  `27 + 10·log10(1 + 12·tone + 52·emg + 250·diathermy share)` ± 1.5 dB. Tone is 1 awake (hypnotic depth under 0.3),
+  falling to a residual 0.12 by depth 0.5, and 0.05 when paralysed (τ 5 s). Levels: awake ~38, GA ~31, relaxant ~29,
+  facial EMG ~52, diathermy bursts +15–25 dB. Ketamine's gamma does not count. Not held during artefact. 4-bar bar:
+  empty under 30 dB, then 30–38, 39–47, 48–55, over 55. The 30–47 Hz EMG power is still injected into the EEG, which is
+  what pushes BIS up.
+- **Diathermy**: 1–2.5 s bursts every 4–8 s of broadband noise clipping at ±400 µV, each followed by a 1-s decaying
+  offset; bright DSA stripes; SQI settles around 15–35 (hollow, sometimes `--`).
+- **Messages** (`monMsg()`, wording from the BIS Complete manual): high (red, flashing; solid with reduced motion):
+  "Isoelectric EEG Detected" (every second flat for 60 s), "BIS Out of Target Range – Low/High" (shown BIS outside
+  40–60 for 10 s while a hypnotic is on, depth ≥ 0.3; only with the target band on); low (yellow): "Data unavailable due
+  to poor signal quality" (SQI < 15), "Excessive Artifact Detected in Signal" (SQI < 50); info (grey): "Smoothing Rate
+  Changed to xx Seconds" for 5 s. `#vMsg` is `aria-live`, updated only when the text changes.
+- **Trend**: BIS thick white on a 0–100 left axis, EMG thin green on a 30–80 dB right axis, artefact bar along the time
+  axis (amber SQI < 50, yellow blanked), clock times (hh:mm) at both ends. The monitor clock is sim time (the warm
+  start ends at the real time), so the axis matches at any speed. Target band 40–60 "set by user" is a teaching
+  default; real monitors default to Inactive.
+- **DSA**: SEF95 white line and MF (SEF50, 50% of 0.5–30 Hz power) purple `#b47cff` line, numbers top right, δ θ α β
+  labels on the right edge.
+- **EEG lane**: ±50 µV full height by default (25 µV/div), soft key cycles ±25/50/100/250; about 5 s across on a
+  phone, 8 s on a desktop, 1-s ticks; "ARTIFACT" (amber) during artefact seconds.
+- **Smoothing** soft key 10/15/30 s (default 15): a moving average of the last N artefact-free raw values.
+- **Teaching labels** (Display checkbox, on by default, per device in `localStorage` `bisdsa.teach`): the zone pill,
+  the newest-2-s box, the newest-column outline, the colour key and the target band. Zone wording: over 90 Awake, 80–90
+  Light/moderate sedation, 60–80 Sedation, 40–60 General anaesthesia, 20–40 Deep hypnotic state, under 20 Burst
+  suppression / flat; "Suppression (SR n%)" whenever SR is above 0.
 - Opens on an awake patient (owner, 14 Oct 2026): 5 min of awake EEG pre-run so the DSA is full; slider at Awake.
 - Monitor first (owner, 14 Oct 2026): the page opens on the monitor (a small title above it), depth slider then drug
   right under it, smaller lanes on phones (`laneH`); the teaching intro follows.
@@ -38,7 +65,7 @@ Lasting decisions for `bis-dsa/`. Status and next steps: `STATUS.md`.
 - Awake EEG is small (about 10 µV RMS, one shared `AWAKE` keyframe); propofol GA is about 3× the amplitude (Purdon
   2015: anaesthetised EEG has 5–20× the power).
 - BIS shown is a **teaching model**, not the proprietary algorithm: a linear fit on SEF95, fast-power fraction,
-  30–47 Hz fraction, slow and alpha fractions, minus 0.25 × SR, stretched, then smoothed over about 15 s.
+  30–47 Hz fraction, slow and alpha fractions, minus 0.25 × SR, stretched, then averaged over the last 15 clean seconds.
   **Bruhn rule** (Bruhn 2000): below SR 40% the features set BIS; from SR 40% BIS is at most `50 − SR/2`. So
   suppression often shows with BIS in the 30s–40s, as in practice.
 - SR as in the BIS manual: each second is split into four 0.25-s sub-blocks; a sub-block is suppressed if it stays within
@@ -47,9 +74,10 @@ Lasting decisions for `bis-dsa/`. Status and next steps: `STATUS.md`.
 - Burst suppression gate (`Engine`): bursts last 0.5–3 s; flat runs last 1–3 s at `bs` 0.5, growing to 10–30 s near 1;
   above 0.97 the EEG is isoelectric. Propofol suppression starts after depth 0.8 in a young adult (0.68 when older).
 - **Proxies (teaching-model honesty):** the stand-in BIS formula above; 128 samples/s (the real monitor samples faster);
-  EMG from a parametric muscle term and 30–47 Hz power, not the monitor's 70–110 Hz band.
+  the EMG readout is a parametric muscle term, not the monitor's measured 70–110 Hz band (the 30–47 Hz muscle power in
+  the EEG is what moves BIS).
 - Check the tuning with `node bis-dsa/test/engine.check.mjs` (runs the engine in Node, no browser, about 20 s; also in
-  the Checks workflow). It prints the table below; rows marked "later" (EMG and SQI model) are not enforced yet.
+  the Checks workflow). It prints the table below, plus SQI, messages, MF and smoothing rows.
 - The footer says it is a teaching approximation; keep that.
 
 ## Drug mix (owner, 14 Oct 2026)
@@ -73,7 +101,7 @@ Lasting decisions for `bis-dsa/`. Status and next steps: `STATUS.md`.
 ## Muscle relaxant (owner, 14 Oct 2026)
 
 - "Muscle relaxant (paralysed)" removes the EMG term and most of the awake fast activity at once (stage 1: gamma
-  ×0.05, beta ×0.3), overriding "Facial muscle activity". Stage 2 (`Engine.nmbS`): 60 s after the relaxant, while the
+  ×0.05, beta ×0.25), overriding "Facial muscle activity". Stage 2 (`Engine.nmbS`): 60 s after the relaxant, while the
   hypnotic depth is under 0.3, a slow state rises with τ 120 s (falls with τ 30 s once the relaxant is off): beta and
   gamma fall further, beta slows, slow and delta power appear. Awake + relaxant: ~83 at 60 s, ~52 at 5 min, back above
   85 two minutes after reversal. This follows the volunteer studies: about 80 at once, then 44–47 minutes later
@@ -84,7 +112,7 @@ Lasting decisions for `bis-dsa/`. Status and next steps: `STATUS.md`.
 
 | State | BIS | Other |
 |---|---|---|
-| Propofol awake | 90–97 | SR 0; EEG RMS 8–12 µV; EMG 35–45 dB (later) |
+| Propofol awake | 90–97 | SR 0; EEG RMS 8–12 µV; EMG 35–45 dB |
 | Propofol 0.17 | 80–95 | beta (13–25 Hz) above awake |
 | Propofol 0.57 | 40–55 | SEF95 12–17 Hz; RMS 25–40 µV and ≥ 3× awake |
 | Propofol 0.76 | 30–42 | SR under 5 |
@@ -92,16 +120,20 @@ Lasting decisions for `bis-dsa/`. Status and next steps: `STATUS.md`.
 | Propofol 1.0 | 0–12 | SR 80 or more |
 | Sevo 0.55 | 40–55 | theta peak 4.5–5.5 Hz; alpha 1–3 dB above propofol 0.55 |
 | Sevo 1.0 | 15–40 | SR at most 60 (never flat) |
-| Ketamine 0.65 | 65–82 | SEF95 ≥ 25; 13–24 Hz not above awake |
+| Ketamine 0.65 | 65–82 | SEF95 ≥ 25; 13–24 Hz not above awake; EMG within 3 dB of awake-paralysed |
 | Mix ketamine 1.0 vs single 1.0 | within 6 | |
 | Propofol + ketamine preset | 58–70 | |
 | Dex 0.4 / 1.0 | 55–72 / 40–58 | 0.4: 0.5–1 Hz ≥ 10 dB below propofol 0.57 |
 | Older, propofol 0.57 | young +6 to +12 | 8–12 Hz 8–10 dB lower; alpha peak 0.7–1.3 Hz lower |
 | Older, propofol 0.80 | | SR above 0 (young: about 0) |
-| Awake + relaxant at 60 s / 300 s | 75–85 / 45–62 | relaxant off again: above 85 after 120 s |
+| Awake + relaxant at 60 s / 300 s | 75–85 / 45–62 | EMG under 30 at 60 s; relaxant off again: above 85 after 120 s |
 | Propofol 3 ± remi 4 | within 3 | |
 | Sevo 0.8 + N₂O 0.6 vs sevo 0.8 | −2 to +3 | |
-| Propofol 0.55 + EMG / + relaxant | 62–85 / 40–55 | |
+| Propofol 0.55 + EMG / + relaxant | 62–85 / 40–55 | EMG 48–58 / 25–30 dB |
+| Clean / diathermy 120 s | | SQI ≥ 90 / under 50; EMG in bursts ≥ 10 dB over clean |
+| Propofol 1.0 for 120 s | | SR 100 and "Isoelectric EEG Detected" |
+| Every state | | MF < SEF95; propofol 0.57 MF 2–8 Hz |
+| Smoothing 10 vs 30 s, awake → 0.57 | | within 5 of final ≥ 5 s sooner with 10 s |
 
 ## Lessons
 

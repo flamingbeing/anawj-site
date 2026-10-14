@@ -1,6 +1,5 @@
 // Node check of the BIS to DSA engine against the tuning targets (bis-dsa/NOTES.md, "Tuning targets").
 // Runs the page's engine without a browser: node bis-dsa/test/engine.check.mjs. Prints a table; exits 1 on a miss.
-// Rows marked "later" are printed for information and not yet enforced.
 import fs from 'node:fs';
 
 const SRC = fs.readFileSync(new URL('../app.js', import.meta.url), 'utf8');
@@ -14,15 +13,16 @@ let seed = 1;
 const rnd = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 const M = Object.create(Math); M.random = rnd;
 const load = () => new Function('Math', 'matchMedia', 'window',
-  `var onColumn=null;${BODY};return {Engine,target,features,bisRaw,step,COLS,SIG,eng,mods,mixTarget,FS,DF,NB};`)(M, () => ({ matches: false }), {});
+  `var onColumn=null;${BODY};return {Engine,target,features,bisRaw,step,COLS,SIG,eng,mods,mixTarget,monMsg,mon,FS,DF,NB};`)(M, () => ({ matches: false }), {});
 
 // one state: snap to it, run, then measure over the last 30 s (or run a script of phases). Spectral shapes are noisy
 // over 30 s, so rows that compare peaks or bands pool several runs (nSeeds).
-function run(drug, d, mods = {}, secs = 120, phases, nSeeds = 1) {
+const MF = []; // [state, mean MF, mean SEF] for every run
+function run(drug, d, mods = {}, secs = 120, phases, nSeeds = 1, monSet) {
   let S, last = [], rms2 = [];
   for (let r = 0; r < nSeeds; r++) {
     seed = BASE + 7919 * r;
-    S = load(); const ms = Object.assign(S.mods, mods);
+    S = load(); Object.assign(S.mon, monSet); const ms = Object.assign(S.mods, mods);
     S.eng.setTarget(drug, d, ms); S.eng.snap();
     const rr = [];
     const go = n => { for (let s = 0; s < n; s++) { S.step(FS_); const w = S.SIG.slice(-FS_); rr.push(w.reduce((a, v) => a + v * v, 0) / FS_); } };
@@ -36,9 +36,12 @@ function run(drug, d, mods = {}, secs = 120, phases, nSeeds = 1) {
   // peak: largest local maximum of the spectrum smoothed over ±0.5 Hz, times f (so a band shows above the 1/f background)
   const Q = P.map((_, k) => k * S.DF * (P[Math.max(0, k - 1)] + P[k] + P[Math.min(S.NB - 1, k + 1)]));
   const peak = (lo, hi) => { let b = null; for (let k = Math.round(lo / S.DF); k <= Math.round(hi / S.DF); k++) if (Q[k] > Q[k - 1] && Q[k] >= Q[k + 1] && (b == null || Q[k] > Q[b])) b = k; if (b == null) return NaN; const [l, c, r] = [Q[b - 1], Q[b], Q[b + 1]]; return (b + 0.5 * (l - r) / (l - 2 * c + r)) * S.DF; }; // parabolic, sub-bin
+  const mf = mean(last.filter(c => c.mf != null).map(c => c.mf)), sefm = mean(last.filter(c => c.sef != null).map(c => c.sef));
+  if (Number.isFinite(mf)) MF.push([`${drug} ${typeof d === 'object' ? JSON.stringify(d) : d}${Object.keys(mods).length ? ' ' + Object.keys(mods).join('+') : ''}`, mf, sefm]);
   return {
-    bis: mean(last.map(c => c.bis)), sr: mean(last.map(c => c.bsr)), sef: mean(last.filter(c => c.sef != null).map(c => c.sef)),
-    rms: Math.sqrt(mean(rms2)), emg: mean(last.map(c => c.emgShow ?? c.emg + 16)), sqi: mean(last.map(c => c.sqi)),
+    S, mf, msg: S.monMsg(),
+    bis: mean(last.filter(c => c.bis != null).map(c => c.bis)), sr: mean(last.map(c => c.bsr)), sef: mean(last.filter(c => c.sef != null).map(c => c.sef)),
+    rms: Math.sqrt(mean(rms2)), emg: mean(last.map(c => c.emg)), sqi: mean(last.map(c => c.sqi)),
     band, peak, bisNow: S.COLS[S.COLS.length - 1].bis,
   };
 }
@@ -48,11 +51,10 @@ const chk = (state, what, v, lo, hi, later) => {
   const ok = v >= lo && v <= hi; if (!ok && !later) fails++;
   rows.push([state, what, Number.isFinite(v) ? v.toFixed(1) : String(v), `${lo}..${hi}`, ok ? 'ok' : later ? 'later' : 'FAIL']);
 };
-const L = true; // later workstream (EMG and SQI model, WS3)
 
 const awake = run('propofol', 0, {}, 120, null, 4);
 chk('Propofol 0 (awake)', 'BIS', awake.bis, 90, 97); chk('Propofol 0 (awake)', 'SR', awake.sr, 0, 0);
-chk('Propofol 0 (awake)', 'RMS uV', awake.rms, 8, 12); chk('Propofol 0 (awake)', 'EMG dB', awake.emg, 35, 45, L);
+chk('Propofol 0 (awake)', 'RMS uV', awake.rms, 8, 12); chk('Propofol 0 (awake)', 'EMG dB', awake.emg, 35, 45);
 const p17 = run('propofol', 0.17);
 chk('Propofol 0.17', 'BIS', p17.bis, 80, 95); chk('Propofol 0.17', 'beta 13-25 dB vs awake', p17.band(13, 25) - awake.band(13, 25), 0.01, 99);
 const p57 = run('propofol', 0.57, {}, 120, null, 4);
@@ -76,7 +78,7 @@ const s100 = run('sevo', 1);
 chk('Sevo 1.0', 'BIS', s100.bis, 15, 40); chk('Sevo 1.0', 'SR', s100.sr, 0, 60);
 const k65 = run('ketamine', 0.65, {}, 120, null, 4), awN = run('propofol', 0, { nmb: true }, 600);
 chk('Ketamine 0.65', 'BIS', k65.bis, 65, 82); chk('Ketamine 0.65', 'SEF95', k65.sef, 25, 99);
-chk('Ketamine 0.65', 'EMG minus awake-paralysed', Math.abs(k65.emg - awN.emg), 0, 3, L);
+chk('Ketamine 0.65', 'EMG minus awake-paralysed', Math.abs(k65.emg - awN.emg), 0, 3);
 chk('Ketamine 0.65', '13-24 Hz dB vs awake', k65.band(13, 24) - awake.band(13, 24), -99, 0.5);
 const k1 = run('ketamine', 1), mk1 = run('mix', { ketamine: 1 });
 chk('Mix ketamine 1.0 vs single', 'BIS diff', Math.abs(mk1.bis - k1.bis), 0, 6);
@@ -93,7 +95,7 @@ const e80 = run('propofol', 0.8, { elderly: true }), y80 = run('propofol', 0.8);
 chk('Elderly propofol 0.80', 'SR', e80.sr, 0.01, 100); chk('Young propofol 0.80', 'SR (about 0)', y80.sr, 0, 5);
 // relaxant in an awake patient: from awake steady state, then relaxant on (and off again)
 const n60 = run('propofol', 0, {}, 120, [[60, { nmb: true }]]);
-chk('Awake + nmb, 60 s', 'BIS', n60.bisNow, 75, 85); chk('Awake + nmb, 60 s', 'EMG dB', n60.emg, 0, 30, L);
+chk('Awake + nmb, 60 s', 'BIS', n60.bisNow, 75, 85); chk('Awake + nmb, 60 s', 'EMG dB', n60.emg, 0, 30);
 const n300 = run('propofol', 0, {}, 120, [[300, { nmb: true }]]);
 chk('Awake + nmb, 300 s', 'BIS', n300.bisNow, 45, 62);
 const nOff = run('propofol', 0, {}, 120, [[300, { nmb: true }], [120, { nmb: false }]]);
@@ -103,12 +105,37 @@ chk('Propofol 3 + remi 4 vs propofol 3', 'BIS diff', Math.abs(tiva.bis - prop3.b
 const sn = run('mix', { sevo: 0.8, n2o: 0.6 }), s8 = run('mix', { sevo: 0.8 });
 chk('Sevo 0.8 + N2O 0.6 vs sevo 0.8', 'BIS diff', sn.bis - s8.bis, -2, 3);
 const pe = run('propofol', 0.55, { emg: true });
-chk('Propofol 0.55 + emg', 'BIS', pe.bis, 62, 85); chk('Propofol 0.55 + emg', 'EMG dB', pe.emg, 48, 58, L);
+chk('Propofol 0.55 + emg', 'BIS', pe.bis, 62, 85); chk('Propofol 0.55 + emg', 'EMG dB', pe.emg, 48, 58);
 const pn = run('propofol', 0.55, { nmb: true });
-chk('Propofol 0.55 + nmb', 'BIS', pn.bis, 40, 55); chk('Propofol 0.55 + nmb', 'EMG dB', pn.emg, 25, 30, L);
+chk('Propofol 0.55 + nmb', 'BIS', pn.bis, 40, 55); chk('Propofol 0.55 + nmb', 'EMG dB', pn.emg, 25, 30);
 chk('Clean signal', 'SQI', awake.sqi, 90, 100);
 const dia = run('propofol', 0.55, { diathermy: true }, 60);
-chk('Diathermy on, 60 s', 'SQI', dia.sqi, 0, 49.99, L);
+chk('Diathermy on, 60 s', 'SQI', dia.sqi, 0, 49.99);
+{ // diathermy for 120 s after 120 s clean: SQI under 50, EMG during bursts 10 dB or more over the clean baseline
+  seed = BASE; const S = load(); S.eng.setTarget('propofol', 0.55, S.mods); S.eng.snap(); S.step(120 * FS_);
+  const base = S.COLS.slice(-30).reduce((a, c) => a + c.emg, 0) / 30;
+  // then 120 s of diathermy, one sample at a time; a burst second is one with diathermy on for 90% of it or more
+  S.mods.diathermy = true; const bursts = [];
+  for (let s = 0; s < 120; s++) { let n = 0; for (let i = 0; i < FS_; i++) { S.step(1); if (S.eng.diOn) n++; } if (n > 0.9 * FS_) bursts.push(S.COLS[S.COLS.length - 1].emg); }
+  const c = S.COLS[S.COLS.length - 1];
+  chk('Diathermy on, 120+ s', 'SQI', c.sqi, 0, 49.99);
+  chk('Diathermy on', 'EMG in bursts minus clean dB', bursts.reduce((a, b) => a + b, 0) / bursts.length - base, 10, 30);
+  chk('Diathermy on', 'monitor message', /Artifact|unavailable/.test((S.monMsg() || [])[1]) ? 1 : 0, 1, 1);
+}
+const iso = run('propofol', 1, {}, 120);
+chk('Isoelectric (propofol 1.0, 120 s)', 'SR', iso.sr, 99.5, 100);
+chk('Isoelectric (propofol 1.0, 120 s)', 'message "Isoelectric EEG Detected"', iso.msg && iso.msg[1] === 'Isoelectric EEG Detected' ? 1 : 0, 1, 1);
+chk('GA, clean (propofol 0.57)', 'no message', p57.msg == null ? 1 : 0, 1, 1);
+chk('Deep (propofol 0.76) for 120 s', 'message "BIS Out of Target Range – Low"', /Target Range . Low/.test((p76.msg || [])[1]) ? 1 : 0, 1, 1);
+// WS4: median frequency (SEF50) under SEF95 in every state; propofol GA MF 2-8 Hz
+chk('MF < SEF95 in every state', 'states where MF >= SEF95', MF.filter(([, m, s]) => !(m < s)).length, 0, 0);
+chk('Propofol 0.57', 'MF (SEF50) Hz', p57.mf, 2, 8);
+{ // smoothing: after an awake -> 0.57 step, BIS is within 5 of its final value at least 5 s sooner with 10 s than 30 s
+  const fin = p57.bis, reach = n => { seed = BASE; const S = load(); S.mon.smooth = n; S.eng.setTarget('propofol', 0, S.mods); S.eng.snap(); S.step(120 * FS_);
+    S.eng.setTarget('propofol', 0.57, S.mods); for (let s = 1; s <= 240; s++) { S.step(FS_); if (Math.abs(S.COLS[S.COLS.length - 1].bis - fin) <= 5) return s; } return 999; };
+  const r10 = reach(10), r30 = reach(30);
+  rows.push(['Smoothing 10 s vs 30 s', `seconds to within 5 of final (10 s: ${r10}, 30 s: ${r30})`, String(r30 - r10), '5..', r30 - r10 >= 5 ? 'ok' : 'FAIL']); if (r30 - r10 < 5) fails++;
+}
 
 const wid = rows[0].map((_, i) => Math.max(...rows.map(r => r[i].length)));
 for (const r of rows) console.log(r.map((c, i) => c.padEnd(wid[i])).join('  '));

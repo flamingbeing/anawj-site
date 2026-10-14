@@ -73,7 +73,7 @@ function target(drug,d,mods){mods=mods||{};
  if(mods.elderly){p.alpha*=0.12;p.slow*=0.32;p.delta*=0.32;p.theta*=0.4;p.bg*=0.5;p.beta*=0.6;p.spindle*=0.4;
   p.alphaF-=drug==='sevo'?0.5:drug==='mix'?1-0.5*p.sh:1;if(drug!=='mix')p.bs=baseTarget(drug,Math.min(1,d+0.12)).bs;}
  // muscle relaxant: no facial EMG, and the muscle share of the awake fast activity goes too (stage 1, at once)
- if(mods.nmb){p.emg=0;p.gamma*=0.05;p.beta*=0.3;}
+ if(mods.nmb){p.emg=0;p.gamma*=0.05;p.beta*=0.25;}
  // facial EMG; an opioid blunts the response to surgery, so less of it
  else if(mods.emg){p.emg=Math.max(p.emg,6*(drug==='mix'?Math.max(0.25,1-(d.remi||0)/6):1));}
  // relaxant stage 2 (Engine nmbS, after ~60 s in a light patient): fast power falls further, slow waves appear (Schuller 2015)
@@ -89,7 +89,7 @@ function profile(p,f,spEnv,spF,kg,ks){
 }
 class Engine{
  constructor(){this.ph=OSC_F.map(()=>Math.random()*6.283);this.m=OSC_F.map(()=>1);this.p=target('propofol',0);
-  this.t=0;this.spT=1;this.spOn=false;this.spD=1;this.spF=12;this.kT=3;this.kPh=0;this.kg=1;this.ks=1;this.bsState=0;this.bsTimer=1;this.gate=1;this.drug='propofol';this.d=0;this.mods={};this.diT=0;this.diOn=false;this.nmbT=0;this.nmbS=0;}
+  this.t=0;this.spT=1;this.spOn=false;this.spD=1;this.spF=12;this.kT=3;this.kPh=0;this.kg=1;this.ks=1;this.bsState=0;this.bsTimer=1;this.gate=1;this.drug='propofol';this.d=0;this.mods={};this.diT=0;this.diOn=false;this.nmbT=0;this.nmbS=0;this.tone=1;this.diAcc=0;this.artAcc=0;this.tail=0;this.tailV=0;}
  setTarget(drug,d,mods){this.drug=drug;this.d=d;this.mods=mods||{};}
  snap(){this.p=target(this.drug,this.d,this.mods);} // jump instantly
  sample(){ // one sample at FS
@@ -99,6 +99,8 @@ class Engine{
   // relaxant stage 2: starts 60 s after the relaxant, only while the hypnotic is light; τ 120 s on, 30 s off
   const m=this.mods;if(m.nmb){this.nmbT+=dt;if(this.nmbT>60&&(tg.dH??this.d)<0.3)this.nmbS+=(1-this.nmbS)*dt/120;}else{this.nmbT=0;this.nmbS-=this.nmbS*dt/30;}
   m._nmbSlow=this.nmbS;
+  // facial muscle tone for the EMG readout: full while awake (dH < 0.3), a little under GA, none when paralysed
+  const tT=m.nmb?0.05:0.12+0.88*cl((0.5-(tg.dH??this.d))/0.2);this.tone+=(tT-this.tone)*dt/5;
   // spindles: 0.5-2 s bursts every 3-8 s, each centred somewhere in 11-14 Hz
   this.spT-=dt;if(this.spT<=0){this.spOn=!this.spOn;if(this.spOn){this.spD=this.spT=0.5+1.5*Math.random();this.spF=11+3*Math.random();}else this.spT=Math.max(1,3+5*Math.random()-this.spD);}
   const spEnv=this.spOn?Math.sin(Math.PI*(1-this.spT/this.spD))**2:0;
@@ -119,10 +121,14 @@ class Engine{
    const P=profile(this.p,f,spEnv,this.spF,this.kg,this.ks); x+=Math.sqrt(2*P)*this.m[i]*Math.sin(this.ph[i]);
   }
   const emgNoise=this.p.emg>0?randn()*Math.sqrt(this.p.emg)*1.2:0;
-  // diathermy: bursts of large broadband interference (a few seconds on, a few off)
-  let art=0;if(this.mods&&this.mods.diathermy){this.diT-=dt;if(this.diT<=0){this.diOn=!this.diOn;this.diT=this.diOn?1.5+Math.random()*2:3+Math.random()*4;}
-   if(this.diOn)art=randn()*180+250*Math.sin(2*Math.PI*41*this.t);}else this.diOn=false;
-  return x*this.gate+emgNoise+randn()*0.6+art;
+  let y=x*this.gate+emgNoise+randn()*0.6;
+  // diathermy: 1-2.5 s bursts of broadband interference clipping at ±400 uV, 4-8 s apart, each followed by a 1-s
+  // settling tail (a decaying offset); burst and tail samples are counted as artefact (diAcc, artAcc; step() reads them)
+  if(m.diathermy){this.diT-=dt;if(this.diT<=0){this.diOn=!this.diOn;this.diT=this.diOn?1+1.5*Math.random():4+4*Math.random();
+    if(!this.diOn){this.tail=1;this.tailV=(Math.random()<.5?-1:1)*(150+150*Math.random());}}}else{this.diOn=false;this.tail=0;}
+  if(this.diOn){y=Math.max(-400,Math.min(400,y+randn()*600));this.diAcc++;this.artAcc++;}
+  else if(this.tail>0){this.tail-=dt;y+=this.tailV*Math.exp(-(1-this.tail)/0.25);this.artAcc++;}
+  return y;
  }
 }
 // FFT (radix-2, in place)
@@ -137,12 +143,12 @@ function spectrum(win){ // returns {P: power per bin (uV^2), re, im}
 }
 function bandPow(P,lo,hi){let s=0;for(let k=Math.round(lo/DF);k<=Math.round(hi/DF);k++)s+=P[k];return s;}
 function features(P,win){
- const tot=bandPow(P,0.5,30); let c=0,sef=30; for(let k=1;k<=60;k++){c+=P[k];if(c>=0.95*tot){sef=k*DF;break;}}
+ const tot=bandPow(P,0.5,30); let c=0,sef=30,mf=null; for(let k=1;k<=60;k++){c+=P[k];if(mf==null&&c>=0.5*tot)mf=k*DF;if(c>=0.95*tot){sef=k*DF;break;}}
  const br=Math.log10((bandPow(P,30,47)+1e-3)/(bandPow(P,11,20)+1e-3));
  // suppression (BIS manual): 0.25-s sub-blocks of the newest second that stay within ±5 uV of their mean
  let r=0,ns=0; for(let i=NWIN-HOP;i<NWIN;i++)r+=win[i]**2; r=Math.sqrt(r/HOP);
  for(let j=NWIN-HOP;j<NWIN;j+=32){let mu=0,mx=0;for(let i=j;i<j+32;i++)mu+=win[i];mu/=32;for(let i=j;i<j+32;i++)mx=Math.max(mx,Math.abs(win[i]-mu));if(mx<=5)ns++;}
- const t47=bandPow(P,0.5,47),supFrac=ns/4;return {sef,br,tot,supFrac,suppressed:supFrac>=0.5,rms:r,slowFrac:bandPow(P,0.5,4)/t47,alphaFrac:bandPow(P,8,14)/t47,fast:Math.log10(bandPow(P,14,47)/t47),hi:Math.log10(bandPow(P,30,47)/t47)};
+ const t47=bandPow(P,0.5,47),supFrac=ns/4;return {sef,mf,br,tot,supFrac,suppressed:supFrac>=0.5,rms:r,slowFrac:bandPow(P,0.5,4)/t47,alphaFrac:bandPow(P,8,14)/t47,fast:Math.log10(bandPow(P,14,47)/t47),hi:Math.log10(bandPow(P,30,47)/t47)};
 }
 function bisRaw(f,bsr){ // teaching model, NOT the proprietary algorithm
  let b=115.85-0.874*f.sef+65.64*f.fast-3.49*f.hi+7.46*f.slowFrac+19.63*f.alphaFrac;
@@ -174,33 +180,51 @@ function fit(c,hLogical){const dpr=Math.min(2,window.devicePixelRatio||1);const 
 const eng=new Engine();
 const SIG=[]; const SIGMAX=8*FS;
 const COLS=[]; const COLMAX=300; // one column per second, 5 min
-const sup=[]; let bisS=null, lastSef=null, produced=0, simT=0, speed=1, paused=false;
+const sup=[]; let bisS=null, lastSef=null, lastMf=null, produced=0, simT=0, speed=1, paused=false;
 let drug='propofol', depth=0; const mods={elderly:false,emg:false,diathermy:false,nmb:false};
-const artH=[],bcH=[];let prevSup=false;
+const artH=[],bcH=[],rawH=[];let prevSup=false,isoN=0,outN=0;
+// monitor settings: smoothing (s), EEG scale (± uV), teaching labels and target band, the info message
+const mon={smooth:15,scale:50,teach:true,info:'',infoUntil:0};
 function applyTarget(){eng.setTarget(drug,depth,mods);describe();}
 
 function step(nSamples){
  for(let i=0;i<nSamples;i++){SIG.push(eng.sample());if(SIG.length>SIGMAX)SIG.shift();produced++;
   if(produced%HOP===0&&SIG.length>=NWIN){
    const win=SIG.slice(-NWIN);const {P}=spectrum(win);const f=features(P,win);
-   // artefact: any sample over 300 uV in the newest second. Artefact seconds lower SQI and are left out of BIS.
-   let mx=0;for(let j=NWIN-HOP;j<NWIN;j++)mx=Math.max(mx,Math.abs(win[j]));const art=mx>300;
-   artH.push(art?1:0);if(artH.length>30)artH.shift();
+   // artefact: any sample over 300 uV in the newest second, or a diathermy burst or its settling tail ("throw away").
+   // Artefact seconds lower SQI and are left out of BIS, SR, SEF and TP.
+   let mx=0;for(let j=NWIN-HOP;j<NWIN;j++)mx=Math.max(mx,Math.abs(win[j]));const diF=eng.diAcc/HOP,art=mx>300||eng.artAcc>0;eng.diAcc=eng.artAcc=0;
+   artH.push(art?1:0);if(artH.length>63)artH.shift(); // SQI over the last 63 s
    const sqi=Math.max(0,Math.min(100,Math.round(98-160*artH.reduce((a,b)=>a+b,0)/artH.length)));
    if(!art){sup.push(f.supFrac);if(sup.length>63)sup.shift();
     bcH.push(prevSup&&!f.suppressed?1:0);if(bcH.length>60)bcH.shift();prevSup=f.suppressed;}
    const bsr=sup.length?100*sup.reduce((a,b)=>a+b,0)/sup.length:0;
-   if(!art){const raw=bisRaw(f,bsr); bisS=bisS==null?raw:bisS+(raw-bisS)*(1/15);} // ~15 s smoothing
-   if(!f.suppressed&&!art)lastSef=f.sef;
+   // smoothing: moving average of the last 10, 15 or 30 artefact-free raw values
+   if(!art){rawH.push(bisRaw(f,bsr));if(rawH.length>30)rawH.shift();const r=rawH.slice(-mon.smooth);bisS=r.reduce((a,b)=>a+b,0)/r.length;}
+   if(!f.suppressed&&!art){lastSef=f.sef;lastMf=f.mf;}
    const db=new Float32Array(NB);for(let k=0;k<NB;k++)db[k]=10*Math.log10(P[k]+1e-4);
-   // EMG and total power hold their last clean value through artefact seconds
+   // EMG (dB re 0.0001 uV^2, as the monitor's 70-110 Hz band): a parametric muscle term, not measured (128 samples/s
+   // can't reach 70 Hz). Muscle tone, facial EMG and diathermy bursts; ketamine's gamma doesn't count. Not held in artefact.
+   const emg=27+10*Math.log10(1+12*eng.tone+52*eng.p.emg+250*diF)+(Math.random()-0.5)*3;
    const prev=COLS[COLS.length-1];
-   const emg=art&&prev?prev.emg:10*Math.log10(bandPow(P,30,47)+1e-4);
-   const tp=art&&prev?prev.tp:10*Math.log10(bandPow(P,0.5,47)+1e-4)+40;
-   COLS.push({db,sef:f.suppressed||art?null:f.sef,bis:bisS,bsr,emg,sqi,tp,bc:bcH.reduce((a,b)=>a+b,0)});if(COLS.length>COLMAX)COLS.shift();
+   const tp=art&&prev?prev.tp:10*Math.log10(bandPow(P,0.5,47)+1e-4)+40; // total power holds through artefact
+   // isoelectric: every second flat for 60 s; out of target: shown BIS outside 40-60 for 10 s while a hypnotic is on
+   isoN=art?isoN:f.supFrac>=1?isoN+1:0;
+   const blank=sqi<15,dH=eng.drug==='mix'?mixTarget(Object.assign({},MIX0,eng.d)).dH:eng.d;
+   outN=!blank&&dH>=0.3&&(bisS<40||bisS>60)?outN+1:0;
+   COLS.push({db,sef:f.suppressed||art?null:f.sef,mf:f.suppressed||art?null:f.mf,bis:blank?null:bisS,bsr,emg,sqi,tp,art,
+    bc:bcH.reduce((a,b)=>a+b,0)});if(COLS.length>COLMAX)COLS.shift();
    onColumn&&onColumn();
   }}
 }
+// the monitor's message region: [priority, text] or null. Wording as in the BIS Complete manual.
+function monMsg(){const c=COLS[COLS.length-1];if(!c)return null;
+ if(isoN>=60)return ['hi','Isoelectric EEG Detected'];
+ if(mon.teach&&outN>=10&&c.bis!=null)return ['hi','BIS Out of Target Range \u2013 '+(c.bis<40?'Low':'High')];
+ if(c.sqi<15)return ['lo','Data unavailable due to poor signal quality'];
+ if(c.sqi<50)return ['lo','Excessive Artifact Detected in Signal'];
+ if(mon.infoUntil>Date.now())return ['info',mon.info];
+ return null;}
 
 // ===== drawing: monitor =====
 const cEeg=document.getElementById('cEeg'),cTrend=document.getElementById('cTrend'),cDsa=document.getElementById('cDsa');
@@ -213,50 +237,76 @@ function paintOff(){const d=offImg.data;const start=COLMAX-COLS.length;
 let view='both';
 // lane heights: smaller on phones so the monitor and the controls fit one screen
 const laneH=()=>{const n=innerWidth<600;return view==='both'?{dsa:n?150:190,eeg:n?90:110}:{dsa:n?260:300,eeg:n?220:280};};
+// monitor clock: sim time from page open (the warm start's 5 min end now), so the trend axis matches the clock at any speed
+const T0=Date.now()-300e3,clk=t=>{const d=new Date(T0+t*1000);return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');};
+const AMBER='#ffb454',MFC='#b47cff',EMGC='#5fd08f';
+function txt(id,t){const el=$(id);if(el.textContent!==t)el.textContent=t;}
 function drawEeg(){if(view==='dsa')return;const {ctx,w,h}=fit(cEeg,laneH().eeg);ctx.fillStyle=SCR.bg;ctx.fillRect(0,0,w,h);
- ctx.strokeStyle=SCR.grid;ctx.lineWidth=1;for(let s=0;s<=8;s++){const x=Math.round(w*s/8)+.5;ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,h);ctx.stroke();}
- ctx.beginPath();ctx.moveTo(0,h/2+.5);ctx.lineTo(w,h/2+.5);ctx.stroke();
- // newest 2-s epoch
- ctx.fillStyle='rgba(23,143,215,.16)';ctx.fillRect(w*6/8,0,w*2/8,h);ctx.strokeStyle='rgba(120,190,255,.7)';ctx.strokeRect(w*6/8+.5,.5,w*2/8-1,h-1);
- ctx.fillStyle=SCR.mute;ctx.font=MONO;ctx.textAlign='right';ctx.fillText('newest 2 s → next DSA column',w-6,14);
- const n=SIG.length,off0=SIGMAX-n,sc=(h/2-4)/100;ctx.strokeStyle='#7ee0a1';ctx.lineWidth=1.3;ctx.beginPath();
- for(let i=0;i<n;i++){const x=(off0+i)/SIGMAX*w,y=h/2-SIG[i]*sc;i?ctx.lineTo(x,y):ctx.moveTo(x,y);}ctx.stroke();}
-function plotGeom(w,h){return {x:34,y:6,w:w-34-30,h:h-24};}
-const emgShow=e=>e+16; // displayed EMG (dB), placed on a BIS-like 30-55 dB scale
+ const secs=w<500?5:8,N=secs*FS,s=mon.scale,sc=(h/2)/s; // about 5 s across a phone, 8 s on a desktop; ±scale full height
+ ctx.strokeStyle=SCR.grid;ctx.lineWidth=1;for(let k=0;k<=secs;k++){const x=Math.round(w*k/secs)+.5;ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,h);ctx.stroke();}
+ for(let j=-1;j<=1;j++){const y=Math.round(h/2+j*h/4)+.5;ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke();} // every scale/2 uV
+ ctx.strokeStyle=SCR.mute;for(let k=1;k<secs;k++){const x=Math.round(w*k/secs)+.5;ctx.beginPath();ctx.moveTo(x,h-5);ctx.lineTo(x,h);ctx.stroke();}
+ if(mon.teach){ctx.fillStyle='rgba(23,143,215,.16)';ctx.fillRect(w*(secs-2)/secs,0,w*2/secs,h);ctx.strokeStyle='rgba(120,190,255,.7)';ctx.strokeRect(w*(secs-2)/secs+.5,.5,w*2/secs-1,h-1);}
+ const n=Math.min(SIG.length,N),o=SIG.length-n,x0=N-n;ctx.save();ctx.beginPath();ctx.rect(0,0,w,h);ctx.clip();ctx.strokeStyle='#7ee0a1';ctx.lineWidth=1.3;ctx.beginPath();
+ for(let i=0;i<n;i++){const x=(x0+i)/N*w,y=h/2-SIG[o+i]*sc;i?ctx.lineTo(x,y):ctx.moveTo(x,y);}ctx.stroke();ctx.restore();
+ if(mon.teach){ctx.font=MONO;const t='newest 2 s → next DSA column',tw=ctx.measureText(t).width;ctx.fillStyle='rgba(5,8,15,.8)';ctx.fillRect(w-tw-10,2,tw+8,16);
+  ctx.fillStyle=SCR.mute;ctx.textAlign='right';ctx.fillText(t,w-6,14);}
+ ctx.font='600 10px "JetBrains Mono", monospace';ctx.textAlign='center';ctx.fillStyle='rgba(5,8,15,.8)';ctx.fillRect(w/secs/2-12,h-15,24,13);ctx.fillStyle=SCR.mute;ctx.fillText('1 s',w/secs/2,h-5);
+ const c=COLS[COLS.length-1];if(c&&c.art){ctx.font='600 11px "JetBrains Mono", monospace';ctx.textAlign='left';ctx.fillStyle=SCR.bg;ctx.fillRect(2,2,64,15);ctx.fillStyle=AMBER;ctx.fillText('ARTIFACT',5,13);}
+ txt('eegLbl',`EEG · ${secs} s`);txt('eegDiv',`${s/2} µV/div`);}
 function drawTrend(){const {ctx,w,h}=fit(cTrend);ctx.fillStyle=SCR.bg;ctx.fillRect(0,0,w,h);
- const g={x:34,y:6,w:w-64,h:h-38},e={y:h-26,h:20};const start=COLMAX-COLS.length;const X=i=>g.x+(start+i+.5)/COLMAX*g.w;
- const Y=v=>g.y+g.h*(1-v/100);ctx.fillStyle='rgba(255,255,255,.07)';ctx.fillRect(g.x,Y(60),g.w,Y(40)-Y(60));
- ctx.font=MONO;ctx.fillStyle=SCR.mute;ctx.textAlign='right';for(const v of [0,50,100]){ctx.fillText(v,g.x-6,Math.min(g.y+g.h,Math.max(10,Y(v)+4)));}
- ctx.strokeStyle=SCR.bis;ctx.lineWidth=2;ctx.beginPath();COLS.forEach((c,i)=>{const y=Y(c.bis);i?ctx.lineTo(X(i),y):ctx.moveTo(X(i),y);});ctx.stroke();
- // EMG lane: one bar per second, 25-55 dB
- ctx.fillStyle=SCR.mute;ctx.fillText('EMG',g.x-6,e.y+e.h);ctx.strokeStyle=SCR.grid;ctx.strokeRect(g.x+.5,e.y+.5,g.w-1,e.h-1);
- const bw=Math.max(1,g.w/COLMAX);COLS.forEach((c,i)=>{const v=Math.max(0,Math.min(1,(emgShow(c.emg)-25)/30));if(v<=0)return;ctx.fillStyle=v>0.55?'#ffb454':'#5fd08f';ctx.fillRect(X(i)-bw/2,e.y+e.h-v*e.h,bw,v*e.h);});}
-function drawDsa(){if(view==='eeg')return;const {ctx,w,h}=fit(cDsa,laneH().dsa);ctx.fillStyle=SCR.bg;ctx.fillRect(0,0,w,h);const g=plotGeom(w,h);
+ const g={x:30,y:14,w:w-60,h:h-34};const start=COLMAX-COLS.length;const X=i=>g.x+(start+i+.5)/COLMAX*g.w;
+ const Y=v=>g.y+g.h*(1-v/100),YE=v=>g.y+g.h*(1-(Math.max(30,Math.min(80,v))-30)/50); // BIS 0-100 left, EMG 30-80 dB right
+ if(mon.teach){ctx.fillStyle='rgba(255,255,255,.09)';ctx.fillRect(g.x,Y(60),g.w,Y(40)-Y(60));}
+ ctx.strokeStyle=SCR.grid;ctx.lineWidth=1;ctx.strokeRect(g.x+.5,g.y+.5,g.w-1,g.h-1);ctx.beginPath();ctx.moveTo(g.x,Math.round(Y(50))+.5);ctx.lineTo(g.x+g.w,Math.round(Y(50))+.5);ctx.stroke();
+ ctx.font=MONO;ctx.textAlign='right';ctx.fillStyle=SCR.mute;for(const v of [0,50,100])ctx.fillText(v,g.x-5,Y(v)+4);
+ ctx.textAlign='left';ctx.fillStyle=EMGC;for(const v of [30,80])ctx.fillText(v,g.x+g.w+5,YE(v)+4);
+ ctx.fillStyle=SCR.bis;ctx.fillText('BIS',g.x,10);ctx.fillStyle=EMGC;ctx.textAlign='right';ctx.fillText('EMG',g.x+g.w,10);
+ // EMG: thin line; BIS: thick white line that breaks where the number is blanked
+ ctx.strokeStyle=EMGC;ctx.lineWidth=1;ctx.beginPath();COLS.forEach((c,i)=>{const y=YE(c.emg);i?ctx.lineTo(X(i),y):ctx.moveTo(X(i),y);});ctx.stroke();
+ ctx.strokeStyle=SCR.bis;ctx.lineWidth=2.5;ctx.lineJoin='round';ctx.beginPath();let pen=false;COLS.forEach((c,i)=>{if(c.bis==null){pen=false;return;}const y=Y(c.bis);pen?ctx.lineTo(X(i),y):ctx.moveTo(X(i),y);pen=true;});ctx.stroke();
+ // artefact bar along the time axis: amber where SQI < 50, yellow where the number was blanked (SQI < 15)
+ const bw=g.w/COLMAX+0.5;COLS.forEach((c,i)=>{if(c.sqi>=50)return;ctx.fillStyle=c.sqi<15?'#ffe600':AMBER;ctx.fillRect(X(i)-bw/2,g.y+g.h+1,bw,4);});
+ ctx.fillStyle=SCR.mute;ctx.textAlign='left';ctx.fillText(clk(simT-COLMAX),g.x,h-3);ctx.textAlign='right';ctx.fillText(clk(simT),g.x+g.w,h-3);}
+function drawDsa(){if(view==='eeg')return;const {ctx,w,h}=fit(cDsa,laneH().dsa);ctx.fillStyle=SCR.bg;ctx.fillRect(0,0,w,h);const R=mon.teach?36:18,g={x:34,y:6,w:w-34-R,h:h-24};
  ctx.imageSmoothingEnabled=true;ctx.drawImage(off,g.x,g.y,g.w,g.h);
- // SEF line
- const start=COLMAX-COLS.length;ctx.strokeStyle=SCR.sef;ctx.lineWidth=1.4;ctx.beginPath();let pen=false;
- COLS.forEach((c,i)=>{if(c.sef==null){pen=false;return;}const x=g.x+(start+i+.5)/COLMAX*g.w,y=g.y+g.h*(1-c.sef/30);pen?ctx.lineTo(x,y):ctx.moveTo(x,y);pen=true;});ctx.stroke();
- // newest column outline
- if(COLS.length){ctx.strokeStyle='rgba(255,255,255,.9)';ctx.lineWidth=1;ctx.strokeRect(g.x+g.w-g.w/COLMAX*3-1,g.y-1,g.w/COLMAX*3+2,g.h+2);}
+ // SEF95 (white) and median frequency, SEF50 (purple)
+ const start=COLMAX-COLS.length,line=(k,col,lw)=>{ctx.strokeStyle=col;ctx.lineWidth=lw;ctx.beginPath();let pen=false;
+  COLS.forEach((c,i)=>{if(c[k]==null){pen=false;return;}const x=g.x+(start+i+.5)/COLMAX*g.w,y=g.y+g.h*(1-c[k]/30);pen?ctx.lineTo(x,y):ctx.moveTo(x,y);pen=true;});ctx.stroke();};
+ line('mf',MFC,1.3);line('sef',SCR.sef,1.4);
+ if(mon.teach&&COLS.length){ctx.strokeStyle='rgba(255,255,255,.9)';ctx.lineWidth=1;ctx.strokeRect(g.x+g.w-g.w/COLMAX*3-1,g.y-1,g.w/COLMAX*3+2,g.h+2);} // newest column
  ctx.font=MONO;ctx.fillStyle=SCR.mute;ctx.textAlign='right';
  for(const f of [0,10,20,30]){ctx.fillText(f,g.x-6,Math.min(g.y+g.h,Math.max(g.y+9,g.y+g.h*(1-f/30)+4)));}
  ctx.save();ctx.translate(10,g.y+g.h/2);ctx.rotate(-Math.PI/2);ctx.textAlign='center';ctx.fillText('Hz',0,0);ctx.restore();
  ctx.textAlign='left';ctx.fillText('−5 min',g.x,h-4);ctx.textAlign='center';ctx.fillText('−2½',g.x+g.w/2,h-4);ctx.textAlign='right';ctx.fillText('now',g.x+g.w,h-4);
+ // SEF and MF numbers, top right, on a dark backing so they read over any colour
+ const c=COLS[COLS.length-1],blank=!c||c.sqi<15,sT='SEF '+(blank||lastSef==null?'--':lastSef.toFixed(1)),mT='MF '+(blank||lastMf==null?'--':lastMf.toFixed(1)),dot=' · ';
+ const wm=ctx.measureText(mT).width,wd=ctx.measureText(dot).width,ws=ctx.measureText(sT).width,rx=g.x+g.w-4;
+ ctx.fillStyle='rgba(5,8,15,.82)';ctx.fillRect(rx-wm-wd-ws-6,g.y+2,wm+wd+ws+8,17);ctx.textAlign='right';ctx.fillStyle=MFC;ctx.fillText(mT,rx,g.y+15);
+ ctx.fillStyle=SCR.mute;ctx.fillText(dot,rx-wm,g.y+15);ctx.fillStyle=SCR.sef;ctx.fillText(sT,rx-wm-wd,g.y+15);
+ // band labels on the right edge
+ ctx.font='600 11px "JetBrains Mono", monospace';ctx.textAlign='left';ctx.fillStyle=SCR.mute;const Yf=f=>g.y+g.h*(1-f/30);
+ for(const [lo,hi,l] of [[0.5,4,'δ'],[4,8,'θ'],[8,12,'α'],[13,30,'β']])ctx.fillText(l,g.x+g.w+4,Math.min(g.y+g.h-1,(Yf(lo)+Yf(hi))/2+4));
+ ctx.strokeStyle=SCR.mute;ctx.lineWidth=1;for(const f of [4,8,12,13]){const y=Math.round(Yf(f))+.5;ctx.beginPath();ctx.moveTo(g.x+g.w,y);ctx.lineTo(g.x+g.w+3,y);ctx.stroke();}
+ if(!mon.teach)return;
  // colour scale
- const lx=w-20;for(let i=0;i<g.h;i++){ctx.fillStyle=rgb(LUT[((1-i/g.h)*255)|0]);ctx.fillRect(lx,g.y+i,10,1);}
+ const lx=w-10;for(let i=0;i<g.h;i++){ctx.fillStyle=rgb(LUT[((1-i/g.h)*255)|0]);ctx.fillRect(lx,g.y+i,6,1);}
  ctx.save();ctx.translate(lx-6,g.y+g.h/2);ctx.rotate(-Math.PI/2);ctx.textAlign='center';ctx.fillStyle=SCR.mute;ctx.font='600 10px "JetBrains Mono", monospace';ctx.fillText('power',0,0);ctx.restore();}
 const $=id=>document.getElementById(id);
-function zoneOf(b){return b>80?'Awake/light':b>60?'Sedation':b>=40?'GA range':b>=20?'Deep':'Very deep';}
-function segs(id,frac,color){const el=$(id);el.style.setProperty('--seg',color);const n=Math.round(Math.max(0,Math.min(1,frac))*10);[...el.children].forEach((x,i)=>x.classList.toggle('on',i<n));}
+function zoneOf(b){return b>90?'Awake':b>80?'Light/moderate sedation':b>60?'Sedation':b>=40?'General anaesthesia':b>=20?'Deep hypnotic state':'Burst suppression / flat';}
+function segs(id,n,color){const el=$(id);el.style.setProperty('--seg',color);[...el.children].forEach((x,i)=>x.classList.toggle('on',i<n));}
 function readouts(){const c=COLS[COLS.length-1];if(!c)return;
- // like the monitor: SQI under 50 shows BIS hollow, under 15 no BIS at all
- const b=$('vBis');b.textContent=c.sqi<15?'--':Math.round(c.bis);b.classList.toggle('hollow',c.sqi>=15&&c.sqi<50);
- $('vZone').textContent=c.sqi<15?'Poor signal':c.sqi<50?'Low SQI: check':zoneOf(c.bis);
- $('vSqi').textContent=c.sqi;segs('sqiSegs',c.sqi/100,c.sqi<15?'#ff6b6b':c.sqi<50?'#ffb454':'#5fd08f');
- const e=emgShow(c.emg);$('vEmg').textContent=Math.round(e);segs('emgSegs',(e-25)/30,e>40?'#ffb454':'#5fd08f');
- $('vSr').textContent=Math.round(c.bsr);$('vSef').textContent=lastSef==null?'--':lastSef.toFixed(1);
- $('vTp').textContent=Math.round(c.tp);$('vBc').textContent=c.bsr<5||c.sqi<50?'--':c.bc;
- const d=new Date();$('vClock').textContent=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
+ // like the monitor: SQI under 50 shows BIS hollow; under 15 no BIS, SEF, SR, TP or BC at all
+ const bl=c.sqi<15,b=$('vBis');b.textContent=bl||c.bis==null?'--':Math.round(c.bis);b.classList.toggle('hollow',!bl&&c.sqi<50);
+ const sr=Math.round(c.bsr);txt('vZone',bl?'Poor signal':c.sqi<50?'Low SQI: check':sr>0?`Suppression (SR ${sr}%)`:zoneOf(c.bis));
+ // SQI: 5 bars of 20; EMG: 4 bars, empty under 30 dB, then 30-38, 39-47, 48-55, over 55
+ $('vSqi').textContent=c.sqi;segs('sqiSegs',Math.ceil(c.sqi/20),c.sqi<15?'#ff6b6b':c.sqi<50?AMBER:'#5fd08f');
+ const e=c.emg;$('vEmg').textContent=Math.round(e);segs('emgSegs',e<30?0:e<39?1:e<48?2:e<56?3:4,e>=48?AMBER:'#5fd08f');
+ $('vSr').textContent=bl?'--':sr;$('vSef').textContent=bl||lastSef==null?'--':lastSef.toFixed(1);
+ $('vTp').textContent=bl?'--':Math.round(c.tp);$('vBc').textContent=c.bsr<5||c.sqi<50?'--':c.bc;
+ txt('vClock',clk(simT));
+ // message region: change the text only when it changes (aria-live)
+ const m=monMsg(),mt=m?m[1]:'',el=$('vMsg');if(el.textContent!==mt){el.textContent=mt;el.className='msg'+(m?' '+m[0]:'');}}
 
 // ===== state descriptions =====
 function describe(){const d=depth;let n,t;
@@ -324,6 +374,14 @@ function setSpeed(s){speed=s;document.querySelectorAll('#speedSeg button[data-sp
 document.querySelectorAll('#speedSeg button[data-speed]').forEach(b=>b.onclick=()=>setSpeed(+b.dataset.speed));
 function setView(v){view=v;document.querySelectorAll('#viewSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.view===v));$('wDsa').hidden=v==='eeg';$('wEeg').hidden=v==='dsa';dirty=true;}
 document.querySelectorAll('#viewSeg button').forEach(b=>b.onclick=()=>setView(b.dataset.view));
+// soft keys: smoothing 10/15/30 s (info message for 5 s) and EEG scale ±25/50/100/250 uV
+$('kSmooth').onclick=()=>{const v=[10,15,30],n=v[(v.indexOf(mon.smooth)+1)%3];mon.smooth=n;$('kSmooth').textContent=`Smoothing ${n} s`;
+ mon.info=`Smoothing Rate Changed to ${n} Seconds`;mon.infoUntil=Date.now()+5000;dirty=true;setTimeout(()=>dirty=true,5100);};
+$('kScale').onclick=()=>{const v=[25,50,100,250],n=v[(v.indexOf(mon.scale)+1)%4];mon.scale=n;$('kScale').textContent=`EEG ±${n} µV`;};
+// teaching labels (per device): zone pill, newest-2-s box, newest-column outline, colour key and the 40-60 target band
+function setTeach(on){mon.teach=on;$('mTeach').checked=on;$('vZone').hidden=!on;$('tgtCap').hidden=!on;dirty=true;try{localStorage.setItem('bisdsa.teach',on?'1':'0');}catch(e){}}
+$('mTeach').onchange=e=>setTeach(e.target.checked);
+try{if(localStorage.getItem('bisdsa.teach')==='0')setTeach(false);}catch(e){}
 $('pause').onclick=()=>{paused=!paused;$('pause').setAttribute('aria-pressed',paused);$('pause').textContent=paused?'Resume':'Pause';};
 
 // ===== the case story =====
