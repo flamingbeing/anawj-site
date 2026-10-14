@@ -12,6 +12,9 @@ nuh-roster:
 prewarm:
   - changed-files:
       - any-glob-to-any-file: 'prewarm/**'
+bis-dsa:
+  - changed-files:
+      - any-glob-to-any-file: 'bis-dsa/**'
 hand-babies:
   - changed-files:
       - any-glob-to-any-file: ['hand-babies/**', 'hand/**']
@@ -23,4 +26,4 @@ hand-log:
       - any-glob-to-any-file: 'hand-log/**'
 site:
   - changed-files:
-      - any-glob-to-any-file: ['*', 'edit/**', 'feedback/**', 'worker/**', 'design/**', 'nuhsdesign/**', 'tools/**', 'privacy/**', 'cmcj/**', '.github/**', '.agents/**', '.claude/**']
+      - any-glob-to-any-file: ['*', 'edit/**', 'ask/**', 'feedback/**', 'worker/**', 'design/**', 'nuhsdesign/**', 'tools/**', 'privacy/**', 'cmcj/**', '.github/**', '.agents/**', '.claude/**']

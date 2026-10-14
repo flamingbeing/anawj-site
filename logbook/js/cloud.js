@@ -15,7 +15,10 @@
 //   logbooks/{email}/bin/{id}         { id, kind: case | reflection | note, data, deletedAt }  recycle bin (30 days), owner only
 //   summaries/{rid}                       counts only, readable by everyone signed in
 //   imports/{rid}                         { email, keys: [importKey], updatedAt }  (which old-form rows are in)
+//   formInbox/{responseId}                { id, email, date, dateText, details, labels, submittedAt }  Google Form responses
+//                                         waiting to be picked up (form-inbox.js); formBots/{uid} lists the bot that writes them
 //   sharedTemplates/{id}                  { id, name, cats, details? }
+//   feedback/{id}                         { uid, text, doing?, screen, version, ua, status, createdAt }  private feedback, app owner reads
 
 import { FIREBASE_CONFIG } from './firebase-config.js';
 import { checkWrite } from './recovery-store.js';
@@ -281,6 +284,35 @@ export async function isAppOwner(email) {
   const { db, F } = await sdk();
   try { return (await F.getDoc(F.doc(db, 'owners', lc(email)))).exists(); }
   catch (e) { if (e?.code !== 'permission-denied') console.warn('Owner check failed', e); return false; }
+}
+
+// ---- private feedback (More → Send feedback; owner reads it in More → Feedback). Never a GitHub issue. ----
+// feedback/{id} { uid, text, doing?, screen, version, ua, status: 'new' | 'done', createdAt (server time) }
+// Resolves true once the server has it, false when it is still queued on this device (offline: Firestore sends it later).
+export async function sendFeedback(rec) {
+  if (demo) return D.sendFeedback(rec);
+  const { db, F } = await sdk();
+  const p = F.addDoc(F.collection(db, 'feedback'), { ...rec, createdAt: F.serverTimestamp() });
+  let late = false;   // a refusal after we've said "queued" goes to the sync-error banner; before that, to the caller
+  p.catch(e => { if (late) { console.error('Feedback not sent', e); for (const cb of syncErrorListeners) cb(e); } });
+  return Promise.race([p.then(() => true), new Promise(r => setTimeout(() => { late = true; r(false); }, ACK_WAIT))]);
+}
+// the app owner only (the rules refuse everyone else): newest first, at most 200
+export async function listFeedback() {
+  if (demo) return D.listFeedback();
+  const { db, F } = await sdk();
+  const snap = await F.getDocs(F.query(F.collection(db, 'feedback'), F.orderBy('createdAt', 'desc'), F.limit(200)));
+  return snap.docs.map(d => { const x = d.data(); return { ...x, id: d.id, createdAt: x.createdAt?.toMillis?.() ?? null }; });
+}
+export async function setFeedbackStatus(id, status) {
+  if (demo) return D.setFeedbackStatus(id, status);
+  const { db, F } = await sdk();
+  await F.updateDoc(F.doc(db, 'feedback', id), { status });
+}
+export async function deleteFeedback(id) {
+  if (demo) return D.deleteFeedback(id);
+  const { db, F } = await sdk();
+  await F.deleteDoc(F.doc(db, 'feedback', id));
 }
 
 // Programme directors (pds/{email}, managed with the evals app) can read the shared totals.
@@ -603,6 +635,33 @@ export async function listCases(email) {
   if (demo) return D.listCases(email);
   const { db, F } = await sdk();
   return (await F.getDocs(F.collection(db, 'logbooks', lc(email), 'cases'))).docs.map(d => ({ ...d.data(), id: d.id }));
+}
+
+// ---- the Google Form inbox: formInbox/{responseId}, written by the Form's Apps Script (form-inbox.js) ----
+// The resident's own entries (the rules let each person read and delete only entries with their email). Read from
+// the server, never the offline cache, so an entry already picked up on another device isn't added twice.
+export async function listFormEntries(email) {
+  if (demo) return D.listFormEntries ? D.listFormEntries(email) : [];
+  const { db, F } = await sdk();
+  const snap = await F.getDocsFromServer(F.query(F.collection(db, 'formInbox'), F.where('email', '==', lc(email))));
+  return snap.docs.map(d => ({ ...d.data(), id: d.id }));
+}
+// One entry at a time, its case (if any) and the entry's delete in one batch, waiting for the server: they land
+// together or not at all, so a case is never lost with its entry, and an entry already picked up on another device
+// (its delete refused) holds up only itself. items: [{ id: inbox id, case: case to save or null }]. -> ids done
+export async function commitFormPickup(email, items) {
+  if (demo) return D.commitFormPickup ? D.commitFormPickup(email, items) : [];
+  email = lc(email);
+  const { db, F } = await sdk();
+  const done = [];
+  for (const it of items) {
+    const b = F.writeBatch(db);
+    if (it.case) { const d = cleanCase(it.case); b.set(F.doc(db, 'logbooks', email, 'cases', d.id), d); }
+    b.delete(F.doc(db, 'formInbox', String(it.id)));
+    try { await b.commit(); done.push(String(it.id)); }
+    catch (err) { console.warn('Google Form entry not picked up', it.id, err.message); }
+  }
+  return done;
 }
 
 // The one-off initials fix (the app owner): every logbook's email, then the fixed cases written back.

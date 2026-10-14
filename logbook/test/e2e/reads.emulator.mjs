@@ -142,6 +142,30 @@ try {
     for (const c of ['reflections', 'bin']) assert.ok(billed(r, c) <= 1, `${c}: ${billed(r, c)} reads with nothing changed`);
     assert.equal(await S(p, 'S.cases.length'), 51);
   } });
+  // the Google Form inbox (form-inbox.js): an entry from the Form's script becomes a case and leaves the inbox; an
+  // edited response replaces that case
+  {
+    const entry = (details, at) => ({ id: '2_FakeResp1', email: E, date: day(1), details, labels: ['16) Lower Segment Caesarean Section (10 | 20)'], submittedAt: at });
+    const inboxEmpty = async () => !(await (await fetch(`${DB}/formInbox/2_FakeResp1`, { headers: H })).json()).fields;
+    const formCase = 'S.cases.find(c => c.source === "form")';
+    await put('formInbox/2_FakeResp1', entry('GH 29F fake Form case S1234567D', Date.now()));
+    await open('Form 1 (a response waiting)', { check: async p => {
+      await until(p, async () => (await import('./js/ui-core.js')).S.cases.some(c => c.source === 'form'));
+      assert.equal(await S(p, formCase + '.initials'), 'GH');
+      assert.equal(await S(p, formCase + '.details'), '29F fake Form case [ID removed]');
+      assert.deepEqual(await S(p, formCase + '.cats'), ['16']);
+      assert.equal(await S(p, 'S.cases.length'), 52);
+      for (const t0 = Date.now(); !(await inboxEmpty()); await p.waitForTimeout(200)) if (Date.now() - t0 > 15000) throw new Error('inbox not emptied');
+      await quiet(p);
+    } });
+    await put('formInbox/2_FakeResp1', entry('GH 29F fake Form case, edited on the Form', Date.now()));
+    await open('Form 2 (the response edited)', { check: async p => {
+      await until(p, async () => (await import('./js/ui-core.js')).S.cases.some(c => c.source === 'form' && /edited on the Form/.test(c.details)));
+      assert.equal(await S(p, 'S.cases.length'), 52);
+      for (const t0 = Date.now(); !(await inboxEmpty()); await p.waitForTimeout(200)) if (Date.now() - t0 > 15000) throw new Error('inbox not emptied');
+      await quiet(p);
+    } });
+  }
   // 6. sign out: this device's copy is deleted
   await open('6 (sign out)', { check: async p => {
     await p.evaluate(async () => (await import('./js/cloud.js')).signOut());

@@ -203,6 +203,10 @@ const NOT_INITIALS = new Set(['GA', 'LA', 'RA', 'MAC', 'ETT', 'LMA', 'ASA', 'OT'
 // Patient initials as stored: upper case, letters, '-' and '.' only, at most 20 characters.
 export const cleanInitials = s => String(s || '').toUpperCase().replace(/[^A-Z.\-]/g, '').slice(0, 20);
 
+// Patient identifiers don't belong in a logbook: an NRIC/FIN (S1234567A) or a long number (a hospital or phone
+// number). The Case tab asks before saving one (ui-core.js okNoIds); the Google Form inbox removes them (form-inbox.js).
+export const ID_RE = /\b[STFGM]\d{7}[A-Z]\b|\b\d{7,}\b/i;
+
 // "AB 34F LSCS spinal" / "AB/34F ..." -> { initials: 'AB', details: '34F LSCS spinal' }. Leading 2–4 letters,
 // unless they are a known case word ("LSCS spinal", "TKR"). Longer initials (5–8 letters, from older cases) count
 // only when an age or a "/" follows ("ABCDEF 45F …", "ABCDEF/45F …"): on their own, "ELECTIVE LSCS" or "spinal

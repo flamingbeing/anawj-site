@@ -10,6 +10,7 @@ The rule for new apps is in `AGENTS.md`.
 | Address | Folder now | Notes |
 |---|---|---|
 | `anawj.com/` | `index.html` | Status page only. Stays on GitHub Pages. |
+| `anaes.anawj.com/bis/` | `bis-dsa/` | Static, anaesthesia teaching: BIS to DSA simulator (14 Oct 2026). Needs its custom domain (below). |
 | `hand.anawj.com/cmcj/` | `cmcj/` | Static, hand surgery. |
 | `hand.anawj.com/babies/` | `hand-babies/` | Static, hand surgery. The old `hand/` redirect goes. |
 | `hand.anawj.com/handlog/` | `hand-log/` | Hand DOPS/Mini-CEX log; data on the phone only, no sign-in (owner, 13 Oct 2026). |
@@ -21,6 +22,7 @@ The rule for new apps is in `AGENTS.md`.
 | `anawj.com/privacy/` | `privacy/` | Stays: the Google sign-in consent screen points here. |
 | `anawj.com/prewarm-update/` | `prewarm-update/` | Stays until no phone runs the old prewarm worker, then becomes a redirect. |
 | `anawj.com/edit/` (decided in step 5) | `edit/` | Stays on `anawj.com`: see "The page editor" below. |
+| `ask.anawj.com/` | `ask/` | Ask Claude, the owner's page; behind Cloudflare Access; its API `/api/ask` is `worker/ask.js` (`edit/NOTES.md`). |
 
 Single-app subdomains serve the app at the root; shared ones keep a path per app. Folders in the repo don't need
 renaming: the hosting maps each address to its folder.
@@ -84,7 +86,9 @@ and builds a preview for every PR.
 - Any other address (the previews on `workers.dev`, the copy of main) serves the whole repo as before.
 - **Trying a subdomain before it exists:** on a PR preview, `<preview>/_sites/hand.anawj.com/babies/` serves what
   `hand.anawj.com/babies/` will. (Real hosts don't take that route.)
-- No data, no secrets, no storage in the Worker: it only serves files. Workers' free plan allows 100,000 requests a
+- No data and no storage in the Worker: it serves files, plus one owner-only API on `ask.anawj.com` (`worker/ask.js`,
+  Ask Claude), the only part with secrets (a GitHub token for issues, the Access team and audience), kept in
+  Cloudflare, never in the repo. Previews never answer that API. Workers' free plan allows 100,000 requests a
   day; every request goes through the Worker (a page load without a cached service worker is a few dozen). If that is
   ever not enough, Workers Paid is $5 a month.
 - Tests: `node worker/test/routes.test.mjs` and `node worker/test/sites.test.mjs` (in the merge checklist in `AGENTS.md`).
@@ -104,6 +108,9 @@ Check: each address answers with its app (`hand.anawj.com/babies/` the hand asse
 trainer, `apmes.anawj.com/logbook/?demo`, `apmes.anawj.com/evals/?demo`, `nuhroster.anawj.com/?demo`,
 `prewarmstudy.anawj.com/`); the same apps still work at their old `anawj.com/<folder>/` addresses (GitHub Pages, until
 each one's step makes it a redirect), and `hand.anawj.com/logbook/` is a 404.
+
+Later addresses take the same two clicks once their PR is merged: `anaes.anawj.com` (BIS to DSA, 14 Oct 2026; check
+`anaes.anawj.com/bis/`).
 
 ## The page editor (decided in step 5)
 

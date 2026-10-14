@@ -10,8 +10,8 @@ const b = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: pr
 // every page the demo admin can open (its id is the address: #display …)
 const PAGES = ['log', 'logbook', 'reflect', 'progress', 'notes', 'more', 'caselogs', 'totals', 'points', 'account', 'settings', 'recovery', 'data',
   'reflimport', 'display', 'access', 'displayadv', 'loggingadv', 'sendto', 'sync', 'sharefmt', 'showhide', 'logging', 'notesset', 'reflset',
-  'export', 'choose', 'admin', 'admintotals', 'adminresidents', 'adminadv', 'tags'];
-const LAZY = ['ui-settings', 'ui-reflect', 'ui-logbook', 'ui-progress', 'ui-admin', 'ui-caselogs', 'ui-account', 'ui-sync', 'ui-send', 'portfolio', 'cloud-save', 'markdown', 'ui-parts'];
+  'export', 'choose', 'admin', 'admintotals', 'adminresidents', 'adminadv', 'tags', 'feedback', 'feedbackinbox'];
+const LAZY = ['ui-settings', 'ui-reflect', 'ui-logbook', 'ui-progress', 'ui-admin', 'ui-caselogs', 'ui-account', 'ui-sync', 'ui-send', 'portfolio', 'cloud-save', 'markdown', 'ui-parts', 'ui-feedback'];
 const loaded = p => p.evaluate(() => performance.getEntriesByType('resource').map(e => e.name).filter(n => /\.js(\?|$)/.test(n)));
 const name = u => u.replace(/^.*\/(js\/)?/, '').replace(/\.js.*$/, '');
 const goHash = (p, id) => p.evaluate(x => { location.hash = '#' + x; }, id).then(() => p.waitForFunction(x => document.getElementById('app').dataset.page === x, id));

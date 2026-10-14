@@ -85,6 +85,8 @@ export async function saveTeamAll({ team, months, rotations }, user, { expectedU
       throw new Conflict({ updatedAt: cur.data().updatedAt, updatedBy: cur.data().updatedBy });
     }
     tx.set(main, doc);
+    // a copy of each save of the staff list, rooms and settings (permanent in the rules), to go back to if needed
+    tx.set(F.doc(F.collection(db, 'team', 'main', 'versions')), plain({ team, savedAt: now, savedBy: by }));
     tx.set(F.doc(db, 'team', 'monthly'), plain({ months, updatedAt: now, updatedBy: by }));
     tx.set(F.doc(db, 'team', 'rotations'), plain({ weeks: rotations.weeks || {}, updatedAt: now, updatedBy: by }));
   });

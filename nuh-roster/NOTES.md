@@ -130,6 +130,12 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
   - Each `rosters/{date}` doc has an immutable `versions` history, which is what Restore uses.
   - Access is the `members` list plus `accessRequests`, enforced by `firestore.rules`.
   - Member roles: `admin`, `rosterer` and `viewer`. Viewers read everything but write nothing (`editor()` in the rules); the app shows them only My day and the roster saved for the team for the date on screen.
+  - The rules (once the 13 Oct rules PR is merged): only `admin` and `rosterer` write (an allowlist, so a missing or
+    mistyped role can't); member documents are `{ role, name, staffId? }` with a lower-case email id, and an admin can't
+    demote or remove themselves; every roster, version and team write must be stamped with the signed-in email
+    (`updatedBy` / `savedBy`); roster ids are dates and match `date`; team documents are only main, monthly, rotations;
+    each staff-list save adds a permanent `team/main/versions` copy. Tested in the emulator: `nuh-roster/test/rules.emulator.mjs`
+    (run by `tools/test-rules.sh`).
   - The rules deploy automatically on merge to main (`.github/workflows/deploy-firestore-rules.yml`): edit the file, never ask the owner to paste it.
   - The Firebase web config in `js/firebase-config.js` is public by design.
 - **Rotations:** a junior's posting on a date is that day's change (`day.staff[id].posting`), else the week's rotation, else their usual posting (`p.posting`). The roster engine and checks get the staff list with each junior's posting for the day on screen (`dayStaff()`), so posting matches and the "(RA)" tags follow the rotation. Rotation edits go through Undo. The Excel layout is names down the first column and each week's Monday across the top; the download is a blank to fill in.
@@ -205,6 +211,10 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
 - A comment that is only a time ("5pm") reads back as a leaving time, as in the older roster style "Name -5pm".
 - AOH and liver duties don't make anyone post call; only the duties listed in Settings do.
 - Undo is per date and is cleared when the header date changes.
+- Practice › Fix 3 problems plants random problems; on a day already short of a senior it plants a second double cover
+  instead of a "no senior" room. Fill empty gaps tries a few seeds and keeps the fullest, but now and then (about 1 in
+  10 tries) it still gives a freed senior another job and a planted gap needs fixing by hand. The browser test tries
+  the exercise up to three times.
 - When this browser can't save (storage full), a bar says so and offers Download everything and Remove old days
   (more than 3 months old); saved data that can't be read is kept under `<key>-damaged-<time>` with a download.
   Days put away don't keep their checks (rebuilt on opening).
@@ -308,4 +318,7 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
   phone sizes (16px fields, 30px targets, no sideways scroll), My day (copy for logbook, My week), the welcome card.
   Runs in the Checks workflow. A signed-in flow can be tried by routing `js/cloud.js` to a fake module (see how the
   13 Oct session tested viewers and team saves).
+- The demo is built for tomorrow's date, so the browser test meets a different made-up day each day. A step that
+  depends on the day (free seniors, who is on leave) must not assume a fixed outcome: start from "Reset this day" and
+  allow for randomness (14 Oct: Fix 3 problems failed every PR when the day was short of a senior; #491).
 - Real sample files (rosters, the contact list, HMS PDFs) must stay out of the repo.

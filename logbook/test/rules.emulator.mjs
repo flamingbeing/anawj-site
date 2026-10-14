@@ -1,7 +1,7 @@
 // Firestore rules checks against the local emulator (fake accounts only). Not run by plain node:
 // needs firebase-tools, @firebase/rules-unit-testing and firebase; see logbook/README.md, "Tests".
 import { initializeTestEnvironment, assertSucceeds, assertFails } from '@firebase/rules-unit-testing';
-import { doc, getDoc, setDoc, deleteDoc, getDocs, collection, query, where, writeBatch, FieldPath } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc, getDocs, collection, query, where, writeBatch, FieldPath, serverTimestamp, updateDoc, addDoc, orderBy, limit } from 'firebase/firestore';
 import { mergePaths } from '../js/profiles.js';
 import fs from 'node:fs';
 const env = await initializeTestEnvironment({ projectId: 'demo-logbook', firestore: { rules: fs.readFileSync('firestore.rules', 'utf8'), host: '127.0.0.1', port: 8085 } });
@@ -282,6 +282,86 @@ await t('other config doc', assertFails(setDoc(doc(adm, 'config', 'other'), { da
 await t('random collection', assertFails(getDoc(doc(adm, 'other', 'x'))));
 await t('template admin delete', assertSucceeds(deleteDoc(doc(adm, 'config', 'portfolioTemplate'))));
 await t('template part admin delete', assertSucceeds(deleteDoc(doc(adm, 'config', 'portfolioTemplate_part0'))));
+// private feedback (More → Send feedback): anyone signed in sends as themselves; only the app owner reads, marks done, deletes
+{
+  // authenticatedContext(email) makes the uid the email
+  const fb = (uid, o = {}) => ({ uid, text: 'The Save button is slow', screen: 'log', version: 'logbook-v41-abcd1234', ua: 'Mozilla/5.0 (fake)', status: 'new', createdAt: serverTimestamp(), ...o });
+  await t('feedback: resident sends', assertSucceeds(setDoc(doc(a, 'feedback', 'f1'), fb(A))));
+  await t('feedback: auto id (addDoc)', assertSucceeds(addDoc(collection(b, 'feedback'), fb(B, { doing: 'Logging a case' }))));
+  await t('feedback: as someone else', assertFails(setDoc(doc(a, 'feedback', 'f2'), fb(B))));
+  await t('feedback: anon', assertFails(setDoc(doc(anon, 'feedback', 'f2'), fb('x'))));
+  await t('feedback: unverified', assertFails(setDoc(doc(unv, 'feedback', 'f2'), fb(A))));
+  await t('feedback: client time', assertFails(setDoc(doc(a, 'feedback', 'f2'), fb(A, { createdAt: Date.now() }))));
+  await t('feedback: no time', assertFails(setDoc(doc(a, 'feedback', 'f2'), (({ createdAt, ...r }) => r)(fb(A)))));
+  await t('feedback: born done', assertFails(setDoc(doc(a, 'feedback', 'f2'), fb(A, { status: 'done' }))));
+  await t('feedback: extra field (email)', assertFails(setDoc(doc(a, 'feedback', 'f2'), fb(A, { email: A }))));
+  await t('feedback: extra field (screen text)', assertFails(setDoc(doc(a, 'feedback', 'f2'), fb(A, { page: 'AB 5yo' }))));
+  await t('feedback: missing version', assertFails(setDoc(doc(a, 'feedback', 'f2'), (({ version, ...r }) => r)(fb(A)))));
+  await t('feedback: empty text', assertFails(setDoc(doc(a, 'feedback', 'f2'), fb(A, { text: '' }))));
+  await t('feedback: 2000 chars', assertSucceeds(setDoc(doc(a, 'feedback', 'f3'), fb(A, { text: 'x'.repeat(2000), doing: 'y'.repeat(300) }))));
+  await t('feedback: 2001 chars', assertFails(setDoc(doc(a, 'feedback', 'f2'), fb(A, { text: 'x'.repeat(2001) }))));
+  await t('feedback: doing 301', assertFails(setDoc(doc(a, 'feedback', 'f2'), fb(A, { doing: 'y'.repeat(301) }))));
+  await t('feedback: doing not text', assertFails(setDoc(doc(a, 'feedback', 'f2'), fb(A, { doing: 5 }))));
+  await t('feedback: long screen', assertFails(setDoc(doc(a, 'feedback', 'f2'), fb(A, { screen: 's'.repeat(41) }))));
+  await t('feedback: long ua', assertFails(setDoc(doc(a, 'feedback', 'f2'), fb(A, { ua: 'u'.repeat(201) }))));
+  await t('feedback: long id', assertFails(setDoc(doc(a, 'feedback', 'i'.repeat(41)), fb(A))));
+  await t('feedback: resident overwrites own', assertFails(setDoc(doc(a, 'feedback', 'f1'), fb(A, { text: 'changed' }))));
+  await t('feedback: resident reads own', assertFails(getDoc(doc(a, 'feedback', 'f1'))));
+  await t('feedback: resident lists', assertFails(getDocs(collection(a, 'feedback'))));
+  await t('feedback: resident marks done', assertFails(updateDoc(doc(a, 'feedback', 'f1'), { status: 'done' })));
+  await t('feedback: resident deletes own', assertFails(deleteDoc(doc(a, 'feedback', 'f1'))));
+  await t('feedback: admin (not owner) reads', assertFails(getDoc(doc(adm, 'feedback', 'f1'))));
+  await t('feedback: admin lists', assertFails(getDocs(collection(adm, 'feedback'))));
+  await t('feedback: admin deletes', assertFails(deleteDoc(doc(adm, 'feedback', 'f1'))));
+  await t('feedback: owner lists newest first', assertSucceeds(getDocs(query(collection(own, 'feedback'), orderBy('createdAt', 'desc'), limit(200)))));
+  await t('feedback: owner reads', assertSucceeds(getDoc(doc(own, 'feedback', 'f1'))));
+  await t('feedback: owner marks done', assertSucceeds(updateDoc(doc(own, 'feedback', 'f1'), { status: 'done' })));
+  await t('feedback: owner marks new again', assertSucceeds(updateDoc(doc(own, 'feedback', 'f1'), { status: 'new' })));
+  await t('feedback: owner other status', assertFails(updateDoc(doc(own, 'feedback', 'f1'), { status: 'wontfix' })));
+  await t('feedback: owner edits text', assertFails(updateDoc(doc(own, 'feedback', 'f1'), { text: 'edited' })));
+  await t('feedback: owner edits text with status', assertFails(updateDoc(doc(own, 'feedback', 'f1'), { status: 'done', text: 'edited' })));
+  await t('feedback: owner adds field', assertFails(updateDoc(doc(own, 'feedback', 'f1'), { note: 'x' })));
+  await t('feedback: owner deletes', assertSucceeds(deleteDoc(doc(own, 'feedback', 'f1'))));
+}
+// the Google Form inbox: only the listed bot adds entries; each resident reads and deletes only their own
+{
+  await env.withSecurityRulesDisabled(async ctx => { await setDoc(doc(ctx.firestore(), 'formBots', 'formbot-uid'), { note: 'Form script' }); });
+  const bot = env.authenticatedContext('formbot-uid', { email: 'formbot@example.com', email_verified: false }).firestore();
+  const fake = env.authenticatedContext('other-uid', { email: 'formbot@example.com', email_verified: false }).firestore();
+  const e = (id, email, extra = {}) => ({ id, email, date: '2026-03-04', details: 'AB 34F LSCS spinal', labels: ['16) GA'], submittedAt: 1, ...extra });
+  await t('form: bot adds an entry', assertSucceeds(setDoc(doc(bot, 'formInbox', 'r1'), e('r1', A))));
+  await t('form: bot replaces it (edited response)', assertSucceeds(setDoc(doc(bot, 'formInbox', 'r1'), e('r1', A, { submittedAt: 2 }))));
+  await t('form: bot adds one for B', assertSucceeds(setDoc(doc(bot, 'formInbox', 'r2'), e('r2', B))));
+  await t('form: bot, no date', assertSucceeds(setDoc(doc(bot, 'formInbox', 'r3'), e('r3', A, { date: null, dateText: 'last Tue' }))));
+  await t('form: bot reads', assertFails(getDoc(doc(bot, 'formInbox', 'r1'))));
+  await t('form: bot lists', assertFails(getDocs(collection(bot, 'formInbox'))));
+  await t('form: bot deletes', assertFails(deleteDoc(doc(bot, 'formInbox', 'r1'))));
+  await t('form: bot writes a case', assertFails(setDoc(doc(bot, 'logbooks', A, 'cases', 'x'), c('x'))));
+  await t('form: bot reads a logbook', assertFails(getDoc(doc(bot, 'logbooks', A))));
+  await t('form: bot lists itself as a bot', assertFails(setDoc(doc(bot, 'formBots', 'other-uid'), {})));
+  await t('form: unlisted account adds', assertFails(setDoc(doc(fake, 'formInbox', 'r9'), e('r9', A))));
+  await t('form: resident adds an entry', assertFails(setDoc(doc(a, 'formInbox', 'r9'), e('r9', A))));
+  await t('form: bot, extra field', assertFails(setDoc(doc(bot, 'formInbox', 'r9'), e('r9', A, { name: 'x' }))));
+  await t('form: bot, id mismatch', assertFails(setDoc(doc(bot, 'formInbox', 'r9'), e('r8', A))));
+  await t('form: bot, odd id', assertFails(setDoc(doc(bot, 'formInbox', 'r 9'), e('r 9', A))));
+  await t('form: bot, capital email', assertFails(setDoc(doc(bot, 'formInbox', 'r9'), e('r9', 'Alice@example.com'))));
+  await t('form: bot, bad date', assertFails(setDoc(doc(bot, 'formInbox', 'r9'), e('r9', A, { date: '4/3/2026' }))));
+  await t('form: bot, long details', assertFails(setDoc(doc(bot, 'formInbox', 'r9'), e('r9', A, { details: 'x'.repeat(2001) }))));
+  await t('form: bot, too many labels', assertFails(setDoc(doc(bot, 'formInbox', 'r9'), e('r9', A, { labels: Array(41).fill('16) GA') }))));
+  await t('form: resident lists own', (async () => {
+    const got = await assertSucceeds(getDocs(query(collection(a, 'formInbox'), where('email', '==', A))));
+    if (got.size !== 2) throw new Error('expected 2, got ' + got.size);
+  })());
+  await t('form: resident lists all', assertFails(getDocs(collection(a, 'formInbox'))));
+  await t('form: resident reads other', assertFails(getDoc(doc(a, 'formInbox', 'r2'))));
+  await t('form: resident deletes other', assertFails(deleteDoc(doc(a, 'formInbox', 'r2'))));
+  await t('form: unverified reads own', assertFails(getDocs(query(collection(unv, 'formInbox'), where('email', '==', A)))));
+  await t('form: resident edits own entry', assertFails(setDoc(doc(a, 'formInbox', 'r1'), e('r1', A, { details: 'changed' }))));
+  await t('form: admin reads', assertFails(getDoc(doc(adm, 'formInbox', 'r1'))));
+  await t('form: anyone reads bots', assertFails(getDoc(doc(own, 'formBots', 'formbot-uid'))));
+  await t('form: resident deletes own', assertSucceeds(deleteDoc(doc(a, 'formInbox', 'r1'))));
+  await t('form: case from the Form', assertSucceeds(setDoc(doc(a, 'logbooks', A, 'cases', 'imp_form~003ar3'), { ...c('imp_form~003ar3'), source: 'form', importKey: 'form:r3@1700000000000' })));
+}
 console.log(`${n - fail}/${n} rule checks passed`);
 await env.cleanup();
 process.exit(fail ? 1 : 0);

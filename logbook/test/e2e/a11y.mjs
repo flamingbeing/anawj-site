@@ -86,6 +86,11 @@ const SCREENS = [
   ['Export / Import', hash('data'), false],
   ['Recover drafts', hash('recovery'), false],
   ['Admin portal', hash('admin'), false],
+  ['Send feedback', async p => { await hash('feedback')(p); await p.getByLabel('Your feedback').waitFor(); }, true],
+  ['Feedback (owner)', async p => {
+    await p.evaluate(async () => { const { cloud } = await import('./js/ui-core.js'); await cloud.sendFeedback({ uid: 'demo-uid', text: 'Fake: the tag picker is slow', doing: 'Logging a fake case', screen: 'log', version: 'logbook-v41-fake', ua: 'Fake browser', status: 'new' }); });
+    await hash('feedbackinbox')(p); await p.locator('.fb-item').first().waitFor();
+  }, true],
   ['Admin residents', hash('adminresidents'), false],
   ['Advanced admin', hash('adminadv'), false],
   ['Case logs', hash('caselogs'), false],

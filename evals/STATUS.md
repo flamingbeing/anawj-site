@@ -12,8 +12,9 @@ Read them all before starting; edit only yours.
 
 ## Waiting on the owner
 
-- Approve (or not) the rules PR #428: PD-only notes keep their author; the item can't change under a started
-  assessment. Emulator: evals 201/201, logbook 227/227, prewarm 116/116.
+- Rules PR #428 (PD-only notes keep their author; the item can't change under a started assessment): **approved
+  14 Oct**, held because the Checks "browser" job is red in `nuh-roster/test/e2e.mjs` on main too (not this PR's).
+  Merges once main is green; the owner can say "merge anyway". Emulator: evals 201/201, logbook 227/227, prewarm 116/116.
 - Decide the assessment-design ideas in `IMPROVEMENTS.md` ("Later or bigger"): they change the programme's own
   forms, so they're for the PD, not the app.
 - Optional: a weekly email digest (Trigger Email extension) if completion stays low with WhatsApp/Email reminders.
@@ -36,7 +37,7 @@ Read them all before starting; edit only yours.
   #412 Progress "Ask for next", filter, early-R1 deadline; #413 PD cohort sort, committee CSV, flags by resident,
   stuck requests; #416 faster first open; #421 a11y fixes, `a11y.mjs`, `edge.e2e.mjs`; #423 `schema.js`;
   #431 quicker request (Today/Yesterday, case link); #434 How evals work, install card; #437 My record (print, CSV);
-  #438 settings switch; #440 assessor time-savers; #441 edit case details. #428 (rules) waits for approval.
+  #438 settings switch; #440 assessor time-savers; #441 edit case details; #442 status. #428 (rules) approved, waits on a green check.
 - #367 Evals moved to `apmes.anawj.com/evals/` (sign-in domain, forward from `anawj.com/evals/` with path, query and `#` kept); sign-in checked by the owner.
 - #157 Logbook learnings moved from `evals/NOTES.md` to `logbook/NOTES.md`; evals notes keep a pointer.
 - #156 `evals/NOTES.md`: theme, keyboard, More screen decisions, app internals, working alongside the logbook session, backlog.
@@ -47,6 +48,7 @@ Read them all before starting; edit only yours.
 
 ## Decisions log
 
+- 2026-10-14: The owner approved rules PR #428; it still waits for green checks before merging.
 - 2026-10-14: The improvement run stays inside the APMES forms and requirements: no question moved, pre-ticked or
   answered by the resident, no scale changed. Those ideas go to the PD.
 - 2026-10-14: The early-R1 group (EPA 2 DOPS, "first 2 months of R1") counts as overdue in R1 from September.

@@ -51,6 +51,7 @@
     <li><strong>Your account:</strong> the name and email of the Google account you sign in with (Firebase Authentication).</li>
     <li><strong>Logbook:</strong> the cases you log (date, patient initials, details, categories, tags), your reflections and their figures, your portfolio details (Section 1), templates and settings.</li>
     <li><strong>Evaluations:</strong> the requests you send or receive (the item, a de-identified case card, the assessor) and the completed assessment forms.</li>
+    <li><strong>Feedback you send</strong> from the logbook (More → Send feedback): your text, the name of the page you were on, the app version and browser type, linked to your account ID (not your email).</li>
     <li><strong>Programme lists:</strong> resident and faculty names and emails kept by the programme admins and directors.</li>
   </ul>
   <p>Data is stored in Google Cloud Firestore (Firebase project in Singapore, <code>asia-southeast1</code>). Your phone or computer also keeps an offline copy so the app works without signal; signing out removes it. Some display settings (such as the theme) are kept on your device only.</p>
@@ -61,9 +62,11 @@
   <div class="wrap"><table>
     <tr><th></th><th>You</th><th>Other residents</th><th>Faculty</th><th>Programme directors</th><th>Admins (incl. programme coordinators)</th><th>App owner</th></tr>
     <tr><td>Your cases and logbook record</td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✓ read, for support and imports</td></tr>
+    <tr><td>Cases you send with the Google Form, until the logbook picks them up</td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
     <tr><td>Your reflections and figures</td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
     <tr><td>A portfolio you mark as ready</td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✓ to produce the portfolio</td><td>✗</td></tr>
     <tr><td>Your counts: name, year, cases per category, reflections per heading</td><td>✓</td><td>✓</td><td>✓ active faculty</td><td>✓</td><td>✓</td><td>✓</td></tr>
+    <tr><td>Feedback you send from the logbook</td><td>✗ once sent</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✓</td></tr>
     <tr><td>Evaluations about you</td><td>✓</td><td>✗</td><td>only those sent to them</td><td>✓</td><td>✓</td><td>✓</td></tr>
   </table></div>
   <p>An assessor sees the evaluations sent to them. These permissions are enforced by the database's security rules, which are published with the app's source code. People who administer the Google Cloud project can technically access stored data; they do so only to run and fix the service.</p>

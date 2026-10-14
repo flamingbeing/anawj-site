@@ -225,7 +225,7 @@ service cloud.firestore {
         && optString(d, 'reflectionId', 200)
         && (!('reflectTag' in d) || d.reflectTag is bool)
         && (!('tags' in d) || (d.tags is list && d.tags.size() <= 20))
-        && (!('source' in d) || d.source in ['app', 'import', 'paste', 'sheet'])
+        && (!('source' in d) || d.source in ['app', 'import', 'paste', 'sheet', 'form'])
         && optNumber(d, 'createdAt') && optNumber(d, 'updatedAt');
     }
 
@@ -296,6 +296,57 @@ service cloud.firestore {
     // which old-form rows have been imported: the app owner only
     match /imports/{rid} {
       allow read, write: if isAppOwner();
+    }
+
+    // the Google Form inbox (form-inbox.js): residents who prefer the old Google Form keep using it. The Form's Apps
+    // Script signs in as a bot account (email and password; never email-verified, so signedIn() and everything that
+    // builds on it stay closed to it) listed by uid in /formBots, which is written only from the console. The bot may
+    // only add or replace entries, never read or delete them. Each resident reads and deletes only the entries
+    // carrying their own (Google-verified) email: the app turns them into cases in their logbook, then deletes them.
+    function isFormBot() {
+      return request.auth != null && exists(/databases/$(database)/documents/formBots/$(request.auth.uid));
+    }
+    function validFormEntry(id, d) {
+      return d.keys().hasOnly(['id', 'email', 'date', 'dateText', 'details', 'labels', 'submittedAt'])
+        && d.id == id && id.matches('^[A-Za-z0-9_-]{1,120}$')
+        && d.email is string && d.email.size() > 3 && d.email.size() <= 200 && d.email == d.email.lower()
+        && (!('date' in d) || d.date == null || (d.date is string && d.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')))
+        && optString(d, 'dateText', 200)
+        && d.details is string && d.details.size() <= 2000
+        && d.labels is list && d.labels.size() <= 40
+        && d.submittedAt is number;
+    }
+    match /formBots/{uid} {
+      allow read, write: if false;
+    }
+    match /formInbox/{id} {
+      allow create, update: if isFormBot() && validFormEntry(id, request.resource.data);
+      allow read, delete: if signedIn() && resource.data.email == me();
+    }
+
+    // private feedback (logbook More → Send feedback): never a public GitHub issue, as a report can mention a case or
+    // a colleague. Anyone signed in may send one, as themselves, with the server's time and status 'new'; nobody but
+    // the app owner reads it. The owner marks it done (only the status changes) or deletes it. No email is stored.
+    match /feedback/{id} {
+      allow create: if signedIn() && id.size() <= 40
+        && validFeedback(request.resource.data)
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.status == 'new'
+        && request.resource.data.createdAt == request.time;
+      allow read, delete: if isAppOwner();
+      allow update: if isAppOwner()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+        && request.resource.data.status in ['new', 'done'];
+    }
+    function validFeedback(d) {
+      return d.keys().hasOnly(['uid', 'text', 'doing', 'screen', 'version', 'ua', 'status', 'createdAt'])
+        && d.keys().hasAll(['uid', 'text', 'screen', 'version', 'ua', 'status', 'createdAt'])
+        && d.uid is string && d.uid.size() <= 128
+        && d.text is string && d.text.size() > 0 && d.text.size() <= 2000
+        && (!('doing' in d) || (d.doing is string && d.doing.size() <= 300))
+        && d.screen is string && d.screen.size() <= 40
+        && d.version is string && d.version.size() <= 60
+        && d.ua is string && d.ua.size() <= 200;
     }
 
     // templates offered to everyone: admins write

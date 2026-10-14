@@ -570,7 +570,25 @@ portfolio content.
   US$0.40/month on Blaze, and photos still work offline. Moving to Firebase Storage needs a console bucket
   (asia-southeast1), loses offline adds, and isn't worth it yet.
 - **Address (13 Oct 2026, SUBDOMAINS.md step 5):** the logbook lives at `apmes.anawj.com/logbook/` (evals beside it). `anawj.com/logbook/` still serves the same folder, but a top-level visit forwards (path, query, # kept; `index.html` head script; no-op on the new host, previews, localhost and frames). A browser with choices saved at the old address first gets a page (`js/moved.js`, `window.LOGBOOK_MOVED_TO`) offering them as a file (`deviceFile` in `settings-file.js`, kind `apmes-logbook-device`: `apmes-logbook-*` and `logbook-*` keys except demo, moved and Google / Dropbox sign-in state); Settings → Settings file at the new address loads it. e2e: `test/e2e/moved.mjs`. `authDomain` is `apmes.anawj.com` (helper pages and `init.json` served by the Worker, `apmes-auth/`).
+- **Google Form inbox (14 Oct 2026):** the old Google Form stays open as a simple way in (owner: no end date). Its
+  Apps Script writes each response to `formInbox/{responseId}` as a bot account listed in `formBots/{uid}` (console
+  only; unverified email, so nothing else opens to it); the app turns the signed-in resident's entries into cases
+  (`source: 'form'`) and deletes them (`form-inbox.js`, README "The Google Form, still open"). One way only: never
+  write back to the Form or its sheet. Each open costs one extra read (the inbox query), even when empty. The script
+  and its setup: `form-script/` (never turn off Firebase Auth "Enable create (sign-up)": it would block new Google sign-ins).
+  Owner, 14 Oct 2026: no "Google sign-ins only" rule (`sign_in_provider`) for now: a small single-hospital Form with no
+  patient identifiers. Password accounts already get nothing (every rule needs a verified email or `formBots`).
 - **Privacy policy:** `privacy/index.html` (anawj.com/privacy/) shows who sees what. Keep it in step when roles change.
+- **Private feedback (14 Oct 2026):** More → Send feedback (`ui-feedback.js`, pure parts in `feedback.js`) saves
+  `feedback/{id}` { uid, text ≤ 2000, doing? ≤ 300, screen, version, ua ≤ 200, status 'new', createdAt = server time }.
+  Residents must never use the site's public routes (page editor, 💬 button): they make **public** GitHub issues.
+  Only the uid is kept, no email (the owner can look a uid up in Firebase Authentication if a reply is needed);
+  `screen` is the name of the page before More (`S.lastScreen`), never anything on it; `version` is the service
+  worker's cache name. Send needs the "no patient details" tick and runs `okNoIds` first. Only the app owner
+  (`owners/`) reads it: More → Feedback (also linked from Admin), New / Done / All, Mark done (the rules let only
+  `status` change, to 'new' or 'done'), Delete, Copy as task (names and numbers replaced using `PRIVATE`, the same
+  patterns as `feedback/overlay.js`; `test/feedback.test.mjs` keeps them in step). Admins can't read it. The demo
+  stores it in the demo store (the demo admin plays the owner). Tests: `test/e2e/feedback.mjs`, rules suite.
 
 ## Tags and suggestions (`tags.js`, `suggest.js`)
 

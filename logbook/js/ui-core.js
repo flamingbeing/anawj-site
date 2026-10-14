@@ -2,7 +2,7 @@
 
 import { BY_CODE, CATEGORIES, DEFAULT_NAMES, yearName, appYear } from './categories.js';
 import { tagSetOf, tagTree, flatTree, userCatNames, tagName as tagNameIn, tagLinks as tagLinksIn } from './tags.js';
-import { countCases, uid, todayISO, sortCodes, progress, rYearDefault, academicYear, splitInitials, cleanInitials } from './engine.js';
+import { countCases, uid, todayISO, sortCodes, progress, rYearDefault, academicYear, splitInitials, cleanInitials, ID_RE } from './engine.js';
 import * as cloud from './cloud.js';
 import { reflectionCounts } from './reflections.js';
 import { writes } from './writes.js';
@@ -29,6 +29,7 @@ export const S = {
   casesSynced: false,  // a snapshot has come from the server (not only the offline cache)
   sharedTemplates: [],
   tab: 'log',
+  lastScreen: null,    // the page before More (app.js); Send feedback names it, nothing else
 };
 
 // Set by app.js: re-render the current screen, or tell it the case list changed.
@@ -399,7 +400,6 @@ function applyLocal(fn) {
 // Without `initials`, leading patient initials are split off the details ("AB 34F LSCS" -> 'AB', '34F LSCS').
 // Patient identifiers don't belong in a logbook: an NRIC/FIN (S1234567A) or a long number (a hospital
 // or phone number) asks before saving.
-const ID_RE = /\b[STFGM]\d{7}[A-Z]\b|\b\d{7,}\b/i;
 export function okNoIds(...texts) {
   if (!texts.some(t => ID_RE.test(String(t || '')))) return Promise.resolve(true);
   return confirmBox('Looks like an ID number', 'This looks like an NRIC, hospital or phone number. Log patient initials only, never identifiers. Save anyway?', 'Save anyway', true);

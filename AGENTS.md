@@ -12,11 +12,15 @@ Static site on GitHub Pages (public repo: no names, patient data or real evaluat
   with `people/NOTES.md`.
 - `nuh-roster/`: NUH anaesthesia daily roster (own Firebase project `nuh-roster`), at `nuhroster.anawj.com` (the old `anawj.com/nuh-roster/` redirects). Start with `nuh-roster/NOTES.md`: its department section (grades, postings, roster sheet, notation, HMS monthly rosters, short names) applies to any app dealing with NUH anaesthesia staff.
 - `prewarm/`: prewarming study op-day data collection (temperatures every 5 min, export to the study's Excel template); served at `prewarmstudy.anawj.com`. Start with `prewarm/NOTES.md`, then `prewarm/PLAN.md`.
+- `bis-dsa/`: BIS to DSA teaching simulator for anaesthesia residents (one static page, synthetic EEG, no data), at
+  `anaes.anawj.com/bis/`. Start with `bis-dsa/NOTES.md`.
 - `hand-babies/`: hand surgery exam crash course for new MOs (one static page, no data), at `hand.anawj.com/babies/`. Start with `hand-babies/NOTES.md`.
 - `hand-log/`: hand surgery DOPS and Mini-CEX log (data on the device only, CSV/JSON export), at `hand.anawj.com/handlog/`. Start with `hand-log/NOTES.md`.
 - `edit/`: the page editor for any page on the site (`edit.anawj.com/<path>` redirects to it). Suggested edits arrive as
   GitHub issues titled `Page edits:`; how to apply them: `edit/NOTES.md`. A daily routine ("Page edits check", 8:58 am
   Singapore) drafts one PR for new ones and never merges: the owner approves page edits.
+- `ask/`: Ask Claude, the owner's one-step change request at `ask.anawj.com` (behind Cloudflare Access; API in
+  `worker/ask.js`). How it works and its setup: `edit/NOTES.md`, "Ask Claude".
 - `apmes/`: APMES programme documents (not secret): the EPA Guidebook v8 and requirements transcribed (the evals
   data is built from them), and the blank portfolio template the logbook tests use. See `apmes/README.md`.
   Before adding a programme file, check its cover/contributor pages and file details (author, embedded files) for
@@ -69,7 +73,7 @@ for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mj
 
 - Logbook changes: `tools/test-logbook.sh` runs all of the above plus the full e2e and every focused browser test
   (about 10 min; `quick` skips the full e2e). Its portfolio-template steps use `apmes/templates/portfolio-template-blank.docx`. After UI changes also run `node logbook/test/e2e/a11y.mjs` (accessibility).
-- Rules changes (`logbook/firestore.rules`, `prewarm/firestore.rules`): `tools/test-rules.sh` runs the logbook, evals and prewarm rules suites in the
+- Rules changes (`logbook/firestore.rules`, `prewarm/firestore.rules`, `nuh-roster/firestore.rules`): `tools/test-rules.sh` runs the logbook, evals, prewarm and roster rules suites in the
   local emulator (fake accounts, demo project; no sign-in, never the live projects).
 - Evals UI changes: also run the e2e test (see `evals/README.md`).
 - Prewarming UI changes: `tools/test-prewarm.sh` runs the repo check, prewarm unit tests and the three browser tests
@@ -78,9 +82,11 @@ for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mj
 - NUH roster changes: run `node nuh-roster/test/e2e.mjs` (Practice in a browser, desktop and phone, axe on every tab;
   under a minute; also in the Checks workflow).
 - Hand log changes: run `node hand-log/test/e2e.mjs`.
+- BIS to DSA changes: run `node bis-dsa/test/e2e.mjs`.
 - People changes, and evals changes to `cloud.js`, `ui-core.js` or the People panes in `ui-admin.js`: run `node people/test/e2e.mjs`.
 - Page editor changes (`edit/`): run `node edit/test/e2e.mjs` and `node hand-babies/test/e2e.mjs` (it opens the editor).
 - Feedback button or Worker changes (`feedback/`, `worker/`): run `node feedback/test/e2e.mjs` (through the real Worker).
+- Ask Claude changes (`ask/`, `worker/ask.js`): run `node ask/test/e2e.mjs` (the API's tests are in `worker/test/`).
 - New or moved pages and documents: `node tools/proofread.mjs` (broken links, missing `noindex`, titles, alt text; also weekly).
 
 ## Working with the owner

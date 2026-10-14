@@ -42,6 +42,8 @@ export function renderAdmin() {
       // APMES People (people/): the same resident list, plus faculty and PDs, a yearly intake and the year check
       h('li', {}, h('a', { href: '../people/' }, h('span', { class: 'mt' }, h('b', {}, 'People (logbook and evals)'),
         h('small', {}, 'Add a yearly intake, year check, faculty and PDs: one list for both apps')), h('span', { class: 'chev', 'aria-hidden': 'true' }, '›'))),
+      // the app owner's private feedback queue (also in More)
+      S.owner ? linkRow('feedbackinbox', 'Feedback', 'Private feedback from residents: mark done, delete, copy as a task') : null,
       linkRow('adminadv', 'Advanced admin settings', `Shared tag groups, default tag names, portfolio template${S.owner ? ', import, initials fix' : ''}`))));
 }
 export function renderAdminResidents() {
@@ -407,7 +409,11 @@ async function runImport() {
       return out;
     });
     try {
-      const res = await cloud.importCases(r.email, g.rid, cases, n => { A.prog = (done + Math.min(n, cases.length)) / total; paintProgress(); });
+      // responses the Google Form inbox already brought into this logbook aren't imported again (form-inbox.js)
+      const { withoutFormCases } = await import('./form-inbox.js');
+      const { rows, dropped } = withoutFormCases(cases, await cloud.listCases(r.email));
+      const res = await cloud.importCases(r.email, g.rid, rows, n => { A.prog = (done + Math.min(n, cases.length)) / total; paintProgress(); });
+      if (dropped) res.skipped += dropped;
       // counts for the Totals tab, from everything in the logbook (cases logged in the app included)
       const all = await cloud.listCases(r.email);
       const intake = r.intake || intakeOf(g.rid);

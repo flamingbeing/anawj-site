@@ -111,6 +111,7 @@ code{font-size:13px;background:var(--inset);padding:2px 4px;word-break:break-all
     <label class="check"><input type="checkbox" id="optEverywhere"> <span>Change this everywhere it appears, not only here (wording rules like “say MO, not HO”)</span></label>
   </div>
   <div class="row"><button value="cancel" formnovalidate>Cancel</button><button value="ok" class="primary">Save</button></div>
+  <div class="row" id="askRow"><button type="button" id="askNow">Ask Claude now (owner only)</button></div>
 </form></dialog>
 
 <dialog id="listDlg">
@@ -388,11 +389,23 @@ code{font-size:13px;background:var(--inset);padding:2px 4px;word-break:break-all
       ? 'Write the new text, or describe what should go here (a new paragraph, a table, a picture…). It will be formatted to match the page.'
       : 'Say what should change. For example: “not how we do it here”, “make this shorter”, “this diagram is wrong: …”.';
     $('noteText').value = '';
-    $('extras').hidden = type !== 'comment';
+    $('extras').hidden = $('askRow').hidden = type !== 'comment';
     $('optOptions').checked = $('optEverywhere').checked = false;
     $('noteDlg').showModal();
   }
   $('aComment').onclick = () => note('comment');
+  // the owner's shortcut: this comment straight to Ask Claude (ask.anawj.com, behind his sign-in), not the list
+  $('askNow').onclick = () => {
+    const v = $('noteText').value.trim();
+    if (!v || !noteFor) { $('noteText').focus(); return; }
+    const el = noteFor.el;
+    const q = new URLSearchParams({ page: 'https://anawj.com' + (pageOf() || '/') + viewOf(), text: v, kind: describe(el).kind,
+      on: isMedia(el) ? describe(el).label : text(el).slice(0, 1500), locator: cssPath(el) });
+    if ($('optOptions').checked) q.set('options', '1');
+    if ($('optEverywhere').checked) q.set('everywhere', '1');
+    window.open('https://ask.anawj.com/?' + q, '_blank', 'noopener');
+    $('noteDlg').close('cancel');
+  };
   $('aAdd').onclick = () => note('add');
   $('noteDlg').addEventListener('close', () => {
     const v = $('noteText').value.trim();
