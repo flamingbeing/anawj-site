@@ -30,13 +30,14 @@ assert.deepEqual(JSON.parse(JSON.stringify(snap)), snap, 'state is plain data (s
 // actions are stamped with their step and replay exactly
 const f = createSim({ seed: 9, profile: { age: 60, sex: 'F', weightKg: 62, heightCm: 158 } });
 f.step(100); f.act({ type: 'note', text: 'first' });
-f.step(250); f.act({ type: 'note', text: 'second' });
+f.step(250); f.act({ type: 'bolus', drug: 'propofol', dose: 2, unit: 'mg/kg', route: 'iv' });
 f.step(400);
 const rec = f.replayRecord();
 assert.equal(rec.actions.length, 2);
 assert.deepEqual(rec.actions.map(x => x.step), [100, 350]);
 const g = replay(rec, {}, f.state.t);
 assert.deepEqual(g.state, f.state, 'replay from the record reproduces the run');
+assert.ok(f.state.pk.d.propofol.ce > 0, 'the replayed run includes the drug');
 
 // time comes from the step count (no drift), and the warm start leaves the clock at zero
 const h = createSim({ seed: 1 });

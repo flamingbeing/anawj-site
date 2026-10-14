@@ -2,7 +2,7 @@
 
 Short and current. Lasting rules go in `NOTES.md`. Update with `/save-state`.
 
-Last updated: 2026-10-14 by Claude Code (build session: M0.2 first monitor).
+Last updated: 2026-10-14 by Claude Code (build session: M1.1 IV PK).
 
 ## Now
 
@@ -19,12 +19,15 @@ Each session keeps its own line in `status/<session>.md`. Read them before start
 
 ## Next
 
-1. M1.1 (IV PK: `pk.js`, `drugs.js`), then the PR order in `DESIGN.md`, one PR at a time, each merged before the
-   next.
+1. M1.2 (syringe pumps and TCI, the Drugs tab, "Behind the monitor"), then the PR order in `DESIGN.md`, one PR at a
+   time, each merged before the next.
 
 ## Recently done
 
-- M0.2 (14 Oct 2026): first monitor at `#theatre`: library screen, sweeping ECG, pleth and capnogram lanes (real pace
+- M1.1 (14 Oct 2026): `pk.js` and `drugs.js`: propofol (Schnider, haemodynamic effect site), remifentanil (Minto),
+  fentanyl, alfentanil, midazolam, ketamine, Marsh for the pump; boluses and infusions as actions; between-patient
+  PK variation. Model only (the Drugs tab comes with M1.2).
+- M0.2 (14 Oct 2026, #572): first monitor at `#theatre`: library screen, sweeping ECG, pleth and capnogram lanes (real pace
   at 5x and 20x), HR, SpO2, EtCO2, RR, NIBP (cycle, start/stop) and temperature, speed keys and pause, fonts, the
   old-address forward, `?seed` and `?test`.
 - M0.1 (14 Oct 2026, #570): `js/model/` loop (`sim.js`, fixed 0.1 s Jacobi step, snapshot, replay, event ring, trends,
