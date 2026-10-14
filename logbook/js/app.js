@@ -1054,17 +1054,30 @@ async function onUser(user) {
 }
 
 // Responses from the old Google Form (its Apps Script puts them in formInbox; form-inbox.js) become cases here, then
-// leave the inbox. Quiet when there are none.
+// leave the inbox. Quiet when there are none. Runs once the server's cases are in, and again when the app comes back
+// to the front (at most every 10 minutes), so an app left open for days still picks them up.
+let formBusy = false, formAt = 0;
 async function pickUpForm(user) {
-  const entries = await cloud.listFormEntries(user.email);
-  if (!entries.length || S.user !== user) return;
-  const { mergeFormEntries, pickupMessage } = await import('./form-inbox.js');
-  const r = mergeFormEntries(entries, new Map((S.cases || []).map(c => [c.id, c])), Date.now());
-  if (r.save.length) await cloud.saveCases(user.email, r.save);
-  await cloud.deleteFormEntries(r.done);
-  const msg = pickupMessage(r);
-  if (msg && S.user === user) toast(msg);
+  if (formBusy || S.user !== user) return;
+  formBusy = true; formAt = Date.now();
+  try {
+    const entries = await cloud.listFormEntries(user.email);
+    if (!entries.length || S.user !== user) return;
+    const [{ mergeFormEntries, pickupMessage, formCaseId }, bin] = await Promise.all([import('./form-inbox.js'), cloud.listBin(user.email).catch(() => [])]);
+    const binned = bin.filter(b => b.kind === 'case' && b.data && b.data.id).map(b => String(b.data.id));
+    const r = mergeFormEntries(entries, new Map((S.cases || []).map(c => [c.id, c])), Date.now(), { binned });
+    const byCase = new Map(r.save.map(c => [c.id, c]));
+    const items = r.done.map(id => ({ id, case: byCase.get(formCaseId(id)) || null }));
+    const done = new Set(await cloud.commitFormPickup(user.email, items));
+    const saved = items.filter(it => it.case && done.has(it.id)).map(it => it.case);
+    const msg = pickupMessage({ ...r, save: saved });
+    if (msg && S.user === user) toast(msg);
+  } finally { formBusy = false; }
 }
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && S.user && S.casesSynced && Date.now() - formAt > 10 * 60e3)
+    pickUpForm(S.user).catch(err => console.warn('Google Form pick-up failed', err));
+});
 
 // Phones: while the keyboard is up (a text box has focus and the visible area has shrunk), the bottom
 // tab bar rides on top of the keyboard instead of being hidden behind it (iOS, and Android by default,

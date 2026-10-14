@@ -66,6 +66,24 @@ assert.match(entryFrom('r 3', 'a@example.com', 1, answers).skip, /response id/);
   assert.equal(e.labels.length, 40);
 }
 
+// identifiers never leave the Form; a date question with a time; a typed "16)" isn't a category; "Other" in a
+// category question is sent (the logbook notes it); the resident's name answer still isn't sent
+{
+  const e = plain(entryFrom('r5', 'a@example.com', 1, [
+    { title: 'Resident', type: 'LIST', value: 'Fake Person (202301)' },
+    { title: 'Date', type: 'DATETIME', value: '2026-10-14 08:30' },
+    { title: 'Initials, case details', type: 'PARAGRAPH_TEXT', value: 'EF 70F S1234567D MRN 12345678 TKR' },
+    { title: 'Remarks', type: 'TEXT', value: '16) not a pick' },
+    { title: 'Category', type: 'CHECKBOX', value: [LSCS, 'Something else typed'] },
+  ]));
+  assert.equal(e.date, '2026-10-14');
+  assert.equal(e.details, 'EF 70F [ID removed] MRN [ID removed] TKR');
+  assert.deepEqual(e.labels, [LSCS, 'Something else typed']);
+  assert.doesNotMatch(JSON.stringify(e), /Fake Person|S1234567D|12345678/);
+  const r = mergeFormEntries([e], {}, 2);
+  assert.match(r.save[0].details, /Form tags not recognised: Something else typed/);
+}
+
 // every top-level name is prefixed, so the script can sit beside another one (e.g. a sheet script with its own
 // onFormSubmit) in the same Apps Script project without replacing or clashing with anything
 {

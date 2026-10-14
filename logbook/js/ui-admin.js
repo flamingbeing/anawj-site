@@ -409,7 +409,11 @@ async function runImport() {
       return out;
     });
     try {
-      const res = await cloud.importCases(r.email, g.rid, cases, n => { A.prog = (done + Math.min(n, cases.length)) / total; paintProgress(); });
+      // responses the Google Form inbox already brought into this logbook aren't imported again (form-inbox.js)
+      const { withoutFormCases } = await import('./form-inbox.js');
+      const { rows, dropped } = withoutFormCases(cases, await cloud.listCases(r.email));
+      const res = await cloud.importCases(r.email, g.rid, rows, n => { A.prog = (done + Math.min(n, cases.length)) / total; paintProgress(); });
+      if (dropped) res.skipped += dropped;
       // counts for the Totals tab, from everything in the logbook (cases logged in the app included)
       const all = await cloud.listCases(r.email);
       const intake = r.intake || intakeOf(g.rid);

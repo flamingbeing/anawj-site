@@ -576,6 +576,8 @@ portfolio content.
   (`source: 'form'`) and deletes them (`form-inbox.js`, README "The Google Form, still open"). One way only: never
   write back to the Form or its sheet. Each open costs one extra read (the inbox query), even when empty. The script
   and its setup: `form-script/` (never turn off Firebase Auth "Enable create (sign-up)": it would block new Google sign-ins).
+  Owner, 14 Oct 2026: no "Google sign-ins only" rule (`sign_in_provider`) for now: a small single-hospital Form with no
+  patient identifiers. Password accounts already get nothing (every rule needs a verified email or `formBots`).
 - **Privacy policy:** `privacy/index.html` (anawj.com/privacy/) shows who sees what. Keep it in step when roles change.
 - **Private feedback (14 Oct 2026):** More → Send feedback (`ui-feedback.js`, pure parts in `feedback.js`) saves
   `feedback/{id}` { uid, text ≤ 2000, doing? ≤ 300, screen, version, ua ≤ 200, status 'new', createdAt = server time }.
