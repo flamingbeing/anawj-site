@@ -7,7 +7,7 @@ import scan, synth, readers
 
 d = sys.argv[1]
 rng = np.random.default_rng(11)
-fmap = json.load(open(f'{d}/fieldmap.json')); fields = {f['id']: f for f in json.load(open(f'{d}/fields.json'))}
+fmap = json.load(open(f'{d}/fieldmap.json', encoding='utf-8')); fields = {f['id']: f for f in json.load(open(f'{d}/fields.json', encoding='utf-8'))}
 tpls = scan.templates(d)
 truth, photos = {}, []
 tmp = tempfile.mkdtemp()
@@ -20,7 +20,7 @@ for pg, tpl in enumerate(tpls):
             o = str(rng.choice(sorted(loc['options']))); synth.cross(img, loc['options'][o], rng); truth[fid] = o
         elif f['type'] in ('num', 'int', 'time', 'text'):
             v = {'num': f'{rng.uniform(34, 38):.1f}', 'int': str(int(rng.integers(30, 90))), 'time': '07:05', 'text': 'AB123'}[f['type']]
-            x0, y0, x1, y1 = scan.crop_rect(loc['rect'], [], tpl.shape)
+            (_, _, _, _), (x0, y0, x1, y1) = scan.crop_rect(loc['rect'], [], tpl.shape)
             synth.write_text(img, (x0, y0, x1, y1) if f['type'] != 'num' else loc['rect'], v.replace(':', '') if f['type'] == 'time' else v, rng)
             truth[fid] = v
     p = f'{tmp}/p{pg + 1}.jpg'; cv2.imwrite(p, synth.photograph(cv2.cvtColor(img, cv2.COLOR_BGR2GRAY), rng)); photos.append(p)
@@ -28,7 +28,7 @@ for pg, tpl in enumerate(tpls):
 wrong_id = 'prewarm_5_core'
 reader = readers.StubReader({k: v for k, v in truth.items()}, {(wrong_id, 1): '37.9'})
 scan.main(['--form-dir', d, '--out', f'{tmp}/out', *photos], reader)
-got = json.load(open(f'{tmp}/out/scan.json'))
+got = json.load(open(f'{tmp}/out/scan.json', encoding='utf-8'))
 print('pages', got['pages']); print('scan.json at', f'{tmp}/out/scan.json')
 bad = 0
 for fid, e in got['fields'].items():

@@ -11,10 +11,7 @@ def fill(template_gray, boxes, grid_cells, rng):
         on = bool(rng.random() < 0.5)
         truth['ticks'].append(on)
         if on:
-            x0, y0, x1, y1 = b['rect']; j = lambda: int(rng.integers(-3, 4))
-            ink = (int(rng.integers(30, 90)),) * 3
-            cv2.line(img, (x0 - 2 + j(), y0 - 1 + j()), (x1 + 2 + j(), y1 + 1 + j()), ink, 3, cv2.LINE_AA)
-            cv2.line(img, (x1 + 2 + j(), y0 - 1 + j()), (x0 - 2 + j(), y1 + 1 + j()), ink, 3, cv2.LINE_AA)
+            cross(img, b['rect'], rng)
     for (x0, y0, x1, y1) in grid_cells:
         if x1 - x0 > 300 or y1 - y0 > 200:
             continue
@@ -58,5 +55,9 @@ def write_text(img, rect, text, rng):
 
 def cross(img, rect, rng):
     x0, y0, x1, y1 = rect; j = lambda: int(rng.integers(-3, 4)); ink = (int(rng.integers(30, 90)),) * 3
+    if rng.random() < 0.6:   # one diagonal slash through the box, running a little past its corners
+        t = int(rng.integers(2, 4)); e = int(rng.integers(2, 7))
+        cv2.line(img, (x0 - e + j(), y1 + e + j()), (x1 + e + j(), y0 - e + j()), ink, t, cv2.LINE_AA)
+        return
     cv2.line(img, (x0 - 2 + j(), y0 - 1 + j()), (x1 + 2 + j(), y1 + 1 + j()), ink, 3, cv2.LINE_AA)
     cv2.line(img, (x1 + 2 + j(), y0 - 1 + j()), (x0 - 2 + j(), y1 + 1 + j()), ink, 3, cv2.LINE_AA)

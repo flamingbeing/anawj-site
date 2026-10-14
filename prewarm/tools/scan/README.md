@@ -13,10 +13,12 @@ those in the review screen.
 2. **Line up the photo** (`align.py`): finds the sheet, flattens it onto the blank page, refines with ECC, and scores
    how well the printed lines match. A low score rejects the photo: retake it.
 3. **Read the page** (`scan.py`):
-   - ticks: the ink in each box (`ticks.py`), ticked / empty / unsure;
+   - ticks: the slash or cross through each box (`ticks.py`), ticked / empty / unsure; fields whose answers are
+     written (Y / N columns, thermal sensation) are read as handwriting, found automatically from the form;
    - handwriting: crop the cell, ask Claude twice (different framing, 2× scale), accept only if both reads agree;
-   - checks (`plausible.py`, `scan.py`): ranges, 24-hour times, whole numbers, temperatures jumping >1.5 °C between
-     neighbours, systolic above diastolic, two ticks in one question. Anything off is flagged.
+   - checks (`plausible.py`, `scan.py`): ranges (skin temperatures down to 20 °C), 24-hour times, whole numbers,
+     option letters, core temperature jumping >1 °C (skin >6 °C) between neighbours, systolic above diastolic, two ticks
+     in one question, an arrow or ditto ("same as above"). Anything off is flagged; values with no known range are not.
 4. **You confirm** (`review.html`): flagged fields first, the photo crop beside each reading. Only values you confirm
    are saved to `patient.reviewed.json`.
 5. **Export** (`export-scan.mjs`): reviewed files → the workbook through the app's own `workbook()`, same 572 columns.
@@ -32,11 +34,22 @@ python3 prewarm/tools/scan/scan.py --form-dir form-data --out scans/pt01 photo1.
 node prewarm/tools/scan/export-scan.mjs study.xlsx pt01.reviewed.json pt02.reviewed.json
 ```
 
-Photos: whole sheet in frame on a plain surface, even light, one page per photo, any order.
+Photos: whole sheet in frame on a plain surface, even light, one page per photo, any order. If a page is picked wrong
+or rejected, say which page each photo is with `--pages 7,9,1` (one number per photo, in order).
+
+**Without API credits** (Claude Max has none): `scan.py --export-crops crops/ ...` aligns the photos, reads the ticks and
+writes every handwritten crop to `crops/` with a `manifest.json`; someone (or a Claude Code session) reads them into
+`readings.json` as `{"<field id>": "<text>"}`; then `scan.py --readings readings.json ...` carries on as usual. There is
+only one read, so no second opinion: the review screen is the only check.
+
+**Windows**: run the shell steps in Git Bash; the tool needs `soffice` (LibreOffice) and `pdftoppm` (poppler) on PATH. Use
+`PYTHON=python sh setup-form.sh ...` if `python3` is the Store stub. `setup-form.sh` uses all cores (`LOCATE_JOBS=n` to
+change); it prints why any field was not placed. The model is Sonnet by default; `SCAN_MODEL=claude-opus-5-5` for hard pages.
 
 ## Tests (all fake data)
 
 - `node prewarm/test/scan-export.test.mjs` (in CI): reviewed values → the right workbook cells.
+- `python3 unit.py` (the small rules; no photos needed)
 - `python3 test.py <dir>` (alignment + ticks on synthetic phone photos) and `python3 e2e.py <form dir>` (whole read
   with a stand-in reader, one deliberate misread that must be flagged). Needs OpenCV, LibreOffice, `pdftoppm`.
 - `node prewarm/tools/scan/review.e2e.mjs <scan.json>` (review page at phone size, axe), static server on 8080.
