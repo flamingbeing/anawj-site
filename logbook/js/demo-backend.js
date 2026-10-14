@@ -211,6 +211,17 @@ export async function deleteAccount(email) {
 
 export async function isAdmin(email) { return !!load().admins[lc(email)]; }
 
+// private feedback: in the demo store (Reset demo wipes it); the demo admin plays the owner, so it reads them back
+export async function sendFeedback(rec) {
+  const s = load(); s.feedback ||= {};
+  const id = 'fb' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  s.feedback[id] = { ...plain(rec), id, createdAt: Date.now() }; save(s);
+  return true;
+}
+export async function listFeedback() { return Object.values(load().feedback || {}).map(plain).sort((a, b) => b.createdAt - a.createdAt); }
+export async function setFeedbackStatus(id, status) { const s = load(); if (s.feedback?.[id]) { s.feedback[id].status = status; save(s); } }
+export async function deleteFeedback(id) { const s = load(); if (s.feedback) { delete s.feedback[id]; save(s); } }
+
 export async function myResident(email) {
   const r = Object.values(load().residents).find(r => r.email === lc(email));
   return r ? plain(r) : null;

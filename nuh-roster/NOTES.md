@@ -205,6 +205,10 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
 - A comment that is only a time ("5pm") reads back as a leaving time, as in the older roster style "Name -5pm".
 - AOH and liver duties don't make anyone post call; only the duties listed in Settings do.
 - Undo is per date and is cleared when the header date changes.
+- Practice › Fix 3 problems plants random problems; on a day already short of a senior it plants a second double cover
+  instead of a "no senior" room. Fill empty gaps tries a few seeds and keeps the fullest, but now and then (about 1 in
+  10 tries) it still gives a freed senior another job and a planted gap needs fixing by hand. The browser test tries
+  the exercise up to three times.
 - When this browser can't save (storage full), a bar says so and offers Download everything and Remove old days
   (more than 3 months old); saved data that can't be read is kept under `<key>-damaged-<time>` with a download.
   Days put away don't keep their checks (rebuilt on opening).
