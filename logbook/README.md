@@ -58,6 +58,8 @@ The Firebase sign-in helper pages are self-hosted at `/__/auth/` (copied from `h
 | `summaries/{rid}` | `{ rid, name, intake, rYear, counts: { code: n }, total, reflections: { headingId: n }, reflectionsTotal, updatedAt }` | admins and programme residents read; admins or that resident write |
 | `imports/{rid}` | `{ email, keys: [importKey], updatedAt }` (keys reset if the resident's email changes) | the app owner |
 | `sharedTemplates/{id}` | `{ id, name, cats, details? }` | everyone signed in reads; admins write |
+| `formInbox/{responseId}` | `{ id, email, date ('YYYY-MM-DD' or null), dateText?, details (≤2000), labels: [category answers] (≤40), submittedAt (ms) }`: Google Form responses waiting for the app to pick them up (`js/form-inbox.js`) | the Form's bot account adds or replaces (never reads); the resident with that email reads and deletes |
+| `formBots/{uid}` | anything: lists the bot account the Form's Apps Script signs in as | nobody (console only) |
 
 `{email}` is always the Google account email in lower case. Category codes and targets are in `js/categories.js`.
 
@@ -69,6 +71,27 @@ The old data is the Google Form responses workbook (tabs **Case** and **AY20xx T
 2. Upload the workbook. It is read in the browser (nothing is uploaded except the resulting cases). `js/importer.js` reads the Case tab: resident, date, details and the category columns, merged into one list of codes. Rows marked "WRONG ENTRY" are skipped; dates that can't be read are kept as text and flagged "needs date".
 3. The page compares the counts per resident and category with the Totals tabs (`countCheck`) and shows any differences before you import.
 4. **Import** writes each resident's cases into `logbooks/{their email}/cases`, then their summary. Every row has an `importKey` (a hash of resident, form timestamp, date, details and categories, plus a counter for identical rows). `imports/{rid}` records which keys are in, so running the import again after more form responses writes only the new rows. The case document ID is derived from the key, so an interrupted import can be resumed without duplicates.
+
+## The Google Form, still open (Oct 2026)
+
+Residents who prefer the old APMES Google Form can keep using it, with no end date; the logbook stays the one record.
+One way only: Form → logbook, never back.
+
+1. A small Apps Script on the Form's response sheet (set up separately, PR 2) runs on every new or edited response
+   and writes just that response to `formInbox/{responseId}`: the respondent's Google sign-in email (the Form
+   requires sign-in), date, the initials and case details answer, and the category answers. It signs in as a bot
+   account (Firebase email and password) whose uid is listed by hand in `formBots/`. The bot's email is never
+   verified, so every other rule (`signedIn()`) stays closed to it; it can only add or replace inbox entries.
+2. When the resident next opens the logbook (after the first server copy of their cases), the app reads their
+   entries, turns each into a case (`source: 'form'`, id from the response id, initials split off, labels to codes,
+   NRIC/long numbers replaced by "[ID removed]", unrecognised tags noted in the details) and deletes the entries.
+3. An edited response replaces the case it made, unless the resident has changed that case in the app since
+   (`importKey` `form:<responseId>@<ms written>`; a later `updatedAt` means theirs); what only the app adds (a linked
+   reflection, the star, personal tags) is kept. A Form case deleted in the app comes back only if that response is
+   edited later.
+
+Tests: `test/form-inbox.test.mjs`, the rules suite (`tools/test-rules.sh`) and the emulator browser test
+(`tools/test-reads.sh`).
 
 ## Code
 
