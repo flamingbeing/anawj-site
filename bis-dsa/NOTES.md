@@ -205,16 +205,65 @@ falls under 50 after about a minute of diathermy) → emergence with blinks → 
 ## Medtronic BIS screen is the default (owner, 14 Oct 2026)
 
 The owner's own monitor is a Medtronic (formerly Covidien) BIS monitor (photos; the owner says it is NOT a VISTA, so the
-screen is labelled "Medtronic BIS"; the exact model and software version are not shown in the photos: ask for Menu > About
-or the back label). The internal ids still say `vista`. The page opens on a copy of that screen: BIS box
-with SQI bars, EMG bar, ST (suppression time, h:mm:ss) and SR boxes, the EEG window (25 mm/sec, 25 µV/division),
-message bar with Dismiss, SILENT / MENU / SENSOR CHECK keys, and the DSA with dotted lines at 4/8/13 Hz, white SEF and
-purple MF lines, band names, H-L colour bar and the BIS trend under it. Layout is absolute in container units (`cqw`),
-from the photos. Menu opens the extra row (smoothing, EEG scale, sweep, trend 5/15/60 min, bottom lane: BIS, BIS + EMG,
-BIS + SR). Numbers the real screen does not show (SQI %, EMG dB, TP, BC, zone) sit in the strip under it; "Teaching
-layout" in Display is the earlier screen (kept; the e2e test uses it for most checks). `HIST` holds 60 min of columns.
-Fonts: bundled look-alikes (`fonts/README.md`): Arimo, Archivo Narrow; the manufacturer's font is not published.
-Still to do for the machine switch (BIS Advance, SedLine): left/right engine, ASYM, PSI.
+screen is labelled "Medtronic BIS"; the cabinet looks like the BIS Complete 2-channel). The internal ids still say
+`vista`. The page opens on it; the detail is in the next section. Numbers the real screen does not show (SQI %, EMG dB, TP,
+BC, zone) sit in the strip under it; "Teaching layout" in Display is the earlier screen (kept; the e2e test uses it for
+most checks). `HIST` holds 60 min of columns. Still to do for the machine switch (BIS Advance, SedLine): ASYM, PSI.
+
+## Medtronic BIS 2-channel screen (rebuilt 14 Oct 2026)
+
+Built from the owner's photos (three monitors, software 3.50 or later), Medtronic's published manual and software-update
+sheet (screens are 640 x 480), as a clone to look at and use. Code: `mt-screen.js` (loaded before `app.js`; the old
+`drawVEeg`/`drawVDsa` are gone). The screen is a 640 x 480 virtual LCD: CSS sizes are `calc(N * var(--u))` with
+`--u = 100cqw / 640`, canvases draw in the same virtual pixels (`mtCv`), so the screen scales as one unit (phone too).
+
+- **Layout:** BIS box (white header with heavy "BIS" in Archivo Black and 5 SQI bars, number in Arial Bold), EMG tube
+  (4 cells, 3 dividers, orange), ST box (violet, h:mm:ss) and SR box (plain bold number), EEG box with a grey **sweep gap**
+  (EEG is a sweep, 25 mm/s, about 3 s across, 1 px lime trace, not a scroll), captions under it ("25 mm / sec.", "EEG",
+  "25 µV / division"; 50 µV with 2 channels and a taller box), message bar at y 180-230, three bevelled pale-blue keys,
+  lower frame with header (SEF integer, MF two digits, date and time with seconds, case code), DSA 0-30 Hz with dotted
+  4/8/13 Hz lines and yellow "Hz" labels, right label panel (Beta, Alpha, Theta, Delta), white SEF and violet MF lines
+  (2 px), then **AMPL** (white area, max |EEG| per second in dB, `col.amp`, scaled 15-75 dB, an estimate) or the BIS trend
+  ("DSA + BIS": header shows `BIS nn`), clock labels every 10 min (every 1 / 2 / 5 min for the 5 / 15 min windows), the
+  artefact strip (orange SQI under 50, yellow blanked), black gap lines (sensor check passed, Clear Trend Data) and the
+  H-L colour bar. Colours were sampled from the photos: pale blue frames (white on the manufacturer's own screenshots).
+- **Colour map:** a saturated red-orange-yellow-green-cyan-blue table (`MT_LUT`), no dark ends. The simulator's dB range maps
+  to it one dB-range lower than the teaching skins (`mon.dbLo - 1` to `mon.dbHi - 9`) so awake beta is cyan and
+  anaesthetic alpha is red, as on the photos. A light 3 x 3 smoothing is applied (the raw one-second columns are noisier
+  than the real display).
+- **Display** (Menu > Display): BIS (trend view: yellow 2.5 px line with black outline, ST in magenta on the right axis,
+  target band, review arrow), EEG (big sweep, small BIS trend top right), DSA + Amplitude (**default**), DSA + BIS.
+  Trend Time Scale 5 / 15 min / 1 hour (default 5: the page opens after 5 min of warm start and the screen should be
+  full; the real default is 1 hour). Display ST decides whether the right axis is ST or the Secondary Variable (EMG, SR).
+- **Menu** (key 2; becomes HOME): three pages of 3 x 3 tiles with real names: Target Range (active, alarm, High / Low in
+  steps of 5, format band / lines; they are `mon.ahi` / `mon.alo`, so they set the "BIS out of target range" alarm),
+  Secondary Variable, Chart Data (interval 1-60 min, table from `HIST`), Alarm Volume (1-5, Test beep), Display, View/Save
+  Settings (table of settings, unsaved ones yellow, Save Active asks for a passkey), Help, Snapshot (camera mark on the
+  time axis), Display SR, Monitor Mode I-IV (presets for smoothing, SR, channels), Export Data (Begin Export downloads the
+  history as CSV), BIS Smoothing Rate 10 / 15 / 30 (a real setting: `mon.smooth`), Print, Configuration, EEG Channels 1 / 2
+  (2 shows the right-hemisphere engine as the second trace), Date and Time, Language, Filters (off adds 50 Hz mains
+  hum to the EEG), Impedance Checking, Maintenance (passkey, then its own page), Demo Case (case code "DEMO"; sensor
+  check refused with message 511), Diagnostics (Clear Trend Data really empties `HIST`). While a menu is open the BIS trend takes
+  the EEG box's place at the top, as on the real monitor. Items with no effect in a simulator answer with the monitor's
+  wording or a short text screen. The passkey keypad accepts any digits (the real passkey is not reproduced).
+- **Keys:** bell is a 3-state key: green, yellow (paused 2 min, seconds counting down), red X with SILENT; MENU/HOME;
+  SENSOR CHECK/EXIT (TREND REVIEW EXIT in review).
+- **Messages** (text, two spaces, code in `[ n ]`): red flashing "BIS out of target range [ 29 ]" (low) / [ 30 ] (high),
+  "Isoelectric EEG Detected [ 31 ]"; yellow "Data unavailable due to poor signal quality [ 28 ]", "Excessive Artifact
+  Detected in Signal [ 27 ]", "Press electrode 3 [ 13 ]", "Sensor Check in Progress", start-up "Factory settings restored"
+  with the navy Dismiss button; info (dark blue) for settings changes ("Smoothing Rate Changed to 30 Seconds [ 534 ]",
+  "Filters Off", "Switching EEG channels to 2"). The red bar keeps flashing while the key is silenced (as on the photo).
+- **Sensor check:** the real screen: empty BIS box with hollow bars, yellow bar, panel with the electrode strip (1, 2, 4 joined,
+  3 apart), grey "?" noise, red blinking X (impedance too high: electrode 3 while the signal is poor), green tick, then
+  PASS and the screen leaves by itself; Show / Hide Values gives kohm and NOISE / HIGH / PASS; EXIT key.
+- **Trend Review** (Display menu or the cyan arrow): Case / Cursor, SR / EMG / SQI / None, Step Backward / Forward (10 s),
+  click the plot to place the cursor with the readout box.
+- **Uncertain or not copied** (the evidence is weak): the 2-channel Display menu layout (no photo of it exists; ours is a
+  reduced version of the 4-channel one), the AMPL dB scale, the DSA window (55 or 60 min), alarm tones (none played, only the
+  Alarm Volume test beep), the battery icon and USB/print icons (not shown), the yellow-bell label, whether Dismiss shows on
+  every low message (we show it on start-up and information messages only), SR hidden when Display SR is off (we hide the
+  box), Date and Time apply (refused: "cannot be changed during a case"), exact fonts (look-alikes: Archivo Black, DejaVu
+  Sans, Arimo, Archivo Narrow), the EMG tube hatching, 4-channel and bilateral views (not the owner's monitor).
 
 ## Lessons
 
@@ -258,7 +307,7 @@ Still to do for the machine switch (BIS Advance, SedLine): left/right engine, AS
 
 ## The Menu is functional (owner, 14 Oct 2026)
 
-The MENU key (VISTA screen, and the Menu button under the two-sided screens) opens an on-screen list; tapping an item steps
+The Menu button under the two-sided screens (BIS Advance, SedLine) opens an on-screen list (the Medtronic screen has its own tile Menu, above); tapping an item steps
 through its values: smoothing rate, EEG scale and sweep, trend window, bottom trend, DSA colour range (four presets), BIS
 alarm low (20–50) and high (50–80) that set the "BIS Out of Target Range" message (`mon.alo`, `mon.ahi`; the message
 also needs the teaching labels on), alarm audio, teaching labels, suppression timers (reset), sensor check, and the monitor

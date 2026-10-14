@@ -7,4 +7,7 @@ Self-hosted (no request to Google when the page loads). Latin subset, variable w
   the on-screen typeface, so this is a close look-alike, not the same font).
 - `ArchivoNarrow-latin-var.woff2`: Archivo Narrow (SIL Open Font License 1.1), for the narrow key captions (SILENT, MENU, SENSOR CHECK).
 
-Licences: <https://github.com/google/fonts/tree/main/apache/arimo> and <https://github.com/google/fonts/tree/main/ofl/archivonarrow>.
+- `ArchivoBlack-latin.woff2`: Archivo Black (SIL Open Font License 1.1), for the heavy "BIS" and "ST"/"EMG" headings of the Medtronic screen (the real ones look like Arial Black).
+- `DejaVuSans-latin.woff2`, `DejaVuSans-Bold-latin.woff2`: DejaVu Sans (Bitstream Vera licence: free to use, copy and embed; Latin subset), for the axis labels, date and time and captions, which look like a wide Verdana-style sans on the real screen.
+
+Licences: <https://github.com/google/fonts/tree/main/apache/arimo>, <https://github.com/google/fonts/tree/main/ofl/archivonarrow>, <https://github.com/google/fonts/tree/main/ofl/archivoblack> and <https://dejavu-fonts.github.io/License.html>.

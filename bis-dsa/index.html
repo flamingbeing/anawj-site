@@ -20,6 +20,9 @@ if (top === self && /^(www\.)?anawj\.com$/.test(location.hostname))
 <style>
 /* Bundled fonts for the BIS VISTA screen (bis-dsa/fonts/README.md): look-alikes, the manufacturer's on-screen typeface is not published */
 @font-face{font-family:"Arimo";font-style:normal;font-weight:400 700;font-display:swap;src:url(fonts/Arimo-latin-var.woff2) format("woff2")}
+@font-face{font-family:"Archivo Black";font-style:normal;font-weight:400;font-display:swap;src:url(fonts/ArchivoBlack-latin.woff2) format("woff2")}
+@font-face{font-family:"DejaVu Sans Web";font-style:normal;font-weight:400;font-display:swap;src:url(fonts/DejaVuSans-latin.woff2) format("woff2")}
+@font-face{font-family:"DejaVu Sans Web";font-style:normal;font-weight:700;font-display:swap;src:url(fonts/DejaVuSans-Bold-latin.woff2) format("woff2")}
 @font-face{font-family:"Archivo Narrow";font-style:normal;font-weight:400 700;font-display:swap;src:url(fonts/ArchivoNarrow-latin-var.woff2) format("woff2")}
 /* Layout: always dark, like the anaesthetic machine's monitor. The screens are near-black; the page around them is a dark slate. */
 :root{
@@ -176,47 +179,91 @@ footer{font-size:13px;color:var(--muted);max-width:80ch;border-top:1px solid var
 /* BIS VISTA-style screen: absolute layout in container units (cqw) taken from the owner's photos of the real monitor */
 .screens{display:grid;gap:10px;min-width:0}
 .vwrap{background:#1b2230;padding:6px;border:1px solid #2b3446;border-radius:18px;display:block}
-.vista{container-type:inline-size;position:relative;aspect-ratio:5/4;background:#000;border-radius:8px;overflow:hidden;color:#fff;font-family:"Arimo","Liberation Sans",Arial,sans-serif;user-select:none}
+/* Medtronic BIS 2-channel screen: a 640 x 480 virtual LCD (4:3), every size below is in virtual pixels times --u */
+.vista{--u:calc(100cqw / 640);--mt-bg:#14172f;--mt-box:#0d1022;--mt-fr:#a8dbf0;--mt-hd:#e2f2fa;--mt-yel:#e8dc1c;--mt-lil:#c9c6e6;
+ container-type:inline-size;position:relative;aspect-ratio:4/3;background:var(--mt-bg);border-radius:6px;overflow:hidden;color:#fff;font-family:"Arimo","Liberation Sans",Arial,sans-serif;user-select:none;-webkit-font-smoothing:none}
 .vista *{box-sizing:border-box}
-.vbox{position:absolute;border:.35cqw solid #8a8f98;border-radius:.8cqw}
-.vbis{left:2.8%;top:3.5%;width:27.2%;height:33.5%}
-.vlbl{position:absolute;left:5%;top:2%;font-weight:700;font-size:5.4cqw;line-height:1}
-.vsqi{position:absolute;right:6%;top:6%;display:flex;gap:.5cqw;align-items:flex-end;height:5cqw}
-.vsqi i{display:block;width:1.1cqw;background:#2b3a2e}
-.vsqi i:nth-child(1){height:20%}.vsqi i:nth-child(2){height:40%}.vsqi i:nth-child(3){height:60%}.vsqi i:nth-child(4){height:80%}.vsqi i:nth-child(5){height:100%}
-.vsqi i.on{background:var(--seg,#3ddc6b)}
-.vnum{position:absolute;left:0;right:0;bottom:2%;text-align:center;font-weight:700;font-size:19cqw;line-height:1;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
-.vnum.hollow{color:transparent;-webkit-text-stroke:.5cqw #fff}
-.vemg{left:32%;top:3.5%;width:6%;height:33.5%;border-color:#8a8f98}
-.vemglbl{position:absolute;left:0;right:0;top:2%;text-align:center;font-weight:700;font-size:1.8cqw}
-.vemgbar{position:absolute;left:28%;right:28%;top:14%;bottom:6%;display:flex;flex-direction:column-reverse;gap:1%}
-.vemgbar i{flex:1;background:#3a2a10}
-.vemgbar i.on{background:var(--seg,#ff9a1f)}
-.vst{left:39%;top:4.5%;width:17%;height:7.5%;border-color:#a074e8;display:flex;align-items:center;justify-content:space-between;padding:0 1.2cqw}
-.vtag{font-weight:700;font-size:2.8cqw}.vval{font-weight:700;font-size:2.7cqw;font-variant-numeric:tabular-nums}
-.st,.vval.st{color:#b48cff}
-.vsr{left:77%;top:4.5%;width:17%;height:7.5%;border-color:#8a8f98;display:flex;align-items:center;justify-content:space-between;padding:0 1.2cqw}
-.vcirc{display:grid;place-items:center;min-width:5cqw;height:5cqw;border:.3cqw solid #cfd3da;border-radius:50%;font-weight:700;font-size:2.8cqw;line-height:1}
-.veeg{left:39%;top:12.5%;width:55%;height:22.5%;border-color:#8a8f98;overflow:hidden}
-.veeg canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
-.veegcap{position:absolute;left:0;right:0;top:1%;text-align:center;font-size:2.4cqw;color:#cfd3da;pointer-events:none}
-.vcap{position:absolute;bottom:1%;font-size:2.1cqw;color:#cfd3da;pointer-events:none}.vcap.l{left:1.5%}.vcap.r{right:1.5%}
-.vmsg{position:absolute;left:2.8%;right:5.5%;top:40%;height:7%;display:flex;align-items:center;justify-content:space-between;padding:0 1.5cqw;font-size:2.7cqw;font-weight:700;border-radius:.6cqw;color:#000;background:#ffe600}
-.vmsg.hi{background:#d6001c;color:#fff}.vmsg.info{background:#3c4a63;color:#fff}
+.vista .p{position:absolute;left:calc(var(--x)*var(--u));top:calc(var(--y)*var(--u));width:calc(var(--w)*var(--u));height:calc(var(--h)*var(--u))}
+.vista canvas.p{display:block}
+.mbox{border:calc(2*var(--u)) solid var(--mt-fr);border-radius:calc(9*var(--u));background:var(--mt-box);overflow:hidden}
+.bhead{position:absolute;left:0;right:0;top:0;height:calc(34*var(--u));background:var(--mt-hd);border-bottom:calc(1*var(--u)) solid #6f7c96}
+.blbl{position:absolute;left:calc(8*var(--u));top:calc(5*var(--u));font:400 calc(25*var(--u))/1 "Archivo Black","Arimo",sans-serif;color:#161c46;letter-spacing:calc(.5*var(--u))}
+.vsqi{position:absolute;left:calc(121*var(--u));bottom:calc(2*var(--u));display:flex;gap:calc(2.8*var(--u));align-items:flex-end;height:calc(28*var(--u))}
+.vsqi i{display:block;width:calc(7.6*var(--u));background:#fff;border:calc(1.2*var(--u)) solid #161c46;border-radius:calc(1*var(--u))}
+.vsqi i:nth-child(1){height:calc(12.6*var(--u))}.vsqi i:nth-child(2){height:calc(15.6*var(--u))}.vsqi i:nth-child(3){height:calc(19.5*var(--u))}.vsqi i:nth-child(4){height:calc(23.4*var(--u))}.vsqi i:nth-child(5){height:calc(27.8*var(--u))}
+.vsqi i.on{background:#34b233;border-color:#1c7d1f}
+.vnum{position:absolute;left:0;right:0;top:calc(34*var(--u));bottom:0;display:flex;align-items:center;justify-content:center;font:700 calc(112*var(--u))/1 "Arimo","Liberation Sans",Arial,sans-serif;color:#fff;letter-spacing:calc(-3*var(--u));font-variant-numeric:tabular-nums;padding-top:calc(4*var(--u))}
+.vnum.hollow{color:transparent;-webkit-text-stroke:calc(2*var(--u)) #fff}
+.ehead{position:absolute;left:0;right:0;top:0;height:calc(34*var(--u));background:var(--mt-hd);color:#10131f;font:700 calc(14*var(--u))/calc(34*var(--u)) "Arimo",sans-serif;text-align:center;border-bottom:calc(1*var(--u)) solid #6f7c96}
+.etube{position:absolute;left:calc(7*var(--u));top:calc(38*var(--u));width:calc(20*var(--u));height:calc(122*var(--u));border:calc(2*var(--u)) solid #e3e9f4;border-radius:calc(5*var(--u));display:flex;flex-direction:column-reverse;overflow:hidden;background:#06070f}
+.etube i{flex:1;border-top:calc(1*var(--u)) solid #cfd6e6}.etube i:last-child{border-top:0}
+.etube i.on{background:repeating-linear-gradient(45deg,#f08a24 0 calc(2*var(--u)),#d9791a calc(2*var(--u)) calc(3*var(--u)))}
+.stbox,.srbox{border:calc(2*var(--u)) solid #8b4fd6;border-radius:calc(6*var(--u));display:flex;align-items:center;justify-content:space-between;padding:0 calc(10*var(--u));font-weight:700;background:#25184b}
+.stbox{color:#cf92f8;font-size:calc(19*var(--u));justify-content:flex-start;gap:calc(10*var(--u));padding:0 calc(8*var(--u));background:#1f1346}
+.srbox{border-color:#b9bfd0;background:#101326;font-size:calc(22*var(--u));padding:0 calc(12*var(--u)) 0 calc(10*var(--u))}
+.srbox b{font-size:calc(21*var(--u));font-weight:700}
+.stbox[hidden],.srbox[hidden]{display:none}
+.ecap{position:absolute;font-size:calc(11*var(--u));line-height:1;color:var(--mt-lil);white-space:nowrap;pointer-events:none;font-family:"DejaVu Sans Web","Arimo",sans-serif}
+.ecap.eeg{font-size:calc(17*var(--u));color:#b8d838;text-align:center;font-family:"Arimo",sans-serif}
+.ecap.r{text-align:right}
+.v2art{position:absolute;color:#f0a020;font:700 calc(13*var(--u))/1 "Arimo",sans-serif}
+.vmsg{left:calc(90*var(--u));top:calc(180*var(--u));width:calc(548*var(--u));height:calc(50*var(--u));display:flex;align-items:center;justify-content:center;font-size:calc(22*var(--u));font-weight:700;border-radius:calc(4*var(--u));color:#000;background:#f6f500;white-space:pre;position:absolute;border:calc(1.5*var(--u)) solid #cfd0d6}
+.vmsg.hi{background:#c8161c;color:#fff;border-color:#e86a6e;background-image:repeating-linear-gradient(90deg,rgba(0,0,0,.18) 0 calc(1*var(--u)),transparent calc(1*var(--u)) calc(3*var(--u)))}
+.vmsg.info{background:#2f3a66;color:#fff;border-color:#6b78a8}
 @media (prefers-reduced-motion:no-preference){.vmsg.hi{animation:msgflash 1s steps(1) infinite}}
-.vmsg button{font:inherit;font-size:2.3cqw;background:rgba(255,255,255,.25);color:inherit;border:.25cqw solid currentColor;border-radius:.6cqw;padding:.3cqw 1.2cqw;cursor:pointer}
-.vkey{position:absolute;left:2.4%;width:11.6%;height:15%;display:grid;place-items:center;align-content:center;gap:.2cqw;background:#c7ccd4;color:#10151d;border:0;border-radius:.8cqw;padding:0;cursor:pointer;font-family:"Archivo Narrow","Arimo",sans-serif}
-.vkey svg{width:3.6cqw;height:3.6cqw;fill:currentColor}
-.vkey b{font-size:1.9cqw;line-height:1.05;font-weight:700;text-align:center;letter-spacing:.02em}
-#kSilent{top:49%}#kMenu{top:66%}#kSensor{top:82.5%}
-.vkey:focus-visible,.vmsg button:focus-visible{outline:.5cqw solid #178fd7;outline-offset:.3cqw}
-.vkey[aria-expanded="true"]{background:#fff;box-shadow:0 0 0 .4cqw #178fd7}
-.vkey.on{background:#ffe600}
-.vdsa{position:absolute;left:23%;top:49%;width:76%;height:49%;display:block;background:#000}
-.vsensor{position:absolute;inset:0;background:rgba(0,0,0,.92);display:grid;place-content:center;justify-items:center;gap:2cqw;font-size:3.4cqw;text-align:center}
+.vmsg .vt{flex:1;text-align:center;min-width:0;overflow:hidden;text-overflow:clip}
+.vmsg button{position:absolute;right:calc(6*var(--u));top:calc(3*var(--u));width:calc(92*var(--u));height:calc(40*var(--u));font:400 calc(16*var(--u))/1 "Arimo",sans-serif;background:#1b2a6b;color:#fff;border:calc(1.5*var(--u)) solid #6b7bc0;border-radius:calc(4*var(--u));padding:0;cursor:pointer}
+.vmsg[hidden],.vmsg button[hidden]{display:none}
+.vkey{position:absolute;left:calc(8*var(--u));width:calc(76*var(--u));height:calc(80*var(--u));padding:calc(7*var(--u));cursor:pointer;border:calc(1.5*var(--u)) solid #2b6aa0;border-radius:calc(4*var(--u));background:linear-gradient(135deg,#a6d8f7,#4aa8e8 70%,#3b8fd0);box-shadow:inset calc(1.5*var(--u)) calc(1.5*var(--u)) 0 #d4eefc,inset calc(-1.5*var(--u)) calc(-1.5*var(--u)) 0 #2c7ebf;font-family:"Archivo Narrow","Arimo",sans-serif;color:#fff}
+.vkey .kin{position:absolute;inset:calc(7*var(--u));background:#07080c;border-radius:calc(9*var(--u));display:flex;flex-direction:column;align-items:center;justify-content:center;gap:calc(3*var(--u))}
+.vkey .kl{font-size:calc(11.5*var(--u));line-height:1.02;letter-spacing:calc(.3*var(--u));text-align:center;text-transform:uppercase;font-weight:500}
+.vkey svg{width:calc(42*var(--u));height:calc(30*var(--u));display:block;overflow:visible}
+.vkey .kl.cnt{font:700 calc(15*var(--u))/1 "Arimo",sans-serif;letter-spacing:0}
+#kSilent{top:calc(232*var(--u))}#kMenu{top:calc(314*var(--u))}#kSensor{top:calc(396*var(--u))}
+.vkey:active{filter:brightness(.9)}
+.vkey:focus-visible,.vmsg button:focus-visible,.mt:focus-visible,.v2rv:focus-visible{outline:calc(2.5*var(--u)) solid #fff;outline-offset:calc(1*var(--u));z-index:5}
+.vkey[aria-expanded="true"]{filter:brightness(1.15)}
+.v2rv{position:absolute;left:calc(122*var(--u));top:calc(384*var(--u));width:calc(34*var(--u));height:calc(34*var(--u));background:none;border:0;padding:0;cursor:pointer;z-index:2}
+.v2rv svg{width:100%;height:100%;display:block}
+.v2rv[hidden]{display:none}
+.vsensor{position:absolute;inset:0;pointer-events:none}
 .vsensor[hidden]{display:none}
-.vel{display:flex;gap:3cqw}.vel i{display:grid;place-items:center;width:7cqw;height:7cqw;border-radius:50%;border:.4cqw solid #8a8f98;font-style:normal;font-weight:700;font-size:3cqw}
-.vel i.ok{background:#1f9d4a;border-color:#3ddc6b}.vel i.chk{border-color:#ffe600;color:#ffe600}
+.vsensor svg{position:absolute;inset:0;width:100%;height:100%}
+@media (prefers-reduced-motion:no-preference){.vsensor .blink{animation:scblink 1s steps(1) infinite}}
+@keyframes scblink{50%{opacity:.25}}
+.vsensor button{pointer-events:auto;position:absolute;left:calc(536*var(--u));top:calc(408*var(--u));width:calc(94*var(--u));height:calc(58*var(--u));font:400 calc(13.5*var(--u))/1.15 "Arimo",sans-serif;color:#e3e1f8;background:#3a3c70;border:calc(1.5*var(--u)) solid #6a6cb0;border-bottom-color:#232553;border-right-color:#232553;border-radius:calc(4*var(--u));cursor:pointer;padding:0}
+.vista.sc .scx{visibility:hidden}
+.v2menu{position:absolute;left:calc(93*var(--u));top:calc(232*var(--u));width:calc(547*var(--u));height:calc(248*var(--u));background:#2f3064;border:calc(2*var(--u)) solid #4c567e;border-radius:calc(7*var(--u));z-index:3;font-family:"Arimo",sans-serif;color:#dcdaf5}
+.v2menu[hidden]{display:none}
+.mt{position:absolute;left:calc(var(--x)*var(--u));top:calc(var(--y)*var(--u));width:calc(var(--w)*var(--u));height:calc(var(--h)*var(--u));background:linear-gradient(#41438f,#34367a);border:calc(1.5*var(--u)) solid #23245a;border-top-color:#7d7fc8;border-left-color:#6668b4;border-radius:calc(5*var(--u));color:#dcdaf5;font:400 calc(16.5*var(--u))/1.12 "Arimo",sans-serif;padding:calc(4*var(--u)) calc(8*var(--u));text-align:center;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:calc(4*var(--u))}
+.mt:disabled{opacity:.55;cursor:default}
+.mt .ar{position:absolute;right:calc(8*var(--u));bottom:calc(7*var(--u));width:0;height:0;border:calc(7*var(--u)) solid transparent;border-left:calc(12*var(--u)) solid #3fc0b0;border-right:0}
+.mt .ar.l{right:auto;left:calc(8*var(--u));border-left:0;border-right:calc(12*var(--u)) solid #b9c3e8}
+.mt.ret{align-items:flex-end;text-align:right;justify-content:flex-start;padding-top:calc(9*var(--u))}
+.mt .g{color:#40e060}.mt .d{color:#b9bbd9}.mt .y{color:#e8dc1c}
+.mt .opts{display:flex;gap:calc(14*var(--u));font-size:calc(15*var(--u))}
+.mt .sq{display:inline-block;width:calc(26*var(--u));height:calc(16*var(--u));background:#37c640;border:calc(1.5*var(--u)) solid #1f7a28}
+.mt .sq.dim{background:#8e8fae;border-color:#6a6b8c}
+.mt .sq.x{background:#c9cad8;border-color:#8a8bab;color:#6a6b8c;font:700 calc(13*var(--u))/calc(12*var(--u)) "Arimo",sans-serif;text-align:center}
+.mt .sq.x.redx{background:#d4d4e2;color:#d21f2b}
+.mt .cy{color:#3fd0e8;font-size:calc(34*var(--u));font-weight:700;line-height:1}.mt .cy2{color:#5fc8e0}.mt .cy3{color:#40c8e8}
+.mt .fm{display:inline-block;width:calc(32*var(--u));height:calc(22*var(--u));border:calc(1.5*var(--u)) solid #8e8fae;background:linear-gradient(#000 30%,#2a52b8 30% 62%,#000 62%)}
+.mt .fm.l{background:#000 repeating-linear-gradient(90deg,#fff 0 calc(2*var(--u)),#000 calc(2*var(--u)) calc(5*var(--u)))}
+.mt .fm.sel{border-color:#40e060}
+.mt.vol{background:linear-gradient(#34353c,#26272c);border-color:#101114;border-top-color:#5b5c64;border-left-color:#4a4b52;border-radius:calc(2*var(--u))}
+.mt .sqs{display:flex;gap:calc(14*var(--u));align-items:center}
+.mt.dis{filter:saturate(.5) brightness(.8)}
+.mt.sel{outline:calc(2*var(--u)) solid #40e060}
+.mtl{position:absolute;left:calc(var(--x)*var(--u));top:calc(var(--y)*var(--u));width:calc(var(--w)*var(--u));font:400 calc(var(--fs,16)*var(--u))/1.15 "Arimo",sans-serif;color:var(--c,#dcdaf5);text-align:var(--ta,center);white-space:pre-line;pointer-events:none}
+.mtbox{position:absolute;left:calc(var(--x)*var(--u));top:calc(var(--y)*var(--u));width:calc(var(--w)*var(--u));height:calc(var(--h)*var(--u));background:var(--bg,#d9dae6);color:var(--c,#b81c1c);font:700 calc(var(--fs,44)*var(--u))/1 "Arimo",sans-serif;display:flex;align-items:center;justify-content:center;border:calc(1.5*var(--u)) solid #23245a}
+.mtlist{position:absolute;background:transparent;color:#fff;font:400 calc(12.5*var(--u))/1.2 "DejaVu Sans Web","Arimo",sans-serif;padding:calc(4*var(--u)) calc(8*var(--u));overflow:hidden;white-space:pre}
+.mtlist table{border-collapse:collapse;width:100%}.mtlist td,.mtlist th{padding:0 calc(6*var(--u));text-align:left;font-weight:400}
+.mtlist th{font-weight:700}
+.v2rev{position:absolute;left:calc(193*var(--u));top:calc(5*var(--u));width:calc(443*var(--u));height:calc(170*var(--u));background:#2f3064;border:calc(2*var(--u)) solid #4c567e;border-radius:calc(7*var(--u));z-index:3;color:#f0a020;font:400 calc(21*var(--u))/1 "Arimo",sans-serif;text-align:center;padding-top:calc(5*var(--u))}
+.v2rev[hidden]{display:none}
+.vista.rv .rvhide{visibility:hidden}
+.v2bat{position:absolute;left:calc(8*var(--u));top:calc(188*var(--u));width:calc(16*var(--u));height:calc(28*var(--u))}
+.v2bat[hidden]{display:none}
 .screens{position:relative}
 .vmenu{position:absolute;left:6px;right:6px;top:6px;min-height:calc(100% - 12px);background:rgba(6,10,16,.97);border:1px solid #3a4558;border-radius:8px;z-index:3;padding:8px 10px;font-family:"Arimo","Liberation Sans",Arial,sans-serif;color:#fff}
 .vmenu[hidden]{display:none}
@@ -246,17 +293,25 @@ footer{font-size:13px;color:var(--muted);max-width:80ch;border-top:1px solid var
   <div class="sim">
     <div class="screens">
     <div class="screen vwrap" id="vistaWrap"><div class="vista" id="vista" role="group" aria-label="Monitor screen in the style of the owner's Medtronic BIS monitor">
-      <div class="vbox vbis"><span class="vlbl">BIS</span><span class="vsqi" id="v2Sqi" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span class="vnum" id="v2Bis">--</span></div>
-      <div class="vbox vemg"><span class="vemglbl">EMG</span><span class="vemgbar" id="v2Emg" aria-hidden="true"><i></i><i></i><i></i><i></i></span></div>
-      <div class="vbox vst"><span class="vtag st">ST</span><span class="vval st" id="v2St">0:00:00</span></div>
-      <div class="vbox vsr"><span class="vtag">SR</span><span class="vcirc" id="v2Sr">0</span></div>
-      <div class="vbox veeg"><canvas id="c2Eeg" aria-label="EEG waveform"></canvas><span class="veegcap">EEG</span><span class="vcap l" id="v2Mm">25 mm / sec.</span><span class="vcap r" id="v2Uv">25 µV / division</span></div>
-      <div class="vmsg" id="v2Msg" hidden><span id="v2MsgT"></span><button type="button" id="v2Dismiss">Dismiss</button></div>
-      <button type="button" class="vkey" id="kSilent" aria-label="Silent: pause the alarm"><svg viewBox="0 0 24 24" aria-hidden="true"><path id="bellP" d="M12 3a6 6 0 0 0-6 6v4l-2 3h16l-2-3V9a6 6 0 0 0-6-6zm-2 15a2 2 0 0 0 4 0z"/></svg><b>SILENT</b></button>
-      <button type="button" class="vkey menukey" id="kMenu" aria-label="Menu: show or hide the monitor settings" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3zM3 10h18M3 15h18M9 4v16M15 4v16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg><b>MENU</b></button>
-      <button type="button" class="vkey" id="kSensor" aria-label="Sensor check"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12h6m8 0h6M8 8h8v8H8z" fill="none" stroke="currentColor" stroke-width="1.8"/></svg><b>SENSOR<br>CHECK</b></button>
-      <canvas id="c2Dsa" class="vdsa" aria-label="Density spectral array with the BIS trend below it"></canvas>
-      <div class="vsensor" id="v2Sensor" hidden><b>Sensor check</b><span class="vel"><i>1</i><i>2</i><i>3</i><i>4</i></span><span id="v2SensorT">Sensor check in progress</span></div>
+      <div class="p mbox bisbox" style="--x:8;--y:6;--w:182;--h:168"><div class="bhead"><span class="blbl">BIS</span><span class="vsqi" id="v2Sqi" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span></div><span class="vnum" id="v2Bis"></span></div>
+      <div class="p mbox emgbox scx" style="--x:200;--y:6;--w:38;--h:168"><div class="ehead">EMG</div><div class="etube" id="v2Emg" aria-hidden="true"><i></i><i></i><i></i><i></i></div></div>
+      <div class="p stbox scx rvhide" id="v2StBox" style="--x:248;--y:6;--w:114;--h:34"><span>ST</span><span id="v2St">0:00:00</span></div>
+      <div class="p srbox scx rvhide" id="v2SrBox" style="--x:504;--y:6;--w:115;--h:34"><span>SR</span><b id="v2Sr">0</b></div>
+      <canvas id="c2Eeg" class="p scx rvhide" style="--x:240;--y:44;--w:376;--h:134" aria-label="EEG waveform"></canvas>
+      <span class="ecap scx rvhide" id="v2Mm" style="left:calc(250*var(--u));top:calc(136*var(--u))">25 mm / sec.</span>
+      <span class="ecap eeg scx rvhide" id="v2EegL" style="left:calc(248*var(--u));width:calc(364*var(--u));top:calc(134*var(--u))">EEG</span>
+      <span class="ecap r scx rvhide" id="v2Uv" style="left:calc(412*var(--u));width:calc(200*var(--u));top:calc(136*var(--u))">25 µV / division</span>
+      <span class="v2art scx rvhide" id="v2Art" style="left:calc(568*var(--u));top:calc(20*var(--u))" hidden>ARTIFACT</span>
+      <div class="vmsg" id="v2Msg" hidden role="status"><span class="vt" id="v2MsgT"></span><button type="button" id="v2Dismiss" hidden>Dismiss</button></div>
+      <button type="button" class="vkey" id="kSilent" aria-label="Silent: pause the alarm" aria-pressed="false"><span class="kin"><span class="kl" id="kSl"></span><svg viewBox="0 0 42 30" aria-hidden="true" id="kBell"></svg></span></button>
+      <button type="button" class="vkey" id="kMenu" aria-label="Menu: show the monitor settings" aria-expanded="false"><span class="kin"><span class="kl" id="kMl">MENU</span><svg viewBox="0 0 42 30" aria-hidden="true" id="kMi"></svg></span></button>
+      <button type="button" class="vkey" id="kSensor" aria-label="Sensor check"><span class="kin"><span class="kl" id="kSn">SENSOR<br>CHECK</span><svg viewBox="0 0 42 30" aria-hidden="true"><path d="M1 15h8M31 15h8" stroke="#fff" stroke-width="2.4" fill="none"/><g fill="none" stroke="#fff" stroke-width="1.8"><circle cx="13" cy="15" r="3.6"/><circle cx="21" cy="15" r="3.6"/><circle cx="29" cy="15" r="3.6"/></g><path d="M9 15h1M16.6 15h1M24.6 15h1" stroke="#fff" stroke-width="1.8"/><circle cx="39" cy="15" r="2.4" fill="none" stroke="#fff" stroke-width="1.8"/></svg></span></button>
+      <canvas id="c2Dsa" class="p scx" style="--x:88;--y:232;--w:552;--h:248" aria-label="Density spectral array with the amplitude or BIS trend under it"></canvas>
+      <button type="button" class="v2rv scx" id="v2Review" aria-label="Trend review" hidden><svg viewBox="0 0 34 34" aria-hidden="true"><path d="M30 4L5 17l25 13z" fill="none" stroke="#30d4d8" stroke-width="2.6" stroke-linejoin="miter"/></svg></button>
+      <div class="vsensor" id="v2Sensor" hidden><svg viewBox="0 0 640 480" id="v2ScSvg" aria-label="Sensor check: electrodes 1 to 4"></svg><button type="button" id="v2ScVal">Show<br>Values</button></div>
+      <div class="v2menu" id="v2Menu" role="dialog" aria-label="Monitor menu" hidden></div>
+      <div class="v2rev" id="v2Rev" hidden></div>
+      <svg class="v2bat" id="v2Bat" viewBox="0 0 16 28" aria-hidden="true" hidden></svg>
     </div></div>
     <div class="screen vwrap" id="bilatWrap" hidden><div class="vista" id="bilat" role="group" aria-label="Two-sided monitor screen: left and right EEG, DSA and trend"><canvas id="cBil" class="bilc" aria-label="Left and right EEG, density spectral arrays and trend"></canvas></div>
       <div class="bilkeys"><button type="button" id="bSilent">Silent</button><button type="button" class="menukey" id="bMenu" aria-expanded="false">Menu</button><button type="button" id="bSensor">Sensor check</button></div></div>
@@ -437,6 +492,7 @@ footer{font-size:13px;color:var(--muted);max-width:80ch;border-top:1px solid var
 
 <footer>A teaching simulation. The EEG is synthetic and the BIS value comes from a simple model of spectral features (edge frequency, fast and slow power, suppression ratio) tuned to typical published ranges. It is not the proprietary BIS algorithm and must not guide patient care.</footer>
 </div>
+<script src="mt-screen.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

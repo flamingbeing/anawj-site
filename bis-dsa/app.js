@@ -309,17 +309,18 @@ function step(nSamples){
    const blank=sqi<15,gaH=eng.drug==='mix'?0.155*(eng.de.propofol||0)+sevoDepth(eng.de.sevo||0):eng.drug==='propofol'||eng.drug==='sevo'?eng.de:0;
    outN=!blank&&gaH>=0.44&&(bisS<mon.alo||bisS>mon.ahi||outN>=10&&(bisS<mon.alo+2||bisS>mon.ahi-2))?outN+1:0;
    if(!art&&!blank){if(bsr>=5)tim.sup++;if(bisS<40)tim.low++;}
-   const col={n:Math.round(produced/FS),ce:ceNow(),db,sef:fresh?lastSef:null,mf:fresh?lastMf:null,bis:blank?null:bisS,bsr,emg,sqi,tp,art,
+   const col={n:Math.round(produced/FS),ce:ceNow(),db,sef:fresh?lastSef:null,mf:fresh?lastMf:null,bis:blank?null:bisS,bsr,emg,sqi,tp,art,amp:20*Math.log10(Math.max(1,mx)),st:tim.sup,
     bc:bcH.reduce((a,b)=>a+b,0)};COLS.push(col);if(COLS.length>COLMAX)COLS.shift();HIST.push(col);if(HIST.length>HISTMAX)HIST.shift();
    onColumn&&onColumn();
   }}
 }
 // the monitor's message region: [priority, text] or null. Wording as in the BIS Complete manual.
 function monMsg(){const c=COLS[COLS.length-1];if(!c)return null;
- if(isoN>=60)return ['hi','Isoelectric EEG Detected'];
- if(mon.teach&&outN>=10&&c.bis!=null)return ['hi','BIS Out of Target Range \u2013 '+(c.bis<50?'Low':'High')];
- if(c.sqi<15)return ['lo','Data unavailable due to poor signal quality'];
- if(c.sqi<50)return ['lo','Excessive Artifact Detected in Signal'];
+ if(isoN>=60)return ['hi','Isoelectric EEG Detected',31,'Isoelectric EEG Detected'];
+ { const tgtOn=typeof MT!=='undefined'&&mon.skin==='vista'?MT.tgt.active&&MT.tgt.alarm:mon.teach,low=c.bis!=null&&c.bis<(mon.alo+mon.ahi)/2;
+   if(tgtOn&&outN>=10&&c.bis!=null)return ['hi','BIS Out of Target Range \u2013 '+(low?'Low':'High'),low?29:30,'BIS out of target range']; }
+ if(c.sqi<15)return ['lo','Data unavailable due to poor signal quality',28,'Data unavailable due to poor signal quality'];
+ if(c.sqi<50)return ['lo','Excessive Artifact Detected in Signal',27,'Excessive Artifact Detected in Signal'];
  if(mon.infoUntil>Date.now())return ['info',mon.info];
  return null;}
 
@@ -393,14 +394,6 @@ function drawDsa(){if(view==='eeg'||mon.skin!=='classic')return;const {ctx,w,h}=
 function fitFill(c){const w=c.clientWidth,h=c.clientHeight;if(!w||!h)return null;const dpr=Math.min(2,window.devicePixelRatio||1),W=Math.round(w*dpr),H=Math.round(h*dpr);
  if(c.width!==W||c.height!==H){c.width=W;c.height=H;}const ctx=c.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);return {ctx,w,h};}
 const VSEC=()=>mon.sweep==='auto'?8:mon.sweep;
-function drawVEeg(){const f=fitFill($('c2Eeg'));if(!f)return;const {ctx,w,h}=f;ctx.clearRect(0,0,w,h);
- const secs=VSEC(),N=secs*FS,sc=(h/2)/mon.scale;
- ctx.strokeStyle='rgba(255,255,255,.14)';ctx.lineWidth=1;ctx.setLineDash([2,4]);ctx.beginPath();ctx.moveTo(0,Math.round(h/2)+.5);ctx.lineTo(w,Math.round(h/2)+.5);ctx.stroke();ctx.setLineDash([]);
- ctx.strokeStyle='rgba(255,255,255,.35)';ctx.beginPath();for(let k=1;k<secs;k++){const x=Math.round(w*k/secs)+.5;ctx.moveTo(x,h-4);ctx.lineTo(x,h);}ctx.stroke();
- if(mon.teach){ctx.fillStyle='rgba(23,143,215,.18)';ctx.fillRect(w*(secs-2)/secs,0,w*2/secs,h);}
- const n=Math.min(SIG.length,N),o=SIG.length-n,x0=N-n;ctx.save();ctx.beginPath();ctx.rect(0,0,w,h);ctx.clip();ctx.strokeStyle='#3ddc6b';ctx.lineWidth=1.2;ctx.beginPath();
- for(let i=0;i<n;i++){const x=(x0+i)/N*w,y=h/2-SIG[o+i]*sc;i?ctx.lineTo(x,y):ctx.moveTo(x,y);}ctx.stroke();ctx.restore();
- txt('v2Mm',`${+(200/secs).toFixed(1)} mm / sec.`);txt('v2Uv',`${mon.scale/2} µV / division`);}
 const OFFS={};
 function paintDsa(slot,hist){const win=mon.trend*60;let o=OFFS[slot];if(!o||o.cv.width!==win){const cv=document.createElement('canvas');cv.width=win;cv.height=NB;o=OFFS[slot]={cv,img:cv.getContext('2d').createImageData(win,NB)};}
  const d=o.img.data,n=Math.min(hist.length,win),off=hist.length-n;
@@ -408,49 +401,6 @@ function paintDsa(slot,hist){const win=mon.trend*60;let o=OFFS[slot];if(!o||o.cv
   if(!col){d[i]=d[i+1]=d[i+2]=0;d[i+3]=255;continue;}
   const c=LUT[(dbToX(col.db[NB-1-y])*255)|0];d[i]=c[0];d[i+1]=c[1];d[i+2]=c[2];d[i+3]=255;}}
  o.cv.getContext('2d').putImageData(o.img,0,0);return o.cv;}
-let offV=null;
-function paintV(){offV=paintDsa('v',HIST);}
-const MON3=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-function drawVDsa(){const f=fitFill($('c2Dsa'));if(!f||!offV)return;const {ctx,w,h}=f;ctx.fillStyle='#000';ctx.fillRect(0,0,w,h);
- const fs=Math.max(8,Math.min(13,w*0.034)),gx=w*0.075,gw=w*0.79,gy=h*0.125,gh=h*0.42,ty=h*0.6,th=h*0.29;
- const win=mon.trend*60,n=Math.min(HIST.length,win),o=HIST.length-n,dw=gw*n/win;
- ctx.font=`600 ${fs}px Arimo, Arial, sans-serif`;ctx.textBaseline='alphabetic';
- // header: SEF (white), MF (blue), date and time, case code
- const c=COLS[COLS.length-1],blank=!c||c.sqi<15,sT='SEF '+(blank||lastSef==null?'--':lastSef.toFixed(1)),mT='MF '+(blank||lastMf==null?'--':lastMf.toFixed(1));
- ctx.textAlign='left';ctx.fillStyle='#fff';ctx.fillText(sT,gx,fs*1.2);ctx.fillStyle='#5aa9ff';ctx.fillText(mT,gx+ctx.measureText(sT).width+fs*0.9,fs*1.2);
- const d0=new Date(T0+simT*1000),dt=`${d0.getDate()} ${MON3[d0.getMonth()]} ${String(d0.getFullYear()).slice(2)}  ${clk(simT)}`;
- ctx.textAlign='right';ctx.fillStyle='#cfd3da';ctx.fillText(dt,gx+gw,fs*1.2);
- if(mon.dbLo!==DB_LO||mon.dbHi!==DB_HI){ctx.fillStyle='#ffb454';ctx.font=`600 ${fs*0.8}px Arimo, Arial, sans-serif`;ctx.fillText(`colour ${mon.dbLo} to ${mon.dbHi} dB`,gx+gw,fs*2.2);ctx.font=`600 ${fs}px Arimo, Arial, sans-serif`;}
- // DSA image, left-aligned: data grows from the left, then scrolls
- ctx.imageSmoothingEnabled=true;if(n)ctx.drawImage(offV,0,0,n,NB,gx,gy,dw,gh);
- const Yf=hz=>gy+gh*(1-hz/30);
- ctx.setLineDash([2,3]);ctx.strokeStyle='rgba(255,255,255,.55)';ctx.lineWidth=1;ctx.beginPath();for(const hz of [4,8,13]){const y=Math.round(Yf(hz))+.5;ctx.moveTo(gx,y);ctx.lineTo(gx+gw,y);}ctx.stroke();ctx.setLineDash([]);
- ctx.strokeStyle='#8a8f98';ctx.strokeRect(gx+.5,gy+.5,gw-1,gh-1);
- const line=(k,col,lw)=>{ctx.strokeStyle=col;ctx.lineWidth=lw;ctx.beginPath();let pen=false;for(let i=0;i<n;i++){const v=HIST[o+i][k];if(v==null){pen=false;continue;}const x=gx+(i+.5)/win*gw,y=gy+gh*(1-v/30);pen?ctx.lineTo(x,y):ctx.moveTo(x,y);pen=true;}ctx.stroke();};
- line('mf','#b48cff',1.2);line('sef','#fff',1.4);
- ctx.fillStyle='#cfd3da';ctx.textAlign='right';for(const hz of [30,13,8,4])ctx.fillText(hz,gx-fs*0.4,Math.max(gy+fs*0.8,Yf(hz)+fs*0.35));
- ctx.fillStyle='#e0b040';ctx.textAlign='left';{let lim=1e9;for(const [lo,hi,l] of [[0,4,'Delta'],[4,8,'Theta'],[8,13,'Alpha'],[13,30,'Beta']]){const y=Math.min(lim-fs*1.05,(Yf(lo)+Yf(hi))/2+fs*0.35);ctx.fillText(l,gx+gw+fs*0.4,y);lim=y;}}
- // colour bar H (high power) to L
- const bx=w-fs*0.7;for(let i=0;i<gh;i++){ctx.fillStyle=rgb(LUT[((1-i/gh)*255)|0]);ctx.fillRect(bx,gy+i,fs*0.45,1);}
- ctx.fillStyle='#cfd3da';ctx.textAlign='center';ctx.font=`600 ${fs*0.8}px Arimo, Arial, sans-serif`;ctx.fillText('H',bx+fs*0.22,gy-2);ctx.fillText('L',bx+fs*0.22,gy+gh+fs*0.75);
- ctx.font=`600 ${fs}px Arimo, Arial, sans-serif`;
- // trend
- const X=i=>gx+(i+.5)/win*gw,Yb=v=>ty+th*(1-v/100);
- if(mon.teach){ctx.fillStyle='rgba(255,255,255,.10)';ctx.fillRect(gx,Yb(60),gw,Yb(40)-Yb(60));}
- ctx.strokeStyle='#8a8f98';ctx.lineWidth=1;ctx.strokeRect(gx+.5,ty+.5,gw-1,th-1);
- ctx.setLineDash([2,3]);ctx.strokeStyle='rgba(255,255,255,.35)';ctx.beginPath();ctx.moveTo(gx,Math.round(Yb(50))+.5);ctx.lineTo(gx+gw,Math.round(Yb(50))+.5);ctx.stroke();ctx.setLineDash([]);
- ctx.fillStyle='#cfd3da';ctx.textAlign='right';for(const v of [100,50,0])ctx.fillText(v,gx-fs*0.4,Math.max(ty+fs*0.8,Math.min(ty+th,Yb(v)+fs*0.35)));
- const tr=(fn,col,lw)=>{ctx.strokeStyle=col;ctx.lineWidth=lw;ctx.lineJoin='round';ctx.beginPath();let pen=false;for(let i=0;i<n;i++){const v=fn(HIST[o+i]);if(v==null){pen=false;continue;}pen?ctx.lineTo(X(i),Yb(v)):ctx.moveTo(X(i),Yb(v));pen=true;}ctx.stroke();};
- if(mon.bottom==='emg')tr(q=>Math.max(0,Math.min(100,(q.emg-30)*2)),'#3ddc6b',1);
- if(mon.bottom==='sr')tr(q=>q.bsr,'#b48cff',1.2);
- if(mon.teach){ctx.setLineDash([3,3]);tr(q=>100*(1-q.ce),'rgba(90,200,255,.85)',1);ctx.setLineDash([]);}
- tr(q=>q.bis,'#ffd23f',1.8);
- const bw=gw/win+.5;for(let i=0;i<n;i++){const q=HIST[o+i];if(q.sqi>=50)continue;ctx.fillStyle=q.sqi<15?'#ffe600':AMBER;ctx.fillRect(X(i)-bw/2,ty+th+1,bw,3);}
- // clock labels under the trend, spread across the window
- ctx.fillStyle='#cfd3da';ctx.textAlign='center';const t0=n?HIST[o].n:simT-win;
- for(let k=0;k<=4;k++){const x=gx+gw*k/4;ctx.textAlign=k===0?'left':k===4?'right':'center';ctx.fillText(clk(t0+win*k/4),x,h-fs*0.15);ctx.fillRect(Math.round(x)-.5,ty+th,1,3);}
- const lab=mon.bottom==='emg'?'BIS + EMG':mon.bottom==='sr'?'BIS + SR':'BIS';ctx.textAlign='left';ctx.fillStyle='#ffd23f';ctx.fillText(lab,gx+fs*0.4,ty+fs*1.2);
- if(mon.teach){ctx.fillStyle='#5ac8ff';ctx.textAlign='right';ctx.fillText('- - effect site',gx+gw-fs*0.4,ty+fs*1.2);}}
 // ===== drawing: two-sided screens (BIS Advance style and Masimo SedLine style; from published descriptions, not photos) =====
 // SedLine's PSi is its own proprietary index: here a straight-line stand-in from the BIS teaching value (BIS 40-60 -> PSi 25-50).
 const psiOf=b=>b==null?null:Math.max(0,Math.min(100,Math.round(1.25*b-25)));
@@ -521,7 +471,6 @@ function drawBil(){const f=fitFill($('cBil'));if(!f)return;const {ctx,w,h}=f;con
 const $=id=>document.getElementById(id);
 function zoneOf(b){return b>90?'Awake':b>80?'Light/moderate sedation':b>60?'Sedation':b>=40?'General anaesthesia':b>=20?'Deep hypnotic state':'Burst suppression / flat';}
 function segs(id,n,color){const el=$(id);el.style.setProperty('--seg',color);[...el.children].forEach((x,i)=>x.classList.toggle('on',i<n));}
-let vDismissed='';
 const mmss=n=>Math.floor(n/60)+':'+String(n%60).padStart(2,'0');
 function readouts(){const c=COLS[COLS.length-1];if(!c)return;
  // like the monitor: SQI under 50 shows BIS hollow; under 15 no BIS, SEF, SR, TP or BC at all
@@ -534,14 +483,10 @@ function readouts(){const c=COLS[COLS.length-1];if(!c)return;
  $('vSr').textContent=bl?'--':sr;$('vSef').textContent=bl||lastSef==null?'--':lastSef.toFixed(1);
  $('vTp').textContent=bl?'--':Math.round(c.tp);$('vBc').textContent=c.bsr<5||c.sqi<50?'--':c.bc;
  txt('vClock',clk(simT));
- // BIS VISTA screen and the teaching strip under it
- const vb=$('v2Bis');txt('v2Bis',bl||c.bis==null?'--':String(Math.round(c.bis)));vb.classList.toggle('hollow',!bl&&c.sqi<50);
- segs('v2Sqi',Math.ceil(c.sqi/20),c.sqi<15?'#ff6b6b':c.sqi<50?AMBER:'#3ddc6b');segs('v2Emg',e<30?0:e<39?1:e<48?2:e<56?3:4,e>=48?'#ff9a1f':'#ffb454');
- txt('v2St',Math.floor(tim.sup/3600)+':'+String(Math.floor(tim.sup/60)%60).padStart(2,'0')+':'+String(tim.sup%60).padStart(2,'0'));txt('v2Sr',bl?'--':String(sr));
+ // the Medtronic screen (mt-screen.js)
+ mtReadouts(c,bl,sr,e);
  txt('s2Sqi',String(c.sqi));txt('s2Emg',String(Math.round(e)));txt('s2Sr',bl?'--':String(sr));txt('s2Sef',bl||lastSef==null?'--':lastSef.toFixed(1));txt('s2Tp',bl?'--':String(Math.round(c.tp)));txt('s2Bc',c.bsr<5||c.sqi<50?'--':String(c.bc));
  txt('s2Zone',bl?'Poor signal':c.sqi<50?'Low SQI: check':sr>0?`Suppression (SR ${sr}%)`:zoneOf(c.bis));txt('s2Sup',mmss(tim.sup));txt('s2Low',mmss(tim.low));
- { const m0=monMsg(),mt0=m0?m0[1]:'';if(!mt0)vDismissed='';const show=!!mt0&&mt0!==vDismissed,vm=$('v2Msg');vm.hidden=!show;
-   if(show){txt('v2MsgT',mt0);vm.className='vmsg '+m0[0];} }
  if(BILAT(mon.skin)){const D=bilData();if(D)txt('bilSum',`L: BIS ${D.bl==null?'--':Math.round(D.bl)}, SR ${Math.round(D.cl.bsr)}%, SQI ${D.cl.sqi}  ·  R: BIS ${D.br==null?'--':Math.round(D.br)}, SR ${Math.round(D.cr.bsr)}%, SQI ${D.cr.sqi}  ·  ASYM ${D.asym}%`+(D.psi!=null?`  ·  PSi ${D.psi}`:''));}
  // message region: change the text only when it changes (aria-live)
  const m=monMsg(),mt=m?m[1]:'',el=$('vMsg');if(el.textContent!==mt){el.textContent=mt;el.className='msg'+(m?' '+m[0]:'');}}
@@ -719,7 +664,7 @@ function trendUI(){$('kTrend').textContent=`Trend ${mon.trend} min`;$('kBottom')
  txt('dsaRange',(mon.dbLo===DB_LO&&mon.dbHi===DB_HI?'':`${mon.dbLo}…${mon.dbHi} dB · `)+`last ${mon.trend} min`);}
 let menuOpen=false; // the on-screen Menu (VISTA and two-sided screens)
 const BILAT=s=>s==='advance'||s==='sedline';
-function applySkin(s,reset,init){mon.skin=s;$('vistaWrap').hidden=s!=='vista';$('bilatWrap').hidden=!BILAT(s);$('classicWrap').hidden=s!=='classic';$('teachStrip').hidden=s==='classic';$('bilSum').hidden=!BILAT(s);
+function applySkin(s,reset,init){mon.skin=s;mtApply();$('vistaWrap').hidden=s!=='vista';$('bilatWrap').hidden=!BILAT(s);$('classicWrap').hidden=s!=='classic';$('teachStrip').hidden=s==='classic';$('bilSum').hidden=!BILAT(s);
  document.querySelectorAll('#skinSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.skin===s));
  $('keySeg').hidden=s!=='classic';if(s==='classic')closeMenu(true);
  if(reset){mon.scale=s==='classic'?100:50;mon.sweep=s==='classic'?'auto':8;}
@@ -736,7 +681,7 @@ const MENU=[
  ['DSA colour range',()=>`${mon.dbLo} to ${mon.dbHi} dB`+(mon.dbLo===DB_LO&&mon.dbHi===DB_HI?' (default)':''),()=>{let i=RANGES.findIndex(r=>r[0]===mon.dbLo&&r[1]===mon.dbHi);[mon.dbLo,mon.dbHi]=RANGES[(i+1)%RANGES.length];dispUI();saveDisp();}],
  ['BIS alarm low',()=>String(mon.alo),()=>{mon.alo=mon.alo>=50?20:mon.alo+5;dirty=true;}],
  ['BIS alarm high',()=>String(mon.ahi),()=>{mon.ahi=mon.ahi>=80?50:mon.ahi+5;dirty=true;}],
- ['Alarm audio',()=>silenced?'Paused':'On',()=>$('kSilent').click()],
+ ['Alarm audio',()=>MT.alarm===0?'On':MT.alarm===1?'Paused':'Silent',()=>$('kSilent').click()],
  ['Teaching labels',()=>mon.teach?'On':'Off',()=>setTeach(!mon.teach)],
  ['Suppression timers',()=>'Reset',()=>$('tReset').click()],
  ['Sensor check',()=>'Start',()=>{closeMenu();$(BILAT(mon.skin)?'bSensor':'kSensor').click();}],
@@ -749,17 +694,8 @@ function toggleMenu(){if(menuOpen){closeMenu();return;}menuOpen=true;$('vMenu').
 document.querySelectorAll('.menukey').forEach(k=>k.onclick=toggleMenu);
 $('vMenuClose').onclick=()=>closeMenu();
 $('vMenu').addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();closeMenu();}});
-let silenced=false;
-$('kSilent').onclick=()=>{silenced=!silenced;$('kSilent').classList.toggle('on',silenced);$('kSilent').setAttribute('aria-pressed',silenced);$('v2Msg').style.animation=silenced?'none':'';
- mon.info=silenced?'Alarm audio paused':'Alarm audio on';mon.infoUntil=Date.now()+4000;dirty=true;setTimeout(()=>dirty=true,4100);};
-let sensorT=0;
-$('kSensor').onclick=()=>{const ok=(COLS[COLS.length-1]||{sqi:100}).sqi>=50,els=[...document.querySelectorAll('#v2Sensor .vel i')];clearTimeout(sensorT);
- $('v2Sensor').hidden=false;els.forEach(e=>e.className='chk');txt('v2SensorT','Sensor check in progress');
- sensorT=setTimeout(()=>{els.forEach((e,i)=>e.className=ok||i!==2?'ok':'chk');txt('v2SensorT',ok?'Sensor check passed':'Check electrode 3');sensorT=setTimeout(()=>{$('v2Sensor').hidden=true;},2000);},1800);};
 $('bSilent').onclick=()=>$('kSilent').click();
 $('bSensor').onclick=()=>{const l=(COLS[COLS.length-1]||{sqi:100}).sqi,r=(R.COLS[R.COLS.length-1]||{sqi:100}).sqi;mon.info=`Sensor check: left ${l>=50?'OK':'check electrodes'}, right ${r>=50?'OK':'check electrodes'}`;mon.infoUntil=Date.now()+5000;dirty=true;setTimeout(()=>dirty=true,5100);};
-$('v2Sensor').onclick=()=>{clearTimeout(sensorT);$('v2Sensor').hidden=true;};
-$('v2Dismiss').onclick=()=>{vDismissed=$('v2MsgT').textContent;dirty=true;};
 $('kTrend').onclick=()=>{const v=[5,15,60];mon.trend=v[(v.indexOf(mon.trend)+1)%3];trendUI();dirty=true;};
 $('kBottom').onclick=()=>{const v=['bis','emg','sr'];mon.bottom=v[(v.indexOf(mon.bottom)+1)%3];trendUI();dirty=true;};
 $('tReset2').onclick=()=>{tim.sup=tim.low=R.tim.sup=R.tim.low=0;dirty=true;};

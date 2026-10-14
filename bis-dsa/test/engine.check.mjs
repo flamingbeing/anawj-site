@@ -60,6 +60,10 @@ chk('Propofol 0.17', 'BIS', p17.bis, 80, 95); chk('Propofol 0.17', 'beta 13-25 d
 const p57 = run('propofol', 0.57, {}, 120, null, 4);
 chk('Propofol 0.57', 'BIS', p57.bis, 40, 55); chk('Propofol 0.57', 'SEF95', p57.sef, 12, 17);
 chk('Propofol 0.57', 'RMS uV', p57.rms, 25, 40); chk('Propofol 0.57', 'RMS GA/awake', p57.rms / awake.rms, 3, 99);
+// the Medtronic screen's amplitude (AMPL, max |EEG| per second in dB re 1 uV) and ST (cumulative suppression seconds) columns
+{ const lastCol = awake.S.COLS[awake.S.COLS.length - 1], gaCol = p57.S.COLS[p57.S.COLS.length - 1];
+  chk('Medtronic AMPL', 'awake amplitude dB (about 25-40 uV peak)', lastCol.amp, 22, 36); chk('Medtronic AMPL', 'GA amplitude minus awake (slow waves are bigger)', gaCol.amp - lastCol.amp, 0.01, 20);
+  chk('Medtronic ST', 'ST seconds, awake', lastCol.st, 0, 0); }
 const p76 = run('propofol', 0.76);
 chk('Propofol 0.76', 'BIS', p76.bis, 30, 42); chk('Propofol 0.76', 'SR', p76.sr, 0, 4.99);
 const p90 = run('propofol', 0.9);
