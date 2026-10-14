@@ -207,6 +207,19 @@ falls under 50 after about a minute of diathermy) → emergence with blinks → 
   seconds only); Reset clears them and the case story starts them at 0. Not on the real monitor: a teaching aid for
   cumulative burst-suppression time (linked to postoperative delirium in observational data; trials are mixed).
 
+## BIS VISTA screen is the default (owner, 14 Oct 2026)
+
+The owner's own monitor is a Covidien (now Medtronic) BIS VISTA-family 2-channel monitor (photos; the model and software
+version are not shown in them: ask for Menu > About or the back label). The page opens on a copy of that screen: BIS box
+with SQI bars, EMG bar, ST (suppression time, h:mm:ss) and SR boxes, the EEG window (25 mm/sec, 25 µV/division),
+message bar with Dismiss, SILENT / MENU / SENSOR CHECK keys, and the DSA with dotted lines at 4/8/13 Hz, white SEF and
+purple MF lines, band names, H-L colour bar and the BIS trend under it. Layout is absolute in container units (`cqw`),
+from the photos. Menu opens the extra row (smoothing, EEG scale, sweep, trend 5/15/60 min, bottom lane: BIS, BIS + EMG,
+BIS + SR). Numbers the real screen does not show (SQI %, EMG dB, TP, BC, zone) sit in the strip under it; "Teaching
+layout" in Display is the earlier screen (kept; the e2e test uses it for most checks). `HIST` holds 60 min of columns.
+Fonts: bundled look-alikes (`fonts/README.md`): Arimo, Archivo Narrow; the manufacturer's font is not published.
+Still to do for the machine switch (BIS Advance, SedLine): left/right engine, ASYM, PSI.
+
 ## Lessons
 
 - `fit()` reads each canvas's logical height once (`c._lh`): setting `canvas.height` rewrites the `height` attribute,

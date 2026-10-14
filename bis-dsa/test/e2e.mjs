@@ -22,6 +22,32 @@ try {
     assert.ok(awake >= 80, `awake BIS ${awake}`);
     assert.equal(await page.textContent('#rName'), 'Awake');
     assert.equal(await page.$eval('#depth', e => e.value), '0');
+    // the default screen is the BIS VISTA style: number, SQI bars, ST and SR boxes, EEG, DSA with the BIS trend under it
+    assert.equal(await page.$eval('#skinSeg [data-skin="vista"]', e => e.getAttribute('aria-pressed')), 'true');
+    assert.equal(await page.$eval('#vistaWrap', e => e.hidden), false);
+    assert.equal(await page.$eval('#classicWrap', e => e.hidden), true);
+    await page.waitForFunction(() => +document.querySelector('#v2Bis').textContent >= 80);
+    assert.equal(await page.$eval('#v2St', e => e.textContent), '0:00:00');
+    assert.ok(await page.$$eval('#v2Sqi i.on', e => e.length) >= 4, 'SQI bars lit');
+    assert.ok(await page.evaluate(() => document.fonts.check('12px Arimo') && document.fonts.check('12px "Archivo Narrow"')), 'bundled fonts load');
+    for (const id of ['c2Dsa', 'c2Eeg']) {
+      const lit = await page.$eval('#' + id, c => { const x = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 0; i < x.length; i += 4) if (x[i] + x[i + 1] + x[i + 2] > 60) n++; return n / (x.length / 4); });
+      assert.ok(lit > 0.02, `${id} is drawn (${lit})`);
+    }
+    // soft keys: Menu opens the settings row, the trend key cycles 5, 15 and 60 min, Sensor check opens and closes
+    assert.equal(await page.$eval('#keySeg', e => e.hidden), true);
+    await page.click('#kMenu'); assert.equal(await page.$eval('#keySeg', e => e.hidden), false);
+    await page.click('#kTrend'); assert.equal(await page.textContent('#kTrend'), 'Trend 15 min');
+    await page.click('#kTrend'); assert.equal(await page.textContent('#kTrend'), 'Trend 60 min');
+    await page.click('#kTrend'); assert.equal(await page.textContent('#kTrend'), 'Trend 5 min');
+    await page.click('#kSensor'); assert.equal(await page.$eval('#v2Sensor', e => e.hidden), false);
+    await page.click('#v2Sensor'); assert.equal(await page.$eval('#v2Sensor', e => e.hidden), true);
+    await page.click('#kMenu');
+    await page.addScriptTag({ path: AXE });
+    { const r = await page.evaluate(() => axe.run(document.querySelector('#monitor'), { runOnly: ['wcag2a', 'wcag2aa'] })); assert.deepEqual(r.violations.map(v => `${v.id}: ${v.nodes.length}`), [], 'axe on the VISTA screen'); }
+    // the teaching layout is still there for the rest of the checks
+    await page.click('#skinSeg [data-skin="classic"]');
+    assert.equal(await page.$eval('#classicWrap', e => e.hidden), false);
     // the relaxant is on by default, given at induction: the awake patient is not paralysed (BIS stays in the 90s)
     assert.equal(await page.$eval('#nmbSeg [data-nmb="auto"]', e => e.getAttribute('aria-pressed')), 'true');
     // move the depth target to GA at 1x: the effect site follows slowly, so the screen still shows an awake patient, and the
@@ -84,7 +110,7 @@ try {
     await page.click('#viewSeg [data-view="both"]');
     await page.waitForFunction(([d, e]) => document.querySelector('#cEeg').clientHeight === e && document.querySelector('#cDsa').clientHeight === d, [dsa0, eeg0]);
     // monitor first: on a phone the monitor and the drug and depth controls are near the top
-    if (viewport.width === 390) assert.ok(await page.$eval('#monitor .screen', e => e.getBoundingClientRect().top + scrollY) < 80, 'monitor at the top');
+    if (viewport.width === 390) assert.ok(await page.$eval('#classicWrap', e => e.getBoundingClientRect().top + scrollY) < 80, 'monitor at the top');
     // facial EMG raises the EMG reading (no relaxant on board)
     await page.click('#nmbSeg [data-nmb="off"]');
     const emg0 = await page.$eval('#vEmg', e => +e.textContent);
