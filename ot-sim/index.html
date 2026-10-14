@@ -4,27 +4,142 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
+<script>
+// The page lives at anaes.anawj.com/ot/. The same folder is still served at anawj.com/ot-sim/, so send visitors on
+// from there (path, query and # kept). Only when it is the top page (the page editor on anawj.com opens it in a frame).
+if (top === self && /^(www\.)?anawj\.com$/.test(location.hostname))
+  location.replace('https://anaes.anawj.com/ot/' + location.pathname.replace(/^\/ot-sim\/?/, '') + location.search + location.hash);
+</script>
 <meta name="theme-color" content="#0a0f18">
 <meta name="color-scheme" content="dark">
 <title>OT Simulator</title>
 <meta name="description" content="Teaching simulator for anaesthesia residents: a general anaesthetic, the vitals monitor and crisis scenarios (in development).">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23002f6c'/%3E%3Ctext x='16' y='22' font-size='13' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='700'%3EOT%3C/text%3E%3C/svg%3E">
+<link rel="preload" href="fonts/Arimo-latin-var.woff2" as="font" type="font/woff2" crossorigin>
 <style>
-:root{--bg:#0a0f18;--fg:#e8edf5;--mut:#9fb0c6;--line:#2a3a52}
+@font-face{font-family:"Arimo";font-style:normal;font-weight:400 700;font-display:swap;src:url(fonts/Arimo-latin-var.woff2) format("woff2")}
+@font-face{font-family:"Archivo Narrow";font-style:normal;font-weight:400 700;font-display:swap;src:url(fonts/ArchivoNarrow-latin-var.woff2) format("woff2")}
+:root{--bg:#0a0f18;--panel:#121a27;--fg:#e8edf5;--mut:#a9b8cc;--line:#2a3a52;--key:#1b2638;--keyon:#e8edf5;
+  --ecg:#4be36a;--spo2:#3fd6ff;--co2:#ffd23f;--nibp:#ff8a8a;--temp:#e2e2e2;
+  --f-mon:"Arimo","Liberation Sans",Arial,sans-serif;--f-narrow:"Archivo Narrow","Arimo",sans-serif}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,sans-serif;padding:max(16px,env(safe-area-inset-top)) 16px 32px}
-main{max-width:40rem;margin:0 auto}
-h1{font-size:1.5rem;margin:.5rem 0}
-p{color:var(--mut)}
-.band{display:flex;height:6px;margin:0 -16px 16px}.band i{flex:1}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;padding:0 0 max(24px,env(safe-area-inset-bottom))}
+.band{display:flex;height:6px}.band i{flex:1}
 .band i:nth-child(1){background:#e57200}.band i:nth-child(2){background:#e4002b}.band i:nth-child(3){background:#178fd7}.band i:nth-child(4){background:#002f6c}
+a{color:#9fd3ff}
+:focus-visible{outline:3px solid #9fd3ff;outline-offset:2px}
+button,select{font:inherit;color:var(--fg);background:var(--key);border:1px solid var(--line);border-radius:8px;min-height:44px;padding:0 14px;cursor:pointer}
+button[aria-pressed=true]{background:var(--keyon);color:#0a0f18;border-color:var(--keyon);font-weight:700}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.wrap{max-width:44rem;margin:0 auto;padding:16px}
+h1{font-size:1.6rem;line-height:1.2;margin:.75rem 0 .25rem}
+.lead,.foot{color:var(--mut)}
+.cards{display:grid;gap:12px;margin:20px 0;padding:0;list-style:none}
+.card{display:block;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;color:var(--fg);text-decoration:none}
+.card:hover{border-color:#5a7393}
+.card h2{font-size:1.15rem;margin:0 0 4px}.card p{margin:0;color:var(--mut)}
+.card .meta{font-size:.875rem;color:var(--mut);margin-top:6px}
+
+/* theatre */
+.topbar{display:flex;align-items:center;gap:8px;padding:8px 12px;flex-wrap:wrap;background:var(--panel);border-bottom:1px solid var(--line)}
+.topbar .back{min-height:44px;font-size:15px;display:inline-flex;align-items:center;padding:0 4px}
+.clock{font:700 20px/1 var(--f-mon);font-variant-numeric:tabular-nums;margin-right:auto;letter-spacing:.02em}
+.clock small{display:block;font:400 11px/1.2 system-ui,sans-serif;color:var(--mut);letter-spacing:0}
+.speeds{display:flex;gap:4px}
+.speeds button{padding:0 8px;min-width:46px}
+.icon{min-width:46px;padding:0 8px;font-size:14px;letter-spacing:-.1em}
+.tbody{padding:8px}
+.monitor{background:#000;border:1px solid #1d2635;border-radius:10px;padding:6px;position:relative;font-family:var(--f-mon)}
+.fastnote{position:absolute;right:8px;top:4px;font:11px/1.2 var(--f-narrow);color:#c9d3e0;background:#1b2638;padding:2px 6px;border-radius:4px;z-index:1}
+.lane{display:grid;grid-template-columns:1fr 92px;align-items:stretch;border-bottom:1px solid #141b26;min-height:96px}
+.lane .trace{position:relative}
+.lane canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.lane .lab{position:absolute;left:4px;top:2px;font:12px/1 var(--f-narrow);z-index:1}
+.num{display:flex;flex-direction:column;justify-content:center;align-items:flex-end;padding:2px 4px 2px 6px;line-height:1}
+.num .nl{font:13px/1.1 var(--f-narrow);letter-spacing:.02em}
+.num .nv{font-weight:700;font-size:40px;font-variant-numeric:tabular-nums}
+.num .nu{font-size:11px;color:#c9d3e0}
+.num .sub{font-size:15px;font-variant-numeric:tabular-nums;margin-top:2px}
+.ecg{color:var(--ecg)}.spo2{color:var(--spo2)}.co2{color:var(--co2)}.nibp{color:var(--nibp)}.temp{color:var(--temp)}
+.row{display:grid;grid-template-columns:1fr auto;gap:6px;padding-top:6px}
+.box{display:flex;flex-direction:column;justify-content:center;padding:4px 6px;line-height:1.1}
+.box .nl{font:13px/1.1 var(--f-narrow)}
+.box .nv{font-weight:700;font-size:30px;font-variant-numeric:tabular-nums}
+.box .nv small{font-size:18px;font-weight:400}
+.box .age{font-size:12px;color:#c9d3e0;margin-top:2px}
+.nibpctl{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.nibpctl button,.nibpctl select{font-family:system-ui,sans-serif;font-size:14px;min-height:44px}
+.nibpctl label{display:flex;align-items:center;gap:6px;font:13px system-ui,sans-serif;color:var(--mut)}
+.side{margin-top:12px;color:var(--mut)}
+.side h2{color:var(--fg);font-size:1.05rem;margin:0 0 4px}
+@media (min-width:960px){
+  .tbody{display:grid;grid-template-columns:2fr 1fr;gap:16px;max-width:1280px;margin:0 auto;padding:16px}
+  .lane{grid-template-columns:1fr 130px;min-height:150px}
+  .num .nv{font-size:56px}
+  .side{margin-top:0}
+}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
 </style>
 </head>
 <body>
 <div class="band" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
-<main>
-<h1>OT Simulator</h1>
-<p id="status">In development. A teaching simulator of a general anaesthetic with a vitals monitor and crisis scenarios, using a synthetic patient. Not for clinical use.</p>
-</main>
+
+<section id="library" class="screen" hidden>
+  <main class="wrap">
+    <h1>OT Simulator</h1>
+    <p class="lead">A teaching simulator of a general anaesthetic: the vitals monitor, the drugs and the crises, on a synthetic patient. In development.</p>
+    <ul class="cards">
+      <li><a class="card" href="#theatre"><h2>Free run</h2><p>A healthy synthetic adult, awake, on the monitor. You do everything.</p><p class="meta">Drugs, airway and breathing controls are being added.</p></a></li>
+    </ul>
+    <p class="foot">Teaching only. The patient is synthetic and the numbers are a model, not clinical advice.</p>
+  </main>
+</section>
+
+<section id="theatre" class="screen" hidden>
+  <h1 class="sr">Theatre</h1>
+  <div class="topbar">
+    <a class="back" href="#library">Library</a>
+    <div class="clock"><span id="clock">00:00</span><small>simulated time</small></div>
+    <div class="speeds" role="group" aria-label="Speed">
+      <button type="button" data-speed="1" aria-pressed="true">1x</button>
+      <button type="button" data-speed="5" aria-pressed="false">5x</button>
+      <button type="button" data-speed="20" aria-pressed="false">20x</button>
+    </div>
+    <button type="button" id="pause" class="icon" aria-label="Pause"><span aria-hidden="true">❚❚</span></button>
+  </div>
+  <div class="tbody">
+    <div class="monitor" id="monitor" role="group" aria-label="Patient monitor">
+      <div class="fastnote" id="fastnote" hidden></div>
+      <div class="lane">
+        <div class="trace"><span class="lab ecg" aria-hidden="true">II</span><canvas id="c-ecg" aria-hidden="true"></canvas></div>
+        <div class="num ecg"><span class="nl">HR</span><span class="nv" id="n-hr">--</span><span class="nu">/min</span></div>
+      </div>
+      <div class="lane">
+        <div class="trace"><span class="lab spo2" aria-hidden="true">Pleth</span><canvas id="c-pleth" aria-hidden="true"></canvas></div>
+        <div class="num spo2"><span class="nl">SpO<sub>2</sub></span><span class="nv" id="n-spo2">--</span><span class="nu">%</span></div>
+      </div>
+      <div class="lane">
+        <div class="trace"><span class="lab co2" aria-hidden="true">CO<sub>2</sub> 0–50 mmHg</span><canvas id="c-co2" aria-hidden="true"></canvas></div>
+        <div class="num co2"><span class="nl">EtCO<sub>2</sub></span><span class="nv" id="n-etco2">--</span><span class="nu">mmHg</span><span class="sub"><span class="sr">Respiratory rate </span>RR <span id="n-rr">--</span></span></div>
+      </div>
+      <div class="row">
+        <div class="box nibp"><span class="nl">NIBP mmHg</span><span class="nv"><span id="n-nibp">--/--</span> <small id="n-map"></small></span><span class="age" id="n-nibp-age"></span></div>
+        <div class="box temp"><span class="nl">Temp</span><span class="nv"><span id="n-temp">--</span><small>°C</small></span></div>
+      </div>
+    </div>
+    <div class="side">
+      <div class="nibpctl">
+        <button type="button" id="nibp-go">Start NIBP</button>
+        <label>Cycle <select id="nibp-cycle"></select></label>
+      </div>
+      <h2 style="margin-top:16px">Free run</h2>
+      <p>A healthy synthetic adult, awake. Drugs, airway and breathing controls come in the next updates.</p>
+      <p class="foot">Teaching only. The patient is synthetic and the numbers are a model, not clinical advice.</p>
+    </div>
+  </div>
+</section>
+
+<script type="module" src="js/main.js"></script>
 </body>
 </html>
