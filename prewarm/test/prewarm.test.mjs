@@ -4,7 +4,7 @@ import { inflateRawSync } from 'node:zlib';
 import { HEADERS, SECTIONS, SCREENING_HEADERS } from '../js/headers.js';
 import { FIELDS, BY_ID, PAGES, SCREENING, SITES, EXTRA, EXTRA_BY_ID, PACU_KEYS, colLetter, colIndex, calc, normaliseTemp, isShown, shownValue } from '../js/schema.js';
 import fs from 'node:fs';
-import { newRecord, setVal, val, mergeRecord, mergeInto, packFile, readFile, isGone } from '../js/store.js';
+import { newRecord, setVal, val, mergeRecord, mergeInto, packFile, readFile, isGone, markDeleted, restore } from '../js/store.js';
 import { workbook, workbookSheets, cellFor, ixText } from '../js/export.js';
 import { dateSerial, timeSerial } from '../js/xlsx.js';
 
@@ -151,6 +151,14 @@ assert.equal(cellFor(BY_ID.age, ''), null);
   assert.equal(workbookSheets([dr], [])[0].rows.length, 3, 'restored: exported');
   dr.deleted = 4000;
   assert.equal(isGone(dr), true, 'deleted again');
+  // delete, restore, delete, restore, again and again: every restore works, even from a phone whose clock is behind
+  const dd = newRecord(); setVal(dd, 'enrol_id', 'DEL-2', 'A', 1000);
+  markDeleted(dd, 5000); assert.equal(isGone(dd), true);
+  restore(dd, 'A', 6000); assert.equal(isGone(dd), false, 'first restore');
+  markDeleted(dd, 7000); assert.equal(isGone(dd), true, 'deleted again');
+  restore(dd, 'A', 8000); assert.equal(isGone(dd), false, 'second restore works');
+  markDeleted(dd, 100); assert.equal(isGone(dd), true, 'a delete from a slow clock still counts');
+  restore(dd, 'A', 50); assert.equal(isGone(dd), false, 'and so does a restore from a slow clock');
   // corrected to the no pre-warming group: its pre-warming readings aren't exported; very long text is cut to fit a cell
   const nw = newRecord(); setVal(nw, 'enrol_id', 'NW-1', 'A'); setVal(nw, 'arm', 1, 'A'); setVal(nw, 'prewarm_0_core', '36.5', 'A');
   assert.equal(workbookSheets([nw], [])[0].rows[2][BY_ID.prewarm_0_core.colIndex], 36.5);

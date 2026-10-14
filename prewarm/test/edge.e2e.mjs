@@ -411,14 +411,14 @@ jobs.push(() => tryit(async () => {
   const lines = await pg.$$eval('.dueline:not([hidden])', els => els.map(e => e.textContent));
   log(lines.length === 2 && lines.every(t => /^Temp \d+ min: due now$/.test(t)), 'home list shows each patient\'s due reading: ' + JSON.stringify(lines));
   // not opened on this phone yet (e.g. a teammate's patient): shown on the list but no alert
-  await pg.evaluate(() => localStorage.removeItem('prewarm-demo:alerted'));
+  await pg.evaluate(() => localStorage.removeItem('prewarm-demo:nag'));
   await open(pg, 1); await pg.waitForTimeout(1500);
   let bn = await pg.evaluate(() => document.querySelector('.banner')?.textContent || '');
   log(!/DEMO-01/.test(bn), 'a patient never opened here doesn\'t alert: ' + bn);
   // opened here: its due readings alert on the other patient's screen too
   await pg.goto('http://localhost:8080/prewarm/?demo'); await pg.waitForTimeout(500);
   await open(pg, 0); await pg.goBack(); await pg.waitForTimeout(300);
-  await pg.evaluate(() => localStorage.removeItem('prewarm-demo:alerted'));
+  await pg.evaluate(() => localStorage.removeItem('prewarm-demo:nag'));
   await open(pg, 1); await pg.waitForTimeout(1500);
   bn = await pg.evaluate(() => document.querySelector('.banner')?.textContent || '');
   log(/DEMO-01: Temperature \d+ min reading due now/.test(bn), 'other patient\'s due reading alerts on this screen: ' + bn);
