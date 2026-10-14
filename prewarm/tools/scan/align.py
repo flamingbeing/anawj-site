@@ -80,3 +80,22 @@ def ink_layer(aligned_gray, template_gray):
     printed = cv2.dilate((template_gray < 160).astype(np.uint8), np.ones((7, 7), np.uint8))
     ink = dark & (1 - printed)
     return cv2.morphologyEx(ink, cv2.MORPH_OPEN, np.ones((2, 2), np.uint8))
+
+
+def guess_page(photo_bgr, templates):
+    """Which template page this photo shows: flatten roughly (no ECC) and compare line patterns at low resolution."""
+    scores = []
+    for t in templates:
+        h, w = t.shape
+        gray = cv2.cvtColor(photo_bgr, cv2.COLOR_BGR2GRAY)
+        quad = find_sheet(gray)
+        if quad is not None:
+            M = cv2.getPerspectiveTransform(quad, np.array([[0, 0], [w, 0], [w, h], [0, h]], np.float32))
+            flat = cv2.warpPerspective(gray, M, (w, h), flags=cv2.INTER_AREA, borderValue=255)
+        else:
+            flat = cv2.resize(gray, (w, h), interpolation=cv2.INTER_AREA)
+        q = lambda im: cv2.resize(im, None, fx=0.2, fy=0.2, interpolation=cv2.INTER_AREA)
+        a = (q(flatten_illumination(flat)) < 190).astype(np.float32); b = (q(t) < 190).astype(np.float32)
+        a, b = cv2.GaussianBlur(a, (0, 0), 2), cv2.GaussianBlur(b, (0, 0), 2)
+        scores.append(float((a * b).sum() / max(1e-6, np.sqrt((a * a).sum() * (b * b).sum()))))
+    return int(np.argmax(scores)), scores
