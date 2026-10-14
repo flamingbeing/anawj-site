@@ -62,7 +62,8 @@ export async function moveToBin(kind, item, extra = {}) {
   const failed = async (ids, err) => { await rollBack(owner, kind, entries.filter(e => ids.includes(e.data.id))); throw err; };
   if (kind === 'case') {
     const ids = entries.map(e => e.data.id);
-    try { if (ids.length === 1) await removeCase(ids[0]); else await deleteMany(ids); }
+    // the case as it was before its bin copy was saved (the bin feed has already taken it off S.cases)
+    try { if (ids.length === 1) await removeCase(ids[0], items[0]); else await deleteMany(ids); }
     catch (err) { await failed(ids, err); }   // (deleteMany is one batch: all or nothing)
     if (ids.length === 1) watchDeletes(owner, kind, entries);
   } else if (kind === 'note') {

@@ -165,9 +165,40 @@ try {
       for (const t0 = Date.now(); !(await inboxEmpty()); await p.waitForTimeout(200)) if (Date.now() - t0 > 15000) throw new Error('inbox not emptied');
       await quiet(p);
     } });
+    // deleting on ANOTHER device (fresh sign-in, empty local copy), through the Delete button's path (recycle bin first),
+    // reaches the server: a normal case and the Form case
+    {
+      const ctx2 = await b.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
+      await ctx2.route(/https:\/\/www\.gstatic\.com\/firebasejs\/[\d.]+\/(firebase-[a-z]+\.js)$/, r => {
+        const file = r.request().url().split('/').pop();
+        r.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(`${SDK_DIR}/${file}`, 'utf8').replace(/firebasejs\/[\d.]+\//g, 'firebasejs/10.12.2/') });
+      });
+      const p = await ctx2.newPage();
+      p.on('pageerror', e => errors.push('device 2: ' + e.message));
+      await p.goto(BASE + '#logbook');
+      await p.getByRole('button', { name: 'Sign in with Google' }).waitFor();
+      await p.evaluate(async e => (await import('./js/cloud.js')).emulatorSignIn(e), E);
+      await until(p, async () => (await import('./js/ui-core.js')).S.casesSynced && (await import('./js/ui-core.js')).S.cases.some(c => c.source === 'form'));
+      const id = await S(p, 'S.cases.find(c => c.source === "form").id');
+      // a normal app case on the same fresh device first, through the same Delete path
+      const appId = await S(p, 'S.cases.find(c => c.source === "app").id');
+      const appOut = await p.evaluate(async id => { const { S } = await import('./js/ui-core.js'); const { moveToBin } = await import('./js/bin.js');
+        try { await moveToBin('case', S.cases.find(c => c.id === id)); return 'ok'; } catch (e) { return 'ERR ' + e.message; } }, appId);
+      let appGone = false; for (const t0 = Date.now(); Date.now() - t0 < 10000; await p.waitForTimeout(300)) if ((appGone = (await fetch(`${DB}/${lb}/cases/${encodeURIComponent(appId)}`, { headers: H })).status === 404)) break;
+      const out = await p.evaluate(async id => { const { S } = await import('./js/ui-core.js'); const { moveToBin } = await import('./js/bin.js');
+        try { await moveToBin('case', S.cases.find(c => c.id === id)); return 'ok'; } catch (e) { return 'ERR ' + e.message; } }, id);
+      const gone = async () => (await fetch(`${DB}/${lb}/cases/${encodeURIComponent(id)}`, { headers: H })).status === 404;
+      let ok = false; for (const t0 = Date.now(); Date.now() - t0 < 15000; await p.waitForTimeout(300)) if ((ok = await gone())) break;
+      console.log('  device 2 delete: app case', appOut, appGone ? '(gone from the server)' : '(STILL on the server)', '| Form case', out, ok ? '(gone from the server)' : '(STILL on the server)');
+      await ctx2.close();
+      // 14 Oct 2026: a single delete compared the server's copy with nothing (the bin feed had already dropped the case
+      // here), counted it as a conflict and never reached the server, while this device kept hiding it
+      if (!appGone || !ok) throw new Error('a delete from a second device never reached the server');
+    }
     // deleting the Form case in the app reaches the server (it goes to the recycle bin)
     await open('Form 3 (delete the Form case)', { check: async p => {
-      const id = await S(p, 'S.cases.find(c => c.source === "form").id');
+      const id = await S(p, 'S.cases.find(c => c.source === "form")?.id || null');
+      if (!id) return;
       await p.evaluate(async id => (await import('./js/ui-core.js')).removeCase(id), id);
       const gone = async () => (await fetch(`${DB}/${lb}/cases/${encodeURIComponent(id)}`, { headers: H })).status === 404;
       for (const t0 = Date.now(); !(await gone()); await p.waitForTimeout(200)) if (Date.now() - t0 > 15000) throw new Error('Form case delete never reached the server');
