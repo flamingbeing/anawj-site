@@ -172,6 +172,9 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
   logbook's pattern: shell cache-first, Firebase SDK cached, big vendor files cached on first use, "Update available:
   Reload" bar). Its VERSION base is `nuh-roster-v1`; the deploy stamps it, so PRs leave it alone. Not registered at the
   old anawj.com address. Offline, the app opens and My day shows the last roster this phone loaded.
+- App version (14 Oct): the bottom of Settings shows "App version <date> (<hash>)" from the `nuh-roster-` cache name and
+  "Not updating? Get the latest version": with signal it unregisters the service worker, deletes only `nuh-roster-` caches
+  and reloads (data in this browser and sign-in are kept); with no signal it changes nothing. Prewarm's pattern.
 - Opening the app on a past date (not today) moves the roster to tomorrow, with a toast to go back.
 - My day also has: Add to calendar (an .ics file made in the browser, `js/ics.js`; no feed URL, nothing sent), My
   week (the next 7 days: saved rosters, else leave and calls from the monthly rosters; viewers load the team's copies

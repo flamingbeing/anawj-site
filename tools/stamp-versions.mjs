@@ -1,7 +1,7 @@
 // Gives each app's service worker a VERSION that changes whenever its files do, at deploy time only
 // (GitHub Pages workflow, Cloudflare preview build). Never committed: PRs don't touch sw.js for a version bump, so
 // sessions working on the same app no longer collide on that line (owner, 13 Oct 2026).
-// 'logbook-v40' becomes 'logbook-v40-3f9a2c1d': a hash of every file the app can serve: its whole folder (the service
+// 'logbook-v40' becomes 'logbook-2026-10-14-3f9a2c1d' (dated: see below), with a hash of every file the app can serve: its whole folder (the service
 // workers serve any same-origin file cache-first and keep it until VERSION changes, so SHELL alone isn't enough) plus
 // SHELL files outside it (../nuhsdesign/tokens.css). Tests, tools and notes are left out; extras only cost an update.
 // Run: node tools/stamp-versions.mjs [--check]   (--check prints the versions without writing)
@@ -14,11 +14,10 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const write = !process.argv.includes('--check');
 const RE = /const VERSION = '([^']+)'/;
-// Apps whose version starts with a date (owner, 14 Oct 2026, prewarm: "can we have the app version start with the date?"):
-// 'prewarm-v79' becomes 'prewarm-2026-10-14-3f9a2c1d'. The date is the day (Singapore time) of the last commit that touched
+// Every app's version starts with a date (owner, 14 Oct 2026, prewarm first: "can we have the app version start with the
+// date?"; then every app shows it in its settings, AGENTS.md): 'prewarm-v79' becomes 'prewarm-2026-10-14-3f9a2c1d'. The date is the day (Singapore time) of the last commit that touched
 // a file the hash covers, so it only moves when the version does; the hash is unchanged. Needs git history (the Pages
 // workflow checks out fully); without it, today's date.
-const DATED = new Set(['prewarm']);
 const lastChanged = files => {
   const today = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Singapore' });
   try {
@@ -47,7 +46,7 @@ for (const app of fs.readdirSync(ROOT).filter(d => fs.existsSync(path.join(ROOT,
   hash.update(sw.replace(RE, `const VERSION = '${base}'`));
   for (const f of files) { hash.update('\0' + path.relative(ROOT, f) + '\0'); if (fs.existsSync(f)) hash.update(fs.readFileSync(f)); }
   const h8 = hash.digest('hex').slice(0, 8);
-  const version = DATED.has(app) ? `${base.replace(/-v\d+$/, '')}-${lastChanged(files)}-${h8}` : `${base}-${h8}`;
+  const version = `${base.replace(/-v\d+$/, '')}-${lastChanged(files)}-${h8}`;
   if (write) fs.writeFileSync(swPath, sw.replace(RE, `const VERSION = '${version}'`));
   console.log(`${app}: ${version}`);
 }
