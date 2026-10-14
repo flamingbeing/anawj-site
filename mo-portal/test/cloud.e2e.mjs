@@ -99,6 +99,11 @@ async function sitTest(p, { wrong = 0, submit = true } = {}) {
   if (submit) { await p.locator('#submit').waitFor(); await p.click('#submit'); await p.locator('dialog[open]').waitFor(); await p.click('dialog button[value=yes]'); }
   return items;
 }
+// wait until the editor's question box starts with `prefix` (dump the page if it never does)
+async function stemIs(p, prefix) {
+  await p.waitForFunction(x => document.querySelector('#stem')?.value.startsWith(x), prefix, { timeout: 10000 })
+    .catch(async e => { throw new Error(`editor never showed "${prefix}". Page: ` + (await p.evaluate(() => document.querySelector('#app').innerText.slice(0, 300))).replace(/\s+/g, ' ')); });
+}
 // faculty page signed in with a fake Google account
 async function facultyPage(ctx, hash = '#/faculty') {
   const p = await newPage(ctx);
@@ -237,9 +242,9 @@ try {
     await page.waitForFunction(() => document.querySelectorAll('#histbody li').length === 3);
   });
   await step('two tabs: stale revision shows the conflict dialog; keep mine saves on top', async () => {
-    const A = page, B = await newPage(facCtx); B.on('console', m => console.log('B console:', m.text().slice(0, 200)));
-    await A.goto(URL_EMU + '#/faculty/q/' + ids.active); await A.waitForFunction(() => document.querySelector('#stem')?.value.startsWith('New active (edit 2)')).catch(async e => { console.log('A DUMP', await A.evaluate(() => document.querySelector('#app').innerText.slice(0, 300))); throw e; });
-    await B.goto(URL_EMU + '#/faculty/q/' + ids.active); await B.waitForFunction(() => document.querySelector('#stem')?.value.startsWith('New active (edit 2)')).catch(async e => { console.log('B DUMP', await B.evaluate(() => document.querySelector('#app').innerText.slice(0, 300))); throw e; });
+    const A = page, B = await newPage(facCtx);
+    await A.goto(URL_EMU + '#/faculty/q/' + ids.active); await stemIs(A, 'New active (edit 2)');
+    await B.goto(URL_EMU + '#/faculty/q/' + ids.active); await stemIs(B, 'New active (edit 2)');
     await B.fill('#stem', 'Tab B wins: which is the antidote to heparin?'); await B.evaluate(() => { document.querySelector('#toast').textContent = ''; }); await B.click('#qf button[type=submit]'); await toastText(B, /Saved/);
     assert.equal((await getD('questions', ids.active)).rev, 4);
     await A.fill('#stem', 'Tab A mine: which is the antidote to heparin?'); await A.click('#qf button[type=submit]');
@@ -250,12 +255,12 @@ try {
     const q = await getD('questions', ids.active); assert.equal(q.stem.startsWith('Tab A mine'), true); assert.equal(q.rev, 5);
     assert.equal((await docs(`questions/${ids.active}/history`)).length, 5, "B's version is kept in the history");
     // and the other way: choose "load theirs"
-    await B.reload(); await B.waitForFunction(() => document.querySelector('#stem')?.value.startsWith('Tab A mine'));
-    await A.goto(URL_EMU + '#/faculty/q/' + ids.active); await A.waitForFunction(() => document.querySelector('#stem')?.value.startsWith('Tab A mine'));
+    await B.reload(); await stemIs(B, 'Tab A mine');
+    await A.goto(URL_EMU + '#/faculty/q/' + ids.active); await stemIs(A, 'Tab A mine');
     await B.fill('#stem', 'Tab B again: which is the antidote to heparin?'); await B.evaluate(() => { document.querySelector('#toast').textContent = ''; }); await B.click('#qf button[type=submit]'); await toastText(B, /Saved/);
     await A.fill('#stem', 'Tab A loses: which is the antidote to heparin?'); await A.click('#qf button[type=submit]');
     await A.locator('dialog[open]').waitFor(); await A.click('dialog button[value=no]');
-    await A.waitForFunction(() => document.querySelector('#stem')?.value.startsWith('Tab B again'));
+    await stemIs(A, 'Tab B again');
     const q2 = await getD('questions', ids.active); assert.equal(q2.stem.startsWith('Tab B again'), true); assert.equal(q2.rev, 6);
     await B.close();
   });
