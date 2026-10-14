@@ -6,7 +6,7 @@ list, filtered by the app's label, has the rest).
 Each session edits only its own file under `status/` (see **Now**). Update this file when a task finishes, a decision is made, or
 before compacting (`/save-state` in Claude Code, `$save-state` in Codex).
 
-Last updated: 2026-10-14 by Claude Code, Logbook 1 (log1).
+Last updated: 2026-10-14 (afternoon) by Claude Code, Logbook 2 (log2).
 
 ## Now
 
@@ -15,6 +15,11 @@ its own file), so sessions never edit the same lines. Read them all before start
 
 ## Waiting on the owner
 
+- **Delete the test "ZZ" case again** (14 Oct): its first delete hit the zombie-delete bug (fixed in #519); after the
+  site updates, reload and delete it once more (the old attempt sits as a conflict in Recent changes on that phone).
+- **App → sheet sync** (`logbook/PLAN-app-to-sheet.md`): say go, and confirm the "app" mark in column J. Owner decided:
+  on for every resident, a few minutes' delay is fine, new cases only. Comes after the data-safety bug hunt.
+- 14 Nov 2026 reminder (scheduled in log2's session): turn the response sheet's "anyone with the link: viewer" off.
 - **Try the 6-hour build** (13–14 Oct): Settings → Profile → Personal; Logbook day → + Daily note; Settings → Advanced
   logging → Labelled parts; Settings → Sync (GitHub / Drive / Dropbox); Send to. Everything new is off until switched on.
   Notes with text open in Preview (⋯ → Edit to type): say if they should open ready to type instead.
@@ -62,6 +67,12 @@ its own file), so sessions never edit the same lines. Read them all before start
 
 ## Recently done
 
+- #519 Fix: a single delete never reached the server (the recycle-bin feed dropped the case first, so the delete saw a
+  conflict) while the device said "Synced"; deleted cases came back after sign-in. Since 13 Oct. Plus the first multi-device
+  emulator test (`tools/test-multidevice.sh`) and the go-live bug-hunt plan.
+- #494, #499, #500, #501, #503, #508 Google Form inbox: the old Google Form stays open (no end date); each response goes to
+  `formInbox` (a bot account, `formBots/`) and becomes a case when the resident opens the app; script bound to the Form
+  (`form-script/`), live and tested end to end 14 Oct.
 - #490 Private feedback queue: residents' More → Send feedback (owner-only `feedback/{id}`, rules change approved by the owner); the owner's More → Feedback (Mark done, Delete, scrubbed Copy as task).
 - #485 Bug hunt: 35 confirmed bugs fixed (sync engine data safety, settings merges, daily-note merges, paste cleaner, sync files, logging).
 - #484 Late dialog "back" no longer pulls you off a page opened meanwhile (Safari); settings search scrolls to the option; phone polish.
@@ -82,6 +93,12 @@ its own file), so sessions never edit the same lines. Read them all before start
 - #289 Polish 6a: settings pages use switches, ✓ lists and one-line help (ⓘ for more); Advanced pages under headings.
 
 ## Decisions log
+
+- 2026-10-14 (log2): The old Google Form stays open as a simple way in, no end date; one way only (Form → logbook);
+  residents use the same Google account for both. No "Google sign-ins only" rule for now (small single-hospital Form, no
+  patient identifiers). Next: new app cases appended to the response sheet as a rudimentary backup during the teething
+  phase (on for everyone). Before go-live: a data-safety bug hunt (multi-device, offline, conflicts) against the real
+  rules in the emulator, with firetop running long soak runs and WebKit.
 
 - 2026-10-14: Residents send feedback only through the logbook's private queue (owner-only in Firestore), never the site's
   public 💬 / page-editor routes, which make public GitHub issues. In demo the demo admin plays the owner.
