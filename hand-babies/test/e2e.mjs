@@ -180,6 +180,14 @@ try {
     await page.goto(BASE);
     await page.screenshot({ path: `${SHOTS}/00-top.png` });
   }
+  // app version and "Get the latest version" in the footer (AGENTS.md): the saved copy's name; the button removes this
+  // app's worker and saved copies and reloads (an old copy planted here goes; another app's copy and saved data stay)
+  await page.goto(BASE); await page.evaluate(() => navigator.serviceWorker.ready); await page.reload(); await page.locator('#appver:not([hidden])').waitFor();
+  assert.match(await page.textContent('#appver'), /^App version \S+/, 'app version shown');
+  await page.evaluate(async () => { await caches.open('hand-babies-old'); await caches.open('other-app-v1'); localStorage.setItem('keep-me', '1'); window.beforeLatest = true; });
+  await Promise.all([page.waitForEvent('load'), page.click('#getlatest')]);
+  const after = await page.evaluate(async () => ({ keys: await caches.keys(), kept: localStorage.getItem('keep-me'), same: !!window.beforeLatest }));
+  assert.ok(!after.same && !after.keys.includes('hand-babies-old') && after.keys.includes('other-app-v1') && after.kept === '1', 'latest version: ' + JSON.stringify(after));
   assert.deepEqual(errors, [], 'no console errors');
   console.log('hand e2e: ok');
 } finally {

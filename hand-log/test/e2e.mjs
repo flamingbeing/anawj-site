@@ -110,6 +110,21 @@ try {
   const [dl] = await Promise.all([page.waitForEvent('download'), page.click('#export-csv')]);
   assert.match(dl.suggestedFilename(), /\.csv$/, 'CSV download');
 
+  // app version and "Get the latest version" (AGENTS.md): the version is the saved copy's name (workers are blocked here,
+  // so the copy is made by hand); the button clears only this app's copy and keeps the entries
+  await page.evaluate(() => caches.open('hand-log-2026-10-14-abcd1234'));
+  await page.reload(); await page.locator('#appver:not([hidden])').waitFor();
+  assert.equal(await page.textContent('#appver'), 'App version 2026-10-14 (abcd1234)');
+  await Promise.all([page.waitForEvent('load'), page.click('#getlatest')]);
+  assert.deepEqual(await page.evaluate(() => caches.keys()), [], 'latest version: saved copy cleared');
+  assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('handlog.entries')).length), 2, 'latest version: entries kept');
+  const quiet = errors.length;   // the blocked fetch below logs a load error on purpose
+  await page.route('**/handlog/sw.js*', r => r.abort());
+  await page.click('#getlatest');
+  await page.locator('#getlatest-msg', { hasText: 'No signal' }).waitFor();
+  await page.unroute('**/handlog/sw.js*');
+  errors.splice(quiet);
+
   await page.goto(BASE + '#list');
   await page.locator('#entries li.entry').first().waitFor();
   const id = await page.evaluate(() => JSON.parse(localStorage.getItem('handlog.entries'))[0].id);

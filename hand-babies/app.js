@@ -307,3 +307,28 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
     if (reg.waiting) reg.waiting.postMessage('skipWaiting');
   }).catch(() => {});
 }
+
+// App version and "Get the latest version" (AGENTS.md): the version is the name of the service worker's saved copy;
+// the button checks there is signal, then removes only this app's worker and copy and reloads (saved data stays)
+function appVersion(prefix) {
+  const line = document.getElementById('appver'), btn = document.getElementById('getlatest'), msg = document.getElementById('getlatest-msg');
+  if (!line || !btn) return;
+  if (window.caches) caches.keys().then(ks => {
+    const k = ks.find(x => x.startsWith(prefix)); if (!k) return;
+    const v = k.slice(prefix.length), d = /^(\d{4}-\d{2}-\d{2})-([0-9a-f]+)$/.exec(v);
+    line.textContent = 'App version ' + (d ? `${d[1]} (${d[2]})` : v); line.hidden = false;
+  }).catch(() => {});
+  btn.onclick = async () => {
+    btn.disabled = true; msg.textContent = '';
+    try {
+      const reg = await navigator.serviceWorker?.getRegistration();
+      const url = new URL(reg?.active?.scriptURL || 'sw.js', location.href);
+      url.searchParams.set('fresh', Date.now());
+      if (!(await fetch(url, { cache: 'no-store' })).ok) throw new Error('offline');
+      await reg?.unregister();
+      if (window.caches) for (const k of await caches.keys()) if (k.startsWith(prefix)) await caches.delete(k);
+      location.reload();
+    } catch { msg.textContent = 'No signal: nothing was changed. Try again with signal.'; btn.disabled = false; }
+  };
+}
+appVersion('hand-babies-');
