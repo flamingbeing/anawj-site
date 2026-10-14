@@ -8,6 +8,12 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
   template's Enrollment ID column (B).
 - **Hospitals:** NTF, NUH, SGH, CGH, TTSH, KTPH, WH (`SITES` in `schema.js`). Each phone picks one in Settings; new
   patients record it (`site`, on the Extra sheet). With sharing, the join code will set it.
+- **Scanning old paper forms** (owner, 14 Oct 2026; `prewarm/tools/scan/`, README there): phone photo, aligned to the
+  blank v3.2 page; ticks by ink; numbers and times read twice by Claude (crops of de-identified cells only; IDs, dates,
+  names and free text are typed by the owner); flags; `review.html` where the owner confirms every value; then the app's
+  own `workbook()`. Field places come from `js/wordform.js` (fill one field, render, diff). Scans, the form and
+  `form-data/` stay out of git. Tested on the fake fixture only; the real form, real handwriting and the live reader
+  still need a dry run at home.
 - **Blinding:** the randomisation group shows only on the pre-warming screen (and when the patient is created).
 - **Columns:** `schema.js` lists fields in template column order; field n is column n. `test/prewarm.test.mjs` pins
   anchor columns. Never insert a template field out of order. Items with no template column go in `EXTRA` (exported
@@ -408,9 +414,7 @@ keeps; it does not test the PACU link (do that by hand, see `RUNBOOK.md`). Check
 Still to fill (patient screen) also lists "POD1 / POD2 chart review due today / overdue" with how many questions have an answer,
 once due and not ticked complete.
 
-- **Scan the old paper forms** (owner, 14 Oct 2026; `prewarm/tools/scan/`, README there): phone photo → aligned to the
-  blank v3.2 page → ticks by ink, numbers and times read twice by Claude (crops of de-identified cells only; IDs, dates,
-  names and free text are typed by the owner) → flags (ranges, times, jumps) → `review.html` (owner confirms every
-  value) → the app's own `workbook()`. Field places come from `js/wordform.js` (fill one field at a time, render, diff),
-  so no coordinates are kept by hand. Scans, the form and `form-data/` stay out of git. Tested on the fake fixture only;
-  the real form, real handwriting and the live reader still need a dry run at home.
+### Off-protocol note (14 Oct 2026)
+Intra-op details ends with a free-text "Anything unusual or off-protocol" (`io_dev`, exported in the Extra sheet): a
+missed reading and why, a monitor fault, warming stopped early. A fuller deviation form (codes, per-reading reasons, a
+log of group changes) is still open and needs the study team's wording.

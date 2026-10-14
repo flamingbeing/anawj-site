@@ -456,8 +456,10 @@ export async function updateCase(c, { base = S.cases.find(x => x.id === c.id) ||
   return saved;
 }
 
-export async function removeCase(id) {
-  const base = S.cases.find(x => x.id === id) || null;
+// base: the version being deleted. Pass it when something may already have dropped the case from S.cases (moving it to
+// the recycle bin: the bin feed removes the binned version here at once), or the delete compares the server's copy with
+// nothing, counts it as "changed elsewhere" and never reaches the server.
+export async function removeCase(id, base = S.cases.find(x => x.id === id) || null) {
   const owner = mine();
   await writes.save('case', owner, { id, _deleted: true }, base);
   if (S.user?.email !== owner) throw new Error('Account changed; this delete belongs to the previous account');

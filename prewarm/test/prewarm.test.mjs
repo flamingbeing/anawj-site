@@ -159,6 +159,10 @@ assert.equal(cellFor(BY_ID.age, ''), null);
   restore(dd, 'A', 8000); assert.equal(isGone(dd), false, 'second restore works');
   markDeleted(dd, 100); assert.equal(isGone(dd), true, 'a delete from a slow clock still counts');
   restore(dd, 'A', 50); assert.equal(isGone(dd), false, 'and so does a restore from a slow clock');
+  // the free-text note for anything off-protocol goes to the Extra sheet
+  const nv = newRecord(); setVal(nv, 'enrol_id', 'NOTE-1', 'A'); setVal(nv, 'io_dev', 'monitor fault 10:20', 'A');
+  const extraSheet = workbookSheets([nv], []).find(sh => sh.name === 'Extra');
+  assert.ok(extraSheet && JSON.stringify(extraSheet.rows).includes('monitor fault 10:20'), 'io_dev is in the Extra sheet');
   // pre-warming readings past the warming export as NA (10 min group: after 10; 30 min group: after 30); none for the no-pre-warming group
   const naRow = (arm, extra = {}) => { const q = newRecord(); setVal(q, 'enrol_id', 'NA-' + arm, 'A'); setVal(q, 'arm', arm, 'A'); for (const [k, v] of Object.entries(extra)) setVal(q, k, v, 'A'); return workbookSheets([q], [])[0].rows[2]; };
   const col = id => BY_ID[id].colIndex;

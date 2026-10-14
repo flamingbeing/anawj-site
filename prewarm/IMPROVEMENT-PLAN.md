@@ -15,7 +15,7 @@ Owner answers: export late pre-warming cells as NA; keep records indefinitely; p
 - Item 9 (pad moves to the next box): #517. Item 10 (late-time `prompt()`): not done, the save flow waits for it.
 - Item 8: GitHub now runs the checks on every PR (someone else added it).
 - Item 17 first half (POD1/POD2 due on the list), item 15 in part (search above 5 patients, "not sent" badge), item 26 in part (RUNBOOK.md, PLAN.md marked old): this PR.
-- Item 16 (Ready for a case? card in Settings): next PR.
+- Item 16 (Ready for a case? card), item 17 second half (POD in Still to fill): #520. Study design: a free-text "anything unusual or off-protocol" note on Intra-op details (`io_dev`, in the Extra sheet): this PR.
 - Not done yet: 11, 13-16 (rest), 18, 20-25, the Today/Earlier list, the study-deviation fields, rules changes (22).
 
 ## A. Protect live data (do first; all small)

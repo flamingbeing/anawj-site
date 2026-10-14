@@ -43,6 +43,10 @@ its own file), so sessions never edit the same lines. Read them all before start
 
 ## Next (agreed queue)
 
+0. **Before go-live: data-safety bug hunt** (owner, 14 Oct, top priority after the zombie-delete fix #519):
+   multi-device (4–5), offline, conflicts, bin, sign-out, Form inbox, every write path tested against the real rules in
+   the emulator, not only in demo mode. Plan and test list: `logbook/PLAN-go-live-bugfix.md`. Firetop can run long
+   soak runs and WebKit.
 1. Subdomains: **all steps done 13 Oct** (`SUBDOMAINS.md`); the logbook is at `apmes.anawj.com/logbook/`. Nothing queued here.
 2. **Waiting on the owner's answers** (13 Oct): the owner wants the logbook to also be his own log (daily note, learning points,
    knowledge-note review, a generic profile; residents may follow). Plans, consequences and the open questions:
