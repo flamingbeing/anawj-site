@@ -578,6 +578,14 @@ portfolio content.
   and its setup: `form-script/` (never turn off Firebase Auth "Enable create (sign-up)": it would block new Google sign-ins).
   Owner, 14 Oct 2026: no "Google sign-ins only" rule (`sign_in_provider`) for now: a small single-hospital Form with no
   patient identifiers. Password accounts already get nothing (every rule needs a verified email or `formBots`).
+- **Test data paths against the real rules (14 Oct 2026 lesson):** the e2e tests run in demo mode, which skips the
+  server-side checks (`commitRecord`'s base comparison, the rules), so a delete that never reached the server passed every
+  test for a day (#519). Any change to saving, deleting, sync or the bin also needs the emulator tests:
+  `tools/test-reads.sh` and `tools/test-multidevice.sh` (5 devices, random actions, devices going offline; seeded).
+  `TEST=conflicts tools/test-multidevice.sh` runs fixed two-device scenarios (same case changed in two places, recycle
+  bin, Form pick-up twice, a late offline save, sign-out with unsent work). The rule they check: nothing that said it
+  saved is lost silently; it is on the server, or its device says "Save needs attention" and keeps it in Recent changes.
+  A delete that loses to an edit made elsewhere is undone with a toast (the edit stays).
 - **Privacy policy:** `privacy/index.html` (anawj.com/privacy/) shows who sees what. Keep it in step when roles change.
 - **Private feedback (14 Oct 2026):** More → Send feedback (`ui-feedback.js`, pure parts in `feedback.js`) saves
   `feedback/{id}` { uid, text ≤ 2000, doing? ≤ 300, screen, version, ua ≤ 200, status 'new', createdAt = server time }.

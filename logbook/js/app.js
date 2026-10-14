@@ -846,6 +846,10 @@ function paintWho() {
 hooks.writesChanged = () => { paintWho(); if (S.tab === 'recovery') render(); };
 window.addEventListener('online', paintWho);
 window.addEventListener('offline', paintWho);
+// the save queue changes on its own (a save landing, failing or meeting a conflict after the phone is back online):
+// the header follows it, so it never says "Synced" while a change needs attention (14 Oct 2026)
+let whoQueued = false;
+writes.onChange(() => { if (whoQueued) return; whoQueued = true; queueMicrotask(() => { whoQueued = false; paintWho(); }); });
 
 // ---------- signed out ----------
 

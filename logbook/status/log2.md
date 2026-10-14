@@ -1,11 +1,12 @@
 # Now: Claude Code, Logbook 2 (log2)
 
-**Claude Code, Logbook 2 (log2)** (branch `ccr-afac5e7a-99esax`): Google Form inbox is LIVE (14 Oct 2026). Merged:
-#494 (app + rules), #499 (script + setup), #500 (prefixed names), #501 (edge cases), #503 (one-click setup). Firetop
-bound the script to the real Form ("APMES logbook inbox", Apps Script API), the owner set the properties and ran
-setup; Form email collection is Verified; an end-to-end ZZ test worked (inbox → case; sheet Case and Database rows
-added as usual; firetop removed the two ZZ rows after a backup copy). Open: the ZZ case was still in the owner's
-logbook (his app delete hadn't synced while he couldn't sign in; delete is tested and works) — owner deletes it once
-signed in. Proposed, waiting for the owner's answers: new app cases → response sheet (outbox + sheet script; on for
-all or opt-in, "from app" mark in column J, a few minutes' delay OK?). Owner to decide: the response sheet is shared
-"anyone with the link: viewer".
+**Claude Code, Logbook 2 (log2)** (branch `ccr-afac5e7a-99esax`, open PR **#523**): pre-go-live data-safety bug hunt
+(`logbook/PLAN-go-live-bugfix.md`, progress at its end). #523 has: the header following the save queue; a save cut off by
+the network retrying by itself; multi-select delete going through the write queue (it lost a concurrent edit); a toast
+when a delete is undone by a conflict; `tools/test-multidevice.sh` (random, 5 devices, offline) and `TEST=conflicts`
+(fixed two-device scenarios, all passing); the harness works on Windows.
+Before merging: Firetop's Firefox/WebKit runs on the new head (asked), then the full `tools/test-logbook.sh` (not at the
+same time as a multi-device run: they share port 8080), then merge #523.
+Open: Firetop's slow-network seed 196651587 (a seeded case missing on device 1 in round 1; didn't repeat here); one
+cloud run hung for 25 min with no output (seed unknown). Then: imports (item 7), app left open for days (item 9), and
+the app → sheet sync (`logbook/PLAN-app-to-sheet.md`, waiting for the owner's go).

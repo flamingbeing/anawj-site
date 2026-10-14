@@ -86,3 +86,11 @@ test('sign-out check sees another tab’s unsynced change in the shared store', 
   assert.equal(await A.flush(50),false,'not synced yet: the sign-out prompt shows');
   f.online(true);assert.equal(await B.flush(),true);assert.equal(await A.flush(50),true,'once B has synced it');
 });
+test('a save cut off by the network stays pending and lands on its own', async () => {
+  const f=fixture();let drops=2;const send=f.config.backend;
+  f.config.backend=async(...a)=>{if(drops-->0)throw Object.assign(Error('Failed to get document because the client is offline.'),{code:'unavailable'});return send(...a);};
+  const q=createWriteQueue(f.config);await q.save('case','a',{id:'1',details:'flaky wifi'});
+  assert.equal(q.status('case','1'),'pending');
+  for(let i=0;i<40&&q.status('case','1')!=='synced';i++)await new Promise(r=>setTimeout(r,20));
+  assert.equal(q.status('case','1'),'synced');assert.equal(f.remote.get('1').details,'flaky wifi');assert.equal(q.entries()[0].error,'');
+});

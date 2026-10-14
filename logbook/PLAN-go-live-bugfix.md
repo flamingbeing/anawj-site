@@ -1,7 +1,7 @@
 # Plan: pre-go-live bug hunt (data safety first)
 
 Owner, 14 Oct 2026: "this is a pretty breaking issue … we are close to go live, so we should do some major bug
-fixing". Status: **agreed priority, not started**. Do this before residents start using the app for real.
+fixing". Status: **in progress (14 Oct, log2, PR #523)**; progress at the end. Do this before residents start using the app for real.
 
 ## Why
 
@@ -46,3 +46,17 @@ Each finding: a failing emulator test first, then the fix, then the test passing
 - **Firetop** (the owner's home computer) can run the long ones: many repeats ("soak" runs, e.g. 50 rounds of random
   actions on 5 devices), real-browser checks (Safari/WebKit isn't installed in the cloud), and a slow-network
   profile. Emulator only: never the live project, never real accounts.
+
+## Progress (14 Oct 2026, log2, #523)
+
+- Done, with tests: 1 (`tools/test-multidevice.sh`, also Firetop soak runs), 2 (offline devices in it; a save cut off
+  by the network now retries by itself), 3 and 5 (`TEST=conflicts`: edit vs edit, edit vs delete, edit vs multi-delete,
+  restore twice, delete-restore-delete, restore with the id taken, 30-day purge), 4 (asks before signing out with
+  unsent work; Cancel keeps it; nothing reaches the next account), 6 (pick-up twice), 8 (a late offline save reaches
+  devices that synced meanwhile), 10 (header follows the save queue).
+- Fixed: multi-select delete was a blind batch that lost an edit made elsewhere at the same moment; it now goes
+  through the write queue case by case. A delete undone by a conflict now says so.
+- Known limits, not fixed: a device whose clock is more than 10 minutes behind writes stamps others' quick syncs skip
+  until the weekly full read (server timestamps would need a rules change); a sign-out not made from the button (another
+  tab, a revoked Google session) drops unsent changes without asking. 7 (imports) and 9 (app left open for days) not
+  tested yet.
