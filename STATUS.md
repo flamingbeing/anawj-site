@@ -50,7 +50,7 @@ Nothing agreed. Ideas for later are in `ROADMAP.md`; nothing there is a task unt
 
 ## Decisions log
 
-- 2026-10-14: the owner approved retiring the seven old uptime monitors (the home computer does it) and dropped the
+- 2026-10-14: the owner approved retiring the seven old uptime monitors (paused by the home computer, reversible) and dropped the
   token-revoking to-do.
 - 2026-10-14: instant page edits work end to end: the renewed token drafted PR #561 from an Ask Claude request (merged).
 - 2026-10-14: uptime is one NAS check of every address in `SITES`, alerting on Telegram (home computer, with the owner).

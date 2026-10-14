@@ -109,7 +109,7 @@ Scheduled checks it runs (owner, 13 Oct 2026; read-only, alerts go to the owner'
 - **Uptime (since 14 Oct 2026):** a small container on the home NAS ("webapps-check") checks the 11 live addresses
   in the Worker's `SITES` list (`worker/routes.js`) and reports to one Uptime Kuma push monitor, which alerts on
   Telegram. An outage can take up to an hour to show. It checks from the owner's home internet, so a home outage makes
-  every site look down at once. The seven older per-address monitors are being retired (owner's OK, 14 Oct).
+  every site look down at once. The seven older per-address monitors were paused on 14 Oct (owner's OK; Resume in Kuma brings one back).
 - **Logbook drift check, Mondays 08:30:** compares the app's data with the response sheet; read-only.
 - No weekly spend report (owner's choice): the budget emails at 50%, 90% and 100% instead.
 - To change or stop them, ask that session.
