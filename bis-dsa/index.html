@@ -43,17 +43,30 @@ section{display:grid;gap:16px;min-width:0}
 .sim{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:18px;align-items:start}
 @media (max-width:900px){.sim{grid-template-columns:minmax(0,1fr)}}
 .screen{background:var(--scr);border:1px solid #1d2838;color:var(--scr-fg);border-radius:14px;padding:14px;display:grid;gap:10px;min-width:0;box-shadow:0 1px 0 var(--line),0 10px 30px -18px rgba(0,0,0,.6)}
-.readouts{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:8px;align-items:stretch}
-.ro{background:var(--scr-2);border-radius:6px;padding:6px 10px;display:grid;grid-template-columns:auto 1fr;align-items:baseline;column-gap:8px;min-width:0}
-.ro .k{font:600 12px/1.2 var(--f-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--scr-mute)}
-.ro .v{font:600 22px/1.1 var(--f-mono);font-variant-numeric:tabular-nums;text-align:right}
-.ro .u{grid-column:1/-1;font-size:11px;color:var(--scr-mute)}
-.bisbox{grid-row:span 3;display:grid;grid-template-columns:1fr;align-content:space-between;padding:8px 12px;border:1px solid #2a3850;background:#000}
-.bisbox .k{font-size:15px;color:var(--scr-fg)}
-.bisbox .v{font-size:clamp(64px,16vw,104px);line-height:.95;color:var(--bisc);text-align:left;letter-spacing:-.03em}
+.screen.mon{background:#1b2230;padding:10px;border:1px solid #2b3446;border-radius:18px}
+.mon .glass{background:#000;border-radius:8px;padding:10px;display:grid;gap:8px;min-width:0}
+.statusbar{display:flex;justify-content:space-between;gap:8px;font:600 11px/1.2 var(--f-mono);color:var(--scr-mute);letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid #1a2333;padding-bottom:6px}
+.statusbar b{color:var(--scr-fg);font-weight:600}
+.readouts{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:8px;align-items:stretch}
+.bisbox{display:grid;align-content:space-between;gap:4px;padding:6px 10px;border:1px solid #2a3850;border-radius:6px;background:#000;min-width:0}
+.bisbox .k{font:600 15px/1.2 var(--f-mono);letter-spacing:.1em;color:var(--scr-fg)}
+.bisbox .v{font:600 clamp(64px,17vw,108px)/.95 var(--f-mono);color:var(--bisc);letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.bisbox .v.hollow{color:transparent;-webkit-text-stroke:2px var(--bisc)}
+.bars{display:grid;gap:8px;align-content:stretch;min-width:0}
+.bar{background:var(--scr-2);border-radius:6px;padding:6px 10px;display:grid;grid-template-columns:auto 1fr;align-items:baseline;gap:4px 8px;min-width:0}
+.bar .k,.ro .k{font:600 12px/1.2 var(--f-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--scr-mute)}
+.bar .v,.ro .v{font:600 20px/1.1 var(--f-mono);font-variant-numeric:tabular-nums;text-align:right;color:var(--scr-fg)}
+.segs{grid-column:1/-1;display:grid;grid-template-columns:repeat(10,1fr);gap:2px;height:12px}
+.segs i{background:#1a2436;border-radius:1px}
+.segs i.on{background:var(--seg,#5fd08f)}
+.bar .u,.ro .u{grid-column:1/-1;font-size:11px;color:var(--scr-mute)}
+.params{grid-column:1/-1;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.ro{background:var(--scr-2);border-radius:6px;padding:5px 8px;display:grid;gap:0;min-width:0}
+.ro .v{text-align:left}
 .zone{justify-self:start;font:600 12px/1.3 var(--f-mono);padding:3px 8px;border-radius:99px;background:#1c2a44;color:var(--scr-fg);white-space:nowrap}
-.emgbar{grid-column:1/-1;height:6px;border-radius:4px;background:#1c2a44;overflow:hidden;margin-top:6px}
-.emgbar b{display:block;height:100%;width:0;background:linear-gradient(90deg,#3cb371,#ffd166,#ff6b6b)}
+.softkeys{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.softkeys button{background:#2a3242;border:1px solid #3a4558;border-bottom-width:3px;color:var(--scr-fg);border-radius:6px;padding:7px 4px;font:600 13px/1.1 var(--f-mono)}
+.softkeys button[aria-pressed="true"]{background:#d9e4f5;color:#000;border-color:#fff}
 .lbl{font:600 11px/1 var(--f-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--scr-mute);display:flex;justify-content:space-between;gap:8px}
 canvas{display:block;width:100%;max-width:100%}
 .panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;display:grid;gap:16px;min-width:0}
@@ -74,8 +87,6 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .reading p{font-size:15px}
 .story{display:grid;gap:8px}
 .lane{display:grid;gap:6px;min-width:0}
-.scrseg button{background:var(--scr-2);border-color:#2a3850;color:var(--scr-fg);padding:5px 10px;font-size:13px}
-.scrseg button[aria-pressed="true"]{background:var(--scr-fg);border-color:var(--scr-fg);color:#000}
 .key{display:inline-block;width:14px;height:3px;vertical-align:middle;margin-left:4px;border-radius:2px}
 .key.bis{background:#fff}.key.emg{background:#5fd08f;height:8px}
 .err{font-size:14px;color:var(--bad)}
@@ -125,17 +136,22 @@ footer{font-size:13px;color:var(--muted);max-width:80ch;border-top:1px solid var
 
 <section id="monitor" aria-labelledby="h-mon">
   <div class="sec-head"><h2 id="h-mon">The monitor</h2>
-  <p>Laid out like a BIS screen: the number and EMG at the top, then the BIS and EMG trends, the DSA, and the raw EEG at the bottom. Switch the view to see the DSA or the EEG large. On the DSA, time runs left to right, frequency goes up (0–30 Hz) and colour shows power; the white line is SEF95, the frequency below which 95% of the power sits.</p></div>
+  <p>Laid out like a BIS screen: the number with its SQI (signal quality) and EMG bars at the top, then the BIS and EMG trends, the DSA, and the raw EEG at the bottom. Switch the view to see the DSA or the EEG large. On the DSA, time runs left to right, frequency goes up (0–30 Hz) and colour shows power; the white line is SEF95, the frequency below which 95% of the power sits.</p></div>
   <div class="sim">
-    <div class="screen">
+    <div class="screen mon"><div class="glass">
+      <div class="statusbar"><span><b>BIS</b> · adult · smoothing 15 s</span><span id="vClock">--:--</span></div>
       <div class="readouts">
-        <div class="ro bisbox"><span class="k">BIS</span><span class="v" id="vBis">--</span><span class="zone" id="vZone">--</span></div>
-        <div class="ro"><span class="k">SR</span><span class="v" id="vSr">0</span><span class="u">% flat EEG, last 63 s</span></div>
-        <div class="ro"><span class="k">SEF95</span><span class="v" id="vSef">--</span><span class="u">Hz</span></div>
-        <div class="ro"><span class="k">EMG</span><span class="v" id="vEmg">--</span><span class="u">dB, high-frequency power</span><div class="emgbar"><b id="vEmgBar"></b></div></div>
-      </div>
-      <div class="seg scrseg" id="viewSeg" role="group" aria-label="Screen view">
-        <button data-view="both" aria-pressed="true">DSA + EEG</button><button data-view="dsa" aria-pressed="false">DSA</button><button data-view="eeg" aria-pressed="false">EEG</button>
+        <div class="bisbox"><span class="k">BIS</span><span class="v" id="vBis">--</span><span class="zone" id="vZone">--</span></div>
+        <div class="bars">
+          <div class="bar"><span class="k">SQI</span><span class="v" id="vSqi">--</span><div class="segs" id="sqiSegs" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><span class="u">signal quality %</span></div>
+          <div class="bar"><span class="k">EMG</span><span class="v" id="vEmg">--</span><div class="segs" id="emgSegs" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><span class="u">dB, 30–55</span></div>
+        </div>
+        <div class="params">
+          <div class="ro"><span class="k">SR</span><span class="v" id="vSr">0</span><span class="u">% flat</span></div>
+          <div class="ro"><span class="k">SEF</span><span class="v" id="vSef">--</span><span class="u">Hz</span></div>
+          <div class="ro"><span class="k">TP</span><span class="v" id="vTp">--</span><span class="u">dB power</span></div>
+          <div class="ro"><span class="k">BC</span><span class="v" id="vBc">0</span><span class="u">bursts/min</span></div>
+        </div>
       </div>
       <div class="lane" id="wTrend"><div class="lbl"><span>BIS trend <i class="key bis"></i> · EMG <i class="key emg"></i></span><span>5 min</span></div>
       <canvas id="cTrend" height="96" aria-label="BIS and EMG trends over the last five minutes"></canvas></div>
@@ -143,7 +159,10 @@ footer{font-size:13px;color:var(--muted);max-width:80ch;border-top:1px solid var
       <canvas id="cDsa" height="190" aria-label="Density spectral array over the last five minutes"></canvas></div>
       <div class="lane" id="wEeg"><div class="lbl"><span>EEG · 8 s</span><span style="text-transform:none">±100 µV</span></div>
       <canvas id="cEeg" height="110" aria-label="Scrolling raw EEG trace"></canvas></div>
-    </div>
+      <div class="softkeys" id="viewSeg" role="group" aria-label="Screen view">
+        <button data-view="both" aria-pressed="true">DSA+EEG</button><button data-view="dsa" aria-pressed="false">DSA</button><button data-view="eeg" aria-pressed="false">EEG</button>
+      </div>
+    </div></div>
     <div class="panel">
       <div class="ctl"><span class="t">Drug</span>
         <div class="seg" id="drugSeg" role="group" aria-label="Drug">
@@ -157,7 +176,8 @@ footer{font-size:13px;color:var(--muted);max-width:80ch;border-top:1px solid var
         <div class="ticks" id="ticks"><span>Awake</span><span>Sedated</span><span>GA</span><span>Deep</span><span>Flat</span></div></div>
       <div class="ctl"><span class="t">Patient and artefact</span>
         <label class="chk"><input type="checkbox" id="mElder"> Older patient (over 70)</label>
-        <label class="chk"><input type="checkbox" id="mEmg"> Facial muscle activity (no relaxant)</label></div>
+        <label class="chk"><input type="checkbox" id="mEmg"> Facial muscle activity (no relaxant)</label>
+        <label class="chk"><input type="checkbox" id="mDia"> Diathermy (electrical interference)</label></div>
       <div class="ctl"><span class="t">Speed</span>
         <div class="seg" id="speedSeg" role="group" aria-label="Simulation speed">
           <button data-speed="1" aria-pressed="true">1×</button><button data-speed="4" aria-pressed="false">4×</button><button data-speed="10" aria-pressed="false">10×</button>

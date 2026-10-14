@@ -48,6 +48,12 @@ try {
     await page.check('#mEmg');
     await page.waitForFunction(e0 => +document.querySelector('#vEmg').textContent >= e0 + 6, emg0, { timeout: 20000 });
     await page.uncheck('#mEmg');
+    // SQI: high on a clean signal; diathermy drops it and the BIS number shows hollow or blank, like the monitor
+    assert.ok(await page.$eval('#vSqi', e => +e.textContent) >= 90, 'clean SQI');
+    await page.check('#mDia');
+    await page.waitForFunction(() => +document.querySelector('#vSqi').textContent < 60, null, { timeout: 30000 });
+    await page.waitForFunction(() => { const b = document.querySelector('#vBis'); return b.classList.contains('hollow') || b.textContent === '--'; }, null, { timeout: 30000 });
+    await page.uncheck('#mDia');
     await page.click('#speedSeg [data-speed="1"]');
     // library strips and quiz drawn
     await page.waitForFunction(() => document.querySelectorAll('#lib canvas').length === 10 && document.querySelectorAll('#opts button').length === 4);
