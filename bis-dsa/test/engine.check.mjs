@@ -27,7 +27,7 @@ function run(drug, d, mods = {}, secs = 120, phases, nSeeds = 1, monSet) {
     const rr = [];
     const go = n => { for (let s = 0; s < n; s++) { S.step(FS_); const w = S.SIG.slice(-FS_); rr.push(w.reduce((a, v) => a + v * v, 0) / FS_); } };
     go(secs);
-    for (const [n, ch] of phases || []) { Object.assign(ms, ch); S.eng.setTarget(drug, d, ms); go(n); }
+    for (const [n, ch, fn] of phases || []) { Object.assign(ms, ch); fn && fn(S); S.eng.setTarget(drug, d, ms); go(n); }
     last = last.concat(S.COLS.slice(-30)); rms2 = rms2.concat(rr.slice(-30));
   }
   const mean = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : NaN;
@@ -136,6 +136,26 @@ chk('Propofol 0.57', 'MF (SEF50) Hz', p57.mf, 2, 8);
   const r10 = reach(10), r30 = reach(30);
   rows.push(['Smoothing 10 s vs 30 s', `seconds to within 5 of final (10 s: ${r10}, 30 s: ${r30})`, String(r30 - r10), '5..', r30 - r10 >= 5 ? 'ok' : 'FAIL']); if (r30 - r10 < 5) fails++;
 }
+
+// WS5: forced-air warmer, blinks, surgical stimulus
+const pw = run('propofol', 0.57, { warmer: true }, 120, null, 4);
+chk('Propofol 0.57 + warmer', 'BIS', pw.bis, 68, 82); chk('Propofol 0.57 + warmer', 'EMG dB minus no warmer', pw.emg - p57.emg, 10, 99);
+chk('Propofol 0.57 + warmer', '8-12 Hz dB vs no warmer', pw.band(8, 12) - p57.band(8, 12), -1, 1);
+const pwOff = run('propofol', 0.57, { warmer: true }, 120, [[150, { warmer: false }]], 4);
+chk('Warmer off, 120-150 s after', 'BIS minus no warmer', pwOff.bis - p57.bis, -5, 5);
+const bl = run('propofol', 0, { blink: true }, 120, null, 4);
+chk('Blinks, awake', 'SQI', bl.sqi, 85, 100); chk('Blinks, awake', 'BIS', bl.bis, 80, 100);
+chk('Blinks, awake', '0.5-2 Hz dB vs no blinks', bl.band(0.5, 2) - awake.band(0.5, 2), 3, 99);
+const stim = S => S.eng.stimulus(''), st = (drug, d, f) => run(drug, d, {}, 120, [[60, {}, f]], 4);
+const s57 = st('propofol', 0.57, stim), q57 = st('propofol', 0.57);
+chk('Stimulus at 0.57, no remi', '8-12 Hz dB change', s57.band(8, 12) - q57.band(8, 12), -4.5, -2.5);
+const s30 = st('propofol', 0.3, stim), q30 = st('propofol', 0.3);
+chk('Stimulus at 0.3, no remi', 'BIS rise', s30.bis - q30.bis, 10, 99);
+const P30 = { propofol: 0.3 / 0.155 }, R30 = { propofol: 0.3 / 0.155, remi: 4 };
+const sm = st('mix', P30, stim), qm = st('mix', P30), sr4 = st('mix', R30, stim), qr4 = st('mix', R30);
+chk('Stimulus, mix remi 4 vs no remi', 'BIS rise ratio', (sr4.bis - qr4.bis) / (sm.bis - qm.bis), -1, 0.33);
+const sd = st('propofol', 0.57, S => S.eng.stimulus('delta'));
+chk('Stimulus at 0.57, delta arousal', 'BIS change (falls)', sd.bis - q57.bis, -99, -0.01);
 
 const wid = rows[0].map((_, i) => Math.max(...rows.map(r => r[i].length)));
 for (const r of rows) console.log(r.map((c, i) => c.padEnd(wid[i])).join('  '));

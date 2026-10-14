@@ -4,8 +4,8 @@ const FS=128, NWIN=256, HOP=128, DF=FS/NWIN; // 0.5 Hz bins
 const OSC_F=[]; for(let f=0.5;f<=47;f+=0.5) OSC_F.push(f);
 function randn(){let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
 // spectral profile parameters (power units ~ uV^2 per 0.5 Hz bin)
-const KEYS=['bg','slow','delta','theta','thetaF','alpha','alphaF','beta','betaF','betaW','gamma','spindle','emg','bs'];
-const S=(o)=>Object.assign({bg:6,slow:0,delta:0,theta:0,thetaF:6,alpha:0,alphaF:10,beta:0,betaF:20,betaW:4.5,gamma:0,spindle:0,emg:0,bs:0},o);
+const KEYS=['bg','slow','delta','theta','thetaF','alpha','alphaF','beta','betaF','betaW','gamma','spindle','emg','bs','ar'];
+const S=(o)=>Object.assign({bg:6,slow:0,delta:0,theta:0,thetaF:6,alpha:0,alphaF:10,beta:0,betaF:20,betaW:4.5,gamma:0,spindle:0,emg:0,bs:0,ar:0},o); // ar: arousal beta at 18 Hz (surgical stimulus)
 // awake: low amplitude, about 10 uV RMS (anaesthetised EEG is 5-20x the power; Purdon 2015), shared by every drug
 const AWAKE=S({bg:1.0,alpha:1,alphaF:10,beta:2,betaF:21,gamma:0.9});
 const DRUGS={
@@ -80,27 +80,39 @@ function target(drug,d,mods){mods=mods||{};
  const ns=mods._nmbSlow||0;if(ns>0){p.beta*=1-0.6*ns;p.gamma*=1-0.8*ns;p.betaF-=3*ns;p.slow+=25*ns;p.delta+=8*ns;}
  return p;
 }
-function profile(p,f,spEnv,spF,kg,ks){
+// forced-air warmer: broadband 30-47 Hz pickup (Hemmerling & Fortier 2002); Engine.wa is its amplitude (power wa²)
+const WARM=6;
+function profile(p,f,spEnv,spF,kg,ks,wa){
  const g=(c,w)=>Math.exp(-((f-c)**2)/(2*w*w));
- let P=p.bg/(0.6+f)*3;
+ let P=p.bg/(0.6+f)*3+p.ar*g(18,4)+(wa?wa*wa*WARM*cl((f-28)/4):0);
  P+=p.slow*ks*g(0.75,0.45)+p.delta*g(2.5,1)+p.theta*g(p.thetaF,1)+p.alpha*g(p.alphaF,1.1)
    +p.spindle*spEnv*g(spF,1.0)+kg*(p.beta*g(p.betaF,p.betaW)+p.gamma*g(34,5))+p.emg*(f>18?Math.min(1,(f-18)/15):0);
  return P;
 }
 class Engine{
  constructor(){this.ph=OSC_F.map(()=>Math.random()*6.283);this.m=OSC_F.map(()=>1);this.p=target('propofol',0);
-  this.t=0;this.spT=1;this.spOn=false;this.spD=1;this.spF=12;this.kT=3;this.kPh=0;this.kg=1;this.ks=1;this.bsState=0;this.bsTimer=1;this.gate=1;this.drug='propofol';this.d=0;this.mods={};this.diT=0;this.diOn=false;this.nmbT=0;this.nmbS=0;this.tone=1;this.diAcc=0;this.artAcc=0;this.tail=0;this.tailV=0;}
+  this.t=0;this.spT=1;this.spOn=false;this.spD=1;this.spF=12;this.kT=3;this.kPh=0;this.kg=1;this.ks=1;this.bsState=0;this.bsTimer=1;this.gate=1;this.drug='propofol';this.d=0;this.mods={};this.diT=0;this.diOn=false;this.nmbT=0;this.nmbS=0;this.tone=1;this.diAcc=0;this.artAcc=0;this.tail=0;this.tailV=0;
+  this.wa=0;this.stT=0;this.stK='';this.blT=2;this.blA=0;this.blP=1;this.dr=0;this.eye=0;}
  setTarget(drug,d,mods){this.drug=drug;this.d=d;this.mods=mods||{};}
- snap(){this.p=target(this.drug,this.d,this.mods);} // jump instantly
+ snap(){this.p=target(this.drug,this.d,this.mods);this.wa=this.mods.warmer?1:0;} // jump instantly
+ // surgical stimulus: a 100-s arousal; kind 'delta' (paradoxical delta arousal) or '' (beta when light, alpha dip when deeper)
+ stimulus(kind){this.stT=100;this.stK=kind??(Math.random()<0.1?'delta':'');}
  sample(){ // one sample at FS
   const dt=1/FS; this.t+=dt;
-  const tg=target(this.drug,this.d,this.mods); const k=dt/8; // ~8 s time constant
+  const tg=target(this.drug,this.d,this.mods),m=this.mods; const k=dt/8; // ~8 s time constant
+  // surgical stimulus (García 2021, Hight 2019), blunted by remifentanil b = remi/4 (mix only): light (dH < 0.5) beta at
+  // 18 Hz and facial EMG; deeper the alpha band dips 3.5 dB, or 1 in 10 a paradoxical delta arousal (BIS falls)
+  if(this.stT>0){this.stT-=dt;const u=1-(this.drug==='mix'?cl((this.d.remi||0)/4):0),dh=tg.dH??this.d;
+   if(dh<0.5){tg.ar+=8*u;if(!m.nmb)tg.emg=Math.max(tg.emg,6*u);}else if(this.stK==='delta'){tg.delta*=1+u;tg.beta*=1-0.5*u;}else tg.alpha*=10**(-0.35*u);}
   for(const key of KEYS)this.p[key]+=(tg[key]-this.p[key])*k;
   // relaxant stage 2: starts 60 s after the relaxant, only while the hypnotic is light; τ 120 s on, 30 s off
-  const m=this.mods;if(m.nmb){this.nmbT+=dt;if(this.nmbT>60&&(tg.dH??this.d)<0.3)this.nmbS+=(1-this.nmbS)*dt/120;}else{this.nmbT=0;this.nmbS-=this.nmbS*dt/30;}
+  if(m.nmb){this.nmbT+=dt;if(this.nmbT>60&&(tg.dH??this.d)<0.3)this.nmbS+=(1-this.nmbS)*dt/120;}else{this.nmbT=0;this.nmbS-=this.nmbS*dt/30;}
   m._nmbSlow=this.nmbS;
   // facial muscle tone for the EMG readout: full while awake (dH < 0.3), a little under GA, none when paralysed
   const tT=m.nmb?0.05:0.12+0.88*cl((0.5-(tg.dH??this.d))/0.2);this.tone+=(tT-this.tone)*dt/5;
+  // forced-air warmer pickup: on within seconds; once off its amplitude fades with τ 60 s (power τ 30 s), so the true
+  // BIS is back in 2-3 min
+  this.wa+=m.warmer?(1-this.wa)*dt/3:-this.wa*dt/60;
   // spindles: 0.5-2 s bursts every 3-8 s, each centred somewhere in 11-14 Hz
   this.spT-=dt;if(this.spT<=0){this.spOn=!this.spOn;if(this.spOn){this.spD=this.spT=0.5+1.5*Math.random();this.spF=11+3*Math.random();}else this.spT=Math.max(1,3+5*Math.random()-this.spD);}
   const spEnv=this.spOn?Math.sin(Math.PI*(1-this.spT/this.spD))**2:0;
@@ -118,10 +130,15 @@ class Engine{
   for(let i=0;i<OSC_F.length;i++){const f=OSC_F[i];
    this.m[i]+= (1-this.m[i])*0.004+(Math.random()-0.5)*0.104; if(this.m[i]<0.05)this.m[i]=0.05;
    this.ph[i]+=6.2832*f*dt+(Math.random()-0.5)*0.277;
-   const P=profile(this.p,f,spEnv,this.spF,this.kg,this.ks); x+=Math.sqrt(2*P)*this.m[i]*Math.sin(this.ph[i]);
+   const P=profile(this.p,f,spEnv,this.spF,this.kg,this.ks,this.wa); x+=Math.sqrt(2*P)*this.m[i]*Math.sin(this.ph[i]);
   }
   const emgNoise=this.p.emg>0?randn()*Math.sqrt(this.p.emg)*1.2:0;
   let y=x*this.gate+emgNoise+randn()*0.6;
+  // blinks and eye movement (frontal sensor): one-sided 300-ms deflections of about 150 uV every 2-6 s (1 in 12 over
+  // 300 uV, which trips the artefact flag) plus a slow drift under 1 Hz
+  if(m.blink){this.blT-=dt;if(this.blT<=0){this.blT=2+4*Math.random();this.blP=0;this.blA=Math.random()<1/12?310+60*Math.random():110+80*Math.random();}
+   this.eye=this.dr+=-this.dr*dt/0.8+12*randn()*Math.sqrt(2*dt/0.8);if(this.blP<0.3){this.eye+=this.blA*Math.sin(Math.PI*this.blP/0.3)**2;this.blP+=dt;}y+=this.eye;}
+  else this.dr=this.eye=0;
   // diathermy: 1-2.5 s bursts of broadband interference clipping at ±400 uV, 4-8 s apart, each followed by a 1-s
   // settling tail (a decaying offset); burst and tail samples are counted as artefact (diAcc, artAcc; step() reads them)
   if(m.diathermy){this.diT-=dt;if(this.diT<=0){this.diOn=!this.diOn;this.diT=this.diOn?1+1.5*Math.random():4+4*Math.random();
@@ -178,19 +195,23 @@ function fit(c,hLogical){const dpr=Math.min(2,window.devicePixelRatio||1);const 
 
 // ===== live simulation state =====
 const eng=new Engine();
-const SIG=[]; const SIGMAX=8*FS;
+const SIG=[],EYE=[]; const SIGMAX=8*FS;
 const COLS=[]; const COLMAX=300; // one column per second, 5 min
 const sup=[]; let bisS=null, lastSef=null, lastMf=null, produced=0, simT=0, speed=1, paused=false;
-let drug='propofol', depth=0; const mods={elderly:false,emg:false,diathermy:false,nmb:false};
+let drug='propofol', depth=0; const mods={elderly:false,emg:false,diathermy:false,nmb:false,warmer:false,blink:false};
 const artH=[],bcH=[],rawH=[];let prevSup=false,isoN=0,outN=0;
 // monitor settings: smoothing (s), EEG scale (± uV), teaching labels and target band, the info message
 const mon={smooth:15,scale:50,teach:true,info:'',infoUntil:0};
 function applyTarget(){eng.setTarget(drug,depth,mods);describe();}
 
+const EYE_REJ=0.85;
 function step(nSamples){
- for(let i=0;i<nSamples;i++){SIG.push(eng.sample());if(SIG.length>SIGMAX)SIG.shift();produced++;
+ for(let i=0;i<nSamples;i++){SIG.push(eng.sample());if(SIG.length>SIGMAX)SIG.shift();EYE.push(eng.eye);if(EYE.length>NWIN)EYE.shift();produced++;
   if(produced%HOP===0&&SIG.length>=NWIN){
-   const win=SIG.slice(-NWIN);const {P}=spectrum(win);const f=features(P,win);
+   // the DSA shows the raw spectrum; BIS, SEF and SR use the epoch after the monitor's eye-blink rejection, modelled
+   // as taking away 85% of the blink and drift the engine added (a proxy: the real detector is proprietary)
+   const win=SIG.slice(-NWIN);const {P}=spectrum(win);let f;
+   if(EYE.some(v=>v)){const wc=win.map((v,j)=>v-EYE_REJ*EYE[j]);f=features(spectrum(wc).P,wc);}else f=features(P,win);
    // artefact: any sample over 300 uV in the newest second, or a diathermy burst or its settling tail ("throw away").
    // Artefact seconds lower SQI and are left out of BIS, SR, SEF and TP.
    let mx=0;for(let j=NWIN-HOP;j<NWIN;j++)mx=Math.max(mx,Math.abs(win[j]));const diF=eng.diAcc/HOP,art=mx>300||eng.artAcc>0;eng.diAcc=eng.artAcc=0;
@@ -205,7 +226,8 @@ function step(nSamples){
    const db=new Float32Array(NB);for(let k=0;k<NB;k++)db[k]=10*Math.log10(P[k]+1e-4);
    // EMG (dB re 0.0001 uV^2, as the monitor's 70-110 Hz band): a parametric muscle term, not measured (128 samples/s
    // can't reach 70 Hz). Muscle tone, facial EMG and diathermy bursts; ketamine's gamma doesn't count. Not held in artefact.
-   const emg=27+10*Math.log10(1+12*eng.tone+52*eng.p.emg+250*diF)+(Math.random()-0.5)*3;
+   // A forced-air warmer adds about 12 dB (its pickup fades with the engine's wa).
+   const emg=27+10*Math.log10(1+12*eng.tone+52*eng.p.emg+250*diF)+12*eng.wa+(Math.random()-0.5)*3;
    const prev=COLS[COLS.length-1];
    const tp=art&&prev?prev.tp:10*Math.log10(bandPow(P,0.5,47)+1e-4)+40; // total power holds through artefact
    // isoelectric: every second flat for 60 s; out of target: shown BIS outside 40-60 for 10 s while a hypnotic is on
@@ -314,24 +336,29 @@ function describe(){const d=depth;let n,t;
  else if(drug==='propofol'||drug==='sevo'){const s=drug==='sevo';
   if(d<0.08){n='Awake';t='Low-amplitude, mixed fast activity. Power is spread thinly across the DSA with no strong band. SEF95 is high (above 25 Hz), so BIS reads 90 or more.';}
   else if(d<0.24){n='Paradoxical excitation';t='Early '+(s?'sevoflurane':'propofol')+' boosts beta (13–25 Hz) power. The DSA brightens high up and BIS may stay high or even rise, although the patient is drifting off.';}
-  else if(d<0.44){n='Sedation';t='Beta fades and a band starts to form around 12 Hz while slow waves appear at the bottom. BIS sits around 60–80. The patient may still respond to voice.';}
-  else if(d<0.68){n='General anaesthesia';t=(s?'Sevoflurane':'Propofol')+' gives the classic two bands: a bright alpha band (8–12 Hz) and bright slow-delta power (under 4 Hz), with a dark gap above about 15 Hz. SEF95 falls to about 15 Hz and BIS reads 40–60.'+(s?' Sevoflurane also adds some theta (4–8 Hz) as it deepens.':'');}
+  else if(d<0.44){n='Sedation';t='The beta peak slides down from about 15–20 Hz towards 12 Hz while slow waves appear at the bottom. BIS sits around 60–80. The patient may still respond to voice.';}
+  else if(d<0.68){n='General anaesthesia';t=(s?'Sevoflurane':'Propofol')+' gives the classic two bands: a bright alpha band (8–12 Hz) and bright slow-delta power (under 4 Hz), with a dark gap above about 15 Hz. SEF95 falls to about 15 Hz and BIS reads 40–60.'+(s?' Sevoflurane also adds theta around 5 Hz from about 1 MAC, filling the gap between slow and alpha.':'');}
   else if(d<0.82){n='Deep anaesthesia';t='The alpha band dims and slides lower; slow waves dominate.'+(s?' With sevoflurane, theta fills in between alpha and slow, merging them into one broad block.':'')+' BIS drops into the 30s.';}
-  else if(d<0.96){n='Burst suppression';t='Bursts of activity alternate with flat periods. Each flat period is a dark vertical stripe on the DSA, and SR rises. BIS is under 30. This is usually more depth than surgery needs, and in older patients it is linked with postoperative delirium.';}
-  else {n='Isoelectric';t='A flat EEG: the DSA is dark, SR is near 100 and BIS is 0. Seen with a large overdose, profound hypothermia, or brain ischaemia.';}
+  else if(d<0.96){n='Burst suppression';t='Bursts of activity alternate with flat periods. Each flat period is a dark vertical stripe on the DSA, and SR rises. BIS usually falls below 30–40 and follows about 50 − SR/2 once SR passes 40%; suppression can start while BIS still reads in the 30s–40s, so watch SR and the raw EEG. Usually more depth than surgery needs; in older patients it is associated with postoperative delirium (EEG-guided trials have not shown that avoiding it prevents delirium). Exceptions: intended suppression for refractory status epilepticus or raised ICP.';}
+  else if(s){n='Very deep (about 2 MAC)';t='Sevoflurane alone rarely flattens the EEG; at 1.5–2 MAC it can cause epileptiform spikes, and BIS may paradoxically rise. Slow waves and theta dominate, with some suppression.';}
+  else {n='Isoelectric';t='A flat EEG: the DSA is dark, SR is near 100 and BIS is 0. Seen with a large overdose, profound hypothermia or circulatory arrest, severe cerebral hypoperfusion or ischaemia, and brain death. Check the sensor and leads first, then blood pressure, oxygenation and CO₂.';}
  } else if(drug==='ketamine'){
   if(d<0.08){n='Awake';t='Mixed fast activity with no strong band. BIS 90 or more.';}
   else if(d<0.45){n='Ketamine, sub-anaesthetic';t='Beta and gamma power rise. BIS stays high, which fits: the patient is analgesed but often still aware.';}
-  else {n='Ketamine anaesthesia';t='Bright fast power from 25–40 Hz (gamma) on top of slow waves, and no alpha band. The fast power keeps SEF95 and BIS high (often 60–80) even though the patient is unconscious. Don’t give more hypnotic just to lower the number.';}
+  else {n='Ketamine anaesthesia';t='Slow-delta waves alternating with bursts of gamma (about 27–40 Hz), more theta, and loss of alpha and mid-beta (10–24 Hz). On a 0–30 Hz DSA the gamma shows as a bright band at the top edge; most of it lies above the display. The fast power keeps SEF95 and BIS high (often 60–80) even though the patient is unconscious. Don’t give more hypnotic just to lower the number.';}
  } else {
   if(d<0.08){n='Awake';t='Mixed fast activity with no strong band. BIS 90 or more.';}
-  else if(d<0.6){n='Dexmedetomidine sedation';t='Sleep-like spindles: short bursts at 12–15 Hz that make the band look beaded, plus slow waves. BIS reads 50–70, yet the patient can usually be roused, as from natural sleep.';}
+  else if(d<0.6){n='Dexmedetomidine sedation';t='Sleep-like spindles: short bursts at 9–15 Hz (peak about 13 Hz) that make the band look beaded, plus slow waves. The slow band is much weaker than under propofol GA. BIS reads 50–70, yet the patient can usually be roused, as from natural sleep.';}
   else {n='Deep dexmedetomidine sedation';t='Slow waves dominate and spindles become sparse. BIS may fall to the 40s, but this is still a rousable, sleep-like state, not general anaesthesia.';}
  }
- if(mods.elderly&&drug!=='ketamine')t+=' Older patient: alpha and overall power are much lower, so the DSA is dimmer and BIS reads higher for the same dose.';
+ if(mods.elderly&&drug!=='ketamine')t+=' Older patient: EEG power is 2–3 times smaller in amplitude, alpha weakest and about 1 Hz slower, so the DSA is dim. For the same brain state BIS tends to read higher (at loss of consciousness, median 70 vs 58 in the young), although older patients need less drug. Chasing 40–60 can push them into burst suppression.';
  if(mods.diathermy)t+=' Diathermy: bursts of electrical interference swamp the EEG. SQI drops, those seconds are left out of BIS (the number holds, shows hollow under SQI 50 and disappears under 15), and the DSA shows bright full-height stripes.';
- if(mods.nmb)t+=' Muscle relaxant: no facial EMG, so any BIS rise from muscle goes. Paralysis also takes away the muscle share of the awake fast activity, so BIS can fall in a patient who is paralysed but awake (in volunteer studies, sometimes into the 40s–60s). A low BIS does not prove unconsciousness in a paralysed patient.';
+ if(mods.nmb)t+=' Muscle relaxant: no facial EMG, so any BIS rise from muscle goes. Paralysis also takes away the muscle share of the awake fast activity, In awake volunteers given a relaxant, BIS fell at once to about 80, then minutes later to the mid-40s (Schuller 2015; an older-monitor study saw 33, once 9). A low BIS under relaxant does not prove unconsciousness.';
  else if(mods.emg)t+=' Muscle activity: broad high-frequency power raises the EMG bar and pushes BIS up. It is artefact, not lighter anaesthesia.';
+ if(mods.warmer)t+=' Forced-air warmer: the blower adds broadband noise above 30 Hz, so BIS climbs (often into the 70s) and the EMG bar rises, while the alpha and slow bands on the DSA don’t change. Switch it off or move the hose: the true value is back in 2–3 minutes (Hemmerling 2002).';
+ if(mods.blink)t+=' Blinks and eye movement: slow one-sided swings on the raw EEG and brighter power at 0.5–2 Hz along the bottom of the DSA. The monitor rejects most of it, but BIS can read a few points low; the biggest blinks are flagged as artefact.';
+ if(eng.stT>0){const dh=drug==='mix'?mixTarget(Object.assign({},MIX0,depth)).dH:depth,bl=drug==='mix'&&depth.remi>=4;
+  t+=' Surgical stimulus: '+(bl?'remifentanil blunts the response, so the EEG barely changes.':dh<0.5?'in a light patient, beta (around 18 Hz) and facial EMG rise and BIS jumps 10–20 points. An opioid blunts this.':eng.stK==='delta'?'a paradoxical delta arousal: slow power rises and BIS falls, though the patient is lighter. Don’t deepen for it.':'the alpha band dips by about 3 dB for a minute or two (an alpha dropout), a sign of nociception rather than too little hypnotic (Hight 2019).');}
  $('rName').textContent=n;$('rText').textContent=t;}
 
 function describeMix(m){const hyp=0.155*m.propofol+sevoDepth(m.sevo),parts=[];let n;
@@ -340,15 +367,15 @@ function describeMix(m){const hyp=0.155*m.propofol+sevoDepth(m.sevo),parts=[];le
  if(on.length)n+=' · '+on.join(' + ');
  if(m.propofol&&m.sevo)parts.push('Propofol and sevoflurane add together into one hypnotic depth.');
  if(hyp>=0.44&&hyp<0.68&&!m.ketamine)parts.push('The hypnotic gives the usual alpha (8–12 Hz) and slow bands.');
- if(m.remi)parts.push('Remifentanil does little to the EEG on its own, but it blunts the response to surgery, so less hypnotic gives the same picture: compare propofol 3 with and without it, or tick facial muscle activity.');
- if(m.ketamine)parts.push('Ketamine adds fast 25–40 Hz power and weakens the alpha band, so BIS reads higher even though the patient is deeper. Don\u2019t chase the number with more propofol.');
+ if(m.remi)parts.push('Remifentanil barely changes BIS in a quiet patient (Guignard 2000), but it blunts the BIS and EMG rise from surgery or intubation: tick facial muscle activity or press Surgical stimulus to see it.');
+ if(m.ketamine)parts.push('Ketamine adds gamma (about 27–40 Hz), weakens the alpha band and thins the slow band, so BIS reads higher even though the patient is deeper (0.5 mg/kg on propofol raised BIS from about 40 to 63). Don\u2019t chase the number with more propofol.');
  if(m.dex)parts.push('Dexmedetomidine adds spindles and slow waves and lowers the hypnotic dose needed.');
- if(m.n2o)parts.push('Nitrous oxide adds anaesthetic effect but little EEG slowing, so BIS barely falls and may rise a little.');
+ if(m.n2o)parts.push('N₂O adds anaesthesia (60% is about 0.6 MAC) but barely moves BIS, so the number underestimates the depth.');
  if(!on.length)parts.push('Pick a combination or move the sliders.');
  return [n,parts.join(' ')];}
 
 // ===== controls =====
-const DEPTH_TICKS={propofol:['Awake','Sedated','GA','Deep','Flat'],sevo:['Awake','Sedated','~1 MAC','Deep','Flat'],ketamine:['Awake','Analgesic','','GA','High dose'],dex:['Awake','','Sedated','','Deep sedation']};
+const DEPTH_TICKS={propofol:['Awake','Sedated','GA','Deep','Flat'],sevo:['Awake','Sedated','~1 MAC','Deep','2 MAC'],ketamine:['Awake','Analgesic','','GA','High dose'],dex:['Awake','','Sedated','','Deep sedation']};
 let mode='single';const mix=Object.assign({},MIX0);
 const MIXROWS=[['propofol','Propofol','µg/ml (effect site)',8,0.1,v=>v.toFixed(1)],['sevo','Sevoflurane','MAC',2,0.05,v=>v.toFixed(2)],
  ['remi','Remifentanil','ng/ml',8,0.5,v=>v.toFixed(1)],['ketamine','Ketamine','% of anaesthetic dose',1,0.05,v=>Math.round(v*100)],
@@ -370,6 +397,11 @@ $('mElder').onchange=e=>{mods.elderly=e.target.checked;applyTarget();};
 $('mEmg').onchange=e=>{mods.emg=e.target.checked;applyTarget();};
 $('mNmb').onchange=e=>{mods.nmb=e.target.checked;applyTarget();};
 $('mDia').onchange=e=>{mods.diathermy=e.target.checked;applyTarget();};
+$('mWarm').onchange=e=>{mods.warmer=e.target.checked;applyTarget();};
+$('mBlink').onchange=e=>{mods.blink=e.target.checked;applyTarget();};
+// surgical stimulus: 100 sim-s of arousal; the button shows pressed while it lasts
+let stimOn=false;function stimUI(){const on=eng.stT>0;if(on!==stimOn){stimOn=on;$('stimBtn').setAttribute('aria-pressed',on);$('stimBtn').textContent=on?'Stimulus running…':'Surgical stimulus';describe();}}
+$('stimBtn').onclick=()=>{eng.stimulus();stimUI();};
 function setSpeed(s){speed=s;document.querySelectorAll('#speedSeg button[data-speed]').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.speed===s));}
 document.querySelectorAll('#speedSeg button[data-speed]').forEach(b=>b.onclick=()=>setSpeed(+b.dataset.speed));
 function setView(v){view=v;document.querySelectorAll('#viewSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.view===v));$('wDsa').hidden=v==='eeg';$('wEeg').hidden=v==='dsa';dirty=true;}
@@ -386,35 +418,38 @@ $('pause').onclick=()=>{paused=!paused;$('pause').setAttribute('aria-pressed',pa
 
 // ===== the case story =====
 const STORY=[
- {at:0,drug:'propofol',d:0,mods:{},cap:'Pre-induction. Awake EEG: small, fast, disorganised. Thin power across the DSA and BIS in the 90s.'},
+ {at:0,drug:'propofol',d:0,mods:{blink:true},cap:'Pre-induction. Awake EEG: small, fast, disorganised. Thin power across the DSA and BIS in the 90s. Blinks put slow swings on the raw EEG and a little brightness along the bottom of the DSA.'},
  {at:25,d:0.17,cap:'Propofol bolus. Beta power rises first (paradoxical excitation), so BIS barely moves even though the patient is drifting off.'},
- {at:50,d:0.57,cap:'Loss of consciousness. Power moves into two bands: alpha 8–12 Hz and slow-delta under 4 Hz. SEF95 drops and BIS settles at 40–60.'},
- {at:130,d:0.9,cap:'Infusion left high and the blood pressure falls. Alpha fades, slow waves dominate, then dark vertical stripes appear: burst suppression. SR climbs and BIS falls below 30.'},
+ {at:50,d:0.57,mods:{},cap:'Loss of consciousness. Power moves into two bands: alpha 8–12 Hz and slow-delta under 4 Hz. SEF95 drops and BIS settles at 40–60.'},
+ {at:130,d:0.9,cap:'Infusion left high and the blood pressure falls. Alpha fades, slow waves dominate, then dark vertical stripes appear: burst suppression. SR climbs; BIS falls into the 30s and then, once SR passes 40%, below 30.'},
  {at:220,d:0.57,cap:'Infusion reduced. The alpha band comes back within a minute or two. Notice the DSA recovers before the smoothed BIS number does.'},
- {at:280,d:0.5,mods:{emg:true},cap:'Relaxant wears off with surgery still going. Facial EMG adds broad high-frequency power and BIS jumps, though the brain state (the alpha band) is unchanged.'},
- {at:330,d:0.5,mods:{nmb:true},cap:'Relaxant given. EMG gone, BIS back in range. More hypnotic was not needed.'},
- {at:370,d:0.12,mods:{},cap:'Relaxant reversed and infusion stopped at the end. Alpha dims, slow waves fade, beta returns and BIS rises towards 80–90 as the patient wakes.'},
- {at:440,end:true,cap:'End of case. Scroll the DSA back in your head: two bands for propofol GA, stripes for too deep, high fast power for EMG.'}];
-let story=null;
+ {at:280,d:0.5,mods:{emg:true},stim:'alpha',cap:'Incision with no opioid on board: the alpha band dips and EMG and BIS rise, though the hypnotic dose has not changed.'},
+ {at:330,d:0.5,mods:{},cap:'Analgesia topped up (relaxant only if surgery needs it). EMG gone, BIS back in range. The alpha band never changed, so more hypnotic was not needed; check the patient isn’t lightening before you paralyse.'},
+ {at:400,d:0.5,mods:{diathermy:true},cap:'Diathermy. Interference swamps the EEG: SQI falls, BIS shows hollow (and -- once SQI is under 15), and the artefact bar marks the trend. Don’t act on the number until the signal is clean.'},
+ {at:460,d:0.5,mods:{},cap:'Diathermy stops. SQI climbs back over the next minute (it looks back 63 s) and BIS returns to where it was.'},
+ {at:500,d:0.12,mods:{blink:true},cap:'Infusion stopped at the end (any relaxant reversed). Alpha dims, slow waves fade, beta returns, blinks come back and BIS rises towards 80–90 as the patient wakes.'},
+ {at:570,end:true,cap:'End of case. Scroll the DSA back in your head: two bands for propofol GA, stripes for too deep, a dipping alpha band and high fast power for stimulus without analgesia, stripes of interference for diathermy.'}];
+let story=null;const SMODS=[['emg','mEmg'],['nmb','mNmb'],['diathermy','mDia'],['warmer','mWarm'],['blink','mBlink']];
 function stopStory(){if(!story)return;story=null;$('storyBtn').textContent='Play a case: induction to emergence';}
 $('storyBtn').onclick=()=>{if(story){stopStory();$('storyCap').textContent='';return;}
- story={t0:simT,i:-1};mods.elderly=false;mods.emg=false;mods.diathermy=false;mods.nmb=false;$('mElder').checked=false;$('mEmg').checked=false;$('mDia').checked=false;$('mNmb').checked=false;setSpeed(10);
+ story={t0:simT,i:-1};mods.elderly=false;$('mElder').checked=false;for(const [k,id] of SMODS){mods[k]=false;$(id).checked=false;}eng.stT=0;setSpeed(10);
  if(paused)$('pause').click();$('storyBtn').textContent='Stop the case';};
 function runStory(){if(!story)return;const t=simT-story.t0;
  while(story.i+1<STORY.length&&t>=STORY[story.i+1].at){story.i++;const s=STORY[story.i];
   if(s.drug)setDrug(s.drug);if(s.d!=null){depth=s.d;$('depth').value=Math.round(s.d*100);}
-  if(s.mods){mods.emg=!!s.mods.emg;mods.nmb=!!s.mods.nmb;$('mEmg').checked=mods.emg;$('mNmb').checked=mods.nmb;}
+  if(s.mods)for(const [k,id] of SMODS){mods[k]=!!s.mods[k];$(id).checked=mods[k];}
+  if(s.stim)eng.stimulus(s.stim);else if(s.mods)eng.stT=0;
   applyTarget();$('storyCap').textContent=`${story.i+1}/${STORY.length} · ${s.cap}`;
   if(s.end){story=null;$('storyBtn').textContent='Play the case again';setSpeed(1);return;}}}
 
 // ===== explainer animation =====
 const cEx=$('cEx');
 const STEPS=[
- {name:'1 · Take an epoch',cap:'The monitor takes the newest 2 seconds of frontal EEG (256 samples at 128 per second). A new epoch is taken every second, so epochs overlap by half.'},
+ {name:'1 · Take an epoch',cap:'The monitor takes the newest 2 seconds of frontal EEG and works it out again every second, so epochs overlap. (This simulator samples at 128 per second, 256 samples an epoch; the real monitor samples faster so it can also measure muscle activity at 70–110 Hz.)'},
  {name:'2 · It is a sum of waves',cap:'Any EEG epoch can be rebuilt by adding together waves of different frequencies. Here it is split into slow-delta (under 4 Hz), alpha (8–13 Hz) and beta (13–30 Hz) parts. Awake, the small fast beta part dominates; under propofol GA the slow and alpha parts are large and beta is tiny.'},
  {name:'3 · Fourier transform',cap:'A fast Fourier transform (FFT) measures how much power the epoch has at each frequency, every 0.5 Hz from 0 to 30 Hz. Taller bar = more power (log scale, in decibels).'},
  {name:'4 · Turn it into colour',cap:'Stand the spectrum on its side so frequency runs upward, and swap bar height for colour: blue for little power, through green and yellow, to red for a lot. The whole spectrum is now one thin column.'},
- {name:'5 · Add it to the DSA',cap:'The column joins the right-hand edge of the DSA and the older columns shift left. One column a second builds the picture on the monitor. BIS is computed from features of these same spectra (and the flat-line ratio), then smoothed.'}];
+ {name:'5 · Add it to the DSA',cap:'The column joins the right-hand edge of the DSA and the older columns shift left. One column a second builds the picture on the monitor. The real BIS mixes a few features: the ratio of fast (30–47 Hz) to mid (11–20 Hz) power, a bispectral measure of how strongly waves of different frequencies are phase-locked (which the DSA doesn’t show) and, when deep, the suppression ratio. The recipe is proprietary; this page uses a simpler stand-in built from the same spectra.'}];
 const T=[0,1.6,4.4,6.8,9.2,11.2,12.4];
 let ex=null, exT=0, exPlaying=!reduced, exLast=null;
 $('steps').innerHTML=STEPS.map((s,i)=>`<li><button data-i="${i}">${s.name}</button></li>`).join('');
@@ -504,14 +539,15 @@ const LIB=[
  {id:'exc',name:'Paradoxical excitation',drug:'propofol',d:0.17,m:{},bis:'80–95',txt:'Beta (13–25 Hz) brightens at induction or in light sedation. BIS can stay high or even rise.'},
  {id:'ga',name:'Propofol GA',drug:'propofol',d:0.57,m:{},bis:'40–60',txt:'Two bright bands, alpha 8–12 Hz and slow under 4 Hz, with a dark gap above. The pattern you want.'},
  {id:'deep',name:'Too deep',drug:'propofol',d:0.76,m:{},bis:'30–40',txt:'Alpha dims and drifts lower; slow waves take over. Consider lightening if surgery allows.'},
- {id:'bs',name:'Burst suppression',drug:'propofol',d:0.9,m:{},bis:'under 30',txt:'Dark vertical stripes are flat-line periods. SR above 0. Usually unnecessary depth.'},
- {id:'old',name:'Older patient, propofol GA',drug:'propofol',d:0.57,m:{elderly:true},bis:'45–60',txt:'Same dose as Propofol GA, but alpha is weak and the strip is dim. BIS reads higher; don’t chase it.'},
+ {id:'bs',name:'Burst suppression',drug:'propofol',d:0.9,m:{},bis:'under 30–40',txt:'Dark vertical stripes are flat-line periods. SR above 0. Usually unnecessary depth (unless intended).'},
+ {id:'old',name:'Older patient, propofol GA',drug:'propofol',d:0.57,m:{elderly:true},bis:'45–60',txt:'Same brain state as Propofol GA, but power is low and alpha weak and slower. BIS reads higher than the depth deserves; don’t chase it.'},
  {id:'sevo',name:'Deep sevoflurane',drug:'sevo',d:0.76,m:{},bis:'30–40',txt:'Theta (4–8 Hz) fills the gap, so alpha and slow merge into one broad bright block.'},
- {id:'ket',name:'Ketamine',drug:'ketamine',d:0.65,m:{},bis:'60–80',txt:'Bright fast power at 25–40 Hz plus slow waves, no alpha. BIS reads high in an unconscious patient.'},
- {id:'dex',name:'Dexmedetomidine',drug:'dex',d:0.4,m:{},bis:'50–70',txt:'Beaded spindles at 12–15 Hz with slow waves, like stage 2 sleep. Rousable.'},
+ {id:'ket',name:'Ketamine',drug:'ketamine',d:0.65,m:{},bis:'60–80',txt:'Slow waves with gamma bursts at the top edge (most gamma is above 30 Hz), no alpha. BIS reads high in an unconscious patient.'},
+ {id:'dex',name:'Dexmedetomidine',drug:'dex',d:0.4,m:{},bis:'50–70',txt:'Beaded spindles at 9–15 Hz with slow waves, like stage 2 sleep, and a weaker slow band than propofol. Rousable.'},
  {id:'propket',name:'Propofol + ketamine',drug:'mix',d:{propofol:3.5,ketamine:0.4},m:{},bis:'55–70',txt:'The propofol slow band is there, but the alpha band fades and fast power fills in above 20 Hz. BIS reads higher than the depth deserves.'},
- {id:'sevon2o',name:'Sevoflurane + N₂O',drug:'mix',d:{sevo:0.8,n2o:0.6},m:{},bis:'55–65',txt:'Sevoflurane bands with extra fast power from nitrous oxide. N₂O adds anaesthesia without lowering BIS much.'},
- {id:'emg',name:'EMG artefact',drug:'propofol',d:0.55,m:{emg:true},bis:'falsely 65–85',txt:'Broad power climbing into the high frequencies over a normal GA pattern. Check the EMG bar.'}];
+ {id:'sevon2o',name:'Sevoflurane + N₂O',drug:'mix',d:{sevo:0.8,n2o:0.6},m:{},bis:'50–60',txt:'Sevoflurane bands with extra fast power from nitrous oxide. N₂O adds anaesthesia without lowering BIS much.'},
+ {id:'emg',name:'EMG artefact',drug:'propofol',d:0.55,m:{emg:true},bis:'falsely 65–85',txt:'Broad power climbing into the high frequencies over a normal GA pattern. Check the EMG bar.'},
+ {id:'warm',name:'Forced-air warmer',drug:'propofol',d:0.57,m:{warmer:true},bis:'falsely 70–80',txt:'Looks like Propofol GA: the noise sits above 30 Hz, off the top of the DSA, so only BIS and the EMG bar read high. Check the warmer.'}];
 function buildLib(){const el=$('lib');el.innerHTML=LIB.map(x=>`<article class="card"><canvas id="lib-${x.id}" height="110" aria-label="DSA strip: ${x.name}"></canvas><div class="meta"><h3>${x.name}</h3><span class="bis">BIS ${x.bis}</span></div><p>${x.txt}</p></article>`).join('');
  let i=0;const next=()=>{if(i>=LIB.length)return;const x=LIB[i++];x.cols=simStrip(x.drug,x.d,x.m,150);drawStrip($('lib-'+x.id),x.cols);setTimeout(next,0);};next();}
 
@@ -531,7 +567,7 @@ var onColumn=()=>{dirty=true;};
 function frame(now){requestAnimationFrame(frame);try{frameBody(now);}catch(e){const el=$('err');if(el&&el.hidden){el.hidden=false;el.textContent='Display error: '+e.message;}}}
 function frameBody(now){const dt=Math.min(0.1,(now-last)/1000);last=now;
  if(!paused){const target=simT+dt*speed;const need=Math.floor(target*FS)-Math.floor(simT*FS);simT=target;step(need);runStory();}
- if(dirty){paintOff();drawTrend();drawDsa();readouts();dirty=false;}
+ if(dirty){paintOff();drawTrend();drawDsa();readouts();stimUI();dirty=false;}
  drawEeg();
  if(exPlaying){exT+=dt;if(exT>=T[6]){exT=0;snapshotEx();}}
  if(!ex)snapshotEx();

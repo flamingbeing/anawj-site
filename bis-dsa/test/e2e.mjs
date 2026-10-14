@@ -67,6 +67,19 @@ try {
     assert.match(await page.textContent('#rText'), /Muscle relaxant/);
     await page.uncheck('#mNmb');
     await page.uncheck('#mEmg');
+    // forced-air warmer: high-frequency pickup raises the EMG reading; blinks and the surgical stimulus are described
+    await page.waitForFunction(() => +document.querySelector('#vEmg').textContent < 40, null, { timeout: 20000 });
+    const emgW = await page.$eval('#vEmg', e => +e.textContent);
+    await page.check('#mWarm');
+    await page.waitForFunction(e0 => +document.querySelector('#vEmg').textContent >= e0 + 6, emgW, { timeout: 20000 });
+    assert.match(await page.textContent('#rText'), /Forced-air warmer/);
+    await page.uncheck('#mWarm');
+    await page.check('#mBlink');
+    assert.match(await page.textContent('#rText'), /Blinks/);
+    await page.uncheck('#mBlink');
+    await page.click('#stimBtn');
+    assert.equal(await page.$eval('#stimBtn', e => e.getAttribute('aria-pressed')), 'true');
+    assert.match(await page.textContent('#rText'), /Surgical stimulus/);
     // SQI: high on a clean signal; diathermy drops it and the BIS number shows hollow or blank, like the monitor
     assert.ok(await page.$eval('#vSqi', e => +e.textContent) >= 90, 'clean SQI');
     await page.check('#mDia');
@@ -75,7 +88,7 @@ try {
     await page.uncheck('#mDia');
     await page.click('#speedSeg [data-speed="1"]');
     // library strips and quiz drawn
-    await page.waitForFunction(() => document.querySelectorAll('#lib canvas').length === 12 && document.querySelectorAll('#opts button').length === 4);
+    await page.waitForFunction(() => document.querySelectorAll('#lib canvas').length === 13 && document.querySelectorAll('#opts button').length === 4);
     await page.click('#opts button');
     assert.ok((await page.textContent('#fb')).length > 10, 'quiz feedback');
     // mix mode: propofol + ketamine reads higher than propofol alone; back to one drug restores the single controls

@@ -24,6 +24,20 @@ Lasting decisions for `bis-dsa/`. Status and next steps: `STATUS.md`.
   what pushes BIS up.
 - **Diathermy**: 1–2.5 s bursts every 4–8 s of broadband noise clipping at ±400 µV, each followed by a 1-s decaying
   offset; bright DSA stripes; SQI settles around 15–35 (hollow, sometimes `--`).
+- **Forced-air warmer** (checkbox; Hemmerling & Fortier 2002): broadband 30–47 Hz pickup (`WARM` × wa², on in a few
+  seconds; once off its amplitude wa fades with τ 60 s, power τ 30 s, so the true BIS is back in 2–3 min) and +12·wa dB
+  on the EMG readout. Over propofol 0.57 BIS reads ~73 with the alpha and slow bands unchanged (the noise is above the
+  0–30 Hz DSA). Library card "Forced-air warmer" (13 cards; e2e expects 13).
+- **Blinks and eye movement** (checkbox, off by default; Medtronic BIS reference guide): one-sided 300-ms deflections
+  of 110–190 µV every 2–6 s (1 in 12 is 310–370 µV and trips the 300 µV artefact flag), plus a slow drift (SD 12 µV,
+  τ 0.8 s). The DSA and raw EEG show them; BIS, SEF and SR use the epoch after the monitor's blink rejection, modelled
+  as taking away 85% of the blink and drift the engine added (`EYE_REJ`; a proxy, the real detector is proprietary).
+  Awake: SQI ~94, BIS ~89 (−4 to −6), 0.5–2 Hz much brighter. On in the case's pre-induction and emergence steps.
+- **Surgical stimulus** (button; García 2021, Hight 2019): `Engine.stimulus(kind)`, a 100-s arousal applied to the
+  target each sample. Blunting b = remi/4 (mix mode only; single drugs b = 0). Hypnotic depth under 0.5: beta at 18 Hz
+  (`ar` term, +8·(1−b)) and facial EMG (unless paralysed), BIS +10–20. Depth 0.5 or more: alpha ×10^(−0.35·(1−b)) (an
+  alpha dropout, about −3 dB in 8–12 Hz), or 1 in 10 a paradoxical delta arousal (delta ×2, beta ×0.5; BIS falls). The
+  button shows pressed while it runs and the reading adds a sentence.
 - **Messages** (`monMsg()`, wording from the BIS Complete manual): high (red, flashing; solid with reduced motion):
   "Isoelectric EEG Detected" (every second flat for 60 s), "BIS Out of Target Range – Low/High" (shown BIS outside
   40–60 for 10 s while a hypnotic is on, depth ≥ 0.3; only with the target band on); low (yellow): "Data unavailable due
@@ -75,8 +89,9 @@ Lasting decisions for `bis-dsa/`. Status and next steps: `STATUS.md`.
   above 0.97 the EEG is isoelectric. Propofol suppression starts after depth 0.8 in a young adult (0.68 when older).
 - **Proxies (teaching-model honesty):** the stand-in BIS formula above; 128 samples/s (the real monitor samples faster);
   the EMG readout is a parametric muscle term, not the monitor's measured 70–110 Hz band (the 30–47 Hz muscle power in
-  the EEG is what moves BIS).
-- Check the tuning with `node bis-dsa/test/engine.check.mjs` (runs the engine in Node, no browser, about 20 s; also in
+  the EEG is what moves BIS; the intro and explainer step 1 say so); blink rejection as a fixed 85% subtraction; the
+  warmer as a fixed noise term. SQI blanking at 15 is a convention, not in the Covidien manual.
+- Check the tuning with `node bis-dsa/test/engine.check.mjs` (runs the engine in Node, no browser, about a minute; also in
   the Checks workflow). It prints the table below, plus SQI, messages, MF and smoothing rows.
 - The footer says it is a teaching approximation; keep that.
 
@@ -134,6 +149,29 @@ Lasting decisions for `bis-dsa/`. Status and next steps: `STATUS.md`.
 | Propofol 1.0 for 120 s | | SR 100 and "Isoelectric EEG Detected" |
 | Every state | | MF < SEF95; propofol 0.57 MF 2–8 Hz |
 | Smoothing 10 vs 30 s, awake → 0.57 | | within 5 of final ≥ 5 s sooner with 10 s |
+| Propofol 0.57 + warmer | 68–82 | EMG ≥ 10 dB over no warmer; 8–12 Hz within 1 dB; 120–150 s after off within 5 |
+| Awake + blinks | 80 or more | SQI ≥ 85; 0.5–2 Hz brighter |
+| Surgical stimulus, propofol 0.57 / 0.3 | / rise ≥ 10 | 0.57: 8–12 Hz −2.5 to −4.5 dB; mix remi 4: rise under a third; delta arousal: BIS falls |
+
+## Case story (`STORY`)
+
+Pre-induction with blinks → propofol bolus (paradoxical excitation) → loss of consciousness (two bands) → too deep
+(burst suppression; BIS in the 30s, under 30 once SR passes 40%) → infusion reduced → incision with no opioid (alpha
+dips, facial EMG, BIS up; surgical stimulus) → analgesia topped up (EMG gone; relaxant only if surgery needs it) →
+diathermy for 60 s at 400 s (hollow, `--`, artefact bar; the spec asked for 20 s, but SQI looks back 63 s and only
+falls under 50 after about a minute of diathermy) → emergence with blinks → end (570 s).
+
+## Clinical wording and evidence (14 Oct 2026)
+
+- Every clinical sentence follows the research pass (spec phase 2, WS6): relaxant in awake volunteers about 80 at once,
+  then mid-40s (Schuller 2015; 33 and 9 in Messner 2003); older patients 2–3× smaller amplitude, alpha ~9 dB lower and
+  ~1 Hz slower (Purdon 2015); Bruhn rule (SR 40%); remifentanil no BIS effect at rest (Guignard 2000); ketamine gamma
+  27–40 Hz mostly above the 0–30 Hz DSA (Akeju 2016); dex spindles 9–15 Hz; sevo theta ~5 Hz from about 1 MAC; sevo
+  at the slider end is "Very deep (about 2 MAC)", not isoelectric; BIS lag 15 s to over 2 min (Pilge 2006).
+- Pitfall cards each end with a source line (DOI or PubMed links). New cards: "Read SR, not just BIS" (Bruhn 2000) and
+  "Validated in adults" (Cornelissen 2015, infants).
+- "What the trials say" table, each row linked by DOI: B-Aware 2004, B-Unaware 2008 / BAG-RECALL 2011, NAP5 2014,
+  ENGAGES 2019, Balanced 2021, AAGBI/SIVA TIVA guideline 2018, NICE DG6.
 
 ## Lessons
 
