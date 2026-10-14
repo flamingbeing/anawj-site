@@ -394,3 +394,9 @@ On the temperature and BP/HR/BIS screens the pad has a Next button for every box
 temp or yes/no boxes), and three digits of a temperature (like 366) save it and open the next box's pad by themselves:
 about 5 taps fewer per reading. Back closes the chain. Edge tests close the next pad after a 3-digit entry. Not done: the
 late-reading time still uses the browser's `prompt()` (`askTime`), because the save flow waits for its answer.
+
+### Patient list: POD due, search, unsent badge; runbook (14 Oct 2026)
+The list shows "POD1 due today / overdue" and "POD2 ..." from the Surgery date field (else the day the patient was
+started on this phone) until the section's Complete tick. A Subject ID search box appears above 5 patients (hides rows,
+no redraw). A patient waiting to send, or whose save was refused, has a red "Not sent yet" / "Not saved to the team"
+line. `RUNBOOK.md` is the one-page study-day routine for the team; `PLAN.md` is marked old.
