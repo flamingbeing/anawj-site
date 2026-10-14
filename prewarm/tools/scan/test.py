@@ -8,7 +8,7 @@ wrong = total = 0; scores = []
 for pg in (0, 1):
     tpl = cv2.imread(f'{d}/page-{pg + 1}.png', cv2.IMREAD_GRAYSCALE)
     bx = boxes.tick_boxes(f'{d}/blank.pdf', pg); cl = boxes.cells(f'{d}/blank.pdf', pg)
-    for trial in range(20):
+    for trial in range(int(sys.argv[2]) if len(sys.argv) > 2 else 20):
         filled, truth = synth.fill(tpl, bx, cl if pg == 1 else [], rng)
         photo = synth.photograph(filled, rng)
         if trial == 0: cv2.imwrite(f'{d}/photo-{pg + 1}.jpg', photo)

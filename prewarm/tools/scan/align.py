@@ -58,13 +58,13 @@ def align_page(photo_bgr, template_gray):
     # ECC refinement on shadow-flattened, blurred images (coarse then fine)
     a, t = flatten_illumination(flat), flatten_illumination(template_gray)
     warp = np.eye(3, dtype=np.float32)
-    for scale in (0.25, 0.5):
+    for scale in (0.2, 0.35):
         sa = cv2.GaussianBlur(cv2.resize(a, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA), (0, 0), 2)
         st = cv2.GaussianBlur(cv2.resize(t, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA), (0, 0), 2)
         W = warp.copy(); W[:2, 2] *= scale; W[2, :2] /= scale
         try:
             _, W = cv2.findTransformECC(st, sa, W, cv2.MOTION_HOMOGRAPHY,
-                                        (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 200, 1e-6), None, 5)
+                                        (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 60, 1e-5), None, 5)
         except cv2.error:
             break
         W[:2, 2] /= scale; W[2, :2] *= scale; warp = W
