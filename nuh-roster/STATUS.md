@@ -14,9 +14,8 @@ sessions never edit the same lines. Read them all before starting; edit only you
 
 ## Waiting on the owner
 
-- **Approve the rules PR** (role allowlist, member shape, stamped writes, date ids, staff-list history): the last PR of
-  the 13 Oct session. It deploys live on merge; 56 emulator checks pass (17 fail on today's rules). After merging,
-  check the "Deploy Firestore rules" run, then sign in and press Save for the team once.
+- Sign in and press **Save for the team** once: the stricter rules (#492) are live since 14 Oct, so this checks a
+  real save still works and writes the first staff-list version.
 - Try the viewer role once with a test account (Settings › Team members › Viewer, and "On the staff list as"): it
   should see only My day (its own day, "your account") and the roster saved for the team; saving is refused.
 - Check the header's "Saved to the team" state and "Save for the team" once while signed in (both untested live).
@@ -38,6 +37,7 @@ The 13 Oct review (`REVIEW-2026-10.md`) is mostly built (its "Done" section list
 
 ## Recently done
 
+- #492 Stricter Firestore rules live (14 Oct): only admins and rosterers edit, every write stamped, staff-list versions kept. #491 kept the browser test green.
 13 Oct: about 30 PRs from the review (#407–#473); the full list is in `REVIEW-2026-10.md` › Done on 13 Oct. The main ones:
 - #476 / #477 / #478 Twenty bugs from a last review of the day's work: AH OT read as double cover, a hand change lost to a carried status, Monthly too wide on phones, and smaller ones.
 - #473 / #446 Generate prefers SC/C for complex lists and double covers, says why, keeps a consultant for AIC.
@@ -62,3 +62,4 @@ The 13 Oct review (`REVIEW-2026-10.md`) is mostly built (its "Done" section list
 - 2026-10-13 The review was built in one evening, PR by PR (owner: "spend the next 5 hours improving this app"); the rules change is the last PR and waits for the owner.
 - 2026-10-13 Generate prefers SC/C seniors for complex lists, double covers and rooms with a Baby MO or MOPEX; AOCC leaves the last free consultant for AIC.
 - 2026-10-13 My day opens on today until 2pm, then tomorrow.
+- 2026-10-14 The owner approved the rules change (#492); deployed by the workflow.
