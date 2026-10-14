@@ -1,3 +1,5 @@
+> **Old plan, kept for history (14 Oct 2026).** The app has long moved past it: current status is in `STATUS.md`, rules and decisions in `NOTES.md`, and it is served at `prewarmstudy.anawj.com` (not `anawj.com/prewarm/`).
+
 # Prewarming study app: plan
 
 Status: **approved 12 Oct 2026.** PR 1 (offline app) and PR 2 (sharing) built; PR 3 (admin polish) next.

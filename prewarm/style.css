@@ -460,3 +460,8 @@ dialog.kp::backdrop { background: rgba(0, 0, 0, .4); }
 .sign.big { border-top: 0; }
 .sign.big .tickbtn { width: 100%; justify-content: center; min-height: 56px; border-radius: var(--r-card); background: var(--navy); color: #fff; font-size: 17px; box-shadow: 0 2px 6px rgba(0, 47, 108, .35); }
 .sign.big .tickbtn .tick { border-color: #fff; background: transparent; }
+
+/* POD1 / POD2 due on the patient list */
+.podline { display: block; color: var(--warn); font-weight: 600; font-size: 13px; }
+.search { width: 100%; box-sizing: border-box; margin: 4px 0 8px; min-height: var(--tap); padding: 6px 12px; font: inherit; border: 1px solid var(--line-input); border-radius: var(--r); background: var(--card); color: var(--ink); }
+.unsent { display: block; color: var(--err); font-weight: 600; font-size: 13px; }

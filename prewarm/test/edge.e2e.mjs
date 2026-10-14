@@ -739,6 +739,30 @@ jobs.push(() => tryit(async () => {
   log(upd.ok() && /Get the latest version/.test(await pg.textContent('#go')), 'update helper page inside the app folder');
   await ctx.close();
 }));
+// AK. chart-review reminders (14 Oct 2026): POD1 / POD2 show as due on the list from the first / second day after the
+// day the patient was started, until their Complete tick
+jobs.push(() => tryit(async () => {
+  const { ctx, pg } = await fresh();
+  const setCreated = days => pg.evaluate(d => { const a = JSON.parse(localStorage.getItem('prewarm-demo:patients')); for (const p of Object.values(a)) p.created = Date.now() - d * 864e5; localStorage.setItem('prewarm-demo:patients', JSON.stringify(a)); }, days);
+  const pod = async () => (await pg.$$eval('.podline', els => els.map(e => e.textContent))).join('|');
+  log(await pod() === '', 'no POD reminder on the day of surgery: ' + await pod());
+  await setCreated(2); await pg.reload(); await pg.waitForTimeout(800);
+  log(/POD1 overdue · POD2 due today/.test(await pod()), 'two days on: POD1 overdue, POD2 due today: ' + await pod());
+  await pg.evaluate(() => { const a = JSON.parse(localStorage.getItem('prewarm-demo:patients')); for (const p of Object.values(a)) p.f.sign_pod1 = { v: 'AB 1 Jan', t: Date.now(), by: 'AB' }; localStorage.setItem('prewarm-demo:patients', JSON.stringify(a)); });
+  await pg.reload(); await pg.waitForTimeout(800);
+  log(!/POD1/.test(await pod()) && /POD2 due today/.test(await pod()), 'POD1 complete: only POD2 is left: ' + await pod());
+  // more than five patients: a Subject ID search appears and filters the list; a waiting patient is badged
+  await pg.evaluate(() => { const a = JSON.parse(localStorage.getItem('prewarm-demo:patients')); const first = Object.values(a)[0];
+    for (let i = 0; i < 5; i++) { const c = JSON.parse(JSON.stringify(first)); c.id = 'zz' + i; c.f.enrol_id = { v: 'ZED-0' + i, t: Date.now(), by: 'AB' }; a[c.id] = c; }
+    localStorage.setItem('prewarm-demo:patients', JSON.stringify(a)); });
+  await pg.reload(); await pg.waitForTimeout(800);
+  log(await pg.$('#psearch') !== null, 'a search box shows with more than five patients');
+  await pg.fill('#psearch', 'zed-03'); await pg.waitForTimeout(200);
+  log(await pg.$$eval('.list li:not([hidden])', l => l.length) === 1, 'typing a Subject ID leaves only that patient');
+  await pg.fill('#psearch', ''); await pg.waitForTimeout(200);
+  log(await pg.$$eval('.list li:not([hidden])', l => l.length) === 7, 'clearing the search shows everyone');
+  await ctx.close();
+}));
 await runJobs();
 await b.close();
 if (fails.length) { console.error('prewarm edge: FAIL\n- ' + fails.join('\n- ')); process.exit(1); }

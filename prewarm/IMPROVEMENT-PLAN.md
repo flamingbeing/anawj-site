@@ -4,6 +4,19 @@ Made from a 20-angle read-only review (20 sub-agents, one angle each, about 5 mi
 **Everything here is a finding to check, not a fact:** items marked (unverified) were not reproduced. Nothing was built
 from this list yet. Order = what to do first. S / M / L = small / medium / large.
 
+## Built so far (14 Oct 2026)
+
+Owner answers: export late pre-warming cells as NA; keep records indefinitely; phones need not wipe their copy; do the rest as recommended.
+
+- Items 1-4: #512 (red chip for saves that did not reach the team, error words by place, PACU `updateDoc`).
+- Items 5, 6: #513 (restore works every time, repeating and catching-up alerts).
+- Items 7 (install), 19 (NA, file name, decimal comma): #514.
+- Item 12 (✓ on done shortcuts): #515. Taller tap targets (13): tried, dropped (Save falls below the fold).
+- Item 9 (pad moves to the next box): #517. Item 10 (late-time `prompt()`): not done, the save flow waits for it.
+- Item 8: GitHub now runs the checks on every PR (someone else added it).
+- Item 17 first half (POD1/POD2 due on the list), item 15 in part (search above 5 patients, "not sent" badge), item 26 in part (RUNBOOK.md, PLAN.md marked old): this PR.
+- Not done yet: 11, 13-16 (rest), 18, 20-25, the Today/Earlier list, the study-deviation fields, rules changes (22).
+
 ## A. Protect live data (do first; all small)
 
 1. **A patient with no hospital shows "Synced" but saves nothing to the team** (`sync`, app.js ~139). Count it as unsent
