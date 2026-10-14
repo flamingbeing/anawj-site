@@ -6,7 +6,7 @@ list, filtered by the app's label, has the rest).
 Each session edits only its own file under `status/` (see **Now**). Update this file when a task finishes, a decision is made, or
 before compacting (`/save-state` in Claude Code, `$save-state` in Codex).
 
-Last updated: 2026-10-14 (afternoon) by Claude Code, Logbook 2 (log2).
+Last updated: 2026-10-14 (evening) by Claude Code, Logbook 2 (log2).
 
 ## Now
 
@@ -53,10 +53,14 @@ its own file), so sessions never edit the same lines. Read them all before start
 
 ## Next (agreed queue)
 
-0. **Before go-live: data-safety bug hunt** (owner, 14 Oct, top priority after the zombie-delete fix #519):
-   multi-device (4–5), offline, conflicts, bin, sign-out, Form inbox, every write path tested against the real rules in
-   the emulator, not only in demo mode. Plan and test list: `logbook/PLAN-go-live-bugfix.md`. Firetop can run long
-   soak runs and WebKit.
+0. **Data-safety bug hunt: first round done and merged (#523), then parked at the owner's request ("come back to
+   bugfixing later", 14 Oct).** Left in `logbook/PLAN-go-live-bugfix.md` ("Parked findings"): imports (item 7) and an app
+   left open for days (item 9) untested; Firefox random seed 285932884 (a device keeps a stale copy of a case after its edit
+   conflicted; replay command in the plan); WebKit `TEST=conflicts` `editVsDelete` (needs a Mac or Linux WebKit run, Windows
+   WebKit can't reach the emulator reliably); known limits (a phone clock >10 min slow; a sign-out not made from the button).
+   Tools: `tools/test-multidevice.sh` (random, `DEVICES/ROUNDS/SEED/BROWSER/SLOW`) and `TEST=conflicts` (fixed scenarios).
+0b. **App → response-sheet sync is live (14 Oct); first end-to-end check pending** (needs a programme resident: see
+   "Waiting on the owner"). A reminder to ask the owner is scheduled for the morning of 15 Oct.
 1. Subdomains: **all steps done 13 Oct** (`SUBDOMAINS.md`); the logbook is at `apmes.anawj.com/logbook/`. Nothing queued here.
 2. **Waiting on the owner's answers** (13 Oct): the owner wants the logbook to also be his own log (daily note, learning points,
    knowledge-note review, a generic profile; residents may follow). Plans, consequences and the open questions:
@@ -72,6 +76,15 @@ its own file), so sessions never edit the same lines. Read them all before start
 
 ## Recently done
 
+- #546 Logbook: the sheet outbox switched on (`SHEET_OUTBOX_ON = true`): a programme resident's new app case goes to the old Form's
+  response sheet within ~5 minutes (Case tab with `app:<id>` in column J, Database, resident report, AY totals). #527 (rules
+  `sheetOutbox`, app side, sheet script `form-script/Outbox.gs`, import skips `app:` rows) and #532 (the script holds the sheet's
+  document lock in small pieces; per-step timings) came first; owner installed the script and raised the Form handler's
+  lock wait to 60 s. #547: the pending end-to-end check recorded.
+- #523 Go-live bug hunt, round 1: header follows the save queue ("Save needs attention"), a save cut off by the network retries
+  by itself, multi-select delete no longer loses a concurrent edit (it uses the write queue per case) and a delete undone by a
+  conflict says so, `tools/test-multidevice.sh` with devices going offline and `TEST=conflicts` scenarios (edit vs edit/delete,
+  bin, Form pick-up twice, late offline save, sheet outbox, sign-out), harness works on Windows.
 - #519 Fix: a single delete never reached the server (the recycle-bin feed dropped the case first, so the delete saw a
   conflict) while the device said "Synced"; deleted cases came back after sign-in. Since 13 Oct. Plus the first multi-device
   emulator test (`tools/test-multidevice.sh`) and the go-live bug-hunt plan.
@@ -99,6 +112,11 @@ its own file), so sessions never edit the same lines. Read them all before start
 
 ## Decisions log
 
+- 2026-10-14 (log2): App → sheet sync decided and built: on for every programme resident, new cases only, a few minutes' delay
+  fine, the same bot account as the Form inbox (it also reads/deletes `sheetOutbox`), column J "App marker" with `app:<caseId>`;
+  the response sheet stays "anyone with the link: viewer" until 14 Nov. Dry run on a copy of the sheet showed one case holds the
+  sheet's document lock 25–42 s while the Form handler waited only 10 s: the owner raised that wait to 60 s and the script
+  holds the lock in pieces. Bug hunt parked at the owner's request; Firetop's findings are in the plan.
 - 2026-10-14 (log2): The old Google Form stays open as a simple way in, no end date; one way only (Form → logbook);
   residents use the same Google account for both. No "Google sign-ins only" rule for now (small single-hospital Form, no
   patient identifiers). Next: new app cases appended to the response sheet as a rudimentary backup during the teething
