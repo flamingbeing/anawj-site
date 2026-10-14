@@ -181,12 +181,14 @@ falls under 50 after about a minute of diathermy) → emergence with blinks → 
 
 ## Effect site, target slider, relaxant default, timers (owner, 14 Oct 2026)
 
-- **Slow transitions ("unzipping"):** the slider and the mix sliders set a *target* dose. The engine's `de` (effect site)
-  follows it with a first-order lag, `EFFECT_TAU` = 45 s (real propofol and sevo half-times are 2-3 min; 45 s keeps it
-  watchable, and 4x/10x speed shortens it). Spectrum glides to the effect-site state with a further 8 s, BIS smooths
-  over 10/15/30 s. Descriptions, the relaxant, the out-of-target alarm and the stimulus all follow `de`, not the target.
-  A drug change or a switch between one drug and the mix snaps `de` (the target type changed); the story's first step
-  and `snap()` jump it.
+- **Fast induction, slow emergence ("unzipping"):** the slider and the mix sliders set a *target* dose. The engine's `de`
+  (effect site) follows it with a first-order lag that is fast going up and slow coming down: `TAU_UP` = 12 s (a bolus)
+  and `TAU_DOWN` = 120 s (waking takes a few minutes: BIS about 77 two minutes after stopping propofol from GA, above
+  90 by five; real half-times are 2-3 min and longer after long infusions). Spectrum then glides to the effect-site state
+  with a further 8 s, BIS smooths over 10/15/30 s; 4x/10x speed shortens it. Descriptions, the relaxant, the
+  out-of-target alarm and the stimulus follow `de`, not the target. A drug change or a switch between one drug and the mix
+  snaps `de`; the story's first step and `snap()` jump it. The **Emergence** key stops every drug (slider to 0, or the mix
+  cleared) and shows the wake-up in the caption.
 - **Depth slider = BIS target:** under the slider, "Target BIS ≈ n" is a forecast: a throwaway `Engine` started at the
   target, 36 sim-s, same features and `bisRaw` (`forecastBis`, ~70 ms, 180 ms after the last change). Where suppression
   is expected (`bs` over 0.02) it runs 90 s and uses the gate's long-run share for SR (mean flat run 2·10^(2(bs−0.5)) s,

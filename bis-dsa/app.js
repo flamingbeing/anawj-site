@@ -93,8 +93,9 @@ function profile(p,f,spEnv,spF,kg,ks,wa){
 }
 // Effect site: the dose the brain 'feels' follows the target dose with a first-order lag, so moving the slider changes the
 // EEG over a minute or two (the DSA 'unzips' from one pattern to the next) instead of at once. Real propofol and sevoflurane
-// effect-site half-times are about 2-3 min; 45 s here keeps a transition watchable. Speed 4x or 10x shortens it too.
-const EFFECT_TAU=45;
+// effect-site half-times are about 2-3 min. Induction is a bolus and quick (12 s here); emergence is slow (120 s here, so a
+// patient takes a few minutes to wake and the DSA unzips back); speed 4x or 10x shortens both.
+const TAU_UP=12,TAU_DOWN=120;
 const cloneD=d=>typeof d==='number'?d:Object.assign({},MIX0,d);
 // is the patient 'induced' (asleep enough that a relaxant would be given)? Hysteresis: given at 0.30, reversed under 0.25.
 // propofol/sevo depth; ketamine 0.45 anaesthetic dose; mix: hypnotic depth or ketamine; dex alone never.
@@ -122,8 +123,8 @@ class Engine{
  stimulus(kind){this.stT=100;this.stK=kind??(Math.random()<0.1?'delta':'');}
  sample(){ // one sample at FS
   const dt=1/FS; this.t+=dt;
-  const m=this.mods,de=this.de,a=dt/EFFECT_TAU;
-  if(typeof de==='number')this.de+=(this.d-de)*a;else for(const q in MIX0)de[q]+=((this.d[q]||0)-de[q])*a;
+  const m=this.mods,de=this.de,au=dt/TAU_UP,ad=dt/TAU_DOWN;
+  if(typeof de==='number')this.de+=(this.d-de)*(this.d>de?au:ad);else for(const q in MIX0){const t=this.d[q]||0;de[q]+=(t-de[q])*(t>de[q]?au:ad);}
   this.updNmb();
   const tg=target(this.drug,this.de,m); const k=dt/8; // ~8 s time constant: the spectrum glides to the effect-site state
   // surgical stimulus (García 2021, Hight 2019), blunted by remifentanil b = remi/4 (mix only): light (dH < 0.5) beta at
@@ -437,6 +438,10 @@ $('mEmg').onchange=e=>{mods.emg=e.target.checked;applyTarget();};
 mods.nmbMode='auto';
 function setNmb(m){mods.nmbMode=m;document.querySelectorAll('#nmbSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.nmb===m));applyTarget();}
 document.querySelectorAll('#nmbSeg button').forEach(b=>b.onclick=()=>setNmb(b.dataset.nmb));
+// emergence: stop every drug; the effect site falls slowly (the relaxant is reversed once the patient is light)
+$('wakeBtn').onclick=()=>{stopStory();
+ if(drug==='mix'){Object.assign(mix,MIX0);syncMix();depth=mix;}else{depth=0;$('depth').value=0;}
+ applyTarget();$('storyCap').textContent='Emergence: drugs stopped. The effect site falls over a few minutes, so the DSA unzips back: the alpha band fades first, then slow waves, beta returns and BIS rises through the 60s and 70s. The relaxant is reversed once the patient is light. Speed up to watch it.';};
 $('tReset').onclick=()=>{tim.sup=tim.low=0;dirty=true;};
 $('mDia').onchange=e=>{mods.diathermy=e.target.checked;applyTarget();};
 $('mWarm').onchange=e=>{mods.warmer=e.target.checked;applyTarget();};
@@ -502,7 +507,7 @@ const STORY=[
  {at:400,d:0.5,mods:{diathermy:true},cap:'Diathermy. Interference swamps the EEG: SQI falls, BIS shows hollow (and -- once SQI is under 15), and the artefact bar marks the trend. Don’t act on the number until the signal is clean.'},
  {at:460,d:0.5,mods:{},cap:'Diathermy stops. SQI climbs back over the next minute (it looks back 63 s) and BIS returns to where it was.'},
  {at:500,d:0.12,mods:{blink:true},cap:'Infusion stopped at the end (any relaxant reversed). Alpha dims, slow waves fade, beta returns, blinks come back and BIS rises towards 80–90 as the patient wakes.'},
- {at:570,end:true,cap:'End of case. Scroll the DSA back in your head: two bands for propofol GA, stripes for too deep, a dipping alpha band and high fast power for stimulus without analgesia, stripes of interference for diathermy.'}];
+ {at:680,end:true,cap:'End of case. Scroll the DSA back in your head: two bands for propofol GA, stripes for too deep, a dipping alpha band and high fast power for stimulus without analgesia, stripes of interference for diathermy.'}];
 let story=null;const SMODS=[['emg','mEmg'],['diathermy','mDia'],['warmer','mWarm'],['blink','mBlink']];
 function stopStory(){if(!story)return;story=null;$('storyBtn').textContent='Play a case: induction to emergence';}
 $('storyBtn').onclick=()=>{if(story){stopStory();$('storyCap').textContent='';return;}

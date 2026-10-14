@@ -109,10 +109,18 @@ try {
     await page.waitForFunction(() => document.querySelector('#vSupT').textContent === '0:00');
     await page.$eval('#depth', e => { e.value = 93; e.dispatchEvent(new Event('input')); });
     await page.waitForFunction(() => document.querySelector('#vSupT').textContent !== '0:00' && +document.querySelector('#vSr').textContent >= 5, null, { timeout: 60000 });
-    assert.notEqual(await page.textContent('#vLowT'), '0:00', 'BIS under 40 time counts too');
+    await page.waitForFunction(() => document.querySelector('#vLowT').textContent !== '0:00', null, { timeout: 60000 }); // BIS under 40 counts too
     await page.click('#tReset');
     await page.waitForFunction(() => document.querySelector('#vSupT').textContent === '0:00');
     await page.$eval('#depth', e => { e.value = 57; e.dispatchEvent(new Event('input')); });
+    // emergence button: stops the drugs (slider to 0), the effect site falls slowly, the patient wakes and the relaxant is reversed
+    await page.click('#wakeBtn');
+    assert.equal(await page.$eval('#depth', e => e.value), '0');
+    assert.match(await page.textContent('#storyCap'), /Emergence/);
+    assert.match(await page.textContent('#tgtSub'), /settling/);
+    assert.notEqual(await page.textContent('#rName'), 'Awake', 'still under right after stopping (slow emergence)');
+    await page.waitForFunction(() => document.querySelector('#rName').textContent === 'Awake', null, { timeout: 90000 });
+    await page.waitForFunction(() => +document.querySelector('#vBis').textContent >= 80, null, { timeout: 60000 });
     // mix mode: propofol + ketamine reads higher than propofol alone; back to one drug restores the single controls
     await page.click('#speedSeg [data-speed="10"]');
     await page.click('#modeSeg [data-mode="mix"]');
@@ -129,7 +137,7 @@ try {
     await page.click('[data-drug="ketamine"]');
     await page.$eval('#depth', e => { e.value = 65; e.dispatchEvent(new Event('input')); });
     await page.waitForFunction(g => +document.querySelector('#vBis').textContent > g + 15, ga, { timeout: 20000 });
-    assert.equal(await page.textContent('#rName'), 'Ketamine anaesthesia');
+    await page.waitForFunction(() => document.querySelector('#rName').textContent === 'Ketamine anaesthesia', null, { timeout: 30000 });
     // explainer steps respond
     await page.click('#steps button[data-i="3"]');
     assert.match(await page.textContent('#exCap'), /on its side/);
