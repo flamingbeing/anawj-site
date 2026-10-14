@@ -590,7 +590,7 @@ portfolio content.
   residents also go to `sheetOutbox/{caseId}` (`js/sheet-outbox.js`, switched by `SHEET_OUTBOX_ON`); a script on the
   sheet turns each into a Case-tab row with `app:<caseId>` in column J and deletes the entry. New cases only (edits
   and deletions don't reach the sheet; a case deleted before pick-up is taken out of the outbox). The Admin
-  workbook import skips rows with `app:` in column J. Tests: `test/sheet-outbox.test.mjs`, the sheetOutbox rules in
+  workbook import skips rows with `app:` in column J. The sheet side is `form-script/Outbox.gs` (setup: `form-script/OUTBOX-README.md`). Tests: `test/sheet-outbox.test.mjs`, the sheetOutbox rules in
   `test/rules.emulator.mjs`, and `TEST=conflicts` (scenario `sheetOutbox`).
 - **Privacy policy:** `privacy/index.html` (anawj.com/privacy/) shows who sees what. Keep it in step when roles change.
 - **Private feedback (14 Oct 2026):** More → Send feedback (`ui-feedback.js`, pure parts in `feedback.js`) saves
