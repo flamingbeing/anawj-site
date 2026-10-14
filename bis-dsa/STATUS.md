@@ -10,15 +10,15 @@ Each session keeps its own line in `status/<session>.md`. Read them before start
 
 ## Waiting on the owner
 
-- Custom domain `anaes.anawj.com`: handed to the home computer (firetop) on 14 Oct 2026; check `anaes.anawj.com/bis/`.
 - Clinical read-through of the wording and BIS ranges.
 
 ## Next (ideas, not agreed)
 
-1. Forward `anawj.com/bis-dsa/` to `anaes.anawj.com/bis/` once the domain answers.
-2. More states: nitrous oxide, opioid-heavy, hypothermia; a left/right (SedLine-style) view.
+1. More states: nitrous oxide, opioid-heavy, hypothermia; a left/right (SedLine-style) view.
 
 ## Recently done
+
+- `anaes.anawj.com/bis/` live (owner added the domain, 14 Oct 2026); `anawj.com/bis-dsa/` forwards to it.
 
 - Phase 2 (14 Oct 2026, branch ccr-0e0d2acf-njkx9t): relaxant two-stage fall, remifentanil and Bruhn rules, drug
   spectra refit, `test/engine.check.mjs`; SQI/EMG/messages like the monitor; trend, DSA MF, EEG scale, smoothing;
