@@ -8,4 +8,4 @@ mkdir -p "$OUT"; OUT=$(realpath "$OUT")
 node "$HERE/locate.mjs" "$BLANK" "$OUT"
 cp "$BLANK" "$OUT/blank.docx"
 (cd "$OUT" && soffice --headless --convert-to pdf blank.docx >/dev/null 2>&1 && pdftoppm -r 200 -png blank.pdf page)
-python3 -s "$HERE/locate.py" "$OUT"
+${PYTHON:-python3} "$HERE/locate.py" "$OUT"

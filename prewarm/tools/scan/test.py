@@ -14,7 +14,7 @@ for pg in (0, 1):
         if trial == 0: cv2.imwrite(f'{d}/photo-{pg + 1}.jpg', photo)
         flat, score = align.align_page(photo, tpl)
         scores.append(score)
-        if score < 0.85:
+        if score < 0.80:
             print(f'page {pg + 1} trial {trial}: RETAKE (score {score:.2f})'); continue
         res = ticks.read_ticks(align.ink_layer(flat, tpl), bx)
         for r, t in zip(res, truth['ticks']):
