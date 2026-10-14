@@ -123,13 +123,7 @@ try {
     await page.waitForFunction(e1 => +document.querySelector('#vEmg').textContent <= e1 - 6, emgHi, { timeout: 20000 });
     assert.match(await page.textContent('#rText'), /Muscle relaxant/);
     await page.uncheck('#mEmg');
-    // forced-air warmer: high-frequency pickup raises the EMG reading; blinks and the surgical stimulus are described
     await page.waitForFunction(() => +document.querySelector('#vEmg').textContent <= 32, null, { timeout: 20000 });
-    const emgW = await page.$eval('#vEmg', e => +e.textContent);
-    await page.check('#mWarm');
-    await page.waitForFunction(e0 => +document.querySelector('#vEmg').textContent >= e0 + 6, emgW, { timeout: 20000 });
-    assert.match(await page.textContent('#rText'), /Forced-air warmer/);
-    await page.uncheck('#mWarm');
     await page.check('#mBlink');
     assert.match(await page.textContent('#rText'), /Blinks/);
     await page.uncheck('#mBlink');
@@ -144,7 +138,7 @@ try {
     await page.uncheck('#mDia');
     await page.click('#speedSeg [data-speed="1"]');
     // library strips and quiz drawn
-    await page.waitForFunction(() => document.querySelectorAll('#lib canvas').length === 13 && document.querySelectorAll('#opts button').length === 4);
+    await page.waitForFunction(() => document.querySelectorAll('#lib canvas').length === 11 && document.querySelectorAll('#opts button').length === 4);
     await page.click('#opts button');
     assert.ok((await page.textContent('#fb')).length > 10, 'quiz feedback');
     // suppression timer: deep propofol brings burst suppression, the suppression time box counts up, Reset clears it

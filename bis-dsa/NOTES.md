@@ -24,10 +24,6 @@ Lasting decisions for `bis-dsa/`. Status and next steps: `STATUS.md`.
   what pushes BIS up.
 - **Diathermy**: 1–2.5 s bursts every 4–8 s of broadband noise clipping at ±400 µV, each followed by a 1-s decaying
   offset; bright DSA stripes; SQI settles around 15–35 (hollow, sometimes `--`).
-- **Forced-air warmer** (checkbox; Hemmerling & Fortier 2002): broadband 30–47 Hz pickup (`WARM` × wa², on in a few
-  seconds; once off its amplitude wa fades with τ 60 s, power τ 30 s, so the true BIS is back in 2–3 min) and +12·wa dB
-  on the EMG readout. Over propofol 0.57 BIS reads ~73 with the alpha and slow bands unchanged (the noise is above the
-  0–30 Hz DSA). Library card "Forced-air warmer" (13 cards; e2e expects 13).
 - **Blinks and eye movement** (checkbox, off by default; Medtronic BIS reference guide): one-sided 300-ms deflections
   of 110–190 µV every 2–6 s (1 in 12 is 310–370 µV and trips the 300 µV artefact flag), plus a slow drift (SD 12 µV,
   τ 0.8 s). The DSA and raw EEG show them; BIS, SEF and SR use the epoch after the monitor's blink rejection, modelled
@@ -154,7 +150,6 @@ Lasting decisions for `bis-dsa/`. Status and next steps: `STATUS.md`.
 | Propofol 0.8 / propofol 0.35, dex 0.4, ketamine 0.3 | | "Out of Target Range – Low" ≥ 80% of 60 s / never |
 | Every state | | MF < SEF95; propofol 0.57 MF 2–8 Hz |
 | Smoothing 10 vs 30 s, awake → 0.57 | | within 5 of final ≥ 5 s sooner with 10 s |
-| Propofol 0.57 + warmer | 68–82 | EMG ≥ 10 dB over no warmer; 8–12 Hz within 1 dB; 120–150 s after off within 5 |
 | Awake + blinks | 80 or more | SQI ≥ 85; 0.5–2 Hz brighter |
 | Surgical stimulus, propofol 0.57 / 0.3 | / rise ≥ 10 | 0.57: 8–12 Hz −2.5 to −4.5 dB; mix remi 4: rise under a third; delta arousal: BIS falls |
 
@@ -230,3 +225,5 @@ Still to do for the machine switch (BIS Advance, SedLine): left/right engine, AS
 
 - Clinical text (state descriptions, pattern library, pitfalls, the case story) is in `app.js` and `index.html`.
   Facts to check with the owner before changing: BIS ranges, the age effect on alpha, ketamine and N2O behaviour.
+
+- 14 Oct 2026 (owner): the forced-air warmer control and library card and the "Paradoxical excitation" card were removed (rarely seen); the engine still supports `mods.warmer` but nothing sets it. "Deep sevoflurane" card is now "Sevoflurane" (the depth is in the picture). The d<0.24 state is called "Very light sedation".

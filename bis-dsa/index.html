@@ -312,7 +312,6 @@ footer{font-size:13px;color:var(--muted);max-width:80ch;border-top:1px solid var
             <button data-nmb="auto" aria-pressed="true">At induction</button><button data-nmb="off" aria-pressed="false">Off</button><button data-nmb="on" aria-pressed="false">On now</button>
           </div></div>
         <label class="chk"><input type="checkbox" id="mDia"> Diathermy (electrical interference)</label>
-        <label class="chk"><input type="checkbox" id="mWarm"> Forced-air warmer (high-frequency noise)</label>
         <label class="chk"><input type="checkbox" id="mBlink"> Blinks and eye movement</label>
         <div class="row"><button class="btn" id="stimBtn" aria-pressed="false">Surgical stimulus</button></div></div>
       <div class="ctl"><span class="t">Display</span>
@@ -387,7 +386,7 @@ footer{font-size:13px;color:var(--muted);max-width:80ch;border-top:1px solid var
     <li><b>Read SR, not just BIS</b>Suppression often appears with BIS 35–45, especially in older patients; SR above 0 means suppression whatever the number (Bruhn 2000).<small>Source: <a href="https://doi.org/10.1023/a:1012216600170">Bruhn 2000, J Clin Monit Comput</a>.</small></li>
     <li><b>Lag</b>BIS is smoothed (10, 15 or 30 s), and the whole delay before it settles at a new level ranged from about 15 s to over 2 minutes in testing (Pilge 2006). The DSA and raw EEG change first.<small>Source: <a href="https://doi.org/10.1097/00000542-200603000-00016">Pilge 2006, Anesthesiology</a>.</small></li>
     <li><b>Low BIS that isn't drug</b>Hypothermia, hypoglycaemia, hypotension with poor cerebral perfusion and cerebral ischaemia all slow or flatten the EEG. So can paralysis in an awake patient, pulse artefact from a sensor over the temporal artery, blinks or head movement that look like slow waves, paradoxical delta during arousal, and pre-existing brain disease or a low-voltage EEG. A sudden fall with no dose change: check glucose, blood pressure and perfusion before lightening.<small>Source: <a href="https://pubmed.ncbi.nlm.nih.gov/11435056/">Mathew 2001</a>; <a href="https://pubmed.ncbi.nlm.nih.gov/26174308/">Schuller 2015</a>; <a href="https://pubmed.ncbi.nlm.nih.gov/33461725/">García 2021</a>.</small></li>
-    <li><b>Interference</b>Forced-air warmers, oscillating ventilators and pacing or ECG spikes add high-frequency noise that can push BIS up (warmer off: true value back in 2–3 min); diathermy swamps the signal. Check the raw EEG, EMG bar and SQI.<small>Source: <a href="https://pubmed.ncbi.nlm.nih.gov/12145044/">Hemmerling &amp; Fortier 2002</a>; BIS Complete operator’s manual.</small></li>
+    <li><b>Interference</b>Oscillating ventilators and pacing or ECG spikes add high-frequency noise that can push BIS up; diathermy swamps the signal. Check the raw EEG, EMG bar and SQI.<small>Source: <a href="https://pubmed.ncbi.nlm.nih.gov/12145044/">Hemmerling &amp; Fortier 2002</a>; BIS Complete operator’s manual.</small></li>
     <li><b>Validated in adults</b>BIS ranges come from adults. In infants under about 4 months there is no frontal alpha under sevoflurane, and BIS is unreliable; interpret cautiously in neurological disease and with psychoactive drugs.<small>Source: <a href="https://doi.org/10.7554/elife.06513">Cornelissen 2015, eLife</a>.</small></li>
   </ul>
 </section>
