@@ -383,3 +383,8 @@ reading) replaces `alerted`. Still only while the app is open: a lock-screen ala
 - **Updates:** the service worker's install is all-or-nothing for the app's own files (one failed download fails the
   install, the browser retries, the phone keeps the old complete copy); Firebase SDK files stay optional. The 3 s
   fallback only clears the saved copy if `sw.js` can be fetched right then. Base `prewarm-v79`.
+
+### Done shortcuts also show a ✓ (14 Oct 2026)
+The green "complete" shortcuts on the patient screen also get a ✓ before the label (not colour alone, red-green colour
+blindness), and their spoken label is "POD1, complete" instead of just "complete". Taller tap targets for the reading
+tabs were tried and dropped: they push Save below the fold on a phone (the e2e test pins that).

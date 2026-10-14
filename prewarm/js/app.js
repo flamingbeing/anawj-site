@@ -995,7 +995,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
   }
   // the other forms, Still to fill and Mark complete: the same on both tabs (owner, 12 Oct 2026)
   function linksHtml() {
-    const done = pg => val(p, 'sign_' + pg) ? ' class="done" aria-label="complete"' : '';
+    const done = (pg, name) => val(p, 'sign_' + pg) ? ` class="done" aria-label="${name}, complete"` : '';
     // once their stage has come: how many questions are left
     const todo = (ids, from) => {
       if (!val(p, from)) return '';
@@ -1003,10 +1003,10 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
       return n ? `${n} to answer` : '';
     };
     return `<nav class="links two" aria-label="Other forms">
-      <a href="#/p/${id}/form/intraop"${done('intraop')}>Intra-op details<small>${todo(INTRAOP_Q, 'io_done') || 'Blood, products, tests'}</small></a>
-      <a href="#/p/${id}/form/pacu"${done('pacu')}>PACU<small>${todo(PACU_Q, 'pacu_in') || 'Temp, NuDESC, delay'}</small></a>
+      <a href="#/p/${id}/form/intraop"${done('intraop', 'Intra-op details')}>Intra-op details<small>${todo(INTRAOP_Q, 'io_done') || 'Blood, products, tests'}</small></a>
+      <a href="#/p/${id}/form/pacu"${done('pacu', 'PACU')}>PACU<small>${todo(PACU_Q, 'pacu_in') || 'Temp, NuDESC, delay'}</small></a>
       </nav>
-      <nav class="links three" aria-label="Perioperative data">${DATA_PARTS.map(d => `<a href="#/p/${id}/${d.path}"${done(d.sign)}>${d.short}</a>`).join('')}</nav>
+      <nav class="links three" aria-label="Perioperative data">${DATA_PARTS.map(d => `<a href="#/p/${id}/${d.path}"${done(d.sign, d.short)}>${d.short}</a>`).join('')}</nav>
       <div class="textlinks"><a href="#/p/${id}/form">Form view</a><a href="#/p/${id}/sheet">Sheet view</a></div>`;
   }
   // previous / next timepoint: big buttons either side of the tabs and the timepoint strip
