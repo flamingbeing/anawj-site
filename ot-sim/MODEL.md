@@ -52,7 +52,7 @@ values (SD about 1 beat/min, 1–2 mmHg, 0.3% SpO2) [D].
 | Lean body mass | James: man 1.1·W − 128·(W/H)², woman 1.07·W − 148·(W/H)² (W kg, H cm) | 55.3 kg | [V] (Schnider, Minto) |
 | Body surface area | Mosteller: √(H·W/3600) | 1.82 m² | [V] Mosteller 1987 |
 | Ideal body weight | Devine: man 50 + 0.9055·(H − 152.4), woman 45.5 + 0.9055·(H − 152.4); not below about 152 cm | 65.9 kg | [V] Devine 1974 via Pai 2000 |
-| Blood volume | 70 mL/kg (women 65) at normal BMI; obese: 70/√(BMI/22) mL/kg × weight (Lemmens 2006) | 4.9 L | [S] Nadler 1962; Lemmens [S] |
+| Blood volume | 70 mL/kg (women 65) up to BMI 25; above it 70/√(BMI/25) mL/kg × weight (the Lemmens 2006 form, made continuous at BMI 25 [D]) | 4.9 L | [S] Nadler 1962; Lemmens [S] |
 | FRC (O2 store) | 30 mL/kg × IBW (about 2.0 L); the GA loss of lung volume is modelled as shunt, not a smaller store; obesity: × max(0.5, 1 − 0.025·(BMI − 25)) | 2.0 L | [D] calibrated to the apnoea targets (section 8); Pelosi 1996 GA 1.69 L, obese 0.67 L [V] |
 | Intrinsic heart rate | 118.1 − 0.57·age (after full autonomic block), between-patient spread about ±15% | 95.3 /min | [V] Jose & Collison 1970 (as quoted; Opthof 2000) |
 
