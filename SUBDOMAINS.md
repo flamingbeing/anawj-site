@@ -21,6 +21,7 @@ The rule for new apps is in `AGENTS.md`.
 | `anawj.com/privacy/` | `privacy/` | Stays: the Google sign-in consent screen points here. |
 | `anawj.com/prewarm-update/` | `prewarm-update/` | Stays until no phone runs the old prewarm worker, then becomes a redirect. |
 | `anawj.com/edit/` (decided in step 5) | `edit/` | Stays on `anawj.com`: see "The page editor" below. |
+| `ask.anawj.com/` | `ask/` | Ask Claude, the owner's page; behind Cloudflare Access; its API `/api/ask` is `worker/ask.js` (`edit/NOTES.md`). |
 
 Single-app subdomains serve the app at the root; shared ones keep a path per app. Folders in the repo don't need
 renaming: the hosting maps each address to its folder.
@@ -84,7 +85,9 @@ and builds a preview for every PR.
 - Any other address (the previews on `workers.dev`, the copy of main) serves the whole repo as before.
 - **Trying a subdomain before it exists:** on a PR preview, `<preview>/_sites/hand.anawj.com/babies/` serves what
   `hand.anawj.com/babies/` will. (Real hosts don't take that route.)
-- No data, no secrets, no storage in the Worker: it only serves files. Workers' free plan allows 100,000 requests a
+- No data and no storage in the Worker: it serves files, plus one owner-only API on `ask.anawj.com` (`worker/ask.js`,
+  Ask Claude), the only part with secrets (a GitHub token for issues, the Access team and audience), kept in
+  Cloudflare, never in the repo. Previews never answer that API. Workers' free plan allows 100,000 requests a
   day; every request goes through the Worker (a page load without a cached service worker is a few dozen). If that is
   ever not enough, Workers Paid is $5 a month.
 - Tests: `node worker/test/routes.test.mjs` and `node worker/test/sites.test.mjs` (in the merge checklist in `AGENTS.md`).

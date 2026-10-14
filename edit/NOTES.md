@@ -124,6 +124,34 @@ handles its comments). Nobody else's comments start it.
 and screenshot workflows don't run on them: run the checks yourself before merging one, or push any small commit
 from a session (which does trigger them).
 
+## Ask Claude (`ask.anawj.com`, the owner only)
+
+One step from an idea to a drafted PR: `ask.anawj.com` takes the page and what should change (typed or spoken, with the
+same options and privacy check as the editor), opens a `Page edits:` issue **as the owner**, so the instant workflow
+drafts the PR at once, and follows it: the PR link and the preview of the same page appear in "Your recent asks". The
+editor's and the feedback button's comment boxes have **Ask Claude now (owner only)**, which opens it prefilled.
+Anyone else gets Cloudflare's sign-in page and can't pass it.
+
+- `ask/index.html` (the page), `worker/ask.js` (its API: `POST /api/ask` opens the issue, `GET /api/ask?issue=N` finds
+  the PR and preview). It checks Access's signed token on every request and accepts posts only from the page itself.
+- Tests: `node ask/test/e2e.mjs` (the page) and `node worker/test/ask.test.mjs` (the API: sign-in check, the issue's
+  content, following it). Both run in Checks.
+- Secrets live in the Worker, which also runs every branch's code on previews (they share the Worker's secrets), so
+  only the owner and his sessions should push branches. The token can only open and read issues on this public repo.
+
+**Owner, to switch it on (once; the home computer can do steps 3–4 with you):**
+1. Cloudflare → Workers & Pages → `anawj-preview` → Settings → Domains & Routes → Add → Custom domain →
+   `ask.anawj.com`.
+2. Cloudflare Zero Trust (one.dash.cloudflare.com; pick a team name if asked; Free plan) → Access → Applications → Add
+   → Self-hosted: domain `ask.anawj.com`; policy **Allow**, include **Emails**: your email; sign-in: one-time PIN.
+   Save, then copy the application's **Audience (AUD) tag**.
+3. GitHub → Settings → Developer settings → Fine-grained tokens → Generate: repository access **only anawj-site**;
+   permissions **Issues: Read and write**, **Pull requests: Read-only**; expiry a year.
+4. Cloudflare → `anawj-preview` → Settings → Variables and Secrets → add three **Secrets**: `GITHUB_ISSUES_TOKEN` (step 3),
+   `ACCESS_TEAM` (your Zero Trust team name, the part before `.cloudflareaccess.com`), `ACCESS_AUD` (step 2).
+Check: open `ask.anawj.com` on your phone, enter the PIN emailed to you, and send a small ask; until step 4 the page
+answers "Ask Claude is not set up yet".
+
 ## Weekly proof-read
 
 `.github/workflows/proofread.yml` runs `node tools/proofread.mjs --live` on Mondays at 08:47 Singapore: every page's title,
