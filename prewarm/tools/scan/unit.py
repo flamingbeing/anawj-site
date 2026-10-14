@@ -55,6 +55,14 @@ out = {'iotemp_0_room': E(), 'iotemp_5_room': E(flags=['arrow or ditto: same as 
        'iotemp_15_room': E(flags=['arrow or ditto: same as the reading above?']), 'iotemp_20_room': E(), 'iotemp_25_room': dict(value=18, flags=[])}
 scan.arrow_gaps(out, F)
 assert out['iotemp_10_room']['flags'] and out['iotemp_20_room']['flags'] and not out['iotemp_0_room']['flags']
+# series order: baseline first, minutes in order, end of surgery last (a baseline next to the end of surgery is not a "jump")
+arm = {'base': 35.0, '0': 35.2, '5': 34.9, '10': 34.2, '300': 29.8, 'end': 23.6}
+fo = {f'iotemp_{k}_arm': {'value': v, 'flags': []} for k, v in arm.items()}
+ff = {f'iotemp_{k}_arm': dict(id=f'iotemp_{k}_arm', series='iotemp', col='arm', point=k) for k in arm}
+scan.series_checks(fo, ff)
+assert not fo['iotemp_base_arm']['flags'] and not fo['iotemp_0_arm']['flags'], fo
+assert fo['iotemp_end_arm']['flags'], 'the real 23.6 after 29.8 is still flagged'
+assert sorted(['300', 'end', 'base', '5', '0'], key=lambda k: scan.point_order(('x', k))) == ['base', '0', '5', '300', 'end']
 # a ticked question where one option also ticks a box further down (No pre-warming also ticks 'Not applicable')
 import locate
 # the real Randomisation row: options 1 and 2 on one line; option 3 ticks its own box AND 'Not applicable' lower down, which

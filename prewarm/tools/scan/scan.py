@@ -138,6 +138,12 @@ def leak_ratio(ink, fmap, page_no):
     return float(ink[mask == 0].sum()) / max(1, (mask == 0).sum()) * 1000
 
 
+def point_order(p):
+    """Order of a series' timepoints (p = (field id, point key)): baseline first, then the minutes, end of surgery last."""
+    k = p[1]
+    return -1 if k == 'base' else int(k) if k.isdigit() else 10 ** 6
+
+
 def arrow_gaps(fields_out, fields):
     """An empty cell sitting between two 'same as above' arrows, or below one and above another reading in the same column,
     is probably covered by the arrow too: flag it instead of leaving it silently empty."""
@@ -146,7 +152,7 @@ def arrow_gaps(fields_out, fields):
         f = fields[fid]
         if f.get('series') == 'iotemp' and f.get('col') in ('under', 'gown', 'room', 'core', 'chest', 'arm', 'thigh', 'calf'):
             cols.setdefault((f['series'], f['col']), []).append((fid, f['point']))
-    key = lambda p: (not p[1].isdigit(), int(p[1]) if p[1].isdigit() else 0)
+    key = point_order
     for pts in cols.values():
         pts.sort(key=key)
         state = [('arrow' if any('arrow' in t for t in fields_out[fid]['flags']) else 'value' if fields_out[fid].get('value') not in (None, '') else 'empty') for fid, _ in pts]
@@ -167,7 +173,7 @@ def series_checks(fields_out, fields):
         if f.get('series') and e.get('value') not in (None, 'NA') and f['col'] in ('core', 'chest', 'arm', 'thigh', 'calf'):
             by.setdefault((f['series'], f['col']), []).append((fid, f['point'], e['value']))
     for (_, col), pts in by.items():
-        pts.sort(key=lambda p: (not p[1].isdigit(), int(p[1]) if p[1].isdigit() else 0))
+        pts.sort(key=point_order)
         for (a, _, va), (b, _, vb) in zip(pts, pts[1:]):
             try:
                 if abs(float(va) - float(vb)) > JUMP[col]:
