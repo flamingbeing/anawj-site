@@ -1589,5 +1589,5 @@ html:not(.rows-short) ul.cases .c-tags > * { max-width: 100%; }
 .fb-gap { flex: 1; }   /* not .grow: its 160 px minimum wraps the row on a phone */
 
 /* Settings, bottom: the app version and "Get the latest version", small and quiet */
-.app-ver { text-align: center; margin: 2px 0 14px; font-size: calc(12px * var(--fs, 1)); }
-.app-ver .linkish { background: none; border: 0; box-shadow: none; padding: 4px 2px; min-height: 24px; color: var(--accent); font: inherit; text-decoration: underline; }
+.app-ver { text-align: center; margin: -6px 0 6px; font-size: calc(12px * var(--fs, 1)); }
+.app-ver .linkish { background: none; border: 0; box-shadow: none; padding: 0 4px; min-height: 44px; color: var(--accent); font: inherit; text-decoration: underline; }
