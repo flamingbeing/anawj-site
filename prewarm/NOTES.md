@@ -388,3 +388,10 @@ reading) replaces `alerted`. Still only while the app is open: a lock-screen ala
 The green "complete" shortcuts on the patient screen also get a ✓ before the label (not colour alone, red-green colour
 blindness), and their spoken label is "POD1, complete" instead of just "complete". Taller tap targets for the reading
 tabs were tried and dropped: they push Save below the fold on a phone (the e2e test pins that).
+
+- **Scan the old paper forms** (owner, 14 Oct 2026; `prewarm/tools/scan/`, README there): phone photo → aligned to the
+  blank v3.2 page → ticks by ink, numbers and times read twice by Claude (crops of de-identified cells only; IDs, dates,
+  names and free text are typed by the owner) → flags (ranges, times, jumps) → `review.html` (owner confirms every
+  value) → the app's own `workbook()`. Field places come from `js/wordform.js` (fill one field at a time, render, diff),
+  so no coordinates are kept by hand. Scans, the form and `form-data/` stay out of git. Tested on the fake fixture only;
+  the real form, real handwriting and the live reader still need a dry run at home.

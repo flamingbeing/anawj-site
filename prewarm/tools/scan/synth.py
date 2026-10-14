@@ -45,3 +45,18 @@ def photograph(page_gray, rng, tilt=0.12):
     img = cv2.GaussianBlur(img, (0, 0), 1.2) + rng.normal(0, 4, img.shape)
     ok, jpg = cv2.imencode('.jpg', np.clip(img, 0, 255).astype(np.uint8), [cv2.IMWRITE_JPEG_QUALITY, 70])
     return cv2.imdecode(jpg, cv2.IMREAD_COLOR)
+
+
+def write_text(img, rect, text, rng):
+    """Handwriting-ish text centred in a rectangle (img is BGR)."""
+    x0, y0, x1, y1 = rect
+    sc = 1.0 + rng.random() * 0.25
+    (tw, th), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SCRIPT_SIMPLEX, sc, 2)
+    cv2.putText(img, text, (x0 + max(2, (x1 - x0 - tw) // 2) + int(rng.integers(-3, 4)), y0 + (y1 - y0 + th) // 2 + int(rng.integers(-3, 4))),
+                cv2.FONT_HERSHEY_SCRIPT_SIMPLEX, sc, (60, 40, 40), 2, cv2.LINE_AA)
+
+
+def cross(img, rect, rng):
+    x0, y0, x1, y1 = rect; j = lambda: int(rng.integers(-3, 4)); ink = (int(rng.integers(30, 90)),) * 3
+    cv2.line(img, (x0 - 2 + j(), y0 - 1 + j()), (x1 + 2 + j(), y1 + 1 + j()), ink, 3, cv2.LINE_AA)
+    cv2.line(img, (x1 + 2 + j(), y0 - 1 + j()), (x0 - 2 + j(), y1 + 1 + j()), ink, 3, cv2.LINE_AA)
