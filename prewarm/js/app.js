@@ -596,19 +596,21 @@ function home() {
         ? `<button class="primary" id="exportsel" ${selecting.size ? '' : 'disabled'}>Export ${selecting.size || ''} to Excel</button>`
         : `<button class="primary" id="lock" ${selecting.size ? '' : 'disabled'}>${LOCK_ICON} Lock</button><button class="secondary" id="unlock" ${selecting.size ? '' : 'disabled'}>Unlock</button>`}</div>
       <button class="link" id="seldone">Done</button></div>` : ''}
+    ${list.length > 5 ? '<input class="search" id="psearch" type="search" placeholder="Find a Subject ID" aria-label="Find a patient by Subject ID" autocomplete="off">' : ''}
     ${list.length ? `<ul class="list">${list.map(p => {
-      const e = lastEdit(p), locked = p.lock?.on;
+      const e = lastEdit(p), locked = p.lock?.on, sa = ` data-sid="${esc(sid(p).toLowerCase())}"`;
       // the same Subject ID on two records (e.g. made on two phones without signal): readings are split between them
       const twin = list.some(q => q !== p && String(val(q, 'enrol_id') || '').toLowerCase() === String(val(p, 'enrol_id') || '').toLowerCase() && (val(q, 'site') || '') === (val(p, 'site') || ''));
       const body = `<b>${esc(sidL(p))}${val(p, 'site') ? ` <small>${esc(val(p, 'site'))}</small>` : ''}</b>${twin ? '<span class="twinline">Same Subject ID twice: readings may be split. Fill in one and correct the other’s ID (Pre-op and patient details), or delete it in Settings.</span>' : ''}<span${locked ? ' class="lockline"' : val(p, 'done') ? ' class="okline"' : ''}>${locked ? `${LOCK_ICON} Locked by the study admin${canLock() ? ' · read only' : ''}` : esc(status(p))}</span>
-        <span class="dueline" data-due="${p.id}" hidden></span>${progressHtml(p)}<small>${e ? 'Last entry ' + new Date(e.t).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) + (e.by ? ' by ' + esc(e.by) : '') : 'No entries yet'}</small>`;
-      if (selecting) return `<li><label class="selrow"><input type="checkbox" data-sel="${p.id}" ${selecting.has(p.id) ? 'checked' : ''}><span>${body}</span></label></li>`;
+        ${pending[p.id] || failed[p.id] ? `<span class="unsent">${failed[p.id] ? 'Not saved to the team' : 'Not sent yet'}</span>` : ''}<span class="dueline" data-due="${p.id}" hidden></span>${podDue(p) ? `<span class="podline">${esc(podDue(p))}</span>` : ''}${progressHtml(p)}<small>${e ? 'Last entry ' + new Date(e.t).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) + (e.by ? ' by ' + esc(e.by) : '') : 'No entries yet'}</small>`;
+      if (selecting) return `<li${sa}><label class="selrow"><input type="checkbox" data-sel="${p.id}" ${selecting.has(p.id) ? 'checked' : ''}><span>${body}</span></label></li>`;
       // admins also get a shortcut to the patient's Form view on every line (owner, 13 Oct 2026)
       const formLink = canLock() ? `<a class="formlink" href="#/p/${p.id}/form" aria-label="Form view of ${esc(sidL(p))}" title="Form view">${FORM_ICON}</a>` : '';
-      if (locked) return `<li class="${formLink ? 'rowact' : ''}"><a href="${canLock() ? '#/p/' + p.id : '#/'}" class="locked"${canLock() ? '' : ' data-locked="1"'}>${body}</a>${formLink}</li>`;
-      return `<li class="${formLink ? 'rowact' : ''}"><a href="#/p/${p.id}"${val(p, 'done') ? ` data-done="${esc(val(p, 'done'))}"` : ''}>${body}</a>${formLink}</li>`;
+      if (locked) return `<li${sa} class="${formLink ? 'rowact' : ''}"><a href="${canLock() ? '#/p/' + p.id : '#/'}" class="locked"${canLock() ? '' : ' data-locked="1"'}>${body}</a>${formLink}</li>`;
+      return `<li${sa} class="${formLink ? 'rowact' : ''}"><a href="#/p/${p.id}"${val(p, 'done') ? ` data-done="${esc(val(p, 'done'))}"` : ''}>${body}</a>${formLink}</li>`;
     }).join('')}</ul>` : `<p class="muted">No patients yet. Tap <b>New patient</b> on the morning of surgery.</p>`}
     <p class="muted small">${sharing() ? `Shared with the ${esc(shared.admin ? 'whole study (admin)' : shared.member.site + ' team')}. Readings sync when there is signal. <b class="syncline">${esc(syncText())}</b>` : `Data stays on this phone. <a href="#/settings">Join your hospital’s team</a> to share patients.`}</p>${refreshHtml()}`);
+  $('#psearch')?.addEventListener('input', e => { const q = e.target.value.trim().toLowerCase(); view.querySelectorAll('.list li[data-sid]').forEach(li => { li.hidden = !!q && !li.dataset.sid.includes(q); }); });
   wireRefresh();
   $('#new').onclick = () => go('#/new');
   // what each patient being charted needs now (a reading or Prewarm off due within 2 min, or late)
@@ -651,6 +653,19 @@ function home() {
     e.preventDefault(); a.dataset.warned = 1; a.classList.add('warned');
     a.insertAdjacentHTML('beforeend', `<em class="warnline">Data collection was marked complete${a.dataset.done ? ' (' + esc(a.dataset.done) + ')' : ''}. Tap again to open it; any change is recorded with your initials.</em>`);
   });
+}
+// chart-review days (14 Oct 2026): POD1 / POD2 are due the first and second calendar day after surgery, until their
+// Complete tick. Surgery date = the Surgery date field, else the day the patient was started on this phone.
+function podDays(p) {
+  if (isGone(p) || status(p) === 'Not started') return null;
+  const od = val(p, 'op_date'), start = od && /^\d{4}-\d{2}-\d{2}$/.test(od) ? new Date(od + 'T00:00:00') : new Date(new Date(p.created || Date.now()).toDateString());
+  return Math.round((new Date(new Date().toDateString()) - start) / 864e5);
+}
+function podDue(p) {
+  const days = podDays(p); if (days == null) return '';
+  const out = [];
+  for (const [n, sign] of [[1, 'sign_pod1'], [2, 'sign_pod2']]) if (days >= n && !val(p, sign)) out.push(`POD${n} ${days > n ? 'overdue' : 'due today'}`);
+  return out.join(' · ');
 }
 function status(p) {
   if (val(p, 'done')) return '✓ Data collection complete';
@@ -1060,7 +1075,9 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
   // the quick-entry pads (owner, 13 Oct 2026): a number pad for a box, a time pad for a key time
   function openCell(k) {
     const c = cols.find(x => x.key === k); if (!c) return;
-    const i = cols.indexOf(c), nxt = s === 'haemo' ? cols[i + 1] : null;
+    // Next goes to the following box that takes a number (the gown set temp and yes/no boxes use taps, not the pad);
+    // three digits of a temperature save it and move on by themselves (14 Oct 2026: about 5 taps fewer per reading)
+    const padCols = cols.filter(x => (x.type === 'num' || x.type === 'int') && x.key !== 'set'), nxt = padCols[padCols.indexOf(c) + 1] || null;
     openKeypad({ title: c.label + (c.unit ? ' ' + c.unit : ''), mode: s === 'haemo' ? 'int' : c.temp ? 'temp' : 'dec', value: draft[k] ?? '',
       hint: was[k] != null ? 'was ' + was[k] : '',
       onDone: v => { draft[k] = v === '' ? null : v; draw(); lockTaps(); },
@@ -1364,6 +1381,13 @@ function gaps(p) {
   const unanswered = ids => ids.map(field).filter(f => f && isShown(f, get) && get(f.id) == null).map(f => f.label);
   if (get('io_done')) add('Intra-op details unanswered', unanswered(INTRAOP_Q), `#/p/${p.id}/form/intraop`);
   if (get('pacu_in')) add('PACU unanswered', unanswered(PACU_Q), `#/p/${p.id}/form/pacu`);
+  // chart review: POD1 / POD2 once due and not ticked complete (how many of the questions have an answer)
+  const days = podDays(p);
+  for (const [n, sign, pages] of [[1, 'sign_pod1', ['pod1', 'pod1an']], [2, 'sign_pod2', ['pod2', 'pod2an', 'dc']]]) {
+    if (days == null || days < n || get(sign)) continue;
+    const all = pages.flatMap(pg => FORM[pg].map(([k]) => k)), done = all.filter(k => get(k) != null).length;
+    add(`POD${n} chart review ${days > n ? 'overdue' : 'due today'}`, [`${done} of ${all.length} answered`], at('data/day' + n));
+  }
   if (get('ev_ot') && get('sat_pre') == null) add('Comfort not asked', ['Before surgery'], '#/p/' + p.id);
   if (get('pacu_in') && get('sat_post') == null) add('Comfort not asked', ['After surgery'], '#/p/' + p.id);
   return out;
@@ -1950,10 +1974,27 @@ function simpleForm(p, id, note = '') {
 }
 
 // ---------- settings
+// Ready for a case? (14 Oct 2026): everything that has gone wrong before a case, in one list
+function readyHtml() {
+  if (!cloud.enabled) return '';
+  const rows = [
+    ['Online', navigator.onLine, 'no signal: readings are kept and sent later'],
+    ['Initials set', !!settings.me, 'add them below'],
+    ['On a team', !!sharing(), 'join your hospital’s team below'],
+    ['Hospital set', !!(shared.member?.site || settings.site), 'choose it below'],
+    ['Nothing waiting or refused', !Object.keys(pending).some(id => patients[id] && !isGone(patients[id])) && !Object.keys(failed).some(id => patients[id] && !isGone(patients[id])), 'tap the chip at the top of a patient for why'],
+    ['Synced in the last 15 minutes', !!lastSync && Date.now() - lastSync < 15 * 60e3, 'tap Refresh now below'],
+    ['App is up to date', !swReg?.waiting, 'tap “Update available” at the top'],
+  ];
+  const bad = rows.filter(r => !r[1]).length;
+  return `<h2>Ready for a case?</h2><ul class="ready" role="list" aria-label="Checks before a case">${rows.map(([l, ok, fix]) => `<li class="${ok ? 'ok' : 'no'}"><span aria-hidden="true">${ok ? '✓' : '✗'}</span><span><b>${esc(l)}</b>${ok ? '' : `<small>${esc(fix)}</small>`}</span></li>`).join('')}</ul>
+    <small class="muted">${bad ? `${bad} to fix before a case.` : 'All good.'} Also make a fresh PACU link per patient and test it once on a phone that is not on the team.</small>`;
+}
 route(/^\/settings$/, () => {
   header('Settings', '#/');
   const tog = (grp, k, l, d = '') => `<label class="tog"><input type="checkbox" data-g="${grp}" data-k="${k}" ${grp === 'hide' ? (settings.hide[k] ? '' : 'checked') : settings[grp][k] ? 'checked' : ''}><span>${l}${d ? `<small>${d}</small>` : ''}</span></label>`;
   paint(`<div class="stack">
+    ${readyHtml()}
     <label class="lab" for="me">Your initials</label><input id="me" value="${esc(settings.me)}" maxlength="6" autocapitalize="characters" autocomplete="off">
     <small class="muted">Saved with each reading as “entered by”.</small>
     <h2>Screen size</h2>

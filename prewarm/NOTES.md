@@ -389,6 +389,25 @@ The green "complete" shortcuts on the patient screen also get a ✓ before the l
 blindness), and their spoken label is "POD1, complete" instead of just "complete". Taller tap targets for the reading
 tabs were tried and dropped: they push Save below the fold on a phone (the e2e test pins that).
 
+### The number pad chains through the boxes (14 Oct 2026)
+On the temperature and BP/HR/BIS screens the pad has a Next button for every box that takes a number (not the gown set
+temp or yes/no boxes), and three digits of a temperature (like 366) save it and open the next box's pad by themselves:
+about 5 taps fewer per reading. Back closes the chain. Edge tests close the next pad after a 3-digit entry. Not done: the
+late-reading time still uses the browser's `prompt()` (`askTime`), because the save flow waits for its answer.
+
+### Patient list: POD due, search, unsent badge; runbook (14 Oct 2026)
+The list shows "POD1 due today / overdue" and "POD2 ..." from the Surgery date field (else the day the patient was
+started on this phone) until the section's Complete tick. A Subject ID search box appears above 5 patients (hides rows,
+no redraw). A patient waiting to send, or whose save was refused, has a red "Not sent yet" / "Not saved to the team"
+line. `RUNBOOK.md` is the one-page study-day routine for the team; `PLAN.md` is marked old.
+
+### Ready for a case? card (14 Oct 2026)
+Top of Settings (when sharing is available): ✓ / ✗ rows for online, initials, on a team, hospital set, nothing waiting
+or refused, synced in the last 15 minutes, app up to date, each with what to do. It only reads state the app already
+keeps; it does not test the PACU link (do that by hand, see `RUNBOOK.md`). Checked in the sync emulator test.
+Still to fill (patient screen) also lists "POD1 / POD2 chart review due today / overdue" with how many questions have an answer,
+once due and not ticked complete.
+
 - **Scan the old paper forms** (owner, 14 Oct 2026; `prewarm/tools/scan/`, README there): phone photo → aligned to the
   blank v3.2 page → ticks by ink, numbers and times read twice by Claude (crops of de-identified cells only; IDs, dates,
   names and free text are typed by the owner) → flags (ranges, times, jumps) → `review.html` (owner confirms every

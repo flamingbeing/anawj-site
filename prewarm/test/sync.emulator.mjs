@@ -335,6 +335,11 @@ try {
   const said = [];
   a.on('dialog', d => { said.push(d.message()); said.length === 1 ? d.accept() : d.dismiss(); });
   await a.goto(BASE + '#/settings');
+  // Ready for a case?: offline with a patient waiting, those two rows are red and the team rows are green
+  await a.waitForSelector('.ready');
+  const noRows = await a.$$eval('.ready li.no', l => l.map(x => x.textContent).join('|'));
+  assert.match(noRows, /Online/); assert.match(noRows, /Nothing waiting or refused/);
+  assert.ok(await a.$('.ready li.ok'), 'and the checks that pass are green');
   await a.click('#leave');
   await a.waitForFunction(() => document.querySelector('#leave') && !document.querySelector('#leave').disabled, null, { timeout: 20000 });
   assert.match(said[0], /deletes all 1 patient from this phone/);

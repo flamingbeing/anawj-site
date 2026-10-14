@@ -593,6 +593,9 @@ jobs.push(() => tryit(async () => {
   await pg.waitForTimeout(800);
   await pg.click('.num[data-type="chest"]'); await pg.waitForSelector('dialog.kp[open]');
   await pg.click('.kp [data-k="3"]'); await pg.click('.kp [data-k="2"]'); await pg.click('.kp [data-k="5"]'); await pg.waitForTimeout(300);
+  // three digits save the reading and the pad moves on to the next box (the next pad is open now: Back closes it)
+  log(await pg.$('dialog.kp[open]') !== null && /Arm|Thigh|Calf|Set/.test(await pg.textContent('dialog.kp .kphead b')), 'the pad moves on to the next box: ' + await pg.textContent('dialog.kp .kphead b').catch(() => '-'));
+  await pg.click('.kp [data-a="back"]'); await pg.waitForTimeout(300);
   log((await pg.textContent('.num[data-type="chest"]')).trim() === '32.5', 'keys 3 2 5 save 32.5: ' + await pg.textContent('.num[data-type="chest"]'));
   await pg.waitForTimeout(800); await pg.click('.num[data-type="chest"]'); await pg.waitForSelector('dialog.kp[open]');
   await pg.click('.kp [data-k="3"]');
@@ -647,11 +650,13 @@ jobs.push(() => tryit(async () => {
   const sealed = () => pg.evaluate(i => { const a = JSON.parse(localStorage.getItem('prewarm-demo:patients')); return !!a[i].f.sign_prewarm; }, id);
   await pg.evaluate(h => { location.hash = h; }, `#/p/${id}/prewarm/5`); await pg.waitForSelector('.num[data-type="core"]');
   await pg.click('.num[data-type="core"]'); await pg.waitForSelector('dialog.kp[open]'); await pg.click('.kp [data-k="3"]'); await pg.click('.kp [data-k="6"]'); await pg.click('.kp [data-k="5"]'); await pg.waitForTimeout(300);
+  if (await pg.$('dialog.kp[open]')) await pg.click('.kp [data-a="back"]'); await pg.waitForTimeout(300);
   const seenD = []; pg.on('dialog', d => { seenD.push(d.message().slice(0, 60)); d.accept(d.type() === 'prompt' ? d.defaultValue() : undefined); });
   await pg.waitForTimeout(900); await pg.click('#save'); await pg.waitForTimeout(500);
   log(/prewarm\/10$/.test(await pg.evaluate(() => location.hash)) && !await sealed(), 'the 5 min save moves to 10 min and does not complete pre-warming: ' + JSON.stringify(seenD) + await pg.textContent('#toast').catch(() => '') + await pg.evaluate(() => location.hash));
   log(await pg.$('.card.dflt [data-type="core"]') !== null, 'a value carried over from the last reading shows as a light grey default');
   await pg.click('.num[data-type="core"]'); await pg.waitForSelector('dialog.kp[open]'); await pg.click('.kp [data-k="3"]'); await pg.click('.kp [data-k="6"]'); await pg.click('.kp [data-k="6"]'); await pg.waitForTimeout(300);
+  if (await pg.$('dialog.kp[open]')) await pg.click('.kp [data-a="back"]');
   await pg.waitForTimeout(900); await pg.click('#save'); await pg.waitForTimeout(600);
   log(/\/iotemp/.test(await pg.evaluate(() => location.hash)) && await sealed(), 'the 10 min save marks pre-warming complete and opens the intra-op temps: ' + await pg.evaluate(() => location.hash));
   await ctx.close();
@@ -732,6 +737,34 @@ jobs.push(() => tryit(async () => {
   log(/^http:\/\/127\.0\.0\.1:/.test(pg.url()) && !/oldhost/.test(pg.url()), 'no redirect loop on the new address');
   const upd = await pg.goto('http://127.0.0.1:8080/prewarm/update.html'); await pg.waitForSelector('#go');
   log(upd.ok() && /Get the latest version/.test(await pg.textContent('#go')), 'update helper page inside the app folder');
+  await ctx.close();
+}));
+// AK. chart-review reminders (14 Oct 2026): POD1 / POD2 show as due on the list from the first / second day after the
+// day the patient was started, until their Complete tick
+jobs.push(() => tryit(async () => {
+  const { ctx, pg } = await fresh();
+  const setCreated = days => pg.evaluate(d => { const a = JSON.parse(localStorage.getItem('prewarm-demo:patients')); for (const p of Object.values(a)) p.created = Date.now() - d * 864e5; localStorage.setItem('prewarm-demo:patients', JSON.stringify(a)); }, days);
+  const pod = async () => (await pg.$$eval('.podline', els => els.map(e => e.textContent))).join('|');
+  log(await pod() === '', 'no POD reminder on the day of surgery: ' + await pod());
+  await setCreated(2); await pg.reload(); await pg.waitForTimeout(800);
+  log(/POD1 overdue · POD2 due today/.test(await pod()), 'two days on: POD1 overdue, POD2 due today: ' + await pod());
+  await pg.click('.list a'); await pg.waitForTimeout(600);
+  const gp = await pg.textContent('#gaps').catch(() => '');
+  log(/POD1 chart review overdue/.test(gp) && /POD2 chart review due today/.test(gp), 'Still to fill lists POD1 and POD2 once due: ' + gp.slice(0, 160));
+  await pg.goBack(); await pg.waitForTimeout(500);
+  await pg.evaluate(() => { const a = JSON.parse(localStorage.getItem('prewarm-demo:patients')); for (const p of Object.values(a)) p.f.sign_pod1 = { v: 'AB 1 Jan', t: Date.now(), by: 'AB' }; localStorage.setItem('prewarm-demo:patients', JSON.stringify(a)); });
+  await pg.reload(); await pg.waitForTimeout(800);
+  log(!/POD1/.test(await pod()) && /POD2 due today/.test(await pod()), 'POD1 complete: only POD2 is left: ' + await pod());
+  // more than five patients: a Subject ID search appears and filters the list; a waiting patient is badged
+  await pg.evaluate(() => { const a = JSON.parse(localStorage.getItem('prewarm-demo:patients')); const first = Object.values(a)[0];
+    for (let i = 0; i < 5; i++) { const c = JSON.parse(JSON.stringify(first)); c.id = 'zz' + i; c.f.enrol_id = { v: 'ZED-0' + i, t: Date.now(), by: 'AB' }; a[c.id] = c; }
+    localStorage.setItem('prewarm-demo:patients', JSON.stringify(a)); });
+  await pg.reload(); await pg.waitForTimeout(800);
+  log(await pg.$('#psearch') !== null, 'a search box shows with more than five patients');
+  await pg.fill('#psearch', 'zed-03'); await pg.waitForTimeout(200);
+  log(await pg.$$eval('.list li:not([hidden])', l => l.length) === 1, 'typing a Subject ID leaves only that patient');
+  await pg.fill('#psearch', ''); await pg.waitForTimeout(200);
+  log(await pg.$$eval('.list li:not([hidden])', l => l.length) === 7, 'clearing the search shows everyone');
   await ctx.close();
 }));
 await runJobs();
