@@ -12,10 +12,6 @@ Each session keeps its own line in `status/<session>.md` (`homepage.md`; a new s
 
 ## Waiting on the owner
 
-- Revoke the two Claude tokens that were shown by mistake while setting up instant page edits (claude.ai settings), if
-  not done yet; the GitHub secret was renewed on 14 Oct.
-- Look at PR #561 (the first Ask Claude draft: Elson's finger clears the table) on its preview and merge it if right.
-- Say whether the home computer may retire the seven old per-address uptime monitors (the NAS check covers them).
 - Whether `?feedback=1` should get through logbook/evals/prewarm's service workers (today a bookmark does it;
   `edit/NOTES.md`). A Telegram bot is still an idea in `ROADMAP.md`.
 - Optional: make **Checks** a required check (GitHub → Settings → Branches → protection rule for `main`).
@@ -54,7 +50,9 @@ Nothing agreed. Ideas for later are in `ROADMAP.md`; nothing there is a task unt
 
 ## Decisions log
 
-- 2026-10-14: instant page edits work end to end: the renewed token drafted PR #561 from an Ask Claude request.
+- 2026-10-14: the owner approved retiring the seven old uptime monitors (paused by the home computer, reversible) and dropped the
+  token-revoking to-do.
+- 2026-10-14: instant page edits work end to end: the renewed token drafted PR #561 from an Ask Claude request (merged).
 - 2026-10-14: uptime is one NAS check of every address in `SITES`, alerting on Telegram (home computer, with the owner).
 - 2026-10-14: the owner chose Ask Claude, the weekly AI proof-read and a private resident feedback queue; Ask Claude
   secrets live in the Worker's runtime Variables and Secrets, not the Build settings.
