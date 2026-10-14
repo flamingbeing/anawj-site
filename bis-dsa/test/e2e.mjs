@@ -34,9 +34,10 @@ try {
     assert.match(await page.textContent('#zoneText'), /BIS 40–60/);
     // EEG sweep key cycles the seconds across the lane; the DSA colour range sliders change the colours and are labelled
     { const lbl = () => page.textContent('#eegLbl');
-      const first = await lbl(); await page.click('#kSweep'); assert.equal(await lbl(), 'EEG · 4 s');
-      await page.click('#kSweep'); assert.equal(await lbl(), 'EEG · 8 s'); await page.click('#kSweep'); assert.equal(await lbl(), 'EEG · 16 s');
-      await page.click('#kSweep'); assert.equal(await lbl(), first, 'back to auto');
+      const want = async t => { await page.waitForFunction(t => document.querySelector('#eegLbl').textContent === t, t, { timeout: 4000 }); return t; };
+      const first = await lbl(); await page.click('#kSweep'); assert.equal(await want('EEG · 4 s'), 'EEG · 4 s');
+      await page.click('#kSweep'); await want('EEG · 8 s'); await page.click('#kSweep'); await want('EEG · 16 s');
+      await page.click('#kSweep'); await want(first);
       const px = () => page.$eval('#cDsa', c => { const x = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let r = 0, b = 0; for (let i = 0; i < x.length; i += 4) { r += x[i]; b += x[i + 2]; } return r / (b + 1); });
       const r0 = await px(); // red-to-blue ratio of the DSA
       await page.$eval('#dbHi', e => { e.value = 14; e.dispatchEvent(new Event('input')); }); // lower ceiling: redder
