@@ -230,7 +230,7 @@ function fit(c,hLogical){const dpr=Math.min(2,window.devicePixelRatio||1);const 
 
 // ===== live simulation state =====
 let eng=new Engine();
-let SIG=[],EYE=[]; const SIGMAX=20*FS; // the EEG lane can sweep 4, 8 or 16 s
+let SIG=[],EYE=[]; const SIGMAX=20*FS; // the EEG lane can sweep 4, 8 or 16 s (the BIS Advance screen, 20 s at 6.25 mm/s)
 let COLS=[]; const COLMAX=300; // one column per second, 5 min
 let HIST=[]; const HISTMAX=14400; // the same columns for the BIS VISTA screen's 5, 15 and 60 min trend windows and a 4 h case to review
 let sup=[]; let bisS=null, lastSef=null, lastMf=null, produced=0, simT=0, speed=1, paused=false;

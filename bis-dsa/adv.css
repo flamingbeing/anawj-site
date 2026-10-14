@@ -206,8 +206,8 @@
 .advs .tip{position:absolute;background:#3ab4ee;color:#000;font-size:calc(21*var(--u));padding:calc(5*var(--u)) calc(10*var(--u));z-index:6;border:calc(1*var(--u)) solid #fff;white-space:nowrap;transform:translateX(-50%)}
 @media (prefers-reduced-motion:reduce){.advs .abar.hi.flash{animation:none}.advs .spin{animation-duration:3s}}
 
-.advs .dlg.dsp .rail.lay{width:calc(184*var(--u))}
-.advs .dlg.dsp .rail.lay button{font-size:calc(15*var(--u))}
+.advs .dlg.dsp .rail.lay{width:calc(160*var(--u))}.advs .dlg .rail.lay button svg{width:calc(44*var(--u))!important;height:calc(33*var(--u))!important}
+.advs .dlg.dsp .rail.lay button{font-size:calc(14.5*var(--u));gap:calc(9*var(--u))}
 .advs .dlg.alm .rail button{font-size:calc(14.5*var(--u));gap:calc(6*var(--u));white-space:nowrap}
 .advs .dlg.alm .rail button em{font-size:calc(13.5*var(--u))}
 .advs select.sl{min-width:calc(120*var(--u));font-size:calc(17*var(--u))}

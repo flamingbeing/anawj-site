@@ -86,11 +86,11 @@ function advTop(){aq('advTop').innerHTML=`
  aq('aBell').innerHTML=IC.bellW;}
 // the left bar changes with the channel mode, case review and demo mode
 function advChrome(){const ch=ADV.ch,rv=!!ADV.review,L=aq('advLeft');let y=ch===4?[106,173,248,356,463,593]:[0,103,177,300,402,523];
- const rb=(id,yc,lab,ic,a,extra)=>`<button type="button" class="rb" id="${id}" data-a="${a}" style="top:calc(${yc-18.5}*var(--u))" ${extra||''}><span class="ci">${ic}</span><span class="l">${lab}</span></button>`;
- const tg=(yc)=>`<button type="button" class="pill gt" id="aGt" data-a="gt" style="top:calc(${yc-17}*var(--u))" role="switch" aria-checked="${ADV.view==='chart'}" aria-label="Chart view"><i class="${ADV.view==='graphs'?'on':''}" style="color:#fff">${IC.graph}</i><i class="${ADV.view==='chart'?'on':''}" style="color:#fff">${IC.table}</i></button>`;
+ const rb=(id,yc,lab,ic,a,extra)=>`<button type="button" class="rb" id="${id}" data-a="${a}" style="top:calc(${yc-18.5-61}*var(--u))" ${extra||''}><span class="ci">${ic}</span><span class="l">${lab}</span></button>`;
+ const tg=(yc)=>`<button type="button" class="pill gt" id="aGt" data-a="gt" style="top:calc(${yc-17-61}*var(--u))" role="switch" aria-checked="${ADV.view==='chart'}" aria-label="Chart view"><i class="${ADV.view==='graphs'?'on':''}" style="color:#fff">${IC.graph}</i><i class="${ADV.view==='chart'?'on':''}" style="color:#fff">${IC.table}</i></button>`;
  let h='';
  if(rv){h=tg(103)+rb('aCases',322,'CASES LIST',IC.list,'caselist')+rb('aLog',434,'CASE LOG',IC.table,'caselog')+rb('aExitRv',657,'EXIT',IC.exit,'exitrv');}
- else{if(ch===4)h+=`<button type="button" class="pill lr" id="aLr" data-a="lr" style="top:calc(${y[0]-17}*var(--u))" role="switch" aria-checked="${ADV.hemi==='R'}" aria-label="Side shown: ${ADV.hemi==='L'?'left':'right'}"><i class="L ${ADV.hemi==='L'?'on':''}">L</i><i class="R ${ADV.hemi==='R'?'on':''}">R</i></button>`;
+ else{if(ch===4)h+=`<button type="button" class="pill lr" id="aLr" data-a="lr" style="top:calc(${y[0]-17-61}*var(--u))" role="switch" aria-checked="${ADV.hemi==='R'}" aria-label="Side shown: ${ADV.hemi==='L'?'left':'right'}"><i class="L ${ADV.hemi==='L'?'on':''}">L</i><i class="R ${ADV.hemi==='R'?'on':''}">R</i></button>`;
   h+=tg(y[1])+rb('aAlarms',y[2],'ALARM <br>SETTINGS',IC.bellW,'alarms')+rb('aSnap',y[3],'SNAPSHOT',IC.flag.replace('currentColor','#fff'),'snap')+rb('aSensor',y[4],'SENSOR <br>CHECK',IC.check.replace('currentColor','#fff'),'sensor')+rb('aInfo',y[5],'INFO',IC.infoW,'info');
   if(ADV.demo)h+=rb('aExitDemo',690,'EXIT DEMO <br>MODE',IC.exit,'exitdemo');}
  L.innerHTML=h;
@@ -135,5 +135,6 @@ function advHeaders(){const L=ADV.lay||(ADV.lay=advLay()),r=L.rect,two=L.two,H=[
   H.push(ab(167,y,'',ttl('EEG',AC.eegLbl)),ab(two?216:208,y,'',`<button type="button" class="sel" id="aUv" data-a="uvpop" aria-haspopup="listbox" aria-label="EEG scale ${ux} microvolts per millimetre"><span>${ux}</span><s></s><span style="color:#d7dce4;font-size:calc(15*var(--u))">µV/mm</span></button>`),
    ab(884,y,'',`<button type="button" class="sel" id="aSw" data-a="swpop" aria-haspopup="listbox" aria-label="EEG sweep speed ${sw} millimetres per second"><span>${sw}</span><s></s><span style="color:#d7dce4;font-size:calc(15*var(--u))">mm/sec</span></button>`,'r'));
   const bx=Math.min(522,ADV_X+ADV_PX/2)-len/2+len*0;H.push(`<div class="a" style="--x:${bx};--y:${y-4};--w:${len};--h:8;border-left:calc(1*var(--u)) solid #d4d4d4;border-right:calc(1*var(--u)) solid #d4d4d4"><div style="position:absolute;left:0;right:0;top:50%;height:calc(1*var(--u));background:#d4d4d4"></div></div>`,`<span class="t" style="--x:${bx+len+6};--y:${y+1};--fs:11;--c:#d4d4d4">${+(secs>=1?1:secs).toFixed(0)} Sec</span>`);}
+ if(!two&&L.strips.length===2){const a=L.strips[0],b=L.strips[1];H.push(`<span class="badge" style="left:calc(911*var(--u));top:calc(${(a.y+a.h+b.y)/2}*var(--u));--c:${bc}">${ADV.hemi}</span>`);}
  aq('advHdr').innerHTML=H.join('');
  ADV.hdrKey=null;}

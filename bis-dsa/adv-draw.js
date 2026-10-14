@@ -2,7 +2,7 @@
 // app.js. Everything is drawn in virtual pixels of the real 1246 x 779 screen; the canvas is scaled to fit. Reads app.js globals
 // (HIST, R, SIG, simT, mon, produced, FS, NB, dbToX, T0, tim ...) only when called, never at load.
 const ADV_FONT='Selawik,"Segoe UI","Open Sans",system-ui,sans-serif';
-const AC={bg:'#000',frame:'#5a5e66',grid:'#4a4e56',axis:'#d4d4d4',bisL:'#ec4c9c',bisR:'#04acec',emg:'#e8792c',sqi:'#40b449',sr:'#9c6cb4',eeg:'#64b47c',eegLbl:'#74a484',asym:'#7cacac',asymFill:'#344c44',asymLine:'#5ec9c0',asymRef:'#2c6f6a',mf:'#922c70',burst:'#d8b890',tick:'#3b9fd8'};
+const AC={bg:'#000',frame:'#5a5e66',grid:'#6a6e76',axis:'#d4d4d4',bisL:'#ec4c9c',bisR:'#04acec',emg:'#e8792c',sqi:'#40b449',sr:'#9c6cb4',eeg:'#64b47c',eegLbl:'#74a484',asym:'#7cacac',asymFill:'#344c44',asymLine:'#5ec9c0',asymRef:'#2c6f6a',mf:'#922c70',burst:'#d8b890',tick:'#3b9fd8'};
 // the monitor's DSA colour scale (read off the legend capsule and the field in the manual's figures): pale mid range, deep blue low, red high
 const ADV_STOPS=[[0,0x2c,0x4f,0xa2],[.09,0x44,0x88,0xc9],[.18,0x43,0xac,0xd9],[.27,0x72,0xcc,0xd5],[.36,0x78,0xcd,0xa6],[.45,0x89,0xcd,0x90],[.55,0xba,0xd7,0x49],[.65,0xfc,0xeb,0x17],[.74,0xf9,0xc6,0x09],[.83,0xef,0x9f,0x0a],[.92,0xf4,0x49,0x37],[1,0xd5,0x22,0x26]];
 const ADV_LUT=Array.from({length:256},(_,i)=>{const p=i/255;let k=0;while(k<ADV_STOPS.length-2&&p>ADV_STOPS[k+1][0])k++;const a=ADV_STOPS[k],b=ADV_STOPS[k+1],f=Math.max(0,Math.min(1,(p-a[0])/(b[0]-a[0])));return [1,2,3].map(j=>Math.round(a[j]+(b[j]-a[j])*f));});
@@ -50,6 +50,7 @@ function advData(){
  D.bis=advSeries(hs[side],c=>c.sqi<15?null:c.bis,tL,win,step);
  D.bisO=advSeries(hs[side==='L'?'R':'L'],c=>c.sqi<15?null:c.bis,tL,win,step);
  D.emg=advSeries(hs[side],c=>c.emg,tL,win,step);
+ D.art=advSeries(hs[side],c=>c.art||c.sqi<15?1:0,tL,win,step);
  D.srS=advSeries(hs[side],c=>c.bsr,tL,win,step);
  D.sqiS=advSeries(hs[side],c=>c.sqi,tL,win,step);
  D.bcS=advSeries(hs[side],c=>c.bc,tL,win,step);
@@ -100,6 +101,8 @@ function advDrawBis(ctx,L,D){const r=L.rect.bis,y0=r.y,h=r.h,Y=v=>y0+h*(1-v/100)
  // target range band (only when the BIS range alarm is on)
  const A=ADV.alarm.bis;if(A.on){const g=ctx.createLinearGradient(ADV_X,0,ADV_X+ADV_PX,0);g.addColorStop(0,'rgba(190,190,190,.34)');g.addColorStop(.18,'rgba(190,190,190,.30)');g.addColorStop(1,'rgba(190,190,190,.07)');ctx.fillStyle=g;ctx.fillRect(ADV_X,Y(A.hi),ADV_PX,Y(A.lo)-Y(A.hi));}
  const ticks=advTicks(D);for(const t of ticks)advV(ctx,advXt(D,t),y0,y0+h,AC.grid);
+ // stretches with no usable EEG (artefact, SQI under 15) as dark blue-grey bands, as the monitor marks a gap in the data
+ ctx.fillStyle='rgba(43,53,71,.85)';for(const [t,v] of D.art)if(v!=null&&v>=.5){const x=advXt(D,t-D.step/2);ctx.fillRect(x,y0,Math.max(3,ADV_PX*D.step/D.win),h);}
  advFrame(ctx,y0,h);
  for(let v=0;v<=100;v+=20)advTx(ctx,String(v),ADV_X-7,Math.max(y0+7,Math.min(y0+h-5,Y(v))),15.5,AC.axis,'right');
  const sec=ADV.sec,ax=ADV_SECAX[sec==='bisO'?'bis':sec];

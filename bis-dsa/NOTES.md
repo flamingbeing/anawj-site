@@ -345,13 +345,13 @@ sheet (screens are 640 x 480), as a clone to look at and use. Code: `mt-screen.j
 
 ## Two-sided screens: BIS Advance style and SedLine style (owner, 14 Oct 2026)
 
-- Pick the monitor in Display > Screen layout: BIS VISTA, BIS Advance (two-sided), Masimo SedLine, Teaching layout.
+- Pick the monitor in Display > Screen layout: BIS VISTA, BIS Advance, Masimo SedLine, Teaching layout. (BIS Advance was rebuilt on 14 Oct 2026: see "Medtronic BIS Advance" below; the text here about the old Advance box, its Menu list and the ASYM bar is history.)
 - A second engine `R` runs the right hemisphere beside the left (the page's own variables). `swapCh()` exchanges the two
   sets of per-channel state around `step()` (`stepR`), so the single-channel code serves both. The right engine reads the
   page's settings through `modsR = Object.create(mods)` with its own `side`.
 - "One-sided EEG slowing" (None / Left / Right) slows the chosen hemisphere (alpha and beta ×0.35–0.45, slow and delta up)
   so ASYM rises. ASYM here = 100·|PL−PR|/(PL+PR) over the last 30 s total power, shown as a bar.
-- Both screens draw L and R EEG, L and R DSA and a trend. Advance: BIS L and R boxes with SQI bars, SR, EMG bars, ASYM, two
+- Both screens draw L and R EEG, L and R DSA and a trend. (Old) Advance: BIS L and R boxes with SQI bars, SR, EMG bars, ASYM, two
   trend lines. SedLine: PSi (a straight-line stand-in, `psiOf`: BIS 40–60 → PSi 25–50; not Masimo's algorithm), SR, EMG and
   ARTF per side, ASYM, PSi trend with the 25–50 band. Layouts come from published descriptions, not photos: the owner can
   send photos to tighten them. Only two of SedLine's four channels are modelled; suppression and artefact marks on the DSA
@@ -359,7 +359,7 @@ sheet (screens are 640 x 480), as a clone to look at and use. Code: `mt-screen.j
 
 ## The Menu is functional (owner, 14 Oct 2026)
 
-The Menu button under the two-sided screens (BIS Advance, SedLine) opens an on-screen list (the Medtronic screen has its own tile Menu, above); tapping an item steps
+The Menu button under the SedLine screen (the Advance screen has the real tile menu now) opens an on-screen list (the Medtronic screen has its own tile Menu, above); tapping an item steps
 through its values: smoothing rate, EEG scale and sweep, trend window, bottom trend, DSA colour range (four presets), BIS
 alarm low (20–50) and high (50–80) that set the "BIS Out of Target Range" message (`mon.alo`, `mon.ahi`; the message
 also needs the teaching labels on), alarm audio, teaching labels, suppression timers (reset), sensor check, and the monitor
@@ -371,3 +371,61 @@ also needs the teaching labels on), alarm audio, teaching labels, suppression ti
   DSAs with an ASYM strip between them (0–30 Hz, upper limit adjustable to 40), and a PSi trend with a green target band,
   blue under it and orange over it. No photos of the BIS Advance screen were found in public material (Medtronic's pages
   describe it only: bilateral DSA, ASYM, left and right BIS, Dual BIS trend); that layout is still from descriptions.
+
+## Medtronic BIS Advance (rebuilt 14 Oct 2026, 'advance' skin)
+
+A near-exact clone of the BIS Advance monitor (10.1 in tablet, 16:10), built from the operator's manual figures (draft Rev A, FCC filing)
+and Medtronic's 2021 marketing screenshots. The owner's own photos are of the VISTA, not the Advance, so every number below comes from the
+manual and the figures; nothing was copied into the repo (looking only).
+
+- Files: `adv-screen.js` (state `ADV`, DOM chrome, headers), `adv-draw.js` (layout and every plot on one canvas), `adv-live.js` (numerics,
+  alarms, messages, audio, the frame hook `advTick`), `adv-menu.js` (tile menu, dialogs, sensor check, review, demo), `adv.css`
+  (everything in virtual pixels of a 1246 x 779 screen times `--u`, so the screen scales as a unit; the phone shows the same screen smaller).
+  `app.js` only calls `advApply()` / `advTick(dirty)` and hides `#advWrap` for other skins. `SIGMAX` is 20 s of EEG (6.25 mm/s sweep).
+  `test/adv.e2e.mjs` (also run by `e2e.mjs`) drives all of it. Class names inside the screen are prefixed (`xbtn`, `xrow`, ...) to stay
+  clear of the page's own CSS (`.mt`, `.bar`, `.btn` ... belong to the VISTA screen and the page).
+- Font: Selawik (SIL OFL, metric-compatible with Segoe UI, which the tablet's UI looks like); `fonts/README.md`.
+- Case: white case, blue band, "Medtronic" under the screen (below 640 px wide the case is dropped to give the screen the room).
+- Channel modes: 4-channel (bilateral sensor, the default: two BIS panels, BURST, SEF/MF of the selected side, L|R pill, ASYM) and
+  2-channel (unilateral: one BIS, SET RANGE, no pill). The simulator has two real engines (L and R). INFO > Demo Mode > Begin Demo Mode
+  for Unilateral / Bilateral switches mode and adds the DEMO MODE mark and EXIT DEMO MODE (the data stay live: only the mark and the
+  restrictions, DOWNLOAD and CASE REVIEW disabled, are the real demo behaviour).
+- Colours (manual figures): BIS L `#ec4c9c`, R `#04acec`, EMG `#e8792c`, SQI `#40b449`, SR purple, ST lavender, MF magenta, EEG `#64b47c`,
+  alarm bar red `#ec1c2c` (high) or yellow `#ecd40c` (low and medium), 12-stop DSA ramp read off the legend capsule. The DSA uses the same display
+  shaping as the VISTA screen (tilt, 10 s minimum averaging, suppression black), only the ramp differs.
+- Numerics: BIS blank (not hollow) under SQI 15; SQI 5 bars (>=80 five, 60 four, 40 three, 20 two orange, under 20 one red); EMG bar 30-55 dB;
+  SR % of the last 63 s; ST mm:ss (h:mm:ss after an hour); BURST /min; SEF and MF whole Hz. Alarm limits are off by default; when set the label
+  shows the range (the disabled-alarm bell icon otherwise), BIS in alarm is white on a red box, SR and SEF in alarm black on yellow.
+- Trends: 10 s cadence (bins of 10 s or wider), time scale 1/6/12/24 h from the case start (the left edge is the case start until the window
+  fills; the data store holds 4 h), ticks every 10 min / 1 h / 2 h / 4 h, case-start triangle, blue now tick, snapshot flags, dark bands where
+  the EEG was unusable. Secondary: EMG (30-80 dB), SR, SQI, NONE, BURST and the other side's BIS (4-channel). ASYM = signed
+  100*(PL-PR)/(PL+PR) of the total power per 10 s, smoothed over about 30 s; |ASYM| < 20 is not drawn; L above, R below.
+- EEG: sweep with an erase gap (not scroll), 1 s dotted grid, "1 Sec" bar, 2/5/10 uV/mm, 6.25/12.5/25/50 mm/s (default 25 and 5 s across),
+  gain from physical size (5.72 virtual px per mm at 25 mm/s), full-scale label follows the gain. 2 uV/mm one channel, 5 or 10 two (2-channel
+  screen); 4-channel screen shows LT, RT (Settings: 1, 2 or 4; LE and RE are the LT and RT traces slightly delayed and scaled, because the
+  simulator has only two EEG sources).
+- Menu (real tree): hamburger > ALARMS (dimmed while monitoring, as on the monitor; ALARM SETTINGS on the left bar does the same job),
+  DISPLAY SETTINGS (layouts per channel mode, Secondary, preview), SETTINGS & MAINTENANCE (Global: date and time format, MPM protocol;
+  Advanced: smoothing 10/15/30, EEG amplitude, scale, channels, filters, impedance, sensor check values, institutional defaults, trends
+  display, Administrator mode (simulator password 1234: erase trend data, factory defaults); Maintenance: logs, configuration, DSC
+  self-test), DOWNLOAD, INFO (demo and parameter help), CASE REVIEW. Items that cannot work here answer with the monitor's own message
+  ("Export failed - USB drive removed", "System is in Demo Mode", "DSC Self-Test passed" ...).
+- Alarms: bar in the top bar (red high, yellow low, count and list drop-down START / ALARM, two lines), pill with bell, pause countdown
+  (120 s) and SILENT, drop-down of four round buttons (audio on, pause, off, volume 1-7); WebAudio beeps when the audio is on
+  (`ADV.sounding`, `ADV.beeps`); audio-off reminder every 3 min if enabled. BIS range needs 10 s outside the range to raise.
+- Messages (bottom bar): count badge, text, n/N, NEXT, check mark; latching until the check mark, otherwise 5 s. It starts with two
+  messages like the figures ("Audio reminder is off" and "Institutional settings restored").
+- Left bar: L|R pill (4-channel), graph/chart toggle (chart = table with Chart Interval 1-60 min, newest row first, case-start row), ALARM
+  SETTINGS, SNAPSHOT (name dialog, "Snapshot created", flag on the axis), SENSOR CHECK (electrode window with spinning rings, PASS/HIGH/NOISE,
+  values in kOhm if "Sensor Check Values" is on; thresholds are only implied: the result comes from the live SQI of the side and diathermy),
+  INFO. In case review: CASES LIST, CASE LOG, EXIT, a red cursor with a time tag and the numerics at the cursor.
+
+**Remaining uncertainty (what the evidence does not show):** exact fonts and icon shapes (redrawn); the wording of second lines for
+ISOELECTRIC EEG and the failed sensor check; the Settings and Maintenance pages, INFO window, Case Log and Case ID window (no native
+screenshots; styled like the dialogs that were seen); the left bar caption (ALARM SETTINGS in the draft manual figures, ALARMS in the 2021
+marketing screens and the text); SET RANGE (2-channel figure) versus SET TARGET (4-channel figure) kept as in the figures; EEG sweep versus
+scroll (the fixed 1 s grid and the dark smudge in the figure suggest a sweep); DSA cell size (about 3 px wide, 60 rows of 0.5 Hz);
+the 4-channel L|R pill also drives the lower SEF/MF panel (as the badge in the figure suggests); CASE REVIEW is left enabled while
+monitoring although the manual says it is disabled then (otherwise a learner could not scroll the case back); ground check every
+10 min, trend-lock, wireless and the camera are not modelled; the real monitor's BIS and ASYM algorithms are proprietary (the simulator's
+stand-in is used). Flashing of the alarm bar is a 1 Hz step (inferred).

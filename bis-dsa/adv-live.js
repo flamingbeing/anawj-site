@@ -67,12 +67,12 @@ function advSound(now){if(ADV.audio===1&&now>ADV.audioEnd){ADV.audio=0;}
  if(ADV.sounding&&now>=ADV.nextBeep){advBeep(hi?3:2,hi?988:740);ADV.nextBeep=now+(hi?4000:12000);}
  if(!ADV.sounding&&ADV.nextBeep&&!any)ADV.nextBeep=0;
  if(ADV.audio===2&&ADV.audioRem&&now>=ADV.nextRem){if(ADV.nextRem)advBeep(1,660);ADV.nextRem=now+180000;}}
-function advSetAudio(a){const was=ADV.audio;ADV.audio=a;ADV.nextBeep=0;ADV.nextRem=0;if(a===1){ADV.audioEnd=Date.now()+120000;advMsg('Alarm Pause Mode On');}else if(a===2)advMsg('Alarm Silent Mode On');else if(was!==0)advMsg(was===2?'Alarm Silent Mode Off':'Alarm audio on');advUnlock();}
+function advSetAudio(a){const was=ADV.audio;ADV.audio=a;ADV.nextBeep=0;ADV.nextRem=0;if(a===1){ADV.audioEnd=Date.now()+120000;advMsg('Alarm Pause Mode On');}else if(a===2)advMsg('Alarm Silent Mode On');else if(was!==0)advMsg(was===2?'Alarm Silent Mode Off':'Alarm audio on');advUnlock();advSound(Date.now());advUI(Date.now());}
 // ----- per-frame UI of the top bar -----
 function advUI(now){
  const t=advNow(),dt=advDate(t),tm=advClockS(t);advSet('aDate',dt);advSet('aTime',tm);
  // alarm bar
- const n=ADV.alarms.length,bar=aq('aAbar');bar.hidden=!n;
+ const n=ADV.alarms.length,bar=aq('aAbar');bar.hidden=!n;if(!n&&bar.className!=='abar')bar.className='abar';
  if(n){const i=Math.floor(now/3000)%n,a=ADV.alarms[i];bar.className='abar '+a.pri+(a.pri==='hi'&&ADV.audio!==2?' flash':'');
   advSet('aAico',a.pri==='hi'?IC.tri3:IC.tri);advSet('aAl1',advEsc(a.l1));advSet('aAl2',advEsc(a.l2));advSet('aAn',`${i+1}/${n}`);
   const c=aq('aAcnt');c.style.visibility='visible';}
@@ -126,7 +126,7 @@ function advKey(e){
  if(ADV.review&&(e.key==='ArrowLeft'||e.key==='ArrowRight')&&!ADV.dlg&&!ADV.menu){const R_=ADV.review,D=ADV.d,st=D.win/ADV_PX*6;R_.t=Math.max(ADV.t0,Math.min(R_.now,(R_.t==null?R_.now:R_.t)+(e.key==='ArrowLeft'?-st:st)));ADV.full=true;advNumerics();advReviewTip();e.preventDefault();}}
 function advReviewTip(){const R_=ADV.review,w=aq('advWm');if(!R_||R_.t==null||ADV.view!=='graphs'){w.innerHTML='';return;}const D=ADV.d;if(!D)return;const x=advXt(D,R_.t);
  w.innerHTML=`<div class="tip" style="left:calc(${x}*var(--u));top:calc(66*var(--u))" aria-live="polite">${advClockS(R_.t,true)}</div>`
-  +[[140,120],[1090,180],[1090,350],[1090,540],[1090,660]].map(([px,py])=>`<span class="wm" style="left:calc(${px}*var(--u));top:calc(${py}*var(--u));transform:rotate(-30deg)">CASE REVIEW MODE</span>`).join('');}
+  +[[1090,180],[1090,350],[1090,540],[1090,660]].map(([px,py])=>`<span class="wm" style="left:calc(${px}*var(--u));top:calc(${py}*var(--u));transform:rotate(-30deg)">CASE REVIEW MODE</span>`).join('');}
 // ----- chart view (the table) -----
 function advChart(force){const el=aq('advChart');if(ADV.view!=='chart')return;const now=simT,I=ADV.chartInt*60,key=Math.floor((now-ADV.t0)/I)+'|'+ADV.ch+ADV.chartInt+ADV.hemi+Math.floor(now/10);if(!force&&ADV.chartKey===key)return;ADV.chartKey=key;
  const two=ADV.ch===2,cols=two?[['BIS','BIS',AC.bisL],['EMG','EMG <small>dB</small>',AC.emg],['SR','SR <small>%</small>',AC.sr],['SQI','SQI <small>%</small>',AC.sqi]]:[['BIS L','BIS L',AC.bisL],['BIS R','BIS R',AC.bisR],['EMG L','EMG L <small>dB</small>',AC.emg],['EMG R','EMG R <small>dB</small>',AC.emg],['SR L','SR L <small>%</small>',AC.sr],['SR R','SR R <small>%</small>',AC.sr],['ASYM','ASYM <small>%</small>',AC.asym],['SQI L','SQI L <small>%</small>',AC.sqi],['SQI R','SQI R <small>%</small>',AC.sqi]];

@@ -11,3 +11,9 @@ Self-hosted (no request to Google when the page loads). Latin subset, variable w
 - `DejaVuSans-latin.woff2`, `DejaVuSans-Bold-latin.woff2`: DejaVu Sans (Bitstream Vera licence: free to use, copy and embed; Latin subset), for the axis labels, date and time and captions, which look like a wide Verdana-style sans on the real screen.
 
 Licences: <https://github.com/google/fonts/tree/main/apache/arimo>, <https://github.com/google/fonts/tree/main/ofl/archivonarrow>, <https://github.com/google/fonts/tree/main/ofl/archivoblack> and <https://dejavu-fonts.github.io/License.html>.
+
+## BIS Advance screen
+
+- `Selawik-Light-latin.woff2`, `Selawik-Regular-latin.woff2`, `Selawik-Semibold-latin.woff2`: Selawik (SIL Open Font License 1.1, Microsoft, <https://github.com/microsoft/Selawik>), Latin
+  subset (U+0020-007E, U+00A0-00FF and a few punctuation marks), made with fontTools. Selawik is metric-compatible with Segoe UI, which is the
+  look of the BIS Advance tablet's on-screen text (digits, captions, dialogs). Licence: <https://github.com/microsoft/Selawik/blob/master/LICENSE.txt>.
