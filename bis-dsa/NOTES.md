@@ -258,6 +258,20 @@ sheet (screens are 640 x 480), as a clone to look at and use. Code: `mt-screen.j
   PASS and the screen leaves by itself; Show / Hide Values gives kohm and NOISE / HIGH / PASS; EXIT key.
 - **Trend Review** (Display menu or the cyan arrow): Case / Cursor, SR / EMG / SQI / None, Step Backward / Forward (10 s),
   click the plot to place the cursor with the readout box.
+- **Reviewer fix pass (14 Oct 2026):** raised, beveled menu tiles on a plain gradient panel (no big frame); Previous / Next
+  centred; Display menu is one "Main display:" tile (thumbnail, BIS / EEG / DSA) plus a DSA tile that toggles DSA +
+  Amplitude / DSA + BIS (Trend Time Scale stays, marked "teaching extra"); page 2's bottom-middle cell is empty; Secondary
+  Variable has five plain tiles (Signal Quality works, Bursts/Minute is a teaching approximation from SR); Alarm Volume
+  tiles x 46-495. Alarm key reads SILENT with a red crossed bell while a red alarm is active. No target or isoelectric
+  alarm (bar or sound) during Sensor Check; its yellow bar names only HIGH electrodes ("Press electrode 2 [ 13 ]"),
+  otherwise "Sensor Check in Progress"; electrodes go navy (pending), grey NOISE, then green (the ground, 2, reads HIGH
+  for a moment so the message can be seen); SQI bars stay hollow; MENU leaves the check like EXIT; leaving with a HIGH
+  electrode gives "Last Sensor Check Failed [ 16 ]" (Dismiss), a pass gives a new random case ID. Snapshot marks the
+  trend at once (old marker becomes a diamond and the warning screen shows only then). Export shows "Exporting ... n%"
+  to "100% complete" with Stop Export and the USB icon under the BIS box. "Date and time not changed [ 513 ]". Target
+  Range still starts at 60 / 40 as a teaching shortcut (the real defaults are 100 / 0: no band, no alarm; we draw no
+  band at 100 / 0). The DSA is softened (3-column and 1-2-1 vertical average), AMPL is white and smoothed, SEF / MF are
+  2 px smoothed lines (MF `#9a6cf0`), the BIS digits are heavy (Arial Black on machines that have it, else Archivo Black).
 - **Uncertain or not copied** (the evidence is weak; the invented screens are unverified): the 2-channel Display menu layout
   (no photo of it exists; ours is a reduced version of the 4-channel one, with the "Trend Time Scale" and "Display ST" tiles
   added: deliberate teaching departures), the AMPL dB scale, the alarm tone itself (a square 880 Hz beep, 3 pulses every 2 s;

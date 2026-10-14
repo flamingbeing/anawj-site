@@ -9,9 +9,9 @@ const MT={
  win:60,                  // Trend Time Scale, minutes (5, 15 or 60); the real monitor's default is 1 hour (the 5 and 15 min scales are a teaching extra)
  secondary:'emg',         // Secondary Variable: 'none' | 'sr' | 'emg' (the trend view's right axis when Display ST is off)
  displayST:true,displaySR:true,
- tgt:{active:false,alarm:true,hi:60,lo:40,fmt:'band'}, // Target Range is Inactive by default, as on the real monitor (manual)
+ tgt:{active:false,alarm:true,hi:60,lo:40,fmt:'band'}, // Target Range is Inactive by default, as on the real monitor; 60 / 40 is a teaching shortcut (the real defaults are High 100 / Low 0: no band, no alarm)
  alarmVol:3,filters:true,imp:true,demo:false,diag:false,audioRem:true,mode:1,chartInt:15,showVals:false,
- caseId:'AH5F',snapT:null,gaps:[],anchor:null,beeps:0,nextBeep:0,nextRem:0,lowDis:'',pw:'1234',
+ caseId:'AH5F',realId:'AH5F',snapT:null,snapPrev:null,gaps:[],anchor:null,beeps:0,nextBeep:0,nextRem:0,lowDis:'',pw:'1234',
  alarm:0,alarmEnd:0,       // alarm key: 0 green, 1 paused for 2 min (yellow, seconds counting down), 2 silenced (red X, SILENT)
  menu:null,menuStack:[],page:1,review:null,sensor:null,
  info:null,infoDismissed:'',startup:{text:'Factory settings restored',on:true},
@@ -28,14 +28,16 @@ const mtHMS=s=>Math.floor(s/3600)+':'+mtPad(Math.floor(s/60)%60)+':'+mtPad(s%60)
 const mtView=()=>MT.review?'bis':MT.main;
 function mtVis(){return mon.skin==='vista';}
 // an information message on the message bar (the monitor's own wording), for a few seconds
-function mtInfo(text,code,ms,pri){MT.info={text,code,pri:pri||'info',until:Date.now()+(ms||5000)};mtD();setTimeout(()=>{mtD();},(ms||5000)+100);}
+function mtInfo(text,code,ms,pri,dis){MT.info={text,code,pri:pri||'info',dis:!!dis,until:Date.now()+(ms||5000)};mtD();setTimeout(()=>{mtD();},(ms||5000)+100);}
 function mtTgtSync(){mon.alo=MT.tgt.lo;mon.ahi=MT.tgt.hi;mtD();}
 // ---------- the alarm key: green > yellow bell (paused 2 min, countdown) > red bell X (silenced, SILENT) > green ----------
 const BELL='M21 2c-1.6 0-2.8 1.1-2.8 2.5C13.4 5.6 11 9.4 11 14v6c0 2-1.6 3.3-3.6 4.4v1.3h27.2v-1.3C32.6 23.3 31 22 31 20v-6c0-4.6-2.4-8.4-7.2-9.5C23.8 3.1 22.6 2 21 2zM17.5 27.4c.4 1.6 1.8 2.6 3.5 2.6s3.1-1 3.5-2.6z';
-function mtBellSvg(){const st=MT.alarm,col=st===0?'#7cc02e':st===1?'#f4e84a':'#e5322a',x=st?'<path d="M9 3l24 24M33 3L9 27" stroke="#6f7488" stroke-width="3.2" fill="none"/>':'';
+// while a high-priority alarm is active (and not yet pressed) the key reads SILENT with a red bell crossed out; pressing it goes to the paused (yellow) state
+function mtAlarmActive(){if(MT.alarm!==0||MT.sensor)return false;const m=monMsg();return !!m&&m[0]==='hi';}
+function mtBellSvg(){const act=mtAlarmActive(),st=MT.alarm,col=act?'#e0202a':st===0?'#7cc02e':st===1?'#f4e84a':'#e5322a',x=st||act?`<path d="M9 3l24 24M33 3L9 27" stroke="${act?'#e8e8f0':'#6f7488'}" stroke-width="3.2" fill="none"/>`:'';
  mq('kBell').innerHTML=`<path d="${BELL}" fill="${col}"/>${x}`;}
 function mtAlarmTick(){if(MT.alarm===1){const left=Math.ceil((MT.alarmEnd-Date.now())/1000);if(left<=0)MT.alarm=0;}mtAlarmUI();mtSound();}
-function mtAlarmUI(){const k=mq('kSilent');mtBellSvg();const left=Math.max(0,Math.ceil((MT.alarmEnd-Date.now())/1000));mq('kSl').textContent=MT.alarm===2?'SILENT':MT.alarm===1?String(left):'';mq('kSl').classList.toggle('cnt',MT.alarm===1);
+function mtAlarmUI(){const k=mq('kSilent');mtBellSvg();const left=Math.max(0,Math.ceil((MT.alarmEnd-Date.now())/1000));mq('kSl').textContent=MT.alarm===2||mtAlarmActive()?'SILENT':MT.alarm===1?String(left):'';mq('kSl').classList.toggle('cnt',MT.alarm===1);
  k.setAttribute('aria-pressed',MT.alarm?'true':'false');k.setAttribute('aria-label',MT.alarm===0?'Alarm key: alarms on. Press to pause the alarm for 2 minutes':MT.alarm===1?`Alarm key: alarms paused, ${left} seconds left. Press to silence indefinitely`:'Alarm key: alarm silenced. Press to switch alarms on again');}
 function mtAlarmPress(){MT.alarm=(MT.alarm+1)%3;if(MT.alarm===1)MT.alarmEnd=Date.now()+120000;MT.nextBeep=0;MT.nextRem=0;mtAlarmUI();mtSound();mtD();}
 // ---------- sound: a high-priority message sounds until the BIS is back in range or the bell is pressed ----------
@@ -45,7 +47,7 @@ function mtAlarmPress(){MT.alarm=(MT.alarm+1)%3;if(MT.alarm===1)MT.alarmEnd=Date
 function mtUnlock(){try{const A=window.AudioContext||window.webkitAudioContext;if(!A)return;MT.ac=MT.ac||new A();if(MT.ac.state==='suspended')MT.ac.resume();}catch(e){}}
 function mtBeep(n,len){n=n||1;len=len||0.3;MT.beeps++;try{const ac=MT.ac;if(!ac||ac.state!=='running')return;const t0=ac.currentTime;
  for(let i=0;i<n;i++){const o=ac.createOscillator(),g=ac.createGain(),t=t0+i*(len+0.12);o.type='square';o.frequency.value=880;g.gain.setValueAtTime(0.012*MT.alarmVol,t);g.gain.setValueAtTime(0,t+len);o.connect(g);g.connect(ac.destination);o.start(t);o.stop(t+len+0.02);}}catch(e){}}
-function mtSound(){if(!mtVis()){MT.sounding=false;return;}const now=Date.now(),m=monMsg(),hi=!!m&&m[0]==='hi';
+function mtSound(){if(!mtVis()){MT.sounding=false;return;}const now=Date.now(),m=monMsg(),hi=!!m&&m[0]==='hi'&&!MT.sensor; // no BIS during a sensor check: no target or isoelectric alarm
  const want=hi&&MT.alarm===0&&(m[2]===31||MT.tgt.alarm); // isoelectric always sounds; the target alarm only with Target Alarm on
  MT.sounding=want;
  if(want){if(now>=MT.nextBeep){MT.nextBeep=now+2000;mtBeep(3,0.16);}}else MT.nextBeep=0;
@@ -55,17 +57,18 @@ const MT_GRID='<rect x="9" y="3" width="24" height="24" fill="none" stroke="#fff
 const MT_HOME='<path d="M21 2L4 17h5v11h8V20h8v8h8V17h5z" fill="#fff"/>';
 function mtKeys(){const home=!!MT.menu;
  mq('kMl').textContent=home?'HOME':'MENU';mq('kMi').innerHTML=home?MT_HOME:MT_GRID;
- mq('kMenu').setAttribute('aria-label',MT.sensor?'Menu: not available during sensor check':home?'Home: leave the menu and return to the main screen':'Menu: show the monitor settings');mq('kMenu').setAttribute('aria-expanded',MT.menu?'true':'false');mq('kMenu').setAttribute('aria-disabled',MT.sensor?'true':'false');
+ mq('kMenu').setAttribute('aria-label',home?'Home: leave the menu and return to the main screen':'Menu: show the monitor settings');mq('kMenu').setAttribute('aria-expanded',MT.menu?'true':'false');
  const sc=!!MT.sensor,rv=!!MT.review;mq('kSn').innerHTML=sc?'EXIT':rv?'TREND<br>REVIEW<br>EXIT':'SENSOR<br>CHECK';
  mq('kSensor').setAttribute('aria-label',sc?'Exit sensor check':rv?'Exit trend review':'Sensor check');mq('kSensor').classList.toggle('exit',sc);}
 // ---------- the message bar (text, then the code in brackets with two spaces before it) ----------
 // Dismiss only on the yellow start-up bar and on a persistent yellow warning; information bars have no button and clear by themselves.
 function mtMessage(){
  const m=monMsg();if(!(m&&m[0]==='lo'))MT.lowDis='';
- if(m&&m[0]==='hi')return {pri:'hi',text:m[3]||m[1],code:m[2]};
- if(MT.sensor){const s=MT.sensor;if(s.pass)return null;if(Date.now()-s.t0<900)return {pri:'lo',text:'Sensor Check in Progress',code:null};
-  const todo=s.el.filter(e=>e.st!=='pass').map(e=>e.n);return {pri:'lo',text:'Press electrode'+(todo.length>1?'s ':' ')+todo.join(', '),code:13};}
- if(MT.info&&MT.info.until>Date.now())return {pri:MT.info.pri,text:MT.info.text,code:MT.info.code};
+ if(m&&m[0]==='hi'&&!MT.sensor)return {pri:'hi',text:m[3]||m[1],code:m[2]};
+ // sensor check: only electrodes that read HIGH are named, even while another is still being measured; otherwise 'in Progress' until a result; nothing once all four pass
+ if(MT.sensor){const s=MT.sensor;if(s.pass)return null;const todo=s.el.filter(e=>e.st==='high').map(e=>e.n);
+  if(!todo.length)return {pri:'lo',text:'Sensor Check in Progress',code:null};return {pri:'lo',text:'Press electrode'+(todo.length>1?'s ':' ')+todo.join(', '),code:13};}
+ if(MT.info&&MT.info.until>Date.now())return {pri:MT.info.pri,text:MT.info.text,code:MT.info.code,dis:!!MT.info.dis,key:MT.info.dis?'info':''};
  if(m&&m[0]==='lo'&&MT.lowDis!==(m[3]||m[1]))return {pri:'lo',text:m[3]||m[1],code:m[2],dis:true,key:'lo',lo:m[3]||m[1]};
  if(MT.startup.on)return {pri:'lo',text:MT.startup.text,code:null,dis:true,key:'startup'};
  if(m&&m[0]==='info')return {pri:'info',text:m[1],code:null};
@@ -75,20 +78,20 @@ function mtMsgUI(){const el=mq('v2Msg'),m=mtMessage();if(!m){el.hidden=true;retu
  const text=m.text+(m.code!=null?`  [ ${m.code} ]`:'')+(MT.diag&&m.code!=null?`  (code ${m.code})`:'');
  const b=mq('v2Dismiss'),was=!b.hidden,t=mq('v2MsgT');b.hidden=!m.dis;el.style.setProperty('padding-right',m.dis?'calc(100*var(--u))':'0');
  el.hidden=false;el.className='vmsg '+m.pri;el.dataset.key=m.key||'';MT.curLo=m.lo||'';
- if(t.textContent!==text||was!==!!m.dis){t.textContent=text;let fs=22;t.style.fontSize=`calc(${fs}*var(--u))`;while(fs>15&&t.scrollWidth>t.clientWidth+1){fs-=.5;t.style.fontSize=`calc(${fs}*var(--u))`;}}}
+ if(t.textContent!==text||was!==!!m.dis){t.textContent=text;let fs=m.pri==='info'?18:22;t.style.fontSize=`calc(${fs}*var(--u))`;while(fs>15&&t.scrollWidth>t.clientWidth+1){fs-=.5;t.style.fontSize=`calc(${fs}*var(--u))`;}}}
 // ---------- readouts: called once a second (and on every change) with the newest column ----------
 function mtReadouts(c,bl,sr,e){
  const sensorOn=!!MT.sensor,v=mq('v2Bis');
  v.textContent=sensorOn||bl||c.bis==null?'':String(Math.round(c.bis));v.classList.toggle('hollow',!sensorOn&&!bl&&c.sqi<50);
  mtSqiBars();
- const en=e<30?0:e<39?1:e<48?2:e<56?3:4;[...mq('v2Emg').children].forEach((x,i)=>x.classList.toggle('on',i<en));
+ const en=e<30?0:e<39?1:e<48?2:e<56?3:4;[...mq('v2Emg').children].forEach((x,i)=>x.classList.toggle('on',i<en));mq('v2Emg').style.setProperty('--lv',[.05,.07,.12,.3,.6][en]); // a thin sliver at a normal EMG, growing in steps
  txt('v2St',mtHMS(tim.sup));txt('v2Sr',bl?'0':String(sr));
  mq('v2StBox').hidden=!MT.displayST;mq('v2SrBox').hidden=!MT.displaySR;
- mq('v2Art').hidden=!c.art;
+ mq('v2Art').hidden=!c.art;mq('v2Usb').hidden=!(MT.usbUntil>Date.now());
  mtLayout();mtMsgUI();mtAlarmTick();mtKeys();
  if(MT.menu)mtMenuLive();}
 // the five SQI bars: signal quality / 20 on the main screen; one green bar per electrode that passes during Sensor Check (all five when all four pass)
-function mtSqiBars(){const c=COLS[COLS.length-1];if(!c)return;const nb=MT.sensor?(MT.sensor.pass?5:MT.sensor.el.filter(x=>x.st==='pass').length):Math.ceil(c.sqi/20);[...mq('v2Sqi').children].forEach((x,i)=>x.classList.toggle('on',i<nb));}
+function mtSqiBars(){const c=COLS[COLS.length-1];if(!c)return;const nb=MT.sensor?0:Math.ceil(c.sqi/20);/* 0: hollow outlines while the sensor is being checked */[...mq('v2Sqi').children].forEach((x,i)=>x.classList.toggle('on',i<nb));}
 function mtLayout(){const two=MT.channels===2,top=MT.menu||MT.main==='eeg',cy=two?158:134,vv=mq('vista');
  vv.classList.toggle('sc',!!MT.sensor);vv.classList.toggle('rv',!!MT.review);
  const set=(id,y)=>{const s=mq(id).style;s.top=`calc(${y}*var(--u))`;};set('v2Mm',cy+2);set('v2EegL',cy);set('v2Uv',cy+2);
@@ -132,18 +135,18 @@ function mtRe(){mtShow(MT.menu,MT.menuArg,true);}
 function mtOpen(){MT.menuStack=[];MT.focusMenu=true;mtShow(MT.page===2?'p2':MT.page===3?'p3':'p1');MT.focusMenu=false;}
 function mtHome(quiet){const was=MT.menu||MT.review;MT.menu=null;MT.menuStack=[];mq('v2Menu').hidden=true;MT.review=null;mq('v2Rev').hidden=true;MT.page=1;mtKeys();mtLayout();mtD();if(was&&!quiet)mq('kMenu').focus();}
 function mtStepVal(list,cur,dir){const i=list.indexOf(cur);return list[(i+(dir||1)+list.length)%list.length];}
-const MTS_NAME={p1:'Menu, page 1',p2:'Menu, page 2',p3:'Menu, page 3',target:'Target Range',secvar:'Secondary Variable',chart:'Chart Data',alarmvol:'Alarm Volume',display:'Display',viewsave:'View/Save Settings',passkey:'Enter Passkey',mode:'Monitor Mode',export:'Export Data',config:'Configuration',datetime:'Date and Time',language:'Language',help:'Help',snapshot:'Snapshot',maint:'Maintenance',diag:'Diagnostics',text:'Information'};
+const MTS_NAME={exporting:'Export',p1:'Menu, page 1',p2:'Menu, page 2',p3:'Menu, page 3',target:'Target Range',secvar:'Secondary Variable',chart:'Chart Data',alarmvol:'Alarm Volume',display:'Display',viewsave:'View/Save Settings',passkey:'Enter Passkey',mode:'Monitor Mode',export:'Export Data',config:'Configuration',datetime:'Date and Time',language:'Language',help:'Help',snapshot:'Snapshot',maint:'Maintenance',diag:'Diagnostics',text:'Information'};
 const mtNextPage=(p)=>({on:()=>{MT.page=p;mtShow('p'+p);}});
 const MTS={
  p1(){mt3(0,0,'Target<br>Range',{html:MT_TGT,ar:'r',cls:'wtgt',on:()=>mtGo('target')});mt3(1,0,'Secondary<br>Variable',{ar:'r',on:()=>mtGo('secvar')});mt3(2,0,'Chart<br>Data',{ar:'r',on:()=>mtGo('chart')});
   mt3(0,1,'Alarm<br>Volume',{ar:'r',on:()=>mtGo('alarmvol')});mt3(1,1,null,{html:MT_DISP+'<span class="sr">Display</span>',ar:'r',k:'Display',on:()=>mtGo('display')});mt3(2,1,'View/Save<br>Settings',{ar:'r',on:()=>mtGo('viewsave')});
-  mt3(0,2,'Help',{ar:'r',on:()=>mtGo('help')});mt3(1,2,'Snapshot',{html:MT_CAM,on:()=>mtGo('snapshot')});mt3(2,2,'Next',Object.assign({ar:'r',ret:true},mtNextPage(2)));},
+  mt3(0,2,'Help',{ar:'r',on:()=>mtGo('help')});mt3(1,2,'Snapshot',{html:MT_CAM,on:()=>mtSnapshot()});mt3(2,2,'Next',Object.assign({ar:'r',ret:true,cls:'pg'},mtNextPage(2)));},
  p2(){mt3(0,0,'Display<br>SR',{html:mtOnOff(MT.displaySR),on:()=>{MT.displaySR=!MT.displaySR;mtRe();mtD();}});mt3(1,0,'Monitor<br>Mode',{ar:'r',on:()=>mtGo('mode')});mt3(2,0,'Export<br>Data',{ar:'r',on:()=>mtGo('export')});
   mt3(0,1,'BIS<br>Smoothing Rate',{html:mtOpts([[10,'10'],[15,'15'],[30,'30']],mon.smooth),on:()=>mtSmooth()});mt3(1,1,'Print',{html:MT_PAGE,ar:'r',on:()=>{mtHome(true);mtInfo('PDF creation completed',null,5000);}});mt3(2,1,'Configuration',{ar:'r',on:()=>mtGo('config')});
-  mt3(0,2,'Previous',{ar:'l',ret:true,on:()=>{MT.page=1;mtShow('p1');}});mt3(1,2,'Display<br>ST',{html:mtOnOff(MT.displayST),on:()=>{MT.displayST=!MT.displayST;mtRe();mtD();}});mt3(2,2,'Next',Object.assign({ar:'r',ret:true},mtNextPage(3)));},
+  mt3(0,2,'Previous',{ar:'l',ret:true,cls:'pg',on:()=>{MT.page=1;mtShow('p1');}});mt3(2,2,'Next',Object.assign({ar:'r',ret:true,cls:'pg'},mtNextPage(3)));}, // the bottom-middle cell is empty here; Display ST lives in the Display menu
  p3(){mt3(0,0,'EEG Channels',{html:mtOpts([[1,'1'],[2,'2']],MT.channels),on:()=>{MT.channels=MT.channels===1?2:1;mtInfo('Switching EEG channels to '+MT.channels);mtRe();}});mt3(1,0,'Date and Time',{ar:'r',on:()=>mtGo('datetime')});mt3(2,0,'Language',{ar:'r',on:()=>mtGo('language')});
   mt3(0,1,'Filters',{html:mtOnOff(MT.filters),on:()=>{MT.filters=!MT.filters;mtInfo(MT.filters?'Filters On':'Filters Off');mtRe();}});mt3(1,1,'Impedance<br>Checking',{html:mtOnOff(MT.imp),on:()=>{MT.imp=!MT.imp;mtInfo(MT.imp?'Impedance Checking Enabled':'Impedance Checking Disabled');mtRe();}});mt3(2,1,'Maintenance',{ar:'r',on:()=>mtGo('passkey',{next:()=>mtShow('maint')})});
-  mt3(0,2,'Previous',{ar:'l',ret:true,on:()=>{MT.page=2;mtShow('p2');}});mt3(1,2,'Demo Case',{ar:'r',on:()=>{MT.demo=!MT.demo;MT.caseId=MT.demo?'DEMO':'AH5F';mtHome(true);mtInfo(MT.demo?'Demo Case started':'Demo Case ended');}});mt3(2,2,'Diagnostics',{ar:'r',on:()=>mtGo('diag')});},
+  mt3(0,2,'Previous',{ar:'l',ret:true,cls:'pg',on:()=>{MT.page=2;mtShow('p2');}});mt3(1,2,'Demo Case',{ar:'r',on:()=>{MT.demo=!MT.demo;MT.caseId=MT.demo?'DEMO':MT.realId;mtHome(true);mtInfo(MT.demo?'Demo Case started':'Demo Case ended');}});mt3(2,2,'Diagnostics',{ar:'r',on:()=>mtGo('diag')});},
  target(){const T=MT.tgt;
   mtTile({x:6,y:6,w:165,h:70,t:'Target Range<br>Active',html:mtOnOff(T.active),on:()=>{T.active=!T.active;mtTgtSync();mtRe();}});
   mtTile({x:6,y:85,w:165,h:70,t:'Target Alarm',html:`<svg viewBox="0 0 42 30" width="34" height="24" aria-hidden="true"><path d="${BELL}" fill="${T.alarm?'#3fe060':'#e5322a'}"/>${T.alarm?'':'<path d="M9 3l24 24M33 3L9 27" stroke="#c9ccee" stroke-width="3.2" fill="none"/>'}</svg>`,on:()=>{T.alarm=!T.alarm;mtRe();mtD();}});
@@ -152,9 +155,8 @@ const MTS={
   mtTile({x:280,y:8,w:62,h:64,html:'<b class="cy">−</b>',k:'hi-',on:()=>stp('hi',-1)});mtBox(349,8,113,64,String(T.hi),{fs:46,cls:'val'});mtTile({x:468,y:8,w:62,h:64,html:'<b class="cy">+</b>',k:'hi+',on:()=>stp('hi',1)});
   mtTile({x:280,y:84,w:62,h:64,html:'<b class="cy">−</b>',k:'lo-',on:()=>stp('lo',-1)});mtBox(349,84,113,64,String(T.lo),{fs:46,cls:'val'});mtTile({x:468,y:84,w:62,h:64,html:'<b class="cy">+</b>',k:'lo+',on:()=>stp('lo',1)});
   mtTile({x:363,y:164,w:167,h:70,t:'Target Range<br>Format',html:`<span class="sqs">${mtFmt('band',T.fmt==='band')}${mtFmt('lines',T.fmt==='lines')}</span>`,on:()=>{T.fmt=T.fmt==='band'?'lines':'band';mtRe();mtD();}});mtRet();},
- secvar(){const S=MT.secondary;const o=(c,r,t,k,dis)=>mt3(c,r,t,{cls:k===S&&!dis?'sel0':'',html:'',dis,on:()=>{MT.secondary=k;mtRe();mtD();}});
-  const mk=(c,r,t,k,dis)=>{const b=o(c,r,(k===S&&!dis?`<b class="g">${t}</b>`:t),k,dis);};mk(0,0,'None','none');mk(1,0,'Suppression<br>Ratio','sr');mk(2,0,'EMG','emg');mk(0,1,'Signal<br>Quality','sqi',true);mk(1,1,'Bursts/<br>Minute','bpm',true);mtRet();
-  mtLbl(366,100,175,'Signal Quality and Bursts/Minute need a BIS Extend sensor',{fs:12,c:'#b9bbd9'});},
+ secvar(){const S=MT.secondary,mk=(c,r,t,k)=>mt3(c,r,k===S?`<span class="g">${t}</span>`:t,{k:'sv'+k,on:()=>{MT.secondary=k;mtRe();mtD();}});
+  mk(0,0,'None','none');mk(1,0,'Suppression<br>Ratio','sr');mk(2,0,'EMG','emg');mk(0,1,'Signal<br>Quality','sqi');mk(1,1,'Bursts/<br>Minute','bpm');mtRet();},
  chart(){const iv=MT.chartInt,L=[1,5,10,15,30,60];
   mtTile({x:6,y:6,w:62,h:64,html:'<b class="cy">+</b>',k:'iv+',on:()=>{MT.chartInt=mtStepVal(L,iv,1);MT.chartOff=0;mtRe();}});mtTile({x:6,y:82,w:62,h:64,html:'<b class="cy">−</b>',k:'iv-',on:()=>{MT.chartInt=mtStepVal(L,iv,-1);MT.chartOff=0;mtRe();}});
   mtLbl(70,32,70,'Interval',{fs:15});mtBox(74,52,62,40,String(iv),{fs:34,bg:'#c9d5ee',c:'#2a6aa8'});mtLbl(70,96,70,'Minutes',{fs:15});
@@ -165,17 +167,19 @@ const MTS={
   const head=`<div style="color:#e8dc1c;font-size:calc(9.5*var(--u));text-align:center">Begin: ${HIST.length?mtStamp(HIST[0].n):'--'}&nbsp;&nbsp;${MT.demo?'DEMO':MT.caseId}&nbsp;&nbsp;End: ${mtStamp(simT)}</div>`;
   mtList(150,22,320,206,head+`<table class="chart"><tr><th></th><th style="color:#e8dc1c">Time</th><th style="color:#e8dc1c">BIS</th><th style="color:#40e060">SQI</th><th style="color:#f08a24">EMG</th></tr>${rows.slice(MT.chartOff,MT.chartOff+per).map(r=>`<tr><td></td><td>${r[0]}</td><td style="color:#e8dc1c">${r[1]}</td><td style="color:#40e060">${r[2]}</td><td style="color:#f08a24">${r[3]}</td></tr>`).join('')||'<tr><td></td><td colspan="4">No data yet</td></tr>'}</table>`).style.background='#0d1022';
   mtTile({x:476,y:8,w:62,h:64,html:'<b class="cy">▲</b>',k:'up',on:()=>{MT.chartOff=Math.max(0,MT.chartOff-1);mtRe();}});mtTile({x:476,y:82,w:62,h:64,html:'<b class="cy">▼</b>',k:'dn',on:()=>{MT.chartOff=Math.min(maxOff,MT.chartOff+1);mtRe();}});},
- alarmvol(){mtLbl(0,8,543,'Alarm Volume',{fs:17});mtLbl(12,52,200,'Softer',{fs:15,ta:'left'});mtLbl(330,52,200,'Louder',{fs:15,ta:'right'});
-  for(let i=1;i<=5;i++)mtTile({x:6+(i-1)*90,y:80,w:88,h:50,html:`<b class="${i===MT.alarmVol?'y':'cy2'}" style="font-size:calc(19*var(--u))">${i}</b>`,k:'v'+i,cls:'vol',on:()=>{MT.alarmVol=i;mtRe();}});
-  mtTile({x:366,y:164,w:167,h:70,t:'Test',html:MT_SPK,on:()=>mtBeep(3,0.16)});mtRet();},
- display(){mtPanel(6,4,175,180);mtLbl(14,10,160,'Main display:',{fs:14,ta:'left',c:'#b9bbd9'});
-  const th=document.createElement('div');th.className='mtthumb';th.style.cssText='--x:14;--y:28';th.innerHTML=mtThumb(MT.main==='dsaAmpl'||MT.main==='dsaBis'?'dsa':MT.main);MT_P.appendChild(th);
-  [['bis','BIS'],['eeg','EEG'],['dsaAmpl','DSA + Amplitude'],['dsaBis','DSA + BIS']].forEach(([k,l],i)=>mtTile({x:10,y:84+i*22,w:165,h:22,cls:'mtopt',html:`<b class="${MT.main===k?'g':'d'}">${l}</b>`,k:'m'+k,on:()=>{MT.main=k;mtRe();mtD();}}));
-  mt3(1,0,'Trend Time Scale',{html:mtOpts([[5,'5 min'],[15,'15 min'],[60,'1 hour']],MT.win),on:()=>{MT.win=mtStepVal([5,15,60],MT.win,1);mtRe();mtD();}});
+ alarmvol(){mtLbl(0,8,543,'Alarm Volume',{fs:17});mtLbl(46,52,200,'Softer',{fs:15,ta:'left'});mtLbl(295,52,200,'Louder',{fs:15,ta:'right'});
+  for(let i=1;i<=5;i++)mtTile({x:46+(i-1)*90,y:80,w:88,h:50,html:`<b class="${i===MT.alarmVol?'y':'cy2'}" style="font-size:calc(19*var(--u))">${i}</b>`,k:'v'+i,cls:'vol',on:()=>{MT.alarmVol=i;mtRe();}});
+  mtTile({x:366,y:164,w:167,h:70,t:'Test',cls:'tl',html:`<span class="spk">${MT_SPK}</span>`,on:()=>mtBeep(3,0.16)});mtRet();},
+ display(){const dsa=MT.main==='dsaAmpl'||MT.main==='dsaBis',cur=dsa?'dsa':MT.main;
+  // 'Main display:' is one tile: the layout thumbnail on the left, BIS / EEG / DSA on the right (the current one green)
+  mtPanel(6,6,175,74);mtLbl(12,9,100,'Main display:',{fs:11,ta:'left',c:'#dcdaf5'});
+  const th=document.createElement('div');th.className='mtthumb';th.style.cssText='--x:12;--y:28';th.innerHTML=mtThumb(dsa?'dsa':MT.main);MT_P.appendChild(th);
+  [['bis','BIS','mbis'],['eeg','EEG','meeg'],['dsa','DSA','mdsaAmpl']].forEach(([k,l,dk],i)=>mtTile({x:98,y:9+i*22,w:80,h:22,cls:'mtopt',html:`<b class="${cur===k?'g':'d'}">${l}</b>`,k:dk,on:()=>{MT.main=k==='dsa'?(MT.main==='dsaBis'?'dsaBis':'dsaAmpl'):k;mtRe();mtD();}}));
+  mt3(1,0,'Trend Time Scale',{cls:'extra',html:mtOpts([[5,'5 min'],[15,'15 min'],[60,'1 hour']],MT.win)+'<span class="tx">teaching extra</span>',on:()=>{MT.win=mtStepVal([5,15,60],MT.win,1);mtRe();mtD();}});
   mt3(2,0,'Display<br>ST',{html:mtOnOff(MT.displayST),on:()=>{MT.displayST=!MT.displayST;mtRe();mtD();}});
-  mt3(1,1,'DSA',{html:MT_PAGE,on:()=>{MT.main=MT.main==='dsaAmpl'?'dsaBis':'dsaAmpl';mtRe();mtD();}});
+  mt3(1,1,null,{k:'dsatoggle',lab:'DSA: switch between DSA + Amplitude and DSA + BIS',html:`${MT_PAGE}<span class="dsat">DSA</span><span class="dsao"><b class="${MT.main==='dsaAmpl'?'g':'d'}">+ Amplitude</b><b class="${MT.main==='dsaBis'?'g':'d'}">+ BIS</b></span>`,on:()=>{MT.main=MT.main==='dsaAmpl'?'dsaBis':'dsaAmpl';mtRe();mtD();}});
   mt3(2,2,'Trend<br>Review',{html:'<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" style="position:absolute;left:8px;bottom:6px"><path d="M20 3L4 12l16 9z" fill="none" stroke="#30d4d8" stroke-width="2.2"/></svg>',ret:true,on:()=>mtReviewOpen()});
-  mtTile({x:6,y:190,w:175,h:48,t:'Return to<br>Previous Menu',ar:'l',ret:true,on:mtBack});},
+  mtRet();},
  viewsave(){const S=mtSettingsList(),sv=MT.saved?mtSettingsList(MT.saved):null,cell=(a)=>a.map(([k,v,raw])=>`<tr><td>${k}</td><td style="color:${sv&&mtDiff(raw,sv,k)?'#e8dc1c':'#fff'}">${v}</td></tr>`).join('');
   // all 17 rows: 7 + 6 under the mode heading, 2 + 2 under "All Modes"; unsaved changes in yellow
   mtLbl(0,2,543,`Monitor Mode ${['','I','II','III','IV'][MT.mode]} Settings`,{fs:17,c:'#fff',b:1});
@@ -199,23 +203,27 @@ const MTS={
   mk(0,0,'Day',mtPad(d.getDate()),'day');mk(1,0,'Month',MT_MON[d.getMonth()],'mon');mk(2,0,'Year',d.getFullYear(),'yr');mk(0,1,'Hour',mtPad(d.getHours()),'hr');mk(1,1,'Minute',mtPad(d.getMinutes()),'min');mk(2,1,'Second',mtPad(d.getSeconds()),'sec');
   const ch=(dir)=>{const k=MT.dtSel||'day',m={day:()=>d.setDate(d.getDate()+dir),mon:()=>d.setMonth(d.getMonth()+dir),yr:()=>d.setFullYear(d.getFullYear()+dir),hr:()=>d.setHours(d.getHours()+dir),min:()=>d.setMinutes(d.getMinutes()+dir),sec:()=>d.setSeconds(d.getSeconds()+dir)};m[k]();mtRe();};
   mtTile({x:36,y:14,w:92,h:60,html:'<b class="cy">▲</b>',k:'dup',on:()=>ch(1)});mtTile({x:36,y:86,w:92,h:60,html:'<b class="cy">▼</b>',k:'ddn',on:()=>ch(-1)});
-  mtRet({y:164,w:165});mtTile({x:363,y:164,w:167,h:70,t:'Apply<br>Change',on:()=>{MT.dt=null;mtHome(true);mtInfo('Date and time cannot be changed during a case');}});},
+  mtRet({y:164,w:165});mtTile({x:363,y:164,w:167,h:70,t:'Apply<br>Change',on:()=>{MT.dt=null;mtHome(true);mtInfo('Date and time not changed',513);}});},
  language(){mtLbl(0,10,543,'Language',{fs:19,c:'#fff'});mtBox(190,60,170,60,'English',{fs:24,bg:'#2f3064',c:'#40e060'});
-  mtTile({x:100,y:70,w:70,h:44,html:'<b class="cy">+</b>',k:'lp',on:()=>mtInfo('English is the only language installed')});mtTile({x:380,y:70,w:70,h:44,html:'<b class="cy">−</b>',k:'lm',on:()=>mtInfo('English is the only language installed')});mtRet();},
- help(){mtList(8,6,530,176,`MENU opens these pages; HOME returns to the main screen.\nSENSOR CHECK shows the electrode impedances and passes when every electrode is good.\nThe bell key pauses the alarm for 2 minutes, then silences it; press again to switch it on.\nDisplay chooses BIS trend, EEG, DSA + Amplitude or DSA + BIS.\nTarget Range sets the alarm limits for the BIS value.`);mtRet({y:190,h:48});},
+  mtTile({x:100,y:70,w:70,h:44,html:'<b class="cy">+</b>',k:'lp',on:()=>{}});mtTile({x:380,y:70,w:70,h:44,html:'<b class="cy">−</b>',k:'lm',on:()=>{}});mtRet();},
+ help(){mtList(8,6,530,176,`MENU opens these pages; HOME returns to the main screen.\nSENSOR CHECK shows the electrode impedances and passes when every electrode is good.\nThe bell key pauses the alarm for 2 minutes, then silences it; press again to switch it on.\nDisplay chooses BIS trend, EEG, DSA + Amplitude or DSA + BIS.\nTarget Range sets the alarm limits for the BIS value.\n(Teaching note: Target Range starts at High 60 / Low 40 here; the real monitor starts at 100 / 0, which draws no band and raises no alarm.)`);mtRet({y:190,h:48});},
  snapshot(){mtLbl(8,18,527,"Warning: Snapshot in memory will be erased.\nPress 'Save Snapshot' button to save new snapshot.",{fs:17,c:'#fff'});
-  mt3(1,1,'Save<br>Snapshot',{html:MT_CAM,on:()=>{MT.snapT=simT;mtHome(true);mtInfo('Snapshot saved');}});mtRet();},
+  mt3(1,1,'Save<br>Snapshot',{html:MT_CAM,on:()=>mtHome(true)});mtRet();},
  maint(){mt3(0,0,'BISx Connection<br>History',{ar:'r',on:()=>mtGo('text',{title:'BISx Connection History',lines:['No BISx connection events recorded.']})});mt3(1,0,'Serial<br>Protocol',{ar:'r',on:()=>mtGo('text',{title:'Serial Protocol',lines:['Serial output is off in the simulator.']})});mt3(2,0,'Software<br>Update',{ar:'r',on:()=>mtGo('text',{title:'Software Update',lines:['Insert a USB drive with update files.','(No update is possible in the simulator.)']})});
   mt3(0,1,'<span style="font-size:calc(13*var(--u))">Restore Default<br>Settings for<br>All Modes</span>',{on:()=>{mtDefaults();mtHome(true);mtInfo('Factory settings restored');}});mt3(1,1,'Audio Off<br>Reminder',{html:mtOnOff(MT.audioRem),on:()=>{MT.audioRem=!MT.audioRem;mtRe();}});mt3(2,1,'Calibrate<br>Touch Screen',{ar:'r',on:()=>mtGo('text',{title:'Calibrate Touch Screen',lines:['Touch the targets as they appear.','(The simulator uses your own pointer; nothing to calibrate.)']})});mtRet();},
  diag(){mt3(0,0,'Diagnostic<br>Codes',{html:mtOnOff(MT.diag),on:()=>{MT.diag=!MT.diag;mtRe();mtD();}});mt3(1,0,'DSC<br>Self Test',{ar:'r',on:()=>mtGo('text',{title:'DSC Self Test',lines:['Digital signal converter self test: passed (simulated).']})});mt3(2,0,'Monitor<br>Error Log',{ar:'r',on:()=>mtGo('text',{title:'Monitor Error Log',lines:['No errors logged.']})});
   mt3(0,1,'Clear<br>Trend Data',{on:()=>{mtClearTrend();mtHome(true);mtInfo('Trend data cleared');}});mtRet();},
+ exporting(){mtLbl(0,10,543,'Export',{fs:19,c:'#fff'});const l=mtLbl(0,70,543,mtExportPct()>=100?'100% complete':'Exporting ... '+mtExportPct()+'%',{fs:22,c:'#fff'});l.id='mtExpPct';
+  mtTile({x:190,y:110,w:167,h:48,t:'Stop Export',on:()=>{MT.usbUntil=0;mtBack();mtD();}});mtRet();},
  text(arg){mtLbl(0,10,543,arg.title,{fs:19,c:'#fff'});mtList(8,40,530,120,arg.lines.join('\n'));mtRet();}};
+// Snapshot (manual 4.6.8): the new marker (camera) goes onto the trend at once; if one was already in memory the old marker becomes a diamond and the warning screen follows
+function mtSnapshot(){const had=MT.snapT!=null;if(had)MT.snapPrev=MT.snapT;MT.snapT=simT;mtD();if(had)mtGo('snapshot');else mtHome(true);}
 function mtSmooth(){const n=mtStepVal([10,15,30],mon.smooth,1);mon.smooth=n;try{$('kSmooth').textContent=`Smoothing ${n} s`;}catch(e){}mtInfo(`Smoothing Rate Changed to ${n} Seconds`,534);mtRe();}
 function mtMode(m){MT.mode=m;const P={1:[15,false,1],2:[30,true,1],3:[10,false,1],4:[15,false,2]}[m];mon.smooth=P[0];MT.displaySR=P[1];MT.channels=P[2];try{$('kSmooth').textContent=`Smoothing ${P[0]} s`;}catch(e){}mtD();}
 function mtSettingsSnap(){return {win:MT.win,alarmVol:MT.alarmVol,tgt:Object.assign({},MT.tgt),audioRem:MT.audioRem,smooth:mon.smooth,displaySR:MT.displaySR,displayST:MT.displayST,secondary:MT.secondary,channels:MT.channels,chartInt:MT.chartInt,showVals:MT.showVals,filters:MT.filters,imp:MT.imp,main:MT.main};}
 function mtSettingsApply(s){if(!s)return;MT.win=s.win;MT.alarmVol=s.alarmVol;Object.assign(MT.tgt,s.tgt);MT.audioRem=s.audioRem;mon.smooth=s.smooth;MT.displaySR=s.displaySR;MT.displayST=s.displayST;MT.secondary=s.secondary;MT.channels=s.channels;MT.chartInt=s.chartInt;MT.showVals=s.showVals;MT.filters=s.filters;MT.imp=s.imp;MT.main=s.main;mtTgtSync();try{$('kSmooth').textContent=`Smoothing ${s.smooth} s`;}catch(e){}}
 function mtDefaults(){mtSettingsApply({win:60,alarmVol:3,tgt:{active:false,alarm:true,hi:60,lo:40,fmt:'band'},audioRem:true,smooth:15,displaySR:true,displayST:true,secondary:'emg',channels:1,chartInt:15,showVals:false,filters:true,imp:true,main:'dsaAmpl'});MT.mode=1;}
-const MT_SEC={none:'None',sr:'Suppression Ratio',emg:'EMG'},MT_MAIN={bis:'BIS',eeg:'EEG',dsaAmpl:'DSA + Amplitude',dsaBis:'DSA + BIS'};
+const MT_SEC={none:'None',sr:'Suppression Ratio',emg:'EMG',sqi:'Signal Quality',bpm:'Bursts/Minute'},MT_MAIN={bis:'BIS',eeg:'EEG',dsaAmpl:'DSA + Amplitude',dsaBis:'DSA + BIS'};
 function mtSettingsList(s){const g=s?{win:s.win,vol:s.alarmVol,tgt:s.tgt,rem:s.audioRem,sm:s.smooth,sr:s.displaySR,sec:s.secondary,ch:s.channels,ci:s.chartInt,sv:s.showVals,f:s.filters,imp:s.imp,main:s.main}:{win:MT.win,vol:MT.alarmVol,tgt:MT.tgt,rem:MT.audioRem,sm:mon.smooth,sr:MT.displaySR,sec:MT.secondary,ch:MT.channels,ci:MT.chartInt,sv:MT.showVals,f:MT.filters,imp:MT.imp,main:MT.main};
  return [['Trend Time Scale',g.win===60?'1 hour':g.win+' minutes',g.win],['Alarm Volume',g.vol+' (of 5)',g.vol],['Target Range',g.tgt.active?'Active':'Inactive',g.tgt.active],['&nbsp;&nbsp;High Limit',g.tgt.hi,g.tgt.hi],['&nbsp;&nbsp;Low Limit',g.tgt.lo,g.tgt.lo],['&nbsp;&nbsp;Target Alarm',g.tgt.alarm?'On':'Off',g.tgt.alarm],['Audio Off Reminder',g.rem?'Active':'Inactive',g.rem],
   ['BIS Smoothing Rate',g.sm+' seconds',g.sm],['Display SR',g.sr?'Yes':'No',g.sr],['Secondary Variable',MT_SEC[g.sec],g.sec],['Maximum EEG Channels',g.ch,g.ch],['Charting Interval',g.ci,g.ci],['Sensor Check Values',g.sv?'Show':'Hide',g.sv],
@@ -223,10 +231,13 @@ function mtSettingsList(s){const g=s?{win:s.win,vol:s.alarmVol,tgt:s.tgt,rem:s.a
 function mtDiff(raw,sv,k){const s=mtSettingsList(sv).find(r=>r[0]===k);return s&&s[2]!==raw;}
 function mtClearTrend(){HIST.length=0;R.HIST.length=0;MT.gaps.length=0;MT.anchor=mtAnchor(simT);mtD();}
 function mtAnchor(t){return Math.ceil((T0/1000+t)/60)*60-T0/1000;} // the next whole minute on the clock: where the time labels start
-function mtExport(){const E=MT.exp,rows=['Time,BIS,SQI,EMG_dB,SR_percent,SEF_Hz,MF_Hz'];HIST.forEach(c=>rows.push([mtStamp(c.n).replace('  ',' '),c.bis==null?'':c.bis.toFixed(1),c.sqi,c.emg.toFixed(1),c.bsr.toFixed(0),c.sef==null?'':c.sef.toFixed(1),c.mf==null?'':c.mf.toFixed(1)].join(',')));
+// Export Data (manual 4.6.11): a status screen with a percentage and Stop Export; the USB icon shows under the BIS box while exporting. The simulator also saves a CSV of the history.
+function mtExport(){const rows=['Time,BIS,SQI,EMG_dB,SR_percent,SEF_Hz,MF_Hz'];HIST.forEach(c=>rows.push([mtStamp(c.n).replace('  ',' '),c.bis==null?'':c.bis.toFixed(1),c.sqi,c.emg.toFixed(1),c.bsr.toFixed(0),c.sef==null?'':c.sef.toFixed(1),c.mf==null?'':c.mf.toFixed(1)].join(',')));
  try{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([rows.join('\n')+'\n'],{type:'text/csv'}));a.download='bis-simulator-history.csv';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);}catch(e){}
- MT.usbUntil=Date.now()+4000;mtHome(true);mtInfo('Export complete');setTimeout(()=>{mtD();},4200);}
-function mtMenuLive(){}
+ MT.expT0=Date.now();MT.usbUntil=MT.expT0+4000;mtGo('exporting');setTimeout(()=>{mtD();},4200);}
+function mtExportPct(){return Math.min(100,Math.floor((Date.now()-(MT.expT0||0))/4000*100));}
+function mtMenuLive(){if(MT.menu==='exporting'){const p=mtExportPct(),e=document.getElementById('mtExpPct');if(e)e.textContent=p>=100?'100% complete':'Exporting ... '+p+'%';}}
+
 // ---------- drawing: everything on a 640 x 480 virtual screen; the canvases map it with a transform ----------
 const MT_FR='#a8dbf0',MT_YEL='#e8dc1c',MT_PXS=121.33; // frame colour; EEG pixels per second (25 mm/s on the real LCD)
 function mtCv(c,X0,Y0,W,H){const w=c.clientWidth;if(!w)return null;const dpr=Math.min(2,window.devicePixelRatio||1),pw=Math.round(w*dpr),ph=Math.round(w*H/W*dpr);
@@ -242,7 +253,10 @@ function mtSeries(m,W,fn){const out=new Array(W).fill(null),per=m.win/W;
 // SEF and MF: held across the pixels that have no clean epoch (suppression), then smoothed over about 10 s: one unbroken line
 function mtTrace(m,W,fn){const ser=mtSeries(m,W,fn),per=m.win/W,last=Math.min(W,Math.ceil(m.n/per)),k=Math.max(1,Math.round(10/per));let held=null;
  for(let x=0;x<last;x++){if(ser[x]==null)ser[x]=held;else held=ser[x];}
- const out=ser.slice();if(k>1)for(let x=0;x<last;x++){let s=0,c=0;for(let j=Math.max(0,x-k+1);j<=x;j++)if(ser[j]!=null){s+=ser[j];c++;}out[x]=c?s/c:null;}return out;}
+ let out=ser.slice();if(k>1)for(let x=0;x<last;x++){let s=0,c=0;for(let j=Math.max(0,x-k+1);j<=x;j++)if(ser[j]!=null){s+=ser[j];c++;}out[x]=c?s/c:null;}
+ return mtMA(out,5);}
+// centred moving average over n samples (a null stays null)
+function mtMA(a,n){const h=n>>1,o=a.slice();for(let x=0;x<a.length;x++){if(a[x]==null)continue;let s=0,c=0;for(let j=Math.max(0,x-h);j<=Math.min(a.length-1,x+h);j++)if(a[j]!=null){s+=a[j];c++;}o[x]=s/c;}return o;}
 function mtLine(ctx,ser,X0,Yf,col,lw,outline){const go=()=>{ctx.beginPath();let pen=false;ser.forEach((v,x)=>{if(v==null){pen=false;return;}const X=X0+x+.5,Y=Yf(v);pen?ctx.lineTo(X,Y):ctx.moveTo(X,Y);pen=true;});ctx.stroke();};
  if(outline){ctx.strokeStyle='#000';ctx.lineWidth=lw+2.5;go();}ctx.strokeStyle=col;ctx.lineWidth=lw;go();}
 // ----- the DSA image: 1 px wide columns, no blur. Power per bin (dB) goes through a display scale that lifts the low frequencies,
@@ -265,7 +279,15 @@ function mtPaintDsa(m){const W=MT_DW,H=MT_DH,per=m.win/W,sh=((mon.dbLo-DB_LO)+(m
   for(let j=0;j<60;j++)w[j]=(v[Math.max(0,j-2)]+2*v[Math.max(0,j-1)]+3*v[j]+2*v[Math.min(59,j+1)]+v[Math.min(59,j+2)])/(9*k); // 2.5 Hz of vertical smoothing: slow gradation, not speckle
   for(let y=0;y<H;y++){const r=MT_ROWS[y],db=w[r[0]]*(1-r[1])+w[r[0]+1]*r[1];let L=(db+r[2]-LO)/SPAN;if(sf>0)L=L*(1-1.5*sf)-.1*sf;
    const c=MT_LUT[(Math.max(0,Math.min(1,L))*255)|0],p=(y*W+x)*4;d[p]=c[0];d[p+1]=c[1];d[p+2]=c[2];d[p+3]=255;}}
- MT_OFF.getContext('2d').putImageData(MT_IMG,0,0);}
+ mtSoften(d,W,H);MT_OFF.getContext('2d').putImageData(MT_IMG,0,0);}
+// soft vertical streaks, not speckle: a 3-column average along each row (black suppression columns stay black) and a light 1-2-1 vertical blend
+let MT_TMP=null;
+function mtSoften(d,W,H){if(!MT_TMP||MT_TMP.length!==d.length)MT_TMP=new Uint8ClampedArray(d.length);const t=MT_TMP;t.set(d);
+ for(let y=0;y<H;y++)for(let x=0;x<W;x++){const p=(y*W+x)*4;if(!t[p]&&!t[p+1]&&!t[p+2])continue;let r=0,g=0,b=0,k=0;
+  for(let dx=-1;dx<=1;dx++){const xx=x+dx;if(xx<0||xx>=W)continue;const q=(y*W+xx)*4;if(!t[q]&&!t[q+1]&&!t[q+2])continue;const w=dx?1:2;r+=t[q]*w;g+=t[q+1]*w;b+=t[q+2]*w;k+=w;}
+  d[p]=r/k;d[p+1]=g/k;d[p+2]=b/k;}
+ t.set(d);
+ for(let y=1;y<H-1;y++)for(let x=0;x<W;x++){const p=(y*W+x)*4,a=p-W*4,c=p+W*4;if(!t[p]&&!t[p+1]&&!t[p+2])continue;for(let j=0;j<3;j++)d[p+j]=(t[a+j]+2*t[p+j]+t[c+j])/4;}}
 // ----- the time axis: labels hh:mm at a fixed spacing from the case start (10 min on the 1 hour scale), none beyond the newest column
 function mtLabels(m,X0,W,total){if(MT.anchor==null)MT.anchor=mtAnchor(0);total=total||m.win;const steps=[1,2,5,10,15,30,60,120],step=steps.find(s=>total/60/s<=7)||120,out=[],base=MT.anchor,st=step*60;
  for(let k=Math.max(0,Math.floor((m.t0-base)/st));;k++){const ts=base+k*st;if(ts>m.tN+.5||ts>m.t0+total)break;const x=X0+(ts-m.t0)/total*W;if(x<X0-6||x>X0+W-17)continue;
@@ -281,7 +303,9 @@ function mtArtefacts(ctx,m,X0,W,y,h,span){const total=span||m.win,per=total/W;
   for(let i=i0;i<i1&&i<m.n;i++){const q=HIST[m.o+i];if(q.sqi<15)lvl=2;else if(q.sqi<50&&lvl<1)lvl=1;}
   if(lvl){ctx.fillStyle=lvl===2?'#ffe600':'#e07820';ctx.fillRect(X0+x,y,1,h);}}}
 function mtGaps(ctx,m,X0,W,y,h,span){const total=span||m.win;MT.gaps.forEach(g=>{const x=X0+(g.t-m.t0)/total*W;if(x>=X0&&x<=X0+W){ctx.fillStyle='#000';ctx.fillRect(Math.floor(x),y,g.w,h);}});}
-function mtSnap(ctx,m,X0,W,y,span){if(MT.snapT==null)return;const total=span||m.win,x=X0+(MT.snapT-m.t0)/total*W;if(x<X0||x>X0+W)return;
+function mtSnap(ctx,m,X0,W,y,span){const total=span||m.win;
+ if(MT.snapPrev!=null){const px=X0+(MT.snapPrev-m.t0)/total*W;if(px>=X0&&px<=X0+W){ctx.fillStyle='#30d4d8';ctx.beginPath();ctx.moveTo(px,y-4);ctx.lineTo(px+4,y);ctx.lineTo(px,y+4);ctx.lineTo(px-4,y);ctx.fill();}}
+ if(MT.snapT==null)return;const x=X0+(MT.snapT-m.t0)/total*W;if(x<X0||x>X0+W)return;
  ctx.fillStyle='#30d4d8';ctx.fillRect(x-5,y-4,10,8);ctx.fillStyle='#000';ctx.fillRect(x-2,y-1,4,4);}
 function mtColourBar(ctx){const x=611,y=262,h=120,g=ctx.createLinearGradient(0,y,0,y+h);MT_STOPS.forEach(t=>g.addColorStop(t[0],`rgb(${t[1]},${t[2]},${t[3]})`));ctx.fillStyle=g;ctx.fillRect(x,y,15,h);
  ctx.strokeStyle='#dfe6ef';ctx.lineWidth=1;ctx.strokeRect(x+.5,y-.5,14,h+1);mtT(ctx,'H',618.5,251,13,'#e8e8f0','center',700);mtT(ctx,'L',618.5,394,13,'#e8e8f0','center',700);}
@@ -298,9 +322,9 @@ function mtDrawDsaView(ctx,withBis){const win=MT.win*60,m=mtModel(win),c=COLS[CO
  for(const hz of [4,8,13]){const y=Math.round(Yh(hz))+.5;ctx.moveTo(143,y);ctx.lineTo(489,y);}ctx.stroke();ctx.restore();
  mtGaps(ctx,m,143,323,258,118);
  // SEF (white) and MF (violet-blue), 2 px, unbroken
- mtLine(ctx,mtTrace(m,323,q=>q.sef),143,v=>Yh(Math.max(0,Math.min(30,v))),'#ffffff',2);mtLine(ctx,mtTrace(m,323,q=>q.mf),143,v=>Yh(Math.max(0,Math.min(30,v))),'#8b78ef',2);
+ mtLine(ctx,mtTrace(m,323,q=>q.sef),143,v=>Yh(Math.max(0,Math.min(30,v))),'#ffffff',2);mtLine(ctx,mtTrace(m,323,q=>q.mf),143,v=>Yh(Math.max(0,Math.min(30,v))),'#9a6cf0',2);
  // header strip: SEF, MF, date and time, case code, BIS
- mtT(ctx,'SEF '+H.sef,150,244,13,'#fff','left',700);mtT(ctx,'MF '+H.mf,150+ctx.measureText('SEF '+H.sef).width+14,244,13,'#6c63ff','left',700);
+ mtT(ctx,'SEF '+H.sef,150,244,13,'#fff','left',700);mtT(ctx,'MF '+H.mf,150+ctx.measureText('SEF '+H.sef).width+14,244,13,'#9a6cf0','left',700);
  mtT(ctx,mtStamp(simT),372,244,12.5,'#fff','center');mtT(ctx,MT.demo?'DEMO':MT.caseId,502,244,12.5,'#fff','left');
  if(withBis)mtT(ctx,'BIS '+H.bis,596,244,12.5,'#fff','right',700);
  // left frequency labels (yellow), band names (yellow, centred on each band)
@@ -309,9 +333,9 @@ function mtDrawDsaView(ctx,withBis){const win=MT.win*60,m=mtModel(win),c=COLS[CO
  ctx.strokeStyle=MT_FR;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(142,377);ctx.lineTo(603,377);ctx.stroke();
  // lower trend: amplitude (white area, 1 px columns) or BIS
  ctx.fillStyle='#000';ctx.fillRect(143,378,459,68);
- if(!withBis){const ser=mtSeries(m,323,q=>q.amp),o=MT_AMP.getContext('2d');o.clearRect(0,0,323,68);o.fillStyle='#dff0ff';ser.forEach((v,x)=>{if(v==null)return;const h=Math.max(1,Math.round(66*mtAmpH(v)));o.fillRect(x,68-h-2,1,h);});ctx.drawImage(MT_AMP,0,0,323,68,143,378,323,68);
+ if(!withBis){const ser=mtMA(mtSeries(m,323,q=>q.amp),5),o=MT_AMP.getContext('2d');o.clearRect(0,0,323,68);o.fillStyle='#ffffff';ser.forEach((v,x)=>{if(v==null)return;const h=Math.max(1,Math.round(66*mtAmpH(v)));o.fillRect(x,68-h-2,1,h);});ctx.drawImage(MT_AMP,0,0,323,68,143,378,323,68);
   mtGaps(ctx,m,143,323,378,68);
-  ctx.save();ctx.setLineDash([2,3]);ctx.strokeStyle='rgba(120,140,170,.8)';ctx.lineWidth=1;ctx.beginPath();for(const f of [.25,.5,.75]){const y=Math.round(446-66*f)+.5;ctx.moveTo(143,y);ctx.lineTo(490,y);}ctx.stroke();ctx.restore();
+  ctx.save();ctx.setLineDash([2,3]);ctx.strokeStyle='#707070';ctx.lineWidth=1;ctx.beginPath();for(const f of [.25,.5,.75]){const y=Math.round(446-66*f)+.5;ctx.moveTo(143,y);ctx.lineTo(490,y);}ctx.stroke();ctx.restore();
   mtT(ctx,'AMPL',545,410,12,'#fff','center');}
  else{const Yb=v=>440-58*v/100;mtGaps(ctx,m,143,323,378,68);
   mtGuides(ctx,mtLabels(m,143,323),378,446);
@@ -319,14 +343,15 @@ function mtDrawDsaView(ctx,withBis){const win=MT.win*60,m=mtModel(win),c=COLS[CO
  // time axis band and the artefact strip
  const labs=mtAxisBand(ctx,m,143,323,448,466);ctx.fillStyle='#000';ctx.fillRect(466,448,136,18);
  ctx.strokeStyle=MT_FR;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(142,447);ctx.lineTo(603,447);ctx.moveTo(142,467);ctx.lineTo(603,467);ctx.stroke();
- mtArtefacts(ctx,m,143,323,469,6);ctx.fillStyle='#000';ctx.fillRect(466,469,136,7);mtSnap(ctx,m,143,323,457);
+ mtArtefacts(ctx,m,143,323,469,7);ctx.fillStyle='#000';ctx.fillRect(466,469,136,7);mtSnap(ctx,m,143,323,457);
  mtColourBar(ctx);}
 // ----- the variable on the right-hand axis of the trend views -----
 function mtRight(sec){
- if(sec==='st'){const mx=Math.max(120,Math.ceil(Math.max(0,...HIST.map(q=>q.st||0))/120)*120);return {rs:q=>q.st==null?null:q.st/mx*100,rt:'ST',rc:'#e060f0',rl:Array.from({length:7},(_,i)=>{const s=Math.round(mx*(6-i)/6);return Math.floor(s/60)+':'+mtPad(s%60);})};}
+ if(sec==='st'){const mx=Math.max(120,Math.ceil(Math.max(0,...HIST.map(q=>q.st||0))/120)*120);return {rs:q=>q.st==null?null:q.st/mx*100,rt:'ST',rc:'#e060e0',rl:Array.from({length:7},(_,i)=>{const s=Math.round(mx*(6-i)/6);return Math.floor(s/60)+':'+mtPad(s%60);})};}
  if(sec==='emg')return {rs:q=>Math.max(0,Math.min(100,(q.emg-30)*2)),rt:'EMG',rc:'#f08a24',rl:[80,70,60,50,40,30].map(String)};
  if(sec==='sr')return {rs:q=>q.bsr,rt:'SR',rc:'#60d0ff',rl:[100,80,60,40,20,0].map(String)};
  if(sec==='sqi')return {rs:q=>q.sqi,rt:'SQI',rc:'#40e060',rl:[100,80,60,40,20,0].map(String)};
+ if(sec==='bpm')return {rs:q=>{const p=(q.bsr||0)/100;return Math.min(100,48*p*(1-p)/30*100);},rt:'BPM',rc:'#f0c040',rl:[30,24,18,12,6,0].map(String)}; // teaching approximation: bursts per minute peak at about half suppression
  return {rs:null,rt:'',rc:'#e060f0',rl:[]};}
 // ----- BIS trend view (also Trend Review) -----
 function mtReviewLen(){return Math.max(60,Math.min(HIST.length,3600));}
@@ -336,7 +361,7 @@ function mtDrawTrendView(ctx){const R_=MT.review,len=R_?mtReviewLen():MT.win*60,
  const sec=R_?R_.sec:MT.displayST?'st':MT.secondary,{rs,rl,rc,rt}=mtRight(sec);
  // grid
  ctx.save();ctx.setLineDash([1,3]);ctx.strokeStyle='rgba(255,255,255,.2)';ctx.lineWidth=1;ctx.beginPath();for(const v of [20,40,60,80]){const y=Math.round(Yb(v))+.5;ctx.moveTo(X0,y);ctx.lineTo(X0+W,y);}ctx.stroke();ctx.restore();
- if(MT.tgt.active){const yh=Yb(MT.tgt.hi),yl=Yb(MT.tgt.lo);if(MT.tgt.fmt==='band'){ctx.fillStyle='rgba(110,110,230,.36)';ctx.fillRect(X0,yh,W,yl-yh);}else{ctx.strokeStyle='#b9b9ff';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(X0,Math.round(yh)+.5);ctx.lineTo(X0+W,Math.round(yh)+.5);ctx.moveTo(X0,Math.round(yl)+.5);ctx.lineTo(X0+W,Math.round(yl)+.5);ctx.stroke();}}
+ if(MT.tgt.active&&!(MT.tgt.hi>=100&&MT.tgt.lo<=0)){const yh=Yb(MT.tgt.hi),yl=Yb(MT.tgt.lo);if(MT.tgt.fmt==='band'){ctx.fillStyle='rgba(110,110,230,.36)';ctx.fillRect(X0,yh,W,yl-yh);}else{ctx.strokeStyle='#b9b9ff';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(X0,Math.round(yh)+.5);ctx.lineTo(X0+W,Math.round(yh)+.5);ctx.moveTo(X0,Math.round(yl)+.5);ctx.lineTo(X0+W,Math.round(yl)+.5);ctx.stroke();}}
  mtGuides(ctx,mtLabels(m,X0,W),260,448,'rgba(190,225,255,.8)');
  mtGaps(ctx,m,X0,W,260,188);
  if(rs)mtLine(ctx,mtSeries(m,W,rs),X0,v=>Yb(v),rc,1.2);
@@ -345,14 +370,14 @@ function mtDrawTrendView(ctx){const R_=MT.review,len=R_?mtReviewLen():MT.win*60,
  for(const v of [0,20,40,60,80,100])mtT(ctx,String(v),116,Yb(v),14,MT_YEL,'right');
  rl.forEach((s,i)=>mtT(ctx,s,610,264+i*(176/(rl.length-1)),14,rc,'left'));
  // header: BIS (heavy) left, date and time centre, the right-hand variable's name
- mtT(ctx,'BIS',129,246,25,'#fff','left',400,'"Archivo Black","Arimo",sans-serif');
- if(R_){mtT(ctx,(HIST.length?mtStamp(HIST[0].n):'--')+' → '+mtStamp(simT),340,246,10.5,'#fff','center');mtT(ctx,MT.demo?'DEMO':MT.caseId,553,246,11,'#aeb3c8','right');
-  if(rt)mtT(ctx,rt,596,246,12,rc,'right',700,MT_BOLD);}
- else{mtT(ctx,mtStamp(simT),372,245,13,'#fff','center');if(rt)mtT(ctx,rt,596,246,25,rc,'right',400,'"Archivo Black","Arimo",sans-serif');}
+ mtT(ctx,'BIS',129,246,12,'#f4f450','left',700,MT_BOLD);
+ if(R_){mtT(ctx,(HIST.length?mtStamp(HIST[0].n):'--')+' → '+mtStamp(simT),340,246,10.5,'#38c8b8','center');mtT(ctx,MT.demo?'DEMO':MT.caseId,553,246,11,'#fff','right');
+  if(rt)mtT(ctx,rt,596,246,11,rc,'right',400,MT_BOLD);}
+ else{mtT(ctx,mtStamp(simT),372,246,11.5,'#38c8b8','center');mtT(ctx,MT.demo?'DEMO':MT.caseId,500,246,11.5,'#fff','left');if(rt)mtT(ctx,rt,596,246,11.5,rc,'right',400,MT_BOLD);}
  ctx.strokeStyle=MT_FR;ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(121,259);ctx.lineTo(603,259);ctx.stroke();
  mtAxisBand(ctx,m,X0,W,450,466);
  ctx.strokeStyle=MT_FR;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(121,449);ctx.lineTo(603,449);ctx.moveTo(121,467);ctx.lineTo(603,467);ctx.stroke();
- mtArtefacts(ctx,m,X0,W,469,6);mtSnap(ctx,m,X0,W,458);
+ mtArtefacts(ctx,m,X0,W,469,7);mtSnap(ctx,m,X0,W,458);
  if(R_&&R_.cur!=null&&m.n){const i=Math.max(0,Math.min(m.n-1,R_.cur)),x=Math.round(X0+(i+.5)/m.win*W)+.5,q=HIST[m.o+i];
   ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x,262);ctx.lineTo(x,448);ctx.stroke();
   const bx=Math.max(X0+6,Math.min(X0+W-110,x-125)),by=292;mtRR(ctx,bx,by,100,72,8);ctx.fillStyle='#3a3b44';ctx.fill();ctx.strokeStyle='#c8c8d0';ctx.lineWidth=2;ctx.stroke();
@@ -369,20 +394,18 @@ const MT_GAIN=1.25; // awake traces here are small (sd about 10 uV): drawn a lit
 function mtSweepBox(ctx,x,y,w,h,big){const N=Math.round(w/MT_PXS*FS),two=MT.channels===2,hh=two?h/2:h,pos=produced%N,gap=Math.round(Math.max(24,w*0.08)),gapN=Math.round(gap/w*N);
  ctx.fillStyle='#05080a';ctx.fillRect(x,y,w,h);
  for(let ch=0;ch<(two?2:1);ch++){const arr=ch?R.SIG:SIG,top=y+ch*hh;ctx.save();ctx.beginPath();ctx.rect(x,top,w,hh);ctx.clip();
-  ctx.fillStyle='#3a4764';ctx.fillRect(x+pos/N*w,top,gap,hh);
-  ctx.strokeStyle='#a5d02b';ctx.lineWidth=1;ctx.beginPath();const L=arr.length-1;let pen=false;
+  ctx.fillStyle='rgba(47,74,130,.9)';ctx.fillRect(x+pos/N*w,top,gap,hh);
+  ctx.strokeStyle='#8fd02a';ctx.lineWidth=1.5;ctx.beginPath();const L=arr.length-1;let pen=false;
   for(let j=0;j<N;j++){let idx;if(j<pos)idx=L-(pos-1-j);else if(j>=pos+gapN)idx=L-(pos-1-j)-N;else{pen=false;continue;}
    if(idx<0||idx>L){pen=false;continue;}let v=arr[idx];if(!MT.filters)v+=9*Math.sin(2*Math.PI*50*(produced-(L-idx))/FS);
    const X=x+j/N*w,Y=top+hh/2-v*MT_GAIN*(hh/100);pen?ctx.lineTo(X,Y):ctx.moveTo(X,Y);pen=true;}
   ctx.stroke();ctx.restore();}
- // small scale ticks: seconds along the top and bottom edges, divisions on the sides
- ctx.strokeStyle='rgba(200,220,235,.55)';ctx.lineWidth=1;ctx.beginPath();for(let s=1;s*MT_PXS<w;s++){const tx=Math.round(x+s*MT_PXS)+.5;ctx.moveTo(tx,y);ctx.lineTo(tx,y+3);ctx.moveTo(tx,y+h-3);ctx.lineTo(tx,y+h);}
- for(let k=1;k<4;k++){const ty=Math.round(y+h*k/4)+.5;ctx.moveTo(x,ty);ctx.lineTo(x+3,ty);ctx.moveTo(x+w-3,ty);ctx.lineTo(x+w,ty);}ctx.stroke();}
+}
 // ----- the small BIS trend that takes the EEG box's place while the Menu is open (and over the big EEG display) -----
 // 'BIS' top left, 'ST' (or the secondary variable) top right with its own axis outside the frame, a black axis band under the plot
 function mtDrawMiniTrend(ctx){const win=MT.win*60,m=mtModel(win),X0=268,W=338,Yb=v=>148-80*v/100,sec=MT.displayST?'st':MT.secondary,{rs,rl,rc,rt}=mtRight(sec);
  mtFrame(ctx,267,47,340,126,6,'#06080b');ctx.fillStyle='#000';ctx.fillRect(X0,64,W,86);
- mtT(ctx,'BIS',275,56,14,'#fff6a0','left',700,MT_BOLD);if(rt)mtT(ctx,rt,598,56,14,rc,'right',700,MT_BOLD);
+ mtT(ctx,'BIS',275,56,12,'#f4f450','left',700,MT_BOLD);if(rt)mtT(ctx,rt,598,56,11.5,rc,'right',400,MT_BOLD);
  ctx.strokeStyle='#cfd9e6';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(268,63.5);ctx.lineTo(606,63.5);ctx.stroke();
  const labs=mtLabels(m,X0,W);mtGuides(ctx,labs,64,150,'rgba(190,225,255,.7)');
  if(rs)mtLine(ctx,mtSeries(m,W,rs),X0,v=>Yb(v),rc,1);
@@ -405,23 +428,32 @@ const MT_EPOS={1:216,2:292,4:368,3:557};
 function mtSensorStart(){if(MT.demo){mtInfo('Not available during Demo Case',511);return;}
  if(MT.menu||MT.review)mtHome(true);
  MT.sensor={t0:Date.now(),el:[1,2,3,4].map(n=>({n,st:'none',v:null})),lab:['1','2','3','4'],pass:false,passAt:0};mtSensorEval();mtSensorSvg();mq('v2Sensor').hidden=false;mtKeys();mtLayout();mtD();mq('kSensor').focus();}
-function mtSensorExit(){if(!MT.sensor)return;const was=MT.sensor.pass;MT.sensor=null;mq('v2Sensor').hidden=true;if(was)MT.gaps.push({t:simT,w:1});mtKeys();mtLayout();mtD();}
+// leaving with an electrode still HIGH: 'Last Sensor Check Failed [16]'; a pass starts a new case (new 4-character case ID) and leaves a gap marker
+function mtNewCaseId(){const A='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';let id='';for(let i=0;i<4;i++)id+=A[Math.floor(Math.random()*A.length)];return id;}
+function mtSensorExit(){if(!MT.sensor)return;const was=MT.sensor.pass,bad=MT.sensor.el.some(e=>e.st==='high');MT.sensor=null;mq('v2Sensor').hidden=true;
+ if(was){MT.gaps.push({t:simT,w:1});MT.realId=mtNewCaseId();if(!MT.demo)MT.caseId=MT.realId;}
+ else if(bad)mtInfo('Last Sensor Check Failed',16,120000,'lo',true);
+ mtKeys();mtLayout();mtD();}
 function mtSensorEval(){const s=MT.sensor;if(!s)return;const c=COLS[COLS.length-1]||{sqi:100},ok=c.sqi>=50,age=(Date.now()-s.t0)/1000,order={1:1.2,4:1.9,3:2.6,2:3.3};
- s.el.forEach(e=>{if(age<order[e.n]){e.st='none';e.v=null;return;}
+ // each electrode is pending (navy), then briefly NOISE (grey ?), then PASS; the ground (2) reads HIGH for a moment first, so the 'Press electrode 2' message can be seen
+ s.el.forEach(e=>{const a=age-order[e.n];if(a<0){e.st='none';e.v=null;return;}
+  if(a<.7){e.st='noise';e.v=null;return;}
   if(!ok&&e.n===3){e.st='high';e.v=40+((Date.now()/700)%1>.5?27:24);return;}
+  if(e.n===2&&a<2.2){e.st='high';e.v=34+((Date.now()/700)%1>.5?9:5);return;}
   e.st='pass';e.v=e.n===2?0:[0,3,0,2][e.n-1]||1;});
  const all=s.el.every(e=>e.st==='pass');if(all&&!s.pass){s.pass=true;s.passAt=Date.now();}if(!all)s.pass=false;
  if(s.pass&&Date.now()-s.passAt>2200){mtSensorExit();return;}
  mtSensorSvg();}
+// the sensor pod: a tapered cable tail, three scalloped lobes (electrodes 1, 2 and 4) joined by narrow necks, a long thin strip and the lobe of electrode 3
+const MT_POD='<path d="M120 317L184 306V356L120 346z"/><rect x="216" y="314" width="152" height="34" rx="6"/><circle cx="216" cy="331" r="36"/><circle cx="292" cy="331" r="36"/><circle cx="368" cy="331" r="36"/><rect x="380" y="326" width="150" height="10"/><rect x="513" y="303" width="86" height="60" rx="28"/>';
 function mtSensorSvg(){const s=MT.sensor;if(!s)return;const sv=mq('v2ScSvg'),vals=MT.showVals,F='font-family="Arimo,sans-serif"';
- // the sensor outline: a tail, three scalloped lobes (electrodes 1, 2 and 4) with narrow necks, a thin strip and a lobe of its own for 3
- let h=`<rect x="92" y="232" width="546" height="244" rx="8" fill="#40406e" stroke="#6a6cb0" stroke-width="1.5"/><text x="365" y="257" text-anchor="middle" ${F} font-weight="700" font-size="20" fill="#fff" letter-spacing="1">Sensor Check</text>
- <g fill="#f4f4fa"><path d="M122 318h72v26h-72l7-13z"/><circle cx="${MT_EPOS[1]}" cy="331" r="39"/><circle cx="${MT_EPOS[2]}" cy="331" r="39"/><circle cx="${MT_EPOS[4]}" cy="331" r="39"/><rect x="380" y="326" width="150" height="10"/><rect x="${MT_EPOS[3]-42}" y="290" width="84" height="82" rx="38"/></g>`;
- for(const n of [1,2,4,3]){const e=s.el[n-1],x=MT_EPOS[n],y=331;let fill='#848684',sym='?',lab='NOISE',cls='';
-  if(s.pass){fill='#3b3d78';sym='';lab='PASS';}else if(e.st==='pass'){fill='#00a652';sym='ok';lab='PASS';}else if(e.st==='high'){fill='#f70000';sym='x';lab='HIGH';cls=' class="blink"';}
-  h+=`<g${cls} data-e="${n}"><circle cx="${x}" cy="${y}" r="29" fill="#2c2e5c"/><circle cx="${x}" cy="${y}" r="26" fill="${fill}"/><text x="${x}" y="${y+7}" text-anchor="middle" ${F} font-weight="700" font-size="21" fill="#fff">${n}</text></g>`;
-  if(vals){h+=`<text x="${x}" y="289" text-anchor="middle" ${F} font-size="15" fill="#fff">${e.v==null?'':e.v}</text><text x="${x}" y="388" text-anchor="middle" ${F} font-size="15" fill="#fff">${s.pass?'PASS':e.st==='none'?'NOISE':lab}</text>`;}
-  else if(s.pass)h+=`<text x="${x}" y="392" text-anchor="middle" ${F} font-size="17" fill="#fff">PASS</text>`;else h+=sym==='ok'?`<path d="M${x-10} 386l7 8l13-17" stroke="#fff" stroke-width="3.4" fill="none"/>`:sym==='x'?`<path d="M${x-9} 378l18 18M${x+9} 378l-18 18" stroke="#fff" stroke-width="2.6"/>`:`<text x="${x}" y="392" text-anchor="middle" ${F} font-size="22" fill="#fff">?</text>`;}
+ let h=`<rect x="92.5" y="231.5" width="546" height="244" rx="7" fill="#4a4a8a" stroke="#8a8cc8" stroke-width="1"/><text x="365" y="257" text-anchor="middle" ${F} font-weight="700" font-size="20" fill="#fff" letter-spacing="1">Sensor Check</text>
+ <g fill="#f4f4fa">${MT_POD}</g>`;
+ for(const n of [1,2,4,3]){const e=s.el[n-1],x=MT_EPOS[n],y=331;let fill='#2c2e5c',sym='',lab='',cls='';
+  if(s.pass){fill='#2c2e5c';sym='';lab='PASS';}else if(e.st==='pass'){fill='#0a9e55';sym='ok';lab='PASS';}else if(e.st==='high'){fill='#e8191f';sym='x';lab='HIGH';cls=' class="blink"';}else if(e.st==='noise'){fill='#808080';sym='?';lab='NOISE';}
+  h+=`<g${cls} data-e="${n}"><circle cx="${x}" cy="${y}" r="29" fill="#1c2050"/><circle cx="${x}" cy="${y}" r="26" fill="${fill}"/><text x="${x}" y="${y+7}" text-anchor="middle" ${F} font-weight="700" font-size="21" fill="#fff">${n}</text></g>`;
+  if(vals){h+=`<text x="${x}" y="289" text-anchor="middle" ${F} font-size="15" fill="#fff">${e.v==null?'':e.v}</text><text x="${x}" y="388" text-anchor="middle" ${F} font-size="15" fill="#fff">${s.pass?'PASS':e.st==='none'?'':lab}</text>`;}
+  else if(s.pass)h+=`<text x="${x}" y="392" text-anchor="middle" ${F} font-size="17" fill="#fff">PASS</text>`;else h+=sym==='ok'?`<path d="M${x-10} 386l7 8l13-17" stroke="#fff" stroke-width="3.4" fill="none"/>`:sym==='x'?`<path d="M${x-9} 378l18 18M${x+9} 378l-18 18" stroke="#fff" stroke-width="2.6"/>`:sym==='?'?`<text x="${x}" y="392" text-anchor="middle" ${F} font-size="22" fill="#fff">?</text>`:'';}
  sv.innerHTML=h;mq('v2ScVal').innerHTML=vals?'Hide<br>Values':'Show<br>Values';}
 // ---------- trend review ----------
 function mtReviewOpen(){MT.menu=null;MT.menuStack=[];mq('v2Menu').hidden=true;MT.review={mode:'case',cur:null,off:0,sec:MT.displayST?'emg':MT.secondary==='none'?'none':MT.secondary};mtReviewUI();mtKeys();mtLayout();mtD();}
@@ -442,16 +474,16 @@ function mtReviewUI(){const R_=MT.review;if(!R_)return;const P=mq('v2Rev');MT_P=
 function mtReviewClick(e){const R_=MT.review;if(!R_||!HIST.length)return;const c=mq('c2Dsa'),r=c.getBoundingClientRect(),vx=88+(e.clientX-r.left)/r.width*552,win=mtReviewLen(),m=mtModel(win,Math.min(R_.off||0,Math.max(0,HIST.length-win))),i=Math.floor((vx-122)/478*win);
  if(i<0||i>=m.n)return;R_.cur=i;if(R_.mode!=='cursor'){R_.mode='cursor';mtReviewUI();}mtD();}
 // ---------- wiring ----------
-function mtApply(){mtHome(true);if(MT.sensor)mtSensorExit();mtLayout();mtAlarmUI();mtKeys();}
+function mtApply(){mtHome(true);if(MT.sensor){MT.sensor=null;mq('v2Sensor').hidden=true;}mtLayout();mtAlarmUI();mtKeys();}
 function mtWire(){
  mq('kSilent').onclick=mtAlarmPress;
- mq('kMenu').onclick=()=>{if(MT.sensor)return;if(MT.menu)mtHome();else{if(MT.review)mtHome(true);mtOpen();}};
+ mq('kMenu').onclick=()=>{if(MT.sensor)mtSensorExit();if(MT.menu)mtHome();else{if(MT.review)mtHome(true);mtOpen();}};
  mq('kSensor').onclick=()=>{if(MT.sensor)mtSensorExit();else if(MT.review)mtHome();else mtSensorStart();};
- mq('v2Dismiss').onclick=()=>{const k=mq('v2Msg').dataset.key;if(k==='startup')MT.startup.on=false;else if(k==='lo')MT.lowDis=MT.curLo;mtD();mtMsgUI();};
+ mq('v2Dismiss').onclick=()=>{const k=mq('v2Msg').dataset.key;if(k==='startup')MT.startup.on=false;else if(k==='info')MT.info=null;else if(k==='lo')MT.lowDis=MT.curLo;mtD();mtMsgUI();};
  mq('v2ScVal').onclick=()=>{MT.showVals=!MT.showVals;mtSensorSvg();};
  mq('v2Review').onclick=mtReviewOpen;
  mq('c2Dsa').addEventListener('click',mtReviewClick);
  const esc=e=>{if(e.key==='Escape'&&(MT.menu||MT.review)){e.preventDefault();mtHome();}};mq('v2Menu').addEventListener('keydown',esc);mq('v2Rev').addEventListener('keydown',esc);
  addEventListener('pointerdown',mtUnlock,{capture:true,once:true});addEventListener('keydown',mtUnlock,{capture:true,once:true});
- setInterval(()=>{if(MT.sensor){mtSensorEval();mtMsgUI();mtSqiBars();}if(mtVis())mtAlarmTick();},400);}
+ setInterval(()=>{if(MT.sensor){mtSensorEval();mtMsgUI();mtSqiBars();}if(mtVis()){mtAlarmTick();mtMenuLive();mq('v2Usb').hidden=!(MT.usbUntil>Date.now());}},400);}
 mtWire();
