@@ -188,6 +188,21 @@ await page.goto(BASE + '?demo=latemc'); await page.waitForTimeout(1200);
 ok((await problems(page)).filter(t => /is on MC but rostered/.test(t)).length === 2, 'late MC scenario');
 await page.context().close();
 
+// ---- Settings: App version and "Get the latest version" (clears only the app's saved copy) ----
+page = await newPage({ width: 390, height: 844 });
+await page.goto(BASE + '?demo'); await page.waitForSelector('#demo-bar');
+await page.evaluate(async () => { await navigator.serviceWorker.ready; for (let i = 0; i < 50 && !(await caches.keys()).some(k => k.startsWith('nuh-roster-')); i++) await new Promise(r => setTimeout(r, 100)); });
+await tab(page, 'Settings');
+const latest = page.locator('.appver button:has-text("Not updating? Get the latest version")');
+ok(await latest.count() === 1, 'Get the latest version button on Settings');
+await page.waitForFunction(() => /^App version \S/.test(document.getElementById('appver')?.textContent || ''));
+ok(true, 'App version line after the service worker installs');
+await page.evaluate(async () => { localStorage.setItem('appver-keep', '1'); await caches.open('nuh-roster-old'); await caches.open('other-app-v1'); });
+await Promise.all([page.waitForEvent('load'), latest.click()]);
+const after2 = await page.evaluate(async () => ({ keys: await caches.keys(), keep: localStorage.getItem('appver-keep'), demo: !!localStorage.getItem('ot-roster-demo') }));
+ok(!after2.keys.includes('nuh-roster-old') && after2.keys.includes('other-app-v1') && after2.keep === '1' && after2.demo, 'Get the latest version clears only nuh-roster- caches and keeps localStorage: ' + JSON.stringify(after2));
+await page.context().close();
+
 // ---- the real app, empty: welcome card, tour points to Practice ----
 page = await newPage({ width: 390, height: 844 });
 await page.goto(BASE); await page.waitForTimeout(700);

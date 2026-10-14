@@ -3945,7 +3945,34 @@ function renderSettings() {
         h('button', { onclick: () => { if (confirm('Reset rules and subspecialties to the defaults? Staff are kept.')) { state.settings = clone(DEFAULT_SETTINGS); render(); } } }, 'Reset rules'),
         h('button', { onclick: () => { if (confirm('Delete everything stored in this browser (staff, day, roster)?')) { state = blankState(); syncRooms(); render(); } } }, 'Delete all data in this browser')),
     )),
+    appVersion(),
   );
+}
+
+// App version and "Get the latest version" (owner, 14 Oct 2026; prewarm's pattern): which saved copy this phone runs,
+// and a way out for a phone stuck on an old one. It only clears the app's own saved copy, never the roster data or sign-in.
+function appVersion() {
+  const ver = h('div', { id: 'appver' }), msg = h('span', { role: 'status' });
+  if (window.caches) caches.keys().then(ks => {
+    const k = ks.find(x => x.startsWith('nuh-roster-')); if (!k) return;
+    const v = k.slice('nuh-roster-'.length), d = /^(\d{4}-\d{2}-\d{2})-([0-9a-f]+)$/.exec(v);
+    ver.textContent = 'App version ' + (d ? `${d[1]} (${d[2]})` : v);
+  }).catch(() => {});
+  const getLatest = async btn => {
+    btn.disabled = true; msg.textContent = '';
+    try {
+      const reg = await navigator.serviceWorker?.getRegistration();
+      const url = new URL(reg?.active?.scriptURL || new URL('sw.js', location.href));
+      url.searchParams.set('fresh', Date.now());
+      const res = await fetch(url, { cache: 'no-store' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      await reg?.unregister();
+      if (window.caches) for (const k of await caches.keys()) if (k.startsWith('nuh-roster-')) await caches.delete(k);
+      location.reload();
+    } catch { msg.textContent = 'No signal: nothing was changed. Try again with signal.'; btn.disabled = false; }
+  };
+  return h('div', { class: 'appver hint' }, ver,
+    h('div', {}, h('button', { type: 'button', class: 'link', onclick: e => getLatest(e.currentTarget) }, 'Not updating? Get the latest version'), ' ', msg));
 }
 
 // ---------- team file ----------
