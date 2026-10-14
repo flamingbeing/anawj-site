@@ -63,3 +63,21 @@ copy; a copy brings the script but not its triggers).
   editor leaves.
 - Tests: `node logbook/test/outbox-script.test.mjs` (the row mapping against `js/categories.js`, the sheet's expectations and
   the logbook's import, and the order of the update chain, with fakes).
+
+## The nightly Totals check (optional, same file)
+
+The sheet's Database tab is built one response at a time and the AY Totals tabs are built from the Database, so a response
+whose update timed out, one added twice, or a Case row changed by hand leaves the Totals out of step with the Case tab
+(Oct 2026: three residents' totals were 1-2 off). `Outbox.gs` also holds a check that compares, by counts only, Case tab ->
+Database -> each AY Totals tab, and can run the same two rebuilds the sheet's own menu has.
+
+- `logbookOutboxTotalsReport` (run by hand, any time): lists the differing cells in the log; changes nothing.
+- `logbookOutboxTotalsSetup` (run once by hand): adds a daily trigger at about 03:00 (`logbookOutboxTotalsCheck`). It only
+  **reports** until you set the Script property `LOGBOOK_TOTALS_FIX` to `on` (Project settings → Script properties).
+- With the property on, a difference triggers **Rebuild Database** (only if the Database differs from the Case tab) and then
+  **Rebuild AY Reports**, each alone in a hold of the document lock, then checks again. It never rebuilds twice in a night, skips
+  the night if a case arrived in the last 10 minutes or if fewer than 1,000 Case rows were read, and never touches the Case or
+  Residents tabs or a resident's own spreadsheet. A category the Totals tabs have no row for (before 26iv was added to
+  `Categories.gs`) is ignored, not a difference. The last result is kept in the Script property `LOGBOOK_TOTALS_LAST`.
+- Measure first: run `logbookOutboxTotalsReport`, then run the menu's Rebuild commands by hand once and note how long each
+  takes (the 6-minute limit applies to the nightly run, which runs both).

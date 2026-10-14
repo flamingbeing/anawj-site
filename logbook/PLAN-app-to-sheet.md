@@ -103,3 +103,14 @@ The owner installed `Outbox.gs` in the response sheet's project (Script properti
 Only cases made from then on go to the sheet (no back-fill). First check: a case logged by a programme resident shows in the
 Case tab within about 5 minutes, with `app:<caseId>` in column J, and in the Database tab. Off switch: set the constant false, or
 delete the trigger.
+
+## Two-way drift (owner, 14 Oct 2026)
+
+Owner: the app is the source of truth AND the Google Form / response sheet is trusted too, so a change in either place
+should reach the other. Built so far: the drift check (`/drift-check`, Firetop's read-only script: counts per resident and
+category, row-level gaps by cause, "changes to old cases", weekly on Mondays 08:30 SGT with a phone message), the re-import
+of missing sheet rows (72 written 14 Oct), and the sheet-side nightly Totals check (`Outbox.gs`, report-only until
+`LOGBOOK_TOTALS_FIX` is on). Not built yet: app edits and deletes reaching the sheet, sheet edits and deletes reaching the
+app (the sheet has no row ids; the Form inbox only sees new or edited responses), the drift dashboard with fix buttons.
+Findings: the sheet's Database is append-only (a hand edit of a Case row leaves the old text; a double append adds rows;
+a timed-out append loses rows); `onFormSubmit` never handles an edited response.
