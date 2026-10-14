@@ -189,6 +189,10 @@ node evals/test/a11y.mjs                                                      # 
 
 - **Rules:** `tools/test-rules.sh` (installs the emulator tools once into `~/.cache/anawj-rules`, about a minute). On 14 Oct: evals 201/201, logbook 227/227, prewarm 116/116.
 - **Playwright** is installed globally. Use executable `/opt/pw-browsers/chromium` in the cloud container.
+- **People reuses evals code** (`cloud.js`, `ui-core.js`, the People panes in `ui-admin.js`): after changing them, also
+  run `node people/test/e2e.mjs`.
+- **A red check on main isn't ours to merge past:** if the Checks run fails in another app's test and main is red too,
+  comment once on the PR and wait (or the owner says "merge anyway"); rules PRs also need the owner's approval.
 - **e2e failing with `ERR_CONNECTION_REFUSED`** means the static server isn't running on port 8110.
 
 ### Git workflow that works here
