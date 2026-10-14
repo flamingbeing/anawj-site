@@ -407,3 +407,8 @@ or refused, synced in the last 15 minutes, app up to date, each with what to do.
 keeps; it does not test the PACU link (do that by hand, see `RUNBOOK.md`). Checked in the sync emulator test.
 Still to fill (patient screen) also lists "POD1 / POD2 chart review due today / overdue" with how many questions have an answer,
 once due and not ticked complete.
+
+### Off-protocol note (14 Oct 2026)
+Intra-op details ends with a free-text "Anything unusual or off-protocol" (`io_dev`, exported in the Extra sheet): a
+missed reading and why, a monitor fault, warming stopped early. A fuller deviation form (codes, per-reading reasons, a
+log of group changes) is still open and needs the study team's wording.
