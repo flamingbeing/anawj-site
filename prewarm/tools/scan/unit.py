@@ -41,4 +41,22 @@ digits = np.zeros((80, 160), np.uint8); cv2.putText(digits, '36.5', (10, 60), cv
 line = np.zeros((80, 160), np.uint8); line[40:42, 5:155] = 1
 edge = np.zeros((80, 160), np.uint8); edge[:, 3:5] = 1
 assert scan.has_writing(digits) and not scan.has_writing(line) and not scan.has_writing(edge)
+# arrows: the shaft of a "same as above" arrow runs through the middle of the cell; a printed line sliver sits at its edge
+cell = np.zeros((42, 106), np.uint8); cell[:, 52:55] = 1
+assert scan.arrow_shaft(cell)
+edge2 = np.zeros((42, 106), np.uint8); edge2[:, 1:4] = 1
+assert not scan.arrow_shaft(edge2)
+short = np.zeros((42, 106), np.uint8); short[10:22, 52:55] = 1
+assert not scan.arrow_shaft(short)
+# empty cells between arrows are flagged, a genuinely empty column is not
+F = {f'iotemp_{p}_room': dict(id=f'iotemp_{p}_room', series='iotemp', col='room', point=p) for p in ('0', '5', '10', '15', '20', '25')}
+E = lambda **k: {'value': None, 'flags': [], **k}
+out = {'iotemp_0_room': E(), 'iotemp_5_room': E(flags=['arrow or ditto: same as the reading above?']), 'iotemp_10_room': E(),
+       'iotemp_15_room': E(flags=['arrow or ditto: same as the reading above?']), 'iotemp_20_room': E(), 'iotemp_25_room': dict(value=18, flags=[])}
+scan.arrow_gaps(out, F)
+assert out['iotemp_10_room']['flags'] and out['iotemp_20_room']['flags'] and not out['iotemp_0_room']['flags']
+# a ticked question where one option also ticks a box further down (No pre-warming also ticks 'Not applicable')
+import locate
+pick = locate.choose_glyphs({'1': [[154, 257, 182, 287]], '2': [[509, 257, 536, 287]], '3': [[864, 257, 891, 287], [820, 760, 848, 790]]})
+assert pick['3'] == [864, 257, 891, 287] and pick['1'] == [154, 257, 182, 287]
 print('unit: ok')
