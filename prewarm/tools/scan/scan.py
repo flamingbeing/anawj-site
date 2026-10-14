@@ -222,6 +222,7 @@ def main(argv=None, reader=None):
     ap.add_argument('--export-crops', metavar='DIR', help='no reading: write the handwritten crops to DIR for someone to read')
     ap.add_argument('--readings', metavar='FILE', help='use readings made from the exported crops, as {field id: text}, instead of the API')
     ap.add_argument('--min-align', type=float, default=MIN_ALIGN, help=f'lowest page alignment score to accept (default {MIN_ALIGN}); lower it only to test a page, and check its crops')
+    ap.add_argument('--key-file', metavar='FILE', help='file holding the Anthropic API key, read by this process only (instead of the ANTHROPIC_API_KEY environment variable)')
     ap.add_argument('photos', nargs='+')
     a = ap.parse_args(argv)
     fmap = json.load(open(f'{a.form_dir}/fieldmap.json', encoding='utf-8'))
@@ -229,7 +230,7 @@ def main(argv=None, reader=None):
     tpls = templates(a.form_dir)
     forced = [int(x) for x in a.pages.split(',')] if a.pages else [None] * len(a.photos)
     if len(forced) != len(a.photos): ap.error('--pages needs one page number per photo')
-    reader = reader or (readers.CropExporter(a.export_crops) if a.export_crops else readers.FileReader(a.readings) if a.readings else readers.AnthropicReader())
+    reader = reader or (readers.CropExporter(a.export_crops) if a.export_crops else readers.FileReader(a.readings) if a.readings else readers.AnthropicReader(key_file=a.key_file))
     _tables = {}
     tables_of = lambda pg: _tables.setdefault(pg, boxes.tables(f'{a.form_dir}/blank.pdf', pg))
     result, pages = {}, []

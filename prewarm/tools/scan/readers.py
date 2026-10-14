@@ -22,10 +22,14 @@ def _expect(f):
 class AnthropicReader:
     """Claude vision. Needs `pip install anthropic` and ANTHROPIC_API_KEY in the environment. Only crops of de-identified
     cells (numbers, times) are ever sent: never IDs, dates, names or free text."""
-    def __init__(self, model=None):
+    def __init__(self, model=None, key_file=None):
         import anthropic
+        # The key can come from a private file given to this one process (--key-file), so it need not live in an
+        # environment variable (a user-level ANTHROPIC_API_KEY stopped Remote Control starting on the home computer).
+        key = open(key_file, encoding='utf-8').read().strip() if key_file else None
         # Sonnet by default (cheaper); SCAN_MODEL=claude-opus-5-5 for the hardest pages
-        self.client, self.model = anthropic.Anthropic(), model or os.environ.get('SCAN_MODEL', 'claude-sonnet-5-5')
+        self.client = anthropic.Anthropic(api_key=key) if key else anthropic.Anthropic()
+        self.model = model or os.environ.get('SCAN_MODEL', 'claude-sonnet-5-5')
 
     def read(self, png, f, variant):
         unit = f' ({f["unit"]})' if f.get('unit') else ''
