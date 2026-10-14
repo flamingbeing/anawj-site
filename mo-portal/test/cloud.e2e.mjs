@@ -61,6 +61,7 @@ const exe = process.env.CHROMIUM_PATH || (fs.existsSync('/opt/pw-browsers/chromi
 const b = await chromium.launch(exe ? { executablePath: exe, args: ['--no-sandbox'] } : {});
 const contexts = [];
 const errors = [];
+const consoleErrors = new Set();   // printed at the end for information (expected ones: refused reads/writes the test provokes)
 async function newCtx(email) {
   const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block', acceptDownloads: true });
   await ctx.route(/fonts\.(googleapis|gstatic)\.com/, r => r.fulfill({ status: 200, contentType: 'text/css', body: '' }));
@@ -71,6 +72,7 @@ async function newCtx(email) {
 async function newPage(ctx) {
   const p = await ctx.newPage();
   p.on('pageerror', e => errors.push(e.message));
+  p.on('console', m => { if (m.type() === 'error') consoleErrors.add(m.text().slice(0, 160)); });
   p.on('dialog', d => d.accept());
   return p;
 }
@@ -335,7 +337,7 @@ D) four`);
   });
 
   // an editor (not admin) sees no Settings and cannot read the passphrase
-  await step('editor role: no Settings page, cannot read the passphrase, can edit questions', async () => {
+  await step('editor role: no Settings page, cannot read the passphrase, delete questions or save settings', async () => {
     const ctx = await newCtx(EDITOR); const p = await facultyPage(ctx); await facultySignIn(p);
     assert.equal(await p.locator('#nav a', { hasText: 'Settings' }).count(), 0);
     const r = await p.evaluate(async () => {
@@ -396,17 +398,35 @@ D) four`);
     await mo.fill('#f-pass', NEWPASS); await mo.click('#start button[type=submit]'); await mo.locator('#go').waitFor();
     assert.equal((await docs('sessions')).length, 3);
   });
-  await step('a stale session cannot submit a finished test (kept in the outbox, no document written)', async () => {
+  let curPass = NEWPASS;
+  await step('a stale session cannot submit a finished test; signing in again with the new passphrase saves it', async () => {
     const before = (await docs('attempts')).length;
     const ctx = await newCtx(); const p = await newPage(ctx); page = p;
-    await moStart(p, 'Dr Locked Out', NEWPASS); await sitTest(p, { submit: false });   // sit the test, stop on the review screen
-    await admin(db => setDoc(doc(db, 'config', 'access'), { passphrase: 'rotated-again-1' }));   // faculty rotate the passphrase mid-test
+    await moStart(p, 'Dr Locked Out', curPass); await sitTest(p, { submit: false });   // sit the test, stop on the review screen
+    curPass = 'rotated-again-1';
+    await admin(db => setDoc(doc(db, 'config', 'access'), { passphrase: curPass }));   // faculty rotate the passphrase mid-test
     await p.click('#submit'); await p.locator('dialog[open]').waitFor(); await p.click('dialog button[value=yes]');
     await p.locator('#saved.warn').waitFor({ timeout: 15000 });
-    assert.match(await text(p, '#saved'), /login has expired|Not saved/);
+    assert.match(await text(p, '#saved'), /login has expired/);
     assert.equal((await docs('attempts')).length, before);
     assert.equal(await p.evaluate(() => JSON.parse(localStorage.getItem('mo-outbox')).length), 1, 'result kept in the outbox');
-    await admin(db => setDoc(doc(db, 'config', 'access'), { passphrase: NEWPASS }));    // restore for the next steps
+    // recovery: back to the start, log in again with the new passphrase: the waiting result is sent under the new login
+    await p.click('#done'); await p.locator('#f-name').waitFor();
+    await p.fill('#f-pass', curPass); await p.click('#start button[type=submit]'); await p.locator('#go').waitFor();
+    await p.waitForFunction(() => JSON.parse(localStorage.getItem('mo-outbox') || '[]').length === 0, null, { timeout: 15000 });
+    const as = await docs('attempts', where('name', '==', 'Dr Locked Out')); assert.equal(as.length, 1);
+    const ss = await docs('sessions', where('name', '==', 'Dr Locked Out')); assert.equal(ss.length, 2);
+    assert.ok(ss.some(x => x.id === as[0].uid), 'saved under the new login');
+  });
+  await step('reload in the middle of a test, then submit: saved under the same name', async () => {
+    const ctx = await newCtx(); const p = await newPage(ctx); page = p;
+    await moStart(p, 'Dr Reloader', curPass); await p.locator('#go').waitFor(); await p.click('#go'); await p.locator('#qform').waitFor();
+    await p.locator('.opt').nth(0).click();
+    await p.reload(); await p.locator('#qform').waitFor();
+    await p.click('#rv'); await p.locator('#submit').waitFor(); await p.click('#submit'); await p.locator('dialog[open]').waitFor(); await p.click('dialog button[value=yes]');
+    await p.locator('#saved.ok').waitFor({ timeout: 15000 });
+    const as = await docs('attempts', where('name', '==', 'Dr Reloader')); assert.equal(as.length, 1); assert.equal(as[0].items.length, 5);
+    assert.equal(as[0].items.filter(i => i.picked != null).length, 1);
   });
 
   // ================= offline outbox =================
@@ -414,7 +434,7 @@ D) four`);
     await step(`offline outbox: submit with no network, ${label}: saved once`, async () => {
       const name = 'Dr Offline ' + (offlineMs > 5000 ? 'Slow' : 'Quick');
       const ctx = await newCtx(); const p = await newPage(ctx); page = p;
-      await moStart(p, name, NEWPASS);
+      await moStart(p, name, curPass);
       await sitTest(p, { submit: false });
       await p.waitForFunction(() => !!document.querySelector('#submit'));
       await ctx.setOffline(true);
@@ -432,11 +452,8 @@ D) four`);
       assert.equal(as[0].items.length, 5);
     });
   }
-  await step('a result saved, then the page reloaded and the outbox replayed by hand: still one document', async () => {
-    const all = await docs('attempts'); const ids2 = new Set(all.map(a => a.id)); assert.equal(ids2.size, all.length);
-  });
-
   await step('no uncaught page errors', async () => { assert.deepEqual(errors, []); });
+  if (consoleErrors.size) console.log('\n(browser console errors seen, for information):\n  ' + [...consoleErrors].join('\n  '));
   console.log('\nAll cloud checks passed.');
 } catch (e) {
   process.exitCode = 1;
