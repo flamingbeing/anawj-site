@@ -48,6 +48,19 @@ try {
     // the teaching layout is still there for the rest of the checks
     await page.click('#skinSeg [data-skin="classic"]');
     assert.equal(await page.$eval('#classicWrap', e => e.hidden), false);
+    // relaxant: a bolus paralyses (TOF count 0, readout and hint), a top-up and sugammadex move it, Off clears it
+    assert.match(await page.textContent('#nmRead'), /No relaxant/);
+    await page.click('#speedSeg [data-speed="10"]'); await page.click('#nmBolus');
+    await page.waitForFunction(() => /TOF count 0/.test(document.querySelector('#nmRead').textContent), null, { timeout: 15000 });
+    assert.match(await page.textContent('#nmHint'), /block/i);
+    await page.click('#nmSug4'); await page.click('#nmTop'); await page.click('#nmSug2');
+    await page.click('#nmbSeg [data-nmb="off"]');
+    await page.waitForFunction(() => /No relaxant/.test(document.querySelector('#nmRead').textContent), null, { timeout: 5000 });
+    await page.click('#nmbSeg [data-nmb="auto"]'); await page.click('#speedSeg [data-speed="1"]');
+    // case length: medium by default; the choice is kept
+    assert.equal(await page.$eval('#caseSeg [data-case="medium"]', e => e.getAttribute('aria-pressed')), 'true');
+    await page.click('#caseSeg [data-case="long"]'); assert.equal(await page.$eval('#caseSeg [data-case="long"]', e => e.getAttribute('aria-pressed')), 'true');
+    await page.click('#caseSeg [data-case="medium"]');
     // the relaxant is on by default, given at induction: the awake patient is not paralysed (BIS stays in the 90s)
     assert.equal(await page.$eval('#nmbSeg [data-nmb="auto"]', e => e.getAttribute('aria-pressed')), 'true');
     // move the depth target to GA at 1x: the effect site follows slowly, so the screen still shows an awake patient, and the
@@ -119,7 +132,7 @@ try {
     await page.waitForFunction(e0 => +document.querySelector('#vEmg').textContent >= e0 + 6, emg0, { timeout: 20000 });
     // a muscle relaxant takes the EMG away again
     const emgHi = await page.$eval('#vEmg', e => +e.textContent);
-    await page.click('#nmbSeg [data-nmb="auto"]');
+    await page.click('#nmBolus');
     await page.waitForFunction(e1 => +document.querySelector('#vEmg').textContent <= e1 - 6, emgHi, { timeout: 20000 });
     assert.match(await page.textContent('#rText'), /Muscle relaxant/);
     await page.uncheck('#mEmg');
