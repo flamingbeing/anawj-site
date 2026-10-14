@@ -87,5 +87,16 @@ export function readFile(text) {
   return { patients: Array.isArray(d.patients) ? d.patients : [], screening: Array.isArray(d.screening) ? d.screening : [], from: d.from || '', at: d.at };
 }
 
+// Delete and restore (14 Oct 2026). Delete, restore, delete, restore must work every time, even if this phone's
+// clock is behind the phone that last deleted or restored: each time is later than the last one seen.
+export function markDeleted(rec, now = Date.now()) {
+  rec.deleted = Math.max(now, (rec.deleted || 0) + 1, (rec.f?.restored?.t || 0) + 1);
+}
+export function restore(rec, by, now = Date.now()) {
+  // the value changes every time (a repeat of the same value would be skipped and so would the restore)
+  const prev = rec.f.restored?.v || 0;
+  setVal(rec, 'restored', Math.max(now, +prev + 1, (rec.deleted || 0) + 1), by, Math.max(now, (rec.deleted || 0) + 1));
+}
+
 // deleted, and not restored since (a restore is the field "restored": its time is after the delete)
 export const isGone = p => !!p.deleted && p.deleted > (p.f?.restored?.t || 0);

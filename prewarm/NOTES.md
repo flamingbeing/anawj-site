@@ -365,3 +365,11 @@ refused save only toasted. `friendly(e, ctx)` words errors by place: `'save'` an
 link has stopped working. Ask the study team for a new link."). `pacuPush` uses `updateDoc`, not a merging `setDoc`:
 a save onto a stopped link would otherwise become a create, which the rules refuse as "Not allowed" (a likely cause of
 the 13 Oct nurse failure, not proven).
+
+### Delete / restore and alerts (14 Oct 2026)
+`markDeleted` and `restore` (store.js) give each delete and restore a time later than the last one seen, so delete,
+restore, delete, restore always works, even from a phone whose clock is behind (the old restore wrote the same value
+`1` again, which `setVal` skipped, so the second restore did nothing). Lock times never go backwards either.
+Due alerts now repeat every 2 minutes while a reading is due and unsaved, for 10 minutes after its time (the banner
+says "overdue" after 5), and a phone that slept checks the moment it is back in front. The `nag` key (last buzz per
+reading) replaces `alerted`. Still only while the app is open: a lock-screen alarm needs a push server.

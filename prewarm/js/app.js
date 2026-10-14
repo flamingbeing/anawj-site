@@ -1,6 +1,6 @@
 // Prewarming study: op-day screens. Data stays on this phone for now (localStorage); sharing comes with Firebase.
 import { PAGES, SERIES, BY_ID, EXTRA_BY_ID, IX_COLS, SITES, PACU_KEYS, calc, normaliseTemp, isShown } from './schema.js';
-import { newRecord, setVal, val, lastEdit, mergeRecord, isGone } from './store.js';
+import { newRecord, setVal, val, lastEdit, mergeRecord, isGone, markDeleted, restore } from './store.js';
 import { openKeypad, closeKeypad } from './keypad.js';
 import { workbook } from './export.js';
 import * as cloud from './cloud.js';
@@ -574,7 +574,7 @@ function setLock(ids, on) {
   const by = shared.email || settings.me || 'admin';
   for (const id of ids) {
     const p = patients[id]; if (!p) continue;
-    p.lock = { on, t: Date.now(), by };
+    p.lock = { on, t: Math.max(Date.now(), (p.lock?.t || 0) + 1), by };
     // locking sends the whole record (repairs a server copy); unlocking only the lock (all a locked patient allows)
     sync(p, on ? Object.keys(p.f) : [], true);
   }
@@ -1239,12 +1239,14 @@ const charting = q => !isGone(q) && !q.lock?.on && !val(q, 'done') && Date.now()
 // alerts for patient p (or, with p null, every patient being charted); other patients' alerts carry their Subject ID,
 // since the next patient pre-warms while the last one is in surgery
 function startAlerts(p) {
-  const alerted = new Set(read('alerted', []));
+  // when each reading last buzzed: a reading still unsaved buzzes again every 2 minutes for 10 minutes after it falls
+  // due (a missed buzz in theatre gets another chance, and a phone that slept catches up when it wakes) (14 Oct 2026)
+  const nag = Object.fromEntries(Object.entries(read('nag', {})).filter(([, t]) => Date.now() - t < 3600e3));
   let lock = null;
   const awake = () => { if ((p || Object.values(patients).some(q => charting(q) && Date.now() - (read('opened', {})[q.id] || 0) < 12 * 3600e3)) && settings.remind.awake && navigator.wakeLock && document.visibilityState === 'visible') navigator.wakeLock.request('screen').then(l => { lock = l; }).catch(() => {}); };
   awake();
   document.addEventListener('visibilitychange', awake);
-  const iv = setInterval(() => {
+  const check = () => {
     // everything falling due this second goes in one banner, with one buzz / beep
     const due = []; let target = null;
     // other patients only if opened on this phone today (not a teammate's patient in another theatre)
@@ -1252,12 +1254,12 @@ function startAlerts(p) {
     const others = Object.values(patients).filter(q => q.id !== p?.id && charting(q) && Date.now() - (opened[q.id] || 0) < 12 * 3600e3);
     for (const q of p ? [p, ...others] : others) {
       const pre = q === p ? '' : sid(q) + ': ';
-      const hit = (tag, msg, to) => { if (alerted.has(tag)) return; alerted.add(tag); due.push(pre + msg); target ||= to; };
+      const hit = (tag, msg, to) => { if (nag[tag] && Date.now() - nag[tag] < 120e3) return; nag[tag] = Date.now(); due.push(pre + msg); target ||= to; };
       // stopping the warming on time matters as much as a reading: Prewarm off due alerts too
       const nx = nextEvent(q);
       if (nx?.id === 'ev_wstop' && nx.due != null) {
         const now = nowFor(q, 'prewarm');
-        if (now >= nx.due && now <= nx.due + 5) hit(q.id + 'ev_wstop' + val(q, 'pw_start'), `Prewarm off due now (${WARM_MIN[val(q, 'arm')]} min of warming): tap Log`, { pid: q.id, ev: 'ev_wstop' });
+        if (now >= nx.due && now <= nx.due + 10) hit(q.id + 'ev_wstop' + val(q, 'pw_start'), `Prewarm off ${now > nx.due + 5 ? 'overdue' : 'due now'} (${WARM_MIN[val(q, 'arm')]} min of warming): tap Log`, { pid: q.id, ev: 'ev_wstop' });
       }
       // BP, HR, BIS alarm only when switched on in Settings (owner, 13 Oct 2026; off by default): their due time
       // still shows in the top bar and on the tab
@@ -1266,18 +1268,22 @@ function startAlerts(p) {
         const now = nowFor(q, s);
         for (const x of pointsFor(q, s)) {
           const d = dueOf(q, s, x), tag = q.id + s + x.key + (val(q, SERIES[s].ref[0]) || '');
-          if (d == null || !expected(q, s, d) || savedAt(q, s, x.key) || now < d || now > d + 5) continue;
-          hit(tag, `${s === 'haemo' ? 'BP, HR, BIS' : 'Temperature'} ${x.label} reading due now`, { pid: q.id, s, key: x.key });
+          if (d == null || !expected(q, s, d) || savedAt(q, s, x.key) || now < d || now > d + 10) continue;
+          hit(tag, `${s === 'haemo' ? 'BP, HR, BIS' : 'Temperature'} ${x.label} reading ${now > d + 5 ? 'overdue' : 'due now'}`, { pid: q.id, s, key: x.key });
         }
       }
     }
     if (!due.length) return;
-    write('alerted', [...alerted].slice(-200));
+    write('nag', nag);
     if (settings.remind.banner) showBanner(due.join(' · ') + ' (tap to open)', 15000, target);
     if (settings.remind.vibrate && navigator.vibrate) navigator.vibrate([300, 150, 300]);
     if (settings.remind.beep) beep();
-  }, 1000);
-  const stop = () => { clearInterval(iv); document.removeEventListener('visibilitychange', awake); lock?.release?.().catch(() => {}); };
+  };
+  const iv = setInterval(check, 1000);
+  // a phone that slept (timers pause) checks the moment it is back in front
+  const back = () => { if (document.visibilityState === 'visible') check(); };
+  document.addEventListener('visibilitychange', back);
+  const stop = () => { clearInterval(iv); document.removeEventListener('visibilitychange', awake); document.removeEventListener('visibilitychange', back); lock?.release?.().catch(() => {}); };
   cleanup.push(stop);
   return stop;
 }
@@ -1798,12 +1804,12 @@ route(/^\/delete$/, () => {
       <ul class="list dellist">${gone.map(p => `<li><div><b>${esc(sidL(p))}</b><small>deleted ${new Date(p.deleted).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</small></div><button class="secondary" data-restore="${p.id}">Restore</button></li>`).join('')}</ul>` : ''}`);
   view.onclick = e => {
     const r = e.target.closest('[data-restore]');
-    if (r) { const p = patients[r.dataset.restore]; if (p) { set(p, 'restored', 1); toast(sid(p) + ' restored'); render(); } return; }
+    if (r) { const p = patients[r.dataset.restore]; if (p?.lock?.on) return toast('Locked: unlock it on the home page first.'); if (p) { restore(p, settings.me); saveAll(); sync(p, ['restored']); toast(sid(p) + ' restored'); render(); } return; }
     const b = e.target.closest('[data-del]'); if (!b) return;
     const p = patients[b.dataset.del]; if (!p) return;
     if (!b.dataset.sure) { b.dataset.sure = Date.now(); b.textContent = 'Tap again'; b.setAttribute('aria-label', 'Tap again to delete ' + sid(p)); return; }
     if (Date.now() - b.dataset.sure < 600) return; // a double tap isn't a second, deliberate tap
-    p.deleted = Date.now(); saveAll(); sync(p, []); toast(sid(p) + ' deleted'); render();
+    markDeleted(p); saveAll(); sync(p, []); toast(sid(p) + ' deleted'); render();
   };
   cleanup.push(() => { view.onclick = null; });
 });
