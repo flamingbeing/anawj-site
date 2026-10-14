@@ -69,7 +69,13 @@ merge origin/main/pull`, pushes to `claude/*` branches, reading sources (web sea
 PR loop (open, update, read checks, merge your own PR). Sessions may edit `.claude/settings.json` to keep this list
 current (owner's OK, 14 Oct 2026); widen it only for what the work needs, and say what you added in the PR.
 It still **asks** for Codex, Firebase and anything that signs in to a live project (`CLAUDE.md`); never add allow rules
-for a `firestore.rules` merge, a force-push to `main`, secrets or live-project sign-in.
+for a force-push to `main`, secrets or live-project sign-in.
+Firestore rules (owner, 14 Oct 2026): a session may merge a PR that changes a `firestore.rules` without waiting for the
+owner, because rules and data are the owner's biggest headache and he does not want to intervene. Do it carefully: run
+`tools/test-rules.sh` (local emulator, fake accounts) first, merge only when the Checks are green, then confirm the
+"Deploy Firestore rules" run succeeded, and say in the report which rules changed and what they now allow or deny. The
+deploy compiles the rules first, so a syntax error leaves the live rules as they were. `ot-sim/` itself has no
+Firestore (no data, no sign-in).
 The permission *mode* is set in the app, not in the repo: pick **Auto** from the mode dropdown when starting the build
 session. Settings are read from `main`, so they apply to new sessions once the PR is merged.
 Network (checked 14 Oct 2026): GitHub, npm, PubMed/NCBI, ANZCA and MHAUS are reachable. If a guideline site is denied,
