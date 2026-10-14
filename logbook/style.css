@@ -1316,6 +1316,12 @@ details:not(.quick-actions) > summary::after { transition: transform var(--dur) 
 /* "‹ Settings" in the header on pages under a tab, in place of the app's name; plain text, no box */
 body.header-back .top h1 { display: none; }
 .top .back-row { margin: 0; }
+/* same height either way: the hidden title still holds the line, and the back link (44 px to tap) sits over it
+   without adding height (it overflows evenly above and below) */
+body.header-back .top .brand { display: grid; align-items: center; }
+body.header-back .top .brand > * { grid-area: 1 / 1; }
+body.header-back .top .brand h1 { display: block; visibility: hidden; }
+.top .back-row { height: 0; display: flex; align-items: center; }
 .back-row .back-link { display: inline-flex; align-items: center; gap: 2px; min-height: 40px; padding-right: 8px; color: var(--accent); font-weight: 600; text-decoration: none; font-size: calc(17px * var(--fs, 1)); }
 .back-row .back-chev { font-size: 1.7em; line-height: 1; margin: -4px 2px 0 -2px; font-weight: 400; }
 main > .back-row { margin: -6px 0 6px; }
