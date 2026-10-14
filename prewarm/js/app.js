@@ -266,7 +266,7 @@ async function refreshNow(btn) {
 // which app version this phone is running (the saved copy's name), so a phone stuck on an old one can be spotted
 const wireRefresh = () => {
   $('#refreshnow')?.addEventListener('click', e => refreshNow(e.target));
-  const el = $('#appver'); if (el && window.caches) caches.keys().then(ks => { const k = ks.find(x => x.startsWith('prewarm-')); if (k && $('#appver')) $('#appver').textContent = 'App version ' + k.replace('prewarm-', ''); }).catch(() => {});
+  const el = $('#appver'); if (el && window.caches) caches.keys().then(ks => { const k = ks.find(x => x.startsWith('prewarm-')); if (k && $('#appver')) { const v = k.replace('prewarm-', ''), d = /^(\d{4}-\d{2}-\d{2})-([0-9a-f]+)$/.exec(v); $('#appver').textContent = 'App version ' + (d ? `${d[1]} (${d[2]})` : v); } }).catch(() => {});
 };
 async function watch() {
   shared.unwatch?.(); shared.unwatch = null;

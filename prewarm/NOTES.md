@@ -435,3 +435,11 @@ chips by `:has()`); questions with 3 or more answers (ASA, Smoker, ECG, pain 0-1
 collapsed. At 390 px: Pre-op 5.0 to 3.2 screens, POD1 2.5 to 1.6, POD2 3.8 to 2.6, PACU 2.2 to 1.7, Intra-op 1.7 to 1.4. (All boxes
 and answers two to a row gave 2.9 / 1.5 / 2.4 / 1.5 / 1.3, but smaller buttons: not worth it.) The Temp and BP, HR, BIS screens
 are unchanged. An odd box before a full-width question leaves a half-empty row; `grid-auto-flow: dense` would reorder, so not done.
+
+### The app version starts with the date (14 Oct 2026)
+Settings (under Refresh now) shows "App version 2026-10-14 (3f9a2c1d)": the day (Singapore time) of the last commit that touched
+a file the version hash covers, then the hash. `tools/stamp-versions.mjs` builds it at deploy (`prewarm-2026-10-14-3f9a2c1d`, the
+saved copy's name); only prewarm is dated (`DATED` in the script, add an app name to extend). The date moves only when the
+files do, so phones don't see extra updates; the Pages workflow now checks out full history (`fetch-depth: 0`) for that
+(without history the script uses today's date). The base in `sw.js` stays `prewarm-v79`: bump it only when the worker's own
+logic changes, as before. Test tap guard: after a pad closes, a tap within 48 px for 0.7 s is swallowed (the sync test waits).
