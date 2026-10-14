@@ -50,17 +50,25 @@ def chars(name):
 
 def choose_glyphs(cands):
     """cands: { option: [rect, ...] } box glyphs that appeared for each option of one ticked question. An option can tick
-    more than one box (No pre-warming also ticks 'Not applicable' further down): keep the one nearest the other options'
-    boxes, which sit in one row or column. Returns { option: rect }."""
+    more than one box (No pre-warming also ticks 'Not applicable' further down the page). The options of one question sit
+    in one row (or one column), so keep the candidate on the same row as the others' boxes (same column if they are
+    stacked); only if none lines up, the one nearest. Returns { option: rect }."""
     centre = lambda r: ((r[0] + r[2]) / 2, (r[1] + r[3]) / 2)
     singles = [centre(c[0]) for c in cands.values() if len(c) == 1]
+    ys, xs = sorted(c[1] for c in singles), sorted(c[0] for c in singles)
+    medy, medx = (ys[len(ys) // 2], xs[len(xs) // 2]) if singles else (None, None)
+    spread_y = (ys[-1] - ys[0]) if singles else 0
+    spread_x = (xs[-1] - xs[0]) if singles else 0
     out = {}
     for o, rects in cands.items():
         if len(rects) == 1 or not singles:
             out[o] = sorted(rects, key=lambda r: (r[1], r[0]))[0]
-        else:
-            mx, my = sum(c[0] for c in singles) / len(singles), sum(c[1] for c in singles) / len(singles)
-            out[o] = min(rects, key=lambda r: (centre(r)[0] - mx) ** 2 + (centre(r)[1] - my) ** 2)
+            continue
+        h = lambda r: r[3] - r[1]
+        same_row = [r for r in rects if abs(centre(r)[1] - medy) <= max(8, 0.4 * h(r))] if spread_y <= spread_x else []
+        same_col = [r for r in rects if abs(centre(r)[0] - medx) <= max(8, 0.4 * (r[2] - r[0]))] if spread_x < spread_y else []
+        pool = same_row or same_col or rects
+        out[o] = min(pool, key=lambda r: (centre(r)[0] - sum(c[0] for c in singles) / len(singles)) ** 2 + (centre(r)[1] - sum(c[1] for c in singles) / len(singles)) ** 2)
     return out
 
 

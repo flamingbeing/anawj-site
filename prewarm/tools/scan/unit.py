@@ -57,6 +57,13 @@ scan.arrow_gaps(out, F)
 assert out['iotemp_10_room']['flags'] and out['iotemp_20_room']['flags'] and not out['iotemp_0_room']['flags']
 # a ticked question where one option also ticks a box further down (No pre-warming also ticks 'Not applicable')
 import locate
-pick = locate.choose_glyphs({'1': [[154, 257, 182, 287]], '2': [[509, 257, 536, 287]], '3': [[864, 257, 891, 287], [820, 760, 848, 790]]})
-assert pick['3'] == [864, 257, 891, 287] and pick['1'] == [154, 257, 182, 287]
+# the real Randomisation row: options 1 and 2 on one line; option 3 ticks its own box AND 'Not applicable' lower down, which
+# is nearer the other two's centre, so nearest-by-distance is wrong: the box on the same row is right
+pick = locate.choose_glyphs({'1': [[215, 492, 246, 522]], '2': [[640, 492, 670, 522]], '3': [[1050, 492, 1080, 522], [601, 829, 631, 860]]})
+assert pick['3'] == [1050, 492, 1080, 522], pick
+# stacked options (one column): the candidate in the same column wins
+pick = locate.choose_glyphs({'a': [[100, 100, 130, 130]], 'b': [[100, 160, 130, 190]], 'c': [[100, 220, 130, 250], [700, 230, 730, 260]]})
+assert pick['c'] == [100, 220, 130, 250], pick
+# no other options to line up with: the top-most, left-most box
+assert locate.choose_glyphs({'x': [[500, 800, 530, 830], [100, 300, 130, 330]]})['x'] == [100, 300, 130, 330]
 print('unit: ok')
