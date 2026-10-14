@@ -1,12 +1,11 @@
 # Now: Claude Code, Logbook 2 (log2)
 
-**Claude Code, Logbook 2 (log2)** (branch `ccr-afac5e7a-99esax`, open PR **#523**): pre-go-live data-safety bug hunt
-(`logbook/PLAN-go-live-bugfix.md`, progress at its end). #523 has: the header following the save queue; a save cut off by
-the network retrying by itself; multi-select delete going through the write queue (it lost a concurrent edit); a toast
-when a delete is undone by a conflict; `tools/test-multidevice.sh` (random, 5 devices, offline) and `TEST=conflicts`
-(fixed two-device scenarios, all passing); the harness works on Windows.
-Before merging: Firetop's Firefox/WebKit runs on the new head (asked), then the full `tools/test-logbook.sh` (not at the
-same time as a multi-device run: they share port 8080), then merge #523.
-Open: Firetop's slow-network seed 196651587 (a seeded case missing on device 1 in round 1; didn't repeat here); one
-cloud run hung for 25 min with no output (seed unknown). Then: imports (item 7), app left open for days (item 9), and
-the app → sheet sync (`logbook/PLAN-app-to-sheet.md`, waiting for the owner's go).
+**Claude Code, Logbook 2 (log2)**: app → response-sheet sync (`logbook/PLAN-app-to-sheet.md`, owner said go 14 Oct).
+PR 1 (branch `ccr-afac5e7a-99esax`): the app side (`js/sheet-outbox.js`, off by `SHEET_OUTBOX_ON = false`), the
+`sheetOutbox` rules (**waits for the owner's approval before merging: deploys live**), the Admin import skipping
+`app:` rows, tests. Next: the sheet script (`form-script/Outbox.gs`) once Firetop has read the sheet's existing
+script (asked, read-only); dry run on a copy of the sheet (owner's OK first); then the one-line switch on.
+Open with the owner: column J confirmed free? Same bot account for the Form inbox and the outbox (it gains read and
+delete on the outbox only), or a separate one?
+The pre-go-live bug hunt (#523, merged) is done except imports and an app left open for days (not tested), and
+Firetop's Firefox/WebKit reruns on main (asked; fix anything they find).

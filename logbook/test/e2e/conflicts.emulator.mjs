@@ -35,12 +35,16 @@ async function list(email, coll) {
   } while (token);
   return out;
 }
+const topList = async coll => ((await (await fetch(`${DB}/${coll}?pageSize=300`, { headers: H })).json()).documents || []);
 const serverCases = async (email = E) => new Map((await list(email, 'cases')).map(d => [d.name.split('/').pop(), d.fields.details?.stringValue ?? '']));
 const serverBin = async () => (await list(E, 'bin')).map(d => ({ id: d.name.split('/').pop(), caseId: d.fields.data?.mapValue?.fields?.id?.stringValue }));
 await fetch(`http://127.0.0.1:${FS}/emulator/v1/projects/demo-logbook/databases/(default)/documents`, { method: 'DELETE' });
 await fetch(`http://127.0.0.1:${AUTH}/emulator/v1/projects/demo-logbook/accounts`, { method: 'DELETE' });
 const old = Date.now() - 2 * 864e5;
 await put(`logbooks/${E}`, { email: E, name: 'Fake Multi', rid: null, updatedAt: old });
+// E is on the programme list (the sheet outbox is for residents only)
+await put('residents/R9', { rid: 'R9', name: 'Fake Multi', email: E, status: 'ACTIVE', intake: 2024, rYear: 2 });
+await put(`logbooks/${E}`, { email: E, name: 'Fake Multi', rid: 'R9', updatedAt: old });
 await put(`logbooks/${OTHER}`, { email: OTHER, name: 'Fake Other', rid: null, updatedAt: old });
 let seeded = 0;
 async function seedCase(text) {
@@ -267,6 +271,38 @@ const scenarios = {
     await reopen(B);
     assert.equal((await casesOn(B)).get('late1'), 'fake case logged offline 30 min ago', 'device B sees the late case');
     return 'late case reaches the other device';
+  },
+  // new app cases go to the response sheet's outbox (sheet-outbox.js), pasted ones too; an edit doesn't, and a case
+  // deleted before the script picked it up is taken out again
+  async sheetOutbox(A) {
+    await reopen(A);
+    await A.p.evaluate(async () => (await import('./js/sheet-outbox.js')).setOutboxOn(true));
+    const outbox = async () => new Map((await topList('sheetOutbox')).map(d => [d.name.split('/').pop(), d.fields]));
+    const until = async (fn, what) => { for (const t0 = Date.now(); !(await fn()); await A.p.waitForTimeout(200)) if (Date.now() - t0 > 15000) throw new Error('timed out: ' + what); };
+    must(await act(A, { kind: 'create', id: 'sheet1', text: 'AB 34F fake case S1234567D for the sheet' }));
+    await until(async () => (await outbox()).has('sheet1'), 'entry for sheet1');
+    const f = (await outbox()).get('sheet1');
+    assert.equal(f.rid.stringValue, 'R9'); assert.equal(f.email.stringValue, E);
+    assert.doesNotMatch(f.details.stringValue, /S1234567D/, 'identifiers masked');
+    // an edit changes nothing in the outbox
+    must(await act(A, { kind: 'edit', id: 'sheet1', text: 'AB fake edit afterwards' })); await settle(A);
+    assert.match((await outbox()).get('sheet1').details.stringValue, /for the sheet/, 'edits do not reach the sheet');
+    // deleted before the script picked it up: the entry goes
+    must(await act(A, { kind: 'delete', id: 'sheet1' }));
+    await until(async () => !(await outbox()).has('sheet1'), 'entry for sheet1 removed');
+    // a pasted list goes too
+    await A.p.evaluate(async () => { const ui = await import('./js/ui-core.js'); const now = Date.now();
+      await ui.saveMany([1, 2].map(i => ({ id: 'sheetp' + i, date: '2026-10-14', initials: 'EF', details: 'fake pasted ' + i, cats: ['08'], createdAt: now + i, updatedAt: now + i, source: 'paste' })), { sheet: true }); });
+    await until(async () => (await outbox()).has('sheetp1') && (await outbox()).has('sheetp2'), 'pasted entries');
+    // restoring a backup (saveMany without { sheet }) does not
+    await A.p.evaluate(async () => { const ui = await import('./js/ui-core.js'); const now = Date.now();
+      await ui.saveMany([{ id: 'sheetr1', date: '2026-10-14', initials: 'GH', details: 'fake restored', cats: ['08'], createdAt: now, updatedAt: now, source: 'app' }]); });
+    await settle(A); await A.p.waitForTimeout(800);
+    assert.ok(!(await outbox()).has('sheetr1'), 'a restore is not a new case');
+    await A.p.evaluate(async () => (await import('./js/sheet-outbox.js')).setOutboxOn(null));
+    must(await act(A, { kind: 'create', id: 'sheet2', text: 'fake case while it is off' })); await settle(A); await A.p.waitForTimeout(800);
+    assert.ok(!(await outbox()).has('sheet2'), 'off: nothing queued');
+    return 'queued, masked, edit ignored, removed on delete, paste yes, restore no, off';
   },
   // signing out with unsent work asks first; Cancel keeps it and it lands later; "Sign out anyway" leaves nothing for the
   // next account on the device

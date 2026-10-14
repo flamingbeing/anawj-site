@@ -362,6 +362,44 @@ await t('template part admin delete', assertSucceeds(deleteDoc(doc(adm, 'config'
   await t('form: resident deletes own', assertSucceeds(deleteDoc(doc(a, 'formInbox', 'r1'))));
   await t('form: case from the Form', assertSucceeds(setDoc(doc(a, 'logbooks', A, 'cases', 'imp_form~003ar3'), { ...c('imp_form~003ar3'), source: 'form', importKey: 'form:r3@1700000000000' })));
 }
+// new app cases for the response sheet: a programme resident adds an entry for their own case; the bot (same account as
+// the Form inbox) lists and deletes entries; nobody else reads
+{
+  await env.withSecurityRulesDisabled(async ctx => { await setDoc(doc(ctx.firestore(), 'logbooks', A), { rid: 'R1' }, { merge: true }); });
+  const bot = env.authenticatedContext('formbot-uid', { email: 'formbot@example.com', email_verified: false }).firestore();
+  const o = (id, extra = {}) => ({ id, email: A, rid: 'R1', date: '2026-03-04', initials: 'AB', details: '34F LSCS spinal', cats: ['16', '28'], createdAt: 1, ...extra });
+  await t('outbox: member adds an entry', assertSucceeds(setDoc(doc(a, 'sheetOutbox', 'k1'), o('k1'))));
+  await t('outbox: no date, dateText', assertSucceeds(setDoc(doc(a, 'sheetOutbox', 'k2'), o('k2', { date: null, dateText: 'last Tue' }))));
+  await t('outbox: edit refused (no update)', assertFails(setDoc(doc(a, 'sheetOutbox', 'k1'), o('k1', { details: 'changed' }))));
+  await t('outbox: entry for someone else', assertFails(setDoc(doc(a, 'sheetOutbox', 'k3'), o('k3', { email: B }))));
+  await t('outbox: wrong rid', assertFails(setDoc(doc(a, 'sheetOutbox', 'k3'), o('k3', { rid: 'R2' }))));
+  await t('outbox: non-member adds', assertFails(setDoc(doc(b, 'sheetOutbox', 'k3'), o('k3', { email: B, rid: 'R2' }))));
+  await t('outbox: unverified', assertFails(setDoc(doc(unv, 'sheetOutbox', 'k3'), o('k3'))));
+  await t('outbox: extra field', assertFails(setDoc(doc(a, 'sheetOutbox', 'k3'), o('k3', { name: 'x' }))));
+  await t('outbox: id mismatch', assertFails(setDoc(doc(a, 'sheetOutbox', 'k3'), o('k4'))));
+  await t('outbox: odd id', assertFails(setDoc(doc(a, 'sheetOutbox', 'k 3'), o('k 3'))));
+  await t('outbox: capital email', assertFails(setDoc(doc(a, 'sheetOutbox', 'k3'), o('k3', { email: 'Alice@example.com' }))));
+  await t('outbox: bad date', assertFails(setDoc(doc(a, 'sheetOutbox', 'k3'), o('k3', { date: '4/3/2026' }))));
+  await t('outbox: long details', assertFails(setDoc(doc(a, 'sheetOutbox', 'k3'), o('k3', { details: 'x'.repeat(2001) }))));
+  await t('outbox: 2000 details', assertSucceeds(setDoc(doc(a, 'sheetOutbox', 'k5'), o('k5', { details: 'x'.repeat(2000) }))));
+  await t('outbox: long initials', assertFails(setDoc(doc(a, 'sheetOutbox', 'k3'), o('k3', { initials: 'A'.repeat(21) }))));
+  await t('outbox: 41 cats', assertFails(setDoc(doc(a, 'sheetOutbox', 'k3'), o('k3', { cats: Array(41).fill('01') }))));
+  await t('outbox: createdAt not a number', assertFails(setDoc(doc(a, 'sheetOutbox', 'k3'), o('k3', { createdAt: 'now' }))));
+  await t('outbox: resident reads own', assertFails(getDoc(doc(a, 'sheetOutbox', 'k1'))));
+  await t('outbox: resident lists', assertFails(getDocs(collection(a, 'sheetOutbox'))));
+  await t('outbox: other resident deletes', assertFails(deleteDoc(doc(b, 'sheetOutbox', 'k1'))));
+  await t('outbox: admin and owner read', assertFails(getDoc(doc(adm, 'sheetOutbox', 'k1'))));
+  await t('outbox: app owner reads', assertFails(getDoc(doc(own, 'sheetOutbox', 'k1'))));
+  await t('outbox: bot lists', assertSucceeds(getDocs(collection(bot, 'sheetOutbox'))));
+  await t('outbox: bot reads', assertSucceeds(getDoc(doc(bot, 'sheetOutbox', 'k1'))));
+  await t('outbox: bot cannot add', assertFails(setDoc(doc(bot, 'sheetOutbox', 'k6'), o('k6'))));
+  await t('outbox: bot cannot edit', assertFails(updateDoc(doc(bot, 'sheetOutbox', 'k1'), { details: 'x' })));
+  await t('outbox: bot still cannot read the Form inbox', assertFails(getDocs(collection(bot, 'formInbox'))));
+  await t('outbox: bot still cannot read a logbook', assertFails(getDoc(doc(bot, 'logbooks', A))));
+  await t('outbox: resident deletes own', assertSucceeds(deleteDoc(doc(a, 'sheetOutbox', 'k2'))));
+  await t('outbox: bot deletes', assertSucceeds(deleteDoc(doc(bot, 'sheetOutbox', 'k1'))));
+  await t('outbox: unlisted account lists', assertFails(getDocs(collection(unv, 'sheetOutbox'))));
+}
 console.log(`${n - fail}/${n} rule checks passed`);
 await env.cleanup();
 process.exit(fail ? 1 : 0);

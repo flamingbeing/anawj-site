@@ -131,3 +131,16 @@ assert.deepEqual(flagCase({ date: '2026-12-01' }, '2026-10-10'), ['future']);
 assert.deepEqual(res.cases.map(c => flagCase(c, '2026-10-10')).filter(f => f.includes('needsDate')).length, 3);
 
 console.log('importer tests passed');
+
+// rows the sheet script added for cases logged in the app (column J 'app:<caseId>') are already in the logbook
+{
+  const mark = (row, v) => { const r = [...row]; while (r.length < 9) r.push(''); r[9] = v; return r; };
+  const rows = [HEADER, mark([A, '2026-03-05', 'KL app case', '10) ENT (5 | 10)', null, null, null, null, ''], 'app:abc123'),
+    mark([A, '2026-03-04', 'MN Form case', '10) ENT (5 | 10)', null, null, null, null, ''], ''), mark([B, '2026-03-03', 'OP odd mark', '10) ENT (5 | 10)', null, null, null, null, ''], 'checked')];
+  const r = parseCaseSheet(rows);
+  assert.deepEqual(r.cases.map(c => c.details), ['MN Form case', 'OP odd mark']);
+  assert.deepEqual(r.skipped, [{ row: 2, reason: 'Made in the app' }]);
+  // the other rows' keys don't depend on the app rows being there
+  assert.deepEqual(parseCaseSheet([HEADER, rows[2], rows[3]]).cases.map(c => c.importKey), r.cases.map(c => c.importKey));
+}
+console.log('PASS importer app rows');

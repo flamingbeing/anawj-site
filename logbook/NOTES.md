@@ -586,6 +586,12 @@ portfolio content.
   bin, Form pick-up twice, a late offline save, sign-out with unsent work). The rule they check: nothing that said it
   saved is lost silently; it is on the server, or its device says "Save needs attention" and keeps it in Recent changes.
   A delete that loses to an edit made elsewhere is undone with a toast (the edit stays).
+- **App → response sheet (14 Oct 2026, `PLAN-app-to-sheet.md`):** new app cases (source `app` or `paste`) of programme
+  residents also go to `sheetOutbox/{caseId}` (`js/sheet-outbox.js`, switched by `SHEET_OUTBOX_ON`); a script on the
+  sheet turns each into a Case-tab row with `app:<caseId>` in column J and deletes the entry. New cases only (edits
+  and deletions don't reach the sheet; a case deleted before pick-up is taken out of the outbox). The Admin
+  workbook import skips rows with `app:` in column J. Tests: `test/sheet-outbox.test.mjs`, the sheetOutbox rules in
+  `test/rules.emulator.mjs`, and `TEST=conflicts` (scenario `sheetOutbox`).
 - **Privacy policy:** `privacy/index.html` (anawj.com/privacy/) shows who sees what. Keep it in step when roles change.
 - **Private feedback (14 Oct 2026):** More → Send feedback (`ui-feedback.js`, pure parts in `feedback.js`) saves
   `feedback/{id}` { uid, text ≤ 2000, doing? ≤ 300, screen, version, ua ≤ 200, status 'new', createdAt = server time }.
