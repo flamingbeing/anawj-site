@@ -15,7 +15,9 @@ const LIMIT = { page: 500, on: 2000, locator: 500, text: 4000 };
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow' } });
 
 export async function handleAsk(request, env, fetchImpl = fetch) {
-  if (!env.GITHUB_ISSUES_TOKEN || !env.ACCESS_TEAM || !env.ACCESS_AUD) return json({ error: 'Ask Claude is not set up yet (edit/NOTES.md, "Ask Claude").' }, 503);
+  // which secrets the Worker can't see (names only, never values), so a setup slip is easy to find
+  const missing = ['GITHUB_ISSUES_TOKEN', 'ACCESS_TEAM', 'ACCESS_AUD'].filter(k => !env[k]);
+  if (missing.length) return json({ error: `Ask Claude is not set up yet: the Worker has no ${missing.join(', ')} (Cloudflare → anawj-preview → Settings → Variables and Secrets; type Secret, then Deploy).` }, 503);
   const who = await verifyAccess(request.headers.get('Cf-Access-Jwt-Assertion'), env, fetchImpl);
   if (!who) return json({ error: 'Sign in first (this page is only for the owner).' }, 401);
   const url = new URL(request.url);
