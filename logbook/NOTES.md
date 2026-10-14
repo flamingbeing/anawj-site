@@ -643,7 +643,7 @@ portfolio content.
   case, plan "done" / pasted-list Undo, Recent changes restoring a deletion) while another device was closed stays on
   that device until then, as does a write stamped by a clock more than 10 minutes slow. A bin-entry tombstone for
   these was considered and not used: older app versions would show it in the recycle bin as an empty case to restore.
-- Late writes: direct writes (pasted lists, bulk tag, reflections saved outside the editor, bin entries) that reach the
+- Late writes: direct writes (pasted lists, reflections saved outside the editor, bin entries) that reach the
   server more than 5 minutes after they were made (offline) are stamped again once the server has them
   (`restampIfLate` in `cloud.js`, one small write per record so one deleted since doesn't block the rest; ids listed in
   `apmes-logbook-late:<email>` from the moment they're queued until the server has them, so a page closed first
@@ -799,6 +799,8 @@ portfolio content.
 ### Device recovery (Codex robustness review)
 
 Case creation, individual edits/Undo and reflection editor saves first commit immutable recovery records on the device (IndexedDB, with localStorage fallback). Server transactions compare the editor’s base version before replacing a record. Offline saves stay usable; rejected saves keep the editor/input. More → Recent changes / Recover drafts shows pending/failed sync, explicit retries, both sides of a concurrent edit, and the last 100 saved versions. Pending/failed/conflicting changes never expire automatically. History is private to the browser/account and is cleared on sign-out; it is not a backup. Existing batch imports and reflection metadata operations keep their existing cloud APIs.
+
+Changes to many logged cases at once (Tag N cases, Settings → tag Merge, a spreadsheet's Changed rows) also go through the queue, case by case with the version each change was made from (`updateMany` in `ui-core.js`, ten at a time; audit, 14 Oct 2026): a blind batch overwrote a case changed on another device meanwhile, with no conflict and no copy. Now that case keeps the other device's version, both are in Recent changes, and the toast says how many were kept (with a Recent changes button). A merge takes the old tag off the list only when every case saved (offline they all count as saved; a conflict found later shows as "Save needs attention", as for one edit). Each case costs a read and a write, and a big change pushes older entries out of the 100-version history. Only brand-new cases (pasted lists, plans, a backup's missing cases) still go in one batch (`saveMany`).
 
 Case and reflection drafts use separate document slots, including when session storage is cloned into a duplicated tab. Case input writes synchronously and flushes on pagehide/hidden; draft status reports storage failures. Recovering a draft preserves the currently open draft in its previous slot.
 

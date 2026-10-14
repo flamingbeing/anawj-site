@@ -485,7 +485,33 @@ export async function restoreCase(c, base = S.cases.find(x => x.id === c.id) || 
   applyLocal(list => [saved, ...list.filter(x => x.id !== c.id)]);
 }
 
-// opts.sheet: cases made now by pasting (also queued for the response sheet); restores and edits are not
+// Many logged cases changed at once (bulk tag, tag merge, a spreadsheet's changed rows): each through the write queue
+// with the version the change was made from, as a single edit is, so a case changed on another device meanwhile keeps
+// that version (both are in Recent changes); a blind batch overwrote it (audit, 14 Oct 2026). Ten at a time.
+// pairs: [{ base, next }] -> { saved, kept (changed elsewhere), failed, error }
+export async function updateMany(pairs) {
+  const r = [];
+  for (let i = 0; i < pairs.length; i += 10)
+    r.push(...await Promise.allSettled(pairs.slice(i, i + 10).map(p => updateCase(p.next, { base: p.base }))));
+  const out = { saved: 0, kept: 0, failed: 0, error: null };
+  r.forEach((x, i) => {
+    if (x.status === 'fulfilled') out.saved++;
+    else if (writes.status('case', String(pairs[i].next.id)) === 'conflict') out.kept++;
+    else { out.failed++; out.error = out.error || x.reason; }
+  });
+  return out;
+}
+// its toast: what didn't save says so, with a way to Recent changes
+export function updatedToast(text, r) {
+  if (!r.kept && !r.failed) return toast(text);
+  const not = [r.kept ? `${r.kept} kept as ${r.kept === 1 ? 'it was' : 'they were'} changed on another device` : '',
+    r.failed ? `${r.failed} not saved (${r.error?.message || 'error'})` : ''].filter(Boolean).join('; ');
+  toast(`${text}. ${not}`, { action: 'Recent changes', onaction: () => { location.hash = '#recovery'; }, ms: 12000 });
+}
+
+// New cases only (pasted lists, plans, a backup's missing cases): one blind batch, with no base to check against; a
+// change to a logged case goes through updateMany. opts.sheet: cases made now by pasting (also queued for the response
+// sheet); restores are not
 export async function saveMany(cases, { sheet = false } = {}) {
   applyLocal(list => {
     const byId = new Map(list.map(c => [c.id, c]));

@@ -3,7 +3,7 @@
 
 import { YEAR_NAMES, DEFAULT_NAMES, BY_CODE } from './categories.js';
 import { sortCodes, uid, academicYear, withParents, weekStart, humanAge } from './engine.js';
-import { S, h, toast, modal, confirmBox, cloud, catChip, catName, catShort, PICKER_ORDER, settings, patchLogbook, displayName, hooks, rYear, myYearName, fill, PROFILES, profile, facultyRole, shows, setShown, caseShown, setCaseShown, categoryNames, setCategoryNames, catPills, tagSet, resetters, download, fileButton, todayISO, saveMany, UNDO_SECS, rowIcon } from './ui-core.js';
+import { S, h, toast, modal, confirmBox, cloud, catChip, catName, catShort, PICKER_ORDER, settings, patchLogbook, displayName, hooks, rYear, myYearName, fill, PROFILES, profile, facultyRole, shows, setShown, caseShown, setCaseShown, categoryNames, setCategoryNames, catPills, tagSet, resetters, download, fileButton, todayISO, updateMany, updatedToast, UNDO_SECS, rowIcon } from './ui-core.js';
 import { MAX_TAGS, tagLinks as tagLinksIn, learnShorthand, cleanShorthand, shorthandOf, DEFAULT_SHORTHAND, cleanTagSet, defaultTagSet, tagTree, flatTree, moveTag, reparentTag, removeTag, newKey, tagSetToCsv, tagSetFromCsv, dropTag, canPlace, placeNewTag } from './tags.js';
 import { pickDialog, CASE_PARTS, AFTER_SAVE, RECENT_COUNTS } from './ui-log.js';
 import { recentCount as snapRecent } from './logging.js';
@@ -1058,16 +1058,21 @@ function mergeTag(n) {
         const code = to.startsWith('c:') ? to.slice(2) : null;
         // what the target counts towards: an APMES tag itself, or a personal tag's links (as choosing it does)
         const adds = code ? [code] : tagLinksIn(set, to);
-        const next = cases.map(c => {
+        // each case through the write queue with the version it was made from: one changed on another device meanwhile
+        // is kept, not overwritten
+        const pairs = cases.map(c => {
           const tags = (c.tags || []).filter(k => k !== from);
           const out = { ...c, tags: code ? tags : [...new Set([...tags, to])], updatedAt: Date.now() };
           if (adds.length) out.cats = sortCodes(withParents([...(c.cats || []), ...adds]));
           if (!out.tags.length) delete out.tags;
-          return out;
+          return { base: c, next: out };
         });
-        try { if (next.length) await saveMany(next); } catch (err) { return toast('Could not merge: ' + err.message); }
+        const owner = S.user?.email, r = await updateMany(pairs), into = code ? catShort(code) : (set.find(x => x.k === to) || {}).n;
+        if (S.user?.email !== owner) return;   // (signed out or switched meanwhile: never this list onto the next account)
+        // the old tag comes off the list only once no case carries it (a kept one still would: merge again later)
+        if (r.saved < pairs.length) return updatedToast(`Merged into ${into}: ${r.saved} of ${pairs.length} case${pairs.length === 1 ? '' : 's'}; “${n.e.n}” stays on your list`, r);
         await saveTags(removeTag(set, from));
-        toast(`Merged into ${code ? catShort(code) : (set.find(x => x.k === to) || {}).n}: ${next.length} case${next.length === 1 ? '' : 's'} updated`);
+        toast(`Merged into ${into}: ${r.saved} case${r.saved === 1 ? '' : 's'} updated`);
       } }, 'Merge'))]);
 }
 
