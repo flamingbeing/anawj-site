@@ -10,8 +10,9 @@ const b = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: pr
 const errors = [];
 const bis = p => p.$eval('#vBis', e => +e.textContent);
 try {
-  for (const viewport of [{ width: 390, height: 844 }, { width: 1280, height: 900 }]) {
-    const page = await b.newPage({ viewport });
+  // the phone runs at 3x pixel density: at 1x a canvas-size bug (graphs growing every frame) never showed
+  for (const [viewport, deviceScaleFactor] of [[{ width: 390, height: 844 }, 3], [{ width: 1280, height: 900 }, 1]]) {
+    const page = await b.newPage({ viewport, deviceScaleFactor });
     page.on('pageerror', e => errors.push(e.message));
     page.on('console', m => { if (m.type() === 'error' && !/fonts\.(googleapis|gstatic)/.test(m.text())) errors.push(m.text()); });
     await page.goto(BASE);
@@ -20,6 +21,15 @@ try {
     const ga = await bis(page);
     assert.ok(ga >= 35 && ga <= 60, `propofol GA BIS ${ga}`);
     assert.equal(await page.textContent('#rName'), 'General anaesthesia');
+    // graphs keep their size and have something drawn on them
+    const heights = () => page.$$eval('.screen canvas', cs => cs.map(c => c.clientHeight));
+    const h0 = await heights();
+    await page.waitForTimeout(1500);
+    assert.deepEqual(await heights(), h0, 'canvas heights stable');
+    assert.equal(await page.$eval('#cEeg', c => c.clientHeight), 110);
+    const lit = await page.$eval('#cDsa', c => { const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 0; i < d.length; i += 4) if (d[i] + d[i + 1] + d[i + 2] > 120) n++; return n / (d.length / 4); });
+    assert.ok(lit > 0.3, `DSA drawn (${lit})`);
+    assert.ok(await page.$eval('#err', e => e.hidden), 'no display error');
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth), 0, 'no sideways scroll');
     // library strips and quiz drawn
     await page.waitForFunction(() => document.querySelectorAll('#lib canvas').length === 10 && document.querySelectorAll('#opts button').length === 4);

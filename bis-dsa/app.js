@@ -66,8 +66,8 @@ class Engine{
   const gTarget=this.bsState?0.03:1; this.gate+=(gTarget-this.gate)*0.08;
   let x=0;
   for(let i=0;i<OSC_F.length;i++){const f=OSC_F[i];
-   this.m[i]+= (1-this.m[i])*0.004+randn()*0.03; if(this.m[i]<0.05)this.m[i]=0.05;
-   this.ph[i]+=6.2832*f*dt+randn()*0.08;
+   this.m[i]+= (1-this.m[i])*0.004+(Math.random()-0.5)*0.104; if(this.m[i]<0.05)this.m[i]=0.05;
+   this.ph[i]+=6.2832*f*dt+(Math.random()-0.5)*0.277;
    const P=profile(this.p,f,spEnv); x+=Math.sqrt(2*P)*this.m[i]*Math.sin(this.ph[i]);
   }
   const emgNoise=this.p.emg>0?randn()*Math.sqrt(this.p.emg)*1.2:0;
@@ -113,7 +113,8 @@ const MONO='600 12px "JetBrains Mono", ui-monospace, monospace';
 const SCR={bg:'#05080f',fg:'#d9e4f5',mute:'#7d8ca6',grid:'#1a2538',bis:'#ffd166',sef:'#ffffff'};
 const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-function fit(c,hLogical){const dpr=Math.min(2,window.devicePixelRatio||1);const w=c.clientWidth||300;const h=hLogical||+c.getAttribute('height')||100;
+function fit(c,hLogical){const dpr=Math.min(2,window.devicePixelRatio||1);const w=c.clientWidth||300;// logical height read once: setting c.height below rewrites the attribute (it grew every frame on dpr>1 phones)
+ if(c._lh==null)c._lh=+c.getAttribute('height')||100;const h=hLogical||c._lh;
  if(c._w!==w||c._h!==h||c._d!==dpr){c.width=Math.round(w*dpr);c.height=Math.round(h*dpr);c.style.height=h+'px';c._w=w;c._h=h;c._d=dpr;}
  const ctx=c.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);return {ctx,w,h};}
 
@@ -267,7 +268,7 @@ function layout(W){if(W>=700)return {W:960,H:440,A:{x:24,y:28,w:912,h:70},B:{x:2
 const ease=t=>t<0?0:t>1?1:t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
 const prog=(a,b)=>ease((exT-a)/(b-a));
 function trace(ctx,arr,x,y,w,h,scale,color,lw){ctx.strokeStyle=color;ctx.lineWidth=lw||1.3;ctx.beginPath();for(let i=0;i<arr.length;i++){const px=x+i/(arr.length-1)*w,py=y+h/2-arr[i]*scale;i?ctx.lineTo(px,py):ctx.moveTo(px,py);}ctx.stroke();}
-function drawEx(){const cw0=cEx.clientWidth||600;const L=layout(cw0);const scale=cw0/L.W;const {ctx}=fit(cEx,L.H*scale);ctx.setTransform(ctx.getTransform().a*scale,0,0,ctx.getTransform().a*scale,0,0);
+function drawEx(){const cw0=cEx.clientWidth||600;const L=layout(cw0);const scale=cw0/L.W;const {ctx}=fit(cEx,L.H*scale);ctx.setTransform(cEx._d*scale,0,0,cEx._d*scale,0,0);
  ctx.fillStyle=SCR.bg;ctx.fillRect(0,0,L.W,L.H);if(!ex){ctx.fillStyle=SCR.mute;ctx.font=MONO;ctx.fillText('Collecting EEG…',24,40);return;}
  const s=curStep();ctx.font=MONO;ctx.textAlign='left';
  // A: strip
@@ -359,14 +360,14 @@ $('qNext').onclick=newQ;
 // ===== main loop =====
 let last=performance.now(),dirty=true,colsSinceSnap=0;
 var onColumn=()=>{dirty=true;};
-function frame(now){const dt=Math.min(0.1,(now-last)/1000);last=now;
+function frame(now){requestAnimationFrame(frame);try{frameBody(now);}catch(e){const el=$('err');if(el&&el.hidden){el.hidden=false;el.textContent='Display error: '+e.message;}}}
+function frameBody(now){const dt=Math.min(0.1,(now-last)/1000);last=now;
  if(!paused){const target=simT+dt*speed;const need=Math.floor(target*FS)-Math.floor(simT*FS);simT=target;step(need);runStory();}
  if(dirty){paintOff();drawTrend();drawDsa();readouts();dirty=false;}
  drawEeg();
  if(exPlaying){exT+=dt;if(exT>=T[6]){exT=0;snapshotEx();}}
  if(!ex)snapshotEx();
- drawEx();exUI();
- requestAnimationFrame(frame);}
+ drawEx();exUI();}
 // warm start: 90 s of awake EEG so the screen opens full
 setDrug('propofol');eng.snap();step(60*FS);depth=0.57;$('depth').value=57;applyTarget();step(170*FS);simT=230;snapshotEx();
 if(reduced){exT=T[5]-0.01;}
