@@ -661,3 +661,19 @@ console.log('engine tests passed');
  assert.equal(dateWindow('today "lap  chole"',new Date(2026,9,10)).rest,'"lap  chole"');
  assert.equal(humanAge(splitAge('2m2w hernia').age),'2 months 2 weeks');
 }
+
+// Totals: every tag (default) or only what counts towards the minimums
+{
+ const {finalTarget,towardsMinimum,tagTotal,MINIMUM_TOTAL}=await import('../js/engine.js');
+ assert.equal(finalTarget('26'),40);          // R2 10 | R3 20 | R4 30 | R5 40: the last one
+ assert.equal(finalTarget('20'),155);
+ assert.equal(towardsMinimum('26',55),40);    // past the last target adds nothing
+ assert.equal(towardsMinimum('26',12),12);
+ const noTarget=Object.keys(BY_CODE).find(k=>finalTarget(k)==null);
+ if(noTarget) assert.equal(towardsMinimum(noTarget,9),0);
+ const counts={'26':55,'26i':3,'20':2,'nope':7};
+ assert.equal(tagTotal(counts),60);           // every tag, unknown codes left out
+ assert.equal(tagTotal(counts,'min'),45);
+ assert.equal(tagTotal({}),0);
+ assert.equal(tagTotal(Object.fromEntries(Object.keys(BY_CODE).map(k=>[k,9999])),"min"),MINIMUM_TOTAL);   // everything met = the whole minimum
+}

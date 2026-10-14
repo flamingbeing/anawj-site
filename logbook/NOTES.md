@@ -786,6 +786,10 @@ portfolio content.
 - Programme tag groups are adopted only from the server logbook, never a cached copy (it overwrote groups
   changed on another device). Delete account re-authenticates before deleting anything.
 - Totals: your own column is live (summaryOf), not the copy loaded when Analytics opened.
+- Totals counts (owner, 14 Oct 2026): by default every tag on every case, all years (cumulative), plus a **Total tags**
+  row like the old Google Sheet's Grand Total (one per tag per case; "Total cases" counts cases, so it is smaller). A
+  per-device switch (`display().totalsCount = 'min'`) shows only what counts towards the minimums (each tag up to its
+  last target; `towardsMinimum` / `tagTotal` in engine.js). Also on the Case log page.
 
 ### Device recovery (Codex robustness review)
 
