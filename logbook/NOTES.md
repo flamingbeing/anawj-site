@@ -819,3 +819,7 @@ Run `logbook/test/e2e/usability.mjs` beside recovery and the full E2E suite. Bot
 The first tap selects a tag in List or Pills and opens a small read-only details card. Edit is explicit; Add after uses the selection as an insertion anchor. Close / Escape / browser Back dismiss the card and retain selection. New tags and section headers offer separate Sits under and Place after controls, a searchable sibling list, Beginning / End and a placement preview. Insertion preserves child subtrees and existing APMES parent restrictions. Changing parent resets placement to its end. A changed layout or account refuses a stale dialog save. Selection clears with the account caches.
 
 Notes v1 followed in its own PR (Claude, after the handover): see **Notes** under "Where things are".
+
+- **Drift check lesson (15 Oct 2026):** an edit or delete in a resident's account found by the drift check is the resident's own
+  work until they say otherwise (a resident's (202411) deliberate duplicate clean-up was first undone as "accidental"). Ask the owner to
+  ask the resident before restoring, and keep a before-snapshot of anything written back.

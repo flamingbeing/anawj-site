@@ -23,3 +23,8 @@ and names in chat only), weekly on Firetop Mondays 08:30 SGT with a phone messag
 `residents` are uploaded JSON files). Sheet script has the nightly Totals check (owner installs it). Next if asked: app edits and
 deletes to the sheet (the `app:` marker finds the row), then sheet edits to the app. A message to Firetop that asks for a LIVE
 change is blocked by the permission classifier: give the owner paste-ready wording.
+
+**15 Oct:** app → sheet sync verified with a real resident (drift check IN SYNC 01:34 SGT); the reminder trigger was deleted. resident 202411
+revert done (CSV for her pending in Firetop). Nothing half-done on log2's side. Next, only if the owner asks: plan and build app
+edits/deletes → sheet (the `app:` marker finds the row; Database and Totals rebuild via the nightly check), refresh the dashboard
+after the Monday 19 Oct drift run, `/drift-check` any time.
