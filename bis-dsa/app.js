@@ -448,8 +448,8 @@ function frameBody(now){const dt=Math.min(0.1,(now-last)/1000);last=now;
  if(exPlaying){exT+=dt;if(exT>=T[6]){exT=0;snapshotEx();}}
  if(!ex)snapshotEx();
  drawEx();exUI();}
-// warm start: 90 s of awake EEG so the screen opens full
-setDrug('propofol');eng.snap();step(60*FS);depth=0.57;$('depth').value=57;applyTarget();step(170*FS);simT=230;snapshotEx();
+// warm start: the patient is awake (owner, 14 Oct 2026); 5 min of awake EEG so the screen opens full
+setDrug('propofol');eng.snap();step(300*FS);simT=300;snapshotEx();
 if(reduced){exT=T[5]-0.01;}
 addEventListener('resize',()=>{dirty=true;LIB.forEach(x=>x.cols&&drawStrip($('lib-'+x.id),x.cols));qa&&drawStrip($('cQuiz'),qa.cols);});
 requestAnimationFrame(frame);

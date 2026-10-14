@@ -16,11 +16,21 @@ try {
     page.on('pageerror', e => errors.push(e.message));
     page.on('console', m => { if (m.type() === 'error' && !/fonts\.(googleapis|gstatic)/.test(m.text())) errors.push(m.text()); });
     await page.goto(BASE);
-    // opens in propofol GA after a warm start: BIS in the GA range, two bands described
+    // opens on an awake patient: BIS in the 80s-90s
     await page.waitForFunction(() => /^\d+$/.test(document.querySelector('#vBis').textContent));
-    const ga = await bis(page);
-    assert.ok(ga >= 35 && ga <= 60, `propofol GA BIS ${ga}`);
+    const awake = await bis(page);
+    assert.ok(awake >= 80, `awake BIS ${awake}`);
+    assert.equal(await page.textContent('#rName'), 'Awake');
+    assert.equal(await page.$eval('#depth', e => e.value), '0');
+    // give propofol to GA depth: BIS falls into 35-60 and the two bands are described
+    await page.click('#speedSeg [data-speed="10"]');
+    await page.$eval('#depth', e => { e.value = 57; e.dispatchEvent(new Event('input')); });
     assert.equal(await page.textContent('#rName'), 'General anaesthesia');
+    await page.waitForFunction(() => +document.querySelector('#vBis').textContent <= 60, null, { timeout: 40000 });
+    await page.waitForTimeout(3000);
+    const ga = await bis(page);
+    assert.ok(ga >= 30 && ga <= 60, `propofol GA BIS ${ga}`);
+    await page.click('#speedSeg [data-speed="1"]');
     // graphs keep their size and have something drawn on them
     const heights = () => page.$$eval('.screen canvas', cs => cs.map(c => c.clientHeight));
     const h0 = await heights();

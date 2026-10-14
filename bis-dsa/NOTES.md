@@ -15,6 +15,7 @@ Lasting decisions for `bis-dsa/`. Status and next steps: `STATUS.md`.
   for the view. SQI = 98 − 160 × share of artefact seconds (any sample over 300 µV) in the last 30 s; artefact seconds
   are left out of BIS, SR, EMG and TP. As on the monitor, BIS shows hollow under SQI 50 and `--` under 15. The
   Diathermy toggle injects interference bursts to show this.
+- Opens on an awake patient (owner, 14 Oct 2026): 5 min of awake EEG pre-run so the DSA is full; slider at Awake.
 - Monitor first (owner, 14 Oct 2026): the page opens on the monitor (a small title above it), depth slider then drug
   right under it, smaller lanes on phones (`laneH`); the teaching intro follows.
 
