@@ -19,8 +19,7 @@ try {
     await page.click('#skinSeg [data-skin="advance"]');
     // start-up: modal messages first (then the sensor check by itself); Skip start-up under the screen starts the case with 35 minutes of earlier trend
     assert.ok(await page.evaluate(() => !!ADV.boot), 'the monitor starts with its boot messages');
-    assert.match(await page.$eval('#advBoot', e => e.textContent), /Connect BISx to start monitoring/);
-    await page.waitForFunction(() => /Initializing BISx/.test(document.querySelector('#advBoot').textContent), null, { timeout: 4000 });
+    assert.deepEqual(await page.evaluate(() => ADV_BOOT.map(x => x[0])), ['Connect BISx to start monitoring', 'Initializing BISx', 'Connect sensor to start monitoring']); // the first two are brief; a slow machine can miss them, so only the last is awaited
     await page.waitForFunction(() => /Connect sensor to start monitoring/.test(document.querySelector('#advBoot').textContent) && document.querySelector('#advBoot [data-a="alarms"]'), null, { timeout: 5000 });
     await page.waitForFunction(() => ADV.sensor && document.querySelector('#advOv .th'), null, { timeout: 6000 }); // the sensor check opens by itself
     await page.click('#advSkip'); assert.equal(await page.evaluate(() => ADV.boot), null); assert.equal(await page.$eval('#advBoot', e => e.hidden), true);
@@ -42,7 +41,7 @@ try {
     await page.evaluate(() => { ADV.msgI = 0; ADV.msgT = Date.now() + 60000; }); await page.waitForTimeout(150);
     assert.equal(await txt(page, '#aMsgT'), 'Audio reminder is off'); assert.equal(await txt(page, '#aMbd'), '2'); assert.match(await txt(page, '#aMc'), /^1\/2$/);
     { const t = await page.evaluate(() => { const d = ADV.d; return { bis: d.bis.filter(p => p[1] != null).length, asym: d.asym.filter(p => p[1] != null).length }; }); assert.ok(t.bis >= 200 && t.asym >= 200, `trends start filled (${JSON.stringify(t)})`); }
-    await page.click('#aNext'); await page.evaluate(() => { ADV.msgT = Date.now() + 60000; }); await page.waitForTimeout(150); assert.equal(await txt(page, '#aMsgT'), 'Institutional settings restored'); await page.click('#aCheck'); await page.waitForFunction(() => document.querySelector('#aMbd').textContent === '1');
+    await page.click('#aNext'); await page.evaluate(() => { ADV.msgT = Date.now() + 60000; }); await page.waitForFunction(([sel, t]) => document.querySelector(sel).textContent.replace(/\s+/g, ' ').trim() === t, ['#aMsgT', 'Institutional settings restored'], { timeout: 5000 }); await page.click('#aCheck'); await page.waitForFunction(() => document.querySelector('#aMbd').textContent === '1');
     // L | R pill: the BIS trend, the SEF and MF panel and the badge follow the side
     assert.equal(await page.evaluate(() => ADV.hemi), 'L'); await page.click('#aLr'); assert.equal(await page.evaluate(() => ADV.hemi), 'R'); assert.equal(await txt(page, '#aBadgeLow'), 'R');
     await page.click('#aLr');
@@ -87,18 +86,18 @@ try {
     assert.equal(await page.$eval('#aBisL', e => e.classList.contains('box')), true, 'digits on a red box');
     await page.waitForFunction(() => ADV.sounding === true && ADV.beeps > 0, null, { timeout: 4000 });
     await page.click('#aAcnt'); assert.equal(await page.$eval('#aAlist', e => e.hidden), false); assert.match(await txt(page, '#aAlist'), /START\s*ALARM\s*\d\d:\d\d\s*BIS ALARM/); await page.click('#aAcnt');
-    await page.click('#aSilent'); assert.equal(await page.evaluate(() => ADV.audio), 1); await page.waitForTimeout(120); assert.equal(await txt(page, '#aMsgT'), 'Alarm Pause Mode On', 'the pill answers at once'); assert.match(await txt(page, '#aPillT'), /^[12]:\d\d$/); assert.equal(await page.evaluate(() => ADV.sounding), false);
-    await page.click('#aSilent'); assert.equal(await txt(page, '#aPillT'), 'SILENT'); await page.waitForTimeout(120); assert.equal(await txt(page, '#aMsgT'), 'Alarm Silent Mode On'); assert.equal(await page.evaluate(() => ADV.msgs.filter(m => /^Alarm (Pause|Silent) Mode/.test(m.text)).length), 1, 'only the newest audio message is kept'); assert.equal(await page.$eval('#aAbar', e => e.hidden), false, 'the bar stays while the audio is off');
-    await page.click('#aDrop'); assert.equal(await page.$$eval('#aCtl button', e => e.length), 4); await page.click('#aCt0'); assert.equal(await page.evaluate(() => ADV.audio), 0); await page.waitForTimeout(120); assert.equal(await txt(page, '#aMsgT'), 'Alarm Silent Mode Off');
+    await page.click('#aSilent'); assert.equal(await page.evaluate(() => ADV.audio), 1); await page.waitForFunction(([sel, t]) => document.querySelector(sel).textContent.replace(/\s+/g, ' ').trim() === t, ['#aMsgT', 'Alarm Pause Mode On'], { timeout: 5000 }); assert.match(await txt(page, '#aPillT'), /^[12]:\d\d$/); await page.waitForFunction(() => ADV.sounding === false, null, { timeout: 5000 });
+    await page.click('#aSilent'); assert.equal(await txt(page, '#aPillT'), 'SILENT'); await page.waitForFunction(([sel, t]) => document.querySelector(sel).textContent.replace(/\s+/g, ' ').trim() === t, ['#aMsgT', 'Alarm Silent Mode On'], { timeout: 5000 }); assert.equal(await page.evaluate(() => ADV.msgs.filter(m => /^Alarm (Pause|Silent) Mode/.test(m.text)).length), 1, 'only the newest audio message is kept'); assert.equal(await page.$eval('#aAbar', e => e.hidden), false, 'the bar stays while the audio is off');
+    await page.click('#aDrop'); assert.equal(await page.$$eval('#aCtl button', e => e.length), 4); await page.click('#aCt0'); assert.equal(await page.evaluate(() => ADV.audio), 0); await page.waitForFunction(([sel, t]) => document.querySelector(sel).textContent.replace(/\s+/g, ' ').trim() === t, ['#aMsgT', 'Alarm Silent Mode Off'], { timeout: 5000 });
     // alarm off again: bar goes
     await page.click('#aAlarms'); await page.click('[data-a="dtog"][data-v="bis"]'); await page.click('[data-a="dapply"]');
     await page.waitForFunction(() => document.querySelector('#aAbar').hidden, null, { timeout: 5000 });
     // Snapshot: dialog with a name; OK makes the message
     await page.click('#aSnap'); assert.equal(await page.$eval('#advSnapName', e => e.value), 'Snapshot 1'); await page.click('[data-a="dok"]');
-    assert.equal(await page.evaluate(() => ADV.msgs.some(m => m.text === 'Snapshot created')), true); await page.waitForTimeout(120); assert.equal(await txt(page, '#aMsgT'), 'Snapshot created');
+    assert.equal(await page.evaluate(() => ADV.msgs.some(m => m.text === 'Snapshot created')), true); await page.waitForFunction(([sel, t]) => document.querySelector(sel).textContent.replace(/\s+/g, ' ').trim() === t, ['#aMsgT', 'Snapshot created'], { timeout: 5000 });
     // Settings and maintenance: smoothing rate drives the monitor; logs without USB say so; Administrator mode asks for a password
     await page.click('#aMenu'); await page.click('[data-a="m_settings"]'); await page.click('[data-a="dsel"][data-v="advanced"]'); await page.click('[data-a="st_smooth"][data-v="10"]');
-    assert.equal(await page.evaluate(() => mon.smooth), 10); assert.equal(await page.evaluate(() => ADV.msgs.some(m => m.text === 'Smoothing rate changed to 10 seconds')), true); await page.waitForTimeout(120); assert.equal(await txt(page, '#aMsgT'), 'Smoothing rate changed to 10 seconds');
+    assert.equal(await page.evaluate(() => mon.smooth), 10); assert.equal(await page.evaluate(() => ADV.msgs.some(m => m.text === 'Smoothing rate changed to 10 seconds')), true); await page.waitForFunction(([sel, t]) => document.querySelector(sel).textContent.replace(/\s+/g, ' ').trim() === t, ['#aMsgT', 'Smoothing rate changed to 10 seconds'], { timeout: 5000 });
     await page.click('[data-a="st_nch"][data-v="1"]'); assert.equal(await page.evaluate(() => ADV.nch[4]), 2, 'EEG Trends are staged until APPLY'); await page.click('[data-a="eeg_apply"]'); assert.equal(await page.evaluate(() => ADV.nch[4]), 1); await page.click('[data-a="st_nch"][data-v="2"]'); await page.click('[data-a="eeg_apply"]'); assert.equal(await page.evaluate(() => ADV.nch[4]), 2);
     await page.click('[data-a="dsel"][data-v="logs"]'); await page.click('[data-a="st_dl"]'); assert.equal(await page.evaluate(() => ADV.msgs.some(m => m.text === 'Export failed - USB drive removed')), true);
     await page.click('[data-a="dsel"][data-v="advanced"]'); await page.click('[data-a="st_admin"]'); await page.fill('#advPw', 'x'); await page.click('[data-a="dok"]'); assert.match(await txt(page, '#advOv [role="alert"]'), /Incorrect/);

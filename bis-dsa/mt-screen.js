@@ -26,7 +26,7 @@ const MT_MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov',
 function mtStamp(t){const d=new Date(T0+t*1000);return `${mtPad(d.getDate())} ${MT_MON[d.getMonth()]} ${d.getFullYear()}  ${mtPad(d.getHours())}:${mtPad(d.getMinutes())}:${mtPad(d.getSeconds())}`;}
 const mtHMS=s=>Math.floor(s/3600)+':'+mtPad(Math.floor(s/60)%60)+':'+mtPad(s%60);
 const mtView=()=>MT.review?'bis':MT.main;
-function mtVis(){return mon.skin==='vista';}
+function mtVis(){return typeof mon!=='undefined'&&mon.skin==='vista';}
 // an information message on the message bar (the monitor's own wording), for a few seconds
 function mtInfo(text,code,ms,pri,dis){MT.info={text,code,pri:pri||'info',dis:!!dis,until:Date.now()+(ms||5000)};mtD();setTimeout(()=>{mtD();},(ms||5000)+100);}
 function mtTgtSync(){mon.alo=MT.tgt.lo;mon.ahi=MT.tgt.hi;mtD();}
