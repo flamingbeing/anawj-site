@@ -6,3 +6,9 @@ cases: a resident's new app case should appear in the Case tab (column J `app:<i
 Form response arriving during a sync must still reach the Database (the Form handler's lock wait is now 60 s).
 The pre-go-live bug hunt (#523, merged) is parked: imports and an app left open for days untested; Firefox seed 285932884 (stale
 copy after a conflict) and WebKit's editVsDelete are open in `PLAN-go-live-bugfix.md`.
+
+**To check once the owner has a programme resident to test with (owner will say "tmr" / when found):** the end-to-end sync check
+listed under "Waiting on the owner" in `logbook/STATUS.md` (new Case-tab row with `app:` in J, Database rows, Executions page,
+a Form response during a sync). If it fails, read the sheet script's Executions (the owner pastes the error text) and the
+`sheetOutbox` rules/`cloud.queueSheetRows`: entries only exist when the account is a programme member (logbook.rid set and a
+residents entry with that email).

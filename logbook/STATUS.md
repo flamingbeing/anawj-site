@@ -17,8 +17,13 @@ its own file), so sessions never edit the same lines. Read them all before start
 
 - **Delete the test "ZZ" case again** (14 Oct): its first delete hit the zombie-delete bug (fixed in #519); after the
   site updates, reload and delete it once more (the old attempt sits as a conflict in Recent changes on that phone).
-- **App → sheet sync** (`logbook/PLAN-app-to-sheet.md`): say go, and confirm the "app" mark in column J. Owner decided:
-  on for every resident, a few minutes' delay is fine, new cases only. Comes after the data-safety bug hunt.
+- **App → sheet sync is LIVE (14 Oct) but not yet seen working end to end.** Needs one programme resident (someone on the
+  Residents list) to log a fake case in the app. Then check, within ~5 minutes: (1) the sheet's Case tab has a new row at the
+  top with `app:<id>` in column J (resident text, a real date, categories in D–G); (2) the Database tab has a row per
+  category; (3) the Executions page of the sheet's Apps Script shows `logbookOutboxRun` ran without errors; (4) log a second
+  case while submitting a Form response and check both land. If nothing appears in 10 minutes: Executions page, then tell
+  the assistant. Off switch: delete the `logbookOutboxRun` trigger, and set `SHEET_OUTBOX_ON = false` (`js/sheet-outbox.js`).
+  Details: `logbook/PLAN-app-to-sheet.md`, `logbook/form-script/OUTBOX-README.md`.
 - 14 Nov 2026 reminder (scheduled in log2's session): turn the response sheet's "anyone with the link: viewer" off.
 - **Try the 6-hour build** (13–14 Oct): Settings → Profile → Personal; Logbook day → + Daily note; Settings → Advanced
   logging → Labelled parts; Settings → Sync (GitHub / Drive / Dropbox); Send to. Everything new is off until switched on.
