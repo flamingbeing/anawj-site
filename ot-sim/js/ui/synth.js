@@ -1,0 +1,110 @@
+// Waveform samples from beat and breath events (DESIGN.md, "Beats, breaths and the waveforms"). UI only: it may use
+// Math freely, and the model never reads it.
+//
+// A source holds sorted beat and breath events on one display clock. At 1x they are the model's own events; at 5x and
+// 20x a FastSource makes its own at wall-clock pace from the model's current rate and values, so a heart rate of 70
+// still looks like 70 on the screen. The shapes below are our own simple templates (sums of bell curves), drawn to look
+// like a lead II ECG, a finger pleth and a capnogram; they carry no diagnostic detail. [D]
+
+const g = (x, c, w) => Math.exp(-((x - c) * (x - c)) / (2 * w * w));
+
+// first index with arr[i].t > t (binary search)
+function upper(arr, t) {
+  let lo = 0, hi = arr.length;
+  while (lo < hi) { const mid = (lo + hi) >> 1; if (arr[mid].t <= t) lo = mid + 1; else hi = mid; }
+  return lo;
+}
+
+// ECG lead II in mV around a beat at time 0 (the R peak); intervals stretch a little with the beat-to-beat interval
+function ecgBeat(x, rr) {
+  const s = Math.sqrt(Math.min(1.5, Math.max(0.3, rr)));
+  return 0.12 * g(x, -0.16, 0.022)            // P
+    - 0.08 * g(x, -0.028, 0.007)              // Q
+    + 1.05 * g(x, 0, 0.0095)                  // R
+    - 0.22 * g(x, 0.026, 0.009)               // S
+    + 0.28 * g(x, 0.24 * s, 0.05 * s);        // T
+}
+export function ecg(src, t) {
+  const b = src.beats, i = upper(b, t + 0.3);
+  let v = 0;
+  for (let k = Math.max(0, i - 3); k < i; k++) v += ecgBeat(t - b[k].t, b[k].rr);
+  return v;
+}
+
+// pleth: arrives about 0.25 s after the R wave at the finger; amplitude follows the pulse pressure [D]
+const PTT = 0.25;
+function plethBeat(x) {
+  if (x < 0) return 0;
+  const up = x < 0.12 ? g(x, 0.12, 0.05) : Math.exp(-(x - 0.12) / 0.32);
+  return up + 0.12 * g(x, 0.36, 0.04) * Math.exp(-x / 0.6);
+}
+export function pleth(src, t) {
+  const b = src.beats, i = upper(b, t - PTT);
+  let v = 0;
+  for (let k = Math.max(0, i - 4); k < i; k++) {
+    const pp = Math.max(0, b[k].sbp - b[k].dbp);
+    v += plethBeat(t - PTT - b[k].t) * Math.min(1.3, pp / 45);
+  }
+  return v;
+}
+
+// capnogram, mmHg: a breath event starts inspiration (CO2 falls to zero), expiration starts after ti: a steep
+// upstroke, then a plateau rising slowly to the end-tidal value
+export function co2(src, t) {
+  const br = src.breaths, i = upper(br, t) - 1;
+  if (i < 0) return 0;
+  const b = br[i], x = t - b.t;
+  if (x < b.ti) {
+    const prevEt = i > 0 ? br[i - 1].etco2 : b.etco2;
+    return prevEt * Math.exp(-x / 0.06);
+  }
+  const e = x - b.ti, exp = Math.max(0.5, b.cycle - b.ti);
+  const up = 1 / (1 + Math.exp(-(e - 0.18) / 0.04));
+  return b.etco2 * up * (0.9 + 0.1 * Math.min(1, e / exp));
+}
+
+// --- event sources ------------------------------------------------------------------------------------------------
+
+// the model's events (1x): the ring plus the events the model already knows are next (exact times kept in state)
+export function modelSource(state) {
+  const beats = [], breaths = [];
+  for (const e of state.ev.ring) (e.kind === 'beat' ? beats : e.kind === 'breath' ? breaths : []).push(e);
+  const v = state.vit;
+  beats.push({ t: v.nextBeat, rr: 60 / v.hr, sbp: v.sbp, dbp: v.dbp });
+  breaths.push({ t: v.nextBreath, cycle: 60 / v.rr, ti: 20 / v.rr, etco2: v.etco2 });
+  return { beats, breaths };
+}
+
+// small seeded generator for the fast-mode beat jitter (UI only)
+function mulberry32(a) {
+  return () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+}
+
+// fast mode (5x, 20x): events at real pace on the display clock, starting from the model's history at the switch
+export class FastSource {
+  constructor(state, t0, seed = 1) {
+    const m = modelSource(state);
+    this.beats = m.beats.filter(e => e.t <= t0);
+    this.breaths = m.breaths.filter(e => e.t <= t0);
+    this.rand = mulberry32(seed);
+    this.nextBeat = Math.max(t0, m.beats[m.beats.length - 1].t);
+    this.nextBreath = Math.max(t0, m.breaths[m.breaths.length - 1].t);
+  }
+  // make events up to display time t + lookahead, from the model's current values
+  advance(state, t) {
+    const v = state.vit, until = t + 0.4;
+    while (this.nextBeat <= until) {
+      const rr = (60 / v.hr) * (1 + 0.02 * (this.rand() - 0.5));
+      this.beats.push({ t: this.nextBeat, rr, sbp: v.sbp, dbp: v.dbp });
+      this.nextBeat += rr;
+    }
+    while (this.nextBreath <= until) {
+      const cycle = 60 / v.rr;
+      this.breaths.push({ t: this.nextBreath, cycle, ti: cycle / 3, etco2: v.etco2 });
+      this.nextBreath += cycle;
+    }
+    // keep about a minute of history (more than any lane shows)
+    if (this.beats.length > 400) this.beats.splice(0, this.beats.length - 300);
+    if (this.breaths.length > 100) this.breaths.splice(0, this.breaths.length - 60);
+  }
+}

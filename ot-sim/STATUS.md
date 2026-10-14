@@ -2,7 +2,7 @@
 
 Short and current. Lasting rules go in `NOTES.md`. Update with `/save-state`.
 
-Last updated: 2026-10-14 by Claude Code (build session: M0.1 model loop).
+Last updated: 2026-10-14 by Claude Code (build session: M0.2 first monitor).
 
 ## Now
 
@@ -19,12 +19,15 @@ Each session keeps its own line in `status/<session>.md`. Read them before start
 
 ## Next
 
-1. M0.2 (first monitor: theatre shell, loop, lanes, synthetic sinus waveforms, numerics), then the PR order in
-   `DESIGN.md`, one PR at a time, each merged before the next.
+1. M1.1 (IV PK: `pk.js`, `drugs.js`), then the PR order in `DESIGN.md`, one PR at a time, each merged before the
+   next.
 
 ## Recently done
 
-- M0.1 (14 Oct 2026): `js/model/` loop (`sim.js`, fixed 0.1 s Jacobi step, snapshot, replay, event ring, trends,
+- M0.2 (14 Oct 2026): first monitor at `#theatre`: library screen, sweeping ECG, pleth and capnogram lanes (real pace
+  at 5x and 20x), HR, SpO2, EtCO2, RR, NIBP (cycle, start/stop) and temperature, speed keys and pause, fonts, the
+  old-address forward, `?seed` and `?test`.
+- M0.1 (14 Oct 2026, #570): `js/model/` loop (`sim.js`, fixed 0.1 s Jacobi step, snapshot, replay, event ring, trends,
   300 s warm start), `rng.js` (sfc32, named streams), `fmath.js` (exact exp, log, pow, sin, cos), `patient.js`
   (covariates and variation), a placeholder `vitals.js`; tests for maths, determinism, purity and the patient.
 - Build plan (14 Oct 2026): `DESIGN.md`, `MODEL.md`, `SCENARIOS.md`, `research/`; brief corrected (Marsh example);

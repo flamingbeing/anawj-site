@@ -120,9 +120,12 @@ export function createSim({ seed = 1, profile = {}, systems = SYSTEMS, strict = 
   const n = Math.round(warmup / DT);
   if (n > 0) {
     sim.step(n);
-    // the warm start is not part of the run: the clock, log, trend and events start at zero
-    sim.state = { ...sim.state, step: 0, t: 0, log: [], trend: [], ev: { seq: 0, ring: [] }, queue: [] };
-    for (const sys of systems) if (sys.rebase) sim.state[sys.name] = sys.rebase(sim.state[sys.name], n * DT);
+    // the warm start is not part of the run: the clock, log and trend start at zero. Its last events are kept with
+    // negative times (sequence numbers carry on), so the monitor has a full sweep of history at t = 0.
+    const off = n * DT, ev = sim.state.ev;
+    const ring = ev.ring.map(e => ({ ...e, t: Math.round((e.t - off) * 1e9) / 1e9 }));
+    sim.state = { ...sim.state, step: 0, t: 0, log: [], trend: [], ev: { seq: ev.seq, ring }, queue: [] };
+    for (const sys of systems) if (sys.rebase) sim.state[sys.name] = sys.rebase(sim.state[sys.name], off);
   }
   return sim;
 }
