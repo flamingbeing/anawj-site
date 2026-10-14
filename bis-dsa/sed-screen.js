@@ -7,7 +7,7 @@ const SED_DEF={profile:'ADULT',psiHi:50,psiLo:25,psiCH:null,psiCL:null,silence:1
  dsaHi:15,dsaLo:-40,sefThick:3,maxHz:30,dsaType:'Multitaper',emgYmax:100,emgYmin:0,emgSens:'Standard',srYmax:100,srYmin:0,srHi:null,srCH:null,srSil:120,
  artfYmax:100,artfYmin:0,sefYmax:30,sefYmin:0,stUnit:'HH:MM',eegAmp:5,eegSpeed:30,eegFilter:true,placement:'EEG/PSi/DSA',monImp:true,dispImp:true,dsaArt:true,
  cursor:true,smart:false,trendLayout:'Dynamic',analogRange:'Fixed',clock24:false,dateFmt:'MM/DD/YY',pauseDur:120,alarmVol:10,pulseVol:3,smartTone:false,standby:false,
- allMute:true,lockVol:false,dataColl:true,brightness:8};
+ allMute:true,lockVol:false,dataColl:true,brightness:10};
 const SED={built:false,set:Object.assign({},SED_DEF),view:'trend',range:30,hold:null,exp:{emg:1,psi:1,sr:1},strip:false,pop:null,dlg:null,full:true,ver:0,
  sim:{disc:false,off:false,none:false,hiz:false,gel:false,expired:false,batt:false},gaps:[],events:[],pre:null,hc:null,D:null,N:null,alm:null,L:null,elec:null,
  imp:{R2:10.0,R1:4.9,CT:5.1,CB:7.4,L1:7.3,L2:5.3},silenceUntil:0,silenceShown:false,pauseUntil:0,pausePerm:false,armed:false,outSince:null,beeps:0,sounding:false,nextBeep:0,
@@ -35,11 +35,11 @@ function sedBuild(){if(SED.built)return;SED.built=true;sedLoad();
  sq('bSilent').onclick=()=>sedBell(true);sq('bMenu').onclick=()=>{SED.dlg?sedDlgClose():sedDlgOpen('main');};sq('bSensor').onclick=()=>sedStripToggle();
  sq('sedSim').addEventListener('click',e=>{const b=e.target.closest('[data-sim]');if(!b)return;const k=b.dataset.sim;SED.sim[k]=!SED.sim[k];b.setAttribute('aria-pressed',String(SED.sim[k]));if(k==='disc'||k==='off'||k==='none')sedGapTrack();sedInval();SED.elec=null;});
  document.addEventListener('pointerdown',()=>sedUnlock(),{once:true});
- sedPre();sedHits();}
+ sedPre();sedHits();if(typeof applyBrightness==='function')applyBrightness();}
 // the earlier trend: a monitor shows a case that has been running for a while, so the screen opens with 30 minutes of awake history,
 // one column a second, laid out from the sim's own spectra (throwaway engines; kept in SED.pre, never in HIST)
 function sedPre(){if(SED.pre)return;const A=advPool(0,60),first=HIST.length?HIST[0].n:1,N=1800,rnd=advRng(77),pre={L:[],R:[]},emaB={L:null,R:null};let dbp={L:null,R:null};
- for(let i=0;i<N;i++){const u=i/N,n=first-N+i,off=2.2*Math.sin(u*9+1)+1.5*Math.sin(u*23);
+ for(let i=0;i<N;i++){const u=i/N,n=first-N+i,off=1.2*Math.sin(u*9+1)+.8*Math.sin(u*23);
   for(const s of ['L','R']){const a=A[Math.floor(rnd()*A.length)],sg=s==='L'?1:-1;let b=a.bis+3.5*clampv(1-u*6,0,1)+1.5*Math.sin(u*17+(s==='R'?1.3:0));emaB[s]=emaB[s]==null?b:emaB[s]*.8+b*.2;
    pre[s].push({n,db:a.db,sef:a.sef,mf:a.mf,bis:emaB[s],bsr:a.bsr,emg:a.emg,sqi:92+Math.floor(rnd()*7),tp:a.tp+sg*off*.6,art:rnd()<.004?1:0,sp:0,st:0,bc:0,amp:20,ce:0});}}
  SED.pre=pre;SED.hc=null;}
@@ -130,7 +130,8 @@ function sedAlarmEval(){const N=SED.N,S=SED.sim,s=SED.set,msgs=[],t=simT;let par
  if(S.batt)sys=true;
  // one message in the title band at a time; with several, they take turns every 3 s
  const pm=par?{text:par.text,lv:par.lv,k:'psi'}:null,all=[...msgs];if(pm)all.push(pm);all.sort((a,b)=>(a.lv==='hi'?0:1)-(b.lv==='hi'?0:1));
- const cur=all.length?all[Math.floor(Date.now()/3000)%all.length]:null;
+ // only the highest priority present is shown in the title band (a red message hides a yellow one)
+ const show=all.filter(m=>m.lv===(all.some(q=>q.lv==='hi')?'hi':m.lv)),cur=show.length?show[Math.floor(Date.now()/3000)%show.length]:null;
  SED.alm={level:all.length?all[0].lv:null,text:cur?cur.text:null,win:cur&&!cur.k?{level:cur.lv}:null,curPar:!!(cur&&cur.k),par:par?{k:'psi',level:par.lv,dir:par.dir}:null,sys,all};}
 function sedSound(now){const A=SED.alm,silenced=SED.silenceUntil>now,paused=SED.pauseUntil>now||SED.pausePerm;if(SED.pauseUntil&&SED.pauseUntil<=now&&!SED.pausePerm){SED.pauseUntil=0;sedInval();}if(SED.silenceUntil&&SED.silenceUntil<=now){SED.silenceUntil=0;SED.silenceShown=false;sedInval();}
  const snd=A&&A.level&&(A.level==='hi'||SED.set.audible)&&!silenced&&!paused;SED.sounding=!!snd;

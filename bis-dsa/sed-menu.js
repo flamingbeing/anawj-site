@@ -3,7 +3,7 @@
 // names, ranges and factory defaults. A leaf screen edits a copy: OK keeps it, Cancel and the back arrow drop it. Loaded after sed-screen.js.
 const sRng=(a,b,s)=>{const o=[];for(let v=a;v<=b;v+=s||1)o.push(v);return o;},sOff=(a,b,s)=>[null,...sRng(a,b,s)];
 const sFmtOff=v=>v==null?'Off':String(v),sFmtU=u=>v=>v+' '+u;
-const SD_SIL=[30,60,120,300],sFmtSil=v=>v===30?'30 sec':v+60===0?'':(v/60)+' min';
+const SD_SIL=[30,60,120,300],sFmtSil=v=>v===30?'30 sec':(v/60)+' min';
 const sFmtPause=v=>v===0?'Permanent':v===-1?'Permanent with Reminder':(v/60)+' min';
 const sCap=s=>s.charAt(0)+s.slice(1).toLowerCase();
 const SD_ABOUT={psi:'The Patient State Index (PSi) is related to the effect of certain anesthetic agents on a patient.',

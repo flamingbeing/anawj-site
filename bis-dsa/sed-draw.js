@@ -9,7 +9,7 @@ const sedStopAt=p=>{let k=0;while(k<SED_STOPS.length-2&&p>SED_STOPS[k+1][0])k++;
 const SED_LUT=Array.from({length:51},(_,i)=>sedStopAt(1-i/50)); // index 0 = weakest (blue) ... 50 = strongest (red)
 const NPX=504,PX0=50,PX1=554,DW=685,DX=50,LH=150; // trend plot columns and x range; DSA width and x; DSA height of one side
 const clampv=(v,a,b)=>Math.max(a,Math.min(b,v)),pad2=n=>String(n).padStart(2,'0');
-function sT(c,s,x,y,size,col,al,wt,it){c.font=`${it?'italic ':''}${wt||400} ${size}px ${SED_FONT}`;c.fillStyle=col;c.textAlign=al||'left';c.textBaseline='alphabetic';c.fillText(s,x,y);}
+function sT(c,s,x,y,size,col,al,wt,it,sx){c.font=`${it?'italic ':''}${wt||400} ${size}px ${SED_FONT}`;c.fillStyle=col;c.textAlign=al||'left';c.textBaseline='alphabetic';if(sx&&sx!==1){c.save();c.translate(x,y);c.scale(sx,1);c.fillText(s,0,0);c.restore();}else c.fillText(s,x,y);}
 function sRR(c,x,y,w,h,r){c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);c.arcTo(x+w,y+h,x,y+h,r);c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);c.closePath();}
 // ----- time -----
 const sedClock=(t,secs,force24)=>{const d=new Date(T0+t*1000);let h=d.getHours();const h24=force24!=null?force24:SED.set.clock24;
@@ -59,15 +59,17 @@ function sedPaintDsa(D){const hz=SED.set.maxHz,hi=SED.set.dsaHi,lo=SED.set.dsaLo
  for(const s of ['L','R']){let o=SED['cv'+s];if(!o){const cv=document.createElement('canvas');cv.width=DW;cv.height=LH;o=SED['cv'+s]={cv,img:cv.getContext('2d').createImageData(DW,LH)};}
   const h=s==='L'?D.hL:D.hR,d=o.img.data,rows=LH,ci=new Int16Array(rows),flag=new Uint8Array(DW),sef=new Float32Array(DW).fill(-1);d.fill(0);for(let i=3;i<d.length;i+=4)d[i]=255;
   const i0=sedLb(h,tS);let lastX=-1;
-  for(let j=i0;j<h.length;j++){const c=h[j];if(c.n>D.tE)break;const x=Math.floor((c.n-tS)/sp);if(x<0||x>=DW)continue;
+  for(let j=i0;j<h.length;j++){const c=h[j];if(c.n>D.tE)break;const x=Math.floor((c.n-tS)/sp);if(x<0||x>=DW)continue;const xq=x-(x%2);
    const gap=sedGap(c.n),sqibad=c.sqi<15;
    if(gap||sqibad){flag[x]=Math.max(flag[x],1);continue;}
    if(c.art&&SED.set.dsaArt){flag[x]=Math.max(flag[x],3);}
    if(c.sp){flag[x]=Math.max(flag[x],2);continue;}
    const pv=h[j-1],nx=h[j+1],bins=c.db;
-   for(let y=0;y<rows;y++){const f=(s==='L'?(rows-1-y):y)*hz/rows,b=f/0.5;let v;if(b>=NB-1)v=-1e9;else{const k=Math.floor(b),fr=b-k,g=(q)=>{const u=q[k]*(1-fr)+q[k+1]*fr;return u;};
+   // the picture is made of 2 x 2 pixel cells (nearest neighbour, no smoothing), as on the real screen
+   for(let y=0;y<rows;y+=2){const f=(s==='L'?(rows-2-y):y)*hz/rows+hz/rows,b=f/0.5;let v;if(b>=NB-1)v=-1e9;else{const k=Math.floor(b),fr=b-k,g=(q)=>q[k]*(1-fr)+q[k+1]*fr;
      if(mt&&pv&&nx&&pv.db&&nx.db){v=0.5*g(bins)+0.25*(g(pv.db)+g(nx.db));}else v=g(bins);}
-     const real=-38+2.1*v,fr2=clampv((real-lo)/(hi-lo),0,1),q=SED_LUT[Math.round(fr2*50)],i=(y*DW+x)*4;d[i]=q[0];d[i+1]=q[1];d[i+2]=q[2];}
+    const real=-35+2.1*v,fr2=clampv((real-lo)/(hi-lo),0,1),q=SED_LUT[Math.round(fr2*50)];
+    for(let dy=0;dy<2;dy++)for(let dx=0;dx<2;dx++){const i=((y+dy)*DW+xq+dx)*4;d[i]=q[0];d[i+1]=q[1];d[i+2]=q[2];}}
    if(c.sef!=null)sef[x]=c.sef;}
   const cx=o.cv.getContext('2d');cx.putImageData(o.img,0,0);
   // flagged columns: artefact (a white line), suppression (a black bar with a blue tick at the 0 Hz edge), no data (a black bar)
@@ -102,7 +104,7 @@ function sChev(c,x,y,w,col,up,dbl){c.save();c.strokeStyle=col;c.lineWidth=2;c.li
 // ----- the whole static screen -----
 const sedAlarmCol=lv=>lv==='hi'?'#ed1c24':'#f9ca07';
 function sedDrawStatic(){const cv=SED.cv;if(!cv)return;const dpr=Math.min(2,window.devicePixelRatio||1),w=cv.clientWidth||400,k=w*dpr/800;
- if(cv._w!==Math.round(800*k)){cv.width=Math.round(800*k);cv.height=Math.round(1280*k);}const c=cv.getContext('2d');c.setTransform(k,0,0,k,0,0);c.clearRect(0,0,800,1280);
+ if(cv._w!==Math.round(800*k)){cv.width=Math.round(800*k);cv.height=Math.round(1280*k);cv._w=cv.width;}const c=cv.getContext('2d');c.setTransform(k,0,0,k,0,0);c.clearRect(0,0,800,1280);
  const D=SED.D,N=SED.N,L=SED.L=sedLay(),A=SED.alm,set=SED.set;
  c.fillStyle=SC.bg;c.fillRect(0,0,800,1280);
  sedStatusBar(c,A);sedWindow(c,A);
@@ -139,13 +141,13 @@ function sedWindow(c,A){const win=A&&A.win,col=win?sedAlarmCol(win.level):null,p
  sRR(c,8,80,784,1107,6);c.fillStyle=SC.bg;c.fill();c.strokeStyle=win?col:'#232120';c.lineWidth=win?2.5:1.2;c.stroke();
  const gg=c.createLinearGradient(0,80,0,110);const tint=win?(win.level==='hi'?['#7a1820','#4a1416']:['#8a6e10','#5a470a']):par?(par.level==='hi'?['#c01c24','#8a1218']:['#b8962a','#8d7218']):['#211e1e','#1c1a1a'];gg.addColorStop(0,tint[0]);gg.addColorStop(1,tint[1]);
  c.save();sRR(c,9,81,782,29,5);c.clip();c.fillStyle=gg;c.fillRect(8,80,784,30);c.restore();
- sT(c,'SedLine',18,102,23,win?(win.level==='hi'?'#ff5a5a':'#f9ca07'):par?'#e8d9a0':'#afafae','left',700,true);sT(c,'TM',92,92,6,'#8a8987','left',400);
+ sT(c,'SedLine',18,102,23,win?(win.level==='hi'?'#ff5a5a':'#f9ca07'):par?'#e8d9a0':'#afafae','left',600,true);sT(c,'TM',92,92,6,'#8a8987','left',400);
  if(SED.set.emgSens==='Maximum')sT(c,'EMG MAX',600,102,15,'#8a8a88','center',400);
  // the pill with the message
  if(A&&A.text){const t=A.text;c.font=`600 18px ${SED_FONT}`;const tw=c.measureText(t).width+34;sRR(c,400-tw/2,83,tw,24,12);c.fillStyle=win&&win.level==='hi'?'#4a1416':par?'#3a2e0e':'#1c1a1a';c.fill();sT(c,t,400,101,18,'#fff','center',600);}
  // the action tab (a blue one with an up chevron under the open menu)
  if(SED.pop&&SED.pop.kind==='action'){sRR(c,705,189,80,21,4);const g=c.createLinearGradient(0,189,0,210);g.addColorStop(0,'#3f95d8');g.addColorStop(1,'#2a76b4');c.fillStyle=g;c.fill();sChev(c,745,199,18,'#fff',true,true);}
- else{sRR(c,703,85,84,25,4);c.fillStyle='#161413';c.fill();c.strokeStyle='#2b2a2a';c.lineWidth=1;c.stroke();sChev(c,745,98,18,'#aaa',false,true);}}
+ else{sRR(c,703,85,84,25,4);c.fillStyle='#161413';c.fill();c.strokeStyle='#2b2a2a';c.lineWidth=1;c.stroke();c.strokeStyle='#bdbdbd';c.lineWidth=1.8;c.lineCap='round';c.beginPath();c.moveTo(737,93);c.lineTo(753,93);c.stroke();sChev(c,745,100,18,'#bdbdbd',false,false);}}
 // ----- the trend rows -----
 function sedMap(k){const s=SED.set;switch(k){case 'psi':return {max:s.psiYmax,min:s.psiYmin,inv:false};case 'emg':return {max:s.emgYmax,min:s.emgYmin};case 'sr':return {max:s.srYmax,min:s.srYmin,inv:true};case 'artf':return {max:s.artfYmax,min:s.artfYmin};case 'sefl':return {max:s.sefYmax,min:s.sefYmin};case 'sefr':return {max:s.sefYmax,min:s.sefYmin};default:return {max:100,min:0};}}
 function sedFmt(k,N,full){const q=N&&N.v;if(!q||N.blank)return null;const v=q[k];if(v==null)return null;
@@ -164,7 +166,7 @@ function sedTrends(c,D,N,L,A){const s=SED.set;
    seg(1,ty,'#b2791d','#684219',top);seg(-1,by,'#293e94','#171d3b',bot);}
   // axis labels and the plot's ticks
   const lab=k==='psi'?[m.max,Math.round((m.max+m.min)/2),m.min]:m.inv?[m.min,m.max]:[m.max,m.min];
-  lab.forEach((v,j)=>{const yy=yv(v);sT(c,String(v),47,yy+6,19,SC.dim,'right',400);});
+  lab.forEach((v,j)=>{const yy=yv(v);sT(c,String(v),47,yy+6,17,SC.dim,'right',400);});
   c.fillStyle='#3a3938';for(let t=0;t<=12;t++)c.fillRect(PX0+t*(PX1-PX0)/12,y0+h-4,1,3);
   // the line and its end dot
   c.strokeStyle=SC.yel;c.lineWidth=2;c.lineJoin='round';c.beginPath();let pen=false,lastp=-1;for(let p=0;p<NPX;p++){const v=ser[p];if(v==null){pen=false;continue;}const x=PX0+p+.5,y=yv(clampv(v,m.min,m.max));pen?c.lineTo(x,y):c.moveTo(x,y);pen=true;lastp=p;}c.stroke();
@@ -173,7 +175,7 @@ function sedTrends(c,D,N,L,A){const s=SED.set;
   if(alarmHere){const col=sedAlarmCol(A.par.level),g=c.createLinearGradient(530,0,787,0);g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(1,A.par.level==='hi'?'#d2202a':'#c8a62e');c.fillStyle=g;c.fillRect(530,y0+1,257,h-2);c.strokeStyle=col;c.lineWidth=3;c.strokeRect(13.5,y0+1.5,772,h-3);}
   // the number and its labels
   const txt=sedFmt(k,N),yc=y0+h/2,white=alarmHere;
-  const big=k==='psi'?92:52;sT(c,txt==null?'--':txt,k==='psi'?705:708,yc+big*.33,big,white?'#fff':SC.yel,'right',400);
+  const big=k==='psi'?92:52;sT(c,txt==null?'--':txt,k==='psi'?705:708,yc+big*.33,big,white?'#fff':SC.yel,'right',400,false,.88);
   if(k==='psi'){const ph=s.psiHi,pl=s.psiLo;sT(c,ph==null?'--':String(ph),780,yc-32,19,'#f8ca07','right');sT(c,pl==null?'--':String(pl),780,yc-14,19,'#f8ca07','right');sT(c,'PSI',780,yc+21,19,SC.unit,'right',500);
    if(alarmHere){sIcoBell(c,731,yc-52,22,'#fff');}}
   else{const lim=k==='sr'&&s.srHi!=null?String(s.srHi):null;if(lim)sT(c,lim,775,yc-10,13,SC.unit,'center');else{sT(c,'–',775,yc-11,13,SC.unit,'center');sT(c,'–',775,yc-4,13,SC.unit,'center');}
@@ -186,8 +188,8 @@ function sedWell(c,D,N,L,A){const ws=L.well;c.fillStyle=SC.bg;c.fillRect(12,L.we
  ws.forEach((k,i)=>{const cx=one?125:12+775*(i+.5)/n,txt=sedFmt(k,N,true),isP=k==='psi',alarmHere=A&&A.par&&A.par.k==='psi'&&isP,size=isP?58:62,base=L.wellY+L.wellH-14;
   if(alarmHere){c.fillStyle=A.par.level==='hi'?'rgba(237,28,36,.35)':'rgba(249,202,7,.28)';c.fillRect(cx-90,L.wellY+4,180,L.wellH-8);c.strokeStyle=sedAlarmCol(A.par.level);c.lineWidth=2;c.strokeRect(cx-90,L.wellY+4,180,L.wellH-8);}
   const t=txt==null?'--':txt,col=alarmHere?'#fff':SC.yel;let big=t,small='';const dot=t.indexOf('.');if(dot>0&&!isP&&k!=='st'){big=t.slice(0,dot);small=t.slice(dot);}
-  c.font=`400 ${size}px ${SED_FONT}`;const w1=c.measureText(big).width;c.font=`400 ${size*.62}px ${SED_FONT}`;const w2=small?c.measureText(small).width:0;c.font=`500 19px ${SED_FONT}`;const nm=SED_NAME[k],w3=Math.max(c.measureText(nm).width,20),tot=w1+w2+8+w3,x0=cx-tot/2;
-  sT(c,big,x0,base,size,col,'left',400);if(small)sT(c,small,x0+w1,base,size*.62,col,'left',400);
+  c.font=`400 ${size}px ${SED_FONT}`;const w1=c.measureText(big).width*.9;c.font=`400 ${size*.62}px ${SED_FONT}`;const w2=small?c.measureText(small).width*.9:0;c.font=`500 19px ${SED_FONT}`;const nm=SED_NAME[k],w3=Math.max(c.measureText(nm).width,20),tot=w1+w2+8+w3,x0=cx-tot/2;
+  sT(c,big,x0,base,size,col,'left',400,false,.9);if(small)sT(c,small,x0+w1,base,size*.62,col,'left',400,false,.9);
   sT(c,nm,x0+w1+w2+8,base-24,19,SC.unit,'left',500);sT(c,k==='st'?'':SED_UNIT[k],x0+w1+w2+8,base-4,14,SC.unit,'left',500);});}
 // ----- the DSA block -----
 function sedDsa(c,D,N,L){const y0=L.dsaY,hz=SED.set.maxHz,hi=SED.set.dsaHi,lo=SED.set.dsaLo,sp=SED.set;
@@ -204,7 +206,7 @@ function sedDsa(c,D,N,L){const y0=L.dsaY,hz=SED.set.maxHz,hi=SED.set.dsaHi,lo=SE
  // frequency labels, L at the bottom of its picture (0 Hz next to ASYM), R mirrored
  const ticks=hz===40?[0,10,20,30,40]:[0,15,30];
  for(const t of ticks){sT(c,String(t),46,y0+1+LH-t*LH/hz+(t===0?0:7),19,SC.dim,'right');sT(c,String(t),46,y0+1+LH+70+t*LH/hz+(t===0?7:t===hz?0:7),19,SC.dim,'right');}
- sT(c,'100',46,y0+LH+17,12,SC.dim,'right');sT(c,'0',46,y0+LH+31,12,SC.dim,'right');sT(c,'100',46,y0+LH+47,12,SC.dim,'right');
+ sT(c,'100',46,y0+LH+17,15,SC.dim,'right');sT(c,'0',46,y0+LH+31,15,SC.dim,'right');sT(c,'100',46,y0+LH+47,15,SC.dim,'right');
  // right gutter: the colour bar, its limits and the L, R and ASYM captions
  const g=c.createLinearGradient(0,y0+4,0,y0+370);SED_STOPS.forEach(s=>g.addColorStop(s[0],`rgb(${s[1].join(',')})`));c.fillStyle=g;c.fillRect(779,y0+3,5,367);
  sT(c,String(hi),775,y0+19,19,SC.dim,'right');sT(c,String(lo),775,y0+368,19,SC.dim,'right');

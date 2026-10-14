@@ -351,26 +351,17 @@ sheet (screens are 640 x 480), as a clone to look at and use. Code: `mt-screen.j
   page's settings through `modsR = Object.create(mods)` with its own `side`.
 - "One-sided EEG slowing" (None / Left / Right) slows the chosen hemisphere (alpha and beta ×0.35–0.45, slow and delta up)
   so ASYM rises. ASYM here = 100·|PL−PR|/(PL+PR) over the last 30 s total power, shown as a bar.
-- Both screens draw L and R EEG, L and R DSA and a trend. (Old) Advance: BIS L and R boxes with SQI bars, SR, EMG bars, ASYM, two
-  trend lines. SedLine: PSi (a straight-line stand-in, `psiOf`: BIS 40–60 → PSi 25–50; not Masimo's algorithm), SR, EMG and
-  ARTF per side, ASYM, PSi trend with the 25–50 band. Layouts come from published descriptions, not photos: the owner can
-  send photos to tighten them. Only two of SedLine's four channels are modelled; suppression and artefact marks on the DSA
-  are not drawn.
+- (History: the first SedLine and Advance screens were drawn from descriptions, on one shared canvas. Both have since been rebuilt from
+  the manufacturers' own screen figures: see "Medtronic BIS Advance" and "Masimo SedLine" below.) The SedLine PSi is still a straight-line
+  stand-in from the BIS teaching value (`psiOf`: BIS 40–60 → PSi 25–50); it is not Masimo's algorithm.
 
 ## The Menu is functional (owner, 14 Oct 2026)
 
-The Menu button under the SedLine screen (the Advance screen has the real tile menu now) opens an on-screen list (the Medtronic screen has its own tile Menu, above); tapping an item steps
+The Menu button under the Teaching layout's screen opens an on-screen list (the Medtronic and Advance screens have their own tile menus, SedLine a Root-style menu tree, below); tapping an item steps
 through its values: smoothing rate, EEG scale and sweep, trend window, bottom trend, DSA colour range (four presets), BIS
 alarm low (20–50) and high (50–80) that set the "BIS Out of Target Range" message (`mon.alo`, `mon.ahi`; the message
 also needs the teaching labels on), alarm audio, teaching labels, suppression timers (reset), sensor check, and the monitor
 (VISTA, Advance, SedLine). Escape or Close shuts it. The soft-key row is only shown in the Teaching layout now.
-
-- SedLine screen tightened against Masimo's own quick reference guide (PLM-10355D: a figure of the display, 14 Oct 2026):
-  EEG traces are yellow on dark blue (default 30 mm/s, 5 µV/mm, four channels L1 R1 L2 R2; we draw L and R), the PSi is a
-  yellow number inside an arc gauge (white 25–50, red outside, needle), with ARTF %, SEFL and SEFR under it, stacked L and R
-  DSAs with an ASYM strip between them (0–30 Hz, upper limit adjustable to 40), and a PSi trend with a green target band,
-  blue under it and orange over it. No photos of the BIS Advance screen were found in public material (Medtronic's pages
-  describe it only: bilateral DSA, ASYM, left and right BIS, Dual BIS trend); that layout is still from descriptions.
 
 ## Medtronic BIS Advance (rebuilt 14 Oct 2026, 'advance' skin)
 
@@ -479,3 +470,47 @@ the 4-channel L|R pill also drives the lower SEF/MF panel (as the badge in the f
 monitoring although the manual says it is disabled then (otherwise a learner could not scroll the case back); ground check every
 10 min, trend-lock, wireless and the camera are not modelled; the real monitor's BIS and ASYM algorithms are proprietary (the simulator's
 stand-in is used). Flashing of the alarm bar is a 1 Hz step (inferred).
+
+## Masimo SedLine (rebuilt 14 Oct 2026, 'sedline' skin)
+
+A near-clone of the SedLine window on a Masimo Root (10.1 in, portrait 800 x 1280, 5:8). Sources: native screenshots in Masimo's operator's manuals
+(SedLine LAB-7373E, Smart SedLine LAB-13168B, SedLine 2.0 LAB-9925E, Root LAB-8425F), the Next Generation SedLine brochure, the quick reference guide and the
+Root product information. Looking only: nothing was copied into the repo. The owner's own photos are of the Medtronic monitor, so none of this was
+checked against a photo of a Root. Look chosen: the 2017/2018 builds (ADULT pill, network, Iris, battery, speaker, clock; Multitaper DSA).
+
+- Files: `sed-screen.js` (state `SED`, settings and their factory defaults, DOM, hit regions, alarms, sound, the frame hook `sedTick`), `sed-draw.js`
+  (data series, DSA images, every drawing), `sed-menu.js` (the menu tree), `sed.css` (design pixels of 800 x 1280 times `--u`, so the screen scales as a
+  unit; the phone shows the same screen smaller), `test/sed.e2e.mjs` (also run by `e2e.mjs`), numeric checks in `engine.check.mjs`. `app.js` only calls
+  `sedApply()` / `sedTick(dirty)`. The screen is two canvases (static: redrawn each second, EEG: every frame) with transparent labelled buttons over them
+  (`.hit`) for keyboard and screen readers. Font: Source Sans 3 (OFL, bundled; closest of seven open fonts to the real digits; the real typeface is not published).
+- Screen: status bar (alarm bell, Audio Pause, [power key if Standby is enabled], profile pill, network, Iris, battery, sounds, clock), SedLine window with the
+  action tab (TREND / ANALOG), four-channel EEG (L1 R1 L2 R2, sweep with a white cursor and a gap, older sweep dimmed, `30 mm/sec`, `5 µV/mm`), trend rows
+  EMG / PSI / SR (PSi 3 times the height, green 25-50 band, orange above and blue below, end dots, limits `50 25`), the well (ARTF, SEFL, SEFR), the DSA (L on
+  top 0 Hz at the bottom, ASYM between, R mirrored, 20 min, time labels every 5 min, colour bar `15` to `-40` dB, SEF line), the history bar with the DSA WINDOW box
+  and `- 0:30 h +`, the event flag and the gear. The electrode strip pulls down over the top of the EEG (Sensor check key under the screen, or the handle).
+- Behaviour: PSi alarm (yellow: panel outline and gradient, white digits, gold title band with the pill `PSI High>50` / `PSI Low<25`, bell tile, tone burst; Audible Alarms
+  Off = no tone), window messages from the manual (red pill and frame: `High Impedance Detected`, `Sensor Off Patient`, `No Sensor Connected`, `SedLine is Disconnected`;
+  yellow: `Gel Bridging Detected`, `Replace Sensor`, `Low SIQ`), battery low (yellow outline of the whole display, `Low Battery`). The bell silences for the PSi Silence
+  Duration (slash on the bell), Audio Pause (red tile with a countdown; Permanent from Sounds). The faults are driven from a "Simulate" row under the screen (outside the monitor).
+  While the sensor is off or the module disconnected the numbers show `--`, the traces stop and the DSA gets black no-data bars. Suppression columns are black bars with a blue
+  tick at the 0 Hz edge; artefact columns are a white line through both DSAs and a grey bar in ASYM (DSA Artifacts On/Off). Tap the history bar (or drag) to move the time shown;
+  it returns to live after 60 s; the DSA is always 20 min, the trends show 0:10 to 2:00 h. Tap a number for About / Settings / Expand or Minimise (the real screen uses press-hold
+  and drag; Fixed Trend Layout keeps three rows).
+- Menu (gear, the Menu key under the screen, or tapping a label): Root's dialog style (black page, thin lowercase title, back arrow, Cancel and OK; a page edits a copy, OK keeps it).
+  Main Menu: Layout (+ Additional Settings: Trend Layout, Analog Range), Sounds, Device Settings (Localization, Kite, Wi-Fi, Ethernet, Bluetooth, Root Battery, Brightness,
+  Access Control, Device Output), About, Trend Settings, Profiles, Iris, SedLine. SedLine: Parameter Settings (PSi: About, Alarms, Trends; DSA: About DSA, Trends, Additional Settings, About ASYM;
+  SEFL, SEFR, EMG, SR, ARTF: About, Trends, + Alarms for SR, Additional Settings for EMG; ST) and Additional Settings. Factory defaults: PSi limits 50 / 25, caution Off, Silence Duration 2 min,
+  Audible Alarms On, Y-axis 100-0, green band 50-25, DSA upper 15 / lower -40 dB, SEF line 3, max 30 Hz, Multitaper, EEG 5 µV/mm, 30 mm/sec, display filter On, placement EEG/PSi/DSA,
+  Monitor and Display Impedance On, DSA Artifacts On, EMG Standard (Maximum changes the EMG scaling and shows `EMG MAX` in the title band). Items with nothing to act on in a simulator
+  (Wi-Fi, Ethernet, Bluetooth, Kite, Iris, device output, baud rates) exist and answer with a plain status. Settings are saved per device (`bisdsa.sed`).
+- How the numbers come from the sim: two engines (left, right) give L and R; L1 and R1 are the engines' signals, L2 and R2 a slightly lagged and attenuated copy with a little
+  independent noise (the real pairs are correlated, not identical). PSi = `psiOf` of the mean BIS of both sides; EMG % from the larger of the two EMG dB (`SED.emgOff` / `emgSpan`);
+  SR from the two sides' mean; ARTF % = artefact seconds in the last 60 s; SEFL / SEFR = the engines' 95% spectral edges; ASYM = signed 100 (PL-PR)/(PL+PR) of the 30 s mean total
+  power. The DSA colours use `-38 + 2.1 x (the sim's dB)` against the screen's upper / lower dB, so the picture looks like the real one at the default scale. The screen starts with 30
+  min of awake history from throwaway engines (`SED.pre`, never in `HIST`; `HISTMAX` is 14400 columns, 4 h).
+- Not known or invented (marked so): the exact typeface; the electrode impedance colour limits (green up to 15 k, yellow to 35 k, red above: invented); when the PSi alarm fires
+  (here: out of the limits for 5 s, and only after the PSi has first been inside them, so an awake patient does not alarm at the start; the real delay is unpublished); alarm priorities
+  of the window messages (red for sensor and impedance faults, yellow for the rest: inferred); the sweep cursor is shown (newer builds); the layout when DSA Placement is EEG/DSA/PSi
+  (DSA directly under the EEG: inferred); the Pediatric look is the pill and the 0-40 Hz DSA only; the start-up splash, the SedLine dialog artwork (taken from the Root layout and access-control
+  screens), animation timing, the on-screen About texts of Root (the DSA / ASYM / PSi texts are the manual's). One DSA column a second, not every 1.2 s. The EMG trend is a stand-in (the sim's EMG
+  is a parametric term). Smart SedLine's ST is an option ("Suppression Time (ST)" in Additional Settings, a simulator addition) rather than a software build.

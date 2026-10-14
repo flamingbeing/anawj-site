@@ -1,0 +1,1 @@
+- bis-dsa (14 Oct 2026, sedline skin session): Masimo SedLine screen rebuilt (see NOTES.md, "Masimo SedLine"); local commits, not pushed. Not checked against a photo of a real Root.

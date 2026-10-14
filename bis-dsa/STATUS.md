@@ -18,6 +18,8 @@ Each session keeps its own line in `status/<session>.md`. Read them before start
 
 ## Recently done
 
+- Masimo SedLine screen rebuilt as a Root (800 x 1280 portrait) near-clone from Masimo's manuals and screen figures (14 Oct 2026, local commits, not pushed): status bar, four-channel EEG sweep, EMG / PSi / SR trends, DSA with ASYM, suppression and artefact marks, history bar, analog view, electrode strip, PSi alarm and window messages, Root-style menu tree with the manual's names and defaults, bundled Source Sans 3. Detail and what is unverified: `NOTES.md`, "Masimo SedLine".
+
 - Medtronic screen fidelity pass (14 Oct 2026, local commit, not pushed): DSA rebuilt (1 px columns, display scale, suppression gaps), 1 hour time axis with 10 min labels, alarm that sounds and gates like the manual (Target Range now Inactive by default, Trend Time Scale default 1 hour: the owner may want either back; both are one-line changes in `MT` / `mtDefaults`), menu and sensor-check details. Detail: `NOTES.md`, "Fidelity pass".
 
 - Two-sided screens (BIS Advance style, SedLine style) with a right-hemisphere engine and a one-sided slowing control (14 Oct 2026). Menu made functional (on-screen list, alarm limits). Queued: photos of Advance and SedLine screens to tighten the layouts; DSA suppression and artefact marks for SedLine.
