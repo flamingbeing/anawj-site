@@ -11,7 +11,8 @@ raw files live on Firetop (the home-computer session, which has the owner's Goog
 this public repo.
 
 1. **Ask Firetop to run it** with `send_message` to the Firetop session (`OPERATIONS.md`, "The home computer", has the
-   session id), e.g. "run the drift-check script (jobs/drift-check) and send me the report".
+   session id), asking it to run `bash Projects/jobs/drift-check/drift-check.sh` (or `drift-check.cmd`) with no arguments and paste
+   the output (about 60 s; it prints names, so keep it in chat).
    Say it must stay read-only. A message asking Firetop to change live data may be refused by the permission
    classifier; do not work around that. A live fix needs the owner's own message to Firetop (give them the wording).
 2. **Report to the owner in plain words**, in chat only: the verdict (IN SYNC, or how many differences), then the
@@ -26,4 +27,8 @@ this public repo.
 4. **Fixes:** a re-import of the workbook adds only missing rows (each row has a content-based `importKey`; rows
    already in the app or its bin are skipped). It is a live change: the owner approves it, Firetop does a dry run
    first, then writes.
+   What it prints: header; one line per resident (cases, sheet rows, totals, differing Totals cells); the row-level gap
+   grouped by cause; "Changes to old cases" (edited, deleted, category added or removed, initials, details, date; its
+   history file keeps counts only); formInbox / sheetOutbox waiting; a verdict line. A restore looks like an edit, and
+   an edit made on the sheet side shows as a missing and an extra row.
 5. If the report shows something new (a pattern, a cause), add it to this list; keep the skill short.
