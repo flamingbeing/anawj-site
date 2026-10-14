@@ -151,6 +151,21 @@ export function progress(counts, rYear) {
   });
 }
 
+// A tag's last (highest) target: what it needs by the end of residency. null: no target.
+export function finalTarget(code) {
+  const v = Object.values((BY_CODE[code] && BY_CODE[code].targets) || {});
+  return v.length ? Math.max(...v) : null;
+}
+// What a tag's count adds towards the minimum requirements: up to its last target, nothing for a tag without one.
+export const towardsMinimum = (code, n) => { const f = finalTarget(code); return f == null ? 0 : Math.min(Math.max(0, n || 0), f); };
+// The minimums added up over every current tag (the most 'min' mode below can reach).
+export const MINIMUM_TOTAL = CATEGORIES.filter(c => !c.retired).reduce((a, c) => a + (finalTarget(c.code) || 0), 0);
+// Tags added up over all cases, every year (Totals): 'all' counts every tag (like the old Google Sheet's Grand
+// Total, one per tag per case); 'min' only what counts towards the minimums.
+export function tagTotal(counts, mode = 'all') {
+  return Object.entries(counts || {}).reduce((a, [code, n]) => a + (!BY_CODE[code] ? 0 : mode === 'min' ? towardsMinimum(code, n) : Math.max(0, n || 0)), 0);
+}
+
 export const STATUS_RANK = { none: 0, done: 1, ontrack: 2, due: 3, late: 4 };
 const worst = items => items.reduce((w, it) => (STATUS_RANK[it.status] > STATUS_RANK[w] ? it.status : w), 'none');
 const epaKey = e => { const m = String(e).match(/^(\d+)(.*)$/); return m ? +m[1] * 100 + (m[2] ? m[2].charCodeAt(0) : 0) : 1e9; };

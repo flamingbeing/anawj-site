@@ -2,7 +2,8 @@
 // benchmarking; counts only, never details).
 
 import { R_YEARS, BY_CODE, CATEGORIES, appYear, yearName } from './categories.js';
-import { progress, todayISO, rYearDefault, weekLead, weekdayNames, fmtDate } from './engine.js';
+import { progress, todayISO, rYearDefault, weekLead, weekdayNames, fmtDate, finalTarget, towardsMinimum, tagTotal, MINIMUM_TOTAL } from './engine.js';
+import { display, setDisplay } from './display.js';
 import { exportTotals } from './xlsxio.js';
 import { reflectionProgress, HEADING_BY_ID } from './reflections.js';
 import { logbookGlance, reflectionGlance, cohortGlance } from './glance.js';
@@ -348,6 +349,10 @@ export function renderTotals() {
       h('button', { class: 'small', onclick: () => { tview.summaries = null; hooks.render(); } }, 'Refresh'),
       h('button', { class: 'small', onclick: () => downloadTotals(table.data) }, 'Download Excel')),
     h('p', { class: 'hint help' }, 'Case counts only, so residents can see how they compare. Under each tag: its targets. Colours use each resident’s own year (tap and hold a red or amber count to see how many short).'),
+    h('div', { class: 'bar' }, countSwitch()),
+    h('p', { class: 'hint help' }, countMode() === 'min'
+      ? 'Towards minimums: each tag counts up to its last target, so extra cases past it don’t add (tags without a target show –).'
+      : 'All tags: every case with that tag, all years added up. A case with 3 tags adds 3 to Total tags.'),
     legend(),
     // scrolls sideways on phones: focusable and named so the keyboard can reach it
     h('div', { class: 'scroll', style: 'margin-top:8px', tabindex: '0', role: 'region', 'aria-label': 'Totals table' }, table.el));
@@ -385,6 +390,14 @@ async function loadSummaries() {
   if (['totals', 'admintotals', 'caselogs', 'caselog', 'progress'].includes(S.tab)) hooks.render();
 }
 
+// Totals' counts (this device): every tag logged, all years (default), or only what counts towards the minimums
+export const countMode = () => (display().totalsCount === 'min' ? 'min' : 'all');
+export function countSwitch() {
+  const set = v => () => { setDisplay({ totalsCount: v === 'min' ? 'min' : null }); hooks.render(); };
+  return h('span', { class: 'seg', role: 'group', 'aria-label': 'Count' },
+    [['all', 'All tags'], ['min', 'Towards minimums']].map(([v, t]) => h('button', { type: 'button', class: 'small', 'aria-pressed': String(countMode() === v), onclick: set(v) }, t)));
+}
+
 export function totalsTable(people) {
   const prog = people.map(p => Object.fromEntries(progress(p.counts || {}, p.rYear || 1).map(x => [x.code, x])));
   const codes = CATEGORIES.filter(c => !c.retired || people.some(p => (p.counts || {})[c.code])).map(c => c.code);
@@ -397,8 +410,11 @@ export function totalsTable(people) {
     const m = pr.milestones.find(x => !x.met && (x.due === 'past' || x.due === 'now'));
     return m ? m.n - pr.count : 0;
   };
+  const min = countMode() === 'min';
   for (const code of codes) {
-    const vals = people.map(p => (p.counts || {})[code] || 0);
+    const all = people.map(p => (p.counts || {})[code] || 0);
+    // towards the minimums: up to the tag's last target; a tag without one counts towards none (–)
+    const vals = min ? all.map(v => (finalTarget(code) == null ? null : towardsMinimum(code, v))) : all;
     const sts = prog.map(pr => (pr[code] ? pr[code].status : 'none'));
     const gaps = prog.map(pr => short(pr[code]));
     // the targets under the name: "10 by R3 | 15 by R5"
@@ -407,17 +423,21 @@ export function totalsTable(people) {
     const tgtR = R_YEARS.filter(y => t[y] != null).map(y => `${t[y]} by ${y}`).join(' | ');   // the download keeps R4/R5
     data.rows.push({ label: catName(code) + (tgtR ? ` [${tgtR}]` : ''), values: vals, statuses: sts });
     add(tbody, h('tr', {}, h('td', { class: 'cat', title: BY_CODE[code].full }, catName(code), tgt ? h('small', { class: 'tgt' }, tgt) : null),
-      vals.map((v, i) => h('td', { class: `n ${sts[i]}`, title: gaps[i] ? `${gaps[i]} short of the target` : '' }, String(v)))));
+      vals.map((v, i) => h('td', { class: `n ${sts[i]}`, title: gaps[i] ? `${gaps[i]} short of the target` : min && all[i] > (v || 0) ? `${all[i]} logged` : '' }, v == null ? '–' : String(v)))));
   }
   const totals = people.map(p => p.total || 0);
+  const tags = people.map(p => tagTotal(p.counts, min ? 'min' : 'all'));
   const refl = people.map(p => p.reflectionsTotal || 0);
-  data.rows.push({ label: 'Total cases', values: totals }, { label: 'Reflections (towards the 96 needed)', values: refl });
+  const tagLabel = min ? `Total towards the minimums (of ${MINIMUM_TOTAL})` : 'Total tags (all cases, every year)';
+  data.rows.push({ label: tagLabel, values: tags }, { label: 'Total cases', values: totals }, { label: 'Reflections (towards the 96 needed)', values: refl });
   add(tbody, 
+    h('tr', { class: 'total' }, h('td', { class: 'cat', title: min ? 'Each tag counted up to its last target' : 'Every tag on every case, added up (a case with 3 tags adds 3)' },
+      min ? 'Towards minimums' : 'Total tags', h('small', { class: 'tgt' }, min ? `of the ${MINIMUM_TOTAL} needed` : 'every tag on every case')), tags.map(v => h('td', { class: 'n' }, String(v)))),
     h('tr', { class: 'total' }, h('td', { class: 'cat' }, 'Total cases'), totals.map(v => h('td', { class: 'n' }, String(v)))),
     h('tr', {}, h('td', { class: 'cat', title: 'Counted towards each heading’s minimum only' }, 'Reflections', h('small', { class: 'tgt' }, 'towards the 96 needed')), refl.map(v => h('td', { class: 'n' }, String(v)))));
   const thead = h('thead', {}, h('tr', {}, h('th', {}, 'Tag'),
     people.map(p => h('th', { class: `rot ${p.rid === meId ? 'me' : ''}`, title: p.name }, `${p.name} · ${p.smo ? 'SMO' : p.rYear ? yearName(p.rYear) : '?'}`))));
-  data.title = `${tview.year ? (tview.year === 3 && people.some(p => p.smo) ? 'R3 / SMO' : 'R' + tview.year) : 'Year unknown'} totals — ${todayISO()}`;
+  data.title = `${tview.year ? (tview.year === 3 && people.some(p => p.smo) ? 'R3 / SMO' : 'R' + tview.year) : 'Year unknown'} totals${min ? ' (towards the minimums)' : ''} — ${todayISO()}`;
   return { el: h('table', { class: 'totals' }, thead, tbody), data };
 }
 

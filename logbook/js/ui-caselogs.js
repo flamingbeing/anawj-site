@@ -7,7 +7,7 @@
 import { REFLECTION_HEADINGS } from './categories.js';
 import { progress, todayISO, fmtDate } from './engine.js';
 import { h, hooks, resetters, catName } from './ui-core.js';
-import { programme, groupYearName, totalsTable, downloadTotals, legend, renderTotals } from './ui-progress.js';
+import { programme, groupYearName, totalsTable, downloadTotals, legend, renderTotals, countSwitch } from './ui-progress.js';
 
 // q: the name search; rid: the resident open in #caselog
 const cv = { q: '', rid: null };
@@ -74,7 +74,7 @@ export function renderCaseLog() {
       h('h2', { style: 'margin:0' }, p.name || 'No name'),
       h('p', { class: 'muted', style: 'margin:2px 0 8px' }, `${yearLabel(p)}${p.intake ? ' · intake ' + p.intake : ''}${p.updatedAt ? ' · updated ' + fmtDate(new Date(p.updatedAt).toISOString().slice(0, 10)) : ''}`),
       h('p', { class: 'cl-sum' }, h('b', {}, `${p.total || 0} cases`), ` · ${n.late} behind · ${n.due} due this year · ${n.ontrack} on track · ${n.done} done`),
-      h('div', { class: 'bar' }, h('button', { class: 'small', onclick: () => downloadTotals(table.data, `case-log-${String(p.name || p.rid).replace(/[^A-Za-z0-9]+/g, '-')}-${todayISO()}.xlsx`) }, 'Download Excel')),
+      h('div', { class: 'bar' }, h('button', { class: 'small', onclick: () => downloadTotals(table.data, `case-log-${String(p.name || p.rid).replace(/[^A-Za-z0-9]+/g, '-')}-${todayISO()}.xlsx`) }, 'Download Excel'), countSwitch()),
       legend(),
       h('div', { class: 'scroll', style: 'margin-top:8px', tabindex: '0', role: 'region', 'aria-label': 'Case log table' }, table.el)),
     h('section', { class: 'card' },
