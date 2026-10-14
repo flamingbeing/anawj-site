@@ -33,12 +33,14 @@ Lasting decisions for `ot-sim/`. Status and next steps: `STATUS.md`. The build b
 - Singapore practice by default (owner is at NUH): units mmHg, kPa not used; temperatures °C; drugs by generic name;
   Mallampati, ASA, Cormack-Lehane as taught here. Metric doses (mg, mcg).
 - Dark monitor, like the BIS page: near-black screens, standard colour coding (ECG green, SpO2 cyan, NIBP/ABP red/white,
-  EtCO2 yellow/white, resp white, temperature, agent colours per ISO 32: sevoflurane yellow, desflurane blue,
-  isoflurane purple, N2O blue, O2 white, air black/white). Phone first (390 px) then desktop, tablet landscape works.
+  EtCO2 yellow/white, resp white, temperature). No standard sets monitor colours (APSF): agents follow the ISO 5360
+  vaporiser and bottle code (sevoflurane yellow, desflurane blue, isoflurane purple), gases the ISO 32 cylinder colours
+  (O2 white, N2O blue, air black/white), and syringe labels ISO 26825. Phone first (390 px) then desktop, tablet
+  landscape works.
 - Accessibility: axe clean; every alarm has a text message as well as sound/colour; respects `prefers-reduced-motion`;
   sound is off until the user turns it on (browsers block autoplay anyway).
 
-## Layout of the code (intended; see PLAN.md for the build order)
+## Layout of the code (intended; the full plan is DESIGN.md, the model MODEL.md, the crises SCENARIOS.md)
 
 - `index.html`: shell and styles; `js/` ES modules, no build step, no dependencies (GitHub Pages / Workers serve files
   as they are; the editor and previews need that).
@@ -60,6 +62,14 @@ Lasting decisions for `ot-sim/`. Status and next steps: `STATUS.md`. The build b
 
 - 14 Oct 2026: folder `ot-sim/`, address `anaes.anawj.com/ot/`, plain ES modules with no build step, model separate
   from UI so Node tests can run it. Environment prepared (routes, labels, checks, test runner, build brief).
+- 14 Oct 2026 (plan, owner asked for a plan before any build): technical plan in `DESIGN.md`, model spec in `MODEL.md`,
+  crises in `SCENARIOS.md`, sourced research notes in `research/`. Its choices are proposals until the owner says go;
+  the open questions and their defaults are at the end of `DESIGN.md`. Main ones: a lumped mean-value circulation with
+  per-beat stroke volume (not a pulsatile solver); waveforms drawn from the model's beats at 1x and at real pace from
+  the current state at 5x and 20x; `fmath.js` so replays match on every browser; the patient runs Schnider and Minto
+  while the TCI pump runs the model the trainee picks; sevoflurane MAC40 2.05%; Singapore defaults SRFAC 2021, DAS 2025,
+  ANZAAG 2022, Association of Anaesthetists blood components 2024. The brief's Marsh example was corrected (it mixed
+  ke0 0.26 and 1.2).
 
 ## Permissions for unattended sessions (14 Oct 2026)
 
