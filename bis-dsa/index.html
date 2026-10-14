@@ -77,6 +77,8 @@ section{display:grid;gap:16px;min-width:0}
 .segs i.on{background:var(--seg,#5fd08f)}
 .bar .u,.ro .u{grid-column:1/-1;font-size:11px;color:var(--scr-mute)}
 .params{grid-column:1/-1;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.timers{grid-column:1/-1;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:6px;align-items:stretch}
+.tclr{background:#2a3242;border:1px solid #3a4558;border-bottom-width:3px;color:var(--scr-fg);border-radius:6px;padding:0 12px;font:600 12px/1 var(--f-mono)}
 .ro{background:var(--scr-2);border-radius:6px;padding:4px 8px;display:flex;align-items:baseline;justify-content:space-between;gap:4px;min-width:0}
 .ro .v{font-size:16px}
 @media (max-width:600px){.bar .u{display:none}.sim{gap:10px}}
@@ -99,6 +101,14 @@ button{font:inherit;cursor:pointer}
 button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 input[type=range]{width:100%;accent-color:var(--accent)}
 .ticks{display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
+.track{position:relative;height:34px}
+.track input[type=range]{position:absolute;inset:0 0 auto 0;height:22px;margin:0;width:100%;background:transparent}
+.zoneband{position:absolute;top:2px;height:18px;border-radius:4px;background:color-mix(in srgb,var(--good) 38%,transparent);outline:1px solid color-mix(in srgb,var(--good) 70%,transparent);pointer-events:none}
+.effmark{position:absolute;bottom:0;width:0;height:0;margin-left:-6px;border:6px solid transparent;border-bottom:9px solid var(--fg);border-top:0;transition:left .25s linear;pointer-events:none}
+.tgt{font-size:15px}.tgt b{font-family:var(--f-mono);font-weight:600}.tgt span{color:var(--muted)}
+.tgtnote{font-size:13px;color:var(--muted);display:flex;gap:6px;align-items:center}
+.swatch{display:inline-block;width:18px;height:10px;border-radius:3px;background:color-mix(in srgb,var(--good) 38%,transparent);outline:1px solid color-mix(in srgb,var(--good) 70%,transparent)}
+.nmbrow{display:grid;gap:6px;font-size:15px}
 .chk{display:flex;gap:8px;align-items:flex-start;font-size:15px}
 .chk input{margin-top:4px;accent-color:var(--accent)}
 .reading{background:var(--accent-soft);border-radius:10px;padding:12px 14px;display:grid;gap:4px}
@@ -176,6 +186,11 @@ footer{font-size:13px;color:var(--muted);max-width:80ch;border-top:1px solid var
           <div class="ro"><span class="k">TP</span><span class="v" id="vTp">--</span><span class="u">dB power</span></div>
           <div class="ro"><span class="k">BC</span><span class="v" id="vBc">0</span><span class="u">bursts/min</span></div>
         </div>
+        <div class="timers" aria-label="Cumulative times this case">
+          <div class="ro"><span class="k">Suppression</span><span class="v" id="vSupT">0:00</span></div>
+          <div class="ro"><span class="k">BIS &lt; 40</span><span class="v" id="vLowT">0:00</span></div>
+          <button type="button" class="tclr" id="tReset" aria-label="Reset the suppression and BIS under 40 timers">Reset</button>
+        </div>
       </div>
       <div class="lane" id="wTrend"><div class="lbl"><span>BIS <i class="key bis"></i> · EMG <i class="key emg"></i></span><span id="tgtCap" style="text-transform:none">target 40–60 set by user</span></div>
       <canvas id="cTrend" height="88" aria-label="BIS and EMG trends over the last five minutes"></canvas></div>
@@ -196,13 +211,16 @@ footer{font-size:13px;color:var(--muted);max-width:80ch;border-top:1px solid var
           <button data-mode="single" aria-pressed="true">One drug</button><button data-mode="mix" aria-pressed="false">Mix drugs</button>
         </div></div>
       <div class="ctl" id="mixCtl" hidden><span class="t">Combinations</span>
+        <p class="tgt" id="tgtMix"><b>Target BIS --</b> <span id="tgtMixSub"></span></p>
         <div class="seg" id="presetSeg" role="group" aria-label="Combinations">
           <button data-preset="tiva">Propofol + remifentanil</button><button data-preset="propket">Propofol + ketamine</button><button data-preset="sevon2o">Sevo + N₂O</button><button data-preset="propdex">Propofol + dex</button><button data-preset="clear">Clear</button>
         </div>
         <div class="mixrows" id="mixRows"></div></div>
-      <div class="ctl" id="depthCtl"><label class="t" for="depth">Depth (effect-site dose)</label>
-        <input type="range" id="depth" min="0" max="100" value="0">
-        <div class="ticks" id="ticks"><span>Awake</span><span>Sedated</span><span>GA</span><span>Deep</span><span>Flat</span></div></div>
+      <div class="ctl" id="depthCtl"><label class="t" for="depth">Depth target</label>
+        <div class="track"><i class="zoneband" id="zoneBand" hidden></i><input type="range" id="depth" min="0" max="100" value="0" aria-describedby="tgtBis"><i class="effmark" id="effMark" aria-hidden="true"></i></div>
+        <div class="ticks" id="ticks"><span>Awake</span><span>Sedated</span><span>GA</span><span>Deep</span><span>Flat</span></div>
+        <p class="tgt" id="tgtBis"><b>Target BIS --</b> <span id="tgtSub"></span></p>
+        <p class="tgtnote" id="zoneNote" hidden><i class="swatch"></i> <span id="zoneText"></span></p></div>
       <div class="ctl" id="drugCtl"><span class="t">Drug</span>
         <div class="seg" id="drugSeg" role="group" aria-label="Drug">
           <button data-drug="propofol" aria-pressed="true">Propofol</button>
@@ -213,7 +231,10 @@ footer{font-size:13px;color:var(--muted);max-width:80ch;border-top:1px solid var
       <div class="ctl"><span class="t">Patient and artefact</span>
         <label class="chk"><input type="checkbox" id="mElder"> Older patient (over 70)</label>
         <label class="chk"><input type="checkbox" id="mEmg"> Facial muscle activity (no relaxant)</label>
-        <label class="chk"><input type="checkbox" id="mNmb"> Muscle relaxant (paralysed)</label>
+        <div class="nmbrow"><span id="nmbLbl">Muscle relaxant</span>
+          <div class="seg" id="nmbSeg" role="group" aria-labelledby="nmbLbl">
+            <button data-nmb="auto" aria-pressed="true">At induction</button><button data-nmb="off" aria-pressed="false">Off</button><button data-nmb="on" aria-pressed="false">On now</button>
+          </div></div>
         <label class="chk"><input type="checkbox" id="mDia"> Diathermy (electrical interference)</label>
         <label class="chk"><input type="checkbox" id="mWarm"> Forced-air warmer (high-frequency noise)</label>
         <label class="chk"><input type="checkbox" id="mBlink"> Blinks and eye movement</label>
@@ -228,7 +249,7 @@ footer{font-size:13px;color:var(--muted);max-width:80ch;border-top:1px solid var
       <div class="reading" aria-live="polite"><b id="rName">Awake</b><p id="rText"></p></div>
       <p class="err" id="err" hidden></p>
       <div class="story">
-        <div class="row"><button class="btn primary" id="storyBtn">Play a case: induction to emergence</button></div>
+        <div class="row"><button class="btn" id="wakeBtn">Emergence: stop the drugs</button><button class="btn primary" id="storyBtn">Play a case: induction to emergence</button></div>
         <p class="caption" id="storyCap" aria-live="polite"></p>
       </div>
     </div>

@@ -151,6 +151,20 @@ chk('Propofol 0.57', 'MF (SEF50) Hz', p57.mf, 2, 8);
   rows.push(['Smoothing 10 s vs 30 s', `seconds to within 5 of final (10 s: ${r10}, 30 s: ${r30})`, String(r30 - r10), '5..', r30 - r10 >= 5 ? 'ok' : 'FAIL']); if (r30 - r10 < 5) fails++;
 }
 
+// effect site and the relaxant mode: induction is quick (tau 12 s), emergence slow (tau 120 s); 'auto' gives the relaxant at induction
+{ seed = BASE; const S = load(), ms = S.mods; ms.nmbMode = 'auto'; S.eng.setTarget('propofol', 0, ms); S.eng.snap(); S.step(120 * FS_);
+  const bisNow = () => S.COLS[S.COLS.length - 1].bis;
+  chk('Relaxant auto, awake 120 s', 'BIS (not paralysed)', bisNow(), 85, 100); chk('Relaxant auto, awake 120 s', 'relaxant on (0/1)', +ms.nmb, 0, 0);
+  S.eng.setTarget('propofol', 0.57, ms); S.step(20 * FS_);
+  chk('Induction step to 0.57, 20 s', 'share of target reached (tau 12 s)', S.eng.de / 0.57, 0.74, 0.88); chk('Induction step, 20 s', 'relaxant given (0/1)', +ms.nmb, 1, 1);
+  S.step(60 * FS_); chk('Induction step to 0.57, 80 s', 'BIS (fast: already in GA range)', bisNow(), 38, 62);
+  S.step(300 * FS_); chk('Induction step to 0.57, 6 min', 'share of target reached', S.eng.de / 0.57, 0.99, 1.01); chk('Induction step to 0.57, 6 min', 'BIS', bisNow(), 38, 56);
+  S.eng.setTarget('propofol', 0, ms); S.step(75 * FS_);
+  chk('Emergence, 75 s after stopping', 'effect site share left (tau 120 s: 0.54)', S.eng.de / 0.57, 0.46, 0.62); chk('Emergence, 75 s', 'BIS still low (slow wake-up)', bisNow(), 0, 78);
+  S.step(45 * FS_); chk('Emergence, 120 s', 'relaxant reversed (0/1)', +ms.nmb, 0, 0); chk('Emergence, 120 s', 'BIS still below 85', bisNow(), 0, 85);
+  S.step(180 * FS_); chk('Emergence, 5 min', 'BIS back above 80', bisNow(), 80, 100);
+  ms.nmbMode = 'on'; S.eng.setTarget('propofol', 0, ms); S.step(5 * FS_); chk('Relaxant On now', 'on (0/1)', +ms.nmb, 1, 1); ms.nmbMode = 'off'; ms.nmb = false; }
+
 // WS5: forced-air warmer, blinks, surgical stimulus
 const pw = run('propofol', 0.57, { warmer: true }, 120, null, 4);
 chk('Propofol 0.57 + warmer', 'BIS', pw.bis, 68, 82); chk('Propofol 0.57 + warmer', 'EMG dB minus no warmer', pw.emg - p57.emg, 10, 99);

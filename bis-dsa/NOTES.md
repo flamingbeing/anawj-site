@@ -179,6 +179,32 @@ falls under 50 after about a minute of diathermy) → emergence with blinks → 
 - "What the trials say" table, each row linked by DOI: B-Aware 2004, B-Unaware 2008 / BAG-RECALL 2011, NAP5 2014,
   ENGAGES 2019, Balanced 2021 (delirium sub-study; primary outcome 1-year mortality no different, Short 2019), AAGBI/SIVA TIVA guideline 2018, NICE DG6.
 
+## Effect site, target slider, relaxant default, timers (owner, 14 Oct 2026)
+
+- **Fast induction, slow emergence ("unzipping"):** the slider and the mix sliders set a *target* dose. The engine's `de`
+  (effect site) follows it with a first-order lag that is fast going up and slow coming down: `TAU_UP` = 12 s (a bolus)
+  and `TAU_DOWN` = 120 s (waking takes a few minutes: BIS about 77 two minutes after stopping propofol from GA, above
+  90 by five; real half-times are 2-3 min and longer after long infusions). Spectrum then glides to the effect-site state
+  with a further 8 s, BIS smooths over 10/15/30 s; 4x/10x speed shortens it. Descriptions, the relaxant, the
+  out-of-target alarm and the stimulus follow `de`, not the target. A drug change or a switch between one drug and the mix
+  snaps `de`; the story's first step and `snap()` jump it. The **Emergence** key stops every drug (slider to 0, or the mix
+  cleared) and shows the wake-up in the caption.
+- **Depth slider = BIS target:** under the slider, "Target BIS ≈ n" is a forecast: a throwaway `Engine` started at the
+  target, 36 sim-s, same features and `bisRaw` (`forecastBis`, ~70 ms, 180 ms after the last change). Where suppression
+  is expected (`bs` over 0.02) it runs 90 s and uses the gate's long-run share for SR (mean flat run 2·10^(2(bs−0.5)) s,
+  mean burst 1.75 s, 1/bs bursts a cycle), because flat runs last up to 30 s. It is within a few points of what the
+  live monitor settles on. A green band on the track marks depths that settle at BIS 40-60 (17 short forecasts at depths
+  0-0.8, one per timeout; recomputed when the drug, older-patient, facial-EMG or relaxant mode changes; none for ketamine
+  alone). The ▲ under the track is the effect site; "settling" / "at target" says where it is.
+- **Relaxant on by default:** three modes (`mods.nmbMode`). **At induction** (default): given when the induced depth reaches
+  0.3 (propofol/sevo depth, ketamine 0.45 dose, mix hypnotic or ketamine; dex alone never) and reversed under 0.25, so the
+  awake patient still opens at BIS 90s and the awake paralysis is not on show; **Off** (EMG teaching); **On now** (the
+  awake-paralysis pitfall). The engine derives `mods.nmb` from the mode each sample (`updNmb`); the Node checks set
+  `mods.nmb` directly and leave `nmbMode` unset.
+- **Suppression time box:** cumulative seconds with the shown SR at 5% or more, and with BIS under 40, this case (clean
+  seconds only); Reset clears them and the case story starts them at 0. Not on the real monitor: a teaching aid for
+  cumulative burst-suppression time (linked to postoperative delirium in observational data; trials are mixed).
+
 ## Lessons
 
 - `fit()` reads each canvas's logical height once (`c._lh`): setting `canvas.height` rewrites the `height` attribute,
