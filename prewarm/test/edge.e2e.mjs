@@ -748,6 +748,10 @@ jobs.push(() => tryit(async () => {
   log(await pod() === '', 'no POD reminder on the day of surgery: ' + await pod());
   await setCreated(2); await pg.reload(); await pg.waitForTimeout(800);
   log(/POD1 overdue · POD2 due today/.test(await pod()), 'two days on: POD1 overdue, POD2 due today: ' + await pod());
+  await pg.click('.list a'); await pg.waitForTimeout(600);
+  const gp = await pg.textContent('#gaps').catch(() => '');
+  log(/POD1 chart review overdue/.test(gp) && /POD2 chart review due today/.test(gp), 'Still to fill lists POD1 and POD2 once due: ' + gp.slice(0, 160));
+  await pg.goBack(); await pg.waitForTimeout(500);
   await pg.evaluate(() => { const a = JSON.parse(localStorage.getItem('prewarm-demo:patients')); for (const p of Object.values(a)) p.f.sign_pod1 = { v: 'AB 1 Jan', t: Date.now(), by: 'AB' }; localStorage.setItem('prewarm-demo:patients', JSON.stringify(a)); });
   await pg.reload(); await pg.waitForTimeout(800);
   log(!/POD1/.test(await pod()) && /POD2 due today/.test(await pod()), 'POD1 complete: only POD2 is left: ' + await pod());
