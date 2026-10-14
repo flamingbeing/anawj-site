@@ -27,25 +27,26 @@ Lasting decisions for `ot-sim/`. Status and next steps: `STATUS.md`. The build b
 - **Teach, don't test, by default.** A debrief after each scenario: timeline of events and actions, what was missed,
   and the teaching points, with sources. No scores that reward speed over safety.
 - **Sources for every clinical number.** Doses, thresholds, drug parameters and crisis management steps cite a
-  source in code comments or `PLAN.md` (published PK/PD models; the AAGBI/ANZCA/SAGES/Difficult Airway Society and
+  source in code comments, with the spec and its sources in `MODEL.md` and `SCENARIOS.md` (published PK/PD models; the AAGBI/ANZCA/SAGES/Difficult Airway Society and
   resuscitation guideline pages; Miller; Morgan & Mikhail). Flag anything unsure for the owner's clinical read-through;
   the owner checks all clinical content before it is described as reviewed.
 - Singapore practice by default (owner is at NUH): units mmHg, kPa not used; temperatures °C; drugs by generic name;
   Mallampati, ASA, Cormack-Lehane as taught here. Metric doses (mg, mcg).
 - Dark monitor, like the BIS page: near-black screens, standard colour coding (ECG green, SpO2 cyan, NIBP/ABP red/white,
-  EtCO2 yellow/white, resp white, temperature, agent colours per ISO 32: sevoflurane yellow, desflurane blue,
-  isoflurane purple, N2O blue, O2 white, air black/white). Phone first (390 px) then desktop, tablet landscape works.
+  EtCO2 yellow/white, resp white, temperature). No standard sets monitor colours (APSF): agents follow the ISO 5360
+  vaporiser and bottle code (sevoflurane yellow, desflurane blue, isoflurane purple), gases the ISO 32 cylinder colours
+  (O2 white, N2O blue, air black/white), and syringe labels ISO 26825. Phone first (390 px) then desktop, tablet
+  landscape works.
 - Accessibility: axe clean; every alarm has a text message as well as sound/colour; respects `prefers-reduced-motion`;
   sound is off until the user turns it on (browsers block autoplay anyway).
 
-## Layout of the code (intended; see PLAN.md for the build order)
+## Layout of the code (intended; the full plan is DESIGN.md, the model MODEL.md, the crises SCENARIOS.md)
 
 - `index.html`: shell and styles; `js/` ES modules, no build step, no dependencies (GitHub Pages / Workers serve files
   as they are; the editor and previews need that).
-- `js/model/`: pure simulation, no DOM, importable by Node tests: `pkpd.js`, `cardio.js`, `resp.js`, `gas.js`,
-  `temp.js`, `patient.js` (assembles them), `events.js` (crisis injection), `rng.js` (seeded).
-- `js/ui/`: monitor, waveforms (canvas), controls (drugs, vent, fluids, airway), alarms, debrief.
-- `js/scenarios/`: data files, one per scenario (`{ id, title, patient, steps, triggers, expected actions, teaching }`).
+- `js/model/` (pure simulation, no DOM, importable by Node tests), `js/ui/` and `js/scenarios/` (one data module per
+  scenario, format in `SCENARIOS.md`): the file list and responsibilities are in `DESIGN.md` "Files", which supersedes
+  the first sketch here (14 Oct 2026).
 - `test/*.test.mjs`: model tests in Node (fast, no browser). `test/e2e.mjs`: browser smoke and flows with axe.
 
 ## How to test
@@ -60,6 +61,23 @@ Lasting decisions for `ot-sim/`. Status and next steps: `STATUS.md`. The build b
 
 - 14 Oct 2026: folder `ot-sim/`, address `anaes.anawj.com/ot/`, plain ES modules with no build step, model separate
   from UI so Node tests can run it. Environment prepared (routes, labels, checks, test runner, build brief).
+- 14 Oct 2026 (plan, owner asked for a plan before any build): technical plan in `DESIGN.md`, model spec in `MODEL.md`,
+  crises in `SCENARIOS.md`, sourced research notes in `research/`. Its choices are proposals until the owner says go;
+  the open questions and their defaults are at the end of `DESIGN.md`. Main ones: a lumped mean-value circulation with
+  per-beat stroke volume (not a pulsatile solver); waveforms drawn from the model's beats at 1x and at real pace from
+  the current state at 5x and 20x; `fmath.js` so replays match on every browser; the patient runs Schnider and Minto
+  while the TCI pump runs the model the trainee picks; sevoflurane MAC40 2.05%; Singapore defaults SRFAC 2021, DAS 2025,
+  ANZAAG 2022, Association of Anaesthetists blood components 2024. The brief's Marsh example was corrected (it mixed
+  ke0 0.26 and 1.2).
+- 14 Oct 2026 (plan revised after two reviews, prototypes and a source check; `research/prototypes.md`): sevoflurane
+  MAC40 default 1.80% (Japanese adults 1.68–1.71% are the closest data to a mostly Chinese population; 2.05% the US
+  label); metaraminol off by default and the dantrolene product an owner question (neither is on the HSA register);
+  SRFAC 2021 gives adrenaline early, not tied to a shock number; rocuronium needs a directional effect site and
+  suxamethonium a faster ke0 than Roy 2002 to meet published times; sugammadex binding solved as equilibrium; one
+  hypnosis rule and one sensitivity quantile per patient; gas.js owns the lung store for every species; Jacobi step
+  (every subsystem reads the previous step); `fmath.js` measured bit-identical on V8 and JavaScriptCore; the PR order
+  now puts gas exchange before volatile agents and adds scenario drugs (M4.0) and resuscitation (M2.8). "What is not
+  modelled" and the known misses are kept in `MODEL.md`.
 
 ## Permissions for unattended sessions (14 Oct 2026)
 
