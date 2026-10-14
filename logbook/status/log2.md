@@ -1,14 +1,12 @@
 # Now: Claude Code, Logbook 2 (log2)
 
-**Claude Code, Logbook 2 (log2)** (branch `ccr-afac5e7a-99esax`, open PR **#523**, not to merge yet): pre-go-live
-data-safety bug hunt (`logbook/PLAN-go-live-bugfix.md`). #523 has the header fix (repaints on every save-queue change,
-so it says "Save needs attention" instead of "Synced" when a save conflicts) and offline devices in
-`tools/test-multidevice.sh` (`test/e2e/multidevice.emulator.mjs`). Half-done: some random runs failed with an edit or a
-delete made offline that didn't land after reconnecting (timing-dependent; one seed passed on rerun). Resume: run
-`DEVICES=5 ROUNDS=10 tools/test-multidevice.sh` a few times; a failure now prints the case's history and every
-device's save-queue entries; find the cause, fix with the test, then merge #523. Don't run the full suite and the
-multi-device test at the same time (they share port 8080 and flake).
-Firetop (home computer) has jobs: A = full suite incl. WebKit + rules + reads + a11y on main (after #519); B = soak runs
-of the multi-device test (Chromium 50 rounds, WebKit/Firefox 30, SLOW=1 20). It reports by message.
-Then: the rest of the bug-hunt list (same-record conflicts, sign-out with unsent changes, "Synced" honesty), then the
-app → sheet sync (`logbook/PLAN-app-to-sheet.md`, waiting for the owner's go).
+**Claude Code, Logbook 2 (log2)** (branch `ccr-afac5e7a-99esax`, open PR **#523**): pre-go-live data-safety bug hunt
+(`logbook/PLAN-go-live-bugfix.md`, progress at its end). #523 has: the header following the save queue; a save cut off by
+the network retrying by itself; multi-select delete going through the write queue (it lost a concurrent edit); a toast
+when a delete is undone by a conflict; `tools/test-multidevice.sh` (random, 5 devices, offline) and `TEST=conflicts`
+(fixed two-device scenarios, all passing); the harness works on Windows.
+Before merging: Firetop's Firefox/WebKit runs on the new head (asked), then the full `tools/test-logbook.sh` (not at the
+same time as a multi-device run: they share port 8080), then merge #523.
+Open: Firetop's slow-network seed 196651587 (a seeded case missing on device 1 in round 1; didn't repeat here); one
+cloud run hung for 25 min with no output (seed unknown). Then: imports (item 7), app left open for days (item 9), and
+the app → sheet sync (`logbook/PLAN-app-to-sheet.md`, waiting for the owner's go).
