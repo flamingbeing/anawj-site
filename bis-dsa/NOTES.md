@@ -240,3 +240,17 @@ Still to do for the machine switch (BIS Advance, SedLine): left/right engine, AS
 - **Case length** (short / medium / long, default medium): the effect site empties with τ 120 s × (1 + (L−1)·sensitivity),
   L = 1, 2.5, 5; sensitivity propofol and dexmedetomidine 0.9, sevoflurane 0.5, ketamine 0.4, remifentanil and N₂O 0.
   A thin dashed "effect site" line on the trend lane (teaching labels on) shows the unzipping.
+
+## Two-sided screens: BIS Advance style and SedLine style (owner, 14 Oct 2026)
+
+- Pick the monitor in Display > Screen layout: BIS VISTA, BIS Advance (two-sided), Masimo SedLine, Teaching layout.
+- A second engine `R` runs the right hemisphere beside the left (the page's own variables). `swapCh()` exchanges the two
+  sets of per-channel state around `step()` (`stepR`), so the single-channel code serves both. The right engine reads the
+  page's settings through `modsR = Object.create(mods)` with its own `side`.
+- "One-sided EEG slowing" (None / Left / Right) slows the chosen hemisphere (alpha and beta ×0.35–0.45, slow and delta up)
+  so ASYM rises. ASYM here = 100·|PL−PR|/(PL+PR) over the last 30 s total power, shown as a bar.
+- Both screens draw L and R EEG, L and R DSA and a trend. Advance: BIS L and R boxes with SQI bars, SR, EMG bars, ASYM, two
+  trend lines. SedLine: PSi (a straight-line stand-in, `psiOf`: BIS 40–60 → PSi 25–50; not Masimo's algorithm), SR, EMG and
+  ARTF per side, ASYM, PSi trend with the 25–50 band. Layouts come from published descriptions, not photos: the owner can
+  send photos to tighten them. Only two of SedLine's four channels are modelled; suppression and artefact marks on the DSA
+  are not drawn.

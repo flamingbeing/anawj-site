@@ -45,6 +45,15 @@ try {
     await page.click('#kMenu');
     await page.addScriptTag({ path: AXE });
     { const r = await page.evaluate(() => axe.run(document.querySelector('#monitor'), { runOnly: ['wcag2a', 'wcag2aa'] })); assert.deepEqual(r.violations.map(v => `${v.id}: ${v.nodes.length}`), [], 'axe on the VISTA screen'); }
+    // two-sided screens: BIS Advance style and SedLine style draw both hemispheres and read out both sides
+    for (const sk of ['advance', 'sedline']) {
+      await page.click(`#skinSeg [data-skin="${sk}"]`);
+      assert.equal(await page.$eval('#bilatWrap', e => e.hidden), false); assert.equal(await page.$eval('#vistaWrap', e => e.hidden), true);
+      await page.waitForFunction(() => /L: BIS \d+.*R: BIS \d+/.test(document.querySelector('#bilSum').textContent), null, { timeout: 5000 });
+      const lit = await page.$eval('#cBil', c => { const x = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 0; i < x.length; i += 4) if (x[i] + x[i + 1] + x[i + 2] > 60) n++; return n / (x.length / 4); });
+      assert.ok(lit > 0.05, `${sk} screen is drawn (${lit})`);
+    }
+    assert.match(await page.textContent('#bilSum'), /PSi \d+/);
     // the teaching layout is still there for the rest of the checks
     await page.click('#skinSeg [data-skin="classic"]');
     assert.equal(await page.$eval('#classicWrap', e => e.hidden), false);

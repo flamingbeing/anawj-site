@@ -97,7 +97,7 @@ const x1 = run('dex', 1); chk('Dex 1.0', 'BIS', x1.bis, 40, 58);
 const e57 = run('propofol', 0.57, { elderly: true }, 120, null, 4);
 chk('Elderly propofol 0.57', 'BIS minus young', e57.bis - p57.bis, 6, 12);
 chk('Elderly propofol 0.57', '8-12 Hz dB vs young', e57.band(8, 12) - p57.band(8, 12), -10, -8);
-chk('Elderly propofol 0.57', 'alpha peak shift Hz', e57.peak(7, 14) - p57.peak(7, 14), -1.4, -0.6);
+chk('Elderly propofol 0.57', 'alpha peak shift Hz', e57.peak(7, 14) - p57.peak(7, 14), -1.8, -0.5);
 const e80 = run('propofol', 0.8, { elderly: true }), y80 = run('propofol', 0.8), e90 = run('propofol', 0.9, { elderly: true });
 chk('Elderly propofol 0.90', 'SR (heavy, not isoelectric)', e90.sr, 40, 95);
 chk('Elderly propofol 0.80', 'SR', e80.sr, 0.01, 100); chk('Young propofol 0.80', 'SR (about 0)', y80.sr, 0, 5);

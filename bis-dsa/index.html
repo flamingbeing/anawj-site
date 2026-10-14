@@ -217,6 +217,8 @@ footer{font-size:13px;color:var(--muted);max-width:80ch;border-top:1px solid var
 .vsensor[hidden]{display:none}
 .vel{display:flex;gap:3cqw}.vel i{display:grid;place-items:center;width:7cqw;height:7cqw;border-radius:50%;border:.4cqw solid #8a8f98;font-style:normal;font-weight:700;font-size:3cqw}
 .vel i.ok{background:#1f9d4a;border-color:#3ddc6b}.vel i.chk{border-color:#ffe600;color:#ffe600}
+.bilc{position:absolute;inset:0;width:100%;height:100%;display:block}
+.vwrap[hidden],#bilSum[hidden]{display:none}
 .keyrow{display:flex;flex-wrap:wrap;gap:6px}.keyrow button{flex:1 1 auto}
 .vmsg[hidden],.keyrow[hidden],.vwrap[hidden],.screen[hidden],.teachstrip[hidden]{display:none}
 .teachstrip{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);font:600 13px/1.3 var(--f-mono);color:var(--muted)}
@@ -244,6 +246,7 @@ footer{font-size:13px;color:var(--muted);max-width:80ch;border-top:1px solid var
       <canvas id="c2Dsa" class="vdsa" aria-label="Density spectral array with the BIS trend below it"></canvas>
       <div class="vsensor" id="v2Sensor" hidden><b>Sensor check</b><span class="vel"><i>1</i><i>2</i><i>3</i><i>4</i></span><span id="v2SensorT">Sensor check in progress</span></div>
     </div></div>
+    <div class="screen vwrap" id="bilatWrap" hidden><div class="vista" id="bilat" role="group" aria-label="Two-sided monitor screen: left and right EEG, DSA and trend"><canvas id="cBil" class="bilc" aria-label="Left and right EEG, density spectral arrays and trend"></canvas></div></div>
     <div class="screen mon" id="classicWrap" hidden><div class="glass">
       <div class="statusbar"><span><b>BIS</b> · Case AH5F</span><div id="vMsg" class="msg" role="status" aria-live="polite"></div><span id="vClock">--:--</span></div>
       <div class="readouts">
@@ -278,7 +281,7 @@ footer{font-size:13px;color:var(--muted);max-width:80ch;border-top:1px solid var
         <button id="kSmooth">Smoothing 15 s</button><button id="kScale">EEG ±100 µV</button><button id="kSweep">EEG sweep auto</button><button id="kTrend">Trend 5 min</button><button id="kBottom">Bottom: BIS trend</button>
       </div>
     <div class="teachstrip" id="teachStrip" aria-label="Readouts the real monitor does not show as numbers">
-      <span class="ts"><b>Block</b> <span id="s2Nm">--</span></span><span class="ts"><b>SQI</b> <span id="s2Sqi">--</span>%</span><span class="ts"><b>EMG</b> <span id="s2Emg">--</span> dB</span><span class="ts"><b>SR</b> <span id="s2Sr">0</span>%</span><span class="ts"><b>SEF</b> <span id="s2Sef">--</span> Hz</span><span class="ts"><b>TP</b> <span id="s2Tp">--</span></span><span class="ts"><b>BC</b> <span id="s2Bc">0</span>/min</span><span class="ts zone" id="s2Zone">--</span><span class="ts"><b>Suppression</b> <span id="s2Sup">0:00</span></span><span class="ts"><b>BIS&lt;40</b> <span id="s2Low">0:00</span></span><button type="button" class="tclr" id="tReset2" aria-label="Reset the suppression and BIS under 40 timers">Reset</button>
+      <span class="ts" id="bilSum" hidden></span><span class="ts"><b>Block</b> <span id="s2Nm">--</span></span><span class="ts"><b>SQI</b> <span id="s2Sqi">--</span>%</span><span class="ts"><b>EMG</b> <span id="s2Emg">--</span> dB</span><span class="ts"><b>SR</b> <span id="s2Sr">0</span>%</span><span class="ts"><b>SEF</b> <span id="s2Sef">--</span> Hz</span><span class="ts"><b>TP</b> <span id="s2Tp">--</span></span><span class="ts"><b>BC</b> <span id="s2Bc">0</span>/min</span><span class="ts zone" id="s2Zone">--</span><span class="ts"><b>Suppression</b> <span id="s2Sup">0:00</span></span><span class="ts"><b>BIS&lt;40</b> <span id="s2Low">0:00</span></span><button type="button" class="tclr" id="tReset2" aria-label="Reset the suppression and BIS under 40 timers">Reset</button>
     </div>
     </div>
     <div class="panel">
@@ -317,11 +320,13 @@ footer{font-size:13px;color:var(--muted);max-width:80ch;border-top:1px solid var
           <p class="tgt" id="nmRead">No relaxant given</p>
           <p class="tgtnote" id="nmHint">Nerve stimulator readout (train-of-four count, ratio, post-tetanic count) estimated from a rocuronium model. Block is timed 6 times faster than real life.</p>
         </div>
+        <div class="nmbrow"><span id="asymLbl">One-sided EEG slowing (shows on two-sided screens)</span>
+          <div class="seg" id="asymSeg" role="group" aria-labelledby="asymLbl"><button data-asym="" aria-pressed="true">None</button><button data-asym="L" aria-pressed="false">Left</button><button data-asym="R" aria-pressed="false">Right</button></div></div>
         <label class="chk"><input type="checkbox" id="mDia"> Diathermy (electrical interference)</label>
         <label class="chk"><input type="checkbox" id="mBlink"> Blinks and eye movement</label>
         <div class="row"><button class="btn" id="stimBtn" aria-pressed="false">Surgical stimulus</button></div></div>
       <div class="ctl"><span class="t">Display</span>
-        <div class="seg" id="skinSeg" role="group" aria-label="Screen layout"><button data-skin="vista" aria-pressed="true">BIS VISTA screen</button><button data-skin="classic" aria-pressed="false">Teaching layout</button></div>
+        <div class="seg" id="skinSeg" role="group" aria-label="Screen layout"><button data-skin="vista" aria-pressed="true">BIS VISTA</button><button data-skin="advance" aria-pressed="false">BIS Advance (two-sided)</button><button data-skin="sedline" aria-pressed="false">Masimo SedLine</button><button data-skin="classic" aria-pressed="false">Teaching layout</button></div>
         <label class="chk"><input type="checkbox" id="mTeach" checked> Teaching labels (zone, newest epoch, colour key, target band)</label>
         <div class="rngbox"><span class="rngt">DSA colour range (power → blue … red)</span>
           <label class="rng" for="dbLo"><span>Floor (blue)</span><output id="oLo" for="dbLo">-3 dB</output></label><input type="range" id="dbLo" min="-30" max="20" step="1" value="-3">

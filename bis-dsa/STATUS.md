@@ -18,6 +18,8 @@ Each session keeps its own line in `status/<session>.md`. Read them before start
 
 ## Recently done
 
+- Two-sided screens (BIS Advance style, SedLine style) with a right-hemisphere engine and a one-sided slowing control (14 Oct 2026). Queued: make the Menu functional.
+
 - BIS VISTA-style screen as the default (owner's photos, 14 Oct 2026); the earlier layout stays as "Teaching layout". Queued: relaxant top-up with PTC/TOF readout, long vs short case emergence, machine switch.
 
 - Effect-site lag fast up (12 s) and slow down (120 s) so emergence unzips slowly and induction is quick, plus an Emergence key; depth slider shows the target BIS (forecast), effect-site marker and a green 40-60 band; relaxant default "At induction" (Off / On now keys); suppression and BIS<40 time box.
