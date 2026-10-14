@@ -1,5 +1,5 @@
 // Prewarming study: op-day screens. Data stays on this phone for now (localStorage); sharing comes with Firebase.
-import { PAGES, SERIES, BY_ID, EXTRA_BY_ID, IX_COLS, SITES, PACU_KEYS, calc, normaliseTemp, isShown } from './schema.js';
+import { PAGES, SERIES, BY_ID, EXTRA_BY_ID, IX_COLS, SITES, PACU_KEYS, calc, normaliseTemp, isShown, WARM_MIN } from './schema.js';
 import { newRecord, setVal, val, lastEdit, mergeRecord, isGone, markDeleted, restore } from './store.js';
 import { openKeypad, closeKeypad } from './keypad.js';
 import { workbook } from './export.js';
@@ -694,7 +694,6 @@ const EVENT_FULL = { pw_gown: 'Gown on', ev_ot: 'In OT', pacu_in: 'PACU arrival'
 // PACU in / To ward are logged on the PACU page (owner, 13 Oct 2026), so they are not in the key-times row or the Log button
 const ESSENTIAL = ['pw_gown', 'pw_start', 'ev_wstop', 'ev_ot', 'io_knife', 'io_done'];
 const PACU_TIMES = ['pacu_in', 'pacu_out'];
-const WARM_MIN = { 1: 30, 2: 10 };
 const mmss = m => { const sec = Math.max(0, Math.floor(m * 60)), h = Math.floor(sec / 3600), mm = Math.floor(sec / 60) % 60, ss = String(sec % 60).padStart(2, '0');
   return h ? `${h}:${String(mm).padStart(2, '0')}:${ss}` : `${mm}:${ss}`; };
 // top bar (owner, 12 Oct 2026): on the right the time now (it sits above the time boxes); to its left a countdown to the
@@ -2223,7 +2222,10 @@ route(/^\/export$/, () => {
 // the Excel file for the given patients: shared from the phone's share sheet when it can, else downloaded
 async function downloadWorkbook(live) {
   const bytes = workbook(live, []);
-  const name = `prewarming-study-${new Date().toISOString().slice(0, 10)}${DEMO ? '-demo' : ''}.xlsx`;
+  // the phone's own date (toISOString is UTC: before 8 am in Singapore it named the file for yesterday), and how many patients
+  const d = new Date(), day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const n = live.filter(p => !isGone(p)).length;
+  const name = `prewarming-study-${day}-${n}pt${DEMO ? '-demo' : ''}.xlsx`;
   const file = new File([bytes], name, { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   if (navigator.canShare?.({ files: [file] })) { try { await navigator.share({ files: [file], title: name }); return; } catch (e) { if (e.name === 'AbortError') return; } }
   const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = name; a.click();
@@ -2286,6 +2288,9 @@ if ('serviceWorker' in navigator && !DEMO) {
       (reg.waiting || w).postMessage('skipWaiting');
       setTimeout(async () => {
         if (reloaded || !navigator.onLine) return;
+        // only wipe the saved copy if the network really answers now (14 Oct 2026): a phone whose signal dropped in these
+        // 3 seconds would otherwise have no app at all offline
+        try { if (!(await fetch('sw.js', { cache: 'no-store' })).ok) return; } catch { return; }
         try { for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister(); for (const k of await caches.keys()) if (k.startsWith('prewarm-')) await caches.delete(k); } catch { /* reload anyway */ }
         location.reload();
       }, 3000);

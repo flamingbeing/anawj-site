@@ -233,6 +233,8 @@ export const PAGES = [
 
 for (const p of PAGES) if (p.series) p.fields = [...p.fields, ...seriesFields(p.series)];
 
+// minutes of active warming by group (1 = 30 min, 2 = 10 min); group 3 has none
+export const WARM_MIN = { 1: 30, 2: 10 };
 export { SERIES };
 
 // All fields in column order; field i goes to column i + 1

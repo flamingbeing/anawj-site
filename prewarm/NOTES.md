@@ -373,3 +373,13 @@ restore, delete, restore always works, even from a phone whose clock is behind (
 Due alerts now repeat every 2 minutes while a reading is due and unsaved, for 10 minutes after its time (the banner
 says "overdue" after 5), and a phone that slept checks the moment it is back in front. The `nag` key (last buzz per
 reading) replaces `alerted`. Still only while the app is open: a lock-screen alarm needs a push server.
+
+### Export NA, file name, safer updates (14 Oct 2026)
+- **Export:** pre-warming reading cells past the warming (after 10 min in the 10 min group, after 30 in the 30 min
+  group) with nothing saved export as `NA` (owner, 14 Oct). The no-pre-warming group and a patient with no group stay
+  as before; the Downloaded columns stay empty. `WARM_MIN` now lives in schema.js. A typed decimal comma ("37,5") exports
+  as a number. The file is named with the phone's local date and the patient count (`prewarming-study-2026-10-14-3pt.xlsx`);
+  it used the UTC date, so a Singapore phone before 8 am got yesterday's.
+- **Updates:** the service worker's install is all-or-nothing for the app's own files (one failed download fails the
+  install, the browser retries, the phone keeps the old complete copy); Firebase SDK files stay optional. The 3 s
+  fallback only clears the saved copy if `sw.js` can be fetched right then. Base `prewarm-v79`.

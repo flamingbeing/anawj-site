@@ -159,6 +159,17 @@ assert.equal(cellFor(BY_ID.age, ''), null);
   restore(dd, 'A', 8000); assert.equal(isGone(dd), false, 'second restore works');
   markDeleted(dd, 100); assert.equal(isGone(dd), true, 'a delete from a slow clock still counts');
   restore(dd, 'A', 50); assert.equal(isGone(dd), false, 'and so does a restore from a slow clock');
+  // pre-warming readings past the warming export as NA (10 min group: after 10; 30 min group: after 30); none for the no-pre-warming group
+  const naRow = (arm, extra = {}) => { const q = newRecord(); setVal(q, 'enrol_id', 'NA-' + arm, 'A'); setVal(q, 'arm', arm, 'A'); for (const [k, v] of Object.entries(extra)) setVal(q, k, v, 'A'); return workbookSheets([q], [])[0].rows[2]; };
+  const col = id => BY_ID[id].colIndex;
+  const r10 = naRow(2, { prewarm_10_core: '36.5' }), r30 = naRow(1), r0 = naRow(3);
+  assert.equal(r10[col('prewarm_15_core')], 'NA', '10 min group: 15 min reading is NA');
+  assert.equal(r10[col('prewarm_10_core')]?.v ?? r10[col('prewarm_10_core')], 36.5, 'the 10 min reading itself is kept');
+  assert.equal(r10[col('prewarm_5_chest')], null, 'a reading within the warming stays empty');
+  assert.equal(r30[col('prewarm_30_core')], null, '30 min group: 30 min is within the warming');
+  assert.equal(r30[col('prewarm_35_core')], 'NA', '30 min group: 35 min is NA');
+  assert.equal(r0[col('prewarm_15_core')], null, 'no pre-warming group: left empty');
+  assert.equal(cellFor({ type: 'num' }, '37,5'), 37.5, 'a decimal comma is a number');
   // corrected to the no pre-warming group: its pre-warming readings aren't exported; very long text is cut to fit a cell
   const nw = newRecord(); setVal(nw, 'enrol_id', 'NW-1', 'A'); setVal(nw, 'arm', 1, 'A'); setVal(nw, 'prewarm_0_core', '36.5', 'A');
   assert.equal(workbookSheets([nw], [])[0].rows[2][BY_ID.prewarm_0_core.colIndex], 36.5);

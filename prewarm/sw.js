@@ -2,7 +2,7 @@
 // changes: the new worker installs alongside the old one and the app offers "Update available".
 // Firebase (added with sharing) will always go to the network; its SDK files are cached here.
 
-const VERSION = 'prewarm-v78';
+const VERSION = 'prewarm-v79';
 const SDK = 'https://www.gstatic.com/firebasejs/10.12.2/';
 const SDK_FILES = ['firebase-app.js', 'firebase-auth.js', 'firebase-firestore.js'].map(f => SDK + f);
 const SHELL = [
@@ -13,9 +13,11 @@ const SHELL = [
 ];
 
 self.addEventListener('install', e => {
-  // one missing file must not stop the whole install, so cache each on its own
+  // all-or-nothing for the app's own files (14 Oct 2026): if one fails to download (flaky hospital wifi) the install fails,
+  // the browser tries again later, and the phone keeps the old complete copy instead of an update with a hole in it.
+  // The Firebase SDK files are fetched from Google and stay optional.
   e.waitUntil(caches.open(VERSION).then(c => Promise.all([
-    ...SHELL.map(u => c.add(new Request(u, { cache: 'reload' })).catch(() => {})),
+    ...SHELL.map(u => c.add(new Request(u, { cache: 'reload' }))),
     ...SDK_FILES.map(u => c.add(new Request(u, { mode: 'cors' })).catch(() => {})),
   ])));
 });
