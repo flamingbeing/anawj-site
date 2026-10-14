@@ -92,6 +92,11 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .reading b{font-family:var(--f-display);font-size:17px}
 .reading p{font-size:15px}
 .story{display:grid;gap:8px}
+.mixrows{display:grid;gap:6px}
+.mixrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 8px;align-items:baseline}
+.mixrow label{font-size:15px}
+.mixrow output{font:600 14px/1 var(--f-mono);font-variant-numeric:tabular-nums;color:var(--accent)}
+.mixrow input{grid-column:1/-1}
 .lane{display:grid;gap:6px;min-width:0}
 .key{display:inline-block;width:14px;height:3px;vertical-align:middle;margin-left:4px;border-radius:2px}
 .key.bis{background:#fff}.key.emg{background:#5fd08f;height:8px}
@@ -163,10 +168,19 @@ footer{font-size:13px;color:var(--muted);max-width:80ch;border-top:1px solid var
       </div>
     </div></div>
     <div class="panel">
-      <div class="ctl"><label class="t" for="depth">Depth (effect-site dose)</label>
+      <div class="ctl"><span class="t">Drugs</span>
+        <div class="seg" id="modeSeg" role="group" aria-label="One drug or a mix">
+          <button data-mode="single" aria-pressed="true">One drug</button><button data-mode="mix" aria-pressed="false">Mix drugs</button>
+        </div></div>
+      <div class="ctl" id="mixCtl" hidden><span class="t">Combinations</span>
+        <div class="seg" id="presetSeg" role="group" aria-label="Combinations">
+          <button data-preset="tiva">Propofol + remifentanil</button><button data-preset="propket">Propofol + ketamine</button><button data-preset="sevon2o">Sevo + N₂O</button><button data-preset="propdex">Propofol + dex</button><button data-preset="clear">Clear</button>
+        </div>
+        <div class="mixrows" id="mixRows"></div></div>
+      <div class="ctl" id="depthCtl"><label class="t" for="depth">Depth (effect-site dose)</label>
         <input type="range" id="depth" min="0" max="100" value="0">
         <div class="ticks" id="ticks"><span>Awake</span><span>Sedated</span><span>GA</span><span>Deep</span><span>Flat</span></div></div>
-      <div class="ctl"><span class="t">Drug</span>
+      <div class="ctl" id="drugCtl"><span class="t">Drug</span>
         <div class="seg" id="drugSeg" role="group" aria-label="Drug">
           <button data-drug="propofol" aria-pressed="true">Propofol</button>
           <button data-drug="sevo" aria-pressed="false">Sevoflurane</button>
@@ -176,6 +190,7 @@ footer{font-size:13px;color:var(--muted);max-width:80ch;border-top:1px solid var
       <div class="ctl"><span class="t">Patient and artefact</span>
         <label class="chk"><input type="checkbox" id="mElder"> Older patient (over 70)</label>
         <label class="chk"><input type="checkbox" id="mEmg"> Facial muscle activity (no relaxant)</label>
+        <label class="chk"><input type="checkbox" id="mNmb"> Muscle relaxant (paralysed)</label>
         <label class="chk"><input type="checkbox" id="mDia"> Diathermy (electrical interference)</label></div>
       <div class="ctl"><span class="t">Speed</span>
         <div class="seg" id="speedSeg" role="group" aria-label="Simulation speed">
@@ -235,7 +250,7 @@ footer{font-size:13px;color:var(--muted);max-width:80ch;border-top:1px solid var
   <div class="sec-head"><h2 id="h-pit">When the number misleads</h2></div>
   <ul class="pit">
     <li><b>Ketamine and nitrous oxide</b>Ketamine adds fast (gamma) power, so BIS often reads 60–80 in an unconscious patient. Nitrous oxide barely moves BIS. Look at the DSA and the clinical picture.</li>
-    <li><b>Muscle (EMG)</b>Frontalis activity sits in the high frequencies and pushes BIS up. Check the EMG bar; a relaxant or more analgesia often brings BIS down without more hypnotic.</li>
+    <li><b>Muscle (EMG) and paralysis</b>Frontalis activity sits in the high frequencies and pushes BIS up. Check the EMG bar; a relaxant or more analgesia often brings BIS down without more hypnotic. The flip side: paralysis can lower BIS in a patient who is awake, so a low number under relaxant doesn’t rule out awareness.</li>
     <li><b>Older brains</b>Alpha power falls with age, so the same propofol dose gives a dimmer DSA and a higher BIS. Chasing the number risks burst suppression.</li>
     <li><b>Lag</b>BIS is smoothed over about 15–30 s. A change in the DSA often shows before the number moves.</li>
     <li><b>Low BIS that isn't drug</b>Hypothermia, hypoglycaemia, hypotension with poor cerebral perfusion and cerebral ischaemia all slow or flatten the EEG.</li>

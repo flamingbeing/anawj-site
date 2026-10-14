@@ -16,11 +16,21 @@ try {
     page.on('pageerror', e => errors.push(e.message));
     page.on('console', m => { if (m.type() === 'error' && !/fonts\.(googleapis|gstatic)/.test(m.text())) errors.push(m.text()); });
     await page.goto(BASE);
-    // opens in propofol GA after a warm start: BIS in the GA range, two bands described
+    // opens on an awake patient: BIS in the 80s-90s
     await page.waitForFunction(() => /^\d+$/.test(document.querySelector('#vBis').textContent));
-    const ga = await bis(page);
-    assert.ok(ga >= 35 && ga <= 60, `propofol GA BIS ${ga}`);
+    const awake = await bis(page);
+    assert.ok(awake >= 80, `awake BIS ${awake}`);
+    assert.equal(await page.textContent('#rName'), 'Awake');
+    assert.equal(await page.$eval('#depth', e => e.value), '0');
+    // give propofol to GA depth: BIS falls into 35-60 and the two bands are described
+    await page.click('#speedSeg [data-speed="10"]');
+    await page.$eval('#depth', e => { e.value = 57; e.dispatchEvent(new Event('input')); });
     assert.equal(await page.textContent('#rName'), 'General anaesthesia');
+    await page.waitForFunction(() => +document.querySelector('#vBis').textContent <= 60, null, { timeout: 40000 });
+    await page.waitForTimeout(3000);
+    const ga = await bis(page);
+    assert.ok(ga >= 30 && ga <= 60, `propofol GA BIS ${ga}`);
+    await page.click('#speedSeg [data-speed="1"]');
     // graphs keep their size and have something drawn on them
     const heights = () => page.$$eval('.screen canvas', cs => cs.map(c => c.clientHeight));
     const h0 = await heights();
@@ -50,6 +60,12 @@ try {
     await page.click('#speedSeg [data-speed="10"]');
     await page.check('#mEmg');
     await page.waitForFunction(e0 => +document.querySelector('#vEmg').textContent >= e0 + 6, emg0, { timeout: 20000 });
+    // a muscle relaxant takes the EMG away again
+    const emgHi = await page.$eval('#vEmg', e => +e.textContent);
+    await page.check('#mNmb');
+    await page.waitForFunction(e1 => +document.querySelector('#vEmg').textContent <= e1 - 6, emgHi, { timeout: 20000 });
+    assert.match(await page.textContent('#rText'), /Muscle relaxant/);
+    await page.uncheck('#mNmb');
     await page.uncheck('#mEmg');
     // SQI: high on a clean signal; diathermy drops it and the BIS number shows hollow or blank, like the monitor
     assert.ok(await page.$eval('#vSqi', e => +e.textContent) >= 90, 'clean SQI');
@@ -59,9 +75,19 @@ try {
     await page.uncheck('#mDia');
     await page.click('#speedSeg [data-speed="1"]');
     // library strips and quiz drawn
-    await page.waitForFunction(() => document.querySelectorAll('#lib canvas').length === 10 && document.querySelectorAll('#opts button').length === 4);
+    await page.waitForFunction(() => document.querySelectorAll('#lib canvas').length === 12 && document.querySelectorAll('#opts button').length === 4);
     await page.click('#opts button');
     assert.ok((await page.textContent('#fb')).length > 10, 'quiz feedback');
+    // mix mode: propofol + ketamine reads higher than propofol alone; back to one drug restores the single controls
+    await page.click('#speedSeg [data-speed="10"]');
+    await page.click('#modeSeg [data-mode="mix"]');
+    assert.ok(await page.$eval('#depthCtl', e => e.hidden) && !(await page.$eval('#mixCtl', e => e.hidden)), 'mix controls shown');
+    await page.click('#presetSeg [data-preset="propket"]');
+    assert.equal(await page.$eval('#o-ketamine', e => e.textContent), '40');
+    assert.match(await page.textContent('#rName'), /propofol \+ ketamine/);
+    await page.waitForFunction(g => +document.querySelector('#vBis').textContent > g + 8, ga, { timeout: 30000 });
+    await page.click('#modeSeg [data-mode="single"]');
+    assert.ok(!(await page.$eval('#depthCtl', e => e.hidden)), 'single controls back');
     // ketamine at 10x speed: BIS climbs well above the GA value
     await page.click('#speedSeg [data-speed="10"]');
     await page.click('[data-drug="ketamine"]');
