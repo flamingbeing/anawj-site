@@ -9,7 +9,7 @@
 // purgeExpired()                 drop entries older than 30 days; app.js runs it once after sign-in
 // renderBin() / openBin()        the bin view (element) / the same in a dialog
 
-import { S, h, toast, modal, confirmBox, cloud, writes, fill, removeCase, deleteMany, restoreCase, miniChips, resetters } from './ui-core.js';
+import { S, h, toast, modal, confirmBox, cloud, writes, fill, removeCase, restoreCase, miniChips, resetters } from './ui-core.js';
 import { cleanNote, noteTitle, MAX_NOTES, isDayNote, cappedNotes, mergeDayNote } from './notepad.js';
 import { cleanCase } from './clean.js';
 import { cleanReflection } from './reflections.js';
@@ -56,16 +56,20 @@ export async function moveToBin(kind, item, extra = {}) {
   if (S.user?.email !== owner) throw new Error('Account changed; the original record has not been deleted');
   binCache = [...entries, ...binCache];
   // if deleting an original fails it is still there: its copy leaves the bin again, or other devices would hide the
-  // record (their bin feed removes that version, sync.js) while it still exists
   // record (their bin feed removes that version, sync.js) while it still exists. A delete through the write queue can
   // also fail after it was accepted (a connection that only looks online): watched until it is synced.
   const failed = async (ids, err) => { await rollBack(owner, kind, entries.filter(e => ids.includes(e.data.id))); throw err; };
   if (kind === 'case') {
-    const ids = entries.map(e => e.data.id);
-    // the case as it was before its bin copy was saved (the bin feed has already taken it off S.cases)
-    try { if (ids.length === 1) await removeCase(ids[0], items[0]); else await deleteMany(ids); }
-    catch (err) { await failed(ids, err); }   // (deleteMany is one batch: all or nothing)
-    if (ids.length === 1) watchDeletes(owner, kind, entries);
+    // each through the write queue with the version being deleted (as it was before its bin copy was saved: the bin
+    // feed has already taken it off S.cases), so a case changed elsewhere meanwhile is kept; a blind batch delete lost
+    // an edit made on another device at the same moment (14 Oct 2026). Ten at a time.
+    const r = [];
+    for (let i = 0; i < items.length; i += 10)
+      r.push(...await Promise.allSettled(items.slice(i, i + 10).map(it => removeCase(String(it.id), it))));
+    const ok = entries.filter((e, i) => r[i].status === 'fulfilled');
+    watchDeletes(owner, kind, ok);
+    const bad = r.find(x => x.status === 'rejected');
+    if (bad) await failed(entries.filter(e => !ok.includes(e)).map(e => e.data.id), bad.reason);
   } else if (kind === 'note') {
     // through the write queue, so it works offline; the open notes list drops them at once
     const r = await Promise.allSettled(entries.map(e => writes.save('note', owner, { id: e.data.id, _deleted: true }, items.find(x => x.id === e.data.id) || null)));
@@ -101,7 +105,9 @@ async function rollBack(owner, kind, entries) {
     catch (err) { console.warn('Bin entry left after a failed delete', e.id, err); }
     const job = kind !== 'reflection' && writes.entries().find(x => x.kind === kind && x.record.id === e.data.id && (x.state === 'failed' || x.state === 'conflict'));
     if (job) await writes.archive(job.key).catch(() => {});
-    if (job && job.state === 'conflict') continue;
+    // the record changed elsewhere first: that version stays, so the delete is undone; say so, or the case seems to
+    // come back by itself
+    if (job && job.state === 'conflict') { toast(`A ${kind} you deleted was changed on another device, so it was kept`); continue; }
     try {
       if (kind === 'case') await restoreCase({ ...e.data }, e.data);
       else if (kind === 'note') await writes.save('note', owner, { ...e.data }, e.data);

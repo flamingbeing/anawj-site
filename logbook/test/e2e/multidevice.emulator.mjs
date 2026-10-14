@@ -13,7 +13,8 @@ import fs from 'node:fs';
 const pw = await import(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/node_modules/playwright/index.mjs');
 const PORT = process.env.PORT || 8080, FS = process.env.READS_FS_PORT || 8087, AUTH = process.env.READS_AUTH_PORT || 9097;
 const SDK_DIR = process.env.SDK_DIR || `${process.env.HOME}/.cache/anawj-rules/node_modules/firebase`;
-const BASE = `http://localhost:${PORT}/logbook/?emulator=${FS}:${AUTH}`;
+// the page on 127.0.0.1 like the emulators: WebKit blocks localhost → 127.0.0.1 ("access control checks")
+const BASE = `http://127.0.0.1:${PORT}/logbook/?emulator=${FS}:${AUTH}`;
 const DEVICES = Number(process.env.DEVICES) || 5, ROUNDS = Number(process.env.ROUNDS) || 8;
 const SEED = Number(process.env.SEED) || Math.floor(Math.random() * 1e9);
 const BROWSER = process.env.BROWSER || 'chromium', SLOW = process.env.SLOW === '1', OFFLINE = process.env.OFFLINE !== '0';
@@ -108,7 +109,10 @@ async function check(round, devs) {
     const mine = new Map(await ids(d.p));
     const extra = [...mine.keys()].filter(id => !server.has(id)), missing = [...server.keys()].filter(id => !mine.has(id));
     const stale = [...mine].filter(([id, t]) => server.has(id) && server.get(id) !== t).map(([id]) => id);
-    assert.deepEqual({ extra, missing, stale }, { extra: [], missing: [], stale: [] }, `round ${round}: device ${d.n} differs from the server`);
+    if (extra.length || missing.length || stale.length) {
+      const odd = [...extra, ...missing, ...stale];
+      throw new Error(`round ${round}: device ${d.n} differs from the server: ${JSON.stringify({ extra, missing, stale })}\n${(await Promise.all(odd.slice(0, 3).map(explain))).join('\n')}`);
+    }
   }
 }
 const history = [];   // [round, device, offline, kind, ids, ok, error] for failure reports
@@ -132,8 +136,11 @@ try {
   // an offline change that met a change made elsewhere meanwhile becomes a conflict when it lands: the app keeps both
   // versions (Recent changes) and the header must say "Save needs attention". Anything else must have landed.
   async function land(d, items, round) {
-    const states = await d.p.evaluate(async () => (await import('./js/writes.js')).writes.entries().map(j => [j.record.id, j.state]));
+    const states = await d.p.evaluate(async () => (await import('./js/writes.js')).writes.entries().map(j => [j.record.id, j.state, j.error || '']));
     const conflicted = new Set(states.filter(([, st]) => st === 'conflict').map(([id]) => id));
+    // a delete that met a change made elsewhere is undone (bin.js rollBack: the other version stays, the job is set
+    // aside): it lost, as a conflict does, but the header has nothing left to flag
+    const undone = new Set(states.filter(([, st, err]) => st === 'archived' && /changed elsewhere/.test(err)).map(([id]) => id));
     const failed = states.filter(([, st]) => st === 'failed');
     if (failed.length) errors.push(`round ${round}: device ${d.n} has failed saves after reconnecting: ${failed.map(([id]) => id).join(', ')}`);
     if (conflicted.size) {
@@ -142,7 +149,7 @@ try {
       if (!/needs attention/i.test(header)) errors.push(`round ${round}: device ${d.n} has conflicts but the header says "${header}"`);
     }
     for (const x of items) {
-      const hit = (x.r.ids || [x.r.id]).filter(id => conflicted.has(id));
+      const hit = (x.r.ids || [x.r.id]).filter(id => conflicted.has(id) || undone.has(id));
       if (hit.length) { conflicts += hit.length; for (const id of hit) ledger.delete(id); if (x.r.ids) { for (const id of x.r.ids.filter(id => !hit.includes(id))) { ledger.set(id, { gone: true }); binned.push(id); } } }
       else record(x.r);
     }

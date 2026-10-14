@@ -69,17 +69,20 @@ function loadSdk() {
     ]);
     const a = app.initializeApp(emulator ? { projectId: 'demo-logbook', apiKey: 'fake-api-key', authDomain: 'localhost' } : FIREBASE_CONFIG);
     const s = { app: a, auth: auth.getAuth(a), db: openDb(a, fs), A: auth, F: fs };
-    if (emulator) {
-      auth.connectAuthEmulator(s.auth, 'http://127.0.0.1:' + emulator.auth, { disableWarnings: true });
-      fs.connectFirestoreEmulator(s.db, '127.0.0.1', emulator.fs);
-    }
+    if (emulator) auth.connectAuthEmulator(s.auth, 'http://127.0.0.1:' + emulator.auth, { disableWarnings: true });
     return s;
   })();
   fb.catch(() => { fb = null; });   // e.g. offline on first ever load: try again next time
   return fb;
 }
 
+// (the emulator again for the fresh Firestore a sign-out opens, or it looks for the live project and stays "offline")
 function openDb(a, fs, memoryOnly = false) {
+  const db = openCache(a, fs, memoryOnly);
+  if (emulator) fs.connectFirestoreEmulator(db, '127.0.0.1', emulator.fs);
+  return db;
+}
+function openCache(a, fs, memoryOnly) {
   if (memoryOnly) {
     try { return fs.initializeFirestore(a, { localCache: fs.memoryLocalCache() }); } catch (e) { return fs.getFirestore(a); }
   }

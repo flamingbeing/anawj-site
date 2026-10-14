@@ -84,7 +84,7 @@ export function createWriteQueue({ store, backend, getOwner = () => null, normal
     notify();
     await Promise.race([drain(keyOf(job)), delay(180)]);
     if (!current(email, gen)) throw new Error('Account changed; the editor has not been saved');
-    if (job.state === 'failed' || job.state === 'conflict') throw new Error(job.error + ' — a copy is kept in Recent changes');
+    if (job.state === 'failed' || job.state === 'conflict') throw new Error(/Recent changes/.test(job.error) ? job.error : job.error + ' — a copy is kept in Recent changes');
     job.accepted = true; await persist(job); notify();
     return copy(job.result || job.record);
   }
