@@ -229,6 +229,45 @@ const scenarios = {
     assert.ok(!left.includes('c_purge1_x'), '31 days: purged'); assert.ok(left.includes('c_purge2_x'), '29 days: kept');
     return `purged ${r.n}`;
   },
+  // a Form response picked up on one device, then edited there; a second device that read the inbox before the pick-up
+  // tries it too: it must not put the Form's version back over the edit (the rules refuse deleting an entry that is
+  // gone, so the second pick-up's batch fails whole)
+  async formTwice(A, B) {
+    await put('formInbox/2_FakeTwice', { id: '2_FakeTwice', email: E, date: '2026-10-14', details: 'GH fake Form case twice', labels: ['16) Lower Segment Caesarean Section (10 | 20)'], submittedAt: Date.now() });
+    const pick = d => d.p.evaluate(async () => {
+      const cloud = await import('./js/cloud.js'), { S } = await import('./js/ui-core.js'), { mergeFormEntries, formCaseId } = await import('./js/form-inbox.js');
+      const entries = await cloud.listFormEntries(S.user.email);
+      return { formCaseId: formCaseId('2_FakeTwice'), r: mergeFormEntries(entries, new Map(S.cases.map(c => [c.id, c])), Date.now()) };
+    });
+    const [pa, pb] = await Promise.all([pick(A), pick(B)]);   // both read the inbox before either picks up
+    const commit = (d, r) => d.p.evaluate(async r => {
+      const cloud = await import('./js/cloud.js'), { S } = await import('./js/ui-core.js'), { formCaseId } = await import('./js/form-inbox.js');
+      const byCase = new Map(r.save.map(c => [c.id, c]));
+      return cloud.commitFormPickup(S.user.email, r.done.map(id => ({ id, case: byCase.get(formCaseId(id)) || null })));
+    }, r);
+    assert.deepEqual(await commit(A, pa.r), ['2_FakeTwice'], 'device A picks it up');
+    await settle(A); await reopen(A);
+    must(await act(A, { kind: 'edit', id: pa.formCaseId, text: 'fake Form case, edited in the app' })); await settle(A);
+    assert.deepEqual(await commit(B, pb.r), [], 'device B finds it already picked up');
+    await settle(B);
+    assert.equal((await serverCases()).get(pa.formCaseId), 'fake Form case, edited in the app', 'the app edit stays');
+    return 'picked up once; the edit stays';
+  },
+  // a case logged offline reaches the server half an hour later: a device that synced meanwhile must still get it (it
+  // reads only what changed since its last sync, less 10 minutes)
+  async lateOffline(A, B) {
+    await reopen(A); await reopen(B);
+    await A.ctx.setOffline(true);
+    await A.p.evaluate(() => { const real = Date.now; window.__realNow = real; Date.now = () => real() - 30 * 60e3; });
+    must(await act(A, { kind: 'create', id: 'late1', text: 'fake case logged offline 30 min ago' }));
+    await A.p.evaluate(() => { Date.now = window.__realNow; });
+    must(await act(B, { kind: 'create', id: 'late2', text: 'fake case on B meanwhile' })); await settle(B); await reopen(B);
+    await A.ctx.setOffline(false); await settle(A);
+    assert.ok((await serverCases()).has('late1'), 'on the server');
+    await reopen(B);
+    assert.equal((await casesOn(B)).get('late1'), 'fake case logged offline 30 min ago', 'device B sees the late case');
+    return 'late case reaches the other device';
+  },
   // signing out with unsent work asks first; Cancel keeps it and it lands later; "Sign out anyway" leaves nothing for the
   // next account on the device
   async signOut(A) {
