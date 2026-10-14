@@ -27,8 +27,9 @@ protect or move. (Prewarm already holds real study data, so its items come first
    with reCAPTCHA Enterprise and add the subdomains. A session then adds the App Check call to each app and, once it
    reports clean traffic, the owner switches on enforcement. Before enforcing Firestore in `apmes-logbook`: the
    Google Form inbox script (`logbook/form-script/`) has no App Check token and would stop; give it a debug token first.
-5. **Rules changes need the owner's approval.** A merged change to any `firestore.rules` deploys live at once. Every
-   session asks the owner before merging one (rule in `AGENTS.md`).
+5. **Rules changes deploy live at once.** A merged change to any `firestore.rules` deploys on merge. Since 14 Oct 2026 the
+   owner no longer approves each one: the merging session tests in the emulator, checks the deploy run and reports what
+   changed (rule in `AGENTS.md`).
 6. **Subdomain moves** (`SUBDOMAINS.md`): finish before residents arrive, so nobody has to sign in again or reinstall.
 7. **Changed-records-only sync** for the logbook (planned in `logbook/STATUS.md`): needed before nationwide use, not
    before the first residents.

@@ -36,7 +36,11 @@ Rules that bite:
 
 - Accounts, settings, costs, the pre-launch checklist and how to hand over: [OPERATIONS.md](OPERATIONS.md). Update
   it when an account, setting or cost changes.
-- A PR that changes any `firestore.rules` waits for the owner's approval before merging (it deploys live on merge).
+- A PR that changes any `firestore.rules` deploys live on merge. Sessions may merge it themselves (owner, 14 Oct 2026: rules
+  and data are his biggest headache; he does not want to intervene), carefully: run `tools/test-rules.sh` first, merge only
+  when the Checks are green, confirm the "Deploy Firestore rules" run succeeded, and say in the report which rules changed
+  and what they now allow or deny. Never loosen rules on real-data collections (logbook, evals, prewarm, roster) just to
+  make a test pass.
 - **Blocked by the cloud environment?** (no Google Cloud sign-in, the owner's real documents, a long test run, a
   secret): hand it to the owner's home-computer session instead of stopping. How and what to send: `OPERATIONS.md`,
   "The home computer". It changes live projects only with the owner's OK.
@@ -108,7 +112,7 @@ for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mj
 - **Goal now:** find diverse use cases. Ideas and the longer-term direction are in [ROADMAP.md](ROADMAP.md).
 - **Merging:** merge your own PRs once the checks above pass, then report (with the PR link). Merge by the number the
   PR's creation returned, never a guessed next number (13 Oct 2026: a guess merged another session's PR early). Exceptions: Claude
-  Code–Codex handover PRs and PRs changing a `firestore.rules` wait for the owner's explicit approval; the owner may say "auto-merge" for a batch, or
+  Code–Codex handover PRs wait for the owner's explicit approval (`firestore.rules` PRs do not any more: see Rules that bite); the owner may say "auto-merge" for a batch, or
   "no e2e yet" (then unit tests and quick browser checks).
 - **Planning:** for multi-part work, say the plan first and wait when asked; the owner plans in batches, then it's
   built PR by PR, each merged before the next. When the owner asks "should we / can we", answer and propose.
