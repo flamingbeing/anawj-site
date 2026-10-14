@@ -384,6 +384,29 @@ manual and the figures; nothing was copied into the repo (looking only).
   `app.js` only calls `advApply()` / `advTick(dirty)` and hides `#advWrap` for other skins. `SIGMAX` is 20 s of EEG (6.25 mm/s sweep).
   `test/adv.e2e.mjs` (also run by `e2e.mjs`) drives all of it. Class names inside the screen are prefixed (`xbtn`, `xrow`, ...) to stay
   clear of the page's own CSS (`.mt`, `.bar`, `.btn` ... belong to the VISTA screen and the page).
+- **Fidelity pass 2 (14 Oct 2026, after a clinician-style review against the manual and the 2021 marketing screens):**
+  - EEG (`adv-draw.js`, `advDrawEeg`): the engine's signal is shown through a display filter (7-tap smoother, 22% of the fast residue kept as
+    fuzz; 75% with EEG filters off), a display gain of 0.55 and a soft limit (normal waves stay under 60% of the half height, a big artefact
+    still reaches further; nothing is clipped). It scrolls right to left, newest at the right edge, with scrolling 1 s gridlines, so there is no
+    sweep gap. Awake fills about a quarter to a third of the frame, propofol GA about 60%.
+  - Earlier trend (`adv-seed.js`): a case starts with 35 min of history (5 s points, `ADV.pre`, never in `HIST`, so the other screens are
+    untouched; `advHist(side)` joins it to the live columns from `ADV.cut`). Columns come from throwaway engines at depth 0 and 0.55 (same
+    spectra and BIS formula), laid out by a script; the ASYM bumps are scripted tp offsets. The case clock starts 35 min earlier
+    (`ADV.t0 = start - 2100`). Demo: defaults restored, the sim goes to propofol GA (page's drug state saved and put back on exit), history
+    BIS ~97 to the low 40s, EMG ~45 to 30 dB.
+  - Start-up: modal 'Connect BISx to start monitoring', 'Initializing BISx', 'Connect sensor to start monitoring' (Alarm Settings button),
+    then the sensor check opens by itself and the case starts when it ends (about 8 s). **Skip start-up** and the **Simulate** row (sensor
+    disconnected, sensor expired, battery low, USB drive; password hint) sit under the screen, outside the monitor. Exit Demo restarts it.
+  - Messages: a new message shows at once for 5 s, then the bar rotates (n/N); Pause/Silent messages replace each other and use the manual's
+    wording; 'Alarm Pause Mode Off' when the 120 s ends. In case review the bar carries only 'CASE REVIEW'.
+  - 4-channel DSA and ASYM layout: BIS 0.34 H, DSA 0.11 H each, ASYM 0.17 H, as in the marketing screen (the reviewer's 22% was measured
+    against the picture with the bezel). Hz labels are dropped rather than overprinted; ASYM edges are teal and drawn last.
+  - **Deliberate deviations** (owner may want them back): all six menu tiles are enabled while monitoring (the manual greys ALARMS and CASE
+    REVIEW; figure 45 shows them white and Alarm Settings is on the left bar anyway); the BIS alarm range is off by default (the manual's default;
+    the dialog row shows its limits `[40 - 60]` with OFF, an ON default would alarm on an awake patient at once); chart interval default 1 min
+    (figure 58) instead of the table's 15; case review keeps the BIS + DSA layout (figure 52).
+  - EEG Trends (amplitude, scale, channels, filters) are staged until APPLY; Logs rows have CANCEL and DOWNLOAD; ID is a read-only window that
+    closes after 1 minute; the case ID stays fixed during a check.
 - Font: Selawik (SIL OFL, metric-compatible with Segoe UI, which the tablet's UI looks like); `fonts/README.md`.
 - Case: white case, blue band, "Medtronic" under the screen (below 640 px wide the case is dropped to give the screen the room).
 - Channel modes: 4-channel (bilateral sensor, the default: two BIS panels, BURST, SEF/MF of the selected side, L|R pill, ASYM) and
