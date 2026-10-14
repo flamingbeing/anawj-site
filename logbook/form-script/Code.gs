@@ -135,6 +135,18 @@ function logbookInboxSubmit(e) {
   logbookInboxSend_(entry);
 }
 
+// Run once by hand after setting BOT_EMAIL and BOT_PASSWORD: adds the On form submit trigger (if it isn't there yet),
+// checks the bot can sign in, and shows what the latest response would send. Safe to run again.
+function logbookInboxSetup() {
+  var form = FormApp.getActiveForm();
+  var has = ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === 'logbookInboxSubmit'; });
+  if (!has) ScriptApp.newTrigger('logbookInboxSubmit').forForm(form).onFormSubmit().create();
+  console.log(has ? 'Trigger already there.' : 'Trigger added: logbookInboxSubmit, on form submit.');
+  logbookInboxToken_(true);
+  console.log('Bot sign-in works.');
+  logbookInboxDryRun();
+}
+
 // Run by hand once, to check the mapping on the latest response: logs what would be sent (only you see the log).
 function logbookInboxDryRun() {
   var rs = FormApp.getActiveForm().getResponses();
