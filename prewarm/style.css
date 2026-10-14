@@ -471,16 +471,21 @@ dialog.kp::backdrop { background: rgba(0, 0, 0, .4); }
 .ready li.no { color: var(--err); }
 .ready small { display: block; color: var(--muted); font-weight: 400; }
 
-/* less scrolling on the sub-pages (owner, 14 Oct 2026): on a phone the questions sit two to a row (label above its answer);
-   a question with 3 or more answers, or long ones, and everything that is not a question (headings, tables, buttons) takes
-   the full row. No extra taps: nothing is hidden. The Temp and BP, HR, BIS screens are not .fld cards and are unchanged. */
+/* less scrolling on the sub-pages (owner, 14 Oct 2026; ease of entry first): on a phone, boxes (numbers, dates, text) sit two to a
+   row with the label above; a Yes / No or 0 1 2 question keeps its own row with the label on the left and big buttons on the
+   right; questions with 3 or more answers or long ones, and headings, tables and buttons, take the full row. Nothing is
+   collapsed, so no extra taps. The Temp and BP, HR, BIS screens are not .fld cards and are unchanged. */
 @media (max-width: 699px) {
   .stack:has(> .fld) { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; align-items: stretch; }
   .stack:has(> .fld) > :not(.fld) { grid-column: 1 / -1; }
   .stack:has(> .fld) > .fld { padding: 6px 8px 8px; gap: 4px; align-content: space-between; min-width: 0; }
-  .stack:has(> .fld) > .fld > .lab { font-size: 14px; line-height: 1.2; }
+  .stack:has(> .fld) > .fld > .lab { line-height: 1.2; }
   .stack:has(> .fld) > .fld > small { font-size: 11px; line-height: 1.2; }
-  .stack:has(> .fld) > .fld > input { min-height: 40px; min-width: 0; width: 100%; box-sizing: border-box; padding-left: 8px; padding-right: 8px; }
-  .stack:has(> .fld) > .fld > .seg .chip { min-height: 40px; font-size: 14px; padding: 2px 4px; }
-  .stack:has(> .fld) > .fld.longopt, .stack:has(> .fld) > .fld:has(> .seg > .chip:nth-child(3)):not(.short), .stack:has(> .fld) > .fld:has(> .seg.many) { grid-column: 1 / -1; }
+  .stack:has(> .fld) > .fld > input { min-height: 42px; min-width: 0; width: 100%; box-sizing: border-box; padding-left: 8px; padding-right: 8px; }
+  /* answers: full row, label left and buttons right for a Yes / No pair; stacked for longer lists */
+  .stack:has(> .fld) > .fld:has(> .seg) { grid-column: 1 / -1; }
+  .stack:has(> .fld) > .fld.short, .stack:has(> .fld) > .fld:has(> .seg > .chip:nth-child(2):last-child):not(.longopt) { grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); align-items: center; column-gap: 10px; row-gap: 0; padding: 6px 10px; }
+  .stack:has(> .fld) > .fld.short > .lab, .stack:has(> .fld) > .fld.short > small, .stack:has(> .fld) > .fld:has(> .seg > .chip:nth-child(2):last-child):not(.longopt) > .lab, .stack:has(> .fld) > .fld:has(> .seg > .chip:nth-child(2):last-child):not(.longopt) > small { grid-column: 1; }
+  .stack:has(> .fld) > .fld.short > .seg, .stack:has(> .fld) > .fld:has(> .seg > .chip:nth-child(2):last-child):not(.longopt) > .seg { grid-column: 2; grid-row: 1 / span 2; min-width: 0; }
+  .stack:has(> .fld) > .fld > .seg .chip { min-height: 42px; }
 }
