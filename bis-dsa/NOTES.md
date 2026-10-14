@@ -227,3 +227,16 @@ Still to do for the machine switch (BIS Advance, SedLine): left/right engine, AS
   Facts to check with the owner before changing: BIS ranges, the age effect on alpha, ketamine and N2O behaviour.
 
 - 14 Oct 2026 (owner): the forced-air warmer control and library card and the "Paradoxical excitation" card were removed (rarely seen); the engine still supports `mods.warmer` but nothing sets it. "Deep sevoflurane" card is now "Sevoflurane" (the depth is in the picture). The d<0.24 state is called "Very light sedation".
+
+## Block readout and case length (owner, 14 Oct 2026)
+
+- **Neuromuscular block** (`nm*` in `app.js`): rocuronium, effective concentration in ED50 units, two-exponential decay
+  (fa 0.85, τ 10 and 70 min), Hill slope 4, effect-site lag; timed 6 times faster than real (`NM_K`) and labelled so.
+  0.6 mg/kg gives T1 under 6% at about 25 min, 25% at 36 min, 95% at 90 min (real minutes). TOF count, TOFr and PTC are
+  read from T1 (an approximation, stated as such). Buttons: rocuronium 0.6, top-up 0.15 mg/kg, sugammadex 2 and 4 mg/kg
+  (each mg/kg removes 0.85 units, so deep block is only partly reversed by 2 mg/kg). "At induction" doses once when the
+  patient goes under; Off clears the block; Infusion holds a full block. `mods.nmbK` (0-1) scales the EEG effects;
+  Emergence gives sugammadex 2 mg/kg. The Node checks set `mods.nmb` directly and ignore `nm`.
+- **Case length** (short / medium / long, default medium): the effect site empties with τ 120 s × (1 + (L−1)·sensitivity),
+  L = 1, 2.5, 5; sensitivity propofol and dexmedetomidine 0.9, sevoflurane 0.5, ketamine 0.4, remifentanil and N₂O 0.
+  A thin dashed "effect site" line on the trend lane (teaching labels on) shows the unzipping.

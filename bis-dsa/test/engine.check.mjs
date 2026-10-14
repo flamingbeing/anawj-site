@@ -13,7 +13,7 @@ let seed = 1;
 const rnd = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 const M = Object.create(Math); M.random = rnd;
 const load = () => new Function('Math', 'matchMedia', 'window',
-  `var onColumn=null;${BODY};return {Engine,target,features,bisRaw,step,COLS,SIG,eng,mods,mixTarget,monMsg,mon,FS,DF,NB};`)(M, () => ({ matches: false }), {});
+  `var onColumn=null;${BODY};return {nm,nmDose,nmSug,nmStep,nmRead,Engine,target,features,bisRaw,step,COLS,SIG,eng,mods,mixTarget,monMsg,mon,FS,DF,NB};`)(M, () => ({ matches: false }), {});
 
 // one state: snap to it, run, then measure over the last 30 s (or run a script of phases). Spectral shapes are noisy
 // over 30 s, so rows that compare peaks or bands pool several runs (nSeeds).
@@ -164,6 +164,11 @@ chk('Propofol 0.57', 'MF (SEF50) Hz', p57.mf, 2, 8);
   S.step(45 * FS_); chk('Emergence, 120 s', 'relaxant reversed (0/1)', +ms.nmb, 0, 0); chk('Emergence, 120 s', 'BIS still below 85', bisNow(), 0, 85);
   S.step(180 * FS_); chk('Emergence, 5 min', 'BIS back above 80', bisNow(), 80, 100);
   ms.nmbMode = 'on'; S.eng.setTarget('propofol', 0, ms); S.step(5 * FS_); chk('Relaxant On now', 'on (0/1)', +ms.nmb, 1, 1); ms.nmbMode = 'off'; ms.nmb = false; }
+{ const share = len => { const S = load(), ms = Object.assign(S.mods, { caseLen: len }); S.eng.setTarget('propofol', 0.57, ms); S.eng.snap(); S.eng.setTarget('propofol', 0, ms); S.step(120 * FS_); return S.eng.de / 0.57; };
+  chk('Emergence 120 s, short case', 'propofol effect-site share left (tau 120 s: 0.37)', share('short'), 0.3, 0.45);
+  chk('Emergence 120 s, medium case', 'propofol effect-site share left (tau 282 s: 0.65)', share('medium'), 0.58, 0.72);
+  chk('Emergence 120 s, long case', 'propofol effect-site share left (tau 552 s: 0.80)', share('long'), 0.74, 0.86); }
+
 
 // WS5: blinks, surgical stimulus
 const bl = run('propofol', 0, { blink: true }, 120, null, 4);
@@ -179,6 +184,15 @@ const sm = st('mix', P30, stim), qm = st('mix', P30), sr4 = st('mix', R30, stim)
 chk('Stimulus, mix remi 4 vs no remi', 'BIS rise ratio', (sr4.bis - qr4.bis) / (sm.bis - qm.bis), -1, 0.33);
 const sd = st('propofol', 0.57, S => S.eng.stimulus('delta'));
 chk('Stimulus at 0.57, delta arousal', 'BIS change (falls)', sd.bis - q57.bis, -99, -0.01);
+
+// neuromuscular block (rocuronium 0.6 mg/kg, timed 6x faster than real: 25 min -> 250 s, 36 min -> 360 s, 90 min -> 900 s)
+{ const S = load(); S.mods.nmbMode = 'on'; S.mods.nmbMode = 'auto'; S.nmDose(0.6); const at = {}; for (let t = 1; t <= 1000; t++) { S.nmStep(1); if ([60, 200, 300, 360, 600, 900].includes(t)) at[t] = S.nmRead(); }
+  chk('Rocuronium 0.6 mg/kg', 'T1 % at 60 s (onset)', at[60].t1, 0, 6); chk('Rocuronium 0.6 mg/kg', 'TOF count at 200 s', at[200].tofc, 0, 0);
+  chk('Rocuronium 0.6 mg/kg', 'T1 % at 360 s', at[360].t1, 15, 40); chk('Rocuronium 0.6 mg/kg', 'TOF count at 600 s', at[600].tofc, 3, 4);
+  chk('Rocuronium 0.6 mg/kg', 'T1 % at 900 s', at[900].t1, 85, 99.5); }
+{ const S = load(); S.mods.nmbMode = 'auto'; S.nmDose(0.6); for (let t = 0; t < 60; t++) S.nmStep(1); const r0 = S.nmRead(); S.nmSug(2); for (let t = 0; t < 30; t++) S.nmStep(1); const r2 = S.nmRead();
+  chk('Sugammadex 2 mg/kg on profound block', 'T1 % rises but not fully', r2.t1 - r0.t1, -1, 20); chk('Sugammadex 2 mg/kg on profound block', 'TOF count', r2.tofc, 0, 1);
+  S.nmSug(16); for (let t = 0; t < 30; t++) S.nmStep(1); chk('Sugammadex 18 mg/kg total', 'TOFr', S.nmRead().tofr ?? 1, 0.9, 1); }
 
 const wid = rows[0].map((_, i) => Math.max(...rows.map(r => r[i].length)));
 for (const r of rows) console.log(r.map((c, i) => c.padEnd(wid[i])).join('  '));

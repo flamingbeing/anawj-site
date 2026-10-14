@@ -75,9 +75,9 @@ function target(drug,d,mods){mods=mods||{};
   p.alphaF-=drug==='sevo'?0.5:drug==='mix'?1-0.5*p.sh:1;if(drug!=='mix')p.bs=baseTarget(drug,d>=0.96?d:Math.min(0.95,d+0.12)).bs;} // shifted, but never isoelectric unless the slider is
  // muscle relaxant: no facial EMG, and the muscle share of the awake fast activity goes too (stage 1, at once)
  // the fast-power cut scales with how light the patient is (lt): under GA only the EMG goes
- if(mods.nmb){const lt=cl((0.45-(p.dH??d))/0.3);p.emg=0;p.gamma*=1-0.95*lt;p.beta*=1-0.75*lt;}
+ const nk=mods.nmbK??(mods.nmb?1:0);if(nk>0){const lt=cl((0.45-(p.dH??d))/0.3)*nk;p.emg*=1-nk;p.gamma*=1-0.95*lt;p.beta*=1-0.75*lt;}
  // facial EMG; an opioid blunts the response to surgery, so less of it
- else if(mods.emg){p.emg=Math.max(p.emg,6*(drug==='mix'?Math.max(0.25,1-(d.remi||0)/6):1));}
+ if(mods.emg){p.emg=Math.max(p.emg,6*(drug==='mix'?Math.max(0.25,1-(d.remi||0)/6):1)*(1-nk));}
  // relaxant stage 2 (Engine nmbS, after ~60 s in a light patient): fast power falls further, slow waves appear (Schuller 2015)
  const ns=mods._nmbSlow||0;if(ns>0){p.beta*=1-0.6*ns;p.gamma*=1-0.8*ns;p.betaF-=3*ns;p.slow+=25*ns;p.delta+=8*ns;}
  return p;
@@ -96,6 +96,10 @@ function profile(p,f,spEnv,spF,kg,ks,wa){
 // effect-site half-times are about 2-3 min. Induction is a bolus and quick (12 s here); emergence is slow (120 s here, so a
 // patient takes a few minutes to wake and the DSA unzips back); speed 4x or 10x shortens both.
 const TAU_UP=12,TAU_DOWN=120;
+// case length (owner, 14 Oct 2026): the effect site empties more slowly after a long case, drug by drug (context-sensitive half-time).
+// Time constant = TAU_DOWN x (1 + (L-1) x CSENS): L 1 short, 2.5 medium, 5 long; remifentanil and N2O do not accumulate.
+const CASEL={short:1,medium:2.5,long:5},CSENS={propofol:0.9,sevo:0.5,ketamine:0.4,dex:0.9,remi:0,n2o:0};
+const tauDown=(q,m)=>TAU_DOWN*(1+((CASEL[m&&m.caseLen]||1)-1)*(CSENS[q]??0.9));
 const cloneD=d=>typeof d==='number'?d:Object.assign({},MIX0,d);
 // is the patient 'induced' (asleep enough that a relaxant would be given)? Hysteresis: given at 0.30, reversed under 0.25.
 // propofol/sevo depth; ketamine 0.45 anaesthetic dose; mix: hypnotic depth or ketamine; dex alone never.
@@ -112,7 +116,7 @@ class Engine{
  snap(){this.de=cloneD(this.d);this.updNmb();this.p=target(this.drug,this.de,this.mods);this.wa=this.mods.warmer?1:0;} // jump instantly
  // muscle relaxant given at induction (nmbMode 'auto'), always ('on') or never ('off'); sets mods.nmb, which target() reads.
  // Only when the page set a mode: the Node checks drive mods.nmb directly.
- updNmb(){const m=this.mods;if(!m.nmbMode)return;
+ updNmb(){const m=this.mods;if(!m.nmbMode||m.nmbK!==undefined)return; // the page's block model (nm) sets nmbK for the live engine
   if(m.nmbMode==='on')this.nmbOn=true;else if(m.nmbMode==='off')this.nmbOn=false;
   else{const v=inducedDepth(this.drug,this.de);if(v>=0.3)this.nmbOn=true;else if(v<0.25)this.nmbOn=false;}
   m.nmb=this.nmbOn;}
@@ -123,8 +127,8 @@ class Engine{
  stimulus(kind){this.stT=100;this.stK=kind??(Math.random()<0.1?'delta':'');}
  sample(){ // one sample at FS
   const dt=1/FS; this.t+=dt;
-  const m=this.mods,de=this.de,au=dt/TAU_UP,ad=dt/TAU_DOWN;
-  if(typeof de==='number')this.de+=(this.d-de)*(this.d>de?au:ad);else for(const q in MIX0){const t=this.d[q]||0;de[q]+=(t-de[q])*(t>de[q]?au:ad);}
+  const m=this.mods,de=this.de,au=dt/TAU_UP;
+  if(typeof de==='number')this.de+=(this.d-de)*(this.d>de?au:dt/tauDown(this.drug,m));else for(const q in MIX0){const t=this.d[q]||0;de[q]+=(t-de[q])*(t>de[q]?au:dt/tauDown(q,m));}
   this.updNmb();
   const tg=target(this.drug,this.de,m); const k=dt/8; // ~8 s time constant: the spectrum glides to the effect-site state
   // surgical stimulus (García 2021, Hight 2019), blunted by remifentanil b = remi/4 (mix only): light (dH < 0.5) beta at
@@ -136,7 +140,7 @@ class Engine{
   if(m.nmb){this.nmbT+=dt;if(this.nmbT>60&&(tg.dH??this.de)<0.3)this.nmbS+=(1-this.nmbS)*dt/120;}else{this.nmbT=0;this.nmbS-=this.nmbS*dt/30;}
   m._nmbSlow=this.nmbS;
   // facial muscle tone for the EMG readout: full while awake (dH < 0.3), a little under GA, none when paralysed
-  const tT=m.nmb?0.05:0.12+0.88*cl((0.5-(tg.dH??this.de))/0.2);this.tone+=(tT-this.tone)*dt/5;
+  const nk=m.nmbK??(m.nmb?1:0),tT=(1-nk)*(0.12+0.88*cl((0.5-(tg.dH??this.de))/0.2))+nk*0.05;this.tone+=(tT-this.tone)*dt/5;
   // forced-air warmer pickup: on within seconds; once off its amplitude fades with τ 60 s (power τ 30 s), so the true
   // BIS is back in 2-3 min
   this.wa+=m.warmer?(1-this.wa)*dt/3:-this.wa*dt/60;
@@ -231,11 +235,31 @@ const sup=[]; let bisS=null, lastSef=null, lastMf=null, produced=0, simT=0, spee
 let drug='propofol', depth=0; const mods={elderly:false,emg:false,diathermy:false,nmb:false,warmer:false,blink:false};
 // cumulative times this case (s): the shown SR at 5% or more (suppression present) and the shown BIS under 40; a clean second only
 const tim={sup:0,low:0};
+// neuromuscular block: rocuronium, a teaching model. Two-exponential decay of the effective concentration (in ED50 units;
+// fitted so 0.6 mg/kg gives T1 under 6% at about 25 min, T1 25% at 36 min, T1 95% at 90 min), Hill slope 4, effect-site lag.
+// Timed NM_K times faster than real life so a case shows it. TOF count / TOFr / PTC are read from T1 (an approximation).
+const NM_K=6,NM_U=19.17,NM_FA=0.85,NM_T1=600/NM_K,NM_T2=4200/NM_K,NM_TE=40/NM_K;
+const nm={a:0,b:0,ce:0,armed:true,given:false};
+function nmDose(mgkg){const u=NM_U*mgkg;nm.a+=u*NM_FA;nm.b+=u*(1-NM_FA);nm.given=true;}
+function nmSug(mgkg){const c=nm.a+nm.b;if(c<=0)return;const rem=Math.min(c,0.85*mgkg),f=1-rem/c;nm.a*=f;nm.b*=f;}
+function nmReset(){nm.a=nm.b=nm.ce=0;nm.armed=true;nm.given=false;}
+const nmD=()=>{const x=Math.pow(nm.ce,4);return x/(1+x);};
+function nmStep(dt){ // dt: sim seconds
+ nm.a*=Math.exp(-dt/NM_T1);nm.b*=Math.exp(-dt/NM_T2);
+ const mode=mods.nmbMode;
+ if(mode==='off'){nm.a=nm.b=0;nm.given=false;}
+ else if(mode==='auto'){const v=inducedDepth(drug,eng.de);if(v<0.25)nm.armed=true;else if(v>=0.3&&nm.armed){nm.armed=false;nmDose(0.6);}}
+ const c=Math.max(nm.a+nm.b,mode==='on'?2.5:0);nm.ce+=(c-nm.ce)*(1-Math.exp(-dt/NM_TE));
+ const D=nmD();mods.nmbK=D;mods.nmb=D>0.5;}
+function nmRead(){const t1=100*(1-nmD()),tofc=t1<6?0:t1<12?1:t1<18?2:t1<25?3:4,
+  tofr=tofc<4?null:Math.min(1,Math.pow(Math.max(0,(t1-30)/70),1.8)),ptc=tofc===0?Math.round(8*Math.pow(t1/6,1.5)):null;return {t1,tofc,tofr,ptc};}
 const artH=[],bcH=[],rawH=[],sefH=[],mfH=[];let prevSup=false,isoN=0,outN=0,sefAge=0;
 // monitor settings: smoothing (s), EEG scale (± uV), teaching labels and target band, the info message
 const mon={smooth:15,scale:50,sweep:8,dbLo:DB_LO,dbHi:DB_HI,teach:true,info:'',infoUntil:0,skin:'vista',trend:5,bottom:'bis'};
 function applyTarget(){eng.setTarget(drug,depth,mods);describe();if(typeof onTarget==='function')onTarget();}
 
+// effect-site depth 0-1 for the trend lane's thin trace (a mix: the hypnotic share)
+const ceNow=()=>{const e=eng.de;return typeof e==='number'?cl(e):cl(0.155*(e.propofol||0)+sevoDepth(e.sevo||0)+0.5*(e.dex||0));};
 const EYE_REJ=0.85;
 function step(nSamples){
  for(let i=0;i<nSamples;i++){SIG.push(eng.sample());if(SIG.length>SIGMAX)SIG.shift();EYE.push(eng.eye);if(EYE.length>NWIN)EYE.shift();produced++;
@@ -271,7 +295,7 @@ function step(nSamples){
    const blank=sqi<15,gaH=eng.drug==='mix'?0.155*(eng.de.propofol||0)+sevoDepth(eng.de.sevo||0):eng.drug==='propofol'||eng.drug==='sevo'?eng.de:0;
    outN=!blank&&gaH>=0.44&&(bisS<40||bisS>60||outN>=10&&(bisS<42||bisS>58))?outN+1:0;
    if(!art&&!blank){if(bsr>=5)tim.sup++;if(bisS<40)tim.low++;}
-   const col={n:Math.round(produced/FS),db,sef:fresh?lastSef:null,mf:fresh?lastMf:null,bis:blank?null:bisS,bsr,emg,sqi,tp,art,
+   const col={n:Math.round(produced/FS),ce:ceNow(),db,sef:fresh?lastSef:null,mf:fresh?lastMf:null,bis:blank?null:bisS,bsr,emg,sqi,tp,art,
     bc:bcH.reduce((a,b)=>a+b,0)};COLS.push(col);if(COLS.length>COLMAX)COLS.shift();HIST.push(col);if(HIST.length>HISTMAX)HIST.shift();
    onColumn&&onColumn();
   }}
@@ -402,12 +426,14 @@ function drawVDsa(){const f=fitFill($('c2Dsa'));if(!f||!offV)return;const {ctx,w
  const tr=(fn,col,lw)=>{ctx.strokeStyle=col;ctx.lineWidth=lw;ctx.lineJoin='round';ctx.beginPath();let pen=false;for(let i=0;i<n;i++){const v=fn(HIST[o+i]);if(v==null){pen=false;continue;}pen?ctx.lineTo(X(i),Yb(v)):ctx.moveTo(X(i),Yb(v));pen=true;}ctx.stroke();};
  if(mon.bottom==='emg')tr(q=>Math.max(0,Math.min(100,(q.emg-30)*2)),'#3ddc6b',1);
  if(mon.bottom==='sr')tr(q=>q.bsr,'#b48cff',1.2);
+ if(mon.teach){ctx.setLineDash([3,3]);tr(q=>100*(1-q.ce),'rgba(90,200,255,.85)',1);ctx.setLineDash([]);}
  tr(q=>q.bis,'#ffd23f',1.8);
  const bw=gw/win+.5;for(let i=0;i<n;i++){const q=HIST[o+i];if(q.sqi>=50)continue;ctx.fillStyle=q.sqi<15?'#ffe600':AMBER;ctx.fillRect(X(i)-bw/2,ty+th+1,bw,3);}
  // clock labels under the trend, spread across the window
  ctx.fillStyle='#cfd3da';ctx.textAlign='center';const t0=n?HIST[o].n:simT-win;
  for(let k=0;k<=4;k++){const x=gx+gw*k/4;ctx.textAlign=k===0?'left':k===4?'right':'center';ctx.fillText(clk(t0+win*k/4),x,h-fs*0.15);ctx.fillRect(Math.round(x)-.5,ty+th,1,3);}
- const lab=mon.bottom==='emg'?'BIS + EMG':mon.bottom==='sr'?'BIS + SR':'BIS';ctx.textAlign='left';ctx.fillStyle='#ffd23f';ctx.fillText(lab,gx+fs*0.4,ty+fs*1.2);}
+ const lab=mon.bottom==='emg'?'BIS + EMG':mon.bottom==='sr'?'BIS + SR':'BIS';ctx.textAlign='left';ctx.fillStyle='#ffd23f';ctx.fillText(lab,gx+fs*0.4,ty+fs*1.2);
+ if(mon.teach){ctx.fillStyle='#5ac8ff';ctx.textAlign='right';ctx.fillText('- - effect site',gx+gw-fs*0.4,ty+fs*1.2);}}
 const $=id=>document.getElementById(id);
 function zoneOf(b){return b>90?'Awake':b>80?'Light/moderate sedation':b>60?'Sedation':b>=40?'General anaesthesia':b>=20?'Deep hypnotic state':'Burst suppression / flat';}
 function segs(id,n,color){const el=$(id);el.style.setProperty('--seg',color);[...el.children].forEach((x,i)=>x.classList.toggle('on',i<n));}
@@ -518,10 +544,26 @@ $('mEmg').onchange=e=>{mods.emg=e.target.checked;applyTarget();};
 mods.nmbMode='auto';
 function setNmb(m){mods.nmbMode=m;document.querySelectorAll('#nmbSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.nmb===m));applyTarget();}
 document.querySelectorAll('#nmbSeg button').forEach(b=>b.onclick=()=>setNmb(b.dataset.nmb));
+// ===== relaxant buttons and the nerve-stimulator readout =====
+mods.nmbK=0; // from here the block model drives the relaxant effect
+function nmHint(r){if(!nm.given&&nm.ce<0.05)return 'No relaxant on board.';
+ if(r.tofc===0)return r.ptc===0?'Profound block: no twitch to train-of-four or post-tetanic count. Sugammadex 2 mg/kg will not reverse this yet; 4 mg/kg, or wait.':`Deep block (PTC ${r.ptc}): no train-of-four twitch. Sugammadex 4 mg/kg reverses it; neostigmine will not.`;
+ if(r.tofc<4)return `Moderate block (TOF count ${r.tofc}): sugammadex 2 mg/kg reverses it. Neostigmine works best from a count of 4.`;
+ if(r.tofr!=null&&r.tofr<0.9)return `TOF count 4, ratio ${r.tofr.toFixed(2)}: not yet recovered. Extubate only at a ratio of 0.9 or more.`;
+ return 'Recovered: TOF ratio 0.9 or more.';}
+function nmUI(){const r=nmRead(),t=`T1 ${Math.round(r.t1)}% · TOF count ${r.tofc}`+(r.ptc!=null?` · PTC ${r.ptc}`:'')+(r.tofr!=null?` · TOFr ${r.tofr.toFixed(2)}`:'');
+ txt('nmRead',nm.given||nm.ce>0.05?t:'No relaxant given');txt('nmHint',nmHint(r));txt('s2Nm',nm.given||nm.ce>0.05?`TOFc ${r.tofc}`+(r.tofr!=null?` · ${r.tofr.toFixed(2)}`:r.ptc!=null?` · PTC ${r.ptc}`:''):'none');}
+$('nmBolus').onclick=()=>{if(mods.nmbMode==='off')setNmb('auto');nmDose(0.6);};
+$('nmTop').onclick=()=>{if(mods.nmbMode==='off')setNmb('auto');nmDose(0.15);};
+$('nmSug2').onclick=()=>nmSug(2);$('nmSug4').onclick=()=>nmSug(4);
+
 // emergence: stop every drug; the effect site falls slowly (the relaxant is reversed once the patient is light)
-$('wakeBtn').onclick=()=>{stopStory();
+function setCase(c){mods.caseLen=c;document.querySelectorAll('#caseSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.case===c));}
+mods.caseLen='medium';
+document.querySelectorAll('#caseSeg button').forEach(b=>b.onclick=()=>setCase(b.dataset.case));
+$('wakeBtn').onclick=()=>{stopStory();nmSug(2);
  if(drug==='mix'){Object.assign(mix,MIX0);syncMix();depth=mix;}else{depth=0;$('depth').value=0;}
- applyTarget();$('storyCap').textContent='Emergence: drugs stopped. The effect site falls over a few minutes, so the DSA unzips back: the alpha band fades first, then slow waves, beta returns and BIS rises through the 60s and 70s. The relaxant is reversed once the patient is light. Speed up to watch it.';};
+ applyTarget();$('storyCap').textContent='Emergence: drugs stopped. The effect site falls over a few minutes (longer after a long case: propofol and dexmedetomidine accumulate, remifentanil does not), so the DSA unzips back: the alpha band fades first, then slow waves, beta returns and BIS rises through the 60s and 70s. The relaxant is reversed once the patient is light. Speed up to watch it.';};
 $('tReset').onclick=()=>{tim.sup=tim.low=0;dirty=true;};
 $('mDia').onchange=e=>{mods.diathermy=e.target.checked;applyTarget();};
 $('mBlink').onchange=e=>{mods.blink=e.target.checked;applyTarget();};
@@ -633,7 +675,7 @@ const STORY=[
 let story=null;const SMODS=[['emg','mEmg'],['diathermy','mDia'],['blink','mBlink']];
 function stopStory(){if(!story)return;story=null;$('storyBtn').textContent='Play a case: induction to emergence';}
 $('storyBtn').onclick=()=>{if(story){stopStory();$('storyCap').textContent='';return;}
- story={t0:simT,i:-1};mods.elderly=false;$('mElder').checked=false;for(const [k,id] of SMODS){mods[k]=false;$(id).checked=false;}setNmb('auto');eng.stT=0;tim.sup=tim.low=0;setSpeed(10);
+ nmReset();story={t0:simT,i:-1};mods.elderly=false;$('mElder').checked=false;for(const [k,id] of SMODS){mods[k]=false;$(id).checked=false;}setNmb('auto');eng.stT=0;tim.sup=tim.low=0;setSpeed(10);
  if(paused)$('pause').click();$('storyBtn').textContent='Stop the case';};
 function runStory(){if(!story)return;const t=simT-story.t0;
  while(story.i+1<STORY.length&&t>=STORY[story.i+1].at){story.i++;const s=STORY[story.i];
@@ -765,13 +807,13 @@ let lastUI=0;let last=performance.now(),dirty=true,colsSinceSnap=0;
 var onColumn=()=>{dirty=true;};
 function frame(now){requestAnimationFrame(frame);try{frameBody(now);}catch(e){const el=$('err');if(el&&el.hidden){el.hidden=false;el.textContent='Display error: '+e.message;}}}
 function frameBody(now){const dt=Math.min(0.1,(now-last)/1000);last=now;
- if(!paused){const target=simT+dt*speed;const need=Math.floor(target*FS)-Math.floor(simT*FS);simT=target;step(need);runStory();}
+ if(!paused){const target=simT+dt*speed;const need=Math.floor(target*FS)-Math.floor(simT*FS);simT=target;nmStep(dt*speed);step(need);runStory();}
  if(dirty){paintOff();drawTrend();drawDsa();if(mon.skin==='vista'){paintV();drawVDsa();}readouts();stimUI();dirty=false;}
  drawEeg();if(mon.skin==='vista')drawVEeg();
  if(exPlaying){exT+=dt;if(exT>=T[6]){exT=0;snapshotEx();}}
  if(!ex)snapshotEx();
  drawEx();exUI();
- if(now-lastUI>250){lastUI=now;slideUI();describe();}}
+ if(now-lastUI>250){lastUI=now;slideUI();describe();nmUI();}}
 // warm start: the patient is awake (owner, 14 Oct 2026); 5 min of awake EEG so the screen opens full
 setDrug('propofol');eng.snap();step(300*FS);simT=300;snapshotEx();
 if(reduced){exT=T[5]-0.01;}
