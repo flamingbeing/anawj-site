@@ -120,7 +120,9 @@ handles its comments). Nobody else's comments start it.
 3. GitHub → Settings → Actions → General → Workflow permissions: tick **Allow GitHub Actions to create and approve pull
    requests**, Save.
 
-Until then the workflow notes "no token yet" and the daily routine handles everything as before.
+**Switched on 14 Oct 2026** (secret and setting in place). Its PRs are opened with GitHub's own token, so the Checks
+and screenshot workflows don't run on them: run the checks yourself before merging one, or push any small commit
+from a session (which does trigger them).
 
 ## Weekly proof-read
 
