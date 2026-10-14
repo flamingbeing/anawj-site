@@ -28,13 +28,13 @@ function sedPage(id){const s=SED.set;
   case 'device':return {title:'device settings',rows:[['Localization','localization'],['Kite','d_kite'],['Wi-Fi','d_wifi'],['Ethernet','d_eth'],['Bluetooth','d_bt'],['Root Battery','d_batt'],['Brightness','d_bright'],['Access Control','access'],['Device Output','d_out']].map(([l,to])=>({t:'nav',l,to}))};
   case 'localization':return {title:'localization',ok:true,rows:[{t:'sel',l:'Time Format',k:'clock24',o:[false,true],f:v=>v?'24 hour':'12 hour'},{t:'sel',l:'Date Format',k:'dateFmt',o:['MM/DD/YY','DD/MM/YY']}]};
   case 'd_kite':return {title:'kite',rows:[{t:'info',l:'Status',v:'Not connected'}]};
-  case 'd_wifi':return {title:'wi-fi',rows:[{t:'info',l:'Wi-Fi',v:'Off'},{t:'info',l:'Network',v:'None'}]};
+  case 'd_wifi':return {title:'wi-fi',rows:[{t:'txt',text:'Not available'}]};
   case 'rainbow':return {title:'rainbow',rows:[{t:'info',l:'Radical-7',v:'Not connected'}]};
   case 'd_eth':return {title:'ethernet',rows:[{t:'info',l:'Ethernet',v:'Not connected'}]};
   case 'd_bt':return {title:'bluetooth',rows:[{t:'info',l:'Bluetooth',v:'Off'}]};
-  case 'd_batt':return {title:'root battery',rows:[{t:'info',l:'Charge',v:SED.sim.batt?'20%':'100%'},{t:'info',l:'Power',v:SED.sim.batt?'Battery':'AC'}]};
+  case 'd_batt':return {title:'root battery',rows:[{t:'info',l:'Battery',v:SED.sim.batt?'20%':'100%'}]};
   case 'd_bright':return {title:'brightness',ok:true,rows:[{t:'sel',l:'Brightness',k:'brightness',o:sRng(3,10)}]};
-  case 'd_out':return {title:'device output',rows:[{t:'info',l:'Serial output',v:'Off'},{t:'info',l:'Baud rate',v:'921600'}]};
+  case 'd_out':return {title:'device output',rows:[{t:'txt',text:'Not available'}]};
   case 'access':return {title:'access control',ok:true,rows:[{t:'sel',l:'power on profile',k:'_pop',o:['Previous Profile','Adult','Pediatric'],local:true},{t:'tog',l:'all mute enabled',k:'allMute'},{t:'sel',l:'lock alarm volume',k:'lockVol',o:[false,true],f:v=>v?'ON':'OFF'},{t:'tog',l:'standby enabled',k:'standby'},{t:'sel',l:'standby reminder tone interval',k:'_sri',o:['30 sec','1 min','2 min'],local:true},{t:'sel',l:'USB Port 1 baudrate',k:'_b1',o:['115200','460800','921600'],local:true,def:'921600'},{t:'sel',l:'USB Port 2 baudrate',k:'_b2',o:['115200','460800','921600'],local:true,def:'921600'},{t:'tog',l:'data collection enabled',k:'dataColl'},{t:'btn',l:'save as adult',b:'Save'},{t:'btn',l:'save as pediatric',b:'Save'},{t:'btn',l:'factory defaults',b:'Restore',fn:'restore'}]};
   case 'about':return {title:'about',rows:[{t:'info',l:'Device',v:'Root'},{t:'info',l:'Module',v:'SedLine'},{t:'info',l:'Software',v:'1.8.1.4'},{t:'info',l:'Module software',v:'2.0.3.1'},{t:'info',l:'Serial number',v:'RT1000417'}]};
   case 'trendset':return {title:'trend settings',ok:true,rows:[{t:'sel',l:'Time Range',k:'range',o:RANGES_H,f:v=>v>=60?(v/60)+':00 h':'0:'+String(v).padStart(2,'0')+' h'},{t:'sel',l:'Trend Layout',k:'trendLayout',o:['Dynamic','Fixed']}]};
@@ -64,6 +64,7 @@ function sedPage(id){const s=SED.set;
  return {title:id,rows:[{t:'txt',text:'This screen is not available in the simulator.'}]};}
 // ----- open, close, back -----
 function sedDlgOpen(id){sedUnlock();const pg=sedPage(id),d={};for(const r of pg.rows||[])if(r.k&&(r.t==='sel'||r.t==='tog'))d[r.k]=r.k==='range'?SED.range:r.local?(SED.local&&SED.local[r.k])||r.def||r.o[0]:SED.set[r.k];
+ if(id==='layout')d.layout=SED.set.layout||6;
  if(!SED.dlg)SED.dlg={stack:[],list:null};SED.dlg.stack.push({id,draft:d,err:''});SED.dlg.list=null;SED.pop=null;sq('bMenu').setAttribute('aria-expanded','true');sedDlgRender();}
 function sedDlgClose(){SED.dlg=null;sedIdle();const el=sq('sedDlg');el.hidden=true;el.innerHTML='';sq('bMenu').setAttribute('aria-expanded','false');sedInval();}
 function sedDlgBack(){if(!SED.dlg)return;SED.dlg.stack.pop();SED.dlg.list=null;if(!SED.dlg.stack.length)sedDlgClose();else sedDlgRender();}
@@ -76,19 +77,21 @@ function sedDlgCommit(){const f=SED.dlg.stack[SED.dlg.stack.length-1],pg=sedPage
  if(err){f.err=err;sedDlgRender();return;}
  for(const k in d){if(k==='range'){SED.range=d[k];continue;}if(k[0]==='_'){(SED.local||(SED.local={}))[k]=d[k];continue;}s[k]=d[k];}
  if('profile' in d&&d.profile!==undefined){s.maxHz=d.profile==='PEDIATRIC'?40:30;}
- if(pg.check==='psi'||'psiHi' in d){SED.armed=false;SED.outSince=null;}
+ if(pg.check==='psi'||'psiHi' in d)SED.outSince=null;
+ if('layout' in d){if(s.layout===6&&(SED.view==='eeg'||SED.view==='dsa'))SED.view='trend';SED.pop=null;}
  if('standby' in d&&!d.standby)SED.standbyOn=false;
  sedSave();SED._hk=null;SED.elec=null;sedInval();applyBrightness();sedDlgBack();}
 function applyBrightness(){const e=sq('sedS');if(e)e.style.filter=SED.set.brightness>=10?'':`brightness(${(0.45+SED.set.brightness*0.055).toFixed(3)})`;}
 function sedDlgAct(a,v,el){sedIdle();const D=SED.dlg,f=D.stack[D.stack.length-1],pg=sedPage(f.id);
  switch(a){
   case 'back':case 'cancel':sedDlgBack();return;
+  case 'lay':f.draft.layout=+v;sedDlgRender();return;
   case 'ok':sedDlgCommit();return;
   case 'go':sedDlgOpen(v);return;
   case 'open':{const i=+v;D.list=D.list===i?null:i;sedDlgRender();const b=sq('sedDlg').querySelector('.sdlist button.on')||sq('sedDlg').querySelector('.sdlist button');if(b)b.focus();return;}
   case 'pick':{const r=pg.rows[D.list],o=r.o[+v];f.draft[r.k]=o;f.err='';D.list=null;sedDlgRender();return;}
   case 'tog':{const r=pg.rows[+v];f.draft[r.k]=!f.draft[r.k];f.err='';sedDlgRender();return;}
-  case 'btn':{const r=pg.rows[+v];if(r.fn==='restore'){Object.assign(SED.set,SED_DEF);SED.exp={emg:1,psi:1,sr:1};SED.range=30;SED.armed=false;sedSave();SED._hk=null;sedInval();applyBrightness();f.draft={};for(const q of pg.rows)if(q.k&&q.t!=='btn')f.draft[q.k]=q.local?q.def||q.o[0]:SED.set[q.k];f.msg='Factory defaults restored';}else f.msg=r.l+': saved';sedDlgRender();return;}}}
+  case 'btn':{const r=pg.rows[+v];if(r.fn==='restore'){Object.assign(SED.set,SED_DEF);SED.exp={emg:1,psi:1,sr:1};SED.range=30;SED.outSince=null;if(SED.view==='eeg'||SED.view==='dsa')SED.view='trend';sedSave();SED._hk=null;sedInval();applyBrightness();f.draft={};for(const q of pg.rows)if(q.k&&q.t!=='btn')f.draft[q.k]=q.local?q.def||q.o[0]:SED.set[q.k];f.msg='Factory defaults restored';}else f.msg=r.l+': saved';sedDlgRender();return;}}}
 // Main Menu tiles: a rounded square in the tile's colour with a white glyph; the label sits under it in thin lowercase
 const SD_TILE={layout:['#8a8a8a','<rect x="9" y="9" width="30" height="21" rx="1.5" fill="none" stroke="#fff" stroke-width="2.4"/><rect x="9" y="34" width="30" height="5" fill="#fff"/>'],
  rainbow:['#000','<text x="24" y="27" text-anchor="middle" font-size="10.5" font-family="Source Sans 3,sans-serif" letter-spacing="1.2"><tspan fill="#e6403a">r</tspan><tspan fill="#f2992e">a</tspan><tspan fill="#f2d33a">i</tspan><tspan fill="#5cc05c">n</tspan><tspan fill="#3aa0e0">b</tspan><tspan fill="#8a63d2">o</tspan><tspan fill="#d8d8d8">w</tspan></text>'],
@@ -99,17 +102,20 @@ const SD_TILE={layout:['#8a8a8a','<rect x="9" y="9" width="30" height="21" rx="1
  profiles:['#3aa088','<circle cx="29" cy="14" r="5.2" fill="#fff"/><path d="M20 40V26c0-4 4-6 9-6s9 2 9 6v14z" fill="#fff"/><circle cx="12" cy="26" r="3.4" fill="#fff"/><path d="M7 41v-9c0-3 2-4 5-4s5 1 5 4v9z" fill="#fff"/>'],
  iris:['#5da12f','<g fill="none" stroke="#fff" stroke-width="2.6"><rect x="8" y="8" width="14" height="14" rx="4"/><rect x="26" y="8" width="14" height="14" rx="4"/><rect x="8" y="26" width="14" height="14" rx="4"/><rect x="26" y="26" width="14" height="14" rx="4"/></g>'],
  sedline:['#a87f1f','<path d="M5 26c4-12 7 10 11-2s6 10 10-2 6 8 10-2 5 3 7-1" fill="none" stroke="#fff" stroke-width="2.8" stroke-linecap="round"/>']};
-// the six layouts of the Layout page: the SedLine window in the shared screen next to rainbow; only the last, SedLine alone, is on a Root without a Radical-7
-function sLayoutTiles(){const fr=[.72,.62,.35,.22,.13],out=[];
- const dev='<rect x="8" y="12" width="46" height="162" rx="10" fill="#4a4a4c"/><rect x="13" y="22" width="36" height="76" rx="3" fill="#10131f"/><ellipse cx="31" cy="48" rx="9" ry="14" fill="#2f7d3c"/><rect x="21" y="118" width="20" height="4" rx="2" fill="#8a8a8a"/>';
- fr.forEach((f,i)=>{const h=160,gap=6,rh=Math.round((h-gap)*f),sh=h-gap-rh;out.push(`<div class="sdlt" role="img" aria-label="Layout ${i+1} of 6"><svg viewBox="0 0 200 190" aria-hidden="true"><rect x=".5" y=".5" width="199" height="189" rx="8" fill="#0d0c0b" stroke="#1f1e1d"/>${dev}<rect x="70" y="15" width="120" height="${rh}" fill="#4b2f77"/><text x="130" y="${15+rh/2+4}" text-anchor="middle" font-size="13" fill="#fff" font-family="Source Sans 3,sans-serif">rainbow</text><rect x="70" y="${15+rh+gap}" width="120" height="${sh}" fill="#a87f1f"/><text x="130" y="${15+rh+gap+sh/2+4}" text-anchor="middle" font-size="13" fill="#fff" font-family="Source Sans 3,sans-serif">SedLine</text></svg></div>`);});
- out.push(`<div class="sdlt on" role="img" aria-label="Layout 6 of 6, selected"><svg viewBox="0 0 200 190" aria-hidden="true"><rect x=".5" y=".5" width="199" height="189" rx="8" fill="#0d0c0b" stroke="#1f1e1d"/>${dev}<rect x="14" y="40" width="24" height="64" fill="#6b3e96"/><text transform="translate(29 72) rotate(-90)" text-anchor="middle" font-size="12" fill="#fff" font-family="Source Sans 3,sans-serif">rainbow</text><rect x="70" y="15" width="120" height="160" fill="#f9ca07"/><text x="130" y="100" text-anchor="middle" font-size="14" fill="#fff" font-family="Source Sans 3,sans-serif">SedLine</text></svg></div>`);
+// the six layouts of the Layout page: the SedLine window in the shared screen next to rainbow; only the last, SedLine alone, is on a Root without a Radical-7.
+// Each tile is a button: a tap moves the blue ring, OK commits the layout.
+function sLayoutTiles(sel){const fr=[.72,.62,.35,.22,.13],out=[],ring='<path class="sdring" d="M15 3C60 0 140 5 185 2Q198 3 198 16C200 70 196 130 198 174Q197 188 184 188C130 191 70 186 15 189Q3 188 3 175C0 120 6 62 2 17Q2 4 15 3Z" fill="none" stroke="#4a9ede" stroke-width="5" stroke-linejoin="round"/>';
+ // a Root: a tapered grey bezel, a navy screen with the green lungs and body, a slot and three dots
+ const dev='<path d="M10 12Q31 6 52 12L58 150Q58 172 46 178H16Q4 172 4 150Z" fill="#555"/><rect x="11" y="20" width="40" height="104" rx="3" fill="#14172e"/><circle cx="31" cy="34" r="6" fill="none" stroke="#2e8b4a" stroke-width="2.2"/><path d="M17 46H45V84Q31 90 17 84Z" fill="#1b2150"/><ellipse cx="24" cy="66" rx="7" ry="13" fill="#2e8b4a"/><ellipse cx="38" cy="66" rx="7" ry="13" fill="#2e8b4a"/><rect x="21" y="132" width="20" height="3.5" rx="1.7" fill="#8a8a8a"/><circle cx="19" cy="150" r="2.6" fill="#7a7a7a"/><circle cx="31" cy="150" r="2.6" fill="#7a7a7a"/><circle cx="43" cy="150" r="2.6" fill="#7a7a7a"/>';
+ const open=(i,on)=>`<button type="button" class="sdlt${on?' on':''}" role="radio" aria-checked="${on}" data-a="lay" data-v="${i+1}" aria-label="Layout ${i+1} of 6"><svg viewBox="0 0 200 190" aria-hidden="true"><rect x=".5" y=".5" width="199" height="189" rx="8" fill="#0d0c0b" stroke="#1f1e1d"/>${dev}`;
+ fr.forEach((f,i)=>{const on=sel===i+1,h=160,gap=6,rh=Math.round((h-gap)*f),sh=h-gap-rh;out.push(`${open(i,on)}<rect x="70" y="15" width="120" height="${rh}" fill="#4b2f77"/><text x="130" y="${15+rh/2+4}" text-anchor="middle" font-size="13" fill="#fff" font-family="Source Sans 3,sans-serif">rainbow</text><rect x="70" y="${15+rh+gap}" width="120" height="${sh}" fill="${on?'#f9c70c':'#a67f1d'}"/><text x="130" y="${15+rh+gap+sh/2+4}" text-anchor="middle" font-size="13" fill="#fff" font-family="Source Sans 3,sans-serif">SedLine</text>${on?ring:''}</svg></button>`);});
+ const on=sel===6;out.push(`${open(5,on)}<rect x="17" y="40" width="24" height="64" fill="#6b3e96"/><text transform="translate(33 72) rotate(-90)" text-anchor="middle" font-size="12" fill="#fff" font-family="Source Sans 3,sans-serif">rainbow</text><rect x="70" y="15" width="120" height="160" fill="${on?'#f9c70c':'#a67f1d'}"/><text x="130" y="100" text-anchor="middle" font-size="14" fill="#fff" font-family="Source Sans 3,sans-serif">SedLine</text>${on?ring:''}</svg></button>`);
  return out.join('');}
-function sedDlgRender(){const D=SED.dlg;if(!D)return;sedIdle();const f=D.stack[D.stack.length-1],pg=sedPage(f.id),el=sq('sedDlg');el.hidden=false;
+function sedDlgRender(){const D=SED.dlg;if(!D)return;sedIdle();const f=D.stack[D.stack.length-1],pg=sedPage(f.id),el=sq('sedDlg'),S=sq('sedS');el.hidden=false;
  const back=`<button type="button" class="sdback" data-a="back" aria-label="Back"><svg viewBox="0 0 44 44" aria-hidden="true"><circle cx="22" cy="22" r="20" fill="#000" stroke="#d8d8d8" stroke-width="2"/><path d="M33 22H13M21 12L11 22l10 10" fill="none" stroke="#fff" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>`;
  let body='';
  if(pg.tiles){body=`<div class="sdtiles">${pg.tiles.map(t=>{const g=SD_TILE[t[1]];return `<button type="button" class="sdtile" data-a="go" data-v="${t[1]}"><i style="--c:${g[0]}"><svg viewBox="0 0 48 48" aria-hidden="true">${g[1]}</svg></i><span>${sEsc(t[0])}</span></button>`;}).join('')}</div>`;}
- else{if(pg.layout)body+=`<div class="sdlay">${sLayoutTiles()}</div>`;
+ else{if(pg.layout)body+=`<div class="sdlay" role="radiogroup" aria-label="Window layout">${sLayoutTiles(f.draft.layout)}</div>`;
   body+=pg.rows.map((r,i)=>{const val=r.k!=null?f.draft[r.k]:null,fm=r.f||(x=>String(x));
    if(r.t==='txt')return `<p class="sdtxt">${sEsc(r.text)}</p>`;
    if(r.t==='info')return `<div class="sdrow"><label>${sEsc(r.l)}</label><div class="sdinfo">${sEsc(r.v)}</div></div>`;
@@ -120,4 +126,4 @@ function sedDlgRender(){const D=SED.dlg;if(!D)return;sedIdle();const f=D.stack[D
     ${open?`<div class="sdlist" role="listbox" aria-label="${sEsc(r.l)}">${r.o.map((o,j)=>`<button type="button" role="option" aria-selected="${o===val}" class="${o===val?'on':''}" data-a="pick" data-v="${j}">${sEsc(fm(o))}</button>`).join('')}</div>`:''}</div>`;}).join('');}
  el.innerHTML=`<div class="sdp" role="dialog" aria-label="${sEsc(pg.title||'main menu')}">${back}<h2>${sEsc(pg.title)}</h2><div class="sdbody">${body}${f.err?`<p class="sderr" role="alert">${sEsc(f.err)}</p>`:''}${f.msg?`<p class="sdmsg" role="status">${sEsc(f.msg)}</p>`:''}</div>
   ${pg.ok?`<div class="sdfoot"><button type="button" class="sdcancel" data-a="cancel">Cancel</button><button type="button" class="sdok" data-a="ok">OK</button></div>`:''}</div>`;
- const first=el.querySelector('.sdbar,.sdtile,.sdok,.sdback');if(first&&!D.list)first.focus({preventScroll:true});}
+ const first=el.querySelector('.sdbar,.sdtile,.sdok,.sdback');S.classList.remove('kb');if(first&&!D.list)first.focus({preventScroll:true});}

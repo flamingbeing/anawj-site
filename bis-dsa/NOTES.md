@@ -537,3 +537,28 @@ checked against a photo of a Root. Look chosen: the 2017/2018 builds (ADULT pill
   drag on the handle pulls the strip down or up (a tap still toggles). Keyboard route: Arrow Up / Down on a focused number expands / minimises. With every other parameter expanded the PSi goes into
   the well (rows share the height evenly), and an empty well gives its height to the rows. The bell is ignored with nothing sounding (a second press while silenced cancels the silence: inferred).
   The high-priority tone is a 10-pulse burst, medium 3. The flag drops a small flag on the history bar and on the trend axis (no text). Escape in a value list closes only the list.
+
+### SedLine, third fidelity pass (14 Oct 2026, after a reviewer's 7/10 against the 800 x 1280 screenshots)
+
+- **PSi alarm has no arming rule any more**: an awake patient on the factory limits (50 / 25) shows `PSI High>50` after 5 s out of range, from the start (the old "armed once in range" rule hid the alarm
+  on a fresh monitor). A limit change resets the 5 s timer. The test lifts the limit for the checks that need a quiet screen.
+- **Yellow PSi alarm, measured on ref05 (pixel samples), not on the reviewer's note**: the title band really is gold (about `#b7a449` at the top to `#8a7428`, darker at both ends, 1 px `#f9ca07` edge), the pill is dark
+  (`#2a2308`, 1 px gold outline, white 18 px text), the number panel gradient ends on `#c3a52d` (the review asked for a near-black band and a `#f8dd86` end; the screenshot shows neither). No in-panel bell
+  for the yellow alarm (only the red one has it); the limits and `PSI` turn pale yellow on the gold. `EMG STD` is no longer drawn (the 2017 look); `EMG MAX` shows only when that sensitivity is chosen
+  and no message is up.
+- **Electrode strip**: opaque `#15171b` band, the squeezed L1 trace at 38% alpha behind it, a small `L1` label, the white cursor starts below the strip, 1 px `#2b2a2a` line at the bottom edge.
+- **Layout page is live** (`SED.set.layout` 1-6, default 6): the tiles are radio buttons; a tap moves the hand-drawn blue ring, OK commits. Layouts 1-5 share the Root screen with a `rainbow` window (empty,
+  nothing is connected) and give SedLine 28 / 38 / 65 / 78 / 87 % of the height. The window then shows one view: TREND, EEG, DSA or ANALOG (four buttons in the action popup, the current one a blue tile) over
+  a compact numeric row (`PSI EMG % SR % ARTF % SEFL Hz SEFR Hz`). `sedLay()` returns the geometry (`L.eeg`, `L.dsa`, `L.gauge`, `L.rows`, compact row) and everything else reads it. `Additional Settings`
+  stays as a small bar under the tiles. In layout 6 a saved EEG or DSA view falls back to TREND.
+- **Type**: well and row digits about 62 px (decimal at 0.62), labels 19 px / units 14 px weight 400; a minimised PSi alone in the well is 58 px at x 50 with `PSI` at 20 px; expanded rows right-align
+  digits at x 720 (SEFL and SEFR whole numbers, ARTF `0.0`) with a left-aligned label stack at x 746. ST is digits plus a `ST` over `HH:MM` (or `%`) stack.
+- **Analog**: the PSi arc is a half circle of ten slim dashes (3 red, 2 white, 5 red on the factory limits), the needle a short fat wedge with its tip on the inner edge; the two mini gauges have six dashes
+  and an outside-the-digits wedge.
+- **No data** (sensor off, no sensor, disconnected): the trend lines stop at the last valid sample with no head dot, the DSA gets a solid black bar that grows to the right edge (8 px at least) and the ASYM
+  strip a matching grey bar. **Sedated data** is coloured like the manufacturer's sedated screens: with the BIS column below about 88 the power is pulled toward red below 8 Hz, green 10-16 Hz, teal at 20 Hz
+  and blue above 24 Hz (`SED_PROF`); the awake picture is untouched.
+- **Dialogs**: no focus box on the back arrow and buttons unless Tab was pressed inside the glass (`.kb`); labels right-align at 40% of the width and value bars are 430 px wide from 43%; the toggle is a
+  glossy blue or dark pill with a chrome knob; layout thumbnails draw a Root (grey bezel, navy screen, green lungs, slot, three dots). The Menu key now closes the whole menu (Escape and the arrow go back one level).
+  The Wi-Fi and Device Output pages say `Not available`; the Battery page shows the charge only.
+- **Scrub bar**: the `DSA WINDOW` caption appears only above the 0:30 range. **Not done**: seeding 2 h of earlier history; Brightness as a slider; the sedated colouring is a profile, not a fit.

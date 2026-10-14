@@ -32,6 +32,10 @@ try {
     const d = await page.evaluate(() => ({ s: SED.set, range: SED.range, view: SED.view, exp: Object.keys(SED.exp) }));
     assert.deepEqual([d.s.psiHi, d.s.psiLo, d.s.eegAmp, d.s.eegSpeed, d.s.dsaHi, d.s.dsaLo, d.s.maxHz, d.s.placement, d.s.silence, d.s.monImp, d.s.dispImp, d.range, d.view], [50, 25, 5, 30, 15, -40, 30, 'EEG/PSi/DSA', 120, true, true, 30, 'trend']);
     assert.deepEqual(d.exp.sort(), ['emg', 'psi', 'sr']);
+    // an awake patient on the factory limits shows PSI High>50 without having been in range first (yellow, medium priority); the limit is lifted for the rest of the checks below
+    await page.waitForFunction(() => SED.alm && SED.alm.text === 'PSI High>50' && SED.alm.par && SED.alm.par.level === 'med', null, { timeout: 20000 });
+    await page.screenshot({ path: process.env.SED_SHOT ? `${process.env.SED_SHOT}-awake-alarm${phone ? '-phone' : ''}.png` : undefined }).catch(() => {});
+    await page.evaluate(() => { SED.set.psiHi = null; SED.outSince = null; sedInval(); }); await page.waitForFunction(() => SED.alm && !SED.alm.text);
     // awake: PSi in the 80s-90s, the clock in the status bar, 30 minutes of earlier history, the canvas drawn
     const n = await page.evaluate(() => ({ psi: SED.N.v.psi, clock: sedClock(simT, false), start: SED.D.start, now: simT, hz: SED.N.v.sefl }));
     assert.ok(n.psi >= 80, `awake PSi ${n.psi}`); assert.match(n.clock, /^\d{1,2}:\d\d (AM|PM)$/); assert.ok(n.now - n.start >= 1700, 'earlier history'); assert.ok(n.hz > 5);
@@ -93,9 +97,10 @@ try {
     await page.click('#sedSim [data-sim="disc"]'); await page.waitForFunction(() => SED.alm && SED.alm.text === 'SedLine is Disconnected'); assert.equal(await page.evaluate(() => SED.elec.state.R1), 'light'); await page.click('#sedSim [data-sim="disc"]');
     await page.waitForFunction(() => !SED.alm.text); assert.ok(await page.evaluate(() => SED.gaps.length >= 2 && SED.gaps.every(g => g[1] != null)), 'no-data gaps were recorded');
     await page.click('#bSensor'); assert.equal(await page.evaluate(() => SED.strip), false);
-    // PSi alarm: armed after the PSi first reaches the limits; then out of them for 5 s: yellow, "PSI High>50", the bell tile, sound; bell silences; audio pause counts down
+    // PSi alarm: back on the factory limit, in range first (no alarm), then out of them for 5 s: yellow, "PSI High>50", the bell tile, sound; bell silences; audio pause counts down
+    await page.evaluate(() => { SED.set.psiHi = 50; SED.outSince = null; sedInval(); });
     await page.evaluate(() => { document.querySelector('#depth').value = 57; document.querySelector('#depth').dispatchEvent(new Event('input', { bubbles: true })); advPrime(40); });
-    await page.waitForFunction(() => SED.N && SED.N.v.psi != null && SED.N.v.psi <= 50 && SED.N.v.psi >= 25 && SED.armed, null, { timeout: 8000 });
+    await page.waitForFunction(() => SED.N && SED.N.v.psi != null && SED.N.v.psi <= 50 && SED.N.v.psi >= 25, null, { timeout: 8000 });
     assert.equal(await page.evaluate(() => SED.alm.par), null, 'in range: no PSi alarm');
     await page.evaluate(() => { document.querySelector('#depth').value = 0; document.querySelector('#depth').dispatchEvent(new Event('input', { bubbles: true })); advPrime(25); });
     await page.waitForFunction(() => SED.alm && SED.alm.par && SED.alm.text === 'PSI High>50', null, { timeout: 8000 });
@@ -108,6 +113,9 @@ try {
     await page.click('[data-a="pause"]'); assert.ok(await page.evaluate(() => SED.pauseUntil > Date.now() + 100000), 'audio pause 2 min'); await page.waitForFunction(() => SED.sounding === false); await page.click('[data-a="pause"]'); assert.equal(await page.evaluate(() => SED.pauseUntil), 0);
     // a new limit (menu) re-arms; PSi limit stand-in matches the numbers beside the PSI row
     // the Root-style menu: Menu key under the screen and the gear open the Main Menu; the manual's names are all there
+    // (the Menu key closes the whole menu when a page is open; Escape and the arrow go back one level; no focus box on the dialog's back arrow)
+    await page.click('#bMenu'); assert.equal(await page.$eval('#sedDlg', e => e.hidden), false); await page.click('#sedDlg [data-v="sedline"]'); await page.click('#bMenu'); assert.equal(await page.$eval('#sedDlg', e => e.hidden), true, 'Menu closes the whole menu');
+    await page.evaluate(() => sedDlgOpen('layout')); assert.equal(await page.$eval('#sedDlg .sdback', e => getComputedStyle(e).outlineStyle), 'none', 'no focus box on the back arrow'); await page.evaluate(() => sedDlgClose());
     await page.click('#bMenu'); assert.equal(await page.$eval('#sedDlg', e => e.hidden), false);
     assert.deepEqual(await page.$$eval('#sedDlg .sdtile span', e => e.map(x => x.textContent)), ['Layout', 'rainbow', 'Sounds', 'Device Settings', 'About', 'Trend Settings', 'Profiles', 'Iris', 'SedLine']);
     await page.click('#sedDlg [data-v="sedline"]'); assert.deepEqual(await page.$$eval('#sedDlg .sdbar', e => e.map(x => x.textContent)), ['Parameter Settings', 'Additional Settings']);
@@ -124,7 +132,6 @@ try {
     assert.match(await page.$eval('#sedDlg .sderr', e => e.textContent), /Invalid limits/); assert.ok(await page.$$eval('#sedDlg .sdbar.bad', e => e.length) > 0, 'the rows are marked'); assert.equal(await page.evaluate(() => SED.set.psiLo), 25); await page.click('#sedDlg .sdcancel');
     // the numbers beside the PSI row follow the limits
     await page.click('#sedDlg [data-a="back"]'); await page.click('#sedDlg [data-a="back"]'); await page.click('#sedDlg [data-a="back"]'); await page.click('#sedDlg [data-a="back"]'); assert.equal(await page.$eval('#sedDlg', e => e.hidden), true);
-    assert.equal(await page.evaluate(() => SED.armed), false, 'a limit change re-arms the alarm');
     await page.evaluate(() => { SED.set.psiHi = 50; sedInval(); });
     // settings that change the picture: Additional Settings and the DSA pages
     await page.click('.hit[data-a="eegset"] >> nth=0'); assert.deepEqual(await page.$$eval('#sedDlg .sdrow label', e => e.map(x => x.textContent)), ['EEG Amplitude', 'EEG Chart Speed', 'EEG Display Filter', 'DSA Placement', 'Monitor Impedance', 'Display Impedance', 'DSA Artifacts']);
@@ -143,6 +150,13 @@ try {
     await page.click('#sedDlg [data-a="back"]'); await page.click('#sedDlg [data-a="back"]'); await page.click('#sedDlg [data-a="back"]'); await page.click('#sedDlg [data-a="back"]');
     await page.click('[data-a="profile"]'); await page.click('#sedDlg [data-a="open"][data-v="0"]'); await page.click('#sedDlg .sdlist [role="option"]:text-is("Pediatric")'); await page.click('#sedDlg .sdok');
     assert.deepEqual(await page.evaluate(() => [SED.set.profile, SED.set.maxHz]), ['PEDIATRIC', 40]);
+    // Layout page: six tiles that are buttons; a tap moves the blue ring, OK commits; layouts 1-5 share the screen with a rainbow window and show one view at a time
+    await page.evaluate(() => sedDlgOpen('layout')); assert.equal(await page.$$eval('#sedDlg button.sdlt', e => e.length), 6); assert.equal(await page.$eval('#sedDlg .sdlt.on', e => e.dataset.v), '6');
+    await page.click('#sedDlg .sdlt[data-v="2"]'); assert.equal(await page.$eval('#sedDlg .sdlt.on', e => e.dataset.v), '2'); assert.equal(await page.evaluate(() => SED.set.layout), 6, 'not committed before OK');
+    await page.click('#sedDlg .sdok'); assert.equal(await page.evaluate(() => SED.set.layout), 2); await page.waitForFunction(() => SED.L.compact); assert.equal(await page.evaluate(() => SED.L.view), 'trend');
+    await page.waitForTimeout(300); await page.click('[data-a="actiontab"]'); await page.waitForSelector('#sedPop .act button'); assert.deepEqual(await page.$$eval('#sedPop .act button', e => e.map(x => x.textContent)), ['TREND', 'EEG', 'DSA', 'ANALOG']); assert.equal(await page.$eval('#sedPop .act button.cur', e => e.dataset.v), 'trend');
+    for (const v of ['dsa', 'eeg', 'analog', 'trend']) { if (!await page.evaluate(() => SED.pop)) await page.click('[data-a="actiontab"]'); await page.click(`#sedPop [data-v="${v}"]`); await page.waitForFunction(v => SED.L.view === v, v); await page.waitForTimeout(150); const L = await page.evaluate(() => ({ v: SED.L.view, e: !!SED.L.eeg, d: !!SED.L.dsa, g: !!SED.L.gauge, r: SED.L.rows.length, w: SED.L.cwell.length })); assert.deepEqual([L.v, L.e, L.d, L.g, L.r > 0, L.w], [v, v === 'eeg', v === 'dsa', v === 'analog', v === 'trend', 6], `shared layout view ${v}`); assert.equal(await page.$eval('#sedEeg', e => e.style.display === 'none'), v !== 'eeg'); }
+    await page.evaluate(() => sedDlgOpen('layout')); await page.click('#sedDlg .sdlt[data-v="6"]'); await page.click('#sedDlg .sdok'); await page.waitForFunction(() => !SED.L.compact); assert.equal(await page.evaluate(() => SED.set.layout), 6);
     // the rest of the Root tree opens: Layout, Sounds, Device Settings, About, Trend Settings, Profiles, Iris, Access Control (with its standby toggle that adds the power key)
     for (const id of ['layout', 'sounds', 'device', 'about', 'trendset', 'profiles', 'iris', 'localization', 'access', 'd_wifi', 'd_batt', 'd_bright', 'about_psi', 'about_dsa', 'about_asym', 'about_sefl', 'p_sr_alarms', 'p_emg_add', 'p_artf_trends', 'p_sefl_trends', 'p_psi_trends']) {
       await page.evaluate(i => sedDlgOpen(i), id); assert.equal(await page.$eval('#sedDlg', e => e.hidden), false, id); assert.ok((await page.$eval('#sedDlg', e => e.textContent)).length > 10, id); await page.evaluate(() => sedDlgClose());
@@ -151,6 +165,7 @@ try {
     await page.click('#sedDlg [data-a="tog"][data-v="3"]'); await page.click('#sedDlg .sdok'); await page.click('#sedDlg [data-a="back"]').catch(() => {}); await page.evaluate(() => sedDlgClose());
     assert.equal(await page.evaluate(() => SED.set.standby), true); assert.equal(await page.$$eval('.hit[data-a="standby"]', e => e.length), 1);
     await page.click('.hit[data-a="standby"]'); assert.equal(await page.$eval('#sedStandby', e => e.hidden), false); await page.click('#sedStandby button'); assert.equal(await page.$eval('#sedStandby', e => e.hidden), true);
+    assert.equal(await page.evaluate(() => SED.set.layout), 6);
     // Escape leaves the menu; the flag drops an event; the other screens still switch
     await page.click('[data-a="gear"]'); assert.equal(await page.$eval('#sedDlg', e => e.hidden), false); await page.keyboard.press('Escape'); assert.equal(await page.$eval('#sedDlg', e => e.hidden), true);
     await page.click('[data-a="flag"]'); assert.equal(await page.evaluate(() => SED.events.length), 1);
