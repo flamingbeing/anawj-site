@@ -407,6 +407,7 @@ D) four`);
     await admin(db => setDoc(doc(db, 'config', 'access'), { passphrase: curPass }));   // faculty rotate the passphrase mid-test
     await p.click('#submit'); await p.locator('dialog[open]').waitFor(); await p.click('dialog button[value=yes]');
     await p.locator('#saved.warn').waitFor({ timeout: 15000 });
+    console.log('DBG', await p.evaluate(async () => { const c = await import('/js/cloud.js'); const o = JSON.parse(localStorage.getItem('mo-outbox'))[0]; try { await c.submitAttempt(o); return 'ok'; } catch (e) { return e.code + ' | ' + e.message + ' | ' + (e.cause && e.cause.code); } }));
     assert.match(await text(p, '#saved'), /login has expired/);
     assert.equal((await docs('attempts')).length, before);
     assert.equal(await p.evaluate(() => JSON.parse(localStorage.getItem('mo-outbox')).length), 1, 'result kept in the outbox');
