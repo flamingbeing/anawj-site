@@ -627,7 +627,7 @@ async function viewSettings() {
       <p class="row"><button class="btn primary" type="submit">Save passphrase</button></p></form>
     <div class="card stack"><h2>Faculty (can edit questions and see results)</h2>
       <ul class="members">${members.map(m => `<li><span>${esc(m.name || '')} <b>${esc(m.email)}</b> · ${esc(m.role)}</span> ${m.email === S.user.email ? '<span class="muted">you</span>' : `<button class="link" data-rm="${esc(m.email)}">Remove</button>`}</li>`).join('')}</ul>
-      <form id="mf" class="stack"><div class="two"><label>Google email<input id="m-email" type="email" required placeholder="name@nuhs.edu.sg"></label><label>Name<input id="m-name" placeholder="Dr Tan"></label></div>
+      <form id="mf" class="stack"><div class="two"><label>Google email<input id="m-email" type="email" required placeholder="name@example.com"></label><label>Name<input id="m-name" placeholder="Dr Tan"></label></div>
       <label>Can<select id="m-role"><option value="editor">Edit questions and see results</option><option value="admin">Do everything (settings, passphrase, faculty list)</option></select></label>
       <p class="row"><button class="btn" type="submit">Add</button></p></form></div>`, 'Settings');
   $('#sf').addEventListener('submit', async ev => {

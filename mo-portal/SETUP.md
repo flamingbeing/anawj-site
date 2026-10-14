@@ -7,7 +7,7 @@ Do them once, signed in to Google as the account that should own the project.
 ## A. Create the project
 
 1. Go to https://console.firebase.google.com and click **Create a project**.
-2. Name it `nuh-mo-portal` (if Firebase says the id is taken, accept the id it suggests and tell Claude). Click Continue.
+2. Name it `ntf-mo-portal` (if Firebase says the id is taken, accept the id it suggests and tell Claude). Click Continue.
 3. Turn **Google Analytics off**. Click **Create project**, then Continue.
 
 ## B. Turn on the two sign-in methods
@@ -55,7 +55,7 @@ change is merged, like the other apps:
 
 1. Ask Claude to "add the MO portal to the Firestore rules workflow". It adds a matrix entry and a paths filter for
    `mo-portal/firestore.rules` to `.github/workflows/deploy-firestore-rules.yml` (nobody edits that file by hand).
-2. In the Google Cloud console (https://console.cloud.google.com, choose the project `nuh-mo-portal` at the top), go to
+2. In the Google Cloud console (https://console.cloud.google.com, choose the project `ntf-mo-portal` at the top), go to
    **IAM & Admin > IAM** and click **Grant access**.
 3. New principal: `firebase-rules-deployer@apmes-logbook.iam.gserviceaccount.com`. Role: **Firebase Rules Admin**
    (type "Rules" in the role filter). Save.

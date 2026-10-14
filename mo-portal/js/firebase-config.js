@@ -1,4 +1,4 @@
-// Firebase web app config for the Baby MO portal (project nuh-mo-portal).
+// Firebase web app config for the Baby MO portal (project ntf-mo-portal).
 // Leave apiKey empty to run the page in local-only mode (everything stays in this browser, no sign-in).
 // These values are public by design; access is controlled by firestore.rules, the members list and the passphrase.
 // Setup steps: SETUP.md.

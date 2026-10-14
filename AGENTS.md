@@ -15,8 +15,8 @@ Static site on GitHub Pages (public repo: no names, patient data or real evaluat
 - `bis-dsa/`: BIS to DSA teaching simulator for anaesthesia residents (one static page, synthetic EEG, no data), at
   `anaes.anawj.com/bis/`. Start with `bis-dsa/NOTES.md`.
 - `hand-babies/`: hand surgery exam crash course for new MOs (one static page, no data), at `hand.anawj.com/babies/`. Start with `hand-babies/NOTES.md`.
-- `mo-portal/`: Baby MO Portal: the MCQ test for new MOs (rotating every few months) and, later, their CBD discussions and
-  feedback; faculty edit the questions in the app; own Firebase project `nuh-mo-portal` (not created yet); at `mo.anawj.com`.
+- `mo-portal/`: Baby MO Portal for NTFGH anaesthesia (not NUH; no link to nuh-roster): the MCQ test for new MOs (rotating every few months) and, later, their CBD discussions and
+  feedback; faculty edit the questions in the app; own Firebase project `ntf-mo-portal` (not created yet); at `mo.anawj.com`.
   Start with `mo-portal/NOTES.md`. The real question bank is not in this repo.
 - `hand-log/`: hand surgery DOPS and Mini-CEX log (data on the device only, CSV/JSON export), at `hand.anawj.com/handlog/`. Start with `hand-log/NOTES.md`.
 - `edit/`: the page editor for any page on the site (`edit.anawj.com/<path>` redirects to it). Suggested edits arrive as

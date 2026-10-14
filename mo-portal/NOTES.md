@@ -4,6 +4,10 @@ Lasting decisions for `mo-portal/`. Status and next steps: `STATUS.md`. Cloud se
 
 ## Purpose
 
+**Audience (owner, 14 Oct 2026): the baby MOs of Ng Teng Fong General Hospital (NTFGH) anaesthesia, not NUH.** The portal
+is independent of the NUH roster app: no links to it, no shared data or sign-in, for now. Tools and pages from the
+sibling repo `anantf-site` (the NTF anaesthesia teaching site) may be reused later.
+
 The department's tests and later discussions for new MOs (every few months a new group rotates in). First module: the
 **Baby MO Test**, the 20-question MCQ (pass 16/20 = 80%, 20 minutes, one answer each, no negative marking) that used to
 be a Word paper. Later modules the owner has in mind (not built): CBD discussions, feedback, questions. Keep the portal
@@ -45,7 +49,7 @@ a set of small modules behind one sign-in; add them as nav links, don't bend the
 - `js/local.js`: browser-only backend (demo and "not connected yet"); `js/cloud.js`: Firebase backend; `js/store.js`
   picks one. Same functions in both: any change to one needs the other.
 - `js/app.js`: all screens (hash routes: `#/`, `#/ready`, `#/test`, `#/result`, `#/faculty…`).
-- `firestore.rules` (project `nuh-mo-portal`, not deployed until the workflow entry in `SETUP.md` step F is added).
+- `firestore.rules` (project `ntf-mo-portal`, not deployed until the workflow entry in `SETUP.md` step F is added).
 
 ## Tests
 

@@ -22,7 +22,7 @@ The rule for new apps is in `AGENTS.md`.
 | `anawj.com/privacy/` | `privacy/` | Stays: the Google sign-in consent screen points here. |
 | `anawj.com/prewarm-update/` | `prewarm-update/` | Stays until no phone runs the old prewarm worker, then becomes a redirect. |
 | `anawj.com/edit/` (decided in step 5) | `edit/` | Stays on `anawj.com`: see "The page editor" below. |
-| `mo.anawj.com/` | `mo-portal/` | Baby MO Portal (14 Oct 2026): saves data and signs people in, so its own subdomain. Own Firebase project `nuh-mo-portal`. Needs its custom domain (below) and the project's authorised domains. |
+| `mo.anawj.com/` | `mo-portal/` | Baby MO Portal (14 Oct 2026): saves data and signs people in, so its own subdomain. Own Firebase project `ntf-mo-portal`. Needs its custom domain (below) and the project's authorised domains. |
 | `ask.anawj.com/` | `ask/` | Ask Claude, the owner's page; behind Cloudflare Access; its API `/api/ask` is `worker/ask.js` (`edit/NOTES.md`). |
 
 Single-app subdomains serve the app at the root; shared ones keep a path per app. Folders in the repo don't need

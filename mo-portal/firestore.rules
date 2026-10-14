@@ -1,6 +1,6 @@
 rules_version = '2';
 
-// Baby MO portal (Firebase project nuh-mo-portal). Deployed by .github/workflows/deploy-firestore-rules.yml once the
+// Baby MO portal (Firebase project ntf-mo-portal). Deployed by .github/workflows/deploy-firestore-rules.yml once the
 // project is added there (see SETUP.md). Tests: tools/test-rules.sh.
 //
 // Two kinds of people:
