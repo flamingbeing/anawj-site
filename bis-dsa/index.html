@@ -49,8 +49,14 @@ section{display:grid;gap:16px;min-width:0}
 .screen{background:var(--scr);border:1px solid #1d2838;color:var(--scr-fg);border-radius:14px;padding:14px;display:grid;gap:10px;min-width:0;box-shadow:0 1px 0 var(--line),0 10px 30px -18px rgba(0,0,0,.6)}
 .screen.mon{background:#1b2230;padding:6px;border:1px solid #2b3446;border-radius:18px}
 .mon .glass{background:#000;border-radius:8px;padding:8px;display:grid;gap:6px;min-width:0}
-.statusbar{display:flex;justify-content:space-between;gap:8px;font:600 11px/1.2 var(--f-mono);color:var(--scr-mute);letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid #1a2333;padding-bottom:6px}
+.statusbar{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:8px;font:600 11px/1.2 var(--f-mono);color:var(--scr-mute);letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid #1a2333;padding-bottom:6px}
 .statusbar b{color:var(--scr-fg);font-weight:600}
+.msg{justify-self:center;text-align:center;text-transform:none;letter-spacing:0;font:600 12px/1.25 var(--f-mono);padding:2px 8px;border-radius:3px;min-width:0}
+.msg:empty{padding:0}
+.msg.hi{background:#c8102e;color:#fff}.msg.lo{background:#ffe600;color:#000}.msg.info{background:#3a4558;color:var(--scr-fg)}
+@media (prefers-reduced-motion:no-preference){.msg.hi{animation:msgflash 1s steps(1) infinite}}
+@keyframes msgflash{50%{background:#5a0010}}
+@media (max-width:600px){.statusbar{grid-template-columns:1fr auto}.statusbar{row-gap:4px}.msg{grid-column:1/-1;grid-row:2;min-height:17px;justify-self:stretch}}
 .readouts{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:8px;align-items:stretch}
 .bisbox{display:grid;align-content:space-between;gap:2px;padding:4px 10px;border:1px solid #2a3850;border-radius:6px;background:#000;min-width:0}
 .bisbox .k{font:600 15px/1.2 var(--f-mono);letter-spacing:.1em;color:var(--scr-fg)}
@@ -60,7 +66,7 @@ section{display:grid;gap:16px;min-width:0}
 .bar{background:var(--scr-2);border-radius:6px;padding:5px 8px;display:grid;grid-template-columns:auto 1fr;align-items:baseline;gap:4px 8px;min-width:0}
 .bar .k,.ro .k{font:600 12px/1.2 var(--f-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--scr-mute)}
 .bar .v,.ro .v{font:600 20px/1.1 var(--f-mono);font-variant-numeric:tabular-nums;text-align:right;color:var(--scr-fg)}
-.segs{grid-column:1/-1;display:grid;grid-template-columns:repeat(10,1fr);gap:2px;height:12px}
+.segs{grid-column:1/-1;display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:3px;height:12px}
 .segs i{background:#1a2436;border-radius:1px}
 .segs i.on{background:var(--seg,#5fd08f)}
 .bar .u,.ro .u{grid-column:1/-1;font-size:11px;color:var(--scr-mute)}
@@ -69,14 +75,15 @@ section{display:grid;gap:16px;min-width:0}
 .ro .v{font-size:16px}
 @media (max-width:600px){.bar .u{display:none}.sim{gap:10px}}
 .ro .u{display:none}
-.zone{justify-self:start;font:600 12px/1.3 var(--f-mono);padding:3px 8px;border-radius:99px;background:#1c2a44;color:var(--scr-fg);white-space:nowrap}
+.zone{justify-self:start;font:600 12px/1.3 var(--f-mono);padding:3px 8px;border-radius:8px;background:#1c2a44;color:var(--scr-fg);text-wrap:balance}
 .softkeys{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
 .softkeys button{background:#2a3242;border:1px solid #3a4558;border-bottom-width:3px;color:var(--scr-fg);border-radius:6px;padding:7px 4px;font:600 13px/1.1 var(--f-mono)}
+.softkeys.two{grid-template-columns:repeat(2,1fr)}
 .softkeys button[aria-pressed="true"]{background:#d9e4f5;color:#000;border-color:#fff}
 .lbl{font:600 11px/1 var(--f-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--scr-mute);display:flex;justify-content:space-between;gap:8px}
 canvas{display:block;width:100%;max-width:100%}
 .panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;display:grid;gap:16px;min-width:0}
-.ctl{display:grid;gap:8px}
+.ctl{display:grid;gap:8px}.ctl[hidden]{display:none}
 .ctl > .t{font:600 12px/1 var(--f-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
 .seg{display:flex;flex-wrap:wrap;gap:6px}
 button{font:inherit;cursor:pointer}
@@ -97,9 +104,9 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .mixrow label{font-size:15px}
 .mixrow output{font:600 14px/1 var(--f-mono);font-variant-numeric:tabular-nums;color:var(--accent)}
 .mixrow input{grid-column:1/-1}
-.lane{display:grid;gap:6px;min-width:0}
+.lane{display:grid;gap:6px;min-width:0}.lane[hidden]{display:none}
 .key{display:inline-block;width:14px;height:3px;vertical-align:middle;margin-left:4px;border-radius:2px}
-.key.bis{background:#fff}.key.emg{background:#5fd08f;height:8px}
+.key.bis{background:#fff}.key.emg{background:#5fd08f;height:1px}
 .err{font-size:14px;color:var(--bad)}
 .caption{min-height:3.2em;font-size:15px;border-left:3px solid var(--q1);padding-left:10px}
 .caption:empty{display:none}
@@ -132,6 +139,13 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .pit{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:12px;margin:0;padding:0;list-style:none}
 .pit li{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:15px}
 .pit b{display:block;font-family:var(--f-display);font-size:16px;margin-bottom:2px}
+a{color:var(--accent)}
+a:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.pit small{display:block;margin-top:6px;font-size:13px;color:var(--muted)}
+.ev{width:100%;border-collapse:collapse;font-size:14px}
+.ev th,.ev td{text-align:left;vertical-align:top;padding:7px 8px;border-bottom:1px solid var(--line)}
+.ev th{font-size:13px;color:var(--muted);font-weight:600}
+.tblwrap{overflow-x:auto}
 footer{font-size:13px;color:var(--muted);max-width:80ch;border-top:1px solid var(--line);padding-top:14px}
 @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
 </style>
@@ -143,12 +157,12 @@ footer{font-size:13px;color:var(--muted);max-width:80ch;border-top:1px solid var
   <h1 class="apptitle" id="h-mon">BIS to DSA <span>simulator</span></h1>
   <div class="sim">
     <div class="screen mon"><div class="glass">
-      <div class="statusbar"><span><b>BIS</b> · adult · smoothing 15 s</span><span id="vClock">--:--</span></div>
+      <div class="statusbar"><span><b>BIS</b> · Case AH5F</span><div id="vMsg" class="msg" role="status" aria-live="polite"></div><span id="vClock">--:--</span></div>
       <div class="readouts">
         <div class="bisbox"><span class="k">BIS</span><span class="v" id="vBis">--</span><span class="zone" id="vZone">--</span></div>
         <div class="bars">
-          <div class="bar"><span class="k">SQI</span><span class="v" id="vSqi">--</span><div class="segs" id="sqiSegs" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><span class="u">signal quality %</span></div>
-          <div class="bar"><span class="k">EMG</span><span class="v" id="vEmg">--</span><div class="segs" id="emgSegs" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><span class="u">dB, 30–55</span></div>
+          <div class="bar"><span class="k">SQI</span><span class="v" id="vSqi">--</span><div class="segs" id="sqiSegs" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div><span class="u">signal quality %</span></div>
+          <div class="bar"><span class="k">EMG</span><span class="v" id="vEmg">--</span><div class="segs" id="emgSegs" aria-hidden="true"><i></i><i></i><i></i><i></i></div><span class="u">dB</span></div>
         </div>
         <div class="params">
           <div class="ro"><span class="k">SR</span><span class="v" id="vSr">0</span><span class="u">% flat</span></div>
@@ -157,14 +171,17 @@ footer{font-size:13px;color:var(--muted);max-width:80ch;border-top:1px solid var
           <div class="ro"><span class="k">BC</span><span class="v" id="vBc">0</span><span class="u">bursts/min</span></div>
         </div>
       </div>
-      <div class="lane" id="wTrend"><div class="lbl"><span>BIS trend <i class="key bis"></i> · EMG <i class="key emg"></i></span><span>5 min</span></div>
-      <canvas id="cTrend" height="80" aria-label="BIS and EMG trends over the last five minutes"></canvas></div>
+      <div class="lane" id="wTrend"><div class="lbl"><span>BIS <i class="key bis"></i> · EMG <i class="key emg"></i></span><span id="tgtCap" style="text-transform:none">target 40–60 set by user</span></div>
+      <canvas id="cTrend" height="88" aria-label="BIS and EMG trends over the last five minutes"></canvas></div>
       <div class="lane" id="wDsa"><div class="lbl"><span>DSA · 0–30 Hz</span><span>last 5 min</span></div>
       <canvas id="cDsa" height="190" aria-label="Density spectral array over the last five minutes"></canvas></div>
-      <div class="lane" id="wEeg"><div class="lbl"><span>EEG · 8 s</span><span style="text-transform:none">±100 µV</span></div>
+      <div class="lane" id="wEeg"><div class="lbl"><span id="eegLbl">EEG · 8 s</span><span id="eegDiv" style="text-transform:none">50 µV/div</span></div>
       <canvas id="cEeg" height="110" aria-label="Scrolling raw EEG trace"></canvas></div>
       <div class="softkeys" id="viewSeg" role="group" aria-label="Screen view">
-        <button data-view="both" aria-pressed="true">DSA+EEG</button><button data-view="dsa" aria-pressed="false">DSA</button><button data-view="eeg" aria-pressed="false">EEG</button>
+        <button data-view="both" aria-pressed="true">DSA + EEG</button><button data-view="dsa" aria-pressed="false">DSA + BIS</button><button data-view="eeg" aria-pressed="false">EEG</button>
+      </div>
+      <div class="softkeys two" id="keySeg" role="group" aria-label="Monitor settings">
+        <button id="kSmooth">Smoothing 15 s</button><button id="kScale">EEG ±100 µV</button>
       </div>
     </div></div>
     <div class="panel">
@@ -191,7 +208,12 @@ footer{font-size:13px;color:var(--muted);max-width:80ch;border-top:1px solid var
         <label class="chk"><input type="checkbox" id="mElder"> Older patient (over 70)</label>
         <label class="chk"><input type="checkbox" id="mEmg"> Facial muscle activity (no relaxant)</label>
         <label class="chk"><input type="checkbox" id="mNmb"> Muscle relaxant (paralysed)</label>
-        <label class="chk"><input type="checkbox" id="mDia"> Diathermy (electrical interference)</label></div>
+        <label class="chk"><input type="checkbox" id="mDia"> Diathermy (electrical interference)</label>
+        <label class="chk"><input type="checkbox" id="mWarm"> Forced-air warmer (high-frequency noise)</label>
+        <label class="chk"><input type="checkbox" id="mBlink"> Blinks and eye movement</label>
+        <div class="row"><button class="btn" id="stimBtn" aria-pressed="false">Surgical stimulus</button></div></div>
+      <div class="ctl"><span class="t">Display</span>
+        <label class="chk"><input type="checkbox" id="mTeach" checked> Teaching labels (zone, newest epoch, colour key, target band)</label></div>
       <div class="ctl"><span class="t">Speed</span>
         <div class="seg" id="speedSeg" role="group" aria-label="Simulation speed">
           <button data-speed="1" aria-pressed="true">1×</button><button data-speed="4" aria-pressed="false">4×</button><button data-speed="10" aria-pressed="false">10×</button>
@@ -211,7 +233,7 @@ footer{font-size:13px;color:var(--muted);max-width:80ch;border-top:1px solid var
   <div class="eyebrow">Anaesthesia teaching · processed EEG</div>
   <h2>From the BIS sensor to the DSA</h2>
   <p class="lede">The BIS number is one summary of a frontal EEG. The density spectral array (DSA) shows the whole spectrum over time, so you can see <em>why</em> the number is what it is. Move the drug and depth controls and watch the raw EEG, the number and the DSA change together.</p>
-  <p>The screen is laid out like a BIS monitor: the number with its SQI (signal quality) and EMG bars, then the BIS and EMG trends, the DSA, and the raw EEG. The keys at the bottom show the DSA or the EEG large. On the DSA, time runs left to right, frequency goes up (0–30 Hz) and colour shows power; the white line is SEF95, the frequency below which 95% of the power sits.</p>
+  <p>The screen is laid out like a BIS monitor: the number with its SQI (signal quality) and EMG bars, then the BIS and EMG trends, the DSA, and the raw EEG. The keys at the bottom show the DSA or the EEG large. On the DSA, time runs left to right, frequency goes up (0–30 Hz) and colour shows power; the white line is SEF95, the frequency below which 95% of the power sits, and the purple line is the median frequency (MF, 50%). Messages from the monitor (artefact, isoelectric EEG, out of target range) appear in the status line. The real monitor measures EMG at 70–110 Hz; this simulator stands in a muscle term, because it samples at only 128 per second.</p>
 </header>
 
 <section id="how" aria-labelledby="h-how">
@@ -249,13 +271,32 @@ footer{font-size:13px;color:var(--muted);max-width:80ch;border-top:1px solid var
 <section id="pitfalls" aria-labelledby="h-pit">
   <div class="sec-head"><h2 id="h-pit">When the number misleads</h2></div>
   <ul class="pit">
-    <li><b>Ketamine and nitrous oxide</b>Ketamine adds fast (gamma) power, so BIS often reads 60–80 in an unconscious patient. Nitrous oxide barely moves BIS. Look at the DSA and the clinical picture.</li>
-    <li><b>Muscle (EMG) and paralysis</b>Frontalis activity sits in the high frequencies and pushes BIS up. Check the EMG bar; a relaxant or more analgesia often brings BIS down without more hypnotic. The flip side: paralysis can lower BIS in a patient who is awake, so a low number under relaxant doesn’t rule out awareness.</li>
-    <li><b>Older brains</b>Alpha power falls with age, so the same propofol dose gives a dimmer DSA and a higher BIS. Chasing the number risks burst suppression.</li>
-    <li><b>Lag</b>BIS is smoothed over about 15–30 s. A change in the DSA often shows before the number moves.</li>
-    <li><b>Low BIS that isn't drug</b>Hypothermia, hypoglycaemia, hypotension with poor cerebral perfusion and cerebral ischaemia all slow or flatten the EEG.</li>
-    <li><b>Interference</b>Diathermy, warmers and pacing spikes corrupt the signal. Low signal quality means don't trust the number.</li>
+    <li><b>Ketamine and nitrous oxide</b>Ketamine adds fast (gamma) power, so BIS often reads 60–80 in an unconscious patient. Nitrous oxide barely moves BIS. Look at the DSA and the clinical picture.<small>Source: <a href="https://doi.org/10.1097/aln.0000000000000841">Purdon 2015, Anesthesiology</a>; <a href="https://doi.org/10.1016/j.clinph.2016.03.005">Akeju 2016</a>.</small></li>
+    <li><b>Muscle (EMG) and paralysis</b>Frontalis activity sits in the high frequencies and pushes BIS up. Check the EMG bar. If the alpha band is unchanged, treat the cause: analgesia first, relaxant only if surgery needs it (paralysis hides movement, which may be the only sign of lightening). Under relaxant, BIS fell to 44–47 in awake volunteers (Schuller 2015). The flip side: paralysis can lower BIS in a patient who is awake, so a low number under relaxant doesn’t rule out awareness.<small>Source: <a href="https://pubmed.ncbi.nlm.nih.gov/26174308/">Schuller 2015, BJA</a>; <a href="https://pubmed.ncbi.nlm.nih.gov/12873942/">Messner 2003</a>.</small></li>
+    <li><b>Older brains</b>Alpha power is about 9 dB lower at 70–90 than at 18–38, and slower (Purdon 2015). Indices may read higher at a dose that already causes unconsciousness. Older patients need less drug; watch SR and the raw EEG before deepening.<small>Source: <a href="https://pubmed.ncbi.nlm.nih.gov/26174300/">Purdon 2015, BJA</a>.</small></li>
+    <li><b>Read SR, not just BIS</b>Suppression often appears with BIS 35–45, especially in older patients; SR above 0 means suppression whatever the number (Bruhn 2000).<small>Source: <a href="https://doi.org/10.1023/a:1012216600170">Bruhn 2000, J Clin Monit Comput</a>.</small></li>
+    <li><b>Lag</b>BIS is smoothed (10, 15 or 30 s), and the whole delay before it settles at a new level ranged from about 15 s to over 2 minutes in testing (Pilge 2006). The DSA and raw EEG change first.<small>Source: <a href="https://doi.org/10.1097/00000542-200603000-00016">Pilge 2006, Anesthesiology</a>.</small></li>
+    <li><b>Low BIS that isn't drug</b>Hypothermia, hypoglycaemia, hypotension with poor cerebral perfusion and cerebral ischaemia all slow or flatten the EEG. So can paralysis in an awake patient, pulse artefact from a sensor over the temporal artery, blinks or head movement that look like slow waves, paradoxical delta during arousal, and pre-existing brain disease or a low-voltage EEG. A sudden fall with no dose change: check glucose, blood pressure and perfusion before lightening.<small>Source: <a href="https://pubmed.ncbi.nlm.nih.gov/11435056/">Mathew 2001</a>; <a href="https://pubmed.ncbi.nlm.nih.gov/26174308/">Schuller 2015</a>; <a href="https://pubmed.ncbi.nlm.nih.gov/33461725/">García 2021</a>.</small></li>
+    <li><b>Interference</b>Forced-air warmers, oscillating ventilators and pacing or ECG spikes add high-frequency noise that can push BIS up (warmer off: true value back in 2–3 min); diathermy swamps the signal. Check the raw EEG, EMG bar and SQI.<small>Source: <a href="https://pubmed.ncbi.nlm.nih.gov/12145044/">Hemmerling &amp; Fortier 2002</a>; BIS Complete operator’s manual.</small></li>
+    <li><b>Validated in adults</b>BIS ranges come from adults. In infants under about 4 months there is no frontal alpha under sevoflurane, and BIS is unreliable; interpret cautiously in neurological disease and with psychoactive drugs.<small>Source: <a href="https://doi.org/10.7554/elife.06513">Cornelissen 2015, eLife</a>.</small></li>
   </ul>
+</section>
+
+<section id="evidence" aria-labelledby="h-ev">
+  <div class="sec-head"><h2 id="h-ev">What the trials say</h2>
+  <p>Processed EEG is a tool, not a target. The main evidence in brief:</p></div>
+  <div class="tblwrap"><table class="ev">
+    <thead><tr><th scope="col">Study</th><th scope="col">Finding</th></tr></thead>
+    <tbody>
+      <tr><td><a href="https://doi.org/10.1016/S0140-6736(04)16300-9">B-Aware 2004</a></td><td>In high-risk patients, BIS-guided anaesthesia cut awareness (2 vs 11 cases) compared with routine care.</td></tr>
+      <tr><td><a href="https://doi.org/10.1056/NEJMoa0707361">B-Unaware 2008</a> / <a href="https://doi.org/10.1056/NEJMoa1100403">BAG-RECALL 2011</a></td><td>BIS was not better than an end-tidal anaesthetic gas alarm protocol at preventing awareness.</td></tr>
+      <tr><td><a href="https://doi.org/10.1093/bja/aeu313">NAP5 2014</a></td><td>Accidental awareness about 1:19,600 overall, about 1:8,200 with a muscle relaxant; most at induction or emergence.</td></tr>
+      <tr><td><a href="https://doi.org/10.1001/jama.2018.22005">ENGAGES 2019</a></td><td>EEG-guided anaesthesia in older patients did not reduce postoperative delirium.</td></tr>
+      <tr><td><a href="https://doi.org/10.1016/j.bja.2021.07.021">Balanced 2021</a> (delirium sub-study)</td><td>Targeting BIS 50 rather than 35 gave delirium 19% vs 28%. A secondary outcome: 1-year mortality, the primary outcome, was no different (<a href="https://doi.org/10.1016/S0140-6736(19)32315-3">Short 2019</a>, Lancet).</td></tr>
+      <tr><td><a href="https://doi.org/10.1111/anae.14428">AAGBI/SIVA TIVA guideline 2018</a></td><td>Use processed EEG when TIVA is given with a muscle relaxant.</td></tr>
+      <tr><td><a href="https://www.nice.org.uk/guidance/dg6">NICE DG6</a></td><td>Depth-of-anaesthesia monitors are an option in patients at higher risk of awareness or excessively deep anaesthesia, and in all patients having TIVA.</td></tr>
+    </tbody>
+  </table></div>
 </section>
 
 <footer>A teaching simulation. The EEG is synthetic and the BIS value comes from a simple model of spectral features (edge frequency, fast and slow power, suppression ratio) tuned to typical published ranges. It is not the proprietary BIS algorithm and must not guide patient care.</footer>

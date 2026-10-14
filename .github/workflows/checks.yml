@@ -28,6 +28,8 @@ jobs:
         run: node tools/check.mjs
       - name: Unit tests
         run: for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mjs prewarm/test/*.test.mjs people/test/*.test.mjs worker/test/*.test.mjs feedback/test/*.test.mjs; do echo "== $f"; node "$f" || exit 1; done
+      - name: BIS to DSA engine tuning
+        run: node bis-dsa/test/engine.check.mjs
       - name: Proof-read (pages and documents)
         run: node tools/proofread.mjs
 
