@@ -208,7 +208,20 @@ The owner's own monitor is a Medtronic (formerly Covidien) BIS monitor (photos; 
 screen is labelled "Medtronic BIS"; the cabinet looks like the BIS Complete 2-channel). The internal ids still say
 `vista`. The page opens on it; the detail is in the next section. Numbers the real screen does not show (SQI %, EMG dB, TP,
 BC, zone) sit in the strip under it; "Teaching layout" in Display is the earlier screen (kept; the e2e test uses it for
-most checks). `HIST` holds 60 min of columns. Still to do for the machine switch (BIS Advance, SedLine): ASYM, PSI.
+most checks). `HIST` holds 60 min of columns. (The BIS Advance and SedLine screens, with ASYM and PSi, have since been built: see their sections below.)
+
+## The three monitor skins at a glance: evidence, inference, unknown (final integration, 14 Oct 2026)
+
+Reference photos, manuals and screenshots were used for looking only and live outside the repo; nothing from them (images or manual text) is committed.
+Every element on all three screens is drawn each frame from the live simulation, never from a picture. Details sit in each skin's section below.
+
+| Skin (id) | Cloned from evidence | Inferred | Unknown or not modelled |
+|---|---|---|---|
+| Medtronic BIS (`vista`, the owner's monitor) | Layout, colours (sampled from the owner's photos), key row, message wording and codes, three-page menu names, sensor-check screens, review keys, defaults from the manual (1 hour scale, Target Range inactive) | EEG gain, AMPL dB scale, DSA colour scale (tuned by eye), alarm tone, Monitor Mode texts | Display menu of the 2-channel monitor (no photo), real passkey, exact fonts (look-alikes), EMG tube hatching, 4-channel views |
+| BIS Advance (`advance`) | Screen geometry (1246 x 779), left bar, alarm and message bars, tile menu tree, dialogs, colour values from the manual figures and 2021 marketing screens, DSA legend ramp | EEG sweep versus scroll, DSA cell size, Settings / Maintenance / INFO / Case Log pages (styled like seen dialogs), alarm bar flash rate, second-line wording of some alarms | Native screenshots of several pages, exact fonts and icons (redrawn; Selawik stands in for Segoe UI), ground check, trend lock, wireless, camera, the proprietary BIS and ASYM algorithms |
+| Masimo SedLine (`sedline`) | Root 800 x 1280 layout, status bar, four-channel EEG, trend rows, well, DSA with ASYM, colour bar, menu tree and its defaults, About texts, alarm and message names | Alarm priorities and delay, impedance colour limits, DSA Placement variants, Pediatric look, dialog artwork, sedated DSA colour profile, EEG character (own 178 Hz generator) | Typeface (Source Sans 3 stands in), start-up splash, animation timing, Masimo's PSi algorithm (a straight-line stand-in from BIS), real EMG, Brightness slider, 2 h of earlier history |
+
+None of the three has been compared side by side with a live unit of that model by the owner except the Medtronic one (photos of his own monitor).
 
 ## Medtronic BIS 2-channel screen (rebuilt 14 Oct 2026)
 
@@ -512,7 +525,7 @@ checked against a photo of a Root. Look chosen: the 2017/2018 builds (ADULT pill
   (here: out of the limits for 5 s, and only after the PSi has first been inside them, so an awake patient does not alarm at the start; the real delay is unpublished); alarm priorities
   of the window messages (red for sensor and impedance faults, yellow for the rest: inferred); the sweep cursor is shown (newer builds); the layout when DSA Placement is EEG/DSA/PSi
   (DSA directly under the EEG: inferred); the Pediatric look is the pill and the 0-40 Hz DSA only; the start-up splash, the SedLine dialog artwork (taken from the Root layout and access-control
-  screens), animation timing, the on-screen About texts of Root (the DSA / ASYM / PSi texts are the manual's). One DSA column a second, not every 1.2 s. The EMG trend is a stand-in (the sim's EMG
+  screens), animation timing, the on-screen About texts of Root (our own short wording, not the manual's). One DSA column a second, not every 1.2 s. The EMG trend is a stand-in (the sim's EMG
   is a parametric term). Smart SedLine's ST is an option (the "Display: Suppression Time (ST) row" button in the Controls disclosure outside the screen, a simulator addition) rather than a software build.
 
 ### SedLine, second fidelity pass (14 Oct 2026, after a side-by-side review against the Root screenshots)
@@ -531,7 +544,7 @@ checked against a photo of a Root. Look chosen: the 2017/2018 builds (ADULT pill
 - **Nothing on the glass says "simulator"**: About reads like a Root (Device Root, Module SedLine, Software 1.8.1.4), the Wi-Fi / Ethernet / Bluetooth / Output pages are plain status rows, a refused
   OK marks the rows red (the text is only for screen readers). The teaching note, the soft keys (Silent, Menu, Sensor check) and the Simulate buttons live in a "Controls" disclosure under the
   bezel, closed by default; the Suppression Time (ST) option moved there too ("Display: Suppression Time (ST) row"). The Menu key opens the Main Menu, and goes back one level when a page is open.
-  The About texts are the manual's, US spelling, the full SEF paragraph on SEFL and SEFR.
+  The About texts are our own short wording (US spelling); the first pass copied the manual's sentences and they were rewritten at final integration so no manual text is in the repo.
 - **Behaviour**: a menu or popup left alone for 60 s returns to the main screen (unsaved changes dropped); the number popup is About / Settings only; gestures: a drag along a trend or the DSA scrolls
   all of them, a wheel or two-finger pinch over the trends steps the range, press-and-hold a number (500 ms, it dims) then drag into the well (minimise) or onto the trends (expand), a vertical
   drag on the handle pulls the strip down or up (a tap still toggles). Keyboard route: Arrow Up / Down on a focused number expands / minimises. With every other parameter expanded the PSi goes into
@@ -562,3 +575,9 @@ checked against a photo of a Root. Look chosen: the 2017/2018 builds (ADULT pill
   glossy blue or dark pill with a chrome knob; layout thumbnails draw a Root (grey bezel, navy screen, green lungs, slot, three dots). The Menu key now closes the whole menu (Escape and the arrow go back one level).
   The Wi-Fi and Device Output pages say `Not available`; the Battery page shows the charge only.
 - **Scrub bar**: the `DSA WINDOW` caption appears only above the 0:30 range. **Not done**: seeding 2 h of earlier history; Brightness as a slider; the sedated colouring is a profile, not a fit.
+
+## Tests (final integration, 14 Oct 2026)
+
+- `node bis-dsa/test/e2e.mjs` runs the teaching-layout and Medtronic checks, then `adv.e2e.mjs` and `sed.e2e.mjs`; the whole run takes over 10 minutes, so give a shell command a background run.
+- An earlier note said `adv.e2e.mjs` was flaky. The cause was the battery-low check: it read `#aBatT` straight after switching the Simulate button off, before the next frame had redrawn it
+  (`'10%' !== '100%'`, about one run in two). The test now waits for the text; the assertion is unchanged. Six runs in a row passed after the fix.

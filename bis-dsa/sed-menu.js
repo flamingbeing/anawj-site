@@ -6,15 +6,15 @@ const sFmtOff=v=>v==null?'Off':String(v),sFmtU=u=>v=>v+' '+u;
 const SD_SIL=[30,60,120,300],sFmtSil=v=>v===30?'30 sec':(v/60)+' min';
 const sFmtPause=v=>v===0?'Permanent':v===-1?'Permanent with Reminder':(v/60)+' min';
 const sCap=s=>s.charAt(0)+s.slice(1).toLowerCase();
-const SD_ABOUT={psi:'The Patient State Index (PSi) is related to the effect of certain anesthetic agents on a patient.',
- dsa:'The Density Spectral Array (DSA) is a color representation of the power of the EEG between 0 and 30/40 Hz showing activity in the right and left areas of the brain using spectral edge frequency as the indices. The DSA represents the last 20 minutes of R and L frontal-prefrontal EEG activity tracked by the 95% Spectral Edge Frequency.',
- asym:'The asymmetry graph shows the degree of asymmetry in between the left and right hemispheres of the brain over time. The asymmetry parameter (ASYM) to the right of the graph indicates the percentage of EEG power present in the left or right hemisphere with respect to total EEG power present.',
- emg:'EMG (electromyography) is a measure of detected muscle activity, such as grimacing or jaw clenching. The EMG value varies from 0% to 100%.',
- sr:'Suppression Ratio (SR) is a measure of how much the electrical activity of the frontal and pre-frontal cortex of the brain is suppressed.',
- artf:'Artifact (ARTF) is a measure of how much physiological (non-brain related) and environmental noise the system detects.',
- sefl:'The Spectral Edge Frequency (SEF) identifies the frequency below which 95% of the total power of the patient’s EEG is located. SEF is a common EEG power signal processed parameter represented on the DSA display’s 0-30/40 Hz scale. 95% SEF power is displayed as a white horizontal line and as a value for both left and right frontal-prefrontal hemispheres of the brain. SEF values display the predominant EEG frequency and corresponding changes.',
- sefr:'The Spectral Edge Frequency (SEF) identifies the frequency below which 95% of the total power of the patient’s EEG is located. SEF is a common EEG power signal processed parameter represented on the DSA display’s 0-30/40 Hz scale. 95% SEF power is displayed as a white horizontal line and as a value for both left and right frontal-prefrontal hemispheres of the brain. SEF values display the predominant EEG frequency and corresponding changes.',
- st:'The Suppression Time (ST) is the cumulative time the EEG is under suppression.'};
+const SD_ABOUT={psi:'PSi is a single number for how deeply the brain is affected by anesthetic drugs. Lower values mean a deeper effect.',
+ dsa:'The DSA paints the EEG power at each frequency, left side above and right side below, as colors that change with time. It covers the last 20 minutes, and the white line marks the frequency below which most of the power lies.',
+ asym:'The asymmetry graph shows whether one side of the brain has more EEG power than the other. The number beside it is that difference as a percentage of the total power.',
+ emg:'EMG shows how much muscle activity the sensor picks up, for example from grimacing or a clenched jaw. It runs from 0% to 100%.',
+ sr:'SR is the share of recent time in which the EEG was flat (suppressed). It rises as anesthesia gets very deep.',
+ artf:'ARTF is the share of recent time in which the signal was spoiled by movement, muscle or electrical noise, not by the brain.',
+ sefl:'SEF is the frequency below which 95% of the EEG power lies. It follows the dominant speed of the EEG and falls as anesthesia deepens. The left side is shown here, as a number and as the white line on the DSA.',
+ sefr:'SEF is the frequency below which 95% of the EEG power lies. It follows the dominant speed of the EEG and falls as anesthesia deepens. The right side is shown here, as a number and as the white line on the DSA.',
+ st:'ST is the total time the EEG has been suppressed during this case.'};
 const SD_PN={psi:'PSi',dsa:'DSA',sefl:'SEFL',sefr:'SEFR',emg:'EMG',sr:'SR',artf:'ARTF',st:'ST'};
 const sTrendRows=(max,min,mx,mn,ss,hi)=>[{t:'sel',l:'Y-Axis Max',k:max,o:sRng(5,hi||100,5),f:null},{t:'sel',l:'Y-Axis Min',k:min,o:sRng(0,(hi||100)-5,5)}];
 // the pages: title, rows (sel = a list, tog = ON/OFF, nav = go to a page, btn = a button, txt = read-only text, info = a label and a value), ok = Cancel and OK shown

@@ -1,6 +1,6 @@
-# Fonts for the BIS VISTA screen
+# Fonts for the BIS simulator screens (Medtronic BIS, BIS Advance, Masimo SedLine)
 
-Self-hosted (no request to Google when the page loads). Latin subset, variable weight, from Google Fonts:
+Self-hosted (no request to Google when the page loads). None of the real monitors' own typefaces is bundled: every font here is an open-licence look-alike. Latin subset, variable weight, from Google Fonts:
 
 - `Arimo-latin-var.woff2`: Arimo (Apache License 2.0), Arial/Helvetica-metric look-alike. Used for the BIS number, labels and
   axis text of the BIS VISTA screen, which on the real monitor looks like Arial/Helvetica (the manufacturer does not publish

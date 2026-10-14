@@ -121,7 +121,7 @@ try {
     await page.click('[data-sim="expired"]'); await page.waitForFunction(() => /SENSOR EXPIRED/.test(document.querySelector('#aAl1').textContent), null, { timeout: 5000 }); await page.click('[data-sim="expired"]');
     await page.click('[data-sim="batt"]'); await page.waitForFunction(() => /BATTERY LOW/.test(document.querySelector('#aAl1').textContent), null, { timeout: 5000 });
     assert.equal(await txt(page, '#aBatT'), '10%'); assert.equal(await page.$eval('#aBolt', e => e.hidden), true, 'no mains bolt on battery'); assert.equal(await page.evaluate(() => ADV.msgs.some(m => m.text === 'AC power disconnected')), true);
-    await page.click('[data-sim="batt"]'); assert.equal(await txt(page, '#aBatT'), '100%'); assert.equal(await page.$eval('#aBolt', e => e.hidden), false);
+    await page.click('[data-sim="batt"]'); await page.waitForFunction(() => document.querySelector('#aBatT').textContent === '100%', null, { timeout: 3000 }); assert.equal(await txt(page, '#aBatT'), '100%'); assert.equal(await page.$eval('#aBolt', e => e.hidden), false);
     // the USB icon is in the bar; the hard keys on the case: function opens the main menu, home closes it, power does nothing
     assert.equal(await page.$eval('#aUsb', e => e.hidden), false);
     await page.click('#aHkFn'); assert.equal(await page.$$eval('#advOv .mm', e => e.length), 1); await page.click('#aHkHome'); assert.equal(await page.$$eval('#advOv .mm', e => e.length), 0); await page.click('#aHkPw'); assert.equal(await page.$$eval('#advOv .mm', e => e.length), 0);
