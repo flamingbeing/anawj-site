@@ -1,0 +1,41 @@
+// Run with: node logbook/test/sheet-outbox.test.mjs  (fake data only)
+// What a new app case sends to the response sheet's outbox (js/sheet-outbox.js).
+import assert from 'node:assert/strict';
+import { outboxEntry, outboxEntries, SHEET_OUTBOX_ON, outboxOn, setOutboxOn } from '../js/sheet-outbox.js';
+
+const who = { email: 'Fake.Person@Example.com', rid: '202301' };
+const c = { id: 'k1', date: '2026-10-14', initials: 'AB', details: '34F elective LSCS spinal', cats: ['16', '28'], createdAt: 1760400000000, updatedAt: 5, source: 'app', tags: ['x'], reflectTag: true };
+
+{
+  const e = outboxEntry(c, who);
+  assert.deepEqual(e, { id: 'k1', email: 'fake.person@example.com', rid: '202301', date: '2026-10-14', initials: 'AB',
+    details: '34F elective LSCS spinal', cats: ['16', '28'], createdAt: 1760400000000 });
+  assert.ok(!('tags' in e) && !('updatedAt' in e) && !('source' in e), 'only what the sheet needs');
+}
+// identifiers never leave the logbook
+assert.equal(outboxEntry({ ...c, details: 'S1234567D 34F hip, MRN 123456789' }, who).details, '[ID removed] 34F hip, MRN [ID removed]');
+// pasted cases go too; Form cases, imported rows and unknown sources do not
+assert.ok(outboxEntry({ ...c, source: 'paste' }, who));
+assert.equal(outboxEntry({ ...c, source: 'form' }, who), null);
+assert.equal(outboxEntry({ ...c, source: 'import' }, who), null);
+assert.equal(outboxEntry({ ...c, source: 'sheet' }, who), null);
+// not a programme resident (no rid): nothing
+assert.equal(outboxEntry(c, { email: who.email, rid: null }), null);
+assert.equal(outboxEntry(c, null), null);
+assert.equal(outboxEntry(null, who), null);
+// no date: the typed date text goes along
+{
+  const e = outboxEntry({ ...c, date: null, dateText: 'last Tue' }, who);
+  assert.equal(e.date, null); assert.equal(e.dateText, 'last Tue');
+}
+// limits the rules check
+{
+  const e = outboxEntry({ ...c, initials: 'X'.repeat(30), details: 'y'.repeat(3000), cats: ['01', '01', ...Array.from({ length: 50 }, (_, i) => String(i))] }, who);
+  assert.equal(e.initials.length, 20); assert.equal(e.details.length, 2000); assert.ok(e.cats.length <= 40); assert.equal(new Set(e.cats).size, e.cats.length);
+}
+assert.equal(outboxEntries([c, { ...c, id: 'k2', source: 'form' }, { ...c, id: 'k3', source: 'paste' }], who).map(e => e.id).join(), 'k1,k3');
+// off until the sheet script is live
+assert.equal(SHEET_OUTBOX_ON, false);
+assert.equal(outboxOn(), false);
+setOutboxOn(true); assert.equal(outboxOn(), true); setOutboxOn(null); assert.equal(outboxOn(), false);
+console.log('PASS sheet-outbox');

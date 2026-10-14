@@ -1163,7 +1163,7 @@ function planCard() {
     const now = Date.now();
     const cases = items.map((p, i) => ({ id: uid(), date: p.date, initials: p.initials || '', details: p.details || '', cats: sortCodes(p.cats || []), ...withTags(p), createdAt: now + i, updatedAt: now + i, source: 'paste' }));
     if (cases.some(c => !c.cats.length) && !opts.quiet && !(await confirmBox('No tag', 'Some of these have no tag yet. Log them anyway?', 'Log'))) return;
-    await saveMany(cases);
+    await saveMany(cases, { sheet: true });
     const gone = new Set(items.map(p => p.id));
     await savePlan(plan().filter(p => !gone.has(p.id)));
     toast(`Logged ${cases.length} case${cases.length === 1 ? '' : 's'}`, { action: 'Undo', onaction: async () => { await deleteMany(cases.map(c => c.id)); await savePlan([...plan(), ...items]); hooks.render(); } });
@@ -1207,7 +1207,7 @@ async function saveBulk(e) {
   const keep = bulkRows;
   bulkRows = null;
   try {
-    await saveMany(cases);
+    await saveMany(cases, { sheet: true });
     const restList = cases.map((c, i) => ({ c, rest: rows[i].rest })), restMade = restNotes(restList);
     if (draft.bulk === bulkText) draft.bulk = ''; saveDraft();   // (text added since Review stays in the box)
     toast(`Saved ${cases.length} cases${restSaid(restList)}`, { action: 'Undo', onaction: () => { binRest(restMade); return deleteMany(cases.map(c => c.id)).catch(err => toast('Could not undo: ' + err.message)); } });

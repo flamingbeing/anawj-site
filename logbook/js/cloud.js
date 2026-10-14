@@ -667,6 +667,20 @@ export async function commitFormPickup(email, items) {
   return done;
 }
 
+// New app cases for the response sheet (sheet-outbox.js). Each entry is its own small write; offline they wait in
+// Firestore's queue with the rest. An entry already there (a retried save) is refused by the rules: fine.
+export async function queueSheetRows(email, entries) {
+  if (demo || !entries.length) return;
+  const { db, F } = await sdk();
+  await Promise.allSettled(entries.map(e => queued(F.setDoc(F.doc(db, 'sheetOutbox', String(e.id)), plain(e)))));
+}
+// A case deleted before the script has picked it up. Best effort: an entry already gone has nothing to delete.
+export async function dropSheetRows(email, ids) {
+  if (demo || !ids.length) return;
+  const { db, F } = await sdk();
+  await Promise.allSettled(ids.map(id => queued(F.deleteDoc(F.doc(db, 'sheetOutbox', String(id))))));
+}
+
 // The one-off initials fix (the app owner): every logbook's email, then the fixed cases written back.
 // fixes: [{ id, initials, details }] from engine.js initialsFixes. onProgress(done, total) after each batch.
 export async function listLogbookEmails() {

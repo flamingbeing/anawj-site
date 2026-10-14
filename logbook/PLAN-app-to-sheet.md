@@ -1,6 +1,6 @@
 # Plan: new app cases → the programme's response sheet (teething phase)
 
-Owner, 14 Oct 2026. Status: **planned, not built**; waiting for the owner's go. Product version only (no names or
+Owner, 14 Oct 2026. Status: **owner said go (14 Oct 2026)**; the app side, rules and tests are built (PR 1, off by a constant until the sheet script is live); the sheet script is written and unit-tested (`form-script/Outbox.gs`, setup in `form-script/OUTBOX-README.md`) but not installed anywhere: next is a dry run on a **copy** of the sheet (owner's OK first). Product version only (no names or
 case data here).
 
 ## Why
@@ -60,3 +60,27 @@ The other direction already exists: Form → logbook (`form-script/`, `js/form-i
 - Two places to log during the teething phase: a case logged in both shows twice in the sheet (and once in each
   place in the logbook if the Form one is picked up): MOs are told to use one.
 - Off switch: delete the trigger, or remove `formBots/{uid}` (also stops the Form inbox).
+
+## Rollout order
+
+1. PR 1 (this): app side (`js/sheet-outbox.js`, `SHEET_OUTBOX_ON = false`), the `sheetOutbox` rules (**waits for the
+   owner's approval**: it deploys live on merge), the Admin import skipping `app:` rows, tests.
+2. The sheet script in a **copy** of the sheet (dry run, with the owner's OK to make the copy), then the real sheet.
+3. One line: `SHEET_OUTBOX_ON = true` in `js/sheet-outbox.js`. Until then no entries are written, so none pile up.
+Off switch afterwards: delete the script's trigger, or set the constant back to false.
+
+One thing the owner should know: the sheet script signs in as the **same bot** as the Form inbox. With these rules that
+bot can also read and delete `sheetOutbox` entries (case text with identifiers masked, and the resident's rid and
+email); it still can't read logbooks, cases or the Form inbox. A separate bot account would keep the two apart.
+
+## What Firetop found in the real sheet's script (read-only, 14 Oct)
+
+- The sheet's script is container-bound ("APMES Case Numbers", owner account, V8, Asia/Singapore). Its `onFormSubmit`
+  (installable on-form-submit trigger) takes the document lock (10 s wait), reads the new row **only** from
+  `event.range` (A–H), then `updateDatabase`, `updateResidentReport(rid)`, `updateAYSummaryReport(ay)`, metadata, and
+  re-sorts the whole Case tab by H descending. A script that adds rows itself does **not** fire it, so `Outbox.gs` runs the
+  same chain under the same lock (one entry per hold, pausing between, so a Form response isn't missed).
+- Database rows are one per category, from D–G split on commas; `B` must be a real date (else Year/Month/Week are blank);
+  the AY comes from the resident id's first four digits. The Case tab has 9 columns (A–I); **column J doesn't exist yet**
+  (setup adds the header "App marker"); the sheet's script uses no Script properties.
+- Deleting or editing a Case row doesn't update Database or reports (only the menu's Rebuild does): same for app rows.

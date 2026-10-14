@@ -6,6 +6,7 @@ import { countCases, uid, todayISO, sortCodes, progress, rYearDefault, academicY
 import * as cloud from './cloud.js';
 import { reflectionCounts } from './reflections.js';
 import { writes } from './writes.js';
+import { outboxOn, outboxEntries } from './sheet-outbox.js';
 import { transients } from './transients.js';
 import { shownIn, switchPatch, mergeSettings } from './profiles.js';
 
@@ -443,8 +444,18 @@ export async function createCase({ id, createdAt, date, details, initials, cats,
   const saved = await writes.save('case', owner, c, null);
   if (S.user?.email !== owner) throw new Error('Account changed; this save belongs to the previous account');
   applyLocal(list => [saved, ...list.filter(x => x.id !== saved.id)]);
+  toSheet([saved]);
   return saved;
 }
+
+// New app cases also go to the response sheet's outbox (sheet-outbox.js): programme residents only, never waited for
+// and never a reason for a save to fail.
+function toSheet(cases) {
+  const who = outboxOn() && S.resident && S.logbook?.rid === S.resident.rid ? { email: mine(), rid: S.resident.rid } : null;
+  const entries = who ? outboxEntries(cases, who) : [];
+  if (entries.length) cloud.queueSheetRows(who.email, entries).catch(err => console.warn('Sheet outbox not queued', err));
+}
+const offSheet = ids => { if (outboxOn() && S.resident) cloud.dropSheetRows(mine(), ids).catch(() => {}); };
 
 export async function updateCase(c, { base = S.cases.find(x => x.id === c.id) || null } = {}) {
   const next = { ...c, cats: sortCodes(c.cats), updatedAt: Date.now() };
@@ -464,6 +475,7 @@ export async function removeCase(id, base = S.cases.find(x => x.id === id) || nu
   await writes.save('case', owner, { id, _deleted: true }, base);
   if (S.user?.email !== owner) throw new Error('Account changed; this delete belongs to the previous account');
   applyLocal(list => list.filter(x => x.id !== id));
+  offSheet([id]);
 }
 
 export async function restoreCase(c, base = S.cases.find(x => x.id === c.id) || null) {
@@ -473,19 +485,22 @@ export async function restoreCase(c, base = S.cases.find(x => x.id === c.id) || 
   applyLocal(list => [saved, ...list.filter(x => x.id !== c.id)]);
 }
 
-export async function saveMany(cases) {
+// opts.sheet: cases made now by pasting (also queued for the response sheet); restores and edits are not
+export async function saveMany(cases, { sheet = false } = {}) {
   applyLocal(list => {
     const byId = new Map(list.map(c => [c.id, c]));
     for (const c of cases) byId.set(c.id, c);
     return [...byId.values()];
   });
   await cloud.saveCases(mine(), cases);
+  if (sheet) toSheet(cases);
 }
 
 export async function deleteMany(ids) {
   const set = new Set(ids);
   applyLocal(list => list.filter(c => !set.has(c.id)));
   await cloud.deleteCases(mine(), ids);
+  offSheet(ids);
 }
 
 export async function patchLogbook(patch) {

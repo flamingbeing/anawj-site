@@ -130,6 +130,8 @@ function findCol(header, ...names) {
 
 // ---------- Case tab ----------
 
+const APP_MARK_COL = 9;   // column J
+
 // rows: the "Case" tab as row arrays, header row included (it is found within the first 10 rows).
 // Returns { cases, skipped:[{row, reason}], warnings:[{row, message}] }. row numbers are 1-based sheet rows.
 export function parseCaseSheet(rows) {
@@ -164,6 +166,8 @@ export function parseCaseSheet(rows) {
       continue;
     }
     if (norm(residentLabel) === 'wrong entry') { skipped.push({ row: rowNo, reason: 'WRONG ENTRY' }); continue; }
+    // rows the sheet script added for cases logged in the app (column J: 'app:<caseId>'; sheet-outbox.js): already in the logbook
+    if (/^app:/i.test(cellText(r[APP_MARK_COL]).trim())) { skipped.push({ row: rowNo, reason: 'Made in the app' }); continue; }
     const rid = ridOf(residentLabel);
     if (!rid) warnings.push({ row: rowNo, message: `No resident id in "${residentLabel}"` });
 

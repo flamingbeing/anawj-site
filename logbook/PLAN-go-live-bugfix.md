@@ -60,3 +60,18 @@ Each finding: a failing emulator test first, then the fix, then the test passing
   until the weekly full read (server timestamps would need a rules change); a sign-out not made from the button (another
   tab, a revoked Google session) drops unsent changes without asking. 7 (imports) and 9 (app left open for days) not
   tested yet.
+
+### Parked findings (Firetop's reruns on main 4a4459c, Windows, 14 Oct; owner: back to bug-fixing later)
+
+- Firefox seeds 631997706 and one random run pass; conflicts scenarios all pass on Firefox.
+- **Open:** Firefox random run, seed 285932884, round 16: device 3 still shows a stale copy of a case (`stale`) that
+  was created, deleted, restored (bin), edited by two devices (one offline), where device 3's own edit conflicted
+  in round 10; its save queue still holds the `conflict` entry and the server has another version. Replay with
+  `BROWSER=firefox SEED=285932884 DEVICES=5 ROUNDS=16 tools/test-multidevice.sh`. Either the conflicted device should
+  show the server's version (overlay of a conflict uses `job.remote`, which may be an older remote) or the test's
+  expectation is wrong; check `writes.overlay` for a `conflict` entry whose `remote` is older than the server's.
+- WebKit on Windows can't reach the emulator reliably ("access control checks", Listen channel errors): treat as
+  environment until a Mac or Linux WebKit run says otherwise. `TEST=conflicts` on WebKit: `editVsDelete` failed with no
+  connection error before it (device B's delete said it saved, isn't on the server, isn't in Recent changes): worth a
+  look on a working WebKit.
+- The harness runs on Windows as is (a leftover Firestore emulator java can hold ports 8087/9087 after an aborted run).
