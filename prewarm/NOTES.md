@@ -388,3 +388,9 @@ reading) replaces `alerted`. Still only while the app is open: a lock-screen ala
 The green "complete" shortcuts on the patient screen also get a ✓ before the label (not colour alone, red-green colour
 blindness), and their spoken label is "POD1, complete" instead of just "complete". Taller tap targets for the reading
 tabs were tried and dropped: they push Save below the fold on a phone (the e2e test pins that).
+
+### The number pad chains through the boxes (14 Oct 2026)
+On the temperature and BP/HR/BIS screens the pad has a Next button for every box that takes a number (not the gown set
+temp or yes/no boxes), and three digits of a temperature (like 366) save it and open the next box's pad by themselves:
+about 5 taps fewer per reading. Back closes the chain. Edge tests close the next pad after a 3-digit entry. Not done: the
+late-reading time still uses the browser's `prompt()` (`askTime`), because the save flow waits for its answer.

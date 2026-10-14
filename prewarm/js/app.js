@@ -1060,7 +1060,9 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
   // the quick-entry pads (owner, 13 Oct 2026): a number pad for a box, a time pad for a key time
   function openCell(k) {
     const c = cols.find(x => x.key === k); if (!c) return;
-    const i = cols.indexOf(c), nxt = s === 'haemo' ? cols[i + 1] : null;
+    // Next goes to the following box that takes a number (the gown set temp and yes/no boxes use taps, not the pad);
+    // three digits of a temperature save it and move on by themselves (14 Oct 2026: about 5 taps fewer per reading)
+    const padCols = cols.filter(x => (x.type === 'num' || x.type === 'int') && x.key !== 'set'), nxt = padCols[padCols.indexOf(c) + 1] || null;
     openKeypad({ title: c.label + (c.unit ? ' ' + c.unit : ''), mode: s === 'haemo' ? 'int' : c.temp ? 'temp' : 'dec', value: draft[k] ?? '',
       hint: was[k] != null ? 'was ' + was[k] : '',
       onDone: v => { draft[k] = v === '' ? null : v; draw(); lockTaps(); },
