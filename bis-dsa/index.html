@@ -104,7 +104,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .mixrow label{font-size:15px}
 .mixrow output{font:600 14px/1 var(--f-mono);font-variant-numeric:tabular-nums;color:var(--accent)}
 .mixrow input{grid-column:1/-1}
-.lane{display:grid;gap:6px;min-width:0}
+.lane{display:grid;gap:6px;min-width:0}.lane[hidden]{display:none}
 .key{display:inline-block;width:14px;height:3px;vertical-align:middle;margin-left:4px;border-radius:2px}
 .key.bis{background:#fff}.key.emg{background:#5fd08f;height:1px}
 .err{font-size:14px;color:var(--bad)}
@@ -175,13 +175,13 @@ footer{font-size:13px;color:var(--muted);max-width:80ch;border-top:1px solid var
       <canvas id="cTrend" height="88" aria-label="BIS and EMG trends over the last five minutes"></canvas></div>
       <div class="lane" id="wDsa"><div class="lbl"><span>DSA · 0–30 Hz</span><span>last 5 min</span></div>
       <canvas id="cDsa" height="190" aria-label="Density spectral array over the last five minutes"></canvas></div>
-      <div class="lane" id="wEeg"><div class="lbl"><span id="eegLbl">EEG · 8 s</span><span id="eegDiv" style="text-transform:none">25 µV/div</span></div>
+      <div class="lane" id="wEeg"><div class="lbl"><span id="eegLbl">EEG · 8 s</span><span id="eegDiv" style="text-transform:none">50 µV/div</span></div>
       <canvas id="cEeg" height="110" aria-label="Scrolling raw EEG trace"></canvas></div>
       <div class="softkeys" id="viewSeg" role="group" aria-label="Screen view">
         <button data-view="both" aria-pressed="true">DSA + EEG</button><button data-view="dsa" aria-pressed="false">DSA + BIS</button><button data-view="eeg" aria-pressed="false">EEG</button>
       </div>
       <div class="softkeys two" id="keySeg" role="group" aria-label="Monitor settings">
-        <button id="kSmooth">Smoothing 15 s</button><button id="kScale">EEG ±50 µV</button>
+        <button id="kSmooth">Smoothing 15 s</button><button id="kScale">EEG ±100 µV</button>
       </div>
     </div></div>
     <div class="panel">
@@ -292,7 +292,7 @@ footer{font-size:13px;color:var(--muted);max-width:80ch;border-top:1px solid var
       <tr><td><a href="https://doi.org/10.1056/NEJMoa0707361">B-Unaware 2008</a> / <a href="https://doi.org/10.1056/NEJMoa1100403">BAG-RECALL 2011</a></td><td>BIS was not better than an end-tidal anaesthetic gas alarm protocol at preventing awareness.</td></tr>
       <tr><td><a href="https://doi.org/10.1093/bja/aeu313">NAP5 2014</a></td><td>Accidental awareness about 1:19,600 overall, about 1:8,200 with a muscle relaxant; most at induction or emergence.</td></tr>
       <tr><td><a href="https://doi.org/10.1001/jama.2018.22005">ENGAGES 2019</a></td><td>EEG-guided anaesthesia in older patients did not reduce postoperative delirium.</td></tr>
-      <tr><td><a href="https://doi.org/10.1016/j.bja.2021.07.021">Balanced 2021</a></td><td>Targeting BIS 50 rather than 35: delirium 19% vs 28%.</td></tr>
+      <tr><td><a href="https://doi.org/10.1016/j.bja.2021.07.021">Balanced 2021</a> (delirium sub-study)</td><td>Targeting BIS 50 rather than 35 gave delirium 19% vs 28%. A secondary outcome: 1-year mortality, the primary outcome, was no different (<a href="https://doi.org/10.1016/S0140-6736(19)32315-3">Short 2019</a>, Lancet).</td></tr>
       <tr><td><a href="https://doi.org/10.1111/anae.14428">AAGBI/SIVA TIVA guideline 2018</a></td><td>Use processed EEG when TIVA is given with a muscle relaxant.</td></tr>
       <tr><td><a href="https://www.nice.org.uk/guidance/dg6">NICE DG6</a></td><td>Depth-of-anaesthesia monitors are an option in patients at higher risk of awareness or excessively deep anaesthesia, and in all patients having TIVA.</td></tr>
     </tbody>

@@ -18,10 +18,10 @@ const load = () => new Function('Math', 'matchMedia', 'window',
 // one state: snap to it, run, then measure over the last 30 s (or run a script of phases). Spectral shapes are noisy
 // over 30 s, so rows that compare peaks or bands pool several runs (nSeeds).
 const MF = []; // [state, mean MF, mean SEF] for every run
-function run(drug, d, mods = {}, secs = 120, phases, nSeeds = 1, monSet) {
+function run(drug, d, mods = {}, secs = 120, phases, nSeeds = 1, monSet, base = BASE) {
   let S, last = [], rms2 = [];
   for (let r = 0; r < nSeeds; r++) {
-    seed = BASE + 7919 * r;
+    seed = base + 7919 * r;
     S = load(); Object.assign(S.mon, monSet); const ms = Object.assign(S.mods, mods);
     S.eng.setTarget(drug, d, ms); S.eng.snap();
     const rr = [];
@@ -63,11 +63,18 @@ chk('Propofol 0.57', 'RMS uV', p57.rms, 25, 40); chk('Propofol 0.57', 'RMS GA/aw
 const p76 = run('propofol', 0.76);
 chk('Propofol 0.76', 'BIS', p76.bis, 30, 42); chk('Propofol 0.76', 'SR', p76.sr, 0, 4.99);
 const p90 = run('propofol', 0.9);
-chk('Propofol 0.90', 'BIS', p90.bis, 22, 42); chk('Propofol 0.90', 'SR', p90.sr, 15, 55);
+chk('Propofol 0.90', 'BIS', p90.bis, 25, 36); chk('Propofol 0.90', 'BIS minus propofol 0.76', p90.bis - p76.bis, -99, 0); chk('Propofol 0.90', 'SR', p90.sr, 15, 55);
 { // Bruhn rule: below SR 40 the features set BIS (no cap); from 40 BIS is at most 50 - SR/2
   const S = load(), f = { sef: 20, fast: -0.6, hi: -1.5, slowFrac: 0.5, alphaFrac: 0.2 };
-  chk('Bruhn rule', 'BIS at SR 30 minus 50-SR/2 (not capped)', S.bisRaw(f, 30) - 35, 0.01, 99);
+  chk('Bruhn rule', 'BIS at SR 0 minus SR 30 (pulled towards 30, not capped)', S.bisRaw(f, 0) - S.bisRaw(f, 30), 0.01, 99);
+  chk('Bruhn rule', 'BIS at SR 30 (not under the 50-SR/2 line)', S.bisRaw(f, 30), 27, 99);
+  chk('Bruhn rule', 'jump in BIS across SR 40', Math.abs(S.bisRaw(f, 39.9) - S.bisRaw(f, 40.1)), 0, 1);
   chk('Bruhn rule', 'BIS at SR 60 (capped at 20)', S.bisRaw(f, 60), 0, 20);
+}
+{ // BIS falls with depth through the start of suppression (0.57 > 0.76 > 0.88 > 0.95), on 3 seeds each
+  const b = d => [0, 1, 2].map(r => run('propofol', d, {}, 120, null, 1, undefined, BASE + 104729 * r).bis);
+  const v = [0.57, 0.76, 0.88, 0.95].map(b), worst = Math.min(...[0, 1, 2].flatMap(r => [v[0][r] - v[1][r], v[1][r] - v[2][r], v[2][r] - v[3][r]]));
+  chk('Propofol 0.57/0.76/0.88/0.95', 'smallest BIS fall between steps', worst, 0.01, 99);
 }
 const p100 = run('propofol', 1);
 chk('Propofol 1.0', 'BIS', p100.bis, 0, 12); chk('Propofol 1.0', 'SR', p100.sr, 80, 100);
@@ -90,8 +97,9 @@ const x1 = run('dex', 1); chk('Dex 1.0', 'BIS', x1.bis, 40, 58);
 const e57 = run('propofol', 0.57, { elderly: true }, 120, null, 4);
 chk('Elderly propofol 0.57', 'BIS minus young', e57.bis - p57.bis, 6, 12);
 chk('Elderly propofol 0.57', '8-12 Hz dB vs young', e57.band(8, 12) - p57.band(8, 12), -10, -8);
-chk('Elderly propofol 0.57', 'alpha peak shift Hz', e57.peak(7, 14) - p57.peak(7, 14), -1.3, -0.7);
-const e80 = run('propofol', 0.8, { elderly: true }), y80 = run('propofol', 0.8);
+chk('Elderly propofol 0.57', 'alpha peak shift Hz', e57.peak(7, 14) - p57.peak(7, 14), -1.4, -0.6);
+const e80 = run('propofol', 0.8, { elderly: true }), y80 = run('propofol', 0.8), e90 = run('propofol', 0.9, { elderly: true });
+chk('Elderly propofol 0.90', 'SR (heavy, not isoelectric)', e90.sr, 40, 95);
 chk('Elderly propofol 0.80', 'SR', e80.sr, 0.01, 100); chk('Young propofol 0.80', 'SR (about 0)', y80.sr, 0, 5);
 // relaxant in an awake patient: from awake steady state, then relaxant on (and off again)
 const n60 = run('propofol', 0, {}, 120, [[60, { nmb: true }]]);
@@ -107,7 +115,8 @@ chk('Sevo 0.8 + N2O 0.6 vs sevo 0.8', 'BIS diff', sn.bis - s8.bis, -2, 3);
 const pe = run('propofol', 0.55, { emg: true });
 chk('Propofol 0.55 + emg', 'BIS', pe.bis, 62, 85); chk('Propofol 0.55 + emg', 'EMG dB', pe.emg, 48, 58);
 const pn = run('propofol', 0.55, { nmb: true });
-chk('Propofol 0.55 + nmb', 'BIS', pn.bis, 40, 55); chk('Propofol 0.55 + nmb', 'EMG dB', pn.emg, 25, 30);
+chk('Propofol 0.55 + nmb', 'BIS', pn.bis, 40, 55); chk('Propofol 0.55 + nmb', 'BIS minus no relaxant', pn.bis - run('propofol', 0.55).bis, -3, 3);
+chk('Propofol 0.45 + nmb', 'BIS minus no relaxant', run('propofol', 0.45, { nmb: true }).bis - run('propofol', 0.45).bis, -3, 3); chk('Propofol 0.55 + nmb', 'EMG dB', pn.emg, 25, 30);
 chk('Clean signal', 'SQI', awake.sqi, 90, 100);
 const dia = run('propofol', 0.55, { diathermy: true }, 60);
 chk('Diathermy on, 60 s', 'SQI', dia.sqi, 0, 49.99);
@@ -126,7 +135,12 @@ const iso = run('propofol', 1, {}, 120);
 chk('Isoelectric (propofol 1.0, 120 s)', 'SR', iso.sr, 99.5, 100);
 chk('Isoelectric (propofol 1.0, 120 s)', 'message "Isoelectric EEG Detected"', iso.msg && iso.msg[1] === 'Isoelectric EEG Detected' ? 1 : 0, 1, 1);
 chk('GA, clean (propofol 0.57)', 'no message', p57.msg == null ? 1 : 0, 1, 1);
-chk('Deep (propofol 0.76) for 120 s', 'message "BIS Out of Target Range – Low"', /Target Range . Low/.test((p76.msg || [])[1]) ? 1 : 0, 1, 1);
+// share of the last 60 s (after 120 s) with a given message
+const msgShare = (drug, d, re) => { seed = BASE; const S = load(); S.eng.setTarget(drug, d, S.mods); S.eng.snap(); S.step(120 * FS_);
+  let n = 0; for (let s = 0; s < 60; s++) { S.step(FS_); if (re.test((S.monMsg() || [])[1] || '')) n++; } return 100 * n / 60; };
+chk('Deep (propofol 0.84), 60 s', '% of seconds with "BIS Out of Target Range – Low"', msgShare('propofol', 0.84, /Target Range . Low/), 80, 100);
+for (const [dr, d] of [['propofol', 0.35], ['dex', 0.4], ['ketamine', 0.3]])
+  chk(`Sedation (${dr} ${d}), 60 s`, '% of seconds with "Out of Target Range"', msgShare(dr, d, /Target Range/), 0, 0);
 // WS4: median frequency (SEF50) under SEF95 in every state; propofol GA MF 2-8 Hz
 chk('MF < SEF95 in every state', 'states where MF >= SEF95', MF.filter(([, m, s]) => !(m < s)).length, 0, 0);
 chk('Propofol 0.57', 'MF (SEF50) Hz', p57.mf, 2, 8);

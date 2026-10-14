@@ -40,7 +40,8 @@ Lasting decisions for `bis-dsa/`. Status and next steps: `STATUS.md`.
   button shows pressed while it runs and the reading adds a sentence.
 - **Messages** (`monMsg()`, wording from the BIS Complete manual): high (red, flashing; solid with reduced motion):
   "Isoelectric EEG Detected" (every second flat for 60 s), "BIS Out of Target Range – Low/High" (shown BIS outside
-  40–60 for 10 s while a hypnotic is on, depth ≥ 0.3; only with the target band on); low (yellow): "Data unavailable due
+  40–60 for 10 s with a GA-level propofol/sevo hypnotic, depth ≥ 0.44, so not for sedation, dex or ketamine; once
+  shown it clears only when BIS is back inside 42–58; only with the target band on); low (yellow): "Data unavailable due
   to poor signal quality" (SQI < 15), "Excessive Artifact Detected in Signal" (SQI < 50); info (grey): "Smoothing Rate
   Changed to xx Seconds" for 5 s. `#vMsg` is `aria-live`, updated only when the text changes.
 - **Trend**: BIS thick white on a 0–100 left axis, EMG thin green on a 30–80 dB right axis, artefact bar along the time
@@ -48,8 +49,9 @@ Lasting decisions for `bis-dsa/`. Status and next steps: `STATUS.md`.
   start ends at the real time), so the axis matches at any speed. Target band 40–60 "set by user" is a teaching
   default; real monitors default to Inactive.
 - **DSA**: SEF95 white line and MF (SEF50, 50% of 0.5–30 Hz power) purple `#b47cff` line, numbers top right, δ θ α β
-  labels on the right edge.
-- **EEG lane**: ±50 µV full height by default (25 µV/div), soft key cycles ±25/50/100/250; about 5 s across on a
+  labels on the right edge. SEF and MF (lines, numbers, SEF tile) are a moving mean over the smoothing window of
+  unsuppressed, clean seconds, and blank (`--`) after 30 s without one (a long flat EEG). MF is drawn thinner at 70%.
+- **EEG lane**: ±100 µV full height by default (50 µV/div; at ±50 about 11% of propofol GA samples clipped), soft key cycles ±25/50/100/250; about 5 s across on a
   phone, 8 s on a desktop, 1-s ticks; "ARTIFACT" (amber) during artefact seconds.
 - **Smoothing** soft key 10/15/30 s (default 15): a moving average of the last N artefact-free raw values.
 - **Teaching labels** (Display checkbox, on by default, per device in `localStorage` `bisdsa.teach`): the zone pill,
@@ -79,9 +81,9 @@ Lasting decisions for `bis-dsa/`. Status and next steps: `STATUS.md`.
 - Awake EEG is small (about 10 µV RMS, one shared `AWAKE` keyframe); propofol GA is about 3× the amplitude (Purdon
   2015: anaesthetised EEG has 5–20× the power).
 - BIS shown is a **teaching model**, not the proprietary algorithm: a linear fit on SEF95, fast-power fraction,
-  30–47 Hz fraction, slow and alpha fractions, minus 0.25 × SR, stretched, then averaged over the last 15 clean seconds.
-  **Bruhn rule** (Bruhn 2000): below SR 40% the features set BIS; from SR 40% BIS is at most `50 − SR/2`. So
-  suppression often shows with BIS in the 30s–40s, as in practice.
+  30–47 Hz fraction, slow and alpha fractions, pulled towards 30 by √(SR/40) while SR is under 40 (Bruhn 2000: BIS about flat there, near
+  30, and never rising with depth), stretched, then averaged over the last 15 clean seconds. **Bruhn rule**: from SR
+  40% BIS is at most `50 − SR/2`, which meets the pull at 30 with no jump. Suppression shows with BIS in the 30s.
 - SR as in the BIS manual: each second is split into four 0.25-s sub-blocks; a sub-block is suppressed if it stays within
   ±5 µV of its mean; SR is the suppressed share over the last 63 s (`features().supFrac`). BC (bursts per minute) shows
   `--` when SR is under 5 or SQI under 50.
@@ -131,7 +133,8 @@ Lasting decisions for `bis-dsa/`. Status and next steps: `STATUS.md`.
 | Propofol 0.17 | 80–95 | beta (13–25 Hz) above awake |
 | Propofol 0.57 | 40–55 | SEF95 12–17 Hz; RMS 25–40 µV and ≥ 3× awake |
 | Propofol 0.76 | 30–42 | SR under 5 |
-| Propofol 0.90 | 22–42 | SR 15–55; not capped while SR < 40 |
+| Propofol 0.90 | 25–36, not above 0.76 | SR 15–55; not capped while SR < 40 |
+| Propofol 0.57 > 0.76 > 0.88 > 0.95 | falls at each step | 3 seeds |
 | Propofol 1.0 | 0–12 | SR 80 or more |
 | Sevo 0.55 | 40–55 | theta peak 4.5–5.5 Hz; alpha 1–3 dB above propofol 0.55 |
 | Sevo 1.0 | 15–40 | SR at most 60 (never flat) |
@@ -139,14 +142,15 @@ Lasting decisions for `bis-dsa/`. Status and next steps: `STATUS.md`.
 | Mix ketamine 1.0 vs single 1.0 | within 6 | |
 | Propofol + ketamine preset | 58–70 | |
 | Dex 0.4 / 1.0 | 55–72 / 40–58 | 0.4: 0.5–1 Hz ≥ 10 dB below propofol 0.57 |
-| Older, propofol 0.57 | young +6 to +12 | 8–12 Hz 8–10 dB lower; alpha peak 0.7–1.3 Hz lower |
-| Older, propofol 0.80 | | SR above 0 (young: about 0) |
+| Older, propofol 0.57 | young +6 to +12 | 8–12 Hz 8–10 dB lower; alpha peak 0.6–1.4 Hz lower |
+| Older, propofol 0.80 / 0.90 | | SR above 0 (young: about 0) / SR 40–95, not isoelectric |
 | Awake + relaxant at 60 s / 300 s | 75–85 / 45–62 | EMG under 30 at 60 s; relaxant off again: above 85 after 120 s |
 | Propofol 3 ± remi 4 | within 3 | |
 | Sevo 0.8 + N₂O 0.6 vs sevo 0.8 | −2 to +3 | |
-| Propofol 0.55 + EMG / + relaxant | 62–85 / 40–55 | EMG 48–58 / 25–30 dB |
+| Propofol 0.55 + EMG / + relaxant | 62–85 / 40–55 | EMG 48–58 / 25–30 dB; relaxant at 0.45 and 0.55 moves BIS ≤ 3 |
 | Clean / diathermy 120 s | | SQI ≥ 90 / under 50; EMG in bursts ≥ 10 dB over clean |
 | Propofol 1.0 for 120 s | | SR 100 and "Isoelectric EEG Detected" |
+| Propofol 0.8 / propofol 0.35, dex 0.4, ketamine 0.3 | | "Out of Target Range – Low" ≥ 80% of 60 s / never |
 | Every state | | MF < SEF95; propofol 0.57 MF 2–8 Hz |
 | Smoothing 10 vs 30 s, awake → 0.57 | | within 5 of final ≥ 5 s sooner with 10 s |
 | Propofol 0.57 + warmer | 68–82 | EMG ≥ 10 dB over no warmer; 8–12 Hz within 1 dB; 120–150 s after off within 5 |
@@ -156,7 +160,7 @@ Lasting decisions for `bis-dsa/`. Status and next steps: `STATUS.md`.
 ## Case story (`STORY`)
 
 Pre-induction with blinks → propofol bolus (paradoxical excitation) → loss of consciousness (two bands) → too deep
-(burst suppression; BIS in the 30s, under 30 once SR passes 40%) → infusion reduced → incision with no opioid (alpha
+(propofol 0.93: burst suppression; BIS in the 30s, under 30 once SR passes 40%, about 60 s in) → infusion reduced → incision with no opioid (alpha
 dips, facial EMG, BIS up; surgical stimulus) → analgesia topped up (EMG gone; relaxant only if surgery needs it) →
 diathermy for 60 s at 400 s (hollow, `--`, artefact bar; the spec asked for 20 s, but SQI looks back 63 s and only
 falls under 50 after about a minute of diathermy) → emergence with blinks → end (570 s).
@@ -167,11 +171,12 @@ falls under 50 after about a minute of diathermy) → emergence with blinks → 
   then mid-40s (Schuller 2015; 33 and 9 in Messner 2003); older patients 2–3× smaller amplitude, alpha ~9 dB lower and
   ~1 Hz slower (Purdon 2015); Bruhn rule (SR 40%); remifentanil no BIS effect at rest (Guignard 2000); ketamine gamma
   27–40 Hz mostly above the 0–30 Hz DSA (Akeju 2016); dex spindles 9–15 Hz; sevo theta ~5 Hz from about 1 MAC; sevo
-  at the slider end is "Very deep (about 2 MAC)", not isoelectric; BIS lag 15 s to over 2 min (Pilge 2006).
+  at the slider end is "Very deep (over 2 MAC)" (SR 40–60, epileptiform spikes not simulated); single-drug sevo ticks
+  read the mix MAC map backwards (0.5 ≈ 0.7 MAC, 0.75 ≈ 1.5 MAC, 1.0 over 2 MAC); BIS lag 15 s to over 2 min (Pilge 2006).
 - Pitfall cards each end with a source line (DOI or PubMed links). New cards: "Read SR, not just BIS" (Bruhn 2000) and
   "Validated in adults" (Cornelissen 2015, infants).
 - "What the trials say" table, each row linked by DOI: B-Aware 2004, B-Unaware 2008 / BAG-RECALL 2011, NAP5 2014,
-  ENGAGES 2019, Balanced 2021, AAGBI/SIVA TIVA guideline 2018, NICE DG6.
+  ENGAGES 2019, Balanced 2021 (delirium sub-study; primary outcome 1-year mortality no different, Short 2019), AAGBI/SIVA TIVA guideline 2018, NICE DG6.
 
 ## Lessons
 

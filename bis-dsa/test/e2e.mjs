@@ -47,10 +47,10 @@ try {
     const dsa0 = await page.$eval('#cDsa', c => c.clientHeight), eeg0 = await page.$eval('#cEeg', c => c.clientHeight);
     await page.click('#viewSeg [data-view="dsa"]');
     await page.waitForFunction(h => document.querySelector('#cDsa').clientHeight > h + 50, dsa0);
-    assert.ok(await page.$eval('#wEeg', e => e.hidden), 'EEG hidden in DSA view');
+    assert.ok(await page.$eval('#wEeg', e => e.hidden && getComputedStyle(e).display === 'none' && e.offsetHeight === 0), 'EEG hidden in DSA view');
     await page.click('#viewSeg [data-view="eeg"]');
     await page.waitForFunction(h => document.querySelector('#cEeg').clientHeight > h + 50, eeg0);
-    assert.ok(await page.$eval('#wDsa', e => e.hidden), 'DSA hidden in EEG view');
+    assert.ok(await page.$eval('#wDsa', e => e.hidden && getComputedStyle(e).display === 'none' && e.offsetHeight === 0), 'DSA hidden in EEG view');
     await page.click('#viewSeg [data-view="both"]');
     await page.waitForFunction(([d, e]) => document.querySelector('#cEeg').clientHeight === e && document.querySelector('#cDsa').clientHeight === d, [dsa0, eeg0]);
     // monitor first: on a phone the monitor and the drug and depth controls are near the top
