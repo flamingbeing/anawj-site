@@ -427,8 +427,11 @@ first, as before, and a reading with nothing but carried boxes is the "blank" ca
 temp still carry as before. Tests confirm grey boxes first (`confirmDefaults` in edge.e2e, the fullcase `temps()`).
 
 ### Less scrolling on the sub-pages (14 Oct 2026)
-On Intra-op details, PACU, Pre-op, POD1 and POD2 (and the nurse's PACU page) a question with a box, or with short answers
-(Yes / No, 0 1 2), has its label on the left and the answer on the right, one row instead of two. Longer lists (pain 0-10,
-GA (Inhalational) / GA (TIVA), Normal / Abnormal / Not done) keep their own line (`.fld.short` / `.longopt` set in
-`fieldHtml`, the rest by `:has()` in style.css). At 390 px: Pre-op 5.0 to 3.4 screens, POD1 2.5 to 1.8, POD2 3.8 to 2.7,
-PACU 2.2 to 1.7, Intra-op 1.7 to 1.4. The Temp and BP, HR, BIS screens are unchanged (owner: fine as they are).
+Hybrid, ease of entry first (owner: "if the gains are minimal you can hybrid"). On a phone (under 700 px), on Intra-op
+details, PACU, Pre-op, POD1, POD2 and the nurse's PACU page: boxes (numbers, dates, text) sit two to a row with the label above;
+a Yes / No or 0 1 2 question keeps its own row with the label on the left and big buttons on the right (`.fld.short`, or two
+chips by `:has()`); questions with 3 or more answers (ASA, Smoker, ECG, pain 0-10), long answers (`.fld.longopt`: GA
+(Inhalational) / GA (TIVA), the adverse events list) and every non-question take the full row. No taps added, nothing
+collapsed. At 390 px: Pre-op 5.0 to 3.2 screens, POD1 2.5 to 1.6, POD2 3.8 to 2.6, PACU 2.2 to 1.7, Intra-op 1.7 to 1.4. (All boxes
+and answers two to a row gave 2.9 / 1.5 / 2.4 / 1.5 / 1.3, but smaller buttons: not worth it.) The Temp and BP, HR, BIS screens
+are unchanged. An odd box before a full-width question leaves a half-empty row; `grid-auto-flow: dense` would reorder, so not done.
