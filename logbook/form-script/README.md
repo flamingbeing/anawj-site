@@ -38,7 +38,8 @@ even in the same project as another script it would replace nothing.
 4. **Editor → choose `logbookInboxDryRun` → Run**. Google asks you to authorise the script (the Form, and connecting
    to an external service): allow. The execution log shows what the latest response would send: check the date, the
    case text and the category answers (`labels`). Nothing is sent by a dry run.
-5. **Triggers (⏰) → Add trigger**: function `logbookInboxSubmit`, deployment Head, event source **From form**,
+5. Either run **`logbookInboxSetup`** (adds the trigger, checks the bot's sign-in, then does the dry run), or by hand:
+   **Triggers (⏰) → Add trigger**: function `logbookInboxSubmit`, deployment Head, event source **From form**,
    event type **On form submit**. Save. Any trigger you already have stays as it is; from now on every new or edited
    response also goes to the inbox.
 6. Optional: **`logbookInboxBackfill`** sends responses from a date onwards (edit `SINCE` at its top first).
