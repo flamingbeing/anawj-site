@@ -2,9 +2,9 @@
 // app.js. Everything is drawn in virtual pixels of the real 1246 x 779 screen; the canvas is scaled to fit. Reads app.js globals
 // (HIST, R, SIG, simT, mon, produced, FS, NB, dbToX, T0, tim ...) only when called, never at load.
 const ADV_FONT='Selawik,"Segoe UI","Open Sans",system-ui,sans-serif';
-const AC={bg:'#000',frame:'#5a5e66',grid:'#6a6e76',axis:'#d4d4d4',bisL:'#ec4c9c',bisR:'#04acec',emg:'#e8792c',sqi:'#40b449',sr:'#9c6cb4',eeg:'#64b47c',eegLbl:'#74a484',asym:'#7cacac',asymFill:'#344c44',asymLine:'#5ec9c0',asymRef:'#2c6f6a',mf:'#922c70',burst:'#d8b890',tick:'#3b9fd8'};
-// the monitor's DSA colour scale (read off the legend capsule and the field in the manual's figures): pale mid range, deep blue low, red high
-const ADV_STOPS=[[0,0x2c,0x4f,0xa2],[.09,0x44,0x88,0xc9],[.18,0x43,0xac,0xd9],[.27,0x72,0xcc,0xd5],[.36,0x78,0xcd,0xa6],[.45,0x89,0xcd,0x90],[.55,0xba,0xd7,0x49],[.65,0xfc,0xeb,0x17],[.74,0xf9,0xc6,0x09],[.83,0xef,0x9f,0x0a],[.92,0xf4,0x49,0x37],[1,0xd5,0x22,0x26]];
+const AC={bg:'#000',frame:'#5a5e66',grid:'#6a6e76',axis:'#d4d4d4',bisL:'#ec4c9c',bisR:'#04acec',emg:'#e8792c',sqi:'#40b449',sr:'#9c6cb4',eeg:'#64b47c',eegLbl:'#74a484',asym:'#7cacac',asymFill:'#344c44',asymLine:'#5ec9c0',asymRef:'#2c6f6a',mf:'#8a3f9f',burst:'#d8b890',tick:'#3b9fd8'};
+// the monitor's DSA colour scale (read off the field in the manual's figures): dark blue at the weak high frequencies, light blue, teal, yellow-green, yellow, orange, red at the strong slow waves
+const ADV_STOPS=[[0,0x1c,0x3f,0x9c],[.2,0x2a,0x8f,0xd8],[.4,0x55,0xc4,0xa8],[.55,0xa7,0xd4,0x4f],[.7,0xf6,0xd5,0x1a],[.85,0xf5,0x8a,0x1f],[1,0xd9,0x14,0x1c]];
 const ADV_LUT=Array.from({length:256},(_,i)=>{const p=i/255;let k=0;while(k<ADV_STOPS.length-2&&p>ADV_STOPS[k+1][0])k++;const a=ADV_STOPS[k],b=ADV_STOPS[k+1],f=Math.max(0,Math.min(1,(p-a[0])/(b[0]-a[0])));return [1,2,3].map(j=>Math.round(a[j]+(b[j]-a[j])*f));});
 const ADV_PX=714, ADV_X=169; // plot x range and width (both layouts)
 const ADV_MMPX=143/25;       // virtual pixels per mm on the real screen at 25 mm/s
@@ -61,13 +61,16 @@ function advData(){
  const k=Math.max(1,Math.round(30/step)),A=D.asym.map(x=>x[1]);D.asym=D.asym.map((p,i)=>{let s=0,c=0;for(let j=Math.max(0,i-k);j<=Math.min(A.length-1,i+k);j++)if(A[j]!=null){s+=A[j];c++;}return [p[0],p[1]==null||!c?null:s/c];});
  D.dsa={L:advDsa(hs.L,tL,win,'L'),R:advDsa(hs.R,tL,win,'R')};
  ADV.d=D;ADV.full=true;}
+// the real field is weak (dark blue) above 20 Hz and strongest at the slow waves and the alpha band: lift 0-4 Hz and 8-13 Hz a little, pull 18-30 Hz down
+const advDsaShape=f=>f<4?.07:f<8?.02:f<13?.05:f>18?-(f-18)*.03:0;
+const advMovAvg=(a,k)=>a.map((v,i)=>{if(v==null)return null;let s=0,c=0;for(let j=Math.max(0,i-k);j<=Math.min(a.length-1,i+k);j++)if(a[j]!=null){s+=a[j];c++;}return s/c;});
 const ADV_CELL=3; // DSA cell width in virtual pixels
 function advDsa(h,tL,win,side){const cols=Math.floor(ADV_PX/ADV_CELL),spc=win/cols;let o=ADV.dsaCv[side];if(!o||o.cv.width!==cols){const cv=document.createElement('canvas');cv.width=cols;cv.height=NB;o=ADV.dsaCv[side]={cv,img:cv.getContext('2d').createImageData(cols,NB)};}
  // the same display shaping as the Medtronic BIS screen (calibrated on the owner's photos): a tilt that flattens the 1/f slope, at least 10 s of
  // epochs averaged in every column, 2.5 Hz of vertical smoothing, suppressed seconds left out (an almost all-suppressed column is black)
  const sh=((mon.dbLo-DB_LO)+(mon.dbHi-DB_HI))/2,sc=(mon.dbHi-mon.dbLo)/(DB_HI-DB_LO),LO=MT_LO+sh,SPAN=MT_SPAN*sc;
  const tilt=Array.from({length:NB},(_,j)=>mtTilt((j+.5)*.5));
- const d=o.img.data,nData=Math.max(0,Math.min(cols,Math.ceil((advNow()-tL)/spc))),sef=[],mf=[],v=new Float32Array(NB),w=new Float32Array(NB);
+ const pc=new Float32Array(NB),pc2=new Float32Array(NB);let pcOk=false;const d=o.img.data,nData=Math.max(0,Math.min(cols,Math.ceil((advNow()-tL)/spc))),sef=[],mf=[],v=new Float32Array(NB),w=new Float32Array(NB);
  for(let c=0;c<cols;c++){const te=tL+(c+1)*spc,tb=tL+c*spc;
   if(c>=nData){for(let y=0;y<NB;y++){const p=(y*cols+c)*4;d[p]=d[p+1]=d[p+2]=0;d[p+3]=255;}sef.push(null);mf.push(null);continue;}
   const i0=advLb(h,tb),i1=advLb(h,te),ia=Math.max(0,Math.min(i0,advLb(h,te-Math.max(spc,10)))),ib=Math.max(i1,ia+1);
@@ -75,10 +78,14 @@ function advDsa(h,tL,win,side){const cols=Math.floor(ADV_PX/ADV_CELL),spc=win/co
   for(let i=i0;i<i1&&i<h.length;i++){own++;const e=h[i];if(e.sp)sup++;if(e.sef!=null){ss+=e.sef;scn++;}if(e.mf!=null){ms+=e.mf;mc++;}}
   for(let i=ia;i<ib&&i<h.length;i++){const e=h[i];if(e.sp)continue;for(let b=0;b<NB;b++)v[b]+=e.db[b];k++;}
   const sf=own?sup/own:0;sef.push(scn?ss/scn:null);mf.push(mc?ms/mc:null);
-  if(!k||sf>=.5){for(let y=0;y<NB;y++){const p=(y*cols+c)*4;d[p]=d[p+1]=d[p+2]=0;d[p+3]=255;}continue;}
+  if(!k||sf>=.5){for(let y=0;y<NB;y++){const p=(y*cols+c)*4;d[p]=d[p+1]=d[p+2]=0;d[p+3]=255;}pcOk=false;continue;}
   for(let j=0;j<NB;j++)w[j]=(v[Math.max(0,j-2)]+2*v[Math.max(0,j-1)]+3*v[j]+2*v[Math.min(NB-1,j+1)]+v[Math.min(NB-1,j+2)])/(9*k);
-  for(let y=0;y<NB;y++){const j=NB-1-y;let L=(w[j]+tilt[j]-LO)/SPAN;if(sf>0)L=L*(1-1.5*sf)-.1*sf;const col=ADV_LUT[(Math.max(0,Math.min(1,L))*255)|0],p=(y*cols+c)*4;d[p]=col[0];d[p+1]=col[1];d[p+2]=col[2];d[p+3]=255;}}
- o.cv.getContext('2d').putImageData(o.img,0,0);return {cols,nData,sef,mf};}
+  for(let y=0;y<NB;y++){const j=NB-1-y;let L=(w[j]+tilt[j]-LO)/SPAN+advDsaShape((j+.5)*.5);if(sf>0)L=L*(1-1.5*sf)-.1*sf;L=Math.max(0,Math.min(1,L));
+   // slow smoothing in time: each column keeps 45 percent of the one before it, so the field reads as smooth blocks
+   if(pc&&pcOk){L=.55*L+.45*pc[j];}pc2[j]=L;
+   const col=ADV_LUT[(L*255)|0],p=(y*cols+c)*4;d[p]=col[0];d[p+1]=col[1];d[p+2]=col[2];d[p+3]=255;}
+  pc.set(pc2);pcOk=true;}
+ o.cv.getContext('2d').putImageData(o.img,0,0);return {cols,nData,sef:advMovAvg(sef,2),mf:advMovAvg(mf,2)};}
 
 // ----- drawing helpers -----
 function advTx(ctx,s,x,y,size,col,al,wt){ctx.font=`${wt||400} ${size}px ${ADV_FONT}`;ctx.fillStyle=col;ctx.textAlign=al||'left';ctx.textBaseline='middle';ctx.fillText(s,x,y);}
@@ -100,11 +107,13 @@ const ADV_SECAX={emg:{lo:30,hi:80,step:10,col:AC.emg},sr:{lo:0,hi:100,step:20,co
 // vertical gridlines at the labelled times: all alike, every third one brighter
 function advGrid(ctx,D,y0,y1,dim){const tk=advTicks(D),s=({60:10,360:60,720:120,1440:240}[ADV.win]||10)*60,base=Math.floor(T0/1000);
  for(const t of tk)advV(ctx,advXt(D,t),y0,y1,Math.round((t+base)/s)%3===0?'#6a6e76':dim||'#4a4e56');}
+// the shared vertical gridlines run over the DSA field too (faint, black)
+function advGridDim(ctx,D,y0,y1){for(const t of advTicks(D))advV(ctx,advXt(D,t),y0,y1,'rgba(0,0,0,.32)');}
 // axis labels that must not overprint: keep them in the order given, drop one that comes within gap px of one already kept
 function advKeep(items,gap){const kept=[];for(const it of items)if(kept.every(k=>Math.abs(k.y-it.y)>=gap))kept.push(it);return kept;}
 function advDrawBis(ctx,L,D){const r=L.rect.bis,y0=r.y,h=r.h,Y=v=>y0+h*(1-v/100),bc=ADV.hemi==='R'?AC.bisR:AC.bisL;
  // target range band (only when the BIS range alarm is on)
- const A=ADV.alarm.bis;if(A.on){const g=ctx.createLinearGradient(ADV_X,0,ADV_X+ADV_PX,0);g.addColorStop(0,'rgba(190,190,190,.34)');g.addColorStop(.18,'rgba(190,190,190,.30)');g.addColorStop(1,'rgba(190,190,190,.07)');ctx.fillStyle=g;ctx.fillRect(ADV_X,Y(A.hi),ADV_PX,Y(A.lo)-Y(A.hi));}
+ const A=ADV.alarm.bis;if(A.on){const g=ctx.createLinearGradient(ADV_X,0,ADV_X+ADV_PX,0);g.addColorStop(0,'rgba(150,150,150,.55)');g.addColorStop(.4,'rgba(150,150,150,.35)');g.addColorStop(1,'rgba(150,150,150,.05)');ctx.fillStyle=g;ctx.fillRect(ADV_X,Y(A.hi),ADV_PX,Y(A.lo)-Y(A.hi));}
  advGrid(ctx,D,y0,y0+h);
  // stretches with no usable EEG (artefact, SQI under 15) as dark blue-grey bands, as the monitor marks a gap in the data
  ctx.fillStyle='rgba(43,53,71,.85)';for(const [t,v] of D.art)if(v!=null&&v>=.5){const x=advXt(D,t-D.step/2);ctx.fillRect(x,y0,Math.max(3,ADV_PX*D.step/D.win),h);}
@@ -118,9 +127,12 @@ function advDrawBis(ctx,L,D){const r=L.rect.bis,y0=r.y,h=r.h,Y=v=>y0+h*(1-v/100)
   advLine(ctx,pts,sy,D,sec==='emg'?'#d8843a':sec==='bisO'?AC.bisR:ax.col,1.2);}
  advLine(ctx,D.bis,Y,D,bc,1.9);}
 function advDrawAxis(ctx,L,D){const r=L.rect.axis,y0=r.y,h=r.h;ctx.fillStyle='#000';ctx.fillRect(115,y0,817,h);
- advH(ctx,115,932,y0+h-.5,'#2a2f36');advH(ctx,ADV_X,ADV_X+ADV_PX,y0,AC.frame);advV(ctx,160,y0,y0+h,'#2a2f36');
- const ticks=advTicks(D),fs=L.two?15.5:14.5;
- for(const t of ticks){const x=advXt(D,t);advV(ctx,x,y0,y0+(L.two?9:7),'#8a8f98');advTx(ctx,advFmtT(t),x+4,y0+h-(L.two?15:10),fs,AC.axis,'left');}
+ // the time axis is a bordered strip: grey lines along the top and the bottom across the whole width (the left gutter too), a tick at every
+ // label running the strip's height, and the label (left aligned, 6 px after its tick)
+ advH(ctx,115,932,y0,'#5a5f66');advH(ctx,115,932,y0+h-1,'#5a5f66');advV(ctx,160,y0,y0+h,'#2a2f36');
+ const ticks=advTicks(D),fs=L.two?14:13.5;
+ for(const t of ticks){const x=advXt(D,t);advV(ctx,x,y0+1,y0+h-1,'#aaa');advTx(ctx,advFmtT(t),x+6,y0+h/2+1,fs,'#d8d8d8','left');}
+ advV(ctx,ADV_X,y0+1,y0+h-1,'#aaa');
  // case start (white triangle) and now (blue tick)
  if(ADV.t0>=D.tL-1){const x=advXt(D,ADV.t0);ctx.fillStyle='#fff';ctx.beginPath();ctx.moveTo(x+1,y0+h-10);ctx.lineTo(x+1,y0+h-2);ctx.lineTo(x+9,y0+h-2);ctx.closePath();ctx.fill();}
  if(advNow()>=D.tL){const x=Math.round(advXt(D,advNow()))+.5;ctx.strokeStyle=AC.tick;ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(x,y0+h-14);ctx.lineTo(x,y0+h);ctx.stroke();}
@@ -128,11 +140,11 @@ function advDrawAxis(ctx,L,D){const r=L.rect.axis,y0=r.y,h=r.h;ctx.fillStyle='#0
 function advDrawDsa(ctx,L,D,side,y0,h,mirror,title){const small=h<130,fs=small?11.5:15.5;const o=ADV.dsaCv[side],ds=D.dsa[side],hz=v=>mirror?y0+h*(v/30):y0+h*(1-v/30);
  ctx.fillStyle='#000';ctx.fillRect(ADV_X,y0,ADV_PX,h);
  const dw=ADV_PX*ds.nData/ds.cols;if(o&&ds.nData){ctx.imageSmoothingEnabled=false;ctx.save();if(mirror){ctx.translate(0,y0+h/2);ctx.scale(1,-1);ctx.translate(0,-(y0+h/2));}ctx.drawImage(o.cv,0,0,ds.nData,NB,ADV_X,y0,dw,h);ctx.restore();}
- for(const f of [13,8,4])advH(ctx,ADV_X,ADV_X+ADV_PX,hz(f),'#000');
- // SEF (white, 2 px) and MF (purple, 2 px) as stepped lines
+ advGridDim(ctx,D,y0,y0+h);for(const f of [13,8,4])advH(ctx,ADV_X,ADV_X+ADV_PX,hz(f),'rgba(0,0,0,.8)');
+ // SEF (white, 1.5 px) and MF (purple, 1.5 px) as stepped lines
  const cw=ADV_PX/ds.cols,step=(arr,col,lw)=>{ctx.beginPath();ctx.strokeStyle=col;ctx.lineWidth=lw;ctx.lineJoin='miter';let pen=false,py=0;
   for(let c=0;c<ds.nData;c++){const v=arr[c];if(v==null){pen=false;continue;}const x=ADV_X+c*cw,y=hz(Math.max(0,Math.min(30,v)));if(!pen){ctx.moveTo(x,y);}else{ctx.lineTo(x,py);ctx.lineTo(x,y);}ctx.lineTo(x+cw,y);pen=true;py=y;}ctx.stroke();};
- step(ds.mf,AC.mf,2);step(ds.sef,'#fff',2);
+ step(ds.mf,AC.mf,1.5);step(ds.sef,'#fff',1.5);
  advFrame(ctx,y0,h);
  // Hz labels at 30, 13, 8, 4 (and 0 on a tall plot), none closer than 12 px: a short plot drops the 8 first, then the 4
  const pos=f=>Math.max(y0+7,Math.min(y0+h-6,hz(f))),want=small?[30,13,4,8]:[30,13,8,4,0];
@@ -158,26 +170,31 @@ function advDrawAsym(ctx,L,D,y0,h,group){const small=h<130,fs=small?12:15.5;cons
  // L and R markers at the right edge
  for(const [t,yy,c] of [['L',Y(60),AC.bisL],['R',Y(-60),AC.bisR]]){const x=ADV_X+ADV_PX+31;ctx.beginPath();ctx.arc(x,yy,11.5,0,7);ctx.fillStyle='#44546c';ctx.fill();advTx(ctx,t,x,yy+.5,14,c,'center');}}
 function advEegSig(side){return side==='R'?{sig:R.SIG,prod:R.produced}:{sig:SIG,prod:produced};}
-// What the monitor shows of the EEG: the engine's signal through the display filter (a 5-tap smoother, a fifth of the fast residue kept as the fine
-// fuzz) at a display gain (the engine's awake EEG is about 11 uV RMS, the monitor's trace uses a quarter to a third of the +-50 uV frame), and a soft limit
-// that keeps even a big slow wave or an artefact inside the frame. Nothing is clipped.
-const ADV_EEG_GAIN=.55,ADV_EEG_FUZZ=.22;
-function advEegSoft(v,half){const T=.35*half,M=.62*half,a=Math.abs(v);let o=a<=T?a:T+(M-T)*Math.tanh((a-T)/(M-T));if(a>90)o+=.33*half*Math.tanh((a-90)/200);return Math.sign(v)*o;} // normal waves stay under 60 percent of the half height; a big artefact still reaches further
+// What the monitor shows of the EEG: the real trace is a 1 px jagged line, slow delta/theta waves (about a quarter to a third of the frame, about +-20 uV
+// in general anaesthesia) with a 20-40 Hz hash on them and a drifting amplitude. The engine's signal is smoothed a little (a 5-tap kernel), a rough
+// share of the fast residue is kept, and a band-limited noise (4 to 5 percent of the frame, a fresh value every sample, fixed by the sample's own number so
+// the trace does not shimmer as it scrolls) and a slow amplitude envelope are added. A soft limit keeps normal waves under half the half-height.
+const ADV_EEG_GAIN=.55,ADV_EEG_FUZZ=.16;
+const advHash=i=>{i=Math.imul(i^(i>>>16),0x7feb352d);i=Math.imul(i^(i>>>15),0x846ca68b);i^=i>>>16;return (i>>>0)/4294967296;};
+const advNoise=i=>(advHash(i)+advHash(i+7919)+advHash(i+104729)-1.5)*2; // about N(0,1)
+const advEnv=t=>Math.max(.5,Math.min(1.35,.8+.22*Math.sin(t*.27+1.1)+.16*Math.sin(t*.91+.4)+(advHash(Math.floor(t/5)+3)>.82?.3:0)));
+function advEegSoftPx(p,hh){const T=.3*hh,M=.5*hh,a=Math.abs(p);let o=a<=T?a:T+(M-T)*Math.tanh((a-T)/(M-T));if(a>3.2*hh)o+=.4*hh*Math.tanh((a-3.2*hh)/(3*hh));return Math.sign(p)*o;}
 function advDrawEeg(ctx,L){if(!L.eeg)return;const r=L.rect.eeg,secs=advSecs(),N=Math.round(secs*FS),two=L.two,uvmm=ADV.uvmm[ADV.ch],pxuv=ADV_MMPX/uvmm;
  ctx.fillStyle='#000';ctx.fillRect(115,r.y-1,817,r.h+2);
- L.strips.forEach((s,si)=>{const cy=s.y+s.h/2,half=s.h/2/pxuv,X1=ADV_X+ADV_PX,{sig,prod}=advEegSig(s.side);
+ const lab=ADV.layout[ADV.ch]==='eeg'?100:50; // the frame's scale is fixed (+-50 uV, +-100 uV with the EEG alone); the uV/mm selector changes the gain
+ L.strips.forEach((s,si)=>{const cy=s.y+s.h/2,hh=s.h/2,X1=ADV_X+ADV_PX,{sig,prod}=advEegSig(s.side);
   advFrame(ctx,s.y,s.h);
   // 1 s dotted gridlines that scroll with the trace, the zero line
   const k0=Math.floor((prod-1)/FS);for(let q=0;q<=Math.ceil(secs);q++){const x=X1-((prod-1)-(k0-q)*FS)/N*ADV_PX;if(x>ADV_X+2&&x<X1-1)advV(ctx,x,s.y+1,s.y+s.h-1,'#5a5e66',[1,3]);}
-  advH(ctx,ADV_X+1,ADV_X+ADV_PX,cy,'#3a3e46');
-  const lab=half>=100?Math.round(half/10)*10:Math.round(half/5)*5;
+  advH(ctx,ADV_X+1,ADV_X+ADV_PX,cy,'#555');
   if(si===0||!two){advTx(ctx,'µV '+lab,162,s.y+8,15,AC.axis,'right');advTx(ctx,'-'+lab,162,s.y+s.h-8,15,AC.axis,'right');}
   if(s.label)advTx(ctx,s.label,142,cy,15.5,AC.axis,'center');
-  ctx.save();ctx.beginPath();ctx.rect(ADV_X+1,s.y+1,ADV_PX-1,s.h-1);ctx.clip();ctx.strokeStyle=AC.eeg;ctx.lineWidth=1.3;ctx.lineJoin='round';ctx.beginPath();
-  const len=sig.length,lag=s.lag||0,gain=(s.lag?.9:1)*ADV_EEG_GAIN,at=i=>sig[Math.max(0,Math.min(len-1-lag,i))],n0=Math.min(N,len-lag),nz=ADV.disc;
-  for(let k=0;k<n0;k++){const i=len-1-lag-(n0-1-k);let v=0;
-   if(!nz){const lp=(at(i-3)+6*at(i-2)+15*at(i-1)+20*at(i)+15*at(i+1)+6*at(i+2)+at(i+3))/64;v=advEegSoft(gain*(lp+(ADV.filters?ADV_EEG_FUZZ:.75)*(at(i)-lp)),half);}
-   const x=X1-(n0-1-k)/N*ADV_PX,y=cy-v*pxuv;if(k)ctx.lineTo(x,y);else ctx.moveTo(x,y);}
+  ctx.save();ctx.beginPath();ctx.rect(ADV_X+1,s.y+1,ADV_PX-1,s.h-1);ctx.clip();ctx.strokeStyle='#5fcf8b';ctx.globalAlpha=.9;ctx.lineWidth=1;ctx.lineJoin='round';ctx.beginPath();
+  const len=sig.length,lag=s.lag||0,gain=(s.lag?.9:1)*ADV_EEG_GAIN,at=i=>sig[Math.max(0,Math.min(len-1-lag,i))],n0=Math.min(N,len-lag),nz=ADV.disc,nzA=(ADV.filters?.055:.1)*hh;
+  for(let k=0;k<n0;k++){const i=len-1-lag-(n0-1-k),ai=prod-1-lag-(n0-1-k)+(s.side==='R'?500009:0);let p=0;
+   if(nz)p=advNoise(ai)*.004*hh;
+   else{const lp=(at(i-1)+2*at(i)+at(i+1))/4,v=gain*(lp+(ADV.filters?ADV_EEG_FUZZ:.5)*(at(i)-lp));p=advEegSoftPx(v*pxuv*advEnv(ai/FS),hh)+(advNoise(ai)+.8*advNoise(ai-1))*.8*nzA;}
+   const x=X1-(n0-1-k)/N*ADV_PX,y=cy-Math.max(-hh+1,Math.min(hh-1,p));if(k)ctx.lineTo(x,y);else ctx.moveTo(x,y);}
   ctx.stroke();ctx.restore();});
  if(ADV.demo)advWatermark(ctx,L);}
 // ----- the whole trend area -----
@@ -193,11 +210,15 @@ function advDrawAll(full){const c=document.getElementById('advCv');if(!c)return;
    if(r.asym)advDrawAsym(ctx,L,D,r.asym.y,r.asym.h,false);
    if(r.axis)advDrawAxis(ctx,L,D);
    advH(ctx,115,932,L.eeg?L.rect.eegH.y:749,'#2a2f36');
-   advReviewCursor(ctx,L,D);}
+   advReviewCursor(ctx,L,D);if(ADV.review)advReviewInfo(ctx,L);}
   ADV.full=false;}
  if(ADV.view==='graphs'&&L.eeg)advDrawEeg(ctx,L);}
 function advWatermark(ctx,L){ctx.save();ctx.fillStyle='rgba(120,120,70,.5)';ctx.font=`400 22px ${ADV_FONT}`;ctx.textAlign='center';ctx.textBaseline='middle';
  const r=L.rect.eeg||L.rect.bis||L.rect.dsa;if(r)ctx.fillText('DEMO MODE',ADV_X+ADV_PX/2,r.y+r.h*.78);ctx.restore();}
+// the case's facts, in a block over the BIS trend while reviewing (labels in one column, values in the next)
+function advReviewInfo(ctx,L){const r=L.rect.bis;if(!r)return;const dur=Math.max(0,Math.round((advNow()-ADV.t0)/60)),d=new Date(T0+ADV.t0*1000),hh=Math.floor(dur/60),mm=dur%60;
+ const rows=[['DATE :',advDate(ADV.t0)],['START TIME:',d.getHours()+':'+apad(d.getMinutes())],['DURATION:',hh+':'+apad(mm)+' hrs'],['CASE ID:',ADV.caseId]],x=ADV_X+46,y=r.y+r.h*.36;
+ rows.forEach(([a,v],i)=>{advTx(ctx,a,x,y+i*31,17,'#e8e8e8','left');advTx(ctx,v,x+106,y+i*31,17,'#e8e8e8','left');});}
 function advReviewCursor(ctx,L,D){const R_=ADV.review;if(!R_||R_.t==null)return;const x=Math.round(advXt(D,R_.t))+.5,r=L.rect;if(x<ADV_X||x>ADV_X+ADV_PX)return;
  const y0=r.bis.y,y1=(r.dsa||r.dsaR||r.axis).y+((r.dsa||r.dsaR||r.axis).h);ctx.strokeStyle='#e8281e';ctx.lineWidth=1.6;ctx.beginPath();ctx.moveTo(x,y0);ctx.lineTo(x,y1);ctx.stroke();
  ctx.save();ctx.fillStyle='rgba(120,120,70,.5)';ctx.font=`400 22px ${ADV_FONT}`;ctx.textAlign='center';ctx.fillText('CASE REVIEW MODE',ADV_X+ADV_PX*.55,r.bis.y+r.bis.h*.9);ctx.restore();}

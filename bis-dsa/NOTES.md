@@ -401,12 +401,39 @@ manual and the figures; nothing was copied into the repo (looking only).
     wording; 'Alarm Pause Mode Off' when the 120 s ends. In case review the bar carries only 'CASE REVIEW'.
   - 4-channel DSA and ASYM layout: BIS 0.34 H, DSA 0.11 H each, ASYM 0.17 H, as in the marketing screen (the reviewer's 22% was measured
     against the picture with the bezel). Hz labels are dropped rather than overprinted; ASYM edges are teal and drawn last.
-  - **Deliberate deviations** (owner may want them back): all six menu tiles are enabled while monitoring (the manual greys ALARMS and CASE
-    REVIEW; figure 45 shows them white and Alarm Settings is on the left bar anyway); the BIS alarm range is off by default (the manual's default;
-    the dialog row shows its limits `[40 - 60]` with OFF, an ON default would alarm on an awake patient at once); chart interval default 1 min
-    (figure 58) instead of the table's 15; case review keeps the BIS + DSA layout (figure 52).
+  - **Deliberate deviations** (owner may want them back): the BIS alarm range is off by default (the manual's default; the dialog row shows its
+    limits `[40 - 60]` with OFF, an ON default would alarm on an awake patient at once); chart interval default 1 min (figure 58) instead of
+    the table's 15; case review keeps the BIS + DSA layout (figure 52). (Pass 3 removed the old deviation 'all six tiles enabled'.)
   - EEG Trends (amplitude, scale, channels, filters) are staged until APPLY; Logs rows have CANCEL and DOWNLOAD; ID is a read-only window that
     closes after 1 minute; the case ID stays fixed during a check.
+- **Fidelity pass 3 (14 Oct 2026, second clinician-style review, 6/10 look and 7/10 behaviour before):**
+  - EEG: a 1 px `#5fcf8b` line (0.9 opacity) that is the engine's signal through a 3-tap smoother plus a band-limited noise (about 5% of the
+    frame, one fresh value per sample, fixed by the sample's own number so it does not shimmer when scrolling) and a slow amplitude envelope
+    with occasional stronger stretches; a soft limit keeps normal waves at about +-20 uV equivalent (under half the half-height). The frame
+    labels are fixed (`µV 50` / `-50`, `100` when the EEG is alone); the µV/mm selector changes the gain only.
+  - DSA: new 7-stop ramp (`#1c3f9c` dark blue to `#d9141c` red) with a frequency shaping (0-4 and 8-13 Hz lifted, 18-30 Hz pulled down, so
+    the top rows read dark blue), 45% carry-over from the previous column (slow smoothing), SEF and MF as 1.5 px lines (`#fff`, `#8a3f9f`),
+    moving average of 5 columns on both, 13/8/4 Hz lines `rgba(0,0,0,.8)`, faint shared vertical gridlines over the field.
+  - Time axis is a bordered strip (grey `#5a5f66` top and bottom lines across the whole width, ticks `#aaa` the strip's height, labels 6 px
+    after their tick); the BIS target band is a gradient (`.55` to `.05`, no border); the BIS alarm box is scaled to 92% with an even margin;
+    the red bar flashes `#ed2024` / `#c0141c` at 1 Hz; the alarm count marker is green.
+  - Top bar: the USB icon is always drawn (brighter when the Simulate USB drive is on), icons `#c8ccd4`; Battery low shows `10%`, an empty red
+    glyph, no bolt, and the once-message 'AC power disconnected'. Case review: no title, the alarm bar, pill and message bar stay live (a
+    sensor disconnected alarm shows in review as in figure 52), the date, time and ID go, a crossed link icon shows, the three left buttons
+    are 52 px rounded squares, and the case facts (DATE, START TIME, DURATION, CASE ID) are printed on the BIS trend.
+  - Main menu: **ALARMS and CASE REVIEW are dimmed (40%) and inert while a sensor is connected outside Demo** (the manual); both work with the
+    sensor disconnected (Simulate row), ALARMS also in Demo; DOWNLOAD is dimmed in Demo. The e2e test disconnects the sensor before it opens
+    case review.
+  - Dialogs are drawn at their design size (607 x 449) and scaled 1.5x (small ones 1.25x), so their text is large as on the real screen; the
+    sensor check is redrawn (grey plug with a white dot, white tail, pads with navy discs: 1, 2, 4, 3 or LT, LE, G, C, RE, RT; a grey ring with a
+    turning blue quarter, green tick on pass, no extra tick over the plug; PASS and kohm text only with Sensor Check Values on, fault names
+    always). Alarm Settings rows have their own icons (BIS wave, SR purple area, SEF rainbow tile) and a green ON; the EEG Trends CANCEL and
+    APPLY moved to the window footer; the Date Format buttons stay on one line each.
+  - Chart view: row bands `#05070b` / `#0c1220`, highlighted oldest row `#16335f` with its full time, date row under it, thin blue scroll bar (always
+    shown; headless Chromium hides scroll bars), column heads 15 px under the BEGIN line.
+  - Messages and alarms: SQI MEDIUM (under 60) and SQI LOW (under 20) wording; USB: a live recording needs a drive ('Live data export in progress /
+    stopped'), pulling the drive while it records gives 'Export failed - USB drive removed'. Hard keys (function = main menu, home = closes
+    every window and menu, power = inert) sit on the blue band under the screen.
 - Font: Selawik (SIL OFL, metric-compatible with Segoe UI, which the tablet's UI looks like); `fonts/README.md`.
 - Case: white case, blue band, "Medtronic" under the screen (below 640 px wide the case is dropped to give the screen the room).
 - Channel modes: 4-channel (bilateral sensor, the default: two BIS panels, BURST, SEF/MF of the selected side, L|R pill, ASYM) and

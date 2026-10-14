@@ -44,11 +44,11 @@
 .advs .hb i{display:block;width:calc(24*var(--u));height:calc(2.4*var(--u));background:#9ca3ab;margin:calc(4.3*var(--u)) 0}
 .advs .hb.on{background:#262e38}
 .advs .abar{position:absolute;left:calc(115*var(--u));top:0;width:calc(817*var(--u));height:calc(61*var(--u));display:flex;align-items:center;color:#fff}
-.advs .abar.hi{background:#ec1c2c}.advs .abar.lo{background:#ecd40c;color:#000}
-.advs .abar.hi.flash{animation:advflash 1s steps(1) infinite}
-@keyframes advflash{50%{background:#b81322}}
+.advs .abar.hi{background:#ed2024}.advs .abar.lo{background:#ecd40c;color:#000}
+.advs .abar.hi.flash{animation:advflash 1s linear infinite}
+@keyframes advflash{0%,70%{background:#ed2024}71%,100%{background:#c0141c}}
 .advs .abar .cnt{position:absolute;left:calc(20*var(--u));top:calc(18*var(--u));display:flex;align-items:center;gap:calc(5*var(--u));font-size:calc(17*var(--u));height:calc(26*var(--u))}
-.advs .abar .cnt .tri{width:0;height:0;border-left:calc(5*var(--u)) solid transparent;border-right:calc(5*var(--u)) solid transparent;border-top:calc(8*var(--u)) solid #7cc02e}
+.advs .abar .cnt .tri{width:0;height:0;border-left:calc(5*var(--u)) solid transparent;border-right:calc(5*var(--u)) solid transparent;border-top:calc(8*var(--u)) solid #6cc04a}
 .advs .abar .cnt.xbtn{cursor:pointer}
 .advs .abar .sep{position:absolute;left:calc(76*var(--u));top:calc(12*var(--u));width:calc(1*var(--u));height:calc(38*var(--u));background:rgba(255,255,255,.28)}
 .advs .abar.lo .sep{background:rgba(0,0,0,.3)}
@@ -90,7 +90,7 @@
 .advs .sq{display:inline-block;width:calc(11*var(--u));height:calc(11*var(--u));margin:0 calc(5*var(--u)) 0 calc(18*var(--u))}
 .advs .cap2{font-size:calc(14*var(--u))}
 .advs .legend{display:inline-flex;align-items:center;gap:calc(6*var(--u));margin-left:calc(26*var(--u));font-size:calc(14*var(--u))}
-.advs .legend i{display:block;width:calc(112*var(--u));height:calc(9*var(--u));border-radius:calc(5*var(--u));background:linear-gradient(90deg,#3d4d81 0,#2c4fa2 7%,#4488c9 16%,#43acd9 25%,#72ccd5 34%,#78cda6 43%,#89cd90 52%,#bad749 61%,#fceb17 70%,#f9c609 78%,#ef9f0a 86%,#f44937 93%,#d52226 97%,#3d4d81 100%)}
+.advs .legend i{display:block;width:calc(112*var(--u));height:calc(9*var(--u));border-radius:calc(5*var(--u));background:linear-gradient(90deg,#1c3f9c 0,#2a8fd8 20%,#55c4a8 40%,#a7d44f 55%,#f6d51a 70%,#f58a1f 85%,#d9141c 100%)}
 .advs .ax{position:absolute;display:flex;align-items:center;font-size:calc(13.5*var(--u));white-space:nowrap}
 .advs .xpop{position:absolute;background:#2a323c;border:calc(1*var(--u)) solid #44546c;border-radius:calc(6*var(--u));z-index:21;padding:calc(4*var(--u));min-width:calc(110*var(--u));box-shadow:0 calc(6*var(--u)) calc(18*var(--u)) rgba(0,0,0,.6)}
 .advs .xpop button{display:block;width:100%;padding:calc(7*var(--u)) calc(12*var(--u));font-size:calc(16*var(--u));border-radius:calc(4*var(--u));white-space:nowrap}
@@ -257,3 +257,53 @@
 .advs .chart th:first-child,.advs .chart td:first-child{white-space:nowrap}
 
 .advs .abar .cnt.xbtn{min-width:0;padding:0;justify-content:flex-start;height:calc(26*var(--u));border-radius:0;text-transform:none;font-size:calc(17*var(--u))}
+
+/* ---- fidelity pass 3 ---- */
+.advs .hb{background:#202830}
+.advs .dt,.advs .tm{font-size:calc(15*var(--u))}
+.advs .apill .d b{border-left:calc(7*var(--u)) solid transparent;border-right:calc(7*var(--u)) solid transparent;border-top:calc(11*var(--u)) solid #fff}
+.advs .abar.hi~.apill .d{border-left-color:rgba(0,0,0,.4)}.advs .abar.lo~.apill .d{border-left-color:rgba(0,0,0,.35)}
+/* the BIS alarm box: the digits sit inside it with an even margin */
+.advs .bis.box{transform:translate(-50%,-50%) scale(.92)}
+.advs .bis.box::before{left:calc(-12*var(--u));right:calc(-12*var(--u));top:calc(.2em - 14*var(--u));bottom:calc(.085em - 6*var(--u))}
+/* message bar: one continuous background, no divider */
+.advs .mbar{background:#0e1218}
+.advs .mbar .ck{border-left:0;background:none}
+/* case review: rounded-square buttons */
+.advs .rb.sq .ci{width:calc(52*var(--u));height:calc(52*var(--u));border-radius:calc(6*var(--u));background:#3b4a66;margin-bottom:calc(13*var(--u))}
+.advs .rb.sq .ci svg{width:calc(30*var(--u));height:calc(30*var(--u))}
+/* hard keys on the case: function, home, power */
+.advbrand .hk{position:absolute;right:2.6%;top:50%;transform:translateY(-50%);display:flex;gap:max(5px,1.1cqw)}
+.advbrand .hk button{width:clamp(15px,2.5cqw,30px);height:clamp(15px,2.5cqw,30px);border-radius:50%;background:#0a3f8c;border:1px solid #5f86bd;color:#bbcde1;display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer}
+.advbrand .hk button svg{width:62%;height:62%}
+.advbrand .hk button:hover{background:#12509f}
+.advbrand .hk button:focus-visible{outline:2px solid #fff;outline-offset:2px}
+/* main menu: a tile that is not available is dimmed to 40 percent and does nothing */
+.advs .mm button[aria-disabled="true"]{color:#fff;opacity:.4;cursor:default}.advs .mm button[aria-disabled="true"] svg{opacity:1}.advs .mm button[aria-disabled="true"]:hover{background:#353d4a}
+/* dialogs: option buttons keep their text on one line */
+.advs .opt button{white-space:nowrap}.advs .opt.tx.wd button{min-width:calc(120*var(--u))}
+.advs .dlg .rail button em.on{color:#3fb56a}
+.advs .dlg .rail button em{color:#9aa0a8}
+.advs .dlg .rail button svg.ri{width:calc(26*var(--u));height:calc(19*var(--u))}
+/* chart view */
+.advs .chart .scroll{top:calc(44*var(--u));overflow-y:scroll}
+.advs .chart th{font-size:calc(15*var(--u))}.advs .chart table.w4 th{font-size:calc(14*var(--u))}
+.advs .chart td{height:calc(43*var(--u));font-size:calc(20*var(--u));background:#05070b;border-bottom:0}
+.advs .chart table.w4 td{font-size:calc(17*var(--u))}
+.advs .chart tr:nth-child(even) td{background:#0c1220}
+.advs .chart tr.st td{background:#16335f}
+.advs .chart tr.dl td{background:#000;border-top:calc(1*var(--u)) solid #2a3140;height:calc(42*var(--u));font-size:calc(15*var(--u))}
+.advs .chart .scroll::-webkit-scrollbar{width:5px}
+.advs .chart .scroll::-webkit-scrollbar-thumb{background:#2f6fb5}
+.advs .chart .scroll::-webkit-scrollbar-track{background:#07090d}
+/* sensor check: the pending ring is grey with a blue quarter that turns */
+.advs .xsc .cp.ok svg{width:calc(34*var(--u));height:calc(34*var(--u))}
+.advs .xsc .cp{font-size:calc(20*var(--u));font-weight:600;color:#7a8090}
+.advs .xsc .cp.ok{color:#2a2f3a;font-weight:400}
+.advs .spin{transform-box:view-box}
+.advs .dlg.alm .rail button{white-space:nowrap}
+.advs .h1 svg.ri{width:calc(24*var(--u));height:calc(19*var(--u));flex:none}
+.advs .xsc{background:#e9eef7}.advs .xsc .th{background:#3f4a63}
+.advs .xsc .cp{font-style:italic}
+.advs .dlg .rail button em.v{margin-left:0;flex:1;text-align:left}
+.advs .dlg.set .xrow>span:first-child{white-space:nowrap}.advs .opt.tx.wd button{min-width:calc(112*var(--u))}

@@ -31,14 +31,13 @@ function advNumerics(){if(!ADV.built)return;advNumLabels();const two=ADV.ch===2,
  }
 // ----- alarms -----
 function advAlarmEval(){if(!ADV.built)return;const A=ADV.alarm,list=[],act=ADV.act||(ADV.act={}),sides=ADV.ch===4?['L','R']:['L'],box={};ADV.alarmBox=box;
- if(ADV.review){ADV.alarms=[];return;}
  let bisDir=0;
  // technical alarms the simulator can raise (the Simulate row under the screen): sensor disconnected, sensor expired, battery low
  if(ADV.disc)list.push({key:'disc',pri:'lo',l1:'SENSOR DISCONNECTED',l2:'Connect sensor or cable'});
  if(ADV.expired)list.push({key:'exp',pri:'lo',l1:'SENSOR EXPIRED',l2:'Replace the sensor'});
  if(ADV.batt)list.push({key:'batt',pri:'lo',l1:'BATTERY LOW',l2:'Connect to power supply'});
  const Sx=ADV.sensor;if(Sx&&Sx.done&&Sx.fail){const bad=Sx.el.filter(e=>e.st!=='pass').map(e=>e.n).join(', ');list.push(ADV.disc?{key:'tum',pri:'lo',l1:'TEMPORARILY UNABLE TO MEASURE ELECTRODES',l2:bad}:{key:'press',pri:'lo',l1:'PRESS CENTER OF ELECTRODES '+bad,l2:'TO ENABLE MONITORING'});}
- for(const s of sides){const h=s==='R'?R.HIST:HIST,tail=h.slice(-10),last=h[h.length-1];if(!last)continue;
+ for(const s of (ADV.review?[]:sides)){const h=s==='R'?R.HIST:HIST,tail=h.slice(-10),last=h[h.length-1];if(!last)continue;
   if(ADV.disc){act['bis'+s]=false;continue;}
   if(A.bis.on){const out=c=>c.bis!=null&&c.sqi>=15&&(c.bis<A.bis.lo||c.bis>A.bis.hi);const key='bis'+s;
    if(act[key]?out(last):tail.length>=10&&tail.every(out))act[key]=true;else act[key]=false;
@@ -48,8 +47,8 @@ function advAlarmEval(){if(!ADV.built)return;const A=ADV.alarm,list=[],act=ADV.a
   const v=advSideVals(s);
   if(A.sr.on&&v&&v.c.bsr>A.sr.hi){box['sr'+s]=true;list.push({key:'sr'+s,pri:'lo',l1:'SR ALARM',l2:'SR above defined threshold'});}
   if(s==='L'||s===ADV.hemi){if(A.sef.on&&v&&v.sef!=null&&v.c.sqi>=15&&(v.sef<A.sef.lo||v.sef>A.sef.hi)){box.sef=true;list.push({key:'sef'+s,pri:'lo',l1:'SEF ALARM',l2:'SEF '+(v.sef<A.sef.lo?'below':'above')+' defined range'});}}
-  if(last.sqi<15)list.push({key:'sqiL'+s,pri:'lo',l1:'SQI LOW',l2:'Due to poor signal quality some parameters are not available'});
-  else if(last.sqi<50)list.push({key:'sqiM'+s,pri:'lo',l1:'SQI MEDIUM',l2:'Excessive artifacts in signal'});}
+  if(last.sqi<20)list.push({key:'sqiL'+s,pri:'lo',l1:'SQI LOW',l2:'Due to poor signal quality some parameters are not available'});
+  else if(last.sqi<60)list.push({key:'sqiM'+s,pri:'lo',l1:'SQI MEDIUM',l2:'Excessive artifacts in signal'});}
  if(bisDir)list.unshift({key:'bis',pri:'hi',l1:'BIS ALARM',l2:'BIS '+(bisDir<0?'below':'above')+' defined range'});
  // one bar entry per alarm name (both sides show one SQI or SEF line)
  const seen=new Set(),uniq=list.filter(a=>{const k=a.l1;if(seen.has(k))return false;seen.add(k);return true;});
@@ -64,9 +63,9 @@ function advMsg(text,o){o=o||{};const now=Date.now(),ex=ADV.msgs.find(m=>m.text=
 function advMsgDrop(re){ADV.msgs=ADV.msgs.filter(m=>!re.test(m.text));}
 function advMsgUI(now){const cur=ADV.msgs[ADV.msgs.length?ADV.msgI%ADV.msgs.length:0];ADV.msgs=ADV.msgs.filter(m=>m.latch||m.until>now);const n=ADV.msgs.length;
  if(n){let i=ADV.msgs.indexOf(cur);if(i<0){i=ADV.msgI%n;ADV.msgT=now;}if(now-ADV.msgT>5000){ADV.msgT=now;if(n>1)i=(i+1)%n;}ADV.msgI=i;}else ADV.msgI=0;
- const hide=!!ADV.review||!!ADV.boot,m=hide?null:ADV.msgs[ADV.msgI];const t=m?m.text:'';const e=aq('aMsgT');if(e._h!==t){e._h=t;e.textContent=t;}
+ const hide=!!ADV.boot,m=hide?null:ADV.msgs[ADV.msgI];const t=m?m.text:'';const e=aq('aMsgT');if(e._h!==t){e._h=t;e.textContent=t;}
  const sh=!!m;aq('aMi').hidden=!sh;aq('aMbd').hidden=!sh;aq('aMn').hidden=!sh;aq('aCheck').hidden=!sh;
- if(sh){const b=aq('aMbd');if(b._h!==n){b._h=n;b.textContent=n;}const c=aq('aMc'),ct=`${ADV.msgI+1}/${n}`;if(c._h!==ct){c._h=ct;c.textContent=ct;}}}
+ if(sh){const b=aq('aMbd');if(b._h!==n){b._h=n;b.textContent=n;}const c=aq('aMc'),ct=`${Math.min(ADV.msgI+1,n)}/${n}`;if(c._h!==ct){c._h=ct;c.textContent=ct;}}}
 // ----- audio -----
 function advUnlock(){try{const A=window.AudioContext||window.webkitAudioContext;if(!A)return;ADV.ac=ADV.ac||new A();if(ADV.ac.state==='suspended')ADV.ac.resume();}catch(e){}}
 function advBeep(n,f){n=n||1;f=f||880;ADV.beeps++;try{const ac=ADV.ac;if(!ac||ac.state!=='running')return;const g=ac.createGain();g.gain.value=0.012*ADV.vol*ADV.vol/2;g.connect(ac.destination);
@@ -82,14 +81,21 @@ function advSetAudio(a){const was=ADV.audio;if(a!==was){ADV.audio=a;ADV.nextBeep
  advUnlock();advSound(Date.now());advUI(Date.now());}
 // ----- per-frame UI of the top bar -----
 function advUI(now){
- const t=advNow(),dt=advDate(t),tm=advClockS(t);advSet('aDate',dt);advSet('aTime',tm);
- // alarm bar (in case review it only carries the title)
- const rv=!!ADV.review,n=rv?0:ADV.alarms.length,bar=aq('aAbar');bar.hidden=!n&&!rv;aq('aPill').hidden=rv;
- if(rv){bar.className='abar rv';advSet('aAico','');advSet('aAl1','CASE REVIEW');advSet('aAl2','');aq('aAcnt').style.visibility='hidden';}
- else{if(!n&&bar.className!=='abar')bar.className='abar';
+ const t=advNow(),dt=advDate(t),tm=advClockS(t),rv=!!ADV.review;advSet('aDate',dt);advSet('aTime',tm);
+ // in case review the date, time and ID go, the serial link shows crossed out and the USB icon goes; the alarm bar and the pill stay as they are
+ document.querySelectorAll('#advTop .dblk').forEach(e=>{if(e.hidden!==rv)e.hidden=rv;});
+ aq('aSer').hidden=rv;aq('aNetx').hidden=!rv;aq('aUsb').hidden=rv;aq('aUsb').style.opacity=ADV.usb?1:.8;
+ // battery: full and on mains, or low (about 10 percent, a red glyph, no bolt) when the Simulate row says so
+ const lowB=!!ADV.batt;advSet('aBatT',lowB?'10%':'100%');aq('aBatT').setAttribute('aria-label','Battery '+(lowB?10:100)+' percent');
+ const bf=aq('aBatFill');if(bf&&bf._l!==lowB){bf._l=lowB;bf.setAttribute('width',lowB?'1.9':'18.2');bf.setAttribute('fill',lowB?'#ec1c2c':'#dce4ec');}
+ aq('aBolt').hidden=lowB;
+ if(lowB&&!ADV.battMsg){ADV.battMsg=true;advMsg('AC power disconnected');}else if(!lowB&&ADV.battMsg){ADV.battMsg=false;advMsgDrop(/^AC power disconnected/);}
+ // alarm bar
+ const n=ADV.alarms.length,bar=aq('aAbar');bar.hidden=!n;aq('aPill').hidden=false;
+ if(bar.className!=='abar'&&!n)bar.className='abar';
  if(n){const i=Math.floor(now/3000)%n,a=ADV.alarms[i];bar.className='abar '+a.pri+(a.pri==='hi'&&ADV.audio!==2?' flash':'');
   advSet('aAico',a.pri==='hi'?IC.tri3:IC.tri);advSet('aAl1',advEsc(a.l1));advSet('aAl2',advEsc(a.l2));advSet('aAn',`${i+1}/${n}`);
-  const c=aq('aAcnt');c.style.visibility='visible';}}
+  const c=aq('aAcnt');c.style.visibility='visible';}
  if(!n&&ADV.list)ADV.list=false;
  aq('aAlist').hidden=!(ADV.list&&n);if(ADV.list&&n){const rows=ADV.alarms.map(a=>`<div class="r"><b>${advClockS(a.t)}</b><span>${advEsc(a.l1)}</span></div>`).join('');advSet('aAlist',`<div class="r h"><b>START</b><span>ALARM</span></div>${rows}`);}
  aq('aAcnt').setAttribute('aria-expanded',!!ADV.list);
@@ -101,7 +107,6 @@ function advUI(now){
  const s=aq('aSilent');const lab=st===0?'Alarm audio on. Press to pause for 2 minutes':st===1?'Alarm audio paused. Press to turn alarm audio off':'Alarm audio off. Press to turn it back on';if(s._l!==lab){s._l=lab;s.setAttribute('aria-label',lab);}
  aq('aCtl').hidden=!ADV.ctl;aq('aVol').hidden=!(ADV.ctl&&ADV.vol_);aq('aDrop').setAttribute('aria-expanded',!!ADV.ctl);
  if(ADV.ctl){[0,1,2].forEach(i=>aq('aCt'+i).classList.toggle('on',st===i));aq('aCt3').classList.toggle('on',false);[...aq('aVol').children].forEach((b,i)=>b.classList.toggle('on',i<ADV.vol));}
- const usb=aq('aUsb');usb.hidden=!ADV.usb;
  advMsgUI(now);}
 // ----- click routing -----
 function advCloseTransient(keep){if(keep!=='ctl'&&(ADV.ctl||ADV.vol_)){ADV.ctl=false;ADV.vol_=false;}if(keep!=='alist'&&ADV.list)ADV.list=false;if(keep!=='pop'&&ADV.pop){ADV.pop=null;aq('advPop').innerHTML='';}}
@@ -135,6 +140,10 @@ function advPopup(anchor,items,cur,fn){const S=aq('advS').getBoundingClientRect(
 function advView(){const ch=ADV.view==='chart';aq('advChart').hidden=!ch;aq('advHdr').hidden=ch;ADV.chartKey=null;if(ch)advChart(true);advChrome();ADV.full=true;}
 function advCvClick(e){const R_=ADV.review;if(!R_)return;const c=aq('advCv'),r=c.getBoundingClientRect(),x=(e.clientX-r.left)/r.width*1246,D=ADV.d;if(!D)return;
  R_.t=Math.max(ADV.t0,Math.min(R_.now,D.tL+(x-ADV_X)/ADV_PX*D.win));ADV.full=true;advNumerics();advReviewTip();}
+// the three hard keys on the case: function (the main menu, like the hamburger), home (closes every window and menu), power (inert)
+function advHardKey(e){const b=e.target.closest('[data-hk]');if(!b)return;const k=b.dataset.hk;if(ADV.boot)return;
+ if(k==='fn'){advCloseTransient();if(ADV.dlg&&ADV.dlg.name!=='sensor'){advCloseDlg();}ADV.menu?advCloseMenu():advOpenMenu();}
+ else if(k==='home'){advCloseTransient();if(ADV.dlg&&ADV.dlg.name!=='sensor')advCloseDlg();if(ADV.menu)advCloseMenu();}}
 function advKey(e){if(!ADV.built||mon.skin!=='advance')return;
  if(e.key==='Escape'){if(ADV.pop){advCloseTransient();return;}if(ADV.ctl||ADV.list){advCloseTransient();return;}if(ADV.dlg&&ADV.dlg.name!=='sensor'){advCloseDlg();e.preventDefault();return;}if(ADV.menu){advCloseMenu();e.preventDefault();return;}}
  if(ADV.review&&(e.key==='ArrowLeft'||e.key==='ArrowRight')&&!ADV.dlg&&!ADV.menu){const R_=ADV.review,D=ADV.d,st=D.win/ADV_PX*6;R_.t=Math.max(ADV.t0,Math.min(R_.now,(R_.t==null?R_.now:R_.t)+(e.key==='ArrowLeft'?-st:st)));ADV.full=true;advNumerics();advReviewTip();e.preventDefault();}}

@@ -54,7 +54,8 @@ try {
     // the main menu: six tiles in the real order; ALARMS is dimmed while monitoring; Escape closes
     await page.click('#aMenu'); assert.equal(await page.$eval('#advOv .mm', e => !!e), true);
     assert.deepEqual(await page.$$eval('#advOv .mm button', bs => bs.map(x => x.textContent.replace(/\s+/g, ' ').trim())), ['ALARMS', 'DISPLAY SETTINGS', 'SETTINGS & MAINTENANCE', 'DOWNLOAD', 'INFO', 'CASE REVIEW']);
-    assert.equal(await page.$$eval('#advOv .mm button[aria-disabled="true"]', e => e.length), 0, 'every tile is white and usable');
+    assert.deepEqual(await page.$$eval('#advOv .mm button[aria-disabled="true"]', bs => bs.map(x => x.textContent.trim())), ['ALARMS', 'CASE REVIEW'], 'ALARMS and CASE REVIEW are dimmed during live monitoring');
+    await page.click('#advOv .mm button[data-a="m_alarms"]', { force: true }); assert.equal(await page.$$eval('#advOv .dlg', e => e.length), 0, 'a dimmed tile does nothing');
     await page.click('#aMenu'); assert.equal(await page.$$eval('#advOv .mm', e => e.length), 0, 'the hamburger stays active over the menu and toggles it');
     await page.click('#aMenu'); await page.evaluate(() => document.activeElement && document.activeElement.blur()); await page.keyboard.press('Escape'); assert.equal(await page.$$eval('#advOv .mm', e => e.length), 0, 'Escape closes the menu wherever the focus is');
     // Display Settings: the 4-channel layouts; choosing BIS, DSA, ASYM redraws with the DSA pair and the ASYM strip between; Secondary
@@ -118,7 +119,14 @@ try {
     await page.waitForFunction(() => /TEMPORARILY UNABLE TO MEASURE ELECTRODES/.test(document.querySelector('#aAl1').textContent), null, { timeout: 9000 }); await page.click('[data-a="sc_close"]'); await page.click('[data-sim="disc"]');
     await page.waitForFunction(() => !document.querySelector('#aAbar') || document.querySelector('#aAbar').hidden || !/SENSOR DISCONNECTED/.test(document.querySelector('#aAl1').textContent), null, { timeout: 5000 });
     await page.click('[data-sim="expired"]'); await page.waitForFunction(() => /SENSOR EXPIRED/.test(document.querySelector('#aAl1').textContent), null, { timeout: 5000 }); await page.click('[data-sim="expired"]');
-    await page.click('[data-sim="batt"]'); await page.waitForFunction(() => /BATTERY LOW/.test(document.querySelector('#aAl1').textContent), null, { timeout: 5000 }); await page.click('[data-sim="batt"]');
+    await page.click('[data-sim="batt"]'); await page.waitForFunction(() => /BATTERY LOW/.test(document.querySelector('#aAl1').textContent), null, { timeout: 5000 });
+    assert.equal(await txt(page, '#aBatT'), '10%'); assert.equal(await page.$eval('#aBolt', e => e.hidden), true, 'no mains bolt on battery'); assert.equal(await page.evaluate(() => ADV.msgs.some(m => m.text === 'AC power disconnected')), true);
+    await page.click('[data-sim="batt"]'); assert.equal(await txt(page, '#aBatT'), '100%'); assert.equal(await page.$eval('#aBolt', e => e.hidden), false);
+    // the USB icon is in the bar; the hard keys on the case: function opens the main menu, home closes it, power does nothing
+    assert.equal(await page.$eval('#aUsb', e => e.hidden), false);
+    await page.click('#aHkFn'); assert.equal(await page.$$eval('#advOv .mm', e => e.length), 1); await page.click('#aHkHome'); assert.equal(await page.$$eval('#advOv .mm', e => e.length), 0); await page.click('#aHkPw'); assert.equal(await page.$$eval('#advOv .mm', e => e.length), 0);
+    // the EEG frame scale stays at +-50 uV whatever the uV/mm gain (the gain changes the trace, not the labels)
+    assert.equal(await page.evaluate(() => { ADV.uvmm[4] = 5; advRelayout(); return ADV.uvmm[4]; }), 5); await page.evaluate(() => { ADV.uvmm[4] = 10; advRelayout(); });
     // diathermy: SQI falls, the SQI alarm raises (yellow) and the BIS number goes blank under SQI 15
     await page.evaluate(() => { mods.diathermy = true; applyTarget(); }); await page.click('#speedSeg [data-speed="10"]');
     await page.waitForFunction(() => !document.querySelector('#aAbar').hidden && /SQI/.test(document.querySelector('#aAl1').textContent), null, { timeout: 30000 });
@@ -126,12 +134,17 @@ try {
     await page.waitForFunction(() => document.querySelector('#aBisL').textContent === '', null, { timeout: 40000 });
     await page.evaluate(() => { mods.diathermy = false; applyTarget(); });
     await page.waitForFunction(() => /^\d+$/.test(document.querySelector('#aBisL').textContent), null, { timeout: 60000 }); await page.click('#speedSeg [data-speed="1"]');
-    // case review: list, review mode with the left bar CASES LIST / CASE LOG / EXIT, numerics follow the cursor, EXIT returns
-    await page.click('#aMenu'); await page.click('[data-a="m_review"]'); assert.match(await txt(page, '#advOv .lst thead'), /Case Start\s*Case ID.*Duration \[hh:mm\]/); await page.click('[data-a="rvopen"]');
+    // case review (the menu tile works only with the sensor disconnected): list, review mode with the left bar CASES LIST / CASE LOG / EXIT, numerics follow the cursor, EXIT returns
+    await page.click('[data-sim="disc"]'); await page.click('#aMenu'); assert.equal(await page.$$eval('#advOv .mm button[aria-disabled="true"]', e => e.length), 0, 'no sensor: every tile works');
+    await page.click('[data-a="m_review"]'); assert.match(await txt(page, '#advOv .lst thead'), /Case Start\s*Case ID.*Duration \[hh:mm\]/); await page.click('[data-a="rvopen"]');
     assert.equal(await page.evaluate(() => !!ADV.review), true); assert.deepEqual(await page.$$eval('#advLeft .rb .l', e => e.map(x => x.textContent)), ['CASES LIST', 'CASE LOG', 'EXIT']);
     await page.waitForFunction(() => document.querySelector('#advWm .tip'), null, { timeout: 3000 }); assert.match(await txt(page, '#advWm .tip'), /^\d\d:\d\d:\d\d$/);
+    // review keeps the alarm bar and pill and the message bar, shows no title and no date block, and prints the case facts on the trend
+    assert.match(await txt(page, '#aAl1'), /SENSOR DISCONNECTED/); assert.equal(await page.$eval('#aPill', e => e.hidden), false); assert.equal(await page.$eval('#aDate', e => e.hidden), true); assert.equal(await page.$eval('#aNetx', e => e.hidden), false);
+    assert.ok(!/CASE REVIEW/.test(await txt(page, '#advTop')), 'no CASE REVIEW title in the top bar'); assert.notEqual(await txt(page, '#aMsgT'), '', 'the message bar stays live');
+    assert.equal(await page.$eval('#aCases', e => e.classList.contains('sq')), true, 'rounded-square review buttons');
     await page.click('#aLog'); assert.match(await txt(page, '#advOv .lst'), /Case start/); await page.click('[data-a="dclose"]');
-    await page.click('#aExitRv'); assert.equal(await page.evaluate(() => !!ADV.review), false);
+    await page.click('#aExitRv'); assert.equal(await page.evaluate(() => !!ADV.review), false); await page.click('[data-sim="disc"]');
     // demo mode for the unilateral sensor: 2-channel screen with one BIS panel, EEG selector shows one channel, SET RANGE, watermark, EXIT DEMO MODE
     await page.click('#aInfo'); await page.click('[data-a="demo"][data-v="2"]');
     assert.equal(await page.$$eval('#aBisR', e => e.length), 0); assert.equal(await page.evaluate(() => ADV.ch + '|' + ADV.layout[2]), '2|bis,eeg'); assert.match(await txt(page, '#advHdr'), /SET RANGE/);

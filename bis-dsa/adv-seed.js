@@ -70,4 +70,7 @@ function advBootEnd(){if(!ADV.boot)return;ADV.boot=null;if(ADV.sensor){ADV.senso
  advStartCase('awake');advBootUI();advHeaders();advChrome();advInval();ADV.alarmDirty=true;}
 // the Simulate row under the screen (outside the monitor): the start-up skip, and the technical alarms the real monitor can raise
 function advSimClick(e){const b=e.target.closest('[data-sim]');if(!b)return;const k=b.dataset.sim;if(k==='skip'){advBootEnd();return;}
- ADV[k]=!ADV[k];b.setAttribute('aria-pressed',String(ADV[k]));ADV.alarmDirty=true;ADV.numKey=null;advInval();}
+ ADV[k]=!ADV[k];b.setAttribute('aria-pressed',String(ADV[k]));ADV.alarmDirty=true;ADV.numKey=null;
+ // a drive pulled out while a live recording runs: the wording of the manual's message table
+ if(k==='usb'&&!ADV.usb&&ADV.rec){ADV.rec=false;advMsg('Export failed - USB drive removed');if(ADV.dlg&&ADV.dlg.name==='download')advOv();}
+ advInval();}
