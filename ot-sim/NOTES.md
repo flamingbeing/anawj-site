@@ -59,6 +59,10 @@ Lasting decisions for `ot-sim/`. Status and next steps: `STATUS.md`. The build b
 
 ## Decisions log
 
+- 14 Oct 2026 (M0.1): the owner said go. Blood volume indexing starts above BMI 25 (not 22) so the default patient is
+  4.9 L. `vitals.js` is a placeholder (steady values plus noise, beats and breaths) that later PRs replace system by
+  system. `tools/test-ot-sim.sh` runs every `test/*.test.mjs`, so new model tests need no wiring.
+
 - 14 Oct 2026: folder `ot-sim/`, address `anaes.anawj.com/ot/`, plain ES modules with no build step, model separate
   from UI so Node tests can run it. Environment prepared (routes, labels, checks, test runner, build brief).
 - 14 Oct 2026 (plan, owner asked for a plan before any build): technical plan in `DESIGN.md`, model spec in `MODEL.md`,

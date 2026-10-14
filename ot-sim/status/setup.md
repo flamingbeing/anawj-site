@@ -1,1 +1,0 @@
-- ot-sim (14 Oct 2026): environment prepared (scaffold, route, CI, `tools/test-ot-sim.sh`, `PLAN.md`). Next session starts at M0.
