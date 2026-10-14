@@ -12,7 +12,8 @@ mkdirSync(out, { recursive: true });
 const zip = await JSZip.loadAsync(readFileSync(blank));
 const xml = await zip.file('word/document.xml').async('string');
 const fieldOf = id => BY_ID[id] || EXTRA_BY_ID[id];
-const all = [...FIELDS, ...EXTRA].filter(f => f.type !== 'rows');
+// some fields list their options as plain strings (io_tech, site): make every option a [value, label] pair
+const all = [...FIELDS, ...EXTRA].filter(f => f.type !== 'rows').map(f => f.opts ? { ...f, opts: f.opts.map(o => Array.isArray(o) ? o : [o, o]) } : f);
 
 // what must be set for a field to show on the form: its parents' answers, and a pre-warming arm
 function prereqs(f, acc = {}) {

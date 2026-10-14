@@ -2,7 +2,8 @@
 Writes fieldmap.json: { fields: { id: { page, rect:[x0,y0,x1,y1] (px at 200 dpi), options: { value: rect },
 written: true when the options are written letters/numbers rather than ticked boxes } }, unplaced: [ {key, why} ] }.
 A character that is new compared with the same form without that field is the field's mark.
-Rendering and reading the PDFs use all CPU cores (set LOCATE_JOBS to change)."""
+Rendering and reading the PDFs use all CPU cores (set LOCATE_JOBS to change). RENDERER=word renders with Microsoft Word
+(docx2pdf) instead of LibreOffice, so the layout matches the printed paper exactly."""
 import concurrent.futures as cf, glob, json, os, subprocess, sys, tempfile
 from pathlib import Path
 import pdfplumber
@@ -20,6 +21,9 @@ def convert_chunk(files):
 
 
 def convert():
+    if os.environ.get('RENDERER') == 'word':   # Microsoft Word itself (pip install docx2pdf; Windows or Mac): the layout of the printed paper
+        subprocess.run([sys.executable, '-m', 'docx2pdf', d], check=False)
+        return
     todo = [f for f in sorted(glob.glob(f'{d}/*.docx')) if not os.path.exists(f[:-5] + '.pdf')]
     chunks = [todo[i::JOBS] for i in range(JOBS) if todo[i::JOBS]]
     with cf.ThreadPoolExecutor(len(chunks) or 1) as ex:

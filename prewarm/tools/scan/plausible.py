@@ -33,6 +33,7 @@ def clean(f, text):
     if re.match(r'(?i)arrow|ditto|same', text):   # an arrow or ditto: "same as above", which only a person can place
         return None, ['arrow or ditto: same as the reading above?']
     if kind == 'code' and f.get('opts'):
+        f = dict(f, opts=[o if isinstance(o, (list, tuple)) else [o, o] for o in f['opts']])
         keys = {str(k): k for k, _ in f['opts']}
         t = text.replace('+', '')
         if t in keys:
