@@ -135,24 +135,33 @@ try {
   };
   // an offline change that met a change made elsewhere meanwhile becomes a conflict when it lands: the app keeps both
   // versions (Recent changes) and the header must say "Save needs attention". Anything else must have landed.
+  // each case's latest save-queue entry on a device: [state, error]
+  const latest = async d => new Map((await d.p.evaluate(async () => (await import('./js/writes.js')).writes.entries().map(j => [j.record.id, j.state, j.error || ''])))
+    .reverse().map(([id, st, err]) => [id, [st, err]]));
+  // a delete that met a change made elsewhere is undone (bin.js rollBack: the other version stays, the job is set aside,
+  // a toast says so): it lost, as a conflict does, and the header has nothing left to flag
+  const isUndone = ([st, err] = []) => st === 'archived' && /changed elsewhere/.test(err);
   async function land(d, items, round) {
-    const states = await d.p.evaluate(async () => (await import('./js/writes.js')).writes.entries().map(j => [j.record.id, j.state, j.error || '']));
-    const conflicted = new Set(states.filter(([, st]) => st === 'conflict').map(([id]) => id));
-    // a delete that met a change made elsewhere is undone (bin.js rollBack: the other version stays, the job is set
-    // aside): it lost, as a conflict does, but the header has nothing left to flag
-    const undone = new Set(states.filter(([, st, err]) => st === 'archived' && /changed elsewhere/.test(err)).map(([id]) => id));
-    const failed = states.filter(([, st]) => st === 'failed');
+    let states = await latest(d);
+    const failed = [...states].filter(([, [st]]) => st === 'failed');
     if (failed.length) errors.push(`round ${round}: device ${d.n} has failed saves after reconnecting: ${failed.map(([id]) => id).join(', ')}`);
+    const conflicted = new Set([...states].filter(([, [st]]) => st === 'conflict').map(([id]) => id));
     if (conflicted.size) {
       await d.p.waitForTimeout(300);
+      states = await latest(d);
       const header = await d.p.evaluate(() => document.querySelector('a.sync')?.textContent || '');
-      if (!/needs attention/i.test(header)) errors.push(`round ${round}: device ${d.n} has conflicts but the header says "${header}"`);
+      if ([...states.values()].some(([st]) => st === 'conflict') && !/needs attention/i.test(header)) errors.push(`round ${round}: device ${d.n} has conflicts but the header says "${header}"`);
     }
     for (const x of items) {
-      const hit = (x.r.ids || [x.r.id]).filter(id => conflicted.has(id) || undone.has(id));
+      const hit = (x.r.ids || [x.r.id]).filter(id => conflicted.has(id) || isUndone(states.get(id)));
       if (hit.length) { conflicts += hit.length; for (const id of hit) ledger.delete(id); if (x.r.ids) { for (const id of x.r.ids.filter(id => !hit.includes(id))) { ledger.set(id, { gone: true }); binned.push(id); } } }
       else record(x.r);
     }
+  }
+  // an online device's delete can be undone the same way, once it lands (a change made elsewhere reached the server first)
+  async function undoneOnline(d, r) {
+    const states = await latest(d);
+    for (const id of (r.ids || [r.id]).filter(id => isUndone(states.get(id)))) { conflicts++; ledger.delete(id); if (binned.includes(id)) binned.splice(binned.indexOf(id), 1); }
   }
   async function reconnect(d) {
     await d.ctx.setOffline(false); d.offline = false; d.stale = true;
@@ -198,6 +207,8 @@ try {
     // let the writes land, then every online device reopens (as after sign-in on a phone left in a pocket)
     const online = devs.filter(d => !d.offline);
     await Promise.all(online.map(d => d.p.evaluate(async () => (await import('./js/cloud.js')).syncFlush()).catch(() => {})));
+    await Promise.all(online.map(d => d.p.evaluate(async () => (await import('./js/writes.js')).writes.flush(8000)).catch(() => {})));
+    for (const [i, r] of results.entries()) if (r.ok && /^delete/.test(r.kind) && !devs[i].offline) await undoneOnline(devs[i], r);
     await new Promise(r => setTimeout(r, 2000));
     await Promise.all(online.map(async d => { await d.p.reload(); await synced(d.p); }));
     for (const d of back) d.held.clear();
