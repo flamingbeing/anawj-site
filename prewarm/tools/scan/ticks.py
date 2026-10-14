@@ -1,14 +1,15 @@
 """Tick or no tick for each box, from ink on the aligned page. Anything in between is returned as 'unsure'.
 
 The nurses mark a box with a slash or cross, often running past its edges. The printed box is already removed from the
-ink layer, so what is left is the stroke: score = stroke pixels around the box / the box's side. A slash or cross is
-2 or more; a clean empty box is near 0; a stray speck or a misaligned printed edge is a fraction."""
+ink layer, so what is left is the stroke: score = stroke pixels INSIDE the box / the box's side. Only the inside counts,
+so a slash that overshoots into the space around the box (or a neighbour's tail) does not tick the wrong box. A slash or
+cross is well above 0.7; a clean empty box is near 0; a stray speck or a misaligned printed edge is a fraction."""
 import numpy as np
 
-CLEAR_TICK, CLEAR_EMPTY = 0.7, 0.3
+CLEAR_TICK, CLEAR_EMPTY = 0.5, 0.15
 
 
-def read_ticks(ink, boxes, pad=2):
+def read_ticks(ink, boxes, pad=0):
     res = []
     for b in boxes:
         x0, y0, x1, y1 = b['rect']

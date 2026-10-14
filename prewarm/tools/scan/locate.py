@@ -1,5 +1,5 @@
 """python3 locate.py <dir from locate.mjs>: render the one-field-at-a-time forms and find where each field's text landed.
-Writes fieldmap.json: { fields: { id: { page, rect:[x0,y0,x1,y1] (px at 200 dpi), options: { value: rect },
+Writes fieldmap.json: { header_bottom: { page: px below which the page header ends }, fields: { id: { page, rect:[x0,y0,x1,y1] (px at 200 dpi), options: { value: rect },
 written: true when the options are written letters/numbers rather than ticked boxes } }, unplaced: [ {key, why} ] }.
 A character that is new compared with the same form without that field is the field's mark.
 Rendering and reading the PDFs use all CPU cores (set LOCATE_JOBS to change). RENDERER=word renders with Microsoft Word
@@ -9,6 +9,7 @@ from pathlib import Path
 import pdfplumber
 
 PT = 200 / 72
+HEADER_MARGIN = 12   # px below the header digits that still count as header
 TICKS = set('☒☑✓✔✗✘')     # ballot-box X, ballot-box check, check marks, crosses
 JOBS = int(os.environ.get('LOCATE_JOBS') or os.cpu_count() or 2)
 d = sys.argv[1]
@@ -22,7 +23,8 @@ def convert_chunk(files):
 
 def convert():
     if os.environ.get('RENDERER') == 'word':   # Microsoft Word itself (pip install docx2pdf; Windows or Mac): the layout of the printed paper
-        subprocess.run([sys.executable, '-m', 'docx2pdf', d], check=False)
+        from docx2pdf import convert as word_convert   # Word converts the whole folder in one session
+        word_convert(d)
         return
     todo = [f for f in sorted(glob.glob(f'{d}/*.docx')) if not os.path.exists(f[:-5] + '.pdf')]
     chunks = [todo[i::JOBS] for i in range(JOBS) if todo[i::JOBS]]
@@ -71,6 +73,16 @@ if __name__ == '__main__':
         for pi in {m[0] for m in marks}: on_page[pi] = on_page.get(pi, 0) + 1
         for k in {m[:4] for m in marks}: freq[k] = freq.get(k, 0) + 1
     common = {k for k, n in freq.items() if on_page[k[0]] >= 4 and n > 0.25 * on_page[k[0]]}
+    # the header (Subject ID / Date of Entry) is the page furniture near the top: where it ends, per page
+    header_bottom = {}
+    tops = {}
+    for v, marks in found:
+        for m in marks:
+            if m[:4] in common and m[2] * PT < 700:
+                tops.setdefault(m[0], {})[m[:4]] = (round(m[2] * PT), round(m[5] * PT))
+    for pi, marks in tops.items():            # the topmost line of such marks (not a tick lower down the page)
+        first = min(t for t, _ in marks.values())
+        header_bottom[pi] = max(b for t, b in marks.values() if t <= first + 60) + HEADER_MARGIN
     fmap, ticked = {}, {}
     for v, marks in found:
         key = v['field'] + (':' + v['option'] if v.get('option') is not None else '')
@@ -81,6 +93,9 @@ if __name__ == '__main__':
         page = own[0][0]
         ms = [m for m in own if m[0] == page]
         rect = [round(min(m[1] for m in ms) * PT), round(min(m[2] for m in ms) * PT), round(max(m[4] for m in ms) * PT), round(max(m[5] for m in ms) * PT)]
+        if rect[1] < header_bottom.get(page, 0):   # Subject ID / Date of Entry live up here: never a field to read or send
+            unplaced.append(dict(key=key, why='lands in the page header band (Subject ID / Date of Entry)'))
+            continue
         f = fmap.setdefault(v['field'], dict(page=page, options={}))
         if v.get('option') is not None:
             f['options'][v['option']] = rect
@@ -90,7 +105,7 @@ if __name__ == '__main__':
     for fid, f in fmap.items():
         if f['options'] and not ticked.get(fid):
             f['written'] = True      # the option's mark is a letter or number (Y/N, thermal sensation), not a ticked box
-    json.dump(dict(fields=fmap, unplaced=sorted(unplaced, key=lambda u: u['key'])), open(f'{d}/fieldmap.json', 'w', encoding='utf-8'), indent=1)
+    json.dump(dict(fields=fmap, header_bottom={str(k): v for k, v in header_bottom.items()}, unplaced=sorted(unplaced, key=lambda u: u['key'])), open(f'{d}/fieldmap.json', 'w', encoding='utf-8'), indent=1)
     by_why = {}
     for u in unplaced: by_why[u['why'].split(' (')[0][:60]] = by_why.get(u['why'].split(' (')[0][:60], 0) + 1
     print(len(fmap), 'fields placed;', len(unplaced), 'variants not placed:', by_why)

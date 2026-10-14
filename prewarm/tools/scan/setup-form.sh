@@ -10,7 +10,7 @@ cp "$BLANK" "$OUT/blank.docx"
 # RENDERER=word renders with Microsoft Word (pip install docx2pdf): same layout as the printed paper. Otherwise LibreOffice,
 # where the fonts matter: install Carlito (Calibri-metric) first or its pages will not match the paper.
 if [ "$RENDERER" = "word" ]; then
-  (cd "$OUT" && ${PYTHON:-python3} -m docx2pdf blank.docx blank.pdf)
+  (cd "$OUT" && ${PYTHON:-python3} -c "from docx2pdf import convert; convert('blank.docx', 'blank.pdf')")
 else
   (cd "$OUT" && soffice --headless --convert-to pdf blank.docx >/dev/null 2>&1)
 fi

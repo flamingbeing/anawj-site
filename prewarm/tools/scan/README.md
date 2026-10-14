@@ -2,7 +2,8 @@
 
 Phone photos of filled-in paper pages → checked values → the same Excel layout the app exports. Local tool: no scans,
 no form, no outputs go in git (the repo is public), and nothing is sent anywhere except small crops of **numbers and
-times** to Claude for reading. IDs, dates, names, signatures and free text are never cropped to the API; you type
+times** to Claude for reading. IDs, dates, names, signatures and free text are never cropped to the API, and nothing in a page's header band (Subject ID / Date of
+Entry, worked out per page from the form) is ever cropped; you type
 those in the review screen.
 
 ## How it works
@@ -10,8 +11,9 @@ those in the review screen.
 1. **Find every field** (once per form version). `setup-form.sh` asks the app's own Form view (`js/wordform.js`) to fill
    the blank form one field at a time, renders each, and sees which printed characters appeared. That gives every
    field's place with no hand-made coordinates, and it follows the form whenever `wordform.js` changes.
-2. **Line up the photo** (`align.py`): finds the sheet, flattens it onto the blank page, refines with ECC, and scores
-   how well the printed lines match. A low score rejects the photo: retake it.
+2. **Line up the photo** (`align.py`): finds the sheet, flattens it onto the blank page, refines with ECC, then finds each
+   printed table's own row and column lines in the photo and pulls them onto the template's (a long table over a phone
+   lens), and scores how well the printed lines match. A low score rejects the photo: retake it.
 3. **Read the page** (`scan.py`):
    - ticks: the slash or cross through each box (`ticks.py`), ticked / empty / unsure; fields whose answers are
      written (Y / N columns, thermal sensation) are read as handwriting, found automatically from the form;
@@ -59,6 +61,7 @@ change); it prints why any field was not placed (the paper form has no per-readi
 ## Tests (all fake data)
 
 - `node prewarm/test/scan-export.test.mjs` (in CI): reviewed values → the right workbook cells.
+- `python3 grid_test.py` (a table whose rows and columns are not where the template says is warped back onto it)
 - `python3 unit.py` (the small rules; no photos needed)
 - `python3 test.py <dir>` (alignment + ticks on synthetic phone photos) and `python3 e2e.py <form dir>` (whole read
   with a stand-in reader, one deliberate misread that must be flagged). Needs OpenCV, LibreOffice, `pdftoppm`.
