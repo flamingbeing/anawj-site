@@ -196,6 +196,7 @@ falls under 50 after about a minute of diathermy) → emergence with blinks → 
   live monitor settles on. A green band on the track marks depths that settle at BIS 40-60 (17 short forecasts at depths
   0-0.8, one per timeout; recomputed when the drug, older-patient, facial-EMG or relaxant mode changes; none for ketamine
   alone). The ▲ under the track is the effect site; "settling" / "at target" says where it is.
+- **Drag bubble:** while the depth slider is dragged (or moved by keyboard), a bubble over the thumb shows "BIS ≈ n" (green inside 40-60), read off a 21-point table (depths 0, 0.05 … 1.0) the zone computation now keeps, or a throttled forecast until the table is ready; it hides about a second after release. One-drug mode only: the mix sliders update the Target BIS line when they stop.
 - **Relaxant on by default:** three modes (`mods.nmbMode`). **At induction** (default): given when the induced depth reaches
   0.3 (propofol/sevo depth, ketamine 0.45 dose, mix hypnotic or ketamine; dex alone never) and reversed under 0.25, so the
   awake patient still opens at BIS 90s and the awake paralysis is not on show; **Off** (EMG teaching); **On now** (the

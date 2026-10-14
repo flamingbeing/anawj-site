@@ -430,7 +430,20 @@ document.querySelectorAll('#modeSeg button').forEach(b=>b.onclick=()=>{stopStory
 function setDrug(dn){showMode('single');lastSingle=dn;depth=$('depth').value/100;drug=dn;document.querySelectorAll('#drugSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.drug===dn));
  $('ticks').innerHTML=DEPTH_TICKS[dn].map(s=>`<span>${s}</span>`).join('');applyTarget();}
 document.querySelectorAll('#drugSeg button').forEach(b=>b.onclick=()=>{stopStory();setDrug(b.dataset.drug);});
-$('depth').oninput=e=>{stopStory();depth=e.target.value/100;applyTarget();};
+// drag bubble: while the depth slider is moved, a bubble over the thumb shows the BIS that depth will settle at (read off
+// the 21-point table when it is ready, otherwise a forecast, throttled); it fades a moment after the last move
+let popT=0,popDown=false,popFc=0,popBusy=0;
+function popBis(d){if(zonePts&&zoneOK===zoneKeyNow()){const x=cl(d)*20,j=Math.min(19,Math.floor(x));return zonePts[j]+(zonePts[j+1]-zonePts[j])*(x-j);}return null;}
+function showPop(){const d=$('depth').value/100,el=$('tgtPop');let b=popBis(d);
+ if(b==null&&!popBusy){popBusy=1;setTimeout(()=>{popBusy=0;popFc=forecastBis(drug,$('depth').value/100,mods);showPop();},120);}
+ if(b==null)b=popFc;
+ el.hidden=false;el.style.left=`clamp(34px, calc(8px + ${d} * (100% - 16px)), calc(100% - 34px))`;
+ el.textContent=b==null?'BIS ≈ …':'BIS ≈ '+Math.round(b);el.className='pop'+(b!=null&&b>=40&&b<=60?' in':'');
+ clearTimeout(popT);if(!popDown)popT=setTimeout(()=>{el.hidden=true;},1100);}
+$('depth').addEventListener('pointerdown',()=>{popDown=true;showPop();});
+addEventListener('pointerup',()=>{if(popDown){popDown=false;clearTimeout(popT);popT=setTimeout(()=>{$('tgtPop').hidden=true;},1100);}});
+$('depth').addEventListener('blur',()=>{popDown=false;$('tgtPop').hidden=true;});
+$('depth').oninput=e=>{stopStory();depth=e.target.value/100;applyTarget();showPop();};
 $('mElder').onchange=e=>{mods.elderly=e.target.checked;applyTarget();};
 $('mEmg').onchange=e=>{mods.emg=e.target.checked;applyTarget();};
 // muscle relaxant (owner, 14 Oct 2026: on by default): 'auto' gives it at induction and reverses it at emergence, so the
@@ -463,12 +476,17 @@ function forecastBis(dr,d,m,secs){
 const fc={bis:null};let fcT=0,fcRun=0,zoneKey='',zoneRun=0;
 var onTarget=()=>{slideUI();clearTimeout(fcT);const run=++fcRun;fcT=setTimeout(()=>{if(run!==fcRun)return;
  fc.bis=forecastBis(drug,drug==='mix'?mix:depth,mods);fcUI();
- if(drug!=='mix'){const key=drug+'|'+(+mods.elderly)+(+mods.emg)+mods.nmbMode;if(key!==zoneKey){zoneKey=key;const zr=++zoneRun;zoneChunk(zr,0,[]);}}},180);};
+ if(drug!=='mix'){const key=zoneKeyNow();if(key!==zoneKey){zoneKey=key;zoneOK='';const zr=++zoneRun;zoneChunk(zr,0,[]);}}},180);};
 // the depth range that gives BIS 40-60, from 17 short forecasts at depths 0-0.8 (BIS 40 is crossed before suppression starts;
 // one forecast per timeout so the live monitor keeps drawing)
+const zoneKeyNow=()=>drug+'|'+(+mods.elderly)+(+mods.emg)+mods.nmbMode;let zoneOK='',zonePts=null;
 function zoneChunk(zr,i,pts){if(zr!==zoneRun)return;pts.push(forecastBis(drug,i/20,mods,24));
  if(i<16){setTimeout(()=>zoneChunk(zr,i+1,pts),40);return;}
- const cross=v=>{for(let j=0;j<=16;j++)if(pts[j]<=v)return j?(j-1+(pts[j-1]-v)/(pts[j-1]-pts[j]))/20:0;return null;};
+ if(i===16)zoneBand(pts);
+ if(i<20){setTimeout(()=>zoneChunk(zr,i+1,pts),40);return;} // 0.85-1.0 too (longer runs where suppression is expected), for the drag bubble
+ zonePts=pts;zoneOK=zoneKeyNow();}
+function zoneBand(pts){
+ const cross=v=>{for(let j=0;j<pts.length;j++)if(pts[j]<=v)return j?(j-1+(pts[j-1]-v)/(pts[j-1]-pts[j]))/20:0;return null;};
  const lo=cross(60),hi=cross(40),h=hi==null?1:hi,band=$('zoneBand');
  const ok=lo!=null&&h>lo;band.hidden=!ok;$('zoneNote').hidden=false;
  if(ok){band.style.left=`calc(8px + ${lo} * (100% - 16px))`;band.style.width=`calc(${h-lo} * (100% - 16px))`;}

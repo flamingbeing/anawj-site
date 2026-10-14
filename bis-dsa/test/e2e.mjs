@@ -32,6 +32,12 @@ try {
     await page.waitForFunction(() => { const m = /≈ (\d+)/.exec(document.querySelector('#tgtBis').textContent); return m && +m[1] >= 35 && +m[1] <= 60; }, null, { timeout: 8000 });
     await page.waitForFunction(() => !document.querySelector('#zoneBand').hidden && document.querySelector('#zoneBand').getBoundingClientRect().width > 8, null, { timeout: 15000 });
     assert.match(await page.textContent('#zoneText'), /BIS 40–60/);
+    // dragging the depth slider pops up the target BIS over the thumb, which hides again a moment after release
+    { const box = await page.locator('#depth').boundingBox(); const y = box.y + box.height / 2;
+      await page.mouse.move(box.x + box.width * 0.5, y); await page.mouse.down(); await page.mouse.move(box.x + box.width * 0.58, y, { steps: 4 });
+      await page.waitForFunction(() => { const p = document.querySelector('#tgtPop'); const m = /≈ (\d+)/.exec(p.textContent); return !p.hidden && m && +m[1] >= 25 && +m[1] <= 80; }, null, { timeout: 8000 });
+      await page.mouse.up();
+      await page.waitForFunction(() => document.querySelector('#tgtPop').hidden, null, { timeout: 4000 }); }
     // the effect-site marker is still left of the slider thumb, then catches up; BIS falls into 35-60 and the bands are described
     assert.ok(await page.$eval('#effMark', m => parseFloat(m.style.left.replace(/[^0-9.]/g, '')) >= 0), 'marker placed');
     await page.click('#speedSeg [data-speed="10"]');
