@@ -1698,7 +1698,9 @@ function fieldHtml(f, get) {
   const hint = f.hint ? `<small class="muted">${esc(f.hint)}</small>` : '';
   if (f.type === 'code' || f.type === 'word') {
     const opts = f.type === 'word' ? f.opts.map(o => [o, f.id === 'io_tech' ? 'GA (' + o + ')' : o]) : f.opts;
-    return `<div class="fld"><span class="lab">${esc(f.label)}</span>${hint}<div class="seg ${opts.length > 4 ? 'many' : ''}">${opts.map(([ov, ol]) =>
+    // short answers (Yes / No, 0 1 2) share a row with their label; long ones (GA (Inhalational)) keep their own line
+    const cls = opts.every(([, l]) => String(l).length <= 4) && opts.length <= 3 ? ' short' : opts.some(([, l]) => String(l).length > 10) ? ' longopt' : '';
+    return `<div class="fld${cls}"><span class="lab">${esc(f.label)}</span>${hint}<div class="seg ${opts.length > 4 ? 'many' : ''}">${opts.map(([ov, ol]) =>
       `<button class="chip" data-f="${f.id}" data-v="${ov}" aria-pressed="${String(v) === String(ov)}">${esc(ol)}</button>`).join('')}</div></div>`;
   }
   const mode = f.type === 'text' ? 'text' : f.type === 'int' ? 'numeric' : 'decimal';

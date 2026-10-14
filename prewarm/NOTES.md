@@ -425,3 +425,10 @@ left out on Save (it is never stored as a new reading). Typing it, tapping the v
 box to fill it all count as confirming it (`touched`; the grey goes away). Saving with some boxes still blank asks
 first, as before, and a reading with nothing but carried boxes is the "blank" case. The set temp, warming Yes / No and room
 temp still carry as before. Tests confirm grey boxes first (`confirmDefaults` in edge.e2e, the fullcase `temps()`).
+
+### Less scrolling on the sub-pages (14 Oct 2026)
+On Intra-op details, PACU, Pre-op, POD1 and POD2 (and the nurse's PACU page) a question with a box, or with short answers
+(Yes / No, 0 1 2), has its label on the left and the answer on the right, one row instead of two. Longer lists (pain 0-10,
+GA (Inhalational) / GA (TIVA), Normal / Abnormal / Not done) keep their own line (`.fld.short` / `.longopt` set in
+`fieldHtml`, the rest by `:has()` in style.css). At 390 px: Pre-op 5.0 to 3.4 screens, POD1 2.5 to 1.8, POD2 3.8 to 2.7,
+PACU 2.2 to 1.7, Intra-op 1.7 to 1.4. The Temp and BP, HR, BIS screens are unchanged (owner: fine as they are).
