@@ -4,94 +4,119 @@ const FS=128, NWIN=256, HOP=128, DF=FS/NWIN; // 0.5 Hz bins
 const OSC_F=[]; for(let f=0.5;f<=47;f+=0.5) OSC_F.push(f);
 function randn(){let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
 // spectral profile parameters (power units ~ uV^2 per 0.5 Hz bin)
-const KEYS=['bg','slow','delta','theta','alpha','alphaF','beta','betaF','gamma','spindle','emg','bs'];
-const S=(o)=>Object.assign({bg:6,slow:0,delta:0,theta:0,alpha:0,alphaF:10,beta:0,betaF:20,gamma:0,spindle:0,emg:0,bs:0},o);
+const KEYS=['bg','slow','delta','theta','thetaF','alpha','alphaF','beta','betaF','betaW','gamma','spindle','emg','bs'];
+const S=(o)=>Object.assign({bg:6,slow:0,delta:0,theta:0,thetaF:6,alpha:0,alphaF:10,beta:0,betaF:20,betaW:4.5,gamma:0,spindle:0,emg:0,bs:0},o);
+// awake: low amplitude, about 10 uV RMS (anaesthetised EEG is 5-20x the power; Purdon 2015), shared by every drug
+const AWAKE=S({bg:1.0,alpha:1,alphaF:10,beta:2,betaF:21,gamma:0.9});
 const DRUGS={
- propofol:[[0,S({bg:3.5,alpha:3,alphaF:10,beta:6,betaF:21,gamma:2.6})],
-  [0.15,S({bg:5,slow:2,delta:1,beta:14,betaF:17,gamma:2,alpha:2})],
+ propofol:[[0,AWAKE],
+  [0.15,S({bg:2.5,slow:2,delta:1,beta:7,betaF:17,gamma:1,alpha:1})],
   [0.32,S({bg:6,slow:25,delta:8,theta:2,alpha:14,alphaF:12,beta:5,betaF:15,gamma:0.6})],
-  [0.55,S({bg:7,slow:110,delta:30,theta:4,alpha:55,alphaF:10.5,beta:0.8,betaF:15,gamma:0.1})],
-  [0.75,S({bg:7,slow:190,delta:45,theta:4,alpha:16,alphaF:9,beta:0.2,betaF:14})],
-  [0.88,S({bg:7,slow:170,delta:35,theta:3,alpha:15,alphaF:9,beta:0.2,bs:0.55})],
+  [0.55,S({bg:7,slow:125,delta:30,theta:4,alpha:64,alphaF:10.5,beta:0.8,betaF:15,gamma:0.1})],
+  [0.75,S({bg:5,slow:190,delta:45,theta:4,alpha:16,alphaF:9,beta:0.2,betaF:14})],
+  [0.8,S({bg:5,slow:182,delta:41,theta:3.6,alpha:15.6,alphaF:9,beta:0.2,betaF:14})], // no suppression yet in a young adult
+  [0.88,S({bg:7,slow:170,delta:35,theta:3,alpha:15,alphaF:9,beta:0.2,bs:0.4})],
   [1,S({bg:7,slow:170,delta:35,theta:3,alpha:10,alphaF:9,beta:0.2,bs:1})]],
- sevo:[[0,S({bg:3.5,alpha:3,alphaF:10,beta:6,betaF:21,gamma:2.6})],
-  [0.15,S({bg:5,slow:2,delta:1,beta:12,betaF:17,gamma:2,alpha:2})],
-  [0.32,S({bg:6,slow:25,delta:8,theta:3,alpha:14,alphaF:11.5,beta:5,betaF:15,gamma:0.6})],
-  [0.55,S({bg:7,slow:100,delta:30,theta:12,alpha:50,alphaF:10,beta:0.8,betaF:15,gamma:0.1})],
-  [0.75,S({bg:7,slow:150,delta:45,theta:40,alpha:30,alphaF:8.5,beta:0.4})],
-  [0.88,S({bg:7,slow:150,delta:40,theta:25,alpha:15,alphaF:8.5,beta:0.2,bs:0.5})],
-  [1,S({bg:7,slow:150,delta:40,theta:20,alpha:10,alphaF:8.5,bs:1})]],
- ketamine:[[0,S({bg:3.5,alpha:3,alphaF:10,beta:6,betaF:21,gamma:2.6})],
-  [0.3,S({bg:5,slow:6,delta:3,theta:3,alpha:1,beta:12,betaF:24,gamma:5})],
-  [0.6,S({bg:6,slow:60,delta:15,theta:10,alpha:0.5,beta:9,betaF:26,gamma:9})],
-  [1,S({bg:6,slow:90,delta:25,theta:14,alpha:0.5,beta:7,betaF:26,gamma:8})]],
- dex:[[0,S({bg:3.5,alpha:3,alphaF:10,beta:6,betaF:21,gamma:2.6})],
-  [0.4,S({bg:6,slow:60,delta:20,theta:3,spindle:40,alphaF:13,beta:1.2,betaF:16,gamma:0.3})],
-  [0.8,S({bg:7,slow:140,delta:35,theta:3,spindle:25,alphaF:13,beta:0.6,gamma:0.1})],
-  [1,S({bg:7,slow:160,delta:40,theta:3,spindle:20,alphaF:13,beta:0.5})]],
+ // sevoflurane: theta at about 5 Hz, slightly stronger alpha than propofol; suppression never complete at clinical doses
+ sevo:[[0,AWAKE],
+  [0.15,S({bg:2.5,slow:2,delta:1,beta:7,betaF:17,gamma:1,alpha:1,thetaF:5})],
+  [0.32,S({bg:6,slow:25,delta:8,theta:3,thetaF:5,alpha:14,alphaF:11.5,beta:5,betaF:15,gamma:0.6})],
+  [0.55,S({bg:7,slow:90,delta:20,theta:22,thetaF:5,alpha:82,alphaF:10,beta:0.8,betaF:15,gamma:0.1})],
+  [0.75,S({bg:7,slow:150,delta:45,theta:40,thetaF:5,alpha:30,alphaF:9,beta:0.4})],
+  [0.88,S({bg:7,slow:150,delta:40,theta:25,thetaF:5,alpha:15,alphaF:8.5,beta:0.2,bs:0.4})],
+  [1,S({bg:7,slow:150,delta:40,theta:20,thetaF:5,alpha:10,alphaF:8.5,bs:0.6})]],
+ // ketamine: gamma 27-40 Hz with slow-delta, little 13-24 Hz, no alpha (Akeju 2016)
+ ketamine:[[0,AWAKE],
+  [0.3,S({bg:5,slow:6,delta:3,theta:3,alpha:1,beta:10,betaF:28,betaW:3,gamma:4})],
+  [0.6,S({bg:6,slow:60,delta:15,theta:11,alpha:0.3,beta:9,betaF:31,betaW:4,gamma:6})],
+  [1,S({bg:6,slow:90,delta:25,theta:12,alpha:0.3,beta:9,betaF:31,betaW:4,gamma:6})]],
+ // dexmedetomidine: spindles ~12 dB below propofol alpha, slow power ~14 dB below propofol GA (Akeju 2014)
+ dex:[[0,AWAKE],
+  [0.4,S({bg:1.2,slow:9,delta:5,theta:2,spindle:6,alphaF:13,beta:0.7,betaF:16,gamma:0.3})],
+  [0.8,S({bg:7,slow:35,delta:12,theta:3,spindle:2.5,alphaF:13,beta:0.6,gamma:0.1})],
+  [1,S({bg:7,slow:45,delta:32,theta:3,spindle:0.8,alphaF:13,beta:0.5})]],
 };
+const cl=x=>Math.max(0,Math.min(1,x));
 function baseTarget(drug,d){
  const kf=DRUGS[drug]; let i=0; while(i<kf.length-2&&d>kf[i+1][0])i++;
- const [d0,a]=kf[i],[d1,b]=kf[i+1]; const t=Math.max(0,Math.min(1,(d-d0)/(d1-d0)));
+ const [d0,a]=kf[i],[d1,b]=kf[i+1]; const t=cl((d-d0)/(d1-d0));
  const p={}; for(const k of KEYS)p[k]=a[k]+(b[k]-a[k])*t;
+ p.kS=drug==='ketamine'&&d>0.45?1:0; // ketamine anaesthesia: gamma bursts alternate with slow waves
  return p;
 }
 // Drug mix (a teaching approximation, not an interaction model): propofol (effect-site ug/ml) and sevoflurane (MAC)
 // add into one hypnotic depth; remifentanil (ng/ml), dexmedetomidine and N2O deepen it a little; then ketamine,
 // dexmedetomidine, remifentanil and N2O each add their own EEG signature on top.
 const MIX0={propofol:0,sevo:0,ketamine:0,dex:0,remi:0,n2o:0};
-function mixTarget(m){
- const dP=m.propofol*0.155,dS=m.sevo*0.55,hyp=Math.min(0.95,dP+dS),on=hyp>0.05?1:0,cl=x=>Math.max(0,Math.min(1,x));
- const dH=cl(hyp+(on?0.012:0.01)*m.remi+0.12*m.dex*on+0.03*m.n2o);
- const sh=dP+dS>0?dS/(dP+dS):0,a=baseTarget('propofol',dH),b=baseTarget('sevo',dH),p={};
+const MAC=[[0,0],[0.3,0.3],[0.5,0.44],[1,0.6],[1.5,0.76],[2,0.88]]; // sevoflurane MAC -> depth
+function sevoDepth(mac){let i=0;while(i<MAC.length-2&&mac>MAC[i+1][0])i++;const [x0,y0]=MAC[i],[x1,y1]=MAC[i+1];return y0+(y1-y0)*cl((mac-x0)/(x1-x0));}
+function mixTarget(m,bsShift){
+ const dP=m.propofol*0.155,dS=sevoDepth(m.sevo),sh=dP+dS>0?dS/(dP+dS):0,hyp=Math.min(0.95-0.05*sh,dP+dS),on=hyp>0.05?1:0;
+ // remifentanil: no BIS effect before stimulation (Guignard 2000); only high doses deepen
+ const dH=cl(hyp+0.004*Math.max(0,m.remi-4)+0.12*m.dex*on+0.15*m.n2o);
+ const a=baseTarget('propofol',dH),b=baseTarget('sevo',dH),p={};
  for(const k of KEYS)p[k]=a[k]*(1-sh)+b[k]*sh;
+ if(bsShift){const d2=cl(dH+bsShift);p.bs=baseTarget('propofol',d2).bs*(1-sh)+baseTarget('sevo',d2).bs*sh;}
  const k=m.ketamine,x=m.dex,r=m.remi,n=m.n2o;
- if(r>0){p.delta+=1.5*r;p.slow+=2*r;p.beta/=1+0.05*r;}
- if(k>0){p.gamma+=9*k;p.beta+=6*k;p.betaF+=(26-p.betaF)*cl(k*2);p.alpha*=1-0.85*cl(k*1.5);p.slow+=50*k;p.theta+=10*k;p.bs*=1-cl(k*1.5);}
- if(x>0){const c=cl(x*2);p.spindle+=40*x*(1-0.5*dH);p.alphaF+=(13-p.alphaF)*c*0.6;p.slow+=100*x;p.delta+=25*x;p.beta*=1-0.8*c;p.gamma*=1-0.8*c;}
- if(n>0){p.gamma+=2*n;p.beta+=2.5*n;p.alpha*=1-0.3*n;}
- return p;
+ // ketamine: with a hypnotic, gamma and 31-Hz beta on top, less alpha and slow; alone, the ketamine keyframes
+ if(k>0){const h=cl(hyp/0.2),c=cl(k*2);p.gamma+=6*k;p.beta+=6*k;p.betaF+=(31-p.betaF)*c;p.betaW+=(4-p.betaW)*c;p.alpha*=1-0.85*cl(k*1.5);
+  p.slow*=1-0.4*cl(k);p.theta*=1-0.3*k;p.bs*=1-cl(k*1.5);
+  if(h<1){const kt=baseTarget('ketamine',k);for(const q of KEYS)p[q]=kt[q]*(1-h)+p[q]*h;}}
+ if(r>6){p.delta+=1.5*(r-6);p.slow+=2*(r-6);}
+ if(x>0){const c=cl(x*2);p.spindle+=6*x*(1-0.5*dH);p.alphaF+=(13-p.alphaF)*c*0.6;p.slow+=25*x;p.delta+=8*x;p.beta*=1-0.8*c;p.gamma*=1-0.8*c;}
+ if(n>0){p.gamma+=0.7*n;p.beta+=0.5*n;p.alpha*=1-0.2*n;p.slow*=1-0.2*n;p.delta*=1-0.2*n;}
+ p.dH=Math.max(dH,k);p.sh=sh;p.kS=k>0.45&&k/(k+hyp)>0.5?1:0;return p;
 }
-function target(drug,d,mods){
- const p=drug==='mix'?mixTarget(Object.assign({},MIX0,d)):baseTarget(drug,d);
- if(mods&&mods.elderly){p.alpha*=0.2;p.spindle*=0.4;p.slow*=0.45;p.delta*=0.5;p.theta*=0.5;p.bg*=0.6;p.beta*=0.6;}
- // muscle relaxant: no facial EMG, and the muscle share of the awake fast activity goes too
- if(mods&&mods.nmb){p.emg=0;p.gamma*=0.05;p.beta*=0.35;}
+function target(drug,d,mods){mods=mods||{};
+ const p=drug==='mix'?mixTarget(Object.assign({},MIX0,d),mods.elderly?0.12:0):baseTarget(drug,d);
+ // older brain (Purdon 2015): much less power, alpha ~9 dB lower and ~1 Hz slower, suppression at a lighter depth
+ if(mods.elderly){p.alpha*=0.12;p.slow*=0.32;p.delta*=0.32;p.theta*=0.4;p.bg*=0.5;p.beta*=0.6;p.spindle*=0.4;
+  p.alphaF-=drug==='sevo'?0.5:drug==='mix'?1-0.5*p.sh:1;if(drug!=='mix')p.bs=baseTarget(drug,Math.min(1,d+0.12)).bs;}
+ // muscle relaxant: no facial EMG, and the muscle share of the awake fast activity goes too (stage 1, at once)
+ if(mods.nmb){p.emg=0;p.gamma*=0.05;p.beta*=0.3;}
  // facial EMG; an opioid blunts the response to surgery, so less of it
- else if(mods&&mods.emg){p.emg=Math.max(p.emg,6*(drug==='mix'?Math.max(0.25,1-(d.remi||0)/6):1));}
+ else if(mods.emg){p.emg=Math.max(p.emg,6*(drug==='mix'?Math.max(0.25,1-(d.remi||0)/6):1));}
+ // relaxant stage 2 (Engine nmbS, after ~60 s in a light patient): fast power falls further, slow waves appear (Schuller 2015)
+ const ns=mods._nmbSlow||0;if(ns>0){p.beta*=1-0.6*ns;p.gamma*=1-0.8*ns;p.betaF-=3*ns;p.slow+=25*ns;p.delta+=8*ns;}
  return p;
 }
-function profile(p,f,spEnv){
+function profile(p,f,spEnv,spF,kg,ks){
  const g=(c,w)=>Math.exp(-((f-c)**2)/(2*w*w));
  let P=p.bg/(0.6+f)*3;
- P+=p.slow*g(0.75,0.45)+p.delta*g(2.5,1)+p.theta*g(6,1.2)+p.alpha*g(p.alphaF,1.1)
-   +p.spindle*spEnv*g(p.alphaF,1.0)+p.beta*g(p.betaF,4.5)+p.gamma*g(34,5)+p.emg*(f>18?Math.min(1,(f-18)/15):0);
+ P+=p.slow*ks*g(0.75,0.45)+p.delta*g(2.5,1)+p.theta*g(p.thetaF,1)+p.alpha*g(p.alphaF,1.1)
+   +p.spindle*spEnv*g(spF,1.0)+kg*(p.beta*g(p.betaF,p.betaW)+p.gamma*g(34,5))+p.emg*(f>18?Math.min(1,(f-18)/15):0);
  return P;
 }
 class Engine{
  constructor(){this.ph=OSC_F.map(()=>Math.random()*6.283);this.m=OSC_F.map(()=>1);this.p=target('propofol',0);
-  this.t=0;this.spPhase=0;this.bsState=0;this.bsTimer=1;this.gate=1;this.drug='propofol';this.d=0;this.mods={};this.diT=0;this.diOn=false;}
+  this.t=0;this.spT=1;this.spOn=false;this.spD=1;this.spF=12;this.kT=3;this.kPh=0;this.kg=1;this.ks=1;this.bsState=0;this.bsTimer=1;this.gate=1;this.drug='propofol';this.d=0;this.mods={};this.diT=0;this.diOn=false;this.nmbT=0;this.nmbS=0;}
  setTarget(drug,d,mods){this.drug=drug;this.d=d;this.mods=mods||{};}
  snap(){this.p=target(this.drug,this.d,this.mods);} // jump instantly
  sample(){ // one sample at FS
   const dt=1/FS; this.t+=dt;
   const tg=target(this.drug,this.d,this.mods); const k=dt/8; // ~8 s time constant
   for(const key of KEYS)this.p[key]+=(tg[key]-this.p[key])*k;
-  // spindle envelope: ~1.5 s bursts every ~5 s
-  this.spPhase+=dt; const sp=(this.spPhase%5.3); const spEnv=sp<1.6?Math.sin(Math.PI*sp/1.6)**2:0;
+  // relaxant stage 2: starts 60 s after the relaxant, only while the hypnotic is light; τ 120 s on, 30 s off
+  const m=this.mods;if(m.nmb){this.nmbT+=dt;if(this.nmbT>60&&(tg.dH??this.d)<0.3)this.nmbS+=(1-this.nmbS)*dt/120;}else{this.nmbT=0;this.nmbS-=this.nmbS*dt/30;}
+  m._nmbSlow=this.nmbS;
+  // spindles: 0.5-2 s bursts every 3-8 s, each centred somewhere in 11-14 Hz
+  this.spT-=dt;if(this.spT<=0){this.spOn=!this.spOn;if(this.spOn){this.spD=this.spT=0.5+1.5*Math.random();this.spF=11+3*Math.random();}else this.spT=Math.max(1,3+5*Math.random()-this.spD);}
+  const spEnv=this.spOn?Math.sin(Math.PI*(1-this.spT/this.spD))**2:0;
+  // ketamine anaesthesia: gamma bursts alternate with slow-delta every 2-5 s (Akeju 2016)
+  this.kT-=dt;if(this.kT<=0){this.kPh^=1;this.kT=2+3*Math.random();}
+  const kOn=tg.kS>0.5;this.kg+=((kOn&&!this.kPh?0.3:1)-this.kg)*0.02;this.ks+=((kOn&&this.kPh?0.5:1)-this.ks)*0.02;
   // burst suppression gate
-  this.bsTimer-=dt; if(this.bsTimer<=0){
-   if(this.bsState===0){ // was burst -> suppression
-    if(Math.random()<this.p.bs){this.bsState=1;this.bsTimer=(this.p.bs>0.97?3:1+5*this.p.bs*Math.random()+2*this.p.bs);} else this.bsTimer=1+Math.random()*2;
-   } else {this.bsState=0;this.bsTimer=(this.p.bs>0.97?0.02:1+Math.random()*1.5);}
-   if(this.p.bs>0.97&&this.bsState===0&&Math.random()<0.98){this.bsState=1;this.bsTimer=3;}
-  }
+  // burst suppression gate: bursts 0.5-3 s; flat runs 1-3 s at bs 0.5 growing to 10-30 s at bs 1; isoelectric above 0.97
+  this.bsTimer-=dt; if(this.bsTimer<=0){const b=this.p.bs;
+   if(b>0.97){this.bsState=1;this.bsTimer=1;}
+   else if(this.bsState===0&&Math.random()<b){this.bsState=1;this.bsTimer=10**(2*Math.max(0,b-0.5))*(1+2*Math.random());}
+   else{this.bsState=0;this.bsTimer=0.5+2.5*Math.random();}}
   const gTarget=this.bsState?0.03:1; this.gate+=(gTarget-this.gate)*0.08;
   let x=0;
   for(let i=0;i<OSC_F.length;i++){const f=OSC_F[i];
    this.m[i]+= (1-this.m[i])*0.004+(Math.random()-0.5)*0.104; if(this.m[i]<0.05)this.m[i]=0.05;
    this.ph[i]+=6.2832*f*dt+(Math.random()-0.5)*0.277;
-   const P=profile(this.p,f,spEnv); x+=Math.sqrt(2*P)*this.m[i]*Math.sin(this.ph[i]);
+   const P=profile(this.p,f,spEnv,this.spF,this.kg,this.ks); x+=Math.sqrt(2*P)*this.m[i]*Math.sin(this.ph[i]);
   }
   const emgNoise=this.p.emg>0?randn()*Math.sqrt(this.p.emg)*1.2:0;
   // diathermy: bursts of large broadband interference (a few seconds on, a few off)
@@ -114,14 +139,15 @@ function bandPow(P,lo,hi){let s=0;for(let k=Math.round(lo/DF);k<=Math.round(hi/D
 function features(P,win){
  const tot=bandPow(P,0.5,30); let c=0,sef=30; for(let k=1;k<=60;k++){c+=P[k];if(c>=0.95*tot){sef=k*DF;break;}}
  const br=Math.log10((bandPow(P,30,47)+1e-3)/(bandPow(P,11,20)+1e-3));
- // suppression: half-window RMS < 5 uV for the newest second
- let r=0; for(let i=NWIN-HOP;i<NWIN;i++)r+=win[i]**2; r=Math.sqrt(r/HOP);
- const t47=bandPow(P,0.5,47);return {sef,br,tot,suppressed:r<4,rms:r,slowFrac:bandPow(P,0.5,4)/t47,alphaFrac:bandPow(P,8,14)/t47,fast:Math.log10(bandPow(P,14,47)/t47),hi:Math.log10(bandPow(P,30,47)/t47)};
+ // suppression (BIS manual): 0.25-s sub-blocks of the newest second that stay within ±5 uV of their mean
+ let r=0,ns=0; for(let i=NWIN-HOP;i<NWIN;i++)r+=win[i]**2; r=Math.sqrt(r/HOP);
+ for(let j=NWIN-HOP;j<NWIN;j+=32){let mu=0,mx=0;for(let i=j;i<j+32;i++)mu+=win[i];mu/=32;for(let i=j;i<j+32;i++)mx=Math.max(mx,Math.abs(win[i]-mu));if(mx<=5)ns++;}
+ const t47=bandPow(P,0.5,47),supFrac=ns/4;return {sef,br,tot,supFrac,suppressed:supFrac>=0.5,rms:r,slowFrac:bandPow(P,0.5,4)/t47,alphaFrac:bandPow(P,8,14)/t47,fast:Math.log10(bandPow(P,14,47)/t47),hi:Math.log10(bandPow(P,30,47)/t47)};
 }
 function bisRaw(f,bsr){ // teaching model, NOT the proprietary algorithm
- let b=114.35-0.874*f.sef+65.64*f.fast-3.49*f.hi+7.46*f.slowFrac+19.63*f.alphaFrac;
- if(b<50)b=50-(50-b)*1.4; else if(b>80)b=80+(b-80)*1.6;
- if(bsr>0)b=Math.min(b,50-bsr/2);
+ let b=115.85-0.874*f.sef+65.64*f.fast-3.49*f.hi+7.46*f.slowFrac+19.63*f.alphaFrac;
+ b-=0.25*bsr;if(b<50)b=50-(50-b)*1.05; else if(b>80)b=80+(b-80)*1.6;
+ if(bsr>=40)b=Math.min(b,50-bsr/2); // Bruhn 2000: BIS is set by SR only once SR passes 40%
  return Math.max(0,Math.min(98,b));
 }
 
@@ -131,7 +157,7 @@ function turbo(x){x=Math.max(0,Math.min(1,x));
  const g=0.09140261+x*(2.19418839+x*(4.84296658+x*(-14.18503333+x*(4.27729857+x*2.82956604))));
  const b=0.1066733+x*(12.64194608+x*(-60.58204836+x*(110.36276771+x*(-89.90310912+x*27.34824973))));
  return [Math.max(0,Math.min(255,r*255))|0,Math.max(0,Math.min(255,g*255))|0,Math.max(0,Math.min(255,b*255))|0];}
-const DB_LO=-2, DB_HI=31, NB=60; // 60 bins of 0.5 Hz = 0-30 Hz
+const DB_LO=-3, DB_HI=31, NB=60; // 60 bins of 0.5 Hz = 0-30 Hz
 const LUT=Array.from({length:256},(_,i)=>turbo(i/255));
 const dbToX=d=>Math.max(0,Math.min(1,(d-DB_LO)/(DB_HI-DB_LO)));
 const rgb=c=>`rgb(${c[0]},${c[1]},${c[2]})`;
@@ -161,7 +187,7 @@ function step(nSamples){
    let mx=0;for(let j=NWIN-HOP;j<NWIN;j++)mx=Math.max(mx,Math.abs(win[j]));const art=mx>300;
    artH.push(art?1:0);if(artH.length>30)artH.shift();
    const sqi=Math.max(0,Math.min(100,Math.round(98-160*artH.reduce((a,b)=>a+b,0)/artH.length)));
-   if(!art){sup.push(f.suppressed?1:0);if(sup.length>63)sup.shift();
+   if(!art){sup.push(f.supFrac);if(sup.length>63)sup.shift();
     bcH.push(prevSup&&!f.suppressed?1:0);if(bcH.length>60)bcH.shift();prevSup=f.suppressed;}
    const bsr=sup.length?100*sup.reduce((a,b)=>a+b,0)/sup.length:0;
    if(!art){const raw=bisRaw(f,bsr); bisS=bisS==null?raw:bisS+(raw-bisS)*(1/15);} // ~15 s smoothing
@@ -229,7 +255,7 @@ function readouts(){const c=COLS[COLS.length-1];if(!c)return;
  $('vSqi').textContent=c.sqi;segs('sqiSegs',c.sqi/100,c.sqi<15?'#ff6b6b':c.sqi<50?'#ffb454':'#5fd08f');
  const e=emgShow(c.emg);$('vEmg').textContent=Math.round(e);segs('emgSegs',(e-25)/30,e>40?'#ffb454':'#5fd08f');
  $('vSr').textContent=Math.round(c.bsr);$('vSef').textContent=lastSef==null?'--':lastSef.toFixed(1);
- $('vTp').textContent=Math.round(c.tp);$('vBc').textContent=c.bc;
+ $('vTp').textContent=Math.round(c.tp);$('vBc').textContent=c.bsr<5||c.sqi<50?'--':c.bc;
  const d=new Date();$('vClock').textContent=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
 
 // ===== state descriptions =====
@@ -258,7 +284,7 @@ function describe(){const d=depth;let n,t;
  else if(mods.emg)t+=' Muscle activity: broad high-frequency power raises the EMG bar and pushes BIS up. It is artefact, not lighter anaesthesia.';
  $('rName').textContent=n;$('rText').textContent=t;}
 
-function describeMix(m){const hyp=0.155*m.propofol+0.55*m.sevo,parts=[];let n;
+function describeMix(m){const hyp=0.155*m.propofol+sevoDepth(m.sevo),parts=[];let n;
  n=hyp<0.08?(m.ketamine>0.45?'Ketamine anaesthesia':m.dex>0.2?'Dexmedetomidine sedation':'Light or no hypnotic'):hyp<0.44?'Sedation':hyp<0.68?'General anaesthesia':hyp<0.85?'Deep anaesthesia':'Burst suppression';
  const on=[m.propofol&&'propofol',m.sevo&&'sevoflurane',m.remi&&'remifentanil',m.ketamine&&'ketamine',m.dex&&'dexmedetomidine',m.n2o&&'N₂O'].filter(Boolean);
  if(on.length)n+=' · '+on.join(' + ');
