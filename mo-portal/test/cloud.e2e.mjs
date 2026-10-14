@@ -237,7 +237,7 @@ try {
     await page.waitForFunction(() => document.querySelectorAll('#histbody li').length === 3);
   });
   await step('two tabs: stale revision shows the conflict dialog; keep mine saves on top', async () => {
-    const A = page, B = await newPage(facCtx);
+    const A = page, B = await newPage(facCtx); B.on('console', m => console.log('B console:', m.text().slice(0, 200)));
     await A.goto(URL_EMU + '#/faculty/q/' + ids.active); await A.waitForFunction(() => document.querySelector('#stem')?.value.startsWith('New active (edit 2)'));
     await B.goto(URL_EMU + '#/faculty/q/' + ids.active); await B.waitForFunction(() => document.querySelector('#stem')?.value.startsWith('New active (edit 2)'));
     await B.fill('#stem', 'Tab B wins: which is the antidote to heparin?'); await B.evaluate(() => { document.querySelector('#toast').textContent = ''; }); await B.click('#qf button[type=submit]'); await toastText(B, /Saved/);
