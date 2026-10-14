@@ -64,11 +64,12 @@ Lasting decisions for `bis-dsa/`. Status and next steps: `STATUS.md`.
 
 ## Address
 
-- `anaes.anawj.com/bis/` (topic subdomain for anaesthesia teaching pages; `worker/routes.js`). Until the owner adds the
-  custom domain (SUBDOMAINS.md), it is at `anawj.com/bis-dsa/` (GitHub Pages) and on PR previews at
-  `<preview>/bis-dsa/` or `<preview>/_sites/anaes.anawj.com/bis/`.
-- Relative paths only (the subdomain serves only this folder). No old-address forward yet: add one (as in
-  `hand-babies/index.html`) once `anaes.anawj.com` answers.
+- `anaes.anawj.com/bis/` (topic subdomain for anaesthesia teaching pages; `worker/routes.js`); custom domain added by
+  the owner and checked 14 Oct 2026 (`/bis/` 200, `/` and other folders 404). PR previews: `<preview>/bis-dsa/` or
+  `<preview>/_sites/anaes.anawj.com/bis/`.
+- The old `anawj.com/bis-dsa/` (GitHub Pages) forwards to it with a top-level-only script at the top of `index.html`
+  (path, query and `#` kept; no-op on the subdomain, previews and localhost).
+- Relative paths only (the subdomain serves only this folder).
 - First published as a private claude.ai artifact; this folder is now the copy to edit.
 
 ## How it works (`app.js`)
