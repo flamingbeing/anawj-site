@@ -11,11 +11,12 @@ Each session keeps its own line in `status/<session>.md`. Read them before start
 ## Waiting on the owner
 
 - **Go-ahead to start building** (the owner asked for a plan first, 14 Oct 2026). Read `DESIGN.md` "In short".
-- Answers to the 10 questions at the end of `DESIGN.md` (monitor brand, TCI model, airway and resuscitation
-  algorithms, NUH drugs and products, sevoflurane MAC, fentanyl ke0, scenario order, scores, processed EEG). The build
-  can start on the defaults given there.
+- Answers to the 11 questions at the end of `DESIGN.md` (monitor brand, TCI model, airway and resuscitation
+  algorithms, crisis guideline defaults, NUH drugs and products including dantrolene, sevoflurane MAC, fentanyl ke0,
+  scenario order, scores, processed EEG). The build can start on the defaults given there.
 - Clinical read-through of drug parameters, thresholds and crisis management steps as each milestone lands
-  (`MODEL.md` and `SCENARIOS.md` tag every number: checked, secondary, unverified or our design choice).
+  (`MODEL.md` tags every number: checked, secondary, unverified or our design choice; `SCENARIOS.md` tags the doses
+  and windows that are not checked, and `research/crises.md` holds each dose's source).
 
 ## Next
 
@@ -24,5 +25,6 @@ Each session keeps its own line in `status/<session>.md`. Read them before start
 
 ## Recently done
 
-- Build plan (14 Oct 2026): `DESIGN.md`, `MODEL.md`, `SCENARIOS.md`, `research/`; brief corrected (Marsh example).
+- Build plan (14 Oct 2026): `DESIGN.md`, `MODEL.md`, `SCENARIOS.md`, `research/`; brief corrected (Marsh example);
+  revised after two reviews, prototypes of the riskiest models and a source check (`research/prototypes.md`).
 - Environment prepared: folder, address, labels, CI hooks, test runner, smoke test, build brief (14 Oct 2026).

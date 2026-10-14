@@ -1,31 +1,42 @@
 # OT simulator: technical plan
 
 How the simulator will be built: the code's shape, the screens, the tests and the PR-by-PR order. Written 14 Oct 2026
-(plan only, nothing built yet). Read with `PLAN.md` (the brief: milestones, guardrails, autonomy rules), `MODEL.md`
-(the physiology and pharmacology, every number with its source) and `SCENARIOS.md` (the crises). Defaults chosen here
-are proposals until the owner says go; the open questions are at the end, each with the default a build session uses
-if there is no answer yet.
+(plan only, nothing built yet) and revised the same day after two independent reviews, throwaway prototypes of the
+riskiest models (`research/prototypes.md`) and a source check of every unverified number. Read with `PLAN.md` (the
+brief: milestones, guardrails, autonomy rules), `MODEL.md` (the physiology and pharmacology, every number with its
+source and status) and `SCENARIOS.md` (the crises). Choices here are proposals until the owner says go; the open
+questions are at the end, each with the default a build session uses if there is no answer yet.
 
 ## In short (for the owner)
 
-- One synthetic patient whose numbers all come from one model: drugs go in, effect-site levels rise, blood pressure,
-  breathing, oxygen and CO2 follow, and the monitor draws what the model says. A crisis changes the model (anaphylaxis
-  lowers vascular tone, narrows the airways and leaks fluid), and the trainee's drugs act on the same model, so a
-  sensible but unscripted response works and a wrong one has consequences.
-- Built in 7 milestones, as about 30 small PRs, each tested and merged before the next: skeleton and monitor (M0),
-  drugs (M1), heart, lungs and ventilator (M2), a whole elective GA from pre-op to extubation (M3), the crisis engine
-  and 12 scenarios (M4), the debrief (M5), sound and polish (M6).
-- The first thing a resident can use is the end of M3 (a full elective GA). The first crisis is the first PR of M4.
-- Changes from the brief: the Marsh example test is corrected (it mixed two versions of the model); waveforms are
-  drawn at real pace even at 20x so they stay readable (the numbers still run 20x); links can open a scenario at a set
-  moment (`?case=anaphylaxis&at=300`) so previews and PR screenshots show mid-crisis screens; sevoflurane MAC is 2.05%
-  at age 40 (the US label and a 2020 meta-regression), not the older pooled 1.80%.
-- Guidelines that moved since the brief: DAS published its 2025 intubation guideline (BJA 2026); the Association of
-  Anaesthetists' 2024 blood components guideline replaced the 2016 one; ERC and AHA 2025 made no major change to
-  adult ALS; Singapore's SRFAC 2021 gives atropine 0.6 mg up to 2.4 mg. The scenarios use these.
-- What you would decide: the monitor look, the propofol model for TCI, the local airway and resuscitation algorithms,
-  the drug strengths and products stocked at NUH, and the scenario order (questions at the end; the build starts with
-  the defaults).
+- **What you need to do:** reply "go" when you are happy for the build to start. The questions at the end can wait:
+  each has a default. After that, each PR lists the new clinical numbers for you to read ("Needs clinical
+  read-through"); nothing is called reviewed until you have.
+- **What residents get:** at `anaes.anawj.com/ot/` (unlisted), a phone-first theatre: a patient monitor at the top,
+  tabs for drugs, airway, breathing, circulation, help and examination below, and a speed key (pause, 1x, 5x, 20x).
+  They induce, maintain and wake a synthetic patient, or pick one of 12 crises, then see a debrief of what they did and
+  when, with the teaching points and their sources.
+- **How it works:** one synthetic patient whose numbers all come from one model: drugs go in, effect-site levels rise,
+  blood pressure, breathing, oxygen and CO2 follow, and the monitor draws what the model says. A crisis changes the
+  model (anaphylaxis lowers vascular tone, narrows the airways and leaks fluid), and the trainee's drugs act on the same
+  model, so a sensible unscripted response works and a wrong one has consequences.
+- **The build:** 7 milestones (M0 skeleton and monitor, M1 drugs, M2 heart, lungs and ventilator, M3 a whole elective
+  GA, M4 the crisis engine and 12 scenarios, M5 debrief, M6 sound and polish) as about 35 small PRs, each tested and
+  merged before the next. The first thing a resident can use is the end of M3; the first crisis is the first scenario
+  PR of M4.
+- **Changes from the brief:** the Marsh example test is corrected (it mixed two versions of the model); waveforms are
+  drawn at real pace even at 20x so they stay readable (the numbers still run 20x); a link can open a scenario at a set
+  moment (`?case=anaphylaxis&at=300` opens it 300 s, 5 min, in) so previews and PR screenshots show mid-crisis screens;
+  the drug-effect and breathing parts of M1 that need a circulation and lungs move to M2.
+- **Sources moved on since the brief was written:** DAS published its 2025 guideline for unanticipated difficult
+  intubation (in BJA, 2026; the full paper was not readable here, so its details come from DAS's own summaries and
+  simulation scenarios); the Association of Anaesthetists' 2024 blood components guideline replaced the 2016 one.
+  Checked for the plan: Singapore's SRFAC 2021 adult ACLS gives atropine 0.6 mg up to 2.4 mg and adrenaline 1 mg every
+  3–5 min "early", not tied to a shock number; ERC 2025 made no major change to adult ALS (AHA 2025 likewise, from
+  secondary sources) but RCUK/ERC 2025 add theatre advice (compressions when SBP stays under 50 mmHg, smaller adrenaline
+  doses with an arterial line), which the scenarios use. Metaraminol and dantrolene are not on Singapore's register of
+  approved medicines (HSA, checked 14 Oct 2026), so metaraminol is off by default and the dantrolene product is a
+  question for you.
 
 ## Architecture
 
@@ -36,33 +47,36 @@ ot-sim/
   index.html              shell, styles, screen containers (no inline clinical text beyond the intro)
   js/main.js              boot: reads the URL, builds the sim and the UI, runs the frame loop
   js/model/               pure simulation: no DOM, no Date, no Math.random; importable by Node tests
-    rng.js                seeded generator (sfc32) with named sub-streams
-    fmath.js              exp, log, pow, sin written with + - * / only, so a run is bit-identical on every browser
-    sim.js                Sim: state, fixed-step loop, action queue, log, snapshot/replay
-    patient.js            patient profile -> covariates (LBM, BSA, FRC, blood volume ...) and between-patient variation
+    rng.js                seeded sfc32 generator with named sub-streams
+    fmath.js              exp, log, pow, sin, cos from + - * / (fdlibm algorithms): bit-identical on every engine
+    sim.js                Sim: state, fixed-step loop, action queue, event log, snapshot and restore
+    patient.js            profile -> covariates (LBM, BSA, IBW, FRC, blood volume ...) and between-patient variation
+    presets.js            start states for scenarios, built by replaying reference actions from "awake"
     drugs.js              drug catalogue: presentation, doses, PK model, effects, sources (data, no logic)
-    pk.js                 compartment models (3-compartment + effect site), boluses, infusions, TCI controller
-    pd.js                 effect models: hypnosis, analgesia (response surface), block, CV and breathing effects
-    volatile.js           vaporiser, circuit (fresh gas, rebreathing), uptake to lung, blood and tissue groups
-    cardio.js             lumped circulation: volumes, preload, contractility, SVR, HR, baroreflex, fluids, bleeding
-    rhythm.js             atrial clock, AV node, ventricular clock: fires the beats cardio.js turns into stroke volumes
-    resp.js               mechanics, ventilator modes, spontaneous breathing and its CO2 drive
-    gas.js                O2/CO2/N2/agent stores in lung and blood, shunt and dead space, SaO2, EtCO2
-    airway.js             airway state machine: patency, mask, SAD, ETT (and misplacement), laryngoscopy grades
-    temp.js               core and peripheral temperature, heat loss, warming
+    pk.js                 compartment models, effect sites, boluses, infusions, sugammadex binding, pump and TCI
+    pd.js                 effect models: hypnosis, stimulus response, block, drug drives to circulation and breathing
+    volatile.js           vaporiser, circuit (fresh gas, rebreathing), agent blood and tissue groups, effect sites
+    rhythm.js             atrial clock, AV node, ventricular clock: emits timed beat events
+    cardio.js             lumped circulation: compartments, venous return, stroke volume, baroreflex, fluids, bleeding
+    resp.js               mechanics, ventilator modes, spontaneous breathing and its CO2 drive; emits breath events
+    gas.js                the lung store (every gas species) and blood O2/CO2, shunt, dead space, acid-base
+    airway.js             airway state machine: patency, mask, SAD, ETT (and misplacement), laryngoscopy
+    temp.js               core and peripheral temperature, heat balance, warming
     conditions.js         disease processes a crisis switches on (mediator level, hypermetabolism, pleural air ...)
+    resus.js              CPR quality, defibrillation, pacing capture, return of circulation
     events.js             scenario runner: triggers, timed changes, expected-action matching
-    monitor.js            what the monitor reports: NIBP cycle, SpO2 averaging and lag, alarm limits and priorities
+    monitor.js            what the monitor reports: averaging, sensor delays, NIBP cycle, alarms
   js/ui/
     loop.js               rAF loop, speed, accumulator, pause on hidden tab
-    lanes.js              sweeping canvas lanes (ECG, pleth, ABP, CO2, Paw)
-    synth.js              waveform synthesis from model state (beat and breath templates)
-    numerics.js           numeric boxes (DOM text, updated about once a second)
+    lanes.js              sweeping canvas lanes (ECG, pleth, ABP, CO2, Paw), with a history buffer for redraws
+    synth.js              waveform samples from beat and breath events (1x) or a UI-side generator (5x, 20x)
+    numerics.js           numeric boxes (DOM text, at most twice a second of wall time)
     alarms.js             alarm bar, silence, aria-live text
-    controls/*.js         drugs, airway, breathing, circulation, help, examine
+    controls/*.js         drugs, airway, breathing, circulation, help, examine, log
     screens/*.js          library, pre-op, theatre, debrief
     sound.js              (M6) SpO2 tone and alarm tones, off by default
   js/scenarios/*.js       one module per scenario (data with source comments)
+  fonts/                  copied from bis-dsa/fonts/ with its README.md (licences)
   test/*.test.mjs         model tests in Node (fast; run by CI on every PR)
   test/model.check.mjs    calibration table: every tuning target in MODEL.md with its value and pass/fail
   test/soak.mjs           hours of simulated time for firetop (not *.test.mjs, so CI does not run it)
@@ -74,67 +88,121 @@ step and no dependencies (`NOTES.md`). Each module stays under about 400 lines s
 
 ### The model loop
 
-- `Sim` owns one plain-object `state` (numbers, short arrays, strings for discrete states) and a fixed `dt` of 0.1 s.
-  `sim.step(n)` runs `n` steps; each step calls the subsystems in a fixed order: actions due this step -> PK ->
-  volatile -> PD -> conditions and scenario events -> airway -> breathing mechanics -> gas exchange -> circulation ->
-  temperature -> monitor -> log. Each subsystem reads the previous step's values of the others (no circular solves),
-  which is stable at 0.1 s because the fastest time constants (effect-site, baroreflex, lung gas mixing) are 2 s or
-  slower. Checked: 3-compartment propofol with Euler steps of 0.1 s matches steps of 0.01 s to 2 decimal places.
-- **Determinism.** No `Math.random`, `Date` or frame timing in `js/model/`. Randomness comes from `rng.js`: one seed,
-  and a named sub-stream per consumer (`rng.stream('airway')`), so adding a new random consumer in a later PR does not
-  shift the numbers of the others and old tests stay valid. Actions are stamped with the step index they apply at.
-  Speed changes only how many steps run per frame. Test: the same seed and actions give a deep-equal state whether run
-  as 1-step or 200-step chunks, and a replay from `{seed, actions}` reproduces the run.
-- Cross-browser: the standard leaves `Math.exp`, `Math.pow`, `Math.log` and `Math.sin` "implementation-approximated", so
-  V8 and Safari may differ in the last bit and a long run could drift. `+ - * /` are exact in IEEE 754 (and engines use
-  the correctly rounded hardware square root), so `fmath.js` builds exp, log, pow and sin from them (a few dozen
-  operations each, tested against `Math` to 1e-12 relative). The model uses only `fmath`; a replay or a shared run link
-  then gives the same numbers on any browser. If profiling ever shows a cost, fall back to `Math` and accept "close"
-  replays.
-- **Snapshots.** `sim.snapshot()` is a structured clone of `state` plus the RNG positions. Uses: the debrief's
-  "rewind to here and try again" (M5), the `?at=` deep links, and tests that start from "anaesthetised and intubated".
-- **Cost.** 20x is 200 steps a second; a step is a few thousand arithmetic operations (two 20-iteration bisections,
-  about a dozen drug models, four agents in three tissue groups, gas stores), so even a slow phone spends well under
-  1 ms a frame on it, and a 30-minute fast-forward (18,000 steps) takes a fraction of a second. Rendering is the budget,
-  not the model.
+- **State.** `Sim` owns one plain-data `state` (numbers, arrays, strings; no functions, Maps or class instances) and a
+  fixed `dt` of 0.1 s. Everything that evolves lives in it: the step counter, the action queue, RNG positions, the pump's
+  own predicted model, the scenario runner's fired triggers and timers, baroreflex delay rings, monitor averaging
+  windows, NIBP and alarm timers, the event ring for the UI. A snapshot is `structuredClone(state)`; restoring it into a
+  fresh `Sim` and running on gives the same numbers as never stopping (tested from M0.1 and in every model PR).
+- **Step order and what each subsystem sees.** Each step: actions due this step -> pump and TCI -> PK -> volatile -> PD
+  -> conditions and scenario events -> airway -> rhythm -> breathing mechanics -> gas exchange -> circulation ->
+  temperature -> resus -> monitor -> log. Every subsystem reads **the previous step's** values of the others from a
+  frozen copy taken at the start of the step and writes only its own slice (a Jacobi step: the order changes nothing,
+  so no hidden lag depends on where a subsystem sits). The few loops that must close within a step are solved inside
+  one subsystem (the atrial pressures inside `cardio.js`; the sugammadex binding inside `pk.js`).
+- **Stability.** The fastest stepped time constants are about 1.4–1.5 s (the arterial compartment and the vagal limb
+  of the baroreflex), so dt/τ is at most about 0.07; everything else is slower (effect sites are minutes). Explicit
+  Euler is accurate there: the prototypes matched 0.01 s steps to 0.0002 (volatile uptake), 2–3 decimals (all drugs)
+  and 0.64 mmHg (circulation during bleeding with positive-pressure ventilation). Within-breath mechanics (pressure and
+  flow during one breath) use the closed-form ventilator formulas, not steps; beats and breaths are events with exact
+  times (below). Very tight equilibria (sugammadex with rocuronium, KD 56 nM) are solved as equilibrium each step: an
+  explicit binding reaction blew up in the prototype.
+- **Determinism.** No `Math.random`, `Date` or frame timing in `js/model/`. Randomness comes from `rng.js`: sfc32 seeded
+  per named sub-stream from a 32-bit FNV-1a hash of `seed:name` (12 draws discarded), so adding a consumer in a later
+  PR does not shift the others' numbers and old tests stay valid. Actions carry the step index they apply at. Speed
+  changes only how many steps run per frame. Tests: the same seed and actions give a deep-equal state run as 1-step or
+  200-step chunks; a replay from `{seed, actions}` reproduces the run; snapshot and restore as above.
+- **Cross-browser.** ECMA-262 leaves `Math.exp`, `log`, `pow`, `sin`, `cos` and the other transcendental functions, and
+  the `**` operator, "implementation-approximated", so engines may differ in the last bit. `+ - * /` and `Math.sqrt`
+  (ECMA-262 21.3.2.33) are correctly rounded, and integer and bit operations are exact. `fmath.js` builds exp, log, pow
+  (x ≥ 0), sin and cos from those using the fdlibm 5.3 algorithms (cite and check the constants against the fdlibm
+  source). The prototype measured exp and log within 1.2 ulp, pow within about 1e-14 relative, and results
+  bit-identical between V8 (Chrome, Node) and JavaScriptCore (Safari) over 140,000 inputs and 200 two-hour
+  trajectories, while plain `Math` differed between those engines in 3–10% of calls. Cost: 30–90 ns a call, about 2% of
+  a core at 20x. sin and cos are valid for |x| below about 8e5: keep oscillator phases in cycles wrapped to [0, 1).
+  A check (model test from M0.1) fails on `**`, `Math.pow`, `exp`, `log`, `log2`, `log10`, `log1p`, `expm1`, `sin`,
+  `cos`, `tan`, `atan`, `atan2`, `sinh`, `cosh`, `tanh`, `cbrt`, `hypot` or `Math.random` anywhere in `js/model/`;
+  squares and cubes are written `x*x`, `x*x*x`. Edge cases are defined: pow(0, y > 0) = 0; log(x ≤ 0) throws in tests;
+  sigmoids written as 1/(1 + U^−γ) with U ≤ 0 giving 0. Firetop (home computer) runs a WebKit replay check before
+  release; CI optionally runs the model tests under Bun (JavaScriptCore) too.
+- **Cost.** About 3–4 µs a step in the prototypes (the circulation with ventilator, its two bisections, the drug
+  models); 20x is 200 steps a second, under 1 ms a second of CPU. A 30-minute fast-forward (18,000 steps) takes about
+  0.1 s on a desktop and under a second on a slow phone.
+- **Memory.** `sim.log` keeps events (actions, alarms, condition changes, beats are not logged) and trends downsampled to
+  one point every 5 s of simulated time, so an 8-hour soak stays bounded.
 
-### Speed and the waveforms
+### Beats, breaths and the waveforms
 
-- Speeds: pause, 1x, 5x, 20x (brief), plus "skip to next event" in the case flow (M3) that runs the model as fast as it
-  can until something needs the trainee (with a cap of, say, 30 simulated minutes).
-- Numerics, trends, alarms and the clock run in simulated time at every speed.
-- **At 1x the monitor draws the model's own beats and breaths**: `rhythm.js` emits each beat (time, kind, stroke
-  volume, conduction) and the ventilator each breath, and `synth.js` turns them into ECG, arterial, pleth and capnogram
-  samples, so an ectopic, a dropped beat or a pulse deficit appears exactly when the model has it.
-- **At 5x and 20x the waveforms are drawn at real pace from the current state**, not replayed fast: a heart rate of 70
-  at 20x would be 23 beats a second across the screen, a blur that teaches nothing. `synth.js` then runs its own beat
-  and breath clocks in wall-clock time from the current rhythm, rate, pressures and ventilator settings (rhythm
-  details like the exact beat a PVC falls on are not kept). The lane label shows "20x" so nobody reads the sweep as
-  real. The model never reads the synthesiser.
-- The tab pauses itself when hidden (`visibilitychange`), so a scenario does not run on unseen; a frame catches up at
-  most 50 steps (5 s simulated) so a stalled phone does not lurch.
+- `rhythm.js` keeps the next atrial and ventricular event times as exact numbers, not rounded to steps, and emits every
+  event that falls inside the step (time, kind, conducted or not, stroke volume once `cardio.js` has set it); `resp.js`
+  does the same for breaths (start, inspiratory time, tidal volume, pressures). Events go into a bounded ring in state
+  that the UI drains, so a frame that runs several steps loses none.
+- **At 1x** the monitor draws the model's own events, about 0.2 s behind model time so an event is known before the
+  sweep reaches it: an ectopic, a dropped beat, a pulse deficit or PEA (an ECG with no pulse) appears exactly when the
+  model has it.
+- **At 5x and 20x** waveforms are drawn at real pace: a heart rate of 70 at 20x would be 23 beats a second across the
+  screen, a blur that teaches nothing. `rhythm.js` exports its event generator as a pure function (state in, events
+  out); `synth.js` runs its own copy at wall-clock pace with a UI-only seeded RNG, restarted from the model's current
+  rhythm state at each speed change, so AF, blocks and ectopics look right without a second implementation. Arterial and
+  pleth lanes follow the model's current stroke volume and perfusion (none in VF or PEA). The lane label shows "20x".
+  The model never reads the synthesiser.
+- On load, resize, a speed change, pause and after a `?at=` fast-forward the lanes are refilled with one full sweep from
+  a history buffer of recent events kept in state (or the current values), so a paused screen is never blank. The first
+  frame after a deep link is deterministic (the PR screenshot comparison is exact).
+- The tab pauses itself when hidden (`visibilitychange`); a frame catches up at most 50 steps (5 s simulated) so a
+  stalled phone does not lurch.
 
-### What the UI reads
+### Actions (the one shape everything uses)
 
-The UI reads `sim.state` (read-only by convention) and `sim.log`, and writes only through `sim.act(action)`. Actions
-are plain objects (`{type:'bolus', drug:'propofol', mg:140}`, `{type:'vent', mode:'VC', vt:450, rr:12, peep:5}`,
-`{type:'airway', do:'insertETT', size:7.5}`), so the same shapes drive the UI, the scenario tests and replays.
+The UI reads `sim.state` (read-only by convention) and `sim.log`, and writes only through `sim.act(action)`. One action
+shape drives the UI, the scenario triggers and expected actions, the tests and replays:
+
+```js
+{ type: 'bolus', drug: 'propofol', dose: 140, unit: 'mg', route: 'iv' }   // sim.act stamps step: n
+{ type: 'infusion', drug: 'remifentanil', rate: 0.15, unit: 'mcg/kg/min' }
+{ type: 'tci', drug: 'propofol', model: 'schnider', mode: 'effect', target: 4 }
+{ type: 'vaporiser', agent: 'sevoflurane', dial: 2 }      { type: 'fgf', o2: 1, air: 1, n2o: 0 }
+{ type: 'vent', mode: 'VC', vt: 450, rr: 12, peep: 5, ie: 0.5, fio2: 0.5 }
+{ type: 'airway', do: 'insertETT', size: 7.5, depth: 21 }  { type: 'fluid', product: 'crystalloid', ml: 250 }
+{ type: 'help', do: 'callHelp' }                           { type: 'examine', what: 'chest' }
+{ type: 'cpr', on: true, quality: 'good' }                 { type: 'shock', joules: 150 }
+```
+
+Scenario matchers are patterns over these keys, with a range allowed in place of a number
+(`{ type: 'bolus', drug: 'adrenaline', route: 'iv', unit: 'mcg', dose: [10, 200] }`). Doses are stored in the unit
+given and converted by `drugs.js`.
+
+### Start presets
+
+A scenario starts from a named preset with parameters, built at load by replaying a fixed reference action list from
+"awake" after the warm start (so presets stay deterministic and need no stored snapshots): `awake`, `preoxygenated`,
+`sedation` (target, with or without a block in progress), `induced` (device: mask, SAD or ETT; just after
+intubation, light), `maintenance` (agent or TIVA, minutes in, surgery type: open, laparoscopic), `emergence` (device,
+relaxant given at a set time). `presets.js` lands in M3.2 (the elective GA needs the same building blocks); building a
+preset counts towards the fast-forward budget above.
 
 ### URL and deep links
 
-- `#library`, `#preop`, `#theatre`, `#debrief` select the screen (the page editor and the PR screenshots can reach
-  each).
-- `?case=<scenario id>` opens that scenario; `?seed=<n>` fixes the patient; `?at=<seconds>` fast-forwards with the
-  scenario's "reference actions" (the correct-treatment course its test uses) to that time and pauses, so
-  `/ot-sim/?case=anaphylaxis&at=300#theatre` is the same screen every time. Used in PR bodies as `Screens:` lines
-  (the screenshot tool waits 1.5 s after load, enough for a fast-forward of 30 simulated minutes).
-- `?demo` is not needed (no data, no sign-in).
+- `#library`, `#preop`, `#theatre`, `#debrief` select the screen (the page editor and PR screenshots can reach each).
+- `?seed=<n>` fixes the patient; `?case=<scenario id>` opens that scenario; `?at=<seconds>` fast-forwards with the
+  scenario's reference actions (the correct-treatment course its test uses) to that time and pauses. PR bodies use
+  `Screens: /ot-sim/?case=anaphylaxis&at=300#theatre` (the screenshot tool waits 1.5 s after load).
+- `?test` (tests only) exposes `step(n)`, `pause()` and `state` on `window` so the e2e test advances the model directly
+  instead of waiting in real time.
+- `?demo` is not needed (no data, no sign-in). Share links (M5.2) are relative (`?case=…&run=…`), never absolute.
+- The old address `anawj.com/ot-sim/` forwards to `anaes.anawj.com/ot/` with the same top-level-only script as
+  `bis-dsa` (path, query and `#` kept; only when `top === self`; no-op on the subdomain, previews and localhost).
+
+### Per-device settings
+
+`localStorage` keys start with `otsim.` (the origin is shared with `/bis/`, which uses `bisdsa.`), each read and written
+in try/catch: `otsim.sound` (off), `otsim.speed` (1x), `otsim.behind` (the "Behind the monitor" panel closed),
+`otsim.layout` (phone or desktop override, auto). Runs are not stored; a run can be shared as a link (M5.2).
 
 ## Screens
 
 Phone first (390 px portrait), then desktop (1280 px), tablet landscape works. Always dark (monitor convention, as
-`bis-dsa`). Top band: the four NUHS quarters (`AGENTS.md`). Fonts: copy `bis-dsa/fonts/` (Arimo, Archivo Narrow), no
-font requests.
+`bis-dsa`). Top band: the four NUHS quarters (`AGENTS.md`). `noindex, nofollow`; never linked from the homepage;
+relative paths only; no network requests (fonts bundled from `bis-dsa/fonts/`, with its licence README).
 
 1. **Library** (`#library`): "Free run" (a healthy adult, you do everything), "Elective GA" (guided case, M3), then the
    scenario cards (title, one line, level, about how long). The teaching-only line is on this screen and in the footer.
@@ -145,100 +213,111 @@ font requests.
    - Phone: a top bar (simulated clock, speed keys, alarm silence, menu) above the monitor (about 55% of the screen):
      ECG II, pleth, capnogram, and ABP or Paw when present, each lane with its numeric at the right; a numeric row
      under the lanes (NIBP with its age, temperature, FiO2/EtO2, agent Fi/Et/MAC, Paw/PEEP/Vt, TOF, and a BIS-like
-     index if the scenario has processed EEG). Alarm bar across the top of the monitor. Under it, a tab bar for the
-     controls: **Drugs**, **Airway**, **Breathing** (O2, ventilator, vaporiser), **Circulation** (fluids, blood, NIBP
-     cycle, lines), **Help** (call for help, tell the surgeon, get the trolley or kit), **Examine** (chest, skin,
-     pupils, movement, breath sounds as text), **Log**. Buttons at least 44 px.
+     index if the scenario has processed EEG). Alarm bar across the top of the monitor. Under it, a tab bar: **Drugs**,
+     **Airway**, **Breathing** (O2, ventilator, vaporiser), **Circulation** (fluids, blood, NIBP cycle, lines, CPR and
+     defibrillator when needed), **Help** (call for help, tell the surgeon, get the trolley or kit, activate the major
+     haemorrhage protocol), **Examine** (chest, skin, pupils, movement, breath sounds as text), **Log**. Buttons at
+     least 44 px.
    - Desktop: monitor on the left two thirds, controls on the right, log under the controls.
    - Drugs: one row per drug with the usual doses for this patient's weight already worked out (labelled with the
      ISO 26825 syringe-label colours by class, as on real syringes), a custom dose, infusions (mg/kg/h or mcg/kg/min),
      and TCI (target, model) for propofol and remifentanil. The dose box says "for this synthetic patient".
-   - "Behind the monitor" (a panel in the menu, closed by default): plasma and effect-site levels, MAC, cardiac output,
-     SVR, stroke volume, PaO2, shunt, the response-surface probabilities. This is where the teaching of mechanism
-     happens; the monitor itself shows only what a real one would.
+   - "Behind the monitor" (a panel in the menu, closed by default): the pump's predicted levels beside the patient's
+     true ones, MAC, cardiac output, SVR, stroke volume, PaO2, shunt, the response-surface probabilities. This is where
+     mechanism is taught; the monitor itself shows only what a real one would.
 4. **Debrief** (`#debrief`, M5): timeline, expected actions met or missed with their times, teaching points with
    sources, "rewind to here".
 
-Accessibility: numerics are DOM text (screen readers can read them), canvases are `aria-hidden` with a text summary;
-the alarm bar is an `aria-live` region updated only when the message changes (assertive for high priority, polite
-otherwise); colour is never the only signal (priority words and shapes); `prefers-reduced-motion` stops flashing (solid
-colour instead) and keeps sweeps (a monitor without moving traces would mislead) but at a lower frame rate.
+Accessibility: numerics are DOM text, canvases are `aria-hidden` with a text summary; the alarm bar is an `aria-live`
+region updated only when the message changes (assertive for high priority, polite otherwise); colour is never the only
+signal (priority words and shapes); `prefers-reduced-motion` stops flashing (solid colour instead) and keeps the sweeps
+(a monitor without moving traces would mislead) at a lower frame rate. Numerics update at most twice a second of wall
+time whatever the speed, so 20x does not mean 20 DOM writes a second.
 
 ## Monitor and alarms (summary; numbers in MODEL.md)
 
-- Numerics update about once a second with monitor-like averaging (SpO2 over a few seconds, HR over a few beats,
-  EtCO2 per breath), computed in `monitor.js` in simulated time, so alarm timing is the same at every speed and tests
-  can assert it.
-- NIBP: off, manual, or cycles of 1, 2.5, 3, 5 min; a measurement takes about 30 s and shows the time since; it fails
-  ("NIBP --") in severe hypotension or arrhythmia, as real ones do.
-- Alarms: limits per parameter with defaults, three priorities with the IEC 60601-1-8 conventions (colour and flash),
-  2-minute silence, technical alarms (probe off, disconnection, no CO2 detected), and a text message for each.
+- `monitor.js` (from M0.2) turns model values into what a monitor shows, in simulated time so alarm timing is the same
+  at every speed: averaging (SpO2 over 8–10 s, HR over a few beats, EtCO2 per breath), sensor delays (SpO2 finger 20–30
+  s, longer with low output or cold), NIBP.
+- NIBP: off, manual, or cycles of 1, 2, 2.5, 3, 5 min, plus STAT; a measurement takes about 30 s and shows its age; it
+  fails ("NIBP --") in severe hypotension or arrhythmia, as real ones do.
+- Alarms (M3.3): limits per parameter with defaults, three priorities with the IEC 60601-1-8 conventions (colour and
+  flash), 2-minute silence, technical alarms (probe off, disconnection, no CO2 detected), and a text message for each.
 
 ## Testing
 
-- **Model tests** (`test/*.test.mjs`, Node, run in CI's unit job, which has a 10-minute limit shared with every other
-  app: keep ours under 60 s in total): determinism; each drug model against its published numbers; physiology
-  calibration (apnoea times, haemorrhage classes, ventilator pressures); each scenario's three courses (untreated,
-  correct, wrong). Seeds fixed in tests.
+- **Model tests** (`test/*.test.mjs`, Node, in CI's unit job, whose 10-minute limit is shared with every other app: keep
+  ours under 60 s in total): determinism, snapshot and restore, the `fmath` ban check; each drug model against its
+  published numbers; physiology calibration (apnoea times, haemorrhage, ventilator pressures); dt 0.1 s against
+  0.01 s within a stated tolerance per subsystem; mass and volume balance (volume drift under 1e-6 mL an hour; gas
+  species balance over a 30-minute apnoea); each scenario's three courses (untreated, correct, wrong). Seeds fixed.
+- **Golden runs** are compared exactly only within one PR (determinism and replay). Across PRs that change the model,
+  calibration targets with tolerances are the contract, not frozen numbers.
 - **Calibration table** (`test/model.check.mjs`, like `bis-dsa/test/engine.check.mjs`): prints every tuning target from
-  `MODEL.md` with the value reached and pass/fail; also a `*.test.mjs` wrapper asserts the table passes, so CI catches
-  drift.
-- **Browser test** (`test/e2e.mjs`, grows each PR): loads at 390 and 1280 px (3x density on the phone, the
-  `bis-dsa` canvas lesson), axe on every screen and every control tab, no horizontal scroll, no console errors, no
-  network requests outside the folder, speed keys, an induction by clicks with the numbers moving the right way, a deep
-  link, the alarm bar's text.
+  `MODEL.md` with the value reached and pass/fail; a `*.test.mjs` wrapper asserts the table passes.
+- **Browser test** (`test/e2e.mjs`, grows each PR; under 60 s in CI, whose browser job is 15 minutes shared): loads at
+  390 and 1280 px (3x density on the phone, the `bis-dsa` canvas lesson) with `?test`, advances the model with
+  `step(n)`, pauses before each axe run; axe on every screen and every control tab; no horizontal scroll; no console
+  errors; no network requests outside the folder; speed keys; an induction by clicks with the numbers moving the right
+  way; a deep link showing non-blank lanes within 1.5 s; the alarm bar's text; at 20x, VF and PEA draw no pleth pulse.
 - **Soak** (`test/soak.mjs`, firetop or a long local run): 8 simulated hours of maintenance at 20x per scenario seed,
   checking no NaN, no negative volumes, values inside physiological bounds, memory flat.
-- `tools/test-ot-sim.sh` already runs the repo check, the route test, the model tests and the browser test.
+- `tools/test-ot-sim.sh` already runs the repo check, the route test, the model tests and the browser test; PRs that
+  add screens or source links also run `node tools/proofread.mjs`.
 
 ## PR order
 
-Each PR: branch from latest `main`, title "OT sim: ...", `tools/test-ot-sim.sh` green, phone and desktop screenshots,
-"Needs clinical read-through" list for new numbers, `NOTES.md` and `STATUS.md` updated, merged by the session (PLAN.md).
-Sizes are rough (lines of new code and data, tests included).
+Each PR: branch from latest `main`; title "OT sim: ..."; `tools/test-ot-sim.sh` green (and `node tools/proofread.mjs`
+when it adds screens or links); phone and desktop screenshots with `Screens:` lines for deep links; a "Needs clinical
+read-through" list for new numbers; `NOTES.md` and `STATUS.md` updated with `/save-state` (own `status/<session>.md`
+for "Now"; the first build session deletes `status/plan.md`); merged by the session (`PLAN.md`). A PR adds the UI for
+what it models, so every model PR is usable and testable in the browser.
 
 | # | PR | What it adds | Tests |
 |---|---|---|---|
-| M0.1 | Model loop | `rng.js`, `fmath.js`, `sim.js`, `patient.js` (covariates), a placeholder patient with steady vitals plus small seeded noise | Determinism (1x vs 200-step chunks, replay), `fmath` against `Math` to 1e-12, covariates (James LBM, BSA) against worked examples |
-| M0.2 | First monitor | Theatre screen shell, `loop.js`, `lanes.js`, `synth.js` (sinus ECG, pleth, capnogram), numerics, speed keys | e2e: lanes draw, numerics present, speed keys, axe, 3x density |
-| M1.1 | IV PK engine | `pk.js` (3-compartment + ke0, bolus, infusion), `drugs.js` with propofol (Marsh, Schnider), remifentanil (Minto), fentanyl | Published values per model (MODEL.md table) |
-| M1.2 | TCI | Effect-site and plasma TCI controller (Shafer-Gregg style) for propofol and remifentanil | Target reached within published time, no overshoot beyond limits |
-| M1.3 | Neuromuscular block | Rocuronium, suxamethonium, sugammadex, neostigmine; TOF count, TOFR, PTC | Onset and duration targets; sugammadex reversal times |
-| M1.4 | Volatile uptake | Vaporiser, circuit, FGF, uptake groups, age-adjusted MAC, sevoflurane, desflurane, isoflurane, N2O | FA/FI curves against human data; MAC by age |
-| M1.5 | Hypnosis and analgesia | `pd.js`: hypnotic effect (propofol plus volatile), BIS-like index, the reduced-Greco stimulus surface, movement and autonomic response | Loss of response C50 by age (Schnider 1999); P_TOL 0.9 pairs (van den Berg 2021); MAC-awake 0.34 |
-| M1.6 | Drug controls | Drugs tab: boluses, infusions, TCI, vaporiser dial and FGF on the Breathing tab; "Behind the monitor" panel | e2e: give propofol, Ce rises, index falls |
-| M2.1 | Circulation | `cardio.js`: compartments, venous return, per-beat SV (ventricular-arterial coupling), baroreflex; `rhythm.js` with sinus rhythm only; anaesthetic effects on SVR, venous tone, Ees and sympathetic tone | Steady state hits the MODEL.md defaults; propofol induction SBP fall in range (Rolly 1985, Sjøen 2026); baroreflex sensitivity about 19 ms/mmHg awake |
-| M2.2 | Fluids and bleeding | Crystalloid and colloid kinetics, blood, Hb dilution, haemorrhage classes, PPV | Haemorrhage class table; fluid bolus response; PPV with hypovolaemia |
-| M2.3 | Vasoactive drugs | Phenylephrine, ephedrine, metaraminol, noradrenaline, adrenaline, atropine, glycopyrrolate, esmolol (receptor-effect model) | Bolus effect size and duration per drug |
-| M2.4 | Gas exchange | `gas.js`: lung and blood O2/CO2 stores, shunt, dead space, Severinghaus, SpO2 lag, EtCO2 | Apnoea desaturation times (healthy, obese, air), CO2 rise in apnoea, pre-oxygenation curve |
-| M2.5 | Ventilator and breathing | `resp.js`: compliance, resistance, VC, PC, PS/spontaneous, manual bag; CO2-driven spontaneous breathing and its depression by drugs | Pressures from formulas; apnoea after induction and return of breathing |
-| M2.6 | Temperature | `temp.js`: redistribution, heat loss, warming | Core temperature curve for the first 3 h |
-| M2.7 | Rhythms | The rest of `rhythm.js` (AV blocks, AF, flutter, SVT, VT, torsades, VF, asystole, PEA, ectopics, pacing, hyperkalaemia stages) and their ECG templates; the circulation's response to each | e2e: each rhythm draws; model: VF gives no output and arterial pressure decays with τ about 3 s |
-| M3.1 | Airway | `airway.js`: obstruction under sedation, adjuncts, mask ventilation quality, SAD, laryngoscopy (Cormack-Lehane from the airway assessment plus a seeded draw), bougie, videolaryngoscope, ETT (oesophageal, endobronchial), cuff | Seeded grade distribution; oesophageal ETT shows no CO2 after the first breaths |
-| M3.2 | Case flow | Library, pre-op, checklist, the elective GA from pre-oxygenation to extubation, surgical stimulus timeline | Whole case runs untouched by a scripted trainee in a test; e2e flow |
-| M3.3 | Alarms and log | `monitor.js` limits, priorities, silence, technical alarms; event log | Alarm onset times in simulated time at 1x and 20x identical |
-| M4.1 | Crisis engine + scenario 1 | `conditions.js`, `events.js`, scenario format, expected-action matching; hypotension after induction | Three courses for scenario 1 |
-| M4.2-M4.7 | Scenarios 2-12, two per PR | In the `PLAN.md` order unless the owner reorders | Three courses each |
+| M0.1 | Model loop | `rng.js`, `fmath.js`, `sim.js` (state rules, Jacobi step, action queue, event ring, log, snapshot and restore), `patient.js` (covariates, default patient), a placeholder patient with steady vitals and small seeded noise | Determinism (1x vs 200-step chunks, replay), snapshot and restore, `fmath` accuracy and golden bits, the ban check, covariates against worked examples (MODEL.md section 1) |
+| M0.2 | First monitor | Theatre shell, hash routing, `?seed`, `?test`, `loop.js`, `lanes.js` with history refill, `synth.js` (sinus ECG, pleth, capnogram), `monitor.js` (averaging, display), `numerics.js`, speed keys, fonts, the old-address forward | e2e: lanes draw and refill after pause, numerics present, speed keys, axe, 3x density, forward script inert on the subdomain |
+| M1.1 | IV PK | `pk.js` (compartments, effect sites, bolus, infusion), `drugs.js`: propofol (Schnider; Eleveld for BMI over 35/42), remifentanil (Minto), fentanyl, alfentanil, midazolam, ketamine, between-patient PK variation | MODEL.md section 2 PK targets |
+| M1.2 | Pump and TCI | Syringe pump with its own predicted model (Marsh 1.2 and 0.26, Schnider, Minto), plasma and effect-site TCI, maximum rate, step-down by stopping; Drugs tab (boluses, infusions, TCI) and "Behind the monitor" | Effect-site target 4 mcg/mL reached about 1.3 min, plasma overshoot reported; 10 s and 1 s updates agree; e2e: give propofol, Ce rises |
+| M1.3 | Neuromuscular block | Rocuronium (directional effect site), suxamethonium (retuned), sugammadex (equilibrium binding), neostigmine with glycopyrrolate; thumb, diaphragm, upper-airway and laryngeal sites; TOF count, TOFR, PTC; TOF on the monitor | Label onset and duration; sugammadex reversal times; suxamethonium 7.1 / 10.9 min; dt invariance of the binding |
+| M1.4 | Hypnosis and stimulus | `pd.js`: one hypnosis rule (asleep or not, age-scaled), BIS-like index, the stimulus surface (age-scaled, volatile term tied to MAC), movement, autonomic drive `pd.auto` (0–1), one per-patient sensitivity quantile | Schnider LOC C50 by age; P_TOL 0.9 isobole; BIS-like table; sevoflurane 1 MAC gives no movement at incision in half (once M2.4 lands) |
+| M2.1 | Circulation | `cardio.js` (compartments, venous return, atrial solve, stroke volume, critical closing pressure, baroreflex with age-solved gains, empty-ventricle decompensation), `rhythm.js` sinus only, propofol and remifentanil drives, `pd.auto` into sympathetic drive, NIBP cycle | Steady state; volume drift; dt check; baroreflex slope; propofol induction SBP; laryngoscopy response at P_TOL 0.9 |
+| M2.2 | Fluids and bleeding | Crystalloid and colloid kinetics as flows, blood products, Hb and red-cell mass, haemorrhage; Circulation tab (fluids, blood) | Haemorrhage tables awake and under GA; 1 L crystalloid Hb target |
+| M2.3 | Vasoactive drugs | Receptor-effect model: phenylephrine, ephedrine, noradrenaline, adrenaline, vasopressin, atropine, glycopyrrolate, esmolol, labetalol, GTN; metaraminol (off by default) | Bolus effect size and duration per drug (MODEL.md section 5) |
+| M2.4 | Gas exchange and breathing | `gas.js` (lung store for every species with bulk inflow, blood O2 and CO2, shunt, dead space, acid-base) and `resp.js` (mechanics, VC, PC, PS, CPAP, manual bag, the CO2 drive and its depression, breath events); Breathing tab (O2, ventilator); SpO2 delay in `monitor.js`; PPV now that pleural pressure exists | Apnoea times (healthy, air, obese, pregnant), CO2 rise, pre-oxygenation half-time (perfect mask until M3.1), induction apnoea, ventilator pressures, PPV table |
+| M2.5 | Volatile agents | `volatile.js`: vaporiser, circuit, FGF, blood and tissue groups, agent effect sites, age-adjusted MAC; vaporiser and FGF controls; agent numerics | FA/FI and washout targets, low-flow targets, MAC by age |
+| M2.6 | Temperature | `temp.js`: redistribution, heat balance, cold fluids, warming | Core temperature curve over 3 h, with and without warming |
+| M2.7 | Rhythms | The rest of `rhythm.js` (AV blocks, AF, flutter, SVT, VT, torsades, VF, asystole, PEA, ectopics, pacing, hyperkalaemia stages) and ECG templates; the circulation's response to each | e2e: each rhythm draws; model: VF gives no output and the Schipke pressure curve |
+| M2.8 | Resuscitation | `resus.js`: CPR quality to cardiac output, pauses, defibrillation success with time in VF, pacing capture, return of circulation; CPR and defibrillator controls | EtCO2 and DBP by compression quality; shock success curve; capture threshold |
+| M3.1 | Airway | `airway.js`: obstruction under sedation, adjuncts, mask seal, SAD, laryngoscopy (Cormack-Lehane from the assessment and a seeded draw), bougie, videolaryngoscope, ETT (oesophageal, endobronchial), cuff, front-of-neck access; Airway tab | Seeded grade distribution; oesophageal ETT shows no CO2 after the first breaths; pre-oxygenation with a real mask seal |
+| M3.2 | Case flow | Library, pre-op, checklist, `presets.js`, the elective GA from pre-oxygenation to extubation, surgical stimulus timeline, Examine and Help tabs, "skip to next event" | Whole case run by a scripted trainee in a test; e2e flow |
+| M3.3 | Alarms | `monitor.js` limits, priorities, silence, technical alarms, alarm entries in the log; Log tab | Alarm onset times identical at 1x and 20x |
+| M4.0 | Scenario drugs | The drugs and products the crises need (MODEL.md section 12): glucagon, salbutamol, magnesium, amiodarone, calcium, insulin with glucose, bicarbonate, tranexamic acid, FFP, platelets, cryoprecipitate, dantrolene, lipid emulsion, cefazolin and other triggers, steroid and antihistamine (as "wrong first" choices) | Each drug's effect on its target and its timing |
+| M4.1 | Crisis engine + scenario 1 | `conditions.js`, `events.js`, scenario format, expected-action matching, `?case` and `?at`; hypotension after induction | Three courses for scenario 1; deep link screenshot |
+| M4.2-M4.7 | Scenarios 2-12 | Two per PR (the last PR has one), in the `PLAN.md` order unless the owner reorders; each adds its condition from MODEL.md section 11 | Three courses each |
 | M5.1 | Debrief | Timeline, actions vs expected, time to treatment, teaching points with sources | e2e: debrief after scenario 1 |
-| M5.2 | Hints and replay | Hint ladder (off by default), rewind to a snapshot, replay a run from seed and actions, share a run as a link | Replay equality |
+| M5.2 | Hints, rewind, share | Hint ladder (off by default), rewind to a snapshot, share a run as a relative link | Replay equality from a link |
 | M6.1 | Sound | SpO2 tone, alarm tones (off by default) | e2e: no audio until turned on |
 | M6.2 | Performance and access | Frame budget on a mid-range phone at 20x, reduced motion, full axe pass, keyboard use | e2e timing budget |
 | M6.3 | Finish | Library cards polished, page editor compatibility (`edit/NOTES.md`), offline copy only if the owner asks | Proof-read, editor test |
 
-Order inside a milestone can change if a later PR needs an earlier hook; a PR may land a small stub of a later
-subsystem (for example a fixed cardiac output for M2.4 if M2.1 slipped) as long as the stub is marked in `NOTES.md`.
+Order inside a milestone can change if a PR needs an earlier hook. A PR may land a small, named stub of a later
+subsystem (M1.4 runs before the circulation exists, so `pd.auto` is tested on its surface alone; M2.1 runs before
+`gas.js`, so it uses fixed oxygenation), as long as the stub is listed in `NOTES.md` and replaced by its PR.
 
 ## Risks and how the plan handles them
 
-- **Clinical accuracy.** Every number has a source in `MODEL.md`; each PR lists new numbers for the owner; the page says
-  teaching only and never "reviewed" until the owner has read it.
-- **Scope.** A full physiology engine can grow without end. The model is lumped (one heart, two lungs' worth of
-  stores, a few tissue groups) and each subsystem has calibration targets: when they pass, stop.
-- **Coupling.** Subsystems talk only through named state fields listed in `MODEL.md` (`cardio.co`, `gas.paCO2`...), so
-  each PR can be tested alone.
-- **Phone performance.** Incremental canvas drawing (only the new strip each frame, like a real sweep), DPR capped at
-  2, numerics updated once a second, no layout work per frame.
-- **Cross-browser replay.** Exact on every browser through `fmath.js` (above); tests compare golden runs exactly.
+- **Clinical accuracy.** Every number has a source and a status in `MODEL.md`; each PR lists new numbers for the owner;
+  the page says teaching only and never "reviewed" until the owner has read it.
+- **Scope.** A full physiology engine can grow without end. The model is lumped (one heart, one lung store, a few
+  tissue groups) and each subsystem has calibration targets: when they pass, stop. Targets the planned structure cannot
+  reach are marked as known misses (desflurane washout, N2O at 30 min) instead of tuned with unphysiological numbers.
+- **Coupling.** Subsystems talk only through the named state fields in `MODEL.md` section 0, with one owner per field,
+  so each PR can be tested alone.
+- **Phone performance.** Incremental canvas drawing with a history refill, DPR capped at 2, numerics at most twice a
+  second, no layout work per frame.
+- **Cross-browser replay.** `fmath.js`, tested bit-identical on V8 and JavaScriptCore; SpiderMonkey and iOS Safari are
+  checked by firetop before release.
 - **Two sessions at once.** One session per milestone; others plan only (`AGENTS.md`).
 
 ## Questions for the owner (with the default used until answered)
@@ -246,22 +325,30 @@ subsystem (for example a fixed cardiac output for M2.4 if M2.1 slipped) as long 
 1. **Monitor look.** Which monitor is in NUH theatres (Philips IntelliVue, GE Carescape, Mindray, Dräger)? Default: a
    generic layout in the common conventions (Philips-like colours on black), no brand. A photo would let it match, as
    the BIS page did.
-2. **Propofol model for TCI.** Which do NUH pumps run: Marsh (ke0 1.2/min, or 0.26), Schnider, or Eleveld? Default:
-   the patient runs Schnider; the pump defaults to Schnider effect-site, with Marsh as options; "Behind the monitor"
-   shows the pump's prediction beside the patient's true level.
-3. **Airway algorithm.** DAS 2025 (published in BJA 2026), the Vortex, ANZCA PG61, or a local NUH one? Default: DAS
-   2025, with the Vortex and ANZCA as other cognitive aids in the teaching points.
-4. **Resuscitation.** SRFAC 2021 (atropine 0.6 mg to 2.4 mg), ERC or AHA? Default: SRFAC with the theatre changes
-   from ERC/RCUK 2025 and NAP7. Open point: the SRFAC 2021 figure for when the first adrenaline goes in VF (after the
-   2nd or 3rd shock); configurable until checked.
-5. **Drugs at NUH.** Strengths and syringes (phenylephrine, ephedrine, noradrenaline, adrenaline); is metaraminol
-   stocked; which dantrolene product (Dantrium 20 mg vials assumed); the massive haemorrhage pack contents. Default:
-   common dilutions, labelled as such.
-6. **Sevoflurane MAC.** 2.05% at age 40 (US label; Cooter 2020) or 1.80% (Mapleson's pooled value, closer to the lower
-   Japanese figures)? Default 2.05%.
-7. **Fentanyl effect-site speed.** ke0 0.147/min (time to peak 3.2 min) or 0.12 (closer to the published 3.6 min)?
+2. **Propofol model for TCI.** Which do NUH pumps run? Singapore studies have used Schnider (and Minto for
+   remifentanil) on Alaris pumps; Fresenius Agilia offers Eleveld and modified Marsh; Alaris derives Schnider's ke0 from
+   a 1.6 min time to peak while others fix it at 0.456/min. Default: the patient runs Schnider with between-patient
+   variation; the pump defaults to Schnider effect-site, with Marsh options; "Behind the monitor" shows the pump's
+   prediction beside the patient's true level.
+3. **Airway algorithm.** DAS 2025, the Vortex, ANZCA PG61, or a local NUH one? Default: DAS 2025, with the Vortex and
+   ANZCA as other cognitive aids.
+4. **Resuscitation.** SRFAC 2021 (atropine 0.6 mg to 2.4 mg; adrenaline 1 mg every 3–5 min, early, not tied to a shock
+   number; amiodarone 300 mg then 150 mg for VF after 3 shocks), with the RCUK/ERC 2025 theatre advice and NAP7?
+   Default: yes.
+5. **Crisis guideline defaults.** Anaphylaxis ANZAAG–ANZCA 2022 (graded adrenaline); bleeding Association of
+   Anaesthetists 2024 (non-trauma targets for surgical bleeding); MH dantrolene 2.5 mg/kg then 1 mg/kg every 5 min;
+   LAST QRH 3-10 2023 (lipid per kg); needle decompression 4th/5th space just anterior to the mid-axillary line (ATLS
+   10). Keep, or use NUH protocols?
+6. **Drugs at NUH.** Strengths and syringes (phenylephrine, ephedrine, noradrenaline, adrenaline); is metaraminol used
+   (not on the HSA register; default off); which dantrolene product (none is on the HSA register, so it comes through
+   special access: Dantrium 20 mg, Ryanodex 250 mg or Agilus 120 mg change the vial count and mixing time; default
+   Dantrium); the major haemorrhage pack contents; red cell product (HSA; default "red cells in additive solution,
+   about 280 mL, haematocrit about 0.6"). Default: common dilutions, labelled as such.
+7. **Sevoflurane MAC at age 40.** 1.80% (Mapleson's pooled value; Japanese adults 1.68–1.71%, the closest data to a
+   mostly Chinese population; no Singapore study found) or 2.05% (US label)? Default 1.80%, changed from the first draft.
+8. **Fentanyl effect-site speed.** ke0 0.147/min (time to peak 3.2 min) or 0.12 (closer to the published 3.6 min)?
    Default 0.147, flagged.
-8. **Scenario order.** Default: the `PLAN.md` order.
-9. **Scores.** None by default (teach, don't test): the debrief shows what was done and when, not a mark. Keep?
-10. **Processed EEG.** Show a BIS-like number on the monitor in TIVA scenarios (from the hypnotic model, not the
+9. **Scenario order.** Default: the `PLAN.md` order.
+10. **Scores.** None by default (teach, don't test): the debrief shows what was done and when, not a mark. Keep?
+11. **Processed EEG.** Show a BIS-like number on the monitor in TIVA scenarios (from the hypnotic model, not the
     `bis-dsa` EEG engine)? Default: yes, as an optional module the scenario turns on.

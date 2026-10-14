@@ -328,7 +328,7 @@ PK + effect compartment** is adequate and is the published structure:
 feature):
 - Normal: full recovery ~10 min (restoration of normal muscle function ~10 min after discontinuation — CPIC
   2026 BChE guideline background).
-- **Heterozygous atypical** (dibucaine number ~40–70): block prolonged ~50–100% (so ~15–30 min); Viby-Mogensen
+- **Heterozygous atypical** (dibucaine number ~40–70): block prolonged ~50–100% (so ~12–20 min; corrected in review); Viby-Mogensen
   1981 (PMID 6267958): mean time to 90% twitch recovery 12–15 min for one abnormal gene vs 9.3 min normal.
 - **Homozygous atypical / silent** (dibucaine number <30, ~1 in 2500–3200): very sensitive; the FDA
   label says the resulting apnoea or prolonged paralysis is managed with controlled ventilation. Published durations

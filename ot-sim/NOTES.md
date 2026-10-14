@@ -27,7 +27,7 @@ Lasting decisions for `ot-sim/`. Status and next steps: `STATUS.md`. The build b
 - **Teach, don't test, by default.** A debrief after each scenario: timeline of events and actions, what was missed,
   and the teaching points, with sources. No scores that reward speed over safety.
 - **Sources for every clinical number.** Doses, thresholds, drug parameters and crisis management steps cite a
-  source in code comments or `PLAN.md` (published PK/PD models; the AAGBI/ANZCA/SAGES/Difficult Airway Society and
+  source in code comments, with the spec and its sources in `MODEL.md` and `SCENARIOS.md` (published PK/PD models; the AAGBI/ANZCA/SAGES/Difficult Airway Society and
   resuscitation guideline pages; Miller; Morgan & Mikhail). Flag anything unsure for the owner's clinical read-through;
   the owner checks all clinical content before it is described as reviewed.
 - Singapore practice by default (owner is at NUH): units mmHg, kPa not used; temperatures °C; drugs by generic name;
@@ -44,10 +44,9 @@ Lasting decisions for `ot-sim/`. Status and next steps: `STATUS.md`. The build b
 
 - `index.html`: shell and styles; `js/` ES modules, no build step, no dependencies (GitHub Pages / Workers serve files
   as they are; the editor and previews need that).
-- `js/model/`: pure simulation, no DOM, importable by Node tests: `pkpd.js`, `cardio.js`, `resp.js`, `gas.js`,
-  `temp.js`, `patient.js` (assembles them), `events.js` (crisis injection), `rng.js` (seeded).
-- `js/ui/`: monitor, waveforms (canvas), controls (drugs, vent, fluids, airway), alarms, debrief.
-- `js/scenarios/`: data files, one per scenario (`{ id, title, patient, steps, triggers, expected actions, teaching }`).
+- `js/model/` (pure simulation, no DOM, importable by Node tests), `js/ui/` and `js/scenarios/` (one data module per
+  scenario, format in `SCENARIOS.md`): the file list and responsibilities are in `DESIGN.md` "Files", which supersedes
+  the first sketch here (14 Oct 2026).
 - `test/*.test.mjs`: model tests in Node (fast, no browser). `test/e2e.mjs`: browser smoke and flows with axe.
 
 ## How to test
@@ -70,6 +69,15 @@ Lasting decisions for `ot-sim/`. Status and next steps: `STATUS.md`. The build b
   while the TCI pump runs the model the trainee picks; sevoflurane MAC40 2.05%; Singapore defaults SRFAC 2021, DAS 2025,
   ANZAAG 2022, Association of Anaesthetists blood components 2024. The brief's Marsh example was corrected (it mixed
   ke0 0.26 and 1.2).
+- 14 Oct 2026 (plan revised after two reviews, prototypes and a source check; `research/prototypes.md`): sevoflurane
+  MAC40 default 1.80% (Japanese adults 1.68–1.71% are the closest data to a mostly Chinese population; 2.05% the US
+  label); metaraminol off by default and the dantrolene product an owner question (neither is on the HSA register);
+  SRFAC 2021 gives adrenaline early, not tied to a shock number; rocuronium needs a directional effect site and
+  suxamethonium a faster ke0 than Roy 2002 to meet published times; sugammadex binding solved as equilibrium; one
+  hypnosis rule and one sensitivity quantile per patient; gas.js owns the lung store for every species; Jacobi step
+  (every subsystem reads the previous step); `fmath.js` measured bit-identical on V8 and JavaScriptCore; the PR order
+  now puts gas exchange before volatile agents and adds scenario drugs (M4.0) and resuscitation (M2.8). "What is not
+  modelled" and the known misses are kept in `MODEL.md`.
 
 ## Permissions for unattended sessions (14 Oct 2026)
 

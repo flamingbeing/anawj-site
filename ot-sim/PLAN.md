@@ -62,7 +62,7 @@ performance on a mid-range phone (no dropped frames at 20x), offline use if the 
 - Teaching only, said on the page. Dosing in the app is for the synthetic patient.
 - Cite the source for each drug model, algorithm and threshold. Prefer open guidelines (DAS, ANZCA, AAGBI, ASRA LAST
   checklist, MHAUS, ERC/AHA). Never paste copyrighted text; paraphrase and cite.
-- Where models are simplified, say so in `NOTES.md` ("what is not modelled") and on the debrief page.
+- Where models are simplified, say so in `MODEL.md` ("What is not modelled") and on the debrief page.
 - Flag uncertain numbers in the PR for the owner; never describe content as clinically reviewed.
 
 ## Autonomy rules

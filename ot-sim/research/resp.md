@@ -304,7 +304,7 @@ PEEP/over-distension, age, COPD, position. EtCO₂ tracks cardiac output when ve
 
 | Quantity | Default / value | Source |
 |---|---|---|
-| Total respiratory system static compliance, GA + paralysis (normal) | ~**95–100 mL/cmH₂O** (lung Cst,L 106.6 ± 31.7; chest-wall Cst,w 190.7 ± 45.1 → combined ~ lower) | Pelosi 1996 (Chest 109:144, PMID 8549177) |
+| Total respiratory system static compliance, GA + paralysis (normal) | ≈ **68 mL/cmH₂O** (series combination of lung Cst,L 106.6 ± 31.7 and chest-wall Cst,w 190.7 ± 45.1; corrected in review) | Pelosi 1996 (Chest 109:144, PMID 8549177) |
 | Cst, morbidly obese (GA) | lung 55.3 ± 15.3; chest wall 112.4 ± 47.4 mL/cmH₂O (both markedly reduced) | Pelosi 1996 |
 | Airway resistance Rmin,L, normal GA | 1.0 ± 0.8 cmH₂O·L⁻¹·s | Pelosi 1996 |
 | Rmin,L, obese GA | 4.7 ± 3.1 cmH₂O·L⁻¹·s | Pelosi 1996 |
