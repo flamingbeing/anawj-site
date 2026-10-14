@@ -476,19 +476,24 @@ function drawBil(){const f=fitFill($('cBil'));if(!f)return;const {ctx,w,h}=f;con
   for(const [k,y0,v] of [['EMG L',0.35,D.emgL],['EMG R',0.43,D.emgR]]){T(k,lx,y0*h+fs*0.9,fs,LT);ctx.strokeStyle=GR;ctx.strokeRect(lx+fs*4,y0*h+.5,lw-fs*4,fs*0.9);ctx.fillStyle=v>60?'#ff9a1f':'#ffb454';ctx.fillRect(lx+fs*4+1,y0*h+1.5,(lw-fs*4-2)*v/100,fs*0.9-2);}
   T('ASYM',lx,0.56*h+fs*0.9,fs,LT);T(D.asym+'%',lx+lw,0.56*h+fs*0.9,fs,'#fff','right',700);ctx.strokeStyle=GR;ctx.strokeRect(lx+.5,0.56*h+fs*1.2,lw-1,fs*0.9);ctx.fillStyle=D.asym>30?'#ff9a1f':'#5aa9ff';ctx.fillRect(lx+1,0.56*h+fs*1.2+1,(lw-2)*Math.min(100,D.asym*2)/100,fs*0.9-2);
  } else {
-  box(0.02,0.02,0.32,0.27);T('PSi',lx+fs*0.5,0.02*h+fs*1.5,fs*1.3,'#5aa9ff','left',700);const p=D.psi;T(p==null?'--':String(p),lx+lw/2,0.27*h,w*0.17,p!=null&&p>=25&&p<=50?'#3ddc6b':'#fff','center',700);
-  T('target 25–50',lx+lw-fs*0.5,0.02*h+fs*1.4,fs*0.85,LT,'right');
-  const tiles=[['SR  L','R',Math.round(D.cl.bsr),Math.round(D.cr.bsr)],['EMG  L','R',D.emgL,D.emgR],['ARTF  L','R',D.artfL,D.artfR]];
-  tiles.forEach(([a,b,vl,vr],i)=>{const y0=0.33+i*0.085;box(0.02,y0,0.32,0.075,'#3a6ea5');T(a+' '+vl+'%   '+b+' '+vr+'%',lx+fs*0.5,y0*h+fs*1.4,fs);});
-  const y0=0.59;T('ASYM',lx,y0*h+fs*0.9,fs,LT);T(D.asym+'%',lx+lw,y0*h+fs*0.9,fs,'#fff','right',700);ctx.strokeStyle=GR;ctx.strokeRect(lx+.5,y0*h+fs*1.2,lw-1,fs*0.9);ctx.fillStyle=D.asym>30?'#ff9a1f':'#5aa9ff';ctx.fillRect(lx+1,y0*h+fs*1.2+1,(lw-2)*Math.min(100,D.asym*2)/100,fs*0.9-2);
+  const p=D.psi,gcx=lx+lw/2,gcy=0.215*h,gr=Math.min(lw*0.36,0.155*h);
+  // gauge arc like the monitor's: white inside the 25-50 target, red dashes outside, a needle at the value
+  const ang=v=>Math.PI*(1.15-1.3*v/100);ctx.lineWidth=fs*0.5;ctx.setLineDash([]);
+  for(const [a,b,col] of [[0,25,'#e4002b'],[25,50,'#fff'],[50,100,'#e4002b']]){ctx.strokeStyle=col;ctx.beginPath();ctx.arc(gcx,gcy,gr,-ang(a),-ang(b),false);ctx.stroke();}
+  if(p!=null){const q=ang(p);ctx.strokeStyle='#f2b21e';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(gcx+Math.cos(q)*gr*0.78,gcy-Math.sin(q)*gr*0.78);ctx.lineTo(gcx+Math.cos(q)*gr*1.12,gcy-Math.sin(q)*gr*1.12);ctx.stroke();}
+  T(p==null?'--':String(p),gcx,gcy-gr*0.05,w*0.105,'#f2b21e','center',700);T('PSi',gcx,gcy+fs*0.6,fs*1.2,'#fff','center',700);T('25',gcx-gr*1.05,gcy-gr*0.45,fs*0.8,LT,'right');T('50',gcx+gr*0.35,gcy-gr*1.12,fs*0.8,LT,'left');
+  const sefL=lastSef,sefR=R.lastSef,f1=v=>v==null?'--':v.toFixed(1);
+  const tiles=[['EMG  L '+D.emgL+'%   R '+D.emgR+'%'],['SR  L '+Math.round(D.cl.bsr)+'%   R '+Math.round(D.cr.bsr)+'%'],['ARTF  L '+D.artfL+'%   R '+D.artfR+'%'],['SEF  L '+f1(sefL)+'   R '+f1(sefR)+' Hz']];
+  tiles.forEach(([t],i)=>{const y0=0.33+i*0.075;box(0.02,y0,0.32,0.065,'#3a6ea5');T(t,lx+fs*0.5,y0*h+fs*1.3,fs);});
+  const y0=0.645;T('ASYM',lx,y0*h+fs*0.9,fs,LT);T(D.asym+'%',lx+lw,y0*h+fs*0.9,fs,'#fff','right',700);ctx.strokeStyle=GR;ctx.strokeRect(lx+.5,y0*h+fs*1.2,lw-1,fs*0.9);ctx.fillStyle=D.asym>30?'#ff9a1f':'#5aa9ff';ctx.fillRect(lx+1,y0*h+fs*1.2+1,(lw-2)*Math.min(100,D.asym*2)/100,fs*0.9-2);
  }
  // message (worst of the two sides)
  const m=D.msgL||D.msgR;if(m){const y0=0.8*h,mh=0.12*h;ctx.fillStyle=m[0]==='hi'?'#d6001c':m[0]==='lo'?'#ffe600':'#3c4a63';ctx.fillRect(lx,y0,lw,mh);ctx.font=F(700,fs*0.85);ctx.fillStyle=m[0]==='lo'?'#000':'#fff';ctx.textAlign='left';
   const words=m[1].split(' ');let line='',yy=y0+fs*1.1;for(const wd of words){const t=line?line+' '+wd:wd;if(ctx.measureText(t).width>lw-fs){ctx.fillText(line,lx+fs*0.4,yy);yy+=fs;line=wd;}else line=t;}ctx.fillText(line,lx+fs*0.4,yy);}
  // right area: EEG traces
  const secs=VSEC(),N=secs*FS,eh=0.135*h;
- [['L',SIG,0.02],['R',R.SIG,0.17]].forEach(([k,sig,y0])=>{const y=y0*h;ctx.strokeStyle=GR;ctx.strokeRect(rx+.5,y+.5,rw-1,eh-1);ctx.save();ctx.beginPath();ctx.rect(rx,y,rw,eh);ctx.clip();
-  ctx.strokeStyle='#3ddc6b';ctx.lineWidth=1.1;ctx.beginPath();const n=Math.min(sig.length,N),o=sig.length-n,x0=N-n,sc=(eh/2)/mon.scale;
+ [['L',SIG,0.02],['R',R.SIG,0.17]].forEach(([k,sig,y0])=>{const y=y0*h;if(sed){ctx.fillStyle='#06142c';ctx.fillRect(rx,y,rw,eh);}ctx.strokeStyle=GR;ctx.strokeRect(rx+.5,y+.5,rw-1,eh-1);ctx.save();ctx.beginPath();ctx.rect(rx,y,rw,eh);ctx.clip();
+  ctx.strokeStyle=sed?'#f2c230':'#3ddc6b';ctx.lineWidth=1.1;ctx.beginPath();const n=Math.min(sig.length,N),o=sig.length-n,x0=N-n,sc=(eh/2)/mon.scale;
   for(let i=0;i<n;i++){const x=rx+(x0+i)/N*rw,yy=y+eh/2-sig[o+i]*sc;i?ctx.lineTo(x,yy):ctx.moveTo(x,yy);}ctx.stroke();ctx.restore();T(k,rx+fs*0.4,y+fs*1.2,fs,LT,'left',700);});
  T(`${+(200/secs).toFixed(1)} mm/s · ${mon.scale/2} µV/div`,rx+rw-fs*0.3,0.02*h+eh-fs*0.3,fs*0.8,LT,'right');
  // DSAs
@@ -503,10 +508,12 @@ function drawBil(){const f=fitFill($('cBil'));if(!f)return;const {ctx,w,h}=f;con
  dsa('bl',HIST,0.33,'L');dsa('br',R.HIST,0.545,'R');
  // trend
  const ty=0.775*h,th=0.16*h,n=Math.min(HIST.length,win),oL=HIST.length-n,oR=R.HIST.length-Math.min(R.HIST.length,win),Yb=v=>ty+th*(1-v/100),X=i=>gx+(i+.5)/win*gw;
- if(mon.teach){ctx.fillStyle='rgba(255,255,255,.10)';const [a,b]=sed?[25,50]:[40,60];ctx.fillRect(gx,Yb(b),gw,Yb(a)-Yb(b));}
+ if(sed){ctx.fillStyle='rgba(40,110,50,.55)';ctx.fillRect(gx,Yb(50),gw,Yb(25)-Yb(50)); // the target band is always green; the line is blue under it and orange over it
+  const bw=gw/win+.6;for(let i=0;i<n;i++){const v=psiOf(HIST[oL+i].bis);if(v==null)continue;if(v>50){ctx.fillStyle='rgba(235,150,30,.7)';ctx.fillRect(X(i)-bw/2,Yb(v),bw,Yb(50)-Yb(v));}else if(v<25){ctx.fillStyle='rgba(40,70,200,.8)';ctx.fillRect(X(i)-bw/2,Yb(25),bw,Yb(v)-Yb(25));}}}
+ else if(mon.teach){ctx.fillStyle='rgba(255,255,255,.10)';ctx.fillRect(gx,Yb(60),gw,Yb(40)-Yb(60));}
  ctx.strokeStyle=GR;ctx.lineWidth=1;ctx.strokeRect(gx+.5,ty+.5,gw-1,th-1);for(const v of [100,50,0])T(String(v),gx-fs*0.3,Math.max(ty+fs*0.8,Math.min(ty+th,Yb(v)+fs*0.35)),fs*0.8,LT,'right');
  const tr=(arr,off,fn,col,lw)=>{const m=Math.min(arr.length,win);ctx.strokeStyle=col;ctx.lineWidth=lw;ctx.lineJoin='round';ctx.beginPath();let pen=false;for(let i=0;i<m;i++){const v=fn(arr[off+i]);if(v==null){pen=false;continue;}pen?ctx.lineTo(X(i),Yb(v)):ctx.moveTo(X(i),Yb(v));pen=true;}ctx.stroke();};
- if(sed){tr(HIST,oL,q=>psiOf(q.bis),'#fff',1.6);T('PSi',gx+fs*0.4,ty+fs*1.2,fs,'#fff');}
+ if(sed){tr(HIST,oL,q=>psiOf(q.bis),'#f2c230',1.6);T('PSi',gx+fs*0.4,ty+fs*1.2,fs,'#f2c230');}
  else{tr(HIST,oL,q=>q.bis,'#ffd23f',1.6);tr(R.HIST,oR,q=>q.bis,'#5ac8ff',1.2);T('BIS L',gx+fs*0.4,ty+fs*1.2,fs,'#ffd23f');T('R',gx+fs*3.6,ty+fs*1.2,fs,'#5ac8ff');}
  const t0=n?HIST[oL].n:simT-win;for(let k=0;k<=4;k++){const x=gx+gw*k/4;T(clk(t0+win*k/4),x,h-fs*0.1,fs*0.85,LT,k===0?'left':k===4?'right':'center');}
  ctx.textAlign='left';}
