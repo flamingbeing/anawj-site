@@ -106,9 +106,12 @@ Scheduled checks it runs (owner, 13 Oct 2026; read-only, alerts go to the owner'
 - **Backups, daily 08:00:** a ready Firestore backup under 30 hours old for `prewarm-study`, `apmes-logbook` and
   `nuh-roster`, and point-in-time recovery still on for `prewarm-study`. Alerts only when something is wrong, plus an
   "all OK" on Mondays so silence means it's still running.
-- **Uptime, every minute:** the seven live addresses (`anawj.com`, `prewarmstudy.`, `apmes.` logbook and evals,
-  `nuhroster.`, `hand.` babies and cmcj); alerts after 2 failures in a row, and warns before a certificate expires. It
-  checks from the owner's home internet, so a home outage makes every site look down at once.
+- **Uptime (since 14 Oct 2026):** a small container on the home NAS ("webapps-check") checks the 11 live addresses
+  in the Worker's `SITES` list (`worker/routes.js`) and reports to one Uptime Kuma push monitor, which alerts on
+  Telegram. An outage can take up to an hour to show. It checks from the owner's home internet, so a home outage makes
+  every site look down at once. The seven older per-address monitors are now duplicates; they are retired only with
+  the owner's OK.
+- **Logbook drift check, Mondays 08:30:** compares the app's data with the response sheet; read-only.
 - No weekly spend report (owner's choice): the budget emails at 50%, 90% and 100% instead.
 - To change or stop them, ask that session.
 
