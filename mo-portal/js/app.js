@@ -269,7 +269,7 @@ async function flushOutbox() {
         if (S.last?.id === att.id) { S.last.saved = true; S.last.saveError = ''; lsSet('mo-last', JSON.stringify(S.last)); }
       } catch (e) {
         if (S.last?.id === att.id) { S.last.saveError = e.code || 'error'; }
-        break;
+        if (e.code === 'offline') break;   // no connection: stop and retry later; any other refusal only parks this result
       }
     }
   } finally { flushing = false; }
@@ -282,7 +282,7 @@ function paintSaved() {
   const waiting = outbox().some(x => x.id === S.last.id);
   el.className = 'status ' + (waiting ? 'warn' : 'ok');
   el.innerHTML = waiting
-    ? (S.last.saveError === 'permission' ? 'Your result could not be saved: your login has expired. Tell the faculty, and tap <b>Download my result</b>.' : 'Not saved to the server yet. Keep this page open; it will try again when you are online.') + ' <button id="retry" class="link">Try now</button>'
+    ? (S.last.saveError === 'permission' ? 'Your result could not be saved yet: your login has expired (the passphrase was changed). Go back to the start and sign in again with the new passphrase; it will be sent then. You can also tap <b>Download my result</b>.' : 'Not saved to the server yet. Keep this page open; it will try again when you are online.') + ' <button id="retry" class="link">Try now</button>'
     : 'Saved. The faculty can see your result.';
   $('#retry')?.addEventListener('click', async () => { await flushOutbox(); paintSaved(); });
 }

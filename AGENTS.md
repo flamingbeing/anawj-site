@@ -85,7 +85,7 @@ for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mj
 - NUH roster changes: run `node nuh-roster/test/e2e.mjs` (Practice in a browser, desktop and phone, axe on every tab;
   under a minute; also in the Checks workflow).
 - Hand log changes: run `node hand-log/test/e2e.mjs`.
-- Baby MO Portal changes: run `node mo-portal/test/logic.test.mjs` and `node mo-portal/test/e2e.mjs`; rules changes also `tools/test-rules.sh`.
+- Baby MO Portal changes: run `node mo-portal/test/logic.test.mjs` and `node mo-portal/test/e2e.mjs`; rules or `cloud.js` changes also `tools/test-rules.sh` and `tools/test-mo-portal-cloud.sh` (real Firebase SDK in a browser against the local emulators, about 2 minutes).
 - BIS to DSA changes: run `node bis-dsa/test/e2e.mjs`.
 - People changes, and evals changes to `cloud.js`, `ui-core.js` or the People panes in `ui-admin.js`: run `node people/test/e2e.mjs`.
 - Page editor changes (`edit/`): run `node edit/test/e2e.mjs` and `node hand-babies/test/e2e.mjs` (it opens the editor).
