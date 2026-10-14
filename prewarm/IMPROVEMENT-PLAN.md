@@ -97,7 +97,7 @@ Owner answers: export late pre-warming cells as NA; keep records indefinitely; p
 ## Questions only the owner can answer
 
 - Should late pre-warming cells export **NA** or stay empty? (also the two empty Downloaded columns)
-- **Carried-over temperatures:** the draft pre-fills last core/skin temperatures and BP/HR/BIS; Save can store a copied
+- (Answered 14 Oct: stopped on Save; built.) **Carried-over temperatures:** the draft pre-fills last core/skin temperatures and BP/HR/BIS; Save can store a copied
   number as a new reading (unverified ~70%). Carry only Set temp, Underbody, Gown, Room? Or require a tap to confirm?
 - Study protocol: add **deviation** codes and "reading not taken, reason"; log arm changes (who, when, why); record
   baseline ward/holding temperature, probe site, GA/regional? Blinding (PLAN.md Q1) and the thermal scale (−3 to +3) are

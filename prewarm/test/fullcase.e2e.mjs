@@ -38,6 +38,8 @@ await Promise.all(['1', '2', '3'].map(async ARM => {
   async function temps(series, key) {
     await pg.goto(`${BASE}?demo#/p/${pid}/${series}/${key}`); await pg.waitForSelector('#save');
     for (const c of ['core', 'chest', 'arm', 'thigh', 'calf', 'room']) if (await pg.$(`.card[data-fill="${c}"]`)) await pg.click(`.card[data-fill="${c}"] .clab`);
+    // carried-over (grey) values are not saved unless confirmed (14 Oct 2026): tap each one and OK, as a user would
+    for (let i = 0; i < 12; i++) { const n = await pg.$('.card.dflt .num'); if (!n) break; await n.click(); await pg.waitForSelector('dialog.kp[open]'); await pg.click('.kp [data-a="ok"]'); await pg.waitForTimeout(150); }
     for (const [c, v] of [['set', '42'], ['ts', '0'], ['under', '0'], ['gown', '0']]) {
       const chip = await pg.$(`.chip[data-c="${c}"][data-v="${v}"]`);
       if (chip && !(await pg.$(`.chip[data-c="${c}"][aria-pressed="true"]`))) await chip.click();

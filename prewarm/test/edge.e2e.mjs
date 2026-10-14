@@ -8,6 +8,17 @@ const tryit = async f => { try { await f(); } catch (e) { fails.push('error: ' +
 const log = (ok, msg) => { if (!ok) fails.push(msg); };
 // a key time: tap its box, then Now on the time pad (the pad also takes typed digits and has Clear and Back)
 const tapNow = async (pg, id) => { await pg.click(`[data-ev="${id}"]`); await pg.click('.kp [data-now]'); };
+// Save leaves out carried-over (grey) measurements (14 Oct 2026): confirm them first, as a user would by tapping each value
+const confirmDefaults = async pg => {
+  for (let i = 0; i < 12; i++) {
+    const n = await pg.$('.card.dflt .num');
+    if (n) { await n.click(); await pg.waitForSelector('dialog.kp[open]'); await pg.click('.kp [data-a="ok"]'); await pg.waitForTimeout(150); continue; }
+    const t = await pg.$('.card.dflt input[data-in]');
+    if (t) { const v = await t.inputValue(); await t.fill(''); await t.fill(v); await pg.waitForTimeout(100); continue; }
+    break;
+  }
+};
+const saveNow = async pg => { await confirmDefaults(pg); await pg.waitForTimeout(800); await pg.click('#save'); };
 // each block below starts from its own fresh browser context, so they run a few at a time (JOBS, default 4)
 const jobs = [];
 async function runJobs(n = +(process.env.JOBS || 4)) {
@@ -54,7 +65,7 @@ jobs.push(() => tryit(async () => {
   const { ctx, pg } = await fresh();
   await open(pg, 0);
   const tp = (await pg.textContent('.tp b')).trim();
-  await pg.dblclick('#save'); await pg.waitForTimeout(500);
+  await confirmDefaults(pg); await pg.waitForTimeout(800); await pg.dblclick('#save'); await pg.waitForTimeout(500);
   const next = (await pg.textContent('.tp b')).trim();
   const saved = await pg.$$eval('.strip a.done', a => a.map(x => x.textContent.trim()));
   log(next !== tp && !saved.includes(next.replace(' min', '')), `double-tap Save on ${tp} must not save ${next} too (saved: ${saved.join(',')})`);
@@ -103,6 +114,7 @@ jobs.push(() => tryit(async () => {
   await pg.click('dialog.ask [data-a="stay"]', { timeout: 3000 }); await pg.waitForTimeout(300);
   log(!pg.url().includes('haemo'), 'link, Stay: still on temps');
   await pg.click('#haemolink'); await pg.waitForTimeout(300);
+  pg.once('dialog', d => d.accept()); // the grey carried-over boxes are left blank on Save: it asks first
   await pg.click('dialog.ask [data-a="save"]', { timeout: 3000 }); await pg.waitForTimeout(500);
   log(pg.url().includes('haemo'), 'link, Save: on BP screen');
   await pg.goBack(); await pg.waitForTimeout(400);
@@ -221,13 +233,13 @@ jobs.push(() => tryit(async () => {
   await pg.click('#haemolink'); await pg.waitForSelector('input[data-in="sbp"]');
   await pg.click('.strip a:has-text("60")'); await pg.waitForSelector('input[data-in="sbp"]');
   for (const k of ['sbp', 'dbp', 'map', 'hr', 'bis']) await pg.fill(`input[data-in="${k}"]`, '');
-  await pg.click('#save'); await pg.waitForTimeout(400);
+  await saveNow(pg); await pg.waitForTimeout(400);
   log(/removed/.test(await pg.textContent('#toast')) && !await pg.$('.strip a.done:has-text("60")'), 'Save with nothing entered removes the reading (nothing saved)');
   await pg.click('.strip a:has-text("60")'); await pg.waitForSelector('input[data-in="sbp"]');
   await pg.fill('input[data-in="sbp"]', '118');
   const accept = d => d.accept(d.type() === 'prompt' ? d.defaultValue() : undefined); // also the "what time was it taken?" question, when the demo clock is late
   await pg.waitForTimeout(900); // the tap guard after the first Save
-  pg.on('dialog', accept); await pg.click('#save'); await pg.waitForTimeout(400); pg.off('dialog', accept);
+  pg.on('dialog', accept); await saveNow(pg); await pg.waitForTimeout(400); pg.off('dialog', accept);
   await pg.waitForFunction(() => !!document.querySelector('#gaps'), null, { timeout: 4000 });
   log(/BP, HR, BIS saved with blanks: .*60 min \(Diastolic BP, Mean BP, Heart rate, BIS\)/.test(await pg.textContent('#gaps')), 'part-blank reading listed: ' + (await pg.textContent('#gaps')).replace(/\s+/g, ' ').slice(0, 300));
   await pg.evaluate(() => { location.hash = '#/settings'; }); await pg.waitForSelector('#me');
@@ -296,7 +308,7 @@ jobs.push(() => tryit(async () => {
   const due = (await pg.textContent('#due')).match(/\d\d:\d\d/)?.[0];
   let q = ''; const ans = d => { if (d.type() === 'prompt') { q = d.message(); d.accept('09:58'); } else d.accept(); };
   pg.on('dialog', ans);
-  await pg.click('#save'); await pg.waitForTimeout(400);
+  await saveNow(pg); await pg.waitForTimeout(400);
   pg.off('dialog', ans);
   log(new RegExp(`The ${tp} reading was due at ${due}`).test(q), `late ${tp} asks when it was taken: ${q}`);
   await pg.click(`.strip a:has-text("${tp.replace(' min', '')}")`); await pg.waitForSelector('[data-attime]');
@@ -351,7 +363,7 @@ jobs.push(() => tryit(async () => {
     log(await pg.getAttribute('.chip[data-c="gown"][data-v="1"]', 'aria-pressed') === 'true', `gown warming Yes by default (start ${t}, due ${due})`);
     await pg.click('.chip[data-c="gown"][data-v="0"]');
     const ok = d => d.type() === 'prompt' ? d.accept(d.defaultValue()) : d.accept(); pg.on('dialog', ok);
-    await pg.click('#save'); await pg.waitForTimeout(400); pg.off('dialog', ok);
+    await saveNow(pg); await pg.waitForTimeout(400); pg.off('dialog', ok);
     await pg.goto(pg.url().replace(/\/iotemp\/\w+$/, '')); await pg.waitForSelector('#gaps');
     log(/Gown warming says No after its start time: .*55 min/.test(await pg.textContent('#gaps')), 'saved No after the start listed');
   } else log(false, `test setup: 55 min due ${due} is before gown start ${t}`);
@@ -652,12 +664,12 @@ jobs.push(() => tryit(async () => {
   await pg.click('.num[data-type="core"]'); await pg.waitForSelector('dialog.kp[open]'); await pg.click('.kp [data-k="3"]'); await pg.click('.kp [data-k="6"]'); await pg.click('.kp [data-k="5"]'); await pg.waitForTimeout(300);
   if (await pg.$('dialog.kp[open]')) await pg.click('.kp [data-a="back"]'); await pg.waitForTimeout(300);
   const seenD = []; pg.on('dialog', d => { seenD.push(d.message().slice(0, 60)); d.accept(d.type() === 'prompt' ? d.defaultValue() : undefined); });
-  await pg.waitForTimeout(900); await pg.click('#save'); await pg.waitForTimeout(500);
+  await saveNow(pg); await pg.waitForTimeout(500);
   log(/prewarm\/10$/.test(await pg.evaluate(() => location.hash)) && !await sealed(), 'the 5 min save moves to 10 min and does not complete pre-warming: ' + JSON.stringify(seenD) + await pg.textContent('#toast').catch(() => '') + await pg.evaluate(() => location.hash));
   log(await pg.$('.card.dflt [data-type="core"]') !== null, 'a value carried over from the last reading shows as a light grey default');
   await pg.click('.num[data-type="core"]'); await pg.waitForSelector('dialog.kp[open]'); await pg.click('.kp [data-k="3"]'); await pg.click('.kp [data-k="6"]'); await pg.click('.kp [data-k="6"]'); await pg.waitForTimeout(300);
   if (await pg.$('dialog.kp[open]')) await pg.click('.kp [data-a="back"]');
-  await pg.waitForTimeout(900); await pg.click('#save'); await pg.waitForTimeout(600);
+  await saveNow(pg); await pg.waitForTimeout(600);
   log(/\/iotemp/.test(await pg.evaluate(() => location.hash)) && await sealed(), 'the 10 min save marks pre-warming complete and opens the intra-op temps: ' + await pg.evaluate(() => location.hash));
   await ctx.close();
 }));
@@ -765,6 +777,31 @@ jobs.push(() => tryit(async () => {
   log(await pg.$$eval('.list li:not([hidden])', l => l.length) === 1, 'typing a Subject ID leaves only that patient');
   await pg.fill('#psearch', ''); await pg.waitForTimeout(200);
   log(await pg.$$eval('.list li:not([hidden])', l => l.length) === 7, 'clearing the search shows everyone');
+  await ctx.close();
+}));
+// AL. carried-over (grey) measurements are not saved unless confirmed (owner, 14 Oct 2026: "stopped on save"): only what
+// was typed, tapped or confirmed with OK is stored; the set temp and warming Yes / No still carry
+jobs.push(() => tryit(async () => {
+  const { ctx, pg } = await fresh();
+  pg.on('dialog', d => d.accept());
+  await open(pg, 0);
+  const id = (await pg.evaluate(() => location.hash)).split('/')[2];
+  const stored = async k => pg.evaluate(([i, k]) => JSON.parse(localStorage.getItem('prewarm-demo:patients'))[i].f[k]?.v ?? null, [id, k]);
+  const point = async () => (await pg.evaluate(() => location.hash)).match(/prewarm\/(\d+)/)?.[1];
+  await pg.evaluate(h => { location.hash = h; }, `#/p/${id}/prewarm/10`); await pg.waitForSelector('#save'); await pg.waitForTimeout(500);
+  for (const c of ['core', 'chest']) { if (await pg.$(`.card[data-fill="${c}"]`)) await pg.click(`.card[data-fill="${c}"] .clab`); }
+  await pg.waitForTimeout(800); await pg.click('#save'); await pg.waitForTimeout(1500);
+  log(await stored('prewarm_10_chest') != null, 'a tapped value is saved: ' + await stored('prewarm_10_chest'));
+  // the app moves on to the next reading, which shows the carried-over values in grey
+  const n1 = await point();
+  log(await pg.$('.card.dflt .num[data-type="chest"]') !== null, 'the next reading (' + n1 + ' min) shows the carried-over value in grey');
+  await pg.waitForTimeout(900); await pg.click('#save'); await pg.waitForTimeout(1500);
+  log(await stored(`prewarm_${n1}_chest`) == null, 'a grey carried-over value is not saved: ' + await stored(`prewarm_${n1}_chest`));
+  // tap the value and OK: it is confirmed, so it is saved
+  await pg.evaluate(h => { location.hash = h; }, `#/p/${id}/prewarm/${n1}`); await pg.waitForSelector('#save'); await pg.waitForTimeout(500);
+  if (await pg.$('.card.dflt .num[data-type="chest"]')) { await pg.click('.num[data-type="chest"]'); await pg.waitForSelector('dialog.kp[open]'); await pg.click('.kp [data-a="ok"]'); await pg.waitForTimeout(300); }
+  await pg.waitForTimeout(900); await pg.click('#save'); await pg.waitForTimeout(1500);
+  log(await stored(`prewarm_${n1}_chest`) != null, 'tapping the value and OK confirms it, so it is saved: ' + await stored(`prewarm_${n1}_chest`));
   await ctx.close();
 }));
 await runJobs();

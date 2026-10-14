@@ -418,3 +418,10 @@ once due and not ticked complete.
 Intra-op details ends with a free-text "Anything unusual or off-protocol" (`io_dev`, exported in the Extra sheet): a
 missed reading and why, a monitor fault, warming stopped early. A fuller deviation form (codes, per-reading reasons, a
 log of group changes) is still open and needs the study team's wording.
+
+### Carried-over measurements are not saved (14 Oct 2026, owner: "stopped on save")
+A temperature (core, chest, arm, thigh, calf) or BP / HR / BIS that is only the grey carried-over value, untouched, is
+left out on Save (it is never stored as a new reading). Typing it, tapping the value and OK, using a stepper or tapping the
+box to fill it all count as confirming it (`touched`; the grey goes away). Saving with some boxes still blank asks
+first, as before, and a reading with nothing but carried boxes is the "blank" case. The set temp, warming Yes / No and room
+temp still carry as before. Tests confirm grey boxes first (`confirmDefaults` in edge.e2e, the fullcase `temps()`).

@@ -855,6 +855,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
   // draft: this timepoint's saved values, else carried over from the last saved timepoint
   const prev = def.points.slice(0, idx).reverse().find(x => savedAt(p, s, x.key));
   const draft = {}, was = {};
+  const touched = new Set(); // boxes the user set or confirmed on this screen (even to the carried-over value)
   // the first intra-op reading starts from the last pre-warming one (owner, 13 Oct 2026)
   const prevPw = !prev && s === 'iotemp' ? [...SERIES.prewarm.points].reverse().find(x => savedAt(p, 'prewarm', x.key)) : null;
   for (const c of cols) {
@@ -887,7 +888,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
   let restored = false;
   if (kept && !p.lock?.on && Date.now() - kept.t < 12 * 3600e3 && cols.every(c => openT[c.key] <= kept.t)) {
     base = snap();
-    for (const c of cols) if (c.key in kept.v) draft[c.key] = kept.v[c.key];
+    for (const c of cols) if (c.key in kept.v) { draft[c.key] = kept.v[c.key]; if (String(kept.v[c.key]) !== String(was[c.key])) touched.add(c.key); }
     // the restored set temp / warming answers stay as they were (not recalculated)
     setTouched = true; warmTouched.add('under'); warmTouched.add('gown');
     restored = snap() !== base;
@@ -897,7 +898,17 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
   document.addEventListener('visibilitychange', hide); window.addEventListener('pagehide', keep);
   cleanup.push(() => { document.removeEventListener('visibilitychange', hide); window.removeEventListener('pagehide', keep); });
   leaveGuard = () => !p.lock?.on && base != null && snap() !== base ? { what: pt.label + ' reading', save: commit, drop: dropDraft } : null;
+  // Save leaves out carried-over measurements (owner, 14 Oct 2026: "stopped on save"): a grey temperature or BP, HR, BIS
+  // that nobody touched is only a default, so it is never stored as a new reading. The set temp, warming Yes / No and room
+  // temp still carry. Cancelled saves put the defaults back.
   function commit() {
+    const dropped = {};
+    for (const c of cols) if ((c.temp || s === 'haemo') && isDefault(c.key)) { dropped[c.key] = draft[c.key]; draft[c.key] = null; }
+    const ok = commitNow();
+    if (!ok) Object.assign(draft, dropped);
+    return ok;
+  }
+  function commitNow() {
     if (sealed()) { toast(sealedMsg(p, s)); return false; }
     if (p.lock?.on) { toast('Locked: read only. Unlock it on the home page to change it.'); return false; }
     const bad = cols.filter(c => c.temp && draft[c.key] != null && (+draft[c.key] < 25 || +draft[c.key] > 45 || Number.isNaN(+draft[c.key])));
@@ -960,7 +971,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     }).join('')}</div>`;
   }
   // a value only carried over (or filled in by a rule) and not yet saved for this timepoint shows light grey (owner, 13 Oct 2026)
-  const isDefault = k => val(p, `${s}_${pt.key}_${k}`) == null && draft[k] != null
+  const isDefault = k => val(p, `${s}_${pt.key}_${k}`) == null && draft[k] != null && !touched.has(k)
     && (String(draft[k]) === String(was[k]) || (k === 'set' && !setTouched) || ((k === 'under' || k === 'gown') && !warmTouched.has(k)));
   function isChanged(k) { const v = draft[k]; return v != null && was[k] != null && String(v) !== String(was[k]); }
   function hintOf(c) {
@@ -1080,9 +1091,9 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     const padCols = cols.filter(x => (x.type === 'num' || x.type === 'int') && x.key !== 'set'), nxt = padCols[padCols.indexOf(c) + 1] || null;
     openKeypad({ title: c.label + (c.unit ? ' ' + c.unit : ''), mode: s === 'haemo' ? 'int' : c.temp ? 'temp' : 'dec', value: draft[k] ?? '',
       hint: was[k] != null ? 'was ' + was[k] : '',
-      onDone: v => { draft[k] = v === '' ? null : v; draw(); lockTaps(); },
+      onDone: v => { draft[k] = v === '' ? null : v; touched.add(k); draw(); lockTaps(); },
       onClear: () => { draft[k] = null; draw(); },
-      onNext: nxt ? v => { draft[k] = v === '' ? null : v; draw(); openCell(nxt.key); } : null, nextLabel: 'Next' });
+      onNext: nxt ? v => { draft[k] = v === '' ? null : v; touched.add(k); draw(); openCell(nxt.key); } : null, nextLabel: 'Next' });
   }
   function editTime(f) {
     const had = !!val(p, f), label = EVENT_FULL[f] || evLabel(f);
@@ -1122,6 +1133,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
   function bump(k, dir) {
     const cur = parseFloat(draft[k]);
     const n = Number.isFinite(cur) ? cur + dir * step[k] : start[k];
+    touched.add(k);
     draft[k] = step[k] < 1 ? (Math.round(n * 10) / 10).toFixed(1) : String(Math.round(n));
   }
   let hold;
@@ -1144,7 +1156,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     const chip = t.closest('.chip[data-c]');
     if (chip) { if (chip.dataset.c === 'set') setTouched = true; warmTouched.add(chip.dataset.c); draft[chip.dataset.c] = draft[chip.dataset.c] === chip.dataset.v ? null : chip.dataset.v; draw(); return; }
     const fl = t.closest('.card[data-fill]');
-    if (fl && !t.closest('[data-step], .num')) { draft[fl.dataset.fill] = start[fl.dataset.fill].toFixed(1); draw(); return; }
+    if (fl && !t.closest('[data-step], .num')) { touched.add(fl.dataset.fill); draft[fl.dataset.fill] = start[fl.dataset.fill].toFixed(1); draw(); return; }
     const m = t.closest('[data-map]');
     if (m) { draft.map = m.dataset.map; draw(); return; }
     const sat = t.closest('[data-sat]');
@@ -1208,7 +1220,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
   view.onfocusin = e => { if (e.target.dataset.in) typing = e.target.dataset.in; };
   view.oninput = e => {
     const k = e.target.dataset.in; if (!k) return;
-    const v = e.target.value.trim(); draft[k] = v === '' ? null : v;
+    const v = e.target.value.trim(); touched.add(k); draft[k] = v === '' ? null : v;
     keep();
     for (const c of cols) {
       const cd = view.querySelector(`.card[data-k="${c.key}"]`); if (!cd) continue;
