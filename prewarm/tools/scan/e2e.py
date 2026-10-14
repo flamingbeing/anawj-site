@@ -39,4 +39,31 @@ for fid, e in got['fields'].items():
     if not ok and sure: bad += 1; print('SILENT ERROR', fid, e['value'], 'truth', t)
     if e['flags']: print('flagged', fid, e['value'], e['flags'])
 print(f'{len(got["fields"])} fields, silent errors: {bad}')
+
+# ---- no API: export the crops, read them (two independent readings), carry on; or type everything in
+import os
+crops = f'{tmp}/crops'
+scan.main(['--form-dir', d, '--out', f'{tmp}/o1', '--export-crops', crops, *photos])
+man = json.load(open(f'{crops}/manifest.json', encoding='utf-8'))
+sheets = sorted(f for f in os.listdir(crops) if f[0] in 'ab' and f.endswith('.png') and f[1] == '-')
+assert man and sheets and all(os.path.exists(f'{crops}/{k}.png') for k in man), 'crops, manifest and sheets written'
+assert all(m['allowed'] for m in man.values()), 'each cell says what it can be'
+numeric = {k: v for k, v in truth.items() if k in man}
+ra = dict(numeric); rb = dict(numeric)
+some = sorted(numeric)[0]; other = sorted(numeric)[-1]
+rb[some] = '99.9'                                  # the second reading disagrees about one cell
+ra[other] = {'text': numeric[other], 'legible': False}  # the first reader is unsure about another
+json.dump(ra, open(f'{tmp}/ra.json', 'w')); json.dump(rb, open(f'{tmp}/rb.json', 'w'))
+scan.main(['--form-dir', d, '--out', f'{tmp}/o2', '--readings', f'{tmp}/ra.json', '--readings2', f'{tmp}/rb.json', *photos])
+g2 = json.load(open(f'{tmp}/o2/scan.json', encoding='utf-8'))['fields']
+assert 'two reads disagree' in g2[some]['flags'], g2[some]
+assert 'hard to read' in g2[other]['flags'], g2[other]
+agreed = [k for k in numeric if k not in (some, other) and fields[k]['type'] in ('num', 'int', 'time')]
+assert agreed and all(str(g2[k]['value']) == str(numeric[k]) or float(g2[k]['value']) == float(numeric[k].replace(':', '')) if ':' not in numeric[k] else True for k in agreed)
+scan.main(['--form-dir', d, '--out', f'{tmp}/o3', '--no-read', *photos])
+g3 = json.load(open(f'{tmp}/o3/scan.json', encoding='utf-8'))['fields']
+assert all(g3[k]['value'] is None and 'type this in (not read)' in g3[k]['flags'] for k in man), 'every written cell is left to be typed'
+ticks_same = [k for k, e in got['fields'].items() if e['kind'] == 'tick']
+assert all(g3[k]['value'] == got['fields'][k]['value'] for k in ticks_same), 'ticks are read the same without a reader'
+print('no-API modes: ok')
 sys.exit(1 if bad else 0)

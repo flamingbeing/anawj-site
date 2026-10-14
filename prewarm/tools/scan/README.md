@@ -43,10 +43,13 @@ short of the 0.80 alignment score is still accepted when every table on it fits 
 own) and the page scores 0.70 or better; it is marked `check_alignment`. `--min-align 0.75` lowers the bar to test a page
 (its crops then need checking). `scan.json` per-option ticks carry `inks` (inside the box) and `centers` (the middle of it).
 
-**Without API credits** (Claude Max has none): `scan.py --export-crops crops/ ...` aligns the photos, reads the ticks and
-writes every handwritten crop to `crops/` with a `manifest.json`; someone (or a Claude Code session) reads them into
-`readings.json` as `{"<field id>": "<text>"}`; then `scan.py --readings readings.json ...` carries on as usual. There is
-only one read, so no second opinion: the review screen is the only check.
+**Without the API** (Claude Max has none): three ways, see [READ-CROPS.md](READ-CROPS.md).
+`scan.py --export-crops crops/ ...` aligns the photos, reads the ticks, and writes every handwritten crop to `crops/` with
+a manifest and numbered contact sheets; a Claude Code session or a person reads them into `readings-a.json`; a second,
+independent pass (the bigger `b-NN` sheets, a fresh session) into `readings-b.json`; then
+`scan.py --readings readings-a.json --readings2 readings-b.json ...` compares the two and flags every disagreement. With only
+`--readings` there is one read and no second opinion; with `--no-read` the owner types every written value in the review
+screen.
 
 **The template must look like the paper.** Field places and the alignment template are rendered from the blank `.docx`. If
 the render is not the same layout as the printed paper (different fonts, different row heights, a different page

@@ -57,27 +57,77 @@ class StubReader:
 
 
 class FileReader:
-    """No API: readings someone else made from the exported crops (--export-crops), as {field id: text}. One read stands
-    in for both, so there is no second opinion; the review screen is the only check."""
-    def __init__(self, path):
-        self.readings = json.load(open(path, encoding='utf-8'))
+    """No API: readings someone else made from the exported crops, as {field id: text} or {field id: {"text", "legible"}}.
+    With a second file (made independently, from the 2x sheets) the two reads are compared, so a disagreement is flagged;
+    with one file the same text stands in for both reads and the review screen is the only check."""
+    def __init__(self, path, path2=None):
+        load = lambda p: json.load(open(p, encoding='utf-8'))
+        self.a = load(path)
+        self.b = load(path2) if path2 else self.a
+        self.two = bool(path2)
+        self.asked, self.missing = set(), set()
 
     def read(self, png, f, variant):
-        r = self.readings.get(f['id'])
+        src = self.a if variant == 0 or not self.two else self.b
+        self.asked.add(f['id'])
+        r = src.get(f['id'])
+        if r is None:
+            self.missing.add(f['id'])
+            return {'text': '', 'legible': False}
         if isinstance(r, dict):           # {"text": "34.0", "legible": false}: say so when a cell is hard to read
             return {'text': str(r.get('text', '')), 'legible': bool(r.get('legible', True))}
-        return {'text': '' if r is None else str(r), 'legible': r is not None}
+        return {'text': str(r), 'legible': True}
+
+
+class NoReader:
+    """Nobody reads the handwriting: the owner types every written value in the review screen (ticks are still read)."""
+    reads_nothing = True
+
+    def read(self, png, f, variant):
+        return {'text': '', 'legible': False}
 
 
 class CropExporter:
-    """Writes each handwritten crop to a folder with a manifest, reads nothing (for a person or another session to read)."""
+    """Writes each handwritten crop to a folder, with a manifest and numbered contact sheets for whoever reads them: sheet a-NN
+    (the crops as they are) for the first reading, sheet b-NN (bigger, a different layout) for an independent second one. Reads
+    nothing itself."""
+    reads_nothing = True
+
     def __init__(self, folder):
-        self.folder, self.manifest = folder, {}
+        self.folder, self.items = folder, []
         os.makedirs(folder, exist_ok=True)
 
     def read(self, png, f, variant):
         if variant == 0:
+            self.items.append((f, png))
             open(os.path.join(self.folder, f['id'] + '.png'), 'wb').write(png)
-            self.manifest[f['id']] = dict(label=f['label'], type=f['type'], unit=f.get('unit'))
-            json.dump(self.manifest, open(os.path.join(self.folder, 'manifest.json'), 'w', encoding='utf-8'), indent=1)
         return {'text': '', 'legible': False}
+
+    def finish(self):
+        import cv2, numpy as np
+        import plausible
+        json.dump({f['id']: dict(label=f['label'], type=f['type'], unit=f.get('unit'), allowed=plausible.allowed(f)) for f, _ in self.items},
+                  open(os.path.join(self.folder, 'manifest.json'), 'w', encoding='utf-8'), indent=1)
+        for prefix, tile_h, tile_w, cols, rows, scale in (('a', 80, 230, 4, 6, 1), ('b', 150, 420, 2, 5, 2)):
+            tiles = []
+            for f, png in self.items:
+                im = cv2.imdecode(np.frombuffer(png, np.uint8), cv2.IMREAD_GRAYSCALE)
+                if scale != 1:
+                    im = cv2.resize(im, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
+                    im = cv2.normalize(im, None, 0, 255, cv2.NORM_MINMAX)
+                k = min(tile_h / im.shape[0], tile_w / im.shape[1]); im = cv2.resize(im, None, fx=k, fy=k, interpolation=cv2.INTER_AREA)
+                t = np.full((tile_h + 30, tile_w + 10), 255, np.uint8)
+                t[4:4 + im.shape[0], 5:5 + im.shape[1]] = im
+                cv2.rectangle(t, (0, 0), (t.shape[1] - 1, t.shape[0] - 1), 150, 1)
+                cv2.putText(t, f['id'][:34], (4, tile_h + 14), cv2.FONT_HERSHEY_SIMPLEX, 0.38, 0, 1, cv2.LINE_AA)
+                cv2.putText(t, f['label'][:34], (4, tile_h + 26), cv2.FONT_HERSHEY_SIMPLEX, 0.34, 90, 1, cv2.LINE_AA)
+                tiles.append(t)
+            per = cols * rows
+            for n in range(0, len(tiles), per):
+                chunk = tiles[n:n + per]
+                th, tw = tiles[0].shape
+                used = -(-len(chunk) // cols)            # only the rows that have tiles
+                sheet = np.full((used * th, cols * tw), 255, np.uint8)
+                for i, t in enumerate(chunk):
+                    r, c = divmod(i, cols); sheet[r * th:(r + 1) * th, c * tw:(c + 1) * tw] = t
+                cv2.imwrite(os.path.join(self.folder, f'{prefix}-{n // per + 1:02d}.png'), sheet)
