@@ -74,6 +74,9 @@ near zero (the APMES apps are a demo). Rough projections, not measurements:
   sign-in.
 - **Reflections and notes are private to each resident, the owner included.** Backups, exports and any handover must
   keep that.
+- **Logbook feedback is private, owner-only, never a GitHub issue.** Residents send it from More → Send feedback
+  (Firestore `feedback/`, only the app owner in `owners/` reads, marks done or deletes it; admins can't). The site's
+  page editor and 💬 button make public issues: never point residents at them.
 - **Public repo:** fake data only; no names, patient data or secrets, ever (`AGENTS.md`).
 - **Going nationwide** is mostly an approval question: expect the programme or MOHH to ask where data lives
   (Singapore, asia-southeast1), who can access it, PDPA and institutional policy, and who is accountable if the owner

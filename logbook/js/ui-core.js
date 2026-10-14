@@ -29,6 +29,7 @@ export const S = {
   casesSynced: false,  // a snapshot has come from the server (not only the offline cache)
   sharedTemplates: [],
   tab: 'log',
+  lastScreen: null,    // the page before More (app.js); Send feedback names it, nothing else
 };
 
 // Set by app.js: re-render the current screen, or tell it the case list changed.

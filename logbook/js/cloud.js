@@ -16,6 +16,7 @@
 //   summaries/{rid}                       counts only, readable by everyone signed in
 //   imports/{rid}                         { email, keys: [importKey], updatedAt }  (which old-form rows are in)
 //   sharedTemplates/{id}                  { id, name, cats, details? }
+//   feedback/{id}                         { uid, text, doing?, screen, version, ua, status, createdAt }  private feedback, app owner reads
 
 import { FIREBASE_CONFIG } from './firebase-config.js';
 import { checkWrite } from './recovery-store.js';
@@ -281,6 +282,35 @@ export async function isAppOwner(email) {
   const { db, F } = await sdk();
   try { return (await F.getDoc(F.doc(db, 'owners', lc(email)))).exists(); }
   catch (e) { if (e?.code !== 'permission-denied') console.warn('Owner check failed', e); return false; }
+}
+
+// ---- private feedback (More → Send feedback; owner reads it in More → Feedback). Never a GitHub issue. ----
+// feedback/{id} { uid, text, doing?, screen, version, ua, status: 'new' | 'done', createdAt (server time) }
+// Resolves true once the server has it, false when it is still queued on this device (offline: Firestore sends it later).
+export async function sendFeedback(rec) {
+  if (demo) return D.sendFeedback(rec);
+  const { db, F } = await sdk();
+  const p = F.addDoc(F.collection(db, 'feedback'), { ...rec, createdAt: F.serverTimestamp() });
+  let late = false;   // a refusal after we've said "queued" goes to the sync-error banner; before that, to the caller
+  p.catch(e => { if (late) { console.error('Feedback not sent', e); for (const cb of syncErrorListeners) cb(e); } });
+  return Promise.race([p.then(() => true), new Promise(r => setTimeout(() => { late = true; r(false); }, ACK_WAIT))]);
+}
+// the app owner only (the rules refuse everyone else): newest first, at most 200
+export async function listFeedback() {
+  if (demo) return D.listFeedback();
+  const { db, F } = await sdk();
+  const snap = await F.getDocs(F.query(F.collection(db, 'feedback'), F.orderBy('createdAt', 'desc'), F.limit(200)));
+  return snap.docs.map(d => { const x = d.data(); return { ...x, id: d.id, createdAt: x.createdAt?.toMillis?.() ?? null }; });
+}
+export async function setFeedbackStatus(id, status) {
+  if (demo) return D.setFeedbackStatus(id, status);
+  const { db, F } = await sdk();
+  await F.updateDoc(F.doc(db, 'feedback', id), { status });
+}
+export async function deleteFeedback(id) {
+  if (demo) return D.deleteFeedback(id);
+  const { db, F } = await sdk();
+  await F.deleteDoc(F.doc(db, 'feedback', id));
 }
 
 // Programme directors (pds/{email}, managed with the evals app) can read the shared totals.

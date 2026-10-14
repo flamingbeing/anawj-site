@@ -27,7 +27,7 @@ const MODS = {
   sync: () => import('./ui-sync.js'), settingsFile: () => import('./settings-file.js'), account: () => import('./ui-account.js'),
   admin: () => import('./ui-admin.js'), recovery: () => import('./ui-recovery.js'), notesExport: () => import('./ui-notes.js'),
   cloudSave: () => import('./cloud-save.js'), backup: () => import('./backup.js'), shareIn: () => import('./ui-share-in.js'),
-  parts: () => import('./ui-parts.js'),
+  parts: () => import('./ui-parts.js'), feedback: () => import('./ui-feedback.js'),
 };
 const mod = {}, loading = {};   // name → the module once loaded; → its promise while loading
 function need(name) {
@@ -95,6 +95,8 @@ const ICONS = {
   bin: 'M4 7h16M10 11v6M14 11v6M5 7l1 13h12l1-13M9 7V4h6v3',
   notes: 'M6 3h9l4 4v14H6zM14 3v5h5M9 12h7M9 16h5',
   notesset: 'M6 3h9l4 4v14H6zM14 3v5h5M9 12h7M9 16h5',
+  feedback: 'M4 5h16v11H9l-5 4zM8 9h8M8 12h5',   // a speech bubble
+  feedbackinbox: 'M3 13l3-8h12l3 8v6H3zM3 13h5l1 2h6l1-2h5',   // an in-tray
   more: 'M5 12h.01M12 12h.01M19 12h.01M4 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0M11 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0M18 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0',
 };
 // the Advanced pages (Settings menu) use their parent page's icon
@@ -148,6 +150,9 @@ const TABS = [
   // opened from More → Export / Import (not in the More list)
   { id: 'export', label: 'Export portfolio', render: page(['reflect'], m => m.reflect.renderExportPage()), hidden: true, under: 'data', unlisted: true },
   { id: 'choose', label: 'Export portfolio', render: page(['reflect'], m => m.reflect.renderChoosePage()), hidden: true, under: 'export', unlisted: true },
+  // private feedback to the programme owner (never a public GitHub issue); the owner reads it in Feedback (owner: true)
+  { id: 'feedback', label: 'Send feedback', render: page(['feedback'], m => m.feedback.renderFeedbackSend()), hidden: true, under: 'more', desc: 'A problem or an idea: only the programme owner reads it' },
+  { id: 'feedbackinbox', label: 'Feedback', render: page(['feedback'], m => m.feedback.renderFeedbackInbox()), owner: true, hidden: true, under: 'more', desc: 'App owner only: feedback sent by residents' },
   // admins open it from More
   { id: 'admin', bar: true, short: 'Admin', label: 'Admin portal', render: page(['admin'], m => m.admin.renderAdmin()), admin: true, hidden: true, under: 'more', desc: 'Admins only: ready portfolios, programme totals, residents, settings' },
   { id: 'admintotals', label: 'Programme totals', render: page(['progress'], m => m.progress.renderTotals()), admin: true, hidden: true, under: 'admin', unlisted: true },
@@ -429,7 +434,7 @@ const banner = document.getElementById('banner');
 // ---------- tabs and routing (#log, #logbook, ...) ----------
 
 // Totals (names and counts of programme residents) is for the programme only; the rules agree.
-const visibleTabs = () => TABS.filter(t => (!t.admin || S.admin) && (!t.faculty || facultyRole()) && (t.id !== 'totals' || S.admin || S.pd || S.resident));
+const visibleTabs = () => TABS.filter(t => (!t.admin || S.admin) && (!t.owner || S.owner) && (!t.faculty || facultyRole()) && (t.id !== 'totals' || S.admin || S.pd || S.resident));
 // the tabs that can sit on the bar: the main ones, and the pages in the More list (bar: true), when put there
 const barCandidates = () => visibleTabs().filter(t => !t.hidden || t.bar).map(t => t.id);
 const TAB_ALIASES = { reflections: 'reflect' };
@@ -470,6 +475,9 @@ function changeScreen(id, scroll = 0) {
   if (S.tab === 'account') mod.account?.flush();
   if (S.tab === 'notes' && id !== 'notes') leaveNotes();
   if (/^admin/.test(S.tab || '') && !/^admin/.test(id)) mod.admin?.leaveAdmin();
+  if (/^feedback/.test(S.tab || '') && S.tab !== id) mod.feedback?.leaveFeedback();
+  // the page feedback is about: the last one before More or Send feedback (its name only goes with the feedback)
+  if (S.tab && !['more', 'feedback'].includes(S.tab)) S.lastScreen = S.tab;
   S.tab = id;
   window.scrollTo(0, 0);
   render();
