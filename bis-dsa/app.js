@@ -162,7 +162,9 @@ function paintOff(){const d=offImg.data;const start=COLMAX-COLS.length;
   const c=LUT[(dbToX(col.db[NB-1-y])*255)|0];d[i]=c[0];d[i+1]=c[1];d[i+2]=c[2];d[i+3]=255;}}
  offCtx.putImageData(offImg,0,0);}
 let view='both';
-function drawEeg(){if(view==='dsa')return;const {ctx,w,h}=fit(cEeg,view==='eeg'?280:110);ctx.fillStyle=SCR.bg;ctx.fillRect(0,0,w,h);
+// lane heights: smaller on phones so the monitor and the controls fit one screen
+const laneH=()=>{const n=innerWidth<600;return view==='both'?{dsa:n?150:190,eeg:n?90:110}:{dsa:n?260:300,eeg:n?220:280};};
+function drawEeg(){if(view==='dsa')return;const {ctx,w,h}=fit(cEeg,laneH().eeg);ctx.fillStyle=SCR.bg;ctx.fillRect(0,0,w,h);
  ctx.strokeStyle=SCR.grid;ctx.lineWidth=1;for(let s=0;s<=8;s++){const x=Math.round(w*s/8)+.5;ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,h);ctx.stroke();}
  ctx.beginPath();ctx.moveTo(0,h/2+.5);ctx.lineTo(w,h/2+.5);ctx.stroke();
  // newest 2-s epoch
@@ -180,7 +182,7 @@ function drawTrend(){const {ctx,w,h}=fit(cTrend);ctx.fillStyle=SCR.bg;ctx.fillRe
  // EMG lane: one bar per second, 25-55 dB
  ctx.fillStyle=SCR.mute;ctx.fillText('EMG',g.x-6,e.y+e.h);ctx.strokeStyle=SCR.grid;ctx.strokeRect(g.x+.5,e.y+.5,g.w-1,e.h-1);
  const bw=Math.max(1,g.w/COLMAX);COLS.forEach((c,i)=>{const v=Math.max(0,Math.min(1,(emgShow(c.emg)-25)/30));if(v<=0)return;ctx.fillStyle=v>0.55?'#ffb454':'#5fd08f';ctx.fillRect(X(i)-bw/2,e.y+e.h-v*e.h,bw,v*e.h);});}
-function drawDsa(){if(view==='eeg')return;const {ctx,w,h}=fit(cDsa,view==='dsa'?300:190);ctx.fillStyle=SCR.bg;ctx.fillRect(0,0,w,h);const g=plotGeom(w,h);
+function drawDsa(){if(view==='eeg')return;const {ctx,w,h}=fit(cDsa,laneH().dsa);ctx.fillStyle=SCR.bg;ctx.fillRect(0,0,w,h);const g=plotGeom(w,h);
  ctx.imageSmoothingEnabled=true;ctx.drawImage(off,g.x,g.y,g.w,g.h);
  // SEF line
  const start=COLMAX-COLS.length;ctx.strokeStyle=SCR.sef;ctx.lineWidth=1.4;ctx.beginPath();let pen=false;
