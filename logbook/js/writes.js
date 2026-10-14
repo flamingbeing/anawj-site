@@ -2,9 +2,11 @@ import { recoveryStore, recordSignature } from './recovery-store.js';
 const copy = value => JSON.parse(JSON.stringify(value));
 const keyOf = job => job.kind + ':' + job.record.id;
 const terminal = new Set(['synced', 'archived']);
+// the network dropped mid-save (Firestore: 'unavailable', 'deadline-exceeded'): the job stays pending and tries again
+const transient = error => error?.code === 'unavailable' || error?.code === 'deadline-exceeded';
 export function createWriteQueue({ store, backend, getOwner = () => null, normalize = (_kind, value) => value, online = () => true, delay = ms => new Promise(r => setTimeout(r, ms)) }) {
   let owner = null, generation = 0, jobs = [], loading = null, storageError = '';
-  const running = new Map(), listeners = new Set();
+  const running = new Map(), listeners = new Set(), waits = new Map();
   const notify = () => { for (const fn of listeners) fn(); };
   const current = (email, gen) => owner === email && generation === gen && getOwner() === email;
   const ordered = () => [...jobs].sort((a, b) => a.at - b.at || a.key.localeCompare(b.key));
@@ -22,6 +24,7 @@ export function createWriteQueue({ store, backend, getOwner = () => null, normal
           job.result = copy(result); job.state = 'synced'; job.error = '';
         } catch (error) {
           if (!current(email, gen)) return;
+          if (transient(error)) { job.error = 'Waiting for the connection'; retryLater(id, email, gen); notify(); break; }
           job.state = error.code === 'write-conflict' ? 'conflict' : 'failed';
           job.error = error.message || 'Could not save';
           if (error.remote !== undefined) job.remote = copy(error.remote);
@@ -29,6 +32,7 @@ export function createWriteQueue({ store, backend, getOwner = () => null, normal
         try { await persist(job); } catch (error) { storageError = error.message; }
         notify();
         if (job.state !== 'synced') break;
+        waits.delete(id);
       }
       // Keep a short device history; failed/conflicting/pending records never expire here.
       const old = ordered().filter(x => terminal.has(x.state)).slice(0, -100);
@@ -36,13 +40,22 @@ export function createWriteQueue({ store, backend, getOwner = () => null, normal
     })().finally(() => {
       if (running.get(id) !== task) return;
       running.delete(id);
-      if (current(email, gen) && online() && ordered().find(x => keyOf(x) === id && !terminal.has(x.state))?.state === 'pending') void drain(id).catch(error => { storageError = error.message; notify(); });
+      if (current(email, gen) && online() && !waits.get(id)?.timer && ordered().find(x => keyOf(x) === id && !terminal.has(x.state))?.state === 'pending') void drain(id).catch(error => { storageError = error.message; notify(); });
     });
     running.set(id, task); return task;
   }
+  // back off 2 s, 4 s … up to a minute; going online (kick) tries at once
+  function retryLater(id, email, gen) {
+    const wait = waits.get(id) || { tries: 0 }; wait.tries++; waits.set(id, wait);
+    const timer = wait.timer = {};
+    delay(Math.min(60000, 1000 * 2 ** wait.tries)).then(() => {
+      if (wait.timer !== timer) return; wait.timer = null;
+      if (current(email, gen)) void drain(id).catch(error => { storageError = error.message; notify(); });
+    });
+  }
   async function activate(email) {
     if (owner === email && loading) return loading;
-    owner = email; const gen = ++generation; jobs = []; running.clear(); storageError = '';
+    owner = email; const gen = ++generation; jobs = []; running.clear(); waits.clear(); storageError = '';
     loading = (async () => {
       try { const found = await store.list(email); if (current(email, gen)) jobs = found; }
       catch (error) { if (current(email, gen)) storageError = error.message; }
@@ -50,7 +63,7 @@ export function createWriteQueue({ store, backend, getOwner = () => null, normal
     })();
     return loading;
   }
-  function kick() { if (owner && getOwner() === owner) for (const id of new Set(jobs.map(keyOf))) void drain(id).catch(error => { storageError = error.message; notify(); }); }
+  function kick() { for (const wait of waits.values()) wait.timer = null; if (owner && getOwner() === owner) for (const id of new Set(jobs.map(keyOf))) void drain(id).catch(error => { storageError = error.message; notify(); }); }
   async function save(kind, email, record, base = null) {
     record = copy(normalize(kind, copy(record))); base = copy(base);
     if (getOwner() !== email) throw new Error('Account changed; the editor has not been saved');
@@ -96,7 +109,7 @@ export function createWriteQueue({ store, backend, getOwner = () => null, normal
     notify();
   }
   async function forget() {
-    const old = owner; owner = null; ++generation; loading = null; jobs = []; running.clear(); storageError = ''; notify();
+    const old = owner; owner = null; ++generation; loading = null; jobs = []; running.clear(); waits.clear(); storageError = ''; notify();
     if (old) await store.forget(old);
   }
   return { activate, save, overlay, retry, archive, forget, kick,
