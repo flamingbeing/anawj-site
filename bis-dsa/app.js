@@ -30,12 +30,33 @@ const DRUGS={
   [0.8,S({bg:7,slow:140,delta:35,theta:3,spindle:25,alphaF:13,beta:0.6,gamma:0.1})],
   [1,S({bg:7,slow:160,delta:40,theta:3,spindle:20,alphaF:13,beta:0.5})]],
 };
-function target(drug,d,mods){
+function baseTarget(drug,d){
  const kf=DRUGS[drug]; let i=0; while(i<kf.length-2&&d>kf[i+1][0])i++;
  const [d0,a]=kf[i],[d1,b]=kf[i+1]; const t=Math.max(0,Math.min(1,(d-d0)/(d1-d0)));
  const p={}; for(const k of KEYS)p[k]=a[k]+(b[k]-a[k])*t;
+ return p;
+}
+// Drug mix (a teaching approximation, not an interaction model): propofol (effect-site ug/ml) and sevoflurane (MAC)
+// add into one hypnotic depth; remifentanil (ng/ml), dexmedetomidine and N2O deepen it a little; then ketamine,
+// dexmedetomidine, remifentanil and N2O each add their own EEG signature on top.
+const MIX0={propofol:0,sevo:0,ketamine:0,dex:0,remi:0,n2o:0};
+function mixTarget(m){
+ const dP=m.propofol*0.155,dS=m.sevo*0.55,hyp=Math.min(0.95,dP+dS),on=hyp>0.05?1:0,cl=x=>Math.max(0,Math.min(1,x));
+ const dH=cl(hyp+(on?0.012:0.01)*m.remi+0.12*m.dex*on+0.03*m.n2o);
+ const sh=dP+dS>0?dS/(dP+dS):0,a=baseTarget('propofol',dH),b=baseTarget('sevo',dH),p={};
+ for(const k of KEYS)p[k]=a[k]*(1-sh)+b[k]*sh;
+ const k=m.ketamine,x=m.dex,r=m.remi,n=m.n2o;
+ if(r>0){p.delta+=1.5*r;p.slow+=2*r;p.beta/=1+0.05*r;}
+ if(k>0){p.gamma+=9*k;p.beta+=6*k;p.betaF+=(26-p.betaF)*cl(k*2);p.alpha*=1-0.85*cl(k*1.5);p.slow+=50*k;p.theta+=10*k;p.bs*=1-cl(k*1.5);}
+ if(x>0){const c=cl(x*2);p.spindle+=40*x*(1-0.5*dH);p.alphaF+=(13-p.alphaF)*c*0.6;p.slow+=100*x;p.delta+=25*x;p.beta*=1-0.8*c;p.gamma*=1-0.8*c;}
+ if(n>0){p.gamma+=2*n;p.beta+=2.5*n;p.alpha*=1-0.3*n;}
+ return p;
+}
+function target(drug,d,mods){
+ const p=drug==='mix'?mixTarget(Object.assign({},MIX0,d)):baseTarget(drug,d);
  if(mods&&mods.elderly){p.alpha*=0.2;p.spindle*=0.4;p.slow*=0.45;p.delta*=0.5;p.theta*=0.5;p.bg*=0.6;p.beta*=0.6;}
- if(mods&&mods.emg){p.emg=Math.max(p.emg,6);}
+ // facial EMG; an opioid blunts the response to surgery, so less of it
+ if(mods&&mods.emg){p.emg=Math.max(p.emg,6*(drug==='mix'?Math.max(0.25,1-(d.remi||0)/6):1));}
  return p;
 }
 function profile(p,f,spEnv){
@@ -211,7 +232,8 @@ function readouts(){const c=COLS[COLS.length-1];if(!c)return;
 
 // ===== state descriptions =====
 function describe(){const d=depth;let n,t;
- if(drug==='propofol'||drug==='sevo'){const s=drug==='sevo';
+ if(drug==='mix'){[n,t]=describeMix(depth);}
+ else if(drug==='propofol'||drug==='sevo'){const s=drug==='sevo';
   if(d<0.08){n='Awake';t='Low-amplitude, mixed fast activity. Power is spread thinly across the DSA with no strong band. SEF95 is high (above 25 Hz), so BIS reads 90 or more.';}
   else if(d<0.24){n='Paradoxical excitation';t='Early '+(s?'sevoflurane':'propofol')+' boosts beta (13–25 Hz) power. The DSA brightens high up and BIS may stay high or even rise, although the patient is drifting off.';}
   else if(d<0.44){n='Sedation';t='Beta fades and a band starts to form around 12 Hz while slow waves appear at the bottom. BIS sits around 60–80. The patient may still respond to voice.';}
@@ -233,9 +255,35 @@ function describe(){const d=depth;let n,t;
  if(mods.emg)t+=' Muscle activity: broad high-frequency power raises the EMG bar and pushes BIS up. It is artefact, not lighter anaesthesia.';
  $('rName').textContent=n;$('rText').textContent=t;}
 
+function describeMix(m){const hyp=0.155*m.propofol+0.55*m.sevo,parts=[];let n;
+ n=hyp<0.08?(m.ketamine>0.45?'Ketamine anaesthesia':m.dex>0.2?'Dexmedetomidine sedation':'Light or no hypnotic'):hyp<0.44?'Sedation':hyp<0.68?'General anaesthesia':hyp<0.85?'Deep anaesthesia':'Burst suppression';
+ const on=[m.propofol&&'propofol',m.sevo&&'sevoflurane',m.remi&&'remifentanil',m.ketamine&&'ketamine',m.dex&&'dexmedetomidine',m.n2o&&'N₂O'].filter(Boolean);
+ if(on.length)n+=' · '+on.join(' + ');
+ if(m.propofol&&m.sevo)parts.push('Propofol and sevoflurane add together into one hypnotic depth.');
+ if(hyp>=0.44&&hyp<0.68&&!m.ketamine)parts.push('The hypnotic gives the usual alpha (8–12 Hz) and slow bands.');
+ if(m.remi)parts.push('Remifentanil does little to the EEG on its own, but it blunts the response to surgery, so less hypnotic gives the same picture: compare propofol 3 with and without it, or tick facial muscle activity.');
+ if(m.ketamine)parts.push('Ketamine adds fast 25–40 Hz power and weakens the alpha band, so BIS reads higher even though the patient is deeper. Don\u2019t chase the number with more propofol.');
+ if(m.dex)parts.push('Dexmedetomidine adds spindles and slow waves and lowers the hypnotic dose needed.');
+ if(m.n2o)parts.push('Nitrous oxide adds anaesthetic effect but little EEG slowing, so BIS barely falls and may rise a little.');
+ if(!on.length)parts.push('Pick a combination or move the sliders.');
+ return [n,parts.join(' ')];}
+
 // ===== controls =====
 const DEPTH_TICKS={propofol:['Awake','Sedated','GA','Deep','Flat'],sevo:['Awake','Sedated','~1 MAC','Deep','Flat'],ketamine:['Awake','Analgesic','','GA','High dose'],dex:['Awake','','Sedated','','Deep sedation']};
-function setDrug(dn){drug=dn;document.querySelectorAll('#drugSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.drug===dn));
+let mode='single';const mix=Object.assign({},MIX0);
+const MIXROWS=[['propofol','Propofol','µg/ml (effect site)',8,0.1,v=>v.toFixed(1)],['sevo','Sevoflurane','MAC',2,0.05,v=>v.toFixed(2)],
+ ['remi','Remifentanil','ng/ml',8,0.5,v=>v.toFixed(1)],['ketamine','Ketamine','% of anaesthetic dose',1,0.05,v=>Math.round(v*100)],
+ ['dex','Dexmedetomidine','% of a deep sedation dose',1,0.05,v=>Math.round(v*100)],['n2o','Nitrous oxide','%',0.7,0.05,v=>Math.round(v*100)]];
+const PRESETS={tiva:{propofol:3,remi:4},propket:{propofol:3.5,ketamine:0.4},sevon2o:{sevo:0.8,n2o:0.6},propdex:{propofol:2.5,dex:0.5},clear:{}};
+$('mixRows').innerHTML=MIXROWS.map(([k,l,u,max,st])=>`<div class="mixrow"><label for="mx-${k}">${l} <small>${u}</small></label><output id="o-${k}" for="mx-${k}">0</output><input type="range" id="mx-${k}" min="0" max="${max}" step="${st}" value="0"></div>`).join('');
+function syncMix(){MIXROWS.forEach(([k,,,,,f])=>{$('mx-'+k).value=mix[k];$('o-'+k).textContent=f(mix[k]);});}
+MIXROWS.forEach(([k,,,,,f])=>$('mx-'+k).oninput=e=>{stopStory();mix[k]=+e.target.value;$('o-'+k).textContent=f(mix[k]);applyTarget();});
+document.querySelectorAll('#presetSeg button').forEach(b=>b.onclick=()=>{stopStory();Object.assign(mix,MIX0,PRESETS[b.dataset.preset]);syncMix();applyTarget();});
+function showMode(m){mode=m;document.querySelectorAll('#modeSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.mode===m));
+ $('mixCtl').hidden=m!=='mix';$('depthCtl').hidden=$('drugCtl').hidden=m==='mix';}
+let lastSingle='propofol';
+document.querySelectorAll('#modeSeg button').forEach(b=>b.onclick=()=>{stopStory();if(b.dataset.mode==='mix'){showMode('mix');drug='mix';depth=mix;syncMix();applyTarget();}else setDrug(lastSingle);});
+function setDrug(dn){showMode('single');lastSingle=dn;depth=$('depth').value/100;drug=dn;document.querySelectorAll('#drugSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.drug===dn));
  $('ticks').innerHTML=DEPTH_TICKS[dn].map(s=>`<span>${s}</span>`).join('');applyTarget();}
 document.querySelectorAll('#drugSeg button').forEach(b=>b.onclick=()=>{stopStory();setDrug(b.dataset.drug);});
 $('depth').oninput=e=>{stopStory();depth=e.target.value/100;applyTarget();};
@@ -373,6 +421,8 @@ const LIB=[
  {id:'sevo',name:'Deep sevoflurane',drug:'sevo',d:0.76,m:{},bis:'30–40',txt:'Theta (4–8 Hz) fills the gap, so alpha and slow merge into one broad bright block.'},
  {id:'ket',name:'Ketamine',drug:'ketamine',d:0.65,m:{},bis:'60–80',txt:'Bright fast power at 25–40 Hz plus slow waves, no alpha. BIS reads high in an unconscious patient.'},
  {id:'dex',name:'Dexmedetomidine',drug:'dex',d:0.4,m:{},bis:'50–70',txt:'Beaded spindles at 12–15 Hz with slow waves, like stage 2 sleep. Rousable.'},
+ {id:'propket',name:'Propofol + ketamine',drug:'mix',d:{propofol:3.5,ketamine:0.4},m:{},bis:'55–70',txt:'The propofol slow band is there, but the alpha band fades and fast power fills in above 20 Hz. BIS reads higher than the depth deserves.'},
+ {id:'sevon2o',name:'Sevoflurane + N₂O',drug:'mix',d:{sevo:0.8,n2o:0.6},m:{},bis:'55–65',txt:'Sevoflurane bands with extra fast power from nitrous oxide. N₂O adds anaesthesia without lowering BIS much.'},
  {id:'emg',name:'EMG artefact',drug:'propofol',d:0.55,m:{emg:true},bis:'falsely 65–85',txt:'Broad power climbing into the high frequencies over a normal GA pattern. Check the EMG bar.'}];
 function buildLib(){const el=$('lib');el.innerHTML=LIB.map(x=>`<article class="card"><canvas id="lib-${x.id}" height="110" aria-label="DSA strip: ${x.name}"></canvas><div class="meta"><h3>${x.name}</h3><span class="bis">BIS ${x.bis}</span></div><p>${x.txt}</p></article>`).join('');
  let i=0;const next=()=>{if(i>=LIB.length)return;const x=LIB[i++];x.cols=simStrip(x.drug,x.d,x.m,150);drawStrip($('lib-'+x.id),x.cols);setTimeout(next,0);};next();}

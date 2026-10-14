@@ -59,9 +59,19 @@ try {
     await page.uncheck('#mDia');
     await page.click('#speedSeg [data-speed="1"]');
     // library strips and quiz drawn
-    await page.waitForFunction(() => document.querySelectorAll('#lib canvas').length === 10 && document.querySelectorAll('#opts button').length === 4);
+    await page.waitForFunction(() => document.querySelectorAll('#lib canvas').length === 12 && document.querySelectorAll('#opts button').length === 4);
     await page.click('#opts button');
     assert.ok((await page.textContent('#fb')).length > 10, 'quiz feedback');
+    // mix mode: propofol + ketamine reads higher than propofol alone; back to one drug restores the single controls
+    await page.click('#speedSeg [data-speed="10"]');
+    await page.click('#modeSeg [data-mode="mix"]');
+    assert.ok(await page.$eval('#depthCtl', e => e.hidden) && !(await page.$eval('#mixCtl', e => e.hidden)), 'mix controls shown');
+    await page.click('#presetSeg [data-preset="propket"]');
+    assert.equal(await page.$eval('#o-ketamine', e => e.textContent), '40');
+    assert.match(await page.textContent('#rName'), /propofol \+ ketamine/);
+    await page.waitForFunction(g => +document.querySelector('#vBis').textContent > g + 8, ga, { timeout: 30000 });
+    await page.click('#modeSeg [data-mode="single"]');
+    assert.ok(!(await page.$eval('#depthCtl', e => e.hidden)), 'single controls back');
     // ketamine at 10x speed: BIS climbs well above the GA value
     await page.click('#speedSeg [data-speed="10"]');
     await page.click('[data-drug="ketamine"]');
