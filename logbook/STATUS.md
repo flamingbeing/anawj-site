@@ -6,7 +6,7 @@ list, filtered by the app's label, has the rest).
 Each session edits only its own file under `status/` (see **Now**). Update this file when a task finishes, a decision is made, or
 before compacting (`/save-state` in Claude Code, `$save-state` in Codex).
 
-Last updated: 2026-10-13 (evening) by Claude Code, Logbook 1 (log1), during the 6-hour build.
+Last updated: 2026-10-14 by Claude Code, Logbook 1 (log1).
 
 ## Now
 
@@ -58,6 +58,7 @@ its own file), so sessions never edit the same lines. Read them all before start
 
 ## Recently done
 
+- #490 Private feedback queue: residents' More → Send feedback (owner-only `feedback/{id}`, rules change approved by the owner); the owner's More → Feedback (Mark done, Delete, scrubbed Copy as task).
 - #485 Bug hunt: 35 confirmed bugs fixed (sync engine data safety, settings merges, daily-note merges, paste cleaner, sync files, logging).
 - #484 Late dialog "back" no longer pulls you off a page opened meanwhile (Safari); settings search scrolls to the option; phone polish.
 - #483 Rarely used screens load on demand: case box ~35% sooner on a phone connection.
@@ -77,6 +78,9 @@ its own file), so sessions never edit the same lines. Read them all before start
 - #289 Polish 6a: settings pages use switches, ✓ lists and one-line help (ⓘ for more); Advanced pages under headings.
 
 ## Decisions log
+
+- 2026-10-14: Residents send feedback only through the logbook's private queue (owner-only in Firestore), never the site's
+  public 💬 / page-editor routes, which make public GitHub issues. In demo the demo admin plays the owner.
 
 - 2026-10-13: 6-hour build process that worked: map the code with parallel readers, build independent tracks in separate git
   worktrees, review each with independent lenses, fix, integrate with a merge agent, then a find → double-verify → fix bug
