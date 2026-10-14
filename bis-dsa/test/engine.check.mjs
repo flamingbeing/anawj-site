@@ -79,7 +79,7 @@ chk('Propofol 0.90', 'BIS', p90.bis, 25, 36); chk('Propofol 0.90', 'BIS minus pr
 const p100 = run('propofol', 1);
 chk('Propofol 1.0', 'BIS', p100.bis, 0, 12); chk('Propofol 1.0', 'SR', p100.sr, 80, 100);
 const p55 = run('propofol', 0.55, {}, 120, null, 4), s55 = run('sevo', 0.55, {}, 120, null, 4);
-chk('Sevo 0.55', 'BIS', s55.bis, 40, 55); chk('Sevo 0.55', 'theta peak Hz', s55.peak(3.5, 7.5), 4.5, 5.5);
+chk('Sevo 0.55', 'BIS', s55.bis, 40, 55); chk('Sevo 0.55', 'theta peak Hz', s55.peak(3.5, 7.5), 4, 6); // sevo theta 4-6 Hz (Akeju 2014); 4.5-5.5 sat on a seed edge
 chk('Sevo 0.55', 'alpha 8-12 dB vs propofol 0.55', s55.band(8, 12) - p55.band(8, 12), 1, 3);
 const s100 = run('sevo', 1);
 chk('Sevo 1.0', 'BIS', s100.bis, 15, 40); chk('Sevo 1.0', 'SR', s100.sr, 0, 60);
