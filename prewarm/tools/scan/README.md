@@ -42,9 +42,19 @@ writes every handwritten crop to `crops/` with a `manifest.json`; someone (or a 
 `readings.json` as `{"<field id>": "<text>"}`; then `scan.py --readings readings.json ...` carries on as usual. There is
 only one read, so no second opinion: the review screen is the only check.
 
+**The template must look like the paper.** Field places and the alignment template are rendered from the blank `.docx`. If
+the render is not the same layout as the printed paper (different fonts, different row heights, a different page
+count), alignment scores drop and printed text leaks into the ink layer, which makes ticks unreliable. Check: the
+template pages should say "Page n of 14" like the paper. Fix: render with Microsoft Word itself (`pip install docx2pdf`,
+then `RENDERER=word sh setup-form.sh ...`), or with LibreOffice after installing the Carlito font (Calibri-metric).
+`scan.py` prints a warning, and puts `template_mismatch` in `scan.json`, for a page whose ink layer is full of printed text.
+
+`readings.json` entries may be text or `{"text": "34.0", "legible": false}`: use the second form for a cell that is hard
+to read, so it is flagged "hard to read".
+
 **Windows**: run the shell steps in Git Bash; the tool needs `soffice` (LibreOffice) and `pdftoppm` (poppler) on PATH. Use
 `PYTHON=python sh setup-form.sh ...` if `python3` is the Store stub. `setup-form.sh` uses all cores (`LOCATE_JOBS=n` to
-change); it prints why any field was not placed. The model is Sonnet by default; `SCAN_MODEL=claude-opus-5-5` for hard pages.
+change); it prints why any field was not placed (the paper form has no per-reading BP / HR / BIS grid, only a "Vital Signs Data Collected" tick, so `haemo_*` readings after the baseline are rightly unplaced). The model is Sonnet by default; `SCAN_MODEL=claude-opus-5-5` for hard pages.
 
 ## Tests (all fake data)
 

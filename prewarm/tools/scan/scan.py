@@ -10,6 +10,7 @@ import align, boxes, ticks, readers, plausible
 
 NEVER_SEND = {'text', 'date', 'word'}      # IDs, dates, names and free text are typed in the review screen, never sent anywhere
 MIN_ALIGN = 0.80                            # below this, the photo is rejected: retake it
+LEAK_WARN = 8.0                             # printed-ink leakage per 1000 px outside the fields (to be tuned on real pages)
 CHECK_ALIGN = 0.90                          # between the two, the page is read but flagged 'check the crops line up'
 JUMP = {'core': 1.0, 'chest': 6.0, 'arm': 6.0, 'thigh': 6.0, 'calf': 6.0}   # °C between neighbouring readings
 
@@ -44,7 +45,7 @@ def crop_rect(rect, cells, shape):
     if inside:
         c = min(inside, key=lambda c: (c[2] - c[0]) * (c[3] - c[1]))
         inner = (c[0] + 3, c[1] + 3, c[2] - 3, c[3] - 3)
-        grow = (6, 10)
+        grow = (5, 5)       # 2 px beyond the cell: enough that an overrunning digit isn't cut, too little to pull in the row above
     else:
         inner = (x0 - 20, y0 - 20, x1 + 60, y1 + 20)
         grow = (4, 8)
@@ -78,6 +79,10 @@ def process_page(page_no, flat, tpl, fmap, fields, cells, reader):
             on = [o for o, r in res.items() if r['state'] == 'ticked']
             unsure = [o for o, r in res.items() if r['state'] == 'unsure']
             flags = [f'unsure tick: {o}' for o in unsure] + (['more than one ticked'] if len(on) > 1 else [])
+            # a slash that overshoots its box can put some ink on a neighbour's: one clearly strongest box wins, but is flagged
+            hot = sorted(((r['ink'], o) for o, r in res.items() if r['state'] != 'empty'), reverse=True)
+            if len(hot) > 1 and hot[0][0] >= ticks.CLEAR_TICK and hot[0][0] >= 2 * hot[1][0] + 0.3:
+                on, flags = [hot[0][1]], ['more than one box has ink: took the clearly strongest, check']
             r0 = next(iter(loc['options'].values()))
             (cx0, cy0, cx1, cy1), _ = crop_rect([min(r[0] for r in loc['options'].values()), r0[1], max(r[2] for r in loc['options'].values()), r0[3]], cells, flat.shape)
             out[fid] = dict(kind='tick', value=on[0] if len(on) == 1 else None, flags=flags, inks={o: r['ink'] for o, r in res.items()},
@@ -99,6 +104,17 @@ def process_page(page_no, flat, tpl, fmap, fields, cells, reader):
             e['flags'] += sorted({p for _, ps in vals for p in ps})
         out[fid] = e
     return out
+
+
+def leak_ratio(ink, fmap, page_no):
+    """Ink far from every field is printed text the template failed to cancel (a template that doesn't match the paper's
+    layout: different fonts or row heights). Share of such ink per 1000 page pixels; high = don't trust this page's ticks."""
+    mask = np.zeros(ink.shape, np.uint8)
+    for loc in fmap['fields'].values():
+        if loc['page'] != page_no: continue
+        for r in ([loc['rect']] if loc.get('rect') else []) + list(loc['options'].values()):
+            mask[max(0, r[1] - 40):r[3] + 40, max(0, r[0] - 60):r[2] + 60] = 1
+    return float(ink[mask == 0].sum()) / max(1, (mask == 0).sum()) * 1000
 
 
 def series_checks(fields_out, fields):
@@ -162,6 +178,11 @@ def main(argv=None, reader=None):
             print(f'{ph}: best fit is page {pg + 1} but it did not line up (score {score:.2f}): retake the photo, or say which page it is with --pages', file=sys.stderr); continue
         if score < CHECK_ALIGN:
             print(f'{ph}: page {pg + 1} lined up only moderately (score {score:.2f}): check the crops in the review screen', file=sys.stderr)
+        leak = leak_ratio(align.ink_layer(flat, tpls[pg]), fmap, pg)
+        pages[-1]['leak'] = round(leak, 1)
+        if leak > LEAK_WARN:
+            pages[-1]['template_mismatch'] = True
+            print(f'{ph}: page {pg + 1}: printed text is leaking into the ink layer ({leak:.0f}); the template does not match the paper layout (fonts / row heights): ticks on this page are less reliable', file=sys.stderr)
         result.update(process_page(pg, flat, tpls[pg], fmap, fields, boxes.cells(f'{a.form_dir}/blank.pdf', pg), reader))
     series_checks(result, fields)
     for fid, e in result.items():

@@ -14,7 +14,7 @@ PROMPT_B = ('Transcribe the handwriting in this image digit by digit. It is one 
 
 def _expect(f):
     if f.get('opts'):
-        return 'one of ' + ', '.join(str(l) for _, l in f['opts']) + ' (often just the first letter, or the number)'
+        return 'one of ' + ', '.join(str(o[1] if isinstance(o, (list, tuple)) else o) for o in f['opts']) + ' (often just the first letter, or the number)'
     return {'time': 'a 24-hour clock time such as 07:05', 'num': 'a decimal number', 'int': 'a whole number',
             'code': 'a number'}.get(f['type'], 'text')
 
@@ -59,7 +59,10 @@ class FileReader:
         self.readings = json.load(open(path, encoding='utf-8'))
 
     def read(self, png, f, variant):
-        return {'text': str(self.readings.get(f['id'], '')), 'legible': f['id'] in self.readings}
+        r = self.readings.get(f['id'])
+        if isinstance(r, dict):           # {"text": "34.0", "legible": false}: say so when a cell is hard to read
+            return {'text': str(r.get('text', '')), 'legible': bool(r.get('legible', True))}
+        return {'text': '' if r is None else str(r), 'legible': r is not None}
 
 
 class CropExporter:
