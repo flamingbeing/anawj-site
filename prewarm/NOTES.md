@@ -383,3 +383,32 @@ reading) replaces `alerted`. Still only while the app is open: a lock-screen ala
 - **Updates:** the service worker's install is all-or-nothing for the app's own files (one failed download fails the
   install, the browser retries, the phone keeps the old complete copy); Firebase SDK files stay optional. The 3 s
   fallback only clears the saved copy if `sw.js` can be fetched right then. Base `prewarm-v79`.
+
+### Done shortcuts also show a ✓ (14 Oct 2026)
+The green "complete" shortcuts on the patient screen also get a ✓ before the label (not colour alone, red-green colour
+blindness), and their spoken label is "POD1, complete" instead of just "complete". Taller tap targets for the reading
+tabs were tried and dropped: they push Save below the fold on a phone (the e2e test pins that).
+
+### The number pad chains through the boxes (14 Oct 2026)
+On the temperature and BP/HR/BIS screens the pad has a Next button for every box that takes a number (not the gown set
+temp or yes/no boxes), and three digits of a temperature (like 366) save it and open the next box's pad by themselves:
+about 5 taps fewer per reading. Back closes the chain. Edge tests close the next pad after a 3-digit entry. Not done: the
+late-reading time still uses the browser's `prompt()` (`askTime`), because the save flow waits for its answer.
+
+### Patient list: POD due, search, unsent badge; runbook (14 Oct 2026)
+The list shows "POD1 due today / overdue" and "POD2 ..." from the Surgery date field (else the day the patient was
+started on this phone) until the section's Complete tick. A Subject ID search box appears above 5 patients (hides rows,
+no redraw). A patient waiting to send, or whose save was refused, has a red "Not sent yet" / "Not saved to the team"
+line. `RUNBOOK.md` is the one-page study-day routine for the team; `PLAN.md` is marked old.
+
+### Ready for a case? card (14 Oct 2026)
+Top of Settings (when sharing is available): ✓ / ✗ rows for online, initials, on a team, hospital set, nothing waiting
+or refused, synced in the last 15 minutes, app up to date, each with what to do. It only reads state the app already
+keeps; it does not test the PACU link (do that by hand, see `RUNBOOK.md`). Checked in the sync emulator test.
+Still to fill (patient screen) also lists "POD1 / POD2 chart review due today / overdue" with how many questions have an answer,
+once due and not ticked complete.
+
+### Off-protocol note (14 Oct 2026)
+Intra-op details ends with a free-text "Anything unusual or off-protocol" (`io_dev`, exported in the Extra sheet): a
+missed reading and why, a monitor fault, warming stopped early. A fuller deviation form (codes, per-reading reasons, a
+log of group changes) is still open and needs the study team's wording.
