@@ -2,8 +2,8 @@
 
 Phone photos of filled-in paper pages → checked values → the same Excel layout the app exports. Local tool: no scans,
 no form, no outputs go in git (the repo is public), and nothing is sent anywhere except small crops of **numbers and
-times** to Claude for reading. IDs, dates, names, signatures and free text are never cropped to the API, and nothing in a page's header band (Subject ID / Date of
-Entry, worked out per page from the form) is ever cropped; you type
+times** to Claude for reading. IDs, dates, names, signatures and free text are never cropped to the API, and nothing in a page's header band (the table row holding "Subject ID" / "Date of Entry" in the blank form, found for each
+page by `boxes.header_bottom`) is ever cropped; you type
 those in the review screen.
 
 ## How it works
@@ -37,7 +37,10 @@ node prewarm/tools/scan/export-scan.mjs study.xlsx pt01.reviewed.json pt02.revie
 ```
 
 Photos: whole sheet in frame on a plain surface, even light, one page per photo, any order. If a page is picked wrong
-or rejected, say which page each photo is with `--pages 7,9,1` (one number per photo, in order).
+or rejected, say which page each photo is with `--pages 7,9,1` (one number per photo, in order). A page that falls just
+short of the 0.80 alignment score is still accepted when every table on it fits the printed lines (0.85 or better on its
+own) and the page scores 0.70 or better; it is marked `check_alignment`. `--min-align 0.75` lowers the bar to test a page
+(its crops then need checking). `scan.json` per-option ticks carry `inks` (inside the box) and `centers` (the middle of it).
 
 **Without API credits** (Claude Max has none): `scan.py --export-crops crops/ ...` aligns the photos, reads the ticks and
 writes every handwritten crop to `crops/` with a `manifest.json`; someone (or a Claude Code session) reads them into

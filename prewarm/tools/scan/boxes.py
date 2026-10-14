@@ -38,3 +38,21 @@ def tables(pdf_path, page_no):
             if len(xs) >= 3 and len(ys) >= 3:
                 out.append(dict(bbox=tuple(round(v * PT) for v in t.bbox), xs=xs, ys=ys))
     return out
+
+
+def header_bottom(pdf_path, page_no, margin=8):
+    """Where the page header (Subject ID / Date of Entry boxes) ends, in template pixels, or 0 if the page has none:
+    the bottom of the table row holding those labels, else a little below the labels."""
+    with pdfplumber.open(pdf_path) as pdf:
+        page = pdf.pages[page_no]
+        words = [w for w in page.extract_words() if w['top'] < page.height * 0.3 and (w['text'].startswith('Subject') or w['text'] == 'Date' or w['text'].startswith('Entry'))]
+        if not words:
+            return 0
+        bottoms = []
+        tabs = page.find_tables()
+        for w in words:
+            cx, cy = (w['x0'] + w['x1']) / 2, (w['top'] + w['bottom']) / 2
+            # the table ROW holding the label (a header table can be merged with the table below it)
+            rows = [r.bbox for t in tabs for r in t.rows if r.bbox[0] <= cx <= r.bbox[2] and r.bbox[1] <= cy <= r.bbox[3]]
+            bottoms.append(max(r[3] for r in rows) if rows else w['bottom'] + 10)
+        return round(max(bottoms) * PT) + margin

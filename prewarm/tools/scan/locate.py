@@ -9,10 +9,9 @@ from pathlib import Path
 import pdfplumber
 
 PT = 200 / 72
-HEADER_MARGIN = 12   # px below the header digits that still count as header
 TICKS = set('☒☑✓✔✗✘')     # ballot-box X, ballot-box check, check marks, crosses
 JOBS = int(os.environ.get('LOCATE_JOBS') or os.cpu_count() or 2)
-d = sys.argv[1]
+d = sys.argv[1] if len(sys.argv) > 1 else ''   # importable for tests
 
 
 def convert_chunk(files):
@@ -22,11 +21,19 @@ def convert_chunk(files):
 
 
 def convert():
-    if os.environ.get('RENDERER') == 'word':   # Microsoft Word itself (pip install docx2pdf; Windows or Mac): the layout of the printed paper
-        from docx2pdf import convert as word_convert   # Word converts the whole folder in one session
-        word_convert(d)
+    # only what has no PDF yet, or whose PDF is older than its .docx (Word and LibreOffice are both slow)
+    todo = [f for f in sorted(glob.glob(f'{d}/*.docx'))
+            if not os.path.exists(f[:-5] + '.pdf') or os.path.getmtime(f[:-5] + '.pdf') < os.path.getmtime(f)]
+    if not todo:
         return
-    todo = [f for f in sorted(glob.glob(f'{d}/*.docx')) if not os.path.exists(f[:-5] + '.pdf')]
+    if os.environ.get('RENDERER') == 'word':   # Microsoft Word itself (pip install docx2pdf; Windows or Mac): the layout of the printed paper
+        from docx2pdf import convert as word_convert   # Word converts a whole folder in one session
+        import shutil
+        tmp = tempfile.mkdtemp()
+        for f in todo: shutil.copy(f, tmp)
+        word_convert(tmp)
+        for f in todo: shutil.move(os.path.join(tmp, os.path.basename(f)[:-5] + '.pdf'), f[:-5] + '.pdf')
+        return
     chunks = [todo[i::JOBS] for i in range(JOBS) if todo[i::JOBS]]
     with cf.ThreadPoolExecutor(len(chunks) or 1) as ex:
         list(ex.map(convert_chunk, chunks))
@@ -39,6 +46,30 @@ def chars(name):
             return name, [(pi, round(c['x0'], 1), round(c['top'], 1), c['text'], c['x1'], c['bottom']) for pi, p in enumerate(pdf.pages) for c in p.chars]
     except Exception as e:  # a form that failed to render
         return name, str(e)
+
+
+def choose_glyphs(cands):
+    """cands: { option: [rect, ...] } box glyphs that appeared for each option of one ticked question. An option can tick
+    more than one box (No pre-warming also ticks 'Not applicable' further down the page). The options of one question sit
+    in one row (or one column), so keep the candidate on the same row as the others' boxes (same column if they are
+    stacked); only if none lines up, the one nearest. Returns { option: rect }."""
+    centre = lambda r: ((r[0] + r[2]) / 2, (r[1] + r[3]) / 2)
+    singles = [centre(c[0]) for c in cands.values() if len(c) == 1]
+    ys, xs = sorted(c[1] for c in singles), sorted(c[0] for c in singles)
+    medy, medx = (ys[len(ys) // 2], xs[len(xs) // 2]) if singles else (None, None)
+    spread_y = (ys[-1] - ys[0]) if singles else 0
+    spread_x = (xs[-1] - xs[0]) if singles else 0
+    out = {}
+    for o, rects in cands.items():
+        if len(rects) == 1 or not singles:
+            out[o] = sorted(rects, key=lambda r: (r[1], r[0]))[0]
+            continue
+        h = lambda r: r[3] - r[1]
+        same_row = [r for r in rects if abs(centre(r)[1] - medy) <= max(8, 0.4 * h(r))] if spread_y <= spread_x else []
+        same_col = [r for r in rects if abs(centre(r)[0] - medx) <= max(8, 0.4 * (r[2] - r[0]))] if spread_x < spread_y else []
+        pool = same_row or same_col or rects
+        out[o] = min(pool, key=lambda r: (centre(r)[0] - sum(c[0] for c in singles) / len(singles)) ** 2 + (centre(r)[1] - sum(c[1] for c in singles) / len(singles)) ** 2)
+    return out
 
 
 def new_marks(variant, base):
@@ -73,17 +104,18 @@ if __name__ == '__main__':
         for pi in {m[0] for m in marks}: on_page[pi] = on_page.get(pi, 0) + 1
         for k in {m[:4] for m in marks}: freq[k] = freq.get(k, 0) + 1
     common = {k for k, n in freq.items() if on_page[k[0]] >= 4 and n > 0.25 * on_page[k[0]]}
-    # the header (Subject ID / Date of Entry) is the page furniture near the top: where it ends, per page
+    # the header (Subject ID / Date of Entry): where it ends on each page, read from the blank form itself
     header_bottom = {}
-    tops = {}
-    for v, marks in found:
-        for m in marks:
-            if m[:4] in common and m[2] * PT < 700:
-                tops.setdefault(m[0], {})[m[:4]] = (round(m[2] * PT), round(m[5] * PT))
-    for pi, marks in tops.items():            # the topmost line of such marks (not a tick lower down the page)
-        first = min(t for t, _ in marks.values())
-        header_bottom[pi] = max(b for t, b in marks.values() if t <= first + 60) + HEADER_MARGIN
-    fmap, ticked = {}, {}
+    if os.path.exists(f'{d}/blank.pdf'):
+        import boxes
+        with pdfplumber.open(f'{d}/blank.pdf') as pdf:
+            for pi in range(len(pdf.pages)):
+                hb = boxes.header_bottom(f'{d}/blank.pdf', pi)
+                if hb: header_bottom[pi] = hb
+            if header_bottom:           # every page has the same header: a page where the labels were not found gets the typical value
+                typical = sorted(header_bottom.values())[len(header_bottom) // 2]
+                for pi in range(len(pdf.pages)): header_bottom.setdefault(pi, typical)
+    fmap, ticked, cands = {}, {}, {}
     for v, marks in found:
         key = v['field'] + (':' + v['option'] if v.get('option') is not None else '')
         own = [m for m in marks if m[:4] not in common]
@@ -92,6 +124,9 @@ if __name__ == '__main__':
             continue
         page = own[0][0]
         ms = [m for m in own if m[0] == page]
+        glyphs = [[round(m[1] * PT), round(m[2] * PT), round(m[4] * PT), round(m[5] * PT)] for m in ms if m[3] in TICKS]   # a ticked option: just its box(es); its label text can shift and would overlap the next option
+        if glyphs and v.get('option') is not None:
+            ms = [m for m in ms if m[3] in TICKS]
         rect = [round(min(m[1] for m in ms) * PT), round(min(m[2] for m in ms) * PT), round(max(m[4] for m in ms) * PT), round(max(m[5] for m in ms) * PT)]
         if rect[1] < header_bottom.get(page, 0):   # Subject ID / Date of Entry live up here: never a field to read or send
             unplaced.append(dict(key=key, why='lands in the page header band (Subject ID / Date of Entry)'))
@@ -100,8 +135,12 @@ if __name__ == '__main__':
         if v.get('option') is not None:
             f['options'][v['option']] = rect
             ticked[v['field']] = ticked.get(v['field'], False) or any(m[3] in TICKS for m in ms)
+            if glyphs: cands.setdefault(v['field'], {})[v['option']] = glyphs
         else:
             f['rect'] = rect
+    for fid, c in cands.items():          # a ticked question: one box per option
+        if fid in fmap and ticked.get(fid):
+            fmap[fid]['options'].update(choose_glyphs(c))
     for fid, f in fmap.items():
         if f['options'] and not ticked.get(fid):
             f['written'] = True      # the option's mark is a letter or number (Y/N, thermal sensation), not a ticked box

@@ -31,9 +31,47 @@ cv2.line(ink, (28, 70), (62, 36), 1, 3)          # slash through the box (40,40)
 ink[150, 150] = 1                                  # speck near an empty box
 r = ticks.read_ticks(ink, [dict(rect=(40, 40, 60, 60)), dict(rect=(140, 140, 160, 160))])
 assert [x['state'] for x in r] == ['ticked', 'empty'], r
+# stacked boxes (30 px apart): a slash through the lower box whose tail runs up into the upper one
+ink2 = np.zeros((200, 200), np.uint8)
+cv2.line(ink2, (25, 112), (70, 52), 1, 3)          # from below-left of the lower box (40,80)-(60,100) up to the upper (40,40)-(60,60)
+r2 = ticks.read_ticks(ink2, [dict(rect=(40, 40, 60, 60)), dict(rect=(40, 80, 60, 100))])
+assert r2[1]['center'] >= 0.6 and r2[0]['center'] <= 0.15, r2    # the middle tells them apart even when both have ink
 # handwriting present or not: digits yes, a thin leftover line or table edge no
 digits = np.zeros((80, 160), np.uint8); cv2.putText(digits, '36.5', (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1.6, 1, 3)
 line = np.zeros((80, 160), np.uint8); line[40:42, 5:155] = 1
 edge = np.zeros((80, 160), np.uint8); edge[:, 3:5] = 1
 assert scan.has_writing(digits) and not scan.has_writing(line) and not scan.has_writing(edge)
+# arrows: the shaft of a "same as above" arrow runs through the middle of the cell; a printed line sliver sits at its edge
+cell = np.zeros((42, 106), np.uint8); cell[:, 52:55] = 1
+assert scan.arrow_shaft(cell)
+edge2 = np.zeros((42, 106), np.uint8); edge2[:, 1:4] = 1
+assert not scan.arrow_shaft(edge2)
+short = np.zeros((42, 106), np.uint8); short[10:22, 52:55] = 1
+assert not scan.arrow_shaft(short)
+# empty cells between arrows are flagged, a genuinely empty column is not
+F = {f'iotemp_{p}_room': dict(id=f'iotemp_{p}_room', series='iotemp', col='room', point=p) for p in ('0', '5', '10', '15', '20', '25')}
+E = lambda **k: {'value': None, 'flags': [], **k}
+out = {'iotemp_0_room': E(), 'iotemp_5_room': E(flags=['arrow or ditto: same as the reading above?']), 'iotemp_10_room': E(),
+       'iotemp_15_room': E(flags=['arrow or ditto: same as the reading above?']), 'iotemp_20_room': E(), 'iotemp_25_room': dict(value=18, flags=[])}
+scan.arrow_gaps(out, F)
+assert out['iotemp_10_room']['flags'] and out['iotemp_20_room']['flags'] and not out['iotemp_0_room']['flags']
+# series order: baseline first, minutes in order, end of surgery last (a baseline next to the end of surgery is not a "jump")
+arm = {'base': 35.0, '0': 35.2, '5': 34.9, '10': 34.2, '300': 29.8, 'end': 23.6}
+fo = {f'iotemp_{k}_arm': {'value': v, 'flags': []} for k, v in arm.items()}
+ff = {f'iotemp_{k}_arm': dict(id=f'iotemp_{k}_arm', series='iotemp', col='arm', point=k) for k in arm}
+scan.series_checks(fo, ff)
+assert not fo['iotemp_base_arm']['flags'] and not fo['iotemp_0_arm']['flags'], fo
+assert fo['iotemp_end_arm']['flags'], 'the real 23.6 after 29.8 is still flagged'
+assert sorted(['300', 'end', 'base', '5', '0'], key=lambda k: scan.point_order(('x', k))) == ['base', '0', '5', '300', 'end']
+# a ticked question where one option also ticks a box further down (No pre-warming also ticks 'Not applicable')
+import locate
+# the real Randomisation row: options 1 and 2 on one line; option 3 ticks its own box AND 'Not applicable' lower down, which
+# is nearer the other two's centre, so nearest-by-distance is wrong: the box on the same row is right
+pick = locate.choose_glyphs({'1': [[215, 492, 246, 522]], '2': [[640, 492, 670, 522]], '3': [[1050, 492, 1080, 522], [601, 829, 631, 860]]})
+assert pick['3'] == [1050, 492, 1080, 522], pick
+# stacked options (one column): the candidate in the same column wins
+pick = locate.choose_glyphs({'a': [[100, 100, 130, 130]], 'b': [[100, 160, 130, 190]], 'c': [[100, 220, 130, 250], [700, 230, 730, 260]]})
+assert pick['c'] == [100, 220, 130, 250], pick
+# no other options to line up with: the top-most, left-most box
+assert locate.choose_glyphs({'x': [[500, 800, 530, 830], [100, 300, 130, 330]]})['x'] == [100, 300, 130, 330]
 print('unit: ok')
