@@ -12,6 +12,9 @@ nuh-roster:
 prewarm:
   - changed-files:
       - any-glob-to-any-file: 'prewarm/**'
+bis-dsa:
+  - changed-files:
+      - any-glob-to-any-file: 'bis-dsa/**'
 hand-babies:
   - changed-files:
       - any-glob-to-any-file: ['hand-babies/**', 'hand/**']
