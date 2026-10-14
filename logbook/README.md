@@ -85,10 +85,14 @@ One way only: Form → logbook, never back.
 2. When the resident next opens the logbook (after the first server copy of their cases), the app reads their
    entries, turns each into a case (`source: 'form'`, id from the response id, initials split off, labels to codes,
    NRIC/long numbers replaced by "[ID removed]", unrecognised tags noted in the details) and deletes the entries.
-3. An edited response replaces the case it made, unless the resident has changed that case in the app since
+3. Duplicates: a response already imported from the workbook (Admin portal) is skipped by the inbox, and a re-run
+   of the workbook import skips responses the inbox brought in (`sameResponse`: same day, same response second once
+   the sheet's time zone is taken off). A Form case the resident deleted (in the bin) doesn't come back. Each entry's
+   case and its delete go in one batch (`cloud.commitFormPickup`); at most 50 per pick-up, which runs again when the
+   app comes back to the front (every 10 minutes at most).
+4. An edited response replaces the case it made, unless the resident has changed that case in the app since
    (`importKey` `form:<responseId>@<ms written>`; a later `updatedAt` means theirs); what only the app adds (a linked
-   reflection, the star, personal tags) is kept. A Form case deleted in the app comes back only if that response is
-   edited later.
+   reflection, the star, personal tags) is kept.
 
 Tests: `test/form-inbox.test.mjs`, `test/form-script.test.mjs`, the rules suite (`tools/test-rules.sh`) and the emulator browser test
 (`tools/test-reads.sh`).

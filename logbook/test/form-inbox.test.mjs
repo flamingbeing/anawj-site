@@ -1,6 +1,6 @@
 // Run with: node logbook/test/form-inbox.test.mjs  (fake cases only)
 import assert from 'node:assert/strict';
-import { entryToCase, mergeFormEntries, formCaseId, maskIds, pickupMessage } from '../js/form-inbox.js';
+import { entryToCase, mergeFormEntries, formCaseId, maskIds, pickupMessage, sameResponse, withoutFormCases, PICKUP_MAX } from '../js/form-inbox.js';
 import { cleanCase } from '../js/clean.js';
 
 const NOW = 1_800_000_000_000;
@@ -79,6 +79,61 @@ const entry = (id, extra = {}) => ({ id, email: 'alice@example.com', date: '2026
   const r5 = mergeFormEntries([entry('m', { details: 'EF 70F S1234567D', labels: ['zz'] })], {}, NOW);
   assert.equal(pickupMessage(r5), '1 case from the Google Form added to your logbook; an ID number was removed from 1; 1 with a tag to check.');
   assert.equal(pickupMessage(mergeFormEntries([], {}, NOW)), '');
+}
+
+// the same response from the workbook import (its timestamp read as UTC: +8 h in Singapore) and from the inbox
+{
+  const t = Date.UTC(2026, 9, 14, 2, 30, 15);   // 10:30:15 in Singapore
+  assert.equal(sameResponse(t + 8 * 3600e3, t), true);
+  assert.equal(sameResponse(t + 8 * 3600e3 + 400, t), true);    // ms rounding
+  assert.equal(sameResponse(t, t), true);                        // a UTC sheet
+  assert.equal(sameResponse(t + 5.5 * 3600e3, t), true);         // any whole quarter-hour zone
+  assert.equal(sameResponse(t + 8 * 3600e3 + 5000, t), false);   // 5 s apart: another response
+  assert.equal(sameResponse(t + 20 * 3600e3, t), false);
+  assert.equal(sameResponse(undefined, t), false);
+  const imported = { id: 'imp_x', source: 'import', date: '2026-03-04', details: 'old copy', cats: ['16'], createdAt: t + 8 * 3600e3, updatedAt: 1 };
+  // backfill after an import: the inbox entry is dropped, not doubled
+  const r = mergeFormEntries([entry('d1', { submittedAt: t })], [imported].reduce((m, c) => m.set(c.id, c), new Map()), NOW);
+  assert.deepEqual(r.save, []);
+  assert.deepEqual(r.dupes, ['d1']);
+  assert.deepEqual(r.done, ['d1']);
+  assert.equal(pickupMessage(r), '');
+  // ... but a different day, or another second, is a different response
+  assert.equal(mergeFormEntries([entry('d2', { submittedAt: t, date: '2026-03-05' })], { imp_x: imported }, NOW).save.length, 1);
+  assert.equal(mergeFormEntries([entry('d3', { submittedAt: t + 7000 })], { imp_x: imported }, NOW).save.length, 1);
+  // re-running the workbook import after the inbox: rows the inbox brought in are left out
+  const formCase = { id: formCaseId('d4'), source: 'form', date: '2026-03-04', createdAt: t };
+  const rows = [{ date: '2026-03-04', createdAt: t + 8 * 3600e3 }, { date: '2026-03-04', createdAt: t + 8 * 3600e3 + 60000 }];
+  const w = withoutFormCases(rows, [formCase, imported]);
+  assert.equal(w.dropped, 1);
+  assert.deepEqual(w.rows, [rows[1]]);
+  assert.deepEqual(withoutFormCases(rows, [imported]), { rows, dropped: 0 });
+}
+
+// a Form case the resident deleted (in the recycle bin) doesn't come back; the entry leaves the inbox
+{
+  const r = mergeFormEntries([entry('b1')], {}, NOW, { binned: [formCaseId('b1')] });
+  assert.deepEqual(r.save, []);
+  assert.deepEqual(r.gone, ['b1']);
+  assert.deepEqual(r.done, ['b1']);
+}
+
+// the same response sent again unchanged (a backfill re-run): nothing to write
+{
+  const had = cleanCase(entryToCase(entry('u1'), NOW).case, NOW + 3);
+  const r = mergeFormEntries([entry('u1')], { [had.id]: had }, NOW + 864e5);
+  assert.deepEqual(r.save, []);
+  assert.deepEqual(r.done, ['u1']);
+}
+
+// at most PICKUP_MAX per pick-up; the rest stay for next time
+{
+  const many = Array.from({ length: PICKUP_MAX + 7 }, (_, i) => entry('m' + i));
+  const r = mergeFormEntries(many, {}, NOW);
+  assert.equal(r.save.length, PICKUP_MAX);
+  assert.equal(r.done.length, PICKUP_MAX);
+  assert.equal(r.left, 7);
+  assert.match(pickupMessage(r), /7 more next time/);
 }
 
 console.log('form-inbox tests passed');

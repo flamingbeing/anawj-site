@@ -25,7 +25,8 @@ protect or move. (Prewarm already holds real study data, so its items come first
 4. **App Check (owner, then a session).** Free. Stops scripts using the public Firebase config to burn quota or fill
    storage (the rules already stop them reading data). Owner: Firebase console → App Check → register each web app
    with reCAPTCHA Enterprise and add the subdomains. A session then adds the App Check call to each app and, once it
-   reports clean traffic, the owner switches on enforcement.
+   reports clean traffic, the owner switches on enforcement. Before enforcing Firestore in `apmes-logbook`: the
+   Google Form inbox script (`logbook/form-script/`) has no App Check token and would stop; give it a debug token first.
 5. **Rules changes need the owner's approval.** A merged change to any `firestore.rules` deploys live at once. Every
    session asks the owner before merging one (rule in `AGENTS.md`).
 6. **Subdomain moves** (`SUBDOMAINS.md`): finish before residents arrive, so nobody has to sign in again or reinstall.

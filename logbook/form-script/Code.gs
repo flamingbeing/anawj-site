@@ -16,6 +16,11 @@ var LOGBOOK_PROJECT_ID = 'apmes-logbook';
 var LOGBOOK_API_KEY = 'AIzaSyDRC7COpi86H0K6oe98XZ8m1sQWJUkP63E';   // the logbook's public web key (logbook/js/firebase-config.js)
 var LOGBOOK_SITE = 'https://apmes.anawj.com/';                      // sent as Referer, in case the key is limited to the site
 var LOGBOOK_CODE_RE = /^\d{2}[ivx]*\)/i;
+// an NRIC/FIN or a long number (hospital, phone): never sent (the same pattern as logbook/js/engine.js ID_RE)
+var LOGBOOK_ID_RE = /\b[STFGM]\d{7}[A-Z]\b|\b\d{7,}\b/gi;
+// a choice question about categories: its answers that aren't a code are sent too, so the logbook notes them
+var LOGBOOK_CATEGORY_TITLE_RE = /categor|procedure|surgery|block/i;
+var LOGBOOK_CHOICE_TYPES = ['CHECKBOX', 'LIST', 'MULTIPLE_CHOICE'];
 
 // ---------- turning one response into an inbox entry (pure: tested in Node, test/form-script.test.mjs) ----------
 
@@ -29,13 +34,18 @@ function logbookInboxEntry_(id, email, submittedAt, answers) {
   for (var i = 0; i < answers.length; i++) {
     var a = answers[i], vals = Array.isArray(a.value) ? a.value : [a.value];
     var title = String(a.title || '').toLowerCase();
-    for (var j = 0; j < vals.length; j++) {
-      var v = String(vals[j] == null ? '' : vals[j]).trim();
-      if (v && LOGBOOK_CODE_RE.test(v) && labels.indexOf(v) < 0 && labels.length < 40) labels.push(v.slice(0, 300));
+    // labels come only from choice questions (a typed answer that starts with "16)" isn't a category)
+    if (LOGBOOK_CHOICE_TYPES.indexOf(a.type) >= 0) {
+      var categoryQ = LOGBOOK_CATEGORY_TITLE_RE.test(title);
+      for (var j = 0; j < vals.length; j++) {
+        var v = String(vals[j] == null ? '' : vals[j]).trim();
+        if (v && (LOGBOOK_CODE_RE.test(v) || categoryQ) && labels.indexOf(v) < 0 && labels.length < 40) labels.push(v.slice(0, 300));
+      }
     }
-    if (a.type === 'DATE' && date === null && dateText === '') {
+    // the date question ("include time" makes it a DATETIME: "YYYY-MM-DD HH:MM")
+    if ((a.type === 'DATE' || a.type === 'DATETIME') && date === null && dateText === '') {
       var d = String(a.value || '').trim();
-      if (/^\d{4}-\d{2}-\d{2}$/.test(d)) date = d; else dateText = d.slice(0, 200);
+      if (/^\d{4}-\d{2}-\d{2}/.test(d)) date = d.slice(0, 10); else dateText = d.slice(0, 200);
     }
     if (a.type === 'TEXT' || a.type === 'PARAGRAPH_TEXT') {
       var t = String(a.value || '');
@@ -43,7 +53,8 @@ function logbookInboxEntry_(id, email, submittedAt, answers) {
       if (details === null && /initial|detail/.test(title)) details = t;
     }
   }
-  var entry = { id: String(id), email: email, date: date, details: String(details !== null ? details : (firstText || '')).slice(0, 2000),
+  var text = String(details !== null ? details : (firstText || '')).replace(LOGBOOK_ID_RE, '[ID removed]');
+  var entry = { id: String(id), email: email, date: date, details: text.slice(0, 2000),
     labels: labels, submittedAt: Number(submittedAt) || 0 };
   if (dateText) entry.dateText = dateText;
   return entry;
@@ -75,7 +86,18 @@ function logbookInboxEntryOf_(response) {
   return logbookInboxEntry_(response.getId(), response.getRespondentEmail(), response.getTimestamp().getTime(), logbookInboxAnswers_(response));
 }
 
-function logbookInboxToken_() {
+// Only a Google-verified respondent email may address the inbox: with typed-in emails anyone could fill someone
+// else's logbook. Settings → Responses → Collect email addresses must be "Verified".
+function logbookInboxVerified_() {
+  var f = FormApp.getActiveForm();
+  if (typeof f.getEmailCollectionType === 'function') return String(f.getEmailCollectionType()) === 'VERIFIED';
+  return f.collectsEmail();
+}
+
+// the bot's sign-in, kept for 50 minutes (a sign-in lasts an hour), so a burst of submissions signs in once
+function logbookInboxToken_(fresh) {
+  var cache = CacheService.getScriptCache();
+  if (!fresh) { var hit = cache.get('logbookInboxToken'); if (hit) return hit; }
   var p = PropertiesService.getScriptProperties();
   var email = p.getProperty('BOT_EMAIL'), password = p.getProperty('BOT_PASSWORD');
   if (!email || !password) throw new Error('Set BOT_EMAIL and BOT_PASSWORD in Project settings → Script properties.');
@@ -84,43 +106,57 @@ function logbookInboxToken_() {
     payload: JSON.stringify({ email: email, password: password, returnSecureToken: true }),
   });
   if (res.getResponseCode() !== 200) throw new Error('Bot sign-in failed: ' + res.getResponseCode() + ' ' + res.getContentText().slice(0, 300));
-  return JSON.parse(res.getContentText()).idToken;
+  var token = JSON.parse(res.getContentText()).idToken;
+  cache.put('logbookInboxToken', token, 3000);
+  return token;
 }
 
 function logbookInboxSend_(entry, token) {
+  var res = logbookInboxPatch_(entry, token || logbookInboxToken_());
+  // a kept sign-in that no longer works (password changed, expired): sign in again once
+  if (res.getResponseCode() === 401 || res.getResponseCode() === 403) res = logbookInboxPatch_(entry, logbookInboxToken_(true));
+  if (res.getResponseCode() !== 200) throw new Error('Inbox write failed for ' + entry.id + ': ' + res.getResponseCode() + ' ' + res.getContentText().slice(0, 300));
+}
+function logbookInboxPatch_(entry, token) {
   var url = 'https://firestore.googleapis.com/v1/projects/' + LOGBOOK_PROJECT_ID + '/databases/(default)/documents/formInbox/' + encodeURIComponent(entry.id);
   var res = UrlFetchApp.fetch(url, {
     method: 'patch', contentType: 'application/json', headers: { Authorization: 'Bearer ' + token, Referer: LOGBOOK_SITE }, muteHttpExceptions: true,
     payload: JSON.stringify({ fields: logbookInboxFields_(entry) }),
   });
-  if (res.getResponseCode() !== 200) throw new Error('Inbox write failed for ' + entry.id + ': ' + res.getResponseCode() + ' ' + res.getContentText().slice(0, 300));
+  return res;
 }
 
 // The trigger (Triggers → Add trigger → logbookInboxSubmit, From form, On form submit). Edited responses fire it too.
+// A skip throws, so it shows in Executions and Google's failure email; it never touches the sheet or its script.
 function logbookInboxSubmit(e) {
+  if (!logbookInboxVerified_()) throw new Error('Not sent: set Settings → Responses → Collect email addresses to "Verified".');
   var entry = logbookInboxEntryOf_(e.response);
-  if (entry.skip) { console.warn('Skipped a response: ' + entry.skip); return; }
-  logbookInboxSend_(entry, logbookInboxToken_());
+  if (entry.skip) throw new Error('Not sent: ' + entry.skip);
+  logbookInboxSend_(entry);
 }
 
 // Run by hand once, to check the mapping on the latest response: logs what would be sent (only you see the log).
 function logbookInboxDryRun() {
   var rs = FormApp.getActiveForm().getResponses();
+  if (!logbookInboxVerified_()) console.warn('Email collection is not "Verified": the trigger would refuse to send.');
   if (!rs.length) { console.log('No responses yet.'); return; }
   console.log(JSON.stringify(logbookInboxEntryOf_(rs[rs.length - 1]), null, 2));
 }
 
-// Optional, run by hand once: sends responses from a date onwards (the logbook skips any it already has).
+// Optional, run by hand once: sends responses from a date onwards. The logbook leaves out ones it already has (from
+// the inbox or the workbook import) and ones the resident deleted. Safe to run again.
 // Edit SINCE first. Older responses are better brought in with the Admin portal's workbook import.
 function logbookInboxBackfill() {
   var SINCE = new Date('2026-10-01T00:00:00+08:00');
-  var rs = FormApp.getActiveForm().getResponses(SINCE), token = logbookInboxToken_(), sent = 0, skipped = 0;
+  if (!logbookInboxVerified_()) throw new Error('Set Settings → Responses → Collect email addresses to "Verified" first.');
+  var rs = FormApp.getActiveForm().getResponses(SINCE), sent = 0, skipped = 0, failed = 0;
   for (var i = 0; i < rs.length; i++) {
     var entry = logbookInboxEntryOf_(rs[i]);
-    if (entry.skip) { skipped++; continue; }
-    logbookInboxSend_(entry, token); sent++;
+    if (entry.skip) { skipped++; continue; }   // e.g. responses from before emails were collected
+    try { logbookInboxSend_(entry); sent++; } catch (err) { failed++; console.warn(err.message); }
+    if ((i + 1) % 50 === 0) console.log((i + 1) + ' of ' + rs.length + ' done');
   }
-  console.log('Sent ' + sent + ', skipped ' + skipped + '.');
+  console.log('Sent ' + sent + ', skipped ' + skipped + ' (no email), failed ' + failed + ', of ' + rs.length + '.');
 }
 
 if (typeof module !== 'undefined') module.exports = { entryFrom: logbookInboxEntry_, firestoreFields: logbookInboxFields_ };

@@ -49,10 +49,24 @@ even in the same project as another script it would replace nothing.
 
 ## Good to know
 
+- **Use the same Google account** for the Form and the logbook app. Entries go to the logbook of the account that
+  submitted; one sent from another account (a hospital PC signed in as someone else, a second Google account) waits
+  unseen. Say so in the Form's description.
+- **Mistakes:** a wrong Form entry is deleted in the app (it won't come back). Voiding a row in the sheet ("WRONG
+  ENTRY") doesn't reach the logbook.
+- **Edited responses** (if response editing is on) update the logbook case, unless the resident changed it in the app.
+- **The workbook import** (Admin portal) skips responses the inbox already brought in, and the inbox skips ones the
+  import brought in (matched by day and response time), so neither counts a case twice.
+- **Off switch:** delete the `formBots/{uid}` document; the bot can't write from that moment. Change the bot's
+  password (Authentication → Users → ⋮ → Reset password, then the `BOT_PASSWORD` property) when a Form editor leaves.
+- **App Check:** if App Check enforcement is ever switched on for Firestore, this script stops (it has no App Check
+  token): leave Firestore unenforced, or give the script a debug token first.
 - The trigger runs as the person who created it. If that person loses edit access to the Form, it stops: recreate
   it from another editor's account (ideally the Form's owner).
-- Failures show in Apps Script → Executions (and Google emails the trigger's owner a daily summary). A response that
-  failed can be sent again by editing it, or with `backfill`.
-- The web key in the script is the logbook's public key (`../js/firebase-config.js`); the script sends the site as
-  Referer in case the key is limited to the site.
+- Failures (including skipped responses and a Form not set to Verified) show in Apps Script → Executions, and Google
+  emails the trigger's owner a daily summary. A response that failed can be sent again by editing it, or with
+  `logbookInboxBackfill` (safe to run again).
+- This script never touches the response sheet or its script; each runs separately on every submission.
+- The web key in the script is the logbook's public key (`../js/firebase-config.js`; no referrer limits on it, so the
+  Referer header is only a courtesy).
 - Tests: `node logbook/test/form-script.test.mjs` (the mapping, against what `form-inbox.js` and the rules expect).
