@@ -7,6 +7,7 @@ Lasting decisions for `bis-dsa/`. Status and next steps: `STATUS.md`.
 - Anaesthesia residents learning processed EEG: how the frontal EEG becomes the BIS number and the density spectral
   array (DSA), and how to read the DSA for propofol, sevoflurane, ketamine and dexmedetomidine (owner, 14 Oct 2026).
 - One static page, no data, no sign-in, no storage. Synthetic EEG only.
+- Always dark, like an anaesthetic monitor (owner, 14 Oct 2026); BIS big on the left, SR/SEF95/EMG stacked on the right.
 
 ## Address
 
@@ -30,6 +31,12 @@ Lasting decisions for `bis-dsa/`. Status and next steps: `STATUS.md`.
   land in published ranges: awake ~90, propofol GA ~45, deep ~32, burst suppression under 30, ketamine ~75–80,
   dexmedetomidine ~45–60, EMG raises GA to ~70. Retune with a quick Node run if states change.
 - The footer says it is a teaching approximation; keep that.
+
+## Lessons
+
+- `fit()` reads each canvas's logical height once (`c._lh`): setting `canvas.height` rewrites the `height` attribute,
+  so reading it every frame made the graphs grow until blank on high-density phones (14 Oct 2026). The test runs the
+  phone at 3x density for that reason.
 
 ## Content
 
