@@ -590,7 +590,7 @@ portfolio content.
   residents also go to `sheetOutbox/{caseId}` (`js/sheet-outbox.js`, switched by `SHEET_OUTBOX_ON`); a script on the
   sheet turns each into a Case-tab row with `app:<caseId>` in column J and deletes the entry. New cases only (edits
   and deletions don't reach the sheet; a case deleted before pick-up is taken out of the outbox). The Admin
-  workbook import skips rows with `app:` in column J. The sheet side is `form-script/Outbox.gs` (setup: `form-script/OUTBOX-README.md`). Tests: `test/sheet-outbox.test.mjs`, the sheetOutbox rules in
+  workbook import skips rows with `app:` in column J. The sheet side is `form-script/Outbox.gs` (setup: `form-script/OUTBOX-README.md`). Lessons (14 Oct): the sheet's own script rebuilds a resident's report and the AY totals in 10–40 s under the document lock while its `onFormSubmit` waits only 10 s (now 60 s), so Outbox.gs holds the lock in small pieces and keeps owed rebuilds in a Script property; a copy of the sheet keeps the REAL residents' report spreadsheet ids (Residents column G), so any test on a copy must repoint them first (`logbookOutboxTryOne` refuses otherwise); Apps Script loads files in list order (keep the original order, put new files last); a script that adds rows doesn't fire `onFormSubmit`, so it runs the same chain itself. Tests: `test/sheet-outbox.test.mjs`, the sheetOutbox rules in
   `test/rules.emulator.mjs`, and `TEST=conflicts` (scenario `sheetOutbox`).
 - **Privacy policy:** `privacy/index.html` (anawj.com/privacy/) shows who sees what. Keep it in step when roles change.
 - **Private feedback (14 Oct 2026):** More → Send feedback (`ui-feedback.js`, pure parts in `feedback.js`) saves
