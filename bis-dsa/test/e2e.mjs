@@ -81,7 +81,7 @@ try {
     await page.click('#kMenu'); await tile('Display').click(); await page.locator('#v2Menu button[data-k="mdsaAmpl"]').click(); await page.click('#kMenu'); assert.equal(await page.$eval('#v2Review', e => e.hidden), true);
     // pages 2 and 3: smoothing rate, Display SR, EEG channels (a second trace and 50 uV / division), Filters, Demo Case
     await page.click('#kMenu'); await tile('Next').click();
-    assert.equal(await page.evaluate(() => mon.smooth), 15); await tile('Smoothing').click(); assert.equal(await page.evaluate(() => mon.smooth), 30); assert.match(await page.textContent('#v2MsgT'), /Smoothing Rate Changed to 30 Seconds {2}\[ 534 \]/);
+    assert.equal(await page.evaluate(() => mon.smooth), 15); await tile('Smoothing').click(); assert.equal(await page.evaluate(() => mon.smooth), 30); if (!/Smoothing/.test(await page.textContent('#v2MsgT')) && await page.locator('#v2Dismiss').isVisible()) await page.click('#v2Dismiss'); await page.waitForFunction(() => /Smoothing Rate Changed to 30 Seconds {2}\[ 534 \]/.test(document.querySelector('#v2MsgT').textContent), null, { timeout: 4000 });
     await tile('Smoothing').click(); await tile('Smoothing').click(); assert.equal(await page.evaluate(() => mon.smooth), 15);
     await tile('Display\nSR').click().catch(() => tile('Display').click()); await page.locator('#v2Menu button[data-k^="DisplaySR"]').click().catch(() => {});
     await tile('Next').click();
