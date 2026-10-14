@@ -15,6 +15,8 @@ export const SITES = {
   // /apmes/guidebook/ is the programme guidebook text the evals app reads (just that folder of apmes/).
   // /__/auth/ and /__/firebase/ are Firebase's sign-in helper pages (the auth domain of logbook and evals). The helper
   // scripts are the same files anawj.com serves; init.json is this host's own copy (authDomain apmes.anawj.com).
+  // Ask Claude, the owner's page (behind Cloudflare Access; its API is worker/ask.js)
+  'ask.anawj.com': { root: 'ask/' },
   'apmes.anawj.com': { prefixes: { '/logbook/': 'logbook/', '/evals/': 'evals/', '/people/': 'people/', '/apmes/guidebook/': 'apmes/guidebook/', '/__/auth/': '__/auth/', '/__/firebase/': 'apmes-auth/firebase/' } },
 };
 

@@ -37,6 +37,19 @@ try {
   await frame.locator('p').first().click();
   await page.click('#aComment');
   assert.ok(await page.isVisible('#optOptions') && await page.isVisible('#optEverywhere'), 'comment options shown');
+  // the owner's shortcut sends the comment straight to Ask Claude, prefilled, without keeping it in the list
+  await page.fill('#noteText', 'Make this shorter');
+  await page.evaluate(() => { window.__opened = []; window.open = u => { window.__opened.push(u); return null; }; });
+  await page.click('#askNow');
+  const askUrl = new URL((await page.evaluate(() => window.__opened))[0]);
+  assert.equal(askUrl.origin + askUrl.pathname, 'https://ask.anawj.com/');
+  assert.equal(askUrl.searchParams.get('page'), 'https://anawj.com/privacy/');
+  assert.equal(askUrl.searchParams.get('text'), 'Make this shorter');
+  assert.ok(askUrl.searchParams.get('kind'), 'the kind of element goes along');
+  assert.ok(askUrl.searchParams.get('locator'));
+  assert.equal(await page.textContent('#count'), '0', 'not kept in the list');
+  await frame.locator('p').first().click();
+  await page.click('#aComment');
   await page.fill('#noteText', 'Patient Tan said S1234567A was wrong');
   await page.check('#optOptions');
   await page.click('#noteDlg button[value=ok]');

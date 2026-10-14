@@ -77,6 +77,21 @@ try {
   assert.equal(await page.evaluate(() => window.__clicks), 0, 'the page never saw the tap');
   const on = await fb(page).locator('#onText').textContent();
   assert.match(on, /^On: paragraph “.+”/);
+  // the owner's shortcut: straight to Ask Claude, prefilled
+  await page.evaluate(() => { window.__opened = []; window.open = u => { window.__opened.push(u); return null; }; });
+  await fb(page).locator('#noteText').fill('Bigger, please');
+  await fb(page).locator('#askNow').click();
+  const ask = new URL((await page.evaluate(() => window.__opened))[0]);
+  assert.equal(ask.origin, 'https://ask.anawj.com');
+  assert.equal(ask.searchParams.get('page'), PREVIEW + '/hand-babies/');
+  assert.equal(ask.searchParams.get('kind'), 'paragraph');
+  assert.match(ask.searchParams.get('on'), /^Tap the one/);
+  assert.equal(await page.locator('[data-anawj-fb]').count(), 0, 'highlight removed');
+  await page.evaluate(() => { window.__clicks = 0; });
+  await fb(page).locator('#fab').click();
+  await fb(page).locator('#mPick').click();
+  await page.evaluate(() => { window.__clicks = 0; });
+  await page.locator('p').first().click();
   await fb(page).locator('#noteText').fill('Make this one line shorter');
   await fb(page).locator('#optEverywhere').check();
   if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'feedback-comment.png') });

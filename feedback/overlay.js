@@ -119,6 +119,7 @@
     <label class="check"><input type="checkbox" id="optOptions"> <span>Show me 2–3 versions to choose from</span></label>
     <label class="check"><input type="checkbox" id="optEverywhere"> <span>Change this everywhere it appears</span></label>
     <div class="row"><button id="noteCancel">Cancel</button><button class="primary" id="noteSave">Save</button></div>
+    <div class="row"><button id="askNow">Ask Claude now (owner only)</button></div>
   </div>
   <div class="sheet" id="share" hidden role="dialog" aria-label="Share this page">
     <h2>Share this page</h2>
@@ -278,6 +279,18 @@
     target = null; pending = null; show(null);
   }
   $('noteCancel').onclick = closeNote;
+  // the owner's shortcut: this comment straight to Ask Claude (ask.anawj.com, behind his sign-in), not the list
+  $('askNow').onclick = () => {
+    const v = $('noteText').value.trim();
+    if (!v) { $('noteText').focus(); return; }
+    const h = here(), p = pending || {};
+    const q = new URLSearchParams({ page: h.url + (h.view || ''), text: v, kind: p.kind || '', on: p.before || '', locator: p.locator || '' });
+    if (p.marks) q.set('on', p.marks.map(m => (m.kind === 'circled' ? 'circled ' : 'arrow ') + m.what).join('; '));
+    if ($('optOptions').checked) q.set('options', '1');
+    if ($('optEverywhere').checked) q.set('everywhere', '1');
+    window.open('https://ask.anawj.com/?' + q, '_blank', 'noopener');
+    closeNote();
+  };
   $('noteSave').onclick = () => {
     const v = $('noteText').value.trim();
     if (!v) { $('noteText').focus(); return; }
