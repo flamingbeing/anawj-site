@@ -60,6 +60,12 @@ try {
     await page.click('#speedSeg [data-speed="10"]');
     await page.check('#mEmg');
     await page.waitForFunction(e0 => +document.querySelector('#vEmg').textContent >= e0 + 6, emg0, { timeout: 20000 });
+    // a muscle relaxant takes the EMG away again
+    const emgHi = await page.$eval('#vEmg', e => +e.textContent);
+    await page.check('#mNmb');
+    await page.waitForFunction(e1 => +document.querySelector('#vEmg').textContent <= e1 - 6, emgHi, { timeout: 20000 });
+    assert.match(await page.textContent('#rText'), /Muscle relaxant/);
+    await page.uncheck('#mNmb');
     await page.uncheck('#mEmg');
     // SQI: high on a clean signal; diathermy drops it and the BIS number shows hollow or blank, like the monitor
     assert.ok(await page.$eval('#vSqi', e => +e.textContent) >= 90, 'clean SQI');

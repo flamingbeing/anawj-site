@@ -55,8 +55,10 @@ function mixTarget(m){
 function target(drug,d,mods){
  const p=drug==='mix'?mixTarget(Object.assign({},MIX0,d)):baseTarget(drug,d);
  if(mods&&mods.elderly){p.alpha*=0.2;p.spindle*=0.4;p.slow*=0.45;p.delta*=0.5;p.theta*=0.5;p.bg*=0.6;p.beta*=0.6;}
+ // muscle relaxant: no facial EMG, and the muscle share of the awake fast activity goes too
+ if(mods&&mods.nmb){p.emg=0;p.gamma*=0.05;p.beta*=0.35;}
  // facial EMG; an opioid blunts the response to surgery, so less of it
- if(mods&&mods.emg){p.emg=Math.max(p.emg,6*(drug==='mix'?Math.max(0.25,1-(d.remi||0)/6):1));}
+ else if(mods&&mods.emg){p.emg=Math.max(p.emg,6*(drug==='mix'?Math.max(0.25,1-(d.remi||0)/6):1));}
  return p;
 }
 function profile(p,f,spEnv){
@@ -147,7 +149,7 @@ const eng=new Engine();
 const SIG=[]; const SIGMAX=8*FS;
 const COLS=[]; const COLMAX=300; // one column per second, 5 min
 const sup=[]; let bisS=null, lastSef=null, produced=0, simT=0, speed=1, paused=false;
-let drug='propofol', depth=0; const mods={elderly:false,emg:false,diathermy:false};
+let drug='propofol', depth=0; const mods={elderly:false,emg:false,diathermy:false,nmb:false};
 const artH=[],bcH=[];let prevSup=false;
 function applyTarget(){eng.setTarget(drug,depth,mods);describe();}
 
@@ -252,7 +254,8 @@ function describe(){const d=depth;let n,t;
  }
  if(mods.elderly&&drug!=='ketamine')t+=' Older patient: alpha and overall power are much lower, so the DSA is dimmer and BIS reads higher for the same dose.';
  if(mods.diathermy)t+=' Diathermy: bursts of electrical interference swamp the EEG. SQI drops, those seconds are left out of BIS (the number holds, shows hollow under SQI 50 and disappears under 15), and the DSA shows bright full-height stripes.';
- if(mods.emg)t+=' Muscle activity: broad high-frequency power raises the EMG bar and pushes BIS up. It is artefact, not lighter anaesthesia.';
+ if(mods.nmb)t+=' Muscle relaxant: no facial EMG, so any BIS rise from muscle goes. Paralysis also takes away the muscle share of the awake fast activity, so BIS can fall in a patient who is paralysed but awake (in volunteer studies, sometimes into the 40s–60s). A low BIS does not prove unconsciousness in a paralysed patient.';
+ else if(mods.emg)t+=' Muscle activity: broad high-frequency power raises the EMG bar and pushes BIS up. It is artefact, not lighter anaesthesia.';
  $('rName').textContent=n;$('rText').textContent=t;}
 
 function describeMix(m){const hyp=0.155*m.propofol+0.55*m.sevo,parts=[];let n;
@@ -289,6 +292,7 @@ document.querySelectorAll('#drugSeg button').forEach(b=>b.onclick=()=>{stopStory
 $('depth').oninput=e=>{stopStory();depth=e.target.value/100;applyTarget();};
 $('mElder').onchange=e=>{mods.elderly=e.target.checked;applyTarget();};
 $('mEmg').onchange=e=>{mods.emg=e.target.checked;applyTarget();};
+$('mNmb').onchange=e=>{mods.nmb=e.target.checked;applyTarget();};
 $('mDia').onchange=e=>{mods.diathermy=e.target.checked;applyTarget();};
 function setSpeed(s){speed=s;document.querySelectorAll('#speedSeg button[data-speed]').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.speed===s));}
 document.querySelectorAll('#speedSeg button[data-speed]').forEach(b=>b.onclick=()=>setSpeed(+b.dataset.speed));
@@ -304,18 +308,18 @@ const STORY=[
  {at:130,d:0.9,cap:'Infusion left high and the blood pressure falls. Alpha fades, slow waves dominate, then dark vertical stripes appear: burst suppression. SR climbs and BIS falls below 30.'},
  {at:220,d:0.57,cap:'Infusion reduced. The alpha band comes back within a minute or two. Notice the DSA recovers before the smoothed BIS number does.'},
  {at:280,d:0.5,mods:{emg:true},cap:'Relaxant wears off with surgery still going. Facial EMG adds broad high-frequency power and BIS jumps, though the brain state (the alpha band) is unchanged.'},
- {at:330,d:0.5,mods:{},cap:'Relaxant given. EMG gone, BIS back in range. More hypnotic was not needed.'},
- {at:370,d:0.12,cap:'Infusion stopped at the end. Alpha dims, slow waves fade, beta returns and BIS rises towards 80–90 as the patient wakes.'},
+ {at:330,d:0.5,mods:{nmb:true},cap:'Relaxant given. EMG gone, BIS back in range. More hypnotic was not needed.'},
+ {at:370,d:0.12,mods:{},cap:'Relaxant reversed and infusion stopped at the end. Alpha dims, slow waves fade, beta returns and BIS rises towards 80–90 as the patient wakes.'},
  {at:440,end:true,cap:'End of case. Scroll the DSA back in your head: two bands for propofol GA, stripes for too deep, high fast power for EMG.'}];
 let story=null;
 function stopStory(){if(!story)return;story=null;$('storyBtn').textContent='Play a case: induction to emergence';}
 $('storyBtn').onclick=()=>{if(story){stopStory();$('storyCap').textContent='';return;}
- story={t0:simT,i:-1};mods.elderly=false;mods.emg=false;mods.diathermy=false;$('mElder').checked=false;$('mEmg').checked=false;$('mDia').checked=false;setSpeed(10);
+ story={t0:simT,i:-1};mods.elderly=false;mods.emg=false;mods.diathermy=false;mods.nmb=false;$('mElder').checked=false;$('mEmg').checked=false;$('mDia').checked=false;$('mNmb').checked=false;setSpeed(10);
  if(paused)$('pause').click();$('storyBtn').textContent='Stop the case';};
 function runStory(){if(!story)return;const t=simT-story.t0;
  while(story.i+1<STORY.length&&t>=STORY[story.i+1].at){story.i++;const s=STORY[story.i];
   if(s.drug)setDrug(s.drug);if(s.d!=null){depth=s.d;$('depth').value=Math.round(s.d*100);}
-  if(s.mods){mods.emg=!!s.mods.emg;$('mEmg').checked=mods.emg;}
+  if(s.mods){mods.emg=!!s.mods.emg;mods.nmb=!!s.mods.nmb;$('mEmg').checked=mods.emg;$('mNmb').checked=mods.nmb;}
   applyTarget();$('storyCap').textContent=`${story.i+1}/${STORY.length} · ${s.cap}`;
   if(s.end){story=null;$('storyBtn').textContent='Play the case again';setSpeed(1);return;}}}
 

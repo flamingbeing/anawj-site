@@ -52,6 +52,13 @@ Lasting decisions for `bis-dsa/`. Status and next steps: `STATUS.md`.
   signatures. Teaching approximation, tuned so: propofol 3 + remi 4 ≈ propofol 3.5 alone (~47); propofol 3.5 +
   ketamine 40% ~62; sevo 0.8 + N₂O 60% a few points above sevo alone; propofol 2.5 + dex 50% ~49.
 
+## Muscle relaxant (owner, 14 Oct 2026)
+
+- "Muscle relaxant (paralysed)" removes the EMG term and most of the awake fast activity (gamma ×0.05, beta ×0.35),
+  overriding "Facial muscle activity". Propofol GA + facial EMG ~68 → with relaxant ~40; awake ~90 → ~80; sedation
+  ~76 → ~67. Teaching point: BIS can fall in a paralysed awake patient (volunteer studies report falls into the
+  40s–60s; our model is milder). The case story gives the relaxant at 330 s and reverses it at emergence.
+
 ## Lessons
 
 - `fit()` reads each canvas's logical height once (`c._lh`): setting `canvas.height` rewrites the `height` attribute,
