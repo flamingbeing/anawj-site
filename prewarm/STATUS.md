@@ -2,7 +2,7 @@
 
 Short and current. Lasting rules go in `NOTES.md`. Update with `/save-state`.
 
-Last updated: 2026-10-13 (late night) by Claude Code, Prewarming Webapp.
+Last updated: 2026-10-14 by Claude Code, Prewarming Webapp.
 
 ## Now
 
@@ -19,16 +19,20 @@ edit the same lines. Read them all before starting; edit only yours.
 - MOVE MERGED (#364, #382, 13 Oct night) and CHECKED on the owner's phones (old nurse link, admin password sign-in, team phone moving and rejoining, synced reading). Homepage session told. Nothing open.
 - PACU link (13 Oct): the old link's saves were refused ("Not allowed"); cause unknown (live rules = repo rules; record deleted). The NEW link works (owner tested). Practice: fresh link per patient, test once on a phone that isn't on the team. Revisit only if it recurs.
 - Firefox phone stuck on an old version: open `anawj.com/prewarm-update/` once and tap Get the latest version.
-- Say if the export should show "NA" in the later pre-warming cells (past 10 / 30 min) and the two empty Downloaded columns.
+- Check on a phone (14 Oct builds): the red sync chip, pad moving to the next box, POD due lines, Ready for a case? in Settings, the repeating alerts. Then tap Update available between patients.
+- Open decisions for the owner: carried-over temperatures (see `IMPROVEMENT-PLAN.md`, questions); the rest of the plan's list.
 - Open the app once as admin with signal (resends every patient so older records get the `locked` flag) and take
   "Update available" on both phones.
 
 ## Next
 
-1. Polish from the first day of real use (13 Oct 2026).
-2. Export across hospitals for admins; a members' view of who entered what.
+1. `IMPROVEMENT-PLAN.md` (14 Oct review): what is built is listed at its top. Next from it: undo toasts instead of confirm() (11), late-reading time on the pad (10), Today / Earlier list (15), export pre-check (19), install-to-home-screen card and forgiving join (20), admin team activity and last-seen (21), PACU "Check link" button (3, rest), JSON backup (23), vendored Carlito font (24), code split (25).
+2. Rules changes (join-code strength, PACU link expiry, member heartbeat) need the owner's approval first.
+3. Export across hospitals for admins; a members' view of who entered what.
 
 ## Recently done
+
+- #512, #513, #514, #515, #517, #518, #520 and the off-protocol note PR (14 Oct): red sync chip and error words by place; PACU `updateDoc`; restore works every time; repeating alerts; export NA past the warming, local-date file name, all-or-nothing install; done shortcuts show a tick; pad moves to the next box; POD1/POD2 due on the list and in Still to fill; patient search; Ready for a case? card; `RUNBOOK.md`; `io_dev` note field.
 
 - #382, #381, #364: move to prewarmstudy.anawj.com (old address moves a phone only when nothing is waiting; join code and initials carried; `update.html`); admins can pick their hospital; update.html on nuhsdesign.
 - #339: list tools: Form view icon per line (admin), Select to export, Select none apart from Lock; Downloaded dropped; "Study IDs only" line removed.
@@ -52,6 +56,8 @@ edit the same lines. Read them all before starting; edit only yours.
 - #285: unsaved readings come back after the phone closes the app; toasts no longer block taps.
 
 ## Decisions
+
+- 14 Oct 2026: export pre-warming readings past the warming as NA (Downloaded columns stay empty); keep records indefinitely and phones need not wipe their copy; build the rest of the review list as recommended, small PRs, no rules changes without approval (owner).
 
 - 13 Oct 2026: prewarm is served at prewarmstudy.anawj.com; moves happen between cases only and only for a phone with nothing waiting (owner); the PACU nurse link is tested once per patient by a non-team phone.
 - 13 Oct 2026: no Log shortcut: the bar's top-right is a sync status chip; key times are set from their pads (owner).
