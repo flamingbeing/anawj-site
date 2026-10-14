@@ -12,7 +12,14 @@ were each tested alone (the 13 Oct sync engine's bin feed, the 11–12 Oct delet
 in demo mode, which skips the server-side checks, so they never saw it. Lesson: **test data paths against the real
 rules in the emulator, across devices**, not only in demo mode.
 
-## What to test (emulator: `tools/test-reads.sh` harness, real rules, fake accounts; N browser contexts = N devices)
+## What to test (emulator, real rules, fake accounts; N browser contexts = N devices)
+
+Started 14 Oct: `tools/test-multidevice.sh` (`test/e2e/multidevice.emulator.mjs`): DEVICES (5) devices do random
+logs, edits, deletes (one or several) and restores at the same moment each round on cases no other device touches,
+then all reopen and must match the server, and every action that said it worked must be on the server. Seeded
+(SEED=… repeats a run); BROWSER=webkit|firefox; SLOW=1 throttles Chromium's network. Without #519's fix it fails in
+round 1 with the zombie delete; with it, 5 devices × 6 rounds pass. Next: same-record conflicts (item 3), offline
+(item 2), sign-out (item 4), and the "Synced" check (item 10).
 
 1. **Many devices, one account (4–5):** each logs, edits and deletes cases (single and multi-select), reflections
    and notes, online; then every device reopens and must show exactly the same list, and the server must match.
