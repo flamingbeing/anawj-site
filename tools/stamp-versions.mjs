@@ -8,11 +8,25 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const write = !process.argv.includes('--check');
 const RE = /const VERSION = '([^']+)'/;
+// Apps whose version starts with a date (owner, 14 Oct 2026, prewarm: "can we have the app version start with the date?"):
+// 'prewarm-v79' becomes 'prewarm-2026-10-14-3f9a2c1d'. The date is the day (Singapore time) of the last commit that touched
+// a file the hash covers, so it only moves when the version does; the hash is unchanged. Needs git history (the Pages
+// workflow checks out fully); without it, today's date.
+const DATED = new Set(['prewarm']);
+const lastChanged = files => {
+  const today = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Singapore' });
+  try {
+    const out = execFileSync('git', ['log', '-1', '--format=%cd', '--date=format-local:%Y-%m-%d', '--', ...files.map(f => path.relative(ROOT, f))],
+      { cwd: ROOT, env: { ...process.env, TZ: 'Asia/Singapore' }, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    return /^\d{4}-\d{2}-\d{2}$/.test(out) ? out : today();
+  } catch { return today(); }
+};
 const SKIP = /(^|\/)(test|tools|node_modules|\.[^/]+)(\/|$)|\.md$/;
 const walk = dir => fs.readdirSync(dir, { withFileTypes: true }).flatMap(d => {
   const f = path.join(dir, d.name);
@@ -25,14 +39,15 @@ for (const app of fs.readdirSync(ROOT).filter(d => fs.existsSync(path.join(ROOT,
   const sw = fs.readFileSync(swPath, 'utf8');
   const m = sw.match(RE);
   if (!m) { console.error(`stamp: ${app}/sw.js has no VERSION`); process.exitCode = 1; continue; }
-  const base = m[1].replace(/-[0-9a-f]{8}$/, '');   // already stamped: stamp again from the base
+  const base = m[1].replace(/-\d{4}-\d{2}-\d{2}-[0-9a-f]{8}$/, '').replace(/-[0-9a-f]{8}$/, '');   // already stamped: stamp again from the base
   const shellSrc = sw.match(/const SHELL = \[([\s\S]*?)\];/)?.[1] || '';
   const shell = [...shellSrc.matchAll(/'([^']+)'/g)].map(x => x[1]).filter(f => f !== './').map(f => path.join(ROOT, app, f));
   const files = [...new Set([...walk(path.join(ROOT, app)).filter(f => f !== swPath), ...shell])].sort();
   const hash = crypto.createHash('sha256');
   hash.update(sw.replace(RE, `const VERSION = '${base}'`));
   for (const f of files) { hash.update('\0' + path.relative(ROOT, f) + '\0'); if (fs.existsSync(f)) hash.update(fs.readFileSync(f)); }
-  const version = `${base}-${hash.digest('hex').slice(0, 8)}`;
+  const h8 = hash.digest('hex').slice(0, 8);
+  const version = DATED.has(app) ? `${base.replace(/-v\d+$/, '')}-${lastChanged(files)}-${h8}` : `${base}-${h8}`;
   if (write) fs.writeFileSync(swPath, sw.replace(RE, `const VERSION = '${version}'`));
   console.log(`${app}: ${version}`);
 }

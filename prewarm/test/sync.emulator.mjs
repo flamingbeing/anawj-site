@@ -120,6 +120,7 @@ try {
   if (SHOTS) await nu.screenshot({ path: SHOTS + '/pacu-nurse.png', fullPage: true });
   await nu.fill('#ninit', 'NN'); await nu.dispatchEvent('#ninit', 'change');
   await nu.click('[data-pev="pacu_in"]'); await nu.click('.kp [data-now]');
+  await nu.waitForTimeout(900); // the 0.7 s tap guard after a pad swallows a tap near the last one (the sub-page layout put this chip there)
   await nu.click('.chip[data-f="pacu_shiver"][data-v="0"]');
   await nu.waitForFunction(() => /Saved to the team/.test(document.querySelector('#nstat')?.textContent || ''), null, { timeout: 20000 });
   await a.waitForFunction(() => /\d\d:\d\d/.test(document.querySelector('[data-pev="pacu_in"] b')?.textContent || '') && document.querySelector('.chip[data-f="pacu_shiver"][data-v="0"]')?.getAttribute('aria-pressed') === 'true', null, { timeout: 25000 });
@@ -335,6 +336,10 @@ try {
   const said = [];
   a.on('dialog', d => { said.push(d.message()); said.length === 1 ? d.accept() : d.dismiss(); });
   await a.goto(BASE + '#/settings');
+  // the app version shows the date first (the deploy stamps the saved copy's name 'prewarm-<date>-<hash>')
+  await a.evaluate(() => caches.keys().then(ks => Promise.all(ks.filter(k => k.startsWith('prewarm-')).map(k => caches.delete(k)))).then(() => caches.open('prewarm-2026-10-14-abcd1234')));
+  await a.goto(BASE + '#/'); await a.goto(BASE + '#/settings'); await a.waitForSelector('#appver');
+  await a.waitForFunction(() => /App version 2026-10-14 \(abcd1234\)/.test(document.querySelector('#appver')?.textContent || ''), null, { timeout: 5000 });
   // Ready for a case?: offline with a patient waiting, those two rows are red and the team rows are green
   await a.waitForSelector('.ready');
   const noRows = await a.$$eval('.ready li.no', l => l.map(x => x.textContent).join('|'));
