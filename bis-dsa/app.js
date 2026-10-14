@@ -232,7 +232,7 @@ function fit(c,hLogical){const dpr=Math.min(2,window.devicePixelRatio||1);const 
 let eng=new Engine();
 let SIG=[],EYE=[]; const SIGMAX=16*FS; // the EEG lane can sweep 4, 8 or 16 s
 let COLS=[]; const COLMAX=300; // one column per second, 5 min
-let HIST=[]; const HISTMAX=3600; // the same columns for the BIS VISTA screen's 5, 15 and 60 min trend windows
+let HIST=[]; const HISTMAX=14400; // the same columns for the BIS VISTA screen's 5, 15 and 60 min trend windows and a 4 h case to review
 let sup=[]; let bisS=null, lastSef=null, lastMf=null, produced=0, simT=0, speed=1, paused=false;
 let drug='propofol', depth=0; const mods={elderly:false,emg:false,diathermy:false,nmb:false,warmer:false,blink:false};
 // cumulative times this case (s): the shown SR at 5% or more (suppression present) and the shown BIS under 40; a clean second only
@@ -255,15 +255,15 @@ function nmStep(dt){ // dt: sim seconds
  const D=nmD();mods.nmbK=D;mods.nmb=D>0.5;}
 function nmRead(){const t1=100*(1-nmD()),tofc=t1<6?0:t1<12?1:t1<18?2:t1<25?3:4,
   tofr=tofc<4?null:Math.min(1,Math.pow(Math.max(0,(t1-30)/70),1.8)),ptc=tofc===0?Math.round(8*Math.pow(t1/6,1.5)):null;return {t1,tofc,tofr,ptc};}
-let artH=[],bcH=[],rawH=[],sefH=[],mfH=[];let prevSup=false,isoN=0,outN=0,sefAge=0;
+let artH=[],bcH=[],rawH=[],sefH=[],mfH=[];let prevSup=false,isoN=0,outN=0,outV=0,sefAge=0;let warming=true; // outV: out-of-target seconds for the Medtronic screen (any depth); not counted during the warm start
 // The right hemisphere (BIS Advance and SedLine): a second engine and its own copy of the per-channel state. The left channel
 // is the page's own variables; the right runs through swapCh(), which exchanges the two sets around a call to step().
 const R={eng:new Engine(),SIG:[],EYE:[],COLS:[],HIST:[],sup:[],bisS:null,lastSef:null,lastMf:null,produced:0,tim:{sup:0,low:0},
- artH:[],bcH:[],rawH:[],sefH:[],mfH:[],prevSup:false,isoN:0,outN:0,sefAge:0};
+ artH:[],bcH:[],rawH:[],sefH:[],mfH:[],prevSup:false,isoN:0,outN:0,outV:0,sefAge:0};
 function swapCh(){[eng,R.eng]=[R.eng,eng];[SIG,R.SIG]=[R.SIG,SIG];[EYE,R.EYE]=[R.EYE,EYE];[COLS,R.COLS]=[R.COLS,COLS];[HIST,R.HIST]=[R.HIST,HIST];
  [sup,R.sup]=[R.sup,sup];[bisS,R.bisS]=[R.bisS,bisS];[lastSef,R.lastSef]=[R.lastSef,lastSef];[lastMf,R.lastMf]=[R.lastMf,lastMf];[produced,R.produced]=[R.produced,produced];
  [tim,R.tim]=[R.tim,tim];[artH,R.artH]=[R.artH,artH];[bcH,R.bcH]=[R.bcH,bcH];[rawH,R.rawH]=[R.rawH,rawH];[sefH,R.sefH]=[R.sefH,sefH];[mfH,R.mfH]=[R.mfH,mfH];
- [prevSup,R.prevSup]=[R.prevSup,prevSup];[isoN,R.isoN]=[R.isoN,isoN];[outN,R.outN]=[R.outN,outN];[sefAge,R.sefAge]=[R.sefAge,sefAge];}
+ [prevSup,R.prevSup]=[R.prevSup,prevSup];[isoN,R.isoN]=[R.isoN,isoN];[outN,R.outN]=[R.outN,outN];[outV,R.outV]=[R.outV,outV];[sefAge,R.sefAge]=[R.sefAge,sefAge];}
 const modsR=Object.create(mods);modsR.side='R';mods.side='L'; // the right engine reads the page's settings, with its own side
 const stepR=n=>{swapCh();try{step(n);}finally{swapCh();}};
 const stimAll=kind=>{const k=kind??(Math.random()<0.1?'delta':'');eng.stimulus(k);R.eng.stimulus(k);};
@@ -308,8 +308,11 @@ function step(nSamples){
    // (GA-level propofol/sevo only, not sedation, dex or ketamine; once shown it clears only back inside 42-58)
    const blank=sqi<15,gaH=eng.drug==='mix'?0.155*(eng.de.propofol||0)+sevoDepth(eng.de.sevo||0):eng.drug==='propofol'||eng.drug==='sevo'?eng.de:0;
    outN=!blank&&gaH>=0.44&&(bisS<mon.alo||bisS>mon.ahi||outN>=10&&(bisS<mon.alo+2||bisS>mon.ahi-2))?outN+1:0;
+   // the Medtronic screen raises 'BIS out of target range' whenever the range is active and the shown BIS has been outside it
+   // for 10 s, at any depth (the manual); Target Alarm only decides whether it sounds
+   outV=!warming&&!blank&&(bisS<mon.alo||bisS>mon.ahi||outV>=10&&(bisS<mon.alo+2||bisS>mon.ahi-2))?outV+1:0;
    if(!art&&!blank){if(bsr>=5)tim.sup++;if(bisS<40)tim.low++;}
-   const col={n:Math.round(produced/FS),ce:ceNow(),db,sef:fresh?lastSef:null,mf:fresh?lastMf:null,bis:blank?null:bisS,bsr,emg,sqi,tp,art,amp:20*Math.log10(Math.max(1,mx)),st:tim.sup,
+   const col={n:Math.round(produced/FS),ce:ceNow(),db,sef:fresh?lastSef:null,mf:fresh?lastMf:null,bis:blank?null:bisS,bsr,emg,sqi,tp,art,sp:f.suppressed?1:0,amp:20*Math.log10(Math.max(1,mx)),st:tim.sup,
     bc:bcH.reduce((a,b)=>a+b,0)};COLS.push(col);if(COLS.length>COLMAX)COLS.shift();HIST.push(col);if(HIST.length>HISTMAX)HIST.shift();
    onColumn&&onColumn();
   }}
@@ -317,7 +320,10 @@ function step(nSamples){
 // the monitor's message region: [priority, text] or null. Wording as in the BIS Complete manual.
 function monMsg(){const c=COLS[COLS.length-1];if(!c)return null;
  if(isoN>=60)return ['hi','Isoelectric EEG Detected',31,'Isoelectric EEG Detected'];
- { const tgtOn=typeof MT!=='undefined'&&mon.skin==='vista'?MT.tgt.active&&MT.tgt.alarm:mon.teach,low=c.bis!=null&&c.bis<(mon.alo+mon.ahi)/2;
+ if(typeof MT!=='undefined'&&mon.skin==='vista'){
+  const low=c.bis!=null&&c.bis<(mon.alo+mon.ahi)/2;
+  if(MT.tgt.active&&outV>=10&&c.bis!=null)return ['hi','BIS Out of Target Range \u2013 '+(low?'Low':'High'),low?29:30,'BIS out of target range'];
+ }else{ const tgtOn=mon.teach,low=c.bis!=null&&c.bis<(mon.alo+mon.ahi)/2;
    if(tgtOn&&outN>=10&&c.bis!=null)return ['hi','BIS Out of Target Range \u2013 '+(low?'Low':'High'),low?29:30,'BIS out of target range']; }
  if(c.sqi<15)return ['lo','Data unavailable due to poor signal quality',28,'Data unavailable due to poor signal quality'];
  if(c.sqi<50)return ['lo','Excessive Artifact Detected in Signal',27,'Excessive Artifact Detected in Signal'];
@@ -864,7 +870,7 @@ function frameBody(now){const dt=Math.min(0.1,(now-last)/1000);last=now;
  drawEx();exUI();
  if(now-lastUI>250){lastUI=now;slideUI();describe();nmUI();}}
 // warm start: the patient is awake (owner, 14 Oct 2026); 5 min of awake EEG so the screen opens full
-setDrug('propofol');snapAll();step(300*FS);stepR(300*FS);simT=300;snapshotEx();
+setDrug('propofol');snapAll();step(300*FS);stepR(300*FS);simT=300;warming=false;snapshotEx();
 if(reduced){exT=T[5]-0.01;}
 addEventListener('resize',()=>{dirty=true;LIB.forEach(x=>x.cols&&drawStrip($('lib-'+x.id),x.cols));qa&&drawStrip($('cQuiz'),qa.cols);});
 requestAnimationFrame(frame);

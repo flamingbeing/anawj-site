@@ -34,6 +34,14 @@ try {
       const lit = await page.$eval('#' + id, c => { const x = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 0; i < x.length; i += 4) if (x[i] + x[i + 1] + x[i + 2] > 60) n++; return n / (x.length / 4); });
       assert.ok(lit > 0.02, `${id} is drawn (${lit})`);
     }
+    // the DSA image and its time axis: 30 min of history on the 1 hour scale (labels every 10 min, none beyond the newest column)
+    await page.evaluate(() => { step(1800 * FS); stepR(1800 * FS); simT += 1800; dirty = true; }); await page.waitForTimeout(400);
+    { const r = await page.evaluate(() => { const m = mtModel(MT.win * 60), l = mtLabels(m, 143, 323); return { tN: m.tN, l: l.map(x => ({ ts: x.ts, x: x.x })) }; });
+      assert.ok(r.l.length >= 3, `axis labels on the 1 hour scale (${r.l.length})`);
+      for (const x of r.l) assert.ok(x.ts <= r.tN + 0.5 && x.x <= 143 + 323 - 17, 'no label beyond the newest column or the data area');
+      for (let i = 1; i < r.l.length; i++) assert.equal(r.l[i].ts - r.l[i - 1].ts, 600, 'labels 10 min apart');
+      const px = await page.$eval('#c2Dsa', (c, pts) => { const k = c.width / 552, g = c.getContext('2d'); return pts.map(([x, y]) => [...g.getImageData(Math.round((x - 88) * k), Math.round((y - 232) * k), 1, 1).data]); }, [[173, 262], [173, 258 + 118 * (1 - 6 / 30)]]);
+      assert.ok(px[0][2] > 150 && px[0][0] < 160, `awake beta is cyan or green (${px[0]})`); assert.ok(px[1][0] > 200 && px[1][2] < 90, `awake 6 Hz is orange-red (${px[1]})`); }
     // start-up message with a Dismiss button, as on the real monitor
     assert.match(await page.textContent('#v2MsgT'), /Factory settings restored/);
     await page.click('#v2Dismiss'); assert.equal(await page.$eval('#v2Msg', e => e.hidden), true);
@@ -56,9 +64,13 @@ try {
     // Display: DSA + BIS shows BIS in the header and the BIS trend under the DSA; BIS (trend) shows the trend view with its review arrow
     await tile('Display').click(); await tile('DSA + BIS').click(); await page.click('#kMenu');
     assert.equal(await page.evaluate(() => MT.main), 'dsaBis');
-    await page.click('#kMenu'); await tile('Display').click(); await tile('Trend Time Scale').click(); assert.equal(await page.evaluate(() => MT.win), 15);
-    await tile('Trend Time Scale').click(); await tile('Trend Time Scale').click(); assert.equal(await page.evaluate(() => MT.win), 5);
+    await page.click('#kMenu'); await tile('Display').click(); assert.equal(await page.evaluate(() => MT.win), 60, 'Trend Time Scale defaults to 1 hour'); await tile('Trend Time Scale').click(); assert.equal(await page.evaluate(() => MT.win), 5);
+    await tile('Trend Time Scale').click(); assert.equal(await page.evaluate(() => MT.win), 15); await tile('Trend Time Scale').click(); assert.equal(await page.evaluate(() => MT.win), 60);
     await page.locator('#v2Menu button[data-k="mbis"]').click(); await page.click('#kMenu'); assert.equal(await page.$eval('#v2Review', e => e.hidden), false, 'review arrow in the BIS trend view');
+    // Trend Review: key 2 stays MENU, key 3 reads TREND REVIEW EXIT, Rewind and Advance work in Case mode, MENU leaves the review and opens the menu
+    await page.click('#v2Review'); assert.equal(await page.textContent('#kMl'), 'MENU'); assert.match(await page.textContent('#kSn'), /TREND\s*REVIEW\s*EXIT/);
+    const rv = n => page.locator('#v2Rev button', { hasText: n }).first(); assert.equal(await rv('Rewind').isDisabled(), false); assert.equal(await rv('Advance').isDisabled(), false); await rv('Rewind').click(); await rv('Advance').click(); assert.ok(await page.locator('#v2Rev svg.ar2').count() >= 2, 'double arrows on the case tiles');
+    await page.click('#kMenu'); assert.equal(await page.$eval('#v2Rev', e => e.hidden), true); assert.equal(await page.$eval('#v2Menu', e => e.hidden), false); await page.click('#kMenu'); assert.equal(await page.$eval('#v2Menu', e => e.hidden), true);
     await page.click('#kMenu'); await tile('Display').click(); await page.locator('#v2Menu button[data-k="mdsaAmpl"]').click(); await page.click('#kMenu'); assert.equal(await page.$eval('#v2Review', e => e.hidden), true);
     // pages 2 and 3: smoothing rate, Display SR, EEG channels (a second trace and 50 uV / division), Filters, Demo Case
     await page.click('#kMenu'); await tile('Next').click();
@@ -71,20 +83,37 @@ try {
     await page.click('#kMenu'); await tile('Next').click(); await tile('Next').click(); await tile('EEG Channels').click(); assert.equal(await page.evaluate(() => MT.channels), 1);
     await tile('Filters').click(); assert.equal(await page.evaluate(() => MT.filters), false); assert.match(await page.textContent('#v2MsgT'), /Filters Off/); await tile('Filters').click();
     await tile('Demo Case').click(); assert.equal(await page.evaluate(() => MT.caseId), 'DEMO');
-    await page.click('#kSensor'); assert.match(await page.textContent('#v2MsgT'), /Not available during Demo Case {2}\[ 511 \]/);
+    await page.click('#kSensor'); await page.waitForFunction(() => /Not available during Demo Case {2}\[ 511 \]/.test(document.querySelector('#v2MsgT').textContent), null, { timeout: 3000 });
     await page.click('#kMenu'); await tile('Next').click(); await tile('Next').click(); await tile('Demo Case').click(); assert.equal(await page.evaluate(() => MT.caseId), 'AH5F');
     // Escape closes the menu; Maintenance asks for a passkey; Diagnostics > Clear Trend Data empties the trend
     await page.click('#kMenu'); await page.keyboard.press('Escape'); assert.equal(await page.$eval('#v2Menu', e => e.hidden), true);
     await page.click('#kMenu'); await tile('Next').click(); await tile('Next').click(); await tile('Maintenance').click(); assert.ok(await tile('Enter Passkey').count() + (await page.locator('#v2Menu .mtl', { hasText: 'Enter Passkey' }).count()), 'passkey screen');
-    await page.click('#v2Menu button[data-k="d1"]'); await page.click('#v2Menu button[data-k="ok"]'); assert.ok(await tile('Audio Off').count(), 'Maintenance menu');
+    await page.click('#v2Menu button[data-k="d9"]'); await page.click('#v2Menu button[data-k="ok"]'); assert.match(await page.textContent('#v2MsgT'), /Invalid passkey/); assert.equal(await page.$eval('#v2Dismiss', e => e.hidden), true, 'information bars have no Dismiss');
+    for (const d of '1234') await page.click(`#v2Menu button[data-k="d${d}"]`); await page.click('#v2Menu button[data-k="ok"]'); assert.ok(await tile('Audio Off').count(), 'Maintenance menu');
     await tile('Return').click(); await tile('Diagnostics').click(); await tile('Clear').click();
     assert.equal(await page.evaluate(() => HIST.length < 5), true, 'trend data cleared'); await page.waitForTimeout(200);
     // alarm key: green, then paused for 2 minutes with a countdown, then silenced (SILENT), then green again
     assert.equal(await page.evaluate(() => MT.alarm), 0); await page.click('#kSilent'); assert.equal(await page.evaluate(() => MT.alarm), 1); assert.ok(+(await page.textContent('#kSl')) > 100, 'countdown');
     await page.click('#kSilent'); assert.equal(await page.textContent('#kSl'), 'SILENT'); await page.click('#kSilent'); assert.equal(await page.evaluate(() => MT.alarm), 0);
-    // sensor check: key 3 becomes EXIT; electrodes resolve to PASS, then it leaves by itself; EXIT also leaves
+    // target alarm: Target Range is Inactive by default (no bar); active, the bar shows at any depth and sounds; Target Alarm only decides the sound
+    assert.equal(await page.evaluate(() => MT.tgt.active), false); assert.equal(await page.evaluate(() => MT.sounding), false);
+    await page.evaluate(() => { MT.tgt.active = true; }); await page.click('#speedSeg [data-speed="10"]');
+    await page.waitForFunction(() => /BIS out of target range {2}\[ 30 \]/.test(document.querySelector('#v2MsgT').textContent) && document.querySelector('#v2Msg').classList.contains('hi'), null, { timeout: 30000 });
+    await page.click('#speedSeg [data-speed="1"]');
+    await page.waitForFunction(() => MT.sounding === true && MT.beeps > 0, null, { timeout: 3000 });
+    assert.equal(await page.$eval('#v2Dismiss', e => e.hidden), true, 'no Dismiss on the alarm bar');
+    await page.click('#kSilent'); await page.waitForFunction(() => MT.alarm === 1 && MT.sounding === false); assert.equal(await page.$eval('#v2Msg', e => e.hidden), false, 'paused: the bar stays, the sound stops');
+    await page.click('#kSilent'); await page.waitForFunction(() => MT.alarm === 2 && MT.sounding === false); await page.click('#kSilent');
+    await page.waitForFunction(() => MT.alarm === 0 && MT.sounding === true);
+    await page.evaluate(() => { MT.tgt.alarm = false; }); await page.waitForFunction(() => MT.sounding === false); assert.equal(await page.$eval('#v2Msg', e => e.hidden), false, 'Target Alarm off: the bar stays, no sound');
+    await page.evaluate(() => { MT.tgt.alarm = true; MT.tgt.active = false; }); await page.waitForFunction(() => !document.querySelector('#v2Msg').classList.contains('hi') || document.querySelector('#v2Msg').hidden);
+    // sensor check: key 3 becomes EXIT; MENU does nothing meanwhile; the SQI bars light as electrodes pass; electrodes resolve to PASS, then it leaves by itself; EXIT also leaves
     await page.click('#kSensor'); assert.equal(await page.$eval('#v2Sensor', e => e.hidden), false); assert.equal(await page.textContent('#kSn'), 'EXIT');
+    await page.click('#kMenu', { force: true }); assert.equal(await page.$eval('#v2Menu', e => e.hidden), true, 'MENU is inert during sensor check');
+    await page.waitForFunction(() => /^Press electrodes? [1-4]/.test(document.querySelector('#v2MsgT').textContent) && /\[ 13 \]/.test(document.querySelector('#v2MsgT').textContent), null, { timeout: 4000 });
+    await page.waitForFunction(() => document.querySelectorAll('#v2Sqi i.on').length >= 1, null, { timeout: 4000 });
     await page.waitForFunction(() => /PASS/.test(document.querySelector('#v2ScSvg').textContent), null, { timeout: 8000 });
+    assert.equal(await page.$$eval('#v2Sqi i.on', e => e.length), 5, 'all four electrodes pass: five bars');
     await page.click('#v2ScVal'); assert.match(await page.textContent('#v2ScVal'), /Hide/);
     await page.click('#kSensor'); assert.equal(await page.$eval('#v2Sensor', e => e.hidden), true);
     await page.addScriptTag({ path: AXE });
