@@ -21,19 +21,21 @@ const sedInval=()=>{SED.full=true;SED.ver++;try{dirty=true;}catch(e){}};
 const sEsc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 // ----- build -----
 function sedBuild(){if(SED.built)return;SED.built=true;sedLoad();
- sq('sedWrap').innerHTML=`<div class="sedcase"><div class="sedbezel"><span class="sedlogo" aria-hidden="true"><i></i>masimo</span>
+ sq('sedWrap').innerHTML=`<div class="sedcase"><div class="sedbezel"><span class="sedlogo" aria-hidden="true"><svg viewBox="0 0 22 14" width="22" height="14"><path d="M11 13.2C5 9.4 1.4 6.6 1.4 3.9 1.4 2 2.9.8 4.7.8c2.4 0 4.6 1.5 6.3 4.1C12.700 2.300 14.900.8 17.300.8c1.800 0 3.300 1.200 3.300 3.100 0 2.700-3.600 5.500-9.600 9.300z" fill="#e4002b"/><path d="M11 5.200l2.400 3.300-2.400 1.800-2.400-1.800z" fill="#17171a"/></svg><b>Masimo</b></span>
   <div class="seds" id="sedS" role="group" aria-label="Masimo SedLine monitor screen, on a Root">
    <canvas id="sedCv" class="a" style="--x:0;--y:0;--w:800;--h:1280" role="img" aria-label="SedLine trends, density spectral arrays and EEG"></canvas>
    <canvas id="sedEeg" class="a" style="--x:0;--y:110;--w:800;--h:300" aria-hidden="true"></canvas>
    <div id="sedHits"></div><div id="sedPop"></div><div id="sedDlg" hidden></div><div id="sedStandby" class="sstandby" hidden><button type="button" data-a="wake">Monitoring suspended. Touch to resume.</button></div>
   </div><span class="sedroot" aria-hidden="true">Root</span></div>
+  <details class="sedctl" id="sedCtl"><summary>Controls</summary><p class="sednote">Teaching simulation: the EEG is synthetic and the PSi is a stand-in, not Masimo’s algorithm. These keys are not on a Root (the touchscreen does all of it); they are here for keyboards and screen readers.</p>
   <div class="bilkeys"><button type="button" id="bSilent">Silent</button><button type="button" id="bMenu" aria-haspopup="dialog" aria-expanded="false">Menu</button><button type="button" id="bSensor" aria-pressed="false">Sensor check</button></div>
-  <div class="sedsim" id="sedSim" role="group" aria-label="Simulator controls, outside the monitor"><span class="sl">Simulate:</span>
-   <button type="button" data-sim="off" aria-pressed="false">Sensor off patient</button><button type="button" data-sim="hiz" aria-pressed="false">High impedance</button><button type="button" data-sim="gel" aria-pressed="false">Gel bridging</button><button type="button" data-sim="none" aria-pressed="false">No sensor</button><button type="button" data-sim="disc" aria-pressed="false">SedLine disconnected</button><button type="button" data-sim="expired" aria-pressed="false">Replace sensor</button><button type="button" data-sim="batt" aria-pressed="false">Battery low</button></div></div>`;
+  <div class="sedsim" id="sedSim" role="group" aria-label="Simulator controls, outside the monitor"><span class="sl">Display:</span><button type="button" data-st="1" aria-pressed="false">Suppression Time (ST) row</button><span class="sl">Simulate:</span>
+   <button type="button" data-sim="off" aria-pressed="false">Sensor off patient</button><button type="button" data-sim="hiz" aria-pressed="false">High impedance</button><button type="button" data-sim="gel" aria-pressed="false">Gel bridging</button><button type="button" data-sim="none" aria-pressed="false">No sensor</button><button type="button" data-sim="disc" aria-pressed="false">SedLine disconnected</button><button type="button" data-sim="expired" aria-pressed="false">Replace sensor</button><button type="button" data-sim="batt" aria-pressed="false">Battery low</button></div></details></div>`;
  SED.cv=sq('sedCv');SED.cvE=sq('sedEeg');
- const S=sq('sedS');S.addEventListener('click',sedClick);S.addEventListener('pointerdown',sedPointer);document.addEventListener('keydown',sedKey);
- sq('bSilent').onclick=()=>sedBell(true);sq('bMenu').onclick=()=>{SED.dlg?sedDlgClose():sedDlgOpen('main');};sq('bSensor').onclick=()=>sedStripToggle();
- sq('sedSim').addEventListener('click',e=>{const b=e.target.closest('[data-sim]');if(!b)return;const k=b.dataset.sim;SED.sim[k]=!SED.sim[k];b.setAttribute('aria-pressed',String(SED.sim[k]));if(k==='disc'||k==='off'||k==='none')sedGapTrack();sedInval();SED.elec=null;});
+ const S=sq('sedS');S.addEventListener('click',sedClick);S.addEventListener('pointerdown',sedPointer);S.addEventListener('wheel',sedWheel,{passive:false});document.addEventListener('keydown',sedKey);
+ const stb=document.querySelector('[data-st]');if(stb)stb.setAttribute('aria-pressed',String(!!SED.set.smart));
+ sq('bSilent').onclick=()=>sedBell(true);sq('bMenu').onclick=()=>{if(SED.dlg)sedDlgBack();else sedDlgOpen('main');}; /* Menu: open the Main Menu; when a page is open, back one level like the arrow */sq('bSensor').onclick=()=>sedStripToggle();
+ sq('sedSim').addEventListener('click',e=>{const st=e.target.closest('[data-st]');if(st){SED.set.smart=!SED.set.smart;st.setAttribute('aria-pressed',String(SED.set.smart));sedSave();SED._hk=null;sedInval();return;}const b=e.target.closest('[data-sim]');if(!b)return;const k=b.dataset.sim;SED.sim[k]=!SED.sim[k];b.setAttribute('aria-pressed',String(SED.sim[k]));if(k==='disc'||k==='off'||k==='none')sedGapTrack();sedInval();SED.elec=null;});
  document.addEventListener('pointerdown',()=>sedUnlock(),{once:true});
  sedPre();sedHits();if(typeof applyBrightness==='function')applyBrightness();}
 // the earlier trend: a monitor shows a case that has been running for a while, so the screen opens with 30 minutes of awake history,
@@ -58,25 +60,26 @@ function sedHits(){const L=sedLay(),k=SED.view+'|'+SED.range+'|'+JSON.stringify(
  b('flag',14,1236,50,42,'Mark an event');b('gear',736,1234,56,46,'Main menu');
  sq('sedHits').innerHTML=H.join('');}
 // ----- the action menu and the number menu -----
-function sedPopRender(){const P=SED.pop,el=sq('sedPop'),key=P?JSON.stringify(P):'';if(el._k===key)return;el._k=key;
+function sedPopRender(){const P=SED.pop,el=sq('sedPop'),key=P?JSON.stringify(P)+SED.view:'';sedIdle();if(el._k===key)return;el._k=key;
  if(!P){el.innerHTML='';return;}
- const ico={trend:'<svg viewBox="0 0 30 24" aria-hidden="true"><path d="M2 18l7-8 6 5 6-9 7 6" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="9" cy="10" r="2.4" fill="currentColor"/><circle cx="15" cy="15" r="2.4" fill="currentColor"/><circle cx="21" cy="6" r="2.4" fill="currentColor"/></svg>',analog:'<svg viewBox="0 0 30 24" aria-hidden="true"><path d="M3 20a12 12 0 0 1 24 0" fill="none" stroke="currentColor" stroke-width="2.4" stroke-dasharray="4 2"/><path d="M15 20l-4-9" stroke="currentColor" stroke-width="2.2"/></svg>'};
+ const ico={trend:'<svg viewBox="0 0 40 32" aria-hidden="true"><path d="M3 24l9-11 8 7 9-13 8 8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/><circle cx="12" cy="13" r="3" fill="currentColor"/><circle cx="20" cy="20" r="3" fill="currentColor"/><circle cx="29" cy="7" r="3" fill="currentColor"/><circle cx="37" cy="15" r="2.6" fill="currentColor"/></svg>',analog:'<svg viewBox="0 0 40 32" aria-hidden="true"><path d="M4 27a16 16 0 0 1 32 0" fill="none" stroke="currentColor" stroke-width="3.2" stroke-dasharray="5 2.6"/><path d="M20 27l-3-12" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><circle cx="20" cy="27" r="2.4" fill="currentColor"/></svg>'};
  if(P.kind==='action'){el.innerHTML=`<div class="spop act" role="menu" aria-label="View options" style="left:calc(578*var(--u));top:calc(117*var(--u));width:calc(209*var(--u));height:calc(66*var(--u))">
-  <button type="button" role="menuitemradio" aria-checked="${SED.view==='trend'}" class="${SED.view==='trend'?'on':''}" data-a="view" data-v="trend">${ico.trend}<span>TREND</span></button><button type="button" role="menuitemradio" aria-checked="${SED.view==='analog'}" class="${SED.view==='analog'?'on':''}" data-a="view" data-v="analog">${ico.analog}<span>ANALOG</span></button></div>
-  <button type="button" class="spopclose" data-a="popclose" aria-label="Close view options" style="left:calc(705*var(--u));top:calc(189*var(--u));width:calc(80*var(--u));height:calc(21*var(--u))"></button>`;return;}
- if(P.kind==='num'){const k=P.k,ex=!!SED.exp[k],y=Math.max(120,Math.min(1000,P.y)),x=Math.max(20,Math.min(560,P.x));
+  <button type="button" role="menuitemradio" aria-checked="${SED.view==='trend'}" class="${SED.view==='trend'?'cur':''}" data-a="view" data-v="trend">${ico.trend}<span>TREND</span></button><button type="button" role="menuitemradio" aria-checked="${SED.view==='analog'}" class="${SED.view==='analog'?'cur':''}" data-a="view" data-v="analog">${ico.analog}<span>ANALOG</span></button></div>
+  <button type="button" class="spopclose" data-a="popclose" aria-label="Close view options" style="left:calc(705*var(--u));top:calc(189*var(--u));width:calc(80*var(--u));height:calc(21*var(--u))"><svg viewBox="0 0 40 16" aria-hidden="true"><path d="M13 9l7-5 7 5M13 14l7-5 7 5" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>`;return;}
+ if(P.kind==='num'){const k=P.k,y=Math.max(120,Math.min(1000,P.y)),x=Math.max(20,Math.min(560,P.x));
+  // the real number menu offers About and the parameter's settings only
   el.innerHTML=`<div class="spop num" role="menu" aria-label="${SED_NAME[k]} menu" style="left:calc(${x}*var(--u));top:calc(${y}*var(--u))"><b>${SED_NAME[k]}</b>
-   <button type="button" role="menuitem" data-a="about" data-v="${k}">About</button><button type="button" role="menuitem" data-a="pset" data-v="${k}">Settings</button>
-   ${SED.view==='trend'?`<button type="button" role="menuitem" data-a="${ex?'minimise':'expand'}" data-v="${k}">${ex?'Minimise':'Expand'}</button>`:''}<button type="button" data-a="popclose" class="x">Close</button></div>`;}}
+   <button type="button" role="menuitem" data-a="about" data-v="${k}">About</button><button type="button" role="menuitem" data-a="pset" data-v="${k}">Settings</button></div>`;}}
 // ----- clicks -----
 function sedUnlock(){try{const A=window.AudioContext||window.webkitAudioContext;if(!A)return;SED.ac=SED.ac||new A();if(SED.ac.state==='suspended')SED.ac.resume();}catch(e){}}
 function sedBeep(n,f){SED.beeps++;try{const ac=SED.ac;if(!ac||ac.state!=='running')return;const g=ac.createGain();g.gain.value=0.012*SED.set.alarmVol*SED.set.alarmVol/10;g.connect(ac.destination);for(let i=0;i<n;i++){const o=ac.createOscillator();o.type='sine';o.frequency.value=f;o.connect(g);const t=ac.currentTime+i*0.18;o.start(t);o.stop(t+0.1);}}catch(e){}}
 function sedStripToggle(){SED.strip=!SED.strip;sq('bSensor').setAttribute('aria-pressed',String(SED.strip));SED.elec=null;SED._hk=null;sedInval();}
-function sedBell(fromKey){const now=Date.now();SED.lastBell=now;
- if(SED.silenceUntil>now){SED.silenceUntil=0;SED.silenceShown=false;}else{SED.silenceUntil=now+SED.set.silence*1000;SED.silenceShown=true;}
- sedUnlock();SED.nextBeep=0;sedInval();}
+function sedBell(fromKey){const now=Date.now();sedUnlock();
+ // a second press while silenced cancels the silence (INFERRED: the manual is silent on it); with nothing sounding or silenced the monitor ignores the key
+ if(SED.silenceUntil>now){SED.silenceUntil=0;SED.silenceShown=false;}else if(SED.alm&&SED.alm.level){SED.lastBell=now;SED.silenceUntil=now+SED.set.silence*1000;SED.silenceShown=true;}else return;
+ SED.nextBeep=0;sedInval();}
 function sedPause(){const now=Date.now();if(SED.pauseUntil>now||SED.pausePerm){SED.pauseUntil=0;SED.pausePerm=false;}else{const d=SED.set.pauseDur;if(d>0)SED.pauseUntil=now+d*1000;else SED.pausePerm=true;}sedUnlock();sedInval();}
-function sedClick(e){const el=e.target.closest('[data-a]');if(!el){if(SED.pop&&SED.pop.kind==='num'){SED.pop=null;sedInval();}return;}
+function sedClick(e){sedIdle();if(SED._swallow){SED._swallow=false;e.stopPropagation();return;}const el=e.target.closest('[data-a]');if(!el){if(SED.pop&&SED.pop.kind==='num'){SED.pop=null;sedInval();}return;}
  const a=el.dataset.a,v=el.dataset.v;sedUnlock();
  if(SED.standbyOn){if(a==='wake'){SED.standbyOn=false;sq('sedStandby').hidden=true;sedInval();}return;}
  if(SED.dlg&&typeof sedDlgAct==='function'&&el.closest('#sedDlg')){sedDlgAct(a,v,el);return;}
@@ -95,22 +98,54 @@ function sedClick(e){const el=e.target.closest('[data-a]');if(!el){if(SED.pop&&S
   case 'axis':sedDlgOpen('p_'+v+'_trends');return;
   case 'about':SED.pop=null;sedDlgOpen('about_'+v);return;
   case 'pset':SED.pop=null;sedDlgOpen('p_'+v);return;
-  case 'expand':SED.exp[v]=1;if(SED.set.trendLayout==='Fixed'){const ks=SED_PARAMS.filter(k=>SED.exp[k]&&k!==v);while(ks.length>2)delete SED.exp[ks.shift()];}SED.pop=null;sedSave();SED._hk=null;sedInval();return;
-  case 'minimise':delete SED.exp[v];SED.pop=null;sedSave();SED._hk=null;sedInval();return;
+  case 'expand':sedExpand(v);return;
+  case 'minimise':sedMinimise(v);return;
   case 'dsa':sedDlgOpen('p_dsa');return;case 'asym':sedDlgOpen('about_asym');return;
   case 'zminus':{const i=RANGES_H.indexOf(SED.range);SED.range=RANGES_H[Math.max(0,i-1)];sedSave();SED._hk=null;sedInval();return;}
   case 'zplus':{const i=RANGES_H.indexOf(SED.range);SED.range=RANGES_H[Math.min(RANGES_H.length-1,i+1)];sedSave();SED._hk=null;sedInval();return;}
   case 'zreset':SED.range=30;sedSave();SED._hk=null;sedInval();return;
   case 'scrub':{const rr=el.getBoundingClientRect(),x=(e.clientX-rr.left)/rr.width,D=SED.D;if(!D)return;const span=Math.min(7200,Math.max(60,D.now-D.start)),t0=D.now-span,t=t0+x*span;sedScrubTo(t);return;}
-  case 'flag':SED.events.push(simT);sedInval();sedToast('Event marked');return;
+  case 'flag':SED.events.push(simT);sedInval();return; // a small flag on the history bar and the trend axis; the real screen's feedback is unpublished, so no text
   case 'gear':sedDlgOpen('main');return;}}
+function sedExpand(v){SED.exp[v]=1;if(SED.set.trendLayout==='Fixed'){const ks=SED_PARAMS.filter(k=>SED.exp[k]&&k!==v);while(ks.length>2)delete SED.exp[ks.shift()];}SED.pop=null;sedSave();SED._hk=null;sedInval();}
+function sedMinimise(v){delete SED.exp[v];SED.pop=null;sedSave();SED._hk=null;sedInval();}
 function sedScrubTo(t){const D=SED.D;if(!D)return;const lo=Math.min(D.now,D.start+1200);let end=t+600;if(end>=D.now-8)SED.hold=null;else SED.hold=Math.max(lo,end);SED.lastScrub=Date.now();sedInval();}
-// drag on the history bar scrolls the trends and DSA together
-function sedPointer(e){const el=e.target.closest('[data-a="scrub"]');if(!el)return;const rr=el.getBoundingClientRect(),move=ev=>{const D=SED.D;if(!D)return;const x=clampv((ev.clientX-rr.left)/rr.width,0,1),span=Math.min(7200,Math.max(60,D.now-D.start));sedScrubTo(D.now-span+x*span);};
- const up=()=>{removeEventListener('pointermove',move);removeEventListener('pointerup',up);};addEventListener('pointermove',move);addEventListener('pointerup',up);}
+// ----- gestures: a drag along any trend or the DSA scrolls them all, a wheel or pinch changes the time range of all trends, press-and-hold
+// a number then drag moves it between the well (minimise) and the trends (expand), a vertical drag on the handle pulls the electrode strip -----
+function sedIdle(){clearTimeout(SED._idle);if(SED.dlg||SED.pop)SED._idle=setTimeout(sedIdleFire,SED.idleMs||60000);}
+// the Root manual: any menu screen returns to the main screen after 1 minute without a touch; unsaved changes are dropped (Cancel)
+function sedIdleFire(){if(SED.dlg)sedDlgClose();if(SED.pop){SED.pop=null;sedInval();}}
+function sedRange(dir){const i=RANGES_H.indexOf(SED.range),n=RANGES_H[clampv(i+dir,0,RANGES_H.length-1)];if(n!==SED.range){SED.range=n;sedSave();SED._hk=null;sedInval();}}
+function sedWheel(e){const S=sq('sedS').getBoundingClientRect(),k=800/S.width,x=(e.clientX-S.left)*k,y=(e.clientY-S.top)*k,L=SED.L;if(SED.dlg||!L||SED.view!=='trend'||x<50||x>600||y<L.trendY||y>L.trendY+L.trendH)return;
+ e.preventDefault();const now=Date.now();if(now-(SED._wh||0)<260)return;SED._wh=now;sedRange(e.deltaY>0?1:-1);}
+function sedPointer(e){sedIdle();SED._swallow=false;if(SED.dlg||SED.standbyOn)return;
+ const S=sq('sedS'),sr=S.getBoundingClientRect(),k=800/sr.width,toD=ev=>({x:(ev.clientX-sr.left)*k,y:(ev.clientY-sr.top)*k}),p0=toD(e),L=SED.L||sedLay(),D=SED.D,el=e.target.closest('[data-a]'),a=el?el.dataset.a:'';
+ const inTrend=SED.view==='trend'&&p0.x>=50&&p0.x<=600&&p0.y>=L.trendY&&p0.y<L.trendY+L.trendH,inDsa=p0.x>=DX&&p0.x<=DX+DW&&p0.y>=L.dsaY&&p0.y<L.dsaY+373;
+ // the history bar: drag to move the time shown
+ if(a==='scrub'){const rr=el.getBoundingClientRect(),move=ev=>{const D2=SED.D;if(!D2)return;const x=clampv((ev.clientX-rr.left)/rr.width,0,1),span=Math.min(7200,Math.max(60,D2.now-D2.start));sedScrubTo(D2.now-span+x*span);};
+  const up=()=>{removeEventListener('pointermove',move);removeEventListener('pointerup',up);};addEventListener('pointermove',move);addEventListener('pointerup',up);return;}
+ // the handle (and the open strip): swipe down to show the electrode status, up to hide it
+ const onHandle=a==='strip'||(SED.strip&&p0.x>=12&&p0.x<=787&&p0.y>=110&&p0.y<=180);
+ if(onHandle){const up=ev=>{removeEventListener('pointerup',up);const dy=(ev.clientY-e.clientY)*k;if(Math.abs(dy)>12){SED._swallow=true;if(dy>0&&!SED.strip)sedStripToggle();else if(dy<0&&SED.strip)sedStripToggle();}};addEventListener('pointerup',up);return;}
+ // press and hold a number (500 ms), then drag it into the well or onto a trend
+ if(a==='num'&&SED.view==='trend'&&D&&!SED.pop){const key=el.dataset.v;let moved=false,held=false;const t=setTimeout(()=>{if(moved)return;held=true;SED.dimK=key;sedInval();},500);
+  const mv=ev=>{const q=toD(ev);if(!held&&Math.hypot(q.x-p0.x,q.y-p0.y)>8){moved=true;clearTimeout(t);}};
+  const up=ev=>{removeEventListener('pointermove',mv);removeEventListener('pointerup',up);clearTimeout(t);if(!held)return;SED._swallow=true;SED.dimK=null;const q=toD(ev),Ln=sedLay();
+   if(q.y>=Ln.wellY-6&&q.y<=Ln.wellY+90&&SED.exp[key])sedMinimise(key);else if(q.y>=Ln.trendY&&q.y<Ln.wellY-6&&!SED.exp[key])sedExpand(key);else sedInval();};
+  addEventListener('pointermove',mv);addEventListener('pointerup',up);return;}
+ // a horizontal drag along a trend or the DSA scrolls all of them; two fingers (or ctrl-wheel on a trackpad) change the time range
+ if((inTrend||inDsa)&&D){const sp=inDsa?1200/DW:D.sp,tE0=D.tE,id=e.pointerId;SED._ptr=SED._ptr||new Map();SED._ptr.set(id,{x:e.clientX,y:e.clientY});let dragging=false,pinch0=null;
+  const mv=ev=>{const m=SED._ptr;if(m&&m.has(ev.pointerId))m.set(ev.pointerId,{x:ev.clientX,y:ev.clientY});
+   if(m&&m.size===2){const [p,q]=[...m.values()],d=Math.hypot(p.x-q.x,p.y-q.y);if(pinch0==null)pinch0=d;else if(d>pinch0*1.35){pinch0=d;SED._swallow=true;sedRange(-1);}else if(d<pinch0/1.35){pinch0=d;SED._swallow=true;sedRange(1);}return;}
+   const dx=(ev.clientX-e.clientX)*k;if(!dragging&&Math.abs(dx)<7)return;dragging=true;SED._swallow=true;
+   const Dn=SED.D;if(!Dn)return;const lo=Math.min(Dn.now,Dn.start+1200),nh=clampv(tE0-dx*sp,lo,Dn.now);if(nh>=Dn.now-8)SED.hold=null;else SED.hold=nh;SED.lastScrub=Date.now();sedInval();};
+  const up=ev=>{if(SED._ptr)SED._ptr.delete(ev.pointerId);removeEventListener('pointermove',mv);removeEventListener('pointerup',up);removeEventListener('pointercancel',up);};
+  addEventListener('pointermove',mv);addEventListener('pointerup',up);addEventListener('pointercancel',up);}}
 function sedKey(e){if(!SED.built||mon.skin!=='sedline')return;
- if(e.key==='Escape'){if(SED.dlg&&SED.dlg.list){SED.dlg.list=null;sedDlgRender();e.preventDefault();return;}if(SED.dlg){sedDlgBack();e.preventDefault();return;}if(SED.pop){SED.pop=null;sedInval();e.preventDefault();return;}}}
-let sedToastT=0;function sedToast(t){SED.toast=t;SED.toastUntil=Date.now()+2500;}
+ sedIdle();
+ if(e.key==='Escape'){if(SED.dlg&&SED.dlg.list!=null){SED.dlg.list=null;sedDlgRender();e.preventDefault();e.stopImmediatePropagation();return;}if(SED.dlg){sedDlgBack();e.preventDefault();e.stopImmediatePropagation();return;}if(SED.pop){SED.pop=null;sedInval();e.preventDefault();e.stopImmediatePropagation();return;}}
+ // keyboard route to the drag-and-drop customising: Arrow Up on a number expands it into a trend, Arrow Down minimises it into the well
+ const h=document.activeElement;if(h&&h.matches&&h.matches('.hit[data-a="num"]')&&(e.key==='ArrowUp'||e.key==='ArrowDown')&&SED.view==='trend'){const k=h.dataset.v;if(e.key==='ArrowUp')sedExpand(k);else sedMinimise(k);e.preventDefault();}}
 // ----- the gaps (no data while the sensor is off, not connected or the module is unplugged) -----
 function sedGapTrack(){const on=SED.sim.disc||SED.sim.off||SED.sim.none,n=HIST.length?HIST[HIST.length-1].n:Math.floor(simT);
  if(on&&SED._gapOpen==null){SED._gapOpen=n;SED.gaps.push([n,null]);}
@@ -135,7 +170,7 @@ function sedAlarmEval(){const N=SED.N,S=SED.sim,s=SED.set,msgs=[],t=simT;let par
  SED.alm={level:all.length?all[0].lv:null,text:cur?cur.text:null,win:cur&&!cur.k?{level:cur.lv}:null,curPar:!!(cur&&cur.k),par:par?{k:'psi',level:par.lv,dir:par.dir}:null,sys,all};}
 function sedSound(now){const A=SED.alm,silenced=SED.silenceUntil>now,paused=SED.pauseUntil>now||SED.pausePerm;if(SED.pauseUntil&&SED.pauseUntil<=now&&!SED.pausePerm){SED.pauseUntil=0;sedInval();}if(SED.silenceUntil&&SED.silenceUntil<=now){SED.silenceUntil=0;SED.silenceShown=false;sedInval();}
  const snd=A&&A.level&&(A.level==='hi'||SED.set.audible)&&!silenced&&!paused;SED.sounding=!!snd;
- if(snd&&now>=SED.nextBeep){sedBeep(A.level==='hi'?5:3,A.level==='hi'?988:784);SED.nextBeep=now+(A.level==='hi'?5000:9000);}if(!snd)SED.nextBeep=0;}
+ if(snd&&now>=SED.nextBeep){sedBeep(A.level==='hi'?10:3,A.level==='hi'?988:784);SED.nextBeep=now+(A.level==='hi'?5000:9000);}if(!snd)SED.nextBeep=0;}
 // ----- the frame hook (called from app.js's loop) -----
 function sedTick(dirty){if(!SED.built)sedBuild();const now=Date.now();
  if(SED.hold!=null&&now-SED.lastScrub>60000){SED.hold=null;SED.full=true;}
@@ -145,7 +180,7 @@ function sedTick(dirty){if(!SED.built)sedBuild();const now=Date.now();
  if(Math.floor(now/3000)!==SED._imp){SED._imp=Math.floor(now/3000);for(const k in SED.imp){SED.imp[k]=Math.max(2.5,Math.min(14,SED.imp[k]+(Math.random()-.5)*.4));}SED.elec=sedElec();}
  sedSound(now);
  const sec=Math.floor(now/1000),key=SED.dirty||SED.full||SED._sec!==sec;
- if(key){if(SED.toast&&now>SED.toastUntil)SED.toast=null;sedDrawStatic();SED._sec=sec;SED.dirty=false;SED.full=false;SED._k=(SED.cv.clientWidth||400)*Math.min(2,window.devicePixelRatio||1)/800;
+ if(key){sedDrawStatic();SED._sec=sec;SED.dirty=false;SED.full=false;SED._k=(SED.cv.clientWidth||400)*Math.min(2,window.devicePixelRatio||1)/800;
   sedHits();sedPopRender();sedSumm();}
  sedDrawEeg();}
 function sedSumm(){const N=SED.N;if(!N)return;const f=k=>sedFmt(k,N,true)||'--';const t=`PSi ${f('psi')}, EMG ${f('emg')}%, SR ${f('sr')}%, ARTF ${f('artf')}%, SEFL ${f('sefl')} Hz, SEFR ${f('sefr')} Hz, ASYM ${Math.round(N.asym)}%`+(SED.alm&&SED.alm.text?', '+SED.alm.text:'');const e=sq('bilSum');if(e&&e._t!==t){e._t=t;e.textContent=t;}}

@@ -513,4 +513,27 @@ checked against a photo of a Root. Look chosen: the 2017/2018 builds (ADULT pill
   of the window messages (red for sensor and impedance faults, yellow for the rest: inferred); the sweep cursor is shown (newer builds); the layout when DSA Placement is EEG/DSA/PSi
   (DSA directly under the EEG: inferred); the Pediatric look is the pill and the 0-40 Hz DSA only; the start-up splash, the SedLine dialog artwork (taken from the Root layout and access-control
   screens), animation timing, the on-screen About texts of Root (the DSA / ASYM / PSi texts are the manual's). One DSA column a second, not every 1.2 s. The EMG trend is a stand-in (the sim's EMG
-  is a parametric term). Smart SedLine's ST is an option ("Suppression Time (ST)" in Additional Settings, a simulator addition) rather than a software build.
+  is a parametric term). Smart SedLine's ST is an option (the "Display: Suppression Time (ST) row" button in the Controls disclosure outside the screen, a simulator addition) rather than a software build.
+
+### SedLine, second fidelity pass (14 Oct 2026, after a side-by-side review against the Root screenshots)
+
+- **EEG**: no longer the engines' 128 Hz signal. `sed-draw.js` runs its own generator at the monitor's 178.154 samples/s: per channel, three band-limited resonators (a slow 1-3 Hz drift with
+  bursts, 4-12 Hz waves, 18 Hz beta at about 20% of the power, no white-noise floor) plus a little 30-50 Hz muscle. Its size and slowness follow the live sim (depth of anaesthesia from the
+  BIS column, suppression, EMG %). 5 µV/mm is 0.78 µV per pixel and a change of the amplitude setting rescales everything; typical peak-to-peak is about 90 px, bursts reach more; nothing is
+  clipped per channel (only at the panel edge), 1 sample per pixel at 30 mm/s (2 at 15), straight 2 px segments. `engine.check.mjs` checks the power split.
+- **DSA**: cells of 3 x 3 px (228 columns, 50 rows per panel), the newest second in each cell, anchored in absolute time so cells do not shimmer; 51 colours, no smoothing. Hanning = one noisy
+  periodogram with per-cell speckle (hash-based, stable between repaints); Multitaper = 3-tap smoothing over time, little speckle, sharper band edges. At 40 Hz (Pediatric) the spectra are extended
+  with a gentle roll-off. The SEF line is smoothed, in steps of 1 Hz, and kept 3 px inside the panel. A dim stub of the oldest columns shows in the left gutter, and of the newest trend samples at each trend's left edge.
+- **Chrome**: time-label band framed (`#100f0d`, 1 px `#2b2a2a`, 5-min ticks), larger axis text, bigger digits (PSi 98, EMG/SR 56, well 64 px, weight 500), well units 19 / 14 px, status bar 3 px
+  higher, bigger bell, the Root logo drawn as a small SVG. Electrode strip: opaque band, labels and K values right-aligned clear of the icons, the squeezed L1 trace in front of the band. TREND / ANALOG
+  popup: two neutral dark tiles, the blue close tab is a real button in `#sedPop` (above both canvases), the title-band tab stays as an empty box; `EMG STD` (or `EMG MAX`) in the title band.
+  Main Menu tiles are coloured rounded squares with white glyphs and a rainbow tile; the Layout page shows the six layout tiles.
+- **Nothing on the glass says "simulator"**: About reads like a Root (Device Root, Module SedLine, Software 1.8.1.4), the Wi-Fi / Ethernet / Bluetooth / Output pages are plain status rows, a refused
+  OK marks the rows red (the text is only for screen readers). The teaching note, the soft keys (Silent, Menu, Sensor check) and the Simulate buttons live in a "Controls" disclosure under the
+  bezel, closed by default; the Suppression Time (ST) option moved there too ("Display: Suppression Time (ST) row"). The Menu key opens the Main Menu, and goes back one level when a page is open.
+  The About texts are the manual's, US spelling, the full SEF paragraph on SEFL and SEFR.
+- **Behaviour**: a menu or popup left alone for 60 s returns to the main screen (unsaved changes dropped); the number popup is About / Settings only; gestures: a drag along a trend or the DSA scrolls
+  all of them, a wheel or two-finger pinch over the trends steps the range, press-and-hold a number (500 ms, it dims) then drag into the well (minimise) or onto the trends (expand), a vertical
+  drag on the handle pulls the strip down or up (a tap still toggles). Keyboard route: Arrow Up / Down on a focused number expands / minimises. With every other parameter expanded the PSi goes into
+  the well (rows share the height evenly), and an empty well gives its height to the rows. The bell is ignored with nothing sounding (a second press while silenced cancels the silence: inferred).
+  The high-priority tone is a 10-pulse burst, medium 3. The flag drops a small flag on the history bar and on the trend axis (no text). Escape in a value list closes only the list.

@@ -212,6 +212,18 @@ chk('Stimulus at 0.57, delta arousal', 'BIS change (falls)', sd.bis - q57.bis, -
   chk('SedLine ASYM', 'range within +-100', Math.abs(F.sedAsym(90, 20)), 0, 100);
   chk('SedLine history', 'columns kept (the monitor shows up to 2 h)', histMax, 7200, 999999); }
 
+// the SedLine EEG generator (sed-draw.js): band-limited resonators, unit variance each; the mix must be 1/f-like (mostly 1-12 Hz, 20-25% above 14 Hz)
+{ const src = fs.readFileSync(new URL('../sed-draw.js', import.meta.url), 'utf8'), a = src.indexOf('const SED_FS'), b = src.indexOf('function sedEegInit');
+  const F = new Function(`const clampv=(v,a,b)=>Math.max(a,Math.min(b,v));${src.slice(a, b)};return {sedRes,SED_RES,sedRng,SED_FS};`)();
+  const rnd = F.sedRng(5), gs = () => { let u = 0; while (u < 1e-9) u = rnd(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(6.2831853 * rnd()); };
+  const N = 8192, y = new Float64Array(N), st = { slow: [0, 0], mid: [0, 0], beta: [0, 0] }, one = { slow: [], mid: [], beta: [] }, sg = { slow: 6.5, mid: 12, beta: Math.sqrt(.2 * (42 + 144)) };
+  for (let n = 0; n < N + 500; n++) { let v = 0; for (const k of ['slow', 'mid', 'beta']) { const r = F.SED_RES[k], o = r.a1 * st[k][0] + r.a2 * st[k][1] + gs() * r.g; st[k][1] = st[k][0]; st[k][0] = o; if (n >= 500) { v += o * sg[k]; one[k].push(o); } } if (n >= 500) y[n - 500] = v; }
+  const vr = a => { const m = a.reduce((p, q) => p + q, 0) / a.length; return a.reduce((p, q) => p + (q - m) ** 2, 0) / a.length; };
+  chk('SedLine EEG', 'resonator output has unit variance (slow)', vr(one.slow), .6, 1.5); chk('SedLine EEG', 'resonator output has unit variance (beta)', vr(one.beta), .8, 1.25);
+  let lo = 0, mid = 0, hi = 0; for (let k = 1; k < 2800; k++) { const f = k * F.SED_FS / N; let re = 0, im = 0; for (let n = 0; n < N; n++) { re += y[n] * Math.cos(2 * Math.PI * k * n / N); im -= y[n] * Math.sin(2 * Math.PI * k * n / N); } const pw = re * re + im * im; if (f < 4) lo += pw; else if (f < 14) mid += pw; else hi += pw; }
+  const tot = lo + mid + hi; chk('SedLine EEG', 'share of power above 14 Hz', hi / tot, .12, .3); chk('SedLine EEG', 'share of power at 4-14 Hz (the dominant band)', mid / tot, .45, .85);
+  const sd = Math.sqrt(vr(Array.from(y))); chk('SedLine EEG', 'typical peak-to-peak at 5 uV/mm (px, 4 sd)', 4 * sd * 6.43 / 5, 60, 130); }
+
 const wid = rows[0].map((_, i) => Math.max(...rows.map(r => r[i].length)));
 for (const r of rows) console.log(r.map((c, i) => c.padEnd(wid[i])).join('  '));
 if (fails) { console.error(`bis-dsa engine: ${fails} check(s) failed`); process.exit(1); }

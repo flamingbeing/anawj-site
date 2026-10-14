@@ -20,6 +20,11 @@ try {
     await page.click('#skinSeg [data-skin="sedline"]');
     assert.equal(await page.$eval('#sedWrap', e => e.hidden), false); assert.equal(await page.$eval('#vistaWrap', e => e.hidden), true); assert.equal(await page.$eval('#advWrap', e => e.hidden), true);
     await page.waitForFunction(() => /PSi \d+/.test(document.querySelector('#bilSum').textContent), null, { timeout: 8000 });
+    // the keys and simulator buttons sit in a "Controls" disclosure, closed by default, so the picture is just the Root
+    assert.equal(await page.$eval('#sedCtl', e => e.open), false); assert.equal(await page.$eval('#sedCtl summary', e => e.textContent.trim()), 'Controls');
+    await page.click('#sedCtl summary'); assert.equal(await page.$eval('#sedCtl', e => e.open), true);
+    // nothing on the glass gives the simulator away
+    { const t = await page.evaluate(() => { const o = []; for (const id of ['main', 'about', 'layout', 'd_wifi', 'd_eth', 'd_bt', 'd_out', 'add']) { sedDlgOpen(id); o.push(document.querySelector('#sedDlg').textContent); sedDlgClose(); } return o.join(' '); }); assert.ok(!/simulat|teaching|stand-in|Not used/i.test(t), 'no simulator wording on the glass'); }
     // the screen is portrait 5:8 and scales as a unit; the bundled Source Sans 3 font loads
     { const r = await page.$eval('#sedS', e => { const q = e.getBoundingClientRect(); return [q.width / q.height, q.width]; }); assert.ok(Math.abs(r[0] - 0.625) < 0.01, `5:8 screen (${r[0]})`); if (phone) assert.ok(r[1] <= 390, 'fits the phone width'); }
     assert.ok(await page.evaluate(() => document.fonts.check('16px "Source Sans 3"')), 'bundled Source Sans 3 font loads');
@@ -34,7 +39,7 @@ try {
     assert.ok(await page.$$eval('#sedHits .hit', e => e.length) > 15, 'hit regions are in place');
     assert.equal(await page.evaluate(() => sedLay().rows.map(r => r.k).join()), 'emg,psi,sr'); assert.equal(await page.evaluate(() => sedLay().well.join()), 'artf,sefl,sefr');
     // action menu: TREND and ANALOG
-    await page.click('[data-a="actiontab"]'); assert.equal(await page.evaluate(() => SED.pop && SED.pop.kind), 'action'); assert.equal(await page.$$eval('#sedPop .act button', e => e.length), 2);
+    await page.click('[data-a="actiontab"]'); assert.equal(await page.evaluate(() => SED.pop && SED.pop.kind), 'action'); assert.equal(await page.$$eval('#sedPop .act button', e => e.length), 2); assert.equal(await page.$$eval('#sedPop .spopclose', e => e.length), 1, 'the blue close tab is in the popup layer');
     await page.click('#sedPop [data-v="analog"]'); assert.equal(await page.evaluate(() => SED.view), 'analog'); await page.waitForTimeout(300);
     assert.equal(await page.evaluate(() => SED.pop), null);
     await page.click('[data-a="actiontab"]'); await page.click('#sedPop [data-v="trend"]'); assert.equal(await page.evaluate(() => SED.view), 'trend');
@@ -47,13 +52,37 @@ try {
     await scrubAt(0.2); assert.ok(await page.evaluate(() => SED.hold != null && SED.hold < simT - 60), 'scrolled back');
     await scrubAt(0.99); assert.equal(await page.evaluate(() => SED.hold), null);
     // number menu: About, Settings, Expand / Minimise
-    await page.click('.hit[data-a="num"][data-v="artf"]'); assert.equal(await page.$$eval('#sedPop .num button[role="menuitem"]', e => e.length), 3);
-    await page.click('#sedPop [data-a="expand"]'); assert.equal(await page.evaluate(() => sedLay().rows.map(r => r.k).join()), 'emg,psi,sr,artf'); assert.equal(await page.evaluate(() => sedLay().well.join()), 'sefl,sefr');
-    await page.click('.hit[data-a="num"][data-v="psi"]'); await page.click('#sedPop [data-a="minimise"]'); assert.equal(await page.evaluate(() => sedLay().well.includes('psi')), true);
-    await page.click('.hit[data-a="num"][data-v="psi"]'); await page.click('#sedPop [data-a="expand"]'); await page.click('.hit[data-a="num"][data-v="artf"]'); await page.click('#sedPop [data-a="minimise"]');
+    await page.click('.hit[data-a="num"][data-v="artf"]'); assert.deepEqual(await page.$$eval('#sedPop .num button', e => e.map(x => x.textContent)), ['About', 'Settings']);
+    await page.keyboard.press('Escape'); assert.equal(await page.evaluate(() => SED.pop), null);
+    await page.evaluate(() => sedExpand('artf')); assert.equal(await page.evaluate(() => sedLay().rows.map(r => r.k).join()), 'emg,psi,sr,artf'); assert.equal(await page.evaluate(() => sedLay().well.join()), 'sefl,sefr');
+    await page.evaluate(() => sedMinimise('psi')); assert.equal(await page.evaluate(() => sedLay().well.includes('psi')), true);
+    await page.evaluate(() => { sedExpand('psi'); sedMinimise('artf'); });
     assert.equal(await page.evaluate(() => sedLay().rows.map(r => r.k).join()), 'emg,psi,sr');
     await page.click('.hit[data-a="num"][data-v="emg"]'); await page.click('#sedPop [data-a="about"]');
     assert.match(await page.$eval('#sedDlg', e => e.textContent), /muscle activity/); await page.click('#sedDlg [data-a="back"]'); assert.equal(await page.$eval('#sedDlg', e => e.hidden), true);
+    // the bell does nothing when nothing is sounding; the layout puts the PSi into the well when everything else is expanded
+    await page.click('[data-a="bell"]'); assert.equal(await page.evaluate(() => [SED.silenceUntil, SED.silenceShown]).then(v => v.join()), '0,false', 'bell with no alarm is ignored');
+    await page.evaluate(() => { for (const k of ['sr', 'emg', 'artf', 'sefl', 'sefr']) sedExpand(k); });
+    { const L = await page.evaluate(() => sedLay()); assert.deepEqual(L.well, ['psi']); assert.equal(L.rows.length, 5); assert.ok(L.rows.every(r => Math.abs(r.h - L.rows[0].h) < 1), 'even rows'); }
+    await page.evaluate(() => { sedExpand('psi'); sedMinimise('artf'); sedMinimise('sefl'); sedMinimise('sefr'); }); assert.equal(await page.evaluate(() => sedLay().rows.map(r => r.k).join()), 'emg,psi,sr');
+    // gestures (pointer): a horizontal drag along a trend scrolls everything, a wheel steps the time range, hold-and-drag moves a number, a vertical drag on the handle pulls the strip
+    { const box = await page.$eval('#sedS', e => { const r = e.getBoundingClientRect(); return [r.left, r.top, r.width / 800]; }), P = (x, y) => [box[0] + x * box[2], box[1] + y * box[2]];
+      await page.evaluate(() => window.scrollTo(0, document.querySelector('#sedS').getBoundingClientRect().top + scrollY - 20)); const b2 = await page.$eval('#sedS', e => { const r = e.getBoundingClientRect(); return [r.left, r.top, r.width / 800]; }), Q = (x, y) => [b2[0] + x * b2[2], b2[1] + y * b2[2]];
+      const vis = await page.evaluate(() => innerHeight); if (Q(0, 1280)[1] > vis + 5) await page.setViewportSize({ width: page.viewportSize().width, height: Math.ceil(Q(0, 1280)[1]) + 10 });
+      const b3 = await page.$eval('#sedS', e => { const r = e.getBoundingClientRect(); return [r.left, r.top, r.width / 800]; }), R = (x, y) => [b3[0] + x * b3[2], b3[1] + y * b3[2]];
+      let [x0, y0] = R(300, 520); await page.mouse.move(x0, y0); await page.mouse.down(); await page.mouse.move(x0 + 120 * b3[2], y0, { steps: 6 }); await page.mouse.up();
+      assert.ok(await page.evaluate(() => SED.hold != null && SED.hold < simT - 60), 'a drag on a trend scrolls back'); assert.equal(await page.evaluate(() => SED.pop), null);
+      [x0, y0] = R(400, 900); await page.mouse.move(x0, y0); await page.mouse.down(); await page.mouse.move(x0 - 400 * b3[2], y0, { steps: 6 }); await page.mouse.up(); assert.equal(await page.evaluate(() => SED.hold), null, 'a drag the other way returns to live');
+      assert.equal(await page.$eval('#sedDlg', e => e.hidden), true, 'a drag on the DSA does not open its menu');
+      [x0, y0] = R(300, 520); await page.mouse.move(x0, y0); await page.mouse.wheel(0, 120); await page.waitForFunction(() => SED.range === 60, null, { timeout: 2000 }); await page.waitForTimeout(300); await page.mouse.wheel(0, -120); await page.waitForFunction(() => SED.range === 30, null, { timeout: 2000 });
+      [x0, y0] = R(720, 440); await page.mouse.move(x0, y0); await page.mouse.down(); await page.waitForFunction(() => SED.dimK === 'emg', null, { timeout: 2000 }); const [x1, y1] = R(400, 770); await page.mouse.move(x1, y1, { steps: 5 }); await page.mouse.up();
+      assert.equal(await page.evaluate(() => sedLay().well.includes('emg')), true, 'hold and drag into the well minimises'); assert.equal(await page.evaluate(() => SED.dimK), null);
+      [x0, y0] = R(150, 770); await page.mouse.move(x0, y0); await page.mouse.down(); await page.waitForFunction(() => SED.dimK != null, null, { timeout: 2000 }); [x0, y0] = R(300, 450); await page.mouse.move(x0, y0, { steps: 5 }); await page.mouse.up();
+      await page.evaluate(() => { sedExpand('emg'); sedMinimise('artf'); sedMinimise('sefl'); sedMinimise('sefr'); }); assert.equal(await page.evaluate(() => sedLay().rows.map(r => r.k).join()), 'emg,psi,sr');
+      [x0, y0] = R(400, 105); await page.mouse.move(x0, y0); await page.mouse.down(); await page.mouse.move(x0, y0 + 50 * b3[2], { steps: 5 }); await page.mouse.up(); assert.equal(await page.evaluate(() => SED.strip), true, 'swipe down on the handle shows the strip');
+      [x0, y0] = R(400, 150); await page.mouse.move(x0, y0); await page.mouse.down(); await page.mouse.move(x0, y0 - 60 * b3[2], { steps: 5 }); await page.mouse.up(); assert.equal(await page.evaluate(() => SED.strip), false, 'swipe up hides it'); }
+    // a menu left alone returns to the main screen after a minute (shortened here)
+    await page.evaluate(() => { SED.idleMs = 300; sedDlgOpen('p_psi_alarms'); }); await page.waitForFunction(() => !SED.dlg, null, { timeout: 3000 }); await page.evaluate(() => { SED.idleMs = 60000; });
     // electrode strip: six electrodes, green with impedances; the simulated faults change colours and messages
     await page.click('#bSensor'); assert.equal(await page.evaluate(() => SED.strip), true);
     { const e = await page.evaluate(() => sedElec()); assert.deepEqual(Object.keys(e.state).sort(), ['CB', 'CT', 'L1', 'L2', 'R1', 'R2']); assert.ok(Object.values(e.state).every(s => s === 'green'), 'all green'); assert.ok(Object.values(e.k).every(v => v > 0 && v < 15)); }
@@ -80,24 +109,25 @@ try {
     // a new limit (menu) re-arms; PSi limit stand-in matches the numbers beside the PSI row
     // the Root-style menu: Menu key under the screen and the gear open the Main Menu; the manual's names are all there
     await page.click('#bMenu'); assert.equal(await page.$eval('#sedDlg', e => e.hidden), false);
-    assert.deepEqual(await page.$$eval('#sedDlg .sdtile span', e => e.map(x => x.textContent)), ['Layout', 'Sounds', 'Device Settings', 'About', 'Trend Settings', 'Profiles', 'Iris', 'SedLine']);
+    assert.deepEqual(await page.$$eval('#sedDlg .sdtile span', e => e.map(x => x.textContent)), ['Layout', 'rainbow', 'Sounds', 'Device Settings', 'About', 'Trend Settings', 'Profiles', 'Iris', 'SedLine']);
     await page.click('#sedDlg [data-v="sedline"]'); assert.deepEqual(await page.$$eval('#sedDlg .sdbar', e => e.map(x => x.textContent)), ['Parameter Settings', 'Additional Settings']);
     await page.click('#sedDlg [data-v="params"]'); assert.deepEqual(await page.$$eval('#sedDlg .sdbar', e => e.map(x => x.textContent)), ['PSi', 'DSA', 'SEFL', 'SEFR', 'EMG', 'SR', 'ARTF']);
     await page.click('#sedDlg [data-v="p_psi"]'); assert.deepEqual(await page.$$eval('#sedDlg .sdbar', e => e.map(x => x.textContent)), ['About', 'Alarms', 'Trends']);
     await page.click('#sedDlg [data-v="p_psi_alarms"]');
     assert.deepEqual(await page.$$eval('#sedDlg .sdrow label', e => e.map(x => x.textContent)), ['High Limit', 'Low Limit', 'High Caution Range', 'Low Caution Range', 'Silence Duration', 'Audible Alarms']);
     assert.deepEqual(await page.$$eval('#sedDlg .sdrow .sdbar', e => e.map(x => x.textContent)), ['50', '25', 'Off', 'Off', '2 min']);
+    await page.click('#sedDlg [data-a="open"][data-v="0"]'); await page.keyboard.press('Escape'); assert.equal(await page.$eval('#sedDlg h2', e => e.textContent), 'psi alarms', 'Escape closes the list first'); assert.equal(await page.$$eval('#sedDlg .sdlist', e => e.length), 0);
     // Cancel drops a change; OK keeps it; a low limit above the high limit is refused
     await page.click('#sedDlg [data-a="open"][data-v="0"]'); await page.click('#sedDlg .sdlist [role="option"]:has-text("60")'); await page.click('#sedDlg .sdcancel'); assert.equal(await page.evaluate(() => SED.set.psiHi), 50);
     await page.click('#sedDlg [data-v="p_psi_alarms"]'); await page.click('#sedDlg [data-a="open"][data-v="0"]'); await page.click('#sedDlg .sdlist [role="option"]:text-is("60")'); await page.click('#sedDlg .sdok'); assert.equal(await page.evaluate(() => SED.set.psiHi), 60);
     await page.click('#sedDlg [data-v="p_psi_alarms"]'); await page.click('#sedDlg [data-a="open"][data-v="1"]'); await page.click('#sedDlg .sdlist [role="option"]:text-is("70")'); await page.click('#sedDlg .sdok');
-    assert.match(await page.$eval('#sedDlg .sderr', e => e.textContent), /low limit must be below/); assert.equal(await page.evaluate(() => SED.set.psiLo), 25); await page.click('#sedDlg .sdcancel');
+    assert.match(await page.$eval('#sedDlg .sderr', e => e.textContent), /Invalid limits/); assert.ok(await page.$$eval('#sedDlg .sdbar.bad', e => e.length) > 0, 'the rows are marked'); assert.equal(await page.evaluate(() => SED.set.psiLo), 25); await page.click('#sedDlg .sdcancel');
     // the numbers beside the PSI row follow the limits
     await page.click('#sedDlg [data-a="back"]'); await page.click('#sedDlg [data-a="back"]'); await page.click('#sedDlg [data-a="back"]'); await page.click('#sedDlg [data-a="back"]'); assert.equal(await page.$eval('#sedDlg', e => e.hidden), true);
     assert.equal(await page.evaluate(() => SED.armed), false, 'a limit change re-arms the alarm');
     await page.evaluate(() => { SED.set.psiHi = 50; sedInval(); });
     // settings that change the picture: Additional Settings and the DSA pages
-    await page.click('.hit[data-a="eegset"] >> nth=0'); assert.deepEqual(await page.$$eval('#sedDlg .sdrow label', e => e.map(x => x.textContent)), ['EEG Amplitude', 'EEG Chart Speed', 'EEG Display Filter', 'DSA Placement', 'Monitor Impedance', 'Display Impedance', 'DSA Artifacts', 'Suppression Time (ST)']);
+    await page.click('.hit[data-a="eegset"] >> nth=0'); assert.deepEqual(await page.$$eval('#sedDlg .sdrow label', e => e.map(x => x.textContent)), ['EEG Amplitude', 'EEG Chart Speed', 'EEG Display Filter', 'DSA Placement', 'Monitor Impedance', 'Display Impedance', 'DSA Artifacts']);
     await page.click('#sedDlg [data-a="open"][data-v="3"]'); await page.click('#sedDlg .sdlist [role="option"]:text-is("EEG/DSA/PSi")'); await page.click('#sedDlg [data-a="open"][data-v="0"]'); await page.click('#sedDlg .sdlist [role="option"]:text-is("10 µV/mm")'); await page.click('#sedDlg [data-a="open"][data-v="1"]'); await page.click('#sedDlg .sdlist [role="option"]:text-is("15 mm/sec")');
     await page.click('#sedDlg [data-a="tog"][data-v="4"]'); await page.click('#sedDlg .sdok');
     { const r = await page.evaluate(() => ({ dsaY: sedLay().dsaY, trendY: sedLay().trendY, a: SED.set.eegAmp, sp: SED.set.eegSpeed, imp: SED.set.monImp, e: sedElec().state.R1 })); assert.deepEqual([r.dsaY, r.trendY, r.a, r.sp, r.imp, r.e], [412, 790, 10, 15, false, 'dark']); }
