@@ -145,12 +145,23 @@ function startPracticeTask() {
   const [a, b] = [rows[1], rows[4]];
   const items = [];
   if (a && onLeave) { a.senior = fmtSenior(onLeave, dayOf(onLeave.id)); items.push({ label: `Someone on leave is on a list`, match: `${onLeave.name} is on`, person: onLeave.id, fix: 'takeOff' }); }
-  if (b) { b.senior = ''; items.push({ label: `${b.label} has no senior`, match: `${b.label}: no senior` }); }
+  // a day already short of a senior has none to spare: a "no senior" gap there could never be filled, so plant a
+  // second double cover instead (it only needs a junior)
+  const short = r.rows.some(x => !isSpecialRow(x) && !isPacu(x.label) && !String(x.senior || '').trim());
+  if (b && !short) { b.senior = ''; items.push({ label: `${b.label} has no senior`, match: `${b.label}: no senior` }); }
   // a double cover with no junior, inside one complex (as the generator would pair rooms)
-  const host = rows.find(x => x !== a && x !== b && rows.some(y => y !== x && y !== a && y !== b && y.complex === x.complex));
-  const dbl = host && rows.find(y => y !== host && y !== a && y !== b && y.complex === host.complex);
-  const s0 = host && cellParts(host, 'senior')[0];
-  if (dbl && s0) { dbl.senior = s0; dbl.junior = ''; items.push({ label: `${dbl.label}: a double cover with no junior`, match: `${dbl.label}: no junior` }); }
+  const used = new Set([a, ...(short ? [] : [b])]);
+  const plantDouble = () => {
+    const host = rows.find(x => !used.has(x) && rows.some(y => y !== x && !used.has(y) && y.complex === x.complex));
+    const dbl = host && rows.find(y => y !== host && !used.has(y) && y.complex === host.complex);
+    const s0 = host && cellParts(host, 'senior')[0];
+    if (!dbl || !s0) return;
+    used.add(host); used.add(dbl);
+    dbl.senior = s0; dbl.junior = '';
+    items.push({ label: `${dbl.label}: a double cover with no junior`, match: `${dbl.label}: no junior` });
+  };
+  plantDouble();
+  if (short) plantDouble();
   state.practiceTask = { date: state.day.date, items };
   lastRows = JSON.stringify(r.rows);
   afterRosterEdit(true);
@@ -2459,16 +2470,25 @@ function fillGaps() {
   if (special('aic').senior) fixed.aic = special('aic').senior;
   if (special('aocc').senior || special('aocc').junior) { fixed['aocc.s'] = special('aocc').senior || ''; fixed['aocc.j'] = special('aocc').junior || ''; }
   genDay.fixed = fixed;
-  const res = generate({ staff: dayStaff(), day: genDay, settings: state.settings, seed: Math.floor(Math.random() * 1e9) });
   const old = Object.fromEntries(r.rows.map(x => [x.roomId, x]));
-  const filled = [];
-  const rows = res.rows.map(g => {
-    const o = old[g.roomId];
-    if (!o) { if (g.senior || g.junior) filled.push(`${g.label} (new room)`); return g; }
-    const row = { ...o };
-    for (const key of ['senior', 'junior', 'premed']) if (!String(o[key] || '').trim() && g[key]) { row[key] = g[key]; filled.push(`${g.label} ${key}`); }
-    return row;
-  });
+  const fillFrom = res => {
+    const filled = [];
+    const rows = res.rows.map(g => {
+      const o = old[g.roomId];
+      if (!o) { if (g.senior || g.junior) filled.push(`${g.label} (new room)`); return g; }
+      const row = { ...o };
+      for (const key of ['senior', 'junior', 'premed']) if (!String(o[key] || '').trim() && g[key]) { row[key] = g[key]; filled.push(`${g.label} ${key}`); }
+      return row;
+    });
+    return { res, rows, filled };
+  };
+  // a few tries: one seed can spend the last free senior on a room another try fills, leaving a gap it could have filled
+  let best = null;
+  for (let i = 0; i < 6; i++) {
+    const t = fillFrom(generate({ staff: dayStaff(), day: clone(genDay), settings: state.settings, seed: Math.floor(Math.random() * 1e9) }));
+    if (!best || t.filled.length > best.filled.length) best = t;
+  }
+  const { res, rows, filled } = best;
   // rows filled in by hand for rooms that aren't running any more stay
   const kept = new Set(rows.map(x => x.roomId));
   rows.push(...r.rows.filter(o => !kept.has(o.roomId) && (o.senior || o.junior || o.premed)));

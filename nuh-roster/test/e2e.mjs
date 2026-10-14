@@ -96,9 +96,21 @@ await page.keyboard.press('Escape'); await page.waitForTimeout(200);
 ok(await page.evaluate(() => document.activeElement.matches('.name[tabindex]')), 'focus back on the name');
 
 // practice exercise
-await page.click('#demo-bar button:has-text("Fix 3 problems")'); await page.waitForTimeout(600);
-ok(/0 of 3/.test(await page.$eval('.practice-task h2', e => e.innerText)), 'practice task planted');
-for (let i = 0; i < 5; i++) { const fix = await page.$('#problems li.error button.primary'); if (!fix) break; await fix.click(); await page.waitForTimeout(500); }
+// from the day as Practice made it: earlier steps here use up the free seniors the fix buttons need. The planted
+// problems are random and Fill can now and then give a freed senior another job, so up to three tries.
+let practiceDone = false;
+for (let attempt = 0; attempt < 3 && !practiceDone; attempt++) {
+  await page.click('#demo-bar button:has-text("Reset this day")'); await page.waitForTimeout(300);
+  await page.click('#demo-bar button:has-text("Fix 3 problems")'); await page.waitForTimeout(600);
+  ok(/0 of 3/.test(await page.$eval('.practice-task h2', e => e.innerText)), 'practice task planted');
+  const planted = (await stored(page)).practiceTask.items.map(i => i.match);
+  for (let i = 0; i < 8; i++) {
+    const fix = await page.evaluateHandle(m => [...document.querySelectorAll('#problems li.error')].find(li => m.some(x => li.innerText.includes(x)))?.querySelector('button.primary') || null, planted);
+    if (!(await fix.evaluate(b => !!b))) break;
+    await fix.click(); await page.waitForTimeout(500);
+  }
+  practiceDone = /Well done/.test(await page.$eval('.practice-task h2', e => e.innerText));
+}
 ok(/Well done/.test(await page.$eval('.practice-task h2', e => e.innerText)), 'practice task done with the fix buttons');
 
 // practice draft round trip through Do it all
