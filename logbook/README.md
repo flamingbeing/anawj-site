@@ -77,7 +77,7 @@ The old data is the Google Form responses workbook (tabs **Case** and **AY20xx T
 Residents who prefer the old APMES Google Form can keep using it, with no end date; the logbook stays the one record.
 One way only: Form → logbook, never back.
 
-1. A small Apps Script on the Form's response sheet (set up separately, PR 2) runs on every new or edited response
+1. A small Apps Script on the Form ([`form-script/`](form-script/README.md): the code and the setup steps) runs on every new or edited response
    and writes just that response to `formInbox/{responseId}`: the respondent's Google sign-in email (the Form
    requires sign-in), date, the initials and case details answer, and the category answers. It signs in as a bot
    account (Firebase email and password) whose uid is listed by hand in `formBots/`. The bot's email is never
@@ -90,7 +90,7 @@ One way only: Form → logbook, never back.
    reflection, the star, personal tags) is kept. A Form case deleted in the app comes back only if that response is
    edited later.
 
-Tests: `test/form-inbox.test.mjs`, the rules suite (`tools/test-rules.sh`) and the emulator browser test
+Tests: `test/form-inbox.test.mjs`, `test/form-script.test.mjs`, the rules suite (`tools/test-rules.sh`) and the emulator browser test
 (`tools/test-reads.sh`).
 
 ## Code

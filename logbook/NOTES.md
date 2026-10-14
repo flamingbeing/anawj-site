@@ -574,7 +574,8 @@ portfolio content.
   Apps Script writes each response to `formInbox/{responseId}` as a bot account listed in `formBots/{uid}` (console
   only; unverified email, so nothing else opens to it); the app turns the signed-in resident's entries into cases
   (`source: 'form'`) and deletes them (`form-inbox.js`, README "The Google Form, still open"). One way only: never
-  write back to the Form or its sheet. Each open costs one extra read (the inbox query), even when empty.
+  write back to the Form or its sheet. Each open costs one extra read (the inbox query), even when empty. The script
+  and its setup: `form-script/` (never turn off Firebase Auth "Enable create (sign-up)": it would block new Google sign-ins).
 - **Privacy policy:** `privacy/index.html` (anawj.com/privacy/) shows who sees what. Keep it in step when roles change.
 - **Private feedback (14 Oct 2026):** More → Send feedback (`ui-feedback.js`, pure parts in `feedback.js`) saves
   `feedback/{id}` { uid, text ≤ 2000, doing? ≤ 300, screen, version, ua ≤ 200, status 'new', createdAt = server time }.
