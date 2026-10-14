@@ -13,7 +13,7 @@ One page for the team. Address: **prewarmstudy.anawj.com** (install it to the ho
 
 ## During the case
 - Readings: tap the box, type three digits (366 = 36.6), the pad moves to the next box, Save. Grey numbers are only
-  defaults carried over: change them or leave them blank.
+  defaults carried over and are **not saved**: type the value (or tap it and press OK) to keep it.
 - Alarms only buzz while the app is open and in front. Keep the phone unlocked with the app on screen. A missed buzz
   repeats every 2 minutes for 10 minutes.
 - Don't tap Update available during the case.
