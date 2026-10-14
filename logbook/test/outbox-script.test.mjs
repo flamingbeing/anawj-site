@@ -63,47 +63,101 @@ const TEXT = 'Fake Person (202301)';
   assert.deepEqual(skipped.skipped, [{ row: 2, reason: 'Made in the app' }]);
 }
 
-// the whole pass, against fakes of the sheet and the existing script
+// phase 1 (rows, Database, one sort), against fakes of the sheet and the existing script
 function fakeIo(over = {}) {
   const log = [], rows = [];
-  const io = {
+  return {
     log, rows, markers: {},
     residentOk: rid => rid !== '999999',
     residentText: rid => `Fake Person (${rid})`,
     appendRow: row => { rows.push(row); log.push('append'); return rows.length + 1; },
     database: (n, first8) => { log.push(`database ${n} ${first8.length}`); },
-    reports: (rids, ays) => { log.push(`reports ${rids} | ${ays}`); },
     sort: () => log.push('sort'),
+    residentReport: rid => log.push(`report ${rid}`),
+    aySummary: ay => log.push(`totals ${ay}`),
     ...over,
   };
-  return io;
 }
+const ids = a => [...a];
 {
   const io = fakeIo();
   const entries = [entry, { ...entry, id: 'k2', rid: '202302' }, { ...entry, id: 'k3', rid: '999999' }, { ...entry, id: 'k4', rid: 'abc' }, { ...entry, id: 'k5', rid: '202301' }];
-  const r = S.process(entries, io);
-  assert.deepEqual([...r.done], ['k1', 'k2', 'k5']);
-  assert.deepEqual([...r.skipped.map(s => s.id)], ['k3', 'k4']);
-  assert.deepEqual([...r.errors], []);
-  // the sheet's order: each row into the Case tab and the Database (before the sort), then the reports, then one sort
-  assert.deepEqual([...io.log], ['append', 'database 2 8', 'append', 'database 3 8', 'append', 'database 4 8', 'reports 202301,202302 | AY2023', 'sort']);
-  // run again with the markers it left: nothing is added twice, the entries can still be deleted
-  const again = S.process(entries.slice(0, 2), { ...io, log: [], rows: [], appendRow: () => { throw new Error('added twice'); } });
-  assert.deepEqual([...again.done], ['k1', 'k2']);
+  const r = S.add(entries, io);
+  assert.deepEqual(ids(r.done), ['k1', 'k2', 'k5']);
+  assert.deepEqual(ids(r.skipped.map(s => s.id)), ['k3', 'k4']);
+  assert.deepEqual(ids(r.errors), []);
+  assert.deepEqual(ids(r.rids).sort(), ['202301', '202302']); assert.deepEqual(ids(r.ays), ['AY2023']);
+  // the sheet's order: each row into the Case tab and the Database (before the sort), then one sort; no rebuilds in this hold
+  assert.deepEqual(ids(io.log), ['append', 'database 2 8', 'append', 'database 3 8', 'append', 'database 4 8', 'sort']);
+  // run again with the markers it left: nothing is added twice, the entries can still be deleted and their rebuilds are owed
+  const again = S.add(entries.slice(0, 2), { ...io, log: [], appendRow: () => { throw new Error('added twice'); } });
+  assert.deepEqual(ids(again.done), ['k1', 'k2']); assert.deepEqual(ids(again.rids).sort(), ['202301', '202302']);
 }
-// nothing to add: no reports, no sort
+// nothing to add: no sort
 {
   const io = fakeIo();
-  S.process([{ ...entry, rid: '999999' }], io);
-  assert.deepEqual([...io.log], []);
+  S.add([{ ...entry, rid: '999999' }], io);
+  assert.deepEqual(ids(io.log), []);
 }
-// a failing Database / report step does not hold the entry back (its row is in the sheet), and is reported
+// a failing Database step does not hold the entry back (its row is in the sheet), and is reported; the sort still runs
 {
-  const io = fakeIo({ database: () => { throw new Error('boom'); }, reports: () => { throw new Error('bang'); } });
-  const r = S.process([entry], io);
-  assert.deepEqual([...r.done], ['k1']);
-  assert.equal(r.errors.length, 2);
-  assert.ok(io.log.includes('sort'));
+  const io = fakeIo({ database: () => { throw new Error('boom'); } });
+  const r = S.add([entry], io);
+  assert.deepEqual(ids(r.done), ['k1']); assert.equal(r.errors.length, 1); assert.ok(io.log.includes('sort'));
+}
+
+// a whole run: the lock is held in pieces (a few entries, then each rebuild), and rebuilds owed survive a stopped run
+function fakeEnv({ entries = [], pending = { rids: [], ays: [] }, over = {}, ioOver = {} } = {}) {
+  const log = [];
+  let clock = 0, held = 0, maxHeld = 0, holds = 0;
+  const io = fakeIo({ ...ioOver, appendRow: row => { log.push('append'); return 2; }, database: () => log.push('database'), sort: () => log.push('sort'),
+    residentReport: rid => { log.push(`report ${rid}`); clock += 20000; }, aySummary: ay => { log.push(`totals ${ay}`); clock += 30000; } });
+  const store = { pending: JSON.parse(JSON.stringify(pending)) };
+  const env = { trail: log, log: () => {}, store, io,
+    list: () => entries, remove: id => log.push(`delete ${id}`),
+    locked: fn => { held++; holds++; maxHeld = Math.max(maxHeld, held); log.push('lock'); try { fn(); } finally { held--; log.push('unlock'); } },
+    getPending: () => JSON.parse(JSON.stringify(store.pending)), setPending: p => { store.pending = JSON.parse(JSON.stringify(p)); log.push('pending ' + p.rids.length + '/' + p.ays.length); },
+    now: () => clock, pause: ms => { clock += ms; }, ...over };
+  env.stats = () => ({ holds, maxHeld });
+  return env;
+}
+{
+  const entries = [1, 2, 3, 4].map(n => ({ ...entry, id: 'e' + n, rid: n < 4 ? '202301' : '202402' }));
+  const env = fakeEnv({ entries });
+  const s = S.cycle(env);
+  assert.equal(s.added, 4); assert.equal(s.rebuilt, 4); assert.equal(s.left, 0); assert.deepEqual(ids(s.errors), []);
+  // 4 entries in chunks of 3 -> 2 holds; then a hold per rebuild: 2 residents + 2 AYs = 4 holds; never two at once
+  assert.equal(env.stats().holds, 2 + 4); assert.equal(env.stats().maxHeld, 1);
+  // the pending list is saved BEFORE an entry is deleted, and emptied only as each rebuild finishes
+  const log = env.trail;
+  assert.ok(log.indexOf('pending 1/1') < log.indexOf('delete e1'), 'owed rebuilds are written down before the entries go');
+  assert.ok(log.indexOf('report 202301') > log.indexOf('delete e4'));
+  assert.deepEqual(JSON.parse(JSON.stringify(env.store.pending)), { rids: [], ays: [] });
+  // a rebuild is never inside the same hold as the rows: between 'lock' and 'unlock' there is one kind of work
+  const holdsOf = []; let cur = null;
+  for (const l of log) { if (l === 'lock') cur = []; else if (l === 'unlock') { holdsOf.push(cur); cur = null; } else if (cur) cur.push(l.split(' ')[0]); }
+  assert.ok(holdsOf.every(h => h.every(x => ['append', 'database', 'sort'].includes(x)) || (h.length === 1 && ['report', 'totals'].includes(h[0]))), JSON.stringify(holdsOf));
+}
+// out of time: the rebuilds still owed are kept for the next run, which does them first
+{
+  const entries = [{ ...entry, id: 'z1' }];
+  const env = fakeEnv({ entries, over: {} });
+  // each rebuild costs 20-30 s of the fake clock; with a 270 s budget and 14 owed rebuilds some are left over
+  const owed = { rids: Array.from({ length: 14 }, (_, i) => `2023${String(i).padStart(2, "0")}`), ays: ['AY2023'] };
+  env.store.pending = JSON.parse(JSON.stringify(owed));
+  const s = S.cycle(env);
+  assert.ok(s.left > 0 && s.left < 16, 'some left: ' + s.left); assert.equal(env.store.pending.rids.length + env.store.pending.ays.length, s.left);
+  // next run: nothing new in the outbox, picks the owed ones up
+  const env2 = fakeEnv({ entries: [], pending: env.store.pending });
+  const s2 = S.cycle(env2);
+  assert.ok(s2.rebuilt > 0);
+}
+// a failing rebuild is reported and not retried forever
+{
+  const env = fakeEnv({ entries: [entry], ioOver: {} });
+  env.io.residentReport = () => { throw new Error('bang'); };
+  const s = S.cycle(env);
+  assert.equal(s.errors.length, 1); assert.equal(s.left, 0);
 }
 
 // a Firestore REST document -> an entry

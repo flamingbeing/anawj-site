@@ -84,3 +84,14 @@ email); it still can't read logbooks, cases or the Form inbox. A separate bot ac
   the AY comes from the resident id's first four digits. The Case tab has 9 columns (A–I); **column J doesn't exist yet**
   (setup adds the header "App marker"); the sheet's script uses no Script properties.
 - Deleting or editing a Case row doesn't update Database or reports (only the menu's Rebuild does): same for app rows.
+
+## Dry run on a copy (Firetop, 14 Oct): works, but the lock is the problem
+
+- Row layout, Database rows (one per category, Year/Month/Week filled, AY from the id), AY totals (+1 per category per case),
+  resident report and the sort all came out right; the sort kept column J with its row. A second case for the same resident worked.
+- **Timing:** one case = 25-42 s with the document lock held throughout (25.8k Database rows). The sheet's own `onFormSubmit`
+  waits 10 s for that lock and throws, so a Form response arriving during a run would lose its Database/report update.
+  The script now holds the lock in pieces (3 entries' rows + Database + one sort; then each rebuild alone, 1-2 s pauses, owed
+  rebuilds kept in a Script property). A piece can still exceed 10 s: the real fix is `waitLock(10000)` → `waitLock(60000)` in the
+  existing `onFormSubmit` (owner's call; it also helps two Form responses close together), or outbox runs at quiet hours only.
+- Not tested yet: the bot sign-in and outbox read from the sheet's project (needs the Script properties set in the editor).

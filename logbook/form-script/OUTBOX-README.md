@@ -23,12 +23,14 @@ copy; a copy brings the script but not its triggers).
 4. **Dry run, on a copy only.** A copy keeps the real residents' own report spreadsheet ids (Residents column G), and the
    sheet's `updateResidentReport` rewrites that spreadsheet's "Case Log". So first, on the **copy's** Residents sheet, point
    one test resident's column G at a blank throwaway spreadsheet and put that spreadsheet's id in
-   `LOGBOOK_OUTBOX_TRY_SAFE_IDS` at the top of `logbookOutboxTryOne` (the function refuses to run otherwise). Then run
-   `logbookOutboxTryOne('<that resident's 6-digit id>')`: it adds one made-up case exactly as a real entry would be, runs the
+   `LOGBOOK_OUTBOX_TRY_SAFE_IDS` at the top of `logbookOutboxTryOne` (the function refuses to run otherwise). Keep the project's original file order (a file that uses another's constants at load time fails otherwise: Menu, Controller,
+   Categories, Residents, Database, Resident Reports, AY Reports, Metadata, Admin, Triggers, Test) and put `LogbookOutbox`
+   after them. Then run `logbookOutboxTryOne('<that resident's 6-digit id>')`: it adds one made-up case exactly as a real entry would be, runs the
    Database, resident report and AY totals update and the sort, and doesn't touch the outbox. Check the new row at the top of
    the Case tab (A resident text, B a real date, C `XY 34F fake test case, ignore`, D–G categories, H timestamp, J
-   `app:try…`), a row for each category in the Database tab, the throwaway spreadsheet's Case Log, and the AY totals. Time
-   how long it takes: it holds the sheet's lock for that long, and the sheet's own `onFormSubmit` waits only 10 seconds for it.
+   `app:try…`), a row for each category in the Database tab, the throwaway spreadsheet's Case Log, and the AY totals. The log
+   prints how long each hold of the lock lasts (`holds`: adding and sorting, the resident's report, the AY totals): the sheet's own
+   `onFormSubmit` waits only 10 seconds for it.
    Delete the copy when done.
 5. `logbookOutboxDryRun` lists what waiting entries would add, without writing anything.
 
@@ -36,7 +38,18 @@ copy; a copy brings the script but not its triggers).
 
 - A script that adds rows itself doesn't fire the sheet's `onFormSubmit`, so this runs the same chain: `updateDatabase`
   (before the sort, with the new row's number), `updateResidentReport`, `updateAYSummaryReport`, then
-  `sortByTimestampDescending_`, one entry per hold of the document lock.
+  `sortByTimestampDescending_`.
+- **The document lock (the one thing to decide).** On the real data the resident report and the AY totals take 10-40
+  seconds each to rebuild (a dry run on a copy: 25-42 s for one case, all steps). The sheet's own `onFormSubmit` takes the same
+  lock and **waits only 10 seconds** for it, then throws: a Form response arriving while anything holds the lock longer loses its
+  Database and report update (the row stays in the Case tab; the menu's Rebuild commands fix it). That is already true for
+  two Form responses close together. This script therefore holds the lock in small pieces (3 entries' rows + Database + one
+  sort; then each rebuild alone, with a pause between), which cuts the wait a Form response can meet from the whole 25-42 s to
+  one piece, but a piece can still be over 10 s. The fix is one line in the existing `onFormSubmit` (Triggers.gs):
+  `lock.waitLock(10000)` → `lock.waitLock(60000)`. That edits the existing script, so it's the owner's call; without it, keep
+  the 5-minute trigger but expect an occasional missed Form response during a run, or restrict the trigger to quiet hours.
+- Rebuilds still owed are written to the Script property `LOGBOOK_OUTBOX_PENDING` before an entry is deleted, so a run that
+  stops half way loses nothing; the next run does them first. A run stops starting new work after 4.5 minutes.
 - A case is never added twice: column J's `app:<caseId>` is checked first (a run that stopped before deleting the entry
   just deletes it next time). Deleting a Case row by hand doesn't update the Database or reports (same as for Form rows):
   use the menu's Rebuild commands.
