@@ -77,7 +77,7 @@ try {
     // Alarm Settings: BIS range 40-60 off by default; enable, APPLY; label shows the range; the message "BIS alarm enabled"
     await page.click('#aAlarms'); assert.match(await txt(page, '#advOv .rail'), /BIS\s*\[40 - 60\]\s*OFF/); assert.equal(await txt(page, '#advOv .drum .cu'), '40');
     await page.click('[data-a="dtog"][data-v="bis"]'); await page.click('[data-a="dapply"]');
-    assert.equal(await page.$eval('#aBisLblL', e => e.textContent.replace(/\s+/g, '')), 'BIS40-60'); assert.equal(await page.evaluate(() => ADV.msgs.some(m => m.text === 'BIS alarm enabled')), true);
+    await page.waitForFunction(() => document.querySelector('#aBisLblL').textContent.replace(/\s+/g, '') === 'BIS40-60', null, { timeout: 5000 }); assert.equal(await page.evaluate(() => ADV.msgs.some(m => m.text === 'BIS alarm enabled')), true);
     assert.equal(await page.evaluate(() => mon.alo + '-' + mon.ahi), '40-60');
     // awake BIS is above 60: after 10 s the BIS ALARM raises (red bar, list, red digit box, sound), the pill pauses then silences
     await page.click('#speedSeg [data-speed="10"]');
