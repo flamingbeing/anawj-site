@@ -29,9 +29,10 @@ those in the review screen.
 
 ```
 pip install opencv-python-headless pdfplumber anthropic        # once
-export ANTHROPIC_API_KEY=...                                    # once per shell (never commit)
+# the live reader needs an Anthropic API key (not included in Claude Max): keep it in a private file outside the repo and give
+# it to this one run with --key-file (never commit it; do not set it as a user-level environment variable)
 sh prewarm/tools/scan/setup-form.sh blank-v3.2.docx form-data   # once per form version
-python3 prewarm/tools/scan/scan.py --form-dir form-data --out scans/pt01 photo1.jpg photo2.jpg ...
+python3 prewarm/tools/scan/scan.py --form-dir form-data --out scans/pt01 --key-file ~/private/anthropic.key photo1.jpg photo2.jpg ...
 # open prewarm/tools/scan/review.html, load scans/pt01/scan.json, check, Save reviewed file
 node prewarm/tools/scan/export-scan.mjs study.xlsx pt01.reviewed.json pt02.reviewed.json
 ```
@@ -42,10 +43,13 @@ short of the 0.80 alignment score is still accepted when every table on it fits 
 own) and the page scores 0.70 or better; it is marked `check_alignment`. `--min-align 0.75` lowers the bar to test a page
 (its crops then need checking). `scan.json` per-option ticks carry `inks` (inside the box) and `centers` (the middle of it).
 
-**Without API credits** (Claude Max has none): `scan.py --export-crops crops/ ...` aligns the photos, reads the ticks and
-writes every handwritten crop to `crops/` with a `manifest.json`; someone (or a Claude Code session) reads them into
-`readings.json` as `{"<field id>": "<text>"}`; then `scan.py --readings readings.json ...` carries on as usual. There is
-only one read, so no second opinion: the review screen is the only check.
+**Without the API** (Claude Max has none): three ways, see [READ-CROPS.md](READ-CROPS.md).
+`scan.py --export-crops crops/ ...` aligns the photos, reads the ticks, and writes every handwritten crop to `crops/` with
+a manifest and numbered contact sheets; a Claude Code session or a person reads them into `readings-a.json`; a second,
+independent pass (the bigger `b-NN` sheets, a fresh session) into `readings-b.json`; then
+`scan.py --readings readings-a.json --readings2 readings-b.json ...` compares the two and flags every disagreement. With only
+`--readings` there is one read and no second opinion; with `--no-read` the owner types every written value in the review
+screen.
 
 **The template must look like the paper.** Field places and the alignment template are rendered from the blank `.docx`. If
 the render is not the same layout as the printed paper (different fonts, different row heights, a different page
@@ -70,8 +74,16 @@ change); it prints why any field was not placed (the paper form has no per-readi
   with a stand-in reader, one deliberate misread that must be flagged). Needs OpenCV, LibreOffice, `pdftoppm`.
 - `node prewarm/tools/scan/review.e2e.mjs <scan.json>` (review page at phone size, axe), static server on 8080.
 
-## Not yet proven
+## Where it stands (15 Oct 2026)
 
-Everything above was tested on a made-up fixture form and synthetic photos. Not yet done: a run on the real v3.2 form,
-real handwriting, and the live Claude reader (`readers.AnthropicReader`). Do a dry run on a few real pages (patient
-details cropped off) and compare with the paper before trusting a batch.
+Tried on the owner's real v3.2 form and five real pages (one patient), with the handwriting read by a person-equivalent
+stand-in (firetop's own reads of the saved crops, via `--export-crops` / `--readings`): alignment accepted on all five
+pages (page 7 by the table rule), 18 of 18 tick questions right, the page header never cropped, the Y/N columns, the Room
+Temp arrows and the 155 page-7 temperature crops all in the right place, 345 fields, 34 flagged, nothing wrong-but-unflagged.
+
+**The live reader (`readers.AnthropicReader`) has never run, so its accuracy and cost are unmeasured.** The owner has no
+Anthropic API credits for now (decision of 15 Oct 2026), so it is shelved; every reading so far was a stand-in, and both
+reads in a stand-in run are the same text, so there is no second opinion. Check a sample of temperatures against the paper.
+
+Still to prove: a "No pre-warming" patient's page 4 (the option whose tick also ticks "Not applicable"; the owner will bring
+one), other handwriting and other patients (a bigger batch), and the live reader.
