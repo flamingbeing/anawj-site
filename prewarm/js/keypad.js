@@ -76,7 +76,7 @@ export function openKeypad(o) {
       fresh = false;
       inp.dispatchEvent(new Event('input'));
       // three digits of a temperature (like 366) are a whole reading: save it
-      if (mode === 'temp' && /^\d{3}$/.test(inp.value) && !finished) { const v = result(); if (v != null && +v >= 25 && +v <= 45) ok(false); }
+      if (mode === 'temp' && /^\d{3}$/.test(inp.value) && !finished) { const v = result(); if (v != null && +v >= 25 && +v <= 45) ok(!!o.onNext); }
       return;
     }
     if (e.target.closest('[data-now]')) return finish(() => o.onDone(o.nowValue));
