@@ -2,7 +2,7 @@
 // patient per row from row 3) and "Screening Number". No DOM (tested in node).
 
 import { HEADERS, SECTIONS, SCREENING_HEADERS } from './headers.js';
-import { FIELDS, SCREENING, SERIES, EXTRA, IX_COLS, PAGES, colIndex, shownValue } from './schema.js';
+import { FIELDS, SCREENING, SERIES, EXTRA, IX_COLS, PAGES, WARM_MIN, colIndex, shownValue } from './schema.js';
 import { val, isGone } from './store.js';
 import { buildXlsx, dateSerial, timeSerial } from './xlsx.js';
 
@@ -11,7 +11,8 @@ export function cellFor(f, v) {
   if (f.type === 'date') { const d = dateSerial(v); return d == null ? String(v) : { v: d, fmt: 'date' }; }
   if (f.type === 'time') { const t = timeSerial(v); return t == null ? String(v) : { v: t, fmt: 'time' }; }
   if (f.type === 'code' || f.type === 'num' || f.type === 'int') {
-    const n = typeof v === 'number' ? v : Number(String(v).trim());
+    // a decimal comma ("37,5") is still a number
+    const n = typeof v === 'number' ? v : Number(String(v).trim().replace(/^(-?\d+),(\d+)$/, '$1.$2'));
     return String(v).trim() !== '' && Number.isFinite(n) ? n : String(v);
   }
   // Excel holds at most 32,767 characters in a cell (a longer one makes the file need repair)
@@ -26,6 +27,10 @@ const bySortKey = (a, b) => sortKey(a).localeCompare(sortKey(b), undefined, { nu
 function exportValue(p, f) {
   const v = shownValue(f.id, k => val(p, k));
   if ((v == null || v === '') && f.id === 'pw_start' && String(val(p, 'arm')) === '3') return 'NA';
+  // pre-warming readings past the warming (after 10 min in the 10 min group, after 30 in the 30 min group) were not
+  // taken: NA, not empty (owner, 14 Oct 2026). Group 3 (no pre-warming) and a patient with no group stay as before.
+  const m = /^prewarm_(\d+)_/.exec(f.id), warm = WARM_MIN[val(p, 'arm')];
+  if ((v == null || v === '') && m && warm && +m[1] > warm) return 'NA';
   return v;
 }
 
