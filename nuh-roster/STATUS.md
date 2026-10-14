@@ -5,7 +5,7 @@ Lasting rules and lessons go in `NOTES.md`. "Recently done" is updated at save-s
 Each session edits only its own file under `status/` (see **Now**). Update this file when a task finishes, a decision
 is made, or before compacting (`/save-state` in Claude Code, `$save-state` in Codex).
 
-Last updated: 2026-10-13 (evening) by Claude Code, NUH Roster session (roster).
+Last updated: 2026-10-14 by Claude Code, NUH Roster session (roster).
 
 ## Now
 
@@ -30,7 +30,8 @@ sessions never edit the same lines. Read them all before starting; edit only you
 
 The 13 Oct review (`REVIEW-2026-10.md`) is mostly built (its "Done" section lists what). Left, only if asked:
 1. Batch I (history and fairness): owner and PDPA decision first.
-2. Team documents: a "restore a staff-list version" screen once the rules PR is in (the versions are written by then).
+2. Team documents: a "restore a staff-list version" screen; the rules are in (#492), so versions are written from the
+   first Save for the team.
 3. Splitting `app.js` (4,350 lines) one tab per PR; `store.js` and `help.js` were the first steps.
 4. A read-only bridge to APMES (owner's question, 13 Oct); "Copy for logbook" on My day is the first, safe step.
 5. Known limits in `NOTES.md`.

@@ -318,4 +318,7 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
   phone sizes (16px fields, 30px targets, no sideways scroll), My day (copy for logbook, My week), the welcome card.
   Runs in the Checks workflow. A signed-in flow can be tried by routing `js/cloud.js` to a fake module (see how the
   13 Oct session tested viewers and team saves).
+- The demo is built for tomorrow's date, so the browser test meets a different made-up day each day. A step that
+  depends on the day (free seniors, who is on leave) must not assume a fixed outcome: start from "Reset this day" and
+  allow for randomness (14 Oct: Fix 3 problems failed every PR when the day was short of a senior; #491).
 - Real sample files (rosters, the contact list, HMS PDFs) must stay out of the repo.
